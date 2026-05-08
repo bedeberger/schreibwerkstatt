@@ -787,21 +787,23 @@ export const bookOverviewMethods = {
     const checkedCounts = withDelta.filter(c => !c.noCheck).map(c => c.count);
     const worstCount = checkedCounts.length > 0 ? Math.max(...checkedCounts) : 0;
     const bestCount = checkedCounts.length > 0 ? Math.min(...checkedCounts) : 0;
-    const enriched = withDelta.map(c => {
-      const halfPct = showMedian && !c.noCheck
-        ? (Math.abs(c.deltaPct) / maxAbsDelta) * HALF
-        : 0;
-      return {
-        ...c,
-        median,
-        showMedian,
-        barWidthPct: halfPct,
-        barLeftPct: c.deltaPct >= 0 ? 50 : 50 - halfPct,
-        isAbove: c.deltaPct > 0,
-        isWorst: !c.noCheck && checkedCounts.length >= 2 && worstCount !== bestCount && c.count === worstCount,
-        isBest: !c.noCheck && checkedCounts.length >= 2 && worstCount !== bestCount && c.count === bestCount,
-      };
-    });
+    const enriched = withDelta
+      .filter(c => !c.noCheck)
+      .map(c => {
+        const halfPct = showMedian
+          ? (Math.abs(c.deltaPct) / maxAbsDelta) * HALF
+          : 0;
+        return {
+          ...c,
+          median,
+          showMedian,
+          barWidthPct: halfPct,
+          barLeftPct: c.deltaPct >= 0 ? 50 : 50 - halfPct,
+          isAbove: c.deltaPct > 0,
+          isWorst: checkedCounts.length >= 2 && worstCount !== bestCount && c.count === worstCount,
+          isBest: checkedCounts.length >= 2 && worstCount !== bestCount && c.count === bestCount,
+        };
+      });
     enriched.sort((a, b) => b.count - a.count);
     return enriched;
   },
@@ -858,27 +860,26 @@ export const bookOverviewMethods = {
     const trackedSecs = withDelta.filter(c => !c.noTime).map(c => c.seconds);
     const worstSeconds = trackedSecs.length > 0 ? Math.max(...trackedSecs) : 0;
     const bestSeconds = trackedSecs.length > 0 ? Math.min(...trackedSecs) : 0;
-    const enriched = withDelta.map(c => {
-      const halfPct = showMedian && !c.noTime
-        ? (Math.abs(c.deltaPct) / maxAbsDelta) * HALF
-        : 0;
-      return {
-        ...c,
-        median,
-        medianLabel: fmtExactDuration(median),
-        durationLabel: fmtExactDuration(c.seconds),
-        showMedian,
-        barWidthPct: halfPct,
-        barLeftPct: c.deltaPct >= 0 ? 50 : 50 - halfPct,
-        isAbove: c.deltaPct > 0,
-        isWorst: !c.noTime && trackedSecs.length >= 2 && worstSeconds !== bestSeconds && c.seconds === worstSeconds,
-        isBest: !c.noTime && trackedSecs.length >= 2 && worstSeconds !== bestSeconds && c.seconds === bestSeconds,
-      };
-    });
-    enriched.sort((a, b) => {
-      if (a.noTime !== b.noTime) return a.noTime ? 1 : -1;
-      return b.seconds - a.seconds;
-    });
+    const enriched = withDelta
+      .filter(c => !c.noTime)
+      .map(c => {
+        const halfPct = showMedian
+          ? (Math.abs(c.deltaPct) / maxAbsDelta) * HALF
+          : 0;
+        return {
+          ...c,
+          median,
+          medianLabel: fmtExactDuration(median),
+          durationLabel: fmtExactDuration(c.seconds),
+          showMedian,
+          barWidthPct: halfPct,
+          barLeftPct: c.deltaPct >= 0 ? 50 : 50 - halfPct,
+          isAbove: c.deltaPct > 0,
+          isWorst: trackedSecs.length >= 2 && worstSeconds !== bestSeconds && c.seconds === worstSeconds,
+          isBest: trackedSecs.length >= 2 && worstSeconds !== bestSeconds && c.seconds === bestSeconds,
+        };
+      });
+    enriched.sort((a, b) => b.seconds - a.seconds);
     return enriched;
   },
 
