@@ -3402,6 +3402,23 @@ function runMigrations() {
     logger.info('DB-Migration auf Version 87 abgeschlossen (users.daily_goal_chars).');
   }
 
+  if (version < 88) {
+    // book_settings.is_finished — markiert Buch als abgeschlossen.
+    // Wenn 1, blendet die Buch-Übersicht die "wie viel pro Tag geschrieben"-Kacheln
+    // (Trend-Sparkline, 7-Tage-Balken, Heute-Ring, Streak-Heatmap) aus, da bei
+    // einem fertigen Buch nicht mehr aktiv geschrieben wird.
+    const bsCols88 = db.pragma('table_info(book_settings)').map(c => c.name);
+    if (!bsCols88.includes('is_finished')) {
+      db.prepare('ALTER TABLE book_settings ADD COLUMN is_finished INTEGER NOT NULL DEFAULT 0').run();
+    }
+    const fkErrors88 = db.pragma('foreign_key_check');
+    if (fkErrors88.length) {
+      throw new Error(`Migration 88: foreign_key_check meldet ${fkErrors88.length} Verstoesse: ${JSON.stringify(fkErrors88.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 88').run();
+    logger.info('DB-Migration auf Version 88 abgeschlossen (book_settings.is_finished).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

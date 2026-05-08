@@ -26,7 +26,7 @@ router.put('/:book_id', jsonBody, (req, res) => {
   const bookId = toIntId(req.params.book_id);
   if (!bookId) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
 
-  const { language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit } = req.body || {};
+  const { language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished } = req.body || {};
   if (!language || !region) {
     return res.status(400).json({ error_code: 'LANGUAGE_REGION_REQUIRED' });
   }
@@ -49,12 +49,14 @@ router.put('/:book_id', jsonBody, (req, res) => {
     return res.status(400).json({ error_code: 'INVALID_TEMPUS', params: { allowed: VALID_TEMPUS.join(', ') } });
   }
 
-  saveBookSettings(bookId, language, region, buchtyp || null, buch_kontext || null, erzaehlperspektive || null, erzaehlzeit || null);
+  const finished = is_finished ? 1 : 0;
+  saveBookSettings(bookId, language, region, buchtyp || null, buch_kontext || null, erzaehlperspektive || null, erzaehlzeit || null, finished);
   res.json({
     ok: true, language, region,
     buchtyp: buchtyp || null, buch_kontext: buch_kontext || null,
     erzaehlperspektive: erzaehlperspektive || null,
     erzaehlzeit: erzaehlzeit || null,
+    is_finished: finished,
     locale: `${language}-${region}`,
   });
 });

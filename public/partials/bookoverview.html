@@ -24,8 +24,7 @@
     <template x-if="overviewLatest()">
       <div class="overview-tile overview-tile--hero internal-link"
            @click="_openLengthStats(30, 'chars')"
-           :aria-label="$app.t('overview.snapshot') + ': ' + _fmtNum(overviewLatest()?.chars) + ' ' + $app.t('bookstats.unit.z')"
-           :data-tip="$app.t('overview.openStats')">
+           :aria-label="$app.t('overview.snapshot') + ': ' + _fmtNum(overviewLatest()?.chars) + ' ' + $app.t('bookstats.unit.z')">
         <div class="overview-tile-label" x-text="$app.t('overview.snapshot')"></div>
         <div class="overview-hero-row">
           <div class="overview-hero-num">
@@ -62,11 +61,10 @@
     <!-- HERO: Sparkline mit Gradient-Fill + farb-codiert + Endpunkt-Marker.
          SVG ist aria-hidden — Trend-Prozent darunter trägt die Info,
          das Tile selbst hat ein zusammenfassendes aria-label. -->
-    <template x-if="overviewSparkline().d">
+    <template x-if="!overviewIsFinished && overviewSparkline().d">
       <div class="overview-tile internal-link"
            @click="_openLengthStats(30, 'chars')"
-           :aria-label="$app.t('overview.trend') + ', ' + $app.t('overview.trendDelta', { pct: (overviewSparkline().deltaPct >= 0 ? '+' : '') + overviewSparkline().deltaPct })"
-           :data-tip="$app.t('overview.openStats')">
+           :aria-label="$app.t('overview.trend') + ', ' + $app.t('overview.trendDelta', { pct: (overviewSparkline().deltaPct >= 0 ? '+' : '') + overviewSparkline().deltaPct })">
         <div class="overview-tile-label" x-text="$app.t('overview.trend')"></div>
         <div class="overview-sparkline-wrap">
           <svg class="overview-sparkline"
@@ -101,11 +99,10 @@
     </template>
 
     <!-- 7-Tage-Balken: Mini-Bar-Chart Zeichen-Delta pro Tag -->
-    <template x-if="overview7DayCharDelta() !== null">
+    <template x-if="!overviewIsFinished && overview7DayCharDelta() !== null">
       <div class="overview-tile internal-link"
            @click="_openLengthStats(7, 'delta_chars')"
-           :aria-label="$app.t('overview.last7Days') + ': ' + (overview7DayCharDelta() >= 0 ? '+' : '') + _fmtNum(overview7DayCharDelta()) + ' ' + $app.t('bookstats.unit.z')"
-           :data-tip="$app.t('overview.openStats')">
+           :aria-label="$app.t('overview.last7Days') + ': ' + (overview7DayCharDelta() >= 0 ? '+' : '') + _fmtNum(overview7DayCharDelta()) + ' ' + $app.t('bookstats.unit.z')">
         <div class="overview-tile-label" x-text="$app.t('overview.last7Days')"></div>
         <div class="overview-bars7">
           <template x-for="d in overviewLast7Days()" :key="d.iso">
@@ -130,7 +127,7 @@
 
     <!-- Heute-Ring: Tagesziel-Donut, pulsiert bei aktivem Schreibtag.
          Goal aus currentUser.daily_goal_chars (User-Settings), Fallback 1500. -->
-    <template x-if="overviewStats && overviewStats.length > 0">
+    <template x-if="!overviewIsFinished && overviewStats && overviewStats.length > 0">
       <div class="overview-tile internal-link"
            @click="_openLengthStats(7, 'delta_chars')"
            :aria-label="$app.t('overview.today.aria', { chars: _fmtNum(overviewTodayRing($app.currentUser?.daily_goal_chars || 1500).chars), goal: _fmtNum(overviewTodayRing($app.currentUser?.daily_goal_chars || 1500).goal), pct: overviewTodayRing($app.currentUser?.daily_goal_chars || 1500).pct })"
@@ -166,10 +163,9 @@
     </template>
 
     <!-- Schreibstatistiken-Heatmap: 52×7 GitHub-Stil-Grid -->
-    <template x-if="overviewStats && overviewStats.length > 0">
+    <template x-if="!overviewIsFinished && overviewStats && overviewStats.length > 0">
       <div class="overview-tile overview-tile--wide internal-link"
-           @click="_openLengthStats(365, 'delta_chars')"
-           :data-tip="$app.t('overview.openStats')">
+           @click="_openLengthStats(365, 'delta_chars')">
         <div class="overview-tile-head">
           <div class="overview-tile-label" x-text="$app.t('overview.streak.title')"></div>
           <div class="overview-streak-meta">
@@ -282,8 +278,7 @@
     <template x-if="overviewFigurenCount() > 0">
       <div class="overview-tile internal-link"
            @click="$app.toggleFiguresCard()"
-           :aria-label="$app.t('tile.figuren') + ': ' + _fmtNum(overviewFigurenCount()) + ' ' + $app.t('overview.unit.figuren')"
-           :data-tip="$app.t('tile.figuren.title')">
+           :aria-label="$app.t('tile.figuren') + ': ' + _fmtNum(overviewFigurenCount()) + ' ' + $app.t('overview.unit.figuren')">
         <div class="overview-tile-label" x-text="$app.t('tile.figuren')"></div>
         <div class="overview-fig-row">
           <span class="overview-fig-count" x-text="_fmtNum(overviewFigurenCount())"></span>
@@ -308,8 +303,7 @@
     <template x-if="overviewSzenenCount() > 0">
       <div class="overview-tile internal-link"
            @click="$app.toggleSzenenCard()"
-           :aria-label="$app.t('tile.szenen') + ': ' + _fmtNum(overviewSzenenCount()) + ' ' + $app.t('overview.unit.total')"
-           :data-tip="$app.t('tile.szenen.title')">
+           :aria-label="$app.t('tile.szenen') + ': ' + _fmtNum(overviewSzenenCount()) + ' ' + $app.t('overview.unit.total')">
         <div class="overview-tile-label" x-text="$app.t('tile.szenen')"></div>
         <div class="overview-fig-row">
           <span class="overview-fig-count" x-text="_fmtNum(overviewSzenenCount())"></span>
@@ -352,8 +346,7 @@
     <template x-if="overviewOrteCount() > 0">
       <div class="overview-tile internal-link"
            @click="$app.toggleOrteCard()"
-           :aria-label="$app.t('tile.orte') + ': ' + _fmtNum(overviewOrteCount()) + ' ' + $app.t('overview.unit.orte')"
-           :data-tip="$app.t('tile.orte.title')">
+           :aria-label="$app.t('tile.orte') + ': ' + _fmtNum(overviewOrteCount()) + ' ' + $app.t('overview.unit.orte')">
         <div class="overview-tile-label" x-text="$app.t('tile.orte')"></div>
         <div class="overview-fig-row">
           <span class="overview-fig-count" x-text="_fmtNum(overviewOrteCount())"></span>
@@ -511,8 +504,7 @@
          (Heatmap zeigt eh alles). -->
     <template x-if="overviewChapterFindings().some(c => !c.noCheck)">
       <div class="overview-tile overview-tile--medium internal-link"
-           @click="$app.toggleFehlerHeatmapCard()"
-           :data-tip="$app.t('overview.openHeatmap')">
+           @click="$app.toggleFehlerHeatmapCard()">
         <div class="overview-tile-head">
           <div class="overview-tile-label" x-text="$app.t('overview.chapterFindings')"></div>
           <span class="overview-tile-median"
@@ -558,8 +550,7 @@
          Anzeige als exakte Dauer (h/min/s). Klick → BookStats (Total-Badges). -->
     <template x-if="overviewChapterLektoratTime().some(c => !c.noTime)">
       <div class="overview-tile overview-tile--medium internal-link"
-           @click="_openLengthStats(0, 'lektorat_minutes')"
-           :data-tip="$app.t('overview.openBookStats')">
+           @click="_openLengthStats(0, 'lektorat_minutes')">
         <div class="overview-tile-head">
           <div class="overview-tile-label" x-text="$app.t('overview.chapterLektoratTime')"></div>
           <span class="overview-tile-median"

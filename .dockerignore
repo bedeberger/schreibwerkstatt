@@ -1,9 +1,0 @@
-node_modules/
-lektorat.db
-lektorat.db-*
-lektorat.log
-lektorat.log.*
-lektorat-history.json*
-.env
-.env.local
-.env.*.local

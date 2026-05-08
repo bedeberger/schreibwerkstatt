@@ -33,7 +33,7 @@ Im Repo flach in `themes/custom/`. In der BookStack-Installation müssen die Exp
     └── pdf-styles.blade.php
 ```
 
-Bei Docker-Setups: gemountetes Theme-Volume (Mount-Target `/app/www/themes`).
+Bei Containerized-BookStack-Setups (z. B. Docker): das Theme-Volume mounten (Mount-Target `/app/www/themes`).
 
 ## 3. Installation
 

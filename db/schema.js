@@ -501,32 +501,33 @@ function updateUserSettings(email, settings) {
 
 // ── Buch-Einstellungen (Sprache + Region) ─────────────────────────────────────
 
-const _getBookSettings = db.prepare('SELECT language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit FROM book_settings WHERE book_id = ?');
+const _getBookSettings = db.prepare('SELECT language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished FROM book_settings WHERE book_id = ?');
 const _upsertBookSettings = db.prepare(`
-  INSERT INTO book_settings (book_id, language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, updated_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  INSERT INTO book_settings (book_id, language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished, updated_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT(book_id) DO UPDATE SET
     language=excluded.language, region=excluded.region,
     buchtyp=excluded.buchtyp, buch_kontext=excluded.buch_kontext,
     erzaehlperspektive=excluded.erzaehlperspektive, erzaehlzeit=excluded.erzaehlzeit,
+    is_finished=excluded.is_finished,
     updated_at=excluded.updated_at
 `);
 
-/** Gibt {language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit} für ein Buch zurück.
+/** Gibt {language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished} für ein Buch zurück.
  *  Fehlt die book_settings-Zeile, werden – wenn vorhanden – die User-Defaults
  *  (default_language/region/buchtyp) als Fallback verwendet. */
 function getBookSettings(bookId, userEmail = null) {
   const row = _getBookSettings.get(parseInt(bookId));
-  if (row) return row;
+  if (row) return { ...row, is_finished: row.is_finished ? 1 : 0 };
   if (userEmail) {
     const u = _getUser.get(userEmail);
     if (u && (u.default_language || u.default_buchtyp)) {
       const language = u.default_language || 'de';
       const region   = u.default_region   || (language === 'en' ? 'US' : 'CH');
-      return { language, region, buchtyp: u.default_buchtyp || null, buch_kontext: null, erzaehlperspektive: null, erzaehlzeit: null };
+      return { language, region, buchtyp: u.default_buchtyp || null, buch_kontext: null, erzaehlperspektive: null, erzaehlzeit: null, is_finished: 0 };
     }
   }
-  return { language: 'de', region: 'CH', buchtyp: null, buch_kontext: null, erzaehlperspektive: null, erzaehlzeit: null };
+  return { language: 'de', region: 'CH', buchtyp: null, buch_kontext: null, erzaehlperspektive: null, erzaehlzeit: null, is_finished: 0 };
 }
 
 /** Locale-Key für ein Buch: z.B. "de-CH", "en-US". */
@@ -535,12 +536,13 @@ function getBookLocale(bookId, userEmail = null) {
   return `${language}-${region}`;
 }
 
-/** Speichert/aktualisiert Sprache, Region, Buchtyp, Buchkontext, Erzählperspektive und Erzählzeit. */
-function saveBookSettings(bookId, language, region, buchtyp, buchKontext, erzaehlperspektive = null, erzaehlzeit = null) {
+/** Speichert/aktualisiert Sprache, Region, Buchtyp, Buchkontext, Erzählperspektive, Erzählzeit, is_finished. */
+function saveBookSettings(bookId, language, region, buchtyp, buchKontext, erzaehlperspektive = null, erzaehlzeit = null, isFinished = 0) {
   _upsertBookSettings.run(
     parseInt(bookId), language, region,
     buchtyp || null, buchKontext || null,
     erzaehlperspektive || null, erzaehlzeit || null,
+    isFinished ? 1 : 0,
     new Date().toISOString()
   );
 }

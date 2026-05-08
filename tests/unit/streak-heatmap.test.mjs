@@ -10,12 +10,11 @@ globalThis.window = { __app: { uiLocale: 'de' } };
 
 const { bookOverviewMethods } = await import('../../public/js/book-overview.js');
 
-// UTC-basierte Datum-Berechnung — book-overview.js nutzt
-// `new Date().toISOString().slice(0,10)` (UTC). Lokale midnight + toISOString
-// liefert in CET den Vortag — Test-Bug, nicht Code-Bug.
-function isoDaysAgo(n) {
-  return new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
-}
+// Tests verwenden den gleichen Helper wie Production-Code (lokales Datum,
+// kein UTC). Sentinel gegen das alte UTC-Datum-Problem in
+// tests/unit/local-date.test.mjs.
+import { localIsoDaysAgo } from '../../public/js/utils.js';
+function isoDaysAgo(n) { return localIsoDaysAgo(n); }
 
 function makeCtx(stats = [], tokEsts = null) {
   if (tokEsts !== null) globalThis.window.__app.tokEsts = tokEsts;
@@ -233,6 +232,27 @@ test('Konsistenz: Donut == _charsTodayDelta()', () => {
   const helper = ctx._charsTodayDelta();
   assert.equal(donut, helper);
   assert.equal(donut, 500);
+});
+
+test('Streak: heute-Cell colored auch nach reassign von tokEsts (Memo-Invalidate-Sentinel)', () => {
+  // Bug-Fix-Sentinel: book-overview Auto-Sync nutzt index-assign auf tokEsts;
+  // _memoN cached aber per Ref-Identität. Index-Assign hält dieselbe Referenz
+  // → Cache-Hit → stale Streak. Fix: reassign nach Sync.
+  // Test simuliert: erster Render mit leerem tokEsts (cache speichern), dann
+  // tokEsts mit neuer Ref ersetzen, zweiter Render muss recomputen.
+  const stats = [
+    { recorded_at: isoDaysAgo(2), chars: 1000 },
+    { recorded_at: isoDaysAgo(0), chars: 2200 },
+  ];
+  const ctx = makeCtx(stats, {}); // erst leer
+  ctx.overviewStreakHeatmap(); // primed cache
+  // tokEsts-Ref ändern (reassign)
+  globalThis.window.__app.tokEsts = { 1: { chars: 2500 } };
+  const out = ctx.overviewStreakHeatmap();
+  // Cache muss invalidieren — wenn nicht, Streak hätte alte Werte
+  let coloredCells = 0;
+  for (const w of out.weeks) for (const c of w) if (c?.level > 0) coloredCells++;
+  assert.ok(coloredCells >= 1, `nach reassign mind. 1 colored cell, hatte ${coloredCells}`);
 });
 
 test('Streak: heute-Cell colored auch wenn nur Live-tokEsts (kein heutiger Snapshot)', () => {

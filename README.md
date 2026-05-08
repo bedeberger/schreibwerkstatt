@@ -20,7 +20,7 @@ KI-gestütztes Lektorat-Tool für [BookStack](https://www.bookstackapp.com/). Ei
 - **Buchstatistik** – Tägliche Snapshots (Wörter, Tokens) als Zeitliniendiagramm.
 - **Fine-Tuning-Export** – JSONL-Trainingsdaten (Stil, Szenen, Dialoge, Q&A, Korrekturen). Anleitung: [docs/finetuning.md](docs/finetuning.md).
 - **WordPress-Import** – One-Shot-Import einer WP-Site aus mysqldump-Datei in ein BookStack-Buch (Categories → Chapter, älteste Posts zuerst). Anleitung: [docs/wordpress-import.md](docs/wordpress-import.md).
-- **Custom-PDF-Export** – Eigener Renderer (pdfkit) mit konfigurierbarem Layout, Schriften aus Google Fonts (runtime download, 30-Tage-Cache), Cover-Bild (sharp-konvertiert), Kapitelumbrüche, Inhaltsverzeichnis und PDF/A-2B-Konformität. Mehrere Profile pro Buch+User. Optional Server-Validierung via veraPDF (im Dockerfile vorinstalliert).
+- **Custom-PDF-Export** – Eigener Renderer (pdfkit) mit konfigurierbarem Layout, Schriften aus Google Fonts (runtime download, 30-Tage-Cache), Cover-Bild (sharp-konvertiert), Kapitelumbrüche, Inhaltsverzeichnis und PDF/A-2B-Konformität. Mehrere Profile pro Buch+User. Optional Server-Validierung via veraPDF (separat installieren, siehe unten).
 - **Bucheinstellungen** – Sprache, Buchtyp, Erzählperspektive, Erzählzeit, Freitext-Kontext fliessen in alle Prompts.
 - **Theme** – Hell/Dunkel/Auto.
 - **Session-Banner** – Bei `401` ohne Hard-Redirect; ungespeicherte Inhalte bleiben erreichbar.
@@ -30,15 +30,20 @@ KI-gestütztes Lektorat-Tool für [BookStack](https://www.bookstackapp.com/). Ei
 - Öffentliche HTTPS-URL (Reverse-Proxy mit TLS).
 - Google OAuth2 Credentials, Callback `https://<domain>/auth/callback`.
 
-## Quick Start (Docker Compose)
+## Quick Start (LXC / Bare Metal)
+
+Node.js v20+:
 
 ```bash
 git clone https://github.com/<user>/bookstack-lektorat.git
 cd bookstack-lektorat
 cp .env.example .env
 # Pflichtfelder setzen, alle Variablen sind in .env.example dokumentiert
-docker compose up -d
+npm ci --omit=dev
+node server.js    # Port 3737
 ```
+
+Produktiv: systemd-Service via [lektorat.service](lektorat.service) (User/WorkingDirectory anpassen, dann `systemctl enable --now lektorat`).
 
 ### Reverse-Proxy
 
@@ -51,26 +56,27 @@ proxy_read_timeout 300s;
 proxy_send_timeout 300s;
 ```
 
-### Container-Ops
+### Optional: veraPDF (PDF/A-Validierung)
+
+Ohne veraPDF läuft die Validierung im Skip-Modus, das PDF wird trotzdem geliefert. Für strikte Validierung:
 
 ```bash
-docker compose logs -f
-docker compose down && git pull && docker compose up -d --build
+apk add --no-cache openjdk17-jre-headless curl unzip   # Alpine
+# oder: apt-get install -y default-jre-headless curl unzip   # Debian/Ubuntu
+
+VERAPDF_VERSION=1.26.2
+curl -sSL "https://software.verapdf.org/releases/verapdf-greenfield-${VERAPDF_VERSION}.zip" -o /tmp/verapdf.zip
+mkdir -p /opt/verapdf && unzip -q /tmp/verapdf.zip -d /opt/verapdf
+cd /opt/verapdf/verapdf-greenfield-${VERAPDF_VERSION}
+java -cp installer-${VERAPDF_VERSION}.jar org.verapdf.apps.Installer -options auto-install-options.xml
+# /opt/verapdf-installation in PATH aufnehmen oder VERAPDF_BIN setzen
 ```
 
-## Ohne Docker
-
-Node.js v20+:
+### Update
 
 ```bash
-git clone https://github.com/<user>/bookstack-lektorat.git
-cd bookstack-lektorat
-cp .env.example .env
-npm install
-node server.js    # Port 3737
+git pull && npm ci --omit=dev && systemctl restart lektorat
 ```
-
-Produktiv: systemd-Service via [lektorat.service](lektorat.service).
 
 ## BookStack-Token
 

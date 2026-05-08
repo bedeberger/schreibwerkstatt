@@ -305,7 +305,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
 });
 
 // ── Graceful Shutdown ────────────────────────────────────────────────────────
-// Docker/Systemd schicken SIGTERM, Ctrl+C schickt SIGINT. Ohne Handler werden
+// systemd schickt SIGTERM, Ctrl+C schickt SIGINT. Ohne Handler werden
 // offene SSE-Streams und Jobs abrupt gekappt. 30 s Drain-Zeit für laufende Requests,
 // danach `server.close()` + SQLite-Close. Kein Force-Kill von Jobs – die kommen
 // beim nächsten Start via cleanupStuckJobRuns() wieder hoch.
@@ -334,9 +334,9 @@ process.on('SIGINT',  () => shutdown('SIGINT'));
 // Tägliche Cron-Jobs (node-cron)
 try {
   const cron = require('node-cron');
-  // Zeitzone explizit setzen – ohne expliziten Wert läuft node-cron in Server-TZ,
-  // in Docker-Containern typischerweise UTC → "23:00" wäre dann 00:00/01:00 CH-Zeit.
-  const cronTz = process.env.CRON_TIMEZONE || 'Europe/Zurich';
+  // Zeitzone explizit setzen – ohne expliziten Wert läuft node-cron in Server-TZ.
+  // In manchen LXC-Templates ist die TZ UTC → "23:00" wäre dann 00:00/01:00 CH-Zeit.
+  const cronTz = process.env.CRON_TIMEZONE || process.env.TZ || 'Europe/Zurich';
 
   // 23:00 – Buchstatistik-Sync + hängende Jobs bereinigen.
   // Tagesscharfe Statistik: recorded_at am Tag X reflektiert Inhalte vom Tag X.

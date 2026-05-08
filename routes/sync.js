@@ -7,6 +7,7 @@ const { bsGet, bsGetAll } = require('../lib/bookstack');
 const { computePageIndex, writePageIndex, writeFigureMentionsForPageAllUsers, tokenizeNamesForStopwords } = require('../lib/page-index');
 const { invalidateBookPageCache } = require('./jobs/chat');
 const { getPrompts } = require('../lib/prompts-loader');
+const { localIsoDate } = require('../lib/local-date');
 
 const router = express.Router();
 
@@ -271,7 +272,10 @@ async function syncBook(bookId, token) {
     catch (e) { logger.warn(`Figuren-Mentions für Seite ${item.page_id} fehlgeschlagen: ${e.message}`); }
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  // Lokales Datum statt UTC: book_stats_history.recorded_at muss zur lokalen
+  // User-Wahrnehmung passen. Frontend-Streak/Heute-Ring iteriert ebenfalls
+  // lokal — beide Seiten in derselben TZ (process.env.TZ, default Europe/Zurich).
+  const today = localIsoDate();
   db.prepare(`
     INSERT INTO book_stats_history (book_id, recorded_at, page_count, words, chars, tok, unique_words, chapter_count, avg_sentence_len, avg_lix, avg_flesch_de)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)

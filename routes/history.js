@@ -1,6 +1,7 @@
 const express = require('express');
 const { db, upsertBookByName } = require('../db/schema');
 const { toIntId } = require('../lib/validate');
+const { localIsoDate } = require('../lib/local-date');
 const logger = require('../logger');
 
 const router = express.Router();
@@ -498,7 +499,7 @@ router.post('/writing-time', jsonBody, (req, res) => {
   if (!book_id) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
   if (!Number.isFinite(secondsRaw) || secondsRaw <= 0) return res.json({ ok: true, added: 0 });
   const seconds = Math.min(Math.round(secondsRaw), 3600);
-  const date = new Date().toISOString().slice(0, 10);
+  const date = localIsoDate();
   db.prepare(`
     INSERT INTO writing_time (user_email, book_id, date, seconds)
     VALUES (?, ?, ?, ?)
@@ -549,7 +550,7 @@ router.post('/lektorat-time', jsonBody, (req, res) => {
   if (!page_id) return res.status(400).json({ error_code: 'INVALID_PAGE_ID' });
   if (!Number.isFinite(secondsRaw) || secondsRaw <= 0) return res.json({ ok: true, added: 0 });
   const seconds = Math.min(Math.round(secondsRaw), 3600);
-  const date = new Date().toISOString().slice(0, 10);
+  const date = localIsoDate();
   db.prepare(`
     INSERT INTO lektorat_time (user_email, book_id, page_id, date, seconds)
     VALUES (?, ?, ?, ?, ?)

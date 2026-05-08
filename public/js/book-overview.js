@@ -17,7 +17,7 @@
 //
 // Visualisierungen sind reines Inline-SVG (kein Chart.js): Overview soll
 // instant beim Buchwechsel sichtbar sein, ohne Lazy-Lib-Load.
-import { fetchJson, fmtExactDuration } from './utils.js';
+import { fetchJson, fmtExactDuration, localIsoDate, localIsoDaysAgo } from './utils.js';
 
 // Retry once mit kurzem Backoff: bei 9 parallelen Endpoints fängt das
 // 5xx-/Netzwerk-Blips ab, ohne dass das Tile stumm leer rendert.
@@ -44,7 +44,7 @@ export const bookOverviewMethods = {
     this.overviewLoading = true;
     this.overviewBookId = bookId;
     try {
-      const [stats, coverage, heat, reviews, recent, figuren, szenen, orte, lektoratTime] = await Promise.all([
+      const [stats, coverage, heat, reviews, recent, figuren, szenen, orte, lektoratTime, settings] = await Promise.all([
         fetchJsonRetry(`/history/book-stats/${bookId}`).catch(() => []),
         fetchJsonRetry(`/history/coverage/${bookId}`).catch(() => null),
         fetchJsonRetry(`/history/fehler-heatmap/${bookId}?mode=open`).catch(() => null),
@@ -54,6 +54,7 @@ export const bookOverviewMethods = {
         fetchJsonRetry(`/figures/scenes/${bookId}`).catch(() => null),
         fetchJsonRetry(`/locations/${bookId}`).catch(() => null),
         fetchJsonRetry(`/history/lektorat-time/${bookId}`).catch(() => null),
+        fetchJsonRetry(`/booksettings/${bookId}`).catch(() => null),
       ]);
       if (this.overviewBookId !== bookId) return;
       this.overviewStats = Array.isArray(stats) ? stats : [];
@@ -68,6 +69,7 @@ export const bookOverviewMethods = {
       this.overviewSzenen = sz;
       this.overviewOrte = Array.isArray(orte?.orte) ? orte.orte : [];
       this.overviewLektoratTime = lektoratTime || null;
+      this.overviewIsFinished = !!settings?.is_finished;
       this._memos = {};
     } catch (e) {
       console.error('[loadBookOverview]', e);
@@ -128,6 +130,25 @@ export const bookOverviewMethods = {
           stale = true;
         }
       }
+      // (c) Live-Diff: Σ tokEsts.chars vs neuester Snapshot.chars. Greift den
+      // Tagesgranularitäts-Blindspot von (b) ab — User editiert mehrfach am
+      // selben Tag nach erstem Sync; Datums-String identisch, aber Live wächst
+      // weiter. Sparkline + Δ-Trend zeigen ohne manuellen Refresh die jüngste
+      // Spitze. Toleranz max(50, 0.5%), damit Normalisierungs-Rundungen nicht
+      // bei jedem Open einen Sync triggern.
+      if (!stale) {
+        const stats = this.overviewStats || [];
+        const lastSnapshot = stats.length ? stats[stats.length - 1] : null;
+        const tokEsts = app.tokEsts || {};
+        let liveChars = 0;
+        for (const id of Object.keys(tokEsts)) liveChars += Number(tokEsts[id]?.chars) || 0;
+        const snapshotChars = Number(lastSnapshot?.chars) || 0;
+        if (liveChars > 0 && snapshotChars > 0) {
+          const diff = Math.abs(liveChars - snapshotChars);
+          const tolerance = Math.max(50, snapshotChars * 0.005);
+          if (diff > tolerance) stale = true;
+        }
+      }
       if (!stale) return;
       this._statsSyncBookId = bookId;
       try {
@@ -136,14 +157,20 @@ export const bookOverviewMethods = {
         if (app.selectedBookId !== bookId) return;
         // tokEsts aktualisieren — gleicher Pfad wie syncBookStats in bookstats.js,
         // damit Sidebar-Σ und Hero-Snapshot nach dem Auto-Sync sofort aktuell sind.
+        // REASSIGN, nicht index-assign: book-overview-Methoden cachen via _memoN
+        // mit tokEsts-Ref als Source. Index-Assign hält dieselbe Referenz →
+        // Cache-Hit → stale Compute (Streak-Heatmap-Symptom: heutige Cell fehlt
+        // weil Cache von vor dem Sync überlebt). Reassign triggert Memo-Invalidate.
         try {
           const fresh = await fetchJsonRetry(`/history/page-stats/${bookId}`);
+          const updated = { ...app.tokEsts };
           for (const p of pages) {
             const c = fresh[p.id];
             if (c && c.updated_at === p.updated_at) {
-              app.tokEsts[p.id] = { tok: c.tok, words: c.words, chars: c.chars };
+              updated[p.id] = { tok: c.tok, words: c.words, chars: c.chars };
             }
           }
+          app.tokEsts = updated;
         } catch { /* tokEsts-Update non-critical */ }
         if (!app.showBookOverviewCard || app.selectedBookId !== bookId) return;
         await this.loadBookOverview(bookId);
@@ -168,6 +195,7 @@ export const bookOverviewMethods = {
     this.overviewSzenen = [];
     this.overviewOrte = [];
     this.overviewLektoratTime = null;
+    this.overviewIsFinished = false;
     this.overviewBookId = null;
     this._memos = {};
   },
@@ -282,7 +310,7 @@ export const bookOverviewMethods = {
   _charsTodayDelta() {
     const a = this.overviewStats || [];
     const tokEsts = window.__app?.tokEsts || {};
-    const todayIso = new Date().toISOString().slice(0, 10);
+    const todayIso = localIsoDate();
 
     let liveChars = 0;
     for (const id of Object.keys(tokEsts)) liveChars += Number(tokEsts[id]?.chars) || 0;
@@ -318,22 +346,24 @@ export const bookOverviewMethods = {
       for (const s of a) charsByDate.set(s.recorded_at, Number(s.chars) || 0);
       const tag = window.__app?.uiLocale === 'en' ? 'en-US' : 'de-CH';
       const fmt = new Intl.DateTimeFormat(tag, { weekday: 'short' });
-      const todayIso = new Date().toISOString().slice(0, 10);
+      const todayIso = localIsoDate();
       const todayDelta = this._charsTodayDelta();
       const days = [];
       for (let i = 6; i >= 0; i--) {
-        const d = new Date(Date.now() - i * 86400000);
-        const iso = d.toISOString().slice(0, 10);
+        const noon = new Date();
+        noon.setHours(12, 0, 0, 0);
+        noon.setDate(noon.getDate() - i);
+        const iso = localIsoDate(noon);
         let delta;
         if (iso === todayIso) {
           delta = todayDelta;
         } else {
-          const prevIso = new Date(d.getTime() - 86400000).toISOString().slice(0, 10);
+          const prevIso = localIsoDaysAgo(i + 1);
           const cur = charsByDate.get(iso);
           const prev = charsByDate.get(prevIso);
           delta = (cur != null && prev != null) ? (cur - prev) : 0;
         }
-        days.push({ iso, label: fmt.format(d), delta });
+        days.push({ iso, label: fmt.format(noon), delta });
       }
       return days;
     });
@@ -358,7 +388,7 @@ export const bookOverviewMethods = {
       for (const id of Object.keys(tokEsts)) liveChars += Number(tokEsts[id]?.chars) || 0;
       const latestSnapshot = a[a.length - 1];
       const latestChars = liveChars > 0 ? liveChars : (Number(latestSnapshot.chars) || 0);
-      const cutoff = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+      const cutoff = localIsoDaysAgo(7);
       let earlier = null;
       for (let i = a.length - 2; i >= 0; i--) {
         if (a[i].recorded_at <= cutoff) { earlier = a[i]; break; }
@@ -435,15 +465,15 @@ export const bookOverviewMethods = {
       const charsByDate = new Map();
       for (const s of a) charsByDate.set(s.recorded_at, Number(s.chars) || 0);
 
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const todayDow = today.getDay(); // 0 = So, 1 = Mo, ..., 6 = Sa
-      // ISO-Wochenstart: Mo. Verschiebung von Sun-based zu Mon-based.
+      // Heute lokal — getDay() ist auf lokaler Mitternacht-Basis OK; isoToday
+      // bewusst lokal, damit Lookup zu Server-Snapshots stimmt (Server muss
+      // ebenfalls lokal schreiben — TZ env in docker).
+      const todayLocal = new Date();
+      todayLocal.setHours(12, 0, 0, 0); // Mittag → DST-Drift-sicher beim ±n*86_400_000
+      const todayDow = todayLocal.getDay(); // 0 = So, 1 = Mo, ..., 6 = Sa
       const dowMon = (todayDow + 6) % 7; // Mo=0 ... So=6
-      const startOffset = (WEEKS - 1) * 7 + dowMon; // erstes Datum links oben (Mo)
-      const isoToday = today.toISOString().slice(0, 10);
-      // Heute-Cell nutzt _charsTodayDelta() (Live-Quelle), damit colored auch
-      // wenn heutiger Cron-Snapshot fehlt oder Live > Snapshot.
+      const startOffset = (WEEKS - 1) * 7 + dowMon;
+      const isoToday = localIsoDate(todayLocal);
       const todayDelta = this._charsTodayDelta();
 
       const cells = [];
@@ -461,16 +491,13 @@ export const bookOverviewMethods = {
           grid[col][row] = { iso: null, delta: null, level: 0, future: true };
           continue;
         }
-        const d = new Date(today.getTime() - offsetDays * 86400000);
-        const iso = d.toISOString().slice(0, 10);
-        const prevIso = new Date(d.getTime() - 86400000).toISOString().slice(0, 10);
+        const iso = localIsoDaysAgo(offsetDays, todayLocal);
+        const prevIso = localIsoDaysAgo(offsetDays + 1, todayLocal);
         const cur = charsByDate.get(iso);
         const prev = charsByDate.get(prevIso);
         const hasSnapshot = cur != null;
         let delta;
         if (iso === isoToday) {
-          // Live-aware: even ohne heutigen Cron-Snapshot wird Schreibfortschritt
-          // angezeigt, sobald tokEsts > prior Snapshot.
           delta = todayDelta > 0 ? todayDelta : (hasSnapshot && prev != null ? cur - prev : null);
         } else {
           delta = (hasSnapshot && prev != null) ? (cur - prev) : (hasSnapshot ? 0 : null);
@@ -502,9 +529,8 @@ export const bookOverviewMethods = {
       // schon. Heute-Eintrag nutzt todayDelta (Live-aware), sonst nur snapshots.
       const linear = [];
       for (let off = startOffset; off >= 0; off--) {
-        const dt = new Date(today.getTime() - off * 86400000);
-        const iso = dt.toISOString().slice(0, 10);
-        const prevIso = new Date(dt.getTime() - 86400000).toISOString().slice(0, 10);
+        const iso = localIsoDaysAgo(off, todayLocal);
+        const prevIso = localIsoDaysAgo(off + 1, todayLocal);
         const cur = charsByDate.get(iso);
         const prev = charsByDate.get(prevIso);
         let delta;

@@ -13,6 +13,7 @@ export function registerBookSettingsCard() {
     bookSettingsBuchKontext: '',
     bookSettingsErzaehlperspektive: '',
     bookSettingsErzaehlzeit: '',
+    bookSettingsIsFinished: false,
     bookSettingsLoading: false,
     bookSettingsSaving: false,
     bookSettingsSaved: false,

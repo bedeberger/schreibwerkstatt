@@ -16,6 +16,7 @@ export const bookSettingsMethods = {
       this.bookSettingsBuchKontext = data.buch_kontext || '';
       this.bookSettingsErzaehlperspektive = data.erzaehlperspektive || '';
       this.bookSettingsErzaehlzeit        = data.erzaehlzeit        || '';
+      this.bookSettingsIsFinished         = !!data.is_finished;
     } catch (e) {
       console.error('[book-settings] Laden fehlgeschlagen:', e);
     } finally {
@@ -39,6 +40,7 @@ export const bookSettingsMethods = {
           buch_kontext:      this.bookSettingsBuchKontext          || null,
           erzaehlperspektive: this.bookSettingsErzaehlperspektive  || null,
           erzaehlzeit:       this.bookSettingsErzaehlzeit          || null,
+          is_finished:       this.bookSettingsIsFinished ? 1 : 0,
         }),
       });
       if (!r.ok) {

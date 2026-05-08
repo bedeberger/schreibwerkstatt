@@ -92,6 +92,28 @@ export function formatNumber(value, uiLocale, decimals = 1) {
 // Wert 0 werden weggelassen, ausser die Gesamtdauer ist 0. Ergebnis: „1 h 23 min 45 s",
 // „23 min 5 s", „45 s". Einheiten sind locale-stabil (bewusst nicht übersetzt,
 // damit eine Stelle die Reihenfolge h/min/s vorgibt).
+// Lokales ISO-Datum (YYYY-MM-DD) — kein UTC. `new Date().toISOString().slice(0,10)`
+// liefert UTC-Datum, das in CET um 1 Tag verschoben sein kann (lokal Mitternacht
+// = UTC vor-22:00 Tag). Bug-Symptom: heutige Zeichen landen im Streak-Grid auf
+// dem Vortag, weil Frontend-Iteration und Server-Snapshots auf unterschiedliche
+// Datums-Strings mappen. Beide Seiten müssen lokal-konsistent sein.
+//
+// 'en-CA' liefert Format YYYY-MM-DD, ist sortier-tauglich, immutable per ECMA-402.
+export function localIsoDate(d = new Date()) {
+  return d.toLocaleDateString('en-CA');
+}
+
+// Lokales ISO-Datum n Tage in der Vergangenheit, kollisionssicher über
+// DST-Wechsel (Math via getTime + 86_400_000 ist DST-blind, kann an
+// Umstellungs-Tagen um 1h driften). Wir reduzieren zur Mittagszeit, weil
+// Mittag in jeder TZ am gleichen Tag bleibt.
+export function localIsoDaysAgo(n, base = new Date()) {
+  const noon = new Date(base);
+  noon.setHours(12, 0, 0, 0);
+  noon.setDate(noon.getDate() - n);
+  return localIsoDate(noon);
+}
+
 export function fmtExactDuration(seconds) {
   const total = Math.max(0, Math.round(Number(seconds) || 0));
   if (total === 0) return '0 s';

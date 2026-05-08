@@ -105,6 +105,19 @@
       </div>
     </div>
 
+    <div class="book-settings-row">
+      <label class="book-settings-label" x-text="$app.t('book.settings.status')"></label>
+      <div class="form-stack">
+        <label class="form-check">
+          <input type="checkbox" id="bs-finished" x-model="bookSettingsIsFinished">
+          <span>
+            <span class="form-check-title" x-text="$app.t('book.settings.finished')"></span>
+            <span class="form-check-desc" x-text="$app.t('book.settings.finished.desc')"></span>
+          </span>
+        </label>
+      </div>
+    </div>
+
     <p class="book-settings-saved" x-show="bookSettingsSaved" x-text="$app.t('common.settingsSaved')"></p>
     <p class="book-settings-error" x-show="bookSettingsError" x-text="bookSettingsError"></p>
 

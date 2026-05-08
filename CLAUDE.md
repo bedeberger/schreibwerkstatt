@@ -1,6 +1,6 @@
 # bookstack-lektorat
 
-KI-gestütztes Lektorat-Tool für BookStack. Deployment, Docker-Setup und Env-Variablen: siehe [README.md](README.md).
+KI-gestütztes Lektorat-Tool für BookStack. Deployment (LXC + systemd) und Env-Variablen: siehe [README.md](README.md).
 
 **Lokal starten:** `npm install && npm start` (Port 3737). Tests: `npm test` (Playwright, erstmalig `npx playwright install chromium`).
 
