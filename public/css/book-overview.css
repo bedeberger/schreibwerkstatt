@@ -264,14 +264,6 @@
 }
 
 /* ── Streak-Heatmap (53 Wochen × 7 Tage GitHub-Stil) ────────────────────── */
-.overview-tile-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
-}
 .overview-streak-meta {
   display: flex;
   gap: 12px;
@@ -529,6 +521,8 @@
   justify-content: space-between;
   align-items: baseline;
   gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
 }
 .overview-tile-median {
   font-size: var(--font-size-xs);
@@ -617,9 +611,6 @@
   background: var(--color-accent);
   transition: width 0.2s ease;
   border-radius: var(--radius-sm);
-}
-.overview-chapter-bar-fill--findings {
-  background: var(--color-warning, #c97a2b);
 }
 /* Diverging-Findings: über Median = mehr Befunde als typisch → Warnfarbe.
    Unter Median = weniger als typisch → gemutete Erfolgsfarbe. */

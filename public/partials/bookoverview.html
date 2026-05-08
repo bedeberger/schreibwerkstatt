@@ -396,8 +396,9 @@
                           'internal-link': cell.value > 0
                         }"
                         :style="{ '--cell-pct': cell.pct }"
-                        :data-tip="cell.ortName + ' · ' + row.name + ': ' + cell.value"
-                        :data-tip="cell.value > 0 ? $app.t('overview.ortPresenceOpen', { ort: cell.ortName, kapitel: row.name }) : ''"
+                        :data-tip="cell.value > 0
+                          ? $app.t('overview.ortPresenceOpen', { ort: cell.ortName, kapitel: row.name })
+                          : cell.ortName + ' · ' + row.name + ': ' + cell.value"
                         @click="cell.value > 0 && $app.openOrtMitKapitel(cell.ortId, row.name)">
                       <span class="overview-presence-fill"></span>
                       <span class="overview-presence-num" x-show="cell.value > 0" x-text="cell.value"></span>
@@ -482,8 +483,9 @@
                           'internal-link': cell.value > 0
                         }"
                         :style="{ '--cell-pct': cell.pct }"
-                        :data-tip="cell.figureName + ' · ' + row.name + ': ' + cell.value"
-                        :data-tip="cell.value > 0 ? $app.t('overview.figPresenceOpen', { figur: cell.figureName, kapitel: row.name }) : ''"
+                        :data-tip="cell.value > 0
+                          ? $app.t('overview.figPresenceOpen', { figur: cell.figureName, kapitel: row.name })
+                          : cell.figureName + ' · ' + row.name + ': ' + cell.value"
                         @click="cell.value > 0 && $app.openFigurMitKapitel(cell.figureId, row.name)">
                       <span class="overview-presence-fill"></span>
                       <span class="overview-presence-num" x-show="cell.value > 0" x-text="cell.value"></span>

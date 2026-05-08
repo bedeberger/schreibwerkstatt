@@ -1079,10 +1079,6 @@ export const bookOverviewMethods = {
     return Number(n || 0).toLocaleString(tag);
   },
 
-  _fmtDuration(sec) {
-    return fmtExactDuration(sec);
-  },
-
   // ── Tile-Click-Handler ───────────────────────────────────────────────────
   _openLengthStats(range = 30, metric = 'chars') {
     window.dispatchEvent(new CustomEvent('book-stats:select', { detail: { metric, range } }));
