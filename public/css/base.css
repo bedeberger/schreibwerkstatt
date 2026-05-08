@@ -92,15 +92,23 @@ h1 {
 
 .site-title {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  align-items: baseline;
+  gap: 0.6rem;
   cursor: pointer;
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 30px;
+  letter-spacing: -0.022em;
+  font-feature-settings: "kern", "liga", "dlig", "calt", "onum", "ss01";
+  text-rendering: optimizeLegibility;
+  color: var(--color-text);
 }
 
 .site-logo {
-  width: 4rem;
-  height: 4rem;
+  width: 3rem;
+  height: 3rem;
   flex-shrink: 0;
+  align-self: center;
 }
 
 code {

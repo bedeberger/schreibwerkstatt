@@ -66,11 +66,13 @@
 /* === Custom Properties === */
 :root {
   color-scheme: light;
-  --color-bg: #f5f4f0;
+  /* Paper/Ink-Palette: warmes Papier als Tischfläche, weisse Karten obenauf,
+     Tinten-Schwarz statt Pure-Black. Editorial-Anmutung statt Standard-SaaS. */
+  --color-bg: #faf7f2;
   --color-surface: #ffffff;
-  --color-text: #1a1a1a;
-  --color-muted: #666;
-  --color-subtle: #999;
+  --color-text: #1f1c18;
+  --color-muted: #6b6258;
+  --color-subtle: #9a9085;
   --color-border: rgba(0, 0, 0, 0.12);
   --color-border-input: rgba(0, 0, 0, 0.2);
   --color-border-focus: rgba(0, 0, 0, 0.4);
@@ -149,9 +151,10 @@
   --color-history-active-bg-hover: rgba(30, 58, 95, 0.14);
   --color-history-section-bg: #e8e6e0;
 
-  /* Page-Content-View + Tooltip-Panels */
-  --color-page-view-bg: #ffffff;
-  --color-page-view-text: #333333;
+  /* Page-Content-View + Tooltip-Panels — Reading-Frame in warmem Papierton,
+     Tooltip-Panel kontrastreich weiss. */
+  --color-page-view-bg: #fbf8f3;
+  --color-page-view-text: #2a2620;
   --color-tooltip-bg: #ffffff;
 
   /* Dev-Banner + Session-Banner */

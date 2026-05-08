@@ -78,6 +78,7 @@
   flex-wrap: wrap;
   justify-content: flex-end;
   min-width: 0;
+  margin-left: auto;
 }
 .card-header-aside .tok-stats {
   display: inline-flex;

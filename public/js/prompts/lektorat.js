@@ -104,7 +104,7 @@ function _buildLektoratPromptBody(text, textLabel, {
   const korrekturPuritaetBlock = `
 KORREKTUR-PURITÄT (zwingend für jeden Eintrag, alle Typen):
 - «korrektur» enthält AUSSCHLIESSLICH den Ersatztext, der «original» wortwörtlich ersetzen soll – sonst nichts.
-- VERBOTEN in «korrektur»: Meta-Präfixe («Satz kürzen auf:», «Ersetzen durch:», «Vorschlag:», «Besser:», «Stattdessen:» o.Ä.), umschliessende Anführungszeichen oder Guillemets («»/„"/"") um den ganzen Ersatztext, Begründungs-Anhänge per Gedankenstrich («... – weil/damit/sonst ...»), Variantenlisten («A oder B»), Kommentare in Klammern.
+- VERBOTEN in «korrektur»: Meta-Präfixe («Satz kürzen auf:», «Ersetzen durch:», «Vorschlag:», «Besser:», «Stattdessen:» o.Ä.), umschliessende Anführungszeichen oder Guillemets («»/„“/“”) um den ganzen Ersatztext, Begründungs-Anhänge per Gedankenstrich («... – weil/damit/sonst ...»), Variantenlisten («A oder B»), Kommentare in Klammern.
 - Begründungen, Hinweise, Alternativen gehören AUSSCHLIESSLICH in «erklaerung».
 - Einsetz-Selbsttest: Würde «original» 1:1 durch «korrektur» ersetzt, ergäbe der Satz korrekten, lesbaren Fliesstext ohne Reste? Wenn nein → Eintrag korrigieren oder weglassen.
 `;

@@ -510,8 +510,16 @@ CSS: [public/css/focus-mode.css](public/css/focus-mode.css). Inline in `.card-su
 - `.page-content-view--editing` — Variante während Bearbeitung
 - Innerhalb: native `h1`–`h6`, `blockquote` werden auto-gestylt
 - `.callout.info` / `.success` / `.warning` / `.danger` — links eingerückte Callout-Boxen
+- `.callout.pullquote` — zentrierte, gross gesetzte Hervorhebung zwischen Absätzen. Kein Border, kein Background — Typografie trägt allein. Auto-Anführungszeichen via `::before`/`::after` in Akzentfarbe.
 - `.poem` — Sonderlayout für Verse (preserve whitespace)
 - `.lektorat-mark` / `.lektorat-mark--selected` — Inline-Annotationen
+
+**Buchsatz-Mikrotypografie** (am Container `.page-content-view`):
+- `hanging-punctuation: first allow-end last` — Anführungszeichen ragen aus Satzkante.
+- `font-feature-settings: "kern", "liga", "dlig", "calt", "onum"` — Ligaturen + alte Ziffern (Source Serif 4 hat OldStyle-Numerals).
+- `text-rendering: optimizeLegibility`.
+- Drop-Cap auf erstem Absatz nach `<h1>` bzw. erstem `<p>` der Seite (`::first-letter`, 3.4em, Akzentfarbe). Greift nicht im `--editing`-Modus, weil contenteditable die Selektion stört.
+- `text-wrap: pretty` auf `<p>`, `text-wrap: balance` auf Headings (verhindert Witwen/Waisen).
 
 Nicht selbst Reading-Typografie definieren; immer diesen Frame verwenden.
 

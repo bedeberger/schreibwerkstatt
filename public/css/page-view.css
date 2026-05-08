@@ -14,14 +14,34 @@
   font-size: 17px;
   color: var(--color-page-view-text);
   hyphens: auto;
+  /* Buchsatz-Mikrotypografie: Anführungszeichen ragen aus Satzkante,
+     Ligaturen + alte Ziffern (OldStyle), feines Hinting. */
+  hanging-punctuation: first allow-end last;
+  font-feature-settings: "kern", "liga", "dlig", "calt", "onum";
+  text-rendering: optimizeLegibility;
 }
-.page-content-view h1 { font-size: 1.5em; margin: 0.6em 0 0.3em; font-weight: 700; }
-.page-content-view h2 { font-size: 1.3em; margin: 0.5em 0 0.3em; font-weight: 700; }
-.page-content-view h3 { font-size: 1.15em; margin: 0.4em 0 0.2em; font-weight: 700; }
-.page-content-view h4 { font-size: 1.05em; margin: 0.3em 0 0.2em; font-weight: 700; }
+.page-content-view h1 { font-size: 1.5em; margin: 0.6em 0 0.3em; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
+.page-content-view h2 { font-size: 1.3em; margin: 0.5em 0 0.3em; font-weight: 700; letter-spacing: -0.005em; text-wrap: balance; }
+.page-content-view h3 { font-size: 1.15em; margin: 0.4em 0 0.2em; font-weight: 700; text-wrap: balance; }
+.page-content-view h4 { font-size: 1.05em; margin: 0.3em 0 0.2em; font-weight: 700; text-wrap: balance; }
 .page-content-view h5 { font-size: 0.95em; margin: 0.3em 0 0.2em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
 .page-content-view h6 { font-size: 0.9em; margin: 0.3em 0 0.2em; font-weight: 700; color: var(--color-muted); }
-.page-content-view p { margin: 0.4em 0; }
+.page-content-view p { margin: 0.4em 0; text-wrap: pretty; }
+
+/* Drop-Cap: erster Absatz nach H1 oder erster Absatz überhaupt bekommt
+   gross gesetzten Anfangsbuchstaben. Greift nur, wenn Reading-Frame nicht
+   im Edit-Modus ist (sonst stört contenteditable die Selektion). */
+.page-content-view:not(.page-content-view--editing) > h1:first-child + p::first-letter,
+.page-content-view:not(.page-content-view--editing) > p:first-of-type::first-letter {
+  font-family: var(--font-serif);
+  font-weight: 700;
+  font-size: 3.4em;
+  line-height: 0.92;
+  float: left;
+  margin: 0.05em 0.08em 0 0;
+  color: var(--color-accent-text);
+  font-feature-settings: "kern", "liga";
+}
 .page-content-view u { text-decoration: underline; }
 .page-content-view s, .page-content-view del, .page-content-view strike { text-decoration: line-through; }
 .page-content-view sup { vertical-align: super; font-size: 0.75em; line-height: 0; }
@@ -71,6 +91,25 @@
 .page-content-view .callout.success { border-left-color: var(--color-ok-border, var(--color-stark)); background: var(--color-ok-bg); color: var(--color-ok-text); }
 .page-content-view .callout.warning { border-left-color: var(--color-mittel); background: var(--color-warn-bg); color: var(--color-warn-text); }
 .page-content-view .callout.danger  { border-left-color: var(--color-err-border, var(--color-schwach-text)); background: var(--color-err-bg); color: var(--color-err-text); }
+
+/* Pull-Quote: zentrierte, gross gesetzte Hervorhebung zwischen Absätzen.
+   Kein Border, kein Background — Typografie trägt allein. */
+.page-content-view .callout.pullquote {
+  border: none;
+  background: transparent;
+  text-align: center;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 1.4em;
+  line-height: 1.4;
+  color: var(--color-text);
+  padding: 1.2em clamp(8px, 4vw, 32px);
+  margin: 1em 0;
+  text-wrap: balance;
+  hyphens: none;
+}
+.page-content-view .callout.pullquote::before { content: "\201C"; margin-right: 0.05em; color: var(--color-accent-text); }
+.page-content-view .callout.pullquote::after  { content: "\201D"; margin-left: 0.05em;  color: var(--color-accent-text); }
 
 /* Edit-Modus: contenteditable-Preview */
 .page-content-view--editing {
