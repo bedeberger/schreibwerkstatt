@@ -475,29 +475,6 @@ CSS: [public/css/tree-history.css](public/css/tree-history.css). `.history-detai
 
 **Stilbox** (`.stilbox`, `.stilbox--review-summary`, `.stilbox--spaced`) — bordered Container für Analyse-Sektionen, in Reviews und Findings wiederverwendet.
 
-### Inline-Redline (Word-Level-Diff)
-
-**Use:** Findings mit Original + Korrektur als gemischte Inline-Zeile statt zwei gestapelter Boxen. Editorial-Pattern (git --word-diff / Word-Track-Changes).
-
-**Markup:**
-```html
-<span class="finding-diff">
-  <span class="finding-diff-seg finding-diff-seg--eq">Der </span>
-  <span class="finding-diff-seg finding-diff-seg--del">schnelle </span>
-  <span class="finding-diff-seg finding-diff-seg--ins">flinke </span>
-  <span class="finding-diff-seg finding-diff-seg--eq">Fuchs.</span>
-</span>
-```
-
-**Diff-Builder:** `findingDiff(f)` aus [public/js/diff-words.js](public/js/diff-words.js). LCS-basiert, behält Whitespace-Tokens als eq-Anker. Komplexität O(n*m); Lektorat-Strings sind kurz, daher unkritisch.
-
-**Regeln:**
-- Greift nur, wenn `f.korrektur` gesetzt ist. Ohne Korrektur (z.B. reine Stilanmerkung): Single-Box-Pfad mit `.finding-original`.
-- Keine eigenen Diff-Implementierungen pro Use-Case — Single Source ist `diff-words.js`.
-- Im `.finding--applied`-Zustand werden del/ins-Backgrounds transparent (Item ist eh durchgestrichen).
-
-CSS: [public/css/findings.css](public/css/findings.css).
-
 ### Marginalia-Stripe (Reading-Frame)
 
 **Use:** Visueller Rotstift-Akzent rechts an Absätzen, die Lektorats-Markierungen enthalten. Editorial-Manuskript-Anmutung.

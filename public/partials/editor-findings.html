@@ -28,16 +28,8 @@
           <span class="badge" :class="_isHardFinding(f.typ) ? 'badge-err' : 'badge-warn'" x-text="$app.t('finding.' + f.typ)"></span>
           <span x-show="$app.appliedOriginals.includes(f.original)" class="tag" x-text="$app.t('editor.findings.applied')"></span>
           <span class="finding-content">
-            <template x-if="f.korrektur">
-              <span class="finding-diff">
-                <template x-for="(seg, sIdx) in _findingDiff(f)" :key="sIdx">
-                  <span :class="'finding-diff-seg finding-diff-seg--' + seg.type" x-text="seg.text"></span>
-                </template>
-              </span>
-            </template>
-            <template x-if="!f.korrektur">
-              <span class="finding-original" x-text="f.original"></span>
-            </template>
+            <span class="finding-original" x-text="f.original"></span>
+            <template x-if="f.korrektur"><span class="finding-korrektur" x-text="f.korrektur"></span></template>
             <span class="finding-explanation" x-text="f.erklaerung"></span>
           </span>
         </label>
@@ -55,15 +47,9 @@
         <div class="applied-history-item">
           <span class="badge" :class="_isHardFinding(f.typ) ? 'badge-err' : 'badge-warn'" x-text="$app.t('finding.' + f.typ)"></span>
           <span class="applied-history-text">
+            <span class="finding-original" x-text="f.original"></span>
             <template x-if="f.korrektur">
-              <span class="finding-diff">
-                <template x-for="(seg, sIdx) in _findingDiff(f)" :key="sIdx">
-                  <span :class="'finding-diff-seg finding-diff-seg--' + seg.type" x-text="seg.text"></span>
-                </template>
-              </span>
-            </template>
-            <template x-if="!f.korrektur">
-              <span class="finding-original" x-text="f.original"></span>
+              <span class="finding-korrektur" x-text="f.korrektur"></span>
             </template>
           </span>
         </div>

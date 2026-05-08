@@ -54,39 +54,6 @@
   overflow-wrap: break-word;
 }
 
-/* Inline-Redline (Word-Level-Diff) — del/ins gemischt in einer Zeile statt
-   zwei gestapelter Boxen. Editorial-Pattern wie git --word-diff oder
-   Track-Changes in Word. */
-.finding-diff {
-  display: block;
-  word-break: break-word;
-  line-height: 1.55;
-}
-.finding-diff-seg {
-  display: inline;
-  padding: 1px 2px;
-  border-radius: var(--radius-sm);
-}
-.finding-diff-seg--eq {
-  color: var(--color-text);
-}
-.finding-diff-seg--del {
-  background: color-mix(in srgb, var(--color-err-border) 18%, transparent);
-  text-decoration: line-through;
-  text-decoration-color: color-mix(in srgb, var(--color-err-border) 70%, transparent);
-  text-decoration-thickness: 1px;
-  color: color-mix(in srgb, var(--color-err-text) 85%, var(--color-text));
-}
-.finding-diff-seg--ins {
-  background: color-mix(in srgb, var(--color-ok-border) 18%, transparent);
-  color: color-mix(in srgb, var(--color-ok-text) 85%, var(--color-text));
-  font-weight: 500;
-}
-/* Bei applied-finding alles dezent: wir wollen sehen WAS geändert wurde,
-   aber das ganze Item ist ja bereits durchgestrichen. */
-.finding--applied .finding-diff-seg--del,
-.finding--applied .finding-diff-seg--ins { background: transparent; }
-
 del {
   background: var(--color-err-bg);
   color: var(--color-err-text);
