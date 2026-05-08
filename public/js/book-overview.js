@@ -275,20 +275,35 @@ export const bookOverviewMethods = {
 
   // Letzte 7 Kalendertage. Pro Tag: Zeichen-Delta zum Vortags-Snapshot.
   // Tage ohne Snapshot bekommen 0. Locale-bewusste Wochentag-Labels (Mo/Di/...).
+  // Heute (letzte Iteration) nutzt Live-tokEsts statt Cron-Snapshot — sonst
+  // klafft Lücke zum Heute-Ring, wenn User nach dem Sync weiterschreibt.
   overviewLast7Days() {
     const a = this.overviewStats || [];
-    return this._memo('last7Days', a, () => {
+    const tokEsts = window.__app?.tokEsts || {};
+    return this._memoN('last7Days', [a, tokEsts], () => {
       const charsByDate = new Map();
       for (const s of a) charsByDate.set(s.recorded_at, Number(s.chars) || 0);
       const tag = window.__app?.uiLocale === 'en' ? 'en-US' : 'de-CH';
       const fmt = new Intl.DateTimeFormat(tag, { weekday: 'short' });
+      // Live-Stand summieren (gleiche Quelle wie Hero-Snapshot + Heute-Ring).
+      let liveChars = 0;
+      const ids = Object.keys(tokEsts);
+      for (const id of ids) liveChars += Number(tokEsts[id]?.chars) || 0;
+
+      const todayIso = new Date().toISOString().slice(0, 10);
       const days = [];
       for (let i = 6; i >= 0; i--) {
         const d = new Date(Date.now() - i * 86400000);
         const iso = d.toISOString().slice(0, 10);
         const prevIso = new Date(d.getTime() - 86400000).toISOString().slice(0, 10);
-        const cur = charsByDate.get(iso);
+        let cur = charsByDate.get(iso);
         const prev = charsByDate.get(prevIso);
+        // Heute: jüngste Schreibarbeit nach Cron-Snapshot lebt nur in tokEsts.
+        // Live-Stand ist immer ≥ Cron-Snapshot von heute (oder ersetzt ihn,
+        // falls heute noch kein Sync gelaufen ist).
+        if (iso === todayIso && liveChars > 0) {
+          cur = Math.max(cur ?? 0, liveChars);
+        }
         const delta = (cur != null && prev != null) ? (cur - prev) : 0;
         days.push({ iso, label: fmt.format(d), delta });
       }
@@ -306,15 +321,21 @@ export const bookOverviewMethods = {
   overview7DayCharDelta() {
     const a = this.overviewStats;
     if (!a || a.length < 2) return null;
-    return this._memo('sevenDayDelta', a, () => {
-      const latest = a[a.length - 1];
+    const tokEsts = window.__app?.tokEsts || {};
+    return this._memoN('sevenDayDelta', [a, tokEsts], () => {
+      // Latest = Live-Summe wenn vorhanden, sonst neuester Cron-Snapshot.
+      // Konsistent zu Heute-Ring + 7-Tage-Bars.
+      let liveChars = 0;
+      for (const id of Object.keys(tokEsts)) liveChars += Number(tokEsts[id]?.chars) || 0;
+      const latestSnapshot = a[a.length - 1];
+      const latestChars = liveChars > 0 ? Math.max(liveChars, Number(latestSnapshot.chars) || 0) : (Number(latestSnapshot.chars) || 0);
       const cutoff = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
       let earlier = null;
       for (let i = a.length - 2; i >= 0; i--) {
         if (a[i].recorded_at <= cutoff) { earlier = a[i]; break; }
       }
       if (!earlier) earlier = a[0];
-      return (Number(latest.chars) || 0) - (Number(earlier.chars) || 0);
+      return latestChars - (Number(earlier.chars) || 0);
     });
   },
 

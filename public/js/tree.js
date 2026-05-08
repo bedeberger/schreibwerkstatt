@@ -77,15 +77,24 @@ export const treeMethods = {
   // Nach einem Page-Save tokEsts neu berechnen, damit der Baum den
   // "leer"-Badge sofort verliert und die Zeichenzahl stimmt. Persistiert
   // den frischen Stat-Eintrag auch in der History-DB.
+  //
+  // WICHTIG: Char/Word-Count muss exakt der Server-Normalisierung in
+  // routes/sync.js#htmlToText entsprechen — Tags zu Single-Space, alle
+  // Whitespace-Sequenzen collapsed, getrimmt. Sonst inflated DOMParser's
+  // textContent (behält Whitespace zwischen Block-Tags) gegenüber dem
+  // Cron-Snapshot, und Heute-Ring/7-Tage-Bars driften nach jedem Save.
   _syncPageStatsAfterSave(page, html) {
     if (!page?.id) return;
-    const text = htmlToText(html || '');
-    const userPrompt = buildLektoratPrompt(text);
-    const words = text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
+    const normalized = String(html || '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const userPrompt = buildLektoratPrompt(normalized);
+    const words = normalized === '' ? 0 : normalized.split(/\s+/).length;
     const stat = {
       tok: Math.round(userPrompt.length / CHARS_PER_TOKEN),
       words,
-      chars: text.length,
+      chars: normalized.length,
     };
     this.tokEsts = { ...this.tokEsts, [page.id]: stat };
     if (!this.selectedBookId) return;
