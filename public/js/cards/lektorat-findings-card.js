@@ -9,6 +9,7 @@
 // `_isHardFinding`) und das Partial-Scope für DOM-Isolation.
 
 import { isHardFinding } from '../page-view.js';
+import { findingDiff } from '../diff-words.js';
 
 // Split-Modus Media Query — dieselbe Schwelle wie page-view.js.
 const splitMQ = typeof window !== 'undefined' ? window.matchMedia('(min-width: 1100px)') : null;
@@ -23,6 +24,9 @@ export function registerLektoratFindingsCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
   window.Alpine.data('lektoratFindingsCard', () => ({
     _isHardFinding(typ) { return isHardFinding(typ); },
+
+    // Word-Level-Diff für Inline-Redline-Darstellung im Findings-Panel.
+    _findingDiff(f) { return findingDiff(f); },
 
     // Hover auf Finding → Preview-Panel zur entsprechenden Markierung scrollen
     // (nur im Split-Modus, sonst zeigt page-view einen Tooltip).

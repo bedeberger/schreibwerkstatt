@@ -370,7 +370,10 @@ export const appViewMethods = {
 
   // Setzt allen Seiten-Level-State zurück (Editor, Lektorat, Chat, History).
   resetPage() {
-    if (this._checkPollTimer) { clearInterval(this._checkPollTimer); this._checkPollTimer = null; }
+    // `_checkPollTimer_<pageId>` bewusst NICHT clearen: Poll der verlassenen
+    // Seite muss weiterlaufen, damit `onDone` → `markPageChecked` den
+    // Sidebar-Status aktualisiert (siehe lektorat.js startCheckPoll). Poll
+    // räumt sich nach Job-Abschluss in job-helpers.js selbst auf.
     this.closeSynonymMenu?.();
     this.closeSynonymPicker?.();
     this.closeFigurLookup?.();

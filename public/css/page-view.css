@@ -28,6 +28,31 @@
 .page-content-view h6 { font-size: 0.9em; margin: 0.3em 0 0.2em; font-weight: 700; color: var(--color-muted); }
 .page-content-view p { margin: 0.4em 0; text-wrap: pretty; }
 
+/* Marginalia: Absätze mit Lektorats-Markierungen bekommen rechts einen
+   feinen severity-getönten Akzentstreifen (wie roter Rotstift am Manuskript-
+   Rand). Selektor via :has() — moderner Browsers only, alte fallen sauber
+   auf den unmodifizierten Default zurück. */
+.page-content-view p:has(.lektorat-mark) {
+  position: relative;
+  padding-right: 14px;
+}
+.page-content-view p:has(.lektorat-mark)::after {
+  content: "";
+  position: absolute;
+  top: 0.4em;
+  bottom: 0.4em;
+  right: 0;
+  width: 3px;
+  background: var(--color-style-border);
+  border-radius: var(--radius-sm);
+  opacity: 0.7;
+}
+/* Hartes Finding (selected) → roter Stripe statt amber */
+.page-content-view p:has(.lektorat-mark--selected)::after {
+  background: var(--color-err-border);
+  opacity: 0.85;
+}
+
 /* Drop-Cap: erster Absatz nach H1 oder erster Absatz überhaupt bekommt
    gross gesetzten Anfangsbuchstaben. Greift nur, wenn Reading-Frame nicht
    im Edit-Modus ist (sonst stört contenteditable die Selektion). */

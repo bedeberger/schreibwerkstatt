@@ -200,7 +200,8 @@ const lektoratState = () => ({
   showPageStatusTip: false,
   pageStatusTipPos: { x: 0, y: 0 },
   pageStatusTipLines: [],
-  _checkPollTimer: null,
+  // Lektorat-Check-Polls werden per-pageId gehalten (`_checkPollTimer_<id>`),
+  // damit ein Seitenwechsel den Poll der Ursprungsseite nicht abreisst.
   // IntersectionObserver-basiertes Lazy-Loading der Token-Estimates für die
   // Sidebar (Server-Endpoint `/sync/page-stats/:bookId`). Refs hier, damit
   // _resetBookScopedState() / destroy() sauber aufräumen können.

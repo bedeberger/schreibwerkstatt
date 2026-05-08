@@ -91,8 +91,12 @@ export const lektoratMethods = {
 
   startCheckPoll(jobId) {
     const pageId = this.currentPage?.id;
+    // Per-pageId Timer-Slot: Wechselt User während laufendem Check auf eine
+    // andere Seite, soll der Poll für die ursprüngliche Seite weiterlaufen
+    // (sonst feuert `onDone` nie → Sidebar-Status der Ursprungsseite bleibt
+    // stale). Ein zweiter Check für eine andere Seite kollidiert nicht.
     this._startPoll({
-      timerProp: '_checkPollTimer',
+      timerProp: '_checkPollTimer_' + pageId,
       jobId,
       lsKey: pageId != null ? 'lektorat_check_job_' + pageId : null,
       onProgress: (job) => {
