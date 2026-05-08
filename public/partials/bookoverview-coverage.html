@@ -1,0 +1,49 @@
+<!-- Lektorat-Coverage als Donut-Ring -->
+<template x-if="overviewCoverage && overviewCoverage.total_pages > 0">
+  <div class="overview-tile internal-link"
+       @click="$app.toggleFehlerHeatmapCard()"
+       :aria-label="$app.t('overview.lektorat') + ': ' + overviewCoverageRing().pct + '%, ' + $app.t('overview.coverageMeta', { checked: (overviewCoverage?.checked_pages ?? 0), total: (overviewCoverage?.total_pages ?? 0) })"
+       :data-tip="$app.t('overview.openHeatmap')">
+    <div class="overview-tile-label" x-text="$app.t('overview.lektorat')"></div>
+    <div class="overview-donut-row">
+      <svg class="overview-donut" viewBox="0 0 72 72" aria-hidden="true">
+        <circle cx="36" cy="36" :r="overviewCoverageRing().r"
+                fill="none" stroke="var(--color-border)" stroke-width="6"></circle>
+        <circle cx="36" cy="36" :r="overviewCoverageRing().r"
+                fill="none" stroke="var(--color-accent)" stroke-width="6"
+                stroke-linecap="round"
+                :stroke-dasharray="overviewCoverageRing().dash + ' ' + overviewCoverageRing().gap"
+                transform="rotate(-90 36 36)"></circle>
+        <text x="36" y="40" text-anchor="middle" class="overview-donut-text"
+              x-text="overviewCoverageRing().pct + '%'"></text>
+      </svg>
+      <div class="overview-donut-meta">
+        <div class="overview-donut-meta-checked"
+             x-text="$app.t('overview.coverageMeta', { checked: (overviewCoverage?.checked_pages ?? 0), total: (overviewCoverage?.total_pages ?? 0) })"></div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<!-- Top-Fehler als horizontale Bars -->
+<template x-if="overviewTopFehler().length > 0">
+  <div class="overview-tile internal-link"
+       @click="$app.toggleFehlerHeatmapCard()"
+       :aria-label="$app.t('overview.topErrors')"
+       :data-tip="$app.t('overview.openHeatmap')">
+    <div class="overview-tile-label" x-text="$app.t('overview.topErrors')"></div>
+    <ul class="overview-error-bars">
+      <template x-for="e in overviewTopFehler()" :key="e.typ">
+        <li class="overview-error-bar-item">
+          <div class="overview-error-bar-head">
+            <span class="overview-error-typ" x-text="overviewFehlerLabel(e.typ)"></span>
+            <span class="overview-error-count" x-text="_fmtNum(e.count)"></span>
+          </div>
+          <div class="overview-error-bar-track">
+            <div class="overview-error-bar-fill" :style="{ width: e.pct + '%' }"></div>
+          </div>
+        </li>
+      </template>
+    </ul>
+  </div>
+</template>

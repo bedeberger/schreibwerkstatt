@@ -1,0 +1,40 @@
+<!-- Kapitel-Verteilung: horizontale Bars pro Kapitel (Zeichen relativ).
+     Immer medium — Bar + 5 Meta-Zellen brauchen Breite, sonst Stack-Wrap. -->
+<template x-if="overviewChapterDistribution().length > 0">
+  <div class="overview-tile overview-tile--medium">
+    <div class="overview-tile-head">
+      <div class="overview-tile-label" x-text="$app.t('overview.chapterDist')"></div>
+      <span class="overview-tile-median"
+            x-show="overviewChapterDistribution()[0]?.median > 0"
+            x-text="$app.t('overview.medianTick') + ': ' + _fmtNum(Math.round(overviewChapterDistribution()[0]?.median)) + ' ' + $app.t('bookstats.unit.z')"></span>
+    </div>
+    <ul class="overview-chapter-list">
+      <template x-for="ch in overviewChapterDistribution()" :key="ch.id">
+        <li class="overview-chapter-row internal-link"
+            :class="{ 'overview-chapter-row--max': ch.isMax, 'overview-chapter-row--min': ch.isMin }"
+            @click="_openKapitelReview(ch.id)"
+            :data-tip="$app.t('overview.chapterReviewOpen', { name: ch.name })">
+          <span class="overview-chapter-name" :data-tip="ch.name" x-text="ch.name"></span>
+          <div class="overview-chapter-bar-track overview-chapter-bar-track--diverge">
+            <div class="overview-chapter-bar-fill"
+                 :class="ch.isPositive ? 'overview-chapter-bar-fill--pos' : 'overview-chapter-bar-fill--neg'"
+                 :style="{ left: ch.barLeftPct + '%', width: ch.barWidthPct + '%' }"></div>
+            <div class="overview-chapter-median-tick"
+                 :data-tip="$app.t('overview.medianTick') + ': ' + _fmtNum(ch.median) + ' ' + $app.t('bookstats.unit.z')"></div>
+          </div>
+          <span class="overview-chapter-meta">
+            <span class="overview-chapter-delta"
+                  :class="ch.deltaPct > 0 ? 'overview-trend-pct--up' : ch.deltaPct < 0 ? 'overview-trend-pct--down' : ''"
+                  x-text="(ch.deltaPct >= 0 ? '+' : '') + ch.deltaPct + '%'"></span>
+            <span class="overview-chapter-chars" x-text="_fmtNum(ch.chars) + ' ' + $app.t('bookstats.unit.z')"></span>
+            <span class="overview-chapter-ns"
+                  :data-tip="$app.t('bookstats.metric.normseiten')"
+                  x-text="ch.normseiten.toLocaleString($app.uiLocale === 'en' ? 'en-US' : 'de-CH', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' ' + $app.t('bookstats.unit.ns')"></span>
+            <span class="overview-chapter-words" x-text="_fmtNum(ch.words) + ' ' + $app.t('bookstats.unit.w')"></span>
+            <span class="overview-chapter-pages" x-text="ch.pages + ' ' + $app.t('bookstats.unit.s')"></span>
+          </span>
+        </li>
+      </template>
+    </ul>
+  </div>
+</template>

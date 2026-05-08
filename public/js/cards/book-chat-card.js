@@ -8,6 +8,7 @@
 //   selectedBookName, t.
 
 import { bookChatMethods } from '../book-chat.js';
+import { setupCardLifecycle } from './card-lifecycle.js';
 
 export function registerBookChatCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -20,37 +21,26 @@ export function registerBookChatCard() {
     bookChatProgress: 0,
     bookChatStatus: '',
     _bookChatPollTimer: null,
-
-    _onBookChanged: null,
-    _onViewReset: null,
-    _onResetBookChat: null,
+    _lifecycle: null,
 
     init() {
-      this.$watch(() => window.__app.showBookChatCard, async (visible) => {
-        if (!visible) return;
-        await this._onVisibleBookChat();
-        this.$nextTick(() => {
-          const ta = this.$el?.querySelector('.chat-input');
-          if (ta) ta.focus();
-        });
+      this._lifecycle = setupCardLifecycle(this, {
+        showFlag: 'showBookChatCard',
+        timerKeys: ['_bookChatPollTimer'],
+        onShow: async () => {
+          await this._onVisibleBookChat();
+          this.$nextTick(() => {
+            const ta = this.$el?.querySelector('.chat-input');
+            if (ta) ta.focus();
+          });
+        },
+        onBookChanged: () => this.resetBookChat(),
+        onViewReset: () => this.resetBookChat(),
+        extraListeners: [{ type: 'book-chat:reset', handler: () => this.resetBookChat() }],
       });
-
-      this._onResetBookChat = () => this.resetBookChat();
-      window.addEventListener('book-chat:reset', this._onResetBookChat);
-
-      this._onBookChanged = () => this.resetBookChat();
-      window.addEventListener('book:changed', this._onBookChanged);
-
-      this._onViewReset = () => this.resetBookChat();
-      window.addEventListener('view:reset', this._onViewReset);
     },
 
-    destroy() {
-      if (this._bookChatPollTimer) { clearInterval(this._bookChatPollTimer); this._bookChatPollTimer = null; }
-      if (this._onResetBookChat) window.removeEventListener('book-chat:reset', this._onResetBookChat);
-      if (this._onBookChanged)   window.removeEventListener('book:changed', this._onBookChanged);
-      if (this._onViewReset)     window.removeEventListener('view:reset', this._onViewReset);
-    },
+    destroy() { this._lifecycle?.destroy(); },
 
     ...bookChatMethods,
   }));

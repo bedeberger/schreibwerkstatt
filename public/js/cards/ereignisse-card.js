@@ -6,6 +6,7 @@
 //   - `ereignisseFilters` (app-navigation.js schreibt darauf)
 //   - `_buildGlobalZeitstrahl` (wird aus figuren.js / loadFiguren gerufen)
 //   - `_reloadZeitstrahl` (wird aus app-komplett.js gerufen)
+import { setupCardLifecycle } from './card-lifecycle.js';
 
 export function registerEreignisseCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -18,58 +19,28 @@ export function registerEreignisseCard() {
     zeitstrahlStatus: '',
     _consolidatePollTimer: null,
     _ereignisseExtractPollTimer: null,
-
-    _onBookChanged: null,
-    _onViewReset: null,
-    _onCardRefresh: null,
+    _lifecycle: null,
 
     init() {
-      this.$watch(() => window.__app.showEreignisseCard, async (visible) => {
-        if (!visible) return;
-        if (!window.__app.selectedBookId) return;
-        await window.__app._reloadZeitstrahl();
+      this._lifecycle = setupCardLifecycle(this, {
+        name: 'ereignisse',
+        showFlag: 'showEreignisseCard',
+        timerKeys: ['_consolidatePollTimer', '_ereignisseExtractPollTimer'],
+        resetState: {
+          ereignisseLoading: false,
+          ereignisseProgress: 0,
+          ereignisseStatus: '',
+          zeitstrahlConsolidating: false,
+          zeitstrahlProgress: 0,
+          zeitstrahlStatus: '',
+        },
+        load: (root) => root._reloadZeitstrahl(),
+        refreshNeedsBookId: false,
       });
-
-      this._onBookChanged = async () => {
-        if (this._consolidatePollTimer) { clearInterval(this._consolidatePollTimer); this._consolidatePollTimer = null; }
-        if (this._ereignisseExtractPollTimer) { clearInterval(this._ereignisseExtractPollTimer); this._ereignisseExtractPollTimer = null; }
-        this.ereignisseLoading = false;
-        this.ereignisseProgress = 0;
-        this.ereignisseStatus = '';
-        this.zeitstrahlConsolidating = false;
-        this.zeitstrahlProgress = 0;
-        this.zeitstrahlStatus = '';
-        if (!window.__app.showEreignisseCard) return;
-        if (!window.__app.selectedBookId) return;
-        await window.__app._reloadZeitstrahl();
-      };
-      window.addEventListener('book:changed', this._onBookChanged);
-
-      this._onViewReset = () => {
-        if (this._consolidatePollTimer) { clearInterval(this._consolidatePollTimer); this._consolidatePollTimer = null; }
-        if (this._ereignisseExtractPollTimer) { clearInterval(this._ereignisseExtractPollTimer); this._ereignisseExtractPollTimer = null; }
-        this.ereignisseLoading = false;
-        this.ereignisseProgress = 0;
-        this.ereignisseStatus = '';
-        this.zeitstrahlConsolidating = false;
-        this.zeitstrahlProgress = 0;
-        this.zeitstrahlStatus = '';
-      };
-      window.addEventListener('view:reset', this._onViewReset);
-
-      this._onCardRefresh = (e) => {
-        if (e.detail?.name !== 'ereignisse') return;
-        window.__app._reloadZeitstrahl();
-      };
-      window.addEventListener('card:refresh', this._onCardRefresh);
     },
 
     destroy() {
-      if (this._consolidatePollTimer) { clearInterval(this._consolidatePollTimer); this._consolidatePollTimer = null; }
-      if (this._ereignisseExtractPollTimer) { clearInterval(this._ereignisseExtractPollTimer); this._ereignisseExtractPollTimer = null; }
-      if (this._onBookChanged) window.removeEventListener('book:changed', this._onBookChanged);
-      if (this._onViewReset)   window.removeEventListener('view:reset', this._onViewReset);
-      if (this._onCardRefresh) window.removeEventListener('card:refresh', this._onCardRefresh);
+      this._lifecycle?.destroy();
     },
 
     // UI-Helper. Lesen $root-Filter + -Daten.

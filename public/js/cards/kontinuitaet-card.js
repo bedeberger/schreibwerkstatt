@@ -1,14 +1,8 @@
 // Alpine.data('kontinuitaetCard') — Sub-Komponente der Kontinuitätsprüfung.
 // Job-Polling implementiert die Karte selbst (manueller Flow, kein createCardJobFeature).
-//
-// Lifecycle:
-//   - $watch(showKontinuitaetCard): bei Öffnen Figuren sicherstellen + History laden
-//   - book:changed: State zurück, History fürs neue Buch laden (wenn sichtbar)
-//   - view:reset: eigenen State nullen, Poll-Timer stoppen
-//   - card:refresh (name==='kontinuitaet'): History-Refresh bei erneutem Klick
-//     auf die bereits offene Karte
 
 import { kontinuitaetMethods } from '../kontinuitaet.js';
+import { setupCardLifecycle } from './card-lifecycle.js';
 
 export function registerKontinuitaetCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -21,69 +15,62 @@ export function registerKontinuitaetCard() {
     selectedKontinuitaetIssueKey: null,
     kontinuitaetSummaryOpen: false,
     _kontinuitaetPollTimer: null,
-
-    _onBookChanged: null,
-    _onViewReset: null,
-    _onCardRefresh: null,
+    _lifecycle: null,
 
     init() {
-      this.$watch(() => window.__app.showKontinuitaetCard, async (visible) => {
-        if (!visible) return;
-        const root = window.__app;
-        if (!root.selectedBookId) return;
-        if (!root.figuren?.length) await root.loadFiguren(root.selectedBookId);
-        await this._loadKontinuitaetHistory();
+      const resetState = {
+        kontinuitaetResult: null,
+        kontinuitaetLoading: false,
+        kontinuitaetProgress: 0,
+        kontinuitaetStatus: '',
+        'kontinuitaetFilters.figurId': '',
+        'kontinuitaetFilters.kapitel': '',
+        'kontinuitaetFilters.schwere': '',
+        selectedKontinuitaetIssueKey: null,
+      };
+      // resetState mit verschachtelten Filter-Keys: Object.assign greift nicht
+      // tief — eigene Reset-Override für korrektes Zurücksetzen der Filter.
+      const doReset = (ctx) => {
+        ctx.kontinuitaetResult = null;
+        ctx.kontinuitaetLoading = false;
+        ctx.kontinuitaetProgress = 0;
+        ctx.kontinuitaetStatus = '';
+        ctx.kontinuitaetFilters.figurId = '';
+        ctx.kontinuitaetFilters.kapitel = '';
+        ctx.kontinuitaetFilters.schwere = '';
+        ctx.selectedKontinuitaetIssueKey = null;
+      };
+
+      this._lifecycle = setupCardLifecycle(this, {
+        name: 'kontinuitaet',
+        showFlag: 'showKontinuitaetCard',
+        timerKeys: ['_kontinuitaetPollTimer'],
+        onShow: async (root) => {
+          if (!root.figuren?.length) await root.loadFiguren(root.selectedBookId);
+          await this._loadKontinuitaetHistory();
+        },
+        load: () => this._loadKontinuitaetHistory(),
+        onBookChanged: async (e, ctx, root) => {
+          if (ctx._kontinuitaetPollTimer) {
+            clearInterval(ctx._kontinuitaetPollTimer);
+            ctx._kontinuitaetPollTimer = null;
+          }
+          doReset(ctx);
+          if (!root.showKontinuitaetCard) return;
+          if (!root.selectedBookId) return;
+          await ctx._loadKontinuitaetHistory();
+        },
+        onViewReset: (e, ctx) => {
+          if (ctx._kontinuitaetPollTimer) {
+            clearInterval(ctx._kontinuitaetPollTimer);
+            ctx._kontinuitaetPollTimer = null;
+          }
+          doReset(ctx);
+        },
       });
-
-      this._onBookChanged = async () => {
-        // Läuft ein Poll-Timer fürs alte Buch? Stoppen, sonst trifft er das falsche.
-        if (this._kontinuitaetPollTimer) {
-          clearInterval(this._kontinuitaetPollTimer);
-          this._kontinuitaetPollTimer = null;
-        }
-        this.kontinuitaetResult = null;
-        this.kontinuitaetLoading = false;
-        this.kontinuitaetProgress = 0;
-        this.kontinuitaetStatus = '';
-        this.kontinuitaetFilters.figurId = '';
-        this.kontinuitaetFilters.kapitel = '';
-        this.kontinuitaetFilters.schwere = '';
-        this.selectedKontinuitaetIssueKey = null;
-        if (!window.__app.showKontinuitaetCard) return;
-        if (!window.__app.selectedBookId) return;
-        await this._loadKontinuitaetHistory();
-      };
-      window.addEventListener('book:changed', this._onBookChanged);
-
-      this._onViewReset = () => {
-        if (this._kontinuitaetPollTimer) {
-          clearInterval(this._kontinuitaetPollTimer);
-          this._kontinuitaetPollTimer = null;
-        }
-        this.kontinuitaetResult = null;
-        this.kontinuitaetStatus = '';
-        this.kontinuitaetProgress = 0;
-        this.kontinuitaetLoading = false;
-        this.kontinuitaetFilters.figurId = '';
-        this.kontinuitaetFilters.kapitel = '';
-        this.kontinuitaetFilters.schwere = '';
-        this.selectedKontinuitaetIssueKey = null;
-      };
-      window.addEventListener('view:reset', this._onViewReset);
-
-      this._onCardRefresh = (e) => {
-        if (e.detail?.name !== 'kontinuitaet') return;
-        this._loadKontinuitaetHistory();
-      };
-      window.addEventListener('card:refresh', this._onCardRefresh);
     },
 
-    destroy() {
-      if (this._kontinuitaetPollTimer) { clearInterval(this._kontinuitaetPollTimer); this._kontinuitaetPollTimer = null; }
-      if (this._onBookChanged)  window.removeEventListener('book:changed', this._onBookChanged);
-      if (this._onViewReset)    window.removeEventListener('view:reset',  this._onViewReset);
-      if (this._onCardRefresh)  window.removeEventListener('card:refresh', this._onCardRefresh);
-    },
+    destroy() { this._lifecycle?.destroy(); },
 
     ...kontinuitaetMethods,
   }));

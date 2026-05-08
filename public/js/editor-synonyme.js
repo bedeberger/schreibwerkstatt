@@ -1,6 +1,5 @@
 import { fetchJson } from './utils.js';
-import { rangeForWordAtClientPoint } from './editor-figur-lookup.js';
-import { WORD_RE } from './editor-utils.js';
+import { WORD_RE, attachReflow, positionPopupNearRect, rangeForWordAtClientPoint } from './editor-utils.js';
 import { startPoll } from './cards/job-helpers.js';
 
 // Synonym-Ermittler für den contenteditable-Editor.
@@ -117,30 +116,24 @@ export const synonymCardMethods = {
     }
     const isPicker = this.showSynonymPicker;
     const el = document.querySelector(isPicker ? '.synonym-picker' : '.synonym-menu');
-    const h = el?.offsetHeight || (isPicker ? 360 : 44);
-    const w = el?.offsetWidth  || (isPicker ? 300 : 220);
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const placeBelow = spaceBelow >= h + 8;
-    this.synonymMenuX = Math.max(8, Math.min(Math.round(rect.left), window.innerWidth - w - 8));
-    this.synonymMenuY = placeBelow
-      ? Math.round(rect.bottom + 4)
-      : Math.max(8, Math.round(rect.top - h - 4));
+    const { x, y } = positionPopupNearRect(rect, el, {
+      gap: 4,
+      fallbackWidth:  isPicker ? 300 : 220,
+      fallbackHeight: isPicker ? 360 : 44,
+    });
+    this.synonymMenuX = x;
+    this.synonymMenuY = y;
   },
 
   _attachSynonymScroll() {
-    if (this._synonymScrollHandler) return;
-    const handler = () => this._positionSynonymUI();
-    // Capture-Phase, damit auch Scrolls in inneren Containern (edit area) erfasst werden
-    window.addEventListener('scroll', handler, true);
-    window.addEventListener('resize', handler);
-    this._synonymScrollHandler = handler;
+    if (this._synonymReflowDetach) return;
+    this._synonymReflowDetach = attachReflow(() => this._positionSynonymUI());
   },
 
   _detachSynonymScroll() {
-    if (!this._synonymScrollHandler) return;
-    window.removeEventListener('scroll', this._synonymScrollHandler, true);
-    window.removeEventListener('resize', this._synonymScrollHandler);
-    this._synonymScrollHandler = null;
+    if (!this._synonymReflowDetach) return;
+    this._synonymReflowDetach();
+    this._synonymReflowDetach = null;
   },
 
   closeSynonymMenu() {

@@ -1,0 +1,23 @@
+<!-- Letzte Bewertung als 6 Sterne + Trend-Pfeil -->
+<template x-if="overviewLastReview">
+  <div class="overview-tile internal-link"
+       @click="$app.toggleBookReviewCard()"
+       :aria-label="$app.t('overview.lastReview')"
+       :data-tip="$app.t('overview.openReview')">
+    <div class="overview-tile-label" x-text="$app.t('overview.lastReview')"></div>
+    <div class="overview-stars" :aria-label="overviewStarsAriaLabel()">
+      <template x-for="(s, i) in overviewStars(overviewLastReview?.review_json?.gesamtnote)" :key="i">
+        <span class="overview-star"
+              :class="s.full ? 'overview-star--full' : s.half ? 'overview-star--half' : 'overview-star--empty'"
+              aria-hidden="true">★</span>
+      </template>
+    </div>
+    <div class="overview-review-meta">
+      <span class="overview-review-date" x-text="$app.formatDate(overviewLastReview?.reviewed_at)"></span>
+      <span class="overview-review-trend" x-show="overviewReviewTrendDisplay()"
+            :class="overviewReviewTrend()?.dir === 'up' ? 'overview-trend-pct--up'
+                  : overviewReviewTrend()?.dir === 'down' ? 'overview-trend-pct--down' : ''"
+            x-text="overviewReviewTrendDisplay()"></span>
+    </div>
+  </div>
+</template>

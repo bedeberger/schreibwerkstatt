@@ -1,0 +1,91 @@
+<!-- Figuren: Anzahl + Top-3 als Avatar-Chips -->
+<template x-if="overviewFigurenCount() > 0">
+  <div class="overview-tile internal-link"
+       @click="$app.toggleFiguresCard()"
+       :aria-label="$app.t('tile.figuren') + ': ' + _fmtNum(overviewFigurenCount()) + ' ' + $app.t('overview.unit.figuren')">
+    <div class="overview-tile-label" x-text="$app.t('tile.figuren')"></div>
+    <div class="overview-fig-row">
+      <span class="overview-fig-count" x-text="_fmtNum(overviewFigurenCount())"></span>
+      <span class="overview-fig-count-unit" x-text="$app.t('overview.unit.figuren')"></span>
+    </div>
+    <div class="overview-fig-chips" x-show="overviewTopFiguren().length > 0">
+      <template x-for="(f, i) in overviewTopFiguren()" :key="f.id">
+        <span class="overview-fig-chip"
+              :data-rolle="f.rolle || ''"
+              :data-tip="f.name + (f.mentions > 0 ? ' · ' + f.mentions : '')">
+          <span class="overview-fig-avatar"
+                :data-idx="i"
+                x-text="overviewInitials(f.kurzname || f.name)"></span>
+          <span class="overview-fig-name" x-text="f.kurzname || f.name"></span>
+        </span>
+      </template>
+    </div>
+  </div>
+</template>
+
+<!-- Szenen: Total + Stacked-Bar Wertungs-Verteilung -->
+<template x-if="overviewSzenenCount() > 0">
+  <div class="overview-tile internal-link"
+       @click="$app.toggleSzenenCard()"
+       :aria-label="$app.t('tile.szenen') + ': ' + _fmtNum(overviewSzenenCount()) + ' ' + $app.t('overview.unit.total')">
+    <div class="overview-tile-label" x-text="$app.t('tile.szenen')"></div>
+    <div class="overview-fig-row">
+      <span class="overview-fig-count" x-text="_fmtNum(overviewSzenenCount())"></span>
+      <span class="overview-fig-count-unit" x-text="$app.t('overview.unit.total')"></span>
+    </div>
+    <div class="overview-stacked-bar"
+         :data-tip="$app.t('overview.szenenBreakdown', {
+           stark: overviewSzenenWertung().stark,
+           mittel: overviewSzenenWertung().mittel,
+           schwach: overviewSzenenWertung().schwach
+         })">
+      <div class="overview-stacked-seg overview-stacked-seg--stark"
+           :style="{ flex: overviewSzenenWertung().stark }"
+           x-show="overviewSzenenWertung().stark > 0"></div>
+      <div class="overview-stacked-seg overview-stacked-seg--mittel"
+           :style="{ flex: overviewSzenenWertung().mittel }"
+           x-show="overviewSzenenWertung().mittel > 0"></div>
+      <div class="overview-stacked-seg overview-stacked-seg--schwach"
+           :style="{ flex: overviewSzenenWertung().schwach }"
+           x-show="overviewSzenenWertung().schwach > 0"></div>
+      <div class="overview-stacked-seg overview-stacked-seg--ohne"
+           :style="{ flex: overviewSzenenWertung().ohne }"
+           x-show="overviewSzenenWertung().ohne > 0"></div>
+    </div>
+    <div class="overview-stacked-legend">
+      <span class="overview-stacked-key overview-stacked-key--stark"
+            x-show="overviewSzenenWertung().stark > 0"
+            x-text="overviewSzenenWertung().stark + ' ' + $app.t('overview.unit.stark')"></span>
+      <span class="overview-stacked-key overview-stacked-key--mittel"
+            x-show="overviewSzenenWertung().mittel > 0"
+            x-text="overviewSzenenWertung().mittel + ' ' + $app.t('overview.unit.mittel')"></span>
+      <span class="overview-stacked-key overview-stacked-key--schwach"
+            x-show="overviewSzenenWertung().schwach > 0"
+            x-text="overviewSzenenWertung().schwach + ' ' + $app.t('overview.unit.schwach')"></span>
+    </div>
+  </div>
+</template>
+
+<!-- Schauplätze: Anzahl + Top-6 als Chips, typ als data-attr für Akzentfarbe -->
+<template x-if="overviewOrteCount() > 0">
+  <div class="overview-tile internal-link"
+       @click="$app.toggleOrteCard()"
+       :aria-label="$app.t('tile.orte') + ': ' + _fmtNum(overviewOrteCount()) + ' ' + $app.t('overview.unit.orte')">
+    <div class="overview-tile-label" x-text="$app.t('tile.orte')"></div>
+    <div class="overview-fig-row">
+      <span class="overview-fig-count" x-text="_fmtNum(overviewOrteCount())"></span>
+      <span class="overview-fig-count-unit" x-text="$app.t('overview.unit.orte')"></span>
+    </div>
+    <div class="overview-fig-chips" x-show="overviewTopOrte().length > 0">
+      <template x-for="o in overviewTopOrte()" :key="o.id">
+        <span class="overview-ort-chip"
+              :data-typ="o.typ"
+              :data-tip="o.name + (o.total > 0 ? ' · ' + o.total : '')"
+              @click.stop="$app.openOrtById(o.id)">
+          <span class="overview-ort-dot" :data-typ="o.typ" aria-hidden="true"></span>
+          <span class="overview-fig-name" x-text="o.name"></span>
+        </span>
+      </template>
+    </div>
+  </div>
+</template>

@@ -21,7 +21,7 @@ const SLASH_ITEMS = [
   { key: 'hr',         tag: 'hr' },
 ];
 
-import { getEditEl } from './editor-utils.js';
+import { getEditEl, placeCaretIn } from './editor-utils.js';
 
 const BLOCK_SEL = 'p, h1, h2, h3, h4, h5, h6, blockquote, pre, li, div.poem';
 
@@ -32,19 +32,6 @@ function findBlock(node, root) {
     cur = cur.parentNode;
   }
   return null;
-}
-
-// Setzt den Cursor in ein frisch transformiertes (leeres) Blockelement.
-// Bei einem <p><br></p>-Muster erwartet der Browser die Position auf dem
-// Elternelement mit Offset 0 – dort erscheint der Cursor sichtbar.
-function placeCaretIn(el) {
-  const sel = document.getSelection();
-  if (!sel) return;
-  const range = document.createRange();
-  range.setStart(el, 0);
-  range.collapse(true);
-  sel.removeAllRanges();
-  sel.addRange(range);
 }
 
 export const toolbarCardMethods = {

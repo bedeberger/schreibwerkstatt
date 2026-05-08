@@ -1,0 +1,104 @@
+@layer components {
+/* Buch-Übersicht: Tile-Grid + gemeinsame Tile-Atome (Label, Head, Median,
+   internal-link-Override, Trend-Pct-Farben). Tile-spezifische Visuals leben
+   in book-overview/{stats,coverage,review,domain,presence,kapitel,recent-actions}.css. */
+
+.book-overview .overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  /* dense: kleine Tiles füllen Lücken zurück, die `--hero`/`--medium`/`--wide`
+     beim Zeilenumbruch lassen (Orphan-Cells). Verhindert Whitespace-Inseln,
+     wenn z.B. ein span-2-Tile 1 Slot frei lässt. */
+  grid-auto-flow: row dense;
+}
+
+.overview-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 0.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  min-width: 0;
+  transition: border-color var(--transition-base), background var(--transition-base), box-shadow var(--transition-base);
+  /* Container für interne Reflows: Chapter-Rows + Matrix-Centering reagieren
+     auf Tile-Breite, nicht auf Viewport. Dadurch funktioniert Single-Span
+     korrekt auch in breiten Viewports. */
+  container-type: inline-size;
+}
+
+.overview-tile.internal-link { cursor: pointer; }
+/* Globaler `.internal-link:hover` setzt opacity 0.65 + underline — für Tiles
+   unerwünscht (Karte soll nicht „dimmen" beim Hover). Overrides hier. */
+.overview-tile.internal-link:hover {
+  opacity: 1;
+  text-decoration: none;
+  border-color: var(--color-border-focus);
+  background: var(--color-hover);
+  box-shadow: var(--shadow-sm);
+}
+.overview-tile.internal-link:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+  text-decoration: none;
+}
+
+.overview-tile--wide { grid-column: 1 / -1; }
+
+/* Hero-Tiles (Snapshot + Trend) sind doppelt so breit wie normale Tiles
+   auf grösseren Viewports — visuelle Hierarchie. Medium-Tiles (Presence,
+   Findings) ebenfalls span 2 — keine volle Zeilenbreite, sonst zu viel
+   Whitespace bei wenigen Spalten/kurzen Bars. */
+@media (min-width: 720px) {
+  .overview-tile--hero { grid-column: span 2; }
+  .overview-tile--medium { grid-column: span 2; }
+}
+
+.overview-tile-label {
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-muted);
+  font-weight: 600;
+}
+
+/* Tile-Head: Label + sekundäre Median-Anzeige nebeneinander. Genutzt von
+   Streak-Heatmap und allen Chapter-List-Tiles. */
+.overview-tile-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.overview-tile-median {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  margin-left: auto;
+}
+
+/* Trend-Pct: shared Up/Down-Farben (Sparkline, 7-Tage, Chapter-Delta, Review). */
+.overview-trend-pct {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-muted);
+}
+.overview-trend-pct--up   { color: var(--color-success, #4caf50); }
+.overview-trend-pct--down { color: var(--color-danger,  #d32f2f); }
+
+@media (max-width: 700px) {
+  .book-overview .overview-grid {
+    grid-template-columns: 1fr;
+  }
+  .overview-tile--hero { grid-column: 1 / -1; }
+}
+
+@media (max-width: 480px) {
+  .book-overview .overview-grid { gap: 10px; }
+  .overview-tile { padding: 12px; gap: 6px; }
+}
+}

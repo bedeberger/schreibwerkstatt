@@ -1,0 +1,141 @@
+<!-- Sparkline mit Gradient-Fill + farb-codiert + Endpunkt-Marker.
+     SVG ist aria-hidden — Trend-Prozent darunter trägt die Info,
+     das Tile selbst hat ein zusammenfassendes aria-label. -->
+<template x-if="!overviewIsFinished && overviewSparkline().d">
+  <div class="overview-tile internal-link"
+       @click="_openLengthStats(30, 'chars')"
+       :aria-label="$app.t('overview.trend') + ', ' + $app.t('overview.trendDelta', { pct: (overviewSparkline().deltaPct >= 0 ? '+' : '') + overviewSparkline().deltaPct })">
+    <div class="overview-tile-label" x-text="$app.t('overview.trend')"></div>
+    <div class="overview-sparkline-wrap">
+      <svg class="overview-sparkline"
+           viewBox="0 0 240 48"
+           preserveAspectRatio="none"
+           aria-hidden="true">
+        <defs>
+          <linearGradient :id="$id('sl-grad')" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   :style="'stop-color:' + overviewSparkline().color + ';stop-opacity:0.3'"></stop>
+            <stop offset="100%" :style="'stop-color:' + overviewSparkline().color + ';stop-opacity:0'"></stop>
+          </linearGradient>
+        </defs>
+        <path :d="overviewSparkline().area" :fill="'url(#' + $id('sl-grad') + ')'" stroke="none"></path>
+        <path :d="overviewSparkline().d" fill="none" :stroke="overviewSparkline().color" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"></path>
+        <circle :cx="overviewSparkline().endX" :cy="overviewSparkline().endY" r="2.2" :fill="overviewSparkline().color"></circle>
+      </svg>
+      <div class="overview-sparkline-hover" aria-hidden="true">
+        <template x-for="(p, i) in overviewSparkline().points" :key="(p.iso || '') + ':' + i">
+          <div class="overview-sparkline-hover-col" :data-tip="p.label">
+            <span class="overview-sparkline-tick" aria-hidden="true"></span>
+          </div>
+        </template>
+      </div>
+    </div>
+    <div class="overview-trend-meta">
+      <span class="overview-trend-pct"
+            :class="overviewSparkline().deltaPct > 0 ? 'overview-trend-pct--up'
+                  : overviewSparkline().deltaPct < 0 ? 'overview-trend-pct--down' : ''"
+            x-text="$app.t('overview.trendDelta', { pct: (overviewSparkline().deltaPct >= 0 ? '+' : '') + overviewSparkline().deltaPct })"></span>
+    </div>
+  </div>
+</template>
+
+<!-- 7-Tage-Balken: Mini-Bar-Chart Zeichen-Delta pro Tag -->
+<template x-if="!overviewIsFinished && overview7DayCharDelta() !== null">
+  <div class="overview-tile internal-link"
+       @click="_openLengthStats(7, 'delta_chars')"
+       :aria-label="$app.t('overview.last7Days') + ': ' + (overview7DayCharDelta() >= 0 ? '+' : '') + _fmtNum(overview7DayCharDelta()) + ' ' + $app.t('bookstats.unit.z')">
+    <div class="overview-tile-label" x-text="$app.t('overview.last7Days')"></div>
+    <div class="overview-bars7">
+      <template x-for="d in overviewLast7Days()" :key="d.iso">
+        <div class="overview-bar7-col" :data-tip="d.label + ': ' + (d.delta >= 0 ? '+' : '') + _fmtNum(d.delta)">
+          <div class="overview-bar7-track">
+            <div class="overview-bar7-fill"
+                 :class="d.delta > 0 ? 'overview-bar7-fill--pos' : d.delta < 0 ? 'overview-bar7-fill--neg' : ''"
+                 :style="{ height: Math.round(Math.abs(d.delta) / overviewLast7Max() * 100) + '%' }"></div>
+          </div>
+          <span class="overview-bar7-label" x-text="d.label"></span>
+        </div>
+      </template>
+    </div>
+    <div class="overview-bars7-total">
+      <span class="overview-trend-pct"
+            :class="overview7DayCharDelta() > 0 ? 'overview-trend-pct--up'
+                  : overview7DayCharDelta() < 0 ? 'overview-trend-pct--down' : ''"
+            x-text="(overview7DayCharDelta() >= 0 ? '+' : '') + _fmtNum(overview7DayCharDelta()) + ' ' + $app.t('bookstats.unit.z')"></span>
+    </div>
+  </div>
+</template>
+
+<!-- Heute-Ring: Tagesziel-Donut, pulsiert bei aktivem Schreibtag.
+     Goal aus currentUser.daily_goal_chars (User-Settings), Fallback 1500. -->
+<template x-if="!overviewIsFinished && overviewStats && overviewStats.length > 0">
+  <div class="overview-tile internal-link"
+       @click="_openLengthStats(7, 'delta_chars')"
+       :aria-label="$app.t('overview.today.aria', { chars: _fmtNum(overviewTodayRing($app.currentUser?.daily_goal_chars || 1500).chars), goal: _fmtNum(overviewTodayRing($app.currentUser?.daily_goal_chars || 1500).goal), pct: overviewTodayRing($app.currentUser?.daily_goal_chars || 1500).pct })"
+       :data-tip="$app.t('overview.openStats')">
+    <div class="overview-tile-label" x-text="$app.t('overview.today.title')"></div>
+    <div class="overview-donut-row">
+      <svg class="overview-donut overview-today-ring"
+           :class="{ 'overview-today-ring--active': overviewTodayRing($app.currentUser?.daily_goal_chars || 1500).active, 'overview-today-ring--reached': overviewTodayRing($app.currentUser?.daily_goal_chars || 1500).reached }"
+           viewBox="0 0 72 72" aria-hidden="true">
+        <circle cx="36" cy="36" :r="overviewTodayRing($app.currentUser?.daily_goal_chars || 1500).r"
+                fill="none" stroke="var(--color-border)" stroke-width="6"></circle>
+        <circle cx="36" cy="36" :r="overviewTodayRing($app.currentUser?.daily_goal_chars || 1500).r"
+                fill="none" stroke="var(--color-accent)" stroke-width="6"
+                stroke-linecap="round"
+                :stroke-dasharray="overviewTodayRing($app.currentUser?.daily_goal_chars || 1500).dash + ' ' + overviewTodayRing($app.currentUser?.daily_goal_chars || 1500).gap"
+                transform="rotate(-90 36 36)"></circle>
+        <text x="36" y="40" text-anchor="middle" class="overview-donut-text"
+              x-text="overviewTodayRing($app.currentUser?.daily_goal_chars || 1500).pct + '%'"></text>
+      </svg>
+      <div class="overview-donut-meta">
+        <div class="overview-donut-meta-checked"
+             x-show="overviewTodayRing($app.currentUser?.daily_goal_chars || 1500).active"
+             x-text="$app.t('overview.today.meta', { chars: _fmtNum(overviewTodayRing($app.currentUser?.daily_goal_chars || 1500).chars), goal: _fmtNum(overviewTodayRing($app.currentUser?.daily_goal_chars || 1500).goal) })"></div>
+        <div class="overview-donut-meta-checked"
+             x-show="!overviewTodayRing($app.currentUser?.daily_goal_chars || 1500).active"
+             x-text="$app.t('overview.today.idle')"></div>
+        <div class="overview-donut-meta-checked"
+             x-show="overviewTodayRing($app.currentUser?.daily_goal_chars || 1500).reached"
+             x-text="$app.t('overview.today.goalReached')"></div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<!-- Schreibstatistiken-Heatmap: 52×7 GitHub-Stil-Grid -->
+<template x-if="!overviewIsFinished && overviewStats && overviewStats.length > 0">
+  <div class="overview-tile overview-tile--wide internal-link"
+       @click="_openLengthStats(365, 'delta_chars')">
+    <div class="overview-tile-head">
+      <div class="overview-tile-label" x-text="$app.t('overview.streak.title')"></div>
+      <div class="overview-streak-meta">
+        <span class="overview-streak-stat" x-text="$app.t('overview.streak.current', { n: overviewStreakHeatmap().currentStreak })"></span>
+        <span class="overview-streak-stat" x-text="$app.t('overview.streak.longest', { n: overviewStreakHeatmap().longestStreak })"></span>
+        <span class="overview-streak-stat" x-text="$app.t('overview.streak.totalActive', { n: overviewStreakHeatmap().totalActiveDays })"></span>
+      </div>
+    </div>
+    <div class="overview-streak-grid" role="img" :aria-label="$app.t('overview.streak.title')">
+      <template x-for="(week, wi) in overviewStreakHeatmap().weeks" :key="wi">
+        <div class="overview-streak-week">
+          <template x-for="(cell, di) in week" :key="di">
+            <div class="overview-streak-cell"
+                 :class="cell ? ('overview-streak-cell--lvl' + cell.level + (cell.future ? ' overview-streak-cell--future' : '')) : 'overview-streak-cell--empty'"
+                 :data-tip="cell && cell.iso
+                   ? (cell.delta != null && cell.delta > 0
+                       ? $app.t('overview.streak.cellTip', { date: cell.iso, chars: _fmtNum(cell.delta) })
+                       : (cell.hasSnapshot ? $app.t('overview.streak.cellTipNoChange', { date: cell.iso }) : $app.t('overview.streak.cellTipNone', { date: cell.iso })))
+                   : null"></div>
+          </template>
+        </div>
+      </template>
+    </div>
+    <div class="overview-streak-legend">
+      <span class="overview-streak-legend-label" x-text="$app.t('overview.streak.legend')"></span>
+      <span class="overview-streak-cell overview-streak-cell--lvl0"></span>
+      <span class="overview-streak-cell overview-streak-cell--lvl1"></span>
+      <span class="overview-streak-cell overview-streak-cell--lvl2"></span>
+      <span class="overview-streak-cell overview-streak-cell--lvl3"></span>
+      <span class="overview-streak-cell overview-streak-cell--lvl4"></span>
+    </div>
+  </div>
+</template>

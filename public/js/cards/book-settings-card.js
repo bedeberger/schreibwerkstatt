@@ -3,6 +3,7 @@
 // im Root. Daten werden beim Öffnen / Buchwechsel nachgeladen.
 
 import { bookSettingsMethods } from '../book-settings.js';
+import { setupCardLifecycle } from './card-lifecycle.js';
 
 export function registerBookSettingsCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -26,42 +27,29 @@ export function registerBookSettingsCard() {
     bookHistoryResetLoading: false,
     bookHistoryResetMessage: '',
     bookHistoryResetError: '',
-
-    _onBookChanged: null,
-    _onViewReset: null,
+    _lifecycle: null,
 
     init() {
-      this.$watch(() => window.__app.showBookSettingsCard, async (visible) => {
-        if (!visible) return;
-        if (!window.__app.selectedBookId) return;
-        await Promise.all([this.loadBookSettings(), this.loadBookJobStats()]);
+      this._lifecycle = setupCardLifecycle(this, {
+        showFlag: 'showBookSettingsCard',
+        onShow: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats()]),
+        load: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats()]),
+        resetState: {
+          expandedJobType: null,
+          bookJobRuns: {},
+          bookHistoryResetMessage: '',
+          bookHistoryResetError: '',
+        },
+        resetStateView: {
+          bookSettingsSaved: false,
+          bookSettingsError: '',
+          bookHistoryResetMessage: '',
+          bookHistoryResetError: '',
+        },
       });
-
-      this._onBookChanged = () => {
-        this.expandedJobType = null;
-        this.bookJobRuns = {};
-        this.bookHistoryResetMessage = '';
-        this.bookHistoryResetError = '';
-        if (!window.__app.showBookSettingsCard) return;
-        if (!window.__app.selectedBookId) return;
-        this.loadBookSettings();
-        this.loadBookJobStats();
-      };
-      window.addEventListener('book:changed', this._onBookChanged);
-
-      this._onViewReset = () => {
-        this.bookSettingsSaved = false;
-        this.bookSettingsError = '';
-        this.bookHistoryResetMessage = '';
-        this.bookHistoryResetError = '';
-      };
-      window.addEventListener('view:reset', this._onViewReset);
     },
 
-    destroy() {
-      if (this._onBookChanged) window.removeEventListener('book:changed', this._onBookChanged);
-      if (this._onViewReset)   window.removeEventListener('view:reset',  this._onViewReset);
-    },
+    destroy() { this._lifecycle?.destroy(); },
 
     ...bookSettingsMethods,
   }));

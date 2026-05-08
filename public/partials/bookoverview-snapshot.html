@@ -1,0 +1,37 @@
+<!-- HERO: Snapshot mit Hero-Zeichen + Sub-Stats (Reihenfolge: Z → W → S → Kapitel → T) -->
+<template x-if="overviewLatest()">
+  <div class="overview-tile overview-tile--hero internal-link"
+       @click="_openLengthStats(30, 'chars')"
+       :aria-label="$app.t('overview.snapshot') + ': ' + _fmtNum(overviewLatest()?.chars) + ' ' + $app.t('bookstats.unit.z')">
+    <div class="overview-tile-label" x-text="$app.t('overview.snapshot')"></div>
+    <div class="overview-hero-row">
+      <div class="overview-hero-num">
+        <span class="overview-hero-value" x-text="_fmtNum(overviewLatest()?.chars)"></span>
+        <span class="overview-hero-unit" x-text="$app.t('bookstats.unit.z')"></span>
+      </div>
+      <div class="overview-substats">
+        <div class="overview-substat" x-show="overviewLatest()?.chars > 0"
+             :data-tip="$app.t('bookstats.metric.normseiten')">
+          <span class="overview-substat-value" x-text="(Math.round((overviewLatest()?.chars || 0) / 1500 * 10) / 10).toLocaleString($app.uiLocale === 'en' ? 'en-US' : 'de-CH', { minimumFractionDigits: 1, maximumFractionDigits: 1 })"></span>
+          <span class="overview-substat-unit" x-text="$app.t('bookstats.unit.ns')"></span>
+        </div>
+        <div class="overview-substat" x-show="overviewLatest()?.words > 0">
+          <span class="overview-substat-value" x-text="_fmtNum(overviewLatest()?.words)"></span>
+          <span class="overview-substat-unit" x-text="$app.t('bookstats.unit.w')"></span>
+        </div>
+        <div class="overview-substat">
+          <span class="overview-substat-value" x-text="_fmtNum(overviewLatest()?.page_count)"></span>
+          <span class="overview-substat-unit" x-text="$app.t('bookstats.unit.s')"></span>
+        </div>
+        <div class="overview-substat">
+          <span class="overview-substat-value" x-text="_fmtNum(overviewLatest()?.chapter_count)"></span>
+          <span class="overview-substat-unit" x-text="$app.t('overview.unit.chapters')"></span>
+        </div>
+        <div class="overview-substat" x-show="overviewLatest()?.tok > 0">
+          <span class="overview-substat-value" x-text="_fmtNum(overviewLatest()?.tok)"></span>
+          <span class="overview-substat-unit" x-text="$app.t('bookstats.unit.t')"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>

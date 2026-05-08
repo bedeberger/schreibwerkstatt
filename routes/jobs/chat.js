@@ -74,6 +74,7 @@ async function runChatJob(jobId, sessionId, userMsgId, message, userEmail, userT
 
     // Seiteninhalt frisch aus BookStack laden
     let pageText = '';
+    let pageUpdatedAt = null;
     if (session.page_id && session.page_id > 0) {
       try {
         const authHeader = userToken
@@ -87,6 +88,7 @@ async function runChatJob(jobId, sessionId, userMsgId, message, userEmail, userT
         if (!pdResp.ok) throw new Error(`BookStack ${pdResp.status}: ${await pdResp.text()}`);
         const pd = await pdResp.json();
         pageText = htmlToText(pd.html || '');
+        pageUpdatedAt = pd.updated_at || null;
       } catch (e) {
         if (e.name === 'AbortError') throw e;
         logger.warn(`Job ${jobId}: Seiteninhalt konnte nicht geladen werden: ${e.message}`);
@@ -150,6 +152,7 @@ async function runChatJob(jobId, sessionId, userMsgId, message, userEmail, userT
       session_id: session.id,
       user_message_id: userMsgId,
       assistant_message_id: asstMsgResult.lastInsertRowid,
+      updatedAt: pageUpdatedAt,
       tokensIn, tokensOut,
     }, chatTps);
     logger.info(`Job ${jobId}: Chat «${session.page_name || '-'}» session ${sessionId} abgeschlossen (${fmtTok(tokensIn)}↑ ${fmtTok(tokensOut)}↓ Tokens, ${vorschlaege.length} Vorschläge).`);

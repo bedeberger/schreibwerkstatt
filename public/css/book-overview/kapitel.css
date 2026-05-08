@@ -1,0 +1,204 @@
+@layer components {
+/* Kapitel-Tiles (Verteilung, Findings, Lektoratszeit): Liste mit Diverging-
+   Bars um Median. 3-Spalten-Subgrid zwingt globale Spaltenausrichtung über
+   alle Rows. */
+.overview-chapter-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(120px, 22%) 1fr auto;
+  column-gap: 12px;
+  row-gap: 4px;
+  max-height: min(360px, 50vh);
+  overflow-y: auto;
+}
+.overview-chapter-row {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  min-width: 0;
+  border-left: 2px solid transparent;
+}
+.overview-chapter-row:hover { background: var(--color-hover); opacity: 1; text-decoration: none; }
+/* Min/Max-Akzent: linker Border + tönt Bar-Fill ein. */
+.overview-chapter-row--max {
+  border-left-color: var(--color-success, #4caf50);
+}
+.overview-chapter-row--max .overview-chapter-bar-fill {
+  background: var(--color-success, #4caf50);
+}
+.overview-chapter-row--min {
+  border-left-color: var(--color-danger, #d32f2f);
+}
+.overview-chapter-row--min .overview-chapter-bar-fill {
+  background: var(--color-danger, #d32f2f);
+  opacity: var(--opacity-disabled);
+}
+/* Worst/Best: für Tiles mit invertierter Semantik (Findings, Lektoratszeit) —
+   höchster Wert = bad (rot), niedrigster = good (grün). Border-only, damit
+   die diverging Bar-Coloring (--findings-pos/neg) nicht überschrieben wird. */
+.overview-chapter-row--worst {
+  border-left-color: var(--color-danger, #d32f2f);
+}
+.overview-chapter-row--best {
+  border-left-color: var(--color-success, #4caf50);
+}
+/* Findings-Tile: ungeprüfte Kapitel ausgrauen. */
+.overview-chapter-row--nocheck {
+  cursor: default;
+}
+.overview-chapter-row--nocheck .overview-chapter-name,
+.overview-chapter-row--nocheck .overview-chapter-meta {
+  opacity: var(--opacity-muted);
+}
+.overview-chapter-row--nocheck .overview-chapter-bar-fill {
+  background: var(--color-border);
+}
+.overview-chapter-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--font-size-sm);
+}
+.overview-chapter-bar-track {
+  height: 8px;
+  border-radius: var(--radius-sm);
+  background: var(--color-border);
+  overflow: visible;
+  min-width: 60px;
+  position: relative;
+}
+.overview-chapter-bar-fill {
+  height: 100%;
+  background: var(--color-accent);
+  transition: width 0.2s ease;
+  border-radius: var(--radius-sm);
+}
+/* Diverging-Findings: über Median = mehr Befunde als typisch → Warnfarbe.
+   Unter Median = weniger als typisch → gemutete Erfolgsfarbe. */
+.overview-chapter-bar-fill--findings-pos {
+  background: var(--color-warning, #c97a2b);
+}
+.overview-chapter-bar-fill--findings-neg {
+  background: var(--color-success, #4caf50);
+  opacity: 0.55;
+}
+/* Diverging-Variante: Track ohne eigene Background-Farbe (Mittellinie übernimmt
+   visuelle Trennung). Bar absolut positioniert, wächst von 50% nach links/rechts. */
+.overview-chapter-bar-track--diverge {
+  background: transparent;
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  height: 10px;
+  border-radius: 0;
+}
+.overview-chapter-bar-track--diverge .overview-chapter-bar-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  height: auto;
+  border-radius: var(--radius-sm);
+  transition: left 0.2s ease, width 0.2s ease;
+}
+.overview-chapter-bar-fill--pos {
+  background: var(--color-success, #4caf50);
+}
+.overview-chapter-bar-fill--neg {
+  background: var(--color-danger, #d32f2f);
+  opacity: 0.7;
+}
+/* Median-Tick: bei Diverging-Bar fix in Track-Mitte, markiert Bezugspunkt.
+   Stretch top/bottom = 8px (Row-Padding 6px + halbe Liste-Gap 2px), damit
+   die Ticks angrenzender Zeilen visuell zu einer durchgehenden Linie
+   verschmelzen. */
+.overview-chapter-bar-track .overview-chapter-median-tick {
+  position: absolute;
+  top: -8px;
+  bottom: -8px;
+  left: 50%;
+  width: 1px;
+  background: var(--color-text);
+  opacity: 0.45;
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 1;
+}
+/* Erste/letzte Zeile: kein Überhang nach oben/unten. */
+.overview-chapter-list > li:first-child .overview-chapter-bar-track .overview-chapter-median-tick { top: 0; }
+.overview-chapter-list > li:last-child .overview-chapter-bar-track .overview-chapter-median-tick { bottom: 0; }
+.overview-chapter-meta {
+  display: inline-flex;
+  gap: 10px;
+  flex: 0 0 auto;
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.overview-chapter-delta {
+  font-variant-numeric: tabular-nums;
+  min-width: 3.5em;
+  text-align: right;
+}
+/* Pin meta-cell-Breiten, damit Track-Spalte (1fr) zeilenübergreifend identisch
+   breit ist. Sonst wandert der Median-Tick je nach Stelligkeit der Zahlen. */
+.overview-chapter-chars {
+  font-variant-numeric: tabular-nums;
+  min-width: 5.5em;
+  text-align: right;
+}
+.overview-chapter-ns {
+  font-variant-numeric: tabular-nums;
+  min-width: 4em;
+  text-align: right;
+}
+.overview-chapter-words {
+  font-variant-numeric: tabular-nums;
+  min-width: 5em;
+  text-align: right;
+}
+.overview-chapter-pages {
+  font-variant-numeric: tabular-nums;
+  min-width: 2.5em;
+  text-align: right;
+}
+
+@media (max-width: 700px) {
+  .overview-chapter-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .overview-chapter-meta {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+  .overview-chapter-delta { min-width: 0; }
+}
+
+/* Container query: in schmalen Single-Span-Tiles (≈220-340px) brechen
+   Chapter-Rows aus dem 3-Spalten-Grid in Stack — egal wie breit der
+   Viewport ist. Spiegelt das Verhalten der 700px-Media-Query auf Tile-
+   Ebene, damit 4-Kapitel-Bücher (Tile-Span 1) sauber rendern. */
+@container (max-width: 380px) {
+  .overview-chapter-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .overview-chapter-meta {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+  .overview-chapter-delta { min-width: 0; }
+}
+
+@media (max-width: 480px) {
+  .overview-chapter-list { max-height: min(260px, 45vh); }
+}
+}

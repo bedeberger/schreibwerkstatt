@@ -2,7 +2,7 @@
 //
 // Eigener State: findOpen, findTerm, findReplace, findCaseSensitive,
 //   findWholeWord, findMatches, findIndex, findX, findY, _findRecomputeTimer,
-//   _findReflowHandler.
+//   _findReflowDetach.
 // Root behält: editMode, focusMode, selectedBookId, setStatus(), t(),
 //   _markEditDirty(). Zugriff via window.__app / $app.
 
@@ -21,13 +21,17 @@ export function registerEditorFindCard() {
     findX: 0,
     findY: 0,
     _findRecomputeTimer: null,
-    _findReflowHandler: null,
-    _onFindHotkey: null,
+    _findReflowDetach: null,
+    _findAbort: null,
 
     init() {
+      const abort = new AbortController();
+      this._findAbort = abort;
+      const { signal } = abort;
+
       // Ctrl/Cmd+F: im Edit-Mode Finder öffnen, sonst BookStack-Suche fokussieren.
       // Bewusst im Sub statt auf dem Body-Keydown: hält die Logik beim Feature.
-      this._onFindHotkey = (event) => {
+      window.addEventListener('keydown', (event) => {
         const isFind = (event.metaKey || event.ctrlKey) && !event.altKey && (event.key === 'f' || event.key === 'F');
         if (!isFind) return;
         const app = window.__app;
@@ -40,31 +44,19 @@ export function registerEditorFindCard() {
           const input = document.querySelector('.bookstack-search-input');
           if (input) { input.focus(); input.select?.(); }
         }
-      };
-      window.addEventListener('keydown', this._onFindHotkey);
+      }, { signal });
 
       // Find-Widget muss bei Buchwechsel/View-Reset geschlossen werden, sonst
       // bleibt der capture-phase Scroll-Listener am Window kleben (per Sub-
       // mount akkumuliert).
-      this._onBookChanged = () => this.closeFind?.();
-      this._onViewReset = () => this.closeFind?.();
-      window.addEventListener('book:changed', this._onBookChanged);
-      window.addEventListener('view:reset', this._onViewReset);
+      window.addEventListener('book:changed', () => this.closeFind?.(), { signal });
+      window.addEventListener('view:reset',   () => this.closeFind?.(), { signal });
     },
 
     destroy() {
       if (this._findRecomputeTimer) { clearTimeout(this._findRecomputeTimer); this._findRecomputeTimer = null; }
-      if (this._findReflowHandler) {
-        window.removeEventListener('resize', this._findReflowHandler);
-        window.removeEventListener('scroll', this._findReflowHandler, true);
-        this._findReflowHandler = null;
-      }
-      if (this._onFindHotkey) {
-        window.removeEventListener('keydown', this._onFindHotkey);
-        this._onFindHotkey = null;
-      }
-      if (this._onBookChanged) window.removeEventListener('book:changed', this._onBookChanged);
-      if (this._onViewReset)   window.removeEventListener('view:reset',  this._onViewReset);
+      if (this._findReflowDetach) { this._findReflowDetach(); this._findReflowDetach = null; }
+      this._findAbort?.abort();
     },
 
     ...editorFindCardMethods,

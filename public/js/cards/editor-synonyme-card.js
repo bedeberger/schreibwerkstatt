@@ -3,7 +3,7 @@
 //
 // Eigener State: showSynonymMenu, synonymMenuX/Y, showSynonymPicker,
 //   synonymThesList/Loading/Error/Disabled, synonymKiList/Loading/Error,
-//   _synonymRange, _synonymWord, _synonymPollTimer, _synonymScrollHandler,
+//   _synonymRange, _synonymWord, _synonymPollTimer, _synonymReflowDetach,
 //   _synonymJobId.
 // Root behält: `_onEditContextMenu` (Trigger am contenteditable extrahiert
 //   Range+Word und dispatcht `editor:synonym:open {range, word, x, y}`),
@@ -29,32 +29,24 @@ export function registerEditorSynonymeCard() {
     _synonymRange: null,
     _synonymWord: '',
     _synonymPollTimer: null,
-    _synonymScrollHandler: null,
+    _synonymReflowDetach: null,
     _synonymJobId: null,
-
-    _onOpen: null,
-    _onCloseMenu: null,
-    _onClosePicker: null,
-    _onRequest: null,
+    _synonymAbort: null,
 
     init() {
-      this._onOpen = (e) => this._openSynonymMenu(e.detail || {});
-      this._onCloseMenu   = () => this.closeSynonymMenu();
-      this._onClosePicker = () => this.closeSynonymPicker();
-      this._onRequest     = () => this.requestSynonyms();
-      window.addEventListener('editor:synonym:open',         this._onOpen);
-      window.addEventListener('editor:synonym:close-menu',   this._onCloseMenu);
-      window.addEventListener('editor:synonym:close-picker', this._onClosePicker);
-      window.addEventListener('editor:synonym:request',      this._onRequest);
+      const abort = new AbortController();
+      this._synonymAbort = abort;
+      const { signal } = abort;
+      window.addEventListener('editor:synonym:open',         (e) => this._openSynonymMenu(e.detail || {}), { signal });
+      window.addEventListener('editor:synonym:close-menu',   () => this.closeSynonymMenu(),               { signal });
+      window.addEventListener('editor:synonym:close-picker', () => this.closeSynonymPicker(),             { signal });
+      window.addEventListener('editor:synonym:request',      () => this.requestSynonyms(),                { signal });
     },
 
     destroy() {
       if (this._synonymPollTimer) { clearInterval(this._synonymPollTimer); this._synonymPollTimer = null; }
       this._detachSynonymScroll();
-      if (this._onOpen)         window.removeEventListener('editor:synonym:open',         this._onOpen);
-      if (this._onCloseMenu)    window.removeEventListener('editor:synonym:close-menu',   this._onCloseMenu);
-      if (this._onClosePicker)  window.removeEventListener('editor:synonym:close-picker', this._onClosePicker);
-      if (this._onRequest)      window.removeEventListener('editor:synonym:request',      this._onRequest);
+      this._synonymAbort?.abort();
     },
 
     ...synonymCardMethods,

@@ -1,0 +1,36 @@
+@layer components {
+/* Sterne-Tile: 6 Sterne (voll/halb/leer) + Datum + Trend-Pfeil. */
+.overview-stars {
+  display: flex;
+  gap: 2px;
+  font-size: 22px;
+  line-height: 1;
+}
+.overview-star { color: var(--color-border); }
+.overview-star--full { color: var(--color-accent); }
+/* Halber Stern: linear-gradient als Mask, fallback voll farbig auf 50%. */
+.overview-star--half {
+  background: linear-gradient(90deg, var(--color-accent) 50%, var(--color-border) 50%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+.overview-review-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: var(--font-size-sm);
+  margin-top: 2px;
+}
+.overview-review-date { color: var(--color-muted); font-size: var(--font-size-xs); }
+.overview-review-trend {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+@media (max-width: 480px) {
+  .overview-stars { font-size: 18px; }
+  /* Sterne + Trend ggf. eng — Wrap erlauben. */
+  .overview-review-meta { flex-wrap: wrap; gap: 4px; }
+}
+}

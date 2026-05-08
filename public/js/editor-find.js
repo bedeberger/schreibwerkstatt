@@ -3,7 +3,7 @@
 // Cmd/Ctrl+F. Wird in Alpine.data('editorFindCard') gespread; `this` zeigt
 // auf die Sub-Komponente, Root-Zugriffe via window.__app.
 
-import { getEditEl, isWordChar } from './editor-utils.js';
+import { getEditEl, isWordChar, attachReflow } from './editor-utils.js';
 
 // Flache Liste aller Text-Nodes im Editor (keine Scripts/Styles – die
 // gibt's hier ohnehin nicht, TreeWalker reicht).
@@ -162,17 +162,14 @@ export const editorFindCardMethods = {
   },
 
   _installFindReflow() {
-    if (this._findReflowHandler) return;
-    this._findReflowHandler = () => this._positionFindWidget();
-    window.addEventListener('resize', this._findReflowHandler);
-    window.addEventListener('scroll', this._findReflowHandler, true);
+    if (this._findReflowDetach) return;
+    this._findReflowDetach = attachReflow(() => this._positionFindWidget());
   },
 
   _uninstallFindReflow() {
-    if (!this._findReflowHandler) return;
-    window.removeEventListener('resize', this._findReflowHandler);
-    window.removeEventListener('scroll', this._findReflowHandler, true);
-    this._findReflowHandler = null;
+    if (!this._findReflowDetach) return;
+    this._findReflowDetach();
+    this._findReflowDetach = null;
   },
 
   onFindInput() {

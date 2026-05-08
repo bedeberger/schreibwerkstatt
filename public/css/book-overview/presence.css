@@ -1,0 +1,135 @@
+@layer components {
+/* Präsenz-Matrix (Kapitel × Top-Figuren bzw. Top-Schauplätze). HSL-Cell-Fill
+   skaliert über `--cell-pct` Custom-Prop (0..100). */
+.overview-presence-wrap {
+  /* `auto`: Scrollbar erscheint nur bei echtem Overflow. `padding-bottom`
+     reserviert Höhe der Scrollbar permanent → kein Layout-Shift, wenn
+     Tabelle erst bei schmalerem Viewport scrollbar wird. Kein Phantom-Thumb
+     bei Tabellen, die reinpassen.
+     `-webkit-appearance: none` + Höhe erzwingt klassische Scrollbar (statt
+     macOS-Overlay), damit sie permanent sichtbar bleibt, sobald sie da ist. */
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: min(360px, 50vh);
+  margin: 0 -4px;
+  padding: 0 4px 10px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-muted) transparent;
+}
+.overview-presence-wrap::-webkit-scrollbar {
+  -webkit-appearance: none;
+  height: 10px;
+}
+.overview-presence-wrap::-webkit-scrollbar-track {
+  background: var(--color-border);
+  border-radius: var(--radius-sm);
+}
+.overview-presence-wrap::-webkit-scrollbar-thumb {
+  background: var(--color-muted);
+  border-radius: var(--radius-sm);
+}
+.overview-presence-wrap::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text);
+}
+.overview-presence-matrix {
+  border-collapse: separate;
+  border-spacing: 2px;
+  /* width: auto — Tabelle nimmt nur Platz, den Cells brauchen.
+     `width: 100%` würde Cells über volle Tile-Breite verteilen → Whitespace.
+     `margin-inline: auto` zentriert die Matrix im Wrap, wenn sie schmaler ist
+     als der Tile (häufig bei wenigen Figuren/Orten + Single-Span). Bei breiter
+     Matrix (≥ Wrap-Breite) kollabiert margin auto auf 0 — kein Scroll-Konflikt. */
+  width: auto;
+  margin-inline: auto;
+  font-size: var(--font-size-xs);
+}
+.overview-presence-col-head {
+  font-weight: 500;
+  color: var(--color-muted);
+  font-size: 10px;
+  text-align: center;
+  padding: 0 2px;
+  /* Lange Kapitelnamen rotieren — schmale Spalten. */
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  white-space: nowrap;
+  max-height: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+  min-width: 18px;
+}
+.overview-presence-row-head {
+  font-weight: 500;
+  color: var(--color-text);
+  text-align: left;
+  padding: 0 8px 0 4px;
+  white-space: nowrap;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.overview-presence-cell {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  background: var(--color-border);
+  cursor: pointer;
+  text-align: center;
+  vertical-align: middle;
+  /* --cell-pct 0..100: globaler Anteil (Wert / Max aller Cells im Matrix).
+     Hue, Sat, Light, Alpha alle daraus → seltene Cells blass-olive,
+     Hauptpräsenz sattes Grün. */
+}
+.overview-presence-cell--empty {
+  background: transparent;
+  border: 0.5px dashed var(--color-border);
+  cursor: default;
+}
+.overview-presence-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-sm);
+  /* Hue 50 (warmes Gelb) → 142 (kräftiges Grün), Sat 30% → 78%,
+     Light leicht abnehmend für satteren High-End. */
+  background: hsl(
+    calc(50 + var(--cell-pct, 0) * 0.92)
+    calc(30% + var(--cell-pct, 0) * 0.48%)
+    calc(60% - var(--cell-pct, 0) * 0.12%)
+  );
+  opacity: calc(0.25 + 0.75 * (var(--cell-pct, 0) / 100));
+  transition: background 0.2s, opacity 0.18s;
+}
+.overview-presence-cell:hover:not(.overview-presence-cell--empty) .overview-presence-fill {
+  filter: brightness(1.15) saturate(1.2);
+}
+.overview-presence-cell--empty .overview-presence-fill { display: none; }
+.overview-presence-num {
+  position: relative;
+  z-index: 1;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  /* Halo in Hintergrundfarbe — bricht die HSL-Cell-Farbe genug, dass dunkler
+     Text auf jeder Sättigung lesbar bleibt. Theme-adaptiv (light + dark). */
+  text-shadow:
+    0 0 2px var(--color-bg),
+    0 0 1px var(--color-bg),
+    0 1px 0 var(--color-bg);
+}
+
+@media (max-width: 700px) {
+  .overview-presence-col-head { max-height: 70px; font-size: 9px; }
+  .overview-presence-cell { width: 20px; height: 20px; }
+}
+@media (max-width: 480px) {
+  .overview-presence-wrap { max-height: min(280px, 45vh); }
+  .overview-presence-cell { width: 18px; height: 18px; }
+  .overview-presence-num { font-size: 9px; }
+  .overview-presence-row-head { max-width: 100px; padding: 0 6px 0 2px; }
+}
+}

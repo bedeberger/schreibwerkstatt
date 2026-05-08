@@ -5,6 +5,7 @@
 // räumt beide auf.
 
 import { bookstatsMethods, _destroyStatsChart, _disconnectThemeObserver } from '../bookstats.js';
+import { setupCardLifecycle } from './card-lifecycle.js';
 
 export function registerBookStatsCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -18,49 +19,14 @@ export function registerBookStatsCard() {
     bookStatsDelta: null,
     writingTimeData: null,
     lektoratTimeData: null,
-
-    _onBookChanged: null,
-    _onViewReset: null,
-    _onSelect: null,
+    _lifecycle: null,
 
     init() {
-      // Öffnen: (Re-)Load der Daten.
-      this.$watch(() => window.__app.showBookStatsCard, async (visible) => {
-        if (!visible) return;
-        if (!window.__app.selectedBookId) return;
-        await this.loadBookStats(window.__app.selectedBookId);
-      });
-
-      this._onBookChanged = () => {
-        if (!window.__app.showBookStatsCard) return;
-        if (!window.__app.selectedBookId) return;
-        // Bei Buchwechsel: State nullen + neu laden. `renderStatsChart` baut
-        // das Chart ohnehin nach jedem Load frisch auf.
-        this.bookStatsData = [];
-        this.bookStatsCoverage = null;
-        this.bookStatsDelta = null;
-        this.writingTimeData = null;
-        this.lektoratTimeData = null;
-        this.loadBookStats(window.__app.selectedBookId);
-      };
-      window.addEventListener('book:changed', this._onBookChanged);
-
-      this._onViewReset = () => {
-        this.bookStatsData = [];
-        this.bookStatsSyncStatus = '';
-        this.bookStatsCoverage = null;
-        this.bookStatsDelta = null;
-        this.writingTimeData = null;
-        this.lektoratTimeData = null;
-        _destroyStatsChart();
-      };
-      window.addEventListener('view:reset', this._onViewReset);
-
       // Deep-Link aus Overview-Tiles: metric + range vorab setzen, damit der
       // Chart direkt mit dem gewünschten Filter rendert. Daten sind ggf. schon
       // geladen (renderStatsChart() reicht), sonst zieht der showBookStatsCard-
       // Watcher loadBookStats nach.
-      this._onSelect = (e) => {
+      const onSelect = (e) => {
         const detail = e.detail || {};
         if (detail.metric) this.bookStatsMetric = detail.metric;
         if (detail.range != null) this.bookStatsRange = detail.range;
@@ -68,13 +34,32 @@ export function registerBookStatsCard() {
           this.$nextTick(() => this.renderStatsChart());
         }
       };
-      window.addEventListener('book-stats:select', this._onSelect);
+
+      this._lifecycle = setupCardLifecycle(this, {
+        showFlag: 'showBookStatsCard',
+        load: (root) => this.loadBookStats(root.selectedBookId),
+        resetState: {
+          bookStatsData: [],
+          bookStatsCoverage: null,
+          bookStatsDelta: null,
+          writingTimeData: null,
+          lektoratTimeData: null,
+        },
+        onViewReset: (e, ctx) => {
+          ctx.bookStatsData = [];
+          ctx.bookStatsSyncStatus = '';
+          ctx.bookStatsCoverage = null;
+          ctx.bookStatsDelta = null;
+          ctx.writingTimeData = null;
+          ctx.lektoratTimeData = null;
+          _destroyStatsChart();
+        },
+        extraListeners: [{ type: 'book-stats:select', handler: onSelect }],
+      });
     },
 
     destroy() {
-      if (this._onBookChanged) window.removeEventListener('book:changed', this._onBookChanged);
-      if (this._onViewReset)   window.removeEventListener('view:reset',  this._onViewReset);
-      if (this._onSelect)      window.removeEventListener('book-stats:select', this._onSelect);
+      this._lifecycle?.destroy();
       _destroyStatsChart();
       _disconnectThemeObserver();
     },

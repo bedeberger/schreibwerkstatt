@@ -12,7 +12,7 @@
 //   - `figurLookupCardMethods`: Popup-Display (Position, Scroll, Schliessen)
 //     in Alpine.data('editorFigurLookupCard').
 
-import { isWordChar, normalizeName, WORD_RE } from './editor-utils.js';
+import { normalizeName, attachReflow, positionPopupNearRect, rangeForWordAtClientPoint } from './editor-utils.js';
 
 function extractYear(geburtstag) {
   if (!geburtstag) return null;
@@ -23,40 +23,6 @@ function extractYear(geburtstag) {
 function wordAtClientPoint(x, y) {
   const r = rangeForWordAtClientPoint(x, y);
   return r ? r.word : null;
-}
-
-// Expandiert einen Punkt (clientX/Y) zum darunterliegenden Wort und liefert
-// sowohl das Wort als auch einen Range über genau dieses Wort. Wird auch vom
-// Synonym-Handler genutzt, um bei Safari-Rechtsklick ohne Selection das Wort
-// unter dem Cursor automatisch zu markieren.
-export function rangeForWordAtClientPoint(x, y) {
-  let range = null;
-  if (document.caretRangeFromPoint) {
-    range = document.caretRangeFromPoint(x, y);
-  } else if (document.caretPositionFromPoint) {
-    const pos = document.caretPositionFromPoint(x, y);
-    if (pos && pos.offsetNode) {
-      range = document.createRange();
-      range.setStart(pos.offsetNode, pos.offset);
-      range.collapse(true);
-    }
-  }
-  if (!range) return null;
-  const node = range.startContainer;
-  if (!node || node.nodeType !== Node.TEXT_NODE) return null;
-  const text = node.nodeValue || '';
-  if (!text) return null;
-  let start = range.startOffset;
-  let end   = range.startOffset;
-  while (start > 0 && isWordChar(text[start - 1])) start--;
-  while (end < text.length && isWordChar(text[end])) end++;
-  if (start === end) return null;
-  const word = text.slice(start, end);
-  if (!WORD_RE.test(word)) return null;
-  const wordRange = document.createRange();
-  wordRange.setStart(node, start);
-  wordRange.setEnd(node, end);
-  return { range: wordRange, word };
 }
 
 // ── Root-Methoden ──────────────────────────────────────────────────────────
@@ -165,35 +131,29 @@ export const figurLookupCardMethods = {
     const a = this._figurLookupAnchor;
     if (!a) return;
     const el = document.querySelector('.figur-lookup');
-    const h = el?.offsetHeight || 200;
-    const w = el?.offsetWidth  || 280;
-    const spaceBelow = window.innerHeight - a.y;
-    const placeBelow = spaceBelow >= h + 8;
-    this.figurLookupX = Math.max(8, Math.min(Math.round(a.x), window.innerWidth - w - 8));
-    this.figurLookupY = placeBelow
-      ? Math.round(a.y + 8)
-      : Math.max(8, Math.round(a.y - h - 8));
+    // Punkt-Anker: Rect mit width/height = 0; gap=8 trennt Popover sichtbar
+    // vom Wort, sonst klebt es am Cursor.
+    const rect = { left: a.x, right: a.x, top: a.y, bottom: a.y, width: 0, height: 0 };
+    const { x, y } = positionPopupNearRect(rect, el, { gap: 8, fallbackWidth: 280, fallbackHeight: 200 });
+    this.figurLookupX = x;
+    this.figurLookupY = y;
   },
 
   _attachFigurLookupScroll() {
-    if (this._figurLookupScrollHandler) return;
-    const handler = () => {
+    if (this._figurLookupReflowDetach) return;
+    this._figurLookupReflowDetach = attachReflow(() => {
       // Im Fokus-Modus driftet das Popover vom darunterliegenden Wort weg,
       // sobald der Text scrollt (typewriter-Recenter). Statt mitzuwandern:
       // schliessen, damit der User einen klaren Zustand sieht.
       if (window.__app?.focusMode) { this.closeFigurLookup(); return; }
       this._positionFigurLookup();
-    };
-    window.addEventListener('scroll', handler, true);
-    window.addEventListener('resize', handler);
-    this._figurLookupScrollHandler = handler;
+    });
   },
 
   _detachFigurLookupScroll() {
-    if (!this._figurLookupScrollHandler) return;
-    window.removeEventListener('scroll', this._figurLookupScrollHandler, true);
-    window.removeEventListener('resize', this._figurLookupScrollHandler);
-    this._figurLookupScrollHandler = null;
+    if (!this._figurLookupReflowDetach) return;
+    this._figurLookupReflowDetach();
+    this._figurLookupReflowDetach = null;
   },
 
   // Anzeigewert für das Geburtsfeld: wenn `geburtstag` eine Jahreszahl

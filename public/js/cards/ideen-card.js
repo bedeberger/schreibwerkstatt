@@ -3,6 +3,7 @@
 // Eigener State; Root behält showIdeenCard, currentPage, selectedBookId, t.
 
 import { ideenMethods } from '../ideen.js';
+import { setupCardLifecycle } from './card-lifecycle.js';
 
 export function registerIdeenCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -19,22 +20,26 @@ export function registerIdeenCard() {
     loading: false,
     busy: false,
     errorMessage: '',
-
-    _onBookChanged: null,
-    _onViewReset: null,
-    _onIdeenReset: null,
+    _lifecycle: null,
 
     init() {
-      // Beim Öffnen + Page-Wechsel laden. Beim Öffnen Textarea fokussieren,
-      // damit User direkt eine neue Idee tippen kann (Tastatur-Workflow).
-      this.$watch(() => window.__app.showIdeenCard, async (visible) => {
-        if (!visible) return;
-        await this.loadIdeen();
-        this.$nextTick(() => {
-          const ta = this.$el?.querySelector('.ideen-input');
-          if (ta) ta.focus();
-        });
+      this._lifecycle = setupCardLifecycle(this, {
+        showFlag: 'showIdeenCard',
+        // showNeedsBookId=false: Ideen sind seiten-, nicht buchgebunden — onShow soll
+        // auch greifen, wenn kein Buch in der Combobox aktiv ist (currentPage reicht).
+        showNeedsBookId: false,
+        onShow: async () => {
+          await this.loadIdeen();
+          this.$nextTick(() => {
+            const ta = this.$el?.querySelector('.ideen-input');
+            if (ta) ta.focus();
+          });
+        },
+        onBookChanged: () => this.resetIdeen(),
+        onViewReset: () => this.resetIdeen(),
+        extraListeners: [{ type: 'ideen:reset', handler: () => this.resetIdeen() }],
       });
+
       this.$watch(() => window.__app.currentPage?.id, async (pid) => {
         if (!pid) { this.resetIdeen(); return; }
         if (window.__app.showIdeenCard) await this.loadIdeen();
@@ -53,21 +58,10 @@ export function registerIdeenCard() {
         const item = this.$el.querySelector(`[data-idee-id="${id}"]`);
         if (item && item.parentNode) item.parentNode.insertBefore(panel, item.nextSibling);
       });
-
-      this._onIdeenReset = () => this.resetIdeen();
-      window.addEventListener('ideen:reset', this._onIdeenReset);
-
-      this._onBookChanged = () => this.resetIdeen();
-      window.addEventListener('book:changed', this._onBookChanged);
-
-      this._onViewReset = () => this.resetIdeen();
-      window.addEventListener('view:reset', this._onViewReset);
     },
 
     destroy() {
-      if (this._onIdeenReset)  window.removeEventListener('ideen:reset', this._onIdeenReset);
-      if (this._onBookChanged) window.removeEventListener('book:changed', this._onBookChanged);
-      if (this._onViewReset)   window.removeEventListener('view:reset', this._onViewReset);
+      this._lifecycle?.destroy();
       this._detachMenuListeners?.();
     },
 

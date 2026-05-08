@@ -86,7 +86,60 @@ Weitere Root-Computeds: `szenenNachKapitel`, `szenenNachSeite`, `orteFiltered`, 
 
 - **Root `init()`** ([public/js/app.js:511](public/js/app.js#L511)): setzt `window.__app = this` (für `$app`-Magic), erzeugt `_abortCtrl = new AbortController()`, registriert globale Listener mit `{ signal }`.
 - **Root `destroy()`** ([public/js/app.js:504](public/js/app.js#L504)): `_abortCtrl.abort()` → alle Listener weg in einem Schlag. Plus `clearInterval(_jobQueueTimer)`, `clearTimeout(_statusTimer)`. **Pflicht für jede neue globale Subscription:** `{ signal: this._abortCtrl.signal }` an `addEventListener` — sonst Leak bei HMR/Re-Init.
-- **Sub-`init()`/`destroy()`**: Karten managen ihre Window-Listener selbst (z.B. `_onBookChanged`); in `destroy()` mit `removeEventListener` aufräumen. vis-network/Chart-Instanzen explizit `.destroy()` callen + Refs nullen (sonst halten DataSets das alte Buch im Speicher).
+- **Sub-`init()`/`destroy()`**: Karten managen ihre Window-Listener selbst — der Soll-Pattern dafür ist [`setupCardLifecycle`](public/js/cards/card-lifecycle.js) (siehe nächste Section). vis-network/Chart-Instanzen explizit `.destroy()` callen + Refs nullen (sonst halten DataSets das alte Buch im Speicher).
+
+### Soll-Pattern für Buch-scoped Karten: `setupCardLifecycle`
+
+Karten, die auf `book:changed` / `view:reset` / `card:refresh` reagieren und beim Öffnen Daten laden, nutzen [`setupCardLifecycle`](public/js/cards/card-lifecycle.js). Das ersetzt die alte Manual-Boilerplate (`_onBookChanged`/`_onViewReset`/`_onCardRefresh`-Felder, je drei `addEventListener`+`removeEventListener`-Paare, redundantes Timer-Cleanup).
+
+**Default-Soll:**
+
+```js
+import { setupCardLifecycle } from './card-lifecycle.js';
+
+window.Alpine.data('orteCard', () => ({
+  orteLoading: false,
+  orteProgress: 0,
+  orteStatus: '',
+  _ortePollTimer: null,
+  _lifecycle: null,
+
+  init() {
+    this._lifecycle = setupCardLifecycle(this, {
+      name: 'orte',                                // matcht event.detail.name auf card:refresh
+      showFlag: 'showOrteCard',                    // Root-Flag, das per $watch beobachtet wird
+      timerKeys: ['_ortePollTimer'],               // Poll-Timer auf ctx, automatisch geclearet
+      resetState: { orteLoading: false, orteProgress: 0, orteStatus: '' },
+      load: (root) => root.loadOrte(root.selectedBookId),
+    });
+  },
+  destroy() { this._lifecycle?.destroy(); },
+}));
+```
+
+Der Helper macht:
+- `$watch(showFlag)` → bei `true` + `selectedBookId` → `cfg.onShow ?? cfg.load`.
+- `book:changed` → Timer clear + `resetState` + (sichtbar + Buch vorhanden) → `cfg.load`.
+- `view:reset` → Timer clear + `resetState` (KEIN Reload).
+- `card:refresh` → wenn `event.detail.name === cfg.name` und Buch vorhanden → `cfg.load`.
+- `destroy()` → `clearTimers` + `AbortController.abort()` (alle internen Listener weg).
+
+**Optional cfg-Felder:**
+| Feld | Zweck |
+|------|-------|
+| `onShow(root)` | Override für `$watch(showFlag)`-Body (z.B. zusätzliche Side-Effects wie Textarea-Fokus, oder Mehrfach-Load). |
+| `onBookChanged(e, ctx, root)` | Vollständiger Override; skipt das Default-`reset+load`. Nutzen für Karten mit Coalesce-Logik (Microtask, debounce). |
+| `onViewReset(e, ctx, root)` | Vollständiger Override fürs `view:reset`-Verhalten. Nutzen, wenn `view:reset` mehr räumt als `book:changed` (z.B. user-scoped Profile-Liste in PDF-Export). |
+| `resetStateView` | Eigenes Reset-Objekt nur fürs `view:reset` (wenn book vs. view unterschiedlich resetten). |
+| `refreshNeedsBookId: false` | Default: `card:refresh` ignoriert wenn kein Buch aktiv. False für Karten mit eigener Buch-Prüfung. |
+| `showNeedsBookId: false` | Analog für `$watch(showFlag)`. |
+| `extraListeners: [{ type, handler }]` | Zusätzliche Window-Events (z.B. `chat:reset`, `book-chat:reset`, `ideen:reset`, `kapitel-review:select`, `book-stats:select`, `job:reconnect`). Werden über denselben AbortController automatisch wieder abgemeldet. |
+
+**Rückgabewert:** `{ signal, destroy }`. `signal` ist der `AbortController.signal` der internen Listener — Karten können eigene `addEventListener(..., { signal })` damit registrieren und sparen sich das `removeEventListener`.
+
+**Wann nicht nutzen:** Karten ohne `book:changed`/`view:reset`/`card:refresh`-Trio (Editor-Slices wie [editor-find-card](public/js/cards/editor-find-card.js), [editor-figur-lookup-card](public/js/cards/editor-figur-lookup-card.js)) verwenden direkt `AbortController` ohne Helper. Karten mit komplett-anderer Reset-Semantik (Coalesce + microtask wie [book-overview-card](public/js/cards/book-overview-card.js); zweistufiger Form-Unmount wie [pdf-export-card](public/js/cards/pdf-export-card.js)) bleiben manuell — der Helper ist Convenience, nicht Pflicht.
+
+**Migration alter Karten:** Boilerplate `_onBookChanged = ...; window.addEventListener(...)` durch einen `setupCardLifecycle`-Aufruf ersetzen. Alle drei `_onXxx`-Felder + alle drei `removeEventListener`-Calls in `destroy()` entfallen — `this._lifecycle?.destroy()` reicht.
 
 ### `$app` / `window.__app` (Root-Zugriff aus Subs)
 

@@ -1,0 +1,270 @@
+@layer components {
+/* Schreibstatistik-Visualisierungen: Hero-Snapshot, Sparkline, 7-Tage-Bars,
+   Coverage-/Today-Donut, Streak-Heatmap. Alles inline-SVG, kein Chart.js. */
+
+/* ── Hero-Snapshot ───────────────────────────────────────────────────────── */
+.overview-hero-row {
+  display: flex;
+  align-items: baseline;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.overview-hero-num {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.overview-hero-value {
+  font-family: var(--font-serif);
+  font-size: 38px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.overview-hero-unit {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+}
+.overview-substats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: baseline;
+}
+.overview-substat {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.overview-substat-value {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.overview-substat-unit {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+
+/* ── Sparkline mit Gradient + Endpunkt-Marker ────────────────────────────── */
+.overview-sparkline-wrap {
+  position: relative;
+  width: 100%;
+}
+.overview-sparkline {
+  width: 100%;
+  height: 56px;
+  display: block;
+}
+/* Hover-Overlay: eine Spalte pro Datenpunkt, transparent, gleichmässig verteilt
+   über die gesamte Sparkline-Fläche. Pointer-Events nur auf den Spalten —
+   Klick auf die Karte (Open Stats) bubblet weiter. */
+.overview-sparkline-hover {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  pointer-events: none;
+}
+.overview-sparkline-hover-col {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  pointer-events: auto;
+  cursor: pointer;
+}
+/* Vertikale gestrichelte Linie an der Spalten-Mitte beim Hover/Focus —
+   zeigt, welcher Datenpunkt im Tooltip gemeint ist. */
+.overview-sparkline-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 0;
+  border-left: 1px dashed var(--color-text);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-0.5px);
+  transition: opacity 0.08s ease;
+}
+.overview-sparkline-hover-col:hover .overview-sparkline-tick,
+.overview-sparkline-hover-col:focus-visible .overview-sparkline-tick {
+  opacity: var(--opacity-disabled);
+}
+.overview-trend-meta {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+}
+
+/* ── 7-Tage-Bar-Chart ────────────────────────────────────────────────────── */
+.overview-bars7 {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  align-items: end;
+  min-height: 60px;
+}
+.overview-bar7-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.overview-bar7-track {
+  width: 100%;
+  height: 48px;
+  display: flex;
+  align-items: flex-end;
+  background: transparent;
+}
+.overview-bar7-fill {
+  width: 100%;
+  min-height: 2px;
+  background: var(--color-border);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  transition: height 0.18s ease;
+}
+.overview-bar7-fill--pos { background: var(--color-success, #4caf50); }
+.overview-bar7-fill--neg { background: var(--color-danger,  #d32f2f); }
+.overview-bar7-label {
+  font-size: 10px;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.overview-bars7-total {
+  margin-top: 2px;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+}
+
+/* ── Donut (Coverage + Today-Ring) ───────────────────────────────────────── */
+.overview-donut-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.overview-donut {
+  width: 72px;
+  height: 72px;
+  flex: 0 0 auto;
+}
+.overview-donut-text {
+  font-family: var(--font-serif);
+  font-size: 14px;
+  font-weight: 500;
+  fill: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+.overview-donut-meta {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.overview-donut-meta-checked {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+}
+
+/* Heute-Ring: Pulse-Animation bei aktivem Schreibtag. */
+.overview-today-ring--active circle:nth-of-type(2) {
+  animation: overviewTodayPulse 2.4s ease-in-out infinite;
+}
+.overview-today-ring--reached circle:nth-of-type(2) {
+  stroke: var(--color-success);
+}
+@keyframes overviewTodayPulse {
+  0%, 100% { stroke-opacity: 1; }
+  50% { stroke-opacity: 0.55; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .overview-today-ring--active circle:nth-of-type(2) { animation: none; }
+}
+
+/* ── Streak-Heatmap (52 Wochen × 7 Tage GitHub-Stil) ─────────────────────── */
+.overview-streak-meta {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+.overview-streak-stat { white-space: nowrap; }
+
+.overview-streak-grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(7, 1fr);
+  gap: 3px;
+  width: 100%;
+  /* Aspect: 53 Spalten × 7 Reihen, Zelle ~ quadratisch. min-Höhe verhindert
+     Kollaps in schmalen Layouts; horizontaler Scroll bei Engstellen. */
+  min-height: 96px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.overview-streak-week {
+  display: contents;
+}
+.overview-streak-cell {
+  width: 100%;
+  min-width: 9px;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--radius-sm);
+  background: var(--color-tag-bg);
+  transition: filter var(--transition-base);
+}
+.overview-streak-cell:hover { filter: brightness(1.1); }
+.overview-streak-cell--empty { visibility: hidden; }
+.overview-streak-cell--future { opacity: 0.25; }
+.overview-streak-cell--lvl0 { background: var(--color-tag-bg); }
+.overview-streak-cell--lvl1 { background: color-mix(in srgb, var(--color-accent) 22%, var(--color-bg)); }
+.overview-streak-cell--lvl2 { background: color-mix(in srgb, var(--color-accent) 45%, var(--color-bg)); }
+.overview-streak-cell--lvl3 { background: color-mix(in srgb, var(--color-accent) 68%, var(--color-bg)); }
+.overview-streak-cell--lvl4 { background: var(--color-accent); }
+
+.overview-streak-legend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+.overview-streak-legend-label { margin-right: 6px; }
+.overview-streak-legend .overview-streak-cell {
+  width: 11px;
+  min-width: 11px;
+  height: 11px;
+  aspect-ratio: auto;
+  flex-shrink: 0;
+}
+
+@media (max-width: 600px) {
+  .overview-streak-grid { min-height: 70px; gap: 2px; }
+  .overview-streak-cell { min-width: 7px; }
+}
+
+/* ── Mobile ──────────────────────────────────────────────────────────────── */
+@media (max-width: 700px) {
+  .overview-hero-value { font-size: 30px; }
+  .overview-hero-row { gap: 14px; }
+  .overview-substat-value { font-size: 16px; }
+}
+@media (max-width: 480px) {
+  .overview-hero-value { font-size: 26px; }
+  .overview-hero-row { gap: 10px; }
+  .overview-substats { gap: 10px; }
+  .overview-substat-value { font-size: 15px; }
+  .overview-sparkline { height: 48px; }
+  .overview-bars7 { min-height: 52px; }
+  .overview-bar7-track { height: 40px; }
+  .overview-donut { width: 60px; height: 60px; }
+  .overview-donut-row { gap: 10px; }
+}
+}

@@ -1,0 +1,24 @@
+<!-- Zuletzt bearbeitet (Zeilen sind individuelle Links).
+     Immer medium — Name + Meta-Spalten brauchen Breite. -->
+<template x-if="overviewRecentPages().length > 0">
+  <div class="overview-tile overview-tile--medium">
+    <div class="overview-tile-label" x-text="$app.t('overview.recent')"></div>
+    <ul class="overview-recent-list">
+      <template x-for="p in overviewRecentPages()" :key="p.id">
+        <li class="overview-recent-item internal-link" @click="$app.selectPage(p)">
+          <span class="overview-recent-name" x-text="p.name"></span>
+          <span class="overview-recent-meta">
+            <span class="overview-recent-chars"
+                  x-show="overviewPageChars(p.id) != null"
+                  x-text="_fmtNum(overviewPageChars(p.id)) + ' ' + $app.t('bookstats.unit.z')"></span>
+            <span class="overview-recent-ns"
+                  x-show="overviewPageChars(p.id) != null"
+                  :data-tip="$app.t('bookstats.metric.normseiten')"
+                  x-text="(Math.round(overviewPageChars(p.id) / 1500 * 10) / 10).toLocaleString($app.uiLocale === 'en' ? 'en-US' : 'de-CH', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' ' + $app.t('bookstats.unit.ns')"></span>
+            <span class="overview-recent-chapter" x-show="p.chapterName" :data-tip="p.chapterName" x-text="p.chapterName"></span>
+          </span>
+        </li>
+      </template>
+    </ul>
+  </div>
+</template>

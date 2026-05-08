@@ -1,0 +1,63 @@
+@layer components {
+/* Recent-Pages-Liste + Quick-Actions-Tile (am Grid-Ende). */
+.overview-recent-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: min(280px, 40vh);
+  overflow-y: auto;
+}
+.overview-recent-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  min-width: 0;
+}
+.overview-recent-item:hover { background: var(--color-hover); opacity: 1; text-decoration: none; }
+.overview-recent-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.overview-recent-meta {
+  display: inline-flex;
+  gap: 10px;
+  flex: 0 0 auto;
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+
+/* ── Quick-Actions ───────────────────────────────────────────────────────── */
+/* Actions-Tile: Container für Quick-Action-Buttons, kein Daten-Tile.
+   Visuell zurückhaltender (gleicher Hintergrund wie Card-Body, keine
+   Hover-Lift-Animation), damit der Unterschied zu klickbaren Daten-Tiles
+   sichtbar ist. */
+.overview-tile--actions {
+  background: var(--color-surface);
+  border-style: dashed;
+}
+.overview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+@media (max-width: 480px) {
+  .overview-recent-list { max-height: min(220px, 40vh); }
+  /* Recent: Meta unter Name — sonst kollidiert mit langen Page-Titeln. */
+  .overview-recent-item { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .overview-recent-meta { width: 100%; justify-content: flex-start; }
+  /* Quick-Actions: Buttons volle Zeile, gleichmässig. */
+  .overview-actions { gap: 4px; }
+  .overview-actions .btn-compact { flex: 1 1 calc(50% - 4px); min-width: 0; }
+}
+}

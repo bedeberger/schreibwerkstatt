@@ -23,22 +23,18 @@ export function registerEditorFocusCard() {
     _focusListeners: null,
     _focusVisibleBlocks: null,
     _focusRaf: null,
+    _focusAbort: null,
 
-    _onToggle: null,
-    _onEnter: null,
-    _onExit: null,
-    _onStartEdit: null,
     _restoreSnapshot: null,
 
     init() {
-      this._onToggle    = () => this.toggleFocusMode();
-      this._onEnter     = () => this.enterFocusMode();
-      this._onExit      = () => this.exitFocusMode();
-      this._onStartEdit = () => this.startFocusEdit();
-      window.addEventListener('editor:focus:toggle',     this._onToggle);
-      window.addEventListener('editor:focus:enter',      this._onEnter);
-      window.addEventListener('editor:focus:exit',       this._onExit);
-      window.addEventListener('editor:focus:start-edit', this._onStartEdit);
+      const abort = new AbortController();
+      this._focusAbort = abort;
+      const { signal } = abort;
+      window.addEventListener('editor:focus:toggle',     () => this.toggleFocusMode(),  { signal });
+      window.addEventListener('editor:focus:enter',      () => this.enterFocusMode(),   { signal });
+      window.addEventListener('editor:focus:exit',       () => this.exitFocusMode(),    { signal });
+      window.addEventListener('editor:focus:start-edit', () => this.startFocusEdit(),   { signal });
 
       // Live-Switch: User ändert Granularität in den Settings, während Focus
       // aktiv ist → Body-Class + State sofort umstellen, ohne Exit/Re-Enter.
@@ -84,10 +80,7 @@ export function registerEditorFocusCard() {
     },
 
     destroy() {
-      if (this._onToggle)    window.removeEventListener('editor:focus:toggle',     this._onToggle);
-      if (this._onEnter)     window.removeEventListener('editor:focus:enter',      this._onEnter);
-      if (this._onExit)      window.removeEventListener('editor:focus:exit',       this._onExit);
-      if (this._onStartEdit) window.removeEventListener('editor:focus:start-edit', this._onStartEdit);
+      this._focusAbort?.abort();
       // Defensive: falls bei destroy noch Listener offen sind (z.B. Hot-Reload)
       if (this._focusListeners) {
         try { this._focusTeardown(); } catch (e) { /* ignorieren */ }

@@ -1,0 +1,128 @@
+@layer components {
+/* Domain-Tiles: Figuren-/Szenen-/Orte-Counts mit Chips bzw. Stacked-Bar.
+   Geteilte Atome: `.overview-fig-row`, `.overview-fig-count`,
+   `.overview-fig-chips` (auch von Orte verwendet, Naming bewahrt). */
+
+.overview-fig-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.overview-fig-count {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.overview-fig-count-unit {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+.overview-fig-chips {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.overview-fig-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 3px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  border: 0.5px solid var(--color-border);
+  font-size: var(--font-size-xs);
+  min-width: 0;
+}
+.overview-fig-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.overview-fig-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-bg);
+  background: var(--color-accent);
+  flex: 0 0 auto;
+}
+/* Drei verschiedene Avatar-Hintergründe für Top-3 (visuelle Unterscheidung) */
+.overview-fig-avatar[data-idx="0"] { background: var(--color-accent); }
+.overview-fig-avatar[data-idx="1"] { background: var(--color-success, #4caf50); }
+.overview-fig-avatar[data-idx="2"] { background: var(--color-warning, #c97a2b); }
+
+/* ── Schauplatz-Chips ────────────────────────────────────────────────────── */
+.overview-ort-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  border: 0.5px solid var(--color-border);
+  font-size: var(--font-size-xs);
+  max-width: 100%;
+  min-width: 0;
+  cursor: pointer;
+}
+.overview-ort-chip:hover { border-color: var(--color-accent); }
+.overview-ort-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-sm);
+  flex: 0 0 auto;
+  background: var(--color-muted);
+}
+/* Schauplatz-Typ-Farben (Enum aus prompts/komplett.js: stadt|gebaeude|raum|landschaft|region|andere) */
+.overview-ort-dot[data-typ="stadt"]      { background: var(--color-accent); }
+.overview-ort-dot[data-typ="gebaeude"]   { background: var(--color-warning, #c97a2b); }
+.overview-ort-dot[data-typ="raum"]       { background: var(--color-success, #4caf50); }
+.overview-ort-dot[data-typ="landschaft"] { background: #6aa9c2; }
+.overview-ort-dot[data-typ="region"]     { background: #9b6dbf; }
+
+/* ── Szenen: Stacked-Bar Wertungs-Verteilung ─────────────────────────────── */
+.overview-stacked-bar {
+  display: flex;
+  height: 10px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--color-border);
+}
+.overview-stacked-seg { transition: flex 0.2s ease; }
+.overview-stacked-seg--stark   { background: var(--color-success, #4caf50); }
+.overview-stacked-seg--mittel  { background: var(--color-warning, #c97a2b); }
+.overview-stacked-seg--schwach { background: var(--color-danger,  #d32f2f); }
+.overview-stacked-seg--ohne    { background: var(--color-border); }
+.overview-stacked-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+.overview-stacked-key { display: inline-flex; align-items: center; gap: 4px; }
+.overview-stacked-key::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-sm);
+}
+.overview-stacked-key--stark::before   { background: var(--color-success, #4caf50); }
+.overview-stacked-key--mittel::before  { background: var(--color-warning, #c97a2b); }
+.overview-stacked-key--schwach::before { background: var(--color-danger,  #d32f2f); }
+
+@media (max-width: 700px) {
+  .overview-fig-count { font-size: 20px; }
+}
+@media (max-width: 480px) {
+  .overview-fig-count { font-size: 18px; }
+}
+}
