@@ -273,10 +273,43 @@ export const bookOverviewMethods = {
     return value;
   },
 
+  // Single source of truth für „heute geschrieben". Nutzt Live-tokEsts wenn
+  // vorhanden, sonst heutigen Cron-Snapshot. Vergleicht gegen jüngsten
+  // Snapshot strikt vor heute (egal wie alt — verkraftet Wochenenden/Lücken).
+  // Negative Deltas (Lösch-Edits) werden auf 0 geklemmt. Wird von Heute-Ring,
+  // 7-Tage-Bar (heutige Spalte) und 7-Tage-Total konsumiert, damit alle drei
+  // exakt dieselbe Zahl zeigen.
+  _charsTodayDelta() {
+    const a = this.overviewStats || [];
+    const tokEsts = window.__app?.tokEsts || {};
+    const todayIso = new Date().toISOString().slice(0, 10);
+
+    let liveChars = 0;
+    for (const id of Object.keys(tokEsts)) liveChars += Number(tokEsts[id]?.chars) || 0;
+
+    let cronTodayChars = null;
+    let prevChars = null;
+    for (let i = a.length - 1; i >= 0; i--) {
+      const r = a[i];
+      if (!r?.recorded_at) continue;
+      if (r.recorded_at === todayIso && cronTodayChars == null) {
+        cronTodayChars = Number(r.chars) || 0;
+        continue;
+      }
+      if (r.recorded_at < todayIso && prevChars == null) {
+        prevChars = Number(r.chars) || 0;
+        break;
+      }
+    }
+    const curChars = liveChars > 0 ? liveChars : cronTodayChars;
+    if (curChars == null || prevChars == null) return 0;
+    return Math.max(0, curChars - prevChars);
+  },
+
   // Letzte 7 Kalendertage. Pro Tag: Zeichen-Delta zum Vortags-Snapshot.
-  // Tage ohne Snapshot bekommen 0. Locale-bewusste Wochentag-Labels (Mo/Di/...).
-  // Heute (letzte Iteration) nutzt Live-tokEsts statt Cron-Snapshot — sonst
-  // klafft Lücke zum Heute-Ring, wenn User nach dem Sync weiterschreibt.
+  // Vergangenheits-Tage strict (cur/prev exakte Kalendertage). Heute liest
+  // _charsTodayDelta() — selbe Quelle wie Heute-Ring, damit Bar und Donut
+  // nie auseinander driften.
   overviewLast7Days() {
     const a = this.overviewStats || [];
     const tokEsts = window.__app?.tokEsts || {};
@@ -285,26 +318,21 @@ export const bookOverviewMethods = {
       for (const s of a) charsByDate.set(s.recorded_at, Number(s.chars) || 0);
       const tag = window.__app?.uiLocale === 'en' ? 'en-US' : 'de-CH';
       const fmt = new Intl.DateTimeFormat(tag, { weekday: 'short' });
-      // Live-Stand summieren (gleiche Quelle wie Hero-Snapshot + Heute-Ring).
-      let liveChars = 0;
-      const ids = Object.keys(tokEsts);
-      for (const id of ids) liveChars += Number(tokEsts[id]?.chars) || 0;
-
       const todayIso = new Date().toISOString().slice(0, 10);
+      const todayDelta = this._charsTodayDelta();
       const days = [];
       for (let i = 6; i >= 0; i--) {
         const d = new Date(Date.now() - i * 86400000);
         const iso = d.toISOString().slice(0, 10);
-        const prevIso = new Date(d.getTime() - 86400000).toISOString().slice(0, 10);
-        let cur = charsByDate.get(iso);
-        const prev = charsByDate.get(prevIso);
-        // Heute: jüngste Schreibarbeit nach Cron-Snapshot lebt nur in tokEsts.
-        // Live-Stand ist immer ≥ Cron-Snapshot von heute (oder ersetzt ihn,
-        // falls heute noch kein Sync gelaufen ist).
-        if (iso === todayIso && liveChars > 0) {
-          cur = Math.max(cur ?? 0, liveChars);
+        let delta;
+        if (iso === todayIso) {
+          delta = todayDelta;
+        } else {
+          const prevIso = new Date(d.getTime() - 86400000).toISOString().slice(0, 10);
+          const cur = charsByDate.get(iso);
+          const prev = charsByDate.get(prevIso);
+          delta = (cur != null && prev != null) ? (cur - prev) : 0;
         }
-        const delta = (cur != null && prev != null) ? (cur - prev) : 0;
         days.push({ iso, label: fmt.format(d), delta });
       }
       return days;
@@ -323,12 +351,13 @@ export const bookOverviewMethods = {
     if (!a || a.length < 2) return null;
     const tokEsts = window.__app?.tokEsts || {};
     return this._memoN('sevenDayDelta', [a, tokEsts], () => {
-      // Latest = Live-Summe wenn vorhanden, sonst neuester Cron-Snapshot.
-      // Konsistent zu Heute-Ring + 7-Tage-Bars.
+      // Latest = Live-Summe wenn vorhanden (raw, kein Math.max — sonst
+      // gewinnt Cron-Snapshot bei Lösch-Edits und überzeichnet net-Delta).
+      // Konsistent zu Heute-Ring (_charsTodayDelta).
       let liveChars = 0;
       for (const id of Object.keys(tokEsts)) liveChars += Number(tokEsts[id]?.chars) || 0;
       const latestSnapshot = a[a.length - 1];
-      const latestChars = liveChars > 0 ? Math.max(liveChars, Number(latestSnapshot.chars) || 0) : (Number(latestSnapshot.chars) || 0);
+      const latestChars = liveChars > 0 ? liveChars : (Number(latestSnapshot.chars) || 0);
       const cutoff = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
       let earlier = null;
       for (let i = a.length - 2; i >= 0; i--) {
@@ -389,7 +418,7 @@ export const bookOverviewMethods = {
     });
   },
 
-  // Streak-Heatmap: 53 Wochen × 7 Tage GitHub-Stil, ausgehend von HEUTE
+  // Streak-Heatmap: 52 Wochen × 7 Tage GitHub-Stil, ausgehend von HEUTE
   // (rechte untere Ecke = heute, links = vor 1 Jahr). Pro Zelle Delta-Zeichen
   // zum Vortag aus overviewStats. Cells ohne Snapshot oder Future-Tage =
   // null (gerendert als leere Box, kein Tile). Level 0..4 nach Quartilen
@@ -400,8 +429,9 @@ export const bookOverviewMethods = {
   // geschrieben). Longest = Max-Run im Fenster.
   overviewStreakHeatmap() {
     const a = this.overviewStats || [];
-    return this._memo('streakHeatmap', a, () => {
-      const WEEKS = 53;
+    const tokEsts = window.__app?.tokEsts || {};
+    return this._memoN('streakHeatmap', [a, tokEsts], () => {
+      const WEEKS = 52;
       const charsByDate = new Map();
       for (const s of a) charsByDate.set(s.recorded_at, Number(s.chars) || 0);
 
@@ -411,6 +441,10 @@ export const bookOverviewMethods = {
       // ISO-Wochenstart: Mo. Verschiebung von Sun-based zu Mon-based.
       const dowMon = (todayDow + 6) % 7; // Mo=0 ... So=6
       const startOffset = (WEEKS - 1) * 7 + dowMon; // erstes Datum links oben (Mo)
+      const isoToday = today.toISOString().slice(0, 10);
+      // Heute-Cell nutzt _charsTodayDelta() (Live-Quelle), damit colored auch
+      // wenn heutiger Cron-Snapshot fehlt oder Live > Snapshot.
+      const todayDelta = this._charsTodayDelta();
 
       const cells = [];
       const grid = []; // weeks[col][row]
@@ -418,17 +452,12 @@ export const bookOverviewMethods = {
       for (let w = 0; w < WEEKS; w++) grid.push([null, null, null, null, null, null, null]);
 
       for (let i = 0; i < WEEKS * 7; i++) {
-        // Index 0 = links oben (vor ~1 Jahr, Mo); steigt zeilenweise. Aber
-        // wir wollen spaltenweise Mo–So; also col = floor(i / 7), row = i % 7.
         const col = Math.floor(i / 7);
         const row = i % 7;
-        // Tagesdistanz von heute (heute = letzter Mo + dowMon Tage, in der
-        // letzten Spalte rechts unten an Position dowMon):
         const daysFromTodayCol = (WEEKS - 1) - col;
         const daysFromTodayRow = dowMon - row;
         const offsetDays = daysFromTodayCol * 7 + daysFromTodayRow;
         if (offsetDays < 0) {
-          // Future cell (selten — z.B. wenn Renderfenster über die Grid-Untergrenze hinausschiesst)
           grid[col][row] = { iso: null, delta: null, level: 0, future: true };
           continue;
         }
@@ -438,8 +467,15 @@ export const bookOverviewMethods = {
         const cur = charsByDate.get(iso);
         const prev = charsByDate.get(prevIso);
         const hasSnapshot = cur != null;
-        const delta = (hasSnapshot && prev != null) ? (cur - prev) : (hasSnapshot ? 0 : null);
-        const cell = { iso, delta, level: 0, future: false, hasSnapshot };
+        let delta;
+        if (iso === isoToday) {
+          // Live-aware: even ohne heutigen Cron-Snapshot wird Schreibfortschritt
+          // angezeigt, sobald tokEsts > prior Snapshot.
+          delta = todayDelta > 0 ? todayDelta : (hasSnapshot && prev != null ? cur - prev : null);
+        } else {
+          delta = (hasSnapshot && prev != null) ? (cur - prev) : (hasSnapshot ? 0 : null);
+        }
+        const cell = { iso, delta, level: 0, future: false, hasSnapshot: hasSnapshot || (iso === isoToday && todayDelta > 0) };
         if (delta != null && delta > 0) positive.push(delta);
         grid[col][row] = cell;
         cells.push(cell);
@@ -463,7 +499,7 @@ export const bookOverviewMethods = {
       // Streaks: lineare Tagesreihe in chronologischer Reihenfolge bauen
       // (älteste links). Aktuelle Streak = Tail-Run > 0; ein heutiges
       // Null-Delta (noch nicht geschrieben) bricht NICHT, gestriges Null
-      // schon.
+      // schon. Heute-Eintrag nutzt todayDelta (Live-aware), sonst nur snapshots.
       const linear = [];
       for (let off = startOffset; off >= 0; off--) {
         const dt = new Date(today.getTime() - off * 86400000);
@@ -471,7 +507,12 @@ export const bookOverviewMethods = {
         const prevIso = new Date(dt.getTime() - 86400000).toISOString().slice(0, 10);
         const cur = charsByDate.get(iso);
         const prev = charsByDate.get(prevIso);
-        const delta = (cur != null && prev != null) ? (cur - prev) : null;
+        let delta;
+        if (iso === isoToday) {
+          delta = todayDelta > 0 ? todayDelta : (cur != null && prev != null ? cur - prev : null);
+        } else {
+          delta = (cur != null && prev != null) ? (cur - prev) : null;
+        }
         linear.push({ iso, delta });
       }
 
@@ -510,51 +551,14 @@ export const bookOverviewMethods = {
     });
   },
 
-  // Heute-Ring: Donut-Math für Tagesziel. todayChars = aktueller Stand minus
-  // jüngstem Snapshot strikt vor heute (egal wie alt — verkraftet Lücken/
-  // Wochenenden/ersten Sync). Negative Deltas zählen als 0.
-  // Aktueller Stand: bevorzugt Live-tokEsts (entkoppelt vom Cron-Job, sieht
-  // jeden Save sofort), Fallback auf heutigen Snapshot aus book_stats_history.
+  // Heute-Ring: Donut-Math für Tagesziel. Konsumiert _charsTodayDelta() —
+  // selbe Quelle wie 7-Tage-Bar (heute) und 7-Tage-Total. Negative Deltas
+  // werden auf 0 geklemmt; ohne prior Snapshot kein Delta möglich → 0.
   overviewTodayRing(goalChars = 1500) {
     const a = this.overviewStats || [];
-    const app = window.__app;
-    const tokEsts = app?.tokEsts || {};
-    // Cache-Key inkludiert tokEsts-Ref, damit Live-Updates Cache invalidieren.
+    const tokEsts = window.__app?.tokEsts || {};
     return this._memoN('todayRing:' + goalChars, [a, tokEsts], () => {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const isoToday = today.toISOString().slice(0, 10);
-
-      // Stats aufsteigend sortiert (history.js: ORDER BY recorded_at ASC).
-      // Heute-Snapshot + jüngsten Snapshot strikt vor heute aus dem Tail.
-      let cronTodayChars = null;
-      let prevChars = null;
-      for (let i = a.length - 1; i >= 0; i--) {
-        const r = a[i];
-        if (!r?.recorded_at) continue;
-        if (r.recorded_at === isoToday && cronTodayChars == null) {
-          cronTodayChars = Number(r.chars) || 0;
-          continue;
-        }
-        if (r.recorded_at < isoToday && prevChars == null) {
-          prevChars = Number(r.chars) || 0;
-          break;
-        }
-      }
-
-      // Live-Stand aus tokEsts (Sidebar-Σ-Quelle, aktualisiert nach jedem Save).
-      let liveChars = 0;
-      const ids = Object.keys(tokEsts);
-      if (ids.length) {
-        for (const id of ids) liveChars += Number(tokEsts[id]?.chars) || 0;
-      }
-      const curChars = liveChars > 0 ? liveChars : cronTodayChars;
-
-      let chars = 0;
-      if (curChars != null && prevChars != null) chars = Math.max(0, curChars - prevChars);
-      // curChars vorhanden, prevChars fehlt → erste Messung im Buch, kein
-      // Delta berechenbar. 0 lassen, statt Cumulative als „heute" auszuweisen.
-
+      const chars = this._charsTodayDelta();
       const goal = Math.max(1, Number(goalChars) || 1500);
       const pct = Math.max(0, Math.min(100, Math.round((chars / goal) * 100)));
       const r = 28;

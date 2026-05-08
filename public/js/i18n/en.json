@@ -470,7 +470,7 @@
   "overview.recent":             "Recently opened pages",
   "overview.quickActions":       "Actions",
   "overview.last7Days":          "Written (7 days)",
-  "overview.streak.title":       "Writing streak (52 weeks)",
+  "overview.streak.title":       "Writing stats (52 weeks)",
   "overview.streak.current":     "Current: {n} days",
   "overview.streak.longest":     "Best: {n} days",
   "overview.streak.totalActive": "{n} active days",

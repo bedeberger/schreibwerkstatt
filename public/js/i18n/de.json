@@ -470,7 +470,7 @@
   "overview.recent":             "Zuletzt geöffnete Seiten",
   "overview.quickActions":       "Aktionen",
   "overview.last7Days":          "Geschrieben (7 Tage)",
-  "overview.streak.title":       "Schreib-Streak (52 Wochen)",
+  "overview.streak.title":       "Schreibstatistiken (52 Wochen)",
   "overview.streak.current":     "Aktuell: {n} Tage",
   "overview.streak.longest":     "Bestleistung: {n} Tage",
   "overview.streak.totalActive": "{n} aktive Tage",

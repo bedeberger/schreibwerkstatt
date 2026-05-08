@@ -10,15 +10,14 @@ globalThis.window = { __app: { uiLocale: 'de' } };
 
 const { bookOverviewMethods } = await import('../../public/js/book-overview.js');
 
+// UTC-basierte Datum-Berechnung — book-overview.js nutzt
+// `new Date().toISOString().slice(0,10)` (UTC). Lokale midnight + toISOString
+// liefert in CET den Vortag — Test-Bug, nicht Code-Bug.
 function isoDaysAgo(n) {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() - n);
-  return d.toISOString().slice(0, 10);
+  return new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
 }
 
 function makeCtx(stats = [], tokEsts = null) {
-  // tokEsts auf window.__app spiegeln, damit overviewTodayRing den Live-Pfad sieht
   if (tokEsts !== null) globalThis.window.__app.tokEsts = tokEsts;
   else globalThis.window.__app.tokEsts = {};
   return {
@@ -26,8 +25,11 @@ function makeCtx(stats = [], tokEsts = null) {
     _memos: {},
     _memo: bookOverviewMethods._memo,
     _memoN: bookOverviewMethods._memoN,
+    _charsTodayDelta: bookOverviewMethods._charsTodayDelta,
     overviewStreakHeatmap: bookOverviewMethods.overviewStreakHeatmap,
     overviewTodayRing: bookOverviewMethods.overviewTodayRing,
+    overviewLast7Days: bookOverviewMethods.overviewLast7Days,
+    overview7DayCharDelta: bookOverviewMethods.overview7DayCharDelta,
   };
 }
 
@@ -37,7 +39,7 @@ test('overviewStreakHeatmap: leere Daten → Streak 0', () => {
   assert.equal(out.currentStreak, 0);
   assert.equal(out.longestStreak, 0);
   assert.equal(out.totalActiveDays, 0);
-  assert.equal(out.weeks.length, 53);
+  assert.equal(out.weeks.length, 52);
 });
 
 test('overviewStreakHeatmap: drei aufeinanderfolgende Tage mit Wachstum → currentStreak 3', () => {
@@ -183,4 +185,70 @@ test('overviewTodayRing: SVG-Math konsistent (dash + gap = circumference)', () =
   const r = ctx.overviewTodayRing(1500);
   const sum = r.dash + r.gap;
   assert.ok(Math.abs(sum - r.c) < 0.001, `dash+gap=${sum}, c=${r.c}`);
+});
+
+// ── Konsistenz-Sentinels: Donut, 7-Tage-Bar (today), 7-Tage-Total
+//    MÜSSEN dieselbe Zahl für „heute" zeigen. Vorher drifteten die Methoden
+//    auseinander (Math.max in Bar/Total liess Cron-Snapshot bei Lösch-Edits
+//    gewinnen, Donut zeigte raw live → 3'004 vs 1'212-Bug).
+test('Konsistenz: Donut == 7-Tage-Bar today (User schreibt nach Sync)', () => {
+  // Cron lief heute @ +500 chars vs gestern. User schrieb dann +800 mehr.
+  const stats = [
+    { recorded_at: isoDaysAgo(1), chars: 1000 },
+    { recorded_at: isoDaysAgo(0), chars: 1500 },
+  ];
+  const tokEsts = { 1: { chars: 2300 } }; // live = 2300 → delta = 1300
+  const ctx = makeCtx(stats, tokEsts);
+  const donut = ctx.overviewTodayRing(1500).chars;
+  const days = ctx.overviewLast7Days();
+  const todayBar = days[days.length - 1].delta;
+  assert.equal(donut, todayBar, `Donut ${donut} != Bar ${todayBar}`);
+  assert.equal(donut, 1300);
+});
+
+test('Konsistenz: Donut == 7-Tage-Bar today (User löscht nach Sync)', () => {
+  // Bug-Fix-Sentinel: cron snapshot zeigt heute +3000, aber User hat
+  // gelöscht → live = +1212. Vorher: Bar zeigte 3000, Donut 1212.
+  const stats = [
+    { recorded_at: isoDaysAgo(1), chars: 17828 },
+    { recorded_at: isoDaysAgo(0), chars: 20832 }, // cron: +3004
+  ];
+  const tokEsts = { 1: { chars: 19040 } }; // live: +1212 (gelöscht)
+  const ctx = makeCtx(stats, tokEsts);
+  const donut = ctx.overviewTodayRing(1500).chars;
+  const days = ctx.overviewLast7Days();
+  const todayBar = days[days.length - 1].delta;
+  assert.equal(donut, todayBar, `Donut ${donut} != Bar ${todayBar} (Math.max-Bug)`);
+  assert.equal(donut, 1212);
+});
+
+test('Konsistenz: Donut == _charsTodayDelta()', () => {
+  // Single source of truth.
+  const stats = [
+    { recorded_at: isoDaysAgo(2), chars: 1000 },
+    { recorded_at: isoDaysAgo(0), chars: 1500 },
+  ];
+  const ctx = makeCtx(stats, {});
+  const donut = ctx.overviewTodayRing(1500).chars;
+  const helper = ctx._charsTodayDelta();
+  assert.equal(donut, helper);
+  assert.equal(donut, 500);
+});
+
+test('Streak: heute-Cell colored auch wenn nur Live-tokEsts (kein heutiger Snapshot)', () => {
+  // Bug-Fix-Sentinel: Streak war leer wenn heute kein Cron-Snapshot, obwohl
+  // tokEsts > prior snapshot. currentStreak musste 0 sein.
+  const stats = [
+    { recorded_at: isoDaysAgo(1), chars: 1000 },
+    // kein heutiger snapshot
+  ];
+  const tokEsts = { 1: { chars: 2500 } }; // live: +1500 vs gestern
+  const ctx = makeCtx(stats, tokEsts);
+  const out = ctx.overviewStreakHeatmap();
+  assert.ok(out.currentStreak >= 1, `currentStreak = ${out.currentStreak}, sollte ≥ 1`);
+  assert.ok(out.totalActiveDays >= 1);
+  // Heute-Cell hat positives Delta → in positive[] → mind. ein Level > 0
+  let coloredCells = 0;
+  for (const w of out.weeks) for (const c of w) if (c?.level > 0) coloredCells++;
+  assert.ok(coloredCells >= 1, 'mindestens eine Cell colored');
 });
