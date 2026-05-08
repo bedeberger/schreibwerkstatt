@@ -1,6 +1,6 @@
 // Tastenkürzel-Overlay: globaler `?`-Hotkey + Modal.
 // Liste der Shortcuts kommt aus i18n (shortcuts.item.*), Bindings selbst leben
-// dort, wo sie gebraucht werden (index.html, editor-focus.js etc.) – das
+// dort, wo sie gebraucht werden (index.html, editor/focus.js etc.) – das
 // Overlay dokumentiert nur.
 //
 // Dieses Modul liefert ausserdem:

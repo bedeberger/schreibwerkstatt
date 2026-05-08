@@ -7,6 +7,29 @@
 //   - `_buildGlobalZeitstrahl` (wird aus figuren.js / loadFiguren gerufen)
 //   - `_reloadZeitstrahl` (wird aus app-komplett.js gerufen)
 import { setupCardLifecycle } from './card-lifecycle.js';
+import { memoizeByIdentity } from '../utils.js';
+
+const _memoEreignisse = () => memoizeByIdentity(([events, suche, figurId, kapitel, seite]) => {
+  let result = events;
+  if (suche) {
+    const q = suche.toLowerCase();
+    result = result.filter(ev => (ev.ereignis || '').toLowerCase().includes(q));
+  }
+  if (figurId) result = result.filter(ev => ev.figuren.some(f => f.id === figurId));
+  if (kapitel) {
+    result = result.filter(ev => {
+      const kap = Array.isArray(ev.kapitel) ? ev.kapitel : (ev.kapitel ? [ev.kapitel] : []);
+      return kap.includes(kapitel);
+    });
+  }
+  if (seite && kapitel) {
+    result = result.filter(ev => {
+      const seiten = Array.isArray(ev.seiten) ? ev.seiten : (ev.seite ? [ev.seite] : []);
+      return seiten.includes(seite);
+    });
+  }
+  return result;
+});
 
 export function registerEreignisseCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -20,6 +43,7 @@ export function registerEreignisseCard() {
     _consolidatePollTimer: null,
     _ereignisseExtractPollTimer: null,
     _lifecycle: null,
+    _memoFiltered: _memoEreignisse(),
 
     init() {
       this._lifecycle = setupCardLifecycle(this, {
@@ -59,28 +83,14 @@ export function registerEreignisseCard() {
 
     filteredEreignisse() {
       const root = window.__app;
-      const filters = root.ereignisseFilters;
-      let result = root.globalZeitstrahl;
-      if (filters.suche) {
-        const q = filters.suche.toLowerCase();
-        result = result.filter(ev => (ev.ereignis || '').toLowerCase().includes(q));
-      }
-      if (filters.figurId) {
-        result = result.filter(ev => ev.figuren.some(f => f.id === filters.figurId));
-      }
-      if (filters.kapitel) {
-        result = result.filter(ev => {
-          const kap = Array.isArray(ev.kapitel) ? ev.kapitel : (ev.kapitel ? [ev.kapitel] : []);
-          return kap.includes(filters.kapitel);
-        });
-      }
-      if (filters.seite && filters.kapitel) {
-        result = result.filter(ev => {
-          const seiten = Array.isArray(ev.seiten) ? ev.seiten : (ev.seite ? [ev.seite] : []);
-          return seiten.includes(filters.seite);
-        });
-      }
-      return result;
+      const f = root.ereignisseFilters;
+      return this._memoFiltered([
+        root.globalZeitstrahl,
+        f.suche ?? '',
+        f.figurId ?? '',
+        f.kapitel ?? '',
+        f.seite ?? '',
+      ]);
     },
   }));
 }

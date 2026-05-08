@@ -7,7 +7,7 @@
 //   Synonym-Kontextmenü). Root dispatcht `editor:figur-lookup:open { fig, x, y }`
 //   und `editor:figur-lookup:close`; diese Sub hört darauf.
 
-import { figurLookupCardMethods } from '../editor-figur-lookup.js';
+import { figurLookupCardMethods } from '../editor/figur-lookup.js';
 
 export function registerEditorFigurLookupCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;

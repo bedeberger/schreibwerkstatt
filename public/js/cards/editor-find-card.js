@@ -6,7 +6,7 @@
 // Root behält: editMode, focusMode, selectedBookId, setStatus(), t(),
 //   _markEditDirty(). Zugriff via window.__app / $app.
 
-import { editorFindCardMethods } from '../editor-find.js';
+import { editorFindCardMethods } from '../editor/find.js';
 
 export function registerEditorFindCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;

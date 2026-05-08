@@ -1,4 +1,4 @@
-// Unit-Tests für Pure-Helpers aus public/js/editor-focus.js.
+// Unit-Tests für Pure-Helpers aus public/js/editor/focus.js.
 // ESM-File, weil das Quellmodul ESM ist; node --test lädt .mjs nativ.
 
 import { test } from 'node:test';
@@ -12,7 +12,7 @@ const {
   getCaretRect,
   setActiveBlock,
   dynamicTypewriterThreshold,
-} = await import('../../public/js/editor-focus.js');
+} = await import('../../public/js/editor/focus.js');
 
 // --- findBlockFromNode ------------------------------------------------------
 

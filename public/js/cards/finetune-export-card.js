@@ -4,11 +4,6 @@
 // Job-ID (für Downloads).
 // `showFinetuneExportCard` bleibt im Root (Hash-Router + Exklusivität).
 //
-// Lifecycle:
-//   - $watch($root.showFinetuneExportCard): on-visible → Active-Job-Check.
-//   - book:changed / view:reset: Poller stoppen, State leeren.
-//   - job:reconnect (type='finetune-export'): Loading-State übernehmen.
-//
 // Default-Profil: Unsloth Studio + Mistral-Small-3.2-24B-QLoRA auf 20-GB-GPU
 // (z.B. RTX 4000 Ada). Ableitungen:
 //   maxChars=4000    → p95 ≈ 1500 Tokens → passt in seq_len=4096
@@ -21,6 +16,7 @@
 
 import { finetuneExportMethods } from '../finetune-export.js';
 import { createCardJobFeature } from './job-feature-card.js';
+import { setupCardLifecycle } from './card-lifecycle.js';
 
 export function registerFinetuneExportCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -38,8 +34,6 @@ export function registerFinetuneExportCard() {
     finetuneEmitText:     false,
     finetuneTruncateLong: true,   // Lange Samples kappen statt droppen
 
-    // KI-Augmentation: Default aus, weil Provider-Kosten + Laufzeit. Wenn aktiviert,
-    // wird der Cache (finetune_ai_cache) genutzt — Folge-Exports kosten dann ~nichts.
     finetuneAiReversePrompts:        false,
     finetuneAiFactQA:                false,
     finetuneAiReasoningBackfill:     false,
@@ -53,31 +47,10 @@ export function registerFinetuneExportCard() {
     finetuneStats:    null,
 
     _finetunePollTimer: null,
-    _onBookChanged: null,
-    _onViewReset: null,
-    _onJobReconnect: null,
+    _lifecycle: null,
 
     init() {
-      this.$watch(() => window.__app.showFinetuneExportCard, async (visible) => {
-        if (!visible) return;
-        if (!window.__app.selectedBookId) return;
-        await this._onVisibleFinetuneExport();
-      });
-
-      this._onBookChanged = () => {
-        if (this._finetunePollTimer) { clearInterval(this._finetunePollTimer); this._finetunePollTimer = null; }
-        this.finetuneLoading = false;
-        this.finetuneProgress = 0;
-        this.finetuneStatus = '';
-        this.finetuneJobId = null;
-        this.finetuneStats = null;
-      };
-      window.addEventListener('book:changed', this._onBookChanged);
-
-      this._onViewReset = () => this._onBookChanged();
-      window.addEventListener('view:reset', this._onViewReset);
-
-      this._onJobReconnect = (e) => {
+      const onJobReconnect = (e) => {
         const d = e.detail;
         if (d?.type !== 'finetune-export') return;
         const job = d.job;
@@ -89,15 +62,23 @@ export function registerFinetuneExportCard() {
         this.finetuneJobId = d.jobId;
         this.startFinetuneExportPoll(d.jobId);
       };
-      window.addEventListener('job:reconnect', this._onJobReconnect);
+
+      this._lifecycle = setupCardLifecycle(this, {
+        showFlag: 'showFinetuneExportCard',
+        timerKeys: ['_finetunePollTimer'],
+        onShow: () => this._onVisibleFinetuneExport(),
+        resetState: {
+          finetuneLoading: false,
+          finetuneProgress: 0,
+          finetuneStatus: '',
+          finetuneJobId: null,
+          finetuneStats: null,
+        },
+        extraListeners: [{ type: 'job:reconnect', handler: onJobReconnect }],
+      });
     },
 
-    destroy() {
-      if (this._finetunePollTimer) { clearInterval(this._finetunePollTimer); this._finetunePollTimer = null; }
-      if (this._onBookChanged)  window.removeEventListener('book:changed', this._onBookChanged);
-      if (this._onViewReset)    window.removeEventListener('view:reset',  this._onViewReset);
-      if (this._onJobReconnect) window.removeEventListener('job:reconnect', this._onJobReconnect);
-    },
+    destroy() { this._lifecycle?.destroy(); },
 
     ...finetuneExportMethods,
 

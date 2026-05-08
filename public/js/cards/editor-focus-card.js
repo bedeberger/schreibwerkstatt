@@ -7,13 +7,13 @@
 //   editor-toolbar/figur-lookup-Checks), `editMode`, `editDirty`, `editSaving`,
 //   `saveOffline`, `lastDraftSavedAt`. Die Sub schreibt `window.__app.focusMode`.
 //
-// Trigger-Events aus dem Root (Trampoline in editor-focus.js):
+// Trigger-Events aus dem Root (Trampoline in editor/focus.js):
 //   - `editor:focus:toggle`    — toggle je nach State
 //   - `editor:focus:enter`     — explizit betreten (muss editMode sein)
 //   - `editor:focus:exit`      — verlassen
 //   - `editor:focus:start-edit` — startet Edit-Mode und tritt dann in Fokus ein
 
-import { focusCardMethods, readFocusSnapshot, clearFocusSnapshot } from '../editor-focus.js';
+import { focusCardMethods, readFocusSnapshot, clearFocusSnapshot } from '../editor/focus.js';
 
 export function registerEditorFocusCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -47,7 +47,7 @@ export function registerEditorFocusCard() {
 
       // Auto-Restore: Reload (z.B. via Session-Banner-Relogin oder manuelles
       // F5) soll den Fokusmodus wieder einnehmen, wenn die ursprüngliche Seite
-      // geladen ist. Snapshot wird beim Eintritt in editor-focus.js geschrieben
+      // geladen ist. Snapshot wird beim Eintritt in editor/focus.js geschrieben
       // und beim regulären Exit gelöscht.
       this._restoreSnapshot = readFocusSnapshot();
       if (this._restoreSnapshot) {

@@ -1,6 +1,6 @@
-// Gemeinsame Utilities für die Editor-Module (editor-find, editor-synonyme,
-// editor-figur-lookup, editor-toolbar): Wort-Regex, Namens-Normalisierung,
-// Caret-Setup, Popup-Positionierung und Reflow-Listener.
+// Gemeinsame Utilities für die Editor-Module (find, synonyme, figur-lookup,
+// toolbar): Wort-Regex, Namens-Normalisierung, Caret-Setup,
+// Popup-Positionierung und Reflow-Listener.
 
 // Ein "Einzelwort" ist eine zusammenhängende Sequenz aus Buchstaben/Ziffern.
 // Bindestriche und Apostrophe zählen mit, damit «auf-/abwärts» oder «wir's» erfasst werden.

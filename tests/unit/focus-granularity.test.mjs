@@ -1,4 +1,4 @@
-// Tests für Granularitäts-Helpers in editor-focus.js: setNearBlocks,
+// Tests für Granularitäts-Helpers in editor/focus.js: setNearBlocks,
 // findSentenceRanges. Sentence-Highlight-Range-Bau braucht echtes DOM und
 // wird in den E2E-Tests verifiziert.
 
@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 const {
   setNearBlocks,
   findSentenceRanges,
-} = await import('../../public/js/editor-focus.js');
+} = await import('../../public/js/editor/focus.js');
 
 // --- setNearBlocks ----------------------------------------------------------
 

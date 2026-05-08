@@ -10,7 +10,7 @@
 //   Trampoline `closeSynonymMenu/closeSynonymPicker` und `requestSynonyms`
 //   dispatchen an die Sub. `_startPoll` bleibt Root-Utility.
 
-import { synonymCardMethods } from '../editor-synonyme.js';
+import { synonymCardMethods } from '../editor/synonyme.js';
 
 export function registerEditorSynonymeCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;

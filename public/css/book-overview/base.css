@@ -13,6 +13,15 @@
   grid-auto-flow: row dense;
 }
 
+/* Tile-Partials werden via `_loadPartials` in `<div id="partial-bookoverview-*">`
+   injiziert — diese Wrapper sind direkte Grid-Children und würden span-Klassen
+   am `.overview-tile` darin neutralisieren. `display: contents` lässt den
+   Wrapper aus dem Box-Tree fallen, sodass das `.overview-tile` selbst Grid-Item
+   wird und seine `--hero` / `--medium` / `--wide`-Spans wieder greifen. */
+.book-overview .overview-grid > [id^="partial-bookoverview-"] {
+  display: contents;
+}
+
 .overview-tile {
   display: flex;
   flex-direction: column;

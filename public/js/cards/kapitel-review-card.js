@@ -5,6 +5,7 @@
 
 import { fetchJson, escHtml, escMd, renderStars } from '../utils.js';
 import { startPoll, runningJobStatus } from './job-helpers.js';
+import { setupCardLifecycle } from './card-lifecycle.js';
 
 export function registerKapitelReviewCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -18,22 +19,10 @@ export function registerKapitelReviewCard() {
     selectedKapitelReviewId: null,
     _kapitelReviewPollTimer: null,
     _kapitelReviewRunningChapterId: '',
-
-    _onBookChanged: null,
-    _onViewReset: null,
-    _onCardRefresh: null,
-    _onJobReconnect: null,
-    _onSelectChapter: null,
+    _lifecycle: null,
 
     init() {
-      this.$watch(() => window.__app.showKapitelReviewCard, async (visible) => {
-        if (!visible) return;
-        await this._openKapitelReview();
-      });
-
-      // Sidebar / Hash-Router rufen Root-Methode `openKapitelReviewForChapter`,
-      // die dispatcht `kapitel-review:select { chapterId }` an die Sub.
-      this._onSelectChapter = (e) => {
+      const onSelectChapter = (e) => {
         const chapterId = e.detail?.chapterId;
         if (!chapterId) return;
         const opts = this.kapitelReviewChapterOptions();
@@ -45,33 +34,8 @@ export function registerKapitelReviewCard() {
           this.setKapitelReviewStatus('');
         }
       };
-      window.addEventListener('kapitel-review:select', this._onSelectChapter);
 
-      this._onBookChanged = () => {
-        if (this._kapitelReviewPollTimer) { clearInterval(this._kapitelReviewPollTimer); this._kapitelReviewPollTimer = null; }
-        this.kapitelReviewLoading = false;
-        this.kapitelReviewProgress = 0;
-        this.kapitelReviewStatus = '';
-        this.kapitelReviewOut = '';
-        window.__app.kapitelReviewChapterId = '';
-        this._kapitelReviewRunningChapterId = '';
-        this.selectedKapitelReviewId = null;
-        this.kapitelReviewHistory = {};
-      };
-      window.addEventListener('book:changed', this._onBookChanged);
-
-      this._onViewReset = () => {
-        this._onBookChanged();
-      };
-      window.addEventListener('view:reset', this._onViewReset);
-
-      this._onCardRefresh = async (e) => {
-        if (e.detail?.name !== 'kapitelReview') return;
-        if (window.__app.selectedBookId) await this.loadKapitelReviewHistory(window.__app.selectedBookId);
-      };
-      window.addEventListener('card:refresh', this._onCardRefresh);
-
-      this._onJobReconnect = (e) => {
+      const onJobReconnect = (e) => {
         const d = e.detail;
         if (d?.type !== 'kapitel-review') return;
         const job = d.job;
@@ -87,17 +51,37 @@ export function registerKapitelReviewCard() {
         );
         this.startKapitelReviewPoll(d.jobId, chapterId);
       };
-      window.addEventListener('job:reconnect', this._onJobReconnect);
+
+      // Reset zieht zusätzlich den Root-State `kapitelReviewChapterId`,
+      // deshalb eigener Override statt resetState.
+      const reset = (ctx) => {
+        ctx.kapitelReviewLoading = false;
+        ctx.kapitelReviewProgress = 0;
+        ctx.kapitelReviewStatus = '';
+        ctx.kapitelReviewOut = '';
+        window.__app.kapitelReviewChapterId = '';
+        ctx._kapitelReviewRunningChapterId = '';
+        ctx.selectedKapitelReviewId = null;
+        ctx.kapitelReviewHistory = {};
+      };
+
+      this._lifecycle = setupCardLifecycle(this, {
+        name: 'kapitelReview',
+        showFlag: 'showKapitelReviewCard',
+        timerKeys: ['_kapitelReviewPollTimer'],
+        showNeedsBookId: false,
+        onShow: () => this._openKapitelReview(),
+        load: (root) => this.loadKapitelReviewHistory(root.selectedBookId),
+        onBookChanged: (e, ctx) => reset(ctx),
+        onViewReset:   (e, ctx) => reset(ctx),
+        extraListeners: [
+          { type: 'kapitel-review:select', handler: onSelectChapter },
+          { type: 'job:reconnect',         handler: onJobReconnect },
+        ],
+      });
     },
 
-    destroy() {
-      if (this._kapitelReviewPollTimer) { clearInterval(this._kapitelReviewPollTimer); this._kapitelReviewPollTimer = null; }
-      if (this._onBookChanged)   window.removeEventListener('book:changed', this._onBookChanged);
-      if (this._onViewReset)     window.removeEventListener('view:reset',  this._onViewReset);
-      if (this._onCardRefresh)   window.removeEventListener('card:refresh', this._onCardRefresh);
-      if (this._onJobReconnect)  window.removeEventListener('job:reconnect', this._onJobReconnect);
-      if (this._onSelectChapter) window.removeEventListener('kapitel-review:select', this._onSelectChapter);
-    },
+    destroy() { this._lifecycle?.destroy(); },
 
     _lsKeyKapitelReview(chapterId) {
       return `lektorat_chapter_review_job_${window.__app.selectedBookId}_${chapterId}`;

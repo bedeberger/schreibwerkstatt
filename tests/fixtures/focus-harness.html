@@ -31,7 +31,7 @@
   </div>
 
   <script type="module">
-    import { focusCardMethods } from '/public/js/editor-focus.js';
+    import { focusCardMethods } from '/public/js/editor/focus.js';
 
     // 60 Absätze mit genug Text, dass die Container weit über die Höhe scrollt.
     const editor = document.querySelector('.page-content-view--editing');
@@ -69,7 +69,7 @@
       $nextTick: (fn) => Promise.resolve().then(fn),
       startEdit() {
         this.editMode = true;
-        // Spiegelt editor-edit.js::startEdit – Enter soll <p> erzeugen,
+        // Spiegelt editor/edit.js::startEdit – Enter soll <p> erzeugen,
         // nicht den Chromium-Default <div>.
         try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch {}
       },

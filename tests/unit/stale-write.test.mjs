@@ -16,7 +16,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-// DOM-Stubs vor Modul-Imports — page-view.js (transitiv von lektorat.js
+// DOM-Stubs vor Modul-Imports — page-view.js (transitiv von editor/lektorat.js
 // importiert) liest beim Top-Level `window.matchMedia(...)`.
 globalThis.window = globalThis.window || {
   matchMedia: () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }),
@@ -32,7 +32,7 @@ globalThis.document = globalThis.document || {
 };
 
 const { bookstackMethods, _invalidateApiCache } = await import('../../public/js/api-bookstack.js');
-const { lektoratMethods } = await import('../../public/js/lektorat.js');
+const { lektoratMethods } = await import('../../public/js/editor/lektorat.js');
 
 // ── Schicht 1 ────────────────────────────────────────────────────────────────
 
