@@ -444,11 +444,11 @@ const _upsertUserLogin = db.prepare(`
     last_login_at = excluded.last_login_at
 `);
 const _getUser = db.prepare(
-  'SELECT email, name, created_at, last_login_at, last_seen_at, locale, theme, default_buchtyp, default_language, default_region, focus_granularity FROM users WHERE email = ?'
+  'SELECT email, name, created_at, last_login_at, last_seen_at, locale, theme, default_buchtyp, default_language, default_region, focus_granularity, daily_goal_chars FROM users WHERE email = ?'
 );
 const _updateUserSettings = db.prepare(`
   UPDATE users
-  SET locale = ?, theme = ?, default_buchtyp = ?, default_language = ?, default_region = ?, focus_granularity = ?
+  SET locale = ?, theme = ?, default_buchtyp = ?, default_language = ?, default_region = ?, focus_granularity = ?, daily_goal_chars = ?
   WHERE email = ?
 `);
 const _touchUserLastSeen = db.prepare(
@@ -494,6 +494,7 @@ function updateUserSettings(email, settings) {
     settings.default_language ?? null,
     settings.default_region ?? null,
     settings.focus_granularity ?? null,
+    settings.daily_goal_chars ?? null,
     email
   );
 }

@@ -128,6 +128,82 @@
       </div>
     </template>
 
+    <!-- Heute-Ring: Tagesziel-Donut, pulsiert bei aktivem Schreibtag.
+         Goal aus currentUser.daily_goal_chars (User-Settings), Fallback 1500. -->
+    <template x-if="overviewStats && overviewStats.length > 0">
+      <div class="overview-tile internal-link"
+           @click="_openLengthStats(7, 'delta_chars')"
+           :aria-label="$app.t('overview.today.aria', { chars: _fmtNum(overviewTodayRing($app.currentUser?.daily_goal_chars || 1500).chars), goal: _fmtNum(overviewTodayRing($app.currentUser?.daily_goal_chars || 1500).goal), pct: overviewTodayRing($app.currentUser?.daily_goal_chars || 1500).pct })"
+           :data-tip="$app.t('overview.openStats')">
+        <div class="overview-tile-label" x-text="$app.t('overview.today.title')"></div>
+        <div class="overview-donut-row">
+          <svg class="overview-donut overview-today-ring"
+               :class="{ 'overview-today-ring--active': overviewTodayRing($app.currentUser?.daily_goal_chars || 1500).active, 'overview-today-ring--reached': overviewTodayRing($app.currentUser?.daily_goal_chars || 1500).reached }"
+               viewBox="0 0 72 72" aria-hidden="true">
+            <circle cx="36" cy="36" :r="overviewTodayRing($app.currentUser?.daily_goal_chars || 1500).r"
+                    fill="none" stroke="var(--color-border)" stroke-width="6"></circle>
+            <circle cx="36" cy="36" :r="overviewTodayRing($app.currentUser?.daily_goal_chars || 1500).r"
+                    fill="none" stroke="var(--color-accent)" stroke-width="6"
+                    stroke-linecap="round"
+                    :stroke-dasharray="overviewTodayRing($app.currentUser?.daily_goal_chars || 1500).dash + ' ' + overviewTodayRing($app.currentUser?.daily_goal_chars || 1500).gap"
+                    transform="rotate(-90 36 36)"></circle>
+            <text x="36" y="40" text-anchor="middle" class="overview-donut-text"
+                  x-text="overviewTodayRing($app.currentUser?.daily_goal_chars || 1500).pct + '%'"></text>
+          </svg>
+          <div class="overview-donut-meta">
+            <div class="overview-donut-meta-checked"
+                 x-show="overviewTodayRing($app.currentUser?.daily_goal_chars || 1500).active"
+                 x-text="$app.t('overview.today.meta', { chars: _fmtNum(overviewTodayRing($app.currentUser?.daily_goal_chars || 1500).chars), goal: _fmtNum(overviewTodayRing($app.currentUser?.daily_goal_chars || 1500).goal) })"></div>
+            <div class="overview-donut-meta-checked"
+                 x-show="!overviewTodayRing($app.currentUser?.daily_goal_chars || 1500).active"
+                 x-text="$app.t('overview.today.idle')"></div>
+            <div class="overview-donut-meta-checked"
+                 x-show="overviewTodayRing($app.currentUser?.daily_goal_chars || 1500).reached"
+                 x-text="$app.t('overview.today.goalReached')"></div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- Streak-Heatmap: 53×7 GitHub-Stil-Grid -->
+    <template x-if="overviewStats && overviewStats.length > 0">
+      <div class="overview-tile overview-tile--wide internal-link"
+           @click="_openLengthStats(365, 'delta_chars')"
+           :data-tip="$app.t('overview.openStats')">
+        <div class="overview-tile-head">
+          <div class="overview-tile-label" x-text="$app.t('overview.streak.title')"></div>
+          <div class="overview-streak-meta">
+            <span class="overview-streak-stat" x-text="$app.t('overview.streak.current', { n: overviewStreakHeatmap().currentStreak })"></span>
+            <span class="overview-streak-stat" x-text="$app.t('overview.streak.longest', { n: overviewStreakHeatmap().longestStreak })"></span>
+            <span class="overview-streak-stat" x-text="$app.t('overview.streak.totalActive', { n: overviewStreakHeatmap().totalActiveDays })"></span>
+          </div>
+        </div>
+        <div class="overview-streak-grid" role="img" :aria-label="$app.t('overview.streak.title')">
+          <template x-for="(week, wi) in overviewStreakHeatmap().weeks" :key="wi">
+            <div class="overview-streak-week">
+              <template x-for="(cell, di) in week" :key="di">
+                <div class="overview-streak-cell"
+                     :class="cell ? ('overview-streak-cell--lvl' + cell.level + (cell.future ? ' overview-streak-cell--future' : '')) : 'overview-streak-cell--empty'"
+                     :data-tip="cell && cell.iso
+                       ? (cell.delta != null && cell.delta > 0
+                           ? $app.t('overview.streak.cellTip', { date: cell.iso, chars: _fmtNum(cell.delta) })
+                           : (cell.hasSnapshot ? $app.t('overview.streak.cellTipNoChange', { date: cell.iso }) : $app.t('overview.streak.cellTipNone', { date: cell.iso })))
+                       : null"></div>
+              </template>
+            </div>
+          </template>
+        </div>
+        <div class="overview-streak-legend">
+          <span class="overview-streak-legend-label" x-text="$app.t('overview.streak.legend')"></span>
+          <span class="overview-streak-cell overview-streak-cell--lvl0"></span>
+          <span class="overview-streak-cell overview-streak-cell--lvl1"></span>
+          <span class="overview-streak-cell overview-streak-cell--lvl2"></span>
+          <span class="overview-streak-cell overview-streak-cell--lvl3"></span>
+          <span class="overview-streak-cell overview-streak-cell--lvl4"></span>
+        </div>
+      </div>
+    </template>
+
     <!-- Lektorat-Coverage als Donut-Ring -->
     <template x-if="overviewCoverage && overviewCoverage.total_pages > 0">
       <div class="overview-tile internal-link"
@@ -299,7 +375,8 @@
 
     <!-- Schauplatz-Präsenz-Matrix: Kapitel (Zeilen) × Top-Schauplätze (Spalten).
          Cell-Wert = location_chapters.haeufigkeit. Cell-Intensität = per Spalte
-         skaliert. Match primär per chapter_id, Fallback chapter_name. -->
+         skaliert. Match primär per chapter_id, Fallback chapter_name.
+         Immer medium — Matrix mit Spalten-Header braucht Breite (siehe DESIGN.md). -->
     <template x-if="overviewOrtPresence()">
       <div class="overview-tile overview-tile--medium">
         <div class="overview-tile-label" x-text="$app.t('overview.ortPresence')"></div>
@@ -341,7 +418,8 @@
       </div>
     </template>
 
-    <!-- Kapitel-Verteilung: horizontale Bars pro Kapitel (Zeichen relativ) -->
+    <!-- Kapitel-Verteilung: horizontale Bars pro Kapitel (Zeichen relativ).
+         Immer medium — Bar + 5 Meta-Zellen brauchen Breite, sonst Stack-Wrap. -->
     <template x-if="overviewChapterDistribution().length > 0">
       <div class="overview-tile overview-tile--medium">
         <div class="overview-tile-head">
@@ -383,7 +461,8 @@
 
     <!-- Figuren-Präsenz-Matrix: Kapitel (Zeilen) × Top-Figuren (Spalten).
          Cell-Wert = Anzahl Szenen pro (Figur, Kapitel). Cell-Intensität = per Spalte skaliert.
-         Horizontaler Scroll bei vielen Figuren. Leere Zellen = Figur fehlt im Kapitel. -->
+         Horizontaler Scroll bei vielen Figuren. Leere Zellen = Figur fehlt im Kapitel.
+         Immer medium — Matrix mit Spalten-Header braucht Breite (siehe DESIGN.md). -->
     <template x-if="overviewFigurePresence()">
       <div class="overview-tile overview-tile--medium">
         <div class="overview-tile-label" x-text="$app.t('overview.figPresence')"></div>
@@ -520,7 +599,8 @@
       </div>
     </template>
 
-    <!-- Zuletzt bearbeitet (Zeilen sind individuelle Links) -->
+    <!-- Zuletzt bearbeitet (Zeilen sind individuelle Links).
+         Immer medium — Name + Meta-Spalten brauchen Breite. -->
     <template x-if="overviewRecentPages().length > 0">
       <div class="overview-tile overview-tile--medium">
         <div class="overview-tile-label" x-text="$app.t('overview.recent')"></div>
@@ -544,8 +624,9 @@
       </div>
     </template>
 
-    <!-- Quick-Actions: kein Daten-Tile, deshalb eigene Variante (kein Hover-Lift). -->
-    <div class="overview-tile overview-tile--medium overview-tile--actions">
+    <!-- Quick-Actions: kein Daten-Tile, deshalb eigene Variante (kein Hover-Lift).
+         Span small (Buttons brauchen wenig Breite); Dense-Packing füllt Lücken. -->
+    <div class="overview-tile overview-tile--actions">
       <div class="overview-tile-label" x-text="$app.t('overview.quickActions')"></div>
       <div class="overview-actions">
         <button type="button" class="btn-compact" @click="$app.toggleBookChatCard()" :disabled="!$app.pages.length" x-text="$app.t('tile.bookchat')"></button>

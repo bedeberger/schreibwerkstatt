@@ -549,7 +549,6 @@ CSS: [public/css/focus-mode.css](public/css/focus-mode.css). Inline in `.card-su
 - `hanging-punctuation: first allow-end last` — Anführungszeichen ragen aus Satzkante.
 - `font-feature-settings: "kern", "liga", "dlig", "calt", "onum"` — Ligaturen + alte Ziffern (Source Serif 4 hat OldStyle-Numerals).
 - `text-rendering: optimizeLegibility`.
-- Drop-Cap auf erstem Absatz nach `<h1>` bzw. erstem `<p>` der Seite (`::first-letter`, 3.4em, Akzentfarbe). Greift nicht im `--editing`-Modus, weil contenteditable die Selektion stört.
 - `text-wrap: pretty` auf `<p>`, `text-wrap: balance` auf Headings (verhindert Witwen/Waisen).
 
 Nicht selbst Reading-Typografie definieren; immer diesen Frame verwenden.
@@ -710,6 +709,8 @@ Nicht eigene Toolbar-Layouts pro Karte erfinden.
 - Tile-Innenleben: `.overview-tile-label` (Header), `.overview-hero-row`/`-num`/`-value`/`-unit`, `.overview-substats`/`-substat`, `.overview-sparkline`, `.overview-trend-meta`/`-pct` (`--up`/`--down`)
 - 7-Tage-Bars: `.overview-bars7` + `-col`/`-track`/`-fill` (`--pos`/`--neg`)/`-label`, `.overview-bars7-total`
 - Donut: `.overview-donut-row` + `.overview-donut` + `-text`/`-meta`
+- Heute-Ring: `.overview-today-ring` (Modifier `--active` triggert `overviewTodayPulse`-Animation, `--reached` flippt Stroke auf success-Farbe). Respektiert `prefers-reduced-motion`. Math via `overviewTodayRing(goal)` in [public/js/book-overview.js](public/js/book-overview.js).
+- Streak-Heatmap: `.overview-streak-grid` (53 Spalten × 7 Reihen, GitHub-Stil) + `.overview-streak-week` (`display: contents` als logische Wochen-Gruppe) + `.overview-streak-cell--lvl0..4` (`color-mix(--color-accent, --color-bg)`-Stufen), `--empty` (visibility hidden für Future-Cells), `--future` (opacity-Reduce). Plus `.overview-streak-meta` (Stats-Reihe), `.overview-streak-legend` (kleine Cells als Skala). Math via `overviewStreakHeatmap()` — Quartil-Bucketing der positiven Tagesdeltas, Streak bricht bei null/negativem Delta (heutiges Null-Delta zählt nicht als Bruch).
 - Fehler-Bars: `.overview-error-bars` + `-bar-item`/`-head`/`-typ`/`-count`/`-track`/`-fill`
 - Bewertung: `.overview-stars` + `.overview-star` (`--full`/`--half`), `.overview-review-meta`/`-date`/`-trend`
 - Figuren-Chips: `.overview-fig-row` + `-count`/`-count-unit`/`-chips`/`-chip`/`-name`/`-avatar` (Avatar-Farbe via `[data-idx="0|1|2"]`)
@@ -719,6 +720,33 @@ Nicht eigene Toolbar-Layouts pro Karte erfinden.
 **Hover-Override:** Globaler `.internal-link:hover` setzt `opacity: 0.65`. Für Tiles ungewollt — `.overview-tile.internal-link:hover` setzt `opacity: 1` zurück und nutzt Border/Shadow als Affordance.
 
 **Neuer Tile-Typ:** Bestehende Tile-Klassen wiederverwenden, SVG inline ins Markup, keine externe Vis-Lib für Overview einführen.
+
+### Tile-Size-Policy
+
+Verbindlich pro Tile-Typ. `grid-auto-flow: row dense` füllt mittlere Lücken, Tail-Lücken in der letzten Zeile sind erlaubt. Tiles werden **nie zwischen** anderen Tiles leer gelassen — Span entweder fix grossgenug oder klein genug, dass Dense-Packing die Lücke schliesst.
+
+| Tile | Span | Begründung |
+|------|------|-----------|
+| Snapshot (Hero) | `--hero` (2) | Hero-Zahl + 5 Sub-Stats brauchen Zeile |
+| Trend (Sparkline) | small (1) | SVG skaliert, Trend-% darunter |
+| 7-Tage-Bars | small (1) | 7 schmale Bars |
+| Heute-Ring | small (1) | Donut + kurze Meta |
+| Streak-Heatmap | `--wide` (full) | 53 Wochen × 7 Tage Grid, eigene Zeile |
+| Coverage (Donut) | small (1) | Donut + Meta |
+| Top-Fehlertypen | small (1) | Bars vertikal gestapelt |
+| Letzte Bewertung | small (1) | Sterne + Datum |
+| Figuren / Szenen / Schauplätze (Chips) | small (1) | Count + 3-6 Chips, max 2 Zeilen |
+| Figuren-Präsenz-Matrix | `--medium` (2) | Spalten-Header (vertikal rotiert) braucht Höhe; mehrere Top-Figuren brauchen Cell-Reihe |
+| Schauplatz-Präsenz-Matrix | `--medium` (2) | analog zur Figuren-Matrix |
+| Kapitel-Verteilung (Bar+Meta-Liste) | `--medium` (2) | Bar + 5 Meta-Zellen (Δ%, Z, NS, W, S) brauchen horizontalen Platz, sonst wrap |
+| Lektorat-Findings pro Kapitel | `--medium` (2) | analog: Bar + Δ% + Count |
+| Lektoratszeit pro Kapitel | `--medium` (2) | analog: Bar + Δ% + Dauer |
+| Zuletzt bearbeitet (Page-Liste) | `--medium` (2) | Name + Z + NS + Kapitel-Tag pro Zeile |
+| Quick-Actions | small (1) | 4 Buttons mit Wrap, kein Daten-Tile |
+
+**Regel:** Wer einen neuen Tile-Typ hinzufügt, ergänzt diese Tabelle und wählt Span nach demselben Prinzip — Content mit horizontaler Struktur (Bars/Liste/Matrix) → medium; Content mit vertikaler Struktur (Donut, Sparkline, Chip-Cluster) → small. Hero und full-width nur für die im Header dokumentierten Sonderfälle (Snapshot, Streak).
+
+**Container-Query:** `.overview-tile` hat `container-type: inline-size`. Chapter-Row-Reflow (`@container (max-width: 380px)` in [public/css/book-overview.css](public/css/book-overview.css)) greift, falls ein Listen-Tile doch auf small fällt (Mobile/2-Spalten-Viewport), und bricht das 3-Spalten-Grid in einen Stack — keine zerquetschten Meta-Zellen.
 
 ---
 

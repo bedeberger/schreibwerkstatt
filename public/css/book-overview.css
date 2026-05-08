@@ -23,6 +23,10 @@
   background: var(--color-bg);
   min-width: 0;
   transition: border-color var(--transition-base), background var(--transition-base), box-shadow var(--transition-base);
+  /* Container für interne Reflows: Chapter-Rows + Matrix-Centering reagieren
+     auf Tile-Breite, nicht auf Viewport. Dadurch funktioniert Single-Span
+     korrekt auch in breiten Viewports. */
+  container-type: inline-size;
 }
 
 .overview-tile.internal-link { cursor: pointer; }
@@ -242,6 +246,93 @@
 .overview-donut-meta-checked {
   font-size: var(--font-size-sm);
   color: var(--color-muted);
+}
+
+/* ── Heute-Ring: Pulse-Animation bei aktivem Schreibtag ─────────────────── */
+.overview-today-ring--active circle:nth-of-type(2) {
+  animation: overviewTodayPulse 2.4s ease-in-out infinite;
+}
+.overview-today-ring--reached circle:nth-of-type(2) {
+  stroke: var(--color-success);
+}
+@keyframes overviewTodayPulse {
+  0%, 100% { stroke-opacity: 1; }
+  50% { stroke-opacity: 0.55; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .overview-today-ring--active circle:nth-of-type(2) { animation: none; }
+}
+
+/* ── Streak-Heatmap (53 Wochen × 7 Tage GitHub-Stil) ────────────────────── */
+.overview-tile-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.overview-streak-meta {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+.overview-streak-stat { white-space: nowrap; }
+
+.overview-streak-grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(7, 1fr);
+  gap: 3px;
+  width: 100%;
+  /* Aspect: 53 Spalten × 7 Reihen, Zelle ~ quadratisch. min-Höhe verhindert
+     Kollaps in schmalen Layouts; horizontaler Scroll bei Engstellen. */
+  min-height: 96px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.overview-streak-week {
+  display: contents;
+}
+.overview-streak-cell {
+  width: 100%;
+  min-width: 9px;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--radius-sm);
+  background: var(--color-tag-bg);
+  transition: filter var(--transition-base);
+}
+.overview-streak-cell:hover { filter: brightness(1.1); }
+.overview-streak-cell--empty { visibility: hidden; }
+.overview-streak-cell--future { opacity: 0.25; }
+.overview-streak-cell--lvl0 { background: var(--color-tag-bg); }
+.overview-streak-cell--lvl1 { background: color-mix(in srgb, var(--color-accent) 22%, var(--color-bg)); }
+.overview-streak-cell--lvl2 { background: color-mix(in srgb, var(--color-accent) 45%, var(--color-bg)); }
+.overview-streak-cell--lvl3 { background: color-mix(in srgb, var(--color-accent) 68%, var(--color-bg)); }
+.overview-streak-cell--lvl4 { background: var(--color-accent); }
+
+.overview-streak-legend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+.overview-streak-legend-label { margin-right: 6px; }
+.overview-streak-legend .overview-streak-cell {
+  width: 11px;
+  min-width: 11px;
+  height: 11px;
+  aspect-ratio: auto;
+  flex-shrink: 0;
+}
+
+@media (max-width: 600px) {
+  .overview-streak-grid { min-height: 70px; gap: 2px; }
+  .overview-streak-cell { min-width: 7px; }
 }
 
 /* ── Top-Fehler-Bars ─────────────────────────────────────────────────────── */
@@ -631,6 +722,23 @@
   }
 }
 
+/* Container query: in schmalen Single-Span-Tiles (≈220-340px) brechen
+   Chapter-Rows aus dem 3-Spalten-Grid in Stack — egal wie breit der
+   Viewport ist. Spiegelt das Verhalten der 700px-Media-Query auf Tile-
+   Ebene, damit 4-Kapitel-Bücher (Tile-Span 1) sauber rendern. */
+@container (max-width: 380px) {
+  .overview-chapter-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .overview-chapter-meta {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+  .overview-chapter-delta { min-width: 0; }
+}
+
 /* ── Figuren-Präsenz-Matrix ──────────────────────────────────────────────── */
 .overview-presence-wrap {
   /* `auto`: Scrollbar erscheint nur bei echtem Overflow. `padding-bottom`
@@ -666,8 +774,12 @@
   border-collapse: separate;
   border-spacing: 2px;
   /* width: auto — Tabelle nimmt nur Platz, den Cells brauchen.
-     `width: 100%` würde Cells über volle Tile-Breite verteilen → Whitespace. */
+     `width: 100%` würde Cells über volle Tile-Breite verteilen → Whitespace.
+     `margin-inline: auto` zentriert die Matrix im Wrap, wenn sie schmaler ist
+     als der Tile (häufig bei wenigen Figuren/Orten + Single-Span). Bei breiter
+     Matrix (≥ Wrap-Breite) kollabiert margin auto auf 0 — kein Scroll-Konflikt. */
   width: auto;
+  margin-inline: auto;
   font-size: var(--font-size-xs);
 }
 .overview-presence-col-head {

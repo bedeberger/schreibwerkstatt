@@ -3386,6 +3386,22 @@ function runMigrations() {
     logger.info('DB-Migration auf Version 86 abgeschlossen (job_runs.error_params).');
   }
 
+  if (version < 87) {
+    // users.daily_goal_chars — Zielwert für Heute-Ring auf der Buch-Übersicht.
+    // 1500 Zeichen ≈ 1 Normseite. NULL = User hat kein eigenes Ziel gesetzt
+    // → Frontend nutzt 1500 als Fallback.
+    const userCols87 = db.pragma('table_info(users)').map(c => c.name);
+    if (!userCols87.includes('daily_goal_chars')) {
+      db.prepare('ALTER TABLE users ADD COLUMN daily_goal_chars INTEGER').run();
+    }
+    const fkErrors87 = db.pragma('foreign_key_check');
+    if (fkErrors87.length) {
+      throw new Error(`Migration 87: foreign_key_check meldet ${fkErrors87.length} Verstoesse: ${JSON.stringify(fkErrors87.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 87').run();
+    logger.info('DB-Migration auf Version 87 abgeschlossen (users.daily_goal_chars).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

@@ -102,8 +102,8 @@ body.focus-mode .page-content-view--editing {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
-  hyphens: auto;
-  -webkit-hyphens: auto;
+  hyphens: none;
+  -webkit-hyphens: none;
   caret-color: var(--color-primary);
 }
 

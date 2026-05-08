@@ -53,20 +53,6 @@
   opacity: 0.85;
 }
 
-/* Drop-Cap: erster Absatz nach H1 oder erster Absatz überhaupt bekommt
-   gross gesetzten Anfangsbuchstaben. Greift nur, wenn Reading-Frame nicht
-   im Edit-Modus ist (sonst stört contenteditable die Selektion). */
-.page-content-view:not(.page-content-view--editing) > h1:first-child + p::first-letter,
-.page-content-view:not(.page-content-view--editing) > p:first-of-type::first-letter {
-  font-family: var(--font-serif);
-  font-weight: 700;
-  font-size: 3.4em;
-  line-height: 0.92;
-  float: left;
-  margin: 0.05em 0.08em 0 0;
-  color: var(--color-accent-text);
-  font-feature-settings: "kern", "liga";
-}
 .page-content-view u { text-decoration: underline; }
 .page-content-view s, .page-content-view del, .page-content-view strike { text-decoration: line-through; }
 .page-content-view sup { vertical-align: super; font-size: 0.75em; line-height: 0; }
@@ -146,5 +132,16 @@
   max-height: 70vh;
 }
 .page-content-view--editing:focus { outline-color: var(--color-primary); }
+/* Im Edit-Modus kein text-wrap:pretty/balance — sonst rebalanciert der Browser
+   bei jedem Keystroke die letzten Zeilen, Buchstaben hüpfen sichtbar zwischen
+   Zeilen ("nervös"). Standard-Wrap reicht. */
+.page-content-view--editing p,
+.page-content-view--editing h1,
+.page-content-view--editing h2,
+.page-content-view--editing h3,
+.page-content-view--editing h4 { text-wrap: wrap; }
+/* Silbentrennung im Edit-Modus aus: wandernde Bruchpunkte beim Tippen,
+   plus Caret/Selektion über soft hyphens ist fehleranfällig. */
+.page-content-view--editing { hyphens: none; -webkit-hyphens: none; }
 
 }

@@ -17,7 +17,7 @@ const {
   i18nError,
   jsonBody,
 } = require('./shared');
-const { getTokenForRequest, getPdfExportProfile, getPdfExportProfileCover } = require('../../db/schema');
+const { getTokenForRequest, getPdfExportProfile, getPdfExportProfileCover, getBookSettings } = require('../../db/schema');
 const { bsGet } = require('../../lib/bookstack');
 const { loadBookContents } = require('../../lib/load-book-contents');
 const { renderPdfBuffer } = require('../../lib/pdf-render');
@@ -66,6 +66,8 @@ async function runPdfExportJob(jobId, { bookId, profileId, userEmail, userToken 
       if (cover) coverBuf = cover.image;
     }
 
+    const { language: bookLang } = getBookSettings(bookId, userEmail);
+
     updateJob(jobId, { progress: 40, statusText: 'job.phase.renderPdf' });
     const buffer = await renderPdfBuffer({
       book,
@@ -73,6 +75,7 @@ async function runPdfExportJob(jobId, { bookId, profileId, userEmail, userToken 
       profile,
       coverBuf,
       token: userToken,
+      lang: bookLang,
     });
 
     if (ctrl?.signal.aborted) throw new Error('job.cancelled');

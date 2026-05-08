@@ -75,6 +75,86 @@ export const bookOverviewMethods = {
       if (this._loadingBookId === bookId) this._loadingBookId = null;
       if (this.overviewBookId === bookId) this.overviewLoading = false;
     }
+    // Background-Auto-Sync: vergleiche pages[].updated_at gegen page_stats-Cache.
+    // Wenn Seiten seit dem letzten Sync editiert wurden → /sync/book im Hintergrund,
+    // danach Overview-Tiles refreshen. Silent (kein Spinner / Status).
+    this._checkBookStatsStaleness(bookId);
+  },
+
+  // Silent background staleness check + auto-sync. Re-Entry-sicher via _staleCheckBookId
+  // und _statsSyncBookId. Während des Post-Sync-Reloads bleibt _statsSyncBookId gesetzt,
+  // damit der rekursive Check sofort returnt (kein Loop).
+  async _checkBookStatsStaleness(bookId) {
+    if (!bookId) return;
+    if (typeof window === 'undefined') return;
+    const app = window.__app;
+    if (!app) return;
+    if (this._statsSyncBookId === bookId) return;
+    if (this._staleCheckBookId === bookId) return;
+    this._staleCheckBookId = bookId;
+    try {
+      // Nach Buchwechsel kann app.pages noch leer sein (loadPages async).
+      // Kurz pollen, dann aufgeben.
+      for (let i = 0; i < 30 && (!app.pages || !app.pages.length); i++) {
+        await new Promise(r => setTimeout(r, 100));
+        if (app.selectedBookId !== bookId) return;
+      }
+      const pages = app.pages || [];
+      if (!pages.length) return;
+      const cache = await fetchJsonRetry(`/history/page-stats/${bookId}`).catch(() => null);
+      if (!cache) return;
+      if (app.selectedBookId !== bookId) return;
+      let stale = false;
+      // (a) per-Seite-Diff: BookStack-pages.updated_at vs page_stats-Cache.
+      for (const p of pages) {
+        const c = cache[p.id];
+        if (!c || c.updated_at !== p.updated_at) { stale = true; break; }
+      }
+      // (b) Aggregat-Diff: book_stats_history.recorded_at (Tagesgranularität) vs
+      // letzte page-Aktivität. Lazy `/sync/page-stats/:id` (IntersectionObserver
+      // in tree.js) hält page_stats fresh, ohne aber book_stats_history zu
+      // schreiben → Sparkline-Snapshot bleibt sonst hängen, bis Cron nachts läuft
+      // oder User manuell synct. Stats-Tile soll nach Edit ohne Wartezeit korrekt
+      // sein, also hier explizit nachsynchronisieren.
+      if (!stale) {
+        const stats = this.overviewStats || [];
+        const lastSnapshotDate = stats.length ? stats[stats.length - 1].recorded_at : null;
+        let latestPageDate = null;
+        for (const p of pages) {
+          const d = p.updated_at ? p.updated_at.slice(0, 10) : null;
+          if (d && (!latestPageDate || d > latestPageDate)) latestPageDate = d;
+        }
+        if (latestPageDate && (!lastSnapshotDate || lastSnapshotDate < latestPageDate)) {
+          stale = true;
+        }
+      }
+      if (!stale) return;
+      this._statsSyncBookId = bookId;
+      try {
+        const res = await fetch(`/sync/book/${bookId}`, { method: 'POST' });
+        if (!res.ok) return;
+        if (app.selectedBookId !== bookId) return;
+        // tokEsts aktualisieren — gleicher Pfad wie syncBookStats in bookstats.js,
+        // damit Sidebar-Σ und Hero-Snapshot nach dem Auto-Sync sofort aktuell sind.
+        try {
+          const fresh = await fetchJsonRetry(`/history/page-stats/${bookId}`);
+          for (const p of pages) {
+            const c = fresh[p.id];
+            if (c && c.updated_at === p.updated_at) {
+              app.tokEsts[p.id] = { tok: c.tok, words: c.words, chars: c.chars };
+            }
+          }
+        } catch { /* tokEsts-Update non-critical */ }
+        if (!app.showBookOverviewCard || app.selectedBookId !== bookId) return;
+        await this.loadBookOverview(bookId);
+      } finally {
+        if (this._statsSyncBookId === bookId) this._statsSyncBookId = null;
+      }
+    } catch (e) {
+      console.warn('[bookOverview] staleness auto-sync failed', e);
+    } finally {
+      if (this._staleCheckBookId === bookId) this._staleCheckBookId = null;
+    }
   },
 
   resetBookOverview() {
@@ -285,6 +365,184 @@ export const bookOverviewMethods = {
         return { chars: data[i], iso, label };
       });
       return { d, area, color, deltaPct, endX, endY, w: W, h: H, points };
+    });
+  },
+
+  // Streak-Heatmap: 53 Wochen × 7 Tage GitHub-Stil, ausgehend von HEUTE
+  // (rechte untere Ecke = heute, links = vor 1 Jahr). Pro Zelle Delta-Zeichen
+  // zum Vortag aus overviewStats. Cells ohne Snapshot oder Future-Tage =
+  // null (gerendert als leere Box, kein Tile). Level 0..4 nach Quartilen
+  // der positiven Deltas; 0 = inactive (kein Schreiben), 1..4 = wachsende
+  // Intensität.
+  // Streak: konsekutive Tage mit positivem Delta endend HEUTE oder GESTERN
+  // (heute ohne Eintrag bricht den Streak nicht — User hat nur noch nicht
+  // geschrieben). Longest = Max-Run im Fenster.
+  overviewStreakHeatmap() {
+    const a = this.overviewStats || [];
+    return this._memo('streakHeatmap', a, () => {
+      const WEEKS = 53;
+      const charsByDate = new Map();
+      for (const s of a) charsByDate.set(s.recorded_at, Number(s.chars) || 0);
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayDow = today.getDay(); // 0 = So, 1 = Mo, ..., 6 = Sa
+      // ISO-Wochenstart: Mo. Verschiebung von Sun-based zu Mon-based.
+      const dowMon = (todayDow + 6) % 7; // Mo=0 ... So=6
+      const startOffset = (WEEKS - 1) * 7 + dowMon; // erstes Datum links oben (Mo)
+
+      const cells = [];
+      const grid = []; // weeks[col][row]
+      const positive = [];
+      for (let w = 0; w < WEEKS; w++) grid.push([null, null, null, null, null, null, null]);
+
+      for (let i = 0; i < WEEKS * 7; i++) {
+        // Index 0 = links oben (vor ~1 Jahr, Mo); steigt zeilenweise. Aber
+        // wir wollen spaltenweise Mo–So; also col = floor(i / 7), row = i % 7.
+        const col = Math.floor(i / 7);
+        const row = i % 7;
+        // Tagesdistanz von heute (heute = letzter Mo + dowMon Tage, in der
+        // letzten Spalte rechts unten an Position dowMon):
+        const daysFromTodayCol = (WEEKS - 1) - col;
+        const daysFromTodayRow = dowMon - row;
+        const offsetDays = daysFromTodayCol * 7 + daysFromTodayRow;
+        if (offsetDays < 0) {
+          // Future cell (selten — z.B. wenn Renderfenster über die Grid-Untergrenze hinausschiesst)
+          grid[col][row] = { iso: null, delta: null, level: 0, future: true };
+          continue;
+        }
+        const d = new Date(today.getTime() - offsetDays * 86400000);
+        const iso = d.toISOString().slice(0, 10);
+        const prevIso = new Date(d.getTime() - 86400000).toISOString().slice(0, 10);
+        const cur = charsByDate.get(iso);
+        const prev = charsByDate.get(prevIso);
+        const hasSnapshot = cur != null;
+        const delta = (hasSnapshot && prev != null) ? (cur - prev) : (hasSnapshot ? 0 : null);
+        const cell = { iso, delta, level: 0, future: false, hasSnapshot };
+        if (delta != null && delta > 0) positive.push(delta);
+        grid[col][row] = cell;
+        cells.push(cell);
+      }
+
+      // Quartil-Bucketing für Level 1..4 auf positiven Deltas
+      const sorted = [...positive].sort((a, b) => a - b);
+      const q = (p) => sorted.length === 0 ? 0 : sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))];
+      const t1 = q(0.25), t2 = q(0.5), t3 = q(0.75);
+      for (let w = 0; w < WEEKS; w++) {
+        for (let r = 0; r < 7; r++) {
+          const c = grid[w][r];
+          if (!c || c.delta == null || c.delta <= 0) { if (c) c.level = 0; continue; }
+          if (c.delta <= t1) c.level = 1;
+          else if (c.delta <= t2) c.level = 2;
+          else if (c.delta <= t3) c.level = 3;
+          else c.level = 4;
+        }
+      }
+
+      // Streaks: lineare Tagesreihe in chronologischer Reihenfolge bauen
+      // (älteste links). Aktuelle Streak = Tail-Run > 0; ein heutiges
+      // Null-Delta (noch nicht geschrieben) bricht NICHT, gestriges Null
+      // schon.
+      const linear = [];
+      for (let off = startOffset; off >= 0; off--) {
+        const dt = new Date(today.getTime() - off * 86400000);
+        const iso = dt.toISOString().slice(0, 10);
+        const prevIso = new Date(dt.getTime() - 86400000).toISOString().slice(0, 10);
+        const cur = charsByDate.get(iso);
+        const prev = charsByDate.get(prevIso);
+        const delta = (cur != null && prev != null) ? (cur - prev) : null;
+        linear.push({ iso, delta });
+      }
+
+      let longest = 0, run = 0;
+      for (const x of linear) {
+        if (x.delta != null && x.delta > 0) { run++; if (run > longest) longest = run; }
+        else run = 0;
+      }
+      // Aktueller Streak: vom Ende rückwärts; heutiges null überspringen
+      let current = 0;
+      for (let i = linear.length - 1; i >= 0; i--) {
+        const x = linear[i];
+        if (i === linear.length - 1 && (x.delta == null || x.delta === 0)) continue;
+        if (x.delta != null && x.delta > 0) current++;
+        else break;
+      }
+      const totalActiveDays = linear.filter(x => x.delta != null && x.delta > 0).length;
+
+      const tag = window.__app?.uiLocale === 'en' ? 'en-US' : 'de-CH';
+      const dayFmt = new Intl.DateTimeFormat(tag, { weekday: 'short' });
+      const dayLabels = [];
+      // Wochenstart Mo: nehme einen Mo als Referenz (z.B. 4. Jan 2027 ist Mo)
+      const monRef = new Date(2027, 0, 4); // 2027-01-04 ist Mo
+      for (let i = 0; i < 7; i++) {
+        dayLabels.push(dayFmt.format(new Date(monRef.getTime() + i * 86400000)));
+      }
+
+      return {
+        weeks: grid,
+        weeksCount: WEEKS,
+        currentStreak: current,
+        longestStreak: longest,
+        totalActiveDays,
+        dayLabels,
+      };
+    });
+  },
+
+  // Heute-Ring: Donut-Math für Tagesziel. todayChars = aktueller Stand minus
+  // jüngstem Snapshot strikt vor heute (egal wie alt — verkraftet Lücken/
+  // Wochenenden/ersten Sync). Negative Deltas zählen als 0.
+  // Aktueller Stand: bevorzugt Live-tokEsts (entkoppelt vom Cron-Job, sieht
+  // jeden Save sofort), Fallback auf heutigen Snapshot aus book_stats_history.
+  overviewTodayRing(goalChars = 1500) {
+    const a = this.overviewStats || [];
+    const app = window.__app;
+    const tokEsts = app?.tokEsts || {};
+    // Cache-Key inkludiert tokEsts-Ref, damit Live-Updates Cache invalidieren.
+    return this._memoN('todayRing:' + goalChars, [a, tokEsts], () => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const isoToday = today.toISOString().slice(0, 10);
+
+      // Stats aufsteigend sortiert (history.js: ORDER BY recorded_at ASC).
+      // Heute-Snapshot + jüngsten Snapshot strikt vor heute aus dem Tail.
+      let cronTodayChars = null;
+      let prevChars = null;
+      for (let i = a.length - 1; i >= 0; i--) {
+        const r = a[i];
+        if (!r?.recorded_at) continue;
+        if (r.recorded_at === isoToday && cronTodayChars == null) {
+          cronTodayChars = Number(r.chars) || 0;
+          continue;
+        }
+        if (r.recorded_at < isoToday && prevChars == null) {
+          prevChars = Number(r.chars) || 0;
+          break;
+        }
+      }
+
+      // Live-Stand aus tokEsts (Sidebar-Σ-Quelle, aktualisiert nach jedem Save).
+      let liveChars = 0;
+      const ids = Object.keys(tokEsts);
+      if (ids.length) {
+        for (const id of ids) liveChars += Number(tokEsts[id]?.chars) || 0;
+      }
+      const curChars = liveChars > 0 ? liveChars : cronTodayChars;
+
+      let chars = 0;
+      if (curChars != null && prevChars != null) chars = Math.max(0, curChars - prevChars);
+      // curChars vorhanden, prevChars fehlt → erste Messung im Buch, kein
+      // Delta berechenbar. 0 lassen, statt Cumulative als „heute" auszuweisen.
+
+      const goal = Math.max(1, Number(goalChars) || 1500);
+      const pct = Math.max(0, Math.min(100, Math.round((chars / goal) * 100)));
+      const r = 28;
+      const circ = 2 * Math.PI * r;
+      const dash = (pct / 100) * circ;
+      const gap = circ - dash;
+      const reached = chars >= goal;
+      const active = chars > 0;
+      return { chars, goal, pct, r, c: circ, dash, gap, reached, active };
     });
   },
 

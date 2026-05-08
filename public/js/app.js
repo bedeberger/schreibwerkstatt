@@ -645,6 +645,11 @@ document.addEventListener('alpine:init', () => {
         if (cfg.ollamaModel) this.ollamaModel = cfg.ollamaModel;
         if (cfg.llamaModel)  this.llamaModel  = cfg.llamaModel;
         this.currentUser = cfg.user || null;
+        // Profile-Felder, die das Frontend live mitführt (z.B. Heute-Ring-Ziel),
+        // aus userSettings ins currentUser-Objekt mergen.
+        if (this.currentUser && cfg.userSettings) {
+          this.currentUser.daily_goal_chars = cfg.userSettings.daily_goal_chars ?? null;
+        }
         this.devMode = !!cfg.devMode;
         this.promptConfig = cfg.promptConfig || {};
         if (cfg.userSettings?.theme && cfg.userSettings.theme !== this.themePref) {

@@ -287,7 +287,7 @@ async function syncBook(bookId, token) {
   return { page_count: pages.length, words: totalWords, chars: totalChars, tok: totalTok, unique_words: uniqueWords, chapter_count: chapterCount, avg_sentence_len: avgSentenceLen, avg_lix: avgLix, avg_flesch_de: avgFleschDe };
 }
 
-async function syncAllBooks() {
+async function _syncAllBooksInner() {
   const users = getAllUserTokens();
   if (!users.length) {
     logger.warn('Sync übersprungen: kein BookStack-Token in der Datenbank hinterlegt.');
@@ -332,7 +332,18 @@ async function syncAllBooks() {
     }
     if (!synced) logger.error(`Sync Buch ${bookId}: alle berechtigten User-Tokens fehlgeschlagen.`);
   }
-  logger.info('Sync abgeschlossen.');
+}
+
+async function syncAllBooks() {
+  const t0 = Date.now();
+  logger.info('Sync gestartet.');
+  try {
+    await _syncAllBooksInner();
+  } finally {
+    const s = Math.round((Date.now() - t0) / 1000);
+    const dur = s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
+    logger.info(`Sync beendet (${dur}).`);
+  }
 }
 
 // GET /sync/pages/:book_id – gecachte Seiten-Vorschautexte liefern
