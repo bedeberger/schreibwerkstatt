@@ -10,10 +10,11 @@
 // Reaktivität / Memoization:
 // Aggregat-Methoden (overviewSparkline, overviewSzenenWertung, …) werden im
 // Template mehrfach pro Render aufgerufen. Sie cachen ihr Ergebnis in
-// `_memos`, geschlüsselt auf die Source-Array-Referenz. `loadBookOverview`
-// und `resetBookOverview` weisen neue Arrays zu → Cache-Miss → Recompute.
-// Die Methoden touchen weiterhin `this.overviewXxx`, damit Alpine die
-// Reaktivität auch beim Cache-Hit korrekt trackt.
+// `_memos` via `_memo(key, deps, fn)`: Cache-Hit nur wenn alle deps-Refs
+// identisch zur letzten Compute. `loadBookOverview` und `resetBookOverview`
+// weisen neue Arrays zu → Cache-Miss → Recompute. Die Methoden touchen
+// weiterhin `this.overviewXxx`, damit Alpine die Reaktivität auch beim
+// Cache-Hit korrekt trackt.
 //
 // Visualisierungen sind reines Inline-SVG (kein Chart.js): Overview soll
 // instant beim Buchwechsel sichtbar sein, ohne Lazy-Lib-Load.
@@ -157,7 +158,7 @@ export const bookOverviewMethods = {
         if (app.selectedBookId !== bookId) return;
         // tokEsts aktualisieren — gleicher Pfad wie syncBookStats in bookstats.js,
         // damit Sidebar-Σ und Hero-Snapshot nach dem Auto-Sync sofort aktuell sind.
-        // REASSIGN, nicht index-assign: book-overview-Methoden cachen via _memoN
+        // REASSIGN, nicht index-assign: book-overview-Methoden cachen via _memo
         // mit tokEsts-Ref als Source. Index-Assign hält dieselbe Referenz →
         // Cache-Hit → stale Compute (Streak-Heatmap-Symptom: heutige Cell fehlt
         // weil Cache von vor dem Sync überlebt). Reassign triggert Memo-Invalidate.
@@ -200,29 +201,20 @@ export const bookOverviewMethods = {
     this._memos = {};
   },
 
-  _memo(key, source, compute) {
-    const memos = (this._memos ||= {});
-    const hit = memos[key];
-    if (hit && hit.source === source) return hit.value;
-    const value = compute();
-    memos[key] = { source, value };
-    return value;
-  },
-
-  // Multi-Source-Variante: Cache hit nur wenn ALLE Source-Refs identisch.
+  // Cache hit nur wenn ALLE Source-Refs (deps) identisch zur letzten Compute.
   // Wichtig für Tiles, die zusätzlich zu `overviewXxx` auch `app.tree`/
   // `app.figuren` lesen — sonst wird ein Compute mit leerem `tree` (während
   // loadPages noch läuft) als `null` cached und Tile bleibt aus, obwohl
-  // tree danach befüllt wird (Hauptquelle-Ref unverändert).
-  _memoN(key, sources, compute) {
+  // tree danach befüllt wird (Haupt-Source-Ref unverändert).
+  _memo(key, deps, compute) {
     const memos = (this._memos ||= {});
     const hit = memos[key];
-    if (hit && hit.sources.length === sources.length
-        && hit.sources.every((s, i) => s === sources[i])) {
+    if (hit && hit.deps.length === deps.length
+        && hit.deps.every((d, i) => d === deps[i])) {
       return hit.value;
     }
     const value = compute();
-    memos[key] = { sources: [...sources], value };
+    memos[key] = { deps: [...deps], value };
     return value;
   },
 
@@ -236,24 +228,26 @@ export const bookOverviewMethods = {
   overviewLatest() {
     const app = window.__app;
     const tokEsts = app?.tokEsts || {};
-    const ids = Object.keys(tokEsts);
-    const histLast = (this.overviewStats && this.overviewStats.length)
-      ? this.overviewStats[this.overviewStats.length - 1] : null;
-    if (!ids.length) return histLast;
-    let chars = 0, words = 0, tok = 0;
-    for (const id of ids) {
-      const e = tokEsts[id];
-      if (!e) continue;
-      chars += Number(e.chars) || 0;
-      words += Number(e.words) || 0;
-      tok += Number(e.tok) || 0;
-    }
     const pages = app?.pages || [];
-    const page_count = pages.length || ids.length;
-    const chapter_count = new Set(
-      pages.map(p => p.chapter_id).filter(Boolean)
-    ).size;
-    return { ...(histLast || {}), chars, words, tok, page_count, chapter_count };
+    const stats = this.overviewStats || [];
+    return this._memo('latest', [stats, tokEsts, pages], () => {
+      const ids = Object.keys(tokEsts);
+      const histLast = stats.length ? stats[stats.length - 1] : null;
+      if (!ids.length) return histLast;
+      let chars = 0, words = 0, tok = 0;
+      for (const id of ids) {
+        const e = tokEsts[id];
+        if (!e) continue;
+        chars += Number(e.chars) || 0;
+        words += Number(e.words) || 0;
+        tok += Number(e.tok) || 0;
+      }
+      const page_count = pages.length || ids.length;
+      const chapter_count = new Set(
+        pages.map(p => p.chapter_id).filter(Boolean)
+      ).size;
+      return { ...(histLast || {}), chars, words, tok, page_count, chapter_count };
+    });
   },
 
   overviewFigurenCount() { return (this.overviewFiguren || []).length; },
@@ -261,7 +255,7 @@ export const bookOverviewMethods = {
 
   overviewSzenenWertung() {
     const sz = this.overviewSzenen || [];
-    return this._memo('szenenWertung', sz, () => {
+    return this._memo('szenenWertung', [sz], () => {
       const out = { stark: 0, mittel: 0, schwach: 0, ohne: 0 };
       for (const s of sz) {
         if (s.wertung === 'stark') out.stark++;
@@ -279,26 +273,23 @@ export const bookOverviewMethods = {
   overviewTopFiguren() {
     const figs = this.overviewFiguren || [];
     const sz = this.overviewSzenen || [];
-    const memos = (this._memos ||= {});
-    const hit = memos.topFiguren;
-    if (hit && hit.figs === figs && hit.sz === sz) return hit.value;
-    const totals = new Map();
-    for (const s of sz) {
-      if (!Array.isArray(s.fig_ids)) continue;
-      for (const fid of s.fig_ids) totals.set(fid, (totals.get(fid) || 0) + 1);
-    }
-    const value = figs
-      .map(f => ({
-        id: f.id,
-        name: f.name,
-        kurzname: f.kurzname,
-        rolle: f.rolle || null,
-        mentions: totals.get(f.id) || 0,
-      }))
-      .sort((a, b) => b.mentions - a.mentions)
-      .slice(0, 6);
-    memos.topFiguren = { figs, sz, value };
-    return value;
+    return this._memo('topFiguren', [figs, sz], () => {
+      const totals = new Map();
+      for (const s of sz) {
+        if (!Array.isArray(s.fig_ids)) continue;
+        for (const fid of s.fig_ids) totals.set(fid, (totals.get(fid) || 0) + 1);
+      }
+      return figs
+        .map(f => ({
+          id: f.id,
+          name: f.name,
+          kurzname: f.kurzname,
+          rolle: f.rolle || null,
+          mentions: totals.get(f.id) || 0,
+        }))
+        .sort((a, b) => b.mentions - a.mentions)
+        .slice(0, 6);
+    });
   },
 
   // Single source of truth für „heute geschrieben". Nutzt Live-tokEsts wenn
@@ -310,28 +301,28 @@ export const bookOverviewMethods = {
   _charsTodayDelta() {
     const a = this.overviewStats || [];
     const tokEsts = window.__app?.tokEsts || {};
-    const todayIso = localIsoDate();
-
-    let liveChars = 0;
-    for (const id of Object.keys(tokEsts)) liveChars += Number(tokEsts[id]?.chars) || 0;
-
-    let cronTodayChars = null;
-    let prevChars = null;
-    for (let i = a.length - 1; i >= 0; i--) {
-      const r = a[i];
-      if (!r?.recorded_at) continue;
-      if (r.recorded_at === todayIso && cronTodayChars == null) {
-        cronTodayChars = Number(r.chars) || 0;
-        continue;
+    return this._memo('charsTodayDelta', [a, tokEsts], () => {
+      const todayIso = localIsoDate();
+      let liveChars = 0;
+      for (const id of Object.keys(tokEsts)) liveChars += Number(tokEsts[id]?.chars) || 0;
+      let cronTodayChars = null;
+      let prevChars = null;
+      for (let i = a.length - 1; i >= 0; i--) {
+        const r = a[i];
+        if (!r?.recorded_at) continue;
+        if (r.recorded_at === todayIso && cronTodayChars == null) {
+          cronTodayChars = Number(r.chars) || 0;
+          continue;
+        }
+        if (r.recorded_at < todayIso && prevChars == null) {
+          prevChars = Number(r.chars) || 0;
+          break;
+        }
       }
-      if (r.recorded_at < todayIso && prevChars == null) {
-        prevChars = Number(r.chars) || 0;
-        break;
-      }
-    }
-    const curChars = liveChars > 0 ? liveChars : cronTodayChars;
-    if (curChars == null || prevChars == null) return 0;
-    return Math.max(0, curChars - prevChars);
+      const curChars = liveChars > 0 ? liveChars : cronTodayChars;
+      if (curChars == null || prevChars == null) return 0;
+      return Math.max(0, curChars - prevChars);
+    });
   },
 
   // Letzte 7 Kalendertage. Pro Tag: Zeichen-Delta zum Vortags-Snapshot.
@@ -341,7 +332,7 @@ export const bookOverviewMethods = {
   overviewLast7Days() {
     const a = this.overviewStats || [];
     const tokEsts = window.__app?.tokEsts || {};
-    return this._memoN('last7Days', [a, tokEsts], () => {
+    return this._memo('last7Days', [a, tokEsts], () => {
       const charsByDate = new Map();
       for (const s of a) charsByDate.set(s.recorded_at, Number(s.chars) || 0);
       const tag = window.__app?.uiLocale === 'en' ? 'en-US' : 'de-CH';
@@ -372,7 +363,7 @@ export const bookOverviewMethods = {
   // Skalierungs-Maximum für 7-Tage-Bars (abs, mind. 1 um Division-by-zero zu vermeiden).
   overviewLast7Max() {
     const days = this.overviewLast7Days();
-    return this._memo('last7Max', days, () =>
+    return this._memo('last7Max', [days], () =>
       Math.max(1, ...days.map(d => Math.abs(d.delta))));
   },
 
@@ -380,7 +371,7 @@ export const bookOverviewMethods = {
     const a = this.overviewStats;
     if (!a || a.length < 2) return null;
     const tokEsts = window.__app?.tokEsts || {};
-    return this._memoN('sevenDayDelta', [a, tokEsts], () => {
+    return this._memo('sevenDayDelta', [a, tokEsts], () => {
       // Latest = Live-Summe wenn vorhanden (raw, kein Math.max — sonst
       // gewinnt Cron-Snapshot bei Lösch-Edits und überzeichnet net-Delta).
       // Konsistent zu Heute-Ring (_charsTodayDelta).
@@ -403,7 +394,7 @@ export const bookOverviewMethods = {
   // `points`: pro Datenpunkt { chars, iso, label } für Hover-Overlay mit Datum + exaktem Wert.
   overviewSparkline() {
     const stats = this.overviewStats || [];
-    return this._memo('sparkline', stats, () => {
+    return this._memo('sparkline', [stats], () => {
       const W = 240, H = 48, PAD = 3;
       const slice = stats.slice(-30);
       const data = slice.map(s => Number(s.chars) || 0);
@@ -460,7 +451,7 @@ export const bookOverviewMethods = {
   overviewStreakHeatmap() {
     const a = this.overviewStats || [];
     const tokEsts = window.__app?.tokEsts || {};
-    return this._memoN('streakHeatmap', [a, tokEsts], () => {
+    return this._memo('streakHeatmap', [a, tokEsts], () => {
       const WEEKS = 52;
       const charsByDate = new Map();
       for (const s of a) charsByDate.set(s.recorded_at, Number(s.chars) || 0);
@@ -583,7 +574,7 @@ export const bookOverviewMethods = {
   overviewTodayRing(goalChars = 1500) {
     const a = this.overviewStats || [];
     const tokEsts = window.__app?.tokEsts || {};
-    return this._memoN('todayRing:' + goalChars, [a, tokEsts], () => {
+    return this._memo('todayRing:' + goalChars, [a, tokEsts], () => {
       const chars = this._charsTodayDelta();
       const goal = Math.max(1, Number(goalChars) || 1500);
       const pct = Math.max(0, Math.min(100, Math.round((chars / goal) * 100)));
@@ -601,7 +592,7 @@ export const bookOverviewMethods = {
   // CIRC = 2π·r — 100% = vollständig sichtbarer Stroke.
   overviewCoverageRing() {
     const cov = this.overviewCoverage;
-    return this._memo('coverageRing', cov, () => {
+    return this._memo('coverageRing', [cov], () => {
       const pct = Math.max(0, Math.min(100, cov?.pct ?? 0));
       const r = 28;
       const c = 2 * Math.PI * r;
@@ -611,7 +602,7 @@ export const bookOverviewMethods = {
 
   overviewTopFehler() {
     const heat = this.overviewHeat;
-    return this._memo('topFehler', heat, () => {
+    return this._memo('topFehler', [heat], () => {
       const totals = heat?.totals || {};
       const arr = Object.entries(totals)
         .map(([typ, count]) => ({ typ, count }))
@@ -663,9 +654,12 @@ export const bookOverviewMethods = {
   },
 
   overviewRecentPages() {
-    const ids = (this.overviewRecent || []).map(r => r.page_id);
-    const byId = new Map((window.__app?.pages || []).map(p => [p.id, p]));
-    return ids.map(id => byId.get(id)).filter(Boolean);
+    const recent = this.overviewRecent || [];
+    const pages = window.__app?.pages || [];
+    return this._memo('recentPages', [recent, pages], () => {
+      const byId = new Map(pages.map(p => [p.id, p]));
+      return recent.map(r => byId.get(r.page_id)).filter(Boolean);
+    });
   },
 
   // Zeichen-Badge pro Recent-Page (aus tokEsts).
@@ -687,51 +681,53 @@ export const bookOverviewMethods = {
     if (!app) return [];
     const tree = app.tree || [];
     const tokEsts = app.tokEsts || {};
-    const out = [];
-    for (const item of tree) {
-      if (item.type !== 'chapter') continue;
-      const pages = item.pages || [];
-      let words = 0, chars = 0;
-      for (const p of pages) {
-        const est = tokEsts[p.id];
-        if (!est) continue;
-        words += Number(est.words) || 0;
-        chars += Number(est.chars) || 0;
+    return this._memo('chapterDist', [tree, tokEsts], () => {
+      const out = [];
+      for (const item of tree) {
+        if (item.type !== 'chapter') continue;
+        const pages = item.pages || [];
+        let words = 0, chars = 0;
+        for (const p of pages) {
+          const est = tokEsts[p.id];
+          if (!est) continue;
+          words += Number(est.words) || 0;
+          chars += Number(est.chars) || 0;
+        }
+        out.push({
+          id: item.id,
+          name: item.name,
+          pages: pages.length,
+          words,
+          chars,
+          normseiten: Math.round((chars / 1500) * 10) / 10,
+        });
       }
-      out.push({
-        id: item.id,
-        name: item.name,
-        pages: pages.length,
-        words,
-        chars,
-        normseiten: Math.round((chars / 1500) * 10) / 10,
-      });
-    }
-    if (out.length === 0) return out;
-    const maxChars = Math.max(1, ...out.map(c => c.chars));
-    const minChars = Math.min(...out.map(c => c.chars));
-    const sorted = [...out].map(c => c.chars).sort((a, b) => a - b);
-    const mid = Math.floor(sorted.length / 2);
-    const median = sorted.length % 2 === 0
-      ? (sorted[mid - 1] + sorted[mid]) / 2
-      : sorted[mid];
-    const withDelta = out.map(c => ({
-      ...c,
-      deltaPct: median > 0 ? Math.round(((c.chars - median) / median) * 100) : 0,
-      isMax: c.chars === maxChars && maxChars > 0,
-      isMin: c.chars === minChars && maxChars !== minChars,
-    }));
-    const maxAbsDelta = Math.max(1, ...withDelta.map(c => Math.abs(c.deltaPct)));
-    const HALF = 48; // % of full track
-    return withDelta.map(c => {
-      const halfPct = (Math.abs(c.deltaPct) / maxAbsDelta) * HALF;
-      return {
+      if (out.length === 0) return out;
+      const maxChars = Math.max(1, ...out.map(c => c.chars));
+      const minChars = Math.min(...out.map(c => c.chars));
+      const sorted = [...out].map(c => c.chars).sort((a, b) => a - b);
+      const mid = Math.floor(sorted.length / 2);
+      const median = sorted.length % 2 === 0
+        ? (sorted[mid - 1] + sorted[mid]) / 2
+        : sorted[mid];
+      const withDelta = out.map(c => ({
         ...c,
-        median,
-        barWidthPct: halfPct,
-        barLeftPct: c.deltaPct >= 0 ? 50 : 50 - halfPct,
-        isPositive: c.deltaPct >= 0,
-      };
+        deltaPct: median > 0 ? Math.round(((c.chars - median) / median) * 100) : 0,
+        isMax: c.chars === maxChars && maxChars > 0,
+        isMin: c.chars === minChars && maxChars !== minChars,
+      }));
+      const maxAbsDelta = Math.max(1, ...withDelta.map(c => Math.abs(c.deltaPct)));
+      const HALF = 48; // % of full track
+      return withDelta.map(c => {
+        const halfPct = (Math.abs(c.deltaPct) / maxAbsDelta) * HALF;
+        return {
+          ...c,
+          median,
+          barWidthPct: halfPct,
+          barLeftPct: c.deltaPct >= 0 ? 50 : 50 - halfPct,
+          isPositive: c.deltaPct >= 0,
+        };
+      });
     });
   },
 
@@ -746,6 +742,10 @@ export const bookOverviewMethods = {
   overviewChapterFindings() {
     const heat = this.overviewHeat;
     if (!heat || !Array.isArray(heat.chapters) || !heat.matrix) return [];
+    return this._memo('chapterFindings', [heat], () => this._computeChapterFindings(heat));
+  },
+
+  _computeChapterFindings(heat) {
     const out = [];
     for (const ch of heat.chapters) {
       if (ch.chapter_id == null) continue;
@@ -819,6 +819,10 @@ export const bookOverviewMethods = {
     const chapters = tree.filter(i => i.type === 'chapter');
     if (chapters.length === 0) return [];
     const lt = this.overviewLektoratTime;
+    return this._memo('chapterLektoratTime', [tree, lt], () => this._computeChapterLektoratTime(chapters, lt));
+  },
+
+  _computeChapterLektoratTime(chapters, lt) {
     const byId = new Map();
     const byName = new Map();
     for (const row of (lt?.per_chapter || [])) {
@@ -896,7 +900,7 @@ export const bookOverviewMethods = {
     const figs = this.overviewFiguren || [];
     const sz = this.overviewSzenen || [];
     const tree = window.__app?.tree || [];
-    return this._memoN('figPresence', [figs, sz, tree],
+    return this._memo('figPresence', [figs, sz, tree],
       () => this._computeFigurePresence(figs, sz));
   },
 
@@ -979,7 +983,7 @@ export const bookOverviewMethods = {
 
   overviewTopOrte() {
     const orte = this.overviewOrte || [];
-    return this._memo('topOrte', orte, () => {
+    return this._memo('topOrte', [orte], () => {
       return orte
         .map(o => {
           const kap = Array.isArray(o.kapitel) ? o.kapitel : [];
@@ -999,7 +1003,7 @@ export const bookOverviewMethods = {
   overviewOrtPresence() {
     const orte = this.overviewOrte || [];
     const tree = window.__app?.tree || [];
-    return this._memoN('ortPresence', [orte, tree], () => {
+    return this._memo('ortPresence', [orte, tree], () => {
       const app = window.__app;
       if (!app || orte.length === 0) return null;
       const tree = app.tree || [];
