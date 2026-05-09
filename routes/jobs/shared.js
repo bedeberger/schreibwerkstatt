@@ -139,19 +139,22 @@ function createJob(type, bookId, userEmail, label, labelParams = null, dedupId =
   const id = randomUUID();
   const dedupValue = dedupId != null ? String(dedupId) : null;
   const key = jobKey(type, dedupValue ?? bookId, userEmail);
+  const provider = (process.env.API_PROVIDER || 'claude').toLowerCase();
+  const model = _modelName(provider);
   jobs.set(id, {
     id, type, bookId: String(bookId), dedupId: dedupValue, userEmail: userEmail || null,
     label: label || null,
     labelParams: labelParams || null,
+    provider, model,
     status: 'queued', progress: 0, statusText: 'job.queued', statusParams: null,
-    tokensIn: 0, tokensOut: 0, tokensPerSec: null,
+    tokensIn: 0, tokensOut: 0, cacheReadIn: 0, cacheCreationIn: 0, tokensPerSec: null,
     maxTokensOut: MAX_TOKENS_OUT,
     result: null, error: null, errorParams: null,
     startedAt: null, endedAt: null,
     cancelled: false,
   });
   jobAbortControllers.set(id, new AbortController());
-  try { insertJobRun({ id, type, bookId: String(bookId), userEmail, label }); } catch (e) {
+  try { insertJobRun({ id, type, bookId: String(bookId), userEmail, label, provider, model }); } catch (e) {
     logger.error(`insertJobRun: ${e.message}`, { job: type, user: userEmail, book: bookId });
   }
   runningJobs.set(key, id);
@@ -201,12 +204,17 @@ function completeJob(id, result, tokensPerSec = null) {
   const job = jobs.get(id);
   if (!job) return;
   Object.assign(job, { status: 'done', progress: 100, result, tokensPerSec, endedAt: new Date().toISOString() });
-  try { endJobRun(id, 'done', job.endedAt, job.tokensIn, job.tokensOut, tokensPerSec, null); } catch (e) {
+  try {
+    endJobRun(id, 'done', job.endedAt, job.tokensIn, job.tokensOut, job.cacheReadIn, job.cacheCreationIn, tokensPerSec, null);
+  } catch (e) {
     logger.error(`endJobRun: ${e.message}`, _jobLogCtx(job));
   }
   // Zentrales Done-Log — ALS-Ctx liefert [type|user|book].
+  const cacheSeg = (job.cacheReadIn || job.cacheCreationIn)
+    ? ` cache=${fmtTok(job.cacheReadIn)}r/${fmtTok(job.cacheCreationIn)}w`
+    : '';
   logger.info(
-    `Fertig (${id.slice(0, 8)}, ${_jobDurationFmt(job.startedAt)}, ${fmtTok(job.tokensIn)}↑ ${fmtTok(job.tokensOut)}↓ Tokens)`,
+    `Fertig (${id.slice(0, 8)}, ${_jobDurationFmt(job.startedAt)}, ${fmtTok(job.tokensIn)}↑ ${fmtTok(job.tokensOut)}↓ Tokens${cacheSeg}, ${job.provider}/${job.model})`,
     _jobLogCtx(job),
   );
   runningJobs.delete(jobDedupKey(job));
@@ -222,7 +230,9 @@ function failJob(id, err) {
   const errorMsg = isCancelled ? 'job.cancelled' : (err.message || String(err));
   const errorParams = isCancelled ? null : (err?.i18nParams || null);
   Object.assign(job, { status, error: errorMsg, errorParams, progress: isCancelled ? job.progress : 0, endedAt: new Date().toISOString() });
-  try { endJobRun(id, status, job.endedAt, job.tokensIn, job.tokensOut, null, errorMsg, errorParams); } catch (e) {
+  try {
+    endJobRun(id, status, job.endedAt, job.tokensIn, job.tokensOut, job.cacheReadIn, job.cacheCreationIn, null, errorMsg, errorParams);
+  } catch (e) {
     logger.error(`endJobRun: ${e.message}`, _jobLogCtx(job));
   }
   // Zentrales Terminal-Log: Cancellation als info, echte Fehler als warn
@@ -246,7 +256,7 @@ function cancelJob(id, userEmail) {
     if (idx !== -1) jobQueue.splice(idx, 1);
     const endedAt = new Date().toISOString();
     Object.assign(job, { status: 'cancelled', error: 'job.cancelled', errorParams: null, endedAt });
-    try { endJobRun(id, 'cancelled', endedAt, 0, 0, null, 'Abgebrochen'); } catch (e) {
+    try { endJobRun(id, 'cancelled', endedAt, 0, 0, 0, 0, null, 'Abgebrochen'); } catch (e) {
       logger.error(`endJobRun: ${e.message}`, { job: job.type, user: job.userEmail, book: job.bookId });
     }
     runningJobs.delete(jobDedupKey(job));
@@ -610,13 +620,19 @@ async function aiCall(jobId, tok, prompt, system, fromPct, toPct, expectedChars 
     ? Math.min(maxTokens, MAX_TOKENS_OUT)
     : MAX_TOKENS_OUT;
   const signal = jobAbortControllers.get(jobId)?.signal;
-  const { text, truncated, tokensIn, tokensOut, genDurationMs } = await callAI(prompt, system, onProgress, maxTokensOverride, signal, provider, jsonSchema);
+  const { text, truncated, tokensIn, tokensOut, cacheReadIn = 0, cacheCreationIn = 0, genDurationMs } = await callAI(prompt, system, onProgress, maxTokensOverride, signal, provider, jsonSchema);
   tok.inflight?.delete(callId);
   tok.in += tokensIn;
   tok.out += tokensOut;
+  tok.cacheRead = (tok.cacheRead || 0) + cacheReadIn;
+  tok.cacheCreate = (tok.cacheCreate || 0) + cacheCreationIn;
   if (genDurationMs != null) tok.ms += genDurationMs;
   const liveTps = tok.ms > 0 ? tok.out / (tok.ms / 1000) : null;
-  updateJob(jobId, { tokensIn: tok.in, tokensOut: tok.out, tokensPerSec: liveTps });
+  updateJob(jobId, {
+    tokensIn: tok.in, tokensOut: tok.out,
+    cacheReadIn: tok.cacheRead, cacheCreationIn: tok.cacheCreate,
+    tokensPerSec: liveTps,
+  });
   if (truncated) throw i18nError('job.error.aiTruncated', { max: maxTokensOverride, tokIn: tokensIn, tokOut: tokensOut, total: tokensIn + tokensOut });
   return parseJSON(text);
 }

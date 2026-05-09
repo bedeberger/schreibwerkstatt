@@ -11,28 +11,38 @@ const tokens = require('./tokens');
 const pdfExport = require('./pdf-export');
 const fonts = require('./fonts');
 const books = require('./books');
+const tokenUsage = require('./token-usage');
 
 // ── Job-Laufzeiten ────────────────────────────────────────────────────────────
 const _stmtInsJobRun = db.prepare(
-  `INSERT INTO job_runs (job_id, type, book_id, user_email, label, status, queued_at)
-   VALUES (?, ?, ?, ?, ?, 'queued', ?)`
+  `INSERT INTO job_runs (job_id, type, book_id, user_email, label, provider, model, status, queued_at)
+   VALUES (?, ?, ?, ?, ?, ?, ?, 'queued', ?)`
 );
 const _stmtStartJobRun = db.prepare(
   `UPDATE job_runs SET status = 'running', started_at = ? WHERE job_id = ?`
 );
 const _stmtEndJobRun = db.prepare(
-  `UPDATE job_runs SET status = ?, ended_at = ?, tokens_in = ?, tokens_out = ?, tokens_per_sec = ?, error = ?, error_params = ? WHERE job_id = ?`
+  `UPDATE job_runs SET status = ?, ended_at = ?, tokens_in = ?, tokens_out = ?, cache_read_in = ?, cache_creation_in = ?, tokens_per_sec = ?, error = ?, error_params = ? WHERE job_id = ?`
 );
 
 function insertJobRun(job) {
-  _stmtInsJobRun.run(job.id, job.type, job.bookId || null, job.userEmail || null, job.label || null, new Date().toISOString());
+  _stmtInsJobRun.run(
+    job.id, job.type, job.bookId || null, job.userEmail || null, job.label || null,
+    job.provider || null, job.model || null,
+    new Date().toISOString(),
+  );
 }
 function startJobRun(jobId, startedAt) {
   _stmtStartJobRun.run(startedAt, jobId);
 }
-function endJobRun(jobId, status, endedAt, tokensIn, tokensOut, tokensPerSec, error, errorParams = null) {
+function endJobRun(jobId, status, endedAt, tokensIn, tokensOut, cacheReadIn, cacheCreationIn, tokensPerSec, error, errorParams = null) {
   const paramsJson = errorParams ? JSON.stringify(errorParams) : null;
-  _stmtEndJobRun.run(status, endedAt, tokensIn || 0, tokensOut || 0, tokensPerSec ?? null, error || null, paramsJson, jobId);
+  _stmtEndJobRun.run(
+    status, endedAt,
+    tokensIn || 0, tokensOut || 0,
+    cacheReadIn || 0, cacheCreationIn || 0,
+    tokensPerSec ?? null, error || null, paramsJson, jobId,
+  );
 }
 
 /** Setzt alle hängenden job_runs (status 'running' oder 'queued') auf 'error'.
@@ -752,6 +762,8 @@ module.exports = {
   touchUserLastSeen, addUserActivity,
   saveCheckpoint, loadCheckpoint, deleteCheckpoint,
   insertJobRun, startJobRun, endJobRun, cleanupStuckJobRuns,
+  getDailyTokenUsage:    tokenUsage.getDailyTokenUsage,
+  getDailyTotalsByUser:  tokenUsage.getDailyTotalsByUser,
   getBookSettings, getBookLocale, saveBookSettings,
   loadChapterExtractCache, saveChapterExtractCache, deleteChapterExtractCache,
   loadFinetuneAiCache, saveFinetuneAiCache, deleteFinetuneAiCache,

@@ -1,24 +1,25 @@
 // Alpine.data('kapitelReviewCard') — Sub-Komponente der Kapitel-Bewertung.
-// Job-Flow manuell implementiert (kein createCardJobFeature), weil der
-// Start-Payload kapitelbezogen ist und die Poll-Logik
-// _kapitelReviewRunningChapterId trackt.
+// Per-Kapitel-Job-State: jeder Run/Reconnect schreibt in seinen eigenen Slot.
+// Getter (`kapitelReviewLoading/Progress/Status/Out`) lesen den Slot des
+// aktuell angezeigten Kapitels — beim Wechsel auf ein anderes Kapitel sieht
+// der User dort sein eigenes Loading/Output, nicht den Status eines parallel
+// laufenden Reviews.
 
 import { fetchJson, escHtml, escMd, renderStars } from '../utils.js';
 import { startPoll, runningJobStatus } from './job-helpers.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
 
+function emptySlot() {
+  return { loading: false, progress: 0, status: '', out: '', jobId: null, pollTimer: null };
+}
+
 export function registerKapitelReviewCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
   window.Alpine.data('kapitelReviewCard', () => ({
     // kapitelReviewChapterId lebt am Root (Hash-Router + Sidebar lesen es).
-    kapitelReviewLoading: false,
-    kapitelReviewProgress: 0,
-    kapitelReviewStatus: '',
-    kapitelReviewOut: '',
     kapitelReviewHistory: {},
     selectedKapitelReviewId: null,
-    _kapitelReviewPollTimer: null,
-    _kapitelReviewRunningChapterId: '',
+    _kapitelReviewByChapter: {}, // { [chapterId]: emptySlot() }
     _lifecycle: null,
 
     init() {
@@ -27,40 +28,32 @@ export function registerKapitelReviewCard() {
         if (!chapterId) return;
         const opts = this.kapitelReviewChapterOptions();
         if (!opts.some(c => String(c.id) === String(chapterId))) return;
-        const switching = String(window.__app.kapitelReviewChapterId) !== String(chapterId);
         window.__app.kapitelReviewChapterId = String(chapterId);
-        if (switching) {
-          this.kapitelReviewOut = '';
-          this.setKapitelReviewStatus('');
-        }
       };
 
       const onJobReconnect = (e) => {
         const d = e.detail;
         if (d?.type !== 'kapitel-review') return;
-        const job = d.job;
         const chapterId = d.extra?.chapterId;
-        this.kapitelReviewLoading = true;
-        this.kapitelReviewProgress = job.progress || 0;
-        window.__app.kapitelReviewChapterId = String(chapterId);
-        this._kapitelReviewRunningChapterId = String(chapterId);
-        this.kapitelReviewOut = '';
-        this.setKapitelReviewStatus(
-          job.statusText ? window.__app.t(job.statusText, job.statusParams) : window.__app.t('common.analysisRunning'),
+        if (!chapterId) return;
+        const root = window.__app;
+        const slot = this._ensureSlot(chapterId);
+        slot.loading = true;
+        slot.progress = d.job.progress || 0;
+        slot.out = '';
+        slot.status = this._formatStatus(
+          d.job.statusText ? root.t(d.job.statusText, d.job.statusParams) : root.t('common.analysisRunning'),
           true,
         );
+        // Reconnect zeigt das wiedergefundene Kapitel auch an.
+        root.kapitelReviewChapterId = String(chapterId);
         this.startKapitelReviewPoll(d.jobId, chapterId);
       };
 
-      // Reset zieht zusätzlich den Root-State `kapitelReviewChapterId`,
-      // deshalb eigener Override statt resetState.
       const reset = (ctx) => {
-        ctx.kapitelReviewLoading = false;
-        ctx.kapitelReviewProgress = 0;
-        ctx.kapitelReviewStatus = '';
-        ctx.kapitelReviewOut = '';
+        ctx._clearAllPollTimers();
+        ctx._kapitelReviewByChapter = {};
         window.__app.kapitelReviewChapterId = '';
-        ctx._kapitelReviewRunningChapterId = '';
         ctx.selectedKapitelReviewId = null;
         ctx.kapitelReviewHistory = {};
       };
@@ -68,7 +61,7 @@ export function registerKapitelReviewCard() {
       this._lifecycle = setupCardLifecycle(this, {
         name: 'kapitelReview',
         showFlag: 'showKapitelReviewCard',
-        timerKeys: ['_kapitelReviewPollTimer'],
+        timerKeys: [],
         showNeedsBookId: false,
         onShow: () => this._openKapitelReview(),
         load: (root) => this.loadKapitelReviewHistory(root.selectedBookId),
@@ -81,7 +74,41 @@ export function registerKapitelReviewCard() {
       });
     },
 
-    destroy() { this._lifecycle?.destroy(); },
+    destroy() {
+      this._clearAllPollTimers();
+      this._lifecycle?.destroy();
+    },
+
+    // --- Per-Kapitel-Slot-Zugriff ----------------------------------------
+
+    _slotFor(chapterId) {
+      const id = String(chapterId || '');
+      return id ? (this._kapitelReviewByChapter[id] || null) : null;
+    },
+    _ensureSlot(chapterId) {
+      const id = String(chapterId || '');
+      if (!id) return null;
+      if (!this._kapitelReviewByChapter[id]) this._kapitelReviewByChapter[id] = emptySlot();
+      return this._kapitelReviewByChapter[id];
+    },
+    _currentSlot() {
+      // Read-only: kein Slot anlegen beim Lesen (würde Render-Side-Effects erzeugen).
+      return this._slotFor(window.__app.kapitelReviewChapterId) || emptySlot();
+    },
+    _clearAllPollTimers() {
+      for (const slot of Object.values(this._kapitelReviewByChapter || {})) {
+        if (slot.pollTimer) { clearInterval(slot.pollTimer); slot.pollTimer = null; }
+      }
+    },
+    _formatStatus(msg, spinner = false) {
+      const safe = escHtml(msg);
+      return spinner ? `<span class="spinner"></span>${safe}` : safe;
+    },
+
+    get kapitelReviewLoading()  { return this._currentSlot().loading; },
+    get kapitelReviewProgress() { return this._currentSlot().progress; },
+    get kapitelReviewStatus()   { return this._currentSlot().status; },
+    get kapitelReviewOut()      { return this._currentSlot().out; },
 
     _lsKeyKapitelReview(chapterId) {
       return `lektorat_chapter_review_job_${window.__app.selectedBookId}_${chapterId}`;
@@ -131,50 +158,43 @@ export function registerKapitelReviewCard() {
       return html;
     },
 
-    setKapitelReviewStatus(msg, spinner = false) {
-      const safe = escHtml(msg);
-      this.kapitelReviewStatus = spinner
-        ? `<span class="spinner"></span>${safe}`
-        : safe;
-    },
-
     startKapitelReviewPoll(jobId, chapterId) {
       const root = window.__app;
-      startPoll(this, {
-        timerProp: '_kapitelReviewPollTimer',
+      const slot = this._ensureSlot(chapterId);
+      if (!slot) return;
+      slot.jobId = jobId;
+      startPoll(slot, {
+        timerProp: 'pollTimer',
         jobId,
         lsKey: this._lsKeyKapitelReview(chapterId),
-        progressProp: 'kapitelReviewProgress',
+        progressProp: 'progress',
         onProgress: (job) => {
-          this.kapitelReviewStatus = runningJobStatus(
+          slot.status = runningJobStatus(
             (k, p) => root.t(k, p),
             job.statusText, job.tokensIn, job.tokensOut, job.maxTokensOut,
             job.progress, job.tokensPerSec, job.statusParams,
           );
         },
         onNotFound: () => {
-          this.kapitelReviewLoading = false;
-          this._kapitelReviewRunningChapterId = '';
-          this.setKapitelReviewStatus(root.t('job.interrupted'));
+          slot.loading = false;
+          slot.status = this._formatStatus(root.t('job.interrupted'));
         },
         onError: (job) => {
-          this.kapitelReviewLoading = false;
-          this._kapitelReviewRunningChapterId = '';
-          this.kapitelReviewOut = `<span class="error-msg">${root.t('common.errorColon')}${escHtml(root.t(job.error, job.errorParams))}</span>`;
-          this.setKapitelReviewStatus('');
+          slot.loading = false;
+          slot.out = `<span class="error-msg">${root.t('common.errorColon')}${escHtml(root.t(job.error, job.errorParams))}</span>`;
+          slot.status = '';
         },
         onDone: async (job) => {
-          this.kapitelReviewLoading = false;
-          this._kapitelReviewRunningChapterId = '';
+          slot.loading = false;
           if (job.result?.empty) {
-            this.setKapitelReviewStatus(root.t('kapitelReview.noPages'));
+            slot.status = this._formatStatus(root.t('kapitelReview.noPages'));
             return;
           }
           const r = job.result?.review;
           if (r) {
-            this.kapitelReviewOut = this._renderKapitelReviewHtml(r);
-            setTimeout(() => { this.kapitelReviewProgress = 0; }, 400);
-            this.setKapitelReviewStatus(root.t('kapitelReview.pagesAnalyzed', { n: job.result.pageCount || '?' }));
+            slot.out = this._renderKapitelReviewHtml(r);
+            setTimeout(() => { slot.progress = 0; }, 400);
+            slot.status = this._formatStatus(root.t('kapitelReview.pagesAnalyzed', { n: job.result.pageCount || '?' }));
             if (root.selectedBookId) await this.loadKapitelReviewHistory(root.selectedBookId);
           }
         },
@@ -208,16 +228,16 @@ export function registerKapitelReviewCard() {
       const root = window.__app;
       const bookId = root.selectedBookId;
       const bookName = root.selectedBookName;
-      const chapterId = window.__app.kapitelReviewChapterId;
+      const chapterId = root.kapitelReviewChapterId;
       if (!chapterId) return;
       const chapter = (root.tree || []).find(i => i.type === 'chapter' && String(i.id) === String(chapterId));
       const chapterName = chapter?.name || '';
-      this.kapitelReviewLoading = true;
-      this.kapitelReviewProgress = 0;
-      this._kapitelReviewRunningChapterId = String(chapterId);
+      const slot = this._ensureSlot(chapterId);
+      slot.loading = true;
+      slot.progress = 0;
+      slot.out = '';
+      slot.status = this._formatStatus(root.t('kapitelReview.starting'), true);
       root.showKapitelReviewCard = true;
-      this.kapitelReviewOut = '';
-      this.setKapitelReviewStatus(root.t('kapitelReview.starting'), true);
       try {
         const { jobId } = await fetchJson('/jobs/chapter-review', {
           method: 'POST',
@@ -233,10 +253,9 @@ export function registerKapitelReviewCard() {
         this.startKapitelReviewPoll(jobId, chapterId);
       } catch (e) {
         console.error('[runKapitelReview]', e);
-        this.kapitelReviewOut = `<span class="error-msg">${root.t('common.errorColon')}${escHtml(e.message)}</span>`;
-        this.setKapitelReviewStatus('');
-        this.kapitelReviewLoading = false;
-        this._kapitelReviewRunningChapterId = '';
+        slot.out = `<span class="error-msg">${root.t('common.errorColon')}${escHtml(e.message)}</span>`;
+        slot.status = '';
+        slot.loading = false;
       }
     },
 

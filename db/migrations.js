@@ -3419,6 +3419,34 @@ function runMigrations() {
     logger.info('DB-Migration auf Version 88 abgeschlossen (book_settings.is_finished).');
   }
 
+  if (version < 89) {
+    // Token-Verbrauch pro Provider/Modell tracken (Cache-Hits trennen).
+    // job_runs: alle Hintergrund-Jobs (Lektorat, Review, Komplett, Synonyme, …).
+    // chat_messages: Seiten-Chat (läuft nicht über Job-Queue, eigener Pfad).
+    // cache_read_in / cache_creation_in nur Claude (lokale Modelle: 0).
+    const jrCols89 = db.pragma('table_info(job_runs)').map(c => c.name);
+    if (!jrCols89.includes('provider'))          db.prepare('ALTER TABLE job_runs ADD COLUMN provider TEXT').run();
+    if (!jrCols89.includes('model'))             db.prepare('ALTER TABLE job_runs ADD COLUMN model TEXT').run();
+    if (!jrCols89.includes('cache_read_in'))     db.prepare('ALTER TABLE job_runs ADD COLUMN cache_read_in INTEGER DEFAULT 0').run();
+    if (!jrCols89.includes('cache_creation_in')) db.prepare('ALTER TABLE job_runs ADD COLUMN cache_creation_in INTEGER DEFAULT 0').run();
+
+    const cmCols89 = db.pragma('table_info(chat_messages)').map(c => c.name);
+    if (!cmCols89.includes('provider'))          db.prepare('ALTER TABLE chat_messages ADD COLUMN provider TEXT').run();
+    if (!cmCols89.includes('model'))             db.prepare('ALTER TABLE chat_messages ADD COLUMN model TEXT').run();
+    if (!cmCols89.includes('cache_read_in'))     db.prepare('ALTER TABLE chat_messages ADD COLUMN cache_read_in INTEGER DEFAULT 0').run();
+    if (!cmCols89.includes('cache_creation_in')) db.prepare('ALTER TABLE chat_messages ADD COLUMN cache_creation_in INTEGER DEFAULT 0').run();
+
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_jr_user_day ON job_runs(user_email, queued_at)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_cm_created_at ON chat_messages(created_at)').run();
+
+    const fkErrors89 = db.pragma('foreign_key_check');
+    if (fkErrors89.length) {
+      throw new Error(`Migration 89: foreign_key_check meldet ${fkErrors89.length} Verstoesse: ${JSON.stringify(fkErrors89.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 89').run();
+    logger.info('DB-Migration auf Version 89 abgeschlossen (provider/model + cache_read_in/cache_creation_in in job_runs + chat_messages).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

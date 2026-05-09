@@ -208,10 +208,9 @@ export const appHashRouterMethods = {
         case 'kapitel':
           if (!this.showKapitelReviewCard) await this.toggleKapitelReviewCard();
           if (arg) {
-            // `kapitelReviewChapterOptions`/`kapitelReviewOut`/`setKapitelReviewStatus`
-            // leben auf der kapitel-review-Sub. Bei Deep-Link `#book/X/kapitel/Y`
-            // ist die Sub evtl. noch nicht gemountet → guard, sonst Crash.
             // Sub übernimmt den Chapter-Wechsel via `kapitel-review:select`-Event.
+            // Bei Deep-Link `#book/X/kapitel/Y` ist die Sub evtl. noch nicht
+            // gemountet — Event wird dann vom init()-Listener verarbeitet.
             window.dispatchEvent(new CustomEvent('kapitel-review:select', { detail: { chapterId: String(arg) } }));
           }
           break;

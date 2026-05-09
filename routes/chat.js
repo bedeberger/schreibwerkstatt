@@ -297,7 +297,7 @@ router.post('/send', jsonBody, async (req, res) => {
     const provider = process.env.API_PROVIDER || 'claude';
     const schema = (provider === 'ollama' || provider === 'llama') ? SCHEMA_CHAT : null;
     const temperatureOverride = (provider === 'ollama' || provider === 'llama') ? chatTemperature() : null;
-    const { text: fullText, truncated, tokensIn, tokensOut } = await callAIChat(
+    const { text: fullText, truncated, tokensIn, tokensOut, cacheReadIn = 0, cacheCreationIn = 0, model: usedModel } = await callAIChat(
       messages, systemPrompt,
       ({ delta }) => {
         if (delta) {
@@ -306,7 +306,7 @@ router.post('/send', jsonBody, async (req, res) => {
       },
       null, null, provider, schema, temperatureOverride,
     );
-    logger.info(`[chat] ${provider} call model=${provider === 'claude' ? (process.env.MODEL_NAME || 'claude-sonnet-4-6') : (provider === 'ollama' ? (process.env.OLLAMA_MODEL || 'llama3.2') : (process.env.LLAMA_MODEL || 'llama3.2'))}`);
+    logger.info(`[chat] ${provider} call model=${usedModel}`);
     if (truncated) {
       logger.warn(`[chat/send] «${session.page_name}» session=${session_id} Antwort abgeschnitten (max_tokens) – ${tokensIn}↑ ${tokensOut}↓.`);
     }
@@ -332,14 +332,18 @@ router.post('/send', jsonBody, async (req, res) => {
     // Assistant-Nachricht in DB speichern
     const assistantNow = new Date().toISOString();
     const asstMsgResult = db.prepare(`
-      INSERT INTO chat_messages (session_id, role, content, vorschlaege, tokens_in, tokens_out, created_at)
-      VALUES (?, 'assistant', ?, ?, ?, ?, ?)
+      INSERT INTO chat_messages (session_id, role, content, vorschlaege, tokens_in, tokens_out, cache_read_in, cache_creation_in, provider, model, created_at)
+      VALUES (?, 'assistant', ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       session.id,
       antwort,
       vorschlaege.length > 0 ? JSON.stringify(vorschlaege) : null,
       tokensIn,
       tokensOut,
+      cacheReadIn,
+      cacheCreationIn,
+      provider,
+      usedModel,
       assistantNow
     );
     db.prepare('UPDATE chat_sessions SET last_message_at = ? WHERE id = ?').run(assistantNow, session.id);
