@@ -1,6 +1,7 @@
 const express = require('express');
 const { db, getAnyUserToken, getAllUserTokens, reconcilePageIds, pruneStaleBookData, getTokenForRequest, upsertBook } = require('../db/schema'); // getAnyUserToken used in POST /book/:book_id
 const logger = require('../logger');
+const { runWithContext, getContext } = require('../lib/log-context');
 const { CHARS_PER_TOKEN } = require('../lib/ai');
 const { toIntId } = require('../lib/validate');
 const { bsGet, bsGetAll } = require('../lib/bookstack');
@@ -324,17 +325,19 @@ async function _syncAllBooksInner() {
 
   logger.info(`Sync: ${bookOwners.size} Buch/Bücher (dedupliziert), ${users.length} User`);
   for (const [bookId, { tokens }] of bookOwners) {
-    let synced = false;
-    for (const u of tokens) {
-      try {
-        await syncBook(bookId, u);
-        synced = true;
-        break;
-      } catch (e) {
-        logger.warn(`Sync Buch ${bookId} mit Token von ${u.email} fehlgeschlagen: ${_errDetail(e)}`);
+    await runWithContext({ ...getContext(), book: bookId }, async () => {
+      let synced = false;
+      for (const u of tokens) {
+        try {
+          await syncBook(bookId, u);
+          synced = true;
+          break;
+        } catch (e) {
+          logger.warn(`Sync Buch ${bookId} mit Token von ${u.email} fehlgeschlagen: ${_errDetail(e)}`);
+        }
       }
-    }
-    if (!synced) logger.error(`Sync Buch ${bookId}: alle berechtigten User-Tokens fehlgeschlagen.`);
+      if (!synced) logger.error(`Sync Buch ${bookId}: alle berechtigten User-Tokens fehlgeschlagen.`);
+    });
   }
 }
 

@@ -124,14 +124,13 @@ if (LOCAL_DEV_MODE) {
 }
 
 // ALS-Logging-Context: jeder logger.*-Call innerhalb des Request-Scopes erbt
-// reqId/ip/user automatisch. Selbst silent — eigentliches Page-Load-Logging
+// scope/user automatisch. Selbst silent — eigentliches Page-Load-Logging
 // passiert weiter unten kurz vor staticServe.
 app.use((req, res, next) => {
   const reqId = crypto.randomUUID().slice(0, 8);
   res.setHeader('X-Request-Id', reqId);
   runWithContext({
-    reqId,
-    ip: req.ip || null,
+    job: 'http',
     user: req.session?.user?.email || null,
   }, () => next());
 });
@@ -283,7 +282,9 @@ const server = app.listen(PORT, '0.0.0.0', () => {
     const row = db.prepare('SELECT MAX(recorded_at) AS last FROM book_stats_history').get();
     if (!row?.last || row.last < cutoff) {
       logger.info(`Startup: book_stats_history letzter Eintrag ${row?.last || 'nie'} – hole Sync nach.`);
-      syncPromise = syncAllBooks().catch(e => logger.error('Startup-Sync Fehler: ' + e.message));
+      syncPromise = runWithContext({ job: 'cron', user: 'system' }, () =>
+        syncAllBooks().catch(e => logger.error('Startup-Sync Fehler: ' + e.message))
+      );
     } else {
       logger.info('Startup: Sync aktuell – kein Catch-up nötig.');
     }
@@ -341,12 +342,14 @@ try {
   // 23:00 – Buchstatistik-Sync + hängende Jobs bereinigen.
   // Tagesscharfe Statistik: recorded_at am Tag X reflektiert Inhalte vom Tag X.
   cron.schedule('0 23 * * *', () => {
-    logger.info('Cron: Starte täglichen Buchstatistik-Sync…');
-    syncAllBooks().catch(e => logger.error('Cron-Sync Fehler: ' + e.message));
+    runWithContext({ job: 'cron', user: 'system' }, () => {
+      logger.info('Cron: Starte täglichen Buchstatistik-Sync…');
+      syncAllBooks().catch(e => logger.error('Cron-Sync Fehler: ' + e.message));
 
-    const stuck = cleanupStuckJobRuns();
-    if (stuck > 0) logger.warn(`Cron: ${stuck} hängender Job-Run(s) auf 'error' gesetzt.`);
-    else logger.info('Cron: Keine hängenden Job-Runs gefunden.');
+      const stuck = cleanupStuckJobRuns();
+      if (stuck > 0) logger.warn(`Cron: ${stuck} hängender Job-Run(s) auf 'error' gesetzt.`);
+      else logger.info('Cron: Keine hängenden Job-Runs gefunden.');
+    });
   }, { timezone: cronTz });
   logger.info(`Cron-Job registriert: Buchstatistik-Sync + Job-Cleanup täglich 23:00 (${cronTz})`);
 
@@ -359,15 +362,17 @@ try {
   // Touches schon eingebrannt sind.
   const staleDays = Math.max(1, parseInt(process.env.STALE_DAYS || '7', 10));
   cron.schedule('0 4 * * *', () => {
-    logger.info(`Cron: Starte Stale-Cleanup (Schwelle ${staleDays} Tage)…`);
-    try {
-      const counts = pruneStaleByAge(staleDays);
-      if (!counts.stale_books && !counts.stale_chapters && !counts.stale_pages) {
-        logger.info('Cron: Keine Stale-Eintraege gefunden.');
+    runWithContext({ job: 'cron', user: 'system' }, () => {
+      logger.info(`Cron: Starte Stale-Cleanup (Schwelle ${staleDays} Tage)…`);
+      try {
+        const counts = pruneStaleByAge(staleDays);
+        if (!counts.stale_books && !counts.stale_chapters && !counts.stale_pages) {
+          logger.info('Cron: Keine Stale-Eintraege gefunden.');
+        }
+      } catch (e) {
+        logger.error('Cron Stale-Cleanup Fehler: ' + e.message);
       }
-    } catch (e) {
-      logger.error('Cron Stale-Cleanup Fehler: ' + e.message);
-    }
+    });
   }, { timezone: cronTz });
   logger.info(`Cron-Job registriert: Stale-Cleanup täglich 04:00 (${cronTz}, Schwelle ${staleDays} Tage)`);
 

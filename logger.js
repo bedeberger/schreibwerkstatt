@@ -8,11 +8,9 @@ const LOG_FILE = path.join(__dirname, 'lektorat.log');
 // haben Vorrang (info.job ?? c.job).
 const enrichWithContext = winston.format((info) => {
   const c = getContext();
-  if (info.job   == null && c.job   != null) info.job   = c.job;
-  if (info.user  == null && c.user  != null) info.user  = c.user;
-  if (info.book  == null && c.book  != null) info.book  = c.book;
-  if (info.ip    == null && c.ip    != null) info.ip    = c.ip;
-  if (info.reqId == null && c.reqId != null) info.reqId = c.reqId;
+  if (info.job  == null && c.job  != null) info.job  = c.job;
+  if (info.user == null && c.user != null) info.user = c.user;
+  if (info.book == null && c.book != null) info.book = c.book;
   return info;
 });
 
@@ -21,16 +19,12 @@ const logger = winston.createLogger({
   format: winston.format.combine(
     enrichWithContext(),
     winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-    winston.format.printf(({ timestamp, level, message, job, user, book, ip, reqId, stack }) => {
-      let ctx = '';
-      if (job) {
-        ctx = ` [${job}|${user || '-'}|${book || '-'}]`;
-      } else if (ip || user) {
-        const id = reqId ? `${reqId} ` : '';
-        ctx = ` [${id}${user || '-'}@${ip || '-'}]`;
-      }
+    winston.format.printf(({ timestamp, level, message, job, user, book, stack }) => {
+      const scope = job || 'app';
+      const u = user || '-';
+      const t = book != null && book !== '' ? String(book) : '-';
       const tail = stack ? `\n${stack}` : '';
-      return `${timestamp} [${level.toUpperCase()}]${ctx} ${message}${tail}`;
+      return `${timestamp} [${level.toUpperCase()}] [${scope}|${u}|${t}] ${message}${tail}`;
     })
   ),
   transports: [

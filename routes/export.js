@@ -280,9 +280,12 @@ router.get('/book/:id/:fmt', async (req, res) => {
 
   res.setHeader('Content-Type', spec.mime);
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  // BOM für plaintext/markdown: sonst rät Notepad CP1252 → Mojibake bei Umlauten.
+  const needsBom = fmt === 'txt' || fmt === 'md';
   const len = upstream.headers.get('content-length');
-  if (len) res.setHeader('Content-Length', len);
+  if (len) res.setHeader('Content-Length', String(Number(len) + (needsBom ? 3 : 0)));
 
+  if (needsBom) res.write(Buffer.from([0xEF, 0xBB, 0xBF]));
   Readable.fromWeb(upstream.body).pipe(res);
 });
 
