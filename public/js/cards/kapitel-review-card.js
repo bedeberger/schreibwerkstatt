@@ -31,6 +31,17 @@ export function registerKapitelReviewCard() {
         window.__app.kapitelReviewChapterId = String(chapterId);
       };
 
+      // Backstop für Done-Events ohne lokalen per-Slot-Poller (z.B. Job lief in
+      // anderem Tab oder Slot wurde durch Buchwechsel zerstört). Lädt History
+      // neu, damit der Eintrag in der Card auftaucht.
+      const onJobFinished = (e) => {
+        const d = e.detail;
+        if (d?.type !== 'chapter-review' || d.job?.status !== 'done') return;
+        const root = window.__app;
+        if (!root.selectedBookId || String(d.bookId) !== String(root.selectedBookId)) return;
+        this.loadKapitelReviewHistory(root.selectedBookId);
+      };
+
       const onJobReconnect = (e) => {
         const d = e.detail;
         if (d?.type !== 'kapitel-review') return;
@@ -70,6 +81,7 @@ export function registerKapitelReviewCard() {
         extraListeners: [
           { type: 'kapitel-review:select', handler: onSelectChapter },
           { type: 'job:reconnect',         handler: onJobReconnect },
+          { type: 'job:finished',          handler: onJobFinished },
         ],
       });
     },

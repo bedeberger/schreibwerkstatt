@@ -184,12 +184,59 @@ export const appJobsCoreMethods = {
     );
   },
 
+  // Diff zwischen letztem und neuem `/jobs/queue`-Snapshot: jeder Job, der
+  // verschwindet, ist done/error/cancelled. Final-Status nachladen + globales
+  // `job:finished`-Event dispatchen → Konsumenten räumen Sidebar/History auch
+  // dann auf, wenn kein per-Job-Poller (mehr) läuft (Reload, anderer Tab,
+  // anderes Buch). Idempotent gegenüber per-Card-Pollern, die ggf. parallel
+  // dasselbe `onDone` ausführen.
+  _detectFinishedJobs(items) {
+    const newMap = new Map(items.map(j => [j.id, { type: j.type, dedupId: j.dedupId, bookId: j.bookId }]));
+    for (const [prevId, meta] of this._jobQueueIdsLastSeen) {
+      if (!newMap.has(prevId)) this._fireJobFinished(prevId, meta);
+    }
+    this._jobQueueIdsLastSeen = newMap;
+  },
+
+  async _fireJobFinished(jobId, meta) {
+    try {
+      const resp = await fetch('/jobs/' + jobId);
+      if (!resp.ok) return;
+      const job = await resp.json();
+      if (job.status !== 'done' && job.status !== 'error' && job.status !== 'cancelled') return;
+      window.dispatchEvent(new CustomEvent('job:finished', {
+        detail: { type: meta.type, jobId, job, dedupId: meta.dedupId, bookId: meta.bookId },
+      }));
+    } catch { /* ignore */ }
+  },
+
+  // Root-Handler für `job:finished` — fängt die Reload-Lücke: User startet
+  // Lektorat-Check auf Seite A, wechselt zu B, reloadet → A's per-Page-Poller
+  // läuft nicht mehr, aber Server-Job geht durch. Disappearance-Detection
+  // triggert hier markPageChecked, damit Sidebar live wird, ohne dass der User
+  // die Quellseite wieder öffnen muss.
+  _onJobFinished(detail) {
+    if (!detail) return;
+    if (detail.type === 'check' && detail.job?.status === 'done') {
+      const pageId = detail.dedupId;
+      const r = detail.job.result || {};
+      if (pageId != null && !r.empty) {
+        const fehler = r.fehler || [];
+        this.markPageChecked(pageId, { pending: fehler.length > 0 });
+        if (this.currentPage?.id === pageId) this.loadPageHistory?.(pageId);
+      }
+    }
+  },
+
   _startJobQueuePoll() {
     if (this._jobQueueTimer) clearInterval(this._jobQueueTimer);
+    if (!this._jobQueueIdsLastSeen) this._jobQueueIdsLastSeen = new Map();
     let consecutiveFailures = 0;
     const poll = async () => {
       try {
-        this.jobQueueItems = await fetchJson('/jobs/queue');
+        const items = await fetchJson('/jobs/queue');
+        this._detectFinishedJobs(items);
+        this.jobQueueItems = items;
         consecutiveFailures = 0;
         if (this.serverOffline) this.serverOffline = false;
       } catch (e) {
@@ -299,9 +346,9 @@ export const appJobsCoreMethods = {
       }));
     });
 
-    // Kapitel-Review: nur einen laufenden Job pro Buch reconnecten – im
-    // tree-Order erste Fundstelle gewinnt. Probes laufen parallel, damit
-    // Tab-Reopen bei vielen Kapiteln nicht N serielle Roundtrips kostet.
+    // Kapitel-Review: alle laufenden Jobs des Buchs reconnecten — die Card
+    // hat per-Kapitel-Slot-State und akzeptiert N Reconnects. Probes parallel,
+    // damit Tab-Reopen bei vielen Kapiteln nicht N serielle Roundtrips kostet.
     const chapterCandidates = [];
     for (const [index, item] of (this.tree || []).entries()) {
       if (item.type !== 'chapter' || item.solo) continue;
@@ -321,14 +368,16 @@ export const appJobsCoreMethods = {
       localStorage.removeItem(c.lsKey);
       return null;
     }));
-    const winner = chapterProbes
+    const winners = chapterProbes
       .filter(Boolean)
-      .sort((a, b) => a.index - b.index)[0];
-    if (winner) {
+      .sort((a, b) => a.index - b.index);
+    if (winners.length > 0) {
       this.showKapitelReviewCard = true;
-      window.dispatchEvent(new CustomEvent('job:reconnect', {
-        detail: { type: 'kapitel-review', jobId: winner.jobId, job: winner.job, extra: { chapterId: winner.chapterId } },
-      }));
+      for (const w of winners) {
+        window.dispatchEvent(new CustomEvent('job:reconnect', {
+          detail: { type: 'kapitel-review', jobId: w.jobId, job: w.job, extra: { chapterId: w.chapterId } },
+        }));
+      }
     }
 
     await this._reconnectJob('lektorat_figures_job_' + bookId, (job, jobId) => {

@@ -595,6 +595,7 @@ document.addEventListener('alpine:init', () => {
       }, { signal });
       window.addEventListener('session-expired', () => { this.sessionExpired = true; }, { signal });
       window.addEventListener('bookstack-token-invalid', () => { this.bookstackTokenInvalid = true; }, { signal });
+      window.addEventListener('job:finished', (e) => this._onJobFinished(e.detail), { signal });
       window.addEventListener('beforeunload', (e) => {
         if (this.editMode && this.editDirty) { e.preventDefault(); e.returnValue = ''; }
       }, { signal });

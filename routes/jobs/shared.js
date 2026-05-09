@@ -875,6 +875,10 @@ sharedRouter.get('/queue', (req, res) => {
       progress: job.progress,
       statusText,
       statusParams,
+      tokensIn: job.tokensIn || 0,
+      tokensOut: job.tokensOut || 0,
+      maxTokensOut: job.maxTokensOut || 0,
+      tokensPerSec: job.tokensPerSec || 0,
       canCancel: true,
     });
   }

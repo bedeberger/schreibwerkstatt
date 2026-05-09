@@ -165,6 +165,7 @@ Custom-Events am `window`. Vollständige Liste:
 | `view:reset` | `resetView()` | alle Subs | Lokalen State komplett nullen |
 | `card:refresh` `{ name }` | erneuter Klick auf offene Karte | passende Sub | Daten neu laden |
 | `job:reconnect` `{ type, jobId, job, extra? }` | `checkPendingJobs()` | review/kapitel-review/figuren/komplett | Loading-State übernehmen + Polling starten |
+| `job:finished` `{ type, jobId, job, dedupId, bookId }` | `_detectFinishedJobs()` (Diff aus `/jobs/queue`) | Root + Subs | Sidebar/History idempotent updaten, auch wenn kein per-Card-Poller mehr läuft (Reload-Lücke). Konsumenten müssen idempotent sein — fired auch parallel zu per-Card-onDone. |
 | `chat:reset` / `book-chat:reset` | Seitenwechsel / User-Settings-Reset | chat-card, book-chat-card | Session leeren |
 | `kapitel-review:select` `{ chapterId }` | Sidebar / Hash-Router | kapitel-review-card | Chapter-ID setzen |
 | `book-stats:select` | Hash-Router | book-stats-card | Statistik-Tab wählen |
