@@ -129,6 +129,7 @@ export const appViewMethods = {
     if (keep !== 'bookReview') this.showBookReviewCard = false;
     if (keep !== 'kapitelReview') this.showKapitelReviewCard = false;
     if (keep !== 'figures') this.showFiguresCard = false;
+    if (keep !== 'figurWerkstatt') this.showFigurWerkstattCard = false;
     if (keep !== 'szenen') this.showSzenenCard = false;
     if (keep !== 'ereignisse') this.showEreignisseCard = false;
     if (keep !== 'bookStats') this.showBookStatsCard = false;
@@ -287,6 +288,15 @@ export const appViewMethods = {
     }
     this._closeOtherMainCards('figures');
     this.showFiguresCard = true;
+  },
+  toggleFigurWerkstattCard() {
+    if (this.showFigurWerkstattCard) {
+      window.dispatchEvent(new CustomEvent('card:refresh', { detail: { name: 'figurWerkstatt' } }));
+      return;
+    }
+    if (!this.selectedBookId) return;
+    this._closeOtherMainCards('figurWerkstatt');
+    this.showFigurWerkstattCard = true;
   },
   toggleBookReviewCard() {
     if (this.showBookReviewCard) {

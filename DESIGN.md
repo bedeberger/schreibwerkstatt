@@ -1101,6 +1101,7 @@ Welche Datei besitzt welche Klassen. Bei neuer Klasse: erst hier prüfen, ob ein
 | File | Karten |
 |------|--------|
 | [figuren.css](public/css/figuren.css) | Figuren-Karte (Graph, Familie, Soziogramm). |
+| [figur-werkstatt.css](public/css/figur-werkstatt.css) | Figuren-Werkstatt (Mindmap, Drafts-Sidebar, Read-only-Tree). |
 | [schauplaetze.css](public/css/schauplaetze.css) | Orte (Aliasing). |
 | [kontinuitaet.css](public/css/kontinuitaet.css) | Kontinuitätsprüfung + Buch-Einstellungen-Spezifika. |
 | [szenen.css](public/css/szenen.css) | Szenen-Karte. |
@@ -1199,11 +1200,9 @@ Position: absolute innerhalb `.card`, `background: var(--color-surface) / 0.7` m
 
 ## Empty-State mit CTA
 
-**Status:** Aktuell nur Text via `.card-status` (`$app.t('common.noDataYet')`). Kein Pattern für „Keine Daten — hier ist der Button um Daten zu erzeugen".
+**Status:** Aktiv (eingeführt mit Figuren-Werkstatt). Klassen leben in [card-form.css](public/css/card-form.css). Verwenden, wann immer eine Karte „Keine Daten — hier der Button um welche zu erzeugen" rendert (z.B. leere Findings, leere Figuren-Liste).
 
-**Wann anlegen:** Empty-Buchwahl, leere Findings („Keine Lektorat-Findings — Prüfung starten"), leere Figuren-Liste („Komplettanalyse läuft erstmals — Knopf").
-
-**Soll-Pattern:**
+**Markup:**
 ```html
 <div class="card-empty">
   <p class="card-empty-text" x-text="$app.t('feature.empty.title')"></p>
@@ -1211,12 +1210,12 @@ Position: absolute innerhalb `.card`, `background: var(--color-surface) / 0.7` m
   <button class="primary" @click="…" x-text="$app.t('feature.empty.cta')"></button>
 </div>
 ```
-- `.card-empty` — vertikaler Stack, mittig, Padding
-- `.card-empty-text` — semantischer Hauptsatz, Serif optional
-- `.card-empty-hint` — 12 px muted Erklärung darunter
+- `.card-empty` — flex-column, zentriert, Padding `--space-2xl --space-lg` (Mobile: `--space-xl --space-md`)
+- `.card-empty-text` — semantischer Hauptsatz, `--font-size-md`, `--fw-medium`
+- `.card-empty-hint` — 12 px muted Erklärung, `max-width: 32em`
 - Button ist Standard `.primary` — kein eigener Empty-CTA-Stil
 
-Bis Pattern angelegt: weiter `.card-status` verwenden, CTA als `.row` darunter.
+Wenn die Karte zusätzlich Inline-Inputs braucht (z.B. „Neue Figur — Name eingeben"), `.card-empty` als Container für Input + Button-Row mit `.row` weiternutzen — siehe [public/partials/figur-werkstatt.html](public/partials/figur-werkstatt.html).
 
 ---
 
@@ -1261,6 +1260,7 @@ Welche Karte verwendet welche Patterns. Drift-Erkennung: wer auf der gleichen Ze
 | BookReview | ✓ | — | — | — | — | — | — | — |
 | KapitelReview | ✓ | — | — | — | — | — | — | — |
 | Figuren | ✓ | — | ✓ | — | ✓ | — | — | ✓ |
+| FigurWerkstatt | ✓ | ✓ | — | ✓ | — | — | — | — |
 | Orte | ✓ | — | — | — | ✓ | — | — | ✓ |
 | Szenen | ✓ | — | ✓ | ✓ | ✓ | — | — | ✓ |
 | Ereignisse | ✓ | — | — | ✓ | ✓ | — | — | ✓ |

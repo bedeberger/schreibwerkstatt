@@ -109,6 +109,14 @@ export {
 } from './prompts/synonym.js';
 
 export {
+  buildBrainstormPrompt,
+  buildConsistencyPrompt,
+  SCHEMA_BRAINSTORM,
+  SCHEMA_CONSISTENCY,
+  WERKSTATT_SEVERITY_ENUM,
+} from './prompts/figur-werkstatt.js';
+
+export {
   buildFinetuneAugmentSystem,
   buildFinetuneReversePromptsPrompt,
   buildFinetuneFactQAPrompt,

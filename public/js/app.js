@@ -21,6 +21,7 @@ import { registerEreignisseCard } from './cards/ereignisse-card.js';
 import { registerOrteCard } from './cards/orte-card.js';
 import { registerSzenenCard } from './cards/szenen-card.js';
 import { registerFigurenCard } from './cards/figuren-card.js';
+import { registerFigurWerkstattCard } from './cards/figur-werkstatt-card.js';
 import { registerStilCard } from './cards/stil-card.js';
 import { registerFehlerHeatmapCard } from './cards/fehler-heatmap-card.js';
 import { registerChatCard } from './cards/chat-card.js';
@@ -212,6 +213,7 @@ document.addEventListener('alpine:init', () => {
   registerOrteCard();
   registerSzenenCard();
   registerFigurenCard();
+  registerFigurWerkstattCard();
   registerBookReviewCard();
   registerKapitelReviewCard();
   registerChatCard();

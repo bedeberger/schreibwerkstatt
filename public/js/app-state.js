@@ -132,6 +132,7 @@ const cardsState = () => ({
   showBookReviewCard: false,
   showKapitelReviewCard: false,
   showFiguresCard: false,
+  showFigurWerkstattCard: false,
   showGlobalZeitstrahl: false,
   showEreignisseCard: false,
   showSzenenCard: false,

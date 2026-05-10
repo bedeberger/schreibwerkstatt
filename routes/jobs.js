@@ -11,6 +11,7 @@ const { chatRouter } = require('./jobs/chat');
 const { synonymeRouter } = require('./jobs/synonyme');
 const { finetuneExportRouter } = require('./jobs/finetune-export');
 const { pdfExportRouter } = require('./jobs/pdf-export');
+const { figurWerkstattRouter } = require('./jobs/figur-werkstatt');
 
 // Feature-Router zuerst mounten – sharedRouter zuletzt, weil GET /:id und DELETE /:id
 // als Catch-All wirken und sonst spezifischere Routen (z.B. DELETE /book-chat-cache,
@@ -23,6 +24,7 @@ router.use('/', chatRouter);
 router.use('/', synonymeRouter);
 router.use('/', finetuneExportRouter);
 router.use('/', pdfExportRouter);
+router.use('/', figurWerkstattRouter);
 router.use('/', sharedRouter);
 
 module.exports = { router, runKomplettAnalyseAll };

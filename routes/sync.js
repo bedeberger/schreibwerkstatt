@@ -75,9 +75,9 @@ const _upsertPageCacheStmt = db.prepare(`
 const _upsertChapterStmt = db.prepare(`
   INSERT INTO chapters (chapter_id, book_id, chapter_name, updated_at, last_seen_at)
   VALUES (?, ?, ?, ?, ?)
-  ON CONFLICT(chapter_id, book_id) DO UPDATE SET
-    chapter_name=excluded.chapter_name, updated_at=excluded.updated_at,
-    last_seen_at=excluded.last_seen_at
+  ON CONFLICT(chapter_id) DO UPDATE SET
+    book_id=excluded.book_id, chapter_name=excluded.chapter_name,
+    updated_at=excluded.updated_at, last_seen_at=excluded.last_seen_at
 `);
 
 // Mig 75: chapter_extract_cache.chapter_id INTEGER FK; Rename invalidiert alle phases.

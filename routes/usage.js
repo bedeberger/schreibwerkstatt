@@ -19,6 +19,7 @@ const ALLOWED_KEYS = new Set([
   'fehlerHeatmap',
   'kontinuitaet',
   'figuren',
+  'werkstatt',
   'szenen',
   'orte',
   'ereignisse',

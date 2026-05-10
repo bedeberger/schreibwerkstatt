@@ -356,7 +356,7 @@ DB-Code lebt in [db/](db/), aufgeteilt auf thematische Files: [connection.js](db
 - Refs auf lokale PKs/UNIQUE-Targets MÜSSEN als FK deklariert werden:
   - `books(book_id)` (PK; externe BookStack-ID, analog `pages.page_id`/`chapters.chapter_id`)
   - `pages(page_id)` (PK)
-  - `chapters(chapter_id)` (UNIQUE)
+  - `chapters(chapter_id)` (PK; global eindeutig — BookStack-ID)
   - `figures(id)` (PK; nicht `figures.fig_id` — TEXT, nicht UNIQUE alleine)
   - `locations(id)`, `figure_scenes(id)`, `chat_sessions(id)`, `continuity_*(id)`
 - ON-DELETE-Strategie bewusst wählen:
@@ -364,7 +364,7 @@ DB-Code lebt in [db/](db/), aufgeteilt auf thematische Files: [connection.js](db
   - `SET NULL` für user-kuratierte Daten (figure_events.page_id/chapter_id, figure_scenes.page_id/chapter_id, locations.erste_erwaehnung_page_id, ideen.page_id, continuity_issue_chapters.chapter_id, page_checks.chapter_id, pages.chapter_id)
 - **Snapshot-Spalten verboten** (`chapter_name`, `kapitel`, `seite`, `page_name`, `book_name`) — keine Ausnahmen. Display-Werte zur Lese-Zeit per JOIN auf `chapters`/`pages`/`books`/`figures`. Wahrheit lebt nur in `pages.page_name`, `chapters.chapter_name`, `books.name` (BookStack-Sync-Caches) und `figures.name` (User-Stamm). Snapshot-Fallback nur bei nullbarem FK, wenn KI-Output keine ID liefern konnte (z. B. `continuity_issue_figures.figur_name` mit nullable `figure_id`).
 - Index auf jede neue FK-Spalte Pflicht (`CREATE INDEX idx_xx_yy ON …`).
-- `book_id`-Spalten referenzieren `books(book_id)` (PK). Discovery via `upsertBook(b)` / `upsertBookByName(bookId, name)` in [routes/sync.js](routes/sync.js) bzw. [db/schema.js](db/schema.js) — jede BookStack-Buch-Berührung upserted in `books`, danach sind FK-CASCADE-Pfade aktiv. Composite-Defensive `(chapter_id, book_id) REFERENCES chapters(chapter_id, book_id)` prüfen, wenn Cross-Book-Bugs möglich.
+- `book_id`-Spalten referenzieren `books(book_id)` (PK). Discovery via `upsertBook(b)` / `upsertBookByName(bookId, name)` in [routes/sync.js](routes/sync.js) bzw. [db/schema.js](db/schema.js) — jede BookStack-Buch-Berührung upserted in `books`, danach sind FK-CASCADE-Pfade aktiv.
 
 ### Sentinel-freie Modellierung
 
