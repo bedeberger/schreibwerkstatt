@@ -12,11 +12,15 @@ jobs:
     timeout-minutes: 5
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      DB_PATH: /tmp/lektorat-ci-${{ github.run_id }}.db
 
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
+
+      - name: Frische DB pro Run (self-hosted Runner persistiert sonst lektorat.db)
+        run: rm -f "$DB_PATH" "${DB_PATH}-shm" "${DB_PATH}-wal"
 
       - name: Cache node_modules
         id: cache-node-modules

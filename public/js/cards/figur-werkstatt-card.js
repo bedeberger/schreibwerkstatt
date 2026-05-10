@@ -38,7 +38,6 @@ export function registerFigurWerkstattCard() {
     runs: { brainstorm: [], consistency: [] },
     runsLoadedDraftId: null,
     runsLoading: false,
-    runsExpanded: { brainstorm: false, consistency: false },
     selectedRunId: null,
     helpExpanded: false,
     _runsLoadDraftId: null,
@@ -106,7 +105,7 @@ export function registerFigurWerkstattCard() {
         name: 'figurWerkstatt',
         showFlag: 'showFigurWerkstattCard',
         timerKeys: ['_brainstormPollTimer', '_consistencyPollTimer'],
-        resetState: { drafts: [], selectedDraftId: null, selectedKnotenId: null, creating: false, newName: '', editName: '', editArchetype: '', editNotes: '', errorMessage: '', brainstormResult: null, consistencyResult: null, brainstormLoading: false, consistencyLoading: false, mindmapFullscreen: false, contextMenuOpen: false, contextMenuNodeId: null, importing: false, importables: [], selectedImportFigureId: '', runs: { brainstorm: [], consistency: [] }, runsLoadedDraftId: null, runsExpanded: { brainstorm: false, consistency: false }, selectedRunId: null, _mindmapDirty: false, _pendingDraftId: null, _pendingKnotenId: null},
+        resetState: { drafts: [], selectedDraftId: null, selectedKnotenId: null, creating: false, newName: '', editName: '', editArchetype: '', editNotes: '', errorMessage: '', brainstormResult: null, consistencyResult: null, brainstormLoading: false, consistencyLoading: false, mindmapFullscreen: false, contextMenuOpen: false, contextMenuNodeId: null, importing: false, importables: [], selectedImportFigureId: '', runs: { brainstorm: [], consistency: [] }, runsLoadedDraftId: null, selectedRunId: null, _mindmapDirty: false, _pendingDraftId: null, _pendingKnotenId: null},
         load: () => this.loadDrafts(),
         onCardRefresh: async () => {
           if (this.isDirty()) {

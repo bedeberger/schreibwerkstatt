@@ -304,66 +304,38 @@
         </div>
       </section>
 
-      <!-- KI-Lauf-Historie: zwei klappbare Sektionen pro Draft.
-           Klick auf Eintrag öffnet Result wie Live-Lauf (selectedRunId markiert). -->
-      <section class="werkstatt-runs" x-show="runsLoadedDraftId === selectedDraftId" x-cloak>
-        <!-- Brainstorm-History -->
-        <div class="werkstatt-runs-section" x-show="runs.brainstorm.length > 0">
-          <button type="button"
-                  class="collapsible-toggle"
-                  :aria-expanded="runsExpanded.brainstorm"
-                  @click="toggleRunsSection('brainstorm')">
-            <span class="section-heading" x-text="$app.t('werkstatt.runs.brainstorm', { count: runs.brainstorm.length })"></span>
-            <span class="history-chevron" :class="{ open: runsExpanded.brainstorm }">›</span>
-          </button>
-          <div class="werkstatt-runs-list" x-show="runsExpanded.brainstorm" x-cloak>
-            <template x-for="r in runs.brainstorm" :key="r.id">
-              <div>
-                <div class="history-item" :class="{ 'history-item--open': selectedRunId === r.id }"
-                     @click="openRun(r.id, 'brainstorm')">
-                  <span class="history-date" x-text="formatRunDate(r.created_at)"></span>
-                  <span class="history-title" x-text="r.knoten_pfad || ''"></span>
-                  <span x-show="r.model" class="tag" x-text="r.model"></span>
-                  <button type="button"
-                          class="btn-delete-history"
-                          :data-tip="$app.t('common.deleteEntry')"
-                          @click.stop="deleteRun(r.id, 'brainstorm')"
-                          x-text="$app.t('common.deleteEntry')"></button>
-                  <span class="history-chevron" :class="{ open: selectedRunId === r.id }">›</span>
-                </div>
-              </div>
-            </template>
+      <!-- KI-Lauf-Historie pro Draft, gleicher Markup wie page-history (Lektorat).
+           Klick auf Eintrag öffnet Result wie Live-Lauf (selectedRunId → history-item--active). -->
+      <div class="history-bar" x-show="runsLoadedDraftId === selectedDraftId && runs.brainstorm.length > 0" x-cloak>
+        <div class="history-heading" x-text="$app.t('werkstatt.runs.brainstorm', { count: runs.brainstorm.length })"></div>
+        <template x-for="r in runs.brainstorm" :key="r.id">
+          <div class="history-item" :class="{ 'history-item--active': selectedRunId === r.id }"
+               @click="openRun(r.id, 'brainstorm')">
+            <span class="history-date" x-text="formatRunDate(r.created_at)"></span>
+            <span x-show="r.knoten_pfad" class="tag" x-text="r.knoten_pfad"></span>
+            <span x-show="r.model" class="tag" x-text="r.model"></span>
+            <button type="button" class="history-item-delete"
+                    @click.stop="deleteRun(r.id, 'brainstorm')"
+                    :data-tip="$app.t('common.deleteEntry')"
+                    :aria-label="$app.t('common.deleteEntry')">×</button>
           </div>
-        </div>
+        </template>
+      </div>
 
-        <!-- Consistency-History -->
-        <div class="werkstatt-runs-section" x-show="runs.consistency.length > 0">
-          <button type="button"
-                  class="collapsible-toggle"
-                  :aria-expanded="runsExpanded.consistency"
-                  @click="toggleRunsSection('consistency')">
-            <span class="section-heading" x-text="$app.t('werkstatt.runs.consistency', { count: runs.consistency.length })"></span>
-            <span class="history-chevron" :class="{ open: runsExpanded.consistency }">›</span>
-          </button>
-          <div class="werkstatt-runs-list" x-show="runsExpanded.consistency" x-cloak>
-            <template x-for="r in runs.consistency" :key="r.id">
-              <div>
-                <div class="history-item" :class="{ 'history-item--open': selectedRunId === r.id }"
-                     @click="openRun(r.id, 'consistency')">
-                  <span class="history-date" x-text="formatRunDate(r.created_at)"></span>
-                  <span x-show="r.model" class="tag" x-text="r.model"></span>
-                  <button type="button"
-                          class="btn-delete-history"
-                          :data-tip="$app.t('common.deleteEntry')"
-                          @click.stop="deleteRun(r.id, 'consistency')"
-                          x-text="$app.t('common.deleteEntry')"></button>
-                  <span class="history-chevron" :class="{ open: selectedRunId === r.id }">›</span>
-                </div>
-              </div>
-            </template>
+      <div class="history-bar" x-show="runsLoadedDraftId === selectedDraftId && runs.consistency.length > 0" x-cloak>
+        <div class="history-heading" x-text="$app.t('werkstatt.runs.consistency', { count: runs.consistency.length })"></div>
+        <template x-for="r in runs.consistency" :key="r.id">
+          <div class="history-item" :class="{ 'history-item--active': selectedRunId === r.id }"
+               @click="openRun(r.id, 'consistency')">
+            <span class="history-date" x-text="formatRunDate(r.created_at)"></span>
+            <span x-show="r.model" class="tag" x-text="r.model"></span>
+            <button type="button" class="history-item-delete"
+                    @click.stop="deleteRun(r.id, 'consistency')"
+                    :data-tip="$app.t('common.deleteEntry')"
+                    :aria-label="$app.t('common.deleteEntry')">×</button>
           </div>
-        </div>
-      </section>
+        </template>
+      </div>
 
       <!-- Consistency-Issues mit Severity-Tags -->
       <section x-show="consistencyResult" x-cloak class="werkstatt-suggestions">

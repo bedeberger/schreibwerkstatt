@@ -40,10 +40,6 @@ export const runsMethods = {
     }
   },
 
-  toggleRunsSection(kind) {
-    this.runsExpanded = { ...this.runsExpanded, [kind]: !this.runsExpanded[kind] };
-  },
-
   // Toggle: Klick auf aktiv markierten Eintrag schliesst Result; sonst Detail
   // laden und brainstormResult/consistencyResult füllen wie ein Live-Lauf.
   async openRun(runId, kind) {

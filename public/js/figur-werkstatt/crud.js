@@ -70,7 +70,6 @@ export const crudMethods = {
     this.selectedImportFigureId = '';
     this.runs = { brainstorm: [], consistency: [] };
     this.runsLoadedDraftId = null;
-    this.runsExpanded = { brainstorm: false, consistency: false };
     this.selectedRunId = null;
     this._mindmapDirty = false;
   },
