@@ -491,6 +491,43 @@ function getChapterFigureRelations(bookId, chapterId, userEmail) {
   `).all(bookId, em);
 }
 
+/** Liefert eine Figur per figures.id inkl. Tags + ausgehender + eingehender
+ *  Beziehungen mit Zielnamen. Owner-Check auf book_id + user_email obliegt
+ *  dem Aufrufer. Genutzt vom Werkstatt-Import: alle figures-Felder werden auf
+ *  Mindmap-Knoten gemappt. */
+function getFigureWithDetails(figureId) {
+  const fig = db.prepare(`
+    SELECT id, book_id, fig_id, user_email, name, kurzname, typ, geburtstag, geschlecht,
+           beruf, wohnadresse, beschreibung, sozialschicht, praesenz, rolle, motivation,
+           konflikt, entwicklung
+      FROM figures WHERE id = ?
+  `).get(parseInt(figureId));
+  if (!fig) return null;
+
+  const tags = db.prepare(
+    'SELECT tag FROM figure_tags WHERE figure_id = ? ORDER BY tag'
+  ).all(fig.id).map(r => r.tag);
+
+  // Ausgehende und eingehende Beziehungen jeweils mit Name des Pendants.
+  const relationsOut = db.prepare(`
+    SELECT r.typ, r.beschreibung, ft.name AS partner_name
+      FROM figure_relations r
+      JOIN figures ft ON ft.id = r.to_fig_id
+     WHERE r.from_fig_id = ?
+     ORDER BY ft.sort_order, ft.id
+  `).all(fig.id);
+
+  const relationsIn = db.prepare(`
+    SELECT r.typ, r.beschreibung, ff.name AS partner_name
+      FROM figure_relations r
+      JOIN figures ff ON ff.id = r.from_fig_id
+     WHERE r.to_fig_id = ?
+     ORDER BY ff.sort_order, ff.id
+  `).all(fig.id);
+
+  return { ...fig, tags, relationsOut, relationsIn };
+}
+
 module.exports = {
   RELATION_INVERSES,
   dedupRelations,
@@ -501,4 +538,5 @@ module.exports = {
   cleanupDuplicateFiguren,
   getChapterFigures,
   getChapterFigureRelations,
+  getFigureWithDetails,
 };

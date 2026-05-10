@@ -1,6 +1,6 @@
 # ERD — bookstack-lektorat
 
-Stand: Schema-Version 96, 47 Tabellen (ohne `sqlite_*`/`schema_version`/`sessions`).
+Stand: Schema-Version 97, 47 Tabellen (ohne `sqlite_*`/`schema_version`/`sessions`).
 
 Quelle: Live-Dump aus [lektorat.db](../lektorat.db) (`.schema --indent`) + [db/migrations.js](../db/migrations.js). Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -74,6 +74,7 @@ erDiagram
   figures ||--o{ zeitstrahl_event_figures: ref
   figures ||--o{ figure_relations        : from
   figures ||--o{ figure_relations        : to
+  figures ||--o{ draft_figures           : "imported as"
 
   locations ||--o{ scene_locations       : in
   locations ||--o{ location_figures      : has
@@ -330,19 +331,21 @@ erDiagram
 ```mermaid
 erDiagram
   draft_figures {
-    INTEGER id           PK
-    INTEGER book_id      FK
+    INTEGER id               PK
+    INTEGER book_id          FK
     TEXT    user_email
     TEXT    name
-    TEXT    archetype    "z.B. protagonist, antagonist, frei"
-    TEXT    mindmap_json "jsMind-Baum: { meta, format, data:{ id, topic, children } }"
+    TEXT    archetype        "z.B. protagonist, antagonist, frei"
+    TEXT    mindmap_json     "jsMind-Baum: { meta, format, data:{ id, topic, children } }"
     TEXT    notes
+    INTEGER source_figure_id FK "ON DELETE SET NULL — Referenz auf figures(id), wenn Draft via Import erzeugt wurde"
     TEXT    created_at
     TEXT    updated_at
   }
+  figures ||--o{ draft_figures : "imported as (SET NULL)"
 ```
 
-`draft_figures` lebt parallel zu `figures` — keine FK zwischen beiden, keine bidirektionale Synchronisation. Werkstatt ist Vorwärts-Entwurfs-Werkzeug; KI-Brainstorm und Konsistenz-Check operieren nur auf der Mindmap.
+`draft_figures` lebt parallel zu `figures`. `source_figure_id` referenziert die Quell-Figur, wenn der Draft via `POST /draft-figures/:book_id/import` aus dem Figuren-Katalog erzeugt wurde — `ON DELETE SET NULL` schützt User-kuratierte Mindmap-Arbeit, wenn die Quell-Figur (z.B. durch Komplettanalyse-Reextraktion) verschwindet. Werkstatt-Jobs (Brainstorm/Consistency) blenden die Quell-Figur per `source_figure_id` aus dem Buch-Kontext aus, damit sie sich nicht selbst widerspricht. Es gibt weiterhin keinen Promotion-Pfad zurück nach `figures` — der Import ist einseitig.
 
 ---
 

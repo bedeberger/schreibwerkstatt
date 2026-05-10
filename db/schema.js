@@ -737,6 +737,7 @@ module.exports = {
   cleanupDuplicateFiguren:  figures.cleanupDuplicateFiguren,
   getChapterFigures:        figures.getChapterFigures,
   getChapterFigureRelations: figures.getChapterFigureRelations,
+  getFigureWithDetails:     figures.getFigureWithDetails,
   // locations
   getChapterLocations,
   // pages
@@ -782,9 +783,14 @@ module.exports = {
   getCachedFont: fonts.getCachedFont,
   cacheFont:     fonts.cacheFont,
   // draft figures (Figuren-Werkstatt)
-  listDraftFigures:   draftFigures.listDraftFigures,
-  getDraftFigure:     draftFigures.getDraftFigure,
-  createDraftFigure:  draftFigures.createDraftFigure,
-  updateDraftFigure:  draftFigures.updateDraftFigure,
-  deleteDraftFigure:  draftFigures.deleteDraftFigure,
+  listDraftFigures:        draftFigures.listDraftFigures,
+  getDraftFigure:          draftFigures.getDraftFigure,
+  getDraftFigureBySource:  draftFigures.getDraftFigureBySource,
+  createDraftFigure:       draftFigures.createDraftFigure,
+  updateDraftFigure:       draftFigures.updateDraftFigure,
+  deleteDraftFigure:       draftFigures.deleteDraftFigure,
+  insertWerkstattRun:      draftFigures.insertWerkstattRun,
+  listWerkstattRuns:       draftFigures.listWerkstattRuns,
+  getWerkstattRun:         draftFigures.getWerkstattRun,
+  deleteWerkstattRun:      draftFigures.deleteWerkstattRun,
 };

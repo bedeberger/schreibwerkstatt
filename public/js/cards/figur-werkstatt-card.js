@@ -31,6 +31,10 @@ export function registerFigurWerkstattCard() {
     contextMenuOpen: false,
     contextMenuNodeId: null,
     contextMenuPos: { left: 0, top: 0 },
+    importing: false,
+    importables: [],
+    importablesLoading: false,
+    selectedImportFigureId: '',
     _mindmapDirty: false,
     _jm: null,
     _jmDraftId: null,
@@ -41,14 +45,35 @@ export function registerFigurWerkstattCard() {
     _fsListener: null,
     _ctxOutsideHandler: null,
     _ctxEscHandler: null,
+    _pendingDraftId: null,
     _lifecycle: null,
 
     init() {
+      // Sub → Root spiegeln: Hash-Router liest werkstattDraftId vom Root.
+      // selectedDraftId bleibt SSoT in der Sub; jede Mutation (selectDraft,
+      // resetState bei book:changed/view:reset, _doDelete) wird via Watcher
+      // auf den Root durchgereicht.
+      this.$watch('selectedDraftId', (id) => {
+        if (window.__app) window.__app.werkstattDraftId = id || null;
+      });
+
+      // Hash-Router → Sub: Permalink `#book/:b/werkstatt/:draftId` dispatcht
+      // `figur-werkstatt:select`. Drafts evtl. noch nicht geladen → ID parken,
+      // loadDrafts() wendet sie nach dem Fetch an.
+      const onSelectDraft = (e) => {
+        const id = parseInt(e.detail?.draftId);
+        if (!id) return;
+        if (!this.drafts.length) { this._pendingDraftId = id; return; }
+        if (this.drafts.some(d => d.id === id) && this.selectedDraftId !== id) {
+          this.selectDraft(id);
+        }
+      };
+
       this._lifecycle = setupCardLifecycle(this, {
         name: 'figurWerkstatt',
         showFlag: 'showFigurWerkstattCard',
         timerKeys: ['_brainstormPollTimer', '_consistencyPollTimer'],
-        resetState: { drafts: [], selectedDraftId: null, selectedKnotenId: null, creating: false, newName: '', editName: '', editArchetype: '', editNotes: '', errorMessage: '', brainstormResult: null, consistencyResult: null, brainstormLoading: false, consistencyLoading: false, mindmapFullscreen: false, contextMenuOpen: false, contextMenuNodeId: null, _mindmapDirty: false },
+        resetState: { drafts: [], selectedDraftId: null, selectedKnotenId: null, creating: false, newName: '', editName: '', editArchetype: '', editNotes: '', errorMessage: '', brainstormResult: null, consistencyResult: null, brainstormLoading: false, consistencyLoading: false, mindmapFullscreen: false, contextMenuOpen: false, contextMenuNodeId: null, importing: false, importables: [], selectedImportFigureId: '', _mindmapDirty: false, _pendingDraftId: null },
         load: () => this.loadDrafts(),
         onCardRefresh: async () => {
           if (this.isDirty()) {
@@ -84,6 +109,9 @@ export function registerFigurWerkstattCard() {
             e.preventDefault();
             e.returnValue = '';
           },
+        }, {
+          type: 'figur-werkstatt:select',
+          handler: onSelectDraft,
         }],
       });
     },

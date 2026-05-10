@@ -9,10 +9,11 @@ const {
   tps,
   createJob, enqueueJob, findActiveJobId,
   jsonBody,
+  _modelName,
 } = require('./shared');
 const { toIntId } = require('../../lib/validate');
 const { db } = require('../../db/connection');
-const { getDraftFigure } = require('../../db/draft-figures');
+const { getDraftFigure, insertWerkstattRun } = require('../../db/draft-figures');
 const { getUser } = require('../../db/schema');
 const { resolveI18n, resolveI18nTree } = require('../../lib/i18n-server');
 
@@ -39,8 +40,20 @@ function _findKnoten(node, targetId, trail = []) {
 
 // ── Buch-Kontext-Loader ─────────────────────────────────────────────────────
 // Liefert Figuren (Name+Typ+Beschreibung) und Orte (Name+Typ) eines Buchs;
-// per-User-skopiert. Nur für Consistency-Check; Brainstorm braucht das nicht.
-function _loadBookFiguren(bookId, userEmail) {
+// per-User-skopiert. Genutzt für Brainstorm (Abgrenzungs-Kontext, damit KI
+// keine Doppelung produziert) und Consistency-Check (Stimmigkeit gegen
+// Buchwelt). excludeFigureId: optional, blendet die Werkstatt-Quellfigur aus,
+// damit sie nicht gegen sich selbst geprüft wird.
+function _loadBookFiguren(bookId, userEmail, excludeFigureId = null) {
+  if (excludeFigureId) {
+    return db.prepare(`
+      SELECT name, typ, beschreibung
+        FROM figures
+       WHERE book_id = ? AND user_email = ? AND id != ?
+       ORDER BY sort_order, name
+       LIMIT 50
+    `).all(parseInt(bookId), userEmail, parseInt(excludeFigureId));
+  }
   return db.prepare(`
     SELECT name, typ, beschreibung
       FROM figures
@@ -82,8 +95,12 @@ async function runBrainstormJob(jobId, draftId, knotenId, userEmail) {
     const mindmapResolved = resolveI18nTree(draft.mindmap, locale);
 
     const { SYSTEM_FIGUREN, BUCH_KONTEXT } = await getBookPrompts(draft.book_id, userEmail);
+    // Quell-Figur aus dem Abgrenzungs-Kontext entfernen, sonst lehnt KI eigene
+    // Eigenschaften als „Doppelung mit Buchfigur" ab. source_figure_id robust
+    // (User darf den Werkstatt-Namen ändern); Name-Match als zweiter Filter
+    // für Drafts ohne Import-Referenz.
     const draftNameNorm = (draft.name || '').trim().toLowerCase();
-    const figuren = _loadBookFiguren(draft.book_id, userEmail)
+    const figuren = _loadBookFiguren(draft.book_id, userEmail, draft.source_figure_id)
       .filter(f => (f.name || '').trim().toLowerCase() !== draftNameNorm);
     const orte = _loadBookOrte(draft.book_id, userEmail);
 
@@ -105,7 +122,15 @@ async function runBrainstormJob(jobId, draftId, knotenId, userEmail) {
         begruendung: typeof v.begruendung === 'string' ? v.begruendung.trim() : '',
       }));
 
-    completeJob(jobId, { vorschlaege, knotenId, knotenPfad, tokensIn: tok.in, tokensOut: tok.out },
+    // Run-Historisierung: Frontend listet alle Läufe pro Draft (klappbare
+    // Sektion); Re-Open lädt result_json, applyBrainstormVorschlag arbeitet
+    // weiter — Apply prüft client-seitig, ob knoten_id noch existiert.
+    const runId = insertWerkstattRun({
+      draftId, bookId: draft.book_id, userEmail,
+      kind: 'brainstorm', knotenId, knotenPfad,
+      result: { vorschlaege }, model: _modelName(),
+    });
+    completeJob(jobId, { vorschlaege, knotenId, knotenPfad, runId, tokensIn: tok.in, tokensOut: tok.out },
       tps(tok), `${vorschlaege.length} Vorschläge für "${knotenPfad}"`);
   } catch (e) {
     if (e.name !== 'AbortError') logger.error(`Brainstorm-Fehler draft=${draftId}: ${e.message}`, { stack: e.stack });
@@ -128,7 +153,12 @@ async function runConsistencyJob(jobId, draftId, userEmail) {
     const mindmapResolved = resolveI18nTree(draft.mindmap, locale);
 
     const { SYSTEM_FIGUREN, BUCH_KONTEXT } = await getBookPrompts(draft.book_id, userEmail);
-    const figuren = _loadBookFiguren(draft.book_id, userEmail);
+    // Quell-Figur ausschliessen wie bei Brainstorm — Consistency würde sonst
+    // jede Übernahme aus den Importdaten als „Konflikt mit gleichnamiger
+    // Buchfigur" markieren.
+    const draftNameNorm = (draft.name || '').trim().toLowerCase();
+    const figuren = _loadBookFiguren(draft.book_id, userEmail, draft.source_figure_id)
+      .filter(f => (f.name || '').trim().toLowerCase() !== draftNameNorm);
     const orte    = _loadBookOrte(draft.book_id, userEmail);
 
     logger.info(`Consistency Start: draft=${draftId} figuren=${figuren.length} orte=${orte.length}`);
@@ -153,7 +183,14 @@ async function runConsistencyJob(jobId, draftId, userEmail) {
         vorschlag: typeof k.vorschlag === 'string' ? k.vorschlag.trim() : '',
       }));
 
-    completeJob(jobId, { konflikte, fazit: result.fazit.trim(), tokensIn: tok.in, tokensOut: tok.out },
+    const fazit = result.fazit.trim();
+    const runId = insertWerkstattRun({
+      draftId, bookId: draft.book_id, userEmail,
+      kind: 'consistency',
+      result: { konflikte, fazit },
+      model: _modelName(),
+    });
+    completeJob(jobId, { konflikte, fazit, runId, tokensIn: tok.in, tokensOut: tok.out },
       tps(tok), `${konflikte.length} Konflikte`);
   } catch (e) {
     if (e.name !== 'AbortError') logger.error(`Consistency-Fehler draft=${draftId}: ${e.message}`, { stack: e.stack });

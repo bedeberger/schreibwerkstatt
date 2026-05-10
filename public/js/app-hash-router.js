@@ -1,5 +1,5 @@
 // URL-Hash-Permalinks + History-Management.
-// Schema: #profil | #book/:bookId[/page/:pageId|/figur/:figId|/ort/:ortId|/kapitel[/:chapterId]|/<view>]
+// Schema: #profil | #book/:bookId[/page/:pageId|/figur/:figId|/ort/:ortId|/werkstatt[/:draftId]|/kapitel[/:chapterId]|/<view>]
 // Views: figuren, werkstatt, orte, szenen, ereignisse, kontinuitaet, bewertung, kapitel, chat, stats, stil, fehler, einstellungen, finetune, export
 //
 // Entwurfsentscheidungen:
@@ -25,6 +25,8 @@ export const appHashRouterMethods = {
       parts.push('szene', String(this.selectedSzeneId));
     } else if (this.showKapitelReviewCard && this.kapitelReviewChapterId) {
       parts.push('kapitel', String(this.kapitelReviewChapterId));
+    } else if (this.showFigurWerkstattCard && this.werkstattDraftId) {
+      parts.push('werkstatt', String(this.werkstattDraftId));
     } else if (this.showFiguresCard) parts.push('figuren');
     else if (this.showFigurWerkstattCard) parts.push('werkstatt');
     else if (this.showOrteCard) parts.push('orte');
@@ -52,7 +54,10 @@ export const appHashRouterMethods = {
     if (parts[0] !== 'book' || !parts[1]) return null;
     const bookId = parts[1];
     const view = parts[2] || 'book';
-    const kind = view === 'figur' ? 'figuren' : view === 'ort' ? 'orte' : view === 'szene' ? 'szenen' : view;
+    const kind = view === 'figur' ? 'figuren'
+      : view === 'ort' ? 'orte'
+      : view === 'szene' ? 'szenen'
+      : view;
     return bookId + ':' + kind;
   },
 
@@ -181,6 +186,15 @@ export const appHashRouterMethods = {
           break;
         case 'werkstatt':
           if (!this.showFigurWerkstattCard) await this.toggleFigurWerkstattCard();
+          if (arg) {
+            // Sub übernimmt Draft-Wechsel via `figur-werkstatt:select`-Event.
+            // Bei Deep-Link `#book/X/werkstatt/Y` ist die Sub evtl. noch nicht
+            // gemountet — Event wird dann nach loadDrafts via _pendingDraftId
+            // verarbeitet.
+            window.dispatchEvent(new CustomEvent('figur-werkstatt:select', { detail: { draftId: parseInt(arg) } }));
+          } else {
+            this.werkstattDraftId = null;
+          }
           break;
         case 'orte':
           this.selectedOrtId = null;
@@ -263,6 +277,7 @@ export const appHashRouterMethods = {
       'showFiguresCard', 'showFigurWerkstattCard', 'showOrteCard', 'showSzenenCard', 'showEreignisseCard',
       'showKontinuitaetCard', 'showBookReviewCard', 'showBookChatCard',
       'showKapitelReviewCard', 'kapitelReviewChapterId',
+      'werkstattDraftId',
       'showBookStatsCard', 'showStilCard', 'showFehlerHeatmapCard',
       'showBookSettingsCard', 'showUserSettingsCard',
       'showFinetuneExportCard',

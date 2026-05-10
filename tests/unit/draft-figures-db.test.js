@@ -102,6 +102,39 @@ test('FK CASCADE: Buchlöschung räumt draft_figures auf', () => {
   assert.equal(schema.listDraftFigures(2099, user).length, 0);
 });
 
+test('source_figure_id: roundtrip + LEFT JOIN auf figures.name', () => {
+  schema.upsertBookByName(2050, 'Import-Buch');
+  const user = 'imp@x.test';
+
+  // figures-Eintrag minimal direkt einfügen (saveFigurenToDb verlangt idMaps).
+  const now = new Date().toISOString();
+  const info = db.prepare(`
+    INSERT INTO figures (book_id, fig_id, name, typ, beschreibung, sort_order, user_email, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(2050, 'fig_anna', 'Anna Schmidt', 'Protagonist', 'Beschreibung', 0, user, now);
+  const figureId = info.lastInsertRowid;
+
+  const draft = schema.createDraftFigure(2050, user, {
+    name: 'Anna Schmidt',
+    archetype: 'protagonist',
+    mindmap: sampleMindmap('Anna Schmidt'),
+    sourceFigureId: figureId,
+  });
+  assert.equal(draft.source_figure_id, figureId);
+  assert.equal(draft.source_figure_name, 'Anna Schmidt');
+
+  // getDraftFigureBySource findet sie
+  const found = schema.getDraftFigureBySource(2050, user, figureId);
+  assert.equal(found.id, draft.id);
+
+  // FK SET NULL: figures-Löschung räumt source_figure_id, aber Draft bleibt.
+  db.prepare('DELETE FROM figures WHERE id = ?').run(figureId);
+  const after = schema.getDraftFigure(draft.id);
+  assert.equal(after.source_figure_id, null);
+  assert.equal(after.source_figure_name, null);
+  assert.equal(after.name, 'Anna Schmidt'); // Mindmap-Arbeit überlebt
+});
+
 test.after(() => {
   try { fs.unlinkSync(tmp); } catch {}
   try { fs.unlinkSync(tmp + '-journal'); } catch {}

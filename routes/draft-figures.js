@@ -5,7 +5,10 @@
 
 const express = require('express');
 const {
-  listDraftFigures, getDraftFigure, createDraftFigure, updateDraftFigure, deleteDraftFigure,
+  listDraftFigures, getDraftFigure, getDraftFigureBySource,
+  createDraftFigure, updateDraftFigure, deleteDraftFigure,
+  listWerkstattRuns, getWerkstattRun, deleteWerkstattRun,
+  getFigureWithDetails, db,
 } = require('../db/schema');
 const { toIntId } = require('../lib/validate');
 const logger = require('../logger');
@@ -133,6 +136,69 @@ router.put('/:id', jsonBody, (req, res) => {
 
   const updated = updateDraftFigure(id, { name, archetype, mindmap, notes });
   res.json(updated);
+});
+
+// Liste der figures eines Buchs, die noch nicht importiert wurden.
+// Ausgeschlossen: figures, für die der User bereits einen Werkstatt-Draft hat
+// (per source_figure_id). Genutzt vom Import-Picker im Frontend.
+router.get('/:book_id/importable', (req, res) => {
+  const userEmail = userEmailOrNull(req);
+  const bookId = toIntId(req.params.book_id);
+  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  if (!bookId)    return res.status(400).json({ error_code: 'INVALID_ID' });
+  const rows = db.prepare(`
+    SELECT f.id, f.name, f.kurzname, f.typ, f.beschreibung
+      FROM figures f
+      LEFT JOIN draft_figures d
+        ON d.source_figure_id = f.id AND d.user_email = ?
+     WHERE f.book_id = ? AND f.user_email IS ? AND d.id IS NULL
+     ORDER BY f.sort_order, f.id
+  `).all(userEmail, bookId, userEmail);
+  res.json(rows);
+});
+
+// Werkstatt-Figur aus bestehender figures-Row importieren. Body: { figureId }.
+// Idempotent gegenüber doppelten Klicks: bestehender Draft mit gleicher
+// source_figure_id → 409 mit existingDraftId, damit das Frontend dorthin
+// navigieren kann statt einen zweiten Draft anzulegen.
+router.post('/:book_id/import', jsonBody, (req, res) => {
+  const userEmail = userEmailOrNull(req);
+  const bookId = toIntId(req.params.book_id);
+  const figureId = toIntId(req.body?.figureId);
+  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  if (!bookId)    return res.status(400).json({ error_code: 'INVALID_ID' });
+  if (!figureId)  return res.status(400).json({ error_code: 'FIGURE_ID_REQ' });
+
+  const fig = getFigureWithDetails(figureId);
+  if (!fig) return res.status(404).json({ error_code: 'FIGURE_NOT_FOUND' });
+  if (fig.book_id !== bookId) return res.status(400).json({ error_code: 'FIGURE_BOOK_MISMATCH' });
+  // Owner-Check: figures sind per User skopiert (ON DELETE pro User getrennt
+  // via saveFigurenToDb). Nur eigene Figuren importierbar; Komplettanalyse-
+  // Figuren mit user_email=NULL (Pre-Migration-Daten) bleiben verboten, sonst
+  // entstünden Drafts ohne reverse-Owner-Pfad bei späterer figure-Mutation.
+  if (fig.user_email !== userEmail) return res.status(403).json({ error_code: 'FORBIDDEN' });
+
+  const existing = getDraftFigureBySource(bookId, userEmail, figureId);
+  if (existing) {
+    return res.status(409).json({ error_code: 'ALREADY_IMPORTED', existingDraftId: existing.id });
+  }
+
+  const { buildMindmapFromFigure, mapArchetype } = require('../lib/draft-mindmap-builder');
+  const mindmap = buildMindmapFromFigure(fig);
+  if (!_validateMindmap(mindmap)) return res.status(500).json({ error_code: 'MINDMAP_INVALID' });
+  const archetype = mapArchetype(fig.typ);
+  const now = new Date().toISOString().slice(0, 10);
+  const notes = `Importiert aus Figur "${fig.name}" am ${now}.`;
+
+  const created = createDraftFigure(bookId, userEmail, {
+    name: fig.name,
+    archetype,
+    mindmap,
+    notes,
+    sourceFigureId: figureId,
+  });
+  logger.info(`[werkstatt] import draft=${created.id} from figure=${figureId} ("${fig.name}")`);
+  res.json(created);
 });
 
 router.delete('/:id', (req, res) => {

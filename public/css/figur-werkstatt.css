@@ -111,6 +111,12 @@
   border-bottom: var(--border-thin) solid var(--color-border);
   padding-bottom: var(--space-sm);
 }
+.werkstatt-detail-titlebar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-sm);
+}
 .werkstatt-detail-name {
   font-family: var(--font-serif);
   font-size: 22px;
@@ -198,6 +204,17 @@
 }
 @media (max-width: 600px) {
   .werkstatt-mindmap { height: 560px; }
+}
+/* Native Touch-Pan auf Mindmap-Panel: jsMind-Option draggable+hide_scrollbars=false
+   gibt .jsmind-inner overflow:auto. Scrollbalken visuell ausblenden, Touch-Action
+   freigeben, programmatic scrollTo (scroll_node_to_center) bleibt funktionsfähig. */
+.werkstatt-mindmap .jsmind-inner {
+  touch-action: pan-x pan-y;
+  scrollbar-width: none;
+}
+.werkstatt-mindmap .jsmind-inner::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .werkstatt-mindmap-controls {

@@ -24,10 +24,13 @@
   </div>
 
   <!-- Empty-State mit CTA — kein Draft vorhanden -->
-  <div x-show="!loading && drafts.length === 0 && !creating" class="card-empty">
+  <div x-show="!loading && drafts.length === 0 && !creating && !importing" class="card-empty">
     <p class="card-empty-text" x-text="$app.t('werkstatt.empty.title')"></p>
     <p class="card-empty-hint" x-text="$app.t('werkstatt.empty.hint')"></p>
-    <button type="button" class="primary" :disabled="busy" @click="startCreate()" x-text="$app.t('werkstatt.empty.cta')"></button>
+    <div class="row">
+      <button type="button" class="primary" :disabled="busy" @click="startCreate()" x-text="$app.t('werkstatt.empty.cta')"></button>
+      <button type="button" :disabled="busy" @click="startImport()" x-text="$app.t('werkstatt.action.import')"></button>
+    </div>
   </div>
 
   <!-- Create-Inline (auch bei leerem Empty-State sichtbar nach Klick auf CTA) -->
@@ -50,7 +53,8 @@
   <div x-show="drafts.length > 0" class="werkstatt-grid">
     <div class="werkstatt-sidebar">
       <div class="list-header">
-        <button type="button" class="primary" :disabled="busy" @click="startCreate()" x-text="$app.t('werkstatt.action.new')"></button>
+        <button type="button" class="primary" :disabled="busy || creating || importing" @click="startCreate()" x-text="$app.t('werkstatt.action.new')"></button>
+        <button type="button" :disabled="busy || creating || importing" @click="startImport()" x-text="$app.t('werkstatt.action.import')"></button>
       </div>
 
       <div class="werkstatt-list" role="list">
@@ -79,11 +83,38 @@
           <button type="button" :disabled="busy" @click="cancelCreate()" x-text="$app.t('common.cancel')"></button>
         </div>
       </div>
+
+      <!-- Import-Inline: Combobox listet Buch-Figuren ohne aktiven Draft des Users.
+           Auswahl + Übernehmen erzeugt Draft mit Mindmap aus figures-Feldern und
+           source_figure_id-Referenz. -->
+      <div x-show="importing" class="werkstatt-create-inline" x-cloak>
+        <div x-show="importablesLoading" class="card-status" x-text="$app.t('werkstatt.import.loading')"></div>
+        <div x-show="!importablesLoading && importables.length === 0" class="card-status" x-text="$app.t('werkstatt.import.empty')"></div>
+        <div x-show="!importablesLoading && importables.length > 0" class="form-stack">
+          <div x-data="combobox($app.t('werkstatt.import.placeholder'))"
+               x-modelable="value"
+               x-model="selectedImportFigureId"
+               x-effect="options = importables.map(f => ({
+                 value: String(f.id),
+                 label: f.name + (f.typ ? ' [' + f.typ + ']' : '')
+               }))"></div>
+        </div>
+        <div class="werkstatt-create-row">
+          <button type="button" class="primary" :disabled="busy || !selectedImportFigureId" @click="runImport()" x-text="$app.t('werkstatt.import.confirm')"></button>
+          <button type="button" :disabled="busy" @click="cancelImport()" x-text="$app.t('common.cancel')"></button>
+        </div>
+      </div>
     </div>
 
     <div class="werkstatt-detail" x-show="selectedDraft()" x-cloak>
       <div class="werkstatt-detail-header">
-        <h2 class="werkstatt-detail-name" x-text="editName || $app.t('werkstatt.field.name')"></h2>
+        <div class="werkstatt-detail-titlebar">
+          <h2 class="werkstatt-detail-name" x-text="editName || $app.t('werkstatt.field.name')"></h2>
+          <span x-show="importedFromName()"
+                class="badge badge-source"
+                :data-tip="$app.t('werkstatt.importedFrom.tip')"
+                x-text="$app.t('werkstatt.importedFrom', { name: importedFromName() })"></span>
+        </div>
         <div class="header-actions">
           <button type="button"
                   :disabled="busy || brainstormLoading || !selectedKnotenId"
@@ -158,7 +189,12 @@
           </div>
         </div>
         <div class="werkstatt-mindmap-canvas">
-          <div class="werkstatt-mindmap"></div>
+          <!-- :key="selectedDraftId" zwingt komplettes Remount des Mindmap-Divs bei
+               Figur-Wechsel. jsMind hängt sich an frische DOM, kein State-Lecken
+               zwischen Drafts. _mountMindmap kriegt $el direkt — keine $el-Magic-Race. -->
+          <template x-for="dId in selectedDraftId ? [selectedDraftId] : []" :key="dId">
+            <div class="werkstatt-mindmap" x-init="_mountMindmap($el)"></div>
+          </template>
           <div class="werkstatt-mindmap-controls werkstatt-mindmap-controls--overlay">
             <button type="button"
                     class="graph-tool-btn"

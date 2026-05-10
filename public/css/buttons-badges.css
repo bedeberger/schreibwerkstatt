@@ -58,5 +58,7 @@ button.primary .btn-count {
 .badge-warn { background: var(--color-warn-bg); color: var(--color-warn-text); }
 .badge-ok   { background: var(--color-ok-bg);   color: var(--color-ok-text); }
 .badge-err     { background: var(--color-err-bg);  color: var(--color-err-text); }
+/* Source-Marker: importierter Werkstatt-Draft zeigt Herkunfts-Figur. */
+.badge-source { background: var(--color-tag-bg); color: var(--color-muted); }
 
 }

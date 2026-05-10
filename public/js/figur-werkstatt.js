@@ -16,14 +16,19 @@ function resolveTopic(topic) {
 
 // Mindmap-Topics werden vor dem Show in jsMind durch resolved Strings ersetzt;
 // beim Speichern bleiben User-Edits direkt erhalten (Default-Marker werden
-// überschrieben sobald User Knoten umbenennt).
-function resolveMindmapForDisplay(mindmap) {
+// überschrieben sobald User Knoten umbenennt). `markers`-Out-Param sammelt
+// Original-`__i18n:…__`-Strings pro Knoten-ID, damit _exportMindmap unveränderte
+// Default-Labels wieder als Marker zurückschreiben kann.
+function resolveMindmapForDisplay(mindmap, markers = null) {
   if (!mindmap?.data) return mindmap;
-  const cloneNode = (n) => ({
-    ...n,
-    topic: resolveTopic(n.topic),
-    children: (n.children || []).map(cloneNode),
-  });
+  const cloneNode = (n) => {
+    if (markers && I18N_MARKER.test(n.topic || '')) markers[n.id] = n.topic;
+    return {
+      ...n,
+      topic: resolveTopic(n.topic),
+      children: (n.children || []).map(cloneNode),
+    };
+  };
   return { ...mindmap, data: cloneNode(mindmap.data) };
 }
 
@@ -59,11 +64,22 @@ export const figurWerkstattMethods = {
       if (this.selectedDraftId && !this.drafts.find(d => d.id === this.selectedDraftId)) {
         this.selectedDraftId = null;
       }
+      // Hash-Deep-Link: Permalink-ID kam via `figur-werkstatt:select`, bevor
+      // Drafts geladen waren. Jetzt auflösen — falls weg, Default greift.
+      if (this._pendingDraftId) {
+        const pid = this._pendingDraftId;
+        this._pendingDraftId = null;
+        if (this.drafts.find(d => d.id === pid)) {
+          this.selectDraft(pid);
+          return;
+        }
+      }
       if (!this.selectedDraftId && this.drafts.length > 0) {
         this.selectDraft(this.drafts[0].id);
-      } else if (this.selectedDraftId) {
-        this.$nextTick(() => this._mountMindmap());
       }
+      // Bei vorhandenem selectedDraftId kein expliziter Mount: x-for :key
+      // im Partial behält die Mindmap-Instanz oder rendert sie neu, sobald
+      // selectedDraftId erstmals gesetzt wird.
     } catch (e) {
       this.errorMessage = app.t('werkstatt.error.load') || app.t('common.error');
       this.drafts = [];
@@ -93,16 +109,106 @@ export const figurWerkstattMethods = {
     this.consistencyResult = null;
     this.mindmapFullscreen = false;
     this.contextMenuOpen = false;
+    this.importing = false;
+    this.importables = [];
+    this.selectedImportFigureId = '';
     this._mindmapDirty = false;
   },
 
-  selectDraft(id) {
+  // ── Import bestehender Buch-Figur ─────────────────────────────────────────
+  // Server filtert figures-Liste auf jene ohne aktiven Werkstatt-Draft des
+  // Users. POST /import erzeugt Draft mit Mindmap aus figures-Feldern und
+  // source_figure_id-Referenz. Werkstatt-Jobs (Brainstorm/Consistency)
+  // schliessen die Quell-Figur serverseitig aus dem Buch-Kontext aus, damit
+  // sie sich nicht selbst referenziert.
+  async startImport() {
+    const app = window.__app;
+    const bookId = app?.selectedBookId;
+    if (!bookId) return;
+    this.importing = true;
+    this.importablesLoading = true;
+    this.selectedImportFigureId = '';
+    this.errorMessage = '';
+    try {
+      const rows = await fetchJson(`/draft-figures/${bookId}/importable`);
+      this.importables = Array.isArray(rows) ? rows : [];
+    } catch (e) {
+      this.importables = [];
+      this.errorMessage = app.t('werkstatt.error.importLoad') || app.t('common.error');
+    } finally {
+      this.importablesLoading = false;
+    }
+  },
+
+  cancelImport() {
+    this.importing = false;
+    this.selectedImportFigureId = '';
+    this.importables = [];
+  },
+
+  async runImport() {
+    const app = window.__app;
+    const bookId = app?.selectedBookId;
+    const figureId = parseInt(this.selectedImportFigureId);
+    if (!bookId || !figureId) return;
+    this.busy = true;
+    try {
+      // Direkter fetch statt fetchJson: 409 ALREADY_IMPORTED soll den
+      // existingDraftId-Body liefern, damit wir zum bestehenden Draft springen
+      // können statt Fehlermeldung zu zeigen.
+      const r = await fetch(`/draft-figures/${bookId}/import`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ figureId }),
+      });
+      const body = await r.json().catch(() => ({}));
+      if (r.status === 409 && body.error_code === 'ALREADY_IMPORTED' && body.existingDraftId) {
+        this.importing = false;
+        this.importables = [];
+        this.selectedImportFigureId = '';
+        await this.loadDrafts();
+        this.selectDraft(body.existingDraftId);
+        this.errorMessage = '';
+        return;
+      }
+      if (!r.ok) throw new Error(body?.error_code || `HTTP ${r.status}`);
+      this.drafts = [body, ...this.drafts];
+      this.importing = false;
+      this.importables = [];
+      this.selectedImportFigureId = '';
+      this.selectDraft(body.id);
+      this.errorMessage = '';
+    } catch (e) {
+      this.errorMessage = app.t('werkstatt.error.import') || app.t('common.error');
+    } finally {
+      this.busy = false;
+    }
+  },
+
+  // Quell-Figur-Name für Header-Badge. Liefert null, wenn der Draft frei
+  // angelegt oder die Quell-Figur inzwischen gelöscht wurde (FK SET NULL,
+  // dann JOIN-Wert NULL). source_figure_name liefert der Server direkt mit;
+  // damit muss das Frontend den figuren-Katalog nicht extra laden, nur um
+  // ein Badge zu rendern.
+  importedFromName() {
+    return this.selectedDraft()?.source_figure_name || null;
+  },
+
+  async selectDraft(id) {
+    // Sicherheits-Save: jsMind-/Form-Edits des aktuellen Drafts vor Wechsel
+    // persistieren. _destroyMindmap weiter unten würde das Tree-DOM sonst
+    // wegwerfen, ohne dass der Stand je den Server gesehen hat. Bei Save-Fehler
+    // Wechsel abbrechen, damit User retry kann statt Edits zu verlieren.
+    if (this.selectedDraftId && this.selectedDraftId !== id && this.isDirty()) {
+      await this.saveDraft();
+      if (this.errorMessage) return;
+    }
     const d = this.drafts.find(x => x.id === id);
     if (!d) { this.selectedDraftId = null; return; }
-    // jsMind zwischen Drafts NICHT wiederverwenden: _jm.show(newMind) räumt
-    // weder DOM noch interne node-map zuverlässig auf, wenn vorher add_node /
-    // remove_node lief (Brainstorm-Apply, Context-Menu-Mutationen). Resultat:
-    // neuer Draft zeigt Knoten des vorherigen. Frischer Editor pro Auswahl.
+    // selectedDraftId-Wechsel ist :key der x-for-Mindmap-Hülle. Alpine entfernt
+    // das alte <div class="werkstatt-mindmap"> komplett aus dem DOM und mountet
+    // ein frisches. _destroyMindmap putzt nur den State (kein DOM-Zugriff nötig);
+    // _mountMindmap wird vom x-init des neuen Divs mit $el-Param aufgerufen.
     if (this.selectedDraftId !== id) this._destroyMindmap();
     this.selectedDraftId = id;
     this.editName = d.name;
@@ -113,7 +219,6 @@ export const figurWerkstattMethods = {
     this.consistencyResult = null;
     this.selectedKnotenId = null;
     this._mindmapDirty = false;
-    this.$nextTick(() => this._mountMindmap());
   },
 
   selectedDraft() {
@@ -231,23 +336,32 @@ export const figurWerkstattMethods = {
   },
 
   // ── Mindmap-Lifecycle (jsMind) ────────────────────────────────────────────
-  async _mountMindmap() {
+  // Aufruf via x-init am Mindmap-Div im Partial: `<template x-for ... :key="selectedDraftId">`
+  // erzeugt pro Figur ein frisches DOM-Element. Container kommt als Param —
+  // kein this.$el-Lookup mehr (war Race-Quelle: $el konnte zwischen
+  // selectDraft und $nextTick auf detached Knoten zeigen). Alpine entsorgt das
+  // alte Mindmap-Element samt Listenern automatisch beim Draft-Wechsel.
+  async _mountMindmap(container) {
+    if (!container) return;
     const sel = this.selectedDraft();
     if (!sel) return;
-    const container = this.$el?.querySelector('.werkstatt-mindmap');
-    if (!container) return;
     // jsMind misst Knotengrößen nur, wenn `container.offsetParent` gesetzt ist.
-    // Beim ersten Öffnen der Karte kann Alpine $nextTick vor dem x-show-Flush
-    // feuern — dann fällt jsMind in c11y-Mode. Defer per rAF, bis sichtbar.
+    // Defer per rAF, bis sichtbar — Cap auf 60 Frames (~1s), sonst loopt rAF
+    // unbegrenzt wenn Card permanent versteckt bleibt.
     if (!container.offsetParent) {
+      if (!container.isConnected) return;
+      const tries = (this._mountTries = (this._mountTries || 0) + 1);
+      if (tries > 60) { this._mountTries = 0; return; }
       const draftId = this.selectedDraftId;
       requestAnimationFrame(() => {
+        if (!container.isConnected) return;
         if (this.selectedDraftId === draftId && window.__app?.showFigurWerkstattCard) {
-          this._mountMindmap();
+          this._mountMindmap(container);
         }
       });
       return;
     }
+    this._mountTries = 0;
     let jsMind;
     try {
       jsMind = await loadJsMind();
@@ -255,25 +369,32 @@ export const figurWerkstattMethods = {
       this.errorMessage = window.__app.t('werkstatt.error.libLoad') || 'Library load failed';
       return;
     }
-    // Race-Schutz: User kann während `await loadJsMind` zur anderen Figur
-    // gewechselt haben. Dann ist `sel` (Snapshot vom Funktions-Start) nicht
-    // mehr aktuell — der spätere Mount für die neue Figur erledigt den Job.
-    if (this.selectedDraftId !== sel.id) return;
-    // Generation-Token: jeder Mount kriegt eine eigene Nummer; läuft eine ältere
-    // Mount-Coroutine danach noch durch (rAF-Retry, Promise-Microtask), wird sie
-    // an _mountGen erkannt und bricht ab.
-    const myGen = (this._mountGen = (this._mountGen || 0) + 1);
-    // Vorhandene jsMind-Instanz IMMER abbauen. `_jm.show(newMind)` ist nach
-    // add_node/remove_node-Mutationen (Brainstorm-Apply, Context-Menu, Tab/Enter)
-    // unzuverlässig — interne node-map und DOM-Cache räumen sich nicht auf,
-    // sodass die Wurzel der Vor-Figur sichtbar bleibt. Frische Instanz pro Mount.
-    if (this._jm) this._destroyMindmap();
-    if (myGen !== this._mountGen) return;
+    // Race: User kann während `await loadJsMind` weitergeschaltet haben. Wenn
+    // selectedDraftId nicht mehr unsere ID ist ODER der Container schon vom
+    // x-for-Remount detached wurde, abbrechen — der neue Mount erledigt es.
+    if (this.selectedDraftId !== sel.id || !container.isConnected) return;
+    this._jm = new jsMind(this._buildJmConfig(container));
+    this._mindmapEl = container;
+    this._attachJmListeners();
+    container.addEventListener('contextmenu', (ev) => this._onMindmapContextMenu(ev));
+    this._topicMarkers = {};
+    this._jm.show(resolveMindmapForDisplay(sel.mindmap, this._topicMarkers));
+    this._jmDraftId = sel.id;
+    this.selectedKnotenId = sel.mindmap?.data?.id || 'root';
+    // Auto-Fokus auf Mindmap-Panel: jsMind setzt tabIndex=1 auf .jsmind-inner —
+    // damit Pfeiltasten/Tab/Enter direkt greifen, ohne dass User vorher klicken muss.
+    this.$nextTick(() => {
+      const panel = container.querySelector('.jsmind-inner');
+      if (panel) panel.focus({ preventScroll: true });
+    });
+  },
+
+  _buildJmConfig(container) {
     // Canvas-Linien: jsMind zeichnet auf <canvas>, also kein CSS-Targeting.
     // Linienfarbe aus globalem Token --color-border lesen, Fallback grau.
     const cs = getComputedStyle(document.documentElement);
     const lineColor = (cs.getPropertyValue('--color-border').trim() || '#888');
-    this._jm = new jsMind({
+    return {
       container,
       editable: true,
       theme: 'primary',
@@ -296,45 +417,45 @@ export const figurWerkstattMethods = {
           left: 37, up: 38, right: 39, down: 40,
         },
       },
-    });
-    // Selection-Tracking für KI-Brainstorm + Auto-Center bei Tastatur-Nav.
-    // type === 4 → Selection. type === 3 → Edit (add/remove/rename/move).
+    };
+  },
+
+  // type === 4 → Selection (User-Klick + Tastatur-Nav + programmatic).
+  // type === 3 → Edit (add/remove/rename/move). _suppressCenter unterdrückt
+  // Auto-Scroll bei programmatic select_node aus Context-Menu/Apply.
+  _attachJmListeners() {
     this._jm.add_event_listener((type, data) => {
       if (type === 4) {
         const id = data?.node || null;
         this.selectedKnotenId = id;
-        if (id) this._centerNodeInView(id);
+        if (id && !this._suppressCenter) this._centerNodeInView(id);
       } else if (type === 3) {
         this._mindmapDirty = true;
       }
     });
-    // Rechtsklick auf jmnode → Context-Menu mit Mindmap-Funktionen.
-    // Listener am Container (überlebt jsMind-Recreate). Einmal pro Container
-    // binden — sonst akkumulieren mit jedem Draft-Wechsel und feuern N-fach.
-    if (!container._werkstattCtxBound) {
-      container.addEventListener('contextmenu', (ev) => this._onMindmapContextMenu(ev));
-      container._werkstattCtxBound = true;
-    }
-    this._jm.show(resolveMindmapForDisplay(sel.mindmap));
-    this._jmDraftId = sel.id;
-    this.selectedKnotenId = sel.mindmap?.data?.id || 'root';
-    // Auto-Fokus auf Mindmap-Panel: jsMind setzt tabIndex=1 auf .jsmind-inner —
-    // damit Pfeiltasten/Tab/Enter direkt greifen, ohne dass User vorher klicken muss.
-    this.$nextTick(() => {
-      const panel = container.querySelector('.jsmind-inner');
-      if (panel) panel.focus({ preventScroll: true });
-    });
+  },
+
+  // Programmatic select ohne Auto-Center-Jump.
+  _selectNodeQuiet(id) {
+    if (!this._jm || !id) return;
+    this._suppressCenter = true;
+    try { this._jm.select_node(id); } finally { this._suppressCenter = false; }
   },
 
   _destroyMindmap() {
-    // jsMind hat keine offizielle destroy()-Methode; container leeren reicht.
-    const container = this.$el?.querySelector?.('.werkstatt-mindmap');
-    if (container) container.innerHTML = '';
+    // x-for :key entfernt den Mindmap-Div samt jsMind-Subtree und allen
+    // Listenern beim Draft-Wechsel automatisch — hier nur State-Refs lösen.
     this._jm = null;
     this._jmDraftId = null;
+    this._mindmapEl = null;
+    this._topicMarkers = null;
     if (this._fsListener) {
       document.removeEventListener('fullscreenchange', this._fsListener);
       this._fsListener = null;
+    }
+    if (this.mindmapFullscreen) {
+      try { document.exitFullscreen?.(); } catch {}
+      this.mindmapFullscreen = false;
     }
     this._hideContextMenu?.();
   },
@@ -349,7 +470,7 @@ export const figurWerkstattMethods = {
       this._jm.scroll_node_to_center(id);
     } catch {
       // Fallback: manueller Scroll, falls API in dieser jsMind-Version fehlt.
-      const inner = this.$el?.querySelector('.jsmind-inner');
+      const inner = this._mindmapEl?.querySelector('.jsmind-inner');
       const node = inner?.querySelector(`jmnode[nodeid="${CSS.escape(id)}"]`);
       if (!inner || !node) return;
       const innerRect = inner.getBoundingClientRect();
@@ -362,31 +483,28 @@ export const figurWerkstattMethods = {
     }
   },
 
+  // Liefert exported jsMind-Tree mit wiederhergestellten i18n-Markern für
+  // unveränderte Default-Knoten. User-umbenannte Knoten behalten den neuen
+  // Topic-String. Sonst würde Save den Marker zerstören und Locale-Wechsel
+  // hätte keinen Effekt mehr auf Default-Labels.
   _exportMindmap() {
     if (!this._jm) return null;
     try {
       const exported = this._jm.get_data('node_tree');
-      // jsMind liefert { meta, format, data }; format auf 'node_tree' fixieren.
-      return exported && exported.data ? exported : null;
+      if (!exported?.data) return null;
+      const markers = this._topicMarkers || {};
+      const restore = (n) => {
+        const marker = markers[n.id];
+        if (marker && n.topic === resolveTopic(marker)) {
+          n.topic = marker;
+        }
+        (n.children || []).forEach(restore);
+      };
+      restore(exported.data);
+      return exported;
     } catch (e) {
       return null;
     }
-  },
-
-  // Knoten-Pfad als „Wurzel > … > Knoten" — für UI-Anzeige + Brainstorm-Heading.
-  knotenPfad(id) {
-    if (!id || !this._jm) return '';
-    const tree = this._exportMindmap()?.data;
-    const walk = (node, trail) => {
-      const here = [...trail, resolveTopic(node.topic)];
-      if (node.id === id) return here.join(' > ');
-      for (const c of node.children || []) {
-        const found = walk(c, here);
-        if (found) return found;
-      }
-      return null;
-    };
-    return tree ? (walk(tree, []) || '') : '';
   },
 
   // ── KI-Brainstorm ─────────────────────────────────────────────────────────
@@ -395,7 +513,7 @@ export const figurWerkstattMethods = {
     const sel = this.selectedDraft();
     if (!sel || !this.selectedKnotenId) return;
     // Aktuellen Mindmap-Stand zuerst speichern, sonst sieht KI alte Daten.
-    await this.saveDraft();
+    if (this.isDirty()) await this.saveDraft();
     this.brainstormLoading = true;
     this.brainstormStatus = '';
     this.brainstormResult = null;
@@ -462,7 +580,7 @@ export const figurWerkstattMethods = {
     const app = window.__app;
     const sel = this.selectedDraft();
     if (!sel) return;
-    await this.saveDraft();
+    if (this.isDirty()) await this.saveDraft();
     this.consistencyLoading = true;
     this.consistencyStatus = '';
     this.consistencyResult = null;
@@ -537,6 +655,8 @@ export const figurWerkstattMethods = {
     this.consistencyLoading = false;
     this.brainstormStatus = '';
     this.consistencyStatus = '';
+    this._brainstormJobId = null;
+    this._consistencyJobId = null;
   },
 
   // ── Vollbild-Modus ────────────────────────────────────────────────────────
@@ -576,8 +696,9 @@ export const figurWerkstattMethods = {
     const nodeId = target.getAttribute('nodeid');
     if (!nodeId) return;
     ev.preventDefault();
-    // Knoten selektieren (jsMind), damit selectedKnotenId für Brainstorm passt.
-    try { this._jm?.select_node(nodeId); } catch {}
+    // Knoten selektieren (programmatic, ohne Auto-Center-Jump), damit
+    // selectedKnotenId für Brainstorm passt.
+    this._selectNodeQuiet(nodeId);
     this.selectedKnotenId = nodeId;
     this.contextMenuNodeId = nodeId;
     this.contextMenuPos = this._clampMenuPos(ev.clientX, ev.clientY);
@@ -635,9 +756,10 @@ export const figurWerkstattMethods = {
     const id = this.contextMenuNodeId;
     this._hideContextMenu();
     if (!id || !this._jm) return;
-    const newId = 'n' + Math.random().toString(36).slice(2, 9) + Date.now().toString(36);
+    const newId = _newNodeId();
     try {
       this._jm.add_node(id, newId, window.__app.t('werkstatt.tree.custom') || 'Neuer Knoten');
+      this._mindmapDirty = true;
       this._jm.select_node(newId);
       this._jm.begin_edit(newId);
     } catch {}
@@ -647,9 +769,10 @@ export const figurWerkstattMethods = {
     const id = this.contextMenuNodeId;
     this._hideContextMenu();
     if (!id || !this._jm) return;
-    const newId = 'n' + Math.random().toString(36).slice(2, 9) + Date.now().toString(36);
+    const newId = _newNodeId();
     try {
       this._jm.insert_node_after(id, newId, window.__app.t('werkstatt.tree.custom') || 'Neuer Knoten');
+      this._mindmapDirty = true;
       this._jm.select_node(newId);
       this._jm.begin_edit(newId);
     } catch {}
@@ -660,7 +783,7 @@ export const figurWerkstattMethods = {
     this._hideContextMenu();
     if (!id || !this._jm) return;
     if (id === 'root') return;
-    try { this._jm.remove_node(id); } catch {}
+    try { this._jm.remove_node(id); this._mindmapDirty = true; } catch {}
   },
 
   ctxBrainstorm() {

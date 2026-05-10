@@ -223,6 +223,12 @@ const kapitelReviewState = () => ({
   kapitelReviewChapterId: '',
 });
 
+// Hash-Router-SSoT für Figuren-Werkstatt-Draft. Sub-Card spiegelt
+// selectedDraftId in dieses Feld; Hash-Router liest/schreibt nur hier.
+const figurWerkstattState = () => ({
+  werkstattDraftId: null,
+});
+
 // Root-seitig: figurenLoading/Progress/Status, selectedFigurId, Filters —
 // gebraucht von Hash-Router, app-navigation, checkPendingJobs-Reconnect.
 const figurenState = () => ({
@@ -312,6 +318,7 @@ export function initialLektoratState() {
     ...lektoratState(),
     ...bookReviewState(),
     ...kapitelReviewState(),
+    ...figurWerkstattState(),
     ...figurenState(),
     ...ereignisseState(),
     ...szenenState(),

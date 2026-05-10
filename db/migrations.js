@@ -3811,6 +3811,79 @@ function runMigrations() {
     logger.info('DB-Migration auf Version 96 abgeschlossen (Surrogate-PK fuer 6 Bridge-Tabellen: continuity_issue_figures/chapters, zeitstrahl_event_chapters/pages/figures, figure_events).');
   }
 
+  if (version < 97) {
+    // draft_figures.source_figure_id: Referenz auf Quell-Figur (figures.id),
+    // wenn Werkstatt-Draft via Import aus dem Figuren-Katalog erzeugt wurde.
+    // ON DELETE SET NULL: User-kuratierte Mindmap-Arbeit bleibt erhalten,
+    // wenn die Quell-Figur (z.B. durch Komplettanalyse-Reextraktion) verschwindet.
+    // FK in SQLite via ALTER TABLE ADD CONSTRAINT nicht möglich → Recreate-Pattern.
+    db.pragma('foreign_keys = OFF');
+
+    db.prepare('DROP TABLE IF EXISTS draft_figures_new').run();
+    db.prepare(`
+      CREATE TABLE draft_figures_new (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id          INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        user_email       TEXT    NOT NULL,
+        name             TEXT    NOT NULL,
+        archetype        TEXT,
+        mindmap_json     TEXT    NOT NULL,
+        notes            TEXT,
+        source_figure_id INTEGER REFERENCES figures(id) ON DELETE SET NULL,
+        created_at       TEXT    NOT NULL,
+        updated_at       TEXT    NOT NULL
+      )
+    `).run();
+    db.prepare(`
+      INSERT INTO draft_figures_new
+        (id, book_id, user_email, name, archetype, mindmap_json, notes, created_at, updated_at)
+      SELECT id, book_id, user_email, name, archetype, mindmap_json, notes, created_at, updated_at
+      FROM draft_figures
+    `).run();
+    db.prepare('DROP TABLE draft_figures').run();
+    db.prepare('ALTER TABLE draft_figures_new RENAME TO draft_figures').run();
+    db.prepare('CREATE INDEX idx_df_book_user ON draft_figures(book_id, user_email)').run();
+    db.prepare('CREATE INDEX idx_df_source ON draft_figures(source_figure_id)').run();
+
+    db.pragma('foreign_keys = ON');
+    const fkErrors97 = db.pragma('foreign_key_check');
+    if (fkErrors97.length) {
+      throw new Error(`Migration 97: foreign_key_check meldet ${fkErrors97.length} Verstoesse: ${JSON.stringify(fkErrors97.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 97').run();
+    logger.info('DB-Migration auf Version 97 abgeschlossen (draft_figures.source_figure_id FK).');
+  }
+
+  if (version < 98) {
+    // werkstatt_runs: KI-Lauf-Historie für Figuren-Werkstatt (Brainstorm +
+    // Consistency). Pro Lauf eine Zeile mit Result-JSON; Frontend zeigt zwei
+    // klappbare Sektionen pro Draft. ON DELETE CASCADE: Run-Historie stirbt
+    // mit dem Draft (lose Runs ohne Draft hätten keinen Owner mehr).
+    // book_id für History-Reset-Pfad (DELETE WHERE book_id = ? AND user_email = ?).
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS werkstatt_runs (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        draft_id    INTEGER NOT NULL REFERENCES draft_figures(id) ON DELETE CASCADE,
+        book_id     INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        user_email  TEXT    NOT NULL,
+        kind        TEXT    NOT NULL CHECK(kind IN ('brainstorm','consistency')),
+        created_at  TEXT    NOT NULL,
+        knoten_id   TEXT,
+        knoten_pfad TEXT,
+        result_json TEXT    NOT NULL,
+        model       TEXT
+      )
+    `).run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_wr_draft_kind_date ON werkstatt_runs(draft_id, kind, created_at DESC)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_wr_book_user       ON werkstatt_runs(book_id, user_email)').run();
+    const fkErrors98 = db.pragma('foreign_key_check');
+    if (fkErrors98.length) {
+      throw new Error(`Migration 98: foreign_key_check meldet ${fkErrors98.length} Verstoesse: ${JSON.stringify(fkErrors98.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 98').run();
+    logger.info('DB-Migration auf Version 98 abgeschlossen (werkstatt_runs).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {
