@@ -75,9 +75,16 @@ export const crudMethods = {
     this._mindmapDirty = false;
   },
 
-  selectDraft(id) {
+  async selectDraft(id) {
     const d = this.drafts.find(x => x.id === id);
     if (!d) { this.selectedDraftId = null; return; }
+    // Auto-Save: beim Wechsel auf andere Figur ungespeicherte Änderungen am
+    // bisherigen Draft (Form + Mindmap) persistieren. Bei Save-Fehler nicht
+    // wechseln — sonst stiller Datenverlust.
+    if (this.selectedDraftId && this.selectedDraftId !== id && this.isDirty()) {
+      const ok = await this.saveDraft();
+      if (!ok) return;
+    }
     // Lokale Poll/Loading-State auf foreign Draft kappen, sonst zeigt der
     // Progress-Bar auf der falschen Figur. Server-Job läuft weiter; wenn der
     // User zurückwechselt, hängt _reattachActiveJobs den Poll wieder an.

@@ -948,7 +948,7 @@ Kein eigenes `@media print {}` pro Karte einführen — der Aufwand für saubere
 |-------|------|-----------|
 | `--z-base` | 1 | In-flow Standard, `position: relative`-Sticky-Anker (z.B. Heatmap-Body-Cells, Book-Overview-Tile-SVG-Layer) |
 | `--z-sticky` | 100 | Sticky Inhalts-Header in Listen/Heatmaps (`.heatmap-table thead`, sticky Filter-Bars) |
-| `--z-header` | 200 | Sticky Card-Header, Toolbar-Header (`.komplett-status-header`, `.header-actions`-Sticky, `.card-form`-Sub-Header) |
+| `--z-header` | 200 | Sticky Card-Header, Toolbar-Header (`.card-header--sticky`, `.werkstatt-detail-header`, Avatar-/Komplettstatus-Popover-Panels) |
 | `--z-popover` | 1000 | Tooltip-Layer, Synonym-Menu, Figur-Lookup, Combobox-Dropdown, Focus-Counter, Token-Setup-Inline-Hint, Ideen-Move-Picker |
 | `--z-toolbar` | 1100 | Edit-Bubble-Toolbar (1001), Find-and-Replace (1002) — über Popovers, weil sie auf Selektion reagieren |
 | `--z-overlay` | 2000 | Palette-Overlay, künftige Fullscreen-Trigger ohne Modal-Charakter |

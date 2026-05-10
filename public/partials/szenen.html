@@ -5,7 +5,7 @@
   szenenFilters bleibt im Root.
 -->
 <div class="card card--szenen" x-data="szenenCard" x-show="$app.showSzenenCard" x-cloak>
-  <div class="card-header card-header--subline">
+  <div class="card-header card-header--subline card-header--sticky">
     <div class="card-header-titlebar">
       <span class="card-title" x-text="$app.t('szenen.title', { name: $app.selectedBookName })"></span>
       <div class="card-subline" x-show="$app.alleAktualisierenLastRun && !szenenLoading">
@@ -89,7 +89,7 @@
   <!-- Alle Szenen -->
   <div x-show="$app.szenen.length > 0" class="szenen-liste-section">
     <!-- Filter-Leiste -->
-    <div class="filter-bar">
+    <div class="filter-bar filter-bar--sticky">
       <input type="text" x-model="$app.szenenFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
       <div class="tabs">
         <button type="button" class="tabs-btn"
