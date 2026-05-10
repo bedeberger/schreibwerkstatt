@@ -64,6 +64,9 @@ export const mindmapMethods = {
     this._mindmapEl = container;
     this._attachJmListeners();
     container.addEventListener('contextmenu', (ev) => this._onMindmapContextMenu(ev));
+    container.addEventListener('mousedown', (ev) => {
+      if (ev.button !== 2 && this.contextMenuOpen) this._hideContextMenu();
+    });
     this._topicMarkers = {};
     this._jm.show(resolveMindmapForDisplay(sel.mindmap, this._topicMarkers));
     this._jmDraftId = sel.id;

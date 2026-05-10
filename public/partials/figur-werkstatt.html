@@ -191,54 +191,27 @@
           <div class="werkstatt-mindmap-controls werkstatt-mindmap-controls--overlay">
             <button type="button"
                     class="graph-tool-btn"
+                    :data-tip="$app.t('graph.zoomIn')"
+                    :aria-label="$app.t('graph.zoomIn')"
+                    @click="_jm && _jm.view && _jm.view.zoom_in()">+</button>
+            <button type="button"
+                    class="graph-tool-btn"
+                    :data-tip="$app.t('graph.zoomOut')"
+                    :aria-label="$app.t('graph.zoomOut')"
+                    @click="_jm && _jm.view && _jm.view.zoom_out()">−</button>
+            <button type="button"
+                    class="graph-tool-btn graph-tool-btn--reset"
+                    :data-tip="$app.t('graph.reset')"
+                    :aria-label="$app.t('graph.reset')"
+                    @click="_jm && _jm.view && _jm.view.set_zoom(1)">&#x26F6;</button>
+            <button type="button"
+                    class="graph-tool-btn"
                     :aria-pressed="mindmapFullscreen"
                     :aria-label="mindmapFullscreen ? $app.t('werkstatt.mindmap.fullscreenExit.tip') : $app.t('werkstatt.mindmap.fullscreen.tip')"
                     @click="toggleMindmapFullscreen()"
                     :data-tip="mindmapFullscreen ? $app.t('werkstatt.mindmap.fullscreenExit.tip') : $app.t('werkstatt.mindmap.fullscreen.tip')"
                     x-text="mindmapFullscreen ? '✕' : '⤢'"></button>
           </div>
-        </div>
-
-        <!-- Tastatur-Navigationshilfe für Mindmap. Spiegelt globale Hilfe (shortcuts.html).
-             Klappbar via .collapsible-toggle-Pattern; helpExpanded persistiert in localStorage. -->
-        <div class="werkstatt-mindmap-help-wrap">
-          <button type="button"
-                  class="werkstatt-mindmap-help-toggle"
-                  :aria-expanded="helpExpanded"
-                  @click="toggleHelp()">
-            <span x-text="$app.t('shortcuts.section.mindmap')"></span>
-            <span class="history-chevron" :class="{ open: helpExpanded }">›</span>
-          </button>
-        <div class="werkstatt-mindmap-help shortcuts-section" x-show="helpExpanded" x-cloak>
-          <div class="shortcuts-row">
-            <span class="shortcuts-keys"><kbd x-text="$app.t('shortcuts.key.arrows')"></kbd> <kbd x-text="$app.t('shortcuts.key.arrowsLR')"></kbd></span>
-            <span class="shortcuts-desc" x-text="$app.t('shortcuts.item.mindmapNav')"></span>
-          </div>
-          <div class="shortcuts-row">
-            <span class="shortcuts-keys"><kbd x-text="$app.t('shortcuts.key.tab')"></kbd></span>
-            <span class="shortcuts-desc" x-text="$app.t('shortcuts.item.mindmapAddChild')"></span>
-          </div>
-          <div class="shortcuts-row">
-            <span class="shortcuts-keys"><kbd x-text="$app.t('shortcuts.key.enter')"></kbd></span>
-            <span class="shortcuts-desc" x-text="$app.t('shortcuts.item.mindmapAddSibling')"></span>
-          </div>
-          <div class="shortcuts-row">
-            <span class="shortcuts-keys"><kbd x-text="$app.t('shortcuts.key.f2')"></kbd></span>
-            <span class="shortcuts-desc" x-text="$app.t('shortcuts.item.mindmapRename')"></span>
-          </div>
-          <div class="shortcuts-row">
-            <span class="shortcuts-keys"><kbd x-text="$app.t('shortcuts.key.del')"></kbd></span>
-            <span class="shortcuts-desc" x-text="$app.t('shortcuts.item.mindmapDelete')"></span>
-          </div>
-          <div class="shortcuts-row">
-            <span class="shortcuts-keys"><kbd x-text="$app.t('shortcuts.key.rightClick')"></kbd></span>
-            <span class="shortcuts-desc" x-text="$app.t('shortcuts.item.mindmapMenu')"></span>
-          </div>
-          <div class="shortcuts-row">
-            <span class="shortcuts-keys"><kbd x-text="$app.t('shortcuts.key.esc')"></kbd></span>
-            <span class="shortcuts-desc" x-text="$app.t('shortcuts.item.mindmapBlur')"></span>
-          </div>
-        </div>
         </div>
 
         <!-- Rechtsklick-Menü, position:fixed via inline-style -->
@@ -268,30 +241,6 @@
         </div>
       </section>
 
-      <!-- Brainstorm-Vorschläge mit Apply -->
-      <section x-show="brainstormResult" x-cloak class="werkstatt-suggestions">
-        <div class="list-header">
-          <h3 class="section-heading" x-text="$app.t('werkstatt.brainstorm.heading', { pfad: brainstormResult ? brainstormResult.knotenPfad : '' })"></h3>
-        </div>
-        <div class="chat-vorschlaege">
-          <template x-for="(v, idx) in brainstormResult ? brainstormResult.vorschlaege : []" :key="idx">
-            <div class="chat-vorschlag">
-              <div class="chat-vorschlag-header">
-                <span class="chat-vorschlag-label" x-text="$app.t('chat.suggestion')"></span>
-                <button type="button"
-                        class="chat-vorschlag-btn"
-                        @click="applyBrainstormVorschlag(idx)"
-                        :disabled="busy"
-                        x-text="$app.t('werkstatt.brainstorm.apply')"></button>
-              </div>
-              <div class="chat-vorschlag-title" x-text="v.label"></div>
-              <div x-show="v.begruendung" class="chat-vorschlag-begruendung" x-text="v.begruendung"></div>
-            </div>
-          </template>
-          <div x-show="brainstormResult && brainstormResult.vorschlaege.length === 0" class="card-status" x-text="$app.t('werkstatt.brainstorm.allApplied')"></div>
-        </div>
-      </section>
-
       <!-- Consistency-Status während KI-Job -->
       <section x-show="consistencyLoading" x-cloak class="werkstatt-job-status">
         <div x-show="consistencyProgress > 0" class="progress-bar-wrap">
@@ -303,20 +252,42 @@
         </div>
       </section>
 
-      <!-- KI-Lauf-Historie pro Draft, gleicher Markup wie page-history (Lektorat).
-           Klick auf Eintrag öffnet Result wie Live-Lauf (selectedRunId → history-item--active). -->
+      <!-- KI-Lauf-Historie pro Draft. Klick expandiert Result inline unter dem
+           Eintrag (history-item--open + history-detail), wie Buch-Review-Verlauf. -->
       <div class="history-bar" x-show="runsLoadedDraftId === selectedDraftId && runs.brainstorm.length > 0" x-cloak>
         <div class="history-heading" x-text="$app.t('werkstatt.runs.brainstorm', { count: runs.brainstorm.length })"></div>
         <template x-for="r in runs.brainstorm" :key="r.id">
-          <div class="history-item" :class="{ 'history-item--active': selectedRunId === r.id }"
-               @click="openRun(r.id, 'brainstorm')">
-            <span class="history-date" x-text="formatRunDate(r.created_at)"></span>
-            <span x-show="r.knoten_pfad" class="tag" x-text="r.knoten_pfad"></span>
-            <span x-show="r.model" class="tag" x-text="r.model"></span>
-            <button type="button" class="history-item-delete"
-                    @click.stop="deleteRun(r.id, 'brainstorm')"
-                    :data-tip="$app.t('common.deleteEntry')"
-                    :aria-label="$app.t('common.deleteEntry')">×</button>
+          <div>
+            <div class="history-item" :class="{ 'history-item--open': selectedRunId === r.id }"
+                 @click="openRun(r.id, 'brainstorm')">
+              <span class="history-date" x-text="formatRunDate(r.created_at)"></span>
+              <span x-show="r.knoten_pfad" class="tag" x-text="r.knoten_pfad"></span>
+              <span x-show="r.model" class="tag" x-text="r.model"></span>
+              <span class="history-chevron" :class="{ open: selectedRunId === r.id }">›</span>
+              <button type="button" class="history-item-delete"
+                      @click.stop="deleteRun(r.id, 'brainstorm')"
+                      :data-tip="$app.t('common.deleteEntry')"
+                      :aria-label="$app.t('common.deleteEntry')">×</button>
+            </div>
+            <div x-show="selectedRunId === r.id && brainstormResult" class="history-detail" x-cloak>
+              <div class="chat-vorschlaege">
+                <template x-for="(v, idx) in brainstormResult ? brainstormResult.vorschlaege : []" :key="idx">
+                  <div class="chat-vorschlag">
+                    <div class="chat-vorschlag-header">
+                      <span class="chat-vorschlag-label" x-text="$app.t('chat.suggestion')"></span>
+                      <button type="button"
+                              class="chat-vorschlag-btn"
+                              @click.stop="applyBrainstormVorschlag(idx)"
+                              :disabled="busy"
+                              x-text="$app.t('werkstatt.brainstorm.apply')"></button>
+                    </div>
+                    <div class="chat-vorschlag-title" x-text="v.label"></div>
+                    <div x-show="v.begruendung" class="chat-vorschlag-begruendung" x-text="v.begruendung"></div>
+                  </div>
+                </template>
+                <div x-show="brainstormResult && brainstormResult.vorschlaege.length === 0" class="card-status" x-text="$app.t('werkstatt.brainstorm.allApplied')"></div>
+              </div>
+            </div>
           </div>
         </template>
       </div>
@@ -324,46 +295,44 @@
       <div class="history-bar" x-show="runsLoadedDraftId === selectedDraftId && runs.consistency.length > 0" x-cloak>
         <div class="history-heading" x-text="$app.t('werkstatt.runs.consistency', { count: runs.consistency.length })"></div>
         <template x-for="r in runs.consistency" :key="r.id">
-          <div class="history-item" :class="{ 'history-item--active': selectedRunId === r.id }"
-               @click="openRun(r.id, 'consistency')">
-            <span class="history-date" x-text="formatRunDate(r.created_at)"></span>
-            <span x-show="r.model" class="tag" x-text="r.model"></span>
-            <button type="button" class="history-item-delete"
-                    @click.stop="deleteRun(r.id, 'consistency')"
-                    :data-tip="$app.t('common.deleteEntry')"
-                    :aria-label="$app.t('common.deleteEntry')">×</button>
+          <div>
+            <div class="history-item" :class="{ 'history-item--open': selectedRunId === r.id }"
+                 @click="openRun(r.id, 'consistency')">
+              <span class="history-date" x-text="formatRunDate(r.created_at)"></span>
+              <span x-show="r.model" class="tag" x-text="r.model"></span>
+              <span class="history-chevron" :class="{ open: selectedRunId === r.id }">›</span>
+              <button type="button" class="history-item-delete"
+                      @click.stop="deleteRun(r.id, 'consistency')"
+                      :data-tip="$app.t('common.deleteEntry')"
+                      :aria-label="$app.t('common.deleteEntry')">×</button>
+            </div>
+            <div x-show="selectedRunId === r.id && consistencyResult" class="history-detail" x-cloak>
+              <p class="werkstatt-consistency-fazit" x-show="consistencyResult && consistencyResult.fazit" x-text="consistencyResult ? consistencyResult.fazit : ''"></p>
+              <div x-show="consistencyResult && consistencyResult.konflikte.length === 0" class="card-status" x-text="$app.t('werkstatt.consistency.noIssues')"></div>
+              <div class="entity-list entity-list--accented" x-show="consistencyResult && consistencyResult.konflikte.length > 0">
+                <template x-for="(k, idx) in consistencyResult ? consistencyResult.konflikte : []" :key="idx">
+                  <div>
+                    <div class="entity-row" :class="{ 'entity-row--selected': selectedKonfliktIdx === idx }"
+                         @click.stop="selectedKonfliktIdx = selectedKonfliktIdx === idx ? null : idx">
+                      <span class="severity-tag" :class="'severity-tag--' + k.schwere" x-text="$app.t('werkstatt.severity.' + k.schwere)"></span>
+                      <span class="entity-row-title" x-text="k.feld"></span>
+                      <span class="entity-row-meta" x-text="k.problem"></span>
+                      <span class="history-chevron" :class="{ open: selectedKonfliktIdx === idx }">›</span>
+                    </div>
+                    <div x-show="selectedKonfliktIdx === idx" class="entity-detail" x-cloak>
+                      <p class="entity-detail-text" x-text="k.problem"></p>
+                      <div x-show="k.vorschlag" class="entity-meta-row">
+                        <span class="entity-meta-label" x-text="$app.t('werkstatt.consistency.vorschlag')"></span>
+                        <span class="entity-meta-value" x-text="k.vorschlag"></span>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
           </div>
         </template>
       </div>
-
-      <!-- Consistency-Issues mit Severity-Tags -->
-      <section x-show="consistencyResult" x-cloak class="werkstatt-suggestions">
-        <div class="list-header">
-          <h3 class="section-heading" x-text="$app.t('werkstatt.consistency.heading')"></h3>
-        </div>
-        <p class="werkstatt-consistency-fazit" x-show="consistencyResult && consistencyResult.fazit" x-text="consistencyResult ? consistencyResult.fazit : ''"></p>
-        <div x-show="consistencyResult && consistencyResult.konflikte.length === 0" class="card-status" x-text="$app.t('werkstatt.consistency.noIssues')"></div>
-        <div class="entity-list entity-list--accented" x-show="consistencyResult && consistencyResult.konflikte.length > 0">
-          <template x-for="(k, idx) in consistencyResult ? consistencyResult.konflikte : []" :key="idx">
-            <div>
-              <div class="entity-row" :class="{ 'entity-row--selected': selectedKonfliktIdx === idx }"
-                   @click="selectedKonfliktIdx = selectedKonfliktIdx === idx ? null : idx">
-                <span class="severity-tag" :class="'severity-tag--' + k.schwere" x-text="$app.t('werkstatt.severity.' + k.schwere)"></span>
-                <span class="entity-row-title" x-text="k.feld"></span>
-                <span class="entity-row-meta" x-text="k.problem"></span>
-                <span class="history-chevron" :class="{ open: selectedKonfliktIdx === idx }">›</span>
-              </div>
-              <div x-show="selectedKonfliktIdx === idx" class="entity-detail" x-cloak>
-                <p class="entity-detail-text" x-text="k.problem"></p>
-                <div x-show="k.vorschlag" class="entity-meta-row">
-                  <span class="entity-meta-label" x-text="$app.t('werkstatt.consistency.vorschlag')"></span>
-                  <span class="entity-meta-value" x-text="k.vorschlag"></span>
-                </div>
-              </div>
-            </div>
-          </template>
-        </div>
-      </section>
     </div>
   </div>
 </div>

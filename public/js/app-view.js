@@ -16,25 +16,10 @@ export const appViewMethods = {
     if (this.editMode && this.editDirty) {
       if (!confirm(this.t('app.switchPageConfirm'))) return;
     }
-    // Buchkarten schliessen – nur eine Ebene (Buch oder Seite) aktiv
-    this.showBookOverviewCard = false;
-    this.showBookReviewCard = false;
-    this.showKapitelReviewCard = false;
-    this.showFiguresCard = false;
-    this.showBookStatsCard = false;
-    this.showStilCard = false;
-    this.showFehlerHeatmapCard = false;
-    this.showBookChatCard = false;
-    this.showEreignisseCard = false;
-    this.showSzenenCard = false;
-    this.showOrteCard = false;
-    this.showBookSettingsCard = false;
-    this.showKontinuitaetCard = false;
-    this.showUserSettingsCard = false;
-    this.showFinetuneExportCard = false;
-    this.showExportCard = false;
-    this.showPdfExportCard = false;
-    this.resetPage();
+    // Alle Buchkarten schliessen + Editor-State resetten – nur eine Ebene
+    // (Buch oder Seite) aktiv. Helper deckt alle showXxxCard-Flags ab und
+    // ruft resetPage(); kein Argument = nichts behalten.
+    this._closeOtherMainCards();
     this.currentPage = p;
     this.showEditorCard = true;
     this.$nextTick(() => this._scrollToEditorCard());

@@ -1,4 +1,7 @@
-/* Figuren-Werkstatt — Vorwärts-Entwicklung von Figuren als Mindmap (jsMind). */
+/* Figuren-Werkstatt — Vorwärts-Entwicklung von Figuren als Mindmap (jsMind).
+   Datei UNLAYERED (kein @layer components): überschreibt Vendor-CSS
+   vendor/jsmind-0.8.7.css, das selbst unlayered lädt. Gelayerte Regeln
+   verlieren generell gegen Unlayered — Spezifität rettet das nicht. */
 
 .card--werkstatt { --card-accent: var(--card-accent-werkstatt); }
 
@@ -269,13 +272,7 @@
 }
 .werkstatt-job-status-row .card-status { flex: 1 1 auto; }
 
-/* Vorschlags- + Konflikt-Listen */
-.werkstatt-suggestions {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-  margin-top: var(--space-md);
-}
+/* Konsistenz-Fazit (lebt im history-detail). */
 .werkstatt-consistency-fazit {
   margin: 0;
   padding: var(--space-sm) var(--space-md);
@@ -350,40 +347,3 @@
   border-color: var(--color-primary);
 }
 
-/* Tastatur-Hilfe unter Mindmap, klappbar via .collapsible-toggle-Pattern.
-   Default zu (siehe helpExpanded), Persistenz via localStorage in Card-JS.
-   Reuse von .shortcuts-section/-row/-keys/-desc aus confirm-dialog.css. */
-.werkstatt-mindmap-help-wrap {
-  margin-top: var(--space-sm);
-}
-.werkstatt-mindmap-help-toggle {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-xs) var(--space-md);
-  border: var(--border-thin) solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  cursor: pointer;
-  text-align: left;
-  font-size: var(--font-size-xs);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--color-muted);
-}
-.werkstatt-mindmap-help-toggle:hover { color: var(--color-text); }
-.werkstatt-mindmap-help {
-  margin-top: var(--space-xs);
-  padding: var(--space-sm) var(--space-md);
-  border: var(--border-thin) solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-}
-.werkstatt-mindmap-help.shortcuts-section {
-  margin-bottom: 0;
-}
-.werkstatt-mindmap-help .shortcuts-row {
-  padding: 0.2rem 0;
-}

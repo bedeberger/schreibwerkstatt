@@ -40,7 +40,6 @@ export function registerFigurWerkstattCard() {
     runsLoading: false,
     selectedRunId: null,
     selectedKonfliktIdx: null,
-    helpExpanded: false,
     _runsLoadDraftId: null,
     _mindmapDirty: false,
     _jm: null,
@@ -60,13 +59,7 @@ export function registerFigurWerkstattCard() {
     _pendingKnotenId: null,
     _lifecycle: null,
 
-    toggleHelp() {
-      this.helpExpanded = !this.helpExpanded;
-      try { localStorage.setItem('werkstatt.helpExpanded', this.helpExpanded ? '1' : '0'); } catch {}
-    },
-
     init() {
-      try { this.helpExpanded = localStorage.getItem('werkstatt.helpExpanded') === '1'; } catch {}
       // Sub → Root spiegeln: Hash-Router liest werkstattDraftId vom Root.
       // selectedDraftId bleibt SSoT in der Sub; jede Mutation (selectDraft,
       // resetState bei book:changed/view:reset, _doDelete) wird via Watcher

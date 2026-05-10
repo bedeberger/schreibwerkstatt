@@ -265,9 +265,11 @@ Der Frontend-Scope ist in **Alpine.data-Sub-Komponenten** aufgeteilt:
 1. Fachmodul in `public/js/` → Methods-Export (`export const xxxMethods = { ... }`), Root-Zugriffe via `window.__app.xxx` (siehe unten).
 2. Sub-Komponente in `public/js/cards/xxx-card.js` → `Alpine.data('xxxCard', () => ({ ...state, init(), destroy(), ...xxxMethods }))`, registriert als `registerXxxCard()` und in `app.js` aufgerufen.
 3. Partial in `public/partials/xxx.html` mit `x-data="xxxCard"` am Wurzel-`<div class="card">`. Root-Zugriffe im Template via `$app.xxx`.
-4. Root-Methode `toggleXxxCard()` in `app-view.js` — reiner Flag-Toggle + `_closeOtherMainCards`. Bei Karten, die bei erneutem Klick refreshen sollen (statt schliessen): `window.dispatchEvent(new CustomEvent('card:refresh', { detail: { name: 'xxx' } }))`.
+4. Root-Methode `toggleXxxCard()` in `app-view.js` — reiner Flag-Toggle + `_closeOtherMainCards('xxx')`. Bei Karten, die bei erneutem Klick refreshen sollen (statt schliessen): `window.dispatchEvent(new CustomEvent('card:refresh', { detail: { name: 'xxx' } }))`.
 5. `showXxxCard`-Flag in `app-state.js` → `cardsState`.
-6. **Eintrag in [public/js/cards/feature-registry.js](public/js/cards/feature-registry.js)** (Single Source of Truth für Quick-Pills + Command-Palette + Usage-Tracking) — bei `kind: 'toggle'` zusätzlich Key in `ALLOWED_KEYS` von [routes/usage.js](routes/usage.js) ergänzen, sonst verwirft `/usage/track` lautlos.
+6. **Pflicht: neue Zeile in `_closeOtherMainCards` ([public/js/app-view.js](public/js/app-view.js))** — `if (keep !== 'xxx') this.showXxxCard = false;`. Ohne Eintrag: Karte schliesst nicht beim Seitenklick und nicht beim Öffnen anderer Karten (Exklusivität bricht).
+7. **Eintrag in [public/js/cards/feature-registry.js](public/js/cards/feature-registry.js)** (Single Source of Truth für Quick-Pills + Command-Palette + Usage-Tracking) — bei `kind: 'toggle'` zusätzlich Key in `ALLOWED_KEYS` von [routes/usage.js](routes/usage.js) ergänzen, sonst verwirft `/usage/track` lautlos.
+8. Hash-Router: in `_currentHashView` ([public/js/app-hash-router.js](public/js/app-hash-router.js)) Parse-/Build-Branch ergänzen + Flag in der Liste am Ende der Datei aufnehmen.
 
 ### Root-Zugriff aus Sub-Komponenten (`$app` / `window.__app`)
 
@@ -301,7 +303,8 @@ Für createJobFeature-ähnliche Karten: [public/js/cards/job-feature-card.js](pu
 
 Immer nur eine Hauptansicht aktiv. Buchebenen-Features und Seitenebenen-Features (Editor) sind gegenseitig exklusiv.
 - Root-Toggle-Methode (`app-view.js`) ruft `_closeOtherMainCards(keep)` auf (schliesst alle anderen Karten + Editor)
-- `selectPage()` schliesst alle Buchkarten bevor der Editor öffnet
+- `selectPage()` ruft `_closeOtherMainCards()` (kein keep) — schliesst alle Buchkarten bevor der Editor öffnet. **Niemals Show-Flags in `selectPage` hand-pflegen** — drift-anfällig (neue Karte vergessen → bleibt beim Seitenklick offen). Helper ist SSoT für „alle Buchkarten zu".
+- Jede neue Buchkarte muss in `_closeOtherMainCards` ([public/js/app-view.js](public/js/app-view.js)) eine eigene `if (keep !== 'xxx') this.showXxxCard = false;`-Zeile bekommen — sonst bricht die Exklusivität für diese Karte (sowohl beim Seitenklick als auch beim Öffnen anderer Karten).
 - Sub-Komponenten haben **keine** eigenen `showXxxCard`-Flags — der Root ist SSoT. Subs hören auf `$watch(() => window.__app.showXxxCard)`.
 - Seiten-Chat ist eine Ausnahme: läuft neben dem Editor, kein `_closeOtherMainCards` beim Öffnen.
 
