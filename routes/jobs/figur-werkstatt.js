@@ -20,11 +20,16 @@ const figurWerkstattRouter = express.Router();
 // Findet einen Knoten anhand seiner ID im jsMind-Baum (data.children-Tree)
 // und liefert den Pfad als "Wurzel > … > Knoten"-String.
 function _findKnotenPfad(node, targetId, trail = []) {
+  return _findKnoten(node, targetId, trail)?.pfad ?? null;
+}
+
+// Wie _findKnotenPfad, liefert zusätzlich den Knoten selbst (für Children-Listing).
+function _findKnoten(node, targetId, trail = []) {
   if (!node) return null;
   const here = [...trail, node.topic || ''];
-  if (node.id === targetId) return here.join(' > ');
+  if (node.id === targetId) return { pfad: here.join(' > '), node };
   for (const child of node.children || []) {
-    const found = _findKnotenPfad(child, targetId, here);
+    const found = _findKnoten(child, targetId, here);
     if (found) return found;
   }
   return null;
@@ -45,7 +50,7 @@ function _loadBookFiguren(bookId, userEmail) {
 
 function _loadBookOrte(bookId, userEmail) {
   return db.prepare(`
-    SELECT name, typ
+    SELECT name, typ, beschreibung
       FROM locations
      WHERE book_id = ? AND user_email = ?
      ORDER BY sort_order, name
@@ -64,17 +69,25 @@ async function runBrainstormJob(jobId, draftId, knotenId, userEmail) {
     if (!draft) throw i18nError('job.error.werkstatt.draftMissing');
     if (draft.user_email !== userEmail) throw i18nError('job.error.forbidden');
 
-    const knotenPfad = _findKnotenPfad(draft.mindmap?.data, knotenId);
-    if (!knotenPfad) throw i18nError('job.error.werkstatt.knotenMissing');
+    const found = _findKnoten(draft.mindmap?.data, knotenId);
+    if (!found) throw i18nError('job.error.werkstatt.knotenMissing');
+    const { pfad: knotenPfad, node: zielKnoten } = found;
+    const existingChildren = (zielKnoten.children || [])
+      .map(c => (c.topic || '').trim())
+      .filter(Boolean);
 
     const { SYSTEM_FIGUREN, BUCH_KONTEXT } = await getBookPrompts(draft.book_id, userEmail);
+    const draftNameNorm = (draft.name || '').trim().toLowerCase();
+    const figuren = _loadBookFiguren(draft.book_id, userEmail)
+      .filter(f => (f.name || '').trim().toLowerCase() !== draftNameNorm);
+    const orte = _loadBookOrte(draft.book_id, userEmail);
 
-    logger.info(`Brainstorm Start: draft=${draftId} knoten="${knotenPfad}"`);
+    logger.info(`Brainstorm Start: draft=${draftId} knoten="${knotenPfad}" figuren=${figuren.length} orte=${orte.length} kinder=${existingChildren.length}`);
     updateJob(jobId, { statusText: 'job.werkstatt.brainstorm.aiReply', progress: 10 });
 
     const tok = { in: 0, out: 0, ms: 0 };
     const result = await aiCall(jobId, tok,
-      buildBrainstormPrompt(draft.name, draft.archetype, knotenPfad, draft.mindmap, BUCH_KONTEXT),
+      buildBrainstormPrompt(draft.name, draft.archetype, knotenPfad, draft.mindmap, BUCH_KONTEXT, figuren, orte, existingChildren),
       SYSTEM_FIGUREN,
       10, 95, 1500, 0.3, 1500, undefined, SCHEMA_BRAINSTORM,
     );

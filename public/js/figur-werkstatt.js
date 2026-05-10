@@ -99,6 +99,11 @@ export const figurWerkstattMethods = {
   selectDraft(id) {
     const d = this.drafts.find(x => x.id === id);
     if (!d) { this.selectedDraftId = null; return; }
+    // jsMind zwischen Drafts NICHT wiederverwenden: _jm.show(newMind) räumt
+    // weder DOM noch interne node-map zuverlässig auf, wenn vorher add_node /
+    // remove_node lief (Brainstorm-Apply, Context-Menu-Mutationen). Resultat:
+    // neuer Draft zeigt Knoten des vorherigen. Frischer Editor pro Auswahl.
+    if (this.selectedDraftId !== id) this._destroyMindmap();
     this.selectedDraftId = id;
     this.editName = d.name;
     this.editArchetype = d.archetype || '';
@@ -162,8 +167,12 @@ export const figurWerkstattMethods = {
     if (!sel) return;
     const name = (this.editName || '').trim();
     if (!name) { this.errorMessage = app.t('werkstatt.error.nameRequired') || app.t('common.error'); return; }
-    // Aktuelle Mindmap aus jsMind exportieren, falls Editor geladen ist.
-    const mindmap = this._exportMindmap() || sel.mindmap;
+    // Mindmap nur aus jsMind exportieren, wenn Editor zu diesem Draft gehört
+    // (_jmDraftId wird in _mountMindmap nach _jm.show() gesetzt, in
+    // _destroyMindmap genullt). Sonst Server-State behalten — verhindert
+    // Überschreiben mit dem Tree, der zufällig im jsMind-DOM steht.
+    const exported = this._jmDraftId === sel.id ? this._exportMindmap() : null;
+    const mindmap = exported || sel.mindmap;
     this.busy = true;
     try {
       const updated = await fetchJson(`/draft-figures/${sel.id}`, {
@@ -179,9 +188,6 @@ export const figurWerkstattMethods = {
       this.drafts = this.drafts.map(d => d.id === updated.id ? updated : d);
       this.errorMessage = '';
       this._mindmapDirty = false;
-      this.savedAt = Date.now();
-      if (this._savedAtTimer) clearTimeout(this._savedAtTimer);
-      this._savedAtTimer = setTimeout(() => { this.savedAt = null; this._savedAtTimer = null; }, 2500);
     } catch (e) {
       this.errorMessage = app.t('werkstatt.error.save') || app.t('common.error');
     } finally {
@@ -230,6 +236,18 @@ export const figurWerkstattMethods = {
     if (!sel) return;
     const container = this.$el?.querySelector('.werkstatt-mindmap');
     if (!container) return;
+    // jsMind misst Knotengrößen nur, wenn `container.offsetParent` gesetzt ist.
+    // Beim ersten Öffnen der Karte kann Alpine $nextTick vor dem x-show-Flush
+    // feuern — dann fällt jsMind in c11y-Mode. Defer per rAF, bis sichtbar.
+    if (!container.offsetParent) {
+      const draftId = this.selectedDraftId;
+      requestAnimationFrame(() => {
+        if (this.selectedDraftId === draftId && window.__app?.showFigurWerkstattCard) {
+          this._mountMindmap();
+        }
+      });
+      return;
+    }
     let jsMind;
     try {
       jsMind = await loadJsMind();
@@ -238,11 +256,15 @@ export const figurWerkstattMethods = {
       return;
     }
     if (!this._jm) {
+      // Canvas-Linien: jsMind zeichnet auf <canvas>, also kein CSS-Targeting.
+      // Linienfarbe aus globalem Token --color-border lesen, Fallback grau.
+      const cs = getComputedStyle(document.documentElement);
+      const lineColor = (cs.getPropertyValue('--color-border').trim() || '#888');
       this._jm = new jsMind({
         container,
         editable: true,
         theme: 'primary',
-        view: { hmargin: 80, vmargin: 40, line_width: 1.5, draggable: true, hide_scrollbars_when_draggable: true },
+        view: { hmargin: 80, vmargin: 40, line_width: 1.5, line_color: lineColor, draggable: true, hide_scrollbars_when_draggable: true },
         layout: { hspace: 30, vspace: 18, pspace: 14 },
         // Tastatur-Navigation: Pfeiltasten navigieren, Tab fügt Sub-Knoten,
         // Enter Geschwister, F2 Editieren, Delete entfernt, Space toggle.
@@ -277,6 +299,10 @@ export const figurWerkstattMethods = {
       container.addEventListener('contextmenu', (ev) => this._onMindmapContextMenu(ev));
     }
     this._jm.show(resolveMindmapForDisplay(sel.mindmap));
+    // _jm an Draft-ID binden: saveDraft exportiert nur, wenn Editor diesen
+    // Draft hält. Verhindert Cross-Contamination, falls _mountMindmap zwischen
+    // Auswahl und Save für anderen Draft umgemounted hätte.
+    this._jmDraftId = sel.id;
     this.selectedKnotenId = sel.mindmap?.data?.id || 'root';
     // Auto-Fokus auf Mindmap-Panel: jsMind setzt tabIndex=1 auf .jsmind-inner —
     // damit Pfeiltasten/Tab/Enter direkt greifen, ohne dass User vorher klicken muss.
@@ -291,6 +317,7 @@ export const figurWerkstattMethods = {
     const container = this.$el?.querySelector?.('.werkstatt-mindmap');
     if (container) container.innerHTML = '';
     this._jm = null;
+    this._jmDraftId = null;
     if (this._fsListener) {
       document.removeEventListener('fullscreenchange', this._fsListener);
       this._fsListener = null;
@@ -298,32 +325,27 @@ export const figurWerkstattMethods = {
     this._hideContextMenu?.();
   },
 
-  // Selektierten Knoten in der Mitte des Mindmap-Containers zeigen.
-  // jsMind selbst zentriert nur die Wurzel. Bei Pfeiltasten-Nav muss der
-  // selektierte Knoten manuell ins Sichtfeld; sonst läuft er aus dem Viewport.
-  // Strategie: scrollLeft/scrollTop des `.jsmind-inner`-Scroll-Containers so
-  // setzen, dass der jmnode mittig liegt — kein scrollIntoView, weil das auch
-  // die Page selbst nach oben scrollt.
+  // Selektierten Knoten zentriert im Mindmap-Viewport zeigen.
+  // jsMind hat eine eingebaute API `scroll_node_to_center(id)`, die den
+  // jsmind-inner-Scroll-Container in beiden Achsen zum Zielknoten zentriert.
+  // Wird bei jedem select-Event (auch Pfeiltasten) aufgerufen.
   _centerNodeInView(id) {
-    const root = this.$el?.querySelector('.werkstatt-mindmap');
-    if (!root) return;
-    const inner = root.querySelector('.jsmind-inner');
-    if (!inner) return;
-    const node = inner.querySelector(`jmnode[nodeid="${CSS.escape(id)}"]`);
-    if (!node) return;
-    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    // Position des Knotens innerhalb des Scroll-Containers ermitteln.
-    const innerRect = inner.getBoundingClientRect();
-    const nodeRect = node.getBoundingClientRect();
-    const targetLeft = inner.scrollLeft + (nodeRect.left - innerRect.left)
-      + nodeRect.width / 2 - innerRect.width / 2;
-    const targetTop = inner.scrollTop + (nodeRect.top - innerRect.top)
-      + nodeRect.height / 2 - innerRect.height / 2;
-    inner.scrollTo({
-      left: Math.max(0, targetLeft),
-      top: Math.max(0, targetTop),
-      behavior: reduced ? 'auto' : 'smooth',
-    });
+    if (!this._jm || !id) return;
+    try {
+      this._jm.scroll_node_to_center(id);
+    } catch {
+      // Fallback: manueller Scroll, falls API in dieser jsMind-Version fehlt.
+      const inner = this.$el?.querySelector('.jsmind-inner');
+      const node = inner?.querySelector(`jmnode[nodeid="${CSS.escape(id)}"]`);
+      if (!inner || !node) return;
+      const innerRect = inner.getBoundingClientRect();
+      const nodeRect = node.getBoundingClientRect();
+      inner.scrollTo({
+        left: Math.max(0, inner.scrollLeft + (nodeRect.left - innerRect.left) + nodeRect.width / 2 - innerRect.width / 2),
+        top:  Math.max(0, inner.scrollTop  + (nodeRect.top  - innerRect.top)  + nodeRect.height / 2 - innerRect.height / 2),
+        behavior: 'smooth',
+      });
+    }
   },
 
   _exportMindmap() {
@@ -434,6 +456,7 @@ export const figurWerkstattMethods = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ draftId: sel.id }),
       });
+      this._consistencyJobId = resp.jobId;
       startPoll(this, {
         timerProp: '_consistencyPollTimer',
         jobId: resp.jobId,
@@ -466,6 +489,29 @@ export const figurWerkstattMethods = {
 
   dismissConsistency() {
     this.consistencyResult = null;
+  },
+
+  // Cancel: schickt DELETE /jobs/:id und räumt lokalen Loading-State auf.
+  // Server setzt Job-Status auf 'cancelled', laufender callAI wird via AbortController unterbrochen.
+  async cancelBrainstorm() {
+    const id = this._brainstormJobId;
+    if (!id) return;
+    await window.__app.cancelJob(id);
+    if (this._brainstormPollTimer) { clearInterval(this._brainstormPollTimer); this._brainstormPollTimer = null; }
+    this.brainstormLoading = false;
+    this.brainstormStatus = '';
+    this.brainstormProgress = 0;
+    this._brainstormJobId = null;
+  },
+  async cancelConsistency() {
+    const id = this._consistencyJobId;
+    if (!id) return;
+    await window.__app.cancelJob(id);
+    if (this._consistencyPollTimer) { clearInterval(this._consistencyPollTimer); this._consistencyPollTimer = null; }
+    this.consistencyLoading = false;
+    this.consistencyStatus = '';
+    this.consistencyProgress = 0;
+    this._consistencyJobId = null;
   },
 
   _clearJobs() {

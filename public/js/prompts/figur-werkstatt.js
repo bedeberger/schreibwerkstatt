@@ -13,22 +13,44 @@ const SEVERITY_ENUM = ['kritisch', 'stark', 'mittel', 'schwach', 'niedrig'];
 // User wählt einen Mindmap-Knoten (z.B. "Steckbrief > Hintergrund") und bekommt
 // 3–7 Sub-Ideen, die zur Figur und zum Buchkontext passen.
 
-export function buildBrainstormPrompt(figurName, archetype, knotenPfad, mindmapJson, buchKontext) {
+function _figurenLines(figuren) {
+  return (figuren || []).slice(0, 50)
+    .map(f => `- ${f.name}${f.typ ? ` [${f.typ}]` : ''}${f.beschreibung ? `: ${f.beschreibung.slice(0, 120)}` : ''}`)
+    .join('\n');
+}
+
+function _orteLines(orte) {
+  return (orte || []).slice(0, 50)
+    .map(o => `- ${o.name}${o.typ ? ` [${o.typ}]` : ''}${o.beschreibung ? `: ${o.beschreibung.slice(0, 120)}` : ''}`)
+    .join('\n');
+}
+
+export function buildBrainstormPrompt(figurName, archetype, knotenPfad, mindmapJson, buchKontext, bestehendeFiguren = [], bestehendeOrte = [], existingChildren = []) {
   const ctxSeg = (buchKontext || '').trim() ? `\nBUCH-KONTEXT:\n${buchKontext}\n` : '';
   const archSeg = archetype ? ` (Archetyp: ${archetype})` : '';
+  const figLines = _figurenLines(bestehendeFiguren);
+  const figSeg = figLines ? `\nBESTEHENDE FIGUREN IM BUCH (zur Abgrenzung, keine Doppelung):\n${figLines}\n` : '';
+  const ortLines = _orteLines(bestehendeOrte);
+  const ortSeg = ortLines ? `\nBESTEHENDE ORTE IM BUCH (Setting, Schauplätze):\n${ortLines}\n` : '';
+  const childList = (existingChildren || []).filter(c => typeof c === 'string' && c.trim());
+  const childSeg = childList.length
+    ? `\nVORHANDENE SUB-KNOTEN AM ZIEL-KNOTEN (NICHT wiederholen):\n${childList.map(c => `- ${c}`).join('\n')}\n`
+    : '';
   return `Du entwickelst eine Romanfigur weiter. Die Autorin arbeitet am Knoten "${knotenPfad}" einer Figuren-Mindmap und braucht 3–7 prägnante Sub-Ideen.
 
 FIGUR: ${figurName}${archSeg}
-${ctxSeg}
+${ctxSeg}${figSeg}${ortSeg}
 AKTUELLE MINDMAP (JSON):
 ${JSON.stringify(mindmapJson)}
 
 ZIEL-KNOTEN: "${knotenPfad}"
-
+${childSeg}
 Liefere 3–7 konkrete, voneinander unterscheidbare Vorschläge als Sub-Ideen für den Ziel-Knoten. Jede Idee:
 - 2–8 Wörter im Label (kurz, einprägsam, Mindmap-tauglich)
 - Knappe Begründung (1 Satz), warum sie zur Figur und zum Buchkontext passt
-- Keine Wiederholung bestehender Knoten in der Mindmap
+- Keine Wiederholung bestehender Knoten in der Mindmap (insbesondere der oben gelisteten Sub-Knoten)
+- Keine Doppelung von Eigenschaften bestehender Figuren — Abgrenzung schärft Profil
+- Schauplätze, falls erwähnt, müssen zu den oben gelisteten Orten passen oder klar neu sein
 
 Antworte mit diesem JSON-Schema:
 {
@@ -53,12 +75,8 @@ export const SCHEMA_BRAINSTORM = _obj({
 export function buildConsistencyPrompt(figurName, archetype, mindmapJson, buchKontext, bestehendeFiguren, bestehendeOrte) {
   const ctxSeg = (buchKontext || '').trim() ? `\nBUCH-KONTEXT:\n${buchKontext}\n` : '';
   const archSeg = archetype ? ` (Archetyp: ${archetype})` : '';
-  const figLines = (bestehendeFiguren || []).slice(0, 50)
-    .map(f => `- ${f.name}${f.typ ? ` [${f.typ}]` : ''}${f.beschreibung ? `: ${f.beschreibung.slice(0, 120)}` : ''}`)
-    .join('\n');
-  const ortLines = (bestehendeOrte || []).slice(0, 50)
-    .map(o => `- ${o.name}${o.typ ? ` [${o.typ}]` : ''}`)
-    .join('\n');
+  const figLines = _figurenLines(bestehendeFiguren);
+  const ortLines = _orteLines(bestehendeOrte);
   const figSeg = figLines ? `\nBESTEHENDE FIGUREN IM BUCH:\n${figLines}\n` : '';
   const ortSeg = ortLines ? `\nBESTEHENDE ORTE IM BUCH:\n${ortLines}\n` : '';
 

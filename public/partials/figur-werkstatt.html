@@ -140,25 +140,27 @@
         </div>
       </div>
 
-      <div class="row">
-        <button type="button" class="primary" :disabled="busy || !editName.trim()" @click="saveDraft()" x-text="$app.t('werkstatt.action.save')"></button>
-        <span class="card-form-saved" x-show="savedAt && !busy" x-cloak x-transition.opacity.duration.250ms x-text="$app.t('werkstatt.saved')"></span>
-      </div>
-
       <!-- Mindmap-Canvas (jsMind, lazy-loaded). Editierbar: F2/Doppelklick zum Umbenennen,
            Tab fügt Sub-Knoten, Enter fügt Geschwister, Delete entfernt, Pfeiltasten navigieren,
            Rechtsklick öffnet Kontext-Menü. -->
       <section class="werkstatt-mindmap-section" :class="{ 'werkstatt-mindmap-section--fullscreen': mindmapFullscreen }">
-        <div class="list-header list-header--between">
-          <h3 class="section-heading" x-text="$app.t('werkstatt.heading')"></h3>
-          <div class="werkstatt-mindmap-controls">
-            <span class="werkstatt-mindmap-hint" x-show="selectedKnotenId" x-text="$app.t('werkstatt.mindmap.selectedHint', { pfad: knotenPfad(selectedKnotenId) })"></span>
-            <button type="button"
-                    class="graph-tool-btn"
-                    :aria-pressed="mindmapScrollEnabled"
-                    :aria-label="mindmapScrollEnabled ? $app.t('werkstatt.mindmap.scrollOn.tip') : $app.t('werkstatt.mindmap.scrollOff.tip')"
-                    @click="mindmapScrollEnabled = !mindmapScrollEnabled"
-                    :data-tip="mindmapScrollEnabled ? $app.t('werkstatt.mindmap.scrollOn.tip') : $app.t('werkstatt.mindmap.scrollOff.tip')">&#x2725;</button>
+        <div class="card-header card-header--subline werkstatt-mindmap-header">
+          <div class="card-header-titlebar">
+            <span class="card-title" x-text="$app.t('werkstatt.mindmap.title')"></span>
+            <div class="card-subline" x-show="selectedDraft()?.updated_at">
+              <span class="save-indicator"
+                    x-text="selectedDraft()?.updated_at ? $app.t('werkstatt.savedAt', { when: $app._formatSaveTs(new Date(selectedDraft().updated_at).getTime()) }) : ''"></span>
+            </div>
+          </div>
+          <div class="card-header-aside">
+            <div class="card-actions">
+              <button type="button" class="primary" :disabled="busy || !editName.trim()" @click="saveDraft()" x-text="$app.t('werkstatt.action.save')"></button>
+            </div>
+          </div>
+        </div>
+        <div class="werkstatt-mindmap-canvas">
+          <div class="werkstatt-mindmap"></div>
+          <div class="werkstatt-mindmap-controls werkstatt-mindmap-controls--overlay">
             <button type="button"
                     class="graph-tool-btn"
                     :aria-pressed="mindmapFullscreen"
@@ -168,8 +170,35 @@
                     x-text="mindmapFullscreen ? '✕' : '⤢'"></button>
           </div>
         </div>
-        <p class="werkstatt-mindmap-keyboard-hint" x-text="$app.t('werkstatt.mindmap.keyboardHint')"></p>
-        <div class="werkstatt-mindmap" :class="{ 'werkstatt-mindmap--scroll': mindmapScrollEnabled }"></div>
+
+        <!-- Tastatur-Navigationshilfe für Mindmap. Spiegelt globale Hilfe (shortcuts.html). -->
+        <div class="werkstatt-mindmap-help shortcuts-section">
+          <div class="shortcuts-section-title" x-text="$app.t('shortcuts.section.mindmap')"></div>
+          <div class="shortcuts-row">
+            <span class="shortcuts-keys"><kbd x-text="$app.t('shortcuts.key.arrows')"></kbd> <kbd x-text="$app.t('shortcuts.key.arrowsLR')"></kbd></span>
+            <span class="shortcuts-desc" x-text="$app.t('shortcuts.item.mindmapNav')"></span>
+          </div>
+          <div class="shortcuts-row">
+            <span class="shortcuts-keys"><kbd x-text="$app.t('shortcuts.key.tab')"></kbd></span>
+            <span class="shortcuts-desc" x-text="$app.t('shortcuts.item.mindmapAddChild')"></span>
+          </div>
+          <div class="shortcuts-row">
+            <span class="shortcuts-keys"><kbd x-text="$app.t('shortcuts.key.enter')"></kbd></span>
+            <span class="shortcuts-desc" x-text="$app.t('shortcuts.item.mindmapAddSibling')"></span>
+          </div>
+          <div class="shortcuts-row">
+            <span class="shortcuts-keys"><kbd x-text="$app.t('shortcuts.key.f2')"></kbd></span>
+            <span class="shortcuts-desc" x-text="$app.t('shortcuts.item.mindmapRename')"></span>
+          </div>
+          <div class="shortcuts-row">
+            <span class="shortcuts-keys"><kbd x-text="$app.t('shortcuts.key.del')"></kbd></span>
+            <span class="shortcuts-desc" x-text="$app.t('shortcuts.item.mindmapDelete')"></span>
+          </div>
+          <div class="shortcuts-row">
+            <span class="shortcuts-keys"><kbd x-text="$app.t('shortcuts.key.rightClick')"></kbd></span>
+            <span class="shortcuts-desc" x-text="$app.t('shortcuts.item.mindmapMenu')"></span>
+          </div>
+        </div>
 
         <!-- Rechtsklick-Menü, position:fixed via inline-style -->
         <div class="werkstatt-context-menu"
@@ -192,7 +221,10 @@
         <div x-show="brainstormProgress > 0" class="progress-bar-wrap">
           <div class="progress-bar" :style="{ '--progress': brainstormProgress + '%' }"></div>
         </div>
-        <div class="card-status" x-html="brainstormStatus"></div>
+        <div class="werkstatt-job-status-row">
+          <div class="card-status" x-html="brainstormStatus"></div>
+          <button type="button" @click="cancelBrainstorm()" x-text="$app.t('common.cancel')"></button>
+        </div>
       </section>
 
       <!-- Brainstorm-Vorschläge mit Apply -->
@@ -201,14 +233,19 @@
           <h3 class="section-heading" x-text="$app.t('werkstatt.brainstorm.heading', { pfad: brainstormResult ? brainstormResult.knotenPfad : '' })"></h3>
           <button type="button" @click="dismissBrainstorm()" x-text="$app.t('werkstatt.brainstorm.dismiss')"></button>
         </div>
-        <div class="entity-list entity-list--accented">
+        <div class="chat-vorschlaege">
           <template x-for="(v, idx) in brainstormResult ? brainstormResult.vorschlaege : []" :key="idx">
-            <div class="entity-row">
-              <div class="entity-row-content">
-                <div class="entity-row-title" x-text="v.label"></div>
-                <div class="entity-row-meta" x-text="v.begruendung"></div>
+            <div class="chat-vorschlag">
+              <div class="chat-vorschlag-header">
+                <span class="chat-vorschlag-label" x-text="$app.t('chat.suggestion')"></span>
+                <button type="button"
+                        class="chat-vorschlag-btn"
+                        @click="applyBrainstormVorschlag(idx)"
+                        :disabled="busy"
+                        x-text="$app.t('werkstatt.brainstorm.apply')"></button>
               </div>
-              <button type="button" class="primary" @click="applyBrainstormVorschlag(idx)" x-text="$app.t('werkstatt.brainstorm.apply')"></button>
+              <div class="chat-vorschlag-title" x-text="v.label"></div>
+              <div x-show="v.begruendung" class="chat-vorschlag-begruendung" x-text="v.begruendung"></div>
             </div>
           </template>
           <div x-show="brainstormResult && brainstormResult.vorschlaege.length === 0" class="card-status" x-text="$app.t('werkstatt.brainstorm.allApplied')"></div>
@@ -220,7 +257,10 @@
         <div x-show="consistencyProgress > 0" class="progress-bar-wrap">
           <div class="progress-bar" :style="{ '--progress': consistencyProgress + '%' }"></div>
         </div>
-        <div class="card-status" x-html="consistencyStatus"></div>
+        <div class="werkstatt-job-status-row">
+          <div class="card-status" x-html="consistencyStatus"></div>
+          <button type="button" @click="cancelConsistency()" x-text="$app.t('common.cancel')"></button>
+        </div>
       </section>
 
       <!-- Consistency-Issues mit Severity-Tags -->

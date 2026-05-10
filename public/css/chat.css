@@ -169,19 +169,25 @@
   font-weight: 700;
 }
 
-/* Änderungsvorschläge */
+/* Änderungsvorschläge — auch ausserhalb von .chat-msg verwendbar (Werkstatt-Brainstorm). */
 .chat-vorschlaege {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-width: 88%;
 }
+/* Bubble-Breite nur im Chat-Kontext, sonst volle Breite. */
+.chat-msg .chat-vorschlaege { max-width: 88%; }
 .chat-vorschlag {
   border: 0.5px solid var(--color-border);
   border-left: 2px solid var(--color-primary);
   padding: 8px 10px;
   background: var(--color-surface);
   font-size: var(--font-size-sm);
+}
+.chat-vorschlag-title {
+  font-weight: 700;
+  margin-bottom: 4px;
+  overflow-wrap: anywhere;
 }
 .chat-vorschlag--applied {
   opacity: var(--opacity-muted);

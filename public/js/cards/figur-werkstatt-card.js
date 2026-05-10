@@ -19,7 +19,6 @@ export function registerFigurWerkstattCard() {
     loading: false,
     busy: false,
     errorMessage: '',
-    savedAt: null,
     brainstormLoading: false,
     brainstormProgress: 0,
     brainstormStatus: '',
@@ -28,16 +27,17 @@ export function registerFigurWerkstattCard() {
     consistencyProgress: 0,
     consistencyStatus: '',
     consistencyResult: null,
-    mindmapScrollEnabled: false,
     mindmapFullscreen: false,
     contextMenuOpen: false,
     contextMenuNodeId: null,
     contextMenuPos: { left: 0, top: 0 },
     _mindmapDirty: false,
     _jm: null,
+    _jmDraftId: null,
+    _brainstormJobId: null,
+    _consistencyJobId: null,
     _brainstormPollTimer: null,
     _consistencyPollTimer: null,
-    _savedAtTimer: null,
     _fsListener: null,
     _ctxOutsideHandler: null,
     _ctxEscHandler: null,
@@ -47,8 +47,8 @@ export function registerFigurWerkstattCard() {
       this._lifecycle = setupCardLifecycle(this, {
         name: 'figurWerkstatt',
         showFlag: 'showFigurWerkstattCard',
-        timerKeys: ['_brainstormPollTimer', '_consistencyPollTimer', '_savedAtTimer'],
-        resetState: { drafts: [], selectedDraftId: null, selectedKnotenId: null, creating: false, newName: '', editName: '', editArchetype: '', editNotes: '', errorMessage: '', brainstormResult: null, consistencyResult: null, brainstormLoading: false, consistencyLoading: false, mindmapScrollEnabled: false, mindmapFullscreen: false, contextMenuOpen: false, contextMenuNodeId: null, _mindmapDirty: false },
+        timerKeys: ['_brainstormPollTimer', '_consistencyPollTimer'],
+        resetState: { drafts: [], selectedDraftId: null, selectedKnotenId: null, creating: false, newName: '', editName: '', editArchetype: '', editNotes: '', errorMessage: '', brainstormResult: null, consistencyResult: null, brainstormLoading: false, consistencyLoading: false, mindmapFullscreen: false, contextMenuOpen: false, contextMenuNodeId: null, _mindmapDirty: false },
         load: () => this.loadDrafts(),
         onCardRefresh: async () => {
           if (this.isDirty()) {
@@ -71,6 +71,18 @@ export function registerFigurWerkstattCard() {
             if (!this.selectedDraftId) return;
             e.preventDefault();
             this.saveDraft();
+          },
+        }, {
+          // Browser-Reload (F5/Cmd+R) und Tab-Close: native Prompt zeigen,
+          // wenn Werkstatt geöffnet ist und ungespeicherte Änderungen vorliegen.
+          // Custom appConfirm geht hier nicht — Browser blockiert Modals in
+          // beforeunload. Pendant zum Editor-beforeunload in app.js.
+          type: 'beforeunload',
+          handler: (e) => {
+            if (!window.__app?.showFigurWerkstattCard) return;
+            if (!this.isDirty()) return;
+            e.preventDefault();
+            e.returnValue = '';
           },
         }],
       });

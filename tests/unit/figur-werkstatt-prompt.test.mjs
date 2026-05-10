@@ -66,20 +66,62 @@ test('buildBrainstormPrompt: ohne Buchkontext + ohne Archetyp → kein Block', a
   const p = buildBrainstormPrompt('Anna', null, 'Stimme', sampleMindmap, '');
   assert.doesNotMatch(p, /BUCH-KONTEXT/);
   assert.doesNotMatch(p, /Archetyp:/);
+  assert.doesNotMatch(p, /BESTEHENDE FIGUREN/);
 });
 
-test('buildConsistencyPrompt: enthält Figuren-Liste, Orte-Liste, Severity-Skala', async () => {
+test('buildBrainstormPrompt: bestehende Figuren werden mit Typ + Beschreibung gelistet', async () => {
+  const { buildBrainstormPrompt } = await import(promptsUrl);
+  const p = buildBrainstormPrompt('Anna', 'protagonist', 'Stimme', sampleMindmap, 'Krimi', [
+    { name: 'Boris', typ: 'antagonist', beschreibung: 'Schurke mit Vergangenheit' },
+    { name: 'Clara', typ: 'nebenfigur' },
+  ]);
+  assert.match(p, /BESTEHENDE FIGUREN/);
+  assert.match(p, /Boris \[antagonist\]: Schurke mit Vergangenheit/);
+  assert.match(p, /Clara \[nebenfigur\]/);
+  assert.match(p, /Keine Doppelung von Eigenschaften bestehender Figuren/);
+});
+
+test('buildBrainstormPrompt: Orte mit Beschreibung gelistet', async () => {
+  const { buildBrainstormPrompt } = await import(promptsUrl);
+  const p = buildBrainstormPrompt('Anna', null, 'Hintergrund', sampleMindmap, '', [], [
+    { name: 'Bergdorf', typ: 'siedlung', beschreibung: 'Abgeschieden im Hochtal' },
+    { name: 'Stadt', typ: 'siedlung' },
+  ]);
+  assert.match(p, /BESTEHENDE ORTE IM BUCH/);
+  assert.match(p, /Bergdorf \[siedlung\]: Abgeschieden im Hochtal/);
+  assert.match(p, /Stadt \[siedlung\]/);
+});
+
+test('buildBrainstormPrompt: existierende Sub-Knoten werden zur Vermeidung gelistet', async () => {
+  const { buildBrainstormPrompt } = await import(promptsUrl);
+  const p = buildBrainstormPrompt('Anna', null, 'Steckbrief', sampleMindmap, '', [], [], [
+    'Aussehen', 'Hintergrund',
+  ]);
+  assert.match(p, /VORHANDENE SUB-KNOTEN AM ZIEL-KNOTEN/);
+  assert.match(p, /- Aussehen/);
+  assert.match(p, /- Hintergrund/);
+  assert.match(p, /NICHT wiederholen/);
+});
+
+test('buildBrainstormPrompt: ohne Sub-Knoten/Orte/Figuren → keine leeren Blöcke', async () => {
+  const { buildBrainstormPrompt } = await import(promptsUrl);
+  const p = buildBrainstormPrompt('Anna', null, 'Stimme', sampleMindmap, '', [], [], []);
+  assert.doesNotMatch(p, /BESTEHENDE ORTE/);
+  assert.doesNotMatch(p, /VORHANDENE SUB-KNOTEN/);
+});
+
+test('buildConsistencyPrompt: enthält Figuren-Liste, Orte-Liste mit Beschreibung, Severity-Skala', async () => {
   const { buildConsistencyPrompt } = await import(promptsUrl);
   const p = buildConsistencyPrompt(
     'Anna', 'protagonist', sampleMindmap, 'Mittelalter',
     [{ name: 'Boris', typ: 'antagonist', beschreibung: 'Schurke' }],
-    [{ name: 'Burg', typ: 'gebäude' }],
+    [{ name: 'Burg', typ: 'gebäude', beschreibung: 'düstere Festung' }],
   );
   assert.match(p, /Anna/);
   assert.match(p, /BESTEHENDE FIGUREN/);
   assert.match(p, /Boris/);
   assert.match(p, /BESTEHENDE ORTE/);
-  assert.match(p, /Burg/);
+  assert.match(p, /Burg \[gebäude\]: düstere Festung/);
   assert.match(p, /kritisch/);
   assert.match(p, /niedrig/);
   assert.match(p, /"konflikte":/);
