@@ -283,6 +283,11 @@ export const appViewMethods = {
     if (!this.selectedBookId) return;
     this._closeOtherMainCards('figurWerkstatt');
     this.showFigurWerkstattCard = true;
+    // Belt-and-braces: explizit triggern, falls $watch in setupCardLifecycle
+    // beim Übergang false→true verpasst (z.B. Deep-Link mit zeitgleichem
+    // book:changed). onCardRefresh ist idempotent (kein dirty bei frischer
+    // Karte) und ruft loadDrafts.
+    window.dispatchEvent(new CustomEvent('card:refresh', { detail: { name: 'figurWerkstatt' } }));
   },
   toggleBookReviewCard() {
     if (this.showBookReviewCard) {

@@ -18,9 +18,13 @@ export const crudMethods = {
     const app = window.__app;
     const bookId = app?.selectedBookId;
     if (!bookId) { this.drafts = []; return; }
+    // Stale-Schutz: bei Buchwechsel während des Fetch verwirft eine spätere
+    // Antwort des alten Buchs den frisch geladenen State des neuen sonst.
+    const isStale = () => window.__app?.selectedBookId !== bookId;
     this.loading = true;
     try {
       const rows = await fetchJson(`/draft-figures/${bookId}`);
+      if (isStale()) return;
       this.drafts = Array.isArray(rows) ? rows : [];
       this.errorMessage = '';
       if (this.selectedDraftId && !this.drafts.find(d => d.id === this.selectedDraftId)) {
@@ -37,10 +41,11 @@ export const crudMethods = {
         this.selectDraft(this.drafts[0].id);
       }
     } catch (e) {
+      if (isStale()) return;
       this.errorMessage = app.t('werkstatt.error.load') || app.t('common.error');
       this.drafts = [];
     } finally {
-      this.loading = false;
+      if (!isStale()) this.loading = false;
     }
   },
 

@@ -49,6 +49,25 @@
     </div>
   </div>
 
+  <!-- Import-Inline bei leerem Empty-State: Combobox mit Buch-Figuren ohne aktiven Draft -->
+  <div x-show="importing && drafts.length === 0" class="card-empty" x-cloak>
+    <div x-show="importablesLoading" class="card-status" x-text="$app.t('werkstatt.import.loading')"></div>
+    <div x-show="!importablesLoading && importables.length === 0" class="card-status" x-text="$app.t('werkstatt.import.empty')"></div>
+    <div x-show="!importablesLoading && importables.length > 0" class="form-stack">
+      <div x-data="combobox($app.t('werkstatt.import.placeholder'))"
+           x-modelable="value"
+           x-model="selectedImportFigureId"
+           x-effect="options = importables.map(f => ({
+             value: String(f.id),
+             label: f.name + (f.typ ? ' [' + f.typ + ']' : '')
+           }))"></div>
+    </div>
+    <div class="row">
+      <button type="button" class="primary" :disabled="busy || !selectedImportFigureId" @click="runImport()" x-text="$app.t('werkstatt.import.confirm')"></button>
+      <button type="button" :disabled="busy" @click="cancelImport()" x-text="$app.t('common.cancel')"></button>
+    </div>
+  </div>
+
   <!-- 2-Spalten-Layout: Drafts-Liste links, Detail rechts -->
   <div x-show="drafts.length > 0" class="werkstatt-grid">
     <div class="werkstatt-sidebar">
