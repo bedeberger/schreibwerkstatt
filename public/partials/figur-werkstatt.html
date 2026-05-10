@@ -347,14 +347,20 @@
         <div x-show="consistencyResult && consistencyResult.konflikte.length === 0" class="card-status" x-text="$app.t('werkstatt.consistency.noIssues')"></div>
         <div class="entity-list entity-list--accented" x-show="consistencyResult && consistencyResult.konflikte.length > 0">
           <template x-for="(k, idx) in consistencyResult ? consistencyResult.konflikte : []" :key="idx">
-            <div class="entity-row">
-              <span class="severity-tag" :class="'severity-tag--' + k.schwere" x-text="$app.t('werkstatt.severity.' + k.schwere)"></span>
-              <div class="entity-row-content">
-                <div class="entity-row-title">
-                  <span x-text="k.feld"></span>
-                  <span class="entity-row-meta" x-text="k.problem"></span>
+            <div>
+              <div class="entity-row" :class="{ 'entity-row--selected': selectedKonfliktIdx === idx }"
+                   @click="selectedKonfliktIdx = selectedKonfliktIdx === idx ? null : idx">
+                <span class="severity-tag" :class="'severity-tag--' + k.schwere" x-text="$app.t('werkstatt.severity.' + k.schwere)"></span>
+                <span class="entity-row-title" x-text="k.feld"></span>
+                <span class="entity-row-meta" x-text="k.problem"></span>
+                <span class="history-chevron" :class="{ open: selectedKonfliktIdx === idx }">›</span>
+              </div>
+              <div x-show="selectedKonfliktIdx === idx" class="entity-detail" x-cloak>
+                <p class="entity-detail-text" x-text="k.problem"></p>
+                <div x-show="k.vorschlag" class="entity-meta-row">
+                  <span class="entity-meta-label" x-text="$app.t('werkstatt.consistency.vorschlag')"></span>
+                  <span class="entity-meta-value" x-text="k.vorschlag"></span>
                 </div>
-                <div class="entity-row-meta" x-show="k.vorschlag" x-text="k.vorschlag"></div>
               </div>
             </div>
           </template>

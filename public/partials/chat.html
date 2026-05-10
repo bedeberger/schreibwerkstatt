@@ -4,7 +4,7 @@
   showChatCard bleibt am Root; fachlicher State in der Sub.
 -->
 <div class="card" id="chat-card" x-data="chatCard" x-show="$app.showChatCard" x-cloak>
-  <div class="card-header card-header--sticky">
+  <div class="card-header">
     <span class="card-title" x-text="$app.t('chat.title', { name: $app.currentPage?.name || '–' })"></span>
     <div class="card-actions">
       <button type="button" @click="startNewChatSession()" :disabled="chatLoading" :data-tip="$app.t('chat.newSessionTitle')" x-text="$app.t('chat.newSession')"></button>
@@ -100,7 +100,7 @@
   Alpine.data-Sub-Komponente — siehe public/js/cards/book-chat-card.js.
 -->
 <div class="card" id="book-chat-card" x-data="bookChatCard" x-show="$app.showBookChatCard" x-cloak>
-  <div class="card-header card-header--sticky">
+  <div class="card-header">
     <span class="card-title" x-text="$app.t('chat.titleBook', { name: $app.selectedBookName })"></span>
     <div class="card-actions">
       <button type="button" @click="startNewBookChatSession()" :disabled="bookChatLoading" :data-tip="$app.t('chat.newSessionTitle')" x-text="$app.t('chat.newSession')"></button>

@@ -69,6 +69,7 @@ export const runsMethods = {
           konflikte: run.result.konflikte || [],
           fazit: run.result.fazit || '',
         };
+        this.selectedKonfliktIdx = null;
         this.brainstormResult = null;
       }
       this.selectedRunId = run.id;
@@ -213,6 +214,7 @@ export const runsMethods = {
             konflikte: job.result.konflikte || [],
             fazit: job.result.fazit || '',
           };
+          this.selectedKonfliktIdx = null;
           this.selectedRunId = job.result.runId || null;
           this.loadRuns?.();
         }

@@ -19,20 +19,13 @@
   }
 }
 
-/* Drafts-Sidebar: Liste der Entwürfe + Neu-Knopf.
-   Sticky beim Scrollen, damit Drafts-Wechsel jederzeit erreichbar bleibt.
-   Eigener Scroll-Bereich (max-height) für viele Drafts; List-Header (Neu/Import)
-   bleibt oben sichtbar via flex-shrink:0, .werkstatt-list nimmt den Rest. */
+/* Drafts-Sidebar: Liste der Entwürfe + Neu-Knopf. */
 .werkstatt-sidebar {
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
   border-right: var(--border-thin) solid var(--color-border);
   padding-right: var(--space-md);
-  position: sticky;
-  top: var(--space-md);
-  align-self: start;
-  max-height: calc(100vh - 120px);
 }
 @container werkstatt (max-width: 640px) {
   .werkstatt-sidebar {
@@ -40,8 +33,6 @@
     border-bottom: var(--border-thin) solid var(--color-border);
     padding-right: 0;
     padding-bottom: var(--space-md);
-    position: static;
-    max-height: none;
   }
 }
 
@@ -107,9 +98,6 @@
   gap: var(--space-lg);
 }
 
-/* Detail-Header sticky: Aktions-Toolbar (Speichern/Brainstorm/Konsistenz)
-   bleibt erreichbar, auch wenn User in Notes/Mindmap/Runs nach unten scrollt.
-   Eigener Hintergrund nötig, damit Inhalt darunter nicht durchscheint. */
 .werkstatt-detail-header {
   display: flex;
   flex-wrap: wrap;
@@ -118,10 +106,6 @@
   gap: var(--space-md);
   border-bottom: var(--border-thin) solid var(--color-border);
   padding: var(--space-sm) 0;
-  position: sticky;
-  top: 0;
-  background: var(--color-surface);
-  z-index: 2;
 }
 .werkstatt-detail-titlebar {
   display: flex;
@@ -151,7 +135,7 @@
   gap: var(--space-sm);
 }
 /* Mindmap-Section-Head: schlanke Heading-Zeile mit Save-Indikator.
-   Save-Button lebt im sticky Detail-Header (Toolbar), nicht mehr hier. */
+   Save-Button lebt im Detail-Header (Toolbar), nicht hier. */
 .werkstatt-mindmap-section-head {
   display: flex;
   flex-wrap: wrap;

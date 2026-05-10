@@ -6,7 +6,7 @@
   createKapitelPage() in der Sub via $root gelesen/geschrieben).
 -->
 <div class="card" x-data="kapitelReviewCard" x-show="$app.showKapitelReviewCard" x-cloak>
-  <div class="card-header card-header--subline card-header--sticky">
+  <div class="card-header card-header--subline">
     <div class="card-header-titlebar">
       <span class="card-title" x-text="$app.t('kapitelReview.title', { name: kapitelReviewSelectedChapter()?.name || $app.selectedBookName })"></span>
       <div class="card-subline" x-show="kapitelReviewSelectedChapter()?.url || kapitelReviewLastEditAt()">

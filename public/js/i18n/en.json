@@ -644,6 +644,7 @@
   "werkstatt.consistency.heading": "Consistency check",
   "werkstatt.consistency.fazit":   "Verdict",
   "werkstatt.consistency.noIssues": "No conflicts found.",
+  "werkstatt.consistency.vorschlag": "Suggestion",
   "werkstatt.tree.steckbrief":      "Profile",
   "werkstatt.tree.aussehen":        "Appearance",
   "werkstatt.tree.persoenlichkeit": "Personality",

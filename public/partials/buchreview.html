@@ -7,7 +7,7 @@
   liest beim Danger-Reset).
 -->
 <div class="card" x-data="bookReviewCard" x-show="$app.showBookReviewCard" x-cloak>
-  <div class="card-header card-header--sticky">
+  <div class="card-header">
     <span class="card-title" x-text="$app.t('review.title', { name: $app.selectedBookName })"></span>
     <div class="card-actions">
       <button type="button" @click="runBookReview()" :disabled="bookReviewLoading">

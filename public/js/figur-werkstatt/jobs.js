@@ -111,6 +111,7 @@ export const jobsMethods = {
     this.consistencyLoading = true;
     this.consistencyStatus = '';
     this.consistencyResult = null;
+    this.selectedKonfliktIdx = null;
     this._consistencyJobDraftId = sel.id;
     try {
       const resp = await fetchJson('/jobs/werkstatt-consistency', {
@@ -139,6 +140,7 @@ export const jobsMethods = {
               konflikte: job.result.konflikte || [],
               fazit: job.result.fazit || '',
             };
+            this.selectedKonfliktIdx = null;
             this.selectedRunId = job.result.runId || null;
             this.loadRuns?.();
           }
@@ -168,6 +170,7 @@ export const jobsMethods = {
 
   dismissConsistency() {
     this.consistencyResult = null;
+    this.selectedKonfliktIdx = null;
   },
 
   // Cancel: schickt DELETE /jobs/:id; Server setzt Status auf 'cancelled',

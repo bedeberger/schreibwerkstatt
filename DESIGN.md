@@ -157,7 +157,7 @@ Wiederkehrende Werte gehen über Tokens. Ad-hoc-Werte (`box-shadow: 0 4px 12px .
 **Regeln:**
 - Wurzel `<div class="card" x-data="xxxCard" x-show="$app.showXxxCard" x-cloak>`.
 - **Animation: nur CSS (`cardFadeIn` aus [public/css/card-form.css](public/css/card-form.css)).** Kein `x-transition` auf `.card` — translateY × scale konkurriert sichtbar bei grossen Karten (Szenen, Figuren), wirkt wabbelig. Neues Karten-Element nur `x-show="…" x-cloak`.
-- Header: `.card-header` mit `.card-header--subline` für Buchtitel + Timestamp. Optional `.card-header--sticky` (Position 0, `--z-header`, deckt Card-Padding seitlich ab) für Karten, deren Body lang scrollt und deren Aktionen/Save-Indicator dauerhaft erreichbar bleiben sollen (Beispiel: Editor-Card; Pendant zu `.werkstatt-detail-header` in der Figur-Werkstatt).
+- Header: `.card-header` mit `.card-header--subline` für Buchtitel + Timestamp.
 - Status-Hinweis: `.card-status` (Loading/Empty), `.card-status--error` für Fehler.
 - Empty-State: `<div x-show="…" class="card-status" x-text="$app.t('common.noDataYet')"></div>`.
 
@@ -948,7 +948,7 @@ Kein eigenes `@media print {}` pro Karte einführen — der Aufwand für saubere
 |-------|------|-----------|
 | `--z-base` | 1 | In-flow Standard, `position: relative`-Sticky-Anker (z.B. Heatmap-Body-Cells, Book-Overview-Tile-SVG-Layer) |
 | `--z-sticky` | 100 | Sticky Inhalts-Header in Listen/Heatmaps (`.heatmap-table thead`, sticky Filter-Bars) |
-| `--z-header` | 200 | Sticky Card-Header, Toolbar-Header (`.card-header--sticky`, `.werkstatt-detail-header`, Avatar-/Komplettstatus-Popover-Panels) |
+| `--z-header` | 200 | Sticky Card-Header, Toolbar-Header (Avatar-/Komplettstatus-Popover-Panels) |
 | `--z-popover` | 1000 | Tooltip-Layer, Synonym-Menu, Figur-Lookup, Combobox-Dropdown, Focus-Counter, Token-Setup-Inline-Hint, Ideen-Move-Picker |
 | `--z-toolbar` | 1100 | Edit-Bubble-Toolbar (1001), Find-and-Replace (1002) — über Popovers, weil sie auf Selektion reagieren |
 | `--z-overlay` | 2000 | Palette-Overlay, künftige Fullscreen-Trigger ohne Modal-Charakter |

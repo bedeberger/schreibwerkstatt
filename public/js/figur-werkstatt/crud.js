@@ -71,6 +71,7 @@ export const crudMethods = {
     this.runs = { brainstorm: [], consistency: [] };
     this.runsLoadedDraftId = null;
     this.selectedRunId = null;
+    this.selectedKonfliktIdx = null;
     this._mindmapDirty = false;
   },
 
@@ -115,6 +116,7 @@ export const crudMethods = {
     this.consistencyResult = null;
     this.selectedKnotenId = null;
     this.selectedRunId = null;
+    this.selectedKonfliktIdx = null;
     this._mindmapDirty = false;
     this.loadRuns?.();
     this._reattachActiveJobs?.(id);
@@ -228,6 +230,7 @@ export const crudMethods = {
         this.runs = { brainstorm: [], consistency: [] };
         this.runsLoadedDraftId = null;
         this.selectedRunId = null;
+        this.selectedKonfliktIdx = null;
         if (this.drafts.length > 0) this.selectDraft(this.drafts[0].id);
       }
     } catch (e) {

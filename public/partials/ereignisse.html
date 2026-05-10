@@ -8,7 +8,7 @@
   hier in der Sub-Komponente.
 -->
 <div class="card" x-data="ereignisseCard" x-show="$app.showEreignisseCard" x-cloak>
-  <div class="card-header card-header--subline card-header--sticky">
+  <div class="card-header card-header--subline">
     <div class="card-header-titlebar">
       <span class="card-title" x-text="$app.t('events.title', { name: $app.selectedBookName })"></span>
       <div class="card-subline" x-show="$app.alleAktualisierenLastRun && !ereignisseLoading && !zeitstrahlConsolidating">
@@ -33,7 +33,7 @@
   <div x-show="$app.globalZeitstrahl.length === 0 && !zeitstrahlConsolidating && !ereignisseLoading" class="card-status" x-text="$app.t('common.noDataYet')"></div>
 
   <!-- Filter -->
-  <div x-show="$app.globalZeitstrahl.length > 0" class="filter-bar filter-bar--sticky">
+  <div x-show="$app.globalZeitstrahl.length > 0" class="filter-bar">
     <input type="text" x-model="$app.ereignisseFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
     <div x-data="combobox($app.t('filter.figur'), $app.t('filter.allFiguren'))"
          x-modelable="value" x-model="$app.ereignisseFilters.figurId"
