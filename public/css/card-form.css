@@ -175,7 +175,7 @@ select:focus {
   top: 100%;
   left: 0;
   right: 0;
-  z-index: 200;
+  z-index: var(--z-header);
   background: var(--color-surface);
   border: 0.5px solid var(--color-border-focus);
   border-top: none;
@@ -248,8 +248,89 @@ select:focus {
 .combobox-wrap--compact .combobox-empty { font-size: var(--size-compact-font-size); padding: 5px 8px; }
 
 /* === Form-Patterns (in Karten wiederverwendbar) ===
-   Ergaenzen die Grid-Klassen .book-settings-row / -label / -form aus
-   kontinuitaet.css. Komplettes Markup-Muster siehe DESIGN.md "Form-Patterns". */
+   Grid-Klassen .card-form-grid / -row / -label und Wertspalten-Bausteine
+   .form-stack / -inline / -check etc. Komplettes Markup-Muster siehe
+   DESIGN.md "Form-Patterns". */
+
+.card-form-grid {
+  padding: 4px 0 8px;
+}
+.card-form-row {
+  display: grid;
+  grid-template-columns: 170px 1fr;
+  align-items: start;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+.card-form-row--top {
+  align-items: flex-start;
+}
+.card-form-label {
+  font-weight: 700;
+  font-size: 13px;
+  padding-top: 6px;
+  color: var(--color-text);
+}
+.card-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.card-form-field-note {
+  font-size: 12px;
+  color: var(--color-muted);
+  margin: 0;
+  line-height: 1.4;
+}
+.card-form-section-divider {
+  font-size: 12px;
+  color: var(--color-muted);
+  line-height: 1.4;
+  margin: 22px 0 14px;
+  padding-top: 14px;
+  border-top: 0.5px solid var(--color-border);
+}
+.card-form-saved {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--color-success);
+  font-weight: 400;
+}
+.card-form-error {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--color-err-text);
+}
+.card-form-textarea {
+  width: 100%;
+  font-size: 13px;
+  font-family: inherit;
+  padding: 6px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  resize: vertical;
+  line-height: 1.5;
+  box-sizing: border-box;
+}
+
+/* Validation-State: aria-invalid="true" reicht — kein paralleler Klassen-State.
+   Screen-Reader liest aria-invalid; Selektor leitet Optik daraus ab. */
+input[aria-invalid="true"],
+textarea[aria-invalid="true"],
+select[aria-invalid="true"],
+.card-form-textarea[aria-invalid="true"] {
+  border-color: var(--color-err-border);
+  outline-color: var(--color-err-border);
+}
+.card-form-hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  text-align: right;
+  margin: 0;
+}
 
 .form-lead {
   margin: 4px 0 14px;
@@ -334,6 +415,13 @@ select:focus {
 }
 
 @media (max-width: 600px) {
+  .card-form-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  .card-form-label {
+    padding-top: 0;
+  }
   .form-inline {
     gap: 10px 16px;
   }

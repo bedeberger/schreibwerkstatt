@@ -3,7 +3,7 @@ const express = require('express');
 const {
   makeJobLogger, updateJob, completeJob, failJob, i18nError,
   aiCall, getPrompts, getBookPrompts,
-  fmtTok, tps,
+  tps,
   jobs, runningJobs, createJob, enqueueJob, jobKey, findActiveJobId,
   jsonBody,
 } = require('./shared');
@@ -16,7 +16,7 @@ async function runSynonymJob(jobId, wort, satz, bookId, userEmail) {
   const { buildSynonymPrompt, SCHEMA_SYNONYM } = await getPrompts();
   const { SYSTEM_SYNONYM } = await getBookPrompts(bookId, userEmail);
   try {
-    logger.info(`Start: Synonym für «${wort}» (book=${bookId || '-'})`);
+    logger.info(`Start: «${wort}»`);
     updateJob(jobId, { statusText: 'job.phase.searchingSynonyms', progress: 10 });
 
     const tok = { in: 0, out: 0, ms: 0 };
@@ -40,10 +40,10 @@ async function runSynonymJob(jobId, wort, satz, bookId, userEmail) {
         return true;
       });
 
-    completeJob(jobId, { synonyme, tokensIn: tok.in, tokensOut: tok.out }, tps(tok));
-    logger.info(`Synonym «${wort}» fertig (${synonyme.length} Vorschläge, ${fmtTok(tok.in)}↑ ${fmtTok(tok.out)}↓ Tokens)`);
+    completeJob(jobId, { synonyme, tokensIn: tok.in, tokensOut: tok.out },
+      tps(tok), `«${wort}» ${synonyme.length} Vorschläge`);
   } catch (e) {
-    if (e.name !== 'AbortError') logger.error(`Fehler Synonym «${wort}»: ${e.message}`, { stack: e.stack });
+    if (e.name !== 'AbortError') logger.error(`Fehler «${wort}»: ${e.message}`, { stack: e.stack });
     failJob(jobId, e);
   }
 }

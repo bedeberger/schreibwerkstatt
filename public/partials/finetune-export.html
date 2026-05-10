@@ -4,7 +4,7 @@
   `showFinetuneExportCard` bleibt im Root (Hash-Router + Exklusivitaet),
   fachlicher State in dieser Komponente.
 
-  Markup-Konvention: Form-Geometrie (book-settings-form / -row / -label) und
+  Markup-Konvention: Form-Geometrie (card-form-grid / -row / -label) und
   Form-Patterns (form-stack / form-check / form-inline / form-num) sind
   geteilt mit book-settings.html / user-settings.html. Siehe DESIGN.md.
 -->
@@ -23,10 +23,10 @@
 
   <p class="form-lead" x-text="$app.t('finetune.lead')"></p>
 
-  <div class="book-settings-form">
+  <div class="card-form-grid">
 
-    <div class="book-settings-row">
-      <label class="book-settings-label" x-text="$app.t('finetune.types')"></label>
+    <div class="card-form-row">
+      <label class="card-form-label" x-text="$app.t('finetune.types')"></label>
       <div class="form-stack">
         <label class="form-check">
           <input type="checkbox" id="ft-type-style" name="ft-type-style" x-model="finetuneTypeStyle">
@@ -66,8 +66,8 @@
       </div>
     </div>
 
-    <div class="book-settings-row">
-      <label class="book-settings-label" x-text="$app.t('finetune.length')"></label>
+    <div class="card-form-row">
+      <label class="card-form-label" x-text="$app.t('finetune.length')"></label>
       <div class="form-inline">
         <label class="form-inline-field">
           <span x-text="$app.t('finetune.length.min')"></span>
@@ -80,8 +80,8 @@
       </div>
     </div>
 
-    <div class="book-settings-row">
-      <label class="book-settings-label" x-text="$app.t('finetune.valSplit')"></label>
+    <div class="card-form-row">
+      <label class="card-form-label" x-text="$app.t('finetune.valSplit')"></label>
       <div class="form-inline">
         <label class="form-inline-field">
           <span x-text="$app.t('finetune.valSplit.ratio')"></span>
@@ -94,10 +94,10 @@
       </div>
     </div>
 
-    <p class="book-settings-section-divider" x-text="$app.t('finetune.ai.lead')"></p>
+    <p class="card-form-section-divider" x-text="$app.t('finetune.ai.lead')"></p>
 
-    <div class="book-settings-row">
-      <label class="book-settings-label" x-text="$app.t('finetune.ai')"></label>
+    <div class="card-form-row">
+      <label class="card-form-label" x-text="$app.t('finetune.ai')"></label>
       <div class="form-stack">
         <label class="form-check">
           <input type="checkbox" id="ft-ai-reverse" name="ft-ai-reverse" x-model="finetuneAiReversePrompts">
@@ -133,8 +133,8 @@
       </div>
     </div>
 
-    <div class="book-settings-row">
-      <label class="book-settings-label" x-text="$app.t('finetune.unsloth')"></label>
+    <div class="card-form-row">
+      <label class="card-form-label" x-text="$app.t('finetune.unsloth')"></label>
       <div class="form-stack">
         <div class="form-inline">
           <label class="form-inline-field">
@@ -200,7 +200,7 @@
         </button>
       </div>
 
-      <p class="book-settings-hint" x-text="$app.t('finetune.hint.expiry')"></p>
+      <p class="card-form-hint" x-text="$app.t('finetune.hint.expiry')"></p>
     </div>
   </template>
 

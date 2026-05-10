@@ -129,6 +129,15 @@
   margin: 14px 0 8px;
 }
 
+.section-heading-sub {
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 12px 0 6px;
+}
+
 .finding-header {
   display: flex;
   align-items: center;

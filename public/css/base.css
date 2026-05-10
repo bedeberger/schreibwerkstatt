@@ -15,7 +15,7 @@
   position: absolute;
   left: 0.5rem;
   top: -3rem;
-  z-index: 1000;
+  z-index: var(--z-toast);
   background: var(--color-primary);
   color: var(--color-on-primary, #fff);
   padding: 0.5rem 0.875rem;

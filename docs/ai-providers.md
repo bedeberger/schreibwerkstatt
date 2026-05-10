@@ -1,0 +1,147 @@
+# KI-Provider
+
+Code: [lib/ai.js](../lib/ai.js). Drei Provider, ein Vertrag.
+
+## Provider-Auswahl
+
+`API_PROVIDER` in `.env`: `claude` (Default) | `ollama` | `llama`.
+
+| Provider | Env-Vars | Streaming | Tool-Use | Caching |
+|----------|----------|-----------|----------|---------|
+| `claude` | `ANTHROPIC_API_KEY`, `MODEL_NAME` | SSE | Ja (`callAIWithTools`) | `cache_control: ephemeral`, optional `ttl: '1h'` |
+| `ollama` | `OLLAMA_HOST`, `OLLAMA_MODEL`, `OLLAMA_TEMPERATURE` | NDJSON | Nein | Nein |
+| `llama` | `LLAMA_HOST`, `LLAMA_MODEL`, `LLAMA_TEMPERATURE` | OpenAI-SSE | Nein | Nein |
+
+Ollama + Llama laufen über globalen **Mutex** (`withOllamaLock`/`withLlamaLock`) — VRAM-Schutz, parallele Calls würden Modelle abschmieren lassen. Jobs laufen weiter parallel; nur die KI-Calls serialisieren am Server.
+
+## Token-Budgets
+
+Aus `.env`:
+
+| Var | Default | Bedeutung |
+|-----|---------|-----------|
+| `MODEL_CONTEXT` | 200 000 | Gesamtes Kontextfenster (Input + Output). Bei lokalen Modellen auf native Kontextgrösse setzen (Mistral-Small3.2 / Llama-3.1: 128 000). |
+| `MODEL_TOKEN` | 64 000 | Output-Cap (`MAX_TOKENS_OUT`). Job-spezifische Overrides per `Math.min` gedeckelt. |
+| `CHARS_PER_TOKEN` | 3 (Claude) / 1.5 (lokal) | Tokenizer-Heuristik für Char-Token-Umrechnung. |
+
+Abgeleitet (`lib/ai.js`):
+- `INPUT_BUDGET_TOKENS = MODEL_CONTEXT − MODEL_TOKEN − 2000` (`CONTEXT_SAFETY_MARGIN`).
+- `INPUT_BUDGET_CHARS = INPUT_BUDGET_TOKENS × CHARS_PER_TOKEN`.
+
+Hard-Check: `MODEL_TOKEN + 2000 < MODEL_CONTEXT`, sonst Crash beim Start (verhindert lokale-Provider-400-Fehler durch `max_tokens > num_ctx`).
+
+Job-Konstanten skalieren automatisch:
+- `SINGLE_PASS_LIMIT = 0.7 × INPUT_BUDGET_CHARS`
+- `PER_CHUNK_LIMIT  = 0.35 × INPUT_BUDGET_CHARS`
+- `BOOK_CHAT_TOKEN_BUDGET` Default + Tool-Result-Caps + Classic-Buch-Chat-Text-Budget.
+
+## API: callAI
+
+```js
+const { callAI } = require('../../lib/ai');
+
+const { text, truncated, tokensIn, tokensOut, cacheReadIn, cacheCreationIn } = await callAI(
+  userPrompt,
+  systemPrompt,                          // String oder Array (s.u.)
+  onProgress,                            // ({ chars, tokIn, delta }) => void
+  maxTokensOverride,                     // optional, gedeckelt durch MODEL_TOKEN
+  signal,                                // AbortController.signal
+  provider,                              // optional, default API_PROVIDER
+  jsonSchema,                            // optional, GBNF-Constrained nur lokal
+);
+```
+
+**`systemPrompt` als Array** = mehrere Cache-Breakpoints (nur Claude):
+
+```js
+[{ text: bookText, ttl: '1h' }, { text: phaseSystem }]
+// Claude: zwei cache_control-Blöcke (1h-Buch + 5min-Phase)
+// Lokal:  zu einem String geflattet
+```
+
+**`callAIChat(messages, ...)`** — Multi-Turn-Variante mit Messages-Array.
+
+**`callAIWithTools(messages, system, tools, ...)`** — Tool-Use, nur Claude. Wirft für Ollama/Llama. Caller verwaltet Loop: bei `stopReason === 'tool_use'` Tool-Results als `tool_result`-Blocks anhängen und neu callen.
+
+## JSON-Pflicht
+
+Jeder Systemprompt MUSS JSON-only erzwingen — `JSON_ONLY`-Konstante aus [public/js/prompts/state.js](../public/js/prompts/state.js).
+
+Nach `callAI` ist Schema-Validierung Pflicht:
+
+```js
+const { text, truncated } = await callAI(...);
+if (truncated) throw new Error('Output abgeschnitten — max_tokens erreicht.');
+//                  ^^ IMMER vor parseJSON werfen, sonst liefert jsonrepair
+//                     tolerant Partial-Daten (silent partial bug).
+
+const parsed = parseJSON(text);
+if (!parsed.fehler) throw new Error('Pflichtfeld `fehler` fehlt.');
+```
+
+`truncated`-Check zuerst, dann Parse, dann Pflichtfeld-Check.
+
+## JSON-Parse-Fallback-Kette
+
+`parseJSON(text)` in [lib/ai.js](../lib/ai.js) (Lines 810+):
+
+1. Strip ```` ```json ```` -Fences, trim.
+2. `JSON.parse()` direkt.
+3. `extractBalancedJson()` — typ-sensitiver Stack, findet erstes balanciertes `{...}`.
+4. `jsonrepair()` (toleranter Repairer).
+5. `escapeUnescapedQuotes()` — escapet ASCII-`"` mitten in String-Werten (typisch: lokale Modelle vergessen Escape bei Anführungszeichen-Beispielen).
+6. `jsonrepair(escaped)`.
+7. Bei Fail: `_dumpParseFail` schreibt Rohtext in `ai_parse_fails/` (rotiert auf 50 Files), wirft mit Position-Preview.
+
+`parseJSONLenient(text, [stringFields])` — schluckt Parse-Fehler, extrahiert benannte String-Felder einzeln per Regex (akzeptiert ASCII + typografische + DE/CH/FR-Quotes). Für User-Prosa-Rettung statt Job-Fail.
+
+## Grammar-Constrained Decoding (lokal)
+
+Optionales 7. Argument `jsonSchema`:
+- **Llama**: `response_format: { type: 'json_schema', json_schema: { strict: true, schema } }` → GBNF-Grammar erzwingt Schema-Konformität + korrekt escapete Strings.
+- **Ollama**: `format: <schema>` mit demselben Effekt.
+- **Claude**: ignoriert (Claude nutzt prompt-basierte Schema-Validierung).
+
+Fixt die "unescaped `"` im String"-Klasse von Bugs, die mistral-small3.2 ohne Schema produziert.
+
+## Retries (nur Claude)
+
+Transiente Fehler retryen mit Exp-Backoff (1s/2s/4s + Jitter, max `CLAUDE_RETRY_MAX`=3):
+- HTTP 429 (Rate-Limit) — respektiert `retry-after`-Header.
+- HTTP 529 (Overloaded).
+- Stream-Event `overloaded_error` — nur retry wenn noch kein Text emittiert (sonst Output-Duplikat).
+
+Nicht-retryable: alle anderen Status-Codes.
+
+## Timeouts (Claude)
+
+Hard-Timeout via `CLAUDE_TIMEOUT_MS` (Default 10 min). `_combineSignals` merged User-Cancel und Timeout in einen AbortController. Marker `state.timedOut` unterscheidet Timeout (`code: 'AI_TIMEOUT'`) von User-Cancel (`AbortError`).
+
+## Connection-Fehler (lokal)
+
+`_connErrorCode` erkennt `ECONNREFUSED`/`ENOTFOUND`/`EHOSTUNREACH`/`ETIMEDOUT`/`EAI_AGAIN`/`ECONNRESET`/`ENETUNREACH` + node-fetch-`fetch failed`. Wirft i18n-keyed `error.OLLAMA_UNREACHABLE`/`error.LLAMA_UNREACHABLE` mit `i18nParams: { host, detail }`.
+
+## Sicherheits-Abbruch (lokal)
+
+Während Streaming: wenn `estimatedOut > MAX_OUTPUT_RATIO × estimatedIn` (= 4×) → Abbruch + `truncated=true`. Schützt gegen Wiederholungs-Schleifen lokaler Modelle.
+
+## Token-Tracking
+
+Rückgabe enthält:
+- `tokensIn` — Input-Tokens (inklusive Cache-Read + Cache-Creation bei Claude).
+- `tokensOut` — generierte Output-Tokens.
+- `cacheReadIn`, `cacheCreationIn` — Claude only, sonst 0.
+- `truncated: bool` — `stop_reason === 'max_tokens'`.
+- `genDurationMs` — Generation-Dauer ohne Setup-Zeit.
+
+Lokale Provider: bei vollständigem Cache-Hit (`prompt_eval_count=0`) Fallback auf Char-Schätzung, damit Anzeige nicht 0 wird. Während Streaming KEIN Schätzwert für `tokIn` — sonst weicht Job-Status vom finalen `usage` ab.
+
+## Provider-Unterschiede in Prompts
+
+`_isLocal`-Flag aus [public/js/prompts/state.js](../public/js/prompts/state.js) wird in `configurePrompts` gesetzt. Lokale Modelle bekommen abgespeckte Prompts (kein POV-/Tempus-Block, keine Figuren-Beziehungen, kein Vorseiten-Kontext) — sparen Tokens, weil lokale Kontextfenster meist 32-128K statt 200K sind.
+
+Schemas werden per `_rebuildLektoratSchema()`/`_rebuildKomplettSchemas()` provider-spezifisch neu gebaut **vor** `configureLocales`.
+
+## Chat-Temperatur
+
+`CHAT_TEMPERATURE`-Env überschreibt Provider-Defaults nur für Seiten-Chat und Buch-Chat. Andere Job-Typen (Review, Lektorat, Komplett) bleiben deterministisch (Temp 0.1-0.2).

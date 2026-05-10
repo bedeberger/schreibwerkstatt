@@ -1,0 +1,292 @@
+'use strict';
+
+/** Mergt duplizierte Figuren anhand des normalisierten Namens (case-insensitive).
+ *  Fängt Fälle ab, in denen kleine Modelle (Ollama/llama) die Dedup-Regel in
+ *  Phase 2 nicht befolgen. Verschmilzt Kapitel, Eigenschaften und Beziehungen.
+ *  Remappt beziehungen.figur_id auf die kanonische ID und entfernt Selbst-Referenzen.
+ *  Zweistufig:
+ *    Stufe 1: exakter normalisierter Name (titel-/whitespace-bereinigt).
+ *    Stufe 2: Teilname-Match (ein Name ist Teilmenge des anderen) plus mind. 2 Indizien
+ *             (Beruf, Geburtsjahr, gemeinsames Kapitel, gleiches Geschlecht, geteilte Beziehung).
+ *             Strenger Schutz: verschiedene Vornamen mit gleichem Nachnamen («Paul Schmidt»
+ *             vs. «Marta Schmidt») werden NICHT zusammengeführt. */
+const TITLE_PREFIX_RE = /^(?:dr\.?|doktor|prof\.?|professor|herrn?|hr\.?|frau|fr\.?|fräulein)\s+/;
+const NAME_STOPWORDS = new Set(['von', 'zu', 'van', 'der', 'die', 'das', 'den', 'dem', 'de', 'la']);
+
+function _normalizeName(s) {
+  let r = (s || '').toLowerCase().trim().replace(/\s+/g, ' ');
+  while (TITLE_PREFIX_RE.test(r)) r = r.replace(TITLE_PREFIX_RE, '');
+  return r;
+}
+
+function _nameTokens(name) {
+  return _normalizeName(name)
+    .split(/[\s\-\.]+/)
+    .filter(t => t.length > 1 && !NAME_STOPWORDS.has(t));
+}
+
+/** Fasst zwei Figuren zu einer kanonischen Figur zusammen. `canon` wird mutiert.
+ *  Gibt nichts zurück – Caller kümmert sich um idRemap. */
+function _mergeFigurInto(canon, other) {
+  for (const field of ['kurzname', 'typ', 'geburtstag', 'geschlecht', 'beruf', 'wohnadresse', 'sozialschicht',
+                       'rolle', 'motivation', 'konflikt', 'entwicklung', 'erste_erwaehnung', 'praesenz']) {
+    if (!canon[field] && other[field]) canon[field] = other[field];
+  }
+  if (!canon.beschreibung && other.beschreibung) canon.beschreibung = other.beschreibung;
+  const zit = new Set([...(canon.schluesselzitate || []), ...(other.schluesselzitate || [])]);
+  canon.schluesselzitate = [...zit].slice(0, 3);
+  const kapByName = new Map();
+  for (const k of (canon.kapitel || [])) kapByName.set(k.name, k.haeufigkeit || 1);
+  for (const k of (other.kapitel || [])) {
+    kapByName.set(k.name, (kapByName.get(k.name) || 0) + (k.haeufigkeit || 1));
+  }
+  canon.kapitel = [...kapByName.entries()].map(([name, haeufigkeit]) => ({ name, haeufigkeit }));
+  const eigSet = new Set([...(canon.eigenschaften || []), ...(other.eigenschaften || [])]);
+  canon.eigenschaften = [...eigSet];
+  const bzByFig = new Map();
+  for (const b of (canon.beziehungen || [])) bzByFig.set(b.figur_id, b);
+  for (const b of (other.beziehungen || [])) if (!bzByFig.has(b.figur_id)) bzByFig.set(b.figur_id, b);
+  canon.beziehungen = [...bzByFig.values()];
+}
+
+/** Zählt Indizienpunkte für zwei Figuren (Nachnamen-Match-Check). */
+function _indicatorScore(a, b) {
+  let score = 0;
+  const ba = (a.beruf || '').toLowerCase().trim();
+  const bb = (b.beruf || '').toLowerCase().trim();
+  if (ba && bb && ba === bb) score += 1;
+  if (a.geburtstag && b.geburtstag && a.geburtstag === b.geburtstag) score += 2;
+  const kapA = new Set((a.kapitel || []).map(k => k.name));
+  for (const k of (b.kapitel || [])) if (kapA.has(k.name)) { score += 1; break; }
+  const ga = (a.geschlecht || '').toLowerCase();
+  const gb = (b.geschlecht || '').toLowerCase();
+  if (ga && gb && ga !== 'unbekannt' && gb !== 'unbekannt' && ga === gb) score += 1;
+  if (a.typ && b.typ && a.typ === b.typ && a.typ !== 'andere') score += 1;
+  const relA = new Set((a.beziehungen || []).map(x => x.figur_id));
+  for (const bz of (b.beziehungen || [])) if (relA.has(bz.figur_id)) { score += 2; break; }
+  return score;
+}
+
+/** Stufe 2: Teilnamens-Fusion. Nur wenn ein Name Teilmenge des anderen ist
+ *  (nach Token-Normalisierung). Verschiedene Vornamen mit gleichem Nachnamen
+ *  → disjunkte Tokens → keine Fusion. */
+function _mergeByPartialName(figuren, idRemap) {
+  const tokens = figuren.map(f => _nameTokens(f.name));
+  const merged = [];
+  const consumed = new Set();
+  for (let i = 0; i < figuren.length; i++) {
+    if (consumed.has(i)) continue;
+    const canon = { ...figuren[i] };
+    let fused = 0;
+    for (let j = i + 1; j < figuren.length; j++) {
+      if (consumed.has(j)) continue;
+      const ta = tokens[i], tb = tokens[j];
+      if (!ta.length || !tb.length) continue;
+      const aInB = ta.every(t => tb.includes(t));
+      const bInA = tb.every(t => ta.includes(t));
+      if (!aInB && !bInA) continue;
+      if (_indicatorScore(canon, figuren[j]) < 2) continue;
+      idRemap[figuren[j].id] = canon.id;
+      _mergeFigurInto(canon, figuren[j]);
+      consumed.add(j);
+      fused++;
+    }
+    if (fused > 0) canon.__fusedInStage2 = fused;
+    merged.push(canon);
+  }
+  return merged;
+}
+
+/** Rollierender Dedup VOR Phase 2: geht chapterFiguren in Reihenfolge durch,
+ *  baut eine kanonische Map (normalisierter Name → Figur) auf und entfernt
+ *  Duplikate aus folgenden Kapiteln. Kapitel-Einträge werden aggregiert,
+ *  Eigenschaften verschmolzen. Beziehungen bleiben kapitel-lokal (werden erst
+ *  von Phase 2 konsolidiert) – wir würden sonst die lokalen fig_id-Referenzen
+ *  brechen. Reduziert die Eingabegrösse für den Phase-2-Konsolidierungs-Call
+ *  und fängt Fälle ab in denen Phase 2 trotz Hinweis Duplikate stehen lässt. */
+function preMergeChapterFiguren(chapterFiguren) {
+  const canonical = new Map();
+  const canonicalList = [];
+  const merged = chapterFiguren.map(c => ({ kapitel: c.kapitel, figuren: [] }));
+  let dupesRemoved = 0;
+
+  for (let ci = 0; ci < chapterFiguren.length; ci++) {
+    for (const f of (chapterFiguren[ci].figuren || [])) {
+      const key = _normalizeName(f.name);
+      if (!key) continue;
+      let canon = canonical.get(key);
+
+      if (!canon) {
+        const tokA = _nameTokens(f.name);
+        if (tokA.length) {
+          for (const entry of canonicalList) {
+            const tokB = _nameTokens(entry.figur.name);
+            if (!tokB.length) continue;
+            const aInB = tokA.every(t => tokB.includes(t));
+            const bInA = tokB.every(t => tokA.includes(t));
+            if (!aInB && !bInA) continue;
+            if (_indicatorScore(entry.figur, f) >= 2) { canon = entry.figur; break; }
+          }
+        }
+      }
+
+      if (canon) {
+        for (const field of ['kurzname', 'typ', 'geburtstag', 'geschlecht', 'beruf', 'wohnadresse', 'sozialschicht',
+                             'rolle', 'motivation', 'konflikt', 'entwicklung', 'erste_erwaehnung', 'praesenz',
+                             'beschreibung']) {
+          if (!canon[field] && f[field]) canon[field] = f[field];
+        }
+        const zit = new Set([...(canon.schluesselzitate || []), ...(f.schluesselzitate || [])]);
+        canon.schluesselzitate = [...zit].slice(0, 3);
+        const eig = new Set([...(canon.eigenschaften || []), ...(f.eigenschaften || [])]);
+        canon.eigenschaften = [...eig];
+        const kapByName = new Map();
+        for (const k of (canon.kapitel || [])) kapByName.set(k.name, k.haeufigkeit || 1);
+        for (const k of (f.kapitel || [])) {
+          kapByName.set(k.name, (kapByName.get(k.name) || 0) + (k.haeufigkeit || 1));
+        }
+        canon.kapitel = [...kapByName.entries()].map(([name, haeufigkeit]) => ({ name, haeufigkeit }));
+        dupesRemoved++;
+      } else {
+        merged[ci].figuren.push(f);
+        canonical.set(key, f);
+        canonicalList.push({ normKey: key, figur: f });
+      }
+    }
+  }
+
+  return { chapterFiguren: merged, dupesRemoved };
+}
+
+/** Welle 4 · #12 – Mode-Vote für Sozialschicht (lokale Modelle).
+ *  Phase 2 (Konsolidierung) bei kleinen Modellen wählt die sozialschicht
+ *  manchmal aus einem Nebenkapitel, obwohl drei andere Kapitel einheitlich
+ *  anders votiert haben. Hier korrigieren wir per Mehrheitsabstimmung über
+ *  die Phase-1-Rohdaten (nach rollierendem Pre-Merge normalisiert per Name).
+ *  Claude läuft durch den holistischen Refine-Call und braucht das nicht. */
+function applySozialschichtModeVote(chapterFiguren, figuren) {
+  const votes = new Map();
+  for (const c of (chapterFiguren || [])) {
+    for (const f of (c.figuren || [])) {
+      if (!f?.name || !f?.sozialschicht) continue;
+      const key = _normalizeName(f.name);
+      if (!votes.has(key)) votes.set(key, {});
+      votes.get(key)[f.sozialschicht] = (votes.get(key)[f.sozialschicht] || 0) + 1;
+    }
+  }
+  let changes = 0;
+  for (const f of figuren) {
+    const v = votes.get(_normalizeName(f.name));
+    if (!v) continue;
+    const entries = Object.entries(v);
+    if (entries.length < 2) continue;
+    entries.sort((a, b) => b[1] - a[1]);
+    if (entries[0][1] === entries[1][1]) continue;
+    const mode = entries[0][0];
+    if (mode && mode !== f.sozialschicht) {
+      f.sozialschicht = mode;
+      changes++;
+    }
+  }
+  return changes;
+}
+
+function mergeDuplicateFiguren(figuren) {
+  const groups = new Map();
+  for (const f of figuren) {
+    const key = _normalizeName(f.name);
+    if (!key) continue;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(f);
+  }
+
+  const idRemap = {};
+  let stage1 = [];
+  for (const group of groups.values()) {
+    if (group.length === 1) { stage1.push(group[0]); continue; }
+    group.sort((a, b) => (b.beschreibung?.length || 0) - (a.beschreibung?.length || 0));
+    const canon = { ...group[0] };
+    for (const other of group.slice(1)) {
+      idRemap[other.id] = canon.id;
+      _mergeFigurInto(canon, other);
+    }
+    stage1.push(canon);
+  }
+  const stage1Saved = figuren.length - stage1.length;
+
+  const stage2 = _mergeByPartialName(stage1, idRemap);
+  const stage2Saved = stage1.length - stage2.length;
+
+  const validIds = new Set(stage2.map(f => f.id));
+  for (const f of stage2) {
+    const seen = new Map();
+    for (const b of (f.beziehungen || [])) {
+      const mappedId = idRemap[b.figur_id] || b.figur_id;
+      if (mappedId === f.id || !validIds.has(mappedId)) continue;
+      if (!seen.has(mappedId)) seen.set(mappedId, { ...b, figur_id: mappedId });
+    }
+    f.beziehungen = [...seen.values()];
+    delete f.__fusedInStage2;
+  }
+
+  return { figuren: stage2, mergedCount: stage1Saved + stage2Saved, stage1Saved, stage2Saved, idRemap };
+}
+
+/** Sanity-Check + Rettung für Beziehungs-Beschreibungen (nur Lokal-KI).
+ *  Lokale Modelle verrutschen oft Beschreibungen zwischen Beziehungen (z.B.
+ *  «Sebastian ist Roberts Freund» auf der Relation Robert→Herr Koch).
+ *  Zweistufig:
+ *    1. Wenn die Beschreibung genau eine andere Figur des Buchs erwähnt und
+ *       diese Figur eine bestehende beziehung (des gleichen Besitzers) ohne
+ *       Beschreibung hat: Beschreibung dorthin verschieben.
+ *    2. Sonst: Beschreibung leeren (typ + Paar bleiben erhalten).
+ *  Gibt { cleared, moved } zurück. */
+function validateBeziehungenDescriptions(figuren) {
+  const idToNames = Object.fromEntries(
+    figuren.map(f => [f.id, [f.name, f.kurzname].filter(Boolean).map(s => s.toLowerCase())])
+  );
+  const allNames = figuren.map(f => ({
+    id: f.id,
+    names: [f.name, f.kurzname].filter(Boolean).map(s => s.toLowerCase()),
+  }));
+  let cleared = 0, moved = 0;
+  for (const f of figuren) {
+    for (const bz of (f.beziehungen || [])) {
+      if (!bz.beschreibung) continue;
+      const currentNames = idToNames[bz.figur_id] || [];
+      if (!currentNames.length) continue;
+      const text = bz.beschreibung.toLowerCase();
+      if (currentNames.some(n => text.includes(n))) continue;
+
+      const candidates = allNames.filter(c =>
+        c.id !== f.id && c.id !== bz.figur_id && c.names.some(n => text.includes(n))
+      );
+      if (candidates.length === 1) {
+        const target = candidates[0];
+        const existing = (f.beziehungen || []).find(x => x.figur_id === target.id);
+        if (existing) {
+          if (!existing.beschreibung) {
+            existing.beschreibung = bz.beschreibung;
+            bz.beschreibung = null;
+            moved++;
+            continue;
+          }
+        } else {
+          (f.beziehungen || []).push({ figur_id: target.id, typ: bz.typ, beschreibung: bz.beschreibung,
+            ...(bz.machtverhaltnis != null ? { machtverhaltnis: bz.machtverhaltnis } : {}) });
+          bz.beschreibung = null;
+          moved++;
+          continue;
+        }
+      }
+      bz.beschreibung = null;
+      cleared++;
+    }
+  }
+  return { cleared, moved };
+}
+
+module.exports = {
+  preMergeChapterFiguren, applySozialschichtModeVote,
+  mergeDuplicateFiguren, validateBeziehungenDescriptions,
+};

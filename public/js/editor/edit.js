@@ -268,6 +268,25 @@ export const editorEditMethods = {
       if (!okShort) return;
     }
 
+    const conflict = await this._checkPageConflict(this.currentPage.id, this.currentPage.updated_at);
+    if (conflict) {
+      const okOverwrite = await this.appConfirm({
+        message: this.t('edit.conflict.message', {
+          user: conflict.remoteUserName || this.t('edit.conflict.unknownUser'),
+          time: this.formatDate(conflict.remoteUpdatedAt),
+        }),
+        confirmLabel: this.t('edit.conflict.saveAnyway'),
+        danger: true,
+      });
+      if (!okOverwrite) {
+        writeDraft(this.currentPage.id, newHtml, this.originalHtml, this.currentPage.updated_at);
+        this.lastDraftSavedAt = Date.now();
+        this.saveOffline = true;
+        this.setStatus(this.t('edit.conflict.kept'), false, 6000);
+        return;
+      }
+    }
+
     this.editSaving = true;
     this.setStatus(this.t('edit.saving'), true);
     try {
@@ -349,6 +368,18 @@ export const editorEditMethods = {
     // absetzen. Vorher prüfte nur saveEdit dieses Flag, quickSave nicht.
     this.editSaving = true;
     try {
+      // Silent-Path: Auto-Save / Pre-Send-Refresh dürfen keinen Modal triggern.
+      // Bei Cross-User-Konflikt → Draft bleibt liegen, saveOffline-Banner zeigt
+      // Hinweis. User muss explizit Save-Button drücken (saveEdit), dort fragt
+      // appConfirm dann nach Überschreiben.
+      const conflict = await this._checkPageConflict(this.currentPage.id, this.currentPage.updated_at);
+      if (conflict) {
+        this.saveOffline = true;
+        this.setStatus(this.t('edit.conflict.unsavedHint', {
+          user: conflict.remoteUserName || this.t('edit.conflict.unknownUser'),
+        }), false, 8000);
+        return;
+      }
       const saved = await this.bsPut('pages/' + this.currentPage.id, {
         html: newHtml,
         name: this.currentPage.name,

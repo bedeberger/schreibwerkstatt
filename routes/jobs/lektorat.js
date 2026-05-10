@@ -5,7 +5,7 @@ const {
   makeJobLogger, updateJob, completeJob, failJob, i18nError,
   aiCall, getPrompts, getBookPrompts,
   htmlToText, bsGet, bsGetAll, jobAbortControllers,
-  _modelName, fmtTok, tps,
+  _modelName, tps,
   jobs, runningJobs, createJob, enqueueJob, jobKey, findActiveJobId,
   jsonBody,
 } = require('./shared');
@@ -94,7 +94,7 @@ async function runCheckJob(jobId, pageId, bookId, userEmail, userToken) {
   const locale = bookId ? getBookLocale(bookId, userEmail) : 'de-CH';
   const bookSettings = bookId ? getBookSettings(bookId, userEmail) : null;
   try {
-    logger.info(`Start: Seite #${pageId} (book=${bookId || '-'})`);
+    logger.info(`Start: Seite #${pageId}`);
     updateJob(jobId, { statusText: 'job.phase.loadingPageContent', progress: 5 });
 
     const pd = await bsGet('pages/' + pageId, userToken);
@@ -177,10 +177,9 @@ async function runCheckJob(jobId, pageId, bookId, userEmail, userToken) {
       checkId: info.lastInsertRowid,
       tokensIn: tok.in,
       tokensOut: tok.out,
-    }, tps(tok));
-    logger.info(`«${pd.name}» fertig (page=${pageId}, book=${bookId || '-'}, chap=${pd.chapter_id || '-'}, ${result.fehler.length} Beanstandungen, ${fmtTok(tok.in)}↑ ${fmtTok(tok.out)}↓ Tokens)`);
+    }, tps(tok), `«${pd.name}» page=${pageId}, chap=${pd.chapter_id || '-'}, ${result.fehler.length} Beanstandungen`);
   } catch (e) {
-    if (e.name !== 'AbortError') logger.error(`Fehler (page=${pageId}, book=${bookId || '-'}): ${e.message}`, { stack: e.stack });
+    if (e.name !== 'AbortError') logger.error(`Fehler (page=${pageId}): ${e.message}`, { stack: e.stack });
     failJob(jobId, e);
   }
 }
@@ -200,7 +199,7 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
     const pages = await bsGetAll('pages?filter[book_id]=' + bookId, userToken);
     if (!pages.length) { completeJob(jobId, { empty: true }); return; }
-    logger.info(`Start: ${pages.length} Seiten (book=${bookId})`);
+    logger.info(`Start: ${pages.length} Seiten`);
 
     // Cloud-Provider verträgt parallele Calls; lokale Provider (Ollama/llama.cpp) sind
     // bereits via Mutex in lib/ai.js serialisiert – Pool=1 verhindert pile-up im aiCall.
@@ -278,10 +277,10 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
             fehler.length, JSON.stringify(fehler),
             szenenBatch.length > 0 ? JSON.stringify(szenenBatch) : null,
             result.stilanalyse || null, result.fazit || null, model, userEmail || null);
-        logger.info(`[${i + 1}/${pages.length}] «${pd.name}» fertig (page=${p.id}, chap=${p.chapter_id || '-'}, ${fehler.length} Beanstandungen)`);
+        logger.info(`[${i + 1}/${pages.length}] «${pd.name}» page=${p.id}, ${fehler.length} Beanstandungen`);
       } catch (e) {
         if (e.name === 'AbortError') throw e;
-        logger.warn(`[${i + 1}/${pages.length}] «${p.name}» übersprungen (page=${p.id}, chap=${p.chapter_id || '-'}): ${e.message}`);
+        logger.warn(`[${i + 1}/${pages.length}] «${p.name}» übersprungen (page=${p.id}): ${e.message}`);
         return;
       }
       done++;
@@ -304,10 +303,10 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
     });
     await Promise.all(workers);
 
-    completeJob(jobId, { pageCount: pages.length, done, totalErrors, tokensIn: tok.in, tokensOut: tok.out }, tps(tok));
-    logger.info(`Fertig: ${done}/${pages.length} Seiten (book=${bookId}), ${totalErrors} Beanstandungen, ${fmtTok(tok.in)}↑ ${fmtTok(tok.out)}↓ Tokens`);
+    completeJob(jobId, { pageCount: pages.length, done, totalErrors, tokensIn: tok.in, tokensOut: tok.out },
+      tps(tok), `${done}/${pages.length} Seiten, ${totalErrors} Beanstandungen`);
   } catch (e) {
-    if (e.name !== 'AbortError') logger.error(`Fehler (book=${bookId}): ${e.message}`, { stack: e.stack });
+    if (e.name !== 'AbortError') logger.error(`Fehler: ${e.message}`, { stack: e.stack });
     failJob(jobId, e);
   }
 }

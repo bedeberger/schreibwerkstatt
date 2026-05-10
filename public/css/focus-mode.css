@@ -14,7 +14,7 @@ body.focus-mode #editor-card {
   top: var(--focus-vh-top, 0px);
   height: var(--focus-vh, 100vh);
   max-height: var(--focus-vh, 100vh);
-  z-index: 1000;
+  z-index: var(--z-overlay);
   margin: 0;
   border-radius: 0;
   border: none;

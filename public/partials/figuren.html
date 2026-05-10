@@ -28,10 +28,10 @@
   <div x-show="$app.figuren.length > 0" class="figur-graph-section">
 
     <!-- Modus-Toggle -->
-    <div class="figur-modus-toggle">
-      <button type="button" class="figur-modus-btn" :class="{ 'figur-modus-btn--active': figurenGraphModus === 'figur' }" @click="setFigurenGraphModus('figur')" x-text="$app.t('figuren.modeGraph')"></button>
-      <button type="button" class="figur-modus-btn" :class="{ 'figur-modus-btn--active': figurenGraphModus === 'familie', 'figur-modus-btn--disabled': !figurenHasFamilyEdges() }" :disabled="!figurenHasFamilyEdges()" @click="figurenHasFamilyEdges() && setFigurenGraphModus('familie')" x-text="$app.t('figuren.modeFamilie')"></button>
-      <button type="button" class="figur-modus-btn" :class="{ 'figur-modus-btn--active': figurenGraphModus === 'soziogramm' }" @click="setFigurenGraphModus('soziogramm')" x-text="$app.t('figuren.modeSoziogramm')"></button>
+    <div class="tabs tabs--fullwidth">
+      <button type="button" class="tabs-btn" :class="{ 'tabs-btn--active': figurenGraphModus === 'figur' }" @click="setFigurenGraphModus('figur')" x-text="$app.t('figuren.modeGraph')"></button>
+      <button type="button" class="tabs-btn" :class="{ 'tabs-btn--active': figurenGraphModus === 'familie' }" :disabled="!figurenHasFamilyEdges()" @click="figurenHasFamilyEdges() && setFigurenGraphModus('familie')" x-text="$app.t('figuren.modeFamilie')"></button>
+      <button type="button" class="tabs-btn" :class="{ 'tabs-btn--active': figurenGraphModus === 'soziogramm' }" @click="setFigurenGraphModus('soziogramm')" x-text="$app.t('figuren.modeSoziogramm')"></button>
     </div>
 
     <!-- Legende (klappbar, Chevron-Stil wie Kontinuität) -->

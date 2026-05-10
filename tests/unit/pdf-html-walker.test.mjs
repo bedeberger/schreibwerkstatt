@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { parseHtmlToBlocks } from '../../lib/pdf-html-walker.js';
+import { parseHtmlToBlocks } from '../../lib/pdf-render/html-walker.js';
 
 test('Heading + Paragraph + Inline-Stil', () => {
   const blocks = parseHtmlToBlocks('<h1>Kapitel 1</h1><p>Text mit <strong>fett</strong> und <em>kursiv</em>.</p>');

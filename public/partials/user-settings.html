@@ -17,26 +17,26 @@
 
   <div x-show="userSettingsLoading" class="muted-msg" x-text="$app.t('common.loading')"></div>
 
-  <div x-show="!userSettingsLoading" class="book-settings-form">
+  <div x-show="!userSettingsLoading" class="card-form-grid">
 
-    <div class="book-settings-row">
-      <label class="book-settings-label" x-text="$app.t('profile.account')"></label>
+    <div class="card-form-row">
+      <label class="card-form-label" x-text="$app.t('profile.account')"></label>
       <div class="user-settings-profile">
         <div><strong x-text="userSettingsProfile?.name || '—'"></strong></div>
         <div class="muted-msg muted-msg--sm" x-text="userSettingsProfile?.email || ''"></div>
       </div>
     </div>
 
-    <div class="book-settings-row">
-      <label class="book-settings-label" x-text="$app.t('profile.bookstackToken')"></label>
+    <div class="card-form-row">
+      <label class="card-form-label" x-text="$app.t('profile.bookstackToken')"></label>
       <div class="book-settings-options">
         <button type="button" @click="$app.openTokenChange()" x-text="$app.t('profile.changeToken')"></button>
       </div>
     </div>
 
-    <div class="book-settings-row">
-      <label class="book-settings-label" x-text="$app.t('profile.uiLanguage')"></label>
-      <div class="book-settings-field">
+    <div class="card-form-row">
+      <label class="card-form-label" x-text="$app.t('profile.uiLanguage')"></label>
+      <div class="card-form-field">
         <div class="book-settings-options">
           <label class="book-settings-option">
             <input type="radio" name="us-ui-lang" value="de" :checked="$app.uiLocale === 'de'" @change="$app.changeLocale('de')">
@@ -47,14 +47,14 @@
             <span x-text="$app.t('lang.en')"></span>
           </label>
         </div>
-        <p class="book-settings-field-note" x-text="$app.t('profile.uiLanguageHint')"></p>
+        <p class="card-form-field-note" x-text="$app.t('profile.uiLanguageHint')"></p>
       </div>
     </div>
 
-    <p class="book-settings-section-divider" x-text="$app.t('profile.newBooksHint')"></p>
+    <p class="card-form-section-divider" x-text="$app.t('profile.newBooksHint')"></p>
 
-    <div class="book-settings-row">
-      <label class="book-settings-label" x-text="$app.t('profile.defaultLanguage')"></label>
+    <div class="card-form-row">
+      <label class="card-form-label" x-text="$app.t('profile.defaultLanguage')"></label>
       <div class="book-settings-options">
         <label class="book-settings-option">
           <input type="radio" name="us-lang" value="" x-model="userSettingsDefaultLanguage" @change="userSettingsDefaultRegion = ''; userSettingsDefaultBuchtyp = ''">
@@ -71,8 +71,8 @@
       </div>
     </div>
 
-    <div class="book-settings-row" x-show="userSettingsDefaultLanguage">
-      <label class="book-settings-label" x-text="$app.t('profile.defaultRegion')"></label>
+    <div class="card-form-row" x-show="userSettingsDefaultLanguage">
+      <label class="card-form-label" x-text="$app.t('profile.defaultRegion')"></label>
       <div class="book-settings-options">
         <template x-if="userSettingsDefaultLanguage === 'de'">
           <div class="book-settings-options">
@@ -101,37 +101,37 @@
       </div>
     </div>
 
-    <div class="book-settings-row" x-show="userSettingsDefaultLanguage">
-      <label class="book-settings-label" x-text="$app.t('profile.defaultBuchtyp')"></label>
+    <div class="card-form-row" x-show="userSettingsDefaultLanguage">
+      <label class="card-form-label" x-text="$app.t('profile.defaultBuchtyp')"></label>
       <div x-data="combobox($app.t('profile.defaultBuchtyp'), $app.t('common.notSet'))"
            x-modelable="value" x-model="userSettingsDefaultBuchtyp"
            x-effect="options = userSettingsBuchtypOptions()"
 ></div>
     </div>
 
-    <p class="book-settings-section-divider" x-text="$app.t('profile.editorSection')"></p>
+    <p class="card-form-section-divider" x-text="$app.t('profile.editorSection')"></p>
 
-    <div class="book-settings-row">
-      <label class="book-settings-label" x-text="$app.t('profile.focusGranularity')"></label>
-      <div class="book-settings-field">
+    <div class="card-form-row">
+      <label class="card-form-label" x-text="$app.t('profile.focusGranularity')"></label>
+      <div class="card-form-field">
         <div x-data="combobox($app.t('profile.focusGranularity'))"
              x-modelable="value" x-model="userSettingsFocusGranularity"
              x-effect="options = userSettingsFocusOptions()"
 ></div>
-        <p class="book-settings-field-note" x-text="$app.t('profile.focusGranularityHint')"></p>
+        <p class="card-form-field-note" x-text="$app.t('profile.focusGranularityHint')"></p>
       </div>
     </div>
 
-    <div class="book-settings-row">
-      <label class="book-settings-label" x-text="$app.t('profile.dailyGoalChars')"></label>
-      <div class="book-settings-field">
+    <div class="card-form-row">
+      <label class="card-form-label" x-text="$app.t('profile.dailyGoalChars')"></label>
+      <div class="card-form-field">
         <input type="number" class="form-num" min="100" max="50000" step="100"
                x-model.number="userSettingsDailyGoalChars">
-        <p class="book-settings-field-note" x-text="$app.t('profile.dailyGoalCharsHint')"></p>
+        <p class="card-form-field-note" x-text="$app.t('profile.dailyGoalCharsHint')"></p>
       </div>
     </div>
 
-    <p class="book-settings-saved" x-show="userSettingsSaved" x-text="$app.t('profile.savedMsg')"></p>
-    <p class="book-settings-error" x-show="userSettingsError" x-text="userSettingsError"></p>
+    <p class="card-form-saved" x-show="userSettingsSaved" x-text="$app.t('profile.savedMsg')"></p>
+    <p class="card-form-error" x-show="userSettingsError" x-text="userSettingsError"></p>
   </div>
 </div>

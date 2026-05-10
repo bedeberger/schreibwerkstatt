@@ -7,7 +7,7 @@ const {
   makeJobLogger, updateJob, completeJob, failJob, i18nError,
   getPrompts, getBookPrompts,
   htmlToText, jobAbortControllers,
-  fmtTok, BS_URL,
+  BS_URL,
   jobs, runningJobs, createJob, enqueueJob, jobKey, findActiveJobId,
   jsonBody,
   getFiguren, getLatestReview, buildChatMessageHistory,
@@ -70,7 +70,7 @@ async function runChatJob(jobId, sessionId, userMsgId, message, userEmail, userT
       WHERE cs.id = ? AND cs.user_email = ?
     `).get(parseInt(sessionId), userEmail);
     if (!session) throw i18nError('job.error.sessionNotFound');
-    logger.info(`Start: Seiten-Chat «${session.page_name || '-'}» (session=${sessionId}, page=${session.page_id || '-'}, msg-len=${message.length})`);
+    logger.info(`Start: «${session.page_name || '-'}» session=${sessionId}, page=${session.page_id || '-'}, msg-len=${message.length}`);
 
     // Seiteninhalt frisch aus BookStack laden
     let pageText = '';
@@ -91,7 +91,7 @@ async function runChatJob(jobId, sessionId, userMsgId, message, userEmail, userT
         pageUpdatedAt = pd.updated_at || null;
       } catch (e) {
         if (e.name === 'AbortError') throw e;
-        logger.warn(`Job ${jobId}: Seiteninhalt konnte nicht geladen werden: ${e.message}`);
+        logger.warn(`Seiteninhalt konnte nicht geladen werden: ${e.message}`);
       }
     }
 
@@ -133,7 +133,7 @@ async function runChatJob(jobId, sessionId, userMsgId, message, userEmail, userT
 
     const { antwort, vorschlaege } = _parseChatResponse(text);
     if (antwort === text && vorschlaege.length === 0) {
-      logger.warn(`Job ${jobId}: Chat-Antwort kein valides JSON – Rohtext wird gespeichert.`);
+      logger.warn('Chat-Antwort kein valides JSON – Rohtext wird gespeichert.');
     }
 
     // Assistant-Nachricht in DB speichern
@@ -154,10 +154,9 @@ async function runChatJob(jobId, sessionId, userMsgId, message, userEmail, userT
       assistant_message_id: asstMsgResult.lastInsertRowid,
       updatedAt: pageUpdatedAt,
       tokensIn, tokensOut,
-    }, chatTps);
-    logger.info(`Job ${jobId}: Chat «${session.page_name || '-'}» session ${sessionId} abgeschlossen (${fmtTok(tokensIn)}↑ ${fmtTok(tokensOut)}↓ Tokens, ${vorschlaege.length} Vorschläge).`);
+    }, chatTps, `«${session.page_name || '-'}» session=${sessionId}, ${vorschlaege.length} Vorschläge`);
   } catch (e) {
-    if (e.name !== 'AbortError') logger.error(`Job ${jobId}: Chat Fehler: ${e.message}`, { stack: e.stack });
+    if (e.name !== 'AbortError') logger.error(`Fehler: ${e.message}`, { stack: e.stack });
     failJob(jobId, e);
   }
 }
@@ -201,7 +200,7 @@ async function runBookChatJob(jobId, sessionId, userMsgId, message, userEmail, u
     const session = db.prepare('SELECT * FROM chat_sessions WHERE id = ? AND user_email = ?')
       .get(parseInt(sessionId), userEmail);
     if (!session) throw i18nError('job.error.sessionNotFound');
-    logger.info(`Start: Buch-Chat «${session.book_name || '-'}» (session=${sessionId}, book=${session.book_id}, msg-len=${message.length})`);
+    logger.info(`Start: «${session.book_name || '-'}» session=${sessionId}, msg-len=${message.length}`);
 
     const { SYSTEM_BOOK_CHAT: bookChatSys, STOPWORDS: bookChatSW } = await getBookPrompts(session.book_id, userEmail);
     const bookChatStopwords = new Set(bookChatSW || []);
@@ -307,7 +306,7 @@ async function runBookChatJob(jobId, sessionId, userMsgId, message, userEmail, u
       ? Math.round((Date.now() - _bookPageCache.get(cacheKey).loadedAt) / 1000) + 's'
       : 'MISS';
     logger.info(
-      `Job ${jobId}: Buch-Chat – ${selectedPages.length}/${pageContents.length} Seiten im Kontext ` +
+      `Kontext: ${selectedPages.length}/${pageContents.length} Seiten ` +
       `(${usedChars}/${TEXT_CHAR_BUDGET} Zeichen, Hist ${Math.round(historyChars / 1000)}k Zeichen, ` +
       `${anyScore ? 'Keyword-Scoring' : 'Gleichverteilung'}, Cache ${cacheAge}).`
     );
@@ -343,7 +342,7 @@ async function runBookChatJob(jobId, sessionId, userMsgId, message, userEmail, u
 
     const { antwort } = _parseChatResponse(text);
     if (antwort === text) {
-      logger.warn(`Job ${jobId}: Buch-Chat-Antwort kein valides JSON – Rohtext wird gespeichert.`);
+      logger.warn('Buch-Chat-Antwort kein valides JSON – Rohtext wird gespeichert.');
     }
 
     // Assistant-Nachricht in DB speichern (vorschlaege=NULL)
@@ -361,10 +360,9 @@ async function runBookChatJob(jobId, sessionId, userMsgId, message, userEmail, u
       tokensIn, tokensOut,
       pagesUsed: selectedPages.length,
       pagesTotal: pageContents.length,
-    }, bookChatTps);
-    logger.info(`Job ${jobId}: Buch-Chat «${session.book_name || '-'}» session ${sessionId} abgeschlossen (${fmtTok(tokensIn)}↑ ${fmtTok(tokensOut)}↓, ${selectedPages.length}/${pageContents.length} Seiten).`);
+    }, bookChatTps, `«${session.book_name || '-'}» session=${sessionId}, ${selectedPages.length}/${pageContents.length} Seiten`);
   } catch (e) {
-    if (e.name !== 'AbortError') logger.error(`Job ${jobId}: Buch-Chat Fehler: ${e.message}`, { stack: e.stack });
+    if (e.name !== 'AbortError') logger.error(`Fehler: ${e.message}`, { stack: e.stack });
     failJob(jobId, e);
   }
 }
@@ -428,7 +426,7 @@ async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEma
     const session = db.prepare('SELECT * FROM chat_sessions WHERE id = ? AND user_email = ?')
       .get(parseInt(sessionId), userEmail);
     if (!session) throw i18nError('job.error.sessionNotFound');
-    logger.info(`Start: Buch-Chat (Agent) «${session.book_name || '-'}» (session=${sessionId}, book=${session.book_id}, msg-len=${message.length})`);
+    logger.info(`Start (Agent): «${session.book_name || '-'}» session=${sessionId}, msg-len=${message.length}`);
 
     const figuren = getFiguren(session.book_id, userEmail);
     const review  = getLatestReview(session.book_id, userEmail);
@@ -491,7 +489,7 @@ async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEma
       if (result.truncated) throw i18nError('job.error.aiTruncated', { max: MAX_TOKENS_OUT, tokIn: totalTokIn, tokOut: totalTokOut, total: totalTokIn + totalTokOut });
 
       if (result.tokensIn > BOOK_CHAT_TOKEN_BUDGET) {
-        logger.warn(`Job ${jobId}: Context-Budget überschritten (${result.tokensIn}/${BOOK_CHAT_TOKEN_BUDGET} Input-Tokens) – Loop abgebrochen.`);
+        logger.warn(`Context-Budget überschritten (${result.tokensIn}/${BOOK_CHAT_TOKEN_BUDGET} Input-Tokens) – Loop abgebrochen.`);
         finalText = result.text || JSON.stringify({ antwort: '__i18n:chat.errors.contextExceeded__' });
         break;
       }
@@ -513,7 +511,7 @@ async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEma
           toolLog.push({ name: tu.name, input: tu.input, ok: true });
         } catch (e) {
           if (e.name === 'AbortError') throw e;
-          logger.warn(`Job ${jobId}: Tool «${tu.name}» Fehler: ${e.message}`);
+          logger.warn(`Tool «${tu.name}» Fehler: ${e.message}`);
           out = { error: e.message };
           toolLog.push({ name: tu.name, input: tu.input, ok: false, error: e.message });
         }
@@ -529,13 +527,13 @@ async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEma
     }
 
     if (finalText == null) {
-      logger.warn(`Job ${jobId}: Max-Iterationen (${BOOK_CHAT_MAX_TOOL_ITER}) erreicht ohne finale Antwort.`);
+      logger.warn(`Max-Iterationen (${BOOK_CHAT_MAX_TOOL_ITER}) erreicht ohne finale Antwort.`);
       finalText = JSON.stringify({ antwort: '__i18n:chat.errors.maxIterReached__' });
     }
 
     const { antwort } = _parseChatResponse(finalText);
     if (antwort === finalText) {
-      logger.warn(`Job ${jobId}: Agent-Antwort kein valides JSON – Rohtext wird gespeichert.`);
+      logger.warn('Agent-Antwort kein valides JSON – Rohtext wird gespeichert.');
     }
 
     // Assistant-Nachricht in DB speichern
@@ -559,10 +557,9 @@ async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEma
       tokensIn: totalTokIn, tokensOut: totalTokOut,
       toolCalls: toolLog.length,
       iterations: iter + 1,
-    }, tpsVal);
-    logger.info(`Job ${jobId}: Agent-Buch-Chat session ${sessionId} abgeschlossen (${fmtTok(totalTokIn)}↑ ${fmtTok(totalTokOut)}↓, ${toolLog.length} Tool-Calls, ${iter + 1} Iter).`);
+    }, tpsVal, `Agent session=${sessionId}, ${toolLog.length} Tool-Calls, ${iter + 1} Iter`);
   } catch (e) {
-    if (e.name !== 'AbortError') logger.error(`Job ${jobId}: Agent-Buch-Chat Fehler: ${e.message}`, { stack: e.stack });
+    if (e.name !== 'AbortError') logger.error(`Agent-Fehler: ${e.message}`, { stack: e.stack });
     failJob(jobId, e);
   }
 }

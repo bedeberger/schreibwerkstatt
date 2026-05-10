@@ -1,7 +1,7 @@
 @layer components {
 /* ── Custom-PDF-Export-Karte ───────────────────────────────────────────────
    Layout-Patterns kommen aus:
-     book-settings.css      → .book-settings-row / .book-settings-form / .book-settings-textarea / .book-settings-saved / .book-settings-error / .book-settings-field-note / .book-settings-label
+     card-form.css          → .card-form-grid / .card-form-row / .card-form-label / .card-form-field / .card-form-field-note / .card-form-textarea / .card-form-saved / .card-form-error / .card-form-hint
      entity-list.css        → .collapsible-toggle
      tree-history.css       → .history-chevron
      tabs.css               → .tabs / .tabs-btn (+ .tabs--scrollable)
@@ -129,7 +129,7 @@
 /* Section-Body kommt aus generischem `.collapsible-section` (entity-list.css). */
 
 /* === Checkbox-Label ===
-   Inline-Variante (steht in .book-settings-field), sowie eine
+   Inline-Variante (steht in .card-form-field), sowie eine
    Leading-Variante als alleinstehender Toggle (vor x-if-gated Inhalt). */
 .pdfx-check {
   display: inline-flex;

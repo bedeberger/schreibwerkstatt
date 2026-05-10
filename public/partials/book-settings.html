@@ -16,10 +16,10 @@
 
   <div x-show="bookSettingsLoading" class="muted-msg" x-text="$app.t('common.loading')"></div>
 
-  <div x-show="!bookSettingsLoading" class="book-settings-form">
+  <div x-show="!bookSettingsLoading" class="card-form-grid">
 
-    <div class="book-settings-row">
-      <label class="book-settings-label" x-text="$app.t('book.settings.language')"></label>
+    <div class="card-form-row">
+      <label class="card-form-label" x-text="$app.t('book.settings.language')"></label>
       <div class="book-settings-options">
         <label class="book-settings-option">
           <input type="radio" name="bs-lang" value="de" x-model="bookSettingsLanguage" @change="bookSettingsRegion = (bookSettingsLanguage === 'de' ? 'CH' : 'US'); bookSettingsBuchtyp = ''">
@@ -32,8 +32,8 @@
       </div>
     </div>
 
-    <div class="book-settings-row">
-      <label class="book-settings-label" x-text="$app.t('book.settings.region')"></label>
+    <div class="card-form-row">
+      <label class="card-form-label" x-text="$app.t('book.settings.region')"></label>
       <div class="book-settings-options">
         <template x-if="bookSettingsLanguage === 'de'">
           <div class="book-settings-options">
@@ -62,51 +62,51 @@
       </div>
     </div>
 
-    <div class="book-settings-row">
-      <label class="book-settings-label" x-text="$app.t('book.settings.buchtyp')"></label>
+    <div class="card-form-row">
+      <label class="card-form-label" x-text="$app.t('book.settings.buchtyp')"></label>
       <div x-data="combobox($app.t('book.settings.buchtyp'), $app.t('book.settings.buchtyp.none'))"
            x-modelable="value" x-model="bookSettingsBuchtyp"
            x-effect="options = bookSettingsBuchtypOptions()"
 ></div>
     </div>
 
-    <div class="book-settings-row">
-      <label class="book-settings-label" x-text="$app.t('book.settings.pov')"></label>
+    <div class="card-form-row">
+      <label class="card-form-label" x-text="$app.t('book.settings.pov')"></label>
       <div x-data="combobox($app.t('book.settings.pov'), $app.t('book.settings.pov.none'))"
            x-modelable="value" x-model="bookSettingsErzaehlperspektive"
            x-effect="options = bookSettingsPovOptions()"
 ></div>
     </div>
 
-    <div class="book-settings-row">
-      <label class="book-settings-label" x-text="$app.t('book.settings.tempus')"></label>
+    <div class="card-form-row">
+      <label class="card-form-label" x-text="$app.t('book.settings.tempus')"></label>
       <div x-data="combobox($app.t('book.settings.tempus'), $app.t('book.settings.tempus.none'))"
            x-modelable="value" x-model="bookSettingsErzaehlzeit"
            x-effect="options = bookSettingsTempusOptions()"
 ></div>
     </div>
 
-    <p class="book-settings-hint"
+    <p class="card-form-hint"
        x-show="bookSettingsBuchtyp === 'kurzgeschichten' && (bookSettingsErzaehlperspektive || bookSettingsErzaehlzeit)"
        x-text="$app.t('book.settings.pov.kurzgeschichtenHint')"></p>
 
-    <div class="book-settings-row book-settings-row--top">
-      <label class="book-settings-label" for="bs-buchkontext" x-text="$app.t('book.settings.context')"></label>
+    <div class="card-form-row card-form-row--top">
+      <label class="card-form-label" for="bs-buchkontext" x-text="$app.t('book.settings.context')"></label>
       <div class="book-settings-kontext-wrap">
         <textarea
           id="bs-buchkontext"
-          class="book-settings-textarea"
+          class="card-form-textarea"
           x-model="bookSettingsBuchKontext"
           :placeholder="$app.t('book.settings.contextPlaceholder')"
           rows="4"
           maxlength="1000"
         ></textarea>
-        <p class="book-settings-hint" x-text="(bookSettingsBuchKontext || '').length + ' / 1000'"></p>
+        <p class="card-form-hint" x-text="(bookSettingsBuchKontext || '').length + ' / 1000'"></p>
       </div>
     </div>
 
-    <div class="book-settings-row">
-      <label class="book-settings-label" x-text="$app.t('book.settings.status')"></label>
+    <div class="card-form-row">
+      <label class="card-form-label" x-text="$app.t('book.settings.status')"></label>
       <div class="form-stack">
         <label class="form-check">
           <input type="checkbox" id="bs-finished" x-model="bookSettingsIsFinished">
@@ -118,8 +118,8 @@
       </div>
     </div>
 
-    <p class="book-settings-saved" x-show="bookSettingsSaved" x-text="$app.t('common.settingsSaved')"></p>
-    <p class="book-settings-error" x-show="bookSettingsError" x-text="bookSettingsError"></p>
+    <p class="card-form-saved" x-show="bookSettingsSaved" x-text="$app.t('common.settingsSaved')"></p>
+    <p class="card-form-error" x-show="bookSettingsError" x-text="bookSettingsError"></p>
 
     <div class="book-settings-danger-zone">
       <div class="book-settings-danger-title" x-text="$app.t('book.settings.dangerZone')"></div>
@@ -135,8 +135,8 @@
           </button>
         </div>
       </div>
-      <p class="book-settings-saved" x-show="bookHistoryResetMessage" x-text="bookHistoryResetMessage"></p>
-      <p class="book-settings-error" x-show="bookHistoryResetError" x-text="bookHistoryResetError"></p>
+      <p class="card-form-saved" x-show="bookHistoryResetMessage" x-text="bookHistoryResetMessage"></p>
+      <p class="card-form-error" x-show="bookHistoryResetError" x-text="bookHistoryResetError"></p>
     </div>
 
     <section class="book-settings-stats">

@@ -115,4 +115,16 @@
   .tabs--scrollable .tabs-btn {
     flex-shrink: 0;
   }
+
+  /* Fullwidth-Variante: Tabs füllen Container, jeder Button gleich breit.
+     Verwendung: Modus-Toggle in Karten mit fester schmaler Spalte (Figuren-Graph,
+     wo 3 Modi gleichberechtigt sind). */
+  .tabs--fullwidth {
+    display: flex;
+    width: 100%;
+  }
+  .tabs--fullwidth .tabs-btn {
+    flex: 1;
+    text-align: center;
+  }
 }

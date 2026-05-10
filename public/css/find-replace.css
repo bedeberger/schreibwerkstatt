@@ -14,7 +14,7 @@
 /* left/top werden in editor-find.js aus der Editor-Karten-Box berechnet. */
 .edit-find {
   position: fixed;
-  z-index: 1002;
+  z-index: var(--z-toolbar);
   display: flex;
   flex-direction: column;
   gap: 4px;

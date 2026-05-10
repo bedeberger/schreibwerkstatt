@@ -43,6 +43,11 @@
   "edit.savedAt":                "✓ saved {time}",
   "edit.saveFailed":             "Save failed – draft saved locally. Error: {msg}",
   "edit.saveFailedRetry":        "Save failed – draft saved locally. Will retry on next connection.",
+  "edit.conflict.message":       "This page was modified on {time} by {user}. Saving anyway will overwrite their changes.",
+  "edit.conflict.saveAnyway":    "Save anyway",
+  "edit.conflict.unknownUser":   "another user",
+  "edit.conflict.kept":          "Conflict: save cancelled, draft kept locally.",
+  "edit.conflict.unsavedHint":   "Conflict: page was modified by {user}. Please save manually to resolve.",
 
   "find.title":                  "Find & Replace",
   "find.placeholder":            "Find…",

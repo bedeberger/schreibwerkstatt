@@ -1,8 +1,10 @@
 # ERD — bookstack-lektorat
 
-Stand: Schema-Version 86, 46 Tabellen (ohne `sqlite_*`/`schema_version`/`sessions`).
+Stand: Schema-Version 89, 46 Tabellen (ohne `sqlite_*`/`schema_version`/`sessions`).
 
 Quelle: Live-Dump aus [lektorat.db](../lektorat.db) (`.schema --indent`) + [db/migrations.js](../db/migrations.js). Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
+
+> **Pflege.** Datei MUSS bei jeder neuen Migration mitgepflegt werden — Stand-Zeile (Schema-Version, Tabellen-Anzahl) + betroffene Block-Definitionen + ggf. neue Mermaid-Tabelle/-Kante. Siehe Doku-Regel in [CLAUDE.md](../CLAUDE.md) → „Datenbank → Migration hinzufügen".
 
 ---
 
@@ -179,6 +181,7 @@ erDiagram
     TEXT    buch_kontext
     TEXT    erzaehlperspektive
     TEXT    erzaehlzeit
+    INTEGER is_finished        "0|1, blendet Schreib-Tracking aus"
     TEXT    updated_at
   }
 
@@ -420,6 +423,10 @@ erDiagram
     TEXT    context_info
     INTEGER tokens_in
     INTEGER tokens_out
+    INTEGER cache_read_in     "Claude prompt-cache hit (lokal: 0)"
+    INTEGER cache_creation_in "Claude prompt-cache write (lokal: 0)"
+    TEXT    provider          "claude|ollama|llama"
+    TEXT    model
     REAL    tps
     TEXT    created_at
   }
@@ -469,6 +476,10 @@ erDiagram
     TEXT    ended_at
     INTEGER tokens_in
     INTEGER tokens_out
+    INTEGER cache_read_in     "Claude prompt-cache hit (lokal: 0)"
+    INTEGER cache_creation_in "Claude prompt-cache write (lokal: 0)"
+    TEXT    provider          "claude|ollama|llama"
+    TEXT    model
     REAL    tokens_per_sec
     TEXT    error
     TEXT    error_params  "JSON, i18n-Params zum error-Key"
@@ -517,6 +528,7 @@ erDiagram
     TEXT    default_language
     TEXT    default_region
     TEXT    focus_granularity
+    INTEGER daily_goal_chars  "NULL → Frontend-Fallback 1500"
     TEXT    created_at
     TEXT    last_login_at
     TEXT    last_seen_at
@@ -661,17 +673,23 @@ Priorisiert nach Wirkung. Jede Änderung als eigene Migration via Recreate-Patte
 16. **`figures.meta` als Catch-All-JSON.**
     Bequem, aber blockiert Indexes/Migrations. Wenn neue Felder mehrfach aus `meta` extrahiert wurden, evtl. Zeit für eigene Spalte.
 
-### CLAUDE.md-Inkonsistenz (Doku-Fix, kein Schema-Change)
-
-17. **CLAUDE.md erwähnt `books(bookstack_book_id)` als UNIQUE-Target.**
-    Live-Schema hat aber `book_id INTEGER PRIMARY KEY` — `bookstack_book_id` existiert nicht (mehr). FK-Targets sind `books(book_id)`. Im Doku-Block „Relationale Integrität" entsprechend aktualisieren.
-
 ---
 
-## 7 · Wie ist dieses ERD entstanden?
+## 7 · Pflege
+
+Bei jeder neuen Migration in [db/migrations.js](../db/migrations.js):
+
+1. Stand-Zeile oben anpassen (Version, Tabellen-Anzahl).
+2. Betroffene Block-Definitionen anfassen (neue Spalte → Zeile in `{}`, neuer Typ-Hinweis als Annotation in `"…"`).
+3. Bei neuer Tabelle: Block ergänzen + FK-Kante in Section 1 (Übersicht) + im passenden thematischen Sub-Diagramm.
+4. Bei neuer FK-Kante auf bestehende Tabellen: Kante in Section 1 nachziehen.
+5. Falls eine Empfehlung aus Section 6 umgesetzt wurde: Punkt löschen.
+
+Live-Schema kontrollieren:
 
 ```
 sqlite3 lektorat.db ".schema --indent" > /tmp/schema_full.sql
+sqlite3 lektorat.db "SELECT version FROM schema_version;"
 ```
 
-Diagramm-Quellen sind die `REFERENCES`-Klauseln aus dem Dump. Bei Schema-Änderung dieses Dokument neu generieren — am einfachsten via dieselbe `.schema`-Pipeline + manueller Mermaid-Update.
+Diagramm-Quellen sind die `REFERENCES`-Klauseln aus dem Dump. Mermaid-Diagramme händisch nachziehen — Auto-Generator wäre möglich, aber die Sub-Diagramme leben von kuratierter Auswahl, kein vollautomatisches Tool produziert sie sinnvoll.

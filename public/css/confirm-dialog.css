@@ -3,7 +3,7 @@
 .confirm-overlay {
   position: fixed;
   inset: 0;
-  z-index: 11000;
+  z-index: var(--z-modal-front);
   background: rgba(0, 0, 0, 0.45);
   display: flex;
   align-items: center;
@@ -58,13 +58,6 @@
 .confirm-dialog-btn--danger:hover { background: var(--color-session-banner-btn-hover, #7a1f1f); }
 
 @media (max-width: 600px) {
-  .book-settings-row {
-    grid-template-columns: 1fr;
-    gap: 6px;
-  }
-  .book-settings-label {
-    padding-top: 0;
-  }
   .book-settings-kontext-wrap {
     width: 100%;
   }
@@ -95,7 +88,7 @@
 .shortcuts-overlay {
   position: fixed;
   inset: 0;
-  z-index: 9500;
+  z-index: var(--z-modal);
   background: var(--color-overlay, rgba(0, 0, 0, 0.45));
   display: flex;
   align-items: center;

@@ -43,6 +43,11 @@
   "edit.savedAt":                "✓ gespeichert {time}",
   "edit.saveFailed":             "Speichern fehlgeschlagen – Entwurf lokal gesichert. Fehler: {msg}",
   "edit.saveFailedRetry":        "Speichern fehlgeschlagen – Entwurf lokal gesichert. Retry bei nächster Verbindung.",
+  "edit.conflict.message":       "Diese Seite wurde am {time} von {user} geändert. Trotzdem speichern überschreibt die fremden Änderungen.",
+  "edit.conflict.saveAnyway":    "Trotzdem speichern",
+  "edit.conflict.unknownUser":   "einem anderen Nutzer",
+  "edit.conflict.kept":          "Konflikt: Speichern abgebrochen, Entwurf lokal gesichert.",
+  "edit.conflict.unsavedHint":   "Konflikt: Seite wurde von {user} geändert. Bitte manuell speichern, um Konflikt zu lösen.",
 
   "find.title":                  "Suchen & Ersetzen",
   "find.placeholder":            "Suchen…",

@@ -90,6 +90,29 @@ export const bookstackMethods = {
     return this._bsWrite('POST', path, body);
   },
 
+  // Pre-Save-Conflict-Check für Read-Modify-Write-Pfade. BookStack hat keinen
+  // If-Match-Support — Optimistic-Concurrency baut die App selbst: kurz vor
+  // dem PUT die Seite frisch lesen und `updated_at` mit dem Snapshot vergleichen,
+  // den der Editor beim Öffnen mitgenommen hat. Mismatch → ein anderer User
+  // hat zwischendrin gespeichert.
+  // Liefert null bei keiner Diskrepanz, sonst { remoteUpdatedAt, remoteUserName,
+  // remoteHtml }. Wirft nicht — Aufrufer entscheidet, was bei Read-Fehler passiert.
+  async _checkPageConflict(pageId, expectedUpdatedAt) {
+    if (!expectedUpdatedAt) return null;
+    let remote;
+    try {
+      remote = await this.bsGet('pages/' + pageId, { fresh: true });
+    } catch {
+      return null;
+    }
+    if (!remote?.updated_at || remote.updated_at === expectedUpdatedAt) return null;
+    return {
+      remoteUpdatedAt: remote.updated_at,
+      remoteUserName: remote.updated_by?.name || null,
+      remoteHtml: remote.html || '',
+    };
+  },
+
   async _bsWrite(method, path, body) {
     const opts = {
       method,

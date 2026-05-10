@@ -4,7 +4,7 @@
    (keine Icons) gem. Projektästhetik. Im Fokus-Modus strukturell gesperrt. */
 .edit-bubble-toolbar {
   position: fixed;
-  z-index: 1001;
+  z-index: var(--z-toolbar);
   transform: translate(-50%, calc(-100% - 8px));
   display: flex;
   gap: 2px;
@@ -31,7 +31,7 @@
 
 .edit-slash-menu {
   position: fixed;
-  z-index: 1001;
+  z-index: var(--z-toolbar);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-md);

@@ -251,15 +251,26 @@
   --pad-badge:       4px 8px;      /* Badge/Tag/kleiner Pill */
   --pad-detail:      0.5rem 0.75rem; /* Detail-Box / Drawer-Inhalt */
 
+  /* === Spacing-Scale — Margins/Gaps ===
+     Wiederkehrende Werte (margin, gap, row-gap). Ad-hoc Pixel-Werte nur,
+     wenn wirklich kein Token passt. Schritte folgen 4-Pixel-Raster. */
+  --space-xs:  4px;
+  --space-sm:  8px;
+  --space-md:  12px;
+  --space-lg:  16px;
+  --space-xl:  24px;
+  --space-2xl: 32px;
+
   /* === Transition-Tokens — drei Geschwindigkeits-Stufen ===
      NIE als `--x: var(--x)` definieren — zirkuläre Custom-Property ist
      invalid → ganze `transition`/`animation`-Property kippt auf Default
      (`0s`) → Chevron-Rotation, cardFadeIn, Hover-Tints sind alle tot.
      Symptom: „Erweiterungen wackeln", weil Section snappt OHNE die
      Chevron-Rotation, die den Snap visuell maskieren würde. */
-  --transition-fast: 0.1s ease;   /* Hover-Tints, schnelle Filter-Pills */
-  --transition-base: 0.12s ease;  /* Standard-Buttons, Cards, Border-Color */
-  --transition-slow: 0.15s ease;  /* grössere Flächen, Cross-Fade */
+  --transition-fast:        0.1s ease;   /* Hover-Tints, schnelle Filter-Pills */
+  --transition-base:        0.12s ease;  /* Standard-Buttons, Cards, Border-Color */
+  --transition-slow:        0.15s ease;  /* grössere Flächen, Cross-Fade */
+  --transition-emphasized:  0.3s ease;   /* Modal/Drawer-Slide, Card-Eingang, längere Fades */
 
   /* === Opacity-Tokens — semantische Stufen === */
   --opacity-disabled: 0.6;   /* :disabled, deaktiviert */
@@ -271,6 +282,20 @@
   /* === Breakpoint-Konstanten (Doku — CSS @media unterstützt keine var()) ===
      Mobile-First-Strategie: 480 phone-sm, 600 phone-lg, 768 tablet, 1024 desktop.
      In neuen @media-Queries ausschliesslich diese vier Werte verwenden. */
+
+  /* === Z-Index-Stack — vom Boden zur Decke, gestaffelt ===
+     Ein neuer Layer prüft erst, ob ein Token passt. Hartcoded z-index nur, wenn
+     der Layer wirklich neu ist (dann Token ergänzen, nicht ad-hoc setzen). */
+  --z-base:        1;     /* in-flow Standard, position-relative Sticky-Anker */
+  --z-sticky:      100;   /* sticky Inhalts-Header in Listen/Heatmaps */
+  --z-header:      200;   /* sticky Card-Header, Toolbar-Header */
+  --z-popover:     1000;  /* Tooltip, Synonym-Menu, Figur-Lookup, Combobox-Dropdown, Focus-Counter */
+  --z-toolbar:     1100;  /* Edit-Bubble-Toolbar, Find-and-Replace */
+  --z-overlay:     2000;  /* Palette-Overlay, ähnliche Fullscreen-Trigger */
+  --z-banner:      10000; /* Session-Banner, Dev-Banner (oben fixed) */
+  --z-modal:       9500;  /* Confirm-Dialog Overlay */
+  --z-modal-front: 11000; /* Confirm-Dialog Panel (über Banner/Palette) */
+  --z-toast:       12000; /* höchster sichtbarer Layer */
 }
 
 /* === Dark-Theme Overrides === */

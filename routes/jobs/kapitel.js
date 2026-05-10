@@ -6,7 +6,7 @@ const {
   aiCall, getPrompts, getBookPrompts,
   bsGet, bsGetAll, jobAbortControllers,
   htmlToText,
-  _modelName, fmtTok, tps,
+  _modelName, tps,
   jobs, runningJobs, createJob, enqueueJob, jobKey, findActiveJobId,
   jsonBody, BATCH_SIZE,
 } = require('./shared');
@@ -31,7 +31,7 @@ async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookNa
       .sort((a, b) => (a.priority || 0) - (b.priority || 0));
 
     if (!pages.length) { completeJob(jobId, { empty: true, chapterName }); return; }
-    logger.info(`Start: Kapitel-Review «${chapterName}» (book=${bookId}, chap=${chapterId}, ${pages.length} Seiten)`);
+    logger.info(`Start: «${chapterName}» chap=${chapterId}, ${pages.length} Seiten`);
 
     const tok = { in: 0, out: 0, ms: 0 };
     const signal = jobAbortControllers.get(jobId)?.signal;
@@ -80,10 +80,9 @@ async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookNa
       pageCount: contents.length,
       tokensIn: tok.in,
       tokensOut: tok.out,
-    }, tps(tok));
-    logger.info(`«${chapterName}» fertig (book=${bookId}, chap=${chapterId}, ${contents.length} Seiten, Note ${r.gesamtnote}, ${fmtTok(tok.in)}↑ ${fmtTok(tok.out)}↓ Tokens)`);
+    }, tps(tok), `«${chapterName}» ${contents.length} Seiten, Note ${r.gesamtnote}`);
   } catch (e) {
-    if (e.name !== 'AbortError') logger.error(`Fehler (book=${bookId}, chap=${chapterId}): ${e.message}`, { stack: e.stack });
+    if (e.name !== 'AbortError') logger.error(`Fehler (chap=${chapterId}): ${e.message}`, { stack: e.stack });
     failJob(jobId, e);
   }
 }

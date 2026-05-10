@@ -6,7 +6,7 @@ const {
   aiCall, getPrompts, getBookPrompts,
   loadPageContents, groupByChapter, buildSinglePassBookText,
   bsGetAll, SINGLE_PASS_LIMIT, BATCH_SIZE, jobAbortControllers, settledAll,
-  _modelName, fmtTok, tps,
+  _modelName, tps,
   jobs, runningJobs, createJob, enqueueJob, jobKey, findActiveJobId,
   jsonBody,
 } = require('./shared');
@@ -32,7 +32,7 @@ async function runReviewJob(jobId, bookId, bookName, userEmail, userToken) {
 
     const chMap = Object.fromEntries(chaptersData.map(c => [c.id, c.name]));
     const tok = { in: 0, out: 0, ms: 0 }; // akkumulierte Token über alle KI-Calls
-    logger.info(`Start: «${bookName}» (book=${bookId}, ${pages.length} Seiten)`);
+    logger.info(`Start: «${bookName}» ${pages.length} Seiten`);
     const pageContents = await loadPageContents(pages, chMap, 50, (i, total) => {
       updateJob(jobId, {
         progress: Math.round((i / total) * 60),
@@ -104,10 +104,10 @@ async function runReviewJob(jobId, bookId, bookName, userEmail, userToken) {
     db.prepare('INSERT INTO book_reviews (book_id, reviewed_at, review_json, model, user_email) VALUES (?, ?, ?, ?, ?)')
       .run(parseInt(bookId), new Date().toISOString(), JSON.stringify(r), model, userEmail || null);
 
-    completeJob(jobId, { review: r, pageCount: pageContents.length, tokensIn: tok.in, tokensOut: tok.out }, tps(tok));
-    logger.info(`«${bookName}» fertig (book=${bookId}, ${pageContents.length} Seiten, Note ${r.gesamtnote}, ${fmtTok(tok.in)}↑ ${fmtTok(tok.out)}↓ Tokens)`);
+    completeJob(jobId, { review: r, pageCount: pageContents.length, tokensIn: tok.in, tokensOut: tok.out },
+      tps(tok), `«${bookName}» ${pageContents.length} Seiten, Note ${r.gesamtnote}`);
   } catch (e) {
-    if (e.name !== 'AbortError') logger.error(`Fehler (book=${bookId}): ${e.message}`, { stack: e.stack });
+    if (e.name !== 'AbortError') logger.error(`Fehler: ${e.message}`, { stack: e.stack });
     failJob(jobId, e);
   }
 }

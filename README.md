@@ -23,7 +23,6 @@ KI-gestütztes Lektorat-Tool für [BookStack](https://www.bookstackapp.com/). Ei
 - **Custom-PDF-Export** – Eigener Renderer (pdfkit) mit konfigurierbarem Layout, Schriften aus Google Fonts (runtime download, 30-Tage-Cache), Cover-Bild (sharp-konvertiert), Kapitelumbrüche, Inhaltsverzeichnis und PDF/A-2B-Konformität. Mehrere Profile pro Buch+User. Optional Server-Validierung via veraPDF (separat installieren, siehe unten).
 - **Bucheinstellungen** – Sprache, Buchtyp, Erzählperspektive, Erzählzeit, Freitext-Kontext fliessen in alle Prompts.
 - **Theme** – Hell/Dunkel/Auto.
-- **Session-Banner** – Bei `401` ohne Hard-Redirect; ungespeicherte Inhalte bleiben erreichbar.
 
 ## Voraussetzungen
 

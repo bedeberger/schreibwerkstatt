@@ -4,6 +4,17 @@ KI-gestütztes Lektorat-Tool für BookStack. Deployment (LXC + systemd) und Env-
 
 **Lokal starten:** `npm install && npm start` (Port 3737). Tests: `npm test` (Playwright, erstmalig `npx playwright install chromium`).
 
+## Vertiefende Dokus
+
+Themen-Spickzettel ausgelagert (Drift-Schutz: CLAUDE.md-Regeln, Details in den Spickzetteln):
+
+- [docs/jobs.md](docs/jobs.md) — Job-Queue: Lifecycle, `createJob`/`updateJob`/`failJob`, Dedup, Polling, Reconnect-Events.
+- [docs/i18n.md](docs/i18n.md) — Key-Konvention, `t/tRaw`, Server-Status-Keys, `__i18n:`-Marker für persistierte Nachrichten.
+- [docs/ai-providers.md](docs/ai-providers.md) — `callAI`-Vertrag, JSON-Parse-Fallback, Token-Budgets, Caching, Mutex bei Ollama/Llama, Retries.
+- [docs/testing.md](docs/testing.md) — Wann Unit/Integration/E2E, Mock-AI-Setup, Harness-Konventionen, häufige Fallen.
+- [docs/erd.md](docs/erd.md) — Schema-ERD (Mermaid) + offene Schema-Verbesserungen.
+- [docs/finetuning.md](docs/finetuning.md), [docs/wordpress-import.md](docs/wordpress-import.md), [docs/bookstack-templates.md](docs/bookstack-templates.md) — Spezialthemen.
+
 ## Doku-Stil dieser Datei
 
 CLAUDE.md beschreibt **ausschliesslich den aktuellen Stand**. Keine Historie, keine Migrationsanleitungen, keine „statt X" / „ersetzt Y" / „alte Variante" / „vorher war …" / „Bug-Symptom"-Erzählungen mit konkreten Symptom-Werten. Wer wissen will, was früher anders war, liest `git log`/`git blame`. Beim Refactor: alten Pfad ersatzlos aus der Datei entfernen, nicht als „migriert von" mitschleppen. **Why:**/**Begründungen** für aktuelle Constraints und Invarianten bleiben — sie erklären den aktuellen Code; Bug-Narrative aber nicht.
@@ -57,7 +68,7 @@ Verbindlicher Aufbau des Alpine-State. Vor jeder UI-Änderung die richtige Ebene
 ### Drei Ebenen
 
 1. **Root `Alpine.data('lektorat')`** ([public/js/app.js:355](public/js/app.js#L355)) — `x-data="lektorat"` am `<body>`. SSoT für: Navigation, Session/Shell, i18n-Locale, **alle `showXxxCard`-Flags** (Hash-Router + Exklusivität), Job-Queue, Editor-Edit-Mode, Auto-Save, Selection. Cross-Cutting-Methoden: `t/tRaw`, `bsGet/bsGetAll`, `loadFiguren/loadOrte/loadSzenen`, `selectPage`, `gotoStelle`, `_closeOtherMainCards`.
-2. **Sub-Komponenten `Alpine.data('xxxCard')`** in [public/js/cards/](public/js/cards/) — 24 Karten, eine pro UI-Card. Eigener fachlicher State + `init()`/`destroy()`. Karten haben **keine** eigenen `showXxxCard`-Flags (Root ist SSoT); sie hören via `$watch(() => window.__app.showXxxCard)` auf Öffnen/Schliessen.
+2. **Sub-Komponenten `Alpine.data('xxxCard')`** in [public/js/cards/](public/js/cards/) — eine pro UI-Card. Eigener fachlicher State + `init()`/`destroy()`. Karten haben **keine** eigenen `showXxxCard`-Flags (Root ist SSoT); sie hören via `$watch(() => window.__app.showXxxCard)` auf Öffnen/Schliessen.
 3. **`Alpine.store('catalog')`** ([public/js/cards/catalog-store.js](public/js/cards/catalog-store.js)) — geteilte Fach-Daten `figuren / orte / szenen / globalZeitstrahl`. Root spiegelt sie via Getter/Setter-Proxy ([public/js/app.js:364-371](public/js/app.js#L364-L371)), damit `this.figuren = …` und `this.figuren.push(…)` weiter funktionieren. Karten lesen via `$store.catalog` oder `$app.figuren`.
 
 ### Root-State-Slices ([public/js/app-state.js](public/js/app-state.js))
@@ -175,7 +186,7 @@ Custom-Events am `window`. Vollständige Liste:
 
 ### Karten-Inventar (Alpine.data-Names)
 
-Buchebene: `bookOverviewCard`, `bookReviewCard`, `kapitelReviewCard`, `figurenCard`, `orteCard`, `szenenCard`, `ereignisseCard`, `kontinuitaetCard`, `bookStatsCard`, `stilCard`, `fehlerHeatmapCard`, `chatCard`, `bookChatCard`, `ideenCard`, `finetuneExportCard`, `bookSettingsCard`, `userSettingsCard`, `paletteCard`.
+Buchebene: `bookOverviewCard`, `bookReviewCard`, `kapitelReviewCard`, `figurenCard`, `orteCard`, `szenenCard`, `ereignisseCard`, `kontinuitaetCard`, `bookStatsCard`, `stilCard`, `fehlerHeatmapCard`, `chatCard`, `bookChatCard`, `ideenCard`, `finetuneExportCard`, `bookSettingsCard`, `userSettingsCard`, `paletteCard`, `exportCard`, `pdfExportCard`.
 Editor-Slices: `editorFindCard`, `editorSynonymeCard`, `editorFigurLookupCard`, `editorToolbarCard`, `editorFocusCard`, `lektoratFindingsCard`, `pageHistoryCard`.
 
 Alle in [public/js/app.js:197-220](public/js/app.js#L197-L220) via `registerXxxCard()` registriert.
@@ -335,7 +346,9 @@ vis-network (Figuren-Graph) und Chart.js (BookStats) laden ausschliesslich on-de
 
 ## Datenbank
 
-DB-Code lebt in [db/](db/), aufgeteilt auf thematische Files: [connection.js](db/connection.js) (better-sqlite3-Setup, `PRAGMA foreign_keys = ON` global), [migrations.js](db/migrations.js) (Schema + `runMigrations`), [schema.js](db/schema.js), [figures.js](db/figures.js), [pages.js](db/pages.js), [tokens.js](db/tokens.js), [pdf-export.js](db/pdf-export.js), [fonts.js](db/fonts.js).
+DB-Code lebt in [db/](db/), aufgeteilt auf thematische Files: [connection.js](db/connection.js) (better-sqlite3-Setup, `PRAGMA foreign_keys = ON` global), [migrations.js](db/migrations.js) (Schema + `runMigrations`), [schema.js](db/schema.js), [books.js](db/books.js), [pages.js](db/pages.js), [figures.js](db/figures.js), [tokens.js](db/tokens.js), [token-usage.js](db/token-usage.js), [pdf-export.js](db/pdf-export.js), [fonts.js](db/fonts.js).
+
+**Schema-Übersicht: [docs/erd.md](docs/erd.md)** — Mermaid-ERD mit allen Tabellen, FK-Kanten und thematischen Sub-Diagrammen (Buch-Hierarchie, Figuren, Continuity/Zeitstrahl, Chat/Reviews/Jobs/Caches/User/Export). Vor neuen Tabellen/Beziehungen prüfen, ob bestehende Strukturen (Bridge-Pattern, FK-Konventionen, ON-DELETE-Strategien) wiederverwendbar sind. Enthält ausserdem priorisierte Liste offener Schema-Verbesserungen.
 
 ### Relationale Integrität (Pflicht)
 
@@ -380,6 +393,8 @@ db.prepare('UPDATE schema_version SET version = N').run();
 9. `UPDATE schema_version`
 
 **Initial-Schema-Block** (oben in `migrations.js`) ist der „Stand vor allen Migrationen". Nur additive Changes (neue Spalten via ALTER ADD COLUMN, neue Tabellen). FK-Anreicherung gehört in eigene Migrationen via Recreate-Pattern, nicht ins Initial-Schema — sonst brechen Daten-Migrationen, die ihre eigenen Vorbedingungen aus alten Spalten lesen, auf frischen DBs.
+
+**Pflicht: [docs/erd.md](docs/erd.md) im selben Commit aktualisieren.** Stand-Zeile (Schema-Version + Tabellen-Anzahl) bumpen; betroffene Block-Definitionen (neue Spalten, geänderte Typen) anpassen; bei neuen Tabellen einen Block + die FK-Kanten in Section 1 (Übersicht) und ggf. im passenden thematischen Sub-Diagramm ergänzen; bei neuen FK-Kanten auf bestehende Tabellen die Kante in Section 1 nachziehen. ERD bleibt sonst still drift-anfällig — die Stand-Zeile lügt, Mermaid-Beziehungen werden falsch.
 
 ### Neuer Beziehungstyp
 
@@ -482,7 +497,7 @@ Ziel: Buch im Modell **internalisieren** (Stil, Welt, Figuren, Fakten, Plot). Da
 **Module:**
 - `routes/jobs/pdf-export.js` — Job-Wrapper, hält PDF-Buffers in `pdfResults`-Map (TTL 2h).
 - `lib/pdf-render.js` — pdfkit-Doc-Lifecycle, Cover, Title-Page, TOC, Kapitel-Loop, Header/Footer-Pass.
-- `lib/pdf-html-walker.js` — linkedom-basiert. Whitelist: h1-h3, p, ul/ol/li, blockquote, pre, hr, img + inline strong/em/u/a. `<div class="poem">` → eigener `poem`-Block. Tabellen werden als Plain-Text-Fallback durchgereicht (kein Layout). Standard-Editor-Markup wird unterstützt.
+- `lib/pdf-render/html-walker.js` — linkedom-basiert. Whitelist: h1-h3, p, ul/ol/li, blockquote, pre, hr, img + inline strong/em/u/a. `<div class="poem">` → eigener `poem`-Block. Tabellen werden als Plain-Text-Fallback durchgereicht (kein Layout). Standard-Editor-Markup wird unterstützt.
 - `lib/pdf-export-defaults.js` — `defaultConfig()` + `validateConfig(src)`. Strict: unbekannte Keys werden verworfen, Numerik geclampt, Enums whitelisted.
 - PDF/A-2B-Subset macht pdfkit nativ via `subset: 'PDF/A-2b'` im PDFDocument-Constructor: hängt `pdfaid:part`/`conformance` ans XMP, schreibt OutputIntent mit eingebettetem sRGB-ICC-Profil aus pdfkit's eigenem Bundle (`node_modules/pdfkit/js/data/sRGB_IEC61966_2_1.icc`). **Nicht** manuell via `doc._root.data.Metadata = …` patchen — pdfkit's `endMetadata()` läuft danach und überschreibt die Referenz.
 - `lib/pdfa-validate.js` — veraPDF-CLI-Wrapper. Schreibt Buffer in Tempdatei mit `.pdf`-Extension (CLI liest nicht von stdin), validiert, löscht. Wenn Binary fehlt → `{ available: false }`, Job liefert PDF mit Warnung. ENV `VERAPDF_BIN`, `VERAPDF_FLAVOUR`, `VERAPDF_DISABLED`.
@@ -621,14 +636,22 @@ public/
 
 ## Tests
 
-`npm test` führt Unit- und E2E-Tests nacheinander aus. Einzeln: `npm run test:unit` (Node built-in, Millisekunden, kein Browser) oder `npm run test:e2e` (Playwright, Chromium nötig). Setup: [tests/](tests/), [playwright.config.js](playwright.config.js).
+`npm test` führt Unit-, Integration- und E2E-Tests nacheinander aus. Einzeln: `npm run test:unit` (Node built-in, parallelisiert, kein Browser), `npm run test:integration` (Node built-in, sequenziell, Job-Pipelines gegen Mock-AI), `npm run test:e2e` (Playwright, Chromium nötig). Setup: [tests/](tests/), [playwright.config.js](playwright.config.js).
 
 **Unit** (`tests/unit/*.test.{js,mjs}`, `node --test`) — decken ab:
-- JSON-Fallback-Kette ([ai.test.js](tests/unit/ai.test.js)), BookStack-Pagination ([bookstack.test.js](tests/unit/bookstack.test.js)), Stil-/Figuren-Metriken ([page-index.test.js](tests/unit/page-index.test.js)), Prompts-Build ([prompts.test.mjs](tests/unit/prompts.test.mjs)), XSS-Escape-Invariante ([escape-xss.test.mjs](tests/unit/escape-xss.test.mjs)), Request-Validierung ([validate.test.js](tests/unit/validate.test.js)), Job-Reconnect-Events ([job-reconnect.test.mjs](tests/unit/job-reconnect.test.mjs)), Hash-Router ([hash-router.test.mjs](tests/unit/hash-router.test.mjs)), Card-Exklusivität ([card-exclusivity.test.mjs](tests/unit/card-exclusivity.test.mjs)), Editor-Focus-Granularität ([editor-focus.test.mjs](tests/unit/editor-focus.test.mjs), [focus-granularity.test.mjs](tests/unit/focus-granularity.test.mjs)), Szenen-Filter ([szenen-filter.test.mjs](tests/unit/szenen-filter.test.mjs)), Ideen-Prompt + Schema ([ideen-prompt.test.mjs](tests/unit/ideen-prompt.test.mjs), [ideen-schema.test.js](tests/unit/ideen-schema.test.js)), Shared-Jobs-Helper ([shared-jobs.test.js](tests/unit/shared-jobs.test.js)).
+- JSON-Fallback-Kette ([ai.test.js](tests/unit/ai.test.js)), BookStack-Pagination ([bookstack.test.js](tests/unit/bookstack.test.js)), Stil-/Figuren-Metriken ([page-index.test.js](tests/unit/page-index.test.js)), Prompts-Build ([prompts.test.mjs](tests/unit/prompts.test.mjs)), XSS-Escape-Invariante ([escape-xss.test.mjs](tests/unit/escape-xss.test.mjs)), Request-Validierung ([validate.test.js](tests/unit/validate.test.js)), Job-Reconnect-Events ([job-reconnect.test.mjs](tests/unit/job-reconnect.test.mjs)), Hash-Router ([hash-router.test.mjs](tests/unit/hash-router.test.mjs)), Card-Exklusivität ([card-exclusivity.test.mjs](tests/unit/card-exclusivity.test.mjs)), Editor-Focus-Granularität ([editor-focus.test.mjs](tests/unit/editor-focus.test.mjs), [focus-granularity.test.mjs](tests/unit/focus-granularity.test.mjs)), Szenen-Filter ([szenen-filter.test.mjs](tests/unit/szenen-filter.test.mjs)), Ideen-Prompt + Schema ([ideen-prompt.test.mjs](tests/unit/ideen-prompt.test.mjs), [ideen-schema.test.js](tests/unit/ideen-schema.test.js)), Shared-Jobs-Helper ([shared-jobs.test.js](tests/unit/shared-jobs.test.js)), HTML-Cleaner ([html-clean.test.js](tests/unit/html-clean.test.js)), Page-Stats-Normalisierung ([page-stats-normalization.test.mjs](tests/unit/page-stats-normalization.test.mjs)), Stale-Write-Schutz ([stale-write.test.mjs](tests/unit/stale-write.test.mjs)), PDF-Export ([pdf-export-db.test.js](tests/unit/pdf-export-db.test.js), [pdf-export-defaults.test.js](tests/unit/pdf-export-defaults.test.js), [pdf-html-walker.test.mjs](tests/unit/pdf-html-walker.test.mjs), [pdf-render.test.mjs](tests/unit/pdf-render.test.mjs)), Palette-Fuzzy ([palette-fuzzy.test.mjs](tests/unit/palette-fuzzy.test.mjs)), Streak-Heatmap ([streak-heatmap.test.mjs](tests/unit/streak-heatmap.test.mjs)), Local-Date ([local-date.test.mjs](tests/unit/local-date.test.mjs), [local-date-server.test.js](tests/unit/local-date-server.test.js)), Book-Overview-Load ([book-overview-load.test.mjs](tests/unit/book-overview-load.test.mjs)).
+
+**Integration** (`tests/integration/*.test.js`, `node --test`, sequenziell mit Mock-AI):
+- [tests/integration/komplett.test.js](tests/integration/komplett.test.js) – Komplettanalyse-Pipeline (Vollextraktion, Konsolidierung, Block 2).
+- [tests/integration/kontinuitaet.test.js](tests/integration/kontinuitaet.test.js) – Standalone-Kontinuitätscheck.
+- [tests/integration/review.test.js](tests/integration/review.test.js) – Buch-Review-Job.
+- [tests/integration/regression.test.js](tests/integration/regression.test.js) – Cross-Job-Regressionen.
+- Helpers in [tests/integration/_helpers/](tests/integration/_helpers/).
 
 **E2E** (`tests/e2e/*.spec.js`, Playwright):
 - [tests/e2e/focus-editor.spec.js](tests/e2e/focus-editor.spec.js) – Fokus-Editor: Toggle, Recenter, Pointer-Schonfrist, Cleanup/Leak-Freiheit.
 - [tests/e2e/clean-content.spec.js](tests/e2e/clean-content.spec.js) – `cleanContentArtefacts` aus [public/js/utils.js](public/js/utils.js): Paste-Artefakt-Stripping.
 - [tests/e2e/lektorat.spec.js](tests/e2e/lektorat.spec.js) – Lektorat-Flow mit Mock-Server und Harness-Szenarien.
+- [tests/e2e/pdf-export.spec.js](tests/e2e/pdf-export.spec.js) – Custom-PDF-Export-Profile (CRUD, Cover, Render-Job).
 
 **Bei grösseren UI-Änderungen** (besonders am Editor, Fokus-Modus, Scroll-/Selection-Verhalten, Lektorat-Flow) vor dem Commit automatisch `npm test` ausführen. Schlägt etwas fehl, Ursache klären statt Tests anpassen. Übrige Bereiche weiterhin manuell validieren.

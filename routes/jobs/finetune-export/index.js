@@ -27,7 +27,7 @@ const finetuneExportRouter = express.Router();
 async function runFinetuneExportJob(jobId, bookId, bookName, userEmail, userToken, opts) {
   const logger = makeJobLogger(jobId);
   try {
-    logger.info(`Start Finetune-Export «${bookName}» (book=${bookId}, types=${Object.entries(opts.types).filter(([,v]) => v).map(([k]) => k).join(',')})`);
+    logger.info(`Start: «${bookName}» types=${Object.entries(opts.types).filter(([,v]) => v).map(([k]) => k).join(',')}`);
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
     const [chaptersData, pages] = await Promise.all([
       bsGetAll('chapters?filter[book_id]=' + bookId, userToken),
@@ -107,7 +107,7 @@ async function runFinetuneExportJob(jobId, bookId, bookName, userEmail, userToke
       ...data,
     };
 
-    logger.info(`Finetune-Export Phase: Seiten geladen (${pageContents.length} Seiten, ${data.figNamesSorted.length} Figuren bekannt).`);
+    logger.info(`Seiten geladen: ${pageContents.length} Seiten, ${data.figNamesSorted.length} Figuren bekannt.`);
 
     if (opts.types.style) {
       updateJob(jobId, { progress: 55, statusText: 'finetune.phase.style' });
@@ -153,10 +153,11 @@ async function runFinetuneExportJob(jobId, bookId, bookName, userEmail, userToke
     updateJob(jobId, { progress: 95, statusText: 'finetune.phase.building' });
 
     const stats = finalizeFinetuneSamples(jobId, ctx);
-    completeJob(jobId, { stats });
-    logger.info(`Finetune-Export fertig: ${stats.total} Samples (${counts.style} style / ${counts.scene} scene / ${counts.dialog} dialog / ${counts.authorChat} authorChat / ${counts.correction} correction / ${counts.aiAugment} aiAugment) → ${stats.train} train, ${stats.val} val, dropped=${stats.dropped}, p95=${stats.tokensP95} tok, max=${stats.tokensMax} tok, recSeq=${stats.recommendedSeqLen}.`);
+    const sampleBreakdown = `${counts.style}/${counts.scene}/${counts.dialog}/${counts.authorChat}/${counts.correction}/${counts.aiAugment} (sty/scn/dlg/ac/cor/aug)`;
+    completeJob(jobId, { stats }, null,
+      `${stats.total} Samples [${sampleBreakdown}], ${stats.train} train + ${stats.val} val, dropped=${stats.dropped}, p95=${stats.tokensP95} tok, max=${stats.tokensMax} tok, recSeq=${stats.recommendedSeqLen}`);
   } catch (e) {
-    if (e.name !== 'AbortError') logger.error(`Fehler Finetune-Export (book=${bookId}): ${e.message}`, { stack: e.stack });
+    if (e.name !== 'AbortError') logger.error(`Fehler: ${e.message}`, { stack: e.stack });
     failJob(jobId, e);
   }
 }
