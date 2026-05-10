@@ -145,13 +145,46 @@
         <span class="card-form-saved" x-show="savedAt && !busy" x-cloak x-transition.opacity.duration.250ms x-text="$app.t('werkstatt.saved')"></span>
       </div>
 
-      <!-- Mindmap-Canvas (jsMind, lazy-loaded). Editierbar: Doppelklick auf Knoten zum Umbenennen, Tab/Enter für neue Sub/Geschwister, Delete entfernt. -->
-      <section class="werkstatt-mindmap-section">
+      <!-- Mindmap-Canvas (jsMind, lazy-loaded). Editierbar: F2/Doppelklick zum Umbenennen,
+           Tab fügt Sub-Knoten, Enter fügt Geschwister, Delete entfernt, Pfeiltasten navigieren,
+           Rechtsklick öffnet Kontext-Menü. -->
+      <section class="werkstatt-mindmap-section" :class="{ 'werkstatt-mindmap-section--fullscreen': mindmapFullscreen }">
         <div class="list-header list-header--between">
           <h3 class="section-heading" x-text="$app.t('werkstatt.heading')"></h3>
-          <span class="werkstatt-mindmap-hint" x-show="selectedKnotenId" x-text="$app.t('werkstatt.mindmap.selectedHint', { pfad: knotenPfad(selectedKnotenId) })"></span>
+          <div class="werkstatt-mindmap-controls">
+            <span class="werkstatt-mindmap-hint" x-show="selectedKnotenId" x-text="$app.t('werkstatt.mindmap.selectedHint', { pfad: knotenPfad(selectedKnotenId) })"></span>
+            <button type="button"
+                    class="graph-tool-btn"
+                    :aria-pressed="mindmapScrollEnabled"
+                    :aria-label="mindmapScrollEnabled ? $app.t('werkstatt.mindmap.scrollOn.tip') : $app.t('werkstatt.mindmap.scrollOff.tip')"
+                    @click="mindmapScrollEnabled = !mindmapScrollEnabled"
+                    :data-tip="mindmapScrollEnabled ? $app.t('werkstatt.mindmap.scrollOn.tip') : $app.t('werkstatt.mindmap.scrollOff.tip')">&#x2725;</button>
+            <button type="button"
+                    class="graph-tool-btn"
+                    :aria-pressed="mindmapFullscreen"
+                    :aria-label="mindmapFullscreen ? $app.t('werkstatt.mindmap.fullscreenExit.tip') : $app.t('werkstatt.mindmap.fullscreen.tip')"
+                    @click="toggleMindmapFullscreen()"
+                    :data-tip="mindmapFullscreen ? $app.t('werkstatt.mindmap.fullscreenExit.tip') : $app.t('werkstatt.mindmap.fullscreen.tip')"
+                    x-text="mindmapFullscreen ? '✕' : '⤢'"></button>
+          </div>
         </div>
-        <div class="werkstatt-mindmap"></div>
+        <p class="werkstatt-mindmap-keyboard-hint" x-text="$app.t('werkstatt.mindmap.keyboardHint')"></p>
+        <div class="werkstatt-mindmap" :class="{ 'werkstatt-mindmap--scroll': mindmapScrollEnabled }"></div>
+
+        <!-- Rechtsklick-Menü, position:fixed via inline-style -->
+        <div class="werkstatt-context-menu"
+             role="menu"
+             x-show="contextMenuOpen"
+             x-cloak
+             :style="{ left: contextMenuPos.left + 'px', top: contextMenuPos.top + 'px' }"
+             @click.stop>
+          <button type="button" role="menuitem" class="werkstatt-context-item" @click="ctxBrainstorm()" x-text="$app.t('werkstatt.action.brainstorm')"></button>
+          <button type="button" role="menuitem" class="werkstatt-context-item" @click="ctxRename()" x-text="$app.t('werkstatt.context.rename')"></button>
+          <button type="button" role="menuitem" class="werkstatt-context-item" @click="ctxAddChild()" x-text="$app.t('werkstatt.context.addChild')"></button>
+          <button type="button" role="menuitem" class="werkstatt-context-item" @click="ctxAddSibling()" x-text="$app.t('werkstatt.context.addSibling')"></button>
+          <div class="werkstatt-context-sep" role="separator"></div>
+          <button type="button" role="menuitem" class="werkstatt-context-item werkstatt-context-item--danger" @click="ctxDelete()" :disabled="contextMenuNodeId === 'root'" x-text="$app.t('werkstatt.context.delete')"></button>
+        </div>
       </section>
 
       <!-- Brainstorm-Status während KI-Job -->

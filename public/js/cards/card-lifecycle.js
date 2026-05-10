@@ -22,6 +22,8 @@
 //   onShow(root)             — overrides default show-watch (which calls cfg.load)
 //   onBookChanged(e, ctx, r) — full override; skips the default reset+load
 //   onViewReset(e, ctx, r)   — full override; skips the default reset
+//   onCardRefresh(e, ctx, r) — runs in place of cfg.load on `card:refresh`
+//                              (name-match + book-id check are handled by helper)
 //   resetStateView           — override resetState specifically on `view:reset`
 //   refreshNeedsBookId       — default true; set false if cfg.load checks itself
 //   showNeedsBookId          — default true; set false to call onShow without book
@@ -77,7 +79,8 @@ export function setupCardLifecycle(ctx, cfg) {
   const onCardRefresh = (e) => {
     if (e.detail?.name !== cfg.name) return;
     if (cfg.refreshNeedsBookId !== false && !root().selectedBookId) return;
-    if (cfg.load) cfg.load(root());
+    if (cfg.onCardRefresh) cfg.onCardRefresh(e, ctx, root());
+    else if (cfg.load) cfg.load(root());
   };
 
   window.addEventListener('book:changed', onBookChanged, { signal });

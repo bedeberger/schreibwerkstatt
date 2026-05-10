@@ -33,6 +33,19 @@ function _newNodeId() {
 }
 
 export const figurWerkstattMethods = {
+  // ── Dirty-Tracking ────────────────────────────────────────────────────────
+  // Vergleich Form-Felder gegen selectedDraft + _mindmapDirty-Flag (gesetzt
+  // durch jsMind-Mutationsevents in _mountMindmap). Reload via card:refresh
+  // prüft isDirty() und ruft appConfirm, bevor er die Server-Daten neu lädt.
+  isDirty() {
+    const sel = this.selectedDraft();
+    if (!sel) return false;
+    if ((this.editName || '').trim() !== (sel.name || '').trim()) return true;
+    if ((this.editArchetype || '') !== (sel.archetype || '')) return true;
+    if ((this.editNotes || '') !== (sel.notes || '')) return true;
+    return !!this._mindmapDirty;
+  },
+
   // ── CRUD ──────────────────────────────────────────────────────────────────
   async loadDrafts() {
     const app = window.__app;
@@ -62,6 +75,10 @@ export const figurWerkstattMethods = {
   resetDrafts() {
     this._destroyMindmap();
     this._clearJobs();
+    this._hideContextMenu?.();
+    if (document.fullscreenElement) {
+      try { document.exitFullscreen(); } catch {}
+    }
     this.drafts = [];
     this.selectedDraftId = null;
     this.selectedKnotenId = null;
@@ -74,6 +91,9 @@ export const figurWerkstattMethods = {
     this.busy = false;
     this.brainstormResult = null;
     this.consistencyResult = null;
+    this.mindmapFullscreen = false;
+    this.contextMenuOpen = false;
+    this._mindmapDirty = false;
   },
 
   selectDraft(id) {
@@ -87,6 +107,7 @@ export const figurWerkstattMethods = {
     this.brainstormResult = null;
     this.consistencyResult = null;
     this.selectedKnotenId = null;
+    this._mindmapDirty = false;
     this.$nextTick(() => this._mountMindmap());
   },
 
@@ -157,6 +178,7 @@ export const figurWerkstattMethods = {
       });
       this.drafts = this.drafts.map(d => d.id === updated.id ? updated : d);
       this.errorMessage = '';
+      this._mindmapDirty = false;
       this.savedAt = Date.now();
       if (this._savedAtTimer) clearTimeout(this._savedAtTimer);
       this._savedAtTimer = setTimeout(() => { this.savedAt = null; this._savedAtTimer = null; }, 2500);
@@ -222,18 +244,46 @@ export const figurWerkstattMethods = {
         theme: 'primary',
         view: { hmargin: 80, vmargin: 40, line_width: 1.5, draggable: true, hide_scrollbars_when_draggable: true },
         layout: { hspace: 30, vspace: 18, pspace: 14 },
+        // Tastatur-Navigation: Pfeiltasten navigieren, Tab fügt Sub-Knoten,
+        // Enter Geschwister, F2 Editieren, Delete entfernt, Space toggle.
+        // jsMind-Default für `addchild` ist nur Insert (45) + Ctrl+Enter (4109);
+        // Tab (9) explizit ergänzen, weil Mac-Tastaturen kein Insert haben und
+        // Tab als Mindmap-Standard erwartet wird (jsMind preventDefault'et Tab
+        // ohnehin).
+        shortcut: {
+          enable: true,
+          mapping: {
+            addchild: [9, 45, 4109],
+            addbrother: 13,
+            editnode: 113,
+            delnode: 46,
+            toggle: 32,
+            left: 37, up: 38, right: 39, down: 40,
+          },
+        },
       });
-      // Selection-Tracking für KI-Brainstorm.
+      // Selection-Tracking für KI-Brainstorm + Auto-Center bei Tastatur-Nav.
+      // type === 4 → Selection. type === 3 → Edit (add/remove/rename/move).
       this._jm.add_event_listener((type, data) => {
-        // type 4 = select (jsMind enum: show=1, resize=2, edit=3, select=4)
         if (type === 4) {
-          this.selectedKnotenId = data?.node || null;
+          const id = data?.node || null;
+          this.selectedKnotenId = id;
+          if (id) this._centerNodeInView(id);
+        } else if (type === 3) {
+          this._mindmapDirty = true;
         }
       });
+      // Rechtsklick auf jmnode → Context-Menu mit Mindmap-Funktionen.
+      container.addEventListener('contextmenu', (ev) => this._onMindmapContextMenu(ev));
     }
     this._jm.show(resolveMindmapForDisplay(sel.mindmap));
-    // Nach show() Wurzel als Default-Selektion.
     this.selectedKnotenId = sel.mindmap?.data?.id || 'root';
+    // Auto-Fokus auf Mindmap-Panel: jsMind setzt tabIndex=1 auf .jsmind-inner —
+    // damit Pfeiltasten/Tab/Enter direkt greifen, ohne dass User vorher klicken muss.
+    this.$nextTick(() => {
+      const panel = container.querySelector('.jsmind-inner');
+      if (panel) panel.focus({ preventScroll: true });
+    });
   },
 
   _destroyMindmap() {
@@ -241,6 +291,39 @@ export const figurWerkstattMethods = {
     const container = this.$el?.querySelector?.('.werkstatt-mindmap');
     if (container) container.innerHTML = '';
     this._jm = null;
+    if (this._fsListener) {
+      document.removeEventListener('fullscreenchange', this._fsListener);
+      this._fsListener = null;
+    }
+    this._hideContextMenu?.();
+  },
+
+  // Selektierten Knoten in der Mitte des Mindmap-Containers zeigen.
+  // jsMind selbst zentriert nur die Wurzel. Bei Pfeiltasten-Nav muss der
+  // selektierte Knoten manuell ins Sichtfeld; sonst läuft er aus dem Viewport.
+  // Strategie: scrollLeft/scrollTop des `.jsmind-inner`-Scroll-Containers so
+  // setzen, dass der jmnode mittig liegt — kein scrollIntoView, weil das auch
+  // die Page selbst nach oben scrollt.
+  _centerNodeInView(id) {
+    const root = this.$el?.querySelector('.werkstatt-mindmap');
+    if (!root) return;
+    const inner = root.querySelector('.jsmind-inner');
+    if (!inner) return;
+    const node = inner.querySelector(`jmnode[nodeid="${CSS.escape(id)}"]`);
+    if (!node) return;
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    // Position des Knotens innerhalb des Scroll-Containers ermitteln.
+    const innerRect = inner.getBoundingClientRect();
+    const nodeRect = node.getBoundingClientRect();
+    const targetLeft = inner.scrollLeft + (nodeRect.left - innerRect.left)
+      + nodeRect.width / 2 - innerRect.width / 2;
+    const targetTop = inner.scrollTop + (nodeRect.top - innerRect.top)
+      + nodeRect.height / 2 - innerRect.height / 2;
+    inner.scrollTo({
+      left: Math.max(0, targetLeft),
+      top: Math.max(0, targetTop),
+      behavior: reduced ? 'auto' : 'smooth',
+    });
   },
 
   _exportMindmap() {
@@ -392,6 +475,135 @@ export const figurWerkstattMethods = {
     this.consistencyLoading = false;
     this.brainstormStatus = '';
     this.consistencyStatus = '';
+  },
+
+  // ── Vollbild-Modus ────────────────────────────────────────────────────────
+  // Triggert Browser-Fullscreen auf den Mindmap-Section-Wrapper. Klassen-Sync
+  // via fullscreenchange-Event (statt own state), damit Esc + F11 mitspielen.
+  async toggleMindmapFullscreen() {
+    const wrap = this.$el?.querySelector('.werkstatt-mindmap-section');
+    if (!wrap) return;
+    if (document.fullscreenElement === wrap) {
+      try { await document.exitFullscreen(); } catch {}
+      return;
+    }
+    if (document.fullscreenElement) {
+      try { await document.exitFullscreen(); } catch {}
+    }
+    try { await wrap.requestFullscreen(); } catch (e) {
+      this.errorMessage = window.__app.t('werkstatt.error.fullscreen') || 'Fullscreen failed';
+      return;
+    }
+    if (!this._fsListener) {
+      this._fsListener = () => {
+        const active = document.fullscreenElement === wrap;
+        this.mindmapFullscreen = active;
+        // Layout-Resize triggern: jsMind cached Container-Höhe.
+        if (this._jm) {
+          try { this._jm.resize(); } catch {}
+        }
+      };
+      document.addEventListener('fullscreenchange', this._fsListener);
+    }
+  },
+
+  // ── Rechtsklick-Menü ──────────────────────────────────────────────────────
+  _onMindmapContextMenu(ev) {
+    const target = ev.target.closest?.('jmnode');
+    if (!target) { this._hideContextMenu(); return; }
+    const nodeId = target.getAttribute('nodeid');
+    if (!nodeId) return;
+    ev.preventDefault();
+    // Knoten selektieren (jsMind), damit selectedKnotenId für Brainstorm passt.
+    try { this._jm?.select_node(nodeId); } catch {}
+    this.selectedKnotenId = nodeId;
+    this.contextMenuNodeId = nodeId;
+    this.contextMenuPos = this._clampMenuPos(ev.clientX, ev.clientY);
+    this.contextMenuOpen = true;
+    if (!this._ctxOutsideHandler) {
+      this._ctxOutsideHandler = (e) => {
+        const menu = this.$el?.querySelector('.werkstatt-context-menu');
+        if (menu && !menu.contains(e.target)) this._hideContextMenu();
+      };
+      document.addEventListener('mousedown', this._ctxOutsideHandler, true);
+      document.addEventListener('keydown', this._ctxEscHandler = (e) => {
+        if (e.key === 'Escape') this._hideContextMenu();
+      });
+    }
+  },
+
+  _clampMenuPos(x, y) {
+    const W = 240, H = 240;
+    // .card ancestor hat transform (cardFadeIn) → erzeugt Containing-Block für position:fixed.
+    // clientX/Y sind viewport-relativ; daher Card-Rect-Offset abziehen.
+    let dx = 0, dy = 0;
+    const cb = this.$el?.closest('.card');
+    if (cb) {
+      const r = cb.getBoundingClientRect();
+      dx = r.left; dy = r.top;
+    }
+    return {
+      left: Math.min(window.innerWidth - W - 8, x) - dx,
+      top: Math.min(window.innerHeight - H - 8, y) - dy,
+    };
+  },
+
+  _hideContextMenu() {
+    this.contextMenuOpen = false;
+    this.contextMenuNodeId = null;
+    if (this._ctxOutsideHandler) {
+      document.removeEventListener('mousedown', this._ctxOutsideHandler, true);
+      this._ctxOutsideHandler = null;
+    }
+    if (this._ctxEscHandler) {
+      document.removeEventListener('keydown', this._ctxEscHandler);
+      this._ctxEscHandler = null;
+    }
+  },
+
+  // Context-Menu-Aktionen — operieren auf contextMenuNodeId.
+  ctxRename() {
+    const id = this.contextMenuNodeId;
+    this._hideContextMenu();
+    if (!id || !this._jm) return;
+    try { this._jm.begin_edit(id); } catch {}
+  },
+
+  ctxAddChild() {
+    const id = this.contextMenuNodeId;
+    this._hideContextMenu();
+    if (!id || !this._jm) return;
+    const newId = 'n' + Math.random().toString(36).slice(2, 9) + Date.now().toString(36);
+    try {
+      this._jm.add_node(id, newId, window.__app.t('werkstatt.tree.custom') || 'Neuer Knoten');
+      this._jm.select_node(newId);
+      this._jm.begin_edit(newId);
+    } catch {}
+  },
+
+  ctxAddSibling() {
+    const id = this.contextMenuNodeId;
+    this._hideContextMenu();
+    if (!id || !this._jm) return;
+    const newId = 'n' + Math.random().toString(36).slice(2, 9) + Date.now().toString(36);
+    try {
+      this._jm.insert_node_after(id, newId, window.__app.t('werkstatt.tree.custom') || 'Neuer Knoten');
+      this._jm.select_node(newId);
+      this._jm.begin_edit(newId);
+    } catch {}
+  },
+
+  ctxDelete() {
+    const id = this.contextMenuNodeId;
+    this._hideContextMenu();
+    if (!id || !this._jm) return;
+    if (id === 'root') return;
+    try { this._jm.remove_node(id); } catch {}
+  },
+
+  ctxBrainstorm() {
+    this._hideContextMenu();
+    this.runBrainstorm();
   },
 };
 

@@ -180,7 +180,7 @@
 }
 .werkstatt-mindmap {
   width: 100%;
-  height: 480px;
+  height: 720px;
   border: var(--border-thin) solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
@@ -188,7 +188,27 @@
   position: relative;
 }
 @media (max-width: 600px) {
-  .werkstatt-mindmap { height: 360px; }
+  .werkstatt-mindmap { height: 560px; }
+}
+
+/* Wheel/Drag-Pan im Mindmap-Panel: Default aus, damit Mausrad die Seite scrollt.
+   Toggle-Klasse aktiviert overflow:auto im jsMind-Inner-Panel; ohne overflow
+   wird auch jsMind-Drag (scrollBy auf e_panel) zum No-Op. Fullscreen erzwingt
+   Scroll, weil keine Page mehr dahinter liegt. */
+.werkstatt-mindmap .jsmind-inner { overflow: hidden; }
+.werkstatt-mindmap--scroll .jsmind-inner { overflow: auto; }
+.werkstatt-mindmap-section:fullscreen .jsmind-inner { overflow: auto; }
+
+.werkstatt-mindmap-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.werkstatt-mindmap-controls .graph-tool-btn[aria-pressed="true"] {
+  background: var(--color-history-active-bg);
+  border-color: var(--card-accent);
+  color: var(--card-accent);
 }
 
 .werkstatt-mindmap-hint {
@@ -223,7 +243,29 @@
   border-color: var(--card-accent);
   color: var(--color-text);
 }
-.werkstatt-mindmap jmexpander { color: var(--color-muted); }
+/* jsMind-Default ist 11×11px mit 10px Font — winzig und schwer lesbar.
+   Override: 18×18, eckig (Badge-Regel), klar lesbares Symbol, Akzent-Hover.
+   `transform: translate(-3.5px,-3.5px)` korrigiert die Größenänderung gegen
+   den fixen jsMind-Layout-Punkt (pspace=14, Box wird sonst nach unten/rechts
+   verschoben). */
+.werkstatt-mindmap jmexpander {
+  width: 18px;
+  height: 18px;
+  line-height: 16px;
+  font-size: 14px;
+  font-weight: var(--fw-semibold);
+  border-radius: var(--radius-sm);
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  transform: translate(-3.5px, -3.5px);
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.werkstatt-mindmap jmexpander:hover {
+  background: var(--color-accent-hover);
+  border-color: var(--card-accent);
+  color: var(--card-accent);
+}
 
 /* Job-Status-Block (Brainstorm/Consistency Loading) */
 .werkstatt-job-status {
@@ -247,4 +289,78 @@
   border-left: 2px solid var(--card-accent);
   font-style: italic;
   color: var(--color-text);
+}
+
+/* Vollbild-Modus: jsMind-Section nimmt Viewport voll. */
+.werkstatt-mindmap-section--fullscreen,
+.werkstatt-mindmap-section:fullscreen {
+  position: fixed;
+  inset: 0;
+  background: var(--color-surface);
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  z-index: var(--z-overlay);
+}
+.werkstatt-mindmap-section:fullscreen .werkstatt-mindmap {
+  flex: 1 1 auto;
+  height: auto;
+}
+
+.werkstatt-mindmap-keyboard-hint {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+/* Rechtsklick-Menü auf Mindmap-Knoten */
+.werkstatt-context-menu {
+  position: fixed;
+  min-width: 220px;
+  background: var(--color-surface);
+  border: var(--border-thin) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  z-index: var(--z-popover);
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0;
+}
+.werkstatt-context-item {
+  display: block;
+  width: 100%;
+  padding: var(--space-xs) var(--space-md);
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  text-align: left;
+  font-size: var(--font-size-base);
+  cursor: pointer;
+}
+.werkstatt-context-item:hover,
+.werkstatt-context-item:focus-visible {
+  background: var(--color-hover);
+  outline: none;
+}
+.werkstatt-context-item:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+.werkstatt-context-item--danger {
+  color: var(--color-err-text);
+}
+.werkstatt-context-item--danger:hover:not(:disabled) {
+  background: var(--color-err-bg);
+}
+.werkstatt-context-sep {
+  height: 1px;
+  background: var(--color-border);
+  margin: 4px 0;
+}
+
+/* Mindmap-Container fokus-sichtbar (Tastatur-Nav-Indikator) */
+.werkstatt-mindmap:focus-within {
+  border-color: var(--card-accent);
 }

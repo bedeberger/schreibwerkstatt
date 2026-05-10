@@ -472,7 +472,7 @@ CSS: [public/css/row.css](public/css/row.css). Auf Mobile (`max-width: 600px`) s
 
 ## Confirm-Dialog (Modal)
 
-**Use:** Destruktive Aktionen bestätigen (Löschen, Reset, Logout).
+**Use:** Destruktive Aktionen bestätigen (Löschen, Reset, Logout) **und** „Verwerfen ungespeicherter Änderungen" (Editor-Cancel, Reload einer Card mit dirty State, Page-Wechsel mit ausstehenden Edits).
 
 **Markup:**
 ```html
@@ -488,6 +488,8 @@ CSS: [public/css/row.css](public/css/row.css). Auf Mobile (`max-width: 600px`) s
 ```
 
 CSS: [public/css/confirm-dialog.css](public/css/confirm-dialog.css). Varianten `--primary` und `--danger`. Niemals native `confirm()` verwenden.
+
+**Unsaved-Changes-Pattern (Reuse, nicht parallel erfinden):** der einheitliche Discard-Dialog läuft über `appConfirm({ message, confirmLabel: t('edit.discardEdit'), danger: true })`. Beispiele: [editor/edit.js#cancelEdit](public/js/editor/edit.js), [figur-werkstatt-card.js#onCardRefresh](public/js/cards/figur-werkstatt-card.js). Pro Feature einen i18n-Key für die Frage (z. B. `edit.cancelConfirm`, `app.switchPageConfirm`, `werkstatt.confirmReload`); der Confirm-Button-Text bleibt der gemeinsame `edit.discardEdit` („Verwerfen" / „Discard").
 
 ---
 
