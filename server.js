@@ -26,6 +26,7 @@ const { router: syncRouter, syncAllBooks } = require('./routes/sync');
 const exportRouter = require('./routes/export');
 const pdfExportRouter = require('./routes/pdf-export');
 const usageRouter = require('./routes/usage');
+const { router: draftFiguresRouter } = require('./routes/draft-figures');
 
 const PORT = process.env.PORT || 3737;
 const app = express();
@@ -101,11 +102,15 @@ if (!sessionSecret) {
 }
 
 const isHttps = (process.env.APP_URL || '').startsWith('https');
+const sessionStore = new SqliteStore({
+  client: db,
+  expired: { clear: true, intervalMs: 15 * 60 * 1000 }, // alle 15 min abgelaufene Sessions löschen
+});
+// Index auf expire — Store-GC scannt `WHERE datetime('now') > datetime(expire)`.
+db.prepare('CREATE INDEX IF NOT EXISTS idx_sessions_expire ON sessions(expire)').run();
+
 app.use(session({
-  store: new SqliteStore({
-    client: db,
-    expired: { clear: true, intervalMs: 15 * 60 * 1000 }, // alle 15 min abgelaufene Sessions löschen
-  }),
+  store: sessionStore,
   secret: sessionSecret,
   resave: false,
   saveUninitialized: false,
@@ -237,6 +242,7 @@ app.use('/sync', syncRouter);
 app.use('/export', exportRouter);
 app.use('/pdf-export', pdfExportRouter);
 app.use('/usage', usageRouter);
+app.use('/draft-figures', draftFiguresRouter);
 
 // Logout: usage-Tabelle behält Einträge (User-Wiederkehr → Top-3 sofort wieder da).
 // Wenn Datenschutz erforderlich, Cleanup über Job/Cron auf Last-Seen-Basis.

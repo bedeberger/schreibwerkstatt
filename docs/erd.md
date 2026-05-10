@@ -1,6 +1,6 @@
 # ERD — bookstack-lektorat
 
-Stand: Schema-Version 90, 47 Tabellen (ohne `sqlite_*`/`schema_version`/`sessions`).
+Stand: Schema-Version 96, 47 Tabellen (ohne `sqlite_*`/`schema_version`/`sessions`).
 
 Quelle: Live-Dump aus [lektorat.db](../lektorat.db) (`.schema --indent`) + [db/migrations.js](../db/migrations.js). Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -51,6 +51,7 @@ erDiagram
   pages ||--o{ ideen                 : at
   pages ||--o{ lektorat_time         : on
   pages ||--o{ locations             : firstMention
+  pages ||--o{ figures               : firstMention
 
   chapters ||--o{ figure_appearances     : has
   chapters ||--o{ figure_events          : at
@@ -107,7 +108,7 @@ erDiagram
     TEXT    last_seen_at
   }
   chapters {
-    INTEGER chapter_id  PK "UNIQUE alone, plus composite (chapter_id, book_id)"
+    INTEGER chapter_id  PK
     INTEGER book_id     FK
     TEXT    chapter_name
     TEXT    updated_at
@@ -219,7 +220,7 @@ erDiagram
     TEXT    entwicklung
     TEXT    praesenz
     TEXT    erste_erwaehnung
-    INTEGER erste_erwaehnung_page_id "kein FK!"
+    INTEGER erste_erwaehnung_page_id FK "SET NULL"
     TEXT    schluesselzitate
     TEXT    wohnadresse
     TEXT    beschreibung
@@ -241,7 +242,7 @@ erDiagram
     TEXT    beschreibung
     INTEGER machtverhaltnis
     TEXT    belege
-    TEXT    user_email
+    TEXT    user_email      "UNIQUE(book_id, from_fig_id, to_fig_id, typ, user_email)"
   }
   figure_appearances {
     INTEGER figure_id   FK
@@ -249,6 +250,7 @@ erDiagram
     INTEGER haeufigkeit
   }
   figure_events {
+    INTEGER id         PK
     INTEGER figure_id  FK
     INTEGER chapter_id FK "SET NULL"
     INTEGER page_id    FK "SET NULL"
@@ -371,12 +373,14 @@ erDiagram
     TEXT    updated_at
   }
   continuity_issue_figures {
+    INTEGER id         PK
     INTEGER issue_id   FK
     INTEGER figure_id  FK "SET NULL — nullable Snapshot"
     TEXT    figur_name
     INTEGER sort_order
   }
   continuity_issue_chapters {
+    INTEGER id         PK
     INTEGER issue_id   FK
     INTEGER chapter_id FK "SET NULL"
     INTEGER sort_order
@@ -394,16 +398,19 @@ erDiagram
     TEXT    updated_at
   }
   zeitstrahl_event_chapters {
+    INTEGER id         PK
     INTEGER event_id   FK
     INTEGER chapter_id FK "SET NULL"
     INTEGER sort_order
   }
   zeitstrahl_event_pages {
+    INTEGER id       PK
     INTEGER event_id FK
     INTEGER page_id  FK "SET NULL"
     INTEGER sort_order
   }
   zeitstrahl_event_figures {
+    INTEGER id         PK
     INTEGER event_id   FK
     INTEGER figure_id  FK "SET NULL"
     TEXT    figur_name
@@ -435,18 +442,18 @@ erDiagram
     TEXT    opening_page_text
   }
   chat_messages {
-    INTEGER id          PK
-    INTEGER session_id  FK
-    TEXT    role        "user|assistant"
+    INTEGER id                PK
+    INTEGER session_id        FK
+    TEXT    role              "user|assistant"
     TEXT    content
-    TEXT    vorschlaege "JSON"
+    TEXT    vorschlaege       "JSON"
     TEXT    context_info
+    TEXT    provider          "claude|ollama|llama"
+    TEXT    model
     INTEGER tokens_in
     INTEGER tokens_out
     INTEGER cache_read_in     "Claude prompt-cache hit (lokal: 0)"
     INTEGER cache_creation_in "Claude prompt-cache write (lokal: 0)"
-    TEXT    provider          "claude|ollama|llama"
-    TEXT    model
     REAL    tps
     TEXT    created_at
   }
@@ -554,7 +561,7 @@ erDiagram
     TEXT    last_seen_at
   }
   user_tokens {
-    TEXT email      PK
+    TEXT email      PK,FK "users(email) CASCADE"
     TEXT token_id   "AES-256-GCM"
     TEXT token_pw   "AES-256-GCM"
     TEXT updated_at
@@ -621,81 +628,7 @@ erDiagram
 
 ---
 
-## 6 · Verbesserungsvorschläge
-
-Priorisiert nach Wirkung. Jede Änderung als eigene Migration via Recreate-Pattern (PRAGMA foreign_keys = OFF, CREATE _new, INSERT SELECT, RENAME, foreign_key_check).
-
-### Kritisch — Daten-Integrität
-
-1. **Bridge-Tabellen ohne PK ⇒ Duplikat-Zeilen möglich.**
-   Betroffen: `continuity_issue_figures`, `continuity_issue_chapters`, `zeitstrahl_event_chapters`, `zeitstrahl_event_pages`, `zeitstrahl_event_figures`, `figure_events`.
-   Fix: Composite-PK ergänzen, z.B. `PRIMARY KEY (issue_id, COALESCE(figure_id,0), figur_name)` bzw. `(event_id, page_id)`. Bei `figure_events` Surrogate-PK `id INTEGER PRIMARY KEY AUTOINCREMENT` (nötig für Update/Delete einzelner Events).
-
-2. **`figure_relations` ohne UNIQUE ⇒ Duplikat-Kanten.**
-   Bsp. zwei Inserts derselben (from_fig_id, to_fig_id, typ) erzeugen 2 Zeilen. Soziogramm rendert dann doppelte Edges.
-   Fix: `UNIQUE(from_fig_id, to_fig_id, typ, user_email)`. Vorher Pre-Cleanup gegen vorhandene Dupes.
-
-3. **`figures.erste_erwaehnung_page_id` ohne FK.**
-   Plain INTEGER, hat aber dieselbe Semantik wie `locations.erste_erwaehnung_page_id` (FK). Page-Delete hinterlässt dangling Refs.
-   Fix: `REFERENCES pages(page_id) ON DELETE SET NULL` + Pre-Cleanup orphans nullen.
-
-4. **`user_email`-Spalten ohne FK auf `users(email)`.**
-   `figures`, `locations`, `figure_scenes`, `figure_relations`, `page_checks`, `book_reviews`, `chapter_reviews`, `chat_sessions`, `continuity_*`, `zeitstrahl_events`, `ideen`, `lektorat_time`, `writing_time`, `user_activity`, `user_feature_usage`, `user_page_usage`, `user_tokens`, `pdf_export_profile`, `chapter_extract_cache`, `book_extract_cache`, `finetune_ai_cache`, `job_runs`, `job_checkpoints`.
-   Bei User-Delete bleiben Orphans; bei Email-Tippfehler im Insert-Pfad keine Constraint-Verletzung.
-   Fix: Schrittweise FKs ergänzen — zuerst neutral mit `ON DELETE SET NULL` (Reviews/Checks: User wegnehmen, Daten bleiben), für reine User-Caches `ON DELETE CASCADE` (`user_*`-Tabellen, `*_cache`-Tabellen, `user_tokens`). Composite-Tabellen mit `user_email NOT NULL DEFAULT ''` müssen vorher konsolidiert werden, sonst FK auf `''` (kein User-Match) bricht.
-
-### Hoch — Schema-Hygiene
-
-5. **`chapters` redundanter PK.**
-   Aktuell: `PRIMARY KEY(chapter_id, book_id)` UND `UNIQUE(chapter_id)`. Composite-PK ist redundant, weil `chapter_id` allein bereits unique ist.
-   Fix: PK auf `(chapter_id)` reduzieren; Composite als `UNIQUE(chapter_id, book_id)` behalten falls Cross-Book-Defensive gewünscht (aktuell gemäss CLAUDE.md Composite-FK von einigen Tabellen erwartet — Verwendungen prüfen, sonst droppen).
-
-6. **`continuity_issues.book_id`/`user_email` denormalisiert.**
-   Beides aus `check_id → continuity_checks` ableitbar. Risiko: Drift, wenn Migration die eine Tabelle ändert, die andere nicht.
-   Fix: Wenn Performance kein Faktor ist (≤ 5'000 Issues pro Buch realistisch), Spalten droppen und Queries auf JOIN umstellen. Sonst Trigger oder DB-Test, der Konsistenz prüft.
-
-7. **`chat_messages` hat Spaltenartefakte aus ALTERs.**
-   Schema-Dump zeigt die Reihenfolge `… context_info TEXT , tps REAL` — kosmetisch, aber zeigt Migrations-Drift. Optional Recreate-Pass für saubere Reihenfolge.
-
-8. **`figure_events` ohne `id`-PK.**
-   Jede Spalte als „Tupel" geführt; `WHERE figure_id=? AND datum=? AND ereignis=?` ist der einzige Lookup-Pfad. Update/Delete einzelner Events nur über DELETE+INSERT der ganzen Figur.
-   Fix: `id INTEGER PRIMARY KEY AUTOINCREMENT` ergänzen; Read/Write-Pfad in [db/figures.js](../db/figures.js) bleibt kompatibel.
-
-9. **Checks für Enum-artige Felder fehlen.**
-   - `continuity_issues.schwere ∈ {kritisch, mittel, gering}` (oder analog) — keine CHECK-Constraint.
-   - `continuity_issues.typ`, `figure_events.typ`, `zeitstrahl_events.typ` ähnlich.
-   - `finetune_ai_cache.scope ∈ {reverse-prompts, fact-qa, reasoning-backfill}` (laut CLAUDE.md) — keine CHECK.
-   Fix: CHECK-Constraints in passenden Recreate-Migrationen (Werte zuerst auditieren).
-
-### Mittel — Konsolidierung
-
-10. **`writing_time` und `lektorat_time` fast identisch.**
-    Unterschied nur `page_id`-Spalte. Eine Tabelle mit nullable `page_id` würde reichen — `writing_time` ist `lektorat_time WHERE page_id IS NULL` (Buchebene).
-    Fix: Merge in `writing_time` mit nullable `page_id`; alte Tabelle nach Daten-Migration droppen. Reduziert Duplicate Code in [routes/usersettings.js](../routes/usersettings.js)/[routes/sync.js](../routes/sync.js)-Reads.
-
-11. **`locations.loc_id` UNIQUE-Constraint per `(book_id, loc_id, user_email)` statt FK-Target.**
-    `figures.fig_id` analog. Das erlaubt mehrere Locations mit derselben `loc_id` über verschiedene User → User-pro-Buch-Scope ist gewollt. Aber: Wenn die App auf Single-User-pro-Buch konvergiert (Self-hosted-OSS), wäre `(book_id, loc_id)` einfacher. Optional.
-
-12. **`books.slug` nicht UNIQUE.**
-    BookStack-Side hat unique slugs; Server kennt sie und könnte einen Constraint setzen. Verhindert ungewollte Doppel-Inserts bei Sync-Bugs.
-
-### Niedrig — Performance/Cosmetic
-
-13. **`sessions.expire` ohne Index.**
-    Express-Session GC-Scan macht `DELETE WHERE expire < ?` — Full-Scan auf wachsender Sessions-Tabelle. `CREATE INDEX idx_sessions_expire ON sessions(expire)` lohnt ab ~10k Zeilen.
-
-14. **`user_tokens` ohne `users(email)`-FK.**
-    Bei User-Delete bleibt Token-Eintrag verwaist. Fix unter Punkt 4.
-
-15. **`pdf_export_profile.cover_image` als BLOB inline.**
-    PDF/A-Cover bis ~5 MB im SQLite-File aufgebläht. Bei vielen Profilen Backup-Grösse beachten. Alternative: Filesystem-Pfad + Hash.
-
-16. **`figures.meta` als Catch-All-JSON.**
-    Bequem, aber blockiert Indexes/Migrations. Wenn neue Felder mehrfach aus `meta` extrahiert wurden, evtl. Zeit für eigene Spalte.
-
----
-
-## 7 · Pflege
+## 6 · Pflege
 
 Bei jeder neuen Migration in [db/migrations.js](../db/migrations.js):
 
@@ -703,7 +636,6 @@ Bei jeder neuen Migration in [db/migrations.js](../db/migrations.js):
 2. Betroffene Block-Definitionen anfassen (neue Spalte → Zeile in `{}`, neuer Typ-Hinweis als Annotation in `"…"`).
 3. Bei neuer Tabelle: Block ergänzen + FK-Kante in Section 1 (Übersicht) + im passenden thematischen Sub-Diagramm.
 4. Bei neuer FK-Kante auf bestehende Tabellen: Kante in Section 1 nachziehen.
-5. Falls eine Empfehlung aus Section 6 umgesetzt wurde: Punkt löschen.
 
 Live-Schema kontrollieren:
 

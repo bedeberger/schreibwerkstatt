@@ -3474,6 +3474,343 @@ function runMigrations() {
     logger.info('DB-Migration auf Version 90 abgeschlossen (draft_figures).');
   }
 
+  if (version < 91) {
+    // user_tokens.email als FK auf users(email) ON DELETE CASCADE.
+    // Token ohne User-Eintrag ist wertlos — sauberer Cascade-Delete.
+    db.pragma('foreign_keys = OFF');
+    db.prepare('DELETE FROM user_tokens WHERE email NOT IN (SELECT email FROM users)').run();
+
+    db.prepare('DROP TABLE IF EXISTS user_tokens_new').run();
+    db.prepare(`
+      CREATE TABLE user_tokens_new (
+        email      TEXT PRIMARY KEY REFERENCES users(email) ON DELETE CASCADE,
+        token_id   TEXT NOT NULL,
+        token_pw   TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    `).run();
+    db.prepare('INSERT INTO user_tokens_new SELECT email, token_id, token_pw, updated_at FROM user_tokens').run();
+    db.prepare('DROP TABLE user_tokens').run();
+    db.prepare('ALTER TABLE user_tokens_new RENAME TO user_tokens').run();
+
+    db.pragma('foreign_keys = ON');
+    const fkErrors91 = db.pragma('foreign_key_check');
+    if (fkErrors91.length) {
+      throw new Error(`Migration 91: foreign_key_check meldet ${fkErrors91.length} Verstoesse: ${JSON.stringify(fkErrors91.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 91').run();
+    logger.info('DB-Migration auf Version 91 abgeschlossen (user_tokens.email FK auf users(email) ON DELETE CASCADE).');
+  }
+
+  if (version < 92) {
+    // figures.erste_erwaehnung_page_id: FK auf pages(page_id) ON DELETE SET NULL.
+    // Analog locations.erste_erwaehnung_page_id (gleiche Semantik). Page-Delete
+    // hinterlaesst sonst dangling Refs.
+    db.pragma('foreign_keys = OFF');
+    const orphans92 = db.prepare(`
+      UPDATE figures SET erste_erwaehnung_page_id = NULL
+       WHERE erste_erwaehnung_page_id IS NOT NULL
+         AND erste_erwaehnung_page_id NOT IN (SELECT page_id FROM pages)
+    `).run().changes;
+    if (orphans92) logger.info(`Mig 92 Pre-Cleanup: ${orphans92} dangling figures.erste_erwaehnung_page_id genullt.`);
+
+    db.prepare('DROP TABLE IF EXISTS figures_new').run();
+    db.prepare(`
+      CREATE TABLE figures_new (
+        id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id                  INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        fig_id                   TEXT    NOT NULL,
+        name                     TEXT    NOT NULL,
+        kurzname                 TEXT,
+        typ                      TEXT,
+        geburtstag               TEXT,
+        geschlecht               TEXT,
+        beruf                    TEXT,
+        beschreibung             TEXT,
+        sort_order               INTEGER DEFAULT 0,
+        meta                     TEXT,
+        updated_at               TEXT    NOT NULL,
+        user_email               TEXT,
+        sozialschicht            TEXT,
+        praesenz                 TEXT,
+        rolle                    TEXT,
+        motivation               TEXT,
+        konflikt                 TEXT,
+        entwicklung              TEXT,
+        erste_erwaehnung         TEXT,
+        erste_erwaehnung_page_id INTEGER REFERENCES pages(page_id) ON DELETE SET NULL,
+        schluesselzitate         TEXT,
+        wohnadresse              TEXT,
+        UNIQUE(book_id, fig_id, user_email)
+      )
+    `).run();
+    db.prepare(`
+      INSERT INTO figures_new
+        (id, book_id, fig_id, name, kurzname, typ, geburtstag, geschlecht, beruf, beschreibung,
+         sort_order, meta, updated_at, user_email, sozialschicht, praesenz, rolle, motivation,
+         konflikt, entwicklung, erste_erwaehnung, erste_erwaehnung_page_id, schluesselzitate, wohnadresse)
+      SELECT
+         id, book_id, fig_id, name, kurzname, typ, geburtstag, geschlecht, beruf, beschreibung,
+         sort_order, meta, updated_at, user_email, sozialschicht, praesenz, rolle, motivation,
+         konflikt, entwicklung, erste_erwaehnung, erste_erwaehnung_page_id, schluesselzitate, wohnadresse
+      FROM figures
+    `).run();
+    db.prepare('DROP TABLE figures').run();
+    db.prepare('ALTER TABLE figures_new RENAME TO figures').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_fig_book_id ON figures(book_id)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_fig_eepage  ON figures(erste_erwaehnung_page_id)').run();
+
+    db.pragma('foreign_keys = ON');
+    const fkErrors92 = db.pragma('foreign_key_check');
+    if (fkErrors92.length) {
+      throw new Error(`Migration 92: foreign_key_check meldet ${fkErrors92.length} Verstoesse: ${JSON.stringify(fkErrors92.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 92').run();
+    logger.info('DB-Migration auf Version 92 abgeschlossen (figures.erste_erwaehnung_page_id FK auf pages(page_id) ON DELETE SET NULL).');
+  }
+
+  if (version < 93) {
+    // chapters: PRIMARY KEY (chapter_id, book_id) + UNIQUE(chapter_id) ist redundant.
+    // chapter_id allein ist global eindeutig (BookStack-ID). PK auf chapter_id reduziert,
+    // Composite-UNIQUE entfernt — kein Konsument verlaesst sich auf composite-FK.
+    db.pragma('foreign_keys = OFF');
+
+    const dupes93 = db.prepare(`
+      SELECT chapter_id, COUNT(*) AS c FROM chapters GROUP BY chapter_id HAVING c > 1
+    `).all();
+    if (dupes93.length) {
+      throw new Error(`Migration 93: ${dupes93.length} chapter_ids mit mehrfachen Eintraegen; manuelle Bereinigung noetig.`);
+    }
+
+    db.prepare('DROP TABLE IF EXISTS chapters_new').run();
+    db.prepare(`
+      CREATE TABLE chapters_new (
+        chapter_id   INTEGER PRIMARY KEY,
+        book_id      INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        chapter_name TEXT    NOT NULL,
+        updated_at   TEXT,
+        last_seen_at TEXT
+      )
+    `).run();
+    db.prepare(`
+      INSERT INTO chapters_new (chapter_id, book_id, chapter_name, updated_at, last_seen_at)
+      SELECT chapter_id, book_id, chapter_name, updated_at, last_seen_at FROM chapters
+    `).run();
+    db.prepare('DROP TABLE chapters').run();
+    db.prepare('ALTER TABLE chapters_new RENAME TO chapters').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_chapters_last_seen ON chapters(last_seen_at)').run();
+
+    db.pragma('foreign_keys = ON');
+    const fkErrors93 = db.pragma('foreign_key_check');
+    if (fkErrors93.length) {
+      throw new Error(`Migration 93: foreign_key_check meldet ${fkErrors93.length} Verstoesse: ${JSON.stringify(fkErrors93.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 93').run();
+    logger.info('DB-Migration auf Version 93 abgeschlossen (chapters PK auf chapter_id reduziert; Composite-UNIQUE entfernt).');
+  }
+
+  if (version < 94) {
+    // chat_messages: Spaltenreihenfolge konsolidieren. Mehrere ALTERs haben tps/provider/model/
+    // cache_read_in/cache_creation_in ans Ende gehaengt — kosmetisch, aber Drift-Indikator.
+    db.pragma('foreign_keys = OFF');
+    db.prepare('DROP TABLE IF EXISTS chat_messages_new').run();
+    db.prepare(`
+      CREATE TABLE chat_messages_new (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id        INTEGER NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
+        role              TEXT    NOT NULL CHECK(role IN ('user','assistant')),
+        content           TEXT    NOT NULL,
+        vorschlaege       TEXT,
+        context_info      TEXT,
+        provider          TEXT,
+        model             TEXT,
+        tokens_in         INTEGER,
+        tokens_out        INTEGER,
+        cache_read_in     INTEGER DEFAULT 0,
+        cache_creation_in INTEGER DEFAULT 0,
+        tps               REAL,
+        created_at        TEXT NOT NULL
+      )
+    `).run();
+    db.prepare(`
+      INSERT INTO chat_messages_new
+        (id, session_id, role, content, vorschlaege, context_info, provider, model,
+         tokens_in, tokens_out, cache_read_in, cache_creation_in, tps, created_at)
+      SELECT
+         id, session_id, role, content, vorschlaege, context_info, provider, model,
+         tokens_in, tokens_out, cache_read_in, cache_creation_in, tps, created_at
+      FROM chat_messages
+    `).run();
+    db.prepare('DROP TABLE chat_messages').run();
+    db.prepare('ALTER TABLE chat_messages_new RENAME TO chat_messages').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_cm_session_created ON chat_messages(session_id, created_at)').run();
+
+    db.pragma('foreign_keys = ON');
+    const fkErrors94 = db.pragma('foreign_key_check');
+    if (fkErrors94.length) {
+      throw new Error(`Migration 94: foreign_key_check meldet ${fkErrors94.length} Verstoesse: ${JSON.stringify(fkErrors94.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 94').run();
+    logger.info('DB-Migration auf Version 94 abgeschlossen (chat_messages Spaltenreihenfolge konsolidiert).');
+  }
+
+  if (version < 95) {
+    // figure_relations: UNIQUE(book_id, from_fig_id, to_fig_id, typ, user_email)
+    // als Defensive-Schicht. Beide Schreibpfade machen bereits Programm-Dedup
+    // (saveFigurenToDb: Full-Replace; addFigurenBeziehungen: ungerichteter Pair-Check).
+    // Constraint laesst kuenftige Bugs hart scheitern statt Doppel-Edges entstehen.
+    db.pragma('foreign_keys = OFF');
+
+    const dedup95 = db.prepare(`
+      DELETE FROM figure_relations
+       WHERE rowid NOT IN (
+         SELECT MIN(rowid) FROM figure_relations
+          GROUP BY book_id, from_fig_id, to_fig_id, typ, COALESCE(user_email,'')
+       )
+    `).run().changes;
+    if (dedup95) logger.info(`Mig 95 Pre-Cleanup: ${dedup95} Duplikat-Relations entfernt.`);
+
+    db.prepare('DROP TABLE IF EXISTS figure_relations_new').run();
+    db.prepare(`
+      CREATE TABLE figure_relations_new (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id         INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        from_fig_id     INTEGER NOT NULL REFERENCES figures(id)    ON DELETE CASCADE,
+        to_fig_id       INTEGER NOT NULL REFERENCES figures(id)    ON DELETE CASCADE,
+        typ             TEXT    NOT NULL,
+        beschreibung    TEXT,
+        user_email      TEXT,
+        machtverhaltnis INTEGER,
+        belege          TEXT,
+        UNIQUE(book_id, from_fig_id, to_fig_id, typ, user_email)
+      )
+    `).run();
+    db.prepare(`
+      INSERT INTO figure_relations_new
+        (id, book_id, from_fig_id, to_fig_id, typ, beschreibung, user_email, machtverhaltnis, belege)
+      SELECT
+         id, book_id, from_fig_id, to_fig_id, typ, beschreibung, user_email, machtverhaltnis, belege
+      FROM figure_relations
+    `).run();
+    db.prepare('DROP TABLE figure_relations').run();
+    db.prepare('ALTER TABLE figure_relations_new RENAME TO figure_relations').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_frel_book_id ON figure_relations(book_id)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_frel_from    ON figure_relations(from_fig_id)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_frel_to      ON figure_relations(to_fig_id)').run();
+
+    db.pragma('foreign_keys = ON');
+    const fkErrors95 = db.pragma('foreign_key_check');
+    if (fkErrors95.length) {
+      throw new Error(`Migration 95: foreign_key_check meldet ${fkErrors95.length} Verstoesse: ${JSON.stringify(fkErrors95.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 95').run();
+    logger.info('DB-Migration auf Version 95 abgeschlossen (figure_relations UNIQUE + Dedup).');
+  }
+
+  if (version < 96) {
+    // Bridge-Tabellen ohne PK -> Surrogate id INTEGER PRIMARY KEY AUTOINCREMENT.
+    // Erlaubt Update/Delete einzelner Zeilen; entlastet Schreibpfade von
+    // Tupel-WHERE-Klauseln. Composite-PK ginge nicht (nullable Refs in den
+    // meisten Bruecken wegen ON DELETE SET NULL).
+    db.pragma('foreign_keys = OFF');
+
+    const _recreate96 = (table, createSql, insertCols, indexSqls) => {
+      db.prepare(`DROP TABLE IF EXISTS ${table}_new`).run();
+      db.prepare(createSql).run();
+      db.prepare(`INSERT INTO ${table}_new (${insertCols}) SELECT ${insertCols} FROM ${table}`).run();
+      db.prepare(`DROP TABLE ${table}`).run();
+      db.prepare(`ALTER TABLE ${table}_new RENAME TO ${table}`).run();
+      for (const ix of indexSqls) db.prepare(ix).run();
+    };
+
+    _recreate96('continuity_issue_figures', `
+      CREATE TABLE continuity_issue_figures_new (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        issue_id   INTEGER NOT NULL REFERENCES continuity_issues(id) ON DELETE CASCADE,
+        figure_id  INTEGER          REFERENCES figures(id)            ON DELETE SET NULL,
+        figur_name TEXT,
+        sort_order INTEGER DEFAULT 0
+      )
+    `, 'issue_id, figure_id, figur_name, sort_order', [
+      'CREATE INDEX idx_cif_issue  ON continuity_issue_figures(issue_id)',
+      'CREATE INDEX idx_cif_figure ON continuity_issue_figures(figure_id)',
+    ]);
+
+    _recreate96('continuity_issue_chapters', `
+      CREATE TABLE continuity_issue_chapters_new (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        issue_id   INTEGER NOT NULL REFERENCES continuity_issues(id) ON DELETE CASCADE,
+        chapter_id INTEGER          REFERENCES chapters(chapter_id)  ON DELETE SET NULL,
+        sort_order INTEGER DEFAULT 0
+      )
+    `, 'issue_id, chapter_id, sort_order', [
+      'CREATE INDEX idx_cic_issue   ON continuity_issue_chapters(issue_id)',
+      'CREATE INDEX idx_cic_chapter ON continuity_issue_chapters(chapter_id)',
+    ]);
+
+    _recreate96('zeitstrahl_event_chapters', `
+      CREATE TABLE zeitstrahl_event_chapters_new (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_id   INTEGER NOT NULL REFERENCES zeitstrahl_events(id) ON DELETE CASCADE,
+        chapter_id INTEGER          REFERENCES chapters(chapter_id)  ON DELETE SET NULL,
+        sort_order INTEGER DEFAULT 0
+      )
+    `, 'event_id, chapter_id, sort_order', [
+      'CREATE INDEX idx_zec_event   ON zeitstrahl_event_chapters(event_id)',
+      'CREATE INDEX idx_zec_chapter ON zeitstrahl_event_chapters(chapter_id)',
+    ]);
+
+    _recreate96('zeitstrahl_event_pages', `
+      CREATE TABLE zeitstrahl_event_pages_new (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_id   INTEGER NOT NULL REFERENCES zeitstrahl_events(id) ON DELETE CASCADE,
+        page_id    INTEGER          REFERENCES pages(page_id)        ON DELETE SET NULL,
+        sort_order INTEGER DEFAULT 0
+      )
+    `, 'event_id, page_id, sort_order', [
+      'CREATE INDEX idx_zep_event ON zeitstrahl_event_pages(event_id)',
+      'CREATE INDEX idx_zep_page  ON zeitstrahl_event_pages(page_id)',
+    ]);
+
+    _recreate96('zeitstrahl_event_figures', `
+      CREATE TABLE zeitstrahl_event_figures_new (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_id   INTEGER NOT NULL REFERENCES zeitstrahl_events(id) ON DELETE CASCADE,
+        figure_id  INTEGER          REFERENCES figures(id)            ON DELETE SET NULL,
+        figur_name TEXT,
+        sort_order INTEGER DEFAULT 0
+      )
+    `, 'event_id, figure_id, figur_name, sort_order', [
+      'CREATE INDEX idx_zef_event  ON zeitstrahl_event_figures(event_id)',
+      'CREATE INDEX idx_zef_figure ON zeitstrahl_event_figures(figure_id)',
+    ]);
+
+    _recreate96('figure_events', `
+      CREATE TABLE figure_events_new (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        figure_id  INTEGER NOT NULL REFERENCES figures(id)         ON DELETE CASCADE,
+        datum      TEXT NOT NULL,
+        ereignis   TEXT NOT NULL,
+        bedeutung  TEXT,
+        typ        TEXT DEFAULT 'persoenlich',
+        sort_order INTEGER DEFAULT 0,
+        chapter_id INTEGER REFERENCES chapters(chapter_id)         ON DELETE SET NULL,
+        page_id    INTEGER REFERENCES pages(page_id)               ON DELETE SET NULL
+      )
+    `, 'figure_id, datum, ereignis, bedeutung, typ, sort_order, chapter_id, page_id', [
+      'CREATE INDEX idx_fe_chapter ON figure_events(chapter_id)',
+      'CREATE INDEX idx_fe_page    ON figure_events(page_id)',
+    ]);
+
+    db.pragma('foreign_keys = ON');
+    const fkErrors96 = db.pragma('foreign_key_check');
+    if (fkErrors96.length) {
+      throw new Error(`Migration 96: foreign_key_check meldet ${fkErrors96.length} Verstoesse: ${JSON.stringify(fkErrors96.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 96').run();
+    logger.info('DB-Migration auf Version 96 abgeschlossen (Surrogate-PK fuer 6 Bridge-Tabellen: continuity_issue_figures/chapters, zeitstrahl_event_chapters/pages/figures, figure_events).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {
