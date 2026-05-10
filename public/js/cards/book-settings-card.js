@@ -27,6 +27,8 @@ export function registerBookSettingsCard() {
     bookHistoryResetLoading: false,
     bookHistoryResetMessage: '',
     bookHistoryResetError: '',
+    _savedAtTimer: null,
+    _resetMsgTimer: null,
     _lifecycle: null,
 
     init() {
@@ -49,7 +51,11 @@ export function registerBookSettingsCard() {
       });
     },
 
-    destroy() { this._lifecycle?.destroy(); },
+    destroy() {
+      if (this._savedAtTimer) { clearTimeout(this._savedAtTimer); this._savedAtTimer = null; }
+      if (this._resetMsgTimer) { clearTimeout(this._resetMsgTimer); this._resetMsgTimer = null; }
+      this._lifecycle?.destroy();
+    },
 
     ...bookSettingsMethods,
   }));

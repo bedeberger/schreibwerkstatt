@@ -169,3 +169,82 @@
     padding-left: var(--space-md);
   }
 }
+
+/* Mindmap-Canvas (jsMind). Feste Höhe, Container-internes Scrolling.
+   jsMind setzt eigene Klassen (.jsmind-inner, jmnodes etc.) — Theme-Brücke
+   nur über Wrapper-Klasse. */
+.werkstatt-mindmap-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.werkstatt-mindmap {
+  width: 100%;
+  height: 480px;
+  border: var(--border-thin) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  overflow: hidden;
+  position: relative;
+}
+@media (max-width: 600px) {
+  .werkstatt-mindmap { height: 360px; }
+}
+
+.werkstatt-mindmap-hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+/* jsMind-Theme-Brücke: Eigene Knotenfarben, neutralere Linien.
+   Class-Selektor `.theme-primary` ist jsMind-Default. */
+.werkstatt-mindmap jmnode {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: var(--border-thin) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  padding: 6px 10px;
+  box-shadow: var(--shadow-soft-sm);
+}
+.werkstatt-mindmap jmnode.root {
+  background: var(--card-accent);
+  color: var(--color-bg);
+  font-weight: var(--fw-semibold);
+  font-family: var(--font-serif);
+}
+.werkstatt-mindmap jmnode:hover {
+  background: var(--color-hover);
+}
+.werkstatt-mindmap jmnode.selected {
+  background: var(--color-accent-hover);
+  border-color: var(--card-accent);
+  color: var(--color-text);
+}
+.werkstatt-mindmap jmexpander { color: var(--color-muted); }
+
+/* Job-Status-Block (Brainstorm/Consistency Loading) */
+.werkstatt-job-status {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin-top: var(--space-md);
+}
+
+/* Vorschlags- + Konflikt-Listen */
+.werkstatt-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+.werkstatt-consistency-fazit {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-bg);
+  border-left: 2px solid var(--card-accent);
+  font-style: italic;
+  color: var(--color-text);
+}

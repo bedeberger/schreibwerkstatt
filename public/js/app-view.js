@@ -188,7 +188,8 @@ export const appViewMethods = {
     if (this.showEditorCard) return;
     const anyOpen = this.showBookOverviewCard
       || this.showBookReviewCard || this.showKapitelReviewCard
-      || this.showFiguresCard || this.showSzenenCard || this.showOrteCard
+      || this.showFiguresCard || this.showFigurWerkstattCard
+      || this.showSzenenCard || this.showOrteCard
       || this.showEreignisseCard || this.showKontinuitaetCard
       || this.showBookStatsCard || this.showStilCard || this.showFehlerHeatmapCard
       || this.showBookChatCard || this.showBookSettingsCard

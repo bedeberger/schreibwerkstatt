@@ -1,5 +1,5 @@
 <!-- Figuren-Werkstatt: Vorwärts-Entwicklung von Figuren als Mindmap.
-     Phase 3: CRUD + read-only Tree. Phase 4: jsMind-Editor + KI-Buttons. -->
+     jsMind-Editor + KI-Brainstorm + Konsistenz-Check. -->
 <div class="card card--werkstatt" x-data="figurWerkstattCard" x-show="$app.showFigurWerkstattCard" x-cloak>
   <div class="card-header card-header--subline">
     <div class="card-header-titlebar">
@@ -31,7 +31,7 @@
   </div>
 
   <!-- Create-Inline (auch bei leerem Empty-State sichtbar nach Klick auf CTA) -->
-  <div x-show="creating" class="card-empty" x-cloak>
+  <div x-show="creating && drafts.length === 0" class="card-empty" x-cloak>
     <p class="card-empty-text" x-text="$app.t('werkstatt.action.new')"></p>
     <input type="text"
            class="werkstatt-new-name"
@@ -62,7 +62,7 @@
                   @click="selectDraft(d.id)"
                   role="listitem">
             <span class="werkstatt-list-name" x-text="d.name"></span>
-            <span class="werkstatt-list-archetype" x-show="d.archetype" x-text="d.archetype ? $app.t('werkstatt.archetype.' + d.archetype, {}) || d.archetype : ''"></span>
+            <span class="werkstatt-list-archetype" x-show="d.archetype" x-text="d.archetype ? ($app.t('werkstatt.archetype.' + d.archetype) || d.archetype) : ''"></span>
           </button>
         </template>
       </div>
@@ -86,6 +86,15 @@
       <div class="werkstatt-detail-header">
         <h2 class="werkstatt-detail-name" x-text="editName || $app.t('werkstatt.field.name')"></h2>
         <div class="header-actions">
+          <button type="button"
+                  :disabled="busy || brainstormLoading || !selectedKnotenId"
+                  @click="runBrainstorm()"
+                  :data-tip="selectedKnotenId ? $app.t('werkstatt.action.brainstorm') : $app.t('werkstatt.action.brainstormSelectFirst')"
+                  x-text="$app.t('werkstatt.action.brainstorm')"></button>
+          <button type="button"
+                  :disabled="busy || consistencyLoading"
+                  @click="runConsistency()"
+                  x-text="$app.t('werkstatt.action.consistency')"></button>
           <button type="button" :disabled="busy" @click="requestDelete()" x-text="$app.t('werkstatt.action.delete')"></button>
         </div>
       </div>
@@ -133,15 +142,74 @@
 
       <div class="row">
         <button type="button" class="primary" :disabled="busy || !editName.trim()" @click="saveDraft()" x-text="$app.t('werkstatt.action.save')"></button>
-        <span class="card-form-saved" x-show="savedAt && !busy" x-text="$app.t('werkstatt.saved')"></span>
+        <span class="card-form-saved" x-show="savedAt && !busy" x-cloak x-transition.opacity.duration.250ms x-text="$app.t('werkstatt.saved')"></span>
       </div>
 
-      <!-- Mindmap read-only (Phase 3). Phase 4 ersetzt durch jsMind. -->
-      <section>
-        <h3 class="section-heading" x-text="$app.t('werkstatt.heading')"></h3>
-        <div class="werkstatt-tree" role="tree">
-          <template x-for="n in mindmapNodes()" :key="n.id">
-            <div class="werkstatt-tree-node" :data-depth="n.depth" role="treeitem" x-text="n.topic"></div>
+      <!-- Mindmap-Canvas (jsMind, lazy-loaded). Editierbar: Doppelklick auf Knoten zum Umbenennen, Tab/Enter für neue Sub/Geschwister, Delete entfernt. -->
+      <section class="werkstatt-mindmap-section">
+        <div class="list-header list-header--between">
+          <h3 class="section-heading" x-text="$app.t('werkstatt.heading')"></h3>
+          <span class="werkstatt-mindmap-hint" x-show="selectedKnotenId" x-text="$app.t('werkstatt.mindmap.selectedHint', { pfad: knotenPfad(selectedKnotenId) })"></span>
+        </div>
+        <div class="werkstatt-mindmap"></div>
+      </section>
+
+      <!-- Brainstorm-Status während KI-Job -->
+      <section x-show="brainstormLoading" x-cloak class="werkstatt-job-status">
+        <div x-show="brainstormProgress > 0" class="progress-bar-wrap">
+          <div class="progress-bar" :style="{ '--progress': brainstormProgress + '%' }"></div>
+        </div>
+        <div class="card-status" x-html="brainstormStatus"></div>
+      </section>
+
+      <!-- Brainstorm-Vorschläge mit Apply -->
+      <section x-show="brainstormResult" x-cloak class="werkstatt-suggestions">
+        <div class="list-header list-header--between">
+          <h3 class="section-heading" x-text="$app.t('werkstatt.brainstorm.heading', { pfad: brainstormResult ? brainstormResult.knotenPfad : '' })"></h3>
+          <button type="button" @click="dismissBrainstorm()" x-text="$app.t('werkstatt.brainstorm.dismiss')"></button>
+        </div>
+        <div class="entity-list entity-list--accented">
+          <template x-for="(v, idx) in brainstormResult ? brainstormResult.vorschlaege : []" :key="idx">
+            <div class="entity-row">
+              <div class="entity-row-content">
+                <div class="entity-row-title" x-text="v.label"></div>
+                <div class="entity-row-meta" x-text="v.begruendung"></div>
+              </div>
+              <button type="button" class="primary" @click="applyBrainstormVorschlag(idx)" x-text="$app.t('werkstatt.brainstorm.apply')"></button>
+            </div>
+          </template>
+          <div x-show="brainstormResult && brainstormResult.vorschlaege.length === 0" class="card-status" x-text="$app.t('werkstatt.brainstorm.allApplied')"></div>
+        </div>
+      </section>
+
+      <!-- Consistency-Status während KI-Job -->
+      <section x-show="consistencyLoading" x-cloak class="werkstatt-job-status">
+        <div x-show="consistencyProgress > 0" class="progress-bar-wrap">
+          <div class="progress-bar" :style="{ '--progress': consistencyProgress + '%' }"></div>
+        </div>
+        <div class="card-status" x-html="consistencyStatus"></div>
+      </section>
+
+      <!-- Consistency-Issues mit Severity-Tags -->
+      <section x-show="consistencyResult" x-cloak class="werkstatt-suggestions">
+        <div class="list-header list-header--between">
+          <h3 class="section-heading" x-text="$app.t('werkstatt.consistency.heading')"></h3>
+          <button type="button" @click="dismissConsistency()" x-text="$app.t('werkstatt.brainstorm.dismiss')"></button>
+        </div>
+        <p class="werkstatt-consistency-fazit" x-show="consistencyResult && consistencyResult.fazit" x-text="consistencyResult ? consistencyResult.fazit : ''"></p>
+        <div x-show="consistencyResult && consistencyResult.konflikte.length === 0" class="card-status" x-text="$app.t('werkstatt.consistency.noIssues')"></div>
+        <div class="entity-list entity-list--accented" x-show="consistencyResult && consistencyResult.konflikte.length > 0">
+          <template x-for="(k, idx) in consistencyResult ? consistencyResult.konflikte : []" :key="idx">
+            <div class="entity-row">
+              <span class="severity-tag" :class="'severity-tag--' + k.schwere" x-text="$app.t('werkstatt.severity.' + k.schwere)"></span>
+              <div class="entity-row-content">
+                <div class="entity-row-title">
+                  <span x-text="k.feld"></span>
+                  <span class="entity-row-meta" x-text="k.problem"></span>
+                </div>
+                <div class="entity-row-meta" x-show="k.vorschlag" x-text="k.vorschlag"></div>
+              </div>
+            </div>
           </template>
         </div>
       </section>

@@ -51,7 +51,8 @@ export const userSettingsMethods = {
           ? Number(this.userSettingsDailyGoalChars) : null;
       }
       this.userSettingsSaved = true;
-      setTimeout(() => { this.userSettingsSaved = false; }, 3000);
+      if (this._savedAtTimer) clearTimeout(this._savedAtTimer);
+      this._savedAtTimer = setTimeout(() => { this.userSettingsSaved = false; this._savedAtTimer = null; }, 2500);
     } catch (e) {
       this.userSettingsError = e.message;
     } finally {

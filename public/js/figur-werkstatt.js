@@ -1,9 +1,10 @@
 // Methoden für die Figuren-Werkstatt-Karte (Sub-Komponente).
-// CRUD über /draft-figures; KI-Brainstorm + Konsistenz-Check kommen in Phase 4.
-// Mindmap-Inhalt wird hier read-only als verschachtelte Liste angezeigt;
-// interaktiver Editor (jsMind) in Phase 4.
+// Phase 4: jsMind-Editor + KI-Brainstorm + Konsistenz-Check.
+// CRUD + Mindmap-Lifecycle + Job-Trigger + Result-Apply.
 
 import { fetchJson } from './utils.js';
+import { loadJsMind } from './lazy-libs.js';
+import { startPoll, runningJobStatus } from './cards/job-helpers.js';
 
 // Server persistiert Default-Knoten-Labels als `__i18n:werkstatt.tree.foo__`.
 // Frontend löst beim Render via t() in die User-Locale auf.
@@ -13,7 +14,26 @@ function resolveTopic(topic) {
   return m ? window.__app.t(m[1]) : (topic || '');
 }
 
+// Mindmap-Topics werden vor dem Show in jsMind durch resolved Strings ersetzt;
+// beim Speichern bleiben User-Edits direkt erhalten (Default-Marker werden
+// überschrieben sobald User Knoten umbenennt).
+function resolveMindmapForDisplay(mindmap) {
+  if (!mindmap?.data) return mindmap;
+  const cloneNode = (n) => ({
+    ...n,
+    topic: resolveTopic(n.topic),
+    children: (n.children || []).map(cloneNode),
+  });
+  return { ...mindmap, data: cloneNode(mindmap.data) };
+}
+
+// Knoten-ID-Generator für jsMind (eindeutig pro Mindmap).
+function _newNodeId() {
+  return 'n' + Math.random().toString(36).slice(2, 9) + Date.now().toString(36);
+}
+
 export const figurWerkstattMethods = {
+  // ── CRUD ──────────────────────────────────────────────────────────────────
   async loadDrafts() {
     const app = window.__app;
     const bookId = app?.selectedBookId;
@@ -28,6 +48,8 @@ export const figurWerkstattMethods = {
       }
       if (!this.selectedDraftId && this.drafts.length > 0) {
         this.selectDraft(this.drafts[0].id);
+      } else if (this.selectedDraftId) {
+        this.$nextTick(() => this._mountMindmap());
       }
     } catch (e) {
       this.errorMessage = app.t('werkstatt.error.load') || app.t('common.error');
@@ -38,8 +60,11 @@ export const figurWerkstattMethods = {
   },
 
   resetDrafts() {
+    this._destroyMindmap();
+    this._clearJobs();
     this.drafts = [];
     this.selectedDraftId = null;
+    this.selectedKnotenId = null;
     this.editName = '';
     this.editArchetype = '';
     this.editNotes = '';
@@ -47,6 +72,8 @@ export const figurWerkstattMethods = {
     this.newName = '';
     this.errorMessage = '';
     this.busy = false;
+    this.brainstormResult = null;
+    this.consistencyResult = null;
   },
 
   selectDraft(id) {
@@ -57,6 +84,10 @@ export const figurWerkstattMethods = {
     this.editArchetype = d.archetype || '';
     this.editNotes = d.notes || '';
     this.creating = false;
+    this.brainstormResult = null;
+    this.consistencyResult = null;
+    this.selectedKnotenId = null;
+    this.$nextTick(() => this._mountMindmap());
   },
 
   selectedDraft() {
@@ -110,6 +141,8 @@ export const figurWerkstattMethods = {
     if (!sel) return;
     const name = (this.editName || '').trim();
     if (!name) { this.errorMessage = app.t('werkstatt.error.nameRequired') || app.t('common.error'); return; }
+    // Aktuelle Mindmap aus jsMind exportieren, falls Editor geladen ist.
+    const mindmap = this._exportMindmap() || sel.mindmap;
     this.busy = true;
     try {
       const updated = await fetchJson(`/draft-figures/${sel.id}`, {
@@ -119,12 +152,14 @@ export const figurWerkstattMethods = {
           name,
           archetype: this.editArchetype || null,
           notes: this.editNotes || null,
-          mindmap: sel.mindmap,
+          mindmap,
         }),
       });
       this.drafts = this.drafts.map(d => d.id === updated.id ? updated : d);
       this.errorMessage = '';
       this.savedAt = Date.now();
+      if (this._savedAtTimer) clearTimeout(this._savedAtTimer);
+      this._savedAtTimer = setTimeout(() => { this.savedAt = null; this._savedAtTimer = null; }, 2500);
     } catch (e) {
       this.errorMessage = app.t('werkstatt.error.save') || app.t('common.error');
     } finally {
@@ -149,12 +184,15 @@ export const figurWerkstattMethods = {
     this.busy = true;
     try {
       await fetchJson(`/draft-figures/${id}`, { method: 'DELETE' });
+      this._destroyMindmap();
       this.drafts = this.drafts.filter(d => d.id !== id);
       if (this.selectedDraftId === id) {
         this.selectedDraftId = null;
         this.editName = '';
         this.editArchetype = '';
         this.editNotes = '';
+        this.brainstormResult = null;
+        this.consistencyResult = null;
         if (this.drafts.length > 0) this.selectDraft(this.drafts[0].id);
       }
     } catch (e) {
@@ -164,17 +202,197 @@ export const figurWerkstattMethods = {
     }
   },
 
-  mindmapNodes() {
+  // ── Mindmap-Lifecycle (jsMind) ────────────────────────────────────────────
+  async _mountMindmap() {
     const sel = this.selectedDraft();
-    if (!sel?.mindmap?.data) return [];
-    const flat = [];
-    const walk = (node, depth) => {
-      flat.push({ id: node.id, topic: resolveTopic(node.topic), depth });
-      for (const c of node.children || []) walk(c, depth + 1);
+    if (!sel) return;
+    const container = this.$el?.querySelector('.werkstatt-mindmap');
+    if (!container) return;
+    let jsMind;
+    try {
+      jsMind = await loadJsMind();
+    } catch (e) {
+      this.errorMessage = window.__app.t('werkstatt.error.libLoad') || 'Library load failed';
+      return;
+    }
+    if (!this._jm) {
+      this._jm = new jsMind({
+        container,
+        editable: true,
+        theme: 'primary',
+        view: { hmargin: 80, vmargin: 40, line_width: 1.5, draggable: true, hide_scrollbars_when_draggable: true },
+        layout: { hspace: 30, vspace: 18, pspace: 14 },
+      });
+      // Selection-Tracking für KI-Brainstorm.
+      this._jm.add_event_listener((type, data) => {
+        // type 4 = select (jsMind enum: show=1, resize=2, edit=3, select=4)
+        if (type === 4) {
+          this.selectedKnotenId = data?.node || null;
+        }
+      });
+    }
+    this._jm.show(resolveMindmapForDisplay(sel.mindmap));
+    // Nach show() Wurzel als Default-Selektion.
+    this.selectedKnotenId = sel.mindmap?.data?.id || 'root';
+  },
+
+  _destroyMindmap() {
+    // jsMind hat keine offizielle destroy()-Methode; container leeren reicht.
+    const container = this.$el?.querySelector?.('.werkstatt-mindmap');
+    if (container) container.innerHTML = '';
+    this._jm = null;
+  },
+
+  _exportMindmap() {
+    if (!this._jm) return null;
+    try {
+      const exported = this._jm.get_data('node_tree');
+      // jsMind liefert { meta, format, data }; format auf 'node_tree' fixieren.
+      return exported && exported.data ? exported : null;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  // Knoten-Pfad als „Wurzel > … > Knoten" — für UI-Anzeige + Brainstorm-Heading.
+  knotenPfad(id) {
+    if (!id || !this._jm) return '';
+    const tree = this._exportMindmap()?.data;
+    const walk = (node, trail) => {
+      const here = [...trail, resolveTopic(node.topic)];
+      if (node.id === id) return here.join(' > ');
+      for (const c of node.children || []) {
+        const found = walk(c, here);
+        if (found) return found;
+      }
+      return null;
     };
-    walk(sel.mindmap.data, 0);
-    return flat;
+    return tree ? (walk(tree, []) || '') : '';
+  },
+
+  // ── KI-Brainstorm ─────────────────────────────────────────────────────────
+  async runBrainstorm() {
+    const app = window.__app;
+    const sel = this.selectedDraft();
+    if (!sel || !this.selectedKnotenId) return;
+    // Aktuellen Mindmap-Stand zuerst speichern, sonst sieht KI alte Daten.
+    await this.saveDraft();
+    this.brainstormLoading = true;
+    this.brainstormStatus = '';
+    this.brainstormResult = null;
+    try {
+      const resp = await fetchJson('/jobs/werkstatt-brainstorm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ draftId: sel.id, knotenId: this.selectedKnotenId }),
+      });
+      this._brainstormJobId = resp.jobId;
+      startPoll(this, {
+        timerProp: '_brainstormPollTimer',
+        jobId: resp.jobId,
+        progressProp: 'brainstormProgress',
+        onProgress: (job) => {
+          this.brainstormStatus = runningJobStatus(app.t.bind(app),
+            job.statusText, job.tokensIn, job.tokensOut, job.maxTokensOut,
+            job.progress, job.tokensPerSec, job.statusParams);
+        },
+        onDone: (job) => {
+          this.brainstormLoading = false;
+          this.brainstormStatus = '';
+          this.brainstormResult = {
+            knotenId: job.result.knotenId,
+            knotenPfad: job.result.knotenPfad,
+            vorschlaege: job.result.vorschlaege || [],
+          };
+        },
+        onError: (job) => {
+          this.brainstormLoading = false;
+          this.brainstormStatus = '';
+          this.errorMessage = app.t(job.error || 'common.error', job.errorParams || {});
+        },
+        onNotFound: () => { this.brainstormLoading = false; this.brainstormStatus = ''; },
+      });
+    } catch (e) {
+      this.brainstormLoading = false;
+      this.errorMessage = app.t('werkstatt.error.brainstorm') || app.t('common.error');
+    }
+  },
+
+  applyBrainstormVorschlag(idx) {
+    if (!this.brainstormResult) return;
+    const v = this.brainstormResult.vorschlaege[idx];
+    if (!v || !this._jm) return;
+    const parentId = this.brainstormResult.knotenId;
+    try {
+      this._jm.add_node(parentId, _newNodeId(), v.label);
+    } catch (e) {
+      console.error('[werkstatt] add_node failed:', e);
+    }
+    // Vorschlag aus Liste entfernen, damit User Apply-Status sieht.
+    this.brainstormResult.vorschlaege = this.brainstormResult.vorschlaege.filter((_, i) => i !== idx);
+  },
+
+  dismissBrainstorm() {
+    this.brainstormResult = null;
+  },
+
+  // ── KI-Konsistenz-Check ──────────────────────────────────────────────────
+  async runConsistency() {
+    const app = window.__app;
+    const sel = this.selectedDraft();
+    if (!sel) return;
+    await this.saveDraft();
+    this.consistencyLoading = true;
+    this.consistencyStatus = '';
+    this.consistencyResult = null;
+    try {
+      const resp = await fetchJson('/jobs/werkstatt-consistency', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ draftId: sel.id }),
+      });
+      startPoll(this, {
+        timerProp: '_consistencyPollTimer',
+        jobId: resp.jobId,
+        progressProp: 'consistencyProgress',
+        onProgress: (job) => {
+          this.consistencyStatus = runningJobStatus(app.t.bind(app),
+            job.statusText, job.tokensIn, job.tokensOut, job.maxTokensOut,
+            job.progress, job.tokensPerSec, job.statusParams);
+        },
+        onDone: (job) => {
+          this.consistencyLoading = false;
+          this.consistencyStatus = '';
+          this.consistencyResult = {
+            konflikte: job.result.konflikte || [],
+            fazit: job.result.fazit || '',
+          };
+        },
+        onError: (job) => {
+          this.consistencyLoading = false;
+          this.consistencyStatus = '';
+          this.errorMessage = app.t(job.error || 'common.error', job.errorParams || {});
+        },
+        onNotFound: () => { this.consistencyLoading = false; this.consistencyStatus = ''; },
+      });
+    } catch (e) {
+      this.consistencyLoading = false;
+      this.errorMessage = app.t('werkstatt.error.consistency') || app.t('common.error');
+    }
+  },
+
+  dismissConsistency() {
+    this.consistencyResult = null;
+  },
+
+  _clearJobs() {
+    if (this._brainstormPollTimer) { clearInterval(this._brainstormPollTimer); this._brainstormPollTimer = null; }
+    if (this._consistencyPollTimer) { clearInterval(this._consistencyPollTimer); this._consistencyPollTimer = null; }
+    this.brainstormLoading = false;
+    this.consistencyLoading = false;
+    this.brainstormStatus = '';
+    this.consistencyStatus = '';
   },
 };
 
-export { resolveTopic };
+export { resolveTopic, resolveMindmapForDisplay };

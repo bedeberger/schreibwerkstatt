@@ -132,8 +132,8 @@
 .severity-dot--lg { width: 8px; height: 8px; }
 .severity-dot--stark    { background: var(--color-stark); }
 .severity-dot--mittel   { background: var(--color-mittel); }
-.severity-dot--schwach  { background: var(--color-err-border); }
-.severity-dot--kritisch { background: var(--color-err-border); }
+.severity-dot--schwach  { background: var(--color-schwach); }
+.severity-dot--kritisch { background: var(--color-schwach); }
 .severity-dot--niedrig  { background: var(--color-border); }
 
 /* === Severity-Tag (Anker links in entity-row) ===
@@ -159,7 +159,7 @@
 .severity-tag--stark    { color: var(--color-surface); background: var(--color-stark); }
 .severity-tag--mittel   { color: var(--color-surface); background: var(--color-mittel); }
 .severity-tag--schwach,
-.severity-tag--kritisch { color: var(--color-surface); background: var(--color-err-border); }
+.severity-tag--kritisch { color: var(--color-surface); background: var(--color-schwach); }
 .severity-tag--niedrig  { color: var(--color-muted); background: var(--color-tag-bg); }
 
 /* === Skeleton-Loader für Listen-Karten ===

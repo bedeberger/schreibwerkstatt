@@ -1,5 +1,5 @@
 // Alpine.data('figurWerkstattCard') — Sub-Komponente der Figuren-Werkstatt-Karte.
-// CRUD über /draft-figures; KI-Buttons (Brainstorm/Konsistenz) folgen in Phase 4.
+// CRUD + jsMind-Editor + KI-Brainstorm + Konsistenz-Check.
 // Root behält showFigurWerkstattCard, selectedBookId, t, appConfirm.
 
 import { figurWerkstattMethods } from '../figur-werkstatt.js';
@@ -10,6 +10,7 @@ export function registerFigurWerkstattCard() {
   window.Alpine.data('figurWerkstattCard', () => ({
     drafts: [],
     selectedDraftId: null,
+    selectedKnotenId: null,
     creating: false,
     newName: '',
     editName: '',
@@ -19,18 +20,32 @@ export function registerFigurWerkstattCard() {
     busy: false,
     errorMessage: '',
     savedAt: null,
+    brainstormLoading: false,
+    brainstormProgress: 0,
+    brainstormStatus: '',
+    brainstormResult: null,
+    consistencyLoading: false,
+    consistencyProgress: 0,
+    consistencyStatus: '',
+    consistencyResult: null,
+    _jm: null,
+    _brainstormPollTimer: null,
+    _consistencyPollTimer: null,
+    _savedAtTimer: null,
     _lifecycle: null,
 
     init() {
       this._lifecycle = setupCardLifecycle(this, {
         name: 'figurWerkstatt',
         showFlag: 'showFigurWerkstattCard',
-        resetState: { drafts: [], selectedDraftId: null, creating: false, newName: '', editName: '', editArchetype: '', editNotes: '', errorMessage: '' },
+        timerKeys: ['_brainstormPollTimer', '_consistencyPollTimer', '_savedAtTimer'],
+        resetState: { drafts: [], selectedDraftId: null, selectedKnotenId: null, creating: false, newName: '', editName: '', editArchetype: '', editNotes: '', errorMessage: '', brainstormResult: null, consistencyResult: null, brainstormLoading: false, consistencyLoading: false },
         load: () => this.loadDrafts(),
       });
     },
 
     destroy() {
+      this._destroyMindmap();
       this._lifecycle?.destroy();
     },
 

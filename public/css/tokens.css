@@ -92,6 +92,7 @@
   --color-primary: #1e3a5f;
   --color-primary-hover: #16293d;
   --color-primary-light: #6a8cb0;
+  --color-on-primary: #ffffff;
   --color-accent: #9a7f3e;
   --color-success: #34d399;
   --color-success-hover: #1D9E75;
@@ -103,6 +104,7 @@
   --color-mittel: #b38600;
   --color-mittel-bg: #FFF3CC;
   --color-mittel-text: #6b4c00;
+  --color-schwach: #c43838;
   --color-schwach-bg: #FFE0E0;
   --color-schwach-text: #8B1E1E;
 
@@ -357,6 +359,7 @@
   --color-primary: #7aa3ca;
   --color-primary-hover: #a8c4e0;
   --color-primary-light: #5a7a99;
+  --color-on-primary: #1a1816;
   --color-accent: #c9a961;
   --color-success: #4fd9aa;
   --color-success-hover: #6eead0;
@@ -369,10 +372,12 @@
   --color-mittel: #d8b040;
   --color-mittel-bg: rgba(179, 134, 0, 0.18);
   --color-mittel-text: #e5c272;
+  --color-schwach: #e25c5c;
   --color-schwach-bg: rgba(226, 75, 74, 0.18);
   --color-schwach-text: #ff9090;
 
   --color-neutral-bg: #2d2a25;
+  --color-running: #6aa3d4;
   --color-accent-bg: rgba(201, 169, 97, 0.18);
   --color-accent-text: #e0c070;
   --color-accent-hover: rgba(201, 169, 97, 0.12);
@@ -419,7 +424,8 @@
   --color-page-view-text: #d8d3c8;
   --color-tooltip-bg: #2d2a25;
 
-  /* Dev-/Session-Banner – Amber bleibt, dunkler Text auf Amber bleibt lesbar */
+  /* Dev-/Session-Banner – Amber bleibt absichtlich auch im Dark-Mode (gut lesbar
+     auf dunklem Text), darum kein Override für --color-dev-banner-bg/text. */
   --color-session-banner-btn-hover: #c44040;
 
   /* Skeleton-Shimmer auf Dark */

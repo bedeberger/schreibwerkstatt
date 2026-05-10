@@ -118,7 +118,7 @@
       </div>
     </div>
 
-    <p class="card-form-saved" x-show="bookSettingsSaved" x-text="$app.t('common.settingsSaved')"></p>
+    <p class="card-form-saved" x-show="bookSettingsSaved" x-cloak x-transition.opacity.duration.250ms x-text="$app.t('common.settingsSaved')"></p>
     <p class="card-form-error" x-show="bookSettingsError" x-text="bookSettingsError"></p>
 
     <div class="book-settings-danger-zone">
@@ -135,7 +135,7 @@
           </button>
         </div>
       </div>
-      <p class="card-form-saved" x-show="bookHistoryResetMessage" x-text="bookHistoryResetMessage"></p>
+      <p class="card-form-saved" x-show="bookHistoryResetMessage" x-cloak x-transition.opacity.duration.250ms x-text="bookHistoryResetMessage"></p>
       <p class="card-form-error" x-show="bookHistoryResetError" x-text="bookHistoryResetError"></p>
     </div>
 

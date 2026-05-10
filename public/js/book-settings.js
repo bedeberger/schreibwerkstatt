@@ -49,7 +49,8 @@ export const bookSettingsMethods = {
         throw new Error(data ? window.__app.tError(data) : `HTTP ${r.status}`);
       }
       this.bookSettingsSaved = true;
-      setTimeout(() => { this.bookSettingsSaved = false; }, 3000);
+      if (this._savedAtTimer) clearTimeout(this._savedAtTimer);
+      this._savedAtTimer = setTimeout(() => { this.bookSettingsSaved = false; this._savedAtTimer = null; }, 2500);
     } catch (e) {
       this.bookSettingsError = e.message;
     } finally {
@@ -148,7 +149,8 @@ export const bookSettingsMethods = {
         window.__app.bookReviewHistory = [];
         window.dispatchEvent(new CustomEvent('chat:reset'));
       }
-      setTimeout(() => { this.bookHistoryResetMessage = ''; }, 6000);
+      if (this._resetMsgTimer) clearTimeout(this._resetMsgTimer);
+      this._resetMsgTimer = setTimeout(() => { this.bookHistoryResetMessage = ''; this._resetMsgTimer = null; }, 6000);
     } catch (e) {
       this.bookHistoryResetError = e.message;
     } finally {

@@ -9,6 +9,7 @@
 
 let _visPromise = null;
 let _chartPromise = null;
+let _jsMindPromise = null;
 
 function _loadScript(src) {
   return new Promise((resolve, reject) => {
@@ -39,4 +40,14 @@ export function loadChart() {
       .catch(err => { _chartPromise = null; throw err; });
   }
   return _chartPromise;
+}
+
+export function loadJsMind() {
+  if (typeof window.jsMind !== 'undefined') return Promise.resolve(window.jsMind);
+  if (!_jsMindPromise) {
+    _jsMindPromise = _loadScript('vendor/jsmind-0.8.7.js')
+      .then(() => window.jsMind)
+      .catch(err => { _jsMindPromise = null; throw err; });
+  }
+  return _jsMindPromise;
 }

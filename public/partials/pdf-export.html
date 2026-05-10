@@ -21,7 +21,7 @@
         <span x-show="saving" class="spinner"></span>
         <span x-text="saving ? $app.t('common.saving') : $app.t('common.save')"></span>
       </button>
-      <span class="card-form-saved" x-show="savedAt" x-text="$app.t('pdfExport.saved')"></span>
+      <span class="card-form-saved" x-show="savedAt" x-cloak x-transition.opacity.duration.250ms x-text="$app.t('pdfExport.saved')"></span>
       <button type="button"
               class="primary"
               x-show="!exporting"

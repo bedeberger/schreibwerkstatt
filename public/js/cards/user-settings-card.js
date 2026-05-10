@@ -19,6 +19,7 @@ export function registerUserSettingsCard() {
     userSettingsSaving: false,
     userSettingsSaved: false,
     userSettingsError: '',
+    _savedAtTimer: null,
 
     _onViewReset: null,
 
@@ -36,6 +37,7 @@ export function registerUserSettingsCard() {
     },
 
     destroy() {
+      if (this._savedAtTimer) { clearTimeout(this._savedAtTimer); this._savedAtTimer = null; }
       if (this._onViewReset) window.removeEventListener('view:reset', this._onViewReset);
     },
 

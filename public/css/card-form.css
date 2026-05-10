@@ -296,6 +296,22 @@ select:focus {
   font-size: 12px;
   color: var(--color-success);
   font-weight: 400;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: opacity 250ms ease;
+}
+/* Inline neben Button (z.B. figur-werkstatt, pdf-export) — vertikal mittig
+   trotz `.row { align-items: flex-end }`. Margin-top entfernen, sonst sitzt
+   Toast in Button-Reihe zu tief. */
+.row > .card-form-saved,
+.card-actions > .card-form-saved {
+  align-self: center;
+  margin: 0;
+}
+.card-form-saved::before {
+  content: "✓";
+  font-weight: 600;
 }
 .card-form-error {
   margin: 8px 0 0;

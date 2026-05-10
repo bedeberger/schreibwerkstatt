@@ -40,6 +40,7 @@ Token-Referenz (Farben, Radien, Spacing, Schriftgrössen): [public/css/tokens.cs
 - [Header-Actions](#header-actions)
 - [Avatar-Menu](#avatar-menu)
 - [Command-Palette](#command-palette) — Cmd/Ctrl+K
+- [Routing / Deep-Links](#routing--deep-links-url-pflicht) — Hash-URL pro Feature Pflicht
 - [Book-Overview-Tiles](#book-overview-tiles) — Default-Home-Grid
 
 **Editor**
@@ -321,7 +322,7 @@ mit `myCardOptions() { return this.cardData.map(...); }` am Karten-Scope.
 
 ### Hint / Error / Saved unterhalb der Form
 
-`.card-form-hint` (12 px, muted, italic), `.card-form-error` (rot), `.card-form-saved` (success).
+`.card-form-hint` (12 px, muted, italic), `.card-form-error` (rot), `.card-form-saved` (success — ✓-Prefix via `::before`, fade via `x-transition.opacity.duration.250ms`, Auto-Dismiss 2500 ms via `_savedAtTimer` in der Karte).
 
 ### Validation-State auf Inputs (Pflicht bei Fehler)
 
@@ -792,6 +793,43 @@ Nicht eigene Toolbar-Layouts pro Karte erfinden.
 **SSoT:** Karten/Aktionen/Provider stehen in [public/js/cards/feature-registry.js](public/js/cards/feature-registry.js), nicht im Template. Neuer Eintrag → dort, nicht hier.
 
 **Kein zweiter Such-Trigger:** Jede neue „Spotlight"-/„Quick-Switcher"-Idee zuerst in Palette-Provider einbauen, kein paralleles Modal.
+
+---
+
+## Routing / Deep-Links (URL-Pflicht)
+
+**Use:** Jedes Feature mit eigener Hauptansicht (Karte, Detail, Editor-Modus, Modal mit dauerhaftem Zustand) braucht eine eigene URL. State, der nicht in der URL steht, ist nicht teilbar, nicht bookmarkbar, geht beim Reload verloren und ist im Plausible nicht messbar. Single-Source-of-Truth für Sichtbarkeit ist die URL — nicht der Show-Flag.
+
+**Schema** (siehe [public/js/app-hash-router.js](public/js/app-hash-router.js)):
+```
+#profil
+#book/:bookId                                     ← Buch-Übersicht
+#book/:bookId/<view>                              ← Buchebenen-Karte ohne Selektion
+#book/:bookId/page/:pageId                        ← Seite im Editor
+#book/:bookId/figur/:figId | ort/:ortId | szene/:szId
+#book/:bookId/kapitel[/:chapterId]
+```
+
+Bekannte Views: `figuren`, `orte`, `szenen`, `ereignisse`, `kontinuitaet`, `bewertung`, `kapitel`, `chat`, `uebersicht`, `stats`, `stil`, `fehler`, `einstellungen`, `finetune`, `export`, `pdf`.
+
+**Regeln:**
+- **Neue Karte → eigener View-Slug** in `_computeHash()` ([public/js/app-hash-router.js](public/js/app-hash-router.js)) **und** Apply-Zweig in `_applyHash()`. Slug kurz, deutsch, Kleinbuchstaben (passt zu bestehenden: `bewertung`, `einstellungen`).
+- **Selektion (`selectedFigurId` etc.) muss in der URL** stehen, sonst Reload verliert die Auswahl. Pattern: eigene Sub-Route `#book/:bookId/<entity>/:id`.
+- **Push vs. Replace:** gleiche Kategorie (z.B. Figur ↔ Figur) = Replace, Wechsel = Push. Liefert `_hashCategory()` automatisch — neue Aliase (`figur` → `figuren`) dort eintragen.
+- **Watcher auf neue State-Felder, die in der URL landen** ([app-hash-router.js](public/js/app-hash-router.js)#`_setupHashWatchers`). Ohne Watcher kein Auto-Sync; Hash-Stand driftet.
+- **Feature-Registry** ([public/js/cards/feature-registry.js](public/js/cards/feature-registry.js)): jeder neue Toggle bekommt einen Eintrag mit Show-Flag-Key, der in `ALLOWED_KEYS` von [routes/usage.js](routes/usage.js) gespiegelt ist. Recency-Tracking (Palette „Zuletzt") triggert auf rising-edge des Show-Flags und braucht den exakten Key.
+- **Plausible-Tracking:** `_writeHash` triggert nach jedem Push/Replace `plausible('pageview')`. Eigene URL = eigene Metrik, ohne Code-Änderung an Analytics.
+- **Test:** [tests/unit/hash-router.test.mjs](tests/unit/hash-router.test.mjs) ergänzen für jede neue View/Selektion (Push/Replace + Apply-Roundtrip).
+
+**Anti-Pattern:**
+- Karte zeigen via reinem Show-Flag ohne URL-Pendant → Reload verliert Ansicht, „Link mir mal X" geht nicht.
+- Selektion nur in lokalem Sub-State (Karte hält `selectedXxxId` selbst) → Hash kann nicht synchronisieren.
+- Modal/Drawer mit dauerhaftem Inhalt (z.B. eigener Settings-Bereich) ohne URL — gleiche Regel wie Karten.
+
+**Ausnahmen** (kein eigener Hash):
+- Kurzlebige Overlays ohne Inhalts-State: Confirm-Dialog, Toast, Sofort-Tooltip, Avatar-Menu, Edit-Bubble-Toolbar.
+- Editor-Sub-Modi (Edit, Fokus, Findings) — sie hängen am Page-Hash; Modus selbst wird nicht gehashed (würde sonst Back-Button-Verhalten zerschiessen).
+- Command-Palette (öffnet via Shortcut, schliesst sofort wieder; kein Inhalts-State).
 
 ---
 
@@ -1346,3 +1384,4 @@ Wer ein neues Pattern einführt:
 9. A11y-Attribute (`aria-*`, `role`, Focus-Trap bei Modal, `aria-invalid` bei Inputs) gesetzt?
 10. Z-Index über Token aus tokens.css gesetzt (kein hartcoded Wert)?
 11. Container-Query vs. Media-Query bewusst gewählt (siehe Section)?
+12. Eigene URL für die neue Hauptansicht im [Hash-Router](#routing--deep-links-url-pflicht) (View-Slug + Apply-Zweig + Selektion + Watcher + Test)?

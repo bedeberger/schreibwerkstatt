@@ -1,6 +1,6 @@
 // URL-Hash-Permalinks + History-Management.
 // Schema: #profil | #book/:bookId[/page/:pageId|/figur/:figId|/ort/:ortId|/kapitel[/:chapterId]|/<view>]
-// Views: figuren, orte, szenen, ereignisse, kontinuitaet, bewertung, kapitel, chat, stats, stil, fehler, einstellungen, finetune, export
+// Views: figuren, werkstatt, orte, szenen, ereignisse, kontinuitaet, bewertung, kapitel, chat, stats, stil, fehler, einstellungen, finetune, export
 //
 // Entwurfsentscheidungen:
 // - push vs. replace entscheidet `_hashCategory`: gleiche Kategorie → replace
@@ -26,6 +26,7 @@ export const appHashRouterMethods = {
     } else if (this.showKapitelReviewCard && this.kapitelReviewChapterId) {
       parts.push('kapitel', String(this.kapitelReviewChapterId));
     } else if (this.showFiguresCard) parts.push('figuren');
+    else if (this.showFigurWerkstattCard) parts.push('werkstatt');
     else if (this.showOrteCard) parts.push('orte');
     else if (this.showSzenenCard) parts.push('szenen');
     else if (this.showEreignisseCard) parts.push('ereignisse');
@@ -178,6 +179,9 @@ export const appHashRouterMethods = {
           if (!this.showFiguresCard) await this.toggleFiguresCard();
           else this._closeOtherMainCards('figures');
           break;
+        case 'werkstatt':
+          if (!this.showFigurWerkstattCard) await this.toggleFigurWerkstattCard();
+          break;
         case 'orte':
           this.selectedOrtId = null;
           if (!this.showOrteCard) await this.toggleOrteCard();
@@ -256,7 +260,7 @@ export const appHashRouterMethods = {
     const watchers = [
       'selectedBookId', 'currentPage', 'showEditorCard',
       'selectedFigurId', 'selectedOrtId', 'selectedSzeneId',
-      'showFiguresCard', 'showOrteCard', 'showSzenenCard', 'showEreignisseCard',
+      'showFiguresCard', 'showFigurWerkstattCard', 'showOrteCard', 'showSzenenCard', 'showEreignisseCard',
       'showKontinuitaetCard', 'showBookReviewCard', 'showBookChatCard',
       'showKapitelReviewCard', 'kapitelReviewChapterId',
       'showBookStatsCard', 'showStilCard', 'showFehlerHeatmapCard',
