@@ -1,0 +1,83 @@
+// Import bestehender Buch-Figur als Werkstatt-Draft.
+// Server filtert figures-Liste auf jene ohne aktiven Werkstatt-Draft des Users.
+// POST /import erzeugt Draft mit Mindmap aus figures-Feldern + source_figure_id-
+// Referenz. Werkstatt-Jobs schliessen die Quell-Figur serverseitig vom Buch-
+// Kontext aus, damit sie sich nicht selbst referenziert.
+
+import { fetchJson } from '../utils.js';
+
+export const importMethods = {
+  async startImport() {
+    const app = window.__app;
+    const bookId = app?.selectedBookId;
+    if (!bookId) return;
+    this.importing = true;
+    this.importablesLoading = true;
+    this.selectedImportFigureId = '';
+    this.errorMessage = '';
+    try {
+      const rows = await fetchJson(`/draft-figures/${bookId}/importable`);
+      this.importables = Array.isArray(rows) ? rows : [];
+    } catch (e) {
+      this.importables = [];
+      this.errorMessage = app.t('werkstatt.error.importLoad') || app.t('common.error');
+    } finally {
+      this.importablesLoading = false;
+    }
+  },
+
+  cancelImport() {
+    this.importing = false;
+    this.selectedImportFigureId = '';
+    this.importables = [];
+  },
+
+  async runImport() {
+    const app = window.__app;
+    const bookId = app?.selectedBookId;
+    const figureId = parseInt(this.selectedImportFigureId);
+    if (!bookId || !figureId) return;
+    this.busy = true;
+    try {
+      // Direkter fetch statt fetchJson: 409 ALREADY_IMPORTED soll den
+      // existingDraftId-Body liefern, damit zum bestehenden Draft gesprungen
+      // werden kann statt Fehlermeldung.
+      const r = await fetch(`/draft-figures/${bookId}/import`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ figureId }),
+      });
+      const body = await r.json().catch(() => ({}));
+      if (r.status === 409 && body.error_code === 'ALREADY_IMPORTED' && body.existingDraftId) {
+        this.importing = false;
+        this.importables = [];
+        this.selectedImportFigureId = '';
+        await this.loadDrafts();
+        this.selectDraft(body.existingDraftId);
+        this.errorMessage = '';
+        return;
+      }
+      if (!r.ok) throw new Error(body?.error_code || `HTTP ${r.status}`);
+      this.drafts = [body, ...this.drafts];
+      this.importing = false;
+      this.importables = [];
+      this.selectedImportFigureId = '';
+      this.selectDraft(body.id);
+      this.errorMessage = '';
+    } catch (e) {
+      this.errorMessage = app.t('werkstatt.error.import') || app.t('common.error');
+    } finally {
+      this.busy = false;
+    }
+  },
+
+  // Quell-Figur-Name für Header-Badge. null wenn frei angelegt oder Quell-Figur
+  // gelöscht (FK SET NULL).
+  importedFromName() {
+    const sel = this.selectedDraft();
+    if (!sel?.source_figure_id) return null;
+    const figs = window.__app?.figuren || [];
+    const fig = figs.find(f => f.id === sel.source_figure_id);
+    return fig?.name || null;
+  },
+};

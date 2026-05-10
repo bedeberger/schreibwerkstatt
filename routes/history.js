@@ -159,18 +159,21 @@ router.delete('/book/:book_id', (req, res) => {
   const delReviews    = db.prepare('DELETE FROM book_reviews     WHERE book_id = ? AND user_email = ?');
   const delChReviews  = db.prepare('DELETE FROM chapter_reviews  WHERE book_id = ? AND user_email = ?');
   const delSessions   = db.prepare('DELETE FROM chat_sessions    WHERE book_id = ? AND user_email = ?');
+  const delWerkRuns   = db.prepare('DELETE FROM werkstatt_runs   WHERE book_id = ? AND user_email = ?');
 
   const result = db.transaction(() => ({
     page_checks:      delChecks.run(book_id, user_email).changes,
     book_reviews:     delReviews.run(book_id, user_email).changes,
     chapter_reviews:  delChReviews.run(book_id, user_email).changes,
     chat_sessions:    delSessions.run(book_id, user_email).changes,
+    werkstatt_runs:   delWerkRuns.run(book_id, user_email).changes,
   }))();
 
   logger.info(
     `History-Reset: book=${book_id} user=${user_email} ` +
     `page_checks=${result.page_checks} book_reviews=${result.book_reviews} ` +
-    `chapter_reviews=${result.chapter_reviews} chat_sessions=${result.chat_sessions}`
+    `chapter_reviews=${result.chapter_reviews} chat_sessions=${result.chat_sessions} ` +
+    `werkstatt_runs=${result.werkstatt_runs}`
   );
   res.json({ ok: true, deleted: result });
 });

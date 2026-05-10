@@ -71,6 +71,23 @@ export const appNavigationMethods = {
     }
   },
 
+  async openWerkstattDraftById(draftId) {
+    this._beginNavigation();
+    try {
+      if (!this.showFigurWerkstattCard) {
+        await this.toggleFigurWerkstattCard();
+      }
+      // Sub übernimmt Draft-Wechsel via figur-werkstatt:select. Drafts evtl.
+      // noch nicht geladen → Sub parkt _pendingDraftId und löst nach loadDrafts.
+      window.dispatchEvent(new CustomEvent('figur-werkstatt:select', {
+        detail: { draftId },
+      }));
+      this.werkstattDraftId = draftId;
+    } finally {
+      this._endNavigation();
+    }
+  },
+
   async openSzeneById(szeneId) {
     this._beginNavigation();
     try {

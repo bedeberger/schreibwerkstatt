@@ -315,6 +315,17 @@ export const appJobsCoreMethods = {
       if (page) await this.selectPage(page);
       return;
     }
+    if (job.type === 'werkstatt-brainstorm' || job.type === 'werkstatt-consistency') {
+      const dedup = String(job.dedupId ?? '');
+      const [draftPart, knotenPart] = dedup.split('|');
+      const draftId = parseInt(draftPart, 10);
+      if (!draftId) return;
+      if (!this.showFigurWerkstattCard) await this.toggleFigurWerkstattCard();
+      window.dispatchEvent(new CustomEvent('figur-werkstatt:select', {
+        detail: { draftId, knotenId: knotenPart || null },
+      }));
+      return;
+    }
     const method = map[job.type];
     if (method && this[method]) await this[method]();
   },

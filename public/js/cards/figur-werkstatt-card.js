@@ -35,9 +35,18 @@ export function registerFigurWerkstattCard() {
     importables: [],
     importablesLoading: false,
     selectedImportFigureId: '',
+    runs: { brainstorm: [], consistency: [] },
+    runsLoadedDraftId: null,
+    runsLoading: false,
+    runsExpanded: { brainstorm: false, consistency: false },
+    selectedRunId: null,
+    helpExpanded: false,
+    _runsLoadDraftId: null,
     _mindmapDirty: false,
     _jm: null,
     _jmDraftId: null,
+    _mindmapEl: null,
+    _topicMarkers: null,
     _brainstormJobId: null,
     _consistencyJobId: null,
     _brainstormPollTimer: null,
@@ -46,15 +55,28 @@ export function registerFigurWerkstattCard() {
     _ctxOutsideHandler: null,
     _ctxEscHandler: null,
     _pendingDraftId: null,
+    _pendingKnotenId: null,
     _lifecycle: null,
 
+    toggleHelp() {
+      this.helpExpanded = !this.helpExpanded;
+      try { localStorage.setItem('werkstatt.helpExpanded', this.helpExpanded ? '1' : '0'); } catch {}
+    },
+
     init() {
+      try { this.helpExpanded = localStorage.getItem('werkstatt.helpExpanded') === '1'; } catch {}
       // Sub → Root spiegeln: Hash-Router liest werkstattDraftId vom Root.
       // selectedDraftId bleibt SSoT in der Sub; jede Mutation (selectDraft,
       // resetState bei book:changed/view:reset, _doDelete) wird via Watcher
       // auf den Root durchgereicht.
       this.$watch('selectedDraftId', (id) => {
         if (window.__app) window.__app.werkstattDraftId = id || null;
+      });
+      // Drafts-Liste auf den Root spiegeln, damit die Command-Palette
+      // (figuren-Provider) auch werkstatt-Drafts findet, ohne selbst zu fetchen,
+      // sobald die Karte mindestens einmal geladen hat.
+      this.$watch('drafts', (list) => {
+        if (window.__app) window.__app.werkstattDrafts = Array.isArray(list) ? list : [];
       });
 
       // Hash-Router → Sub: Permalink `#book/:b/werkstatt/:draftId` dispatcht
@@ -63,9 +85,18 @@ export function registerFigurWerkstattCard() {
       const onSelectDraft = (e) => {
         const id = parseInt(e.detail?.draftId);
         if (!id) return;
-        if (!this.drafts.length) { this._pendingDraftId = id; return; }
-        if (this.drafts.some(d => d.id === id) && this.selectedDraftId !== id) {
+        const knotenId = e.detail?.knotenId || null;
+        if (!this.drafts.length) {
+          this._pendingDraftId = id;
+          this._pendingKnotenId = knotenId;
+          return;
+        }
+        if (!this.drafts.some(d => d.id === id)) return;
+        if (this.selectedDraftId !== id) {
+          this._pendingKnotenId = knotenId;
           this.selectDraft(id);
+        } else if (knotenId) {
+          this._selectNodeQuiet(knotenId);
         }
       };
 
@@ -73,7 +104,7 @@ export function registerFigurWerkstattCard() {
         name: 'figurWerkstatt',
         showFlag: 'showFigurWerkstattCard',
         timerKeys: ['_brainstormPollTimer', '_consistencyPollTimer'],
-        resetState: { drafts: [], selectedDraftId: null, selectedKnotenId: null, creating: false, newName: '', editName: '', editArchetype: '', editNotes: '', errorMessage: '', brainstormResult: null, consistencyResult: null, brainstormLoading: false, consistencyLoading: false, mindmapFullscreen: false, contextMenuOpen: false, contextMenuNodeId: null, importing: false, importables: [], selectedImportFigureId: '', _mindmapDirty: false, _pendingDraftId: null },
+        resetState: { drafts: [], selectedDraftId: null, selectedKnotenId: null, creating: false, newName: '', editName: '', editArchetype: '', editNotes: '', errorMessage: '', brainstormResult: null, consistencyResult: null, brainstormLoading: false, consistencyLoading: false, mindmapFullscreen: false, contextMenuOpen: false, contextMenuNodeId: null, importing: false, importables: [], selectedImportFigureId: '', runs: { brainstorm: [], consistency: [] }, runsLoadedDraftId: null, runsExpanded: { brainstorm: false, consistency: false }, selectedRunId: null, _mindmapDirty: false, _pendingDraftId: null, _pendingKnotenId: null},
         load: () => this.loadDrafts(),
         onCardRefresh: async () => {
           if (this.isDirty()) {

@@ -113,15 +113,32 @@ export const PROVIDERS = [
     list(root) {
       return Array.isArray(root.figuren) ? root.figuren : [];
     },
-    // Defensive: Falls beim Buch-Wechsel der Reset durchläuft bevor loadFiguren fertig ist.
+    drafts(root) {
+      return Array.isArray(root.werkstattDrafts) ? root.werkstattDrafts : [];
+    },
+    // Defensive: Falls beim Buch-Wechsel der Reset durchläuft bevor loadFiguren
+    // fertig ist. Werkstatt-Drafts werden ebenfalls einmal pro Buch nachgeladen,
+    // damit die Palette sie auch findet, wenn die Werkstatt-Karte nie geöffnet
+    // wurde.
     prepare(root) {
       if (root.selectedBookId && !(root.figuren && root.figuren.length) && typeof root.loadFiguren === 'function') {
         _onceForBook(root.selectedBookId, 'figuren', () => root.loadFiguren(root.selectedBookId));
       }
+      if (root.selectedBookId && !this.drafts(root).length) {
+        _onceForBook(root.selectedBookId, 'werkstatt-drafts', async () => {
+          try {
+            const r = await fetch(`/draft-figures/${root.selectedBookId}`, { credentials: 'same-origin' });
+            if (!r.ok) return;
+            const data = await r.json();
+            root.werkstattDrafts = Array.isArray(data) ? data : [];
+          } catch { /* still searchable nach Karten-Open */ }
+        });
+      }
     },
-    search(root, q, _t) {
+    search(root, q, t) {
       const items = this.list(root);
-      if (!items.length) return [];
+      const drafts = this.drafts(root);
+      if (!items.length && !drafts.length) return [];
       const out = [];
       for (const f of items) {
         const name = f.name || f.kurzname || '';
@@ -136,6 +153,23 @@ export const PROVIDERS = [
           indices: m.indices,
           available: true,
           run: (r) => r.openFigurById(f.id),
+        });
+      }
+      const werkstattLabel = t('palette.figur.werkstatt') || 'Werkstatt';
+      for (const d of drafts) {
+        const name = d.name || '';
+        const m = fuzzyMatch(q, name);
+        if (!m) continue;
+        const archetype = d.archetype || '';
+        out.push({
+          key: 'werkstatt:' + d.id,
+          providerKey: 'figuren',
+          label: name,
+          sub: archetype ? (archetype + ' · ' + werkstattLabel) : werkstattLabel,
+          score: m.score,
+          indices: m.indices,
+          available: true,
+          run: (r) => r.openWerkstattDraftById(d.id),
         });
       }
       return rank(out);

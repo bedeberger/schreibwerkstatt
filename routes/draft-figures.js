@@ -66,6 +66,43 @@ function _validateMindmap(obj) {
   return true;
 }
 
+// Werkstatt-Runs: KI-Lauf-Historie pro Draft (Brainstorm + Consistency).
+// Routen müssen VOR /:book_id stehen, sonst frisst der numerische Param-Match
+// das Wort "runs" und Express liefert 400 INVALID_ID.
+// Liste ohne result_json (spart bei vielen Einträgen); Detail liefert vollen
+// JSON. Owner-Check via user_email auf draft (List) bzw. run (Get/Delete).
+router.get('/by-id/:id/runs', (req, res) => {
+  const userEmail = userEmailOrNull(req);
+  const id = toIntId(req.params.id);
+  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  if (!id)        return res.status(400).json({ error_code: 'INVALID_ID' });
+  const draft = getDraftFigure(id);
+  if (!draft) return res.status(404).json({ error_code: 'NOT_FOUND' });
+  if (draft.user_email !== userEmail) return res.status(403).json({ error_code: 'FORBIDDEN' });
+  res.json(listWerkstattRuns(id, userEmail));
+});
+
+router.get('/runs/:run_id', (req, res) => {
+  const userEmail = userEmailOrNull(req);
+  const id = toIntId(req.params.run_id);
+  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  if (!id)        return res.status(400).json({ error_code: 'INVALID_ID' });
+  const run = getWerkstattRun(id);
+  if (!run) return res.status(404).json({ error_code: 'NOT_FOUND' });
+  if (run.user_email !== userEmail) return res.status(403).json({ error_code: 'FORBIDDEN' });
+  res.json(run);
+});
+
+router.delete('/runs/:run_id', (req, res) => {
+  const userEmail = userEmailOrNull(req);
+  const id = toIntId(req.params.run_id);
+  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  if (!id)        return res.status(400).json({ error_code: 'INVALID_ID' });
+  const changes = deleteWerkstattRun(id, userEmail);
+  if (!changes) return res.status(404).json({ error_code: 'NOT_FOUND' });
+  res.json({ ok: true });
+});
+
 // Liste aller Werkstatt-Figuren eines Buchs (per User).
 router.get('/:book_id', (req, res) => {
   const userEmail = userEmailOrNull(req);

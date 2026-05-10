@@ -12,6 +12,7 @@ KI-gestütztes Lektorat-Tool für [BookStack](https://www.bookstackapp.com/). Ei
 - **Buch-Chat** – KI-Dialog über das ganze Buch mit Werkzeugen (Pronomen-Zählung, Figurenverteilung, Volltextsuche, Seitenabruf) auf vorberechnetem Index.
 - **Buchbewertung / Kapitelbewertung** – Stärken, Schwächen, Empfehlungen.
 - **Figurenübersicht** – Charakterextraktion mit Beziehungsgraph; Figurenkontext auch im Lektorat einblendbar.
+- **Figuren-Werkstatt** – Vorwärts-Entwicklung von Figuren als jsMind-Mindmap (Steckbrief, Stimme, Subtext, eigene Aspekte). Import bestehender Buchfiguren mit vorgefülltem Baum, KI-Brainstorm pro Knoten (3–7 Sub-Ideen, vor doppelt mit anderen Buchfiguren geschützt) und Konsistenz-Check gegen Buchwelt mit Severity-Skala. Lauf-Historie pro Figur. Anleitung: [docs/figur-werkstatt.md](docs/figur-werkstatt.md).
 - **Ereignisse / Schauplätze / Szenen** – Übersichten pro Kapitel.
 - **Kontinuitätsprüfer** – Findet Widersprüche.
 - **Stil-Heatmap** – Satzlänge, Adverbien, Füllwörter, Wiederholungen pro Kapitel.
@@ -118,4 +119,5 @@ Installation: [docs/bookstack-templates.md](docs/bookstack-templates.md).
 - **[OpenThesaurus](https://www.openthesaurus.de/)** – Synonyme
 - **[Alpine.js](https://alpinejs.dev/)** – Frontend-Framework
 - **[vis-network](https://visjs.github.io/vis-network/)** – Beziehungsgraph
+- **[jsMind](https://github.com/hizzgdev/jsmind)** – Mindmap-Editor (Figuren-Werkstatt)
 - **[Chart.js](https://www.chartjs.org/)** – Diagramme

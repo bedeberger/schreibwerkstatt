@@ -131,6 +131,21 @@ test('_computeHash: kapitel-Review mit chapterId → #book/X/kapitel/Y', () => {
   assert.equal(c._computeHash(), '#book/42/kapitel/99');
 });
 
+test('_computeHash: Werkstatt-Liste → #book/X/werkstatt', () => {
+  const c = makeCtx();
+  c.selectedBookId = 42;
+  c.showFigurWerkstattCard = true;
+  assert.equal(c._computeHash(), '#book/42/werkstatt');
+});
+
+test('_computeHash: einzelner Werkstatt-Draft → #book/X/werkstatt/Y', () => {
+  const c = makeCtx();
+  c.selectedBookId = 42;
+  c.showFigurWerkstattCard = true;
+  c.werkstattDraftId = 7;
+  assert.equal(c._computeHash(), '#book/42/werkstatt/7');
+});
+
 test('_computeHash: Buch-Chat → #book/X/chat', () => {
   const c = makeCtx();
   c.selectedBookId = 42;
@@ -149,6 +164,12 @@ test('_hashCategory: ort und orte teilen Kategorie', () => {
   const c = makeCtx();
   assert.equal(c._hashCategory('#book/42/orte'), '42:orte');
   assert.equal(c._hashCategory('#book/42/ort/3'), '42:orte');
+});
+
+test('_hashCategory: Werkstatt-Liste und einzelner Draft teilen Kategorie (replace)', () => {
+  const c = makeCtx();
+  assert.equal(c._hashCategory('#book/42/werkstatt'), '42:werkstatt');
+  assert.equal(c._hashCategory('#book/42/werkstatt/7'), '42:werkstatt');
 });
 
 test('_hashCategory: anderes Buch → andere Kategorie (push)', () => {
@@ -226,6 +247,26 @@ test('_applyHash: Deep-Link auf #book/42/kapitel/123 → öffnet Kapitel-Review 
   const sel = events.find(e => e.type === 'kapitel-review:select');
   assert.ok(sel, 'kapitel-review:select Event fehlt – Sub könnte chapterId nicht erhalten');
   assert.equal(sel.detail.chapterId, '123');
+});
+
+test('_applyHash: Deep-Link auf #book/42/werkstatt/7 → öffnet Werkstatt + dispatcht select-Event', async () => {
+  events.length = 0;
+  const c = makeCtx({ hash: '#book/42/werkstatt/7' });
+  await c._applyHash();
+  assert.equal(c.showFigurWerkstattCard, true);
+  const sel = events.find(e => e.type === 'figur-werkstatt:select');
+  assert.ok(sel, 'figur-werkstatt:select Event fehlt – Sub könnte draftId nicht erhalten');
+  assert.equal(sel.detail.draftId, 7);
+});
+
+test('_applyHash: Deep-Link auf #book/42/werkstatt → öffnet Werkstatt ohne select-Event', async () => {
+  events.length = 0;
+  const c = makeCtx({ hash: '#book/42/werkstatt' });
+  c.werkstattDraftId = 99; // alter Stand → muss geräumt werden
+  await c._applyHash();
+  assert.equal(c.showFigurWerkstattCard, true);
+  assert.equal(c.werkstattDraftId, null);
+  assert.ok(!events.find(e => e.type === 'figur-werkstatt:select'));
 });
 
 test('_applyHash: Deep-Link auf #book/42/page/7 → selectPage', async () => {

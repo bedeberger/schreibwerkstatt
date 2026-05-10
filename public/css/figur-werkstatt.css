@@ -1,11 +1,9 @@
-/* Figuren-Werkstatt — Vorwärts-Entwicklung von Figuren als Mindmap.
-   Phase 3 zeigt Mindmap als read-only Liste; Phase 4 ersetzt durch jsMind. */
+/* Figuren-Werkstatt — Vorwärts-Entwicklung von Figuren als Mindmap (jsMind). */
 
 .card--werkstatt { --card-accent: var(--card-accent-werkstatt); }
 
 /* Card-internes 2-Spalten-Layout: Drafts-Liste links, Detail rechts.
-   Container-Query, weil Karte in variablem Slot lebt. Mobile-Fallback
-   via Media-Query, weil Phone-Layout viewport-bezogen ist. */
+   Container-Query, weil Karte in variablem Slot lebt. */
 .werkstatt-grid {
   display: grid;
   grid-template-columns: minmax(180px, 240px) 1fr;
@@ -17,22 +15,24 @@
 @container werkstatt (max-width: 640px) {
   .werkstatt-grid {
     grid-template-columns: 1fr;
-  }
-}
-@media (max-width: 600px) {
-  .werkstatt-grid {
-    grid-template-columns: 1fr;
     gap: var(--space-md);
   }
 }
 
-/* Drafts-Sidebar: Liste der Entwürfe + Neu-Knopf */
+/* Drafts-Sidebar: Liste der Entwürfe + Neu-Knopf.
+   Sticky beim Scrollen, damit Drafts-Wechsel jederzeit erreichbar bleibt.
+   Eigener Scroll-Bereich (max-height) für viele Drafts; List-Header (Neu/Import)
+   bleibt oben sichtbar via flex-shrink:0, .werkstatt-list nimmt den Rest. */
 .werkstatt-sidebar {
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
   border-right: var(--border-thin) solid var(--color-border);
   padding-right: var(--space-md);
+  position: sticky;
+  top: var(--space-md);
+  align-self: start;
+  max-height: calc(100vh - 120px);
 }
 @container werkstatt (max-width: 640px) {
   .werkstatt-sidebar {
@@ -40,6 +40,8 @@
     border-bottom: var(--border-thin) solid var(--color-border);
     padding-right: 0;
     padding-bottom: var(--space-md);
+    position: static;
+    max-height: none;
   }
 }
 
@@ -47,6 +49,9 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .werkstatt-list-item {
@@ -102,6 +107,9 @@
   gap: var(--space-lg);
 }
 
+/* Detail-Header sticky: Aktions-Toolbar (Speichern/Brainstorm/Konsistenz)
+   bleibt erreichbar, auch wenn User in Notes/Mindmap/Runs nach unten scrollt.
+   Eigener Hintergrund nötig, damit Inhalt darunter nicht durchscheint. */
 .werkstatt-detail-header {
   display: flex;
   flex-wrap: wrap;
@@ -109,7 +117,11 @@
   justify-content: space-between;
   gap: var(--space-md);
   border-bottom: var(--border-thin) solid var(--color-border);
-  padding-bottom: var(--space-sm);
+  padding: var(--space-sm) 0;
+  position: sticky;
+  top: 0;
+  background: var(--color-surface);
+  z-index: 2;
 }
 .werkstatt-detail-titlebar {
   display: flex;
@@ -124,55 +136,9 @@
   line-height: var(--lh-tight);
 }
 
-/* Mindmap-Tree als read-only verschachtelte Liste (Phase 3).
-   Phase 4 ersetzt durch jsMind-Canvas; Klassen bleiben für Anchor-IDs nutzbar. */
-.werkstatt-tree {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: var(--space-md);
-  border: var(--border-thin) solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  font-family: var(--font-sans);
-  font-size: var(--font-size-base);
-}
-.werkstatt-tree-node {
-  padding: 2px 0;
-  line-height: var(--lh-base);
-}
-.werkstatt-tree-node[data-depth="0"] {
-  font-weight: var(--fw-semibold);
-  color: var(--card-accent);
-  font-size: var(--font-size-md);
-  padding-bottom: var(--space-xs);
-}
-.werkstatt-tree-node[data-depth="1"] {
-  font-weight: var(--fw-medium);
-  padding-left: var(--space-md);
-  padding-top: var(--space-xs);
-}
-.werkstatt-tree-node[data-depth="2"] {
-  padding-left: var(--space-xl);
-  color: var(--color-muted);
-  font-size: 13px;
-}
-.werkstatt-tree-node[data-depth="3"] {
-  padding-left: 36px;
-  color: var(--color-muted);
-  font-size: 13px;
-}
-
-@media (max-width: 600px) {
+@container werkstatt (max-width: 640px) {
   .werkstatt-detail-name {
     font-size: 20px;
-  }
-  .werkstatt-tree {
-    padding: var(--space-sm);
-  }
-  .werkstatt-tree-node[data-depth="2"],
-  .werkstatt-tree-node[data-depth="3"] {
-    padding-left: var(--space-md);
   }
 }
 
@@ -184,10 +150,17 @@
   flex-direction: column;
   gap: var(--space-sm);
 }
-/* Mindmap-Section-Header reuse the card-header-subline pattern.
-   Section-Gap übernimmt Abstand zur Canvas → margin-bottom raus. */
-.werkstatt-mindmap-header {
-  margin-bottom: 0;
+/* Mindmap-Section-Head: schlanke Heading-Zeile mit Save-Indikator.
+   Save-Button lebt im sticky Detail-Header (Toolbar), nicht mehr hier. */
+.werkstatt-mindmap-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+.werkstatt-mindmap-section-head .section-heading {
+  margin: 0;
 }
 /* Wrapper hält Mindmap-Canvas + Overlay-Toolbar; relative für Absolute-Positioning. */
 .werkstatt-mindmap-canvas {
@@ -195,26 +168,20 @@
 }
 .werkstatt-mindmap {
   width: 100%;
-  height: 720px;
+  height: clamp(420px, 70vh, 760px);
   border: var(--border-thin) solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
   overflow: hidden;
   position: relative;
 }
-@media (max-width: 600px) {
-  .werkstatt-mindmap { height: 560px; }
-}
-/* Native Touch-Pan auf Mindmap-Panel: jsMind-Option draggable+hide_scrollbars=false
-   gibt .jsmind-inner overflow:auto. Scrollbalken visuell ausblenden, Touch-Action
-   freigeben, programmatic scrollTo (scroll_node_to_center) bleibt funktionsfähig. */
+/* Wheel-Trap-Fix: jsMind setzt overflow:auto auf .jsmind-inner. Wheel über
+   Mindmap landet dann im Container und blockiert Page-Scroll, auch wenn der
+   Tree gar nicht overflowt. overflow:hidden gibt Wheel an Page durch; Pan
+   passiert via jsMind draggable:true (Maus-Drag, Touch-Drag). scrollTo bleibt
+   programmatisch funktionsfähig (overflow:hidden verhindert nur User-Scroll). */
 .werkstatt-mindmap .jsmind-inner {
-  touch-action: pan-x pan-y;
-  scrollbar-width: none;
-}
-.werkstatt-mindmap .jsmind-inner::-webkit-scrollbar {
-  width: 0;
-  height: 0;
+  overflow: hidden;
 }
 
 .werkstatt-mindmap-controls {
@@ -272,11 +239,12 @@
   border-color: var(--color-primary);
   color: var(--color-text);
 }
-/* jsMind-Default ist 11×11px mit 10px Font — winzig und schwer lesbar.
-   Override: 18×18, eckig (Badge-Regel), klar lesbares Symbol, Akzent-Hover.
-   `transform: translate(-3.5px,-3.5px)` korrigiert die Größenänderung gegen
-   den fixen jsMind-Layout-Punkt (pspace=14, Box wird sonst nach unten/rechts
-   verschoben). */
+/* jsMind-Default ist 11×11px mit 10px Font — schwer lesbar (besonders mit
+   expander_style:'number'). Override: 18×18, eckig (Badge-Regel).
+   jsMind positioniert den Expander auf Layout-Punkt (basiert auf pspace=14
+   und Default-Größe 11×11). translate kompensiert die Vergrößerung um
+   (18-11)/2 = 3.5px nach links/oben — sonst wandert das Kästchen nach
+   unten/rechts vom Layout-Anker weg. Bei jsMind-Upgrade prüfen. */
 .werkstatt-mindmap jmexpander {
   width: 18px;
   height: 18px;
@@ -327,21 +295,19 @@
   color: var(--color-text);
 }
 
-/* Vollbild-Modus: jsMind-Section nimmt Viewport voll. */
-.werkstatt-mindmap-section--fullscreen,
-.werkstatt-mindmap-section:fullscreen {
+/* Vollbild-Modus: ganzes Detail-Pane (Header+Form+Mindmap+Runs) nimmt Viewport.
+   So bleibt Toolbar (Speichern/Brainstorm/Konsistenz) und Notes erreichbar.
+   Detail wird scrollbar; Mindmap streckt sich auf min. 60vh. */
+.werkstatt-detail:fullscreen {
   position: fixed;
   inset: 0;
   background: var(--color-surface);
   padding: var(--space-lg);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
   z-index: var(--z-overlay);
+  overflow-y: auto;
 }
-.werkstatt-mindmap-section:fullscreen .werkstatt-mindmap {
-  flex: 1 1 auto;
-  height: auto;
+.werkstatt-detail:fullscreen .werkstatt-mindmap {
+  height: clamp(420px, 70vh, 1000px);
 }
 
 /* Rechtsklick-Menü auf Mindmap-Knoten */
@@ -394,10 +360,32 @@
   border-color: var(--color-primary);
 }
 
-/* Tastatur-Hilfe unter Mindmap. Reuse von .shortcuts-section/-row/-keys/-desc
-   aus shortcuts-Overlay (confirm-dialog.css), kompakter eingebettet. */
-.werkstatt-mindmap-help {
+/* Tastatur-Hilfe unter Mindmap, klappbar via .collapsible-toggle-Pattern.
+   Default zu (siehe helpExpanded), Persistenz via localStorage in Card-JS.
+   Reuse von .shortcuts-section/-row/-keys/-desc aus confirm-dialog.css. */
+.werkstatt-mindmap-help-wrap {
   margin-top: var(--space-sm);
+}
+.werkstatt-mindmap-help-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-xs) var(--space-md);
+  border: var(--border-thin) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  cursor: pointer;
+  text-align: left;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-muted);
+}
+.werkstatt-mindmap-help-toggle:hover { color: var(--color-text); }
+.werkstatt-mindmap-help {
+  margin-top: var(--space-xs);
   padding: var(--space-sm) var(--space-md);
   border: var(--border-thin) solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -408,4 +396,47 @@
 }
 .werkstatt-mindmap-help .shortcuts-row {
   padding: 0.2rem 0;
+}
+
+/* KI-Lauf-Historie: zwei klappbare Sektionen pro Draft (Brainstorm + Consistency).
+   Reuse von .history-item/.history-chevron/.collapsible-toggle aus tree-history.css. */
+.werkstatt-runs {
+  margin-top: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.werkstatt-runs-section {
+  border: var(--border-thin) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+.werkstatt-runs-section .collapsible-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-sm) var(--space-md);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+.werkstatt-runs-section .collapsible-toggle:hover {
+  background: var(--color-hover);
+}
+.werkstatt-runs-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: 0 var(--space-md) var(--space-sm);
+}
+.werkstatt-runs-list .history-title {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--color-text);
 }

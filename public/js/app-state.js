@@ -225,8 +225,13 @@ const kapitelReviewState = () => ({
 
 // Hash-Router-SSoT für Figuren-Werkstatt-Draft. Sub-Card spiegelt
 // selectedDraftId in dieses Feld; Hash-Router liest/schreibt nur hier.
+// werkstattDrafts: Spiegel der Sub-Card-Liste, damit die Command-Palette die
+// Drafts auch indizieren kann, wenn die Werkstatt-Karte nie geöffnet wurde.
+// Sub-Card hat $watch auf this.drafts → schreibt hierher; Palette-Provider
+// triggert bei Bedarf ein einmaliges /draft-figures-Fetch.
 const figurWerkstattState = () => ({
   werkstattDraftId: null,
+  werkstattDrafts: [],
 });
 
 // Root-seitig: figurenLoading/Progress/Status, selectedFigurId, Filters —

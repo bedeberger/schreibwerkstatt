@@ -1,6 +1,6 @@
 # ERD — bookstack-lektorat
 
-Stand: Schema-Version 97, 47 Tabellen (ohne `sqlite_*`/`schema_version`/`sessions`).
+Stand: Schema-Version 98, 48 Tabellen (ohne `sqlite_*`/`schema_version`/`sessions`).
 
 Quelle: Live-Dump aus [lektorat.db](../lektorat.db) (`.schema --indent`) + [db/migrations.js](../db/migrations.js). Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -40,6 +40,9 @@ erDiagram
   books ||--o{ book_extract_cache    : has
   books ||--o{ finetune_ai_cache     : has
   books ||--o{ draft_figures         : has
+  books ||--o{ werkstatt_runs        : has
+
+  draft_figures ||--o{ werkstatt_runs : "ki-history"
 
   pages ||--o{ page_checks           : has
   pages ||--|| page_stats            : has
@@ -342,10 +345,25 @@ erDiagram
     TEXT    created_at
     TEXT    updated_at
   }
+  werkstatt_runs {
+    INTEGER id          PK
+    INTEGER draft_id    FK "ON DELETE CASCADE"
+    INTEGER book_id     FK "ON DELETE CASCADE — History-Reset-Pfad"
+    TEXT    user_email
+    TEXT    kind        "CHECK IN ('brainstorm','consistency')"
+    TEXT    created_at
+    TEXT    knoten_id   "nullable: nur Brainstorm referenziert einen Mindmap-Knoten"
+    TEXT    knoten_pfad "nullable: aufgelöster i18n-Pfad zur Lauf-Zeit"
+    TEXT    result_json "vollständiges Job-Result (vorschlaege oder { konflikte, fazit })"
+    TEXT    model
+  }
   figures ||--o{ draft_figures : "imported as (SET NULL)"
+  draft_figures ||--o{ werkstatt_runs : "ki-history"
 ```
 
 `draft_figures` lebt parallel zu `figures`. `source_figure_id` referenziert die Quell-Figur, wenn der Draft via `POST /draft-figures/:book_id/import` aus dem Figuren-Katalog erzeugt wurde — `ON DELETE SET NULL` schützt User-kuratierte Mindmap-Arbeit, wenn die Quell-Figur (z.B. durch Komplettanalyse-Reextraktion) verschwindet. Werkstatt-Jobs (Brainstorm/Consistency) blenden die Quell-Figur per `source_figure_id` aus dem Buch-Kontext aus, damit sie sich nicht selbst widerspricht. Es gibt weiterhin keinen Promotion-Pfad zurück nach `figures` — der Import ist einseitig.
+
+`werkstatt_runs` historisiert jeden KI-Lauf (Brainstorm + Consistency-Check) als kompletten Result-JSON. `ON DELETE CASCADE` auf `draft_id`: Run-Historie stirbt mit dem Draft. `book_id` redundant für den `DELETE /history/book/:id`-Reset-Pfad (per User). Frontend zeigt zwei klappbare Sektionen pro Draft; Klick lädt den Lauf wie einen Live-Run, Apply (Brainstorm) prüft client-seitig, ob `knoten_id` noch in der aktuellen Mindmap existiert.
 
 ---
 

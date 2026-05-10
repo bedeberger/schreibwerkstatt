@@ -116,6 +116,7 @@
                 x-text="$app.t('werkstatt.importedFrom', { name: importedFromName() })"></span>
         </div>
         <div class="header-actions">
+          <button type="button" class="primary" :disabled="busy || !editName.trim()" @click="saveDraft()" x-text="$app.t('werkstatt.action.save')"></button>
           <button type="button"
                   :disabled="busy || brainstormLoading || !selectedKnotenId"
                   @click="runBrainstorm()"
@@ -173,20 +174,12 @@
       <!-- Mindmap-Canvas (jsMind, lazy-loaded). Editierbar: F2/Doppelklick zum Umbenennen,
            Tab fügt Sub-Knoten, Enter fügt Geschwister, Delete entfernt, Pfeiltasten navigieren,
            Rechtsklick öffnet Kontext-Menü. -->
-      <section class="werkstatt-mindmap-section" :class="{ 'werkstatt-mindmap-section--fullscreen': mindmapFullscreen }">
-        <div class="card-header card-header--subline werkstatt-mindmap-header">
-          <div class="card-header-titlebar">
-            <span class="card-title" x-text="$app.t('werkstatt.mindmap.title')"></span>
-            <div class="card-subline" x-show="selectedDraft()?.updated_at">
-              <span class="save-indicator"
-                    x-text="selectedDraft()?.updated_at ? $app.t('werkstatt.savedAt', { when: $app._formatSaveTs(new Date(selectedDraft().updated_at).getTime()) }) : ''"></span>
-            </div>
-          </div>
-          <div class="card-header-aside">
-            <div class="card-actions">
-              <button type="button" class="primary" :disabled="busy || !editName.trim()" @click="saveDraft()" x-text="$app.t('werkstatt.action.save')"></button>
-            </div>
-          </div>
+      <section class="werkstatt-mindmap-section">
+        <div class="werkstatt-mindmap-section-head">
+          <h3 class="section-heading" x-text="$app.t('werkstatt.mindmap.title')"></h3>
+          <span class="save-indicator"
+                x-show="selectedDraft()?.updated_at"
+                x-text="selectedDraft()?.updated_at ? $app.t('werkstatt.savedAt', { when: $app._formatSaveTs(new Date(selectedDraft().updated_at).getTime()) }) : ''"></span>
         </div>
         <div class="werkstatt-mindmap-canvas">
           <!-- :key="selectedDraftId" zwingt komplettes Remount des Mindmap-Divs bei
@@ -206,9 +199,17 @@
           </div>
         </div>
 
-        <!-- Tastatur-Navigationshilfe für Mindmap. Spiegelt globale Hilfe (shortcuts.html). -->
-        <div class="werkstatt-mindmap-help shortcuts-section">
-          <div class="shortcuts-section-title" x-text="$app.t('shortcuts.section.mindmap')"></div>
+        <!-- Tastatur-Navigationshilfe für Mindmap. Spiegelt globale Hilfe (shortcuts.html).
+             Klappbar via .collapsible-toggle-Pattern; helpExpanded persistiert in localStorage. -->
+        <div class="werkstatt-mindmap-help-wrap">
+          <button type="button"
+                  class="werkstatt-mindmap-help-toggle"
+                  :aria-expanded="helpExpanded"
+                  @click="toggleHelp()">
+            <span x-text="$app.t('shortcuts.section.mindmap')"></span>
+            <span class="history-chevron" :class="{ open: helpExpanded }">›</span>
+          </button>
+        <div class="werkstatt-mindmap-help shortcuts-section" x-show="helpExpanded" x-cloak>
           <div class="shortcuts-row">
             <span class="shortcuts-keys"><kbd x-text="$app.t('shortcuts.key.arrows')"></kbd> <kbd x-text="$app.t('shortcuts.key.arrowsLR')"></kbd></span>
             <span class="shortcuts-desc" x-text="$app.t('shortcuts.item.mindmapNav')"></span>
@@ -233,6 +234,11 @@
             <span class="shortcuts-keys"><kbd x-text="$app.t('shortcuts.key.rightClick')"></kbd></span>
             <span class="shortcuts-desc" x-text="$app.t('shortcuts.item.mindmapMenu')"></span>
           </div>
+          <div class="shortcuts-row">
+            <span class="shortcuts-keys"><kbd x-text="$app.t('shortcuts.key.esc')"></kbd></span>
+            <span class="shortcuts-desc" x-text="$app.t('shortcuts.item.mindmapBlur')"></span>
+          </div>
+        </div>
         </div>
 
         <!-- Rechtsklick-Menü, position:fixed via inline-style -->
@@ -295,6 +301,67 @@
         <div class="werkstatt-job-status-row">
           <div class="card-status" x-html="consistencyStatus"></div>
           <button type="button" @click="cancelConsistency()" x-text="$app.t('common.cancel')"></button>
+        </div>
+      </section>
+
+      <!-- KI-Lauf-Historie: zwei klappbare Sektionen pro Draft.
+           Klick auf Eintrag öffnet Result wie Live-Lauf (selectedRunId markiert). -->
+      <section class="werkstatt-runs" x-show="runsLoadedDraftId === selectedDraftId" x-cloak>
+        <!-- Brainstorm-History -->
+        <div class="werkstatt-runs-section" x-show="runs.brainstorm.length > 0">
+          <button type="button"
+                  class="collapsible-toggle"
+                  :aria-expanded="runsExpanded.brainstorm"
+                  @click="toggleRunsSection('brainstorm')">
+            <span class="section-heading" x-text="$app.t('werkstatt.runs.brainstorm', { count: runs.brainstorm.length })"></span>
+            <span class="history-chevron" :class="{ open: runsExpanded.brainstorm }">›</span>
+          </button>
+          <div class="werkstatt-runs-list" x-show="runsExpanded.brainstorm" x-cloak>
+            <template x-for="r in runs.brainstorm" :key="r.id">
+              <div>
+                <div class="history-item" :class="{ 'history-item--open': selectedRunId === r.id }"
+                     @click="openRun(r.id, 'brainstorm')">
+                  <span class="history-date" x-text="formatRunDate(r.created_at)"></span>
+                  <span class="history-title" x-text="r.knoten_pfad || ''"></span>
+                  <span x-show="r.model" class="tag" x-text="r.model"></span>
+                  <button type="button"
+                          class="btn-delete-history"
+                          :data-tip="$app.t('common.deleteEntry')"
+                          @click.stop="deleteRun(r.id, 'brainstorm')"
+                          x-text="$app.t('common.deleteEntry')"></button>
+                  <span class="history-chevron" :class="{ open: selectedRunId === r.id }">›</span>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- Consistency-History -->
+        <div class="werkstatt-runs-section" x-show="runs.consistency.length > 0">
+          <button type="button"
+                  class="collapsible-toggle"
+                  :aria-expanded="runsExpanded.consistency"
+                  @click="toggleRunsSection('consistency')">
+            <span class="section-heading" x-text="$app.t('werkstatt.runs.consistency', { count: runs.consistency.length })"></span>
+            <span class="history-chevron" :class="{ open: runsExpanded.consistency }">›</span>
+          </button>
+          <div class="werkstatt-runs-list" x-show="runsExpanded.consistency" x-cloak>
+            <template x-for="r in runs.consistency" :key="r.id">
+              <div>
+                <div class="history-item" :class="{ 'history-item--open': selectedRunId === r.id }"
+                     @click="openRun(r.id, 'consistency')">
+                  <span class="history-date" x-text="formatRunDate(r.created_at)"></span>
+                  <span x-show="r.model" class="tag" x-text="r.model"></span>
+                  <button type="button"
+                          class="btn-delete-history"
+                          :data-tip="$app.t('common.deleteEntry')"
+                          @click.stop="deleteRun(r.id, 'consistency')"
+                          x-text="$app.t('common.deleteEntry')"></button>
+                  <span class="history-chevron" :class="{ open: selectedRunId === r.id }">›</span>
+                </div>
+              </div>
+            </template>
+          </div>
         </div>
       </section>
 
