@@ -28,6 +28,20 @@
   .card-header { flex-direction: column; align-items: flex-start; }
 }
 
+/* Sticky-Variante: Header bleibt beim Scrollen oben sichtbar (Aktionen/Save-Indicator
+   immer erreichbar). Negative Margins + Padding decken die seitliche Card-Padding-Zone,
+   damit Inhalt darunter nicht durchscheint. */
+.card-header--sticky {
+  position: sticky;
+  top: 0;
+  background: var(--color-surface);
+  z-index: var(--z-header);
+  margin-left: -1.25rem;
+  margin-right: -1.25rem;
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+}
+
 .card-title {
   font-family: var(--font-serif);
   font-weight: 500;

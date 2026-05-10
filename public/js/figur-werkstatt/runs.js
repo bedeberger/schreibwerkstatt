@@ -125,16 +125,16 @@ export const runsMethods = {
       const bs = queue.find(j => j.type === 'werkstatt-brainstorm'
         && typeof j.dedupId === 'string'
         && j.dedupId.startsWith(draftStr + '|'));
-      if (bs && this.selectedDraftId === draftId) this._reattachBrainstormJob(bs);
+      if (bs && this.selectedDraftId === draftId) this._reattachBrainstormJob(bs, draftId);
     }
     if (!this._consistencyJobId && !this.consistencyLoading) {
       const cs = queue.find(j => j.type === 'werkstatt-consistency'
         && String(j.dedupId) === draftStr);
-      if (cs && this.selectedDraftId === draftId) this._reattachConsistencyJob(cs);
+      if (cs && this.selectedDraftId === draftId) this._reattachConsistencyJob(cs, draftId);
     }
   },
 
-  _reattachBrainstormJob(qItem) {
+  _reattachBrainstormJob(qItem, draftId) {
     const app = window.__app;
     this.brainstormLoading = true;
     this.brainstormProgress = qItem.progress || 0;
@@ -143,6 +143,7 @@ export const runsMethods = {
       qItem.progress, qItem.tokensPerSec, qItem.statusParams);
     this.brainstormResult = null;
     this._brainstormJobId = qItem.id;
+    this._brainstormJobDraftId = draftId;
     startPoll(this, {
       timerProp: '_brainstormPollTimer',
       jobId: qItem.id,
@@ -153,26 +154,40 @@ export const runsMethods = {
           job.progress, job.tokensPerSec, job.statusParams);
       },
       onDone: (job) => {
+        const targetId = this._brainstormJobDraftId;
         this.brainstormLoading = false;
         this.brainstormStatus = '';
-        this.brainstormResult = {
-          knotenId: job.result.knotenId,
-          knotenPfad: job.result.knotenPfad,
-          vorschlaege: job.result.vorschlaege || [],
-        };
-        this.selectedRunId = job.result.runId || null;
-        this.loadRuns?.();
+        this._brainstormJobId = null;
+        this._brainstormJobDraftId = null;
+        if (this.selectedDraftId === targetId) {
+          this.brainstormResult = {
+            knotenId: job.result.knotenId,
+            knotenPfad: job.result.knotenPfad,
+            vorschlaege: job.result.vorschlaege || [],
+          };
+          this.selectedRunId = job.result.runId || null;
+          this.loadRuns?.();
+        }
       },
       onError: (job) => {
         this.brainstormLoading = false;
         this.brainstormStatus = '';
-        this.errorMessage = app.t(job.error || 'common.error', job.errorParams || {});
+        this._brainstormJobId = null;
+        if (this.selectedDraftId === this._brainstormJobDraftId) {
+          this.errorMessage = app.t(job.error || 'common.error', job.errorParams || {});
+        }
+        this._brainstormJobDraftId = null;
       },
-      onNotFound: () => { this.brainstormLoading = false; this.brainstormStatus = ''; this._brainstormJobId = null; },
+      onNotFound: () => {
+        this.brainstormLoading = false;
+        this.brainstormStatus = '';
+        this._brainstormJobId = null;
+        this._brainstormJobDraftId = null;
+      },
     });
   },
 
-  _reattachConsistencyJob(qItem) {
+  _reattachConsistencyJob(qItem, draftId) {
     const app = window.__app;
     this.consistencyLoading = true;
     this.consistencyProgress = qItem.progress || 0;
@@ -181,6 +196,7 @@ export const runsMethods = {
       qItem.progress, qItem.tokensPerSec, qItem.statusParams);
     this.consistencyResult = null;
     this._consistencyJobId = qItem.id;
+    this._consistencyJobDraftId = draftId;
     startPoll(this, {
       timerProp: '_consistencyPollTimer',
       jobId: qItem.id,
@@ -191,21 +207,35 @@ export const runsMethods = {
           job.progress, job.tokensPerSec, job.statusParams);
       },
       onDone: (job) => {
+        const targetId = this._consistencyJobDraftId;
         this.consistencyLoading = false;
         this.consistencyStatus = '';
-        this.consistencyResult = {
-          konflikte: job.result.konflikte || [],
-          fazit: job.result.fazit || '',
-        };
-        this.selectedRunId = job.result.runId || null;
-        this.loadRuns?.();
+        this._consistencyJobId = null;
+        this._consistencyJobDraftId = null;
+        if (this.selectedDraftId === targetId) {
+          this.consistencyResult = {
+            konflikte: job.result.konflikte || [],
+            fazit: job.result.fazit || '',
+          };
+          this.selectedRunId = job.result.runId || null;
+          this.loadRuns?.();
+        }
       },
       onError: (job) => {
         this.consistencyLoading = false;
         this.consistencyStatus = '';
-        this.errorMessage = app.t(job.error || 'common.error', job.errorParams || {});
+        this._consistencyJobId = null;
+        if (this.selectedDraftId === this._consistencyJobDraftId) {
+          this.errorMessage = app.t(job.error || 'common.error', job.errorParams || {});
+        }
+        this._consistencyJobDraftId = null;
       },
-      onNotFound: () => { this.consistencyLoading = false; this.consistencyStatus = ''; this._consistencyJobId = null; },
+      onNotFound: () => {
+        this.consistencyLoading = false;
+        this.consistencyStatus = '';
+        this._consistencyJobId = null;
+        this._consistencyJobDraftId = null;
+      },
     });
   },
 

@@ -18,6 +18,7 @@ export const jobsMethods = {
     this.brainstormLoading = true;
     this.brainstormStatus = '';
     this.brainstormResult = null;
+    this._brainstormJobDraftId = sel.id;
     try {
       const resp = await fetchJson('/jobs/werkstatt-brainstorm', {
         method: 'POST',
@@ -35,25 +36,43 @@ export const jobsMethods = {
             job.progress, job.tokensPerSec, job.statusParams);
         },
         onDone: (job) => {
+          // Result nur aufs aktuelle Draft anwenden; sonst landet Vorschlags-
+          // Liste auf der falschen Figur. History via loadRuns kriegt der
+          // Quell-Draft beim nächsten Öffnen via _reattachActiveJobs / loadRuns.
+          const targetId = this._brainstormJobDraftId;
           this.brainstormLoading = false;
           this.brainstormStatus = '';
-          this.brainstormResult = {
-            knotenId: job.result.knotenId,
-            knotenPfad: job.result.knotenPfad,
-            vorschlaege: job.result.vorschlaege || [],
-          };
-          this.selectedRunId = job.result.runId || null;
-          this.loadRuns?.();
+          this._brainstormJobId = null;
+          this._brainstormJobDraftId = null;
+          if (this.selectedDraftId === targetId) {
+            this.brainstormResult = {
+              knotenId: job.result.knotenId,
+              knotenPfad: job.result.knotenPfad,
+              vorschlaege: job.result.vorschlaege || [],
+            };
+            this.selectedRunId = job.result.runId || null;
+            this.loadRuns?.();
+          }
         },
         onError: (job) => {
           this.brainstormLoading = false;
           this.brainstormStatus = '';
-          this.errorMessage = app.t(job.error || 'common.error', job.errorParams || {});
+          this._brainstormJobId = null;
+          if (this.selectedDraftId === this._brainstormJobDraftId) {
+            this.errorMessage = app.t(job.error || 'common.error', job.errorParams || {});
+          }
+          this._brainstormJobDraftId = null;
         },
-        onNotFound: () => { this.brainstormLoading = false; this.brainstormStatus = ''; },
+        onNotFound: () => {
+          this.brainstormLoading = false;
+          this.brainstormStatus = '';
+          this._brainstormJobId = null;
+          this._brainstormJobDraftId = null;
+        },
       });
     } catch (e) {
       this.brainstormLoading = false;
+      this._brainstormJobDraftId = null;
       this.errorMessage = app.t('werkstatt.error.brainstorm') || app.t('common.error');
     }
   },
@@ -92,6 +111,7 @@ export const jobsMethods = {
     this.consistencyLoading = true;
     this.consistencyStatus = '';
     this.consistencyResult = null;
+    this._consistencyJobDraftId = sel.id;
     try {
       const resp = await fetchJson('/jobs/werkstatt-consistency', {
         method: 'POST',
@@ -109,24 +129,39 @@ export const jobsMethods = {
             job.progress, job.tokensPerSec, job.statusParams);
         },
         onDone: (job) => {
+          const targetId = this._consistencyJobDraftId;
           this.consistencyLoading = false;
           this.consistencyStatus = '';
-          this.consistencyResult = {
-            konflikte: job.result.konflikte || [],
-            fazit: job.result.fazit || '',
-          };
-          this.selectedRunId = job.result.runId || null;
-          this.loadRuns?.();
+          this._consistencyJobId = null;
+          this._consistencyJobDraftId = null;
+          if (this.selectedDraftId === targetId) {
+            this.consistencyResult = {
+              konflikte: job.result.konflikte || [],
+              fazit: job.result.fazit || '',
+            };
+            this.selectedRunId = job.result.runId || null;
+            this.loadRuns?.();
+          }
         },
         onError: (job) => {
           this.consistencyLoading = false;
           this.consistencyStatus = '';
-          this.errorMessage = app.t(job.error || 'common.error', job.errorParams || {});
+          this._consistencyJobId = null;
+          if (this.selectedDraftId === this._consistencyJobDraftId) {
+            this.errorMessage = app.t(job.error || 'common.error', job.errorParams || {});
+          }
+          this._consistencyJobDraftId = null;
         },
-        onNotFound: () => { this.consistencyLoading = false; this.consistencyStatus = ''; },
+        onNotFound: () => {
+          this.consistencyLoading = false;
+          this.consistencyStatus = '';
+          this._consistencyJobId = null;
+          this._consistencyJobDraftId = null;
+        },
       });
     } catch (e) {
       this.consistencyLoading = false;
+      this._consistencyJobDraftId = null;
       this.errorMessage = app.t('werkstatt.error.consistency') || app.t('common.error');
     }
   },
@@ -146,6 +181,7 @@ export const jobsMethods = {
     this.brainstormStatus = '';
     this.brainstormProgress = 0;
     this._brainstormJobId = null;
+    this._brainstormJobDraftId = null;
   },
 
   async cancelConsistency() {
@@ -157,6 +193,7 @@ export const jobsMethods = {
     this.consistencyStatus = '';
     this.consistencyProgress = 0;
     this._consistencyJobId = null;
+    this._consistencyJobDraftId = null;
   },
 
   _clearJobs() {
@@ -167,6 +204,8 @@ export const jobsMethods = {
     this.brainstormStatus = '';
     this.consistencyStatus = '';
     this._brainstormJobId = null;
+    this._brainstormJobDraftId = null;
     this._consistencyJobId = null;
+    this._consistencyJobDraftId = null;
   },
 };

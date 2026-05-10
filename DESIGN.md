@@ -157,7 +157,7 @@ Wiederkehrende Werte gehen über Tokens. Ad-hoc-Werte (`box-shadow: 0 4px 12px .
 **Regeln:**
 - Wurzel `<div class="card" x-data="xxxCard" x-show="$app.showXxxCard" x-cloak>`.
 - **Animation: nur CSS (`cardFadeIn` aus [public/css/card-form.css](public/css/card-form.css)).** Kein `x-transition` auf `.card` — translateY × scale konkurriert sichtbar bei grossen Karten (Szenen, Figuren), wirkt wabbelig. Neues Karten-Element nur `x-show="…" x-cloak`.
-- Header: `.card-header` mit `.card-header--subline` für Buchtitel + Timestamp.
+- Header: `.card-header` mit `.card-header--subline` für Buchtitel + Timestamp. Optional `.card-header--sticky` (Position 0, `--z-header`, deckt Card-Padding seitlich ab) für Karten, deren Body lang scrollt und deren Aktionen/Save-Indicator dauerhaft erreichbar bleiben sollen (Beispiel: Editor-Card; Pendant zu `.werkstatt-detail-header` in der Figur-Werkstatt).
 - Status-Hinweis: `.card-status` (Loading/Empty), `.card-status--error` für Fehler.
 - Empty-State: `<div x-show="…" class="card-status" x-text="$app.t('common.noDataYet')"></div>`.
 
