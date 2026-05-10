@@ -115,7 +115,7 @@
                 :data-tip="$app.t('werkstatt.importedFrom.tip')"
                 x-text="$app.t('werkstatt.importedFrom', { name: importedFromName() })"></span>
         </div>
-        <div class="header-actions">
+        <div class="card-actions">
           <button type="button" class="primary" :disabled="busy || !editName.trim()" @click="saveDraft()" x-text="$app.t('werkstatt.action.save')"></button>
           <button type="button"
                   :disabled="busy || brainstormLoading || !selectedKnotenId"

@@ -6,16 +6,15 @@
 .card--werkstatt { --card-accent: var(--card-accent-werkstatt); }
 
 /* Card-internes 2-Spalten-Layout: Drafts-Liste links, Detail rechts.
-   Container-Query, weil Karte in variablem Slot lebt. */
+   Media-Query (Viewport-bezogen) — Container-Query feuerte nicht zuverlässig,
+   weil Detail-Children (Mindmap, Form) das Grid breiter zwangen als 640px. */
 .werkstatt-grid {
   display: grid;
   grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
   gap: var(--space-lg);
   align-items: start;
-  container-type: inline-size;
-  container-name: werkstatt;
 }
-@container werkstatt (max-width: 640px) {
+@media (max-width: 700px) {
   .werkstatt-grid {
     grid-template-columns: minmax(0, 1fr);
     gap: var(--space-md);
@@ -33,7 +32,7 @@
   border-right: var(--border-thin) solid var(--color-border);
   padding-right: var(--space-md);
 }
-@container werkstatt (max-width: 640px) {
+@media (max-width: 700px) {
   .werkstatt-sidebar {
     border-right: 0;
     border-bottom: var(--border-thin) solid var(--color-border);
@@ -79,6 +78,22 @@
 .werkstatt-list-archetype {
   font-size: var(--font-size-xs);
   color: var(--color-muted);
+}
+
+@media (max-width: 700px) {
+  .werkstatt-list {
+    gap: 0;
+  }
+  .werkstatt-list-item {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-xs);
+    padding: var(--space-xs) var(--space-sm);
+  }
+  .werkstatt-list-name {
+    font-size: var(--font-size-sm);
+  }
 }
 
 /* Neu-Eingabe inline */
@@ -129,7 +144,7 @@
   line-height: var(--lh-tight);
 }
 
-@container werkstatt (max-width: 640px) {
+@media (max-width: 700px) {
   .werkstatt-detail-name {
     font-size: 20px;
   }
