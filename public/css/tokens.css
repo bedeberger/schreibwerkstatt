@@ -210,9 +210,35 @@
   --figpal-text-mix:   75%;
   --figpal-border-mix: 60%;
 
+  /* === Radius — bewusst alle 0 (eckige Editorial-Anmutung) ===
+     Drei Token-Stufen bleiben erhalten als semantischer Slot — falls je ein
+     Designwechsel kommt, kann pro Stufe (sm = klein/Badge, md = mittel/Card,
+     lg = gross/Modal) angepasst werden, ohne jeden Konsumenten zu suchen.
+     Jetziger Wert: 0 (eckig). Nicht erfinden, nicht zu ad-hoc-Pixel-Radius
+     greifen. */
   --radius-sm: 0;
   --radius-md: 0;
   --radius-lg: 0;
+
+  /* === Border-Width-Tokens — drei Stufen ===
+     0.5px für dezente Trenner (Card-innere Tabellen-Zeilen, Filter-Chevrons),
+     1px Standard (Card-Rand, Inputs), 2px für Akzentbänder (Tabs-Active,
+     Card-Accent-Stripe, Findings-Severity). */
+  --border-thin:   0.5px;
+  --border:        1px;
+  --border-thick:  2px;
+
+  /* === Font-Weight-Tokens === */
+  --fw-regular:    400;
+  --fw-medium:     500;
+  --fw-semibold:   600;
+  --fw-bold:       700;
+
+  /* === Line-Height-Tokens === */
+  --lh-tight:      1.2;   /* Headings, Buttons, kompakte UI */
+  --lh-base:       1.45;  /* Standard-Text */
+  --lh-relaxed:    1.6;   /* Reading-Frame, längere Absätze */
+
   --font-size-xs: 11px;
   --font-size-sm: 13px;
   --font-size-base: 14px;

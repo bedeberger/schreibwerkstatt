@@ -90,6 +90,25 @@ h1 {
   margin-bottom: 0.25rem;
 }
 
+/* === Keyboard-Shortcut-Anzeige (kbd) ===
+   Globaler Reset, damit `<kbd>⌘K</kbd>` ohne Konsumenten-Klasse passabel
+   aussieht. Pro-Komponente-Klassen (.palette-hero-kbd) erben oder ueberschreiben. */
+kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5em;
+  padding: 1px 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--font-size-xs);
+  font-weight: var(--fw-medium);
+  line-height: var(--lh-tight);
+  background: var(--color-tag-bg);
+  color: var(--color-text);
+  border: var(--border-thin) solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
 .site-title {
   display: flex;
   align-items: baseline;

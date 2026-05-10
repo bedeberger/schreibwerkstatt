@@ -28,7 +28,7 @@
   padding: 0.75rem 1rem;
   min-width: 260px;
   z-index: var(--z-header);
-  box-shadow: 0 4px 24px var(--color-shadow-med);
+  box-shadow: var(--shadow-md);
   animation: cardFadeIn var(--transition-base) both;
 }
 .komplett-status-title {

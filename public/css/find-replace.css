@@ -20,7 +20,7 @@
   gap: 4px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  box-shadow: 0 6px 18px var(--color-shadow-med);
+  box-shadow: var(--shadow-md);
   padding: 6px;
   width: 420px;
   max-width: calc(100vw - 48px);

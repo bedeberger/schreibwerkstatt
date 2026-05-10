@@ -47,15 +47,25 @@ Token-Referenz (Farben, Radien, Spacing, Schriftgrössen): [public/css/tokens.cs
 
 **Overlays**
 - [Confirm-Dialog](#confirm-dialog-modal)
+- [Modal-Wrapper](#modal-wrapper-generisches-pattern) — Status: noch nicht konsolidiert
 - [Sofort-Tooltip (`data-tip`)](#sofort-tooltip-data-tip--default-variante)
+- [Keyboard-Shortcut (`<kbd>`)](#keyboard-shortcut-anzeige-kbd)
+- [Loading-Overlay](#loading-overlay) — Status: kein generisches Pattern
+- [Empty-State mit CTA](#empty-state-mit-cta) — Status: kein generisches Pattern
+- [Inline-Action-Group](#inline-action-group) — Status: kein Standard
 - [Drawer / Side-Panel](#drawer--side-panel) — noch kein generisches Pattern
 - [Toast/Snackbar](#toastsnackbar) — noch kein generisches Pattern
 
 **Querschnitt**
 - [Z-Index-Stack](#z-index-stack)
+- [Relative z-index](#relative-z-index-lokal-stack-werte) — lokal-stack-Werte
 - [Reduced-Motion (Pflicht)](#reduced-motion-pflicht)
 - [Severity-Vokabular](#severity-vokabular-mapping)
 - [Accessibility (A11y)](#accessibility-a11y)
+- [Naming-Konventionen](#naming-konventionen)
+- [CSS-File-Inventar](#css-file-inventar)
+- [Pattern-Matrix](#pattern-matrix-karte--pattern)
+- [Tooling: stylelint-Skizze](#tooling-stylelint-skizze)
 - [Wartung](#wartung) — Checkliste für neue Patterns
 
 ---
@@ -97,7 +107,12 @@ Wiederkehrende Werte gehen über Tokens. Ad-hoc-Werte (`box-shadow: 0 4px 12px .
 | **Spacing** | `--space-xs` (4px), `--space-sm` (8px), `--space-md` (12px), `--space-lg` (16px), `--space-xl` (24px), `--space-2xl` (32px) | Margins, Gaps, Row-Gaps. 4-Pixel-Raster. Ad-hoc Pixel nur bei wirklich nicht-passendem Token. |
 | **Transition** | `--transition-fast` (0.1s), `--transition-base` (0.12s), `--transition-slow` (0.15s), `--transition-emphasized` (0.3s) | Standard-Cadence. Emphasized für Modal/Drawer-Slides, Card-Eingang, längere Fades. **NIE als `--x: var(--x)` definieren** — zirkuläre Custom-Property ist invalid → ganze `transition`/`animation`-Property kippt auf Default `0s` → Chevron-Rotationen, `cardFadeIn`, Hover-Tints sind tot, Erweiterungen „wackeln" weil Section snappt ohne Chevron-Maskierung. Definitionen müssen Literalwerte tragen, [public/css/tokens.css](public/css/tokens.css). |
 | **Opacity** | `--opacity-disabled` (0.6), `--opacity-muted` (0.5), `--opacity-hint` (0.4), `--opacity-faint` (0.35), `--opacity-strong` (0.75) | Semantische Stufen. `:disabled` immer `--opacity-disabled`. |
-| **Font-Size klein** | `--font-size-xs` (11px), `--font-size-sm` (13px), `--font-size-base` (14px) | `font-size: 11px` → `var(--font-size-xs)`. |
+| **Font-Size klein** | `--font-size-xs` (11px), `--font-size-sm` (13px), `--font-size-base` (14px), `--font-size-md` (15px), `--font-size-lg` (26px) | `font-size: 11px` → `var(--font-size-xs)`. |
+| **Font-Family** | `--font-sans` (Inter), `--font-serif` (Source Serif 4) | UI immer `--font-sans`, Reading-Frame + Headings `--font-serif`. |
+| **Font-Weight** | `--fw-regular` (400), `--fw-medium` (500), `--fw-semibold` (600), `--fw-bold` (700) | `font-weight: 600` → `var(--fw-semibold)`. |
+| **Line-Height** | `--lh-tight` (1.2), `--lh-base` (1.45), `--lh-relaxed` (1.6) | Headings/UI tight, Standard base, Reading-Frame relaxed. |
+| **Border-Width** | `--border-thin` (0.5px), `--border` (1px), `--border-thick` (2px) | Trenner / Standard-Rand / Akzentband. |
+| **Radius** | `--radius-sm` / `-md` / `-lg` — alle aktuell `0` (Editorial-Eckig) | Drei semantische Stufen, falls Design-Wechsel kommt. Nicht zu ad-hoc Pixel-Radius greifen. |
 | **Z-Index** | `--z-base` (1), `--z-sticky` (100), `--z-header` (200), `--z-popover` (1000), `--z-toolbar` (1100), `--z-overlay` (2000), `--z-banner` (10000), `--z-modal` (9500), `--z-modal-front` (11000), `--z-toast` (12000) | Stapel-Reihenfolge — siehe Section „Z-Index-Stack" unten. |
 
 ---
@@ -151,9 +166,21 @@ Wiederkehrende Werte gehen über Tokens. Ad-hoc-Werte (`box-shadow: 0 4px 12px .
 
 ## Combobox (Auswahlfeld)
 
-**Use:** Jedes Auswahlfeld. Ersetzt natives `<select>` (siehe CLAUDE.md harte Regel).
+**Use:** Jedes Auswahlfeld. Ersetzt natives `<select>`.
 
-Pattern + Pflicht-Markup: siehe [CLAUDE.md](CLAUDE.md) Abschnitt „Combobox statt `<select>`". Nicht hier duplizieren — Single Source of Truth bleibt CLAUDE.md.
+**Markup + Pflicht-Attribute** stehen in [CLAUDE.md](CLAUDE.md) (harte Regel „Combobox statt `<select>`"), weil Architektur (`x-data="combobox(...)"`, `x-modelable`, `x-effect`-Datenfluss) primär Alpine-Verhalten ist.
+
+**Hier (visuelles):**
+
+**Klassen** ([public/css/card-form.css](public/css/card-form.css)):
+- `.combobox-wrap` — Wrapper, vom Helper auto-gesetzt (mit `--compact` per Default).
+- `.combobox-trigger` — Button-Look (gleiche Höhe wie `<input>` über `--size-default-padding-y`).
+- `.combobox-chevron` — Disclosure-Marker `▾`, rotiert via `.combobox-chevron--open` 0°→180°.
+- `.combobox-dropdown` — Popover-Liste (mit `--up`-Modifier wenn nach oben aufklappt).
+- `.combobox-search` — Input innerhalb Dropdown.
+- `.combobox-option` / `.combobox-option--active` / `.combobox-empty`.
+
+**Regel:** Wrapper-Div leer lassen (Helper überschreibt `innerHTML`). Pflicht-Pattern: `x-data="combobox(placeholder, emptyLabel?)" x-modelable="value" x-model="ref" x-effect="options = …"`.
 
 ### Reaktivität bei Datenquelle aus Karten-Scope (häufiger „Liste leer"-Bug)
 
@@ -558,6 +585,14 @@ CSS: [public/css/tree-history.css](public/css/tree-history.css). `.history-detai
 ## Editor
 
 Editor-spezifische Patterns. Greifen nur in der Editor-Card und im Fokus-Modus; andere Karten verwenden sie nicht.
+
+**Sub-Sections:**
+- [Findings-Cards](#findings-cards-lektorat-ergebnisse) (Lektorat-Output, Severity, Marginalia-Stripe)
+- [Page-Content-View](#page-content-view-reading-frame) (Reading-Frame, Buchsatz, Callouts)
+- [Focus-Mode](#focus-mode) (Vollbild + Typewriter-Dimming)
+- [Edit-Bubble-Toolbar](#edit-bubble-toolbar-inline-formatierung) (Inline-Format + Slash-Menu)
+- [Find-and-Replace](#find-and-replace) (Cmd+F-Panel)
+- [Lookup-Popover](#lookup-popover-figur-lookup) (Figuren-Detail bei Ctrl+Click)
 
 ### Findings-Cards (Lektorat-Ergebnisse)
 
@@ -1016,6 +1051,284 @@ Siehe Section „Reduced-Motion" oben.
 ### Lang-Attribut
 
 Inhalte in einer Locale, die vom `<html lang="...">`-Default abweicht, bekommen `lang="de"` / `lang="en"` am Container. Relevant für Chat-Antworten, BookStack-Page-HTML (User-Sprache pro Buch).
+
+---
+
+## CSS-File-Inventar
+
+Welche Datei besitzt welche Klassen. Bei neuer Klasse: erst hier prüfen, ob ein File thematisch passt — sonst neue Datei anlegen + in [public/index.html](public/index.html) **und** [tests/fixtures/focus-harness.html](tests/fixtures/focus-harness.html) einhängen (gleiche Reihenfolge!).
+
+### Foundation
+| File | Inhalt |
+|------|--------|
+| [tokens.css](public/css/tokens.css) | Custom-Properties (Farben, Schatten, Tokens), `@font-face`, Cascade-Layer-Order. Unlayered. |
+| [base.css](public/css/base.css) | Reset, `:focus-visible`, `.skip-link`, globale `prefers-reduced-motion`. |
+| [layout-base.css](public/css/layout-base.css) | `.session-banner`, `.dev-banner` (oben fixed). |
+| [twocolumn.css](public/css/twocolumn.css) | `.layout` / `-sidebar` / `-main` (Editor-Layout). |
+| [row.css](public/css/row.css) | `.row` Flexbox-Utility. |
+| [utilities.css](public/css/utilities.css) | `.list-header`, Job-Queue-Footer, `.palette-badge`. |
+
+### Komponenten (geteilt)
+| File | Inhalt |
+|------|--------|
+| [card-form.css](public/css/card-form.css) | `.card`, `.card-header*`, `.card-form-*` Grid, Form-Wertspalten, Combobox-Klassen, `cardFadeIn`. |
+| [buttons-badges.css](public/css/buttons-badges.css) | `<button>` Hierarchie, `.badge-*`, `.avatar-*`. |
+| [tabs.css](public/css/tabs.css) | `.tabs` / `.tabs-btn` + `--active`/`--scrollable`/`--fullwidth`. |
+| [entity-list.css](public/css/entity-list.css) | `.entity-list` / `-row`, `.severity-tag*`, `.collapsible-*`, Skeleton. |
+| [tree-history.css](public/css/tree-history.css) | Sidebar-Tree, `.history-*`, `.history-chevron`. |
+| [tooltip.css](public/css/tooltip.css) | `.tip-layer` (geteilter `data-tip`-Layer). |
+| [confirm-dialog.css](public/css/confirm-dialog.css) | `.confirm-overlay` / `-dialog`, Shortcuts-Overlay. |
+| [feature-tiles.css](public/css/feature-tiles.css) | Palette (Hero/Overlay/Panel/Item), Quick-Pills. |
+| [header-actions.css](public/css/header-actions.css) | `.header-actions`-Cluster, Update-All-Panel. |
+| [progress / heatmap / findings / analysis] | siehe Spezifika. |
+| [heatmap.css](public/css/heatmap.css) | `.heatmap-*` Tabelle + Detail-Drawer. |
+| [findings.css](public/css/findings.css) | `.finding` / `.stilbox`. |
+| [analysis.css](public/css/analysis.css) | `.section-heading*`, JS-generated Output-Stile. |
+
+### Editor
+| File | Inhalt |
+|------|--------|
+| [page-view.css](public/css/page-view.css) | `.page-content-view` Reading-Frame, Callouts, Marginalia-Stripe. |
+| [focus-mode.css](public/css/focus-mode.css) | Fokus-Modus, Save-Indicator, Caret-Pulse. |
+| [edit-toolbar.css](public/css/edit-toolbar.css) | `.edit-bubble-toolbar`, `.edit-slash-menu`. |
+| [find-replace.css](public/css/find-replace.css) | `.edit-find*`. |
+| [synonym-menu.css](public/css/synonym-menu.css) | Synonym-Kontextmenü + Picker. |
+| [synonyme.css](public/css/synonyme.css) | Synonyme-Karten-Stile (Listen). |
+| [figur-lookup.css](public/css/figur-lookup.css) | `.figur-lookup` Popover. |
+| [lektorat.css](public/css/lektorat.css) | `.lektorat-mark`, Findings-Flash, Hover-Sync. |
+
+### Karten (eine pro Konzept)
+| File | Karten |
+|------|--------|
+| [figuren.css](public/css/figuren.css) | Figuren-Karte (Graph, Familie, Soziogramm). |
+| [schauplaetze.css](public/css/schauplaetze.css) | Orte (Aliasing). |
+| [kontinuitaet.css](public/css/kontinuitaet.css) | Kontinuitätsprüfung + Buch-Einstellungen-Spezifika. |
+| [szenen.css](public/css/szenen.css) | Szenen-Karte. |
+| [kapitel-review.css](public/css/kapitel-review.css) | Kapitel-Review. |
+| [review.css](public/css/review.css) | Buch-Review. |
+| [chat.css](public/css/chat.css) | Seiten-/Buch-Chat. |
+| [ideen.css](public/css/ideen.css) | Ideen-Karte. |
+| [book-settings.css](public/css/book-settings.css) | Buch-Einstellungen Job-Stats-Tabellen. |
+| [pdf-export.css](public/css/pdf-export.css) | PDF-Export-Profile + Tabs. |
+| [export.css](public/css/export.css) | BookStack-Export (Buch). |
+| [zeitleiste.css](public/css/zeitleiste.css) | Globaler Zeitstrahl. |
+| [komplett-status.css](public/css/komplett-status.css) | Komplettanalyse-Status-Header. |
+| [kapitel.css](public/css/kapitel.css) | Kapitel-Liste. |
+| [tokens-est.css](public/css/tokens-est.css) | Token-Schätzung Inline-Badges + Tooltip. |
+| [token-setup.css](public/css/token-setup.css) | First-Run-Token-Setup-Modal. |
+| [page-list.css](public/css/page-list.css) | Seiten-Liste in Sidebar. |
+| [page-view.css](public/css/page-view.css) | (siehe Editor). |
+| [search.css](public/css/search.css) | BookStack-Suche, Buchwahl. |
+| [misc.css](public/css/misc.css) | Restposten, prüfen ob Klassen migrierbar. |
+| [safari-fallback.css](public/css/safari-fallback.css) | Safari-spezifische `:has()`-Fallbacks. |
+
+### book-overview/ (Subfolder, dichtes Tile-Grid)
+[coverage.css](public/css/book-overview/coverage.css), [domain.css](public/css/book-overview/domain.css), [kapitel.css](public/css/book-overview/kapitel.css), [presence.css](public/css/book-overview/presence.css), [recent-actions.css](public/css/book-overview/recent-actions.css), [stats.css](public/css/book-overview/stats.css) — pro Tile-Familie ein File. Cascade-Order = Lade-Order in [public/index.html](public/index.html).
+
+---
+
+## Naming-Konventionen
+
+Project mixt zwei Schemata. Beide sind erlaubt, aber pro Komponente konsistent.
+
+**BEM-light** für Komponenten mit Modifiern: `.block`, `.block-element`, `.block--modifier`. Beispiele: `.card`, `.card-header`, `.card-form-row--top`, `.tabs-btn--active`.
+
+**Flat** für kleine Utility-Klassen ohne Modifier-Bedarf: `.row`, `.muted-msg`, `.spinner`. Beispiele: `.list-header`, `.form-stack`.
+
+**Anti-Patterns:**
+- `.tabs-btn-count-active` ❌ — Modifier per `--active`-Suffix nicht durch Konkatenation. Richtig: `.tabs-btn--active .tabs-btn-count`.
+- Camel-Case-Klassen (`.cardForm`) ❌ — kebab-case Pflicht.
+- Doppel-Element (`.card-header-title-text`) ❌ — bei mehr als zwei Element-Stufen Refactor zu Sub-Komponente erwägen.
+
+**Präfix-Konventionen pro Domain:**
+- `card-`, `card-form-` — Karten-Form-Geometrie (geteilt)
+- `tabs-`, `entity-`, `palette-`, `tree-`, `history-`, `heatmap-`, `finding-` — geteilte Komponenten
+- `editor-`, `edit-`, `lektorat-`, `figur-`, `chat-` — Editor-Slices
+- `overview-` — Book-Overview-Tiles
+- `pdfx-` — PDF-Export-spezifisch (kurz, weil viele Sub-Klassen)
+- `book-settings-` — Buch-Einstellungs-spezifische Klassen (Danger-Zone, Locale, Options) — generische Form-Klassen heissen `card-form-*`.
+
+---
+
+## Modal-Wrapper (generisches Pattern)
+
+**Status:** Aktuell **kein generisches Modal-Wrapper-Pattern**. Mehrere Modal-artige Overlays existieren parallel:
+- `.confirm-overlay` + `.confirm-dialog` ([confirm-dialog.css](public/css/confirm-dialog.css))
+- `.shortcuts-overlay` + `.shortcuts-panel` ([confirm-dialog.css](public/css/confirm-dialog.css))
+- `.palette-overlay` + `.palette-panel` ([feature-tiles.css](public/css/feature-tiles.css))
+- `.token-setup-*` ([token-setup.css](public/css/token-setup.css))
+
+Jedes hat eigenen Backdrop, eigene Close-Logik, eigenen Focus-Trap. Drift-Risiko hoch.
+
+**Wann konsolidieren:** Sobald ein fünfter Konsument auftaucht, oder ein Bug zeigt, dass eine Variante z.B. Esc nicht behandelt während andere es tun.
+
+**Vorgesehenes Konsolidat:**
+```html
+<div class="modal-overlay" role="dialog" aria-modal="true">
+  <div class="modal-panel modal-panel--md">…</div>
+</div>
+```
+- `.modal-overlay` — Backdrop + Position-Fixed + `--z-modal`
+- `.modal-panel` — zentriertes Panel mit `--shadow-lg`
+- Modifier `--sm/-md/-lg` für Breite (480/720/960)
+
+Bestehende Confirm/Shortcuts/Palette/Token-Setup würden darauf migrieren, behalten aber ihre eigenen Inhalts-Klassen (`.confirm-dialog-message`, `.palette-list`, etc.).
+
+**Bis dahin:** Neue Modale orientieren sich an `.confirm-overlay` (am vollständigsten dokumentiert) und kopieren die Geometrie statt eigene zu erfinden.
+
+---
+
+## Loading-Overlay
+
+**Status:** Kein generisches Pattern. Loading-Indikatoren existieren als:
+- Inline-`.spinner` neben Button-Label (Standard für Buttons während async-Action)
+- `.card-status` mit Text + `.progress-bar-wrap`
+- Skeleton-Loader (`.entity-skeleton*` / `.chat-skeleton-*`)
+
+**Wann anlegen:** Sobald jemand „kompletter Kartenüberlay während Refresh" braucht (aktuell behandelt jede Karte das via `x-show`-Toggling auf Inhalt + `.card-status` daneben).
+
+**Soll-Pattern (wenn nötig):**
+```html
+<div class="card-loading-overlay" x-show="loading" aria-busy="true">
+  <span class="spinner" aria-hidden="true"></span>
+</div>
+```
+Position: absolute innerhalb `.card`, `background: var(--color-surface) / 0.7` mit Backdrop-Blur. `aria-busy="true"` auf Karte oder Overlay.
+
+---
+
+## Empty-State mit CTA
+
+**Status:** Aktuell nur Text via `.card-status` (`$app.t('common.noDataYet')`). Kein Pattern für „Keine Daten — hier ist der Button um Daten zu erzeugen".
+
+**Wann anlegen:** Empty-Buchwahl, leere Findings („Keine Lektorat-Findings — Prüfung starten"), leere Figuren-Liste („Komplettanalyse läuft erstmals — Knopf").
+
+**Soll-Pattern:**
+```html
+<div class="card-empty">
+  <p class="card-empty-text" x-text="$app.t('feature.empty.title')"></p>
+  <p class="card-empty-hint" x-text="$app.t('feature.empty.hint')"></p>
+  <button class="primary" @click="…" x-text="$app.t('feature.empty.cta')"></button>
+</div>
+```
+- `.card-empty` — vertikaler Stack, mittig, Padding
+- `.card-empty-text` — semantischer Hauptsatz, Serif optional
+- `.card-empty-hint` — 12 px muted Erklärung darunter
+- Button ist Standard `.primary` — kein eigener Empty-CTA-Stil
+
+Bis Pattern angelegt: weiter `.card-status` verwenden, CTA als `.row` darunter.
+
+---
+
+## Inline-Action-Group
+
+**Status:** Kein Standard. Patterns wie „Mehr anzeigen / Alle ausklappen / Filter zurücksetzen" als Link-Reihe nach Listen werden ad-hoc gebaut.
+
+**Soll-Pattern (wenn jemand Bedarf hat):**
+```html
+<div class="inline-actions">
+  <button type="button" class="link-btn" @click="…">Alle ausklappen</button>
+  <span class="inline-actions-sep">·</span>
+  <button type="button" class="link-btn" @click="…">Filter zurücksetzen</button>
+</div>
+```
+- `.inline-actions` — flex row, `gap: var(--space-sm)`, `font-size: var(--font-size-sm)`
+- `.link-btn` — Button-Reset auf Text-Link (color: var(--color-primary), Hover: underline)
+- `.inline-actions-sep` — `·` als Separator (entspricht Mikro-Typografie-Regel: gleichwertige Items mit `·`, nicht `:`)
+
+---
+
+## Keyboard-Shortcut-Anzeige (`<kbd>`)
+
+**Use:** Tasten anzeigen (Hotkeys, Help-Overlay, Palette-Hero).
+
+**Markup:** Native `<kbd>` mit globalem Reset in [base.css](public/css/base.css):
+```html
+Shortcut: <kbd>⌘</kbd>+<kbd>K</kbd>
+```
+
+**Klasse-Stil** existiert pro Konsument: `.palette-hero-kbd`, `.palette-mode-pill kbd`. Globaler Reset ist gesetzt — neue Konsumenten erben automatisch und überschreiben nur, wenn nötig.
+
+---
+
+## Pattern-Matrix (Karte → Pattern)
+
+Welche Karte verwendet welche Patterns. Drift-Erkennung: wer auf der gleichen Zeile fehlt obwohl er sollte, verwendet wahrscheinlich Reinvention.
+
+| Karte | `.card` | Form | Tabs | Combobox | Entity-List | Heatmap | Findings | Filter-Bar |
+|-------|:------:|:----:|:----:|:--------:|:-----------:|:-------:|:--------:|:----------:|
+| BookOverview | ✓ | — | — | — | — | — | — | — |
+| BookReview | ✓ | — | — | — | — | — | — | — |
+| KapitelReview | ✓ | — | — | — | — | — | — | — |
+| Figuren | ✓ | — | ✓ | — | ✓ | — | — | ✓ |
+| Orte | ✓ | — | — | — | ✓ | — | — | ✓ |
+| Szenen | ✓ | — | ✓ | ✓ | ✓ | — | — | ✓ |
+| Ereignisse | ✓ | — | — | ✓ | ✓ | — | — | ✓ |
+| Kontinuität | ✓ | ✓ | ✓ | ✓ | ✓ | — | — | — |
+| BookStats | ✓ | — | — | — | — | — | — | — |
+| Stil | ✓ | — | ✓ | — | — | ✓ | — | — |
+| FehlerHeatmap | ✓ | — | ✓ | — | — | ✓ | — | — |
+| BookSettings | ✓ | ✓ | — | ✓ | — | — | — | — |
+| UserSettings | ✓ | ✓ | — | ✓ | — | — | — | — |
+| FinetuneExport | ✓ | ✓ | — | ✓ | — | — | — | — |
+| PdfExport | ✓ | ✓ | ✓ | ✓ | — | — | — | — |
+| Ideen | ✓ | — | — | ✓ | ✓ | — | — | ✓ |
+| Chat (Seite) | ✓ | — | — | — | — | — | — | — |
+| BuchChat | ✓ | — | — | — | — | — | — | — |
+| Editor (Findings) | ✓ | — | — | — | ✓ | — | ✓ | — |
+| PageHistory | ✓ | — | — | — | — | — | — | — |
+| Palette | (Modal) | — | — | — | ✓ | — | — | ✓ |
+
+**Audit-Hinweis:** Wer eine neue Karte oder ein neues Pattern einführt, fügt hier Spalte/Zeile + Häkchen hinzu. Nicht nur Existenz prüfen — auch ob die Karte die geteilte Klasse benutzt oder eigenes Vokabular pflegt.
+
+---
+
+## Relative z-index (lokal-stack-Werte)
+
+Werte 1, 2, 5, 10, 20, 50 in [heatmap.css](public/css/heatmap.css), [lektorat.css](public/css/lektorat.css), [twocolumn.css](public/css/twocolumn.css), [search.css](public/css/search.css), [book-overview/](public/css/book-overview/) sind **lokal-relativ** und gehören NICHT in den globalen Stack:
+- Heatmap: sticky-thead (1) und sticky-rowhead (2) innerhalb der Tabelle
+- Lektorat-Marks: Findings-Flash (50) über In-Place-Markierungen
+- Twocolumn: Resize-Handle (5) über Sidebar-Content
+- Book-Overview-Tiles: SVG-Layering innerhalb Tile
+
+Diese Werte bleiben hartcoded mit Kommentar `/* lokal-relativ, kein globaler Stack-Tier */` in der Nähe. Wer sie migriert, durchbricht die lokale Stack-Logik.
+
+Im globalen Stack (siehe [Z-Index-Stack](#z-index-stack)) steht alles, was per `position: fixed` oder gegen andere Komponenten konkurriert.
+
+---
+
+## Tooling: stylelint-Skizze
+
+**Status:** Aktuell nicht eingerichtet. Skizze für späteren Setup:
+
+```json
+{
+  "rules": {
+    "declaration-property-value-disallowed-list": {
+      "z-index": ["/^[0-9]+$/"],
+      "/^font-weight$/": ["/^[0-9]+$/"],
+      "/^transition-duration$/": ["/^[0-9.]+m?s$/"]
+    },
+    "declaration-property-value-allowed-list": {
+      "/^z-index$/": ["/^var\\(--z-/", "/^[1-5]$/"]
+    },
+    "color-no-hex": true,
+    "color-named": "never",
+    "custom-property-pattern": "^[a-z][a-z0-9-]+$"
+  }
+}
+```
+
+Was es prüft:
+- z-index muss `var(--z-*)` oder lokal-relative 1-5 sein
+- font-weight muss Token sein, nicht Zahl
+- transition-duration muss Token sein, nicht Literal
+- Hex-Farben verboten, immer Token
+- Custom-Property-Naming einheitlich kebab-case
+
+Setup-Aufwand: ~1 Stunde (`npm i -D stylelint stylelint-config-standard` + `.stylelintrc.json` + npm-Script). Aktuelle Codebase würde initial ~50-100 Verstöße melden — die meisten Migrationskandidaten, einzelne Ausnahmen via `/* stylelint-disable-next-line */`.
+
+Nicht in scope für DESIGN.md-Refactor — separater Task wenn gewünscht.
 
 ---
 

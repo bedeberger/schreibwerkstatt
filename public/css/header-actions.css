@@ -174,7 +174,7 @@
   padding: 0.5rem;
   min-width: 260px;
   z-index: var(--z-header);
-  box-shadow: 0 6px 28px var(--color-shadow-strong);
+  box-shadow: var(--shadow-lg);
   animation: cardFadeIn var(--transition-base) both;
   display: flex;
   flex-direction: column;

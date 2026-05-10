@@ -3447,6 +3447,33 @@ function runMigrations() {
     logger.info('DB-Migration auf Version 89 abgeschlossen (provider/model + cache_read_in/cache_creation_in in job_runs + chat_messages).');
   }
 
+  if (version < 90) {
+    // draft_figures: Figuren-Werkstatt (vorwärts-entwickelte Figuren als
+    // Mindmap, isoliert von der figures-Tabelle, kein Promotion-Pfad).
+    // mindmap_json hält die jsMind-Baumstruktur direkt.
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS draft_figures (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id      INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        user_email   TEXT    NOT NULL,
+        name         TEXT    NOT NULL,
+        archetype    TEXT,
+        mindmap_json TEXT    NOT NULL,
+        notes        TEXT,
+        created_at   TEXT    NOT NULL,
+        updated_at   TEXT    NOT NULL
+      )
+    `).run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_df_book_user ON draft_figures(book_id, user_email)').run();
+
+    const fkErrors90 = db.pragma('foreign_key_check');
+    if (fkErrors90.length) {
+      throw new Error(`Migration 90: foreign_key_check meldet ${fkErrors90.length} Verstoesse: ${JSON.stringify(fkErrors90.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 90').run();
+    logger.info('DB-Migration auf Version 90 abgeschlossen (draft_figures).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

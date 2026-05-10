@@ -12,6 +12,7 @@ const pdfExport = require('./pdf-export');
 const fonts = require('./fonts');
 const books = require('./books');
 const tokenUsage = require('./token-usage');
+const draftFigures = require('./draft-figures');
 
 // ── Job-Laufzeiten ────────────────────────────────────────────────────────────
 const _stmtInsJobRun = db.prepare(
@@ -780,4 +781,10 @@ module.exports = {
   // fonts
   getCachedFont: fonts.getCachedFont,
   cacheFont:     fonts.cacheFont,
+  // draft figures (Figuren-Werkstatt)
+  listDraftFigures:   draftFigures.listDraftFigures,
+  getDraftFigure:     draftFigures.getDraftFigure,
+  createDraftFigure:  draftFigures.createDraftFigure,
+  updateDraftFigure:  draftFigures.updateDraftFigure,
+  deleteDraftFigure:  draftFigures.deleteDraftFigure,
 };

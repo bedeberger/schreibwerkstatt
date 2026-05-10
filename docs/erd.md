@@ -1,6 +1,6 @@
 # ERD — bookstack-lektorat
 
-Stand: Schema-Version 89, 46 Tabellen (ohne `sqlite_*`/`schema_version`/`sessions`).
+Stand: Schema-Version 90, 47 Tabellen (ohne `sqlite_*`/`schema_version`/`sessions`).
 
 Quelle: Live-Dump aus [lektorat.db](../lektorat.db) (`.schema --indent`) + [db/migrations.js](../db/migrations.js). Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -39,6 +39,7 @@ erDiagram
   books ||--o{ chapter_extract_cache : has
   books ||--o{ book_extract_cache    : has
   books ||--o{ finetune_ai_cache     : has
+  books ||--o{ draft_figures         : has
 
   pages ||--o{ page_checks           : has
   pages ||--|| page_stats            : has
@@ -321,6 +322,25 @@ erDiagram
   locations ||--o{ location_figures   : has
   locations ||--o{ location_chapters  : at
 ```
+
+### 3a · Figuren-Werkstatt (isoliert, kein Promotion-Pfad zu `figures`)
+
+```mermaid
+erDiagram
+  draft_figures {
+    INTEGER id           PK
+    INTEGER book_id      FK
+    TEXT    user_email
+    TEXT    name
+    TEXT    archetype    "z.B. protagonist, antagonist, frei"
+    TEXT    mindmap_json "jsMind-Baum: { meta, format, data:{ id, topic, children } }"
+    TEXT    notes
+    TEXT    created_at
+    TEXT    updated_at
+  }
+```
+
+`draft_figures` lebt parallel zu `figures` — keine FK zwischen beiden, keine bidirektionale Synchronisation. Werkstatt ist Vorwärts-Entwurfs-Werkzeug; KI-Brainstorm und Konsistenz-Check operieren nur auf der Mindmap.
 
 ---
 

@@ -179,14 +179,14 @@ select:focus {
   background: var(--color-surface);
   border: 0.5px solid var(--color-border-focus);
   border-top: none;
-  box-shadow: 0 4px 14px var(--color-shadow-soft);
+  box-shadow: var(--shadow-md);
 }
 .combobox-dropdown--up {
   top: auto;
   bottom: 100%;
   border-top: 0.5px solid var(--color-border-focus);
   border-bottom: none;
-  box-shadow: 0 -4px 14px var(--color-shadow-soft);
+  box-shadow: var(--shadow-md);
 }
 .combobox-search {
   display: block;
