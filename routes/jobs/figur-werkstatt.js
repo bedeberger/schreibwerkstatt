@@ -13,6 +13,8 @@ const {
 const { toIntId } = require('../../lib/validate');
 const { db } = require('../../db/connection');
 const { getDraftFigure } = require('../../db/draft-figures');
+const { getUser } = require('../../db/schema');
+const { resolveI18n, resolveI18nTree } = require('../../lib/i18n-server');
 
 const figurWerkstattRouter = express.Router();
 
@@ -69,12 +71,15 @@ async function runBrainstormJob(jobId, draftId, knotenId, userEmail) {
     if (!draft) throw i18nError('job.error.werkstatt.draftMissing');
     if (draft.user_email !== userEmail) throw i18nError('job.error.forbidden');
 
+    const locale = getUser(userEmail)?.locale || 'de';
     const found = _findKnoten(draft.mindmap?.data, knotenId);
     if (!found) throw i18nError('job.error.werkstatt.knotenMissing');
-    const { pfad: knotenPfad, node: zielKnoten } = found;
+    const { pfad: rawPfad, node: zielKnoten } = found;
+    const knotenPfad = resolveI18n(rawPfad, locale);
     const existingChildren = (zielKnoten.children || [])
-      .map(c => (c.topic || '').trim())
+      .map(c => resolveI18n((c.topic || '').trim(), locale))
       .filter(Boolean);
+    const mindmapResolved = resolveI18nTree(draft.mindmap, locale);
 
     const { SYSTEM_FIGUREN, BUCH_KONTEXT } = await getBookPrompts(draft.book_id, userEmail);
     const draftNameNorm = (draft.name || '').trim().toLowerCase();
@@ -87,7 +92,7 @@ async function runBrainstormJob(jobId, draftId, knotenId, userEmail) {
 
     const tok = { in: 0, out: 0, ms: 0 };
     const result = await aiCall(jobId, tok,
-      buildBrainstormPrompt(draft.name, draft.archetype, knotenPfad, draft.mindmap, BUCH_KONTEXT, figuren, orte, existingChildren),
+      buildBrainstormPrompt(draft.name, draft.archetype, knotenPfad, mindmapResolved, BUCH_KONTEXT, figuren, orte, existingChildren),
       SYSTEM_FIGUREN,
       10, 95, 1500, 0.3, 1500, undefined, SCHEMA_BRAINSTORM,
     );
@@ -119,6 +124,9 @@ async function runConsistencyJob(jobId, draftId, userEmail) {
     if (!draft) throw i18nError('job.error.werkstatt.draftMissing');
     if (draft.user_email !== userEmail) throw i18nError('job.error.forbidden');
 
+    const locale = getUser(userEmail)?.locale || 'de';
+    const mindmapResolved = resolveI18nTree(draft.mindmap, locale);
+
     const { SYSTEM_FIGUREN, BUCH_KONTEXT } = await getBookPrompts(draft.book_id, userEmail);
     const figuren = _loadBookFiguren(draft.book_id, userEmail);
     const orte    = _loadBookOrte(draft.book_id, userEmail);
@@ -128,7 +136,7 @@ async function runConsistencyJob(jobId, draftId, userEmail) {
 
     const tok = { in: 0, out: 0, ms: 0 };
     const result = await aiCall(jobId, tok,
-      buildConsistencyPrompt(draft.name, draft.archetype, draft.mindmap, BUCH_KONTEXT, figuren, orte),
+      buildConsistencyPrompt(draft.name, draft.archetype, mindmapResolved, BUCH_KONTEXT, figuren, orte),
       SYSTEM_FIGUREN,
       10, 95, 2500, 0.3, 3000, undefined, SCHEMA_CONSISTENCY,
     );

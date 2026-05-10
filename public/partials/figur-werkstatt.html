@@ -49,8 +49,7 @@
   <!-- 2-Spalten-Layout: Drafts-Liste links, Detail rechts -->
   <div x-show="drafts.length > 0" class="werkstatt-grid">
     <div class="werkstatt-sidebar">
-      <div class="list-header list-header--between">
-        <h3 class="section-heading section-heading-top" x-text="$app.t('werkstatt.heading')"></h3>
+      <div class="list-header">
         <button type="button" class="primary" :disabled="busy" @click="startCreate()" x-text="$app.t('werkstatt.action.new')"></button>
       </div>
 

@@ -610,7 +610,6 @@
   "figuren.legend.toggle":       "Legend",
 
   "werkstatt.title":             "Character Workshop: {name}",
-  "werkstatt.heading":           "Character Workshop",
   "werkstatt.subline":           "Forward draft — not linked to extracted characters",
   "werkstatt.empty.title":       "No workshop characters yet",
   "werkstatt.empty.hint":        "Create a first character and develop it as a mindmap.",

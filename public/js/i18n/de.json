@@ -610,7 +610,6 @@
   "figuren.legend.toggle":       "Legende",
 
   "werkstatt.title":             "Figuren-Werkstatt: {name}",
-  "werkstatt.heading":           "Figuren-Werkstatt",
   "werkstatt.subline":           "Vorwärts-Entwurf — keine Verbindung zu extrahierten Figuren",
   "werkstatt.empty.title":       "Noch keine Werkstatt-Figuren",
   "werkstatt.empty.hint":        "Lege eine erste Figur an und entwickle sie als Mindmap aus.",

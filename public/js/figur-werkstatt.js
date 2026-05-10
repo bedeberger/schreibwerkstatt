@@ -255,53 +255,67 @@ export const figurWerkstattMethods = {
       this.errorMessage = window.__app.t('werkstatt.error.libLoad') || 'Library load failed';
       return;
     }
-    if (!this._jm) {
-      // Canvas-Linien: jsMind zeichnet auf <canvas>, also kein CSS-Targeting.
-      // Linienfarbe aus globalem Token --color-border lesen, Fallback grau.
-      const cs = getComputedStyle(document.documentElement);
-      const lineColor = (cs.getPropertyValue('--color-border').trim() || '#888');
-      this._jm = new jsMind({
-        container,
-        editable: true,
-        theme: 'primary',
-        view: { hmargin: 80, vmargin: 40, line_width: 1.5, line_color: lineColor, draggable: true, hide_scrollbars_when_draggable: true },
-        layout: { hspace: 30, vspace: 18, pspace: 14 },
-        // Tastatur-Navigation: Pfeiltasten navigieren, Tab fügt Sub-Knoten,
-        // Enter Geschwister, F2 Editieren, Delete entfernt, Space toggle.
-        // jsMind-Default für `addchild` ist nur Insert (45) + Ctrl+Enter (4109);
-        // Tab (9) explizit ergänzen, weil Mac-Tastaturen kein Insert haben und
-        // Tab als Mindmap-Standard erwartet wird (jsMind preventDefault'et Tab
-        // ohnehin).
-        shortcut: {
-          enable: true,
-          mapping: {
-            addchild: [9, 45, 4109],
-            addbrother: 13,
-            editnode: 113,
-            delnode: 46,
-            toggle: 32,
-            left: 37, up: 38, right: 39, down: 40,
-          },
+    // Race-Schutz: User kann während `await loadJsMind` zur anderen Figur
+    // gewechselt haben. Dann ist `sel` (Snapshot vom Funktions-Start) nicht
+    // mehr aktuell — der spätere Mount für die neue Figur erledigt den Job.
+    if (this.selectedDraftId !== sel.id) return;
+    // Generation-Token: jeder Mount kriegt eine eigene Nummer; läuft eine ältere
+    // Mount-Coroutine danach noch durch (rAF-Retry, Promise-Microtask), wird sie
+    // an _mountGen erkannt und bricht ab.
+    const myGen = (this._mountGen = (this._mountGen || 0) + 1);
+    // Vorhandene jsMind-Instanz IMMER abbauen. `_jm.show(newMind)` ist nach
+    // add_node/remove_node-Mutationen (Brainstorm-Apply, Context-Menu, Tab/Enter)
+    // unzuverlässig — interne node-map und DOM-Cache räumen sich nicht auf,
+    // sodass die Wurzel der Vor-Figur sichtbar bleibt. Frische Instanz pro Mount.
+    if (this._jm) this._destroyMindmap();
+    if (myGen !== this._mountGen) return;
+    // Canvas-Linien: jsMind zeichnet auf <canvas>, also kein CSS-Targeting.
+    // Linienfarbe aus globalem Token --color-border lesen, Fallback grau.
+    const cs = getComputedStyle(document.documentElement);
+    const lineColor = (cs.getPropertyValue('--color-border').trim() || '#888');
+    this._jm = new jsMind({
+      container,
+      editable: true,
+      theme: 'primary',
+      view: { hmargin: 80, vmargin: 40, line_width: 1.5, line_color: lineColor, draggable: true, hide_scrollbars_when_draggable: true },
+      layout: { hspace: 30, vspace: 18, pspace: 14 },
+      // Tastatur-Navigation: Pfeiltasten navigieren, Tab fügt Sub-Knoten,
+      // Enter Geschwister, F2 Editieren, Delete entfernt, Space toggle.
+      // jsMind-Default für `addchild` ist nur Insert (45) + Ctrl+Enter (4109);
+      // Tab (9) explizit ergänzen, weil Mac-Tastaturen kein Insert haben und
+      // Tab als Mindmap-Standard erwartet wird (jsMind preventDefault'et Tab
+      // ohnehin).
+      shortcut: {
+        enable: true,
+        mapping: {
+          addchild: [9, 45, 4109],
+          addbrother: 13,
+          editnode: 113,
+          delnode: 46,
+          toggle: 32,
+          left: 37, up: 38, right: 39, down: 40,
         },
-      });
-      // Selection-Tracking für KI-Brainstorm + Auto-Center bei Tastatur-Nav.
-      // type === 4 → Selection. type === 3 → Edit (add/remove/rename/move).
-      this._jm.add_event_listener((type, data) => {
-        if (type === 4) {
-          const id = data?.node || null;
-          this.selectedKnotenId = id;
-          if (id) this._centerNodeInView(id);
-        } else if (type === 3) {
-          this._mindmapDirty = true;
-        }
-      });
-      // Rechtsklick auf jmnode → Context-Menu mit Mindmap-Funktionen.
+      },
+    });
+    // Selection-Tracking für KI-Brainstorm + Auto-Center bei Tastatur-Nav.
+    // type === 4 → Selection. type === 3 → Edit (add/remove/rename/move).
+    this._jm.add_event_listener((type, data) => {
+      if (type === 4) {
+        const id = data?.node || null;
+        this.selectedKnotenId = id;
+        if (id) this._centerNodeInView(id);
+      } else if (type === 3) {
+        this._mindmapDirty = true;
+      }
+    });
+    // Rechtsklick auf jmnode → Context-Menu mit Mindmap-Funktionen.
+    // Listener am Container (überlebt jsMind-Recreate). Einmal pro Container
+    // binden — sonst akkumulieren mit jedem Draft-Wechsel und feuern N-fach.
+    if (!container._werkstattCtxBound) {
       container.addEventListener('contextmenu', (ev) => this._onMindmapContextMenu(ev));
+      container._werkstattCtxBound = true;
     }
     this._jm.show(resolveMindmapForDisplay(sel.mindmap));
-    // _jm an Draft-ID binden: saveDraft exportiert nur, wenn Editor diesen
-    // Draft hält. Verhindert Cross-Contamination, falls _mountMindmap zwischen
-    // Auswahl und Save für anderen Draft umgemounted hätte.
     this._jmDraftId = sel.id;
     this.selectedKnotenId = sel.mindmap?.data?.id || 'root';
     // Auto-Fokus auf Mindmap-Panel: jsMind setzt tabIndex=1 auf .jsmind-inner —
