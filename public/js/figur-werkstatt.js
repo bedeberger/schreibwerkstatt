@@ -430,11 +430,13 @@ export const figurWerkstattMethods = {
     const parentId = this.brainstormResult.knotenId;
     try {
       this._jm.add_node(parentId, _newNodeId(), v.label);
+      // jsMind feuert type=3 nicht zuverlässig bei API-add_node — explizit
+      // dirty markieren, sonst würde Save-Button clean bleiben.
+      this._mindmapDirty = true;
+      this.brainstormResult.vorschlaege = this.brainstormResult.vorschlaege.filter((_, i) => i !== idx);
     } catch (e) {
-      console.error('[werkstatt] add_node failed:', e);
+      this.errorMessage = window.__app.t('werkstatt.error.applyFailed');
     }
-    // Vorschlag aus Liste entfernen, damit User Apply-Status sieht.
-    this.brainstormResult.vorschlaege = this.brainstormResult.vorschlaege.filter((_, i) => i !== idx);
   },
 
   dismissBrainstorm() {
