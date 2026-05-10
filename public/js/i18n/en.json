@@ -640,7 +640,6 @@
   "werkstatt.severity.niedrig":  "low",
   "werkstatt.brainstorm.heading": "AI suggestions for «{pfad}»",
   "werkstatt.brainstorm.apply":  "Apply",
-  "werkstatt.brainstorm.dismiss": "Dismiss",
   "werkstatt.consistency.heading": "Consistency check",
   "werkstatt.consistency.fazit":   "Verdict",
   "werkstatt.consistency.noIssues": "No conflicts found.",

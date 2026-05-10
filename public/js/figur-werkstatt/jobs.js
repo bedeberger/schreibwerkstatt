@@ -96,10 +96,6 @@ export const jobsMethods = {
     }
   },
 
-  dismissBrainstorm() {
-    this.brainstormResult = null;
-  },
-
   async runConsistency() {
     const app = window.__app;
     const sel = this.selectedDraft();
@@ -166,11 +162,6 @@ export const jobsMethods = {
       this._consistencyJobDraftId = null;
       this.errorMessage = app.t('werkstatt.error.consistency') || app.t('common.error');
     }
-  },
-
-  dismissConsistency() {
-    this.consistencyResult = null;
-    this.selectedKonfliktIdx = null;
   },
 
   // Cancel: schickt DELETE /jobs/:id; Server setzt Status auf 'cancelled',

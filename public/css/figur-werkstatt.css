@@ -6,7 +6,7 @@
    Container-Query, weil Karte in variablem Slot lebt. */
 .werkstatt-grid {
   display: grid;
-  grid-template-columns: minmax(180px, 240px) 1fr;
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
   gap: var(--space-lg);
   align-items: start;
   container-type: inline-size;
@@ -14,16 +14,19 @@
 }
 @container werkstatt (max-width: 640px) {
   .werkstatt-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-md);
   }
 }
 
-/* Drafts-Sidebar: Liste der Entwürfe + Neu-Knopf. */
+/* Drafts-Sidebar: Liste der Entwürfe + Neu-Knopf. min-width:0 erlaubt
+   Grid-Spalte unter min-content zu shrinken — sonst bläht sich Grid breiter
+   als Card und Container-Query feuert nicht. */
 .werkstatt-sidebar {
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
+  min-width: 0;
   border-right: var(--border-thin) solid var(--color-border);
   padding-right: var(--space-md);
 }
@@ -91,11 +94,14 @@
 }
 .werkstatt-create-row > button { flex: 1; }
 
-/* Detail-Pane */
+/* Detail-Pane. min-width:0 wie Sidebar: Grid-Spalte muss unter min-content
+   shrinken können, sonst stretcht Form/Mindmap die Spalte und Container-Query
+   greift auf Mobile nicht. */
 .werkstatt-detail {
   display: flex;
   flex-direction: column;
   gap: var(--space-lg);
+  min-width: 0;
 }
 
 .werkstatt-detail-header {

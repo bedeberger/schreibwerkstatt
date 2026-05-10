@@ -270,9 +270,8 @@
 
       <!-- Brainstorm-Vorschläge mit Apply -->
       <section x-show="brainstormResult" x-cloak class="werkstatt-suggestions">
-        <div class="list-header list-header--between">
+        <div class="list-header">
           <h3 class="section-heading" x-text="$app.t('werkstatt.brainstorm.heading', { pfad: brainstormResult ? brainstormResult.knotenPfad : '' })"></h3>
-          <button type="button" @click="dismissBrainstorm()" x-text="$app.t('werkstatt.brainstorm.dismiss')"></button>
         </div>
         <div class="chat-vorschlaege">
           <template x-for="(v, idx) in brainstormResult ? brainstormResult.vorschlaege : []" :key="idx">
@@ -339,9 +338,8 @@
 
       <!-- Consistency-Issues mit Severity-Tags -->
       <section x-show="consistencyResult" x-cloak class="werkstatt-suggestions">
-        <div class="list-header list-header--between">
+        <div class="list-header">
           <h3 class="section-heading" x-text="$app.t('werkstatt.consistency.heading')"></h3>
-          <button type="button" @click="dismissConsistency()" x-text="$app.t('werkstatt.brainstorm.dismiss')"></button>
         </div>
         <p class="werkstatt-consistency-fazit" x-show="consistencyResult && consistencyResult.fazit" x-text="consistencyResult ? consistencyResult.fazit : ''"></p>
         <div x-show="consistencyResult && consistencyResult.konflikte.length === 0" class="card-status" x-text="$app.t('werkstatt.consistency.noIssues')"></div>

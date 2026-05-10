@@ -640,7 +640,6 @@
   "werkstatt.severity.niedrig":  "niedrig",
   "werkstatt.brainstorm.heading": "KI-Vorschläge für «{pfad}»",
   "werkstatt.brainstorm.apply":  "Übernehmen",
-  "werkstatt.brainstorm.dismiss": "Verwerfen",
   "werkstatt.consistency.heading": "Stimmigkeitsprüfung",
   "werkstatt.consistency.fazit":   "Fazit",
   "werkstatt.consistency.noIssues": "Keine Konflikte gefunden.",
