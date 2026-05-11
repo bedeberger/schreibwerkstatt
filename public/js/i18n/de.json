@@ -323,6 +323,8 @@
   "pdfExport.chapter.spaceBeforeMm":       "Abstand vor Titel (mm)",
   "pdfExport.chapter.blankPageAfter":      "Leere Seite nach Kapitelende",
   "pdfExport.chapter.dropCap":             "Initialbuchstabe",
+  "pdfExport.chapter.titleRule":           "Trennlinie unter Kapiteltitel",
+  "pdfExport.chapter.pageTitleRule":       "Trennlinie unter Seitentitel",
   "pdfExport.chapter.pageStructureLegend": "BookStack-Seiten",
   "pdfExport.chapter.pageStructureHint":   "Lege fest, ob die einzelnen BookStack-Seiten innerhalb eines Kapitels als Unter-Überschriften erscheinen oder durchgehend gerendert werden.",
   "pdfExport.chapter.pageStructure":       "Verhalten",

@@ -326,6 +326,14 @@
                 <input type="checkbox" x-model="activeProfile.config.chapter.dropCap">
                 <span x-text="$app.t('pdfExport.chapter.dropCap')"></span>
               </label>
+              <label class="pdfx-check">
+                <input type="checkbox" x-model="activeProfile.config.chapter.titleRule">
+                <span x-text="$app.t('pdfExport.chapter.titleRule')"></span>
+              </label>
+              <label class="pdfx-check" x-show="activeProfile.config.chapter.pageStructure === 'nested'">
+                <input type="checkbox" x-model="activeProfile.config.chapter.pageTitleRule">
+                <span x-text="$app.t('pdfExport.chapter.pageTitleRule')"></span>
+              </label>
             </div>
           </div>
 
