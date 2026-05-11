@@ -431,33 +431,31 @@ export const focusCardMethods = {
         const granularity = window.__app?.focusGranularity || 'paragraph';
         const blockChanged = block !== ctx._lastBlock;
         const granularityChanged = granularity !== ctx._lastGranularity;
-        // Sentence-Mode muss bei jedem Tick neu laufen (Caret kann Satzgrenze
-        // überqueren, ohne den Block zu wechseln). Andere Modi sind purely
-        // block-basiert → bei unverändertem Block reichen Scroll-Updates.
-        const needsMarkUpdate = blockChanged || granularityChanged || granularity === 'sentence';
-        if (needsMarkUpdate) {
-          if (granularity === 'typewriter-only') {
-            // Kein Block markieren — Body-Class hebt Dim sowieso auf. Trotzdem
-            // Leichen-Klassen abräumen (User wechselt Mode → bereits gesetzte
-            // .focus-paragraph-active/-near sollen weg).
-            setActiveBlock(container, null);
-            setNearBlocks(container, null);
-          } else {
-            setActiveBlock(container, block);
-            if (granularity === 'window-3') {
-              setNearBlocks(container, block);
-            } else {
-              setNearBlocks(container, null);
-            }
-            if (granularity === 'sentence') {
-              applySentenceHighlight(block, sel);
-            } else if (typeof CSS !== 'undefined' && CSS.highlights) {
-              CSS.highlights.delete('focus-sentence-dim');
-            }
-          }
-          ctx._lastBlock = block;
-          ctx._lastGranularity = granularity;
+
+        // Block-Markierungen jeden Tick neu setzen — günstig (QSA +
+        // classList-Toggles) und garantiert Defense gegen Ghost-Klassen
+        // (z.B. Chromium-Split-Bug, externe DOM-Mutationen).
+        if (granularity === 'typewriter-only') {
+          setActiveBlock(container, null);
+          setNearBlocks(container, null);
+        } else {
+          setActiveBlock(container, block);
+          setNearBlocks(container, granularity === 'window-3' ? block : null);
         }
+
+        // Sentence-Highlight ist der teure Pfad (Range-Iteration über Text-
+        // knoten). Nur neu rechnen, wenn Block wechselt, Granularität wechselt
+        // oder Sentence-Mode aktiv ist (Caret kann Satzgrenze innerhalb eines
+        // Blocks überqueren).
+        if (blockChanged || granularityChanged || granularity === 'sentence') {
+          if (granularity === 'sentence') {
+            applySentenceHighlight(block, sel);
+          } else if (typeof CSS !== 'undefined' && CSS.highlights) {
+            CSS.highlights.delete('focus-sentence-dim');
+          }
+        }
+        ctx._lastBlock = block;
+        ctx._lastGranularity = granularity;
 
         // Aktive Textmarkierung: nicht recentern, sonst springt der Viewport
         // während der User die Auswahl aufzieht oder an ihr arbeitet.
