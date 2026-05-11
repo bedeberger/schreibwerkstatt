@@ -127,4 +127,20 @@
     flex: 1;
     text-align: center;
   }
+
+  /* Mobile: generelle .tabs-Reihen werden scrollbar, damit sie nicht aus der
+     Karte herausragen (z.B. Schwere-Filter in Szenen/Kontinuität bei vier
+     Buttons mit Counts auf engen Viewports). */
+  @media (max-width: 600px) {
+    .tabs:not(.tabs--fullwidth) {
+      display: flex;
+      max-width: 100%;
+      overflow-x: auto;
+      scrollbar-width: thin;
+      -webkit-overflow-scrolling: touch;
+    }
+    .tabs:not(.tabs--fullwidth) .tabs-btn {
+      flex-shrink: 0;
+    }
+  }
 }
