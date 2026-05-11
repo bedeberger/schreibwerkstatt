@@ -158,6 +158,40 @@ export const bookSettingsMethods = {
     }
   },
 
+  async deleteBook() {
+    const app = window.__app;
+    const bookId = app.selectedBookId;
+    if (!bookId) return;
+    const book = app.books.find(b => String(b.id) === String(bookId));
+    const name = book?.name || '';
+    if (!await app.appConfirm({
+      message: app.t('book.settings.deleteBookConfirm', { name }),
+      confirmLabel: app.t('common.delete'),
+      danger: true,
+    })) return;
+
+    this.bookDeleteLoading = true;
+    this.bookDeleteError = '';
+    try {
+      await app.bsDelete('books/' + bookId);
+      const r = await fetch(`/booksettings/${bookId}/book`, { method: 'DELETE' });
+      if (!r.ok) {
+        let errData = null;
+        try { errData = await r.json(); } catch (_) {}
+        throw new Error(errData ? app.tError(errData) : `HTTP ${r.status}`);
+      }
+      app.showBookSettingsCard = false;
+      app.selectedBookId = '';
+      app.resetView();
+      await app.loadBooks();
+      app.setStatus(app.t('book.settings.deleteBookSummary', { name }), false, 5000);
+    } catch (e) {
+      this.bookDeleteError = app.t('book.settings.deleteBookFailed', { msg: e.message });
+    } finally {
+      this.bookDeleteLoading = false;
+    }
+  },
+
   // Drill-Down: Typ-Zeile aufklappen → letzte N Runs nachladen.
   // Cache pro Typ in bookJobRuns; Re-Toggle schliesst nur, lädt nicht neu.
   async toggleJobRuns(type) {

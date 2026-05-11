@@ -232,6 +232,11 @@
   "book.settings.dangerZone":    "Gefahrenzone",
   "book.settings.dangerText":    "Löscht alle deine Lektorate, Buchbewertungen und Chats zu diesem Buch. Andere Nutzer sind nicht betroffen. Nicht rückgängig zu machen.",
   "book.settings.dangerButton":  "Historie für dieses Buch löschen",
+  "book.settings.deleteBookText":    "Verschiebt das Buch in den BookStack-Papierkorb und entfernt alle App-Referenzen (Lektorate, Bewertungen, Chats, Figuren, Orte, Szenen, Kontinuität, Zeitstrahl, Statistik, Schreib- und Lektoratszeit, PDF-Profile — aller Nutzer dieses Buchs).",
+  "book.settings.deleteBookButton":  "Buch löschen",
+  "book.settings.deleteBookConfirm": "Das Buch «{name}» löschen?\n\nIn BookStack landet es im Papierkorb (wiederherstellbar). In dieser App werden ALLE Daten zu diesem Buch unwiderruflich entfernt — auch die anderer Nutzer.",
+  "book.settings.deleteBookSummary": "Buch «{name}» gelöscht. BookStack-Papierkorb + alle App-Daten entfernt.",
+  "book.settings.deleteBookFailed":  "Löschen fehlgeschlagen: {msg}",
 
   "book.export.title":           "Buch exportieren",
   "book.export.hint":            "Lädt das gesamte Buch via BookStack-Export herunter. Dateiname wird automatisch mit Zeitstempel versehen.",

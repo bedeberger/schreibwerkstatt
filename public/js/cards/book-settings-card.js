@@ -27,6 +27,8 @@ export function registerBookSettingsCard() {
     bookHistoryResetLoading: false,
     bookHistoryResetMessage: '',
     bookHistoryResetError: '',
+    bookDeleteLoading: false,
+    bookDeleteError: '',
     _savedAtTimer: null,
     _resetMsgTimer: null,
     _lifecycle: null,
@@ -41,12 +43,14 @@ export function registerBookSettingsCard() {
           bookJobRuns: {},
           bookHistoryResetMessage: '',
           bookHistoryResetError: '',
+          bookDeleteError: '',
         },
         resetStateView: {
           bookSettingsSaved: false,
           bookSettingsError: '',
           bookHistoryResetMessage: '',
           bookHistoryResetError: '',
+          bookDeleteError: '',
         },
       });
     },

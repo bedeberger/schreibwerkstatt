@@ -4,10 +4,17 @@
 // Seiten. Keine KI, keine Job-Queue — direkter BookStack-API-Zugriff via
 // Root-bsGet/bsPut/bsPost/bsDelete-Helper.
 //
-// Eigener State: lokale Arbeitskopien (`workTree`, `soloPages`) als
-// Drop-Target für Sortable; Sortable-Instanzen für Cleanup.
-// Root behält: Wahrheits-`pages`/`tree` (loadPages refresht nach jeder
-// erfolgreichen Mutation).
+// Speicher-Strategie: nach jeder erfolgreichen Mutation patchen wir den
+// Root-Tree IN-PLACE. Kein `loadPages()` (würde root.pages + root.tree
+// reassignen → ganze App-UI re-rendert, sichtbarer Flicker). Sidebar liest
+// dieselben Items, die wir mutieren, und re-rendert nur die betroffenen Stellen
+// via Alpine-Deep-Reactivity.
+//
+// Re-Snapshot der Card-Visualisierung passiert ausschliesslich über das
+// `pages:loaded`-Event aus tree.js (echte Server-Reloads, z.B. Buchwechsel) —
+// nicht über einen $watch der Tree-Identität, sonst würden eigene
+// Reassignments im Tree (nicht der Fall mehr, aber als Safety) zur
+// Selbst-Reentry führen.
 
 import { setupCardLifecycle } from './card-lifecycle.js';
 import { loadSortable } from '../lazy-libs.js';
@@ -32,30 +39,32 @@ export function registerBookOrganizerCard() {
           await loadSortable();
           await this._rerender();
         },
-        // book:changed feuert VOR loadPages — Snapshot von altem tree wäre
-        // stale. Nur State + Sortable cleanen; der tree-Watch unten greift,
-        // sobald loadPages das neue tree gesetzt hat.
+        // book:changed feuert VOR loadPages — Sortable cleanen + State leeren,
+        // der pages:loaded-Listener unten greift, sobald loadPages fertig ist.
         onBookChanged: (e, ctx) => {
           ctx._destroySortables();
           Object.assign(ctx, { workTree: [], soloPages: [], organizerStatus: '', organizerProgress: 0, organizerSaving: false });
         },
         onCardRefresh: async (e, ctx, root) => {
-          await root.loadPages();
+          await root.loadPages(); // pages:loaded triggert _rerender
         },
         onViewReset: (e, ctx) => {
           ctx._destroySortables();
           Object.assign(ctx, { workTree: [], soloPages: [] });
         },
+        extraListeners: [
+          { type: 'pages:loaded', handler: async () => {
+            if (!window.__app.showBookOrganizerCard) return;
+            await loadSortable();
+            await this._rerender();
+          } },
+        ],
       });
+    },
 
-      // Tree-Watch ist die SSoT für „UI ist synchron mit BookStack". Greift bei
-      // (a) initialem loadPages, (b) Buchwechsel nach loadPages, (c) eigenen
-      // Mutationen nach _refresh(), (d) externen Refreshes durch andere Karten.
-      this.$watch(() => window.__app.tree, async () => {
-        if (!window.__app.showBookOrganizerCard) return;
-        await loadSortable();
-        await this._rerender();
-      });
+    destroy() {
+      this._destroySortables();
+      this._lifecycle?.destroy();
     },
 
     async _rerender() {
@@ -63,11 +72,6 @@ export function registerBookOrganizerCard() {
       this._snapshotFromRoot();
       await this.$nextTick();
       this._initSortables();
-    },
-
-    destroy() {
-      this._destroySortables();
-      this._lifecycle?.destroy();
     },
 
     _snapshotFromRoot() {
@@ -127,8 +131,10 @@ export function registerBookOrganizerCard() {
       if (this.organizerSaving) return;
       const ids = [...evt.to.querySelectorAll('.organizer-chapter[data-chapter-id]')]
         .map(el => parseInt(el.dataset.chapterId, 10));
-      const byId = new Map(this.workTree.map(c => [c.id, c]));
-      this.workTree = ids.map(id => byId.get(id)).filter(Boolean);
+      const idxOf = new Map(ids.map((id, i) => [id, i]));
+      // In-place sort: kein Reassignment, sonst rendert Alpine x-for neu und
+      // konkurriert mit Sortable's bereits gesetzter DOM-Reihenfolge.
+      this.workTree.sort((a, b) => (idxOf.get(a.id) ?? 0) - (idxOf.get(b.id) ?? 0));
       await this._renumberChapters();
     },
 
@@ -164,29 +170,38 @@ export function registerBookOrganizerCard() {
       return this.soloPages.find(p => p.id === id) || null;
     },
 
+    async _runMutation(fn, errKey = 'bookOrganizer.saveFailed') {
+      const root = window.__app;
+      this.organizerSaving = true;
+      try {
+        await fn();
+      } catch (e) {
+        root.setStatus(root.t(errKey, { detail: e.message }));
+        // Bei Fehler einmal voll resynchronisieren — Server-Zustand könnte
+        // partiell mutiert sein.
+        await root.loadPages();
+      } finally {
+        this.organizerSaving = false;
+        this.organizerProgress = 0;
+        this.organizerStatus = '';
+      }
+    },
+
     async _renumberChapters() {
       const root = window.__app;
       const total = this.workTree.length;
       if (!total) return;
-      this.organizerSaving = true;
-      this.organizerProgress = 0;
-      this.organizerStatus = root.t('bookOrganizer.savingChapters', { done: 0, total });
-      try {
+      await this._runMutation(async () => {
+        this.organizerProgress = 0;
+        this.organizerStatus = root.t('bookOrganizer.savingChapters', { done: 0, total });
         for (let i = 0; i < this.workTree.length; i++) {
           const c = this.workTree[i];
           await root.bsPut('chapters/' + c.id, { name: c.name, priority: i + 1 });
           this.organizerProgress = Math.round(((i + 1) / total) * 100);
           this.organizerStatus = root.t('bookOrganizer.savingChapters', { done: i + 1, total });
         }
-        await this._refresh();
-      } catch (e) {
-        root.setStatus(root.t('bookOrganizer.saveFailed', { detail: e.message }));
-        await this._refresh();
-      } finally {
-        this.organizerSaving = false;
-        this.organizerProgress = 0;
-        this.organizerStatus = '';
-      }
+        this._mirrorChapterOrderInRoot();
+      });
     },
 
     async _renumberPages(toChapId, fromChapId) {
@@ -201,31 +216,17 @@ export function registerBookOrganizerCard() {
       ];
       const total = targets.length;
       if (!total) return;
-      this.organizerSaving = true;
-      this.organizerProgress = 0;
-      this.organizerStatus = root.t('bookOrganizer.savingPages', { done: 0, total });
-      try {
+      await this._runMutation(async () => {
+        this.organizerProgress = 0;
+        this.organizerStatus = root.t('bookOrganizer.savingPages', { done: 0, total });
         for (let i = 0; i < targets.length; i++) {
           const t = targets[i];
           await root.bsPut('pages/' + t.id, { name: t.name, priority: t.priority, chapter_id: t.chapter_id });
           this.organizerProgress = Math.round(((i + 1) / total) * 100);
           this.organizerStatus = root.t('bookOrganizer.savingPages', { done: i + 1, total });
         }
-        await this._refresh();
-      } catch (e) {
-        root.setStatus(root.t('bookOrganizer.saveFailed', { detail: e.message }));
-        await this._refresh();
-      } finally {
-        this.organizerSaving = false;
-        this.organizerProgress = 0;
-        this.organizerStatus = '';
-      }
-    },
-
-    async _refresh() {
-      // tree-Watch im init() re-rendert die Karte automatisch, sobald
-      // loadPages den Tree neu zugewiesen hat.
-      await window.__app.loadPages();
+        this._mirrorPageMembershipInRoot([toChapId, fromChapId].filter(v => v != null));
+      });
     },
 
     onRenameChapter(id, ev) {
@@ -244,7 +245,11 @@ export function registerBookOrganizerCard() {
         await root.bsPut('chapters/' + id, { name: newName });
         const ch = this.workTree.find(c => c.id === id);
         if (ch) ch.name = newName;
-        await root.loadPages();
+        // In-place mirror: chapter entry in root.tree + _chapterOrderMap.
+        for (const it of root.tree) {
+          if (it.type === 'chapter' && !it.solo && it.id === id) it.name = newName;
+        }
+        this._rebuildChapterOrderMap();
       } catch (e) {
         root.setStatus(root.t('bookOrganizer.saveFailed', { detail: e.message }));
         const ch = this.workTree.find(c => c.id === id);
@@ -268,7 +273,16 @@ export function registerBookOrganizerCard() {
         await root.bsPut('pages/' + id, { name: newName });
         const page = this._findPage(id);
         if (page) page.name = newName;
-        await root.loadPages();
+        // In-place mirror: page in root.pages + ggf. solo-Tree-Entry.
+        const rp = root.pages.find(p => p.id === id);
+        if (rp) rp.name = newName;
+        for (const it of root.tree) {
+          if (it.type === 'chapter' && it.solo && it.pages?.[0]?.id === id) {
+            it.name = newName;
+          }
+        }
+        // Pages-Maps neu aufbauen (Reihenfolge unverändert, aber Name-Index drin).
+        this._rebuildPageOrderMaps();
       } catch (e) {
         root.setStatus(root.t('bookOrganizer.saveFailed', { detail: e.message }));
         const page = this._findPage(id);
@@ -281,12 +295,35 @@ export function registerBookOrganizerCard() {
       const name = window.prompt(root.t('bookOrganizer.promptChapterName'));
       const trimmed = (name || '').trim();
       if (!trimmed) return;
-      try {
-        await root.bsPost('chapters', { book_id: parseInt(root.selectedBookId, 10), name: trimmed });
-        await this._refresh();
-      } catch (e) {
-        root.setStatus(root.t('bookOrganizer.createFailed', { detail: e.message }));
-      }
+      await this._runMutation(async () => {
+        const created = await root.bsPost('chapters', { book_id: parseInt(root.selectedBookId, 10), name: trimmed });
+        if (!created?.id) return;
+        // In-place: Tree-Eintrag anlegen + workTree erweitern + Maps neu.
+        const priority = (created.priority != null) ? created.priority : this._nextChapterPriority();
+        const treeEntry = {
+          type: 'chapter',
+          id: created.id,
+          name: created.name || trimmed,
+          priority,
+          open: true,
+          solo: false,
+          url: this._chapterUrl(created),
+          pages: [],
+        };
+        root.tree.push(treeEntry);
+        root.tree.sort((a, b) => a.priority - b.priority);
+        this.workTree.push({ id: created.id, name: treeEntry.name, pages: [] });
+        this.workTree.sort((a, b) => {
+          const ai = root.tree.findIndex(it => !it.solo && it.id === a.id);
+          const bi = root.tree.findIndex(it => !it.solo && it.id === b.id);
+          return ai - bi;
+        });
+        this._rebuildChapterOrderMap();
+        if (typeof root._refreshChapterStats === 'function') root._refreshChapterStats();
+        await this.$nextTick();
+        this._destroySortables();
+        this._initSortables();
+      }, 'bookOrganizer.createFailed');
     },
 
     async createPage(chapterId) {
@@ -300,12 +337,39 @@ export function registerBookOrganizerCard() {
         html: '',
       };
       if (chapterId) body.chapter_id = chapterId;
-      try {
-        await root.bsPost('pages', body);
-        await this._refresh();
-      } catch (e) {
-        root.setStatus(root.t('bookOrganizer.createFailed', { detail: e.message }));
-      }
+      await this._runMutation(async () => {
+        const created = await root.bsPost('pages', body);
+        if (!created?.id) return;
+        const enriched = this._enrichPage(created);
+        root.pages.push(enriched);
+        if (chapterId) {
+          // In Kapitel-Tree-Entry hinzufügen.
+          const treeCh = root.tree.find(it => it.type === 'chapter' && !it.solo && it.id === chapterId);
+          if (treeCh) treeCh.pages.push(enriched);
+          const wch = this.workTree.find(c => c.id === chapterId);
+          if (wch) wch.pages.push({ id: enriched.id, name: enriched.name, chapter_id: chapterId });
+        } else {
+          // Neuer Solo-Tree-Eintrag.
+          root.tree.push({
+            type: 'chapter',
+            id: 'solo-' + enriched.id,
+            name: enriched.name,
+            priority: enriched.priority || 9999,
+            open: true,
+            solo: true,
+            url: null,
+            pages: [enriched],
+          });
+          root.tree.sort((a, b) => a.priority - b.priority);
+          this.soloPages.push({ id: enriched.id, name: enriched.name, chapter_id: 0 });
+        }
+        this._resortRootPages();
+        this._rebuildPageOrderMaps();
+        if (typeof root._refreshChapterStats === 'function') root._refreshChapterStats();
+        await this.$nextTick();
+        this._destroySortables();
+        this._initSortables();
+      }, 'bookOrganizer.createFailed');
     },
 
     async deleteChapter(id) {
@@ -323,12 +387,27 @@ export function registerBookOrganizerCard() {
         danger: true,
       });
       if (!ok) return;
-      try {
+      await this._runMutation(async () => {
         await root.bsDelete('chapters/' + id);
-        await this._refresh();
-      } catch (e) {
-        root.setStatus(root.t('bookOrganizer.deleteFailed', { detail: e.message }));
-      }
+        // BookStack-Cascade: Kapitel + dessen Seiten landen im Papierkorb.
+        const deletedPageIds = new Set(ch.pages.map(p => p.id));
+        for (let i = root.pages.length - 1; i >= 0; i--) {
+          if (deletedPageIds.has(root.pages[i].id)) root.pages.splice(i, 1);
+        }
+        for (let i = root.tree.length - 1; i >= 0; i--) {
+          if (root.tree[i].type === 'chapter' && !root.tree[i].solo && root.tree[i].id === id) {
+            root.tree.splice(i, 1);
+          }
+        }
+        const wIdx = this.workTree.findIndex(c => c.id === id);
+        if (wIdx >= 0) this.workTree.splice(wIdx, 1);
+        this._rebuildChapterOrderMap();
+        this._rebuildPageOrderMaps();
+        if (typeof root._refreshChapterStats === 'function') root._refreshChapterStats();
+        await this.$nextTick();
+        this._destroySortables();
+        this._initSortables();
+      }, 'bookOrganizer.deleteFailed');
     },
 
     async deletePage(id) {
@@ -346,12 +425,184 @@ export function registerBookOrganizerCard() {
         danger: true,
       });
       if (!ok) return;
-      try {
+      await this._runMutation(async () => {
         await root.bsDelete('pages/' + id);
-        await this._refresh();
-      } catch (e) {
-        root.setStatus(root.t('bookOrganizer.deleteFailed', { detail: e.message }));
+        // Aus root.pages entfernen.
+        const pi = root.pages.findIndex(p => p.id === id);
+        if (pi >= 0) root.pages.splice(pi, 1);
+        // Aus Kapitel-Tree-Pages bzw. Solo-Tree-Eintrag entfernen.
+        for (let i = root.tree.length - 1; i >= 0; i--) {
+          const it = root.tree[i];
+          if (it.type === 'chapter') {
+            if (it.solo && it.pages?.[0]?.id === id) {
+              root.tree.splice(i, 1);
+            } else if (!it.solo) {
+              const j = it.pages.findIndex(p => p.id === id);
+              if (j >= 0) it.pages.splice(j, 1);
+            }
+          }
+        }
+        // Aus workTree/soloPages entfernen.
+        for (const c of this.workTree) {
+          const j = c.pages.findIndex(p => p.id === id);
+          if (j >= 0) c.pages.splice(j, 1);
+        }
+        const si = this.soloPages.findIndex(p => p.id === id);
+        if (si >= 0) this.soloPages.splice(si, 1);
+        this._rebuildPageOrderMaps();
+        if (typeof root._refreshChapterStats === 'function') root._refreshChapterStats();
+      }, 'bookOrganizer.deleteFailed');
+    },
+
+    // ─── In-Place-Mirror-Helpers ─────────────────────────────────────────────
+
+    _mirrorChapterOrderInRoot() {
+      const root = window.__app;
+      const newPrio = new Map(this.workTree.map((c, i) => [c.id, i + 1]));
+      for (const it of root.tree) {
+        if (it.type === 'chapter' && !it.solo) {
+          const p = newPrio.get(it.id);
+          if (p !== undefined) it.priority = p;
+        }
       }
+      root.tree.sort((a, b) => a.priority - b.priority);
+      this._rebuildChapterOrderMap();
+      this._resortRootPages();
+      this._rebuildPageOrderMaps();
+      if (typeof root._refreshChapterStats === 'function') root._refreshChapterStats();
+    },
+
+    _mirrorPageMembershipInRoot(affectedChapterIds) {
+      const root = window.__app;
+      // Für jede betroffene Page in workTree/soloPages: chapter_id + priority + name auf root.pages spiegeln.
+      const updates = new Map();
+      for (const c of this.workTree) {
+        for (let i = 0; i < c.pages.length; i++) {
+          updates.set(c.pages[i].id, { chapter_id: c.id, priority: i + 1, name: c.pages[i].name });
+        }
+      }
+      for (let i = 0; i < this.soloPages.length; i++) {
+        updates.set(this.soloPages[i].id, { chapter_id: 0, priority: i + 1, name: this.soloPages[i].name });
+      }
+      for (const p of root.pages) {
+        const u = updates.get(p.id);
+        if (!u) continue;
+        p.chapter_id = u.chapter_id || 0;
+        p.priority = u.priority;
+        p.name = u.name;
+        if (u.chapter_id) {
+          const treeCh = root.tree.find(it => it.type === 'chapter' && !it.solo && it.id === u.chapter_id);
+          p.chapterName = treeCh?.name || p.chapterName;
+        } else {
+          p.chapterName = null;
+        }
+      }
+      // Betroffene Kapitel: pages-Array im Tree-Eintrag aus root.pages neu filtern.
+      for (const chapId of new Set(affectedChapterIds)) {
+        if (chapId === 0) continue;
+        const treeCh = root.tree.find(it => it.type === 'chapter' && !it.solo && it.id === chapId);
+        if (!treeCh) continue;
+        treeCh.pages = root.pages
+          .filter(p => p.chapter_id === chapId)
+          .sort((a, b) => (a.priority || 0) - (b.priority || 0));
+      }
+      // Solo-Entries: rebuild (Pages, die jetzt root-level sind bzw. waren).
+      this._rebuildSoloEntries();
+      this._resortRootPages();
+      this._rebuildPageOrderMaps();
+      if (typeof root._refreshChapterStats === 'function') root._refreshChapterStats();
+    },
+
+    _rebuildSoloEntries() {
+      const root = window.__app;
+      // Existing solo entries entfernen.
+      for (let i = root.tree.length - 1; i >= 0; i--) {
+        if (root.tree[i].type === 'chapter' && root.tree[i].solo) root.tree.splice(i, 1);
+      }
+      // Frisch nach soloPages-Reihenfolge anlegen.
+      for (const sp of this.soloPages) {
+        const rp = root.pages.find(p => p.id === sp.id);
+        if (!rp) continue;
+        root.tree.push({
+          type: 'chapter',
+          id: 'solo-' + sp.id,
+          name: sp.name,
+          priority: rp.priority || 9999,
+          open: true,
+          solo: true,
+          url: null,
+          pages: [rp],
+        });
+      }
+      root.tree.sort((a, b) => a.priority - b.priority);
+    },
+
+    _resortRootPages() {
+      const root = window.__app;
+      const chapterPrio = new Map();
+      for (const it of root.tree) {
+        if (it.type === 'chapter' && !it.solo) chapterPrio.set(it.id, it.priority || 0);
+      }
+      root.pages.sort((a, b) => {
+        const aO = a.chapter_id ? (chapterPrio.get(a.chapter_id) ?? 999) : -1;
+        const bO = b.chapter_id ? (chapterPrio.get(b.chapter_id) ?? 999) : -1;
+        if (aO !== bO) return aO - bO;
+        return (a.priority || 0) - (b.priority || 0);
+      });
+    },
+
+    _rebuildChapterOrderMap() {
+      const root = window.__app;
+      const map = new Map();
+      let idx = 0;
+      for (const it of root.tree) {
+        if (it.type === 'chapter' && !it.solo) map.set(it.name, idx++);
+      }
+      root._chapterOrderMap = map;
+    },
+
+    _rebuildPageOrderMaps() {
+      const root = window.__app;
+      const nameMap = new Map();
+      const idMap = new Map();
+      for (let i = 0; i < root.pages.length; i++) {
+        const p = root.pages[i];
+        if (!nameMap.has(p.name)) nameMap.set(p.name, i);
+        idMap.set(p.id, i);
+      }
+      root._pageOrderMap = nameMap;
+      root._pageIdOrderMap = idMap;
+    },
+
+    _nextChapterPriority() {
+      const root = window.__app;
+      let max = 0;
+      for (const it of root.tree) {
+        if (it.type === 'chapter' && !it.solo && it.priority > max) max = it.priority;
+      }
+      return max + 1;
+    },
+
+    _enrichPage(p) {
+      // Spiegelt die Augmentation aus tree.js#loadPages.
+      const root = window.__app;
+      const treeCh = p.chapter_id
+        ? root.tree.find(it => it.type === 'chapter' && !it.solo && it.id === p.chapter_id)
+        : null;
+      return {
+        ...p,
+        chapterName: treeCh?.name || null,
+        url: root.bookstackUrl && p.book_slug && p.slug
+          ? `${root.bookstackUrl}/books/${p.book_slug}/page/${p.slug}`
+          : null,
+      };
+    },
+
+    _chapterUrl(c) {
+      const root = window.__app;
+      return root.bookstackUrl && c.book_slug && c.slug
+        ? `${root.bookstackUrl}/books/${c.book_slug}/chapter/${c.slug}`
+        : null;
     },
   }));
 }

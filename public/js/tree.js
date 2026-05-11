@@ -330,6 +330,11 @@ export const treeMethods = {
       ]);
       this.checkPendingJobs(bookId); // Reconnect nach Tab-Schliessen, kein await
       this.loadTokenEstimates(this._tokenEstGen); // Hintergrund, kein await
+      // Karten, die einen frischen Tree brauchen (Buchorganizer), reagieren
+      // explizit auf diesen Event statt auf einen $watch der Tree-Identität —
+      // so können dieselben Karten auch In-Place-Mutationen am Tree machen,
+      // ohne sich selbst rekursiv neu zu rendern.
+      window.dispatchEvent(new CustomEvent('pages:loaded', { detail: { bookId } }));
     } catch (e) {
       console.error('[loadPages]', e);
       this.setStatus(this.t('common.errorColon') + e.message);

@@ -232,6 +232,11 @@
   "book.settings.dangerZone":    "Danger zone",
   "book.settings.dangerText":    "Deletes all your page edits, book reviews and chats for this book. Other users are not affected. This cannot be undone.",
   "book.settings.dangerButton":  "Delete history for this book",
+  "book.settings.deleteBookText":    "Moves the book to BookStack's recycle bin and removes all app references (page edits, reviews, chats, characters, locations, scenes, continuity, timeline, statistics, writing and editing time, PDF profiles — for all users of this book).",
+  "book.settings.deleteBookButton":  "Delete book",
+  "book.settings.deleteBookConfirm": "Delete the book “{name}”?\n\nIn BookStack it lands in the recycle bin (recoverable). In this app ALL data for this book is removed permanently — including other users'.",
+  "book.settings.deleteBookSummary": "Book “{name}” deleted. Moved to BookStack recycle bin and all app data removed.",
+  "book.settings.deleteBookFailed":  "Delete failed: {msg}",
 
   "book.export.title":           "Export book",
   "book.export.hint":            "Downloads the entire book via BookStack export. Filename is timestamped automatically.",
