@@ -67,6 +67,9 @@ const navigationState = () => ({
   _bookstackSearchTimer: null,
   _bookstackSearchAbort: null,
   _bookstackSearchSeq: 0,
+  newChapterTitle: '',
+  newChapterCreating: false,
+  newChapterError: '',
 });
 
 const editorState = () => ({

@@ -527,6 +527,8 @@
   "sidebar.empty":               "leer",
   "sidebar.noPagesFound":        "Keine Seiten gefunden.",
   "sidebar.resizeHandle":        "Sidebar-Breite verändern (Pfeiltasten zum Anpassen)",
+  "sidebar.newChapterPlaceholder": "Titel des neuen Kapitels…",
+  "sidebar.newChapterAdd":         "Kapitel anlegen",
   "sidebar.status.noLektorat":   "Noch kein Lektorat",
   "sidebar.status.lektoratToday":     "Lektorat heute, {time}",
   "sidebar.status.lektoratYesterday": "Lektorat gestern, {time}",

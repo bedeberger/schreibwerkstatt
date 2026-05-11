@@ -28,6 +28,21 @@
     </div>
     <div class="batch-status" x-html="batchStatus"></div>
   </div>
+  <!-- Neues Kapitel anlegen -->
+  <form x-show="!pageSearch" class="kapitel-new-page" @submit.prevent="createChapter()">
+    <input type="text"
+           class="kapitel-new-page-input"
+           x-model="newChapterTitle"
+           :placeholder="t('sidebar.newChapterPlaceholder')"
+           :aria-label="t('sidebar.newChapterPlaceholder')"
+           :disabled="newChapterCreating">
+    <button type="submit"
+            :disabled="newChapterCreating || !newChapterTitle.trim()">
+      <span x-show="newChapterCreating" class="spinner"></span>
+      <span x-text="t('sidebar.newChapterAdd')"></span>
+    </button>
+  </form>
+  <div x-show="newChapterError" class="error-msg" x-text="newChapterError"></div>
   <template x-for="item in filteredTree" :key="item.id">
     <div class="tree-chapter" :class="{ 'tree-chapter--solo': item.solo }">
       <div x-show="!item.solo"

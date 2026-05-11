@@ -327,6 +327,42 @@ export const treeMethods = {
     }
   },
 
+  async createChapter() {
+    const bookId = this.selectedBookId;
+    const title = (this.newChapterTitle || '').trim();
+    if (!bookId || !title || this.newChapterCreating) return;
+    this.newChapterCreating = true;
+    this.newChapterError = '';
+    try {
+      const created = await this.bsPost('chapters', {
+        book_id: parseInt(bookId),
+        name: title,
+      });
+      this.newChapterTitle = '';
+      if (!created?.id) return;
+      const chapterItem = {
+        type: 'chapter',
+        id: created.id,
+        name: created.name,
+        priority: created.priority ?? Number.MAX_SAFE_INTEGER,
+        open: true,
+        solo: false,
+        url: this.bookstackUrl && created.book_slug && created.slug
+          ? `${this.bookstackUrl}/books/${created.book_slug}/chapter/${created.slug}`
+          : null,
+        pages: [],
+      };
+      this.tree = [...this.tree, chapterItem].sort((a, b) => a.priority - b.priority);
+      if (this._chapterOrderMap) this._chapterOrderMap.set(chapterItem.name, this._chapterOrderMap.size);
+      fetch('/sync/book/' + bookId, { method: 'POST' }).catch(() => {});
+    } catch (e) {
+      console.error('[createChapter]', e);
+      this.newChapterError = e.message || this.t('common.unknownError');
+    } finally {
+      this.newChapterCreating = false;
+    }
+  },
+
   // Token-Estimates befüllen die Sidebar-Badges + Σ-Totals. Strategie:
   //   1) Server-Backfill (`POST /sync/page-stats/:bookId`) — ein einzelner
   //      Request, Server holt fehlende Stats parallel von BookStack und
