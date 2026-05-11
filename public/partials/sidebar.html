@@ -55,8 +55,8 @@
               @click.stop="if (!pageSearch && item.pages.length > 0) item.open = !item.open"></span>
         <span x-text="item.name"></span>
         <span class="tree-chapter-meta">
-          <span class="tag" x-show="item.pages.length > 1" x-text="t('sidebar.pagesCount', { n: item.pages.length })"></span>
-          <template x-if="item.pages.length > 1 && item.stats">
+          <span class="tag" x-show="item.pages.length >= 1" x-text="item.pages.length === 1 ? t('sidebar.pagesCountOne') : t('sidebar.pagesCount', { n: item.pages.length })"></span>
+          <template x-if="item.pages.length >= 1 && item.stats">
             <span class="tok-badge tok-neutral"
               x-text="item.stats.badge"
               @mouseenter.stop="_showTokTip($el, item.stats, { _chapterOnly: true })"

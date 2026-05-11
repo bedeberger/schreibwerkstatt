@@ -569,6 +569,7 @@
   "sidebar.expandAll":           "Expand all",
   "sidebar.collapseAll":         "Collapse all",
   "sidebar.pagesCount":          "{n} pages",
+  "sidebar.pagesCountOne":       "1 page",
   "sidebar.reviewChapterTitle":  "Review chapter «{name}» (dramaturgy, pacing, coherence)",
   "sidebar.emptyChapterTitle":   "Open chapter «{name}» to add the first page",
   "sidebar.empty":               "empty",

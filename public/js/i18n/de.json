@@ -569,6 +569,7 @@
   "sidebar.expandAll":           "Alle ausklappen",
   "sidebar.collapseAll":         "Alle einklappen",
   "sidebar.pagesCount":          "{n} Seiten",
+  "sidebar.pagesCountOne":       "1 Seite",
   "sidebar.reviewChapterTitle":  "Kapitel «{name}» bewerten (Dramaturgie, Erzähltempo, Kohärenz)",
   "sidebar.emptyChapterTitle":   "Kapitel «{name}» öffnen, um eine erste Seite anzulegen",
   "sidebar.empty":               "leer",

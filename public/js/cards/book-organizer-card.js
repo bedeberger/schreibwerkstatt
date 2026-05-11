@@ -357,7 +357,11 @@ export function registerBookOrganizerCard() {
         if (chapterId) {
           const treeCh = root.tree.find(it => it.type === 'chapter' && !it.solo && String(it.id) === String(chapterId));
           if (treeCh) {
-            treeCh.pages.push(newPage);
+            // Reassignment statt push: Alpine-Reaktivität greift bei nested
+            // Arrays nicht immer zuverlässig, wenn das Parent-Item kürzlich
+            // selbst gepusht wurde (neu erstelltes Kapitel). Property-Set
+            // auf `.pages` triggert die Watcher in jedem Fall.
+            treeCh.pages = [...treeCh.pages, newPage];
             treeCh.open = true;
           }
         } else {

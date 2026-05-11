@@ -58,7 +58,7 @@
                  @keydown.enter.prevent="$event.target.blur()"
                  :disabled="organizerSaving"
                  :aria-label="$app.t('bookOrganizer.renameChapter')">
-          <span class="organizer-chapter-meta tag" x-text="$app.t('sidebar.pagesCount', { n: ch.pages.length })"></span>
+          <span class="organizer-chapter-meta tag" x-text="ch.pages.length === 1 ? $app.t('sidebar.pagesCountOne') : $app.t('sidebar.pagesCount', { n: ch.pages.length })"></span>
           <div class="organizer-chapter-actions">
             <button type="button" class="btn-compact" @click="createPage(ch.id)" :disabled="organizerSaving" x-text="$app.t('bookOrganizer.addPageHere')"></button>
             <button type="button" class="organizer-delete-btn organizer-delete-btn--chapter" @click="deleteChapter(ch.id)" :disabled="organizerSaving"
