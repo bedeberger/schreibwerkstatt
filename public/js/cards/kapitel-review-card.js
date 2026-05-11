@@ -377,5 +377,19 @@ export function registerKapitelReviewCard() {
         root.newPageCreating = false;
       }
     },
+
+    // Neues Kapitel direkt unter dem aktuell angezeigten Kapitel einhängen
+    // und sofort zum neuen Kapitel navigieren, damit der User dort eine
+    // erste Seite anlegen kann. ID wird direkt am Root gesetzt — der
+    // kapitel-review:select-Handler filtert via kapitelReviewChapterOptions()
+    // 0-Seiten-Kapitel raus und wäre für ein frisches Kapitel ein No-Op.
+    async createSiblingChapter() {
+      const root = window.__app;
+      const current = this.kapitelReviewSelectedChapter();
+      if (!current || root.newChapterCreating) return;
+      const created = await root.createChapter({ afterChapterId: current.id });
+      if (!created) return;
+      root.kapitelReviewChapterId = String(created.id);
+    },
   }));
 }

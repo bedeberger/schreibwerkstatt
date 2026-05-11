@@ -10,6 +10,7 @@
 let _visPromise = null;
 let _chartPromise = null;
 let _jsMindPromise = null;
+let _sortablePromise = null;
 
 function _loadScript(src) {
   return new Promise((resolve, reject) => {
@@ -50,4 +51,14 @@ export function loadJsMind() {
       .catch(err => { _jsMindPromise = null; throw err; });
   }
   return _jsMindPromise;
+}
+
+export function loadSortable() {
+  if (typeof window.Sortable !== 'undefined') return Promise.resolve(window.Sortable);
+  if (!_sortablePromise) {
+    _sortablePromise = _loadScript('vendor/sortable-1.15.6.min.js')
+      .then(() => window.Sortable)
+      .catch(err => { _sortablePromise = null; throw err; });
+  }
+  return _sortablePromise;
 }

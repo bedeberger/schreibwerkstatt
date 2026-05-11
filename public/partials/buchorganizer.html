@@ -1,0 +1,86 @@
+<!-- Buchorganizer -->
+<!--
+  Alpine.data-Sub-Komponente — siehe public/js/cards/book-organizer-card.js.
+  DnD via SortableJS (lazy aus lazy-libs.js). Reorder/Move setzt BookStack-
+  priority + chapter_id pro Item; Renames + CRUD direkt auf den BookStack-Endpoints.
+-->
+<div class="card card--organizer" x-data="bookOrganizerCard" x-show="$app.showBookOrganizerCard" x-cloak>
+  <div class="card-header">
+    <span class="card-title" x-text="$app.t('bookOrganizer.title', { name: $app.selectedBookName })"></span>
+    <div class="card-actions">
+      <button type="button" @click="createChapter()" :disabled="organizerSaving" x-text="$app.t('bookOrganizer.newChapter')"></button>
+      <button type="button" @click="createPage(0)" :disabled="organizerSaving" x-text="$app.t('bookOrganizer.newSoloPage')"></button>
+    </div>
+  </div>
+
+  <div x-show="organizerProgress > 0" class="progress-bar-wrap">
+    <div class="progress-bar" :style="{ '--progress': organizerProgress + '%' }"></div>
+  </div>
+  <div x-show="organizerStatus" class="card-status" x-text="organizerStatus"></div>
+
+  <div x-show="workTree.length === 0 && soloPages.length === 0 && !organizerSaving" class="muted-msg muted-msg--spaced" x-text="$app.t('bookOrganizer.empty')"></div>
+
+  <p class="organizer-hint muted-msg muted-msg--sm" x-text="$app.t('bookOrganizer.hint')"></p>
+
+  <!-- Solo-Pages (kein Kapitel) zuerst -->
+  <div class="organizer-chapter organizer-chapter--solo" x-show="soloPages.length > 0 || workTree.length === 0">
+    <div class="organizer-chapter-header">
+      <span class="organizer-chapter-label" x-text="$app.t('bookOrganizer.soloHeader')"></span>
+      <div class="organizer-chapter-actions">
+        <button type="button" class="btn-compact" @click="createPage(0)" :disabled="organizerSaving" x-text="$app.t('bookOrganizer.addPageHere')"></button>
+      </div>
+    </div>
+    <ul class="organizer-pages" data-organizer="page-list" :data-chapter-id="0">
+      <template x-for="page in soloPages" :key="page.id">
+        <li class="organizer-page" :data-page-id="page.id">
+          <span class="organizer-drag-handle" :data-tip="$app.t('bookOrganizer.dragHint')" aria-hidden="true">⋮⋮</span>
+          <input type="text" class="organizer-name" :value="page.name"
+                 @blur="onRenamePage(page.id, $event)"
+                 @keydown.enter.prevent="$event.target.blur()"
+                 :disabled="organizerSaving"
+                 :aria-label="$app.t('bookOrganizer.renamePage')">
+          <button type="button" class="organizer-delete-btn" @click="deletePage(page.id)" :disabled="organizerSaving"
+                  :data-tip="$app.t('bookOrganizer.deletePage')" :aria-label="$app.t('bookOrganizer.deletePage')">×</button>
+        </li>
+      </template>
+      <li class="organizer-empty" x-show="soloPages.length === 0" x-text="$app.t('bookOrganizer.noSoloPages')"></li>
+    </ul>
+  </div>
+
+  <!-- Kapitel-Liste -->
+  <div class="organizer-list" data-organizer="chapter-list">
+    <template x-for="ch in workTree" :key="ch.id">
+      <div class="organizer-chapter" :data-chapter-id="ch.id">
+        <div class="organizer-chapter-header">
+          <span class="organizer-drag-handle organizer-drag-handle--chapter" :data-tip="$app.t('bookOrganizer.dragHint')" aria-hidden="true">⋮⋮</span>
+          <input type="text" class="organizer-name organizer-name--chapter" :value="ch.name"
+                 @blur="onRenameChapter(ch.id, $event)"
+                 @keydown.enter.prevent="$event.target.blur()"
+                 :disabled="organizerSaving"
+                 :aria-label="$app.t('bookOrganizer.renameChapter')">
+          <span class="organizer-chapter-meta tag" x-text="$app.t('sidebar.pagesCount', { n: ch.pages.length })"></span>
+          <div class="organizer-chapter-actions">
+            <button type="button" class="btn-compact" @click="createPage(ch.id)" :disabled="organizerSaving" x-text="$app.t('bookOrganizer.addPageHere')"></button>
+            <button type="button" class="organizer-delete-btn organizer-delete-btn--chapter" @click="deleteChapter(ch.id)" :disabled="organizerSaving"
+                    :data-tip="$app.t('bookOrganizer.deleteChapter')" :aria-label="$app.t('bookOrganizer.deleteChapter')">×</button>
+          </div>
+        </div>
+        <ul class="organizer-pages" data-organizer="page-list" :data-chapter-id="ch.id">
+          <template x-for="page in ch.pages" :key="page.id">
+            <li class="organizer-page" :data-page-id="page.id">
+              <span class="organizer-drag-handle" :data-tip="$app.t('bookOrganizer.dragHint')" aria-hidden="true">⋮⋮</span>
+              <input type="text" class="organizer-name" :value="page.name"
+                     @blur="onRenamePage(page.id, $event)"
+                     @keydown.enter.prevent="$event.target.blur()"
+                     :disabled="organizerSaving"
+                     :aria-label="$app.t('bookOrganizer.renamePage')">
+              <button type="button" class="organizer-delete-btn" @click="deletePage(page.id)" :disabled="organizerSaving"
+                      :data-tip="$app.t('bookOrganizer.deletePage')" :aria-label="$app.t('bookOrganizer.deletePage')">×</button>
+            </li>
+          </template>
+          <li class="organizer-empty" x-show="ch.pages.length === 0" x-text="$app.t('bookOrganizer.noPagesInChapter')"></li>
+        </ul>
+      </div>
+    </template>
+  </div>
+</div>

@@ -145,7 +145,16 @@ export const treeMethods = {
   },
 
   _onChapterHeaderActivate(item) {
-    if (this.pageSearch || item.pages.length === 0) return;
+    if (this.pageSearch) return;
+    // Leeres Kapitel → kapitel-review-card öffnen, damit User direkt eine
+    // erste Seite anlegen kann. openKapitelReviewForChapter filtert 0-Seiten-
+    // Kapitel via kapitelReviewChapterOptions() raus, deswegen direkt setzen.
+    if (item.pages.length === 0) {
+      this._closeOtherMainCards('kapitelReview');
+      this.showKapitelReviewCard = true;
+      this.kapitelReviewChapterId = String(item.id);
+      return;
+    }
     if (this._bookQualifiesForChapterReview()) this.openKapitelReviewForChapter(item.id);
     else item.open = !item.open;
   },
@@ -327,24 +336,29 @@ export const treeMethods = {
     }
   },
 
-  async createChapter() {
+  async createChapter({ afterChapterId } = {}) {
     const bookId = this.selectedBookId;
     const title = (this.newChapterTitle || '').trim();
-    if (!bookId || !title || this.newChapterCreating) return;
+    if (!bookId || !title || this.newChapterCreating) return null;
     this.newChapterCreating = true;
     this.newChapterError = '';
     try {
-      const created = await this.bsPost('chapters', {
-        book_id: parseInt(bookId),
-        name: title,
-      });
+      const afterItem = afterChapterId
+        ? this.tree.find(i => i.type === 'chapter' && !i.solo && String(i.id) === String(afterChapterId))
+        : null;
+      const body = { book_id: parseInt(bookId), name: title };
+      if (afterItem && Number.isFinite(afterItem.priority)) body.priority = afterItem.priority + 1;
+      const created = await this.bsPost('chapters', body);
       this.newChapterTitle = '';
-      if (!created?.id) return;
+      if (!created?.id) return null;
+      const localPriority = afterItem && Number.isFinite(afterItem.priority)
+        ? afterItem.priority + 0.5
+        : (created.priority ?? Number.MAX_SAFE_INTEGER);
       const chapterItem = {
         type: 'chapter',
         id: created.id,
         name: created.name,
-        priority: created.priority ?? Number.MAX_SAFE_INTEGER,
+        priority: localPriority,
         open: true,
         solo: false,
         url: this.bookstackUrl && created.book_slug && created.slug
@@ -355,9 +369,11 @@ export const treeMethods = {
       this.tree = [...this.tree, chapterItem].sort((a, b) => a.priority - b.priority);
       if (this._chapterOrderMap) this._chapterOrderMap.set(chapterItem.name, this._chapterOrderMap.size);
       fetch('/sync/book/' + bookId, { method: 'POST' }).catch(() => {});
+      return chapterItem;
     } catch (e) {
       console.error('[createChapter]', e);
       this.newChapterError = e.message || this.t('common.unknownError');
+      return null;
     } finally {
       this.newChapterCreating = false;
     }

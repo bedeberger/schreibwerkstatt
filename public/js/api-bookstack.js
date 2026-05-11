@@ -90,6 +90,38 @@ export const bookstackMethods = {
     return this._bsWrite('POST', path, body);
   },
 
+  // DELETE soft-löscht in BookStack (Recycle-Bin). Antwort ist 204 No Content,
+  // also kein JSON-Body — eigener Code-Pfad statt _bsWrite, das auf r.json() wartet.
+  async bsDelete(path) {
+    let lastRes = null;
+    for (let attempt = 0; attempt <= MAX_RETRY_429; attempt++) {
+      let r;
+      try {
+        r = await _fetchWithTimeout('/api/' + path, { method: 'DELETE' }, 30000, this.t('bs.timeoutPut'));
+      } catch (e) {
+        if (e.name === 'AbortError') throw new Error(e.message || this.t('bs.timeoutAborted'));
+        throw e;
+      }
+      if (r.ok) {
+        _invalidateApiCache(path);
+        return true;
+      }
+      lastRes = r;
+      if (r.status !== 429 || attempt === MAX_RETRY_429) break;
+      const wait = _parseRetryAfter(r.headers.get('Retry-After'))
+        ?? Math.min(8000, 1000 * Math.pow(2, attempt));
+      await new Promise(rs => setTimeout(rs, wait));
+    }
+    let detail = '';
+    try {
+      const e = await lastRes.json();
+      detail = e?.error?.message || e?.message || '';
+    } catch (_) {}
+    throw new Error(detail
+      ? this.t('bs.apiErrorDetail', { status: lastRes.status, detail })
+      : this.t('bs.apiError', { status: lastRes.status }));
+  },
+
   // Pre-Save-Conflict-Check für Read-Modify-Write-Pfade. BookStack hat keinen
   // If-Match-Support — Optimistic-Concurrency baut die App selbst: kurz vor
   // dem PUT die Seite frisch lesen und `updated_at` mit dem Snapshot vergleichen,

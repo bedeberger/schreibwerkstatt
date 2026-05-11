@@ -247,6 +247,26 @@ select:focus {
 .combobox-wrap--compact .combobox-option { font-size: var(--size-compact-font-size); padding: 5px 8px; }
 .combobox-wrap--compact .combobox-empty { font-size: var(--size-compact-font-size); padding: 5px 8px; }
 
+/* Optionaler Footer-Button (cfg.footer.{label,action}). Sitzt unterhalb der
+   Liste, durch border-top abgesetzt. Keine Tastatur-Nav (bewusst aussen vor —
+   ArrowDown/Enter bleibt auf den regulären Optionen). */
+.combobox-footer-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-top: 1px solid var(--color-border);
+  background: transparent;
+  padding: var(--pad-btn-compact);
+  font-size: var(--font-size-base);
+  color: var(--color-accent);
+  cursor: pointer;
+  font-family: inherit;
+}
+.combobox-footer-btn:hover,
+.combobox-footer-btn:focus { background: var(--color-hover); outline: none; }
+.combobox-wrap--compact .combobox-footer-btn { font-size: var(--size-compact-font-size); padding: 5px 8px; }
+
 /* === Form-Patterns (in Karten wiederverwendbar) ===
    Grid-Klassen .card-form-grid / -row / -label und Wertspalten-Bausteine
    .form-stack / -inline / -check etc. Komplettes Markup-Muster siehe

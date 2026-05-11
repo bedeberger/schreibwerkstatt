@@ -59,7 +59,9 @@
   <link rel="stylesheet" href="css/schauplaetze.css">
   <link rel="stylesheet" href="css/kontinuitaet.css">
   <link rel="stylesheet" href="css/confirm-dialog.css">
+  <link rel="stylesheet" href="css/book-create-modal.css">
   <link rel="stylesheet" href="css/ideen.css">
+  <link rel="stylesheet" href="css/buchorganizer.css">
   <link rel="stylesheet" href="css/book-overview/base.css">
   <link rel="stylesheet" href="css/book-overview/stats.css">
   <link rel="stylesheet" href="css/book-overview/coverage.css">
@@ -140,7 +142,7 @@
 <div class="card card--book-selector" x-show="showBookCard" x-cloak>
   <label x-text="t('book.label')"></label>
   <div class="row book-selector-row">
-    <div x-data="combobox({ placeholder: t('book.chooseBook'), compact: false })"
+    <div x-data="combobox({ placeholder: t('book.chooseBook'), compact: false, footer: { label: () => t('book.create.action'), action: () => openCreateBook() } })"
          x-modelable="value" x-model="selectedBookId"
          x-effect="options = books.map(b => ({value: String(b.id), label: b.name}))"
          @combobox-change="resetView();"></div>
@@ -221,6 +223,7 @@
 <div id="partial-finetune-export"></div>
 <div id="partial-export"></div>
 <div id="partial-pdf-export"></div>
+<div id="partial-buchorganizer"></div>
 <div id="partial-user-settings"></div>
 <!-- Edit-Toolbar (Bubble + Slash) – teleportiert nach <body>, hier nur Scope-Host -->
 <div id="partial-editor-toolbar"></div>
@@ -275,6 +278,36 @@
               @click="_resolveConfirmDialog(true)"
               x-init="$watch('confirmDialogOpen', v => { if (v) $nextTick(() => $el.focus()); })"
               x-text="confirmDialogConfirmLabel"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Buch-erstellen-Modal (Trigger: Combobox-Footer "+ Neues Buch …") -->
+<div class="book-create-overlay" x-show="bookCreateOpen" x-cloak
+     @keydown.escape.window="if (bookCreateOpen && !bookCreateBusy) cancelCreateBook()"
+     @click.self="if (!bookCreateBusy) cancelCreateBook()">
+  <div class="book-create-dialog" role="dialog" aria-modal="true" :aria-label="t('book.create.title')">
+    <div class="book-create-title" x-text="t('book.create.title')"></div>
+    <input type="text"
+           class="book-create-input"
+           x-model="bookCreateName"
+           maxlength="255"
+           :placeholder="t('book.create.namePlaceholder')"
+           :aria-label="t('book.create.nameLabel')"
+           :disabled="bookCreateBusy"
+           @keydown.enter.prevent="submitCreateBook()">
+    <div class="book-create-error" x-show="bookCreateError" x-cloak x-text="bookCreateError"></div>
+    <div class="book-create-actions">
+      <button type="button" class="book-create-btn book-create-btn--cancel"
+              :disabled="bookCreateBusy"
+              @click="cancelCreateBook()"
+              x-text="t('book.create.cancel')"></button>
+      <button type="button" class="book-create-btn book-create-btn--primary"
+              :disabled="bookCreateBusy || !bookCreateName.trim()"
+              @click="submitCreateBook()">
+        <span x-show="!bookCreateBusy" x-text="t('book.create.submit')"></span>
+        <span x-show="bookCreateBusy" x-cloak x-text="t('book.create.submitting')"></span>
+      </button>
     </div>
   </div>
 </div>

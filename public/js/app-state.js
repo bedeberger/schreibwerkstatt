@@ -152,6 +152,7 @@ const cardsState = () => ({
   showFinetuneExportCard: false,
   showExportCard: false,
   showPdfExportCard: false,
+  showBookOrganizerCard: false,
   showKomplettStatus: false,
   showAvatarMenu: false,
 });
@@ -298,6 +299,16 @@ const featuresUsageState = () => ({
   recentPageIds: [],
 });
 
+// Modal-State fuer Buch-Erstellung (Trigger: Combobox-Footer "+ Neues Buch").
+// Eigener Slice statt Inline in cardsState, weil Open/Close keine Show-Flag-
+// Exklusivitaet braucht — Modal liegt ueber allem.
+const bookCreateState = () => ({
+  bookCreateOpen: false,
+  bookCreateName: '',
+  bookCreateBusy: false,
+  bookCreateError: '',
+});
+
 const jobsState = () => ({
   jobQueueItems: [],
   jobQueueExpanded: false,
@@ -333,6 +344,7 @@ export function initialLektoratState() {
     ...orteState(),
     ...chatsState(),
     ...featuresUsageState(),
+    ...bookCreateState(),
     ...jobsState(),
   };
 }

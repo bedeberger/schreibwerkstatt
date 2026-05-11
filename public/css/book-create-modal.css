@@ -1,0 +1,83 @@
+@layer components {
+/* === Buch-erstellen-Modal (Trigger: Combobox-Footer "+ Neues Buch …") === */
+/* Visuell angelehnt an .confirm-dialog (siehe confirm-dialog.css), aber mit
+   Input-Feld. Selbe Tokens fuer Cascade-Konsistenz. */
+.book-create-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal-front);
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+.book-create-dialog {
+  background: var(--color-card-bg);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  max-width: 480px;
+  width: 100%;
+  padding: 1.25rem 1.25rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+.book-create-title {
+  font-size: var(--font-size-lg, 1.1rem);
+  font-weight: 700;
+}
+.book-create-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.5rem 0.65rem;
+  font: inherit;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+.book-create-input:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+}
+.book-create-input:disabled {
+  opacity: var(--opacity-hint);
+  cursor: not-allowed;
+}
+.book-create-error {
+  font-size: var(--font-size-sm);
+  color: var(--color-err-text, #b91c1c);
+}
+.book-create-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+.book-create-btn {
+  padding: 0.45rem 1rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.book-create-btn:hover:not(:disabled) { background: var(--color-hover-light); }
+.book-create-btn:disabled { opacity: var(--opacity-hint); cursor: not-allowed; }
+.book-create-btn--primary {
+  background: var(--color-primary);
+  color: var(--color-on-primary, #fff);
+  border-color: var(--color-primary);
+}
+.book-create-btn--primary:hover:not(:disabled) { background: var(--color-primary-hover); }
+
+@media (max-width: 480px) {
+  .book-create-dialog { padding: 1rem; }
+  .book-create-actions { flex-direction: column-reverse; }
+  .book-create-btn { width: 100%; }
+}
+}

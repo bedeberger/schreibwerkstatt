@@ -128,6 +128,7 @@ export const appViewMethods = {
     if (keep !== 'finetuneExport') this.showFinetuneExportCard = false;
     if (keep !== 'export') this.showExportCard = false;
     if (keep !== 'pdfExport') this.showPdfExportCard = false;
+    if (keep !== 'bookOrganizer') this.showBookOrganizerCard = false;
     this.resetPage();
   },
 
@@ -179,7 +180,8 @@ export const appViewMethods = {
       || this.showBookStatsCard || this.showStilCard || this.showFehlerHeatmapCard
       || this.showBookChatCard || this.showBookSettingsCard
       || this.showUserSettingsCard || this.showFinetuneExportCard
-      || this.showExportCard || this.showPdfExportCard;
+      || this.showExportCard || this.showPdfExportCard
+      || this.showBookOrganizerCard;
     if (anyOpen) return;
     this.showBookOverviewCard = true;
   },
@@ -222,6 +224,15 @@ export const appViewMethods = {
     if (this.showPdfExportCard) { this.showPdfExportCard = false; return; }
     this._closeOtherMainCards('pdfExport');
     this.showPdfExportCard = true;
+  },
+  toggleBookOrganizerCard() {
+    if (this.showBookOrganizerCard) {
+      window.dispatchEvent(new CustomEvent('card:refresh', { detail: { name: 'bookOrganizer' } }));
+      return;
+    }
+    if (!this.selectedBookId) return;
+    this._closeOtherMainCards('bookOrganizer');
+    this.showBookOrganizerCard = true;
   },
   // Abweichend von den anderen Toggles: erneuter Klick schliesst NICHT, sondern
   // refresht die History. Sub-Komponente lauscht auf `card:refresh`
@@ -534,6 +545,7 @@ export const appViewMethods = {
     this.showFinetuneExportCard = false;
     this.showExportCard = false;
     this.showPdfExportCard = false;
+    this.showBookOrganizerCard = false;
     this.alleAktualisierenLastRun = null;
     this.alleAktualisierenProgress = 0;
     this.alleAktualisierenTokIn = 0;

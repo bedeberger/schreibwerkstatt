@@ -4,6 +4,7 @@
     <span class="card-title" x-text="t('sidebar.pagesOf', { name: selectedBookName })"></span>
     <div class="card-actions">
       <button type="button" @click="loadPages({ source: 'manual' })" x-text="t('sidebar.loadPages')"></button>
+      <button type="button" @click="toggleBookOrganizerCard()" :disabled="!selectedBookId" :data-tip="t('tile.bookOrganizer.title')" x-text="t('tile.bookOrganizer')"></button>
       <button type="button" @click="batchCheck()" :disabled="!pages.length" :data-tip="t('sidebar.checkAllTitle')" x-text="t('sidebar.checkAll')"></button>
     </div>
   </div>
@@ -28,34 +29,23 @@
     </div>
     <div class="batch-status" x-html="batchStatus"></div>
   </div>
-  <!-- Neues Kapitel anlegen -->
-  <form x-show="!pageSearch" class="kapitel-new-page" @submit.prevent="createChapter()">
-    <input type="text"
-           class="kapitel-new-page-input"
-           x-model="newChapterTitle"
-           :placeholder="t('sidebar.newChapterPlaceholder')"
-           :aria-label="t('sidebar.newChapterPlaceholder')"
-           :disabled="newChapterCreating">
-    <button type="submit"
-            :disabled="newChapterCreating || !newChapterTitle.trim()">
-      <span x-show="newChapterCreating" class="spinner"></span>
-      <span x-text="t('sidebar.newChapterAdd')"></span>
-    </button>
-  </form>
-  <div x-show="newChapterError" class="error-msg" x-text="newChapterError"></div>
   <template x-for="item in filteredTree" :key="item.id">
     <div class="tree-chapter" :class="{ 'tree-chapter--solo': item.solo }">
       <div x-show="!item.solo"
            class="tree-chapter-header"
            role="button"
-           :tabindex="item.pages.length === 0 ? -1 : 0"
+           tabindex="0"
            :aria-expanded="item.pages.length > 0 ? (item.open ? 'true' : 'false') : null"
            :class="{
-             disabled: item.pages.length === 0,
+             'tree-chapter-header--empty': item.pages.length === 0,
              'tree-chapter-header--active': showKapitelReviewCard && String(kapitelReviewChapterId) === String(item.id),
              'tree-chapter-header--reviewable': _bookQualifiesForChapterReview() && item.pages.length > 0,
            }"
-           :data-tip="_bookQualifiesForChapterReview() && item.pages.length > 0 && !pageSearch ? t('sidebar.reviewChapterTitle', { name: item.name }) : ''"
+           :data-tip="!pageSearch
+             ? (item.pages.length === 0
+                 ? t('sidebar.emptyChapterTitle', { name: item.name })
+                 : (_bookQualifiesForChapterReview() ? t('sidebar.reviewChapterTitle', { name: item.name }) : ''))
+             : ''"
            @keydown.enter.prevent="_onChapterHeaderActivate(item)"
            @keydown.space.prevent="_onChapterHeaderActivate(item)"
            @keydown.arrow-right.prevent="if (item.pages.length > 0 && !item.open) item.open = true"

@@ -71,6 +71,25 @@
   align-self: stretch;
 }
 
+/* Seite + Kapitel anlegen: gemeinsames 2-Spalten-Grid, damit Buttons über
+   beide Forms exakt gleich breit ausgerichtet sind (Button-Spalte = max-content). */
+.kapitel-add-forms {
+  display: grid;
+  grid-template-columns: 1fr max-content;
+  gap: 6px;
+  margin-top: 10px;
+}
+.kapitel-add-forms .kapitel-new-page { display: contents; }
+.kapitel-add-forms .kapitel-new-page > button { width: 100%; }
+.kapitel-add-forms .error-msg { grid-column: 1 / -1; }
+.kapitel-add-divider {
+  grid-column: 1 / -1;
+  border: 0;
+  border-top: 1px solid var(--color-border);
+  margin: 6px 0;
+  width: 100%;
+}
+
 /* === Token-Badges: W und Z im Seitenbaum ausblenden === */
 .tok-tree-words,
 .tok-tree-chars { display: none; }

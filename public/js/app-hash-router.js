@@ -44,6 +44,7 @@ export const appHashRouterMethods = {
     else if (this.showFinetuneExportCard) parts.push('finetune');
     else if (this.showExportCard) parts.push('export');
     else if (this.showPdfExportCard) parts.push('pdf');
+    else if (this.showBookOrganizerCard) parts.push('organize');
     return '#' + parts.join('/');
   },
 
@@ -259,6 +260,9 @@ export const appHashRouterMethods = {
         case 'pdf':
           if (!this.showPdfExportCard) await this.togglePdfExportCard();
           break;
+        case 'organize':
+          if (!this.showBookOrganizerCard) await this.toggleBookOrganizerCard();
+          break;
       }
     } finally {
       this._applyingHash = false;
@@ -283,6 +287,7 @@ export const appHashRouterMethods = {
       'showFinetuneExportCard',
       'showExportCard',
       'showPdfExportCard',
+      'showBookOrganizerCard',
       'showBookOverviewCard',
     ];
     this._hashWatcherTeardowns = [];

@@ -175,6 +175,7 @@
   --card-accent-szenen: #6e4f9a;
   --card-accent-kontinuitaet: #b86537;
   --card-accent-werkstatt: #2f6e7a;
+  --card-accent-organize: #3a5a8a;
 
   /* Job-Queue-Footer – folgt Theme (Light: warme Crème, Dark: warmes Dunkelbraun) */
   --color-queue-bar-bg: var(--color-surface);
@@ -436,6 +437,7 @@
   --card-accent-szenen: #b39ad9;
   --card-accent-kontinuitaet: #e0905a;
   --card-accent-werkstatt: #6ab0bc;
+  --card-accent-organize: #7896c6;
 
   /* Queue-Footer folgt Theme über var()-Verkettung – keine Overrides nötig */
 

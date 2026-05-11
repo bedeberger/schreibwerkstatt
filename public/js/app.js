@@ -35,6 +35,7 @@ import { registerUserSettingsCard } from './cards/user-settings-card.js';
 import { registerFinetuneExportCard } from './cards/finetune-export-card.js';
 import { registerExportCard } from './cards/export-card.js';
 import { registerPdfExportCard } from './cards/pdf-export-card.js';
+import { registerBookOrganizerCard } from './cards/book-organizer-card.js';
 import { configureI18n, i18nMethods, getSupportedLocales } from './i18n.js';
 import { pageViewMethods } from './page-view.js';
 import { editorEditMethods } from './editor/edit.js';
@@ -60,6 +61,7 @@ import { appViewMethods } from './app-view.js';
 import { appNavigationMethods } from './app-navigation.js';
 import { appHashRouterMethods } from './app-hash-router.js';
 import { offlineSyncMethods } from './offline-sync.js';
+import { bookCreateMethods } from './book-create.js';
 
 // Globaler fetch-Wrapper: fängt 401-Antworten ab und signalisiert Session-Ablauf
 // via 'session-expired'-Event. Alpine zeigt daraufhin einen Banner. Kein Auto-
@@ -208,6 +210,7 @@ document.addEventListener('alpine:init', () => {
   registerFinetuneExportCard();
   registerExportCard();
   registerPdfExportCard();
+  registerBookOrganizerCard();
   registerKontinuitaetCard();
   registerEreignisseCard();
   registerOrteCard();
@@ -249,6 +252,7 @@ document.addEventListener('alpine:init', () => {
     _placeholder: cfg.placeholder ?? null,
     _emptyLabel: cfg.emptyLabel ?? null,
     _compact: cfg.compact !== false,
+    _footer: (cfg.footer && typeof cfg.footer.action === 'function') ? cfg.footer : null,
     _onOutside: null,
     highlighted: -1,
     openUp: false,
@@ -306,6 +310,24 @@ document.addEventListener('alpine:init', () => {
       this.value = val;
       this.close();
       this.$dispatch('combobox-change', val);
+    },
+    // Footer-Action (optionaler cfg.footer.action) — z. B. "+ Neues Buch …".
+    // Schliesst Dropdown vor dem Handler-Call, damit ein folgendes Modal nicht
+    // mit offenem Dropdown konkurriert.
+    triggerFooter() {
+      const f = this._footer;
+      if (!f || typeof f.action !== 'function') return;
+      this.close();
+      try { f.action(); } catch (e) { console.error('[combobox.footer]', e); }
+    },
+    // Label lazy ausrechnen — ein `cfg.footer.label = t('...')` wuerde sonst
+    // den i18n-String zum x-data-Init-Zeitpunkt einfrieren, der vor
+    // `configureI18n` liegen kann (Raw-Key im UI). Function-Form erlaubt
+    // Re-Evaluation pro Template-Render und reagiert auf uiLocale-Wechsel.
+    get _footerLabel() {
+      const f = this._footer;
+      if (!f) return '';
+      return typeof f.label === 'function' ? f.label() : (f.label || '');
     },
     onKeydown(e) {
       if (!this.open) {
@@ -378,6 +400,10 @@ document.addEventListener('alpine:init', () => {
             </template>
             <li class="combobox-empty" x-show="filtered.length === 0" x-text="$app.t('find.noMatches')"></li>
           </ul>
+          <button type="button" class="combobox-footer-btn"
+                  x-show="_footer" x-cloak
+                  @click="triggerFooter()"
+                  x-text="_footerLabel"></button>
         </div>
       `;
       // Alpine processed das frisch gesetzte innerHTML nicht zuverlaessig, wenn
@@ -747,5 +773,6 @@ document.addEventListener('alpine:init', () => {
     ...appHashRouterMethods,
     ...offlineSyncMethods,
     ...featuresUsageMethods,
+    ...bookCreateMethods,
   }));
 });

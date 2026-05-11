@@ -1,0 +1,178 @@
+@layer components {
+/* === Buchorganizer ===
+   DnD-fähige Reorder/Move-Card für Kapitel + Seiten.
+   Akzentfarbe = --card-accent-organize (blaugrau, neutral wie ein File-Manager).
+*/
+.card--organizer { --card-accent: var(--card-accent-organize); }
+
+.card--organizer .organizer-hint {
+  margin: 4px 0 12px;
+}
+
+.organizer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.organizer-chapter {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-card-bg);
+  overflow: hidden;
+}
+
+.organizer-chapter--solo {
+  margin-bottom: 16px;
+  border-style: dashed;
+}
+
+.organizer-chapter-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--color-hover-light);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.organizer-chapter-label {
+  font-weight: 600;
+  color: var(--color-muted);
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  flex: 1;
+}
+
+.organizer-chapter-meta {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.organizer-chapter-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.organizer-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 22px;
+  color: var(--color-subtle);
+  cursor: grab;
+  user-select: none;
+  font-size: 14px;
+  letter-spacing: -2px;
+  flex-shrink: 0;
+}
+.organizer-drag-handle:active { cursor: grabbing; }
+.organizer-drag-handle--chapter { color: var(--card-accent); }
+
+.organizer-name {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  padding: 4px 6px;
+  font: inherit;
+  color: var(--color-text);
+}
+.organizer-name:hover {
+  border-color: var(--color-border-input);
+  background: var(--color-surface);
+}
+.organizer-name:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+  background: var(--color-surface);
+}
+.organizer-name--chapter {
+  font-weight: 600;
+}
+
+.organizer-pages {
+  list-style: none;
+  margin: 0;
+  padding: 4px 6px 6px;
+  min-height: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.organizer-page {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  transition: background-color 0.12s;
+}
+.organizer-page:hover { background: var(--color-hover); }
+
+.organizer-delete-btn {
+  border: 0;
+  background: transparent;
+  color: var(--color-subtle);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+.organizer-delete-btn:hover {
+  background: var(--color-err-bg);
+  color: var(--color-err-text);
+}
+.organizer-delete-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+.organizer-delete-btn--chapter { margin-left: 4px; }
+
+.organizer-empty {
+  padding: 6px 8px;
+  font-size: 12px;
+  color: var(--color-subtle);
+  font-style: italic;
+}
+
+/* SortableJS-Klassen für Drag-Zustände */
+.organizer-page.sortable-ghost,
+.organizer-chapter.sortable-ghost {
+  opacity: 0.4;
+  background: var(--color-accent-soft);
+}
+.organizer-page.sortable-chosen,
+.organizer-chapter.sortable-chosen {
+  background: var(--color-accent-bg);
+}
+.organizer-page.sortable-drag,
+.organizer-chapter.sortable-drag {
+  box-shadow: 0 6px 16px var(--color-shadow);
+}
+
+@media (max-width: 600px) {
+  .organizer-chapter-header {
+    flex-wrap: wrap;
+  }
+  .organizer-chapter-meta {
+    order: 3;
+    margin-left: 0;
+  }
+  .organizer-chapter-actions {
+    order: 4;
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .organizer-name {
+    font-size: 14px;
+  }
+}
+}

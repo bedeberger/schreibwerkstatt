@@ -81,21 +81,44 @@
         </template>
       </div>
 
-      <!-- Schnell eine neue Seite anlegen (Titel → am Ende des Kapitels einfügen) -->
-      <form class="kapitel-new-page" @submit.prevent="createKapitelPage()">
-        <input type="text"
-               class="kapitel-new-page-input"
-               x-model="$app.newPageTitle"
-               :placeholder="$app.t('kapitelReview.newPagePlaceholder')"
-               :aria-label="$app.t('kapitelReview.newPagePlaceholder')"
-               :disabled="$app.newPageCreating">
-        <button type="submit"
-                :disabled="$app.newPageCreating || !$app.newPageTitle.trim()">
-          <span x-show="$app.newPageCreating" class="spinner"></span>
-          <span x-text="$app.t('kapitelReview.newPageAdd')"></span>
-        </button>
-      </form>
-      <div x-show="$app.newPageError" class="error-msg" x-text="$app.newPageError"></div>
+      <!--
+        Beide "Anlegen"-Forms im Grid: 2 Spalten (Input / Button), Forms via
+        display:contents, damit Buttons über beide Zeilen gleichbreit
+        ausgerichtet werden. Horizontaler Trenner zwischen Seite und Kapitel.
+      -->
+      <div class="kapitel-add-forms">
+        <form class="kapitel-new-page" @submit.prevent="createKapitelPage()">
+          <input type="text"
+                 class="kapitel-new-page-input"
+                 x-model="$app.newPageTitle"
+                 :placeholder="$app.t('kapitelReview.newPagePlaceholder')"
+                 :aria-label="$app.t('kapitelReview.newPagePlaceholder')"
+                 :disabled="$app.newPageCreating">
+          <button type="submit"
+                  :disabled="$app.newPageCreating || !$app.newPageTitle.trim()">
+            <span x-show="$app.newPageCreating" class="spinner"></span>
+            <span x-text="$app.t('kapitelReview.newPageAdd')"></span>
+          </button>
+        </form>
+        <div class="error-msg" x-show="$app.newPageError" x-text="$app.newPageError"></div>
+
+        <hr class="kapitel-add-divider">
+
+        <form class="kapitel-new-page" @submit.prevent="createSiblingChapter()">
+          <input type="text"
+                 class="kapitel-new-page-input"
+                 x-model="$app.newChapterTitle"
+                 :placeholder="$app.t('kapitelReview.newChapterPlaceholder')"
+                 :aria-label="$app.t('kapitelReview.newChapterPlaceholder')"
+                 :disabled="$app.newChapterCreating">
+          <button type="submit"
+                  :disabled="$app.newChapterCreating || !$app.newChapterTitle.trim()">
+            <span x-show="$app.newChapterCreating" class="spinner"></span>
+            <span x-text="$app.t('kapitelReview.newChapterAdd')"></span>
+          </button>
+        </form>
+        <div class="error-msg" x-show="$app.newChapterError" x-text="$app.newChapterError"></div>
+      </div>
     </div>
   </template>
 
