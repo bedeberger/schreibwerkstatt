@@ -661,6 +661,12 @@ export const focusCardMethods = {
       expectedScroll: 0,      // prog-Scroll-Unterscheidung (Counter statt Zeit)
       vvTimer: 0,
       cursorTimer: 0,
+      // Short-circuit-Cache für _focusUpdateActive: bleibt der aktive Block
+      // gleich (häufigster Fall beim Tippen), sparen wir setActiveBlock /
+      // setNearBlocks / sentence-Highlight komplett ein. _lastGranularity
+      // invalidiert den Cache bei Live-Mode-Switch.
+      _lastBlock: null,
+      _lastGranularity: null,
     };
 
     const markPointer = () => {
@@ -710,6 +716,10 @@ export const focusCardMethods = {
       if (e.inputType === 'insertParagraph' || e.inputType === 'insertLineBreak') {
         setActiveBlock(container, null);
         setNearBlocks(container, null);
+        // Cache invalidieren — sonst hält der Short-Circuit in
+        // _focusUpdateActive den vermeintlich „noch aktiven" Block fest
+        // und setzt nach dem Split keine neue Markierung.
+        ctx._lastBlock = null;
       }
     };
 
@@ -730,6 +740,7 @@ export const focusCardMethods = {
     const onBlur = () => {
       if (this._focusState !== 'active') return;
       setActiveBlock(container, null);
+      ctx._lastBlock = null;
     };
     // Editor bekommt Fokus zurück (z.B. nach Modal-Schließen) → Recenter
     // auf aktuelle Caret-Position.
@@ -937,24 +948,34 @@ export const focusCardMethods = {
         if (!block) block = findBlockAtViewportCenter(container, ctx.visibleBlocks);
 
         const granularity = window.__app?.focusGranularity || 'paragraph';
-        if (granularity === 'typewriter-only') {
-          // Kein Block markieren — Body-Class hebt Dim sowieso auf. Trotzdem
-          // Leichen-Klassen abräumen (User wechselt Mode → bereits gesetzte
-          // .focus-paragraph-active/-near sollen weg).
-          setActiveBlock(container, null);
-          setNearBlocks(container, null);
-        } else {
-          setActiveBlock(container, block);
-          if (granularity === 'window-3') {
-            setNearBlocks(container, block);
-          } else {
+        const blockChanged = block !== ctx._lastBlock;
+        const granularityChanged = granularity !== ctx._lastGranularity;
+        // Sentence-Mode muss bei jedem Tick neu laufen (Caret kann Satzgrenze
+        // überqueren, ohne den Block zu wechseln). Andere Modi sind purely
+        // block-basiert → bei unverändertem Block reichen Scroll-Updates.
+        const needsMarkUpdate = blockChanged || granularityChanged || granularity === 'sentence';
+        if (needsMarkUpdate) {
+          if (granularity === 'typewriter-only') {
+            // Kein Block markieren — Body-Class hebt Dim sowieso auf. Trotzdem
+            // Leichen-Klassen abräumen (User wechselt Mode → bereits gesetzte
+            // .focus-paragraph-active/-near sollen weg).
+            setActiveBlock(container, null);
             setNearBlocks(container, null);
+          } else {
+            setActiveBlock(container, block);
+            if (granularity === 'window-3') {
+              setNearBlocks(container, block);
+            } else {
+              setNearBlocks(container, null);
+            }
+            if (granularity === 'sentence') {
+              applySentenceHighlight(block, sel);
+            } else if (typeof CSS !== 'undefined' && CSS.highlights) {
+              CSS.highlights.delete('focus-sentence-dim');
+            }
           }
-          if (granularity === 'sentence') {
-            applySentenceHighlight(block, sel);
-          } else if (typeof CSS !== 'undefined' && CSS.highlights) {
-            CSS.highlights.delete('focus-sentence-dim');
-          }
+          ctx._lastBlock = block;
+          ctx._lastGranularity = granularity;
         }
 
         // Aktive Textmarkierung: nicht recentern, sonst springt der Viewport
