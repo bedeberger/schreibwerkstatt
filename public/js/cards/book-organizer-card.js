@@ -319,7 +319,7 @@ export function registerBookOrganizerCard() {
       const body = {
         book_id: parseInt(root.selectedBookId, 10),
         name,
-        html: '',
+        html: '<p></p>',
       };
       if (chapterId) body.chapter_id = chapterId;
       await this._runMutation(async () => {
