@@ -373,7 +373,7 @@ export const treeMethods = {
       };
       this.tree = [...this.tree, chapterItem].sort((a, b) => a.priority - b.priority);
       if (this._chapterOrderMap) this._chapterOrderMap.set(chapterItem.name, this._chapterOrderMap.size);
-      fetch('/sync/book/' + bookId, { method: 'POST' }).catch(() => {});
+      await this.bsRegisterChapterLocally(created);
       return chapterItem;
     } catch (e) {
       console.error('[createChapter]', e);

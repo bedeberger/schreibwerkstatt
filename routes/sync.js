@@ -365,6 +365,53 @@ router.get('/pages/:book_id', (req, res) => {
   res.json(result);
 });
 
+// POST /sync/pages/upsert – einzelne Seite (+ optional Kapitel) sofort lokal
+// registrieren. Wird nach BookStack-Page-Create gerufen, damit FK-abhängige
+// Features (ideen, page_checks, figure_scenes …) auf der frischen Seite nicht
+// in `FOREIGN KEY constraint failed` rennen, bis der nächste Sync läuft.
+router.post('/pages/upsert', express.json(), (req, res) => {
+  const bookId      = toIntId(req.body?.book_id);
+  const pageId      = toIntId(req.body?.page_id);
+  const pageName    = (req.body?.page_name || '').toString();
+  const chapterId   = req.body?.chapter_id ? toIntId(req.body.chapter_id) : null;
+  const chapterName = req.body?.chapter_name ? req.body.chapter_name.toString() : null;
+  const updatedAt   = req.body?.updated_at ? req.body.updated_at.toString() : new Date().toISOString();
+  if (!bookId || !pageId) return res.status(400).json({ error_code: 'BOOKID_PAGEID_REQ' });
+  if (!db.prepare('SELECT 1 FROM books WHERE book_id = ?').get(bookId)) {
+    return res.status(400).json({ error_code: 'BOOK_NOT_FOUND' });
+  }
+
+  const seenAt = new Date().toISOString();
+  db.transaction(() => {
+    let effectiveChapterId = chapterId;
+    if (chapterId) {
+      if (chapterName) {
+        _upsertChapterStmt.run(chapterId, bookId, chapterName, updatedAt, seenAt);
+      } else if (!db.prepare('SELECT 1 FROM chapters WHERE chapter_id = ?').get(chapterId)) {
+        effectiveChapterId = null;
+      }
+    }
+    _upsertPageCacheStmt.run(pageId, bookId, pageName, effectiveChapterId, updatedAt, seenAt);
+  })();
+  res.json({ ok: true });
+});
+
+// POST /sync/chapters/upsert – einzelnes Kapitel sofort lokal registrieren.
+// Symmetrisch zu /pages/upsert; nötig nach BookStack-Chapter-Create, damit
+// nachfolgende Features mit chapter_id-FK nicht warten müssen.
+router.post('/chapters/upsert', express.json(), (req, res) => {
+  const bookId      = toIntId(req.body?.book_id);
+  const chapterId   = toIntId(req.body?.chapter_id);
+  const chapterName = (req.body?.chapter_name || '').toString();
+  const updatedAt   = req.body?.updated_at ? req.body.updated_at.toString() : new Date().toISOString();
+  if (!bookId || !chapterId || !chapterName) return res.status(400).json({ error_code: 'FIELDS_REQ' });
+  if (!db.prepare('SELECT 1 FROM books WHERE book_id = ?').get(bookId)) {
+    return res.status(400).json({ error_code: 'BOOK_NOT_FOUND' });
+  }
+  _upsertChapterStmt.run(chapterId, bookId, chapterName, updatedAt, new Date().toISOString());
+  res.json({ ok: true });
+});
+
 // POST /sync/pages/:book_id – leichtgewichtiger pages-Cache-Update (ohne Seiten-Inhalte)
 router.post('/pages/:book_id', async (req, res) => {
   const bookId = toIntId(req.params.book_id);

@@ -90,6 +90,48 @@ export const bookstackMethods = {
     return this._bsWrite('POST', path, body);
   },
 
+  // Frisch erzeugte BookStack-Seite sofort in die lokale `pages`-Tabelle eintragen,
+  // damit FK-abhängige Features (ideen, page_checks, figure_scenes, …) auf der
+  // Seite arbeiten können, bevor der nächste Sync läuft. Kapitel mit-upserten,
+  // falls der Caller chapter_name kennt — sonst hängt ggf. auch dort eine
+  // unbekannte chapter_id-FK.
+  async bsRegisterPageLocally(created, chapter) {
+    if (!created?.id || !created?.book_id) return;
+    const body = {
+      book_id: created.book_id,
+      page_id: created.id,
+      page_name: created.name || '',
+      updated_at: created.updated_at || null,
+    };
+    if (created.chapter_id || chapter?.id) {
+      body.chapter_id = created.chapter_id || chapter.id;
+      if (chapter?.name) body.chapter_name = chapter.name;
+    }
+    try {
+      await fetch('/sync/pages/upsert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    } catch (_) { /* non-fatal */ }
+  },
+
+  async bsRegisterChapterLocally(created) {
+    if (!created?.id || !created?.book_id || !created?.name) return;
+    try {
+      await fetch('/sync/chapters/upsert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          book_id: created.book_id,
+          chapter_id: created.id,
+          chapter_name: created.name,
+          updated_at: created.updated_at || null,
+        }),
+      });
+    } catch (_) { /* non-fatal */ }
+  },
+
   // DELETE soft-löscht in BookStack (Recycle-Bin). Antwort ist 204 No Content,
   // also kein JSON-Body — eigener Code-Pfad statt _bsWrite, das auf r.json() wartet.
   async bsDelete(path) {

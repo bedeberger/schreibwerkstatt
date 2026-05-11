@@ -353,6 +353,7 @@ export function registerKapitelReviewCard() {
         });
         root.newPageTitle = '';
         if (!created?.id) return;
+        await root.bsRegisterPageLocally(created, { id: chapter.id, name: chapter.name });
         const newPage = {
           ...created,
           chapterName: chapter.name,
