@@ -43,3 +43,15 @@ test('validateConfig erhält pageStructure und pageBreakBetweenPages', () => {
   assert.equal(c.chapter.pageStructure, 'nested');
   assert.equal(c.chapter.pageBreakBetweenPages, true);
 });
+
+test('validateConfig erhält titleRule und pageTitleRule', () => {
+  const c = validateConfig({ chapter: { titleRule: true, pageTitleRule: true } });
+  assert.equal(c.chapter.titleRule, true);
+  assert.equal(c.chapter.pageTitleRule, true);
+});
+
+test('defaultConfig: Trennlinien-Toggles default off', () => {
+  const c = defaultConfig();
+  assert.equal(c.chapter.titleRule, false);
+  assert.equal(c.chapter.pageTitleRule, false);
+});

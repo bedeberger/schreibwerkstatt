@@ -323,6 +323,8 @@
   "pdfExport.chapter.spaceBeforeMm":       "Space before title (mm)",
   "pdfExport.chapter.blankPageAfter":      "Blank page after chapter",
   "pdfExport.chapter.dropCap":             "Drop cap",
+  "pdfExport.chapter.titleRule":           "Rule below chapter title",
+  "pdfExport.chapter.pageTitleRule":       "Rule below page title",
   "pdfExport.chapter.pageStructureLegend": "BookStack pages",
   "pdfExport.chapter.pageStructureHint":   "Decide whether the individual BookStack pages within a chapter appear as sub-headings or render continuously.",
   "pdfExport.chapter.pageStructure":       "Behaviour",
