@@ -218,9 +218,12 @@ export const treeMethods = {
       this.tree = [];
       this.pages = [];
       this._tokenEstGen++;
+      // Buchwechsel: SW-API_CACHE (SWR) kann stale Listen liefern, daher fresh.
+      // Initialer Load greift normal aufs Cache (offline-resilient).
+      const fresh = opts.source === 'bookSwitch';
       const [chapters, pages] = await Promise.all([
-        this.bsGetAll('chapters?filter[book_id]=' + bookId),
-        this.bsGetAll('pages?filter[book_id]=' + bookId),
+        this.bsGetAll('chapters?filter[book_id]=' + bookId, { fresh }),
+        this.bsGetAll('pages?filter[book_id]=' + bookId, { fresh }),
       ]);
 
       // Buch wurde gewechselt während die Anfrage lief → veraltete Daten verwerfen.

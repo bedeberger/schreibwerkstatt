@@ -69,12 +69,12 @@ export const bookstackMethods = {
     throw new Error(this.t('bs.apiError', { status: lastStatus }));
   },
 
-  async bsGetAll(path) {
+  async bsGetAll(path, opts = {}) {
     const COUNT = 500;
     let offset = 0, all = [];
     while (true) {
       const sep = path.includes('?') ? '&' : '?';
-      const data = await this.bsGet(`${path}${sep}count=${COUNT}&offset=${offset}`);
+      const data = await this.bsGet(`${path}${sep}count=${COUNT}&offset=${offset}`, opts);
       all = all.concat(data.data);
       if (all.length >= data.total) break;
       offset += COUNT;

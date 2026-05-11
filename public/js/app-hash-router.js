@@ -142,7 +142,7 @@ export const appHashRouterMethods = {
       if (String(this.selectedBookId) !== targetBookId) {
         this.selectedBookId = targetBookId;
         this._resetBookScopedState();
-        await this.loadPages();
+        await this.loadPages({ source: 'bookSwitch' });
       } else if (isInitialApply) {
         window.dispatchEvent(new CustomEvent('book:changed', {
           detail: { bookId: this.selectedBookId },
