@@ -129,6 +129,7 @@ export function registerBookOrganizerCard() {
 
     async _onChapterDrop(evt) {
       if (this.organizerSaving) return;
+      if (evt.oldIndex === evt.newIndex) return;
       const ids = [...evt.to.querySelectorAll('.organizer-chapter[data-chapter-id]')]
         .map(el => parseInt(el.dataset.chapterId, 10));
       const idxOf = new Map(ids.map((id, i) => [id, i]));
@@ -140,6 +141,7 @@ export function registerBookOrganizerCard() {
 
     async _onPageDrop(evt) {
       if (this.organizerSaving) return;
+      if (evt.from === evt.to && evt.oldIndex === evt.newIndex) return;
       const fromChapId = this._parseChapterIdAttr(evt.from);
       const toChapId = this._parseChapterIdAttr(evt.to);
       const pageId = parseInt(evt.item.dataset.pageId, 10);
