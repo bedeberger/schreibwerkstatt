@@ -103,7 +103,7 @@ export function registerBookOrganizerCard() {
       const chapterListEl = this.$root.querySelector('[data-organizer="chapter-list"]');
       if (chapterListEl) {
         this._sortables.push(new Sortable(chapterListEl, {
-          handle: '.organizer-drag-handle',
+          handle: '.organizer-drag-handle--chapter',
           animation: 150,
           draggable: '.organizer-chapter',
           onEnd: (evt) => this._onChapterDrop(evt),
@@ -388,12 +388,16 @@ export function registerBookOrganizerCard() {
       const root = window.__app;
       const ch = this.workTree.find(c => c.id === id);
       if (!ch) return;
+      if (ch.pages.length > 0) {
+        root.setStatus(root.t('bookOrganizer.chapterNotEmpty', { name: ch.name, n: ch.pages.length }));
+        return;
+      }
       if (root.currentPage && root.currentPage.chapter_id === id) {
         root.setStatus(root.t('bookOrganizer.pageInEditorWarn'));
         return;
       }
       const ok = await root.appConfirm({
-        message: root.t('bookOrganizer.confirmDeleteChapter', { name: ch.name, n: ch.pages.length }),
+        message: root.t('bookOrganizer.confirmDeleteChapter', { name: ch.name }),
         confirmLabel: root.t('common.delete'),
         cancelLabel: root.t('common.cancel'),
         danger: true,
