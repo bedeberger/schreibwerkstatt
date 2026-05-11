@@ -298,13 +298,29 @@ export function registerBookOrganizerCard() {
         confirmLabel: root.t('bookOrganizer.create'),
       });
       if (!name) return;
-      // Create-Pfad nutzt loadPages bewusst: BookStack-POST-Response enthält
-      // nicht zuverlässig alle Felder, die wir für eine vollständige In-Place-
-      // Insertion bräuchten (Slugs, Priority-Spacing zu Solo-Pages). Der
-      // pages:loaded-Listener re-rendert die Karte einmal sauber.
       await this._runMutation(async () => {
-        await root.bsPost('chapters', { book_id: parseInt(root.selectedBookId, 10), name });
-        await root.loadPages();
+        const created = await root.bsPost('chapters', {
+          book_id: parseInt(root.selectedBookId, 10),
+          name,
+        });
+        if (!created?.id) return;
+        const treeEntry = {
+          type: 'chapter',
+          id: created.id,
+          name: created.name || name,
+          priority: created.priority ?? Number.MAX_SAFE_INTEGER,
+          open: true,
+          solo: false,
+          url: root.bookstackUrl && created.book_slug && created.slug
+            ? `${root.bookstackUrl}/books/${created.book_slug}/chapter/${created.slug}`
+            : null,
+          pages: [],
+        };
+        root.tree.push(treeEntry);
+        root.tree.sort((a, b) => a.priority - b.priority);
+        this._rebuildChapterOrderMap();
+        if (typeof root._refreshChapterStats === 'function') root._refreshChapterStats();
+        await this._rerender();
       }, 'bookOrganizer.createFailed');
     },
 
@@ -319,12 +335,48 @@ export function registerBookOrganizerCard() {
       const body = {
         book_id: parseInt(root.selectedBookId, 10),
         name,
+        // BookStack legt mit leerem html-Feld evtl. einen Draft an, der nicht
+        // in GET /pages auftaucht. `<p></p>` erzwingt eine reguläre Seite.
         html: '<p></p>',
       };
       if (chapterId) body.chapter_id = chapterId;
       await this._runMutation(async () => {
-        await root.bsPost('pages', body);
-        await root.loadPages();
+        const created = await root.bsPost('pages', body);
+        if (!created?.id) return;
+        const chapName = chapterId
+          ? root.tree.find(it => it.type === 'chapter' && !it.solo && String(it.id) === String(chapterId))?.name || null
+          : null;
+        const newPage = {
+          ...created,
+          chapterName: chapName,
+          url: root.bookstackUrl && created.book_slug && created.slug
+            ? `${root.bookstackUrl}/books/${created.book_slug}/page/${created.slug}`
+            : null,
+        };
+        root.pages.push(newPage);
+        if (chapterId) {
+          const treeCh = root.tree.find(it => it.type === 'chapter' && !it.solo && String(it.id) === String(chapterId));
+          if (treeCh) {
+            treeCh.pages.push(newPage);
+            treeCh.open = true;
+          }
+        } else {
+          root.tree.push({
+            type: 'chapter',
+            id: 'solo-' + newPage.id,
+            name: newPage.name,
+            priority: newPage.priority ?? Number.MAX_SAFE_INTEGER,
+            open: true,
+            solo: true,
+            url: null,
+            pages: [newPage],
+          });
+          root.tree.sort((a, b) => a.priority - b.priority);
+        }
+        root.tokEsts[newPage.id] = { tok: 0, words: 0, chars: 0 };
+        this._rebuildPageOrderMaps();
+        if (typeof root._refreshChapterStats === 'function') root._refreshChapterStats();
+        await this._rerender();
       }, 'bookOrganizer.createFailed');
     },
 
