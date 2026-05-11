@@ -661,7 +661,6 @@ export const focusCardMethods = {
       expectedScroll: 0,      // prog-Scroll-Unterscheidung (Counter statt Zeit)
       vvTimer: 0,
       cursorTimer: 0,
-      counterTimer: 0,
     };
 
     const markPointer = () => {
@@ -691,34 +690,13 @@ export const focusCardMethods = {
       }, CURSOR_HIDE_MS);
     };
 
-    // Wort-/Zeichen-Counter: textContent reicht (DOM-Reflow vermeiden, kein
-    // innerText). Whitespace-Split für Wörter, Filter gegen Leerstrings.
-    // Zusätzlich Delta gegen die Tages-Baseline, damit der Header anzeigt,
-    // wieviel der User heute auf dieser Seite ergänzt hat.
-    const updateCounter = () => {
-      if (!app) return;
-      const txt = container.textContent || '';
-      const chars = txt.length;
-      const words = txt.trim() ? txt.trim().split(/\s+/).length : 0;
-      app.focusCountChars = chars;
-      app.focusCountWords = words;
-      const { dw, dc } = dailyDelta(app.currentPage?.id, words, chars);
-      app.focusCountWordsDelta = fmtSigned(dw);
-      app.focusCountCharsDelta = fmtSigned(dc);
-    };
-    const scheduleCounter = () => {
-      clearTimeout(ctx.counterTimer);
-      ctx.counterTimer = setTimeout(() => {
-        if (this._focusState === 'active') updateCounter();
-      }, COUNTER_DEBOUNCE_MS);
-    };
-
     // Input-Event fängt Fälle, die selectionchange nicht abdeckt: undo/redo
     // ohne Caret-Move, Paste mit stabiler Caret-Position, Content-Rewrite
-    // durch externe Module.
+    // durch externe Module. Wort-/Zeichen-Counter läuft via installEditCounter
+    // (in edit.js gestartet, Voraussetzung für Fokus) — kein zweiter Listener
+    // hier nötig.
     const onInput = () => {
       if (this._focusState !== 'active') return;
-      scheduleCounter();
       if (ctx.composing) return;
       this._focusUpdateActive(true);
     };
@@ -834,7 +812,6 @@ export const focusCardMethods = {
     this._focusListeners = ctx;
     this._focusVisibleBlocks = visibleBlocks;
 
-    updateCounter();
     showCursor();
 
     const editEl = document.querySelector('.page-content-view--editing');
@@ -851,7 +828,6 @@ export const focusCardMethods = {
       clearTimeout(ctx.pointerTimer);
       clearTimeout(ctx.vvTimer);
       clearTimeout(ctx.cursorTimer);
-      clearTimeout(ctx.counterTimer);
       this._focusListeners = null;
     }
     this._focusVisibleBlocks = null;
