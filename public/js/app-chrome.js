@@ -198,6 +198,9 @@ export const appChromeMethods = {
     if (this._confirmDialogResolve) {
       try { this._confirmDialogResolve(false); } catch {}
     }
+    this.confirmDialogInput = false;
+    this.confirmDialogInputValue = '';
+    this.confirmDialogInputPlaceholder = '';
     this.confirmDialogMessage = message || '';
     this.confirmDialogConfirmLabel = confirmLabel || this.t('common.confirm');
     this.confirmDialogCancelLabel = cancelLabel || this.t('common.cancel');
@@ -206,11 +209,37 @@ export const appChromeMethods = {
     return new Promise(resolve => { this._confirmDialogResolve = resolve; });
   },
 
+  // Prompt-Variante: zeigt Textfeld im Modal, liefert getrimmten String oder
+  // null (Cancel/leer). Nutzung:
+  //   const name = await this.appPrompt({ message, placeholder?, defaultValue? });
+  //   if (!name) return;
+  appPrompt({ message, placeholder, defaultValue, confirmLabel, cancelLabel } = {}) {
+    if (this._confirmDialogResolve) {
+      try { this._confirmDialogResolve(null); } catch {}
+    }
+    this.confirmDialogInput = true;
+    this.confirmDialogInputValue = defaultValue || '';
+    this.confirmDialogInputPlaceholder = placeholder || '';
+    this.confirmDialogMessage = message || '';
+    this.confirmDialogConfirmLabel = confirmLabel || this.t('common.confirm');
+    this.confirmDialogCancelLabel = cancelLabel || this.t('common.cancel');
+    this.confirmDialogDanger = false;
+    this.confirmDialogOpen = true;
+    return new Promise(resolve => { this._confirmDialogResolve = resolve; });
+  },
+
   _resolveConfirmDialog(value) {
     const r = this._confirmDialogResolve;
+    const wasInput = this.confirmDialogInput;
+    const inputVal = (this.confirmDialogInputValue || '').trim();
     this._confirmDialogResolve = null;
     this.confirmDialogOpen = false;
-    if (r) r(value);
+    this.confirmDialogInput = false;
+    this.confirmDialogInputValue = '';
+    this.confirmDialogInputPlaceholder = '';
+    if (!r) return;
+    if (wasInput) r(value ? (inputVal || null) : null);
+    else r(value);
   },
 
   // Alert-Variante: nur OK-Button, immer truthy. Nutzt dieselbe Modal-DOM,

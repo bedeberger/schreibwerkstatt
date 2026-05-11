@@ -135,6 +135,11 @@
   gap: 16px;
   flex-wrap: wrap;
 }
+.book-settings-danger-section + .book-settings-danger-section {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-err-border);
+}
 .book-settings-danger-text {
   flex: 1;
   font-size: 12px;

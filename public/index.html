@@ -263,12 +263,19 @@
 </div><!-- end layout-main -->
 </div><!-- end layout -->
 
-<!-- Confirm-Dialog (Ersatz für window.confirm; siehe appConfirm in app-chrome.js) -->
+<!-- Confirm-/Prompt-Dialog (Ersatz für window.confirm + window.prompt;
+     siehe appConfirm / appPrompt in app-chrome.js) -->
 <div class="confirm-overlay" x-show="confirmDialogOpen" x-cloak
      @keydown.escape.window="if (confirmDialogOpen) _resolveConfirmDialog(false)"
      @click.self="_resolveConfirmDialog(false)">
   <div class="confirm-dialog" role="alertdialog" aria-modal="true" :aria-label="confirmDialogMessage">
     <div class="confirm-dialog-message" x-text="confirmDialogMessage"></div>
+    <input type="text" class="confirm-dialog-input"
+           x-show="confirmDialogInput"
+           x-model="confirmDialogInputValue"
+           :placeholder="confirmDialogInputPlaceholder"
+           @keydown.enter.prevent="_resolveConfirmDialog(true)"
+           x-init="$watch('confirmDialogOpen', v => { if (v && confirmDialogInput) $nextTick(() => { $el.focus(); $el.select(); }); })">
     <div class="confirm-dialog-actions">
       <button type="button" class="confirm-dialog-btn confirm-dialog-btn--cancel"
               x-show="confirmDialogCancelLabel"
@@ -276,7 +283,7 @@
       <button type="button" class="confirm-dialog-btn"
               :class="confirmDialogDanger ? 'confirm-dialog-btn--danger' : 'confirm-dialog-btn--primary'"
               @click="_resolveConfirmDialog(true)"
-              x-init="$watch('confirmDialogOpen', v => { if (v) $nextTick(() => $el.focus()); })"
+              x-init="$watch('confirmDialogOpen', v => { if (v && !confirmDialogInput) $nextTick(() => $el.focus()); })"
               x-text="confirmDialogConfirmLabel"></button>
     </div>
   </div>

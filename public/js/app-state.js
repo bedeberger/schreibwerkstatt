@@ -174,6 +174,11 @@ const confirmDialogState = () => ({
   confirmDialogConfirmLabel: '',
   confirmDialogCancelLabel: '',
   confirmDialogDanger: false,
+  // Input-Mode (Prompt-Variante via appPrompt): zeigt Textfeld; Resolver
+  // liefert getrimmten Input-String (oder null bei Cancel).
+  confirmDialogInput: false,
+  confirmDialogInputValue: '',
+  confirmDialogInputPlaceholder: '',
   _confirmDialogResolve: null,
 });
 
