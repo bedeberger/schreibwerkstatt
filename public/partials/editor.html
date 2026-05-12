@@ -79,6 +79,20 @@
   <div class="card-status" x-show="checkStatus" x-html="checkStatus"></div>
   <div id="status" x-html="statusHtml"></div>
 
+  <!-- Cross-User-Konflikt aus _checkPageConflict / Server-OCC. Bleibt im
+       Fokusmodus sichtbar (eigene Klasse, nicht via #status versteckt). -->
+  <div class="editor-conflict-banner" role="alert" x-show="editConflict" x-cloak>
+    <span class="editor-conflict-banner__icon" aria-hidden="true">!</span>
+    <span class="editor-conflict-banner__text"
+          x-text="t('edit.conflict.banner', {
+            user: editConflict?.remoteUserName || t('edit.conflict.unknownUser'),
+            time: editConflict?.remoteUpdatedAt ? formatDate(editConflict.remoteUpdatedAt) : ''
+          })"></span>
+    <button type="button" class="editor-conflict-banner__action"
+            @click="saveEdit()" :disabled="editSaving"
+            x-text="t('edit.conflict.resolveBtn')"></button>
+  </div>
+
   <!-- Figurenkontext-Panel (collapsible) -->
   <template x-if="chapterFigures.length > 0">
     <div class="figure-context-panel">

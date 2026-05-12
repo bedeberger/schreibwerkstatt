@@ -1,4 +1,4 @@
-// Tastenkürzel-Overlay: globaler `?`-Hotkey + Modal.
+// Tastenkürzel-Overlay: globaler `?`-Hotkey + Modal (natives <dialog>).
 // Liste der Shortcuts kommt aus i18n (shortcuts.item.*), Bindings selbst leben
 // dort, wo sie gebraucht werden (index.html, editor/focus.js etc.) – das
 // Overlay dokumentiert nur.
@@ -6,7 +6,7 @@
 // Dieses Modul liefert ausserdem:
 //  - Findings-Sprung Alt+J/K im Editor.
 //  - Tree-Pfeilnavigation für die Sidebar (auch ohne aktive Suche).
-//  - `trapFocus(event, rootEl)`-Helper für Modal-Inline-Nutzung.
+//  - `trapFocus(event, rootEl)`-Helper (für nicht-<dialog>-Modals wie editor-find).
 
 const FOCUSABLE = [
   'a[href]', 'button:not([disabled])', 'textarea:not([disabled])',
@@ -17,13 +17,18 @@ const FOCUSABLE = [
 const visible = (el) => !!(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
 
 export const shortcutsMethods = {
-  showShortcutsOverlay: false,
-
   toggleShortcutsOverlay() {
-    this.showShortcutsOverlay = !this.showShortcutsOverlay;
+    const dlg = this.$refs?.shortcutsDialog;
+    if (!dlg) return;
+    if (dlg.open) dlg.close();
+    else {
+      dlg.showModal();
+      this.$nextTick(() => { this.$refs?.shortcutsCloseBtn?.focus(); });
+    }
   },
   closeShortcutsOverlay() {
-    this.showShortcutsOverlay = false;
+    const dlg = this.$refs?.shortcutsDialog;
+    if (dlg && dlg.open) dlg.close();
   },
 
   // Focus-Trap-Helper für Modal-Inline-Nutzung: in `<div @keydown="trapFocus($event, $el)">`

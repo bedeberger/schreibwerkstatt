@@ -1,16 +1,26 @@
 /* === Tabs / Segmented-Toggle ===
-   SSoT-Pattern für Tab-Reihen und Modus-Toggles. Generisches `.tabs` +
-   `.tabs-btn` + `--active`. Modifier `.tabs--scrollable` aktiviert horizontalen
-   Scroll für viele Tabs (Mobile / breite PDF-Export-Reihe).
+   SSoT-Pattern für Tab-Reihen und Modus-/Filter-Toggles. Generisches `.tabs` +
+   `.tabs-btn` + `--active`. Modifier: `.tabs--scrollable` (horizontaler Scroll),
+   `.tabs--fullwidth` (Buttons füllen Container gleichmässig).
 
-   Markup:
-     <div class="tabs">
-       <button class="tabs-btn" :class="{ 'tabs-btn--active': mode === 'a' }">A</button>
-       <button class="tabs-btn">B</button>
+   Markup (a11y-Soll: role="tablist" + role="tab" + aria-selected):
+     <div class="tabs" role="tablist">
+       <button class="tabs-btn" role="tab"
+               :class="{ 'tabs-btn--active': mode === 'a' }"
+               :aria-selected="mode === 'a'">A</button>
+       <button class="tabs-btn" role="tab" :aria-selected="mode === 'b'">B</button>
      </div>
 
-   Polished Segmented: Active dezenter (Tint statt Vollfarbe) + 2px Akzentband
-   am Unterkante, weiche Übergänge. Eckig (radius-sm = 0).
+   Look: bordered Wrapper (eckig, radius-sm) mit dezenten Trennstrichen pro
+   Button. Active markiert via Akzentfarbe + 2px-Underline, der animiert
+   (scaleX 0→1). Hover zeigt 1px gedämpfte Vorschau-Linie. aria-selected ist
+   additiver a11y-Hook parallel zur Klasse.
+
+   Warum keine Container-Queries: `container-type: inline-size` auf einem
+   `display: inline-flex` setzt Inline-Size-Containment, was content-basiertes
+   Sizing unterdrückt — der Wrapper collapsed dann auf 0 Breite. Wenn
+   karten-spezifische Compactness nötig wird, lokale Class auf das passende
+   .tabs-Element setzen (z.B. .pdfx-tabs in pdf-export.css).
 */
 @layer components {
   .tabs {
@@ -23,7 +33,7 @@
 
   .tabs-btn {
     position: relative;
-    padding: 6px 14px;
+    padding: 8px 14px;
     font-size: var(--font-size-sm);
     font-weight: 500;
     background: transparent;
@@ -39,17 +49,12 @@
   }
 
   .tabs-btn:hover {
-    background: color-mix(in oklab, var(--color-primary) 6%, transparent);
     color: var(--color-text);
   }
 
-  .tabs-btn--active {
-    background: color-mix(in oklab, var(--color-primary) 12%, transparent);
-    color: var(--color-primary);
-    font-weight: 600;
-  }
-
-  .tabs-btn--active::after {
+  /* Underline-Indicator: ::after immer im DOM, default scaleX(0). Active und
+     Hover schalten auf scaleX(1) — Browser animiert die Skalierung weich. */
+  .tabs-btn::after {
     content: '';
     position: absolute;
     left: 0;
@@ -57,10 +62,30 @@
     bottom: 0;
     height: 2px;
     background: var(--color-primary);
+    transform: scaleX(0);
+    transform-origin: center;
+    transition: transform 200ms ease, background-color 140ms ease, height 140ms ease;
+    pointer-events: none;
   }
 
-  .tabs-btn--active:hover {
-    background: color-mix(in oklab, var(--color-primary) 18%, transparent);
+  /* Hover-Vorschau (nur auf inaktiven Tabs): 1px Underline in muted. */
+  .tabs-btn:not(.tabs-btn--active):not([aria-selected="true"]):hover::after {
+    transform: scaleX(1);
+    background: var(--color-muted);
+    height: 1px;
+  }
+
+  /* Active: Akzentfarbe + 2px scaleX(1) Underline. Doppel-Selektor erlaubt
+     parallelen a11y-Hook via aria-selected (CSS-Hook ist additiv zur Klasse). */
+  .tabs-btn--active,
+  .tabs-btn[aria-selected="true"] {
+    color: var(--color-primary);
+    font-weight: 600;
+  }
+  .tabs-btn--active::after,
+  .tabs-btn[aria-selected="true"]::after {
+    transform: scaleX(1);
+    background: var(--color-primary);
   }
 
   .tabs-btn:focus-visible {
@@ -77,8 +102,11 @@
   }
   .tabs-btn:disabled:hover,
   .tabs-btn[aria-disabled="true"]:hover {
-    background: transparent;
     color: var(--color-muted);
+  }
+  .tabs-btn:disabled:hover::after,
+  .tabs-btn[aria-disabled="true"]:hover::after {
+    transform: scaleX(0);
   }
 
   /* Count-Badge im Tab (rechts vom Label). Reuse Stil von .btn-count. */
@@ -94,7 +122,8 @@
     border-radius: var(--radius-sm);
     vertical-align: middle;
   }
-  .tabs-btn--active .tabs-btn-count {
+  .tabs-btn--active .tabs-btn-count,
+  .tabs-btn[aria-selected="true"] .tabs-btn-count {
     background: color-mix(in oklab, var(--color-primary) 22%, transparent);
     color: var(--color-primary);
   }
@@ -128,9 +157,9 @@
     text-align: center;
   }
 
-  /* Mobile: generelle .tabs-Reihen werden scrollbar, damit sie nicht aus der
-     Karte herausragen (z.B. Schwere-Filter in Szenen/Kontinuität bei vier
-     Buttons mit Counts auf engen Viewports). */
+  /* Mobile-Viewport: generelle .tabs-Reihen werden scrollbar, damit sie nicht
+     aus der Karte herausragen (z.B. Schwere-Filter in Szenen/Kontinuität bei
+     vier Buttons mit Counts auf engen Viewports). */
   @media (max-width: 600px) {
     .tabs:not(.tabs--fullwidth) {
       display: flex;
@@ -143,4 +172,5 @@
       flex-shrink: 0;
     }
   }
+
 }

@@ -87,6 +87,11 @@ const editorState = () => ({
   editDirty: false,
   editSaving: false,
   saveOffline: false,
+  // Cross-User-Konflikt aus _checkPageConflict. quickSave (Auto-Save / Exit-
+  // Fokus) zeigt keinen Modal — der Banner ist im Fokus-Header sichtbar und
+  // bleibt bis zum nächsten erfolgreichen Save oder bis User explizit
+  // entscheidet. Form: `{ remoteUserName, remoteUpdatedAt }`.
+  editConflict: null,
   lastAutosaveAt: null,
   lastDraftSavedAt: null,
   _autosaveIdleTimer: null,
@@ -164,12 +169,12 @@ const statusState = () => ({
 });
 
 // Confirm-Dialog (Ersatz für window.confirm). Native confirm() lässt Chrome
-// auf macOS aus dem nativen Vollbild-Space rausspringen, damit die Browser-
-// Modal überhaupt rendert — nach Klick bleibt das Fenster ausserhalb des
-// Vollbilds. Eigener Alpine-Modal vermeidet das. `_resolve` wird vom
-// `appConfirm`-Helper gesetzt; Buttons rufen `_resolveConfirmDialog(bool)`.
+// auf macOS aus dem nativen Vollbild-Space rausspringen — bricht u.a. den
+// Focus-Mode-Cancel-Flow. Wir nutzen stattdessen natives <dialog> +
+// showModal() (DOM-Modal, kein OS-Modal); Markup in index.html, Helper
+// `appConfirm`/`appPrompt` in app-chrome.js. Buttons rufen
+// `_resolveConfirmDialog(bool)`.
 const confirmDialogState = () => ({
-  confirmDialogOpen: false,
   confirmDialogMessage: '',
   confirmDialogConfirmLabel: '',
   confirmDialogCancelLabel: '',
@@ -306,9 +311,8 @@ const featuresUsageState = () => ({
 
 // Modal-State fuer Buch-Erstellung (Trigger: Combobox-Footer "+ Neues Buch").
 // Eigener Slice statt Inline in cardsState, weil Open/Close keine Show-Flag-
-// Exklusivitaet braucht — Modal liegt ueber allem.
+// Exklusivitaet braucht — Modal liegt ueber allem (natives <dialog>).
 const bookCreateState = () => ({
-  bookCreateOpen: false,
   bookCreateName: '',
   bookCreateBusy: false,
   bookCreateError: '',

@@ -272,6 +272,19 @@
               </div>
             </template>
 
+            <div class="card-form-row">
+              <label class="card-form-label">
+                <span x-text="$app.t('pdfExport.font.color')"></span>
+                <template x-if="role === 'heading'">
+                  <span class="pdfx-color-hint" x-text="$app.t('pdfExport.font.colorHintRule')"></span>
+                </template>
+              </label>
+              <div class="card-form-field pdfx-color-field">
+                <input type="color" class="pdfx-color-picker" x-model="activeProfile.config.font[role].color">
+                <span class="pdfx-color-text" x-text="activeProfile.config.font[role].color"></span>
+              </div>
+            </div>
+
             <div class="pdfx-font-preview" :style="fontPreviewStyle(role)">
               <span x-text="$app.t('pdfExport.font.previewText')"></span>
             </div>

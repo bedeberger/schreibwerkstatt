@@ -79,7 +79,7 @@
 /* === Tabs-Wrapper === Margin pro Karte; Pattern-Look kommt aus tabs.css. */
 .pdfx-tabs { margin: 0.6rem 0 1rem; }
 
-.pdfx-tab-panel { padding: 0.4rem 0 0.6rem; }
+.pdfx-tab-panel { padding: 1rem 0.875rem 0.75rem; }
 
 /* === Inputs für Zahlen + freie Texte ===
    Zentralisiertes Numeric/Text-Input-Styling, das mit .combobox-trigger
@@ -168,6 +168,44 @@
   border-radius: var(--radius-sm);
   background: var(--color-bg);
   font-size: 18px;
+}
+
+/* === Farbpicker pro Schriftrolle ===
+   Native <input type=color> + danebenstehendes Hex-Textfeld; beide x-modeled
+   auf dasselbe config-Feld. flex-direction: row explizit, weil
+   `.card-form-field` flex-column erzwingt — würde Picker + Hex untereinander
+   stacken statt nebeneinander. */
+.pdfx-color-field {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 0.5rem;
+}
+.pdfx-color-picker {
+  width: 36px;
+  height: 28px;
+  padding: 0;
+  border: 0.5px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.pdfx-color-picker::-webkit-color-swatch-wrapper { padding: 2px; }
+.pdfx-color-picker::-webkit-color-swatch { border: none; border-radius: 2px; }
+.pdfx-color-text {
+  font-size: var(--font-size-sm);
+  font-family: var(--font-mono, monospace);
+  color: var(--color-muted);
+  letter-spacing: 0.02em;
+}
+.pdfx-color-hint {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  margin-top: 0.15rem;
 }
 
 /* === Cover-Preview (Bilderkasten) === */

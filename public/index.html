@@ -264,60 +264,61 @@
 </div><!-- end layout -->
 
 <!-- Confirm-/Prompt-Dialog (Ersatz für window.confirm + window.prompt;
-     siehe appConfirm / appPrompt in app-chrome.js) -->
-<div class="confirm-overlay" x-show="confirmDialogOpen" x-cloak
-     @keydown.escape.window="if (confirmDialogOpen) _resolveConfirmDialog(false)"
-     @click.self="_resolveConfirmDialog(false)">
-  <div class="confirm-dialog" role="alertdialog" aria-modal="true" :aria-label="confirmDialogMessage">
-    <div class="confirm-dialog-message" x-text="confirmDialogMessage"></div>
-    <input type="text" class="confirm-dialog-input"
-           x-show="confirmDialogInput"
-           x-model="confirmDialogInputValue"
-           :placeholder="confirmDialogInputPlaceholder"
-           @keydown.enter.prevent="_resolveConfirmDialog(true)"
-           x-init="$watch('confirmDialogOpen', v => { if (v && confirmDialogInput) $nextTick(() => { $el.focus(); $el.select(); }); })">
-    <div class="confirm-dialog-actions">
-      <button type="button" class="confirm-dialog-btn confirm-dialog-btn--cancel"
-              x-show="confirmDialogCancelLabel"
-              @click="_resolveConfirmDialog(false)" x-text="confirmDialogCancelLabel"></button>
-      <button type="button" class="confirm-dialog-btn"
-              :class="confirmDialogDanger ? 'confirm-dialog-btn--danger' : 'confirm-dialog-btn--primary'"
-              @click="_resolveConfirmDialog(true)"
-              x-init="$watch('confirmDialogOpen', v => { if (v && !confirmDialogInput) $nextTick(() => $el.focus()); })"
-              x-text="confirmDialogConfirmLabel"></button>
-    </div>
+     siehe appConfirm / appPrompt in app-chrome.js).
+     Native <dialog> + showModal(): Focus-Trap, Inert-Hintergrund, ESC-Routing
+     via cancel-Event. Click auf ::backdrop schliesst (Listener in app-chrome). -->
+<dialog id="app-confirm-dialog" class="confirm-dialog"
+        x-ref="confirmDialog"
+        @cancel.prevent="_resolveConfirmDialog(false)"
+        @click="if ($event.target === $el) _resolveConfirmDialog(false)">
+  <div class="confirm-dialog-message" x-text="confirmDialogMessage"></div>
+  <input type="text" class="confirm-dialog-input"
+         x-show="confirmDialogInput"
+         x-ref="confirmDialogInput"
+         x-model="confirmDialogInputValue"
+         :placeholder="confirmDialogInputPlaceholder"
+         @keydown.enter.prevent="_resolveConfirmDialog(true)">
+  <div class="confirm-dialog-actions">
+    <button type="button" class="confirm-dialog-btn confirm-dialog-btn--cancel"
+            x-show="confirmDialogCancelLabel"
+            @click="_resolveConfirmDialog(false)" x-text="confirmDialogCancelLabel"></button>
+    <button type="button" class="confirm-dialog-btn"
+            :class="confirmDialogDanger ? 'confirm-dialog-btn--danger' : 'confirm-dialog-btn--primary'"
+            x-ref="confirmDialogConfirmBtn"
+            @click="_resolveConfirmDialog(true)"
+            x-text="confirmDialogConfirmLabel"></button>
   </div>
-</div>
+</dialog>
 
 <!-- Buch-erstellen-Modal (Trigger: Combobox-Footer "+ Neues Buch …") -->
-<div class="book-create-overlay" x-show="bookCreateOpen" x-cloak
-     @keydown.escape.window="if (bookCreateOpen && !bookCreateBusy) cancelCreateBook()"
-     @click.self="if (!bookCreateBusy) cancelCreateBook()">
-  <div class="book-create-dialog" role="dialog" aria-modal="true" :aria-label="t('book.create.title')">
-    <div class="book-create-title" x-text="t('book.create.title')"></div>
-    <input type="text"
-           class="book-create-input"
-           x-model="bookCreateName"
-           maxlength="255"
-           :placeholder="t('book.create.namePlaceholder')"
-           :aria-label="t('book.create.nameLabel')"
-           :disabled="bookCreateBusy"
-           @keydown.enter.prevent="submitCreateBook()">
-    <div class="book-create-error" x-show="bookCreateError" x-cloak x-text="bookCreateError"></div>
-    <div class="book-create-actions">
-      <button type="button" class="book-create-btn book-create-btn--cancel"
-              :disabled="bookCreateBusy"
-              @click="cancelCreateBook()"
-              x-text="t('book.create.cancel')"></button>
-      <button type="button" class="book-create-btn book-create-btn--primary"
-              :disabled="bookCreateBusy || !bookCreateName.trim()"
-              @click="submitCreateBook()">
-        <span x-show="!bookCreateBusy" x-text="t('book.create.submit')"></span>
-        <span x-show="bookCreateBusy" x-cloak x-text="t('book.create.submitting')"></span>
-      </button>
-    </div>
+<dialog id="book-create-dialog" class="book-create-dialog"
+        x-ref="bookCreateDialog"
+        @cancel.prevent="if (!bookCreateBusy) cancelCreateBook()"
+        @click="if ($event.target === $el && !bookCreateBusy) cancelCreateBook()">
+  <div class="book-create-title" x-text="t('book.create.title')"></div>
+  <input type="text"
+         class="book-create-input"
+         x-ref="bookCreateInput"
+         x-model="bookCreateName"
+         maxlength="255"
+         :placeholder="t('book.create.namePlaceholder')"
+         :aria-label="t('book.create.nameLabel')"
+         :disabled="bookCreateBusy"
+         @keydown.enter.prevent="submitCreateBook()">
+  <div class="book-create-error" x-show="bookCreateError" x-cloak x-text="bookCreateError"></div>
+  <div class="book-create-actions">
+    <button type="button" class="book-create-btn book-create-btn--cancel"
+            :disabled="bookCreateBusy"
+            @click="cancelCreateBook()"
+            x-text="t('book.create.cancel')"></button>
+    <button type="button" class="book-create-btn book-create-btn--primary"
+            :disabled="bookCreateBusy || !bookCreateName.trim()"
+            @click="submitCreateBook()">
+      <span x-show="!bookCreateBusy" x-text="t('book.create.submit')"></span>
+      <span x-show="bookCreateBusy" x-cloak x-text="t('book.create.submitting')"></span>
+    </button>
   </div>
-</div>
+</dialog>
 
 <!-- Job-Queue Footer -->
 <div class="job-queue-bar" x-show="jobQueueItems.length > 0" x-cloak aria-live="polite" aria-atomic="false">

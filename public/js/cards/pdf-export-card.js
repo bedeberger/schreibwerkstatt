@@ -11,6 +11,8 @@
 // Render-Job läuft über die Standard-Job-Queue (/jobs/pdf-export). Sobald done,
 // wird das PDF-File via /jobs/pdf-export/:id/file als Download geholt.
 
+import { startPoll } from './job-helpers.js';
+
 const TABS = ['layout', 'font', 'chapter', 'cover', 'toc', 'extras', 'pdfa'];
 
 export function registerPdfExportCard() {
@@ -279,7 +281,8 @@ export function registerPdfExportCard() {
       const f = this.activeProfile.config.font[role];
       if (!f) return '';
       this.loadFontPreview(f.family, f.weight || 400);
-      return `font-family: '${f.family}', serif; font-weight: ${f.weight || 400};`;
+      const color = f.color && /^#[0-9a-fA-F]{6}$/.test(f.color) ? f.color : '';
+      return `font-family: '${f.family}', serif; font-weight: ${f.weight || 400};${color ? ` color: ${color};` : ''}`;
     },
 
     onFontPick(role, family) {
@@ -329,40 +332,38 @@ export function registerPdfExportCard() {
 
     _startPoll(jobId) {
       this._stopPoll();
-      this._pollTimer = setInterval(async () => {
-        try {
-          const r = await fetch(`/jobs/${jobId}`);
-          if (!r.ok) return;
-          const job = await r.json();
-          this.exportProgress = job.progress || 0;
+      startPoll(this, {
+        timerProp: '_pollTimer',
+        jobId,
+        progressProp: 'exportProgress',
+        intervalMs: 1000,
+        onProgress: (job) => {
           this.exportStatus = job.statusText
             ? window.__app.t(job.statusText, job.statusParams)
             : '';
-          if (job.status === 'done') {
-            this._stopPoll();
-            this.exporting = false;
-            this.exportProgress = 100;
-            const result = job.result || {};
-            const isWarning = result.pdfa?.requested && result.pdfa.validatorAvailable && !result.pdfa.passed;
-            this.exportStatus = window.__app.t(isWarning ? 'pdfExport.pdfaWarning' : 'pdfExport.done');
-            this._triggerDownload(jobId, result.filename);
-            // Status nach kurzer Zeit ausblenden — Warning bleibt länger sichtbar.
-            if (this._exportStatusTimer) clearTimeout(this._exportStatusTimer);
-            const ttl = isWarning ? 8000 : 3500;
-            this._exportStatusTimer = setTimeout(() => {
-              this.exportStatus = '';
-              this.exportProgress = 0;
-              this._exportStatusTimer = null;
-            }, ttl);
-          } else if (job.status === 'error' || job.status === 'cancelled') {
-            this._stopPoll();
-            this.exporting = false;
-            this.exportError = job.error
-              ? window.__app.t(job.error, job.errorParams)
-              : window.__app.t('pdfExport.error.generic');
-          }
-        } catch {}
-      }, 1000);
+        },
+        onError: (job) => {
+          this.exporting = false;
+          this.exportError = job.error
+            ? window.__app.t(job.error, job.errorParams)
+            : window.__app.t('pdfExport.error.generic');
+        },
+        onDone: (job) => {
+          this.exporting = false;
+          this.exportProgress = 100;
+          const result = job.result || {};
+          const isWarning = result.pdfa?.requested && result.pdfa.validatorAvailable && !result.pdfa.passed;
+          this.exportStatus = window.__app.t(isWarning ? 'pdfExport.pdfaWarning' : 'pdfExport.done');
+          this._triggerDownload(jobId, result.filename);
+          if (this._exportStatusTimer) clearTimeout(this._exportStatusTimer);
+          const ttl = isWarning ? 8000 : 3500;
+          this._exportStatusTimer = setTimeout(() => {
+            this.exportStatus = '';
+            this.exportProgress = 0;
+            this._exportStatusTimer = null;
+          }, ttl);
+        },
+      });
     },
 
     _stopPoll() {

@@ -1,8 +1,9 @@
 // Kontinuitätsprüfer-Methoden (werden in Alpine.data('kontinuitaetCard')
-// gespreadet). Job-Flow (runKontinuitaetCheck + startKontinuitaetPoll) direkt
-// implementiert, ohne createCardJobFeature.
+// gespreadet). Job-Flow (runKontinuitaetCheck + startKontinuitaetPoll) nutzt
+// shared `startPoll`-Helper; eigene Toggle-Logik bleibt (kein createCardJobFeature).
 
 import { fetchJson, escHtml } from './utils.js';
+import { startPoll } from './cards/job-helpers.js';
 
 export const kontinuitaetMethods = {
   async _loadKontinuitaetHistory() {
@@ -50,39 +51,30 @@ export const kontinuitaetMethods = {
   startKontinuitaetPoll(jobId) {
     const root = window.__app;
     const bookId = root.selectedBookId;
-    const lsKey = `lektorat_kontinuitaet_job_${bookId}`;
-    if (this._kontinuitaetPollTimer) clearInterval(this._kontinuitaetPollTimer);
-    this._kontinuitaetPollTimer = setInterval(async () => {
-      try {
-        const resp = await fetch('/jobs/' + jobId);
-        if (resp.status === 404) {
-          clearInterval(this._kontinuitaetPollTimer);
-          this._kontinuitaetPollTimer = null;
-          localStorage.removeItem(lsKey);
-          this.kontinuitaetLoading = false;
-          this.kontinuitaetProgress = 0;
-          this._kontinuitaetWriteStatus(root.t('kontinuitaet.interrupted'), false);
-          return;
-        }
-        if (!resp.ok) return;
-        const job = await resp.json();
-        this.kontinuitaetProgress = job.progress || 0;
-        if (job.status === 'running' || job.status === 'queued') {
-          this.kontinuitaetStatus = root._runningJobStatus(
-            job.statusText, job.tokensIn, job.tokensOut, job.maxTokensOut,
-            job.progress, job.tokensPerSec, job.statusParams,
-          );
-          return;
-        }
-        clearInterval(this._kontinuitaetPollTimer);
-        this._kontinuitaetPollTimer = null;
-        localStorage.removeItem(lsKey);
+    startPoll(this, {
+      timerProp: '_kontinuitaetPollTimer',
+      jobId,
+      lsKey: `lektorat_kontinuitaet_job_${bookId}`,
+      progressProp: 'kontinuitaetProgress',
+      onProgress: (job) => {
+        this.kontinuitaetStatus = root._runningJobStatus(
+          job.statusText, job.tokensIn, job.tokensOut, job.maxTokensOut,
+          job.progress, job.tokensPerSec, job.statusParams,
+        );
+      },
+      onNotFound: () => {
         this.kontinuitaetLoading = false;
         this.kontinuitaetProgress = 0;
-        if (job.status === 'cancelled' || job.status === 'error') {
-          this.kontinuitaetStatus = `<span class="error-msg">${root.t('common.errorColon')}${escHtml(root.t(job.error || '', job.errorParams))}</span>`;
-          return;
-        }
+        this._kontinuitaetWriteStatus(root.t('kontinuitaet.interrupted'), false);
+      },
+      onError: (job) => {
+        this.kontinuitaetLoading = false;
+        this.kontinuitaetProgress = 0;
+        this.kontinuitaetStatus = `<span class="error-msg">${root.t('common.errorColon')}${escHtml(root.t(job.error || '', job.errorParams))}</span>`;
+      },
+      onDone: async (job) => {
+        this.kontinuitaetLoading = false;
+        this.kontinuitaetProgress = 0;
         if (job.result?.empty) {
           this._kontinuitaetWriteStatus(root.t('kontinuitaet.noPages'), false);
           return;
@@ -95,8 +87,8 @@ export const kontinuitaetMethods = {
             : root.t(count === 1 ? 'kontinuitaet.issuesOne' : 'kontinuitaet.issuesMany', { count }),
           false,
         );
-      } catch (e) { console.error('[startKontinuitaetPoll]', e); }
-    }, 2000);
+      },
+    });
   },
 
   // Issues gefiltert nach UI-Filtern (figurId, kapitel). Reads figuren+tree

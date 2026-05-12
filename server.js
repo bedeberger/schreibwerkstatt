@@ -22,7 +22,7 @@ const ideenRouter = require('./routes/ideen');
 const bookSettingsRouter = require('./routes/booksettings');
 const booksRouter = require('./routes/books');
 const userSettingsRouter = require('./routes/usersettings');
-const { router: proxiesRouter, bookstackProxy, bookstackPageCleaner, BOOKSTACK_URL } = require('./routes/proxies');
+const { router: proxiesRouter, bookstackProxy, bookstackPageCleaner, bookstackPageOcc, BOOKSTACK_URL } = require('./routes/proxies');
 const { router: syncRouter, syncAllBooks } = require('./routes/sync');
 const exportRouter = require('./routes/export');
 const pdfExportRouter = require('./routes/pdf-export');
@@ -265,7 +265,7 @@ app.use((req, _res, next) => {
 });
 
 app.use(staticServe);
-app.use('/api', bookstackPageCleaner, bookstackProxy);
+app.use('/api', bookstackPageCleaner, bookstackPageOcc, bookstackProxy);
 
 const server = app.listen(PORT, '0.0.0.0', () => {
   logger.info(`Lektorat läuft auf http://0.0.0.0:${PORT}`);

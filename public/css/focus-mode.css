@@ -398,4 +398,51 @@ body.focus-mode.focus-cursor-hidden .page-content-view--editing * {
 .save-indicator--draft { color: var(--color-warning, #b5651d); }
 .save-indicator--offline { color: var(--color-error, #b33); }
 
+/* Cross-User-Save-Konflikt. Steht zwischen #status und dem Editor-Body,
+   bleibt im Fokus sichtbar (unterhalb des Header-Bereichs, der opacity:0
+   bekommt). User schreibt sonst minutenlang weiter, ohne dass die Auto-
+   Save-Failures sichtbar wären. */
+.editor-conflict-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-error, #b33) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-error, #b33) 45%, transparent);
+  color: var(--color-error, #b33);
+  font-size: var(--font-size-sm);
+  margin: 6px 12px 0;
+}
+.editor-conflict-banner__icon {
+  font-weight: 700;
+  width: 1.4em;
+  height: 1.4em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-error, #b33) 35%, transparent);
+  color: var(--color-bg, #fff);
+}
+.editor-conflict-banner__text { flex: 1 1 auto; }
+.editor-conflict-banner__action {
+  flex: 0 0 auto;
+  font-size: var(--font-size-xs);
+}
+
+/* Im Fokus auffälliger und nicht im hidden Header-Bereich. Position oberhalb
+   des Editor-Bodys, mit höherem Kontrast, ignoriert die globale #status-
+   display:none-Regel. */
+body.focus-mode .editor-conflict-banner {
+  position: fixed;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  max-width: min(720px, calc(100vw - 32px));
+  box-shadow: 0 6px 24px rgba(0,0,0,0.18);
+  margin: 0;
+}
+
 }

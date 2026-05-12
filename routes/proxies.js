@@ -389,6 +389,55 @@ const bookstackPageCleaner = (req, res, next) => {
   });
 };
 
+// Server-Side Optimistic-Concurrency für PUT /pages/:id. Schliesst das Race-
+// Window zwischen Client-Side-_checkPageConflict und dem eigentlichen PUT.
+// Header `X-If-Match-Revision` enthält den vom Client erwarteten revision_count
+// der Seite. Server liest aktuelle Seite, vergleicht. Mismatch → 412 mit
+// Konflikt-Metadaten, ohne den PUT an BookStack abzusetzen.
+const bookstackPageOcc = async (req, res, next) => {
+  if (req.method !== 'PUT') return next();
+  const m = req.path.match(/^\/pages\/(\d+)\/?$/);
+  if (!m) return next();
+  const expectedRev = req.get('X-If-Match-Revision');
+  if (!expectedRev) return next();
+  const expectedRevNum = Number(expectedRev);
+  if (!Number.isFinite(expectedRevNum)) {
+    // Defensiv: ungültiger Header → ignorieren, normaler PUT-Pfad.
+    delete req.headers['x-if-match-revision'];
+    return next();
+  }
+  const pageId = m[1];
+  const t = getTokenForRequest(req);
+  if (!t) return next(); // Auth-Pfad sortiert sich später aus
+  try {
+    const r = await fetch(`${BOOKSTACK_URL}/api/pages/${pageId}`, {
+      method: 'GET',
+      headers: { 'Authorization': `Token ${t.id}:${t.pw}` },
+    });
+    if (!r.ok) {
+      // Read-Fehler → kein OCC erzwingen, PUT laufen lassen. Bei echtem
+      // 401/403/404 wird der Proxy denselben Fehler weiterreichen.
+      return next();
+    }
+    const remote = await r.json();
+    if (remote?.revision_count != null && remote.revision_count !== expectedRevNum) {
+      return res.status(412).json({
+        error_code: 'BOOKSTACK_REVISION_MISMATCH',
+        remote: {
+          revisionCount: remote.revision_count,
+          updatedAt: remote.updated_at || null,
+          userName: remote.updated_by?.name || null,
+        },
+      });
+    }
+  } catch (e) {
+    logger.warn(`OCC-Pre-Check fehlgeschlagen (PUT /pages/${pageId}): ${e.message}`);
+  }
+  // BookStack kennt den Header nicht — entfernen, sonst nutzlos im Wire.
+  delete req.headers['x-if-match-revision'];
+  next();
+};
+
 // Proxy /api/* → BookStack. Token wird pro Request aus der DB gezogen, nicht
 // aus der Session – sonst würde ein Token-Update auf Gerät A die Sessions auf
 // anderen Geräten nicht erreichen (stale-token → fälschliches 401).
@@ -440,4 +489,4 @@ const bookstackProxy = createProxyMiddleware({
   }
 });
 
-module.exports = { router, bookstackProxy, bookstackPageCleaner, BOOKSTACK_URL };
+module.exports = { router, bookstackProxy, bookstackPageCleaner, bookstackPageOcc, BOOKSTACK_URL };

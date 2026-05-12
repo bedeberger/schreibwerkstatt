@@ -9,7 +9,7 @@
 
 import { escHtml } from '../utils.js';
 
-const COMBINING = /[̀-ͯ]/g;
+const COMBINING = /\p{M}/gu;
 
 function normalize(s) {
   return s.normalize('NFD').replace(COMBINING, '').toLowerCase();

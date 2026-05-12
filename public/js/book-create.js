@@ -9,17 +9,18 @@ export const bookCreateMethods = {
     this.bookCreateName = '';
     this.bookCreateError = '';
     this.bookCreateBusy = false;
-    this.bookCreateOpen = true;
+    const dlg = this.$refs?.bookCreateDialog;
+    if (dlg && !dlg.open) dlg.showModal();
     this.$nextTick(() => {
-      if (typeof document === 'undefined') return;
-      const input = document.querySelector('.book-create-dialog input');
+      const input = this.$refs?.bookCreateInput;
       input?.focus();
     });
   },
 
   cancelCreateBook() {
     if (this.bookCreateBusy) return;
-    this.bookCreateOpen = false;
+    const dlg = this.$refs?.bookCreateDialog;
+    if (dlg && dlg.open) dlg.close();
     this.bookCreateName = '';
     this.bookCreateError = '';
   },
@@ -48,7 +49,8 @@ export const bookCreateMethods = {
         throw new Error(detail || `HTTP ${res.status}`);
       }
       const created = await res.json();
-      this.bookCreateOpen = false;
+      const dlg = this.$refs?.bookCreateDialog;
+      if (dlg && dlg.open) dlg.close();
       this.bookCreateName = '';
       await this.loadBooks();
       this.selectedBookId = String(created.id);

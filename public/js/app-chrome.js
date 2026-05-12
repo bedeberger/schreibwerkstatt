@@ -188,10 +188,11 @@ export const appChromeMethods = {
     this.tokenSetupError = '';
   },
 
-  // Custom Confirm-Dialog. Native window.confirm() reisst Chrome auf macOS aus
-  // dem nativen Vollbild-Space (zeigt Modal nur ausserhalb des Spaces) — nach
-  // dem Klick bleibt das Fenster im Standard-Modus. Bricht u.a. Focus-Mode-
-  // Cancel-Flow.
+  // Confirm-Dialog via natives HTMLDialogElement.
+  // Native showModal() gibt Focus-Trap, Inert-Hintergrund und ESC-Routing
+  // (cancel-Event) gratis. Wichtig: window.confirm() reisst Chrome auf macOS
+  // aus dem nativen Vollbild-Space; <dialog> ist DOM (kein OS-Modal) und
+  // verursacht den Bug nicht.
   // Verwendung:
   //   if (!await this.appConfirm({ message, confirmLabel?, cancelLabel?, danger? })) return;
   appConfirm({ message, confirmLabel, cancelLabel, danger = false } = {}) {
@@ -205,8 +206,7 @@ export const appChromeMethods = {
     this.confirmDialogConfirmLabel = confirmLabel || this.t('common.confirm');
     this.confirmDialogCancelLabel = cancelLabel || this.t('common.cancel');
     this.confirmDialogDanger = !!danger;
-    this.confirmDialogOpen = true;
-    return new Promise(resolve => { this._confirmDialogResolve = resolve; });
+    return this._openConfirmDialog(false);
   },
 
   // Prompt-Variante: zeigt Textfeld im Modal, liefert getrimmten String oder
@@ -224,7 +224,22 @@ export const appChromeMethods = {
     this.confirmDialogConfirmLabel = confirmLabel || this.t('common.confirm');
     this.confirmDialogCancelLabel = cancelLabel || this.t('common.cancel');
     this.confirmDialogDanger = false;
-    this.confirmDialogOpen = true;
+    return this._openConfirmDialog(true);
+  },
+
+  _openConfirmDialog(isInput) {
+    const dlg = this.$refs.confirmDialog;
+    if (!dlg) return Promise.resolve(isInput ? null : false);
+    if (!dlg.open) dlg.showModal();
+    this.$nextTick(() => {
+      if (isInput) {
+        const inp = this.$refs.confirmDialogInput;
+        if (inp) { inp.focus(); inp.select(); }
+      } else {
+        const btn = this.$refs.confirmDialogConfirmBtn;
+        if (btn) btn.focus();
+      }
+    });
     return new Promise(resolve => { this._confirmDialogResolve = resolve; });
   },
 
@@ -233,7 +248,8 @@ export const appChromeMethods = {
     const wasInput = this.confirmDialogInput;
     const inputVal = (this.confirmDialogInputValue || '').trim();
     this._confirmDialogResolve = null;
-    this.confirmDialogOpen = false;
+    const dlg = this.$refs?.confirmDialog;
+    if (dlg && dlg.open) dlg.close();
     this.confirmDialogInput = false;
     this.confirmDialogInputValue = '';
     this.confirmDialogInputPlaceholder = '';

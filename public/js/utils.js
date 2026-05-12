@@ -59,9 +59,23 @@ export function localeTag(uiLocale) {
   return uiLocale === 'en' ? 'en-US' : 'de-CH';
 }
 
+// Pro Locale gecacht — Intl.RelativeTimeFormat-Konstruktion ist nicht gratis,
+// und _fmtRelativeLine wird pro Sidebar-Render mehrfach aufgerufen.
+const _RTF_CACHE = new Map();
+export function relativeDay(diffDays, uiLocale) {
+  const tag = localeTag(uiLocale);
+  let rtf = _RTF_CACHE.get(tag);
+  if (!rtf) {
+    rtf = new Intl.RelativeTimeFormat(tag, { numeric: 'auto' });
+    _RTF_CACHE.set(tag, rtf);
+  }
+  return rtf.format(-diffDays, 'day');
+}
+
 // Relative Last-Run-Anzeige aus ISO-Timestamp. Server liefert nur den ISO-
 // String; Lokalisierung passiert hier (i18n-Hard-Rule). `t` ist die i18n-Funktion,
-// `uiLocale` der Sprachcode aus der App ('de' oder 'en').
+// `uiLocale` der Sprachcode aus der App ('de' oder 'en'). Intl.RelativeTimeFormat
+// liefert „heute"/„gestern"/„vor 3 Tagen" lokalisiert; Template setzt Time daneben.
 export function formatLastRun(isoStr, t, uiLocale) {
   if (!isoStr) return '';
   const d = new Date(isoStr);
@@ -72,9 +86,7 @@ export function formatLastRun(isoStr, t, uiLocale) {
   const dDay  = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const diffDays = Math.round((today - dDay) / 86400000);
-  if (diffDays === 0) return t('job.lastRun.today',     { time });
-  if (diffDays === 1) return t('job.lastRun.yesterday', { time });
-  if (diffDays < 7)   return t('job.lastRun.daysAgo',   { days: diffDays, time });
+  if (diffDays < 7) return t('job.lastRun.rel', { rel: relativeDay(diffDays, uiLocale), time });
   const date = d.toLocaleDateString(tag, { day: '2-digit', month: '2-digit' });
   return t('job.lastRun.dateAt', { date, time });
 }

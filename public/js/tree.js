@@ -1,4 +1,4 @@
-import { htmlToText, CHARS_PER_TOKEN, fetchJson } from './utils.js';
+import { htmlToText, CHARS_PER_TOKEN, fetchJson, localeTag, relativeDay } from './utils.js';
 import { buildLektoratPrompt } from './prompts.js';
 
 // Buch-/Seiten-Lade-Methoden (werden in die Alpine-Komponente gespreadet)
@@ -15,12 +15,11 @@ function _diffDays(then, now = new Date()) {
   return Math.round((b - a) / 86400000);
 }
 
-function _localeTag(locale) { return locale === 'en' ? 'en-US' : 'de-CH'; }
 function _fmtTime(d, locale) {
-  return d.toLocaleTimeString(_localeTag(locale), { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleTimeString(localeTag(locale), { hour: '2-digit', minute: '2-digit' });
 }
 function _fmtDateShort(d, locale) {
-  return d.toLocaleDateString(_localeTag(locale), { day: '2-digit', month: '2-digit' });
+  return d.toLocaleDateString(localeTag(locale), { day: '2-digit', month: '2-digit' });
 }
 
 export const treeMethods = {
@@ -35,14 +34,12 @@ export const treeMethods = {
     return 'ok';
   },
 
-  // Erwartete Keys: `${prefix}Today|Yesterday|DaysAgo|On` mit Platzhaltern
-  // {time}, {days}, {date}.
+  // Erwartete Keys: `${prefix}Rel` ({rel, time}) und `${prefix}On` ({date, time}).
+  // `rel` kommt aus Intl.RelativeTimeFormat (heute / gestern / vor N Tagen).
   _fmtRelativeLine(d, prefix) {
-    const diff = _diffDays(d);
+    const diff = Math.max(0, _diffDays(d));
     const time = _fmtTime(d, this.uiLocale);
-    if (diff <= 0)  return this.t(`${prefix}Today`,     { time });
-    if (diff === 1) return this.t(`${prefix}Yesterday`, { time });
-    if (diff < 7)   return this.t(`${prefix}DaysAgo`,   { days: diff, time });
+    if (diff < 7) return this.t(`${prefix}Rel`, { rel: relativeDay(diff, this.uiLocale), time });
     return this.t(`${prefix}On`, { date: _fmtDateShort(d, this.uiLocale), time });
   },
 

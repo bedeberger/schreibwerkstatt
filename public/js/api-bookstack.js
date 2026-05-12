@@ -82,12 +82,12 @@ export const bookstackMethods = {
     return all;
   },
 
-  async bsPut(path, body) {
-    return this._bsWrite('PUT', path, body);
+  async bsPut(path, body, opts) {
+    return this._bsWrite('PUT', path, body, opts);
   },
 
-  async bsPost(path, body) {
-    return this._bsWrite('POST', path, body);
+  async bsPost(path, body, opts) {
+    return this._bsWrite('POST', path, body, opts);
   },
 
   // Frisch erzeugte BookStack-Seite sofort in die lokale `pages`-Tabelle eintragen,
@@ -187,10 +187,18 @@ export const bookstackMethods = {
     };
   },
 
-  async _bsWrite(method, path, body) {
+  async _bsWrite(method, path, body, writeOpts) {
+    const headers = { 'Content-Type': 'application/json' };
+    // Optimistic-Concurrency: Server-Side-Check im Proxy. Header wird vom
+    // BookStack-Proxy abgefangen, nicht weitergeleitet — bei Mismatch 412,
+    // ohne den Server-Request abzusetzen. Schliesst Race-Window GET→PUT
+    // zwischen Client-Side-_checkPageConflict und tatsächlichem PUT.
+    if (writeOpts?.ifMatchRevision != null) {
+      headers['X-If-Match-Revision'] = String(writeOpts.ifMatchRevision);
+    }
     const opts = {
       method,
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(body),
     };
     let lastRes = null;
@@ -210,6 +218,17 @@ export const bookstackMethods = {
         // mit Stale-Daten aus dem SWR-Cache.
         _invalidateApiCache(path);
         return r.json();
+      }
+      // 412 Precondition Failed: Server-OCC hat Mismatch erkannt. Body enthält
+      // remoteRevisionCount/remoteUpdatedAt/remoteUserName für Conflict-UI.
+      // Eigener Error-Typ damit Aufrufer (saveEdit/quickSave) differenzieren.
+      if (r.status === 412) {
+        let payload = null;
+        try { payload = await r.json(); } catch (_) {}
+        const err = new Error('PRECONDITION_FAILED');
+        err.code = 'PRECONDITION_FAILED';
+        err.remote = payload?.remote || null;
+        throw err;
       }
       lastRes = r;
       if (r.status !== 429 || attempt === MAX_RETRY_429) break;

@@ -6,7 +6,9 @@ import { escHtml, fmtTok } from '../utils.js';
 // Generischer Job-Poller. `ctx` ist das Komponenten-Objekt (Root oder Card),
 // in dessen Feldern `timerProp` und `progressProp` geschrieben wird.
 //
-// config: { timerProp, jobId, lsKey?, progressProp?, onProgress, onNotFound, onError, onDone }
+// config: { timerProp, jobId, lsKey?, progressProp?, intervalMs?,
+//           onProgress, onNotFound, onError, onDone }
+// intervalMs: Default 2000. PDF-Export fährt 1000 für schnelleres UI-Feedback.
 export function startPoll(ctx, config) {
   if (ctx[config.timerProp]) clearInterval(ctx[config.timerProp]);
   ctx[config.timerProp] = setInterval(async () => {
@@ -30,7 +32,7 @@ export function startPoll(ctx, config) {
       if (job.status === 'error') await config.onError?.(job);
       else await config.onDone?.(job);
     } catch (e) { console.error('[poll ' + config.timerProp + ']', e); }
-  }, 2000);
+  }, config.intervalMs || 2000);
 }
 
 // Baut das Status-HTML für einen laufenden Job. `translate` ist die i18n-Funktion

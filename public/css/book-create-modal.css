@@ -1,17 +1,7 @@
 @layer components {
-/* === Buch-erstellen-Modal (Trigger: Combobox-Footer "+ Neues Buch …") === */
-/* Visuell angelehnt an .confirm-dialog (siehe confirm-dialog.css), aber mit
-   Input-Feld. Selbe Tokens fuer Cascade-Konsistenz. */
-.book-create-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-modal-front);
-  background: rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-}
+/* === Buch-erstellen-Modal (Trigger: Combobox-Footer "+ Neues Buch …") ===
+   Natives <dialog> + showModal(); ::backdrop fuer Hintergrund.
+   Visuell angelehnt an .confirm-dialog. */
 .book-create-dialog {
   background: var(--color-card-bg);
   color: var(--color-text);
@@ -19,11 +9,17 @@
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
   max-width: 480px;
-  width: 100%;
+  width: calc(100% - 2rem);
   padding: 1.25rem 1.25rem 1rem;
+  margin: auto;
+}
+.book-create-dialog[open] {
   display: flex;
   flex-direction: column;
   gap: 0.9rem;
+}
+.book-create-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.45);
 }
 .book-create-title {
   font-size: var(--font-size-lg, 1.1rem);

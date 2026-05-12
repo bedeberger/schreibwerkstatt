@@ -6,24 +6,29 @@ KI-gestütztes Lektorat-Tool für [BookStack](https://www.bookstackapp.com/). Ei
 
 - **Seitenlektorat** – Rechtschreib-, Grammatik- und Stilprüfung mit selektiver Korrekturübernahme.
 - **Bearbeitungsmodus** – Seiten direkt bearbeiten und nach BookStack zurückspeichern. Auto-Save alle 30 s, lokaler Draft (localStorage), Offline-Modus mit Retry.
-- **Fokusmodus** (F11) – Vollbild, Typewriter-Scroll, Absatz-Hervorhebung. Auto-Save, Schreibzeit-Tracking, Mobile-/IME-Support.
+- **Fokusmodus** (Cmd/Ctrl+Shift+E) – Vollbild, Typewriter-Scroll, Absatz-Hervorhebung. Auto-Save, Schreibzeit-Tracking, Live-Zeichen-/Wortzähler, Mobile-/IME-Support.
 - **Synonym-Finder** – Wort markieren → Rechtsklick → Vorschläge aus [OpenThesaurus](https://www.openthesaurus.de/) + KI mit Satzkontext.
 - **Seiten-Chat** – KI-Dialog zu einer Seite. Änderungsvorschläge übernehmbar.
 - **Buch-Chat** – KI-Dialog über das ganze Buch mit Werkzeugen (Pronomen-Zählung, Figurenverteilung, Volltextsuche, Seitenabruf) auf vorberechnetem Index.
+- **Buch-Übersicht** – Dashboard pro Buch: Snapshot, Zeichen-Trend (30 Tage), Schreib-pro-Tag-Heatmap, Lektorat-Abdeckung, Top-Fehlertypen, Kapitel-Qualität, Figuren-/Orts-Präsenz, letzte Seiten, Status „abgeschlossen".
+- **Buchorganizer** – Kapitel & Seiten per Drag&Drop ordnen, neue Kapitel/Seiten anlegen, umbenennen, löschen. Sidebar-Tree zeigt Seitenanzahl pro Kapitel.
 - **Buchbewertung / Kapitelbewertung** – Stärken, Schwächen, Empfehlungen.
-- **Figurenübersicht** – Charakterextraktion mit Beziehungsgraph; Figurenkontext auch im Lektorat einblendbar.
+- **Figurenübersicht** – Charakterextraktion mit Beziehungsgraph (Vollbild-Modus); Figurenkontext auch im Lektorat einblendbar.
 - **Figuren-Werkstatt** – Vorwärts-Entwicklung von Figuren als jsMind-Mindmap (Steckbrief, Stimme, Subtext, eigene Aspekte). Import bestehender Buchfiguren mit vorgefülltem Baum, KI-Brainstorm pro Knoten (3–7 Sub-Ideen, vor doppelt mit anderen Buchfiguren geschützt) und Konsistenz-Check gegen Buchwelt mit Severity-Skala. Lauf-Historie pro Figur. Anleitung: [docs/figur-werkstatt.md](docs/figur-werkstatt.md).
 - **Ereignisse / Schauplätze / Szenen** – Übersichten pro Kapitel.
 - **Kontinuitätsprüfer** – Findet Widersprüche.
 - **Stil-Heatmap** – Satzlänge, Adverbien, Füllwörter, Wiederholungen pro Kapitel.
 - **Fehler-Heatmap** – Befunde aller Lektorats-Läufe nach Kapitel und Fehlertyp.
-- **Lektorat-Verlauf** – Frühere Korrekturen als Inline-Highlights, selektiv nachträglich übernehmbar.
-- **Buchstatistik** – Tägliche Snapshots (Wörter, Tokens) als Zeitliniendiagramm.
+- **Lektorat-Verlauf** – Frühere Korrekturen als Inline-Highlights, selektiv nachträglich übernehmbar. Lektoratszeit pro Lauf wird mitgemessen.
+- **Buchstatistik** – Tägliche Snapshots (Zeichen, Wörter, Tokens) als Zeitliniendiagramm.
+- **Ideen-Sammlung** – Notiz-Sammelbox pro Buch oder Seite.
+- **Command-Palette** (Cmd/Ctrl+K bzw. `/`) – Fuzzy-Suche über Karten, Aktionen, Seiten, Kapitel, Figuren, Orte, Szenen. Prefix-Modi: `>` Befehle, `#` Seiten, `!` Kapitel, `@` Figuren, `$` Orte, `%` Szenen.
 - **Fine-Tuning-Export** – JSONL-Trainingsdaten (Stil, Szenen, Dialoge, Q&A, Korrekturen). Anleitung: [docs/finetuning.md](docs/finetuning.md).
-- **WordPress-Import** – One-Shot-Import einer WP-Site aus mysqldump-Datei in ein BookStack-Buch (Categories → Chapter, älteste Posts zuerst). Anleitung: [docs/wordpress-import.md](docs/wordpress-import.md).
-- **Custom-PDF-Export** – Eigener Renderer (pdfkit) mit konfigurierbarem Layout, Schriften aus Google Fonts (runtime download, 30-Tage-Cache), Cover-Bild (sharp-konvertiert), Kapitelumbrüche, Inhaltsverzeichnis und PDF/A-2B-Konformität. Mehrere Profile pro Buch+User. Optional Server-Validierung via veraPDF (separat installieren, siehe unten).
+- **WordPress-Import** – One-Shot-Import einer WP-Site aus mysqldump-Datei in ein BookStack-Buch (Categories → Chapter, älteste Posts zuerst nach Jahrgang). Anleitung: [docs/wordpress-import.md](docs/wordpress-import.md).
+- **Buch-Export** – BookStack-Native-Formate (PDF, HTML, Markdown, Plaintext, EPUB) mit Timestamp-Filename.
+- **Custom-PDF-Export** – Eigener Renderer (pdfkit) mit druckfertiger PDF/A-2B-Konformität. Konfigurierbares Layout (Seitenformat, Ränder, Kapitelumbrüche), freie Schriftwahl aus Google Fonts (runtime download, 30-Tage-Cache), Cover-Bild, Inhaltsverzeichnis, mehrere Profile pro Buch+User. Optional Server-Validierung via veraPDF (separat installieren, siehe unten).
 - **Bucheinstellungen** – Sprache, Buchtyp, Erzählperspektive, Erzählzeit, Freitext-Kontext fliessen in alle Prompts.
-- **Theme** – Hell/Dunkel/Auto.
+- **Theme** – Hell/Dunkel/Auto, Sprachumschaltung Deutsch/Englisch.
 
 ## Voraussetzungen
 

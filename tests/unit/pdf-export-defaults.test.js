@@ -55,3 +55,37 @@ test('defaultConfig: Trennlinien-Toggles default off', () => {
   assert.equal(c.chapter.titleRule, false);
   assert.equal(c.chapter.pageTitleRule, false);
 });
+
+test('defaultConfig: Farbe pro Schriftrolle vorkonfiguriert', () => {
+  const c = defaultConfig();
+  assert.match(c.font.body.color,     /^#[0-9a-f]{6}$/);
+  assert.match(c.font.heading.color,  /^#[0-9a-f]{6}$/);
+  assert.match(c.font.title.color,    /^#[0-9a-f]{6}$/);
+  assert.match(c.font.subtitle.color, /^#[0-9a-f]{6}$/);
+  assert.match(c.font.byline.color,   /^#[0-9a-f]{6}$/);
+});
+
+test('validateConfig: Hex-Farben akzeptiert (6-stellig, 3-stellig, lowercase)', () => {
+  const c = validateConfig({ font: {
+    body:     { color: '#ABCDEF' },
+    heading:  { color: '#f00' },
+    title:    { color: '#012345' },
+  }});
+  assert.equal(c.font.body.color,    '#abcdef');
+  assert.equal(c.font.heading.color, '#ff0000');
+  assert.equal(c.font.title.color,   '#012345');
+});
+
+test('validateConfig: Bad Hex fällt auf Default zurück', () => {
+  const d = defaultConfig();
+  const c = validateConfig({ font: {
+    body:    { color: 'red' },
+    heading: { color: '#12' },
+    title:   { color: '#GGGGGG' },
+    byline:  { color: null },
+  }});
+  assert.equal(c.font.body.color,    d.font.body.color);
+  assert.equal(c.font.heading.color, d.font.heading.color);
+  assert.equal(c.font.title.color,   d.font.title.color);
+  assert.equal(c.font.byline.color,  d.font.byline.color);
+});

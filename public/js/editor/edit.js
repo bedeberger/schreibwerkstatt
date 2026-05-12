@@ -268,8 +268,17 @@ export const editorEditMethods = {
       if (!okShort) return;
     }
 
-    const conflict = await this._checkPageConflict(this.currentPage.id, this.currentPage.updated_at);
+    const expectedRev = this.currentPage.revision_count ?? null;
+    const conflict = await this._checkPageConflict(
+      this.currentPage.id,
+      this.currentPage.updated_at,
+      expectedRev,
+    );
     if (conflict) {
+      this.editConflict = {
+        remoteUserName: conflict.remoteUserName,
+        remoteUpdatedAt: conflict.remoteUpdatedAt,
+      };
       const okOverwrite = await this.appConfirm({
         message: this.t('edit.conflict.message', {
           user: conflict.remoteUserName || this.t('edit.conflict.unknownUser'),
@@ -290,11 +299,16 @@ export const editorEditMethods = {
     this.editSaving = true;
     this.setStatus(this.t('edit.saving'), true);
     try {
+      // Server-Side-OCC: Header schliesst Race-Window zwischen Pre-Check und
+      // tatsächlichem PUT. Bei Overwrite-Bestätigung Header weglassen, sonst
+      // würde der Server den User-bestätigten Overwrite blockieren.
+      const writeOpts = conflict ? null : (expectedRev != null ? { ifMatchRevision: expectedRev } : null);
       const saved = await this.bsPut('pages/' + this.currentPage.id, {
         html: newHtml,
         name: this.currentPage.name,
-      });
+      }, writeOpts);
       if (saved?.updated_at) this.currentPage.updated_at = saved.updated_at;
+      if (saved?.revision_count != null) this.currentPage.revision_count = saved.revision_count;
 
       this.originalHtml = newHtml;
       this.currentPageEmpty = !htmlToText(newHtml).trim();
@@ -307,6 +321,7 @@ export const editorEditMethods = {
       this.lastDraftSavedAt = null;
       this.editDirty = false;
       this.saveOffline = false;
+      this.editConflict = null;
       this.updatePageView();
       if (this.focusMode) {
         this.setStatus(this.t('edit.changesSaved'), false, 3000);
@@ -326,7 +341,17 @@ export const editorEditMethods = {
       writeDraft(this.currentPage.id, newHtml, this.originalHtml, this.currentPage.updated_at);
       this.lastDraftSavedAt = Date.now();
       this.saveOffline = true;
-      if (!navigator.onLine) {
+      // Race-Treffer: Server-OCC wirft 412, obwohl Client-Side-Check passed.
+      // Conflict-Banner setzen + spezifischen Hinweis statt generic saveFailed.
+      if (e?.code === 'PRECONDITION_FAILED') {
+        this.editConflict = {
+          remoteUserName: e.remote?.userName || null,
+          remoteUpdatedAt: e.remote?.updatedAt || null,
+        };
+        this.setStatus(this.t('edit.conflict.unsavedHint', {
+          user: e.remote?.userName || this.t('edit.conflict.unknownUser'),
+        }), false, 8000);
+      } else if (!navigator.onLine) {
         this.setStatus(this.t('edit.offlineSaved'), false, 8000);
       } else {
         this.setStatus(this.t('edit.saveFailed', { msg: e.message }), false, 8000);
@@ -369,25 +394,53 @@ export const editorEditMethods = {
     this.editSaving = true;
     try {
       // Silent-Path: Auto-Save / Pre-Send-Refresh dürfen keinen Modal triggern.
-      // Bei Cross-User-Konflikt → Draft bleibt liegen, saveOffline-Banner zeigt
-      // Hinweis. User muss explizit Save-Button drücken (saveEdit), dort fragt
-      // appConfirm dann nach Überschreiben.
-      const conflict = await this._checkPageConflict(this.currentPage.id, this.currentPage.updated_at);
+      // Bei Cross-User-Konflikt → Draft bleibt liegen, editConflict-Banner
+      // im Editor-Header zeigt Hinweis (auch im Fokusmodus sichtbar). User
+      // muss explizit Save-Button drücken (saveEdit), dort fragt appConfirm
+      // dann nach Überschreiben.
+      const expectedRev = this.currentPage.revision_count ?? null;
+      const conflict = await this._checkPageConflict(
+        this.currentPage.id,
+        this.currentPage.updated_at,
+        expectedRev,
+      );
       if (conflict) {
         this.saveOffline = true;
+        this.editConflict = {
+          remoteUserName: conflict.remoteUserName,
+          remoteUpdatedAt: conflict.remoteUpdatedAt,
+        };
         this.setStatus(this.t('edit.conflict.unsavedHint', {
           user: conflict.remoteUserName || this.t('edit.conflict.unknownUser'),
         }), false, 8000);
         return;
       }
-      const saved = await this.bsPut('pages/' + this.currentPage.id, {
-        html: newHtml,
-        name: this.currentPage.name,
-      });
+      let saved;
+      try {
+        saved = await this.bsPut('pages/' + this.currentPage.id, {
+          html: newHtml,
+          name: this.currentPage.name,
+        }, expectedRev != null ? { ifMatchRevision: expectedRev } : null);
+      } catch (writeErr) {
+        if (writeErr?.code === 'PRECONDITION_FAILED') {
+          this.saveOffline = true;
+          this.editConflict = {
+            remoteUserName: writeErr.remote?.userName || null,
+            remoteUpdatedAt: writeErr.remote?.updatedAt || null,
+          };
+          this.setStatus(this.t('edit.conflict.unsavedHint', {
+            user: writeErr.remote?.userName || this.t('edit.conflict.unknownUser'),
+          }), false, 8000);
+          return;
+        }
+        throw writeErr;
+      }
       if (saved?.updated_at) this.currentPage.updated_at = saved.updated_at;
+      if (saved?.revision_count != null) this.currentPage.revision_count = saved.revision_count;
       this.originalHtml = newHtml;
       this.editDirty = false;
       this.saveOffline = false;
+      this.editConflict = null;
       this.lastAutosaveAt = Date.now();
       this.lastDraftSavedAt = null;
       clearDraft(this.currentPage.id);
