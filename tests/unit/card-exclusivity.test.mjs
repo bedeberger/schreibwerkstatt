@@ -22,6 +22,7 @@ function makeCtx() {
     showBookReviewCard: false,
     showKapitelReviewCard: false,
     showFiguresCard: false,
+    showFigurWerkstattCard: false,
     showSzenenCard: false,
     showEreignisseCard: false,
     showBookStatsCard: false,
@@ -33,10 +34,33 @@ function makeCtx() {
     showBookSettingsCard: false,
     showUserSettingsCard: false,
     showFinetuneExportCard: false,
+    showExportCard: false,
+    showPdfExportCard: false,
+    showBookOrganizerCard: false,
     showEditorCard: false,
     showChatCard: false,
     showIdeenCard: false,
     showTreeCard: false,
+    // resetView-Pflichtdaten
+    bookReviewHistory: [],
+    figurenStatus: '',
+    figurenProgress: 0,
+    selectedFigurId: null,
+    figurenFilters: { kapitel: '', seite: '' },
+    globalZeitstrahl: [],
+    showGlobalZeitstrahl: false,
+    ereignisseFilters: { figurId: '', kapitel: '', seite: '' },
+    szenen: [],
+    szenenUpdatedAt: null,
+    selectedSzeneId: null,
+    szenenFilters: { wertung: '', figurId: '', kapitel: '', ortId: '' },
+    orteFilters: { figurId: '', kapitel: '', szeneId: '' },
+    batchLoading: false,
+    batchProgress: 0,
+    batchStatus: '',
+    _batchPollTimer: null,
+    _komplettPollTimer: null,
+    clearBookstackSearch() {},
     selectedBookId: 42,
     currentPage: { id: 7 },
     figuren: [],
@@ -156,6 +180,30 @@ test('toggleChatCard: ohne currentPage nicht öffnen', () => {
   c.currentPage = null;
   c.toggleChatCard();
   assert.equal(c.showChatCard, false);
+});
+
+test('resetView: schliesst alle Hauptkarten und öffnet bookOverview (Home-Klick)', () => {
+  // Regression: figurWerkstatt war früher nicht in resetView gelistet → Home-Klick
+  // aus Werkstatt liess Flag true → _maybeOpenBookOverview skipte → keine Übersicht.
+  // Mit Registry-driven Reset darf das nicht mehr passieren — neue Karten kommen
+  // automatisch durch EXCLUSIVE_CARDS.
+  const c = makeCtx();
+  c.showFigurWerkstattCard = true;
+  c.resetView();
+  assert.equal(c.showFigurWerkstattCard, false, 'Werkstatt-Flag muss nach resetView false sein');
+  assert.equal(c.showBookOverviewCard, true, 'bookOverview ist Default-Home');
+});
+
+test('resetView: kein zweiter Tab offen → bookOverview öffnet', () => {
+  const c = makeCtx();
+  c.showBookOrganizerCard = true;
+  c.showExportCard = true;
+  c.showPdfExportCard = true;
+  c.resetView();
+  assert.equal(c.showBookOrganizerCard, false);
+  assert.equal(c.showExportCard, false);
+  assert.equal(c.showPdfExportCard, false);
+  assert.equal(c.showBookOverviewCard, true);
 });
 
 test('toggleKontinuitaetCard: refresh-Pattern beim erneuten Klick', () => {

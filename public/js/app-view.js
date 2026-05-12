@@ -1,4 +1,5 @@
 import { htmlToText, stripFocusArtefacts, fetchJson, escHtml } from './utils.js';
+import { EXCLUSIVE_CARDS } from './cards/feature-registry.js';
 
 // View-Steuerung: Exklusivität zwischen Buch-/Seiten-Karten, Seitenauswahl,
 // Reset-Logik beim Buch-/Seitenwechsel. Buchebenen-Features und Editor sind
@@ -110,25 +111,9 @@ export const appViewMethods = {
   // Bewertung, Figuren, Entwicklung und Buch-Chat sind exklusiv.
   // Beim Öffnen einer Buchkarte wird auch die offene Seite geschlossen.
   _closeOtherMainCards(keep) {
-    if (keep !== 'bookOverview') this.showBookOverviewCard = false;
-    if (keep !== 'bookReview') this.showBookReviewCard = false;
-    if (keep !== 'kapitelReview') this.showKapitelReviewCard = false;
-    if (keep !== 'figures') this.showFiguresCard = false;
-    if (keep !== 'figurWerkstatt') this.showFigurWerkstattCard = false;
-    if (keep !== 'szenen') this.showSzenenCard = false;
-    if (keep !== 'ereignisse') this.showEreignisseCard = false;
-    if (keep !== 'bookStats') this.showBookStatsCard = false;
-    if (keep !== 'stil') this.showStilCard = false;
-    if (keep !== 'fehlerHeatmap') this.showFehlerHeatmapCard = false;
-    if (keep !== 'bookChat') this.showBookChatCard = false;
-    if (keep !== 'orte') this.showOrteCard = false;
-    if (keep !== 'kontinuitaet') this.showKontinuitaetCard = false;
-    if (keep !== 'bookSettings') this.showBookSettingsCard = false;
-    if (keep !== 'userSettings') this.showUserSettingsCard = false;
-    if (keep !== 'finetuneExport') this.showFinetuneExportCard = false;
-    if (keep !== 'export') this.showExportCard = false;
-    if (keep !== 'pdfExport') this.showPdfExportCard = false;
-    if (keep !== 'bookOrganizer') this.showBookOrganizerCard = false;
+    for (const c of EXCLUSIVE_CARDS) {
+      if (keep !== c.key) this[c.flag] = false;
+    }
     this.resetPage();
   },
 
@@ -172,16 +157,7 @@ export const appViewMethods = {
   _maybeOpenBookOverview() {
     if (!this.selectedBookId) return;
     if (this.showEditorCard) return;
-    const anyOpen = this.showBookOverviewCard
-      || this.showBookReviewCard || this.showKapitelReviewCard
-      || this.showFiguresCard || this.showFigurWerkstattCard
-      || this.showSzenenCard || this.showOrteCard
-      || this.showEreignisseCard || this.showKontinuitaetCard
-      || this.showBookStatsCard || this.showStilCard || this.showFehlerHeatmapCard
-      || this.showBookChatCard || this.showBookSettingsCard
-      || this.showUserSettingsCard || this.showFinetuneExportCard
-      || this.showExportCard || this.showPdfExportCard
-      || this.showBookOrganizerCard;
+    const anyOpen = EXCLUSIVE_CARDS.some(c => this[c.flag]);
     if (anyOpen) return;
     this.showBookOverviewCard = true;
   },
@@ -501,16 +477,13 @@ export const appViewMethods = {
     this.clearBookstackSearch();
     // Kapitel in der Sidebar bleiben geöffnet (kein c.open = false)
     this.showTreeCard = true;
-    this.showBookOverviewCard = false;
-    this.showBookReviewCard = false;
+    // Alle Hauptkarten schliessen (Single-Source aus feature-registry).
+    for (const c of EXCLUSIVE_CARDS) this[c.flag] = false;
     this.bookReviewHistory = [];
-    this.showKapitelReviewCard = false;
     if (this._batchPollTimer) { clearInterval(this._batchPollTimer); this._batchPollTimer = null; }
     this.batchLoading = false;
     this.batchProgress = 0;
     this.batchStatus = '';
-    this.showFiguresCard = false;
-    this.showFigurWerkstattCard = false;
     this.figurenStatus = '';
     this.figurenProgress = 0;
     this.selectedFigurId = null;
@@ -518,11 +491,9 @@ export const appViewMethods = {
     this.figurenFilters.seite = '';
     this.globalZeitstrahl = [];
     this.showGlobalZeitstrahl = false;
-    this.showEreignisseCard = false;
     this.ereignisseFilters.figurId = '';
     this.ereignisseFilters.kapitel = '';
     this.ereignisseFilters.seite = '';
-    this.showSzenenCard = false;
     this.szenen = [];
     this.szenenUpdatedAt = null;
     this.selectedSzeneId = null;
@@ -530,23 +501,11 @@ export const appViewMethods = {
     this.szenenFilters.figurId = '';
     this.szenenFilters.kapitel = '';
     this.szenenFilters.ortId = '';
-    this.showBookStatsCard = false;
-    this.showStilCard = false;
-    this.showFehlerHeatmapCard = false;
-    this.showOrteCard = false;
     this.orte = [];
     this.orteFilters.figurId = '';
     this.orteFilters.kapitel = '';
     this.orteFilters.szeneId = '';
-    this.showKontinuitaetCard = false;
     if (this._komplettPollTimer) { clearInterval(this._komplettPollTimer); this._komplettPollTimer = null; }
-    this.showBookChatCard = false;
-    this.showBookSettingsCard = false;
-    this.showUserSettingsCard = false;
-    this.showFinetuneExportCard = false;
-    this.showExportCard = false;
-    this.showPdfExportCard = false;
-    this.showBookOrganizerCard = false;
     this.alleAktualisierenLastRun = null;
     this.alleAktualisierenProgress = 0;
     this.alleAktualisierenTokIn = 0;

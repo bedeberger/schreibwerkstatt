@@ -99,6 +99,37 @@ export const ACTIONS = [
     } },
 ];
 
+// Alle Hauptkarten mit Exklusivitäts-Verhalten. Superset von FEATURES
+// (enthält zusätzlich nicht-Palette-Karten wie kapitelReview und userSettings,
+// die via Sidebar bzw. Avatar-Menu geöffnet werden, aber dieselbe „eine Karte
+// gleichzeitig"-Regel folgen). Wird von `_closeOtherMainCards`, `resetView`
+// und `_maybeOpenBookOverview` in [public/js/app-view.js](public/js/app-view.js)
+// gelesen — neue Hauptkarte braucht nur einen Eintrag hier, die View-Logik
+// bleibt drift-frei.
+//   `key`  – Argument für `_closeOtherMainCards(keep)`.
+//   `flag` – Show-State-Flag am Root.
+export const EXCLUSIVE_CARDS = [
+  { key: 'bookOverview',   flag: 'showBookOverviewCard' },
+  { key: 'bookReview',     flag: 'showBookReviewCard' },
+  { key: 'kapitelReview',  flag: 'showKapitelReviewCard' },
+  { key: 'figures',        flag: 'showFiguresCard' },
+  { key: 'figurWerkstatt', flag: 'showFigurWerkstattCard' },
+  { key: 'szenen',         flag: 'showSzenenCard' },
+  { key: 'ereignisse',     flag: 'showEreignisseCard' },
+  { key: 'bookStats',      flag: 'showBookStatsCard' },
+  { key: 'stil',           flag: 'showStilCard' },
+  { key: 'fehlerHeatmap',  flag: 'showFehlerHeatmapCard' },
+  { key: 'bookChat',       flag: 'showBookChatCard' },
+  { key: 'orte',           flag: 'showOrteCard' },
+  { key: 'kontinuitaet',   flag: 'showKontinuitaetCard' },
+  { key: 'bookSettings',   flag: 'showBookSettingsCard' },
+  { key: 'userSettings',   flag: 'showUserSettingsCard' },
+  { key: 'finetuneExport', flag: 'showFinetuneExportCard' },
+  { key: 'export',         flag: 'showExportCard' },
+  { key: 'pdfExport',      flag: 'showPdfExportCard' },
+  { key: 'bookOrganizer',  flag: 'showBookOrganizerCard' },
+];
+
 export const FEATURE_GROUPS = ['review', 'world', 'tools', 'app'];
 
 export const GROUP_LABEL_KEY = {
