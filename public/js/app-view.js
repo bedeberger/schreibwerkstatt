@@ -510,6 +510,7 @@ export const appViewMethods = {
     this.batchProgress = 0;
     this.batchStatus = '';
     this.showFiguresCard = false;
+    this.showFigurWerkstattCard = false;
     this.figurenStatus = '';
     this.figurenProgress = 0;
     this.selectedFigurId = null;
