@@ -1,5 +1,6 @@
 import { escHtml } from './utils.js';
 import { loadVis } from './lazy-libs.js';
+import { toggleWrapFullscreen } from './fullscreen.js';
 
 // Graph-Render-Methoden (werden in Alpine.data('figurenCard') gespreadet).
 // Root-Zugriffe via window.__app. vis-network-Instanz (_figurenNetwork) +
@@ -105,22 +106,12 @@ export const graphMethods = {
   },
 
   async toggleFigurenGraphFullscreen() {
-    const container = document.getElementById('figuren-graph');
-    const wrap = container?.closest('.figuren-graph-wrap');
+    const wrap = document.getElementById('figuren-graph')?.closest('.figuren-graph-wrap');
     if (!wrap) return;
-
-    // Native Browser-Fullscreen (versteckt Browser-Chrome). State-Sync via
-    // `fullscreenchange`-Listener in figuren-card.js — figurenGraphFullscreen
-    // wird dort gesetzt, Canvas-Resize + fit() ebenfalls.
-    if (document.fullscreenElement === wrap) {
-      try { await document.exitFullscreen(); } catch {}
-      return;
-    }
-    if (document.fullscreenElement) {
-      try { await document.exitFullscreen(); } catch {}
-    }
+    // State-Sync via `fullscreenchange`-Listener in figuren-card.js —
+    // figurenGraphFullscreen wird dort gesetzt, Canvas-Resize + fit() ebenfalls.
     try {
-      await wrap.requestFullscreen();
+      await toggleWrapFullscreen(wrap);
     } catch {
       // Fallback (iOS Safari u.ä. ohne Fullscreen-API): CSS-Overlay-Klasse.
       this.figurenGraphFullscreen = !this.figurenGraphFullscreen;

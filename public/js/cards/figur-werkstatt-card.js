@@ -4,6 +4,7 @@
 
 import { figurWerkstattMethods } from '../figur-werkstatt.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
+import { attachFullscreenSync } from '../fullscreen.js';
 
 export function registerFigurWerkstattCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -52,7 +53,6 @@ export function registerFigurWerkstattCard() {
     _consistencyJobDraftId: null,
     _brainstormPollTimer: null,
     _consistencyPollTimer: null,
-    _fsListener: null,
     _ctxOutsideHandler: null,
     _ctxEscHandler: null,
     _pendingDraftId: null,
@@ -139,6 +139,18 @@ export function registerFigurWerkstattCard() {
           type: 'figur-werkstatt:select',
           handler: onSelectDraft,
         }],
+      });
+
+      // Native Fullscreen-API: State spiegeln, jsMind resize bei Enter/Exit.
+      attachFullscreenSync({
+        resolveWrap: () => document.querySelector('.werkstatt-detail'),
+        signal: this._lifecycle.signal,
+        onChange: (active) => {
+          this.mindmapFullscreen = active;
+          if (this._jm) {
+            try { this._jm.resize(); } catch {}
+          }
+        },
       });
     },
 

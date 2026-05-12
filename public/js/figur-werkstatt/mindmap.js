@@ -5,6 +5,7 @@
 // bleibt funktionsfähig.
 
 import { loadJsMind } from '../lazy-libs.js';
+import { toggleWrapFullscreen } from '../fullscreen.js';
 
 const I18N_MARKER = /^__i18n:([a-zA-Z0-9_.-]+)__$/;
 
@@ -189,13 +190,8 @@ export const mindmapMethods = {
     this._jmDraftId = null;
     this._mindmapEl = null;
     this._topicMarkers = null;
-    if (this._fsListener) {
-      document.removeEventListener('fullscreenchange', this._fsListener);
-      this._fsListener = null;
-    }
-    if (this.mindmapFullscreen) {
+    if (document.fullscreenElement?.classList?.contains?.('werkstatt-detail')) {
       try { document.exitFullscreen?.(); } catch {}
-      this.mindmapFullscreen = false;
     }
     this._hideContextMenu?.();
   },
@@ -254,29 +250,16 @@ export const mindmapMethods = {
   async toggleMindmapFullscreen() {
     // Fullscreen umfasst das ganze Detail-Pane (Header + Form + Mindmap + Runs),
     // nicht nur die Mindmap-Section: Save/Brainstorm/Konsistenz und Notes
-    // bleiben im Vollbild erreichbar.
-    const wrap = this.$el?.querySelector('.werkstatt-detail');
+    // bleiben im Vollbild erreichbar. `$el` würde im @click-Kontext das Button-
+    // Element liefern (kein Descendant von .werkstatt-detail) — globale Suche.
+    const wrap = document.querySelector('.werkstatt-detail');
     if (!wrap) return;
-    if (document.fullscreenElement === wrap) {
-      try { await document.exitFullscreen(); } catch {}
-      return;
-    }
-    if (document.fullscreenElement) {
-      try { await document.exitFullscreen(); } catch {}
-    }
-    try { await wrap.requestFullscreen(); } catch (e) {
+    // State-Sync via `fullscreenchange`-Listener in figur-werkstatt-card.js —
+    // mindmapFullscreen wird dort gesetzt, jsMind resize ebenfalls.
+    try {
+      await toggleWrapFullscreen(wrap);
+    } catch {
       this.errorMessage = window.__app.t('werkstatt.error.fullscreen') || 'Fullscreen failed';
-      return;
-    }
-    if (!this._fsListener) {
-      this._fsListener = () => {
-        const active = document.fullscreenElement === wrap;
-        this.mindmapFullscreen = active;
-        if (this._jm) {
-          try { this._jm.resize(); } catch {}
-        }
-      };
-      document.addEventListener('fullscreenchange', this._fsListener);
     }
   },
 };

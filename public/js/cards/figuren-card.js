@@ -14,6 +14,7 @@
 
 import { graphMethods } from '../graph.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
+import { attachFullscreenSync } from '../fullscreen.js';
 import { memoizeByIdentity } from '../utils.js';
 
 const FIGUR_TYP_ORDER = { hauptfigur: 0, antagonist: 1, mentor: 2, nebenfigur: 3, andere: 4 };
@@ -130,19 +131,20 @@ export function registerFigurenCard() {
 
       // Native Fullscreen-API: State spiegeln, Canvas neu fitten, beim Verlassen
       // (Esc / Browser-UI) Toggle-Flag sauber zurücksetzen.
-      this._fsListener = () => {
-        const wrap = document.getElementById('figuren-graph')?.closest('.figuren-graph-wrap');
-        const active = !!wrap && document.fullscreenElement === wrap;
-        this.figurenGraphFullscreen = active;
-        if (this._figurenNetwork) {
-          // vis-network hört auf window.resize → Canvas an neuen Container anpassen.
-          window.dispatchEvent(new Event('resize'));
-          requestAnimationFrame(() => {
-            this._figurenNetwork?.fit({ animation: { duration: 200, easingFunction: 'easeInOutQuad' } });
-          });
-        }
-      };
-      document.addEventListener('fullscreenchange', this._fsListener, { signal: this._lifecycle.signal });
+      attachFullscreenSync({
+        resolveWrap: () => document.getElementById('figuren-graph')?.closest('.figuren-graph-wrap'),
+        signal: this._lifecycle.signal,
+        onChange: (active) => {
+          this.figurenGraphFullscreen = active;
+          if (this._figurenNetwork) {
+            // vis-network hört auf window.resize → Canvas an neuen Container anpassen.
+            window.dispatchEvent(new Event('resize'));
+            requestAnimationFrame(() => {
+              this._figurenNetwork?.fit({ animation: { duration: 200, easingFunction: 'easeInOutQuad' } });
+            });
+          }
+        },
+      });
     },
 
     destroy() {
