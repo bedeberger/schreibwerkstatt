@@ -130,7 +130,25 @@
   }
 }
 
-/* Vollbild-Modus: überlagert die Seite, Toolbar oben, Graph nimmt Rest. */
+/* Vollbild-Modus: native Browser-Fullscreen-API (`:fullscreen`) ist die
+   primäre Variante — versteckt Browser-Chrome, nutzt den gesamten Screen.
+   `.is-fullscreen` bleibt als CSS-Overlay-Fallback für Engines ohne
+   Fullscreen-API (iOS Safari u.ä.). Beide Selektoren gleiche Regeln. */
+.figuren-graph-wrap:fullscreen {
+  background: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  gap: 8px;
+}
+.figuren-graph-wrap:fullscreen .figuren-graph-container {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+  border-radius: var(--radius-sm);
+  touch-action: none;
+}
+
 .figuren-graph-wrap.is-fullscreen {
   position: fixed;
   inset: 0;

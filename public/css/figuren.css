@@ -16,6 +16,10 @@
 .figur-legend-dot--prekariat            { --fig-hue: var(--palette-wine); }
 /* Unterwelt: invertierte Darstellung (dunkler Hintergrund, helle Linie) – braucht starken Mix */
 .figur-legend-dot--unterwelt            { --fig-hue: var(--palette-dark); --figpal-bg-mix: 95%; border-color: var(--color-border-contrast); }
+:root[data-theme="dark"] .figur-legend-dot--unterwelt {
+  --fig-hue: var(--palette-gray-light);
+  border-color: var(--palette-dark);
+}
 
 /* === Figuren: Kanten-Legende === */
 .figur-legend--soziogramm { flex-wrap: wrap; row-gap: 4px; }
@@ -96,6 +100,10 @@
 .figur-schicht-prekariat            { --badge-hue: var(--palette-wine); }
 /* Unterwelt: invertierte Darstellung (dunkler Hintergrund, heller Text) */
 .figur-schicht-unterwelt            { --badge-hue: var(--palette-dark); background: var(--palette-dark); color: var(--color-text-inverse); }
+:root[data-theme="dark"] .figur-schicht-unterwelt {
+  background: var(--palette-gray-light);
+  color: var(--palette-dark);
+}
 .figur-praesenz-zentral      { --badge-hue: var(--palette-blue); }
 .figur-praesenz-regelmaessig { --badge-hue: var(--palette-green); }
 .figur-praesenz-punktuell    { --badge-hue: var(--palette-orange); }

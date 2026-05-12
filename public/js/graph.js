@@ -104,17 +104,33 @@ export const graphMethods = {
     return false;
   },
 
-  toggleFigurenGraphFullscreen() {
-    this.figurenGraphFullscreen = !this.figurenGraphFullscreen;
-    const net = this._figurenNetwork;
-    if (!net) return;
-    this.$nextTick(() => {
-      // vis-network reagiert auf window.resize und passt Canvas an neue Container-Grösse an.
-      window.dispatchEvent(new Event('resize'));
-      if (this.figurenGraphFullscreen) {
-        net.fit({ animation: { duration: 200, easingFunction: 'easeInOutQuad' } });
-      }
-    });
+  async toggleFigurenGraphFullscreen() {
+    const container = document.getElementById('figuren-graph');
+    const wrap = container?.closest('.figuren-graph-wrap');
+    if (!wrap) return;
+
+    // Native Browser-Fullscreen (versteckt Browser-Chrome). State-Sync via
+    // `fullscreenchange`-Listener in figuren-card.js — figurenGraphFullscreen
+    // wird dort gesetzt, Canvas-Resize + fit() ebenfalls.
+    if (document.fullscreenElement === wrap) {
+      try { await document.exitFullscreen(); } catch {}
+      return;
+    }
+    if (document.fullscreenElement) {
+      try { await document.exitFullscreen(); } catch {}
+    }
+    try {
+      await wrap.requestFullscreen();
+    } catch {
+      // Fallback (iOS Safari u.ä. ohne Fullscreen-API): CSS-Overlay-Klasse.
+      this.figurenGraphFullscreen = !this.figurenGraphFullscreen;
+      this.$nextTick(() => {
+        window.dispatchEvent(new Event('resize'));
+        if (this.figurenGraphFullscreen && this._figurenNetwork) {
+          this._figurenNetwork.fit({ animation: { duration: 200, easingFunction: 'easeInOutQuad' } });
+        }
+      });
+    }
   },
 
   async renderFigurGraph() {
@@ -316,21 +332,28 @@ export const graphMethods = {
       }
 
       const dpr = window.devicePixelRatio || 1;
+      // Adaptive Schriftgrösse: bei kleinem Container (600 px) bleiben 11/10 px,
+      // im Fullscreen (Canvas wächst auf >1000 px Höhe) skalieren Header/Tier
+      // proportional bis 18/15 — sonst sind die Kapitel im Vollbild unlesbar.
+      const cHeightCss  = ctx.canvas.height / dpr;
+      const cWidthCss   = ctx.canvas.width / dpr;
+      const headerFs    = Math.max(11, Math.min(18, cHeightCss / 55));
+      const tierFs      = Math.max(10, Math.min(15, cHeightCss / 65));
+      const lblMaxChars = cHeightCss > 700 ? 60 : 34;
 
       // 2) Kapitel-Header oben (Screen-Koordinaten → feste Lesegrösse, folgen dem Pan)
       if (N > 0) {
         ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.font = `600 ${11 * dpr}px system-ui,-apple-system,sans-serif`;
+        ctx.font = `600 ${headerFs * dpr}px system-ui,-apple-system,sans-serif`;
         ctx.textAlign    = 'center';
         ctx.textBaseline = 'top';
         ctx.fillStyle    = '#555';
-        const cWidth = ctx.canvas.width / dpr;
         for (let i = 0; i < N; i++) {
           const dom = network.canvasToDOM({ x: i * COL_W, y: Y_TOP });
-          if (dom.x < -120 || dom.x > cWidth + 120) continue;
+          if (dom.x < -120 || dom.x > cWidthCss + 120) continue;
           const raw = `${i + 1}. ${chapterOrder[i]}`;
-          const lbl = raw.length > 34 ? raw.slice(0, 32) + '…' : raw;
+          const lbl = raw.length > lblMaxChars ? raw.slice(0, lblMaxChars - 2) + '…' : raw;
           ctx.fillText(lbl, dom.x * dpr, 8 * dpr);
         }
         ctx.restore();
@@ -339,21 +362,22 @@ export const graphMethods = {
       // 3) Tier-Labels links am Canvas-Rand (Screen-Koordinaten)
       ctx.save();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.font = `600 ${10 * dpr}px system-ui,-apple-system,sans-serif`;
+      ctx.font = `600 ${tierFs * dpr}px system-ui,-apple-system,sans-serif`;
       ctx.textBaseline = 'middle';
       ctx.textAlign    = 'left';
-      const cHeight = ctx.canvas.height / dpr;
+      const padY = (tierFs * 0.9) * dpr;
+      const pillH = (tierFs * 1.6) * dpr;
       for (const t of tiersUsed) {
         const midY = TIER_Y[t] + ((layoutPerTier[t].maxRows - 1) * ROW_H) / 2;
         const dom = network.canvasToDOM({ x: 0, y: midY });
-        if (dom.y < -16 || dom.y > cHeight + 16) continue;
+        if (dom.y < -16 || dom.y > cHeightCss + 16) continue;
         const label = window.__app.t('figuren.type.' + t);
         const tw    = ctx.measureText(label).width;
-        const px = 6 * dpr, py = dom.y * dpr - 9 * dpr, pw = tw + 12 * dpr, ph = 18 * dpr, pr = 4 * dpr;
+        const px = 6 * dpr, py = dom.y * dpr - padY, pw = tw + 12 * dpr, pr = 4 * dpr;
         ctx.fillStyle = 'rgba(255,255,255,0.88)';
         ctx.beginPath();
-        if (ctx.roundRect) ctx.roundRect(px, py, pw, ph, pr);
-        else ctx.rect(px, py, pw, ph);
+        if (ctx.roundRect) ctx.roundRect(px, py, pw, pillH, pr);
+        else ctx.rect(px, py, pw, pillH);
         ctx.fill();
         ctx.fillStyle = TIER_COLOR[t] || '#555';
         ctx.fillText(label, 12 * dpr, dom.y * dpr);
@@ -606,7 +630,7 @@ export const graphMethods = {
       arbeiterschicht:     '#6B3F0D',
       migrantenmilieu:     '#9A4010',
       prekariat:           '#6B1A1A',
-      unterwelt:           '#ccc',
+      unterwelt:           '#333',
       andere:              '#888',
     };
     const BAND_H      = LEVEL_Y_GAP * 0.90;
@@ -637,16 +661,20 @@ export const graphMethods = {
       ctx.save();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       const dpr = window.devicePixelRatio || 1;
-      ctx.font = `bold ${10 * dpr}px system-ui, -apple-system, sans-serif`;
+      const cHeightCss = ctx.canvas.height / dpr;
+      const schichtFs  = Math.max(10, Math.min(15, cHeightCss / 65));
+      ctx.font = `bold ${schichtFs * dpr}px system-ui, -apple-system, sans-serif`;
       ctx.textBaseline = 'middle';
+      const padY  = (schichtFs * 0.9) * dpr;
+      const pillH = (schichtFs * 1.6) * dpr;
       for (const [levStr, schicht] of Object.entries(levelToSchicht)) {
         const domY = network.canvasToDOM({ x: 0, y: Number(levStr) * LEVEL_Y_GAP }).y;
-        if (domY < -16 || domY > ctx.canvas.height / dpr + 16) continue;
+        if (domY < -16 || domY > cHeightCss + 16) continue;
         // Hintergrund-Pill (rounded rect, compat-safe) – Koordinaten in Canvas-Pixeln (× dpr)
         const label = window.__app.t('figuren.schicht.' + schicht);
         const tw    = ctx.measureText(label).width;
         const cY = domY * dpr;
-        const px = 6 * dpr, py = cY - 9 * dpr, pw = tw + 12 * dpr, ph = 18 * dpr, pr = 4 * dpr;
+        const px = 6 * dpr, py = cY - padY, pw = tw + 12 * dpr, ph = pillH, pr = 4 * dpr;
         ctx.fillStyle = 'rgba(255,255,255,0.80)';
         ctx.beginPath();
         if (ctx.roundRect) {

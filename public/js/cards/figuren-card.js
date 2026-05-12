@@ -127,9 +127,29 @@ export function registerFigurenCard() {
           this.renderFigurGraph();
         }
       });
+
+      // Native Fullscreen-API: State spiegeln, Canvas neu fitten, beim Verlassen
+      // (Esc / Browser-UI) Toggle-Flag sauber zurücksetzen.
+      this._fsListener = () => {
+        const wrap = document.getElementById('figuren-graph')?.closest('.figuren-graph-wrap');
+        const active = !!wrap && document.fullscreenElement === wrap;
+        this.figurenGraphFullscreen = active;
+        if (this._figurenNetwork) {
+          // vis-network hört auf window.resize → Canvas an neuen Container anpassen.
+          window.dispatchEvent(new Event('resize'));
+          requestAnimationFrame(() => {
+            this._figurenNetwork?.fit({ animation: { duration: 200, easingFunction: 'easeInOutQuad' } });
+          });
+        }
+      };
+      document.addEventListener('fullscreenchange', this._fsListener, { signal: this._lifecycle.signal });
     },
 
     destroy() {
+      // Falls Karte im Vollbild abgebaut wird (Buchwechsel etc.): zuerst Browser-Fullscreen verlassen.
+      if (document.fullscreenElement?.classList?.contains?.('figuren-graph-wrap')) {
+        try { document.exitFullscreen?.(); } catch {}
+      }
       this._lifecycle?.destroy();
       if (this._figurenNetwork) { this._figurenNetwork.destroy(); this._figurenNetwork = null; }
     },
