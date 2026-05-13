@@ -11,6 +11,7 @@ const {
   jsonBody,
 } = require('./shared');
 const { narrativeLabels } = require('./narrative-labels');
+const { loadReviewKomplettContext } = require('./review-context');
 const { toIntId } = require('../../lib/validate');
 
 const reviewRouter = express.Router();
@@ -26,7 +27,11 @@ async function runReviewJob(jobId, bookId, bookName, userEmail, userToken) {
   // einkippen. Kapitelanalyse bleibt schwerpunkt-frei (würde Synthese verzerren).
   const locale = `${bookSettings?.language || 'de'}-${bookSettings?.region || 'CH'}`;
   const reviewSchwerpunkt = getBuchtypReviewSchwerpunkt(locale, bookSettings?.buchtyp || null);
-  const narrativeWithSchwerpunkt = { ...narrative, reviewSchwerpunkt };
+  // Komplett-Daten + Mikro-Findings sind optional: ohne vorhergehende Komplett­
+  // analyse / ohne Lektorats-Findings bleiben die Buckets leer und der Prompt
+  // injiziert keinen Strukturdaten-Block.
+  const komplettContext = loadReviewKomplettContext(bookId, userEmail);
+  const reviewOptions = { ...narrative, reviewSchwerpunkt, komplettContext };
   try {
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
     const [chaptersData, pages] = await Promise.all([
@@ -57,7 +62,7 @@ async function runReviewJob(jobId, bookId, bookName, userEmail, userToken) {
       const bookText = buildSinglePassBookText(groups, groupOrder);
 
       r = await aiCall(jobId, tok,
-        buildBookReviewSinglePassPrompt(bookName, pageContents.length, bookText, narrativeWithSchwerpunkt),
+        buildBookReviewSinglePassPrompt(bookName, pageContents.length, bookText, reviewOptions),
         SYSTEM_BUCHBEWERTUNG,
         65, 97, 5000, 0.2, null, undefined, SCHEMA_REVIEW,
       );
@@ -97,7 +102,7 @@ async function runReviewJob(jobId, bookId, bookName, userEmail, userToken) {
         statusText: 'job.phase.finalReview',
       });
       r = await aiCall(jobId, tok,
-        buildBookReviewMultiPassPrompt(bookName, chapterAnalyses, pageContents.length, narrativeWithSchwerpunkt),
+        buildBookReviewMultiPassPrompt(bookName, chapterAnalyses, pageContents.length, reviewOptions),
         SYSTEM_BUCHBEWERTUNG,
         90, 97, 5000, 0.2, null, undefined, SCHEMA_REVIEW,
       );

@@ -80,6 +80,11 @@ export function renderReviewHtml(r, translate) {
         <div class="bewertung-section-title">${escHtml(translate('review.section.thema'))}</div>
         <p class="bewertung-section-text">${escMd(r.thema)}</p>
       </div>`;
+  if (r.mikro_befund) html += `
+      <div class="bewertung-section">
+        <div class="bewertung-section-title">${escHtml(translate('review.section.mikroBefund'))}</div>
+        <p class="bewertung-section-text">${escMd(r.mikro_befund)}</p>
+      </div>`;
   if (r.staerken?.length) html += `
       <div class="bewertung-section">
         <div class="bewertung-section-title">${escHtml(translate('review.strengths'))}</div>
