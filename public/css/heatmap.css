@@ -61,6 +61,25 @@
   top: 0;
   z-index: 1;
 }
+/* Cluster-Kopfzeile: gruppiert die Typen-Spalten thematisch. */
+.heatmap-cluster-row th.heatmap-cluster-head {
+  text-align: center;
+  font-size: var(--font-size-xs, 11px);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-fg-muted, var(--color-muted));
+  border-bottom: 0.5px solid var(--color-border);
+  padding-bottom: 2px;
+}
+.heatmap-cluster-row th + th.heatmap-cluster-head {
+  border-left: 0.5px solid var(--color-border);
+}
+.heatmap-cluster-row + tr th[colspan] { /* no-op selector to keep specificity comment near */ }
+/* Senkrechte Trennlinie an Cluster-Grenzen in der Typen-Reihe und im Body. */
+.heatmap-table thead tr:nth-child(2) th.heatmap-cluster-start,
+.heatmap-table tbody td.heatmap-cluster-start {
+  border-left: 0.5px solid var(--color-border);
+}
 .heatmap-rowhead {
   text-align: left !important;
   font-weight: 500;
@@ -151,6 +170,19 @@
   }
   .heatmap-rowhead-main { font-size: var(--font-size-sm); }
   .heatmap-coverage { max-width: 100px; }
+  .heatmap-cluster-row th.heatmap-cluster-head {
+    font-size: 10px;
+    padding-bottom: 1px;
+  }
+}
+/* 17 Typen-Spalten + 2 Meta-Spalten → bei mittleren Viewports/Containern dichter packen,
+   damit nicht jede Tabelle scrollen muss. Kompaktes Padding, aber lesbar. */
+@media (max-width: 1100px) {
+  .heatmap-table thead tr:nth-child(2) th,
+  .heatmap-table tbody td.heatmap-cell {
+    padding-left: 5px;
+    padding-right: 5px;
+  }
 }
 
 /* Heatmap-Detail-Panel (aufklappbar unter der Tabelle) */

@@ -135,3 +135,62 @@ test('buildLektoratPrompt: erzeugt nicht-leeren Prompt-Body', async () => {
   assert.ok(out.length > 50);
   assert.ok(out.includes('Der Hund läuft im Wald.'));
 });
+
+test('buildLektoratPrompt (claude): enthält alle 17 Typen im Enum + 5 neue Spezial-Blöcke', async () => {
+  const m = await freshPrompts('claude');
+  const out = m.buildLektoratPrompt('Der Hund läuft im Wald.', { buchtyp: 'roman' });
+  for (const t of ['filterwort', 'klischee', 'pleonasmus', 'namenskonsistenz', 'figurenmerkmal', 'anrede', 'schauplatzmerkmal']) {
+    assert.match(out, new RegExp(t), `Typ «${t}» fehlt im Cloud-Prompt`);
+  }
+  assert.match(out, /Filterwort-Regeln/);
+  assert.match(out, /Klischee-Regeln/);
+  assert.match(out, /Pleonasmus-Regeln/);
+});
+
+test('buildLektoratPrompt (claude): Figurenkonsistenz-Block nur bei figuren.length > 0', async () => {
+  const m = await freshPrompts('claude');
+  const ohne = m.buildLektoratPrompt('Text.', { figuren: [] });
+  const mit  = m.buildLektoratPrompt('Text.', { figuren: [{ name: 'Anna', geschlecht: 'weiblich' }] });
+  assert.ok(!ohne.includes('Figurenkonsistenz-Regeln'), 'darf ohne Figuren nicht eingebunden sein');
+  assert.match(mit, /Figurenkonsistenz-Regeln/);
+  assert.match(mit, /laut Figurenkartei/);
+});
+
+test('buildLektoratPrompt (claude): Schauplatzkonsistenz-Block nur bei orte.length > 0', async () => {
+  const m = await freshPrompts('claude');
+  const ohne = m.buildLektoratPrompt('Text.', { orte: [] });
+  const mit  = m.buildLektoratPrompt('Text.', { orte: [{ name: 'Berlin', typ: 'Stadt' }] });
+  assert.ok(!ohne.includes('Schauplatzkonsistenz-Regeln'), 'darf ohne Orte nicht eingebunden sein');
+  assert.match(mit, /Schauplatzkonsistenz-Regeln/);
+});
+
+test('buildLektoratPrompt (ollama): nur 6 Local-Typen, keine neuen Spezial-Blöcke', async () => {
+  const m = await freshPrompts('ollama');
+  const out = m.buildLektoratPrompt('Text.', { figuren: [{ name: 'Anna' }], orte: [{ name: 'Berlin' }] });
+  // Local-Enum darf neue Typen NICHT enthalten
+  for (const t of ['filterwort', 'klischee', 'pleonasmus', 'namenskonsistenz', 'figurenmerkmal', 'anrede', 'schauplatzmerkmal']) {
+    assert.ok(!out.includes(t), `Local-Modus darf «${t}» nicht referenzieren`);
+  }
+  assert.ok(!out.includes('Filterwort-Regeln'));
+  assert.ok(!out.includes('Figurenkonsistenz-Regeln'));
+});
+
+test('SCHEMA_LEKTORAT (claude): enum umfasst alle 17 Cloud-Typen', async () => {
+  const m = await freshPrompts('claude');
+  const e = m.SCHEMA_LEKTORAT?.properties?.fehler?.items?.properties?.typ?.enum;
+  assert.ok(Array.isArray(e), 'enum-Array fehlt im Schema');
+  assert.equal(e.length, 17);
+  for (const t of ['filterwort', 'klischee', 'pleonasmus', 'namenskonsistenz', 'figurenmerkmal', 'anrede', 'schauplatzmerkmal']) {
+    assert.ok(e.includes(t), `Schema-enum fehlt «${t}»`);
+  }
+});
+
+test('SCHEMA_LEKTORAT (ollama): enum bleibt auf 6 Local-Typen beschränkt', async () => {
+  const m = await freshPrompts('ollama');
+  const e = m.SCHEMA_LEKTORAT?.properties?.fehler?.items?.properties?.typ?.enum;
+  assert.ok(Array.isArray(e));
+  assert.equal(e.length, 6);
+  for (const t of ['filterwort', 'klischee', 'pleonasmus', 'namenskonsistenz']) {
+    assert.ok(!e.includes(t), `Local-Schema darf «${t}» nicht enthalten`);
+  }
+});

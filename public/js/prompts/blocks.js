@@ -69,6 +69,74 @@ Show-vs-Tell-Regeln (typ: «show_vs_tell»):
 - Selbsttest: Passt die szenische Variante zum Erzähltempo und zur Szene? Nicht aufblähen. Würde die szenische Variante den Lesefluss bremsen, obwohl die Stelle gerade Tempo braucht? Dann weglassen.`;
 }
 
+export function _buildFilterwortBlock() {
+  return `
+Filterwort-Regeln (typ: «filterwort»):
+- Wahrnehmungs-/Kognitions-Verben identifizieren, die die POV-Figur zwischen Leser und Erfahrung schieben («sah», «hörte», «fühlte», «bemerkte», «erkannte», «dachte», «beobachtete», «spürte», «schaute», «blickte», «entdeckte»). Beispiel: «Sie sah, wie er die Tür öffnete» → distanziert; «Er öffnete die Tür» → unmittelbar.
+- Nur im Erzähltext aus personaler / Ich-Perspektive melden. In auktorialer Erzählweise sind Wahrnehmungsverben legitim. In direkter Rede / Dialog NICHT melden.
+- Nicht melden, wenn die Wahrnehmung selbst der Punkt ist («Erst jetzt sah sie, dass …» – Erkenntnis ist Plot-Beat).
+- «original»: vollständiger Satz zeichengenau aus dem Text.
+- «korrektur»: derselbe Satz ohne Filter-Verb, mit der Wahrnehmungssache direkt geschildert.
+- Selbsttest: Wird das Filterverb gestrichen und das Wahrgenommene direkt erzählt, gewinnt der Satz an Unmittelbarkeit? Wenn nein → weglassen.`;
+}
+
+export function _buildKlischeeBlock() {
+  return `
+Klischee-Regeln (typ: «klischee»):
+- Abgenutzte Bildsprache, abgegriffene Metaphern, Phrasen, die in deutschsprachiger Romanprosa als Klischee gelten. Beispiele: «das Herz raste», «ein kalter Schauer lief ihm den Rücken hinunter», «Augen wie Smaragde», «die Welt blieb stehen», «Schmetterlinge im Bauch», «Gänsehaut überzog ihre Arme», «sein Blut gefror», «Tränen kullerten».
+- Auch melden: schiefe Bilder / gemischte Metaphern (zwei unvereinbare Bildebenen in einem Satz), tote Vergleiche («wie ein Blitz», «schwarz wie die Nacht»), reflexartige Genre-Phrasen.
+- In direkter Rede / Dialog NICHT melden: Figuren dürfen klischeehaft sprechen.
+- «original»: Phrase ODER vollständiger Satz zeichengenau aus dem Text (denselben Span-Typ in «korrektur» beibehalten).
+- «korrektur»: konkretes, frisches Bild oder schlichte Beschreibung – nicht das nächste Klischee.
+- Selbsttest: Würde ein professioneller Lektor die Stelle als «zu abgegriffen» markieren? Bei Zweifel weglassen.`;
+}
+
+export function _buildPleonasmusBlock() {
+  return `
+Pleonasmus-Regeln (typ: «pleonasmus»):
+- Redundanz / doppelte Bedeutung in einer Phrase. Beispiele: «weisser Schimmel», «tote Leiche», «nickte zustimmend mit dem Kopf», «zuckte mit den Schultern hoch», «zurückkehren wieder», «kleines Detail», «ganz und gar», «runde Kugel», «schwarze Dunkelheit», «hörbares Geräusch».
+- Auch melden: Body-Part-Autonomy mit redundantem Bezug («seine Augen blickten ihn an»), tautologische Adjektiv-Substantiv-Paare.
+- Nicht melden, wenn die Doppelung als bewusste Verstärkung lesbar ist (Lyrik, ironisches Register, Figurenrede mit Charakterisierung).
+- «original»: die redundante Phrase zeichengenau aus dem Text (Span = Phrase).
+- «korrektur»: dieselbe Phrase ohne Redundanz – nur die nicht-überflüssige Komponente bleibt stehen.
+- Selbsttest: Geht Information verloren, wenn der redundante Teil gestrichen wird? Wenn nein → melden.`;
+}
+
+export function _buildFigurenkonsistenzBlock() {
+  return `
+Figurenkonsistenz-Regeln (typ: «namenskonsistenz», «figurenmerkmal», «anrede»):
+- Diese Typen werden AUSSCHLIESSLICH gegen den oben gelieferten Figuren-Block + Beziehungs-Block geprüft. KEINE externe Welt-Annahme, kein Schluss aus Eigennamen-Klang, kein Raten. Wenn der Stamm zur Stelle schweigt (keine entsprechende Eigenschaft / Beziehung dokumentiert) → Eintrag verwerfen.
+- typ «namenskonsistenz»:
+  · Eine Figur wird mit einer Schreibvariante genannt, die weder ihrem «name» noch ihrem «kurzname» im Figuren-Block entspricht (z.B. «Hannah» wo der Stamm «Hanna» sagt; «Mayer» wo der Stamm «Meier» sagt).
+  · Span: einzelnes Wort (der falsch geschriebene Name).
+  · «korrektur»: kanonische Schreibweise aus dem Stamm.
+  · «erklaerung»: MUSS die kanonische Form aus dem Figuren-Block zitieren («laut Figurenkartei: Hanna»).
+- typ «figurenmerkmal»:
+  · Eine Aussage im Text widerspricht einer im Figuren-Block dokumentierten Eigenschaft: Geschlecht/Pronomen (Stamm «weiblich» → Text «er»), Beruf, etablierte Beschreibung (Aussehen / Alter / Herkunft) sofern explizit im Stamm hinterlegt.
+  · Span: Phrase (das widersprüchliche Wort / die widersprüchliche Phrase).
+  · «korrektur»: Phrase im selben Span-Typ, korrigiert gegen den Stamm.
+  · «erklaerung»: MUSS Quelle nennen («laut Figurenkartei: weiblich, Pronomen «sie»» bzw. «laut Figurenkartei: Lehrerin»).
+- typ «anrede»:
+  · Du/Sie + Anrede­form widerspricht der etablierten Beziehung im Beziehungs-Block (z.B. «Sie» an einen Bruder, «du» an einen Vorgesetzten).
+  · Span: die Anrede-Phrase.
+  · «korrektur»: Anrede passend zur Beziehung.
+  · «erklaerung»: MUSS Beziehungs-Typ aus dem Beziehungs-Block zitieren («laut Beziehungen: Geschwister – duzen üblich»).
+- Nicht melden in direkter Rede, wenn die Abweichung als Charakterisierung lesbar ist (Figur lügt, irrt, beleidigt absichtlich, sieztgesteltt) – das ist Subtext, kein Fehler.
+- Severity-Schwelle: nur melden, wenn der Widerspruch deutlich ist und ein Lektor ihn anstreichen würde. Bei Unklarheit / Stamm-Schweigen / mehrdeutiger Stelle: weglassen.`;
+}
+
+export function _buildSchauplatzkonsistenzBlock() {
+  return `
+Schauplatzkonsistenz-Regeln (typ: «schauplatzmerkmal»):
+- Wird AUSSCHLIESSLICH gegen den oben gelieferten Schauplätze-Block geprüft. KEINE externe Welt-Annahme. Wenn der Stamm zur Stelle schweigt → verwerfen.
+- Aussage im Text widerspricht einer im Orts-Block dokumentierten Eigenschaft: Typ (Stadt/Dorf/Wald/…), Stimmung, etablierte Beschreibung (Grösse, Lage, Merkmale) sofern explizit hinterlegt.
+- «original»: Phrase zeichengenau aus dem Text.
+- «korrektur»: Phrase, korrigiert gegen den Stamm.
+- «erklaerung»: MUSS Quelle nennen («laut Orts-Kartei: kleines Dorf, nicht Stadt»).
+- Nicht melden bei nachvollziehbarer dramaturgischer Veränderung im Plot (Ort wurde im Verlauf zerstört, umgebaut, anders geworden) – nur Widersprüche zur etablierten Welt, nicht zur Welt-Entwicklung.
+- Severity-Schwelle: nur deutliche Widersprüche. Stamm-Schweigen → kein Eintrag.`;
+}
+
 export function _buildPassivBlock() {
   return `
 Passivkonstruktionen-Regeln (typ: «passiv»):

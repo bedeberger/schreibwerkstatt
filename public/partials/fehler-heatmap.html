@@ -40,11 +40,20 @@
       <div class="heatmap-scroll">
         <table class="heatmap-table">
           <thead>
+            <tr class="heatmap-cluster-row">
+              <th class="heatmap-rowhead" colspan="2"></th>
+              <template x-for="cluster in fehlerHeatmapClusters" :key="cluster.key">
+                <th class="heatmap-cluster-head"
+                    :colspan="cluster.typen.length"
+                    x-text="$app.t('fehlerHeatmap.cluster.' + cluster.key)"></th>
+              </template>
+            </tr>
             <tr>
               <th class="heatmap-rowhead" x-text="$app.t('fehlerHeatmap.chapter')"></th>
               <th class="heatmap-numcol" x-text="$app.t('fehlerHeatmap.coverage')"></th>
-              <template x-for="typ in fehlerHeatmapTypen" :key="typ">
-                <th :data-tip="$app.t('fehlerHeatmap.typ.' + typ)">
+              <template x-for="(typ, idx) in fehlerHeatmapTypen" :key="typ">
+                <th :data-tip="$app.t('fehlerHeatmap.typ.' + typ)"
+                    :class="{ 'heatmap-cluster-start': fehlerHeatmapClusterStarts.includes(idx) }">
                   <span x-text="$app.t('fehlerHeatmap.typ.' + typ)"></span>
                 </th>
               </template>
@@ -66,11 +75,12 @@
                     <span class="heatmap-coverage-bar" :style="{ '--coverage': fehlerHeatmapCoveragePct(ch) + '%' }"></span>
                   </span>
                 </td>
-                <template x-for="typ in fehlerHeatmapTypen" :key="typ">
+                <template x-for="(typ, idx) in fehlerHeatmapTypen" :key="typ">
                   <td class="heatmap-cell heatmap-cell--clickable"
                       :class="[
                         ('heatmap-cell--' + fehlerHeatmapCellKind(fehlerHeatmapChapterKey(ch), typ, fehlerHeatmapCoveragePct(ch))),
-                        { 'heatmap-cell--active': activeFehlerDetailKey === fehlerHeatmapChapterKey(ch) + ':' + typ }
+                        { 'heatmap-cell--active': activeFehlerDetailKey === fehlerHeatmapChapterKey(ch) + ':' + typ,
+                          'heatmap-cluster-start': fehlerHeatmapClusterStarts.includes(idx) }
                       ]"
                       :style="fehlerHeatmapCellVars(fehlerHeatmapChapterKey(ch), typ, fehlerHeatmapCoveragePct(ch))"
                       :data-tip="fehlerHeatmapCellTooltip(fehlerHeatmapChapterKey(ch), typ)"

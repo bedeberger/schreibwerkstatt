@@ -9,6 +9,11 @@ import {
   _buildWiederholungBlock,
   _buildSchwacheVerbenBlock,
   _buildFuellwortBlock,
+  _buildFilterwortBlock,
+  _buildKlischeeBlock,
+  _buildPleonasmusBlock,
+  _buildFigurenkonsistenzBlock,
+  _buildSchauplatzkonsistenzBlock,
   _buildShowVsTellBlock,
   _buildPassivBlock,
   _buildPerspektivbruchBlock,
@@ -92,14 +97,14 @@ function _buildLektoratPromptBody(text, textLabel, {
   // Textverständnis, an dem kleine Modelle häufig scheitern oder in Wiederholungsloops geraten.
   const typEnum = _isLocal
     ? 'rechtschreibung|grammatik|stil|wiederholung|schwaches_verb|fuellwort'
-    : 'rechtschreibung|grammatik|stil|wiederholung|schwaches_verb|fuellwort|show_vs_tell|passiv|perspektivbruch|tempuswechsel';
+    : 'rechtschreibung|grammatik|stil|wiederholung|schwaches_verb|fuellwort|filterwort|klischee|pleonasmus|show_vs_tell|passiv|perspektivbruch|tempuswechsel|namenskonsistenz|figurenmerkmal|anrede|schauplatzmerkmal';
 
   // Lokal + Cloud: Typ-Priorität und Anti-Doppelung pro Textspanne. Verhindert,
   // dass derselbe Satz mehrfach gemeldet wird (z.B. fuellwort + schwaches_verb +
   // stil am gleichen Wort) – pro Span genau ein Eintrag mit dem spezifischsten Typ.
   const dedupTypen = _isLocal
     ? 'rechtschreibung > grammatik > wiederholung > schwaches_verb > fuellwort > stil'
-    : 'rechtschreibung > grammatik > wiederholung > perspektivbruch > tempuswechsel > passiv > show_vs_tell > schwaches_verb > fuellwort > stil';
+    : 'rechtschreibung > grammatik > namenskonsistenz > figurenmerkmal > schauplatzmerkmal > anrede > pleonasmus > wiederholung > perspektivbruch > tempuswechsel > klischee > passiv > show_vs_tell > filterwort > schwaches_verb > fuellwort > stil';
 
   const dedupBlock = `
 EIN-EINTRAG-PRO-STELLE (Anti-Doppelung, alle Typen):
@@ -141,9 +146,15 @@ SPAN-TYP-KONSISTENZ (zwischen «original» und «korrektur», zwingend):
 - VERBOTEN: «original» = «wegen dem Regen», «korrektur» = «Wegen des Regens blieben wir zu Hause.» (Phrase vs. ganzer Satz). Richtig: «korrektur» = «wegen des Regens».
 - VERBOTEN: «original» = ganzer Satz, «korrektur» = nur die ersetzte Phrase ohne Satzrest.
 - Pflicht-Span-Typ pro Typ:
-  · rechtschreibung, grammatik: Phrase oder Wort (genau die fehlerhafte Stelle)
-  · wiederholung, schwaches_verb, fuellwort, passiv, show_vs_tell, perspektivbruch, tempuswechsel: vollständiger Satz
-  · stil: vollständiger Satz ODER eindeutig abgrenzbare Phrase – beide Felder müssen denselben Span-Typ haben
+${_isLocal
+  ? `  · rechtschreibung, grammatik: Phrase oder Wort (genau die fehlerhafte Stelle)
+  · wiederholung, schwaches_verb, fuellwort: vollständiger Satz
+  · stil: vollständiger Satz ODER eindeutig abgrenzbare Phrase – beide Felder müssen denselben Span-Typ haben`
+  : `  · rechtschreibung, grammatik: Phrase oder Wort (genau die fehlerhafte Stelle)
+  · namenskonsistenz: einzelnes Wort (der falsch geschriebene Name)
+  · figurenmerkmal, anrede, schauplatzmerkmal, pleonasmus: Phrase (genau die widersprüchliche / redundante Stelle)
+  · wiederholung, schwaches_verb, fuellwort, filterwort, passiv, show_vs_tell, perspektivbruch, tempuswechsel: vollständiger Satz
+  · klischee, stil: vollständiger Satz ODER eindeutig abgrenzbare Phrase – beide Felder müssen denselben Span-Typ haben`}
 `;
 
   const filterBlock = _isLocal
@@ -185,12 +196,24 @@ Beispiel eines VERWORFENEN Eintrags (Korrektur-Purität verletzt):
 { "typ": "show_vs_tell", "original": "Dort versteckte er sich vor der Konfrontation, vor der eigentlich normalsten Auseinandersetzung zwischen Ehepartnern.", "korrektur": "Satz kürzen auf: «Dort versteckte er sich vor der Konfrontation.» – der erklärende Nachsatz nimmt dem Leser die Deutung vorweg.", "erklaerung": "..." } → «korrektur» enthält Meta-Präfix, Guillemets und Begründungs-Anhang → KORRIGIEREN zu: { "korrektur": "Dort versteckte er sich vor der Konfrontation.", "erklaerung": "Der erklärende Nachsatz nimmt dem Leser die Deutung vorweg – Satz kürzen." }
 `;
 
+  const figurenkonsistenzBlock = (!_isLocal && figuren.length > 0)
+    ? _buildFigurenkonsistenzBlock()
+    : '';
+  const schauplatzkonsistenzBlock = (!_isLocal && orte.length > 0)
+    ? _buildSchauplatzkonsistenzBlock()
+    : '';
+
   const spezialBlocks = _isLocal
     ? ''
-    : `${_buildShowVsTellBlock()}
+    : `${_buildFilterwortBlock()}
+${_buildKlischeeBlock()}
+${_buildPleonasmusBlock()}
+${_buildShowVsTellBlock()}
 ${_buildPassivBlock()}
 ${_buildPerspektivbruchBlock()}
 ${_buildTempuswechselBlock()}
+${figurenkonsistenzBlock}
+${schauplatzkonsistenzBlock}
 `;
 
   // Lokal: szenen/stilanalyse/fazit werden aus Schema und Prompt gestrichen. Kleine Modelle
@@ -296,10 +319,17 @@ ${html}`;
 export let SCHEMA_LEKTORAT = null;
 
 function _buildLektoratSchema() {
+  const enumLocal = ['rechtschreibung', 'grammatik', 'stil', 'wiederholung', 'schwaches_verb', 'fuellwort'];
+  const enumCloud = [
+    ...enumLocal,
+    'filterwort', 'klischee', 'pleonasmus',
+    'show_vs_tell', 'passiv', 'perspektivbruch', 'tempuswechsel',
+    'namenskonsistenz', 'figurenmerkmal', 'anrede', 'schauplatzmerkmal',
+  ];
   const fehlerField = {
     type: 'array',
     items: _obj({
-      typ: { type: 'string', enum: ['rechtschreibung', 'grammatik', 'stil', 'wiederholung', 'schwaches_verb', 'fuellwort'] },
+      typ: { type: 'string', enum: _isLocal ? enumLocal : enumCloud },
       original: _str,
       korrektur: _str,
       kontext: _str,

@@ -4,24 +4,30 @@
 
 import { fetchJson, formatNumber, heatmapCellVars, minMaxBy } from './utils.js';
 
-// Reihenfolge der Typen-Spalten. Muss mit VALID_TYPEN in routes/jobs/lektorat.js kompatibel sein.
-const FEHLER_TYPEN = [
-  'rechtschreibung',
-  'grammatik',
-  'stil',
-  'wiederholung',
-  'schwaches_verb',
-  'fuellwort',
-  'show_vs_tell',
-  'passiv',
-  'perspektivbruch',
-  'tempuswechsel',
+// Cluster-Gruppierung der Typen-Spalten. Reihenfolge in den Cluster-Arrays = Spalten-Reihenfolge.
+// Muss mit VALID_TYPEN in routes/jobs/lektorat.js kompatibel sein.
+const FEHLER_CLUSTERS = [
+  { key: 'sprache',    typen: ['rechtschreibung', 'grammatik'] },
+  { key: 'wort',       typen: ['wiederholung', 'schwaches_verb', 'fuellwort', 'filterwort'] },
+  { key: 'stil',       typen: ['stil', 'pleonasmus', 'klischee', 'passiv'] },
+  { key: 'erzaehlung', typen: ['show_vs_tell', 'perspektivbruch', 'tempuswechsel'] },
+  { key: 'welt',       typen: ['namenskonsistenz', 'figurenmerkmal', 'schauplatzmerkmal', 'anrede'] },
 ];
+const FEHLER_TYPEN = FEHLER_CLUSTERS.flatMap(c => c.typen);
 
 const MODES = ['open', 'applied', 'all'];
 
 export const fehlerHeatmapMethods = {
   get fehlerHeatmapTypen() { return FEHLER_TYPEN; },
+  get fehlerHeatmapClusters() { return FEHLER_CLUSTERS; },
+  // Spalten-Indizes der jeweils ersten Spalte eines Clusters (für Trennlinien).
+  // Erstes Cluster startet bei 0 – wird ignoriert (keine Trennlinie ganz links).
+  get fehlerHeatmapClusterStarts() {
+    const starts = [];
+    let cursor = 0;
+    for (const c of FEHLER_CLUSTERS) { starts.push(cursor); cursor += c.typen.length; }
+    return starts.slice(1);
+  },
 
   async loadFehlerHeatmap() {
     if (!window.__app.selectedBookId) return;

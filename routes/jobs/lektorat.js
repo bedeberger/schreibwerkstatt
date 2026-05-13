@@ -57,7 +57,12 @@ function findPreviousPage(pages, currentPageId, currentChapterId) {
 }
 
 // Gültige Fehlertypen und Validierung für Lektorat-Ergebnisse
-const VALID_TYPEN = new Set(['rechtschreibung', 'grammatik', 'stil', 'wiederholung', 'schwaches_verb', 'fuellwort', 'show_vs_tell', 'passiv', 'perspektivbruch', 'tempuswechsel']);
+const VALID_TYPEN = new Set([
+  'rechtschreibung', 'grammatik', 'stil', 'wiederholung',
+  'schwaches_verb', 'fuellwort', 'filterwort', 'klischee', 'pleonasmus',
+  'show_vs_tell', 'passiv', 'perspektivbruch', 'tempuswechsel',
+  'namenskonsistenz', 'figurenmerkmal', 'anrede', 'schauplatzmerkmal',
+]);
 
 // Erklärungs-Phrasen die darauf hindeuten, dass der Eintrag kein echter Fehler ist.
 // Lokale Modelle (Ollama/Llama) ignorieren die FILTER-PFLICHT im Prompt häufig
