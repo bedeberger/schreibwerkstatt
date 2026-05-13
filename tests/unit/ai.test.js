@@ -69,3 +69,53 @@ test('parseJSON: reiner Klartext → jsonrepair liefert String (dokumentiertes V
   // Caller müssen anschliessend strukturell prüfen (z.B. `if (!Array.isArray(result.fehler))`).
   assert.equal(parseJSON('das ist kein JSON'), 'das ist kein JSON');
 });
+
+// ── Retry-Verhalten bei transient `overloaded_error` ──────────────────────────
+// Claude liefert gelegentlich 503 mit `{"error":{"type":"overloaded_error", ...}}`
+// (z. B. "API key validation is temporarily unavailable"). Status 503 ist nicht
+// im hard-coded RETRY_STATUS-Set, deshalb wird die Erkennung body-basiert gemacht.
+test('callAI: retried bei 503 + overloaded_error im Body und gibt finalen Text zurück', async () => {
+  // fetch mocken: zuerst 503-Overloaded, dann SSE-Erfolg.
+  const origFetch = globalThis.fetch;
+  process.env.API_PROVIDER = 'claude';
+  process.env.ANTHROPIC_API_KEY = 'sk-test';
+  process.env.CLAUDE_RETRY_MAX = '3';
+
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    if (calls === 1) {
+      return new Response(
+        JSON.stringify({
+          type: 'error',
+          error: { type: 'overloaded_error', message: 'API key validation is temporarily unavailable. Please retry.' },
+        }),
+        { status: 503, statusText: 'Service Unavailable', headers: { 'content-type': 'application/json' } },
+      );
+    }
+    // Minimaler SSE-Erfolgsstream.
+    const sse = [
+      'data: {"type":"message_start","message":{"usage":{"input_tokens":1,"output_tokens":0}}}',
+      'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"{\\"ok\\":1}"}}',
+      'data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":2}}',
+      'data: [DONE]',
+      '',
+    ].join('\n');
+    return new Response(sse, {
+      status: 200,
+      headers: { 'content-type': 'text/event-stream' },
+    });
+  };
+
+  try {
+    // Lazy-require, damit env-Vars vor dem ersten require gesetzt sind.
+    delete require.cache[require.resolve('../../lib/ai')];
+    const { callAI } = require('../../lib/ai');
+    const res = await callAI('hi', 'sys', null, 100, null, 'claude');
+    assert.equal(res.text, '{"ok":1}');
+    assert.equal(calls, 2, 'sollte einmal retryen');
+  } finally {
+    globalThis.fetch = origFetch;
+    delete require.cache[require.resolve('../../lib/ai')];
+  }
+});
