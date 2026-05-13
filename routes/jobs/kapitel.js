@@ -18,9 +18,11 @@ const kapitelRouter = express.Router();
 // ── Job: Kapitel-Review (Makrobewertung eines einzelnen Kapitels) ────────────
 async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookName, userEmail, userToken) {
   const logger = makeJobLogger(jobId);
-  const { buildChapterReviewPrompt, SCHEMA_CHAPTER_REVIEW } = await getPrompts();
+  const { buildChapterReviewPrompt, SCHEMA_CHAPTER_REVIEW, getBuchtypReviewSchwerpunkt } = await getPrompts();
   const { SYSTEM_KAPITELREVIEW } = await getBookPrompts(bookId, userEmail);
   const bookSettings = getBookSettings(bookId, userEmail);
+  const locale = `${bookSettings?.language || 'de'}-${bookSettings?.region || 'CH'}`;
+  const reviewSchwerpunkt = getBuchtypReviewSchwerpunkt(locale, bookSettings?.buchtyp || null);
   try {
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
     // Alle Buchseiten holen; Kapitel-Filter läuft clientseitig – BookStack
@@ -58,7 +60,7 @@ async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookNa
 
     updateJob(jobId, { progress: 65, statusText: 'job.phase.aiChapterReview' });
     const r = await aiCall(jobId, tok,
-      buildChapterReviewPrompt(chapterName, bookName, contents.length, chText, narrativeLabels(bookSettings)),
+      buildChapterReviewPrompt(chapterName, bookName, contents.length, chText, { ...narrativeLabels(bookSettings), reviewSchwerpunkt }),
       SYSTEM_KAPITELREVIEW,
       65, 97, 5000, 0.2, null, undefined, SCHEMA_CHAPTER_REVIEW,
     );

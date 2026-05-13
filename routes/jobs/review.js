@@ -18,9 +18,15 @@ const reviewRouter = express.Router();
 // ── Job: Buchbewertung ────────────────────────────────────────────────────────
 async function runReviewJob(jobId, bookId, bookName, userEmail, userToken) {
   const logger = makeJobLogger(jobId);
-  const { buildBookReviewSinglePassPrompt, buildChapterAnalysisPrompt, buildBookReviewMultiPassPrompt, SCHEMA_REVIEW, SCHEMA_CHAPTER_ANALYSIS } = await getPrompts();
+  const { buildBookReviewSinglePassPrompt, buildChapterAnalysisPrompt, buildBookReviewMultiPassPrompt, SCHEMA_REVIEW, SCHEMA_CHAPTER_ANALYSIS, getBuchtypReviewSchwerpunkt } = await getPrompts();
   const { SYSTEM_BUCHBEWERTUNG, SYSTEM_KAPITELANALYSE } = await getBookPrompts(bookId, userEmail);
-  const narrative = narrativeLabels(getBookSettings(bookId, userEmail));
+  const bookSettings = getBookSettings(bookId, userEmail);
+  const narrative = narrativeLabels(bookSettings);
+  // Genre-Schwerpunkt aus prompt-config.json laden und in Buchreview-Prompts
+  // einkippen. Kapitelanalyse bleibt schwerpunkt-frei (würde Synthese verzerren).
+  const locale = `${bookSettings?.language || 'de'}-${bookSettings?.region || 'CH'}`;
+  const reviewSchwerpunkt = getBuchtypReviewSchwerpunkt(locale, bookSettings?.buchtyp || null);
+  const narrativeWithSchwerpunkt = { ...narrative, reviewSchwerpunkt };
   try {
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
     const [chaptersData, pages] = await Promise.all([
@@ -51,7 +57,7 @@ async function runReviewJob(jobId, bookId, bookName, userEmail, userToken) {
       const bookText = buildSinglePassBookText(groups, groupOrder);
 
       r = await aiCall(jobId, tok,
-        buildBookReviewSinglePassPrompt(bookName, pageContents.length, bookText, narrative),
+        buildBookReviewSinglePassPrompt(bookName, pageContents.length, bookText, narrativeWithSchwerpunkt),
         SYSTEM_BUCHBEWERTUNG,
         65, 97, 5000, 0.2, null, undefined, SCHEMA_REVIEW,
       );
@@ -91,7 +97,7 @@ async function runReviewJob(jobId, bookId, bookName, userEmail, userToken) {
         statusText: 'job.phase.finalReview',
       });
       r = await aiCall(jobId, tok,
-        buildBookReviewMultiPassPrompt(bookName, chapterAnalyses, pageContents.length, narrative),
+        buildBookReviewMultiPassPrompt(bookName, chapterAnalyses, pageContents.length, narrativeWithSchwerpunkt),
         SYSTEM_BUCHBEWERTUNG,
         90, 97, 5000, 0.2, null, undefined, SCHEMA_REVIEW,
       );

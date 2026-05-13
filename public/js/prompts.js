@@ -46,6 +46,7 @@ export {
   SYSTEM_KOMPLETT_FIGUREN_PASS,
   SYSTEM_KOMPLETT_ORTE_PASS,
   getLocalePromptsForBook,
+  getBuchtypReviewSchwerpunkt,
 } from './prompts/core.js';
 
 export {

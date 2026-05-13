@@ -7,7 +7,6 @@ const { toIntId } = require('../lib/validate');
 const { bsGet, bsGetAll } = require('../lib/bookstack');
 const { computePageIndex, writePageIndex, writeFigureMentionsForPageAllUsers, tokenizeNamesForStopwords } = require('../lib/page-index');
 const { invalidateBookPageCache } = require('./jobs/chat');
-const { getPrompts } = require('../lib/prompts-loader');
 const { localIsoDate } = require('../lib/local-date');
 
 const router = express.Router();
@@ -36,16 +35,17 @@ function _errDetail(e) {
   return parts.join(' | ');
 }
 
-// Token-Schätzung: echte Promptlänge aus buildLektoratPrompt — gleiche Quelle
-// wie public/js/tree.js:_syncPageStatsAfterSave, damit Cron-Sync und
-// Page-Save-Pfad denselben Wert in page_stats.tok schreiben (Snapshot vs.
-// Sidebar-Σ wären sonst dauerhaft auseinander).
-function computeStats(html, buildLektoratPrompt) {
+// Token-Schätzung: Text-Tokens (chars / CHARS_PER_TOKEN), gleiche Quelle wie
+// chars. Hero und Sidebar-Σ zeigen damit ein konstantes Verhältnis. Kein
+// Per-Page-Prompt-Overhead mehr — `tok` bedeutet „Tokens des Texts", nicht
+// „Tokens des Lektorat-Prompts". Frontend nutzt dieselbe Formel in
+// public/js/tree.js:_syncPageStatsAfterSave.
+function computeStats(html) {
   const text = htmlToText(html);
   const wordList = text.trim() === '' ? [] : text.trim().split(/\s+/);
   const words = wordList.length;
   const chars = text.length;
-  const tok = Math.round(buildLektoratPrompt(text).length / CHARS_PER_TOKEN);
+  const tok = Math.round(chars / CHARS_PER_TOKEN);
   const sentences = text.trim() === '' ? 0 : text.split(/[.!?]+/).filter(s => s.trim().length > 0).length;
   return { words, chars, tok, wordList, sentences };
 }
@@ -170,7 +170,6 @@ async function syncPagesCache(bookId, token) {
 }
 
 async function syncBook(bookId, token) {
-  const { buildLektoratPrompt } = await getPrompts();
   const [pages, book, chapters] = await Promise.all([
     bsGetAll(`pages?filter[book_id]=${bookId}`, token),
     bsGet(`books/${bookId}`, token),
@@ -213,7 +212,7 @@ async function syncBook(bookId, token) {
     const results = await Promise.allSettled(batch.map(async p => {
       const pd = await bsGet(`pages/${p.id}`, token);
       const text = htmlToText(pd.html || '');
-      const { words, chars, tok, wordList, sentences } = computeStats(pd.html || '', buildLektoratPrompt);
+      const { words, chars, tok, wordList, sentences } = computeStats(pd.html || '');
       const preview = text.trim().slice(0, PREVIEW_CHARS);
       return { page_id: p.id, book_id: bookId, tok, words, chars, updated_at: p.updated_at || null, cached_at: now, wordList, sentences, preview, fullText: text };
     }));
@@ -450,7 +449,6 @@ router.post('/page-stats/:book_id', express.json(), async (req, res) => {
   }
 
   try {
-    const { buildLektoratPrompt } = await getPrompts();
     const pages = await bsGetAll(`pages?filter[book_id]=${bookId}`, token);
 
     // FK-Vorbereitung: page_stats.book_id → books, page_stats.page_id → pages.
@@ -499,7 +497,7 @@ router.post('/page-stats/:book_id', express.json(), async (req, res) => {
       const slice = stale.slice(i, i + BATCH);
       const results = await Promise.allSettled(slice.map(async p => {
         const pd = await bsGet(`pages/${p.id}`, token);
-        const { words, chars, tok } = computeStats(pd.html || '', buildLektoratPrompt);
+        const { words, chars, tok } = computeStats(pd.html || '');
         return { page_id: p.id, book_id: bookId, tok, words, chars, updated_at: p.updated_at || null, cached_at: now };
       }));
       for (const r of results) if (r.status === 'fulfilled') newItems.push(r.value);

@@ -247,3 +247,20 @@ export function getLocalePromptsForBook(localeKey, buchtyp, buchKontext) {
   const localChatAddon = _localChatAddonByLocale.get(localeKey) || _localChatAddonByLocale.get(_defaultLocale) || '';
   return _buildLocalePrompts(augLocale, _erklaerungRule, kontext, autorenstil, localChatAddon);
 }
+
+/**
+ * Liefert den `reviewSchwerpunkt`-Text für einen Buchtyp einer Locale.
+ * Wird von den Buchreview-/Kapitelreview-Prompts genutzt, um den Bewertungs­fokus
+ * genre-spezifisch zu schärfen (Krimi: Logik der Auflösung, Sachbuch: Argumentation, …).
+ * Bei fehlendem Eintrag oder leerem Feld → '' (Prompt baut dann keinen Schwerpunkt-Block).
+ *
+ * @param {string} localeKey z.B. 'de-CH', 'en-US'
+ * @param {string|null} buchtyp Key aus prompt-config.json buchtypen
+ * @returns {string} Schwerpunkt-Text oder ''
+ */
+export function getBuchtypReviewSchwerpunkt(localeKey, buchtyp) {
+  if (!buchtyp) return '';
+  const langCode = (localeKey || _defaultLocale).split('-')[0];
+  const def = _buchtypen?.[langCode]?.[buchtyp];
+  return (def?.reviewSchwerpunkt || '').trim();
+}

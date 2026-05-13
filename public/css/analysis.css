@@ -116,6 +116,63 @@
 .bullet-list.pos li::before     { content: '+'; color: var(--color-ok-text); }
 .bullet-list.neg li::before     { content: '−'; color: var(--color-err-text); }
 
+/* === Review-Empfehlungen (prio + kategorie + text) === */
+.rec-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.rec-item {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: baseline;
+  column-gap: 10px;
+  row-gap: 2px;
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+}
+.rec-item .severity-tag { align-self: center; }
+.rec-kategorie {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+.rec-text { color: var(--color-text); }
+@media (max-width: 540px) {
+  .rec-item { grid-template-columns: auto 1fr; row-gap: 4px; }
+  .rec-item .rec-kategorie { grid-column: 2; }
+  .rec-item .rec-text      { grid-column: 1 / -1; }
+}
+
+/* === Review-Beispielzitate === */
+.zitate-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.zitat-item {
+  padding: 8px 12px;
+  background: var(--color-bg);
+  border-left: 3px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+.zitat-item--staerke   { border-left-color: var(--color-ok-border); }
+.zitat-item--schwaeche { border-left-color: var(--color-err-border); }
+.zitat-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  margin-bottom: 4px;
+}
+.zitat-text {
+  margin: 0 0 4px 0;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+}
+.zitat-comment {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+}
+
 /* === Section headings (in JS-generated output) === */
 .section-heading {
   font-family: var(--font-serif);

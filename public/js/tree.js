@@ -1,5 +1,4 @@
 import { htmlToText, CHARS_PER_TOKEN, fetchJson, localeTag, relativeDay } from './utils.js';
-import { buildLektoratPrompt } from './prompts.js';
 
 // Buch-/Seiten-Lade-Methoden (werden in die Alpine-Komponente gespreadet)
 // `this` bezieht sich auf die Alpine-Komponente.
@@ -80,16 +79,18 @@ export const treeMethods = {
   // Whitespace-Sequenzen collapsed, getrimmt. Sonst inflated DOMParser's
   // textContent (behält Whitespace zwischen Block-Tags) gegenüber dem
   // Cron-Snapshot, und Heute-Ring/7-Tage-Bars driften nach jedem Save.
+  //
+  // tok = chars / CHARS_PER_TOKEN — Text-Tokens, gleiche Quelle wie chars.
+  // Identische Formel in routes/sync.js#computeStats.
   _syncPageStatsAfterSave(page, html) {
     if (!page?.id) return;
     const normalized = String(html || '')
       .replace(/<[^>]+>/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
-    const userPrompt = buildLektoratPrompt(normalized);
     const words = normalized === '' ? 0 : normalized.split(/\s+/).length;
     const stat = {
-      tok: Math.round(userPrompt.length / CHARS_PER_TOKEN),
+      tok: Math.round(normalized.length / CHARS_PER_TOKEN),
       words,
       chars: normalized.length,
     };

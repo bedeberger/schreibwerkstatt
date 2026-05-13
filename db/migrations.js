@@ -3884,6 +3884,25 @@ function runMigrations() {
     logger.info('DB-Migration auf Version 98 abgeschlossen (werkstatt_runs).');
   }
 
+  if (version < 99) {
+    // tok-Semantik-Wechsel: page_stats.tok und book_stats_history.tok bedeuten
+    // ab sofort Text-Tokens (chars / CHARS_PER_TOKEN), nicht mehr Lektorat-
+    // Prompt-Tokens. Hero und Sparkline sollen ohne Sprung weiterlaufen, also
+    // bestehende Rows recomputen. CHARS_PER_TOKEN aus Provider abgeleitet
+    // (Claude=3, sonst=1.5; ENV-Override zieht).
+    const provider = (process.env.API_PROVIDER || 'claude').toLowerCase();
+    const cptDefault = provider === 'claude' ? 3 : 1.5;
+    const cpt = parseFloat(process.env.CHARS_PER_TOKEN) || cptDefault;
+    db.prepare('UPDATE page_stats SET tok = ROUND(chars / ?) WHERE chars IS NOT NULL').run(cpt);
+    db.prepare('UPDATE book_stats_history SET tok = ROUND(chars / ?) WHERE chars IS NOT NULL').run(cpt);
+    const fkErrors99 = db.pragma('foreign_key_check');
+    if (fkErrors99.length) {
+      throw new Error(`Migration 99: foreign_key_check meldet ${fkErrors99.length} Verstoesse: ${JSON.stringify(fkErrors99.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 99').run();
+    logger.info(`DB-Migration auf Version 99 abgeschlossen (tok = chars/${cpt} in page_stats + book_stats_history).`);
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {
