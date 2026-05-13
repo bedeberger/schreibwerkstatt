@@ -123,11 +123,58 @@ KORREKTUR-PURITÄT (zwingend für jeden Eintrag, alle Typen):
 - VERBOTEN in «korrektur»: Meta-Präfixe («Satz kürzen auf:», «Ersetzen durch:», «Vorschlag:», «Besser:», «Stattdessen:» o.Ä.), umschliessende Anführungszeichen oder Guillemets («»/„“/“”) um den ganzen Ersatztext, Begründungs-Anhänge per Gedankenstrich («... – weil/damit/sonst ...»), Variantenlisten («A oder B»), Kommentare in Klammern.
 - Begründungen, Hinweise, Alternativen gehören AUSSCHLIESSLICH in «erklaerung».
 - Einsetz-Selbsttest: Würde «original» 1:1 durch «korrektur» ersetzt, ergäbe der Satz korrekten, lesbaren Fliesstext ohne Reste? Wenn nein → Eintrag korrigieren oder weglassen.
+
+ZEICHENGENAUIGKEIT von «original» (zwingend, alle Typen):
+- «original» MUSS exakt – Zeichen für Zeichen – aus dem oben gegebenen Originaltext kopiert sein. KEINE Normalisierung erlaubt:
+  · Anführungszeichen / Guillemets: «...», „...", "...", '...', ‹...› → exakt so übernehmen wie im Text, nicht durch eine andere Variante ersetzen
+  · Halbgeviertstrich (–), Bindestrich (-), Geviertstrich (—) → exakt so übernehmen
+  · Geschützte Leerzeichen ( ), schmale Leerzeichen ( ), normale Leerzeichen → exakt so übernehmen
+  · Apostroph-Varianten (gerade ', typografisch ' und '), Auslassungspunkte (…) vs. drei Punkte (...) → exakt so übernehmen
+  · Gross-/Kleinschreibung, Satzzeichen, Whitespace → 1:1
+- Wenn die Stelle im Text Zeichen enthält, die in deinem JSON-Output durch Escaping repräsentiert werden müssen (z.B. Anführungszeichen), entsprechend escapen – aber den ursprünglichen Zeichensatz beibehalten.
+- Selbsttest: Wenn ein automatisierter String-Find mit «original» den Text durchsucht, MUSS er die Stelle genau einmal finden. Approximationen (z.B. „..." statt «...») bedeuten: Stelle wird im Editor nicht gefunden → Eintrag unbrauchbar.
+
+SPAN-TYP-KONSISTENZ (zwischen «original» und «korrektur», zwingend):
+- «original» und «korrektur» müssen DENSELBEN Span-Typ haben:
+  · Wenn «original» eine einzelne Phrase / ein Wort ist → «korrektur» auch eine Phrase / ein Wort (Ersatz im Satz).
+  · Wenn «original» ein vollständiger Satz ist → «korrektur» auch ein vollständiger, kompletter Satz.
+- VERBOTEN: «original» = «wegen dem Regen», «korrektur» = «Wegen des Regens blieben wir zu Hause.» (Phrase vs. ganzer Satz). Richtig: «korrektur» = «wegen des Regens».
+- VERBOTEN: «original» = ganzer Satz, «korrektur» = nur die ersetzte Phrase ohne Satzrest.
+- Pflicht-Span-Typ pro Typ:
+  · rechtschreibung, grammatik: Phrase oder Wort (genau die fehlerhafte Stelle)
+  · wiederholung, schwaches_verb, fuellwort, passiv, show_vs_tell, perspektivbruch, tempuswechsel: vollständiger Satz
+  · stil: vollständiger Satz ODER eindeutig abgrenzbare Phrase – beide Felder müssen denselben Span-Typ haben
 `;
 
   const filterBlock = _isLocal
     ? ''
     : `${erklaerungRule ? `\nFILTER-PFLICHT: ${erklaerungRule}\n` : ''}${korrekturRegeln ? `\n${korrekturRegeln}\n` : ''}`;
+
+  // Severity + Findings-Obergrenze: Anti-Pedanterie. Cloud-only – kleine Modelle
+  // produzieren ohnehin weniger und sollten nicht zusätzlich gefiltert werden.
+  const severityBlock = _isLocal ? '' : `
+SCHWERE-SCHWELLE (Anti-Pedanterie, Pflicht-Filter vor dem Aufnehmen ins «fehler»-Array):
+- Melde NUR Schwächen, die einem ernsthaften Leser spürbar ins Auge fallen oder das Lese-Erlebnis nachweislich beeinträchtigen.
+- Selbsttest pro Eintrag: «Würde ein professioneller Lektor diese Stelle in einem bezahlten Lektorat anstreichen?» Wenn die Antwort «vielleicht», «Geschmacksache» oder «nur am Rand» wäre → weglassen.
+- VERWORFEN-Kandidaten: minimal alternative Synonyme ohne klaren Gewinn, Mikro-Stilpräferenzen, ein einzelnes «sehr» / «ein bisschen» wenn der Satz sonst rund läuft, vollkommen idiomatische Wendungen, regional übliche Formulierungen, ironisch oder bewusst eingesetzte «Schwächen».
+- Qualität schlägt Quantität: lieber 5 starke, präzise Findings als 25 schwache. Wenn nach dem Selbsttest mehr als ~20 Einträge übrig bleiben, hart priorisieren: nur die schwersten 20 behalten, restliche weglassen.
+- Echte Rechtschreib- und Grammatikfehler unterliegen der Schwere-Schwelle NICHT – diese werden immer gemeldet (eindeutige Falschschreibung, Kongruenzfehler, Kasusfehler etc.).
+`;
+
+  // Selbstkontroll-Pass: Sortierung + Schluss-Review. Hat bei Claude messbaren
+  // Effekt; bei lokalen Modellen erhöht es Halluzinationsrisiko und wird
+  // weggelassen.
+  const selbstkontrollBlock = _isLocal ? '' : `
+SELBSTKONTROLL-PASS (Pflicht vor dem Antworten):
+Bevor du die JSON-Antwort ausgibst, gehe deine gesammelten Findings einmal durch und prüfe:
+1. SCHWERE: Hat jeder Eintrag den Selbsttest «professioneller Lektor anstreichen?» bestanden? Wenn nein → streichen.
+2. DOPPELUNG: Überlappt «original» eines Eintrags textlich mit dem «original» eines anderen Eintrags? Wenn ja → nur den mit dem treffendsten Typ (gemäss Typ-Priorität oben) behalten.
+3. PURITÄT: Enthält «korrektur» Meta-Präfixe / Guillemets / Begründungs-Anhänge? Wenn ja → korrigieren oder Eintrag streichen.
+4. ZEICHENGENAUIGKEIT: Liesse sich «original» mit einem String-Find im Originaltext genau einmal finden? Wenn nein → korrigieren oder streichen.
+5. SPAN-TYP-KONSISTENZ: Sind «original» und «korrektur» beide gleichlange Spans (beide Phrase ODER beide Satz)? Wenn nein → korrigieren.
+6. ERKLÄRUNGS-FILTER: Enthält «erklaerung» «kein Fehler» / «vertretbar» / «möglicherweise» / «akzeptabel» / «im Schweizer Kontext»? Wenn ja → Eintrag streichen.
+7. SORTIERUNG: Sortiere das «fehler»-Array AUFSTEIGEND nach Textposition (erstes Auftreten von «original» im Originaltext – früh im Text zuerst, spät im Text zuletzt).
+`;
 
   const beispielBlock = _isLocal ? '' : `
 Beispiel eines GUTEN Eintrags:
@@ -156,7 +203,7 @@ ${_buildTempuswechselBlock()}
       "typ": "${typEnum}",
       "original": "das fehlerhafte Wort oder die fehlerhafte Phrase – bei «wiederholung»: vollständiger Satz zeichengenau aus dem Text",
       "korrektur": "die korrekte Version – bei «wiederholung»: derselbe Satz mit Synonym",
-      "erklaerung": "kurze Erklärung – nur diesen einen Mangel beschreiben"
+      "erklaerung": "Erklärung in EINEM Satz, maximal 25 Wörter – nur diesen einen Mangel beschreiben, keine Mehrfach-Begründungen, keine Alternativ-Vorschläge"
     }
   ]
 }`
@@ -167,7 +214,7 @@ ${_buildTempuswechselBlock()}
       "typ": "${typEnum}",
       "original": "das fehlerhafte Wort oder die fehlerhafte Phrase – bei «wiederholung»: vollständiger Satz zeichengenau aus dem Text",
       "korrektur": "die korrekte Version – bei «wiederholung»: derselbe Satz mit Synonym",
-      "erklaerung": "kurze Erklärung – nur diesen einen Mangel beschreiben"
+      "erklaerung": "Erklärung in EINEM Satz, maximal 25 Wörter – nur diesen einen Mangel beschreiben, keine Mehrfach-Begründungen, keine Alternativ-Vorschläge"
     }
   ],
   "szenen": [
@@ -192,7 +239,7 @@ Szenen-Regeln:
     : 'Analysiere den Text vollständig von Anfang bis Ende – nicht nur lokale Abschnitte oder die letzten Sätze – auf Rechtschreibfehler, Grammatikfehler, stilistische Auffälligkeiten und auffällige Wortwiederholungen. Bewerte ausserdem die Szenen der Seite.';
 
   return `${aufgabeSatz}
-${metaBlock}${povBlock}${wichtigBlock}${korrekturPuritaetBlock}${filterBlock}
+${metaBlock}${povBlock}${wichtigBlock}${korrekturPuritaetBlock}${severityBlock}${filterBlock}
 ${schemaBlock}
 ${beispielBlock}${szenenRegelnBlock}
 ${_buildStilBlock()}
@@ -200,6 +247,7 @@ ${_buildWiederholungBlock(stopwords)}
 ${_buildSchwacheVerbenBlock()}
 ${_buildFuellwortBlock()}
 ${spezialBlocks}${figurenBlock}${beziehungenBlock}${orteBlock}${previousBlock}
+${selbstkontrollBlock}
 ${textLabel}
 ${text}`;
 }
