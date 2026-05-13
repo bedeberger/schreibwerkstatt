@@ -94,9 +94,25 @@ function _buildLektoratPromptBody(text, textLabel, {
     ? 'rechtschreibung|grammatik|stil|wiederholung|schwaches_verb|fuellwort'
     : 'rechtschreibung|grammatik|stil|wiederholung|schwaches_verb|fuellwort|show_vs_tell|passiv|perspektivbruch|tempuswechsel';
 
+  // Lokal + Cloud: Typ-Priorität und Anti-Doppelung pro Textspanne. Verhindert,
+  // dass derselbe Satz mehrfach gemeldet wird (z.B. fuellwort + schwaches_verb +
+  // stil am gleichen Wort) – pro Span genau ein Eintrag mit dem spezifischsten Typ.
+  const dedupTypen = _isLocal
+    ? 'rechtschreibung > grammatik > wiederholung > schwaches_verb > fuellwort > stil'
+    : 'rechtschreibung > grammatik > wiederholung > perspektivbruch > tempuswechsel > passiv > show_vs_tell > schwaches_verb > fuellwort > stil';
+
+  const dedupBlock = `
+EIN-EINTRAG-PRO-STELLE (Anti-Doppelung, alle Typen):
+- Pro Textspanne (überlappendes Wort oder überlappende Phrase) maximal EIN Eintrag im «fehler»-Array.
+- Typ-Priorität bei Überlappung (spezifisch schlägt generisch): ${dedupTypen}.
+- Beispiel «Er war eigentlich wütend»: NICHT als «fuellwort» (eigentlich) UND «show_vs_tell» (war wütend) UND «stil» (ganze Phrase) melden. Den treffendsten Typ wählen; die anderen Aspekte können knapp in «erklaerung» mitschwingen, aber KEIN zweiter Eintrag am gleichen Span.
+- Mehrere Einträge zum selben Satz sind erlaubt NUR bei klar getrennten, nicht-überlappenden Textspannen (z.B. Fehler am Satzanfang UND unabhängiger Fehler am Satzende).
+- Selbsttest pro Eintrag: Überlappt «original» textlich mit einem bereits ausgewählten Eintrag (gleiches Wort, gleiche Phrase, oder ineinandergeschachtelt)? Wenn ja → Eintrag streichen oder mit dem bereits gewählten zusammenführen (treffenderen Typ behalten).
+`;
+
   const wichtigBlock = _isLocal
-    ? ''
-    : '\nWICHTIG: Jede einzelne Beanstandung erhält einen eigenen Eintrag im «fehler»-Array. Wenn an einer Stelle mehrere unabhängige Probleme vorliegen (z.B. ein Gallizismus und separate Anführungszeichen-Problematik), müssen diese als separate Einträge erscheinen – niemals in einer gemeinsamen «erklaerung» zusammenfassen.\n';
+    ? dedupBlock
+    : `\nWICHTIG: Bei wirklich unabhängigen Problemen an unterschiedlichen Textspannen separate Einträge erstellen (niemals in einer gemeinsamen «erklaerung» zusammenfassen). Für überlappende Spannen gilt die folgende Anti-Doppelung-Regel:\n${dedupBlock}`;
 
   // Gilt für ALLE Typen (lokal + cloud). Modelle bündeln sonst Meta-Präfixe,
   // Anführungszeichen oder Begründungs-Anhänge in das «korrektur»-Feld – das

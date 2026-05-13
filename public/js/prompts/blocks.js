@@ -4,8 +4,13 @@
 export function _buildStilBlock() {
   return `
 Stil-Regeln (typ: «stil»):
-- Nur melden, falls das Problem nicht bereits als anderer Typ (wiederholung, grammatik, rechtschreibung) erfasst wurde
-- PFLICHT: «korrektur» muss immer eine konkrete Umformulierung enthalten – nicht leer lassen, nicht dasselbe wie «original». Keine Stilanmerkung ohne konkreten Verbesserungsvorschlag.`;
+- «stil» ist KEIN Auffang-Eimer. Er greift NUR für stilistische Schwächen, die KEINEM spezifischeren Typ zugeordnet werden können.
+- Wenn ein spezifischerer Typ passt (schwaches_verb, fuellwort, wiederholung, passiv, show_vs_tell, grammatik, rechtschreibung) → diesen Typ verwenden, NICHT «stil».
+- «stil» deckt ab: holprige Wortstellung / schwerfälliger Satzbau, gestelzte oder umständliche Formulierung, Stilbruch im Register (z.B. Bürokratendeutsch in literarischem Text), unklare Bezüge / Mehrdeutigkeit, falsch gewählte Idiomatik / Kollokation, übermässige Adjektiv-/Adverb-Häufung, Nominalstil statt Verbstil, Pleonasmen / Tautologien.
+- «stil» deckt NICHT ab: einzelne schwache Verben (→ schwaches_verb), einzelne Füllwörter (→ fuellwort), Wortwiederholung (→ wiederholung), abstraktes Telling (→ show_vs_tell), Passivkonstruktion (→ passiv), Grammatikfehler (→ grammatik).
+- «original»: vollständiger Satz oder eindeutig abgrenzbare Phrase zeichengenau aus dem Text.
+- PFLICHT: «korrektur» muss immer eine konkrete Umformulierung enthalten – nicht leer lassen, nicht dasselbe wie «original». Keine Stilanmerkung ohne konkreten Verbesserungsvorschlag.
+- Selbsttest: Lässt sich die Schwäche präzise mit einem der spezifischen Typen benennen? Wenn ja → spezifischen Typ verwenden, «stil» weglassen.`;
 }
 
 // sw: explizite Stoppwort-Liste; Caller muss sie übergeben (kein globaler Fallback).
