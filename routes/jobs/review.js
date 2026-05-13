@@ -27,9 +27,8 @@ async function runReviewJob(jobId, bookId, bookName, userEmail, userToken) {
   // einkippen. Kapitelanalyse bleibt schwerpunkt-frei (würde Synthese verzerren).
   const locale = `${bookSettings?.language || 'de'}-${bookSettings?.region || 'CH'}`;
   const reviewSchwerpunkt = getBuchtypReviewSchwerpunkt(locale, bookSettings?.buchtyp || null);
-  // Komplett-Daten + Mikro-Findings sind optional: ohne vorhergehende Komplett­
-  // analyse / ohne Lektorats-Findings bleiben die Buckets leer und der Prompt
-  // injiziert keinen Strukturdaten-Block.
+  // Komplett-Daten sind optional: ohne vorhergehende Komplettanalyse bleiben
+  // die Buckets leer und der Prompt injiziert keinen Strukturdaten-Block.
   const komplettContext = loadReviewKomplettContext(bookId, userEmail);
   const reviewOptions = { ...narrative, reviewSchwerpunkt, komplettContext };
   try {
