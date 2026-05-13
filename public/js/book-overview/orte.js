@@ -30,12 +30,19 @@ export const orteMethods = {
     return this._memo('ortPresence', [orte, tree], () => {
       const app = window.__app;
       if (!app || orte.length === 0) return null;
+      // Solo-Wrapper (Spezialseiten ohne Kapitel) ausklammern — sie sind in tree
+      // als type:'chapter' mit solo:true verpackt (siehe tree.js loadPages).
       const chapters = (app.tree || [])
-        .filter(i => i.type === 'chapter')
+        .filter(i => i.type === 'chapter' && !i.solo)
         .map(c => ({ id: c.id, name: c.name }));
       if (chapters.length === 0) return null;
 
       const MAX_COLS = 20;
+
+      // Spezialseiten ohne Kapitel ausklammern: Orte, die nur dort vorkommen,
+      // dürfen weder Top-N-Selektion noch Matrix-Skalierung beeinflussen.
+      const chapterIds = new Set(chapters.map(c => Number(c.id)));
+      const chapterNames = new Set(chapters.map(c => c.name));
 
       const candidates = orte.map(o => {
         const kap = Array.isArray(o.kapitel) ? o.kapitel : [];
@@ -43,8 +50,13 @@ export const orteMethods = {
         const byName = new Map();
         for (const k of kap) {
           const h = Number(k?.haeufigkeit) || 0;
-          if (k?.chapter_id != null) byId.set(Number(k.chapter_id), (byId.get(Number(k.chapter_id)) || 0) + h);
-          if (k?.name) byName.set(k.name, (byName.get(k.name) || 0) + h);
+          const kid = k?.chapter_id != null ? Number(k.chapter_id) : null;
+          const kname = k?.name || '';
+          const inChapter = (kid != null && chapterIds.has(kid))
+                         || (kname && chapterNames.has(kname));
+          if (!inChapter) continue;
+          if (kid != null) byId.set(kid, (byId.get(kid) || 0) + h);
+          if (kname) byName.set(kname, (byName.get(kname) || 0) + h);
         }
         let total = 0;
         for (const v of byName.values()) total += v;

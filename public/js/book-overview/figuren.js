@@ -46,8 +46,10 @@ export const figurenMethods = {
     const app = window.__app;
     if (!app || figs.length === 0 || sz.length === 0) return null;
     const tree = app.tree || [];
+    // Solo-Wrapper (Spezialseiten ohne Kapitel) ausklammern — sie sind in tree
+    // als type:'chapter' mit solo:true verpackt (siehe tree.js loadPages).
     const chapters = tree
-      .filter(i => i.type === 'chapter')
+      .filter(i => i.type === 'chapter' && !i.solo)
       .map(c => ({ id: c.id, name: c.name }));
     if (chapters.length === 0) return null;
 
@@ -56,11 +58,19 @@ export const figurenMethods = {
     const figByFigId = new Map();
     for (const f of figs) figByFigId.set(f.id, f);
 
+    // Spezialseiten ohne Kapitel ausklammern: Figuren, die nur dort auftreten,
+    // dürfen weder Top-N-Selektion noch Matrix-Skalierung beeinflussen.
+    const chapterIds = new Set(chapters.map(c => Number(c.id)));
+    const chapterNames = new Set(chapters.map(c => c.name));
+
     const counts = new Map(); // fig_id -> { byId, byName, total }
     for (const s of sz) {
       if (!Array.isArray(s.fig_ids) || s.fig_ids.length === 0) continue;
       const chapId = s.chapter_id ?? null;
       const chapName = s.kapitel || '';
+      const inChapter = (chapId != null && chapterIds.has(Number(chapId)))
+                     || (chapName && chapterNames.has(chapName));
+      if (!inChapter) continue;
       for (const figId of s.fig_ids) {
         let m = counts.get(figId);
         if (!m) { m = { byId: new Map(), byName: new Map(), total: 0 }; counts.set(figId, m); }

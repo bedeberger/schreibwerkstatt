@@ -18,7 +18,8 @@ export const kapitelMethods = {
     return this._memo('chapterDist', [tree, tokEsts], () => {
       const out = [];
       for (const item of tree) {
-        if (item.type !== 'chapter') continue;
+        // Solo-Wrapper für Spezialseiten ohne Kapitel ausklammern (verzerren Median).
+        if (item.type !== 'chapter' || item.solo) continue;
         const pages = item.pages || [];
         let words = 0, chars = 0;
         for (const p of pages) {
