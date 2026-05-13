@@ -6,6 +6,7 @@
 // laufenden Reviews.
 
 import { fetchJson, escHtml, escMd, renderStars } from '../utils.js';
+import { renderEmpfehlungItem, renderZitatItem } from '../review.js';
 import { startPoll, runningJobStatus } from './job-helpers.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
 
@@ -164,7 +165,12 @@ export function registerKapitelReviewCard() {
       if (r.empfehlungen?.length) html += `
             <div class="bewertung-section">
               <div class="bewertung-section-title">${escHtml(t('review.section.empfehlungen'))}</div>
-              <ul class="bullet-list">${r.empfehlungen.map(s => `<li>${escMd(s)}</li>`).join('')}</ul>
+              <ul class="rec-list">${r.empfehlungen.map(e => renderEmpfehlungItem(e, t)).join('')}</ul>
+            </div>`;
+      if (r.beispielzitate?.length) html += `
+            <div class="bewertung-section">
+              <div class="bewertung-section-title">${escHtml(t('review.section.zitate'))}</div>
+              <ul class="zitate-list">${r.beispielzitate.map(z => renderZitatItem(z, t)).join('')}</ul>
             </div>`;
       if (r.fazit) html += `<div class="fazit fazit--review">${escMd(r.fazit)}</div>`;
       return html;

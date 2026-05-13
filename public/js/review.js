@@ -11,7 +11,7 @@ const PRIO_TO_SEVERITY = {
   niedrig: 'niedrig',
 };
 
-function _renderEmpfehlungItem(item, translate) {
+export function renderEmpfehlungItem(item, translate) {
   // Backward-Compat: alte Reviews speichern empfehlungen als string[].
   if (typeof item === 'string') return `<li>${escMd(item)}</li>`;
   const prio      = (item?.prio || '').toLowerCase();
@@ -26,7 +26,7 @@ function _renderEmpfehlungItem(item, translate) {
   return `<li class="rec-item">${prioBadge}${catSpan}<span class="rec-text">${escMd(text)}</span></li>`;
 }
 
-function _renderZitatItem(z, translate) {
+export function renderZitatItem(z, translate) {
   const kind = z?.kind === 'staerke' ? 'staerke' : 'schwaeche';
   const label = translate('review.zitate.' + kind);
   return `
@@ -93,12 +93,12 @@ export function renderReviewHtml(r, translate) {
   if (r.empfehlungen?.length) html += `
       <div class="bewertung-section">
         <div class="bewertung-section-title">${escHtml(translate('review.section.empfehlungen'))}</div>
-        <ul class="rec-list">${r.empfehlungen.map(e => _renderEmpfehlungItem(e, translate)).join('')}</ul>
+        <ul class="rec-list">${r.empfehlungen.map(e => renderEmpfehlungItem(e, translate)).join('')}</ul>
       </div>`;
   if (r.beispielzitate?.length) html += `
       <div class="bewertung-section">
         <div class="bewertung-section-title">${escHtml(translate('review.section.zitate'))}</div>
-        <ul class="zitate-list">${r.beispielzitate.map(z => _renderZitatItem(z, translate)).join('')}</ul>
+        <ul class="zitate-list">${r.beispielzitate.map(z => renderZitatItem(z, translate)).join('')}</ul>
       </div>`;
   if (r.fazit) html += `<div class="fazit fazit--review">${escMd(r.fazit)}</div>`;
   return html;
