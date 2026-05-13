@@ -72,7 +72,7 @@ function _buildReviewSchwerpunktBlock(schwerpunkt) {
 }
 
 /**
- * Baut den Strukturdaten-Block aus Komplettanalyse-Daten + Mikro-Findings.
+ * Baut den Strukturdaten-Block aus Komplettanalyse-Daten.
  * Erscheint nur, wenn mindestens eine Quelle Daten liefert.
  *
  * Wichtig: die Daten gelten als Wahrheit. Modell darf sich darauf beziehen
@@ -80,7 +80,7 @@ function _buildReviewSchwerpunktBlock(schwerpunkt) {
  * Ärztin genannt"). Bei leeren Quellen wird der jeweilige Abschnitt weggelassen –
  * keine erfundenen Befunde.
  *
- * @param {{figuren:Array, beziehungen:Array, continuityIssues:Array, zeitstrahl:Array, mikro:Object|null}} ctx
+ * @param {{figuren:Array, beziehungen:Array, continuityIssues:Array, zeitstrahl:Array}} ctx
  * @returns {string} Block oder '' (wenn alle Buckets leer)
  */
 function _buildKomplettContextBlock(ctx) {
@@ -123,28 +123,12 @@ function _buildKomplettContextBlock(ctx) {
     parts.push(`Globaler Zeitstrahl (Reihenfolge der wichtigen Ereignisse):\n${lines.join('\n')}`);
   }
 
-  if (ctx.mikro && ctx.mikro.pagesChecked > 0) {
-    const typLine = (ctx.mikro.topTypen || [])
-      .slice(0, 12)
-      .map(t => `${t.typ}: ${t.count}`)
-      .join(', ');
-    const kapLines = (ctx.mikro.topKapitel || []).map(k =>
-      `  · ${k.chapter_name || `Kapitel ${k.chapter_id}`}: ${k.findings} Findings auf ${k.pages} Seiten`
-    );
-    parts.push(
-      `Mikro-Lektorats-Statistik (Aggregat über alle Lektorats-Findings des Buchs):\n` +
-      `- Seiten geprüft: ${ctx.mikro.pagesChecked}, davon mit Findings: ${ctx.mikro.pagesWithFindings}, Gesamtzahl Findings: ${ctx.mikro.totalFindings}\n` +
-      (typLine ? `- Verteilung nach Typ: ${typLine}\n` : '') +
-      (kapLines.length ? `- Schwerpunkte nach Kapitel:\n${kapLines.join('\n')}` : '')
-    );
-  }
-
   if (!parts.length) return '';
   return `
-=== STRUKTURDATEN AUS DER KOMPLETTANALYSE + LEKTORAT (verbindlich) ===
+=== STRUKTURDATEN AUS DER KOMPLETTANALYSE (verbindlich) ===
 Wo Aussagen im Buchtext den folgenden Strukturdaten widersprechen, beziehe dich in
-"plot", "figuren" oder "mikro_befund" konkret auf die widersprüchliche Stelle und
-nenne die Kartei-Wahrheit. Wo die Strukturdaten schweigen, NICHT raten.
+"plot" oder "figuren" konkret auf die widersprüchliche Stelle und nenne die
+Kartei-Wahrheit. Wo die Strukturdaten schweigen, NICHT raten.
 
 ${parts.join('\n\n')}
 === ENDE STRUKTURDATEN ===
@@ -172,7 +156,6 @@ Antworte mit diesem JSON-Schema:
   "dramaturgie": "Spannungskurve, Aufbau, Höhepunkte, Schluss (2-4 Sätze)",
   "pacing":      "Tempo, Längen, Mittelteil, Rhythmus (2-3 Sätze)",
   "thema":       "Roter Faden, zentrale Frage / Idee, Konsequenz der Verfolgung (2-3 Sätze)",
-  "mikro_befund": "Wenn oben eine Mikro-Lektorats-Statistik gegeben ist: 2-4 Sätze, was diese Verteilung über das Buch aussagt (Schwerpunkt-Kapitel, dominante Schwächentypen). Wenn keine Statistik vorliegt: leeren String liefern.",
   "staerken":    ["Stärke 1", "Stärke 2", "Stärke 3"],
   "schwaechen":  ["Schwäche 1", "Schwäche 2"],
   "empfehlungen":[
@@ -312,7 +295,6 @@ Antworte mit diesem JSON-Schema:
   "dramaturgie": "Spannungskurve, Aufbau, Höhepunkte, Schluss über alle Kapitel (2-4 Sätze)",
   "pacing":      "Tempo, Längen, Mittelteil, Rhythmus über alle Kapitel (2-3 Sätze)",
   "thema":       "Roter Faden, zentrale Frage / Idee, Konsequenz der Verfolgung (2-3 Sätze)",
-  "mikro_befund": "Wenn oben eine Mikro-Lektorats-Statistik gegeben ist: 2-4 Sätze, was diese Verteilung über das Buch aussagt (Schwerpunkt-Kapitel, dominante Schwächentypen). Wenn keine Statistik vorliegt: leeren String liefern.",
   "staerken":    ["Stärke 1", "Stärke 2", "Stärke 3"],
   "schwaechen":  ["Schwäche 1", "Schwäche 2"],
   "empfehlungen":[
@@ -350,7 +332,6 @@ export const SCHEMA_REVIEW = _obj({
   dramaturgie: _str,
   pacing: _str,
   thema: _str,
-  mikro_befund: _str,
   staerken: { type: 'array', items: _str },
   schwaechen: { type: 'array', items: _str },
   empfehlungen: { type: 'array', items: _empfehlungItem },
