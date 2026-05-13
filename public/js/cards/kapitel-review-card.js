@@ -5,8 +5,8 @@
 // der User dort sein eigenes Loading/Output, nicht den Status eines parallel
 // laufenden Reviews.
 
-import { fetchJson, escHtml, escMd, renderStars } from '../utils.js';
-import { renderEmpfehlungItem, renderZitatItem } from '../review.js';
+import { fetchJson, escHtml, renderStars } from '../utils.js';
+import { renderReviewHtml, CHAPTER_REVIEW_AXES } from '../review.js';
 import { startPoll, runningJobStatus } from './job-helpers.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
 
@@ -130,50 +130,7 @@ export function registerKapitelReviewCard() {
     renderStars(note) { return renderStars(note); },
 
     _renderKapitelReviewHtml(r) {
-      const t = (k, p) => window.__app.t(k, p);
-      const stars = renderStars(r.gesamtnote);
-      let html = `
-          <div class="bewertung-header">
-            <span class="bewertung-stars">${stars}</span>
-            <span class="bewertung-header-note">${escMd(r.gesamtnote_begruendung || '')}</span>
-          </div>
-          <div class="stilbox stilbox--review-summary">${escMd(r.zusammenfassung || '')}</div>`;
-      const sections = [
-        ['dramaturgie', 'kapitelReview.section.dramaturgie'],
-        ['pacing',      'kapitelReview.section.pacing'],
-        ['kohaerenz',   'kapitelReview.section.kohaerenz'],
-        ['perspektive', 'kapitelReview.section.perspektive'],
-        ['figuren',     'kapitelReview.section.figuren'],
-      ];
-      for (const [key, i18n] of sections) {
-        if (r[key]) html += `
-            <div class="bewertung-section">
-              <div class="bewertung-section-title">${escHtml(t(i18n))}</div>
-              <p class="bewertung-section-text">${escMd(r[key])}</p>
-            </div>`;
-      }
-      if (r.staerken?.length) html += `
-            <div class="bewertung-section">
-              <div class="bewertung-section-title">${escHtml(t('review.strengths'))}</div>
-              <ul class="bullet-list pos">${r.staerken.map(s => `<li>${escMd(s)}</li>`).join('')}</ul>
-            </div>`;
-      if (r.schwaechen?.length) html += `
-            <div class="bewertung-section">
-              <div class="bewertung-section-title">${escHtml(t('review.weaknesses'))}</div>
-              <ul class="bullet-list neg">${r.schwaechen.map(s => `<li>${escMd(s)}</li>`).join('')}</ul>
-            </div>`;
-      if (r.empfehlungen?.length) html += `
-            <div class="bewertung-section">
-              <div class="bewertung-section-title">${escHtml(t('review.section.empfehlungen'))}</div>
-              <ul class="rec-list">${r.empfehlungen.map(e => renderEmpfehlungItem(e, t)).join('')}</ul>
-            </div>`;
-      if (r.beispielzitate?.length) html += `
-            <div class="bewertung-section">
-              <div class="bewertung-section-title">${escHtml(t('review.section.zitate'))}</div>
-              <ul class="zitate-list">${r.beispielzitate.map(z => renderZitatItem(z, t)).join('')}</ul>
-            </div>`;
-      if (r.fazit) html += `<div class="fazit fazit--review">${escMd(r.fazit)}</div>`;
-      return html;
+      return renderReviewHtml(r, CHAPTER_REVIEW_AXES, (k, p) => window.__app.t(k, p));
     },
 
     startKapitelReviewPoll(jobId, chapterId) {

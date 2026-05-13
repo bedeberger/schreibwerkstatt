@@ -16,26 +16,47 @@ Notenskala (verbindlich – nicht abweichen):
 - Eine Note über 4.5 verlangt eine konkrete Stärke pro Achse; ohne → maximal 4.5.
 - Halbschritte (.0, .5) bevorzugen; .25 / .75 nur wenn die Bewertung klar zwischen zwei Stufen liegt.`;
 
-// Sechs Bewertungsachsen, die in jedem Buchreview-Output zwingend belegt werden.
-// Multi-Pass mag dünner ausfallen – das ist akzeptiert; die Achsen bleiben Pflicht,
-// damit die Notenbegründung über alle Achsen tragfähig wird.
-const ACHSEN_BLOCK = `
-Bewertungsachsen (alle sechs zwingend, je 2–5 Sätze, konkret und am Text belegt):
-- struktur:    Aufbau, Kapitelgliederung, Übergänge, Logik der Abfolge.
-- stil:        Sprache, Satzbau, Ton, Konsistenz über das Buch.
-- plot:        Konflikt, Stakes, Wendepunkte, Auflösung. Wenn Buch sachlich/lyrisch: stattdessen Argumentationsgang / Bildlogik.
-- figuren:     Hauptfiguren-Bogen, Nebenfiguren, Stimmigkeit und Entwicklung über das Buch hinweg.
-- dramaturgie: Spannungskurve über die Kapitel, Aufbau, Höhepunkte, Schluss.
-- pacing:      Tempo, Längen, Mittelteil-Loch, Rhythmus über das Buch.
-- thema:       Roter Faden, durchgehende Frage / Idee, Konsequenz der Verfolgung.
+// Bewertungsachsen pro Scope. Werden über `_buildAchsenBlock()` zu einem
+// Prompt-Block geformt – Buch- und Kapitel-Review nutzen denselben Generator,
+// damit das Achsen-Vokabular konsistent bleibt.
+const BOOK_PROMPT_AXES = [
+  { key: 'struktur',    hint: 'Aufbau, Kapitelgliederung, Übergänge, Logik der Abfolge.' },
+  { key: 'stil',        hint: 'Sprache, Satzbau, Ton, Konsistenz über das Buch.' },
+  { key: 'plot',        hint: 'Konflikt, Stakes, Wendepunkte, Auflösung. Wenn Buch sachlich/lyrisch: stattdessen Argumentationsgang / Bildlogik.' },
+  { key: 'figuren',     hint: 'Hauptfiguren-Bogen, Nebenfiguren, Stimmigkeit und Entwicklung über das Buch hinweg.' },
+  { key: 'dramaturgie', hint: 'Spannungskurve über die Kapitel, Aufbau, Höhepunkte, Schluss.' },
+  { key: 'pacing',      hint: 'Tempo, Längen, Mittelteil-Loch, Rhythmus über das Buch.' },
+  { key: 'thema',       hint: 'Roter Faden, durchgehende Frage / Idee, Konsequenz der Verfolgung.' },
+];
+const BOOK_PROMPT_GEWICHTUNG = 'Plot, Figuren, Dramaturgie und Stil tragen die Gesamtnote stärker als Mikro-Mängel oder einzelne Stellen.';
 
-GEWICHTUNG: Plot, Figuren, Dramaturgie und Stil tragen die Gesamtnote stärker als Mikro-Mängel oder einzelne Stellen.`;
+const CHAPTER_PROMPT_AXES = [
+  { key: 'dramaturgie', hint: 'Spannungsbogen, Szenenabfolge, Aufbau, Höhepunkte.' },
+  { key: 'pacing',      hint: 'Tempo, Längen, Leerlauf, Szenenrhythmus.' },
+  { key: 'kohaerenz',   hint: 'Roter Faden, Übergänge zwischen Seiten/Szenen, Logik der Handlung.' },
+  { key: 'perspektive', hint: 'Erzählperspektive und Konsistenz innerhalb des Kapitels.' },
+  { key: 'figuren',     hint: 'Auftreten der Figuren im Kapitel, Stimmigkeit, Entwicklung.' },
+];
+const CHAPTER_PROMPT_GEWICHTUNG = 'Dramaturgie, Pacing und Kohärenz sind die zentralen Bewertungskriterien dieses Kapitels und fliessen stärker in die Gesamtnote ein als sprachliche Einzelmängel.';
+
+function _buildAchsenBlock(axes, gewichtung) {
+  const pad = Math.max(...axes.map(a => a.key.length)) + 1;
+  const lines = axes.map(a => `- ${a.key}:${' '.repeat(pad - a.key.length)}${a.hint}`).join('\n');
+  return `
+Bewertungsachsen (alle ${axes.length} zwingend, je 2–5 Sätze, konkret und am Text belegt):
+${lines}
+
+GEWICHTUNG: ${gewichtung}`;
+}
+
+const ACHSEN_BLOCK_BOOK    = _buildAchsenBlock(BOOK_PROMPT_AXES,    BOOK_PROMPT_GEWICHTUNG);
+const ACHSEN_BLOCK_CHAPTER = _buildAchsenBlock(CHAPTER_PROMPT_AXES, CHAPTER_PROMPT_GEWICHTUNG);
 
 // Format-Block für die strukturierten Empfehlungen + Zitatbelege. Wird in
 // Buch- und Kapitelreview-Prompts geteilt, damit die Schemas konsistent bleiben.
 const EMPFEHLUNGEN_FORMAT_BLOCK = `
 Empfehlungen – Format & Priorisierung:
-- Jede Empfehlung ist ein Objekt { "prio": "hoch"|"mittel"|"niedrig", "kategorie": "plot"|"figuren"|"stil"|"struktur"|"dramaturgie"|"pacing"|"thema"|"mikro", "text": "konkrete Handlungsanweisung" }.
+- Jede Empfehlung ist ein Objekt { "prio": "hoch"|"mittel"|"niedrig", "kategorie": "plot"|"figuren"|"stil"|"struktur"|"dramaturgie"|"pacing"|"thema"|"perspektive"|"kohaerenz"|"mikro", "text": "konkrete Handlungsanweisung" }.
 - "hoch": Eingriff, ohne den das Buch in zentralen Achsen nicht trägt (Plot-Logik, Figurenbogen, struktureller Bruch). Maximal so viele "hoch" wie wirklich gravierend.
 - "mittel": klare Verbesserung mit spürbarem Effekt, aber das Buch trägt auch ohne sie.
 - "niedrig": Feinschliff / Quick-Win (einzelne Stilstellen, Dopplungen, Mikro-Mängel).
@@ -140,7 +161,7 @@ export function buildBookReviewSinglePassPrompt(bookName, pageCount, bookText, {
   const schwerpunktBlock = _buildReviewSchwerpunktBlock(reviewSchwerpunkt);
   const kontextBlock = _buildKomplettContextBlock(komplettContext);
   return `Bewerte das folgende Buch «${bookName}» kritisch und umfassend.
-${ACHSEN_BLOCK}
+${ACHSEN_BLOCK_BOOK}
 ${NOTENSKALA_BLOCK}
 ${EMPFEHLUNGEN_FORMAT_BLOCK}
 ${schwerpunktBlock}${povBlock}${kontextBlock}
@@ -209,20 +230,14 @@ export function buildChapterReviewPrompt(chapterName, bookName, pageCount, chTex
   const schwerpunktBlock = _buildReviewSchwerpunktBlock(reviewSchwerpunkt);
   return `Bewerte das Kapitel «${chapterName}» aus dem Buch «${bookName}» kritisch und umfassend.
 Der Fokus liegt auf seitenübergreifenden Qualitäten – nicht auf Mikro-Fehlern (dafür gibt es das Seiten-Lektorat).
-Prüfe:
-- Dramaturgie und Spannungsbogen (Szenenabfolge, Aufbau, Höhepunkte)
-- Pacing (Tempo, Längen, Leerlauf, Szenenrhythmus)
-- Kohärenz und roter Faden (Übergänge zwischen Seiten/Szenen, Logik der Handlung)
-- Erzählperspektive und Konsistenz innerhalb des Kapitels
-- Figuren im Kapitel (Auftreten, Stimmigkeit, Entwicklung)
-
-GEWICHTUNG: Dramaturgie, Pacing und Kohärenz sind die zentralen Bewertungskriterien dieses Kapitels und fliessen stärker in die Gesamtnote ein als sprachliche Einzelmängel.
+${ACHSEN_BLOCK_CHAPTER}
+${NOTENSKALA_BLOCK}
 ${EMPFEHLUNGEN_FORMAT_BLOCK}
 ${schwerpunktBlock}${povBlock}
 Antworte mit diesem JSON-Schema:
 {
   "gesamtnote": 4.5,
-  "gesamtnote_begruendung": "Ein Satz warum diese Note (gesamtnote als Dezimalzahl von 1.0=sehr schwach bis 6.0=ausgezeichnet, Halbschritte erlaubt)",
+  "gesamtnote_begruendung": "Ein Satz warum diese Note (gesamtnote als Dezimalzahl von 1.0=sehr schwach bis 6.0=ausgezeichnet, Halbschritte bevorzugt) – muss sich auf die unten gefüllten Achsen stützen",
   "zusammenfassung": "2-3 Sätze Gesamteindruck dieses Kapitels",
   "dramaturgie": "Spannungsbogen, Szenenstruktur, Aufbau (3-4 Sätze)",
   "pacing": "Tempo, Längen, Leerlauf (2-3 Sätze)",
@@ -272,7 +287,7 @@ Leite Plot, Figurenbogen, Dramaturgie und Pacing aus der Abfolge der Kapitelanal
 auch wenn die einzelnen Kapitelausgaben kompakt sind, MUSS die Buchebene alle sechs Achsen
 benennen. Wo eine Achse aus den Kapitelanalysen nicht ableitbar ist, dies offen benennen
 ("aus den Kapitelanalysen nicht eindeutig …") statt zu raten.
-${ACHSEN_BLOCK}
+${ACHSEN_BLOCK_BOOK}
 ${NOTENSKALA_BLOCK}
 ${EMPFEHLUNGEN_FORMAT_BLOCK}
 HINWEIS: Für "beispielzitate" stehen im Multi-Pass keine Volltexte zur Verfügung.
@@ -311,7 +326,7 @@ Antworte mit diesem JSON-Schema:
 
 const _empfehlungItem = _obj({
   prio:      { type: 'string', enum: ['hoch', 'mittel', 'niedrig'] },
-  kategorie: { type: 'string', enum: ['plot', 'figuren', 'stil', 'struktur', 'dramaturgie', 'pacing', 'thema', 'mikro'] },
+  kategorie: { type: 'string', enum: ['plot', 'figuren', 'stil', 'struktur', 'dramaturgie', 'pacing', 'thema', 'perspektive', 'kohaerenz', 'mikro'] },
   text:      _str,
 });
 

@@ -117,18 +117,21 @@
 .bullet-list.neg li::before     { content: '−'; color: var(--color-err-text); }
 
 /* === Review-Empfehlungen (prio + kategorie + text) === */
-.rec-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.rec-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 14px; }
 .rec-item {
   display: grid;
-  grid-template-columns: auto auto 1fr;
-  align-items: baseline;
-  column-gap: 10px;
-  row-gap: 2px;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  column-gap: 12px;
+  row-gap: 4px;
   font-size: var(--font-size-base);
   line-height: 1.5;
 }
-.rec-item .severity-tag { align-self: center; }
+.rec-item .severity-tag { grid-column: 1; grid-row: 1; }
 .rec-kategorie {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -136,12 +139,7 @@
   color: var(--color-muted);
   white-space: nowrap;
 }
-.rec-text { color: var(--color-text); }
-@media (max-width: 540px) {
-  .rec-item { grid-template-columns: auto 1fr; row-gap: 4px; }
-  .rec-item .rec-kategorie { grid-column: 2; }
-  .rec-item .rec-text      { grid-column: 1 / -1; }
-}
+.rec-text { grid-column: 1 / -1; grid-row: 2; color: var(--color-text); }
 
 /* === Review-Beispielzitate === */
 .zitate-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }

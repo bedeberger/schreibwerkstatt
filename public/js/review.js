@@ -1,5 +1,7 @@
-// Buchbewertungs-Render-Helper. Der Job-Flow (Start, Poll, Render) lebt in
-// Alpine.data('bookReviewCard'); hier nur das HTML-Rendering.
+// Geteilter Review-Renderer für Buch- und Kapitelbewertung.
+// Achsen-Set wird von aussen reingereicht, damit Buch- und Kapitel-Card
+// dasselbe Markup teilen (Header/Stars/Summary/Achsen/Stärken/Schwächen/
+// Empfehlungen/Zitate/Fazit) – nur die Achsen-Liste unterscheidet sich.
 
 import { escHtml, escMd, renderStars } from './utils.js';
 
@@ -11,7 +13,26 @@ const PRIO_TO_SEVERITY = {
   niedrig: 'niedrig',
 };
 
-export function renderEmpfehlungItem(item, translate) {
+// Achsen-Sets: [feldname-in-review-JSON, i18n-key-für-Section-Title]
+export const BOOK_REVIEW_AXES = [
+  ['struktur',    'review.section.struktur'],
+  ['stil',        'review.section.stil'],
+  ['plot',        'review.section.plot'],
+  ['figuren',     'review.section.figuren'],
+  ['dramaturgie', 'review.section.dramaturgie'],
+  ['pacing',      'review.section.pacing'],
+  ['thema',       'review.section.thema'],
+];
+
+export const CHAPTER_REVIEW_AXES = [
+  ['dramaturgie', 'kapitelReview.section.dramaturgie'],
+  ['pacing',      'kapitelReview.section.pacing'],
+  ['kohaerenz',   'kapitelReview.section.kohaerenz'],
+  ['perspektive', 'kapitelReview.section.perspektive'],
+  ['figuren',     'kapitelReview.section.figuren'],
+];
+
+function renderEmpfehlungItem(item, translate) {
   // Backward-Compat: alte Reviews speichern empfehlungen als string[].
   if (typeof item === 'string') return `<li>${escMd(item)}</li>`;
   const prio      = (item?.prio || '').toLowerCase();
@@ -26,7 +47,7 @@ export function renderEmpfehlungItem(item, translate) {
   return `<li class="rec-item">${prioBadge}${catSpan}<span class="rec-text">${escMd(text)}</span></li>`;
 }
 
-export function renderZitatItem(z, translate) {
+function renderZitatItem(z, translate) {
   const kind = z?.kind === 'staerke' ? 'staerke' : 'schwaeche';
   const label = translate('review.zitate.' + kind);
   return `
@@ -37,7 +58,7 @@ export function renderZitatItem(z, translate) {
         </li>`;
 }
 
-export function renderReviewHtml(r, translate) {
+export function renderReviewHtml(r, axes, translate) {
   const stars = renderStars(r.gesamtnote);
   let html = `
       <div class="bewertung-header">
@@ -45,41 +66,14 @@ export function renderReviewHtml(r, translate) {
         <span class="bewertung-header-note">${escMd(r.gesamtnote_begruendung || '')}</span>
       </div>
       <div class="stilbox stilbox--review-summary">${escMd(r.zusammenfassung || '')}</div>`;
-  if (r.struktur) html += `
+  for (const [key, i18n] of axes) {
+    if (!r[key]) continue;
+    html += `
       <div class="bewertung-section">
-        <div class="bewertung-section-title">${escHtml(translate('review.section.struktur'))}</div>
-        <p class="bewertung-section-text">${escMd(r.struktur)}</p>
+        <div class="bewertung-section-title">${escHtml(translate(i18n))}</div>
+        <p class="bewertung-section-text">${escMd(r[key])}</p>
       </div>`;
-  if (r.stil) html += `
-      <div class="bewertung-section">
-        <div class="bewertung-section-title">${escHtml(translate('review.section.stil'))}</div>
-        <p class="bewertung-section-text">${escMd(r.stil)}</p>
-      </div>`;
-  if (r.plot) html += `
-      <div class="bewertung-section">
-        <div class="bewertung-section-title">${escHtml(translate('review.section.plot'))}</div>
-        <p class="bewertung-section-text">${escMd(r.plot)}</p>
-      </div>`;
-  if (r.figuren) html += `
-      <div class="bewertung-section">
-        <div class="bewertung-section-title">${escHtml(translate('review.section.figuren'))}</div>
-        <p class="bewertung-section-text">${escMd(r.figuren)}</p>
-      </div>`;
-  if (r.dramaturgie) html += `
-      <div class="bewertung-section">
-        <div class="bewertung-section-title">${escHtml(translate('review.section.dramaturgie'))}</div>
-        <p class="bewertung-section-text">${escMd(r.dramaturgie)}</p>
-      </div>`;
-  if (r.pacing) html += `
-      <div class="bewertung-section">
-        <div class="bewertung-section-title">${escHtml(translate('review.section.pacing'))}</div>
-        <p class="bewertung-section-text">${escMd(r.pacing)}</p>
-      </div>`;
-  if (r.thema) html += `
-      <div class="bewertung-section">
-        <div class="bewertung-section-title">${escHtml(translate('review.section.thema'))}</div>
-        <p class="bewertung-section-text">${escMd(r.thema)}</p>
-      </div>`;
+  }
   if (r.staerken?.length) html += `
       <div class="bewertung-section">
         <div class="bewertung-section-title">${escHtml(translate('review.strengths'))}</div>
