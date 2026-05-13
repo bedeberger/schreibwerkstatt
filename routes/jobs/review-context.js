@@ -22,12 +22,19 @@ function _truncString(s, n) {
   return t.length > n ? t.slice(0, n - 1).trimEnd() + '…' : t;
 }
 
-/** Lädt Zeitstrahl-Events aus zeitstrahl_events. Kapitel-IDs werden bei Bedarf
- *  in lesbare Namen aufgelöst.
+/** Lädt Zeitstrahl-Events aus zeitstrahl_events. Kapitel-Namen kommen via
+ *  Junction-Tabelle zeitstrahl_event_chapters → chapters (Migration 74).
+ *  Pro Event: kommagetrennte Kapitelnamen in Sort-Order.
  */
 function _loadZeitstrahl(bookId, userEmail) {
   return db.prepare(`
-    SELECT ze.datum, ze.ereignis, ze.typ, ze.bedeutung, ze.kapitel
+    SELECT ze.datum, ze.ereignis, ze.typ, ze.bedeutung,
+           (
+             SELECT GROUP_CONCAT(c.chapter_name, ', ')
+               FROM zeitstrahl_event_chapters zec
+               LEFT JOIN chapters c ON c.chapter_id = zec.chapter_id
+              WHERE zec.event_id = ze.id
+           ) AS kapitel
       FROM zeitstrahl_events ze
      WHERE ze.book_id = ? AND ze.user_email = ?
      ORDER BY ze.sort_order, ze.id
