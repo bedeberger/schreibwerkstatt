@@ -209,7 +209,7 @@
   background: color-mix(in srgb, var(--color-surface) 88%, transparent);
   border: var(--border-thin) solid var(--color-border);
   border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-soft-sm);
+  box-shadow: var(--shadow-sm);
   backdrop-filter: blur(4px);
 }
 
@@ -230,7 +230,7 @@
   font-family: var(--font-sans);
   font-size: var(--font-size-base);
   padding: 6px 10px;
-  box-shadow: var(--shadow-soft-sm);
+  box-shadow: var(--shadow-sm);
 }
 .werkstatt-mindmap jmnode.root {
   background: var(--color-primary);

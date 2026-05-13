@@ -1,0 +1,62 @@
+/* Transition-, Shadow-, Opacity-Tokens + globaler reduced-motion-Block. */
+
+:root {
+  /* === Transition — drei Geschwindigkeits-Stufen ===
+     NIE als `--x: var(--x)` definieren — zirkuläre Custom-Property ist
+     invalid → ganze `transition`/`animation`-Property kippt auf Default
+     (`0s`) → Chevron-Rotation, cardFadeIn, Hover-Tints sind tot. */
+  --transition-fast:        0.1s ease;   /* Hover-Tints, schnelle Filter-Pills */
+  --transition-base:        0.12s ease;  /* Standard-Buttons, Cards, Border-Color */
+  --transition-slow:        0.15s ease;  /* grössere Flächen, Cross-Fade */
+  --transition-emphasized:  0.3s ease;   /* Modal/Drawer-Slide, Card-Eingang, längere Fades */
+
+  /* === Shadow — drei Erhebungs-Stufen ===
+     Dark-Theme erbt automatisch dunklere --color-shadow-*-Werte aus tokens/colors.css. */
+  --shadow-sm:        0 2px 8px var(--color-shadow);          /* Karten-Lift */
+  --shadow-md:        0 4px 12px var(--color-shadow-med);     /* Popover/Dropdown */
+  --shadow-lg:        0 12px 40px var(--color-shadow-strong); /* Modal */
+  --shadow-inset-top: 0 -2px 10px var(--color-shadow-soft);   /* Job-Queue-Footer */
+
+  /* === Opacity-Stufen === */
+  --opacity-disabled: 0.6;   /* :disabled, deaktiviert */
+  --opacity-muted:    0.5;   /* sekundäre Aktion, gedämpft */
+  --opacity-hint:     0.4;   /* Hint, sehr dezent */
+  --opacity-faint:    0.35;  /* fast unsichtbar (Fokus-Modus, Skeleton) */
+  --opacity-strong:   0.75;  /* gedimmter aktiver Zustand */
+
+  /* === Focus-Ring ===
+     Globaler `:focus-visible`-Style. Outline + Offset, themed.
+     Konsumenten brauchen keine Buttons/Inputs/Cards mehr eigen-stylen. */
+  --focus-ring-width:  2px;
+  --focus-ring-offset: 2px;
+  --focus-ring-color:  var(--color-border-focus);
+  --focus-ring:        var(--focus-ring-width) solid var(--focus-ring-color);
+}
+
+/* === Globaler :focus-visible — eine Quelle der Wahrheit ===
+   Browser-Default-Outline neutralisiert; Token-Outline gesetzt. Komponenten
+   dürfen weiterhin lokal überschreiben (z.B. Cards, Drawer mit Inset-Ring),
+   aber Default greift überall. */
+:focus { outline: none; }
+:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* === Reduced-Motion ===
+   Wenn User animations meidet: Transition-Tokens auf 0s drücken und
+   alle CSS-Animationen (cardFadeIn, Skeleton-Shimmer, Chevron-Rotation)
+   instant. Globaler Override greift, weil Tokens überall via var() konsumiert. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --transition-fast:       0s linear;
+    --transition-base:       0s linear;
+    --transition-slow:       0s linear;
+    --transition-emphasized: 0s linear;
+  }
+  *, *::before, *::after {
+    animation-duration: 0.001s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0s !important;
+  }
+}

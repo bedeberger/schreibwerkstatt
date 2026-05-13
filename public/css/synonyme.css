@@ -33,7 +33,7 @@
 
 .syn-passage {
   font-size: var(--font-size-sm);
-  color: var(--color-text-preview);
+  color: var(--color-muted);
   margin-bottom: 6px;
   line-height: 1.5;
 }

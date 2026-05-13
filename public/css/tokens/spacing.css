@@ -1,0 +1,33 @@
+/* Spacing-, Padding-, Radius-, Border-Tokens. */
+
+:root {
+  /* === Spacing-Scale — 4-Pixel-Raster ===
+     Margins/Gaps/Row-Gaps. Ad-hoc Pixel-Werte nur, wenn wirklich kein Token passt. */
+  --space-xs:  4px;
+  --space-sm:  8px;
+  --space-md:  12px;
+  --space-lg:  16px;
+  --space-xl:  24px;
+  --space-2xl: 32px;
+
+  /* === Padding-Tokens — wiederkehrende Zellgrössen === */
+  --pad-btn-compact: 7px 10px;       /* compact button */
+  --pad-badge:       4px 8px;        /* Badge/Tag/kleiner Pill */
+  --pad-detail:      0.5rem 0.75rem; /* Detail-Box / Drawer-Inhalt */
+
+  /* === Border-Width — drei Stufen ===
+     0.5px dezenter Trenner (Card-innere Tabellen, Filter-Chevrons),
+     1px Standard (Card-Rand, Inputs), 2px Akzentband (Tabs-Active,
+     Card-Accent-Stripe, Findings-Severity). */
+  --border-thin:   0.5px;
+  --border:        1px;
+  --border-thick:  2px;
+
+  /* === Radius-Token-Stufen ===
+     Editorial-Eckig bleibt Leitmotiv: Badges/Tags hart auf 0 (Listen-Element-Sprache).
+     Cards leicht weichgespült (2px) — feiner sichtbar bei Hover/Drop-Shadow.
+     Modal/Drawer/Popover 4px — grössere Fläche verträgt mehr Weichheit. */
+  --radius-sm: 0;     /* Badges, Tags, Pills */
+  --radius-md: 2px;   /* Cards, Inputs, Buttons */
+  --radius-lg: 4px;   /* Modal, Drawer, Tooltip, Confirm-Dialog */
+}

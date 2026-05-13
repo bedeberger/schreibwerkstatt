@@ -203,3 +203,24 @@
 }
 
 }
+
+@layer components {
+/* === Row-Utility: Flexbox-Wrapper für Button-Gruppen + Input-Reihen ===
+   Mobile (≤480 px) stapelt sich der Inhalt automatisch (Inputs full-width,
+   Buttons gleich verteilt). */
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.row > * { flex: 1; }
+.row > button { flex: 0 0 auto; }
+
+@media (max-width: 480px) {
+  .row > select,
+  .row > .combobox-wrap,
+  .row > input { flex: 1 0 100%; }
+  .row > button { flex: 1; }
+}
+}

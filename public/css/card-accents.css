@@ -1,0 +1,26 @@
+/* Card-Accent-Mapping — pro Karte ein Hue aus tokens/colors.css.
+   Karten-CSS-Dateien lesen `var(--card-accent)` (z.B. für Anchor-Bar oder
+   Title-Underline). Diese Datei ist Single-Source-of-Truth für die Hue-Wahl
+   und ersetzt verstreute `--card-accent`-Deklarationen in einzelnen Karten-CSS.
+
+   Bestehende Pro-Karten-Mappings in szenen.css/orte.css/etc bleiben funktional
+   (die Variable wird hier vorab gesetzt, dort optional überschrieben).
+   Bei Neu-Karten: Hue in tokens/colors.css als --card-accent-<key> definieren,
+   hier verlinken, Klasse `card--<key>` am Wurzel-Div setzen. */
+
+@layer components {
+  .card--figuren       { --card-accent: var(--card-accent-figuren); }
+  .card--ereignisse    { --card-accent: var(--card-accent-ereignisse); }
+  .card--heatmap       { --card-accent: var(--card-accent-heatmap); }
+  .card--bookstats     { --card-accent: var(--card-accent-bookstats); }
+  .card--review        { --card-accent: var(--card-accent-review); }
+  .card--kapitel       { --card-accent: var(--card-accent-kapitel); }
+  .card--chat          { --card-accent: var(--card-accent-chat); }
+  .card--ideen         { --card-accent: var(--card-accent-ideen); }
+  .card--finetune      { --card-accent: var(--card-accent-finetune); }
+  .card--pdfexport     { --card-accent: var(--card-accent-pdfexport); }
+  .card--settings      { --card-accent: var(--card-accent-settings); }
+  .card--stil          { --card-accent: var(--card-accent-stil); }
+  .card--export        { --card-accent: var(--card-accent-settings); }
+  .card--bookoverview  { --card-accent: var(--card-accent-organize); }
+}

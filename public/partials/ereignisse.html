@@ -7,7 +7,7 @@
   (filteredEreignisse, ereignisseKapitelListe, ereignisseSeitenListe) leben
   hier in der Sub-Komponente.
 -->
-<div class="card" x-data="ereignisseCard" x-show="$app.showEreignisseCard" x-cloak>
+<div class="card card--ereignisse" x-data="ereignisseCard" x-show="$app.showEreignisseCard" x-cloak>
   <div class="card-header card-header--subline">
     <div class="card-header-titlebar">
       <span class="card-title" x-text="$app.t('events.title', { name: $app.selectedBookName })"></span>

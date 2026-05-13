@@ -11,7 +11,7 @@
     - .card-header > .card-actions für Speichern + Exportieren
     - .card-status / .card-form-saved / .card-form-error
 -->
-<div class="card pdf-export-card" x-data="pdfExportCard" x-show="$app.showPdfExportCard" x-cloak>
+<div class="card card--pdfexport pdf-export-card" x-data="pdfExportCard" x-show="$app.showPdfExportCard" x-cloak>
   <div class="card-header">
     <span class="card-title" x-text="$app.t('pdfExport.title')"></span>
     <div class="card-actions" x-show="_formMounted">

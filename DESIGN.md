@@ -103,17 +103,19 @@ Wiederkehrende Werte gehen über Tokens. Ad-hoc-Werte (`box-shadow: 0 4px 12px .
 
 | Bereich | Tokens | Verwendung |
 |---------|--------|------------|
-| **Schatten** | `--shadow-sm` (Card-Lift), `--shadow-md` (Popover/Dropdown), `--shadow-lg` (Modal), `--shadow-soft-sm` (sehr dezent), `--shadow-inset-top` (Job-Queue-Footer) | Standard-Erhebungen. Dark-Theme erbt automatisch dunklere Schatten. |
+| **Schatten** | `--shadow-sm` (Card-Lift), `--shadow-md` (Popover/Dropdown), `--shadow-lg` (Modal), `--shadow-inset-top` (Job-Queue-Footer) | Drei Erhebungs-Stufen + Inset. Dark-Theme erbt automatisch dunklere Schatten. |
 | **Padding** | `--pad-btn-compact` (7px 10px), `--pad-badge` (4px 8px), `--pad-detail` (0.5rem 0.75rem) | Compact-Buttons, Badges/Tags, Detail-Boxen / Drawer-Inhalt. |
 | **Spacing** | `--space-xs` (4px), `--space-sm` (8px), `--space-md` (12px), `--space-lg` (16px), `--space-xl` (24px), `--space-2xl` (32px) | Margins, Gaps, Row-Gaps. 4-Pixel-Raster. Ad-hoc Pixel nur bei wirklich nicht-passendem Token. |
-| **Transition** | `--transition-fast` (0.1s), `--transition-base` (0.12s), `--transition-slow` (0.15s), `--transition-emphasized` (0.3s) | Standard-Cadence. Emphasized für Modal/Drawer-Slides, Card-Eingang, längere Fades. **NIE als `--x: var(--x)` definieren** — zirkuläre Custom-Property ist invalid → ganze `transition`/`animation`-Property kippt auf Default `0s` → Chevron-Rotationen, `cardFadeIn`, Hover-Tints sind tot, Erweiterungen „wackeln" weil Section snappt ohne Chevron-Maskierung. Definitionen müssen Literalwerte tragen, [public/css/tokens.css](public/css/tokens.css). |
+| **Transition** | `--transition-fast` (0.1s), `--transition-base` (0.12s), `--transition-slow` (0.15s), `--transition-emphasized` (0.3s) | Standard-Cadence. Emphasized für Modal/Drawer-Slides, Card-Eingang, längere Fades. **NIE als `--x: var(--x)` definieren** — zirkuläre Custom-Property ist invalid → ganze `transition`/`animation`-Property kippt auf Default `0s` → Chevron-Rotationen, `cardFadeIn`, Hover-Tints sind tot, Erweiterungen „wackeln" weil Section snappt ohne Chevron-Maskierung. Definitionen müssen Literalwerte tragen, [public/css/tokens/motion.css](public/css/tokens/motion.css). `prefers-reduced-motion: reduce` flippt alle Transition-Tokens auf `0s` (globaler Override in derselben Datei). |
 | **Opacity** | `--opacity-disabled` (0.6), `--opacity-muted` (0.5), `--opacity-hint` (0.4), `--opacity-faint` (0.35), `--opacity-strong` (0.75) | Semantische Stufen. `:disabled` immer `--opacity-disabled`. |
-| **Font-Size klein** | `--font-size-xs` (11px), `--font-size-sm` (13px), `--font-size-base` (14px), `--font-size-md` (15px), `--font-size-lg` (26px) | `font-size: 11px` → `var(--font-size-xs)`. |
+| **Focus-Ring** | `--focus-ring-width` (2px), `--focus-ring-offset` (2px), `--focus-ring-color` (var(--color-border-focus)), `--focus-ring` (kompletter shorthand) | Globaler `:focus-visible`-Style in [tokens/motion.css](public/css/tokens/motion.css). Buttons/Inputs/Cards erben automatisch — kein per-Komponente-Override nötig, ausser Inset-Ring gewünscht. |
+| **Font-Size** | `--font-size-xs` (11px), `--font-size-sm` (13px), `--font-size-base` (14px), `--font-size-md` (15px), `--font-size-lg` (18px), `--font-size-xl` (22px), `--font-size-2xl` (26px) | xs/sm/base/md = UI-Stufen. lg = Sub-Heading. xl = Card-Title-Standard. 2xl = Hero/H1. |
 | **Font-Family** | `--font-sans` (Inter), `--font-serif` (Source Serif 4) | UI immer `--font-sans`, Reading-Frame + Headings `--font-serif`. |
 | **Font-Weight** | `--fw-regular` (400), `--fw-medium` (500), `--fw-semibold` (600), `--fw-bold` (700) | `font-weight: 600` → `var(--fw-semibold)`. |
 | **Line-Height** | `--lh-tight` (1.2), `--lh-base` (1.45), `--lh-relaxed` (1.6) | Headings/UI tight, Standard base, Reading-Frame relaxed. |
 | **Border-Width** | `--border-thin` (0.5px), `--border` (1px), `--border-thick` (2px) | Trenner / Standard-Rand / Akzentband. |
-| **Radius** | `--radius-sm` / `-md` / `-lg` — alle aktuell `0` (Editorial-Eckig) | Drei semantische Stufen, falls Design-Wechsel kommt. Nicht zu ad-hoc Pixel-Radius greifen. |
+| **Radius** | `--radius-sm` (0, hart — Badges/Tags/Pills), `--radius-md` (2px — Cards, Inputs, Buttons), `--radius-lg` (4px — Modal, Drawer, Tooltip, Confirm-Dialog) | Editorial-Eckig bleibt Leitmotiv (Listen-Elemente hart auf 0), grössere Flächen leicht weichgespült. Nicht zu ad-hoc Pixel-Radius greifen. |
+| **Text-Farben** | `--color-text`, `--color-muted`, `--color-subtle`, `--color-faint` | Vier Stufen vom prägnantesten zum dezentesten — Body / sekundär / tertiär / fast unsichtbar. Inverse für dauerhaft dunkle Flächen: `--color-text-inverse`, `--color-text-inverse-muted`. |
 | **Z-Index** | `--z-base` (1), `--z-sticky` (100), `--z-header` (200), `--z-popover` (1000), `--z-toolbar` (1100), `--z-overlay` (2000), `--z-banner` (10000), `--z-modal` (9500), `--z-modal-front` (11000), `--z-toast` (12000) | Stapel-Reihenfolge — siehe Section „Z-Index-Stack" unten. |
 
 ---
@@ -155,13 +157,16 @@ Wiederkehrende Werte gehen über Tokens. Ad-hoc-Werte (`box-shadow: 0 4px 12px .
 **Use:** Hauptansicht im Buchscope (Figuren, Orte, Szenen, …).
 
 **Regeln:**
-- Wurzel `<div class="card" x-data="xxxCard" x-show="$app.showXxxCard" x-cloak>`.
+- Wurzel `<div class="card card--<key>" x-data="xxxCard" x-show="$app.showXxxCard" x-cloak>`. **`card--<key>` Pflicht** — auch wenn die Karte den Akzent (noch) nicht visuell nutzt, hängt die `--card-accent`-Custom-Property dran und steht für künftige Anchor-Bar/Title-Underline/Severity-Marker bereit.
 - **Animation: nur CSS (`cardFadeIn` aus [public/css/card-form.css](public/css/card-form.css)).** Kein `x-transition` auf `.card` — translateY × scale konkurriert sichtbar bei grossen Karten (Szenen, Figuren), wirkt wabbelig. Neues Karten-Element nur `x-show="…" x-cloak`.
 - Header: `.card-header` mit `.card-header--subline` für Buchtitel + Timestamp.
 - Status-Hinweis: `.card-status` (Loading/Empty), `.card-status--error` für Fehler.
 - Empty-State: `<div x-show="…" class="card-status" x-text="$app.t('common.noDataYet')"></div>`.
 
-**Akzentfarbe pro Karte:** `.card--xxx { --card-accent: var(--card-accent-xxx); }` (siehe `tokens.css`).
+**Akzentfarbe pro Karte (Single-Source-of-Truth):**
+- Hue-Tokens in [tokens/colors.css](public/css/tokens/colors.css) als `--card-accent-<key>` für alle Karten definiert (Light + Dark spiegelt).
+- Mapping `.card--<key> { --card-accent: var(--card-accent-<key>); }` zentral in [public/css/card-accents.css](public/css/card-accents.css).
+- Neue Karte: Hue in `tokens/colors.css` ergänzen (Light + Dark), Mapping in `card-accents.css`, Klasse `card--<key>` am Wurzel-Div setzen. Pro-Karten-CSS-Datei nur noch konsumieren (`background: var(--card-accent)`), nicht selbst deklarieren.
 
 ---
 
@@ -466,7 +471,7 @@ Nur einmal verwendet — nicht neu erfinden für andere Kontexte (Karten haben e
 <div class="row">…</div>
 ```
 
-CSS: [public/css/row.css](public/css/row.css). Auf Mobile (`max-width: 600px`) stapelt sich der Inhalt automatisch.
+CSS: [public/css/utilities.css](public/css/utilities.css). Auf Mobile (`max-width: 480px`) stapelt sich der Inhalt automatisch.
 
 ---
 
@@ -739,7 +744,7 @@ Markup: [public/partials/avatar-menu.html](public/partials/avatar-menu.html). Be
 
 **Implementation:** Ein einziges `.tip-layer`-Element wird beim ersten Hover via [public/js/tooltip.js](public/js/tooltip.js) in den Body gehängt und auf das jeweilige Target positioniert (fixed). Pseudo-Slots (`::before`/`::after`) auf den Targets bleiben so frei für eigene Decorations.
 
-**Klassen** [public/css/tooltip.css](public/css/tooltip.css):
+**Klassen** [public/css/misc.css](public/css/misc.css):
 - `.tip-layer` (Wrapper, `position: fixed`), `.tip-bubble` (Inhalt), `.tip-arrow` (Dreieck).
 - `data-placement="top|bottom"` schaltet die Pfeilseite. Auto-Flip nach unten, wenn oben kein Platz.
 
@@ -1002,6 +1007,12 @@ Wer eine neue Animation einführt: nichts tun, ausser sie ist `infinite` (dann e
 
 Drei parallele Skalen sind vorhanden — bewusst, weil Use-Cases unterschiedlich sind. Pflicht: das passende Vokabular pro Kontext, nicht querkreuzen.
 
+**Zwei Farb-Achsen in tokens/colors.css:**
+- **content-severity** (`--color-stark/-mittel/-schwach` mit `-bg`/`-text`) — Findings, Continuity, Lektorats-Output. Semantisch reicher als ok/warn/err und visuell getrennt, damit Findings nicht wie System-Banner aussehen.
+- **operational-status** (`--color-ok-*`, `--color-warn-*`, `--color-err-*`) — Banner, Validation-Border, Job-Status, Sync-Status, System-Hinweise.
+
+Eigene Shades bewusst nicht aliased — Achsen optisch trennen. Regel: Lektorats-/Continuity-Output greift content-severity, Banner/Job/Validation greifen operational-status. Querkreuzen nur, wenn ein Element semantisch beides ist (rar).
+
 | Skala | Klassen | Use-Case | CSS |
 |-------|---------|---------|-----|
 | **Findings** (Lektorat-Ergebnisse) | `.finding.error` / `.ok` / `.style` | Output von `runCheck` — Border-Color am Findings-Container | [findings.css](public/css/findings.css) |
@@ -1104,26 +1115,30 @@ Welche Datei besitzt welche Klassen. Bei neuer Klasse: erst hier prüfen, ob ein
 ### Foundation
 | File | Inhalt |
 |------|--------|
-| [tokens.css](public/css/tokens.css) | Custom-Properties (Farben, Schatten, Tokens), `@font-face`, Cascade-Layer-Order. Unlayered. |
-| [base.css](public/css/base.css) | Reset, `:focus-visible`, `.skip-link`, globale `prefers-reduced-motion`. |
+| [tokens.css](public/css/tokens.css) | Cascade-Layer-Order, `@font-face`, `@import` der Token-Module aus `tokens/`. Slim Facade — keine Tokens direkt drin. Unlayered. |
+| [tokens/colors.css](public/css/tokens/colors.css) | Farb-Tokens Light (`:root`) + Dark (`:root[data-theme="dark"]`). Inkl. `--color-text` + `--color-muted` + `--color-subtle` + `--color-faint`, Status-Achsen (content-severity + operational), `--card-accent-*`-Hues. |
+| [tokens/typography.css](public/css/tokens/typography.css) | `--font-sans` / `--font-serif`, `--font-size-xs/sm/base/md/lg/xl/2xl`, `--fw-*`, `--lh-*`, Control-Sizes. |
+| [tokens/spacing.css](public/css/tokens/spacing.css) | `--space-*` (4px-Raster), `--pad-*`, `--border-*`, `--radius-sm/-md/-lg` (0/2/4). |
+| [tokens/motion.css](public/css/tokens/motion.css) | `--transition-*`, `--shadow-*`, `--opacity-*`, `--focus-ring*`, globaler `:focus-visible` + `prefers-reduced-motion`-Override. |
+| [tokens/scale.css](public/css/tokens/scale.css) | `--z-*` Stack. |
+| [base.css](public/css/base.css) | Reset, `h1`-`h3`, `.skip-link`. |
 | [layout-base.css](public/css/layout-base.css) | `.session-banner`, `.dev-banner` (oben fixed). |
 | [twocolumn.css](public/css/twocolumn.css) | `.layout` / `-sidebar` / `-main` (Editor-Layout). |
-| [row.css](public/css/row.css) | `.row` Flexbox-Utility. |
-| [utilities.css](public/css/utilities.css) | `.list-header`, Job-Queue-Footer, `.palette-badge`. |
+| [utilities.css](public/css/utilities.css) | `.list-header`, Job-Queue-Footer, `.palette-badge`, `.row` Flexbox-Utility. |
+| [card-accents.css](public/css/card-accents.css) | `.card--<key> { --card-accent: var(--card-accent-<key>); }` — SSoT für Karten-Akzentfarben (alle Karten). |
 
 ### Komponenten (geteilt)
 | File | Inhalt |
 |------|--------|
-| [card-form.css](public/css/card-form.css) | `.card`, `.card-header*`, `.card-form-*` Grid, Form-Wertspalten, Combobox-Klassen, `cardFadeIn`. |
+| [card-form.css](public/css/card-form.css) | `.card`, `.card-header*`, `.card-form-*` Grid, Form-Wertspalten, Combobox-Klassen, `cardFadeIn`, `.token-setup-*` First-Run-Modal. |
 | [buttons-badges.css](public/css/buttons-badges.css) | `<button>` Hierarchie, `.badge-*`, `.avatar-*`. |
 | [tabs.css](public/css/tabs.css) | `.tabs` / `.tabs-btn` + `--active`/`--scrollable`/`--fullwidth`. |
-| [entity-list.css](public/css/entity-list.css) | `.entity-list` / `-row`, `.severity-tag*`, `.collapsible-*`, Skeleton. |
+| [entity-list.css](public/css/entity-list.css) | `.entity-list` / `-row`, `.severity-tag*`, `.collapsible-*`, Skeleton, `.ort-*` Schauplätze. |
 | [tree-history.css](public/css/tree-history.css) | Sidebar-Tree, `.history-*`, `.history-chevron`. |
-| [tooltip.css](public/css/tooltip.css) | `.tip-layer` (geteilter `data-tip`-Layer). |
+| [misc.css](public/css/misc.css) | `.btn-compact`, `.tip-layer` (`data-tip`-Layer), Restposten. |
 | [confirm-dialog.css](public/css/confirm-dialog.css) | `.confirm-overlay` / `-dialog`, Shortcuts-Overlay. |
 | [feature-tiles.css](public/css/feature-tiles.css) | Palette (Hero/Overlay/Panel/Item), Quick-Pills. |
 | [header-actions.css](public/css/header-actions.css) | `.header-actions`-Cluster, Update-All-Panel. |
-| [progress / heatmap / findings / analysis] | siehe Spezifika. |
 | [heatmap.css](public/css/heatmap.css) | `.heatmap-*` Tabelle + Detail-Drawer. |
 | [findings.css](public/css/findings.css) | `.finding` / `.stilbox`. |
 | [analysis.css](public/css/analysis.css) | `.section-heading*`, JS-generated Output-Stile. |
@@ -1145,11 +1160,9 @@ Welche Datei besitzt welche Klassen. Bei neuer Klasse: erst hier prüfen, ob ein
 |------|--------|
 | [figuren.css](public/css/figuren.css) | Figuren-Karte (Graph, Familie, Soziogramm). |
 | [figur-werkstatt.css](public/css/figur-werkstatt.css) | Figuren-Werkstatt (Mindmap, Drafts-Sidebar, Read-only-Tree). |
-| [schauplaetze.css](public/css/schauplaetze.css) | Orte (Aliasing). |
 | [kontinuitaet.css](public/css/kontinuitaet.css) | Kontinuitätsprüfung + Buch-Einstellungen-Spezifika. |
 | [szenen.css](public/css/szenen.css) | Szenen-Karte. |
 | [kapitel-review.css](public/css/kapitel-review.css) | Kapitel-Review. |
-| [review.css](public/css/review.css) | Buch-Review. |
 | [chat.css](public/css/chat.css) | Seiten-/Buch-Chat. |
 | [ideen.css](public/css/ideen.css) | Ideen-Karte. |
 | [book-settings.css](public/css/book-settings.css) | Buch-Einstellungen Job-Stats-Tabellen. |
@@ -1157,14 +1170,11 @@ Welche Datei besitzt welche Klassen. Bei neuer Klasse: erst hier prüfen, ob ein
 | [export.css](public/css/export.css) | BookStack-Export (Buch). |
 | [zeitleiste.css](public/css/zeitleiste.css) | Globaler Zeitstrahl. |
 | [komplett-status.css](public/css/komplett-status.css) | Komplettanalyse-Status-Header. |
-| [kapitel.css](public/css/kapitel.css) | Kapitel-Liste. |
 | [tokens-est.css](public/css/tokens-est.css) | Token-Schätzung Inline-Badges + Tooltip. |
-| [token-setup.css](public/css/token-setup.css) | First-Run-Token-Setup-Modal. |
 | [page-list.css](public/css/page-list.css) | Seiten-Liste in Sidebar. |
 | [page-view.css](public/css/page-view.css) | (siehe Editor). |
 | [search.css](public/css/search.css) | BookStack-Suche, Buchwahl. |
-| [misc.css](public/css/misc.css) | Restposten, prüfen ob Klassen migrierbar. |
-| [safari-fallback.css](public/css/safari-fallback.css) | Safari-spezifische `:has()`-Fallbacks. |
+| [safari-fallback.css](public/css/safari-fallback.css) | Safari < 16.2 `color-mix()`-Fallbacks via `@supports not (...)`. **Wichtig: muss spät in der Cascade geladen werden** (Override-Wirkung), darum eigenes File und nicht in misc.css gemergt. |
 
 ### book-overview/ (Subfolder, dichtes Tile-Grid)
 [coverage.css](public/css/book-overview/coverage.css), [domain.css](public/css/book-overview/domain.css), [kapitel.css](public/css/book-overview/kapitel.css), [presence.css](public/css/book-overview/presence.css), [recent-actions.css](public/css/book-overview/recent-actions.css), [stats.css](public/css/book-overview/stats.css) — pro Tile-Familie ein File. Cascade-Order = Lade-Order in [public/index.html](public/index.html).
@@ -1200,7 +1210,7 @@ Project mixt zwei Schemata. Beide sind erlaubt, aber pro Komponente konsistent.
 - `.confirm-overlay` + `.confirm-dialog` ([confirm-dialog.css](public/css/confirm-dialog.css))
 - `.shortcuts-overlay` + `.shortcuts-panel` ([confirm-dialog.css](public/css/confirm-dialog.css))
 - `.palette-overlay` + `.palette-panel` ([feature-tiles.css](public/css/feature-tiles.css))
-- `.token-setup-*` ([token-setup.css](public/css/token-setup.css))
+- `.token-setup-*` ([card-form.css](public/css/card-form.css))
 
 Jedes hat eigenen Backdrop, eigene Close-Logik, eigenen Focus-Trap. Drift-Risiko hoch.
 

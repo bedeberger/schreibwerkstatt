@@ -135,7 +135,7 @@
   box-shadow: var(--shadow-md);
   font-size: var(--font-size-sm);
   line-height: 1.5;
-  color: var(--color-text-preview);
+  color: var(--color-muted);
   text-decoration: none;
   font-style: normal;
   font-weight: normal;
@@ -147,7 +147,7 @@
 .lektorat-tip--visible { display: flex; }
 .lektorat-tip .badge { align-self: flex-start; }
 .lektorat-tip-korrektur { font-weight: 700; color: var(--color-mark-ins-text); }
-.lektorat-tip-erkl { color: var(--color-text-tip-hint); }
+.lektorat-tip-erkl { color: var(--color-subtle); }
 
 /* Flash-Animation beim Scrollen zur Fehlerliste */
 .finding--flash {
@@ -205,14 +205,14 @@
   box-shadow: var(--shadow-md);
   font-size: var(--font-size-sm);
   line-height: 1.5;
-  color: var(--color-text-preview);
+  color: var(--color-muted);
 }
 .figure-context-tooltip-name { font-weight: 700; margin-bottom: 4px; }
 .figure-context-tooltip-row { margin-bottom: 2px; }
-.figure-context-label { font-weight: 400; color: var(--color-text-tip-hint); }
+.figure-context-label { font-weight: 400; color: var(--color-subtle); }
 .figure-context-tooltip-desc {
   margin-top: 4px;
-  color: var(--color-text-preview-soft);
+  color: var(--color-subtle);
   line-height: 1.5;
 }
 

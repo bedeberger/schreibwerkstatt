@@ -61,7 +61,7 @@
   border-left: 3px solid var(--color-border);
   padding-left: 12px;
   margin: 0.6em 0;
-  color: var(--color-text-preview-soft);
+  color: var(--color-subtle);
   font-style: italic;
 }
 .page-content-view table { border-collapse: collapse; margin: 0.6em 0; width: 100%; }
@@ -80,7 +80,7 @@
   border-left: 3px solid var(--color-border);
   padding-left: 12px;
   margin: 0.6em 0;
-  color: var(--color-text-preview-soft);
+  color: var(--color-subtle);
   font-style: italic;
   white-space: pre-line;
   hyphens: none;

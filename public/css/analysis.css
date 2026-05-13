@@ -41,7 +41,7 @@
 
 /* === Buchbewertung === */
 .bewertung-stars {
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-2xl);
 }
 
 /* Sterne-Rating: zwei übereinander liegende Layer, Vordergrund-Width pro

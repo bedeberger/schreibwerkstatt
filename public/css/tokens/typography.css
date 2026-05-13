@@ -1,0 +1,37 @@
+/* Typografie-Tokens — Schriftfamilien, Sizes, Weights, Line-Heights.
+   Self-hosted Inter (Sans) + Source Serif 4 (Headings + Reading-Frame). */
+
+:root {
+  /* === Font-Family === */
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-serif: 'Source Serif 4', 'Iowan Old Style', 'Palatino', Georgia, serif;
+
+  /* === Font-Size-Scale ===
+     Editorial-Skala, 4-Stufen modular: xs/sm/base/md (UI),
+     lg/xl/2xl (Sub-Headings, Section-Heading, Card-Title). */
+  --font-size-xs:   11px;
+  --font-size-sm:   13px;
+  --font-size-base: 14px;
+  --font-size-md:   15px;
+  --font-size-lg:   18px;   /* Sub-Heading, Section-Heading-Stufe 2 */
+  --font-size-xl:   22px;   /* Card-Title-Standard */
+  --font-size-2xl:  26px;   /* Hero/Card-Title-prominent */
+
+  /* === Font-Weight === */
+  --fw-regular:    400;
+  --fw-medium:     500;
+  --fw-semibold:   600;
+  --fw-bold:       700;
+
+  /* === Line-Height === */
+  --lh-tight:      1.2;   /* Headings, Buttons, kompakte UI */
+  --lh-base:       1.45;  /* Standard-Text */
+  --lh-relaxed:    1.6;   /* Reading-Frame, längere Absätze */
+
+  /* === Compact-Controls (Buttons + Dropdowns nebeneinander gleich hoch) === */
+  --size-compact-font-size: 12px;
+  --size-compact-padding: 4px 10px;
+
+  /* === Default-Controlgrösse (button, combobox-trigger, input, select) === */
+  --size-default-padding-y: 8px;
+}

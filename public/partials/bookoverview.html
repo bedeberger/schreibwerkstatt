@@ -2,7 +2,7 @@
      Tile-Templates leben in eigenen Partials (bookoverview-*.html) und werden vom Loader
      in die `<div id="partial-bookoverview-*">`-Container injiziert. Die Tile-Reihenfolge
      hier entspricht der visuellen Reihenfolge im Grid (grid-auto-flow: row dense). -->
-<div class="card book-overview" x-data="bookOverviewCard" x-show="$app.showBookOverviewCard" x-cloak>
+<div class="card card--bookoverview book-overview" x-data="bookOverviewCard" x-show="$app.showBookOverviewCard" x-cloak>
   <div class="card-header">
     <span class="card-title" x-text="$app.t('overview.title', { name: $app.selectedBookName })"></span>
     <div class="card-actions">
