@@ -5,6 +5,7 @@
 
 const express = require('express');
 const { db } = require('../db/schema');
+const { setContext } = require('../lib/log-context');
 const logger = require('../logger');
 
 const router = express.Router();
@@ -94,6 +95,7 @@ router.post('/page/track', jsonBody, (req, res) => {
   const pageId = parseInt(req.body?.page_id, 10);
   const bookId = parseInt(req.body?.book_id, 10);
   if (!pageId || !bookId) return res.status(400).json({ error_code: 'INVALID_IDS' });
+  setContext({ book: bookId });
   const now = Date.now();
   try {
     db.prepare(`
@@ -117,6 +119,7 @@ router.get('/page/recent', (req, res) => {
   if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
   const bookId = parseInt(req.query.book_id, 10);
   if (!bookId) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
+  setContext({ book: bookId });
   const limit = Math.max(1, Math.min(20, parseInt(req.query.limit, 10) || 5));
   try {
     const rows = db.prepare(`

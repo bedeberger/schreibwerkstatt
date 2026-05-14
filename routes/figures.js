@@ -2,9 +2,11 @@ const express = require('express');
 const { db, saveFigurenToDb, saveZeitstrahlEvents, getChapterFigures, cleanupDuplicateFiguren } = require('../db/schema');
 const { recomputeBookFigureMentions } = require('../lib/page-index');
 const { toIntId, inClause } = require('../lib/validate');
+const { bookParamHandler } = require('../lib/log-context');
 const logger = require('../logger');
 
 const router = express.Router();
+router.param('book_id', bookParamHandler);
 const jsonBody = express.json();
 
 // Konsolidierten Zeitstrahl eines Buchs laden (vor /:book_id definiert um Konflikte zu vermeiden)

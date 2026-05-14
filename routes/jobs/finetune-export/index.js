@@ -11,6 +11,7 @@ const {
 } = require('../shared');
 
 const { buildExportFilename } = require('../../../lib/filenames');
+const { setContext } = require('../../../lib/log-context');
 const { loadFinetuneData } = require('./data-loader');
 const { finalizeFinetuneSamples } = require('./finalize');
 const { finetuneResultStore } = require('./lib/store');
@@ -166,6 +167,7 @@ finetuneExportRouter.post('/finetune-export', jsonBody, (req, res) => {
   const { book_id, book_name, types, min_chars, max_chars, val_split, val_seed,
           max_seq_tokens, emit_text, fulltext, max_full_chars, truncate_long, ai } = req.body || {};
   if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
+  setContext({ book: book_id });
   const aiOpts = {
     reversePrompts:        !!(ai && ai.reverse_prompts),
     factQA:                !!(ai && ai.fact_qa),

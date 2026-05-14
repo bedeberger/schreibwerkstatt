@@ -5,8 +5,11 @@
     <div class="overview-tile-label" x-text="$app.t('overview.recent')"></div>
     <ul class="overview-recent-list">
       <template x-for="p in overviewRecentPages()" :key="p.id">
-        <li class="overview-recent-item internal-link" @click="$app.selectPage(p)">
-          <span class="overview-recent-name" x-text="p.name"></span>
+        <li class="overview-recent-item internal-link" @click="$app.selectPage(p)" :data-tip="$app.pageStatusTooltip(p).join(' · ')">
+          <span class="overview-recent-name">
+            <span class="page-status-dot" :class="'page-status-' + $app.pageStatus(p)"></span>
+            <span x-text="p.name"></span>
+          </span>
           <span class="overview-recent-meta">
             <span class="overview-recent-chars"
                   x-show="overviewPageChars(p.id) != null"

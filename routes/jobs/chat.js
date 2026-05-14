@@ -14,6 +14,7 @@ const {
 } = require('./shared');
 const { executeTool } = require('./book-chat-tools');
 const { toIntId } = require('../../lib/validate');
+const { setContext } = require('../../lib/log-context');
 
 const chatRouter = express.Router();
 
@@ -383,6 +384,7 @@ function _handleChatPost(req, res, { jobType, sessionSelect, labelFn, runFn }) {
 
   const session = db.prepare(sessionSelect).get(session_id, userEmail);
   if (!session) return res.status(404).json({ error_code: 'SESSION_NOT_FOUND' });
+  if (session.book_id) setContext({ book: session.book_id });
 
   const now = new Date().toISOString();
   const userMsgResult = db.prepare(
@@ -609,6 +611,7 @@ chatRouter.post('/book-chat', jsonBody, (req, res) => _handleChatPost(req, res, 
 chatRouter.delete('/book-chat-cache', (req, res) => {
   const book_id = toIntId(req.query.book_id);
   if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
+  setContext({ book: book_id });
   const userEmail = req.session?.user?.email || null;
   const key = `${book_id}:${userEmail}`;
   _bookPageCache.delete(key);

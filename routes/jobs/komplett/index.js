@@ -6,16 +6,19 @@ const {
   getTokenForRequest,
 } = require('../../../db/schema');
 const { toIntId } = require('../../../lib/validate');
+const { bookParamHandler, setContext } = require('../../../lib/log-context');
 const { jsonBody, createJob, enqueueJob, findActiveJobId } = require('../shared');
 const { runKomplettAnalyseJob, runKontinuitaetJob, runKomplettAnalyseAll } = require('./job');
 
 const komplettRouter = express.Router();
+komplettRouter.param('book_id', bookParamHandler);
 
 // ── Routen ────────────────────────────────────────────────────────────────────
 komplettRouter.post('/komplett-analyse', jsonBody, (req, res) => {
   const { book_name } = req.body;
   const book_id = toIntId(req.body?.book_id);
   if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
+  setContext({ book: book_id });
   const userEmail = req.session?.user?.email || null;
   const userToken = getTokenForRequest(req);
   const existing = findActiveJobId('komplett-analyse', book_id, userEmail);
@@ -31,6 +34,7 @@ komplettRouter.post('/kontinuitaet', jsonBody, (req, res) => {
   const { book_name } = req.body;
   const book_id = toIntId(req.body?.book_id);
   if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
+  setContext({ book: book_id });
   const userEmail = req.session?.user?.email || null;
   const userToken = getTokenForRequest(req);
   const existing = findActiveJobId('kontinuitaet', book_id, userEmail);

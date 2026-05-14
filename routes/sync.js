@@ -1,7 +1,7 @@
 const express = require('express');
 const { db, getAnyUserToken, getAllUserTokens, reconcilePageIds, pruneStaleBookData, getTokenForRequest, upsertBook } = require('../db/schema'); // getAnyUserToken used in POST /book/:book_id
 const logger = require('../logger');
-const { runWithContext, getContext } = require('../lib/log-context');
+const { runWithContext, getContext, bookParamHandler } = require('../lib/log-context');
 const { CHARS_PER_TOKEN } = require('../lib/ai');
 const { toIntId } = require('../lib/validate');
 const { bsGet, bsGetAll } = require('../lib/bookstack');
@@ -10,6 +10,7 @@ const { invalidateBookPageCache } = require('./jobs/chat');
 const { localIsoDate } = require('../lib/local-date');
 
 const router = express.Router();
+router.param('book_id', bookParamHandler);
 
 function htmlToText(html) {
   return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();

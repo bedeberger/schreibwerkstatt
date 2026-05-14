@@ -4,6 +4,7 @@ const logger = require('../logger');
 const { callAIChat, parseJSONLenient, chatTemperature } = require('../lib/ai');
 const { toIntId } = require('../lib/validate');
 const { BOOKSTACK_URL } = require('../lib/bookstack');
+const { bookParamHandler, setContext } = require('../lib/log-context');
 const {
   getPrompts, getBookPrompts,
   getFiguren, getLatestReview, getOpenIdeen, buildChatMessageHistory,
@@ -11,6 +12,7 @@ const {
 } = require('./jobs/shared');
 
 const router = express.Router();
+router.param('book_id', bookParamHandler);
 const jsonBody = express.json();
 
 // ── Hilfsfunktionen ──────────────────────────────────────────────────────────
@@ -36,6 +38,7 @@ router.post('/session', jsonBody, async (req, res) => {
   if (!book_id || !page_id || !userEmail) {
     return res.status(400).json({ error_code: 'BOOKID_PAGEID_LOGIN_REQ' });
   }
+  setContext({ book: book_id });
 
   // Snapshot: Seitentext beim Chat-Öffnen einmalig sichern. Ermöglicht später
   // im System-Prompt einen Vergleich „Stand beim Öffnen" vs. „aktueller Stand",
@@ -86,6 +89,7 @@ router.post('/session/book', jsonBody, (req, res) => {
   if (!book_id || !userEmail) {
     return res.status(400).json({ error_code: 'BOOKID_LOGIN_REQ' });
   }
+  setContext({ book: book_id });
   // Orphan-Cleanup analog zum Seiten-Chat (siehe Kommentar oben).
   db.prepare(`
     DELETE FROM chat_sessions
@@ -241,6 +245,7 @@ router.post('/send', jsonBody, async (req, res) => {
       WHERE cs.id = ? AND cs.user_email = ?
     `).get(session_id, userEmail);
     if (!session) return res.status(404).json({ error_code: 'SESSION_NOT_FOUND' });
+    setContext({ book: session.book_id });
     logger.info(`[chat/send] «${session.page_name}» session=${session_id} user=${userEmail} book=${session.book_id}`);
 
     const now = new Date().toISOString();

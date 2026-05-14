@@ -8,6 +8,7 @@ const {
   jsonBody,
 } = require('./shared');
 const { toIntId } = require('../../lib/validate');
+const { setContext } = require('../../lib/log-context');
 
 const synonymeRouter = express.Router();
 
@@ -53,6 +54,7 @@ synonymeRouter.post('/synonym', jsonBody, (req, res) => {
   const book_id = toIntId(req.body?.book_id);
   if (!wort || typeof wort !== 'string' || !wort.trim()) return res.status(400).json({ error_code: 'WORT_REQUIRED' });
   if (!satz || typeof satz !== 'string' || !satz.trim()) return res.status(400).json({ error_code: 'SATZ_REQUIRED' });
+  if (book_id) setContext({ book: book_id });
   const userEmail = req.session?.user?.email || null;
   const entityKey = `${book_id || 0}|${wort.trim().toLowerCase()}|${satz.trim().slice(0, 60)}`;
   const existing = findActiveJobId('synonym', entityKey, userEmail);

@@ -5,6 +5,7 @@
 const express = require('express');
 const { db } = require('../db/schema');
 const { toIntId } = require('../lib/validate');
+const { setContext } = require('../lib/log-context');
 const logger = require('../logger');
 
 const router = express.Router();
@@ -22,6 +23,7 @@ router.get('/counts', (req, res) => {
   const bookId = toIntId(req.query.book_id);
   if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
   if (!bookId)    return res.status(400).json({ error_code: 'INVALID_ID' });
+  setContext({ book: bookId });
   const rows = db.prepare(`
     SELECT page_id, COUNT(*) AS n
     FROM ideen
@@ -59,6 +61,7 @@ router.post('/', jsonBody, (req, res) => {
   if (!bookId || !pageId) return res.status(400).json({ error_code: 'BOOKID_PAGEID_REQ' });
   if (!content)           return res.status(400).json({ error_code: 'CONTENT_REQ' });
   if (content.length > MAX_LEN) return res.status(400).json({ error_code: 'CONTENT_TOO_LONG' });
+  setContext({ book: bookId });
 
   const now = new Date().toISOString();
   const result = db.prepare(`

@@ -24,6 +24,7 @@ const { renderPdfBuffer } = require('../../lib/pdf-render');
 const { validatePdfa } = require('../../lib/pdfa-validate');
 const { buildExportFilename } = require('../../lib/filenames');
 const { toIntId } = require('../../lib/validate');
+const { setContext } = require('../../lib/log-context');
 const logger = require('../../logger');
 
 const router = express.Router();
@@ -143,6 +144,7 @@ router.post('/pdf-export', jsonBody, async (req, res) => {
   const bookId = toIntId(req.body?.book_id || req.body?.bookId);
   const profileId = toIntId(req.body?.profile_id || req.body?.profileId);
   if (!bookId || !profileId) return res.status(400).json({ error_code: 'BOOK_OR_PROFILE_REQUIRED' });
+  setContext({ book: bookId });
 
   const profile = getPdfExportProfile(profileId);
   if (!profile) return res.status(404).json({ error_code: 'PROFILE_NOT_FOUND' });

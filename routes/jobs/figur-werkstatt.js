@@ -12,6 +12,7 @@ const {
   _modelName,
 } = require('./shared');
 const { toIntId } = require('../../lib/validate');
+const { setContext } = require('../../lib/log-context');
 const { db } = require('../../db/connection');
 const { getDraftFigure, insertWerkstattRun } = require('../../db/draft-figures');
 const { getUser } = require('../../db/schema');
@@ -211,6 +212,7 @@ figurWerkstattRouter.post('/werkstatt-brainstorm', jsonBody, (req, res) => {
   const draft = getDraftFigure(draftId);
   if (!draft) return res.status(404).json({ error_code: 'DRAFT_NOT_FOUND' });
   if (draft.user_email !== userEmail) return res.status(403).json({ error_code: 'FORBIDDEN' });
+  if (draft.book_id) setContext({ book: draft.book_id });
 
   const entityKey = `${draftId}|${knotenId}`;
   const existing = findActiveJobId('werkstatt-brainstorm', entityKey, userEmail);
@@ -232,6 +234,7 @@ figurWerkstattRouter.post('/werkstatt-consistency', jsonBody, (req, res) => {
   const draft = getDraftFigure(draftId);
   if (!draft) return res.status(404).json({ error_code: 'DRAFT_NOT_FOUND' });
   if (draft.user_email !== userEmail) return res.status(403).json({ error_code: 'FORBIDDEN' });
+  if (draft.book_id) setContext({ book: draft.book_id });
 
   const existing = findActiveJobId('werkstatt-consistency', draftId, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });

@@ -12,6 +12,7 @@ const {
 } = require('./shared');
 const { narrativeLabels } = require('./narrative-labels');
 const { toIntId } = require('../../lib/validate');
+const { setContext } = require('../../lib/log-context');
 
 const kapitelRouter = express.Router();
 
@@ -139,6 +140,7 @@ kapitelRouter.post('/chapter-review', jsonBody, (req, res) => {
   const chapter_id = toIntId(req.body?.chapter_id);
   if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
   if (!chapter_id) return res.status(400).json({ error_code: 'CHAPTER_ID_REQUIRED' });
+  setContext({ book: book_id });
   const userEmail = req.session?.user?.email || null;
   const userToken = getTokenForRequest(req);
   // Dedup auf Kapitel-Ebene – parallele Reviews unterschiedlicher Kapitel sind ok.

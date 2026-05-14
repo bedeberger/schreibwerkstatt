@@ -11,9 +11,11 @@ const {
   getFigureWithDetails, db,
 } = require('../db/schema');
 const { toIntId } = require('../lib/validate');
+const { bookParamHandler } = require('../lib/log-context');
 const logger = require('../logger');
 
 const router = express.Router();
+router.param('book_id', bookParamHandler);
 const jsonBody = express.json({ limit: '1mb' });
 
 const MAX_NAME_LEN = 200;

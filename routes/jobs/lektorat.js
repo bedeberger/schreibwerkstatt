@@ -12,6 +12,7 @@ const {
 
 const { narrativeLabels } = require('./narrative-labels');
 const { toIntId } = require('../../lib/validate');
+const { setContext } = require('../../lib/log-context');
 
 // Lokale Provider (ollama/llama) bekommen einen deutlich abgespeckten Lektorat-Prompt:
 // kein Vorseiten-Kontext (BookStack-Roundtrip gespart), keine Figuren-Beziehungen,
@@ -322,6 +323,7 @@ lektoratRouter.post('/check', jsonBody, (req, res) => {
   const page_id = toIntId(req.body?.page_id);
   const book_id = toIntId(req.body?.book_id);
   if (!page_id) return res.status(400).json({ error_code: 'PAGE_ID_REQUIRED' });
+  if (book_id) setContext({ book: book_id });
   const userEmail = req.session?.user?.email || null;
   const userToken = getTokenForRequest(req);
   const existing = findActiveJobId('check', page_id, userEmail);
@@ -337,6 +339,7 @@ lektoratRouter.post('/batch-check', jsonBody, (req, res) => {
   const { book_name } = req.body;
   const book_id = toIntId(req.body?.book_id);
   if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
+  setContext({ book: book_id });
   const userEmail = req.session?.user?.email || null;
   const userToken = getTokenForRequest(req);
   const existing = findActiveJobId('batch-check', book_id, userEmail);

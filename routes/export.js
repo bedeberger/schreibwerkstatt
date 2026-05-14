@@ -18,6 +18,7 @@ const { bsGet, BOOKSTACK_URL, authHeader } = require('../lib/bookstack');
 const { loadBookContents } = require('../lib/load-book-contents');
 const { buildExportFilename } = require('../lib/filenames');
 const { toIntId } = require('../lib/validate');
+const { setContext } = require('../lib/log-context');
 
 const router = express.Router();
 
@@ -230,6 +231,7 @@ router.get('/book/:id/:fmt', async (req, res) => {
   const spec = FORMATS[fmt];
   if (!id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
   if (!spec) return res.status(400).json({ error_code: 'BAD_FORMAT' });
+  setContext({ book: id });
 
   const token = getTokenForRequest(req);
   if (!token) return res.status(401).json({ error_code: 'BOOKSTACK_UNAUTHED' });

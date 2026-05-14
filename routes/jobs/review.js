@@ -13,6 +13,7 @@ const {
 const { narrativeLabels } = require('./narrative-labels');
 const { loadReviewKomplettContext } = require('./review-context');
 const { toIntId } = require('../../lib/validate');
+const { setContext } = require('../../lib/log-context');
 
 const reviewRouter = express.Router();
 
@@ -128,6 +129,7 @@ reviewRouter.post('/review', jsonBody, (req, res) => {
   const { book_name } = req.body;
   const book_id = toIntId(req.body?.book_id);
   if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
+  setContext({ book: book_id });
   const userEmail = req.session?.user?.email || null;
   const userToken = getTokenForRequest(req);
   const existing = findActiveJobId('review', book_id, userEmail);

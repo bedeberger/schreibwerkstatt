@@ -2,8 +2,10 @@
 const express = require('express');
 const { db, saveOrteToDb } = require('../db/schema');
 const { toIntId, inClause } = require('../lib/validate');
+const { bookParamHandler } = require('../lib/log-context');
 
 const router = express.Router();
+router.param('book_id', bookParamHandler);
 const jsonBody = express.json();
 
 // Schauplätze eines Buchs laden

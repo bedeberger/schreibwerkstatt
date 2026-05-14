@@ -2,14 +2,17 @@ const express = require('express');
 const { db, upsertBookByName } = require('../db/schema');
 const { toIntId } = require('../lib/validate');
 const { localIsoDate } = require('../lib/local-date');
+const { bookParamHandler, setContext } = require('../lib/log-context');
 const logger = require('../logger');
 
 const router = express.Router();
+router.param('book_id', bookParamHandler);
 const jsonBody = express.json();
 
 // Lektorat-Ergebnis speichern
 router.post('/check', jsonBody, (req, res) => {
   const { page_id, book_id, error_count, errors_json, stilanalyse, fazit, model } = req.body;
+  if (book_id) setContext({ book: book_id });
   const user_email = req.session?.user?.email || null;
   const result = db.prepare(`
     INSERT INTO page_checks (page_id, book_id, checked_at, error_count, errors_json, stilanalyse, fazit, model, user_email)

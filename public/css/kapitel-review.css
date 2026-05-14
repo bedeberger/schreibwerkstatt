@@ -42,6 +42,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: var(--font-size-sm);
 }
 .kapitel-page-stats {
   display: flex;
