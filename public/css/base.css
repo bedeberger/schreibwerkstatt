@@ -2,13 +2,6 @@
 /* === Reset === */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* === Einheitlicher Fokus-Ring (Keyboard-only via :focus-visible) === */
-:focus { outline: none; }
-:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
-}
-
 /* Skip-Link: standardmässig optisch versteckt, beim Fokussieren sichtbar
    in der oberen linken Ecke. Greift Screenreader- und Tastatur-User früh ab. */
 .skip-link {

@@ -52,7 +52,7 @@ export const lektoratMethods = {
       return;
     }
     const pageIdAtStart = this.currentPage.id;
-    this.logAuditEvent?.('lektoratOpened', { page: pageIdAtStart });
+    this.logAuditEvent?.('lektoratOpened', { book: this.selectedBookId, page: pageIdAtStart });
     this.checkLoading = true;
     this.checkDone = false;
     this.activeHistoryEntryId = null;

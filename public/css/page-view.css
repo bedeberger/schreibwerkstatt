@@ -128,14 +128,10 @@
 .page-content-view .callout.pullquote::before { content: "\201C"; margin-right: 0.05em; color: var(--color-accent-text); }
 .page-content-view .callout.pullquote::after  { content: "\201D"; margin-left: 0.05em;  color: var(--color-accent-text); }
 
-/* Edit-Modus: contenteditable-Preview.
-   !important auf outline, weil :focus-visible-Token-Outline (tokens/motion.css)
-   unlayered lebt und sonst die intent-inset-Outline durch einen 2px-Aussen-
-   Focus-Ring ersetzen würde (zwei sichtbare Balken links/rechts der Box).
-   !important in @layer schlägt unlayered normal. */
+/* Edit-Modus: contenteditable-Preview. */
 .page-content-view--editing {
-  outline: 2px solid var(--color-primary) !important;
-  outline-offset: -2px !important;
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
   border-left: 5px solid var(--color-primary);
   background: var(--color-accent-soft);
   cursor: text;

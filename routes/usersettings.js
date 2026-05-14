@@ -1,6 +1,7 @@
 'use strict';
 const express = require('express');
 const { getUser, updateUserSettings } = require('../db/schema');
+const { setContext } = require('../lib/log-context');
 const logger = require('../logger');
 
 const router = express.Router();
@@ -19,6 +20,8 @@ router.post('/event', jsonBody, (req, res) => {
   const label = AUDIT_EVENTS[event];
   if (!label) return res.status(400).json({ error_code: 'INVALID_EVENT' });
   const meta = req.body?.meta && typeof req.body.meta === 'object' ? req.body.meta : null;
+  const bookId = meta && Number.isFinite(Number(meta.book)) ? parseInt(meta.book, 10) : null;
+  if (bookId) setContext({ book: bookId });
   const suffix = meta
     ? ' ' + Object.entries(meta)
         .filter(([, v]) => v != null && v !== '')

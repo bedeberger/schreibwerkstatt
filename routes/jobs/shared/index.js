@@ -62,6 +62,7 @@ module.exports = {
 
   getFiguren: queries.getFiguren,
   getLatestReview: queries.getLatestReview,
+  getLatestPageCheck: queries.getLatestPageCheck,
   getOpenIdeen: queries.getOpenIdeen,
   buildChatMessageHistory: queries.buildChatMessageHistory,
 

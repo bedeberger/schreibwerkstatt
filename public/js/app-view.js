@@ -332,7 +332,7 @@ export const appViewMethods = {
     if (!this.currentPage) return;
     if (this.showIdeenCard) this.showIdeenCard = false;
     this.showChatCard = true;
-    this.logAuditEvent?.('chatOpened', { page: this.currentPage.id });
+    this.logAuditEvent?.('chatOpened', { book: this.selectedBookId, page: this.currentPage.id });
   },
   // Buch-Chat: exklusive Hauptkarte wie alle anderen.
   toggleBookChatCard() {

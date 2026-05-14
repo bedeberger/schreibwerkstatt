@@ -23,24 +23,6 @@
   --opacity-hint:     0.4;   /* Hint, sehr dezent */
   --opacity-faint:    0.35;  /* fast unsichtbar (Fokus-Modus, Skeleton) */
   --opacity-strong:   0.75;  /* gedimmter aktiver Zustand */
-
-  /* === Focus-Ring ===
-     Globaler `:focus-visible`-Style. Outline + Offset, themed.
-     Konsumenten brauchen keine Buttons/Inputs/Cards mehr eigen-stylen. */
-  --focus-ring-width:  2px;
-  --focus-ring-offset: 2px;
-  --focus-ring-color:  var(--color-border-focus);
-  --focus-ring:        var(--focus-ring-width) solid var(--focus-ring-color);
-}
-
-/* === Globaler :focus-visible — eine Quelle der Wahrheit ===
-   Browser-Default-Outline neutralisiert; Token-Outline gesetzt. Komponenten
-   dürfen weiterhin lokal überschreiben (z.B. Cards, Drawer mit Inset-Ring),
-   aber Default greift überall. */
-:focus { outline: none; }
-:focus-visible {
-  outline: var(--focus-ring);
-  outline-offset: var(--focus-ring-offset);
 }
 
 /* === Reduced-Motion ===

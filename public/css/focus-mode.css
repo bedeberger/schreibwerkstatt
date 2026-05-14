@@ -69,8 +69,7 @@ body.focus-mode #editor-card .editor-preview-wrap {
 #partial-editor-body-edit,
 #partial-editor-body-view { display: contents; }
 
-body.focus-mode .page-content-view,
-body.focus-mode .page-content-view--editing {
+body.focus-mode :is(.page-content-view, .page-content-view--editing) {
   /* overflow-anchor aus: Chrome's Scroll-Anchoring verschiebt den Scrollpunkt
      bei Content-Mutationen (contenteditable-Split, IO-triggered repaints) und
      kämpft mit unserem expliziten Typewriter-Scroll → sichtbares „Flattern". */
@@ -109,8 +108,7 @@ body.focus-mode .page-content-view--editing {
 
 /* Auf schmalen Screens: kompaktere Schrift, weniger Puffer oben */
 @media (max-width: 600px) {
-  body.focus-mode .page-content-view,
-  body.focus-mode .page-content-view--editing {
+  body.focus-mode :is(.page-content-view, .page-content-view--editing) {
     font-size: 1.15rem;
     line-height: 1.7;
     padding-top: calc(var(--focus-vh, 100vh) * 0.25);
@@ -123,8 +121,7 @@ body.focus-mode .page-content-view--editing {
     opacity: var(--opacity-disabled);
   }
 }
-body.focus-mode .page-content-view::-webkit-scrollbar,
-body.focus-mode .page-content-view--editing::-webkit-scrollbar {
+body.focus-mode :is(.page-content-view, .page-content-view--editing)::-webkit-scrollbar {
   width: 0;
   height: 0;
 }
@@ -135,10 +132,8 @@ body.focus-mode .page-content-view--editing::-webkit-scrollbar {
    ersten Absatz. pointer-events:none am Container, auto auf allen Descendants:
    Klicks im Padding fallen durch (kein Caret-Move), Klicks auf Absätze/Marks
    funktionieren normal. */
-body.focus-mode .page-content-view,
-body.focus-mode .page-content-view--editing { pointer-events: none; }
-body.focus-mode .page-content-view *,
-body.focus-mode .page-content-view--editing * { pointer-events: auto; }
+body.focus-mode :is(.page-content-view, .page-content-view--editing) { pointer-events: none; }
+body.focus-mode :is(.page-content-view, .page-content-view--editing) * { pointer-events: auto; }
 
 /* Im Fokus-Modus liegt #editor-card auf --z-overlay (2000). Popovers, die
    nach <body> teleportiert sind (Synonym-Menu/Picker, Figur-Lookup),
@@ -171,15 +166,13 @@ body.focus-mode:not(.focus-mode--typewriter-only)
 /* Aktiver Block im Light-Mode auf reines Schwarz heben (statt --color-text
    #1a1a1a), damit der Kontrast zu den dim-Blöcken (opacity 0.35) deutlich
    ist. Dark-Theme behält --color-text. */
-:root:not([data-theme="dark"]) body.focus-mode .page-content-view .focus-paragraph-active,
-:root:not([data-theme="dark"]) body.focus-mode .page-content-view--editing .focus-paragraph-active {
+:root:not([data-theme="dark"]) body.focus-mode :is(.page-content-view, .page-content-view--editing) .focus-paragraph-active {
   color: #000;
 }
 
 /* Window-3-Modus: Nachbarn (prev/next) bekommen abgeschwächten Mid-Tone,
    damit aktiver Block weiter heraussticht, Kontext aber lesbar bleibt. */
-body.focus-mode .page-content-view .focus-paragraph-near,
-body.focus-mode .page-content-view--editing .focus-paragraph-near {
+body.focus-mode :is(.page-content-view, .page-content-view--editing) .focus-paragraph-near {
   opacity: 0.7;
 }
 
@@ -215,19 +208,9 @@ body.focus-mode .lektorat-mark--selected {
 
 /* === Fokus-Modus: Formatierungen auf Fliesstext plätten ===
    Rein visuell – HTML bleibt intakt (Edit-Mode + Save-Pfad). Der User sieht
-   nur Absätze, damit nichts vom Rhythmus des Textes ablenkt. */
-body.focus-mode .page-content-view h1,
-body.focus-mode .page-content-view h2,
-body.focus-mode .page-content-view h3,
-body.focus-mode .page-content-view h4,
-body.focus-mode .page-content-view h5,
-body.focus-mode .page-content-view h6,
-body.focus-mode .page-content-view--editing h1,
-body.focus-mode .page-content-view--editing h2,
-body.focus-mode .page-content-view--editing h3,
-body.focus-mode .page-content-view--editing h4,
-body.focus-mode .page-content-view--editing h5,
-body.focus-mode .page-content-view--editing h6 {
+   nur Absätze, damit nichts vom Rhythmus des Textes ablenkt.
+   Container-Gruppe via :is() — eine Rule statt zwei pro Block. */
+body.focus-mode :is(.page-content-view, .page-content-view--editing) :is(h1, h2, h3, h4, h5, h6) {
   font-size: inherit;
   font-weight: inherit;
   line-height: inherit;
@@ -238,35 +221,20 @@ body.focus-mode .page-content-view--editing h6 {
 }
 
 /* Bold/Italic im Fokus-Modus sichtbar lassen — Ctrl+B/Ctrl+I sind als
-   Shortcut explizit dokumentiert. <u> bleibt unten geplättet, weil
-   Underline mit Link-Styling kollidiert und Ctrl+U-Eingabe ohnehin
-   geblockt ist. */
-
-body.focus-mode .page-content-view u,
-body.focus-mode .page-content-view s,
-body.focus-mode .page-content-view del,
-body.focus-mode .page-content-view strike,
-body.focus-mode .page-content-view--editing u,
-body.focus-mode .page-content-view--editing s,
-body.focus-mode .page-content-view--editing del,
-body.focus-mode .page-content-view--editing strike {
+   Shortcut explizit dokumentiert. <u> bleibt geplättet, weil Underline mit
+   Link-Styling kollidiert und Ctrl+U-Eingabe ohnehin geblockt ist. */
+body.focus-mode :is(.page-content-view, .page-content-view--editing) :is(u, s, del, strike) {
   text-decoration: none;
   color: inherit;
 }
 
-body.focus-mode .page-content-view sup,
-body.focus-mode .page-content-view sub,
-body.focus-mode .page-content-view--editing sup,
-body.focus-mode .page-content-view--editing sub {
+body.focus-mode :is(.page-content-view, .page-content-view--editing) :is(sup, sub) {
   vertical-align: baseline;
   font-size: inherit;
   line-height: inherit;
 }
 
-body.focus-mode .page-content-view code,
-body.focus-mode .page-content-view pre,
-body.focus-mode .page-content-view--editing code,
-body.focus-mode .page-content-view--editing pre {
+body.focus-mode :is(.page-content-view, .page-content-view--editing) :is(code, pre) {
   background: transparent;
   padding: 0;
   border: none;
@@ -277,8 +245,7 @@ body.focus-mode .page-content-view--editing pre {
   overflow-x: visible;
 }
 
-body.focus-mode .page-content-view blockquote,
-body.focus-mode .page-content-view--editing blockquote {
+body.focus-mode :is(.page-content-view, .page-content-view--editing) blockquote {
   border: none;
   padding: 0;
   margin: 0.4em 0;
@@ -286,8 +253,7 @@ body.focus-mode .page-content-view--editing blockquote {
   font-style: inherit;
 }
 
-body.focus-mode .page-content-view .callout,
-body.focus-mode .page-content-view--editing .callout {
+body.focus-mode :is(.page-content-view, .page-content-view--editing) .callout {
   background: transparent;
   border: none;
   padding: 0;
@@ -299,27 +265,21 @@ body.focus-mode .page-content-view--editing .callout {
 /* Fokus-Modus: .poem-Wrapper aus dem Render-Tree entfernen, damit die inneren
    <p> wie normale Absätze behandelt werden und focus-paragraph-active greift
    (opacity 0.5 auf dem Wrapper würde sonst das aktive <p> mitdimmen). */
-body.focus-mode .page-content-view .poem,
-body.focus-mode .page-content-view--editing .poem {
+body.focus-mode :is(.page-content-view, .page-content-view--editing) .poem {
   display: contents;
 }
 
-body.focus-mode .page-content-view ul,
-body.focus-mode .page-content-view ol,
-body.focus-mode .page-content-view--editing ul,
-body.focus-mode .page-content-view--editing ol {
+body.focus-mode :is(.page-content-view, .page-content-view--editing) :is(ul, ol) {
   list-style: none;
   padding-left: 0;
   margin: 0.4em 0;
 }
 
-body.focus-mode .page-content-view li,
-body.focus-mode .page-content-view--editing li {
+body.focus-mode :is(.page-content-view, .page-content-view--editing) li {
   margin: 0.4em 0;
 }
 
-body.focus-mode .page-content-view hr,
-body.focus-mode .page-content-view--editing hr {
+body.focus-mode :is(.page-content-view, .page-content-view--editing) hr {
   border: none;
   margin: 0.8em 0;
   height: 0;
@@ -328,16 +288,8 @@ body.focus-mode .page-content-view--editing hr {
 /* Inline-Formatierungen aus BookStack (text-align, Farbe, Hintergrund via
    style-Attribut). Attribut-Selektor greift auch bei beliebigen span-
    Wrappern ohne dass wir den Stil parsen müssen. */
-body.focus-mode .page-content-view [style*="color"],
-body.focus-mode .page-content-view [style*="background"],
-body.focus-mode .page-content-view [style*="text-align"],
-body.focus-mode .page-content-view [style*="font-family"],
-body.focus-mode .page-content-view [style*="white-space"],
-body.focus-mode .page-content-view--editing [style*="color"],
-body.focus-mode .page-content-view--editing [style*="background"],
-body.focus-mode .page-content-view--editing [style*="text-align"],
-body.focus-mode .page-content-view--editing [style*="font-family"],
-body.focus-mode .page-content-view--editing [style*="white-space"] {
+body.focus-mode :is(.page-content-view, .page-content-view--editing)
+  :is([style*="color"], [style*="background"], [style*="text-align"], [style*="font-family"], [style*="white-space"]) {
   color: inherit !important;
   background: transparent !important;
   text-align: inherit !important;
@@ -351,10 +303,7 @@ body.focus-mode .page-content-view--editing [style*="white-space"] {
 /* Tabellen und Bilder stören den Lese-/Schreibfluss – komplett ausblenden.
    Im Edit-Modus bleibt das Markup im DOM erhalten und wird beim Verlassen
    wieder sichtbar. */
-body.focus-mode .page-content-view table,
-body.focus-mode .page-content-view img,
-body.focus-mode .page-content-view--editing table,
-body.focus-mode .page-content-view--editing img {
+body.focus-mode :is(.page-content-view, .page-content-view--editing) :is(table, img) {
   display: none;
 }
 
@@ -470,30 +419,24 @@ body.focus-mode .editor-preview-wrap.lektorat-split-preview {
   height: auto;
   overflow: visible;
 }
-body.focus-mode .lektorat-split-preview .page-content-view,
-body.focus-mode .lektorat-split-preview .page-content-view--editing {
+body.focus-mode .lektorat-split-preview :is(.page-content-view, .page-content-view--editing) {
   height: auto;
   border-radius: 0;
 }
 
 /* Mark-Stripe rechts pro Absatz killen — Marks sind im Fokus visuell
    neutralisiert, Stripe würde sonst als durchgehende Vertikallinie wirken. */
-body.focus-mode .page-content-view p:has(.lektorat-mark),
-body.focus-mode .page-content-view--editing p:has(.lektorat-mark) {
+body.focus-mode :is(.page-content-view, .page-content-view--editing) p:has(.lektorat-mark) {
   padding-right: 0;
 }
-body.focus-mode .page-content-view p:has(.lektorat-mark)::after,
-body.focus-mode .page-content-view--editing p:has(.lektorat-mark)::after {
+body.focus-mode :is(.page-content-view, .page-content-view--editing) p:has(.lektorat-mark)::after {
   display: none;
 }
 
+body.focus-mode :is(.page-content-view, .page-content-view--editing) {
+  outline: none;
+  outline-offset: 0;
+  border: none;
 }
 
-/* Unlayered: globaler :focus-visible-Token-Outline (tokens/motion.css) lebt
-   unlayered und schlägt sonst jede @layer-components-Regel. Im Fokus-Modus
-   würde der Outline um .page-content-view--editing (60ch breit, viewport-hoch)
-   als zwei senkrechte Balken links/rechts der Lese-Spalte erscheinen. */
-body.focus-mode .page-content-view--editing:focus,
-body.focus-mode .page-content-view--editing:focus-visible {
-  outline: none;
 }

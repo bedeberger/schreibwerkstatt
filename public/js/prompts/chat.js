@@ -19,8 +19,11 @@ import { SYSTEM_CHAT, SYSTEM_BOOK_CHAT } from './core.js';
  *                                      Notizen zu möglichen Fortsetzungen, Szenen,
  *                                      Ankern. KI darf sie aufgreifen/diskutieren,
  *                                      aber nicht eigenmächtig in Vorschläge umwandeln.
+ * @param {Object|null} lektorat        Letztes Lektorat dieser Seite aus page_checks
+ *                                      ({ checked_at, fehler, stilanalyse, fazit }).
+ *                                      Kann gegenüber pageText veraltet sein.
  */
-export function buildChatSystemPrompt(pageName, pageText, figuren, review, systemOverride = null, openingPageText = null, ideen = null) {
+export function buildChatSystemPrompt(pageName, pageText, figuren, review, systemOverride = null, openingPageText = null, ideen = null, lektorat = null) {
   const parts = [
     systemOverride ?? SYSTEM_CHAT,
     '',
@@ -72,6 +75,19 @@ export function buildChatSystemPrompt(pageName, pageText, figuren, review, syste
       staerken:    review.staerken,
       schwaechen:  review.schwaechen,
     }, null, 2));
+    parts.push('');
+  }
+
+  if (lektorat && ((Array.isArray(lektorat.fehler) && lektorat.fehler.length > 0) || lektorat.stilanalyse || lektorat.fazit)) {
+    const datum = lektorat.checked_at ? lektorat.checked_at.slice(0, 16).replace('T', ' ') : null;
+    parts.push(`=== LETZTES LEKTORAT DIESER SEITE${datum ? ` (Stand ${datum})` : ''} ===`);
+    parts.push(JSON.stringify({
+      ...(Array.isArray(lektorat.fehler) && lektorat.fehler.length > 0 ? { fehler: lektorat.fehler } : {}),
+      ...(lektorat.stilanalyse ? { stilanalyse: lektorat.stilanalyse } : {}),
+      ...(lektorat.fazit ? { fazit: lektorat.fazit } : {}),
+    }, null, 2));
+    parts.push('');
+    parts.push('Hinweis: Diese Beanstandungen stammen aus einem früheren Lektoratslauf. Der Seitentext kann seitdem überarbeitet worden sein — prüfe gegen den aktuellen Seiteninhalt, bevor du dich darauf beziehst. Wiederhole bereits erledigte Punkte nicht; greife noch offene Beanstandungen auf, wenn der Autor danach fragt oder daran arbeitet.');
     parts.push('');
   }
 

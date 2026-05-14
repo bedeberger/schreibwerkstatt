@@ -12,6 +12,32 @@ function getOpenIdeen(pageId, userEmail) {
   `).all(pageId, userEmail);
 }
 
+/**
+ * Letztes Lektorat einer Seite (user-spezifisch). Wird im Seiten-Chat als
+ * Kontext eingespielt, damit die KI auf bereits gefundene Beanstandungen Bezug
+ * nehmen kann ohne sie neu zu erfinden.
+ */
+function getLatestPageCheck(pageId, userEmail) {
+  if (!pageId || !userEmail) return null;
+  const row = db.prepare(`
+    SELECT checked_at, error_count, errors_json, stilanalyse, fazit, model
+    FROM page_checks
+    WHERE page_id = ? AND user_email = ?
+    ORDER BY checked_at DESC LIMIT 1
+  `).get(pageId, userEmail);
+  if (!row) return null;
+  let fehler = [];
+  try { fehler = JSON.parse(row.errors_json || '[]'); } catch { fehler = []; }
+  return {
+    checked_at: row.checked_at,
+    error_count: row.error_count,
+    fehler,
+    stilanalyse: row.stilanalyse || null,
+    fazit: row.fazit || null,
+    model: row.model || null,
+  };
+}
+
 /** Letzte Buchbewertung für ein Buch (user-spezifisch) aus der DB. */
 function getLatestReview(bookId, userEmail) {
   const row = db.prepare(`
@@ -178,4 +204,4 @@ function buildChatMessageHistory(sessionId) {
   return out;
 }
 
-module.exports = { getOpenIdeen, getLatestReview, getFiguren, buildChatMessageHistory };
+module.exports = { getOpenIdeen, getLatestReview, getLatestPageCheck, getFiguren, buildChatMessageHistory };
