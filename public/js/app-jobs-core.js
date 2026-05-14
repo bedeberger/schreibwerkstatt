@@ -236,6 +236,13 @@ export const appJobsCoreMethods = {
         if (this.currentPage?.id === pageId) this.loadPageHistory?.(pageId);
       }
     }
+    // batch-check schreibt page_checks pro Seite serverseitig; eigener Per-Card-
+    // Poller fehlt nach Reload/Buchwechsel/anderem Tab. Server-Map als SSoT nachladen.
+    if (detail.type === 'batch-check' && detail.job?.status === 'done'
+        && detail.bookId != null
+        && String(detail.bookId) === String(this.selectedBookId)) {
+      this.refreshPageAges?.();
+    }
     this._maybeShowJobToast(detail);
   },
 
