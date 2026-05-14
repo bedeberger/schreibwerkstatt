@@ -299,8 +299,13 @@
     font-family: var(--font-serif);
   }
   .book-editor-page-body[contenteditable="false"] { cursor: text; }
-  .book-editor-page-body[contenteditable="true"]:focus {
+  /* !important auf outline, weil unlayered :focus-visible-Token (tokens/motion.css)
+     sonst einen Aussen-Focus-Ring um die ganze Seitenbox zieht — visuell ein
+     Vertikal-Balken-Paar links/rechts. Hintergrund-Tönung markiert aktiven Block. */
+  .book-editor-page-body[contenteditable="true"]:focus,
+  .book-editor-page-body[contenteditable="true"]:focus-visible {
     background: color-mix(in srgb, var(--card-accent, currentColor) 3%, transparent);
+    outline: none !important;
   }
   .book-editor-page-body p { margin-block: 0.7em; }
   .book-editor-page-body p:first-child { margin-block-start: 0.3em; }
