@@ -127,7 +127,19 @@ Sub-Komponente `figurWerkstattCard` ([public/js/cards/figur-werkstatt-card.js](.
 
 Server-Status-Keys: `job.werkstatt.brainstorm.aiReply`, `job.werkstatt.consistency.aiReply`. Fehler: `job.error.werkstatt.draftMissing|knotenMissing|vorschlaegeMissing|konflikteMissing|fazitMissing`. Default-Mindmap-Marker: `werkstatt.tree.{steckbrief|aussehen|persoenlichkeit|hintergrund|beziehungen|konflikt|bogen|stimme|sprechweise|phrasen|verben|subtext|want|need|wound|lie|custom}`. Vollständige Keys siehe `werkstatt.*` in [public/js/i18n/de.json](../public/js/i18n/de.json) / [en.json](../public/js/i18n/en.json).
 
+## Buch-Chat-Tools (read-only)
+
+Der Agentic Buch-Chat kann die Werkstatt-Drafts des aktuellen Users lesen. Implementiert in [routes/jobs/book-chat-tools.js](../routes/jobs/book-chat-tools.js), Schemas in [public/js/prompts/chat.js](../public/js/prompts/chat.js#BOOK_CHAT_TOOLS).
+
+| Tool | Eingabe | Output |
+|------|---------|--------|
+| `list_werkstatt_drafts` | — | `drafts[{draft_id,name,archetype,source_figure_name,notes,updated_at,runs:{brainstorm,consistency},last_run}]` |
+| `get_werkstatt_draft` | `draft_id` ODER `figur_name` (+ optional `include_runs`, `run_limit`) | Volle Draft-Metadaten + `mindmap_text` (eingerückte Bullet-Liste in User-Locale) + `runs` (gekürzt) |
+
+User-Scope wie überall in der Werkstatt: `WHERE book_id=? AND user_email=?`. Cross-User-/Cross-Book-Zugriff liefert `error: 'Werkstatt-Draft nicht gefunden'`. `mindmap_json`-i18n-Marker werden via `resolveI18nTree(locale)` aus [lib/i18n-server.js](../lib/i18n-server.js) aufgelöst. Run-Snippets sind hart geclampt (Begründung 160, Problem 240, Fazit 400 Zeichen).
+
 ## Tests
 
 - [tests/unit/draft-figures-db.test.js](../tests/unit/draft-figures-db.test.js) — CRUD + Run-Insert/List/Get/Delete + Cascade.
 - [tests/integration/figur-werkstatt.test.js](../tests/integration/figur-werkstatt.test.js) — Brainstorm + Consistency mit Mock-AI, Pfad-Resolve, Severity-Enum, Quell-Figur-Ausschluss.
+- [tests/integration/book-chat-werkstatt-tools.test.js](../tests/integration/book-chat-werkstatt-tools.test.js) — Buch-Chat-Tools: User-Scope, Cross-Book-Isolation, Mindmap-i18n-Resolve, Run-Snippets.

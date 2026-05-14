@@ -170,6 +170,7 @@ export function buildBookChatAgentSystemPrompt(bookName, figuren, review, system
  * Werkzeug-Definitionen für den Agentic Buch-Chat.
  * Anthropic-Tool-Format (name/description/input_schema). lib/ai.js liest daraus direkt.
  * Beschreibungen bewusst kurz — kosten Input-Tokens.
+ * Übersicht aller Tools: docs/buchchat-tools.md
  */
 export const BOOK_CHAT_TOOLS = [
   {

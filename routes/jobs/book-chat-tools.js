@@ -2,6 +2,7 @@
 // Tool-Implementierungen für den Agentic Buch-Chat.
 // Jede Funktion nimmt (input, ctx) und gibt ein JSON-serialisierbares Objekt zurück.
 // ctx = { bookId, userEmail, userToken, jobSignal, logger }
+// Übersicht aller Tools + Vertrag: docs/buchchat-tools.md
 
 const { db, getUser } = require('../../db/schema');
 const { INPUT_BUDGET_CHARS } = require('../../lib/ai');

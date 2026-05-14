@@ -14,6 +14,8 @@ Themen-Spickzettel ausgelagert (Drift-Schutz: CLAUDE.md-Regeln, Details in den S
 - [docs/testing.md](docs/testing.md) — Wann Unit/Integration/E2E, Mock-AI-Setup, Harness-Konventionen, häufige Fallen.
 - [docs/erd.md](docs/erd.md) — Schema-ERD (Mermaid) + offene Schema-Verbesserungen.
 - [docs/figur-werkstatt.md](docs/figur-werkstatt.md) — Figuren-Werkstatt: jsMind-Mindmap, Import aus `figures`, Brainstorm-/Consistency-Jobs, Run-Historie, Hash-Permalinks.
+- [docs/buchchat-tools.md](docs/buchchat-tools.md) — Agentic Buch-Chat: Tool-Inventar (19 Stück), `ctx`-Vertrag, Truncation, Loop-Constraints, neues Tool anlegen.
+- [docs/focus-editor.md](docs/focus-editor.md) — Focus-Editor: State-Machine, Submodule (`focus/`), Trampoline-Pattern, Granularitäten, Recenter-Pipeline, Auto-`<p>`-Slot, Snapshot, Pflicht-Invarianten.
 - [docs/finetuning.md](docs/finetuning.md), [docs/wordpress-import.md](docs/wordpress-import.md), [docs/bookstack-templates.md](docs/bookstack-templates.md) — Spezialthemen.
 
 ## Doku-Stil dieser Datei
