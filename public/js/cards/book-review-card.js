@@ -8,7 +8,7 @@
 //   - `loadBookReviewHistory` (history.js), `_closeOtherMainCards`, `t`
 
 import { renderReviewHtml, BOOK_REVIEW_AXES } from '../review.js';
-import { escHtml, renderStars } from '../utils.js';
+import { escHtml, renderStars, noteTip } from '../utils.js';
 import { createCardJobFeature } from './job-feature-card.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
 
@@ -75,6 +75,7 @@ export function registerBookReviewCard() {
     },
 
     renderStars(note) { return renderStars(note); },
+    noteTip(note) { return noteTip(note); },
 
     ...createCardJobFeature({
       name: 'review',

@@ -1,0 +1,13 @@
+<template x-if="jobToast">
+  <div class="job-toast"
+       :class="'job-toast--' + (jobToast.severity || 'ok')"
+       role="status"
+       aria-live="polite"
+       x-cloak>
+    <span class="job-toast-msg" x-text="jobToast.message"></span>
+    <button type="button"
+            class="job-toast-close"
+            :aria-label="t('common.close')"
+            @click="_dismissJobToast()">×</button>
+  </div>
+</template>

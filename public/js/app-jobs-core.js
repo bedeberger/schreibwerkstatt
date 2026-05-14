@@ -236,6 +236,53 @@ export const appJobsCoreMethods = {
         if (this.currentPage?.id === pageId) this.loadPageHistory?.(pageId);
       }
     }
+    this._maybeShowJobToast(detail);
+  },
+
+  // Job-Done-Toast. Whitelist langlaufender Job-Typen — kurze Seiten-Lektorat-
+  // Checks (`type === 'check'`) erzeugen ihr eigenes Sidebar-Signal und würden
+  // bei jedem Klick einen Toast spammen. Toast feuert auch dann, wenn der User
+  // während des Jobs das Buch gewechselt hat oder die Karte geschlossen war —
+  // genau der Reload-/Buchwechsel-Lücken-Fix für komplett-analyse & Co.
+  _maybeShowJobToast(detail) {
+    if (!detail?.job) return;
+    const job = detail.job;
+    if (job.status === 'cancelled') return;
+    const labels = {
+      'komplett-analyse':      'toast.job.komplettAnalyse',
+      'kontinuitaet':          'toast.job.kontinuitaet',
+      'review':                'toast.job.review',
+      'kapitel-review':        'toast.job.kapitelReview',
+      'figuren':               'toast.job.figuren',
+      'book-chat':             'toast.job.bookChat',
+      'finetune-export':       'toast.job.finetuneExport',
+      'pdf-export':            'toast.job.pdfExport',
+      'batch-check':           'toast.job.batchCheck',
+      'werkstatt-brainstorm':  'toast.job.werkstattBrainstorm',
+      'werkstatt-consistency': 'toast.job.werkstattConsistency',
+    };
+    const labelKey = labels[detail.type];
+    if (!labelKey) return;
+    const severity = job.status === 'done' ? 'ok' : 'err';
+    const suffixKey = job.status === 'done' ? 'toast.job.done' : 'toast.job.failed';
+    const label = this.t(labelKey);
+    const suffix = this.t(suffixKey);
+    const message = `${label} ${suffix}`;
+    this._showJobToast({ message, severity, jobType: detail.type, bookId: detail.bookId ?? null });
+  },
+
+  _showJobToast({ message, severity, jobType, bookId }) {
+    if (this._jobToastTimer) { clearTimeout(this._jobToastTimer); this._jobToastTimer = null; }
+    this.jobToast = { message, severity, jobType, bookId };
+    this._jobToastTimer = setTimeout(() => {
+      this.jobToast = null;
+      this._jobToastTimer = null;
+    }, 4500);
+  },
+
+  _dismissJobToast() {
+    if (this._jobToastTimer) { clearTimeout(this._jobToastTimer); this._jobToastTimer = null; }
+    this.jobToast = null;
   },
 
   _startJobQueuePoll() {

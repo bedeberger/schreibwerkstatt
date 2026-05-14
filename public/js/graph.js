@@ -184,7 +184,11 @@ export const graphMethods = {
     const chapIdx = {};
     chapterOrder.forEach((c, i) => { chapIdx[c] = i; });
 
-    const COL_W           = 440;  // Breite einer Kapitel-Spalte (Hintergrund-Raster + xIdx-Skalierung)
+    // Spaltenbreite skaliert mit Container-Breite / Kapitelzahl. Bei vielen Kapiteln
+    // (z.B. 37 Spalten in 900 px Container) würde 440 px/Spalte eine 16k-Canvas erzeugen,
+    // in die fit() winzige Nodes hineinzoomt. Floor 160 hält Presence-Bar lesbar.
+    const containerW      = container.offsetWidth || 900;
+    const COL_W           = Math.max(160, Math.min(440, containerW / Math.max(N, 4)));
     const ROW_H           = 50;   // Vertikaler Abstand zwischen zwei Stapelzeilen innerhalb eines Tiers
     const TIER_BASE_GAP   = 80;   // Zusatz-Luft zwischen zwei Tiers
     const MIN_DX          = 130;  // Minimaler horizontaler Abstand zwischen zwei Figuren derselben Zeile
@@ -332,8 +336,14 @@ export const graphMethods = {
       const tierFs      = Math.max(10, Math.min(15, cHeightCss / 65));
       const lblMaxChars = cHeightCss > 700 ? 60 : 34;
 
-      // 2) Kapitel-Header oben (Screen-Koordinaten → feste Lesegrösse, folgen dem Pan)
+      // 2) Kapitel-Header oben (Screen-Koordinaten → feste Lesegrösse, folgen dem Pan).
+      // Header-Stride hängt vom aktuellen Zoom ab: bei dichten Spalten (viele Kapitel
+      // oder rausgezoomt) wird nur jeder n-te Header gezeichnet, sonst überlappen die
+      // Labels. Letzte Spalte immer gezeichnet (Orientierung).
       if (N > 0) {
+        const scale    = network.getScale();
+        const pxPerCol = COL_W * scale;
+        const step     = Math.max(1, Math.ceil(70 / Math.max(1, pxPerCol)));
         ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.font = `600 ${headerFs * dpr}px system-ui,-apple-system,sans-serif`;
@@ -341,6 +351,7 @@ export const graphMethods = {
         ctx.textBaseline = 'top';
         ctx.fillStyle    = '#555';
         for (let i = 0; i < N; i++) {
+          if (i % step !== 0 && i !== N - 1) continue;
           const dom = network.canvasToDOM({ x: i * COL_W, y: Y_TOP });
           if (dom.x < -120 || dom.x > cWidthCss + 120) continue;
           const raw = `${i + 1}. ${chapterOrder[i]}`;
@@ -376,14 +387,17 @@ export const graphMethods = {
       ctx.restore();
     });
 
-    // 4) Presence-Bar unter jeder Node (Netzwerk-Koordinaten, skaliert mit Zoom)
+    // 4) Presence-Bar unter jeder Node (Netzwerk-Koordinaten, skaliert mit Zoom).
+    // Bei vielen Kapiteln (N=37) wären 70 px / Segmentbreite ~1.9 px → unsichtbar;
+    // Min-Breite skaliert mit N (min 3 px pro Segment), Cap bei 220 px gegen Overlap.
     if (N > 0) {
+      const minBarW = Math.min(220, Math.max(70, N * 3));
       network.on('afterDrawing', ctx => {
         ctx.save();
         for (const f of figuren) {
           const bb = network.getBoundingBox(f.id);
           if (!bb) continue;
-          const barW    = Math.max(bb.right - bb.left, 70);
+          const barW    = Math.max(bb.right - bb.left, minBarW);
           const barLeft = (bb.left + bb.right) / 2 - barW / 2;
           const barY    = bb.bottom + 4;
           const barH    = 4;
@@ -421,9 +435,12 @@ export const graphMethods = {
       event?.preventDefault?.();
     });
 
-    // Sofort fitten (keine Stabilisierung nötig, Physics ist aus)
+    // Sofort fitten (keine Stabilisierung nötig, Physics ist aus).
+    // fit() auf Node-IDs statt Canvas: leere Kapitel-Spalten würden sonst die
+    // Bounding-Box aufblähen → Nodes mikroskopisch im Viewport.
+    const fitIds = figuren.map(f => f.id);
     requestAnimationFrame(() => {
-      network.fit({ animation: { duration: 250, easingFunction: 'easeInOutQuad' } });
+      network.fit({ nodes: fitIds, animation: { duration: 250, easingFunction: 'easeInOutQuad' } });
       if (this.figurenGraphKapitel) this._figurenGraphSetKapitel(this.figurenGraphKapitel);
     });
 

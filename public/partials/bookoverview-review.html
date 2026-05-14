@@ -5,7 +5,7 @@
        :aria-label="$app.t('overview.lastReview')"
        :data-tip="$app.t('overview.openReview')">
     <div class="overview-tile-label" x-text="$app.t('overview.lastReview')"></div>
-    <div class="overview-stars" :aria-label="overviewStarsAriaLabel()">
+    <div class="overview-stars" :aria-label="overviewStarsAriaLabel()" :data-tip="overviewStarsAriaLabel()">
       <template x-for="(s, i) in overviewStars(overviewLastReview?.review_json?.gesamtnote)" :key="i">
         <span class="overview-star"
               :class="s.full ? 'overview-star--full' : s.half ? 'overview-star--half' : 'overview-star--empty'"

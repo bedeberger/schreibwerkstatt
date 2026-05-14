@@ -219,6 +219,15 @@ export function renderStars(note, max = 6) {
     + `</span>`;
 }
 
+// Tooltip-Text für Sterne: exakter Wert auf 0.5 gerundet, "n / max".
+// Null wenn keine numerische Note → :data-tip greift nicht.
+export function noteTip(note, max = 6) {
+  const n = Number(note);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  const rounded = Math.round(Math.min(max, n) * 2) / 2;
+  return `${rounded.toFixed(1)} / ${max}`;
+}
+
 export function escHtml(s) {
   if (!s) return '';
   return String(s)

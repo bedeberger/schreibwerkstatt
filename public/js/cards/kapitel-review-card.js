@@ -5,7 +5,7 @@
 // der User dort sein eigenes Loading/Output, nicht den Status eines parallel
 // laufenden Reviews.
 
-import { fetchJson, escHtml, renderStars } from '../utils.js';
+import { fetchJson, escHtml, renderStars, noteTip } from '../utils.js';
 import { renderReviewHtml, CHAPTER_REVIEW_AXES } from '../review.js';
 import { startPoll, runningJobStatus } from './job-helpers.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
@@ -128,6 +128,7 @@ export function registerKapitelReviewCard() {
     },
 
     renderStars(note) { return renderStars(note); },
+    noteTip(note) { return noteTip(note); },
 
     _renderKapitelReviewHtml(r) {
       return renderReviewHtml(r, CHAPTER_REVIEW_AXES, (k, p) => window.__app.t(k, p));

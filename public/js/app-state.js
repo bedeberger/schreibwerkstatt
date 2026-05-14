@@ -331,6 +331,13 @@ const jobsState = () => ({
   alleAktualisierenTokOut: 0,
   alleAktualisierenTps: null,
   alleAktualisierenPassMode: null,
+  // Globaler Job-Done-Toast. Wird von `_onJobFinished` für relevante
+  // langlaufende Job-Typen gesetzt (komplett-analyse, review, kapitel-review,
+  // figuren, kontinuitaet, book-chat, finetune-export, pdf-export, batch-check,
+  // werkstatt-*). Auto-Dismiss via `_jobToastTimer`. Severity 'ok' für done,
+  // 'err' für error.
+  jobToast: null,
+  _jobToastTimer: null,
 });
 
 export function initialLektoratState() {

@@ -3,7 +3,7 @@
 // dasselbe Markup teilen (Header/Stars/Summary/Achsen/Stärken/Schwächen/
 // Empfehlungen/Zitate/Fazit) – nur die Achsen-Liste unterscheidet sich.
 
-import { escHtml, escMd, renderStars } from './utils.js';
+import { escHtml, escMd, renderStars, noteTip } from './utils.js';
 
 // Mapping Prio → severity-tag-Variante. Reuse statt eigene Badge-Klassen.
 // hoch = rot (kritisch), mittel = amber, niedrig = grau.
@@ -60,9 +60,11 @@ function renderZitatItem(z, translate) {
 
 export function renderReviewHtml(r, axes, translate) {
   const stars = renderStars(r.gesamtnote);
+  const tip = noteTip(r.gesamtnote);
+  const tipAttr = tip ? ` data-tip="${escHtml(tip)}"` : '';
   let html = `
       <div class="bewertung-header">
-        <span class="bewertung-stars">${stars}</span>
+        <span class="bewertung-stars"${tipAttr}>${stars}</span>
         <span class="bewertung-header-note">${escMd(r.gesamtnote_begruendung || '')}</span>
       </div>
       <div class="stilbox stilbox--review-summary">${escMd(r.zusammenfassung || '')}</div>`;

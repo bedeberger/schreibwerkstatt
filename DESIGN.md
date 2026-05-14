@@ -1066,19 +1066,30 @@ Eigene Shades bewusst nicht aliased — Achsen optisch trennen. Regel: Lektorats
 
 ## Toast/Snackbar
 
-**Status:** Aktuell **kein generisches Toast-Pattern**. Einziger toast-artiger Layer ist `.palette-toast` ([feature-tiles.css:147](public/css/feature-tiles.css#L147)) — eine Statuszeile am unteren Rand des Palette-Modals, kein Floating-Snackbar. Bewusst nicht zum globalen Pattern erhoben, solange nur ein Konsument existiert.
+**Status:** Ein generischer Job-Done-Toast ist umgesetzt (`.job-toast` in [job-toast.css](public/css/job-toast.css), Markup [partials/job-toast.html](public/partials/job-toast.html), State `jobToast` + `_showJobToast()`/`_dismissJobToast()` am Root). Daneben weiterhin lokal: `.palette-toast` ([feature-tiles.css:151](public/css/feature-tiles.css#L151)) als Statuszeile innerhalb des Palette-Modals — kein Floating-Snackbar, deshalb keine Migration nötig.
 
-**Wann anlegen:** Sobald ein zweiter Konsument auftaucht (Save-Success-Banner, Network-Recovery-Hinweis, Job-Done-Notification). Dann **hier dokumentieren**, nicht ad-hoc daneben bauen.
+**Markup:**
+```html
+<div class="job-toast job-toast--ok" role="status" aria-live="polite">
+  <span class="job-toast-msg">Komplettanalyse fertig</span>
+  <button class="job-toast-close" aria-label="Schliessen">×</button>
+</div>
+```
+- Severity-Modifier: `.job-toast--ok` (Success) / `.job-toast--err` (Error). Mappt auf `--color-ok-*` bzw. `--color-err-*` aus operational-status (siehe Severity-Achsen).
+- Position: fixed bottom-right (`--z-toast` = 12000). Mobile (<600px): full-width unten.
+- Animation: 160 ms Fade+Slide; bei `prefers-reduced-motion: reduce` nur Fade.
 
-**Vorgesehener Slot:** `--z-toast` (12000) ist reserviert. Position: `bottom-center` oder `bottom-right`, fixed.
+**Trigger:** Root-Handler `_onJobFinished` ([app-jobs-core.js](public/js/app-jobs-core.js)) ruft `_maybeShowJobToast(detail)` für eine Whitelist langlaufender Job-Typen (`komplett-analyse`, `kontinuitaet`, `review`, `kapitel-review`, `figuren`, `book-chat`, `finetune-export`, `pdf-export`, `batch-check`, `werkstatt-brainstorm`, `werkstatt-consistency`). `type === 'check'` (Seiten-Lektorat) ist absichtlich ausgenommen — feuert pro Seitenklick und hat sein eigenes Sidebar-Signal. `status === 'cancelled'` erzeugt keinen Toast.
 
-**Vorbedingung für globales Toast:**
-- `aria-live="polite"`-Region für nicht-kritische Updates, `aria-live="assertive"` für Fehler.
-- Auto-Dismiss-Timer (analog `_toastTimer` in [palette-card.js](public/js/cards/palette-card.js)), via `setTimeout` 2200–4000 ms.
-- Reduced-Motion: kein Slide-In, nur Fade.
-- Kein Toast für blockierende Aktionen — dafür ist `.confirm-overlay` da.
+**Auto-Dismiss:** 4500 ms via `_jobToastTimer`. Close-Button setzt Toast sofort auf `null`.
 
-**Bis dahin:** Card-interne Status-Hinweise nutzen `.card-status` / `.book-settings-saved` / `.book-settings-error`. Nicht improvisieren.
+**Regeln für neue Konsumenten:**
+- `aria-live="polite"` für Info/Success, `aria-live="assertive"` für Error (Markup oben → `polite`; bei Pflicht-Error im Markup overriden).
+- Niemals modal/blockierend. Für Bestätigungen ist `.confirm-overlay` da.
+- Toast-Text immer i18n-Key (Severity-Suffix `toast.job.done` / `toast.job.failed` separat, damit Job-Labels wiederverwendbar bleiben).
+- Bei zusätzlichen Use-Cases (Save-Success, Network-Recovery): zweiten State `appToast` o.ä. *nicht* anlegen — `jobToast` umbenennen in `appToast` und Severity/Source-Felder erweitern.
+
+**Card-interne Status-Hinweise** (Save-Bestätigung in einer Form, Validation-Fehler innerhalb einer Karte) bleiben bei `.card-status` / `.book-settings-saved` / `.book-settings-error` — Toast nur für globale, kartenübergreifende Events.
 
 ---
 
