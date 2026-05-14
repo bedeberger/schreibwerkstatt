@@ -19,6 +19,21 @@
 import { setupCardLifecycle } from './card-lifecycle.js';
 import { loadSortable } from '../lazy-libs.js';
 
+// Guard gegen Sortable v1.15.6 Race: `_onDragOver` kann auf einer destroyten
+// Instanz (this.el === null) feuern, wenn Alpine x-for nach einem Drop neu
+// reconciliated. Native dragover-Listener wird in destroy() vor el=null
+// entfernt, aber zwischen Alpine-Reordering und Sortable-State-Update treten
+// gelegentlich stale Refs auf. Wir no-op auf null el statt zu crashen.
+function _patchSortableOnce(Sortable) {
+  if (Sortable.prototype._dragOverGuarded) return;
+  const orig = Sortable.prototype._onDragOver;
+  Sortable.prototype._onDragOver = function (evt) {
+    if (!this.el) return;
+    return orig.call(this, evt);
+  };
+  Sortable.prototype._dragOverGuarded = true;
+}
+
 export function registerBookOrganizerCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
   window.Alpine.data('bookOrganizerCard', () => ({
@@ -99,14 +114,24 @@ export function registerBookOrganizerCard() {
     _initSortables() {
       const Sortable = window.Sortable;
       if (!Sortable) return;
+      _patchSortableOnce(Sortable);
       this._destroySortables();
+      // x-ignore auf das Drag-Item setzen, damit der via cloneNode(true) erzeugte
+      // Fallback-Ghost im <body> von Alpines MutationObserver übersprungen wird —
+      // sonst evaluiert Alpine `:value="page.name"` ausserhalb des x-for-Scopes
+      // und wirft "page is not defined". Nach Drag wieder entfernen.
+      const markIgnore = (evt) => evt.item?.setAttribute('x-ignore', '');
+      const unmarkIgnore = (evt) => evt.item?.removeAttribute('x-ignore');
       const chapterListEl = this.$root.querySelector('[data-organizer="chapter-list"]');
       if (chapterListEl) {
         this._sortables.push(new Sortable(chapterListEl, {
           handle: '.organizer-drag-handle--chapter',
           animation: 150,
           draggable: '.organizer-chapter',
-          onEnd: (evt) => this._onChapterDrop(evt),
+          emptyInsertThreshold: 0,
+          onChoose: markIgnore,
+          onUnchoose: unmarkIgnore,
+          onEnd: (evt) => { unmarkIgnore(evt); this._onChapterDrop(evt); },
         }));
       }
       const pageLists = this.$root.querySelectorAll('[data-organizer="page-list"]');
@@ -116,7 +141,10 @@ export function registerBookOrganizerCard() {
           animation: 150,
           draggable: '.organizer-page',
           group: { name: 'pages', pull: true, put: true },
-          onEnd: (evt) => this._onPageDrop(evt),
+          emptyInsertThreshold: 0,
+          onChoose: markIgnore,
+          onUnchoose: unmarkIgnore,
+          onEnd: (evt) => { unmarkIgnore(evt); this._onPageDrop(evt); },
         }));
       }
     },
