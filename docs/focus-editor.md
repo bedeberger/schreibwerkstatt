@@ -89,6 +89,11 @@ selectionchange / input / scroll / focus → _focusUpdateActive(…)
 - **Klick markiert `pointerIntent`** ([card.js:153-157](../public/js/editor/focus/card.js#L153-L157)) — folgender `selectionchange` recentert NICHT (Klick ist absichtliche Positionsänderung). Flag fällt nach `POINTER_GRACE_MS=300` ms automatisch zurück (Klick in leeren Margin erzeugt keinen selectionchange).
 - **Typewriter-Schwelle dynamisch** ([typewriter.js:11-18](../public/js/editor/focus/typewriter.js#L11-L18)): `max(16, line-height * 0.5)`. Statisches 16 px scrollte schon bei subpixel-Jitter — halbe Zeilenhöhe ist die natürliche „echte Zeilenwechsel"-Grenze.
 - **`expectedScroll`-Counter** ([typewriter.js:50](../public/js/editor/focus/typewriter.js#L50)): programmatischer Scroll inkrementiert; `onScroll` dekrementiert und feuert kein Recenter. Counter > Zeitfenster, weil ScrollEnd nicht zuverlässig in allen Engines.
+- **`getCaretRect`-Dreistufenpfad** ([typewriter.js](../public/js/editor/focus/typewriter.js)):
+  1. `range.getClientRects()[0]` — Standardfall, deckt 95 %.
+  2. `range.getBoundingClientRect()` — Fallback bei leerer Rect-Liste.
+  3. **Probe-Range-Expansion**: Range um 1 Position erweitern (`setEnd(off+1)`, sonst `setStart(off-1)`), Rect lesen, Probe verwerfen. Fängt den collapsed-Range-Bug am Soft-Wrap-Bruch und direkt nach `<br>`, wo Browser sonst Höhe 0 / leere Rects liefern. Non-collapsed Ranges liefern deterministisch das Rect der angrenzenden Glyphe → korrekte visuelle Zeile.
+- **Kein Block-BBox-Fallback im Recenter** ([card.js:463-473](../public/js/editor/focus/card.js#L463-L473)): Wenn `getCaretRect` `null` liefert, bleibt der Scroll aus — kein Rückfall auf `block.getBoundingClientRect()`. Begründung: bei langen Absätzen ohne neue Absatzmarken (User schreibt Riesensatz mit Soft-Wraps und shift-enter-Brüchen) bewegt sich die Block-Mitte nicht mit dem Caret. Block-BBox als Ziel hätte den Typewriter stehenbleiben lassen, obwohl der Cursor visuell mehrere Zeilen tiefer sitzt. Wenn das Caret-Rect wirklich nicht ermittelbar ist (leerer Absatz ohne Text-Kind, kein Fokus), liefert der nächste echte Input bereits valides Rect.
 
 ## Lifecycle-Sequenzen (Pflichtreihenfolge)
 
@@ -155,12 +160,13 @@ Beim Enter springt der Caret an Buchende. `jumpToTrailingParagraph` ([dom-blocks
 10. **Sentence-Highlight nur via `CSS.highlights`.** Keine DOM-Span-Wraps — sonst Save-Diff bei jedem Caret-Move. Browser ohne Custom-Highlight-API → Sentence-Mode degradiert lautlos auf Paragraph-Visual.
 11. **`overflow-anchor: none`** auf `.page-content-view*` im Fokus. Chrome's Scroll-Anchoring kämpft sonst mit Typewriter-Scroll → sichtbares „Flattern".
 12. **`x-show="!focusMode"`-Guards für Findings-Close-Button, Toolbar, Bubble.** Findings sind im Fokus ohnehin via CSS ausgeblendet; Buttons trotzdem mit `x-show` raus, damit Tab-Reihenfolge sauber bleibt.
+13. **Typewriter folgt ausschliesslich dem Caret-Rect.** Kein Block-BBox-Fallback im Recenter. `getCaretRect` ist die einzige Ziel-Rect-Quelle; liefert sie `null`, bleibt der Scroll aus. Block-Mitte als Ersatz täuscht Stabilität vor und blockiert Typewriter in langen Absätzen mit Soft-Wraps / `<br>`-Brüchen — `getCaretRect` deckt diese Edge-Cases via Probe-Range-Expansion ab.
 
 ## Tests
 
 | Datei | Deckt ab |
 |---|---|
-| [tests/unit/editor-focus.test.mjs](../tests/unit/editor-focus.test.mjs) | `findBlockFromNode` outermost, `pickCenterBlock` Distanz-Logik, `computeTypewriterDelta` Schwellen-Verhalten, `setActiveBlock` class=""-Cleanup, `findSentenceRanges` Intl.Segmenter + Regex-Fallback, `dailyDelta` Baseline + Prune |
+| [tests/unit/editor-focus.test.mjs](../tests/unit/editor-focus.test.mjs) | `findBlockFromNode` outermost, `pickCenterBlock` Distanz-Logik, `computeTypewriterDelta` Schwellen-Verhalten, `setActiveBlock` class=""-Cleanup, `findSentenceRanges` Intl.Segmenter + Regex-Fallback, `dailyDelta` Baseline + Prune, `getCaretRect` Probe-Range-Expansion am Soft-Wrap-Bruch |
 | [tests/unit/focus-granularity.test.mjs](../tests/unit/focus-granularity.test.mjs) | Body-Class-Wechsel bei `focusGranularity`-Live-Switch, Cache-Invalidation, `dynamicTypewriterThreshold` aus computed line-height |
 | [tests/e2e/focus-editor.spec.js](../tests/e2e/focus-editor.spec.js) | Toggle, Recenter beim Tippen, Pointer-Schonfrist (Klick recentert NICHT), Cleanup (keine Listener-Leaks nach Exit), Auto-`<p>`-Slot räumt sich ab |
 

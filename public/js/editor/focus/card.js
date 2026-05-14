@@ -461,12 +461,18 @@ export const focusCardMethods = {
         // während der User die Auswahl aufzieht oder an ihr arbeitet.
         const hasSelection = sel && sel.rangeCount > 0 && !sel.isCollapsed;
         if (scroll && block && !hasSelection) {
-          // Cursor-Zeile bevorzugen (echter Typewriter-Scroll). Nur wenn keine
-          // Caret-Rect ermittelbar ist (z.B. leerer Absatz, kein Fokus), auf
-          // Block-Mitte zurückfallen.
-          const targetRect = getCaretRect(container) || block.getBoundingClientRect();
-          const threshold = dynamicTypewriterThreshold(block);
-          typewriterScroll(container, targetRect, ctx, threshold);
+          // Ausschliesslich Caret-Rect als Ziel — Block-BBox-Fallback wäre
+          // schädlich: bei langen Absätzen mit Soft-Wrap / shift-enter-Brüchen
+          // bewegt sich Block-Mitte nicht mit dem Caret, der Typewriter würde
+          // stehenbleiben. `getCaretRect` hat eine eigene Probe-Range-Expansion
+          // für die Edge-Cases (Wrap-Bruch, nach <br>); liefert sie trotzdem
+          // null (leerer Absatz, kein Fokus), bleibt der Scroll aus — der
+          // nächste echte Input liefert valides Rect.
+          const targetRect = getCaretRect(container);
+          if (targetRect) {
+            const threshold = dynamicTypewriterThreshold(block);
+            typewriterScroll(container, targetRect, ctx, threshold);
+          }
         }
       } catch (err) {
         reportError('updateActive', err);

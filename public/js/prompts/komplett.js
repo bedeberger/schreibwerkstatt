@@ -238,7 +238,7 @@ const PROBLEME_RULES = `Regeln:
 - Nur echte Widersprüche – keine stilistischen oder inhaltlichen Anmerkungen
 - WICHTIG: Wenn du bei der Analyse zum Schluss kommst, dass KEIN Widerspruch vorliegt (z.B. «konsistent», «passt», «kein echter Widerspruch»), dann das Problem NICHT melden. Nur tatsächliche Widersprüche ins Array aufnehmen.
 - Das «probleme»-Array ist AUSSCHLIESSLICH für bestätigte Widersprüche da – nicht für Zwischenüberlegungen, geprüfte-aber-verworfene Kandidaten oder Entwarnungen. Wenn ein Kandidat sich beim Nachdenken als harmlos herausstellt, wird er komplett weggelassen, nicht mit einer Erklärung ins Array geschrieben.
-- Selbstcheck vor dem Antworten: Lies jede «beschreibung» gegen. Enthält sie Formulierungen wie «kein Widerspruch», «kein echter Widerspruch», «konsistent», «passt zusammen», «stimmig», «wird nicht gemeldet», «Entwarnung», «unproblematisch», «lässt sich erklären durch …» (als Entwarnung) – dann den ganzen Eintrag ersatzlos aus dem Array entfernen. Jede «beschreibung» muss den Widerspruch positiv benennen, nicht seine Abwesenheit.
+- Selbstcheck vor dem Antworten: Lies jede «beschreibung» UND jede «empfehlung» gegen. Enthält EINES der beiden Felder Formulierungen wie «kein Widerspruch», «kein echter Widerspruch», «konsistent», «passt zusammen», «stimmig», «wird nicht gemeldet», «Entwarnung», «unproblematisch», «das ist korrekt», «kein Problem», «Eintrag entfernen», «lässt sich erklären durch …» (als Entwarnung) – dann den ganzen Eintrag ersatzlos aus dem Array entfernen. «beschreibung» muss den Widerspruch positiv benennen, «empfehlung» muss eine Lösung des Widerspruchs vorschlagen – niemals «Eintrag entfernen» oder ähnliche Selbst-Annullierungen.
 - schwere: «kritisch» = klarer Logikfehler der dem Leser sofort auffällt und zwingend korrigiert werden muss; «mittel» = wahrscheinlicher Fehler der den Leser stören könnte; «niedrig» = mögliche Inkonsistenz die eventuell beabsichtigt ist
 - Soziolekt-Probleme: nur wenn klar ein Sprachmuster etabliert wurde und dann ohne Begründung bricht – nicht melden wenn Figur wenig Dialoganteil hat
 - figuren: PFLICHTFELD – immer angeben, mindestens []; Namen exakt wie in der Figurenliste; [] nur wenn wirklich keine Figur betroffen (rein ortsbezogene Widersprüche)
@@ -550,6 +550,53 @@ ${ORTE_RULES}`;
 
 // ── Kontinuitätsprüfung ───────────────────────────────────────────────────────
 
+// Figuren mit geteilten Namens-Tokens (z.B. zwei «Dieter») werden vom Modell
+// sonst als dieselbe Person interpretiert und produzieren False-Positives in
+// der Kontinuitätsprüfung. Wir listen Kollisionen explizit auf.
+const _DISAMBIG_STOPWORDS = new Set([
+  'herr', 'frau', 'dr', 'doktor', 'prof', 'professor', 'fräulein',
+  'von', 'zu', 'van', 'der', 'die', 'das', 'den', 'dem', 'de', 'la',
+]);
+function _figurenNameCollisions(figurenKompakt) {
+  if (!figurenKompakt || figurenKompakt.length < 2) return [];
+  const byToken = new Map();
+  for (const f of figurenKompakt) {
+    const seen = new Set();
+    const tokens = String(f.name || '')
+      .toLowerCase()
+      .split(/[\s\-.,]+/)
+      .filter(t => t.length > 1 && !_DISAMBIG_STOPWORDS.has(t));
+    for (const t of tokens) {
+      if (seen.has(t)) continue;
+      seen.add(t);
+      if (!byToken.has(t)) byToken.set(t, []);
+      byToken.get(t).push(f);
+    }
+  }
+  const collisions = [];
+  const seenGroups = new Set();
+  for (const [token, figs] of byToken) {
+    if (figs.length < 2) continue;
+    const key = figs.map(f => f.name).sort().join('|');
+    if (seenGroups.has(key)) continue;
+    seenGroups.add(key);
+    collisions.push({ token, figuren: figs });
+  }
+  return collisions;
+}
+function _buildDisambiguationBlock(figurenKompakt) {
+  const collisions = _figurenNameCollisions(figurenKompakt);
+  if (!collisions.length) return '';
+  const lines = collisions.map(c =>
+    `- Namens-Token «${c.token}» teilen: ${c.figuren.map(f => `«${f.name}»`).join(', ')}`
+  ).join('\n');
+  return `\n\n## Namens-Disambiguierung
+Folgende Figuren teilen Namens-Token (typischerweise Vornamen). Sie sind UNTERSCHIEDLICHE Personen:
+${lines}
+
+Eine kontextfreie Erwähnung nur des geteilten Tokens (z.B. «Dieter») kann jede dieser Figuren meinen. Übertrage Eigenschaften, Aufenthalte, Ereignisse einer Figur NICHT auf die andere. Melde keinen Widerspruch, wenn die Zuordnung im Text mehrdeutig bleibt.`;
+}
+
 export function buildKontinuitaetChapterFactsPrompt(chapterName, chText) {
   return `Extrahiere alle konkreten Fakten und Behauptungen aus dem Kapitel «${chapterName}» die für die Kontinuitätsprüfung relevant sind: Figuren-Zustände (lebendig/tot, Verletzungen, Wissen, Beziehungen), Ortsbeschreibungen, Zeitangaben, Objekte und deren Besitz/Zustand, sowie wichtige Handlungsereignisse.
 
@@ -573,11 +620,12 @@ export function buildKontinuitaetCheckPrompt(bookName, chapterFacts, figurenKomp
   const figurenStr = figurenKompakt && figurenKompakt.length
     ? '\n\n## Bekannte Figuren\n' + figurenKompakt.map(f => `${f.name} (${f.typ}): ${f.beschreibung || ''}`).join('\n')
     : '';
+  const disambigStr = _buildDisambiguationBlock(figurenKompakt);
   const orteStr = orteKompakt && orteKompakt.length
     ? '\n\n## Bekannte Schauplätze\n' + orteKompakt.map(o => `${o.name} (${o.typ || 'andere'}): ${o.beschreibung || ''}`).join('\n')
     : '';
 
-  return `Prüfe das Buch «${bookName}» auf Kontinuitätsfehler und Widersprüche. Dir liegen die extrahierten Fakten aller Kapitel vor.${figurenStr}${orteStr}
+  return `Prüfe das Buch «${bookName}» auf Kontinuitätsfehler und Widersprüche. Dir liegen die extrahierten Fakten aller Kapitel vor.${figurenStr}${disambigStr}${orteStr}
 
 ## Extrahierte Fakten nach Kapitel:
 
@@ -597,6 +645,7 @@ export function buildKontinuitaetSinglePassPrompt(bookName, bookText, figurenKom
   const figurenStr = figurenKompakt && figurenKompakt.length
     ? '\n\n## Bekannte Figuren\n' + figurenKompakt.map(f => `${f.name} (${f.typ || ''}): ${f.beschreibung || ''}`).join('\n')
     : '';
+  const disambigStr = _buildDisambiguationBlock(figurenKompakt);
   const orteStr = orteKompakt && orteKompakt.length
     ? '\n\n## Bekannte Schauplätze\n' + orteKompakt.map(o => `${o.name} (${o.typ || 'andere'}): ${o.beschreibung || ''}`).join('\n')
     : '';
@@ -608,7 +657,7 @@ export function buildKontinuitaetSinglePassPrompt(bookName, bookText, figurenKom
   const textBlock = bookText == null
     ? 'Der Buchtext steht im System-Prompt oben.'
     : `Buchtext:\n\n${bookText}`;
-  return `Prüfe das Buch «${bookName}» auf Kontinuitätsfehler und Widersprüche.${figurenStr}${orteStr}
+  return `Prüfe das Buch «${bookName}» auf Kontinuitätsfehler und Widersprüche.${figurenStr}${disambigStr}${orteStr}
 ${povBlock}
 Suche aktiv nach: Figuren die nach ihrem Tod wieder auftauchen; Orte die sich widersprüchlich beschrieben werden; Zeitangaben die nicht vereinbar sind; Objekte die falsch verwendet werden; Figuren die Wissen haben das sie noch nicht haben könnten; Charakterverhalten das ihrer etablierten Persönlichkeit widerspricht; Soziolekt-Brüche: Figuren die plötzlich anders sprechen als durch ihre Herkunft, Bildung und soziale Schicht etabliert (Registerwechsel ohne dramaturgische Begründung).${erzaehlformHint}
 

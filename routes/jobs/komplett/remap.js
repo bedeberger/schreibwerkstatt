@@ -132,12 +132,26 @@ function saveSzenenAndEvents(bookIdInt, email, szenen, assignments, locIdToDbId,
   return { szenenCount: szenen.length, eventsCount };
 }
 
+// Patterns, mit denen die KI eine eigene Entwarnung in beschreibung/empfehlung
+// signalisiert. Synchron mit Prompt-Selbstcheck in
+// public/js/prompts/komplett.js (PROBLEME_RULES). KI hält die Selbstcheck-Regel
+// nicht zuverlässig ein → Server filtert defensiv nach.
+const SELF_CANCEL_PATTERN = /\b(kein(en)?\s+(echten?\s+)?widerspruch|kein\s+problem|das\s+ist\s+korrekt|konsistent|pass(t|en)\s+zusammen|stimmig|unproblematisch|entwarnung|wird\s+nicht\s+gemeldet|eintrag\s+entfernen)\b/i;
+
+function _isSelfCancelled(p) {
+  return SELF_CANCEL_PATTERN.test(p.beschreibung || '') || SELF_CANCEL_PATTERN.test(p.empfehlung || '');
+}
+
 /** Speichert Kontinuitätsprüfung in die DB (eine Zeile pro Issue + Bridge-Tabellen
  *  für Figuren-/Kapitel-Referenzen). Gibt normalizedIssues zurück, oder null bei
  *  ungültiger Antwort. */
 function saveKontinuitaetResult(bookIdInt, email, kontResult, figNameToId, chNameToId, effectiveProvider, log, jobId) {
   if (typeof kontResult?.zusammenfassung === 'undefined') return null;
-  const issues = (kontResult.probleme || []).map(p => ({
+  const rawProbleme = kontResult.probleme || [];
+  const filtered = rawProbleme.filter(p => !_isSelfCancelled(p));
+  const dropped = rawProbleme.length - filtered.length;
+  if (dropped > 0) log.warn(`Kontinuität: ${dropped} Selbst-Entwarnungen verworfen.`);
+  const issues = filtered.map(p => ({
     schwere: p.schwere, typ: p.typ, beschreibung: p.beschreibung,
     stelle_a: p.stelle_a, stelle_b: p.stelle_b, empfehlung: p.empfehlung,
     figuren: (p.figuren || []).map(_refToString).filter(Boolean),
@@ -151,4 +165,4 @@ function saveKontinuitaetResult(bookIdInt, email, kontResult, figNameToId, chNam
   return normalizedIssues;
 }
 
-module.exports = { remapSzenen, remapAssignments, saveSzenenAndEvents, saveKontinuitaetResult };
+module.exports = { remapSzenen, remapAssignments, saveSzenenAndEvents, saveKontinuitaetResult, _isSelfCancelled };

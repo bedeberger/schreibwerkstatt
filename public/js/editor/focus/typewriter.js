@@ -17,6 +17,37 @@ export function dynamicTypewriterThreshold(block, fallback = TYPEWRITER_THRESHOL
   return fallback;
 }
 
+// Range um 1 Position erweitern, Rect lesen, Probe wegwerfen. Browser liefern
+// für collapsed Ranges am Soft-Wrap-Bruch / direkt nach <br> regelmässig
+// leere getClientRects() und Höhe-0-BoundingClientRect. Eine non-collapsed
+// Probe-Range liefert deterministisch den Rect der angrenzenden Glyphe — und
+// damit die korrekte visuelle Zeile.
+function expandRangeRect(range) {
+  const node = range.startContainer;
+  if (!node) return null;
+  const off = range.startOffset;
+  const len = node.nodeType === 3 ? (node.nodeValue || '').length : node.childNodes.length;
+  const probe = range.cloneRange();
+  try {
+    if (off < len) probe.setEnd(node, off + 1);
+    else if (off > 0) probe.setStart(node, off - 1);
+    else return null;
+  } catch { return null; }
+  const rects = probe.getClientRects();
+  if (rects.length > 0 && rects[0].height > 0) return rects[0];
+  const bb = probe.getBoundingClientRect();
+  if (bb && bb.height > 0) return bb;
+  return null;
+}
+
+// Liefert das Rect der visuellen Zeile, in der der Caret sitzt. Drei Stufen:
+// 1) `getClientRects()[0]` — schnellster Pfad, deckt 95 % der Fälle.
+// 2) `getBoundingClientRect()` — Fallback wenn Step 1 leer (manche Browser).
+// 3) **Range um 1 Zeichen expandieren** — fängt collapsed-Range-Bug am
+//    Soft-Wrap-Bruch und direkt nach `<br>`: dort liefern Browser sonst Höhe 0
+//    bzw. leere Rect-Liste, der Recenter würde auf Block-BBox zurückfallen
+//    (Block-Mitte stillgestanden → Typewriter scrollte bei langem Absatz mit
+//    Soft-Wraps oder shift-enter-Bruchen nicht mit).
 export function getCaretRect(container, selection) {
   const sel = selection || (typeof document !== 'undefined' ? document.getSelection() : null);
   if (!sel || sel.rangeCount === 0) return null;
@@ -25,8 +56,8 @@ export function getCaretRect(container, selection) {
   const rects = range.getClientRects();
   if (rects.length > 0 && rects[0].height > 0) return rects[0];
   const rect = range.getBoundingClientRect();
-  if (rect.height > 0) return rect;
-  return null;
+  if (rect && rect.height > 0) return rect;
+  return expandRangeRect(range);
 }
 
 // Pure: wie weit muss gescrollt werden, damit targetRect auf containerRect-

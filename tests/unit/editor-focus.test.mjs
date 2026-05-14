@@ -208,19 +208,44 @@ test('computeTypewriterDelta: null-input → 0', () => {
 
 // --- getCaretRect -----------------------------------------------------------
 
-function mkSelection({ empty = false, outside = false, emptyRects = false, zeroHeight = false } = {}) {
+function mkSelection({
+  empty = false,
+  outside = false,
+  emptyRects = false,
+  zeroHeight = false,
+  expandRect = null,        // {top, bottom, height} – Rect der Probe-Range
+  startContainer = null,    // erlaubt mkTextNode-Override für Expansion
+  startOffset = 0,
+} = {}) {
   if (empty) return { rangeCount: 0, getRangeAt: () => null };
-  const startContainer = {};
+  const sc = startContainer || {};
   const rect = zeroHeight ? { top: 0, bottom: 0, height: 0 } : { top: 10, bottom: 30, height: 20 };
   const rects = emptyRects ? [] : [rect];
+  const range = {
+    startContainer: sc,
+    startOffset,
+    getClientRects: () => rects,
+    getBoundingClientRect: () => rect,
+    cloneRange() {
+      // Clone-Range muss die Expansion-Branch in getCaretRect bedienen:
+      // setEnd/setStart wechselt das Rect-Verhalten auf expandRect.
+      let expanded = false;
+      return {
+        startContainer: sc,
+        startOffset,
+        setEnd() { expanded = true; },
+        setStart() { expanded = true; },
+        getClientRects: () => (expanded && expandRect ? [expandRect] : []),
+        getBoundingClientRect: () => (expanded && expandRect
+          ? expandRect
+          : { top: 0, bottom: 0, height: 0 }),
+      };
+    },
+  };
   return {
     rangeCount: 1,
-    getRangeAt: () => ({
-      startContainer,
-      getClientRects: () => rects,
-      getBoundingClientRect: () => rect,
-    }),
-    _startContainer: startContainer,
+    getRangeAt: () => range,
+    _startContainer: sc,
     _outside: outside,
   };
 }
@@ -257,10 +282,56 @@ test('getCaretRect: leere getClientRects → Fallback boundingClientRect', () =>
   assert.equal(rect.height, 20);
 });
 
-test('getCaretRect: Höhe 0 → null', () => {
-  const sel = mkSelection({ zeroHeight: true });
+test('getCaretRect: Höhe 0 ohne Expansion-Möglichkeit → null', () => {
+  // Text-Node mit Länge 0 und Offset 0 → weder setEnd(off+1) noch
+  // setStart(off-1) möglich; Probe-Range bringt nichts.
+  const textNode = { nodeType: 3, nodeValue: '' };
+  const sel = mkSelection({
+    zeroHeight: true,
+    startContainer: textNode,
+    startOffset: 0,
+  });
   const container = mkContainer(() => true);
   assert.equal(getCaretRect(container, sel), null);
+});
+
+// Regression: collapsed Caret am Soft-Wrap-Bruch oder direkt nach <br> liefert
+// in Chromium/Firefox regelmässig leere getClientRects() und Höhe-0-BoundingRect.
+// Ohne Probe-Range-Expansion würde der Recenter dann auf Block-BBox zurückfallen,
+// und der Typewriter scrollte bei langen Absätzen ohne neue Absatzmarken nicht
+// mit. Mit Expansion liefert eine non-collapsed Probe-Range deterministisch das
+// Rect der angrenzenden Glyphe → korrekte visuelle Zeile.
+test('getCaretRect: Soft-Wrap-Bruch (leere Rects + Höhe 0) → Probe-Range-Expansion', () => {
+  const textNode = { nodeType: 3, nodeValue: 'lorem ipsum dolor sit amet' };
+  const sel = mkSelection({
+    emptyRects: true,
+    zeroHeight: true,
+    startContainer: textNode,
+    startOffset: 12,                              // Position innerhalb Textknoten
+    expandRect: { top: 240, bottom: 268, height: 28 },
+  });
+  const container = mkContainer(() => true);
+  const rect = getCaretRect(container, sel);
+  assert.ok(rect, 'expand-fallback muss greifen');
+  assert.equal(rect.top, 240);
+  assert.equal(rect.height, 28);
+});
+
+test('getCaretRect: Caret am Textnode-Ende → setStart(off-1) als Expansion', () => {
+  // Im selben Test-Helper deckt setStart denselben Pfad ab — Rect-Wechsel
+  // wird unabhängig von setEnd/setStart getriggert.
+  const textNode = { nodeType: 3, nodeValue: 'abc' };
+  const sel = mkSelection({
+    emptyRects: true,
+    zeroHeight: true,
+    startContainer: textNode,
+    startOffset: 3,
+    expandRect: { top: 100, bottom: 120, height: 20 },
+  });
+  const container = mkContainer(() => true);
+  const rect = getCaretRect(container, sel);
+  assert.ok(rect);
+  assert.equal(rect.top, 100);
 });
 
 // --- setActiveBlock (DOM-Mutation, aber simpel stubbar) ---------------------
