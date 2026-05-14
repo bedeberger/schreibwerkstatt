@@ -6,7 +6,7 @@ import { tRaw } from './i18n.js';
 import { _sanitizeFigur } from './figuren.js';
 
 // Weiche Typen: standardmässig nicht vorausgewählt (User entscheidet pro Finding)
-export const SOFT_TYPEN = new Set(['wiederholung', 'schwaches_verb', 'fuellwort', 'filterwort', 'klischee', 'pleonasmus', 'show_vs_tell', 'passiv', 'perspektivbruch', 'tempuswechsel']);
+export const SOFT_TYPEN = new Set(['wiederholung', 'schwaches_verb', 'fuellwort', 'filterwort', 'klischee', 'pleonasmus', 'ki_geruch', 'show_vs_tell', 'passiv', 'perspektivbruch', 'tempuswechsel']);
 
 // Harte Typen = Default-selektiert → rote Einfärbung (Badge, Border, Inline-Mark --selected).
 // Weiche Typen und 'stil' = Default-unselektiert → orange Einfärbung.

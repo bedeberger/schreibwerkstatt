@@ -102,6 +102,24 @@ Pleonasmus-Regeln (typ: «pleonasmus»):
 - Selbsttest: Geht Information verloren, wenn der redundante Teil gestrichen wird? Wenn nein → melden.`;
 }
 
+export function _buildAiSmellBlock() {
+  return `
+KI-Geruch-Regeln (typ: «ki_geruch»):
+- Stellen identifizieren, die nach generischer LLM-Prosa klingen – aufgesetzte Bedeutsamkeit, leere Eleganz, sprachliche Tics, die in massenhaft KI-erzeugten Texten wiederkehren. Ziel ist NICHT, KI-Urheberschaft zu beweisen, sondern Passagen zu markieren, deren Tonfall an seelenlose Maschinenprosa erinnert und die literarische Stimme verwässert.
+- Vier konkrete Muster (mindestens eines muss klar erfüllt sein):
+  · GENERIC-ADJEKTIVE: leere Intensitäts- und Bedeutungssteigerer ohne sinnliche Verankerung («atemberaubend», «überwältigend», «gewaltig», «sanft», «zart», «geheimnisvoll», «magisch», «episch», «wunderschön», «unendlich», «zeitlos», «pur», «rein», «kristallklar», «samtweich», «strahlend»). Vor allem in Häufung oder als Adjektiv-Kette mehrerer dieser Wörter im gleichen Satz/Absatz.
+  · TRICOLA / PARALLELISMUS: dreigliedrige Aufzählung mit auffallend gleicher Satzlänge oder gleichem Bau («Er sah sie, er hörte sie, er fühlte sie.», «Die Stille. Die Leere. Die Kälte.», «Nicht aus Wut, nicht aus Trauer, nicht aus Verzweiflung.»). Typischer LLM-Rhythmus-Tic; vereinzelt vertretbar, gehäuft KI-Marker.
+  · GENERISCHE METAPHERN: abstrakte Sinnbild-Phrasen ohne Bodenhaftung («Reise zu sich selbst», «Tanz des Schicksals», «Symphonie der Gefühle», «Echo der Vergangenheit», «Wandteppich der Zeit», «Faden der Erinnerung», «Spiegel der Seele», «Schleier des Vergessens», «Funke der Hoffnung»). Hohle Metapher-Floskeln, die auf alles und nichts passen.
+  · ERKLÄR-TICS / AUFGESETZTE BEDEUTSAMKEIT: Inquit-Adverbien-Inflation («sagte sie nachdenklich», «flüsterte er sanft», «erwiderte sie zögernd»), Bedeutungs-Präambeln («Mit jedem Atemzug ...», «In diesem Moment wusste sie ...», «Es war, als ob ...», «Tief in ihrem Inneren ...», «Etwas in ihr ...»), redundante Gefühls-Doppelung («ein Lächeln, das gleichzeitig Trauer und Hoffnung trug»).
+- «original»: vollständiger Satz oder eindeutig abgrenzbare Phrase zeichengenau aus dem Text (denselben Span-Typ in «korrektur» beibehalten).
+- «korrektur»: konkrete Umformulierung mit sinnlicher Verankerung, präzisem Verb, eigener Stimme – nicht bloss kürzen, nicht das nächste KI-Muster.
+- «erklaerung»: EIN Satz, benennt das verletzte Muster («Generic-Adjektive ohne sinnliche Verankerung», «Tricola-Rhythmus mit drei parallelen Kola», «generische Metapher ohne Bodenhaftung», «Erklär-Inquit / aufgesetzte Bedeutsamkeit»).
+- In direkter Rede / Dialog NICHT melden: Figuren dürfen klischeehaft oder pathetisch sprechen – das charakterisiert. «ki_geruch» gilt ausschliesslich für Erzähltext.
+- NICHT melden bei: bewusstem Pathos (Trauerrede, feierlicher Anlass, Prolog/Epilog mit erhöhtem Ton), Ironie/Persiflage, lyrischen Passagen mit deutlich poetischem Register, Genre-Konvention (Märchen, Fabel, Saga).
+- Severity-Schwelle: nur deutliche Fälle. Ein einzelnes Generic-Adjektiv im sonst dichten Erzähltext → weglassen. Häufung im selben Satz/Absatz oder leerer Bedeutungs-Satz → melden.
+- Selbsttest: Liest sich diese Stelle wie generische LLM-Prosa, die in tausend anderen Texten genauso stehen könnte? Würde sie verloren gehen, wenn ein professioneller Lektor sie streicht? Wenn ja → melden. Bei Zweifel → weglassen.`;
+}
+
 export function _buildFigurenkonsistenzBlock() {
   return `
 Figurenkonsistenz-Regeln (typ: «namenskonsistenz», «figurenmerkmal», «anrede»):
