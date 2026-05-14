@@ -1060,6 +1060,8 @@
 
   "editor.toolbar.boldTitle":    "Bold (Ctrl/⌘+B)",
   "editor.toolbar.italicTitle":  "Italic (Ctrl/⌘+I)",
+  "editor.toolbar.synonymTitle": "Synonyms (Ctrl/⌘+Shift+S)",
+  "editor.toolbar.synonymLabel": "Syn",
 
   "editor.slash.hint":           "Choose block type",
   "editor.slash.paragraph":      "Paragraph",
@@ -1165,6 +1167,7 @@
   "shortcuts.item.bold":         "Bold (edit and focus mode)",
   "shortcuts.item.italic":       "Italic (edit and focus mode)",
   "shortcuts.item.synonym":      "Synonyms for selected word (edit mode)",
+  "shortcuts.item.synonymHotkey": "Open synonyms for selected word",
   "shortcuts.item.figurLookup":  "Character lookup by clicking on a name",
   "shortcuts.item.find":         "Find & Replace (in edit mode); otherwise focus book search",
   "shortcuts.item.focusToggle":  "Toggle focus mode",

@@ -74,16 +74,19 @@ export const appViewMethods = {
     await this.loadPageHistory(p.id);
   },
 
-  // Scroll-Ziel beim Seitenwechsel: Mobile (<960px, einspaltig) → Editor-Card
-  // ins Viewport, sonst sieht User den Tree statt der frisch geöffneten Seite.
-  // Desktop (>=960px, zweispaltig) → Window-Top, da Editor in eigener Spalte.
-  _scrollToEditorCard() {
+  // Scroll-Ziel beim Karten-Öffnen: Mobile (<960px, einspaltig) → Karte
+  // ins Viewport, sonst sieht User den Tree statt der frisch geöffneten Karte.
+  // Desktop (>=960px, zweispaltig) → Window-Top, da Karten in eigener Spalte.
+  _scrollToCardEl(el) {
     const isMobile = window.matchMedia('(max-width: 959.98px)').matches;
-    if (isMobile) {
-      const el = document.getElementById('editor-card');
-      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+    if (isMobile && el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  },
+  _scrollToEditorCard() {
+    this._scrollToCardEl(document.getElementById('editor-card'));
   },
 
   // Lädt die aktuell offene Seite neu vom Server (SW-Cache umgangen). Wird
@@ -115,6 +118,12 @@ export const appViewMethods = {
       if (keep !== c.key) this[c.flag] = false;
     }
     this.resetPage();
+    const target = keep ? EXCLUSIVE_CARDS.find(c => c.key === keep) : null;
+    if (target && typeof this.$nextTick === 'function') {
+      this.$nextTick(() => {
+        this._scrollToCardEl(document.querySelector(`[x-show="$app.${target.flag}"]`));
+      });
+    }
   },
 
   // Lädt Badge-Counts (offene Ideen, Chat-Sessions) für die geöffnete Seite.

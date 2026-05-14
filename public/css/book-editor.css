@@ -179,23 +179,31 @@
     50% { opacity: 1; }
   }
 
+  /* Stream als zusammenhängendes Papier-Panel: paper-bg auf dem Container,
+     Bodies transparent. Sonst alternieren beim Scrollen Caption- und Gap-Stripes
+     (Card-Weiss) mit Body-Stripes (Paper) → wahrgenommener Flicker bei schnellem
+     Scrollen an Seitenübergängen. */
   .book-editor-stream {
     display: flex;
     flex-direction: column;
-    padding: var(--space-lg) 0;
+    padding: var(--space-lg) clamp(18px, 4vw, 40px);
     max-width: 72ch;
     margin-inline: auto;
+    background: var(--color-page-view-bg);
+    color: var(--color-page-view-text);
+    border-radius: var(--radius-md);
   }
 
   /* ─ Kapitel-Header ─────────────────────────────────────────────────────
      Typografisch, kein gefärbter Balken. Sticky beim Scrollen. Dünne Rule
-     darunter zieht die Trennung zum ersten Seitenblock. */
+     darunter zieht die Trennung zum ersten Seitenblock. Bg matcht den Stream,
+     damit der Sticky-Handoff während Fast-Scroll nicht als Farbband flickert. */
   .book-editor-chapter-header {
     position: sticky;
     top: 0;
     z-index: 2;
     padding: var(--space-md) 0 var(--space-sm);
-    background: var(--color-bg);
+    background: var(--color-page-view-bg);
     margin-block: var(--space-lg) 0;
   }
   .book-editor-chapter-header:first-child { margin-block-start: 0; }
@@ -281,12 +289,13 @@
      Read- und Edit-Modus identische Typografie. Subtiler Hauch beim Fokus,
      kein Border/Background-Wechsel sonst. */
   .book-editor-page-body {
-    padding-block: var(--space-sm);
+    padding-block: 28px;
     min-height: 2em;
     outline: none;
     line-height: var(--lh-relaxed);
     font-size: var(--font-size-md);
-    color: var(--color-text);
+    color: inherit;
+    background: transparent;
     font-family: var(--font-serif);
   }
   .book-editor-page-body[contenteditable="false"] { cursor: text; }

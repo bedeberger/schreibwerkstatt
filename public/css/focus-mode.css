@@ -129,6 +129,17 @@ body.focus-mode .page-content-view--editing::-webkit-scrollbar {
   height: 0;
 }
 
+/* Klicks nur auf echten Textinhalt durchlassen. Die 45vh-Padding ober-/unterhalb
+   und der Bereich links/rechts der 60ch-Spalte sollen inert sein — sonst
+   springt der Caret beim Klick ins Leere an Anfang/Ende der Seite oder in den
+   ersten Absatz. pointer-events:none am Container, auto auf allen Descendants:
+   Klicks im Padding fallen durch (kein Caret-Move), Klicks auf Absätze/Marks
+   funktionieren normal. */
+body.focus-mode .page-content-view,
+body.focus-mode .page-content-view--editing { pointer-events: none; }
+body.focus-mode .page-content-view *,
+body.focus-mode .page-content-view--editing * { pointer-events: auto; }
+
 /* Im Fokus-Modus liegt #editor-card auf --z-overlay (2000). Popovers, die
    nach <body> teleportiert sind (Synonym-Menu/Picker, Figur-Lookup),
    bleiben sonst mit ihrem Default --z-popover (1000) unter dem Overlay
@@ -445,4 +456,44 @@ body.focus-mode .editor-conflict-banner {
   margin: 0;
 }
 
+/* Lektorat-Split im Fokus-Modus deaktivieren: Findings sind via
+   .lektorat-split-findings { display:none } ohnehin ausgeblendet, das
+   2-Col-Grid + 75vh-Höhe reservierten aber Platz und stauchten den
+   Preview auf Halbbreite. */
+body.focus-mode .editor-body-wrap.lektorat-split {
+  display: block;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+}
+body.focus-mode .editor-preview-wrap.lektorat-split-preview {
+  height: auto;
+  overflow: visible;
+}
+body.focus-mode .lektorat-split-preview .page-content-view,
+body.focus-mode .lektorat-split-preview .page-content-view--editing {
+  height: auto;
+  border-radius: 0;
+}
+
+/* Mark-Stripe rechts pro Absatz killen — Marks sind im Fokus visuell
+   neutralisiert, Stripe würde sonst als durchgehende Vertikallinie wirken. */
+body.focus-mode .page-content-view p:has(.lektorat-mark),
+body.focus-mode .page-content-view--editing p:has(.lektorat-mark) {
+  padding-right: 0;
+}
+body.focus-mode .page-content-view p:has(.lektorat-mark)::after,
+body.focus-mode .page-content-view--editing p:has(.lektorat-mark)::after {
+  display: none;
+}
+
+}
+
+/* Unlayered: globaler :focus-visible-Token-Outline (tokens/motion.css) lebt
+   unlayered und schlägt sonst jede @layer-components-Regel. Im Fokus-Modus
+   würde der Outline um .page-content-view--editing (60ch breit, viewport-hoch)
+   als zwei senkrechte Balken links/rechts der Lese-Spalte erscheinen. */
+body.focus-mode .page-content-view--editing:focus,
+body.focus-mode .page-content-view--editing:focus-visible {
+  outline: none;
 }

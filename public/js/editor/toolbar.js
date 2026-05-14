@@ -21,7 +21,7 @@ const SLASH_ITEMS = [
   { key: 'hr',         tag: 'hr' },
 ];
 
-import { getEditEl, placeCaretIn } from './utils.js';
+import { getEditEl, placeCaretIn, WORD_RE } from './utils.js';
 
 const BLOCK_SEL = 'p, h1, h2, h3, h4, h5, h6, blockquote, pre, li, div.poem';
 
@@ -71,6 +71,8 @@ export const toolbarCardMethods = {
     this.bubbleX = rect.left + rect.width / 2;
     this.bubbleY = rect.top;
     this.bubbleShow = true;
+    const text = sel.toString().trim();
+    this.bubbleSingleWord = !!text && WORD_RE.test(text);
   },
 
   _applyInline(command) {

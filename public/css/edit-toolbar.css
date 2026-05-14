@@ -28,6 +28,7 @@
 .edit-bubble-btn:active { background: var(--color-hover-strong); }
 .edit-bubble-btn--bold   { font-weight: 700; }
 .edit-bubble-btn--italic { font-style: italic; }
+.edit-bubble-btn--syn    { font-size: 0.78rem; padding-inline: 8px; border-left: 1px solid var(--color-border); }
 
 .edit-slash-menu {
   position: fixed;

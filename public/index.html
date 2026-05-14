@@ -88,7 +88,7 @@
       @keydown.ctrl.enter.window="if (showEditorCard && !checkLoading && !focusMode) runCheck()"
       @keydown.ctrl.s.prevent.window="if (editMode) quickSave()"
       @keydown.meta.s.prevent.window="if (editMode) quickSave()"
-      @keydown.window="handleShortcutsHotkey($event); handleFocusHotkey($event); handleNavHotkey($event); handleFindingsHotkey($event); handleTreeKeydown($event)"
+      @keydown.window="handleShortcutsHotkey($event); handleFocusHotkey($event); handleNavHotkey($event); handleFindingsHotkey($event); handleTreeKeydown($event); handleSynonymHotkey($event)"
       @app-update-available.window="updateAvailable = true">
 
 <a class="skip-link" href="#main-content" x-text="t('a11y.skipToMain')"></a>

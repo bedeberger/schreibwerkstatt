@@ -1061,6 +1061,8 @@
 
   "editor.toolbar.boldTitle":    "Fett (Strg/⌘+B)",
   "editor.toolbar.italicTitle":  "Kursiv (Strg/⌘+I)",
+  "editor.toolbar.synonymTitle": "Synonyme (Strg/⌘+Shift+S)",
+  "editor.toolbar.synonymLabel": "Syn",
 
   "editor.slash.hint":           "Blocktyp wählen",
   "editor.slash.paragraph":      "Absatz",
@@ -1166,6 +1168,7 @@
   "shortcuts.item.bold":         "Fett (im Bearbeiten- und Fokus-Modus)",
   "shortcuts.item.italic":       "Kursiv (im Bearbeiten- und Fokus-Modus)",
   "shortcuts.item.synonym":      "Synonyme für markiertes Wort (Bearbeiten-Modus)",
+  "shortcuts.item.synonymHotkey": "Synonyme für markiertes Wort öffnen",
   "shortcuts.item.figurLookup":  "Figuren-Lookup per Klick auf einen Namen",
   "shortcuts.item.find":         "Suchen & Ersetzen (im Bearbeiten-Modus); sonst Buchsuche fokussieren",
   "shortcuts.item.focusToggle":  "Fokus-Modus ein-/ausschalten",

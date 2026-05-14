@@ -769,6 +769,35 @@ Markup: [public/partials/avatar-menu.html](public/partials/avatar-menu.html). Be
 
 Nicht eigene Toolbar-Layouts pro Karte erfinden.
 
+### Card-Actions: Gruppierung (`.card-actions--grouped`)
+
+**Use:** Karten-Header mit ≥4 Aktionen, die semantisch in Bündel zerfallen (z.B. Editor: run-Aktionen / Modus-Toggles / Side-Card-Toggles). Trennstrich zwischen Bündeln macht die Aktionstypen visuell unterscheidbar.
+
+**Markup:**
+```html
+<div class="card-actions card-actions--grouped">
+  <span class="action-group">
+    <button>Prüfen</button>
+    <button>Speichern</button>
+  </span>
+  <span class="action-sep" aria-hidden="true"></span>
+  <span class="action-group">
+    <button>Bearbeiten</button>
+    <button>Fokus</button>
+  </span>
+</div>
+```
+
+**Klassen** ([public/css/misc.css](public/css/misc.css)):
+- `.action-group` — `display: contents` — semantischer Wrapper, kein Layout-Bruch zum Flex-Parent
+- `.action-sep` — 1 px Trennstrich (`var(--color-border)`), full-height via `align-self: stretch`
+
+**Mobile (≤700 px):** `.action-sep` wird ausgeblendet (Buttons stapeln ohnehin auf 100% Breite via Flex-Reflow). Kein paralleler Stack-Marker nötig.
+
+**Wann nicht:** Karten mit ≤3 Aktionen oder ohne semantische Bündel — bleiben bei flachem `.card-actions`. Gruppierung nur, wenn die Sektionen wirklich unterschiedliche Aktionstypen sind.
+
+**Referenz:** [public/partials/editor.html](public/partials/editor.html) (View-Mode: 3 Gruppen × run/mode/side; Edit-Mode: 2 Gruppen × commit/mode).
+
 ---
 
 ## Command-Palette

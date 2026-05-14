@@ -19,9 +19,22 @@
   white-space: nowrap;
 }
 
+/* Gruppen-Modifier: semantische Bündel mit Trennstrich.
+   .action-group ist display:contents — kein Layout-Bruch zum Flex-Parent. */
+.action-group { display: contents; }
+
+.action-sep {
+  display: inline-block;
+  width: 1px;
+  align-self: stretch;
+  background: var(--color-border);
+  margin: 4px 2px;
+}
+
 @media (max-width: 700px) {
   .card-actions { width: 100%; }
   .card-actions button { flex: 1 1 auto; min-width: 0; }
+  .card-actions--grouped .action-sep { display: none; }
 }
 
 @media (max-width: 480px) {
@@ -99,9 +112,9 @@
   display: flex;
   gap: 4px;
   align-items: center;
-  flex-shrink: 0;
   margin-left: 4px;
   flex-wrap: wrap;
+  min-width: 0;
 }
 
 /* === Compact Buttons === */

@@ -15,6 +15,7 @@ export function registerEditorToolbarCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
   window.Alpine.data('editorToolbarCard', () => ({
     bubbleShow: false,
+    bubbleSingleWord: false,
     bubbleX: 0,
     bubbleY: 0,
     slashShow: false,

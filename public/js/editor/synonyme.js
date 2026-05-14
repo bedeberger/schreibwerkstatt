@@ -3,31 +3,39 @@ import { WORD_RE, attachReflow, positionPopupNearRect, rangeForWordAtClientPoint
 import { startPoll } from '../cards/job-helpers.js';
 
 // Synonym-Ermittler für den contenteditable-Editor.
-// Rechtsklick auf ein markiertes Einzelwort → Custom-Menü → KI-Call →
-// Picker mit Synonymvorschlägen → Klick ersetzt das Wort im DOM.
+// Cmd/Ctrl+Shift+S auf markiertem Wort (oder Cursor in Wort) → Custom-Menü →
+// KI-Call → Picker mit Synonymvorschlägen → Klick ersetzt das Wort im DOM.
+// Trigger bewusst per Hotkey statt Rechtsklick — Rechtsklick gehört dem nativen
+// Browser-Menü inkl. Spellcheck.
 //
 // Zweigeteilt:
-//   - `synonymMethods`: Root-Trigger am contenteditable. Extrahiert Range +
-//     Wort, dispatcht `editor:synonym:open {range, word, x, y}`. Enthält
-//     Trampoline `closeSynonymMenu/Picker`, `requestSynonyms` für Legacy-
-//     Aufrufer (app-view.resetPage, editor-edit.cancelEdit/saveEdit).
+//   - `synonymMethods`: Root-Trigger (Hotkey + contextmenu für macOS-Figuren-
+//     Lookup-Fallback). Dispatcht `editor:synonym:open {range, word}`.
+//     Trampoline `closeSynonymMenu/Picker`, `requestSynonyms`.
 //   - `synonymCardMethods`: Menü/Picker-Display + Thesaurus/KI-Fetch in
 //     Alpine.data('editorSynonymeCard').
 
 export const synonymMethods = {
+  // contextmenu-Handler: fängt NUR macOS-Ctrl+Leftclick ab (feuert kein `click`,
+  // sondern `contextmenu`) — wenn das Wort eine Figur trifft, öffnet das
+  // Lookup-Popover. Plain Rechtsklick fällt durch zum nativen Browser-Menü
+  // (inkl. Spellcheck/Diktionär). Mobile bleibt komplett unangetastet.
   _onEditContextMenu(e) {
     if (!this.editMode) return;
-    // macOS: Ctrl+Klick feuert `contextmenu` statt `click`. Deshalb Figuren-
-    // Lookup auch hier versuchen, sonst ginge Ctrl+Klick auf eine Figur auf
-    // Mac nie.
-    if ((e.ctrlKey || e.metaKey) && this._tryOpenFigurLookupAt?.(e)) return;
+    if (!(e.ctrlKey || e.metaKey)) return;
+    this._tryOpenFigurLookupAt?.(e);
+  },
 
-    // Mobile: natives Kontextmenü behalten, Synonym-Feature ist Desktop-only.
+  // Cmd/Ctrl+Shift+S → Synonyme für markiertes Wort oder Wort unter Cursor.
+  // Nur im Edit-Mode aktiv (Fokus-Mode hat editMode=true → läuft mit).
+  handleSynonymHotkey(e) {
+    if (!this.editMode) return;
+    if (!(e.ctrlKey || e.metaKey) || !e.shiftKey || e.altKey) return;
+    if ((e.key || '').toLowerCase() !== 's') return;
     if (window.innerWidth <= 768) return;
     const editEl = this._getEditEl?.();
     if (!editEl) return;
     const sel = window.getSelection();
-
     let range = null;
     let wort = '';
     if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
@@ -37,25 +45,51 @@ export const synonymMethods = {
       if (!editEl.contains(r.commonAncestorContainer)) return;
       range = r.cloneRange();
       wort  = text;
+    } else if (sel && sel.rangeCount > 0) {
+      // Caret in Wort: Range expandieren über die Wortgrenzen.
+      const r = sel.getRangeAt(0);
+      if (!editEl.contains(r.commonAncestorContainer)) return;
+      const node = r.startContainer;
+      if (node.nodeType !== Node.TEXT_NODE) return;
+      const text = node.textContent || '';
+      let s = r.startOffset;
+      let eIdx = r.startOffset;
+      const isWord = (ch) => /[\p{L}\p{M}\d'’-]/u.test(ch);
+      while (s > 0 && isWord(text[s - 1])) s--;
+      while (eIdx < text.length && isWord(text[eIdx])) eIdx++;
+      const candidate = text.slice(s, eIdx);
+      if (!candidate || !WORD_RE.test(candidate)) return;
+      const expanded = document.createRange();
+      expanded.setStart(node, s);
+      expanded.setEnd(node, eIdx);
+      range = expanded;
+      wort  = candidate;
+      sel.removeAllRanges();
+      sel.addRange(expanded.cloneRange());
     } else {
-      // Safari markiert beim Rechtsklick auf ein Wort die Auswahl nicht
-      // automatisch — Wort unter Cursor selbst ermitteln.
-      const hit = rangeForWordAtClientPoint(e.clientX, e.clientY);
-      if (!hit) return;
-      if (!editEl.contains(hit.range.commonAncestorContainer)) return;
-      range = hit.range;
-      wort  = hit.word;
-      // Sichtbare Selektion setzen, damit der User weiss, auf welches Wort
-      // sich das Menü bezieht.
-      if (sel) {
-        sel.removeAllRanges();
-        sel.addRange(range.cloneRange());
-      }
+      return;
     }
-
     e.preventDefault();
     window.dispatchEvent(new CustomEvent('editor:synonym:open', {
-      detail: { range, word: wort, clientX: e.clientX, clientY: e.clientY },
+      detail: { range, word: wort },
+    }));
+  },
+
+  // Toolbar-Button („Syn"): liest aktuelle Selection (muss Einzelwort sein) und
+  // öffnet das Synonym-Menü. Bubble-Toolbar zeigt den Button nur, wenn die
+  // Selection als Einzelwort matcht — der Handler doppelt-prüft.
+  openSynonymForCurrentSelection() {
+    if (!this.editMode) return;
+    const editEl = this._getEditEl?.();
+    if (!editEl) return;
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+    const text = sel.toString().trim();
+    if (!text || !WORD_RE.test(text)) return;
+    const r = sel.getRangeAt(0);
+    if (!editEl.contains(r.commonAncestorContainer)) return;
+    window.dispatchEvent(new CustomEvent('editor:synonym:open', {
+      detail: { range: r.cloneRange(), word: text },
     }));
   },
 
