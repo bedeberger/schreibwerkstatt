@@ -1,6 +1,6 @@
 # ERD — bookstack-lektorat
 
-Stand: Schema-Version 102, 50 Tabellen (ohne `sqlite_*`/`schema_version`/`sessions`).
+Stand: Schema-Version 103, 53 Tabellen (ohne `sqlite_*`/`schema_version`/`sessions`).
 
 Quelle: Live-Dump aus [lektorat.db](../lektorat.db) (`.schema --indent`) + [db/migrations.js](../db/migrations.js). Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -40,6 +40,8 @@ erDiagram
   books ||--o{ book_extract_cache    : has
   books ||--o{ chapter_review_cache  : has
   books ||--o{ book_review_cache     : has
+  books ||--o{ chapter_macro_review_cache : has
+  books ||--o{ lektorat_cache        : has
   books ||--o{ finetune_ai_cache     : has
   books ||--o{ draft_figures         : has
   books ||--o{ werkstatt_runs        : has
@@ -55,6 +57,7 @@ erDiagram
   pages ||--o{ zeitstrahl_event_pages: at
   pages ||--o{ ideen                 : at
   pages ||--o{ lektorat_time         : on
+  pages ||--o{ lektorat_cache        : cached
   pages ||--o{ locations             : firstMention
   pages ||--o{ figures               : firstMention
 
@@ -67,6 +70,7 @@ erDiagram
   chapters ||--o{ chapter_reviews        : has
   chapters ||--o{ chapter_extract_cache  : cached
   chapters ||--o{ chapter_review_cache   : cached
+  chapters ||--o{ chapter_macro_review_cache : cached
   chapters ||--o{ pages                  : groups
   chapters ||--o{ page_checks            : ref
 
@@ -573,6 +577,28 @@ erDiagram
     TEXT    user_email   PK
     TEXT    pages_sig
     TEXT    review_json
+    TEXT    cached_at
+  }
+  chapter_macro_review_cache {
+    INTEGER book_id      PK,FK
+    TEXT    user_email   PK
+    INTEGER chapter_id   PK,FK
+    TEXT    pages_sig
+    TEXT    review_json
+    TEXT    cached_at
+  }
+  synonym_cache {
+    TEXT    user_email   PK
+    TEXT    key_hash     PK
+    TEXT    result_json
+    TEXT    cached_at
+  }
+  lektorat_cache {
+    INTEGER book_id      PK,FK
+    TEXT    user_email   PK
+    INTEGER page_id      PK,FK
+    TEXT    ctx_sig
+    TEXT    result_json
     TEXT    cached_at
   }
   finetune_ai_cache {

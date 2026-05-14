@@ -476,6 +476,101 @@ function deleteReviewCache(bookId, userEmail) {
   return c + b;
 }
 
+// ── Delta-Cache: Kapitel-Makro-Review (kapitel.js) ────────────────────────────
+// Single-Row pro Kapitel (Endergebnis). Sub-Chunk-Caches der Multi-Pass-Variante
+// werden bewusst NICHT gecached (sehr seltener Fall, eigene Tabelle wäre Overhead).
+const _loadChapterMacroReviewCache = db.prepare(
+  `SELECT review_json FROM chapter_macro_review_cache
+   WHERE book_id = ? AND user_email = ? AND chapter_id = ? AND pages_sig = ?`
+);
+const _saveChapterMacroReviewCache = db.prepare(
+  `INSERT OR REPLACE INTO chapter_macro_review_cache
+   (book_id, user_email, chapter_id, pages_sig, review_json, cached_at)
+   VALUES (?, ?, ?, ?, ?, ?)`
+);
+const _deleteChapterMacroReviewCache = db.prepare(
+  `DELETE FROM chapter_macro_review_cache WHERE book_id = ? AND user_email = ?`
+);
+
+function loadChapterMacroReviewCache(bookId, userEmail, chapterId, pagesSig) {
+  const row = _loadChapterMacroReviewCache.get(
+    parseInt(bookId), userEmail || '', parseInt(chapterId), pagesSig
+  );
+  if (!row) return null;
+  try { return JSON.parse(row.review_json); } catch { return null; }
+}
+
+function saveChapterMacroReviewCache(bookId, userEmail, chapterId, pagesSig, review) {
+  _saveChapterMacroReviewCache.run(
+    parseInt(bookId), userEmail || '', parseInt(chapterId),
+    pagesSig, JSON.stringify(review), new Date().toISOString(),
+  );
+}
+
+function deleteChapterMacroReviewCache(bookId, userEmail) {
+  return _deleteChapterMacroReviewCache.run(parseInt(bookId), userEmail || '').changes;
+}
+
+// ── Delta-Cache: Synonym-Suche (synonyme.js) ──────────────────────────────────
+// Key-Hash deckt wort + satz + buchtyp + locale + cacheVersion ab. Pro User.
+const _loadSynonymCache = db.prepare(
+  `SELECT result_json FROM synonym_cache WHERE user_email = ? AND key_hash = ?`
+);
+const _saveSynonymCache = db.prepare(
+  `INSERT OR REPLACE INTO synonym_cache (user_email, key_hash, result_json, cached_at)
+   VALUES (?, ?, ?, ?)`
+);
+const _deleteSynonymCache = db.prepare(`DELETE FROM synonym_cache WHERE user_email = ?`);
+
+function loadSynonymCache(userEmail, keyHash) {
+  const row = _loadSynonymCache.get(userEmail || '', keyHash);
+  if (!row) return null;
+  try { return JSON.parse(row.result_json); } catch { return null; }
+}
+
+function saveSynonymCache(userEmail, keyHash, result) {
+  _saveSynonymCache.run(userEmail || '', keyHash, JSON.stringify(result), new Date().toISOString());
+}
+
+function deleteSynonymCache(userEmail) {
+  return _deleteSynonymCache.run(userEmail || '').changes;
+}
+
+// ── Delta-Cache: Seiten-Lektorat (lektorat.js Single + Batch) ─────────────────
+// Single-Row pro Seite. ctx_sig deckt updated_at, Kapitelkontext (figuren/orte/
+// beziehungen), narrative, Stopwords/Regeln und cacheVersion ab.
+const _loadLektoratCache = db.prepare(
+  `SELECT result_json FROM lektorat_cache
+   WHERE book_id = ? AND user_email = ? AND page_id = ? AND ctx_sig = ?`
+);
+const _saveLektoratCache = db.prepare(
+  `INSERT OR REPLACE INTO lektorat_cache
+   (book_id, user_email, page_id, ctx_sig, result_json, cached_at)
+   VALUES (?, ?, ?, ?, ?, ?)`
+);
+const _deleteLektoratCache = db.prepare(
+  `DELETE FROM lektorat_cache WHERE book_id = ? AND user_email = ?`
+);
+
+function loadLektoratCache(bookId, userEmail, pageId, ctxSig) {
+  const row = _loadLektoratCache.get(
+    parseInt(bookId), userEmail || '', parseInt(pageId), ctxSig
+  );
+  if (!row) return null;
+  try { return JSON.parse(row.result_json); } catch { return null; }
+}
+
+function saveLektoratCache(bookId, userEmail, pageId, ctxSig, result) {
+  _saveLektoratCache.run(
+    parseInt(bookId), userEmail || '', parseInt(pageId),
+    ctxSig, JSON.stringify(result), new Date().toISOString(),
+  );
+}
+
+function deleteLektoratCache(bookId, userEmail) {
+  return _deleteLektoratCache.run(parseInt(bookId), userEmail || '').changes;
+}
+
 // ── Delta-Cache: Finetune-AI-Augmentation ─────────────────────────────────────
 // Cache-Key: (book_id, user_email, scope, scope_key, version).
 // scope: 'reverse-prompts' | 'fact-qa' | 'reasoning-backfill'
@@ -838,6 +933,9 @@ module.exports = {
   loadChapterExtractCache, saveChapterExtractCache, deleteChapterExtractCache,
   loadChapterReviewCache, saveChapterReviewCache,
   loadBookReviewCache, saveBookReviewCache, deleteReviewCache,
+  loadChapterMacroReviewCache, saveChapterMacroReviewCache, deleteChapterMacroReviewCache,
+  loadSynonymCache, saveSynonymCache, deleteSynonymCache,
+  loadLektoratCache, saveLektoratCache, deleteLektoratCache,
   loadFinetuneAiCache, saveFinetuneAiCache, deleteFinetuneAiCache,
   // pdf-export profiles
   listPdfExportProfiles:  pdfExport.listProfiles,

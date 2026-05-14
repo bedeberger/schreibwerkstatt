@@ -102,10 +102,12 @@ function pruneStaleBookData(bookId, validPageIds, validChapterIds) {
     page_figure_mentions: 0,
     chat_sessions: 0,
     ideen: 0,
+    lektorat_cache: 0,
     pages: 0,
     chapter_reviews: 0,
     chapter_extract_cache: 0,
     chapter_review_cache: 0,
+    chapter_macro_review_cache: 0,
     figure_appearances: 0,
     location_chapters: 0,
     chapters: 0,
@@ -127,6 +129,8 @@ function pruneStaleBookData(bookId, validPageIds, validChapterIds) {
       counts.chat_sessions        = db.prepare("DELETE FROM chat_sessions        WHERE book_id = ? AND kind = 'page' AND page_id IN (SELECT page_id FROM _stale_pages)").run(bookId).changes;
       // Ideen verwaister Seiten löschen (user-scoped Tabelle, aber Page weg → Inhalt obsolet)
       counts.ideen                = db.prepare('DELETE FROM ideen                WHERE book_id = ? AND page_id IN (SELECT page_id FROM _stale_pages)').run(bookId).changes;
+      // lektorat_cache: FK CASCADE seit Mig 103 — expliziter Cleanup defensiv.
+      counts.lektorat_cache       = db.prepare('DELETE FROM lektorat_cache       WHERE book_id = ? AND page_id IN (SELECT page_id FROM _stale_pages)').run(bookId).changes;
 
       // User-kuratierte Daten nur nullen (page_id-Ref weg, fachliche Daten bleiben)
       db.prepare('UPDATE figure_events SET page_id = NULL WHERE page_id IN (SELECT page_id FROM _stale_pages)').run();
@@ -155,6 +159,10 @@ function pruneStaleBookData(bookId, validPageIds, validChapterIds) {
       // chapter_review_cache: FK CASCADE seit Mig 102 — expliziter Cleanup defensiv.
       counts.chapter_review_cache = db.prepare(
         'DELETE FROM chapter_review_cache WHERE book_id = ? AND chapter_id IN (SELECT chapter_id FROM _stale_chapters)'
+      ).run(bookId).changes;
+      // chapter_macro_review_cache: FK CASCADE seit Mig 103 — expliziter Cleanup defensiv.
+      counts.chapter_macro_review_cache = db.prepare(
+        'DELETE FROM chapter_macro_review_cache WHERE book_id = ? AND chapter_id IN (SELECT chapter_id FROM _stale_chapters)'
       ).run(bookId).changes;
 
       db.prepare('UPDATE figure_events SET chapter_id = NULL WHERE chapter_id IN (SELECT chapter_id FROM _stale_chapters)').run();

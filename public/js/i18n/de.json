@@ -197,7 +197,7 @@
   "offline.syncConflicts":        "{n} Entwurf/Entwürfe nicht synchronisiert – Server hat sich seitdem geändert. Beim nächsten Öffnen der Seite wird nachgefragt.",
   "dev.banner":                  "DEV-MODUS – lokale Session, kein OAuth",
   "app.titleReset":              "Ansicht zurücksetzen",
-  "app.subtitle":                "KI-gestützte Rechtschreibprüfung & Stilanalyse",
+  "app.subtitle":                "Schreiben, Lektorat und Buchanalyse mit KI",
 
   "tokenSetup.title":            "BookStack API-Token einrichten",
   "tokenSetup.titleChange":      "BookStack API-Token ändern",
@@ -517,6 +517,9 @@
   "bookEditor.allSaved":         "Alle Änderungen gespeichert",
   "bookEditor.btn.find":         "Suchen",
   "bookEditor.btn.findTitle":    "Suchen/Ersetzen im ganzen Buch (Cmd/Ctrl+F)",
+  "bookEditor.btn.outline":      "Inhalt",
+  "bookEditor.btn.outlineTitle": "Inhaltsverzeichnis ein-/ausblenden",
+  "bookEditor.outline.title":    "Inhalt",
   "bookEditor.btn.saveAll":      "Alle speichern",
   "bookEditor.btn.saveAllTitle": "Alle ungespeicherten Blöcke sequenziell speichern (Cmd/Ctrl+S)",
   "bookEditor.btn.saveAllProgress": "Speichere {done}/{total} …",

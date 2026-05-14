@@ -7,6 +7,7 @@ KI-gestütztes Lektorat-Tool für [BookStack](https://www.bookstackapp.com/). Ei
 - **Seitenlektorat** – Rechtschreib-, Grammatik- und Stilprüfung mit selektiver Korrekturübernahme.
 - **Bearbeitungsmodus** – Seiten direkt bearbeiten und nach BookStack zurückspeichern. Auto-Save alle 30 s, lokaler Draft (localStorage), Offline-Modus mit Retry.
 - **Fokusmodus** (Cmd/Ctrl+Shift+E) – Vollbild, Typewriter-Scroll, Absatz-Hervorhebung. Auto-Save, Schreibzeit-Tracking, Live-Zeichen-/Wortzähler, Mobile-/IME-Support.
+- **Bucheditor** – Ganzes Buch als scrollbarer Stream mit Kapitel-Trennern und Inhaltsverzeichnis-Outline. Inline-Edit pro Seite, dirty/saving/conflict-Status je Block, Save-All sequenziell, Konflikterkennung (Server-Version vs. eigene). Buchweite Suche & Ersetzen (Case/Whole-Word, Treffer-Navigation, Replace-All) über alle Seiten hinweg.
 - **Synonym-Finder** – Wort markieren → Rechtsklick → Vorschläge aus [OpenThesaurus](https://www.openthesaurus.de/) + KI mit Satzkontext.
 - **Seiten-Chat** – KI-Dialog zu einer Seite. Änderungsvorschläge übernehmbar.
 - **Buch-Chat** – KI-Dialog über das ganze Buch mit Werkzeugen (Pronomen-Zählung, Figurenverteilung, Volltextsuche, Seitenabruf) auf vorberechnetem Index.

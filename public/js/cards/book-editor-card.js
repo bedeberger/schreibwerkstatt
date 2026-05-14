@@ -118,6 +118,14 @@ export function registerBookEditorCard() {
     _findRecomputeTimer: null,
     _beforeUnloadHandler: null,
 
+    // Outline (Inhaltsverzeichnis): aktuell sichtbarer Page-Block via
+    // IntersectionObserver. collapsedChapters: Set<chapterId> für eingeklappte
+    // Kapitel-Gruppen. outlineOpen: Mobile-Toggle.
+    visiblePageId: null,
+    collapsedChapters: {},
+    outlineOpen: true,
+    _outlineObserver: null,
+
     _lifecycle: null,
 
     init() {
@@ -132,6 +140,7 @@ export function registerBookEditorCard() {
           dirtyCount: 0, savingCount: 0,
           findOpen: false, findTerm: '', findReplace: '',
           findMatches: [], findIndex: -1,
+          visiblePageId: null, collapsedChapters: {},
         },
         load: (root) => this._load(root.selectedBookId),
       });
@@ -143,6 +152,12 @@ export function registerBookEditorCard() {
         }
       };
       window.addEventListener('beforeunload', this._beforeUnloadHandler, { signal: this._lifecycle.signal });
+
+      // Cmd/Ctrl+F-Routing via editor-find-card: dispatcht hierher, wenn die
+      // Karte sichtbar ist (statt BookStack-Search zu fokussieren).
+      window.addEventListener('book-editor:open-find', () => {
+        if (window.__app?.showBookEditorCard) this.openFind();
+      }, { signal: this._lifecycle.signal });
     },
 
     destroy() {
@@ -150,6 +165,7 @@ export function registerBookEditorCard() {
       for (const t of this._autosaveMaxTimers.values()) clearTimeout(t);
       this._autosaveTimers.clear();
       this._autosaveMaxTimers.clear();
+      this._teardownOutlineObserver();
       clearHighlights();
       this._lifecycle?.destroy();
     },
@@ -171,6 +187,8 @@ export function registerBookEditorCard() {
           const app = window.__app;
           app?.setStatus?.(app.t('bookEditor.missingPages', { n: data.missing }), false, 5000);
         }
+        // Outline-IntersectionObserver nach Render bauen.
+        this.$nextTick(() => this._initOutlineObserver());
       } catch (e) {
         this.loading = false;
         this.loadError = e.message || 'Load failed';
@@ -384,6 +402,107 @@ export function registerBookEditorCard() {
       block._rev++;
     },
 
+    // ── Outline / TOC ─────────────────────────────────────────────────────
+    // Liste der Outline-Items, abgeleitet aus blocks. Pro Page mit Mini-Status
+    // (dirty/saving/saved). Pro Kapitel: Liste seiner Pages + collapsed-Flag.
+    get outlineNodes() {
+      const out = [];
+      let currentChapter = null;
+      let solos = [];
+      for (const b of this.blocks) {
+        if (b.kind === 'chapter') {
+          if (solos.length) { out.push({ kind: 'solos', pages: solos }); solos = []; }
+          currentChapter = { kind: 'chapter', chapterId: b.chapterId, name: b.name, pages: [] };
+          out.push(currentChapter);
+        } else if (b.kind === 'page') {
+          const item = { kind: 'page', pageId: b.pageId, name: b.name, block: b };
+          if (currentChapter) currentChapter.pages.push(item);
+          else solos.push(item);
+        }
+      }
+      if (solos.length) out.push({ kind: 'solos', pages: solos });
+      return out;
+    },
+
+    _initOutlineObserver() {
+      this._teardownOutlineObserver();
+      if (typeof IntersectionObserver === 'undefined') return;
+      const targets = document.querySelectorAll('.book-editor-page-card');
+      if (targets.length === 0) return;
+      const visible = new Map();
+      let rafScheduled = false;
+      const flush = () => {
+        rafScheduled = false;
+        // Topmost sichtbaren Block wählen: kleinster top-offset > 0.
+        let bestId = null, bestTop = Infinity;
+        for (const [id, top] of visible) {
+          if (top < bestTop) { bestTop = top; bestId = id; }
+        }
+        if (bestId != null) {
+          const next = parseInt(bestId, 10);
+          if (next !== this.visiblePageId) this.visiblePageId = next;
+        }
+      };
+      const io = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          const id = entry.target.dataset.outlinePageId;
+          if (!id) continue;
+          if (entry.isIntersecting) {
+            // Top-Position relativ zum Viewport — stabiler als intersectionRatio
+            // bei langen Blöcken, die den ganzen Viewport füllen (Ratio nahe 1
+            // für mehrere Pages → Wechsel zwischen ihnen wackelt).
+            visible.set(id, entry.boundingClientRect.top);
+          } else {
+            visible.delete(id);
+          }
+        }
+        // rAF-Throttle: viele IO-Entries pro Scroll-Tick zu EINEM Update bündeln.
+        // Verhindert Reactivity-Sturm + Outline-Active-Glitches beim Fast-Scroll.
+        if (!rafScheduled) {
+          rafScheduled = true;
+          requestAnimationFrame(flush);
+        }
+      }, {
+        // Top-Margin schiebt den Schwellenwert unter den Sticky-Header.
+        // Threshold [0] reicht — wir wählen nach boundingClientRect.top, nicht
+        // nach Ratio; weniger Trigger-Events.
+        rootMargin: '-100px 0px -60% 0px',
+        threshold: 0,
+      });
+      for (const t of targets) io.observe(t);
+      this._outlineObserver = io;
+    },
+
+    _teardownOutlineObserver() {
+      if (this._outlineObserver) {
+        this._outlineObserver.disconnect();
+        this._outlineObserver = null;
+      }
+    },
+
+    scrollToBlock(pageId) {
+      const el = document.querySelector(`[data-outline-page-id="${pageId}"]`);
+      if (!el) return;
+      el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      this.visiblePageId = pageId;
+    },
+
+    toggleChapterCollapse(chapterId) {
+      const next = { ...this.collapsedChapters };
+      if (next[chapterId]) delete next[chapterId];
+      else next[chapterId] = true;
+      this.collapsedChapters = next;
+    },
+
+    outlinePageStatus(block) {
+      if (!block) return '';
+      if (block.saving) return 'saving';
+      if (block.conflict || block.saveError) return 'error';
+      if (block.dirty) return 'dirty';
+      if (block.savedAt && (Date.now() - block.savedAt) < 4000) return 'saved';
+      return '';
+    },
+
     // ── Find / Replace ────────────────────────────────────────────────────
     openFind() {
       this.findOpen = true;
@@ -593,17 +712,13 @@ export function registerBookEditorCard() {
       }
     },
 
+    // Cmd/Ctrl+F läuft global über editor-find-card → book-editor:open-find.
+    // Hier nur Cmd/Ctrl+S für Save-All.
     onCardKeydown(event) {
       const mod = event.metaKey || event.ctrlKey;
-      if (mod && (event.key === 'f' || event.key === 'F')) {
-        event.preventDefault();
-        this.openFind();
-        return;
-      }
-      if (mod && (event.key === 's' || event.key === 'S')) {
+      if (mod && !event.shiftKey && !event.altKey && (event.key === 's' || event.key === 'S')) {
         event.preventDefault();
         this.saveAllDirty();
-        return;
       }
     },
 

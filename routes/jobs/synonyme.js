@@ -1,9 +1,14 @@
 'use strict';
+const crypto = require('crypto');
 const express = require('express');
+const {
+  getBookSettings,
+  loadSynonymCache, saveSynonymCache,
+} = require('../../db/schema');
 const {
   makeJobLogger, updateJob, completeJob, failJob, i18nError,
   aiCall, getPrompts, getBookPrompts,
-  tps,
+  _modelName, tps,
   jobs, runningJobs, createJob, enqueueJob, jobKey, findActiveJobId,
   jsonBody,
 } = require('./shared');
@@ -12,13 +17,33 @@ const { setContext } = require('../../lib/log-context');
 
 const synonymeRouter = express.Router();
 
+function _synonymKeyHash(wort, satz, bookSettings, cacheVersion) {
+  const buchtyp = bookSettings?.buchtyp || '';
+  const locale = `${bookSettings?.language || 'de'}-${bookSettings?.region || 'CH'}`;
+  const buchKontext = bookSettings?.buch_kontext || '';
+  const raw = `${wort.trim().toLowerCase()}|${satz.trim().toLowerCase()}|${buchtyp}|${locale}|${buchKontext}|${cacheVersion}`;
+  return crypto.createHash('sha1').update(raw).digest('hex');
+}
+
 async function runSynonymJob(jobId, wort, satz, bookId, userEmail) {
   const logger = makeJobLogger(jobId);
-  const { buildSynonymPrompt, SCHEMA_SYNONYM } = await getPrompts();
+  const prompts = await getPrompts();
+  const { buildSynonymPrompt, SCHEMA_SYNONYM, PROMPTS_VERSION } = prompts;
   const { SYSTEM_SYNONYM } = await getBookPrompts(bookId, userEmail);
+  const bookSettings = bookId ? getBookSettings(bookId, userEmail) : null;
+  const cacheVersion = `${_modelName(process.env.API_PROVIDER || 'claude')}:${PROMPTS_VERSION || ''}`;
+  const keyHash = _synonymKeyHash(wort, satz, bookSettings, cacheVersion);
   try {
     logger.info(`Start: «${wort}»`);
     updateJob(jobId, { statusText: 'job.phase.searchingSynonyms', progress: 10 });
+
+    const cached = loadSynonymCache(userEmail, keyHash);
+    if (cached) {
+      logger.info(`«${wort}» – Cache-HIT, spart Synonym-Call.`);
+      completeJob(jobId, { synonyme: cached, tokensIn: 0, tokensOut: 0, cached: true },
+        null, `«${wort}» Cache-HIT ${cached.length} Vorschläge`);
+      return;
+    }
 
     const tok = { in: 0, out: 0, ms: 0 };
     const result = await aiCall(jobId, tok,
@@ -40,6 +65,8 @@ async function runSynonymJob(jobId, wort, satz, bookId, userEmail) {
         seen.add(key);
         return true;
       });
+
+    saveSynonymCache(userEmail, keyHash, synonyme);
 
     completeJob(jobId, { synonyme, tokensIn: tok.in, tokensOut: tok.out },
       tps(tok), `«${wort}» ${synonyme.length} Vorschläge`);
@@ -66,4 +93,4 @@ synonymeRouter.post('/synonym', jsonBody, (req, res) => {
   res.json({ jobId });
 });
 
-module.exports = { synonymeRouter };
+module.exports = { synonymeRouter, runSynonymJob };

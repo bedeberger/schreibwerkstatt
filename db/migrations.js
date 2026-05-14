@@ -4006,6 +4006,51 @@ function runMigrations() {
     logger.info('DB-Migration auf Version 102 abgeschlossen (chapter_review_cache + book_review_cache für Buch-Review Delta-Caching).');
   }
 
+  if (version < 103) {
+    // Delta-Caches für Kapitel-Bewertung, Synonym-Suche, Seiten-Lektorat.
+    // Analog zu chapter_extract_cache: pages_sig/ctx_sig identisch → HIT.
+    const mig103 = `
+      CREATE TABLE IF NOT EXISTS chapter_macro_review_cache (
+        book_id     INTEGER NOT NULL REFERENCES books(book_id)       ON DELETE CASCADE,
+        user_email  TEXT    NOT NULL DEFAULT '',
+        chapter_id  INTEGER NOT NULL REFERENCES chapters(chapter_id) ON DELETE CASCADE,
+        pages_sig   TEXT    NOT NULL,
+        review_json TEXT    NOT NULL,
+        cached_at   TEXT    NOT NULL,
+        PRIMARY KEY (book_id, user_email, chapter_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_cmrc_book_user
+        ON chapter_macro_review_cache(book_id, user_email);
+
+      CREATE TABLE IF NOT EXISTS synonym_cache (
+        user_email  TEXT    NOT NULL DEFAULT '',
+        key_hash    TEXT    NOT NULL,
+        result_json TEXT    NOT NULL,
+        cached_at   TEXT    NOT NULL,
+        PRIMARY KEY (user_email, key_hash)
+      );
+      CREATE INDEX IF NOT EXISTS idx_sc_user ON synonym_cache(user_email);
+
+      CREATE TABLE IF NOT EXISTS lektorat_cache (
+        book_id     INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        user_email  TEXT    NOT NULL DEFAULT '',
+        page_id     INTEGER NOT NULL REFERENCES pages(page_id) ON DELETE CASCADE,
+        ctx_sig     TEXT    NOT NULL,
+        result_json TEXT    NOT NULL,
+        cached_at   TEXT    NOT NULL,
+        PRIMARY KEY (book_id, user_email, page_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_lc_book_user ON lektorat_cache(book_id, user_email);
+    `;
+    db.exec(mig103);
+    const fkErrors103 = db.pragma('foreign_key_check');
+    if (fkErrors103.length) {
+      throw new Error(`Migration 103: foreign_key_check meldet ${fkErrors103.length} Verstoesse: ${JSON.stringify(fkErrors103.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 103').run();
+    logger.info('DB-Migration auf Version 103 abgeschlossen (chapter_macro_review_cache + synonym_cache + lektorat_cache).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

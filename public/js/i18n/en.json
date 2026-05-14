@@ -197,7 +197,7 @@
   "offline.syncConflicts":        "{n} draft(s) not synced – server changed in the meantime. You'll be asked when you reopen the page.",
   "dev.banner":                  "DEV MODE – local session, no OAuth",
   "app.titleReset":              "Reset view",
-  "app.subtitle":                "AI-assisted spellchecking & style analysis",
+  "app.subtitle":                "Writing, editing and book analysis with AI",
 
   "tokenSetup.title":            "Set up BookStack API token",
   "tokenSetup.titleChange":      "Change BookStack API token",
@@ -517,6 +517,9 @@
   "bookEditor.allSaved":         "All changes saved",
   "bookEditor.btn.find":         "Find",
   "bookEditor.btn.findTitle":    "Find & replace across the whole book (Cmd/Ctrl+F)",
+  "bookEditor.btn.outline":      "Outline",
+  "bookEditor.btn.outlineTitle": "Show/hide outline",
+  "bookEditor.outline.title":    "Outline",
   "bookEditor.btn.saveAll":      "Save all",
   "bookEditor.btn.saveAllTitle": "Save all unsaved blocks sequentially (Cmd/Ctrl+S)",
   "bookEditor.btn.saveAllProgress": "Saving {done}/{total} …",

@@ -17,6 +17,10 @@
     </div>
     <div class="card-header-aside">
       <div class="card-actions">
+        <button type="button" @click="outlineOpen = !outlineOpen"
+                :class="{ primary: outlineOpen }"
+                :data-tip="$app.t('bookEditor.btn.outlineTitle')"
+                x-text="$app.t('bookEditor.btn.outline')"></button>
         <button type="button" @click="openFind()"
                 :data-tip="$app.t('bookEditor.btn.findTitle')"
                 x-text="$app.t('bookEditor.btn.find')"></button>
@@ -36,7 +40,71 @@
   </div>
   <div x-show="loadError" class="card-status book-editor-load-error" x-text="loadError"></div>
 
-  <div class="book-editor-stream" x-show="!loading && blocks.length > 0">
+  <div class="book-editor-layout" :class="{ 'book-editor-layout--no-outline': !outlineOpen }"
+       x-show="!loading && blocks.length > 0">
+
+    <!-- Outline / Inhaltsverzeichnis -->
+    <aside class="book-editor-outline" x-show="outlineOpen" x-cloak>
+      <div class="book-editor-outline-title" x-text="$app.t('bookEditor.outline.title')"></div>
+      <nav class="book-editor-outline-nav" :aria-label="$app.t('bookEditor.outline.title')">
+        <template x-for="node in outlineNodes" :key="node.kind === 'chapter' ? ('c-' + node.chapterId) : ('s-' + (node.pages?.[0]?.pageId || 0))">
+          <div class="book-editor-outline-group">
+
+            <template x-if="node.kind === 'chapter'">
+              <button type="button"
+                      class="book-editor-outline-chapter"
+                      :class="{ 'book-editor-outline-chapter--collapsed': !!collapsedChapters[node.chapterId] }"
+                      @click="toggleChapterCollapse(node.chapterId)">
+                <span class="book-editor-outline-chevron" x-text="collapsedChapters[node.chapterId] ? '›' : '⌄'"></span>
+                <span class="book-editor-outline-chapter-name" x-text="node.name"></span>
+                <span class="book-editor-outline-count" x-text="node.pages.length"></span>
+              </button>
+            </template>
+
+            <template x-if="node.kind === 'chapter' && !collapsedChapters[node.chapterId]">
+              <ul class="book-editor-outline-pages">
+                <template x-for="pg in node.pages" :key="pg.pageId">
+                  <li>
+                    <button type="button"
+                            class="book-editor-outline-page"
+                            :class="{
+                              'book-editor-outline-page--active': visiblePageId === pg.pageId,
+                              ['book-editor-outline-page--' + outlinePageStatus(pg.block)]: !!outlinePageStatus(pg.block),
+                            }"
+                            @click="scrollToBlock(pg.pageId)">
+                      <span class="book-editor-outline-dot" aria-hidden="true"></span>
+                      <span class="book-editor-outline-page-name" x-text="pg.name"></span>
+                    </button>
+                  </li>
+                </template>
+              </ul>
+            </template>
+
+            <template x-if="node.kind === 'solos'">
+              <ul class="book-editor-outline-pages book-editor-outline-pages--solo">
+                <template x-for="pg in node.pages" :key="pg.pageId">
+                  <li>
+                    <button type="button"
+                            class="book-editor-outline-page"
+                            :class="{
+                              'book-editor-outline-page--active': visiblePageId === pg.pageId,
+                              ['book-editor-outline-page--' + outlinePageStatus(pg.block)]: !!outlinePageStatus(pg.block),
+                            }"
+                            @click="scrollToBlock(pg.pageId)">
+                      <span class="book-editor-outline-dot" aria-hidden="true"></span>
+                      <span class="book-editor-outline-page-name" x-text="pg.name"></span>
+                    </button>
+                  </li>
+                </template>
+              </ul>
+            </template>
+
+          </div>
+        </template>
+      </nav>
+    </aside>
+
+    <div class="book-editor-stream">
     <template x-for="block in blocks" :key="block.kind === 'chapter' ? ('c-' + block.chapterId) : ('p-' + block.pageId)">
       <div class="book-editor-row">
 
@@ -48,6 +116,7 @@
 
         <template x-if="block.kind === 'page'">
           <div class="book-editor-page-card"
+               :data-outline-page-id="block.pageId"
                :class="{
                  'book-editor-page-card--active': activePageId === block.pageId,
                  'book-editor-page-card--dirty': block.dirty,
@@ -89,6 +158,7 @@
 
       </div>
     </template>
+    </div>
   </div>
 
   <div x-show="!loading && blocks.length === 0 && !loadError" class="card-status"

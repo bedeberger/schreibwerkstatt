@@ -298,6 +298,58 @@ test('Kapitel-Review: 1 Kapitel → 1 AI-Call, chapter_reviews-Zeile', async () 
   assert.equal(stored.gesamtnote, 4.1);
 });
 
+test('Kapitel-Review Cache: Rerun trifft chapter_macro_review_cache → 0 AI-Calls', async () => {
+  const BOOK_ID = 93;
+  const CHAPTER_ID = 9800;
+  ctx.mockBs.setBook({
+    chapters: [{ id: CHAPTER_ID, book_id: BOOK_ID, name: 'Kap A' }],
+    pages: [
+      { id: 9810, book_id: BOOK_ID, chapter_id: CHAPTER_ID, name: 'S 1', priority: 0, updated_at: '2026-05-01T10:00:00Z' },
+      { id: 9811, book_id: BOOK_ID, chapter_id: CHAPTER_ID, name: 'S 2', priority: 1, updated_at: '2026-05-01T10:00:00Z' },
+    ],
+    pageBodies: {
+      9810: '<p>Anna ging in den Wald.</p>',
+      9811: '<p>Es war kalt.</p>',
+    },
+  });
+
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.includes('gesamtnote') && e.schemaKeys.includes('dramaturgie'),
+    chapterReviewResponse(4.1),
+  );
+
+  // Erster Run → schreibt Cache.
+  const jobId1 = ctx.shared.createJob('chapter-review', BOOK_ID, 'tester@test.dev', 'job.label.chapterReview', null, CHAPTER_ID);
+  ctx.shared.enqueueJob(jobId1, () =>
+    ctx.kapitel.runChapterReviewJob(jobId1, BOOK_ID, CHAPTER_ID, 'Kap A', 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }),
+  );
+  const job1 = await waitForJob(ctx.shared, jobId1);
+  assert.equal(job1.status, 'done');
+  assert.equal(ctx.mockAi.log.length, 1, '1. Run = 1 Call');
+
+  const cacheRow = ctx.dbSchema.db.prepare(
+    'SELECT pages_sig FROM chapter_macro_review_cache WHERE book_id = ? AND chapter_id = ? AND user_email = ?'
+  ).get(BOOK_ID, CHAPTER_ID, 'tester@test.dev');
+  assert.ok(cacheRow, 'chapter_macro_review_cache fehlt nach 1. Run');
+
+  // Zweiter Run → Cache-HIT.
+  const jobId2 = ctx.shared.createJob('chapter-review', BOOK_ID, 'tester@test.dev', 'job.label.chapterReview', null, CHAPTER_ID);
+  ctx.shared.enqueueJob(jobId2, () =>
+    ctx.kapitel.runChapterReviewJob(jobId2, BOOK_ID, CHAPTER_ID, 'Kap A', 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }),
+  );
+  const job2 = await waitForJob(ctx.shared, jobId2);
+  assert.equal(job2.status, 'done');
+  assert.equal(job2.result.review.gesamtnote, 4.1);
+  assert.equal(job2.result.cached, true);
+  assert.equal(ctx.mockAi.log.length, 1, '2. Run = Cache-HIT');
+
+  // chapter_reviews-Zeile wird trotz HIT geschrieben (History-Eintrag).
+  const reviewRows = ctx.dbSchema.db.prepare(
+    'SELECT COUNT(*) AS n FROM chapter_reviews WHERE book_id = ? AND chapter_id = ? AND user_email = ?'
+  ).get(BOOK_ID, CHAPTER_ID, 'tester@test.dev').n;
+  assert.equal(reviewRows, 2, 'beide Runs in chapter_reviews persistiert');
+});
+
 test('Kapitel-Review: leeres Kapitel → result.empty, kein AI-Call', async () => {
   const BOOK_ID = 91;
   const CHAPTER_ID = 9400;
