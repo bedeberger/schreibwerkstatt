@@ -384,6 +384,25 @@ export const BOOK_CHAT_TOOLS = [
       required: [],
     },
   },
+  {
+    name: 'list_werkstatt_drafts',
+    description: 'Listet die Figuren-Werkstatt-Drafts dieses Users für das Buch: pro Draft Name, Archetyp, Quell-Figur (falls Import), notes-Vorschau, Anzahl Brainstorm-/Consistency-Läufe und Metadaten zum letzten KI-Lauf. Werkstatt-Drafts sind vom Katalog (get_figure_profile) getrennte Vorwärts-Entwicklungs-Mindmaps für Figuren. Beantwortet "an welchen Figuren arbeitet der User in der Werkstatt?".',
+    input_schema: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'get_werkstatt_draft',
+    description: 'Lädt einen Werkstatt-Draft mit kompletter Mindmap (als hierarchischer Plaintext: eingerückte Bullet-Liste der Knoten in User-Locale aufgelöst) und optional die KI-Läufe (Brainstorm-Vorschläge, Consistency-Konflikte+Fazit) gekürzt. Ideal für "was hat der User für Figur X notiert?", "was kam beim Brainstorm raus?", "welche Inkonsistenzen wurden bei der Werkstatt-Figur gefunden?". draft_id (bevorzugt) ODER figur_name angeben.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        draft_id:     { type: 'integer', description: 'Draft-ID aus list_werkstatt_drafts.' },
+        figur_name:   { type: 'string',  description: 'Alternative: Name des Werkstatt-Drafts (exakt oder Substring).' },
+        include_runs: { type: 'boolean', description: 'true = KI-Läufe (Brainstorm/Consistency) mitliefern. Default: true.' },
+        run_limit:    { type: 'integer', description: 'Maximale Anzahl Läufe (default 5, max 20). Neueste zuerst.' },
+      },
+      required: [],
+    },
+  },
 ];
 
 export function buildBookChatSystemPrompt(bookName, relevantPages, figuren, review, systemOverride = null) {
