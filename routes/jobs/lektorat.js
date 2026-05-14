@@ -161,13 +161,14 @@ async function runCheckJob(jobId, pageId, bookId, userEmail, userToken) {
     updateJob(jobId, { statusText: 'job.phase.aiAnalyzing', progress: 10 });
 
     // Cache nur wenn bookId vorhanden (FK auf books).
+    const langCode = (locale || 'de-CH').split('-')[0];
     const ctxSig = bookId ? buildLektoratCtxSig({
       upd: pd.updated_at || '',
       text_sha: crypto.createHash('sha1').update(text).digest('hex').slice(0, 16),
       fig: figuren, ort: orte, bez: figurenBeziehungen,
       nar: narrativeLabels(bookSettings),
       sw: lektoratStopwords, er: lektoratErklaerungRule, kr: lektoratKorrekturRegeln,
-      pe: previousExcerpt, cn: chapterName, pn: pd.name, cv: cacheVersion,
+      pe: previousExcerpt, cn: chapterName, pn: pd.name, cv: cacheVersion, lc: langCode,
     }) : null;
     const cached = ctxSig ? loadLektoratCache(bookId, userEmail, pageId, ctxSig) : null;
 
@@ -186,6 +187,7 @@ async function runCheckJob(jobId, pageId, bookId, userEmail, userToken) {
           pageName: pd.name, chapterName,
           ...narrativeLabels(bookSettings),
           previousExcerpt,
+          langCode,
         }),
         SYSTEM_LEKTORAT,
         10, 97, 5000, 0.2, null, undefined, SCHEMA_LEKTORAT,
@@ -234,6 +236,7 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
   const cacheVersion = `${_modelName(process.env.API_PROVIDER || 'claude')}:${PROMPTS_VERSION || ''}`;
   const { SYSTEM_LEKTORAT, STOPWORDS: batchStopwords, ERKLAERUNG_RULE: batchErklaerungRule, KORREKTUR_REGELN: batchKorrekturRegeln } = await getBookPrompts(bookId, userEmail);
   const locale = getBookLocale(bookId, userEmail);
+  const langCode = (locale || 'de-CH').split('-')[0];
   const bookSettings = getBookSettings(bookId, userEmail);
   // Kapitelname-Cache (chapter_id → name) aus lokaler DB, spart wiederholte Lookups pro Seite.
   const chapterRows = db.prepare('SELECT chapter_id, chapter_name FROM chapters WHERE book_id = ?').all(parseInt(bookId));
@@ -295,7 +298,7 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
           ep: bookSettings?.erzaehlperspektive || null,
           ez: bookSettings?.erzaehlzeit || null,
           sw: batchStopwords, er: batchErklaerungRule, kr: batchKorrekturRegeln,
-          pe: previousExcerpt, cn: chapterName, pn: p.name, cv: cacheVersion,
+          pe: previousExcerpt, cn: chapterName, pn: p.name, cv: cacheVersion, lc: langCode,
         });
         const cached = loadLektoratCache(bookId, userEmail, p.id, ctxSig);
 
@@ -320,6 +323,7 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
               erzaehlperspektive: bookSettings?.erzaehlperspektive || null,
               erzaehlzeit: bookSettings?.erzaehlzeit || null,
               previousExcerpt,
+              langCode,
             }),
             SYSTEM_LEKTORAT,
             null, null, 2000, 0.2, null, undefined, SCHEMA_LEKTORAT,

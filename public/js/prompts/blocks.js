@@ -137,27 +137,39 @@ Schauplatzkonsistenz-Regeln (typ: «schauplatzmerkmal»):
 - Severity-Schwelle: nur deutliche Widersprüche. Stamm-Schweigen → kein Eintrag.`;
 }
 
-export function _buildDialogformatBlock() {
+// Locale-scharf: liefert NUR die Normen der Buch-Sprache (DE oder EN).
+// langCode = 'de' (default) | 'en'.
+export function _buildDialogformatBlock(langCode = 'de') {
+  if (langCode === 'en') {
+    return `
+Dialogue-format rules (typ: «dialogformat»):
+- Typographic correctness of direct speech, English convention. Within a book the choice must be consistent – the variant established by the book is the norm, deviations from it are findings.
+- Quotation marks: "…" (typographic double quotes). Nested quote: '…' (single).
+- Punctuation ALWAYS inside the quotes: «"Come here," she said.» – comma sits before the closing «"», tag verb lowercase.
+- Tag after !/?: «"Come here!" she shouted.» – the «,» is replaced by «!» / «?», tag verb still lowercase.
+- Independent following sentence instead of tag: «"Come here." She smiled.» – period INSIDE the quotes, capital letter follows.
+- Interrupted speech: «"Wait—"» (em-dash). Trailing off: «"I don't…"» (ellipsis).
+- Speaker change → new paragraph. Multiple sentences by the same speaker stay in one paragraph.
+- «original»: phrase copied character-exact from the text – precisely the typographically wrong span (closing quote + tag transition, stray straight quote «"» / «'», misplaced comma, wrongly capitalised tag verb).
+- «korrektur»: same phrase typographically correct; same span type.
+- «erklaerung»: ONE sentence naming the rule that was broken («comma belongs inside the closing quote», «tag verb after comma should be lowercase», «straight ASCII quotes instead of typographic «"…"»», …).
+- DO NOT report: a quotation-mark style the book uses consistently throughout (that IS the book's norm, not an error); letter/SMS/diary inserts with their own convention; single highlighted words in quotes (not actual speech).
+- Self-test: would an editor flag this spot as typographically wrong or inconsistent? If the choice is deliberate and consistently maintained → leave it out.`;
+  }
+  // Default: Deutsch
   return `
 Dialogformat-Regeln (typ: «dialogformat»):
-- Typografische Korrektheit der direkten Rede. Sprache des Textes bestimmen, dann gegen die passende Norm prüfen. Innerhalb eines Buchs muss die Wahl konsistent sein – etablierte Variante des Buchs ist die Norm, Abweichungen davon sind Findings.
-- Deutsch:
-  · Anführungszeichen: «„…"» (U+201E unten, U+201C oben) ODER «…» (Guillemets, Spitzen nach aussen). Konsistent innerhalb des Buchs. Gerade ASCII-Quotes ("…", '…') sind in Romanprosa falsch.
-  · Zitat im Zitat: ‚…' (halbe Gänsefüsschen).
-  · Inquit-Komma nach Schlusszeichen: «„Komm her", sagte sie.» – Komma steht nach dem schliessenden Anführungszeichen; Inquit-Verb kleingeschrieben.
-  · Inquit nach !/?: «„Komm her!" rief sie.» – Satzzeichen bleibt drin, KEIN zusätzliches Komma, Inquit-Verb klein.
-  · Eigenständiger Folgesatz statt Inquit: «„Komm her." Sie lächelte.» – Punkt am Ende der Rede, Grossbuchstabe folgt.
-  · Eingeschobenes Inquit: «„Komm her", sagte sie, „aber leise."» – Fortsetzung der Rede klein.
-- Englisch:
-  · Anführungszeichen: "…" (double quotes, typografisch). Zitat im Zitat: '…' (single).
-  · Satzzeichen IMMER innerhalb der Quotes: «"Come here," she said.» – Komma vor schliessendem «"», Tag lowercase.
-  · Inquit nach !/?: «"Come here!" she shouted.» – Punkt/Komma durch !/? ersetzt, Tag lowercase.
-  · Eigenständiger Folgesatz: «"Come here." She smiled.» – Punkt INNERHALB der Quotes, Grossbuchstabe folgt.
-  · Unterbrochene Rede: «"Wait—"» (em-dash). Verlöschende Rede: «"I don't…"» (Ellipsis).
+- Typografische Korrektheit der direkten Rede, deutsche Norm. Innerhalb eines Buchs muss die Wahl konsistent sein – etablierte Variante des Buchs ist die Norm, Abweichungen davon sind Findings.
+- Anführungszeichen: «„…"» (U+201E unten, U+201C oben) ODER «…» (Guillemets, Spitzen nach aussen). Konsistent innerhalb des Buchs. Gerade ASCII-Quotes ("…", '…') sind in deutscher Romanprosa falsch.
+- Zitat im Zitat: ‚…' (halbe Gänsefüsschen).
+- Inquit-Komma nach Schlusszeichen: «„Komm her", sagte sie.» – Komma steht nach dem schliessenden Anführungszeichen; Inquit-Verb kleingeschrieben.
+- Inquit nach !/?: «„Komm her!" rief sie.» – Satzzeichen bleibt drin, KEIN zusätzliches Komma, Inquit-Verb klein.
+- Eigenständiger Folgesatz statt Inquit: «„Komm her." Sie lächelte.» – Punkt am Ende der Rede, Grossbuchstabe folgt.
+- Eingeschobenes Inquit: «„Komm her", sagte sie, „aber leise."» – Fortsetzung der Rede klein.
 - Sprecherwechsel: neuer Absatz. Mehrere Sätze desselben Sprechers bleiben im selben Absatz.
 - «original»: Phrase zeichengenau aus dem Text – exakt der typografisch falsche Bereich (Schlussklammer + Inquit-Übergang, einzelnes falsches Anführungszeichen, falsche Komma-Position, falsch grossgeschriebenes Tag-Verb).
 - «korrektur»: dieselbe Phrase typografisch korrekt; gleicher Span-Typ.
-- «erklaerung»: EIN Satz, benennt die verletzte Regel («Komma gehört vor das schliessende Anführungszeichen», «Inquit-Verb nach Komma kleinschreiben», «gerade ASCII-Quotes statt typografischer Gänsefüsschen», …).
+- «erklaerung»: EIN Satz, benennt die verletzte Regel («Komma gehört nach das schliessende Anführungszeichen», «Inquit-Verb nach Komma kleinschreiben», «gerade ASCII-Quotes statt typografischer Gänsefüsschen», …).
 - NICHT melden: Anführungszeichen-Stil, der im Buch durchgehend konsistent gewählt ist (das ist die Norm des Buchs, nicht ein Fehler). Brief-/SMS-/Tagebuch-Einschübe mit eigener Konvention. Einzelne hervorgehobene Wörter in Quotes (keine echte Rede).
 - Selbsttest: Würde ein Lektor diese Stelle als typografisch falsch oder uneinheitlich anstreichen? Wenn die Wahl bewusst und konsequent durchgehalten ist → weglassen.`;
 }

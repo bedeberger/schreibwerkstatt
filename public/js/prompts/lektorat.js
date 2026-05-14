@@ -36,6 +36,7 @@ function _buildLektoratPromptBody(text, textLabel, {
   erzaehlzeit = null,
   buchtyp = null,
   previousExcerpt = null,
+  langCode = 'de',
 } = {}) {
   const metaParts = [];
   if (chapterName) metaParts.push(`Kapitel: «${chapterName}»`);
@@ -211,7 +212,7 @@ Beispiel eines VERWORFENEN Eintrags (Korrektur-Purität verletzt):
 ${_buildKlischeeBlock()}
 ${_buildPleonasmusBlock()}
 ${_buildShowVsTellBlock()}
-${_buildDialogformatBlock()}
+${_buildDialogformatBlock(langCode)}
 ${_buildPassivBlock()}
 ${_buildPerspektivbruchBlock()}
 ${_buildTempuswechselBlock()}
