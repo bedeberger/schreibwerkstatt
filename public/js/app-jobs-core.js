@@ -227,6 +227,8 @@ export const appJobsCoreMethods = {
   // die Quellseite wieder öffnen muss.
   _onJobFinished(detail) {
     if (!detail) return;
+    const isCurrentBook = detail.bookId != null
+      && String(detail.bookId) === String(this.selectedBookId);
     if (detail.type === 'check' && detail.job?.status === 'done') {
       const pageId = detail.dedupId;
       const r = detail.job.result || {};
@@ -235,12 +237,11 @@ export const appJobsCoreMethods = {
         this.markPageChecked(pageId, { pending: fehler.length > 0 });
         if (this.currentPage?.id === pageId) this.loadPageHistory?.(pageId);
       }
+      if (isCurrentBook) this.refreshPageAges?.();
     }
     // batch-check schreibt page_checks pro Seite serverseitig; eigener Per-Card-
     // Poller fehlt nach Reload/Buchwechsel/anderem Tab. Server-Map als SSoT nachladen.
-    if (detail.type === 'batch-check' && detail.job?.status === 'done'
-        && detail.bookId != null
-        && String(detail.bookId) === String(this.selectedBookId)) {
+    if (detail.type === 'batch-check' && detail.job?.status === 'done' && isCurrentBook) {
       this.refreshPageAges?.();
     }
     this._maybeShowJobToast(detail);

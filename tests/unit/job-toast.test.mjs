@@ -11,8 +11,11 @@ function makeCtx() {
     currentPage: null,
     pages: [],
     pageLastChecked: {},
+    selectedBookId: null,
+    refreshAgesCalls: 0,
     markPageChecked() {},
     loadPageHistory() {},
+    refreshPageAges() { this.refreshAgesCalls++; },
     t: (k) => k,
     ...appJobsCoreMethods,
   };
@@ -101,6 +104,59 @@ test('aufeinanderfolgende Toasts ersetzen sich (Timer reset)', () => {
   ctx._onJobFinished({ type: 'figuren', jobId: 8, bookId: 1, job: { status: 'done' } });
   assert.notEqual(ctx._jobToastTimer, firstTimer);
   assert.equal(ctx.jobToast.jobType, 'figuren');
+});
+
+test('check done im aktuellen Buch → refreshPageAges + markPageChecked', () => {
+  const ctx = makeCtx();
+  ctx.selectedBookId = '42';
+  let marked = null;
+  ctx.markPageChecked = (pageId, opts) => { marked = { pageId, opts }; };
+  ctx._onJobFinished({
+    type: 'check', jobId: 20, dedupId: 7, bookId: 42,
+    job: { status: 'done', result: { fehler: [{ typ: 'rechtschreibung' }] } },
+  });
+  assert.equal(ctx.refreshAgesCalls, 1);
+  assert.deepEqual(marked, { pageId: 7, opts: { pending: true } });
+});
+
+test('check done in anderem Buch → kein refreshPageAges (markPageChecked trotzdem)', () => {
+  const ctx = makeCtx();
+  ctx.selectedBookId = '42';
+  let marked = false;
+  ctx.markPageChecked = () => { marked = true; };
+  ctx._onJobFinished({
+    type: 'check', jobId: 21, dedupId: 7, bookId: 99,
+    job: { status: 'done', result: { fehler: [] } },
+  });
+  assert.equal(ctx.refreshAgesCalls, 0);
+  assert.equal(marked, true);
+});
+
+test('batch-check done im aktuellen Buch → refreshPageAges', () => {
+  const ctx = makeCtx();
+  ctx.selectedBookId = '42';
+  ctx._onJobFinished({
+    type: 'batch-check', jobId: 10, bookId: 42, job: { status: 'done' },
+  });
+  assert.equal(ctx.refreshAgesCalls, 1);
+});
+
+test('batch-check done in anderem Buch → kein refreshPageAges', () => {
+  const ctx = makeCtx();
+  ctx.selectedBookId = '42';
+  ctx._onJobFinished({
+    type: 'batch-check', jobId: 11, bookId: 99, job: { status: 'done' },
+  });
+  assert.equal(ctx.refreshAgesCalls, 0);
+});
+
+test('batch-check error → kein refreshPageAges', () => {
+  const ctx = makeCtx();
+  ctx.selectedBookId = '42';
+  ctx._onJobFinished({
+    type: 'batch-check', jobId: 12, bookId: 42, job: { status: 'error', error: 'foo' },
+  });
+  assert.equal(ctx.refreshAgesCalls, 0);
 });
 
 test('alle Whitelist-Typen erzeugen Toast', () => {

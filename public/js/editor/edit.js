@@ -305,6 +305,8 @@ export const editorEditMethods = {
 
       this._filterFindingsAfterSave(newHtml);
       this._syncPageStatsAfterSave?.(this.currentPage, newHtml);
+      // Sidebar-Lektorat-Status flippt auf 'warn' (updated_at > checkedAt) — Server-Map nachladen.
+      this.refreshPageAges?.();
 
       clearDraft(this.currentPage.id);
       this.lastAutosaveAt = Date.now();
@@ -405,6 +407,8 @@ export const editorEditMethods = {
       this.currentPageEmpty = !htmlToText(newHtml).trim();
       this._filterFindingsAfterSave(newHtml);
       this._syncPageStatsAfterSave?.(this.currentPage, newHtml);
+      // Sidebar-Lektorat-Status flippt auf 'warn' (updated_at > checkedAt) — Server-Map nachladen.
+      this.refreshPageAges?.();
       this.updatePageView();
       this.setStatus(this.t('edit.savedAt', { time: new Date().toLocaleTimeString(localeTag) }), false, 2500);
     } catch (e) {
