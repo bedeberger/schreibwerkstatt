@@ -131,6 +131,7 @@ export function buildBookChatAgentSystemPrompt(bookName, figuren, review, system
     '- Häufigkeit, Verteilung, Erzählperspektive → count_pronouns, get_chapter_stats',
     '- Figurenverteilung, erstes Auftreten → get_figure_mentions, list_chapters',
     '- Konkrete Textstellen oder Zitate → search_passages, get_pages',
+    '- Kapitel-Qualität, Stärken/Schwächen, beste/schwächste Kapitel → list_chapter_reviews',
     '',
     'Rufe Werkzeuge an, bevor du vermutest. Bei interpretatorischen Fragen (Stil, Ton, Wirkung) kannst du direkt antworten oder mit search_passages Belege suchen.',
     `Maximal ${maxToolIter} Werkzeug-Iterationen pro Antwort. Halte Werkzeug-Argumente präzise und kurz.`,
@@ -230,7 +231,7 @@ export const BOOK_CHAT_TOOLS = [
   },
   {
     name: 'get_pages',
-    description: 'Lädt den vollen Text bestimmter Seiten (bei Bedarf für Zitate oder Detail-Analyse). Bis zu 20 Seiten pro Aufruf – bei kleinen Büchern kannst du in einem Call das ganze Buch laden (Page-IDs vorher via list_chapters holen).',
+    description: 'Lädt den vollen Text bestimmter Seiten (bei Bedarf für Zitate oder Detail-Analyse). Bis zu 20 Seiten pro Aufruf – bei kleinen Büchern kannst du in einem Call das ganze Buch laden (Page-IDs vorher via list_chapters holen). Falls für die Seite ein gespeichertes Lektorat existiert, kommt es als latest_check {checked_at, error_count, fazit, stilanalyse} mit.',
     input_schema: {
       type: 'object',
       properties: {
@@ -238,6 +239,19 @@ export const BOOK_CHAT_TOOLS = [
         max_chars_per_page: { type: 'integer', description: 'Harte Kürzung pro Seite. Server clamped automatisch an das Kontextfenster – nur setzen, wenn explizit weniger gewünscht.' },
       },
       required: ['ids'],
+    },
+  },
+  {
+    name: 'list_chapter_reviews',
+    description: 'Liefert die letzten Kapitelbewertungen für dieses Buch und diesen User: pro Kapitel gesamtnote (1.0–6.0), Stärken, Schwächen, Fazit, Zusammenfassung. Antwortet ohne weiteren KI-Call (liest gespeicherte chapter_reviews). Beantwortet direkt Fragen wie „welche Kapitel sind am stärksten/schwächsten?", „wo ist die Dramaturgie am besten?". ohne_bewertung listet noch nicht bewertete Kapitel.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        chapter_ids: { type: 'array', items: { type: 'integer' }, description: 'Optional: nur diese Kapitel-IDs. Ohne Angabe: alle bewerteten Kapitel.' },
+        sort:        { type: 'string', enum: ['note_desc', 'note_asc', 'chapter'], description: 'Reihenfolge der reviews. Default: note_desc (stärkste zuerst).' },
+        limit:       { type: 'integer', description: 'Maximale Anzahl Reviews (default 30, max 100).' },
+      },
+      required: [],
     },
   },
 ];

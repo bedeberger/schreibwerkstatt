@@ -340,6 +340,31 @@ async function tool_search_passages(input, ctx) {
 
 // ── get_pages ─────────────────────────────────────────────────────────────────
 
+// Letztes Lektorat einer Seite — Stilanalyse wird hart geclampt (kann lang werden);
+// errors_json bewusst ausgelassen, sonst sprengt es das Token-Budget.
+const LATEST_CHECK_STILANALYSE_CHARS = 600;
+
+function _latestCheckForPage(pageId, userEmail) {
+  const row = db.prepare(`
+    SELECT checked_at, error_count, fazit, stilanalyse, model
+    FROM page_checks
+    WHERE page_id = ? AND user_email IS ?
+    ORDER BY checked_at DESC
+    LIMIT 1
+  `).get(pageId, userEmail || null);
+  if (!row) return null;
+  const stil = row.stilanalyse || null;
+  return {
+    checked_at:  row.checked_at,
+    error_count: row.error_count ?? 0,
+    fazit:       row.fazit || null,
+    stilanalyse: stil && stil.length > LATEST_CHECK_STILANALYSE_CHARS
+      ? stil.slice(0, LATEST_CHECK_STILANALYSE_CHARS) + '…'
+      : stil,
+    model:       row.model || null,
+  };
+}
+
 async function tool_get_pages(input, ctx) {
   const ids = Array.isArray(input.ids) ? input.ids.filter(n => Number.isInteger(n)) : [];
   if (!ids.length) return { error: 'ids fehlen oder leer' };
@@ -361,12 +386,14 @@ async function tool_get_pages(input, ctx) {
         LEFT JOIN chapters c ON c.chapter_id = p.chapter_id AND c.book_id = p.book_id
         WHERE p.page_id = ?
       `).get(pageId);
+      const latestCheck = _latestCheckForPage(pageId, ctx.userEmail);
       results.push({
         page_id: pageId,
         page_name: pageRow?.page_name || pd.name || `#${pageId}`,
         chapter_name: pageRow?.chapter_name || null,
         text: text.length > maxChars ? text.slice(0, maxChars) + '…' : text,
         truncated: text.length > maxChars,
+        ...(latestCheck ? { latest_check: latestCheck } : {}),
       });
     } catch (e) {
       missing.push({ page_id: pageId, error: e.message });
@@ -380,15 +407,100 @@ async function tool_get_pages(input, ctx) {
   });
 }
 
+// ── list_chapter_reviews ─────────────────────────────────────────────────────
+
+const CHAPTER_REVIEW_FAZIT_CHARS = 400;
+const CHAPTER_REVIEW_DEFAULT_LIMIT = 30;
+
+function tool_list_chapter_reviews(input, ctx) {
+  const userEmail = ctx.userEmail || null;
+  const chapterIdsFilter = Array.isArray(input?.chapter_ids)
+    ? input.chapter_ids.filter(n => Number.isInteger(n))
+    : null;
+  const sort = input?.sort === 'note_asc' || input?.sort === 'note_desc' || input?.sort === 'chapter'
+    ? input.sort
+    : 'note_desc';
+  const limit = Math.min(100, Math.max(1, Number.isInteger(input?.limit) ? input.limit : CHAPTER_REVIEW_DEFAULT_LIMIT));
+
+  // Letzten Eintrag pro Kapitel via MAX(reviewed_at)-Subquery.
+  let sql = `
+    SELECT cr.chapter_id, c.chapter_name, cr.reviewed_at, cr.review_json, cr.model
+    FROM chapter_reviews cr
+    JOIN chapters c ON c.chapter_id = cr.chapter_id AND c.book_id = cr.book_id
+    WHERE cr.book_id = ? AND cr.user_email IS ?
+      AND cr.reviewed_at = (
+        SELECT MAX(cr2.reviewed_at) FROM chapter_reviews cr2
+        WHERE cr2.chapter_id = cr.chapter_id
+          AND cr2.book_id = cr.book_id
+          AND cr2.user_email IS ?
+      )
+  `;
+  const params = [ctx.bookId, userEmail, userEmail];
+  if (chapterIdsFilter && chapterIdsFilter.length) {
+    sql += ` AND cr.chapter_id IN (${chapterIdsFilter.map(() => '?').join(',')})`;
+    params.push(...chapterIdsFilter);
+  }
+  const rows = db.prepare(sql).all(...params);
+
+  const items = [];
+  for (const r of rows) {
+    let parsed = null;
+    try { parsed = r.review_json ? JSON.parse(r.review_json) : null; } catch { parsed = null; }
+    if (!parsed) continue;
+    const fazit = parsed.fazit || null;
+    items.push({
+      chapter_id:   r.chapter_id,
+      chapter_name: r.chapter_name,
+      reviewed_at:  r.reviewed_at,
+      gesamtnote:   typeof parsed.gesamtnote === 'number' ? parsed.gesamtnote : null,
+      zusammenfassung: parsed.zusammenfassung || null,
+      fazit:        fazit && fazit.length > CHAPTER_REVIEW_FAZIT_CHARS
+        ? fazit.slice(0, CHAPTER_REVIEW_FAZIT_CHARS) + '…'
+        : fazit,
+      staerken:     Array.isArray(parsed.staerken)   ? parsed.staerken   : [],
+      schwaechen:   Array.isArray(parsed.schwaechen) ? parsed.schwaechen : [],
+      model:        r.model || null,
+    });
+  }
+
+  if (sort === 'note_desc')      items.sort((a, b) => (b.gesamtnote ?? -1) - (a.gesamtnote ?? -1));
+  else if (sort === 'note_asc')  items.sort((a, b) => (a.gesamtnote ?? 99) - (b.gesamtnote ?? 99));
+  else                            items.sort((a, b) => a.chapter_id - b.chapter_id);
+
+  const total = items.length;
+  const limited = items.slice(0, limit);
+
+  // Liste aller Kapitel des Buchs, damit das Modell sieht, welche noch keine Bewertung haben.
+  const allChapters = db.prepare(
+    'SELECT chapter_id, chapter_name FROM chapters WHERE book_id = ? ORDER BY chapter_id'
+  ).all(ctx.bookId);
+  const reviewedIds = new Set(items.map(i => i.chapter_id));
+  const missingReview = allChapters
+    .filter(c => !reviewedIds.has(c.chapter_id))
+    .map(c => ({ chapter_id: c.chapter_id, chapter_name: c.chapter_name }));
+
+  return _truncateResult({
+    reviews: limited,
+    total,
+    sort,
+    ...(limited.length < total ? { truncated: true, shown: limited.length } : {}),
+    ...(missingReview.length ? {
+      ohne_bewertung: missingReview,
+      hint: 'Diese Kapitel wurden noch nicht bewertet (chapter_reviews fehlt).',
+    } : {}),
+  });
+}
+
 // ── Dispatch ──────────────────────────────────────────────────────────────────
 
 const TOOLS = {
-  list_chapters:       tool_list_chapters,
-  count_pronouns:      tool_count_pronouns,
-  get_chapter_stats:   tool_get_chapter_stats,
-  get_figure_mentions: tool_get_figure_mentions,
-  search_passages:     tool_search_passages,
-  get_pages:           tool_get_pages,
+  list_chapters:        tool_list_chapters,
+  count_pronouns:       tool_count_pronouns,
+  get_chapter_stats:    tool_get_chapter_stats,
+  get_figure_mentions:  tool_get_figure_mentions,
+  search_passages:      tool_search_passages,
+  get_pages:            tool_get_pages,
+  list_chapter_reviews: tool_list_chapter_reviews,
 };
 
 async function executeTool(name, input, ctx) {
