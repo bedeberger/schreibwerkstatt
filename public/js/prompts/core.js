@@ -17,7 +17,7 @@ import {
 // Versionsmarker für persistente Caches (z.B. chapter_extract_cache, Phase-1
 // Single-Pass-Cache). Bei jeder schemarelevanten Änderung erhöhen, damit alte
 // Cache-Einträge nicht mehr matchen und frisch extrahiert wird.
-export const PROMPTS_VERSION = '9';
+export const PROMPTS_VERSION = '10';
 
 // Kompakte Ersatzregeln für commonRules[langCode] im Lokal-Modus.
 // Behält nur die Kernregel – WAS GEMELDET WERDEN SOLL ist redundant mit den typ-spezifischen
@@ -62,6 +62,7 @@ let _localeMap  = new Map();
 let _rawLocales = new Map();
 let _autorenstilByLocale = new Map();
 let _localChatAddonByLocale = new Map();
+let _werkAbgeschlossenByLang = {};
 let _buchtypen  = {};
 let _erklaerungRule = '';
 let _defaultLocale = 'de-CH';
@@ -151,6 +152,7 @@ export function configureLocales(cfg) {
   _localChatAddonByLocale.clear();
   _buchtypen     = cfg.buchtypen || {};
   _erklaerungRule = cfg.erklaerungRule || '';
+  _werkAbgeschlossenByLang = cfg.werkAbgeschlossenRule || {};
 
   if (cfg.locales && typeof cfg.locales === 'object') {
     // ── Neues Format: locales-Map ─────────────────────────────────────────────
@@ -223,13 +225,14 @@ export function configureLocales(cfg) {
  * @param {string} localeKey   z.B. 'de-CH', 'en-US'
  * @param {string|null} buchtyp     Key aus prompt-config.json buchtypen (z.B. 'roman')
  * @param {string|null} buchKontext Freitext des Users (Schauplatz, Epoche, …)
+ * @param {boolean}     isFinished  Buch wurde vom Autor als abgeschlossen markiert
  * @returns {{ SYSTEM_LEKTORAT, ..., BUCH_KONTEXT }}
  */
-export function getLocalePromptsForBook(localeKey, buchtyp, buchKontext) {
+export function getLocalePromptsForBook(localeKey, buchtyp, buchKontext, isFinished = false) {
   const rawLocale = _rawLocales.get(localeKey) || _rawLocales.get(_defaultLocale) || {};
   const kontext   = (buchKontext || '').trim();
 
-  // Augmentierte baseRules: Original + Buchtyp-Block + Freitext-Block
+  // Augmentierte baseRules: Original + Buchtyp-Block + Freitext-Block + Fertig-Block
   const langCode    = (localeKey || _defaultLocale).split('-')[0];
   const buchtypDef  = buchtyp && _buchtypen?.[langCode]?.[buchtyp];
   let augRules = rawLocale.baseRules || '';
@@ -238,6 +241,10 @@ export function getLocalePromptsForBook(localeKey, buchtyp, buchKontext) {
   }
   if (kontext) {
     augRules += `\n\nVORRANGIGE ANGABEN DES AUTORS (übersteuern bei Konflikt alle obigen Regeln – insbesondere Stil-, Ton- und Formatvorgaben):\n${kontext}`;
+  }
+  if (isFinished) {
+    const fertigRule = _werkAbgeschlossenByLang?.[langCode];
+    if (fertigRule) augRules += `\n\n${fertigRule}`;
   }
 
   const augLocale = { ...rawLocale, baseRules: augRules };

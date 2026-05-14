@@ -13,9 +13,9 @@ const { i18nError } = require('./jobs');
  */
 async function getBookPrompts(bookId, userEmail = null) {
   const { getLocalePromptsForBook } = await getPrompts();
-  const settings = bookId ? getBookSettings(bookId, userEmail) : { language: 'de', region: 'CH', buchtyp: null, buch_kontext: null };
+  const settings = bookId ? getBookSettings(bookId, userEmail) : { language: 'de', region: 'CH', buchtyp: null, buch_kontext: null, is_finished: 0 };
   const locale   = `${settings.language}-${settings.region}`;
-  return getLocalePromptsForBook(locale, settings.buchtyp || null, settings.buch_kontext || null);
+  return getLocalePromptsForBook(locale, settings.buchtyp || null, settings.buch_kontext || null, !!settings.is_finished);
 }
 
 // Wrapped `lib/bookstack.js` – mappt Nicht-OK-Responses auf i18nError, damit

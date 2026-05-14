@@ -101,6 +101,37 @@ test('getLocalePromptsForBook: Buchtyp + Freitext → beide Blöcke, Freitext na
     'Freitext muss NACH Buchtyp stehen, damit User-Angaben Buchtyp-Defaults übersteuern können');
 });
 
+test('getLocalePromptsForBook: isFinished=true injiziert WERK-ABGESCHLOSSEN in alle Prompts', async () => {
+  const m = await freshPrompts('claude');
+  const out = m.getLocalePromptsForBook('de-CH', null, '', true);
+  // baseRules-Augmentation landet in allen Prompt-Bundles, die rules nutzen
+  for (const key of ['SYSTEM_LEKTORAT', 'SYSTEM_BUCHBEWERTUNG', 'SYSTEM_KAPITELREVIEW', 'SYSTEM_CHAT', 'SYSTEM_BOOK_CHAT']) {
+    assert.match(out[key], /WERK ABGESCHLOSSEN/, `${key} fehlt WERK-ABGESCHLOSSEN-Block`);
+    assert.match(out[key], /Figuren und Szenen werden nicht mehr weiterentwickelt/, `${key} fehlt Kern-Aussage`);
+  }
+});
+
+test('getLocalePromptsForBook: isFinished=false → kein WERK-ABGESCHLOSSEN-Block', async () => {
+  const m = await freshPrompts('claude');
+  const out = m.getLocalePromptsForBook('de-CH', null, '', false);
+  assert.doesNotMatch(out.SYSTEM_LEKTORAT, /WERK ABGESCHLOSSEN/);
+  assert.doesNotMatch(out.SYSTEM_BUCHBEWERTUNG, /WERK ABGESCHLOSSEN/);
+});
+
+test('getLocalePromptsForBook: isFinished default (omitted) → kein Block', async () => {
+  const m = await freshPrompts('claude');
+  const out = m.getLocalePromptsForBook('de-CH', null, '');
+  assert.doesNotMatch(out.SYSTEM_LEKTORAT, /WERK ABGESCHLOSSEN/);
+});
+
+test('getLocalePromptsForBook (en-US): isFinished → englische WORK-COMPLETED-Variante', async () => {
+  const m = await freshPrompts('claude');
+  if (!cfg.locales['en-US']) return;
+  const out = m.getLocalePromptsForBook('en-US', null, '', true);
+  assert.match(out.SYSTEM_LEKTORAT, /WORK COMPLETED/);
+  assert.match(out.SYSTEM_BOOK_CHAT, /WORK COMPLETED/);
+});
+
 test('getLocalePromptsForBook: unbekannter Buchtyp → ignoriert, kein Crash', async () => {
   const m = await freshPrompts('claude');
   const out = m.getLocalePromptsForBook('de-CH', 'gibtsnicht', '');

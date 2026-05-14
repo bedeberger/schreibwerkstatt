@@ -17,6 +17,11 @@
     "en": "ANSWER COMPLETENESS (mandatory): If you announce 'reasons', 'points', 'arguments', 'examples', or 'steps' in a response, you must spell them out in the same response — never announce and stop. No response may end with a colon."
   },
 
+  "werkAbgeschlossenRule": {
+    "de": "WERK ABGESCHLOSSEN: Der Autor hat dieses Werk als abgeschlossen markiert. Figuren und Szenen werden nicht mehr weiterentwickelt. Schlage keine strukturellen Umbauten, neuen Handlungsstränge, zusätzlichen Figurenentwicklungen oder Szenen-Erweiterungen vor. Erkenne und benenne weiterhin sprachliche und handwerkliche Mängel (Rechtschreibung, Grammatik, Stil, Logik-/Kontinuitätsfehler) ohne Einschränkung. Bewertungen dürfen Beobachtungen zu Figurenbogen und Szenenführung festhalten, formulieren sie aber nicht als Aufgaben zur Weiterentwicklung. Im Chat: bei Fragen nach Weiterentwicklung von Figuren oder Szenen den abgeschlossenen Status erwähnen und stattdessen analytisch zur bestehenden Substanz Stellung nehmen.",
+    "en": "WORK COMPLETED: The author has marked this work as finished. Characters and scenes are no longer being developed. Do not propose structural rewrites, new plot lines, additional character development, or scene expansions. Continue to identify and name linguistic and craft issues (spelling, grammar, style, logic/continuity errors) without restriction. Reviews may note observations on character arcs and scene structure, but must not phrase them as tasks for further development. In chat: when asked about further development of characters or scenes, mention the completed status and instead respond analytically to the existing substance."
+  },
+
   "buchtypen": {
     "de": {
       "roman":          { "label": "Roman",                     "zusatz": "Das vorliegende Werk ist ein Roman mit durchgehender Handlung und Figurenentwicklung über das gesamte Buch.",
