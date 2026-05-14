@@ -53,6 +53,7 @@ router.patch('/check/:id/saved', jsonBody, (req, res) => {
     WHERE pc.id = ? AND pc.user_email = ?
   `).get(id, user_email);
   if (!row) return res.status(404).json({ error_code: 'NOT_FOUND' });
+  if (row.book_id) setContext({ book: row.book_id });
 
   db.prepare('UPDATE page_checks SET saved = ?, saved_at = ?, applied_errors_json = COALESCE(?, applied_errors_json), selected_errors_json = COALESCE(?, selected_errors_json), stilkorrektur_log = COALESCE(?, stilkorrektur_log) WHERE id = ? AND user_email = ? AND book_id = ?')
     .run(saved, saved_at, applied, selected, stilLog, id, user_email, row.book_id);
