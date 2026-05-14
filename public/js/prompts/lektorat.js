@@ -15,6 +15,7 @@ import {
   _buildFigurenkonsistenzBlock,
   _buildSchauplatzkonsistenzBlock,
   _buildShowVsTellBlock,
+  _buildDialogformatBlock,
   _buildPassivBlock,
   _buildPerspektivbruchBlock,
   _buildTempuswechselBlock,
@@ -97,14 +98,14 @@ function _buildLektoratPromptBody(text, textLabel, {
   // Textverständnis, an dem kleine Modelle häufig scheitern oder in Wiederholungsloops geraten.
   const typEnum = _isLocal
     ? 'rechtschreibung|grammatik|stil|wiederholung|schwaches_verb|fuellwort'
-    : 'rechtschreibung|grammatik|stil|wiederholung|schwaches_verb|fuellwort|filterwort|klischee|pleonasmus|show_vs_tell|passiv|perspektivbruch|tempuswechsel|namenskonsistenz|figurenmerkmal|anrede|schauplatzmerkmal';
+    : 'rechtschreibung|grammatik|stil|wiederholung|schwaches_verb|fuellwort|filterwort|klischee|pleonasmus|show_vs_tell|passiv|perspektivbruch|tempuswechsel|dialogformat|namenskonsistenz|figurenmerkmal|anrede|schauplatzmerkmal';
 
   // Lokal + Cloud: Typ-Priorität und Anti-Doppelung pro Textspanne. Verhindert,
   // dass derselbe Satz mehrfach gemeldet wird (z.B. fuellwort + schwaches_verb +
   // stil am gleichen Wort) – pro Span genau ein Eintrag mit dem spezifischsten Typ.
   const dedupTypen = _isLocal
     ? 'rechtschreibung > grammatik > wiederholung > schwaches_verb > fuellwort > stil'
-    : 'rechtschreibung > grammatik > namenskonsistenz > figurenmerkmal > schauplatzmerkmal > anrede > pleonasmus > wiederholung > perspektivbruch > tempuswechsel > klischee > passiv > show_vs_tell > filterwort > schwaches_verb > fuellwort > stil';
+    : 'dialogformat > rechtschreibung > grammatik > namenskonsistenz > figurenmerkmal > schauplatzmerkmal > anrede > pleonasmus > wiederholung > perspektivbruch > tempuswechsel > klischee > passiv > show_vs_tell > filterwort > schwaches_verb > fuellwort > stil';
 
   const dedupBlock = `
 EIN-EINTRAG-PRO-STELLE (Anti-Doppelung, alle Typen):
@@ -152,7 +153,7 @@ ${_isLocal
   · stil: vollständiger Satz ODER eindeutig abgrenzbare Phrase – beide Felder müssen denselben Span-Typ haben`
   : `  · rechtschreibung, grammatik: Phrase oder Wort (genau die fehlerhafte Stelle)
   · namenskonsistenz: einzelnes Wort (der falsch geschriebene Name)
-  · figurenmerkmal, anrede, schauplatzmerkmal, pleonasmus: Phrase (genau die widersprüchliche / redundante Stelle)
+  · figurenmerkmal, anrede, schauplatzmerkmal, pleonasmus, dialogformat: Phrase (genau die widersprüchliche / redundante / typografisch falsche Stelle)
   · wiederholung, schwaches_verb, fuellwort, filterwort, passiv, show_vs_tell, perspektivbruch, tempuswechsel: vollständiger Satz
   · klischee, stil: vollständiger Satz ODER eindeutig abgrenzbare Phrase – beide Felder müssen denselben Span-Typ haben`}
 `;
@@ -210,6 +211,7 @@ Beispiel eines VERWORFENEN Eintrags (Korrektur-Purität verletzt):
 ${_buildKlischeeBlock()}
 ${_buildPleonasmusBlock()}
 ${_buildShowVsTellBlock()}
+${_buildDialogformatBlock()}
 ${_buildPassivBlock()}
 ${_buildPerspektivbruchBlock()}
 ${_buildTempuswechselBlock()}
@@ -325,6 +327,7 @@ function _buildLektoratSchema() {
     ...enumLocal,
     'filterwort', 'klischee', 'pleonasmus',
     'show_vs_tell', 'passiv', 'perspektivbruch', 'tempuswechsel',
+    'dialogformat',
     'namenskonsistenz', 'figurenmerkmal', 'anrede', 'schauplatzmerkmal',
   ];
   const fehlerField = {

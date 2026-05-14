@@ -1007,6 +1007,7 @@
   "fehlerHeatmap.cluster.welt":        "Welt",
   "fehlerHeatmap.typ.rechtschreibung":     "Rechtschreibung",
   "fehlerHeatmap.typ.grammatik":           "Grammatik",
+  "fehlerHeatmap.typ.dialogformat":        "Dialogformat",
   "fehlerHeatmap.typ.stil":                "Stil",
   "fehlerHeatmap.typ.wiederholung":        "Wiederholung",
   "fehlerHeatmap.typ.schwaches_verb":      "Schwaches Verb",
@@ -1090,6 +1091,7 @@
 
   "finding.rechtschreibung":     "Rechtschr.",
   "finding.grammatik":           "Grammatik",
+  "finding.dialogformat":        "Dialog",
   "finding.wiederholung":        "Wdh.",
   "finding.schwaches_verb":      "schw. Verb",
   "finding.fuellwort":           "Füllwort",

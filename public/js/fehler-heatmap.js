@@ -7,7 +7,7 @@ import { fetchJson, formatNumber, heatmapCellVars, minMaxBy } from './utils.js';
 // Cluster-Gruppierung der Typen-Spalten. Reihenfolge in den Cluster-Arrays = Spalten-Reihenfolge.
 // Muss mit VALID_TYPEN in routes/jobs/lektorat.js kompatibel sein.
 const FEHLER_CLUSTERS = [
-  { key: 'sprache',    typen: ['rechtschreibung', 'grammatik'] },
+  { key: 'sprache',    typen: ['rechtschreibung', 'grammatik', 'dialogformat'] },
   { key: 'wort',       typen: ['wiederholung', 'schwaches_verb', 'fuellwort', 'filterwort'] },
   { key: 'stil',       typen: ['stil', 'pleonasmus', 'klischee', 'passiv'] },
   { key: 'erzaehlung', typen: ['show_vs_tell', 'perspektivbruch', 'tempuswechsel'] },

@@ -175,12 +175,12 @@ test('buildLektoratPrompt (ollama): nur 6 Local-Typen, keine neuen Spezial-Blöc
   assert.ok(!out.includes('Figurenkonsistenz-Regeln'));
 });
 
-test('SCHEMA_LEKTORAT (claude): enum umfasst alle 17 Cloud-Typen', async () => {
+test('SCHEMA_LEKTORAT (claude): enum umfasst alle 18 Cloud-Typen', async () => {
   const m = await freshPrompts('claude');
   const e = m.SCHEMA_LEKTORAT?.properties?.fehler?.items?.properties?.typ?.enum;
   assert.ok(Array.isArray(e), 'enum-Array fehlt im Schema');
-  assert.equal(e.length, 17);
-  for (const t of ['filterwort', 'klischee', 'pleonasmus', 'namenskonsistenz', 'figurenmerkmal', 'anrede', 'schauplatzmerkmal']) {
+  assert.equal(e.length, 18);
+  for (const t of ['filterwort', 'klischee', 'pleonasmus', 'dialogformat', 'namenskonsistenz', 'figurenmerkmal', 'anrede', 'schauplatzmerkmal']) {
     assert.ok(e.includes(t), `Schema-enum fehlt «${t}»`);
   }
 });

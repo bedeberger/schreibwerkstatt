@@ -75,7 +75,7 @@ function findPreviousPage(pages, currentPageId, currentChapterId) {
 const VALID_TYPEN = new Set([
   'rechtschreibung', 'grammatik', 'stil', 'wiederholung',
   'schwaches_verb', 'fuellwort', 'filterwort', 'klischee', 'pleonasmus',
-  'show_vs_tell', 'passiv', 'perspektivbruch', 'tempuswechsel',
+  'show_vs_tell', 'passiv', 'perspektivbruch', 'tempuswechsel', 'dialogformat',
   'namenskonsistenz', 'figurenmerkmal', 'anrede', 'schauplatzmerkmal',
 ]);
 

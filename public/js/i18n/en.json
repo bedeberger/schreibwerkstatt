@@ -1006,6 +1006,7 @@
   "fehlerHeatmap.cluster.welt":        "World",
   "fehlerHeatmap.typ.rechtschreibung":     "Spelling",
   "fehlerHeatmap.typ.grammatik":           "Grammar",
+  "fehlerHeatmap.typ.dialogformat":        "Dialogue format",
   "fehlerHeatmap.typ.stil":                "Style",
   "fehlerHeatmap.typ.wiederholung":        "Repetition",
   "fehlerHeatmap.typ.schwaches_verb":      "Weak verb",
@@ -1089,6 +1090,7 @@
 
   "finding.rechtschreibung":     "Spell.",
   "finding.grammatik":           "Grammar",
+  "finding.dialogformat":        "Dialogue",
   "finding.wiederholung":        "Rep.",
   "finding.schwaches_verb":      "weak verb",
   "finding.fuellwort":           "Filler",
