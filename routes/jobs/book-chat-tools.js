@@ -6,6 +6,7 @@
 const { db } = require('../../db/schema');
 const { INPUT_BUDGET_CHARS } = require('../../lib/ai');
 const { bsGet, htmlToText } = require('./shared');
+const { inClause } = require('../../lib/validate');
 
 // Obergrenzen schützen das Token-Budget gegen ausufernde Tool-Calls. Skaliert mit
 // MODEL_CONTEXT, damit User mit grösserem Kontextfenster reichere Tool-Antworten
@@ -209,17 +210,17 @@ function tool_get_chapter_stats(input, ctx) {
 
 // ── get_figure_mentions ───────────────────────────────────────────────────────
 
-function tool_get_figure_mentions(input, ctx) {
+function _findFigure(input, ctx) {
   const userEmail = ctx.userEmail || null;
-  let figRow = null;
+  let row = null;
   if (input.figur_id) {
-    figRow = db.prepare(
+    row = db.prepare(
       'SELECT id, fig_id, name, kurzname FROM figures WHERE book_id = ? AND fig_id = ? AND user_email IS ?'
     ).get(ctx.bookId, input.figur_id, userEmail);
   }
-  if (!figRow && input.figur_name) {
+  if (!row && input.figur_name) {
     const q = `%${input.figur_name}%`;
-    figRow = db.prepare(
+    row = db.prepare(
       `SELECT id, fig_id, name, kurzname FROM figures
          WHERE book_id = ? AND user_email IS ?
            AND (name LIKE ? OR kurzname LIKE ?)
@@ -227,6 +228,11 @@ function tool_get_figure_mentions(input, ctx) {
          LIMIT 1`
     ).get(ctx.bookId, userEmail, q, q, input.figur_name, input.figur_name);
   }
+  return row;
+}
+
+function tool_get_figure_mentions(input, ctx) {
+  const figRow = _findFigure(input, ctx);
   if (!figRow) {
     return { error: 'Figur nicht gefunden', hint: 'Prüfe die Figurenliste im System-Prompt.' };
   }
@@ -491,16 +497,376 @@ function tool_list_chapter_reviews(input, ctx) {
   });
 }
 
+// ── get_figure_relations ──────────────────────────────────────────────────────
+
+function tool_get_figure_relations(input, ctx) {
+  const userEmail = ctx.userEmail || null;
+  let focus = null;
+  if (input?.figur_id || input?.figur_name) {
+    focus = _findFigure(input, ctx);
+    if (!focus) return { error: 'Figur nicht gefunden', hint: 'Prüfe die Figurenliste im System-Prompt.' };
+  }
+
+  const rows = db.prepare(`
+    SELECT ff.fig_id   AS from_fig_id, ff.name AS from_name,
+           ft.fig_id   AS to_fig_id,   ft.name AS to_name,
+           r.typ, r.beschreibung, r.machtverhaltnis, r.belege
+    FROM figure_relations r
+    JOIN figures ff ON ff.id = r.from_fig_id
+    JOIN figures ft ON ft.id = r.to_fig_id
+    WHERE r.book_id = ? AND r.user_email IS ?
+    ORDER BY ff.name, ft.name
+  `).all(ctx.bookId, userEmail);
+
+  const filtered = focus
+    ? rows.filter(r => r.from_fig_id === focus.fig_id || r.to_fig_id === focus.fig_id)
+    : rows;
+
+  const edges = filtered.map(r => {
+    let belege = [];
+    if (r.belege) { try { belege = JSON.parse(r.belege) || []; } catch { belege = []; } }
+    return {
+      from: { fig_id: r.from_fig_id, name: r.from_name },
+      to:   { fig_id: r.to_fig_id,   name: r.to_name },
+      typ: r.typ,
+      beschreibung: r.beschreibung || null,
+      machtverhaltnis: r.machtverhaltnis ?? null,
+      belege: Array.isArray(belege) ? belege.slice(0, 3) : [],
+    };
+  });
+
+  const nodeIds = new Set();
+  for (const e of edges) { nodeIds.add(e.from.fig_id); nodeIds.add(e.to.fig_id); }
+  const nodes = nodeIds.size
+    ? db.prepare(
+        `SELECT fig_id, name, kurzname, typ FROM figures
+           WHERE book_id = ? AND user_email IS ?
+             AND fig_id IN (${[...nodeIds].map(() => '?').join(',')})`
+      ).all(ctx.bookId, userEmail, ...nodeIds)
+    : [];
+
+  return _truncateResult({
+    ...(focus ? { focus: { fig_id: focus.fig_id, name: focus.name } } : {}),
+    edges,
+    nodes,
+    total: edges.length,
+    ...(rows.length === 0
+      ? { hint: 'Keine Beziehungen vorhanden. Komplettanalyse (Soziogramm) noch nicht ausgeführt.' }
+      : {}),
+  });
+}
+
+// ── get_figure_profile ────────────────────────────────────────────────────────
+
+function tool_get_figure_profile(input, ctx) {
+  const userEmail = ctx.userEmail || null;
+  const figRow = _findFigure(input, ctx);
+  if (!figRow) return { error: 'Figur nicht gefunden', hint: 'Prüfe die Figurenliste im System-Prompt.' };
+
+  const f = db.prepare(`
+    SELECT * FROM figures WHERE id = ?
+  `).get(figRow.id);
+
+  const tags = db.prepare('SELECT tag FROM figure_tags WHERE figure_id = ?').all(figRow.id).map(t => t.tag);
+
+  const appearances = db.prepare(`
+    SELECT fa.chapter_id, c.chapter_name, fa.haeufigkeit
+    FROM figure_appearances fa
+    LEFT JOIN chapters c ON c.chapter_id = fa.chapter_id
+    WHERE fa.figure_id = ?
+    ORDER BY fa.chapter_id
+  `).all(figRow.id);
+
+  const events = db.prepare(`
+    SELECT fe.datum, fe.ereignis, fe.bedeutung, fe.typ,
+           fe.chapter_id, c.chapter_name,
+           fe.page_id, p.page_name
+    FROM figure_events fe
+    LEFT JOIN chapters c ON c.chapter_id = fe.chapter_id
+    LEFT JOIN pages    p ON p.page_id    = fe.page_id
+    WHERE fe.figure_id = ?
+    ORDER BY fe.sort_order, fe.datum
+  `).all(figRow.id);
+
+  const scenes = db.prepare(`
+    SELECT fs.id, fs.titel, fs.wertung, fs.kommentar,
+           fs.chapter_id, c.chapter_name,
+           fs.page_id, p.page_name
+    FROM figure_scenes fs
+    JOIN scene_figures sf ON sf.scene_id = fs.id
+    LEFT JOIN chapters c ON c.chapter_id = fs.chapter_id
+    LEFT JOIN pages    p ON p.page_id    = fs.page_id
+    WHERE sf.figure_id = ? AND fs.book_id = ? AND fs.user_email IS ?
+    ORDER BY fs.sort_order
+  `).all(figRow.id, ctx.bookId, userEmail);
+
+  const relations = db.prepare(`
+    SELECT ff.fig_id AS from_fig_id, ff.name AS from_name,
+           ft.fig_id AS to_fig_id,   ft.name AS to_name,
+           r.typ, r.beschreibung, r.machtverhaltnis
+    FROM figure_relations r
+    JOIN figures ff ON ff.id = r.from_fig_id
+    JOIN figures ft ON ft.id = r.to_fig_id
+    WHERE r.book_id = ? AND r.user_email IS ?
+      AND (ff.id = ? OR ft.id = ?)
+  `).all(ctx.bookId, userEmail, figRow.id, figRow.id);
+
+  let zitate = [];
+  if (f.schluesselzitate) { try { zitate = JSON.parse(f.schluesselzitate) || []; } catch { zitate = []; } }
+
+  return _truncateResult({
+    fig_id: f.fig_id,
+    name: f.name,
+    kurzname: f.kurzname || null,
+    typ: f.typ || null,
+    geburtstag: f.geburtstag || null,
+    geschlecht: f.geschlecht || null,
+    beruf: f.beruf || null,
+    wohnadresse: f.wohnadresse || null,
+    beschreibung: f.beschreibung || null,
+    sozialschicht: f.sozialschicht || null,
+    praesenz: f.praesenz || null,
+    rolle: f.rolle || null,
+    motivation: f.motivation || null,
+    konflikt: f.konflikt || null,
+    entwicklung: f.entwicklung || null,
+    erste_erwaehnung: f.erste_erwaehnung || null,
+    erste_erwaehnung_page_id: f.erste_erwaehnung_page_id || null,
+    eigenschaften: tags,
+    schluesselzitate: Array.isArray(zitate) ? zitate : [],
+    kapitel: appearances.map(a => ({ chapter_id: a.chapter_id, chapter_name: a.chapter_name, haeufigkeit: a.haeufigkeit })),
+    lebensereignisse: events.map(e => ({
+      datum: e.datum,
+      ereignis: e.ereignis,
+      bedeutung: e.bedeutung || null,
+      typ: e.typ || 'persoenlich',
+      chapter_id: e.chapter_id, chapter_name: e.chapter_name || null,
+      page_id: e.page_id,       page_name: e.page_name || null,
+    })),
+    szenen: scenes.map(s => ({
+      scene_id: s.id, titel: s.titel, wertung: s.wertung || null, kommentar: s.kommentar || null,
+      chapter_id: s.chapter_id, chapter_name: s.chapter_name || null,
+      page_id: s.page_id, page_name: s.page_name || null,
+    })),
+    beziehungen: relations.map(r => ({
+      from: { fig_id: r.from_fig_id, name: r.from_name },
+      to:   { fig_id: r.to_fig_id,   name: r.to_name },
+      typ: r.typ, beschreibung: r.beschreibung || null,
+      machtverhaltnis: r.machtverhaltnis ?? null,
+    })),
+  });
+}
+
+// ── list_continuity_issues ────────────────────────────────────────────────────
+
+const CONTINUITY_DEFAULT_LIMIT = 30;
+
+function tool_list_continuity_issues(input, ctx) {
+  const userEmail = ctx.userEmail || null;
+  const check = db.prepare(`
+    SELECT id, checked_at, summary, model
+    FROM continuity_checks
+    WHERE book_id = ? AND user_email IS ?
+    ORDER BY checked_at DESC
+    LIMIT 1
+  `).get(ctx.bookId, userEmail);
+  if (!check) {
+    return {
+      issues: [],
+      hint: 'Kein Kontinuitätscheck vorhanden. Job „Kontinuität" ausführen.',
+    };
+  }
+
+  const schwereFilter = typeof input?.schwere === 'string' ? input.schwere.toLowerCase() : null;
+  const typFilter     = typeof input?.typ === 'string'     ? input.typ.toLowerCase()     : null;
+  const chapterFilter = Number.isInteger(input?.chapter_id) ? input.chapter_id           : null;
+  const limit = Math.min(100, Math.max(1, Number.isInteger(input?.limit) ? input.limit : CONTINUITY_DEFAULT_LIMIT));
+
+  let issues = db.prepare(`
+    SELECT id, schwere, typ, beschreibung, stelle_a, stelle_b, empfehlung, sort_order
+    FROM continuity_issues
+    WHERE check_id = ?
+    ORDER BY sort_order, id
+  `).all(check.id);
+
+  if (schwereFilter) issues = issues.filter(i => (i.schwere || '').toLowerCase() === schwereFilter);
+  if (typFilter)     issues = issues.filter(i => (i.typ || '').toLowerCase()     === typFilter);
+
+  if (!issues.length) {
+    return { check_id: check.id, checked_at: check.checked_at, summary: check.summary || null, issues: [], total: 0 };
+  }
+
+  const issueIds = issues.map(i => i.id);
+  const { sql: idSql, values: idVals } = inClause(issueIds);
+
+  const figRows = db.prepare(`
+    SELECT cif.issue_id, COALESCE(f.fig_id, NULL) AS fig_id,
+           COALESCE(f.name, cif.figur_name) AS name
+    FROM continuity_issue_figures cif
+    LEFT JOIN figures f ON f.id = cif.figure_id
+    WHERE cif.issue_id IN ${idSql}
+    ORDER BY cif.issue_id, cif.sort_order
+  `).all(...idVals);
+  const chRows = db.prepare(`
+    SELECT cic.issue_id, cic.chapter_id, c.chapter_name
+    FROM continuity_issue_chapters cic
+    LEFT JOIN chapters c ON c.chapter_id = cic.chapter_id
+    WHERE cic.issue_id IN ${idSql}
+    ORDER BY cic.issue_id, cic.sort_order
+  `).all(...idVals);
+
+  const figByIssue = new Map();
+  for (const r of figRows) {
+    if (!r.name) continue;
+    if (!figByIssue.has(r.issue_id)) figByIssue.set(r.issue_id, []);
+    figByIssue.get(r.issue_id).push({ fig_id: r.fig_id || null, name: r.name });
+  }
+  const chByIssue = new Map();
+  for (const r of chRows) {
+    if (!chByIssue.has(r.issue_id)) chByIssue.set(r.issue_id, []);
+    chByIssue.get(r.issue_id).push({ chapter_id: r.chapter_id, chapter_name: r.chapter_name || null });
+  }
+
+  let enriched = issues.map(i => ({
+    issue_id: i.id,
+    schwere: i.schwere || null,
+    typ: i.typ || null,
+    beschreibung: i.beschreibung || null,
+    stelle_a: i.stelle_a || null,
+    stelle_b: i.stelle_b || null,
+    empfehlung: i.empfehlung || null,
+    figuren: figByIssue.get(i.id) || [],
+    kapitel: chByIssue.get(i.id) || [],
+  }));
+
+  if (chapterFilter != null) {
+    enriched = enriched.filter(i => i.kapitel.some(c => c.chapter_id === chapterFilter));
+  }
+
+  const total = enriched.length;
+  const limited = enriched.slice(0, limit);
+
+  return _truncateResult({
+    check_id: check.id,
+    checked_at: check.checked_at,
+    summary: check.summary || null,
+    model: check.model || null,
+    issues: limited,
+    total,
+    ...(limited.length < total ? { truncated: true, shown: limited.length } : {}),
+  });
+}
+
+// ── get_timeline ──────────────────────────────────────────────────────────────
+
+const TIMELINE_DEFAULT_LIMIT = 60;
+
+function tool_get_timeline(input, ctx) {
+  const userEmail = ctx.userEmail || '';
+  let focusFig = null;
+  if (input?.figur_id || input?.figur_name) {
+    focusFig = _findFigure(input, ctx);
+    if (!focusFig) return { error: 'Figur nicht gefunden', hint: 'Prüfe die Figurenliste im System-Prompt.' };
+  }
+  const typFilter = typeof input?.typ === 'string' ? input.typ.toLowerCase() : null;
+  const limit = Math.min(200, Math.max(1, Number.isInteger(input?.limit) ? input.limit : TIMELINE_DEFAULT_LIMIT));
+
+  const events = db.prepare(`
+    SELECT id, datum, ereignis, typ, bedeutung
+    FROM zeitstrahl_events
+    WHERE book_id = ? AND user_email = ?
+    ORDER BY sort_order, id
+  `).all(ctx.bookId, userEmail);
+
+  if (!events.length) {
+    return {
+      events: [],
+      hint: 'Kein Zeitstrahl vorhanden. Komplettanalyse ausführen (Phase 6).',
+    };
+  }
+
+  const eventIds = events.map(e => e.id);
+  const { sql: idSql, values: idVals } = inClause(eventIds);
+
+  const chRows = db.prepare(`
+    SELECT zec.event_id, zec.chapter_id, c.chapter_name
+    FROM zeitstrahl_event_chapters zec
+    LEFT JOIN chapters c ON c.chapter_id = zec.chapter_id
+    WHERE zec.event_id IN ${idSql}
+    ORDER BY zec.event_id, zec.sort_order
+  `).all(...idVals);
+  const pgRows = db.prepare(`
+    SELECT zep.event_id, zep.page_id, p.page_name
+    FROM zeitstrahl_event_pages zep
+    LEFT JOIN pages p ON p.page_id = zep.page_id
+    WHERE zep.event_id IN ${idSql}
+    ORDER BY zep.event_id, zep.sort_order
+  `).all(...idVals);
+  const fgRows = db.prepare(`
+    SELECT zef.event_id, f.fig_id, COALESCE(f.name, zef.figur_name) AS name
+    FROM zeitstrahl_event_figures zef
+    LEFT JOIN figures f ON f.id = zef.figure_id
+    WHERE zef.event_id IN ${idSql}
+    ORDER BY zef.event_id, zef.sort_order
+  `).all(...idVals);
+
+  const chByEvt = new Map();
+  for (const r of chRows) {
+    if (!chByEvt.has(r.event_id)) chByEvt.set(r.event_id, []);
+    chByEvt.get(r.event_id).push({ chapter_id: r.chapter_id, chapter_name: r.chapter_name || null });
+  }
+  const pgByEvt = new Map();
+  for (const r of pgRows) {
+    if (!pgByEvt.has(r.event_id)) pgByEvt.set(r.event_id, []);
+    pgByEvt.get(r.event_id).push({ page_id: r.page_id, page_name: r.page_name || null });
+  }
+  const fgByEvt = new Map();
+  for (const r of fgRows) {
+    if (!r.name) continue;
+    if (!fgByEvt.has(r.event_id)) fgByEvt.set(r.event_id, []);
+    fgByEvt.get(r.event_id).push({ fig_id: r.fig_id || null, name: r.name });
+  }
+
+  let enriched = events.map(e => ({
+    datum: e.datum,
+    ereignis: e.ereignis,
+    typ: e.typ || 'persoenlich',
+    bedeutung: e.bedeutung || null,
+    kapitel: chByEvt.get(e.id) || [],
+    seiten:  pgByEvt.get(e.id) || [],
+    figuren: fgByEvt.get(e.id) || [],
+  }));
+
+  if (typFilter) enriched = enriched.filter(e => (e.typ || '').toLowerCase() === typFilter);
+  if (focusFig) {
+    enriched = enriched.filter(e => e.figuren.some(f => f.fig_id === focusFig.fig_id));
+  }
+
+  const total = enriched.length;
+  const limited = enriched.slice(0, limit);
+
+  return _truncateResult({
+    ...(focusFig ? { focus: { fig_id: focusFig.fig_id, name: focusFig.name } } : {}),
+    events: limited,
+    total,
+    ...(limited.length < total ? { truncated: true, shown: limited.length } : {}),
+  });
+}
+
 // ── Dispatch ──────────────────────────────────────────────────────────────────
 
 const TOOLS = {
-  list_chapters:        tool_list_chapters,
-  count_pronouns:       tool_count_pronouns,
-  get_chapter_stats:    tool_get_chapter_stats,
-  get_figure_mentions:  tool_get_figure_mentions,
-  search_passages:      tool_search_passages,
-  get_pages:            tool_get_pages,
-  list_chapter_reviews: tool_list_chapter_reviews,
+  list_chapters:         tool_list_chapters,
+  count_pronouns:        tool_count_pronouns,
+  get_chapter_stats:     tool_get_chapter_stats,
+  get_figure_mentions:   tool_get_figure_mentions,
+  search_passages:       tool_search_passages,
+  get_pages:             tool_get_pages,
+  list_chapter_reviews:  tool_list_chapter_reviews,
+  get_figure_relations:  tool_get_figure_relations,
+  get_figure_profile:    tool_get_figure_profile,
+  list_continuity_issues: tool_list_continuity_issues,
+  get_timeline:          tool_get_timeline,
 };
 
 async function executeTool(name, input, ctx) {

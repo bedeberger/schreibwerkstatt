@@ -254,6 +254,58 @@ export const BOOK_CHAT_TOOLS = [
       required: [],
     },
   },
+  {
+    name: 'get_figure_relations',
+    description: 'Liefert das Soziogramm: alle Figurenbeziehungen als gerichtete Kanten (from → to) mit Typ, Beschreibung, Machtverhältnis und bis zu 3 Belegen. Ohne Filter: ganzes Buch. Mit figur_id/figur_name: nur Kanten, die diese Figur berühren. Ideal für "wer kennt wen?", "Konflikte zwischen X und Y", "wer dominiert?".',
+    input_schema: {
+      type: 'object',
+      properties: {
+        figur_id:   { type: 'string', description: 'Optional: nur Kanten dieser Figur (fig_id, z.B. "fig_3").' },
+        figur_name: { type: 'string', description: 'Alternative: Name/Kurzname der Figur.' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'get_figure_profile',
+    description: 'Vollständiges Profil einer Figur: Stammdaten (Typ, Geburtstag, Beruf, Rolle, Motivation, Konflikt, Entwicklung, Sozialschicht, Präsenz), Tags, Schlüsselzitate, alle Lebensereignisse (mit Kapitel/Seite), Szenen, Kapitel-Auftritte und alle Beziehungen (beide Richtungen). Schwergewichtig — für "was weißt du über X?" oder Detail-Analyse einer Figur. Gib figur_id (bevorzugt) ODER figur_name an.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        figur_id:   { type: 'string', description: 'fig_id (z.B. "fig_3").' },
+        figur_name: { type: 'string', description: 'Alternative: Name/Kurzname.' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'list_continuity_issues',
+    description: 'Listet die Befunde des letzten Kontinuitätschecks: pro Issue Typ, Schwere, Beschreibung, betroffene Stellen (stelle_a/stelle_b), Empfehlung sowie betroffene Figuren und Kapitel. Beantwortet "wo widerspricht sich das Buch?", "was sind die schwersten Lücken?", "Kontinuitätsprobleme in Kapitel X". Liefert nichts, wenn noch kein Check ausgeführt wurde.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        schwere:    { type: 'string', description: 'Optionaler Filter (z.B. "hoch", "mittel", "niedrig"). Vergleich case-insensitive.' },
+        typ:        { type: 'string', description: 'Optionaler Typ-Filter (z.B. "zeit", "ort", "fakt"). Vergleich case-insensitive.' },
+        chapter_id: { type: 'integer', description: 'Nur Issues, die dieses Kapitel betreffen.' },
+        limit:      { type: 'integer', description: 'Maximale Anzahl (default 30, max 100).' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'get_timeline',
+    description: 'Liefert den konsolidierten Zeitstrahl (zeitstrahl_events) chronologisch nach sort_order: Datum, Ereignis, Typ, Bedeutung, betroffene Kapitel/Seiten/Figuren. Mit figur_id/figur_name filtert auf Ereignisse, an denen diese Figur beteiligt ist. Mit typ filtert auf Ereignistyp (z.B. "persoenlich", "historisch"). Ideal für "wann passiert was?", "biografische Timeline von X".',
+    input_schema: {
+      type: 'object',
+      properties: {
+        figur_id:   { type: 'string', description: 'Optional: nur Ereignisse dieser Figur (fig_id).' },
+        figur_name: { type: 'string', description: 'Alternative: Name/Kurzname der Figur.' },
+        typ:        { type: 'string', description: 'Optional: Typ-Filter (case-insensitive).' },
+        limit:      { type: 'integer', description: 'Maximale Anzahl (default 60, max 200).' },
+      },
+      required: [],
+    },
+  },
 ];
 
 export function buildBookChatSystemPrompt(bookName, relevantPages, figuren, review, systemOverride = null) {

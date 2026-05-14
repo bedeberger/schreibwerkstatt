@@ -513,21 +513,41 @@ async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEma
       const toolResults = [];
       for (const tu of result.toolUses) {
         if (jobSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
+        const t0 = Date.now();
         let out;
+        let ok = true;
+        let errMsg = null;
         try {
           out = await executeTool(tu.name, tu.input, ctx);
-          toolLog.push({ name: tu.name, input: tu.input, ok: true });
         } catch (e) {
           if (e.name === 'AbortError') throw e;
-          logger.warn(`Tool «${tu.name}» Fehler: ${e.message}`);
+          ok = false;
+          errMsg = e.message;
           out = { error: e.message };
-          toolLog.push({ name: tu.name, input: tu.input, ok: false, error: e.message });
         }
+        const durationMs = Date.now() - t0;
         const content = JSON.stringify(out);
+        const resultBytes = content.length;
+        const truncated = resultBytes > TOOL_RESULT_CAP_CHARS;
+        toolLog.push({
+          name: tu.name,
+          input: tu.input,
+          ok,
+          durationMs,
+          resultBytes,
+          truncated,
+          iter: iter + 1,
+          ...(errMsg ? { error: errMsg } : {}),
+        });
+        if (ok) {
+          logger.info(`tool=${tu.name} dur=${durationMs}ms bytes=${resultBytes}${truncated ? ' truncated' : ''} iter=${iter + 1}`);
+        } else {
+          logger.warn(`tool=${tu.name} dur=${durationMs}ms bytes=${resultBytes} iter=${iter + 1} FAILED: ${errMsg}`);
+        }
         toolResults.push({
           type: 'tool_result',
           tool_use_id: tu.id,
-          content: content.length > TOOL_RESULT_CAP_CHARS ? content.slice(0, TOOL_RESULT_CAP_CHARS) + '…' : content,
+          content: truncated ? content.slice(0, TOOL_RESULT_CAP_CHARS) + '…' : content,
           ...(out && out.error ? { is_error: true } : {}),
         });
       }
