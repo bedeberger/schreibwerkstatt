@@ -518,7 +518,7 @@ export function registerPaletteCard() {
         fetch('/usage/track', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key, source: 'palette' }),
+          body: JSON.stringify({ key, source: 'palette', book_id: window.__app?.selectedBookId || null }),
           credentials: 'same-origin',
         }).catch(() => {});
       } catch {}

@@ -1,0 +1,157 @@
+<!-- Bucheditor: ganzes Buch als scrollbarer Stream.
+     Alpine.data-Sub-Komponente — siehe public/js/cards/book-editor-card.js. -->
+<div class="card card--bookeditor" x-data="bookEditorCard" x-show="$app.showBookEditorCard" x-cloak
+     @keydown="onCardKeydown($event)">
+  <div class="card-header card-header--subline">
+    <div class="card-header-titlebar">
+      <span class="card-title" x-text="$app.t('bookEditor.title', { name: $app.selectedBookName })"></span>
+      <div class="card-subline">
+        <span x-show="dirtyCount > 0" class="book-editor-counter book-editor-counter--dirty"
+              x-text="$app.t('bookEditor.dirtyCount', { n: dirtyCount })"></span>
+        <span x-show="savingCount > 0" class="book-editor-counter book-editor-counter--saving"
+              x-text="$app.t('bookEditor.savingCount', { n: savingCount })"></span>
+        <span x-show="blocks.length > 0 && dirtyCount === 0 && savingCount === 0"
+              class="book-editor-counter book-editor-counter--clean"
+              x-text="$app.t('bookEditor.allSaved')"></span>
+      </div>
+    </div>
+    <div class="card-header-aside">
+      <div class="card-actions">
+        <button type="button" @click="openFind()"
+                :data-tip="$app.t('bookEditor.btn.findTitle')"
+                x-text="$app.t('bookEditor.btn.find')"></button>
+        <button type="button" class="success" @click="saveAllDirty()"
+                :disabled="saveAllRunning || dirtyCount === 0"
+                :data-tip="$app.t('bookEditor.btn.saveAllTitle')">
+          <span x-show="saveAllRunning" class="spinner"></span>
+          <span x-text="saveAllRunning ? $app.t('bookEditor.btn.saveAllProgress', { done: saveAllDone, total: saveAllTotal }) : $app.t('bookEditor.btn.saveAll')"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div x-show="loading" class="card-status">
+    <span class="spinner"></span>
+    <span x-text="$app.t('bookEditor.loading')"></span>
+  </div>
+  <div x-show="loadError" class="card-status book-editor-load-error" x-text="loadError"></div>
+
+  <div class="book-editor-stream" x-show="!loading && blocks.length > 0">
+    <template x-for="block in blocks" :key="block.kind === 'chapter' ? ('c-' + block.chapterId) : ('p-' + block.pageId)">
+      <div class="book-editor-row">
+
+        <template x-if="block.kind === 'chapter'">
+          <div class="book-editor-chapter-header">
+            <span class="book-editor-chapter-name" x-text="block.name"></span>
+          </div>
+        </template>
+
+        <template x-if="block.kind === 'page'">
+          <div class="book-editor-page-card"
+               :class="{
+                 'book-editor-page-card--active': activePageId === block.pageId,
+                 'book-editor-page-card--dirty': block.dirty,
+                 'book-editor-page-card--saving': block.saving,
+                 'book-editor-page-card--conflict': !!block.conflict,
+                 'book-editor-page-card--error': !!block.saveError,
+               }">
+            <div class="book-editor-page-header">
+              <span class="book-editor-page-name" x-text="block.name"></span>
+              <span class="book-editor-page-status"
+                    :class="'book-editor-page-status--' + blockStatusKey(block)"
+                    x-html="blockStatusLine(block)"></span>
+            </div>
+
+            <!-- Body wird imperativ via _mountBlockEl gefüllt; _maybeRehydrate
+                 refresht inaktive Blöcke bei externen Mutationen (Find/Replace,
+                 Reload). HTML-Quelle ist BookStack-Proxy (server-cleant). -->
+            <div class="book-editor-page-body"
+                 :data-book-editor-page="block.pageId"
+                 :contenteditable="activePageId === block.pageId"
+                 spellcheck="true"
+                 x-init="_mountBlockEl($el, block)"
+                 x-effect="_maybeRehydrate($el, block)"
+                 @mousedown="_onBlockMousedown(block, $event)"
+                 @click="activateBlock(block)"
+                 @input="_onBlockInput(block, $event)"></div>
+
+            <div x-show="block.conflict" x-cloak class="book-editor-conflict">
+              <span x-text="$app.t('bookEditor.conflict.banner', {
+                user: block.conflict?.remoteUserName || $app.t('edit.conflict.unknownUser')
+              })"></span>
+              <button type="button" class="danger" @click="resolveConflictOverwrite(block)"
+                      x-text="$app.t('bookEditor.conflict.overwrite')"></button>
+              <button type="button" @click="resolveConflictTakeRemote(block)"
+                      x-text="$app.t('bookEditor.conflict.takeRemote')"></button>
+            </div>
+          </div>
+        </template>
+
+      </div>
+    </template>
+  </div>
+
+  <div x-show="!loading && blocks.length === 0 && !loadError" class="card-status"
+       x-text="$app.t('bookEditor.empty')"></div>
+
+  <!-- Find / Replace Bar — teleportiert nach <body>, damit position:fixed greift. -->
+  <template x-teleport="body">
+    <div x-show="findOpen && $app.showBookEditorCard" x-cloak
+         class="book-editor-find"
+         role="dialog"
+         aria-modal="true"
+         :aria-label="$app.t('bookEditor.find.title')"
+         @keydown.escape.stop="closeFind()"
+         @mousedown.stop>
+      <div class="book-editor-find-row">
+        <input type="text"
+               class="book-editor-find-input"
+               x-model="findTerm"
+               @input="onFindInput()"
+               @keydown="onFindKeydown($event)"
+               :placeholder="$app.t('bookEditor.find.placeholder')"
+               :aria-label="$app.t('bookEditor.find.placeholder')">
+        <span class="book-editor-find-count"
+              x-text="findTerm
+                ? (findMatches.length > 0
+                    ? $app.t('find.counter', { i: findIndex + 1, n: findMatches.length })
+                    : $app.t('find.noMatches'))
+                : ''"></span>
+        <button type="button" class="book-editor-find-btn" @click="findPrev()"
+                :disabled="findMatches.length === 0"
+                :data-tip="$app.t('find.prev')" :aria-label="$app.t('find.prev')">&#x2191;</button>
+        <button type="button" class="book-editor-find-btn" @click="findNext()"
+                :disabled="findMatches.length === 0"
+                :data-tip="$app.t('find.next')" :aria-label="$app.t('find.next')">&#x2193;</button>
+        <button type="button" class="book-editor-find-btn"
+                :class="{ 'book-editor-find-btn--active': findCaseSensitive }"
+                @click="findCaseSensitive = !findCaseSensitive; recomputeFindMatches()"
+                :data-tip="$app.t('find.caseSensitive')" :aria-label="$app.t('find.caseSensitive')"
+                :aria-pressed="findCaseSensitive">Aa</button>
+        <button type="button" class="book-editor-find-btn"
+                :class="{ 'book-editor-find-btn--active': findWholeWord }"
+                @click="findWholeWord = !findWholeWord; recomputeFindMatches()"
+                :data-tip="$app.t('find.wholeWord')" :aria-label="$app.t('find.wholeWord')"
+                :aria-pressed="findWholeWord">W</button>
+        <button type="button" class="book-editor-find-close" @click="closeFind()"
+                :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')">&#x2715;</button>
+      </div>
+      <div class="book-editor-find-row">
+        <input type="text"
+               class="book-editor-find-input book-editor-find-input--replace"
+               x-model="findReplace"
+               @keydown.escape.stop="closeFind()"
+               :placeholder="$app.t('find.replacePlaceholder')"
+               :aria-label="$app.t('find.replacePlaceholder')">
+        <button type="button" class="book-editor-find-btn book-editor-find-btn--text"
+                @click="replaceCurrent()"
+                :disabled="findMatches.length === 0"
+                x-text="$app.t('find.replace')"></button>
+        <button type="button" class="book-editor-find-btn book-editor-find-btn--text"
+                @click="replaceAll()"
+                :disabled="findMatches.length === 0"
+                x-text="$app.t('find.replaceAll')"></button>
+      </div>
+    </div>
+  </template>
+</div>

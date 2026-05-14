@@ -7,7 +7,7 @@
 //  - Auth/KI/Job-Queue/SSE: Network-Only, nie cachen
 //  - Version-Bump der Konstanten invalidiert den jeweiligen Cache
 
-const SHELL_CACHE = 'lektorat-shell-v461';
+const SHELL_CACHE = 'lektorat-shell-v463';
 const API_CACHE = 'lektorat-api-v2';
 const CONFIG_CACHE = 'lektorat-config-v1';
 const ACTIVE_CACHES = new Set([SHELL_CACHE, API_CACHE, CONFIG_CACHE]);
@@ -29,6 +29,7 @@ const NEVER_CACHE_PREFIXES = [
   '/sync',
   '/booksettings',
   '/ideen',
+  '/book-editor',
 ];
 
 const SHELL_ASSET_REGEX = /\.(?:css|js|mjs|json|svg|ico|png|woff2?)$/i;

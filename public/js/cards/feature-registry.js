@@ -53,6 +53,8 @@ export const FEATURES = [
     aliases: ['pdf','pdfa','custom','layout','schrift','font','cover','titelbild','print','druck'] },
   { key: 'bookOrganizer',  kind: 'toggle', group: 'tools',  labelKey: 'tile.bookOrganizer',  descKey: 'tile.bookOrganizer.desc',  flag: 'showBookOrganizerCard', toggle: 'toggleBookOrganizerCard',  requiresBook: true,
     aliases: ['organize','organisieren','sortieren','reorder','umordnen','verschieben','rename','umbenennen','delete','loeschen','create','anlegen','struktur','kapitel','chapter','seiten','pages'] },
+  { key: 'bookEditor',     kind: 'toggle', group: 'tools',  labelKey: 'tile.bookEditor',     descKey: 'tile.bookEditor.desc',     flag: 'showBookEditorCard',    toggle: 'toggleBookEditorCard',     requiresPages: true,
+    aliases: ['bucheditor','book-editor','stream','endlos','endless','single-page','one-page','edit-all','alle-bearbeiten','volltext','full-text','suchen-ersetzen','search-replace','find-replace','suchen','ersetzen'] },
 ];
 
 // Globale Aktionen (kind:'action'). Eigene Sektion in der Palette.
@@ -128,6 +130,7 @@ export const EXCLUSIVE_CARDS = [
   { key: 'export',         flag: 'showExportCard' },
   { key: 'pdfExport',      flag: 'showPdfExportCard' },
   { key: 'bookOrganizer',  flag: 'showBookOrganizerCard' },
+  { key: 'bookEditor',     flag: 'showBookEditorCard' },
 ];
 
 export const FEATURE_GROUPS = ['review', 'world', 'tools', 'app'];

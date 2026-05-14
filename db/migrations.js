@@ -3968,6 +3968,44 @@ function runMigrations() {
     logger.info(`DB-Migration auf Version 101 abgeschlossen (tok = chars/${cpt101} in page_stats + book_stats_history; non-Claude default 1.5 → 4).`);
   }
 
+  if (version < 102) {
+    // Delta-Cache für Buch-Review (analog chapter_extract_cache / book_extract_cache
+    // aus Komplettanalyse). Spart bei grossen Büchern den Kapitelanalyse-Call,
+    // wenn pages_sig + Prompt-Vars unverändert sind.
+    const mig102 = `
+      CREATE TABLE IF NOT EXISTS chapter_review_cache (
+        book_id     INTEGER NOT NULL REFERENCES books(book_id)    ON DELETE CASCADE,
+        user_email  TEXT    NOT NULL DEFAULT '',
+        chapter_id  INTEGER NOT NULL REFERENCES chapters(chapter_id) ON DELETE CASCADE,
+        phase       TEXT    NOT NULL DEFAULT '',
+        pages_sig   TEXT    NOT NULL,
+        review_json TEXT    NOT NULL,
+        cached_at   TEXT    NOT NULL,
+        PRIMARY KEY (book_id, user_email, chapter_id, phase)
+      );
+      CREATE INDEX IF NOT EXISTS idx_crc_book_user
+        ON chapter_review_cache(book_id, user_email);
+
+      CREATE TABLE IF NOT EXISTS book_review_cache (
+        book_id     INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        user_email  TEXT    NOT NULL DEFAULT '',
+        pages_sig   TEXT    NOT NULL,
+        review_json TEXT    NOT NULL,
+        cached_at   TEXT    NOT NULL,
+        PRIMARY KEY (book_id, user_email)
+      );
+      CREATE INDEX IF NOT EXISTS idx_brc_book_user
+        ON book_review_cache(book_id, user_email);
+    `;
+    db.exec(mig102);
+    const fkErrors102 = db.pragma('foreign_key_check');
+    if (fkErrors102.length) {
+      throw new Error(`Migration 102: foreign_key_check meldet ${fkErrors102.length} Verstoesse: ${JSON.stringify(fkErrors102.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 102').run();
+    logger.info('DB-Migration auf Version 102 abgeschlossen (chapter_review_cache + book_review_cache für Buch-Review Delta-Caching).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

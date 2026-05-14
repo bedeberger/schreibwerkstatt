@@ -408,6 +408,74 @@ function deleteChapterExtractCache(bookId, userEmail) {
   return c + b;
 }
 
+// ── Delta-Cache: Buch-Review (Kapitelanalyse + Single-Pass-Review) ────────────
+// Spart bei grossen Büchern den Kapitelanalyse-Call, wenn pages_sig identisch
+// (page_id:updated_at + Prompt-Vars). chapterKey-Format identisch zum Extract-
+// Cache: '<chapter_id>(__sub<N>)?' oder '__singlepass__'.
+const _loadChapterReviewCache = db.prepare(
+  `SELECT review_json FROM chapter_review_cache
+   WHERE book_id = ? AND user_email = ? AND chapter_id = ? AND phase = ? AND pages_sig = ?`
+);
+const _saveChapterReviewCache = db.prepare(
+  `INSERT OR REPLACE INTO chapter_review_cache
+   (book_id, user_email, chapter_id, phase, pages_sig, review_json, cached_at)
+   VALUES (?, ?, ?, ?, ?, ?, ?)`
+);
+const _loadBookReviewCache = db.prepare(
+  `SELECT review_json FROM book_review_cache
+   WHERE book_id = ? AND user_email = ? AND pages_sig = ?`
+);
+const _saveBookReviewCache = db.prepare(
+  `INSERT OR REPLACE INTO book_review_cache
+   (book_id, user_email, pages_sig, review_json, cached_at)
+   VALUES (?, ?, ?, ?, ?)`
+);
+
+function loadChapterReviewCache(bookId, userEmail, chapterKey, pagesSig) {
+  const parsed = _parseChapterKey(chapterKey);
+  if (!parsed || parsed.book) return null;
+  const row = _loadChapterReviewCache.get(
+    parseInt(bookId), userEmail || '', parsed.chapterId, parsed.phase, pagesSig
+  );
+  if (!row) return null;
+  try { return JSON.parse(row.review_json); } catch { return null; }
+}
+
+function saveChapterReviewCache(bookId, userEmail, chapterKey, pagesSig, review) {
+  const parsed = _parseChapterKey(chapterKey);
+  if (!parsed || parsed.book) return;
+  _saveChapterReviewCache.run(
+    parseInt(bookId), userEmail || '', parsed.chapterId, parsed.phase,
+    pagesSig, JSON.stringify(review), new Date().toISOString(),
+  );
+}
+
+function loadBookReviewCache(bookId, userEmail, pagesSig) {
+  const row = _loadBookReviewCache.get(parseInt(bookId), userEmail || '', pagesSig);
+  if (!row) return null;
+  try { return JSON.parse(row.review_json); } catch { return null; }
+}
+
+function saveBookReviewCache(bookId, userEmail, pagesSig, review) {
+  _saveBookReviewCache.run(
+    parseInt(bookId), userEmail || '', pagesSig,
+    JSON.stringify(review), new Date().toISOString(),
+  );
+}
+
+const _deleteChapterReviewCache = db.prepare(
+  `DELETE FROM chapter_review_cache WHERE book_id = ? AND user_email = ?`
+);
+const _deleteBookReviewCache = db.prepare(
+  `DELETE FROM book_review_cache WHERE book_id = ? AND user_email = ?`
+);
+
+function deleteReviewCache(bookId, userEmail) {
+  const c = _deleteChapterReviewCache.run(parseInt(bookId), userEmail || '').changes;
+  const b = _deleteBookReviewCache.run(parseInt(bookId), userEmail || '').changes;
+  return c + b;
+}
+
 // ── Delta-Cache: Finetune-AI-Augmentation ─────────────────────────────────────
 // Cache-Key: (book_id, user_email, scope, scope_key, version).
 // scope: 'reverse-prompts' | 'fact-qa' | 'reasoning-backfill'
@@ -768,6 +836,8 @@ module.exports = {
   getDailyTotalsByUser:  tokenUsage.getDailyTotalsByUser,
   getBookSettings, getBookLocale, saveBookSettings,
   loadChapterExtractCache, saveChapterExtractCache, deleteChapterExtractCache,
+  loadChapterReviewCache, saveChapterReviewCache,
+  loadBookReviewCache, saveBookReviewCache, deleteReviewCache,
   loadFinetuneAiCache, saveFinetuneAiCache, deleteFinetuneAiCache,
   // pdf-export profiles
   listPdfExportProfiles:  pdfExport.listProfiles,

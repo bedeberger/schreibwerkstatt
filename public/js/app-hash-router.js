@@ -45,6 +45,7 @@ export const appHashRouterMethods = {
     else if (this.showExportCard) parts.push('export');
     else if (this.showPdfExportCard) parts.push('pdf');
     else if (this.showBookOrganizerCard) parts.push('organize');
+    else if (this.showBookEditorCard) parts.push('bucheditor');
     return '#' + parts.join('/');
   },
 
@@ -263,6 +264,9 @@ export const appHashRouterMethods = {
         case 'organize':
           if (!this.showBookOrganizerCard) await this.toggleBookOrganizerCard();
           break;
+        case 'bucheditor':
+          if (!this.showBookEditorCard) await this.toggleBookEditorCard();
+          break;
       }
     } finally {
       this._applyingHash = false;
@@ -288,6 +292,7 @@ export const appHashRouterMethods = {
       'showExportCard',
       'showPdfExportCard',
       'showBookOrganizerCard',
+      'showBookEditorCard',
       'showBookOverviewCard',
     ];
     this._hashWatcherTeardowns = [];

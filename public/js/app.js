@@ -36,6 +36,7 @@ import { registerFinetuneExportCard } from './cards/finetune-export-card.js';
 import { registerExportCard } from './cards/export-card.js';
 import { registerPdfExportCard } from './cards/pdf-export-card.js';
 import { registerBookOrganizerCard } from './cards/book-organizer-card.js';
+import { registerBookEditorCard } from './cards/book-editor-card.js';
 import { configureI18n, i18nMethods, getSupportedLocales } from './i18n.js';
 import { pageViewMethods } from './page-view.js';
 import { editorEditMethods } from './editor/edit.js';
@@ -211,6 +212,7 @@ document.addEventListener('alpine:init', () => {
   registerExportCard();
   registerPdfExportCard();
   registerBookOrganizerCard();
+  registerBookEditorCard();
   registerKontinuitaetCard();
   registerEreignisseCard();
   registerOrteCard();

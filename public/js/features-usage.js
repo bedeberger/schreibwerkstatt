@@ -28,7 +28,7 @@ export const featuresUsageMethods = {
       await fetch('/usage/track', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key }),
+        body: JSON.stringify({ key, book_id: this.selectedBookId || null }),
         credentials: 'same-origin',
       });
     } catch (e) {

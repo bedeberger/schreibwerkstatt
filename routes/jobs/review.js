@@ -1,6 +1,11 @@
 'use strict';
+const crypto = require('crypto');
 const express = require('express');
-const { db, getBookSettings, getTokenForRequest, upsertBookByName } = require('../../db/schema');
+const {
+  db, getBookSettings, getTokenForRequest, upsertBookByName,
+  loadChapterReviewCache, saveChapterReviewCache,
+  loadBookReviewCache, saveBookReviewCache,
+} = require('../../db/schema');
 const {
   makeJobLogger, updateJob, completeJob, failJob, i18nError,
   aiCall, getPrompts, getBookPrompts,
@@ -15,12 +20,35 @@ const { loadReviewKomplettContext } = require('./review-context');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
 
+// Stabile, kurze Signatur für strukturierte Prompt-Vars (narrative,
+// reviewSchwerpunkt, komplettContext). Identischer Inhalt → identische Sig.
+function _sigHash(obj) {
+  return crypto.createHash('sha1').update(JSON.stringify(obj ?? null)).digest('hex').slice(0, 12);
+}
+
+// pages_sig pro Chunk (analog Komplettanalyse): page_id:updated_at sortiert,
+// plus alle Prompt-Vars, die das Kapitelanalyse-Ergebnis beeinflussen.
+function buildChapterPagesSig(chunk, { narrativeSig, cacheVersion }) {
+  const pages = chunk.pages.map(p => `${p.id}:${p.updated_at || ''}`).sort().join('|');
+  return `${pages}||${chunk.name}||${narrativeSig}||${cacheVersion}`;
+}
+
+// pages_sig fürs ganze Buch (Single-Pass-Review).
+function buildBookReviewPagesSig(pageContents, { bookName, optionsSig, cacheVersion }) {
+  const pages = pageContents
+    .map(p => `${p.id}:${p.updated_at || ''}|${p.chapter_id ?? ''}:${p.chapter ?? ''}`)
+    .sort()
+    .join('|');
+  return `${pages}||${bookName}||${optionsSig}||${cacheVersion}`;
+}
+
 const reviewRouter = express.Router();
 
 // ── Job: Buchbewertung ────────────────────────────────────────────────────────
 async function runReviewJob(jobId, bookId, bookName, userEmail, userToken) {
   const logger = makeJobLogger(jobId);
-  const { buildBookReviewSinglePassPrompt, buildChapterAnalysisPrompt, buildBookReviewMultiPassPrompt, SCHEMA_REVIEW, SCHEMA_CHAPTER_ANALYSIS, getBuchtypReviewSchwerpunkt } = await getPrompts();
+  const prompts = await getPrompts();
+  const { buildBookReviewSinglePassPrompt, buildChapterAnalysisPrompt, buildBookReviewMultiPassPrompt, SCHEMA_REVIEW, SCHEMA_CHAPTER_ANALYSIS, getBuchtypReviewSchwerpunkt, PROMPTS_VERSION } = prompts;
   const { SYSTEM_BUCHBEWERTUNG, SYSTEM_KAPITELANALYSE } = await getBookPrompts(bookId, userEmail);
   const bookSettings = getBookSettings(bookId, userEmail);
   const narrative = narrativeLabels(bookSettings);
@@ -32,6 +60,15 @@ async function runReviewJob(jobId, bookId, bookName, userEmail, userToken) {
   // die Buckets leer und der Prompt injiziert keinen Strukturdaten-Block.
   const komplettContext = loadReviewKomplettContext(bookId, userEmail);
   const reviewOptions = { ...narrative, reviewSchwerpunkt, komplettContext };
+
+  const bookIdInt = parseInt(bookId);
+  const email = userEmail || '';
+  const effectiveProvider = process.env.API_PROVIDER || 'claude';
+  // Cache-Version: Modellname + Prompts-Schema-Version. Ändert sich eins davon,
+  // werden alle persistierten Review-Caches automatisch verworfen.
+  const cacheVersion = `${_modelName(effectiveProvider)}:${PROMPTS_VERSION || ''}`;
+  const narrativeSig = _sigHash(narrative);
+  const optionsSig = _sigHash({ schwerpunkt: reviewSchwerpunkt, komplettContext, narrative });
   try {
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
     const [chaptersData, pages] = await Promise.all([
@@ -60,22 +97,44 @@ async function runReviewJob(jobId, bookId, bookName, userEmail, userToken) {
     if (totalChars <= SINGLE_PASS_LIMIT) {
       updateJob(jobId, { progress: 65, statusText: 'job.phase.aiBookReview' });
       const bookText = buildSinglePassBookText(groups, groupOrder);
-
-      r = await aiCall(jobId, tok,
-        buildBookReviewSinglePassPrompt(bookName, pageContents.length, bookText, reviewOptions),
-        SYSTEM_BUCHBEWERTUNG,
-        65, 97, 5000, 0.2, null, undefined, SCHEMA_REVIEW,
-      );
+      const bookPagesSig = buildBookReviewPagesSig(pageContents, { bookName, optionsSig, cacheVersion });
+      const cached = loadBookReviewCache(bookIdInt, email, bookPagesSig);
+      if (cached) {
+        logger.info(`Single-Pass-Review – Cache-HIT (pages_sig match) – spart Review-Call.`);
+        updateJob(jobId, { progress: 97, statusText: 'job.phase.checkpointLoaded' });
+        r = cached;
+      } else {
+        r = await aiCall(jobId, tok,
+          buildBookReviewSinglePassPrompt(bookName, pageContents.length, bookText, reviewOptions),
+          SYSTEM_BUCHBEWERTUNG,
+          65, 97, 5000, 0.2, null, undefined, SCHEMA_REVIEW,
+        );
+        saveBookReviewCache(bookIdInt, email, bookPagesSig, r);
+      }
     } else {
       const { chunkOrder, chunks } = splitGroupsIntoChunks(groups, groupOrder, PER_CHUNK_LIMIT);
       const chapterAnalyses = [];
       let completed = 0;
+      let cacheHits = 0;
 
       const thunks = chunkOrder.map((key, gi) => async () => {
         if (jobAbortControllers.get(jobId)?.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
         const chunk = chunks.get(key);
         const fromPct = 65 + Math.round((gi / chunkOrder.length) * 25);
         const toPct   = 65 + Math.round(((gi + 1) / chunkOrder.length) * 25);
+        const pagesSig = buildChapterPagesSig(chunk, { narrativeSig, cacheVersion });
+        const cached = loadChapterReviewCache(bookIdInt, email, key, pagesSig);
+        if (cached) {
+          cacheHits++;
+          completed++;
+          updateJob(jobId, {
+            progress: toPct,
+            statusText: 'job.phase.analyzing',
+            statusParams: { current: gi + 1, total: chunkOrder.length, name: chunk.name },
+          });
+          logger.info(`[${completed}/${chunkOrder.length}] «${chunk.name}» – Cache-HIT`);
+          return { name: chunk.name, pageCount: chunk.pages.length, ...cached };
+        }
         updateJob(jobId, {
           progress: fromPct,
           statusText: 'job.phase.analyzing',
@@ -87,6 +146,7 @@ async function runReviewJob(jobId, bookId, bookName, userEmail, userToken) {
           SYSTEM_KAPITELANALYSE,
           fromPct, toPct, 1500, 0.2, null, undefined, SCHEMA_CHAPTER_ANALYSIS,
         );
+        saveChapterReviewCache(bookIdInt, email, key, pagesSig, ca);
         completed++;
         logger.info(`[${completed}/${chunkOrder.length}] «${chunk.name}» analysiert (${chunk.pages.length} Seiten)`);
         return { name: chunk.name, pageCount: chunk.pages.length, ...ca };
@@ -96,6 +156,9 @@ async function runReviewJob(jobId, bookId, bookName, userEmail, userToken) {
       for (const result of results) {
         if (result.status === 'rejected') throw result.reason;
         chapterAnalyses.push(result.value);
+      }
+      if (cacheHits > 0) {
+        logger.info(`Kapitelanalyse: ${cacheHits}/${chunkOrder.length} aus Cache (Delta-Cache spart Calls).`);
       }
 
       updateJob(jobId, {

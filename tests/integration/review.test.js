@@ -146,6 +146,101 @@ test('Buch-Review: fehlt gesamtnote → failJob', async () => {
   assert.equal(job.error, 'job.error.gesamtnoteMissing');
 });
 
+test('Buch-Review Cache: Single-Pass-Rerun trifft book_review_cache → 0 AI-Calls', async () => {
+  const BOOK_ID = 88;
+  ctx.mockBs.setBook({
+    chapters: [{ id: 8800, book_id: BOOK_ID, name: 'Kap 1' }],
+    pages: [{ id: 8801, book_id: BOOK_ID, chapter_id: 8800, name: 'S 1', updated_at: '2026-05-01T10:00:00Z' }],
+    pageBodies: { 8801: '<p>' + 'Anna ging weiter. '.repeat(60) + '</p>' },
+  });
+
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.includes('gesamtnote') && e.schemaKeys.includes('struktur'),
+    reviewResponse(4.5),
+  );
+
+  // Erster Run → schreibt Cache.
+  const jobId1 = ctx.shared.createJob('review', BOOK_ID, 'tester@test.dev', 'job.label.review');
+  ctx.shared.enqueueJob(jobId1, () =>
+    ctx.review.runReviewJob(jobId1, BOOK_ID, 'Mein Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }),
+  );
+  const job1 = await waitForJob(ctx.shared, jobId1);
+  assert.equal(job1.status, 'done');
+  assert.equal(ctx.mockAi.log.length, 1, '1. Run = 1 Call');
+
+  const cacheRow = ctx.dbSchema.db.prepare(
+    'SELECT pages_sig FROM book_review_cache WHERE book_id = ? AND user_email = ?'
+  ).get(BOOK_ID, 'tester@test.dev');
+  assert.ok(cacheRow, 'book_review_cache fehlt nach 1. Run');
+
+  // Zweiter Run identische Inputs → Cache-HIT.
+  const jobId2 = ctx.shared.createJob('review', BOOK_ID, 'tester@test.dev', 'job.label.review');
+  ctx.shared.enqueueJob(jobId2, () =>
+    ctx.review.runReviewJob(jobId2, BOOK_ID, 'Mein Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }),
+  );
+  const job2 = await waitForJob(ctx.shared, jobId2);
+  assert.equal(job2.status, 'done');
+  assert.equal(job2.result.review.gesamtnote, 4.5);
+  assert.equal(ctx.mockAi.log.length, 1, '2. Run = Cache-HIT, kein neuer AI-Call');
+});
+
+test('Buch-Review Cache: Multi-Pass — geänderte Seite invalidiert nur 1 Kapitel', async () => {
+  const BOOK_ID = 89;
+  const chapters = [], pages = [], bodies = {};
+  for (let i = 0; i < 3; i++) {
+    chapters.push({ id: 8900 + i, book_id: BOOK_ID, name: `Kap ${i + 1}` });
+    pages.push({ id: 8910 + i, book_id: BOOK_ID, chapter_id: 8900 + i, name: `S ${i + 1}`, updated_at: '2026-05-01T10:00:00Z' });
+    bodies[8910 + i] = '<p>' + 'Anna ging weiter durch das Land. '.repeat(280) + '</p>';
+  }
+  ctx.mockBs.setBook({ chapters, pages, pageBodies: bodies });
+
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.includes('themen') && e.schemaKeys.includes('qualitaet'),
+    chapterAnalysisResponse(),
+  );
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.includes('gesamtnote') && e.schemaKeys.includes('struktur'),
+    reviewResponse(3.8),
+  );
+
+  // 1. Run → 3 Analysen + 1 Final.
+  const jobId1 = ctx.shared.createJob('review', BOOK_ID, 'tester@test.dev', 'job.label.review');
+  ctx.shared.enqueueJob(jobId1, () =>
+    ctx.review.runReviewJob(jobId1, BOOK_ID, 'Multi', 'tester@test.dev', { id: 'tok', pw: 'pw' }),
+  );
+  const job1 = await waitForJob(ctx.shared, jobId1, { timeoutMs: 8000 });
+  assert.equal(job1.status, 'done');
+  assert.equal(ctx.mockAi.log.length, 4, '1. Run = 3 Analysen + 1 Final');
+
+  const cachedCount = ctx.dbSchema.db.prepare(
+    'SELECT COUNT(*) AS n FROM chapter_review_cache WHERE book_id = ? AND user_email = ?'
+  ).get(BOOK_ID, 'tester@test.dev').n;
+  assert.equal(cachedCount, 3, '3 Kapitelanalysen gecacht');
+
+  // Seite in Kapitel 2 ändert sich → updated_at neu.
+  pages[1].updated_at = '2026-05-02T11:00:00Z';
+  ctx.mockBs.setBook({ chapters, pages, pageBodies: bodies });
+
+  ctx.mockAi.reset();
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.includes('themen') && e.schemaKeys.includes('qualitaet'),
+    chapterAnalysisResponse(),
+  );
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.includes('gesamtnote') && e.schemaKeys.includes('struktur'),
+    reviewResponse(3.8),
+  );
+
+  const jobId2 = ctx.shared.createJob('review', BOOK_ID, 'tester@test.dev', 'job.label.review');
+  ctx.shared.enqueueJob(jobId2, () =>
+    ctx.review.runReviewJob(jobId2, BOOK_ID, 'Multi', 'tester@test.dev', { id: 'tok', pw: 'pw' }),
+  );
+  const job2 = await waitForJob(ctx.shared, jobId2, { timeoutMs: 8000 });
+  assert.equal(job2.status, 'done');
+  // 2 Kapitel cached + 1 neu analysiert + 1 Final = 2 Calls.
+  assert.equal(ctx.mockAi.log.length, 2, '2. Run: 1 Kapitelanalyse + 1 Final (2 aus Cache)');
+});
+
 test('Buch-Review: leeres Buch → result.empty', async () => {
   const BOOK_ID = 83;
   ctx.mockBs.setBook({ chapters: [], pages: [], pageBodies: {} });

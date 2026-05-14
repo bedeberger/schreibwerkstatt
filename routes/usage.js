@@ -31,6 +31,7 @@ const ALLOWED_KEYS = new Set([
   'export',
   'pdfExport',
   'bookOrganizer',
+  'bookEditor',
 ]);
 
 function userEmailOrNull(req) {
@@ -51,6 +52,8 @@ router.post('/track', jsonBody, (req, res) => {
   }
   const rawSource = (req.body?.source || '').toString();
   const source = KNOWN_SOURCES.has(rawSource) ? rawSource : null;
+  const bookId = parseInt(req.body?.book_id, 10);
+  if (bookId) setContext({ book: bookId });
   const now = Date.now();
   try {
     db.prepare(`

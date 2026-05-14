@@ -1,0 +1,262 @@
+/* Bucheditor — Manuskript-Stream.
+   Visuelle Logik: ein durchgehender Text mit typografischen Kapitel-/Seiten-
+   Marken statt gestapelter Karten. Block-Grenzen sind Rules + Captions,
+   nicht Borders. Active-Block markiert sich über ein dünnes Left-Rail.
+   Karten-Akzent ist Sepia (passend zur Paper/Ink-Palette der App). */
+
+@layer components {
+
+  .book-editor-stream {
+    display: flex;
+    flex-direction: column;
+    padding: var(--space-lg) 0;
+    max-width: 72ch;
+    margin-inline: auto;
+  }
+
+  /* ─ Kapitel-Header ─────────────────────────────────────────────────────
+     Typografisch, kein gefärbter Balken. Sticky beim Scrollen. Dünne Rule
+     darunter zieht die Trennung zum ersten Seitenblock. */
+  .book-editor-chapter-header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    padding: var(--space-md) 0 var(--space-sm);
+    background: var(--color-bg);
+    margin-block: var(--space-lg) 0;
+  }
+  .book-editor-chapter-header:first-child { margin-block-start: 0; }
+  .book-editor-chapter-name {
+    display: block;
+    font-family: var(--font-serif);
+    font-size: var(--font-size-xl);
+    font-weight: var(--fw-semibold);
+    color: var(--color-text);
+    letter-spacing: -0.005em;
+    line-height: var(--lh-tight);
+    padding-block-end: var(--space-xs);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  /* ─ Page-Block ─────────────────────────────────────────────────────────
+     Kein Karten-Wrapper. Caption oben, Body darunter. Active-Indikator als
+     Left-Rail; sonst keine Borders. */
+  .book-editor-page-card {
+    display: flex;
+    flex-direction: column;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    margin-block: var(--space-md) 0;
+    position: relative;
+    transition: background 0.15s ease;
+  }
+  .book-editor-page-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 -12px;
+    width: 2px;
+    background: transparent;
+    transition: background 0.15s ease;
+  }
+  .book-editor-page-card--active::before {
+    background: var(--card-accent, currentColor);
+  }
+  .book-editor-page-card--dirty:not(.book-editor-page-card--saving)::before {
+    background: color-mix(in srgb, var(--card-accent, currentColor) 60%, transparent);
+  }
+  .book-editor-page-card--saving::before {
+    background: var(--color-muted);
+    opacity: 0.6;
+  }
+  .book-editor-page-card--conflict::before,
+  .book-editor-page-card--error::before {
+    background: var(--color-error, #b33);
+  }
+
+  /* Caption-Zeile statt Header-Bar — Marginalie-Look. */
+  .book-editor-page-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-sm);
+    padding-block-end: var(--space-xs);
+    font-size: var(--font-size-xs);
+    color: var(--color-muted);
+    border-bottom: 1px dotted var(--color-border);
+  }
+  .book-editor-page-name {
+    font-family: var(--font-sans);
+    font-weight: var(--fw-medium);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-muted);
+  }
+  .book-editor-page-status {
+    font-family: var(--font-sans);
+    font-size: var(--font-size-xs);
+    font-style: italic;
+    color: var(--color-muted);
+  }
+  .book-editor-page-status--dirty   { color: var(--card-accent, currentColor); font-style: normal; }
+  .book-editor-page-status--saving  { color: var(--color-muted); }
+  .book-editor-page-status--saved   { color: var(--color-muted); }
+  .book-editor-page-status--error,
+  .book-editor-page-status--conflict { color: var(--color-error, #b33); font-style: normal; }
+
+  /* ─ Body ───────────────────────────────────────────────────────────────
+     Read- und Edit-Modus identische Typografie. Subtiler Hauch beim Fokus,
+     kein Border/Background-Wechsel sonst. */
+  .book-editor-page-body {
+    padding-block: var(--space-sm);
+    min-height: 2em;
+    outline: none;
+    line-height: var(--lh-relaxed);
+    font-size: var(--font-size-md);
+    color: var(--color-text);
+    font-family: var(--font-serif);
+  }
+  .book-editor-page-body[contenteditable="false"] { cursor: text; }
+  .book-editor-page-body[contenteditable="true"]:focus {
+    background: color-mix(in srgb, var(--card-accent, currentColor) 3%, transparent);
+  }
+  .book-editor-page-body p { margin-block: 0.7em; }
+  .book-editor-page-body p:first-child { margin-block-start: 0.3em; }
+  .book-editor-page-body p:last-child { margin-block-end: 0.3em; }
+  .book-editor-page-body h1,
+  .book-editor-page-body h2,
+  .book-editor-page-body h3 {
+    font-weight: var(--fw-semibold);
+    margin-block: 1em 0.4em;
+    font-family: var(--font-serif);
+  }
+  .book-editor-page-body blockquote {
+    margin-inline-start: var(--space-md);
+    padding-inline-start: var(--space-md);
+    border-inline-start: 2px solid var(--color-border);
+    color: var(--color-muted);
+    font-style: italic;
+  }
+
+  /* Find-Highlights — gedämpft. */
+  ::highlight(book-editor-find-match) {
+    background: color-mix(in srgb, var(--card-accent, currentColor) 22%, transparent);
+  }
+  ::highlight(book-editor-find-current) {
+    background: color-mix(in srgb, var(--card-accent, currentColor) 55%, transparent);
+    color: var(--color-text);
+  }
+
+  /* Konflikt-Banner — Marginalie, dünner Rail. */
+  .book-editor-conflict {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-block: var(--space-sm) 0;
+    padding: var(--space-xs) var(--space-sm);
+    border-left: 3px solid var(--color-error, #b33);
+    background: color-mix(in srgb, var(--color-error, #b33) 6%, transparent);
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+  }
+
+  /* Header-Counter — minimalistisch. */
+  .book-editor-counter {
+    font-size: var(--font-size-xs);
+    color: var(--color-muted);
+    padding-inline: var(--space-xs);
+  }
+  .book-editor-counter--dirty { color: var(--card-accent, currentColor); }
+  .book-editor-counter--saving { color: var(--color-muted); font-style: italic; }
+  .book-editor-counter--clean { color: var(--color-muted); }
+
+  .book-editor-load-error { color: var(--color-error, #b33); }
+
+  /* ─ Find-Bar ───────────────────────────────────────────────────────────
+     Sticky am unteren Viewport-Rand. */
+  .book-editor-find {
+    position: fixed;
+    right: var(--space-md);
+    bottom: var(--space-md);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    padding: var(--space-sm);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 3px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    width: 440px;
+    max-width: calc(100vw - 2 * var(--space-md));
+  }
+  .book-editor-find-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+  }
+  .book-editor-find-input {
+    flex: 1;
+    min-width: 0;
+    padding: var(--space-xs) var(--space-sm);
+    border: 1px solid var(--color-border-input, var(--color-border));
+    border-radius: 3px;
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-size: var(--font-size-base);
+  }
+  .book-editor-find-count {
+    font-size: var(--font-size-xs);
+    color: var(--color-muted);
+    white-space: nowrap;
+    min-width: 4em;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .book-editor-find-btn {
+    padding: var(--space-xs) var(--space-sm);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text);
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+    font-family: var(--font-sans);
+  }
+  .book-editor-find-btn:hover:not(:disabled) {
+    background: var(--color-bg);
+    border-color: var(--card-accent, var(--color-border));
+  }
+  .book-editor-find-btn:disabled { opacity: 0.4; cursor: default; }
+  .book-editor-find-btn--active {
+    background: color-mix(in srgb, var(--card-accent, currentColor) 18%, var(--color-surface));
+    border-color: var(--card-accent, currentColor);
+    color: var(--card-accent, currentColor);
+  }
+  .book-editor-find-btn--text { min-width: 6em; }
+  .book-editor-find-close {
+    margin-inline-start: auto;
+    padding: var(--space-xs) var(--space-sm);
+    border: none;
+    background: transparent;
+    color: var(--color-muted);
+    cursor: pointer;
+    font-size: var(--font-size-md);
+  }
+  .book-editor-find-close:hover { color: var(--color-text); }
+}
+
+/* Container-Query: schmale Karten-Slots → Stream nutzt ganze Breite. */
+@container card (max-width: 600px) {
+  .book-editor-stream { max-width: none; padding-inline: var(--space-sm); }
+  .book-editor-page-card::before { inset-inline-start: -8px; }
+  .book-editor-find { width: calc(100vw - 2 * var(--space-sm)); right: var(--space-sm); }
+}
+
+@media (max-width: 600px) {
+  .book-editor-stream { max-width: none; padding-inline: var(--space-sm); }
+  .book-editor-page-card::before { inset-inline-start: -8px; }
+  .book-editor-find { width: calc(100vw - 24px); right: 12px; bottom: 12px; }
+  .book-editor-find-btn--text { min-width: auto; }
+}

@@ -23,4 +23,5 @@
   .card--stil          { --card-accent: var(--card-accent-stil); }
   .card--export        { --card-accent: var(--card-accent-settings); }
   .card--bookoverview  { --card-accent: var(--card-accent-organize); }
+  .card--bookeditor    { --card-accent: var(--card-accent-bookeditor); }
 }

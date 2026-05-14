@@ -245,6 +245,7 @@ app.use('/export', exportRouter);
 app.use('/pdf-export', pdfExportRouter);
 app.use('/usage', usageRouter);
 app.use('/draft-figures', draftFiguresRouter);
+app.use('/book-editor', require('./routes/book-editor'));
 
 // Logout: usage-Tabelle behält Einträge (User-Wiederkehr → Top-3 sofort wieder da).
 // Wenn Datenschutz erforderlich, Cleanup über Job/Cron auf Last-Seen-Basis.

@@ -52,8 +52,10 @@ function getBookName(bookId) {
 // chat_sessions[kind=page], ideen) und FK SET NULL (figure_events.page_id,
 // figure_scenes.page_id, locations.erste_erwaehnung_page_id).
 // Chapters-DELETE triggert CASCADE (chapter_reviews, chapter_extract_cache,
-// figure_appearances, location_chapters) und SET NULL (figure_events.chapter_id,
-// figure_scenes.chapter_id, page_checks.chapter_id, pages.chapter_id).
+// chapter_review_cache, figure_appearances, location_chapters) und SET NULL
+// (figure_events.chapter_id, figure_scenes.chapter_id, page_checks.chapter_id,
+// pages.chapter_id).
+// Books-DELETE triggert zusätzlich CASCADE auf book_extract_cache + book_review_cache.
 function pruneStaleByAge(days) {
   const cutoffMs = Date.now() - Math.max(1, days) * 86_400_000;
   const cutoff = new Date(cutoffMs).toISOString();

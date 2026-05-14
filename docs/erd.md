@@ -1,6 +1,6 @@
 # ERD — bookstack-lektorat
 
-Stand: Schema-Version 101, 48 Tabellen (ohne `sqlite_*`/`schema_version`/`sessions`).
+Stand: Schema-Version 102, 50 Tabellen (ohne `sqlite_*`/`schema_version`/`sessions`).
 
 Quelle: Live-Dump aus [lektorat.db](../lektorat.db) (`.schema --indent`) + [db/migrations.js](../db/migrations.js). Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -38,6 +38,8 @@ erDiagram
   books ||--o{ lektorat_time         : has
   books ||--o{ chapter_extract_cache : has
   books ||--o{ book_extract_cache    : has
+  books ||--o{ chapter_review_cache  : has
+  books ||--o{ book_review_cache     : has
   books ||--o{ finetune_ai_cache     : has
   books ||--o{ draft_figures         : has
   books ||--o{ werkstatt_runs        : has
@@ -64,6 +66,7 @@ erDiagram
   chapters ||--o{ zeitstrahl_event_chapters : at
   chapters ||--o{ chapter_reviews        : has
   chapters ||--o{ chapter_extract_cache  : cached
+  chapters ||--o{ chapter_review_cache   : cached
   chapters ||--o{ pages                  : groups
   chapters ||--o{ page_checks            : ref
 
@@ -554,6 +557,22 @@ erDiagram
     TEXT    user_email   PK
     TEXT    pages_sig
     TEXT    extract_json
+    TEXT    cached_at
+  }
+  chapter_review_cache {
+    INTEGER book_id      PK,FK
+    TEXT    user_email   PK
+    INTEGER chapter_id   PK,FK
+    TEXT    phase        PK
+    TEXT    pages_sig
+    TEXT    review_json
+    TEXT    cached_at
+  }
+  book_review_cache {
+    INTEGER book_id      PK,FK
+    TEXT    user_email   PK
+    TEXT    pages_sig
+    TEXT    review_json
     TEXT    cached_at
   }
   finetune_ai_cache {

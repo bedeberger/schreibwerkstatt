@@ -1,0 +1,632 @@
+// Alpine.data('bookEditorCard') — Bucheditor.
+//
+// Rendert alle Kapitel + Seiten eines Buchs in Lesereihenfolge als Sequenz
+// separater contenteditable-Blöcke. Pro-Block-Save schreibt direkt zurück
+// nach BookStack (bsPut), Stale-Schutz via _checkPageConflict. HTML-Quelle
+// ist immer der BookStack-Proxy (server-cleant via bookstackPageCleaner) —
+// gleicher Vertrauensgrad wie der bestehende Seiten-Editor.
+//
+// Click-aktiviert-Block: Default contenteditable=false; Klick setzt aktive
+// pageId, Caret aus Mousedown-Position. Verlassen flusht Save bei dirty.
+//
+// Save-Queue: pro-Block dirty/saving; Concurrency 1; Save-All seriell.
+//
+// Find/Replace: TreeWalker über alle Block-Container; CSS Custom Highlight API;
+// Replace via Range.deleteContents + Text-Insert; Block wird dirty + queued.
+
+import { setupCardLifecycle } from './card-lifecycle.js';
+import { stripFocusArtefacts, htmlToText, fetchJson, escHtml } from '../utils.js';
+
+const AUTOSAVE_IDLE_MS = 60000;
+const AUTOSAVE_MAX_MS = 120000;
+
+const HIGHLIGHT_ALL = 'book-editor-find-match';
+const HIGHLIGHT_CURRENT = 'book-editor-find-current';
+let _hlAll = null, _hlCurrent = null;
+function ensureHighlights() {
+  if (typeof CSS === 'undefined' || !CSS.highlights || typeof Highlight === 'undefined') return false;
+  if (!_hlAll) { _hlAll = new Highlight(); CSS.highlights.set(HIGHLIGHT_ALL, _hlAll); }
+  if (!_hlCurrent) { _hlCurrent = new Highlight(); CSS.highlights.set(HIGHLIGHT_CURRENT, _hlCurrent); }
+  return true;
+}
+function clearHighlights() {
+  if (_hlAll) _hlAll.clear();
+  if (_hlCurrent) _hlCurrent.clear();
+}
+
+function isWordCharBE(ch) {
+  if (!ch) return false;
+  return /[\p{L}\p{N}_]/u.test(ch);
+}
+
+// Findings-/Chat-Marks entfernen, falls aus History/Chat-Apply im rohen HTML
+// vorhanden. Bucheditor selbst rendert keine Lektorats-Marks.
+function cleanForSave(html) {
+  if (!html) return '';
+  if (html.indexOf('lektorat-mark') === -1 && html.indexOf('chat-mark') === -1 &&
+      html.indexOf('lektorat-ins') === -1 && html.indexOf('chat-mark-ins') === -1) {
+    return html;
+  }
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  tmp.querySelectorAll('.lektorat-ins, .chat-mark-ins').forEach(n => n.remove());
+  tmp.querySelectorAll('.lektorat-mark, .chat-mark').forEach(mark => {
+    const parent = mark.parentNode;
+    if (!parent) return;
+    while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+    parent.removeChild(mark);
+  });
+  return tmp.innerHTML;
+}
+
+// Build-Funktion getrennt für Unit-Tests.
+export function buildBlocksFromPages(pages) {
+  const blocks = [];
+  let lastChapterId = undefined;
+  for (const p of pages || []) {
+    if (p.chapterId !== lastChapterId) {
+      lastChapterId = p.chapterId;
+      if (p.chapterId) {
+        blocks.push({ kind: 'chapter', chapterId: p.chapterId, name: p.chapterName || '' });
+      }
+    }
+    const html = stripFocusArtefacts(p.html || '');
+    blocks.push({
+      kind: 'page',
+      pageId: p.pageId,
+      name: p.pageName || '',
+      chapterId: p.chapterId,
+      html,
+      originalHtml: html,
+      originalUpdatedAt: p.updated_at || null,
+      dirty: false,
+      saving: false,
+      saveError: '',
+      conflict: null,
+      savedAt: null,
+      _rev: 0,
+    });
+  }
+  return blocks;
+}
+
+export function registerBookEditorCard() {
+  if (typeof window === 'undefined' || !window.Alpine) return;
+  window.Alpine.data('bookEditorCard', () => ({
+    blocks: [],
+    loading: false,
+    loadError: '',
+    activePageId: null,
+    saveQueue: [],
+    saveProcessing: false,
+    saveAllRunning: false,
+    saveAllTotal: 0,
+    saveAllDone: 0,
+    dirtyCount: 0,
+    savingCount: 0,
+    _autosaveTimers: new Map(),
+    _autosaveMaxTimers: new Map(),
+    _pendingMousedown: null,
+
+    findOpen: false,
+    findTerm: '',
+    findReplace: '',
+    findCaseSensitive: false,
+    findWholeWord: false,
+    findMatches: [],
+    findIndex: -1,
+    _findRecomputeTimer: null,
+    _beforeUnloadHandler: null,
+
+    _lifecycle: null,
+
+    init() {
+      this._lifecycle = setupCardLifecycle(this, {
+        name: 'bookEditor',
+        showFlag: 'showBookEditorCard',
+        timerKeys: [],
+        resetState: {
+          blocks: [], loading: false, loadError: '',
+          activePageId: null, saveQueue: [], saveProcessing: false,
+          saveAllRunning: false, saveAllTotal: 0, saveAllDone: 0,
+          dirtyCount: 0, savingCount: 0,
+          findOpen: false, findTerm: '', findReplace: '',
+          findMatches: [], findIndex: -1,
+        },
+        load: (root) => this._load(root.selectedBookId),
+      });
+
+      this._beforeUnloadHandler = (e) => {
+        if (this.dirtyCount > 0 || this.savingCount > 0) {
+          e.preventDefault();
+          e.returnValue = '';
+        }
+      };
+      window.addEventListener('beforeunload', this._beforeUnloadHandler, { signal: this._lifecycle.signal });
+    },
+
+    destroy() {
+      for (const t of this._autosaveTimers.values()) clearTimeout(t);
+      for (const t of this._autosaveMaxTimers.values()) clearTimeout(t);
+      this._autosaveTimers.clear();
+      this._autosaveMaxTimers.clear();
+      clearHighlights();
+      this._lifecycle?.destroy();
+    },
+
+    // ── Laden ──────────────────────────────────────────────────────────────
+    async _load(bookId) {
+      if (!bookId) return;
+      this.loading = true;
+      this.loadError = '';
+      this.blocks = [];
+      this.activePageId = null;
+      this.dirtyCount = 0;
+      this.savingCount = 0;
+      try {
+        const data = await fetchJson('/book-editor/' + bookId + '/contents');
+        this.blocks = buildBlocksFromPages(data.pages || []);
+        this.loading = false;
+        if (data.missing > 0) {
+          const app = window.__app;
+          app?.setStatus?.(app.t('bookEditor.missingPages', { n: data.missing }), false, 5000);
+        }
+      } catch (e) {
+        this.loading = false;
+        this.loadError = e.message || 'Load failed';
+      }
+    },
+
+    // ── Rendering-Sync ────────────────────────────────────────────────────
+    // Initialer Mount-Hook (x-init). Setzt rev-Marker + Initial-Body imperativ.
+    _mountBlockEl(el, block) {
+      if (!el || block.kind !== 'page') return;
+      el.innerHTML = block.html;
+      el.dataset.rev = String(block._rev || 0);
+    },
+
+    // Schreibt block.html in DOM-Container; läuft NICHT auf dem aktiven Block
+    // (DOM gehört dort dem User). Per-Block-_rev triggert Re-Hydrate bei
+    // externen Mutationen (Find/Replace, Reload).
+    _maybeRehydrate(el, block) {
+      if (!el || block.kind !== 'page') return;
+      if (this.activePageId === block.pageId) return;
+      const seen = parseInt(el.dataset.rev || '-1', 10);
+      if (seen === block._rev) return;
+      // Trusted Source: HTML kommt vom BookStack-Proxy (server-cleant).
+      el.innerHTML = block.html;
+      el.dataset.rev = String(block._rev);
+    },
+
+    // ── Klick-aktiviert-Block ─────────────────────────────────────────────
+    _onBlockMousedown(block, event) {
+      if (block.kind !== 'page') return;
+      if (this.activePageId === block.pageId) return;
+      this._pendingMousedown = { x: event.clientX, y: event.clientY, pageId: block.pageId };
+    },
+
+    async activateBlock(block) {
+      if (block.kind !== 'page') return;
+      if (this.activePageId === block.pageId) return;
+      if (this.activePageId != null) {
+        const prev = this.blocks.find(b => b.kind === 'page' && b.pageId === this.activePageId);
+        if (prev?.dirty) this._enqueueSave(prev.pageId);
+      }
+      this.activePageId = block.pageId;
+      this.$nextTick(() => {
+        const el = document.querySelector(`[data-book-editor-page="${block.pageId}"]`);
+        if (!el) return;
+        el.focus({ preventScroll: true });
+        if (this._pendingMousedown && this._pendingMousedown.pageId === block.pageId) {
+          const md = this._pendingMousedown;
+          this._pendingMousedown = null;
+          try {
+            const range = document.caretRangeFromPoint
+              ? document.caretRangeFromPoint(md.x, md.y)
+              : null;
+            if (range && el.contains(range.startContainer)) {
+              const sel = window.getSelection();
+              sel.removeAllRanges();
+              sel.addRange(range);
+            }
+          } catch { /* noop */ }
+        }
+      });
+    },
+
+    _onBlockInput(block, event) {
+      if (block.kind !== 'page') return;
+      const el = event.currentTarget;
+      block.html = el.innerHTML;
+      this._markBlockDirty(block);
+    },
+
+    _markBlockDirty(block) {
+      if (block.dirty) {
+        this._scheduleAutosave(block.pageId);
+        return;
+      }
+      block.dirty = true;
+      this.dirtyCount++;
+      this._scheduleAutosave(block.pageId);
+    },
+
+    _scheduleAutosave(pageId) {
+      const idleTimer = this._autosaveTimers.get(pageId);
+      if (idleTimer) clearTimeout(idleTimer);
+      this._autosaveTimers.set(pageId, setTimeout(() => {
+        this._autosaveTimers.delete(pageId);
+        this._enqueueSave(pageId);
+      }, AUTOSAVE_IDLE_MS));
+      if (!this._autosaveMaxTimers.has(pageId)) {
+        this._autosaveMaxTimers.set(pageId, setTimeout(() => {
+          this._autosaveMaxTimers.delete(pageId);
+          this._enqueueSave(pageId);
+        }, AUTOSAVE_MAX_MS));
+      }
+    },
+
+    // ── Save-Queue ────────────────────────────────────────────────────────
+    _enqueueSave(pageId) {
+      const block = this.blocks.find(b => b.kind === 'page' && b.pageId === pageId);
+      if (!block || !block.dirty || block.saving) return;
+      if (!this.saveQueue.includes(pageId)) this.saveQueue.push(pageId);
+      this._processQueue();
+    },
+
+    async _processQueue() {
+      if (this.saveProcessing) return;
+      if (this.saveQueue.length === 0) return;
+      this.saveProcessing = true;
+      try {
+        while (this.saveQueue.length > 0) {
+          const pageId = this.saveQueue.shift();
+          const block = this.blocks.find(b => b.kind === 'page' && b.pageId === pageId);
+          if (!block || !block.dirty) continue;
+          await this._saveBlock(block);
+        }
+      } finally {
+        this.saveProcessing = false;
+      }
+    },
+
+    async _saveBlock(block) {
+      const app = window.__app;
+      if (!app) return;
+      const idle = this._autosaveTimers.get(block.pageId);
+      if (idle) { clearTimeout(idle); this._autosaveTimers.delete(block.pageId); }
+      const mx = this._autosaveMaxTimers.get(block.pageId);
+      if (mx) { clearTimeout(mx); this._autosaveMaxTimers.delete(block.pageId); }
+
+      const newHtml = cleanForSave(block.html);
+      if (newHtml === block.originalHtml) {
+        block.dirty = false;
+        this.dirtyCount = Math.max(0, this.dirtyCount - 1);
+        return;
+      }
+      const newText = htmlToText(newHtml).trim();
+      if (!newText) {
+        block.saveError = app.t('bookEditor.emptyAbort');
+        return;
+      }
+      block.saving = true;
+      block.saveError = '';
+      this.savingCount++;
+      try {
+        const conflict = await app._checkPageConflict(block.pageId, block.originalUpdatedAt);
+        if (conflict) {
+          block.conflict = {
+            remoteUserName: conflict.remoteUserName,
+            remoteUpdatedAt: conflict.remoteUpdatedAt,
+            remoteHtml: conflict.remoteHtml,
+          };
+          block.saveError = app.t('bookEditor.conflictHint', {
+            user: conflict.remoteUserName || app.t('edit.conflict.unknownUser'),
+          });
+          return;
+        }
+        const saved = await app.bsPut('pages/' + block.pageId, {
+          html: newHtml,
+          name: block.name,
+        });
+        block.originalHtml = newHtml;
+        if (saved?.updated_at) block.originalUpdatedAt = saved.updated_at;
+        block.dirty = false;
+        block.savedAt = Date.now();
+        block.conflict = null;
+        this.dirtyCount = Math.max(0, this.dirtyCount - 1);
+        app._syncPageStatsAfterSave?.({ id: block.pageId, updated_at: block.originalUpdatedAt }, newHtml);
+      } catch (e) {
+        block.saveError = e.message || app.t('bookEditor.saveFailed');
+      } finally {
+        block.saving = false;
+        this.savingCount = Math.max(0, this.savingCount - 1);
+      }
+    },
+
+    async saveAllDirty() {
+      if (this.saveAllRunning) return;
+      const dirty = this.blocks.filter(b => b.kind === 'page' && b.dirty);
+      if (dirty.length === 0) return;
+      this.saveAllRunning = true;
+      this.saveAllTotal = dirty.length;
+      this.saveAllDone = 0;
+      for (const b of dirty) {
+        if (!this.saveQueue.includes(b.pageId)) this.saveQueue.push(b.pageId);
+      }
+      const startLen = this.saveQueue.length;
+      this._processQueue();
+      while (this.saveProcessing || this.saveQueue.length > 0) {
+        await new Promise(rs => setTimeout(rs, 200));
+        this.saveAllDone = startLen - this.saveQueue.length;
+      }
+      this.saveAllRunning = false;
+      this.saveAllDone = this.saveAllTotal;
+    },
+
+    async resolveConflictOverwrite(block) {
+      if (!block.conflict) return;
+      block.originalUpdatedAt = block.conflict.remoteUpdatedAt;
+      block.conflict = null;
+      block.saveError = '';
+      if (!block.dirty) { block.dirty = true; this.dirtyCount++; }
+      this._enqueueSave(block.pageId);
+    },
+
+    resolveConflictTakeRemote(block) {
+      if (!block.conflict) return;
+      block.html = block.conflict.remoteHtml || '';
+      block.originalHtml = block.html;
+      block.originalUpdatedAt = block.conflict.remoteUpdatedAt;
+      if (block.dirty) { block.dirty = false; this.dirtyCount = Math.max(0, this.dirtyCount - 1); }
+      block.conflict = null;
+      block.saveError = '';
+      block._rev++;
+    },
+
+    // ── Find / Replace ────────────────────────────────────────────────────
+    openFind() {
+      this.findOpen = true;
+      this.$nextTick(() => {
+        const inp = document.querySelector('.book-editor-find-input');
+        if (inp) { inp.focus(); inp.select(); }
+        this.recomputeFindMatches();
+      });
+    },
+
+    closeFind() {
+      this.findOpen = false;
+      this.findMatches = [];
+      this.findIndex = -1;
+      clearHighlights();
+      if (this._findRecomputeTimer) { clearTimeout(this._findRecomputeTimer); this._findRecomputeTimer = null; }
+    },
+
+    onFindInput() {
+      if (this._findRecomputeTimer) clearTimeout(this._findRecomputeTimer);
+      this._findRecomputeTimer = setTimeout(() => {
+        this._findRecomputeTimer = null;
+        this.recomputeFindMatches();
+        if (this.findMatches.length > 0) this._selectMatch(0);
+      }, 120);
+    },
+
+    _allBlockEls() {
+      return Array.from(document.querySelectorAll('[data-book-editor-page]'));
+    },
+
+    recomputeFindMatches() {
+      if (!this.findTerm) {
+        this.findMatches = [];
+        this.findIndex = -1;
+        this._refreshFindHighlights();
+        return;
+      }
+      const els = this._allBlockEls();
+      const matches = [];
+      for (const el of els) {
+        const pageId = parseInt(el.dataset.bookEditorPage, 10);
+        const found = this._matchesIn(el, this.findTerm, this.findCaseSensitive, this.findWholeWord);
+        for (const m of found) matches.push({ ...m, pageId, container: el });
+      }
+      this.findMatches = matches;
+      this.findIndex = matches.length > 0 ? 0 : -1;
+      this._refreshFindHighlights();
+    },
+
+    _matchesIn(root, term, caseSensitive, wholeWord) {
+      const nodes = [];
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+      let n;
+      while ((n = walker.nextNode())) nodes.push(n);
+      const full = nodes.map(x => x.nodeValue).join('');
+      const hay = caseSensitive ? full : full.toLowerCase();
+      const needle = caseSensitive ? term : term.toLowerCase();
+      const isWord = (ch) => isWordCharBE(ch) || ch === '_';
+      const starts = new Array(nodes.length);
+      let acc = 0;
+      for (let i = 0; i < nodes.length; i++) {
+        starts[i] = acc;
+        acc += nodes[i].nodeValue.length;
+      }
+      const out = [];
+      let from = 0;
+      while (from <= hay.length - needle.length) {
+        const idx = hay.indexOf(needle, from);
+        if (idx === -1) break;
+        if (wholeWord) {
+          const before = idx > 0 ? hay[idx - 1] : '';
+          const after = hay[idx + needle.length] || '';
+          if (isWord(before) || isWord(after)) { from = idx + 1; continue; }
+        }
+        out.push(this._mapOffset(nodes, starts, idx, needle.length));
+        from = idx + Math.max(1, needle.length);
+      }
+      return out;
+    },
+
+    _mapOffset(nodes, starts, globalStart, length) {
+      const globalEnd = globalStart + length;
+      let startNode = null, startOffset = 0, endNode = null, endOffset = 0;
+      for (let i = 0; i < nodes.length; i++) {
+        const s = starts[i];
+        const e = s + nodes[i].nodeValue.length;
+        if (startNode == null && globalStart >= s && globalStart <= e) {
+          startNode = nodes[i];
+          startOffset = globalStart - s;
+        }
+        if (globalEnd >= s && globalEnd <= e) {
+          endNode = nodes[i];
+          endOffset = globalEnd - s;
+          break;
+        }
+      }
+      return { startNode, startOffset, endNode, endOffset };
+    },
+
+    _rangeOf(m) {
+      const r = document.createRange();
+      r.setStart(m.startNode, m.startOffset);
+      r.setEnd(m.endNode, m.endOffset);
+      return r;
+    },
+
+    _refreshFindHighlights() {
+      if (!ensureHighlights()) return;
+      clearHighlights();
+      if (!this.findMatches?.length) return;
+      for (let i = 0; i < this.findMatches.length; i++) {
+        const m = this.findMatches[i];
+        if (!m.startNode || !m.endNode) continue;
+        try {
+          const r = this._rangeOf(m);
+          if (i === this.findIndex) _hlCurrent.add(r);
+          else _hlAll.add(r);
+        } catch { /* noop */ }
+      }
+    },
+
+    findNext() {
+      if (this.findMatches.length === 0) this.recomputeFindMatches();
+      if (this.findMatches.length === 0) return;
+      this._selectMatch((this.findIndex + 1) % this.findMatches.length);
+    },
+
+    findPrev() {
+      if (this.findMatches.length === 0) this.recomputeFindMatches();
+      if (this.findMatches.length === 0) return;
+      this._selectMatch((this.findIndex - 1 + this.findMatches.length) % this.findMatches.length);
+    },
+
+    _selectMatch(i) {
+      this.findIndex = i;
+      this._refreshFindHighlights();
+      const m = this.findMatches[i];
+      if (!m?.startNode) return;
+      try {
+        const range = this._rangeOf(m);
+        const rect = range.getBoundingClientRect();
+        if (rect && (rect.top < 120 || rect.bottom > window.innerHeight - 120)) {
+          (m.startNode.parentElement || m.container)?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+        }
+      } catch { /* noop */ }
+    },
+
+    replaceCurrent() {
+      if (this.findMatches.length === 0) return;
+      const m = this.findMatches[this.findIndex];
+      if (!m?.startNode || !m?.endNode) return;
+      this._doReplaceAt(m);
+      this.$nextTick(() => {
+        this.recomputeFindMatches();
+        if (this.findMatches.length > 0) {
+          this._selectMatch(Math.min(this.findIndex, this.findMatches.length - 1));
+        }
+      });
+    },
+
+    replaceAll() {
+      if (!this.findTerm) return;
+      this.recomputeFindMatches();
+      if (this.findMatches.length === 0) return;
+      const matches = this.findMatches.slice().reverse();
+      let count = 0;
+      for (const m of matches) {
+        if (this._doReplaceAt(m)) count++;
+      }
+      const app = window.__app;
+      app?.setStatus?.(app.t('bookEditor.find.replacedAll', { n: count }), false, 3000);
+      this.$nextTick(() => this.recomputeFindMatches());
+    },
+
+    _doReplaceAt(m) {
+      if (!m.startNode || !m.endNode) return false;
+      const container = m.container || m.startNode.parentElement?.closest('[data-book-editor-page]');
+      if (!container) return false;
+      try {
+        const range = this._rangeOf(m);
+        range.deleteContents();
+        const textNode = document.createTextNode(this.findReplace);
+        range.insertNode(textNode);
+        const pageId = parseInt(container.dataset.bookEditorPage, 10);
+        const block = this.blocks.find(b => b.kind === 'page' && b.pageId === pageId);
+        if (block) {
+          block.html = container.innerHTML;
+          if (!block.dirty) {
+            block.dirty = true;
+            this.dirtyCount++;
+          }
+          this._scheduleAutosave(block.pageId);
+        }
+        return true;
+      } catch {
+        return false;
+      }
+    },
+
+    onFindKeydown(event) {
+      if (event.key === 'Escape') { event.preventDefault(); this.closeFind(); return; }
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        if (event.shiftKey) this.findPrev();
+        else this.findNext();
+      }
+    },
+
+    onCardKeydown(event) {
+      const mod = event.metaKey || event.ctrlKey;
+      if (mod && (event.key === 'f' || event.key === 'F')) {
+        event.preventDefault();
+        this.openFind();
+        return;
+      }
+      if (mod && (event.key === 's' || event.key === 'S')) {
+        event.preventDefault();
+        this.saveAllDirty();
+        return;
+      }
+    },
+
+    blockStatusKey(block) {
+      if (block.kind !== 'page') return '';
+      if (block.saving) return 'saving';
+      if (block.conflict) return 'conflict';
+      if (block.saveError) return 'error';
+      if (block.dirty) return 'dirty';
+      if (block.savedAt && (Date.now() - block.savedAt) < 4000) return 'saved';
+      return '';
+    },
+
+    blockStatusLine(block) {
+      if (block.kind !== 'page') return '';
+      const app = window.__app;
+      if (!app) return '';
+      if (block.saving) return escHtml(app.t('bookEditor.status.saving'));
+      if (block.conflict) return escHtml(app.t('bookEditor.status.conflict', { user: block.conflict.remoteUserName || app.t('edit.conflict.unknownUser') }));
+      if (block.saveError) return escHtml(block.saveError);
+      if (block.dirty) return escHtml(app.t('bookEditor.status.dirty'));
+      if (block.savedAt) return escHtml(app.t('bookEditor.status.saved'));
+      return '';
+    },
+  }));
+}

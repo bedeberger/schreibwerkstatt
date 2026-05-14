@@ -158,6 +158,7 @@ const cardsState = () => ({
   showExportCard: false,
   showPdfExportCard: false,
   showBookOrganizerCard: false,
+  showBookEditorCard: false,
   showKomplettStatus: false,
   showAvatarMenu: false,
 });

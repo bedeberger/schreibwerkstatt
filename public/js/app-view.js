@@ -210,6 +210,15 @@ export const appViewMethods = {
     this._closeOtherMainCards('bookOrganizer');
     this.showBookOrganizerCard = true;
   },
+  toggleBookEditorCard() {
+    if (this.showBookEditorCard) {
+      window.dispatchEvent(new CustomEvent('card:refresh', { detail: { name: 'bookEditor' } }));
+      return;
+    }
+    if (!this.selectedBookId) return;
+    this._closeOtherMainCards('bookEditor');
+    this.showBookEditorCard = true;
+  },
   // Abweichend von den anderen Toggles: erneuter Klick schliesst NICHT, sondern
   // refresht die History. Sub-Komponente lauscht auf `card:refresh`
   // mit name='kontinuitaet'.
