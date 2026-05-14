@@ -323,6 +323,13 @@
   flex-shrink: 0;
 }
 
+@media (max-width: 480px) {
+  .chat-session-delete {
+    padding: 6px 10px;
+    font-size: 16px;
+  }
+}
+
 /* success-msg (auch von Chat verwendet) */
 .success-msg {
   color: var(--color-ok-text);
