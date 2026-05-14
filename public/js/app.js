@@ -556,7 +556,9 @@ document.addEventListener('alpine:init', () => {
     },
 
     get _numLocale() {
-      return this.uiLocale === 'en' ? 'en-US' : 'de-CH';
+      const region = this.defaultRegion || (this.uiLocale === 'en' ? 'US' : 'CH');
+      const lang = this.uiLocale || 'de';
+      return `${lang}-${region}`;
     },
 
     get selectedBookUrl() {
@@ -664,11 +666,13 @@ document.addEventListener('alpine:init', () => {
       try {
         const preferred = cfg.userSettings?.locale || browserLoc || 'de';
         const locale = supported.includes(preferred) ? preferred : 'de';
+        const region = cfg.userSettings?.default_region || (locale === 'en' ? 'US' : 'CH');
+        this.defaultRegion = region;
         if (locale !== this.uiLocale) {
           await configureI18n(locale);
           this.uiLocale = locale;
-          document.documentElement.setAttribute('lang', locale);
         }
+        document.documentElement.setAttribute('lang', `${locale}-${region}`);
         this.bookstackUrl = cfg.bookstackUrl || '';
         if (cfg.claudeModel) this.claudeModel = cfg.claudeModel;
         if (cfg.claudeMaxTokens) this.claudeMaxTokens = cfg.claudeMaxTokens;

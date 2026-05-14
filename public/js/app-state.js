@@ -20,6 +20,7 @@ const shellState = () => ({
   themePref: 'auto',
   focusGranularity: 'paragraph',
   uiLocale: '',
+  defaultRegion: '',
   // Plattform-Detect für Tasten-Hint-Anzeige (⌘ vs. Ctrl). Wird in init()
   // gesetzt; default true wäre auf Windows falsch, default false ist sichere
   // Annahme bevor JS gelaufen ist (Hero erscheint mit Ctrl, dann snap auf ⌘ falls Mac).

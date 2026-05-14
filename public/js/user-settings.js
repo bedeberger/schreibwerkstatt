@@ -44,6 +44,9 @@ export const userSettingsMethods = {
         throw new Error(data ? window.__app.tError(data) : `HTTP ${r.status}`);
       }
       window.__app.focusGranularity = this.userSettingsFocusGranularity || 'paragraph';
+      const region = this.userSettingsDefaultRegion || (window.__app.uiLocale === 'en' ? 'US' : 'CH');
+      window.__app.defaultRegion = region;
+      document.documentElement.setAttribute('lang', `${window.__app.uiLocale || 'de'}-${region}`);
       // Tile liest currentUser.daily_goal_chars; sofort spiegeln, damit
       // Heute-Ring nach Save ohne Reload das neue Ziel zeigt.
       if (window.__app.currentUser) {

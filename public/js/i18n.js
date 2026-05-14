@@ -91,7 +91,8 @@ export const i18nMethods = {
     if (locale === this.uiLocale) return;
     await configureI18n(locale);
     this.uiLocale = locale;
-    document.documentElement.setAttribute('lang', locale);
+    const region = this.defaultRegion || (locale === 'en' ? 'US' : 'CH');
+    document.documentElement.setAttribute('lang', `${locale}-${region}`);
     fetch('/me/settings', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
