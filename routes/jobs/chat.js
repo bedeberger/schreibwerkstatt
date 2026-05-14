@@ -376,9 +376,22 @@ async function runBookChatJob(jobId, sessionId, userMsgId, message, userEmail, u
 function _handleChatPost(req, res, { jobType, sessionSelect, labelFn, runFn }) {
   const { message } = req.body;
   const session_id = toIntId(req.body?.session_id);
+  const clientMsgId = typeof req.body?.client_msg_id === 'string' && req.body.client_msg_id.length <= 64
+    ? req.body.client_msg_id
+    : null;
   if (!session_id || !message?.trim()) return res.status(400).json({ error_code: 'SESSION_ID_MSG_REQUIRED' });
   const userEmail = req.session?.user?.email || null;
   if (!userEmail) return res.status(401).json({ error_code: 'NOT_LOGGED_IN' });
+
+  // Idempotency: gleicher client_msg_id in selber Session → bestehende jobId zurück,
+  // KEIN zweiter Insert. Schützt vor Doppel-Send bei Connection-Loss-Retry.
+  if (clientMsgId) {
+    const dup = db.prepare(
+      `SELECT job_id FROM chat_messages WHERE session_id = ? AND client_msg_id = ?`
+    ).get(session_id, clientMsgId);
+    if (dup) return res.json({ jobId: dup.job_id || null, existing: true });
+  }
+
   const existing = findActiveJobId(jobType, session_id, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });
 
@@ -388,14 +401,15 @@ function _handleChatPost(req, res, { jobType, sessionSelect, labelFn, runFn }) {
 
   const now = new Date().toISOString();
   const userMsgResult = db.prepare(
-    `INSERT INTO chat_messages (session_id, role, content, created_at) VALUES (?, 'user', ?, ?)`
-  ).run(session.id, message.trim(), now);
+    `INSERT INTO chat_messages (session_id, role, content, created_at, client_msg_id) VALUES (?, 'user', ?, ?, ?)`
+  ).run(session.id, message.trim(), now, clientMsgId);
   db.prepare('UPDATE chat_sessions SET last_message_at = ? WHERE id = ?').run(now, session.id);
 
   const userToken = getTokenForRequest(req);
 
   const { key: label, params: labelParams } = labelFn(session);
   const jobId = createJob(jobType, session.book_id || 0, userEmail, label, labelParams, session_id);
+  db.prepare('UPDATE chat_messages SET job_id = ? WHERE id = ?').run(jobId, userMsgResult.lastInsertRowid);
   enqueueJob(jobId, () => runFn(jobId, session_id, userMsgResult.lastInsertRowid, message.trim(), userEmail, userToken));
   res.json({ jobId });
 }

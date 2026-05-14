@@ -4051,6 +4051,30 @@ function runMigrations() {
     logger.info('DB-Migration auf Version 103 abgeschlossen (chapter_macro_review_cache + synonym_cache + lektorat_cache).');
   }
 
+  if (version < 104) {
+    // Idempotency-Key für Chat-Send: client_msg_id (UUID) + job_id-Backreferenz.
+    // Verhindert Doppel-Inserts bei Connection-Loss-Retry (siehe chat.js _handleChatPost).
+    const cmCols104 = db.pragma('table_info(chat_messages)').map(c => c.name);
+    if (!cmCols104.includes('client_msg_id')) {
+      db.prepare('ALTER TABLE chat_messages ADD COLUMN client_msg_id TEXT').run();
+    }
+    if (!cmCols104.includes('job_id')) {
+      db.prepare('ALTER TABLE chat_messages ADD COLUMN job_id TEXT').run();
+    }
+    const mig104 = `
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_cm_session_clientmsg
+        ON chat_messages(session_id, client_msg_id)
+        WHERE client_msg_id IS NOT NULL;
+    `;
+    db.exec(mig104);
+    const fkErrors104 = db.pragma('foreign_key_check');
+    if (fkErrors104.length) {
+      throw new Error(`Migration 104: foreign_key_check meldet ${fkErrors104.length} Verstoesse: ${JSON.stringify(fkErrors104.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 104').run();
+    logger.info('DB-Migration auf Version 104 abgeschlossen (chat_messages.client_msg_id + job_id für Idempotency).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

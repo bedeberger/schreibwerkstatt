@@ -6,6 +6,14 @@
 import { escHtml, fmtTok, renderChatMarkdown, fetchJson } from './utils.js';
 import { startPoll, runningJobStatus } from './cards/job-helpers.js';
 
+function _newClientMsgId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  // Fallback für sehr alte Browser ohne crypto.randomUUID.
+  return 'cm-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+}
+
 export function makeChatMethods(cfg) {
   const p = cfg.props;
   const L = cfg.label; // 'Chat' oder 'BookChat'
@@ -163,25 +171,43 @@ export function makeChatMethods(cfg) {
 
   m[`send${L}Message`] = async function () {
     const root = window.__app;
+    if (this[p.loading] || !this[p.sessionId]) return;
     const msg = (this[p.input] || '').trim();
-    if (!msg || this[p.loading] || !this[p.sessionId]) return;
+    if (!msg) return;
+
+    // Idempotency-Key: UUID pro logischem Send. Bei Retry mit identischem Text
+    // wird die UUID des fehlgeschlagenen Versuchs wiederverwendet, damit der
+    // Server (chat.js _handleChatPost) Doppel-Inserts dedupen kann.
+    const lastMsg = this[p.messages][this[p.messages].length - 1];
+    const isRetry = !!(lastMsg && lastMsg.role === 'user' && lastMsg.sendError && lastMsg.content === msg && lastMsg.clientMsgId);
+    const clientMsgId = isRetry ? lastMsg.clientMsgId : _newClientMsgId();
+
     this[p.input] = '';
     this[p.loading] = true;
     this[p.status] = '';
-    this[p.messages].push({ role: 'user', content: msg, id: null });
+    if (isRetry) {
+      lastMsg.sendError = false;
+    } else {
+      this[p.messages].push({ role: 'user', content: msg, id: null, clientMsgId, sendError: false });
+    }
     this.$nextTick(() => scrollToBottom.call(this));
     if (cfg.onBeforeSend) await cfg.onBeforeSend.call(this);
     try {
       const { jobId } = await fetchJson(cfg.sendUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: this[p.sessionId], message: msg }),
+        body: JSON.stringify({ session_id: this[p.sessionId], message: msg, client_msg_id: clientMsgId }),
       });
-      if (cfg.lsKeyFn) localStorage.setItem(cfg.lsKeyFn(this[p.sessionId]), jobId);
-      startPollLocal.call(this, jobId);
+      if (cfg.lsKeyFn && jobId) localStorage.setItem(cfg.lsKeyFn(this[p.sessionId]), jobId);
+      if (jobId) startPollLocal.call(this, jobId);
+      else { this[p.loading] = false; this.$nextTick(() => scrollToBottom.call(this)); }
     } catch (e) {
       console.error(`[send${L}Message]`, e);
-      this[p.messages] = this[p.messages].slice(0, -1);
+      // Optimistische Msg behalten + sendError markieren + Input restaurieren,
+      // damit User mit selber UUID erneut senden kann (Server dedupt dann).
+      const tail = this[p.messages][this[p.messages].length - 1];
+      if (tail && tail.clientMsgId === clientMsgId) tail.sendError = true;
+      this[p.input] = msg;
       this[p.status] = `<span class="error-msg">${root.t('common.errorColon')}${escHtml(e.message)}</span>`;
       this[p.loading] = false;
       this.$nextTick(() => scrollToBottom.call(this));

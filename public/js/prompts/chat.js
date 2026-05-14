@@ -306,6 +306,84 @@ export const BOOK_CHAT_TOOLS = [
       required: [],
     },
   },
+  {
+    name: 'get_book_review',
+    description: 'Liefert die letzte gespeicherte Buchbewertung dieses Users: gesamtnote (1.0–6.0), Stärken, Schwächen, Fazit, Zusammenfassung, Modell, Datum. Antwortet ohne KI-Call (liest book_reviews). Pendant zu list_chapter_reviews, aber Buchebene. Beantwortet "wie gut ist das Buch insgesamt?" anhand der existierenden Bewertung.',
+    input_schema: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'list_ideen',
+    description: 'Listet die Notizen/Ideen, die der User im Editor zu einzelnen Seiten gespeichert hat (mit Kapitel-/Seitenkontext). Ideal um offene Anmerkungen aufzugreifen, oder zu beantworten "was wollte ich an Kapitel X noch ändern?". Filterbar nach erledigt, page_id, chapter_id. Offene Ideen erscheinen zuerst.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        erledigt:   { type: 'boolean', description: 'true = nur erledigte, false = nur offene. Ohne Angabe: beide.' },
+        page_id:    { type: 'integer', description: 'Nur Ideen zu dieser Seite.' },
+        chapter_id: { type: 'integer', description: 'Nur Ideen zu Seiten dieses Kapitels.' },
+        limit:      { type: 'integer', description: 'Maximale Anzahl (default 50, max 200).' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'get_lektorat_hotspots',
+    description: 'Aggregat über page_checks (letzter Check pro Seite): pro Kapitel total/avg/max Fehleranzahl plus Top-N-Seiten mit den meisten Fehlern (inkl. fazit-Snippet). Beantwortet "wo sind die schwersten Lektorat-Probleme?", "welche Kapitel brauchen am meisten Arbeit?". Schneller Überblick statt vielfacher get_pages-Aufrufe.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        chapter_id: { type: 'integer', description: 'Nur Seiten dieses Kapitels.' },
+        min_errors: { type: 'integer', description: 'Mindest-Fehleranzahl pro Seite (default 0).' },
+        limit:      { type: 'integer', description: 'Anzahl Top-Seiten (default 20, max 100).' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'get_stil_metrics',
+    description: 'Stil- und Lesbarkeitsmetriken aus page_stats. Drei Modi via scope: "book" (Aggregat über das ganze Buch), "chapter" (Aufschlüsselung pro Kapitel), "page" (Top-N-Seiten nach einer Metrik). Liefert words/chars/sentences/dialog_chars/dialog_ratio_percent/filler_count/passive_count/adverb_count/avg_sentence_len/sentence_len_p90/lix/flesch_de. Ideal für "wie viel Passiv im Buch?", "welche Kapitel haben am meisten Dialog?", "welche Seiten haben höchsten LIX (schwere Lesbarkeit)?".',
+    input_schema: {
+      type: 'object',
+      properties: {
+        scope:      { type: 'string', enum: ['book', 'chapter', 'page'], description: 'Aggregations-Scope. Default: book.' },
+        chapter_id: { type: 'integer', description: 'Nur für scope=chapter: einzelnes Kapitel statt aller.' },
+        metric:     {
+          type: 'string',
+          enum: ['filler_count', 'passive_count', 'adverb_count', 'sentences', 'dialog_chars', 'avg_sentence_len', 'sentence_len_p90', 'lix', 'flesch_de'],
+          description: 'Nur für scope=page: nach welcher Metrik sortiert wird. Default: passive_count.',
+        },
+        order:      { type: 'string', enum: ['asc', 'desc'], description: 'Nur für scope=page: Sortier-Richtung. Default: desc (höchster Wert zuerst).' },
+        limit:      { type: 'integer', description: 'Nur für scope=page: Anzahl Seiten (default 10, max 50).' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'list_locations',
+    description: 'Liefert alle Schauplätze/Orte des Buchs: Name, Typ, Beschreibung, Stimmung, erste Erwähnung, betroffene Kapitel (mit Häufigkeit), assoziierte Figuren. Pendant zu Figurenliste, aber für Orte. Filterbar nach chapter_id (nur Orte, die in diesem Kapitel vorkommen).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        chapter_id: { type: 'integer', description: 'Nur Orte, die in diesem Kapitel auftauchen.' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'list_scenes',
+    description: 'Listet Szenen aus dem Szenenkatalog (figure_scenes) mit Titel, Wertung, Kommentar, Kapitel/Seite, beteiligten Figuren und Orten. Filterbar nach chapter_id, page_id, figur_id/figur_name (Figur ist in der Szene), loc_id (Ort der Szene). Ideal für "welche Szenen spielt X?", "Szenen in Kapitel 3", "Szenen im Wald".',
+    input_schema: {
+      type: 'object',
+      properties: {
+        chapter_id: { type: 'integer', description: 'Nur Szenen dieses Kapitels.' },
+        page_id:    { type: 'integer', description: 'Nur Szenen dieser Seite.' },
+        figur_id:   { type: 'string',  description: 'Nur Szenen mit dieser Figur (fig_id).' },
+        figur_name: { type: 'string',  description: 'Alternative: Name/Kurzname.' },
+        loc_id:     { type: 'string',  description: 'Nur Szenen an diesem Ort (loc_id).' },
+        limit:      { type: 'integer', description: 'Maximale Anzahl (default 50, max 200).' },
+      },
+      required: [],
+    },
+  },
 ];
 
 export function buildBookChatSystemPrompt(bookName, relevantPages, figuren, review, systemOverride = null) {

@@ -3,10 +3,12 @@
 // Jede Funktion nimmt (input, ctx) und gibt ein JSON-serialisierbares Objekt zurück.
 // ctx = { bookId, userEmail, userToken, jobSignal, logger }
 
-const { db } = require('../../db/schema');
+const { db, getUser } = require('../../db/schema');
 const { INPUT_BUDGET_CHARS } = require('../../lib/ai');
 const { bsGet, htmlToText } = require('./shared');
 const { inClause } = require('../../lib/validate');
+const { listDraftFigures, getDraftFigure, listWerkstattRuns, getWerkstattRun } = require('../../db/draft-figures');
+const { resolveI18nTree, resolveI18n } = require('../../lib/i18n-server');
 
 // Obergrenzen schützen das Token-Budget gegen ausufernde Tool-Calls. Skaliert mit
 // MODEL_CONTEXT, damit User mit grösserem Kontextfenster reichere Tool-Antworten
@@ -853,20 +855,483 @@ function tool_get_timeline(input, ctx) {
   });
 }
 
+// ── get_book_review ───────────────────────────────────────────────────────────
+
+const BOOK_REVIEW_FAZIT_CHARS = 600;
+
+function tool_get_book_review(_input, ctx) {
+  const userEmail = ctx.userEmail || null;
+  const row = db.prepare(`
+    SELECT br.reviewed_at, br.review_json, br.model, b.name AS book_name
+    FROM book_reviews br
+    LEFT JOIN books b ON b.book_id = br.book_id
+    WHERE br.book_id = ? AND br.user_email IS ?
+    ORDER BY br.reviewed_at DESC
+    LIMIT 1
+  `).get(ctx.bookId, userEmail);
+
+  if (!row) {
+    return { hint: 'Noch keine Buchbewertung vorhanden. Job „Buchbewertung" ausführen.' };
+  }
+
+  let parsed = null;
+  try { parsed = row.review_json ? JSON.parse(row.review_json) : null; } catch { parsed = null; }
+  if (!parsed) {
+    return { error: 'Buchbewertung kann nicht geparst werden.', reviewed_at: row.reviewed_at };
+  }
+
+  const fazit = parsed.fazit || null;
+  return _truncateResult({
+    book_name: row.book_name || null,
+    reviewed_at: row.reviewed_at,
+    gesamtnote: typeof parsed.gesamtnote === 'number' ? parsed.gesamtnote : null,
+    zusammenfassung: parsed.zusammenfassung || null,
+    fazit: fazit && fazit.length > BOOK_REVIEW_FAZIT_CHARS
+      ? fazit.slice(0, BOOK_REVIEW_FAZIT_CHARS) + '…'
+      : fazit,
+    staerken: Array.isArray(parsed.staerken) ? parsed.staerken : [],
+    schwaechen: Array.isArray(parsed.schwaechen) ? parsed.schwaechen : [],
+    model: row.model || null,
+  });
+}
+
+// ── list_ideen ────────────────────────────────────────────────────────────────
+
+const IDEEN_DEFAULT_LIMIT = 50;
+const IDEEN_CONTENT_CHARS = 400;
+
+function tool_list_ideen(input, ctx) {
+  const userEmail = ctx.userEmail || '';
+  const erledigtFilter = typeof input?.erledigt === 'boolean' ? (input.erledigt ? 1 : 0) : null;
+  const pageFilter    = Number.isInteger(input?.page_id)    ? input.page_id    : null;
+  const chapterFilter = Number.isInteger(input?.chapter_id) ? input.chapter_id : null;
+  const limit = Math.min(200, Math.max(1, Number.isInteger(input?.limit) ? input.limit : IDEEN_DEFAULT_LIMIT));
+
+  let sql = `
+    SELECT i.id, i.content, i.erledigt, i.erledigt_at, i.created_at, i.updated_at,
+           i.page_id, p.page_name, p.chapter_id, c.chapter_name
+    FROM ideen i
+    LEFT JOIN pages    p ON p.page_id    = i.page_id
+    LEFT JOIN chapters c ON c.chapter_id = p.chapter_id AND c.book_id = i.book_id
+    WHERE i.book_id = ? AND i.user_email = ?
+  `;
+  const params = [ctx.bookId, userEmail];
+  if (erledigtFilter !== null) { sql += ' AND i.erledigt = ?'; params.push(erledigtFilter); }
+  if (pageFilter    !== null) { sql += ' AND i.page_id = ?'; params.push(pageFilter); }
+  if (chapterFilter !== null) { sql += ' AND p.chapter_id = ?'; params.push(chapterFilter); }
+  sql += ' ORDER BY i.erledigt ASC, i.updated_at DESC, i.id DESC';
+
+  const rows = db.prepare(sql).all(...params);
+  if (!rows.length) return { ideen: [], total: 0 };
+
+  const total = rows.length;
+  const limited = rows.slice(0, limit).map(r => ({
+    id: r.id,
+    content: r.content && r.content.length > IDEEN_CONTENT_CHARS
+      ? r.content.slice(0, IDEEN_CONTENT_CHARS) + '…'
+      : (r.content || ''),
+    erledigt: !!r.erledigt,
+    erledigt_at: r.erledigt_at || null,
+    created_at: r.created_at,
+    updated_at: r.updated_at,
+    page_id: r.page_id,
+    page_name: r.page_name || null,
+    chapter_id: r.chapter_id ?? null,
+    chapter_name: r.chapter_name || null,
+  }));
+
+  const offen = rows.filter(r => !r.erledigt).length;
+  return _truncateResult({
+    ideen: limited,
+    total,
+    offen,
+    erledigt: total - offen,
+    ...(limited.length < total ? { truncated: true, shown: limited.length } : {}),
+  });
+}
+
+// ── get_lektorat_hotspots ─────────────────────────────────────────────────────
+
+const HOTSPOTS_DEFAULT_LIMIT = 20;
+const HOTSPOTS_FAZIT_CHARS = 200;
+
+function tool_get_lektorat_hotspots(input, ctx) {
+  const userEmail = ctx.userEmail || null;
+  const chapterFilter = Number.isInteger(input?.chapter_id) ? input.chapter_id : null;
+  const minErrors     = Number.isInteger(input?.min_errors) ? Math.max(0, input.min_errors) : 0;
+  const limit = Math.min(100, Math.max(1, Number.isInteger(input?.limit) ? input.limit : HOTSPOTS_DEFAULT_LIMIT));
+
+  // Letzter Check pro Seite via MAX(checked_at)-Subquery.
+  let sql = `
+    SELECT pc.page_id, pc.checked_at, pc.error_count, pc.fazit, pc.stilanalyse,
+           p.page_name, p.chapter_id, c.chapter_name
+    FROM page_checks pc
+    JOIN pages    p ON p.page_id    = pc.page_id
+    LEFT JOIN chapters c ON c.chapter_id = p.chapter_id AND c.book_id = p.book_id
+    WHERE pc.book_id = ? AND pc.user_email IS ?
+      AND pc.checked_at = (
+        SELECT MAX(pc2.checked_at) FROM page_checks pc2
+        WHERE pc2.page_id = pc.page_id AND pc2.user_email IS ?
+      )
+  `;
+  const params = [ctx.bookId, userEmail, userEmail];
+  if (chapterFilter !== null) { sql += ' AND p.chapter_id = ?'; params.push(chapterFilter); }
+  sql += ' ORDER BY pc.error_count DESC, pc.checked_at DESC';
+
+  const rows = db.prepare(sql).all(...params).filter(r => (r.error_count || 0) >= minErrors);
+  if (!rows.length) {
+    return {
+      hotspots: [],
+      hint: 'Keine Lektorat-Ergebnisse mit den gewählten Filtern.',
+    };
+  }
+
+  // Pro-Kapitel-Aggregat
+  const byChapter = new Map();
+  for (const r of rows) {
+    const key = r.chapter_id ?? 0;
+    if (!byChapter.has(key)) byChapter.set(key, {
+      chapter_id: r.chapter_id,
+      chapter_name: r.chapter_name || '(ohne Kapitel)',
+      pages: 0, total_errors: 0, max_errors: 0,
+    });
+    const ch = byChapter.get(key);
+    ch.pages++;
+    ch.total_errors += r.error_count || 0;
+    if ((r.error_count || 0) > ch.max_errors) ch.max_errors = r.error_count;
+  }
+  const perChapter = [...byChapter.values()].map(c => ({
+    chapter_id: c.chapter_id,
+    chapter_name: c.chapter_name,
+    pages_checked: c.pages,
+    total_errors: c.total_errors,
+    avg_errors: Math.round((c.total_errors / c.pages) * 10) / 10,
+    max_errors: c.max_errors,
+  })).sort((a, b) => b.total_errors - a.total_errors);
+
+  const top = rows.slice(0, limit).map(r => ({
+    page_id: r.page_id,
+    page_name: r.page_name,
+    chapter_id: r.chapter_id,
+    chapter_name: r.chapter_name || null,
+    error_count: r.error_count || 0,
+    checked_at: r.checked_at,
+    fazit: r.fazit && r.fazit.length > HOTSPOTS_FAZIT_CHARS
+      ? r.fazit.slice(0, HOTSPOTS_FAZIT_CHARS) + '…'
+      : (r.fazit || null),
+  }));
+
+  return _truncateResult({
+    pages_checked: rows.length,
+    total_errors: rows.reduce((s, r) => s + (r.error_count || 0), 0),
+    per_chapter: perChapter,
+    top_pages: top,
+    ...(top.length < rows.length ? { truncated: true, shown: top.length } : {}),
+  });
+}
+
+// ── get_stil_metrics ──────────────────────────────────────────────────────────
+
+const STIL_METRIC_COLS = ['filler_count', 'passive_count', 'adverb_count', 'sentences', 'dialog_chars', 'avg_sentence_len', 'sentence_len_p90', 'lix', 'flesch_de'];
+const STIL_DEFAULT_LIMIT = 10;
+
+function tool_get_stil_metrics(input, ctx) {
+  const scope = input?.scope === 'chapter' || input?.scope === 'page' ? input.scope : 'book';
+  const metric = STIL_METRIC_COLS.includes(input?.metric) ? input.metric : 'passive_count';
+  const order = input?.order === 'asc' ? 'ASC' : 'DESC';
+  const limit = Math.min(50, Math.max(1, Number.isInteger(input?.limit) ? input.limit : STIL_DEFAULT_LIMIT));
+
+  if (scope === 'book') {
+    const r = db.prepare(`
+      SELECT
+        COUNT(*) AS pages,
+        SUM(words) AS words, SUM(chars) AS chars,
+        SUM(sentences) AS sentences, SUM(dialog_chars) AS dialog_chars,
+        SUM(filler_count) AS filler_count,
+        SUM(passive_count) AS passive_count,
+        SUM(adverb_count) AS adverb_count,
+        AVG(avg_sentence_len) AS avg_sentence_len,
+        AVG(sentence_len_p90) AS sentence_len_p90,
+        AVG(lix) AS lix, AVG(flesch_de) AS flesch_de
+      FROM page_stats
+      WHERE book_id = ? AND sentences IS NOT NULL
+    `).get(ctx.bookId);
+    if (!r || !r.pages) return { hint: 'Keine Stil-Metriken vorhanden. Sync ausführen.' };
+    const dialog_ratio = r.chars ? Math.round((r.dialog_chars / r.chars) * 1000) / 10 : null;
+    return _truncateResult({
+      scope: 'book',
+      pages: r.pages,
+      words: r.words, chars: r.chars,
+      sentences: r.sentences, dialog_chars: r.dialog_chars,
+      dialog_ratio_percent: dialog_ratio,
+      filler_count: r.filler_count, passive_count: r.passive_count, adverb_count: r.adverb_count,
+      avg_sentence_len: r.avg_sentence_len ? Math.round(r.avg_sentence_len * 10) / 10 : null,
+      sentence_len_p90: r.sentence_len_p90 ? Math.round(r.sentence_len_p90 * 10) / 10 : null,
+      lix: r.lix != null ? Math.round(r.lix * 10) / 10 : null,
+      flesch_de: r.flesch_de != null ? Math.round(r.flesch_de * 10) / 10 : null,
+    });
+  }
+
+  if (scope === 'chapter') {
+    const chapterFilter = Number.isInteger(input?.chapter_id) ? input.chapter_id : null;
+    let sql = `
+      SELECT p.chapter_id, c.chapter_name,
+             COUNT(*) AS pages,
+             SUM(ps.words) AS words, SUM(ps.chars) AS chars,
+             SUM(ps.sentences) AS sentences, SUM(ps.dialog_chars) AS dialog_chars,
+             SUM(ps.filler_count) AS filler_count,
+             SUM(ps.passive_count) AS passive_count,
+             SUM(ps.adverb_count) AS adverb_count,
+             AVG(ps.avg_sentence_len) AS avg_sentence_len,
+             AVG(ps.sentence_len_p90) AS sentence_len_p90,
+             AVG(ps.lix) AS lix, AVG(ps.flesch_de) AS flesch_de
+      FROM page_stats ps
+      JOIN pages p ON p.page_id = ps.page_id
+      LEFT JOIN chapters c ON c.chapter_id = p.chapter_id AND c.book_id = p.book_id
+      WHERE ps.book_id = ? AND ps.sentences IS NOT NULL
+    `;
+    const params = [ctx.bookId];
+    if (chapterFilter !== null) { sql += ' AND p.chapter_id = ?'; params.push(chapterFilter); }
+    sql += ' GROUP BY p.chapter_id, c.chapter_name ORDER BY p.chapter_id';
+    const rows = db.prepare(sql).all(...params);
+    if (!rows.length) return { hint: 'Keine Stil-Metriken vorhanden.' };
+    return _truncateResult({
+      scope: 'chapter',
+      chapters: rows.map(r => ({
+        chapter_id: r.chapter_id,
+        chapter_name: r.chapter_name || '(ohne Kapitel)',
+        pages: r.pages, words: r.words, chars: r.chars,
+        sentences: r.sentences, dialog_chars: r.dialog_chars,
+        dialog_ratio_percent: r.chars ? Math.round((r.dialog_chars / r.chars) * 1000) / 10 : null,
+        filler_count: r.filler_count, passive_count: r.passive_count, adverb_count: r.adverb_count,
+        avg_sentence_len: r.avg_sentence_len ? Math.round(r.avg_sentence_len * 10) / 10 : null,
+        sentence_len_p90: r.sentence_len_p90 ? Math.round(r.sentence_len_p90 * 10) / 10 : null,
+        lix: r.lix != null ? Math.round(r.lix * 10) / 10 : null,
+        flesch_de: r.flesch_de != null ? Math.round(r.flesch_de * 10) / 10 : null,
+      })),
+    });
+  }
+
+  // scope === 'page' → Top-N nach Metrik
+  const sql = `
+    SELECT ps.page_id, p.page_name, p.chapter_id, c.chapter_name,
+           ps.words, ps.${metric} AS metric_value
+    FROM page_stats ps
+    JOIN pages p ON p.page_id = ps.page_id
+    LEFT JOIN chapters c ON c.chapter_id = p.chapter_id AND c.book_id = p.book_id
+    WHERE ps.book_id = ? AND ps.${metric} IS NOT NULL
+    ORDER BY ps.${metric} ${order}, ps.page_id
+    LIMIT ?
+  `;
+  const rows = db.prepare(sql).all(ctx.bookId, limit);
+  return _truncateResult({
+    scope: 'page',
+    metric,
+    order: order.toLowerCase(),
+    pages: rows.map(r => ({
+      page_id: r.page_id,
+      page_name: r.page_name,
+      chapter_id: r.chapter_id,
+      chapter_name: r.chapter_name || null,
+      words: r.words,
+      [metric]: r.metric_value != null && metric.startsWith('avg_') ? Math.round(r.metric_value * 10) / 10 : r.metric_value,
+    })),
+  });
+}
+
+// ── list_locations ────────────────────────────────────────────────────────────
+
+function tool_list_locations(input, ctx) {
+  const userEmail = ctx.userEmail || null;
+  const chapterFilter = Number.isInteger(input?.chapter_id) ? input.chapter_id : null;
+
+  let sql = `
+    SELECT l.id, l.loc_id, l.name, l.typ, l.beschreibung, l.stimmung,
+           l.erste_erwaehnung, l.erste_erwaehnung_page_id, p.page_name AS erste_erwaehnung_page_name
+    FROM locations l
+    LEFT JOIN pages p ON p.page_id = l.erste_erwaehnung_page_id
+    WHERE l.book_id = ? AND l.user_email IS ?
+  `;
+  const params = [ctx.bookId, userEmail];
+  if (chapterFilter !== null) {
+    sql = `
+      SELECT DISTINCT l.id, l.loc_id, l.name, l.typ, l.beschreibung, l.stimmung,
+             l.erste_erwaehnung, l.erste_erwaehnung_page_id, p.page_name AS erste_erwaehnung_page_name
+      FROM locations l
+      LEFT JOIN pages p ON p.page_id = l.erste_erwaehnung_page_id
+      JOIN location_chapters lc ON lc.location_id = l.id
+      WHERE l.book_id = ? AND l.user_email IS ? AND lc.chapter_id = ?
+    `;
+    params.push(chapterFilter);
+  }
+  sql += ' ORDER BY l.sort_order, l.id';
+
+  const rows = db.prepare(sql).all(...params);
+  if (!rows.length) {
+    return { locations: [], hint: 'Keine Orte vorhanden. Komplettanalyse ausführen.' };
+  }
+
+  const locIds = rows.map(r => r.id);
+  const { sql: idSql, values: idVals } = inClause(locIds);
+
+  const chRows = db.prepare(`
+    SELECT lc.location_id, lc.chapter_id, c.chapter_name, lc.haeufigkeit
+    FROM location_chapters lc
+    LEFT JOIN chapters c ON c.chapter_id = lc.chapter_id
+    WHERE lc.location_id IN ${idSql}
+    ORDER BY lc.location_id, lc.chapter_id
+  `).all(...idVals);
+  const fgRows = db.prepare(`
+    SELECT lf.location_id, lf.fig_id, f.name
+    FROM location_figures lf
+    LEFT JOIN figures f ON f.fig_id = lf.fig_id AND f.book_id = ? AND f.user_email IS ?
+    WHERE lf.location_id IN ${idSql}
+  `).all(ctx.bookId, userEmail, ...idVals);
+
+  const chByLoc = new Map();
+  for (const r of chRows) {
+    if (!chByLoc.has(r.location_id)) chByLoc.set(r.location_id, []);
+    chByLoc.get(r.location_id).push({ chapter_id: r.chapter_id, chapter_name: r.chapter_name || null, haeufigkeit: r.haeufigkeit });
+  }
+  const fgByLoc = new Map();
+  for (const r of fgRows) {
+    if (!fgByLoc.has(r.location_id)) fgByLoc.set(r.location_id, []);
+    fgByLoc.get(r.location_id).push({ fig_id: r.fig_id, name: r.name || null });
+  }
+
+  return _truncateResult({
+    locations: rows.map(r => ({
+      loc_id: r.loc_id,
+      name: r.name,
+      typ: r.typ || null,
+      beschreibung: r.beschreibung || null,
+      stimmung: r.stimmung || null,
+      erste_erwaehnung: r.erste_erwaehnung || null,
+      erste_erwaehnung_page_id: r.erste_erwaehnung_page_id || null,
+      erste_erwaehnung_page_name: r.erste_erwaehnung_page_name || null,
+      kapitel: chByLoc.get(r.id) || [],
+      figuren: fgByLoc.get(r.id) || [],
+    })),
+    total: rows.length,
+  });
+}
+
+// ── list_scenes ───────────────────────────────────────────────────────────────
+
+const SCENES_DEFAULT_LIMIT = 50;
+
+function tool_list_scenes(input, ctx) {
+  const userEmail = ctx.userEmail || null;
+  const chapterFilter = Number.isInteger(input?.chapter_id) ? input.chapter_id : null;
+  const pageFilter    = Number.isInteger(input?.page_id)    ? input.page_id    : null;
+  const limit = Math.min(200, Math.max(1, Number.isInteger(input?.limit) ? input.limit : SCENES_DEFAULT_LIMIT));
+
+  let figFilterId = null;
+  if (input?.figur_id || input?.figur_name) {
+    const figRow = _findFigure(input, ctx);
+    if (!figRow) return { error: 'Figur nicht gefunden' };
+    figFilterId = figRow.id;
+  }
+  let locFilterId = null;
+  if (input?.loc_id) {
+    const locRow = db.prepare(
+      'SELECT id FROM locations WHERE book_id = ? AND loc_id = ? AND user_email IS ?'
+    ).get(ctx.bookId, input.loc_id, userEmail);
+    if (!locRow) return { error: 'Ort nicht gefunden' };
+    locFilterId = locRow.id;
+  }
+
+  let sql = `
+    SELECT fs.id, fs.titel, fs.wertung, fs.kommentar, fs.sort_order,
+           fs.chapter_id, c.chapter_name,
+           fs.page_id, p.page_name
+    FROM figure_scenes fs
+    LEFT JOIN chapters c ON c.chapter_id = fs.chapter_id
+    LEFT JOIN pages    p ON p.page_id    = fs.page_id
+    WHERE fs.book_id = ? AND fs.user_email IS ?
+  `;
+  const params = [ctx.bookId, userEmail];
+  if (chapterFilter !== null) { sql += ' AND fs.chapter_id = ?'; params.push(chapterFilter); }
+  if (pageFilter    !== null) { sql += ' AND fs.page_id = ?';    params.push(pageFilter); }
+  if (figFilterId   !== null) {
+    sql += ' AND fs.id IN (SELECT scene_id FROM scene_figures WHERE figure_id = ?)';
+    params.push(figFilterId);
+  }
+  if (locFilterId !== null) {
+    sql += ' AND fs.id IN (SELECT scene_id FROM scene_locations WHERE location_id = ?)';
+    params.push(locFilterId);
+  }
+  sql += ' ORDER BY fs.sort_order, fs.id';
+
+  const rows = db.prepare(sql).all(...params);
+  if (!rows.length) return { scenes: [], total: 0, hint: 'Keine Szenen für diesen Filter.' };
+
+  const sceneIds = rows.map(r => r.id);
+  const { sql: idSql, values: idVals } = inClause(sceneIds);
+
+  const sfRows = db.prepare(`
+    SELECT sf.scene_id, f.fig_id, f.name
+    FROM scene_figures sf
+    JOIN figures f ON f.id = sf.figure_id
+    WHERE sf.scene_id IN ${idSql}
+  `).all(...idVals);
+  const slRows = db.prepare(`
+    SELECT sl.scene_id, l.loc_id, l.name
+    FROM scene_locations sl
+    JOIN locations l ON l.id = sl.location_id
+    WHERE sl.scene_id IN ${idSql}
+  `).all(...idVals);
+
+  const sfBy = new Map();
+  for (const r of sfRows) {
+    if (!sfBy.has(r.scene_id)) sfBy.set(r.scene_id, []);
+    sfBy.get(r.scene_id).push({ fig_id: r.fig_id, name: r.name });
+  }
+  const slBy = new Map();
+  for (const r of slRows) {
+    if (!slBy.has(r.scene_id)) slBy.set(r.scene_id, []);
+    slBy.get(r.scene_id).push({ loc_id: r.loc_id, name: r.name });
+  }
+
+  const total = rows.length;
+  const limited = rows.slice(0, limit).map(r => ({
+    scene_id: r.id,
+    titel: r.titel,
+    wertung: r.wertung || null,
+    kommentar: r.kommentar || null,
+    chapter_id: r.chapter_id, chapter_name: r.chapter_name || null,
+    page_id: r.page_id, page_name: r.page_name || null,
+    figuren: sfBy.get(r.id) || [],
+    orte:    slBy.get(r.id) || [],
+  }));
+
+  return _truncateResult({
+    scenes: limited,
+    total,
+    ...(limited.length < total ? { truncated: true, shown: limited.length } : {}),
+  });
+}
+
 // ── Dispatch ──────────────────────────────────────────────────────────────────
 
 const TOOLS = {
-  list_chapters:         tool_list_chapters,
-  count_pronouns:        tool_count_pronouns,
-  get_chapter_stats:     tool_get_chapter_stats,
-  get_figure_mentions:   tool_get_figure_mentions,
-  search_passages:       tool_search_passages,
-  get_pages:             tool_get_pages,
-  list_chapter_reviews:  tool_list_chapter_reviews,
-  get_figure_relations:  tool_get_figure_relations,
-  get_figure_profile:    tool_get_figure_profile,
+  list_chapters:          tool_list_chapters,
+  count_pronouns:         tool_count_pronouns,
+  get_chapter_stats:      tool_get_chapter_stats,
+  get_figure_mentions:    tool_get_figure_mentions,
+  search_passages:        tool_search_passages,
+  get_pages:              tool_get_pages,
+  list_chapter_reviews:   tool_list_chapter_reviews,
+  get_figure_relations:   tool_get_figure_relations,
+  get_figure_profile:     tool_get_figure_profile,
   list_continuity_issues: tool_list_continuity_issues,
-  get_timeline:          tool_get_timeline,
+  get_timeline:           tool_get_timeline,
+  get_book_review:        tool_get_book_review,
+  list_ideen:             tool_list_ideen,
+  get_lektorat_hotspots:  tool_get_lektorat_hotspots,
+  get_stil_metrics:       tool_get_stil_metrics,
+  list_locations:         tool_list_locations,
+  list_scenes:            tool_list_scenes,
 };
 
 async function executeTool(name, input, ctx) {
