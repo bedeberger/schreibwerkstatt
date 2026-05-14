@@ -4,8 +4,8 @@ const { db, getBookSettings, getTokenForRequest, upsertBookByName } = require('.
 const {
   makeJobLogger, updateJob, completeJob, failJob, i18nError,
   aiCall, getPrompts, getBookPrompts,
-  loadPageContents, groupByChapter, buildSinglePassBookText,
-  bsGetAll, SINGLE_PASS_LIMIT, BATCH_SIZE, jobAbortControllers, settledAll,
+  loadPageContents, groupByChapter, splitGroupsIntoChunks, buildSinglePassBookText,
+  bsGetAll, SINGLE_PASS_LIMIT, PER_CHUNK_LIMIT, BATCH_SIZE, jobAbortControllers, settledAll,
   _modelName, tps,
   jobs, runningJobs, createJob, enqueueJob, jobKey, findActiveJobId,
   jsonBody,
@@ -66,28 +66,29 @@ async function runReviewJob(jobId, bookId, bookName, userEmail, userToken) {
         65, 97, 5000, 0.2, null, undefined, SCHEMA_REVIEW,
       );
     } else {
+      const { chunkOrder, chunks } = splitGroupsIntoChunks(groups, groupOrder, PER_CHUNK_LIMIT);
       const chapterAnalyses = [];
       let completed = 0;
 
-      const thunks = groupOrder.map((key, gi) => async () => {
+      const thunks = chunkOrder.map((key, gi) => async () => {
         if (jobAbortControllers.get(jobId)?.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
-        const group = groups.get(key);
-        const fromPct = 65 + Math.round((gi / groupOrder.length) * 25);
-        const toPct   = 65 + Math.round(((gi + 1) / groupOrder.length) * 25);
+        const chunk = chunks.get(key);
+        const fromPct = 65 + Math.round((gi / chunkOrder.length) * 25);
+        const toPct   = 65 + Math.round(((gi + 1) / chunkOrder.length) * 25);
         updateJob(jobId, {
           progress: fromPct,
           statusText: 'job.phase.analyzing',
-          statusParams: { current: gi + 1, total: groupOrder.length, name: group.name },
+          statusParams: { current: gi + 1, total: chunkOrder.length, name: chunk.name },
         });
-        const chText = group.pages.map(p => `### ${p.title}\n${p.text}`).join('\n\n---\n\n');
+        const chText = chunk.pages.map(p => `### ${p.title}\n${p.text}`).join('\n\n---\n\n');
         const ca = await aiCall(jobId, tok,
-          buildChapterAnalysisPrompt(group.name, bookName, group.pages.length, chText, narrative),
+          buildChapterAnalysisPrompt(chunk.name, bookName, chunk.pages.length, chText, narrative),
           SYSTEM_KAPITELANALYSE,
           fromPct, toPct, 1500, 0.2, null, undefined, SCHEMA_CHAPTER_ANALYSIS,
         );
         completed++;
-        logger.info(`[${completed}/${groupOrder.length}] «${group.name}» analysiert (${group.pages.length} Seiten)`);
-        return { name: group.name, pageCount: group.pages.length, ...ca };
+        logger.info(`[${completed}/${chunkOrder.length}] «${chunk.name}» analysiert (${chunk.pages.length} Seiten)`);
+        return { name: chunk.name, pageCount: chunk.pages.length, ...ca };
       });
 
       const results = await settledAll(thunks);

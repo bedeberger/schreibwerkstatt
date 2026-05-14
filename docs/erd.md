@@ -1,6 +1,6 @@
 # ERD — bookstack-lektorat
 
-Stand: Schema-Version 98, 48 Tabellen (ohne `sqlite_*`/`schema_version`/`sessions`).
+Stand: Schema-Version 101, 48 Tabellen (ohne `sqlite_*`/`schema_version`/`sessions`).
 
 Quelle: Live-Dump aus [lektorat.db](../lektorat.db) (`.schema --indent`) + [db/migrations.js](../db/migrations.js). Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 

@@ -1,5 +1,15 @@
 import { escHtml, fmtTok, fetchJson } from './utils.js';
 import { startPoll as _startPollFn, runningJobStatus as _runningJobStatusFn } from './cards/job-helpers.js';
+import { EXCLUSIVE_CARDS } from './cards/feature-registry.js';
+
+// Auto-Open für Reconnect-Pfade: nur wenn keine Hauptkarte/Editor offen ist.
+// Verhindert, dass ein spät resolvender Reconnect den vom User geöffneten
+// Editor oder eine andere Karte zerstört. Loading-State + Polling laufen
+// trotzdem (Footer-Indikator zeigt Progress); User öffnet die Karte manuell.
+function canAutoOpenCard(ctx) {
+  if (ctx.showEditorCard) return false;
+  return !EXCLUSIVE_CARDS.some(c => ctx[c.flag]);
+}
 
 // Factory für standard job-driven Feature-Cards (Review, Kontinuität,
 // Kapitel-Review, Figuren, …). Die Features folgen alle demselben Muster:
@@ -351,7 +361,7 @@ export const appJobsCoreMethods = {
   // ihren Loading/Progress/Status-State selbst her.
   async checkPendingJobs(bookId) {
     await this._reconnectJob('lektorat_review_job_' + bookId, (job, jobId) => {
-      this.showBookReviewCard = true;
+      if (canAutoOpenCard(this)) this.showBookReviewCard = true;
       window.dispatchEvent(new CustomEvent('job:reconnect', {
         detail: { type: 'review', jobId, job },
       }));
@@ -383,7 +393,7 @@ export const appJobsCoreMethods = {
       .filter(Boolean)
       .sort((a, b) => a.index - b.index);
     if (winners.length > 0) {
-      this.showKapitelReviewCard = true;
+      if (canAutoOpenCard(this)) this.showKapitelReviewCard = true;
       for (const w of winners) {
         window.dispatchEvent(new CustomEvent('job:reconnect', {
           detail: { type: 'kapitel-review', jobId: w.jobId, job: w.job, extra: { chapterId: w.chapterId } },
@@ -394,7 +404,7 @@ export const appJobsCoreMethods = {
     await this._reconnectJob('lektorat_figures_job_' + bookId, (job, jobId) => {
       this.figurenLoading = true;
       this.figurenProgress = job.progress || 0;
-      this.showFiguresCard = true;
+      if (canAutoOpenCard(this)) this.showFiguresCard = true;
       this.figurenStatus = job.statusText ? this.t(job.statusText, job.statusParams) : this.t('common.analysisRunning');
       this.startFiguresPoll(jobId);
     });

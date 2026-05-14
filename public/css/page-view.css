@@ -59,11 +59,17 @@
 .page-content-view sub { vertical-align: sub; font-size: 0.75em; line-height: 0; }
 .page-content-view blockquote {
   border-left: 3px solid var(--color-border);
-  padding-left: 12px;
-  margin: 0.6em 0;
+  padding: 0.3em 0 0.3em 12px;
+  margin: 0.4em 0;
   color: var(--color-subtle);
   font-style: italic;
 }
+.page-content-view blockquote > :first-child { margin-top: 0; }
+.page-content-view blockquote > :last-child { margin-bottom: 0; }
+/* WordPress-Import-Artefakt: BookStack-HTML hat oft ein orphan <br> direkt
+   nach <blockquote>, das eine ganze Zeilenhöhe Lücke erzeugt. Visuell
+   schlucken — Original-HTML bleibt unverändert (nur Display-Stripping). */
+.page-content-view blockquote + br { display: none; }
 .page-content-view table { border-collapse: collapse; margin: 0.6em 0; width: 100%; }
 .page-content-view th, .page-content-view td { border: 1px solid var(--color-border); padding: 6px 10px; text-align: left; }
 .page-content-view th { background: var(--color-bg); font-weight: 700; }

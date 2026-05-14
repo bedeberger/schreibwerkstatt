@@ -5,10 +5,10 @@ const {
   makeJobLogger, updateJob, completeJob, failJob, i18nError,
   aiCall, getPrompts, getBookPrompts,
   bsGet, bsGetAll, jobAbortControllers,
-  htmlToText,
+  htmlToText, splitGroupsIntoChunks,
   _modelName, tps,
   jobs, runningJobs, createJob, enqueueJob, jobKey, findActiveJobId,
-  jsonBody, BATCH_SIZE,
+  jsonBody, BATCH_SIZE, SINGLE_PASS_LIMIT, PER_CHUNK_LIMIT,
 } = require('./shared');
 const { narrativeLabels } = require('./narrative-labels');
 const { toIntId } = require('../../lib/validate');
@@ -18,9 +18,15 @@ const kapitelRouter = express.Router();
 // ── Job: Kapitel-Review (Makrobewertung eines einzelnen Kapitels) ────────────
 async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookName, userEmail, userToken) {
   const logger = makeJobLogger(jobId);
-  const { buildChapterReviewPrompt, SCHEMA_CHAPTER_REVIEW, getBuchtypReviewSchwerpunkt } = await getPrompts();
-  const { SYSTEM_KAPITELREVIEW } = await getBookPrompts(bookId, userEmail);
+  const {
+    buildChapterReviewPrompt, buildChapterReviewMultiPassPrompt,
+    buildChapterAnalysisPrompt,
+    SCHEMA_CHAPTER_REVIEW, SCHEMA_CHAPTER_ANALYSIS,
+    getBuchtypReviewSchwerpunkt,
+  } = await getPrompts();
+  const { SYSTEM_KAPITELREVIEW, SYSTEM_KAPITELANALYSE } = await getBookPrompts(bookId, userEmail);
   const bookSettings = getBookSettings(bookId, userEmail);
+  const narrative = narrativeLabels(bookSettings);
   const locale = `${bookSettings?.language || 'de'}-${bookSettings?.region || 'CH'}`;
   const reviewSchwerpunkt = getBuchtypReviewSchwerpunkt(locale, bookSettings?.buchtyp || null);
   try {
@@ -56,14 +62,51 @@ async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookNa
 
     if (!contents.length) { completeJob(jobId, { empty: true, chapterName }); return; }
 
-    const chText = contents.map(p => `### ${p.title}\n${p.text}`).join('\n\n---\n\n');
+    const totalChars = contents.reduce((s, p) => s + p.text.length, 0);
+    let r;
 
-    updateJob(jobId, { progress: 65, statusText: 'job.phase.aiChapterReview' });
-    const r = await aiCall(jobId, tok,
-      buildChapterReviewPrompt(chapterName, bookName, contents.length, chText, { ...narrativeLabels(bookSettings), reviewSchwerpunkt }),
-      SYSTEM_KAPITELREVIEW,
-      65, 97, 5000, 0.2, null, undefined, SCHEMA_CHAPTER_REVIEW,
-    );
+    if (totalChars <= SINGLE_PASS_LIMIT) {
+      const chText = contents.map(p => `### ${p.title}\n${p.text}`).join('\n\n---\n\n');
+      updateJob(jobId, { progress: 65, statusText: 'job.phase.aiChapterReview' });
+      r = await aiCall(jobId, tok,
+        buildChapterReviewPrompt(chapterName, bookName, contents.length, chText, { ...narrative, reviewSchwerpunkt }),
+        SYSTEM_KAPITELREVIEW,
+        65, 97, 5000, 0.2, null, undefined, SCHEMA_CHAPTER_REVIEW,
+      );
+    } else {
+      // Kapitel sprengt Input-Budget → in Sub-Chunks zerlegen, je Analyse, dann synthetisieren.
+      const groupKey = String(chapterId);
+      const baseGroups = new Map([[groupKey, { name: chapterName, pages: contents }]]);
+      const { chunkOrder, chunks } = splitGroupsIntoChunks(baseGroups, [groupKey], PER_CHUNK_LIMIT);
+      logger.info(`Multi-Pass: ${chunkOrder.length} Teilabschnitte (${totalChars} chars > ${SINGLE_PASS_LIMIT})`);
+
+      const subAnalyses = [];
+      for (let i = 0; i < chunkOrder.length; i++) {
+        if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+        const chunk = chunks.get(chunkOrder[i]);
+        const fromPct = 65 + Math.round((i / chunkOrder.length) * 25);
+        const toPct   = 65 + Math.round(((i + 1) / chunkOrder.length) * 25);
+        updateJob(jobId, {
+          progress: fromPct,
+          statusText: 'job.phase.analyzing',
+          statusParams: { current: i + 1, total: chunkOrder.length, name: chapterName },
+        });
+        const chunkText = chunk.pages.map(p => `### ${p.title}\n${p.text}`).join('\n\n---\n\n');
+        const ca = await aiCall(jobId, tok,
+          buildChapterAnalysisPrompt(chapterName, bookName, chunk.pages.length, chunkText, narrative),
+          SYSTEM_KAPITELANALYSE,
+          fromPct, toPct, 1500, 0.2, null, undefined, SCHEMA_CHAPTER_ANALYSIS,
+        );
+        subAnalyses.push({ pageCount: chunk.pages.length, ...ca });
+      }
+
+      updateJob(jobId, { progress: 90, statusText: 'job.phase.finalReview' });
+      r = await aiCall(jobId, tok,
+        buildChapterReviewMultiPassPrompt(chapterName, bookName, subAnalyses, contents.length, { ...narrative, reviewSchwerpunkt }),
+        SYSTEM_KAPITELREVIEW,
+        90, 97, 5000, 0.2, null, undefined, SCHEMA_CHAPTER_REVIEW,
+      );
+    }
 
     if (r?.gesamtnote == null) throw i18nError('job.error.gesamtnoteMissing');
 

@@ -322,6 +322,66 @@ Antworte mit diesem JSON-Schema:
 }`;
 }
 
+// Multi-Pass-Variante der Kapitelbewertung: wird verwendet, wenn ein einzelnes
+// Kapitel das Input-Budget des Modells sprengt. Sub-Chunks wurden zuvor mit
+// `buildChapterAnalysisPrompt` (SCHEMA_CHAPTER_ANALYSIS) analysiert und werden
+// hier zu einer Kapitelbewertung (SCHEMA_CHAPTER_REVIEW) zusammengeführt.
+export function buildChapterReviewMultiPassPrompt(chapterName, bookName, subAnalyses, totalPageCount, { erzaehlperspektive = null, erzaehlzeit = null, buchtyp = null, reviewSchwerpunkt = '' } = {}) {
+  const povBlock = _buildErzaehlformBlock(erzaehlperspektive, erzaehlzeit, buchtyp, 'review');
+  const schwerpunktBlock = _buildReviewSchwerpunktBlock(reviewSchwerpunkt);
+  const synthIn = subAnalyses.map((ca, i) => {
+    const lines = [
+      `## Abschnitt ${i + 1} (${ca.pageCount} Seiten)`,
+      `Themen: ${ca.themen || '–'}`,
+      `Stil: ${ca.stil || '–'}`,
+      `Qualität: ${ca.qualitaet || '–'}`,
+      `Dramaturgie: ${ca.dramaturgie_kurz || '–'}`,
+      `Figuren: ${ca.figuren_kurz || '–'}`,
+      `Pacing: ${ca.pacing_kurz || '–'}`,
+      `Stärken: ${(ca.staerken || []).join(' | ') || '–'}`,
+      `Schwächen: ${(ca.schwaechen || []).join(' | ') || '–'}`,
+    ];
+    return lines.join('\n');
+  }).join('\n\n');
+  return `Bewerte das Kapitel «${chapterName}» aus dem Buch «${bookName}» kritisch und umfassend.
+Grundlage sind die Analysen von ${subAnalyses.length} Teilabschnitten des Kapitels (insgesamt ${totalPageCount} Seiten).
+Leite Dramaturgie, Pacing, Kohärenz, Perspektive und Figurenführung aus der Abfolge der Teil-Analysen ab –
+auch wenn die einzelnen Ausgaben kompakt sind, MUSS die Kapitelbewertung alle Achsen
+benennen. Wo eine Achse aus den Teil-Analysen nicht ableitbar ist, dies offen benennen
+("aus den Teil-Analysen nicht eindeutig …") statt zu raten.
+${ACHSEN_BLOCK_CHAPTER}
+${NOTENSKALA_BLOCK}
+${EMPFEHLUNGEN_FORMAT_BLOCK}
+HINWEIS: Für "beispielzitate" stehen im Multi-Pass keine Volltexte zur Verfügung.
+Wenn aus den Teil-Analysen keine wörtlichen Zitate ableitbar sind, das Feld
+"beispielzitate" auf [] setzen statt zu raten.
+${schwerpunktBlock}${povBlock}
+Teil-Analysen:
+
+${synthIn}
+
+Antworte mit diesem JSON-Schema:
+{
+  "gesamtnote": 4.5,
+  "gesamtnote_begruendung": "Ein Satz warum diese Note (gesamtnote als Dezimalzahl von 1.0=sehr schwach bis 6.0=ausgezeichnet, Halbschritte bevorzugt) – muss sich auf die unten gefüllten Achsen stützen",
+  "zusammenfassung": "2-3 Sätze Gesamteindruck dieses Kapitels",
+  "dramaturgie": "Spannungsbogen, Szenenstruktur, Aufbau über alle Abschnitte (3-4 Sätze)",
+  "pacing": "Tempo, Längen, Leerlauf über alle Abschnitte (2-3 Sätze)",
+  "kohaerenz": "Roter Faden und Übergänge zwischen den Abschnitten (2-3 Sätze)",
+  "perspektive": "Erzählperspektive und Konsistenz innerhalb des Kapitels (1-2 Sätze) – falls eine Erzählform vorgegeben ist: explizit beurteilen, ob das Kapitel ihr folgt oder davon abweicht",
+  "figuren": "Auftreten und Stimmigkeit der Figuren über das Kapitel (2-3 Sätze)",
+  "staerken": ["konkrete Stärke 1", "konkrete Stärke 2", "konkrete Stärke 3"],
+  "schwaechen": ["konkrete Schwäche 1", "konkrete Schwäche 2"],
+  "empfehlungen":[
+    { "prio": "hoch",    "kategorie": "dramaturgie", "text": "konkrete Handlungsanweisung an den Autor" },
+    { "prio": "mittel",  "kategorie": "stil",        "text": "…" },
+    { "prio": "niedrig", "kategorie": "mikro",       "text": "…" }
+  ],
+  "beispielzitate": [],
+  "fazit": "Abschliessendes Urteil in 1-2 Sätzen"
+}`;
+}
+
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
 const _empfehlungItem = _obj({

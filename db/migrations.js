@@ -3903,6 +3903,71 @@ function runMigrations() {
     logger.info(`DB-Migration auf Version 99 abgeschlossen (tok = chars/${cpt} in page_stats + book_stats_history).`);
   }
 
+  if (version < 100) {
+    // chat_sessions: Snapshot-Spalten book_name + page_name fallen weg. Display-
+    // Werte werden zur Lese-Zeit per JOIN auf books.name bzw. pages.page_name
+    // gezogen (CLAUDE.md «Snapshot-Spalten verboten»). Gleichzeitig book_id zur
+    // FK auf books(book_id) härten (DB relational integrity).
+    db.pragma('foreign_keys = OFF');
+    // Orphan-Cleanup: chat_sessions ohne zugehöriges Buch entfernen
+    // (chat_messages folgen via CASCADE).
+    db.prepare('DELETE FROM chat_sessions WHERE book_id NOT IN (SELECT book_id FROM books)').run();
+    const runStmt100 = (sql) => db.prepare(sql).run();
+    runStmt100('DROP TABLE IF EXISTS chat_sessions_new');
+    runStmt100(`
+      CREATE TABLE chat_sessions_new (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id           INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        kind              TEXT    NOT NULL DEFAULT 'page' CHECK(kind IN ('page','book')),
+        page_id           INTEGER REFERENCES pages(page_id) ON DELETE CASCADE,
+        user_email        TEXT    NOT NULL,
+        created_at        TEXT    NOT NULL,
+        last_message_at   TEXT    NOT NULL,
+        opening_page_text TEXT,
+        CHECK ((kind = 'page' AND page_id IS NOT NULL)
+            OR (kind = 'book' AND page_id IS NULL))
+      )
+    `);
+    runStmt100(`
+      INSERT INTO chat_sessions_new
+        (id, book_id, kind, page_id, user_email, created_at, last_message_at, opening_page_text)
+      SELECT
+        id, book_id, kind, page_id, user_email, created_at, last_message_at, opening_page_text
+      FROM chat_sessions
+    `);
+    runStmt100('DROP TABLE chat_sessions');
+    runStmt100('ALTER TABLE chat_sessions_new RENAME TO chat_sessions');
+    runStmt100('CREATE INDEX idx_cs_page_id ON chat_sessions(page_id, user_email)');
+    runStmt100('CREATE INDEX idx_cs_book_id ON chat_sessions(book_id, user_email)');
+    runStmt100('CREATE INDEX idx_cs_kind    ON chat_sessions(book_id, user_email, kind)');
+    db.pragma('foreign_keys = ON');
+    const fkErrors100 = db.pragma('foreign_key_check');
+    if (fkErrors100.length) {
+      throw new Error(`Migration 100: foreign_key_check meldet ${fkErrors100.length} Verstoesse: ${JSON.stringify(fkErrors100.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 100').run();
+    logger.info('DB-Migration auf Version 100 abgeschlossen (chat_sessions: book_name + page_name gedroppt, book_id FK auf books).');
+  }
+
+  if (version < 101) {
+    // CHARS_PER_TOKEN-Default für non-Claude Provider wurde von 1.5 auf 4
+    // angehoben (realistischer für SentencePiece-Tokenizer von Mistral/Llama auf
+    // deutschem Fliesstext). Bestehende page_stats.tok / book_stats_history.tok
+    // wurden in Migration 99 mit dem alten Wert berechnet – jetzt neu rechnen,
+    // damit Hero/Sparkline ohne Sprung weiterlaufen.
+    const provider101 = (process.env.API_PROVIDER || 'claude').toLowerCase();
+    const cpt101Default = provider101 === 'claude' ? 3 : 4;
+    const cpt101 = parseFloat(process.env.CHARS_PER_TOKEN) || cpt101Default;
+    db.prepare('UPDATE page_stats SET tok = ROUND(chars / ?) WHERE chars IS NOT NULL').run(cpt101);
+    db.prepare('UPDATE book_stats_history SET tok = ROUND(chars / ?) WHERE chars IS NOT NULL').run(cpt101);
+    const fkErrors101 = db.pragma('foreign_key_check');
+    if (fkErrors101.length) {
+      throw new Error(`Migration 101: foreign_key_check meldet ${fkErrors101.length} Verstoesse: ${JSON.stringify(fkErrors101.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 101').run();
+    logger.info(`DB-Migration auf Version 101 abgeschlossen (tok = chars/${cpt101} in page_stats + book_stats_history; non-Claude default 1.5 → 4).`);
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

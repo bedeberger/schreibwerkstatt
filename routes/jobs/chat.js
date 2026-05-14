@@ -197,8 +197,11 @@ async function runBookChatJob(jobId, sessionId, userMsgId, message, userEmail, u
   try {
     updateJob(jobId, { statusText: 'job.phase.preparing', progress: 5 });
 
-    const session = db.prepare('SELECT * FROM chat_sessions WHERE id = ? AND user_email = ?')
-      .get(parseInt(sessionId), userEmail);
+    const session = db.prepare(`
+      SELECT cs.*, b.name AS book_name FROM chat_sessions cs
+      LEFT JOIN books b ON b.book_id = cs.book_id
+      WHERE cs.id = ? AND cs.user_email = ?
+    `).get(parseInt(sessionId), userEmail);
     if (!session) throw i18nError('job.error.sessionNotFound');
     logger.info(`Start: «${session.book_name || '-'}» session=${sessionId}, msg-len=${message.length}`);
 
@@ -423,8 +426,11 @@ async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEma
   try {
     updateJob(jobId, { statusText: 'job.phase.preparing', progress: 5 });
 
-    const session = db.prepare('SELECT * FROM chat_sessions WHERE id = ? AND user_email = ?')
-      .get(parseInt(sessionId), userEmail);
+    const session = db.prepare(`
+      SELECT cs.*, b.name AS book_name FROM chat_sessions cs
+      LEFT JOIN books b ON b.book_id = cs.book_id
+      WHERE cs.id = ? AND cs.user_email = ?
+    `).get(parseInt(sessionId), userEmail);
     if (!session) throw i18nError('job.error.sessionNotFound');
     logger.info(`Start (Agent): «${session.book_name || '-'}» session=${sessionId}, msg-len=${message.length}`);
 

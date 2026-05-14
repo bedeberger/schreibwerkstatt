@@ -61,6 +61,7 @@ export {
   buildBookReviewSinglePassPrompt,
   buildChapterAnalysisPrompt,
   buildChapterReviewPrompt,
+  buildChapterReviewMultiPassPrompt,
   buildBookReviewMultiPassPrompt,
   SCHEMA_REVIEW,
   SCHEMA_CHAPTER_ANALYSIS,
