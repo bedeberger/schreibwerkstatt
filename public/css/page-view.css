@@ -14,9 +14,7 @@
   font-size: 17px;
   color: var(--color-page-view-text);
   hyphens: auto;
-  /* Buchsatz-Mikrotypografie: Anführungszeichen ragen aus Satzkante,
-     Ligaturen + alte Ziffern (OldStyle), feines Hinting. */
-  hanging-punctuation: first allow-end last;
+  /* Buchsatz-Mikrotypografie: Ligaturen + alte Ziffern (OldStyle), feines Hinting. */
   font-feature-settings: "kern", "liga", "dlig", "calt", "onum";
   text-rendering: optimizeLegibility;
 }
