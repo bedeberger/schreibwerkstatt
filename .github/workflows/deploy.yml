@@ -165,4 +165,4 @@ jobs:
           fetch-depth: 1
 
       - name: Deploy
-        run: bash deploy.sh
+        run: bash deploy/deploy.sh

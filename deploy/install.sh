@@ -35,7 +35,7 @@ npm install --omit=dev --quiet
 
 # Systemd Service installieren
 echo "Installiere systemd service..."
-cp lektorat.service "/etc/systemd/system/${SERVICE}.service"
+cp deploy/lektorat.service "/etc/systemd/system/${SERVICE}.service"
 systemctl daemon-reload
 systemctl enable "$SERVICE"
 systemctl restart "$SERVICE"

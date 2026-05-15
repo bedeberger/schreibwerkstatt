@@ -49,7 +49,7 @@ npm ci --omit=dev
 node server.js    # Port 3737
 ```
 
-Produktiv: systemd-Service via [lektorat.service](lektorat.service) (User/WorkingDirectory anpassen, dann `systemctl enable --now lektorat`).
+Produktiv: systemd-Service via [deploy/lektorat.service](deploy/lektorat.service) (User/WorkingDirectory anpassen, dann `systemctl enable --now lektorat`). Erst-Install: `bash deploy/install.sh`. CD via [deploy/deploy.sh](deploy/deploy.sh).
 
 ### Reverse-Proxy
 

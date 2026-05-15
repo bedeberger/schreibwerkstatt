@@ -42,8 +42,8 @@ cd "$INSTALL_DIR"
 npm install --omit=dev --quiet
 
 # Service-Unit immer aktualisieren (User, Pfade etc. können sich ändern)
-if [ -f "$INSTALL_DIR/lektorat.service" ]; then
-  cp "$INSTALL_DIR/lektorat.service" /etc/systemd/system/
+if [ -f "$INSTALL_DIR/deploy/lektorat.service" ]; then
+  cp "$INSTALL_DIR/deploy/lektorat.service" /etc/systemd/system/
   systemctl daemon-reload
 fi
 
