@@ -1294,7 +1294,7 @@
   "toast.job.kontinuitaet":          "Kontinuitätsprüfung",
   "toast.job.review":                "Buchbewertung",
   "toast.job.kapitelReview":         "Kapitelbewertung",
-  "toast.job.figuren":               "Figuren-Analyse",
+  "toast.job.check":                 "Seitenlektorat",
   "toast.job.bookChat":              "Buch-Chat",
   "toast.job.finetuneExport":        "Finetune-Export",
   "toast.job.pdfExport":             "PDF-Export",

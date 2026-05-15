@@ -1293,7 +1293,7 @@
   "toast.job.kontinuitaet":          "Continuity check",
   "toast.job.review":                "Book review",
   "toast.job.kapitelReview":         "Chapter review",
-  "toast.job.figuren":               "Character analysis",
+  "toast.job.check":                 "Page edit",
   "toast.job.bookChat":              "Book chat",
   "toast.job.finetuneExport":        "Finetune export",
   "toast.job.pdfExport":             "PDF export",

@@ -247,11 +247,9 @@ export const appJobsCoreMethods = {
     this._maybeShowJobToast(detail);
   },
 
-  // Job-Done-Toast. Whitelist langlaufender Job-Typen — kurze Seiten-Lektorat-
-  // Checks (`type === 'check'`) erzeugen ihr eigenes Sidebar-Signal und würden
-  // bei jedem Klick einen Toast spammen. Toast feuert auch dann, wenn der User
-  // während des Jobs das Buch gewechselt hat oder die Karte geschlossen war —
-  // genau der Reload-/Buchwechsel-Lücken-Fix für komplett-analyse & Co.
+  // Job-Done-Toast. Whitelist langlaufender Job-Typen. Toast feuert auch dann,
+  // wenn der User während des Jobs das Buch gewechselt hat oder die Karte
+  // geschlossen war — Reload-/Buchwechsel-Lücken-Fix für komplett-analyse & Co.
   _maybeShowJobToast(detail) {
     if (!detail?.job) return;
     const job = detail.job;
@@ -260,8 +258,8 @@ export const appJobsCoreMethods = {
       'komplett-analyse':      'toast.job.komplettAnalyse',
       'kontinuitaet':          'toast.job.kontinuitaet',
       'review':                'toast.job.review',
-      'kapitel-review':        'toast.job.kapitelReview',
-      'figuren':               'toast.job.figuren',
+      'chapter-review':        'toast.job.kapitelReview',
+      'check':                 'toast.job.check',
       'book-chat':             'toast.job.bookChat',
       'finetune-export':       'toast.job.finetuneExport',
       'pdf-export':            'toast.job.pdfExport',
