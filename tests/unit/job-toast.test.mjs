@@ -60,7 +60,7 @@ test('cancelled → kein Toast', () => {
   assert.equal(ctx.jobToast, null);
 });
 
-test('type=check → kein Toast (Sidebar-Signal reicht, sonst Spam)', () => {
+test('type=check done → ok-Toast', () => {
   const ctx = makeCtx();
   ctx._onJobFinished({
     type: 'check',
@@ -68,7 +68,9 @@ test('type=check → kein Toast (Sidebar-Signal reicht, sonst Spam)', () => {
     dedupId: 999,
     job: { status: 'done', result: { fehler: [] } },
   });
-  assert.equal(ctx.jobToast, null);
+  assert.equal(ctx.jobToast.severity, 'ok');
+  assert.equal(ctx.jobToast.jobType, 'check');
+  assert.match(ctx.jobToast.message, /toast\.job\.check/);
 });
 
 test('unbekannter Job-Typ → kein Toast', () => {
@@ -101,9 +103,9 @@ test('aufeinanderfolgende Toasts ersetzen sich (Timer reset)', () => {
   const ctx = makeCtx();
   ctx._onJobFinished({ type: 'review', jobId: 7, bookId: 1, job: { status: 'done' } });
   const firstTimer = ctx._jobToastTimer;
-  ctx._onJobFinished({ type: 'figuren', jobId: 8, bookId: 1, job: { status: 'done' } });
+  ctx._onJobFinished({ type: 'pdf-export', jobId: 8, bookId: 1, job: { status: 'done' } });
   assert.notEqual(ctx._jobToastTimer, firstTimer);
-  assert.equal(ctx.jobToast.jobType, 'figuren');
+  assert.equal(ctx.jobToast.jobType, 'pdf-export');
 });
 
 test('check done im aktuellen Buch → refreshPageAges + markPageChecked', () => {
@@ -161,7 +163,7 @@ test('batch-check error → kein refreshPageAges', () => {
 
 test('alle Whitelist-Typen erzeugen Toast', () => {
   const types = [
-    'komplett-analyse','kontinuitaet','review','kapitel-review','figuren',
+    'komplett-analyse','kontinuitaet','review','chapter-review','check',
     'book-chat','finetune-export','pdf-export','batch-check',
     'werkstatt-brainstorm','werkstatt-consistency',
   ];
