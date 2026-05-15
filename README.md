@@ -119,11 +119,43 @@ Installation: [docs/bookstack-templates.md](docs/bookstack-templates.md).
 
 ## Credits
 
-- **[BookStack](https://www.bookstackapp.com/)** – Wiki-Plattform
-- **[Anthropic Claude](https://www.anthropic.com/)** – KI-Modell
-- **[Ollama](https://ollama.com/)** / **[llama.cpp](https://github.com/ggerganov/llama.cpp)** / **[LM Studio](https://lmstudio.ai/)** – lokale LLMs (`API_PROVIDER=ollama` oder `llama`)
-- **[OpenThesaurus](https://www.openthesaurus.de/)** – Synonyme
-- **[Alpine.js](https://alpinejs.dev/)** – Frontend-Framework
-- **[vis-network](https://visjs.github.io/vis-network/)** – Beziehungsgraph
-- **[jsMind](https://github.com/hizzgdev/jsmind)** – Mindmap-Editor (Figuren-Werkstatt)
-- **[Chart.js](https://www.chartjs.org/)** – Diagramme
+Dieses Projekt ist nicht offiziell mit dem BookStack-Projekt assoziiert. „BookStack" ist eine Marke von Dan Brown; der Name wird hier ausschliesslich zur Beschreibung der Interoperabilität verwendet.
+
+### Plattformen & Modelle
+
+- **[BookStack](https://www.bookstackapp.com/)** – Wiki-Plattform (MIT)
+- **[Anthropic Claude](https://www.anthropic.com/)** – KI-Modell (Anthropic Usage Policies; Outputs frei nutzbar)
+- **[Ollama](https://ollama.com/)** (MIT) / **[llama.cpp](https://github.com/ggerganov/llama.cpp)** (MIT) / **[LM Studio](https://lmstudio.ai/)** – lokale LLMs (`API_PROVIDER=ollama` oder `llama`)
+- **[OpenThesaurus](https://www.openthesaurus.de/)** – Synonyme (Daten unter LGPL/CC-BY-SA; Nutzung via öffentliche API zur Laufzeit, keine Redistribution)
+- **[veraPDF](https://verapdf.org/)** – PDF/A-Validierung (GPL-3.0; aufgerufen als externer Prozess)
+
+### Frontend-Libraries (vendored in [public/vendor/](public/vendor/))
+
+- **[Alpine.js](https://alpinejs.dev/)** – Frontend-Framework (MIT)
+- **[vis-network](https://visjs.github.io/vis-network/)** – Beziehungsgraph (Apache-2.0 + MIT)
+- **[Chart.js](https://www.chartjs.org/)** – Diagramme (MIT)
+- **[SortableJS](https://github.com/SortableJS/Sortable)** – Drag&Drop für Buchorganizer (MIT)
+- **[jsMind](https://github.com/hizzgdev/jsmind)** – Mindmap-Editor / Figuren-Werkstatt (BSD-3-Clause)
+
+Die Originallizenztexte der vendored Libraries liegen in [public/vendor/LICENSES/](public/vendor/LICENSES/).
+
+### Fonts
+
+- **[Inter](https://rsms.me/inter/)** © Rasmus Andersson – SIL Open Font License 1.1
+- **[Source Serif 4](https://github.com/adobe-fonts/source-serif)** © Adobe – SIL Open Font License 1.1
+
+Lokal ausgelieferte Schriftdateien liegen in [public/fonts/](public/fonts/); die zugehörige OFL-Lizenz unter [public/fonts/OFL.txt](public/fonts/OFL.txt).
+
+Der Custom-PDF-Export lädt zur Laufzeit Familien aus **[Google Fonts](https://fonts.google.com/)** (jeweils SIL OFL 1.1 oder Apache-2.0) und bettet sie in die erzeugten PDFs ein. Beide Lizenzen erlauben Embedding ohne Royalty.
+
+### Server-Dependencies
+
+Vollständige Liste in [package.json](package.json) – durchgehend OSI-genehmigte permissive Lizenzen (MIT/Apache-2.0/BSD/ISC). Auswahl: Express, better-sqlite3, pdfkit, sharp, linkedom, jsonrepair, winston, helmet, openid-client, node-cron, xmlbuilder2, epub-gen-memory, @turbodocx/html-to-docx.
+
+## Lizenz
+
+Dieses Projekt steht unter der **GNU Affero General Public License v3.0** (AGPL-3.0) – siehe [LICENSE](LICENSE). Wer den Dienst über ein Netzwerk anbietet, muss den modifizierten Quellcode den Nutzern verfügbar machen (§ 13 AGPL).
+
+Lizenzhinweise zu Drittsoftware:
+- Vendored Frontend-Libraries: [public/vendor/LICENSES/](public/vendor/LICENSES/)
+- Mitgelieferte Schriften (Inter, Source Serif 4): [public/fonts/OFL.txt](public/fonts/OFL.txt)
