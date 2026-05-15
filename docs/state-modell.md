@@ -4,9 +4,9 @@ Verbindlicher Aufbau des Alpine-State. Vor jeder UI-Änderung die richtige Ebene
 
 ## Drei Ebenen
 
-1. **Root `Alpine.data('lektorat')`** ([public/js/app.js:355](../public/js/app.js#L355)) — `x-data="lektorat"` am `<body>`. SSoT für: Navigation, Session/Shell, i18n-Locale, **alle `showXxxCard`-Flags** (Hash-Router + Exklusivität), Job-Queue, Editor-Edit-Mode, Auto-Save, Selection. Cross-Cutting-Methoden: `t/tRaw`, `bsGet/bsGetAll`, `loadFiguren/loadOrte/loadSzenen`, `selectPage`, `gotoStelle`, `_closeOtherMainCards`.
+1. **Root `Alpine.data('lektorat')`** ([public/js/app.js:430](../public/js/app.js#L430)) — `x-data="lektorat"` am `<body>`. SSoT für: Navigation, Session/Shell, i18n-Locale, **alle `showXxxCard`-Flags** (Hash-Router + Exklusivität), Job-Queue, Editor-Edit-Mode, Auto-Save, Selection. Cross-Cutting-Methoden: `t/tRaw`, `bsGet/bsGetAll`, `loadFiguren/loadOrte/loadSzenen`, `selectPage`, `gotoStelle`, `_closeOtherMainCards`.
 2. **Sub-Komponenten `Alpine.data('xxxCard')`** in [public/js/cards/](../public/js/cards/) — eine pro UI-Card. Eigener fachlicher State + `init()`/`destroy()`. Karten haben **keine** eigenen `showXxxCard`-Flags (Root ist SSoT); sie hören via `$watch(() => window.__app.showXxxCard)` auf Öffnen/Schliessen.
-3. **`Alpine.store('catalog')`** ([public/js/cards/catalog-store.js](../public/js/cards/catalog-store.js)) — geteilte Fach-Daten `figuren / orte / szenen / globalZeitstrahl`. Root spiegelt sie via Getter/Setter-Proxy ([public/js/app.js:364-371](../public/js/app.js#L364-L371)), damit `this.figuren = …` und `this.figuren.push(…)` weiter funktionieren. Karten lesen via `$store.catalog` oder `$app.figuren`.
+3. **`Alpine.store('catalog')`** ([public/js/cards/catalog-store.js](../public/js/cards/catalog-store.js)) — geteilte Fach-Daten `figuren / orte / szenen / globalZeitstrahl`. Root spiegelt sie via Getter/Setter-Proxy ([public/js/app.js:439-446](../public/js/app.js#L439-L446)), damit `this.figuren = …` und `this.figuren.push(…)` weiter funktionieren. Karten lesen via `$store.catalog` oder `$app.figuren`.
 
 ## Root-State-Slices ([public/js/app-state.js](../public/js/app-state.js))
 
@@ -36,14 +36,14 @@ Verbindlicher Aufbau des Alpine-State. Vor jeder UI-Änderung die richtige Ebene
 
 ## Computed-Maps am Root (Performance)
 
-`figurenById / orteById / szenenById` ([public/js/app.js:378-398](../public/js/app.js#L378-L398)) sind getter-basierte O(1)-Lookups, die nur bei Referenzwechsel der Quell-Arrays neu gebaut werden. **`loadFiguren` etc. müssen die Arrays reassignen, nie pushen** — sonst rebuildet der Cache nicht. Render-Loops in figuren.html/orte.html/szenen.html nutzen diese Maps statt `.find()`.
+`figurenById / orteById / szenenById` ([public/js/app.js:453-473](../public/js/app.js#L453-L473)) sind getter-basierte O(1)-Lookups, die nur bei Referenzwechsel der Quell-Arrays neu gebaut werden. **`loadFiguren` etc. müssen die Arrays reassignen, nie pushen** — sonst rebuildet der Cache nicht. Render-Loops in figuren.html/orte.html/szenen.html nutzen diese Maps statt `.find()`.
 
 Weitere Root-Computeds: `szenenNachKapitel`, `szenenNachSeite`, `orteFiltered`, `szenenFiltered`, `filteredTree`, `selectedBookName`, `selectedBookUrl`, `statusHtml`, `ideenMovePickerOptions()`.
 
 ## Lifecycle
 
-- **Root `init()`** ([public/js/app.js:511](../public/js/app.js#L511)): setzt `window.__app = this` (für `$app`-Magic), erzeugt `_abortCtrl = new AbortController()`, registriert globale Listener mit `{ signal }`.
-- **Root `destroy()`** ([public/js/app.js:504](../public/js/app.js#L504)): `_abortCtrl.abort()` → alle Listener weg in einem Schlag. Plus `clearInterval(_jobQueueTimer)`, `clearTimeout(_statusTimer)`. **Pflicht für jede neue globale Subscription:** `{ signal: this._abortCtrl.signal }` an `addEventListener` — sonst Leak bei HMR/Re-Init.
+- **Root `init()`** ([public/js/app.js:611](../public/js/app.js#L611)): setzt `window.__app = this` (für `$app`-Magic), erzeugt `_abortCtrl = new AbortController()`, registriert globale Listener mit `{ signal }`.
+- **Root `destroy()`** ([public/js/app.js:603](../public/js/app.js#L603)): `_abortCtrl.abort()` → alle Listener weg in einem Schlag. Plus `clearInterval(_jobQueueTimer)`, `clearTimeout(_statusTimer)`. **Pflicht für jede neue globale Subscription:** `{ signal: this._abortCtrl.signal }` an `addEventListener` — sonst Leak bei HMR/Re-Init.
 - **Sub-`init()`/`destroy()`**: Karten managen ihre Window-Listener selbst — der Soll-Pattern dafür ist [`setupCardLifecycle`](../public/js/cards/card-lifecycle.js) (siehe nächste Section). vis-network/Chart-Instanzen explizit `.destroy()` callen + Refs nullen (sonst halten DataSets das alte Buch im Speicher).
 
 ## Soll-Pattern für Buch-scoped Karten: `setupCardLifecycle`
@@ -100,7 +100,7 @@ Der Helper macht:
 ## `$app` / `window.__app` (Root-Zugriff aus Subs)
 
 Alpine's `$root` zeigt auf das nächste `x-data` (= Sub selbst), nicht auf die `lektorat`-Root.
-- **In Templates** (Alpine-Expressions): `$app.t('key')`, `$app.selectedBookId`, `$app.figuren` — via `Alpine.magic('app', …)` ([public/js/app.js:195](../public/js/app.js#L195)).
+- **In Templates** (Alpine-Expressions): `$app.t('key')`, `$app.selectedBookId`, `$app.figuren` — via `Alpine.magic('app', …)` ([public/js/app.js:202](../public/js/app.js#L202)).
 - **In JS-Methoden/Gettern** (Subs): `window.__app.xxx`. Magics sind in JS-Getter-Ausführungen nicht zuverlässig; `window.__app` ist robust und ein reaktiver Alpine-Proxy.
 
 ## Event-Bus (Root → Subs)
@@ -123,10 +123,10 @@ Custom-Events am `window`. Vollständige Liste:
 
 ## Karten-Inventar (Alpine.data-Names)
 
-Buchebene: `bookOverviewCard`, `bookReviewCard`, `kapitelReviewCard`, `figurenCard`, `orteCard`, `szenenCard`, `ereignisseCard`, `kontinuitaetCard`, `bookStatsCard`, `stilCard`, `fehlerHeatmapCard`, `chatCard`, `bookChatCard`, `ideenCard`, `finetuneExportCard`, `bookSettingsCard`, `userSettingsCard`, `paletteCard`, `exportCard`, `pdfExportCard`.
+Buchebene: `bookOverviewCard`, `bookReviewCard`, `kapitelReviewCard`, `figurenCard`, `figurWerkstattCard`, `orteCard`, `szenenCard`, `ereignisseCard`, `kontinuitaetCard`, `bookStatsCard`, `stilCard`, `fehlerHeatmapCard`, `chatCard`, `bookChatCard`, `ideenCard`, `finetuneExportCard`, `bookSettingsCard`, `userSettingsCard`, `paletteCard`, `exportCard`, `pdfExportCard`, `bookOrganizerCard`, `bookEditorCard`.
 Editor-Slices: `editorFindCard`, `editorSynonymeCard`, `editorFigurLookupCard`, `editorToolbarCard`, `editorFocusCard`, `lektoratFindingsCard`, `pageHistoryCard`.
 
-Alle in [public/js/app.js:197-220](../public/js/app.js#L197-L220) via `registerXxxCard()` registriert.
+Alle in [public/js/app.js:205-234](../public/js/app.js#L205-L234) via `registerXxxCard()` registriert.
 
 ## Was bleibt im Root (nicht in Subs auslagern)
 
@@ -140,8 +140,8 @@ Vier orthogonale Modi am Editor — kein Single-Enum, sondern Boolean-Flags am R
 | Modus | Flag | Slice / Datei | Enter | Exit |
 |-------|------|---------------|-------|------|
 | **Viewmodus** (Lesen) | _kein_ (= alle anderen `false`) | — | Default | — |
-| **Prüfmodus** | `checkDone: true` | `lektoratState` ([app-state.js:167](../public/js/app-state.js#L167)) | `runCheck()` ([editor/lektorat.js:42](../public/js/editor/lektorat.js#L42)) → Polling → Setzen bei Done ([editor/lektorat.js:149](../public/js/editor/lektorat.js#L149)) oder `loadHistoryEntry` ([history.js:141](../public/js/history.js#L141)) | `closeFindings()` ([editor/lektorat.js:28](../public/js/editor/lektorat.js#L28)) |
-| **Editmodus** | `editMode: true` | `editorState` ([app-state.js:83](../public/js/app-state.js#L83)) | `startEdit()` ([editor/edit.js:144](../public/js/editor/edit.js#L144)) | `saveEdit()` / `cancelEdit()` ([editor/edit.js:208-232](../public/js/editor/edit.js#L208-L232)) |
+| **Prüfmodus** | `checkDone: true` | `lektoratState` ([app-state.js:199](../public/js/app-state.js#L199)) | `runCheck()` ([editor/lektorat.js:42](../public/js/editor/lektorat.js#L42)) → Polling → Setzen bei Done ([editor/lektorat.js:175](../public/js/editor/lektorat.js#L175)) oder `loadHistoryEntry` ([history.js:142](../public/js/history.js#L142)) | `closeFindings()` ([editor/lektorat.js:28](../public/js/editor/lektorat.js#L28)) |
+| **Editmodus** | `editMode: true` | `editorState` ([app-state.js:87](../public/js/app-state.js#L87)) | `startEdit()` ([editor/edit.js:147](../public/js/editor/edit.js#L147)) | `cancelEdit()` ([editor/edit.js:211](../public/js/editor/edit.js#L211)) / `saveEdit()` ([editor/edit.js:237](../public/js/editor/edit.js#L237)) |
 | **Fokusmodus** | `focusMode: true` | `focusModeState` ([app-state.js](../public/js/app-state.js)) | `enterFocusMode()` / `startFocusEdit()` / Cmd+Shift+E | `exitFocusMode()` / Esc / Cmd+Shift+E |
 
 **Begleit-State pro Modus:**
@@ -163,13 +163,13 @@ Vier orthogonale Modi am Editor — kein Single-Enum, sondern Boolean-Flags am R
 
 **Invarianten (Pflicht — bei Änderungen prüfen):**
 
-1. `focusMode === true` ⇒ `editMode === true`. Enforced in [editor/focus.js:572](../public/js/editor/focus.js#L572) (`enterFocusMode` bricht ab) und [editor/edit.js:231](../public/js/editor/edit.js#L231) (`cancelEdit` ruft `exitFocusMode` zuerst).
-2. `runCheck` darf nicht im Editmodus starten. Template-Guard: Prüfen-Button hat `x-show="!editMode"` ([editor.html:41-43](../public/partials/editor.html#L41)).
-3. `closeFindings`-Button im Editmodus nur sichtbar wenn `!focusMode` ([editor.html:66](../public/partials/editor.html#L66)) — im Fokus sind Findings ohnehin ausgeblendet.
-4. **Chat-Modus** (showChatCard) snapshotet `checkDone` in `_checkDoneBeforeChat` und setzt `checkDone=false` ([chat-base.js:121](../public/js/chat-base.js#L121)); beim Schliessen Restore ([app-view.js:291-307](../public/js/app-view.js#L291-L307)). Ohne diesen Snapshot würde der Chat Findings doppelt rendern.
-5. **Reset-Reihenfolge in `resetPage()`** ([app-view.js:355-397](../public/js/app-view.js#L355-L397)): `exitFocusMode` → `_stopAutosave` → Chat-Reset → Card-Flags → Editor-State (`editMode/editDirty/editSaving`) → Lektorat-State (`checkDone/findings/...`). Diese Reihenfolge ist Pflicht — Fokus zuerst, weil `exitFocusMode` `editMode/editDirty` liest.
-6. `saveEdit` im Fokus bleibt im Fokus+Edit ([editor/edit.js:289](../public/js/editor/edit.js#L289), [editor/focus.js:914](../public/js/editor/focus.js#L914)) — User möchte weiter schreiben. Nur sauberer Exit (kein editDirty, kein editSaving) räumt Edit-Mode auf.
-7. Hotkey Cmd+Shift+E ([editor/focus.js:531](../public/js/editor/focus.js#L531)) wirkt nur bei `showEditorCard` und routet zustandsabhängig: in Fokus → exit, in Edit → enter, sonst → startFocusEdit (Edit + Fokus in einem Schritt).
+1. `focusMode === true` ⇒ `editMode === true`. Enforced in [editor/focus/card.js:45](../public/js/editor/focus/card.js#L45) (`enterFocusMode` bricht bei `!editMode` ab) und [editor/edit.js:234](../public/js/editor/edit.js#L234) (`cancelEdit` ruft `exitFocusMode` zuerst).
+2. `runCheck` darf nicht im Editmodus starten. Template-Guard: Prüfen-Button steht in `<template x-if="!editMode">` ([editor.html:44](../public/partials/editor.html#L44)).
+3. `closeFindings`-Button im Editmodus nur sichtbar wenn `!focusMode` ([editor.html:82](../public/partials/editor.html#L82)) — im Fokus sind Findings ohnehin ausgeblendet.
+4. **Chat-Modus** (showChatCard) snapshotet `checkDone` in `_checkDoneBeforeChat` und setzt `checkDone=false` ([chat-base.js:129](../public/js/chat-base.js#L129)); beim Schliessen Restore ([app-view.js:310-320](../public/js/app-view.js#L310-L320)). Ohne diesen Snapshot würde der Chat Findings doppelt rendern.
+5. **Reset-Reihenfolge in `resetPage()`** ([app-view.js:378](../public/js/app-view.js#L378)): `exitFocusMode` → `_stopAutosave` → Chat-Reset → Card-Flags → Editor-State (`editMode/editDirty/editSaving`) → Lektorat-State (`checkDone/findings/...`). Diese Reihenfolge ist Pflicht — Fokus zuerst, weil `exitFocusMode` `editMode/editDirty` liest.
+6. `saveEdit` im Fokus bleibt im Fokus+Edit ([editor/edit.js:318](../public/js/editor/edit.js#L318)) — User möchte weiter schreiben. Erst sauberer Exit räumt Edit-Mode auf, dann flusht `exitFocusMode` per `quickSave` ([editor/focus/card.js:349-351](../public/js/editor/focus/card.js#L349-L351)).
+7. Hotkey Cmd+Shift+E ([editor/focus/trampoline.js:28](../public/js/editor/focus/trampoline.js#L28) → [editor/focus/card.js:245](../public/js/editor/focus/card.js#L245)) wirkt nur bei `showEditorCard` und routet zustandsabhängig: in Fokus → exit, in Edit → enter, sonst → startFocusEdit (Edit + Fokus in einem Schritt).
 
 **Bei Modus-Erweiterung (z.B. „Diff-Modus", „Annotations-Modus")** dieser Section folgen:
 1. Flag in passenden Slice von `app-state.js`.
