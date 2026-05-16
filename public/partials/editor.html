@@ -43,21 +43,22 @@
       <div class="card-actions card-actions--grouped">
       <template x-if="!editMode">
         <span class="display-contents">
-          <span class="action-group">
+          <span class="action-group" x-show="canReview()">
             <button type="button" @click="runCheck()" :disabled="checkLoading || currentPageEmpty" :data-tip="currentPageEmpty ? t('editor.btn.pageEmpty') : t('editor.btn.checkTitle')" x-text="t('editor.btn.check')"></button>
             <button type="button" @click="closeFindings()" x-show="checkDone" :data-tip="t('editor.btn.exitCheckTitle')" x-text="t('editor.btn.exitCheck')"></button>
-            <button type="button" class="success" @click="saveCorrections()" :disabled="saveApplying != null" x-show="(correctedHtml && selectedFindings.some(v => v)) || saveApplying != null">
+            <button type="button" class="success" @click="saveCorrections()" :disabled="saveApplying != null" x-show="canEdit() && ((correctedHtml && selectedFindings.some(v => v)) || saveApplying != null)">
               <span x-show="saveApplying != null" class="spinner"></span><span x-text="saveApplying != null ? t('editor.btn.saveCorrectionsProgress') : t('editor.btn.saveCorrections')"></span>
             </button>
           </span>
-          <span class="action-sep" aria-hidden="true"></span>
-          <span class="action-group">
+          <span class="action-sep" aria-hidden="true" x-show="canReview() && canEdit()"></span>
+          <span class="action-group" x-show="canEdit()">
             <button type="button" @click="startEdit()" :disabled="checkLoading || saveApplying != null || originalHtml === null" :data-tip="t('editor.btn.editTitle')" x-text="t('editor.btn.edit')"></button>
             <button type="button" @click="startFocusEdit()" :disabled="checkLoading || saveApplying != null || originalHtml === null" :data-tip="t('editor.btn.focusTitle')" x-text="t('editor.btn.focus')"></button>
           </span>
           <span class="action-sep" aria-hidden="true"></span>
           <span class="action-group">
-            <button type="button" @click="toggleChatCard()" :class="{ primary: showChatCard }" :disabled="currentPageEmpty" :data-tip="t('editor.btn.chatTitle')">
+            <button type="button" @click="readerPrint()" :data-tip="t('reader.printHint')" x-text="t('reader.print')"></button>
+            <button type="button" @click="toggleChatCard()" x-show="canReview()" :class="{ primary: showChatCard }" :disabled="currentPageEmpty" :data-tip="t('editor.btn.chatTitle')">
               <span x-text="t('editor.btn.chat')"></span>
               <span class="btn-count" x-show="currentPageChatSessionCount > 0" x-text="currentPageChatSessionCount" :data-tip="t('editor.btn.chatCountTitle', { n: currentPageChatSessionCount })"></span>
             </button>

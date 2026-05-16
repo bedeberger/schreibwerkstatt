@@ -61,7 +61,7 @@ Bewusst out-of-scope (User-Wunsch): Attachments (werden nicht genutzt → kein M
 | 3 | Eigene Sortierung | ja | `localdb`-only nativ; `bookstack` weiter via BS-`priority` | 0, 1 |
 | 4a2 | Public Landing + Request-Register | ja | Öffentliche Startseite mit Login + Registrierungsanfrage; Admin moderiert Anfragen | 4c2 |
 | 4b | Book-ACL + Sharing (owner/editor/lektor/viewer) | ja | Buchliste filtert auf Shares; Rollen-Matrix | — |
-| 4b1 | Lese-Modus (Print-CSS + readOnly) | ja | Druckansicht + readOnly für viewer | 4b |
+| 4b1 ✓ | Lese-Modus (Print-CSS + readOnly) | ja | Druckansicht + readOnly für viewer | 4b |
 | 4b2 | Export-Konsolidierung (Eigenbau alle Scopes + Formate) | ja | Export-Karte für Buch/Kapitel/Seite; kein BookStack-Pass-Through mehr | 4b |
 | 4c1 | First-Run-Setup-Wizard (`/setup`) | ja | Admin loggt sich via `ADMIN_PASSWORD` ein und konfiguriert OAuth/KI/Backend/SMTP Schritt für Schritt; auch später wieder aufrufbar | — |
 | 4d | Token-Budget + Cost-Tracking (Admin) | ja (additiv) | Admin-Karte Usage; pro-User-Monats-Budget hard/soft; 429 bei Hard-Cap | — |
@@ -83,6 +83,7 @@ Bewusst out-of-scope (User-Wunsch): Attachments (werden nicht genutzt → kein M
 - Phase 4c (Admin-Settings): Migration 108 (`app_settings` + `app_settings_audit`), [lib/app-settings.js](../lib/app-settings.js) als SSoT-Helper mit DEFAULTS, `bootstrapFromEnv()` für initiale ENV→DB-Spiegelung (server.js-Startup), AES-Crypto via [lib/crypto.js](../lib/crypto.js) für `ENCRYPTED_KEYS`-Set (api_key, secrets, tokens), Sentinel `__unchanged__` für Re-PUTs ohne Klartext, `changed`-EventEmitter für Hot-Reload (z.B. OIDC-Client-Invalidate in [routes/auth.js](../routes/auth.js) bei `app.public_url`/`auth.google.*`-Wechsel). `/admin/settings`-Routen ([routes/admin-settings.js](../routes/admin-settings.js)) mit GET/PUT/DELETE + Test-Probes (`test-provider`, `test-oauth`). Frontend `AdminSettingsCard` ([public/js/cards/admin-settings-card.js](../public/js/cards/admin-settings-card.js)) mit 8 Tabs (auth, provider, model, backend, jobs, cron, pdfa, advanced) + Save-Diff (sendet nur dirty Keys). ENV-Reads in Konsumenten bleiben vorerst als Fallback — Strict-ENV-Kill verschiebt sich auf Folge-Refactor. Tests: `tests/unit/app-settings.test.js`, `tests/unit/admin-settings-routes.test.js`.
 - Phase 4c1 (First-Run-Setup-Wizard): [routes/setup.js](../routes/setup.js) mit `GET /setup` (HTML), `GET /setup/state` (Steps + Values + Masked-Flags), `POST /setup/:step` (publicUrl/oauth/emails/ai/backend/smtp je atomar, Encrypted-Sentinel `__unchanged__` honored, leerer Secret-Wert = kein Overwrite), `POST /setup/test/{oauth,provider,backend,smtp}` (smtp-Probe Stub bis Phase 4c2), `POST /setup/complete` (setzt `app.setup_completed=true` + spiegelt `ADMIN_EMAIL` nach `auth.admin_email`). Standalone-Wizard-Frontend ([public/setup.html](../public/setup.html) + [public/js/setup.js](../public/js/setup.js) + [public/css/setup.css](../public/css/setup.css)) ohne Alpine, eigene Inline-i18n (DE/EN aus `navigator.language`). Admin-only via `requireAdmin`. `/config` liefert `setupCompleted`-Flag; `toggleAdminUsersCard` + `toggleAdminSettingsCard` redirecten auf `/setup`, solange Admin nicht abgeschlossen hat. Tests: `tests/unit/setup-routes.test.js` (18 Cases — Guards, Step-Validierung, Encrypted-Sentinel, Complete, smtp-Stub).
 - Phase 4c2 (SMTP-Mailer): nodemailer-Dep, [lib/mailer.js](../lib/mailer.js) als Singleton-Service mit Mode-Auflösung (`disabled`/`gmail-oauth`/`gmail-app-password`/`generic`), In-Memory-Rate-Limit (30/min Default), Settings-Change-Event-Hook (Cache-Invalidate bei `smtp.*`-Wechsel), Test-Transport-Factory für Tests. [lib/mailer-templates.js](../lib/mailer-templates.js) mit `invite` + `test`-Template, i18n-Lookup (de/en), HTML-Escape gegen Injection. Admin-Routen `GET /admin/settings/smtp/test-config` + `POST /admin/settings/smtp/test-send`. Frontend `AdminSettingsCard`-Tab „SMTP / Mailer" mit Mode-abhängigen Feldern + Test-Mail-Button. ENCRYPTED_KEYS-Set in `app-settings.js` deckt `smtp.gmail.client_secret`, `smtp.gmail.refresh_token`, `smtp.gmail.app_password`, `smtp.password` ab. Tests: `tests/unit/mailer.test.mjs` (Templates inkl. Escape, getStatus, send-Pfade, jsonTransport-Roundtrip, Settings-Reload).
+- Phase 4b1 (Lese-Modus): Frontend-Role-Wiring (4b-Vorgriff) — `bookRoles`-Cache + `currentBookRole` am Root, Getter `canEdit()`/`canReview()`/`isViewer()` in [tree.js](../public/js/tree.js), Fetch via `GET /books/:id/access` in `_loadBookRole()` (Best-Effort: 403/Fehler → null → Legacy-Fallback erlaubt Edit, bis 4b serverseitig alle Schreibpfade enforced). Editor-Buttons in [editor.html](../public/partials/editor.html) (Edit/Fokus/Chat/Korrekturen) hinter `canEdit()`/`canReview()`; `startEdit`/`saveEdit`/`quickSave` mit `canEdit()`-Defense-in-Depth. [public/css/print.css](../public/css/print.css) (`@media print`) blendet UI-Chrome aus, rendert nur `.page-content-view` als Serif-Buchsatz mit `@page`-Margen + Page-Break-Hints. `readerPrint()`-Methode in [app-view.js](../public/js/app-view.js) + „Drucken"-Button in der Editor-Toolbar (callt `window.print()`; cancelEdit vorher, wenn nicht dirty, damit keine Findings-Marks im Druck). i18n-Keys `reader.print`/`reader.printHint` (DE+EN). `SHELL_CACHE` bumped.
 - Phase 0b Backend (Backfill-Job in [routes/jobs/backfill.js](../routes/jobs/backfill.js), Upserts in [db/backfill.js](../db/backfill.js), Mock-BookStack `book_id]?=`-Filter-Fix, 5 Integration-Tests in [tests/integration/backfill.test.js](../tests/integration/backfill.test.js)). Frontend-Trigger-Punkte siehe Phase-0b-Block unten.
 4a/4c/4b zuerst, weil User-Identität, `app.backend`-Schalter und ACL die SSoT für alle folgenden Phasen sind. Lese-Modus (4b1, Print-CSS + readOnly) direkt nach 4b, weil viewer-Rolle erst dann existiert. Phase 7 (Suche) **vor** Phase 8, damit FTS schon steht, wenn Admin Backend wechselt — Index wird beim Bulk-Copy mitgefüllt.
 
@@ -489,29 +490,17 @@ Migrationsschritt (läuft als Teil der Phase-4b-Migration, **vor** dem `books.ow
 
 ---
 
-## Phase 4b1 — Lese-Modus (Print-CSS + readOnly-Editor)
+## Phase 4b1 — Lese-Modus (Print-CSS + readOnly-Editor) — erledigt
 
 Ablenkungsfreier Lese-Pfad für `viewer` (und alle, die „nur lesen" wollen). **Bewusst minimal**: kein eigener Render-Stack, kein E-Reader-Klon — der existierende Editor im readOnly-Mode + Print-CSS reichen für Solo/Multi-User-Self-Host.
 
-**Komponenten:**
+**Implementiert:**
 
-1. **Editor-readOnly für viewer-Rolle** ([public/js/cards/book-editor-card.js](../public/js/cards/book-editor-card.js)):
-   - CodeMirror-Option `readOnly: true`, wenn `$app.bookRole === 'viewer'`.
-   - Toolbar-Buttons hidden via `$app.canEdit`-Getter (existiert bereits als Pattern; siehe Phase 4b „Viewer im Editor").
-   - Findings-/Page-Chat-Card komplett ausgeblendet (minRole-Filter Phase 4b).
-   - Selection/Find/Synonyme-Lookup bleibt erlaubt — kein Mutationsweg.
-   - Auto-Save-Pfad früh aussteigen (`if (!canEdit) return`).
+1. **Role-aware Editor** — `bookRoles`-Cache + `currentBookRole` am Root ([app-state.js](../public/js/app-state.js)). `_loadBookRole(bookId)` in [tree.js](../public/js/tree.js) fetcht `GET /books/:id/access` und cached pro Buch. Getter `canEdit()` (editor + owner), `canReview()` (lektor + editor + owner), `isViewer()`. Buttons in [editor.html](../public/partials/editor.html) (Bearbeiten/Fokus/Chat/Korrekturen) hinter den Gettern. `startEdit`/`saveEdit`/`quickSave` mit Defense-in-Depth-Guard.
+2. **Print-CSS** ([public/css/print.css](../public/css/print.css)) — `@media print` blendet UI-Chrome aus, rendert `.page-content-view` als Serif-Buchsatz mit `@page`-Margen, Page-Break-Hints, Korrekturmark-Stripping. Verlinkt in [index.html](../public/index.html) + [tests/fixtures/focus-harness.html](../tests/fixtures/focus-harness.html) via `media="print"`. `SHELL_CACHE` bumped.
+3. **„Drucken"-Button** in der Editor-Toolbar ruft `readerPrint()` ([app-view.js](../public/js/app-view.js)) → `cancelEdit()` (falls nicht dirty) + `window.print()`. i18n-Keys `reader.print`/`reader.printHint` (DE+EN).
 
-2. **Print-CSS** (`public/css/print.css`, neu):
-   - `@media print { … }`: Topbar, Sidebar, Toolbar, Karten-Chrome, Findings-Margins, Job-Footer, Buttons → `display: none`.
-   - Editor-Container auf volle Breite, max-width ~680px, serif-Schrift (`var(--font-serif)`).
-   - Kapitel-Titel als grosses H1, Page-Headings als H2.
-   - Page-Break-Hints (`page-break-before: always` für Kapitel-Wechsel).
-   - Link aus `<link>` in [public/index.html](../public/index.html) + [tests/fixtures/focus-harness.html](../tests/fixtures/focus-harness.html), `SHELL_CACHE` bumpen.
-   - User öffnet Browser-Print-Dialog (Cmd/Ctrl+P) → kriegt Buch als lineares Druckbild bzw. PDF-Export via Browser.
-
-3. **„Lesen"-Button in Buchliste/Topbar** (optional, leichtgewichtig):
-   - Schaltet Editor in readOnly + ruft `window.print()` direkt auf. Oder: dezenter Hint-Tooltip „Cmd/Ctrl+P für Druck/PDF".
+**Fallback:** `currentBookRole === null` (Endpoint-403, fehlende `book_access`-Row) → `canEdit()` liefert `true`, damit Legacy-Bücher bis zur vollen 4b-Enforcement nicht UI-seitig gesperrt sind. Server-Guard ist sowieso die Sicherheits-Ebene.
 
 **Explizit weggelassen (gegenüber ursprünglichem Plan):**
 - Keine `reader_progress`/`reader_bookmarks`-Tabellen.
@@ -522,12 +511,6 @@ Ablenkungsfreier Lese-Pfad für `viewer` (und alle, die „nur lesen" wollen). *
 - Keine `/reader/*`-Routen.
 
 **Begründung:** Custom-PDF-Export ([routes/jobs/pdf-export.js](../routes/jobs/pdf-export.js)) existiert bereits als „Buch sauber konsumieren"-Pfad mit Profilen/Cover/Schrift. Print-CSS deckt den Browser-Pfad ab. Eigenes E-Reader-UI ist Aufwand ohne klaren Mehrwert für Self-Host.
-
-**i18n:** keine neuen Keys (oder maximal `reader.printHint`).
-
-**Aufwand:** 0.5-1 Tag (Print-CSS + readOnly-Guard + minRole-Filter-Wiring aus Phase 4b).
-
-**Falls später echter E-Reader gewünscht:** Plan-Stand vor diesem Cut steht in git-History dieser Datei (`git log -p docs/bookstack-exit.md`).
 
 ---
 

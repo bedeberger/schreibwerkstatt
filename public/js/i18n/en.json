@@ -1038,6 +1038,8 @@
   "editor.btn.pageEmpty":        "Page is empty",
   "editor.btn.edit":             "Edit",
   "editor.btn.editTitle":        "Edit text manually",
+  "reader.print":                "Print",
+  "reader.printHint":            "Print / PDF view (⌘P / Ctrl+P)",
   "editor.btn.focus":            "Focus editor",
   "editor.btn.focusTitle":       "Distraction-free fullscreen writing (Ctrl+Shift+E)",
   "editor.btn.exitCheck":        "Exit check mode",

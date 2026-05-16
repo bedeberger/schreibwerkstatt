@@ -149,6 +149,9 @@ export const editorEditMethods = {
   startEdit() {
     if (!this.currentPage || this.originalHtml === null) return;
     if (this.checkLoading || this.saveApplying != null) return;
+    // Phase 4b1: viewer/lektor duerfen Page-HTML nicht direkt mutieren.
+    // Defense-in-depth zum verstecken Button-Hide in editor.html.
+    if (!this.canEdit()) return;
     this.editMode = true;
     this.editDirty = false;
     this.editSaving = false;
@@ -238,6 +241,7 @@ export const editorEditMethods = {
 
   async saveEdit() {
     if (!this.currentPage) return;
+    if (!this.canEdit()) return;
     const el = this._getEditEl();
     if (!el) return;
     const newHtml = stripLektoratMarks(el.innerHTML);
@@ -348,6 +352,9 @@ export const editorEditMethods = {
   // Stilles Speichern (Ctrl+S / Auto-Save): bleibt im Editor.
   async quickSave() {
     if (!this.editMode || !this.currentPage || this.editSaving) return;
+    // Phase 4b1: ohne Edit-Recht kein Auto-Save (Defense; startEdit blockt
+    // ohnehin den Eintritt — aber Race mit Role-Refresh waehrend Edit-Session).
+    if (!this.canEdit()) return;
     const el = this._getEditEl();
     if (!el) return;
     const newHtml = stripLektoratMarks(el.innerHTML);

@@ -48,6 +48,13 @@ const aiProviderState = () => ({
 const navigationState = () => ({
   books: [],
   selectedBookId: '',
+  // Per-Buch ACL-Rolle aus /books/:id/access. `currentBookRole` ist die Rolle
+  // fuer selectedBookId (Snapshot fuer $watch + Getter `canEdit`/`canReview`).
+  // null = nicht ermittelbar (kein Zugriff oder Endpoint-Fehler) → Frontend
+  // faellt auf Legacy-Verhalten zurueck (canEdit=true), bis Phase 4b alle
+  // Schreibpfade serverseitig enforced. `bookRoles` cached pro Buch.
+  bookRoles: {},
+  currentBookRole: null,
   pages: [],
   tree: [],
   _applyingHash: false,

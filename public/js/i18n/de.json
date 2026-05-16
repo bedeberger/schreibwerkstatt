@@ -1039,6 +1039,8 @@
   "editor.btn.pageEmpty":        "Seite ist leer",
   "editor.btn.edit":             "Bearbeiten",
   "editor.btn.editTitle":        "Text manuell bearbeiten",
+  "reader.print":                "Drucken",
+  "reader.printHint":            "Druck-/PDF-Ansicht (⌘P / Strg+P)",
   "editor.btn.focus":            "Fokus-Editor",
   "editor.btn.focusTitle":       "Ablenkungsfrei im Vollbild schreiben (Strg+Shift+E)",
   "editor.btn.exitCheck":        "Prüfmodus verlassen",

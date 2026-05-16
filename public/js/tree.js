@@ -192,11 +192,53 @@ export const treeMethods = {
       }
       this.showBookCard = true;
       this.setStatus(this.t('tree.booksFound', { n: this.books.length }), false, 4000);
+      if (this.selectedBookId) this._loadBookRole(this.selectedBookId);
       await this.loadPages();
     } catch (e) {
       console.error('[loadBooks]', e);
       this.setStatus(this.t('common.errorColon') + e.message);
     }
+  },
+
+  // Phase 4b/4b1: ACL-Rolle aus /books/:id/access laden + cachen. Getter
+  // `canEdit`/`canReview`/`isViewer` lesen ausschliesslich `currentBookRole`.
+  async _loadBookRole(bookId) {
+    const id = bookId ? String(bookId) : '';
+    if (!id) { this.currentBookRole = null; return; }
+    if (Object.prototype.hasOwnProperty.call(this.bookRoles, id)) {
+      if (String(this.selectedBookId) === id) this.currentBookRole = this.bookRoles[id];
+      return;
+    }
+    let role = null;
+    try {
+      const res = await fetch('/books/' + encodeURIComponent(id) + '/access', {
+        headers: { Accept: 'application/json' },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        role = data?.my_role || null;
+      }
+    } catch (e) {
+      // Netzwerk-Fehler → role bleibt null (Legacy-Fallback: canEdit=true)
+    }
+    this.bookRoles[id] = role;
+    if (String(this.selectedBookId) === id) this.currentBookRole = role;
+  },
+
+  // Edit-Recht (Page-HTML schreiben): editor + owner. lektor + viewer nein.
+  // null = unbekannt → Legacy-Fallback erlaubt Edit (4b enforced serverseitig
+  // ohnehin; Frontend-Check ist nur UX, kein Sicherheitsanker).
+  canEdit() {
+    const r = this.currentBookRole;
+    return r === null || r === 'editor' || r === 'owner';
+  },
+  // Review-Recht (Lektorat-Check, Page-Chat): lektor + editor + owner.
+  canReview() {
+    const r = this.currentBookRole;
+    return r === null || r === 'lektor' || r === 'editor' || r === 'owner';
+  },
+  isViewer() {
+    return this.currentBookRole === 'viewer';
   },
 
   async loadPages(opts = {}) {

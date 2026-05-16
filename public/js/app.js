@@ -720,6 +720,7 @@ document.addEventListener('alpine:init', () => {
         this.loadRecentFeatures();
         if (this.selectedBookId) this.loadRecentPages(this.selectedBookId);
         await this._applyHash();
+        if (this.selectedBookId) this._loadBookRole(this.selectedBookId);
         this._maybeOpenBookOverview();
         this._syncUrlNow();
         this._applyingHash = false;
@@ -737,6 +738,7 @@ document.addEventListener('alpine:init', () => {
           // also überspringen.
           if (String(newVal) === String(oldVal)) return;
           this._resetBookScopedState();
+          this._loadBookRole(newVal);
           await this.loadPages({ source: 'bookSwitch' });
           await this._reloadVisibleBookCards();
           this._maybeOpenBookOverview();

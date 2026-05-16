@@ -171,6 +171,18 @@ export const appViewMethods = {
     if (anyOpen) return;
     this.showBookOverviewCard = true;
   },
+  // Phase 4b1: Browser-Print-Dialog. Druckbild kommt aus public/css/print.css.
+  // Wenn Editor in editMode ist, vorher cancelEdit (Findings-Marks/Toolbar
+  // sollen nicht im Druck landen) — gilt nur wenn nichts dirty, sonst respektiert
+  // cancelEdit den Confirm-Dialog.
+  readerPrint() {
+    if (this.editMode && !this.editDirty) {
+      this.cancelEdit();
+      this.$nextTick(() => window.print());
+      return;
+    }
+    window.print();
+  },
   toggleStilCard() {
     if (this.showStilCard) { this.showStilCard = false; return; }
     this._closeOtherMainCards('stil');
