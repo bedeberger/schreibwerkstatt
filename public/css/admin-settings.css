@@ -1,0 +1,78 @@
+/* Phase 4c (BookStack-Exit): AdminSettingsCard. */
+
+.card--admin-settings {
+  --card-accent: var(--card-accent-admin-settings, var(--color-accent));
+}
+
+.admin-settings-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: var(--space-md);
+}
+
+.admin-settings-tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: var(--space-sm) var(--space-md);
+  color: var(--color-muted);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.admin-settings-tab.is-active {
+  color: var(--color-text);
+  border-bottom-color: var(--card-accent);
+  font-weight: 600;
+}
+
+.admin-settings-section {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.admin-settings-section label {
+  display: grid;
+  gap: var(--space-xs);
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+}
+
+.admin-settings-section label.checkbox-row {
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+  justify-content: start;
+  align-items: center;
+}
+
+.admin-settings-actions {
+  margin-top: var(--space-sm);
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.admin-settings-test-result {
+  margin-top: var(--space-md);
+  padding: var(--space-sm);
+  border-radius: var(--radius-md);
+  background: var(--color-tag-bg);
+  font-size: var(--font-size-sm);
+}
+
+.success-msg {
+  padding: var(--space-sm);
+  background: var(--color-ok-bg);
+  color: var(--color-ok-text);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-md);
+}
+
+@media (max-width: 720px) {
+  .admin-settings-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+}

@@ -201,6 +201,11 @@ export const appViewMethods = {
     this._closeOtherMainCards('adminUsers');
     this.showAdminUsersCard = true;
   },
+  toggleAdminSettingsCard() {
+    if (this.showAdminSettingsCard) { this.showAdminSettingsCard = false; return; }
+    this._closeOtherMainCards('adminSettings');
+    this.showAdminSettingsCard = true;
+  },
   toggleFinetuneExportCard() {
     if (this.showFinetuneExportCard) { this.showFinetuneExportCard = false; return; }
     this._closeOtherMainCards('finetuneExport');

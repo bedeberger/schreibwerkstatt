@@ -109,7 +109,12 @@ label {
 }
 
 input[type=text],
+input[type=email],
 input[type=password],
+input[type=url],
+input[type=search],
+input[type=tel],
+input[type=number],
 select {
   width: 100%;
   padding: var(--size-default-padding-y) 10px;
@@ -122,7 +127,12 @@ select {
 /* iOS: font-size >= 16px verhindert automatisches Zoom-in beim Fokus */
 @media (max-width: 768px) {
   input[type=text],
+  input[type=email],
   input[type=password],
+  input[type=url],
+  input[type=search],
+  input[type=tel],
+  input[type=number],
   select {
     font-size: 16px;
   }

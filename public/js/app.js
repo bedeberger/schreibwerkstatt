@@ -33,6 +33,7 @@ import { registerKontinuitaetCard } from './cards/kontinuitaet-card.js';
 import { registerBookSettingsCard } from './cards/book-settings-card.js';
 import { registerUserSettingsCard } from './cards/user-settings-card.js';
 import { registerAdminUsersCard } from './cards/admin-users-card.js';
+import { registerAdminSettingsCard } from './cards/admin-settings-card.js';
 import { registerFinetuneExportCard } from './cards/finetune-export-card.js';
 import { registerExportCard } from './cards/export-card.js';
 import { registerPdfExportCard } from './cards/pdf-export-card.js';
@@ -210,6 +211,7 @@ document.addEventListener('alpine:init', () => {
   registerBookSettingsCard();
   registerUserSettingsCard();
   registerAdminUsersCard();
+  registerAdminSettingsCard();
   registerFinetuneExportCard();
   registerExportCard();
   registerPdfExportCard();

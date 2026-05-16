@@ -1,0 +1,179 @@
+<!-- Admin-Settings (Runtime-Configs) -->
+<!--
+  Alpine.data-Sub-Komponente — siehe public/js/cards/admin-settings-card.js.
+  `showAdminSettingsCard` + `toggleAdminSettingsCard` im Root. Nur sichtbar
+  bei $app.currentUser.role === 'admin'; Frontend-Guard zusaetzlich zum
+  Server-side requireAdmin (lib/admin-mw.js).
+-->
+<div class="card card--admin-settings" x-data="adminSettingsCard" x-show="$app.showAdminSettingsCard" x-cloak>
+  <div class="card-header">
+    <span class="card-title" x-text="$app.t('admin.settings.title')"></span>
+    <div class="card-actions">
+      <button type="button" @click="adminSettingsLoad()" :disabled="adminSettingsLoading || adminSettingsSaving" x-text="$app.t('common.refresh')"></button>
+      <button type="button" @click="adminSettingsSave()" :disabled="adminSettingsLoading || adminSettingsSaving">
+        <span x-show="adminSettingsSaving" class="spinner"></span>
+        <span x-text="adminSettingsSaving ? $app.t('common.saving') : $app.t('common.save')"></span>
+      </button>
+    </div>
+  </div>
+
+  <div x-show="adminSettingsLoading" class="muted-msg" x-text="$app.t('common.loading')"></div>
+  <div x-show="adminSettingsError" class="error-msg" x-text="adminSettingsError"></div>
+  <div x-show="adminSettingsSaved" class="success-msg">
+    <span x-text="$app.t('admin.settings.saved', { count: adminSettingsSavedCount })"></span>
+  </div>
+
+  <div x-show="!adminSettingsLoading && Object.keys(adminSettingsMap).length">
+    <!-- Tab-Leiste -->
+    <nav class="admin-settings-tabs" role="tablist">
+      <template x-for="t in ['auth','provider','model','backend','jobs','cron','pdfa','advanced']" :key="t">
+        <button type="button" role="tab"
+                :class="['admin-settings-tab', adminSettingsTab === t ? 'is-active' : '']"
+                @click="adminSettingsSwitchTab(t)"
+                x-text="$app.t('admin.settings.tab.' + t)"></button>
+      </template>
+    </nav>
+
+    <!-- Auth-Tab -->
+    <section x-show="adminSettingsTab === 'auth'" class="admin-settings-section">
+      <label>app.public_url
+        <input type="url" x-model="adminSettingsForm['app.public_url']" placeholder="https://app.example.com">
+      </label>
+      <label>auth.google.client_id
+        <input type="text" x-model="adminSettingsForm['auth.google.client_id']" :placeholder="$app.t('admin.settings.secret.masked')">
+        <small x-show="adminSettingsMap['auth.google.client_id']?.masked" class="muted-msg muted-msg--sm" x-text="adminSettingsMap['auth.google.client_id'].masked"></small>
+      </label>
+      <label>auth.google.client_secret
+        <input type="password" x-model="adminSettingsForm['auth.google.client_secret']" :placeholder="$app.t('admin.settings.secret.masked')">
+        <small x-show="adminSettingsMap['auth.google.client_secret']?.masked" class="muted-msg muted-msg--sm" x-text="adminSettingsMap['auth.google.client_secret'].masked"></small>
+      </label>
+      <label>auth.allowed_emails (CSV)
+        <input type="text" x-model="adminSettingsForm['auth.allowed_emails']" placeholder="alice@x.com, bob@x.com">
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" :checked="adminSettingsForm['auth.allow_open_signup'] === true || adminSettingsForm['auth.allow_open_signup'] === 'true'"
+               @change="adminSettingsForm['auth.allow_open_signup'] = $event.target.checked">
+        <span>auth.allow_open_signup</span>
+      </label>
+      <div class="admin-settings-actions">
+        <button type="button" @click="adminSettingsTest('oauth')" x-text="$app.t('admin.settings.test.oauth')"></button>
+      </div>
+    </section>
+
+    <!-- Provider-Tab -->
+    <section x-show="adminSettingsTab === 'provider'" class="admin-settings-section">
+      <label>ai.provider
+        <select x-model="adminSettingsForm['ai.provider']">
+          <option value="claude">Claude</option>
+          <option value="ollama">Ollama</option>
+          <option value="llama">Llama</option>
+        </select>
+      </label>
+      <div x-show="adminSettingsForm['ai.provider'] === 'claude'">
+        <label>ai.claude.api_key
+          <input type="password" x-model="adminSettingsForm['ai.claude.api_key']" :placeholder="$app.t('admin.settings.secret.masked')">
+          <small x-show="adminSettingsMap['ai.claude.api_key']?.masked" class="muted-msg muted-msg--sm" x-text="adminSettingsMap['ai.claude.api_key'].masked"></small>
+        </label>
+      </div>
+      <div x-show="adminSettingsForm['ai.provider'] === 'ollama'">
+        <label>ai.ollama.host
+          <input type="url" x-model="adminSettingsForm['ai.ollama.host']" placeholder="http://localhost:11434">
+        </label>
+        <label>ai.ollama.model
+          <input type="text" x-model="adminSettingsForm['ai.ollama.model']">
+        </label>
+        <label>ai.ollama.temperature
+          <input type="number" step="0.1" min="0" max="2" x-model.number="adminSettingsForm['ai.ollama.temperature']">
+        </label>
+      </div>
+      <div x-show="adminSettingsForm['ai.provider'] === 'llama'">
+        <label>ai.llama.host <input type="url" x-model="adminSettingsForm['ai.llama.host']"></label>
+        <label>ai.llama.model <input type="text" x-model="adminSettingsForm['ai.llama.model']"></label>
+        <label>ai.llama.temperature <input type="number" step="0.1" min="0" max="2" x-model.number="adminSettingsForm['ai.llama.temperature']"></label>
+      </div>
+      <div class="admin-settings-actions">
+        <button type="button" @click="adminSettingsTest('provider')" x-text="$app.t('admin.settings.test.connection')"></button>
+      </div>
+    </section>
+
+    <!-- Modell-Tab -->
+    <section x-show="adminSettingsTab === 'model'" class="admin-settings-section">
+      <label>ai.claude.model <input type="text" x-model="adminSettingsForm['ai.claude.model']"></label>
+      <label>ai.claude.max_tokens_out <input type="number" min="1024" x-model.number="adminSettingsForm['ai.claude.max_tokens_out']"></label>
+      <label>ai.claude.context_window <input type="number" min="8000" x-model.number="adminSettingsForm['ai.claude.context_window']"></label>
+      <label>ai.chars_per_token <input type="number" step="0.1" min="1" max="10" x-model.number="adminSettingsForm['ai.chars_per_token']"></label>
+    </section>
+
+    <!-- Storage-Backend-Tab -->
+    <section x-show="adminSettingsTab === 'backend'" class="admin-settings-section">
+      <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.backend.switchWarning')"></p>
+      <label>app.backend
+        <select x-model="adminSettingsForm['app.backend']">
+          <option value="bookstack">bookstack</option>
+          <option value="localdb">localdb</option>
+        </select>
+      </label>
+      <div x-show="adminSettingsForm['app.backend'] === 'bookstack'">
+        <label>app.bookstack.base_url <input type="url" x-model="adminSettingsForm['app.bookstack.base_url']"></label>
+        <label>app.bookstack.token_id
+          <input type="password" x-model="adminSettingsForm['app.bookstack.token_id']" :placeholder="$app.t('admin.settings.secret.masked')">
+        </label>
+        <label>app.bookstack.token_secret
+          <input type="password" x-model="adminSettingsForm['app.bookstack.token_secret']" :placeholder="$app.t('admin.settings.secret.masked')">
+        </label>
+      </div>
+    </section>
+
+    <!-- Jobs-Tab -->
+    <section x-show="adminSettingsTab === 'jobs'" class="admin-settings-section">
+      <label>jobs.max_concurrent <input type="number" min="1" max="8" x-model.number="adminSettingsForm['jobs.max_concurrent']"></label>
+      <label>jobs.book_chat.mode
+        <select x-model="adminSettingsForm['jobs.book_chat.mode']">
+          <option value="auto">auto</option>
+          <option value="agent">agent</option>
+          <option value="classic">classic</option>
+        </select>
+      </label>
+      <label>jobs.book_chat.max_tool_iter <input type="number" min="1" max="50" x-model.number="adminSettingsForm['jobs.book_chat.max_tool_iter']"></label>
+      <label>jobs.book_chat.token_budget <input type="number" min="0" x-model.number="adminSettingsForm['jobs.book_chat.token_budget']"></label>
+    </section>
+
+    <!-- Cron-Tab -->
+    <section x-show="adminSettingsTab === 'cron'" class="admin-settings-section">
+      <label>cron.timezone <input type="text" x-model="adminSettingsForm['cron.timezone']"></label>
+      <label>cron.stale_days <input type="number" min="1" max="365" x-model.number="adminSettingsForm['cron.stale_days']"></label>
+    </section>
+
+    <!-- PDF/A-Tab -->
+    <section x-show="adminSettingsTab === 'pdfa'" class="admin-settings-section">
+      <label>pdfa.flavour
+        <select x-model="adminSettingsForm['pdfa.flavour']">
+          <option value="2b">2b</option>
+          <option value="3b">3b</option>
+        </select>
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" :checked="adminSettingsForm['pdfa.disabled'] === true || adminSettingsForm['pdfa.disabled'] === 'true'"
+               @change="adminSettingsForm['pdfa.disabled'] = $event.target.checked">
+        <span>pdfa.disabled</span>
+      </label>
+    </section>
+
+    <!-- Erweitert-Tab -->
+    <section x-show="adminSettingsTab === 'advanced'" class="admin-settings-section">
+      <p class="muted-msg" x-text="$app.t('admin.settings.advanced.disclaimer')"></p>
+      <label>ai.claude.retry_max <input type="number" min="0" max="10" x-model.number="adminSettingsForm['ai.claude.retry_max']"></label>
+      <label>ai.claude.timeout_ms <input type="number" min="1000" x-model.number="adminSettingsForm['ai.claude.timeout_ms']"></label>
+      <label>ai.claude.phase1_concurrency <input type="number" min="1" max="16" x-model.number="adminSettingsForm['ai.claude.phase1_concurrency']"></label>
+      <label>ai.lektorat_batch_concurrency <input type="number" min="1" max="8" x-model.number="adminSettingsForm['ai.lektorat_batch_concurrency']"></label>
+      <label>ai.chat_temperature <input type="number" step="0.1" min="0" max="2" x-model.number="adminSettingsForm['ai.chat_temperature']"></label>
+    </section>
+
+    <!-- Test-Result-Anzeige -->
+    <div class="admin-settings-test-result" x-show="adminSettingsTestResult">
+      <strong x-text="$app.t('admin.settings.test.' + (adminSettingsTestResult?.ok ? 'ok' : 'fail'))"></strong>
+      <span x-show="adminSettingsTestResult?.latency_ms" x-text="' · ' + adminSettingsTestResult?.latency_ms + ' ms'"></span>
+      <span x-show="adminSettingsTestResult?.error" x-text="' · ' + adminSettingsTestResult?.error"></span>
+    </div>
+  </div>
+</div>

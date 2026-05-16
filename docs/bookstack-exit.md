@@ -63,9 +63,8 @@ Bewusst out-of-scope (User-Wunsch): Attachments (werden nicht genutzt → kein M
 | 4b | Book-ACL + Sharing (owner/editor/lektor/viewer) | ja | Buchliste filtert auf Shares; Rollen-Matrix | — |
 | 4b1 | Lese-Modus (Print-CSS + readOnly) | ja | Druckansicht + readOnly für viewer | 4b |
 | 4b2 | Export-Konsolidierung (Eigenbau alle Scopes + Formate) | ja | Export-Karte für Buch/Kapitel/Seite; kein BookStack-Pass-Through mehr | 4b |
-| 4c | Admin-Settings (alle Runtime-Configs aus `.env` → DB) | ja | Admin-UI für Provider/Modell/Auth/Cron/Tuning + Backend-Auswahl | — |
-| 4c1 | First-Run-Setup-Wizard (`/setup`) | ja | Admin loggt sich via `ADMIN_PASSWORD` ein und konfiguriert OAuth/KI/Backend/SMTP Schritt für Schritt; auch später wieder aufrufbar | 4c |
-| 4c2 | SMTP-Mailer (Gmail/Workspace via OAuth2 oder App-Passwort) | ja | Admin konfiguriert Versand-Konto; Invite-/Notify-Mails gehen raus statt Token-Anzeige in UI | 4c |
+| 4c1 | First-Run-Setup-Wizard (`/setup`) | ja | Admin loggt sich via `ADMIN_PASSWORD` ein und konfiguriert OAuth/KI/Backend/SMTP Schritt für Schritt; auch später wieder aufrufbar | — |
+| 4c2 | SMTP-Mailer (Gmail/Workspace via OAuth2 oder App-Passwort) | ja | Admin konfiguriert Versand-Konto; Invite-/Notify-Mails gehen raus statt Token-Anzeige in UI | — |
 | 4d | Token-Budget + Cost-Tracking (Admin) | ja (additiv) | Admin-Karte Usage; pro-User-Monats-Budget hard/soft; 429 bei Hard-Cap | — |
 | 6 | Tags/Kategorien | ja | Filter-UI (beide Backends) | — |
 | 7 | Volltextsuche (FTS5) | ja | App-eigene Suche (beide Backends) | 1, 2, 4b |
@@ -74,7 +73,7 @@ Bewusst out-of-scope (User-Wunsch): Attachments (werden nicht genutzt → kein M
 | 10 | Schema-Squash | ja | keiner | 9 |
 | 11 | Per-User-AI-Provider-Override | ja (additiv) | Admin weist pro User claude/ollama/llama zu; User folgt sonst globalem Default | 4c, 4d |
 
-**Start-Reihenfolge:** 0b → 4c → 4c1 → 4c2 → 4a2 → 4d → 4b → 4b1 → 4b2 → 2 → 6 → 1 → 3 → 7 → 8 → 9 → 10.
+**Start-Reihenfolge:** 0b → 4c1 → 4c2 → 4a2 → 4d → 4b → 4b1 → 4b2 → 2 → 6 → 1 → 3 → 7 → 8 → 9 → 10.
 10 (Squash) zuletzt — Squash vorher wäre Wegwerfarbeit, weil bis dahin viele Migrationen dazukommen. Phase 11 (Per-User-AI-Provider-Override) ist additiv und kann nach 4d eingeschoben werden, sobald die Hauptkette steht.
 
 **Erledigt:**
@@ -82,6 +81,7 @@ Bewusst out-of-scope (User-Wunsch): Attachments (werden nicht genutzt → kein M
 - Phase 0d (TTL-Cache-Cleanup, [lib/cache-cleanup.js](../lib/cache-cleanup.js) im 23:00-Cron-Tick, manuell via `npm run cache:cleanup [-- --vacuum]`).
 - Phase 0 (Schema-Skelett, Migration 105 + 106 in [db/migrations.js](../db/migrations.js): additive Phase-0-Spalten auf pages/chapters/books + AUTOINCREMENT-Recreate mit `sqlite_sequence`-Wasserzeichen `≥ 1_000_000`). Dauerhafte Invariante steht oben in „Schema-Invariante (aus Phase 0)". Tests: `tests/unit/db-pragmas.test.js`, `tests/unit/cache-cleanup.test.js`, `tests/unit/schema-phase0.test.js`.
 - Phase 4a (App-User-Verwaltung): Migration 107 (`app_users` + `user_invites` mit Partial-UNIQUE + `user_sessions_audit` + `users.email`-FK), [db/app-users.js](../db/app-users.js) Helper-API, ENV-getriebener Admin-Bootstrap, OIDC-Lookup mit Status-Gate + Invite-Accept + ALLOW_OPEN_SIGNUP, `POST /auth/admin-login` mit `timingSafeEqual` + Rate-Limit ([lib/admin-login-ratelimit.js](../lib/admin-login-ratelimit.js)), `GET /login`-Landing-Page mit Google-Button + Admin-Form, `/admin/users`-Routen (Liste, Invite, Update, Soft-Delete, Audit) hinter [lib/admin-mw.js#requireAdmin](../lib/admin-mw.js), `POST /me/invite` mit `can_invite_users`-Gate, Frontend-Karte `AdminUsersCard` ([public/js/cards/admin-users-card.js](../public/js/cards/admin-users-card.js)) + Avatar-Menu-Link für Admins. Tests: `tests/unit/app-users.test.js`, `tests/unit/admin-login-ratelimit.test.js`, `tests/unit/admin-users-routes.test.js`, `tests/unit/login-page.test.js`.
+- Phase 4c (Admin-Settings): Migration 108 (`app_settings` + `app_settings_audit`), [lib/app-settings.js](../lib/app-settings.js) als SSoT-Helper mit DEFAULTS, `bootstrapFromEnv()` für initiale ENV→DB-Spiegelung (server.js-Startup), AES-Crypto via [lib/crypto.js](../lib/crypto.js) für `ENCRYPTED_KEYS`-Set (api_key, secrets, tokens), Sentinel `__unchanged__` für Re-PUTs ohne Klartext, `changed`-EventEmitter für Hot-Reload (z.B. OIDC-Client-Invalidate in [routes/auth.js](../routes/auth.js) bei `app.public_url`/`auth.google.*`-Wechsel). `/admin/settings`-Routen ([routes/admin-settings.js](../routes/admin-settings.js)) mit GET/PUT/DELETE + Test-Probes (`test-provider`, `test-oauth`). Frontend `AdminSettingsCard` ([public/js/cards/admin-settings-card.js](../public/js/cards/admin-settings-card.js)) mit 8 Tabs (auth, provider, model, backend, jobs, cron, pdfa, advanced) + Save-Diff (sendet nur dirty Keys). ENV-Reads in Konsumenten bleiben vorerst als Fallback — Strict-ENV-Kill verschiebt sich auf Folge-Refactor. Tests: `tests/unit/app-settings.test.js`, `tests/unit/admin-settings-routes.test.js`.
 - Phase 0b Backend (Backfill-Job in [routes/jobs/backfill.js](../routes/jobs/backfill.js), Upserts in [db/backfill.js](../db/backfill.js), Mock-BookStack `book_id]?=`-Filter-Fix, 5 Integration-Tests in [tests/integration/backfill.test.js](../tests/integration/backfill.test.js)). Frontend-Trigger-Punkte siehe Phase-0b-Block unten.
 4a/4c/4b zuerst, weil User-Identität, `app.backend`-Schalter und ACL die SSoT für alle folgenden Phasen sind. Lese-Modus (4b1, Print-CSS + readOnly) direkt nach 4b, weil viewer-Rolle erst dann existiert. Phase 7 (Suche) **vor** Phase 8, damit FTS schon steht, wenn Admin Backend wechselt — Index wird beim Bulk-Copy mitgefüllt.
 
@@ -637,143 +637,6 @@ Neue Keys: `export.scope.book`, `export.scope.chapter`, `export.scope.page`, `ex
 ### Aufwand
 
 3-4 Tage (Loader-Konsolidierung + 6 Builder-Module + Sync-Route-Refactor + Job-Scope + Frontend-Combobox + Test-Sweep). Doppelt so gross wie die ursprüngliche „nur-Scopes"-Variante, weil Pass-Through-Branch und drei BookStack-Renderer (PDF/HTML/TXT) durch Eigenbau ersetzt werden müssen.
-
----
-
-## Phase 4c — Admin-Settings (alle Runtime-Configs aus `.env` → DB)
-
-Ziel: `.env` schrumpft auf **reines Boot-/Infra-Layer**. Alles, was zur Laufzeit konfigurierbar sein soll (Auth-Provider, KI-Provider, Storage-Backend, Job-Tuning, Cron, PDF/A), wandert in `app_settings` und ist über die Admin-Konsole editierbar.
-
-### `.env`-Endzustand
-
-**Bleibt in `.env`** (nur Werte, die *vor* der DB lesbar sein müssen oder Crypto-Root sind):
-
-| Variable | Grund |
-|---|---|
-| `PORT` | Express bindet vor DB-Open. |
-| `DB_PATH` | Wir öffnen erst die DB damit. |
-| `SESSION_SECRET` | Express-Session-Middleware initialisiert vor DB-Read. |
-| `MASTER_KEY` | AES-256-GCM-Root, verschlüsselt selbst die DB-Settings (Henne/Ei — kann nicht in der DB liegen). Existiert bereits für BookStack-Tokens, [lib/crypto.js](../lib/crypto.js). |
-| `ADMIN_EMAIL` | Identität des Bootstrap-/Persistent-Admins. Wird beim Server-Start als `app_users`-Row angelegt mit `global_role='admin'`, `status='active'`. |
-| `ADMIN_PASSWORD` | Klartext-Passwort für `POST /auth/admin-login`. Wahrheit lebt in ENV — kein Hash in DB. Leer/unset → Passwort-Login-Pfad deaktiviert (nur OIDC). |
-| `TZ` | Process-Level (Node liest beim Start). |
-| `LOG_LEVEL` | Winston-Init vor DB-Open; späterer Override via `app.log_level` möglich, wirkt nach Restart. |
-| `LOCAL_DEV_MODE` | Dev-Bypass — bewusst nicht in DB (sonst Prod-Risiko via Migration-Copy). |
-| `LOCAL_DEV_SEED` | Dev-Seed-Schalter (Default `true` wenn `LOCAL_DEV_MODE=true`). Aus demselben Grund wie `LOCAL_DEV_MODE` nicht in DB — kein versehentliches Aktivieren via Settings-Copy. |
-| `VERAPDF_BIN` | Pfad zu System-Binary; Container-Konfiguration, keine User-Entscheidung. |
-
-Alles andere — **gelöscht aus `.env.example`** und aus DB gelesen.
-
-### Migration N+4c
-
-```sql
-CREATE TABLE app_settings (
-  key TEXT PRIMARY KEY,
-  value_json TEXT NOT NULL,
-  encrypted INTEGER NOT NULL DEFAULT 0,
-  updated_at TEXT DEFAULT (datetime('now')),
-  updated_by TEXT
-);
-```
-
-`encrypted=1` markiert Felder, deren `value_json` AES-GCM-encrypted ist (`enc:v1:`-Prefix). [lib/app-settings.js](../lib/app-settings.js) liest sie transparent.
-
-### Verwaltete Keys
-
-**Auth** (`auth.*`):
-- `auth.google.client_id`, `auth.google.client_secret` (encrypted).
-- `auth.allowed_emails` (CSV → Array beim Lesen).
-- `auth.allow_open_signup` (bool).
-- `auth.admin_email` (read-only Spiegel der ENV `ADMIN_EMAIL` für UI-Anzeige; Wahrheit bleibt ENV — Wizard schreibt diesen Key beim Abschluss zur Information, ändert aber nicht die ENV).
-
-**KI-Provider** (`ai.*`):
-- `ai.provider` → `'claude'|'ollama'|'llama'`.
-- `ai.claude.api_key` (encrypted), `ai.claude.model`, `ai.claude.max_tokens_out`, `ai.claude.context_window`, `ai.claude.retry_max`, `ai.claude.timeout_ms`, `ai.claude.phase1_concurrency`.
-- `ai.ollama.host`, `ai.ollama.model`, `ai.ollama.temperature`.
-- `ai.llama.host`, `ai.llama.model`, `ai.llama.temperature`.
-- `ai.chat_temperature` (Override für Seiten-/Buch-Chat bei Ollama/Llama).
-- `ai.chars_per_token` (Heuristik).
-- `ai.lektorat_batch_concurrency`.
-
-**Jobs / Buch-Chat** (`jobs.*`):
-- `jobs.max_concurrent`.
-- `jobs.book_chat.mode` → `'auto'|'agent'|'classic'`.
-- `jobs.book_chat.max_tool_iter`.
-- `jobs.book_chat.token_budget` (0 = vom Input-Budget ableiten).
-
-**Cron / Sync** (`cron.*`):
-- `cron.timezone`, `cron.stale_days`.
-
-**PDF/A** (`pdfa.*`):
-- `pdfa.flavour`, `pdfa.disabled`.
-
-**SMTP / Mailer** (`smtp.*`, siehe Phase 4c2):
-- `smtp.mode` → `'gmail-oauth'|'gmail-app-password'|'generic'|'disabled'`. Default `disabled` — kein Versand, Invite-Token bleibt in UI sichtbar (Pre-4c2-Verhalten).
-- `smtp.from_email` (Pflicht ausser bei `disabled`) — Absender-Adresse. Bei Gmail muss diese mit dem authentifizierten Konto übereinstimmen oder als „Send mail as"-Alias dort hinterlegt sein.
-- `smtp.from_name` (optional) — Anzeigename.
-- `smtp.reply_to` (optional).
-- **Gmail-OAuth2** (`mode='gmail-oauth'`): `smtp.gmail.client_id`, `smtp.gmail.client_secret` (encrypted), `smtp.gmail.refresh_token` (encrypted), `smtp.gmail.user` (Versand-Konto, meist = `from_email`).
-- **Gmail-App-Passwort** (`mode='gmail-app-password'`, Fallback wenn 2FA + App-Passwort statt OAuth): `smtp.gmail.user`, `smtp.gmail.app_password` (encrypted, 16-stellig ohne Spaces).
-- **Generic-SMTP** (`mode='generic'`, für Nicht-Google-Provider): `smtp.host`, `smtp.port` (Default 587), `smtp.secure` (bool, `true`=TLS-Direct/465, `false`=STARTTLS/587), `smtp.user`, `smtp.password` (encrypted).
-- `smtp.rate_limit_per_minute` (Default 30) — primitive Drossel, schützt gegen Gmail-Throttling.
-
-**Storage-Backend** (`app.*`):
-- `app.backend` → `'localdb'|'bookstack'`. **Default `localdb`** für Neu-Installationen.
-- `app.bookstack.base_url`, `app.bookstack.token_id` (encrypted), `app.bookstack.token_secret` (encrypted) — nur relevant bei `app.backend='bookstack'`.
-- `app.setup_completed` (bool, gesetzt durch Wizard 4c1).
-
-### Auflösungs-Reihenfolge
-
-Neues SSoT-Modul [lib/app-settings.js](../lib/app-settings.js) ersetzt direkte `process.env.*`-Reads in [lib/ai.js](../lib/ai.js), [routes/jobs/shared.js](../routes/jobs/shared.js), [routes/jobs/book-chat-*.js](../routes/jobs/), [routes/sync.js](../routes/sync.js), [lib/pdfa-validate.js](../lib/pdfa-validate.js), [routes/auth.js](../routes/auth.js).
-
-1. DB-Setting (`app_settings`).
-2. Hardcoded Default in [lib/app-settings.js](../lib/app-settings.js).
-
-**Kein ENV-Fallback** für migrierte Keys. ENV-Reads für diese Keys werden in den Modulen entfernt — `.env` ist für diese Keys tot. Wer Werte ändern will, nutzt Admin-UI oder direktes SQL-Update auf `app_settings`.
-
-**Reload-Verhalten**: `app-settings`-Modul cached pro Server-Boot in Memory. `PUT /admin/settings/:key` invalidiert Cache + emittiert In-Process-Event `app-settings:changed`. Module mit teurem Re-Init (KI-Client-Instanzen, OAuth-Strategy, Cron-Jobs) reagieren auf das Event und bauen ihre Singletons neu. Provider-/OAuth-Wechsel ohne Server-Restart.
-
-### Backend-Switch-Verhalten
-
-- `PUT /admin/settings/app.backend` ändert den Key. **Inhalte werden nicht automatisch migriert** — Admin muss zuerst Phase-8-Bulk-Copy-Job ausführen.
-- Frontend-Warn-Modal beim Wechsel: „Pages aus dem aktuellen Backend werden nicht mehr sichtbar sein, bis Sie eine Migration durchführen."
-- `content-store`-Modul hört auf `app-settings:changed` und liest Backend-Pointer neu. Aktive Jobs im alten Backend laufen zu Ende.
-
-### Admin-Routen
-
-- `GET /admin/settings` → alle Keys, Secrets maskiert (letzte 4 Zeichen sichtbar).
-- `PUT /admin/settings/:key` → Single-Key-Update. Encrypted-Felder akzeptieren Sentinel `"__unchanged__"` für „nicht angefasst".
-- `POST /admin/settings/test-provider` → 1-Token-Probecall gegen aktuellen KI-Provider, gibt Latenz + Erfolg.
-- `POST /admin/settings/test-backend` → bei `bookstack` `GET /api/books?count=1`, bei `localdb` `SELECT 1`. Latenz + Erfolg.
-- `POST /admin/settings/test-oauth` → validiert Google-Client-ID via Discovery-Doc-Fetch (Format-Check, kein voller OAuth-Roundtrip).
-
-Alle Admin-Routen guarded via `global_role='admin'` aus Phase 4a.
-
-### Frontend — Karte `AdminSettingsCard`
-
-Zweite Admin-Karte neben `AdminUsersCard`. Tabs:
-
-1. **Auth**: Google-Client-ID/-Secret, Allowed-Emails, Open-Signup-Toggle.
-2. **Provider**: Auswahl Claude/Ollama/Llama + Per-Provider-Inputs (API-Key, Host, Modell, Temperature).
-3. **Modell**: Modell-ID, `max_tokens_out`, `context_window`, `chars_per_token`.
-4. **Storage-Backend**: Combobox `localdb|bookstack`, bei `bookstack` zusätzliche Felder (Base-URL, Token-ID, Token-Secret). Test-Backend-Button. Warnhinweis beim Wechsel.
-5. **SMTP / Mailer**: Mode-Combobox (`disabled|gmail-oauth|gmail-app-password|generic`), Mode-abhängige Felder, From-Email/Name, Reply-To, Rate-Limit. „Test-Mail senden"-Button (an `from_email` selbst). Details siehe Phase 4c2.
-6. **Jobs**: `max_concurrent`, Book-Chat-Modus + Iter-Limit + Token-Budget.
-7. **Cron**: Timezone, Stale-Days.
-8. **PDF/A**: Flavour, Disabled-Toggle.
-9. **Erweitert** (Disclosure, default eingeklappt): `claude.retry_max`, `claude.timeout_ms`, `claude.phase1_concurrency`, `lektorat_batch_concurrency`, `chat_temperature`. Hinweis-Box: „Werte ohne starken Grund unverändert lassen — Defaults sind aus Praxis kalibriert."
-
-„Verbindung testen"-Buttons pro Tab (Provider, Backend, OAuth, SMTP). Save-Button persistent unten, Dirty-Indikator pro Feld. Secret-Inputs mit Masking + Sentinel-Pattern für „unchanged".
-
-### i18n
-
-`admin.settings.title`, `admin.settings.tab.{auth,provider,model,backend,jobs,cron,pdfa,advanced}`, `admin.settings.backend.{localdb,bookstack,switchWarning}`, `admin.settings.test.{connection,backend,oauth}`, `admin.settings.test.{ok,fail}`, `admin.settings.secret.masked`, `admin.settings.secret.unchanged`, `admin.settings.advanced.disclaimer`.
-
-### Sicherheit
-
-- API-Keys + Tokens nie im Klartext über die Wire (auch nicht Admin → Frontend). Lesen → Masking; Schreiben → Sentinel `"__unchanged__"` für nicht angefasste Felder.
-- Alle `encrypted=1`-Spalten via [lib/crypto.js](../lib/crypto.js) (AES-256-GCM mit `MASTER_KEY`).
-- Audit-Log: `app_settings.updated_by` + `updated_at` gesetzt; optional Migration für `app_settings_audit`-Tabelle mit Vor-/Nachwert-Hashes (nicht Klartext-Secrets).
 
 ---
 
@@ -1617,7 +1480,6 @@ Ollama/Llama serialisieren heute global über einen Mutex (CLAUDE.md „KI-Provi
 | 4b | 4-5 Tage | mittel (Rollen-Matrix + Apply-Routen + minRole-Filter) |
 | 4b1 | 0.5-1 Tag | niedrig (Print-CSS + readOnly-Guard, keine neuen Tabellen) |
 | 4b2 | 3-4 Tage | mittel (6 Format-Builder, Pass-Through-Cut, Sync- + Job-Route auf einen Loader) |
-| 4c | 4-6 Tage | mittel (Backend-Switch + Hot-Reload + Test-Probes + ENV-Migration in vielen Modulen) |
 | 4c1 | 1-2 Tage | niedrig (eigenständige Wizard-Page, kleines Form-State-Modell) |
 | 5 | — | ENTFÄLLT |
 | 6 | 2-3 Tage | niedrig |
