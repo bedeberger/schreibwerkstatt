@@ -15,6 +15,7 @@ const contentStore = require('../../lib/content-store');
 const { executeTool } = require('./book-chat-tools');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
+const appSettings = require('../../lib/app-settings');
 
 const chatRouter = express.Router();
 
@@ -384,6 +385,23 @@ function _handleChatPost(req, res, { jobType, sessionSelect, labelFn, runFn }) {
   if (!session) return res.status(404).json({ error_code: 'SESSION_NOT_FOUND' });
   if (session.book_id) setContext({ book: session.book_id });
 
+  // ACL-Guard. Page-Chat: lektor+. Buch-Chat: editor+, ausser
+  // book_settings.allow_lektor_book_chat=1 setzt es auf lektor+.
+  if (session.book_id) {
+    const { requireBookAccess, sendACLError, ACLError } = require('../../lib/acl');
+    const { getBookSettings } = require('../../db/schema');
+    let minRole = 'lektor';
+    if (jobType === 'book-chat') {
+      const bs = getBookSettings(session.book_id);
+      minRole = bs?.allow_lektor_book_chat ? 'lektor' : 'editor';
+    }
+    try { requireBookAccess(req, session.book_id, minRole); }
+    catch (e) {
+      if (e instanceof ACLError) { sendACLError(res, e); return; }
+      throw e;
+    }
+  }
+
   const now = new Date().toISOString();
   const userMsgResult = db.prepare(
     `INSERT INTO chat_messages (session_id, role, content, created_at, client_msg_id) VALUES (?, 'user', ?, ?, ?)`
@@ -403,19 +421,25 @@ function _handleChatPost(req, res, { jobType, sessionSelect, labelFn, runFn }) {
 // Ersetzt runBookChatJob bei API_PROVIDER=claude (und BOOK_CHAT_MODE != 'classic').
 // Der Agent ruft Tools aus routes/jobs/book-chat-tools.js auf, um Fragen
 // über den gesamten Buchindex zu beantworten, statt alle Seiten vorab zu laden.
-const BOOK_CHAT_MAX_TOOL_ITER = parseInt(process.env.BOOK_CHAT_MAX_TOOL_ITER, 10) || 6;
+function _bookChatMaxToolIter() {
+  return parseInt(appSettings.get('jobs.book_chat.max_tool_iter'), 10) || 6;
+}
 // Per-Iteration-Limit für Input-Tokens (Context-Window-Schutz, nicht kumulativ).
 // Default leitet sich aus INPUT_BUDGET_TOKENS (= MODEL_CONTEXT − MODEL_TOKEN − Puffer) ab.
 // Prompt-Caching macht wiederholte Tokens ohnehin billig, deshalb kein Summen-Budget.
-const BOOK_CHAT_TOKEN_BUDGET   = parseInt(process.env.BOOK_CHAT_TOKEN_BUDGET, 10) || INPUT_BUDGET_TOKENS;
+function _bookChatTokenBudget() {
+  return parseInt(appSettings.get('jobs.book_chat.token_budget'), 10) || INPUT_BUDGET_TOKENS;
+}
 // Per-Tool-Result-Cap: damit eine einzelne Tool-Antwort nicht allein das Budget sprengt.
 // Annahme: bis zu 6 Iterationen × ~3 Tool-Calls × Sicherheitsfaktor 2 ⇒ /36.
 // Min 4000 Zeichen, damit Tool-Results bei kleinen Kontextfenstern noch brauchbar sind.
-const TOOL_RESULT_CAP_CHARS    = Math.max(4000, Math.floor(INPUT_BUDGET_CHARS / (BOOK_CHAT_MAX_TOOL_ITER * 6)));
+function _toolResultCapChars(maxIter) {
+  return Math.max(4000, Math.floor(INPUT_BUDGET_CHARS / (maxIter * 6)));
+}
 
 function _bookChatUseAgent() {
-  const provider = process.env.API_PROVIDER || 'claude';
-  const mode = (process.env.BOOK_CHAT_MODE || 'auto').toLowerCase();
+  const provider = appSettings.get('ai.provider') || 'claude';
+  const mode = String(appSettings.get('jobs.book_chat.mode') || 'auto').toLowerCase();
   if (mode === 'classic') return false;
   if (mode === 'agent')   return provider === 'claude';
   return provider === 'claude'; // 'auto'
@@ -438,8 +462,11 @@ async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEma
     const figuren = getFiguren(session.book_id, userEmail);
     const review  = getLatestReview(session.book_id, userEmail);
     const { SYSTEM_BOOK_CHAT: bookChatSys } = await getBookPrompts(session.book_id, userEmail);
+    const maxToolIter = _bookChatMaxToolIter();
+    const tokenBudget = _bookChatTokenBudget();
+    const toolResultCap = _toolResultCapChars(maxToolIter);
     const systemPrompt = buildBookChatAgentSystemPrompt(
-      session.book_name || '', figuren, review, bookChatSys, BOOK_CHAT_MAX_TOOL_ITER
+      session.book_name || '', figuren, review, bookChatSys, maxToolIter
     );
 
     const jobSignal = jobAbortControllers.get(jobId)?.signal;
@@ -461,11 +488,11 @@ async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEma
     const toolLog = []; // für context_info
     let iter = 0;
 
-    for (iter = 0; iter < BOOK_CHAT_MAX_TOOL_ITER; iter++) {
+    for (iter = 0; iter < maxToolIter; iter++) {
       if (jobSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
       updateJob(jobId, {
         statusText: 'job.phase.agentTools',
-        statusParams: { current: iter + 1, total: BOOK_CHAT_MAX_TOOL_ITER },
+        statusParams: { current: iter + 1, total: maxToolIter },
         progress: Math.min(90, 10 + iter * 12),
       });
 
@@ -495,8 +522,8 @@ async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEma
 
       if (result.truncated) throw i18nError('job.error.aiTruncated', { max: MAX_TOKENS_OUT, tokIn: totalTokIn, tokOut: totalTokOut, total: totalTokIn + totalTokOut });
 
-      if (result.tokensIn > BOOK_CHAT_TOKEN_BUDGET) {
-        logger.warn(`Context-Budget überschritten (${result.tokensIn}/${BOOK_CHAT_TOKEN_BUDGET} Input-Tokens) – Loop abgebrochen.`);
+      if (result.tokensIn > tokenBudget) {
+        logger.warn(`Context-Budget überschritten (${result.tokensIn}/${tokenBudget} Input-Tokens) – Loop abgebrochen.`);
         finalText = result.text || JSON.stringify({ antwort: '__i18n:chat.errors.contextExceeded__' });
         break;
       }
@@ -527,7 +554,7 @@ async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEma
         const durationMs = Date.now() - t0;
         const content = JSON.stringify(out);
         const resultBytes = content.length;
-        const truncated = resultBytes > TOOL_RESULT_CAP_CHARS;
+        const truncated = resultBytes > toolResultCap;
         toolLog.push({
           name: tu.name,
           input: tu.input,
@@ -546,7 +573,7 @@ async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEma
         toolResults.push({
           type: 'tool_result',
           tool_use_id: tu.id,
-          content: truncated ? content.slice(0, TOOL_RESULT_CAP_CHARS) + '…' : content,
+          content: truncated ? content.slice(0, toolResultCap) + '…' : content,
           ...(out && out.error ? { is_error: true } : {}),
         });
       }
@@ -554,7 +581,7 @@ async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEma
     }
 
     if (finalText == null) {
-      logger.warn(`Max-Iterationen (${BOOK_CHAT_MAX_TOOL_ITER}) erreicht ohne finale Antwort.`);
+      logger.warn(`Max-Iterationen (${maxToolIter}) erreicht ohne finale Antwort.`);
       finalText = JSON.stringify({ antwort: '__i18n:chat.errors.maxIterReached__' });
     }
 
@@ -574,7 +601,7 @@ async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEma
     const asstMsgResult = db.prepare(`
       INSERT INTO chat_messages (session_id, role, content, tokens_in, tokens_out, cache_read_in, cache_creation_in, provider, model, tps, context_info, created_at)
       VALUES (?, 'assistant', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(session.id, antwort, totalTokIn, totalTokOut, totalCacheRead, totalCacheCreation, 'claude', (process.env.MODEL_NAME || 'claude-sonnet-4-6'), tpsVal, JSON.stringify(contextInfo), assistantNow);
+    `).run(session.id, antwort, totalTokIn, totalTokOut, totalCacheRead, totalCacheCreation, 'claude', (appSettings.get('ai.claude.model') || 'claude-sonnet-4-6'), tpsVal, JSON.stringify(contextInfo), assistantNow);
     db.prepare('UPDATE chat_sessions SET last_message_at = ? WHERE id = ?').run(assistantNow, session.id);
 
     completeJob(jobId, {
@@ -631,6 +658,9 @@ chatRouter.delete('/book-chat-cache', (req, res) => {
   const book_id = toIntId(req.query.book_id);
   if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
   setContext({ book: book_id });
+  const { requireBookAccess, sendACLError } = require('../../lib/acl');
+  try { requireBookAccess(req, book_id, 'editor'); }
+  catch (e) { if (sendACLError(res, e)) return; throw e; }
   const userEmail = req.session?.user?.email || null;
   const key = `${book_id}:${userEmail}`;
   _bookPageCache.delete(key);

@@ -147,8 +147,8 @@ app.use(session({
 
 if (LOCAL_DEV_MODE) {
   logger.warn('LOCAL_DEV_MODE aktiv – OAuth wird übersprungen, automatische Dev-Session!');
-} else if (!process.env.ALLOWED_EMAILS) {
-  logger.warn('ALLOWED_EMAILS nicht gesetzt – ALLE Google-Konten haben Zugriff! Bitte in .env einschränken.');
+} else if (!appSettings.get('auth.allowed_emails')) {
+  logger.warn('auth.allowed_emails nicht gesetzt – ALLE Google-Konten haben Zugriff! Bitte in App-Einstellungen einschränken.');
 }
 
 // ALS-Logging-Context: jeder logger.*-Call innerhalb des Request-Scopes erbt
@@ -165,6 +165,12 @@ app.use((req, res, next) => {
 
 // ── Auth-Routen (öffentlich) ──────────────────────────────────────────────────
 app.use(authRouter);
+
+// ── Public-Routen (Phase 4a2, vor Auth-Guard) ────────────────────────────────
+// /landing, /register (GET+POST) und Unauth-Override fuer GET /. Eingeloggte
+// und LOCAL_DEV_MODE laufen ueber `next()` weiter — Guard + staticServe
+// liefern dann die SPA-Shell.
+app.use(require('./routes/public'));
 
 // ── Öffentliche PWA-Assets (vor Auth-Guard) ──────────────────────────────────
 // Browser holen manifest.webmanifest und sw.js ohne Credentials; hinter dem
@@ -282,6 +288,7 @@ app.use('/book-editor', require('./routes/book-editor'));
 app.use('/admin/users', require('./routes/admin-users'));
 app.use('/admin/settings', require('./routes/admin-settings'));
 app.use('/admin/usage', require('./routes/admin-usage'));
+app.use('/admin/registration-requests', require('./routes/admin-registration-requests'));
 app.use('/setup', require('./routes/setup'));
 
 // Logout: usage-Tabelle behält Einträge (User-Wiederkehr → Top-3 sofort wieder da).
@@ -338,7 +345,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   }
 
   syncPromise.finally(() => {
-    const staleDays = Math.max(1, parseInt(process.env.STALE_DAYS || '7', 10));
+    const staleDays = Math.max(1, parseInt(appSettings.get('cron.stale_days'), 10) || 7);
     try {
       const counts = pruneStaleByAge(staleDays);
       if (!counts.stale_books && !counts.stale_chapters && !counts.stale_pages) {
@@ -383,7 +390,7 @@ try {
   const cron = require('node-cron');
   // Zeitzone explizit setzen – ohne expliziten Wert läuft node-cron in Server-TZ.
   // In manchen LXC-Templates ist die TZ UTC → "23:00" wäre dann 00:00/01:00 CH-Zeit.
-  const cronTz = process.env.CRON_TIMEZONE || process.env.TZ || 'Europe/Zurich';
+  const cronTz = appSettings.get('cron.timezone') || process.env.TZ || 'Europe/Zurich';
 
   // 23:00 – Buchstatistik-Sync + hängende Jobs bereinigen + TTL-Cache-Cleanup.
   // Tagesscharfe Statistik: recorded_at am Tag X reflektiert Inhalte vom Tag X.
@@ -413,7 +420,7 @@ try {
   // sind. Schwelle gross genug, dass ein einzelner Sync-Fehler nicht sofort
   // zuschlaegt. Laeuft 5h nach dem 23:00-Sync, damit aktuelle last_seen_at-
   // Touches schon eingebrannt sind.
-  const staleDays = Math.max(1, parseInt(process.env.STALE_DAYS || '7', 10));
+  const staleDays = Math.max(1, parseInt(appSettings.get('cron.stale_days'), 10) || 7);
   cron.schedule('0 4 * * *', () => {
     runWithContext({ job: 'cron', user: 'system' }, () => {
       logger.info(`Cron: Starte Stale-Cleanup (Schwelle ${staleDays} Tage)…`);
@@ -428,6 +435,23 @@ try {
     });
   }, { timezone: cronTz });
   logger.info(`Cron-Job registriert: Stale-Cleanup täglich 04:00 (${cronTz}, Schwelle ${staleDays} Tage)`);
+
+  // Phase 4a2: 02:30 – pending registration_requests aelter als N Tage auf
+  // 'expired' setzen. Default 30 Tage; konfigurierbar via app_settings
+  // auth.registration.expire_days. Status-Wechsel ohne Mail (siehe Spec).
+  cron.schedule('30 2 * * *', () => {
+    runWithContext({ job: 'cron', user: 'system' }, () => {
+      try {
+        const regRequests = require('./db/registration-requests');
+        const days = Math.max(1, parseInt(appSettings.get('auth.registration.expire_days'), 10) || 30);
+        const changed = regRequests.expireStale(days);
+        if (changed > 0) logger.info(`Cron: ${changed} pending registration_requests auf 'expired' gesetzt (Schwelle ${days} Tage).`);
+      } catch (e) {
+        logger.error('Cron registration-expire Fehler: ' + e.message);
+      }
+    });
+  }, { timezone: cronTz });
+  logger.info(`Cron-Job registriert: registration_requests-Expire täglich 02:30 (${cronTz})`);
 
   // 03:00 – Nacht-Komplettanalyse für alle Bücher × alle User (deaktiviert)
   // cron.schedule('0 3 * * *', () => {

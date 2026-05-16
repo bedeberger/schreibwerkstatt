@@ -18,6 +18,7 @@ const contentStore = require('../../lib/content-store');
 const { narrativeLabels } = require('./narrative-labels');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
+const appSettings = require('../../lib/app-settings');
 
 function _sigHash(obj) {
   return crypto.createHash('sha1').update(JSON.stringify(obj ?? null)).digest('hex').slice(0, 12);
@@ -45,7 +46,7 @@ async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookNa
   const bookIdInt = parseInt(bookId);
   const chapterIdInt = parseInt(chapterId);
   const email = userEmail || '';
-  const cacheVersion = `${_modelName(process.env.API_PROVIDER || 'claude')}:${PROMPTS_VERSION || ''}`;
+  const cacheVersion = `${_modelName(appSettings.get('ai.provider') || 'claude')}:${PROMPTS_VERSION || ''}`;
   const optionsSig = _sigHash({ narrative, schwerpunkt: reviewSchwerpunkt });
   try {
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
@@ -67,7 +68,7 @@ async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookNa
     if (cached) {
       logger.info(`«${chapterName}» – Cache-HIT (pages_sig match) – spart Kapitel-Review-Call.`);
       updateJob(jobId, { progress: 97, statusText: 'job.phase.checkpointLoaded' });
-      const model = _modelName(process.env.API_PROVIDER || 'claude');
+      const model = _modelName(appSettings.get('ai.provider') || 'claude');
       if (bookName) upsertBookByName(bookIdInt, bookName);
       db.prepare(`INSERT INTO chapter_reviews
         (book_id, chapter_id, reviewed_at, review_json, model, user_email)
@@ -157,7 +158,7 @@ async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookNa
 
     saveChapterMacroReviewCache(bookIdInt, email, chapterIdInt, pagesSig, r);
 
-    const model = _modelName(process.env.API_PROVIDER || 'claude');
+    const model = _modelName(appSettings.get('ai.provider') || 'claude');
     if (bookName) upsertBookByName(parseInt(bookId), bookName);
     db.prepare(`INSERT INTO chapter_reviews
       (book_id, chapter_id, reviewed_at, review_json, model, user_email)
@@ -187,6 +188,9 @@ kapitelRouter.post('/chapter-review', jsonBody, (req, res) => {
   if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
   if (!chapter_id) return res.status(400).json({ error_code: 'CHAPTER_ID_REQUIRED' });
   setContext({ book: book_id });
+  const { requireBookAccess, sendACLError } = require('../../lib/acl');
+  try { requireBookAccess(req, book_id, 'editor'); }
+  catch (e) { if (sendACLError(res, e)) return; throw e; }
   const userEmail = req.session?.user?.email || null;
   const userToken = getTokenForRequest(req);
   // Dedup auf Kapitel-Ebene – parallele Reviews unterschiedlicher Kapitel sind ok.

@@ -14,6 +14,7 @@ const {
 } = require('./shared');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
+const appSettings = require('../../lib/app-settings');
 
 const synonymeRouter = express.Router();
 
@@ -31,7 +32,7 @@ async function runSynonymJob(jobId, wort, satz, bookId, userEmail) {
   const { buildSynonymPrompt, SCHEMA_SYNONYM, PROMPTS_VERSION } = prompts;
   const { SYSTEM_SYNONYM } = await getBookPrompts(bookId, userEmail);
   const bookSettings = bookId ? getBookSettings(bookId, userEmail) : null;
-  const cacheVersion = `${_modelName(process.env.API_PROVIDER || 'claude')}:${PROMPTS_VERSION || ''}`;
+  const cacheVersion = `${_modelName(appSettings.get('ai.provider') || 'claude')}:${PROMPTS_VERSION || ''}`;
   const keyHash = _synonymKeyHash(wort, satz, bookSettings, cacheVersion);
   try {
     logger.info(`Start: «${wort}»`);
@@ -82,6 +83,11 @@ synonymeRouter.post('/synonym', jsonBody, (req, res) => {
   if (!wort || typeof wort !== 'string' || !wort.trim()) return res.status(400).json({ error_code: 'WORT_REQUIRED' });
   if (!satz || typeof satz !== 'string' || !satz.trim()) return res.status(400).json({ error_code: 'SATZ_REQUIRED' });
   if (book_id) setContext({ book: book_id });
+  if (book_id) {
+    const { requireBookAccess, sendACLError } = require('../../lib/acl');
+    try { requireBookAccess(req, book_id, 'lektor'); }
+    catch (e) { if (sendACLError(res, e)) return; throw e; }
+  }
   const userEmail = req.session?.user?.email || null;
   const entityKey = `${book_id || 0}|${wort.trim().toLowerCase()}|${satz.trim().slice(0, 60)}`;
   const existing = findActiveJobId('synonym', entityKey, userEmail);

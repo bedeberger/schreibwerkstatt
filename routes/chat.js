@@ -4,7 +4,10 @@ const logger = require('../logger');
 const { callAIChat, parseJSONLenient, chatTemperature } = require('../lib/ai');
 const { toIntId } = require('../lib/validate');
 const contentStore = require('../lib/content-store');
-const { bookParamHandler, setContext } = require('../lib/log-context');
+const { setContext } = require('../lib/log-context');
+const { aclParamGuard, requireBookAccess, sendACLError } = require('../lib/acl');
+const appSettings = require('../lib/app-settings');
+const { enforceBudget } = require('../lib/budget');
 const {
   getPrompts, getBookPrompts,
   getFiguren, getLatestReview, getLatestPageCheck, getOpenIdeen, buildChatMessageHistory,
@@ -12,7 +15,7 @@ const {
 } = require('./jobs/shared');
 
 const router = express.Router();
-router.param('book_id', bookParamHandler);
+router.param('book_id', aclParamGuard('viewer'));
 const jsonBody = express.json();
 
 // ── Hilfsfunktionen ──────────────────────────────────────────────────────────
@@ -39,6 +42,8 @@ router.post('/session', jsonBody, async (req, res) => {
     return res.status(400).json({ error_code: 'BOOKID_PAGEID_LOGIN_REQ' });
   }
   setContext({ book: book_id });
+  try { requireBookAccess(req, book_id, 'lektor'); }
+  catch (e) { if (sendACLError(res, e)) return; throw e; }
 
   // Snapshot: Seitentext beim Chat-Öffnen einmalig sichern. Ermöglicht später
   // im System-Prompt einen Vergleich „Stand beim Öffnen" vs. „aktueller Stand",
@@ -79,6 +84,14 @@ router.post('/session/book', jsonBody, (req, res) => {
     return res.status(400).json({ error_code: 'BOOKID_LOGIN_REQ' });
   }
   setContext({ book: book_id });
+  // Buch-Chat: editor+, ausser allow_lektor_book_chat=1 → lektor+.
+  {
+    const { getBookSettings } = require('../db/schema');
+    const bs = getBookSettings(book_id);
+    const min = bs?.allow_lektor_book_chat ? 'lektor' : 'editor';
+    try { requireBookAccess(req, book_id, min); }
+    catch (e) { if (sendACLError(res, e)) return; throw e; }
+  }
   // Orphan-Cleanup analog zum Seiten-Chat (siehe Kommentar oben).
   db.prepare(`
     DELETE FROM chat_sessions
@@ -213,7 +226,7 @@ router.patch('/message/:id/vorschlag/:idx/applied', jsonBody, (req, res) => {
  *   data: {"type":"meta","message_id":42,"tokens_in":100,"tokens_out":200}
  *   data: [DONE]
  */
-router.post('/send', jsonBody, async (req, res) => {
+router.post('/send', jsonBody, enforceBudget, async (req, res) => {
   const { message, page_text } = req.body;
   const session_id = toIntId(req.body?.session_id);
   const userEmail = req.session?.user?.email || null;
@@ -235,6 +248,10 @@ router.post('/send', jsonBody, async (req, res) => {
     `).get(session_id, userEmail);
     if (!session) return res.status(404).json({ error_code: 'SESSION_NOT_FOUND' });
     setContext({ book: session.book_id });
+    if (session.book_id) {
+      try { requireBookAccess(req, session.book_id, 'lektor'); }
+      catch (e) { if (sendACLError(res, e)) return; throw e; }
+    }
     logger.info(`[chat/send] «${session.page_name}» session=${session_id} user=${userEmail} book=${session.book_id}`);
 
     const now = new Date().toISOString();
@@ -290,7 +307,7 @@ router.post('/send', jsonBody, async (req, res) => {
     // Alle drei Provider laufen jetzt über callAIChat; der onProgress-Callback
     // relayed Text-Deltas als Anthropic-kompatibles SSE-Event an den Client.
     // (Lokale Provider bekommen das Schema für Grammar-Constrained-JSON.)
-    const provider = process.env.API_PROVIDER || 'claude';
+    const provider = appSettings.get('ai.provider') || 'claude';
     const schema = (provider === 'ollama' || provider === 'llama') ? SCHEMA_CHAT : null;
     const temperatureOverride = (provider === 'ollama' || provider === 'llama') ? chatTemperature() : null;
     const { text: fullText, truncated, tokensIn, tokensOut, cacheReadIn = 0, cacheCreationIn = 0, model: usedModel } = await callAIChat(

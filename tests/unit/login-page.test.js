@@ -12,13 +12,15 @@ const express = require('express');
 
 const tmpDb = path.join(os.tmpdir(), `login-page-test-${process.pid}-${Date.now()}.db`);
 process.env.DB_PATH = tmpDb;
-process.env.GOOGLE_CLIENT_ID = 'test-client-id';
-process.env.GOOGLE_CLIENT_SECRET = 'test-client-secret';
+process.env.SESSION_SECRET = 'a'.repeat(32); // crypto-Master fuer encrypted app_settings
 process.env.ADMIN_EMAIL = 'admin@example.com';
 process.env.ADMIN_PASSWORD = 's3cret';
 
 require('../../db/migrations');
 const { db } = require('../../db/connection');
+const appSettings = require('../../lib/app-settings');
+appSettings.set('auth.google.client_id', 'test-client-id', { updatedBy: 'test' });
+appSettings.set('auth.google.client_secret', 'test-client-secret', { updatedBy: 'test' });
 const appUsers = require('../../db/app-users');
 appUsers.ensureAdminFromEnv();
 const rl = require('../../lib/admin-login-ratelimit');

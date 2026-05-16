@@ -16,6 +16,7 @@ const {
   createJob, enqueueJob, findActiveJobId,
 } = require('../shared');
 const contentStore = require('../../../lib/content-store');
+const appSettings = require('../../../lib/app-settings');
 const { runNonCritical, buildBookSystemBlockText } = require('./utils');
 const { invalidateRenamedChapterCaches, loadAndValidateCheckpoint, restorePhase1FromCheckpoint } = require('./checkpoint');
 const { remapSzenen, remapAssignments, saveSzenenAndEvents, saveKontinuitaetResult } = require('./remap');
@@ -42,7 +43,7 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
   // Schemas werden nur von lokalen Providern (ollama/llama) verwendet – Claude ignoriert sie.
   const call = (jobId_, tok_, prompt_, system_, fromPct, toPct, expectedChars, outputRatio, maxTokens, schema) =>
     aiCall(jobId_, tok_, prompt_, system_, fromPct, toPct, expectedChars, outputRatio, maxTokens, provider, schema);
-  const effectiveProvider = provider || process.env.API_PROVIDER || 'claude';
+  const effectiveProvider = provider || appSettings.get('ai.provider') || 'claude';
   // SINGLE_PASS_LIMIT skaliert jetzt dynamisch mit MODEL_CONTEXT (siehe shared/loader.js).
   // Bei 200K-Kontext ≈ 420K Zeichen Single-Pass – reicht für fast alle Bücher.
   const singlePassLimit = SINGLE_PASS_LIMIT;
@@ -238,7 +239,7 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
   const log = makeJobLogger(jobId);
   const call = (jobId_, tok_, prompt_, system_, fromPct, toPct, expectedChars, outputRatio, maxTokens, schema) =>
     aiCall(jobId_, tok_, prompt_, system_, fromPct, toPct, expectedChars, outputRatio, maxTokens, provider, schema);
-  const effectiveProvider = provider || process.env.API_PROVIDER || 'claude';
+  const effectiveProvider = provider || appSettings.get('ai.provider') || 'claude';
   const singlePassLimit = SINGLE_PASS_LIMIT;
   const prompts = await getPrompts();
   const sys = await getBookPrompts(bookId, email);
@@ -355,12 +356,12 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
 
 // ── Nacht-Cron: Komplettanalyse für alle Bücher × alle User ──────────────────
 async function runKomplettAnalyseAll() {
-  const cronProvider = process.env.API_PROVIDER || 'llama';
-  const cronHostOk = cronProvider === 'llama'  ? !!process.env.LLAMA_HOST
-                   : cronProvider === 'ollama' ? !!process.env.OLLAMA_HOST
+  const cronProvider = appSettings.get('ai.provider') || 'llama';
+  const cronHostOk = cronProvider === 'llama'  ? !!appSettings.get('ai.llama.host')
+                   : cronProvider === 'ollama' ? !!appSettings.get('ai.ollama.host')
                    : true;
   if (!cronHostOk) {
-    logger.info(`Nacht-Analyse übersprungen: ${cronProvider.toUpperCase()}_HOST nicht konfiguriert.`);
+    logger.info(`Nacht-Analyse übersprungen: ai.${cronProvider}.host nicht konfiguriert.`);
     return;
   }
 

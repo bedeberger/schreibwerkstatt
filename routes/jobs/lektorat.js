@@ -28,12 +28,19 @@ function buildLektoratCtxSig(parts) {
 const { narrativeLabels } = require('./narrative-labels');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
+const { requireBookAccess, sendACLError } = require('../../lib/acl');
+const appSettings = require('../../lib/app-settings');
+
+function _pageBookId(pageId) {
+  const r = db.prepare('SELECT book_id FROM pages WHERE page_id = ?').get(parseInt(pageId, 10));
+  return r?.book_id || null;
+}
 
 // Lokale Provider (ollama/llama) bekommen einen deutlich abgespeckten Lektorat-Prompt:
 // kein Vorseiten-Kontext (BookStack-Roundtrip gespart), keine Figuren-Beziehungen,
 // kein POV-/Tempus-Block. Alle Einsparungen auch in public/js/prompts.js (_isLocal).
 const _isLocalProvider = () => {
-  const p = process.env.API_PROVIDER || 'claude';
+  const p = appSettings.get('ai.provider') || 'claude';
   return p === 'ollama' || p === 'llama';
 };
 
@@ -115,7 +122,7 @@ async function runCheckJob(jobId, pageId, bookId, userEmail, userToken) {
   const { SYSTEM_LEKTORAT_BLOCKS: SYSTEM_LEKTORAT, STOPWORDS: lektoratStopwords, ERKLAERUNG_RULE: lektoratErklaerungRule, KORREKTUR_REGELN: lektoratKorrekturRegeln } = await getBookPrompts(bookId, userEmail);
   const locale = bookId ? getBookLocale(bookId, userEmail) : 'de-CH';
   const bookSettings = bookId ? getBookSettings(bookId, userEmail) : null;
-  const cacheVersion = `${_modelName(process.env.API_PROVIDER || 'claude')}:${PROMPTS_VERSION || ''}`;
+  const cacheVersion = `${_modelName(appSettings.get('ai.provider') || 'claude')}:${PROMPTS_VERSION || ''}`;
   try {
     logger.info(`Start: Seite #${pageId}`);
     updateJob(jobId, { statusText: 'job.phase.loadingPageContent', progress: 5 });
@@ -200,7 +207,7 @@ async function runCheckJob(jobId, pageId, bookId, userEmail, userToken) {
       if (ctxSig) saveLektoratCache(bookId, userEmail, pageId, ctxSig, result);
     }
 
-    const model = _modelName(process.env.API_PROVIDER || 'claude');
+    const model = _modelName(appSettings.get('ai.provider') || 'claude');
     const szenen = Array.isArray(result?.szenen) ? result.szenen : [];
 
     const info = db.prepare(`INSERT INTO page_checks
@@ -234,7 +241,7 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
   const logger = makeJobLogger(jobId);
   const prompts = await getPrompts();
   const { buildBatchLektoratPrompt, SCHEMA_LEKTORAT, PROMPTS_VERSION } = prompts;
-  const cacheVersion = `${_modelName(process.env.API_PROVIDER || 'claude')}:${PROMPTS_VERSION || ''}`;
+  const cacheVersion = `${_modelName(appSettings.get('ai.provider') || 'claude')}:${PROMPTS_VERSION || ''}`;
   const { SYSTEM_LEKTORAT_BLOCKS: SYSTEM_LEKTORAT, STOPWORDS: batchStopwords, ERKLAERUNG_RULE: batchErklaerungRule, KORREKTUR_REGELN: batchKorrekturRegeln } = await getBookPrompts(bookId, userEmail);
   const locale = getBookLocale(bookId, userEmail);
   const langCode = (locale || 'de-CH').split('-')[0];
@@ -251,9 +258,9 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
 
     // Cloud-Provider verträgt parallele Calls; lokale Provider (Ollama/llama.cpp) sind
     // bereits via Mutex in lib/ai.js serialisiert – Pool=1 verhindert pile-up im aiCall.
-    const concurrency = local ? 1 : (parseInt(process.env.LEKTORAT_BATCH_CONCURRENCY, 10) || 4);
+    const concurrency = local ? 1 : (parseInt(appSettings.get('ai.lektorat_batch_concurrency'), 10) || 4);
     const tok = { in: 0, out: 0, ms: 0, inflight: new Map() };
-    const model = _modelName(process.env.API_PROVIDER || 'claude');
+    const model = _modelName(appSettings.get('ai.provider') || 'claude');
     let done = 0, totalErrors = 0;
 
     // Letzten-Absatz-Cache pro page_id, damit die Vorseiten-Extraktion im Batch
@@ -383,9 +390,13 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
 lektoratRouter.post('/check', jsonBody, (req, res) => {
   const { page_name } = req.body;
   const page_id = toIntId(req.body?.page_id);
-  const book_id = toIntId(req.body?.book_id);
+  let book_id = toIntId(req.body?.book_id);
   if (!page_id) return res.status(400).json({ error_code: 'PAGE_ID_REQUIRED' });
-  if (book_id) setContext({ book: book_id });
+  if (!book_id) book_id = _pageBookId(page_id);
+  if (!book_id) return res.status(404).json({ error_code: 'BOOK_NOT_FOUND' });
+  setContext({ book: book_id });
+  try { requireBookAccess(req, book_id, 'lektor'); }
+  catch (e) { if (sendACLError(res, e)) return; throw e; }
   const userEmail = req.session?.user?.email || null;
   const userToken = getTokenForRequest(req);
   const existing = findActiveJobId('check', page_id, userEmail);
@@ -402,6 +413,8 @@ lektoratRouter.post('/batch-check', jsonBody, (req, res) => {
   const book_id = toIntId(req.body?.book_id);
   if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
   setContext({ book: book_id });
+  try { requireBookAccess(req, book_id, 'lektor'); }
+  catch (e) { if (sendACLError(res, e)) return; throw e; }
   const userEmail = req.session?.user?.email || null;
   const userToken = getTokenForRequest(req);
   const existing = findActiveJobId('batch-check', book_id, userEmail);

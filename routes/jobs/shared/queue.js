@@ -2,10 +2,13 @@
 const logger = require('../../../logger');
 const { runWithContext } = require('../../../lib/log-context');
 const { startJobRun } = require('../../../db/schema');
+const appSettings = require('../../../lib/app-settings');
 const { jobs, runningJobs, jobQueue, jobDedupKey } = require('./state');
 
 // Maximale Anzahl gleichzeitig laufender Jobs (über alle User).
-const MAX_CONCURRENT = parseInt(process.env.MAX_CONCURRENT_JOBS, 10) || 2;
+function _maxConcurrent() {
+  return parseInt(appSettings.get('jobs.max_concurrent'), 10) || 2;
+}
 let activeCount = 0;
 
 // Auto-Cleanup: 2 h nachdem der Job terminal (done|error|cancelled) wurde,
@@ -14,7 +17,8 @@ let activeCount = 0;
 const CLEANUP_DELAY_MS = 2 * 60 * 60 * 1000;
 
 function drainQueue() {
-  while (activeCount < MAX_CONCURRENT && jobQueue.length > 0) {
+  const maxConcurrent = _maxConcurrent();
+  while (activeCount < maxConcurrent && jobQueue.length > 0) {
     const { jobId, fn } = jobQueue.shift();
     const job = jobs.get(jobId);
     if (!job) continue; // Job wurde zwischenzeitlich entfernt
@@ -50,6 +54,6 @@ function _scheduleJobCleanup(id) {
 }
 
 module.exports = {
-  MAX_CONCURRENT, CLEANUP_DELAY_MS,
+  CLEANUP_DELAY_MS,
   drainQueue, enqueueJob, _scheduleJobCleanup,
 };

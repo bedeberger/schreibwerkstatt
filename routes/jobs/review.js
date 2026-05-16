@@ -20,6 +20,7 @@ const { narrativeLabels } = require('./narrative-labels');
 const { loadReviewKomplettContext } = require('./review-context');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
+const appSettings = require('../../lib/app-settings');
 
 // Stabile, kurze Signatur für strukturierte Prompt-Vars (narrative,
 // reviewSchwerpunkt, komplettContext). Identischer Inhalt → identische Sig.
@@ -64,7 +65,7 @@ async function runReviewJob(jobId, bookId, bookName, userEmail, userToken) {
 
   const bookIdInt = parseInt(bookId);
   const email = userEmail || '';
-  const effectiveProvider = process.env.API_PROVIDER || 'claude';
+  const effectiveProvider = appSettings.get('ai.provider') || 'claude';
   // Cache-Version: Modellname + Prompts-Schema-Version. Ändert sich eins davon,
   // werden alle persistierten Review-Caches automatisch verworfen.
   const cacheVersion = `${_modelName(effectiveProvider)}:${PROMPTS_VERSION || ''}`;
@@ -175,7 +176,7 @@ async function runReviewJob(jobId, bookId, bookName, userEmail, userToken) {
 
     if (r?.gesamtnote == null) throw i18nError('job.error.gesamtnoteMissing');
 
-    const model = _modelName(process.env.API_PROVIDER || 'claude');
+    const model = _modelName(appSettings.get('ai.provider') || 'claude');
     if (bookName) upsertBookByName(parseInt(bookId), bookName);
     db.prepare('INSERT INTO book_reviews (book_id, reviewed_at, review_json, model, user_email) VALUES (?, ?, ?, ?, ?)')
       .run(parseInt(bookId), new Date().toISOString(), JSON.stringify(r), model, userEmail || null);
@@ -194,6 +195,9 @@ reviewRouter.post('/review', jsonBody, (req, res) => {
   const book_id = toIntId(req.body?.book_id);
   if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
   setContext({ book: book_id });
+  const { requireBookAccess, sendACLError } = require('../../lib/acl');
+  try { requireBookAccess(req, book_id, 'editor'); }
+  catch (e) { if (sendACLError(res, e)) return; throw e; }
   const userEmail = req.session?.user?.email || null;
   const userToken = getTokenForRequest(req);
   const existing = findActiveJobId('review', book_id, userEmail);

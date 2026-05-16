@@ -22,6 +22,7 @@ const {
 } = require('../../../../db/schema');
 const { aiCall, _modelName, getPrompts } = require('../../shared');
 const { extractName } = require('../lib/names');
+const appSettings = require('../../../../lib/app-settings');
 
 const REVERSE_PROMPTS_PER_PAGE_DEFAULT = 4;
 const FACT_QA_PER_ENTITY_DEFAULT = 4;
@@ -56,7 +57,7 @@ async function buildAiAugmentSamples(ctx) {
   if (!ai.reversePrompts && !ai.factQA && !ai.reasoningBackfill) return;
 
   const prompts = await getPrompts();
-  const provider = process.env.API_PROVIDER || 'claude';
+  const provider = appSettings.get('ai.provider') || 'claude';
   const subCtx = {
     ...ctx,
     prompts,

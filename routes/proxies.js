@@ -37,17 +37,18 @@ router.get('/config', (req, res) => {
       role: appUser?.global_role || 'user',
       status: appUser?.status || 'active',
       can_invite_users: appUser?.can_invite_users ? 1 : 0,
+      isAdmin: appUser?.global_role === 'admin',
     };
   }
   res.json({
     bookstackUrl: BOOKSTACK_URL.replace(/\/$/, ''),
     bookstackTokenOk: !!getTokenForRequest(req),
     claudeMaxTokens: MAX_TOKENS_OUT,
-    claudeModel: process.env.MODEL_NAME || 'claude-sonnet-4-6',
-    apiProvider: process.env.API_PROVIDER || 'claude',
+    claudeModel: appSettings.get('ai.claude.model') || 'claude-sonnet-4-6',
+    apiProvider: appSettings.get('ai.provider') || 'claude',
     charsPerToken: CHARS_PER_TOKEN,
-    ollamaModel: process.env.OLLAMA_MODEL || 'llama3.2',
-    llamaModel:  process.env.LLAMA_MODEL  || 'llama3.2',
+    ollamaModel: appSettings.get('ai.ollama.model') || 'llama3.2',
+    llamaModel:  appSettings.get('ai.llama.model')  || 'llama3.2',
     user,
     userSettings: sessionUser ? getUser(sessionUser.email) : null,
     devMode: process.env.LOCAL_DEV_MODE === 'true',
@@ -64,13 +65,13 @@ router.post('/claude', jsonBody, async (req, res) => {
       return res.status(400).json({ error_code: 'INVALID_PROMPT_KIND', params: { kind: req.body.promptKind || '' } });
     }
     // Nur erlaubte Felder weitergeben – verhindert Model-Override durch das Frontend
-    const model = process.env.MODEL_NAME || 'claude-sonnet-4-6';
+    const model = appSettings.get('ai.claude.model') || 'claude-sonnet-4-6';
     const maxTokens = MAX_TOKENS_OUT;
     const upstream = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY || '',
+        'x-api-key': appSettings.get('ai.claude.api_key') || '',
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
@@ -106,8 +107,8 @@ router.post('/claude', jsonBody, async (req, res) => {
 
 // Proxy /ollama → Ollama /api/chat (NDJSON → Anthropic-kompatibles SSE)
 router.post('/ollama', jsonBody, async (req, res) => {
-  const ollamaHost = (process.env.OLLAMA_HOST || 'http://localhost:11434').replace(/\/$/, '');
-  const model = process.env.OLLAMA_MODEL || 'llama3.2';
+  const ollamaHost = String(appSettings.get('ai.ollama.host') || 'http://localhost:11434').replace(/\/$/, '');
+  const model = appSettings.get('ai.ollama.model') || 'llama3.2';
   try {
     const systemPrompt = await resolveProxySystemPrompt(req.body.promptKind);
     if (!systemPrompt) {
@@ -190,8 +191,8 @@ router.post('/ollama', jsonBody, async (req, res) => {
 
 // Proxy /llama → OpenAI-kompatibler Endpunkt (Anthropic-Format → OpenAI-Format → Anthropic-SSE)
 router.post('/llama', jsonBody, async (req, res) => {
-  const llamaHost = (process.env.LLAMA_HOST || 'http://localhost:8080').replace(/\/$/, '');
-  const model = process.env.LLAMA_MODEL || 'llama3.2';
+  const llamaHost = String(appSettings.get('ai.llama.host') || 'http://localhost:8080').replace(/\/$/, '');
+  const model = appSettings.get('ai.llama.model') || 'llama3.2';
   try {
     const systemPrompt = await resolveProxySystemPrompt(req.body.promptKind);
     if (!systemPrompt) {

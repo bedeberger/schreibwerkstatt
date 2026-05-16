@@ -1,5 +1,6 @@
 'use strict';
 const { callAI, parseJSON, CHARS_PER_TOKEN, MAX_TOKENS_OUT } = require('../../../lib/ai');
+const appSettings = require('../../../lib/app-settings');
 const { jobAbortControllers } = require('./state');
 const { updateJob, i18nError } = require('./jobs');
 
@@ -14,7 +15,7 @@ const { updateJob, i18nError } = require('./jobs');
 // — der Erst-Call schreibt den Prompt-Cache, Folge-Calls greifen den Cache-Hit
 // und sind ~10× günstiger + viel kürzer (kleinerer TPM-Burst).
 async function settledAll(thunks, opts = {}) {
-  const isLocal = (process.env.API_PROVIDER || 'claude') !== 'claude';
+  const isLocal = (appSettings.get('ai.provider') || 'claude') !== 'claude';
   if (isLocal) {
     const results = [];
     for (const fn of thunks) {

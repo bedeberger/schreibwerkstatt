@@ -3,6 +3,7 @@ const { randomUUID } = require('crypto');
 const logger = require('../../../logger');
 const { insertJobRun, endJobRun } = require('../../../db/schema');
 const { MAX_TOKENS_OUT } = require('../../../lib/ai');
+const appSettings = require('../../../lib/app-settings');
 const { jobs, runningJobs, jobAbortControllers, jobQueue, jobKey, jobDedupKey } = require('./state');
 const { _scheduleJobCleanup } = require('./queue');
 const { _modelName } = require('./model');
@@ -92,7 +93,7 @@ function createJob(type, bookId, userEmail, label, labelParams = null, dedupId =
   const id = randomUUID();
   const dedupValue = dedupId != null ? String(dedupId) : null;
   const key = jobKey(type, dedupValue ?? bookId, userEmail);
-  const provider = (process.env.API_PROVIDER || 'claude').toLowerCase();
+  const provider = String(appSettings.get('ai.provider') || 'claude').toLowerCase();
   const model = _modelName(provider);
   jobs.set(id, {
     id, type, bookId: String(bookId), dedupId: dedupValue, userEmail: userEmail || null,

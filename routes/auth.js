@@ -39,8 +39,8 @@ async function getClient() {
   const appUrl = getPublicUrl();
   if (!appUrl) throw new Error('app.public_url ist nicht gesetzt — Admin muss die öffentliche URL in den App-Einstellungen hinterlegen.');
   oidcClient = new googleIssuer.Client({
-    client_id: appSettings.get('auth.google.client_id') || process.env.GOOGLE_CLIENT_ID,
-    client_secret: appSettings.get('auth.google.client_secret') || process.env.GOOGLE_CLIENT_SECRET,
+    client_id: appSettings.get('auth.google.client_id'),
+    client_secret: appSettings.get('auth.google.client_secret'),
     redirect_uris: [`${appUrl}/auth/callback`],
     response_types: ['code'],
   });
@@ -86,9 +86,9 @@ router.get('/auth/login', async (req, res) => {
   if (process.env.LOCAL_DEV_MODE === 'true') {
     return res.redirect('/');
   }
-  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+  if (!appSettings.get('auth.google.client_id') || !appSettings.get('auth.google.client_secret')) {
     return res.status(500).send(
-      'Google OAuth nicht konfiguriert. Bitte GOOGLE_CLIENT_ID und GOOGLE_CLIENT_SECRET in der .env setzen.'
+      'Google OAuth nicht konfiguriert. Admin muss auth.google.client_id und auth.google.client_secret in den App-Einstellungen setzen.'
     );
   }
   try {
@@ -146,8 +146,8 @@ router.get('/auth/callback', async (req, res) => {
     const userAgent = req.headers['user-agent'] || null;
     const lang = _bodyLang(req);
 
-    // Optionale E-Mail-Whitelist (ALLOWED_EMAILS=a@b.com,c@d.com)
-    const allowed = process.env.ALLOWED_EMAILS;
+    // Optionale E-Mail-Whitelist (auth.allowed_emails: a@b.com,c@d.com)
+    const allowed = appSettings.get('auth.allowed_emails');
     if (allowed) {
       const list = allowed.split(',').map(e => e.trim().toLowerCase());
       if (!list.includes(email)) {
@@ -191,7 +191,7 @@ router.get('/auth/callback', async (req, res) => {
           invitedBy: acceptedInvite.invited_by,
         });
         appUsers.acceptInvite(acceptedInvite.id);
-      } else if (process.env.ALLOW_OPEN_SIGNUP === 'true') {
+      } else if (appSettings.get('auth.allow_open_signup') === true) {
         user = appUsers.createUser({
           email,
           displayName: claims.name || email,
@@ -246,7 +246,7 @@ router.get('/login', (req, res) => {
   if (process.env.LOCAL_DEV_MODE === 'true') return res.redirect('/');
   if (req.session?.user) return res.redirect(req.query.returnTo || '/');
   const lang = _bodyLang(req);
-  const hasGoogle = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+  const hasGoogle = !!(appSettings.get('auth.google.client_id') && appSettings.get('auth.google.client_secret'));
   const hasAdminPw = !!process.env.ADMIN_PASSWORD;
   const returnTo = typeof req.query.returnTo === 'string' && req.query.returnTo.startsWith('/') && !req.query.returnTo.startsWith('//')
     ? req.query.returnTo : '/';

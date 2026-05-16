@@ -20,6 +20,7 @@ const {
   preMergeChapterFiguren, applySozialschichtModeVote,
   mergeDuplicateFiguren, validateBeziehungenDescriptions,
 } = require('./figuren-merge');
+const appSettings = require('../../../lib/app-settings');
 
 /**
  * Phase 1: Vollextraktion (Figuren+Orte+Fakten+Szenen+Events).
@@ -110,9 +111,9 @@ async function runPhase1(ctx) {
     // Claude-Multi-Pass: Anthropic-TPM-Burst dämpfen.
     //   - warmup: Erst-Chunk seriell → schreibt Prompt-Cache; Folge-Chunks
     //     hitten den Cache, ~10× günstiger Input + kürzere Reqs → kleinerer Burst.
-    //   - concurrency-Cap: max. CLAUDE_PHASE1_CONCURRENCY parallele Chunks.
+    //   - concurrency-Cap: max. ai.claude.phase1_concurrency parallele Chunks.
     //     Default 4 — empirisch belastbar gegen Tier-1/2 TPM-Limits bei ~25k tok/Chunk.
-    const claudeConcurrency = Math.max(1, parseInt(process.env.CLAUDE_PHASE1_CONCURRENCY, 10) || 4);
+    const claudeConcurrency = Math.max(1, parseInt(appSettings.get('ai.claude.phase1_concurrency'), 10) || 4);
     const settledOpts = (effectiveProvider === 'claude' && chunkTexts.length > claudeConcurrency)
       ? { concurrency: claudeConcurrency, warmup: true }
       : {};
