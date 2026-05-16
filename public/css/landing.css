@@ -1,0 +1,161 @@
+/* Phase 4a2 (BookStack-Exit): Public-Landing + Register. Standalone-Seiten
+   ausserhalb der SPA-Shell — analog setup.css ohne @layer-Einordnung;
+   tokens.css liefert Custom-Props. */
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  color: var(--color-text);
+  background: var(--color-bg);
+  line-height: 1.5;
+}
+
+.public-shell {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: var(--space-2xl) var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+}
+
+.public-header h1 {
+  font-size: var(--font-size-2xl);
+  margin: 0 0 var(--space-xs);
+}
+
+.public-sub {
+  color: var(--color-muted);
+  margin: 0;
+}
+
+.public-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-xl);
+}
+
+.public-btn {
+  display: inline-block;
+  font: inherit;
+  text-align: center;
+  text-decoration: none;
+  padding: var(--space-sm) var(--space-lg);
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.public-btn:hover {
+  background: var(--color-hover);
+}
+
+.public-btn--primary {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.public-btn--primary:hover {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+}
+
+.public-btn-link {
+  font: inherit;
+  color: var(--color-muted);
+  text-decoration: none;
+  align-self: center;
+}
+
+.public-btn-link:hover { color: var(--color-text); }
+
+.public-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-xl);
+}
+
+.public-form label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+}
+
+.public-form label span {
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.public-form input,
+.public-form textarea {
+  font: inherit;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  width: 100%;
+  resize: vertical;
+}
+
+.public-form input:focus,
+.public-form textarea:focus {
+  border-color: var(--color-border-focus);
+  outline: none;
+}
+
+.public-form-actions {
+  display: flex;
+  gap: var(--space-md);
+  justify-content: space-between;
+  align-items: center;
+  margin-top: var(--space-sm);
+}
+
+.public-msg {
+  font-size: var(--font-size-sm);
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+}
+
+.public-msg--ok {
+  background: var(--color-ok-bg);
+  border: 1px solid var(--color-ok-border);
+  color: var(--color-ok-text);
+}
+
+.public-msg--err {
+  background: var(--color-err-bg);
+  border: 1px solid var(--color-err-border);
+  color: var(--color-err-text);
+}
+
+.public-footer {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+  text-align: center;
+}
+
+@media (max-width: 480px) {
+  .public-shell { padding: var(--space-lg) var(--space-md); }
+  .public-actions, .public-form { padding: var(--space-lg); }
+  .public-form-actions { flex-direction: column-reverse; align-items: stretch; gap: var(--space-sm); }
+}

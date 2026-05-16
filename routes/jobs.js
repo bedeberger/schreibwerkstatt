@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 
+const { enforceBudget } = require('../lib/budget');
 const { sharedRouter } = require('./jobs/shared');
 const { lektoratRouter } = require('./jobs/lektorat');
 const { reviewRouter } = require('./jobs/review');
@@ -13,6 +14,16 @@ const { finetuneExportRouter } = require('./jobs/finetune-export');
 const { pdfExportRouter } = require('./jobs/pdf-export');
 const { figurWerkstattRouter } = require('./jobs/figur-werkstatt');
 const { backfillRouter } = require('./jobs/backfill');
+
+// Phase 4d: Budget-Enforcement. enforceBudget skipped non-POST, skipped non-
+// Claude-Provider und skipped die Backfill-Route (kein AI-Spend). Greift VOR
+// allen Sub-Routern, sonst lassen sich die Job-POSTs unter /jobs/* nicht mit
+// einer einzigen Middleware kapseln.
+router.use((req, res, next) => {
+  if (req.method !== 'POST') return next();
+  if (req.path === '/backfill') return next();
+  return enforceBudget(req, res, next);
+});
 
 // Feature-Router zuerst mounten – sharedRouter zuletzt, weil GET /:id und DELETE /:id
 // als Catch-All wirken und sonst spezifischere Routen (z.B. DELETE /book-chat-cache,

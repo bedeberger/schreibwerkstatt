@@ -409,9 +409,19 @@ try {
       } catch (e) {
         logger.error('Cron Cache-Cleanup Fehler: ' + e.message);
       }
+
+      // Phase 4b: abgelaufene page_locks wegraeumen. Funktional ist es nicht
+      // noetig (Guards filtern `WHERE expires_at > now`), nur DB-Hygiene.
+      try {
+        const { purgeExpiredLocks } = require('./db/book-access');
+        const removed = purgeExpiredLocks();
+        if (removed > 0) logger.info(`Cron: ${removed} abgelaufene page_locks entfernt.`);
+      } catch (e) {
+        logger.error('Cron page_locks-Cleanup Fehler: ' + e.message);
+      }
     });
   }, { timezone: cronTz });
-  logger.info(`Cron-Job registriert: Buchstatistik-Sync + Job-Cleanup + Cache-TTL-Cleanup täglich 23:00 (${cronTz})`);
+  logger.info(`Cron-Job registriert: Buchstatistik-Sync + Job-Cleanup + Cache-TTL-Cleanup + page_locks-Purge täglich 23:00 (${cronTz})`);
 
   // 04:00 – Stale-Cleanup. Eintraege (books/chapters/pages), deren letzter
   // Discovery-Touch (last_seen_at) aelter ist als STALE_DAYS, werden geloescht.

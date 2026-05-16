@@ -18,7 +18,8 @@ const { db } = require('./connection');
 const _stmtFindByEmail = db.prepare(`
   SELECT id, email, display_name, avatar_url, global_role, status, language,
          model_override, can_invite_users, first_seen_at, last_seen_at,
-         invited_by, invited_at, created_at
+         invited_by, invited_at, created_at,
+         monthly_budget_usd, budget_mode
     FROM app_users
    WHERE email = ?
 `);
@@ -51,9 +52,14 @@ const _stmtSetInviteFlag = db.prepare(`
 
 const _stmtListUsers = db.prepare(`
   SELECT id, email, display_name, global_role, status, language,
-         can_invite_users, first_seen_at, last_seen_at, created_at
+         can_invite_users, first_seen_at, last_seen_at, created_at,
+         monthly_budget_usd, budget_mode
     FROM app_users
    ORDER BY created_at DESC, email
+`);
+
+const _stmtSetBudget = db.prepare(`
+  UPDATE app_users SET monthly_budget_usd = ?, budget_mode = ? WHERE email = ?
 `);
 
 const _stmtInsertAudit = db.prepare(`
@@ -142,6 +148,21 @@ function setGlobalRole(email, role) {
 
 function setCanInviteUsers(email, flag) {
   _stmtSetInviteFlag.run(flag ? 1 : 0, _normEmail(email));
+}
+
+// Phase 4d: Admin setzt Monats-Budget. `usd=null` entfernt das numerische
+// Limit; `mode='none'` deaktiviert Pruefung komplett.
+function setBudget(email, { usd, mode }) {
+  const e = _normEmail(email);
+  if (!e) throw new Error('setBudget: email required');
+  if (mode !== 'none' && mode !== 'soft' && mode !== 'hard') {
+    throw new Error("setBudget: mode must be 'none'|'soft'|'hard'");
+  }
+  const usdVal = (usd === null || usd === undefined || usd === '') ? null : Number(usd);
+  if (usdVal !== null && (!Number.isFinite(usdVal) || usdVal < 0)) {
+    throw new Error('setBudget: usd must be null or a non-negative number');
+  }
+  _stmtSetBudget.run(usdVal, mode, e);
 }
 
 // Soft-Delete: status='deleted' + anonymize display_name. Email bleibt
@@ -256,7 +277,7 @@ function ensureAdminFromEnv() {
 
 module.exports = {
   getUser, listUsers, createUser, touchLogin,
-  setStatus, setGlobalRole, setCanInviteUsers, softDeleteUser,
+  setStatus, setGlobalRole, setCanInviteUsers, setBudget, softDeleteUser,
   recordAuditEvent, listAuditForUser,
   createInvite, findInviteByToken, inviteStatus, acceptInvite, revokeInvite, listActiveInvites,
   ensureAdminFromEnv,

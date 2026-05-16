@@ -58,7 +58,7 @@ router.put('/:email', express.json(), (req, res) => {
   const user = appUsers.getUser(target);
   if (!user) return res.status(404).json({ error_code: 'USER_NOT_FOUND' });
 
-  const { global_role, status, can_invite_users } = req.body || {};
+  const { global_role, status, can_invite_users, monthly_budget_usd, budget_mode } = req.body || {};
   const ip = _clientIp(req);
   const userAgent = req.headers['user-agent'] || null;
   const actor = req.session.user.email;
@@ -84,6 +84,23 @@ router.put('/:email', express.json(), (req, res) => {
   }
   if (can_invite_users !== undefined) {
     appUsers.setCanInviteUsers(target, !!can_invite_users);
+  }
+  // Phase 4d: Budget-Felder. Beide muessen zusammen kommen — Mode + USD bilden
+  // eine Einheit, sonst sind Defaults missverstaendlich.
+  if (monthly_budget_usd !== undefined || budget_mode !== undefined) {
+    const nextMode = budget_mode !== undefined ? budget_mode : (user.budget_mode || 'none');
+    const nextUsd = monthly_budget_usd === undefined ? user.monthly_budget_usd : monthly_budget_usd;
+    try {
+      appUsers.setBudget(target, { usd: nextUsd, mode: nextMode });
+      if (nextMode !== (user.budget_mode || 'none') || nextUsd !== user.monthly_budget_usd) {
+        appUsers.recordAuditEvent(target, 'budget-changed', {
+          ip, userAgent,
+          meta: { from: { mode: user.budget_mode || 'none', usd: user.monthly_budget_usd }, to: { mode: nextMode, usd: nextUsd }, by: actor },
+        });
+      }
+    } catch (e) {
+      return res.status(400).json({ error_code: 'BUDGET_INVALID', detail: e.message });
+    }
   }
 
   res.json({ user: appUsers.getUser(target) });

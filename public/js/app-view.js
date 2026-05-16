@@ -226,6 +226,15 @@ export const appViewMethods = {
     this._closeOtherMainCards('adminSettings');
     this.showAdminSettingsCard = true;
   },
+  toggleAdminUsageCard() {
+    if (this.currentUser?.role === 'admin' && !this.setupCompleted) {
+      window.location.href = '/setup';
+      return;
+    }
+    if (this.showAdminUsageCard) { this.showAdminUsageCard = false; return; }
+    this._closeOtherMainCards('adminUsage');
+    this.showAdminUsageCard = true;
+  },
   toggleFinetuneExportCard() {
     if (this.showFinetuneExportCard) { this.showFinetuneExportCard = false; return; }
     this._closeOtherMainCards('finetuneExport');

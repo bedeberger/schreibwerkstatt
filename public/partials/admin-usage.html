@@ -1,0 +1,313 @@
+<!-- Admin-Usage-Dashboard (Phase 4d) -->
+<!--
+  Sub-Komponente — siehe public/js/cards/admin-usage-card.js.
+  `showAdminUsageCard` + `toggleAdminUsageCard` im Root. Sichtbar nur bei
+  $app.currentUser.isAdmin (Frontend-Guard zusaetzlich zum Server-side
+  requireAdmin). Privacy-Boundary: keine Buchtitel, kein Inhalt — Admin
+  sieht USD/Tokens + anonyme book_id.
+-->
+<div class="card card--admin-usage" x-data="adminUsageCard" x-show="$app.showAdminUsageCard" x-cloak>
+  <div class="card-header">
+    <span class="card-title" x-text="$app.t('admin.usage.title')"></span>
+    <div class="card-actions">
+      <button type="button" @click="adminUsageLoadTab()" :disabled="adminUsageLoading" x-text="$app.t('common.refresh')"></button>
+    </div>
+  </div>
+
+  <!-- Tab-Bar -->
+  <div class="admin-usage-tabs">
+    <template x-for="tab in ['users','jobs','chat','summary','features','time']" :key="tab">
+      <button type="button"
+              :class="['admin-usage-tab', adminUsageTab === tab ? 'is-active' : '']"
+              @click="adminUsageSelectTab(tab)"
+              x-text="$app.t('admin.usage.tab.' + tab)"></button>
+    </template>
+  </div>
+
+  <!-- Datumsbereich -->
+  <div class="admin-usage-range">
+    <label>
+      <span x-text="$app.t('admin.usage.from')"></span>
+      <input type="date" x-model="adminUsageFrom">
+    </label>
+    <label>
+      <span x-text="$app.t('admin.usage.to')"></span>
+      <input type="date" x-model="adminUsageTo">
+    </label>
+  </div>
+
+  <div x-show="adminUsageLoading" class="muted-msg" x-text="$app.t('common.loading')"></div>
+  <div x-show="adminUsageError" class="error-msg" x-text="adminUsageError"></div>
+
+  <!-- ── Users-Tab ─────────────────────────────────────────────────────── -->
+  <div x-show="adminUsageTab === 'users'" class="admin-usage-pane">
+    <table class="admin-usage-table" x-show="adminUsageUsersList.length">
+      <thead>
+        <tr>
+          <th x-text="$app.t('admin.users.email')"></th>
+          <th x-text="$app.t('admin.usage.column.cost')"></th>
+          <th x-text="$app.t('admin.usage.column.tokensIn')"></th>
+          <th x-text="$app.t('admin.usage.column.tokensOut')"></th>
+          <th x-text="$app.t('admin.usage.user.budget')"></th>
+          <th x-text="$app.t('admin.usage.user.mode')"></th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-for="u in adminUsageUsersList" :key="u.email">
+          <tr :class="u.overrun ? 'admin-usage-row--overrun' : ''">
+            <td>
+              <div x-text="u.displayName || u.email"></div>
+              <div class="muted-msg muted-msg--sm" x-text="u.email"></div>
+            </td>
+            <td x-text="adminUsageMoney(u.usd)"></td>
+            <td x-text="adminUsageInt(u.tokensIn)"></td>
+            <td x-text="adminUsageInt(u.tokensOut)"></td>
+            <td>
+              <input type="number" min="0" step="0.01"
+                     x-model="u._draftBudget"
+                     :placeholder="$app.t('admin.usage.user.noBudget')"
+                     class="admin-usage-budget-input">
+            </td>
+            <td>
+              <select x-model="u._draftMode" class="admin-usage-mode-select">
+                <option value="none"   x-text="$app.t('admin.usage.user.mode.none')"></option>
+                <option value="soft"   x-text="$app.t('admin.usage.user.mode.soft')"></option>
+                <option value="hard"   x-text="$app.t('admin.usage.user.mode.hard')"></option>
+              </select>
+            </td>
+            <td class="admin-usage-actions">
+              <button type="button" @click="adminUsageSaveBudget(u)" :disabled="u._saving"
+                      x-text="u._saving ? $app.t('common.saving') : $app.t('common.save')"></button>
+              <span x-show="u._savedAt && (Date.now() - u._savedAt < 2000)"
+                    class="muted-msg muted-msg--sm" x-text="$app.t('common.saved')"></span>
+              <button type="button" @click="adminUsageFilterUser = u.email; adminUsageSelectTab('jobs')"
+                      x-text="$app.t('admin.usage.user.drillDown')"></button>
+            </td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+    <div x-show="!adminUsageUsersList.length && !adminUsageLoading" class="muted-msg" x-text="$app.t('admin.usage.empty')"></div>
+  </div>
+
+  <!-- ── Jobs-Tab ──────────────────────────────────────────────────────── -->
+  <div x-show="adminUsageTab === 'jobs'" class="admin-usage-pane">
+    <div class="admin-usage-filter">
+      <label>
+        <span x-text="$app.t('admin.usage.filter.user')"></span>
+        <input type="email" x-model="adminUsageFilterUser" :placeholder="$app.t('admin.users.email')">
+      </label>
+    </div>
+    <table class="admin-usage-table" x-show="adminUsageJobsList.length">
+      <thead>
+        <tr>
+          <th x-text="$app.t('admin.usage.job.type')"></th>
+          <th x-text="$app.t('admin.usage.job.model')"></th>
+          <th x-text="$app.t('admin.usage.column.tokensIn')"></th>
+          <th x-text="$app.t('admin.usage.column.tokensOut')"></th>
+          <th x-text="$app.t('admin.usage.column.cacheRead')"></th>
+          <th x-text="$app.t('admin.usage.column.cacheWrite')"></th>
+          <th x-text="$app.t('admin.usage.column.cost')"></th>
+          <th x-text="$app.t('admin.usage.job.book')"></th>
+          <th x-text="$app.t('admin.usage.job.queuedAt')"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-for="r in adminUsageJobsList" :key="r.id">
+          <tr>
+            <td x-text="r.type"></td>
+            <td x-text="r.model || '—'"></td>
+            <td x-text="adminUsageInt(r.tokensIn)"></td>
+            <td x-text="adminUsageInt(r.tokensOut)"></td>
+            <td x-text="adminUsageInt(r.cacheReadIn)"></td>
+            <td x-text="adminUsageInt(r.cacheCreationIn)"></td>
+            <td x-text="adminUsageMoney(r.usd)"></td>
+            <td x-text="r.bookId ? ('#' + r.bookId) : '—'"></td>
+            <td x-text="new Date(r.queuedAt).toLocaleString($app.uiLocale === 'en' ? 'en-US' : 'de-CH')"></td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+    <div x-show="!adminUsageFilterUser" class="muted-msg" x-text="$app.t('admin.usage.filter.userHint')"></div>
+    <div x-show="adminUsageFilterUser && !adminUsageJobsList.length && !adminUsageLoading" class="muted-msg" x-text="$app.t('admin.usage.empty')"></div>
+  </div>
+
+  <!-- ── Chat-Tab ──────────────────────────────────────────────────────── -->
+  <div x-show="adminUsageTab === 'chat'" class="admin-usage-pane">
+    <div class="admin-usage-filter">
+      <label>
+        <span x-text="$app.t('admin.usage.filter.user')"></span>
+        <input type="email" x-model="adminUsageFilterUser" :placeholder="$app.t('admin.users.email')">
+      </label>
+    </div>
+    <table class="admin-usage-table" x-show="adminUsageChatList.length">
+      <thead>
+        <tr>
+          <th x-text="$app.t('admin.usage.chat.kind')"></th>
+          <th x-text="$app.t('admin.usage.job.model')"></th>
+          <th x-text="$app.t('admin.usage.column.tokensIn')"></th>
+          <th x-text="$app.t('admin.usage.column.tokensOut')"></th>
+          <th x-text="$app.t('admin.usage.column.cacheRead')"></th>
+          <th x-text="$app.t('admin.usage.column.cost')"></th>
+          <th x-text="$app.t('admin.usage.job.book')"></th>
+          <th x-text="$app.t('admin.usage.job.queuedAt')"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-for="r in adminUsageChatList" :key="r.id">
+          <tr>
+            <td x-text="r.sessionKind"></td>
+            <td x-text="r.model || '—'"></td>
+            <td x-text="adminUsageInt(r.tokensIn)"></td>
+            <td x-text="adminUsageInt(r.tokensOut)"></td>
+            <td x-text="adminUsageInt(r.cacheReadIn)"></td>
+            <td x-text="adminUsageMoney(r.usd)"></td>
+            <td x-text="r.bookId ? ('#' + r.bookId) : '—'"></td>
+            <td x-text="new Date(r.createdAt).toLocaleString($app.uiLocale === 'en' ? 'en-US' : 'de-CH')"></td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+    <div x-show="!adminUsageFilterUser" class="muted-msg" x-text="$app.t('admin.usage.filter.userHint')"></div>
+    <div x-show="adminUsageFilterUser && !adminUsageChatList.length && !adminUsageLoading" class="muted-msg" x-text="$app.t('admin.usage.empty')"></div>
+  </div>
+
+  <!-- ── Summary-Tab ───────────────────────────────────────────────────── -->
+  <div x-show="adminUsageTab === 'summary'" class="admin-usage-pane">
+    <div class="admin-usage-totals" x-show="adminUsageSummary">
+      <div class="admin-usage-kpi">
+        <div class="admin-usage-kpi-label" x-text="$app.t('admin.usage.summary.total')"></div>
+        <div class="admin-usage-kpi-value" x-text="adminUsageMoney(adminUsageSummary?.totals?.usd)"></div>
+      </div>
+      <div class="admin-usage-kpi">
+        <div class="admin-usage-kpi-label" x-text="$app.t('admin.usage.column.tokensIn')"></div>
+        <div class="admin-usage-kpi-value" x-text="adminUsageInt(adminUsageSummary?.totals?.tokensIn)"></div>
+      </div>
+      <div class="admin-usage-kpi">
+        <div class="admin-usage-kpi-label" x-text="$app.t('admin.usage.column.tokensOut')"></div>
+        <div class="admin-usage-kpi-value" x-text="adminUsageInt(adminUsageSummary?.totals?.tokensOut)"></div>
+      </div>
+      <div class="admin-usage-kpi">
+        <div class="admin-usage-kpi-label" x-text="$app.t('admin.usage.column.cacheRead')"></div>
+        <div class="admin-usage-kpi-value" x-text="adminUsageInt(adminUsageSummary?.totals?.cacheReadIn)"></div>
+      </div>
+      <div class="admin-usage-kpi">
+        <div class="admin-usage-kpi-label" x-text="$app.t('admin.usage.column.cacheWrite')"></div>
+        <div class="admin-usage-kpi-value" x-text="adminUsageInt(adminUsageSummary?.totals?.cacheCreationIn)"></div>
+      </div>
+    </div>
+
+    <div class="admin-usage-charts" x-show="adminUsageSummary">
+      <figure>
+        <figcaption x-text="$app.t('admin.usage.summary.topUsers')"></figcaption>
+        <canvas x-ref="chartUsers" height="220"></canvas>
+      </figure>
+      <figure>
+        <figcaption x-text="$app.t('admin.usage.summary.byModel')"></figcaption>
+        <canvas x-ref="chartModel" height="220"></canvas>
+      </figure>
+      <figure>
+        <figcaption x-text="$app.t('admin.usage.summary.byType')"></figcaption>
+        <canvas x-ref="chartType" height="220"></canvas>
+      </figure>
+    </div>
+  </div>
+
+  <!-- ── Features-Tab ──────────────────────────────────────────────────── -->
+  <div x-show="adminUsageTab === 'features'" class="admin-usage-pane">
+    <h3 x-text="$app.t('admin.usage.feature.totals')"></h3>
+    <table class="admin-usage-table" x-show="adminUsageFeatureTotals.length">
+      <thead>
+        <tr>
+          <th x-text="$app.t('admin.usage.feature.key')"></th>
+          <th x-text="$app.t('admin.usage.feature.count')"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-for="t in adminUsageFeatureTotals" :key="t.featureKey">
+          <tr>
+            <td x-text="t.featureKey"></td>
+            <td x-text="adminUsageInt(t.count)"></td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+
+    <h3 x-text="$app.t('admin.usage.feature.byUser')" style="margin-top: var(--space-md);"></h3>
+    <table class="admin-usage-table" x-show="adminUsageFeatureItems.length">
+      <thead>
+        <tr>
+          <th x-text="$app.t('admin.users.email')"></th>
+          <th x-text="$app.t('admin.usage.feature.key')"></th>
+          <th x-text="$app.t('admin.usage.feature.count')"></th>
+          <th x-text="$app.t('admin.usage.feature.lastUsed')"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-for="r in adminUsageFeatureItems" :key="r.email + ':' + r.featureKey">
+          <tr>
+            <td x-text="r.email"></td>
+            <td x-text="r.featureKey"></td>
+            <td x-text="adminUsageInt(r.count)"></td>
+            <td x-text="r.lastUsed ? new Date(r.lastUsed).toLocaleString($app.uiLocale === 'en' ? 'en-US' : 'de-CH') : '—'"></td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── Zeit-Tab ──────────────────────────────────────────────────────── -->
+  <div x-show="adminUsageTab === 'time'" class="admin-usage-pane">
+    <table class="admin-usage-table" x-show="adminUsageTimeItems.length">
+      <thead>
+        <tr>
+          <th x-text="$app.t('admin.users.email')"></th>
+          <th x-text="$app.t('admin.usage.time.book')"></th>
+          <th x-text="$app.t('admin.usage.time.writing')"></th>
+          <th x-text="$app.t('admin.usage.time.lektorat')"></th>
+          <th x-text="$app.t('admin.usage.time.total')"></th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-for="r in adminUsageTimeItems" :key="r.email + ':' + r.bookId">
+          <tr>
+            <td x-text="r.email"></td>
+            <td x-text="r.bookId ? ('#' + r.bookId) : '—'"></td>
+            <td x-text="adminUsageHhmm(r.writingSeconds)"></td>
+            <td x-text="adminUsageHhmm(r.lektoratSeconds)"></td>
+            <td x-text="adminUsageHhmm(r.totalSeconds)"></td>
+            <td>
+              <button type="button" @click="adminUsageLoadTimeSeries(r)"
+                      x-text="adminUsageTimeSeriesKey === (r.email + ':' + r.bookId) ? $app.t('admin.usage.time.hideSeries') : $app.t('admin.usage.time.series')"></button>
+            </td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+
+    <div class="admin-usage-series" x-show="adminUsageTimeSeries.length">
+      <table class="admin-usage-table">
+        <thead>
+          <tr>
+            <th x-text="$app.t('admin.usage.time.date')"></th>
+            <th x-text="$app.t('admin.usage.time.writing')"></th>
+            <th x-text="$app.t('admin.usage.time.lektorat')"></th>
+            <th x-text="$app.t('admin.usage.time.total')"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="d in adminUsageTimeSeries" :key="d.date">
+            <tr>
+              <td x-text="d.date"></td>
+              <td x-text="adminUsageHhmm(d.writingSeconds)"></td>
+              <td x-text="adminUsageHhmm(d.lektoratSeconds)"></td>
+              <td x-text="adminUsageHhmm(d.totalSeconds)"></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
