@@ -157,147 +157,65 @@ Implementiert; Code-Pfade:
 
 ---
 
-## Phase 7 — Volltextsuche (SQLite FTS5)
+## Phase 7 — Volltextsuche (SQLite FTS5) (erledigt)
 
-Eigene Volltextsuche über alle App-Inhalte. Läuft parallel zu BookStack-Search während Replica-Phase; in Phase 8 wird nur noch der BookStack-Pfad entfernt.
+Implementiert; Code-Pfade:
 
-**Scope:**
-- Bücher: `books.name`, `books.description`.
-- Kapitel: `chapters.chapter_name`, `chapters.description`.
-- Pages: `pages.page_name`, `pages.body_html` (HTML-stripped).
-- Domain-Objekte: `figures.name` + `figures.beschreibung`, `locations.name` + `locations.beschreibung`, `figure_scenes` (Titel/Beschreibung), `ideen.titel` + `ideen.text`.
-
-Ein einziger FTS5-Index; Diskriminator über `kind`-Spalte; ACL über `book_id`.
-
-**Migration:**
-
-```sql
-CREATE VIRTUAL TABLE search_index USING fts5(
-  kind UNINDEXED,         -- 'book' | 'chapter' | 'page' | 'figure' | 'location' | 'scene' | 'idea'
-  entity_id UNINDEXED,
-  book_id UNINDEXED,      -- für ACL-JOIN
-  lang UNINDEXED,         -- 'de' | 'en' | NULL
-  title,                  -- gewichtbar via bm25(search_index, 5.0, 1.0)
-  body,
-  tokenize = "unicode61 remove_diacritics 2 tokenchars '-_'"
-);
-
-CREATE VIRTUAL TABLE search_trigram USING fts5(
-  kind UNINDEXED,
-  entity_id UNINDEXED,
-  book_id UNINDEXED,
-  title,
-  tokenize = "trigram"
-);
-
-CREATE TABLE search_meta (
-  key TEXT PRIMARY KEY,
-  value TEXT,
-  updated_at TEXT DEFAULT (datetime('now'))
-);
-INSERT INTO search_meta (key, value) VALUES ('last_optimize', NULL);
-```
-
-**Tokenizer-Wahl:**
-- `unicode61 remove_diacritics 2` — Umlaut-Folding, DE+EN gemeinsam.
-- `tokenchars '-_'` — Bindestrich-Wörter zusammenhalten.
-- Kein Porter-Stemmer (nur EN, schlecht für DE).
-- Zweiter trigram-Index nur in Titeln für Typo-Toleranz.
-
-**Sync-Strategie**: Application-level, nicht SQL-Trigger (HTML→Text-Stripping muss in JS passieren, Konsistenz zu [routes/sync.js](../routes/sync.js)#htmlToText). Hook-Punkte:
-- Page-Save (Phase-2-Hook): `searchIndex.upsert('page', page_id, …)`.
-- Chapter-Update, Book-Update.
-- Domain-Object-CRUD ([routes/figures.js](../routes/figures.js), [routes/locations.js](../routes/locations.js), [routes/ideen.js](../routes/ideen.js)).
-- Sync-Pull (Phase 1): bei Body-Update → FTS-Reindex der Page.
-
-Lib `lib/search.js` als Single Entry Point: `upsert(kind, id, fields)`, `remove(kind, id)`, `query(text, opts)`, `reindexAll()`.
-
-**HTML→Text-Normalisierung** für `body`: Reuse von [lib/html-clean.js](../lib/html-clean.js) + `htmlToText`-Variante (Tag→Space + `\s+`→Single-Space — identisch zu `routes/sync.js`/Frontend). Pflicht-Konsistenz, sonst Drift zu `page_stats.chars`.
-
-**Search-API** (`routes/search.js`):
-
-```
-GET /search?q=...&kind=page,chapter&book_id=42&limit=50&offset=0
-```
-
-- ACL-Filter zwingend: JOIN auf `book_access` mit `req.session.user_email`.
-- BM25-Gewichtung: Title 5x stärker als Body.
-- Query-Parsing: `"`-quote-Phrasen, `-`-Negationen, `*`-Präfix; Spezialzeichen escapen. Single-Word + kein Treffer → Fallback auf `search_trigram`.
-- Default-Filter: Pages + Chapters. Rest als Opt-In via `kind`.
-
-**Frontend:**
-- **Command-Palette-Integration**: Provider `searchProvider` in [public/js/cards/palette-providers.js](../public/js/cards/palette-providers.js). Prefix `?` für Volltext-Modus.
-- **`SearchCard`** (eigene Pill, `FEATURES`+`EXCLUSIVE_CARDS`+`ALLOWED_KEYS`-Eintrag): Search-Input, `kind`-Filter-Pills, Buch-Combobox, Ergebnisliste mit Snippet+Pfad, Tastatur-Navigation. Treffer-Klick navigiert via Hash-Router; Query-Param `?q=...` an Editor-Find weiterreichen → Markierung via [public/js/editor/find.js](../public/js/editor/find.js).
-
-**Performance:**
-- Daily `INSERT INTO search_index(search_index) VALUES('optimize')` im 02:00-Sync-Cron.
-- Initial-Build via `lib/search.js#reindexAll()` beim Migrations-Lauf, batched 500er-Chunks.
-- Erwartete Index-Grösse ~30-40% der indexierten Text-Grösse.
-
-**ACL-Test (Pflicht)**: zwei User mit unterschiedlichen `book_access`-Mengen, `/search?q=*` liefert nur Treffer aus sichtbaren Büchern.
-
-**i18n**: `search.title`, `search.placeholder`, `search.filter.kind`, `search.filter.book`, `search.empty`, `search.results.count` (`{n}`), `search.kind.{book,chapter,page,figure,location,scene,idea}`, `search.snippet.unavailable`.
-
-**Tests**: Unit (Query-Parser, HTML→Text-Match), Integration (Index-Sync nach Save/CRUD/Pull, ACL-Boundary), E2E (Suche → Klick → Highlight).
+- **Migration 116** ([db/migrations.js](../db/migrations.js)): `search_index` (FTS5, unicode61 `remove_diacritics 2` + `tokenchars '-_'`, Spalten `kind|entity_id|book_id|lang` UNINDEXED + `title`+`body` indexiert) + `search_trigram` (FTS5 trigram, Titel-only) + `search_meta` (key/value-Store). Migration setzt `reindex_required=1`; Server.js boot-hook ruft `reindexIfNeeded()` in setImmediate. FTS5 unterstuetzt keine FKs — Index-Pflege via Application-Hooks (s.u.).
+- **Lib** ([lib/search.js](../lib/search.js)): Single Entry Point. `upsertPage/Chapter/BookMeta/Figure/Location/Scene/Idea(id)` liest die aktuelle Row und schreibt sie in beide FTS5-Tabellen (DELETE-then-INSERT, idempotent). `remove(kind, id)` + `removeAllForBook(bookId)` + `removeKindForBook(kind, bookId)` fuer Full-Replace-Pfade (figures/locations/scenes). `query(input, { allowedBookIds, kinds, bookId, limit, offset })` → BM25 mit `bm25(search_index, 5.0, 1.0)` (title 5x), Single-Word-Zero-Hit faellt automatisch auf Trigram-Titel-Match zurueck. `buildMatchQuery()` parsed `"phrasen"`, `-negation`, `prefix*` und stripped Non-Word-Zeichen (`/[^\p{L}\p{N}_-]/u`) — User-Input kann keinen FTS5-Syntax-Error werfen. Alle Upserts safe-wrapped (Failure → warn-Log, kein Throw — Search-Sync darf den Save nicht abbrechen). HTML→Text identisch zu [routes/sync.js#htmlToText](../routes/sync.js) und [db/page-revisions.js](../db/page-revisions.js) (Pflicht-Konsistenz).
+- **Schreib-Hooks**:
+  - [lib/content-store/index.js](../lib/content-store/index.js): `createBook`/`deleteBook` → upsertBookMeta/removeAllForBook; `createChapter`/`updateChapter`/`deleteChapter` → upsertChapter/remove; `createPage`/`savePage`/`deletePage` → upsertPage/remove. searchIndex lazy-import (Test-Schema-Kompatibilitaet).
+  - [routes/figures.js](../routes/figures.js) `PUT /:book_id`: nach `saveFigurenToDb` Full-Replace per `removeKindForBook('figure', bookId)` + Re-Upsert aller Figuren des Buchs. `DELETE /scenes/:book_id` analog fuer Szenen.
+  - [routes/locations.js](../routes/locations.js) `PUT /:book_id`: nach `saveOrteToDb` Full-Replace.
+  - [routes/ideen.js](../routes/ideen.js): POST/PATCH/DELETE rufen `upsertIdea`/`remove`. content = Plain-Text, erste Zeile als Titel (Trigram + bm25-Boost).
+  - [routes/jobs/komplett/remap.js#saveSzenenAndEvents](../routes/jobs/komplett/remap.js): nach figure_scenes-Full-Replace alle drei Domain-Indizes (scene/figure/location) fuer das Buch neu aufbauen.
+  - [routes/sync.js#syncBook](../routes/sync.js): nach BookStack-Pull `upsertBookMeta(bookId)` + Re-Upsert aller Kapitel + indexierten Seiten.
+  - [db/pages.js#pruneStaleBookData](../db/pages.js): nach Stale-Cleanup explizite `remove('page'/'chapter', id)`-Calls. searchIndex lazy-import + try/catch (Cron-Pfad).
+- **Search-API** ([routes/search.js](../routes/search.js)): `GET /search?q=...&kind=page,chapter&book_id=42&limit=50&offset=0`. ACL strikt: ohne `book_id` filtert serverseitig via `bookAccess.listBookIdsForUser(email)` (leere Liste → leere Hits, kein Cross-Buch-Leak). Mit `book_id` zusaetzlicher viewer-Guard. Default-`kind` = `page,chapter`; `kind=*` aktiviert alle Domain-Objekte. Mount in [server.js](../server.js): `app.use('/search', require('./routes/search'))`. `/search` in `NEVER_CACHE_PREFIXES` von [public/sw.js](../public/sw.js).
+- **Cron**: Tagliche `INSERT INTO search_index(search_index) VALUES('optimize')` im bestehenden 23:00-Cron-Block ([server.js](../server.js)) — kein separater 02:00-Cron. `last_optimize` in `search_meta`.
+- **Frontend**:
+  - `SearchCard` ([public/js/cards/search-card.js](../public/js/cards/search-card.js), Partial [public/partials/search.html](../public/partials/search.html)): Search-Input mit Debouncing (220 ms), Kind-Filter-Pills (alle 7 Typen, Default `page,chapter`), Scope-Toggle (aktuelles Buch ↔ alle), Snippet-Render via `<mark>`. Treffer-Klick dispatcht auf `gotoPageById`/`openKapitelReviewForChapter`/`openFigurById`/`openOrtById`/`openSzeneById` je nach `kind`. Hash-Route `#search` (book-unabhaengig).
+  - `FEATURES`+`EXCLUSIVE_CARDS`-Eintrag in [public/js/cards/feature-registry.js](../public/js/cards/feature-registry.js) (`minRole: 'viewer'`); `showSearchCard` in [public/js/app-state.js](../public/js/app-state.js); `toggleSearchCard` in [public/js/app-view.js](../public/js/app-view.js); `search` in `ALLOWED_KEYS` von [routes/usage.js](../routes/usage.js); Hash-Router-watcher + parse/build/category in [public/js/app-hash-router.js](../public/js/app-hash-router.js).
+  - Command-Palette-Provider `fulltext` mit Prefix `?` in [public/js/cards/palette-providers.js](../public/js/cards/palette-providers.js): async `fetch('/search?...')` mit Query-Cache pro `(q,bookId)`-Paar, Re-Render via `palette:rerender`-Event ([public/js/cards/palette-card.js](../public/js/cards/palette-card.js)). `?` in Palette-Legend.
+  - Card-Accent: `--card-accent-search` in [public/css/tokens/colors.css](../public/css/tokens/colors.css) (Light + Dark) + Mapping in [public/css/card-accents.css](../public/css/card-accents.css). UI-Styles in [public/css/search.css](../public/css/search.css) (`.card--search`, Kind-Pills, Scope-Toggle, Treffer-Liste mit BM25-Snippet).
+- **i18n**: `tile.search{,.desc,.title}` + `search.{title,subtitle,placeholder,clear,loading,empty,fallback,untitled,results.count,scope.book,scope.all,kind.*}` + `palette.legend.fulltext` + `palette.section.fulltext` in beiden Locale-Files.
+- **Tests**: [tests/unit/search-query.test.mjs](../tests/unit/search-query.test.mjs) (10 Cases — Query-Parser fuer Phrasen/Negation/Prefix/Sanitization, htmlToText-Parity, empty-allowedBookIds short-circuit). [tests/integration/search-index.test.js](../tests/integration/search-index.test.js) (10 Cases — Upsert+Query, Title-BM25-Boost, Umlaut-Folding `remove_diacritics=2`, ACL-Filter, kind-Filter, Idempotenz, remove/removeAllForBook, reindexAll, Trigram-Fallback, Empty-Row-Skip).
 
 ---
 
 ## Phase 8 — Backend-Migration-Tool (Bulk-Copy)
 
-Voraussetzung: Phasen 1–7 stabil. Beide Backends sind betrieblich okay; Admin zieht **gerichtet** um.
+**Aktueller Stand:** `bookstack → localdb` landed; symmetrischer Pfad `localdb → bookstack` weiterhin offen.
 
-**Job-Typ `backend-migrate`** ([routes/jobs/backend-migrate.js](../routes/jobs/backend-migrate.js)) — Standard-Pattern, Admin-only.
+### Erledigt: `bookstack → localdb` (ID-erhaltend)
 
-**Trigger** über Admin-Karte `AdminBackendMigrationCard`:
-- Quelle/Ziel-Auswahl (`bookstack` → `localdb` ist Primärfall; `localdb` → `bookstack` symmetrisch).
-- Wahl: alle Bücher oder Einzel-Buch.
-- Checkbox „Quelle nach erfolgreichem Copy auf read-only setzen" (empfohlen).
+- **Job** ([routes/jobs/backend-migrate.js](../routes/jobs/backend-migrate.js)): `runBackendMigrateJob` + `POST /jobs/backend-migrate` (Admin-only via `requireAdmin`). Body: `{ source, target, bookId?, setSourceReadOnly?, cutover? }`. Dedup-Key `migrate:global` (genau ein Migrate-Job zur Zeit). Aktuell akzeptierte Werte: `source='bookstack'`, `target='localdb'`. Reads gehen direkt am Bookstack-Backend vorbei an der Facade, Writes über `backfillBookTransactional` (ID-erhaltend via `ON CONFLICT(page_id) DO UPDATE`).
+- **Source-Read-Only-Marker**: `app_settings` Key `app.migrate.source_readonly` (Default `''`). `_assertWritable` in [lib/content-store/index.js](../lib/content-store/index.js) wirft `BACKEND_READ_ONLY` (status 423), wenn Marker == `currentBackend()`. Greift auf alle Write-Calls (savePage, createPage, deletePage, createChapter, updateChapter, deleteChapter, createBook, deleteBook). Reads bleiben erlaubt.
+- **FTS-Reindex**: pro migriertem Buch `removeAllForBook` + iterativer `upsertChapter`/`upsertPage`-Sweep, damit Phase-7-Suche unter localdb sofort konsistent ist.
+- **Cutover**: nach Erfolg aller Bücher `appSettings.set('app.backend', 'localdb', …)`. `app-settings:changed`-Event löst Hot-Reload aus; ein neuerlicher Switch nach `bookstack` bleibt blockiert, solange der Read-Only-Marker steht.
+- **Rollback-Helfer**: `POST /jobs/backend-migrate/clear-readonly` (Admin) löscht den Marker explizit.
+- **Status-Endpoint**: `GET /jobs/backend-migrate/status` liefert `{ currentBackend, sourceReadOnly }` für die UI ohne Umweg über `/admin/settings`.
+- **Admin-UI** ([public/js/cards/admin-backend-migration-card.js](../public/js/cards/admin-backend-migration-card.js) + [public/partials/admin-backend-migration.html](../public/partials/admin-backend-migration.html)): Status-Block, Form mit Buch-Filter, Read-Only-/Cutover-Checkboxen, Job-Polling via `startPoll` + `runningJobStatus`. Card-Tile in [public/partials/admin-home.html](../public/partials/admin-home.html). Hash `#admin/migration`. Registriert in `EXCLUSIVE_CARDS` ([public/js/cards/feature-registry.js](../public/js/cards/feature-registry.js)). Admin-only, nicht in `FEATURES`/Palette.
+- **ID-Strategie**: localdb übernimmt BookStack-PKs 1:1 (Phase 0b-Invariante; AUTOINCREMENT-Wasserzeichen hält BS-Range frei). Keine ID-Map, kein FK-Repair — alle ~40 FK-Spalten zeigen weiter auf dieselben Integer-IDs.
+- **Idempotenz**: `backfillBookTransactional` ist Upsert; Re-Run aktualisiert Bodies.
+- **Tests** ([tests/integration/backend-migrate.test.js](../tests/integration/backend-migrate.test.js)): Bulk-Copy + ID-Erhalt, Cutover, Cutover-Skip, Read-Only-Guard wirft `BACKEND_READ_ONLY`/423, idempotenter Re-Run mit aktualisiertem Body.
 
-**Pipeline pro Buch:**
+### Offen: `localdb → bookstack` (Symmetrie-Pfad)
 
-1. **Source-Read-Only-Marker**: `app_settings` Key `app.migrate.source_readonly = '<source-backend>'`. Content-Store-Facade blockiert ab da `savePage`/`createPage` für den Source-Backend (Edits → 423 Locked mit i18n-Text).
-2. **Bulk-Copy**: pro Page/Chapter Source-Lesen → Target-Schreiben.
-3. **FK-Repair**: richtungsabhängig (siehe ID-Strategie).
-4. **FTS-Reindex** (Phase 7) für migrierte Bücher.
-5. **Cutover**: nach erfolgreichem Copy aller selektierten Bücher: `app.backend = <target>` (atomar). Source-Read-Only-Marker bleibt — Rollback-Option.
-6. **Abort/Rollback**: Job-Cancel rollt nur die laufende Buch-Transaction zurück.
+BookStack-API vergibt frische IDs beim POST → ID-Mapping zwingend:
 
-**ID-Strategie pro Richtung:**
+```sql
+CREATE TABLE backend_migration_idmap (
+  kind          TEXT NOT NULL CHECK(kind IN ('book','chapter','page')),
+  source_id     INTEGER NOT NULL,
+  target_id     INTEGER NOT NULL,
+  migrated_at   TEXT DEFAULT (datetime('now')),
+  PRIMARY KEY (kind, source_id)
+);
+CREATE INDEX idx_idmap_target ON backend_migration_idmap(kind, target_id);
+```
 
-- **`bookstack → localdb` (Primärfall, ID-erhaltend):** localdb übernimmt BookStack-PKs 1:1 (Phase 0b-Invariante; AUTOINCREMENT-Wasserzeichen hält BS-Range frei). **Keine ID-Map, kein FK-Repair** — alle ~40 FK-Spalten zeigen weiter auf dieselben Integer-IDs. Implementierung: `INSERT INTO pages (page_id, …) VALUES (?, …) ON CONFLICT(page_id) DO UPDATE`.
-- **`localdb → bookstack` (Symmetrie-Pfad):** BookStack-API vergibt frische IDs beim POST. ID-Mapping zwingend:
-
-  ```sql
-  CREATE TABLE backend_migration_idmap (
-    kind          TEXT NOT NULL CHECK(kind IN ('book','chapter','page')),
-    source_id     INTEGER NOT NULL,
-    target_id     INTEGER NOT NULL,
-    migrated_at   TEXT DEFAULT (datetime('now')),
-    PRIMARY KEY (kind, source_id)
-  );
-  CREATE INDEX idx_idmap_target ON backend_migration_idmap(kind, target_id);
-  ```
-
-  FK-Repair iteriert alle ~40 FK-Spalten und mapped `source_id → target_id` via Join, dann `UPDATE … WHERE source_id IN map`. Transaction pro Buch.
-
-In beiden Richtungen: `foreign_key_check` am Ende der Buch-Transaction muss leer sein, sonst Rollback.
-
-**Implementierungs-Details:**
-- BookStack-Pages ohne Markdown → `body_markdown=NULL`.
-- BookStack-`priority` → wird in `book_order.order_json` (Phase 3) materialisiert.
-- BookStack-Tags (falls genutzt) → werden in Phase-6-`book_tag_assignments` migriert.
-- localdb → BookStack: BS-API verlangt Reihenfolge (Books → Chapters → Pages), Pages-`html` als POST.
-
-**Idempotenz**: Re-Run mit denselben Source/Target ist no-op pro bereits migriertem Buch (ID-Map-Check). Force-Re-Migrate via UI-Toggle.
-
-**Logging**: Pro Buch `[backend-migrate|admin@…|<book_id>] copied chapters=N pages=M elapsed=Ts`.
-
-**Tests:**
-- Integration: Mock-BS + In-Memory-DB → migrate `bookstack` → `localdb`, alle Pages/Bodies/Order erhalten, FK-`page_revisions` zeigen weiter auf richtige Page.
-- Integration: Migrate-symmetrisch zurück, Round-Trip-Body identisch (Byte-Vergleich nach `cleanPageHtml`).
-- Unit: ID-Map-FK-Repair (alle Spalten-Treffer durchgehen).
-
-**i18n**: `admin.backendMigration.{title,source,target,startButton,warnSourceReadonly,progress,error.<reason>}`.
+FK-Repair iteriert alle ~40 FK-Spalten und mapped `source_id → target_id` via Join, dann `UPDATE … WHERE source_id IN map`. Transaction pro Buch. `foreign_key_check` am Ende der Buch-Transaction muss leer sein, sonst Rollback. BS-API verlangt Reihenfolge Books → Chapters → Pages; Pages-`html` als POST. Job- + UI-Skelett stehen — die symmetrische Richtung erweitert nur `runBackendMigrateJob`, den `target`-Validator und ergänzt die ID-Map-Schreib-Pipeline.
 
 ---
 
@@ -440,8 +358,6 @@ Bestehende Cache-Einträge bekommen `provider = ai.provider`-Default im Backfill
 
 | Phase | Aufwand | Risiko |
 |---|---|---|
-| 6 | 2–3 Tage | niedrig |
-| 7 | 4–6 Tage | mittel (FTS5-Schema + Sync-Hooks + UI) |
 | 8 | 4–6 Tage | mittel-hoch (Bulk-Copy + FK-Repair + ID-Map + Round-Trip-Tests) |
 | 9 | 1–2 Tage | niedrig (Doku-Sweep) |
 | 10 | 1–2 Tage | mittel (Diff-Test gegen Bestand) |

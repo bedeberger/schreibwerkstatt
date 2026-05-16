@@ -33,6 +33,21 @@ export function registerAdminBackendMigrationCard() {
     formSetReadOnly: true,
     formCutover: true,
 
+    get canStart() {
+      if (!this.currentBackend) return false;
+      return this.currentBackend === this.formSource;
+    },
+    get startBlockedReason() {
+      if (!this.currentBackend) return '';
+      if (this.currentBackend !== this.formSource) {
+        return window.__app.t('admin.migrate.blocked.notSource', {
+          source: this.formSource,
+          current: this.currentBackend,
+        });
+      }
+      return '';
+    },
+
     init() {
       this.$watch(() => window.__app.showAdminBackendMigrationCard, async (visible) => {
         if (visible) {
@@ -108,17 +123,29 @@ export function registerAdminBackendMigrationCard() {
       if (this.formBookId && Number(this.formBookId) > 0) payload.bookId = Number(this.formBookId);
 
       try {
-        const { jobId, existing } = await fetchJson('/jobs/backend-migrate', {
+        const resp = await fetch('/jobs/backend-migrate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
-        if (existing) {
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) {
+          const code = data.error_code || '';
+          const key = `admin.migrate.error.${code}`;
+          const translated = t(key, { current: this.currentBackend, source: this.formSource });
+          this.error = translated !== key
+            ? translated
+            : (data.detail ? `HTTP ${resp.status}: ${data.detail}` : `HTTP ${resp.status}`);
+          this.loading = false;
+          this.statusHtml = '';
+          return;
+        }
+        if (data.existing) {
           this.statusHtml = `<span class="spinner"></span>${escHtml(t('admin.migrate.status.alreadyRunning'))}`;
         }
-        localStorage.setItem(_LS_KEY, jobId);
+        localStorage.setItem(_LS_KEY, data.jobId);
         this._startStatusPoll();
-        this._pollJob(jobId);
+        this._pollJob(data.jobId);
       } catch (e) {
         this.loading = false;
         this.error = e.message || String(e);

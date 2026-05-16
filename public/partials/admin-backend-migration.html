@@ -56,8 +56,9 @@
       <span x-text="$app.t('admin.migrate.form.cutover')"></span>
     </label>
 
+    <p class="muted-msg muted-msg--sm" x-show="!canStart && startBlockedReason" x-text="startBlockedReason"></p>
     <div class="admin-migrate-actions">
-      <button type="button" @click="start()" :disabled="loading" x-text="$app.t('admin.migrate.start')"></button>
+      <button type="button" @click="start()" :disabled="loading || !canStart" x-text="$app.t('admin.migrate.start')"></button>
     </div>
   </section>
 
