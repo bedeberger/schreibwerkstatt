@@ -8,6 +8,8 @@
 //   `toggle` – Methodenname am Root, der die Karte ein-/ausschaltet.
 //   `requiresPages` – disabled, wenn Buch leer.
 //   `requiresBook`  – disabled, wenn kein Buch gewählt.
+//   `minRole`       – Buch-Rolle, ab der die Karte sichtbar ist (Phase 4b).
+//                     Hierarchie: viewer < lektor < editor < owner. Pflichtfeld.
 //
 // Aktionen (`kind: 'action'`): einmalige Befehle (Theme wechseln, Logout …).
 //   `run(root)` – wird mit Root als Argument aufgerufen.
@@ -15,45 +17,47 @@
 // `aliases` (optional): zusätzliche Suchbegriffe (Synonyme, EN-Übersetzungen).
 
 export const FEATURES = [
-  // Übersicht
-  { key: 'overview',       kind: 'toggle', group: 'tools',  labelKey: 'tile.overview',       descKey: 'tile.overview.desc',       flag: 'showBookOverviewCard',   toggle: 'toggleBookOverviewCard',   requiresBook: true,
+  // Übersicht — Viewer darf read-only Buch-Overview sehen.
+  { key: 'overview',       kind: 'toggle', group: 'tools',  labelKey: 'tile.overview',       descKey: 'tile.overview.desc',       flag: 'showBookOverviewCard',   toggle: 'toggleBookOverviewCard',   requiresBook: true, minRole: 'viewer',
     aliases: ['uebersicht','overview','dashboard','home','start','startseite','landing'] },
-  // Bewertung
-  { key: 'review',         kind: 'toggle', group: 'review', labelKey: 'tile.review',         descKey: 'tile.review.desc',         flag: 'showBookReviewCard',     toggle: 'toggleBookReviewCard',     requiresBook: true,
+  // Bewertung / Analyse-Cards: editor+ (Stats- und Lektorat-Auswertung).
+  { key: 'review',         kind: 'toggle', group: 'review', labelKey: 'tile.review',         descKey: 'tile.review.desc',         flag: 'showBookReviewCard',     toggle: 'toggleBookReviewCard',     requiresBook: true, minRole: 'editor',
     aliases: ['bewertung','rating','note','stars','sterne','feedback'] },
-  { key: 'stil',           kind: 'toggle', group: 'review', labelKey: 'tile.stil',           descKey: 'tile.stil.desc',           flag: 'showStilCard',           toggle: 'toggleStilCard',           requiresBook: true,
+  { key: 'stil',           kind: 'toggle', group: 'review', labelKey: 'tile.stil',           descKey: 'tile.stil.desc',           flag: 'showStilCard',           toggle: 'toggleStilCard',           requiresBook: true, minRole: 'editor',
     aliases: ['style','heatmap','passiv','fuellwoerter','filler','readability','lesbarkeit','metrik'] },
-  { key: 'fehlerHeatmap',  kind: 'toggle', group: 'review', labelKey: 'tile.fehlerHeatmap',  descKey: 'tile.fehlerHeatmap.desc',  flag: 'showFehlerHeatmapCard',  toggle: 'toggleFehlerHeatmapCard',  requiresBook: true,
+  { key: 'fehlerHeatmap',  kind: 'toggle', group: 'review', labelKey: 'tile.fehlerHeatmap',  descKey: 'tile.fehlerHeatmap.desc',  flag: 'showFehlerHeatmapCard',  toggle: 'toggleFehlerHeatmapCard',  requiresBook: true, minRole: 'editor',
     aliases: ['errors','heatmap','findings','lektorat','typo','tippfehler'] },
-  { key: 'kontinuitaet',   kind: 'toggle', group: 'review', labelKey: 'tile.kontinuitaet',   descKey: 'tile.kontinuitaet.desc',   flag: 'showKontinuitaetCard',   toggle: 'toggleKontinuitaetCard',   requiresBook: true,
+  { key: 'kontinuitaet',   kind: 'toggle', group: 'review', labelKey: 'tile.kontinuitaet',   descKey: 'tile.kontinuitaet.desc',   flag: 'showKontinuitaetCard',   toggle: 'toggleKontinuitaetCard',   requiresBook: true, minRole: 'editor',
     aliases: ['continuity','widerspruch','plot-hole','contradiction','consistency'] },
-  // Welt & Plot
-  { key: 'figuren',        kind: 'toggle', group: 'world',  labelKey: 'tile.figuren',        descKey: 'tile.figuren.desc',        flag: 'showFiguresCard',        toggle: 'toggleFiguresCard',        requiresBook: true,
+  // Welt & Plot — World-Cards: editor+ (für Viewer/Lektor nicht relevant).
+  { key: 'figuren',        kind: 'toggle', group: 'world',  labelKey: 'tile.figuren',        descKey: 'tile.figuren.desc',        flag: 'showFiguresCard',        toggle: 'toggleFiguresCard',        requiresBook: true, minRole: 'editor',
     aliases: ['characters','personen','cast','protagonist','antagonist','soziogramm','graph'] },
-  { key: 'werkstatt',      kind: 'toggle', group: 'world',  labelKey: 'tile.werkstatt',      descKey: 'tile.werkstatt.desc',      flag: 'showFigurWerkstattCard', toggle: 'toggleFigurWerkstattCard', requiresBook: true,
+  { key: 'werkstatt',      kind: 'toggle', group: 'world',  labelKey: 'tile.werkstatt',      descKey: 'tile.werkstatt.desc',      flag: 'showFigurWerkstattCard', toggle: 'toggleFigurWerkstattCard', requiresBook: true, minRole: 'editor',
     aliases: ['workshop','mindmap','draft','entwurf','brainstorm','character','figur','vorwaerts'] },
-  { key: 'szenen',         kind: 'toggle', group: 'world',  labelKey: 'tile.szenen',         descKey: 'tile.szenen.desc',         flag: 'showSzenenCard',         toggle: 'toggleSzenenCard',         requiresBook: true,
+  { key: 'szenen',         kind: 'toggle', group: 'world',  labelKey: 'tile.szenen',         descKey: 'tile.szenen.desc',         flag: 'showSzenenCard',         toggle: 'toggleSzenenCard',         requiresBook: true, minRole: 'editor',
     aliases: ['scenes','beats','sequences','akt'] },
-  { key: 'orte',           kind: 'toggle', group: 'world',  labelKey: 'tile.orte',           descKey: 'tile.orte.desc',           flag: 'showOrteCard',           toggle: 'toggleOrteCard',           requiresBook: true,
+  { key: 'orte',           kind: 'toggle', group: 'world',  labelKey: 'tile.orte',           descKey: 'tile.orte.desc',           flag: 'showOrteCard',           toggle: 'toggleOrteCard',           requiresBook: true, minRole: 'editor',
     aliases: ['locations','schauplaetze','places','setting','welt','world'] },
-  { key: 'ereignisse',     kind: 'toggle', group: 'world',  labelKey: 'tile.events',         descKey: 'tile.events.desc',         flag: 'showEreignisseCard',     toggle: 'toggleEreignisseCard',     requiresBook: true,
+  { key: 'ereignisse',     kind: 'toggle', group: 'world',  labelKey: 'tile.events',         descKey: 'tile.events.desc',         flag: 'showEreignisseCard',     toggle: 'toggleEreignisseCard',     requiresBook: true, minRole: 'editor',
     aliases: ['events','timeline','zeitstrahl','plot','chronologie'] },
   // Werkzeug
-  { key: 'bookchat',       kind: 'toggle', group: 'tools',  labelKey: 'tile.bookchat',       descKey: 'tile.bookchat.desc',       flag: 'showBookChatCard',       toggle: 'toggleBookChatCard',       requiresPages: true,
+  { key: 'bookchat',       kind: 'toggle', group: 'tools',  labelKey: 'tile.bookchat',       descKey: 'tile.bookchat.desc',       flag: 'showBookChatCard',       toggle: 'toggleBookChatCard',       requiresPages: true, minRole: 'editor',
     aliases: ['ai','frage','question','rag','assistant'] },
-  { key: 'stats',          kind: 'toggle', group: 'tools',  labelKey: 'tile.stats',          descKey: 'tile.stats.desc',          flag: 'showBookStatsCard',      toggle: 'toggleBookStatsCard',      requiresBook: true,
+  { key: 'stats',          kind: 'toggle', group: 'tools',  labelKey: 'tile.stats',          descKey: 'tile.stats.desc',          flag: 'showBookStatsCard',      toggle: 'toggleBookStatsCard',      requiresBook: true, minRole: 'editor',
     aliases: ['statistik','progress','wordcount','entwicklung','timeline'] },
-  { key: 'bookSettings',   kind: 'toggle', group: 'tools',  labelKey: 'tile.bookSettings',   descKey: 'tile.bookSettings.desc',   flag: 'showBookSettingsCard',   toggle: 'toggleBookSettingsCard',   requiresBook: true,
+  { key: 'bookSettings',   kind: 'toggle', group: 'tools',  labelKey: 'tile.bookSettings',   descKey: 'tile.bookSettings.desc',   flag: 'showBookSettingsCard',   toggle: 'toggleBookSettingsCard',   requiresBook: true, minRole: 'editor',
     aliases: ['settings','config','buchtyp','booktype','einstellungen','genre'] },
-  { key: 'finetuneExport', kind: 'toggle', group: 'tools',  labelKey: 'tile.finetuneExport', descKey: 'tile.finetuneExport.desc', flag: 'showFinetuneExportCard', toggle: 'toggleFinetuneExportCard', requiresBook: true,
+  { key: 'finetuneExport', kind: 'toggle', group: 'tools',  labelKey: 'tile.finetuneExport', descKey: 'tile.finetuneExport.desc', flag: 'showFinetuneExportCard', toggle: 'toggleFinetuneExportCard', requiresBook: true, minRole: 'editor',
     aliases: ['export','training','jsonl','llm','dataset','samples'] },
-  { key: 'export',         kind: 'toggle', group: 'tools',  labelKey: 'tile.export',         descKey: 'tile.export.desc',         flag: 'showExportCard',         toggle: 'toggleExportCard',         requiresBook: true,
+  // Export: viewer reicht (Lese-Zugang impliziert Export).
+  { key: 'export',         kind: 'toggle', group: 'tools',  labelKey: 'tile.export',         descKey: 'tile.export.desc',         flag: 'showExportCard',         toggle: 'toggleExportCard',         requiresBook: true, minRole: 'viewer',
     aliases: ['download','pdf','epub','html','txt','markdown','md','herunterladen','speichern'] },
-  { key: 'pdfExport',      kind: 'toggle', group: 'tools',  labelKey: 'tile.pdfExport',      descKey: 'tile.pdfExport.desc',      flag: 'showPdfExportCard',      toggle: 'togglePdfExportCard',      requiresBook: true,
+  { key: 'pdfExport',      kind: 'toggle', group: 'tools',  labelKey: 'tile.pdfExport',      descKey: 'tile.pdfExport.desc',      flag: 'showPdfExportCard',      toggle: 'togglePdfExportCard',      requiresBook: true, minRole: 'viewer',
     aliases: ['pdf','pdfa','custom','layout','schrift','font','cover','titelbild','print','druck'] },
-  { key: 'bookOrganizer',  kind: 'toggle', group: 'tools',  labelKey: 'tile.bookOrganizer',  descKey: 'tile.bookOrganizer.desc',  flag: 'showBookOrganizerCard', toggle: 'toggleBookOrganizerCard',  requiresBook: true,
+  { key: 'bookOrganizer',  kind: 'toggle', group: 'tools',  labelKey: 'tile.bookOrganizer',  descKey: 'tile.bookOrganizer.desc',  flag: 'showBookOrganizerCard', toggle: 'toggleBookOrganizerCard',  requiresBook: true, minRole: 'editor',
     aliases: ['organize','organisieren','sortieren','reorder','umordnen','verschieben','rename','umbenennen','delete','loeschen','create','anlegen','struktur','kapitel','chapter','seiten','pages'] },
-  { key: 'bookEditor',     kind: 'toggle', group: 'tools',  labelKey: 'tile.bookEditor',     descKey: 'tile.bookEditor.desc',     flag: 'showBookEditorCard',    toggle: 'toggleBookEditorCard',     requiresPages: true,
+  // Editor: viewer (read-only) / lektor (apply-only) / editor+ (frei).
+  { key: 'bookEditor',     kind: 'toggle', group: 'tools',  labelKey: 'tile.bookEditor',     descKey: 'tile.bookEditor.desc',     flag: 'showBookEditorCard',    toggle: 'toggleBookEditorCard',     requiresPages: true, minRole: 'viewer',
     aliases: ['bucheditor','book-editor','stream','endlos','endless','single-page','one-page','edit-all','alle-bearbeiten','volltext','full-text','suchen-ersetzen','search-replace','find-replace','suchen','ersetzen'] },
 ];
 
@@ -128,6 +132,7 @@ export const EXCLUSIVE_CARDS = [
   { key: 'userSettings',   flag: 'showUserSettingsCard' },
   { key: 'adminUsers',     flag: 'showAdminUsersCard' },
   { key: 'adminSettings',  flag: 'showAdminSettingsCard' },
+  { key: 'adminUsage',     flag: 'showAdminUsageCard' },
   { key: 'finetuneExport', flag: 'showFinetuneExportCard' },
   { key: 'export',         flag: 'showExportCard' },
   { key: 'pdfExport',      flag: 'showPdfExportCard' },
@@ -170,5 +175,29 @@ export function unavailabilityReasonKey(feature, ctx) {
   if (!feature) return null;
   if (feature.requiresBook && !ctx.selectedBookId) return 'palette.disabled.needBook';
   if (feature.requiresPages && !(ctx.pages && ctx.pages.length > 0)) return 'palette.disabled.needPages';
+  if (feature.minRole && ctx.bookRole && !hasMinRole(ctx.bookRole, feature.minRole)) return 'palette.disabled.insufficientRole';
   return null;
+}
+
+// Rolle-Hierarchie (Phase 4b): viewer < lektor < editor < owner.
+// SSoT für Frontend-Visibility-Checks (Quick-Pills, Command-Palette, Sidebar).
+// Server-Guard ist autoritativ (lib/acl.js), das hier ist UX.
+export const ROLE_RANK = { viewer: 1, lektor: 2, editor: 3, owner: 4 };
+
+export function hasMinRole(actual, required) {
+  if (!required) return true;
+  if (!actual) return false;
+  const a = ROLE_RANK[actual] || 0;
+  const r = ROLE_RANK[required] || 0;
+  return a >= r;
+}
+
+// Filter `features` aufs sichtbare Subset für eine Buchrolle. Cards ohne
+// `minRole` sind nur für editor+ sichtbar (defensive: kein impliziter Viewer).
+export function featuresVisibleFor(features, role) {
+  if (!role) return features.filter(f => !f.requiresBook && !f.requiresPages);
+  return features.filter(f => {
+    const min = f.minRole || 'editor';
+    return hasMinRole(role, min);
+  });
 }

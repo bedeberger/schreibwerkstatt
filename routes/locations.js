@@ -2,10 +2,10 @@
 const express = require('express');
 const { db, saveOrteToDb } = require('../db/schema');
 const { toIntId, inClause } = require('../lib/validate');
-const { bookParamHandler } = require('../lib/log-context');
+const { aclParamGuard } = require('../lib/acl');
 
 const router = express.Router();
-router.param('book_id', bookParamHandler);
+router.param('book_id', aclParamGuard('editor'));
 const jsonBody = express.json();
 
 // Schauplätze eines Buchs laden

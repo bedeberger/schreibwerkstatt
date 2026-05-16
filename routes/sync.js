@@ -1,7 +1,8 @@
 const express = require('express');
 const { db, getAnyUserToken, getAllUserTokens, reconcilePageIds, pruneStaleBookData, getTokenForRequest, upsertBook } = require('../db/schema'); // getAnyUserToken used in POST /book/:book_id
 const logger = require('../logger');
-const { runWithContext, getContext, bookParamHandler } = require('../lib/log-context');
+const { runWithContext, getContext } = require('../lib/log-context');
+const { aclParamGuard, requireBookAccess, sendACLError } = require('../lib/acl');
 const { CHARS_PER_TOKEN } = require('../lib/ai');
 const { toIntId } = require('../lib/validate');
 const contentStore = require('../lib/content-store');
@@ -10,7 +11,8 @@ const { invalidateBookPageCache } = require('./jobs/chat');
 const { localIsoDate } = require('../lib/local-date');
 
 const router = express.Router();
-router.param('book_id', bookParamHandler);
+// Sync ist Write-Pfad (Pages-Upsert, Stats-Recompute) → editor+.
+router.param('book_id', aclParamGuard('editor'));
 
 function htmlToText(html) {
   return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -380,6 +382,8 @@ router.post('/pages/upsert', express.json(), (req, res) => {
   if (!db.prepare('SELECT 1 FROM books WHERE book_id = ?').get(bookId)) {
     return res.status(400).json({ error_code: 'BOOK_NOT_FOUND' });
   }
+  try { requireBookAccess(req, bookId, 'editor'); }
+  catch (e) { if (sendACLError(res, e)) return; throw e; }
 
   const seenAt = new Date().toISOString();
   db.transaction(() => {
@@ -408,6 +412,8 @@ router.post('/chapters/upsert', express.json(), (req, res) => {
   if (!db.prepare('SELECT 1 FROM books WHERE book_id = ?').get(bookId)) {
     return res.status(400).json({ error_code: 'BOOK_NOT_FOUND' });
   }
+  try { requireBookAccess(req, bookId, 'editor'); }
+  catch (e) { if (sendACLError(res, e)) return; throw e; }
   _upsertChapterStmt.run(chapterId, bookId, chapterName, updatedAt, new Date().toISOString());
   res.json({ ok: true });
 });
@@ -543,8 +549,9 @@ router.post('/book/:book_id', async (req, res) => {
   }
 });
 
-// POST /sync/all – alle Bücher
-router.post('/all', async (_req, res) => {
+// POST /sync/all – alle Bücher. Admin-only (globale Operation).
+const { requireAdmin } = require('../lib/admin-mw');
+router.post('/all', requireAdmin, async (_req, res) => {
   syncAllBooks().catch(e => logger.error('Sync /all Fehler: ' + _errDetail(e)));
   res.json({ ok: true, message: 'Sync gestartet' });
 });

@@ -2,11 +2,10 @@
 const express = require('express');
 const { db, getBookSettings, saveBookSettings } = require('../db/schema');
 const { toIntId } = require('../lib/validate');
-const { bookParamHandler } = require('../lib/log-context');
+const { aclParamGuard } = require('../lib/acl');
 const logger = require('../logger');
 
 const router = express.Router();
-router.param('book_id', bookParamHandler);
 const jsonBody = express.json();
 
 const VALID_LANGUAGES = ['de', 'en'];
@@ -17,19 +16,17 @@ const VALID_TEMPUS  = ['praeteritum', 'praesens', 'gemischt'];
 const BUCH_KONTEXT_MAX = 1000;
 
 /** Gibt Sprache, Region, Buchtyp und Buchkontext für ein Buch zurück. */
-router.get('/:book_id', (req, res) => {
-  const bookId = toIntId(req.params.book_id);
-  if (!bookId) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
+router.get('/:book_id', aclParamGuard('viewer'), (req, res) => {
+  const bookId = req.bookId;
   const settings = getBookSettings(bookId, req.session?.user?.email || null);
   res.json(settings);
 });
 
 /** Speichert Sprache, Region, Buchtyp und Buchkontext für ein Buch. */
-router.put('/:book_id', jsonBody, (req, res) => {
-  const bookId = toIntId(req.params.book_id);
-  if (!bookId) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
+router.put('/:book_id', aclParamGuard('editor'), jsonBody, (req, res) => {
+  const bookId = req.bookId;
 
-  const { language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished } = req.body || {};
+  const { language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat } = req.body || {};
   if (!language || !region) {
     return res.status(400).json({ error_code: 'LANGUAGE_REGION_REQUIRED' });
   }
@@ -53,13 +50,15 @@ router.put('/:book_id', jsonBody, (req, res) => {
   }
 
   const finished = is_finished ? 1 : 0;
-  saveBookSettings(bookId, language, region, buchtyp || null, buch_kontext || null, erzaehlperspektive || null, erzaehlzeit || null, finished);
+  const lektorBookChat = allow_lektor_book_chat ? 1 : 0;
+  saveBookSettings(bookId, language, region, buchtyp || null, buch_kontext || null, erzaehlperspektive || null, erzaehlzeit || null, finished, lektorBookChat);
   res.json({
     ok: true, language, region,
     buchtyp: buchtyp || null, buch_kontext: buch_kontext || null,
     erzaehlperspektive: erzaehlperspektive || null,
     erzaehlzeit: erzaehlzeit || null,
     is_finished: finished,
+    allow_lektor_book_chat: lektorBookChat,
     locale: `${language}-${region}`,
   });
 });
@@ -75,11 +74,9 @@ router.put('/:book_id', jsonBody, (req, res) => {
  * Voraussetzung: Frontend hat das Buch zuvor in BookStack soft-gelöscht
  * (Recycle-Bin). Diese Route räumt nur die app-internen Referenzen.
  */
-router.delete('/:book_id/book', (req, res) => {
+router.delete('/:book_id/book', aclParamGuard('owner'), (req, res) => {
   const user_email = req.session?.user?.email || null;
-  if (!user_email) return res.status(401).json({ error_code: 'NOT_LOGGED_IN' });
-  const bookId = toIntId(req.params.book_id);
-  if (!bookId) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
+  const bookId = req.bookId;
 
   const row = db.prepare('SELECT name FROM books WHERE book_id = ?').get(bookId);
   const changes = db.prepare('DELETE FROM books WHERE book_id = ?').run(bookId).changes;

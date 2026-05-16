@@ -2,11 +2,14 @@ const express = require('express');
 const { db, saveFigurenToDb, saveZeitstrahlEvents, getChapterFigures, cleanupDuplicateFiguren } = require('../db/schema');
 const { recomputeBookFigureMentions } = require('../lib/page-index');
 const { toIntId, inClause } = require('../lib/validate');
-const { bookParamHandler } = require('../lib/log-context');
+const { aclParamGuard } = require('../lib/acl');
 const logger = require('../logger');
 
 const router = express.Router();
-router.param('book_id', bookParamHandler);
+// Figuren/Orte/Szenen sind nur fuer editor+ relevant (Buchwelt-CRUD); Lektor
+// und Viewer sehen die Karten nicht — Server folgt der Frontend-Sicht (siehe
+// docs/bookstack-exit.md Phase 4b Karten-Sichtbarkeit).
+router.param('book_id', aclParamGuard('editor'));
 const jsonBody = express.json();
 
 // Konsolidierten Zeitstrahl eines Buchs laden (vor /:book_id definiert um Konflikte zu vermeiden)

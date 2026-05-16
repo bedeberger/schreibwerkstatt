@@ -116,4 +116,87 @@ export const adminUsersMethods = {
       setTimeout(() => { this.adminUsersCopied = false; }, 1500);
     } catch {}
   },
+
+  // ─── Phase 4a2: Registration-Requests ──────────────────────────────────
+
+  async adminUsersRequestsLoad() {
+    if (this.adminUsersRequestsLoading) return;
+    this.adminUsersRequestsLoading = true;
+    this.adminUsersError = '';
+    try {
+      const status = this.adminUsersRequestsStatus || 'pending';
+      const r = await fetch(`/admin/registration-requests?status=${encodeURIComponent(status)}`, {
+        credentials: 'same-origin',
+      });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        throw new Error(j.error_code || `HTTP ${r.status}`);
+      }
+      const data = await r.json();
+      this.adminUsersRequestsList = data.items || [];
+    } catch (e) {
+      this.adminUsersError = e.message;
+    } finally {
+      this.adminUsersRequestsLoading = false;
+    }
+  },
+
+  async adminUsersApproveRequest(req, role = 'user') {
+    if (!req || this.adminUsersRequestsBusy) return;
+    this.adminUsersRequestsBusy = req.id;
+    this.adminUsersError = '';
+    this.adminUsersRequestsResult = null;
+    try {
+      const r = await fetch(`/admin/registration-requests/${req.id}/approve`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ role }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error_code || `HTTP ${r.status}`);
+      this.adminUsersRequestsResult = { id: req.id, inviteUrl: j.inviteUrl, mail: j.mail };
+      await this.adminUsersRequestsLoad();
+      await this.adminUsersLoad();
+    } catch (e) {
+      this.adminUsersError = e.message;
+    } finally {
+      this.adminUsersRequestsBusy = null;
+    }
+  },
+
+  async adminUsersDenyRequest(req) {
+    if (!req || this.adminUsersRequestsBusy) return;
+    const reason = window.prompt(
+      window.__app?.t?.('admin.users.requests.denyReasonPrompt') || 'Begründung (optional):'
+    );
+    // null = Cancel → abbrechen; '' = bestaetigt ohne Reason → erlauben.
+    if (reason === null) return;
+    this.adminUsersRequestsBusy = req.id;
+    this.adminUsersError = '';
+    try {
+      const r = await fetch(`/admin/registration-requests/${req.id}/deny`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ reason }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error_code || `HTTP ${r.status}`);
+      await this.adminUsersRequestsLoad();
+    } catch (e) {
+      this.adminUsersError = e.message;
+    } finally {
+      this.adminUsersRequestsBusy = null;
+    }
+  },
+
+  async adminUsersCopyRequestInviteUrl(id, url) {
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      this.adminUsersRequestsCopiedId = id;
+      setTimeout(() => { this.adminUsersRequestsCopiedId = null; }, 1500);
+    } catch {}
+  },
 };

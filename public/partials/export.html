@@ -10,6 +10,13 @@
 
   <p class="book-export-hint" x-text="$app.t('book.export.hint')"></p>
 
+  <div class="book-export-scope">
+    <label class="book-export-scope-label" x-text="$app.t('export.scope.label')"></label>
+    <div x-data="combobox($app.t('export.scope.label'))"
+         x-modelable="value" x-model="exportScope"
+         x-effect="options = exportScopeOptions()"></div>
+  </div>
+
   <div class="book-export-buttons">
     <template x-for="fmt in ['pdf','epub','docx','html','txt','md']" :key="fmt">
       <button type="button"

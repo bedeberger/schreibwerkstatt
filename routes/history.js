@@ -2,17 +2,30 @@ const express = require('express');
 const { db, upsertBookByName } = require('../db/schema');
 const { toIntId } = require('../lib/validate');
 const { localIsoDate } = require('../lib/local-date');
-const { bookParamHandler, setContext } = require('../lib/log-context');
+const { setContext } = require('../lib/log-context');
+const { aclParamGuard, requireBookAccess, sendACLError } = require('../lib/acl');
 const logger = require('../logger');
 
 const router = express.Router();
-router.param('book_id', bookParamHandler);
+// Reads (Lektoratverlauf, Reviews, Stats, Heatmap) sind viewer+.
+router.param('book_id', aclParamGuard('viewer'));
 const jsonBody = express.json();
 
-// Lektorat-Ergebnis speichern
+function _pageBookId(pageId) {
+  const r = db.prepare('SELECT book_id FROM pages WHERE page_id = ?').get(parseInt(pageId, 10));
+  return r?.book_id || null;
+}
+function _guardBook(req, res, bookId, minRole) {
+  setContext({ book: bookId });
+  try { requireBookAccess(req, bookId, minRole); return true; }
+  catch (e) { return !sendACLError(res, e); }
+}
+
+// Lektorat-Ergebnis speichern (lektor+, weil Lektor selbst Findings triggern darf).
 router.post('/check', jsonBody, (req, res) => {
   const { page_id, book_id, error_count, errors_json, stilanalyse, fazit, model } = req.body;
-  if (book_id) setContext({ book: book_id });
+  if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
+  if (!_guardBook(req, res, book_id, 'lektor')) return;
   const user_email = req.session?.user?.email || null;
   const result = db.prepare(`
     INSERT INTO page_checks (page_id, book_id, checked_at, error_count, errors_json, stilanalyse, fazit, model, user_email)
@@ -53,7 +66,8 @@ router.patch('/check/:id/saved', jsonBody, (req, res) => {
     WHERE pc.id = ? AND pc.user_email = ?
   `).get(id, user_email);
   if (!row) return res.status(404).json({ error_code: 'NOT_FOUND' });
-  if (row.book_id) setContext({ book: row.book_id });
+  if (!row.book_id) return res.status(400).json({ error_code: 'CHECK_HAS_NO_BOOK' });
+  if (!_guardBook(req, res, row.book_id, 'lektor')) return;
 
   db.prepare('UPDATE page_checks SET saved = ?, saved_at = ?, applied_errors_json = COALESCE(?, applied_errors_json), selected_errors_json = COALESCE(?, selected_errors_json), stilkorrektur_log = COALESCE(?, stilkorrektur_log) WHERE id = ? AND user_email = ? AND book_id = ?')
     .run(saved, saved_at, applied, selected, stilLog, id, user_email, row.book_id);
@@ -86,6 +100,9 @@ router.get('/page/:page_id', (req, res) => {
   const user_email = req.session?.user?.email || null;
   const pageId = toIntId(req.params.page_id);
   if (!pageId) return res.status(400).json({ error_code: 'INVALID_ID' });
+  const bookId = _pageBookId(pageId);
+  if (!bookId) return res.status(404).json({ error_code: 'PAGE_NOT_FOUND' });
+  if (!_guardBook(req, res, bookId, 'viewer')) return;
   const rows = db.prepare(`
     SELECT pc.id, pc.page_id, p.page_name, pc.book_id, pc.chapter_id, pc.checked_at,
            pc.error_count, pc.stilanalyse, pc.fazit, pc.model, pc.saved, pc.saved_at
@@ -103,9 +120,10 @@ router.get('/check/:id/details', (req, res) => {
   const id = toIntId(req.params.id);
   if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
   const r = db.prepare(`
-    SELECT errors_json, applied_errors_json, selected_errors_json, szenen_json, stilkorrektur_log
+    SELECT book_id, errors_json, applied_errors_json, selected_errors_json, szenen_json, stilkorrektur_log
     FROM page_checks WHERE id = ? AND user_email = ?`).get(id, user_email);
   if (!r) return res.status(404).json({ error_code: 'NOT_FOUND' });
+  if (r.book_id && !_guardBook(req, res, r.book_id, 'viewer')) return;
   res.json({
     errors_json: JSON.parse(r.errors_json || '[]'),
     applied_errors_json: r.applied_errors_json ? JSON.parse(r.applied_errors_json) : null,
@@ -115,9 +133,11 @@ router.get('/check/:id/details', (req, res) => {
   });
 });
 
-// Buchbewertung speichern
+// Buchbewertung speichern (editor+, weil sie eine Analyse persistiert).
 router.post('/review', jsonBody, (req, res) => {
   const { book_id, book_name, review_json, model } = req.body;
+  if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
+  if (!_guardBook(req, res, book_id, 'editor')) return;
   const user_email = req.session?.user?.email || null;
   upsertBookByName(book_id, book_name);
   const result = db.prepare(`

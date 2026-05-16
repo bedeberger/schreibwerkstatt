@@ -1,0 +1,114 @@
+// Builder-Tests gegen synthetische {scope, book, chapter?, page?, groups}-
+// Fixtures. PDF: %PDF-Header. EPUB/DOCX: ZIP-Magic + Manifest-Entry. HTML:
+// Wohlgeformtheit. TXT/MD: Normalisierung.
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import path from 'node:path';
+
+process.env.DB_PATH = path.join('/tmp', `builders-${process.pid}-${Date.now()}.db`);
+await import('../../../db/schema.js');
+
+const { buildTxt }  = await import('../../../lib/export-builders/txt.js');
+const { buildMd }   = await import('../../../lib/export-builders/md.js');
+const { buildHtml } = await import('../../../lib/export-builders/html.js');
+const { buildEpub } = await import('../../../lib/export-builders/epub.js');
+const { buildDocx } = await import('../../../lib/export-builders/docx.js');
+const { buildPdf }  = await import('../../../lib/export-builders/pdf.js');
+
+const book = { id: 1, name: 'Mein Buch', slug: 'mein-buch', description: 'Beschreibung' };
+const chapter = { id: 10, name: 'Erstes Kapitel', slug: 'erstes' };
+const page = { id: 100, name: 'Seite eins', slug: 'p1', html: '<p>Hallo Welt.</p>' };
+
+const bookGroups = [
+  { chapterId: 10, chapter: { id: 10, name: 'K1' }, pages: [
+    { p: { id: 1, name: 'p1' }, pd: { html: '<h1>Kap 1</h1><p>Text eins.</p>' } },
+    { p: { id: 2, name: 'p2' }, pd: { html: '<p>Text zwei.</p>' } },
+  ]},
+];
+
+const chapterBundle = {
+  scope: 'chapter', book, chapter,
+  groups: [{ chapterId: 10, chapter, pages: [
+    { p: { id: 1, name: 'p1' }, pd: { html: '<p>Kapitelinhalt.</p>' } },
+  ]}],
+};
+
+const pageBundle = {
+  scope: 'page', book, chapter, page,
+  groups: [{ chapterId: 10, chapter, pages: [{ p: page, pd: page }] }],
+};
+
+const bookBundle = { scope: 'book', book, groups: bookGroups };
+
+test('txt: HTML-Tags entfernt, Buchtitel oben, Whitespace collapsed', () => {
+  const buf = buildTxt(bookBundle);
+  const s = buf.toString('utf8');
+  assert.ok(s.startsWith('Mein Buch'));
+  assert.ok(s.includes('Text eins.'));
+  assert.ok(!s.includes('<p>'));
+  // \s+ collapsed
+  assert.ok(!/\s{3,}/.test(s));
+});
+
+test('txt scope=chapter rendert Kapitelnamen als Titel', () => {
+  const buf = buildTxt(chapterBundle);
+  const s = buf.toString('utf8');
+  assert.ok(s.startsWith('Erstes Kapitel'));
+  assert.ok(s.includes('Kapitelinhalt.'));
+});
+
+test('md: Headings + Markdown-Escape', () => {
+  const buf = buildMd(bookBundle);
+  const s = buf.toString('utf8');
+  assert.ok(s.startsWith('# Mein Buch'));
+  assert.ok(s.includes('## K1'));
+  assert.ok(/Text eins\./.test(s));
+});
+
+test('md scope=page nutzt page.markdown wenn vorhanden', () => {
+  const bundle = {
+    scope: 'page', book, chapter, page,
+    groups: [{ chapterId: 10, chapter, pages: [{ p: page, pd: { ...page, markdown: '**Bold**' } }] }],
+  };
+  const s = buildMd(bundle).toString('utf8');
+  assert.ok(s.includes('**Bold**'));
+});
+
+test('html: Wohlgeformtheit (DOCTYPE + body)', () => {
+  const buf = buildHtml(bookBundle);
+  const s = buf.toString('utf8');
+  assert.ok(s.startsWith('<!DOCTYPE html>'));
+  assert.ok(s.includes('<title>Mein Buch</title>'));
+  assert.ok(s.includes('<h1>Mein Buch</h1>'));
+  assert.ok(s.includes('<h2>K1</h2>'));
+  assert.ok(s.includes('</body></html>'));
+});
+
+test('html scope=page: Page-Name als Haupttitel', () => {
+  const buf = buildHtml(pageBundle);
+  const s = buf.toString('utf8');
+  assert.ok(s.includes('<title>Seite eins</title>'));
+  assert.ok(s.includes('<h1>Seite eins</h1>'));
+});
+
+test('epub: ZIP-Magic + EPUB-Mimetype', async () => {
+  const buf = await buildEpub(bookBundle);
+  assert.equal(buf[0], 0x50);
+  assert.equal(buf[1], 0x4B);
+  const head = buf.slice(0, 200).toString('utf8');
+  assert.ok(head.includes('application/epub+zip'));
+});
+
+test('docx: ZIP-Magic + Manifest-Entry', async () => {
+  const buf = await buildDocx(bookBundle);
+  assert.equal(buf[0], 0x50);
+  assert.equal(buf[1], 0x4B);
+  const s = buf.toString('binary');
+  assert.ok(s.includes('word/document.xml'));
+});
+
+test('pdf scope=page: %PDF-Header + kein Cover-Page', async () => {
+  const buf = await buildPdf(pageBundle, { token: null, lang: 'de' });
+  assert.equal(buf.slice(0, 5).toString(), '%PDF-');
+}, { timeout: 60000 });

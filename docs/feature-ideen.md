@@ -30,3 +30,7 @@
 
 ## Admin User
 - auf dev_local wer ist "admin"?
+
+## Gemeinsames Bearbeiten
+- versionhistory zeigt, wer geupdatet hat
+- Bei geänderten Seiten von anderen Users; toast aktivieren oder so

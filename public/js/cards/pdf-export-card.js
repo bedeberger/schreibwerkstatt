@@ -21,6 +21,7 @@ export function registerPdfExportCard() {
     profiles: [],
     activeProfileId: null,
     activeProfile: null,        // { id, name, config, has_cover, ... }
+    exportScope: 'book',
     // Form-Mount-Gate: getrennt von activeProfile, damit Alpine die x-if-DOM
     // sicher unmounten kann, BEVOR activeProfile auf null/neuen Wert wechselt.
     // Sonst feuern x-model/x-effect-Closures (combobox-x-data) noch ein Mal mit
@@ -307,11 +308,14 @@ export function registerPdfExportCard() {
       this.exportStatus = window.__app.t('pdfExport.starting');
       this.exportError = '';
       try {
+        const ref = this._exportEntity();
+        if (!ref) { this.exportError = window.__app.t('pdfExport.error.startFailed'); this.exporting = false; return; }
         const r = await fetch('/jobs/pdf-export', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            book_id: parseInt(window.__app.selectedBookId),
+            scope: ref.scope,
+            entityId: ref.id,
             profile_id: this.activeProfile.id,
           }),
         });
@@ -383,6 +387,24 @@ export function registerPdfExportCard() {
       if (!this.currentJobId) return;
       try { await fetch(`/jobs/${this.currentJobId}`, { method: 'DELETE' }); } catch {}
       // Poll deckt das `cancelled`-Status-Update bereits ab; UI-Reset im Polling.
+    },
+
+    // ── Scope-Auswahl (Buch/Kapitel/Seite) ───────────────────────────────
+    exportScopeOptions() {
+      const app = window.__app;
+      const opts = [{ value: 'book', label: app?.t?.('export.scope.book') || 'Buch' }];
+      if (app?.currentPage?.chapter_id) opts.push({ value: 'chapter', label: app.t('export.scope.chapter') });
+      if (app?.currentPage?.id)         opts.push({ value: 'page',    label: app.t('export.scope.page') });
+      return opts;
+    },
+    _exportEntity() {
+      const app = window.__app;
+      if (!app) return null;
+      const scope = this.exportScope || 'book';
+      if (scope === 'page' && app.currentPage?.id) return { scope: 'page', id: app.currentPage.id };
+      if (scope === 'chapter' && app.currentPage?.chapter_id) return { scope: 'chapter', id: app.currentPage.chapter_id };
+      const bid = app.selectedBookId;
+      return bid ? { scope: 'book', id: parseInt(bid) } : null;
     },
 
     // ── Helpers fürs Template ────────────────────────────────────────────

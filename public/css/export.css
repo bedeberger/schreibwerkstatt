@@ -9,6 +9,21 @@
   margin: 0 0 12px;
 }
 
+.book-export-scope {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+}
+.book-export-scope-label {
+  color: var(--color-muted);
+  font-size: var(--font-size-sm);
+}
+.book-export-scope > [x-data] {
+  flex: 0 0 auto;
+  min-width: 200px;
+}
+
 .book-export-buttons {
   display: flex;
   flex-wrap: wrap;

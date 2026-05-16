@@ -212,7 +212,12 @@ figurWerkstattRouter.post('/werkstatt-brainstorm', jsonBody, (req, res) => {
   const draft = getDraftFigure(draftId);
   if (!draft) return res.status(404).json({ error_code: 'DRAFT_NOT_FOUND' });
   if (draft.user_email !== userEmail) return res.status(403).json({ error_code: 'FORBIDDEN' });
-  if (draft.book_id) setContext({ book: draft.book_id });
+  if (draft.book_id) {
+    setContext({ book: draft.book_id });
+    const { requireBookAccess, sendACLError } = require('../../lib/acl');
+    try { requireBookAccess(req, draft.book_id, 'editor'); }
+    catch (e) { if (sendACLError(res, e)) return; throw e; }
+  }
 
   const entityKey = `${draftId}|${knotenId}`;
   const existing = findActiveJobId('werkstatt-brainstorm', entityKey, userEmail);
@@ -234,7 +239,12 @@ figurWerkstattRouter.post('/werkstatt-consistency', jsonBody, (req, res) => {
   const draft = getDraftFigure(draftId);
   if (!draft) return res.status(404).json({ error_code: 'DRAFT_NOT_FOUND' });
   if (draft.user_email !== userEmail) return res.status(403).json({ error_code: 'FORBIDDEN' });
-  if (draft.book_id) setContext({ book: draft.book_id });
+  if (draft.book_id) {
+    setContext({ book: draft.book_id });
+    const { requireBookAccess, sendACLError } = require('../../lib/acl');
+    try { requireBookAccess(req, draft.book_id, 'editor'); }
+    catch (e) { if (sendACLError(res, e)) return; throw e; }
+  }
 
   const existing = findActiveJobId('werkstatt-consistency', draftId, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });

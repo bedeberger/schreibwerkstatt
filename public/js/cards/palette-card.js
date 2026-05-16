@@ -15,6 +15,7 @@ import {
   FEATURES, ACTIONS, FEATURE_GROUPS, GROUP_LABEL_KEY,
   DEFAULT_RECENT_KEYS,
   featureByKey, isFeatureAvailable, unavailabilityReasonKey,
+  featuresVisibleFor,
 } from './feature-registry.js';
 import { fuzzyMatch, highlight } from './palette-fuzzy.js';
 import { PROVIDERS, parseQuery } from './palette-providers.js';
@@ -128,6 +129,7 @@ export function registerPaletteCard() {
       return {
         selectedBookId: root.selectedBookId,
         pages: root.pages,
+        bookRole: root.currentBookRole || null,
       };
     },
 
@@ -140,6 +142,7 @@ export function registerPaletteCard() {
       const cacheKey = [
         this.paletteQuery,
         ctx.selectedBookId || '',
+        ctx.bookRole || '',
         (ctx.pages || []).length,
         (root.figuren || []).length,
         (root.orte || []).length,
@@ -161,6 +164,13 @@ export function registerPaletteCard() {
     _buildSections(root, ctx) {
       const parsed = parseQuery(this.paletteQuery);
       const t = (k, p) => (root.t ? root.t(k, p) : k);
+      // Phase 4b minRole-Filter: bei aktivem Buch nur Cards anbieten, die der
+      // aktuellen Buch-Rolle entsprechen. Ohne Buch (Quick-Pills Home-Screen)
+      // FEATURES unverändert lassen — Cards mit `requiresBook` sind dann eh
+      // disabled.
+      const visibleFeatures = ctx.bookRole
+        ? featuresVisibleFor(FEATURES, ctx.bookRole)
+        : FEATURES;
 
       // Provider-Modus: nur dieser eine Provider.
       if (parsed.mode === 'provider') {
@@ -240,7 +250,7 @@ export function registerPaletteCard() {
       if (!q) {
         for (const groupKey of FEATURE_GROUPS) {
           if (groupKey === 'app') continue;
-          const items = this._matchFeatures(FEATURES.filter(f => f.group === groupKey), q, ctx, t);
+          const items = this._matchFeatures(visibleFeatures.filter(f => f.group === groupKey), q, ctx, t);
           if (items.length) {
             sections.push({ key: groupKey, labelKey: GROUP_LABEL_KEY[groupKey], items });
           }
@@ -251,7 +261,7 @@ export function registerPaletteCard() {
         }
       } else {
         const matched = [];
-        for (const f of FEATURES) {
+        for (const f of visibleFeatures) {
           const m = this._matchFeatureFuzzy(f, q, t);
           if (!m) continue;
           const item = this._toggleItem(f, ctx);

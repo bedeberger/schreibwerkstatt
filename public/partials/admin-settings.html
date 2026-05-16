@@ -41,11 +41,11 @@
       </label>
       <label>auth.google.client_id
         <input type="text" x-model="adminSettingsForm['auth.google.client_id']" :placeholder="$app.t('admin.settings.secret.masked')">
-        <small x-show="adminSettingsMap['auth.google.client_id']?.masked" class="muted-msg muted-msg--sm" x-text="adminSettingsMap['auth.google.client_id'].masked"></small>
+        <small x-show="adminSettingsMap['auth.google.client_id']?.masked" class="muted-msg muted-msg--sm" x-text="adminSettingsMap['auth.google.client_id']?.masked"></small>
       </label>
       <label>auth.google.client_secret
         <input type="password" x-model="adminSettingsForm['auth.google.client_secret']" :placeholder="$app.t('admin.settings.secret.masked')">
-        <small x-show="adminSettingsMap['auth.google.client_secret']?.masked" class="muted-msg muted-msg--sm" x-text="adminSettingsMap['auth.google.client_secret'].masked"></small>
+        <small x-show="adminSettingsMap['auth.google.client_secret']?.masked" class="muted-msg muted-msg--sm" x-text="adminSettingsMap['auth.google.client_secret']?.masked"></small>
       </label>
       <label>auth.allowed_emails (CSV)
         <input type="text" x-model="adminSettingsForm['auth.allowed_emails']" placeholder="alice@x.com, bob@x.com">
@@ -78,7 +78,7 @@
         </h4>
         <label>ai.claude.api_key
           <input type="password" x-model="adminSettingsForm['ai.claude.api_key']" :placeholder="$app.t('admin.settings.secret.masked')">
-          <small x-show="adminSettingsMap['ai.claude.api_key']?.masked" class="muted-msg muted-msg--sm" x-text="adminSettingsMap['ai.claude.api_key'].masked"></small>
+          <small x-show="adminSettingsMap['ai.claude.api_key']?.masked" class="muted-msg muted-msg--sm" x-text="adminSettingsMap['ai.claude.api_key']?.masked"></small>
         </label>
         <label>ai.claude.model
           <input type="text" x-model="adminSettingsForm['ai.claude.model']" placeholder="claude-sonnet-4-6">
@@ -164,7 +164,7 @@
         <label>smtp.gmail.user <input type="email" x-model="adminSettingsForm['smtp.gmail.user']"></label>
         <label>smtp.gmail.client_id
           <input type="password" x-model="adminSettingsForm['smtp.gmail.client_id']" :placeholder="$app.t('admin.settings.secret.masked')">
-          <small x-show="adminSettingsMap['smtp.gmail.client_id']?.masked" class="muted-msg muted-msg--sm" x-text="adminSettingsMap['smtp.gmail.client_id'].masked"></small>
+          <small x-show="adminSettingsMap['smtp.gmail.client_id']?.masked" class="muted-msg muted-msg--sm" x-text="adminSettingsMap['smtp.gmail.client_id']?.masked"></small>
         </label>
         <label>smtp.gmail.client_secret
           <input type="password" x-model="adminSettingsForm['smtp.gmail.client_secret']" :placeholder="$app.t('admin.settings.secret.masked')">

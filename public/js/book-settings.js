@@ -18,6 +18,7 @@ export const bookSettingsMethods = {
       this.bookSettingsErzaehlperspektive = data.erzaehlperspektive || '';
       this.bookSettingsErzaehlzeit        = data.erzaehlzeit        || '';
       this.bookSettingsIsFinished         = !!data.is_finished;
+      this.bookSettingsAllowLektorBookChat = !!data.allow_lektor_book_chat;
     } catch (e) {
       console.error('[book-settings] Laden fehlgeschlagen:', e);
     } finally {
@@ -42,6 +43,7 @@ export const bookSettingsMethods = {
           erzaehlperspektive: this.bookSettingsErzaehlperspektive  || null,
           erzaehlzeit:       this.bookSettingsErzaehlzeit          || null,
           is_finished:       this.bookSettingsIsFinished ? 1 : 0,
+          allow_lektor_book_chat: this.bookSettingsAllowLektorBookChat ? 1 : 0,
         }),
       });
       if (!r.ok) {
@@ -191,6 +193,126 @@ export const bookSettingsMethods = {
     } finally {
       this.bookDeleteLoading = false;
     }
+  },
+
+  // ── Phase 4b Sharing ───────────────────────────────────────────────────────
+
+  async loadBookAccess() {
+    const bookId = window.__app.selectedBookId;
+    if (!bookId) { this.bookAccessList = []; return; }
+    this.bookAccessLoading = true;
+    this.bookAccessError = '';
+    try {
+      const data = await fetchJson(`/books/${bookId}/access`);
+      this.bookAccessList = data?.access || [];
+    } catch (e) {
+      this.bookAccessError = e.message;
+    } finally {
+      this.bookAccessLoading = false;
+    }
+  },
+
+  // Owner darf sharen; Server enforced final.
+  bookAccessIsOwner() {
+    return window.__app.currentBookRole === 'owner';
+  },
+
+  async shareBookAccessAdd() {
+    if (!this.bookAccessIsOwner()) return;
+    const bookId = window.__app.selectedBookId;
+    const email = (this.shareEmail || '').trim().toLowerCase();
+    const role = this.shareRole;
+    if (!bookId || !email) return;
+    this.shareBusy = true;
+    this.bookAccessError = '';
+    try {
+      const r = await fetch(`/books/${bookId}/share`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, role }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(window.__app.tError(data) || `HTTP ${r.status}`);
+      this.shareEmail = '';
+      await this.loadBookAccess();
+    } catch (e) {
+      this.bookAccessError = e.message;
+    } finally {
+      this.shareBusy = false;
+    }
+  },
+
+  async changeBookAccessRole(email, newRole) {
+    if (!this.bookAccessIsOwner()) return;
+    const bookId = window.__app.selectedBookId;
+    this.bookAccessError = '';
+    try {
+      const r = await fetch(`/books/${bookId}/access/${encodeURIComponent(email)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: newRole }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(window.__app.tError(data) || `HTTP ${r.status}`);
+      await this.loadBookAccess();
+    } catch (e) {
+      this.bookAccessError = e.message;
+    }
+  },
+
+  async revokeBookAccess(email) {
+    if (!this.bookAccessIsOwner()) return;
+    const bookId = window.__app.selectedBookId;
+    if (!await window.__app.appConfirm({
+      message: window.__app.t('book.share.revokeConfirm', { email }),
+      confirmLabel: window.__app.t('common.delete'),
+      danger: true,
+    })) return;
+    this.bookAccessError = '';
+    try {
+      const r = await fetch(`/books/${bookId}/access/${encodeURIComponent(email)}`, { method: 'DELETE' });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(window.__app.tError(data) || `HTTP ${r.status}`);
+      await this.loadBookAccess();
+    } catch (e) {
+      this.bookAccessError = e.message;
+    }
+  },
+
+  async transferOwnership(email) {
+    if (!this.bookAccessIsOwner()) return;
+    const bookId = window.__app.selectedBookId;
+    if (!await window.__app.appConfirm({
+      message: window.__app.t('book.share.transferConfirm', { email }),
+      confirmLabel: window.__app.t('book.share.transferConfirmBtn'),
+      danger: true,
+    })) return;
+    this.bookAccessError = '';
+    try {
+      const r = await fetch(`/books/${bookId}/transfer-ownership`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(window.__app.tError(data) || `HTTP ${r.status}`);
+      // Rollen cachen invalidieren + neu laden.
+      window.__app.bookRoles = {};
+      window.__app.currentBookRole = null;
+      if (window.__app._loadBookRole) await window.__app._loadBookRole(bookId);
+      await this.loadBookAccess();
+    } catch (e) {
+      this.bookAccessError = e.message;
+    }
+  },
+
+  bookAccessRoleOptions() {
+    const t = window.__app.t;
+    return [
+      { value: 'viewer', label: t('book.share.role.viewer') },
+      { value: 'lektor', label: t('book.share.role.lektor') },
+      { value: 'editor', label: t('book.share.role.editor') },
+    ];
   },
 
   // Drill-Down: Typ-Zeile aufklappen → letzte N Runs nachladen.

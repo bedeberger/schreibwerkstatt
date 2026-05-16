@@ -119,4 +119,98 @@
   }
 }
 
+/* Phase 4b Sharing-Section innerhalb der BookSettings-Card. */
+.book-share-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.book-share-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-card-bg-subtle, var(--color-card-bg));
+}
+.book-share-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.book-share-email {
+  font-weight: 500;
+}
+.book-share-displayname {
+  font-size: var(--font-size-xs);
+}
+.book-share-row-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.book-share-row-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.book-share-role-select {
+  padding: 4px var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-card-bg);
+  font-size: var(--font-size-sm);
+}
+.book-share-btn-transfer,
+.book-share-btn-revoke {
+  padding: 4px var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+}
+.book-share-btn-revoke { color: var(--color-danger, #c44); }
+.book-share-invite {
+  margin-top: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.book-share-invite-row {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+.book-share-invite-row input { flex: 1; min-width: 0; }
+
+/* Lock-Banner (Phase 4b page_locks). Sitzt im Editor-Header analog
+   zum Session-Banner. */
+.page-lock-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-warning-bg, #fff7e0);
+  border: 1px solid var(--color-warning-border, #e0c060);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-2);
+  font-size: var(--font-size-sm);
+}
+
+@media (max-width: 600px) {
+  .book-share-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .book-share-row-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .book-share-invite-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }

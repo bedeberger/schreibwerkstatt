@@ -15,6 +15,14 @@ export function registerBookSettingsCard() {
     bookSettingsErzaehlperspektive: '',
     bookSettingsErzaehlzeit: '',
     bookSettingsIsFinished: false,
+    bookSettingsAllowLektorBookChat: false,
+    // Phase 4b Sharing: Access-Liste + Invite-Form.
+    bookAccessList: [],
+    bookAccessLoading: false,
+    bookAccessError: '',
+    shareEmail: '',
+    shareRole: 'viewer',
+    shareBusy: false,
     bookSettingsLoading: false,
     bookSettingsSaving: false,
     bookSettingsSaved: false,
@@ -36,14 +44,18 @@ export function registerBookSettingsCard() {
     init() {
       this._lifecycle = setupCardLifecycle(this, {
         showFlag: 'showBookSettingsCard',
-        onShow: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats()]),
-        load: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats()]),
+        onShow: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats(), this.loadBookAccess()]),
+        load: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats(), this.loadBookAccess()]),
         resetState: {
           expandedJobType: null,
           bookJobRuns: {},
           bookHistoryResetMessage: '',
           bookHistoryResetError: '',
           bookDeleteError: '',
+          bookAccessList: [],
+          bookAccessError: '',
+          shareEmail: '',
+          shareRole: 'viewer',
         },
         resetStateView: {
           bookSettingsSaved: false,
@@ -51,6 +63,7 @@ export function registerBookSettingsCard() {
           bookHistoryResetMessage: '',
           bookHistoryResetError: '',
           bookDeleteError: '',
+          bookAccessError: '',
         },
       });
     },

@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 107, 56 Tabellen (ohne `sqlite_*`/`schema_version`/`sessions`).
+Stand: Schema-Version 111, 60 Tabellen (ohne `sqlite_*`/`schema_version`/`sessions`).
 
 Quelle: Live-Dump aus [schreibwerkstatt.db](../schreibwerkstatt.db) (`.schema --indent`) + [db/migrations.js](../db/migrations.js). Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -34,6 +34,9 @@ erDiagram
   books ||--o{ ideen                 : has
   books ||--o{ pdf_export_profile    : has
   books ||--o{ user_page_usage       : has
+  books ||--o{ book_access           : has
+  books ||--o{ book_share_invites    : has
+  books ||--o{ page_locks            : locks
   books ||--o{ writing_time          : has
   books ||--o{ lektorat_time         : has
   books ||--o{ chapter_extract_cache : has
@@ -60,6 +63,10 @@ erDiagram
   pages ||--o{ lektorat_cache        : cached
   pages ||--o{ locations             : firstMention
   pages ||--o{ figures               : firstMention
+  pages ||--|| page_locks            : locked
+
+  app_users ||--o{ book_access       : grants
+  app_users ||--o{ page_locks        : holds
 
   chapters ||--o{ figure_appearances     : has
   chapters ||--o{ figure_events          : at
@@ -202,14 +209,15 @@ erDiagram
     TEXT    updated_at
   }
   book_settings {
-    INTEGER book_id            PK,FK
-    TEXT    language           "default 'de'"
-    TEXT    region             "default 'CH'"
+    INTEGER book_id                  PK,FK
+    TEXT    language                 "default 'de'"
+    TEXT    region                   "default 'CH'"
     TEXT    buchtyp
     TEXT    buch_kontext
     TEXT    erzaehlperspektive
     TEXT    erzaehlzeit
-    INTEGER is_finished        "0|1, blendet Schreib-Tracking aus"
+    INTEGER is_finished              "0|1, blendet Schreib-Tracking aus"
+    INTEGER allow_lektor_book_chat   "Phase 4b: Lektor darf Buch-Chat (Default 0)"
     TEXT    updated_at
   }
 
@@ -642,6 +650,8 @@ erDiagram
     TEXT    invited_by
     TEXT    invited_at
     TEXT    created_at
+    REAL    monthly_budget_usd "Phase 4d: NULL = kein numerisches Limit"
+    TEXT    budget_mode        "Phase 4d: none | soft | hard (Default none)"
   }
   user_invites {
     INTEGER id           PK "AUTOINCREMENT"
@@ -657,11 +667,37 @@ erDiagram
   user_sessions_audit {
     INTEGER id         PK "AUTOINCREMENT"
     TEXT    user_email
-    TEXT    event      "login | logout | login-denied | suspended | reactivated | role-changed | deleted"
+    TEXT    event      "login | logout | login-denied | suspended | reactivated | role-changed | deleted | budget-changed | usage-viewed"
     TEXT    ip
     TEXT    user_agent
     TEXT    meta_json  "JSON-Encoded Detail (method, from/to-Rolle, ...)"
     TEXT    created_at
+  }
+  book_access {
+    INTEGER book_id     PK,FK "books(book_id) CASCADE — Phase 4b"
+    TEXT    user_email  PK,FK "app_users(email) CASCADE"
+    TEXT    role        "owner | editor | lektor | viewer"
+    TEXT    granted_at
+    TEXT    granted_by
+  }
+  book_share_invites {
+    INTEGER id            PK "AUTOINCREMENT"
+    INTEGER book_id       FK "books(book_id) CASCADE"
+    TEXT    invitee_email
+    TEXT    role          "editor | lektor | viewer"
+    TEXT    invited_by
+    TEXT    invited_at
+    TEXT    accepted_at   "NULL = noch offen"
+    TEXT    revoked_at
+  }
+  page_locks {
+    INTEGER page_id            PK,FK "pages(page_id) CASCADE — Phase 4b"
+    INTEGER book_id            FK "books(book_id) CASCADE"
+    TEXT    locked_by_email    FK "app_users(email) CASCADE"
+    TEXT    reason             "lektorat"
+    TEXT    acquired_at
+    TEXT    expires_at         "TTL 30 min, Heartbeat verlängert"
+    TEXT    last_heartbeat_at
   }
   users {
     TEXT    email             PK,FK "app_users(email) CASCADE"

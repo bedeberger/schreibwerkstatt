@@ -58,6 +58,11 @@
   align-items: center;
 }
 
+.pdfx-scope-picker {
+  display: inline-flex;
+  min-width: 180px;
+}
+
 /* === Profilname (Inline-Edit-Input) === */
 .pdfx-name-input {
   width: 100%;

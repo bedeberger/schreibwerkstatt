@@ -4447,6 +4447,197 @@ function runMigrations() {
     logger.info('DB-Migration auf Version 108 abgeschlossen (Phase 4c app_settings + app_settings_audit).');
   }
 
+  if (version < 109) {
+    // Phase 4b (BookStack-Exit, docs/bookstack-exit.md): Book-ACL + Sharing.
+    //
+    // book_access ist SSoT fuer "wer darf was am Buch". Vier Rollen (Hierarchie
+    // absteigend): owner > editor > lektor > viewer. Buchlisten + alle
+    // book-scoped Routen filtern strikt darueber; Admin ohne Share-Row sieht
+    // leeres Array. PK (book_id, user_email).
+    //
+    // book_share_invites speichert eingehende Sharing-Einladungen mit
+    // accepted_at/revoked_at-Lifecycle (vorerst Auto-Accept; Hooks fuer
+    // explizite Annahme bleiben).
+    //
+    // page_locks blockt waehrend einer Lektorat-Session konkurrierende
+    // Free-Text-Edits auf derselben Seite (Heartbeat 30 min). Verhindert
+    // Range-Drift in Findings-Positionen.
+    //
+    // book_settings.allow_lektor_book_chat: Opt-In pro Buch, ob Lektor den
+    // Buch-Chat triggern darf (Default 0, Token-Kosten-Vermeidung).
+    //
+    // Backfill: jede books-Row mit owner_email != NULL bekommt einen owner-
+    // Eintrag in book_access. BookStack-Permission-Discovery (Mehrfachzugriff
+    // auf geteilte BookStack-Buecher) erfolgt separat ueber CLI bei Bedarf.
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS book_access (
+        book_id     INTEGER NOT NULL REFERENCES books(book_id)       ON DELETE CASCADE,
+        user_email  TEXT    NOT NULL REFERENCES app_users(email)     ON DELETE CASCADE,
+        role        TEXT    NOT NULL CHECK(role IN ('owner','editor','lektor','viewer')),
+        granted_at  TEXT    DEFAULT (datetime('now')),
+        granted_by  TEXT,
+        PRIMARY KEY (book_id, user_email)
+      )
+    `).run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_book_access_user ON book_access(user_email)').run();
+
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS book_share_invites (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id       INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        invitee_email TEXT    NOT NULL,
+        role          TEXT    NOT NULL CHECK(role IN ('editor','lektor','viewer')),
+        invited_by    TEXT    NOT NULL,
+        invited_at    TEXT    DEFAULT (datetime('now')),
+        accepted_at   TEXT,
+        revoked_at    TEXT,
+        UNIQUE(book_id, invitee_email)
+      )
+    `).run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_book_share_invites_book ON book_share_invites(book_id)').run();
+
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS page_locks (
+        page_id           INTEGER PRIMARY KEY REFERENCES pages(page_id)     ON DELETE CASCADE,
+        book_id           INTEGER NOT NULL    REFERENCES books(book_id)     ON DELETE CASCADE,
+        locked_by_email   TEXT    NOT NULL    REFERENCES app_users(email)   ON DELETE CASCADE,
+        reason            TEXT    NOT NULL CHECK(reason IN ('lektorat')),
+        acquired_at       TEXT    NOT NULL DEFAULT (datetime('now')),
+        expires_at        TEXT    NOT NULL,
+        last_heartbeat_at TEXT    NOT NULL DEFAULT (datetime('now'))
+      )
+    `).run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_page_locks_book    ON page_locks(book_id)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_page_locks_user    ON page_locks(locked_by_email)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_page_locks_expires ON page_locks(expires_at)').run();
+
+    // book_settings.allow_lektor_book_chat (additiv).
+    const bsCols109 = db.pragma('table_info(book_settings)').map(c => c.name);
+    if (bsCols109.length > 0 && !bsCols109.includes('allow_lektor_book_chat')) {
+      db.prepare('ALTER TABLE book_settings ADD COLUMN allow_lektor_book_chat INTEGER NOT NULL DEFAULT 0').run();
+    }
+
+    // Owner-Backfill aus books.owner_email. Nur Bücher mit existierendem
+    // app_users-Eintrag — sonst verletzt FK ON DELETE CASCADE. Bücher ohne
+    // owner_email oder mit unbekannter Email bleiben im "herrenlos"-Zustand
+    // (Admin-Hint sichtbar in BookAccessCard).
+    const ownerInsert = db.prepare(`
+      INSERT OR IGNORE INTO book_access (book_id, user_email, role, granted_by)
+      SELECT b.book_id, b.owner_email, 'owner', 'migration-109'
+        FROM books b
+       WHERE b.owner_email IS NOT NULL
+         AND b.owner_email <> ''
+         AND EXISTS (SELECT 1 FROM app_users u WHERE u.email = b.owner_email)
+    `);
+    const ownerRows = ownerInsert.run().changes;
+    if (ownerRows > 0) {
+      logger.info(`Migration 109: ${ownerRows} Owner-Row(s) aus books.owner_email nach book_access gespiegelt.`);
+    }
+
+    const fkErrors109 = db.pragma('foreign_key_check');
+    if (fkErrors109.length) {
+      throw new Error(`Migration 109: foreign_key_check meldet ${fkErrors109.length} Verstoesse: ${JSON.stringify(fkErrors109.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 109').run();
+    logger.info('DB-Migration auf Version 109 abgeschlossen (Phase 4b Book-ACL: book_access + book_share_invites + page_locks + book_settings.allow_lektor_book_chat).');
+  }
+
+  if (version < 110) {
+    // Phase 4d (BookStack-Exit, docs/bookstack-exit.md): Token-Budget pro User.
+    //
+    // monthly_budget_usd = NULL => kein numerisches Limit (nur sinnvoll mit
+    //   mode != 'none').
+    // budget_mode 'none' deaktiviert Pruefung komplett — Default fuer Neu-User,
+    //   damit Bestandsdeployments nicht ploetzlich blocken. 'soft' warnt
+    //   (Frontend-Banner + Admin-Markierung), 'hard' blockt Job-/Chat-POSTs
+    //   mit HTTP 429 BUDGET_EXCEEDED.
+    //
+    // Cost wird zur Lese-Zeit aus (provider, model, tokens_*) via
+    // lib/pricing.js#costUsd berechnet — keine Materialisierung in job_runs
+    // /chat_messages, damit Preis-PRs rueckwirkend wirken.
+    const appUserCols = db.pragma('table_info(app_users)').map(c => c.name);
+    if (!appUserCols.includes('monthly_budget_usd')) {
+      db.prepare('ALTER TABLE app_users ADD COLUMN monthly_budget_usd REAL').run();
+    }
+    if (!appUserCols.includes('budget_mode')) {
+      db.prepare(`ALTER TABLE app_users ADD COLUMN budget_mode TEXT NOT NULL DEFAULT 'none'
+                    CHECK(budget_mode IN ('none','soft','hard'))`).run();
+    }
+
+    // Audit-CHECK erweitern: 'budget-changed' (Admin setzt Limit/Mode),
+    // 'usage-viewed' (Admin liest Usage-Dashboard — Privacy-Boundary-Nachweis).
+    // SQLite kann CHECK nur via Table-Recreate aendern.
+    db.pragma('foreign_keys = OFF');
+    db.prepare('DROP TABLE IF EXISTS user_sessions_audit_new').run();
+    db.prepare(`
+      CREATE TABLE user_sessions_audit_new (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_email TEXT NOT NULL,
+        event      TEXT NOT NULL CHECK(event IN
+                       ('login','logout','login-denied','suspended','reactivated',
+                        'role-changed','deleted','budget-changed','usage-viewed')),
+        ip         TEXT,
+        user_agent TEXT,
+        meta_json  TEXT,
+        created_at TEXT DEFAULT (datetime('now'))
+      )
+    `).run();
+    db.prepare(`
+      INSERT INTO user_sessions_audit_new (id, user_email, event, ip, user_agent, meta_json, created_at)
+      SELECT id, user_email, event, ip, user_agent, meta_json, created_at FROM user_sessions_audit
+    `).run();
+    db.prepare('DROP TABLE user_sessions_audit').run();
+    db.prepare('ALTER TABLE user_sessions_audit_new RENAME TO user_sessions_audit').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_user_audit_user ON user_sessions_audit(user_email, created_at DESC)').run();
+    db.pragma('foreign_keys = ON');
+
+    const fkErrors110 = db.pragma('foreign_key_check');
+    if (fkErrors110.length) {
+      throw new Error(`Migration 110: foreign_key_check meldet ${fkErrors110.length} Verstoesse: ${JSON.stringify(fkErrors110.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 110').run();
+    logger.info('DB-Migration auf Version 110 abgeschlossen (Phase 4d Token-Budget: app_users.monthly_budget_usd + budget_mode).');
+  }
+
+  if (version < 111) {
+    // Phase 4a2 (BookStack-Exit, docs/bookstack-exit.md): Public-Landing +
+    // Request-Register. Frische Besucher koennen Zugang anfordern; Admin
+    // moderiert via AdminUsersCard. Partial UNIQUE blockiert nur pending-
+    // Requests pro Email — abgelehnte / abgelaufene erlauben neuen Antrag.
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS registration_requests (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        email         TEXT    NOT NULL,
+        display_name  TEXT,
+        message       TEXT,
+        ip            TEXT,
+        user_agent    TEXT,
+        status        TEXT    NOT NULL DEFAULT 'pending'
+                          CHECK(status IN ('pending','approved','denied','expired')),
+        created_at    TEXT    DEFAULT (datetime('now')),
+        reviewed_at   TEXT,
+        reviewed_by   TEXT,
+        review_reason TEXT,
+        invite_id     INTEGER,
+        FOREIGN KEY (invite_id) REFERENCES user_invites(id) ON DELETE SET NULL
+      )
+    `).run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_reg_req_status ON registration_requests(status, created_at DESC)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_reg_req_invite_id ON registration_requests(invite_id)').run();
+    db.prepare(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_reg_req_pending_email
+        ON registration_requests(email)
+        WHERE status = 'pending'
+    `).run();
+
+    const fkErrors111 = db.pragma('foreign_key_check');
+    if (fkErrors111.length) {
+      throw new Error(`Migration 111: foreign_key_check meldet ${fkErrors111.length} Verstoesse: ${JSON.stringify(fkErrors111.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 111').run();
+    logger.info('DB-Migration auf Version 111 abgeschlossen (Phase 4a2 Public Landing + Request-Register: registration_requests).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

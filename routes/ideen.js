@@ -6,6 +6,7 @@ const express = require('express');
 const { db } = require('../db/schema');
 const { toIntId } = require('../lib/validate');
 const { setContext } = require('../lib/log-context');
+const { requireBookAccess, sendACLError } = require('../lib/acl');
 const logger = require('../logger');
 
 const router = express.Router();
@@ -17,13 +18,24 @@ function userEmailOrNull(req) {
   return req.session?.user?.email || null;
 }
 
+function _pageBookId(pageId) {
+  const r = db.prepare('SELECT book_id FROM pages WHERE page_id = ?').get(parseInt(pageId, 10));
+  return r?.book_id || null;
+}
+
+function _guard(req, res, bookId, minRole) {
+  setContext({ book: bookId });
+  try { requireBookAccess(req, bookId, minRole); return true; }
+  catch (e) { return !sendACLError(res, e); }
+}
+
 // Map page_id → Anzahl offener Ideen für ein Buch (für Tree-Indikatoren).
 router.get('/counts', (req, res) => {
   const userEmail = userEmailOrNull(req);
   const bookId = toIntId(req.query.book_id);
   if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
   if (!bookId)    return res.status(400).json({ error_code: 'INVALID_ID' });
-  setContext({ book: bookId });
+  if (!_guard(req, res, bookId, 'editor')) return;
   const rows = db.prepare(`
     SELECT page_id, COUNT(*) AS n
     FROM ideen
@@ -41,6 +53,9 @@ router.get('/', (req, res) => {
   const pageId = toIntId(req.query.page_id);
   if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
   if (!pageId)    return res.status(400).json({ error_code: 'INVALID_ID' });
+  const bookId = _pageBookId(pageId);
+  if (!bookId) return res.status(404).json({ error_code: 'PAGE_NOT_FOUND' });
+  if (!_guard(req, res, bookId, 'editor')) return;
   const rows = db.prepare(`
     SELECT i.id, i.book_id, i.page_id, p.page_name, i.content, i.erledigt, i.erledigt_at, i.created_at, i.updated_at
     FROM ideen i
@@ -61,7 +76,7 @@ router.post('/', jsonBody, (req, res) => {
   if (!bookId || !pageId) return res.status(400).json({ error_code: 'BOOKID_PAGEID_REQ' });
   if (!content)           return res.status(400).json({ error_code: 'CONTENT_REQ' });
   if (content.length > MAX_LEN) return res.status(400).json({ error_code: 'CONTENT_TOO_LONG' });
-  setContext({ book: bookId });
+  if (!_guard(req, res, bookId, 'editor')) return;
 
   const now = new Date().toISOString();
   const result = db.prepare(`
@@ -90,6 +105,7 @@ router.patch('/:id', jsonBody, (req, res) => {
     'SELECT id, book_id, page_id, erledigt FROM ideen WHERE id = ? AND user_email = ?'
   ).get(id, userEmail);
   if (!existing) return res.status(404).json({ error_code: 'IDEE_NOT_FOUND' });
+  if (!_guard(req, res, existing.book_id, 'editor')) return;
 
   const sets = [];
   const vals = [];
@@ -140,8 +156,10 @@ router.delete('/:id', (req, res) => {
   if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
   const id = toIntId(req.params.id);
   if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
-  const r = db.prepare('DELETE FROM ideen WHERE id = ? AND user_email = ?').run(id, userEmail);
-  if (!r.changes) return res.status(404).json({ error_code: 'IDEE_NOT_FOUND' });
+  const existing = db.prepare('SELECT book_id FROM ideen WHERE id = ? AND user_email = ?').get(id, userEmail);
+  if (!existing) return res.status(404).json({ error_code: 'IDEE_NOT_FOUND' });
+  if (!_guard(req, res, existing.book_id, 'editor')) return;
+  db.prepare('DELETE FROM ideen WHERE id = ? AND user_email = ?').run(id, userEmail);
   res.json({ ok: true });
 });
 

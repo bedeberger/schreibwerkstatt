@@ -6,12 +6,14 @@ const {
   getTokenForRequest,
 } = require('../../../db/schema');
 const { toIntId } = require('../../../lib/validate');
-const { bookParamHandler, setContext } = require('../../../lib/log-context');
+const { setContext } = require('../../../lib/log-context');
+const { aclParamGuard, requireBookAccess, sendACLError } = require('../../../lib/acl');
 const { jsonBody, createJob, enqueueJob, findActiveJobId } = require('../shared');
 const { runKomplettAnalyseJob, runKontinuitaetJob, runKomplettAnalyseAll } = require('./job');
 
 const komplettRouter = express.Router();
-komplettRouter.param('book_id', bookParamHandler);
+// :book_id-Routes (GET kontinuitaet, DELETE chapter-cache) sind viewer+ resp. editor+.
+komplettRouter.param('book_id', aclParamGuard('viewer'));
 
 // ── Routen ────────────────────────────────────────────────────────────────────
 komplettRouter.post('/komplett-analyse', jsonBody, (req, res) => {
@@ -19,6 +21,8 @@ komplettRouter.post('/komplett-analyse', jsonBody, (req, res) => {
   const book_id = toIntId(req.body?.book_id);
   if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
   setContext({ book: book_id });
+  try { requireBookAccess(req, book_id, 'editor'); }
+  catch (e) { if (sendACLError(res, e)) return; throw e; }
   const userEmail = req.session?.user?.email || null;
   const userToken = getTokenForRequest(req);
   const existing = findActiveJobId('komplett-analyse', book_id, userEmail);
@@ -35,6 +39,8 @@ komplettRouter.post('/kontinuitaet', jsonBody, (req, res) => {
   const book_id = toIntId(req.body?.book_id);
   if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
   setContext({ book: book_id });
+  try { requireBookAccess(req, book_id, 'editor'); }
+  catch (e) { if (sendACLError(res, e)) return; throw e; }
   const userEmail = req.session?.user?.email || null;
   const userToken = getTokenForRequest(req);
   const existing = findActiveJobId('kontinuitaet', book_id, userEmail);

@@ -1,13 +1,12 @@
 'use strict';
-// Custom-PDF-Export-Job. Lädt Buch + Kapitel + Seiten, rendert via lib/pdf-render
-// und persistiert das Buffer in einem In-Memory-Result-Store, weil die
-// Standard-Job-Result-Serialisierung JSON ist und MB-Buffers darin nichts zu
-// suchen haben. Frontend lädt das fertige PDF über einen separaten Endpoint
-// als Stream.
+// Custom-PDF-Export-Job. Laedt via lib/load-contents (Buch/Kapitel/Seite),
+// rendert via lib/pdf-render und persistiert das Buffer in einem In-Memory-
+// Result-Store, weil die Standard-Job-Result-Serialisierung JSON ist und MB-
+// Buffers darin nichts zu suchen haben. Frontend laedt das fertige PDF ueber
+// einen separaten Endpoint als Stream.
 //
-// Job-Result-JSON enthält nur Metadaten: Größe, MIME, Validation-Status. Der
-// eigentliche Buffer wird in `pdfResults` Map gehalten und beim Job-Cleanup
-// (siehe shared.js) zusammen mit dem Job entfernt.
+// Job-Result-JSON enthaelt nur Metadaten: Groesse, MIME, Validation-Status. Der
+// eigentliche Buffer wird in `pdfResults`-Map gehalten und nach 2 h gecleart.
 
 const express = require('express');
 const {
@@ -18,23 +17,21 @@ const {
   jsonBody,
 } = require('./shared');
 const { getTokenForRequest, getPdfExportProfile, getPdfExportProfileCover, getBookSettings } = require('../../db/schema');
-const contentStore = require('../../lib/content-store');
-const { loadBookContents } = require('../../lib/load-book-contents');
+const { loadContents } = require('../../lib/load-contents');
 const { renderPdfBuffer } = require('../../lib/pdf-render');
 const { validatePdfa } = require('../../lib/pdfa-validate');
 const { buildExportFilename } = require('../../lib/filenames');
+const { resolveSlug } = require('../../lib/export-builders/shared');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
 const logger = require('../../logger');
 
 const router = express.Router();
 
-// jobId → { buffer, mime, filename }
-// Wird beim Job-Cleanup nicht automatisch geleert (shared.js kennt diese Map
-// nicht). Daher manuell: bei completeJob/failJob/Cancel räumen wir den Eintrag
-// nach 2 h im selben Intervall, das shared.js für jobs nutzt.
-const pdfResults = new Map();
+const VALID_SCOPES = new Set(['book', 'chapter', 'page']);
 
+// jobId → { buffer, mime, filename }
+const pdfResults = new Map();
 const RESULT_TTL_MS = 2 * 60 * 60 * 1000;
 
 function _scheduleResultCleanup(jobId) {
@@ -42,7 +39,7 @@ function _scheduleResultCleanup(jobId) {
   t.unref?.();
 }
 
-async function runPdfExportJob(jobId, { bookId, profileId, userEmail, userToken }) {
+async function runPdfExportJob(jobId, { scope, entityId, profileId, userEmail, userToken }) {
   const log = makeJobLogger(jobId);
   const ctrl = jobAbortControllers.get(jobId);
 
@@ -53,30 +50,27 @@ async function runPdfExportJob(jobId, { bookId, profileId, userEmail, userToken 
     if (profile.user_email !== userEmail) throw i18nError('job.error.forbidden');
 
     updateJob(jobId, { progress: 10, statusText: 'job.phase.loadBook' });
-    const book = await contentStore.loadBook(bookId, userToken);
-    log.info(`Start PDF-Export «${book.name}» (book=${bookId}, profile=${profile.name})`);
+    const bundle = await loadContents({ scope, id: entityId }, userToken);
+    const { book, chapter, page, groups } = bundle;
+    log.info(`Start PDF-Export «${book.name}» (scope=${scope}, entity=${entityId}, profile=${profile.name})`);
 
-    updateJob(jobId, { progress: 20, statusText: 'job.phase.loadPages' });
-    const { groups } = await loadBookContents(bookId, userToken);
+    updateJob(jobId, { progress: 30, statusText: 'job.phase.loadPages' });
 
     if (ctrl?.signal.aborted) throw new Error('job.cancelled');
 
     let coverBuf = null;
-    if (profile.config.cover.enabled && profile.has_cover) {
+    if (scope === 'book' && profile.config.cover.enabled && profile.has_cover) {
       const cover = getPdfExportProfileCover(profileId);
       if (cover) coverBuf = cover.image;
     }
 
-    const { language: bookLang } = getBookSettings(bookId, userEmail);
+    const { language: bookLang } = getBookSettings(book.id, userEmail);
 
     updateJob(jobId, { progress: 40, statusText: 'job.phase.renderPdf' });
     const buffer = await renderPdfBuffer({
-      book,
-      groups,
-      profile,
-      coverBuf,
-      token: userToken,
-      lang: bookLang,
+      book, groups, profile,
+      coverBuf, token: userToken, lang: bookLang,
+      scope, chapter, page,
     });
 
     if (ctrl?.signal.aborted) throw new Error('job.cancelled');
@@ -91,23 +85,20 @@ async function runPdfExportJob(jobId, { bookId, profileId, userEmail, userToken 
         validation = { available: false, reason: 'validator-error' };
       }
       if (validation.available && !validation.passed) {
-        // Validation-Fail wird derzeit nicht-fatal behandelt — Buffer wird
-        // trotzdem ausgeliefert, das Frontend zeigt aber eine Warnung.
         log.warn(`veraPDF flagged document as non-compliant (job=${jobId})`);
       }
     }
 
-    const slug = book.slug || book.name || `book${bookId}`;
+    const slug = resolveSlug(bundle);
     const filename = buildExportFilename({
-      prefix: 'book',
-      slug, ext: 'pdf', date: new Date(),
+      prefix: scope, slug, ext: 'pdf', date: new Date(),
     });
 
     pdfResults.set(jobId, { buffer, mime: 'application/pdf', filename });
     _scheduleResultCleanup(jobId);
 
     const sizeKb = Math.round(buffer.length / 1024);
-    log.info(`PDF generiert «${filename}» (${sizeKb} KB, profile=${profile.name}, pdfa=${validation.available ? (validation.passed ? 'pass' : 'fail') : 'skipped'})`);
+    log.info(`PDF generiert «${filename}» (${sizeKb} KB, scope=${scope}, profile=${profile.name}, pdfa=${validation.available ? (validation.passed ? 'pass' : 'fail') : 'skipped'})`);
 
     completeJob(jobId, {
       ready: true,
@@ -115,6 +106,7 @@ async function runPdfExportJob(jobId, { bookId, profileId, userEmail, userToken 
       mime: 'application/pdf',
       filename,
       profileName: profile.name,
+      scope,
       pdfa: {
         requested: !!profile.config.pdfa.enabled,
         validatorAvailable: !!validation.available,
@@ -127,10 +119,9 @@ async function runPdfExportJob(jobId, { bookId, profileId, userEmail, userToken 
       failJob(jobId, e);
       return;
     }
-    if (e?.code === 'BOOK_EMPTY') {
-      failJob(jobId, i18nError('job.error.bookEmpty'));
-      return;
-    }
+    if (e?.code === 'BOOK_EMPTY')    { failJob(jobId, i18nError('job.error.bookEmpty'));    return; }
+    if (e?.code === 'CHAPTER_EMPTY') { failJob(jobId, i18nError('job.error.chapterEmpty')); return; }
+    if (e?.code === 'PAGE_EMPTY')    { failJob(jobId, i18nError('job.error.pageEmpty'));    return; }
     log.error(`pdf-export job ${jobId}: ${e.message}`);
     failJob(jobId, e);
   }
@@ -141,21 +132,52 @@ router.post('/pdf-export', jsonBody, async (req, res) => {
   const userToken = getTokenForRequest(req);
   if (!userToken) return res.status(401).json({ error_code: 'BOOKSTACK_UNAUTHED' });
 
-  const bookId = toIntId(req.body?.book_id || req.body?.bookId);
+  const rawScope = String(req.body?.scope || 'book').toLowerCase();
+  const scope = VALID_SCOPES.has(rawScope) ? rawScope : null;
+  if (!scope) return res.status(400).json({ error_code: 'BAD_SCOPE' });
+
+  const entityId = toIntId(req.body?.entityId ?? req.body?.entity_id ?? req.body?.book_id ?? req.body?.bookId);
   const profileId = toIntId(req.body?.profile_id || req.body?.profileId);
-  if (!bookId || !profileId) return res.status(400).json({ error_code: 'BOOK_OR_PROFILE_REQUIRED' });
-  setContext({ book: bookId });
+  if (!entityId || !profileId) return res.status(400).json({ error_code: 'ENTITY_OR_PROFILE_REQUIRED' });
 
   const profile = getPdfExportProfile(profileId);
   if (!profile) return res.status(404).json({ error_code: 'PROFILE_NOT_FOUND' });
   if (profile.user_email !== userEmail) return res.status(403).json({ error_code: 'FORBIDDEN' });
 
-  const dedupId = `${bookId}:${profileId}`;
+  // Buch-ID fuer Logging + Dedup ableiten: bei scope='book' === entityId,
+  // sonst via content-store-Lookup (Chapter/Page).
+  let bookId = entityId;
+  if (scope !== 'book') {
+    const contentStore = require('../../lib/content-store');
+    try {
+      if (scope === 'chapter') {
+        const ch = await contentStore.loadChapter(entityId, userToken);
+        bookId = ch?.book_id || 0;
+      } else if (scope === 'page') {
+        const pg = await contentStore.loadPage(entityId, userToken);
+        bookId = pg?.book_id || 0;
+      }
+    } catch (e) {
+      if (e.status === 404) return res.status(404).json({ error_code: 'NOT_FOUND' });
+      if (e.status === 401 || e.status === 403) return res.status(401).json({ error_code: 'BOOKSTACK_UNAUTHED' });
+      return res.status(502).json({ error_code: 'BOOKSTACK_UNREACHABLE' });
+    }
+  }
+  if (bookId) setContext({ book: bookId });
+
+  // PDF-Export: viewer reicht (Export gilt fuer alle Rollen).
+  if (bookId) {
+    const { requireBookAccess, sendACLError } = require('../../lib/acl');
+    try { requireBookAccess(req, bookId, 'viewer'); }
+    catch (e) { if (sendACLError(res, e)) return; throw e; }
+  }
+
+  const dedupId = `${scope}:${entityId}:${profileId}`;
   const existing = findActiveJobId('pdf-export', dedupId, userEmail);
   if (existing) return res.json({ jobId: existing, deduplicated: true });
 
   const jobId = createJob('pdf-export', bookId, userEmail, 'job.label.pdfExport', { profile: profile.name }, dedupId);
-  enqueueJob(jobId, () => runPdfExportJob(jobId, { bookId, profileId, userEmail, userToken }));
+  enqueueJob(jobId, () => runPdfExportJob(jobId, { scope, entityId, profileId, userEmail, userToken }));
   res.status(202).json({ jobId });
 });
 

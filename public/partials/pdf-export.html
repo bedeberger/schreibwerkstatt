@@ -22,6 +22,11 @@
         <span x-text="saving ? $app.t('common.saving') : $app.t('common.save')"></span>
       </button>
       <span class="card-form-saved" x-show="savedAt" x-cloak x-transition.opacity.duration.250ms x-text="$app.t('pdfExport.saved')"></span>
+      <div class="pdfx-scope-picker" x-show="!exporting">
+        <div x-data="combobox($app.t('export.scope.label'))"
+             x-modelable="value" x-model="exportScope"
+             x-effect="options = exportScopeOptions()"></div>
+      </div>
       <button type="button"
               class="primary"
               x-show="!exporting"

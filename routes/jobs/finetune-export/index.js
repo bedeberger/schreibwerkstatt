@@ -169,6 +169,9 @@ finetuneExportRouter.post('/finetune-export', jsonBody, (req, res) => {
           max_seq_tokens, emit_text, fulltext, max_full_chars, truncate_long, ai } = req.body || {};
   if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
   setContext({ book: book_id });
+  const { requireBookAccess, sendACLError } = require('../../../lib/acl');
+  try { requireBookAccess(req, book_id, 'editor'); }
+  catch (e) { if (sendACLError(res, e)) return; throw e; }
   const aiOpts = {
     reversePrompts:        !!(ai && ai.reverse_prompts),
     factQA:                !!(ai && ai.fact_qa),
