@@ -10,8 +10,7 @@
 
 'use strict';
 require('dotenv').config();
-const fs = require('fs');
-const path = require('path');
+const { parseDummyBook, META } = require('../tests/fixtures/dummy-book-loader');
 
 const API_HOST = (process.env.API_HOST || '').replace(/\/$/, '');
 const TOKEN_ID = process.env.TOKEN_ID;
@@ -22,8 +21,7 @@ if (!API_HOST || !TOKEN_ID || !TOKEN_SECRET) {
   process.exit(1);
 }
 
-const FIXTURE = path.join(__dirname, '..', 'tests', 'fixtures', 'dummy-book.md');
-const BOOK_NAME = 'Der Nebel über Luzern';
+const BOOK_NAME = META.title;
 const BOOK_DESCRIPTION = 'Dummy-Krimi zum Testen des schreibwerkstatt-Tools. Enthält absichtliche Fehler und Kontinuitätsbrüche.';
 
 const headers = {
@@ -42,48 +40,6 @@ async function api(method, pathSuffix, body) {
   return text ? JSON.parse(text) : {};
 }
 
-function parseFixture(md) {
-  const cut = md.indexOf('# Fehler-Checkliste');
-  const body = cut > 0 ? md.slice(0, cut) : md;
-
-  const chapters = [];
-  let currentChapter = null;
-  let currentPage = null;
-  let buffer = [];
-
-  const flushPage = () => {
-    if (currentPage && currentChapter) {
-      currentPage.markdown = buffer.join('\n').trim();
-      currentChapter.pages.push(currentPage);
-    }
-    currentPage = null;
-    buffer = [];
-  };
-
-  for (const line of body.split('\n')) {
-    const chapMatch = line.match(/^# Kapitel \d+ — (.+)$/);
-    const pageMatch = line.match(/^## Seite [\d.]+:\s*(.+)$/);
-
-    if (chapMatch) {
-      flushPage();
-      currentChapter = { title: `Kapitel ${chapters.length + 1} — ${chapMatch[1].trim()}`, pages: [] };
-      chapters.push(currentChapter);
-      continue;
-    }
-    if (pageMatch) {
-      flushPage();
-      currentPage = { title: pageMatch[1].trim() };
-      continue;
-    }
-    if (currentPage) {
-      if (line.trim() === '---') continue;
-      buffer.push(line);
-    }
-  }
-  flushPage();
-  return chapters;
-}
-
 async function bookExists(name) {
   const q = encodeURIComponent(`"${name}" {type:book}`);
   const res = await api('GET', `/search?query=${q}&count=10`);
@@ -91,8 +47,7 @@ async function bookExists(name) {
 }
 
 (async () => {
-  const md = fs.readFileSync(FIXTURE, 'utf8');
-  const chapters = parseFixture(md);
+  const { chapters } = parseDummyBook();
 
   console.log(`Fixture: ${chapters.length} Kapitel, ${chapters.reduce((s, c) => s + c.pages.length, 0)} Seiten`);
 

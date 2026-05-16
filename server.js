@@ -10,8 +10,9 @@ const logger = require('./logger');
 const { runWithContext } = require('./lib/log-context');
 
 // DB-Setup + Migrationen laufen beim Import
-const { db, cleanupStuckJobRuns, upsertUserLogin, touchUserLastSeen, addUserActivity, pruneStaleByAge } = require('./db/schema');
+const { db, cleanupStuckJobRuns, upsertUserLogin, touchUserLastSeen, addUserActivity, pruneStaleByAge, setUserToken } = require('./db/schema');
 const appUsers = require('./db/app-users');
+const bookAccess = require('./db/book-access');
 const { ensureAdminFromEnv } = appUsers;
 const appSettings = require('./lib/app-settings');
 
@@ -311,9 +312,38 @@ app.use((req, _res, next) => {
 
 app.use(staticServe);
 
+function bootstrapDevAccess(stage) {
+  if (!LOCAL_DEV_MODE) return;
+  const email = 'dev@local';
+  try {
+    if (!appUsers.getUser(email)) {
+      appUsers.createUser({ email, displayName: 'Dev (lokal)', globalRole: 'admin', status: 'active' });
+    }
+    upsertUserLogin(email, 'Dev (lokal)');
+    if (process.env.TOKEN_ID && process.env.TOKEN_KENNWORT) {
+      setUserToken(email, process.env.TOKEN_ID, process.env.TOKEN_KENNWORT);
+    }
+    const books = db.prepare('SELECT book_id FROM books').all();
+    let granted = 0;
+    for (const { book_id } of books) {
+      if (!bookAccess.getBookRole(book_id, email)) {
+        bookAccess.grantAccess(book_id, email, 'owner', 'system');
+        granted++;
+      }
+    }
+    if (granted > 0) {
+      logger.info(`LOCAL_DEV_MODE (${stage}): ${granted} Buch/Bücher für ${email} als owner freigeschaltet.`);
+    }
+  } catch (e) {
+    logger.warn(`bootstrapDevAccess (${stage}): ${e.message}`);
+  }
+}
+
 const server = app.listen(PORT, '0.0.0.0', () => {
   logger.info(`Lektorat läuft auf http://0.0.0.0:${PORT}`);
   logger.info(`BookStack Ziel: ${BOOKSTACK_URL}`);
+
+  bootstrapDevAccess('boot');
 
   // Hängende Job-Runs aus dem letzten Server-Leben bereinigen
   const stuck = cleanupStuckJobRuns();
@@ -354,6 +384,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
     } catch (e) {
       logger.error('Startup Stale-Cleanup Fehler: ' + e.message);
     }
+    bootstrapDevAccess('post-sync');
   });
 });
 

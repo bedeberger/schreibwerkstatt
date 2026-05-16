@@ -15,10 +15,12 @@
   </div>
 
   <!-- Tab-Bar -->
-  <div class="admin-usage-tabs">
+  <div class="tabs" role="tablist">
     <template x-for="tab in ['users','jobs','chat','summary','features','time']" :key="tab">
-      <button type="button"
-              :class="['admin-usage-tab', adminUsageTab === tab ? 'is-active' : '']"
+      <button type="button" role="tab"
+              class="tabs-btn"
+              :class="adminUsageTab === tab ? 'tabs-btn--active' : ''"
+              :aria-selected="adminUsageTab === tab"
               @click="adminUsageSelectTab(tab)"
               x-text="$app.t('admin.usage.tab.' + tab)"></button>
     </template>
@@ -49,8 +51,6 @@
           <th x-text="$app.t('admin.usage.column.tokensIn')"></th>
           <th x-text="$app.t('admin.usage.column.tokensOut')"></th>
           <th x-text="$app.t('admin.usage.user.budget')"></th>
-          <th x-text="$app.t('admin.usage.user.mode')"></th>
-          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -63,20 +63,16 @@
             <td x-text="adminUsageMoney(u.usd)"></td>
             <td x-text="adminUsageInt(u.tokensIn)"></td>
             <td x-text="adminUsageInt(u.tokensOut)"></td>
-            <td>
+            <td class="admin-usage-budget-cell">
               <input type="number" min="0" step="0.01"
                      x-model="u._draftBudget"
                      :placeholder="$app.t('admin.usage.user.noBudget')"
                      class="admin-usage-budget-input">
-            </td>
-            <td>
               <select x-model="u._draftMode" class="admin-usage-mode-select">
                 <option value="none"   x-text="$app.t('admin.usage.user.mode.none')"></option>
                 <option value="soft"   x-text="$app.t('admin.usage.user.mode.soft')"></option>
                 <option value="hard"   x-text="$app.t('admin.usage.user.mode.hard')"></option>
               </select>
-            </td>
-            <td class="admin-usage-actions">
               <button type="button" @click="adminUsageSaveBudget(u)" :disabled="u._saving"
                       x-text="u._saving ? $app.t('common.saving') : $app.t('common.save')"></button>
               <span x-show="u._savedAt && (Date.now() - u._savedAt < 2000)"
@@ -201,15 +197,21 @@
     <div class="admin-usage-charts" x-show="adminUsageSummary">
       <figure>
         <figcaption x-text="$app.t('admin.usage.summary.topUsers')"></figcaption>
-        <canvas x-ref="chartUsers" height="220"></canvas>
+        <div class="admin-usage-chart-canvas">
+          <canvas x-ref="chartUsers"></canvas>
+        </div>
       </figure>
       <figure>
         <figcaption x-text="$app.t('admin.usage.summary.byModel')"></figcaption>
-        <canvas x-ref="chartModel" height="220"></canvas>
+        <div class="admin-usage-chart-canvas">
+          <canvas x-ref="chartModel"></canvas>
+        </div>
       </figure>
       <figure>
         <figcaption x-text="$app.t('admin.usage.summary.byType')"></figcaption>
-        <canvas x-ref="chartType" height="220"></canvas>
+        <div class="admin-usage-chart-canvas">
+          <canvas x-ref="chartType"></canvas>
+        </div>
       </figure>
     </div>
   </div>

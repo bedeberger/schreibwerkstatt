@@ -1,5 +1,30 @@
-const { db } = require('./connection');
+const fs = require('fs');
+const path = require('path');
+const { db, DB_FILE } = require('./connection');
 const logger = require('../logger');
+
+// Serialisiert parallele Migrations-Runner (z.B. node --test --test-concurrency
+// mit geteiltem DB_PATH). Ohne Lock racen mehrere Worker auf ALTER TABLE und
+// laufen in "duplicate column"-Fehler, weil Pragma-Reads vor dem Write
+// stattfinden. Lock haelt nur den Migrations-Scope, kein Runtime-Block.
+function _withMigrationLock(fn) {
+  const lockPath = `${DB_FILE}.migration-lock`;
+  const start = Date.now();
+  let fd;
+  while (true) {
+    try { fd = fs.openSync(lockPath, 'wx'); break; }
+    catch (e) {
+      if (e.code !== 'EEXIST') throw e;
+      if (Date.now() - start > 30000) throw new Error(`Migration lock timeout: ${lockPath}`);
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
+    }
+  }
+  try { return fn(); }
+  finally {
+    try { fs.closeSync(fd); } catch {}
+    try { fs.unlinkSync(lockPath); } catch {}
+  }
+}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS page_checks (
@@ -338,6 +363,10 @@ db.exec(`
 `);
 
 function runMigrations() {
+  return _withMigrationLock(_runMigrationsLocked);
+}
+
+function _runMigrationsLocked() {
   const { version } = db.prepare('SELECT version FROM schema_version').get();
   if (version < 2) {
     db.exec('ALTER TABLE page_checks ADD COLUMN applied_errors_json TEXT');

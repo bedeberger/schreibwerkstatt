@@ -307,11 +307,11 @@ export const bookSettingsMethods = {
   },
 
   bookAccessRoleOptions() {
-    const t = window.__app.t;
+    const app = window.__app;
     return [
-      { value: 'viewer', label: t('book.share.role.viewer') },
-      { value: 'lektor', label: t('book.share.role.lektor') },
-      { value: 'editor', label: t('book.share.role.editor') },
+      { value: 'viewer', label: app.t('book.share.role.viewer') },
+      { value: 'lektor', label: app.t('book.share.role.lektor') },
+      { value: 'editor', label: app.t('book.share.role.editor') },
     ];
   },
 

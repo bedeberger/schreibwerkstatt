@@ -75,16 +75,17 @@
 }
 
 .admin-users-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-xs);
-  justify-content: flex-end;
-  align-items: center;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .admin-users-actions button {
   font-size: var(--font-size-xs);
   padding: var(--space-xs) var(--space-sm);
+}
+
+.admin-users-actions button + button {
+  margin-left: var(--space-xs);
 }
 
 .admin-users-actions .danger {

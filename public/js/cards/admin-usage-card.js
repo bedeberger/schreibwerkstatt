@@ -8,7 +8,10 @@ export function registerAdminUsageCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
   window.Alpine.data('adminUsageCard', () => ({
     adminUsageInitialized: false,
-    adminUsageTab: 'users',
+    // adminUsageTab lebt am Root (Hash-Router liest/schreibt es). Getter/Setter
+    // halten den Sub-Scope kompatibel, ohne den State zu duplizieren.
+    get adminUsageTab() { return window.__app?.adminUsageTab ?? 'users'; },
+    set adminUsageTab(v) { if (window.__app) window.__app.adminUsageTab = v; },
     adminUsageLoading: false,
     adminUsageError: '',
     adminUsageFrom: '',

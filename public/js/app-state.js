@@ -166,6 +166,7 @@ const cardsState = () => ({
   showAdminUsersCard: false,
   showAdminSettingsCard: false,
   showAdminUsageCard: false,
+  adminUsageTab: 'users',
   showFinetuneExportCard: false,
   showExportCard: false,
   showPdfExportCard: false,

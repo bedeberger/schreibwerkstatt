@@ -1,6 +1,7 @@
 // URL-Hash-Permalinks + History-Management.
-// Schema: #profil | #book/:bookId[/page/:pageId|/figur/:figId|/ort/:ortId|/werkstatt[/:draftId]|/kapitel[/:chapterId]|/<view>]
+// Schema: #profil | #admin/<users|settings|usage[/<tab>]> | #book/:bookId[/page/:pageId|/figur/:figId|/ort/:ortId|/werkstatt[/:draftId]|/kapitel[/:chapterId]|/<view>]
 // Views: figuren, werkstatt, orte, szenen, ereignisse, kontinuitaet, bewertung, kapitel, chat, stats, stil, fehler, einstellungen, finetune, export
+// Admin-Usage-Tabs: users (default, weggelassen) | jobs | chat | summary | features | time
 //
 // Entwurfsentscheidungen:
 // - push vs. replace entscheidet `_hashCategory`: gleiche Kategorie → replace
@@ -13,6 +14,12 @@
 export const appHashRouterMethods = {
   _computeHash() {
     if (this.showUserSettingsCard) return '#profil';
+    if (this.showAdminUsersCard) return '#admin/users';
+    if (this.showAdminSettingsCard) return '#admin/settings';
+    if (this.showAdminUsageCard) {
+      const tab = this.adminUsageTab;
+      return '#admin/usage' + (tab && tab !== 'users' ? '/' + tab : '');
+    }
     if (!this.selectedBookId) return '';
     const parts = ['book', this.selectedBookId];
     if (this.showEditorCard && this.currentPage?.id) {
@@ -53,6 +60,7 @@ export const appHashRouterMethods = {
     if (!hash) return null;
     const parts = hash.replace(/^#/, '').split('/').filter(Boolean);
     if (parts[0] === 'profil') return 'profil';
+    if (parts[0] === 'admin') return 'admin:' + (parts[1] || '');
     if (parts[0] !== 'book' || !parts[1]) return null;
     const bookId = parts[1];
     const view = parts[2] || 'book';
@@ -119,6 +127,29 @@ export const appHashRouterMethods = {
       this._inHashApply = true;
       try {
         if (!this.showUserSettingsCard) await this.toggleUserSettingsCard();
+      } finally {
+        this._applyingHash = false;
+        this._inHashApply = false;
+      }
+      return;
+    }
+
+    if (parts[0] === 'admin') {
+      this._applyingHash = true;
+      this._inHashApply = true;
+      try {
+        const sub = parts[1] || 'users';
+        if (sub === 'users') {
+          if (!this.showAdminUsersCard) await this.toggleAdminUsersCard();
+        } else if (sub === 'settings') {
+          if (!this.showAdminSettingsCard) await this.toggleAdminSettingsCard();
+        } else if (sub === 'usage') {
+          if (!this.showAdminUsageCard) await this.toggleAdminUsageCard();
+          const tab = parts[2];
+          const valid = ['users', 'jobs', 'chat', 'summary', 'features', 'time'];
+          if (tab && valid.includes(tab)) this.adminUsageTab = tab;
+          else if (!tab) this.adminUsageTab = 'users';
+        }
       } finally {
         this._applyingHash = false;
         this._inHashApply = false;
@@ -288,6 +319,7 @@ export const appHashRouterMethods = {
       'werkstattDraftId',
       'showBookStatsCard', 'showStilCard', 'showFehlerHeatmapCard',
       'showBookSettingsCard', 'showUserSettingsCard',
+      'showAdminUsersCard', 'showAdminSettingsCard', 'showAdminUsageCard', 'adminUsageTab',
       'showFinetuneExportCard',
       'showExportCard',
       'showPdfExportCard',
