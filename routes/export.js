@@ -14,7 +14,8 @@ const { EPub } = require('epub-gen-memory');
 const HTMLtoDOCX = require('@turbodocx/html-to-docx');
 const logger = require('../logger');
 const { getTokenForRequest } = require('../db/schema');
-const { bsGet, BOOKSTACK_URL, authHeader } = require('../lib/bookstack');
+const { BOOKSTACK_URL, authHeader } = require('../lib/bookstack');
+const contentStore = require('../lib/content-store');
 const { loadBookContents } = require('../lib/load-book-contents');
 const { buildExportFilename } = require('../lib/filenames');
 const { toIntId } = require('../lib/validate');
@@ -238,7 +239,7 @@ router.get('/book/:id/:fmt', async (req, res) => {
 
   let book;
   try {
-    book = await bsGet(`books/${id}`, token);
+    book = await contentStore.loadBook(id, token);
   } catch (e) {
     if (e.status === 401 || e.status === 403) return res.status(401).json({ error_code: 'BOOKSTACK_UNAUTHED' });
     if (e.status === 404) return res.status(404).json({ error_code: 'BOOK_NOT_FOUND' });

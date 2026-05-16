@@ -1,7 +1,7 @@
 // Statischer Mini-Server für Playwright. Liefert public/ und tests/ aus,
 // damit die Harness-HTMLs die Module per ESM laden können. Zusätzlich liefert
 // er deterministische Mocks für die Job-Queue-Endpoints (/jobs/check,
-// /jobs/:id), den BookStack-Proxy (/api/pages/:id) und den History-Endpoint
+// /jobs/:id), das Content-Repo (/content/pages/:id) und den History-Endpoint
 // (/history/check/:id/saved), die das Lektorat-Harness braucht. Das ist
 // bewusst kein echter Mini-Express – ein Roh-HTTP-Dispatch reicht und hält
 // das Setup ohne Extra-Dependencies.
@@ -107,9 +107,9 @@ async function handleMockRoute(req, res, urlPath) {
     return true;
   }
 
-  // BookStack-Proxy-Mock: GET liefert dieselbe HTML wie das Lektorat-Result,
+  // Content-Repo-Mock: GET liefert dieselbe HTML wie das Lektorat-Result,
   // PUT bestätigt den Speichervorgang und merkt den Body für Assertions.
-  const pageMatch = urlPath.match(/^\/api\/pages\/\d+$/);
+  const pageMatch = urlPath.match(/^\/content\/pages\/\d+$/);
   if (pageMatch) {
     if (req.method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/json' });

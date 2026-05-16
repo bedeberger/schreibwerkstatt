@@ -1,7 +1,7 @@
 'use strict';
 const { db } = require('../../../db/schema');
 const { INPUT_BUDGET_CHARS } = require('../../../lib/ai');
-const { bsGet: _bsGet, bsBatch: _bsBatch } = require('../../../lib/bookstack');
+const contentStore = require('../../../lib/content-store');
 const { inClause } = require('../../../lib/validate');
 const { i18nError } = require('./jobs');
 const { htmlToText } = require('./ai');
@@ -47,23 +47,28 @@ async function loadPageContents(pages, chMap, minLength, onBatch, userToken, sig
       filteredPages = pages;
     }
   }
-  return _bsBatch(filteredPages, async (p, batchSignal) => {
-    const pd = await _bsGet('pages/' + p.id, userToken, { timeoutMs: 30000 }).catch(e => {
+  return contentStore.loadPagesBatch(filteredPages, userToken, {
+    batchSize: BATCH_SIZE,
+    onBatch,
+    signal,
+    onError: (_p, e) => {
       if (e.status) throw i18nError('job.error.bookstack', { status: e.status, text: e.bodyText });
       throw e;
-    });
-    if (batchSignal?.aborted) return null;
-    const text = htmlToText(pd.html).trim();
-    if (text.length < minLength) return null;
-    return {
-      id: p.id,
-      updated_at: p.updated_at || '',
-      title: p.name,
-      chapter_id: p.chapter_id || null,
-      chapter: p.chapter_id ? (chMap[p.chapter_id] || 'Kapitel') : null,
-      text,
-    };
-  }, { batchSize: BATCH_SIZE, onBatch, signal });
+    },
+  }).then(loaded => loaded
+    .map(pd => {
+      const text = htmlToText(pd.html).trim();
+      if (text.length < minLength) return null;
+      return {
+        id: pd.id,
+        updated_at: pd.updated_at || '',
+        title: pd.name,
+        chapter_id: pd.chapter_id || null,
+        chapter: pd.chapter_id ? (chMap[pd.chapter_id] || 'Kapitel') : null,
+        text,
+      };
+    })
+    .filter(Boolean));
 }
 
 function groupByChapter(pageContents) {

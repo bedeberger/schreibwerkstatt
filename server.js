@@ -20,7 +20,6 @@ const { router: jobsRouter, runKomplettAnalyseAll } = require('./routes/jobs');
 const chatRouter = require('./routes/chat');
 const ideenRouter = require('./routes/ideen');
 const bookSettingsRouter = require('./routes/booksettings');
-const booksRouter = require('./routes/books');
 const userSettingsRouter = require('./routes/usersettings');
 const { router: proxiesRouter, bookstackProxy, bookstackPageCleaner, BOOKSTACK_URL } = require('./routes/proxies');
 const { router: syncRouter, syncAllBooks } = require('./routes/sync');
@@ -185,7 +184,7 @@ app.use((req, res, next) => {
 
 // ── Auth-Guard ────────────────────────────────────────────────────────────────
 // API-Pfade → 401 JSON; HTML-Pfade → Redirect zu /auth/login
-const API_PREFIXES = ['/api/', '/history/', '/figures/', '/locations/', '/jobs/', '/sync/', '/chat/', '/booksettings/', '/books/', '/content/', '/me/', '/config', '/claude', '/ollama', '/llama'];
+const API_PREFIXES = ['/api/', '/history/', '/figures/', '/locations/', '/jobs/', '/sync/', '/chat/', '/booksettings/', '/content/', '/me/', '/config', '/claude', '/ollama', '/llama'];
 
 app.use((req, res, next) => {
   if (req.session?.user) return next();
@@ -239,7 +238,6 @@ app.use('/jobs', jobsRouter);
 app.use('/chat', chatRouter);
 app.use('/ideen', ideenRouter);
 app.use('/booksettings', bookSettingsRouter);
-app.use('/books', booksRouter);
 app.use('/me', userSettingsRouter);
 app.use('/sync', syncRouter);
 app.use('/export', exportRouter);

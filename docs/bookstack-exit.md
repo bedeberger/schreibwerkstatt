@@ -25,7 +25,7 @@ Ziel: Editor/Lektorat/Chat/History sprechen nur noch mit einer Domain-Repository
 - [x] **Schritt 3b — Strukturoperationen migriert.** Server-Routen ergänzt in [routes/content.js](../routes/content.js): `POST /content/pages`, `DELETE /content/pages/:id`, `POST /content/chapters`, `PUT /content/chapters/:id`, `DELETE /content/chapters/:id`, `DELETE /content/books/:id`. `PUT /content/pages/:id` akzeptiert zusätzlich `position` (→ BookStack-`priority`) und `chapter_id` (Drag/Drop). `bsDelete` neu in [lib/bookstack.js](../lib/bookstack.js). Repo erweitert: `createPage/updatePage/deletePage/createChapter/updateChapter/deleteChapter/deleteBook`. Call-Sites migriert: [public/js/cards/book-organizer-card.js](../public/js/cards/book-organizer-card.js) (8 Operationen), [public/js/tree.js](../public/js/tree.js) (createChapter), [public/js/cards/kapitel-review-card.js](../public/js/cards/kapitel-review-card.js) (createPage), [public/js/book-settings.js](../public/js/book-settings.js) (deleteBook). [public/js/api-bookstack.js](../public/js/api-bookstack.js) ist auf reine Lektorat-Domain-Logik (`_loadApplyAndSave`, `_applyStilkorrektur`, `_checkPageConflict`) + Local-Cache-Helper (`bsRegisterPageLocally`/`bsRegisterChapterLocally`) reduziert — alle `bs*`/`_invalidateApiCache` entfernt.
 - [x] **Schritt 3c — Search migriert.** Route `GET /content/search?query=…&book_id=…&count=…` in [routes/content.js](../routes/content.js); augmentiert Query mit `{type:page} {in_book:N}` server-seitig, filtert Page-Hits, gibt `{ hits: [PageMeta] }` zurück. Frontend: [public/js/bookstack-search.js](../public/js/bookstack-search.js) → `contentRepo.search`. AbortController fuer in-flight-Cancellation via seq-Guard (Repo-Search akzeptiert noch kein Signal; folgt mit Schritt 4).
 - [ ] **Schritt 4 — Server-Loader-Abstraktion:** `lib/content-store.js` mit `loadPage/loadBook/savePage`; [routes/jobs/shared/loader.js](../routes/jobs/shared/loader.js), [routes/content.js](../routes/content.js) und [routes/book-editor.js](../routes/book-editor.js) konsumieren `content-store`, Token-Param verschwindet aus Job-Routen.
-- [ ] **Schritt 5 — Token-Leak schliessen:** `req.session.bookstackToken` nur noch in [lib/bookstack.js](../lib/bookstack.js) + `content-store.js`. [routes/books.js](../routes/books.js) (heute dead-code nach Schritt 3, aber noch montiert) entfernen; [routes/book-editor.js](../routes/book-editor.js)/[routes/export.js](../routes/export.js) lesen Token nicht mehr direkt.
+- [ ] **Schritt 5 — Token-Leak schliessen:** `req.session.bookstackToken` nur noch in [lib/bookstack.js](../lib/bookstack.js) + `content-store.js`. [routes/books.js](../routes/books.js) ist **toter Mount** ([server.js:242](../server.js#L242)): Frontend ruft seit Schritt 3 ausschliesslich `POST /content/books`, niemand mehr `POST /books`. Easy-Win — Mount entfernen, Datei löschen, kein Daten-Risiko. [routes/book-editor.js](../routes/book-editor.js)/[routes/export.js](../routes/export.js) lesen Token nicht mehr direkt.
 - [x] **Schritt 6 — Tripwire (Frontend).** [tests/unit/content-repo-tripwire.test.mjs](../tests/unit/content-repo-tripwire.test.mjs) fail-fast bei jedem `bs*`-Call oder direktem `/api/`-Fetch in `public/js/**` — Allowlist ist seit Schritt 3c **leer**. Server-seitiger Tripwire (`bsGet|bsPut|bsPost|bsGetAll|bsDelete` nur in `lib/bookstack.js`/`routes/content.js`/`lib/content-store.js`) folgt mit Schritt 4.
 
 **Folge für Phase 1+:** Replica-Sync füllt lokale Tabellen; `content-store`-Implementierung bekommt einen `USE_LOCAL_READS`-Branch. Caller-Code in Editor/Lektorat/Chat ändert sich nicht.
@@ -73,7 +73,7 @@ Bewusst out-of-scope (User-Wunsch): Attachments (werden nicht genutzt → kein M
 | 3 | Eigene Sortierung | ja | `localdb`-only nativ; `bookstack` weiter via BS-`priority` | 0, 1 |
 | 4a | App-User-Verwaltung | mittel (FK-Recreate) | Admin-Karte; restriktive Logins; User-Invite-Flag | 0 |
 | 4b | Book-ACL + Sharing (owner/editor/lektor/viewer) | ja | Buchliste filtert auf Shares; Rollen-Matrix | 0, 4a |
-| 4b1 | Reader-View (Kindle-artig) | ja | Lese-UI für viewer (und alle) | 4b |
+| 4b1 | Lese-Modus (Print-CSS + readOnly) | ja | Druckansicht + readOnly für viewer | 4b |
 | 4c | Admin-Settings (alle Runtime-Configs aus `.env` → DB) | ja | Admin-UI für Provider/Modell/Auth/Cron/Tuning + Backend-Auswahl | 4a |
 | 4c1 | First-Run-Setup-Wizard (`/setup`) | ja | Admin loggt sich via `ADMIN_PASSWORD` ein und konfiguriert OAuth/KI/Backend Schritt für Schritt; auch später wieder aufrufbar | 4c |
 | 4d | Token-Budget + Cost-Tracking (Admin) | ja (additiv) | Admin-Karte Usage; pro-User-Monats-Budget hard/soft; 429 bei Hard-Cap | 4a |
@@ -83,9 +83,9 @@ Bewusst out-of-scope (User-Wunsch): Attachments (werden nicht genutzt → kein M
 | 9 | Doku-Update (Multi-Backend-Sweep) | ja | keiner (Doku) | 8 |
 | 10 | Schema-Squash | ja | keiner | 9 |
 
-**Start-Reihenfolge:** 0c → 0d → 0 → 0b → 4a → 4c → 4c1 → 4d → 4b → 4b1 → 2 → 6 → 1 → 3 → 7 → 8 → 9 → 10.
-0c/0d vorab, da unabhängig von Backend-Pluralisierung und sofort gewinnbringend. 10 (Squash) zuletzt — Squash vorher wäre Wegwerfarbeit, weil bis dahin viele Migrationen dazukommen.
-4a/4c/4b zuerst, weil User-Identität, `app.backend`-Schalter und ACL die SSoT für alle folgenden Phasen sind. Reader-View (4b1) direkt danach, weil sie der einzige UI-Pfad für Viewer ist. Phase 7 (Suche) **vor** Phase 8, damit FTS schon steht, wenn Admin Backend wechselt — Index wird beim Bulk-Copy mitgefüllt.
+**Start-Reihenfolge:** Vor-Phase Schritt 5 → 0c → 0d → Vor-Phase Schritt 4 → 0 → 0b → 4a → 4c → 4c1 → 4d → 4b → 4b1 → 2 → 6 → 1 → 3 → 7 → 8 → 9 → 10.
+Vor-Phase Schritt 5 als Easy-Win sofort ([routes/books.js](../routes/books.js) toter Mount entfernen). 0c/0d vorab, da unabhängig von Backend-Pluralisierung und sofort gewinnbringend. Schritt 4 (`lib/content-store.js`) Pflicht-Voraussetzung für Phase 1 (Backend-Dispatch). 10 (Squash) zuletzt — Squash vorher wäre Wegwerfarbeit, weil bis dahin viele Migrationen dazukommen.
+4a/4c/4b zuerst, weil User-Identität, `app.backend`-Schalter und ACL die SSoT für alle folgenden Phasen sind. Lese-Modus (4b1, Print-CSS + readOnly) direkt nach 4b, weil viewer-Rolle erst dann existiert. Phase 7 (Suche) **vor** Phase 8, damit FTS schon steht, wenn Admin Backend wechselt — Index wird beim Bulk-Copy mitgefüllt.
 
 4d (Token-Budget + Cost) folgt 4a (braucht `app_users.global_role='admin'`). Vor 4b einsortiert, weil Kostenkontrolle vor Sharing-Welle (mehr Co-Editoren = mehr KI-Calls) bestehen muss; rein additiv (neue Spalten/Tabelle/Routen, kein Refactor) und kann bei Bedarf vorgezogen werden.
 
@@ -214,6 +214,7 @@ Ziel: Cache-Tabellen wachsen heute unbegrenzt. Nach Komplettanalyse-Reruns, Lekt
 - `job_runs` (`status IN ('done','error','cancelled')` älter als N Tage)
 - `page_checks` (alte Snapshots, sobald Page neu gesynct wurde)
 - `book_stats_history` — historische Snapshots > 365 Tage purgen oder downsamplen
+- `page_revisions` (Phase 2) — kein TTL, sondern Max-Limit pro `page_id` (siehe Phase 2)
 
 **Migration N+m** (additiv) — fehlende `created_at`-Spalten ergänzen:
 
@@ -336,6 +337,22 @@ CREATE INDEX idx_page_revisions_page ON page_revisions(page_id, created_at DESC)
 Jeder erfolgreiche `bsPut`-Pfad (Editor-Save, Focus-Save, Chat-Apply, Lektorat-Apply, History-Restore) schreibt Revision **vor** PUT mit `source`-Tag. Sync-Pull schreibt Revision `source='bookstack-sync'`, wenn Body sich änderte.
 
 **Frontend**: `page-history-card` umstellen auf `GET /local/pages/:id/revisions`. Restore = neue Revision + PUT.
+
+**Retention via Max-Limit pro Seite** (BookStack-Stil, kein TTL):
+- Setting `app.page_revision_limit` in `app_settings` (Default `50`, Range `10..500`). Analog BookStack-Config `revision-limit`.
+- Cleanup-Job purged pro `page_id` alle Revisions ausserhalb der jüngsten N:
+  ```sql
+  DELETE FROM page_revisions
+  WHERE id IN (
+    SELECT id FROM page_revisions pr
+    WHERE pr.page_id = page_revisions.page_id
+    ORDER BY created_at DESC
+    LIMIT -1 OFFSET ?  -- ? = limit
+  );
+  ```
+  Effizient via Window-Function (`ROW_NUMBER() OVER (PARTITION BY page_id ORDER BY created_at DESC)`) — alle Pages in einem Pass.
+- Hook in `lib/cache-cleanup.js` (Phase 0d): zusätzliche Policy `{ table: 'page_revisions', kind: 'per-page-limit', setting: 'page_revision_limit' }`. Cron-Tick 02:00 ruft mit auf.
+- Kein TTL — User-Wert (eigene Edit-History) verfällt nicht nach Datum, nur nach Anzahl. Konsistent mit BookStack-Verhalten, Migration `bookstack`→`localdb` ist erwartungstreu.
 
 Vorteil sofort verfügbar, auch ohne Phase 1.
 
@@ -680,94 +697,45 @@ Realisierung: neues Feld `minRole: 'viewer'|'lektor'|'editor'|'owner'` pro `FEAT
 
 ---
 
-## Phase 4b1 — Reader-View (Kindle-artiger Lesemodus)
+## Phase 4b1 — Lese-Modus (Print-CSS + readOnly-Editor)
 
-Eigene Lese-UI für `viewer` (optional auch von Owner/Editor/Lektor als „Lesen statt Bearbeiten"-Variante nutzbar). Ziel: ablenkungsfreier Buch-Lesemodus, der wie ein E-Reader (Kindle-Web, Apple Books, Readwise Reader) funktioniert — nicht der heutige Editor-im-Read-Only-Mode.
+Ablenkungsfreier Lese-Pfad für `viewer` (und alle, die „nur lesen" wollen). **Bewusst minimal**: kein eigener Render-Stack, kein E-Reader-Klon — der existierende Editor im readOnly-Mode + Print-CSS reichen für Solo/Multi-User-Self-Host.
 
-**Abgrenzung zum heutigen Editor**: Editor zeigt eine Page in Roh-HTML mit Toolbar/Findings/Margins/Logs/Chrome. Reader zeigt **Buch als kontinuierlichen Lese-Fluss** über Kapitelgrenzen, schöne Typo, kein App-Chrome, Tastatur-Navigation.
+**Komponenten:**
 
-**Neue Karte `ReaderCard`** (`FEATURES`+`EXCLUSIVE_CARDS`+`ALLOWED_KEYS`-Eintrag, `minRole: 'viewer'`):
+1. **Editor-readOnly für viewer-Rolle** ([public/js/cards/book-editor-card.js](../public/js/cards/book-editor-card.js)):
+   - CodeMirror-Option `readOnly: true`, wenn `$app.bookRole === 'viewer'`.
+   - Toolbar-Buttons hidden via `$app.canEdit`-Getter (existiert bereits als Pattern; siehe Phase 4b „Viewer im Editor").
+   - Findings-/Page-Chat-Card komplett ausgeblendet (minRole-Filter Phase 4b).
+   - Selection/Find/Synonyme-Lookup bleibt erlaubt — kein Mutationsweg.
+   - Auto-Save-Pfad früh aussteigen (`if (!canEdit) return`).
 
-Layout:
-- Vollflächiger Lese-Container, max-width ~680px (Buch-Spaltenbreite). Side-Margins via CSS `--reader-margin`. Mobile: full-bleed mit Padding.
-- Header dünn: Buchtitel, aktuelles Kapitel, Progress-Bar (gelesene Zeichen / Gesamt), Schliessen-Button.
-- Footer dünn: Vor/Zurück-Kapitel, Page-Indikator („Seite 3 von 12 in Kapitel X").
-- Body: Kapitel-für-Kapitel zusammenhängend gerendert (BookStack-Pages innerhalb eines Kapitels nahtlos verkettet, gleiche HTML→Render-Pipeline wie heute). Page-Trenner subtil: kleiner zentrierter Glyph oder dünne hr.
-- Kapitel-Trenner: Kapitel-Titel als grosse H1 auf eigener „Seite" (Scroll-Snap-Punkt). Inhalt davor mit grosszügigem Bottom-Padding.
+2. **Print-CSS** (`public/css/print.css`, neu):
+   - `@media print { … }`: Topbar, Sidebar, Toolbar, Karten-Chrome, Findings-Margins, Job-Footer, Buttons → `display: none`.
+   - Editor-Container auf volle Breite, max-width ~680px, serif-Schrift (`var(--font-serif)`).
+   - Kapitel-Titel als grosses H1, Page-Headings als H2.
+   - Page-Break-Hints (`page-break-before: always` für Kapitel-Wechsel).
+   - Link aus `<link>` in [public/index.html](../public/index.html) + [tests/fixtures/focus-harness.html](../tests/fixtures/focus-harness.html), `SHELL_CACHE` bumpen.
+   - User öffnet Browser-Print-Dialog (Cmd/Ctrl+P) → kriegt Buch als lineares Druckbild bzw. PDF-Export via Browser.
 
-Reader-Features:
-- **Theme**: hell / sepia / dunkel. Toggle als kleines Floating-Control oben rechts. Persistiert in `user_settings.reader_theme`.
-- **Typo-Settings**: Schriftgrösse (S/M/L/XL), Zeilenhöhe (kompakt/normal/luftig), Schrift (Serif-Default „Source Serif"/„Lora", Sans-Option, Dyslexie-freundliche Option „Atkinson Hyperlegible"). Alles in `user_settings.reader_typo` als JSON.
-- **Spalten**: einspaltig (Default), zweispaltig auf breiten Viewports (>1400px). Reine CSS-`column-count`-Geschichte, keine eigene Pagination-Engine.
-- **Lesefortschritt pro Buch**: `reader_progress`-Tabelle (Phase 4b1-Migration) speichert pro `(book_id, user_email)` den zuletzt gelesenen `page_id` + Scroll-Offset (in Prozent der Page-Höhe). Beim Öffnen springt Reader an die Stelle.
-- **Bookmarks**: User markiert Position. Liste in Sidebar/Modal. CRUD auf `reader_bookmarks` (`id, book_id, user_email, page_id, anchor TEXT, label TEXT, created_at`).
-- **Highlights + Notizen** (optional, Phase 4b1.1): Selektion → Floating-Toolbar mit Farben + Notiz-Feld. Speichert Range + Color + Note in `reader_highlights`. Render legt absolute Overlays über Text. Solid-State: nur Bookmarks ohne Range — Highlights als Stretch-Goal markieren.
-- **TOC-Drawer**: Slide-in von links mit Kapitel-Liste (Klick = Sprung), aktueller Eintrag highlighted.
-- **Suche im Buch** (Phase 7 wiederverwenden): Cmd/Ctrl+F im Reader → Inline-Find-Bar. Wenn Phase 7 noch nicht da: simple `textContent`-Suche im aktuellen Kapitel-Markup.
-- **Tastatur**: Pfeiltasten = Scroll, Page Up/Down = Seitenweise (CSS-Scroll-Snap), `n`/`p` = nächstes/vorheriges Kapitel, `b` = Bookmark setzen, `t` = TOC.
-- **Keine KI-Funktionen, keine Stats, keine Margin-Annotations, keine Toolbar**. Reader ist Lese-Modus, nichts weiter.
+3. **„Lesen"-Button in Buchliste/Topbar** (optional, leichtgewichtig):
+   - Schaltet Editor in readOnly + ruft `window.print()` direkt auf. Oder: dezenter Hint-Tooltip „Cmd/Ctrl+P für Druck/PDF".
 
-Migration N+4b1:
+**Explizit weggelassen (gegenüber ursprünglichem Plan):**
+- Keine `reader_progress`/`reader_bookmarks`-Tabellen.
+- Keine `user_settings.reader_theme`/`reader_typo_json`-Spalten.
+- Keine `ReaderCard` Sub-Komponente.
+- Keine eigene Render-Pipeline (`reader-render.js` etc.).
+- Keine Theme-Toggles (hell/sepia/dunkel), keine Typo-Settings, keine TOC-Drawer, keine Highlights/Notizen.
+- Keine `/reader/*`-Routen.
 
-```sql
-CREATE TABLE reader_progress (
-  book_id INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
-  user_email TEXT NOT NULL REFERENCES app_users(email) ON DELETE CASCADE,
-  page_id INTEGER REFERENCES pages(page_id) ON DELETE SET NULL,
-  scroll_pct REAL DEFAULT 0,  -- 0..100, Position innerhalb der page_id
-  updated_at TEXT DEFAULT (datetime('now')),
-  PRIMARY KEY (book_id, user_email)
-);
+**Begründung:** Custom-PDF-Export ([routes/jobs/pdf-export.js](../routes/jobs/pdf-export.js)) existiert bereits als „Buch sauber konsumieren"-Pfad mit Profilen/Cover/Schrift. Print-CSS deckt den Browser-Pfad ab. Eigenes E-Reader-UI ist Aufwand ohne klaren Mehrwert für Self-Host.
 
-CREATE TABLE reader_bookmarks (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  book_id INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
-  user_email TEXT NOT NULL REFERENCES app_users(email) ON DELETE CASCADE,
-  page_id INTEGER NOT NULL REFERENCES pages(page_id) ON DELETE CASCADE,
-  anchor TEXT,    -- CSS-Selector oder Char-Offset für Sub-Page-Position
-  label TEXT,
-  created_at TEXT DEFAULT (datetime('now'))
-);
-CREATE INDEX idx_reader_bookmarks_user_book ON reader_bookmarks(user_email, book_id);
+**i18n:** keine neuen Keys (oder maximal `reader.printHint`).
 
-ALTER TABLE user_settings ADD COLUMN reader_theme TEXT DEFAULT 'light';
-ALTER TABLE user_settings ADD COLUMN reader_typo_json TEXT;
-```
+**Aufwand:** 0.5-1 Tag (Print-CSS + readOnly-Guard + minRole-Filter-Wiring aus Phase 4b).
 
-Routen:
-- `GET /reader/:book_id` → kompletter Buchinhalt (Kapitel + Pages, Body-HTML, Reihenfolge aus Phase 3-`book_order`). ACL: `viewer`+. Einmaliger Bulk-Load, kein Page-by-Page-Fetch — Reader soll offline-tauglich sein (Stretch).
-- `GET /reader/:book_id/progress`, `PUT /reader/:book_id/progress`.
-- `GET /reader/:book_id/bookmarks`, `POST`, `PUT /:id`, `DELETE /:id`.
-- Export-Route (`/export/...`) bleibt — Reader hat „Buch herunterladen"-Button als Shortcut.
-
-Frontend-Module:
-- `public/js/cards/reader-card.js` — Alpine-Card mit Lifecycle (load → render → restore-progress → throttled-progress-save bei Scroll).
-- `public/js/reader/` (Subfolder, weil > 600 LOC erwartbar):
-  - `reader-render.js` — Buchinhalt → HTML-Stream mit Kapitel-Sections, page-data-Attributen für Progress-Tracking.
-  - `reader-progress.js` — IntersectionObserver auf Page-Markern, throttled PUT `/progress`.
-  - `reader-bookmarks.js` — CRUD + Drawer-Rendering.
-  - `reader-typo.js` — Theme/Schrift/Grösse-Preferences.
-- CSS in `public/css/reader/` (Subfolder): `reader-shell.css`, `reader-typo.css` (font-family per Theme, line-height-Stufen), `reader-themes.css` (hell/sepia/dunkel als CSS-Custom-Prop-Overrides), `reader-bookmarks.css`. `<link>`-Reihenfolge in [public/index.html](../public/index.html) ergänzen + `SHELL_CACHE` bumpen.
-
-i18n:
-- `reader.title`, `reader.theme.light|sepia|dark`, `reader.typo.size|line|font`
-- `reader.font.serif|sans|dyslexic`
-- `reader.bookmark.add|remove|empty`, `reader.toc.title`
-- `reader.progress.read` (mit `{pct}`), `reader.chapter.of` (mit `{i}`/`{n}`)
-
-Lifecycle / Sub-Komponenten-Pattern:
-- `ReaderCard` ist eigene Sub-Komponente (`Alpine.data('readerCard', …)`). Wegen Vollfläche: macht `_closeOtherMainCards('reader')` beim Open.
-- Toggle via Buchliste-Menü („Lesen") + Quick-Pill „Reader" + Command-Palette-Action `action.reader`.
-- Schliessen via Esc, Schliessen-Button, oder Klick auf anderen Buchwechsel-Trigger.
-- Hash-Router-Eintrag `#reader/:book_id` (+ optional `#reader/:book_id/p/:page_id`).
-
-Tests:
-- Unit: Reader-Render (Buchinhalt → erwartete Kapitel-Anker-Struktur, Bulk-Load-Format).
-- Unit: Progress-Throttle (Mock-IntersectionObserver, prüft maximal 1 PUT/2s).
-- E2E: Reader öffnen → Theme wechseln → Bookmark setzen → schliessen → erneut öffnen → Position wiederhergestellt.
-- A11y: Tastatur-Nav alle Shortcuts, Screenreader-Landmarks (header/main/footer roles).
-
-Aufwand: 4-6 Tage (inkl. Typo-Refinement + Themes; ohne Highlights). Highlights als +2 Tage optional.
+**Falls später echter E-Reader gewünscht:** Plan-Stand vor diesem Cut steht in git-History dieser Datei (`git log -p docs/bookstack-exit.md`).
 
 ---
 
@@ -1077,6 +1045,50 @@ Modul [public/js/cards/admin-usage-card.js](../public/js/cards/admin-usage-card.
 - `README.md`: ENV-Vars `DEFAULT_USER_BUDGET_USD`, `DEFAULT_USER_BUDGET_MODE`, `ADMIN_EMAIL` + `ADMIN_PASSWORD` (siehe Phase 4a/4c). Hinweis auf Anthropic-Preisseite + Update-Disziplin.
 - `docs/erd.md`: neue `app_users`-Spalten + Stand-Zeile.
 - Spickzettel `docs/admin.md` (neu, optional): Cost-Tracking-Doku + Pricing-Update-Workflow.
+
+### Feature- und Schreibaktivität (zusätzliche Tabs in `AdminUsageCard`)
+
+Die App persistiert bereits drei Aktivitäts-Quellen, die der Admin pro User aggregiert sehen will. Implementiert als zusätzliche Tabs in der `AdminUsageCard` (gleiche Karte, gleicher `requireAdmin`-Guard, keine neue Migration — Tabellen existieren):
+
+- [user_feature_usage](../db/migrations.js) (`user_email`, `feature_key`, `last_used`, `use_count`) — welche Karte/Aktion wie oft.
+- [writing_time](../db/migrations.js) (`user_email`, `book_id`, `date`, `seconds`) — Editor-/Fokus-Zeit pro Tag pro Buch.
+- [lektorat_time](../db/migrations.js) (`user_email`, `book_id`, `page_id`, `date`, `seconds`) — Prüfmodus-Zeit pro Tag pro Buch/Seite.
+
+#### DB-Queries (zusätzlich in [db/admin-usage.js](../db/admin-usage.js))
+
+- `listFeatureUsage({ from, to })` — `GROUP BY user_email, feature_key`, Summe `use_count` im Zeitraum (Range via `last_used`). Liefert `[{ email, feature_key, count, last_used }]`.
+- `featureUsageTotals({ from, to })` — `GROUP BY feature_key`, Top-N global. Für Summary-Tab „beliebteste Features".
+- `listWritingTime({ from, to })` — `GROUP BY user_email, book_id`, Summe `seconds`. Liefert `[{ email, book_id, seconds }]`.
+- `listLektoratTime({ from, to })` — analog, Summe `seconds` pro `(user_email, book_id)`.
+- `dailyTimeSeries(email, bookId, { from, to })` — `GROUP BY date`, kombiniert writing + lektorat, für Trend-Linie pro User-Buch.
+
+#### Admin-Routen (Ergänzung in [routes/admin-usage.js](../routes/admin-usage.js))
+
+- `GET /admin/usage/features?from&to` → `listFeatureUsage` + `featureUsageTotals`.
+- `GET /admin/usage/time?from&to` → `listWritingTime` + `listLektoratTime`, gemerged auf `(email, book_id)` mit Spalten `writingSeconds`, `lektoratSeconds`, `totalSeconds`.
+- `GET /admin/usage/time/:email/:bookId/series?from&to` → `dailyTimeSeries` für Drill-Down-Chart.
+
+Alle hinter `requireAdmin`. Privacy-Boundary identisch zur 4d-Hauptsektion: `book_id` als anonyme ID, **kein** JOIN auf `books.name`. Feature-Keys sind ohnehin technische Identifier (`overview`, `review`, `figuren`, …) — kein Inhalts-Leak.
+
+#### Frontend-Tabs (Ergänzung in [admin-usage-card.js](../public/js/cards/admin-usage-card.js))
+
+- **Features**: Datumsbereich-Picker. Tabelle Email | Feature | Count | Letzte Nutzung; sortierbar. Optional Top-N-Bar (Chart.js) der globalen `featureUsageTotals`.
+- **Zeit**: Datumsbereich-Picker. Tabelle Email | Buch-ID | Schreibzeit (`hh:mm`) | Lektoratszeit (`hh:mm`) | Gesamt. Klick auf Zeile öffnet Drill-Down-Chart (tägliche Series). Sekunden formatieren via Helper, der `< 60s` als `< 1 min`, sonst `Xh Ym` rendert.
+
+Locale-Format wie 4d (`de-CH`/`en-US`). Apostroph-Tausender bei Stunden ≥ 1’000 (selten, aber konsistent).
+
+#### i18n (zusätzlich)
+
+- `admin.usage.tab.features`, `admin.usage.tab.time`
+- `admin.usage.feature.key`, `admin.usage.feature.count`, `admin.usage.feature.lastUsed`
+- `admin.usage.time.writing`, `admin.usage.time.lektorat`, `admin.usage.time.total`
+- `admin.usage.time.book`, `admin.usage.time.series`
+- Formate via bestehende `t(…, { hours, minutes })`-Parameter-Map; kein neues Format-Modul.
+
+#### Tests
+
+- `tests/unit/admin-usage-queries.test.mjs` — `listFeatureUsage` / `listWritingTime` / `listLektoratTime` mit gemockten Rows, Aggregate matchen erwartete Summen, Datums-Boundary korrekt.
+- `tests/integration/admin-usage.test.js` (bestehend) erweitern um Feature- und Time-Routen.
 
 ### Out-of-Scope für 4d
 
@@ -1434,7 +1446,7 @@ Ziel: 100+ Migrationen zu einem konsolidierten Initial-Schema kollabieren. Nach 
 | 3 | 2-3 Tage | niedrig |
 | 4a | 4-6 Tage | mittel (FK-Recreate, Login-Flow) |
 | 4b | 4-5 Tage | mittel (Rollen-Matrix + Apply-Routen + minRole-Filter) |
-| 4b1 | 4-6 Tage | niedrig (reines Frontend + 2 Mini-Tabellen) |
+| 4b1 | 0.5-1 Tag | niedrig (Print-CSS + readOnly-Guard, keine neuen Tabellen) |
 | 4c | 4-6 Tage | mittel (Backend-Switch + Hot-Reload + Test-Probes + ENV-Migration in vielen Modulen) |
 | 4c1 | 1-2 Tage | niedrig (eigenständige Wizard-Page, kleines Form-State-Modell) |
 | 5 | — | ENTFÄLLT |
@@ -1444,4 +1456,4 @@ Ziel: 100+ Migrationen zu einem konsolidierten Initial-Schema kollabieren. Nach 
 | 9 | 1-2 Tage | niedrig (Doku-Sweep) |
 | 10 | 1-2 Tage | mittel (Diff-Test gegen Bestand) |
 
-Gesamt ca. 6-9 Wochen Vollzeit, mit Puffer (Phase 0c/0d/10 marginal). Spart gegenüber alter „Kill"-Variante v. a. Phase 5 (Dual-Write) + Editor-Wechsel.
+Gesamt ca. 7-8 Wochen Vollzeit, mit Puffer (Phase 0c/0d/10 marginal). Spart gegenüber alter „Kill"-Variante v. a. Phase 5 (Dual-Write) + Editor-Wechsel; gegenüber Original-Plan zusätzlich ~4 Tage durch 4b1-Skalierung (E-Reader → Print-CSS).
