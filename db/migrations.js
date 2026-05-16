@@ -4405,6 +4405,48 @@ function runMigrations() {
     logger.info('DB-Migration auf Version 107 abgeschlossen (Phase 4a App-User-DB: app_users + user_invites + user_sessions_audit, users.email FK auf app_users).');
   }
 
+  if (version < 108) {
+    // Phase 4c (BookStack-Exit, docs/bookstack-exit.md): app_settings als
+    // Runtime-Config-Store. Auth-/KI-Provider-/Storage-Backend-/Job-Tuning-/
+    // Cron-/PDF-A-Werte wandern aus `.env` in die DB; ENV bleibt nur fuer
+    // Boot-Layer (PORT, DB_PATH, APP_URL, SESSION_SECRET, ADMIN_EMAIL/PASSWORD,
+    // TZ, LOG_LEVEL, LOCAL_DEV_MODE, VERAPDF_BIN).
+    //
+    // `encrypted=1` markiert Felder mit AES-GCM-verschluesseltem value_json
+    // (lib/crypto.js, `enc:v1:`-Prefix). lib/app-settings.js liest sie
+    // transparent.
+    //
+    // app_settings_audit haelt Vor-/Nachwert-Hash + updated_by — kein
+    // Klartext-Secret in der Audit-Tabelle.
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS app_settings (
+        key        TEXT PRIMARY KEY,
+        value_json TEXT NOT NULL,
+        encrypted  INTEGER NOT NULL DEFAULT 0,
+        updated_at TEXT DEFAULT (datetime('now')),
+        updated_by TEXT
+      )
+    `).run();
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS app_settings_audit (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        key         TEXT NOT NULL,
+        old_hash    TEXT,
+        new_hash    TEXT,
+        updated_by  TEXT NOT NULL,
+        updated_at  TEXT DEFAULT (datetime('now'))
+      )
+    `).run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_app_settings_audit_key ON app_settings_audit(key, updated_at DESC)').run();
+
+    const fkErrors108 = db.pragma('foreign_key_check');
+    if (fkErrors108.length) {
+      throw new Error(`Migration 108: foreign_key_check meldet ${fkErrors108.length} Verstoesse: ${JSON.stringify(fkErrors108.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 108').run();
+    logger.info('DB-Migration auf Version 108 abgeschlossen (Phase 4c app_settings + app_settings_audit).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {
