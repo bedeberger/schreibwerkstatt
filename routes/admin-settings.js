@@ -125,20 +125,19 @@ router.get('/smtp/test-config', (req, res) => {
 });
 
 // POST /admin/settings/smtp/test-send { to? } — sendet ein 'test'-Template
-// an `to` (Default: smtp.from_email). Liefert { ok, latencyMs, error? }.
+// an `to` (Default: Gmail-User des Mailers). Liefert { ok, latencyMs, error? }.
 router.post('/smtp/test-send', express.json(), async (req, res) => {
   const mailer = require('../lib/mailer');
-  const fromEmail = appSettings.get('smtp.from_email');
-  const to = (req.body?.to || fromEmail || '').trim();
-  if (!to) return res.json({ ok: false, error: 'NO_RECIPIENT' });
   const status = mailer.getStatus();
+  const to = (req.body?.to || status.fromEmail || '').trim();
+  if (!to) return res.json({ ok: false, error: 'NO_RECIPIENT' });
   if (!status.ready) {
-    return res.json({ ok: false, error: status.mode === 'disabled' ? 'DISABLED' : 'INCOMPLETE_CONFIG', missing: status.missing });
+    return res.json({ ok: false, error: 'INCOMPLETE_CONFIG', missing: status.missing });
   }
   const r = await mailer.send({
     to,
     template: 'test',
-    ctx: { mode: status.mode, fromEmail },
+    ctx: { mode: status.mode, fromEmail: status.fromEmail },
     locale: 'de',
   });
   if (r.sent) {

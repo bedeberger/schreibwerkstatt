@@ -121,10 +121,17 @@ export const contentRepo = {
     return page;
   },
 
-  // PUT /content/pages/:id mit `{ html?, name?, position?, chapter_id? }`.
-  // Server cleant html, mapped position→priority.
+  // PUT /content/pages/:id mit `{ html?, name?, position?, chapter_id?, source? }`.
+  // Server cleant html, mapped position→priority. Bei Body-Change schreibt die
+  // content-store-Facade eine page_revisions-Row mit `source` (Default 'main') —
+  // Frontend dispatcht danach `page-revisions:changed`, damit die Revisionsliste
+  // sich aktualisiert ohne Page-Reload.
   async savePage(id, body) {
-    return _write('PUT', 'pages/' + id, body);
+    const out = await _write('PUT', 'pages/' + id, body);
+    if (typeof body?.html === 'string' && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('page-revisions:changed', { detail: { pageId: id } }));
+    }
+    return out;
   },
 
   // Alias fuer Strukturoperationen (rename/move/reorder ohne Body-Change).

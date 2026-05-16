@@ -303,6 +303,7 @@ export const editorEditMethods = {
       const saved = await contentRepo.savePage(this.currentPage.id, {
         html: newHtml,
         name: this.currentPage.name,
+        source: this.focusMode ? 'focus' : 'main',
       });
       if (saved?.updated_at) this.currentPage.updated_at = saved.updated_at;
 
@@ -404,6 +405,7 @@ export const editorEditMethods = {
       const saved = await contentRepo.savePage(this.currentPage.id, {
         html: newHtml,
         name: this.currentPage.name,
+        source: this.focusMode ? 'focus' : 'main',
       });
       if (saved?.updated_at) this.currentPage.updated_at = saved.updated_at;
       this.originalHtml = newHtml;

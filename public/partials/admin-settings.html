@@ -174,56 +174,26 @@
     <!-- SMTP / Mailer-Tab -->
     <section x-show="adminSettingsTab === 'smtp'" class="admin-settings-section">
       <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.smtp.hint')"></p>
-      <label>smtp.mode
-        <select x-model="adminSettingsForm['smtp.mode']">
-          <option value="disabled">disabled</option>
-          <option value="gmail-oauth">gmail-oauth</option>
-          <option value="gmail-app-password">gmail-app-password</option>
-          <option value="generic">generic</option>
-        </select>
+      <p class="muted-msg muted-msg--sm">
+        <span x-text="$app.t('admin.settings.smtp.appPasswordHint')"></span>
+        <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer">myaccount.google.com/apppasswords</a>
+      </p>
+
+      <label>smtp.gmail.user
+        <input type="email" x-model="adminSettingsForm['smtp.gmail.user']" placeholder="name@gmail.com" autocomplete="off">
       </label>
-      <label>smtp.from_email <input type="email" x-model="adminSettingsForm['smtp.from_email']" placeholder="noreply@example.com"></label>
-      <label>smtp.from_name <input type="text" x-model="adminSettingsForm['smtp.from_name']" placeholder="Schreibwerkstatt"></label>
-      <label>smtp.reply_to <input type="email" x-model="adminSettingsForm['smtp.reply_to']"></label>
-
-      <div x-show="adminSettingsForm['smtp.mode'] === 'gmail-oauth'">
-        <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.smtp.hint.gmailOauth')"></p>
-        <label>smtp.gmail.user <input type="email" x-model="adminSettingsForm['smtp.gmail.user']"></label>
-        <label>smtp.gmail.client_id
-          <input type="password" x-model="adminSettingsForm['smtp.gmail.client_id']" :placeholder="$app.t('admin.settings.secret.masked')">
-          <small x-show="adminSettingsMap['smtp.gmail.client_id']?.masked" class="muted-msg muted-msg--sm" x-text="adminSettingsMap['smtp.gmail.client_id']?.masked"></small>
-        </label>
-        <label>smtp.gmail.client_secret
-          <input type="password" x-model="adminSettingsForm['smtp.gmail.client_secret']" :placeholder="$app.t('admin.settings.secret.masked')">
-        </label>
-        <label>smtp.gmail.refresh_token
-          <input type="password" x-model="adminSettingsForm['smtp.gmail.refresh_token']" :placeholder="$app.t('admin.settings.secret.masked')">
-        </label>
-      </div>
-
-      <div x-show="adminSettingsForm['smtp.mode'] === 'gmail-app-password'">
-        <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.smtp.hint.gmailAppPassword')"></p>
-        <label>smtp.gmail.user <input type="email" x-model="adminSettingsForm['smtp.gmail.user']"></label>
-        <label>smtp.gmail.app_password
-          <input type="password" x-model="adminSettingsForm['smtp.gmail.app_password']" :placeholder="$app.t('admin.settings.secret.masked')">
-        </label>
-      </div>
-
-      <div x-show="adminSettingsForm['smtp.mode'] === 'generic'">
-        <label>smtp.host <input type="text" x-model="adminSettingsForm['smtp.host']"></label>
-        <label>smtp.port <input type="number" min="1" max="65535" x-model.number="adminSettingsForm['smtp.port']"></label>
-        <label class="checkbox-row">
-          <input type="checkbox" :checked="adminSettingsForm['smtp.secure'] === true || adminSettingsForm['smtp.secure'] === 'true'"
-                 @change="adminSettingsForm['smtp.secure'] = $event.target.checked">
-          <span>smtp.secure (TLS-Direct/465)</span>
-        </label>
-        <label>smtp.user <input type="text" x-model="adminSettingsForm['smtp.user']"></label>
-        <label>smtp.password
-          <input type="password" x-model="adminSettingsForm['smtp.password']" :placeholder="$app.t('admin.settings.secret.masked')">
-        </label>
-      </div>
-
-      <label>smtp.rate_limit_per_minute <input type="number" min="1" max="500" x-model.number="adminSettingsForm['smtp.rate_limit_per_minute']"></label>
+      <label>smtp.gmail.app_password
+        <input type="password" x-model="adminSettingsForm['smtp.gmail.app_password']" :placeholder="$app.t('admin.settings.secret.masked')" autocomplete="off">
+      </label>
+      <label>smtp.from_name
+        <input type="text" x-model="adminSettingsForm['smtp.from_name']" placeholder="Schreibwerkstatt">
+      </label>
+      <label>smtp.reply_to
+        <input type="email" x-model="adminSettingsForm['smtp.reply_to']" placeholder="(optional)">
+      </label>
+      <label>smtp.rate_limit_per_minute
+        <input type="number" min="1" max="500" x-model.number="adminSettingsForm['smtp.rate_limit_per_minute']">
+      </label>
 
       <div class="admin-settings-actions">
         <button type="button" @click="adminSettingsTest('smtp')" x-text="$app.t('admin.settings.test.smtp')"></button>

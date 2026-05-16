@@ -1,4 +1,5 @@
 // Phase 4c2 (BookStack-Exit, docs/bookstack-exit.md): Mailer + Templates.
+// Mailer ist Gmail-only (App-Password via nodemailer service:'gmail').
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,6 +16,19 @@ const { db } = await import('../../db/connection.js');
 const appSettings = (await import('../../lib/app-settings.js')).default ?? (await import('../../lib/app-settings.js'));
 const { renderTemplate, listTemplates, _esc } = await import('../../lib/mailer-templates.js');
 const mailer = (await import('../../lib/mailer.js')).default ?? (await import('../../lib/mailer.js'));
+
+const SMTP_KEYS = [
+  'smtp.gmail.user',
+  'smtp.gmail.app_password',
+  'smtp.from_name',
+  'smtp.reply_to',
+  'smtp.rate_limit_per_minute',
+];
+
+function clearSmtp() {
+  for (const k of SMTP_KEYS) appSettings.remove(k, { updatedBy: 'test' });
+  mailer._setTestTransportFactory(null);
+}
 
 test.after(() => {
   try { db.close(); } catch {}
@@ -66,46 +80,58 @@ test('renderTemplate: unbekanntes Template wirft', () => {
   assert.throws(() => renderTemplate('does-not-exist', {}, 'de'), /unknown template/);
 });
 
-test('mailer.getStatus: disabled-Default → mode=disabled, ready=false', () => {
+test('mailer.getStatus: ohne Config → mode=disabled, ready=false, missing listet user+app_password', () => {
+  clearSmtp();
   const s = mailer.getStatus();
   assert.equal(s.mode, 'disabled');
   assert.equal(s.ready, false);
+  assert.ok(s.missing.includes('smtp.gmail.user'));
+  assert.ok(s.missing.includes('smtp.gmail.app_password'));
 });
 
-test('mailer.getStatus: incomplete gmail-oauth → missing-keys werden gelistet', () => {
-  appSettings.set('smtp.mode', 'gmail-oauth', { updatedBy: 'test' });
-  appSettings.set('smtp.from_email', 'sender@example.com', { updatedBy: 'test' });
-  // client_id/secret/refresh_token/user fehlen
+test('mailer.getStatus: nur user gesetzt → mode=disabled, missing=[app_password]', () => {
+  clearSmtp();
+  appSettings.set('smtp.gmail.user', 'sender@gmail.com', { updatedBy: 'test' });
   const s = mailer.getStatus();
-  assert.equal(s.mode, 'gmail-oauth');
+  assert.equal(s.mode, 'disabled');
   assert.equal(s.ready, false);
-  assert.ok(s.missing.includes('smtp.gmail.client_id'));
-  assert.ok(s.missing.includes('smtp.gmail.refresh_token'));
+  assert.deepEqual(s.missing, ['smtp.gmail.app_password']);
 });
 
-test('mailer.send: disabled → sent=false reason=disabled', async () => {
-  appSettings.set('smtp.mode', 'disabled', { updatedBy: 'test' });
-  const r = await mailer.send({ to: 'x@y.com', template: 'test', ctx: {}, locale: 'de' });
-  assert.equal(r.sent, false);
-  assert.equal(r.reason, 'disabled');
+test('mailer.getStatus: vollständige Config → mode=gmail, ready=true, fromEmail=user', () => {
+  clearSmtp();
+  appSettings.set('smtp.gmail.user', 'sender@gmail.com', { updatedBy: 'test' });
+  appSettings.set('smtp.gmail.app_password', 'abcd efgh ijkl mnop', { updatedBy: 'test' });
+  const s = mailer.getStatus();
+  assert.equal(s.mode, 'gmail');
+  assert.equal(s.ready, true);
+  assert.equal(s.fromEmail, 'sender@gmail.com');
+  assert.deepEqual(s.missing, []);
 });
 
-test('mailer.send: incomplete config → sent=false reason=incomplete-config', async () => {
-  appSettings.set('smtp.mode', 'gmail-oauth', { updatedBy: 'test' });
-  appSettings.remove('smtp.from_email');
+test('mailer.send: ohne Config → sent=false reason=incomplete-config + missing-Array', async () => {
+  clearSmtp();
   const r = await mailer.send({ to: 'x@y.com', template: 'test', ctx: {}, locale: 'de' });
   assert.equal(r.sent, false);
   assert.equal(r.reason, 'incomplete-config');
   assert.ok(Array.isArray(r.missing));
+  assert.ok(r.missing.length > 0);
+});
+
+test('mailer.send: nur user gesetzt → sent=false reason=incomplete-config', async () => {
+  clearSmtp();
+  appSettings.set('smtp.gmail.user', 'sender@gmail.com', { updatedBy: 'test' });
+  const r = await mailer.send({ to: 'x@y.com', template: 'test', ctx: {}, locale: 'de' });
+  assert.equal(r.sent, false);
+  assert.equal(r.reason, 'incomplete-config');
+  assert.deepEqual(r.missing, ['smtp.gmail.app_password']);
 });
 
 test('mailer.send: end-to-end via jsonTransport-Stub', async () => {
-  appSettings.set('smtp.mode', 'generic', { updatedBy: 'test' });
-  appSettings.set('smtp.from_email', 'sender@example.com', { updatedBy: 'test' });
+  clearSmtp();
+  appSettings.set('smtp.gmail.user', 'sender@gmail.com', { updatedBy: 'test' });
+  appSettings.set('smtp.gmail.app_password', 'abcd efgh ijkl mnop', { updatedBy: 'test' });
   appSettings.set('smtp.from_name', 'Schreibwerkstatt', { updatedBy: 'test' });
-  appSettings.set('smtp.host', 'mock', { updatedBy: 'test' });
-  appSettings.set('smtp.user', 'mockuser', { updatedBy: 'test' });
-  appSettings.set('smtp.password', 'mockpass', { updatedBy: 'test' });
 
   const nodemailer = (await import('nodemailer')).default ?? (await import('nodemailer'));
   mailer._setTestTransportFactory(() => nodemailer.createTransport({ jsonTransport: true }));
@@ -118,25 +144,22 @@ test('mailer.send: end-to-end via jsonTransport-Stub', async () => {
   });
   assert.equal(r.sent, true);
   assert.ok(r.info);
-  // jsonTransport-Antwort: info.message ist JSON-string
   const msg = JSON.parse(r.info.message);
   assert.equal(msg.to[0].address, 'recipient@example.com');
+  assert.equal(msg.from.address, 'sender@gmail.com');
+  assert.equal(msg.from.name, 'Schreibwerkstatt');
   assert.match(msg.subject, /Einladung/);
   assert.match(msg.html, /Alice/);
 });
 
 test('mailer: Settings-Change-Event invalidiert Transporter-Cache', () => {
-  // Test-Factory zuruecksetzen, damit der echte _buildTransporter laeuft
-  mailer._setTestTransportFactory(null);
-  // Vor-Setting
-  appSettings.set('smtp.mode', 'generic', { updatedBy: 'test' });
-  appSettings.set('smtp.from_email', 'sender@example.com', { updatedBy: 'test' });
-  appSettings.set('smtp.host', 'mock', { updatedBy: 'test' });
-  appSettings.set('smtp.user', 'mockuser', { updatedBy: 'test' });
-  appSettings.set('smtp.password', 'mockpass', { updatedBy: 'test' });
-  mailer.getTransporter(); // baut Singleton
-  // Mode-Wechsel → Cache verworfen
-  appSettings.set('smtp.mode', 'disabled', { updatedBy: 'test' });
-  const t = mailer.getTransporter();
-  assert.equal(t, null, 'Transporter sollte nach mode=disabled null sein');
+  clearSmtp();
+  appSettings.set('smtp.gmail.user', 'sender@gmail.com', { updatedBy: 'test' });
+  appSettings.set('smtp.gmail.app_password', 'abcd efgh ijkl mnop', { updatedBy: 'test' });
+  const t1 = mailer.getTransporter();
+  assert.ok(t1, 'Transporter sollte mit vollständiger Config gebaut werden');
+
+  appSettings.remove('smtp.gmail.app_password', { updatedBy: 'test' });
+  const t2 = mailer.getTransporter();
+  assert.equal(t2, null, 'Transporter sollte nach Entfernen des App-Passworts null sein');
 });
