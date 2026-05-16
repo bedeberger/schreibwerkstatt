@@ -5,6 +5,7 @@ const { getBookLocale, getUser, getTokenForRequest } = require('../db/schema');
 const { getPrompts, getPromptConfig } = require('../lib/prompts-loader');
 const { toIntId } = require('../lib/validate');
 const { BOOKSTACK_URL } = require('../lib/bookstack');
+const appSettings = require('../lib/app-settings');
 
 // Allowlist für den /claude-, /ollama- und /llama-Proxy: Client darf kein beliebiges
 // `system` schicken. Stattdessen `promptKind` angeben – Server löst den System-Prompt
@@ -51,6 +52,7 @@ router.get('/config', (req, res) => {
     userSettings: sessionUser ? getUser(sessionUser.email) : null,
     devMode: process.env.LOCAL_DEV_MODE === 'true',
     promptConfig: getPromptConfig(),
+    setupCompleted: appSettings.get('app.setup_completed') === true,
   });
 });
 
