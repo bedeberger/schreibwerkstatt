@@ -196,6 +196,11 @@ export const appViewMethods = {
     this._closeOtherMainCards('userSettings');
     this.showUserSettingsCard = true;
   },
+  toggleAdminUsersCard() {
+    if (this.showAdminUsersCard) { this.showAdminUsersCard = false; return; }
+    this._closeOtherMainCards('adminUsers');
+    this.showAdminUsersCard = true;
+  },
   toggleFinetuneExportCard() {
     if (this.showFinetuneExportCard) { this.showFinetuneExportCard = false; return; }
     this._closeOtherMainCards('finetuneExport');

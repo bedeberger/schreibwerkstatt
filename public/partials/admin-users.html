@@ -1,0 +1,113 @@
+<!-- Admin-User-Verwaltung -->
+<!--
+  Alpine.data-Sub-Komponente — siehe public/js/cards/admin-users-card.js.
+  `showAdminUsersCard` + `toggleAdminUsersCard` im Root. Nur sichtbar bei
+  $app.currentUser.role === 'admin' — Frontend-Guard zusaetzlich zum
+  Server-side requireAdmin (lib/admin-mw.js).
+-->
+<div class="card card--admin-users" x-data="adminUsersCard" x-show="$app.showAdminUsersCard" x-cloak>
+  <div class="card-header">
+    <span class="card-title" x-text="$app.t('admin.users.title')"></span>
+    <div class="card-actions">
+      <button type="button" @click="adminUsersLoad()" :disabled="adminUsersLoading" x-text="$app.t('common.refresh')"></button>
+    </div>
+  </div>
+
+  <div x-show="adminUsersLoading" class="muted-msg" x-text="$app.t('common.loading')"></div>
+  <div x-show="adminUsersError" class="error-msg" x-text="adminUsersError"></div>
+
+  <div class="card-form-grid" x-show="!adminUsersLoading">
+
+    <!-- Invite-Sektion -->
+    <fieldset class="admin-users-invite">
+      <legend x-text="$app.t('admin.users.invite')"></legend>
+      <div class="admin-users-invite-row">
+        <input type="email" x-model="adminUsersInviteEmail"
+               :placeholder="$app.t('admin.users.invite.emailPlaceholder')"
+               :disabled="adminUsersInviting">
+        <div x-data="combobox($app.t('admin.users.role'))"
+             x-modelable="value" x-model="adminUsersInviteRole"
+             x-effect="options = [
+               { value: 'user',  label: $app.t('admin.users.role.user') },
+               { value: 'admin', label: $app.t('admin.users.role.admin') },
+             ]"></div>
+        <button type="button" @click="adminUsersInvite()" :disabled="adminUsersInviting || !adminUsersInviteEmail">
+          <span x-text="adminUsersInviting ? $app.t('common.saving') : $app.t('admin.users.invite.submit')"></span>
+        </button>
+      </div>
+      <div class="admin-users-invite-result" x-show="adminUsersInviteResult">
+        <span class="muted-msg muted-msg--sm" x-text="$app.t('admin.users.invite.created', { email: adminUsersInviteResult?.email })"></span>
+        <div class="admin-users-invite-url">
+          <code x-text="adminUsersInviteResult?.url"></code>
+          <button type="button" @click="adminUsersCopyInviteUrl()" x-text="adminUsersCopied ? $app.t('common.copied') : $app.t('common.copy')"></button>
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- User-Tabelle -->
+    <table class="admin-users-table" x-show="adminUsersList.length">
+      <thead>
+        <tr>
+          <th x-text="$app.t('admin.users.email')"></th>
+          <th x-text="$app.t('admin.users.role')"></th>
+          <th x-text="$app.t('admin.users.status')"></th>
+          <th x-text="$app.t('admin.users.lastLogin')"></th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-for="u in adminUsersList" :key="u.email">
+          <tr>
+            <td>
+              <div x-text="u.display_name || u.email"></div>
+              <div class="muted-msg muted-msg--sm" x-text="u.email"></div>
+            </td>
+            <td>
+              <div x-data="combobox($app.t('admin.users.role'))"
+                   x-modelable="value"
+                   :x-init="'$watch(\'value\', v => { if (v && v !== ' + JSON.stringify(u.global_role) + ') adminUsersUpdate(' + JSON.stringify(u) + ', { global_role: v }); })'"
+                   :value="u.global_role"
+                   x-effect="options = [
+                     { value: 'user',  label: $app.t('admin.users.role.user') },
+                     { value: 'admin', label: $app.t('admin.users.role.admin') },
+                   ]"></div>
+            </td>
+            <td>
+              <span class="badge" :class="'badge--status-' + u.status" x-text="$app.t('admin.users.status.' + u.status)"></span>
+            </td>
+            <td>
+              <span class="muted-msg muted-msg--sm" x-text="u.last_seen_at ? new Date(u.last_seen_at).toLocaleString(($app.uiLocale === 'en' ? 'en-US' : 'de-CH')) : '—'"></span>
+            </td>
+            <td class="admin-users-actions">
+              <button type="button"
+                      @click="adminUsersUpdate(u, { status: u.status === 'suspended' ? 'active' : 'suspended' })"
+                      x-text="u.status === 'suspended' ? $app.t('admin.users.reactivate') : $app.t('admin.users.suspend')"></button>
+              <button type="button" @click="adminUsersToggleAudit(u)"
+                      x-text="adminUsersAuditEmail === u.email ? $app.t('admin.users.auditClose') : $app.t('admin.users.audit')"></button>
+              <button type="button" class="danger" @click="adminUsersDelete(u)"
+                      x-show="u.email !== $app.currentUser?.email"
+                      x-text="$app.t('admin.users.delete')"></button>
+            </td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+
+    <!-- Audit-Drawer -->
+    <div class="admin-users-audit" x-show="adminUsersAuditEmail">
+      <h3 x-text="$app.t('admin.users.auditTitle', { email: adminUsersAuditEmail })"></h3>
+      <ul>
+        <template x-for="ev in adminUsersAuditEvents" :key="ev.id">
+          <li>
+            <span class="badge" :class="'badge--event-' + ev.event" x-text="ev.event"></span>
+            <span class="muted-msg muted-msg--sm" x-text="new Date(ev.created_at).toLocaleString(($app.uiLocale === 'en' ? 'en-US' : 'de-CH'))"></span>
+            <span class="muted-msg" x-show="ev.ip" x-text="' • ' + ev.ip"></span>
+            <pre class="admin-users-meta" x-show="ev.meta_json" x-text="ev.meta_json"></pre>
+          </li>
+        </template>
+        <li x-show="!adminUsersAuditEvents.length" class="muted-msg" x-text="$app.t('admin.users.auditEmpty')"></li>
+      </ul>
+    </div>
+
+  </div>
+</div>

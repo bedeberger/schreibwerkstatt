@@ -25,7 +25,19 @@ const jsonBody = express.json();
 
 // Modell-Konfiguration ans Frontend liefern (keine Credentials)
 router.get('/config', (req, res) => {
-  const user = req.session?.user || null;
+  const sessionUser = req.session?.user || null;
+  // Phase 4a: role + can_invite_users aus app_users (SSoT) ueber sessionUser
+  // mergen — Frontend nutzt das fuer Admin-Karte + Invite-Dialog.
+  let user = sessionUser;
+  if (sessionUser) {
+    const appUser = require('../db/app-users').getUser(sessionUser.email);
+    user = {
+      ...sessionUser,
+      role: appUser?.global_role || 'user',
+      status: appUser?.status || 'active',
+      can_invite_users: appUser?.can_invite_users ? 1 : 0,
+    };
+  }
   res.json({
     bookstackUrl: BOOKSTACK_URL.replace(/\/$/, ''),
     bookstackTokenOk: !!getTokenForRequest(req),
@@ -36,7 +48,7 @@ router.get('/config', (req, res) => {
     ollamaModel: process.env.OLLAMA_MODEL || 'llama3.2',
     llamaModel:  process.env.LLAMA_MODEL  || 'llama3.2',
     user,
-    userSettings: user ? getUser(user.email) : null,
+    userSettings: sessionUser ? getUser(sessionUser.email) : null,
     devMode: process.env.LOCAL_DEV_MODE === 'true',
     promptConfig: getPromptConfig(),
   });

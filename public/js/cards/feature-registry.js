@@ -126,6 +126,7 @@ export const EXCLUSIVE_CARDS = [
   { key: 'kontinuitaet',   flag: 'showKontinuitaetCard' },
   { key: 'bookSettings',   flag: 'showBookSettingsCard' },
   { key: 'userSettings',   flag: 'showUserSettingsCard' },
+  { key: 'adminUsers',     flag: 'showAdminUsersCard' },
   { key: 'finetuneExport', flag: 'showFinetuneExportCard' },
   { key: 'export',         flag: 'showExportCard' },
   { key: 'pdfExport',      flag: 'showPdfExportCard' },

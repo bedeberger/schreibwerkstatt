@@ -1,0 +1,161 @@
+/* Phase 4a (BookStack-Exit): AdminUsersCard.
+   Layout-Slots: card--admin-users, admin-users-invite, admin-users-table,
+   admin-users-audit. Akzentfarbe per --card-accent (Mapping siehe
+   public/css/card-accents.css). */
+
+.card--admin-users {
+  --card-accent: var(--card-accent-admin-users, var(--accent));
+}
+
+.admin-users-invite {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.admin-users-invite legend {
+  padding: 0 var(--space-xs);
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.admin-users-invite-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr auto;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+.admin-users-invite-row input[type="email"] {
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--text-default);
+  font-size: var(--font-size-sm);
+}
+
+.admin-users-invite-result {
+  margin-top: var(--space-sm);
+  padding: var(--space-sm);
+  background: var(--bg-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.admin-users-invite-url {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  margin-top: var(--space-xs);
+}
+
+.admin-users-invite-url code {
+  flex: 1;
+  padding: var(--space-xs);
+  background: var(--bg-default);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.admin-users-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+
+.admin-users-table th,
+.admin-users-table td {
+  text-align: left;
+  padding: var(--space-sm) var(--space-xs);
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: middle;
+}
+
+.admin-users-table th {
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.admin-users-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  justify-content: flex-end;
+}
+
+.admin-users-actions button {
+  font-size: var(--font-size-xs);
+  padding: var(--space-xs) var(--space-sm);
+}
+
+.admin-users-actions .danger {
+  color: var(--color-danger);
+}
+
+.admin-users-audit {
+  margin-top: var(--space-md);
+  padding: var(--space-md);
+  background: var(--bg-subtle);
+  border-radius: var(--radius-md);
+}
+
+.admin-users-audit h3 {
+  margin: 0 0 var(--space-sm) 0;
+  font-size: var(--font-size-md);
+}
+
+.admin-users-audit ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-users-audit li {
+  padding: var(--space-xs) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.admin-users-audit li:last-child {
+  border-bottom: none;
+}
+
+.admin-users-meta {
+  margin-top: var(--space-xs);
+  padding: var(--space-xs);
+  background: var(--bg-default);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+
+/* Status- + Event-Badges: eckig (var(--radius-sm)), nie pill-foermig */
+.badge--status-active      { background: var(--color-success-bg, #d1fadf); color: var(--color-success, #027a48); }
+.badge--status-suspended   { background: var(--color-warning-bg, #fef0c7); color: var(--color-warning, #b54708); }
+.badge--status-invited     { background: var(--color-info-bg, #d1e9ff); color: var(--color-info, #175cd3); }
+.badge--status-deleted     { background: var(--bg-subtle); color: var(--text-muted); }
+
+.badge--event-login        { background: var(--color-success-bg, #d1fadf); color: var(--color-success, #027a48); }
+.badge--event-logout       { background: var(--bg-subtle); color: var(--text-muted); }
+.badge--event-login-denied { background: var(--color-danger-bg, #fee4e2); color: var(--color-danger, #b42318); }
+.badge--event-suspended    { background: var(--color-warning-bg, #fef0c7); color: var(--color-warning, #b54708); }
+.badge--event-reactivated  { background: var(--color-success-bg, #d1fadf); color: var(--color-success, #027a48); }
+.badge--event-role-changed { background: var(--color-info-bg, #d1e9ff); color: var(--color-info, #175cd3); }
+.badge--event-deleted      { background: var(--bg-subtle); color: var(--text-muted); }
+
+@media (max-width: 720px) {
+  .admin-users-invite-row {
+    grid-template-columns: 1fr;
+  }
+  .admin-users-table th:nth-child(4),
+  .admin-users-table td:nth-child(4) {
+    display: none;
+  }
+}

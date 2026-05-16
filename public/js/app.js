@@ -32,6 +32,7 @@ import { orteMethods } from './orte.js';
 import { registerKontinuitaetCard } from './cards/kontinuitaet-card.js';
 import { registerBookSettingsCard } from './cards/book-settings-card.js';
 import { registerUserSettingsCard } from './cards/user-settings-card.js';
+import { registerAdminUsersCard } from './cards/admin-users-card.js';
 import { registerFinetuneExportCard } from './cards/finetune-export-card.js';
 import { registerExportCard } from './cards/export-card.js';
 import { registerPdfExportCard } from './cards/pdf-export-card.js';
@@ -208,6 +209,7 @@ document.addEventListener('alpine:init', () => {
   registerBookStatsCard();
   registerBookSettingsCard();
   registerUserSettingsCard();
+  registerAdminUsersCard();
   registerFinetuneExportCard();
   registerExportCard();
   registerPdfExportCard();

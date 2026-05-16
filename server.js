@@ -211,7 +211,7 @@ app.use((req, res, next) => {
   if (API_PREFIXES.some(p => req.path.startsWith(p))) {
     return res.status(401).json({ error_code: 'NOT_LOGGED_IN' });
   }
-  return res.redirect(`/auth/login?returnTo=${encodeURIComponent(req.originalUrl)}`);
+  return res.redirect(`/login?returnTo=${encodeURIComponent(req.originalUrl)}`);
 });
 
 // ── Aktivitäts-Tracking ──────────────────────────────────────────────────────

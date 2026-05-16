@@ -216,6 +216,78 @@ router.get('/auth/callback', async (req, res) => {
   }
 });
 
+// GET /login → Landing-Page mit Google-Button + optionaler Admin-Form.
+// Auth-Guard redirected unauth User hierhin (statt direkt zu Google),
+// damit Admin-Pfad sichtbar ist. Wenn ADMIN_PASSWORD-ENV leer ist, wird
+// die Admin-Form ausgeblendet (Plan-Pfad B deaktiviert).
+router.get('/login', (req, res) => {
+  if (process.env.LOCAL_DEV_MODE === 'true') return res.redirect('/');
+  if (req.session?.user) return res.redirect(req.query.returnTo || '/');
+  const lang = _bodyLang(req);
+  const hasGoogle = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+  const hasAdminPw = !!process.env.ADMIN_PASSWORD;
+  const returnTo = typeof req.query.returnTo === 'string' && req.query.returnTo.startsWith('/') && !req.query.returnTo.startsWith('//')
+    ? req.query.returnTo : '/';
+  const t = lang === 'en'
+    ? { title: 'Sign in', google: 'Sign in with Google', adminTitle: 'Admin login', email: 'Admin email', password: 'Password', submit: 'Sign in as admin', or: 'or', noAdmin: 'Admin login disabled.' }
+    : { title: 'Anmeldung', google: 'Mit Google anmelden', adminTitle: 'Admin-Login', email: 'Admin-E-Mail', password: 'Passwort', submit: 'Als Admin anmelden', or: 'oder', noAdmin: 'Admin-Login deaktiviert.' };
+  res.set('Cache-Control', 'no-store');
+  res.send(`<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><title>${t.title}</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  body{font-family:system-ui,sans-serif;max-width:420px;margin:48px auto;padding:0 16px;color:#1a1a1a;background:#fafafa}
+  h1{font-size:1.5em;margin-bottom:24px}
+  .btn-google{display:inline-block;padding:10px 16px;background:#fff;border:1px solid #ccc;border-radius:4px;text-decoration:none;color:#1a1a1a;font-size:1em}
+  .btn-google:hover{background:#f0f0f0}
+  fieldset{border:1px solid #ddd;border-radius:4px;padding:16px;margin-top:24px}
+  legend{padding:0 8px;color:#666;font-size:0.9em}
+  label{display:block;margin-top:8px;font-size:0.9em;color:#555}
+  input[type=email],input[type=password]{width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;font-size:1em;box-sizing:border-box;margin-top:4px}
+  button[type=submit]{margin-top:12px;padding:10px 16px;background:#0070d0;color:#fff;border:0;border-radius:4px;font-size:1em;cursor:pointer}
+  button[type=submit]:hover{background:#005bb0}
+  .err{color:#c00;margin-top:8px;font-size:0.9em;min-height:1.2em}
+  .sep{margin:24px 0;text-align:center;color:#999;font-size:0.9em}
+</style></head>
+<body>
+<h1>${t.title}</h1>
+${hasGoogle ? `<p><a class="btn-google" href="/auth/login?returnTo=${encodeURIComponent(returnTo)}">${t.google}</a></p>` : ''}
+${hasGoogle && hasAdminPw ? `<div class="sep">— ${t.or} —</div>` : ''}
+${hasAdminPw ? `<fieldset><legend>${t.adminTitle}</legend>
+<form id="admin-form">
+  <label>${t.email}<input type="email" id="email" required autocomplete="username"></label>
+  <label>${t.password}<input type="password" id="password" required autocomplete="current-password"></label>
+  <button type="submit">${t.submit}</button>
+  <div class="err" id="err"></div>
+</form></fieldset>
+<script>
+document.getElementById('admin-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const err = document.getElementById('err');
+  err.textContent = '';
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  try {
+    const r = await fetch('/auth/admin-login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    if (r.ok) { window.location.href = ${JSON.stringify(returnTo)}; return; }
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 429) {
+      const sec = j.retryAfter || 900;
+      err.textContent = ${lang === 'en' ? `'Too many attempts. Retry in ' + sec + 's.'` : `'Zu viele Versuche. Erneut in ' + sec + 's.'`};
+    } else {
+      err.textContent = ${JSON.stringify(lang === 'en' ? 'Invalid credentials.' : 'Falsche Zugangsdaten.')};
+    }
+  } catch (ex) {
+    err.textContent = ex.message;
+  }
+});
+</script>` : (hasGoogle ? '' : `<p>${t.noAdmin}</p>`)}
+</body></html>`);
+});
+
 // POST /auth/admin-login → ENV-getriebener Admin-Login.
 //
 // Wahrheit lebt in ENV: ADMIN_EMAIL + ADMIN_PASSWORD. timingSafeEqual ueber

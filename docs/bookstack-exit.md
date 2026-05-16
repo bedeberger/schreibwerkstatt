@@ -59,29 +59,29 @@ Bewusst out-of-scope (User-Wunsch): Attachments (werden nicht genutzt → kein M
 | 1 | `localdb`-Backend implementieren (Content-Store-Variante) | ja (Flag) | keiner solange `app.backend='bookstack'` | 0b |
 | 2 | Eigene Page-Revisions | ja | feinere History (beide Backends) | 0 |
 | 3 | Eigene Sortierung | ja | `localdb`-only nativ; `bookstack` weiter via BS-`priority` | 0, 1 |
-| 4a | App-User-Verwaltung | mittel (FK-Recreate) | Admin-Karte; restriktive Logins; User-Invite-Flag | 0 |
-| 4a2 | Public Landing + Request-Register | ja | Öffentliche Startseite mit Login + Registrierungsanfrage; Admin moderiert Anfragen | 4a, 4c2 |
-| 4b | Book-ACL + Sharing (owner/editor/lektor/viewer) | ja | Buchliste filtert auf Shares; Rollen-Matrix | 0, 4a |
+| 4a2 | Public Landing + Request-Register | ja | Öffentliche Startseite mit Login + Registrierungsanfrage; Admin moderiert Anfragen | 4c2 |
+| 4b | Book-ACL + Sharing (owner/editor/lektor/viewer) | ja | Buchliste filtert auf Shares; Rollen-Matrix | — |
 | 4b1 | Lese-Modus (Print-CSS + readOnly) | ja | Druckansicht + readOnly für viewer | 4b |
 | 4b2 | Export-Konsolidierung (Eigenbau alle Scopes + Formate) | ja | Export-Karte für Buch/Kapitel/Seite; kein BookStack-Pass-Through mehr | 4b |
-| 4c | Admin-Settings (alle Runtime-Configs aus `.env` → DB) | ja | Admin-UI für Provider/Modell/Auth/Cron/Tuning + Backend-Auswahl | 4a |
+| 4c | Admin-Settings (alle Runtime-Configs aus `.env` → DB) | ja | Admin-UI für Provider/Modell/Auth/Cron/Tuning + Backend-Auswahl | — |
 | 4c1 | First-Run-Setup-Wizard (`/setup`) | ja | Admin loggt sich via `ADMIN_PASSWORD` ein und konfiguriert OAuth/KI/Backend/SMTP Schritt für Schritt; auch später wieder aufrufbar | 4c |
 | 4c2 | SMTP-Mailer (Gmail/Workspace via OAuth2 oder App-Passwort) | ja | Admin konfiguriert Versand-Konto; Invite-/Notify-Mails gehen raus statt Token-Anzeige in UI | 4c |
-| 4d | Token-Budget + Cost-Tracking (Admin) | ja (additiv) | Admin-Karte Usage; pro-User-Monats-Budget hard/soft; 429 bei Hard-Cap | 4a |
-| 6 | Tags/Kategorien | ja | Filter-UI (beide Backends) | 0, 4a |
+| 4d | Token-Budget + Cost-Tracking (Admin) | ja (additiv) | Admin-Karte Usage; pro-User-Monats-Budget hard/soft; 429 bei Hard-Cap | — |
+| 6 | Tags/Kategorien | ja | Filter-UI (beide Backends) | — |
 | 7 | Volltextsuche (FTS5) | ja | App-eigene Suche (beide Backends) | 1, 2, 4b |
 | 8 | Backend-Migration-Tool (Bulk-Copy) | one-way pro Direction | Admin-UI „Backend wechseln" | 1–7 |
 | 9 | Doku-Update (Multi-Backend-Sweep) | ja | keiner (Doku) | 8 |
 | 10 | Schema-Squash | ja | keiner | 9 |
-| 11 | Per-User-AI-Provider-Override | ja (additiv) | Admin weist pro User claude/ollama/llama zu; User folgt sonst globalem Default | 4a, 4c, 4d |
+| 11 | Per-User-AI-Provider-Override | ja (additiv) | Admin weist pro User claude/ollama/llama zu; User folgt sonst globalem Default | 4c, 4d |
 
-**Start-Reihenfolge:** 0b → 4a → 4c → 4c1 → 4c2 → 4a2 → 4d → 4b → 4b1 → 4b2 → 2 → 6 → 1 → 3 → 7 → 8 → 9 → 10.
+**Start-Reihenfolge:** 0b → 4c → 4c1 → 4c2 → 4a2 → 4d → 4b → 4b1 → 4b2 → 2 → 6 → 1 → 3 → 7 → 8 → 9 → 10.
 10 (Squash) zuletzt — Squash vorher wäre Wegwerfarbeit, weil bis dahin viele Migrationen dazukommen. Phase 11 (Per-User-AI-Provider-Override) ist additiv und kann nach 4d eingeschoben werden, sobald die Hauptkette steht.
 
 **Erledigt:**
 - Phase 0c (PRAGMA-Tuning, [db/connection.js](../db/connection.js) + `PRAGMA optimize` im SIGTERM-Handler von [server.js](../server.js)).
 - Phase 0d (TTL-Cache-Cleanup, [lib/cache-cleanup.js](../lib/cache-cleanup.js) im 23:00-Cron-Tick, manuell via `npm run cache:cleanup [-- --vacuum]`).
 - Phase 0 (Schema-Skelett, Migration 105 + 106 in [db/migrations.js](../db/migrations.js): additive Phase-0-Spalten auf pages/chapters/books + AUTOINCREMENT-Recreate mit `sqlite_sequence`-Wasserzeichen `≥ 1_000_000`). Dauerhafte Invariante steht oben in „Schema-Invariante (aus Phase 0)". Tests: `tests/unit/db-pragmas.test.js`, `tests/unit/cache-cleanup.test.js`, `tests/unit/schema-phase0.test.js`.
+- Phase 4a (App-User-Verwaltung): Migration 107 (`app_users` + `user_invites` mit Partial-UNIQUE + `user_sessions_audit` + `users.email`-FK), [db/app-users.js](../db/app-users.js) Helper-API, ENV-getriebener Admin-Bootstrap, OIDC-Lookup mit Status-Gate + Invite-Accept + ALLOW_OPEN_SIGNUP, `POST /auth/admin-login` mit `timingSafeEqual` + Rate-Limit ([lib/admin-login-ratelimit.js](../lib/admin-login-ratelimit.js)), `GET /login`-Landing-Page mit Google-Button + Admin-Form, `/admin/users`-Routen (Liste, Invite, Update, Soft-Delete, Audit) hinter [lib/admin-mw.js#requireAdmin](../lib/admin-mw.js), `POST /me/invite` mit `can_invite_users`-Gate, Frontend-Karte `AdminUsersCard` ([public/js/cards/admin-users-card.js](../public/js/cards/admin-users-card.js)) + Avatar-Menu-Link für Admins. Tests: `tests/unit/app-users.test.js`, `tests/unit/admin-login-ratelimit.test.js`, `tests/unit/admin-users-routes.test.js`, `tests/unit/login-page.test.js`.
 - Phase 0b Backend (Backfill-Job in [routes/jobs/backfill.js](../routes/jobs/backfill.js), Upserts in [db/backfill.js](../db/backfill.js), Mock-BookStack `book_id]?=`-Filter-Fix, 5 Integration-Tests in [tests/integration/backfill.test.js](../tests/integration/backfill.test.js)). Frontend-Trigger-Punkte siehe Phase-0b-Block unten.
 4a/4c/4b zuerst, weil User-Identität, `app.backend`-Schalter und ACL die SSoT für alle folgenden Phasen sind. Lese-Modus (4b1, Print-CSS + readOnly) direkt nach 4b, weil viewer-Rolle erst dann existiert. Phase 7 (Suche) **vor** Phase 8, damit FTS schon steht, wenn Admin Backend wechselt — Index wird beim Bulk-Copy mitgefüllt.
 
@@ -339,137 +339,6 @@ CREATE TABLE book_order (
 
 ---
 
-## Phase 4a — App-User-Verwaltung
-
-Eigene User-DB. BookStack-User-Liste wird ignoriert. OIDC-Login bleibt Identitätsquelle.
-
-**Migration N+4a**:
-
-```sql
-CREATE TABLE app_users (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  email TEXT NOT NULL UNIQUE,
-  display_name TEXT,
-  avatar_url TEXT,
-  global_role TEXT NOT NULL DEFAULT 'user'
-    CHECK(global_role IN ('admin','user')),
-  status TEXT NOT NULL DEFAULT 'active'
-    CHECK(status IN ('invited','active','suspended','deleted')),
-  language TEXT DEFAULT 'de',
-  model_override TEXT,
-  can_invite_users INTEGER NOT NULL DEFAULT 1,  -- darf User-Invites (Phase 4a) erstellen. Default an: Standard-User soll Kollegen als viewer/lektor onboarden können. Admin kann pro User entziehen.
-  first_seen_at TEXT,
-  last_seen_at TEXT,
-  invited_by TEXT,
-  invited_at TEXT,
-  created_at TEXT DEFAULT (datetime('now'))
-);
-CREATE INDEX idx_app_users_status ON app_users(status);
-
-CREATE TABLE user_invites (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  email TEXT NOT NULL,
-  global_role TEXT NOT NULL DEFAULT 'user'
-    CHECK(global_role IN ('admin','user')),
-  invite_token TEXT NOT NULL UNIQUE,
-  invited_by TEXT NOT NULL,
-  invited_at TEXT DEFAULT (datetime('now')),
-  expires_at TEXT NOT NULL,
-  accepted_at TEXT,
-  revoked_at TEXT
-);
-CREATE INDEX idx_user_invites_token ON user_invites(invite_token);
--- Partial UNIQUE: nur aktive Invites blockieren erneutes Senden.
--- Revoked/accepted Invites dürfen denselben Email-Eintrag erneut bekommen.
-CREATE UNIQUE INDEX idx_user_invites_active_email
-  ON user_invites(email)
-  WHERE revoked_at IS NULL AND accepted_at IS NULL;
-
-CREATE TABLE user_sessions_audit (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_email TEXT NOT NULL,
-  event TEXT NOT NULL CHECK(event IN
-    ('login','logout','login-denied','suspended','reactivated','role-changed','deleted')),
-  ip TEXT,
-  user_agent TEXT,
-  meta_json TEXT,
-  created_at TEXT DEFAULT (datetime('now'))
-);
-CREATE INDEX idx_user_audit_user ON user_sessions_audit(user_email, created_at DESC);
-```
-
-**Bestehende User-bezogene Tabellen** (FK-Recreate-Pattern):
-- `user_settings` → FK `user_email REFERENCES app_users(email) ON DELETE CASCADE`.
-- Token-Tabellen (`tokens`, `token_usage`, falls user-scoped).
-- `jobs`, `chat_sessions`, `page_revisions` → bewusst **keine** harte FK. User-Löschung würde Historie kaskadieren. Stattdessen Soft-Delete (`status='deleted'`), Email bleibt blockiert.
-
-**Rollen**:
-- `admin`: User-Verwaltung + globale Settings + Claude-Config. **Keine** Buchsicht (Privacy-Boundary, siehe oben). Implizit `can_invite_users=1`.
-- `user`: Standard. Eigene Bücher anlegen, teilen, sehen. `can_invite_users=1` per Default — Use-Case: User lädt Kollegen als `lektor`/`viewer` ein, ohne dass Admin eingreift. Invite erzwingt `global_role='user'`. Admin kann Flag pro User entziehen (z.B. bei Missbrauch). Admin-Hochstufung bleibt Admin-only.
-
-**Status-Werte**:
-- `invited`: Invite ausgestellt, noch nie eingeloggt.
-- `active`: aktiv, darf einloggen.
-- `suspended`: vorübergehend gesperrt.
-- `deleted`: Soft-Delete, Email permanent blockiert.
-
-**Zwei parallele Login-Pfade** (Umbau in [routes/auth.js](../routes/auth.js)):
-
-*A) Google-OIDC (Standard-User + Admin alternativ):*
-1. OIDC-Callback liefert verifizierte Email.
-2. Lookup in `app_users`.
-3. `status='active'` → Session anlegen (`global_role` aus DB), `last_seen_at` updaten, Audit `login` mit `method='oidc'`.
-4. `status='suspended'` oder `'deleted'` → 403, Audit `login-denied`.
-5. Kein Treffer, aber gültiger Invite-Token (Query-Param `?invite=…`) → User aus Invite anlegen, `status='active'`, Invite `accepted_at` setzen.
-6. Kein Treffer, kein Invite → 403, Hinweis „Zugang nicht freigeschaltet".
-
-*B) Admin-Passwort-Login (persistent, kein Bootstrap-Only):*
-1. `GET /login` zeigt zwei Buttons: „Mit Google anmelden" + „Admin-Login".
-2. `POST /auth/admin-login` `{ email, password }` → vergleicht gegen `process.env.ADMIN_EMAIL` + `process.env.ADMIN_PASSWORD` via `crypto.timingSafeEqual`.
-3. Match → Session mit `global_role='admin'`, Audit `login` mit `method='env'`.
-4. Mismatch → 401 + Rate-Limit-Zähler hochzählen, Audit `login-denied`.
-5. `ADMIN_PASSWORD` leer/unset → Pfad B komplett deaktiviert (Button ausgeblendet, Route liefert 404).
-
-**`ADMIN_EMAIL`/`ADMIN_PASSWORD` Semantik:**
-- Klartext in `.env` (Self-Hosted-Pattern, [[project_self_hosted_oss]]). Dateirechte `chmod 600`. Nie in Git.
-- Wahrheit lebt in ENV — kein Passwort-Hash in DB. `.env` ändern → sofort wirksam beim nächsten Login (keine Restart-Pflicht, `process.env` wird zur Login-Zeit gelesen).
-- `app_users`-Row für `ADMIN_EMAIL` wird beim Server-Start angelegt, falls fehlend: `global_role='admin'`, `status='active'`. Diese Row trägt Audit, `display_name`, `language` etc. — Passwort selbst aber nicht.
-- Email-Wechsel in `.env`: alte Admin-Row bleibt liegen (Soft-Delete/Cleanup durch Admin selbst); neue Email legt zweite Admin-Row beim ersten Login an.
-- OIDC-Login mit derselben Email funktioniert parallel (gleiche Row, beide Methoden lösen die Session aus).
-
-**Rate-Limit** (`express-rate-limit`, neue Dep): 5 Versuche pro IP pro 15 min auf `POST /auth/admin-login`. Nach Limit 429 + 15-min-Sperre. OIDC-Pfad nicht limitiert (Google macht das vor).
-
-**Open-Signup-Schalter**: Env `ALLOW_OPEN_SIGNUP=false` (Default). Wenn `true`: OIDC-Schritt 6 legt User automatisch als `status='active', global_role='user'` an. Passwort-Pfad ignoriert das Flag (Admin-only).
-
-**Routen**:
-- `GET /admin/users` (Admin) — Liste + Filter + Suche.
-- `POST /admin/users/invite` `{ email, role }` → `user_invites`-Row + Token. Versendet Invite-Mail via Mailer-Service (Phase 4c2) wenn `smtp.mode != 'disabled'`; sonst Token in UI anzeigen (Fallback, Admin kopiert URL manuell). **Guard**: `global_role='admin' OR app_users.can_invite_users=1`. Wer kein Admin ist, darf nur Invites mit `role='user'` ausstellen (kein Admin-Hochstufen).
-- `PUT /admin/users/:email` `{ global_role?, status?, can_invite_users? }` (Admin only — `can_invite_users` ist Admin-vergebenes Flag).
-- `DELETE /admin/users/:email` → Soft-Delete (`status='deleted'`), `display_name` anonymisieren, Audit behalten.
-- `GET /me` (bestehend, anpassen): liefert `{ email, displayName, role, can_invite_users, language, model_override }` aus `app_users`.
-- `PUT /me` (bestehende [routes/usersettings.js](../routes/usersettings.js)): nur Selbst-Felder (kein `can_invite_users`, das setzt Admin).
-- `POST /me/invite` `{ email }` → User-Invite-Variante für Nicht-Admins mit `can_invite_users=1`. Erzwingt `role='user'`, sonst identisch zu `/admin/users/invite`. UI-Einstiegspunkt aus Buch-Sharing-Dialog: „User existiert noch nicht — jetzt einladen".
-
-**Frontend — neue Karte `AdminUsersCard`**:
-- `FEATURES`-Eintrag + `EXCLUSIVE_CARDS` + `ALLOWED_KEYS` in [routes/usage.js](../routes/usage.js).
-- Sichtbarkeit: nur wenn `$app.currentUser.role === 'admin'`. Pill und Card-Toggle ansonsten ausgeblendet.
-- Tabelle: User, Rolle (Combobox), Status (Combobox), letzter Login, Aktionen (Suspend, Delete).
-- Invite-Sektion: Email-Input + Role-Combobox + „Invite erstellen" → Token-Anzeige + Copy + Invite-URL.
-- Audit-Drawer pro User (letzte 50 Events).
-
-**i18n** (beide Locales pflegen):
-- `admin.users.title`, `admin.users.invite`, `admin.users.role`, `admin.users.status`
-- `admin.users.role.admin|user`, `admin.users.status.active|suspended|invited|deleted`
-- `admin.users.confirmDelete`, `admin.users.lastLogin`
-- `auth.denied.notInvited`, `auth.denied.suspended`
-- `me.language`, `me.modelOverride`
-
-**Migration des Bestands**:
-- Scan `book_access`-Vorgänger / `chat_sessions` / `jobs` / etc. nach distinct `user_email`.
-- Für jeden Eintrag `app_users`-Row anlegen mit `status='active'`, `global_role='user'`.
-- `ADMIN_EMAIL` → wenn matched, `global_role='admin'`. Sonst neue Row anlegen.
-
----
 
 ## Phase 4b — Book-ACL + Sharing
 
@@ -1745,7 +1614,6 @@ Ollama/Llama serialisieren heute global über einen Mutex (CLAUDE.md „KI-Provi
 | 1 | 4-6 Tage | mittel (Backend-Disjunktion, Test-Pflege gegen beide) |
 | 2 | 2-3 Tage | niedrig |
 | 3 | 2-3 Tage | niedrig |
-| 4a | 4-6 Tage | mittel (FK-Recreate, Login-Flow) |
 | 4b | 4-5 Tage | mittel (Rollen-Matrix + Apply-Routen + minRole-Filter) |
 | 4b1 | 0.5-1 Tag | niedrig (Print-CSS + readOnly-Guard, keine neuen Tabellen) |
 | 4b2 | 3-4 Tage | mittel (6 Format-Builder, Pass-Through-Cut, Sync- + Job-Route auf einen Loader) |
