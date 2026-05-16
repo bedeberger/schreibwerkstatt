@@ -1,8 +1,11 @@
+const crypto = require('crypto');
 const express = require('express');
 const { Issuer, generators } = require('openid-client');
 const logger = require('../logger');
 const { getUserToken, setUserToken, upsertUserLogin, getTokenForRequest } = require('../db/schema');
 const { maybeAutoBackfillOnLogin } = require('./jobs/backfill');
+const appUsers = require('../db/app-users');
+const rateLimit = require('../lib/admin-login-ratelimit');
 
 const router = express.Router();
 
@@ -24,6 +27,37 @@ async function getClient() {
 
 // Maximal parallele offene Login-Flows pro Session (ältere werden verworfen)
 const MAX_PENDING_FLOWS = 5;
+
+function _clientIp(req) {
+  return req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.connection?.remoteAddress || null;
+}
+
+// Konstant-zeit-Vergleich gleichgrosser Buffer. ENV-Passwort + User-Input
+// auf SHA-256 normalisieren, damit Buffer-Laenge identisch ist.
+function _passwordsMatch(expected, given) {
+  if (!expected || !given) return false;
+  const a = crypto.createHash('sha256').update(String(expected)).digest();
+  const b = crypto.createHash('sha256').update(String(given)).digest();
+  return crypto.timingSafeEqual(a, b);
+}
+
+// Phase 4a Status-Gates: 'suspended' / 'deleted' → 403, audit + denied-Render.
+function _renderDenied(res, lang, reasonKey) {
+  res.status(403);
+  const t = lang === 'en'
+    ? { title: 'Access denied', body: { suspended: 'Your account is suspended.', deleted: 'Your account has been deleted.', notInvited: 'No access. Ask your administrator for an invite.' }, cta: 'Use another account' }
+    : { title: 'Zugriff verweigert', body: { suspended: 'Dein Konto ist gesperrt.', deleted: 'Dein Konto wurde gelöscht.', notInvited: 'Kein Zugang. Bitte Admin um eine Einladung.' }, cta: 'Anderes Konto verwenden' };
+  res.set('Cache-Control', 'no-store');
+  res.send(`<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><title>${t.title}</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body><h1>${t.title}</h1><p>${t.body[reasonKey] || t.body.notInvited}</p>
+<p><a href="/auth/logout">${t.cta}</a></p></body></html>`);
+}
+
+function _bodyLang(req) {
+  const accept = String(req.headers['accept-language'] || '').toLowerCase();
+  return accept.startsWith('en') ? 'en' : 'de';
+}
 
 // GET /auth/login → redirect zu Google (oder direkt zu / im LOCAL_DEV_MODE)
 router.get('/auth/login', async (req, res) => {
@@ -85,22 +119,71 @@ router.get('/auth/callback', async (req, res) => {
       { state: flow.state, nonce: flow.nonce }
     );
     const claims = tokenSet.claims();
-    const email = claims.email;
+    const email = (claims.email || '').toLowerCase();
+    const ip = _clientIp(req);
+    const userAgent = req.headers['user-agent'] || null;
+    const lang = _bodyLang(req);
 
     // Optionale E-Mail-Whitelist (ALLOWED_EMAILS=a@b.com,c@d.com)
     const allowed = process.env.ALLOWED_EMAILS;
     if (allowed) {
       const list = allowed.split(',').map(e => e.trim().toLowerCase());
-      if (!list.includes(email.toLowerCase())) {
+      if (!list.includes(email)) {
         logger.warn('Login verweigert (nicht in ALLOWED_EMAILS).', { user: email });
-        return res.status(403).send(
-          `Zugriff verweigert: ${email} ist nicht berechtigt. ` +
-          `<a href="/auth/logout">Anderes Konto verwenden</a>`
-        );
+        appUsers.recordAuditEvent(email, 'login-denied', { ip, userAgent, meta: { method: 'oidc', reason: 'not-in-allowed-emails' } });
+        return _renderDenied(res, lang, 'notInvited');
       }
     }
 
-    const returnTo = flow.returnTo || '/';
+    // Phase 4a: app_users-Lookup + Status-Gate + Invite-Accept-Flow.
+    let user = appUsers.getUser(email);
+    if (user) {
+      if (user.status === 'suspended') {
+        appUsers.recordAuditEvent(email, 'login-denied', { ip, userAgent, meta: { method: 'oidc', reason: 'suspended' } });
+        return _renderDenied(res, lang, 'suspended');
+      }
+      if (user.status === 'deleted') {
+        appUsers.recordAuditEvent(email, 'login-denied', { ip, userAgent, meta: { method: 'oidc', reason: 'deleted' } });
+        return _renderDenied(res, lang, 'deleted');
+      }
+    } else {
+      // Kein Eintrag in app_users: pruefen, ob ein gueltiger Invite-Token
+      // im returnTo verlinkt ist, oder ALLOW_OPEN_SIGNUP greift.
+      const inviteToken = (() => {
+        try { return new URL(flow.returnTo || '', 'http://x').searchParams.get('invite'); }
+        catch { return null; }
+      })();
+      let acceptedInvite = null;
+      if (inviteToken) {
+        const inv = appUsers.findInviteByToken(inviteToken);
+        if (inv && inv.email === email && appUsers.inviteStatus(inv) === 'active') {
+          acceptedInvite = inv;
+        }
+      }
+      if (acceptedInvite) {
+        user = appUsers.createUser({
+          email,
+          displayName: claims.name || email,
+          globalRole: acceptedInvite.global_role,
+          status: 'active',
+          invitedBy: acceptedInvite.invited_by,
+        });
+        appUsers.acceptInvite(acceptedInvite.id);
+      } else if (process.env.ALLOW_OPEN_SIGNUP === 'true') {
+        user = appUsers.createUser({
+          email,
+          displayName: claims.name || email,
+          globalRole: 'user',
+          status: 'active',
+        });
+      } else {
+        appUsers.recordAuditEvent(email, 'login-denied', { ip, userAgent, meta: { method: 'oidc', reason: 'not-invited' } });
+        logger.warn('Login verweigert (kein Invite, ALLOW_OPEN_SIGNUP=false).', { user: email });
+        return _renderDenied(res, lang, 'notInvited');
+      }
+    }
+
+    const returnTo = (flow.returnTo && flow.returnTo.startsWith('/') && !flow.returnTo.startsWith('//')) ? flow.returnTo : '/';
     // Verbrauchten Flow entfernen; übrige parallele Flows nicht antasten.
     if (flowIdx >= 0) {
       pending.splice(flowIdx, 1);
@@ -109,10 +192,17 @@ router.get('/auth/callback', async (req, res) => {
     delete req.session.oidcState;
     delete req.session.oidcNonce;
     delete req.session.returnTo;
-    req.session.user = { email, name: claims.name || email, picture: claims.picture || null };
+    req.session.user = {
+      email,
+      name: claims.name || user.display_name || email,
+      picture: claims.picture || null,
+      role: user.global_role,
+    };
     req.session.loginAt = Date.now();
     req.session.lastSeen = Date.now();
     upsertUserLogin(email, claims.name || email);
+    appUsers.touchLogin(email, claims.name || null);
+    appUsers.recordAuditEvent(email, 'login', { ip, userAgent, meta: { method: 'oidc' } });
     // Gespeicherten BookStack-Token in Session laden (falls vorhanden)
     const stored = getUserToken(email);
     if (stored) req.session.bookstackToken = { id: stored.token_id, pw: stored.token_pw };
@@ -126,6 +216,54 @@ router.get('/auth/callback', async (req, res) => {
   }
 });
 
+// POST /auth/admin-login → ENV-getriebener Admin-Login.
+//
+// Wahrheit lebt in ENV: ADMIN_EMAIL + ADMIN_PASSWORD. timingSafeEqual ueber
+// SHA-256-Hash beider Werte (gleiche Buffer-Laenge, konstantzeit-Vergleich).
+// Rate-Limit pro IP via lib/admin-login-ratelimit. Ohne ADMIN_PASSWORD-ENV
+// liefert die Route 404 (Login-Pfad B komplett deaktiviert).
+router.post('/auth/admin-login', express.json(), (req, res) => {
+  if (!process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD) {
+    return res.status(404).json({ error_code: 'ADMIN_LOGIN_DISABLED' });
+  }
+  const ip = _clientIp(req);
+  const state = rateLimit.getState(ip);
+  if (state.blocked) {
+    res.set('Retry-After', String(state.retryAfterSec || 900));
+    return res.status(429).json({ error_code: 'RATE_LIMITED', retryAfter: state.retryAfterSec });
+  }
+  const { email, password } = req.body || {};
+  const givenEmail = (email || '').toLowerCase().trim();
+  const expectedEmail = (process.env.ADMIN_EMAIL || '').toLowerCase().trim();
+  const userAgent = req.headers['user-agent'] || null;
+
+  const emailMatch = givenEmail && expectedEmail && givenEmail === expectedEmail;
+  const passwordMatch = _passwordsMatch(process.env.ADMIN_PASSWORD, password);
+
+  if (!emailMatch || !passwordMatch) {
+    const after = rateLimit.recordFailure(ip);
+    appUsers.recordAuditEvent(givenEmail || expectedEmail, 'login-denied', { ip, userAgent, meta: { method: 'env', failCount: after.failCount } });
+    logger.warn('Admin-Login fehlgeschlagen.', { user: givenEmail || expectedEmail });
+    return res.status(401).json({ error_code: 'INVALID_CREDENTIALS' });
+  }
+
+  rateLimit.recordSuccess(ip);
+  // Sicherstellen, dass app_users-Row existiert + global_role='admin'.
+  appUsers.ensureAdminFromEnv();
+  appUsers.touchLogin(givenEmail);
+  appUsers.recordAuditEvent(givenEmail, 'login', { ip, userAgent, meta: { method: 'env' } });
+
+  req.session.user = { email: givenEmail, name: 'Admin', picture: null, role: 'admin' };
+  req.session.loginAt = Date.now();
+  req.session.lastSeen = Date.now();
+  upsertUserLogin(givenEmail, 'Admin');
+  logger.info('Admin-Login (ENV-Pfad).', { user: givenEmail });
+  req.session.save(err => {
+    if (err) return res.status(500).json({ error_code: 'SESSION_SAVE_FAILED' });
+    res.json({ ok: true });
+  });
+});
+
 // GET /auth/logout → Session löschen + Landing-Page anzeigen.
 // Kein Auto-Redirect zu /auth/login: Google-Session wäre meist noch aktiv und
 // würde uns sofort silent wieder einloggen. User klickt aktiv "Erneut anmelden".
@@ -134,6 +272,11 @@ router.get('/auth/logout', (req, res) => {
   const loginAt = req.session.loginAt;
   const accept = String(req.headers['accept-language'] || '').toLowerCase();
   const lang = accept.startsWith('en') ? 'en' : 'de';
+  const ip = _clientIp(req);
+  const userAgent = req.headers['user-agent'] || null;
+  if (email) {
+    appUsers.recordAuditEvent(email, 'logout', { ip, userAgent });
+  }
   req.session.destroy(() => {
     if (email) {
       const durMin = loginAt ? Math.round((Date.now() - loginAt) / 60000) : null;
