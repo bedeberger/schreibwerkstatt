@@ -84,6 +84,7 @@ Bewusst out-of-scope (User-Wunsch): Attachments (werden nicht genutzt → kein M
 - Phase 4c1 (First-Run-Setup-Wizard): [routes/setup.js](../routes/setup.js) mit `GET /setup` (HTML), `GET /setup/state` (Steps + Values + Masked-Flags), `POST /setup/:step` (publicUrl/oauth/emails/ai/backend/smtp je atomar, Encrypted-Sentinel `__unchanged__` honored, leerer Secret-Wert = kein Overwrite), `POST /setup/test/{oauth,provider,backend,smtp}` (smtp-Probe Stub bis Phase 4c2), `POST /setup/complete` (setzt `app.setup_completed=true` + spiegelt `ADMIN_EMAIL` nach `auth.admin_email`). Standalone-Wizard-Frontend ([public/setup.html](../public/setup.html) + [public/js/setup.js](../public/js/setup.js) + [public/css/setup.css](../public/css/setup.css)) ohne Alpine, eigene Inline-i18n (DE/EN aus `navigator.language`). Admin-only via `requireAdmin`. `/config` liefert `setupCompleted`-Flag; `toggleAdminUsersCard` + `toggleAdminSettingsCard` redirecten auf `/setup`, solange Admin nicht abgeschlossen hat. Tests: `tests/unit/setup-routes.test.js` (18 Cases — Guards, Step-Validierung, Encrypted-Sentinel, Complete, smtp-Stub).
 - Phase 4c2 (SMTP-Mailer): nodemailer-Dep, [lib/mailer.js](../lib/mailer.js) als Singleton-Service mit Mode-Auflösung (`disabled`/`gmail-oauth`/`gmail-app-password`/`generic`), In-Memory-Rate-Limit (30/min Default), Settings-Change-Event-Hook (Cache-Invalidate bei `smtp.*`-Wechsel), Test-Transport-Factory für Tests. [lib/mailer-templates.js](../lib/mailer-templates.js) mit `invite` + `test`-Template, i18n-Lookup (de/en), HTML-Escape gegen Injection. Admin-Routen `GET /admin/settings/smtp/test-config` + `POST /admin/settings/smtp/test-send`. Frontend `AdminSettingsCard`-Tab „SMTP / Mailer" mit Mode-abhängigen Feldern + Test-Mail-Button. ENCRYPTED_KEYS-Set in `app-settings.js` deckt `smtp.gmail.client_secret`, `smtp.gmail.refresh_token`, `smtp.gmail.app_password`, `smtp.password` ab. Tests: `tests/unit/mailer.test.mjs` (Templates inkl. Escape, getStatus, send-Pfade, jsonTransport-Roundtrip, Settings-Reload).
 - Phase 4b1 (Lese-Modus): Frontend-Role-Wiring (4b-Vorgriff) — `bookRoles`-Cache + `currentBookRole` am Root, Getter `canEdit()`/`canReview()`/`isViewer()` in [tree.js](../public/js/tree.js), Fetch via `GET /books/:id/access` in `_loadBookRole()` (Best-Effort: 403/Fehler → null → Legacy-Fallback erlaubt Edit, bis 4b serverseitig alle Schreibpfade enforced). Editor-Buttons in [editor.html](../public/partials/editor.html) (Edit/Fokus/Chat/Korrekturen) hinter `canEdit()`/`canReview()`; `startEdit`/`saveEdit`/`quickSave` mit `canEdit()`-Defense-in-Depth. [public/css/print.css](../public/css/print.css) (`@media print`) blendet UI-Chrome aus, rendert nur `.page-content-view` als Serif-Buchsatz mit `@page`-Margen + Page-Break-Hints. `readerPrint()`-Methode in [app-view.js](../public/js/app-view.js) + „Drucken"-Button in der Editor-Toolbar (callt `window.print()`; cancelEdit vorher, wenn nicht dirty, damit keine Findings-Marks im Druck). i18n-Keys `reader.print`/`reader.printHint` (DE+EN). `SHELL_CACHE` bumped.
+- Phase 4b2 (Export-Konsolidierung): [lib/load-contents.js](../lib/load-contents.js) als Scope-Dispatcher (`book`/`chapter`/`page`) — liefert einheitliche `{ scope, book, chapter?, page?, groups }`-Shape, an die alle Konsumenten andocken. [lib/load-book-contents.js](../lib/load-book-contents.js) gelöscht. Format-Builder pro Format in [lib/export-builders/](../lib/export-builders/): `pdf.js` (wrappt [lib/pdf-render.js](../lib/pdf-render.js) mit Default-Profil), `html.js` (Single-File-HTML mit Print-CSS-Wrapper), `txt.js`/`md.js` (gleiche HTML→Text-Normalisierung wie [routes/sync.js](../routes/sync.js)#htmlToText), `epub.js` + `docx.js` (aus altem `routes/export.js` extrahiert, scope-fähig). [lib/export-builders/index.js](../lib/export-builders/index.js) liefert Format-Map `{ mime, build, bom }`. Sync-Route konsolidiert auf `GET /export/:scope/:id/:fmt` in [routes/export.js](../routes/export.js); altes `/export/book/:id/:fmt` ersatzlos entfernt. Async-Job [routes/jobs/pdf-export.js](../routes/jobs/pdf-export.js) nimmt `{ scope, entityId, profileId }` (mit Backward-Compat-Fallback auf `book_id`), Dedup-Key `${scope}:${entityId}:${profileId}`. `streamExport` + `BOOKSTACK_URL`/`authHeader`-Import aus [lib/content-store.js](../lib/content-store.js) gestrichen — kein Pass-Through-Branch mehr. PDF-Render ([lib/pdf-render/index.js](../lib/pdf-render/index.js)) nimmt `scope`/`chapter`/`page`: Cover bei chapter/page weglassen, TOC bei page weg + chapter einstufig, Title-Page bei chapter/page mit Kapitel-/Seitentitel als Haupttitel und Buchtitel als Untertitel-Kontext. Frontend: `exportCard` + `pdfExportCard` mit Scope-Combobox ([public/partials/export.html](../public/partials/export.html), [public/partials/pdf-export.html](../public/partials/pdf-export.html)), Optionen je nach Navigation-State (Page → Chapter → Book). `bookExport`/`exportPdf` posten Scope + entityId. i18n: `export.scope.{book,chapter,page,label}` + `export.error.{chapterEmpty,pageEmpty,…}` + `job.error.chapterEmpty`/`pageEmpty` in beiden Locales. `SHELL_CACHE` bumped. Tests: [tests/unit/load-contents.test.mjs](../tests/unit/load-contents.test.mjs) (Scope-Dispatch + Empty-Fälle), [tests/unit/export-builders/builders.test.mjs](../tests/unit/export-builders/builders.test.mjs) (PDF/HTML/TXT/MD/EPUB/DOCX gegen synthetische Fixtures).
 - Phase 0b Backend (Backfill-Job in [routes/jobs/backfill.js](../routes/jobs/backfill.js), Upserts in [db/backfill.js](../db/backfill.js), Mock-BookStack `book_id]?=`-Filter-Fix, 5 Integration-Tests in [tests/integration/backfill.test.js](../tests/integration/backfill.test.js)). Frontend-Trigger-Punkte siehe Phase-0b-Block unten.
 4a/4c/4b zuerst, weil User-Identität, `app.backend`-Schalter und ACL die SSoT für alle folgenden Phasen sind. Lese-Modus (4b1, Print-CSS + readOnly) direkt nach 4b, weil viewer-Rolle erst dann existiert. Phase 7 (Suche) **vor** Phase 8, damit FTS schon steht, wenn Admin Backend wechselt — Index wird beim Bulk-Copy mitgefüllt.
 
@@ -514,113 +515,20 @@ Ablenkungsfreier Lese-Pfad für `viewer` (und alle, die „nur lesen" wollen). *
 
 ---
 
-## Phase 4b2 — Export-Konsolidierung (Eigenbau alle Scopes + Formate)
+## Phase 4b2 — Export-Konsolidierung — erledigt
 
-Heute zwei Wege nebeneinander: [routes/export.js](../routes/export.js) (Buch-Sync-Download, PDF/HTML/TXT/MD per BookStack-Pass-Through über `streamExport`, EPUB/DOCX als Eigenbau) und [routes/jobs/pdf-export.js](../routes/jobs/pdf-export.js) (Buch-async-Job, Custom-PDF mit Profilen). Im `localdb`-Backend gibt es kein BookStack-Pass-Through mehr — alles muss eigenbau sein. Diese Phase **konsolidiert** beide Wege und ergänzt gleichzeitig Kapitel- und Seiten-Scope.
+Implementiert; siehe Erledigt-Block oben für Code-Pfade + Tests. Aktuelle Invarianten:
 
-**Endzustand:**
-- Ein Loader (`lib/load-contents.js`) für Buch/Kapitel/Seite.
-- Pro Format ein Builder in `lib/export-builders/` (`pdf.js`, `html.js`, `txt.js`, `md.js`, `epub.js`, `docx.js`).
-- Eine Sync-Route `GET /export/:scope/:id/:fmt` (Default-Styling, kein Profil).
-- Eine Async-Job-Route `POST /jobs/pdf-export` mit Scope-Param (Custom-Profil/Cover/Schrift).
-- `content-store.streamExport` + `lib/bookstack.js`-Import in `routes/export.js` ersatzlos gestrichen.
-
-### Lib-Refactor
-
-**[lib/load-book-contents.js](../lib/load-book-contents.js) → [lib/load-contents.js](../lib/load-contents.js)** (umbenennen + erweitern), exportiert genau einen Dispatcher:
-
-```js
-loadContents({ scope, id }, ctx) → { scope, book, chapters?, pages, groups }
-```
-
-- `scope === 'book'`: alle Kapitel + Pages, Multi-Chapter-Grouping (heutige Logik).
-- `scope === 'chapter'`: `contentStore.loadChapter(id)` → `contentStore.listPages(book_id)` gefiltert auf `chapter_id`, position-sortiert → `{ groups: [oneGroup] }`. `CHAPTER_EMPTY` analog `BOOK_EMPTY`.
-- `scope === 'page'`: `contentStore.loadPage(id)` → `{ groups: [{ chapter: null, pages: [x] }] }`. `PAGE_EMPTY` bei `!html`.
-
-Gemeinsame Grouping-Hilfsfunktion bleibt intern; Buch ruft sie mit allen Chapters, Kapitel mit einem, Seite mit einer Pseudo-Gruppe. Alle Konsumenten (`routes/export.js`, `routes/jobs/pdf-export.js`) schalten auf `loadContents` um. `load-book-contents.js` wird gelöscht.
-
-**Format-Builders** in [lib/export-builders/](../lib/export-builders/) — eine Datei pro Format, jeweils `buildXxx({ scope, book, groups, options? }) → Buffer`:
-
-- `pdf.js` — wrappt [lib/pdf-render.js](../lib/pdf-render.js). Default-Profil aus [lib/pdf-export-defaults.js](../lib/pdf-export-defaults.js)#`defaultConfig()`. Kein Cover/keine Custom-Font. Scope-Flags an Render-Pipeline (Cover/TOC/Title-Page unten).
-- `html.js` — Single-File-HTML mit `<style>`-Wrapper (Print-CSS aus Phase 4b1 wiederverwendet) + Kapitel-/Page-Headings.
-- `txt.js` — HTML→Text via [lib/html-clean.js](../lib/html-clean.js) + `htmlToText`-Variante (Tag→Space, `\s+`→Single-Space — **dieselbe** Normalisierung wie [routes/sync.js](../routes/sync.js)#htmlToText, CLAUDE.md-Regel „HTML→Text-Normalisierung").
-- `md.js` — Multi-Source-Strategie: bevorzugt `pages.body_markdown` (in `localdb` ab Phase 0b vorhanden), Fallback `turndown` (`html → md`) für Pages ohne Markdown-Spalte. Kapitel- und Page-Titel als `#`/`##`-Headings prepended.
-- `epub.js` — bestehender Build aus heutigem `routes/export.js`, hierher verschoben + scope-fähig (Single-Group für Chapter/Page).
-- `docx.js` — bestehender Build, ebenfalls hierher + scope-fähig.
-
-### Sync-Route
-
-**Eine Route ersetzt alle bisherigen:** `GET /export/:scope/:id/:fmt` in [routes/export.js](../routes/export.js).
-
-- `scope ∈ {'book','chapter','page'}`, `fmt ∈ {pdf,html,txt,md,epub,docx}`.
-- `toIntId(req.params.id)` validieren.
-- `loadContents({ scope, id })` → liefert `book` (für Filename-Slug + `setContext({ book })`).
-- Builder pro Format aus `lib/export-builders/` aufrufen → `Buffer`.
-- `buildExportFilename({ prefix: scope, slug: chapter?.slug ?? page?.slug ?? book.slug, ext: fmt, date })`. Filename-Builder bleibt unverändert; nur neuer Prefix-Wert (`'book'|'chapter'|'page'`).
-- Response: `Content-Type` aus Format-Map, `Content-Disposition` mit Filename, `Content-Length`, `res.end(buf)`. BOM-Prepend für `txt`/`md` (Notepad-Mojibake) wie bisher.
-- Alte Routen `GET /export/book/:id/:fmt` ersatzlos entfernt (war ohnehin nur ein Pfad; ein Reverse-Proxy-Redirect ist nicht nötig — keine externen Konsumenten ausser unserer eigenen Frontend-Karte).
-
-### Streichungen
-
-- `content-store.streamExport` aus [lib/content-store.js](../lib/content-store.js) entfernt + aus `module.exports`.
-- `BOOKSTACK_URL`/`authHeader`-Import in [routes/export.js](../routes/export.js) entfernt (heute schon WIP-modifiziert, nutzt `streamExport` — Phase 4b2 finalisiert den Cut).
-- Server-Tripwire-Allowlist um `lib/content-store.js`-Streaming-Pfad verkürzt.
-- BookStack-Inventory-Bullet „Export (`/api/books/:id/export/{fmt}`)" verliert in `localdb`-Mode Bedeutung; bleibt nur als historischer Hinweis. Bei `bookstack`-Backend liest die App weiterhin Body-HTML via `content-store.loadPage`, aber Export-Rendering läuft im App-Server (keine BookStack-Renderer-Aufrufe mehr).
-
-### Custom-PDF-Job
-
-[routes/jobs/pdf-export.js](../routes/jobs/pdf-export.js) bekommt Scope-Parameter im POST-Body:
-
-```js
-{ profileId, scope: 'book'|'chapter'|'page', entityId }
-```
-
-`entityId` ist `book_id`/`chapter_id`/`page_id`. Statt `loadBookContents` → `loadContents({ scope, id: entityId })`. Render-Pipeline ([lib/pdf-render.js](../lib/pdf-render.js)) bleibt unverändert (konsumiert `groups`); nur Scope-Flags an TOC/Cover/Title-Page:
-
-- **Cover:** bei `chapter`/`page` weglassen (Default). Optional Profil-Toggle „Cover auch bei Teil-Export".
-- **TOC:** bei `page` weglassen, bei `chapter` einstufig.
-- **Title-Page:** bei `chapter`/`page` Kapitel-/Seitentitel statt Buchtitel; Untertitel zeigt Buchtitel als Kontext.
-
-Profile bleiben Buch-scoped (`pdf_export_profile.book_id`); ein Profil gilt für alle drei Scopes desselben Buchs. Job-Result-JSON enthält wie bisher Metadaten, Buffer-Stream über `/jobs/pdf-export/:id/file`.
-
-### Sync vs. Async — Aufteilung
-
-- **`GET /export/:scope/:id/:fmt`** = synchron, Default-Styling, kein Profil. Schnellpfad für „eben mal Kapitel als DOCX an Lektor".
-- **`POST /jobs/pdf-export`** = asynchron, Custom-Profil/Cover/Font/veraPDF-Check. Schwerer Pfad für „druckfertige PDF/A".
-
-Beide Wege teilen `loadContents` + (im PDF-Fall) `lib/pdf-render.js`. Keine doppelte Render-Logik.
-
-### Frontend
-
-[public/js/cards/export-card.js](../public/js/cards/export-card.js) bekommt Scope-Combobox (Pflicht-Pattern aus CLAUDE.md):
-
-- Optionen: „Ganzes Buch", „Aktuelles Kapitel" (nur wenn `selectedChapterId`), „Aktuelle Seite" (nur wenn `currentPageId`).
-- Default: „Ganzes Buch".
-- Format-Buttons-URL: `/export/${scope}/${entityId}/${fmt}`.
-
-[public/js/cards/pdf-export-card.js](../public/js/cards/pdf-export-card.js) bekommt denselben Scope-Combobox neben dem Profil-Selector. Render-Trigger postet `{ profileId, scope, entityId }`.
-
-Quick-Pills + Command-Palette: kein neuer `FEATURES`-Eintrag nötig — die Karten `export`/`pdfExport` bleiben SSoT, Scope ist Karten-internes Detail. Optional Editor-Toolbar-Knöpfe „Kapitel als PDF" / „Seite als PDF" hinter eigenem `FEATURES`-Eintrag.
-
-### Rollen-Matrix
-
-`export` und `pdfExport` bleiben `minRole: 'viewer'` (siehe Phase 4b). Scope ändert nichts — wer ein Buch sehen darf, darf auch Auszüge davon exportieren.
-
-### i18n
-
-Neue Keys: `export.scope.book`, `export.scope.chapter`, `export.scope.page`, `export.error.chapterEmpty`, `export.error.pageEmpty`. Beide Locales pflegen (CLAUDE.md-Regel).
-
-### Tests
-
-- **Unit pro Builder** in [tests/unit/export-builders/](../tests/unit/export-builders/): jeweils gegen synthetische `{ scope, book, groups }`-Fixtures. PDF: Magic-Bytes `%PDF-`. EPUB/DOCX: ZIP-Magic + Manifest-Entry. HTML: Wohlgeformtheit. TXT/MD: Normalisierung match `sync.js`#htmlToText.
-- **Unit `loadContents`**: scope-Dispatch, `CHAPTER_EMPTY`/`PAGE_EMPTY`, Page-Sort.
-- **Integration**: Round-Trip pro Format pro Scope gegen Mock-`content-store`.
-- **E2E**: Scope-Combobox in Export-Karte rendert nur sichtbare Optionen je nach Navigation-State.
-- **Tripwire**: Tests, die `fetch`/`streamExport` in `routes/export.js` erwarten, werden entfernt; neuer Tripwire prüft, dass `routes/export.js` keine `BOOKSTACK_URL`-Imports mehr enthält.
-
-### Aufwand
-
-3-4 Tage (Loader-Konsolidierung + 6 Builder-Module + Sync-Route-Refactor + Job-Scope + Frontend-Combobox + Test-Sweep). Doppelt so gross wie die ursprüngliche „nur-Scopes"-Variante, weil Pass-Through-Branch und drei BookStack-Renderer (PDF/HTML/TXT) durch Eigenbau ersetzt werden müssen.
+- **Single Loader**: [lib/load-contents.js#loadContents](../lib/load-contents.js) ist Scope-Dispatcher für Buch/Kapitel/Seite. Liefert `{ scope, book, chapter?, page?, groups }`. Error-Codes: `BOOK_EMPTY`/`CHAPTER_EMPTY`/`PAGE_EMPTY`/`CHAPTER_NOT_FOUND`/`BAD_SCOPE`/`BAD_ID`. Konsumenten: [routes/export.js](../routes/export.js) + [routes/jobs/pdf-export.js](../routes/jobs/pdf-export.js).
+- **Builder-Map**: [lib/export-builders/index.js](../lib/export-builders/index.js) exportiert `FORMATS = { pdf, html, txt, md, epub, docx }` mit `{ mime, build, bom }`. Jeder Builder konsumiert die loadContents-Shape. BOM-Prefix für txt/md schreibt der Caller (Route), nicht der Builder.
+- **Sync-Route**: `GET /export/:scope/:id/:fmt`. Default-Styling, kein Profil. Filename-Prefix = Scope (`book-…`, `chapter-…`, `page-…`).
+- **Async-Job**: `POST /jobs/pdf-export` Body `{ scope, entityId, profileId }`. Dedup-Key `${scope}:${entityId}:${profileId}`. Backward-Compat: `book_id`/`bookId` werden als `entityId` akzeptiert, wenn `scope` fehlt (default `'book'`).
+- **Pdf-Render**: [lib/pdf-render/index.js](../lib/pdf-render/index.js) nimmt optionale `scope`/`chapter`/`page`. Defaults rückwärtskompatibel (`scope='book'`). Bei `chapter`/`page`: Cover weglassen, TOC bei page abschalten + bei chapter einstufig, Title-Page mit Kapitel-/Seitentitel und Buchtitel als Subtitle.
+- **Streichungen**: `content-store.streamExport` + `BOOKSTACK_URL`/`authHeader`-Import aus [lib/content-store.js](../lib/content-store.js) entfernt. `lib/load-book-contents.js` gelöscht. `routes/export.js` enthält keinen Pass-Through-Branch mehr. BookStack-Inventory-Bullet „Export (`/api/books/:id/export/{fmt}`)" entfällt im `localdb`-Mode.
+- **Frontend**: `exportCard` + `pdfExportCard` mit `exportScope`-State + Combobox; Optionen je nach Navigation-State (Page → Chapter → Book). Reconcile bei Page-Wechsel. `bookExport`/`exportPdf` posten Scope + entityId.
+- **i18n**: `export.scope.{label,book,chapter,page}` + `export.error.{chapterEmpty,pageEmpty,bookEmpty,badScope,notFound}` + `job.error.{chapterEmpty,pageEmpty}` (beide Locales).
+- **Rollen-Matrix**: `export` und `pdfExport` bleiben `minRole: 'viewer'` (Phase 4b). Scope ändert das nicht.
+- **Tests**: [tests/unit/load-contents.test.mjs](../tests/unit/load-contents.test.mjs) (Scope-Dispatch + Empty-Fälle), [tests/unit/export-builders/builders.test.mjs](../tests/unit/export-builders/builders.test.mjs) (Magic-Bytes / Wohlgeformtheit pro Format pro Scope).
 
 ---
 
