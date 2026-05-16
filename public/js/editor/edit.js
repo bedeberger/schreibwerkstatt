@@ -1,6 +1,7 @@
 import { htmlToText, stripFocusArtefacts, cleanContentArtefacts, collapseEmptyBlocks, stripTrailingEmptyBlocks } from '../utils.js';
 import { sortByPosition, buildHighlightedHtml } from '../page-view.js';
 import { installEditCounter } from './focus.js';
+import { contentRepo } from '../repo/content.js';
 
 // Auto-Save nach BookStack: idle-debounce + max-Cap. Jede Schreibaktion
 // resettet den Idle-Timer; läuft der User durchgehend, greift der Max-Timer.
@@ -294,7 +295,7 @@ export const editorEditMethods = {
     this.editSaving = true;
     this.setStatus(this.t('edit.saving'), true);
     try {
-      const saved = await this.bsPut('pages/' + this.currentPage.id, {
+      const saved = await contentRepo.savePage(this.currentPage.id, {
         html: newHtml,
         name: this.currentPage.name,
       });
@@ -392,7 +393,7 @@ export const editorEditMethods = {
         }), false, 8000);
         return;
       }
-      const saved = await this.bsPut('pages/' + this.currentPage.id, {
+      const saved = await contentRepo.savePage(this.currentPage.id, {
         html: newHtml,
         name: this.currentPage.name,
       });

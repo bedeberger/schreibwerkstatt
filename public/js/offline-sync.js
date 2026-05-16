@@ -1,12 +1,14 @@
 // Globaler Offline-/Reconnect-Sync.
 // Zweck: Nutzer kann Buch lesen und Seiten im Editor bearbeiten, auch wenn das
 // Client-Gerät offline ist (Zug/Café). Der Service Worker liefert Shell und
-// BookStack-GETs aus dem Cache (siehe public/sw.js), der Editor schreibt
+// Content-GETs aus dem Cache (siehe public/sw.js), der Editor schreibt
 // Drafts in localStorage. Dieses Modul sammelt alle offenen Drafts ein und
-// pusht sie beim Wiederverbinden zurück an BookStack — auch für Seiten, die
+// pusht sie beim Wiederverbinden zurück an die Persistenz — auch für Seiten, die
 // der Nutzer inzwischen geschlossen hat. Konflikt (Server hat sich seit dem
 // Draft verändert) → Draft liegen lassen, editor-edit fragt beim nächsten
 // Öffnen nach.
+
+import { contentRepo } from './repo/content.js';
 
 const DRAFT_PREFIX = 'editor_draft_';
 
@@ -69,9 +71,9 @@ export const offlineSyncMethods = {
         const draft = readDraft(pageId);
         if (!draft?.html) continue;
         try {
-          const r = await fetch('/api/pages/' + pageId + '?__fresh=1');
-          if (!r.ok) { failed++; continue; }
-          const page = await r.json();
+          let page;
+          try { page = await contentRepo.loadPage(pageId, { fresh: true }); }
+          catch { failed++; continue; }
           if (draft.originalHtml && page.html !== draft.originalHtml) {
             conflicts++;
             continue;
@@ -80,7 +82,7 @@ export const offlineSyncMethods = {
             conflicts++;
             continue;
           }
-          const saved = await this.bsPut('pages/' + pageId, {
+          const saved = await contentRepo.savePage(pageId, {
             html: draft.html,
             name: page.name,
           });

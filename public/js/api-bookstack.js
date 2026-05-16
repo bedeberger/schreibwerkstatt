@@ -1,5 +1,6 @@
 import { buildStilkorrekturPrompt } from './prompts.js';
 import { SAFETY_HTML_RATIO, replaceInHtml, stripFocusArtefacts, fmtTok } from './utils.js';
+import { contentRepo } from './repo/content.js';
 
 // Methoden für BookStack-API-Calls (werden in die Alpine-Komponente gespreadet)
 // `this` bezieht sich auf die Alpine-Komponente.
@@ -175,14 +176,14 @@ export const bookstackMethods = {
     if (!expectedUpdatedAt) return null;
     let remote;
     try {
-      remote = await this.bsGet('pages/' + pageId, { fresh: true });
+      remote = await contentRepo.loadPage(pageId, { fresh: true });
     } catch {
       return null;
     }
     if (!remote?.updated_at || remote.updated_at === expectedUpdatedAt) return null;
     return {
       remoteUpdatedAt: remote.updated_at,
-      remoteUserName: remote.updated_by?.name || null,
+      remoteUserName: remote.updated_by_name || null,
       remoteHtml: remote.html || '',
     };
   },
@@ -385,10 +386,12 @@ export const bookstackMethods = {
   // Liefert { finalHtml, stilLog } (stilLog null wenn keine Stil-Findings). Wirft bei Fehler.
   async _loadApplyAndSave(selectedErrors, selectedStyles, onProgress) {
     onProgress(10, this.t('bs.loadingPage'));
-    // `fresh: true` umgeht SWR — sonst kann der API_CACHE nach kurz zuvor
+    // `fresh: true` umgeht SWR — sonst kann der CONTENT_CACHE nach kurz zuvor
     // gesetzten Edits noch die alte Fassung liefern, und der gleich folgende
     // PUT würde frische Server-Edits mit Stale-Daten überschreiben.
-    const page = await this.bsGet('pages/' + this.currentPage.id, { fresh: true });
+    // contentRepo.loadPage ruft stripFocusArtefacts intern, der zweite Aufruf
+    // ist idempotenter Sicherheitsgurt.
+    const page = await contentRepo.loadPage(this.currentPage.id, { fresh: true });
     page.html = stripFocusArtefacts(page.html || '');
 
     let finalHtml = selectedErrors.length > 0
@@ -416,7 +419,7 @@ export const bookstackMethods = {
     }
 
     onProgress(85, this.t('bs.savingToBookStack'));
-    const saved = await this.bsPut('pages/' + this.currentPage.id, { html: finalHtml, name: this.currentPage.name });
+    const saved = await contentRepo.savePage(this.currentPage.id, { html: finalHtml, name: this.currentPage.name });
     if (saved?.updated_at) this.currentPage.updated_at = saved.updated_at;
     // Übernommene Korrekturen sind eine direkte Folge des Lektorats — Seite soll nicht
     // unmittelbar danach auf "seit Lektorat bearbeitet" flippen.

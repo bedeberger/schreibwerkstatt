@@ -175,7 +175,7 @@ export function buildBookChatAgentSystemPrompt(bookName, figuren, review, system
 export const BOOK_CHAT_TOOLS = [
   {
     name: 'list_chapters',
-    description: 'Liefert die komplette Kapitel- und Seitenliste: pro Kapitel chapter_id, Name, Seitenzahl, Wortzahl UND pages[{page_id,page_name,words}]. Zusätzlich total_pages/total_words für das ganze Buch. Nutze dies zuerst für einen Überblick – und um page_ids für get_pages zu bekommen, z.B. wenn du bei einem kleinen Buch alle Seiten laden willst.',
+    description: 'Liefert die komplette Kapitel- und Seitenliste: pro Kapitel chapter_id, Name, Seitenzahl, Wortzahl UND pages[{page_id,page_name,words}]. Zusätzlich total_pages/total_words für das ganze Buch. Nutze dies zuerst für einen Überblick – und um page_ids für get_pages zu bekommen, z.B. wenn du bei einem kleinen Buch alle Seiten laden willst. Nicht nutzen für Detailstatistik eines einzelnen Kapitels (Dialoganteil, Top-Figuren-Erwähnungen) – dafür `get_chapter_stats`.',
     input_schema: { type: 'object', properties: {}, required: [] },
   },
   {
@@ -196,7 +196,7 @@ export const BOOK_CHAT_TOOLS = [
   },
   {
     name: 'get_chapter_stats',
-    description: 'Zusammenfassende Statistik eines Kapitels: Wortzahl, Satzzahl, Dialoganteil, Top-Figuren-Erwähnungen.',
+    description: 'Zusammenfassende Statistik EINES Kapitels: Wortzahl, Satzzahl, Dialoganteil, Top-Figuren-Erwähnungen. Nicht nutzen für Buch-weite Aggregationen über mehrere/alle Kapitel – dafür `get_stil_metrics` (scope="chapter") oder `list_chapters`.',
     input_schema: {
       type: 'object',
       properties: {
@@ -207,7 +207,7 @@ export const BOOK_CHAT_TOOLS = [
   },
   {
     name: 'get_figure_mentions',
-    description: 'Wo und wie oft wird eine Figur erwähnt? Antwort nach Kapitel und Seite, mit Count je Seite. Ideal für "wann taucht X erstmals auf?". Gib figur_id (bevorzugt) ODER figur_name an.',
+    description: 'Wo und wie oft wird eine Figur erwähnt? Antwort nach Kapitel und Seite, mit Count je Seite. Ideal für "wann taucht X erstmals auf?", "in welchen Kapiteln kommt X häufig vor?". Leichtgewichtig – nur Auftrittsverteilung. Nicht nutzen für Profil, Beziehungen oder Lebensereignisse von X – dafür `get_figure_profile`. Gib figur_id (bevorzugt) ODER figur_name an.',
     input_schema: {
       type: 'object',
       properties: {
@@ -219,7 +219,7 @@ export const BOOK_CHAT_TOOLS = [
   },
   {
     name: 'search_passages',
-    description: 'Durchsucht das Buch nach Textstellen. Liefert Treffer mit Kurzkontext (Snippet). Standard: case-insensitive Literal-Suche; mit regex=true als Regex.',
+    description: 'Durchsucht das Buch nach Textstellen. Liefert Treffer mit Kurzkontext (Snippet). Standard: case-insensitive Literal-Suche; mit regex=true als Regex. Nutze dies, wenn du nicht weisst, wo etwas steht, oder ob es überhaupt vorkommt. Nicht nutzen, wenn du bereits page_ids kennst und den vollen Seitentext brauchst – dafür `get_pages`. Auch nicht für Figuren-Auftritte – dafür `get_figure_mentions`.',
     input_schema: {
       type: 'object',
       properties: {
@@ -232,7 +232,7 @@ export const BOOK_CHAT_TOOLS = [
   },
   {
     name: 'get_pages',
-    description: 'Lädt den vollen Text bestimmter Seiten (bei Bedarf für Zitate oder Detail-Analyse). Bis zu 20 Seiten pro Aufruf – bei kleinen Büchern kannst du in einem Call das ganze Buch laden (Page-IDs vorher via list_chapters holen). Falls für die Seite ein gespeichertes Lektorat existiert, kommt es als latest_check {checked_at, error_count, fazit, stilanalyse} mit.',
+    description: 'Lädt den vollen Text bestimmter Seiten (bei Bedarf für Zitate oder Detail-Analyse). Bis zu 20 Seiten pro Aufruf – bei kleinen Büchern kannst du in einem Call das ganze Buch laden (Page-IDs vorher via list_chapters holen). Falls für die Seite ein gespeichertes Lektorat existiert, kommt es als latest_check {checked_at, error_count, fazit, stilanalyse} mit. Schwergewichtig (Volltext) – nicht nutzen für blosse Trefferlisten oder „wo kommt X vor?", dafür `search_passages` / `get_figure_mentions`. Nicht zur Massen-Inspektion ganzer Bücher aufrufen, wenn ein Aggregat-Tool (z.B. `get_stil_metrics`, `get_lektorat_hotspots`) die Frage direkt beantwortet.',
     input_schema: {
       type: 'object',
       properties: {
@@ -269,7 +269,7 @@ export const BOOK_CHAT_TOOLS = [
   },
   {
     name: 'get_figure_profile',
-    description: 'Vollständiges Profil einer Figur: Stammdaten (Typ, Geburtstag, Beruf, Rolle, Motivation, Konflikt, Entwicklung, Sozialschicht, Präsenz), Tags, Schlüsselzitate, alle Lebensereignisse (mit Kapitel/Seite), Szenen, Kapitel-Auftritte und alle Beziehungen (beide Richtungen). Schwergewichtig — für "was weißt du über X?" oder Detail-Analyse einer Figur. Gib figur_id (bevorzugt) ODER figur_name an.',
+    description: 'Vollständiges Profil einer Figur: Stammdaten (Typ, Geburtstag, Beruf, Rolle, Motivation, Konflikt, Entwicklung, Sozialschicht, Präsenz), Tags, Schlüsselzitate, alle Lebensereignisse (mit Kapitel/Seite), Szenen, Kapitel-Auftritte und alle Beziehungen (beide Richtungen). Schwergewichtig — für "was weißt du über X?" oder Detail-Analyse einer Figur. Enthält bereits Beziehungen – kein zusätzliches `get_figure_relations` nötig. Nicht nutzen, wenn nur Auftrittsverteilung gefragt ist (→ `get_figure_mentions`) oder nur Kanten zwischen mehreren Figuren (→ `get_figure_relations` ohne Filter). Gib figur_id (bevorzugt) ODER figur_name an.',
     input_schema: {
       type: 'object',
       properties: {
@@ -309,7 +309,7 @@ export const BOOK_CHAT_TOOLS = [
   },
   {
     name: 'get_book_review',
-    description: 'Liefert die letzte gespeicherte Buchbewertung dieses Users: gesamtnote (1.0–6.0), Stärken, Schwächen, Fazit, Zusammenfassung, Modell, Datum. Antwortet ohne KI-Call (liest book_reviews). Pendant zu list_chapter_reviews, aber Buchebene. Beantwortet "wie gut ist das Buch insgesamt?" anhand der existierenden Bewertung.',
+    description: 'Liefert die letzte gespeicherte Buchbewertung dieses Users: gesamtnote (1.0–6.0), Stärken, Schwächen, Fazit, Zusammenfassung, Modell, Datum. Antwortet ohne KI-Call (liest book_reviews). Beantwortet "wie gut ist das Buch insgesamt?" anhand der existierenden Bewertung. Nicht nutzen für Kapitel-weise Stärken/Schwächen oder Vergleich zwischen Kapiteln – dafür `list_chapter_reviews`.',
     input_schema: { type: 'object', properties: {}, required: [] },
   },
   {
@@ -328,7 +328,7 @@ export const BOOK_CHAT_TOOLS = [
   },
   {
     name: 'get_lektorat_hotspots',
-    description: 'Aggregat über page_checks (letzter Check pro Seite): pro Kapitel total/avg/max Fehleranzahl plus Top-N-Seiten mit den meisten Fehlern (inkl. fazit-Snippet). Beantwortet "wo sind die schwersten Lektorat-Probleme?", "welche Kapitel brauchen am meisten Arbeit?". Schneller Überblick statt vielfacher get_pages-Aufrufe.',
+    description: 'Aggregat über page_checks (letzter Check pro Seite): pro Kapitel total/avg/max Fehleranzahl plus Top-N-Seiten mit den meisten Fehlern (inkl. fazit-Snippet). Beantwortet "wo sind die schwersten Lektorat-Probleme?", "welche Kapitel brauchen am meisten Arbeit?". Schneller Überblick statt vielfacher get_pages-Aufrufe. Nicht nutzen für Stil-/Lesbarkeitsmetriken (Passiv-Anteil, LIX, Dialoganteil) – dafür `get_stil_metrics`. Hotspots zählen Fehler-Findings; Metriken messen Satzstruktur.',
     input_schema: {
       type: 'object',
       properties: {
@@ -341,7 +341,7 @@ export const BOOK_CHAT_TOOLS = [
   },
   {
     name: 'get_stil_metrics',
-    description: 'Stil- und Lesbarkeitsmetriken aus page_stats. Drei Modi via scope: "book" (Aggregat über das ganze Buch), "chapter" (Aufschlüsselung pro Kapitel), "page" (Top-N-Seiten nach einer Metrik). Liefert words/chars/sentences/dialog_chars/dialog_ratio_percent/filler_count/passive_count/adverb_count/avg_sentence_len/sentence_len_p90/lix/flesch_de. Ideal für "wie viel Passiv im Buch?", "welche Kapitel haben am meisten Dialog?", "welche Seiten haben höchsten LIX (schwere Lesbarkeit)?".',
+    description: 'Stil- und Lesbarkeitsmetriken aus page_stats. Drei Modi via scope: "book" (Aggregat über das ganze Buch), "chapter" (Aufschlüsselung pro Kapitel), "page" (Top-N-Seiten nach einer Metrik). Liefert words/chars/sentences/dialog_chars/dialog_ratio_percent/filler_count/passive_count/adverb_count/avg_sentence_len/sentence_len_p90/lix/flesch_de. Ideal für "wie viel Passiv im Buch?", "welche Kapitel haben am meisten Dialog?", "welche Seiten haben höchsten LIX (schwere Lesbarkeit)?". Nicht nutzen für Fehleranzahl/Lektorat-Hotspots – dafür `get_lektorat_hotspots`. Metriken zählen Satzmerkmale strukturell, nicht qualitative Findings.',
     input_schema: {
       type: 'object',
       properties: {

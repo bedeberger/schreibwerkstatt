@@ -219,6 +219,7 @@ const FAKTEN_RULES = `Fakten-Regeln:
 // ── Kontinuitäts-Probleme-Schema (verwendet in Check und SinglePass) ─────────
 
 const PROBLEME_SCHEMA = `{
+  "_reasoning": "Knappe Stichpunkte (max 6 Zeilen) zu deinem Vorgehen: 1) zentrale Fakten/Behauptungen, die du gesammelt hast; 2) paarweise Vergleiche, die du angestellt hast (welche Stellen gegen welche?); 3) Kandidaten, die du verworfen hast (mit Kurz-Begründung – z.B. ‹durch Rückblende erklärbar›, ‹im selben Kapitel auflösbar›); 4) bestätigte Widersprüche, die ins probleme-Array kommen.",
   "probleme": [
     {
       "schwere": "kritisch|mittel|niedrig",
@@ -235,6 +236,8 @@ const PROBLEME_SCHEMA = `{
 }`;
 
 const PROBLEME_RULES = `Regeln:
+- Reasoning-First: «_reasoning» MUSS das erste Feld im JSON-Output sein. Denke dort schrittweise nach, BEVOR du «probleme» befüllst. Reihenfolge der Schritte: (1) Fakten, (2) paarweise Vergleiche, (3) verworfene Kandidaten mit Grund, (4) bestätigte Widersprüche. Knapp halten, Stichpunkte reichen.
+- «probleme» enthält NUR die im _reasoning unter (4) bestätigten Widersprüche – jeden verworfenen Kandidaten lässt du weg, NIE als Eintrag mit «Eintrag entfernen»-Empfehlung.
 - Nur echte Widersprüche – keine stilistischen oder inhaltlichen Anmerkungen
 - WICHTIG: Wenn du bei der Analyse zum Schluss kommst, dass KEIN Widerspruch vorliegt (z.B. «konsistent», «passt», «kein echter Widerspruch»), dann das Problem NICHT melden. Nur tatsächliche Widersprüche ins Array aufnehmen.
 - Das «probleme»-Array ist AUSSCHLIESSLICH für bestätigte Widersprüche da – nicht für Zwischenüberlegungen, geprüfte-aber-verworfene Kandidaten oder Entwarnungen. Wenn ein Kandidat sich beim Nachdenken als harmlos herausstellt, wird er komplett weggelassen, nicht mit einer Erklärung ins Array geschrieben.
@@ -450,9 +453,11 @@ export function buildExtraktionKomplettChapterPrompt(chapterName, bookName, page
     ? 'Der Text ist in Kapitel-Sektionen gegliedert (## Kapitelname) mit Seiten darunter (### Seitentitel). Für alle Kapitel-Felder (kapitel[].name der Figuren und Orte, szenen[].kapitel, lebensereignisse[].kapitel): den Kapitelnamen exakt aus dem ## Header entnehmen, unter dem der jeweilige Abschnitt steht.'
     : `Für alle Kapitel-Felder (kapitel[].name der Figuren und Orte, szenen[].kapitel, lebensereignisse[].kapitel): immer genau «${chapterName}» verwenden – die ### Überschriften im Text sind Seitentitel, keine Kapitelnamen.`;
   const textBlock = chText == null
-    ? 'Der Buchtext steht im System-Prompt oben.'
-    : `${isSinglePass ? `Buchtext (${pageCount} Seiten)` : `Kapiteltext (${pageCount} Seiten)`}:\n\n${chText}`;
-  return `Extrahiere aus ${scope} in einem Durchgang: alle Figuren, alle Schauplätze, alle kontinuitätsrelevanten Fakten, alle Szenen und alle Lebensereignisse der Figuren.
+    ? '<text>Der Buchtext steht im System-Prompt oben.</text>'
+    : `<${isSinglePass ? 'buchtext' : 'kapiteltext'} seiten="${pageCount}">\n${chText}\n</${isSinglePass ? 'buchtext' : 'kapiteltext'}>`;
+  return `<aufgabe>
+Extrahiere aus ${scope} in einem Durchgang: alle Figuren, alle Schauplätze, alle kontinuitätsrelevanten Fakten, alle Szenen und alle Lebensereignisse der Figuren.
+</aufgabe>
 
 ${kapitelNote}
 
@@ -467,9 +472,11 @@ export function buildExtraktionFigurenPassPrompt(chapterName, bookName, pageCoun
     ? 'Der Text ist in Kapitel-Sektionen gegliedert (## Kapitelname) mit Seiten darunter (### Seitentitel). Für kapitel[].name und lebensereignisse[].kapitel: exakt aus dem ## Header entnehmen.'
     : `Für kapitel[].name und lebensereignisse[].kapitel: immer genau «${chapterName}» verwenden – ### Überschriften sind Seitentitel.`;
   const textBlock = chText == null
-    ? 'Der Buchtext steht im System-Prompt oben.'
-    : `${isSinglePass ? `Buchtext (${pageCount} Seiten)` : `Kapiteltext (${pageCount} Seiten)`}:\n\n${chText}`;
-  return `Extrahiere aus ${scope} AUSSCHLIESSLICH: alle Figuren (inkl. Beziehungen) und alle Lebensereignisse der Figuren. Keine Orte, keine Fakten, keine Szenen – die werden separat extrahiert.
+    ? '<text>Der Buchtext steht im System-Prompt oben.</text>'
+    : `<${isSinglePass ? 'buchtext' : 'kapiteltext'} seiten="${pageCount}">\n${chText}\n</${isSinglePass ? 'buchtext' : 'kapiteltext'}>`;
+  return `<aufgabe>
+Extrahiere aus ${scope} AUSSCHLIESSLICH: alle Figuren (inkl. Beziehungen) und alle Lebensereignisse der Figuren. Keine Orte, keine Fakten, keine Szenen – die werden separat extrahiert.
+</aufgabe>
 
 ${kapitelNote}
 
@@ -484,9 +491,11 @@ export function buildExtraktionOrtePassPrompt(chapterName, bookName, pageCount, 
     ? 'Der Text ist in Kapitel-Sektionen gegliedert (## Kapitelname). Für alle Kapitel-Felder den Namen aus dem ## Header entnehmen.'
     : `Für alle Kapitel-Felder: immer genau «${chapterName}» verwenden.`;
   const textBlock = chText == null
-    ? 'Der Buchtext steht im System-Prompt oben.'
-    : `${isSinglePass ? `Buchtext (${pageCount} Seiten)` : `Kapiteltext (${pageCount} Seiten)`}:\n\n${chText}`;
-  return `Extrahiere aus ${scope} AUSSCHLIESSLICH: alle Schauplätze, alle kontinuitätsrelevanten Fakten und alle Szenen. Figuren-Stammdaten nicht – die sind separat erfasst. In Szenen nur Figurennamen als Referenz nennen.
+    ? '<text>Der Buchtext steht im System-Prompt oben.</text>'
+    : `<${isSinglePass ? 'buchtext' : 'kapiteltext'} seiten="${pageCount}">\n${chText}\n</${isSinglePass ? 'buchtext' : 'kapiteltext'}>`;
+  return `<aufgabe>
+Extrahiere aus ${scope} AUSSCHLIESSLICH: alle Schauplätze, alle kontinuitätsrelevanten Fakten und alle Szenen. Figuren-Stammdaten nicht – die sind separat erfasst. In Szenen nur Figurennamen als Referenz nennen.
+</aufgabe>
 
 ${kapitelNote}
 

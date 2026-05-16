@@ -16,6 +16,7 @@
 
 import { setupCardLifecycle } from './card-lifecycle.js';
 import { stripFocusArtefacts, htmlToText, fetchJson, escHtml } from '../utils.js';
+import { contentRepo } from '../repo/content.js';
 
 const AUTOSAVE_IDLE_MS = 60000;
 const AUTOSAVE_MAX_MS = 120000;
@@ -343,7 +344,7 @@ export function registerBookEditorCard() {
           });
           return;
         }
-        const saved = await app.bsPut('pages/' + block.pageId, {
+        const saved = await contentRepo.savePage(block.pageId, {
           html: newHtml,
           name: block.name,
         });

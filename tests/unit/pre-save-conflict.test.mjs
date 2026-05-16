@@ -1,13 +1,12 @@
 // Tests für Pre-Save-Conflict-Check (Stage 1 Kollaborations-Awareness).
-// BookStack hat keinen If-Match-Support — Optimistic-Concurrency baut die App
-// selbst: kurz vor jedem PUT die Seite frisch lesen und `updated_at` mit dem
+// App hat keinen If-Match-Support — Optimistic-Concurrency baut sie selbst:
+// kurz vor jedem PUT die Seite frisch lesen und `updated_at` mit dem
 // Snapshot vom Editor-Open vergleichen. Mismatch = Cross-User-Konflikt.
 //
-// Zwei Verhaltensweisen:
-//   - saveEdit (User-Klick): appConfirm-Modal, Cancel hält Draft.
-//   - quickSave (Auto/Pre-Send): silent saveOffline-Banner, kein Modal.
+// Reads gehen ueber contentRepo.loadPage (= GET /content/pages/:id). Wir
+// stubben globalThis.fetch, contentRepo macht den HTTP-Call.
 
-import test from 'node:test';
+import test, { beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
 globalThis.window = globalThis.window || {
@@ -22,75 +21,85 @@ globalThis.document = globalThis.document || {
 
 const { bookstackMethods } = await import('../../public/js/api-bookstack.js');
 
-// ── Helper-Direktcheck ──────────────────────────────────────────────────────
+let originalFetch;
+let originalNavigatorDesc;
+let fetchCalls;
+
+beforeEach(() => {
+  originalFetch = globalThis.fetch;
+  fetchCalls = [];
+  originalNavigatorDesc = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  Object.defineProperty(globalThis, 'navigator', {
+    configurable: true, writable: true,
+    value: { serviceWorker: { controller: { postMessage() {} } } },
+  });
+});
+
+afterEach(() => {
+  globalThis.fetch = originalFetch;
+  if (originalNavigatorDesc) Object.defineProperty(globalThis, 'navigator', originalNavigatorDesc);
+  else delete globalThis.navigator;
+});
+
+function mockFetch(handler) {
+  globalThis.fetch = async (url, opts) => {
+    fetchCalls.push({ url: String(url), opts });
+    return handler(String(url), opts || {});
+  };
+}
+
+function jsonResponse(body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status, headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+function makeCtx() {
+  return { ...bookstackMethods, t: (k) => k };
+}
 
 test('_checkPageConflict: returns null wenn updated_at identisch', async () => {
-  const ctx = {
-    ...bookstackMethods,
-    bsGet: async () => ({ id: 1, updated_at: 't1', html: '<p>x</p>' }),
-    t: (k) => k,
-  };
-  const r = await ctx._checkPageConflict(1, 't1');
+  mockFetch(() => jsonResponse({ id: 1, updated_at: 't1', html: '<p>x</p>' }));
+  const r = await makeCtx()._checkPageConflict(1, 't1');
   assert.equal(r, null);
 });
 
 test('_checkPageConflict: liefert remote-Info bei updated_at-Mismatch', async () => {
-  const ctx = {
-    ...bookstackMethods,
-    bsGet: async () => ({
-      id: 1,
-      updated_at: 't2',
-      html: '<p>fremde Änderung</p>',
-      updated_by: { name: 'Alice' },
-    }),
-    t: (k) => k,
-  };
-  const r = await ctx._checkPageConflict(1, 't1');
+  mockFetch(() => jsonResponse({
+    id: 1,
+    updated_at: 't2',
+    html: '<p>fremde Änderung</p>',
+    updated_by_name: 'Alice',
+  }));
+  const r = await makeCtx()._checkPageConflict(1, 't1');
   assert.equal(r.remoteUpdatedAt, 't2');
   assert.equal(r.remoteUserName, 'Alice');
   assert.equal(r.remoteHtml, '<p>fremde Änderung</p>');
 });
 
 test('_checkPageConflict: returns null bei fehlendem expectedUpdatedAt (kein Baseline)', async () => {
-  const ctx = {
-    ...bookstackMethods,
-    bsGet: async () => { throw new Error('darf nicht laufen'); },
-    t: (k) => k,
-  };
-  assert.equal(await ctx._checkPageConflict(1, null), null);
-  assert.equal(await ctx._checkPageConflict(1, ''), null);
-  assert.equal(await ctx._checkPageConflict(1, undefined), null);
+  mockFetch(() => { throw new Error('darf nicht laufen'); });
+  assert.equal(await makeCtx()._checkPageConflict(1, null), null);
+  assert.equal(await makeCtx()._checkPageConflict(1, ''), null);
+  assert.equal(await makeCtx()._checkPageConflict(1, undefined), null);
+  assert.equal(fetchCalls.length, 0);
 });
 
 test('_checkPageConflict: returns null bei Read-Fehler (defensiv – kein false positive)', async () => {
-  const ctx = {
-    ...bookstackMethods,
-    bsGet: async () => { throw new Error('network'); },
-    t: (k) => k,
-  };
-  assert.equal(await ctx._checkPageConflict(1, 't1'), null);
+  mockFetch(() => { throw new Error('network'); });
+  assert.equal(await makeCtx()._checkPageConflict(1, 't1'), null);
 });
 
-test('_checkPageConflict: fallback auf null-User wenn updated_by fehlt', async () => {
-  const ctx = {
-    ...bookstackMethods,
-    bsGet: async () => ({ updated_at: 't2', html: '' }),
-  };
-  const r = await ctx._checkPageConflict(1, 't1');
+test('_checkPageConflict: fallback auf null-User wenn updated_by_name fehlt', async () => {
+  mockFetch(() => jsonResponse({ updated_at: 't2', html: '' }));
+  const r = await makeCtx()._checkPageConflict(1, 't1');
   assert.equal(r.remoteUserName, null);
 });
 
-test('_checkPageConflict: bsGet wird mit fresh:true aufgerufen (umgeht SW-Cache)', async () => {
-  let captured = null;
-  const ctx = {
-    ...bookstackMethods,
-    bsGet: async (path, opts) => {
-      captured = { path, fresh: !!opts?.fresh };
-      return { updated_at: 't1' };
-    },
-  };
-  await ctx._checkPageConflict(42, 't1');
-  assert.equal(captured.path, 'pages/42');
-  assert.equal(captured.fresh, true,
-    'Conflict-Check muss fresh sein, sonst sieht er ggf. den eigenen stale SW-Cache');
+test('_checkPageConflict: loadPage wird mit fresh:true aufgerufen (umgeht SW-Cache)', async () => {
+  mockFetch(() => jsonResponse({ updated_at: 't1' }));
+  await makeCtx()._checkPageConflict(42, 't1');
+  assert.equal(fetchCalls.length, 1);
+  assert.equal(fetchCalls[0].url, '/content/pages/42?__fresh=1',
+    'Conflict-Check muss fresh-Marker setzen, sonst sieht er ggf. den eigenen stale SW-Cache');
 });

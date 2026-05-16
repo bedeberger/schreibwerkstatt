@@ -195,12 +195,12 @@ Dialogformat-Regeln (typ: «dialogformat»):
 export function _buildPassivBlock() {
   return `
 Passivkonstruktionen-Regeln (typ: «passiv»):
-- Vermeidbare Passivkonstruktionen identifizieren, die den Text schwerfällig oder unpersönlich machen
-- «original»: vollständiger Satz zeichengenau aus dem Text
-- «korrektur»: derselbe Satz in aktiver Formulierung — das handelnde Subjekt klar benennen
-- In direkter Rede / Dialog konservativer: Passiv in Figurensprache spiegelt oft Sprechgewohnheit oder Distanz – nur melden, wenn die Konstruktion auch im Dialog spürbar holprig wirkt.
-- Nicht melden, wenn das Passiv bewusst eingesetzt wird (Täter unbekannt/unwichtig, wissenschaftlicher Stil, Betonung auf dem Objekt) oder die aktive Variante gezwungen klingt
-- Selbsttest: Ist die aktive Formulierung wirklich klarer und lebendiger? Klingt sie natürlich im Kontext?`;
+- Melde vermeidbare Passivkonstruktionen, die den Text schwerfällig oder unpersönlich machen.
+- «original»: vollständiger Satz, zeichengenau aus dem Text.
+- «korrektur»: derselbe Satz in aktiver Formulierung — benenne das handelnde Subjekt klar.
+- In direkter Rede / Dialog: melde konservativer. Figuren-Passiv spiegelt oft Sprechgewohnheit oder Distanz – flagge nur, wenn die Stelle auch im Dialog hörbar holpert.
+- Melde nicht, wenn der Autor das Passiv bewusst setzt (Täter unbekannt/unwichtig, wissenschaftlicher Stil, Betonung auf dem Objekt) oder die Aktivform gezwungen klingt.
+- Selbsttest: Klingt deine Aktivformulierung klarer, lebendiger und natürlich im Kontext? Wenn nein → weglassen.`;
 }
 
 export function _buildPerspektivbruchBlock() {

@@ -160,11 +160,14 @@ export function buildBookReviewSinglePassPrompt(bookName, pageCount, bookText, {
   const povBlock = _buildErzaehlformBlock(erzaehlperspektive, erzaehlzeit, buchtyp, 'review');
   const schwerpunktBlock = _buildReviewSchwerpunktBlock(reviewSchwerpunkt);
   const kontextBlock = _buildKomplettContextBlock(komplettContext);
-  return `Bewerte das folgende Buch «${bookName}» kritisch und umfassend.
+  return `<aufgabe>
+Bewerte das folgende Buch «${bookName}» kritisch und umfassend.
+</aufgabe>
 ${ACHSEN_BLOCK_BOOK}
 ${NOTENSKALA_BLOCK}
 ${EMPFEHLUNGEN_FORMAT_BLOCK}
 ${schwerpunktBlock}${povBlock}${kontextBlock}
+<output_format>
 Antworte mit diesem JSON-Schema:
 {
   "gesamtnote": 4.5,
@@ -190,20 +193,23 @@ Antworte mit diesem JSON-Schema:
   ],
   "fazit": "Abschliessendes Urteil in 1-2 Sätzen"
 }
-
-Buchinhalt (${pageCount} Seiten):
-
-${bookText}`;
+</output_format>
+<buchinhalt seiten="${pageCount}">
+${bookText}
+</buchinhalt>`;
 }
 
 export function buildChapterAnalysisPrompt(chapterName, bookName, pageCount, chText, { erzaehlperspektive = null, erzaehlzeit = null, buchtyp = null } = {}) {
   const povBlock = _buildErzaehlformBlock(erzaehlperspektive, erzaehlzeit, buchtyp, 'review');
-  return `Analysiere das Kapitel «${chapterName}» aus dem Buch «${bookName}».
+  return `<aufgabe>
+Analysiere das Kapitel «${chapterName}» aus dem Buch «${bookName}».
 Lies den vollständigen Kapiteltext und gib eine kompakte Analyse als JSON zurück.
 Die Ausgabe dient als Eingabe für eine Buchebene-Synthese – sie MUSS deshalb auch
 Dramaturgie, Figuren und Pacing knapp benennen (nicht nur Themen/Stil).
+</aufgabe>
 ${KAPITELANALYSE_FORMAT_BLOCK}
 ${povBlock}
+<output_format>
 Antworte mit diesem JSON-Schema:
 {
   "themen": "Hauptthemen und Inhalte in 1-2 Sätzen",
@@ -215,10 +221,10 @@ Antworte mit diesem JSON-Schema:
   "staerken": ["konkrete Stärke 1", "konkrete Stärke 2"],
   "schwaechen": ["konkrete Schwäche 1", "konkrete Schwäche 2"]
 }
-
-Kapitelinhalt (${pageCount} Seiten):
-
-${chText}`;
+</output_format>
+<kapitelinhalt seiten="${pageCount}">
+${chText}
+</kapitelinhalt>`;
 }
 
 // Kapitel-Review: makro-kritische Bewertung eines einzelnen Kapitels.

@@ -1,8 +1,15 @@
-# BookStack-Exit-Plan
+# Storage-Backend-Pluralisierung
 
-Schrittweise Loslösung von BookStack als Storage/Auth/Editor-Backend. Eigene Persistenz, eigene Benutzerverwaltung, eigener Editor. Jede Phase shippable, hinter Feature-Flag, reversibel bis Phase 7. Replica-Modell zuerst (BookStack bleibt Wahrheit), später Flip auf eigene SSoT.
+Storage-Backend wird Admin-konfigurierbar. Zwei gleichwertige First-Class-Backends:
 
-**Diese Datei ist ein Migrationsplan, kein Stand-Dokument** — bewusste Ausnahme zur CLAUDE.md-Doku-Stil-Regel. Sobald eine Phase live ist, gehört der dauerhafte Teil davon in CLAUDE.md / passende `docs/`-Spickzettel; dieser Plan wird dann beim Abhaken gestrichen.
+- **`localdb`** (Default für Neu-Installationen): Pages/Chapters/Order/Body leben in lokaler SQLite-DB. Eigene Persistenz, eigene Revisionen, eigene Suche. Keine BookStack-Dependency mehr nötig.
+- **`bookstack`** (für bestehende Deployments + alle, die BookStack-UI parallel weiter nutzen wollen): Pages/Chapters/Body leben in BookStack. App-DB bleibt Cache (page_stats, FTS-Index, App-Domain-Daten).
+
+Admin wählt global via `app.backend` in `app_settings` (Phase 4c). Wechsel ist Bulk-Copy-Job (Phase 8), nicht Runtime-Hot-Swap. Kein Dual-Write — ein Backend zur Zeit. Inhaltliche Features (eigene User-Mgmt, ACL, Reader-View, Revisions, Tags, FTS) gelten für beide Backends, sind Backend-agnostisch durch die Content-Store-Abstraktion (Vor-Phase).
+
+Editor + WYSIWYG ändern sich nicht: App nutzt eigenen CodeMirror-basierten Editor, Body bleibt HTML. BookStack-TinyMCE-Iframe wird von der App nie eingebunden — historisch nicht, auch nicht im `bookstack`-Modus.
+
+**Diese Datei beschreibt die Multi-Backend-Architektur als Plan** — bewusste Ausnahme zur CLAUDE.md-Doku-Stil-Regel. Sobald eine Phase live ist, gehört der dauerhafte Teil davon in CLAUDE.md / passende `docs/`-Spickzettel. Diese Datei bleibt liegen, solange offene Phasen existieren; vollständig erledigte Phasen werden gestrichen, der Rest bleibt als Architekturbeschreibung für künftige Code-Sessions.
 
 ---
 
@@ -13,7 +20,7 @@ Ziel: Editor/Lektorat/Chat/History sprechen nur noch mit einer Domain-Repository
 **Status:**
 
 - [x] **Schritt 1 — Server: Normalisierte Endpunkte.** [lib/content-mapper.js](../lib/content-mapper.js) (mapBook/mapChapter/mapPage/mapPageMeta) + [routes/content.js](../routes/content.js) gemountet unter `/content`. Endpunkte: `GET /content/books`, `GET /content/books/:id`, `GET /content/books/:id/tree`, `GET /content/chapters/:id`, `GET /content/pages/:id`, `PUT /content/pages/:id` (mit `cleanPageHtml`), `POST /content/books` (upserted lokale books-Row). Intern weiter `bsGet`/`bsGetAll`/`bsPut`/`bsPost` aus [lib/bookstack.js](../lib/bookstack.js) — `bsPut` neu für symmetrischen Write-Chokepoint. Unit-Test: [tests/unit/content-mapper.test.mjs](../tests/unit/content-mapper.test.mjs).
-- [ ] **Schritt 2 — Frontend: Repository-Modul.** `public/js/repo/content.js` mit `listBooks/bookTree/loadPage/savePage/createBook`. SW-Cache-Namespace `/content/*` (kein Konflikt mit `/api/*`-Legacy-Cache).
+- [x] **Schritt 2 — Frontend: Repository-Modul.** [public/js/repo/content.js](../public/js/repo/content.js) mit `listBooks/loadBook/bookTree/loadChapter/loadPage/savePage/createBook`. SW erweitert ([public/sw.js](../public/sw.js)): neuer `CONTENT_CACHE`-Namespace via gemeinsame `_handleSwr`-Helper, `invalidate-content`-Postmessage parallel zu `invalidate-api`, `SHELL_CACHE` v508→v509 gebumpt, Logout-Cleanup um `CONTENT_CACHE` ergaenzt. Caller-Migration kommt in Schritt 3. Unit-Test: [tests/unit/content-repo.test.mjs](../tests/unit/content-repo.test.mjs).
 - [ ] **Schritt 3 — Call-Sites umstellen:** [public/js/tree.js](../public/js/tree.js) (3× `bsGetAll` → `bookTree`), [public/js/api-bookstack.js](../public/js/api-bookstack.js) (page-load/save), [public/js/editor/edit.js](../public/js/editor/edit.js), Chat-Apply, History-Restore, Lektorat-Apply. `routes/books.js` POST → ruft intern `contentRouter`-Logik bzw. Frontend → `POST /content/books`.
 - [ ] **Schritt 4 — Server-Loader-Abstraktion:** `lib/content-store.js` mit `loadPage/loadBook/savePage`; [routes/jobs/shared/loader.js](../routes/jobs/shared/loader.js) und [routes/content.js](../routes/content.js) konsumieren `content-store`, Token-Param verschwindet aus Job-Routen.
 - [ ] **Schritt 5 — Token-Leak schliessen:** `req.session.bookstackToken` nur noch in [lib/bookstack.js](../lib/bookstack.js) + `content-store.js`. [routes/books.js](../routes/books.js)/[routes/book-editor.js](../routes/book-editor.js)/[routes/export.js](../routes/export.js) lesen Token nicht mehr direkt.
@@ -56,21 +63,28 @@ Bewusst out-of-scope (User-Wunsch): Attachments (werden nicht genutzt → kein M
 | # | Phase | Reversibel? | User-Impact | Abhängigkeiten |
 |---|---|---|---|---|
 | 0 | Schema-Skelett | ja | keiner | — |
-| 1 | Read-Replica (Pull-only) | ja (Flag) | keiner | 0 |
-| 2 | Eigene Page-Revisions | ja | feinere History | 0 |
-| 3 | Eigene Sortierung | ja (Push-back) | schnellerer Reorder | 0, 1 |
+| 0b | Initial Backfill (BookStack → DB) | ja | keiner | 0 |
+| 0c | PRAGMA-Tuning | ja | schnellere Reads | — |
+| 0d | Cache-TTL-Cleanup | ja | keiner | — |
+| 1 | `localdb`-Backend implementieren (Content-Store-Variante) | ja (Flag) | keiner solange `app.backend='bookstack'` | 0, 0b, Vor-Phase |
+| 2 | Eigene Page-Revisions | ja | feinere History (beide Backends) | 0 |
+| 3 | Eigene Sortierung | ja | `localdb`-only nativ; `bookstack` weiter via BS-`priority` | 0, 1 |
 | 4a | App-User-Verwaltung | mittel (FK-Recreate) | Admin-Karte; restriktive Logins; User-Invite-Flag | 0 |
 | 4b | Book-ACL + Sharing (owner/editor/lektor/viewer) | ja | Buchliste filtert auf Shares; Rollen-Matrix | 0, 4a |
 | 4b1 | Reader-View (Kindle-artig) | ja | Lese-UI für viewer (und alle) | 4b |
-| 4c | Admin-Settings (Claude-Config) | ja | Admin-UI für Provider/Modell | 4a |
-| 5 | Dual-Write | mittel | offline-fähig | 1, 2, 3 |
-| 6 | Tags/Kategorien | ja | Filter-UI | 0, 4a |
-| 7 | Volltextsuche (FTS5) | ja | App-eigene Suche, parallel zu BookStack | 1, 2, 4b |
-| 8 | Kill BookStack | one-way | Editor-Wechsel sichtbar | 1–7 |
-| 9 | Doku-Update (Standalone) | ja | keiner (Doku) | 8 |
+| 4c | Admin-Settings (alle Runtime-Configs aus `.env` → DB) | ja | Admin-UI für Provider/Modell/Auth/Cron/Tuning + Backend-Auswahl | 4a |
+| 4c1 | First-Run-Setup-Wizard (`/setup`) | ja | One-Shot-Onboarding ohne Google-OAuth | 4c |
+| 6 | Tags/Kategorien | ja | Filter-UI (beide Backends) | 0, 4a |
+| 7 | Volltextsuche (FTS5) | ja | App-eigene Suche (beide Backends) | 1, 2, 4b |
+| 8 | Backend-Migration-Tool (Bulk-Copy) | one-way pro Direction | Admin-UI „Backend wechseln" | 1–7 |
+| 9 | Doku-Update (Multi-Backend-Sweep) | ja | keiner (Doku) | 8 |
+| 10 | Schema-Squash | ja | keiner | 9 |
 
-**Start-Reihenfolge:** 0 → 4a → 4c → 4b → 4b1 → 2 → 6 → 1 → 3 → 7 → 5 → 8 → 9.
-4a/4c/4b zuerst, weil User-Identität und ACL die SSoT für alle folgenden Phasen sind. Reader-View (4b1) direkt danach, weil sie der einzige UI-Pfad für Viewer ist — ohne sie hat Viewer-Rolle kein sinnvolles Frontend. Phase 7 (Suche) **vor** Phase 8 (Kill), damit BookStack-Search-Pfad beim Exit nur noch entfernt, nicht ersetzt werden muss.
+**Start-Reihenfolge:** 0c → 0d → 0 → 0b → 4a → 4c → 4c1 → 4b → 4b1 → 2 → 6 → 1 → 3 → 7 → 8 → 9 → 10.
+0c/0d vorab, da unabhängig von Backend-Pluralisierung und sofort gewinnbringend. 10 (Squash) zuletzt — Squash vorher wäre Wegwerfarbeit, weil bis dahin viele Migrationen dazukommen.
+4a/4c/4b zuerst, weil User-Identität, `app.backend`-Schalter und ACL die SSoT für alle folgenden Phasen sind. Reader-View (4b1) direkt danach, weil sie der einzige UI-Pfad für Viewer ist. Phase 7 (Suche) **vor** Phase 8, damit FTS schon steht, wenn Admin Backend wechselt — Index wird beim Bulk-Copy mitgefüllt.
+
+**Phase 5 (Dual-Write) entfällt.** Im Multi-Backend-Modell schreibt jeder Backend in seine eigene Wahrheit; ein gleichzeitiges Schreiben in BookStack **und** localdb wäre nur sinnvoll bei „Migration mit Rollback-Schutz" — und das deckt Phase 8 als One-Shot-Bulk-Copy mit veraltetem Quell-Backend-Read-Only-Marker während des Runs ab.
 
 ---
 
@@ -105,23 +119,191 @@ ALTER TABLE books ADD COLUMN created_at TEXT;
 
 ---
 
-## Phase 1 — Read-Replica (Pull-only)
+## Phase 0b — Initial Backfill (Bulk-Copy BookStack → DB)
 
-Ziel: Lesepfad zieht aus lokaler DB, BookStack nur noch beim Sync.
+Ziel: Vollabzug aller BookStack-Bücher/Kapitel/Seiten in lokale Tabellen nach Migration N+1, **pro User mit dessen eigenem Session-Token**. Phase 1 (Sync-Worker) übernimmt danach inkrementelle Updates; ohne Backfill liesse Phase 1 die DB für einen Neu-User leer.
 
-**Sync-Worker** `lib/replica-sync.js` (neu):
+**Per-User-Backfill** — kein Admin-Token, kein globaler Run. Jeder User backfilled mit seinem eigenen Session-`bookstackToken` exakt jene Bücher, die BookStack ihm zeigt. Konsistent mit Privacy-Boundary (Phase 4b): Buch-Sichtbarkeit bleibt durch BookStack-Permissions definiert, kein Admin-Bypass.
+
+**Endpoint** `POST /sync/backfill` (neu, in [routes/sync.js](../routes/sync.js)):
+
+- Auth via Session-Guard, User-Email + Token aus `req.session`.
+- Iteriert `bsGetAll('/api/books')` mit User-Token → pro Buch:
+  - `upsertBook({ book_id, name, description, owner_email = req.session.email, created_at })` ([db/schema.js](../db/schema.js)) — `owner_email` nur setzen, wenn leer (erster User „erbt" das Buch; spätere Sharing-Regelung kommt mit Phase 4b).
+  - `bsGetAll('/api/books/:id/chapters')` → `upsertChapter({ chapter_id, book_id, chapter_name, position, priority, slug, description })`.
+  - `bsGetAll('/api/books/:id/pages')` für Metadaten + Hierarchie. Body pro Seite via `bsGet('/api/pages/:id')` (Detail-Endpoint liefert `html` + `markdown`).
+  - `upsertPage({ page_id, book_id, chapter_id, page_name, body_html, body_markdown, position, priority, slug, remote_updated_at })`. `local_updated_at = remote_updated_at`, `dirty = 0`.
+- Optional Body `{ bookId }` für Einzel-Buch-Backfill (Smoke-Test, partielle Recovery, gezielter Restore).
+- Idempotent: alle Upserts `INSERT … ON CONFLICT DO UPDATE`. Re-Run aktualisiert bestehende Rows, fügt fehlende hinzu.
+- Logging via Winston mit `setContext({ book })` pro Buch-Iteration: `[backfill|user@mail|42] chapters=8 pages=120`.
+- Job-Queue: lange Laufzeit → als `'backfill'`-Job-Typ in [routes/jobs/](../routes/jobs/) implementieren (Standard-Pattern: `runBackfillJob` + Status-Polling), nicht synchron im Request.
+
+**Trigger-Punkte:**
+- **Manuell** über Karte „Buch-Einstellungen" oder „User-Einstellungen": Button „BookStack synchronisieren". Reicht für initialen Roll-Out.
+- **Auto bei erstem Login pro User** (optional): wenn `pages.body_html` für keines der User-sichtbaren Bücher gefüllt ist, Backfill-Job starten und Toast anzeigen. Verhindert „leerer Editor"-Effekt nach Deploy von Phase 1.
+- **Pro Buch on-demand:** beim ersten Page-Open eines Buchs ohne lokale Bodies → Lazy-Backfill nur für dieses Buch.
+
+**`upsertPage`/`upsertChapter`** neue Helfer in [db/pages.js](../db/pages.js) bzw. [db/schema.js](../db/schema.js). Beide nehmen das vom BookStack-Mapper gelieferte Shape, kein Snapshot-Smell (`page_name`/`chapter_name` sind weiterhin Sync-Caches der BookStack-Wahrheit, nicht Denormalisierung).
+
+**ID-Invariante (kritisch für FK-Integrität):** BookStack-IDs werden **1:1 als lokale Primary Keys** übernommen — `pages.page_id`, `chapters.chapter_id`, `books.book_id` (alle bereits `INTEGER PRIMARY KEY` **ohne** `AUTOINCREMENT`, siehe [db/migrations.js](../db/migrations.js)). Kein Remapping, keine separate `local_id`/`remote_id`-Spalte, keine Surrogate-IDs.
+
+- Upserts setzen die ID **explizit** aus dem BookStack-Response (`INSERT INTO pages (page_id, …) VALUES (?, …) ON CONFLICT(page_id) DO UPDATE …`).
+- `figures.book_id`, `page_stats.page_id`, `chapter_reviews.chapter_id`, `figure_events.page_id`, `figure_scenes.chapter_id`, `locations.erste_erwaehnung_page_id`, `continuity_issue_chapters.chapter_id`, `ideen.page_id`, `lektorat_cache.page_id`, `page_revisions.page_id`/`book_id`, `chat_sessions.page_id`, `chapter_extract_cache.chapter_id` etc. — alle ~40 FK-Spalten in [docs/erd.md](erd.md) — referenzieren weiter dieselben BookStack-IDs. Nichts muss umgeschrieben werden.
+- Backfill-Reihenfolge erzwingt FK-Validität: **erst** `books`, **dann** `chapters` (FK → books), **dann** `pages` (FK → books, optional → chapters). Innerhalb eines Buchs in einer Transaktion, damit `foreign_key_check` am Ende grün ist.
+- Phase 8 (Kill BookStack) ändert daran nichts: dieselben Integer-IDs bleiben PKs, sind dann aber app-vergeben statt BookStack-vergeben (z.B. via `INTEGER PRIMARY KEY AUTOINCREMENT` ab Phase 8 für neu erstellte Rows). Existierende Rows behalten ihre BookStack-IDs für immer → alle historischen FKs (Reviews, Caches, Findings, Revisions, Lektorat-Time, etc.) bleiben gültig.
+- `figure_id`, `location_id`, `scene_id` etc. sind app-interne Surrogate (kein BookStack-Pendant) — unverändert, kein Konflikt.
+- Test-Pflicht: Backfill-Unit-Test validiert nach jedem Buch `db.pragma('foreign_key_check')` → muss leer sein. Sonst Abbruch + Rollback.
+
+**Sequenz:** Migration N+1 läuft beim nächsten App-Start automatisch (additiv, schnell). Backfill stösst jeder User für sich an — nach Login einmalig oder via Sync-Button. Phase 1 (Sync-Worker) übernimmt dann inkrementell.
+
+**Idempotenz-Garantie:** Endpoint darf jederzeit re-getriggert werden — z.B. wenn neue Bücher in BookStack auftauchen oder lokale Bodies nach Schema-Bumps neu gefüllt werden müssen. Phase 1 macht denselben Diff-Check (`updated_at`); Backfill ist „kalter Sync-Worker-Lauf für genau einen User".
+
+**Wichtig — keine fremden Bücher mirrorbar:** Was User A backfilled, ist exakt das, was BookStack User A zeigt. User B sieht im Backfill seine eigene Buch-Auswahl. In `books` landen ggf. dieselben `book_id`s aus mehreren User-Backfills (idempotenter Upsert), aber Sichtbarkeit regelt sich später über `book_access` (Phase 4b) — bis dahin spiegelt `owner_email` den Erst-Backfiller.
+
+**Tests:** Unit-Test mit Mock-BookStack-Client (Books-Liste → Chapter-Liste → Page-Detail) gegen In-Memory-DB. Verifiziert: Re-Run ist idempotent, FK-Constraints halten, `body_html` landet pro Seite, `remote_updated_at` gesetzt, zwei User-Backfills mit überlappenden Büchern erzeugen keine Duplikate.
+
+---
+
+## Phase 0c — PRAGMA-Tuning
+
+Ziel: SQLite-Tuning für wachsende DB (Replica-Bodies + FTS5-Index ab Phase 7 = mehr Volumen). Unabhängig vom BookStack-Exit, sofort lohnend. Reversibel — alle PRAGMAs sind Runtime-Settings, kein DB-Format-Wechsel.
+
+**Anpassung in [db/connection.js](../db/connection.js):**
+
+```js
+db.pragma('journal_mode = WAL');                  // bleibt
+db.pragma('synchronous = NORMAL');                // bleibt
+db.pragma('foreign_keys = ON');                   // bleibt
+db.pragma('cache_size = -65536');                 // 64 MB Page-Cache (neg = KiB)
+db.pragma('mmap_size = 268435456');               // 256 MB memory-mapped I/O
+db.pragma('temp_store = MEMORY');                 // Temp-Tables/Indexe in RAM
+db.pragma('busy_timeout = 5000');                 // 5 s Lock-Wait statt SQLITE_BUSY
+db.pragma('wal_autocheckpoint = 1000');           // Checkpoint alle ~4 MB WAL (Default, explizit dokumentiert)
+```
+
+**Begründungen:**
+- `cache_size = -65536` — 64 MB Hot-Pages im Prozess-Cache. Default ≈ 2 MB. Reduziert Page-Reads für `figures`/`pages`/`chat_messages`-Scans drastisch.
+- `mmap_size = 256 MB` — DB-File in den Adressraum gemappt, Linux-Kernel paged on-demand. Schub für die kommenden Body-HTML-Reads (Phase 1).
+- `temp_store = MEMORY` — Sortierungen + temp-Indizes (Komplettanalyse-JOINs, Palette-Provider) ohne Temp-Files auf Disk.
+- `busy_timeout = 5000` — Cron-Sync + interaktiver Schreiber überschneiden sich gelegentlich. 5 s Wait > sofortiger Fehler.
+
+**Optional `PRAGMA optimize` beim Shutdown** (in `server.js`-SIGTERM-Handler): SQLite analysiert Query-Statistiken, baut bessere Indexpläne. Cheap, max. einmal pro Sitzung.
+
+**Tests:** Smoke-Test in [tests/unit/](../tests/unit/) — Open-DB, prüfe `PRAGMA cache_size`/`mmap_size`/`temp_store`/`busy_timeout` Returns. Verhindert Regression bei künftigem Connection-Refactor.
+
+**Aufwand:** ~1 h. Risiko: niedrig. Rollback: PRAGMA-Block entfernen.
+
+---
+
+## Phase 0d — Cache-TTL-Cleanup
+
+Ziel: Cache-Tabellen wachsen heute unbegrenzt. Nach Komplettanalyse-Reruns, Lektorat-Sessions, Buch-Bewertungen sammelt sich Müll, der nicht mehr matcht (Prompt-Version gebumpt, Page-Signatur veraltet). Periodischer Cleanup-Cron hält die DB schlank, beschleunigt Sequential-Scans, reduziert Backup-Grösse.
+
+**Betroffene Tabellen** (gemäss CLAUDE.md-Cache-Liste):
+- `chapter_extract_cache`, `book_extract_cache` — Komplettanalyse
+- `chapter_review_cache`, `book_review_cache`, `chapter_macro_review_cache` — Bewertungen
+- `synonym_cache` — Editor-Synonyme
+- `lektorat_cache` — Seiten-Lektorat
+- `finetune_ai_cache` — Finetune-Augmentation
+- `font_cache` — bereits 30-Tage-TTL beim Stale-Read, aber kein Purge
+- `job_runs` (`status IN ('done','error','cancelled')` älter als N Tage)
+- `page_checks` (alte Snapshots, sobald Page neu gesynct wurde)
+- `book_stats_history` — historische Snapshots > 365 Tage purgen oder downsamplen
+
+**Migration N+m** (additiv) — fehlende `created_at`-Spalten ergänzen:
+
+```sql
+ALTER TABLE chapter_extract_cache       ADD COLUMN created_at TEXT;
+ALTER TABLE book_extract_cache          ADD COLUMN created_at TEXT;
+ALTER TABLE chapter_review_cache        ADD COLUMN created_at TEXT;
+ALTER TABLE book_review_cache           ADD COLUMN created_at TEXT;
+ALTER TABLE chapter_macro_review_cache  ADD COLUMN created_at TEXT;
+ALTER TABLE synonym_cache               ADD COLUMN created_at TEXT;
+ALTER TABLE lektorat_cache              ADD COLUMN created_at TEXT;
+ALTER TABLE finetune_ai_cache           ADD COLUMN created_at TEXT;
+-- Backfill bestehende Rows: created_at = COALESCE(updated_at, datetime('now'))
+```
+
+Tabellen mit bereits vorhandenem `created_at`/`updated_at` (`font_cache`, `job_runs`, `page_checks`, `book_stats_history`) übersprungen.
+
+**Modul `lib/cache-cleanup.js`** (neu):
+
+```js
+const POLICIES = [
+  { table: 'chapter_extract_cache',       ttlDays: 90 },
+  { table: 'book_extract_cache',          ttlDays: 90 },
+  { table: 'chapter_review_cache',        ttlDays: 90 },
+  { table: 'book_review_cache',           ttlDays: 90 },
+  { table: 'chapter_macro_review_cache',  ttlDays: 90 },
+  { table: 'synonym_cache',               ttlDays: 30 },
+  { table: 'lektorat_cache',              ttlDays: 60 },
+  { table: 'finetune_ai_cache',           ttlDays: 60 },
+  { table: 'font_cache',                  ttlDays: 90 },
+  { table: 'job_runs',                    ttlDays: 30, where: `status IN ('done','error','cancelled')` },
+  { table: 'page_checks',                 ttlDays: 90 },
+  { table: 'book_stats_history',          ttlDays: 365 },
+];
+function runCacheCleanup() { /* DELETE pro Policy mit datetime('now', '-N days') */ }
+```
+
+**Scheduler:** Im selben Cron-Tick wie [routes/sync.js](../routes/sync.js)#`syncAllBooks` (täglich 02:00) zusätzlich `runCacheCleanup()`. Logs pro Tabelle: `[cache-cleanup] table=synonym_cache removed=247`.
+
+**Manuelles Tool:** `npm run cache:cleanup` (script in `package.json`) für Ad-hoc-Trigger nach Prompt-Schema-Änderung. Optional `--vacuum`-Flag ruft am Ende `VACUUM;` (Rebuild ohne Lücken, Disk-Space-Reclaim).
+
+**Why TTL statt Cache-Invalidation nach Inhaltsänderung:** `PROMPTS_VERSION`-Bumps und `pages_sig`-Mismatches sortieren stale Rows lautlos aus (Cache-Miss → Neu-Extraktion). Die alten Rows bleiben aber liegen. TTL ist die einfachste Garbage-Collection — Hit-Rate auf alte Rows ist nach 30/60/90 Tagen praktisch null.
+
+**Tests:** Unit-Test in [tests/unit/cache-cleanup.test.mjs](../tests/unit/cache-cleanup.test.mjs) — seedet In-Memory-DB mit alten + frischen Rows, ruft `runCacheCleanup`, verifiziert: alte raus, frische bleiben, Policies einzeln testbar.
+
+**Aufwand:** ~0.5 Tag. Risiko: niedrig (DELETE per TTL, kein FK-Bruch). Rollback: Cron-Hook auskommentieren.
+
+---
+
+## Phase 1 — `localdb`-Backend implementieren (Content-Store-Variante)
+
+Ziel: `lib/content-store.js` (aus Vor-Phase Schritt 4) bekommt eine zweite Implementierung, die ausschliesslich auf lokale Tabellen geht. Backend-Dispatch via `app.backend`-Setting (Phase 4c). Solange `app.backend='bookstack'`, ändert sich das Verhalten nicht.
+
+**Architektur**:
+
+```
+content-store.js  (Facade, dispatcht auf gewählten Backend)
+  ├─ backends/bookstack.js  (heute: bsGet/bsPut/bsGetAll, unverändert gekapselt)
+  └─ backends/localdb.js    (NEU: SQLite-Reads/Writes auf pages/chapters/books)
+```
+
+`content-store.js` liest `app.backend` aus `app_settings`. Default `localdb` für Neu-Installationen; `bookstack` als Migrations-Default für Deployments, die heute `BOOKSTACK_BASE_URL` in ENV gesetzt haben (einmaliger Bootstrap-Default beim ersten Start nach Phase 4c-Migration). Cache pro Server-Boot; Setting-Änderung erfordert App-Restart (oder Hot-Reload via `/admin/settings`, siehe Phase 4c).
+
+**Localdb-Backend** `lib/content-store/backends/localdb.js`:
+- `loadBook(book_id)` → `SELECT … FROM books WHERE book_id = ?`.
+- `bookTree(book_id)` → `chapters` + `pages` JOIN, sortiert nach `book_order.order_json` (Phase 3) oder Fallback `position`.
+- `loadPage(page_id)` → `SELECT page_id, book_id, chapter_id, page_name, body_html, body_markdown, updated_at FROM pages …`.
+- `savePage(page_id, { body_html, body_markdown, page_name? })` → Transaction: `page_revisions`-Row (Phase 2) → `UPDATE pages SET body_html=?, local_updated_at=datetime('now'), dirty=0 …` → FTS-Reindex (Phase 7).
+- `createBook(name, owner_email)` / `createChapter` / `createPage` → INSERT mit lokal generierter PK (eigener Sequence-Counter ab `1_000_000` zur Abgrenzung vom BookStack-ID-Range).
+- Kein HTTP, kein Token, keine BookStack-Berührung.
+
+**ID-Strategie**: BookStack-IDs sind positive Integer aus BS-DB (typisch < 100k). Im `localdb`-Mode neu angelegte Entitäten kriegen IDs aus separater Sequence — klare Trennung, kein Kollisionsrisiko bei späterer Backend-Migration. FK-Constraints bleiben intakt, weil `books`/`chapters`/`pages` ihre PKs unverändert führen.
+
+**Bookstack-Backend** `lib/content-store/backends/bookstack.js`:
+- Aktueller Code aus [routes/content.js](../routes/content.js) und [lib/bookstack.js](../lib/bookstack.js) bleibt funktional — wird nur hinter der Facade gekapselt.
+- Sync-Worker (siehe unten) füllt lokale Cache-Tabellen (`page_stats`, `chapter_extract_cache`, FTS-Index) — diese Cache-Pfade laufen **nur** im `bookstack`-Mode. Im `localdb`-Mode triggert jeder Save direkt die Cache-Aktualisierung im selben Pfad.
+
+**Sync-Worker** `lib/replica-sync.js` (neu, nur aktiv bei `app.backend='bookstack'`):
 - Pro Buch: `GET /api/books/:id` + `GET /api/books/:id/chapters` + Pages-Paginierung via `bsGetAll`.
 - Body via Page-Detail (`GET /api/pages/:id`).
-- Diff via `updated_at`: stale → Refetch + Update.
-- Hierarchie/Order: BookStack-`priority` → lokales `position` (lockstep).
-- Trigger: `POST /sync/book/:id` manuell + Cron 02:00 (existiert in [routes/sync.js](../routes/sync.js)) + bei jedem Page-Open ein Lazy-Refresh-Check.
+- Diff via `updated_at`: stale → Refetch + Update lokaler Cache-Spalten + FTS-Reindex.
+- Hierarchie/Order: BookStack-`priority` → lokales `position` (lockstep, Cache).
+- Trigger: `POST /sync/book/:id` manuell + Cron 02:00 (existiert in [routes/sync.js](../routes/sync.js)) + bei jedem Page-Open Lazy-Refresh-Check.
+- Im `localdb`-Mode: Sync-Cron deregistriert oder no-op.
 
-**Read-Routes** (neu, lokal):
-- `GET /local/books`, `/local/books/:id`, `/local/books/:id/contents`, `/local/pages/:id`.
+**Routen**: Frontend spricht unverändert `/content/...` (aus Vor-Phase Schritt 1). Kein neuer `/local/...`-Pfad — die Backend-Wahl ist serverintern.
 
-**Frontend**: `bsGet`/`bsGetAll`-Wrapper kriegt Feature-Flag `USE_LOCAL_READS`. Shadow-Phase (beide Pfade aufrufen, Diff im Log) → harter Switch.
+**Frontend**: bleibt unverändert. `public/js/repo/content.js` (Vor-Phase Schritt 2) spricht nur die Facade-URL. Kein Feature-Flag im Frontend, kein Shadow-Mode.
 
-Bestehende Caches (`page_stats`, `chapter_extract_cache`) lesen schon aus lokalen Tabellen — kein Bruch.
+**Tests**:
+- Unit (Backend-Disjunktion): beide Backends erfüllen denselben `content-store`-Vertrag (`loadPage`/`savePage`/`bookTree`), gegen Mock-DB bzw. Mock-BookStack.
+- Integration: `/content/pages/:id` PUT im `localdb`-Mode persistiert in `pages.body_html`, schreibt `page_revisions`-Row, refresht FTS.
+- Integration: `/content/pages/:id` PUT im `bookstack`-Mode ruft `bsPut`, schreibt zusätzlich `page_revisions` lokal (Phase 2).
+
+Bestehende Caches (`page_stats`, `chapter_extract_cache`) bleiben unverändert — sie sind backend-agnostisch (gefüttert von Sync im BS-Mode, von Save-Hooks im localdb-Mode).
 
 ---
 
@@ -369,6 +551,19 @@ CREATE TABLE book_share_invites (
   revoked_at TEXT,
   UNIQUE(book_id, invitee_email)
 );
+
+CREATE TABLE page_locks (
+  page_id INTEGER PRIMARY KEY REFERENCES pages(page_id) ON DELETE CASCADE,
+  book_id INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+  locked_by_email TEXT NOT NULL REFERENCES app_users(email) ON DELETE CASCADE,
+  reason TEXT NOT NULL CHECK(reason IN ('lektorat')),
+  acquired_at TEXT NOT NULL DEFAULT (datetime('now')),
+  expires_at TEXT NOT NULL,
+  last_heartbeat_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_page_locks_book ON page_locks(book_id);
+CREATE INDEX idx_page_locks_user ON page_locks(locked_by_email);
+CREATE INDEX idx_page_locks_expires ON page_locks(expires_at);
 ```
 
 **Rollen pro Buch** (Hierarchie absteigend, jede höhere Stufe hat alle Rechte der niedrigeren):
@@ -402,6 +597,19 @@ CREATE TABLE book_share_invites (
 - `POST /local/pages/:id/apply-chat-vorschlag` `{ vorschlag_id }` — analog, `source='chat-apply'`.
 - `PUT /local/pages/:id { body_html }` (Free-Edit-Pfad) bleibt `editor`+.
 - Lektor-Guard auf Apply-Routen prüft zusätzlich, dass der Vorschlag/das Finding zu derselben Page gehört. Kein Pfad, mit dem Lektor beliebigen HTML einschleusen könnte.
+
+**Page-Lock während Lektorat-Session** (`page_locks`-Tabelle, siehe Schema oben): Seite, an der gerade lektoriert wird, ist für Free-Text-Edits gesperrt. Verhindert, dass der Autor parallel im Editor weiterschreibt, während der Lektor Findings ansieht/anwendet — sonst driften Range-Positionen weg und der `updatedAt`-Staleness-Check (siehe Risiko unten) verwirft die ganze Lektorat-Session.
+
+- **Acquire**: Wer den Lektorat-Job triggert (`POST /jobs/lektorat`) oder eine bestehende Findings-Liste öffnet (`POST /local/pages/:id/lock` mit `reason='lektorat'`), erhält einen Lock auf die Page. `expires_at = now + 30 min`. Ein bereits bestehender Lock desselben Users wird verlängert (Idempotenz); Lock eines fremden Users → `423 Locked` mit `{ locked_by_email, expires_at }` für UI-Anzeige.
+- **Heartbeat**: Frontend (Lektorat-Findings-Card) postet alle 60 s `POST /local/pages/:id/lock/heartbeat`, solange die Karte offen ist. Heartbeat verlängert `expires_at` um weitere 30 min und setzt `last_heartbeat_at`.
+- **Release**: Explizit via `DELETE /local/pages/:id/lock` beim Schliessen der Findings-Card oder „Lektorat abschliessen"-Button. Implizit beim ersten erfolgreichen Apply-Pfad-Call, der den Findings-Stack leert (Server löscht Lock-Row im selben Transaktions-Schritt). Implizit beim `beforeunload` (best-effort `navigator.sendBeacon`).
+- **Server-seitiges Cleanup**: Jeder Lock-Check filtert `WHERE expires_at > datetime('now')`. Cron-Cleanup (im 0d-Cron mit drin) löscht abgelaufene Rows einmal pro Tag — Funktionalität hängt nicht davon ab, nur DB-Hygiene.
+- **Guard auf Free-Edit-Routen** (`PUT /local/pages/:id`, `PUT /local/pages/:id/order`, `POST /local/pages/:id/apply-chat-vorschlag` aus dem Page-Chat des Editors): Server prüft `page_locks`. Existiert ein Lock und `locked_by_email !== currentUser.email` und `expires_at > now` → `423 Locked` mit `{ locked_by_email }`. Apply-Routen des **Lock-Holders selbst** sind erlaubt (Lektor braucht sie ja).
+- **Frontend-UX im Editor** (für den Autor, der gesperrt ist): Statt 423-Fehler-Toast eine Editor-Banner-Komponente analog zum Session-Banner: „Diese Seite wird gerade von `<email>` lektoriert (bis `<expires_at>`). Bearbeitung pausiert." CodeMirror auf `readOnly: true` setzen, Toolbar-Mutations-Buttons hidden, Auto-Save-Pfad früh aussteigen. Banner refresht via Polling (`GET /local/pages/:id/lock` alle 30 s) und blendet sich aus, sobald der Lock weg ist; danach wieder normales Editier-Verhalten.
+- **Frontend-UX im Lektorat** (für den Lektor): Findings-Card zeigt am Header „Du lektorierst — andere können diese Seite gerade nicht bearbeiten". Beim Schliessen der Card explizit Release. Bei Hard-Tab-Close greift Heartbeat-Timeout (max 30 min Stau).
+- **Owner/Editor-Override**: Owner darf einen fremden Lock brechen (`DELETE /local/pages/:id/lock?force=true` → 403 für Editor, 200 für Owner). Use-Case: Lektor lässt Browser offen, Urlaub, Owner muss weiter. Audit-Log-Event `lock-broken` mit `meta_json = { broken_by, original_holder }`.
+
+**Lock-Granularität**: Lock ist **pro Page**, nicht pro Kapitel/Buch. Lektor kann mehrere Pages gleichzeitig halten (eine Findings-Card pro Page); Autor kann an anderen Pages desselben Buches frei weiterarbeiten.
 
 **Viewer im Editor**: Frontend öffnet Page im Editor mit `readOnly: true` (CodeMirror-Option) + Toolbar-Buttons hidden via `$app.canEdit`-Getter. Auto-Save-Pfad früh aussteigen. Selection/Find/Synonyme-Lookup bleibt erlaubt (kein Mutationsweg). Findings-Card + Page-Chat-Card komplett ausgeblendet.
 
@@ -542,9 +750,9 @@ Aufwand: 4-6 Tage (inkl. Typo-Refinement + Themes; ohne Highlights). Highlights 
 
 ---
 
-## Phase 4c — Admin-Settings (Claude-Config)
+## Phase 4c — Admin-Settings (Provider + Backend-Auswahl)
 
-Admin-Domäne ist User + Provider-Konfiguration. KI-Provider-Settings wandern von `.env` in DB (oder Hybrid).
+Admin-Domäne ist User-Mgmt + globale App-Konfiguration: KI-Provider, Modell, **Storage-Backend**. KI-Provider-Settings + Backend-Switch wandern von `.env` in DB (Hybrid mit ENV-Fallback).
 
 **Migration N+4c**:
 
@@ -565,49 +773,56 @@ CREATE TABLE app_settings (
 - `ai.claude.context_window` (Override für `MODEL_CONTEXT`).
 - `ai.ollama.host`, `ai.ollama.model`, `ai.ollama.temperature`.
 - `ai.llama.host`, `ai.llama.model`, `ai.llama.temperature`.
+- `app.backend` → `'localdb'|'bookstack'`. **Default `localdb`** für Neu-Installationen. Bootstrap-Default `bookstack`, wenn beim ersten Start nach 4c-Migration `BOOKSTACK_BASE_URL` in ENV gesetzt ist (Erkennung über `lib/content-store.js`-Bootstrap).
+- `app.bookstack.base_url`, `app.bookstack.token_id`, `app.bookstack.token_secret` (AES-256-GCM) — nur relevant bei `app.backend='bookstack'`. ENV-Fallback bleibt.
 - `app.allow_open_signup` (Override für ENV).
 - `app.initial_admin_email` (read-only nach Setup).
 
-**Auflösungs-Reihenfolge** in [lib/ai.js](../lib/ai.js):
+**Auflösungs-Reihenfolge** in [lib/ai.js](../lib/ai.js) und [lib/content-store.js](../lib/content-store.js):
 1. DB-Setting (`app_settings`).
 2. ENV-Variable.
 3. Hardcoded-Default.
 
 ENV bleibt Bootstrap-Mechanismus für erstes Start-Up (insb. Initial-Admin-Email + Anthropic-Key, falls Setup-UI noch nicht erreichbar). Sobald DB-Setting existiert, hat es Vorrang.
 
+**Backend-Switch-Verhalten**:
+- `PUT /admin/settings/app.backend` ändert den Key. **Bestehende Inhalte werden nicht automatisch migriert** — Admin muss zuerst Phase-8-Bulk-Copy-Job ausführen, falls Inhalte vom alten Backend in den neuen wandern sollen.
+- Frontend-Warn-Modal beim Wechsel: „Achtung — Pages aus dem aktuellen Backend werden nicht mehr sichtbar sein, bis Sie eine Migration durchführen."
+- Hot-Reload: nach `PUT` triggert Server intern Event, das `content-store`-Modul den Backend-Pointer neu lesen lässt. Aktive Jobs/Requests im alten Backend laufen zu Ende (kein In-Flight-Switch). Server-Restart als Fallback bleibt sauber.
+
 **Routen** (Admin-only):
-- `GET /admin/settings` → liefert alle Keys (API-Keys maskiert: nur letzte 4 Zeichen).
+- `GET /admin/settings` → liefert alle Keys (API-Keys/Tokens maskiert: nur letzte 4 Zeichen).
 - `PUT /admin/settings/:key` → Single-Key-Update.
-- `POST /admin/settings/test-provider` → führt Mini-Probecall (1-Token-Output) gegen den aktuell konfigurierten Provider aus, gibt Latenz + Erfolg zurück.
+- `POST /admin/settings/test-provider` → Mini-Probecall (1-Token-Output) gegen den aktuell konfigurierten KI-Provider, gibt Latenz + Erfolg zurück.
+- `POST /admin/settings/test-backend` → führt `loadBook(any_id)` + `bookTree`-Probe gegen den aktuell konfigurierten Storage-Backend aus. Bei `bookstack` Probecall gegen `GET /api/books?count=1`; bei `localdb` einfache `SELECT 1`. Gibt Latenz + Erfolg zurück.
 
 **Frontend — neue Karte `AdminSettingsCard`** (zweite Admin-Karte neben `AdminUsersCard`):
 - Tab „Provider": Auswahl Claude/Ollama/Llama + Per-Provider-Inputs.
 - Tab „Modell": Modell-ID, Token-Limits, Kontext-Grösse.
+- Tab **„Storage-Backend"**: Combobox `localdb|bookstack`, bei `bookstack` zusätzliche Felder (Base-URL, Token-ID, Token-Secret). Test-Backend-Button. Warnhinweis-Block beim Wechsel: „Inhalts-Sichtbarkeit ändert sich; ggf. Backend-Migration starten (Karte Backend-Migration)."
 - Tab „Auth": Open-Signup-Toggle, Initial-Admin-Anzeige.
 - „Verbindung testen"-Button → Probecall.
-- API-Key-Input mit Masking. Save sendet ungespeichert nur, wenn Wert geändert.
+- API-Key-/Token-Inputs mit Masking. Save sendet ungespeichert nur, wenn Wert geändert.
 
 **i18n**:
 - `admin.settings.title`, `admin.settings.provider`, `admin.settings.model`
+- `admin.settings.backend`, `admin.settings.backend.localdb`, `admin.settings.backend.bookstack`
+- `admin.settings.backend.switchWarning`
 - `admin.settings.testConnection`, `admin.settings.connectionOk`, `admin.settings.connectionFail`
-- `admin.settings.apiKeyMasked`
+- `admin.settings.testBackend`, `admin.settings.backendOk`, `admin.settings.backendFail`
+- `admin.settings.apiKeyMasked`, `admin.settings.tokenMasked`
 
 **Sicherheit**:
-- API-Keys nie im Klartext über die Wire (auch nicht Admin → Frontend). Beim Lesen Maskierung; beim Schreiben akzeptiert Backend einen Sentinel-Wert „unchanged" für Felder, die nicht angefasst wurden.
-- DB-Spalte AES-256-GCM-verschlüsselt mit `MASTER_KEY`-ENV (existiert schon für Bookstack-Tokens, [lib/crypto.js](../lib/crypto.js)).
+- API-Keys + BookStack-Tokens nie im Klartext über die Wire (auch nicht Admin → Frontend). Beim Lesen Maskierung; beim Schreiben akzeptiert Backend einen Sentinel-Wert „unchanged" für Felder, die nicht angefasst wurden.
+- DB-Spalten AES-256-GCM-verschlüsselt mit `MASTER_KEY`-ENV (existiert schon für Bookstack-Tokens, [lib/crypto.js](../lib/crypto.js)).
 
 ---
 
-## Phase 5 — Dual-Write
+## Phase 5 — ENTFÄLLT (Dual-Write)
 
-Schreibpfad hybrid:
-1. Lokal schreiben (Page-Body, Revision-Row, Order).
-2. `pages.dirty=1`.
-3. Async-Push-Worker pusht zu BookStack; bei Erfolg `dirty=0`, `remote_updated_at` neu.
+Im Multi-Backend-Modell schreibt jeder Backend in seine eigene Wahrheit. Gleichzeitiges Schreiben in BookStack **und** localdb wäre nur sinnvoll, wenn beide gleichzeitig autoritativ wären — das wäre Konflikt-Hölle ohne nutzbaren Mehrwert. Stattdessen: ein Backend zur Zeit, Backend-Wechsel via Phase-8-Bulk-Copy-Job.
 
-**Konflikt** (BookStack-`updated_at` weicht ab beim Push): Konflikt-Revision (`source='conflict'`) + Page-Flag im Tree → User entscheidet manuell.
-
-Frontend `bsPut` → `localPut`. Lokale Routes brauchen keinen SW-API-Cache-Invalidation. `fresh:true`-Pflicht reduziert sich auf BookStack-Direktzugriffe (= nur noch im Push-Worker).
+Falls künftig „Offline-Edit + Push-when-online" gefragt wird, ist das ein orthogonaler Pfad (Service-Worker-Outbox), nicht Dual-Write.
 
 ---
 
@@ -785,54 +1000,154 @@ GET /search?q=...&kind=page,chapter&book_id=42&limit=50&offset=0
 
 ---
 
-## Phase 8 — Kill BookStack
+## Phase 8 — Backend-Migration-Tool (Bulk-Copy)
 
-Voraussetzung: Phasen 1–7 stabil, Push-Worker schmerzfrei, keine Edits über BookStack-UI mehr, eigene Suche live.
+Voraussetzung: Phasen 1–7 stabil. Beide Backends sind betrieblich okay; Admin kann jetzt **gerichtet umziehen**. Kein „Kill" — `bookstack`-Backend bleibt als gleichwertige Option im Code.
 
-- Sync auf bidirektional → dann einmalig-final.
-- BookStack-Container abschalten.
-- Löschen aus Code:
-  - [routes/proxies.js](../routes/proxies.js) (BookStack-Teil)
-  - `public/js/api-bookstack.js`
-  - `public/js/bookstack-search.js` (BookStack-Search-Pfad; eigene Suche aus Phase 7 bleibt)
-  - `bsGet`/`bsPut`-Wrapper
-  - `bookstackToken` aus Session
-- **WYSIWYG**: TipTap einbauen (Phase 8a, eigener PR). Body bleibt HTML-kompatibel. Editor-Subs (`editor-toolbar`, `editor-find`, `editor-synonyme`, `editor/edit`) liegen schon hier; nur die TinyMCE-Schnittstelle muss ersetzt werden.
-- **Export**: BookStack-`/export/{fmt}`-Proxy ersetzen durch eigene Renderer (HTML/Markdown). Custom-PDF bleibt wie heute.
-- **Templates**: falls genutzt (siehe [docs/bookstack-templates.md](bookstack-templates.md)) — eigene Template-Tabelle + Picker.
+**Job-Typ `backend-migrate`** ([routes/jobs/backend-migrate.js](../routes/jobs/backend-migrate.js)) — Standard-Pattern (`runBackendMigrateJob` + Status-Polling), Admin-only.
+
+**Trigger** über Admin-Karte `AdminBackendMigrationCard` (eigene Karte, Admin-only):
+- Quelle/Ziel-Auswahl (`bookstack` → `localdb` ist primärer Fall; `localdb` → `bookstack` symmetrisch implementiert, aber als „selten" markiert).
+- Wahl: alle Bücher oder Einzel-Buch.
+- Checkbox „Quelle nach erfolgreichem Copy auf read-only setzen" (empfohlen).
+- „Migration starten" → Job in Queue.
+
+**Pipeline pro Buch**:
+
+1. **Source-Read-Only-Marker** setzen: `app_settings` Key `app.migrate.source_readonly = '<source-backend>'`. Content-Store-Facade blockiert ab da `savePage`/`createPage` für den Source-Backend (alle Edits → 423 Locked mit i18n-Text).
+2. **Bulk-Copy**: pro Page/Chapter im Source → Lesen via Source-Backend → Schreiben via Target-Backend. ID-Mapping-Tabelle `backend_migration_idmap (source_backend, source_id, target_backend, target_id, kind, migrated_at)` für nachträgliche Referenz-Reparatur.
+3. **FK-Repair**: alle Tabellen mit `book_id`/`page_id`/`chapter_id`-FKs (Phase 0/4b/6/7-Tabellen) werden via ID-Map umverdrahtet. Transaction pro Buch.
+4. **FTS-Reindex** (Phase 7) für migrierte Bücher.
+5. **Cutover**: nach erfolgreichem Copy aller selektierten Bücher: `app.backend = <target>` (atomar). Source-Read-Only-Marker bleibt — falls Admin später zurück will, ist Source noch konsistent.
+6. **Abort/Rollback**: Job-Cancel rollt nur die laufende Buch-Transaction zurück. Bereits migrierte Bücher bleiben — ID-Map ist Wahrheit. Admin sieht „N von M migriert; nicht migrierte Bücher bleiben in `<source>`."
+
+**Schritt-für-Schritt-Mismatches** (Implementierungs-Details):
+- BookStack-Pages ohne Markdown → `body_markdown=NULL` (localdb akzeptiert).
+- BookStack-`priority` → wird in `book_order.order_json` (Phase 3) materialisiert.
+- BookStack-Tags (falls genutzt) → werden in Phase 6 `book_tag_assignments` migriert (wenn `app.backend='bookstack'` aktuell Tags pflegt — sonst no-op).
+- localdb → BookStack: BS-API verlangt Reihenfolge (Books → Chapters → Pages), Pages-`html` als POST. BS akzeptiert sauber-cleantes HTML. Custom-PDF-Profile sind Backend-agnostisch.
+
+**Idempotenz**: Re-Run mit denselben Source/Target ist no-op pro bereits migriertem Buch (ID-Map-Check). Force-Re-Migrate via UI-Toggle „bereits migrierte Bücher überschreiben".
+
+**Logging**: Pro Buch `[backend-migrate|admin@…|<book_id>] copied chapters=N pages=M elapsed=Ts`.
+
+**Tests**:
+- Integration: Mock-BS + In-Memory-DB → migrate `bookstack` → `localdb`, alle Pages/Bodies/Order erhalten, FK-`page_revisions` zeigen weiter auf richtige Page.
+- Integration: Migrate-symmetrisch zurück, Round-Trip-Body identisch (Byte-Vergleich nach `cleanPageHtml`).
+- Unit: ID-Map-FK-Repair (`figure_appearances`, `chat_sessions`, `book_tag_assignments` etc.) — alle Spalten-Treffer durchgehen.
+
+**i18n**:
+- `admin.backendMigration.title`, `admin.backendMigration.source`, `admin.backendMigration.target`
+- `admin.backendMigration.startButton`, `admin.backendMigration.warnSourceReadonly`
+- `admin.backendMigration.progress` (mit `{done}/{total}`)
+- `admin.backendMigration.error.<reason>`
+
+### ID-Vergabe im `localdb`-Mode
+
+Pages/Chapters/Books, die im `localdb`-Mode neu angelegt werden, brauchen IDs ohne Kollision mit BookStack-Range-IDs (positive Integer < 100k typisch). Phase 1 hat die Backend-Implementierung; dieser Block dokumentiert die ID-Sequence formal — relevant sowohl für Neu-Installationen (nur localdb) als auch für migrierte Bestände.
+
+**Migration N+8 (FK-Recreate-Pattern, einmalig):** `books`, `chapters`, `pages` werden auf `INTEGER PRIMARY KEY AUTOINCREMENT` umgestellt. Heute fehlt `AUTOINCREMENT` (BookStack lieferte die Werte) — ohne `AUTOINCREMENT` würde SQLite gelöschte IDs wiederverwenden, was bei sentinel-naher Logik (`book_id=0` als User-Default in `pdf_export_profile`) und alten Job-Results gefährlich wäre. Mit `AUTOINCREMENT` ist `sqlite_sequence` führend, IDs sind strikt monoton.
+
+```sql
+-- Pseudocode, ausgeführt via Recreate-Pattern aus CLAUDE.md
+db.pragma('foreign_keys = OFF');
+
+CREATE TABLE books_new (
+  book_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  -- restliche Spalten identisch zu books
+  ...
+);
+INSERT INTO books_new SELECT * FROM books;  -- bestehende IDs bleiben erhalten
+DROP TABLE books; ALTER TABLE books_new RENAME TO books;
+
+-- Wasserzeichen: nächste neu vergebene ID > MAX(bisherige IDs, BookStack-Range).
+-- Im `localdb`-Mode setzen wir das Wasserzeichen explizit auf eine hohe Schwelle
+-- (z.B. 1_000_000), um BookStack-Range-IDs frei zu halten für künftige BS-Imports.
+INSERT OR REPLACE INTO sqlite_sequence (name, seq)
+  VALUES ('books',    MAX(1000000, (SELECT COALESCE(MAX(book_id),    0) FROM books))),
+         ('chapters', MAX(1000000, (SELECT COALESCE(MAX(chapter_id), 0) FROM chapters))),
+         ('pages',    MAX(1000000, (SELECT COALESCE(MAX(page_id),    0) FROM pages)));
+
+db.pragma('foreign_keys = ON');
+db.pragma('foreign_key_check');  -- muss leer sein
+```
+
+**Folgen:**
+
+- Bestehende Rows behalten ihre IDs für immer. Alle ~40 FK-Spalten (`figures.book_id`, `page_stats.page_id`, `chapter_reviews.chapter_id`, `page_revisions.page_id`, `lektorat_time.page_id`, `chat_sessions.page_id`, `pdf_export_profile.book_id`, …) bleiben gültig. Historie ungebrochen.
+- Neue Bücher/Kapitel/Seiten im `localdb`-Mode: SQLite vergibt `seq + 1` aus `sqlite_sequence`. Klare Trennung von BookStack-Range — bei Bedarf später Re-Import aus BookStack ohne ID-Konflikt.
+- Im `bookstack`-Mode bleibt BookStack die ID-Quelle; lokale Tabellen übernehmen die externen IDs wie heute (Phase 0b/1).
+- IDs aus gelöschten Rows werden **nicht** wiederverwendet (AUTOINCREMENT-Garantie). Schützt vor „Zombie-FK".
+- Sentinel `book_id = 0` (User-Default-PDF-Profile) bleibt safe.
+- App-eigene Surrogat-Tabellen (`figures.id`, `locations.id`, `figure_scenes.id`, `ideen.id`, …) bleiben unverändert.
+
+**Alternativlösung verworfen:** UUIDs / ULIDs als PKs. Würde alle ~40 FK-Spalten + sämtlichen Client-Code (URL-Parameter `:book_id`, Hash-Router, Job-Results, Caches) brechen. Kein Mehrwert für Self-Hosted-App.
 
 ---
 
-## Phase 9 — Doku-Update (Standalone-App)
+## Phase 9 — Doku-Update (Multi-Backend-Sweep)
 
-Nach Phase 8 ist BookStack als Abhängigkeit raus. Sämtliche Doku, die noch von „BookStack-Basis", „bewusste Abhängigkeit" oder BookStack-Setup spricht, wird auf Standalone-Realität umgestellt. Reine Doku-Phase, kein Code-Risiko.
+Nach Phase 8 ist Backend-Pluralität betrieblich Realität. Doku muss reflektieren: BookStack ist **eine Option**, kein zwingender Bestandteil. Reine Doku-Phase, kein Code-Risiko.
 
 **Zu aktualisieren:**
 
-- **[README.md](../README.md)** — Intro neu (Standalone-App, kein BookStack-Backend mehr), Deployment-Block (LXC + systemd) auf neue Architektur ohne BookStack-Container, Env-Variablen-Liste durchgehen: `BOOKSTACK_BASE_URL`/`BOOKSTACK_TOKEN_ID`/`BOOKSTACK_TOKEN_SECRET` etc. raus, neue App-eigene Vars rein (eigener Editor, eigene Suche, eigene User-DB). Architektur-Diagramm: BookStack-Box entfernen, NGINX → Express direkt.
-- **[CLAUDE.md](../CLAUDE.md)** — Header-Zeile „Auf BookStack-Basis (bewusste Abhängigkeit — Storage, Auth, Editor)" löschen. Architektur-Überblick: BookStack-Proxy-Routen (`/api/*`) raus, eigene Page-/Editor-Routen rein. Harte Regeln durchgehen: `bsGetAll`/`bsGet`/`bsPut`-Regel raus oder durch App-eigene RMW-Regel ersetzen; `bsGet(..., { fresh: true })`-Regel entweder löschen (kein SW-API_CACHE mehr für BS-Calls) oder auf eigene Cache-Schicht umformulieren. Read-Modify-Write-Pfade neu beschreiben. `lib/bookstack.js` aus Projektstruktur raus. Editor-Sektion: TipTap statt TinyMCE-Schnittstelle. Spickzettel-Links: [docs/bookstack-exit.md](bookstack-exit.md) und [docs/bookstack-templates.md](bookstack-templates.md) streichen.
-- **[LICENSE](../LICENSE)** — Lizenzdatei prüfen: bisheriger Stand orientierte sich an BookStack-Kontext (AGPL-Pflicht durch BookStack-Abhängigkeit). Standalone-App kann frei wählen — Lizenzwahl bewusst neu treffen (AGPL beibehalten / MIT / proprietär self-hosted). Copyright-Header (`Copyright © …`) auf aktuellen Stand bringen. Third-Party-Notices: BookStack-Erwähnung raus, neue Deps (TipTap, eigene Search-Lib) ergänzen.
-- **Deploy-Doku** (README-Block + ggf. `docs/deploy.md` neu) — LXC-Container-Setup ohne BookStack-Sub-Container. systemd-Unit der App bleibt; BookStack-Unit + MariaDB-Backup-Snippets entfallen. NGINX-Konfig: Proxy-Pass auf `/api/` raus, Reverse-Proxy nur noch auf App-Port 3737. Backup-Strategie: nur noch eigene SQLite-DB + Uploads (statt MariaDB-Dump + BookStack-Storage). Migration-Notes für bestehende User: BookStack-DB final exportiert → App-DB übernommen, BookStack-Container kann gestoppt + entfernt werden.
-- **Spickzettel-Cleanup** in [docs/](./):
-  - [bookstack-templates.md](bookstack-templates.md) — entweder ersatzlos löschen oder in neue „Template-Verwaltung"-Doku überführen, falls Templates aus Phase 8 übernommen.
-  - [bookstack-exit.md](bookstack-exit.md) (diese Datei) — beim Abschluss von Phase 9 streichen; CLAUDE.md-Verweis darauf ebenfalls entfernen (steht aktuell als Ausnahme zur „Stand-only"-Regel drin).
-  - [erd.md](erd.md), [jobs.md](jobs.md), [i18n.md](i18n.md), [ai-providers.md](ai-providers.md), [testing.md](testing.md), [figur-werkstatt.md](figur-werkstatt.md), [buchchat-tools.md](buchchat-tools.md), [focus-editor.md](focus-editor.md), [state-modell.md](state-modell.md), [finetuning.md](finetuning.md), [wordpress-import.md](wordpress-import.md) — jeweils auf BookStack-Referenzen grep'pen und auf Standalone-Pendants umstellen.
-- **`package.json`** — Description-Feld + `keywords` von BookStack-bezogenen Begriffen befreien. Repo-URL / Homepage aktualisieren, falls bisher auf BookStack-Fork verwies.
-- **Tests-Doku** — [tests/](../tests/) README (falls vorhanden) auf neue Editor-/Persistenz-Schicht anpassen. E2E-Tests, die `bsGet`-Mocks brauchten, sind in Phase 8 schon umgestellt; Doku synchron.
+- **[README.md](../README.md)** — Intro neu: „Schreiben/Lektorat/Buchanalyse mit KI. Storage-Backend wählbar: SQLite (Default) oder BookStack." Deployment-Block (LXC + systemd) in zwei Varianten: Minimal-Setup (nur App + SQLite) als Default, BookStack-Setup als optionaler Pfad. Env-Variablen-Liste: `BOOKSTACK_BASE_URL`/`BOOKSTACK_TOKEN_ID`/`BOOKSTACK_TOKEN_SECRET` als „optional, nur bei `app.backend=bookstack` nötig" markieren. Architektur-Diagramm: BookStack-Box gestrichelt (optional).
+- **[CLAUDE.md](../CLAUDE.md)** — Header-Zeile umformulieren: „BookStack als optionales Storage-Backend (eines von zweien)". Architektur-Überblick: Content-Store-Facade als zentrale Storage-Abstraktion dokumentieren; BookStack-Proxy-Routen (`/api/*`) bleiben, sind aber als Backend-spezifisch markiert. Harte Regeln durchgehen: `bsGetAll`/`bsGet`/`bsPut`-Regel auf „nur in `lib/bookstack.js` + `lib/content-store/backends/bookstack.js`" verschärfen (Vor-Phase Schritt 6 wirkt hier weiter); `bsGet(..., { fresh: true })`-Regel bleibt, gilt nur im `bookstack`-Mode. Read-Modify-Write-Pfade um localdb-Variante ergänzen. Editor-Sektion bleibt (CodeMirror, kein Wechsel). Spickzettel-Verweis auf [docs/bookstack-exit.md](bookstack-exit.md) bleibt, weil die Datei zur Multi-Backend-Architekturbeschreibung mutiert ist.
+- **[LICENSE](../LICENSE)** — bleibt wie heute (BookStack ist nicht mehr zwingend, also keine AGPL-Pflicht durch Abhängigkeit; bewusste Wahl möglich). Lizenzfrage als separates Ticket markieren, nicht Pflicht innerhalb von Phase 9.
+- **Deploy-Doku** (README-Block + ggf. `docs/deploy.md` neu): Zwei Setup-Pfade. Minimal (`app.backend=localdb`): nur App + SQLite-Datei, kein zusätzlicher Container. Klassisch (`app.backend=bookstack`): wie heute, BookStack-Sub-Container + MariaDB. Backup-Strategie pro Backend dokumentieren.
+- **Spickzettel-Update** in [docs/](./):
+  - [bookstack-templates.md](bookstack-templates.md) — bleibt (Templates sind BookStack-Feature; im `localdb`-Mode nicht verfügbar bzw. eigene Template-Tabelle Future-Work).
+  - [bookstack-exit.md](bookstack-exit.md) (diese Datei) — wandelt sich von „Plan" zu „Multi-Backend-Architektur-Doku". Beim Abschluss aller Phasen die abgehakten Schritte streichen, übrig bleibt der dauerhafte Architektur-Block (Backends, Content-Store-Facade, Migration-Tool). CLAUDE.md-Verweis bleibt; aus „Migrationsplan" wird „Architektur-Spickzettel".
+  - [erd.md](erd.md), [jobs.md](jobs.md), [i18n.md](i18n.md), [ai-providers.md](ai-providers.md), [testing.md](testing.md), [figur-werkstatt.md](figur-werkstatt.md), [buchchat-tools.md](buchchat-tools.md), [focus-editor.md](focus-editor.md), [state-modell.md](state-modell.md), [finetuning.md](finetuning.md), [wordpress-import.md](wordpress-import.md) — jeweils auf BookStack-Annahmen grep'pen, wo nötig auf „Backend-agnostisch" oder „nur `bookstack`-Backend" umstellen.
+- **`package.json`** — bleibt (keine zwingende Änderung).
+- **Tests-Doku** — [tests/](../tests/) README (falls vorhanden): klarmachen, dass Integration-Tests gegen beide Backends laufen sollten (Mock-BS und In-Memory-SQLite-DB).
 
-**Reihenfolge innerhalb Phase 9:** README + CLAUDE.md zuerst (Einstiegspunkte für neue Contributors + Sessions), dann LICENSE, dann Deploy-Block, dann Spickzettel.
+**Reihenfolge innerhalb Phase 9:** README + CLAUDE.md zuerst (Einstiegspunkte für neue Contributors + Sessions), dann Deploy-Block, dann Spickzettel.
+
+---
+
+## Phase 10 — Schema-Squash
+
+Ziel: 100+ Migrationen zu einem konsolidierten Initial-Schema kollabieren. Nach Phase 9 ist die DB-Struktur stabil (BookStack-Exit komplett, keine ALTER-Wellen mehr in Sicht). Squash entfernt Wegwerf-Migrationen (FK-Recreate-Zwischenschritte, Reverted-Columns, alte Cache-Schemas), reduziert Boot-Zeit auf frischen Installs und macht [db/migrations.js](../db/migrations.js) wieder lesbar.
+
+**Warum erst hier:** Squash vor Phase 8/9 wäre Wegwerfarbeit — Phase 1–9 bringt nochmals 15–25 Migrationen (Replica, ACL, Tags, FTS5, Editor-Wechsel). Erst nach Phase 9 ist die Migration-Liste „eingefroren genug".
+
+**Vorgehen:**
+
+1. **Cut-Schema generieren.** Auf einer frischen DB Migrationen 1–N durchlaufen, dann `sqlite3 db.sqlite '.schema'` → kanonisches CREATE-Skript. Manuell aufräumen: konsistente Spalten-Reihenfolge, Namens-Konventionen, FK-Aktionen explizit (`ON DELETE CASCADE`/`SET NULL` statt Default), Indexe pro Tabelle gruppiert.
+2. **Tooling: `tools/squash-migrations.js`** (neues Script) — generiert das CREATE-Skript aus einer Roh-Migration-DB, vergleicht es per `.schema` mit einer auf altem Pfad migrierten DB. Diff muss leer sein (Byte-Vergleich nach Normalisierung); sonst Squash-Stop.
+3. **Neuer Initial-Block** in [db/migrations.js](../db/migrations.js): Migrationen 1 bis N werden durch einen einzigen Branch ersetzt, der bei `version === 0` das gesamte `SQUASHED_SCHEMA` einspielt und `schema_version` auf N setzt. Anschliessend startet das übliche `if (version < N+1)`-Muster für künftige Migrationen.
+4. **Compat-Branch für Bestandsinstallationen:** `if (version > 0 && version < N) { … legacy-Migrationen 1..N nacheinander … }` bleibt vorerst drin, damit existierende DBs nicht reissen. Erst nach 1 Major-Release entfernen, dokumentiert als Breaking-Change (User mit `version < N` müssen vorher ein „Bridge-Release" durchlaufen).
+5. **Initial-Schema in [docs/erd.md](erd.md) abgleichen.** Stand-Zeile (Schema-Version) auf gesquashte Version setzen, Block-Definitionen direkt aus `SQUASHED_SCHEMA` regenerieren — ein einziger SSoT pro Tabelle.
+6. **Tests:**
+   - **Frische DB:** Migration läuft, `foreign_key_check` ist leer, Smoke-Insert pro Tabelle erfolgreich.
+   - **Bestandsdaten:** Snapshot einer Pre-Squash-DB durch Compat-Branch ziehen, danach Frische-Schema-Diff = leer.
+   - **CI-Job:** „No-drift"-Check vergleicht Bestand- vs. Frisch-Pfad Schema bei jedem Build.
+7. **Indexe + Triggers separat squashen:** SQLite trennt `CREATE INDEX`/`CREATE TRIGGER` vom Table-DDL. Squash-Skript baut sortiert: Tables → Indexes → Triggers → Views → Virtual Tables (FTS5).
+8. **FTS5-Triggers (aus Phase 7):** im Squash mit drin, kein separater Sync-Pfad.
+
+**Anti-Patterns vermeiden:**
+- Kein `DROP TABLE … RECREATE` im gesquashten Block — Squash ist „Initial Install", nicht „Re-Migration".
+- Keine ENV-Bedingungen im Squash. Wer ENV-bedingte Spalten will, dokumentiert das als reguläre Migration N+1.
+- Keine Data-Backfills im Squash (`UPDATE foo SET …`). Frische DB hat keine Daten. Backfills bleiben in der Bestands-Migrationsbranche.
+
+**Aufwand:** ~1–2 Tage (Skript + manueller Schema-Cleanup + Tests). Risiko: mittel — falsche Spalten-Reihenfolge ändert keinen Run-Effekt, aber `SELECT *` bricht in Tests. Strenger Diff-Test gegen Bestandsmigration ist Pflicht.
+
+**Rollback:** Squashed-Block durch Compat-Branch ersetzen (alle Original-Migrationen liegen in `git`). Schema-Version-Sprung muss bedacht werden — Re-Migrieren rückwärts geht nicht, aber `version === N` ist nach beiden Pfaden identisch.
 
 ---
 
 ## Risiken / offene Fragen
 
-- **Lektor-Apply-Range-Drift**: Lektorat-Findings haben Positionen im damaligen Body. Wenn Lektor anwendet und Page zwischenzeitlich von Editor verändert wurde, greift bereits der `updatedAt`-Staleness-Check (CLAUDE.md-Regel „Job-Ergebnisse mit `updatedAt`-Staleness-Check"). Lektor-Apply muss denselben Vergleich machen — Server-Route lehnt 409 ab, wenn `pages.updated_at` differiert vom Snapshot, der das Finding erzeugt hat.
+- **Lektor-Apply-Range-Drift**: Lektorat-Findings haben Positionen im damaligen Body. Primärer Schutz ist der **Page-Lock** während der Lektorat-Session (siehe Phase 4b „Page-Lock während Lektorat-Session") — solange der Lektor die Findings-Card offen hat, lehnen Free-Edit-Routen mit `423 Locked` ab, also kann kein paralleler Editor-Save die Range-Positionen verschieben. Fallback bleibt der `updatedAt`-Staleness-Check (CLAUDE.md-Regel „Job-Ergebnisse mit `updatedAt`-Staleness-Check") für Edge-Cases: Lock abgelaufen (User 30 min weg), Owner-Override hat den Lock gebrochen, oder Edit kam vor dem Acquire. In dem Fall lehnt die Apply-Route mit 409 ab, wenn `pages.updated_at` vom Snapshot des Findings differiert.
 - **Viewer-Lean-Endpoint**: separater `?lean=true`-Pfad für Buchliste/Overview vermeidet, dass Viewer-Frontend versehentlich Analyse-Daten lädt (Token-Verbrauch via Lazy-Refresh, Privacy bei „Was lektoriert hat KI?"). Alternativ: Server liefert für `viewer` per default lean, ohne Param. Letzteres robuster, Konsequenz: Tile-Layout muss leere Slots verkraften.
 - **Lektor + Buch-Chat**: Buch-Chat ist heute Analyse-Werkzeug ohne Schreibwirkung — könnte Lektor sehen dürfen. Default: nein (sonst werden Token-Kosten unkontrolliert). Toggleable in BookSettings durch Owner.
 - **`can_invite_users` ohne Buch-Share**: User mit Invite-Recht aber ohne aktuelle Buch-Rolle (z.B. Ex-Mitarbeiter, deren Share widerrufen wurde, behalten Invite-Flag) sehen nichts in der App. Nicht falsch, aber UX-Hinweis nötig.
 - **Owner-Transfer-Workflow**: Auto-Accept oder zweistufig (neuer Owner bestätigt)? Solo-Tenant heute: Auto-Accept reicht.
 - **Email-Versand**: Invites + Ownership-Transfer brauchen SMTP, sonst Token-Copy-Workflow. Akzeptabel als MVP, später ausbaubar.
-- **veraPDF**-artiger optionaler Setup-Schritt für TipTap-Editor-Erweiterungen (Inline-Bilder, Tabellen): später entscheiden.
+- **Feature-Parität zwischen Backends**: Jedes neue Feature muss in beiden Backends laufen. Risiko: jemand baut etwas localdb-only und vergisst BS-Backend. **Gegenmittel**: Content-Store-Vertrag (Vor-Phase Schritt 4) + Tripwire (Schritt 6) — `bsGet`/`bsPut` ausserhalb `lib/content-store/backends/bookstack.js` schlägt im CI-Grep fehl. Neue Feature-PR ohne Test gegen beide Backends wird im Review abgelehnt.
+- **BS-Eigene Edits ausserhalb der App**: Wer im `bookstack`-Mode parallel via BookStack-UI editiert, umgeht App-Revisions, FTS-Index und Page-Lock. Sync-Worker fängt es zwar ein (kein Datenverlust), aber Lektor/Editor-Apply kann auf veraltetem Body operieren. **Empfehlung**: App-Doku rät dringend zu „BookStack-UI nicht parallel benutzen, ausser zum Lesen". Kein technischer Lock möglich, weil BS-UI ein eigenständiger Stack ist.
+- **Backend-Migration mit Jobs in Flight**: Wenn während Phase-8-Migration ein KI-Job läuft, der gerade `loadPage(old_id)` aufgerufen hat und später `savePage(old_id)` versucht: nach Cutover ist `old_id` evtl. via ID-Map auf `new_id` umgemapt. **Gegenmittel**: Migration startet erst, wenn Job-Queue für betroffene Bücher leer ist (Pre-Check); während Migration werden neue Jobs für migrierende Bücher abgelehnt (423 Locked).
 - **Privacy bei Logs**: Winston-Logs enthalten `user_email`. Bleibt — Self-Hosted, Betreiber sieht Logs sowieso.
 - **Audit-Tabelle vs. DSGVO**: bei Hard-Delete-Request müsste `user_sessions_audit` ebenfalls anonymisiert werden. Heute irrelevant (Solo-Self-Hosted), aber Schema-Spalte für Pseudonymisierung offen halten.
 
@@ -843,17 +1158,20 @@ Nach Phase 8 ist BookStack als Abhängigkeit raus. Sämtliche Doku, die noch von
 | Phase | Aufwand | Risiko |
 |---|---|---|
 | 0 | 0.5 Tag | niedrig |
-| 1 | 3-5 Tage | niedrig (Shadow-Phase) |
+| 0c | 1 h | niedrig (PRAGMAs) |
+| 0d | 0.5 Tag | niedrig (TTL-DELETE) |
+| 1 | 4-6 Tage | mittel (Backend-Disjunktion, Test-Pflege gegen beide) |
 | 2 | 2-3 Tage | niedrig |
 | 3 | 2-3 Tage | niedrig |
 | 4a | 4-6 Tage | mittel (FK-Recreate, Login-Flow) |
 | 4b | 4-5 Tage | mittel (Rollen-Matrix + Apply-Routen + minRole-Filter) |
 | 4b1 | 4-6 Tage | niedrig (reines Frontend + 2 Mini-Tabellen) |
-| 4c | 2-3 Tage | niedrig |
-| 5 | 4-6 Tage | mittel-hoch (Konflikt-Pfad) |
+| 4c | 3-4 Tage | mittel (Backend-Switch + Hot-Reload + Test-Probe für beide) |
+| 5 | — | ENTFÄLLT |
 | 6 | 2-3 Tage | niedrig |
 | 7 | 4-6 Tage | mittel (FTS5-Schema + Sync-Hooks + UI) |
-| 8 | 1-2 Wochen | hoch (Editor-Wechsel, Export-Renderer) |
+| 8 | 4-6 Tage | mittel-hoch (Bulk-Copy + FK-Repair + ID-Map + Round-Trip-Tests) |
 | 9 | 1-2 Tage | niedrig (Doku-Sweep) |
+| 10 | 1-2 Tage | mittel (Diff-Test gegen Bestand) |
 
-Gesamt ca. 8-11 Wochen Vollzeit, mit Puffer.
+Gesamt ca. 6-9 Wochen Vollzeit, mit Puffer (Phase 0c/0d/10 marginal). Spart gegenüber alter „Kill"-Variante v. a. Phase 5 (Dual-Write) + Editor-Wechsel.

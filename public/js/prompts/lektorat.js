@@ -271,18 +271,31 @@ Szenen-Regeln:
     ? 'Analysiere den Text vollständig von Anfang bis Ende – nicht nur lokale Abschnitte oder die letzten Sätze – auf Rechtschreibfehler, Grammatikfehler, stilistische Auffälligkeiten und auffällige Wortwiederholungen.'
     : 'Analysiere den Text vollständig von Anfang bis Ende – nicht nur lokale Abschnitte oder die letzten Sätze – auf Rechtschreibfehler, Grammatikfehler, stilistische Auffälligkeiten und auffällige Wortwiederholungen. Bewerte ausserdem die Szenen der Seite.';
 
-  return `${aufgabeSatz}
+  // XML-Wrapper für die strukturell trennbaren Sektionen — hilft Claude beim
+  // Parsen von Aufgabe, Schema, Beispielen und Originaltext als distinkte
+  // Einheiten. Der mittlere Regel-Korpus bleibt als geordnete Textblöcke; die
+  // bestehenden Section-Header (KORREKTUR-PURITÄT, SCHWERE-SCHWELLE, …) wirken
+  // bereits als interne Marker.
+  const beispielSection = beispielBlock.trim()
+    ? `<beispiele>\n${beispielBlock.trim()}\n</beispiele>\n`
+    : '';
+  return `<aufgabe>
+${aufgabeSatz}
+</aufgabe>
 ${metaBlock}${povBlock}${wichtigBlock}${korrekturPuritaetBlock}${severityBlock}${filterBlock}
+<output_format>
 ${schemaBlock}
-${beispielBlock}${szenenRegelnBlock}
+</output_format>
+${beispielSection}${szenenRegelnBlock}
 ${_buildStilBlock()}
 ${_buildWiederholungBlock(stopwords)}
 ${_buildSchwacheVerbenBlock()}
 ${_buildFuellwortBlock()}
 ${spezialBlocks}${figurenBlock}${beziehungenBlock}${orteBlock}${previousBlock}
 ${selbstkontrollBlock}
-${textLabel}
-${text}`;
+<originaltext label="${textLabel.replace(/:\s*$/, '')}">
+${text}
+</originaltext>`;
 }
 
 export function buildLektoratPrompt(text, opts = {}) {

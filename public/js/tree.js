@@ -1,4 +1,5 @@
 import { htmlToText, CHARS_PER_TOKEN, fetchJson, localeTag, relativeDay } from './utils.js';
+import { contentRepo } from './repo/content.js';
 
 // Buch-/Seiten-Lade-Methoden (werden in die Alpine-Komponente gespreadet)
 // `this` bezieht sich auf die Alpine-Komponente.
@@ -185,7 +186,7 @@ export const treeMethods = {
   async loadBooks() {
     try {
       this.setStatus(this.t('tree.connecting'), true);
-      this.books = await this.bsGetAll('books');
+      this.books = await contentRepo.listBooks();
       if (!this.selectedBookId || !this.books.some(b => String(b.id) === String(this.selectedBookId))) {
         this.selectedBookId = String(this.books[0]?.id || '');
       }
@@ -216,13 +217,10 @@ export const treeMethods = {
       this.tree = [];
       this.pages = [];
       this._tokenEstGen++;
-      // Buchwechsel: SW-API_CACHE (SWR) kann stale Listen liefern, daher fresh.
+      // Buchwechsel: SW-CONTENT_CACHE (SWR) kann stale Listen liefern, daher fresh.
       // Initialer Load greift normal aufs Cache (offline-resilient).
       const fresh = opts.source === 'bookSwitch';
-      const [chapters, pages] = await Promise.all([
-        this.bsGetAll('chapters?filter[book_id]=' + bookId, { fresh }),
-        this.bsGetAll('pages?filter[book_id]=' + bookId, { fresh }),
-      ]);
+      const tree = await contentRepo.bookTree(bookId, { fresh });
 
       // Buch wurde gewechselt während die Anfrage lief → veraltete Daten verwerfen.
       if (this.selectedBookId !== bookId) return;
@@ -231,31 +229,32 @@ export const treeMethods = {
       const qs = opts.source ? `?source=${encodeURIComponent(opts.source)}` : '';
       fetch('/sync/pages/' + bookId + qs, { method: 'POST' }).catch(() => {});
 
-      const sortedChapters = [...chapters].sort((a, b) => a.priority - b.priority);
+      // contentRepo.bookTree liefert Kapitel mit pre-sortierter pages-Liste
+      // (Domain-Shape: position statt priority) und topPages fuer Seiten ohne
+      // Kapitel. UI-Items behalten internes `priority`-Feld als Sort-Schluessel.
+      const sortedChapters = tree.chapters;
       const chMap = Object.fromEntries(sortedChapters.map(c => [c.id, c.name]));
-      const chapterOrder = Object.fromEntries(sortedChapters.map((c, i) => [c.id, i]));
 
-      this.pages = [...pages]
-        .sort((a, b) => {
-          const aO = a.chapter_id ? (chapterOrder[a.chapter_id] ?? 999) : -1;
-          const bO = b.chapter_id ? (chapterOrder[b.chapter_id] ?? 999) : -1;
-          if (aO !== bO) return aO - bO;
-          return a.priority - b.priority;
-        })
-        .map(p => ({
-          ...p,
-          chapterName: p.chapter_id ? (chMap[p.chapter_id] || this.t('tree.chapterFallback')) : null,
-          url: this.bookstackUrl && p.book_slug && p.slug
-            ? `${this.bookstackUrl}/books/${p.book_slug}/page/${p.slug}`
-            : null,
-        }));
+      const decoratePage = (p) => ({
+        ...p,
+        priority: p.position, // legacy alias fuer UI-Sortierung + drag/drop
+        chapterName: p.chapter_id ? (chMap[p.chapter_id] || this.t('tree.chapterFallback')) : null,
+        url: this.bookstackUrl && p.book_slug && p.slug
+          ? `${this.bookstackUrl}/books/${p.book_slug}/page/${p.slug}`
+          : null,
+      });
+
+      this.pages = [
+        ...sortedChapters.flatMap(c => c.pages.map(decoratePage)),
+        ...tree.topPages.map(decoratePage),
+      ];
 
       this.tree = [
         ...sortedChapters.map(c => ({
           type: 'chapter',
           id: c.id,
           name: c.name,
-          priority: c.priority,
+          priority: c.position,
           open: true,
           solo: false,
           url: this.bookstackUrl && c.book_slug && c.slug

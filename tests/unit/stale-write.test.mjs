@@ -31,18 +31,45 @@ globalThis.document = globalThis.document || {
   createElement: () => ({ innerHTML: '', querySelectorAll: () => [], appendChild: () => {} }),
 };
 
+// Navigator-Stub fuer contentRepo._invalidateContentCache (No-Op-SW).
+{
+  const desc = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  Object.defineProperty(globalThis, 'navigator', {
+    configurable: true, writable: true,
+    value: { serviceWorker: { controller: { postMessage() {} } } },
+  });
+  // restore-Schritt erfolgt am Ende dieser Datei via process.on('beforeExit')
+  globalThis.__origNavigatorDesc = desc;
+}
+
 const { bookstackMethods, _invalidateApiCache } = await import('../../public/js/api-bookstack.js');
 const { lektoratMethods } = await import('../../public/js/editor/lektorat.js');
 
 // ── Schicht 1 ────────────────────────────────────────────────────────────────
 
 test('_loadApplyAndSave reads fresh page → PUT respects newer edits', async () => {
-  const reads = [];
-  const writes = [];
   // Stale = was der SW-Cache vor dem User-Edit gespeichert hatte.
-  // Fresh = was tatsächlich auf BookStack steht (nach User-Edit im Fokus-Editor).
+  // Fresh = was tatsaechlich auf dem Server steht (nach User-Edit im Fokus-Editor).
   const STALE = '<p>old text X</p>';
   const FRESH = '<p>user edit Y</p>';
+
+  const reads = [];
+  const writes = [];
+  const origFetch = globalThis.fetch;
+  globalThis.fetch = async (url, opts) => {
+    const u = String(url);
+    if (opts?.method === 'PUT') {
+      writes.push({ url: u, body: JSON.parse(opts.body) });
+      return new Response(JSON.stringify({ updated_at: 'after', html: writes.at(-1).body.html }), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    reads.push({ url: u, fresh: u.includes('__fresh=1') });
+    // contentRepo.loadPage zieht stripFocusArtefacts intern, daher gleiches html-Feld.
+    return new Response(JSON.stringify({ id: 123, name: 'T', html: u.includes('__fresh=1') ? FRESH : STALE }), {
+      status: 200, headers: { 'Content-Type': 'application/json' },
+    });
+  };
 
   const ctx = {
     ...bookstackMethods,
@@ -51,24 +78,20 @@ test('_loadApplyAndSave reads fresh page → PUT respects newer edits', async ()
     setStatus: () => {},
     markPageChecked: () => {},
     _syncPageStatsAfterSave: () => {},
-    bsGet: async (path, opts) => {
-      reads.push({ path, fresh: !!opts?.fresh });
-      return { id: 123, name: 'T', html: opts?.fresh ? FRESH : STALE };
-    },
-    bsPut: async (path, body) => {
-      writes.push({ path, body });
-      return { updated_at: 'after' };
-    },
   };
 
-  // Hard-Finding, dessen Original NUR in der frischen Fassung vorkommt.
-  // Liest der Code stale, kann er die Korrektur nicht anwenden und PUTet
-  // die alte Fassung → User-Edits weg. Mit fresh greift die Korrektur.
-  await ctx._loadApplyAndSave(
-    [{ original: 'edit Y', korrektur: 'edit Y!' }],
-    [],
-    () => {},
-  );
+  try {
+    // Hard-Finding, dessen Original NUR in der frischen Fassung vorkommt.
+    // Liest der Code stale, kann er die Korrektur nicht anwenden und PUTet
+    // die alte Fassung → User-Edits weg. Mit fresh greift die Korrektur.
+    await ctx._loadApplyAndSave(
+      [{ original: 'edit Y', korrektur: 'edit Y!' }],
+      [],
+      () => {},
+    );
+  } finally {
+    globalThis.fetch = origFetch;
+  }
 
   assert.equal(reads.length, 1, 'genau ein Read');
   assert.equal(reads[0].fresh, true, 'Read muss fresh:true setzen (umgeht SW-SWR)');

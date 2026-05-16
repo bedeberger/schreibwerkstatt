@@ -1,5 +1,6 @@
-import { escHtml, findInHtml, stripFocusArtefacts, clearStatusAfter } from './utils.js';
+import { escHtml, findInHtml, clearStatusAfter } from './utils.js';
 import { makeChatMethods } from './chat-base.js';
+import { contentRepo } from './repo/content.js';
 
 // Seiten-Chat-Methoden (werden in Alpine.data('chatCard') gespreadet).
 // Gemeinsame Logik kommt aus chat-base.js; hier nur Seiten-Chat-Spezifika.
@@ -44,9 +45,9 @@ const baseMethods = makeChatMethods({
     }
     try {
       // `fresh: true`: nach quickSave oben muss der Read den neuen Stand sehen
-      // (SW-API_CACHE ist sonst noch stale, falls Cache-Bust noch nicht durch ist).
-      const pageData = await root.bsGet('pages/' + root.currentPage.id, { fresh: true });
-      root.originalHtml = stripFocusArtefacts(pageData.html || '');
+      // (SW-CONTENT_CACHE ist sonst noch stale, falls Cache-Bust noch nicht durch ist).
+      const pageData = await contentRepo.loadPage(root.currentPage.id, { fresh: true });
+      root.originalHtml = pageData.html || '';
       this._chatPendingRefresh = false;
     } catch (e) {
       console.warn('[sendChatMessage] Seiteninhalt konnte nicht geladen werden:', e.message);
@@ -106,7 +107,7 @@ export const chatMethods = {
       // `fresh: true`: Stale-Check vor dem Apply muss den aktuellen Server-Stand
       // sehen — sonst kann der gleich folgende _loadApplyAndSave-PUT Edits
       // überschreiben, die zwischen letztem GET und jetzt geschrieben wurden.
-      const page = await root.bsGet('pages/' + pageIdAtStart, { fresh: true });
+      const page = await contentRepo.loadPage(pageIdAtStart, { fresh: true });
       if (!samePage()) return;
       if (!findInHtml(page.html, vorschlag.original)) {
         setErr(root.t('chat.originalNotFound'));

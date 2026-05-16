@@ -7,10 +7,11 @@
 //  - Auth/KI/Job-Queue/SSE: Network-Only, nie cachen
 //  - Version-Bump der Konstanten invalidiert den jeweiligen Cache
 
-const SHELL_CACHE = 'schreibwerkstatt-shell-v508';
+const SHELL_CACHE = 'schreibwerkstatt-shell-v509';
 const API_CACHE = 'schreibwerkstatt-api-v3';
+const CONTENT_CACHE = 'schreibwerkstatt-content-v1';
 const CONFIG_CACHE = 'schreibwerkstatt-config-v2';
-const ACTIVE_CACHES = new Set([SHELL_CACHE, API_CACHE, CONFIG_CACHE]);
+const ACTIVE_CACHES = new Set([SHELL_CACHE, API_CACHE, CONTENT_CACHE, CONFIG_CACHE]);
 const SHELL_PATH = '/index.html';
 const CONFIG_PATH = '/config';
 
@@ -131,7 +132,7 @@ async function _evictApiCache(cache) {
     for (let i = 0; i < overflow; i++) await cache.delete(keys[i]);
   }
 }
-async function handleApi(req) {
+async function _handleSwr(req, cacheName) {
   // Bypass-Marker: konsistenzkritische Reads (z.B. Konflikt-Check vor
   // Draft-Push) müssen frische Server-Daten sehen, nicht den SWR-Cache.
   // Sonst matcht ein stale `page.html` mit dem `draft.originalHtml` und
@@ -146,7 +147,7 @@ async function handleApi(req) {
       });
     }
   }
-  const cache = await caches.open(API_CACHE);
+  const cache = await caches.open(cacheName);
   const cached = await cache.match(req);
   const netPromise = fetch(req).then(async (res) => {
     if (res && res.ok && res.type !== 'opaqueredirect') {
@@ -167,6 +168,9 @@ async function handleApi(req) {
     headers: { 'Content-Type': 'application/json; charset=utf-8' },
   });
 }
+
+function handleApi(req)     { return _handleSwr(req, API_CACHE); }
+function handleContent(req) { return _handleSwr(req, CONTENT_CACHE); }
 
 // /config liefert Session-User + Provider-Config. SWR, damit wiederkehrende
 // Offline-User den App-Shell-Bootstrap komplett durchlaufen können. 401/Fehler
@@ -205,31 +209,39 @@ self.addEventListener('message', (event) => {
     event.waitUntil((async () => {
       await Promise.all([
         caches.delete(API_CACHE),
+        caches.delete(CONTENT_CACHE),
         caches.delete(CONFIG_CACHE),
       ]);
       event.source?.postMessage?.({ type: 'auth-logout-done' });
     })());
   }
-  // Invalidiert API_CACHE-Einträge nach BookStack-Writes. Ohne diesen Bust
-  // liefert SWR nach einem `bsPut('pages/X')` weiterhin die alte HTML-Fassung
-  // beim nächsten `bsGet('pages/X')` — und ein Read-Modify-Write-Pfad
-  // (Lektorat-Save, Chat-Vorschlag) überschreibt damit frische User-Edits
-  // mit Stale-Daten. paths sind BookStack-API-Subpfade ohne `/api/`-Prefix.
+  // Invalidiert SWR-Cache-Einträge nach Writes. Ohne diesen Bust liefert SWR
+  // nach einem PUT weiterhin die alte Fassung beim nächsten GET — und ein
+  // Read-Modify-Write-Pfad (Lektorat-Save, Chat-Vorschlag) überschreibt damit
+  // frische User-Edits mit Stale-Daten.
+  // `invalidate-api`: paths sind BookStack-API-Subpfade ohne `/api/`-Prefix.
+  // `invalidate-content`: paths sind /content/*-Subpfade ohne `/content/`-Prefix.
   if (event.data?.type === 'invalidate-api') {
     const paths = Array.isArray(event.data.paths) ? event.data.paths : [];
-    event.waitUntil((async () => {
-      const cache = await caches.open(API_CACHE);
-      const keys = await cache.keys();
-      const targets = new Set(paths.map(p => '/api/' + p));
-      for (const k of keys) {
-        try {
-          const u = new URL(k.url);
-          if (targets.has(u.pathname)) await cache.delete(k);
-        } catch {}
-      }
-    })());
+    event.waitUntil(_invalidateCacheEntries(API_CACHE, paths, '/api/'));
+  }
+  if (event.data?.type === 'invalidate-content') {
+    const paths = Array.isArray(event.data.paths) ? event.data.paths : [];
+    event.waitUntil(_invalidateCacheEntries(CONTENT_CACHE, paths, '/content/'));
   }
 });
+
+async function _invalidateCacheEntries(cacheName, paths, prefix) {
+  const cache = await caches.open(cacheName);
+  const keys = await cache.keys();
+  const targets = new Set(paths.map(p => prefix + p));
+  for (const k of keys) {
+    try {
+      const u = new URL(k.url);
+      if (targets.has(u.pathname)) await cache.delete(k);
+    } catch {}
+  }
+}
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
@@ -249,6 +261,10 @@ self.addEventListener('fetch', (event) => {
   }
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(handleApi(req));
+    return;
+  }
+  if (url.pathname.startsWith('/content/')) {
+    event.respondWith(handleContent(req));
     return;
   }
   if (isShellRequest(url)) {

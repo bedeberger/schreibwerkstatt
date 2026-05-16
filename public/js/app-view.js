@@ -1,5 +1,6 @@
-import { htmlToText, stripFocusArtefacts, fetchJson, escHtml } from './utils.js';
+import { htmlToText, fetchJson, escHtml } from './utils.js';
 import { EXCLUSIVE_CARDS } from './cards/feature-registry.js';
+import { contentRepo } from './repo/content.js';
 
 // View-Steuerung: Exklusivität zwischen Buch-/Seiten-Karten, Seitenauswahl,
 // Reset-Logik beim Buch-/Seitenwechsel. Buchebenen-Features und Editor sind
@@ -33,18 +34,18 @@ export const appViewMethods = {
 
     // Seiteninhalt laden und als formatiertes HTML rendern
     try {
-      let pd = await this.bsGet('pages/' + p.id);
+      let pd = await contentRepo.loadPage(p.id);
       // Stale-Check: Wenn der Tree-Eintrag (`p.updated_at`, kann selbst aus
       // SW-Cache stammen) jünger ist als die Detail-Antwort, hat der SW eine
       // veraltete Version geliefert → einmalig mit __fresh nachziehen.
       if (p.updated_at && pd.updated_at && new Date(pd.updated_at) < new Date(p.updated_at)) {
-        pd = await this.bsGet('pages/' + p.id, { fresh: true });
+        pd = await contentRepo.loadPage(p.id, { fresh: true });
       }
-      const html = stripFocusArtefacts(pd.html || '');
+      const html = pd.html || '';
       this.originalHtml = html;
       this.renderedPageHtml = html;
       this._updatePageViewHeight();
-      // Listing-Cache kann stale sein (bsPut aktualisiert ihn nicht).
+      // Listing-Cache kann stale sein (Page-Save aktualisiert ihn nicht).
       if (pd.updated_at) p.updated_at = pd.updated_at;
       this.currentPageEmpty = !htmlToText(html).trim();
       this.analysisOut = '';
@@ -96,9 +97,9 @@ export const appViewMethods = {
     if (!this.currentPage) return;
     const pageId = this.currentPage.id;
     try {
-      const pd = await this.bsGet('pages/' + pageId, { fresh: true });
+      const pd = await contentRepo.loadPage(pageId, { fresh: true });
       if (this.currentPage?.id !== pageId) return;
-      const html = stripFocusArtefacts(pd.html || '');
+      const html = pd.html || '';
       this.originalHtml = html;
       this.renderedPageHtml = html;
       this._updatePageViewHeight();
