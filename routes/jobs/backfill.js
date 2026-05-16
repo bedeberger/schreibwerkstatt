@@ -19,8 +19,10 @@ const {
 } = require('./shared');
 const contentStore = require('../../lib/content-store');
 const { backfillBookTransactional } = require('../../db/backfill');
+const { db } = require('../../db/connection');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
+const logger = require('../../logger');
 
 const backfillRouter = express.Router();
 
@@ -124,4 +126,33 @@ backfillRouter.post('/backfill', jsonBody, (req, res) => {
   res.json({ jobId });
 });
 
-module.exports = { backfillRouter, runBackfillJob };
+// Auto-Trigger nach erfolgreichem Login: wenn pages.body_html global noch
+// nirgends gefuellt ist, startet automatisch ein Full-Backfill fuer den
+// gerade eingeloggten User. Verhindert „leerer Editor"-Effekt nach
+// Phase-1-Deploy.
+//
+// Heuristik (global statt per-User), weil pro-User-Tracking erst mit Phase 4a
+// (app_users) kommt. Sobald irgendein Body in der DB liegt, schaltet der
+// Auto-Trigger ab — manueller Re-Run bleibt jederzeit moeglich.
+//
+// Idempotent: doppelte Auto-Trigger werden via findActiveJobId verhindert.
+// Fehler in der DB-Heuristik oder beim Enqueue werden geschluckt — Login
+// darf an einem fehlgeschlagenen Auto-Trigger nicht scheitern.
+function maybeAutoBackfillOnLogin(userEmail, token) {
+  if (!userEmail || !token) return null;
+  try {
+    const row = db.prepare('SELECT 1 AS x FROM pages WHERE body_html IS NOT NULL LIMIT 1').get();
+    if (row) return null; // schon mal gebackfilled
+    const entityKey = `user:${userEmail}`;
+    if (findActiveJobId('backfill', entityKey, userEmail)) return null;
+    const jobId = createJob('backfill', 0, userEmail, 'job.label.backfillAll', null, entityKey);
+    enqueueJob(jobId, () => runBackfillJob(jobId, userEmail, token));
+    logger.info('Auto-Backfill nach Login angestossen.', { job: 'backfill', user: userEmail });
+    return jobId;
+  } catch (e) {
+    logger.warn(`maybeAutoBackfillOnLogin: ${e.message}`);
+    return null;
+  }
+}
+
+module.exports = { backfillRouter, runBackfillJob, maybeAutoBackfillOnLogin };

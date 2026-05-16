@@ -161,6 +161,53 @@ test('Einzel-Buch-Filter: nur das selektierte Buch wird gebackfilled', async () 
   assert.equal(page22.body_html, null);
 });
 
+test('Auto-Trigger nach Login: leere body_html-Tabelle startet Backfill', async () => {
+  _seedTwoBookFixture();
+  // Sicherheitshalber: kein body_html in der DB nach setBook
+  const { db } = ctx.dbSchema;
+  db.prepare('UPDATE pages SET body_html = NULL').run();
+
+  const jobId = ctx.backfill.maybeAutoBackfillOnLogin('alice@example.com', { id: 'tok', pw: 'pw' });
+  assert.ok(jobId, 'maybeAutoBackfillOnLogin sollte Job starten');
+
+  const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 10000 });
+  assert.equal(job.status, 'done');
+  assert.equal(job.result.pages, 3);
+
+  // body_html ist befuellt
+  const p = db.prepare('SELECT body_html FROM pages WHERE page_id = 1200').get();
+  assert.match(p.body_html, /Alpha-Seite-1 Body/);
+});
+
+test('Auto-Trigger: bereits gefuellte body_html-Spalte → kein Job', async () => {
+  _seedTwoBookFixture();
+  const { db } = ctx.dbSchema;
+  // Eine Seite hat schon einen Body — Heuristik schlaegt nicht zu.
+  db.prepare("UPDATE pages SET body_html = '<p>preset</p>' WHERE page_id = 1200").run();
+
+  const jobId = ctx.backfill.maybeAutoBackfillOnLogin('alice@example.com', { id: 'tok', pw: 'pw' });
+  assert.equal(jobId, null, 'kein Auto-Trigger erwartet, wenn body_html gefuellt');
+});
+
+test('Auto-Trigger: kein Token → kein Job', () => {
+  const jobId = ctx.backfill.maybeAutoBackfillOnLogin('alice@example.com', null);
+  assert.equal(jobId, null);
+});
+
+test('Auto-Trigger: zweimal aufgerufen mit aktiver Queue → kein zweiter Job', async () => {
+  _seedTwoBookFixture();
+  const { db } = ctx.dbSchema;
+  db.prepare('UPDATE pages SET body_html = NULL').run();
+
+  // MAX_CONCURRENT_JOBS=1 + erster Job blockiert den zweiten auf 'queued'.
+  // findActiveJobId matched 'queued' + 'running' → zweiter Aufruf liefert null.
+  const job1 = ctx.backfill.maybeAutoBackfillOnLogin('alice@example.com', { id: 'tok', pw: 'pw' });
+  assert.ok(job1);
+  const job2 = ctx.backfill.maybeAutoBackfillOnLogin('alice@example.com', { id: 'tok', pw: 'pw' });
+  assert.equal(job2, null, 'kein zweiter Job bei aktivem Backfill');
+  await waitForJob(ctx.shared, job1, { timeoutMs: 10000 });
+});
+
 test('Leerer BookStack: result.books = 0, kein Throw', async () => {
   ctx.mockBs.setBook({ books: [], chapters: [], pages: [], pageBodies: {} });
 

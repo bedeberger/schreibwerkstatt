@@ -55,7 +55,7 @@ Bewusst out-of-scope (User-Wunsch): Attachments (werden nicht genutzt → kein M
 
 | # | Phase | Reversibel? | User-Impact | Abhängigkeiten |
 |---|---|---|---|---|
-| 0b | Backfill: Frontend-Trigger (Backend steht) | ja | manueller „BookStack-synchronisieren"-Button + Login-Auto-Backfill + Lazy-Backfill | — |
+| 0b | Backfill: Frontend-Trigger (Backend + Auto-Login-Trigger stehen) | ja | manueller „BookStack-synchronisieren"-Button + Lazy-Backfill | — |
 | 1 | `localdb`-Backend implementieren (Content-Store-Variante) | ja (Flag) | keiner solange `app.backend='bookstack'` | 0b |
 | 2 | Eigene Page-Revisions | ja | feinere History (beide Backends) | 0 |
 | 3 | Eigene Sortierung | ja | `localdb`-only nativ; `bookstack` weiter via BS-`priority` | 0, 1 |
@@ -119,10 +119,11 @@ Phase-0-Spalten im aktuellen Schema:
 
 Backend-Backfill steht: Job-Typ `'backfill'` in [routes/jobs/backfill.js](../routes/jobs/backfill.js) (`runBackfillJob` + `POST /jobs/backfill`), Upsert-Helpers in [db/backfill.js](../db/backfill.js), Idempotenz + FK-Reihenfolge (books → chapters → pages) + `foreign_key_check` getestet in [tests/integration/backfill.test.js](../tests/integration/backfill.test.js). Dedup auf User-Ebene; Body `{ bookId }` schraenkt auf Einzelbuch ein; `owner_email` wird nur beim Erst-Backfill gesetzt (Erst-Backfiller „erbt" das Buch; Phase 4b regelt spaeter Sharing).
 
-**Offen — drei Trigger-Punkte:**
+**Offen — zwei Trigger-Punkte:**
 - **Manuell** in „Buch-Einstellungen" oder „User-Einstellungen": Button „BookStack synchronisieren" → `POST /jobs/backfill` (optional `{ bookId }` aus Buch-Settings-Kontext). Reicht fuer initialen Roll-Out.
-- **Auto bei erstem Login pro User** (optional): wenn `pages.body_html` fuer keines der User-sichtbaren Buecher gefuellt ist, Backfill-Job starten und Toast anzeigen. Verhindert „leerer Editor"-Effekt nach Deploy von Phase 1.
 - **Pro Buch on-demand:** beim ersten Page-Open eines Buchs ohne lokale Bodies → Lazy-Backfill `POST /jobs/backfill { bookId }`.
+
+**Erledigt — Auto-Login-Trigger:** [routes/jobs/backfill.js#maybeAutoBackfillOnLogin](../routes/jobs/backfill.js), aufgerufen aus [routes/auth.js](../routes/auth.js) nach erfolgreichem OIDC-Callback. Globale Heuristik: `SELECT 1 FROM pages WHERE body_html IS NOT NULL LIMIT 1` — leer → Auto-Backfill anstossen. Idempotent via `findActiveJobId`; Fehler werden geloggt, blockieren Login nicht. Sobald irgendein Body in der DB liegt, schaltet der Auto-Trigger ab (pro-User-Tracking kommt erst mit Phase 4a `app_users.last_backfill_at`).
 
 Phase 1 (Sync-Worker) uebernimmt nach Erst-Backfill inkrementelle Updates per `updated_at`-Diff. Re-Run bleibt idempotent (Cron-tauglich).
 

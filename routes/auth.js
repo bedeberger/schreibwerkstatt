@@ -2,6 +2,7 @@ const express = require('express');
 const { Issuer, generators } = require('openid-client');
 const logger = require('../logger');
 const { getUserToken, setUserToken, upsertUserLogin, getTokenForRequest } = require('../db/schema');
+const { maybeAutoBackfillOnLogin } = require('./jobs/backfill');
 
 const router = express.Router();
 
@@ -116,6 +117,8 @@ router.get('/auth/callback', async (req, res) => {
     const stored = getUserToken(email);
     if (stored) req.session.bookstackToken = { id: stored.token_id, pw: stored.token_pw };
     logger.info(`Login${stored ? ' (Token geladen)' : ' (kein Token hinterlegt)'}`, { user: email });
+    // Phase 0b Auto-Trigger: leere DB → Backfill anstossen.
+    if (stored) maybeAutoBackfillOnLogin(email, req.session.bookstackToken);
     res.redirect(returnTo);
   } catch (err) {
     logger.error('Auth callback error: ' + err.message);
