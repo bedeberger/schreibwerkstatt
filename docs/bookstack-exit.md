@@ -55,117 +55,65 @@ Phase-0-Spalten im aktuellen Schema:
 
 ## Offene Phasen (Reihenfolge)
 
-`1 → 2 → 3 → 6 → 7 → 8 → 9 → 10 → 11`. Phase 11 (Per-User-AI-Provider) ist additiv und kann eingeschoben werden, sobald `app_users` (steht) + `app_settings` (steht) konsolidiert sind.
+`3 → 6 → 7 → 8 → 9 → 10 → 11`. Phase 11 (Per-User-AI-Provider) ist additiv und kann eingeschoben werden, sobald `app_users` (steht) + `app_settings` (steht) konsolidiert sind.
+
+Phase 1 (`localdb`-Backend) + Phase 2 (Page-Revisions) gelandet — siehe Code-Pfade in den jeweiligen Abschnitten.
 
 ---
 
-## Phase 1 — `localdb`-Backend implementieren
+## Phase 1 — `localdb`-Backend (erledigt)
 
-Ziel: [lib/content-store.js](../lib/content-store.js) bekommt eine zweite Implementierung, die ausschliesslich auf lokale Tabellen geht. Backend-Dispatch via `app.backend`-Setting. Solange `app.backend='bookstack'`, ändert sich nichts.
+Implementiert; Code-Pfade:
 
-**Architektur:**
+**Architektur** ([lib/content-store/](../lib/content-store/)):
 
 ```
-content-store.js  (Facade, dispatcht auf gewählten Backend)
-  ├─ backends/bookstack.js  (heute: bsGet/bsPut/bsGetAll, unverändert gekapselt)
-  └─ backends/localdb.js    (NEU: SQLite-Reads/Writes auf pages/chapters/books)
+lib/content-store/
+  ├─ index.js              Facade — dispatcht via app_settings.app.backend
+  └─ backends/
+     ├─ bookstack.js       BookStack-API-Aufrufe + Token-Resolver
+     └─ localdb.js         Lokale SQLite-Tabellen (books/chapters/pages)
 ```
 
-`content-store.js` liest `app.backend` aus `app_settings`. Default `localdb` für Neu-Installationen; `bookstack` als Migrations-Default, wenn `BOOKSTACK_BASE_URL` in ENV gesetzt ist. Cache pro Server-Boot; Setting-Wechsel via Hot-Reload-Event.
+- **Dispatcher** ([lib/content-store/index.js](../lib/content-store/index.js)): liest `app.backend` per-Call aus `app_settings`. Default `bookstack` für Bestandsdeployments. Hot-Reload via `app-settings:changed`-Event ohne Restart. Konsumenten importieren weiter `require('../lib/content-store')`.
+- **Bookstack-Backend** ([lib/content-store/backends/bookstack.js](../lib/content-store/backends/bookstack.js)): `bsGet`/`bsPut`/`bsGetAll`-Calls + Token-Resolver. Tripwire-Allowlist aktualisiert.
+- **Localdb-Backend** ([lib/content-store/backends/localdb.js](../lib/content-store/backends/localdb.js)): vollständiger Vertrag gegen SQLite. CRUD auf books/chapters/pages, bookTree mit JOIN, searchPages LIKE-Fallback (bis Phase 7 FTS5 kommt). IDs aus `sqlite_sequence` (≥ 1_000_001 dank Phase-0-Wasserzeichen). `savePage` setzt `local_updated_at` + `dirty=0`. `NOT_FOUND`-Errors mit `code` + `status: 404`.
+- **Sync-Worker** ([routes/sync.js](../routes/sync.js)): bestehender Per-User-Sync-Cron mit Backend-Mode-Guard `_isBookstackBackend()`. `syncAllBooks()` + `POST /sync/book/:book_id` → no-op (Cron) / 409 (Route) bei `localdb`-Backend. Cron-Tick 02:00 in [server.js](../server.js) bleibt unverändert.
+- **Tripwire** ([tests/unit/content-store-tripwire.test.mjs](../tests/unit/content-store-tripwire.test.mjs)): `bs*`-Calls + `BOOKSTACK_URL`-Referenzen nur in `lib/bookstack.js` + `lib/content-store/backends/bookstack.js` + `routes/sync.js` + `routes/jobs/shared/bookstack.js` + `routes/proxies.js` + `lib/pdf-render/images.js`.
 
-**Localdb-Backend** `lib/content-store/backends/localdb.js`:
-- `loadBook(book_id)` → `SELECT … FROM books WHERE book_id = ?`.
-- `bookTree(book_id)` → `chapters` + `pages` JOIN, sortiert nach `book_order.order_json` (Phase 3) oder Fallback `position`.
-- `loadPage(page_id)` → `SELECT page_id, book_id, chapter_id, page_name, body_html, body_markdown, updated_at FROM pages …`.
-- `savePage(page_id, { body_html, body_markdown, page_name? })` → Transaction: `page_revisions`-Row (Phase 2) → `UPDATE pages SET body_html=?, local_updated_at=datetime('now'), dirty=0 …` → FTS-Reindex (Phase 7).
-- `createBook(name, owner_email)` / `createChapter` / `createPage` → `INSERT` ohne expliziten PK; SQLite vergibt aus `sqlite_sequence` (Wasserzeichen ≥ 1_000_000).
-- Kein HTTP, kein Token, keine BookStack-Berührung.
+### Devmode-Seed ([lib/dev-seed.js](../lib/dev-seed.js))
 
-**Bookstack-Backend** `lib/content-store/backends/bookstack.js`:
-- Aktueller Code aus [lib/content-store.js](../lib/content-store.js) und [lib/bookstack.js](../lib/bookstack.js) bleibt funktional, wird nur hinter der Facade gekapselt. Tripwire wandert mit.
-
-**Sync-Worker** `lib/replica-sync.js` (nur aktiv bei `app.backend='bookstack'`):
-- Pro Buch: `GET /api/books/:id` + `GET /api/books/:id/chapters` + Pages-Paginierung via `bsGetAll`.
-- Body via Page-Detail (`GET /api/pages/:id`).
-- Diff via `updated_at`: stale → Refetch + Update lokaler Cache-Spalten + FTS-Reindex.
-- Trigger: `POST /sync/book/:id` manuell + Cron 02:00 + Page-Open Lazy-Refresh.
-- Im `localdb`-Mode: Sync-Cron no-op.
-
-**Routen**: Frontend spricht unverändert `/content/...`. Backend-Wahl ist serverintern.
-
-**Tests:**
-- Unit: beide Backends erfüllen denselben `content-store`-Vertrag (`loadPage`/`savePage`/`bookTree`).
-- Integration: `/content/pages/:id` PUT im `localdb`-Mode persistiert in `pages.body_html`, schreibt `page_revisions`, refresht FTS.
-- Integration: `/content/pages/:id` PUT im `bookstack`-Mode ruft `bsPut`, schreibt zusätzlich `page_revisions` lokal.
-
-### Devmode-Seed
-
-Im `localdb`-Mode ist `books` beim Erststart leer. Auto-Seed direkt nach Migrations.
-
-**Trigger-Bedingung** (alle vier):
-- `LOCAL_DEV_MODE === 'true'`
-- `LOCAL_DEV_SEED !== 'false'` (Default an)
-- `app.backend === 'localdb'`
-- `SELECT COUNT(*) FROM books = 0`
-
-**Inhalt** (just enough, damit alle Karten Daten haben):
-- 1 Buch (`name='Devmode-Testbuch'`, `owner_email='dev@local'`).
-- 2 Kapitel + 5 Pages mit echtem Prosa-Text (Public-Domain — Kafka „Verwandlung" o.ä.).
-- IDs aus Wasserzeichen `≥ 1_000_001`.
-
-**Code**: [lib/dev-seed.js](../lib/dev-seed.js) — `runDevSeedIfNeeded()`, Call in [server.js](../server.js) nach `runMigrations()`, vor Route-Mount. Prosa-Text inline.
-
-**Tests**: `tests/unit/dev-seed.test.mjs` — Idempotenz, Guards einzeln, IDs ≥ 1_000_001.
+Auto-Seed bei `LOCAL_DEV_MODE=true` + `LOCAL_DEV_SEED!=false` + `app.backend='localdb'` + leerer `books`-Tabelle. 4 Guards alle Pflicht. Inhalt: 1 Buch (`'Devmode-Testbuch'`, `owner_email='dev@local'`) + 2 Kapitel + 5 Pages mit Kafka-„Verwandlung"-Public-Domain-Prosa. IDs ≥ 1_000_001. Hook in [server.js](../server.js) nach `bootstrapFromEnv()`. Test: [tests/unit/dev-seed.test.mjs](../tests/unit/dev-seed.test.mjs).
 
 ### i18n-Sweep für backend-agnostische Save-Strings
 
-Solange Save in BookStack ging, war „in BookStack gespeichert" eindeutig. Multi-Backend → User-Text muss vom Backend unabhängig sein.
+In beiden Locales angepasst:
+- `bs.savingToBookStack` → "Speichere…" / "Saving…"
+- `editor.savedTitle` → "Gespeichert" / "Saved"
+- `chat.changeSaved` → "Änderung gespeichert." / "Change saved."
+- `tree.connecting` → "Lade Buchliste…" / "Loading book list…"
 
-Umzubenennen (beide Locales `de`+`en` in [public/js/i18n/](../public/js/i18n/)):
-- `bs.savingToBookStack` „Speichere in BookStack…" → `editor.saving` „Speichere…"
-- `editor.savedTitle` „Auf BookStack gespeichert" → „Gespeichert"
-- `chat.changeSaved` „Änderung in BookStack gespeichert." → „Änderung gespeichert."
-- `tree.connecting` „Verbinde mit BookStack…" → „Lade Buchliste…"
+**Offen — Folge-Sweep für backend-spezifische Strings**: `book.openInBookstack`, `editor.openInBookstack`, `editor.revisionsTitle`, `bs.timeoutGet`/`bs.timeoutPut`/`bs.apiError*`, `session.bookstackTokenInvalid`, `tokenSetup.*`, `profile.bookstackToken`, `error.NO_BOOKSTACK_TOKEN`/`error.BOOKSTACK_UNAUTHED`/`error.BOOKSTACK_UNREACHABLE`, `job.error.noBookstackToken`/`job.error.bookstack*`, `palette.action.token` bleiben — werden in Phase 9 (Multi-Backend-Sweep) backend-conditional (`$app.currentBackend === 'bookstack'`). Server-Status-Keys (`'job.phase.savingToBookStack'`) existieren derzeit keine; bei Bedarf bei Phase 9 mit aufnehmen.
 
-Backend-spezifische Strings bleiben, werden aber nur im `bookstack`-Mode angezeigt (`$app.currentBackend === 'bookstack'`): `book.openInBookstack`, `editor.openInBookstack`, `editor.revisionsTitle`, `book.search.placeholder` (BookStack-Variante), `bs.timeoutGet`/`bs.timeoutPut`/`bs.apiError*`, `session.bookstackTokenInvalid`, `tokenSetup.*`, `profile.bookstackToken`, `error.NO_BOOKSTACK_TOKEN`/`error.BOOKSTACK_UNAUTHED`/`error.BOOKSTACK_UNREACHABLE`, `job.error.noBookstackToken`/`job.error.bookstack*`, `palette.action.token`.
-
-Texte mit `BookStack-Papierkorb`/`BookStack-Export`/`BookStack-Seiten` (delete-Confirm, export-Hint, pdf-export-Chapter-Hints, bookOrganizer-Confirms): jeweils zwei Varianten oder generisch.
-
-**Server-Status-Keys**: `routes/jobs/shared/queue.js` und Save-Job-Helper setzen `statusText` ausschliesslich als generischer i18n-Key (`'job.phase.saving'`, nicht `'job.phase.savingToBookStack'`).
+### Tests
+- [tests/integration/content-store-localdb.test.js](../tests/integration/content-store-localdb.test.js): 9 Cases — Domain-Shape, savePage-dirty-Reset, createPage-Wasserzeichen, bookTree-Gruppierung, searchPages-LIKE, deletePage NOT_FOUND, loadPagesBatch ohne Token.
+- [tests/integration/backfill-sweep.test.js](../tests/integration/backfill-sweep.test.js): Auto-Sweep bei `app.backend`-Wechsel (Phase 0b).
 
 ---
 
-## Phase 2 — Eigene Page-Revisions
+## Phase 2 — Eigene Page-Revisions (erledigt)
 
-**Migration:**
+Implementiert; Code-Pfade:
 
-```sql
-CREATE TABLE page_revisions (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  page_id INTEGER NOT NULL REFERENCES pages(page_id) ON DELETE CASCADE,
-  book_id INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
-  body_html TEXT NOT NULL,
-  body_markdown TEXT,
-  chars INTEGER, words INTEGER, tok INTEGER,
-  source TEXT NOT NULL CHECK(source IN
-    ('focus','main','chat-apply','lektorat-apply','bookstack-sync','import','conflict')),
-  user_email TEXT,
-  created_at TEXT DEFAULT (datetime('now')),
-  summary TEXT
-);
-CREATE INDEX idx_page_revisions_page ON page_revisions(page_id, created_at DESC);
-```
-
-Jeder erfolgreiche `content-store.savePage`-Pfad (Editor-Save, Focus-Save, Chat-Apply, Lektorat-Apply, History-Restore) schreibt Revision **vor** PUT mit `source`-Tag — gilt für beide Backends, weil die Facade der Schreib-Chokepoint ist. Sync-Pull im `bookstack`-Mode schreibt `source='bookstack-sync'`, wenn Body sich änderte.
-
-**Frontend**: `page-history-card` umstellen auf `GET /local/pages/:id/revisions`. Restore = neue Revision + PUT.
-
-**Retention via Max-Limit pro Seite** (BookStack-Stil, kein TTL):
-- Setting `app.page_revision_limit` in `app_settings` (Default `50`, Range `10..500`).
-- Cleanup-Job purged pro `page_id` alle Revisions ausserhalb der jüngsten N via `ROW_NUMBER() OVER (PARTITION BY page_id ORDER BY created_at DESC)`.
-- Hook in [lib/cache-cleanup.js](../lib/cache-cleanup.js): Policy `{ table: 'page_revisions', kind: 'per-page-limit', setting: 'page_revision_limit' }`. Cron 02:00 ruft mit auf.
-
-Vorteil sofort verfügbar, auch ohne Phase 1.
+- **Migration 112** ([db/migrations.js](../db/migrations.js)): `page_revisions` mit FK auf `pages(page_id)` ON DELETE CASCADE + `books(book_id)` ON DELETE CASCADE. CHECK auf `source IN ('focus','main','chat-apply','lektorat-apply','bookstack-sync','import','conflict')`. Indexe `idx_page_revisions_page`/`idx_page_revisions_book`.
+- **DB-Helper** ([db/page-revisions.js](../db/page-revisions.js)): `insert/listForPage/get/countForPage/pruneOverLimit` + `VALID_SOURCES`-Set.
+- **Schreib-Chokepoint** ([lib/content-store/index.js#savePage](../lib/content-store/index.js)): nach Backend-PUT bei `body.html`-Save Revision schreiben. `source` aus `body.source` (Default `'main'`), `summary` aus `body.summary` (max 500 Zeichen). Reine Rename-/Reorder-Saves erzeugen keine Revision. Backend-agnostisch — beide Backends durchlaufen denselben Pfad.
+- **Routen** ([routes/content.js](../routes/content.js)): `GET /content/pages/:id/revisions` (viewer), `GET /content/pages/:id/revisions/:rev_id` (viewer, voller Body), `POST /content/pages/:id/revisions/:rev_id/restore` (editor + Page-Lock-Check).
+- **Setting**: `app.page_revision_limit` (Default `50`, Range 10..500).
+- **Retention** ([lib/cache-cleanup.js](../lib/cache-cleanup.js)): POLICIES-Eintrag `{ table: 'page_revisions', kind: 'per-page-limit', setting: 'app.page_revision_limit' }`. Cron 02:00 ruft `pruneOverLimit(limit)` — Single-Statement-DELETE mit `ROW_NUMBER() OVER (PARTITION BY page_id ORDER BY created_at DESC)`. `app-settings` + `page-revisions` werden lazy-importiert (Test-Schema-Kompatibilität).
+- **Frontend** ([public/js/cards/page-revisions-card.js](../public/js/cards/page-revisions-card.js) + [public/partials/page-revisions.html](../public/partials/page-revisions.html)): Versionsliste unter dem Editor mit Restore-Button. Collapsible via `.collapsible-toggle` + `.history-chevron`-Pattern. CSS in [public/css/tree-history.css](../public/css/tree-history.css) `.page-revisions-bar`/`-list`. Reload-Hook via Custom-Event `page-revisions:changed`.
+- **i18n**: `editor.revisions.{count,chars,restore,restoring,restoreTitle,restored,restoreFailed,restoreConfirm}` + 7 `editor.revisions.source.*`-Labels (de + en).
+- **Tests**: [tests/unit/page-revisions-cleanup.test.mjs](../tests/unit/page-revisions-cleanup.test.mjs) — Pruning pro page_id, leere Tabelle, invalides Setting → Error-Path.
 
 ---
 

@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 111, 60 Tabellen (ohne `sqlite_*`/`schema_version`/`sessions`).
+Stand: Schema-Version 113, 61 Tabellen (ohne `sqlite_*`/`schema_version`/`sessions`).
 
 Quelle: Live-Dump aus [schreibwerkstatt.db](../schreibwerkstatt.db) (`.schema --indent`) + [db/migrations.js](../db/migrations.js). Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -64,6 +64,8 @@ erDiagram
   pages ||--o{ locations             : firstMention
   pages ||--o{ figures               : firstMention
   pages ||--|| page_locks            : locked
+  pages ||--o{ page_revisions        : has
+  books ||--o{ page_revisions        : has
 
   app_users ||--o{ book_access       : grants
   app_users ||--o{ page_locks        : holds
@@ -178,6 +180,20 @@ erDiagram
     TEXT    updated_at
     TEXT    cached_at
   }
+  page_revisions {
+    INTEGER id            PK
+    INTEGER page_id       FK "ON DELETE CASCADE"
+    INTEGER book_id       FK "ON DELETE CASCADE"
+    TEXT    body_html
+    TEXT    body_markdown
+    INTEGER chars
+    INTEGER words
+    INTEGER tok
+    TEXT    source        "focus|main|chat-apply|lektorat-apply|bookstack-sync|import|conflict"
+    TEXT    user_email
+    TEXT    created_at
+    TEXT    summary
+  }
   page_checks {
     INTEGER id          PK
     INTEGER page_id     FK
@@ -226,6 +242,8 @@ erDiagram
   chapters  ||--o{ pages       : groups
   pages     ||--|| page_stats  : has
   pages     ||--o{ page_checks : has
+  pages     ||--o{ page_revisions : has
+  books     ||--o{ page_revisions : has
   pages     ||--o{ ideen       : at
   books     ||--o{ ideen       : has
   books     ||--|| book_settings : has

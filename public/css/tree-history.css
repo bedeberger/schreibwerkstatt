@@ -256,8 +256,6 @@
 }
 .btn-delete-history:hover { opacity: 1; }
 
-}
-
 /* === Phase 2 (BookStack-Exit): page_revisions-Liste unter dem Editor ===
    Reuse .history-bar + .history-item; einziger Spezialwert: Liste schliesst
    per Default ein, oeffnet via .collapsible-toggle. Cursor auf history-item
@@ -271,3 +269,5 @@
 .page-revisions-list .history-item { cursor: default; }
 .page-revisions-list .history-item:hover { background: transparent; }
 .page-revisions-list .btn-toggle-saved { margin-left: auto; }
+
+}

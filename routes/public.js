@@ -223,7 +223,7 @@ router.post('/register', express.json({ limit: '8kb' }), async (req, res) => {
   if (created) {
     logger.info(`registration-request eingegangen: ${e} (ip=${ip || '-'})`);
     // Admin-Mail (best effort): an alle active admin-User. Mailer skipt
-    // selbst, wenn smtp.mode === 'disabled'.
+    // selbst, wenn Gmail-Credentials fehlen.
     try {
       const admins = appUsers.listUsers().filter(u => u.global_role === 'admin' && u.status === 'active');
       const adminUrl = (appSettings.get('app.public_url') || '').replace(/\/$/, '') + '/#admin-users';
