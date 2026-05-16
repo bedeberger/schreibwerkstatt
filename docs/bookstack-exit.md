@@ -32,7 +32,7 @@ Editor + WYSIWYG ändern sich nicht: App nutzt eigenen CodeMirror-basierten Edit
 - Auth/User-Liste/Rollen/Permissions.
 - WYSIWYG-Editor (TinyMCE).
 - Volltextsuche.
-- Export (`/api/books/:id/export/{fmt}`) — nur Buch-Scope; Kapitel-/Seiten-Export aus BookStack-UI ist kein API-Pfad.
+- Export (`/api/books/:id/export/{fmt}`, nur Buch-Scope, PDF/HTML/TXT/MD) — wird in Phase 4b2 durch Eigenbau ersetzt; im `localdb`-Backend nicht mehr verfügbar.
 - Templates, Shelves.
 
 App verwendet schon eigenständig: Google-OIDC-Login, Custom-PDF-Export, Focus-Editor, alle KI-Jobs, Page-Stats, Job-Queue. BookStack bleibt für Persistenz + WYSIWYG + User-DB.
@@ -721,47 +721,60 @@ Ablenkungsfreier Lese-Pfad für `viewer` (und alle, die „nur lesen" wollen). *
 
 ---
 
-## Phase 4b2 — Export-Scopes (Kapitel + Seite)
+## Phase 4b2 — Export-Konsolidierung (Eigenbau alle Scopes + Formate)
 
-Heute exportiert [routes/export.js](../routes/export.js) und [routes/jobs/pdf-export.js](../routes/jobs/pdf-export.js) ausschliesslich auf Buch-Ebene. Beim Schreiben einzelner Kapitel/Seiten will man oft *nur* diesen Ausschnitt herausziehen — für Beta-Leser, Druckabzug einzelner Szenen, Übergabe an Lektor. Diese Phase ergänzt Kapitel- und Seiten-Scope für **alle bestehenden Formate** (PDF, HTML, TXT, MD, EPUB, DOCX) und für den Custom-PDF-Renderer.
+Heute zwei Wege nebeneinander: [routes/export.js](../routes/export.js) (Buch-Sync-Download, PDF/HTML/TXT/MD per BookStack-Pass-Through über `streamExport`, EPUB/DOCX als Eigenbau) und [routes/jobs/pdf-export.js](../routes/jobs/pdf-export.js) (Buch-async-Job, Custom-PDF mit Profilen). Im `localdb`-Backend gibt es kein BookStack-Pass-Through mehr — alles muss eigenbau sein. Diese Phase **konsolidiert** beide Wege und ergänzt gleichzeitig Kapitel- und Seiten-Scope.
 
-**Bewusst unabhängig vom Storage-Backend:** Build-Pipeline ist storage-agnostisch (konsumiert `content-store`-Abstraktion), funktioniert sowohl für `bookstack` als auch `localdb`. Kein BookStack-Pass-Through für Kapitel/Seite, weil die BookStack-API keine `chapters/:id/export/:fmt`- oder `pages/:id/export/:fmt`-Endpoints kennt — wir bauen ohnehin alles selbst.
+**Endzustand:**
+- Ein Loader (`lib/load-contents.js`) für Buch/Kapitel/Seite.
+- Pro Format ein Builder in `lib/export-builders/` (`pdf.js`, `html.js`, `txt.js`, `md.js`, `epub.js`, `docx.js`).
+- Eine Sync-Route `GET /export/:scope/:id/:fmt` (Default-Styling, kein Profil).
+- Eine Async-Job-Route `POST /jobs/pdf-export` mit Scope-Param (Custom-Profil/Cover/Schrift).
+- `content-store.streamExport` + `lib/bookstack.js`-Import in `routes/export.js` ersatzlos gestrichen.
 
 ### Lib-Refactor
 
-[lib/load-book-contents.js](../lib/load-book-contents.js) wird zu `lib/load-contents.js` (oder behält den Namen, exportiert zusätzlich):
+**[lib/load-book-contents.js](../lib/load-book-contents.js) → [lib/load-contents.js](../lib/load-contents.js)** (umbenennen + erweitern), exportiert genau einen Dispatcher:
 
-- `loadBookContents(bookId, ctx)` — bleibt unverändert (Pipeline + Multi-Chapter-Grouping).
-- `loadChapterContents(chapterId, ctx)` — `contentStore.loadChapter` + `contentStore.listPages(book_id)` gefiltert auf `chapter_id`, position-sortiert. Liefert `{ chapter, pages }` (kein `groups`-Array — Single-Chapter ist ohnehin nur eine Gruppe). Wirft `CHAPTER_EMPTY` analog `BOOK_EMPTY`.
-- `loadPageContent(pageId, ctx)` — `contentStore.loadPage(pageId)`. Wirft `PAGE_EMPTY` bei `!html`. Liefert `{ page, chapter? }` (Chapter optional für Headline-Kontext im Build).
+```js
+loadContents({ scope, id }, ctx) → { scope, book, chapters?, pages, groups }
+```
 
-Gemeinsame Grouping-Hilfsfunktion bleibt intern: Buch-Pipeline ruft sie mit allen Chapters, Kapitel-Pipeline mit einem Chapter, Seiten-Pipeline mit einer Pseudo-Gruppe.
+- `scope === 'book'`: alle Kapitel + Pages, Multi-Chapter-Grouping (heutige Logik).
+- `scope === 'chapter'`: `contentStore.loadChapter(id)` → `contentStore.listPages(book_id)` gefiltert auf `chapter_id`, position-sortiert → `{ groups: [oneGroup] }`. `CHAPTER_EMPTY` analog `BOOK_EMPTY`.
+- `scope === 'page'`: `contentStore.loadPage(id)` → `{ groups: [{ chapter: null, pages: [x] }] }`. `PAGE_EMPTY` bei `!html`.
 
-### Routen
+Gemeinsame Grouping-Hilfsfunktion bleibt intern; Buch ruft sie mit allen Chapters, Kapitel mit einem, Seite mit einer Pseudo-Gruppe. Alle Konsumenten (`routes/export.js`, `routes/jobs/pdf-export.js`) schalten auf `loadContents` um. `load-book-contents.js` wird gelöscht.
 
-Zwei neue GETs in [routes/export.js](../routes/export.js), identische Auth-/Format-/Filename-Pipeline:
+**Format-Builders** in [lib/export-builders/](../lib/export-builders/) — eine Datei pro Format, jeweils `buildXxx({ scope, book, groups, options? }) → Buffer`:
 
-- `GET /export/chapter/:id/:fmt`
-- `GET /export/page/:id/:fmt`
+- `pdf.js` — wrappt [lib/pdf-render.js](../lib/pdf-render.js). Default-Profil aus [lib/pdf-export-defaults.js](../lib/pdf-export-defaults.js)#`defaultConfig()`. Kein Cover/keine Custom-Font. Scope-Flags an Render-Pipeline (Cover/TOC/Title-Page unten).
+- `html.js` — Single-File-HTML mit `<style>`-Wrapper (Print-CSS aus Phase 4b1 wiederverwendet) + Kapitel-/Page-Headings.
+- `txt.js` — HTML→Text via [lib/html-clean.js](../lib/html-clean.js) + `htmlToText`-Variante (Tag→Space, `\s+`→Single-Space — **dieselbe** Normalisierung wie [routes/sync.js](../routes/sync.js)#htmlToText, CLAUDE.md-Regel „HTML→Text-Normalisierung").
+- `md.js` — Multi-Source-Strategie: bevorzugt `pages.body_markdown` (in `localdb` ab Phase 0b vorhanden), Fallback `turndown` (`html → md`) für Pages ohne Markdown-Spalte. Kapitel- und Page-Titel als `#`/`##`-Headings prepended.
+- `epub.js` — bestehender Build aus heutigem `routes/export.js`, hierher verschoben + scope-fähig (Single-Group für Chapter/Page).
+- `docx.js` — bestehender Build, ebenfalls hierher + scope-fähig.
 
-Pro Route:
-1. `toIntId(req.params.id)` validieren.
-2. `loadChapter`/`loadPage` zum Auflösen von `book_id` (für `setContext({ book })` + Filename-Slug).
-3. Format-Branch:
-   - **EPUB/DOCX/PDF/HTML/TXT/MD** alle via eigene Builder. EPUB/DOCX-Build wie heute, aber Input ist `{ groups: [oneGroup] }` bzw. `{ groups: [{ chapter: null, pages: [x] }] }`. PDF/HTML/TXT/MD-Build neu (heute nur BookStack-Pass-Through); kann auf der gleichen `groups`-Struktur arbeiten — PDF via `lib/pdf-render.js` (Custom-Profil-Render, Default-Profil), HTML via einfacher Concat + Wrapper, TXT/MD via HTML→Text-Strip (gleiche Normalisierung wie `lib/html-clean.js` + `routes/sync.js`#htmlToText, CLAUDE.md-Regel „HTML→Text-Normalisierung").
-4. `buildExportFilename({ prefix: 'chapter'|'page', slug: chapter.slug ?? page.slug, ext: fmt, date })`. Filename-Builder bleibt unverändert; nur neuer Prefix-Wert.
-5. Pass-Through-Branch (`streamExport`) entfällt komplett, sobald Eigenbau-PDF/HTML/TXT/MD für Buch-Scope ebenfalls aktiviert ist — siehe „Folgeschritt" unten.
+### Sync-Route
 
-### Folgeschritt: Buch-Export auf Eigenbau umstellen
+**Eine Route ersetzt alle bisherigen:** `GET /export/:scope/:id/:fmt` in [routes/export.js](../routes/export.js).
 
-`streamExport` + `streamChapterExport`/`streamPageExport`-Varianten in [content-store.js](../lib/content-store.js) entfallen, sobald der Eigenbau auch für Buch-Scope eingeschaltet ist. Vorteil:
-- Backend-Symmetrie: `localdb` und `bookstack` liefern dieselbe Output-Qualität.
-- Keine BookStack-Layout-Drift (BookStack-PDF nutzt anderen CSS-Stack als unser Custom-PDF).
-- `streamExport` aus `content-store.js` löschen + Allowlist in Tripwire enger ziehen.
+- `scope ∈ {'book','chapter','page'}`, `fmt ∈ {pdf,html,txt,md,epub,docx}`.
+- `toIntId(req.params.id)` validieren.
+- `loadContents({ scope, id })` → liefert `book` (für Filename-Slug + `setContext({ book })`).
+- Builder pro Format aus `lib/export-builders/` aufrufen → `Buffer`.
+- `buildExportFilename({ prefix: scope, slug: chapter?.slug ?? page?.slug ?? book.slug, ext: fmt, date })`. Filename-Builder bleibt unverändert; nur neuer Prefix-Wert (`'book'|'chapter'|'page'`).
+- Response: `Content-Type` aus Format-Map, `Content-Disposition` mit Filename, `Content-Length`, `res.end(buf)`. BOM-Prepend für `txt`/`md` (Notepad-Mojibake) wie bisher.
+- Alte Routen `GET /export/book/:id/:fmt` ersatzlos entfernt (war ohnehin nur ein Pfad; ein Reverse-Proxy-Redirect ist nicht nötig — keine externen Konsumenten ausser unserer eigenen Frontend-Karte).
 
-Solange `bookstack`-Backend noch aktiv genutzt wird, kann der Pass-Through optional erhalten bleiben (Buch-PDF schneller, wenn BS-Server lokal). Default nach 4b2: Eigenbau für alle Scopes.
+### Streichungen
 
-### Custom-PDF (`/jobs/pdf-export`)
+- `content-store.streamExport` aus [lib/content-store.js](../lib/content-store.js) entfernt + aus `module.exports`.
+- `BOOKSTACK_URL`/`authHeader`-Import in [routes/export.js](../routes/export.js) entfernt (heute schon WIP-modifiziert, nutzt `streamExport` — Phase 4b2 finalisiert den Cut).
+- Server-Tripwire-Allowlist um `lib/content-store.js`-Streaming-Pfad verkürzt.
+- BookStack-Inventory-Bullet „Export (`/api/books/:id/export/{fmt}`)" verliert in `localdb`-Mode Bedeutung; bleibt nur als historischer Hinweis. Bei `bookstack`-Backend liest die App weiterhin Body-HTML via `content-store.loadPage`, aber Export-Rendering läuft im App-Server (keine BookStack-Renderer-Aufrufe mehr).
+
+### Custom-PDF-Job
 
 [routes/jobs/pdf-export.js](../routes/jobs/pdf-export.js) bekommt Scope-Parameter im POST-Body:
 
@@ -769,27 +782,36 @@ Solange `bookstack`-Backend noch aktiv genutzt wird, kann der Pass-Through optio
 { profileId, scope: 'book'|'chapter'|'page', entityId }
 ```
 
-`entityId` ist `book_id`/`chapter_id`/`page_id`. `loadBookContents` → `loadContents({ scope, entityId, ctx })`-Dispatcher. Render-Pipeline ([lib/pdf-render.js](../lib/pdf-render.js)) bleibt unverändert (konsumiert `groups`); nur die TOC- und Cover-Logik bekommen Scope-Flags:
-- Cover: bei `chapter`/`page` weglassen (oder optional via Profil-Toggle „Cover auch bei Teil-Export anzeigen").
-- TOC: bei `page` weglassen, bei `chapter` optional auf eine Stufe begrenzen.
-- Title-Page: bei `chapter`/`page` Kapitel-/Seitentitel statt Buchtitel.
+`entityId` ist `book_id`/`chapter_id`/`page_id`. Statt `loadBookContents` → `loadContents({ scope, id: entityId })`. Render-Pipeline ([lib/pdf-render.js](../lib/pdf-render.js)) bleibt unverändert (konsumiert `groups`); nur Scope-Flags an TOC/Cover/Title-Page:
 
-Profile bleiben Buch-scoped (`pdf_export_profile.book_id`); ein Profil gilt für alle drei Scopes desselben Buchs.
+- **Cover:** bei `chapter`/`page` weglassen (Default). Optional Profil-Toggle „Cover auch bei Teil-Export".
+- **TOC:** bei `page` weglassen, bei `chapter` einstufig.
+- **Title-Page:** bei `chapter`/`page` Kapitel-/Seitentitel statt Buchtitel; Untertitel zeigt Buchtitel als Kontext.
+
+Profile bleiben Buch-scoped (`pdf_export_profile.book_id`); ein Profil gilt für alle drei Scopes desselben Buchs. Job-Result-JSON enthält wie bisher Metadaten, Buffer-Stream über `/jobs/pdf-export/:id/file`.
+
+### Sync vs. Async — Aufteilung
+
+- **`GET /export/:scope/:id/:fmt`** = synchron, Default-Styling, kein Profil. Schnellpfad für „eben mal Kapitel als DOCX an Lektor".
+- **`POST /jobs/pdf-export`** = asynchron, Custom-Profil/Cover/Font/veraPDF-Check. Schwerer Pfad für „druckfertige PDF/A".
+
+Beide Wege teilen `loadContents` + (im PDF-Fall) `lib/pdf-render.js`. Keine doppelte Render-Logik.
 
 ### Frontend
 
 [public/js/cards/export-card.js](../public/js/cards/export-card.js) bekommt Scope-Combobox (Pflicht-Pattern aus CLAUDE.md):
+
 - Optionen: „Ganzes Buch", „Aktuelles Kapitel" (nur wenn `selectedChapterId`), „Aktuelle Seite" (nur wenn `currentPageId`).
 - Default: „Ganzes Buch".
-- Format-Buttons-URL wird abhängig vom Scope gebaut: `/export/${scope}/${entityId}/${fmt}`.
+- Format-Buttons-URL: `/export/${scope}/${entityId}/${fmt}`.
 
 [public/js/cards/pdf-export-card.js](../public/js/cards/pdf-export-card.js) bekommt denselben Scope-Combobox neben dem Profil-Selector. Render-Trigger postet `{ profileId, scope, entityId }`.
 
-Quick-Pills + Command-Palette: kein neuer `FEATURES`-Eintrag nötig — die Karte `export`/`pdfExport` bleibt SSoT, Scope ist Karten-internes Detail. Optional Editor-Toolbar-Knöpfe „Kapitel als PDF" / „Seite als PDF" (kleiner Bequemlichkeitswin, hinter eigenem `FEATURES`-Eintrag wenn gewünscht).
+Quick-Pills + Command-Palette: kein neuer `FEATURES`-Eintrag nötig — die Karten `export`/`pdfExport` bleiben SSoT, Scope ist Karten-internes Detail. Optional Editor-Toolbar-Knöpfe „Kapitel als PDF" / „Seite als PDF" hinter eigenem `FEATURES`-Eintrag.
 
 ### Rollen-Matrix
 
-`export` und `pdfExport` bleiben `minRole: 'viewer'` (siehe Phase 4b). Scope ändert daran nichts — wer ein Buch sehen darf, darf auch Auszüge davon exportieren.
+`export` und `pdfExport` bleiben `minRole: 'viewer'` (siehe Phase 4b). Scope ändert nichts — wer ein Buch sehen darf, darf auch Auszüge davon exportieren.
 
 ### i18n
 
@@ -797,13 +819,15 @@ Neue Keys: `export.scope.book`, `export.scope.chapter`, `export.scope.page`, `ex
 
 ### Tests
 
-- **Unit:** `loadChapterContents` (Page-Sort, leeres Kapitel → `CHAPTER_EMPTY`), `loadPageContent` (Page ohne HTML → `PAGE_EMPTY`).
-- **Integration:** Round-Trip pro Format pro Scope — Build-Pipeline gegen Mock-`content-store`, Output-Buffer non-empty, EPUB-/DOCX-Magic-Bytes geprüft.
-- **E2E:** Scope-Combobox in Export-Karte rendert nur sichtbare Optionen je nach Navigation-State.
+- **Unit pro Builder** in [tests/unit/export-builders/](../tests/unit/export-builders/): jeweils gegen synthetische `{ scope, book, groups }`-Fixtures. PDF: Magic-Bytes `%PDF-`. EPUB/DOCX: ZIP-Magic + Manifest-Entry. HTML: Wohlgeformtheit. TXT/MD: Normalisierung match `sync.js`#htmlToText.
+- **Unit `loadContents`**: scope-Dispatch, `CHAPTER_EMPTY`/`PAGE_EMPTY`, Page-Sort.
+- **Integration**: Round-Trip pro Format pro Scope gegen Mock-`content-store`.
+- **E2E**: Scope-Combobox in Export-Karte rendert nur sichtbare Optionen je nach Navigation-State.
+- **Tripwire**: Tests, die `fetch`/`streamExport` in `routes/export.js` erwarten, werden entfernt; neuer Tripwire prüft, dass `routes/export.js` keine `BOOKSTACK_URL`-Imports mehr enthält.
 
 ### Aufwand
 
-1.5-2 Tage (Lib-Refactor + 2 neue Routen + Custom-PDF-Scope + Frontend-Combobox + Tests). Eigenbau-PDF/HTML/TXT/MD für Buch-Scope (Folgeschritt zur Eliminierung von `streamExport`) wird separat budgetiert, weil optional.
+3-4 Tage (Loader-Konsolidierung + 6 Builder-Module + Sync-Route-Refactor + Job-Scope + Frontend-Combobox + Test-Sweep). Doppelt so gross wie die ursprüngliche „nur-Scopes"-Variante, weil Pass-Through-Branch und drei BookStack-Renderer (PDF/HTML/TXT) durch Eigenbau ersetzt werden müssen.
 
 ---
 
@@ -1515,7 +1539,7 @@ Ziel: 100+ Migrationen zu einem konsolidierten Initial-Schema kollabieren. Nach 
 | 4a | 4-6 Tage | mittel (FK-Recreate, Login-Flow) |
 | 4b | 4-5 Tage | mittel (Rollen-Matrix + Apply-Routen + minRole-Filter) |
 | 4b1 | 0.5-1 Tag | niedrig (Print-CSS + readOnly-Guard, keine neuen Tabellen) |
-| 4b2 | 1.5-2 Tage | niedrig (storage-agnostisch, baut auf bestehender EPUB/DOCX-Pipeline auf) |
+| 4b2 | 3-4 Tage | mittel (6 Format-Builder, Pass-Through-Cut, Sync- + Job-Route auf einen Loader) |
 | 4c | 4-6 Tage | mittel (Backend-Switch + Hot-Reload + Test-Probes + ENV-Migration in vielen Modulen) |
 | 4c1 | 1-2 Tage | niedrig (eigenständige Wizard-Page, kleines Form-State-Modell) |
 | 5 | — | ENTFÄLLT |
