@@ -111,7 +111,7 @@ test('audit-Tabelle erhaelt Hashes bei jedem set', () => {
 
 test('isEncryptedKey: bekannte Keys werden erkannt', () => {
   assert.equal(settings.isEncryptedKey('ai.claude.api_key'), true);
-  assert.equal(settings.isEncryptedKey('app.bookstack.token_secret'), true);
+  assert.equal(settings.isEncryptedKey('smtp.gmail.app_password'), true);
   assert.equal(settings.isEncryptedKey('ai.provider'), false);
 });
 

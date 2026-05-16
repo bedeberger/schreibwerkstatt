@@ -14,12 +14,16 @@
 export const appHashRouterMethods = {
   _computeHash() {
     if (this.showUserSettingsCard) return '#profil';
+    // Phase 7: Volltextsuche ist book-unabhaengig — eigener Top-Level-Hash.
+    if (this.showSearchCard) return '#search';
     if (this.showAdminUsersCard) return '#admin/users';
     if (this.showAdminSettingsCard) return '#admin/settings';
     if (this.showAdminUsageCard) {
       const tab = this.adminUsageTab;
       return '#admin/usage' + (tab && tab !== 'users' ? '/' + tab : '');
     }
+    if (this.showAdminCategoriesCard) return '#admin/categories';
+    if (this.showAdminBackendMigrationCard) return '#admin/migration';
     if (!this.selectedBookId) return '';
     const parts = ['book', this.selectedBookId];
     if (this.showEditorCard && this.currentPage?.id) {
@@ -60,6 +64,7 @@ export const appHashRouterMethods = {
     if (!hash) return null;
     const parts = hash.replace(/^#/, '').split('/').filter(Boolean);
     if (parts[0] === 'profil') return 'profil';
+    if (parts[0] === 'search') return 'search';
     if (parts[0] === 'admin') return 'admin:' + (parts[1] || '');
     if (parts[0] !== 'book' || !parts[1]) return null;
     const bookId = parts[1];
@@ -134,6 +139,18 @@ export const appHashRouterMethods = {
       return;
     }
 
+    if (parts[0] === 'search') {
+      this._applyingHash = true;
+      this._inHashApply = true;
+      try {
+        if (!this.showSearchCard) await this.toggleSearchCard();
+      } finally {
+        this._applyingHash = false;
+        this._inHashApply = false;
+      }
+      return;
+    }
+
     if (parts[0] === 'admin') {
       this._applyingHash = true;
       this._inHashApply = true;
@@ -149,6 +166,10 @@ export const appHashRouterMethods = {
           const valid = ['users', 'jobs', 'chat', 'summary', 'features', 'time'];
           if (tab && valid.includes(tab)) this.adminUsageTab = tab;
           else if (!tab) this.adminUsageTab = 'users';
+        } else if (sub === 'categories') {
+          if (!this.showAdminCategoriesCard) await this.toggleAdminCategoriesCard();
+        } else if (sub === 'migration') {
+          if (!this.showAdminBackendMigrationCard) await this.toggleAdminBackendMigrationCard();
         }
       } finally {
         this._applyingHash = false;
@@ -320,12 +341,14 @@ export const appHashRouterMethods = {
       'showBookStatsCard', 'showStilCard', 'showFehlerHeatmapCard',
       'showBookSettingsCard', 'showUserSettingsCard',
       'showAdminUsersCard', 'showAdminSettingsCard', 'showAdminUsageCard', 'adminUsageTab',
+      'showAdminCategoriesCard', 'showAdminBackendMigrationCard',
       'showFinetuneExportCard',
       'showExportCard',
       'showPdfExportCard',
       'showBookOrganizerCard',
       'showBookEditorCard',
       'showBookOverviewCard',
+      'showSearchCard',
     ];
     this._hashWatcherTeardowns = [];
     for (const prop of watchers) {

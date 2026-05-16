@@ -18,6 +18,35 @@ import { fuzzyMatch } from './palette-fuzzy.js';
 
 const PER_PROVIDER_LIMIT = 8;
 
+// Volltextsuche-Treffer-Aktivierung. Identische Dispatch-Logik wie
+// searchCard#activateHit, dupliziert hier weil die Palette keine Sub-Karten-
+// Methoden aufruft — sie kennt nur den Root.
+function _runFulltextHit(root, hit) {
+  if (!root || !hit) return;
+  switch (hit.kind) {
+    case 'page':     return root.gotoPageById?.(hit.entity_id);
+    case 'chapter': {
+      const tree = root.tree || [];
+      const ch = tree.find(t => t.type === 'chapter' && String(t.id) === String(hit.entity_id));
+      if (ch && typeof root.openKapitelReviewForChapter === 'function') {
+        return root.openKapitelReviewForChapter(hit.entity_id);
+      }
+      if (ch?.pages?.[0]) return root.selectPage(ch.pages[0]);
+      return;
+    }
+    case 'book':
+      if (hit.book_id && root.selectedBookId !== hit.book_id) root.selectedBookId = hit.book_id;
+      return root.toggleBookOverviewCard?.();
+    case 'figure':   return root.openFigurById?.(hit.entity_id);
+    case 'location': return root.openOrtById?.(hit.entity_id);
+    case 'scene':    return root.openSzeneById?.(hit.entity_id);
+    case 'idea':
+      // Idea → eigene Suche im Karten-Trigger; Palette macht's einfach: SearchCard oeffnen.
+      root.toggleSearchCard?.();
+      return;
+  }
+}
+
 // In-Flight-Guard für lazy provider-prepare Calls. Ohne Guard feuert jeder
 // Keystroke `loadFiguren/Orte/Szenen` neu, bis der Fetch antwortet (Liste leer
 // = guard-bedingung unverändert). Set hält pro Buch+Provider eine pending
@@ -207,6 +236,57 @@ export const PROVIDERS = [
         });
       }
       return rank(out);
+    },
+  },
+  {
+    // Volltextsuche-Provider (Phase 7 BookStack-Exit). Async — feuert
+    // `/search?q=...` und cached pro Query bis zur naechsten Eingabe.
+    key: 'fulltext',
+    prefix: '?',
+    sectionKey: 'palette.section.fulltext',
+    _cache: { q: '', book: '', items: null },
+    _inflight: null,
+    list() { return []; },
+    prepare(root) {
+      const q = (this._lastQuery || '').trim();
+      if (q.length < 2) return;
+      const bookId = root.selectedBookId || '';
+      const cacheKey = q + '|' + bookId;
+      if (this._cache && (this._cache.q + '|' + this._cache.book) === cacheKey) return;
+      if (this._inflight === cacheKey) return;
+      this._inflight = cacheKey;
+      const url = new URLSearchParams({ q, kind: 'page,chapter,figure,location,scene,idea', limit: '12' });
+      if (bookId) url.set('book_id', String(bookId));
+      fetch('/search?' + url.toString(), { credentials: 'same-origin' })
+        .then(r => r.ok ? r.json() : { hits: [] })
+        .then(data => {
+          this._cache = { q, book: bookId, items: Array.isArray(data.hits) ? data.hits : [] };
+          // Re-Render der Palette anstossen — sonst zeigt sie das Cache-Miss-
+          // Snapshot von vorhin bis zum naechsten Keystroke. palette-card
+          // lauscht auf 'palette:rerender' und invalidiert Sections-Cache.
+          window.dispatchEvent(new CustomEvent('palette:rerender'));
+        })
+        .catch(() => { this._cache = { q, book: bookId, items: [] }; })
+        .finally(() => { if (this._inflight === cacheKey) this._inflight = null; });
+    },
+    search(root, q, t) {
+      this._lastQuery = q;
+      this.prepare(root);
+      if (!q || q.length < 2) return [];
+      const bookId = root.selectedBookId || '';
+      const cacheKey = q + '|' + bookId;
+      if (!this._cache || (this._cache.q + '|' + this._cache.book) !== cacheKey) return [];
+      const items = this._cache.items || [];
+      return items.slice(0, PER_PROVIDER_LIMIT).map(h => ({
+        key: 'fts:' + h.kind + ':' + h.entity_id,
+        providerKey: 'fulltext',
+        label: h.title || (t('search.untitled') || ''),
+        sub: t('search.kind.' + h.kind) || h.kind,
+        score: 0,
+        indices: [],
+        available: true,
+        run: (r) => _runFulltextHit(r, h),
+      }));
     },
   },
   {

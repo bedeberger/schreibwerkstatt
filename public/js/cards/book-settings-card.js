@@ -23,6 +23,13 @@ export function registerBookSettingsCard() {
     shareEmail: '',
     shareRole: 'viewer',
     shareBusy: false,
+    // Phase 6: Kategorie + Tags.
+    categoryPool: [],
+    tagPool: [],
+    bookCategoryId: '',
+    bookTagIds: [],
+    newTagName: '',
+    newTagBusy: false,
     bookSettingsLoading: false,
     bookSettingsSaving: false,
     bookSettingsSaved: false,
@@ -44,8 +51,8 @@ export function registerBookSettingsCard() {
     init() {
       this._lifecycle = setupCardLifecycle(this, {
         showFlag: 'showBookSettingsCard',
-        onShow: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats(), this.loadBookAccess()]),
-        load: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats(), this.loadBookAccess()]),
+        onShow: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats(), this.loadBookAccess(), this.loadBookCategoriesAndTags()]),
+        load: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats(), this.loadBookAccess(), this.loadBookCategoriesAndTags()]),
         resetState: {
           expandedJobType: null,
           bookJobRuns: {},
@@ -56,6 +63,9 @@ export function registerBookSettingsCard() {
           bookAccessError: '',
           shareEmail: '',
           shareRole: 'viewer',
+          bookCategoryId: '',
+          bookTagIds: [],
+          newTagName: '',
         },
         resetStateView: {
           bookSettingsSaved: false,

@@ -4715,6 +4715,143 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 113 abgeschlossen (auth.allowed_emails entfernt).');
   }
 
+  if (version < 114) {
+    // Phase 3 (BookStack-Exit, docs/bookstack-exit.md): Eigene Sortierung.
+    // book_order ist SSoT fuer Buch-Hierarchie (Kapitel + Seiten, inkl.
+    // Top-Level-Seiten). pages.position/chapters.position/pages.chapter_id
+    // werden vom PUT-Hook aus order_json materialisiert (fuer Querys/JOINs).
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS book_order (
+        book_id    INTEGER PRIMARY KEY REFERENCES books(book_id) ON DELETE CASCADE,
+        order_json TEXT NOT NULL,
+        updated_at TEXT DEFAULT (datetime('now')),
+        updated_by TEXT
+      )
+    `).run();
+
+    const fkErrors114 = db.pragma('foreign_key_check');
+    if (fkErrors114.length) {
+      throw new Error(`Migration 114: foreign_key_check meldet ${fkErrors114.length} Verstoesse: ${JSON.stringify(fkErrors114.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 114').run();
+    logger.info('DB-Migration auf Version 114 abgeschlossen (Phase 3 BookStack-Exit: book_order).');
+  }
+
+  if (version < 115) {
+    // Phase 6 (BookStack-Exit, docs/bookstack-exit.md): Kategorien + Tags.
+    // book_categories: hierarchisch (parent_id), admin-verwaltet, global.
+    // book_tags: flach, jeder Auth-User darf erzeugen, admin loescht.
+    // book_tag_assignments: M:N-Bridge zwischen books und book_tags.
+    // books.category_id: optional. SET NULL beim Loeschen einer Kategorie.
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS book_categories (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        parent_id   INTEGER REFERENCES book_categories(id) ON DELETE SET NULL,
+        name        TEXT NOT NULL,
+        slug        TEXT NOT NULL UNIQUE,
+        color       TEXT,
+        position    INTEGER DEFAULT 0,
+        created_by  TEXT,
+        created_at  TEXT DEFAULT (datetime('now'))
+      )
+    `).run();
+    db.prepare(
+      'CREATE INDEX IF NOT EXISTS idx_book_categories_parent ON book_categories(parent_id)'
+    ).run();
+
+    // books.category_id: ALTER TABLE ADD COLUMN unterstuetzt FK-Inline-Form
+    // in SQLite. Bestandsrows behalten NULL.
+    const bookCols115 = db.pragma('table_info(books)').map(c => c.name);
+    if (!bookCols115.includes('category_id')) {
+      db.prepare('ALTER TABLE books ADD COLUMN category_id INTEGER REFERENCES book_categories(id) ON DELETE SET NULL').run();
+    }
+    db.prepare(
+      'CREATE INDEX IF NOT EXISTS idx_books_category ON books(category_id)'
+    ).run();
+
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS book_tags (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        name        TEXT NOT NULL UNIQUE,
+        slug        TEXT NOT NULL UNIQUE,
+        color       TEXT,
+        created_by  TEXT,
+        created_at  TEXT DEFAULT (datetime('now'))
+      )
+    `).run();
+
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS book_tag_assignments (
+        book_id      INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        tag_id       INTEGER NOT NULL REFERENCES book_tags(id) ON DELETE CASCADE,
+        assigned_at  TEXT DEFAULT (datetime('now')),
+        assigned_by  TEXT,
+        PRIMARY KEY (book_id, tag_id)
+      )
+    `).run();
+    db.prepare(
+      'CREATE INDEX IF NOT EXISTS idx_bta_tag ON book_tag_assignments(tag_id)'
+    ).run();
+
+    const fkErrors115 = db.pragma('foreign_key_check');
+    if (fkErrors115.length) {
+      throw new Error(`Migration 115: foreign_key_check meldet ${fkErrors115.length} Verstoesse: ${JSON.stringify(fkErrors115.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 115').run();
+    logger.info('DB-Migration auf Version 115 abgeschlossen (Phase 6 BookStack-Exit: book_categories, book_tags, book_tag_assignments).');
+  }
+
+  if (version < 116) {
+    // Phase 7 (BookStack-Exit, docs/bookstack-exit.md): SQLite-FTS5-Volltextsuche.
+    // search_index   – Haupt-Index (BM25, Titel 5x staerker als Body), Unicode61
+    //                  mit remove_diacritics=2 (Umlaut-Folding DE+EN), tokenchars
+    //                  '-_' fuer Bindestrich-Woerter.
+    // search_trigram – Titel-only Trigram-Index (Typo-Toleranz, Single-Word-Fallback).
+    // search_meta    – key/value-Store fuer last_optimize/last_reindex/reindex_required.
+    // Initialer Reindex: Marker `reindex_required=1` setzen, server.js startet
+    // searchIndex.reindexIfNeeded() in setImmediate nach dem Boot.
+    db.prepare(`
+      CREATE VIRTUAL TABLE IF NOT EXISTS search_index USING fts5(
+        kind UNINDEXED,
+        entity_id UNINDEXED,
+        book_id UNINDEXED,
+        lang UNINDEXED,
+        title,
+        body,
+        tokenize="unicode61 remove_diacritics 2 tokenchars '-_'"
+      )
+    `).run();
+    db.prepare(`
+      CREATE VIRTUAL TABLE IF NOT EXISTS search_trigram USING fts5(
+        kind UNINDEXED,
+        entity_id UNINDEXED,
+        book_id UNINDEXED,
+        title,
+        tokenize="trigram"
+      )
+    `).run();
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS search_meta (
+        key        TEXT PRIMARY KEY,
+        value      TEXT,
+        updated_at TEXT DEFAULT (datetime('now'))
+      )
+    `).run();
+    db.prepare(
+      `INSERT OR REPLACE INTO search_meta (key, value, updated_at) VALUES ('reindex_required', '1', datetime('now'))`
+    ).run();
+    db.prepare(
+      `INSERT OR IGNORE INTO search_meta (key, value) VALUES ('last_optimize', NULL)`
+    ).run();
+
+    const fkErrors116 = db.pragma('foreign_key_check');
+    if (fkErrors116.length) {
+      throw new Error(`Migration 116: foreign_key_check meldet ${fkErrors116.length} Verstoesse: ${JSON.stringify(fkErrors116.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 116').run();
+    logger.info('DB-Migration auf Version 116 abgeschlossen (Phase 7 BookStack-Exit: FTS5 search_index + search_trigram + search_meta).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

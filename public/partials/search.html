@@ -1,0 +1,63 @@
+<!-- Volltextsuche (Phase 7 BookStack-Exit). Sucht ueber FTS5; ACL via book_access. -->
+<div class="card card--search" id="search-card" x-data="searchCard" x-show="$app.showSearchCard" x-cloak>
+  <div class="card-header">
+    <span class="card-title" x-text="$app.t('search.title')"></span>
+    <span class="card-subtitle" x-text="$app.t('search.subtitle')"></span>
+  </div>
+
+  <div class="search-q-row">
+    <input
+      type="search"
+      class="search-q"
+      x-model="q"
+      :placeholder="$app.t('search.placeholder')"
+      :aria-label="$app.t('search.placeholder')"
+      @input="onInput()"
+      @keydown.enter.prevent="runSearch()"
+    />
+    <button type="button"
+      class="btn-compact search-clear"
+      x-show="q"
+      @click="q=''; runSearch();"
+      :title="$app.t('search.clear')">×</button>
+  </div>
+
+  <div class="search-filters">
+    <div class="search-kind-pills">
+      <template x-for="k in kindOptions()" :key="k">
+        <button type="button"
+          class="kind-pill"
+          :class="{ 'is-active': isKindActive(k) }"
+          @click="toggleKind(k)"
+          x-text="$app.t('search.kind.' + k)"></button>
+      </template>
+    </div>
+
+    <button type="button"
+      class="search-scope-toggle"
+      x-show="$app.selectedBookId"
+      :class="{ 'is-active': scopeMode === 'book' }"
+      @click="toggleScope()"
+      x-text="scopeMode === 'book' ? $app.t('search.scope.book') : $app.t('search.scope.all')"></button>
+  </div>
+
+  <div class="search-status" x-show="loading" x-text="$app.t('search.loading')"></div>
+  <div class="search-status search-status--error" x-show="errorMessage && !loading" x-text="errorMessage"></div>
+  <div class="search-status" x-show="fallback && !loading && hits.length" x-text="$app.t('search.fallback')"></div>
+  <div class="search-status" x-show="!loading && !errorMessage && q.length >= 2 && hits.length === 0" x-text="$app.t('search.empty')"></div>
+  <div class="search-status search-status--meta" x-show="!loading && hits.length"
+       x-text="$app.t('search.results.count', { n: hits.length })"></div>
+
+  <ul class="search-results" x-show="hits.length">
+    <template x-for="hit in hits" :key="hit.kind + ':' + hit.entity_id">
+      <li class="search-hit internal-link"
+          @click="activateHit(hit)">
+        <div class="search-hit-row">
+          <span class="search-hit-kind" :data-kind="hit.kind" x-text="hitKindLabel(hit.kind)"></span>
+          <span class="search-hit-title" x-text="hit.title || $app.t('search.untitled')"></span>
+        </div>
+        <div class="search-hit-snippet" x-show="hit.snippet" x-html="hit.snippet"></div>
+      </li>
+    </template>
+  </ul>
+</div>

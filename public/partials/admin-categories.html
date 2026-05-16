@@ -1,0 +1,98 @@
+<!-- Admin: Kategorien + Tags (Phase 6 BookStack-Exit) -->
+<!--
+  Alpine.data-Sub-Komponente — siehe public/js/cards/admin-categories-card.js.
+  `showAdminCategoriesCard` + `toggleAdminCategoriesCard` im Root. Nur sichtbar
+  bei $app.currentUser.role === 'admin'.
+-->
+<div class="card card--admin-categories" x-data="adminCategoriesCard" x-show="$app.showAdminCategoriesCard" x-cloak>
+  <div class="card-header">
+    <span class="card-title" x-text="$app.t('admin.categories.title')"></span>
+    <div class="card-actions">
+      <button type="button" @click="loadAll()" :disabled="loading" x-text="$app.t('common.refresh')"></button>
+    </div>
+  </div>
+
+  <div x-show="loading" class="muted-msg" x-text="$app.t('common.loading')"></div>
+  <p class="card-form-error" x-show="error" x-text="error"></p>
+
+  <div class="card-form-grid" x-show="!loading">
+
+    <section class="admin-pool-section">
+      <h3 class="book-settings-stats-title" x-text="$app.t('book.category')"></h3>
+
+      <div class="admin-pool-create">
+        <input type="text"
+               class="card-form-input"
+               x-model="newCategoryName"
+               :placeholder="$app.t('admin.cat.namePlaceholder')"
+               @keydown.enter.prevent="createCategory()"
+               :disabled="busy"
+               maxlength="120">
+        <button type="button" @click="createCategory()" :disabled="busy || !newCategoryName.trim()" x-text="$app.t('common.new')"></button>
+      </div>
+
+      <p class="muted-msg muted-msg--sm" x-show="categories.length === 0" x-text="$app.t('categories.empty')"></p>
+      <table class="admin-pool-table" x-show="categories.length">
+        <thead>
+          <tr>
+            <th x-text="$app.t('admin.cat.col.name')"></th>
+            <th x-text="$app.t('admin.cat.col.slug')"></th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="cat in categories" :key="cat.id">
+            <tr>
+              <td x-text="cat.name"></td>
+              <td><code class="muted-msg muted-msg--sm" x-text="cat.slug"></code></td>
+              <td class="admin-pool-actions">
+                <button type="button" @click="renameCategory(cat)" x-text="$app.t('admin.cat.rename')"></button>
+                <button type="button" class="danger" @click="deleteCategory(cat)" x-text="$app.t('common.delete')"></button>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="admin-pool-section">
+      <h3 class="book-settings-stats-title" x-text="$app.t('book.tags')"></h3>
+
+      <div class="admin-pool-create">
+        <input type="text"
+               class="card-form-input"
+               x-model="newTagName"
+               :placeholder="$app.t('admin.tag.namePlaceholder')"
+               @keydown.enter.prevent="createTag()"
+               :disabled="busy"
+               maxlength="80">
+        <button type="button" @click="createTag()" :disabled="busy || !newTagName.trim()" x-text="$app.t('common.new')"></button>
+      </div>
+
+      <p class="muted-msg muted-msg--sm" x-show="tags.length === 0" x-text="$app.t('tags.empty')"></p>
+      <table class="admin-pool-table" x-show="tags.length">
+        <thead>
+          <tr>
+            <th x-text="$app.t('admin.tag.col.name')"></th>
+            <th x-text="$app.t('admin.tag.col.slug')"></th>
+            <th x-text="$app.t('admin.tag.col.usage')"></th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="tag in tags" :key="tag.id">
+            <tr>
+              <td x-text="tag.name"></td>
+              <td><code class="muted-msg muted-msg--sm" x-text="tag.slug"></code></td>
+              <td x-text="tag.book_count || 0"></td>
+              <td class="admin-pool-actions">
+                <button type="button" @click="renameTag(tag)" x-text="$app.t('admin.tag.rename')"></button>
+                <button type="button" class="danger" @click="deleteTag(tag)" x-text="$app.t('common.delete')"></button>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </section>
+  </div>
+</div>

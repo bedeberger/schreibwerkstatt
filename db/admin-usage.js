@@ -50,11 +50,22 @@ function _cost(row) {
   });
 }
 
+// Admin-User nutzen die KI-Pipelines nicht (nur Plattform-Mgmt); aus allen
+// Cost-/Usage-Aggregaten ausschliessen, damit Reports den echten KI-Verbrauch
+// zeigen.
+const _stmtAdminEmails = db.prepare(`SELECT email FROM app_users WHERE global_role = 'admin'`);
+function _adminEmailSet() {
+  const s = new Set();
+  for (const r of _stmtAdminEmails.all()) s.add(r.email);
+  return s;
+}
+
 function _aggregateByUser({ fromIso, toIso }) {
+  const admins = _adminEmailSet();
   const acc = new Map();
   const add = (row, source) => {
     const email = row.user_email || '';
-    if (!email) return;
+    if (!email || admins.has(email)) return;
     const prev = acc.get(email) || {
       email, usd: 0, tokensIn: 0, tokensOut: 0,
       cacheReadIn: 0, cacheCreationIn: 0,
@@ -83,7 +94,7 @@ function listUsersWithUsage({ from, to } = {}) {
     SELECT email, display_name, global_role, status,
            monthly_budget_usd, budget_mode, last_seen_at
       FROM app_users
-     WHERE status != 'deleted'
+     WHERE status != 'deleted' AND global_role != 'admin'
      ORDER BY email
   `).all();
   return users.map(u => {
@@ -187,8 +198,10 @@ function getChatMessagesForUser(email, { from, to, limit = 50, offset = 0 } = {}
 
 function monthlyTotals({ from, to } = {}) {
   const { fromIso, toIso } = _resolveRange({ from, to });
-  const jobs = _stmtJobsRange.all(fromIso, toIso);
-  const chats = _stmtChatsRange.all(fromIso, toIso);
+  const admins = _adminEmailSet();
+  const notAdmin = (r) => r.user_email && !admins.has(r.user_email);
+  const jobs = _stmtJobsRange.all(fromIso, toIso).filter(notAdmin);
+  const chats = _stmtChatsRange.all(fromIso, toIso).filter(notAdmin);
 
   let totalUsd = 0, totalIn = 0, totalOut = 0, totalCacheR = 0, totalCacheW = 0;
   const byUser  = new Map();
@@ -234,9 +247,9 @@ function monthlyTotals({ from, to } = {}) {
 
   // Job-Typ-Aggregat braucht separates Query mit `type`-Spalte
   const typeRows = db.prepare(`
-    SELECT type, provider, model, tokens_in, tokens_out, cache_read_in, cache_creation_in
+    SELECT user_email, type, provider, model, tokens_in, tokens_out, cache_read_in, cache_creation_in
       FROM job_runs WHERE queued_at >= ? AND queued_at < ?
-  `).all(fromIso, toIso);
+  `).all(fromIso, toIso).filter(notAdmin);
   for (const r of typeRows) {
     bumpType(r.type || 'unknown', _cost(r));
   }
@@ -274,7 +287,8 @@ function listFeatureUsage({ from, to } = {}) {
   const { fromIso, toIso } = _resolveRange({ from, to });
   const fromMs = Date.parse(fromIso);
   const toMs   = Date.parse(toIso);
-  const rows = _stmtFeatureUsage.all(fromMs, toMs);
+  const admins = _adminEmailSet();
+  const rows = _stmtFeatureUsage.all(fromMs, toMs).filter(r => !admins.has(r.user_email));
   return rows.map(r => ({
     email: r.user_email, featureKey: r.feature_key,
     count: r.use_count, lastUsed: r.last_used,
@@ -314,8 +328,10 @@ function listTimeUsage({ from, to } = {}) {
   const { fromIso, toIso } = _resolveRange({ from, to });
   const fromDay = _yyyymmdd(fromIso);
   const toDay   = _yyyymmdd(toIso);
-  const writing  = _stmtWritingTime.all(fromDay, toDay);
-  const lektorat = _stmtLektoratTime.all(fromDay, toDay);
+  const admins = _adminEmailSet();
+  const skipAdmin = (r) => !admins.has(r.user_email);
+  const writing  = _stmtWritingTime.all(fromDay, toDay).filter(skipAdmin);
+  const lektorat = _stmtLektoratTime.all(fromDay, toDay).filter(skipAdmin);
   const merged = new Map();
   const keyOf = (email, book) => `${email}\t${book}`;
   for (const r of writing) {

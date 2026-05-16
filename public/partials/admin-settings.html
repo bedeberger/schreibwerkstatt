@@ -132,12 +132,7 @@
       </label>
       <div x-show="adminSettingsForm['app.backend'] === 'bookstack'">
         <label>app.bookstack.base_url <input type="url" x-model="adminSettingsForm['app.bookstack.base_url']"></label>
-        <label>app.bookstack.token_id
-          <input type="password" x-model="adminSettingsForm['app.bookstack.token_id']" :placeholder="$app.t('admin.settings.secret.masked')">
-        </label>
-        <label>app.bookstack.token_secret
-          <input type="password" x-model="adminSettingsForm['app.bookstack.token_secret']" :placeholder="$app.t('admin.settings.secret.masked')">
-        </label>
+        <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.bookstack.tokenHint')"></p>
       </div>
 
       <!-- Phase 0b: Auto-Sweep-Progress nach Backend-Wechsel -->
@@ -184,6 +179,7 @@
       </label>
       <label>smtp.gmail.app_password
         <input type="password" x-model="adminSettingsForm['smtp.gmail.app_password']" :placeholder="$app.t('admin.settings.secret.masked')" autocomplete="off">
+        <small x-show="adminSettingsMap['smtp.gmail.app_password']?.masked" class="muted-msg muted-msg--sm" x-text="adminSettingsMap['smtp.gmail.app_password']?.masked"></small>
       </label>
       <label>smtp.from_name
         <input type="text" x-model="adminSettingsForm['smtp.from_name']" placeholder="Schreibwerkstatt">
@@ -258,8 +254,9 @@
       </div>
     </section>
 
-    <!-- Test-Result-Anzeige -->
-    <div class="admin-settings-test-result" x-show="adminSettingsTestResult">
+    <!-- Test-Result-Anzeige (pro Tab gescoped via kind→tab-Mapping) -->
+    <div class="admin-settings-test-result"
+         x-show="adminSettingsTestResult && ({ oauth: 'auth', provider: 'provider', smtp: 'smtp' }[adminSettingsTestResult.kind] === adminSettingsTab)">
       <strong x-text="$app.t('admin.settings.test.' + (adminSettingsTestResult?.ok ? 'ok' : 'fail'))"></strong>
       <span x-show="adminSettingsTestResult?.latency_ms" x-text="' · ' + adminSettingsTestResult?.latency_ms + ' ms'"></span>
       <span x-show="adminSettingsTestResult?.error" x-text="' · ' + adminSettingsTestResult?.error"></span>

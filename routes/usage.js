@@ -32,6 +32,7 @@ const ALLOWED_KEYS = new Set([
   'pdfExport',
   'bookOrganizer',
   'bookEditor',
+  'search',
 ]);
 
 function userEmailOrNull(req) {

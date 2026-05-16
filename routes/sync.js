@@ -10,6 +10,7 @@ const appSettings = require('../lib/app-settings');
 const { computePageIndex, writePageIndex, writeFigureMentionsForPageAllUsers, tokenizeNamesForStopwords } = require('../lib/page-index');
 const { invalidateBookPageCache } = require('./jobs/chat');
 const { localIsoDate } = require('../lib/local-date');
+const searchIndex = require('../lib/search');
 
 // Phase 1 (BookStack-Exit): Sync-Worker laeuft nur im `bookstack`-Backend.
 // Im `localdb`-Mode ist die DB autoritativ — kein BookStack-Pull noetig; Cron-
@@ -282,6 +283,17 @@ async function syncBook(bookId, token) {
   for (const item of indexItems) {
     try { writeFigureMentionsForPageAllUsers(item.page_id, bookId, item.fullText); }
     catch (e) { logger.warn(`Figuren-Mentions für Seite ${item.page_id} fehlgeschlagen: ${e.message}`); }
+  }
+
+  // Phase 7: Volltext-Index nach Sync-Pull aktualisieren. Buch-Meta + Kapitel
+  // werden ueber upsertBook/upsertChapters in _upsertPagesCache implizit
+  // beruehrt; Seiten haben nach upsertPageStatsMany die neuen body_html-Werte.
+  try {
+    searchIndex.upsertBookMeta(bookId);
+    for (const ch of chapters) searchIndex.upsertChapter(ch.id);
+    for (const item of indexItems) searchIndex.upsertPage(item.page_id);
+  } catch (e) {
+    logger.warn(`Search-Index Sync Buch ${bookId} fehlgeschlagen: ${e.message}`);
   }
 
   // Lokales Datum statt UTC: book_stats_history.recorded_at muss zur lokalen

@@ -3,6 +3,7 @@ const express = require('express');
 const { db, saveOrteToDb } = require('../db/schema');
 const { toIntId, inClause } = require('../lib/validate');
 const { aclParamGuard } = require('../lib/acl');
+const searchIndex = require('../lib/search');
 
 const router = express.Router();
 router.param('book_id', aclParamGuard('editor'));
@@ -67,6 +68,10 @@ router.put('/:book_id', jsonBody, (req, res) => {
   if (!bookId) return res.status(400).json({ error_code: 'INVALID_ID' });
   const userEmail = req.session?.user?.email || null;
   saveOrteToDb(bookId, req.body.orte || [], userEmail);
+  // FTS-Index nachziehen — saveOrteToDb ist Full-Replace pro Buch.
+  searchIndex.removeKindForBook('location', bookId);
+  const locRows = db.prepare('SELECT id FROM locations WHERE book_id = ?').all(bookId);
+  for (const r of locRows) searchIndex.upsertLocation(r.id);
   res.json({ ok: true });
 });
 

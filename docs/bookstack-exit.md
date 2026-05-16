@@ -55,9 +55,9 @@ Phase-0-Spalten im aktuellen Schema:
 
 ## Offene Phasen (Reihenfolge)
 
-`3 → 6 → 7 → 8 → 9 → 10 → 11`. Phase 11 (Per-User-AI-Provider) ist additiv und kann eingeschoben werden, sobald `app_users` (steht) + `app_settings` (steht) konsolidiert sind.
+`8 → 9 → 10 → 11`. Phase 11 (Per-User-AI-Provider) ist additiv und kann eingeschoben werden, sobald `app_users` (steht) + `app_settings` (steht) konsolidiert sind.
 
-Phase 1 (`localdb`-Backend) + Phase 2 (Page-Revisions) gelandet — siehe Code-Pfade in den jeweiligen Abschnitten.
+Phase 1 (`localdb`-Backend) + Phase 2 (Page-Revisions) + Phase 3 (Eigene Sortierung) + Phase 6 (Tags + Kategorien) + Phase 7 (FTS5-Volltextsuche) gelandet — siehe Code-Pfade in den jeweiligen Abschnitten.
 
 ---
 
@@ -117,115 +117,43 @@ Implementiert; Code-Pfade:
 
 ---
 
-## Phase 3 — Eigene Sortierung (Kapitel + Seiten)
+## Phase 3 — Eigene Sortierung (Kapitel + Seiten) (erledigt)
 
-Deckt **alle** Strukturoperationen ab: Kapitel-Reihenfolge, Seiten-Reihenfolge innerhalb eines Kapitels, Seiten direkt unter Buch, Seiten zwischen Kapiteln umhängen, Seiten zwischen Top-Level und Kapitel umhängen.
+Implementiert; Code-Pfade:
 
-**Migration:**
+- **Migration 114** ([db/migrations.js](../db/migrations.js)): `book_order` mit `book_id PRIMARY KEY REFERENCES books(book_id) ON DELETE CASCADE`, `order_json TEXT NOT NULL`, `updated_at`, `updated_by`.
+- **DB-Helper** ([db/book-order.js](../db/book-order.js)): `validateTree`/`materializeTree`/`getOrder`/`putOrder`/`buildFromCurrentState`/`reconcile`/`ensureTree` + `TreeValidationError` mit `status: 400`. `putOrder` validiert + materialisiert + persistiert in einer Transaction; `ensureTree` initialisiert aus aktuellen `chapters.position`/`pages.position` (Auto-Init bei erstem Read) und reconciliert neue/geloeschte Items vor jedem Read.
+- **Routen** ([routes/content.js](../routes/content.js)): `GET /content/books/:id/order` (viewer-ACL) + `PUT /content/books/:id/order` (editor-ACL) mit `{ order_json: [...] }`. Validierungs-Fehler werden als `400 { error_code: 'INVALID_TREE', reason, detail }` zurueckgegeben.
+- **Facade-Overlay** ([lib/content-store/index.js](../lib/content-store/index.js)): `bookTree` ruft Backend, ordnet das Ergebnis dann nach `book_order.ensureTree`. Beide Backends (localdb + bookstack) profitieren, ohne dass das Backend Order-Kenntnis braucht. `_applyOrder` filtert raw chapters/topPages durch den gespeicherten Tree.
+- **Frontend-Repo** ([public/js/repo/content.js](../public/js/repo/content.js)): `loadOrder(id)` + `saveOrder(id, tree)` mit CONTENT_CACHE-Invalidation auf `books/:id/order` + `books/:id/tree`.
+- **Frontend** ([public/js/cards/book-organizer-card.js](../public/js/cards/book-organizer-card.js)): `_buildTreeFromWorkstate()` baut Tree aus `workTree` + `soloPages`. `_persistOrder()` ersetzt die per-Item-Renumber-Loops — ein einziges PUT, keine N+M HTTP-Calls bei Reorder. `_mirrorChapterOrderInRoot`/`_mirrorPageMembershipInRoot` synchronisieren root.tree/root.pages in-place.
+- **Hierarchie-Invarianten** (Server): genau zwei Ebenen (Buch -> Kapitel|Seite -> Seite); `type` + `id` Pflicht; IDs gehoeren zum Buch; Vollstaendigkeit (alle Chapter+Pages des Buches genau einmal); keine `children` an Seiten; keine verschachtelten Kapitel.
+- **Materialisierung** (Spalten `chapters.position`, `pages.position`, `pages.chapter_id`): 0-basiert, pro Bucket lueckenlos. Wird nur fuer Querys/JOINs (Filter, Sort in figures/locations/jobs) benoetigt; SSoT bleibt `order_json`.
+- **Konflikt mit Replica-Pull** (`bookstack`-Mode): Sync-Pull synct Body + Metadaten, nicht Order. `ensureTree` reconciliert in BookStack neu hinzugefuegte Pages/Chapters an das Ende des Trees an. Auf BookStack-UI vorgenommene Reorder werden ignoriert.
 
-```sql
-CREATE TABLE book_order (
-  book_id INTEGER PRIMARY KEY REFERENCES books(book_id) ON DELETE CASCADE,
-  order_json TEXT NOT NULL,
-  updated_at TEXT DEFAULT (datetime('now')),
-  updated_by TEXT
-);
-```
-
-**Tree-Format** (`order_json`):
-
-```json
-[
-  { "type": "chapter", "id": 42, "children": [
-      { "type": "page", "id": 101 },
-      { "type": "page", "id": 102 }
-  ]},
-  { "type": "page", "id": 103 },
-  { "type": "chapter", "id": 43, "children": [] }
-]
-```
-
-**Hierarchie-Invarianten** (Server-Validierung in `PUT /local/books/:id/order`):
-- Genau zwei Ebenen: Buch → (Kapitel ODER Seite) → Seite.
-- `type` (`'chapter'|'page'`) + numerische `id` pro Eintrag.
-- Alle IDs gehören zum betreffenden `book_id`.
-- Keine doppelten IDs, alle Pages/Kapitel des Buches kommen genau einmal vor (Vollständigkeit erzwingen — verhindert „verlorene" Pages).
-- `children` nur bei `type='chapter'`.
-
-**Materialisierte Spalten** (`pages.position`, `chapters.position`, `pages.chapter_id`): Server-Hook beim `PUT /local/books/:id/order` traversiert Tree, vergibt Positionen (0-basiert, lückenlos), setzt `pages.chapter_id` (NULL für Top-Level). Atomar in Transaction. Materialisierung dient nur Querys/JOINs; Tree-Render liest aus `order_json` (SSoT).
-
-**Routen:**
-- `GET /local/books/:id/order` → `{ order_json, updated_at, updated_by }`.
-- `PUT /local/books/:id/order` `{ order_json }` → Validierung + Materialisierung + Save in Transaction.
-- Keine Per-Item-Move-Routen — Frontend sendet immer den vollständigen Tree.
-
-**Frontend** ([public/js/tree.js](../public/js/tree.js)): Drag-Reorder berechnet neuen Tree clientseitig, sendet komplettes Snapshot. Optimistic-Update + Rollback bei 4xx. UI-Granularitäten (Kapitel verschieben, Seite verschieben, Umhängen Top-Level↔Kapitel) verwenden dasselbe Endpoint.
-
-**Initial-Fill** beim Aktivieren: Migration baut `order_json` aus den vorhandenen `pages.priority`/`chapters.priority`. Danach übernimmt `book_order` die Wahrheit.
-
-**Konflikt mit Replica-Pull** (`bookstack`-Mode): Sync-Pull synct nur Body + Metadaten, nie Order. Auf BookStack-UI vorgenommene Reorder werden ignoriert. Admin-Log-Hint.
-
-**Tests:**
-- Unit: Tree-Validator (Schema, Vollständigkeit, Doppel-IDs, Verschachtelungsgrenze).
-- Unit: Materialisierung (Tree → `pages.chapter_id`/`*.position`).
-- E2E: Drag-Reorder über alle 5 Granularitäten.
+**Tests:** [tests/integration/book-order.test.js](../tests/integration/book-order.test.js) — Validator (vollstaendiger Baum, Doppel-Page, fehlende Page, unbekannte ID, verschachteltes Kapitel), Materializer (chapters/pages position + chapter_id), `putOrder` (order_json + updated_by), `ensureTree` (Initial-Fill + Reconcile), Facade-Overlay (bookTree liest order_json).
 
 ---
 
-## Phase 6 — Tags + Kategorien
+## Phase 6 — Tags + Kategorien (erledigt)
 
-**Migration:**
+Implementiert; Code-Pfade:
 
-```sql
-CREATE TABLE book_categories (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  parent_id INTEGER REFERENCES book_categories(id) ON DELETE SET NULL,
-  name TEXT NOT NULL,
-  slug TEXT NOT NULL UNIQUE,
-  color TEXT,
-  position INTEGER DEFAULT 0,
-  created_by TEXT,
-  created_at TEXT DEFAULT (datetime('now'))
-);
-CREATE INDEX idx_book_categories_parent ON book_categories(parent_id);
-
-ALTER TABLE books ADD COLUMN category_id INTEGER
-  REFERENCES book_categories(id) ON DELETE SET NULL;
-CREATE INDEX idx_books_category ON books(category_id);
-
-CREATE TABLE book_tags (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL UNIQUE,
-  slug TEXT NOT NULL UNIQUE,
-  color TEXT,
-  created_by TEXT,
-  created_at TEXT DEFAULT (datetime('now'))
-);
-
-CREATE TABLE book_tag_assignments (
-  book_id INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
-  tag_id  INTEGER NOT NULL REFERENCES book_tags(id) ON DELETE CASCADE,
-  assigned_at TEXT DEFAULT (datetime('now')),
-  assigned_by TEXT,
-  PRIMARY KEY (book_id, tag_id)
-);
-CREATE INDEX idx_bta_tag ON book_tag_assignments(tag_id);
-```
-
-**Slug-Generierung** (`lib/slug.js`): `slugify(name)` = lowercase + ASCII-Folding (`ä→ae`, `ö→oe`, `ü→ue`, `ß→ss`, `NFD`+`/\p{Diacritic}/u` strip) + `\s+` → `-` + `[^a-z0-9-]` raus + Multi-Dash collabsen + Trim 64 Zeichen. Dedup auf DB-Ebene: bei `UNIQUE`-Konflikt Suffix `-2`, `-3`, …
-
-**Sichtbarkeit**: Tag-/Kategorie-Pool ist **global** (alle App-User sehen denselben Pool). Zuordnung an Buch erfordert `editor`+. Filter respektiert ACL.
-
-**Admin**: kann Pool verwalten (Create/Edit/Delete), sieht aber keine Bücher.
-
-**Routen:**
-- `GET/POST/PUT/DELETE /local/categories` (POST/PUT/DELETE: Admin).
-- `GET/POST/PUT/DELETE /local/tags` (POST: jeder Auth-User; DELETE: Admin).
-- `PUT /books/:id/category`, `PUT /books/:id/tags` (Owner/Editor).
-
-**Frontend**: BookSettings-Card mit Combobox „Kategorie" + Multi-Select „Tags". Inline neuer Tag via Free-Input. Filter-Pills in Buchliste. Admin-Karte für Kategorie-Pool.
-
-**i18n**: `book.category`, `book.tags`, `categories.empty`, `tags.empty`, `tag.new`, `book.filter.byCategory`, `book.filter.byTag`.
+- **Migration 115** ([db/migrations.js](../db/migrations.js)): `book_categories` (hierarchisch via `parent_id` ON DELETE SET NULL, UNIQUE slug), `book_tags` (flach, UNIQUE name + UNIQUE slug), `book_tag_assignments` (M:N-Bridge, PK `(book_id, tag_id)`, ON DELETE CASCADE auf beiden Seiten), `books.category_id` (FK ON DELETE SET NULL). Indexe `idx_book_categories_parent`, `idx_books_category`, `idx_bta_tag`.
+- **Slug-Helper** ([lib/slug.js](../lib/slug.js)): `slugify(name)` (lowercase + Umlaut-Folding `ä→ae`/`ö→oe`/`ü→ue`/`ß→ss` + NFD-Diakritika-Strip + `\s+`→`-` + Multi-Dash-Collapse + 64-Char-Trim). `uniqueSlug(base, exists)` haengt `-2`, `-3` … bei Konflikt an.
+- **DB-Helper** ([db/book-categories.js](../db/book-categories.js), [db/book-tags.js](../db/book-tags.js)): CRUD + `setForBook` (atomic Replace) + `listAssignmentsForBooks` (Bulk-Map fuer Listen-Endpoint).
+- **Routen**:
+  - [routes/categories.js](../routes/categories.js) mount `/local/categories`: GET (alle), POST/PUT/DELETE (admin via `requireAdmin`).
+  - [routes/tags.js](../routes/tags.js) mount `/local/tags`: GET + POST (alle Auth-User, Inline-Create), PUT/DELETE (admin).
+  - [routes/book-access.js](../routes/book-access.js) ergaenzt: GET/PUT `/books/:book_id/category`, GET/PUT `/books/:book_id/tags` (editor+ via `aclParamGuard`).
+  - [routes/content.js](../routes/content.js) `GET /content/books` liefert `category_id` + `tags`-Array pro Buch (fuer Frontend-Filter).
+- **Frontend**:
+  - BookSettings-Card ([public/js/book-settings.js](../public/js/book-settings.js) + [public/partials/book-settings.html](../public/partials/book-settings.html)): Kategorie via Combobox (Save on Change), Tags als Chip-Toggle-Pool + Inline-Create-Input.
+  - Admin-Karte ([public/js/cards/admin-categories-card.js](../public/js/cards/admin-categories-card.js) + [public/partials/admin-categories.html](../public/partials/admin-categories.html)): Pool-Verwaltung (Create/Rename/Delete fuer Kategorien + Tags). Eintrag im Avatar-Menue (admin-only).
+  - Filter-Pills in der Buchliste ([public/index.html](../public/index.html) + `filteredBooks()` in [public/js/tree.js](../public/js/tree.js)): Kategorie + Tags als Toggle-Pills, AND-Kombination, Pool aus aktuellem Bestand abgeleitet.
+- **Sichtbarkeit**: Pool global; Admin kann verwalten, sieht aber keine Buecher (Privacy-Boundary unveraendert). Zuordnung an Buch erfordert editor+. Frontend-Filter respektiert ACL automatisch (filtert nur Buecher, die `/content/books` ohnehin schon liefert).
+- **i18n** (de + en): `book.category`, `book.tags`, `categories.empty`, `tags.empty`, `tag.new`, `book.filter.byCategory`, `book.filter.byTag`, `book.filter.clear`, `admin.categories.title`, `admin.cat.*`, `admin.tag.*`. Plus `error.NAME_REQUIRED`/`NAME_TOO_LONG`/`INVALID_ID`/`INVALID_CATEGORY_ID`/`CATEGORY_NOT_FOUND`/`TAG_NOT_FOUND`/`TAG_IDS_REQUIRED`/`SELF_PARENT`.
+- **Tests**: [tests/unit/slug.test.mjs](../tests/unit/slug.test.mjs) (slugify + uniqueSlug), [tests/unit/book-categories-tags.test.js](../tests/unit/book-categories-tags.test.js) (CRUD, Slug-Uniqueness, self-parent-Check, FK SET NULL + CASCADE, atomic setForBook, listAssignmentsForBooks).
 
 ---
 
@@ -512,10 +440,6 @@ Bestehende Cache-Einträge bekommen `provider = ai.provider`-Default im Backfill
 
 | Phase | Aufwand | Risiko |
 |---|---|---|
-| 0b Frontend | 0.5–1 Tag | niedrig (2 Trigger-Punkte anbinden) |
-| 1 | 4–6 Tage | mittel (Backend-Disjunktion, Test-Pflege gegen beide) |
-| 2 | 2–3 Tage | niedrig |
-| 3 | 2–3 Tage | niedrig |
 | 6 | 2–3 Tage | niedrig |
 | 7 | 4–6 Tage | mittel (FTS5-Schema + Sync-Hooks + UI) |
 | 8 | 4–6 Tage | mittel-hoch (Bulk-Copy + FK-Repair + ID-Map + Round-Trip-Tests) |

@@ -223,6 +223,16 @@ export const appViewMethods = {
     this._closeOtherMainCards('adminUsage');
     this.showAdminUsageCard = true;
   },
+  toggleAdminCategoriesCard() {
+    if (this.showAdminCategoriesCard) { this.showAdminCategoriesCard = false; return; }
+    this._closeOtherMainCards('adminCategories');
+    this.showAdminCategoriesCard = true;
+  },
+  toggleAdminBackendMigrationCard() {
+    if (this.showAdminBackendMigrationCard) { this.showAdminBackendMigrationCard = false; return; }
+    this._closeOtherMainCards('adminBackendMigration');
+    this.showAdminBackendMigrationCard = true;
+  },
   toggleFinetuneExportCard() {
     if (this.showFinetuneExportCard) { this.showFinetuneExportCard = false; return; }
     this._closeOtherMainCards('finetuneExport');
@@ -255,6 +265,14 @@ export const appViewMethods = {
     if (!this.selectedBookId) return;
     this._closeOtherMainCards('bookEditor');
     this.showBookEditorCard = true;
+  },
+  toggleSearchCard() {
+    if (this.showSearchCard) {
+      window.dispatchEvent(new CustomEvent('card:refresh', { detail: { name: 'search' } }));
+      return;
+    }
+    this._closeOtherMainCards('search');
+    this.showSearchCard = true;
   },
   // Abweichend von den anderen Toggles: erneuter Klick schliesst NICHT, sondern
   // refresht die History. Sub-Komponente lauscht auf `card:refresh`

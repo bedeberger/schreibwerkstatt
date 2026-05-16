@@ -125,6 +125,7 @@
   --card-accent-pdfexport: #6a4a3a;
   --card-accent-settings: #5a5a5a;
   --card-accent-bookeditor: #7a5a3a;
+  --card-accent-search: #3a6a7a;
 
   /* Job-Queue-Footer */
   --color-queue-bar-bg: var(--color-surface);
@@ -263,6 +264,7 @@
   --card-accent-pdfexport: #a8806a;
   --card-accent-settings: #989286;
   --card-accent-bookeditor: #c69a78;
+  --card-accent-search: #7ec2d0;
 
   --color-border-contrast: #d8d8d8;
 

@@ -14,6 +14,7 @@ const { finetuneExportRouter } = require('./jobs/finetune-export');
 const { pdfExportRouter } = require('./jobs/pdf-export');
 const { figurWerkstattRouter } = require('./jobs/figur-werkstatt');
 const { backfillRouter } = require('./jobs/backfill');
+const { backendMigrateRouter } = require('./jobs/backend-migrate');
 
 // Phase 4d: Budget-Enforcement. enforceBudget skipped non-POST, skipped non-
 // Claude-Provider und skipped die Backfill-Route (kein AI-Spend). Greift VOR
@@ -22,6 +23,7 @@ const { backfillRouter } = require('./jobs/backfill');
 router.use((req, res, next) => {
   if (req.method !== 'POST') return next();
   if (req.path === '/backfill') return next();
+  if (req.path.startsWith('/backend-migrate')) return next();
   return enforceBudget(req, res, next);
 });
 
@@ -38,6 +40,7 @@ router.use('/', finetuneExportRouter);
 router.use('/', pdfExportRouter);
 router.use('/', figurWerkstattRouter);
 router.use('/', backfillRouter);
+router.use('/', backendMigrateRouter);
 router.use('/', sharedRouter);
 
 module.exports = { router, runKomplettAnalyseAll };

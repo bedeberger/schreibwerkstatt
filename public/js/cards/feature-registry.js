@@ -59,6 +59,11 @@ export const FEATURES = [
   // Editor: viewer (read-only) / lektor (apply-only) / editor+ (frei).
   { key: 'bookEditor',     kind: 'toggle', group: 'tools',  labelKey: 'tile.bookEditor',     descKey: 'tile.bookEditor.desc',     flag: 'showBookEditorCard',    toggle: 'toggleBookEditorCard',     requiresPages: true, minRole: 'viewer',
     aliases: ['bucheditor','book-editor','stream','endlos','endless','single-page','one-page','edit-all','alle-bearbeiten','volltext','full-text','suchen-ersetzen','search-replace','find-replace','suchen','ersetzen'] },
+  // Volltextsuche (Phase 7 BookStack-Exit). minRole viewer — Search filtert
+  // serverseitig zusaetzlich nach book_access; jeder Auth-User darf suchen,
+  // sieht aber nur eigene Buecher.
+  { key: 'search',         kind: 'toggle', group: 'tools',  labelKey: 'tile.search',         descKey: 'tile.search.desc',         flag: 'showSearchCard',        toggle: 'toggleSearchCard',         minRole: 'viewer',
+    aliases: ['suche','search','volltext','fulltext','find','finden','fts','grep'] },
 ];
 
 // Globale Aktionen (kind:'action'). Eigene Sektion in der Palette.
@@ -133,11 +138,14 @@ export const EXCLUSIVE_CARDS = [
   { key: 'adminUsers',     flag: 'showAdminUsersCard' },
   { key: 'adminSettings',  flag: 'showAdminSettingsCard' },
   { key: 'adminUsage',     flag: 'showAdminUsageCard' },
+  { key: 'adminCategories', flag: 'showAdminCategoriesCard' },
+  { key: 'adminBackendMigration', flag: 'showAdminBackendMigrationCard' },
   { key: 'finetuneExport', flag: 'showFinetuneExportCard' },
   { key: 'export',         flag: 'showExportCard' },
   { key: 'pdfExport',      flag: 'showPdfExportCard' },
   { key: 'bookOrganizer',  flag: 'showBookOrganizerCard' },
   { key: 'bookEditor',     flag: 'showBookEditorCard' },
+  { key: 'search',         flag: 'showSearchCard' },
 ];
 
 export const FEATURE_GROUPS = ['review', 'world', 'tools', 'app'];

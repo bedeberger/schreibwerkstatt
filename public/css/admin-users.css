@@ -197,3 +197,41 @@
     flex-wrap: wrap;
   }
 }
+
+/* Phase 6: Kategorie- + Tag-Pool. Wiederverwendet admin-users-Table-Stilistik. */
+.card--admin-categories { --card-accent: var(--card-accent-admin-users, var(--color-primary)); }
+.admin-pool-section { margin-top: var(--space-md); }
+.admin-pool-section:first-child { margin-top: 0; }
+.admin-pool-create {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  margin-bottom: var(--space-2);
+}
+.admin-pool-create input { flex: 1; min-width: 0; }
+.admin-pool-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+.admin-pool-table th,
+.admin-pool-table td {
+  text-align: left;
+  padding: var(--space-sm) var(--space-xs);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+.admin-pool-table th {
+  font-weight: 600;
+  color: var(--color-muted);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.admin-pool-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+@media (max-width: 600px) {
+  .admin-pool-create { flex-direction: column; align-items: stretch; }
+}

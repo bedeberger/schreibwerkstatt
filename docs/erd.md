@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 113, 61 Tabellen (ohne `sqlite_*`/`schema_version`/`sessions`).
+Stand: Schema-Version 115, 65 Tabellen (ohne `sqlite_*`/`schema_version`/`sessions`).
 
 Quelle: Live-Dump aus [schreibwerkstatt.db](../schreibwerkstatt.db) (`.schema --indent`) + [db/migrations.js](../db/migrations.js). Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -48,6 +48,11 @@ erDiagram
   books ||--o{ finetune_ai_cache     : has
   books ||--o{ draft_figures         : has
   books ||--o{ werkstatt_runs        : has
+  books ||--o{ book_tag_assignments  : tagged
+  books }o--o| book_categories       : "category_id"
+
+  book_categories ||--o{ book_categories : parent
+  book_tags ||--o{ book_tag_assignments : assigned
 
   draft_figures ||--o{ werkstatt_runs : "ki-history"
 
@@ -66,6 +71,7 @@ erDiagram
   pages ||--|| page_locks            : locked
   pages ||--o{ page_revisions        : has
   books ||--o{ page_revisions        : has
+  books ||--|| book_order            : has
 
   app_users ||--o{ book_access       : grants
   app_users ||--o{ page_locks        : holds
@@ -129,6 +135,31 @@ erDiagram
     TEXT    description
     BLOB    cover_image
     TEXT    owner_email "Erst-Backfiller / Phase 4b book_access-Bridge"
+    INTEGER category_id FK "Phase 6, ON DELETE SET NULL"
+  }
+  book_categories {
+    INTEGER id          PK
+    INTEGER parent_id   FK "ON DELETE SET NULL"
+    TEXT    name
+    TEXT    slug        "UNIQUE"
+    TEXT    color
+    INTEGER position
+    TEXT    created_by
+    TEXT    created_at
+  }
+  book_tags {
+    INTEGER id          PK
+    TEXT    name        "UNIQUE"
+    TEXT    slug        "UNIQUE"
+    TEXT    color
+    TEXT    created_by
+    TEXT    created_at
+  }
+  book_tag_assignments {
+    INTEGER book_id     PK,FK "ON DELETE CASCADE"
+    INTEGER tag_id      PK,FK "ON DELETE CASCADE"
+    TEXT    assigned_at
+    TEXT    assigned_by
   }
   chapters {
     INTEGER chapter_id  PK "AUTOINCREMENT, Watermark >=1_000_000"
@@ -194,6 +225,12 @@ erDiagram
     TEXT    created_at
     TEXT    summary
   }
+  book_order {
+    INTEGER book_id    PK,FK "ON DELETE CASCADE"
+    TEXT    order_json "[{type,id,children?}], SSoT Kapitel+Seiten-Reihenfolge"
+    TEXT    updated_at
+    TEXT    updated_by
+  }
   page_checks {
     INTEGER id          PK
     INTEGER page_id     FK
@@ -244,6 +281,7 @@ erDiagram
   pages     ||--o{ page_checks : has
   pages     ||--o{ page_revisions : has
   books     ||--o{ page_revisions : has
+  books     ||--|| book_order  : has
   pages     ||--o{ ideen       : at
   books     ||--o{ ideen       : has
   books     ||--|| book_settings : has

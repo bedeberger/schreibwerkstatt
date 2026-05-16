@@ -148,9 +148,32 @@
   <div class="row book-selector-row">
     <div x-data="combobox({ placeholder: () => t('book.chooseBook'), compact: false, footer: { label: () => t('book.create.action'), action: () => openCreateBook() } })"
          x-modelable="value" x-model="selectedBookId"
-         x-effect="options = books.map(b => ({value: String(b.id), label: b.name}))"
+         x-effect="options = filteredBooks().map(b => ({value: String(b.id), label: b.name}))"
          @combobox-change="resetView();"></div>
     <a :href="selectedBookUrl || '#'" target="_blank" rel="noopener" class="btn-bookstack-link" :class="{ 'btn-bookstack-link--hidden': !selectedBookUrl }" :tabindex="selectedBookUrl ? 0 : -1" :aria-hidden="!selectedBookUrl" :data-tip="t('book.openInBookstack')" x-text="t('book.bookstack')"></a>
+  </div>
+
+  <!-- Phase 6: Filter-Pills (Kategorie + Tags). Reines Frontend-Filter -->
+  <div class="book-filter-row" x-show="bookFilterCategoryPool.length || bookFilterTagPool.length" x-cloak>
+    <template x-for="cat in bookFilterCategoryPool" :key="cat.id">
+      <button type="button"
+              class="book-filter-pill"
+              :class="{ 'is-active': String(bookFilterCategoryId) === String(cat.id) }"
+              @click="bookFilterCategoryId = String(bookFilterCategoryId) === String(cat.id) ? '' : String(cat.id)"
+              x-text="cat.name"></button>
+    </template>
+    <template x-for="tag in bookFilterTagPool" :key="'t' + tag.id">
+      <button type="button"
+              class="book-filter-pill book-filter-pill--tag"
+              :class="{ 'is-active': bookFilterTagIds.includes(tag.id) }"
+              @click="toggleBookFilterTag(tag.id)"
+              x-text="tag.name"></button>
+    </template>
+    <button type="button"
+            class="book-filter-clear"
+            x-show="bookFilterCategoryId || bookFilterTagIds.length"
+            @click="clearBookFilters()"
+            x-text="t('book.filter.clear')"></button>
   </div>
 
   <!-- Hero-Palette-Trigger: Power-User-Eintritt zu allen Features (⌘K / Strg+K). -->
@@ -230,10 +253,13 @@
 <div id="partial-pdf-export"></div>
 <div id="partial-buchorganizer"></div>
 <div id="partial-book-editor"></div>
+<div id="partial-search"></div>
 <div id="partial-user-settings"></div>
 <div id="partial-admin-users"></div>
 <div id="partial-admin-settings"></div>
 <div id="partial-admin-usage"></div>
+<div id="partial-admin-categories"></div>
+<div id="partial-admin-backend-migration"></div>
 <!-- Edit-Toolbar (Bubble + Slash) – teleportiert nach <body>, hier nur Scope-Host -->
 <div id="partial-editor-toolbar"></div>
 <div id="partial-editor-find"></div>

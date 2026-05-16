@@ -115,6 +115,12 @@ function pruneStaleBookData(bookId, validPageIds, validChapterIds) {
 
   if (stalePageIds.length === 0 && staleChapterIds.length === 0) return counts;
 
+  // Phase 7: Volltext-Index synchron halten. Lazy-Import, weil pages.js auch
+  // im Stale-Cleanup-Cron-Pfad geladen wird — Search-Failure darf den Prune
+  // nicht abbrechen.
+  let _searchIndex = null;
+  try { _searchIndex = require('../lib/search'); } catch {}
+
   db.transaction(() => {
     if (stalePageIds.length > 0) {
       db.exec('CREATE TEMP TABLE IF NOT EXISTS _stale_pages (page_id INTEGER PRIMARY KEY)');
@@ -139,6 +145,9 @@ function pruneStaleBookData(bookId, validPageIds, validChapterIds) {
 
       counts.pages = db.prepare('DELETE FROM pages WHERE book_id = ? AND page_id IN (SELECT page_id FROM _stale_pages)').run(bookId).changes;
       db.exec('DROP TABLE _stale_pages');
+      if (_searchIndex) {
+        try { for (const pid of stalePageIds) _searchIndex.remove('page', pid); } catch (_e) {}
+      }
     }
 
     if (staleChapterIds.length > 0) {
@@ -171,6 +180,9 @@ function pruneStaleBookData(bookId, validPageIds, validChapterIds) {
 
       counts.chapters = db.prepare('DELETE FROM chapters WHERE book_id = ? AND chapter_id IN (SELECT chapter_id FROM _stale_chapters)').run(bookId).changes;
       db.exec('DROP TABLE _stale_chapters');
+      if (_searchIndex) {
+        try { for (const cid of staleChapterIds) _searchIndex.remove('chapter', cid); } catch (_e) {}
+      }
     }
   })();
 

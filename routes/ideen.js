@@ -7,6 +7,7 @@ const { db } = require('../db/schema');
 const { toIntId } = require('../lib/validate');
 const { setContext } = require('../lib/log-context');
 const { requireBookAccess, sendACLError } = require('../lib/acl');
+const searchIndex = require('../lib/search');
 const logger = require('../logger');
 
 const router = express.Router();
@@ -90,6 +91,7 @@ router.post('/', jsonBody, (req, res) => {
     LEFT JOIN pages p ON p.page_id = i.page_id
     WHERE i.id = ?
   `).get(result.lastInsertRowid);
+  searchIndex.upsertIdea(row.id);
   logger.info(`[ideen] create id=${row.id} page=${pageId}`);
   res.json(row);
 });
@@ -146,6 +148,7 @@ router.patch('/:id', jsonBody, (req, res) => {
     LEFT JOIN pages p ON p.page_id = i.page_id
     WHERE i.id = ?
   `).get(id);
+  searchIndex.upsertIdea(id);
   if (movedTo) logger.info(`[ideen] move id=${id} from=${movedFrom} to=${movedTo}`);
   res.json(row);
 });
@@ -160,6 +163,7 @@ router.delete('/:id', (req, res) => {
   if (!existing) return res.status(404).json({ error_code: 'IDEE_NOT_FOUND' });
   if (!_guard(req, res, existing.book_id, 'editor')) return;
   db.prepare('DELETE FROM ideen WHERE id = ? AND user_email = ?').run(id, userEmail);
+  searchIndex.remove('idea', id);
   res.json({ ok: true });
 });
 

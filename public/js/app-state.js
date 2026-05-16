@@ -46,6 +46,13 @@ const aiProviderState = () => ({
 
 const navigationState = () => ({
   books: [],
+  // Phase 6: Buchliste-Filter (UI-only, persistiert nicht; reines Frontend-Filter
+  // ueber die per /content/books gelieferten category_id + tags-Felder).
+  bookFilterCategoryId: '',
+  bookFilterTagIds: [],
+  // Pool fuer Filter-Pills in der Buchliste — wird beim Login einmal geladen.
+  bookFilterCategoryPool: [],
+  bookFilterTagPool: [],
   selectedBookId: '',
   // Per-Buch ACL-Rolle aus /books/:id/access. `currentBookRole` ist die Rolle
   // fuer selectedBookId (Snapshot fuer $watch + Getter `canEdit`/`canReview`).
@@ -165,12 +172,15 @@ const cardsState = () => ({
   showAdminUsersCard: false,
   showAdminSettingsCard: false,
   showAdminUsageCard: false,
+  showAdminCategoriesCard: false,
+  showAdminBackendMigrationCard: false,
   adminUsageTab: 'users',
   showFinetuneExportCard: false,
   showExportCard: false,
   showPdfExportCard: false,
   showBookOrganizerCard: false,
   showBookEditorCard: false,
+  showSearchCard: false,
   showKomplettStatus: false,
   showAvatarMenu: false,
 });

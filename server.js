@@ -38,6 +38,16 @@ try {
   runDevSeedIfNeeded();
 } catch (e) { logger.warn(`runDevSeedIfNeeded: ${e.message}`); }
 
+// Phase 7: Initial-Reindex der FTS5-Tabellen, wenn Migration 116 die Marker-
+// Row gesetzt hat (Bestandsdaten brauchen einen Full-Index nach dem Upgrade).
+// In setImmediate, damit Boot nicht blockiert.
+setImmediate(() => {
+  try {
+    const searchIndex = require('./lib/search');
+    searchIndex.reindexIfNeeded();
+  } catch (e) { logger.warn(`searchIndex.reindexIfNeeded: ${e.message}`); }
+});
+
 const authRouter = require('./routes/auth');
 const historyRouter = require('./routes/history');
 const figuresRouter = require('./routes/figures');
@@ -228,7 +238,7 @@ app.use((req, res, next) => {
 
 // ── Auth-Guard ────────────────────────────────────────────────────────────────
 // API-Pfade → 401 JSON; HTML-Pfade → Redirect zu /auth/login
-const API_PREFIXES = ['/history/', '/figures/', '/locations/', '/jobs/', '/sync/', '/chat/', '/booksettings/', '/content/', '/books/', '/apply/', '/me/', '/admin/', '/config', '/claude', '/ollama', '/llama'];
+const API_PREFIXES = ['/history/', '/figures/', '/locations/', '/jobs/', '/sync/', '/chat/', '/booksettings/', '/content/', '/books/', '/apply/', '/me/', '/admin/', '/local/', '/config', '/claude', '/ollama', '/llama'];
 
 app.use((req, res, next) => {
   if (req.session?.user) return next();
@@ -301,6 +311,7 @@ app.use('/pdf-export', pdfExportRouter);
 app.use('/usage', usageRouter);
 app.use('/draft-figures', draftFiguresRouter);
 app.use('/content', contentRouter);
+app.use('/search', require('./routes/search'));
 app.use('/apply', require('./routes/apply'));
 app.use('/books', require('./routes/book-access'));
 app.use('/book-editor', require('./routes/book-editor'));
@@ -308,6 +319,8 @@ app.use('/admin/users', require('./routes/admin-users'));
 app.use('/admin/settings', require('./routes/admin-settings'));
 app.use('/admin/usage', require('./routes/admin-usage'));
 app.use('/admin/registration-requests', require('./routes/admin-registration-requests'));
+app.use('/local/categories', require('./routes/categories'));
+app.use('/local/tags', require('./routes/tags'));
 
 // Logout: usage-Tabelle behält Einträge (User-Wiederkehr → Top-3 sofort wieder da).
 // Wenn Datenschutz erforderlich, Cleanup über Job/Cron auf Last-Seen-Basis.
@@ -456,6 +469,15 @@ try {
         logger.info(`Cron: Cache-Cleanup entfernt ${summary.totalRemoved} Row(s) aus ${summary.tables.length} Tabellen.`);
       } catch (e) {
         logger.error('Cron Cache-Cleanup Fehler: ' + e.message);
+      }
+
+      // Phase 7: FTS5-Optimize. Faltet die Segmente zu einem grossen B-Tree
+      // zusammen — billig nach naechtlichen Schreibern, beschleunigt Querys.
+      try {
+        const searchIndex = require('./lib/search');
+        searchIndex.optimize();
+      } catch (e) {
+        logger.error('Cron Search-Optimize Fehler: ' + e.message);
       }
 
       // Phase 4b: abgelaufene page_locks wegraeumen. Funktional ist es nicht

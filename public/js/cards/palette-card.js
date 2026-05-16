@@ -51,6 +51,15 @@ export function registerPaletteCard() {
 
       window.addEventListener('palette:open', () => this.openPalette(), { signal });
       window.addEventListener('palette:close', () => this.closePalette(), { signal });
+      // Phase 7: Async-Provider (Fulltext) signalisiert via 'palette:rerender'
+      // dass sich der Cache geaendert hat — Sections-Cache nullen, damit
+      // paletteSections() neu rechnet.
+      window.addEventListener('palette:rerender', () => {
+        this._sectionsCache = null;
+        this._sectionsCacheKey = '';
+        this._flatCache = null;
+        this._flatCacheKey = '';
+      }, { signal });
     },
 
     destroy() {
@@ -433,6 +442,7 @@ export function registerPaletteCard() {
         { prefix: '@', labelKey: 'palette.legend.figuren' },
         { prefix: '$', labelKey: 'palette.legend.orte' },
         { prefix: '%', labelKey: 'palette.legend.szenen' },
+        { prefix: '?', labelKey: 'palette.legend.fulltext' },
       ];
     },
 

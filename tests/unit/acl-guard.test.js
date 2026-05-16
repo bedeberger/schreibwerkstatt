@@ -91,9 +91,10 @@ test('requireBookAccess: ungültige Book-ID → 400', () => {
 test('aclParamGuard: setzt req.bookId + req.bookRole bei erfolg', () => {
   const guard = acl.aclParamGuard('viewer');
   const req = reqFor('bob@x.ch');
+  req.params.book_id = '2001';
   let called = false;
   const res = { status: () => res, json: () => { called = true; } };
-  runWithContext({}, () => guard(req, res, () => { called = true; }, '2001'));
+  runWithContext({}, () => guard(req, res, () => { called = true; }));
   assert.equal(called, true);
   assert.equal(req.bookId, 2001);
   assert.equal(req.bookRole, 'viewer');
@@ -102,10 +103,11 @@ test('aclParamGuard: setzt req.bookId + req.bookRole bei erfolg', () => {
 test('aclParamGuard: 403 bei zu niedriger Rolle', () => {
   const guard = acl.aclParamGuard('editor');
   const req = reqFor('bob@x.ch');
+  req.params.book_id = '2001';
   let status = null;
   let body = null;
   const res = { status: (s) => { status = s; return res; }, json: (b) => { body = b; } };
-  runWithContext({}, () => guard(req, res, () => {}, '2001'));
+  runWithContext({}, () => guard(req, res, () => {}));
   assert.equal(status, 403);
   assert.equal(body.error_code, 'INSUFFICIENT_ROLE');
 });

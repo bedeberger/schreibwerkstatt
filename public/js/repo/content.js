@@ -109,6 +109,15 @@ export const contentRepo = {
   // GET /content/books/:id/tree → { chapters: [{...c, pages: [...]}], topPages: [...] }
   bookTree(id, opts)            { return _get('books/' + id + '/tree', opts); },
 
+  // Phase 3 (BookStack-Exit): Sortier-SSoT.
+  // GET → { tree, updated_at, updated_by }; PUT { order_json } setzt den
+  // vollstaendigen Baum atomar (Validierung + Materialisierung in Tx).
+  loadOrder(id, opts)           { return _get('books/' + id + '/order', opts); },
+  saveOrder(id, tree) {
+    return _write('PUT', 'books/' + id + '/order', { order_json: tree },
+      ['books/' + id + '/order', 'books/' + id + '/tree']);
+  },
+
   // GET /content/chapters/:id → einzelnes Kapitel.
   loadChapter(id, opts)         { return _get('chapters/' + id, opts); },
 

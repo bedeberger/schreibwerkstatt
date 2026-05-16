@@ -3,6 +3,7 @@ const { db, saveFigurenToDb, saveZeitstrahlEvents, getChapterFigures, cleanupDup
 const { recomputeBookFigureMentions } = require('../lib/page-index');
 const { toIntId, inClause } = require('../lib/validate');
 const { aclParamGuard } = require('../lib/acl');
+const searchIndex = require('../lib/search');
 const logger = require('../logger');
 
 const router = express.Router();
@@ -152,8 +153,21 @@ router.delete('/scenes/:book_id', (req, res) => {
   if (!bookId) return res.status(400).json({ error_code: 'INVALID_ID' });
   const userEmail = req.session?.user?.email || null;
   db.prepare('DELETE FROM figure_scenes WHERE book_id = ? AND user_email = ?').run(bookId, userEmail);
+  // FTS-Index ist user-agnostisch (Buch-scoped); nach Loeschen aller Szenen
+  // eines Buchs werden potentielle Reste anderer User noch indexiert sein —
+  // _reindexScenesForBook bringt sie wieder in Sync.
+  searchIndex.removeKindForBook('scene', bookId);
+  _reindexScenesForBook(bookId);
   res.json({ ok: true });
 });
+
+// Re-Index aller figure_scenes eines Buchs (user-agnostisch). FTS-Boundary
+// liegt auf book_id, nicht auf user_email — andere User des Buchs duerfen
+// ihre Szenen weiter finden.
+function _reindexScenesForBook(bookId) {
+  const rows = db.prepare('SELECT id FROM figure_scenes WHERE book_id = ?').all(bookId);
+  for (const r of rows) searchIndex.upsertScene(r.id);
+}
 
 // Figuren eines Kapitels laden (für Kontext-Panel im Editor)
 router.get('/chapter/:book_id/:chapter_id', (req, res) => {
@@ -287,6 +301,11 @@ router.put('/:book_id', jsonBody, (req, res) => {
   // Response sofort – Mentions-Neuberechnung läuft im Hintergrund. Auf grossen Büchern
   // (>500 Seiten × >50 Figuren) braucht der Regex-Scan mehrere Sekunden.
   res.json({ ok: true });
+  // FTS-Index nachziehen: saveFigurenToDb ist Full-Replace pro Buch — daher
+  // kind/book droppen und neu indexieren.
+  searchIndex.removeKindForBook('figure', bookId);
+  const figRows = db.prepare('SELECT id FROM figures WHERE book_id = ?').all(bookId);
+  for (const r of figRows) searchIndex.upsertFigure(r.id);
   setImmediate(() => {
     try {
       const { figures, pagesProcessed } = recomputeBookFigureMentions(bookId, userEmail);

@@ -165,7 +165,7 @@ export function registerBookOrganizerCard() {
       // In-place sort: kein Reassignment, sonst rendert Alpine x-for neu und
       // konkurriert mit Sortable's bereits gesetzter DOM-Reihenfolge.
       this.workTree.sort((a, b) => (idxOf.get(a.id) ?? 0) - (idxOf.get(b.id) ?? 0));
-      await this._renumberChapters();
+      await this._persistOrder();
     },
 
     async _onPageDrop(evt) {
@@ -183,7 +183,7 @@ export function registerBookOrganizerCard() {
       const bucket = toChapId === 0 ? this.soloPages : this.workTree.find(c => c.id === toChapId)?.pages;
       if (!bucket) return;
       bucket.splice(targetIdx >= 0 ? targetIdx : bucket.length, 0, pageObj);
-      await this._renumberPages(toChapId, fromChapId !== toChapId ? fromChapId : null);
+      await this._persistOrder({ affectedChapters: [toChapId, fromChapId !== toChapId ? fromChapId : null].filter(v => v != null) });
     },
 
     _removePageFromBucket(chapId, pageId) {
@@ -218,49 +218,42 @@ export function registerBookOrganizerCard() {
       }
     },
 
-    async _renumberChapters() {
-      const root = window.__app;
-      const total = this.workTree.length;
-      if (!total) return;
-      await this._runMutation(async () => {
-        this.organizerProgress = 0;
-        this.organizerStatus = root.t('bookOrganizer.savingChapters', { done: 0, total });
-        for (let i = 0; i < this.workTree.length; i++) {
-          const c = this.workTree[i];
-          await contentRepo.updateChapter(c.id, { name: c.name, position: i + 1 });
-          this.organizerProgress = Math.round(((i + 1) / total) * 100);
-          this.organizerStatus = root.t('bookOrganizer.savingChapters', { done: i + 1, total });
-        }
-        this._mirrorChapterOrderInRoot();
-      });
+    // Phase 3 (BookStack-Exit): Single-Tree-PUT. Statt per-Item update fuer
+    // alle veraenderten Items wird der vollstaendige Tree atomar an
+    // /content/books/:id/order geschickt. Server validiert + materialisiert
+    // chapters.position/pages.position/pages.chapter_id in einer Transaction.
+    _buildTreeFromWorkstate() {
+      const tree = [];
+      const chapterById = new Map(this.workTree.map(c => [c.id, c]));
+      // Reihenfolge: Kapitel in workTree-Order, dazwischen ggf. Top-Level-Seiten.
+      // Aktuelles UI gruppiert workTree-Kapitel oben und soloPages danach
+      // (Bestandsverhalten). Wir behalten das bei.
+      for (const c of this.workTree) {
+        tree.push({
+          type: 'chapter',
+          id: c.id,
+          children: c.pages.map(p => ({ type: 'page', id: p.id })),
+        });
+      }
+      for (const p of this.soloPages) {
+        tree.push({ type: 'page', id: p.id });
+      }
+      return tree;
     },
 
-    async _renumberPages(toChapId, fromChapId) {
+    async _persistOrder({ affectedChapters = null } = {}) {
       const root = window.__app;
-      const collect = (chapId) => {
-        const list = chapId === 0 ? this.soloPages : (this.workTree.find(c => c.id === chapId)?.pages || []);
-        return list.map((p, i) => ({ id: p.id, chapter_id: chapId, priority: i + 1, name: p.name }));
-      };
-      const targets = [
-        ...collect(toChapId),
-        ...(fromChapId != null ? collect(fromChapId) : []),
-      ];
-      const total = targets.length;
-      if (!total) return;
+      const bookId = parseInt(root.selectedBookId, 10);
+      if (!bookId) return;
+      const tree = this._buildTreeFromWorkstate();
       await this._runMutation(async () => {
         this.organizerProgress = 0;
-        this.organizerStatus = root.t('bookOrganizer.savingPages', { done: 0, total });
-        for (let i = 0; i < targets.length; i++) {
-          const t = targets[i];
-          await contentRepo.updatePage(t.id, {
-            name: t.name,
-            position: t.priority,
-            chapter_id: t.chapter_id,
-          });
-          this.organizerProgress = Math.round(((i + 1) / total) * 100);
-          this.organizerStatus = root.t('bookOrganizer.savingPages', { done: i + 1, total });
-        }
-        this._mirrorPageMembershipInRoot([toChapId, fromChapId].filter(v => v != null));
+        this.organizerStatus = root.t('bookOrganizer.savingOrder');
+        await contentRepo.saveOrder(bookId, tree);
+        this.organizerProgress = 100;
+        // Affected chapters: nur Kapitel-Reorder → undefined; Page-Move → Liste.
+        if (affectedChapters) this._mirrorPageMembershipInRoot(affectedChapters);
+        else this._mirrorChapterOrderInRoot();
       });
     },
 

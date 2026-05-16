@@ -84,13 +84,13 @@ router.post('/test-provider', express.json(), async (req, res) => {
       return res.json({ ok, status: resp.status, provider, model, latency_ms: Date.now() - t0 });
     }
     if (provider === 'ollama') {
-      const host = appSettings.get('ai.ollama.host');
+      const host = String(appSettings.get('ai.ollama.host') || '').replace(/\/$/, '');
       const r = await fetch(`${host}/api/tags`).catch(() => null);
       return res.json({ ok: !!r?.ok, status: r?.status || 0, provider, latency_ms: Date.now() - t0 });
     }
     if (provider === 'llama') {
-      const host = appSettings.get('ai.llama.host');
-      const r = await fetch(`${host}/health`).catch(() => null);
+      const host = String(appSettings.get('ai.llama.host') || '').replace(/\/$/, '');
+      const r = await fetch(`${host}/v1/models`).catch(() => null);
       return res.json({ ok: !!r?.ok, status: r?.status || 0, provider, latency_ms: Date.now() - t0 });
     }
     return res.json({ ok: false, error: 'UNKNOWN_PROVIDER', provider });

@@ -11,11 +11,13 @@ const express = require('express');
 const logger = require('../logger');
 const contentStore = require('../lib/content-store');
 const pageRevisions = require('../db/page-revisions');
+const bookOrder = require('../db/book-order');
 const { toIntId } = require('../lib/validate');
 const { getTokenForRequest, getAnyUserToken } = require('../db/schema');
 const { setContext, bookParamHandler } = require('../lib/log-context');
 const { aclParamGuard, requireBookAccess, sendACLError, ACLError } = require('../lib/acl');
 const bookAccess = require('../db/book-access');
+const bookTags = require('../db/book-tags');
 const { db } = require('../db/connection');
 
 const router = express.Router();
@@ -84,15 +86,20 @@ router.get('/books', async (req, res) => {
   if (!token) return;
   try {
     const all = await contentStore.listBooks(token);
-    const owners = new Map(
-      db.prepare('SELECT book_id, owner_email FROM books').all().map(r => [r.book_id, r.owner_email])
+    const meta = new Map(
+      db.prepare('SELECT book_id, owner_email, category_id FROM books').all()
+        .map(r => [r.book_id, { owner_email: r.owner_email, category_id: r.category_id }])
     );
+    const visibleIds = all.filter(b => allowedIds.has(b.id)).map(b => b.id);
+    const tagsByBook = bookTags.listAssignmentsForBooks(visibleIds);
     const visible = all
       .filter(b => allowedIds.has(b.id))
       .map(b => ({
         ...b,
         role: roleByBook.get(b.id) || null,
-        owner_email: owners.get(b.id) || null,
+        owner_email: meta.get(b.id)?.owner_email || null,
+        category_id: meta.get(b.id)?.category_id ?? null,
+        tags: tagsByBook.get(b.id) || [],
       }));
     res.json(visible);
   } catch (e) { _fail(res, e, 'GET /content/books'); }
@@ -114,6 +121,38 @@ router.get('/books/:book_id/tree', aclParamGuard('viewer'), async (req, res) => 
   if (!token) return;
   try { res.json(await contentStore.bookTree(req.bookId, token)); }
   catch (e) { _fail(res, e, 'GET /content/books/:id/tree'); }
+});
+
+// Phase 3 (BookStack-Exit): Eigene Sortierung.
+//
+// GET /content/books/:book_id/order — Tree-Snapshot + Audit-Meta. Auto-init:
+// keine Row -> aus aktuellen pages.position/chapters.position bauen; vorhandene
+// Row gegen DB-Stand reconcilen (neue/geloeschte Items).
+router.get('/books/:book_id/order', aclParamGuard('viewer'), (req, res) => {
+  try {
+    const data = bookOrder.ensureTree(req.bookId, _userEmail(req));
+    res.json(data);
+  } catch (e) { _fail(res, e, 'GET /content/books/:id/order'); }
+});
+
+// PUT /content/books/:book_id/order — Vollstaendigen Tree speichern. Body:
+// `{ order_json: [...] }`. Server validiert (Schema + Vollstaendigkeit +
+// Doppel-IDs) und materialisiert chapters.position/pages.position/
+// pages.chapter_id in einer Transaction.
+router.put('/books/:book_id/order', aclParamGuard('editor'), jsonBody, (req, res) => {
+  const tree = req.body?.order_json;
+  if (!Array.isArray(tree)) {
+    return res.status(400).json({ error_code: 'INVALID_BODY', detail: 'order_json must be array' });
+  }
+  try {
+    const saved = bookOrder.putOrder(req.bookId, tree, _userEmail(req));
+    res.json(saved);
+  } catch (e) {
+    if (e instanceof bookOrder.TreeValidationError) {
+      return res.status(400).json({ error_code: 'INVALID_TREE', reason: e.code, detail: e.detail });
+    }
+    _fail(res, e, 'PUT /content/books/:id/order');
+  }
 });
 
 // GET /content/chapters/:chapter_id — Kapitel-Detail.

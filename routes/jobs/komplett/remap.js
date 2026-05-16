@@ -4,6 +4,7 @@ const {
 } = require('../../../db/schema');
 const { _modelName } = require('../shared');
 const { _refToString } = require('./utils');
+const searchIndex = require('../../../lib/search');
 
 /** Mappt Szenen-Klarnamen (aus Phase 1) auf konsolidierte Figuren-/Ort-IDs. */
 function remapSzenen(chSzenen, figNameToId, figNameToIdLower, ortNameToId, ortNameToIdLower, chNameToId) {
@@ -128,6 +129,19 @@ function saveSzenenAndEvents(bookIdInt, email, szenen, assignments, locIdToDbId,
     saveZeitstrahlEvents(bookIdInt, email, []);
     updateFigurenEvents(bookIdInt, assignments, email, idMaps);
   }
+  // Phase 7: figure_scenes neu indexieren — Full-Replace pro Buch (kind/book
+  // droppen, dann Re-Upsert aller aktuellen Rows).
+  searchIndex.removeKindForBook('scene', bookIdInt);
+  const sceneRows = db.prepare('SELECT id FROM figure_scenes WHERE book_id = ?').all(bookIdInt);
+  for (const r of sceneRows) searchIndex.upsertScene(r.id);
+  // Figuren wurden im selben Job-Run via saveFigurenToDb persistiert — die
+  // figures-Daten haben sich potentiell geaendert (Beschreibungen, Namen).
+  searchIndex.removeKindForBook('figure', bookIdInt);
+  const figRows = db.prepare('SELECT id FROM figures WHERE book_id = ?').all(bookIdInt);
+  for (const f of figRows) searchIndex.upsertFigure(f.id);
+  searchIndex.removeKindForBook('location', bookIdInt);
+  const locRows = db.prepare('SELECT id FROM locations WHERE book_id = ?').all(bookIdInt);
+  for (const l of locRows) searchIndex.upsertLocation(l.id);
   log.info(`${szenen.length} Szenen, ${eventsCount} Ereignisse gespeichert.`);
   return { szenenCount: szenen.length, eventsCount };
 }
