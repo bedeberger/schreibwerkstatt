@@ -8,8 +8,9 @@
 // updateJob-Fortschritts-Meldungen. Dedup auf User-Ebene (genau ein
 // Backfill-Job pro User gleichzeitig) — `entityKey = userEmail || 'anonymous'`.
 //
-// Optionaler Body `{ bookId }` schraenkt den Lauf auf ein einzelnes Buch ein
-// (Smoke-Test, gezielter Restore, Lazy-Backfill beim ersten Page-Open).
+// Auto-Sweep beim Backend-Switch: `app-settings:changed` mit Key `app.backend`
+// queued pro aktivem User mit gespeichertem BookStack-Token einen Backfill-Job
+// — sequentiell durch die Job-Queue, idempotent ueber findActiveJobId.
 
 const express = require('express');
 const {
@@ -22,6 +23,10 @@ const { backfillBookTransactional } = require('../../db/backfill');
 const { db } = require('../../db/connection');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
+const { getAllUserTokens } = require('../../db/tokens');
+const { listUsers } = require('../../db/app-users');
+const appSettings = require('../../lib/app-settings');
+const { requireAdmin } = require('../../lib/admin-mw');
 const logger = require('../../logger');
 
 const backfillRouter = express.Router();
@@ -155,4 +160,121 @@ function maybeAutoBackfillOnLogin(userEmail, token) {
   }
 }
 
-module.exports = { backfillRouter, runBackfillJob, maybeAutoBackfillOnLogin };
+// Auto-Sweep beim Backend-Switch
+// ─────────────────────────────────────────────────────────────────────────────
+// Trigger: `app-settings:changed`-Event mit Key `app.backend`. Bei tatsaechlich
+// veraendertem Wert (vorher != nachher) wird pro aktivem User mit gespeichertem
+// BookStack-Token ein Backfill-Job in die Queue gelegt. Sequentiell durch die
+// Queue-Concurrency-Limits; idempotent ueber findActiveJobId.
+//
+// Status persistiert im Modul-Scope; GET /jobs/backfill/sweep liefert den
+// aktuellen Stand fuer das AdminSettingsCard.
+
+const _sweep = {
+  active: false,
+  startedAt: null,
+  endedAt: null,
+  triggeredBy: null,
+  fromBackend: null,
+  toBackend: null,
+  total: 0,
+  enqueued: 0,
+  skipped: 0,
+  jobIds: [],
+};
+
+let _lastBackend = null;
+try { _lastBackend = appSettings.get('app.backend'); } catch (_) { _lastBackend = null; }
+
+function getSweepState() { return { ..._sweep }; }
+
+function runBackfillSweep({ triggeredBy = null, fromBackend = null, toBackend = null } = {}) {
+  // Active-Users: status='active' + vorhandenes Token. Tokens ohne app_users-
+  // Eintrag werden ebenfalls beruecksichtigt (Legacy-User vor Phase 4a).
+  const activeEmails = new Set(
+    listUsers().filter(u => u.status === 'active').map(u => u.email),
+  );
+  const haveAppUsers = activeEmails.size > 0;
+  const tokens = getAllUserTokens()
+    .filter(t => !haveAppUsers || activeEmails.has(t.email));
+
+  Object.assign(_sweep, {
+    active: true,
+    startedAt: new Date().toISOString(),
+    endedAt: null,
+    triggeredBy,
+    fromBackend,
+    toBackend,
+    total: tokens.length,
+    enqueued: 0,
+    skipped: 0,
+    jobIds: [],
+  });
+
+  logger.info(
+    `Backfill-Sweep gestartet: ${tokens.length} User (${fromBackend || '?'} → ${toBackend || '?'}, by ${triggeredBy || 'system'}).`,
+    { job: 'backfill-sweep', user: triggeredBy },
+  );
+
+  for (const t of tokens) {
+    const userEmail = t.email;
+    const token = { id: t.token_id, pw: t.token_pw };
+    const entityKey = `user:${userEmail}`;
+    if (findActiveJobId('backfill', entityKey, userEmail)) {
+      _sweep.skipped += 1;
+      continue;
+    }
+    try {
+      const jobId = createJob('backfill', 0, userEmail, 'job.label.backfillAll', null, entityKey);
+      enqueueJob(jobId, () => runBackfillJob(jobId, userEmail, token));
+      _sweep.enqueued += 1;
+      _sweep.jobIds.push(jobId);
+    } catch (e) {
+      logger.warn(`Backfill-Sweep: enqueue fuer ${userEmail} fehlgeschlagen: ${e.message}`);
+      _sweep.skipped += 1;
+    }
+  }
+
+  _sweep.endedAt = new Date().toISOString();
+  _sweep.active = false;
+
+  logger.info(
+    `Backfill-Sweep enqueued: ${_sweep.enqueued}/${_sweep.total} (skipped=${_sweep.skipped}).`,
+    { job: 'backfill-sweep', user: triggeredBy },
+  );
+
+  return getSweepState();
+}
+
+appSettings.on('changed', ({ key, updatedBy }) => {
+  if (key !== 'app.backend') return;
+  const current = appSettings.get('app.backend');
+  if (current === _lastBackend) return;
+  const previous = _lastBackend;
+  _lastBackend = current;
+  try {
+    runBackfillSweep({ triggeredBy: updatedBy || null, fromBackend: previous, toBackend: current });
+  } catch (e) {
+    logger.error(`Backfill-Sweep: Trigger fehlgeschlagen: ${e.message}`, { stack: e.stack });
+  }
+});
+
+// GET /jobs/backfill/sweep — Admin-only Status-Endpoint fuer das
+// AdminSettingsCard Backend-Tab. Liefert letzten Sweep-Stand + Live-Counts
+// laufender/queued/done Jobs aus der Job-Map (Frontend pollt waehrend Sweep
+// laeuft).
+backfillRouter.get('/backfill/sweep', requireAdmin, (req, res) => {
+  const { jobs } = require('./shared/state');
+  let running = 0, queued = 0, done = 0, failed = 0;
+  for (const jobId of _sweep.jobIds) {
+    const j = jobs.get(jobId);
+    if (!j) { done += 1; continue; } // bereits aus Map evicted
+    if (j.status === 'running') running += 1;
+    else if (j.status === 'queued') queued += 1;
+    else if (j.status === 'done') done += 1;
+    else if (j.status === 'error' || j.status === 'cancelled') failed += 1;
+  }
+  res.json({ sweep: getSweepState(), counts: { running, queued, done, failed } });
+});
+
+module.exports = { backfillRouter, runBackfillJob, maybeAutoBackfillOnLogin, runBackfillSweep, getSweepState };

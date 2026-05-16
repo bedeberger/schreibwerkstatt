@@ -27,8 +27,14 @@ const _stmtEndJobRun = db.prepare(
 );
 
 function insertJobRun(job) {
+  // bookId normalisieren: System-Jobs (Backfill, Synonym ohne Buch, …) übergeben
+  // 0 als „kein Buchkontext". Mig 83 hat die books-Sentinel-Zeile (book_id=0)
+  // entfernt → FK `job_runs.book_id REFERENCES books(book_id)` würde brechen.
+  // Nicht-positive / nicht-numerische Werte daher als NULL persistieren.
+  const bookNum = Number(job.bookId);
+  const bookId = Number.isInteger(bookNum) && bookNum > 0 ? bookNum : null;
   _stmtInsJobRun.run(
-    job.id, job.type, job.bookId || null, job.userEmail || null, job.label || null,
+    job.id, job.type, bookId, job.userEmail || null, job.label || null,
     job.provider || null, job.model || null,
     new Date().toISOString(),
   );

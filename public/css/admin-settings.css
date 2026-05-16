@@ -106,6 +106,28 @@
   margin-bottom: var(--space-md);
 }
 
+.admin-settings-sweep {
+  display: grid;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  margin-top: var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-tag-bg);
+}
+
+.admin-settings-sweep h4 {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.admin-settings-sweep p {
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+
 @media (max-width: 720px) {
   .admin-settings-tabs {
     overflow-x: auto;

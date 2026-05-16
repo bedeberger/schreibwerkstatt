@@ -51,34 +51,40 @@
           <th x-text="$app.t('admin.usage.column.tokensIn')"></th>
           <th x-text="$app.t('admin.usage.column.tokensOut')"></th>
           <th x-text="$app.t('admin.usage.user.budget')"></th>
+          <th x-text="$app.t('admin.usage.user.mode')"></th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
         <template x-for="u in adminUsageUsersList" :key="u.email">
           <tr :class="u.overrun ? 'admin-usage-row--overrun' : ''">
-            <td>
+            <td class="admin-usage-cell-email">
               <div x-text="u.displayName || u.email"></div>
               <div class="muted-msg muted-msg--sm" x-text="u.email"></div>
             </td>
-            <td x-text="adminUsageMoney(u.usd)"></td>
-            <td x-text="adminUsageInt(u.tokensIn)"></td>
-            <td x-text="adminUsageInt(u.tokensOut)"></td>
-            <td class="admin-usage-budget-cell">
+            <td class="admin-usage-cell-num" x-text="adminUsageMoney(u.usd)"></td>
+            <td class="admin-usage-cell-num" x-text="adminUsageInt(u.tokensIn)"></td>
+            <td class="admin-usage-cell-num" x-text="adminUsageInt(u.tokensOut)"></td>
+            <td class="admin-usage-cell-shrink">
               <input type="number" min="0" step="0.01"
                      x-model="u._draftBudget"
                      :placeholder="$app.t('admin.usage.user.noBudget')"
                      class="admin-usage-budget-input">
+            </td>
+            <td class="admin-usage-cell-shrink">
               <select x-model="u._draftMode" class="admin-usage-mode-select">
                 <option value="none"   x-text="$app.t('admin.usage.user.mode.none')"></option>
                 <option value="soft"   x-text="$app.t('admin.usage.user.mode.soft')"></option>
                 <option value="hard"   x-text="$app.t('admin.usage.user.mode.hard')"></option>
               </select>
-              <button type="button" @click="adminUsageSaveBudget(u)" :disabled="u._saving"
-                      x-text="u._saving ? $app.t('common.saving') : $app.t('common.save')"></button>
-              <span x-show="u._savedAt && (Date.now() - u._savedAt < 2000)"
-                    class="muted-msg muted-msg--sm" x-text="$app.t('common.saved')"></span>
-              <button type="button" @click="adminUsageFilterUser = u.email; adminUsageSelectTab('jobs')"
-                      x-text="$app.t('admin.usage.user.drillDown')"></button>
+            </td>
+            <td class="admin-usage-cell-shrink">
+              <div class="admin-usage-actions">
+                <button type="button" @click="adminUsageSaveBudget(u)" :disabled="u._saving"
+                        x-text="u._saving ? $app.t('common.saving') : (u._savedAt && (Date.now() - u._savedAt < 2000) ? $app.t('common.saved') : $app.t('common.save'))"></button>
+                <button type="button" @click="adminUsageFilterUser = u.email; adminUsageSelectTab('jobs')"
+                        x-text="$app.t('admin.usage.user.drillDown')"></button>
+              </div>
             </td>
           </tr>
         </template>

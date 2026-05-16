@@ -67,7 +67,7 @@ test('Kontinuität single-pass: 1 Kapitel, 1 Seite, AI liefert 1 Problem', async
 
 test('Kontinuität: leeres Buch → result.empty', async () => {
   const BOOK_ID = 43;
-  ctx.mockBs.setBook({ chapters: [], pages: [], pageBodies: {} });
+  ctx.mockBs.setBook({ chapters: [], pages: [], pageBodies: {}, books: [{ id: BOOK_ID, name: 'Leer' }] });
 
   const jobId = ctx.shared.createJob('kontinuitaet', BOOK_ID, 'tester@test.dev', 'job.label.kontinuitaet');
   ctx.shared.enqueueJob(jobId, () =>

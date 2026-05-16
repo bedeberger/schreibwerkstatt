@@ -243,7 +243,7 @@ test('Buch-Review Cache: Multi-Pass — geänderte Seite invalidiert nur 1 Kapit
 
 test('Buch-Review: leeres Buch → result.empty', async () => {
   const BOOK_ID = 83;
-  ctx.mockBs.setBook({ chapters: [], pages: [], pageBodies: {} });
+  ctx.mockBs.setBook({ chapters: [], pages: [], pageBodies: {}, books: [{ id: BOOK_ID, name: 'Leer' }] });
 
   const jobId = ctx.shared.createJob('review', BOOK_ID, 'tester@test.dev', 'job.label.review');
   ctx.shared.enqueueJob(jobId, () =>

@@ -4,9 +4,9 @@
 // ein, damit Pipeline-Tests reproduzierbar gegen echte Prosa laufen können.
 //
 // IDs sind deterministisch aus bookId abgeleitet:
-//   chapter_id = bookId * 1000 + chapterIndex (1..4)
-//   page_id    = bookId * 1000 + 100 + (chapterIndex - 1) * 10 + pageIndex (1..2)
-// Damit lassen sich Asserts „page mit 1.1 ist page_id X" stabil ausdrücken.
+//   chapter_id = bookId * 1000 + chapterIndex     (z.B. 102001..102004)
+//   page_id    = bookId * 1000 + chapterIndex*10 + pageIndex  (z.B. 102011, 102012, 102021, …)
+// Damit lassen sich Asserts „page 1.1 hat page_id 102011" stabil ausdrücken.
 
 const { parseDummyBook, META } = require('../../fixtures/dummy-book-loader');
 
@@ -47,7 +47,7 @@ function buildDummyBookFixture(bookId) {
 
     chap.pages.forEach((page, pi) => {
       const pageIndex = pi + 1;
-      const pageId = bookId * 1000 + 100 + (chapIndex - 1) * 10 + pageIndex;
+      const pageId = bookId * 1000 + chapIndex * 10 + pageIndex;
       pages.push({
         id: pageId,
         book_id: bookId,

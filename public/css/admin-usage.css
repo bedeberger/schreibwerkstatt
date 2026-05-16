@@ -102,16 +102,22 @@
   color: var(--color-text);
 }
 
-.admin-usage-budget-cell {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-xs);
+/* Numerische + Form-Spalten nowrap, damit nichts umbricht.
+   Auto-Layout verteilt freie Breite proportional zur Max-Content-Breite —
+   ohne `width: 1%` werden Spalten nicht künstlich an den rechten Rand gedrückt. */
+.admin-usage-cell-num,
+.admin-usage-cell-shrink {
   white-space: nowrap;
-  width: 1%;
 }
 
-.admin-usage-budget-cell button {
+.admin-usage-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-wrap: nowrap;
+}
+
+.admin-usage-actions button {
   font-size: var(--font-size-xs);
   padding: var(--space-xs) var(--space-sm);
 }

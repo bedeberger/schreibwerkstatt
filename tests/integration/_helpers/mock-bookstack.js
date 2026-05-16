@@ -60,7 +60,7 @@ function _wipeDb() {
 
 function setBook({ chapters = [], pages = [], pageBodies = {}, books = [] } = {}) {
   state = { chapters, pages, pageBodies, books };
-  _seedDb({ chapters, pages });
+  _seedDb({ chapters, pages, books });
 }
 
 function _matchListPath(path, key) {

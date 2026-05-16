@@ -17,12 +17,17 @@ export function registerAdminSettingsCard() {
     adminSettingsTab: 'auth',
     adminSettingsTestResult: null,
 
+    // Phase 0b: Backfill-Sweep-State + Polling
+    adminSettingsSweep: null,
+    _sweepPollTimer: null,
+
     _onViewReset: null,
 
     init() {
       this.$watch(() => window.__app.showAdminSettingsCard, async (visible) => {
-        if (!visible) return;
+        if (!visible) { this._adminSettingsStopSweepPoll(); return; }
         await this.adminSettingsLoad();
+        await this.adminSettingsSweepLoad();
       });
       this._onViewReset = () => {
         this.adminSettingsError = '';
@@ -33,6 +38,7 @@ export function registerAdminSettingsCard() {
 
     destroy() {
       if (this._onViewReset) window.removeEventListener('view:reset', this._onViewReset);
+      this._adminSettingsStopSweepPoll();
     },
 
     ...adminSettingsMethods,

@@ -105,7 +105,7 @@ test('Komplettanalyse Single-Pass: 1 Kapitel, P1 + P8 → done', async () => {
 
 test('Komplettanalyse: leeres Buch → result.empty, kein AI-Call', async () => {
   const BOOK_ID = 51;
-  ctx.mockBs.setBook({ chapters: [], pages: [], pageBodies: {} });
+  ctx.mockBs.setBook({ chapters: [], pages: [], pageBodies: {}, books: [{ id: BOOK_ID, name: 'Leer' }] });
 
   const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
   ctx.shared.enqueueJob(jobId, () =>

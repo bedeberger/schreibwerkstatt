@@ -142,6 +142,36 @@
           <input type="password" x-model="adminSettingsForm['app.bookstack.token_secret']" :placeholder="$app.t('admin.settings.secret.masked')">
         </label>
       </div>
+
+      <!-- Phase 0b: Auto-Sweep-Progress nach Backend-Wechsel -->
+      <div x-show="adminSettingsSweep && adminSettingsSweep.startedAt" class="admin-settings-sweep">
+        <h4 x-text="$app.t('admin.settings.backend.sweep.title')"></h4>
+        <p class="muted-msg muted-msg--sm">
+          <span x-text="$app.t('admin.settings.backend.sweep.range', {
+            from: adminSettingsSweep?.fromBackend || '?',
+            to: adminSettingsSweep?.toBackend || '?'
+          })"></span>
+        </p>
+        <p>
+          <span x-text="$app.t('admin.settings.backend.sweep.enqueued', {
+            n: adminSettingsSweep?.enqueued || 0,
+            total: adminSettingsSweep?.total || 0
+          })"></span>
+          <span x-show="adminSettingsSweep?.skipped"
+                x-text="$app.t('admin.settings.backend.sweep.skipped', { n: adminSettingsSweep?.skipped || 0 })"></span>
+        </p>
+        <div class="progress-bar" :style="{ '--progress': adminSettingsSweepProgress() + '%' }"></div>
+        <p class="muted-msg muted-msg--sm">
+          <span x-text="$app.t('admin.settings.backend.sweep.running', { n: adminSettingsSweep?.counts?.running || 0 })"></span>
+          ·
+          <span x-text="$app.t('admin.settings.backend.sweep.queued', { n: adminSettingsSweep?.counts?.queued || 0 })"></span>
+          ·
+          <span x-text="$app.t('admin.settings.backend.sweep.done', { n: adminSettingsSweep?.counts?.done || 0 })"></span>
+          <span x-show="adminSettingsSweep?.counts?.failed">
+            · <span x-text="$app.t('admin.settings.backend.sweep.failed', { n: adminSettingsSweep?.counts?.failed || 0 })"></span>
+          </span>
+        </p>
+      </div>
     </section>
 
     <!-- SMTP / Mailer-Tab -->
