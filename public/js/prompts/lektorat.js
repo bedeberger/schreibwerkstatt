@@ -191,11 +191,15 @@ Bevor du die JSON-Antwort ausgibst, gehe deine gesammelten Findings einmal durch
 8. ZUSAMMENFASSUNGS-DISJUNKTION: Lies «stilanalyse», «fazit» und jedes «szenen[].kommentar» einzeln. Wenn ein Satz dort einen Mangel beschreibt, der textuell oder thematisch bereits durch einen Eintrag im «fehler»-Array abgedeckt ist (auch in Aggregat-Form wie «viele Wiederholungen», «passivlastig», «schwache Verben», «zu viele Füllwörter», «häufige Stilbrüche», «Show-vs-Tell-Probleme») → diesen Satz löschen oder durch eine inhaltlich nicht überlappende Beobachtung ersetzen. Selbsttest: Wäre der Satz überflüssig, wenn der Leser das «fehler»-Array bereits gesehen hat? Wenn ja → raus. Die drei Summary-Felder dürfen keine konkreten Findings paraphrasieren und keine Findings-Gruppen charakterisieren.
 `;
 
+  // Few-Shot: ein GUTES + ein VERWORFENES Beispiel. Das Erklärung-Filter-
+  // Anti-Pattern ist bereits durch SCHWERE-SCHWELLE + SELBSTKONTROLL-PASS Step 6
+  // explizit abgedeckt (Trigger-Wörter: kein Fehler / vertretbar / möglicherweise / akzeptabel)
+  // — extra Beispiel wäre Token-Redundanz. Das Korrektur-Purität-Beispiel bleibt,
+  // weil es einzigartig die IN-PLACE-Korrektur (Meta-Präfix raus + Reformulierung)
+  // demonstriert, die keine Regel-Beschreibung gleichwertig zeigt.
   const beispielBlock = _isLocal ? '' : `
 Beispiel eines GUTEN Eintrags:
 { "typ": "grammatik", "original": "wegen dem Regen", "korrektur": "wegen des Regens", "erklaerung": "«wegen» verlangt den Genitiv." }
-Beispiel eines VERWORFENEN Eintrags (Erklärung-Filter):
-{ "typ": "rechtschreibung", "original": "heisst", "korrektur": "heißt", "erklaerung": "Könnte im Standarddeutschen mit ß geschrieben werden." } → Erklärung enthält Unsicherheit → Selbsttest nicht bestanden → weglassen.
 Beispiel eines VERWORFENEN Eintrags (Korrektur-Purität verletzt):
 { "typ": "show_vs_tell", "original": "Dort versteckte er sich vor der Konfrontation, vor der eigentlich normalsten Auseinandersetzung zwischen Ehepartnern.", "korrektur": "Satz kürzen auf: «Dort versteckte er sich vor der Konfrontation.» – der erklärende Nachsatz nimmt dem Leser die Deutung vorweg.", "erklaerung": "..." } → «korrektur» enthält Meta-Präfix, Guillemets und Begründungs-Anhang → KORRIGIEREN zu: { "korrektur": "Dort versteckte er sich vor der Konfrontation.", "erklaerung": "Der erklärende Nachsatz nimmt dem Leser die Deutung vorweg – Satz kürzen." }
 `;

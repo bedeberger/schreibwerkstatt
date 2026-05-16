@@ -50,9 +50,10 @@ Bewusst out-of-scope (User-Wunsch): Attachments (werden nicht genutzt → kein M
 | 6 | Tags/Kategorien | ja | Filter-UI | 0, 4a |
 | 7 | Volltextsuche (FTS5) | ja | App-eigene Suche, parallel zu BookStack | 1, 2, 4b |
 | 8 | Kill BookStack | one-way | Editor-Wechsel sichtbar | 1–7 |
+| 9 | Doku-Update (Standalone) | ja | keiner (Doku) | 8 |
 
-**Start-Reihenfolge:** 0 → 4a → 4c → 4b → 2 → 6 → 1 → 3 → 7 → 5 → 8.
-4a/4c/4b zuerst, weil User-Identität und ACL die SSoT für alle folgenden Phasen sind. Phase 7 (Suche) **vor** Phase 8 (Kill), damit BookStack-Search-Pfad beim Exit nur noch entfernt, nicht ersetzt werden muss.
+**Start-Reihenfolge:** 0 → 4a → 4c → 4b → 4b1 → 2 → 6 → 1 → 3 → 7 → 5 → 8 → 9.
+4a/4c/4b zuerst, weil User-Identität und ACL die SSoT für alle folgenden Phasen sind. Reader-View (4b1) direkt danach, weil sie der einzige UI-Pfad für Viewer ist — ohne sie hat Viewer-Rolle kein sinnvolles Frontend. Phase 7 (Suche) **vor** Phase 8 (Kill), damit BookStack-Search-Pfad beim Exit nur noch entfernt, nicht ersetzt werden muss.
 
 ---
 
@@ -785,6 +786,27 @@ Voraussetzung: Phasen 1–7 stabil, Push-Worker schmerzfrei, keine Edits über B
 
 ---
 
+## Phase 9 — Doku-Update (Standalone-App)
+
+Nach Phase 8 ist BookStack als Abhängigkeit raus. Sämtliche Doku, die noch von „BookStack-Basis", „bewusste Abhängigkeit" oder BookStack-Setup spricht, wird auf Standalone-Realität umgestellt. Reine Doku-Phase, kein Code-Risiko.
+
+**Zu aktualisieren:**
+
+- **[README.md](../README.md)** — Intro neu (Standalone-App, kein BookStack-Backend mehr), Deployment-Block (LXC + systemd) auf neue Architektur ohne BookStack-Container, Env-Variablen-Liste durchgehen: `BOOKSTACK_BASE_URL`/`BOOKSTACK_TOKEN_ID`/`BOOKSTACK_TOKEN_SECRET` etc. raus, neue App-eigene Vars rein (eigener Editor, eigene Suche, eigene User-DB). Architektur-Diagramm: BookStack-Box entfernen, NGINX → Express direkt.
+- **[CLAUDE.md](../CLAUDE.md)** — Header-Zeile „Auf BookStack-Basis (bewusste Abhängigkeit — Storage, Auth, Editor)" löschen. Architektur-Überblick: BookStack-Proxy-Routen (`/api/*`) raus, eigene Page-/Editor-Routen rein. Harte Regeln durchgehen: `bsGetAll`/`bsGet`/`bsPut`-Regel raus oder durch App-eigene RMW-Regel ersetzen; `bsGet(..., { fresh: true })`-Regel entweder löschen (kein SW-API_CACHE mehr für BS-Calls) oder auf eigene Cache-Schicht umformulieren. Read-Modify-Write-Pfade neu beschreiben. `lib/bookstack.js` aus Projektstruktur raus. Editor-Sektion: TipTap statt TinyMCE-Schnittstelle. Spickzettel-Links: [docs/bookstack-exit.md](bookstack-exit.md) und [docs/bookstack-templates.md](bookstack-templates.md) streichen.
+- **[LICENSE](../LICENSE)** — Lizenzdatei prüfen: bisheriger Stand orientierte sich an BookStack-Kontext (AGPL-Pflicht durch BookStack-Abhängigkeit). Standalone-App kann frei wählen — Lizenzwahl bewusst neu treffen (AGPL beibehalten / MIT / proprietär self-hosted). Copyright-Header (`Copyright © …`) auf aktuellen Stand bringen. Third-Party-Notices: BookStack-Erwähnung raus, neue Deps (TipTap, eigene Search-Lib) ergänzen.
+- **Deploy-Doku** (README-Block + ggf. `docs/deploy.md` neu) — LXC-Container-Setup ohne BookStack-Sub-Container. systemd-Unit der App bleibt; BookStack-Unit + MariaDB-Backup-Snippets entfallen. NGINX-Konfig: Proxy-Pass auf `/api/` raus, Reverse-Proxy nur noch auf App-Port 3737. Backup-Strategie: nur noch eigene SQLite-DB + Uploads (statt MariaDB-Dump + BookStack-Storage). Migration-Notes für bestehende User: BookStack-DB final exportiert → App-DB übernommen, BookStack-Container kann gestoppt + entfernt werden.
+- **Spickzettel-Cleanup** in [docs/](./):
+  - [bookstack-templates.md](bookstack-templates.md) — entweder ersatzlos löschen oder in neue „Template-Verwaltung"-Doku überführen, falls Templates aus Phase 8 übernommen.
+  - [bookstack-exit.md](bookstack-exit.md) (diese Datei) — beim Abschluss von Phase 9 streichen; CLAUDE.md-Verweis darauf ebenfalls entfernen (steht aktuell als Ausnahme zur „Stand-only"-Regel drin).
+  - [erd.md](erd.md), [jobs.md](jobs.md), [i18n.md](i18n.md), [ai-providers.md](ai-providers.md), [testing.md](testing.md), [figur-werkstatt.md](figur-werkstatt.md), [buchchat-tools.md](buchchat-tools.md), [focus-editor.md](focus-editor.md), [state-modell.md](state-modell.md), [finetuning.md](finetuning.md), [wordpress-import.md](wordpress-import.md) — jeweils auf BookStack-Referenzen grep'pen und auf Standalone-Pendants umstellen.
+- **`package.json`** — Description-Feld + `keywords` von BookStack-bezogenen Begriffen befreien. Repo-URL / Homepage aktualisieren, falls bisher auf BookStack-Fork verwies.
+- **Tests-Doku** — [tests/](../tests/) README (falls vorhanden) auf neue Editor-/Persistenz-Schicht anpassen. E2E-Tests, die `bsGet`-Mocks brauchten, sind in Phase 8 schon umgestellt; Doku synchron.
+
+**Reihenfolge innerhalb Phase 9:** README + CLAUDE.md zuerst (Einstiegspunkte für neue Contributors + Sessions), dann LICENSE, dann Deploy-Block, dann Spickzettel.
+
+---
+
 ## Risiken / offene Fragen
 
 - **Lektor-Apply-Range-Drift**: Lektorat-Findings haben Positionen im damaligen Body. Wenn Lektor anwendet und Page zwischenzeitlich von Editor verändert wurde, greift bereits der `updatedAt`-Staleness-Check (CLAUDE.md-Regel „Job-Ergebnisse mit `updatedAt`-Staleness-Check"). Lektor-Apply muss denselben Vergleich machen — Server-Route lehnt 409 ab, wenn `pages.updated_at` differiert vom Snapshot, der das Finding erzeugt hat.
@@ -808,11 +830,13 @@ Voraussetzung: Phasen 1–7 stabil, Push-Worker schmerzfrei, keine Edits über B
 | 2 | 2-3 Tage | niedrig |
 | 3 | 2-3 Tage | niedrig |
 | 4a | 4-6 Tage | mittel (FK-Recreate, Login-Flow) |
-| 4b | 3-4 Tage | mittel |
+| 4b | 4-5 Tage | mittel (Rollen-Matrix + Apply-Routen + minRole-Filter) |
+| 4b1 | 4-6 Tage | niedrig (reines Frontend + 2 Mini-Tabellen) |
 | 4c | 2-3 Tage | niedrig |
 | 5 | 4-6 Tage | mittel-hoch (Konflikt-Pfad) |
 | 6 | 2-3 Tage | niedrig |
 | 7 | 4-6 Tage | mittel (FTS5-Schema + Sync-Hooks + UI) |
 | 8 | 1-2 Wochen | hoch (Editor-Wechsel, Export-Renderer) |
+| 9 | 1-2 Tage | niedrig (Doku-Sweep) |
 
-Gesamt ca. 7-10 Wochen Vollzeit, mit Puffer.
+Gesamt ca. 8-11 Wochen Vollzeit, mit Puffer.
