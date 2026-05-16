@@ -11,6 +11,16 @@ const { runWithContext } = require('./lib/log-context');
 
 // DB-Setup + Migrationen laufen beim Import
 const { db, cleanupStuckJobRuns, upsertUserLogin, touchUserLastSeen, addUserActivity, pruneStaleByAge } = require('./db/schema');
+const { ensureAdminFromEnv } = require('./db/app-users');
+
+// Phase 4a Admin-Bootstrap: ADMIN_EMAIL aus ENV → app_users-Row mit
+// global_role='admin'. Idempotent + ENV-Wechsel-tauglich (kein Restart-Zwang).
+try {
+  const r = ensureAdminFromEnv();
+  if (r && r.action !== 'exists') logger.info(`ADMIN_EMAIL ${r.email}: ${r.action}`);
+} catch (e) {
+  logger.warn(`ensureAdminFromEnv: ${e.message}`);
+}
 
 const authRouter = require('./routes/auth');
 const historyRouter = require('./routes/history');

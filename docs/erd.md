@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 106, 53 Tabellen (ohne `sqlite_*`/`schema_version`/`sessions`).
+Stand: Schema-Version 107, 56 Tabellen (ohne `sqlite_*`/`schema_version`/`sessions`).
 
 Quelle: Live-Dump aus [schreibwerkstatt.db](../schreibwerkstatt.db) (`.schema --indent`) + [db/migrations.js](../db/migrations.js). Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -627,8 +627,44 @@ erDiagram
     TEXT    cached_at
   }
 
+  app_users {
+    INTEGER id               PK "AUTOINCREMENT"
+    TEXT    email            "UNIQUE, lowercase-normalisiert"
+    TEXT    display_name
+    TEXT    avatar_url
+    TEXT    global_role      "admin | user (Default user)"
+    TEXT    status           "invited | active | suspended | deleted"
+    TEXT    language
+    TEXT    model_override
+    INTEGER can_invite_users "Default 1; Admin entzieht bei Missbrauch"
+    TEXT    first_seen_at
+    TEXT    last_seen_at
+    TEXT    invited_by
+    TEXT    invited_at
+    TEXT    created_at
+  }
+  user_invites {
+    INTEGER id           PK "AUTOINCREMENT"
+    TEXT    email
+    TEXT    global_role  "admin | user"
+    TEXT    invite_token "UNIQUE"
+    TEXT    invited_by
+    TEXT    invited_at
+    TEXT    expires_at
+    TEXT    accepted_at  "NULL = noch offen"
+    TEXT    revoked_at
+  }
+  user_sessions_audit {
+    INTEGER id         PK "AUTOINCREMENT"
+    TEXT    user_email
+    TEXT    event      "login | logout | login-denied | suspended | reactivated | role-changed | deleted"
+    TEXT    ip
+    TEXT    user_agent
+    TEXT    meta_json  "JSON-Encoded Detail (method, from/to-Rolle, ...)"
+    TEXT    created_at
+  }
   users {
-    TEXT    email             PK
+    TEXT    email             PK,FK "app_users(email) CASCADE"
     TEXT    name
     TEXT    locale
     TEXT    theme

@@ -4246,6 +4246,165 @@ function runMigrations() {
     logger.info('DB-Migration auf Version 106 abgeschlossen (books/chapters/pages auf AUTOINCREMENT umgestellt, sqlite_sequence Wasserzeichen >= 1_000_000).');
   }
 
+  if (version < 107) {
+    // Phase 4a (BookStack-Exit, docs/bookstack-exit.md): App-eigene User-DB.
+    // Drei neue Tabellen: app_users (Identity + Role + Status), user_invites
+    // (Token-Workflow), user_sessions_audit (Login-Events fuer Admin).
+    //
+    // Bestehende `users`-Tabelle (Profil/Settings, seit Mig 41) bleibt — sie
+    // wird hier nur um eine FK auf app_users(email) ON DELETE CASCADE erweitert,
+    // damit beim Hard-Delete eines App-Users (selten; Default ist Soft-Delete
+    // via status='deleted') auch Profile/Tokens kaskadieren.
+    //
+    // Backfill: alle distinct user_email-Werte aus users + job_runs +
+    // chat_sessions + user_tokens + page_checks bekommen app_users-Rows mit
+    // status='active', global_role='user'. ADMIN_EMAIL-Bootstrap laeuft NICHT
+    // hier (Migration ist data-frei), sondern beim Server-Start (separater
+    // Helper, damit ENV-Wechsel ohne Re-Migration wirkt).
+    db.pragma('foreign_keys = OFF');
+
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS app_users (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        email            TEXT NOT NULL UNIQUE,
+        display_name     TEXT,
+        avatar_url       TEXT,
+        global_role      TEXT NOT NULL DEFAULT 'user'
+                              CHECK(global_role IN ('admin','user')),
+        status           TEXT NOT NULL DEFAULT 'active'
+                              CHECK(status IN ('invited','active','suspended','deleted')),
+        language         TEXT DEFAULT 'de',
+        model_override   TEXT,
+        can_invite_users INTEGER NOT NULL DEFAULT 1,
+        first_seen_at    TEXT,
+        last_seen_at     TEXT,
+        invited_by       TEXT,
+        invited_at       TEXT,
+        created_at       TEXT DEFAULT (datetime('now'))
+      )
+    `).run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_app_users_status ON app_users(status)').run();
+
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS user_invites (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        email        TEXT NOT NULL,
+        global_role  TEXT NOT NULL DEFAULT 'user'
+                          CHECK(global_role IN ('admin','user')),
+        invite_token TEXT NOT NULL UNIQUE,
+        invited_by   TEXT NOT NULL,
+        invited_at   TEXT DEFAULT (datetime('now')),
+        expires_at   TEXT NOT NULL,
+        accepted_at  TEXT,
+        revoked_at   TEXT
+      )
+    `).run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_user_invites_token ON user_invites(invite_token)').run();
+    // Partial UNIQUE: nur aktive Invites blockieren erneutes Senden.
+    db.prepare(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_user_invites_active_email
+        ON user_invites(email)
+        WHERE revoked_at IS NULL AND accepted_at IS NULL
+    `).run();
+
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS user_sessions_audit (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_email TEXT NOT NULL,
+        event      TEXT NOT NULL CHECK(event IN
+                       ('login','logout','login-denied','suspended','reactivated','role-changed','deleted')),
+        ip         TEXT,
+        user_agent TEXT,
+        meta_json  TEXT,
+        created_at TEXT DEFAULT (datetime('now'))
+      )
+    `).run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_user_audit_user ON user_sessions_audit(user_email, created_at DESC)').run();
+
+    // Bestandsbackfill: distinct user_email aus allen user-scoped Tabellen.
+    const sources = [
+      "SELECT email AS email, name AS display_name, created_at, last_seen_at FROM users",
+      "SELECT DISTINCT user_email AS email, NULL AS display_name, NULL AS created_at, NULL AS last_seen_at FROM job_runs WHERE user_email IS NOT NULL AND user_email <> ''",
+      "SELECT DISTINCT user_email AS email, NULL AS display_name, NULL AS created_at, NULL AS last_seen_at FROM chat_sessions WHERE user_email IS NOT NULL AND user_email <> ''",
+      "SELECT email AS email, NULL AS display_name, NULL AS created_at, NULL AS last_seen_at FROM user_tokens WHERE email IS NOT NULL AND email <> ''",
+      "SELECT DISTINCT user_email AS email, NULL AS display_name, NULL AS created_at, NULL AS last_seen_at FROM page_checks WHERE user_email IS NOT NULL AND user_email <> ''",
+    ];
+    const insUser = db.prepare(`
+      INSERT INTO app_users (email, display_name, status, global_role, first_seen_at, last_seen_at, created_at)
+      VALUES (?, ?, 'active', 'user', ?, ?, ?)
+      ON CONFLICT(email) DO UPDATE SET
+        display_name  = COALESCE(app_users.display_name, excluded.display_name),
+        first_seen_at = COALESCE(app_users.first_seen_at, excluded.first_seen_at),
+        last_seen_at  = COALESCE(app_users.last_seen_at, excluded.last_seen_at)
+    `);
+    const seen = new Set();
+    db.transaction(() => {
+      for (const sql of sources) {
+        const tableOk = (() => {
+          try { return db.prepare(sql + ' LIMIT 0').all() !== undefined; }
+          catch { return false; }
+        })();
+        if (!tableOk) continue;
+        const rows = db.prepare(sql).all();
+        for (const r of rows) {
+          if (!r.email) continue;
+          if (seen.has(r.email)) continue;
+          seen.add(r.email);
+          const nowIso = new Date().toISOString();
+          insUser.run(
+            r.email,
+            r.display_name || null,
+            r.created_at || nowIso,
+            r.last_seen_at || null,
+            r.created_at || nowIso,
+          );
+        }
+      }
+    })();
+    if (seen.size > 0) logger.info(`Migration 107: ${seen.size} distinct user_email(s) nach app_users gespiegelt.`);
+
+    // FK-Recreate `users`: email REFERENCES app_users(email) ON DELETE CASCADE.
+    // Spalten-Reihenfolge entspricht aktuellem Stand (Mig 41 + 52 + 63 + 87).
+    db.prepare('DELETE FROM users WHERE email NOT IN (SELECT email FROM app_users)').run();
+
+    db.prepare('DROP TABLE IF EXISTS users_new').run();
+    db.prepare(`
+      CREATE TABLE users_new (
+        email             TEXT PRIMARY KEY REFERENCES app_users(email) ON DELETE CASCADE,
+        name              TEXT,
+        created_at        TEXT NOT NULL,
+        last_login_at     TEXT,
+        locale            TEXT,
+        theme             TEXT,
+        default_buchtyp   TEXT,
+        default_language  TEXT,
+        default_region    TEXT,
+        last_seen_at      TEXT,
+        focus_granularity TEXT,
+        daily_goal_chars  INTEGER
+      )
+    `).run();
+    db.prepare(`
+      INSERT INTO users_new (email, name, created_at, last_login_at, locale, theme,
+                             default_buchtyp, default_language, default_region,
+                             last_seen_at, focus_granularity, daily_goal_chars)
+      SELECT                 email, name, created_at, last_login_at, locale, theme,
+                             default_buchtyp, default_language, default_region,
+                             last_seen_at, focus_granularity, daily_goal_chars
+        FROM users
+    `).run();
+    db.prepare('DROP TABLE users').run();
+    db.prepare('ALTER TABLE users_new RENAME TO users').run();
+
+    db.pragma('foreign_keys = ON');
+    const fkErrors107 = db.pragma('foreign_key_check');
+    if (fkErrors107.length) {
+      throw new Error(`Migration 107: foreign_key_check meldet ${fkErrors107.length} Verstoesse: ${JSON.stringify(fkErrors107.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 107').run();
+    logger.info('DB-Migration auf Version 107 abgeschlossen (Phase 4a App-User-DB: app_users + user_invites + user_sessions_audit, users.email FK auf app_users).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {
