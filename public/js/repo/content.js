@@ -76,17 +76,17 @@ async function _get(path, { fresh = false } = {}) {
   }
 }
 
-async function _write(method, path, body) {
+async function _write(method, path, body, invalidationPaths) {
   const opts = {
     method,
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: body !== undefined ? JSON.stringify(body) : undefined,
   };
   for (let attempt = 0; attempt <= MAX_RETRY_429; attempt++) {
     const r = await _fetchWithTimeout('/content/' + path, opts, WRITE_TIMEOUT_MS);
     if (r.ok) {
-      _invalidateContentCache(path);
-      return r.json();
+      _invalidateContentCache(invalidationPaths || path);
+      return r.status === 204 ? null : r.json();
     }
     if (r.status !== 429 || attempt === MAX_RETRY_429) {
       throw _httpError(method, path, r.status, await _errBody(r));
@@ -119,13 +119,63 @@ export const contentRepo = {
     return page;
   },
 
-  // PUT /content/pages/:id mit `{ html?, name? }`. Server `cleanPageHtml`-t.
+  // PUT /content/pages/:id mit `{ html?, name?, position?, chapter_id? }`.
+  // Server cleant html, mapped position→priority.
   async savePage(id, body) {
     return _write('PUT', 'pages/' + id, body);
+  },
+
+  // Alias fuer Strukturoperationen (rename/move/reorder ohne Body-Change).
+  async updatePage(id, body) {
+    // Invalidiert auch das Buch-Tree-Listing, weil Rename/Move dort sichtbar wird.
+    const inv = ['pages/' + id];
+    if (body?.book_id) inv.push('books/' + body.book_id + '/tree');
+    return _write('PUT', 'pages/' + id, body, inv);
+  },
+
+  // POST /content/pages mit `{ book_id?, chapter_id?, name, html? }`.
+  async createPage(body) {
+    const inv = ['pages'];
+    if (body?.book_id) inv.push('books/' + body.book_id + '/tree');
+    return _write('POST', 'pages', body, inv);
+  },
+
+  // DELETE /content/pages/:id. Liefert null.
+  async deletePage(id) {
+    return _write('DELETE', 'pages/' + id);
+  },
+
+  // POST /content/chapters mit `{ book_id, name, position?, description? }`.
+  async createChapter(body) {
+    const inv = ['chapters'];
+    if (body?.book_id) inv.push('books/' + body.book_id + '/tree');
+    return _write('POST', 'chapters', body, inv);
+  },
+
+  async updateChapter(id, body) {
+    const inv = ['chapters/' + id];
+    if (body?.book_id) inv.push('books/' + body.book_id + '/tree');
+    return _write('PUT', 'chapters/' + id, body, inv);
+  },
+
+  async deleteChapter(id) {
+    return _write('DELETE', 'chapters/' + id);
   },
 
   // POST /content/books mit `{ name, description? }`. Server upserted lokale books-Row.
   async createBook(body) {
     return _write('POST', 'books', body);
+  },
+
+  async deleteBook(id) {
+    return _write('DELETE', 'books/' + id);
+  },
+
+  // GET /content/search?query=…&book_id=… → { hits: [Page-Meta] }
+  async search(query, { bookId, count } = {}) {
+    const params = new URLSearchParams({ query });
+    if (bookId) params.set('book_id', String(bookId));
+    if (count) params.set('count', String(count));
+    return _get('search?' + params.toString());
   },
 };

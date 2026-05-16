@@ -1,8 +1,8 @@
 // Alpine.data('bookOrganizerCard') — Sub-Komponente Buchorganizer.
 //
 // Reorder/Move (DnD via SortableJS, lazy), Create/Rename/Delete für Kapitel +
-// Seiten. Keine KI, keine Job-Queue — direkter BookStack-API-Zugriff via
-// Root-bsGet/bsPut/bsPost/bsDelete-Helper.
+// Seiten. Keine KI, keine Job-Queue — direkter Storage-Zugriff via
+// contentRepo (Domain-Repository, /content/*).
 //
 // Speicher-Strategie: nach jeder erfolgreichen Mutation patchen wir den
 // Root-Tree IN-PLACE. Kein `loadPages()` (würde root.pages + root.tree
@@ -18,6 +18,7 @@
 
 import { setupCardLifecycle } from './card-lifecycle.js';
 import { loadSortable } from '../lazy-libs.js';
+import { contentRepo } from '../repo/content.js';
 
 // Guard gegen Sortable v1.15.6 Race: `_onDragOver` kann auf einer destroyten
 // Instanz (this.el === null) feuern, wenn Alpine x-for nach einem Drop neu
@@ -226,7 +227,7 @@ export function registerBookOrganizerCard() {
         this.organizerStatus = root.t('bookOrganizer.savingChapters', { done: 0, total });
         for (let i = 0; i < this.workTree.length; i++) {
           const c = this.workTree[i];
-          await root.bsPut('chapters/' + c.id, { name: c.name, priority: i + 1 });
+          await contentRepo.updateChapter(c.id, { name: c.name, position: i + 1 });
           this.organizerProgress = Math.round(((i + 1) / total) * 100);
           this.organizerStatus = root.t('bookOrganizer.savingChapters', { done: i + 1, total });
         }
@@ -251,7 +252,11 @@ export function registerBookOrganizerCard() {
         this.organizerStatus = root.t('bookOrganizer.savingPages', { done: 0, total });
         for (let i = 0; i < targets.length; i++) {
           const t = targets[i];
-          await root.bsPut('pages/' + t.id, { name: t.name, priority: t.priority, chapter_id: t.chapter_id });
+          await contentRepo.updatePage(t.id, {
+            name: t.name,
+            position: t.priority,
+            chapter_id: t.chapter_id,
+          });
           this.organizerProgress = Math.round(((i + 1) / total) * 100);
           this.organizerStatus = root.t('bookOrganizer.savingPages', { done: i + 1, total });
         }
@@ -272,7 +277,7 @@ export function registerBookOrganizerCard() {
     async _doRenameChapter(id, newName, inputEl) {
       const root = window.__app;
       try {
-        await root.bsPut('chapters/' + id, { name: newName });
+        await contentRepo.updateChapter(id, { name: newName });
         const ch = this.workTree.find(c => c.id === id);
         if (ch) ch.name = newName;
         // In-place mirror: chapter entry in root.tree + _chapterOrderMap.
@@ -300,7 +305,7 @@ export function registerBookOrganizerCard() {
     async _doRenamePage(id, newName, inputEl) {
       const root = window.__app;
       try {
-        await root.bsPut('pages/' + id, { name: newName });
+        await contentRepo.updatePage(id, { name: newName });
         const page = this._findPage(id);
         if (page) page.name = newName;
         // In-place mirror: page in root.pages + ggf. solo-Tree-Entry.
@@ -329,7 +334,7 @@ export function registerBookOrganizerCard() {
       });
       if (!name) return;
       await this._runMutation(async () => {
-        const created = await root.bsPost('chapters', {
+        const created = await contentRepo.createChapter({
           book_id: parseInt(root.selectedBookId, 10),
           name,
         });
@@ -366,13 +371,14 @@ export function registerBookOrganizerCard() {
       const body = {
         book_id: parseInt(root.selectedBookId, 10),
         name,
-        // BookStack legt mit leerem html-Feld evtl. einen Draft an, der nicht
-        // in GET /pages auftaucht. `<p></p>` erzwingt eine reguläre Seite.
+        // Server (routes/content.js) defaultet HTML auf '<p></p>' wenn leer —
+        // notwendig, weil BookStack sonst einen Draft anlegt, der nicht in
+        // GET /pages auftaucht. Explizit hier setzen schadet nicht.
         html: '<p></p>',
       };
       if (chapterId) body.chapter_id = chapterId;
       await this._runMutation(async () => {
-        const created = await root.bsPost('pages', body);
+        const created = await contentRepo.createPage(body);
         if (!created?.id) return;
         const chapName = chapterId
           ? root.tree.find(it => it.type === 'chapter' && !it.solo && String(it.id) === String(chapterId))?.name || null
@@ -436,7 +442,7 @@ export function registerBookOrganizerCard() {
       });
       if (!ok) return;
       await this._runMutation(async () => {
-        await root.bsDelete('chapters/' + id);
+        await contentRepo.deleteChapter(id);
         // BookStack-Cascade: Kapitel + dessen Seiten landen im Papierkorb.
         const deletedPageIds = new Set(ch.pages.map(p => p.id));
         for (let i = root.pages.length - 1; i >= 0; i--) {
@@ -474,7 +480,7 @@ export function registerBookOrganizerCard() {
       });
       if (!ok) return;
       await this._runMutation(async () => {
-        await root.bsDelete('pages/' + id);
+        await contentRepo.deletePage(id);
         // Aus root.pages entfernen.
         const pi = root.pages.findIndex(p => p.id === id);
         if (pi >= 0) root.pages.splice(pi, 1);

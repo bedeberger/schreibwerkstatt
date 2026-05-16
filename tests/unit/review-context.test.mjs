@@ -95,7 +95,7 @@ test('Multi-Pass-Prompt: komplettContext-Block landet zwischen Schwerpunkt und K
     },
   });
   const idxStruct = out.indexOf('STRUKTURDATEN AUS DER KOMPLETTANALYSE');
-  const idxKapitel = out.indexOf('Kapitelanalysen:');
+  const idxKapitel = out.indexOf('<kapitelanalysen');
   assert.ok(idxStruct > 0, 'Strukturdaten-Block muss vorhanden sein');
   assert.ok(idxKapitel > 0, 'Kapitelanalysen-Block muss vorhanden sein');
   assert.ok(idxStruct < idxKapitel, 'Strukturdaten müssen VOR den Kapitelanalysen stehen');

@@ -352,13 +352,13 @@ export const treeMethods = {
         ? this.tree.find(i => i.type === 'chapter' && !i.solo && String(i.id) === String(afterChapterId))
         : null;
       const body = { book_id: parseInt(bookId), name: title };
-      if (afterItem && Number.isFinite(afterItem.priority)) body.priority = afterItem.priority + 1;
-      const created = await this.bsPost('chapters', body);
+      if (afterItem && Number.isFinite(afterItem.priority)) body.position = afterItem.priority + 1;
+      const created = await contentRepo.createChapter(body);
       this.newChapterTitle = '';
       if (!created?.id) return null;
       const localPriority = afterItem && Number.isFinite(afterItem.priority)
         ? afterItem.priority + 0.5
-        : (created.priority ?? Number.MAX_SAFE_INTEGER);
+        : (created.position ?? Number.MAX_SAFE_INTEGER);
       const chapterItem = {
         type: 'chapter',
         id: created.id,

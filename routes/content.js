@@ -13,7 +13,7 @@
 
 const express = require('express');
 const logger = require('../logger');
-const { bsGet, bsGetAll, bsPost, bsPut } = require('../lib/bookstack');
+const { bsGet, bsGetAll, bsPost, bsPut, bsDelete } = require('../lib/bookstack');
 const { mapBook, mapChapter, mapPage, mapPageMeta } = require('../lib/content-mapper');
 const { cleanPageHtml } = require('../lib/html-clean');
 const { toIntId } = require('../lib/validate');
@@ -124,8 +124,12 @@ router.get('/pages/:page_id', async (req, res) => {
   } catch (e) { _fail(res, e, 'GET /content/pages/:id'); }
 });
 
-// PUT /content/pages/:page_id — Speichert Body+Name. HTML wird serverseitig
-// durch cleanPageHtml geschleust (gleiche Invariante wie bookstackPageCleaner).
+// PUT /content/pages/:page_id — Speichert Body+Name, optional auch
+// Position+Kapitel (Drag/Drop im Book-Organizer). Domain-Body:
+//   { html?, name?, position?, chapter_id? }
+// → BookStack-Body: { html?, name?, priority?, chapter_id? }. HTML wird
+// serverseitig durch cleanPageHtml geschleust (gleiche Invariante wie
+// bookstackPageCleaner).
 router.put('/pages/:page_id', jsonBody, async (req, res) => {
   const token = _requireToken(req, res);
   if (!token) return;
@@ -141,6 +145,8 @@ router.put('/pages/:page_id', jsonBody, async (req, res) => {
     }
   }
   if (typeof req.body?.name === 'string') body.name = req.body.name;
+  if (Number.isFinite(req.body?.position)) body.priority = req.body.position;
+  if (req.body?.chapter_id !== undefined) body.chapter_id = req.body.chapter_id;
   if (!Object.keys(body).length) return res.status(400).json({ error_code: 'EMPTY_BODY' });
 
   try {
@@ -148,6 +154,137 @@ router.put('/pages/:page_id', jsonBody, async (req, res) => {
     if (updated?.book_id) setContext({ book: updated.book_id });
     res.json(mapPage(updated));
   } catch (e) { _fail(res, e, 'PUT /content/pages/:id'); }
+});
+
+// POST /content/pages — Neue Seite. Domain-Body: { book_id?, chapter_id?, name, html? }.
+// Mindestens einer von book_id/chapter_id ist Pflicht (BookStack-Regel).
+router.post('/pages', jsonBody, async (req, res) => {
+  const token = _requireToken(req, res);
+  if (!token) return;
+  const bookId = req.body?.book_id !== undefined ? toIntId(req.body.book_id) : null;
+  const chapterId = req.body?.chapter_id !== undefined ? toIntId(req.body.chapter_id) : null;
+  const name = (req.body?.name || '').toString().trim();
+  if (!name) return res.status(400).json({ error_code: 'NAME_REQUIRED' });
+  if (!bookId && !chapterId) return res.status(400).json({ error_code: 'BOOK_OR_CHAPTER_REQUIRED' });
+
+  const payload = { name };
+  if (bookId) payload.book_id = bookId;
+  if (chapterId) payload.chapter_id = chapterId;
+  // BookStack braucht Body — leeres html legt Draft an, der nicht in GET /pages
+  // auftaucht. Default '<p></p>' erzwingt reguläre Seite.
+  const rawHtml = typeof req.body?.html === 'string' ? req.body.html : '<p></p>';
+  try { payload.html = cleanPageHtml(rawHtml); }
+  catch { payload.html = rawHtml; }
+
+  try {
+    if (bookId) setContext({ book: bookId });
+    const created = await bsPost('pages', payload, token);
+    if (created?.book_id) setContext({ book: created.book_id });
+    res.json(mapPage(created));
+  } catch (e) { _fail(res, e, 'POST /content/pages'); }
+});
+
+// DELETE /content/pages/:page_id — Seite in den Papierkorb. BookStack
+// liefert 204; Domain-Antwort `{ ok: true }`.
+router.delete('/pages/:page_id', async (req, res) => {
+  const token = _requireToken(req, res);
+  if (!token) return;
+  const pageId = toIntId(req.params.page_id);
+  if (!pageId) return res.status(400).json({ error_code: 'INVALID_PAGE_ID' });
+  try {
+    await bsDelete(`pages/${pageId}`, token);
+    res.json({ ok: true });
+  } catch (e) { _fail(res, e, 'DELETE /content/pages/:id'); }
+});
+
+// POST /content/chapters — Neues Kapitel. Domain-Body: { book_id, name, position?, description? }.
+router.post('/chapters', jsonBody, async (req, res) => {
+  const token = _requireToken(req, res);
+  if (!token) return;
+  const bookId = toIntId(req.body?.book_id);
+  const name = (req.body?.name || '').toString().trim();
+  if (!bookId) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
+  if (!name) return res.status(400).json({ error_code: 'NAME_REQUIRED' });
+
+  const payload = { book_id: bookId, name };
+  if (Number.isFinite(req.body?.position)) payload.priority = req.body.position;
+  if (typeof req.body?.description === 'string') payload.description = req.body.description;
+
+  try {
+    setContext({ book: bookId });
+    const created = await bsPost('chapters', payload, token);
+    res.json(mapChapter(created));
+  } catch (e) { _fail(res, e, 'POST /content/chapters'); }
+});
+
+// PUT /content/chapters/:chapter_id — Kapitel-Update (rename / reorder / description).
+// Domain-Body: { name?, position?, description? }.
+router.put('/chapters/:chapter_id', jsonBody, async (req, res) => {
+  const token = _requireToken(req, res);
+  if (!token) return;
+  const chapterId = toIntId(req.params.chapter_id);
+  if (!chapterId) return res.status(400).json({ error_code: 'INVALID_CHAPTER_ID' });
+
+  const body = {};
+  if (typeof req.body?.name === 'string') body.name = req.body.name;
+  if (Number.isFinite(req.body?.position)) body.priority = req.body.position;
+  if (typeof req.body?.description === 'string') body.description = req.body.description;
+  if (!Object.keys(body).length) return res.status(400).json({ error_code: 'EMPTY_BODY' });
+
+  try {
+    const updated = await bsPut(`chapters/${chapterId}`, body, token);
+    if (updated?.book_id) setContext({ book: updated.book_id });
+    res.json(mapChapter(updated));
+  } catch (e) { _fail(res, e, 'PUT /content/chapters/:id'); }
+});
+
+// DELETE /content/chapters/:chapter_id — Kapitel + seine Seiten in den Papierkorb.
+router.delete('/chapters/:chapter_id', async (req, res) => {
+  const token = _requireToken(req, res);
+  if (!token) return;
+  const chapterId = toIntId(req.params.chapter_id);
+  if (!chapterId) return res.status(400).json({ error_code: 'INVALID_CHAPTER_ID' });
+  try {
+    await bsDelete(`chapters/${chapterId}`, token);
+    res.json({ ok: true });
+  } catch (e) { _fail(res, e, 'DELETE /content/chapters/:id'); }
+});
+
+// DELETE /content/books/:book_id — Buch (samt allem darunter) in den Papierkorb.
+router.delete('/books/:book_id', async (req, res) => {
+  const token = _requireToken(req, res);
+  if (!token) return;
+  const bookId = toIntId(req.params.book_id);
+  if (!bookId) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
+  try {
+    await bsDelete(`books/${bookId}`, token);
+    res.json({ ok: true });
+  } catch (e) { _fail(res, e, 'DELETE /content/books/:id'); }
+});
+
+// GET /content/search?query=…&book_id=… — Volltextsuche. Liefert nur Seiten-Hits;
+// nicht-Page-Hits werden serverseitig gefiltert (Tree-UI braucht keine Buch/
+// Kapitel-Treffer). Filter `{in_book:N}` wird ergänzt, wenn book_id gesetzt ist.
+router.get('/search', async (req, res) => {
+  const token = _requireToken(req, res);
+  if (!token) return;
+  const query = (req.query?.query || '').toString().trim();
+  const count = Math.min(Math.max(parseInt(req.query?.count || '20', 10) || 20, 1), 100);
+  const bookId = req.query?.book_id ? toIntId(req.query.book_id) : null;
+  if (query.length < 2) return res.json({ hits: [] });
+
+  const augmented = bookId
+    ? `${query} {type:page} {in_book:${bookId}}`
+    : `${query} {type:page}`;
+
+  try {
+    if (bookId) setContext({ book: bookId });
+    const data = await bsGet(`search?query=${encodeURIComponent(augmented)}&count=${count}`, token);
+    const hits = (data.data || [])
+      .filter(h => h.type === 'page' && (!bookId || h.book_id === bookId))
+      .map(mapPageMeta);
+    res.json({ hits });
+  } catch (e) { _fail(res, e, 'GET /content/search'); }
 });
 
 // POST /content/books — Neues Buch anlegen. Upserted lokale `books`-Row,

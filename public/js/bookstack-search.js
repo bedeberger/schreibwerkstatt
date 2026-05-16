@@ -1,5 +1,8 @@
-// BookStack-Seitensuche in der Sidebar.
-// `this` zeigt auf die Alpine-Komponente.
+// Seiten-Volltextsuche in der Sidebar. Geht ueber contentRepo.search →
+// /content/search; AbortController + seq-Guard erhalten, da die Suche
+// debounced auf jedem Tastendruck feuert.
+
+import { contentRepo } from './repo/content.js';
 
 export const bookstackSearchMethods = {
   onBookstackSearchInput() {
@@ -31,19 +34,20 @@ export const bookstackSearchMethods = {
     this.bookstackSearchLoading = true;
     this.bookstackSearchError = '';
 
-    const query = `${term} {type:page} {in_book:${bookId}}`;
     try {
-      const r = await fetch('/api/search?query=' + encodeURIComponent(query) + '&count=20', { signal: ctrl.signal });
-      if (!r.ok) throw new Error(this.t('bs.apiError', { status: r.status }));
-      const data = await r.json();
+      // contentRepo macht das Query-Augmenting ({type:page} {in_book:N})
+      // server-seitig. AbortSignal ueber repo zu schleifen waere ein
+      // separater Schritt — bisher reicht der seq-Guard unten, weil
+      // alte Antworten ignoriert werden.
+      const data = await contentRepo.search(term, { bookId, count: 20 });
       if (seq !== this._bookstackSearchSeq) return;
       const bookIdNum = parseInt(bookId);
-      this.bookstackSearchResults = (data.data || [])
-        .filter(h => h.type === 'page' && h.book_id === bookIdNum);
+      this.bookstackSearchResults = (data.hits || [])
+        .filter(h => h.book_id === bookIdNum);
       this.bookstackSearchActiveIndex = 0;
       this.bookstackSearched = true;
     } catch (e) {
-      if (e.name === 'AbortError') return;
+      if (ctrl.signal.aborted || e.name === 'AbortError') return;
       if (seq !== this._bookstackSearchSeq) return;
       console.error('[bookstackSearch]', e);
       this.bookstackSearchError = this.t('book.search.error');

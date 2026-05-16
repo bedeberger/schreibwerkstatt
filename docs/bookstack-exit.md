@@ -21,10 +21,12 @@ Ziel: Editor/Lektorat/Chat/History sprechen nur noch mit einer Domain-Repository
 
 - [x] **Schritt 1 — Server: Normalisierte Endpunkte.** [lib/content-mapper.js](../lib/content-mapper.js) (mapBook/mapChapter/mapPage/mapPageMeta) + [routes/content.js](../routes/content.js) gemountet unter `/content`. Endpunkte: `GET /content/books`, `GET /content/books/:id`, `GET /content/books/:id/tree`, `GET /content/chapters/:id`, `GET /content/pages/:id`, `PUT /content/pages/:id` (mit `cleanPageHtml`), `POST /content/books` (upserted lokale books-Row). Intern weiter `bsGet`/`bsGetAll`/`bsPut`/`bsPost` aus [lib/bookstack.js](../lib/bookstack.js) — `bsPut` neu für symmetrischen Write-Chokepoint. Unit-Test: [tests/unit/content-mapper.test.mjs](../tests/unit/content-mapper.test.mjs).
 - [x] **Schritt 2 — Frontend: Repository-Modul.** [public/js/repo/content.js](../public/js/repo/content.js) mit `listBooks/loadBook/bookTree/loadChapter/loadPage/savePage/createBook`. SW erweitert ([public/sw.js](../public/sw.js)): neuer `CONTENT_CACHE`-Namespace via gemeinsame `_handleSwr`-Helper, `invalidate-content`-Postmessage parallel zu `invalidate-api`, `SHELL_CACHE` v508→v509 gebumpt, Logout-Cleanup um `CONTENT_CACHE` ergaenzt. Caller-Migration kommt in Schritt 3. Unit-Test: [tests/unit/content-repo.test.mjs](../tests/unit/content-repo.test.mjs).
-- [ ] **Schritt 3 — Call-Sites umstellen:** [public/js/tree.js](../public/js/tree.js) (3× `bsGetAll` → `bookTree`), [public/js/api-bookstack.js](../public/js/api-bookstack.js) (page-load/save), [public/js/editor/edit.js](../public/js/editor/edit.js), Chat-Apply, History-Restore, Lektorat-Apply. `routes/books.js` POST → ruft intern `contentRouter`-Logik bzw. Frontend → `POST /content/books`.
-- [ ] **Schritt 4 — Server-Loader-Abstraktion:** `lib/content-store.js` mit `loadPage/loadBook/savePage`; [routes/jobs/shared/loader.js](../routes/jobs/shared/loader.js) und [routes/content.js](../routes/content.js) konsumieren `content-store`, Token-Param verschwindet aus Job-Routen.
-- [ ] **Schritt 5 — Token-Leak schliessen:** `req.session.bookstackToken` nur noch in [lib/bookstack.js](../lib/bookstack.js) + `content-store.js`. [routes/books.js](../routes/books.js)/[routes/book-editor.js](../routes/book-editor.js)/[routes/export.js](../routes/export.js) lesen Token nicht mehr direkt.
-- [ ] **Schritt 6 — Tripwires:** Grep-Check in CI: `bsGet|bsPut|bsPost|bsGetAll` nur in `lib/bookstack.js`, `lib/content-store.js`, `lib/load-book-contents.js`, `routes/content.js` (Server) + `public/js/api-bookstack.js`, `public/js/repo/content.js` (Frontend). Sonst Fail.
+- [x] **Schritt 3 — Call-Sites umstellen (Editor/Lektorat-Pfade).** Frontend-Tree-Reads: [public/js/tree.js](../public/js/tree.js) konsumiert `contentRepo.listBooks` + `contentRepo.bookTree`. Page-Reads: [public/js/app-view.js](../public/js/app-view.js) (selectPage + refetch), [public/js/chat.js](../public/js/chat.js) (Pre-Send-Refresh + Chat-Apply), [public/js/history.js](../public/js/history.js), [public/js/api-bookstack.js](../public/js/api-bookstack.js) (`_checkPageConflict`, `_loadApplyAndSave`). Page-Writes: [public/js/editor/edit.js](../public/js/editor/edit.js) (saveEdit + quickSave), [public/js/api-bookstack.js](../public/js/api-bookstack.js) (Lektorat-Save), [public/js/offline-sync.js](../public/js/offline-sync.js) (Draft-Push), [public/js/cards/book-editor-card.js](../public/js/cards/book-editor-card.js). Buch-Create: [public/js/book-create.js](../public/js/book-create.js) → `contentRepo.createBook`. Mapper-Erweiterung: `mapPage` exportiert `updated_by_name` + `revision_count`; `mapChapter`/`mapPageMeta` zusätzlich `book_slug` (UI-Deeplink in Tree). Tests angepasst: [tests/unit/pre-save-conflict.test.mjs](../tests/unit/pre-save-conflict.test.mjs) + [tests/unit/stale-write.test.mjs](../tests/unit/stale-write.test.mjs) stubben jetzt `fetch` statt `bsGet`. Tripwire-Test: [tests/unit/content-repo-tripwire.test.mjs](../tests/unit/content-repo-tripwire.test.mjs) — fail-fast bei jedem neuen `/api/` oder `bs*` ausserhalb der Allowlist.
+- [x] **Schritt 3b — Strukturoperationen migriert.** Server-Routen ergänzt in [routes/content.js](../routes/content.js): `POST /content/pages`, `DELETE /content/pages/:id`, `POST /content/chapters`, `PUT /content/chapters/:id`, `DELETE /content/chapters/:id`, `DELETE /content/books/:id`. `PUT /content/pages/:id` akzeptiert zusätzlich `position` (→ BookStack-`priority`) und `chapter_id` (Drag/Drop). `bsDelete` neu in [lib/bookstack.js](../lib/bookstack.js). Repo erweitert: `createPage/updatePage/deletePage/createChapter/updateChapter/deleteChapter/deleteBook`. Call-Sites migriert: [public/js/cards/book-organizer-card.js](../public/js/cards/book-organizer-card.js) (8 Operationen), [public/js/tree.js](../public/js/tree.js) (createChapter), [public/js/cards/kapitel-review-card.js](../public/js/cards/kapitel-review-card.js) (createPage), [public/js/book-settings.js](../public/js/book-settings.js) (deleteBook). [public/js/api-bookstack.js](../public/js/api-bookstack.js) ist auf reine Lektorat-Domain-Logik (`_loadApplyAndSave`, `_applyStilkorrektur`, `_checkPageConflict`) + Local-Cache-Helper (`bsRegisterPageLocally`/`bsRegisterChapterLocally`) reduziert — alle `bs*`/`_invalidateApiCache` entfernt.
+- [x] **Schritt 3c — Search migriert.** Route `GET /content/search?query=…&book_id=…&count=…` in [routes/content.js](../routes/content.js); augmentiert Query mit `{type:page} {in_book:N}` server-seitig, filtert Page-Hits, gibt `{ hits: [PageMeta] }` zurück. Frontend: [public/js/bookstack-search.js](../public/js/bookstack-search.js) → `contentRepo.search`. AbortController fuer in-flight-Cancellation via seq-Guard (Repo-Search akzeptiert noch kein Signal; folgt mit Schritt 4).
+- [ ] **Schritt 4 — Server-Loader-Abstraktion:** `lib/content-store.js` mit `loadPage/loadBook/savePage`; [routes/jobs/shared/loader.js](../routes/jobs/shared/loader.js), [routes/content.js](../routes/content.js) und [routes/book-editor.js](../routes/book-editor.js) konsumieren `content-store`, Token-Param verschwindet aus Job-Routen.
+- [ ] **Schritt 5 — Token-Leak schliessen:** `req.session.bookstackToken` nur noch in [lib/bookstack.js](../lib/bookstack.js) + `content-store.js`. [routes/books.js](../routes/books.js) (heute dead-code nach Schritt 3, aber noch montiert) entfernen; [routes/book-editor.js](../routes/book-editor.js)/[routes/export.js](../routes/export.js) lesen Token nicht mehr direkt.
+- [x] **Schritt 6 — Tripwire (Frontend).** [tests/unit/content-repo-tripwire.test.mjs](../tests/unit/content-repo-tripwire.test.mjs) fail-fast bei jedem `bs*`-Call oder direktem `/api/`-Fetch in `public/js/**` — Allowlist ist seit Schritt 3c **leer**. Server-seitiger Tripwire (`bsGet|bsPut|bsPost|bsGetAll|bsDelete` nur in `lib/bookstack.js`/`routes/content.js`/`lib/content-store.js`) folgt mit Schritt 4.
 
 **Folge für Phase 1+:** Replica-Sync füllt lokale Tabellen; `content-store`-Implementierung bekommt einen `USE_LOCAL_READS`-Branch. Caller-Code in Editor/Lektorat/Chat ändert sich nicht.
 
@@ -73,16 +75,19 @@ Bewusst out-of-scope (User-Wunsch): Attachments (werden nicht genutzt → kein M
 | 4b | Book-ACL + Sharing (owner/editor/lektor/viewer) | ja | Buchliste filtert auf Shares; Rollen-Matrix | 0, 4a |
 | 4b1 | Reader-View (Kindle-artig) | ja | Lese-UI für viewer (und alle) | 4b |
 | 4c | Admin-Settings (alle Runtime-Configs aus `.env` → DB) | ja | Admin-UI für Provider/Modell/Auth/Cron/Tuning + Backend-Auswahl | 4a |
-| 4c1 | First-Run-Setup-Wizard (`/setup`) | ja | One-Shot-Onboarding ohne Google-OAuth | 4c |
+| 4c1 | First-Run-Setup-Wizard (`/setup`) | ja | Admin loggt sich via `ADMIN_PASSWORD` ein und konfiguriert OAuth/KI/Backend Schritt für Schritt; auch später wieder aufrufbar | 4c |
+| 4d | Token-Budget + Cost-Tracking (Admin) | ja (additiv) | Admin-Karte Usage; pro-User-Monats-Budget hard/soft; 429 bei Hard-Cap | 4a |
 | 6 | Tags/Kategorien | ja | Filter-UI (beide Backends) | 0, 4a |
 | 7 | Volltextsuche (FTS5) | ja | App-eigene Suche (beide Backends) | 1, 2, 4b |
 | 8 | Backend-Migration-Tool (Bulk-Copy) | one-way pro Direction | Admin-UI „Backend wechseln" | 1–7 |
 | 9 | Doku-Update (Multi-Backend-Sweep) | ja | keiner (Doku) | 8 |
 | 10 | Schema-Squash | ja | keiner | 9 |
 
-**Start-Reihenfolge:** 0c → 0d → 0 → 0b → 4a → 4c → 4c1 → 4b → 4b1 → 2 → 6 → 1 → 3 → 7 → 8 → 9 → 10.
+**Start-Reihenfolge:** 0c → 0d → 0 → 0b → 4a → 4c → 4c1 → 4d → 4b → 4b1 → 2 → 6 → 1 → 3 → 7 → 8 → 9 → 10.
 0c/0d vorab, da unabhängig von Backend-Pluralisierung und sofort gewinnbringend. 10 (Squash) zuletzt — Squash vorher wäre Wegwerfarbeit, weil bis dahin viele Migrationen dazukommen.
 4a/4c/4b zuerst, weil User-Identität, `app.backend`-Schalter und ACL die SSoT für alle folgenden Phasen sind. Reader-View (4b1) direkt danach, weil sie der einzige UI-Pfad für Viewer ist. Phase 7 (Suche) **vor** Phase 8, damit FTS schon steht, wenn Admin Backend wechselt — Index wird beim Bulk-Copy mitgefüllt.
+
+4d (Token-Budget + Cost) folgt 4a (braucht `app_users.global_role='admin'`). Vor 4b einsortiert, weil Kostenkontrolle vor Sharing-Welle (mehr Co-Editoren = mehr KI-Calls) bestehen muss; rein additiv (neue Spalten/Tabelle/Routen, kein Refactor) und kann bei Bedarf vorgezogen werden.
 
 **Phase 5 (Dual-Write) entfällt.** Im Multi-Backend-Modell schreibt jeder Backend in seine eigene Wahrheit; ein gleichzeitiges Schreiben in BookStack **und** localdb wäre nur sinnvoll bei „Migration mit Rollback-Schutz" — und das deckt Phase 8 als One-Shot-Bulk-Copy mit veraltetem Quell-Backend-Read-Only-Marker während des Runs ab.
 
@@ -485,17 +490,33 @@ CREATE INDEX idx_user_audit_user ON user_sessions_audit(user_email, created_at D
 - `suspended`: vorübergehend gesperrt.
 - `deleted`: Soft-Delete, Email permanent blockiert.
 
-**Login-Flow** (Umbau in [routes/auth.js](../routes/auth.js)):
-1. Google-OIDC-Callback liefert verifizierte Email.
+**Zwei parallele Login-Pfade** (Umbau in [routes/auth.js](../routes/auth.js)):
+
+*A) Google-OIDC (Standard-User + Admin alternativ):*
+1. OIDC-Callback liefert verifizierte Email.
 2. Lookup in `app_users`.
-3. `status='active'` → Session anlegen, `last_seen_at` updaten, Audit `login`.
+3. `status='active'` → Session anlegen (`global_role` aus DB), `last_seen_at` updaten, Audit `login` mit `method='oidc'`.
 4. `status='suspended'` oder `'deleted'` → 403, Audit `login-denied`.
 5. Kein Treffer, aber gültiger Invite-Token (Query-Param `?invite=…`) → User aus Invite anlegen, `status='active'`, Invite `accepted_at` setzen.
 6. Kein Treffer, kein Invite → 403, Hinweis „Zugang nicht freigeschaltet".
 
-**Open-Signup-Schalter**: Env `ALLOW_OPEN_SIGNUP=false` (Default). Wenn `true`: Schritt 6 legt User automatisch als `status='active', global_role='user'` an.
+*B) Admin-Passwort-Login (persistent, kein Bootstrap-Only):*
+1. `GET /login` zeigt zwei Buttons: „Mit Google anmelden" + „Admin-Login".
+2. `POST /auth/admin-login` `{ email, password }` → vergleicht gegen `process.env.ADMIN_EMAIL` + `process.env.ADMIN_PASSWORD` via `crypto.timingSafeEqual`.
+3. Match → Session mit `global_role='admin'`, Audit `login` mit `method='env'`.
+4. Mismatch → 401 + Rate-Limit-Zähler hochzählen, Audit `login-denied`.
+5. `ADMIN_PASSWORD` leer/unset → Pfad B komplett deaktiviert (Button ausgeblendet, Route liefert 404).
 
-**Initial-Admin**: Env `INITIAL_ADMIN_EMAIL`. Beim ersten Server-Start nach 4a: wenn `app_users` leer, wird genau dieser User mit `global_role='admin'` angelegt (bzw. beim ersten Login promoted).
+**`ADMIN_EMAIL`/`ADMIN_PASSWORD` Semantik:**
+- Klartext in `.env` (Self-Hosted-Pattern, [[project_self_hosted_oss]]). Dateirechte `chmod 600`. Nie in Git.
+- Wahrheit lebt in ENV — kein Passwort-Hash in DB. `.env` ändern → sofort wirksam beim nächsten Login (keine Restart-Pflicht, `process.env` wird zur Login-Zeit gelesen).
+- `app_users`-Row für `ADMIN_EMAIL` wird beim Server-Start angelegt, falls fehlend: `global_role='admin'`, `status='active'`. Diese Row trägt Audit, `display_name`, `language` etc. — Passwort selbst aber nicht.
+- Email-Wechsel in `.env`: alte Admin-Row bleibt liegen (Soft-Delete/Cleanup durch Admin selbst); neue Email legt zweite Admin-Row beim ersten Login an.
+- OIDC-Login mit derselben Email funktioniert parallel (gleiche Row, beide Methoden lösen die Session aus).
+
+**Rate-Limit** (`express-rate-limit`, neue Dep): 5 Versuche pro IP pro 15 min auf `POST /auth/admin-login`. Nach Limit 429 + 15-min-Sperre. OIDC-Pfad nicht limitiert (Google macht das vor).
+
+**Open-Signup-Schalter**: Env `ALLOW_OPEN_SIGNUP=false` (Default). Wenn `true`: OIDC-Schritt 6 legt User automatisch als `status='active', global_role='user'` an. Passwort-Pfad ignoriert das Flag (Admin-only).
 
 **Routen**:
 - `GET /admin/users` (Admin) — Liste + Filter + Suche.
@@ -523,7 +544,7 @@ CREATE INDEX idx_user_audit_user ON user_sessions_audit(user_email, created_at D
 **Migration des Bestands**:
 - Scan `book_access`-Vorgänger / `chat_sessions` / `jobs` / etc. nach distinct `user_email`.
 - Für jeden Eintrag `app_users`-Row anlegen mit `status='active'`, `global_role='user'`.
-- `INITIAL_ADMIN_EMAIL` → wenn matched, `global_role='admin'`.
+- `ADMIN_EMAIL` → wenn matched, `global_role='admin'`. Sonst neue Row anlegen.
 
 ---
 
@@ -655,7 +676,7 @@ Realisierung: neues Feld `minRole: 'viewer'|'lektor'|'editor'|'owner'` pro `FEAT
 
 **Karten-Sichtbarkeit global** (App-Ebene): `AdminUsersCard` + `AdminSettingsCard` weiterhin nur `global_role='admin'`. `UserSettingsCard` (Self-Profile) für alle.
 
-**Backfill**: Migration scannt `books.owner_email`, schreibt Owner-Row in `book_access`. Bücher ohne `owner_email`: erste Person, die nach 4b zugreift, wird Owner — aber nur, wenn `INITIAL_ADMIN_EMAIL` nicht greift (Admin darf gerade kein Buch-Owner werden, sonst Privacy-Bruch). Konkret: Backfill fragt manuell pro Legacy-Buch oder lässt es im „herrenlos"-Zustand mit Admin-Hint.
+**Backfill**: Migration scannt `books.owner_email`, schreibt Owner-Row in `book_access`. Bücher ohne `owner_email`: erste Person, die nach 4b zugreift, wird Owner — aber nur, wenn `ADMIN_EMAIL` nicht greift (Admin darf gerade kein Buch-Owner werden, sonst Privacy-Bruch). Konkret: Backfill fragt manuell pro Legacy-Buch oder lässt es im „herrenlos"-Zustand mit Admin-Hint.
 
 ---
 
@@ -750,71 +771,319 @@ Aufwand: 4-6 Tage (inkl. Typo-Refinement + Themes; ohne Highlights). Highlights 
 
 ---
 
-## Phase 4c — Admin-Settings (Provider + Backend-Auswahl)
+## Phase 4c — Admin-Settings (alle Runtime-Configs aus `.env` → DB)
 
-Admin-Domäne ist User-Mgmt + globale App-Konfiguration: KI-Provider, Modell, **Storage-Backend**. KI-Provider-Settings + Backend-Switch wandern von `.env` in DB (Hybrid mit ENV-Fallback).
+Ziel: `.env` schrumpft auf **reines Boot-/Infra-Layer**. Alles, was zur Laufzeit konfigurierbar sein soll (Auth-Provider, KI-Provider, Storage-Backend, Job-Tuning, Cron, PDF/A), wandert in `app_settings` und ist über die Admin-Konsole editierbar.
 
-**Migration N+4c**:
+### `.env`-Endzustand
+
+**Bleibt in `.env`** (nur Werte, die *vor* der DB lesbar sein müssen oder Crypto-Root sind):
+
+| Variable | Grund |
+|---|---|
+| `PORT` | Express bindet vor DB-Open. |
+| `DB_PATH` | Wir öffnen erst die DB damit. |
+| `APP_URL` | OAuth-Callback-URL muss vor Auth-Init feststehen. |
+| `SESSION_SECRET` | Express-Session-Middleware initialisiert vor DB-Read. |
+| `MASTER_KEY` | AES-256-GCM-Root, verschlüsselt selbst die DB-Settings (Henne/Ei — kann nicht in der DB liegen). Existiert bereits für BookStack-Tokens, [lib/crypto.js](../lib/crypto.js). |
+| `ADMIN_EMAIL` | Identität des Bootstrap-/Persistent-Admins. Wird beim Server-Start als `app_users`-Row angelegt mit `global_role='admin'`, `status='active'`. |
+| `ADMIN_PASSWORD` | Klartext-Passwort für `POST /auth/admin-login`. Wahrheit lebt in ENV — kein Hash in DB. Leer/unset → Passwort-Login-Pfad deaktiviert (nur OIDC). |
+| `TZ` | Process-Level (Node liest beim Start). |
+| `LOG_LEVEL` | Winston-Init vor DB-Open; späterer Override via `app.log_level` möglich, wirkt nach Restart. |
+| `LOCAL_DEV_MODE` | Dev-Bypass — bewusst nicht in DB (sonst Prod-Risiko via Migration-Copy). |
+| `VERAPDF_BIN` | Pfad zu System-Binary; Container-Konfiguration, keine User-Entscheidung. |
+
+Alles andere — **gelöscht aus `.env.example`** und aus DB gelesen.
+
+### Migration N+4c
 
 ```sql
 CREATE TABLE app_settings (
   key TEXT PRIMARY KEY,
   value_json TEXT NOT NULL,
+  encrypted INTEGER NOT NULL DEFAULT 0,
   updated_at TEXT DEFAULT (datetime('now')),
   updated_by TEXT
 );
 ```
 
-**Verwaltete Keys** (alle scoped auf `ai.*` / `app.*`):
+`encrypted=1` markiert Felder, deren `value_json` AES-GCM-encrypted ist (`enc:v1:`-Prefix). [lib/app-settings.js](../lib/app-settings.js) liest sie transparent.
+
+### Verwaltete Keys
+
+**Auth** (`auth.*`):
+- `auth.google.client_id`, `auth.google.client_secret` (encrypted).
+- `auth.allowed_emails` (CSV → Array beim Lesen).
+- `auth.allow_open_signup` (bool).
+- `auth.admin_email` (read-only Spiegel der ENV `ADMIN_EMAIL` für UI-Anzeige; Wahrheit bleibt ENV — Wizard schreibt diesen Key beim Abschluss zur Information, ändert aber nicht die ENV).
+
+**KI-Provider** (`ai.*`):
 - `ai.provider` → `'claude'|'ollama'|'llama'`.
-- `ai.claude.api_key` → AES-256-GCM-encrypted (`enc:v1:`-Prefix, siehe [lib/crypto.js](../lib/crypto.js)).
-- `ai.claude.model` (Override für `MODEL_NAME`).
-- `ai.claude.max_tokens_out` (Override für `MODEL_TOKEN`).
-- `ai.claude.context_window` (Override für `MODEL_CONTEXT`).
+- `ai.claude.api_key` (encrypted), `ai.claude.model`, `ai.claude.max_tokens_out`, `ai.claude.context_window`, `ai.claude.retry_max`, `ai.claude.timeout_ms`, `ai.claude.phase1_concurrency`.
 - `ai.ollama.host`, `ai.ollama.model`, `ai.ollama.temperature`.
 - `ai.llama.host`, `ai.llama.model`, `ai.llama.temperature`.
-- `app.backend` → `'localdb'|'bookstack'`. **Default `localdb`** für Neu-Installationen. Bootstrap-Default `bookstack`, wenn beim ersten Start nach 4c-Migration `BOOKSTACK_BASE_URL` in ENV gesetzt ist (Erkennung über `lib/content-store.js`-Bootstrap).
-- `app.bookstack.base_url`, `app.bookstack.token_id`, `app.bookstack.token_secret` (AES-256-GCM) — nur relevant bei `app.backend='bookstack'`. ENV-Fallback bleibt.
-- `app.allow_open_signup` (Override für ENV).
-- `app.initial_admin_email` (read-only nach Setup).
+- `ai.chat_temperature` (Override für Seiten-/Buch-Chat bei Ollama/Llama).
+- `ai.chars_per_token` (Heuristik).
+- `ai.lektorat_batch_concurrency`.
 
-**Auflösungs-Reihenfolge** in [lib/ai.js](../lib/ai.js) und [lib/content-store.js](../lib/content-store.js):
+**Jobs / Buch-Chat** (`jobs.*`):
+- `jobs.max_concurrent`.
+- `jobs.book_chat.mode` → `'auto'|'agent'|'classic'`.
+- `jobs.book_chat.max_tool_iter`.
+- `jobs.book_chat.token_budget` (0 = vom Input-Budget ableiten).
+
+**Cron / Sync** (`cron.*`):
+- `cron.timezone`, `cron.stale_days`.
+
+**PDF/A** (`pdfa.*`):
+- `pdfa.flavour`, `pdfa.disabled`.
+
+**Storage-Backend** (`app.*`):
+- `app.backend` → `'localdb'|'bookstack'`. **Default `localdb`** für Neu-Installationen.
+- `app.bookstack.base_url`, `app.bookstack.token_id` (encrypted), `app.bookstack.token_secret` (encrypted) — nur relevant bei `app.backend='bookstack'`.
+- `app.setup_completed` (bool, gesetzt durch Wizard 4c1).
+
+### Auflösungs-Reihenfolge
+
+Neues SSoT-Modul [lib/app-settings.js](../lib/app-settings.js) ersetzt direkte `process.env.*`-Reads in [lib/ai.js](../lib/ai.js), [routes/jobs/shared.js](../routes/jobs/shared.js), [routes/jobs/book-chat-*.js](../routes/jobs/), [routes/sync.js](../routes/sync.js), [lib/pdfa-validate.js](../lib/pdfa-validate.js), [routes/auth.js](../routes/auth.js).
+
 1. DB-Setting (`app_settings`).
-2. ENV-Variable.
-3. Hardcoded-Default.
+2. Hardcoded Default in [lib/app-settings.js](../lib/app-settings.js).
 
-ENV bleibt Bootstrap-Mechanismus für erstes Start-Up (insb. Initial-Admin-Email + Anthropic-Key, falls Setup-UI noch nicht erreichbar). Sobald DB-Setting existiert, hat es Vorrang.
+**Kein ENV-Fallback** für migrierte Keys. ENV-Reads für diese Keys werden in den Modulen entfernt — `.env` ist für diese Keys tot. Wer Werte ändern will, nutzt Admin-UI oder direktes SQL-Update auf `app_settings`.
 
-**Backend-Switch-Verhalten**:
-- `PUT /admin/settings/app.backend` ändert den Key. **Bestehende Inhalte werden nicht automatisch migriert** — Admin muss zuerst Phase-8-Bulk-Copy-Job ausführen, falls Inhalte vom alten Backend in den neuen wandern sollen.
-- Frontend-Warn-Modal beim Wechsel: „Achtung — Pages aus dem aktuellen Backend werden nicht mehr sichtbar sein, bis Sie eine Migration durchführen."
-- Hot-Reload: nach `PUT` triggert Server intern Event, das `content-store`-Modul den Backend-Pointer neu lesen lässt. Aktive Jobs/Requests im alten Backend laufen zu Ende (kein In-Flight-Switch). Server-Restart als Fallback bleibt sauber.
+**Reload-Verhalten**: `app-settings`-Modul cached pro Server-Boot in Memory. `PUT /admin/settings/:key` invalidiert Cache + emittiert In-Process-Event `app-settings:changed`. Module mit teurem Re-Init (KI-Client-Instanzen, OAuth-Strategy, Cron-Jobs) reagieren auf das Event und bauen ihre Singletons neu. Provider-/OAuth-Wechsel ohne Server-Restart.
 
-**Routen** (Admin-only):
-- `GET /admin/settings` → liefert alle Keys (API-Keys/Tokens maskiert: nur letzte 4 Zeichen).
-- `PUT /admin/settings/:key` → Single-Key-Update.
-- `POST /admin/settings/test-provider` → Mini-Probecall (1-Token-Output) gegen den aktuell konfigurierten KI-Provider, gibt Latenz + Erfolg zurück.
-- `POST /admin/settings/test-backend` → führt `loadBook(any_id)` + `bookTree`-Probe gegen den aktuell konfigurierten Storage-Backend aus. Bei `bookstack` Probecall gegen `GET /api/books?count=1`; bei `localdb` einfache `SELECT 1`. Gibt Latenz + Erfolg zurück.
+### Backend-Switch-Verhalten
 
-**Frontend — neue Karte `AdminSettingsCard`** (zweite Admin-Karte neben `AdminUsersCard`):
-- Tab „Provider": Auswahl Claude/Ollama/Llama + Per-Provider-Inputs.
-- Tab „Modell": Modell-ID, Token-Limits, Kontext-Grösse.
-- Tab **„Storage-Backend"**: Combobox `localdb|bookstack`, bei `bookstack` zusätzliche Felder (Base-URL, Token-ID, Token-Secret). Test-Backend-Button. Warnhinweis-Block beim Wechsel: „Inhalts-Sichtbarkeit ändert sich; ggf. Backend-Migration starten (Karte Backend-Migration)."
-- Tab „Auth": Open-Signup-Toggle, Initial-Admin-Anzeige.
-- „Verbindung testen"-Button → Probecall.
-- API-Key-/Token-Inputs mit Masking. Save sendet ungespeichert nur, wenn Wert geändert.
+- `PUT /admin/settings/app.backend` ändert den Key. **Inhalte werden nicht automatisch migriert** — Admin muss zuerst Phase-8-Bulk-Copy-Job ausführen.
+- Frontend-Warn-Modal beim Wechsel: „Pages aus dem aktuellen Backend werden nicht mehr sichtbar sein, bis Sie eine Migration durchführen."
+- `content-store`-Modul hört auf `app-settings:changed` und liest Backend-Pointer neu. Aktive Jobs im alten Backend laufen zu Ende.
 
-**i18n**:
-- `admin.settings.title`, `admin.settings.provider`, `admin.settings.model`
-- `admin.settings.backend`, `admin.settings.backend.localdb`, `admin.settings.backend.bookstack`
-- `admin.settings.backend.switchWarning`
-- `admin.settings.testConnection`, `admin.settings.connectionOk`, `admin.settings.connectionFail`
-- `admin.settings.testBackend`, `admin.settings.backendOk`, `admin.settings.backendFail`
-- `admin.settings.apiKeyMasked`, `admin.settings.tokenMasked`
+### Admin-Routen
 
-**Sicherheit**:
-- API-Keys + BookStack-Tokens nie im Klartext über die Wire (auch nicht Admin → Frontend). Beim Lesen Maskierung; beim Schreiben akzeptiert Backend einen Sentinel-Wert „unchanged" für Felder, die nicht angefasst wurden.
-- DB-Spalten AES-256-GCM-verschlüsselt mit `MASTER_KEY`-ENV (existiert schon für Bookstack-Tokens, [lib/crypto.js](../lib/crypto.js)).
+- `GET /admin/settings` → alle Keys, Secrets maskiert (letzte 4 Zeichen sichtbar).
+- `PUT /admin/settings/:key` → Single-Key-Update. Encrypted-Felder akzeptieren Sentinel `"__unchanged__"` für „nicht angefasst".
+- `POST /admin/settings/test-provider` → 1-Token-Probecall gegen aktuellen KI-Provider, gibt Latenz + Erfolg.
+- `POST /admin/settings/test-backend` → bei `bookstack` `GET /api/books?count=1`, bei `localdb` `SELECT 1`. Latenz + Erfolg.
+- `POST /admin/settings/test-oauth` → validiert Google-Client-ID via Discovery-Doc-Fetch (Format-Check, kein voller OAuth-Roundtrip).
+
+Alle Admin-Routen guarded via `global_role='admin'` aus Phase 4a.
+
+### Frontend — Karte `AdminSettingsCard`
+
+Zweite Admin-Karte neben `AdminUsersCard`. Tabs:
+
+1. **Auth**: Google-Client-ID/-Secret, Allowed-Emails, Open-Signup-Toggle.
+2. **Provider**: Auswahl Claude/Ollama/Llama + Per-Provider-Inputs (API-Key, Host, Modell, Temperature).
+3. **Modell**: Modell-ID, `max_tokens_out`, `context_window`, `chars_per_token`.
+4. **Storage-Backend**: Combobox `localdb|bookstack`, bei `bookstack` zusätzliche Felder (Base-URL, Token-ID, Token-Secret). Test-Backend-Button. Warnhinweis beim Wechsel.
+5. **Jobs**: `max_concurrent`, Book-Chat-Modus + Iter-Limit + Token-Budget.
+6. **Cron**: Timezone, Stale-Days.
+7. **PDF/A**: Flavour, Disabled-Toggle.
+8. **Erweitert** (Disclosure, default eingeklappt): `claude.retry_max`, `claude.timeout_ms`, `claude.phase1_concurrency`, `lektorat_batch_concurrency`, `chat_temperature`. Hinweis-Box: „Werte ohne starken Grund unverändert lassen — Defaults sind aus Praxis kalibriert."
+
+„Verbindung testen"-Buttons pro Tab (Provider, Backend, OAuth). Save-Button persistent unten, Dirty-Indikator pro Feld. Secret-Inputs mit Masking + Sentinel-Pattern für „unchanged".
+
+### i18n
+
+`admin.settings.title`, `admin.settings.tab.{auth,provider,model,backend,jobs,cron,pdfa,advanced}`, `admin.settings.backend.{localdb,bookstack,switchWarning}`, `admin.settings.test.{connection,backend,oauth}`, `admin.settings.test.{ok,fail}`, `admin.settings.secret.masked`, `admin.settings.secret.unchanged`, `admin.settings.advanced.disclaimer`.
+
+### Sicherheit
+
+- API-Keys + Tokens nie im Klartext über die Wire (auch nicht Admin → Frontend). Lesen → Masking; Schreiben → Sentinel `"__unchanged__"` für nicht angefasste Felder.
+- Alle `encrypted=1`-Spalten via [lib/crypto.js](../lib/crypto.js) (AES-256-GCM mit `MASTER_KEY`).
+- Audit-Log: `app_settings.updated_by` + `updated_at` gesetzt; optional Migration für `app_settings_audit`-Tabelle mit Vor-/Nachwert-Hashes (nicht Klartext-Secrets).
+
+---
+
+## Phase 4c1 — First-Run-Setup-Wizard (`/setup`)
+
+Ziel: Frische Installation, leere DB, keine Google-Credentials → Admin loggt sich via `ADMIN_PASSWORD` ein und wird durch initiales Setup geführt (Google-OAuth-Config, KI-Provider, Storage-Backend). Wizard ist auch nach Abschluss erneut aufrufbar (= „Settings neu durchgehen"-Pfad), Trigger-Logik ist nur die initiale Pflicht-Weiterleitung.
+
+### Voraussetzung
+
+`ADMIN_EMAIL` + `ADMIN_PASSWORD` sind in `.env` gesetzt (siehe Phase 4c `.env`-Endzustand). Ohne `ADMIN_PASSWORD` ist kein First-Run möglich — App startet, weist beim Aufruf auf fehlende ENV hin.
+
+### Trigger-Bedingung
+
+Bei jedem Request einer eingeloggten Admin-Session: solange `app_settings.app.setup_completed` nicht `true` ist → `/admin/*`-Karten redirecten auf `/setup`. Andere App-Bereiche sind verfügbar, zeigen aber Banner „Setup unvollständig — KI-Features deaktiviert" wenn entsprechende Settings fehlen. `/setup` bleibt nach `setup_completed=true` erreichbar (Admin kann jederzeit Schritte erneut durchgehen), wird aber nicht mehr aktiv redirected.
+
+### Zugriffsschutz
+
+`/setup/*` Routen sind **Admin-only** — Guard via Session (`global_role='admin'`). Erreichbar nach `POST /auth/admin-login` (Phase 4a, Pfad B). Kein localhost-Only-Trick, kein ENV-Override nötig — Passwort-Login ist der Schutzmechanismus.
+
+### Wizard-Schritte
+
+1. **Begrüssung**: Anzeige der erkannten `ADMIN_EMAIL` (read-only). Hinweis: „Diese Email ist als Admin via `.env` konfiguriert. Du kannst dich zusätzlich via Google-OAuth mit derselben Email einloggen, sobald OAuth eingerichtet ist."
+2. **Google-OAuth** (optional, überspringbar): `client_id` + `client_secret`. Anzeige der zu hinterlegenden Redirect-URI (`${APP_URL}/auth/callback`). Test-Button → Discovery-Doc-Fetch. Skip → reine Passwort-Auth, weitere User können nur via Invite + Passwort-fähiger zweiter Mechanismus (späterer Ausbau, vorerst nicht in Scope).
+3. **Allowed-Emails** (optional, nur relevant bei OAuth aktiv): kommaseparierte Liste oder leer (= alle Google-Konten, die in `app_users` als `status='active'` existieren, dürfen rein).
+4. **KI-Provider** (optional, kann später): Provider-Wahl + minimaler Setup (Claude-Key oder Ollama-Host). Test-Button. Überspringen → App ohne KI-Features bis Admin-Konsole-Nachzug.
+5. **Storage-Backend**: `localdb` (Default) oder `bookstack` (Base-URL + Token-ID/-Secret + Test-Button).
+6. **Fertig**: Wizard setzt `app.setup_completed=true` und `auth.admin_email` (Spiegel von ENV) für UI-Anzeige. Redirect zur Hauptansicht.
+
+Jeder Schritt schreibt sofort in `app_settings` (kein Bulk-Commit am Ende). Bei Abbruch springt Wizard beim nächsten Aufruf zum ersten unbefüllten Schritt; nach `setup_completed=true` startet er auf Schritt 1 und lässt durch alle Schritte navigieren.
+
+### Routen
+
+- `GET /setup` → Wizard-Page (Admin-Session erforderlich). [public/setup.html](../public/setup.html) + [public/css/setup.css](../public/css/setup.css) + [public/js/setup.js](../public/js/setup.js).
+- `GET /setup/state` → welche Schritte abgeschlossen sind, plus `admin_email` (read-only).
+- `POST /setup/:step` → speichert Werte des Schritts. Guard: `global_role='admin'` (kein „setup_completed"-Bypass mehr nötig, weil Admin-Login als Gate dient).
+- `POST /setup/test/{provider,backend,oauth}` → Test-Probes.
+- `POST /setup/complete` → setzt `app.setup_completed=true`.
+
+### i18n
+
+`setup.welcome.title`, `setup.welcome.adminEmailHint`, `setup.step.{oauth,emails,ai,backend,done}.{title,description,hint}`, `setup.button.{next,back,test,skip,finish}`, `setup.error.{required,invalidEmail,oauthFail,backendFail}`, `setup.banner.incomplete`.
+
+### Sicherheit
+
+- Setup-Routen no-cache (`Cache-Control: no-store`).
+- Test-Probes loggen ohne Klartext-Secrets (Masking im Logger-Layer).
+- Wizard arbeitet ausschliesslich mit Admin-Session — kein Pre-Auth-Pfad, der versehentlich öffentlich exponiert wird.
+
+---
+
+## Phase 4d — Token-Budget + Cost-Tracking (Admin)
+
+Ziel: Admin sieht USD-Kosten pro User/Job/Monat und konfiguriert pro User ein Monats-Budget. Bei Überschreitung wahlweise hart blocken (HTTP 429) oder weich warnen. Voraussetzung für Multi-User-Self-Host: ein einzelner User darf das Anthropic-Budget des Betreibers nicht leersaugen.
+
+**Abhängigkeit auf 4a**: Admin-Rolle = `app_users.global_role='admin'`. Vor 4a kein Admin → keine sinnvolle Budget-Konfiguration. Soll 4d **vor** 4a anlaufen (Bootstrapping), fällt die Karte zurück auf einen schmaleren Pfad mit `ADMIN_EMAIL`-ENV-Match + `requireAdmin`-Middleware in [lib/admin.js](../lib/admin.js); beim Migrieren auf 4a wird die ENV-Match-Middleware durch das DB-Flag abgelöst (ENV bleibt der persistente Identifier für den Bootstrap-Admin).
+
+**Token-Erfassung steht bereits**: `job_runs` und `chat_messages` persistieren `tokens_in`, `tokens_out`, `cache_read_in`, `cache_creation_in`, `provider`, `model`, `user_email`, `book_id`, Zeitstempel (siehe [db/token-usage.js](../db/token-usage.js)). 4d ergänzt nur Cost-Berechnung + Budget-Spalten + Admin-UI.
+
+### Pricing-Modul
+
+Hardcoded Konstanten in [lib/pricing.js](../lib/pricing.js) (neu). $/Mtoken pro Modell, getrennt nach `input` / `output` / `cache_write` / `cache_read`:
+
+```js
+export const PRICING = {
+  'claude-opus-4-7':   { input: 15.00, output: 75.00, cache_write: 18.75, cache_read: 1.50 },
+  'claude-sonnet-4-6': { input:  3.00, output: 15.00, cache_write:  3.75, cache_read: 0.30 },
+  'claude-haiku-4-5':  { input:  1.00, output:  5.00, cache_write:  1.25, cache_read: 0.10 },
+  // ältere weiter unterstützen, solange sie in MODEL_NAME-Defaults oder model_override auftauchen
+};
+
+export function costUsd({ provider, model, tokensIn, tokensOut, cacheReadIn, cacheCreationIn }) {
+  if (provider !== 'claude') return 0; // Ollama/Llama lokal → 0
+  const p = PRICING[model] || PRICING[fallbackFamily(model)] || null;
+  if (!p) return 0; // unbekanntes Modell → 0 + Winston-Warning
+  return ((tokensIn || 0)        * p.input        +
+          (tokensOut || 0)       * p.output       +
+          (cacheCreationIn || 0) * p.cache_write  +
+          (cacheReadIn || 0)     * p.cache_read) / 1_000_000;
+}
+```
+
+**Update-Disziplin**: Bei Anthropic-Preisänderung → PR auf `PRICING`. Logger warnt bei unbekanntem Modell („Pricing fehlt für `claude-…`"), damit kein stiller Drift entsteht. Lokale Provider (`ollama`/`llama`) kosten 0 — bewusste Entscheidung (Strom/Compute-Eigenaufwand des Betreibers, nicht App-Sache).
+
+### Migration N+4d
+
+```sql
+ALTER TABLE app_users ADD COLUMN monthly_budget_usd REAL;            -- NULL = kein Limit
+ALTER TABLE app_users ADD COLUMN budget_mode TEXT NOT NULL DEFAULT 'none'
+  CHECK(budget_mode IN ('none','soft','hard'));
+```
+
+**Semantik**:
+- `budget_mode='none'`: keine Prüfung, `monthly_budget_usd` ignoriert.
+- `budget_mode='soft'`: Jobs laufen weiter, aber `/config` liefert `user.budgetOverrun=true`; Frontend zeigt Warn-Banner an User + Admin-Dashboard markiert User rot.
+- `budget_mode='hard'`: POST auf Job/Chat-Routen → 429 JSON `{ code: 'BUDGET_EXCEEDED', usd, budget, mode: 'hard' }`, wenn aktueller Monat ≥ Budget.
+
+**Zeitraum**: Kalendermonat (`from = first-of-current-month UTC`). Kein expliziter Reset — Query filtert `started_at >= monthStart`. Admin-UI erlaubt Drill-Down auf vergangene Monate.
+
+**Bestehende Spalten reichen sonst aus** — kein neues `cost_usd` in `job_runs`/`chat_messages` materialisieren. Cost wird zur Lese-Zeit aus `(provider, model, tokens_*)` via `costUsd()` berechnet. Vorteil: Preis-Update via PR wirkt rückwirkend auf alte Daten (Admin sieht „so viel hätte das zu heutigen Preisen gekostet"). Nachteil: minimale Re-Compute-Last pro Read — vernachlässigbar bei den Volumen (< 10k Jobs/Monat).
+
+### Budget-Enforcement
+
+Neues Modul [lib/budget.js](../lib/budget.js):
+
+```js
+export function checkBudget(email) {
+  const user = getAppUser(email);                               // app_users-Row
+  if (!user || user.budget_mode === 'none') return { allowed: true, mode: 'none' };
+  const monthStart = firstOfCurrentMonthUtc();
+  const usd = sumMonthlyCostUsd(email, monthStart);             // JOIN job_runs + chat_messages, costUsd() pro Row
+  const over = usd >= (user.monthly_budget_usd || 0);
+  if (!over) return { allowed: true, usd, budget: user.monthly_budget_usd, mode: user.budget_mode };
+  return { allowed: user.budget_mode !== 'hard', usd, budget: user.monthly_budget_usd, mode: user.budget_mode, overrun: true };
+}
+```
+
+**Express-Middleware** `enforceBudget`: an alle Job-POST-Routen ([routes/jobs.js](../routes/jobs.js)) + `/chat/send` ([routes/chat.js](../routes/chat.js)) montiert. Skip wenn `API_PROVIDER !== 'claude'` (lokale Provider). Liest `checkBudget(req.session.email)`; `allowed=false` → 429 mit JSON-Body. Frontend zeigt aus dem Job-Error eine spezifische Toast-Message + Modal-Hinweis „Budget aufgebraucht — Admin kontaktieren".
+
+**Wichtige Invariante**: Enforcement nur auf **POST**-Routen, nicht auf `/jobs/:id`-Status-Polls. Sonst kann ein laufender Job nicht mehr abgefragt werden, sobald sein eigener Token-Verbrauch das Budget reisst. Laufende Jobs laufen zu Ende; nächster Start ist blockiert (oder warnt bei soft).
+
+### DB-Queries
+
+Neues Modul [db/admin-usage.js](../db/admin-usage.js):
+- `sumMonthlyCostUsd(email, monthStart)` — JOIN `job_runs` UNION `chat_messages`, pro Row `costUsd()`, sum. Cached pro Request (Re-Compute zwischen Routen aber günstig).
+- `listUsersWithUsage({ monthStart })` — alle `app_users` + monatliche USD-Summe + Token-Summe + Budget + Mode. JOIN-Variante mit Aggregat in SQL (Cost-Mapping in JS, da `costUsd` JS-seitig lebt — alternativ via SQL-View, wenn Pricing in DB wandert).
+- `getJobRunsForUser(email, { from, to, limit, offset })` — paginiert. Liefert `{ id, type, provider, model, tokensIn, tokensOut, cacheReadIn, cacheCreationIn, costUsd, queuedAt, endedAt, status }`.
+- `getChatMessagesForUser(email, { from, to, limit, offset })` — analog für Chat-Messages.
+- `monthlyTotals({ from, to })` — globale Aggregation: Gesamt-USD, Top-N-User, Per-Modell-Breakdown, Per-Job-Typ-Breakdown.
+
+### Admin-Routen
+
+Neues Router-Modul [routes/admin-usage.js](../routes/admin-usage.js), gemountet auf `/admin/usage` (alle hinter `requireAdmin`-Middleware aus [lib/admin.js](../lib/admin.js)):
+
+- `GET /admin/usage/users?month=YYYY-MM` → `listUsersWithUsage` + Budget + Mode pro User.
+- `PUT /admin/users/:email/budget` Body `{ usd: number|null, mode: 'none'|'soft'|'hard' }` → Update auf `app_users`. **Hinweis**: lebt unter `/admin/users` (Phase 4a-Router) und ergänzt dessen `PUT /admin/users/:email`-Endpoint um Budget-Felder; Single-Source-of-Truth-User-Edit bleibt 4a.
+- `GET /admin/usage/users/:email/jobs?from&to&limit&offset` → Job-Run-Liste mit USD.
+- `GET /admin/usage/users/:email/chat?from&to&limit&offset` → Chat-Message-Liste mit USD.
+- `GET /admin/usage/summary?from&to` → Top-User + Pro-Modell + Pro-Job-Typ + Gesamt.
+
+**Privacy-Boundary** (analog zu [Leitplanken](#privacy-boundary-kritisch)): Admin sieht **Job-Typen, Modelle, Token-Counts, Kosten, Zeitstempel** — aber **keine Prompt-Inhalte, keine Chat-Texte, keine Buchtitel**. Konkret: `book_id` ist in den Queries vorhanden (für Filter-UX wäre der Buchtitel praktisch), wird aber in der Admin-Response **nicht** auf `books.name` gejoined. Anzeige als anonyme „Buch #42"-ID. Wer das Buch öffnen will, braucht ACL-Zugriff via Phase 4b. Audit-Log-Event `admin-usage-viewed` bei jedem Read.
+
+**Session-Augmentation**: [routes/auth.js](../routes/auth.js) setzt nach Login `req.session.isAdmin = (user.global_role === 'admin')`. [routes/proxies.js](../routes/proxies.js)#`/config` exposed `user.isAdmin` + `user.monthlyUsage = { usd, tokensIn, tokensOut, budget, mode, overrun }` zur Frontend-Kontrolle.
+
+### Frontend — `AdminUsageCard` (dritte Admin-Karte neben `AdminUsersCard` + `AdminSettingsCard`)
+
+Modul [public/js/cards/admin-usage-card.js](../public/js/cards/admin-usage-card.js) + Partial [public/partials/admin-usage.html](../public/partials/admin-usage.html). Sichtbarkeit: nur bei `$app.user.isAdmin`. Eintrag in `FEATURES` + `EXCLUSIVE_CARDS` ([feature-registry.js](../public/js/cards/feature-registry.js)) und `ALLOWED_KEYS` in [routes/usage.js](../routes/usage.js).
+
+**Tabs**:
+- **Users**: Tabelle Email | Name | Monat-USD | Budget (Input USD, NULL-Toggle) | Mode (Combobox `none/soft/hard`) | Aktion (speichern). Inline-Edit; Save via `PUT /admin/users/:email/budget`. Rote Markierung bei Overrun (`usd >= budget && mode !== 'none'`).
+- **Jobs**: User-Combobox + Datumsbereich → Tabelle Job-Typ | Modell | Tokens-in/out/cache | USD | Datum. Pagination 50/page.
+- **Chat**: analog Tab Jobs für `chat_messages`.
+- **Summary**: aktueller Monat — Gesamt-USD, Top-10-User-Bar (Chart.js, lazy via [lazy-libs.js](../public/js/lazy-libs.js)), Pro-Modell-Pie, Pro-Job-Typ-Bar. Trend-Linie letzte 6 Monate.
+
+**User-seitige Banner**: Wenn `user.monthlyUsage.budget` gesetzt → kleine Anzeige in User-Settings-Card („Verbraucht 12.34 / 50.00 USD"). Wenn `user.monthlyUsage.overrun` und `mode='soft'` → globaler Banner (Root-Topbar, analog zum Session-Banner). Wenn `mode='hard'` und Job-POST 429 → Modal mit Hinweis + Admin-Kontakt-Mailto.
+
+**i18n** (de+en in [public/js/i18n/](../public/js/i18n/)):
+- `admin.usage.title`, `admin.usage.tab.users`, `admin.usage.tab.jobs`, `admin.usage.tab.chat`, `admin.usage.tab.summary`
+- `admin.usage.user.budget`, `admin.usage.user.mode`, `admin.usage.user.mode.none|soft|hard`
+- `admin.usage.column.tokensIn`, `admin.usage.column.tokensOut`, `admin.usage.column.cacheRead`, `admin.usage.column.cacheWrite`, `admin.usage.column.cost`
+- `admin.usage.overrun`, `admin.usage.banner.soft`, `admin.usage.modal.hard`
+- `me.usage.consumed`, `me.usage.budget`
+
+**Locale-Konvention**: USD-Beträge im `de-CH`/`en-US`-Locale rendern, je nach `currentUser.language`. Dezimaltrenner Punkt (DE-CH-Standard), Tausender-Apostroph, z.B. `1’234.56 USD`.
+
+### Sicherheit / Missbrauchsschutz
+
+- Ein im Soft-Mode laufender User kann theoretisch das Anthropic-Budget des Betreibers leersaugen, bevor Admin reagiert → Empfehlung im README, Default-Mode für neu angelegte User auf `hard` mit konservativem Limit (z.B. `monthly_budget_usd=20`) zu setzen. Env `DEFAULT_USER_BUDGET_USD` + `DEFAULT_USER_BUDGET_MODE` für Auto-Provisioning via Phase 4a-Invites.
+- Cache-Read ist günstig (10 % vom Input bei Claude); Cache-Write teuer (125 %). Prompt-Caching-Logik in [lib/ai.js](../lib/ai.js) bleibt unverändert, aber Admin-Dashboard zeigt Cache-Hit-Rate pro User (Indikator für „dieser User triggert ständig kalte Pipelines = teurer").
+- Budget-Bypass für Admin selbst: optional `app_users.budget_mode='none'` für Admin als Default. Aber: Admin kann auch im UI seinem eigenen Account ein Budget geben, wenn er sich selbst disziplinieren will.
+
+### Tests
+
+- `tests/unit/pricing.test.mjs` — `costUsd` pro Modell + alle Token-Arten + Cache-Pricing; `provider!=='claude'` → 0; unbekanntes Modell → 0 + Warn-Log.
+- `tests/unit/budget.test.mjs` — `checkBudget` Matrix (none/soft/hard × under/over); Monatsgrenzen (UTC-Boundary); skip bei lokalem Provider.
+- `tests/unit/admin-auth.test.mjs` — `requireAdmin` 403/200, Session-Flag, `ADMIN_EMAIL`-ENV-Match-Fallback (pre-4a-Pfad).
+- `tests/integration/admin-usage.test.js` — Routen mit Mock-DB (Jobs + Chats vorseeden, Aggregate matchen erwartete USD).
+- `tests/integration/budget-enforcement.test.js` — Job-POST mit Hard-Cap erreicht → 429; Soft-Cap → 200 + `overrun=true` in Folge-Config-Response.
+
+### Docs
+
+- `README.md`: ENV-Vars `DEFAULT_USER_BUDGET_USD`, `DEFAULT_USER_BUDGET_MODE`, `ADMIN_EMAIL` + `ADMIN_PASSWORD` (siehe Phase 4a/4c). Hinweis auf Anthropic-Preisseite + Update-Disziplin.
+- `docs/erd.md`: neue `app_users`-Spalten + Stand-Zeile.
+- Spickzettel `docs/admin.md` (neu, optional): Cost-Tracking-Doku + Pricing-Update-Workflow.
+
+### Out-of-Scope für 4d
+
+- **Echtzeit-Token-Counter im UI während eines Jobs** — könnte schön sein, braucht aber SSE-Verlängerung auf nicht-Streaming-Jobs. Folge-Phase.
+- **Email-Alerts an Admin bei Overrun** — SMTP-Setup ist nicht universell self-hostable; bewusst weggelassen. Manuell via Dashboard-Polling.
+- **Per-Buch-Budget** — User-Budget reicht initial. Per-Buch nur falls Sharing (Phase 4b) zu Konflikten führt (z.B. Lektor verbraucht Editor-Budget).
+- **Token-Refund bei Job-Fail** — aktuell zählen auch failed Jobs (Anthropic stellt Tokens trotzdem in Rechnung, sofern API-Call zurückkam). Bei `AbortError` vor erstem `message_start` → tokens=0, wirkt automatisch.
 
 ---
 
@@ -1091,7 +1360,7 @@ Nach Phase 8 ist Backend-Pluralität betrieblich Realität. Doku muss reflektier
 
 **Zu aktualisieren:**
 
-- **[README.md](../README.md)** — Intro neu: „Schreiben/Lektorat/Buchanalyse mit KI. Storage-Backend wählbar: SQLite (Default) oder BookStack." Deployment-Block (LXC + systemd) in zwei Varianten: Minimal-Setup (nur App + SQLite) als Default, BookStack-Setup als optionaler Pfad. Env-Variablen-Liste: `BOOKSTACK_BASE_URL`/`BOOKSTACK_TOKEN_ID`/`BOOKSTACK_TOKEN_SECRET` als „optional, nur bei `app.backend=bookstack` nötig" markieren. Architektur-Diagramm: BookStack-Box gestrichelt (optional).
+- **[README.md](../README.md)** — Intro neu: „Schreiben/Lektorat/Buchanalyse mit KI. Storage-Backend wählbar: SQLite (Default) oder BookStack." Deployment-Block (LXC + systemd) in zwei Varianten: Minimal-Setup (nur App + SQLite) als Default, BookStack-Setup als optionaler Pfad. Env-Variablen-Liste: `BOOKSTACK_BASE_URL`/`BOOKSTACK_TOKEN_ID`/`BOOKSTACK_TOKEN_SECRET` als „optional, nur bei `app.backend=bookstack` nötig" markieren. **`ADMIN_EMAIL` + `ADMIN_PASSWORD` als Pflicht-ENV dokumentieren** (Admin-Login-Pfad neben Google-OIDC). Architektur-Diagramm: BookStack-Box gestrichelt (optional).
 - **[CLAUDE.md](../CLAUDE.md)** — Header-Zeile umformulieren: „BookStack als optionales Storage-Backend (eines von zweien)". Architektur-Überblick: Content-Store-Facade als zentrale Storage-Abstraktion dokumentieren; BookStack-Proxy-Routen (`/api/*`) bleiben, sind aber als Backend-spezifisch markiert. Harte Regeln durchgehen: `bsGetAll`/`bsGet`/`bsPut`-Regel auf „nur in `lib/bookstack.js` + `lib/content-store/backends/bookstack.js`" verschärfen (Vor-Phase Schritt 6 wirkt hier weiter); `bsGet(..., { fresh: true })`-Regel bleibt, gilt nur im `bookstack`-Mode. Read-Modify-Write-Pfade um localdb-Variante ergänzen. Editor-Sektion bleibt (CodeMirror, kein Wechsel). Spickzettel-Verweis auf [docs/bookstack-exit.md](bookstack-exit.md) bleibt, weil die Datei zur Multi-Backend-Architekturbeschreibung mutiert ist.
 - **[LICENSE](../LICENSE)** — bleibt wie heute (BookStack ist nicht mehr zwingend, also keine AGPL-Pflicht durch Abhängigkeit; bewusste Wahl möglich). Lizenzfrage als separates Ticket markieren, nicht Pflicht innerhalb von Phase 9.
 - **Deploy-Doku** (README-Block + ggf. `docs/deploy.md` neu): Zwei Setup-Pfade. Minimal (`app.backend=localdb`): nur App + SQLite-Datei, kein zusätzlicher Container. Klassisch (`app.backend=bookstack`): wie heute, BookStack-Sub-Container + MariaDB. Backup-Strategie pro Backend dokumentieren.
@@ -1166,7 +1435,8 @@ Ziel: 100+ Migrationen zu einem konsolidierten Initial-Schema kollabieren. Nach 
 | 4a | 4-6 Tage | mittel (FK-Recreate, Login-Flow) |
 | 4b | 4-5 Tage | mittel (Rollen-Matrix + Apply-Routen + minRole-Filter) |
 | 4b1 | 4-6 Tage | niedrig (reines Frontend + 2 Mini-Tabellen) |
-| 4c | 3-4 Tage | mittel (Backend-Switch + Hot-Reload + Test-Probe für beide) |
+| 4c | 4-6 Tage | mittel (Backend-Switch + Hot-Reload + Test-Probes + ENV-Migration in vielen Modulen) |
+| 4c1 | 1-2 Tage | niedrig (eigenständige Wizard-Page, kleines Form-State-Modell) |
 | 5 | — | ENTFÄLLT |
 | 6 | 2-3 Tage | niedrig |
 | 7 | 4-6 Tage | mittel (FTS5-Schema + Sync-Hooks + UI) |

@@ -3,6 +3,7 @@
 // Root-Zugriffe via window.__app.
 
 import { fetchJson } from './utils.js';
+import { contentRepo } from './repo/content.js';
 
 export const bookSettingsMethods = {
   async loadBookSettings() {
@@ -173,7 +174,7 @@ export const bookSettingsMethods = {
     this.bookDeleteLoading = true;
     this.bookDeleteError = '';
     try {
-      await app.bsDelete('books/' + bookId);
+      await contentRepo.deleteBook(bookId);
       const r = await fetch(`/booksettings/${bookId}/book`, { method: 'DELETE' });
       if (!r.ok) {
         let errData = null;

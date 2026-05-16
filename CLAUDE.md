@@ -18,7 +18,7 @@ Themen-Spickzettel ausgelagert (Drift-Schutz: CLAUDE.md-Regeln, Details in den S
 - [docs/focus-editor.md](docs/focus-editor.md) — Focus-Editor: State-Machine, Submodule (`focus/`), Trampoline-Pattern, Granularitäten, Recenter-Pipeline, Auto-`<p>`-Slot, Snapshot, Pflicht-Invarianten.
 - [docs/state-modell.md](docs/state-modell.md) — Frontend-State-Modell: 3 Ebenen (Root/Sub/Store), 14 Slices, Lifecycle, `setupCardLifecycle`, Event-Bus, Editor-Modi (4 Flags, Invarianten, erlaubte Kombinationen).
 - [docs/finetuning.md](docs/finetuning.md), [docs/wordpress-import.md](docs/wordpress-import.md), [docs/bookstack-templates.md](docs/bookstack-templates.md) — Spezialthemen.
-- [docs/bookstack-exit.md](docs/bookstack-exit.md) — **Migrationsplan** (Ausnahme zur Stand-only-Regel): Schritte zur Loslösung von BookStack — eigene Persistenz, User-Verwaltung mit Privacy-Boundary „Admin sieht keine Bücher", ACL/Sharing, Tags, Editor-Ersatz. Wird beim Abhaken gestrichen.
+- [docs/bookstack-exit.md](docs/bookstack-exit.md) — **Multi-Backend-Architektur + Migrationsplan** (Ausnahme zur Stand-only-Regel): `app.backend = 'localdb' | 'bookstack'` als Admin-Setting, beide First-Class via Content-Store-Facade. Plus: User-Verwaltung mit Privacy-Boundary „Admin sieht keine Bücher", ACL/Sharing, Tags, FTS, Backend-Migration-Tool (Bulk-Copy). Erledigte Schritte werden gestrichen, dauerhafte Architektur-Blöcke bleiben.
 
 ## Doku-Stil dieser Datei
 

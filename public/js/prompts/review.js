@@ -234,12 +234,15 @@ ${chText}
 export function buildChapterReviewPrompt(chapterName, bookName, pageCount, chText, { erzaehlperspektive = null, erzaehlzeit = null, buchtyp = null, reviewSchwerpunkt = '' } = {}) {
   const povBlock = _buildErzaehlformBlock(erzaehlperspektive, erzaehlzeit, buchtyp, 'review');
   const schwerpunktBlock = _buildReviewSchwerpunktBlock(reviewSchwerpunkt);
-  return `Bewerte das Kapitel «${chapterName}» aus dem Buch «${bookName}» kritisch und umfassend.
+  return `<aufgabe>
+Bewerte das Kapitel «${chapterName}» aus dem Buch «${bookName}» kritisch und umfassend.
 Der Fokus liegt auf seitenübergreifenden Qualitäten – nicht auf Mikro-Fehlern (dafür gibt es das Seiten-Lektorat).
+</aufgabe>
 ${ACHSEN_BLOCK_CHAPTER}
 ${NOTENSKALA_BLOCK}
 ${EMPFEHLUNGEN_FORMAT_BLOCK}
 ${schwerpunktBlock}${povBlock}
+<output_format>
 Antworte mit diesem JSON-Schema:
 {
   "gesamtnote": 4.5,
@@ -263,10 +266,10 @@ Antworte mit diesem JSON-Schema:
   ],
   "fazit": "Abschliessendes Urteil in 1-2 Sätzen"
 }
-
-Kapitelinhalt (${pageCount} Seiten):
-
-${chText}`;
+</output_format>
+<kapitelinhalt seiten="${pageCount}">
+${chText}
+</kapitelinhalt>`;
 }
 
 export function buildBookReviewMultiPassPrompt(bookName, chapterAnalyses, totalPageCount, { erzaehlperspektive = null, erzaehlzeit = null, buchtyp = null, reviewSchwerpunkt = '', komplettContext = null } = {}) {
@@ -287,12 +290,14 @@ export function buildBookReviewMultiPassPrompt(bookName, chapterAnalyses, totalP
     ];
     return lines.join('\n');
   }).join('\n\n');
-  return `Bewerte das Buch «${bookName}» kritisch und umfassend.
+  return `<aufgabe>
+Bewerte das Buch «${bookName}» kritisch und umfassend.
 Grundlage sind die Analysen aller ${chapterAnalyses.length} Kapitel (insgesamt ${totalPageCount} Seiten).
 Leite Plot, Figurenbogen, Dramaturgie und Pacing aus der Abfolge der Kapitelanalysen ab –
 auch wenn die einzelnen Kapitelausgaben kompakt sind, MUSS die Buchebene alle sechs Achsen
 benennen. Wo eine Achse aus den Kapitelanalysen nicht ableitbar ist, dies offen benennen
 ("aus den Kapitelanalysen nicht eindeutig …") statt zu raten.
+</aufgabe>
 ${ACHSEN_BLOCK_BOOK}
 ${NOTENSKALA_BLOCK}
 ${EMPFEHLUNGEN_FORMAT_BLOCK}
@@ -300,10 +305,10 @@ HINWEIS: Für "beispielzitate" stehen im Multi-Pass keine Volltexte zur Verfügu
 Wenn aus den Kapitelanalysen keine wörtlichen Zitate ableitbar sind, das Feld
 "beispielzitate" auf [] setzen statt zu raten.
 ${schwerpunktBlock}${povBlock}${kontextBlock}
-Kapitelanalysen:
-
+<kapitelanalysen kapitel="${chapterAnalyses.length}" seiten="${totalPageCount}">
 ${synthIn}
-
+</kapitelanalysen>
+<output_format>
 Antworte mit diesem JSON-Schema:
 {
   "gesamtnote": 4.5,
@@ -325,7 +330,8 @@ Antworte mit diesem JSON-Schema:
   ],
   "beispielzitate": [],
   "fazit":       "Abschliessendes Urteil in 1-3 Sätzen"
-}`;
+}
+</output_format>`;
 }
 
 // Multi-Pass-Variante der Kapitelbewertung: wird verwendet, wenn ein einzelnes
@@ -349,12 +355,14 @@ export function buildChapterReviewMultiPassPrompt(chapterName, bookName, subAnal
     ];
     return lines.join('\n');
   }).join('\n\n');
-  return `Bewerte das Kapitel «${chapterName}» aus dem Buch «${bookName}» kritisch und umfassend.
+  return `<aufgabe>
+Bewerte das Kapitel «${chapterName}» aus dem Buch «${bookName}» kritisch und umfassend.
 Grundlage sind die Analysen von ${subAnalyses.length} Teilabschnitten des Kapitels (insgesamt ${totalPageCount} Seiten).
 Leite Dramaturgie, Pacing, Kohärenz, Perspektive und Figurenführung aus der Abfolge der Teil-Analysen ab –
 auch wenn die einzelnen Ausgaben kompakt sind, MUSS die Kapitelbewertung alle Achsen
 benennen. Wo eine Achse aus den Teil-Analysen nicht ableitbar ist, dies offen benennen
 ("aus den Teil-Analysen nicht eindeutig …") statt zu raten.
+</aufgabe>
 ${ACHSEN_BLOCK_CHAPTER}
 ${NOTENSKALA_BLOCK}
 ${EMPFEHLUNGEN_FORMAT_BLOCK}
@@ -362,10 +370,10 @@ HINWEIS: Für "beispielzitate" stehen im Multi-Pass keine Volltexte zur Verfügu
 Wenn aus den Teil-Analysen keine wörtlichen Zitate ableitbar sind, das Feld
 "beispielzitate" auf [] setzen statt zu raten.
 ${schwerpunktBlock}${povBlock}
-Teil-Analysen:
-
+<teil_analysen abschnitte="${subAnalyses.length}" seiten="${totalPageCount}">
 ${synthIn}
-
+</teil_analysen>
+<output_format>
 Antworte mit diesem JSON-Schema:
 {
   "gesamtnote": 4.5,
@@ -385,7 +393,8 @@ Antworte mit diesem JSON-Schema:
   ],
   "beispielzitate": [],
   "fazit": "Abschliessendes Urteil in 1-2 Sätzen"
-}`;
+}
+</output_format>`;
 }
 
 // ── Schemas ──────────────────────────────────────────────────────────────────

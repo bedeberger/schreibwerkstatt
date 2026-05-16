@@ -1,13 +1,13 @@
 // Tests für die Stale-Write-Regression: ein Read-Modify-Write-Pfad
-// (Lektorat-Save, Chat-Vorschlag, History-Apply) hat den SW-API_CACHE
+// (Lektorat-Save, Chat-Vorschlag, History-Apply) hat den SW-Cache
 // gelesen, dort lag aber noch die Pre-Edit-Fassung der Seite.
 // Folge: User-Edits aus dem Fokus-Editor wurden beim nächsten
 // "Korrekturen speichern" mit der alten Fassung überschrieben.
 //
-// Drei Schutzschichten werden geprüft:
+// Zwei Schutzschichten werden geprüft (Schicht 2 — Cache-Invalidation —
+// laeuft jetzt ueber contentRepo._invalidateContentCache und wird in
+// content-repo.test.mjs verifiziert):
 //   1. `_loadApplyAndSave` liest mit `fresh: true` (umgeht SWR-Cache).
-//   2. Nach jedem `_bsWrite` postet der Client `invalidate-api` an den SW,
-//      damit zukünftige nicht-fresh-Reads ebenfalls den neuen Stand sehen.
 //   3. `runCheck onDone` verwirft Findings, deren Server-Snapshot
 //      (`updatedAt`) nicht zum aktuellen `currentPage.updated_at` passt —
 //      sonst würden positionsbasierte Findings auf veränderten Text
@@ -42,7 +42,7 @@ globalThis.document = globalThis.document || {
   globalThis.__origNavigatorDesc = desc;
 }
 
-const { bookstackMethods, _invalidateApiCache } = await import('../../public/js/api-bookstack.js');
+const { bookstackMethods } = await import('../../public/js/api-bookstack.js');
 const { lektoratMethods } = await import('../../public/js/editor/lektorat.js');
 
 // ── Schicht 1 ────────────────────────────────────────────────────────────────
@@ -130,38 +130,6 @@ test('_loadApplyAndSave: fehlt der fresh-Flag, schlägt der Test an (Regressions
   await legacyLoadApplyAndSave();
   assert.equal(reads[0], false, 'Sentinel: Legacy-Pfad würde stale lesen');
   assert.equal(leakedStaleToPut, STALE, 'Sentinel: Legacy-Pfad würde STALE in PUT durchreichen');
-});
-
-// ── Schicht 2 ────────────────────────────────────────────────────────────────
-
-// `navigator` ist auf globalThis als Getter definiert — defineProperty mit
-// configurable:true erlaubt Stub und Restore.
-function withNavigator(stub, fn) {
-  const desc = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
-  Object.defineProperty(globalThis, 'navigator', { value: stub, configurable: true, writable: true });
-  try { return fn(); }
-  finally {
-    if (desc) Object.defineProperty(globalThis, 'navigator', desc);
-    else delete globalThis.navigator;
-  }
-}
-
-test('_invalidateApiCache postet invalidate-api an den Service-Worker', () => {
-  const messages = [];
-  withNavigator({
-    serviceWorker: { controller: { postMessage: (m) => messages.push(m) } },
-  }, () => {
-    _invalidateApiCache('pages/42');
-  });
-  assert.equal(messages.length, 1);
-  assert.equal(messages[0].type, 'invalidate-api');
-  assert.deepEqual(messages[0].paths, ['pages/42']);
-});
-
-test('_invalidateApiCache ist No-Op ohne SW-Controller (Browser ohne SW, Tests, IE)', () => {
-  withNavigator({ serviceWorker: { controller: null } }, () => {
-    _invalidateApiCache('pages/1'); // darf nicht werfen
-  });
 });
 
 // ── Schicht 3 ────────────────────────────────────────────────────────────────

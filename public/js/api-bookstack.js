@@ -2,96 +2,20 @@ import { buildStilkorrekturPrompt } from './prompts.js';
 import { SAFETY_HTML_RATIO, replaceInHtml, stripFocusArtefacts, fmtTok } from './utils.js';
 import { contentRepo } from './repo/content.js';
 
-// Methoden für BookStack-API-Calls (werden in die Alpine-Komponente gespreadet)
-// `this` bezieht sich auf die Alpine-Komponente.
-// Authorization-Header wird serverseitig vom Proxy injiziert.
-
-// Retry-After: Sekunden (Integer) ODER HTTP-Date. Liefert Millisekunden zum Warten,
-// gedeckelt auf 30 s damit ein böser Header die UI nicht ewig blockiert.
-function _parseRetryAfter(raw) {
-  if (!raw) return null;
-  const secs = Number(raw);
-  if (Number.isFinite(secs) && secs >= 0) return Math.min(30000, Math.round(secs * 1000));
-  const date = Date.parse(raw);
-  if (!Number.isNaN(date)) return Math.min(30000, Math.max(0, date - Date.now()));
-  return null;
-}
-
-// Wrapper um fetch mit eigenem Timeout. Liefert die Response (auch bei 429),
-// damit der Aufrufer entscheiden kann, ob retried wird.
-async function _fetchWithTimeout(url, opts, timeoutMs, abortMsg) {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(new Error(abortMsg)), timeoutMs);
-  try {
-    return await fetch(url, { ...opts, signal: ctrl.signal });
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-const MAX_RETRY_429 = 3;
-
-// Bust SW-API_CACHE nach BookStack-Writes. Ohne diese Invalidierung serviert
-// SWR auf Folge-Reads (Editor-Open, Lektorat-Save, Chat-Vorschlag) den alten
-// Stand — und ein Read-Modify-Write-Pfad überschreibt frische Server-Edits
-// mit Stale-Daten. Aufruf nach jedem erfolgreichen `_bsWrite('PUT'|'POST'|...)`.
-export function _invalidateApiCache(paths) {
-  if (typeof navigator === 'undefined') return;
-  const ctrl = navigator.serviceWorker?.controller;
-  if (!ctrl) return;
-  const arr = Array.isArray(paths) ? paths : [paths];
-  try { ctrl.postMessage({ type: 'invalidate-api', paths: arr }); } catch {}
-}
+// Editor-/Lektorat-Domain-Methoden, die in die Alpine-Komponente gespreadet
+// werden. `this` bezeigt auf die Alpine-Wurzel. Storage-Zugriff laeuft
+// ausschliesslich ueber contentRepo (Domain-Repository, /content/*).
+//
+// Hier verbleiben nur Funktionen, die nicht woanders besser passen:
+//   - `_loadApplyAndSave` / `_applyStilkorrektur` / `_applyCorrections`
+//     (Lektorat-Pipeline, ruft contentRepo + Stil-KI),
+//   - `_checkPageConflict` (Optimistic-Concurrency-Vergleich),
+//   - `bsRegisterPageLocally` / `bsRegisterChapterLocally` (lokale
+//     `pages`/`chapters`-Cache-Upserts nach Page/Chapter-Create, hitten
+//     `/sync/pages/upsert` bzw. `/sync/chapters/upsert` — kein BookStack-API).
 
 export const bookstackMethods = {
-  async bsGet(path, opts = {}) {
-    let lastStatus = 0;
-    // Bypass-Marker: SW (public/sw.js) sieht `?__fresh=1` und umgeht den
-    // SWR-Cache. Nötig für konsistenzkritische Reads (Editor-Open, Re-Klick),
-    // sonst kann eine veraltete Version aus dem API-Cache rendern.
-    const url = '/api/' + path + (opts.fresh ? (path.includes('?') ? '&' : '?') + '__fresh=1' : '');
-    for (let attempt = 0; attempt <= MAX_RETRY_429; attempt++) {
-      let r;
-      try {
-        r = await _fetchWithTimeout(url, {}, 30000, this.t('bs.timeoutGet'));
-      } catch (e) {
-        if (e.name === 'AbortError') {
-          throw new Error(e.message || this.t('bs.timeoutAborted'));
-        }
-        throw e;
-      }
-      if (r.ok) return r.json();
-      lastStatus = r.status;
-      if (r.status !== 429 || attempt === MAX_RETRY_429) break;
-      const wait = _parseRetryAfter(r.headers.get('Retry-After'))
-        ?? Math.min(8000, 1000 * Math.pow(2, attempt));
-      await new Promise(rs => setTimeout(rs, wait));
-    }
-    throw new Error(this.t('bs.apiError', { status: lastStatus }));
-  },
-
-  async bsGetAll(path, opts = {}) {
-    const COUNT = 500;
-    let offset = 0, all = [];
-    while (true) {
-      const sep = path.includes('?') ? '&' : '?';
-      const data = await this.bsGet(`${path}${sep}count=${COUNT}&offset=${offset}`, opts);
-      all = all.concat(data.data);
-      if (all.length >= data.total) break;
-      offset += COUNT;
-    }
-    return all;
-  },
-
-  async bsPut(path, body, opts) {
-    return this._bsWrite('PUT', path, body, opts);
-  },
-
-  async bsPost(path, body, opts) {
-    return this._bsWrite('POST', path, body, opts);
-  },
-
-  // Frisch erzeugte BookStack-Seite sofort in die lokale `pages`-Tabelle eintragen,
+  // Frisch erzeugte Seite sofort in die lokale `pages`-Tabelle eintragen,
   // damit FK-abhängige Features (ideen, page_checks, figure_scenes, …) auf der
   // Seite arbeiten können, bevor der nächste Sync läuft. Kapitel mit-upserten,
   // falls der Caller chapter_name kennt — sonst hängt ggf. auch dort eine
@@ -133,38 +57,6 @@ export const bookstackMethods = {
     } catch (_) { /* non-fatal */ }
   },
 
-  // DELETE soft-löscht in BookStack (Recycle-Bin). Antwort ist 204 No Content,
-  // also kein JSON-Body — eigener Code-Pfad statt _bsWrite, das auf r.json() wartet.
-  async bsDelete(path) {
-    let lastRes = null;
-    for (let attempt = 0; attempt <= MAX_RETRY_429; attempt++) {
-      let r;
-      try {
-        r = await _fetchWithTimeout('/api/' + path, { method: 'DELETE' }, 30000, this.t('bs.timeoutPut'));
-      } catch (e) {
-        if (e.name === 'AbortError') throw new Error(e.message || this.t('bs.timeoutAborted'));
-        throw e;
-      }
-      if (r.ok) {
-        _invalidateApiCache(path);
-        return true;
-      }
-      lastRes = r;
-      if (r.status !== 429 || attempt === MAX_RETRY_429) break;
-      const wait = _parseRetryAfter(r.headers.get('Retry-After'))
-        ?? Math.min(8000, 1000 * Math.pow(2, attempt));
-      await new Promise(rs => setTimeout(rs, wait));
-    }
-    let detail = '';
-    try {
-      const e = await lastRes.json();
-      detail = e?.error?.message || e?.message || '';
-    } catch (_) {}
-    throw new Error(detail
-      ? this.t('bs.apiErrorDetail', { status: lastRes.status, detail })
-      : this.t('bs.apiError', { status: lastRes.status }));
-  },
-
   // Pre-Save-Conflict-Check für Read-Modify-Write-Pfade. BookStack hat keinen
   // If-Match-Support — Optimistic-Concurrency baut die App selbst: kurz vor
   // dem PUT die Seite frisch lesen und `updated_at` mit dem Snapshot vergleichen,
@@ -186,75 +78,6 @@ export const bookstackMethods = {
       remoteUserName: remote.updated_by_name || null,
       remoteHtml: remote.html || '',
     };
-  },
-
-  async _bsWrite(method, path, body, writeOpts) {
-    const headers = { 'Content-Type': 'application/json' };
-    // Optimistic-Concurrency: Server-Side-Check im Proxy. Header wird vom
-    // BookStack-Proxy abgefangen, nicht weitergeleitet — bei Mismatch 412,
-    // ohne den Server-Request abzusetzen. Schliesst Race-Window GET→PUT
-    // zwischen Client-Side-_checkPageConflict und tatsächlichem PUT.
-    if (writeOpts?.ifMatchRevision != null) {
-      headers['X-If-Match-Revision'] = String(writeOpts.ifMatchRevision);
-    }
-    const opts = {
-      method,
-      headers,
-      body: JSON.stringify(body),
-    };
-    let lastRes = null;
-    for (let attempt = 0; attempt <= MAX_RETRY_429; attempt++) {
-      let r;
-      try {
-        r = await _fetchWithTimeout('/api/' + path, opts, 90000, this.t('bs.timeoutPut'));
-      } catch (e) {
-        if (e.name === 'AbortError') {
-          throw new Error(e.message || this.t('bs.timeoutAborted'));
-        }
-        throw e;
-      }
-      if (r.ok) {
-        // Pages-Cache nach Write busten — Folge-Reads müssen die neue Fassung
-        // sehen, sonst überschreibt der nächste Read-Modify-Write Server-Edits
-        // mit Stale-Daten aus dem SWR-Cache.
-        _invalidateApiCache(path);
-        return r.json();
-      }
-      // 412 Precondition Failed: Server-OCC hat Mismatch erkannt. Body enthält
-      // remoteRevisionCount/remoteUpdatedAt/remoteUserName für Conflict-UI.
-      // Eigener Error-Typ damit Aufrufer (saveEdit/quickSave) differenzieren.
-      if (r.status === 412) {
-        let payload = null;
-        try { payload = await r.json(); } catch (_) {}
-        const err = new Error('PRECONDITION_FAILED');
-        err.code = 'PRECONDITION_FAILED';
-        err.remote = payload?.remote || null;
-        throw err;
-      }
-      lastRes = r;
-      if (r.status !== 429 || attempt === MAX_RETRY_429) break;
-      const wait = _parseRetryAfter(r.headers.get('Retry-After'))
-        ?? Math.min(8000, 1000 * Math.pow(2, attempt));
-      await new Promise(rs => setTimeout(rs, wait));
-    }
-    let detail = '';
-    try {
-      const e = await lastRes.json();
-      // BookStack 422 liefert { error: { message, validation: { feld: [msgs] } } } —
-      // tiefer auflösen, sonst rendert der String "[object Object]".
-      const validation = e?.error?.validation;
-      const flatVal = validation && typeof validation === 'object'
-        ? Object.values(validation).flat().filter(Boolean).join('; ')
-        : '';
-      detail = flatVal
-        || e?.error?.message
-        || e?.message
-        || (typeof e?.error === 'string' ? e.error : '')
-        || '';
-    } catch (_) {}
-    throw new Error(detail
-      ? this.t('bs.apiErrorDetail', { status: lastRes.status, detail })
-      : this.t('bs.apiError', { status: lastRes.status }));
   },
 
   _applyCorrections(html, fehler) {

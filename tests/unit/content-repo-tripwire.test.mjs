@@ -16,21 +16,9 @@ import { join, relative } from 'node:path';
 const REPO_ROOT = new URL('../../', import.meta.url).pathname;
 const ROOT = join(REPO_ROOT, 'public/js');
 
-// Dateien, in denen `bs*`/`/api/`-Aufrufe legitim sind:
-//   - api-bookstack.js: Definition der bs*-Wrapper.
-//   - repo/content.js: nutzt ausschliesslich /content/*, kein /api/.
-//   - bookstack-search.js: Suche, separater Migrations-Step (Schritt 7 Phase).
-// Strukturoperationen (deferred bis Strukturen-Sub-Step):
-//   - tree.js (bsPost chapters), book-settings.js (bsDelete books),
-//     cards/kapitel-review-card.js (bsPost pages), cards/book-organizer-card.js.
-const ALLOW_API_OR_BS = new Set([
-  'api-bookstack.js',
-  'bookstack-search.js',
-  'tree.js',
-  'book-settings.js',
-  'cards/kapitel-review-card.js',
-  'cards/book-organizer-card.js',
-]);
+// Dateien, in denen `bs*`/`/api/`-Aufrufe legitim sind: nach Schritt 3 + 3b
+// + 3c keine mehr. Die Allowlist ist leer. Jede neue Verletzung scheitert hier.
+const ALLOW_API_OR_BS = new Set([]);
 
 const BS_RE = /\bbs(Get|GetAll|Put|Post|Delete)\b/;
 const API_RE = /['"`]\/api\//;

@@ -9,6 +9,7 @@ import { fetchJson, escHtml, renderStars, noteTip } from '../utils.js';
 import { renderReviewHtml, CHAPTER_REVIEW_AXES } from '../review.js';
 import { startPoll, runningJobStatus } from './job-helpers.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
+import { contentRepo } from '../repo/content.js';
 
 function emptySlot() {
   return { loading: false, progress: 0, status: '', out: '', jobId: null, pollTimer: null };
@@ -310,7 +311,7 @@ export function registerKapitelReviewCard() {
       root.newPageCreating = true;
       root.newPageError = '';
       try {
-        const created = await root.bsPost('pages', {
+        const created = await contentRepo.createPage({
           chapter_id: parseInt(chapter.id),
           name: title,
           html: '<p></p>',
