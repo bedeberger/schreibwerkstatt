@@ -24,6 +24,7 @@ const userSettingsRouter = require('./routes/usersettings');
 const { router: proxiesRouter } = require('./routes/proxies');
 const { BOOKSTACK_URL } = require('./lib/bookstack');
 const { router: syncRouter, syncAllBooks } = require('./routes/sync');
+const { runCacheCleanup } = require('./lib/cache-cleanup');
 const exportRouter = require('./routes/export');
 const pdfExportRouter = require('./routes/pdf-export');
 const usageRouter = require('./routes/usage');
@@ -349,7 +350,7 @@ try {
   // In manchen LXC-Templates ist die TZ UTC → "23:00" wäre dann 00:00/01:00 CH-Zeit.
   const cronTz = process.env.CRON_TIMEZONE || process.env.TZ || 'Europe/Zurich';
 
-  // 23:00 – Buchstatistik-Sync + hängende Jobs bereinigen.
+  // 23:00 – Buchstatistik-Sync + hängende Jobs bereinigen + TTL-Cache-Cleanup.
   // Tagesscharfe Statistik: recorded_at am Tag X reflektiert Inhalte vom Tag X.
   cron.schedule('0 23 * * *', () => {
     runWithContext({ job: 'cron', user: 'system' }, () => {
@@ -359,9 +360,16 @@ try {
       const stuck = cleanupStuckJobRuns();
       if (stuck > 0) logger.warn(`Cron: ${stuck} hängender Job-Run(s) auf 'error' gesetzt.`);
       else logger.info('Cron: Keine hängenden Job-Runs gefunden.');
+
+      try {
+        const summary = runCacheCleanup();
+        logger.info(`Cron: Cache-Cleanup entfernt ${summary.totalRemoved} Row(s) aus ${summary.tables.length} Tabellen.`);
+      } catch (e) {
+        logger.error('Cron Cache-Cleanup Fehler: ' + e.message);
+      }
     });
   }, { timezone: cronTz });
-  logger.info(`Cron-Job registriert: Buchstatistik-Sync + Job-Cleanup täglich 23:00 (${cronTz})`);
+  logger.info(`Cron-Job registriert: Buchstatistik-Sync + Job-Cleanup + Cache-TTL-Cleanup täglich 23:00 (${cronTz})`);
 
   // 04:00 – Stale-Cleanup. Eintraege (books/chapters/pages), deren letzter
   // Discovery-Touch (last_seen_at) aelter ist als STALE_DAYS, werden geloescht.

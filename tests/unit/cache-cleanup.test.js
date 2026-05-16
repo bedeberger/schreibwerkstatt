@@ -1,0 +1,164 @@
+'use strict';
+// Unit-Tests fuer lib/cache-cleanup.js. Seedet eine in-Tmp-Datei liegende DB
+// mit alten und frischen Rows in einer Auswahl der Policy-Tabellen und
+// verifiziert, dass nur die alten Rows entfernt werden.
+//
+// Plan-Referenz: docs/bookstack-exit.md#phase-0d.
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const os = require('os');
+const path = require('path');
+const fs = require('fs');
+
+const tmpDb = path.join(os.tmpdir(), `cache-cleanup-test-${process.pid}-${Date.now()}.db`);
+process.env.DB_PATH = tmpDb;
+
+const { db } = require('../../db/connection');
+
+// Minimal-Schema fuer die getesteten Tabellen. Spalten-Namen matchen das
+// echte Schema (siehe db/migrations.js); FK-Constraints werden hier
+// bewusst weggelassen, weil wir nicht die volle Migrationspipeline ziehen.
+const SCHEMA_STMTS = [
+  `CREATE TABLE chapter_extract_cache (
+    book_id INTEGER, user_email TEXT, chapter_id INTEGER, phase TEXT,
+    pages_sig TEXT, extract_json TEXT, cached_at TEXT,
+    PRIMARY KEY (book_id, user_email, chapter_id, phase)
+  )`,
+  `CREATE TABLE synonym_cache (
+    user_email TEXT, key_hash TEXT, result_json TEXT, cached_at TEXT,
+    PRIMARY KEY (user_email, key_hash)
+  )`,
+  `CREATE TABLE lektorat_cache (
+    book_id INTEGER, user_email TEXT, page_id INTEGER,
+    ctx_sig TEXT, result_json TEXT, cached_at TEXT,
+    PRIMARY KEY (book_id, user_email, page_id)
+  )`,
+  `CREATE TABLE font_cache (
+    family TEXT, weight INTEGER, style TEXT, ttf BLOB, fetched_at INTEGER,
+    PRIMARY KEY (family, weight, style)
+  )`,
+  `CREATE TABLE job_runs (
+    job_id TEXT PRIMARY KEY, type TEXT, status TEXT,
+    queued_at TEXT, started_at TEXT, ended_at TEXT
+  )`,
+  `CREATE TABLE page_checks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, page_id INTEGER, checked_at TEXT
+  )`,
+  `CREATE TABLE book_stats_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, book_id INTEGER, recorded_at TEXT
+  )`,
+];
+for (const stmt of SCHEMA_STMTS) db.prepare(stmt).run();
+
+// Stale-Werte (200 Tage alt → trifft alle ISO-Policies ≤ 365 Tagen).
+const STALE = "datetime('now', '-200 days')";
+const STALE_EPOCH = Math.floor(Date.now() / 1000) - 200 * 86400;
+// Frisch (gestern → unter jeder TTL).
+const FRESH = "datetime('now', '-1 days')";
+const FRESH_EPOCH = Math.floor(Date.now() / 1000) - 86400;
+
+const SEED_STMTS = [
+  `INSERT INTO chapter_extract_cache VALUES (1,'a@b',10,'p1','sig1','{}', ${STALE})`,
+  `INSERT INTO chapter_extract_cache VALUES (1,'a@b',11,'p1','sig2','{}', ${FRESH})`,
+
+  `INSERT INTO synonym_cache VALUES ('a@b','hash1','{}', ${STALE})`,
+  `INSERT INTO synonym_cache VALUES ('a@b','hash2','{}', ${FRESH})`,
+
+  `INSERT INTO lektorat_cache VALUES (1,'a@b',100,'sig','{}', ${STALE})`,
+  `INSERT INTO lektorat_cache VALUES (1,'a@b',101,'sig','{}', ${FRESH})`,
+
+  `INSERT INTO font_cache VALUES ('Lato',400,'normal', X'00', ${STALE_EPOCH})`,
+  `INSERT INTO font_cache VALUES ('Lato',700,'normal', X'00', ${FRESH_EPOCH})`,
+
+  `INSERT INTO job_runs VALUES ('old-done','x','done', ${STALE}, NULL, NULL)`,
+  `INSERT INTO job_runs VALUES ('old-queued','x','queued', ${STALE}, NULL, NULL)`,
+  `INSERT INTO job_runs VALUES ('fresh-done','x','done', ${FRESH}, NULL, NULL)`,
+
+  `INSERT INTO page_checks (page_id, checked_at) VALUES (1, ${STALE})`,
+  `INSERT INTO page_checks (page_id, checked_at) VALUES (2, ${FRESH})`,
+
+  `INSERT INTO book_stats_history (book_id, recorded_at) VALUES (1, datetime('now','-400 days'))`,
+  `INSERT INTO book_stats_history (book_id, recorded_at) VALUES (1, ${FRESH})`,
+];
+for (const stmt of SEED_STMTS) db.prepare(stmt).run();
+
+const { runCacheCleanup, POLICIES } = require('../../lib/cache-cleanup');
+
+test.after(() => {
+  try { db.close(); } catch {}
+  try { fs.unlinkSync(tmpDb); } catch {}
+  try { fs.unlinkSync(tmpDb + '-wal'); } catch {}
+  try { fs.unlinkSync(tmpDb + '-shm'); } catch {}
+});
+
+const summary = runCacheCleanup();
+
+test('POLICIES enthaelt alle erwarteten Tabellen', () => {
+  const names = POLICIES.map(p => p.table);
+  assert.ok(names.includes('chapter_extract_cache'));
+  assert.ok(names.includes('synonym_cache'));
+  assert.ok(names.includes('lektorat_cache'));
+  assert.ok(names.includes('font_cache'));
+  assert.ok(names.includes('job_runs'));
+  assert.ok(names.includes('page_checks'));
+  assert.ok(names.includes('book_stats_history'));
+});
+
+test('chapter_extract_cache: nur stale Row weg', () => {
+  const rows = db.prepare('SELECT chapter_id FROM chapter_extract_cache ORDER BY chapter_id').all();
+  assert.deepEqual(rows.map(r => r.chapter_id), [11]);
+});
+
+test('synonym_cache: nur stale Row weg', () => {
+  const rows = db.prepare('SELECT key_hash FROM synonym_cache ORDER BY key_hash').all();
+  assert.deepEqual(rows.map(r => r.key_hash), ['hash2']);
+});
+
+test('lektorat_cache: nur stale Row weg (TTL 60 Tage)', () => {
+  const rows = db.prepare('SELECT page_id FROM lektorat_cache ORDER BY page_id').all();
+  assert.deepEqual(rows.map(r => r.page_id), [101]);
+});
+
+test('font_cache: epoch-TTL kickt stale Row', () => {
+  const rows = db.prepare('SELECT weight FROM font_cache ORDER BY weight').all();
+  assert.deepEqual(rows.map(r => r.weight), [700]);
+});
+
+test('job_runs: stale queued bleibt (status-Filter), stale done weg', () => {
+  const rows = db.prepare('SELECT job_id FROM job_runs ORDER BY job_id').all();
+  const ids = rows.map(r => r.job_id);
+  assert.ok(ids.includes('fresh-done'));
+  assert.ok(ids.includes('old-queued'));
+  assert.ok(!ids.includes('old-done'));
+});
+
+test('page_checks: nur stale Row weg', () => {
+  const rows = db.prepare('SELECT page_id FROM page_checks ORDER BY page_id').all();
+  assert.deepEqual(rows.map(r => r.page_id), [2]);
+});
+
+test('book_stats_history: 400 Tage alt weg (TTL 365)', () => {
+  const cnt = db.prepare('SELECT COUNT(*) AS c FROM book_stats_history').get().c;
+  assert.equal(cnt, 1);
+});
+
+test('summary.totalRemoved >= 7 (eine pro getesteter Tabelle)', () => {
+  assert.ok(summary.totalRemoved >= 7, `erwartet >=7 entfernte Rows, got ${summary.totalRemoved}`);
+});
+
+test('Tabellen, die nicht im Test-Schema sind, werden uebersprungen', () => {
+  const skipped = summary.tables.filter(t => t.skipped === 'table-missing');
+  // book_extract_cache, chapter_review_cache, book_review_cache,
+  // chapter_macro_review_cache, finetune_ai_cache sind im Test-Schema nicht angelegt.
+  assert.ok(skipped.length >= 5, `erwartet >=5 uebersprungene Tabellen, got ${skipped.length}`);
+});
+
+test('Re-Run ist idempotent (kein Throw)', () => {
+  const second = runCacheCleanup();
+  assert.equal(second.totalRemoved, 0);
+});
+
+test('Vacuum-Flag laeuft fehlerfrei', () => {
+  assert.doesNotThrow(() => runCacheCleanup({ vacuum: true }));
+});

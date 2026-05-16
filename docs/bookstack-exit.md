@@ -57,8 +57,6 @@ Bewusst out-of-scope (User-Wunsch): Attachments (werden nicht genutzt → kein M
 |---|---|---|---|---|
 | 0 | Schema-Skelett | ja | keiner | — |
 | 0b | Initial Backfill (BookStack → DB) | ja | keiner | 0 |
-| 0c | PRAGMA-Tuning | ja | schnellere Reads | — |
-| 0d | Cache-TTL-Cleanup | ja | keiner | — |
 | 1 | `localdb`-Backend implementieren (Content-Store-Variante) | ja (Flag) | keiner solange `app.backend='bookstack'` | 0, 0b |
 | 2 | Eigene Page-Revisions | ja | feinere History (beide Backends) | 0 |
 | 3 | Eigene Sortierung | ja | `localdb`-only nativ; `bookstack` weiter via BS-`priority` | 0, 1 |
@@ -76,9 +74,12 @@ Bewusst out-of-scope (User-Wunsch): Attachments (werden nicht genutzt → kein M
 | 8 | Backend-Migration-Tool (Bulk-Copy) | one-way pro Direction | Admin-UI „Backend wechseln" | 1–7 |
 | 9 | Doku-Update (Multi-Backend-Sweep) | ja | keiner (Doku) | 8 |
 | 10 | Schema-Squash | ja | keiner | 9 |
+| 11 | Per-User-AI-Provider-Override | ja (additiv) | Admin weist pro User claude/ollama/llama zu; User folgt sonst globalem Default | 4a, 4c, 4d |
 
-**Start-Reihenfolge:** 0c → 0d → 0 → 0b → 4a → 4c → 4c1 → 4c2 → 4a2 → 4d → 4b → 4b1 → 4b2 → 2 → 6 → 1 → 3 → 7 → 8 → 9 → 10.
-0c/0d vorab, da unabhängig von Backend-Pluralisierung und sofort gewinnbringend. 10 (Squash) zuletzt — Squash vorher wäre Wegwerfarbeit, weil bis dahin viele Migrationen dazukommen.
+**Start-Reihenfolge:** 0 → 0b → 4a → 4c → 4c1 → 4c2 → 4a2 → 4d → 4b → 4b1 → 4b2 → 2 → 6 → 1 → 3 → 7 → 8 → 9 → 10.
+10 (Squash) zuletzt — Squash vorher wäre Wegwerfarbeit, weil bis dahin viele Migrationen dazukommen. Phase 11 (Per-User-AI-Provider-Override) ist additiv und kann nach 4d eingeschoben werden, sobald die Hauptkette steht.
+
+**Erledigt:** Phase 0c (PRAGMA-Tuning, [db/connection.js](../db/connection.js) + `PRAGMA optimize` im SIGTERM-Handler von [server.js](../server.js)) und Phase 0d (TTL-Cache-Cleanup, [lib/cache-cleanup.js](../lib/cache-cleanup.js) im 23:00-Cron-Tick, manuell via `npm run cache:cleanup [-- --vacuum]`, Smoke-Tests in `tests/unit/db-pragmas.test.js` + `tests/unit/cache-cleanup.test.js`).
 4a/4c/4b zuerst, weil User-Identität, `app.backend`-Schalter und ACL die SSoT für alle folgenden Phasen sind. Lese-Modus (4b1, Print-CSS + readOnly) direkt nach 4b, weil viewer-Rolle erst dann existiert. Phase 7 (Suche) **vor** Phase 8, damit FTS schon steht, wenn Admin Backend wechselt — Index wird beim Bulk-Copy mitgefüllt.
 
 4d (Token-Budget + Cost) folgt 4a (braucht `app_users.global_role='admin'`). Vor 4b einsortiert, weil Kostenkontrolle vor Sharing-Welle (mehr Co-Editoren = mehr KI-Calls) bestehen muss; rein additiv (neue Spalten/Tabelle/Routen, kein Refactor) und kann bei Bedarf vorgezogen werden.
@@ -200,101 +201,6 @@ Ziel: Vollabzug aller BookStack-Bücher/Kapitel/Seiten in lokale Tabellen nach M
 **Wichtig — keine fremden Bücher mirrorbar:** Was User A backfilled, ist exakt das, was BookStack User A zeigt. User B sieht im Backfill seine eigene Buch-Auswahl. In `books` landen ggf. dieselben `book_id`s aus mehreren User-Backfills (idempotenter Upsert), aber Sichtbarkeit regelt sich später über `book_access` (Phase 4b) — bis dahin spiegelt `owner_email` den Erst-Backfiller.
 
 **Tests:** Unit-Test mit Mock-BookStack-Client (Books-Liste → Chapter-Liste → Page-Detail) gegen In-Memory-DB. Verifiziert: Re-Run ist idempotent, FK-Constraints halten, `body_html` landet pro Seite, `remote_updated_at` gesetzt, zwei User-Backfills mit überlappenden Büchern erzeugen keine Duplikate.
-
----
-
-## Phase 0c — PRAGMA-Tuning
-
-Ziel: SQLite-Tuning für wachsende DB (Replica-Bodies + FTS5-Index ab Phase 7 = mehr Volumen). Unabhängig vom BookStack-Exit, sofort lohnend. Reversibel — alle PRAGMAs sind Runtime-Settings, kein DB-Format-Wechsel.
-
-**Anpassung in [db/connection.js](../db/connection.js):**
-
-```js
-db.pragma('journal_mode = WAL');                  // bleibt
-db.pragma('synchronous = NORMAL');                // bleibt
-db.pragma('foreign_keys = ON');                   // bleibt
-db.pragma('cache_size = -65536');                 // 64 MB Page-Cache (neg = KiB)
-db.pragma('mmap_size = 268435456');               // 256 MB memory-mapped I/O
-db.pragma('temp_store = MEMORY');                 // Temp-Tables/Indexe in RAM
-db.pragma('busy_timeout = 5000');                 // 5 s Lock-Wait statt SQLITE_BUSY
-db.pragma('wal_autocheckpoint = 1000');           // Checkpoint alle ~4 MB WAL (Default, explizit dokumentiert)
-```
-
-**Begründungen:**
-- `cache_size = -65536` — 64 MB Hot-Pages im Prozess-Cache. Default ≈ 2 MB. Reduziert Page-Reads für `figures`/`pages`/`chat_messages`-Scans drastisch.
-- `mmap_size = 256 MB` — DB-File in den Adressraum gemappt, Linux-Kernel paged on-demand. Schub für die kommenden Body-HTML-Reads (Phase 1).
-- `temp_store = MEMORY` — Sortierungen + temp-Indizes (Komplettanalyse-JOINs, Palette-Provider) ohne Temp-Files auf Disk.
-- `busy_timeout = 5000` — Cron-Sync + interaktiver Schreiber überschneiden sich gelegentlich. 5 s Wait > sofortiger Fehler.
-
-**Optional `PRAGMA optimize` beim Shutdown** (in `server.js`-SIGTERM-Handler): SQLite analysiert Query-Statistiken, baut bessere Indexpläne. Cheap, max. einmal pro Sitzung.
-
-**Tests:** Smoke-Test in [tests/unit/](../tests/unit/) — Open-DB, prüfe `PRAGMA cache_size`/`mmap_size`/`temp_store`/`busy_timeout` Returns. Verhindert Regression bei künftigem Connection-Refactor.
-
-**Aufwand:** ~1 h. Risiko: niedrig. Rollback: PRAGMA-Block entfernen.
-
----
-
-## Phase 0d — Cache-TTL-Cleanup
-
-Ziel: Cache-Tabellen wachsen heute unbegrenzt. Nach Komplettanalyse-Reruns, Lektorat-Sessions, Buch-Bewertungen sammelt sich Müll, der nicht mehr matcht (Prompt-Version gebumpt, Page-Signatur veraltet). Periodischer Cleanup-Cron hält die DB schlank, beschleunigt Sequential-Scans, reduziert Backup-Grösse.
-
-**Betroffene Tabellen** (gemäss CLAUDE.md-Cache-Liste):
-- `chapter_extract_cache`, `book_extract_cache` — Komplettanalyse
-- `chapter_review_cache`, `book_review_cache`, `chapter_macro_review_cache` — Bewertungen
-- `synonym_cache` — Editor-Synonyme
-- `lektorat_cache` — Seiten-Lektorat
-- `finetune_ai_cache` — Finetune-Augmentation
-- `font_cache` — bereits 30-Tage-TTL beim Stale-Read, aber kein Purge
-- `job_runs` (`status IN ('done','error','cancelled')` älter als N Tage)
-- `page_checks` (alte Snapshots, sobald Page neu gesynct wurde)
-- `book_stats_history` — historische Snapshots > 365 Tage purgen oder downsamplen
-- `page_revisions` (Phase 2) — kein TTL, sondern Max-Limit pro `page_id` (siehe Phase 2)
-
-**Migration N+m** (additiv) — fehlende `created_at`-Spalten ergänzen:
-
-```sql
-ALTER TABLE chapter_extract_cache       ADD COLUMN created_at TEXT;
-ALTER TABLE book_extract_cache          ADD COLUMN created_at TEXT;
-ALTER TABLE chapter_review_cache        ADD COLUMN created_at TEXT;
-ALTER TABLE book_review_cache           ADD COLUMN created_at TEXT;
-ALTER TABLE chapter_macro_review_cache  ADD COLUMN created_at TEXT;
-ALTER TABLE synonym_cache               ADD COLUMN created_at TEXT;
-ALTER TABLE lektorat_cache              ADD COLUMN created_at TEXT;
-ALTER TABLE finetune_ai_cache           ADD COLUMN created_at TEXT;
--- Backfill bestehende Rows: created_at = COALESCE(updated_at, datetime('now'))
-```
-
-Tabellen mit bereits vorhandenem `created_at`/`updated_at` (`font_cache`, `job_runs`, `page_checks`, `book_stats_history`) übersprungen.
-
-**Modul `lib/cache-cleanup.js`** (neu):
-
-```js
-const POLICIES = [
-  { table: 'chapter_extract_cache',       ttlDays: 90 },
-  { table: 'book_extract_cache',          ttlDays: 90 },
-  { table: 'chapter_review_cache',        ttlDays: 90 },
-  { table: 'book_review_cache',           ttlDays: 90 },
-  { table: 'chapter_macro_review_cache',  ttlDays: 90 },
-  { table: 'synonym_cache',               ttlDays: 90 },
-  { table: 'lektorat_cache',              ttlDays: 60 },
-  { table: 'finetune_ai_cache',           ttlDays: 60 },
-  { table: 'font_cache',                  ttlDays: 90 },
-  { table: 'job_runs',                    ttlDays: 30, where: `status IN ('done','error','cancelled')` },
-  { table: 'page_checks',                 ttlDays: 90 },
-  { table: 'book_stats_history',          ttlDays: 365 },
-];
-function runCacheCleanup() { /* DELETE pro Policy mit datetime('now', '-N days') */ }
-```
-
-**Scheduler:** Im selben Cron-Tick wie [routes/sync.js](../routes/sync.js)#`syncAllBooks` (täglich 02:00) zusätzlich `runCacheCleanup()`. Logs pro Tabelle: `[cache-cleanup] table=synonym_cache removed=247`.
-
-**Manuelles Tool:** `npm run cache:cleanup` (script in `package.json`) für Ad-hoc-Trigger nach Prompt-Schema-Änderung. Optional `--vacuum`-Flag ruft am Ende `VACUUM;` (Rebuild ohne Lücken, Disk-Space-Reclaim).
-
-**Why TTL statt Cache-Invalidation nach Inhaltsänderung:** `PROMPTS_VERSION`-Bumps und `pages_sig`-Mismatches sortieren stale Rows lautlos aus (Cache-Miss → Neu-Extraktion). Die alten Rows bleiben aber liegen. TTL ist die einfachste Garbage-Collection — Hit-Rate auf alte Rows ist nach 30/60/90 Tagen praktisch null.
-
-**Tests:** Unit-Test in [tests/unit/cache-cleanup.test.mjs](../tests/unit/cache-cleanup.test.mjs) — seedet In-Memory-DB mit alten + frischen Rows, ruft `runCacheCleanup`, verifiziert: alte raus, frische bleiben, Policies einzeln testbar.
-
-**Aufwand:** ~0.5 Tag. Risiko: niedrig (DELETE per TTL, kein FK-Bruch). Rollback: Cron-Hook auskommentieren.
 
 ---
 
@@ -1126,6 +1032,193 @@ Jeder Schritt schreibt sofort in `app_settings` (kein Bulk-Commit am Ende). Bei 
 
 ---
 
+## Phase 4c2 — SMTP-Mailer (Gmail/Workspace via OAuth2 oder App-Passwort)
+
+Ziel: App kann transactional Mails versenden (Invite-Token, Registrierungsanfragen, Admin-Benachrichtigungen). Gmail/Workspace ist Primärziel (Self-Hosted-Betreiber haben meist Google-Konto), Generic-SMTP als Fallback für eigenen Mailserver. Admin konfiguriert über `AdminSettingsCard`-Tab „SMTP / Mailer".
+
+### Voraussetzung
+
+Phase 4c (Admin-Settings) — `smtp.*`-Keys (siehe „Verwaltete Keys") leben in `app_settings`, Secrets encrypted via `MASTER_KEY`.
+
+### Dependency
+
+`nodemailer` (neu in `package.json`). Unterstützt Gmail-OAuth2 (`xoauth2`), App-Passwort und Generic-SMTP nativ. Kein zusätzlicher Google-API-Client nötig — Refresh-Token-Flow steckt in nodemailer-Transport-Config.
+
+### Modul-Layout
+
+- [lib/mailer.js](../lib/mailer.js) — Singleton-Service. `getTransporter()` baut nodemailer-Transport aus aktuellen `app_settings`-Werten, cached pro Boot. Hört auf `app-settings:changed`-Event (Phase 4c) und reinitialisiert bei `smtp.*`-Änderung.
+- [lib/mailer-templates.js](../lib/mailer-templates.js) — i18n-fähige Templates (Subject + HTML + Plain-Text). Pro Template `{ subjectKey, render(ctx, locale) }`. Templates: `invite`, `registration-request-admin`, `registration-approved`, `registration-denied`, `test`.
+- `mailer.send({ to, template, ctx, locale })` → resolved Template, dispatcht Transport. Bei `smtp.mode='disabled'` → no-op + Winston-`warn` (Caller bekommt `{ sent: false, reason: 'disabled' }`, muss UI-Fallback machen).
+
+### Gmail-OAuth2-Flow (empfohlen)
+
+**Einmaliges Setup durch Admin** (Dokumentiert im Wizard 4c1 + AdminSettingsCard-Hinweis-Box):
+1. Google-Cloud-Console → neues Projekt → OAuth-Consent-Screen (interner Modus für Workspace, „Testing" für Privat-Gmail).
+2. Credentials → OAuth-Client-ID, Typ „Web application", Redirect-URI `https://developers.google.com/oauthplayground` (für Refresh-Token-Beschaffung).
+3. OAuth-Playground → Settings → eigene Client-ID/Secret eintragen → Scope `https://mail.google.com/` autorisieren → „Exchange authorization code" → Refresh-Token kopieren.
+4. In `AdminSettingsCard`-SMTP-Tab eintragen: `client_id`, `client_secret`, `refresh_token`, `user` (Gmail-Adresse). „Test-Mail" senden.
+
+**Runtime**: nodemailer-Transport mit
+```js
+{ service: 'gmail', auth: { type: 'OAuth2', user, clientId, clientSecret, refreshToken } }
+```
+Access-Token wird intern bei Bedarf via Refresh-Token nachgeholt — kein expliziter Token-Refresh-Cron nötig.
+
+### Gmail-App-Passwort-Flow (Fallback)
+
+Für Accounts mit 2FA, wo OAuth-Setup zu aufwendig ist:
+1. [Google-Konto](https://myaccount.google.com/apppasswords) → App-Passwort erstellen → 16-stelligen Code kopieren.
+2. In Card eintragen: `user`, `app_password`.
+
+**Runtime**: `{ service: 'gmail', auth: { user, pass: appPassword } }`. App-Passwort umgeht 2FA für SMTP — bewusst akzeptiert, weil Self-Host-Pattern.
+
+### Generic-SMTP
+
+Klassische `host`/`port`/`secure`/`user`/`password`-Felder für eigenen Mailserver. Nodemailer-Transport `{ host, port, secure, auth: { user, pass } }`.
+
+### Routen
+
+- `GET /admin/settings/smtp/test-config` → liest aktuelle Werte (maskiert), prüft Vollständigkeit pro Mode, gibt `{ ready: bool, missing: [keys] }`.
+- `POST /admin/settings/smtp/test-send` `{ to? }` → sendet `test`-Template an `to` (Default: `from_email`). Liefert `{ ok, latencyMs, error? }`. Guard: `global_role='admin'`.
+
+### Rate-Limit
+
+Pro Boot in-Memory-Counter pro Minute. Default 30/min (Gmail-Throttle ist 100/h für „less secure"-Pfade, ~500/Tag — 30/min im Burst, Backoff bei 429). Bei Überlauf → `mailer.send` queued in-Memory mit 1s-Backoff, nicht persistent. Migrationspfad für persistente Mail-Queue: bewusst out-of-scope (Self-Host-Lasten klein, keine Massen-Mails).
+
+### i18n
+
+Beide Locales pflegen — Subject + Body via `t(key, params)`:
+- `mail.subject.invite`, `mail.subject.registrationRequestAdmin`, `mail.subject.registrationApproved`, `mail.subject.registrationDenied`, `mail.subject.test`.
+- `mail.body.invite.{intro,cta,expires,footer}` mit `{inviterName, role, inviteUrl, expiresAt}`.
+- `mail.body.registrationRequestAdmin.{intro,emailLine,messageLine,actionCta,footer}` mit `{requesterEmail, message, approveUrl}`.
+- `mail.body.registrationApproved.{intro,cta,footer}` mit `{loginUrl}`.
+- `mail.body.registrationDenied.{intro,reasonLine,footer}` mit `{reason}`.
+- Admin-UI: `admin.settings.smtp.{mode,fromEmail,fromName,replyTo,gmail.user,gmail.refreshToken,gmail.appPassword,host,port,secure,test.ok,test.fail,test.disabled,hint.gmailOauth,hint.gmailAppPassword}`.
+
+Empfänger-Locale: `app_users.language` (oder Browser-Default beim Request-Register-Antragsteller, fällt auf `de` zurück).
+
+### Logging
+
+- `[INFO][mailer|admin@…|] sent template=invite to=u@x.com latencyMs=234`
+- `[WARN][mailer|…|] disabled — invite token left in UI for u@x.com`
+- `[ERROR][mailer|…|] gmail-oauth refresh-token revoked — admin muss neu autorisieren`
+
+Klartext-Secrets nie loggen (nodemailer-Debug standardmässig aus; `LOG_LEVEL=debug` schaltet rohes SMTP-Protokoll ein — dokumentiert als Troubleshooting-only).
+
+### Tests
+
+- [tests/unit/mailer.test.mjs](../tests/unit/mailer.test.mjs) — Template-Rendering pro Locale, Mode-Switch (`disabled` → no-op), Settings-Reload-Event.
+- Integration: nodemailer-Stream-Transport (`jsonTransport`) statt echtem SMTP. Echte Gmail-Pings nur manuell via „Test-Mail"-Button.
+
+### Sicherheit
+
+- Alle Auth-Secrets (`client_secret`, `refresh_token`, `app_password`, generic `password`) `encrypted=1` in `app_settings`.
+- Mail-Body escapest User-Input (`requesterEmail`, `message`) — sonst HTML-Injection via Registrierungs-Message. `lib/mailer-templates.js` nutzt Plain-`String`-Templating mit HTML-Escape-Helper aus [public/js/utils.js](../public/js/utils.js) (auf Server-Seite via dynamischen Import oder kleine Server-Kopie).
+- Reply-To überschreibbar, From nicht — From muss mit authentifiziertem Konto matchen, sonst rejected Gmail die Mail.
+- Keine Bounce-Verarbeitung (out-of-scope) — Admin sieht in Logs, ob Versand fehlschlug.
+
+### Aufwand
+
+Klein — 1 neue Dep, 1 Lib-Modul + Templates, ein Tab in `AdminSettingsCard`, ein Wizard-Step. Hauptaufwand ist sauberes i18n + Klar-Doku der Gmail-OAuth-Setup-Schritte.
+
+---
+
+## Phase 4a2 — Public Landing + Request-Register
+
+Ziel: Frische, nicht-eingeloggte Besucher sehen eine schlichte Startseite mit „Login" und „Zugang anfordern". Heute redirected `/` direkt auf die SPA, die ohne Session sofort 401-Bouncing macht — kein öffentliches Gesicht der App. Mit 4a2 gibt es einen sauberen unauth-Einstiegspunkt + einen moderiert-offenen Registrierungspfad ohne `ALLOW_OPEN_SIGNUP=true` (das bleibt für vollautomatische Setups).
+
+### Abhängigkeiten
+
+- Phase 4a (`app_users`, `user_invites`, Audit, OIDC-Callback mit `?invite=…`-Param).
+- Phase 4c2 (Mailer) — Admin-Benachrichtigung + Approve/Deny-Notification. Ohne Mailer: Fallback auf In-App-Inbox in `AdminUsersCard`.
+
+### Migration N+4a2
+
+```sql
+CREATE TABLE registration_requests (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT NOT NULL,
+  display_name TEXT,           -- optional, User füllt aus
+  message TEXT,                -- Freitext „Warum will ich Zugang"
+  ip TEXT,
+  user_agent TEXT,
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK(status IN ('pending','approved','denied','expired')),
+  created_at TEXT DEFAULT (datetime('now')),
+  reviewed_at TEXT,
+  reviewed_by TEXT,            -- admin-email
+  review_reason TEXT,          -- bei denied optional, bei approved leer
+  invite_id INTEGER,           -- gesetzt bei approval, FK auf user_invites(id)
+  FOREIGN KEY (invite_id) REFERENCES user_invites(id) ON DELETE SET NULL
+);
+CREATE INDEX idx_reg_req_status ON registration_requests(status, created_at DESC);
+-- Partial UNIQUE: nur pending-Anfragen blockieren erneuten Antrag desselben Mails.
+CREATE UNIQUE INDEX idx_reg_req_pending_email
+  ON registration_requests(email)
+  WHERE status = 'pending';
+```
+
+Mit `foreign_key_check` am Migrations-Ende (siehe CLAUDE.md Pflicht-Block).
+
+### Public-Routen (nicht hinter Session-Guard)
+
+Bestehender Auth-Guard in [server.js](../server.js) hängt aktuell vor `/` — wir spalten:
+- `/` → wenn eingeloggt → SPA-Shell `index.html`; wenn nicht → `landing.html`. Keine 401-Bounce mehr.
+- `/landing` → immer öffentliches `landing.html` (auch eingeloggt aufrufbar, z.B. zum Ausloggen-anschauen).
+- `GET /login` → Login-Page mit Buttons „Mit Google anmelden" (`/auth/google`, wenn Google-Client konfiguriert ist) und „Admin-Login" (Form `/auth/admin-login`, wenn `ADMIN_PASSWORD` gesetzt). Beide Buttons können ausgeblendet sein, wenn Voraussetzungen fehlen.
+- `GET /register` → Formular: Email (Pflicht), Anzeigename (optional), Nachricht (optional, 500 Zeichen). Captcha siehe Sicherheit. Kein Passwortfeld — Login läuft immer via Google-OAuth nach Approval.
+- `POST /register` `{ email, displayName?, message?, captchaToken? }` → Insert in `registration_requests`. Rate-Limit pro IP (3/Stunde via `express-rate-limit`). Mailt Admin via `registration-request-admin`-Template. Antwortet immer 202 mit derselben Erfolgsmeldung („Anfrage eingegangen — du erhältst eine Mail, sobald sie geprüft wurde"), unabhängig davon ob Email schon existiert / bereits pending ist (kein User-Enumeration-Leak).
+
+### Public-Frontend
+
+Drei statische HTML-Files (kein Alpine-Root nötig — minimaler Footprint, separat ausgeliefert):
+- [public/landing.html](../public/landing.html) — Hero-Block: App-Name + Untertitel + zwei Buttons („Login", „Zugang anfordern"). Footer-Links nach Wunsch.
+- [public/login.html](../public/login.html) — zwei Login-Buttons (Google / Admin) + Link zurück zu Landing.
+- [public/register.html](../public/register.html) — Formular + Captcha-Slot + Hinweis „Wir antworten per Mail an die angegebene Adresse".
+
+CSS via bestehendes [public/css/tokens.css](../public/css/tokens.css) (eingelagerter `<link>`-Tag), plus dünner File `public/css/landing.css` für Hero-Spezifika. Kein Service-Worker-Eingriff — Landing-Routen `Cache-Control: no-store`.
+
+**i18n im Public-Frontend**: Locale aus `Accept-Language`-Header (`de`/`en`-Fallback `de`). Statische HTML wird durch Express-Template-Replacement (`String.replace`-Pass auf Pre-Defined-Keys) oder einfache Mini-Template-Function in [routes/public.js](../routes/public.js) gerendert. Keine schwere Templating-Engine — nur Key-Substitution.
+
+### Admin-Workflow
+
+`AdminUsersCard` (Phase 4a) erweitert um Tab „Anfragen":
+- Liste der `pending`-Requests mit Email, Name, Message, Zeitstempel, IP.
+- Pro Request zwei Aktionen:
+  - **Annehmen** `POST /admin/registration-requests/:id/approve` `{ role='user' }` → erzeugt `user_invites`-Row + Token, setzt `status='approved'`, sendet `registration-approved`-Mail mit `inviteUrl = ${APP_URL}/login?invite=${token}`. Login-Page leitet `?invite`-Param an `/auth/google` weiter; OIDC-Callback liest Invite und legt `app_users`-Row beim ersten Login an (Phase 4a, Schritt 5).
+  - **Ablehnen** `POST /admin/registration-requests/:id/deny` `{ reason? }` → `status='denied'`, sendet optional `registration-denied`-Mail mit Reason.
+- Bulk-Aktionen: Mehrfachauswahl → batch approve/deny.
+- Auto-Expire: täglicher Cron-Job markiert `pending`-Requests älter als 30 Tage als `expired` (keine Mail, nur Status).
+
+Wenn `smtp.mode='disabled'` → Approve/Deny mailen nicht, sondern setzen `review_reason` mit Hinweis „Mailer deaktiviert — Admin muss User manuell informieren". `AdminUsersCard` zeigt dann Invite-URL inline zum Kopieren.
+
+### Sicherheit
+
+- **Captcha**: hCaptcha als optionale Default-Schutzschicht (`auth.captcha.{site_key,secret_key}` in `app_settings`, encrypted). Wenn nicht konfiguriert → Captcha-Feld ausgeblendet, harter Rate-Limit (3/h/IP) bleibt. Hinweis-Box in AdminSettingsCard-Auth-Tab: „Ohne Captcha könnte Register-Formular für Spam missbraucht werden."
+- **User-Enumeration verhindern**: `POST /register` antwortet immer gleich — kein „Email existiert bereits". Doppel-Requests werden über Partial-UNIQUE-Index abgewiesen, aber API-Response bleibt 202.
+- **HTML-Escape**: `message`-Feld geht durch Escape (siehe Mailer-Sektion) bevor es im Admin-UI oder in Admin-Mail landet.
+- **IP-Logging**: kein DSGVO-Pseudonymisierungs-Aufwand — Self-Host-Pattern ([[project_self_hosted_oss]]), Verantwortung beim Betreiber, Hinweis im Datenschutz-Footer-Link der Landing-Page (Betreiber pflegt Inhalt).
+- **Audit**: `user_sessions_audit`-Eintrag bei Approve mit `event='role-changed'` + `meta_json={ from: 'request', request_id: N }`.
+
+### Tests
+
+- Unit: Rate-Limit-Logik, User-Enumeration-Antwortgleichheit, Captcha-Bypass-Pfad bei Nicht-Konfiguration.
+- Integration: `POST /register` → Admin-Mail-Versand (Stream-Transport), Approve → Invite-Erstellung + Mail.
+- E2E (Playwright): Landing → Register-Formular → Confirmation. Admin-User: Anfragen-Tab → Approve → Invite-URL sichtbar.
+
+### i18n
+
+- `landing.{title,subtitle,login,register,footer}`.
+- `login.{title,withGoogle,withAdminPassword,backToLanding,denied.notInvited,denied.suspended}`.
+- `register.{title,emailLabel,nameLabel,messageLabel,submit,success,error.rateLimit,error.invalidEmail,captchaLabel}`.
+- `admin.users.tab.requests`, `admin.users.requests.{empty,email,name,message,createdAt,approve,deny,expired,bulkApprove,bulkDeny,deniedReason,approvedAt,inviteUrlCopy,mailerDisabledHint}`.
+
+### Aufwand
+
+Mittel — 3 statische HTML-Files + Mini-i18n-Render, 1 Public-Router, neue `registration_requests`-Tabelle, neuer Tab in `AdminUsersCard`, Mail-Templates (in 4c2 schon vorgesehen), Captcha-Optional-Schicht, E2E-Tests.
+
+---
+
 ## Phase 4d — Token-Budget + Cost-Tracking (Admin)
 
 Ziel: Admin sieht USD-Kosten pro User/Job/Monat und konfiguriert pro User ein Monats-Budget. Bei Überschreitung wahlweise hart blocken (HTTP 429) oder weich warnen. Voraussetzung für Multi-User-Self-Host: ein einzelner User darf das Anthropic-Budget des Betreibers nicht leersaugen.
@@ -1613,6 +1706,94 @@ Ziel: 100+ Migrationen zu einem konsolidierten Initial-Schema kollabieren. Nach 
 
 ---
 
+## Phase 11 — Per-User-AI-Provider-Override
+
+Ziel: Admin weist pro User einen KI-Provider zu. Beispiel-Verteilung: User A + B auf `claude` (zahlende Kunden), User C auf `ollama` (Self-Service-Stufe), User D auf `llama` (Test). Globaler `ai.provider` aus Phase 4c bleibt Default für alle User ohne Override.
+
+**Abhängigkeit:** Phase 4a (`app_users`), Phase 4c (`app_settings` als Quelle der Provider-Credentials). Phase 4d (Cost-Tracking) wertet den Override pro User aus, damit Budget-Abrechnung den tatsächlich genutzten Provider trifft.
+
+### Modell
+
+Provider-**Wahl** ist pro User; Provider-**Credentials** bleiben global in `app_settings` (`ai.claude.api_key`, `ai.ollama.host`, …). Kein Per-User-API-Key — Admin schaltet Zugang zu vorhandenen Providern frei, verteilt aber keine getrennten Keys. Variante „eigene Keys pro User" ist Future-Work (würde `ai.<provider>.api_key` in `app_users` spiegeln müssen, mit Encryption-Roundtrip).
+
+### Migration N+11
+
+```sql
+ALTER TABLE app_users ADD COLUMN ai_provider_override TEXT
+  CHECK(ai_provider_override IN ('claude','ollama','llama') OR ai_provider_override IS NULL);
+```
+
+`NULL` = User folgt globalem `ai.provider`. Nicht-NULL = User-Override gewinnt. Keine eigene Tabelle nötig — 1:1-Beziehung, kein Verlauf, kein Sub-Feld.
+
+Bestand: alle Rows bleiben `NULL` → identisches Verhalten wie vor der Migration.
+
+### Auflösungs-Reihenfolge
+
+In [lib/ai.js](../lib/ai.js) `callAI(ctx, …)`:
+
+1. `ctx.userEmail` → `app_users.ai_provider_override`.
+2. Fallback: `app_settings.ai.provider`.
+3. Hardcoded Default (`'claude'`).
+
+`ctx.userEmail` muss bis in jeden `callAI`-Aufrufpfad durchgereicht werden. Worker-Pfad: `job.userEmail` ist in [routes/jobs/shared/queue.js](../routes/jobs/shared/queue.js) bereits im ALS-Context — als `userEmail` aus dem Context lesen, nicht durch jeden Funktionsparameter neu fädeln. SSE-Routes (Seiten-Chat) lesen `req.session.email`.
+
+**`MODEL_TOKEN`/`MODEL_CONTEXT`-Implikation:** Provider-Wechsel ändert Kontextfenster (Claude 200k, lokale Modelle 32k–128k). `INPUT_BUDGET_TOKENS`-Berechnung in [lib/ai.js](../lib/ai.js) muss **pro Call** vom resolvten Provider abhängen, nicht vom Boot-Default. Konsequenz: `SINGLE_PASS_LIMIT`/`PER_CHUNK_LIMIT` (heute Module-Konstanten in [routes/jobs/shared.js](../routes/jobs/shared.js)) werden pro Job-Run aus `aiClient.contextWindow` neu berechnet. Cache-Keys (`chapter_extract_cache`, `book_extract_cache`) bekommen `provider` als zusätzliches Feld — sonst liefert Claude-Cache an Ollama-User stale Chunks anderer Granularität zurück.
+
+### Admin-UI — Erweiterung `AdminUsersCard`
+
+- Spalte „Provider" in der User-Tabelle. Combobox: `(Global: claude)` | `claude` | `ollama` | `llama`. Auswahl `(Global)` setzt `ai_provider_override = NULL`.
+- `PUT /admin/users/:email` ([routes/admin-users.js](../routes/admin-users.js), aus Phase 4a) akzeptiert zusätzliches Feld `ai_provider_override` (Admin-only).
+- Anzeige des effektiven Providers für jeden User (resolved value), nicht nur des Overrides, damit Admin auf einen Blick sieht, „wer läuft auf was". Spalten-Format: `claude (Global)` für Default-Follower, `ollama (Override)` für Override-User.
+- Validierung: Combobox-Optionen werden serverseitig aus den **konfigurierten** Providern berechnet — wenn `ai.ollama.host` leer ist, wird `ollama` in der UI mit „nicht konfiguriert" disabled. Vermeidet Override auf einen Provider, der für keinen User funktionieren würde.
+
+### Self-Service — bewusst nein
+
+Kein User-sichtbares Self-Service-Override in [routes/usersettings.js](../routes/usersettings.js) / `userSettingsCard`. Grund: Cost-Verteilung gehört zum Admin-Kontrakt mit dem User („du bist auf Plan X"). Eigenmächtiges Hochstufen auf `claude` durch den User würde Phase 4d-Budgets unterlaufen. Admin behält Hoheit.
+
+`GET /me` liefert den resolvten Provider aber **read-only** mit (`{ … aiProvider: 'claude' }`), damit Frontend in der Statuszeile / Card-Footern korrekt anzeigen kann „Antwortet via Claude" — wichtig für User-Erwartung an Latenz.
+
+### Hot-Reload
+
+KI-Client-Instanzen werden bisher pro Server-Boot einmal aus `app_settings.ai.*` aufgebaut und auf `app-settings:changed`-Event rebuilt (Phase 4c). Mit Per-User-Override muss der Aufbau **pro Request/Job** den User berücksichtigen. Variante A: pro Provider ein Singleton (`claudeClient`, `ollamaClient`, `llamaClient`), `callAI` wählt nach resolvtem Provider. Variante B: pro Call ad-hoc bauen. **Variante A**, sonst kostet jede Klein-Inferenz Setup-Roundtrip.
+
+Singletons hängen weiterhin am `app-settings:changed`-Event und bauen sich auf Credential-Wechsel komplett neu. Per-User-Override-Wechsel triggert kein Rebuild — nur die Routing-Tabelle ändert sich, die Clients bleiben warm.
+
+### Mutex / VRAM-Schutz
+
+Ollama/Llama serialisieren heute global über einen Mutex (CLAUDE.md „KI-Provider" Tabelle). Bleibt: Mutex ist providerspezifisch, nicht userspezifisch. Wenn drei User auf `ollama` zugewiesen sind und alle gleichzeitig einen Job starten, läuft trotzdem nur einer — VRAM verträgt keine Parallelität. Admin muss die Verteilung wissen (UI-Hinweis im Provider-Tab: „Lokale Provider serialisieren Job-Pipeline").
+
+### Cost-Tracking (Phase 4d-Integration)
+
+[lib/cost-tracker.js](../lib/cost-tracker.js) aus Phase 4d liest Pricing pro Provider. Per-User-Override fliesst in die Kalkulation automatisch ein, weil `callAI` den resolvten Provider zurückgibt und `recordTokenUsage(provider, …)` das in `token_usage.provider` schreibt (existiert bereits oder muss in Phase 4d ergänzt werden — bei Phase-11-Implementierung gegen 4d-Schema prüfen). Admin-Dashboard zeigt Kosten pro User korrekt aufgeschlüsselt, ohne dass Phase 11 separates Reporting bauen muss.
+
+### i18n
+
+`admin.users.aiProvider`, `admin.users.aiProvider.global`, `admin.users.aiProvider.notConfigured`, `admin.users.aiProvider.effective` (`{provider} ({source})`-Pattern, `source` = `global|override`). Frontend-Statuszeile: `chat.providerHint` (`Antwortet via {provider}`).
+
+### Tests
+
+- **Unit:** `tests/unit/ai-resolve.test.mjs` — Auflösungs-Reihenfolge (Override > Global > Default), inkl. NULL-Fallback und ungültiger Override-Wert (CHECK fängt; defensiv testen, dass `callAI` bei manuell injizierten Bad-Daten nicht crasht, sondern auf Default zurückfällt).
+- **Unit:** `tests/unit/context-budget-per-provider.test.mjs` — `INPUT_BUDGET_TOKENS` skaliert mit Provider-Wechsel; Cache-Key enthält Provider.
+- **Integration:** `tests/integration/per-user-provider.test.js` — Drei Mock-User mit unterschiedlichen Overrides, Job-Run, Assert auf richtigen Mock-AI-Endpoint.
+- **E2E:** Smoke gegen `AdminUsersCard`-Combobox (Override setzen, `GET /me` als Ziel-User reflektiert Wechsel).
+
+### Risiko / Edge-Cases
+
+- **Override auf nicht-konfigurierten Provider:** Admin setzt `ollama` ohne `ai.ollama.host`. Erste Inferenz schlägt fehl, User sieht generischen Fehler. **Gegenmittel**: PUT-Route lehnt Override mit 400 ab, wenn Ziel-Provider keine Credentials in `app_settings` hat. UI-Combobox bereits disabled, aber API-Guard als zweite Schutzschicht.
+- **In-Flight-Jobs beim Override-Wechsel:** Admin ändert User-Override während ein Job läuft. Job hält den alten Client-Singleton via Closure → läuft mit altem Provider zu Ende. Akzeptabel (analog zur Phase-4c-`app-settings:changed`-Race).
+- **Buch-Owner ≠ Job-Starter (Phase 4b Sharing):** Lektor B startet Job auf Buch von Owner A. Welcher Provider zählt? **Antwort: Provider des Job-Starters** (Lektor B), nicht des Buch-Owners. Cost-Tracking läuft auf den User, der den Call ausgelöst hat — Phase 4d-Budget gehört zu B, nicht zu A.
+- **Cache-Vergiftung:** Cache-Keys ohne Provider würden Claude-Output an Ollama-User ausliefern (oder umgekehrt) — Schema wäre dasselbe, Stil-/Qualität nicht. `provider`-Spalte in den Caches (`chapter_extract_cache`, `book_extract_cache`, `chapter_review_cache`, `book_review_cache`, `chapter_macro_review_cache`, `synonym_cache`, `lektorat_cache`) **Pflicht** mit dieser Migration. Migration N+11 also nicht nur `ALTER TABLE app_users`, sondern auch `ALTER TABLE <cache> ADD COLUMN provider TEXT` für jede Cache-Tabelle, plus angepasste UNIQUE-Indexe.
+
+### Doku-Update
+
+- [docs/erd.md](erd.md) — `ai_provider_override`-Spalte in `app_users`-Block, Stand-Zeile bumpen, `provider`-Spalten in den Cache-Blöcken.
+- [docs/ai-providers.md](ai-providers.md) — Auflösungs-Reihenfolge, Pro-User-Override-Verhalten, Cache-Key-Erweiterung.
+- [CLAUDE.md](../CLAUDE.md) — KI-Provider-Block um Per-User-Override-Hinweis ergänzen (kurz, Verweis auf `ai-providers.md`).
+
+**Aufwand:** ~1.5–2 Tage. Risiko: niedrig–mittel — Cache-Key-Erweiterung ist die einzige Bestandsdaten-relevante Stelle (bestehende Cache-Einträge bekommen `provider = ai.provider`-Default im Backfill, Stand bleibt valide).
+
+---
+
 ## Risiken / offene Fragen
 
 - **Lektor-Apply-Range-Drift**: Lektorat-Findings haben Positionen im damaligen Body. Primärer Schutz ist der **Page-Lock** während der Lektorat-Session (siehe Phase 4b „Page-Lock während Lektorat-Session") — solange der Lektor die Findings-Card offen hat, lehnen Free-Edit-Routen mit `423 Locked` ab, also kann kein paralleler Editor-Save die Range-Positionen verschieben. Fallback bleibt der `updatedAt`-Staleness-Check (CLAUDE.md-Regel „Job-Ergebnisse mit `updatedAt`-Staleness-Check") für Edge-Cases: Lock abgelaufen (User 30 min weg), Owner-Override hat den Lock gebrochen, oder Edit kam vor dem Acquire. In dem Fall lehnt die Apply-Route mit 409 ab, wenn `pages.updated_at` vom Snapshot des Findings differiert.
@@ -1636,8 +1817,6 @@ Ziel: 100+ Migrationen zu einem konsolidierten Initial-Schema kollabieren. Nach 
 | Phase | Aufwand | Risiko |
 |---|---|---|
 | 0 | 0.5 Tag | niedrig |
-| 0c | 1 h | niedrig (PRAGMAs) |
-| 0d | 0.5 Tag | niedrig (TTL-DELETE) |
 | 1 | 4-6 Tage | mittel (Backend-Disjunktion, Test-Pflege gegen beide) |
 | 2 | 2-3 Tage | niedrig |
 | 3 | 2-3 Tage | niedrig |
@@ -1653,6 +1832,7 @@ Ziel: 100+ Migrationen zu einem konsolidierten Initial-Schema kollabieren. Nach 
 | 8 | 4-6 Tage | mittel-hoch (Bulk-Copy + FK-Repair + ID-Map + Round-Trip-Tests) |
 | 9 | 1-2 Tage | niedrig (Doku-Sweep) |
 | 10 | 1-2 Tage | mittel (Diff-Test gegen Bestand) |
+| 11 | 1.5-2 Tage | niedrig-mittel (Cache-Key-Migration, Per-Call-Provider-Resolve) |
 
 **Nett-Summe nach Tagen** ≈ 40-55 Vollzeit-Tage Coding. Realistische Wand-Zeit deutlich höher:
 
