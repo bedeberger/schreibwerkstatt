@@ -185,6 +185,12 @@ const PUBLIC_ASSETS = new Set([
   '/schreibwerkstatt_icon.ico',
   '/favicon.ico',
 ]);
+// Pre-auth-erlaubte Prefixes: landing.html + register.html ziehen /css/tokens.css
+// + /css/landing.css (+ deren @import-Sub-Tokens) und Variable-Fonts aus /fonts/.
+// Ohne diese Freigabe landen die Requests im Auth-Guard und werden als HTML
+// (`/login?returnTo=...`) zurückgegeben → Browser verweigert das Stylesheet wegen
+// falschem MIME-Type.
+const PUBLIC_ASSET_PREFIXES = ['/css/', '/fonts/'];
 // Statische Assets: `no-cache` für alles ausser Bildern. ETag bleibt aktiv —
 // Browser revalidiert bei jedem Reload mit If-None-Match (304 wenn unverändert,
 // nur Header-Roundtrip, keine Bytes). Bilder/Icons halten 7 Tage, weil sie sich
@@ -205,7 +211,10 @@ const staticServe = express.static(path.join(__dirname, 'public'), {
   },
 });
 app.use((req, res, next) => {
-  if (req.method === 'GET' && PUBLIC_ASSETS.has(req.path)) {
+  if (req.method === 'GET' && (
+    PUBLIC_ASSETS.has(req.path) ||
+    PUBLIC_ASSET_PREFIXES.some(p => req.path.startsWith(p))
+  )) {
     return staticServe(req, res, next);
   }
   next();
