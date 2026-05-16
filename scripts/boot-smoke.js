@@ -87,11 +87,11 @@ function waitForReady(child) {
     console.log('[boot-smoke] OK: /config → 401 JSON');
 
     const root = await get('/');
-    if (root.status !== 302) throw new Error(`/: erwarte 302 Redirect, bekam ${root.status}`);
-    if (!String(root.headers.location || '').startsWith('/login')) {
-      throw new Error(`/: erwarte Redirect nach /login, bekam ${root.headers.location}`);
+    if (root.status !== 200) throw new Error(`/: erwarte 200 Landing, bekam ${root.status}`);
+    if (!/href="\/login"/.test(root.body) || !/href="\/register"/.test(root.body)) {
+      throw new Error(`/: erwarte Landing-HTML mit /login und /register Links`);
     }
-    console.log('[boot-smoke] OK: / → 302 /login');
+    console.log('[boot-smoke] OK: / → 200 Landing');
 
     const jobs = await get('/jobs/status/nonexistent');
     if (jobs.status !== 401) throw new Error(`/jobs/*: erwarte 401, bekam ${jobs.status}`);
