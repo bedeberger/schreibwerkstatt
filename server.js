@@ -333,6 +333,7 @@ function shutdown(signal) {
   server.close(err => {
     clearTimeout(force);
     if (err) logger.error('server.close Fehler: ' + err.message);
+    try { db.pragma('optimize'); } catch {}
     try { db.close(); } catch {}
     logger.info('Graceful Shutdown abgeschlossen.');
     process.exit(err ? 1 : 0);
