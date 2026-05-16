@@ -6,6 +6,23 @@ Schrittweise Loslösung von BookStack als Storage/Auth/Editor-Backend. Eigene Pe
 
 ---
 
+## Vor-Phase — Repo-Indirektion (Architektur-Abstraktion ohne Storage-Swap)
+
+Ziel: Editor/Lektorat/Chat/History sprechen nur noch mit einer Domain-Repository-API (`contentRepo` Frontend, `content-store` Server). BookStack-URL-Form, BookStack-JSON-Shape und Token-Hantierung bleiben auf wenige Dateien begrenzt. Phase 1 (Read-Replica) tauscht dann nur Implementierungen, keine Call-Sites.
+
+**Status:**
+
+- [x] **Schritt 1 — Server: Normalisierte Endpunkte.** [lib/content-mapper.js](../lib/content-mapper.js) (mapBook/mapChapter/mapPage/mapPageMeta) + [routes/content.js](../routes/content.js) gemountet unter `/content`. Endpunkte: `GET /content/books`, `GET /content/books/:id`, `GET /content/books/:id/tree`, `GET /content/chapters/:id`, `GET /content/pages/:id`, `PUT /content/pages/:id` (mit `cleanPageHtml`), `POST /content/books` (upserted lokale books-Row). Intern weiter `bsGet`/`bsGetAll`/`bsPut`/`bsPost` aus [lib/bookstack.js](../lib/bookstack.js) — `bsPut` neu für symmetrischen Write-Chokepoint. Unit-Test: [tests/unit/content-mapper.test.mjs](../tests/unit/content-mapper.test.mjs).
+- [ ] **Schritt 2 — Frontend: Repository-Modul.** `public/js/repo/content.js` mit `listBooks/bookTree/loadPage/savePage/createBook`. SW-Cache-Namespace `/content/*` (kein Konflikt mit `/api/*`-Legacy-Cache).
+- [ ] **Schritt 3 — Call-Sites umstellen:** [public/js/tree.js](../public/js/tree.js) (3× `bsGetAll` → `bookTree`), [public/js/api-bookstack.js](../public/js/api-bookstack.js) (page-load/save), [public/js/editor/edit.js](../public/js/editor/edit.js), Chat-Apply, History-Restore, Lektorat-Apply. `routes/books.js` POST → ruft intern `contentRouter`-Logik bzw. Frontend → `POST /content/books`.
+- [ ] **Schritt 4 — Server-Loader-Abstraktion:** `lib/content-store.js` mit `loadPage/loadBook/savePage`; [routes/jobs/shared/loader.js](../routes/jobs/shared/loader.js) und [routes/content.js](../routes/content.js) konsumieren `content-store`, Token-Param verschwindet aus Job-Routen.
+- [ ] **Schritt 5 — Token-Leak schliessen:** `req.session.bookstackToken` nur noch in [lib/bookstack.js](../lib/bookstack.js) + `content-store.js`. [routes/books.js](../routes/books.js)/[routes/book-editor.js](../routes/book-editor.js)/[routes/export.js](../routes/export.js) lesen Token nicht mehr direkt.
+- [ ] **Schritt 6 — Tripwires:** Grep-Check in CI: `bsGet|bsPut|bsPost|bsGetAll` nur in `lib/bookstack.js`, `lib/content-store.js`, `lib/load-book-contents.js`, `routes/content.js` (Server) + `public/js/api-bookstack.js`, `public/js/repo/content.js` (Frontend). Sonst Fail.
+
+**Folge für Phase 1+:** Replica-Sync füllt lokale Tabellen; `content-store`-Implementierung bekommt einen `USE_LOCAL_READS`-Branch. Caller-Code in Editor/Lektorat/Chat ändert sich nicht.
+
+---
+
 ## Leitplanken
 
 ### Privacy-Boundary (kritisch)

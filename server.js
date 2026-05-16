@@ -28,6 +28,7 @@ const exportRouter = require('./routes/export');
 const pdfExportRouter = require('./routes/pdf-export');
 const usageRouter = require('./routes/usage');
 const { router: draftFiguresRouter } = require('./routes/draft-figures');
+const contentRouter = require('./routes/content');
 
 const PORT = process.env.PORT || 3737;
 const app = express();
@@ -184,7 +185,7 @@ app.use((req, res, next) => {
 
 // ── Auth-Guard ────────────────────────────────────────────────────────────────
 // API-Pfade → 401 JSON; HTML-Pfade → Redirect zu /auth/login
-const API_PREFIXES = ['/api/', '/history/', '/figures/', '/locations/', '/jobs/', '/sync/', '/chat/', '/booksettings/', '/books/', '/me/', '/config', '/claude', '/ollama', '/llama'];
+const API_PREFIXES = ['/api/', '/history/', '/figures/', '/locations/', '/jobs/', '/sync/', '/chat/', '/booksettings/', '/books/', '/content/', '/me/', '/config', '/claude', '/ollama', '/llama'];
 
 app.use((req, res, next) => {
   if (req.session?.user) return next();
@@ -245,6 +246,7 @@ app.use('/export', exportRouter);
 app.use('/pdf-export', pdfExportRouter);
 app.use('/usage', usageRouter);
 app.use('/draft-figures', draftFiguresRouter);
+app.use('/content', contentRouter);
 app.use('/book-editor', require('./routes/book-editor'));
 
 // Logout: usage-Tabelle behält Einträge (User-Wiederkehr → Top-3 sofort wieder da).
