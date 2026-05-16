@@ -55,7 +55,7 @@ Bewusst out-of-scope (User-Wunsch): Attachments (werden nicht genutzt → kein M
 
 | # | Phase | Reversibel? | User-Impact | Abhängigkeiten |
 |---|---|---|---|---|
-| 0b | Initial Backfill (BookStack → DB) | ja | keiner | — |
+| 0b | Backfill: Frontend-Trigger (Backend steht) | ja | manueller „BookStack-synchronisieren"-Button + Login-Auto-Backfill + Lazy-Backfill | — |
 | 1 | `localdb`-Backend implementieren (Content-Store-Variante) | ja (Flag) | keiner solange `app.backend='bookstack'` | 0b |
 | 2 | Eigene Page-Revisions | ja | feinere History (beide Backends) | 0 |
 | 3 | Eigene Sortierung | ja | `localdb`-only nativ; `bookstack` weiter via BS-`priority` | 0, 1 |
@@ -82,6 +82,7 @@ Bewusst out-of-scope (User-Wunsch): Attachments (werden nicht genutzt → kein M
 - Phase 0c (PRAGMA-Tuning, [db/connection.js](../db/connection.js) + `PRAGMA optimize` im SIGTERM-Handler von [server.js](../server.js)).
 - Phase 0d (TTL-Cache-Cleanup, [lib/cache-cleanup.js](../lib/cache-cleanup.js) im 23:00-Cron-Tick, manuell via `npm run cache:cleanup [-- --vacuum]`).
 - Phase 0 (Schema-Skelett, Migration 105 + 106 in [db/migrations.js](../db/migrations.js): additive Phase-0-Spalten auf pages/chapters/books + AUTOINCREMENT-Recreate mit `sqlite_sequence`-Wasserzeichen `≥ 1_000_000`). Dauerhafte Invariante steht oben in „Schema-Invariante (aus Phase 0)". Tests: `tests/unit/db-pragmas.test.js`, `tests/unit/cache-cleanup.test.js`, `tests/unit/schema-phase0.test.js`.
+- Phase 0b Backend (Backfill-Job in [routes/jobs/backfill.js](../routes/jobs/backfill.js), Upserts in [db/backfill.js](../db/backfill.js), Mock-BookStack `book_id]?=`-Filter-Fix, 5 Integration-Tests in [tests/integration/backfill.test.js](../tests/integration/backfill.test.js)). Frontend-Trigger-Punkte siehe Phase-0b-Block unten.
 4a/4c/4b zuerst, weil User-Identität, `app.backend`-Schalter und ACL die SSoT für alle folgenden Phasen sind. Lese-Modus (4b1, Print-CSS + readOnly) direkt nach 4b, weil viewer-Rolle erst dann existiert. Phase 7 (Suche) **vor** Phase 8, damit FTS schon steht, wenn Admin Backend wechselt — Index wird beim Bulk-Copy mitgefüllt.
 
 4d (Token-Budget + Cost) folgt 4a (braucht `app_users.global_role='admin'`). Vor 4b einsortiert, weil Kostenkontrolle vor Sharing-Welle (mehr Co-Editoren = mehr KI-Calls) bestehen muss; rein additiv (neue Spalten/Tabelle/Routen, kein Refactor) und kann bei Bedarf vorgezogen werden.
@@ -114,48 +115,16 @@ Phase-0-Spalten im aktuellen Schema:
 
 ---
 
-## Phase 0b — Initial Backfill (Bulk-Copy BookStack → DB)
+## Phase 0b — Backfill: Frontend-Trigger (offen)
 
-Ziel: Vollabzug aller BookStack-Bücher/Kapitel/Seiten in lokale Tabellen (Phase-0-Schema steht bereits, siehe „Schema-Invariante"), **pro User mit dessen eigenem Session-Token**. Phase 1 (Sync-Worker) übernimmt danach inkrementelle Updates; ohne Backfill liesse Phase 1 die DB für einen Neu-User leer.
+Backend-Backfill steht: Job-Typ `'backfill'` in [routes/jobs/backfill.js](../routes/jobs/backfill.js) (`runBackfillJob` + `POST /jobs/backfill`), Upsert-Helpers in [db/backfill.js](../db/backfill.js), Idempotenz + FK-Reihenfolge (books → chapters → pages) + `foreign_key_check` getestet in [tests/integration/backfill.test.js](../tests/integration/backfill.test.js). Dedup auf User-Ebene; Body `{ bookId }` schraenkt auf Einzelbuch ein; `owner_email` wird nur beim Erst-Backfill gesetzt (Erst-Backfiller „erbt" das Buch; Phase 4b regelt spaeter Sharing).
 
-**Per-User-Backfill** — kein Admin-Token, kein globaler Run. Jeder User backfilled mit seinem eigenen Session-`bookstackToken` exakt jene Bücher, die BookStack ihm zeigt. Konsistent mit Privacy-Boundary (Phase 4b): Buch-Sichtbarkeit bleibt durch BookStack-Permissions definiert, kein Admin-Bypass.
+**Offen — drei Trigger-Punkte:**
+- **Manuell** in „Buch-Einstellungen" oder „User-Einstellungen": Button „BookStack synchronisieren" → `POST /jobs/backfill` (optional `{ bookId }` aus Buch-Settings-Kontext). Reicht fuer initialen Roll-Out.
+- **Auto bei erstem Login pro User** (optional): wenn `pages.body_html` fuer keines der User-sichtbaren Buecher gefuellt ist, Backfill-Job starten und Toast anzeigen. Verhindert „leerer Editor"-Effekt nach Deploy von Phase 1.
+- **Pro Buch on-demand:** beim ersten Page-Open eines Buchs ohne lokale Bodies → Lazy-Backfill `POST /jobs/backfill { bookId }`.
 
-**Endpoint** `POST /sync/backfill` (neu, in [routes/sync.js](../routes/sync.js)):
-
-- Auth via Session-Guard, User-Email + Token aus `req.session`.
-- Iteriert `bsGetAll('/api/books')` mit User-Token → pro Buch:
-  - `upsertBook({ book_id, name, description, owner_email = req.session.email, created_at })` ([db/schema.js](../db/schema.js)) — `owner_email` nur setzen, wenn leer (erster User „erbt" das Buch; spätere Sharing-Regelung kommt mit Phase 4b).
-  - `bsGetAll('/api/books/:id/chapters')` → `upsertChapter({ chapter_id, book_id, chapter_name, position, priority, slug, description })`.
-  - `bsGetAll('/api/books/:id/pages')` für Metadaten + Hierarchie. Body pro Seite via `bsGet('/api/pages/:id')` (Detail-Endpoint liefert `html` + `markdown`).
-  - `upsertPage({ page_id, book_id, chapter_id, page_name, body_html, body_markdown, position, priority, slug, remote_updated_at })`. `local_updated_at = remote_updated_at`, `dirty = 0`.
-- Optional Body `{ bookId }` für Einzel-Buch-Backfill (Smoke-Test, partielle Recovery, gezielter Restore).
-- Idempotent: alle Upserts `INSERT … ON CONFLICT DO UPDATE`. Re-Run aktualisiert bestehende Rows, fügt fehlende hinzu.
-- Logging via Winston mit `setContext({ book })` pro Buch-Iteration: `[backfill|user@mail|42] chapters=8 pages=120`.
-- Job-Queue: lange Laufzeit → als `'backfill'`-Job-Typ in [routes/jobs/](../routes/jobs/) implementieren (Standard-Pattern: `runBackfillJob` + Status-Polling), nicht synchron im Request.
-
-**Trigger-Punkte:**
-- **Manuell** über Karte „Buch-Einstellungen" oder „User-Einstellungen": Button „BookStack synchronisieren". Reicht für initialen Roll-Out.
-- **Auto bei erstem Login pro User** (optional): wenn `pages.body_html` für keines der User-sichtbaren Bücher gefüllt ist, Backfill-Job starten und Toast anzeigen. Verhindert „leerer Editor"-Effekt nach Deploy von Phase 1.
-- **Pro Buch on-demand:** beim ersten Page-Open eines Buchs ohne lokale Bodies → Lazy-Backfill nur für dieses Buch.
-
-**`upsertPage`/`upsertChapter`** neue Helfer in [db/pages.js](../db/pages.js) bzw. [db/schema.js](../db/schema.js). Beide nehmen das vom BookStack-Mapper gelieferte Shape, kein Snapshot-Smell (`page_name`/`chapter_name` sind weiterhin Sync-Caches der BookStack-Wahrheit, nicht Denormalisierung).
-
-**ID-Invariante (kritisch für FK-Integrität):** BookStack-IDs werden **1:1 als lokale Primary Keys** übernommen — `pages.page_id`, `chapters.chapter_id`, `books.book_id` (alle bereits `INTEGER PRIMARY KEY` **ohne** `AUTOINCREMENT`, siehe [db/migrations.js](../db/migrations.js)). Kein Remapping, keine separate `local_id`/`remote_id`-Spalte, keine Surrogate-IDs.
-
-- Upserts setzen die ID **explizit** aus dem BookStack-Response (`INSERT INTO pages (page_id, …) VALUES (?, …) ON CONFLICT(page_id) DO UPDATE …`).
-- `figures.book_id`, `page_stats.page_id`, `chapter_reviews.chapter_id`, `figure_events.page_id`, `figure_scenes.chapter_id`, `locations.erste_erwaehnung_page_id`, `continuity_issue_chapters.chapter_id`, `ideen.page_id`, `lektorat_cache.page_id`, `page_revisions.page_id`/`book_id`, `chat_sessions.page_id`, `chapter_extract_cache.chapter_id` etc. — alle ~40 FK-Spalten in [docs/erd.md](erd.md) — referenzieren weiter dieselben BookStack-IDs. Nichts muss umgeschrieben werden.
-- Backfill-Reihenfolge erzwingt FK-Validität: **erst** `books`, **dann** `chapters` (FK → books), **dann** `pages` (FK → books, optional → chapters). Innerhalb eines Buchs in einer Transaktion, damit `foreign_key_check` am Ende grün ist.
-- Phase 8 (Kill BookStack) ändert daran nichts: dieselben Integer-IDs bleiben PKs, sind dann aber app-vergeben statt BookStack-vergeben (z.B. via `INTEGER PRIMARY KEY AUTOINCREMENT` ab Phase 8 für neu erstellte Rows). Existierende Rows behalten ihre BookStack-IDs für immer → alle historischen FKs (Reviews, Caches, Findings, Revisions, Lektorat-Time, etc.) bleiben gültig.
-- `figure_id`, `location_id`, `scene_id` etc. sind app-interne Surrogate (kein BookStack-Pendant) — unverändert, kein Konflikt.
-- Test-Pflicht: Backfill-Unit-Test validiert nach jedem Buch `db.pragma('foreign_key_check')` → muss leer sein. Sonst Abbruch + Rollback.
-
-**Sequenz:** Phase-0-Migrationen (105 + 106) sind bereits live. Backfill stösst jeder User für sich an — nach Login einmalig oder via Sync-Button. Phase 1 (Sync-Worker) übernimmt dann inkrementell.
-
-**Idempotenz-Garantie:** Endpoint darf jederzeit re-getriggert werden — z.B. wenn neue Bücher in BookStack auftauchen oder lokale Bodies nach Schema-Bumps neu gefüllt werden müssen. Phase 1 macht denselben Diff-Check (`updated_at`); Backfill ist „kalter Sync-Worker-Lauf für genau einen User".
-
-**Wichtig — keine fremden Bücher mirrorbar:** Was User A backfilled, ist exakt das, was BookStack User A zeigt. User B sieht im Backfill seine eigene Buch-Auswahl. In `books` landen ggf. dieselben `book_id`s aus mehreren User-Backfills (idempotenter Upsert), aber Sichtbarkeit regelt sich später über `book_access` (Phase 4b) — bis dahin spiegelt `owner_email` den Erst-Backfiller.
-
-**Tests:** Unit-Test mit Mock-BookStack-Client (Books-Liste → Chapter-Liste → Page-Detail) gegen In-Memory-DB. Verifiziert: Re-Run ist idempotent, FK-Constraints halten, `body_html` landet pro Seite, `remote_updated_at` gesetzt, zwei User-Backfills mit überlappenden Büchern erzeugen keine Duplikate.
+Phase 1 (Sync-Worker) uebernimmt nach Erst-Backfill inkrementelle Updates per `updated_at`-Diff. Re-Run bleibt idempotent (Cron-tauglich).
 
 ---
 
@@ -1771,6 +1740,7 @@ Ollama/Llama serialisieren heute global über einen Mutex (CLAUDE.md „KI-Provi
 
 | Phase | Aufwand | Risiko |
 |---|---|---|
+| 0b | 0.5-1 Tag | niedrig (3 Frontend-Trigger an das Backend anbinden, kein neuer Code) |
 | 1 | 4-6 Tage | mittel (Backend-Disjunktion, Test-Pflege gegen beide) |
 | 2 | 2-3 Tage | niedrig |
 | 3 | 2-3 Tage | niedrig |

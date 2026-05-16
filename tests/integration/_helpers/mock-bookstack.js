@@ -71,6 +71,31 @@ function _matchListPath(path, key) {
 
 async function bsGet(reqPath, _token) {
   callCounts.bsGet++;
+
+  const mBook = reqPath.match(/^books\/(\d+)$/);
+  if (mBook) {
+    const id = parseInt(mBook[1]);
+    const book = state.books.find(b => b.id === id);
+    if (!book) {
+      const err = new Error('not found');
+      err.status = 404;
+      throw err;
+    }
+    return { ...book };
+  }
+
+  const mChapter = reqPath.match(/^chapters\/(\d+)$/);
+  if (mChapter) {
+    const id = parseInt(mChapter[1]);
+    const chapter = state.chapters.find(c => c.id === id);
+    if (!chapter) {
+      const err = new Error('not found');
+      err.status = 404;
+      throw err;
+    }
+    return { ...chapter };
+  }
+
   const m = reqPath.match(/^pages\/(\d+)$/);
   if (m) {
     const id = parseInt(m[1]);
@@ -97,12 +122,14 @@ async function bsGet(reqPath, _token) {
 async function bsGetAll(reqPath, _token) {
   callCounts.bsGetAll++;
   if (_matchListPath(reqPath, 'chapters') || reqPath.startsWith('chapters?')) {
-    const bookFilter = reqPath.match(/book_id=(\d+)/);
+    // content-store baut `filter[book_id]=${id}` — die `]` vor `=` muss mit.
+    const bookFilter = reqPath.match(/book_id\]?=(\d+)/);
     const bid = bookFilter ? parseInt(bookFilter[1]) : null;
     return bid ? state.chapters.filter(c => c.book_id === bid) : state.chapters;
   }
   if (_matchListPath(reqPath, 'pages') || reqPath.startsWith('pages?')) {
-    const bookFilter = reqPath.match(/book_id=(\d+)/);
+    // content-store baut `filter[book_id]=${id}` — die `]` vor `=` muss mit.
+    const bookFilter = reqPath.match(/book_id\]?=(\d+)/);
     const bid = bookFilter ? parseInt(bookFilter[1]) : null;
     return bid ? state.pages.filter(p => p.book_id === bid) : state.pages;
   }
