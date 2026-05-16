@@ -53,6 +53,7 @@ import { registerEditorToolbarCard } from './cards/editor-toolbar-card.js';
 import { registerEditorFocusCard } from './cards/editor-focus-card.js';
 import { registerLektoratFindingsCard } from './cards/lektorat-findings-card.js';
 import { registerPageHistoryCard } from './cards/page-history-card.js';
+import { registerPageRevisionsCard } from './cards/page-revisions-card.js';
 import { registerPaletteCard } from './cards/palette-card.js';
 import { shortcutsMethods } from './shortcuts.js';
 import { featuresUsageMethods } from './features-usage.js';
@@ -237,6 +238,7 @@ document.addEventListener('alpine:init', () => {
   registerEditorFocusCard();
   registerLektoratFindingsCard();
   registerPageHistoryCard();
+  registerPageRevisionsCard();
   registerPaletteCard();
 
   // combobox(placeholder, emptyLabel) — Legacy-Positional-Form.

@@ -1,0 +1,31 @@
+<!-- Phase 2 (BookStack-Exit): App-eigene Revisionsliste pro Seite.
+     Container in editor.html hat display:contents, damit dieser Wrapper
+     direkt Geschwister im Editor-Layout bleibt. Collapsible via
+     .collapsible-toggle + .history-chevron (DESIGN.md). -->
+<div x-data="pageRevisionsCard"
+     x-show="$app.currentPage && revisions.length > 0"
+     class="history-bar page-revisions-bar">
+  <button type="button"
+          class="collapsible-toggle"
+          @click="open = !open"
+          :aria-expanded="open">
+    <span x-text="$app.t('editor.revisions.count', { n: revisions.length })"></span>
+    <span class="history-chevron" :class="{ open }" aria-hidden="true">›</span>
+  </button>
+  <div x-show="open" x-cloak class="page-revisions-list">
+    <template x-for="rev in revisions" :key="rev.id">
+      <div class="history-item">
+        <span class="history-date" x-text="$app.formatDate(rev.created_at)"></span>
+        <span class="badge badge-ok" x-text="sourceLabel(rev.source)"></span>
+        <span class="tag" x-show="rev.user_email" x-text="rev.user_email"></span>
+        <span class="tag" x-text="formatChars(rev.chars) + ' ' + $app.t('editor.revisions.chars')"></span>
+        <button type="button"
+                class="btn-toggle-saved btn-toggle-saved--off"
+                @click="restore(rev)"
+                :disabled="restoringId === rev.id"
+                :data-tip="$app.t('editor.revisions.restoreTitle')"
+                x-text="restoringId === rev.id ? $app.t('editor.revisions.restoring') : $app.t('editor.revisions.restore')"></button>
+      </div>
+    </template>
+  </div>
+</div>

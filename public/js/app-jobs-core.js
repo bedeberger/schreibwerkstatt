@@ -485,7 +485,7 @@ export const appJobsCoreMethods = {
           this.showKomplettStatus = true;
           this._startKomplettPoll(jobId, bookId);
         }
-      } catch (e) { console.error('[checkPendingJobs komplett-active]', e); }
+      } catch { /* ignore — kein aktiver Komplett-Job oder offline */ }
     }
   },
 };
