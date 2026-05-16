@@ -88,10 +88,10 @@ function waitForReady(child) {
 
     const root = await get('/');
     if (root.status !== 302) throw new Error(`/: erwarte 302 Redirect, bekam ${root.status}`);
-    if (!String(root.headers.location || '').startsWith('/auth/login')) {
-      throw new Error(`/: erwarte Redirect nach /auth/login, bekam ${root.headers.location}`);
+    if (!String(root.headers.location || '').startsWith('/login')) {
+      throw new Error(`/: erwarte Redirect nach /login, bekam ${root.headers.location}`);
     }
-    console.log('[boot-smoke] OK: / → 302 /auth/login');
+    console.log('[boot-smoke] OK: / → 302 /login');
 
     const jobs = await get('/jobs/status/nonexistent');
     if (jobs.status !== 401) throw new Error(`/jobs/*: erwarte 401, bekam ${jobs.status}`);
