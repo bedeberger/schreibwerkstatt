@@ -186,6 +186,10 @@
   border-radius: var(--radius-md);
 }
 
+.admin-usage-h3--spaced {
+  margin-top: var(--space-md);
+}
+
 @media (max-width: 720px) {
   .admin-usage-table th:nth-child(5),
   .admin-usage-table td:nth-child(5),

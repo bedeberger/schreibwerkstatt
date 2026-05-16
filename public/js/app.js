@@ -266,7 +266,9 @@ document.addEventListener('alpine:init', () => {
     openUp: false,
 
     get placeholder() {
-      return this._placeholder ?? window.__app?.t?.('common.choose') ?? 'Auswählen…';
+      const p = this._placeholder;
+      if (typeof p === 'function') return p() ?? window.__app?.t?.('common.choose') ?? 'Auswählen…';
+      return p ?? window.__app?.t?.('common.choose') ?? 'Auswählen…';
     },
     get emptyLabel() {
       return this._emptyLabel;

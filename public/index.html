@@ -145,7 +145,7 @@
 <div class="card card--book-selector" x-show="showBookCard" x-cloak>
   <label x-text="t('book.label')"></label>
   <div class="row book-selector-row">
-    <div x-data="combobox({ placeholder: t('book.chooseBook'), compact: false, footer: { label: () => t('book.create.action'), action: () => openCreateBook() } })"
+    <div x-data="combobox({ placeholder: () => t('book.chooseBook'), compact: false, footer: { label: () => t('book.create.action'), action: () => openCreateBook() } })"
          x-modelable="value" x-model="selectedBookId"
          x-effect="options = books.map(b => ({value: String(b.id), label: b.name}))"
          @combobox-change="resetView();"></div>
