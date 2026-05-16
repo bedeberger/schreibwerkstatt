@@ -16,7 +16,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 
 // Vor require auf eigene Temp-DB zeigen, sonst öffnet db/connection.js die
-// Produktions-DB (oder die Default-./lektorat.db im Repo-Root).
+// Produktions-DB (oder die Default-./schreibwerkstatt.db im Repo-Root).
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fk-smoke-'));
 const dbFile = path.join(tmpDir, `fresh-${process.pid}-${Date.now()}.db`);
 process.env.DB_PATH = dbFile;

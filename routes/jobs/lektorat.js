@@ -111,7 +111,7 @@ async function runCheckJob(jobId, pageId, bookId, userEmail, userToken) {
   const logger = makeJobLogger(jobId);
   const prompts = await getPrompts();
   const { buildLektoratPrompt, SCHEMA_LEKTORAT, PROMPTS_VERSION } = prompts;
-  const { SYSTEM_LEKTORAT, STOPWORDS: lektoratStopwords, ERKLAERUNG_RULE: lektoratErklaerungRule, KORREKTUR_REGELN: lektoratKorrekturRegeln } = await getBookPrompts(bookId, userEmail);
+  const { SYSTEM_LEKTORAT_BLOCKS: SYSTEM_LEKTORAT, STOPWORDS: lektoratStopwords, ERKLAERUNG_RULE: lektoratErklaerungRule, KORREKTUR_REGELN: lektoratKorrekturRegeln } = await getBookPrompts(bookId, userEmail);
   const locale = bookId ? getBookLocale(bookId, userEmail) : 'de-CH';
   const bookSettings = bookId ? getBookSettings(bookId, userEmail) : null;
   const cacheVersion = `${_modelName(process.env.API_PROVIDER || 'claude')}:${PROMPTS_VERSION || ''}`;
@@ -234,7 +234,7 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
   const prompts = await getPrompts();
   const { buildBatchLektoratPrompt, SCHEMA_LEKTORAT, PROMPTS_VERSION } = prompts;
   const cacheVersion = `${_modelName(process.env.API_PROVIDER || 'claude')}:${PROMPTS_VERSION || ''}`;
-  const { SYSTEM_LEKTORAT, STOPWORDS: batchStopwords, ERKLAERUNG_RULE: batchErklaerungRule, KORREKTUR_REGELN: batchKorrekturRegeln } = await getBookPrompts(bookId, userEmail);
+  const { SYSTEM_LEKTORAT_BLOCKS: SYSTEM_LEKTORAT, STOPWORDS: batchStopwords, ERKLAERUNG_RULE: batchErklaerungRule, KORREKTUR_REGELN: batchKorrekturRegeln } = await getBookPrompts(bookId, userEmail);
   const locale = getBookLocale(bookId, userEmail);
   const langCode = (locale || 'de-CH').split('-')[0];
   const bookSettings = getBookSettings(bookId, userEmail);

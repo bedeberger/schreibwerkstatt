@@ -152,8 +152,8 @@ const PUBLIC_ASSETS = new Set([
   '/sw.js',
   '/icon-192.png',
   '/icon-512.png',
-  '/bookstack_lektorat_icon.svg',
-  '/bookstack_lektorat_icon.ico',
+  '/schreibwerkstatt_icon.svg',
+  '/schreibwerkstatt_icon.ico',
   '/favicon.ico',
 ]);
 // Statische Assets: `no-cache` für alles ausser Bildern. ETag bleibt aktiv —

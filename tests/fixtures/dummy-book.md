@@ -1,4 +1,4 @@
-# Dummy-Buch für bookstack-lektorat
+# Dummy-Buch für schreibwerkstatt
 
 **Titel:** Der Nebel über Luzern
 **Genre / Buchtyp:** Krimi / Thriller

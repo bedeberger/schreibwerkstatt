@@ -49,7 +49,7 @@ async function runReviewJob(jobId, bookId, bookName, userEmail, userToken) {
   const logger = makeJobLogger(jobId);
   const prompts = await getPrompts();
   const { buildBookReviewSinglePassPrompt, buildChapterAnalysisPrompt, buildBookReviewMultiPassPrompt, SCHEMA_REVIEW, SCHEMA_CHAPTER_ANALYSIS, getBuchtypReviewSchwerpunkt, PROMPTS_VERSION } = prompts;
-  const { SYSTEM_BUCHBEWERTUNG, SYSTEM_KAPITELANALYSE } = await getBookPrompts(bookId, userEmail);
+  const { SYSTEM_BUCHBEWERTUNG_BLOCKS: SYSTEM_BUCHBEWERTUNG, SYSTEM_KAPITELANALYSE_BLOCKS: SYSTEM_KAPITELANALYSE } = await getBookPrompts(bookId, userEmail);
   const bookSettings = getBookSettings(bookId, userEmail);
   const narrative = narrativeLabels(bookSettings);
   // Genre-Schwerpunkt aus prompt-config.json laden und in Buchreview-Prompts

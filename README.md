@@ -1,4 +1,4 @@
-# bookstack-lektorat
+# schreibwerkstatt
 
 Schreiben, Lektorat und Buchanalyse mit KI — auf Basis von [BookStack](https://www.bookstackapp.com/). Eigenständiger Node.js-Service, der sich per BookStack-API anbindet.
 
@@ -41,15 +41,15 @@ Schreiben, Lektorat und Buchanalyse mit KI — auf Basis von [BookStack](https:/
 Node.js v20+:
 
 ```bash
-git clone https://github.com/<user>/bookstack-lektorat.git
-cd bookstack-lektorat
+git clone https://github.com/<user>/schreibwerkstatt.git
+cd schreibwerkstatt
 cp .env.example .env
 # Pflichtfelder setzen, alle Variablen sind in .env.example dokumentiert
 npm ci --omit=dev
 node server.js    # Port 3737
 ```
 
-Produktiv: systemd-Service via [deploy/lektorat.service](deploy/lektorat.service) (User/WorkingDirectory anpassen, dann `systemctl enable --now lektorat`). Erst-Install: `bash deploy/install.sh`. CD via [deploy/deploy.sh](deploy/deploy.sh).
+Produktiv: systemd-Service via [deploy/schreibwerkstatt.service](deploy/schreibwerkstatt.service) (User/WorkingDirectory anpassen, dann `systemctl enable --now schreibwerkstatt`). Erst-Install: `bash deploy/install.sh`. CD via [deploy/deploy.sh](deploy/deploy.sh).
 
 ### Reverse-Proxy
 

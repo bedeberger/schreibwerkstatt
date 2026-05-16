@@ -1,4 +1,4 @@
-# bookstack-lektorat
+# schreibwerkstatt
 
 Schreiben, Lektorat und Buchanalyse mit KI. Auf BookStack-Basis (bewusste Abhängigkeit — Storage, Auth, Editor). Deployment (LXC + systemd) und Env-Variablen: siehe [README.md](README.md).
 
@@ -18,6 +18,7 @@ Themen-Spickzettel ausgelagert (Drift-Schutz: CLAUDE.md-Regeln, Details in den S
 - [docs/focus-editor.md](docs/focus-editor.md) — Focus-Editor: State-Machine, Submodule (`focus/`), Trampoline-Pattern, Granularitäten, Recenter-Pipeline, Auto-`<p>`-Slot, Snapshot, Pflicht-Invarianten.
 - [docs/state-modell.md](docs/state-modell.md) — Frontend-State-Modell: 3 Ebenen (Root/Sub/Store), 14 Slices, Lifecycle, `setupCardLifecycle`, Event-Bus, Editor-Modi (4 Flags, Invarianten, erlaubte Kombinationen).
 - [docs/finetuning.md](docs/finetuning.md), [docs/wordpress-import.md](docs/wordpress-import.md), [docs/bookstack-templates.md](docs/bookstack-templates.md) — Spezialthemen.
+- [docs/bookstack-exit.md](docs/bookstack-exit.md) — **Migrationsplan** (Ausnahme zur Stand-only-Regel): Schritte zur Loslösung von BookStack — eigene Persistenz, User-Verwaltung mit Privacy-Boundary „Admin sieht keine Bücher", ACL/Sharing, Tags, Editor-Ersatz. Wird beim Abhaken gestrichen.
 
 ## Doku-Stil dieser Datei
 
@@ -34,7 +35,7 @@ CLAUDE.md beschreibt **ausschliesslich den aktuellen Stand**. Keine Historie, ke
   - **Gilt auch serverseitig:** `updateJob`/`failJob`-`statusText` immer als i18n-Key setzen (z.B. `'job.phase.aiReply'`), dynamische Werte als `statusParams`-Objekt. Job-Labels via `{ key, params }` an `createJob`. Fehler-Messages, die der User sieht, ebenfalls als Key.
   - **Automatisch übersetzen, ungefragt:** jeder neue User-sichtbare String wird beim Hinzufügen sofort in beide Locale-Dateien eingetragen — egal ob Frontend-Label, Server-Status, Fehlertext, Placeholder oder Tooltip. Nie nur DE (oder nur EN) committen und auf „mach ich später" verschieben.
   - **Persistierte User-Nachrichten (z.B. Chat-Fallbacks in DB):** als `__i18n:bereich.feld__`-Marker speichern; Frontend löst beim Rendern via `t()` auf. So bleibt die Locale-Wahl des späteren Betrachters massgeblich.
-  - **Ausnahme:** Winston-Logs (`logger.info/warn/error`) bleiben vorläufig deutsch — sie gehen nur in `lektorat.log`/Console, nicht an den User.
+  - **Ausnahme:** Winston-Logs (`logger.info/warn/error`) bleiben vorläufig deutsch — sie gehen nur in `schreibwerkstatt.log`/Console, nicht an den User.
 - **`bsGetAll` statt `bsGet` für Listen** — BookStack paginiert (Standard 20 Einträge). `bsGetAll` iteriert alle Seiten automatisch.
 - **HTML→Text-Normalisierung für Stats: Frontend MUSS Server matchen** — `page_stats.chars`/`words`/`tok` werden auf zwei Pfaden befüllt: a) Server-Sync ([routes/sync.js](routes/sync.js)#htmlToText: Tags zu Single-Space, `\s+` collapsed, getrimmt) und b) Frontend nach Page-Save ([tree.js](public/js/tree.js)#`_syncPageStatsAfterSave`). Beide Pfade MÜSSEN dieselbe Normalisierung verwenden. `DOMParser().body.textContent` behält Whitespace zwischen Block-Tags und bläst `tokEsts.chars` gegenüber dem Cron-Snapshot auf — Frontend-Save-Pfad nutzt deshalb dieselben zwei Regex-Replacements wie Server. `tok = Math.round(chars / CHARS_PER_TOKEN)` (Text-Tokens, gleiche Quelle wie chars; kein Prompt-Overhead). Beide Pfade müssen die Formel synchron halten. `/history/page-stats/batch` persistiert blind, kein Server-Recompute. Test: [tests/unit/page-stats-normalization.test.mjs](tests/unit/page-stats-normalization.test.mjs).
 - **Read-Modify-Write nur mit `bsGet(..., { fresh: true })`** — jeder Pfad, der eine BookStack-Seite liest, modifiziert und mit `bsPut` zurückschreibt (Lektorat-Save, Chat-Vorschlag-Apply, History-Apply, Pre-Send-Refresh des Seiten-Chats), MUSS den Read mit `fresh: true` machen. Sonst liefert der SW-API_CACHE (SWR) eine Pre-Edit-Fassung; der nachfolgende PUT überschreibt frische Server-Edits aus dem Fokus-Editor mit Stale-Daten. `_bsWrite` postet nach jedem erfolgreichen Schreibvorgang `invalidate-api` an den SW als zweite Schutzschicht; `fresh: true` bleibt trotzdem Pflicht pro RMW-Pfad. Test: [tests/unit/stale-write.test.mjs](tests/unit/stale-write.test.mjs).
@@ -368,7 +369,7 @@ Ziel: Buch im Modell **internalisieren** (Stil, Welt, Figuren, Fakten, Plot). Da
 
 ## Logging
 
-Winston (`logger.js`): Level `info`, Ausgabe in `lektorat.log` (5 MB, 3 Dateien rotiert) + Console. Jobs nutzen Child-Logger mit Kontext: `logger.child({ job, user, book })` → Format: `[INFO][lektorat|user@mail.com|42] Nachricht`.
+Winston (`logger.js`): Level `info`, Ausgabe in `schreibwerkstatt.log` (5 MB, 3 Dateien rotiert) + Console. Jobs nutzen Child-Logger mit Kontext: `logger.child({ job, user, book })` → Format: `[INFO][lektorat|user@mail.com|42] Nachricht` (das `lektorat` im Beispiel ist der Job-Typ, nicht die App).
 
 ## Projektstruktur
 

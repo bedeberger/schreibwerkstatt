@@ -45,6 +45,23 @@ function buildSystemNoJson(prefix, rules) {
   return `${prefix}\n\n${rules}`;
 }
 
+// Splittet einen stabilen System-Prompt + buchspezifischen Kontext in zwei
+// Cache-Blöcke für Anthropic. Der stabile Block bekommt 1h-TTL → trifft auch
+// nach Buchwechsel oder langer Session den Cache; der buchspezifische Teil
+// bleibt ephemeral (5min-Default). Ohne bookContextStr fällt das auf einen
+// einzelnen String zurück (Standard-Cache).
+//
+// Konsumiert von Job-Sites via SYSTEM_*_BLOCKS. Lokale Provider (Ollama/Llama)
+// erhalten das Array unverändert; callAIChat (lib/ai.js) flattet es vor dem
+// Versand zu einem einzelnen String.
+function _toCacheBlocks(stableSysString, bookContextStr) {
+  if (!bookContextStr) return stableSysString;
+  return [
+    { text: stableSysString, ttl: '1h' },
+    { text: bookContextStr },
+  ];
+}
+
 // Schlanker System-Prompt für die Synonym-Suche:
 // Rolle + Locale-Norm (korrekturRegeln) + optionaler Autor-Kontext + JSON_ONLY.
 // Bewusst ohne baseRules/commonRules, da die Aufgabe eng umrissen ist
@@ -74,40 +91,78 @@ let _defaultLocale = 'de-CH';
  *  bleiben davon unberührt – dort soll die Kritik nicht durch Autorenstil-Imitation
  *  abgemildert werden.
  */
-function _buildLocalePrompts(localeConfig, globalErklaerungRule, buchKontext = '', autorenstilRule = '', localChatAddon = '') {
+function _buildLocalePrompts(localeConfig, globalErklaerungRule, buchKontext = '', autorenstilRule = '', localChatAddon = '', bookContextStr = '') {
   const rules = localeConfig.baseRules || '';
   const rulesWithAutorenstil = autorenstilRule ? `${rules}\n\n${autorenstilRule}` : rules;
   const sp    = localeConfig.systemPrompts || {};
   // Nur für lokale Provider (ollama/llama) befüllt; bricht den „Ich kündige an und höre auf"-Trainingsbias.
   const chatAddonSuffix = localChatAddon ? `\n\n${localChatAddon}` : '';
+
+  // Stable Cores (ohne Buch-Kontext) — werden im 1h-Cache-Block gesendet.
+  const SYS_LEKTORAT_CORE         = buildSystem(sp.lektorat          || '', rulesWithAutorenstil);
+  const SYS_BUCHBEWERTUNG_CORE    = buildSystem(sp.buchbewertung     || '', rules);
+  const SYS_KAPITELANALYSE_CORE   = buildSystem(sp.kapitelanalyse    || '', rules);
+  const SYS_KAPITELREVIEW_CORE    = buildSystem(sp.kapitelreview     || sp.buchbewertung || '', rules);
+  const SYS_FIGUREN_CORE          = buildSystem(sp.figuren           || '', rules);
+  const SYS_STILKORREKTUR_CORE    = buildSystem(sp.stilkorrektur     || '', rulesWithAutorenstil);
+  const SYS_ORTE_CORE             = buildSystem(sp.orte              || 'Du bist ein Literaturanalytiker. Du identifizierst Schauplätze und Orte präzise und konservativ – nur was im Text eindeutig belegt ist.', rules);
+  const SYS_KONTINUITAET_CORE     = buildSystem(sp.kontinuitaet      || 'Du bist ein sorgfältiger Literaturlektor. Du prüfst einen Roman auf Kontinuitätsfehler und Widersprüche – Figuren, Zeitabläufe, Orte, Objekte und Charakterverhalten.', rules);
+  const SYS_ZEITSTRAHL_CORE       = buildSystem(sp.zeitstrahl        || '', rules);
+  // Komplett-Extraktion enthält das Schema; buchKontext fliesst in das Schema-Embedding ein,
+  // bleibt aber für die _toCacheBlocks-Split-Logik separat sichtbar — der Core ist
+  // bewusst der Builder-Output OHNE bookContextStr-Section (siehe getLocalePromptsForBook).
+  const SYS_KOMPLETT_EXTRAKTION_CORE   = buildSystemKomplett(sp.figuren   || '', rules, buchKontext);
+  const SYS_KOMPLETT_FIGUREN_PASS_CORE = buildSystemKomplettFiguren(sp.figuren || '', rules, buchKontext);
+  const SYS_KOMPLETT_ORTE_PASS_CORE    = buildSystemKomplettOrteSzenen(sp.orte || sp.figuren || '', rules, buchKontext);
+
+  // Augmented Strings (Backward-Compat): Core + Book-Context als Single-String.
+  // Konsumenten ohne Multi-Block-Support (chat-builder, proxies.js) bleiben funktionsfähig.
+  const _aug = (core) => bookContextStr ? `${core}\n\n${bookContextStr}` : core;
+
   return {
     ERKLAERUNG_RULE:             globalErklaerungRule || '',
     KORREKTUR_REGELN:            localeConfig.korrekturRegeln || '',
     STOPWORDS:                   Array.isArray(localeConfig.stopwords) ? localeConfig.stopwords : [],
     BUCH_KONTEXT:                buchKontext,
-    SYSTEM_LEKTORAT:             buildSystem(sp.lektorat          || '', rulesWithAutorenstil),
-    SYSTEM_BUCHBEWERTUNG:        buildSystem(sp.buchbewertung     || '', rules),
-    SYSTEM_KAPITELANALYSE:       buildSystem(sp.kapitelanalyse    || '', rules),
+    SYSTEM_LEKTORAT:             _aug(SYS_LEKTORAT_CORE),
+    SYSTEM_LEKTORAT_BLOCKS:      _toCacheBlocks(SYS_LEKTORAT_CORE, bookContextStr),
+    SYSTEM_BUCHBEWERTUNG:        _aug(SYS_BUCHBEWERTUNG_CORE),
+    SYSTEM_BUCHBEWERTUNG_BLOCKS: _toCacheBlocks(SYS_BUCHBEWERTUNG_CORE, bookContextStr),
+    SYSTEM_KAPITELANALYSE:       _aug(SYS_KAPITELANALYSE_CORE),
+    SYSTEM_KAPITELANALYSE_BLOCKS:_toCacheBlocks(SYS_KAPITELANALYSE_CORE, bookContextStr),
     // Kapitel-Review nutzt die gleiche Bewerter-Rolle wie die Buchbewertung,
     // wenn prompt-config.json keinen eigenen `kapitelreview`-Slot liefert.
-    SYSTEM_KAPITELREVIEW:        buildSystem(sp.kapitelreview     || sp.buchbewertung || '', rules),
-    SYSTEM_FIGUREN:              buildSystem(sp.figuren           || '', rules),
-    SYSTEM_STILKORREKTUR:        buildSystem(sp.stilkorrektur     || '', rulesWithAutorenstil),
+    SYSTEM_KAPITELREVIEW:        _aug(SYS_KAPITELREVIEW_CORE),
+    SYSTEM_KAPITELREVIEW_BLOCKS: _toCacheBlocks(SYS_KAPITELREVIEW_CORE, bookContextStr),
+    SYSTEM_FIGUREN:              _aug(SYS_FIGUREN_CORE),
+    SYSTEM_FIGUREN_BLOCKS:       _toCacheBlocks(SYS_FIGUREN_CORE, bookContextStr),
+    SYSTEM_STILKORREKTUR:        _aug(SYS_STILKORREKTUR_CORE),
+    SYSTEM_STILKORREKTUR_BLOCKS: _toCacheBlocks(SYS_STILKORREKTUR_CORE, bookContextStr),
     // Synonym-Suche: schlanker System-Prompt – nur Rolle + Locale-Norm (korrekturRegeln)
-    // + optionaler Autor-Kontext. Ohne baseRules/commonRules.
+    // + optionaler Autor-Kontext. Ohne baseRules/commonRules. buchKontext ist hier bereits
+    // im Core eingebaut (buildSystemSynonym) — kein zusätzlicher Cache-Split nötig.
     SYSTEM_SYNONYM:              buildSystemSynonym(sp.synonym    || '', localeConfig.korrekturRegeln || '', buchKontext),
-    SYSTEM_CHAT:                 buildSystemNoJson(sp.chat        || '', rulesWithAutorenstil) + chatAddonSuffix,
-    SYSTEM_BOOK_CHAT:            buildSystemNoJson(sp.buchchat    || '', rules) + chatAddonSuffix,
-    SYSTEM_ORTE:                 buildSystem(sp.orte              || 'Du bist ein Literaturanalytiker. Du identifizierst Schauplätze und Orte präzise und konservativ – nur was im Text eindeutig belegt ist.', rules),
-    SYSTEM_KONTINUITAET:         buildSystem(sp.kontinuitaet      || 'Du bist ein sorgfältiger Literaturlektor. Du prüfst einen Roman auf Kontinuitätsfehler und Widersprüche – Figuren, Zeitabläufe, Orte, Objekte und Charakterverhalten.', rules),
-    SYSTEM_ZEITSTRAHL:           buildSystem(sp.zeitstrahl        || '', rules),
+    // Chat-Prompts bleiben String (chat-builder konkateniert weitere Sektionen).
+    // bookContextStr wird hier ebenfalls inline gemerged — kein Multi-Block-Split,
+    // weil der Builder darauf String erwartet.
+    SYSTEM_CHAT:                 _aug(buildSystemNoJson(sp.chat        || '', rulesWithAutorenstil)) + chatAddonSuffix,
+    SYSTEM_BOOK_CHAT:            _aug(buildSystemNoJson(sp.buchchat    || '', rules)) + chatAddonSuffix,
+    SYSTEM_ORTE:                 _aug(SYS_ORTE_CORE),
+    SYSTEM_ORTE_BLOCKS:          _toCacheBlocks(SYS_ORTE_CORE, bookContextStr),
+    SYSTEM_KONTINUITAET:         _aug(SYS_KONTINUITAET_CORE),
+    SYSTEM_KONTINUITAET_BLOCKS:  _toCacheBlocks(SYS_KONTINUITAET_CORE, bookContextStr),
+    SYSTEM_ZEITSTRAHL:           _aug(SYS_ZEITSTRAHL_CORE),
+    SYSTEM_ZEITSTRAHL_BLOCKS:    _toCacheBlocks(SYS_ZEITSTRAHL_CORE, bookContextStr),
     // Kombinierter System-Prompt für buildExtraktionKomplettChapterPrompt (P1+P5 merged).
     // Schema und Regeln sind im System-Prompt → werden gecacht; User-Message enthält nur Kapiteltext.
-    SYSTEM_KOMPLETT_EXTRAKTION:  buildSystemKomplett(sp.figuren   || '', rules, buchKontext),
+    SYSTEM_KOMPLETT_EXTRAKTION:        _aug(SYS_KOMPLETT_EXTRAKTION_CORE),
+    SYSTEM_KOMPLETT_EXTRAKTION_BLOCKS: _toCacheBlocks(SYS_KOMPLETT_EXTRAKTION_CORE, bookContextStr),
     // Welle 4 · #11 – für lokale Modelle zweiter fokussierter Pass.
     // Claude nutzt weiterhin SYSTEM_KOMPLETT_EXTRAKTION (kombinierter Single-Call).
-    SYSTEM_KOMPLETT_FIGUREN_PASS: buildSystemKomplettFiguren(sp.figuren || '', rules, buchKontext),
-    SYSTEM_KOMPLETT_ORTE_PASS:    buildSystemKomplettOrteSzenen(sp.orte || sp.figuren || '', rules, buchKontext),
+    SYSTEM_KOMPLETT_FIGUREN_PASS:        _aug(SYS_KOMPLETT_FIGUREN_PASS_CORE),
+    SYSTEM_KOMPLETT_FIGUREN_PASS_BLOCKS: _toCacheBlocks(SYS_KOMPLETT_FIGUREN_PASS_CORE, bookContextStr),
+    SYSTEM_KOMPLETT_ORTE_PASS:           _aug(SYS_KOMPLETT_ORTE_PASS_CORE),
+    SYSTEM_KOMPLETT_ORTE_PASS_BLOCKS:    _toCacheBlocks(SYS_KOMPLETT_ORTE_PASS_CORE, bookContextStr),
   };
 }
 
@@ -196,7 +251,9 @@ export function configureLocales(cfg) {
     _localeMap.set('de-CH', _buildLocalePrompts(flatCfg, cfg.erklaerungRule));
   }
 
-  // Globale Exports auf Default-Locale setzen (ESM-Live-Binding für Client-Code)
+  // Globale Exports auf Default-Locale setzen (ESM-Live-Binding für Client-Code).
+  // Achtung: nur die String-Form wird hier exportiert; Multi-Block-Varianten
+  // (SYSTEM_*_BLOCKS) leben pro Buch und werden via getBookPrompts geliefert.
   const def = _localeMap.get(_defaultLocale) || {};
   ERKLAERUNG_RULE              = def.ERKLAERUNG_RULE              ?? '';
   KORREKTUR_REGELN             = def.KORREKTUR_REGELN             ?? '';
@@ -232,27 +289,30 @@ export function getLocalePromptsForBook(localeKey, buchtyp, buchKontext, isFinis
   const rawLocale = _rawLocales.get(localeKey) || _rawLocales.get(_defaultLocale) || {};
   const kontext   = (buchKontext || '').trim();
 
-  // Augmentierte baseRules: Original + Buchtyp-Block + Freitext-Block + Fertig-Block
+  // Buchspezifische Sektion separat sammeln — KEIN Inline-Merge in baseRules mehr.
+  // _buildLocalePrompts splittet sie via _toCacheBlocks in einen eigenen Cache-Block,
+  // damit der stabile SYSTEM-Core (Persona + Regeln + Schema) buchübergreifend
+  // gecacht bleiben kann (1h-TTL).
   const langCode    = (localeKey || _defaultLocale).split('-')[0];
   const buchtypDef  = buchtyp && _buchtypen?.[langCode]?.[buchtyp];
-  let augRules = rawLocale.baseRules || '';
+  const bookCtxParts = [];
   if (buchtypDef?.zusatz) {
-    augRules += `\n\nBUCHTYP-KONTEXT: ${buchtypDef.zusatz}`;
+    bookCtxParts.push(`BUCHTYP-KONTEXT: ${buchtypDef.zusatz}`);
   }
   if (kontext) {
-    augRules += `\n\nVORRANGIGE ANGABEN DES AUTORS (übersteuern bei Konflikt alle obigen Regeln – insbesondere Stil-, Ton- und Formatvorgaben):\n${kontext}`;
+    bookCtxParts.push(`VORRANGIGE ANGABEN DES AUTORS (übersteuern bei Konflikt alle obigen Regeln – insbesondere Stil-, Ton- und Formatvorgaben):\n${kontext}`);
   }
   if (isFinished) {
     const fertigRule = _werkAbgeschlossenByLang?.[langCode];
-    if (fertigRule) augRules += `\n\n${fertigRule}`;
+    if (fertigRule) bookCtxParts.push(fertigRule);
   }
+  const bookContextStr = bookCtxParts.join('\n\n');
 
-  const augLocale = { ...rawLocale, baseRules: augRules };
   // buchKontext als soziogramm-Kontext weitergeben (figurenBasisRules / SYSTEM_KOMPLETT_EXTRAKTION).
   // autorenstilRule wird nur an Lektorat/Chat/Stilkorrektur angehängt (siehe _buildLocalePrompts).
   const autorenstil = _autorenstilByLocale.get(localeKey) || _autorenstilByLocale.get(_defaultLocale) || '';
   const localChatAddon = _localChatAddonByLocale.get(localeKey) || _localChatAddonByLocale.get(_defaultLocale) || '';
-  return _buildLocalePrompts(augLocale, _erklaerungRule, kontext, autorenstil, localChatAddon);
+  return _buildLocalePrompts(rawLocale, _erklaerungRule, kontext, autorenstil, localChatAddon, bookContextStr);
 }
 
 /**

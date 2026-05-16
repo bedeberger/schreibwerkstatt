@@ -142,6 +142,21 @@ function htmlToText(html) {
     .replace(/\s+/g, ' ').trim();
 }
 
+// Konvertiert eine SYSTEM_*_BLOCKS-Variante (String oder Array aus prompts/core.js)
+// in ein Anthropic-Block-Array mit konfigurierbarem Default-TTL. Idempotent für
+// Array-Eingaben (TTL-Hints der Eingabe bleiben erhalten). Nutzung in Multi-Block-
+// Jobs, die zusätzliche Cache-Blöcke (z.B. Buchtext) prependen wollen:
+//
+//   const sysBlocks = [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_X_BLOCKS, '1h')];
+//
+// Für einfache Job-Sites ohne zusätzliche Blöcke ist der Helper nicht nötig —
+// aiCall/callAI verarbeiten String und Array transparent.
+function toSystemBlocks(blocksOrString, defaultTtl) {
+  if (Array.isArray(blocksOrString)) return blocksOrString;
+  if (!blocksOrString) return [];
+  return [{ text: blocksOrString, ttl: defaultTtl }];
+}
+
 // Mindestabstand zwischen zwei updateJob-Calls aus dem Streaming-onProgress.
 // Reduziert Event-Loop-Last bei parallelen KI-Streams; die Live-Anzeige ruckelt
 // in der Praxis bei 200 ms nicht sichtbar.
@@ -225,4 +240,5 @@ module.exports = {
   cleanPageTextForClaude, htmlToText,
   PROGRESS_THROTTLE_MS,
   aiCall,
+  toSystemBlocks,
 };

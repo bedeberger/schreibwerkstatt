@@ -24,7 +24,7 @@ if (!API_HOST || !TOKEN_ID || !TOKEN_SECRET) {
 
 const FIXTURE = path.join(__dirname, '..', 'tests', 'fixtures', 'dummy-book.md');
 const BOOK_NAME = 'Der Nebel über Luzern';
-const BOOK_DESCRIPTION = 'Dummy-Krimi zum Testen des bookstack-lektorat-Tools. Enthält absichtliche Fehler und Kontinuitätsbrüche.';
+const BOOK_DESCRIPTION = 'Dummy-Krimi zum Testen des schreibwerkstatt-Tools. Enthält absichtliche Fehler und Kontinuitätsbrüche.';
 
 const headers = {
   'Authorization': `Token ${TOKEN_ID}:${TOKEN_SECRET}`,

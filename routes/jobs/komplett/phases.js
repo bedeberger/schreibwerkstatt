@@ -10,6 +10,7 @@ const {
 const { recomputeBookFigureMentions } = require('../../../lib/page-index');
 const {
   i18nError, settledAll, splitGroupsIntoChunks, PER_CHUNK_LIMIT, updateJob,
+  toSystemBlocks,
 } = require('../shared');
 const {
   buildBookSystemBlockText, buildBookPagesSig,
@@ -63,13 +64,13 @@ async function runPhase1(ctx) {
         const bookSystemBlock = { text: buildBookSystemBlockText(bookName, pageContents.length, fullBookText), ttl: '1h' };
         r = await call(jobId, tok,
           prompts.buildExtraktionKomplettChapterPrompt('Gesamtbuch', bookName, pageContents.length, null),
-          [bookSystemBlock, { text: sys.SYSTEM_KOMPLETT_EXTRAKTION }],
+          [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KOMPLETT_EXTRAKTION_BLOCKS, '1h')],
           12, 28, 22000, 0.2, null, prompts.SCHEMA_KOMPLETT_EXTRAKTION,
         );
       } else {
         r = await call(jobId, tok,
           prompts.buildExtraktionKomplettChapterPrompt('Gesamtbuch', bookName, pageContents.length, fullBookText),
-          sys.SYSTEM_KOMPLETT_EXTRAKTION, 12, 28, 16000, 0.2, null, prompts.SCHEMA_KOMPLETT_EXTRAKTION,
+          sys.SYSTEM_KOMPLETT_EXTRAKTION_BLOCKS, 12, 28, 16000, 0.2, null, prompts.SCHEMA_KOMPLETT_EXTRAKTION,
         );
       }
       const passA = { figuren: r?.figuren, assignments: r?.assignments };
@@ -129,7 +130,7 @@ async function runPhase1(ctx) {
           log.info(`${chunkLabel} – Cache-MISS, KI-Call…`);
           const result = await call(jobId, tok,
             prompts.buildExtraktionKomplettChapterPrompt(chunk.name, bookName, chunk.pages.length, chText),
-            sys.SYSTEM_KOMPLETT_EXTRAKTION, 12, 28, 14000, 0.2, null, prompts.SCHEMA_KOMPLETT_EXTRAKTION,
+            sys.SYSTEM_KOMPLETT_EXTRAKTION_BLOCKS, 12, 28, 14000, 0.2, null, prompts.SCHEMA_KOMPLETT_EXTRAKTION,
           );
           saveChapterExtractCache(bookIdInt, email, key, pagesSig, result);
           log.info(`${chunkLabel} – OK (fig=${result?.figuren?.length ?? 0} orte=${result?.orte?.length ?? 0} sz=${result?.szenen?.length ?? 0}).`);
@@ -147,7 +148,7 @@ async function runPhase1(ctx) {
           log.info(`${chunkLabel} Pass A (Figuren) – KI-Call…`);
           passA = await call(jobId, tok,
             prompts.buildExtraktionFigurenPassPrompt(chunk.name, bookName, chunk.pages.length, chText),
-            sys.SYSTEM_KOMPLETT_FIGUREN_PASS, 12, 20, 8000, 0.2, null, prompts.SCHEMA_KOMPLETT_FIGUREN_PASS,
+            sys.SYSTEM_KOMPLETT_FIGUREN_PASS_BLOCKS, 12, 20, 8000, 0.2, null, prompts.SCHEMA_KOMPLETT_FIGUREN_PASS,
           );
           saveChapterExtractCache(bookIdInt, email, figKey, pagesSig, passA);
         }
@@ -158,7 +159,7 @@ async function runPhase1(ctx) {
           log.info(`${chunkLabel} Pass B (Orte/Szenen) – KI-Call…`);
           passB = await call(jobId, tok,
             prompts.buildExtraktionOrtePassPrompt(chunk.name, bookName, chunk.pages.length, chText),
-            sys.SYSTEM_KOMPLETT_ORTE_PASS, 20, 28, 6000, 0.2, null, prompts.SCHEMA_KOMPLETT_ORTE_PASS,
+            sys.SYSTEM_KOMPLETT_ORTE_PASS_BLOCKS, 20, 28, 6000, 0.2, null, prompts.SCHEMA_KOMPLETT_ORTE_PASS,
           );
           saveChapterExtractCache(bookIdInt, email, ortKey, pagesSig, passB);
         }
@@ -231,7 +232,7 @@ async function runPhase2(ctx, chapterFiguren, chapterAssignments) {
     const figProgressEnd = effectiveProvider === 'claude' ? 40 : 43;
     const figResult = await call(jobId, tok,
       prompts.buildFiguresBasisConsolidationPrompt(bookName, preMerged, sys.BUCH_KONTEXT || ''),
-      sys.SYSTEM_FIGUREN, 30, figProgressEnd, 8000, 0.2, null, prompts.SCHEMA_FIGUREN_KONSOL,
+      sys.SYSTEM_FIGUREN_BLOCKS, 30, figProgressEnd, 8000, 0.2, null, prompts.SCHEMA_FIGUREN_KONSOL,
     );
     if (!Array.isArray(figResult?.figuren)) throw i18nError('job.error.figurenMissing');
     figuren = figResult.figuren.map((f, i) => ({ ...f, id: f.id || ('fig_' + (i + 1)) }));
@@ -271,7 +272,7 @@ async function runPhase2(ctx, chapterFiguren, chapterAssignments) {
       try {
         const sozResult = await call(jobId, tok,
           prompts.buildSoziogrammConsolidationPrompt(bookName, figuren, sys.BUCH_KONTEXT || ''),
-          sys.SYSTEM_FIGUREN, 40, 43, 3000, 0.2, null, prompts.SCHEMA_SOZIOGRAMM_KONSOL,
+          sys.SYSTEM_FIGUREN_BLOCKS, 40, 43, 3000, 0.2, null, prompts.SCHEMA_SOZIOGRAMM_KONSOL,
         );
         const validIds = new Set(figuren.map(f => f.id));
         const prelimSchichtById = Object.fromEntries(sozFiguren.map(s => [s.fig_id, s.sozialschicht]));
@@ -336,7 +337,7 @@ async function runPhase3(ctx, chapterOrte, figurenKompakt, isSinglePass, idRemap
     updateJob(jobId, { progress: 43, statusText: 'job.phase.consolidatingOrte' });
     const orteResultRaw = prefetched || await call(jobId, tok,
       prompts.buildLocationsConsolidationPrompt(bookName, chapterOrte, figurenKompakt),
-      sys.SYSTEM_ORTE, 43, 55, 6000, 0.2, null, prompts.SCHEMA_ORTE_KONSOL,
+      sys.SYSTEM_ORTE_BLOCKS, 43, 55, 6000, 0.2, null, prompts.SCHEMA_ORTE_KONSOL,
     );
     if (!Array.isArray(orteResultRaw?.orte)) throw i18nError('job.error.orteMissing');
     if (prefetched) {
@@ -385,7 +386,7 @@ async function runPhase3OrteCall(ctx, chapterOrte, figurenKompaktForPrompt) {
   const { jobId, bookName, call, tok, prompts, sys } = ctx;
   return call(jobId, tok,
     prompts.buildLocationsConsolidationPrompt(bookName, chapterOrte, figurenKompaktForPrompt),
-    sys.SYSTEM_ORTE,
+    sys.SYSTEM_ORTE_BLOCKS,
     null, null,
     6000, 0.2, null, prompts.SCHEMA_ORTE_KONSOL,
   );
@@ -466,7 +467,7 @@ async function runPhase3b(ctx, figuren) {
 
   const bzResult = await call(jobId, tok,
     prompts.buildKapiteluebergreifendeBeziehungenPrompt(bookName, figuren, textForPrompt),
-    sys.SYSTEM_FIGUREN, 55, 58, 2000, 0.2, null, prompts.SCHEMA_BEZIEHUNGEN,
+    sys.SYSTEM_FIGUREN_BLOCKS, 55, 58, 2000, 0.2, null, prompts.SCHEMA_BEZIEHUNGEN,
   );
   const newBz = Array.isArray(bzResult?.beziehungen) ? bzResult.beziehungen : [];
   if (newBz.length > 0) addFigurenBeziehungen(bookIdInt, newBz, email, ctx.idMaps);
@@ -527,7 +528,7 @@ async function runZeitstrahl(ctx, opts = {}) {
 
   const ztResult = await call(jobId, tok,
     prompts.buildZeitstrahlConsolidationPrompt(zeitstrahlEvents),
-    sys.SYSTEM_ZEITSTRAHL,
+    sys.SYSTEM_ZEITSTRAHL_BLOCKS,
     silent ? null : 78, silent ? null : 82,
     3000, 0.2, null, prompts.SCHEMA_ZEITSTRAHL,
   );

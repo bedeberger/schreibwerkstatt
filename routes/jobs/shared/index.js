@@ -56,6 +56,7 @@ module.exports = {
   splitGroupsIntoChunks: loader.splitGroupsIntoChunks,
 
   aiCall: ai.aiCall,
+  toSystemBlocks: ai.toSystemBlocks,
 
   getPrompts,
   getBookPrompts: bs.getBookPrompts,

@@ -216,6 +216,69 @@ test('SCHEMA_LEKTORAT (claude): enum umfasst alle 19 Cloud-Typen', async () => {
   }
 });
 
+// ── Multi-Block Cache-Schichten ──────────────────────────────────────────────
+// Job-Sites holen SYSTEM_*_BLOCKS statt SYSTEM_* — wenn buchtyp/freitext/isFinished
+// gesetzt, splittet getLocalePromptsForBook in zwei Cache-Blöcke: stabiler Core
+// (1h-TTL) + buchspezifischer Kontext (ephemeral). Sonst fallback auf String.
+
+test('SYSTEM_LEKTORAT_BLOCKS: ohne Buchkontext → String (Backward-Compat)', async () => {
+  const m = await freshPrompts('claude');
+  const out = m.getLocalePromptsForBook('de-CH', null, '', false);
+  assert.equal(typeof out.SYSTEM_LEKTORAT_BLOCKS, 'string',
+    'Ohne Buchkontext muss _BLOCKS ein String sein, kein Array');
+  assert.equal(out.SYSTEM_LEKTORAT_BLOCKS, out.SYSTEM_LEKTORAT,
+    'String-Form muss identisch zum SYSTEM_LEKTORAT-String sein');
+});
+
+test('SYSTEM_LEKTORAT_BLOCKS: mit Buchtyp → 2-Block-Array mit 1h-TTL-Hint', async () => {
+  const m = await freshPrompts('claude');
+  const out = m.getLocalePromptsForBook('de-CH', 'krimi', '', false);
+  assert.ok(Array.isArray(out.SYSTEM_LEKTORAT_BLOCKS),
+    'Mit Buchtyp muss _BLOCKS ein Array sein');
+  assert.equal(out.SYSTEM_LEKTORAT_BLOCKS.length, 2,
+    'Genau zwei Cache-Blöcke: stabiler Core + buchspezifischer Kontext');
+  assert.equal(out.SYSTEM_LEKTORAT_BLOCKS[0].ttl, '1h',
+    'Erster Block (Core) muss 1h-TTL haben — buchübergreifender Cache');
+  assert.equal(out.SYSTEM_LEKTORAT_BLOCKS[1].ttl, undefined,
+    'Zweiter Block (BookContext) bleibt ephemeral (5min Default)');
+});
+
+test('SYSTEM_LEKTORAT_BLOCKS: Core enthält KEINEN BUCHTYP-KONTEXT, BookContext schon', async () => {
+  const m = await freshPrompts('claude');
+  const out = m.getLocalePromptsForBook('de-CH', 'krimi', '', false);
+  assert.doesNotMatch(out.SYSTEM_LEKTORAT_BLOCKS[0].text, /BUCHTYP-KONTEXT/,
+    'Core muss buchunabhängig sein — Cache-Hit über Bücher hinweg');
+  assert.match(out.SYSTEM_LEKTORAT_BLOCKS[1].text, /BUCHTYP-KONTEXT/,
+    'BookContext-Block enthält den Buchtyp-Zusatz');
+});
+
+test('SYSTEM_*_BLOCKS: alle Job-relevanten Prompts haben _BLOCKS-Variante', async () => {
+  const m = await freshPrompts('claude');
+  const out = m.getLocalePromptsForBook('de-CH', 'krimi', 'Mars 2189.', true);
+  for (const key of [
+    'SYSTEM_LEKTORAT_BLOCKS', 'SYSTEM_BUCHBEWERTUNG_BLOCKS',
+    'SYSTEM_KAPITELANALYSE_BLOCKS', 'SYSTEM_KAPITELREVIEW_BLOCKS',
+    'SYSTEM_FIGUREN_BLOCKS', 'SYSTEM_STILKORREKTUR_BLOCKS',
+    'SYSTEM_ORTE_BLOCKS', 'SYSTEM_KONTINUITAET_BLOCKS', 'SYSTEM_ZEITSTRAHL_BLOCKS',
+    'SYSTEM_KOMPLETT_EXTRAKTION_BLOCKS',
+    'SYSTEM_KOMPLETT_FIGUREN_PASS_BLOCKS', 'SYSTEM_KOMPLETT_ORTE_PASS_BLOCKS',
+  ]) {
+    assert.ok(Array.isArray(out[key]), `${key} muss Array sein bei nicht-leerem Buchkontext`);
+    assert.equal(out[key].length, 2, `${key} muss 2 Blöcke haben`);
+    assert.equal(out[key][0].ttl, '1h', `${key}[0] muss 1h-TTL haben`);
+  }
+});
+
+test('SYSTEM_*_BLOCKS: BookContext-Block enthält alle aktivierten Sektionen', async () => {
+  const m = await freshPrompts('claude');
+  const out = m.getLocalePromptsForBook('de-CH', 'krimi', 'Spielt 1893 in Zürich.', true);
+  const ctxBlock = out.SYSTEM_LEKTORAT_BLOCKS[1].text;
+  assert.match(ctxBlock, /BUCHTYP-KONTEXT/);
+  assert.match(ctxBlock, /VORRANGIGE ANGABEN DES AUTORS/);
+  assert.match(ctxBlock, /Spielt 1893 in Zürich/);
+  assert.match(ctxBlock, /WERK ABGESCHLOSSEN/);
+});
+
 test('SCHEMA_LEKTORAT (ollama): enum bleibt auf 6 Local-Typen beschränkt', async () => {
   const m = await freshPrompts('ollama');
   const e = m.SCHEMA_LEKTORAT?.properties?.fehler?.items?.properties?.typ?.enum;

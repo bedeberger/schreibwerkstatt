@@ -35,7 +35,7 @@ async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookNa
     getBuchtypReviewSchwerpunkt,
     PROMPTS_VERSION,
   } = prompts;
-  const { SYSTEM_KAPITELREVIEW, SYSTEM_KAPITELANALYSE } = await getBookPrompts(bookId, userEmail);
+  const { SYSTEM_KAPITELREVIEW_BLOCKS: SYSTEM_KAPITELREVIEW, SYSTEM_KAPITELANALYSE_BLOCKS: SYSTEM_KAPITELANALYSE } = await getBookPrompts(bookId, userEmail);
   const bookSettings = getBookSettings(bookId, userEmail);
   const narrative = narrativeLabels(bookSettings);
   const locale = `${bookSettings?.language || 'de'}-${bookSettings?.region || 'CH'}`;

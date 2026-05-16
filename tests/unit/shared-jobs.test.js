@@ -12,8 +12,8 @@ const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
 
-// Test-DB in tmpfs, damit kein lektorat.db angefasst wird.
-const tmpDb = path.join(os.tmpdir(), `lektorat-test-${process.pid}-${Date.now()}.db`);
+// Test-DB in tmpfs, damit kein schreibwerkstatt.db angefasst wird.
+const tmpDb = path.join(os.tmpdir(), `schreibwerkstatt-test-${process.pid}-${Date.now()}.db`);
 process.env.DB_PATH = tmpDb;
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 // Kein API_PROVIDER → defaults auf claude (kein Netzwerk – wir stubben callAI ohnehin).

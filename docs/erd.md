@@ -1,8 +1,8 @@
-# ERD — bookstack-lektorat
+# ERD — schreibwerkstatt
 
 Stand: Schema-Version 103, 53 Tabellen (ohne `sqlite_*`/`schema_version`/`sessions`).
 
-Quelle: Live-Dump aus [lektorat.db](../lektorat.db) (`.schema --indent`) + [db/migrations.js](../db/migrations.js). Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
+Quelle: Live-Dump aus [schreibwerkstatt.db](../schreibwerkstatt.db) (`.schema --indent`) + [db/migrations.js](../db/migrations.js). Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
 > **Pflege.** Datei MUSS bei jeder neuen Migration mitgepflegt werden — Stand-Zeile (Schema-Version, Tabellen-Anzahl) + betroffene Block-Definitionen + ggf. neue Mermaid-Tabelle/-Kante. Siehe Doku-Regel in [CLAUDE.md](../CLAUDE.md) → „Datenbank → Migration hinzufügen".
 
@@ -706,8 +706,8 @@ Bei jeder neuen Migration in [db/migrations.js](../db/migrations.js):
 Live-Schema kontrollieren:
 
 ```
-sqlite3 lektorat.db ".schema --indent" > /tmp/schema_full.sql
-sqlite3 lektorat.db "SELECT version FROM schema_version;"
+sqlite3 schreibwerkstatt.db ".schema --indent" > /tmp/schema_full.sql
+sqlite3 schreibwerkstatt.db "SELECT version FROM schema_version;"
 ```
 
 Diagramm-Quellen sind die `REFERENCES`-Klauseln aus dem Dump. Mermaid-Diagramme händisch nachziehen — Auto-Generator wäre möglich, aber die Sub-Diagramme leben von kuratierter Auswahl, kein vollautomatisches Tool produziert sie sinnvoll.

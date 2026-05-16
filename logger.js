@@ -2,7 +2,7 @@ const path = require('path');
 const winston = require('winston');
 const { getContext } = require('./lib/log-context');
 
-const LOG_FILE = path.join(__dirname, 'lektorat.log');
+const LOG_FILE = path.join(__dirname, 'schreibwerkstatt.log');
 
 // Merged ALS-Context in jedes Log-Info-Objekt; explizite Felder am Call-Site
 // haben Vorrang (info.job ?? c.job).

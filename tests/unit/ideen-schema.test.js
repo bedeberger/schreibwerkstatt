@@ -1,6 +1,6 @@
 'use strict';
 // ideen-Tabelle: CRUD + User-Isolation gegen frische In-Memory-DB.
-// Wir replizieren das Migrations-DDL hier, damit der Test ohne lektorat.db läuft.
+// Wir replizieren das Migrations-DDL hier, damit der Test ohne schreibwerkstatt.db läuft.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');

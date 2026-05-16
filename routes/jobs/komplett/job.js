@@ -9,7 +9,7 @@ const {
 const { narrativeLabels } = require('../narrative-labels');
 const {
   makeJobLogger, updateJob, completeJob, failJob, i18nError,
-  aiCall, getPrompts, getBookPrompts,
+  aiCall, toSystemBlocks, getPrompts, getBookPrompts,
   loadPageContents, groupByChapter, buildSinglePassBookText, cleanPageTextForClaude,
   bsGetAll, SINGLE_PASS_LIMIT, BATCH_SIZE, jobAbortControllers,
   _modelName, fmtTok, tps,
@@ -187,14 +187,14 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
         const bookSystemBlock = { text: buildBookSystemBlockText(bookName, pageContents.length, fullBookText), ttl: '1h' };
         return call(jobId, tok,
           prompts.buildKontinuitaetSinglePassPrompt(bookName, null, figKompakt, orteKompakt, narrativeLabels(getBookSettings(bookIdInt, email))),
-          [bookSystemBlock, { text: sys.SYSTEM_KONTINUITAET }],
+          [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KONTINUITAET_BLOCKS, '1h')],
           82, 97, 5000, 0.2, null, prompts.SCHEMA_KONTINUITAET_PROBLEME,
         );
       }
       log.info(`Kontinuität facts-basiert: ${chapterFakten.length} Kapitel, ${figKompakt.length} Figuren`);
       return call(jobId, tok,
         prompts.buildKontinuitaetCheckPrompt(bookName, chapterFakten, figKompakt, orteKompakt),
-        sys.SYSTEM_KONTINUITAET, 82, 97, effectiveProvider === 'claude' ? 5000 : 2500, 0.2, null, prompts.SCHEMA_KONTINUITAET_PROBLEME,
+        sys.SYSTEM_KONTINUITAET_BLOCKS, 82, 97, effectiveProvider === 'claude' ? 5000 : 2500, 0.2, null, prompts.SCHEMA_KONTINUITAET_PROBLEME,
       );
     };
 
@@ -298,7 +298,7 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
       const bookText = buildSinglePassBookText(groups, groupOrder);
       result = await call(jobId, tok,
         prompts.buildKontinuitaetSinglePassPrompt(bookName, bookText, figurenKompakt, orteKompakt, narrativeLabels(getBookSettings(bookIdInt, email))),
-        sys.SYSTEM_KONTINUITAET, 60, 97, 5000, 0.2, null, prompts.SCHEMA_KONTINUITAET_PROBLEME,
+        sys.SYSTEM_KONTINUITAET_BLOCKS, 60, 97, 5000, 0.2, null, prompts.SCHEMA_KONTINUITAET_PROBLEME,
       );
     } else {
       // Multi-Pass: Fakten pro Kapitel extrahieren – ggf. aus Checkpoint fortsetzen
@@ -320,7 +320,7 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
         try {
           const chResult = await call(jobId, tok,
             prompts.buildKontinuitaetChapterFactsPrompt(group.name, chText),
-            sys.SYSTEM_KONTINUITAET, fromPct, toPct, 1500, 0.2, null, prompts.SCHEMA_KONTINUITAET_FAKTEN,
+            sys.SYSTEM_KONTINUITAET_BLOCKS, fromPct, toPct, 1500, 0.2, null, prompts.SCHEMA_KONTINUITAET_FAKTEN,
           );
           chapterFacts.push({ kapitel: group.name, fakten: chResult.fakten || [] });
         } catch (e) {
@@ -333,7 +333,7 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
       updateJob(jobId, { progress: 88, statusText: 'job.phase.checkContradictions' });
       result = await call(jobId, tok,
         prompts.buildKontinuitaetCheckPrompt(bookName, chapterFacts, figurenKompakt, orteKompakt),
-        sys.SYSTEM_KONTINUITAET, 88, 97, 5000, 0.2, null, prompts.SCHEMA_KONTINUITAET_PROBLEME,
+        sys.SYSTEM_KONTINUITAET_BLOCKS, 88, 97, 5000, 0.2, null, prompts.SCHEMA_KONTINUITAET_PROBLEME,
       );
     }
 

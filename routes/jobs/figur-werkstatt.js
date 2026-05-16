@@ -95,7 +95,7 @@ async function runBrainstormJob(jobId, draftId, knotenId, userEmail) {
       .filter(Boolean);
     const mindmapResolved = resolveI18nTree(draft.mindmap, locale);
 
-    const { SYSTEM_FIGUREN, BUCH_KONTEXT } = await getBookPrompts(draft.book_id, userEmail);
+    const { SYSTEM_FIGUREN_BLOCKS: SYSTEM_FIGUREN, BUCH_KONTEXT } = await getBookPrompts(draft.book_id, userEmail);
     // Quell-Figur aus dem Abgrenzungs-Kontext entfernen, sonst lehnt KI eigene
     // Eigenschaften als „Doppelung mit Buchfigur" ab. source_figure_id robust
     // (User darf den Werkstatt-Namen ändern); Name-Match als zweiter Filter
@@ -153,7 +153,7 @@ async function runConsistencyJob(jobId, draftId, userEmail) {
     const locale = getUser(userEmail)?.locale || 'de';
     const mindmapResolved = resolveI18nTree(draft.mindmap, locale);
 
-    const { SYSTEM_FIGUREN, BUCH_KONTEXT } = await getBookPrompts(draft.book_id, userEmail);
+    const { SYSTEM_FIGUREN_BLOCKS: SYSTEM_FIGUREN, BUCH_KONTEXT } = await getBookPrompts(draft.book_id, userEmail);
     // Quell-Figur ausschliessen wie bei Brainstorm — Consistency würde sonst
     // jede Übernahme aus den Importdaten als „Konflikt mit gleichnamiger
     // Buchfigur" markieren.

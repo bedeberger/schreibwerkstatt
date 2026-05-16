@@ -126,7 +126,7 @@ ollama create buch-autor -f ../../../Modelfile.example
 ollama run buch-autor "Schreibe den Anfang eines neuen Kapitels."
 ```
 
-`.env` der bookstack-lektorat-App:
+`.env` der schreibwerkstatt-App:
 
 ```
 API_PROVIDER=ollama

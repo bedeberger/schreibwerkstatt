@@ -1,11 +1,11 @@
 [Unit]
-Description=BookStack Lektorat
+Description=Schreibwerkstatt
 After=network.target
 
 [Service]
 Type=simple
 User=github-runner
-WorkingDirectory=/opt/lektorat
+WorkingDirectory=/opt/schreibwerkstatt
 ExecStart=/usr/bin/node server.js
 Restart=on-failure
 RestartSec=5
