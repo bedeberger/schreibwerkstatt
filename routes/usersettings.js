@@ -1,6 +1,7 @@
 'use strict';
 const express = require('express');
 const { getUser, updateUserSettings } = require('../db/schema');
+const appUsers = require('../db/app-users');
 const { setContext } = require('../lib/log-context');
 const logger = require('../logger');
 
@@ -59,12 +60,22 @@ const NUMERIC_FIELDS = [
   { key: 'daily_goal_chars', min: DAILY_GOAL_MIN, max: DAILY_GOAL_MAX, label: 'daily_goal_chars' },
 ];
 
-/** Aktuelles User-Profil samt Einstellungen. */
+/** Aktuelles User-Profil samt Einstellungen + app_users-Identity. */
 router.get('/settings', (req, res) => {
   const email = req.session.user.email;
   const user = getUser(email);
   if (!user) return res.status(404).json({ error_code: 'USER_PROFILE_NOT_FOUND' });
-  res.json(user);
+  // Phase 4a: Identity-Felder aus app_users mitliefern. Frontend nutzt
+  // role + can_invite_users fuer UI-Gates (Admin-Karte, Invite-Dialog).
+  const app = appUsers.getUser(email);
+  res.json({
+    ...user,
+    role: app?.global_role || 'user',
+    status: app?.status || 'active',
+    can_invite_users: app?.can_invite_users ? 1 : 0,
+    display_name: app?.display_name || null,
+    model_override: app?.model_override || null,
+  });
 });
 
 /** Partielles Update. Nicht übergebene Felder bleiben unverändert;
@@ -105,6 +116,29 @@ router.patch('/settings', jsonBody, (req, res) => {
 
   updateUserSettings(email, merged);
   res.json({ ok: true, ...getUser(email) });
+});
+
+// Phase 4a: User-Selbst-Invite. Gate via app_users.can_invite_users; Admins
+// duerfen ueber /admin/users/invite mit role='admin' arbeiten, hier zwingend
+// role='user'. Use-Case: Buch-Sharing-Dialog laedt frische Email ein.
+router.post('/invite', jsonBody, (req, res) => {
+  const inviter = req.session.user.email;
+  const me = appUsers.getUser(inviter);
+  if (!me) return res.status(403).json({ error_code: 'NOT_REGISTERED' });
+  if (me.status !== 'active') return res.status(403).json({ error_code: 'NOT_ACTIVE' });
+  if (!me.can_invite_users && me.global_role !== 'admin') {
+    return res.status(403).json({ error_code: 'INVITE_FORBIDDEN' });
+  }
+  const email = (req.body?.email || '').toLowerCase().trim();
+  if (!email) return res.status(400).json({ error_code: 'EMAIL_REQUIRED' });
+  try {
+    const invite = appUsers.createInvite({ email, globalRole: 'user', invitedBy: inviter });
+    logger.info(`Self-Invite ausgestellt: ${email}`, { user: inviter });
+    res.json({ invite });
+  } catch (e) {
+    logger.error(`Self-Invite: ${e.message}`, { user: inviter });
+    res.status(500).json({ error_code: 'INVITE_FAILED', detail: e.message });
+  }
 });
 
 module.exports = router;
