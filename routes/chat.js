@@ -1,9 +1,9 @@
 const express = require('express');
-const { db, getTokenForRequest, upsertBookByName } = require('../db/schema');
+const { db, upsertBookByName } = require('../db/schema');
 const logger = require('../logger');
 const { callAIChat, parseJSONLenient, chatTemperature } = require('../lib/ai');
 const { toIntId } = require('../lib/validate');
-const { BOOKSTACK_URL } = require('../lib/bookstack');
+const contentStore = require('../lib/content-store');
 const { bookParamHandler, setContext } = require('../lib/log-context');
 const {
   getPrompts, getBookPrompts,
@@ -45,22 +45,11 @@ router.post('/session', jsonBody, async (req, res) => {
   // damit die KI Änderungen während laufendem Chat erkennt.
   let openingPageText = null;
   try {
-    const token = getTokenForRequest(req);
-    const authHeader = token
-      ? `Token ${token.id}:${token.pw}`
-      : `Token ${process.env.TOKEN_ID || ''}:${process.env.TOKEN_KENNWORT || ''}`;
-    const resp = await fetch(`${BOOKSTACK_URL}/api/pages/${page_id}`, {
-      headers: { Authorization: authHeader },
-      signal: AbortSignal.timeout(15000),
-    });
-    if (resp.ok) {
-      const pd = await resp.json();
-      openingPageText = htmlToText(pd.html || '');
-    } else {
-      logger.warn(`[chat/session] Snapshot-Load fehlgeschlagen page=${page_id} status=${resp.status}`);
-    }
+    const pd = await contentStore.loadPage(page_id, req);
+    openingPageText = htmlToText(pd.html || '');
   } catch (e) {
-    logger.warn(`[chat/session] Snapshot-Load Fehler page=${page_id}: ${e.message}`);
+    const status = e?.status ? ` status=${e.status}` : '';
+    logger.warn(`[chat/session] Snapshot-Load fehlgeschlagen page=${page_id}${status}: ${e.message}`);
   }
 
   // Orphan-Cleanup: vorher angelegte leere Sessions desselben Users für dieselbe

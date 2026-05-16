@@ -4,14 +4,14 @@ const { db, getTokenForRequest } = require('../../db/schema');
 const { callAIChat, callAIWithTools, parseJSONLenient, chatTemperature, CHARS_PER_TOKEN, MAX_TOKENS_OUT, INPUT_BUDGET_TOKENS, INPUT_BUDGET_CHARS } = require('../../lib/ai');
 const {
   _promptConfig,
-  makeJobLogger, updateJob, completeJob, failJob, i18nError,
+  makeJobLogger, updateJob, completeJob, failJob, i18nError, bsHttpError,
   getPrompts, getBookPrompts,
   htmlToText, jobAbortControllers,
-  BS_URL,
   jobs, runningJobs, createJob, enqueueJob, jobKey, findActiveJobId,
   jsonBody,
   getFiguren, getLatestReview, buildChatMessageHistory,
 } = require('./shared');
+const contentStore = require('../../lib/content-store');
 const { executeTool } = require('./book-chat-tools');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
@@ -73,21 +73,12 @@ async function runChatJob(jobId, sessionId, userMsgId, message, userEmail, userT
     if (!session) throw i18nError('job.error.sessionNotFound');
     logger.info(`Start: «${session.page_name || '-'}» session=${sessionId}, page=${session.page_id || '-'}, msg-len=${message.length}`);
 
-    // Seiteninhalt frisch aus BookStack laden
+    // Seiteninhalt frisch laden (via content-store)
     let pageText = '';
     let pageUpdatedAt = null;
     if (session.page_id && session.page_id > 0) {
       try {
-        const authHeader = userToken
-          ? `Token ${userToken.id}:${userToken.pw}`
-          : `Token ${process.env.TOKEN_ID || ''}:${process.env.TOKEN_KENNWORT || ''}`;
-        const jobSignal = jobAbortControllers.get(jobId)?.signal;
-        const pdResp = await fetch(`${BS_URL}/api/pages/${session.page_id}`, {
-          headers: { Authorization: authHeader },
-          signal: jobSignal ? AbortSignal.any([jobSignal, AbortSignal.timeout(30000)]) : AbortSignal.timeout(30000),
-        });
-        if (!pdResp.ok) throw new Error(`BookStack ${pdResp.status}: ${await pdResp.text()}`);
-        const pd = await pdResp.json();
+        const pd = await contentStore.loadPage(session.page_id, userToken);
         pageText = htmlToText(pd.html || '');
         pageUpdatedAt = pd.updated_at || null;
       } catch (e) {
@@ -211,7 +202,6 @@ async function runBookChatJob(jobId, sessionId, userMsgId, message, userEmail, u
 
     if (!userToken) throw i18nError('job.error.noBookstackToken');
 
-    const authHeader = `Token ${userToken.id}:${userToken.pw}`;
     const cacheKey = `${session.book_id}:${userEmail}`;
     const jobSignal = jobAbortControllers.get(jobId)?.signal;
 
@@ -223,13 +213,12 @@ async function runBookChatJob(jobId, sessionId, userMsgId, message, userEmail, u
       updateJob(jobId, { statusText: 'job.phase.pagesFromCache', progress: 40 });
     } else {
       updateJob(jobId, { statusText: 'job.phase.pageListLoading', progress: 8 });
-      const fetchSignal = jobSignal ? AbortSignal.any([jobSignal, AbortSignal.timeout(30000)]) : AbortSignal.timeout(30000);
-      const pagesListResp = await fetch(
-        `${BS_URL}/api/pages?filter[book_id]=${session.book_id}&count=500`,
-        { headers: { Authorization: authHeader }, signal: fetchSignal }
-      );
-      if (!pagesListResp.ok) throw i18nError('job.error.bookstackPageList', { status: pagesListResp.status });
-      const pages = (await pagesListResp.json()).data || [];
+      let pages;
+      try { pages = await contentStore.listPages(session.book_id, userToken); }
+      catch (e) {
+        if (e?.status) throw i18nError('job.error.bookstackPageList', { status: e.status });
+        throw e;
+      }
 
       const BATCH = 5;
       pageContents = [];
@@ -242,15 +231,11 @@ async function runBookChatJob(jobId, sessionId, userMsgId, message, userEmail, u
         });
         const batch = pages.slice(i, i + BATCH);
         const results = await Promise.allSettled(batch.map(async p => {
-          const batchSignal = jobSignal ? AbortSignal.any([jobSignal, AbortSignal.timeout(30000)]) : AbortSignal.timeout(30000);
-          const r = await fetch(`${BS_URL}/api/pages/${p.id}`, {
-            headers: { Authorization: authHeader },
-            signal: batchSignal,
-          });
-          if (!r.ok) return null;
-          const pd = await r.json();
-          const text = htmlToText(pd.html || '').trim();
-          return text ? { name: p.name, id: p.id, slug: p.slug, book_slug: p.book_slug, text } : null;
+          try {
+            const pd = await contentStore.loadPage(p.id, userToken);
+            const text = htmlToText(pd.html || '').trim();
+            return text ? { name: p.name, id: p.id, slug: p.slug, book_slug: p.book_slug, text } : null;
+          } catch { return null; }
         }));
         for (const r of results) {
           if (r.status === 'fulfilled' && r.value) pageContents.push(r.value);

@@ -1,22 +1,21 @@
-// Service Worker: hält die SPA-Shell und BookStack-Inhalte offline verfügbar (Zug-Szenario).
+// Service Worker: hält die SPA-Shell und Buch-Inhalte offline verfügbar (Zug-Szenario).
 // Strategie:
 //  - Shell-Assets (CSS/JS/Icons): Stale-While-Revalidate im SHELL_CACHE
 //  - HTML-Partials: Network-First mit Cache-Fallback (verhindert eingefrorene UI-Bugs)
-//  - BookStack-GETs (/api/*): Stale-While-Revalidate im API_CACHE → Navigation + Seiteninhalt offline
+//  - Content-GETs (/content/*): Stale-While-Revalidate im CONTENT_CACHE → Navigation + Seiteninhalt offline
 //  - Schreibende Requests (PUT/POST/DELETE): nie behandelt (method-Check am Anfang)
 //  - Auth/KI/Job-Queue/SSE: Network-Only, nie cachen
 //  - Version-Bump der Konstanten invalidiert den jeweiligen Cache
 
-const SHELL_CACHE = 'schreibwerkstatt-shell-v509';
-const API_CACHE = 'schreibwerkstatt-api-v3';
+const SHELL_CACHE = 'schreibwerkstatt-shell-v510';
 const CONTENT_CACHE = 'schreibwerkstatt-content-v1';
 const CONFIG_CACHE = 'schreibwerkstatt-config-v2';
-const ACTIVE_CACHES = new Set([SHELL_CACHE, API_CACHE, CONTENT_CACHE, CONFIG_CACHE]);
+const ACTIVE_CACHES = new Set([SHELL_CACHE, CONTENT_CACHE, CONFIG_CACHE]);
 const SHELL_PATH = '/index.html';
 const CONFIG_PATH = '/config';
 
 // Pfade, die niemals aus dem Cache kommen dürfen (dynamische/auth-pflichtige Daten, Streams).
-// /api/* und /config sind bewusst NICHT hier – sie haben eigene SWR-Handler.
+// /content/* und /config sind bewusst NICHT hier – sie haben eigene SWR-Handler.
 const NEVER_CACHE_PREFIXES = [
   '/auth/',
   '/claude',
@@ -116,18 +115,18 @@ async function handleShellAsset(req) {
   return new Response('Offline', { status: 503 });
 }
 
-// BookStack-GETs: Stale-While-Revalidate, damit Buch-/Kapitel-/Seitenlisten
-// und einzelne Seiteninhalte (/api/pages/:id) offline lesbar bleiben.
+// Content-GETs: Stale-While-Revalidate, damit Buch-/Kapitel-/Seitenlisten
+// und einzelne Seiteninhalte (/content/pages/:id) offline lesbar bleiben.
 // 401/Fehlerantworten werden nicht gecacht, damit Login-Redirects nicht festfrieren.
 //
-// LRU-Bound: ohne Limit wächst der API-Cache mit jeder besuchten Seite und
-// verbraucht auf Long-Running-Sessions zig MB. MAX_API_CACHE_ENTRIES kappt
+// LRU-Bound: ohne Limit wächst der Cache mit jeder besuchten Seite und
+// verbraucht auf Long-Running-Sessions zig MB. MAX_CONTENT_CACHE_ENTRIES kappt
 // nach FIFO (cache.keys() liefert Insertion-Order in allen Browsern, die SW
 // unterstützen).
-const MAX_API_CACHE_ENTRIES = 200;
-async function _evictApiCache(cache) {
+const MAX_CONTENT_CACHE_ENTRIES = 200;
+async function _evictContentCache(cache) {
   const keys = await cache.keys();
-  const overflow = keys.length - MAX_API_CACHE_ENTRIES;
+  const overflow = keys.length - MAX_CONTENT_CACHE_ENTRIES;
   if (overflow > 0) {
     for (let i = 0; i < overflow; i++) await cache.delete(keys[i]);
   }
@@ -152,7 +151,7 @@ async function _handleSwr(req, cacheName) {
   const netPromise = fetch(req).then(async (res) => {
     if (res && res.ok && res.type !== 'opaqueredirect') {
       await cache.put(req, res.clone());
-      await _evictApiCache(cache);
+      await _evictContentCache(cache);
     }
     return res;
   }).catch(() => null);
@@ -169,7 +168,6 @@ async function _handleSwr(req, cacheName) {
   });
 }
 
-function handleApi(req)     { return _handleSwr(req, API_CACHE); }
 function handleContent(req) { return _handleSwr(req, CONTENT_CACHE); }
 
 // /config liefert Session-User + Provider-Config. SWR, damit wiederkehrende
@@ -208,23 +206,17 @@ self.addEventListener('message', (event) => {
   if (event.data?.type === 'auth-logout') {
     event.waitUntil((async () => {
       await Promise.all([
-        caches.delete(API_CACHE),
         caches.delete(CONTENT_CACHE),
         caches.delete(CONFIG_CACHE),
       ]);
       event.source?.postMessage?.({ type: 'auth-logout-done' });
     })());
   }
-  // Invalidiert SWR-Cache-Einträge nach Writes. Ohne diesen Bust liefert SWR
+  // Invalidiert CONTENT_CACHE-Einträge nach Writes. Ohne diesen Bust liefert SWR
   // nach einem PUT weiterhin die alte Fassung beim nächsten GET — und ein
   // Read-Modify-Write-Pfad (Lektorat-Save, Chat-Vorschlag) überschreibt damit
-  // frische User-Edits mit Stale-Daten.
-  // `invalidate-api`: paths sind BookStack-API-Subpfade ohne `/api/`-Prefix.
-  // `invalidate-content`: paths sind /content/*-Subpfade ohne `/content/`-Prefix.
-  if (event.data?.type === 'invalidate-api') {
-    const paths = Array.isArray(event.data.paths) ? event.data.paths : [];
-    event.waitUntil(_invalidateCacheEntries(API_CACHE, paths, '/api/'));
-  }
+  // frische User-Edits mit Stale-Daten. paths sind /content/*-Subpfade
+  // ohne `/content/`-Prefix.
   if (event.data?.type === 'invalidate-content') {
     const paths = Array.isArray(event.data.paths) ? event.data.paths : [];
     event.waitUntil(_invalidateCacheEntries(CONTENT_CACHE, paths, '/content/'));
@@ -257,10 +249,6 @@ self.addEventListener('fetch', (event) => {
   }
   if (url.pathname === CONFIG_PATH) {
     event.respondWith(handleConfig(req));
-    return;
-  }
-  if (url.pathname.startsWith('/api/')) {
-    event.respondWith(handleApi(req));
     return;
   }
   if (url.pathname.startsWith('/content/')) {

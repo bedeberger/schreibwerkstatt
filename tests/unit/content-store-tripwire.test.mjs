@@ -28,6 +28,12 @@ const ALLOW_BS_CALLERS = new Set([
 const ALLOW_PREFIXES = [];
 
 const BS_RE = /\bbs(Get|GetAll|Put|Post|Delete|Batch)\b/;
+// Direkter BookStack-URL- oder /api/-Zugriff ohne content-store dazwischen.
+// Routen, die `/api/...` rauspipen (OAuth, OpenThesaurus, Anthropic etc.),
+// matchen das BS_RE nicht und werden hier sondergeprueft. Pfade ausserhalb
+// von lib/bookstack.js + lib/content-store.js duerfen weder die BookStack-
+// Origin direkt referenzieren noch `/api/`-Pfade dorthin bauen.
+const BOOKSTACK_URL_RE = /\bBOOKSTACK_URL\b/;
 
 function walk(dir, out = []) {
   for (const entry of readdirSync(dir)) {
@@ -69,4 +75,34 @@ test('no bs* calls in routes/lib outside content-store + allowed legacy callers'
   }
   assert.equal(violations.length, 0,
     'Server-seitiger Direktaufruf von bs* ausserhalb der Allowlist:\n  ' + violations.join('\n  '));
+});
+
+// Routen/Libs duerfen BookStack-Origin nicht direkt referenzieren — alles geht
+// ueber content-store. Allowlist analog zu bs*-Check. routes/proxies.js
+// bleibt als Allowed: CSP-Origin-Berechnung + `/api/*`-Proxy-Mount sind
+// notwendige Setup-Punkte fuer den BookStack-Pass-Through-Proxy (wird mit
+// Schritt 5/Phase 7 demontiert).
+const ALLOW_BS_URL = new Set([
+  'lib/bookstack.js',
+  'lib/content-store.js',
+  'routes/proxies.js',     // CSP-Origin + /api/* Proxy-Mount (Schritt 5/Phase 7)
+  'lib/pdf-render/images.js', // Asset-Proxy: BookStack-Image-URLs aufloesen
+]);
+
+test('no direct BOOKSTACK_URL reference outside content-store / lib/bookstack / proxies-mount', () => {
+  const violations = [];
+  for (const dir of SCAN_DIRS) {
+    for (const file of walk(dir)) {
+      const rel = relative(REPO_ROOT, file);
+      if (ALLOW_BS_URL.has(rel)) continue;
+      const src = readFileSync(file, 'utf8');
+      const lines = src.split('\n');
+      for (let i = 0; i < lines.length; i++) {
+        const line = stripComments(lines[i]);
+        if (BOOKSTACK_URL_RE.test(line)) violations.push(`${rel}:${i + 1}: ${lines[i].trim()}`);
+      }
+    }
+  }
+  assert.equal(violations.length, 0,
+    'Direkter BOOKSTACK_URL-Zugriff ausserhalb content-store:\n  ' + violations.join('\n  '));
 });

@@ -6,7 +6,6 @@
 // ueber `bsHttpError` aus shared/jobs.js. So bleibt content-store die SSoT,
 // und es gibt keinen zweiten Layer mehr, der bs*-Aufrufe versteckt.
 
-const { BOOKSTACK_URL: BS_URL } = require('../../../lib/bookstack');
 const { getBookSettings } = require('../../../db/schema');
 const { getPrompts } = require('../../../lib/prompts-loader');
 
@@ -24,4 +23,4 @@ async function getBookPrompts(bookId, userEmail = null) {
   return getLocalePromptsForBook(locale, settings.buchtyp || null, settings.buch_kontext || null, !!settings.is_finished);
 }
 
-module.exports = { BS_URL, getBookPrompts };
+module.exports = { getBookPrompts };

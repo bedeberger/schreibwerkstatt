@@ -1,13 +1,10 @@
 const express = require('express');
-const { createProxyMiddleware, fixRequestBody } = require('http-proxy-middleware');
 const logger = require('../logger');
 const { MAX_TOKENS_OUT, MODEL_CONTEXT, CHARS_PER_TOKEN, ollamaTemp, llamaTemp } = require('../lib/ai');
 const { getBookLocale, getUser, getTokenForRequest } = require('../db/schema');
 const { getPrompts, getPromptConfig } = require('../lib/prompts-loader');
 const { toIntId } = require('../lib/validate');
-const { cleanPageHtml } = require('../lib/html-clean');
-
-const BOOKSTACK_URL = process.env.API_HOST || process.env.BOOKSTACK_URL || 'http://localhost:80';
+const { BOOKSTACK_URL } = require('../lib/bookstack');
 
 // Allowlist für den /claude-, /ollama- und /llama-Proxy: Client darf kein beliebiges
 // `system` schicken. Stattdessen `promptKind` angeben – Server löst den System-Prompt
@@ -364,80 +361,4 @@ router.get('/openthesaurus/synonyms', async (req, res) => {
   }
 });
 
-// Page-HTML-Sanitizer für Schreibvorgänge. Vor dem Proxy gemountet; parsed JSON
-// nur für Page-Writes, kollabiert leere Absätze (`<p></p>`, `<p><br></p>`,
-// `<br><br>`-Runs) und triggert beim Proxy `fixRequestBody`. Catched alle Pfade
-// (Lektorat-Save, Chat-Apply, History-Apply, Editor-Save, Future-Routen) — nicht
-// nur die, die im Frontend manuell gefiltert sind.
-const _pageWriteJson = express.json({ limit: '10mb' });
-function _isPageWrite(req) {
-  if (req.method !== 'PUT' && req.method !== 'POST') return false;
-  return /^\/pages(?:\/\d+)?\/?$/.test(req.path);
-}
-const bookstackPageCleaner = (req, res, next) => {
-  if (!_isPageWrite(req)) return next();
-  _pageWriteJson(req, res, (err) => {
-    if (err) return next(err);
-    if (req.body && typeof req.body.html === 'string') {
-      try {
-        req.body.html = cleanPageHtml(req.body.html);
-      } catch (e) {
-        logger.warn(`HTML-Cleaner fehlgeschlagen (${req.method} ${req.path}): ${e.message}`);
-      }
-    }
-    next();
-  });
-};
-
-// Proxy /api/* → BookStack. Token wird pro Request aus der DB gezogen, nicht
-// aus der Session – sonst würde ein Token-Update auf Gerät A die Sessions auf
-// anderen Geräten nicht erreichen (stale-token → fälschliches 401).
-const bookstackProxy = createProxyMiddleware({
-  target: BOOKSTACK_URL,
-  changeOrigin: true,
-  pathRewrite: { '^/': '/api/' },
-  on: {
-    proxyReq: (proxyReq, req) => {
-      // Lektorat-Session-Cookie nicht an BookStack weiterreichen — BookStack sieht
-      // sonst Cookie + Token gleichzeitig und auth-fallback hängt sich an die
-      // (anonyme) Session statt am Token, Resultat: 403 "no API permission".
-      proxyReq.removeHeader('cookie');
-      proxyReq.removeHeader('Authorization');
-      const t = getTokenForRequest(req);
-      if (t) {
-        proxyReq.setHeader('Authorization', `Token ${t.id}:${t.pw}`);
-      }
-      // Wenn Body bereits geparst wurde (Page-Cleaner-Pfad), Stream neu serialisieren.
-      // Ohne fixRequestBody hängt sich der Proxy auf, weil der Stream konsumiert ist.
-      if (req.body && Object.keys(req.body).length > 0) {
-        fixRequestBody(proxyReq, req);
-      }
-    },
-    proxyRes: (proxyRes, req, res) => {
-      // BookStack meldet fehlende Auth per Redirect zur Login-Seite (301/302);
-      // widerrufene/ungültige Tokens per 401. Beides → einheitlicher Fehler-Code.
-      if (proxyRes.statusCode === 301 || proxyRes.statusCode === 302 || proxyRes.statusCode === 401) {
-        proxyRes.destroy();
-        // headersSent-Guard: wenn http-proxy-middleware bereits Header relayed
-        // hat, würde res.status() einen "Cannot set headers"-Crash werfen.
-        if (!res.headersSent) res.status(401).json({ error_code: 'BOOKSTACK_UNAUTHED' });
-        return;
-      }
-      // Erfolgreiche Page-Creates loggen (POST /pages → 200/201).
-      if (req.method === 'POST'
-          && /^\/pages\/?$/.test(req.url)
-          && proxyRes.statusCode >= 200 && proxyRes.statusCode < 300) {
-        const name = req.body?.name ? `«${req.body.name}»` : '';
-        const book = req.body?.book_id ? ` book=${req.body.book_id}` : '';
-        const chap = req.body?.chapter_id ? ` chap=${req.body.chapter_id}` : '';
-        logger.info(`Seite erstellt ${name}${book}${chap}`.trim());
-      }
-    },
-    error: (err, _req, res) => {
-      logger.error('BookStack proxy error: ' + err.message);
-      if (!res.headersSent) res.status(502).json({ error_code: 'BOOKSTACK_UNREACHABLE', params: { detail: err.message } });
-    }
-  }
-});
-
-module.exports = { router, bookstackProxy, bookstackPageCleaner, BOOKSTACK_URL };
+module.exports = { router };

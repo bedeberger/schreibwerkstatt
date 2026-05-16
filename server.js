@@ -21,7 +21,8 @@ const chatRouter = require('./routes/chat');
 const ideenRouter = require('./routes/ideen');
 const bookSettingsRouter = require('./routes/booksettings');
 const userSettingsRouter = require('./routes/usersettings');
-const { router: proxiesRouter, bookstackProxy, bookstackPageCleaner, BOOKSTACK_URL } = require('./routes/proxies');
+const { router: proxiesRouter } = require('./routes/proxies');
+const { BOOKSTACK_URL } = require('./lib/bookstack');
 const { router: syncRouter, syncAllBooks } = require('./routes/sync');
 const exportRouter = require('./routes/export');
 const pdfExportRouter = require('./routes/pdf-export');
@@ -42,8 +43,8 @@ app.set('trust proxy', 1);
 // img-src enthält die BookStack-Origin (Editor-Preview rendert Server-HTML mit
 // absoluten BookStack-Bild-URLs) plus data:/blob: für Generated Charts/Graphs
 // plus *.googleusercontent.com für Google-Profilbilder im Avatar-Menü.
-// connect-src 'self' deckt alle XHR/SSE-Endpunkte (Server proxy'd Anthropic,
-// Ollama, BookStack); Plausible darf an seine eigene Origin posten.
+// connect-src 'self' deckt alle XHR/SSE-Endpunkte (Server proxy'd Anthropic +
+// Ollama; Storage geht ueber /content/*); Plausible darf an seine eigene Origin posten.
 const PLAUSIBLE_ORIGIN = 'https://analytics.david-berger.ch';
 const cspBookstackOrigin = (() => {
   try { return new URL(BOOKSTACK_URL).origin; }
@@ -184,7 +185,7 @@ app.use((req, res, next) => {
 
 // ── Auth-Guard ────────────────────────────────────────────────────────────────
 // API-Pfade → 401 JSON; HTML-Pfade → Redirect zu /auth/login
-const API_PREFIXES = ['/api/', '/history/', '/figures/', '/locations/', '/jobs/', '/sync/', '/chat/', '/booksettings/', '/content/', '/me/', '/config', '/claude', '/ollama', '/llama'];
+const API_PREFIXES = ['/history/', '/figures/', '/locations/', '/jobs/', '/sync/', '/chat/', '/booksettings/', '/content/', '/me/', '/config', '/claude', '/ollama', '/llama'];
 
 app.use((req, res, next) => {
   if (req.session?.user) return next();
@@ -266,7 +267,6 @@ app.use((req, _res, next) => {
 });
 
 app.use(staticServe);
-app.use('/api', bookstackPageCleaner, bookstackProxy);
 
 const server = app.listen(PORT, '0.0.0.0', () => {
   logger.info(`Lektorat läuft auf http://0.0.0.0:${PORT}`);

@@ -49,8 +49,10 @@ function _httpError(method, path, status, body) {
   return err;
 }
 
-// SW-Cache-Invalidation nach Writes. Spiegelt _invalidateApiCache aus
-// api-bookstack.js, aber im /content/*-Namespace (eigener CONTENT_CACHE in sw.js).
+// SW-Cache-Invalidation nach Writes: ohne Bust serviert SWR auf Folge-Reads
+// die alte Fassung — ein Read-Modify-Write-Pfad (Lektorat-Save, Chat-Vorschlag)
+// ueberschreibt sonst frische Server-Edits mit Stale-Daten. Postmessage an
+// public/sw.js#invalidate-content-Handler im CONTENT_CACHE-Namespace.
 function _invalidateContentCache(paths) {
   if (typeof navigator === 'undefined') return;
   const ctrl = navigator.serviceWorker?.controller;

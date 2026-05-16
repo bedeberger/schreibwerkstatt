@@ -44,8 +44,6 @@ module.exports = {
   _modelName: model._modelName,
   settledAll: ai.settledAll,
 
-  BS_URL: bs.BS_URL,
-
   htmlToText: ai.htmlToText,
   cleanPageTextForClaude: ai.cleanPageTextForClaude,
 

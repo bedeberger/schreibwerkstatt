@@ -13,26 +13,6 @@ Editor + WYSIWYG ändern sich nicht: App nutzt eigenen CodeMirror-basierten Edit
 
 ---
 
-## Vor-Phase — Repo-Indirektion (Architektur-Abstraktion ohne Storage-Swap)
-
-Ziel: Editor/Lektorat/Chat/History sprechen nur noch mit einer Domain-Repository-API (`contentRepo` Frontend, `content-store` Server). BookStack-URL-Form, BookStack-JSON-Shape und Token-Hantierung bleiben auf wenige Dateien begrenzt. Phase 1 (Read-Replica) tauscht dann nur Implementierungen, keine Call-Sites.
-
-**Status:**
-
-- [x] **Schritt 1 — Server: Normalisierte Endpunkte.** [lib/content-mapper.js](../lib/content-mapper.js) (mapBook/mapChapter/mapPage/mapPageMeta) + [routes/content.js](../routes/content.js) gemountet unter `/content`. Endpunkte: `GET /content/books`, `GET /content/books/:id`, `GET /content/books/:id/tree`, `GET /content/chapters/:id`, `GET /content/pages/:id`, `PUT /content/pages/:id` (mit `cleanPageHtml`), `POST /content/books` (upserted lokale books-Row). Intern weiter `bsGet`/`bsGetAll`/`bsPut`/`bsPost` aus [lib/bookstack.js](../lib/bookstack.js) — `bsPut` neu für symmetrischen Write-Chokepoint. Unit-Test: [tests/unit/content-mapper.test.mjs](../tests/unit/content-mapper.test.mjs).
-- [x] **Schritt 2 — Frontend: Repository-Modul.** [public/js/repo/content.js](../public/js/repo/content.js) mit `listBooks/loadBook/bookTree/loadChapter/loadPage/savePage/createBook`. SW erweitert ([public/sw.js](../public/sw.js)): neuer `CONTENT_CACHE`-Namespace via gemeinsame `_handleSwr`-Helper, `invalidate-content`-Postmessage parallel zu `invalidate-api`, `SHELL_CACHE` v508→v509 gebumpt, Logout-Cleanup um `CONTENT_CACHE` ergaenzt. Caller-Migration kommt in Schritt 3. Unit-Test: [tests/unit/content-repo.test.mjs](../tests/unit/content-repo.test.mjs).
-- [x] **Schritt 3 — Call-Sites umstellen (Editor/Lektorat-Pfade).** Frontend-Tree-Reads: [public/js/tree.js](../public/js/tree.js) konsumiert `contentRepo.listBooks` + `contentRepo.bookTree`. Page-Reads: [public/js/app-view.js](../public/js/app-view.js) (selectPage + refetch), [public/js/chat.js](../public/js/chat.js) (Pre-Send-Refresh + Chat-Apply), [public/js/history.js](../public/js/history.js), [public/js/api-bookstack.js](../public/js/api-bookstack.js) (`_checkPageConflict`, `_loadApplyAndSave`). Page-Writes: [public/js/editor/edit.js](../public/js/editor/edit.js) (saveEdit + quickSave), [public/js/api-bookstack.js](../public/js/api-bookstack.js) (Lektorat-Save), [public/js/offline-sync.js](../public/js/offline-sync.js) (Draft-Push), [public/js/cards/book-editor-card.js](../public/js/cards/book-editor-card.js). Buch-Create: [public/js/book-create.js](../public/js/book-create.js) → `contentRepo.createBook`. Mapper-Erweiterung: `mapPage` exportiert `updated_by_name` + `revision_count`; `mapChapter`/`mapPageMeta` zusätzlich `book_slug` (UI-Deeplink in Tree). Tests angepasst: [tests/unit/pre-save-conflict.test.mjs](../tests/unit/pre-save-conflict.test.mjs) + [tests/unit/stale-write.test.mjs](../tests/unit/stale-write.test.mjs) stubben jetzt `fetch` statt `bsGet`. Tripwire-Test: [tests/unit/content-repo-tripwire.test.mjs](../tests/unit/content-repo-tripwire.test.mjs) — fail-fast bei jedem neuen `/api/` oder `bs*` ausserhalb der Allowlist.
-- [x] **Schritt 3b — Strukturoperationen migriert.** Server-Routen ergänzt in [routes/content.js](../routes/content.js): `POST /content/pages`, `DELETE /content/pages/:id`, `POST /content/chapters`, `PUT /content/chapters/:id`, `DELETE /content/chapters/:id`, `DELETE /content/books/:id`. `PUT /content/pages/:id` akzeptiert zusätzlich `position` (→ BookStack-`priority`) und `chapter_id` (Drag/Drop). `bsDelete` neu in [lib/bookstack.js](../lib/bookstack.js). Repo erweitert: `createPage/updatePage/deletePage/createChapter/updateChapter/deleteChapter/deleteBook`. Call-Sites migriert: [public/js/cards/book-organizer-card.js](../public/js/cards/book-organizer-card.js) (8 Operationen), [public/js/tree.js](../public/js/tree.js) (createChapter), [public/js/cards/kapitel-review-card.js](../public/js/cards/kapitel-review-card.js) (createPage), [public/js/book-settings.js](../public/js/book-settings.js) (deleteBook). [public/js/api-bookstack.js](../public/js/api-bookstack.js) ist auf reine Lektorat-Domain-Logik (`_loadApplyAndSave`, `_applyStilkorrektur`, `_checkPageConflict`) + Local-Cache-Helper (`bsRegisterPageLocally`/`bsRegisterChapterLocally`) reduziert — alle `bs*`/`_invalidateApiCache` entfernt.
-- [x] **Schritt 3c — Search migriert.** Route `GET /content/search?query=…&book_id=…&count=…` in [routes/content.js](../routes/content.js); augmentiert Query mit `{type:page} {in_book:N}` server-seitig, filtert Page-Hits, gibt `{ hits: [PageMeta] }` zurück. Frontend: [public/js/bookstack-search.js](../public/js/bookstack-search.js) → `contentRepo.search`. AbortController fuer in-flight-Cancellation via seq-Guard (Repo-Search akzeptiert noch kein Signal; folgt mit Schritt 4).
-- [x] **Schritt 4 — Server-Loader-Abstraktion.** [lib/content-store.js](../lib/content-store.js) ist die serverseitige SSoT (`listBooks/loadBook/bookTree/listChapters/loadChapter/createChapter/updateChapter/deleteChapter/listPages/loadPage/savePage/createPage/deletePage/createBook/deleteBook/searchPages/loadPagesBatch`). Token-Resolution intern via `_resolveToken(ctx)` — akzeptiert Express-`req` (zieht via `getTokenForRequest` aus DB+Session) oder direkt ein Token-Object (fuer Cron/Jobs). Konsumenten: [routes/content.js](../routes/content.js) (duenne HTTP-Schicht), [routes/book-editor.js](../routes/book-editor.js) (bookTree + loadPagesBatch), [routes/jobs/shared/loader.js](../routes/jobs/shared/loader.js) (Job-Loader nutzt `loadPagesBatch`), [routes/export.js](../routes/export.js) (`loadBook`). [routes/books.js](../routes/books.js) wurde geloescht (dead nach Schritt 3) + aus [server.js](../server.js) demontiert + `/books/` aus `API_PREFIXES` entfernt.
-- [ ] **Schritt 4b — Job-Handler migrieren (deferred):** [routes/jobs/lektorat.js](../routes/jobs/lektorat.js), [routes/jobs/kapitel.js](../routes/jobs/kapitel.js), [routes/jobs/review.js](../routes/jobs/review.js), [routes/jobs/komplett/job.js](../routes/jobs/komplett/job.js), [routes/jobs/finetune-export/index.js](../routes/jobs/finetune-export/index.js), [routes/jobs/book-chat-tools.js](../routes/jobs/book-chat-tools.js), [routes/jobs/pdf-export.js](../routes/jobs/pdf-export.js) und [routes/sync.js](../routes/sync.js) rufen weiter direkt `bsGet`/`bsGetAll` mit Token aus Job-Context. Server-Tripwire ([tests/unit/content-store-tripwire.test.mjs](../tests/unit/content-store-tripwire.test.mjs)) erlaubt das via `ALLOW_PREFIXES = ['routes/jobs/']` und [routes/sync.js](../routes/sync.js)-Eintrag. Migration analog zu Schritt 3: `bsGetAll('pages?filter[book_id]=N', userToken)` → `contentStore.listPages(bookId, userToken)`, `bsGet('pages/'+id, userToken)` → `contentStore.loadPage(id, userToken)`.
-- [ ] **Schritt 5 — Token-Leak schliessen:** `req.session.bookstackToken` nur noch in [lib/bookstack.js](../lib/bookstack.js) + `lib/content-store.js`. Nach Schritt 4b auch `bookstackPageCleaner`-Middleware in [routes/proxies.js](../routes/proxies.js) ueberfluessig (kein Direkt-Schreiben an `/api/pages` mehr), entfernen.
-- [x] **Schritt 6 — Tripwire (Frontend + Server).** [tests/unit/content-repo-tripwire.test.mjs](../tests/unit/content-repo-tripwire.test.mjs) fail-fast bei jedem `bs*`-Call oder direktem `/api/`-Fetch in `public/js/**` — Allowlist ist seit Schritt 3c **leer**. [tests/unit/content-store-tripwire.test.mjs](../tests/unit/content-store-tripwire.test.mjs) fail-fast bei `bs*`-Calls in `routes/`/`lib/` ausserhalb `lib/bookstack.js`, `lib/content-store.js`, `lib/load-book-contents.js`, `routes/sync.js` und `routes/jobs/**`. Nach Schritt 4b sind nur noch `lib/bookstack.js` + `lib/content-store.js` legitim.
-
-**Folge für Phase 1+:** Replica-Sync füllt lokale Tabellen; `content-store`-Implementierung bekommt einen `USE_LOCAL_READS`-Branch. Caller-Code in Editor/Lektorat/Chat ändert sich nicht.
-
----
-
 ## Leitplanken
 
 ### Privacy-Boundary (kritisch)
@@ -52,7 +32,7 @@ Ziel: Editor/Lektorat/Chat/History sprechen nur noch mit einer Domain-Repository
 - Auth/User-Liste/Rollen/Permissions.
 - WYSIWYG-Editor (TinyMCE).
 - Volltextsuche.
-- Export (`/export/{fmt}`).
+- Export (`/api/books/:id/export/{fmt}`) — nur Buch-Scope; Kapitel-/Seiten-Export aus BookStack-UI ist kein API-Pfad.
 - Templates, Shelves.
 
 App verwendet schon eigenständig: Google-OIDC-Login, Custom-PDF-Export, Focus-Editor, alle KI-Jobs, Page-Stats, Job-Queue. BookStack bleibt für Persistenz + WYSIWYG + User-DB.
@@ -75,6 +55,7 @@ Bewusst out-of-scope (User-Wunsch): Attachments (werden nicht genutzt → kein M
 | 4a | App-User-Verwaltung | mittel (FK-Recreate) | Admin-Karte; restriktive Logins; User-Invite-Flag | 0 |
 | 4b | Book-ACL + Sharing (owner/editor/lektor/viewer) | ja | Buchliste filtert auf Shares; Rollen-Matrix | 0, 4a |
 | 4b1 | Lese-Modus (Print-CSS + readOnly) | ja | Druckansicht + readOnly für viewer | 4b |
+| 4b2 | Export-Konsolidierung (Eigenbau alle Scopes + Formate) | ja | Export-Karte für Buch/Kapitel/Seite; kein BookStack-Pass-Through mehr | 4b |
 | 4c | Admin-Settings (alle Runtime-Configs aus `.env` → DB) | ja | Admin-UI für Provider/Modell/Auth/Cron/Tuning + Backend-Auswahl | 4a |
 | 4c1 | First-Run-Setup-Wizard (`/setup`) | ja | Admin loggt sich via `ADMIN_PASSWORD` ein und konfiguriert OAuth/KI/Backend Schritt für Schritt; auch später wieder aufrufbar | 4c |
 | 4d | Token-Budget + Cost-Tracking (Admin) | ja (additiv) | Admin-Karte Usage; pro-User-Monats-Budget hard/soft; 429 bei Hard-Cap | 4a |
@@ -84,7 +65,7 @@ Bewusst out-of-scope (User-Wunsch): Attachments (werden nicht genutzt → kein M
 | 9 | Doku-Update (Multi-Backend-Sweep) | ja | keiner (Doku) | 8 |
 | 10 | Schema-Squash | ja | keiner | 9 |
 
-**Start-Reihenfolge:** Vor-Phase Schritt 5 → 0c → 0d → Vor-Phase Schritt 4 → 0 → 0b → 4a → 4c → 4c1 → 4d → 4b → 4b1 → 2 → 6 → 1 → 3 → 7 → 8 → 9 → 10.
+**Start-Reihenfolge:** Vor-Phase Schritt 5 → 0c → 0d → Vor-Phase Schritt 4 → 0 → 0b → 4a → 4c → 4c1 → 4d → 4b → 4b1 → 4b2 → 2 → 6 → 1 → 3 → 7 → 8 → 9 → 10.
 Vor-Phase Schritt 5 als Easy-Win sofort ([routes/books.js](../routes/books.js) toter Mount entfernen). 0c/0d vorab, da unabhängig von Backend-Pluralisierung und sofort gewinnbringend. Schritt 4 (`lib/content-store.js`) Pflicht-Voraussetzung für Phase 1 (Backend-Dispatch). 10 (Squash) zuletzt — Squash vorher wäre Wegwerfarbeit, weil bis dahin viele Migrationen dazukommen.
 4a/4c/4b zuerst, weil User-Identität, `app.backend`-Schalter und ACL die SSoT für alle folgenden Phasen sind. Lese-Modus (4b1, Print-CSS + readOnly) direkt nach 4b, weil viewer-Rolle erst dann existiert. Phase 7 (Suche) **vor** Phase 8, damit FTS schon steht, wenn Admin Backend wechselt — Index wird beim Bulk-Copy mitgefüllt.
 
@@ -737,6 +718,92 @@ Ablenkungsfreier Lese-Pfad für `viewer` (und alle, die „nur lesen" wollen). *
 **Aufwand:** 0.5-1 Tag (Print-CSS + readOnly-Guard + minRole-Filter-Wiring aus Phase 4b).
 
 **Falls später echter E-Reader gewünscht:** Plan-Stand vor diesem Cut steht in git-History dieser Datei (`git log -p docs/bookstack-exit.md`).
+
+---
+
+## Phase 4b2 — Export-Scopes (Kapitel + Seite)
+
+Heute exportiert [routes/export.js](../routes/export.js) und [routes/jobs/pdf-export.js](../routes/jobs/pdf-export.js) ausschliesslich auf Buch-Ebene. Beim Schreiben einzelner Kapitel/Seiten will man oft *nur* diesen Ausschnitt herausziehen — für Beta-Leser, Druckabzug einzelner Szenen, Übergabe an Lektor. Diese Phase ergänzt Kapitel- und Seiten-Scope für **alle bestehenden Formate** (PDF, HTML, TXT, MD, EPUB, DOCX) und für den Custom-PDF-Renderer.
+
+**Bewusst unabhängig vom Storage-Backend:** Build-Pipeline ist storage-agnostisch (konsumiert `content-store`-Abstraktion), funktioniert sowohl für `bookstack` als auch `localdb`. Kein BookStack-Pass-Through für Kapitel/Seite, weil die BookStack-API keine `chapters/:id/export/:fmt`- oder `pages/:id/export/:fmt`-Endpoints kennt — wir bauen ohnehin alles selbst.
+
+### Lib-Refactor
+
+[lib/load-book-contents.js](../lib/load-book-contents.js) wird zu `lib/load-contents.js` (oder behält den Namen, exportiert zusätzlich):
+
+- `loadBookContents(bookId, ctx)` — bleibt unverändert (Pipeline + Multi-Chapter-Grouping).
+- `loadChapterContents(chapterId, ctx)` — `contentStore.loadChapter` + `contentStore.listPages(book_id)` gefiltert auf `chapter_id`, position-sortiert. Liefert `{ chapter, pages }` (kein `groups`-Array — Single-Chapter ist ohnehin nur eine Gruppe). Wirft `CHAPTER_EMPTY` analog `BOOK_EMPTY`.
+- `loadPageContent(pageId, ctx)` — `contentStore.loadPage(pageId)`. Wirft `PAGE_EMPTY` bei `!html`. Liefert `{ page, chapter? }` (Chapter optional für Headline-Kontext im Build).
+
+Gemeinsame Grouping-Hilfsfunktion bleibt intern: Buch-Pipeline ruft sie mit allen Chapters, Kapitel-Pipeline mit einem Chapter, Seiten-Pipeline mit einer Pseudo-Gruppe.
+
+### Routen
+
+Zwei neue GETs in [routes/export.js](../routes/export.js), identische Auth-/Format-/Filename-Pipeline:
+
+- `GET /export/chapter/:id/:fmt`
+- `GET /export/page/:id/:fmt`
+
+Pro Route:
+1. `toIntId(req.params.id)` validieren.
+2. `loadChapter`/`loadPage` zum Auflösen von `book_id` (für `setContext({ book })` + Filename-Slug).
+3. Format-Branch:
+   - **EPUB/DOCX/PDF/HTML/TXT/MD** alle via eigene Builder. EPUB/DOCX-Build wie heute, aber Input ist `{ groups: [oneGroup] }` bzw. `{ groups: [{ chapter: null, pages: [x] }] }`. PDF/HTML/TXT/MD-Build neu (heute nur BookStack-Pass-Through); kann auf der gleichen `groups`-Struktur arbeiten — PDF via `lib/pdf-render.js` (Custom-Profil-Render, Default-Profil), HTML via einfacher Concat + Wrapper, TXT/MD via HTML→Text-Strip (gleiche Normalisierung wie `lib/html-clean.js` + `routes/sync.js`#htmlToText, CLAUDE.md-Regel „HTML→Text-Normalisierung").
+4. `buildExportFilename({ prefix: 'chapter'|'page', slug: chapter.slug ?? page.slug, ext: fmt, date })`. Filename-Builder bleibt unverändert; nur neuer Prefix-Wert.
+5. Pass-Through-Branch (`streamExport`) entfällt komplett, sobald Eigenbau-PDF/HTML/TXT/MD für Buch-Scope ebenfalls aktiviert ist — siehe „Folgeschritt" unten.
+
+### Folgeschritt: Buch-Export auf Eigenbau umstellen
+
+`streamExport` + `streamChapterExport`/`streamPageExport`-Varianten in [content-store.js](../lib/content-store.js) entfallen, sobald der Eigenbau auch für Buch-Scope eingeschaltet ist. Vorteil:
+- Backend-Symmetrie: `localdb` und `bookstack` liefern dieselbe Output-Qualität.
+- Keine BookStack-Layout-Drift (BookStack-PDF nutzt anderen CSS-Stack als unser Custom-PDF).
+- `streamExport` aus `content-store.js` löschen + Allowlist in Tripwire enger ziehen.
+
+Solange `bookstack`-Backend noch aktiv genutzt wird, kann der Pass-Through optional erhalten bleiben (Buch-PDF schneller, wenn BS-Server lokal). Default nach 4b2: Eigenbau für alle Scopes.
+
+### Custom-PDF (`/jobs/pdf-export`)
+
+[routes/jobs/pdf-export.js](../routes/jobs/pdf-export.js) bekommt Scope-Parameter im POST-Body:
+
+```js
+{ profileId, scope: 'book'|'chapter'|'page', entityId }
+```
+
+`entityId` ist `book_id`/`chapter_id`/`page_id`. `loadBookContents` → `loadContents({ scope, entityId, ctx })`-Dispatcher. Render-Pipeline ([lib/pdf-render.js](../lib/pdf-render.js)) bleibt unverändert (konsumiert `groups`); nur die TOC- und Cover-Logik bekommen Scope-Flags:
+- Cover: bei `chapter`/`page` weglassen (oder optional via Profil-Toggle „Cover auch bei Teil-Export anzeigen").
+- TOC: bei `page` weglassen, bei `chapter` optional auf eine Stufe begrenzen.
+- Title-Page: bei `chapter`/`page` Kapitel-/Seitentitel statt Buchtitel.
+
+Profile bleiben Buch-scoped (`pdf_export_profile.book_id`); ein Profil gilt für alle drei Scopes desselben Buchs.
+
+### Frontend
+
+[public/js/cards/export-card.js](../public/js/cards/export-card.js) bekommt Scope-Combobox (Pflicht-Pattern aus CLAUDE.md):
+- Optionen: „Ganzes Buch", „Aktuelles Kapitel" (nur wenn `selectedChapterId`), „Aktuelle Seite" (nur wenn `currentPageId`).
+- Default: „Ganzes Buch".
+- Format-Buttons-URL wird abhängig vom Scope gebaut: `/export/${scope}/${entityId}/${fmt}`.
+
+[public/js/cards/pdf-export-card.js](../public/js/cards/pdf-export-card.js) bekommt denselben Scope-Combobox neben dem Profil-Selector. Render-Trigger postet `{ profileId, scope, entityId }`.
+
+Quick-Pills + Command-Palette: kein neuer `FEATURES`-Eintrag nötig — die Karte `export`/`pdfExport` bleibt SSoT, Scope ist Karten-internes Detail. Optional Editor-Toolbar-Knöpfe „Kapitel als PDF" / „Seite als PDF" (kleiner Bequemlichkeitswin, hinter eigenem `FEATURES`-Eintrag wenn gewünscht).
+
+### Rollen-Matrix
+
+`export` und `pdfExport` bleiben `minRole: 'viewer'` (siehe Phase 4b). Scope ändert daran nichts — wer ein Buch sehen darf, darf auch Auszüge davon exportieren.
+
+### i18n
+
+Neue Keys: `export.scope.book`, `export.scope.chapter`, `export.scope.page`, `export.error.chapterEmpty`, `export.error.pageEmpty`. Beide Locales pflegen (CLAUDE.md-Regel).
+
+### Tests
+
+- **Unit:** `loadChapterContents` (Page-Sort, leeres Kapitel → `CHAPTER_EMPTY`), `loadPageContent` (Page ohne HTML → `PAGE_EMPTY`).
+- **Integration:** Round-Trip pro Format pro Scope — Build-Pipeline gegen Mock-`content-store`, Output-Buffer non-empty, EPUB-/DOCX-Magic-Bytes geprüft.
+- **E2E:** Scope-Combobox in Export-Karte rendert nur sichtbare Optionen je nach Navigation-State.
+
+### Aufwand
+
+1.5-2 Tage (Lib-Refactor + 2 neue Routen + Custom-PDF-Scope + Frontend-Combobox + Tests). Eigenbau-PDF/HTML/TXT/MD für Buch-Scope (Folgeschritt zur Eliminierung von `streamExport`) wird separat budgetiert, weil optional.
 
 ---
 
@@ -1448,6 +1515,7 @@ Ziel: 100+ Migrationen zu einem konsolidierten Initial-Schema kollabieren. Nach 
 | 4a | 4-6 Tage | mittel (FK-Recreate, Login-Flow) |
 | 4b | 4-5 Tage | mittel (Rollen-Matrix + Apply-Routen + minRole-Filter) |
 | 4b1 | 0.5-1 Tag | niedrig (Print-CSS + readOnly-Guard, keine neuen Tabellen) |
+| 4b2 | 1.5-2 Tage | niedrig (storage-agnostisch, baut auf bestehender EPUB/DOCX-Pipeline auf) |
 | 4c | 4-6 Tage | mittel (Backend-Switch + Hot-Reload + Test-Probes + ENV-Migration in vielen Modulen) |
 | 4c1 | 1-2 Tage | niedrig (eigenständige Wizard-Page, kleines Form-State-Modell) |
 | 5 | — | ENTFÄLLT |

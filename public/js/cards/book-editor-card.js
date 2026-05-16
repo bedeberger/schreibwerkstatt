@@ -1,10 +1,9 @@
 // Alpine.data('bookEditorCard') — Bucheditor.
 //
 // Rendert alle Kapitel + Seiten eines Buchs in Lesereihenfolge als Sequenz
-// separater contenteditable-Blöcke. Pro-Block-Save schreibt direkt zurück
-// nach BookStack (bsPut), Stale-Schutz via _checkPageConflict. HTML-Quelle
-// ist immer der BookStack-Proxy (server-cleant via bookstackPageCleaner) —
-// gleicher Vertrauensgrad wie der bestehende Seiten-Editor.
+// separater contenteditable-Blöcke. Pro-Block-Save schreibt via
+// contentRepo.savePage, Stale-Schutz via _checkPageConflict. HTML-Quelle ist
+// /content/* (server-cleant in routes/content.js via cleanPageHtml).
 //
 // Click-aktiviert-Block: Default contenteditable=false; Klick setzt aktive
 // pageId, Caret aus Mousedown-Position. Verlassen flusht Save bei dirty.

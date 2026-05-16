@@ -14,7 +14,6 @@ const { EPub } = require('epub-gen-memory');
 const HTMLtoDOCX = require('@turbodocx/html-to-docx');
 const logger = require('../logger');
 const { getTokenForRequest } = require('../db/schema');
-const { BOOKSTACK_URL, authHeader } = require('../lib/bookstack');
 const contentStore = require('../lib/content-store');
 const { loadBookContents } = require('../lib/load-book-contents');
 const { buildExportFilename } = require('../lib/filenames');
@@ -269,9 +268,7 @@ router.get('/book/:id/:fmt', async (req, res) => {
 
   let upstream;
   try {
-    upstream = await fetch(`${BOOKSTACK_URL}/api/books/${id}/export/${spec.upstream}`, {
-      headers: { Authorization: authHeader(token) },
-    });
+    upstream = await contentStore.streamExport(id, spec.upstream, token);
   } catch (e) {
     logger.error(`Export-Fetch fehlgeschlagen (book=${id}, fmt=${fmt}): ${e.message}`);
     return res.status(502).json({ error_code: 'BOOKSTACK_UNREACHABLE' });

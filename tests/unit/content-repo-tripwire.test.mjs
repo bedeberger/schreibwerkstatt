@@ -1,12 +1,7 @@
-// Tripwire-Test: BookStack-API darf nur ueber den dafuer vorgesehenen Layer
-// erreichbar sein. Caller, die direkt `/api/`-Pfade oder die `bs*`-Wrapper
-// ausserhalb der Allowlist verwenden, sind ein Architektur-Verstoss gegen
-// die Repo-Indirektion (docs/bookstack-exit.md, Schritt 6).
-//
-// Hier zaehlen NUR die Pfade, die schon migriert sind (Editor + Lektorat +
-// Chat + History + Tree-Reads + Page-Writes). Strukturoperationen (Create/
-// Rename/Reorder/Delete von Kapiteln+Seiten) sind bewusst noch nicht migriert
-// und stehen separat in der Allowlist.
+// Tripwire-Test: Storage-Zugriff im Frontend ausschliesslich ueber
+// public/js/repo/content.js (contentRepo). Direkte `/api/`-Fetches oder
+// `bs*`-Aufrufe in `public/js/**` sind ein Architektur-Verstoss gegen die
+// Repo-Indirektion und scheitern hier sofort.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
