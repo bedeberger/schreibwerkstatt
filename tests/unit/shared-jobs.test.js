@@ -20,6 +20,9 @@ process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 
 // lib/ai stubben BEVOR shared.js geladen wird. parseJSON muss spy-bar sein,
 // damit der Test verifizieren kann, dass es bei truncated:true NICHT aufgerufen wird.
+// Pflicht-Vorlauf: db/migrations erzeugt die Tabellen, die lib/app-settings
+// beim Modul-Load via prepare() aufmacht (sonst SqliteError: no such table).
+require('../../db/migrations');
 const aiPath = require.resolve('../../lib/ai');
 const realAi = require(aiPath);
 let parseCalls = 0;

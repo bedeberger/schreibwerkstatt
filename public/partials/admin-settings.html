@@ -26,7 +26,7 @@
   <div x-show="!adminSettingsLoading && Object.keys(adminSettingsMap).length">
     <!-- Tab-Leiste -->
     <nav class="admin-settings-tabs" role="tablist">
-      <template x-for="t in ['auth','provider','model','backend','jobs','cron','pdfa','advanced']" :key="t">
+      <template x-for="t in ['auth','provider','budget','backend','smtp','jobs','cron','pdfa','advanced']" :key="t">
         <button type="button" role="tab"
                 :class="['admin-settings-tab', adminSettingsTab === t ? 'is-active' : '']"
                 @click="adminSettingsSwitchTab(t)"
@@ -60,7 +60,7 @@
       </div>
     </section>
 
-    <!-- Provider-Tab -->
+    <!-- Provider-Tab: Auswahl + alle drei Provider-Sub-Sektionen parallel -->
     <section x-show="adminSettingsTab === 'provider'" class="admin-settings-section">
       <label>ai.provider
         <select x-model="adminSettingsForm['ai.provider']">
@@ -68,14 +68,28 @@
           <option value="ollama">Ollama</option>
           <option value="llama">Llama</option>
         </select>
+        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.providerChoice')"></small>
       </label>
-      <div x-show="adminSettingsForm['ai.provider'] === 'claude'">
+
+      <div :class="['admin-settings-subsection', adminSettingsForm['ai.provider'] === 'claude' ? 'is-active-provider' : '']">
+        <h4 class="admin-settings-subheading">
+          <span x-text="$app.t('admin.settings.section.claude')"></span>
+          <span x-show="adminSettingsForm['ai.provider'] === 'claude'" class="admin-settings-active-badge" x-text="$app.t('admin.settings.provider.active')"></span>
+        </h4>
         <label>ai.claude.api_key
           <input type="password" x-model="adminSettingsForm['ai.claude.api_key']" :placeholder="$app.t('admin.settings.secret.masked')">
           <small x-show="adminSettingsMap['ai.claude.api_key']?.masked" class="muted-msg muted-msg--sm" x-text="adminSettingsMap['ai.claude.api_key'].masked"></small>
         </label>
+        <label>ai.claude.model
+          <input type="text" x-model="adminSettingsForm['ai.claude.model']" placeholder="claude-sonnet-4-6">
+        </label>
       </div>
-      <div x-show="adminSettingsForm['ai.provider'] === 'ollama'">
+
+      <div :class="['admin-settings-subsection', adminSettingsForm['ai.provider'] === 'ollama' ? 'is-active-provider' : '']">
+        <h4 class="admin-settings-subheading">
+          <span x-text="$app.t('admin.settings.section.ollama')"></span>
+          <span x-show="adminSettingsForm['ai.provider'] === 'ollama'" class="admin-settings-active-badge" x-text="$app.t('admin.settings.provider.active')"></span>
+        </h4>
         <label>ai.ollama.host
           <input type="url" x-model="adminSettingsForm['ai.ollama.host']" placeholder="http://localhost:11434">
         </label>
@@ -86,21 +100,27 @@
           <input type="number" step="0.1" min="0" max="2" x-model.number="adminSettingsForm['ai.ollama.temperature']">
         </label>
       </div>
-      <div x-show="adminSettingsForm['ai.provider'] === 'llama'">
-        <label>ai.llama.host <input type="url" x-model="adminSettingsForm['ai.llama.host']"></label>
+
+      <div :class="['admin-settings-subsection', adminSettingsForm['ai.provider'] === 'llama' ? 'is-active-provider' : '']">
+        <h4 class="admin-settings-subheading">
+          <span x-text="$app.t('admin.settings.section.llama')"></span>
+          <span x-show="adminSettingsForm['ai.provider'] === 'llama'" class="admin-settings-active-badge" x-text="$app.t('admin.settings.provider.active')"></span>
+        </h4>
+        <label>ai.llama.host <input type="url" x-model="adminSettingsForm['ai.llama.host']" placeholder="http://localhost:8080"></label>
         <label>ai.llama.model <input type="text" x-model="adminSettingsForm['ai.llama.model']"></label>
         <label>ai.llama.temperature <input type="number" step="0.1" min="0" max="2" x-model.number="adminSettingsForm['ai.llama.temperature']"></label>
       </div>
+
       <div class="admin-settings-actions">
         <button type="button" @click="adminSettingsTest('provider')" x-text="$app.t('admin.settings.test.connection')"></button>
       </div>
     </section>
 
-    <!-- Modell-Tab -->
-    <section x-show="adminSettingsTab === 'model'" class="admin-settings-section">
-      <label>ai.claude.model <input type="text" x-model="adminSettingsForm['ai.claude.model']"></label>
-      <label>ai.claude.max_tokens_out <input type="number" min="1024" x-model.number="adminSettingsForm['ai.claude.max_tokens_out']"></label>
+    <!-- Budget-Tab: globale Token-Limits (gelten fuer alle Provider) -->
+    <section x-show="adminSettingsTab === 'budget'" class="admin-settings-section">
+      <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.budgetGlobal')"></p>
       <label>ai.claude.context_window <input type="number" min="8000" x-model.number="adminSettingsForm['ai.claude.context_window']"></label>
+      <label>ai.claude.max_tokens_out <input type="number" min="1024" x-model.number="adminSettingsForm['ai.claude.max_tokens_out']"></label>
       <label>ai.chars_per_token <input type="number" step="0.1" min="1" max="10" x-model.number="adminSettingsForm['ai.chars_per_token']"></label>
     </section>
 
@@ -121,6 +141,65 @@
         <label>app.bookstack.token_secret
           <input type="password" x-model="adminSettingsForm['app.bookstack.token_secret']" :placeholder="$app.t('admin.settings.secret.masked')">
         </label>
+      </div>
+    </section>
+
+    <!-- SMTP / Mailer-Tab -->
+    <section x-show="adminSettingsTab === 'smtp'" class="admin-settings-section">
+      <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.smtp.hint')"></p>
+      <label>smtp.mode
+        <select x-model="adminSettingsForm['smtp.mode']">
+          <option value="disabled">disabled</option>
+          <option value="gmail-oauth">gmail-oauth</option>
+          <option value="gmail-app-password">gmail-app-password</option>
+          <option value="generic">generic</option>
+        </select>
+      </label>
+      <label>smtp.from_email <input type="email" x-model="adminSettingsForm['smtp.from_email']" placeholder="noreply@example.com"></label>
+      <label>smtp.from_name <input type="text" x-model="adminSettingsForm['smtp.from_name']" placeholder="Schreibwerkstatt"></label>
+      <label>smtp.reply_to <input type="email" x-model="adminSettingsForm['smtp.reply_to']"></label>
+
+      <div x-show="adminSettingsForm['smtp.mode'] === 'gmail-oauth'">
+        <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.smtp.hint.gmailOauth')"></p>
+        <label>smtp.gmail.user <input type="email" x-model="adminSettingsForm['smtp.gmail.user']"></label>
+        <label>smtp.gmail.client_id
+          <input type="password" x-model="adminSettingsForm['smtp.gmail.client_id']" :placeholder="$app.t('admin.settings.secret.masked')">
+          <small x-show="adminSettingsMap['smtp.gmail.client_id']?.masked" class="muted-msg muted-msg--sm" x-text="adminSettingsMap['smtp.gmail.client_id'].masked"></small>
+        </label>
+        <label>smtp.gmail.client_secret
+          <input type="password" x-model="adminSettingsForm['smtp.gmail.client_secret']" :placeholder="$app.t('admin.settings.secret.masked')">
+        </label>
+        <label>smtp.gmail.refresh_token
+          <input type="password" x-model="adminSettingsForm['smtp.gmail.refresh_token']" :placeholder="$app.t('admin.settings.secret.masked')">
+        </label>
+      </div>
+
+      <div x-show="adminSettingsForm['smtp.mode'] === 'gmail-app-password'">
+        <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.smtp.hint.gmailAppPassword')"></p>
+        <label>smtp.gmail.user <input type="email" x-model="adminSettingsForm['smtp.gmail.user']"></label>
+        <label>smtp.gmail.app_password
+          <input type="password" x-model="adminSettingsForm['smtp.gmail.app_password']" :placeholder="$app.t('admin.settings.secret.masked')">
+        </label>
+      </div>
+
+      <div x-show="adminSettingsForm['smtp.mode'] === 'generic'">
+        <label>smtp.host <input type="text" x-model="adminSettingsForm['smtp.host']"></label>
+        <label>smtp.port <input type="number" min="1" max="65535" x-model.number="adminSettingsForm['smtp.port']"></label>
+        <label class="checkbox-row">
+          <input type="checkbox" :checked="adminSettingsForm['smtp.secure'] === true || adminSettingsForm['smtp.secure'] === 'true'"
+                 @change="adminSettingsForm['smtp.secure'] = $event.target.checked">
+          <span>smtp.secure (TLS-Direct/465)</span>
+        </label>
+        <label>smtp.user <input type="text" x-model="adminSettingsForm['smtp.user']"></label>
+        <label>smtp.password
+          <input type="password" x-model="adminSettingsForm['smtp.password']" :placeholder="$app.t('admin.settings.secret.masked')">
+        </label>
+      </div>
+
+      <label>smtp.rate_limit_per_minute <input type="number" min="1" max="500" x-model.number="adminSettingsForm['smtp.rate_limit_per_minute']"></label>
+
+      <div class="admin-settings-actions">
+        <button type="button" @click="adminSettingsTest('smtp')" x-text="$app.t('admin.settings.test.smtp')"></button>
       </div>
     </section>
 
@@ -159,14 +238,27 @@
       </label>
     </section>
 
-    <!-- Erweitert-Tab -->
+    <!-- Erweitert-Tab: global vs. Claude-only sauber getrennt -->
     <section x-show="adminSettingsTab === 'advanced'" class="admin-settings-section">
       <p class="muted-msg" x-text="$app.t('admin.settings.advanced.disclaimer')"></p>
-      <label>ai.claude.retry_max <input type="number" min="0" max="10" x-model.number="adminSettingsForm['ai.claude.retry_max']"></label>
-      <label>ai.claude.timeout_ms <input type="number" min="1000" x-model.number="adminSettingsForm['ai.claude.timeout_ms']"></label>
-      <label>ai.claude.phase1_concurrency <input type="number" min="1" max="16" x-model.number="adminSettingsForm['ai.claude.phase1_concurrency']"></label>
-      <label>ai.lektorat_batch_concurrency <input type="number" min="1" max="8" x-model.number="adminSettingsForm['ai.lektorat_batch_concurrency']"></label>
-      <label>ai.chat_temperature <input type="number" step="0.1" min="0" max="2" x-model.number="adminSettingsForm['ai.chat_temperature']"></label>
+
+      <div class="admin-settings-subsection">
+        <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.section.global')"></span></h4>
+        <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.advancedGlobal')"></p>
+        <label>ai.chat_temperature <input type="number" step="0.1" min="0" max="2" x-model.number="adminSettingsForm['ai.chat_temperature']"></label>
+        <label>ai.lektorat_batch_concurrency <input type="number" min="1" max="8" x-model.number="adminSettingsForm['ai.lektorat_batch_concurrency']"></label>
+      </div>
+
+      <div :class="['admin-settings-subsection', adminSettingsForm['ai.provider'] === 'claude' ? 'is-active-provider' : '']">
+        <h4 class="admin-settings-subheading">
+          <span x-text="$app.t('admin.settings.section.claudeOnly')"></span>
+          <span x-show="adminSettingsForm['ai.provider'] === 'claude'" class="admin-settings-active-badge" x-text="$app.t('admin.settings.provider.active')"></span>
+        </h4>
+        <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.advancedClaude')"></p>
+        <label>ai.claude.retry_max <input type="number" min="0" max="10" x-model.number="adminSettingsForm['ai.claude.retry_max']"></label>
+        <label>ai.claude.timeout_ms <input type="number" min="1000" x-model.number="adminSettingsForm['ai.claude.timeout_ms']"></label>
+        <label>ai.claude.phase1_concurrency <input type="number" min="1" max="16" x-model.number="adminSettingsForm['ai.claude.phase1_concurrency']"></label>
+      </div>
     </section>
 
     <!-- Test-Result-Anzeige -->

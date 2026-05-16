@@ -95,11 +95,17 @@ export const adminSettingsMethods = {
   async adminSettingsTest(kind) {
     const path = kind === 'provider' ? '/admin/settings/test-provider'
                : kind === 'oauth'    ? '/admin/settings/test-oauth'
+               : kind === 'smtp'     ? '/admin/settings/smtp/test-send'
                : null;
     if (!path) return;
     this.adminSettingsTestResult = { kind, running: true };
     try {
-      const r = await fetch(path, { method: 'POST', credentials: 'same-origin' });
+      const r = await fetch(path, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        credentials: 'same-origin',
+        body: kind === 'smtp' ? JSON.stringify({}) : undefined,
+      });
       const j = await r.json();
       this.adminSettingsTestResult = { kind, ...j, running: false };
     } catch (e) {

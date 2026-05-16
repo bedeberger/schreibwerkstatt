@@ -64,7 +64,6 @@ Bewusst out-of-scope (User-Wunsch): Attachments (werden nicht genutzt → kein M
 | 4b1 | Lese-Modus (Print-CSS + readOnly) | ja | Druckansicht + readOnly für viewer | 4b |
 | 4b2 | Export-Konsolidierung (Eigenbau alle Scopes + Formate) | ja | Export-Karte für Buch/Kapitel/Seite; kein BookStack-Pass-Through mehr | 4b |
 | 4c1 | First-Run-Setup-Wizard (`/setup`) | ja | Admin loggt sich via `ADMIN_PASSWORD` ein und konfiguriert OAuth/KI/Backend/SMTP Schritt für Schritt; auch später wieder aufrufbar | — |
-| 4c2 | SMTP-Mailer (Gmail/Workspace via OAuth2 oder App-Passwort) | ja | Admin konfiguriert Versand-Konto; Invite-/Notify-Mails gehen raus statt Token-Anzeige in UI | — |
 | 4d | Token-Budget + Cost-Tracking (Admin) | ja (additiv) | Admin-Karte Usage; pro-User-Monats-Budget hard/soft; 429 bei Hard-Cap | — |
 | 6 | Tags/Kategorien | ja | Filter-UI (beide Backends) | — |
 | 7 | Volltextsuche (FTS5) | ja | App-eigene Suche (beide Backends) | 1, 2, 4b |
@@ -73,7 +72,7 @@ Bewusst out-of-scope (User-Wunsch): Attachments (werden nicht genutzt → kein M
 | 10 | Schema-Squash | ja | keiner | 9 |
 | 11 | Per-User-AI-Provider-Override | ja (additiv) | Admin weist pro User claude/ollama/llama zu; User folgt sonst globalem Default | 4c, 4d |
 
-**Start-Reihenfolge:** 0b → 4c1 → 4c2 → 4a2 → 4d → 4b → 4b1 → 4b2 → 2 → 6 → 1 → 3 → 7 → 8 → 9 → 10.
+**Start-Reihenfolge:** 0b → 4c1 → 4a2 → 4d → 4b → 4b1 → 4b2 → 2 → 6 → 1 → 3 → 7 → 8 → 9 → 10.
 10 (Squash) zuletzt — Squash vorher wäre Wegwerfarbeit, weil bis dahin viele Migrationen dazukommen. Phase 11 (Per-User-AI-Provider-Override) ist additiv und kann nach 4d eingeschoben werden, sobald die Hauptkette steht.
 
 **Erledigt:**
@@ -82,6 +81,8 @@ Bewusst out-of-scope (User-Wunsch): Attachments (werden nicht genutzt → kein M
 - Phase 0 (Schema-Skelett, Migration 105 + 106 in [db/migrations.js](../db/migrations.js): additive Phase-0-Spalten auf pages/chapters/books + AUTOINCREMENT-Recreate mit `sqlite_sequence`-Wasserzeichen `≥ 1_000_000`). Dauerhafte Invariante steht oben in „Schema-Invariante (aus Phase 0)". Tests: `tests/unit/db-pragmas.test.js`, `tests/unit/cache-cleanup.test.js`, `tests/unit/schema-phase0.test.js`.
 - Phase 4a (App-User-Verwaltung): Migration 107 (`app_users` + `user_invites` mit Partial-UNIQUE + `user_sessions_audit` + `users.email`-FK), [db/app-users.js](../db/app-users.js) Helper-API, ENV-getriebener Admin-Bootstrap, OIDC-Lookup mit Status-Gate + Invite-Accept + ALLOW_OPEN_SIGNUP, `POST /auth/admin-login` mit `timingSafeEqual` + Rate-Limit ([lib/admin-login-ratelimit.js](../lib/admin-login-ratelimit.js)), `GET /login`-Landing-Page mit Google-Button + Admin-Form, `/admin/users`-Routen (Liste, Invite, Update, Soft-Delete, Audit) hinter [lib/admin-mw.js#requireAdmin](../lib/admin-mw.js), `POST /me/invite` mit `can_invite_users`-Gate, Frontend-Karte `AdminUsersCard` ([public/js/cards/admin-users-card.js](../public/js/cards/admin-users-card.js)) + Avatar-Menu-Link für Admins. Tests: `tests/unit/app-users.test.js`, `tests/unit/admin-login-ratelimit.test.js`, `tests/unit/admin-users-routes.test.js`, `tests/unit/login-page.test.js`.
 - Phase 4c (Admin-Settings): Migration 108 (`app_settings` + `app_settings_audit`), [lib/app-settings.js](../lib/app-settings.js) als SSoT-Helper mit DEFAULTS, `bootstrapFromEnv()` für initiale ENV→DB-Spiegelung (server.js-Startup), AES-Crypto via [lib/crypto.js](../lib/crypto.js) für `ENCRYPTED_KEYS`-Set (api_key, secrets, tokens), Sentinel `__unchanged__` für Re-PUTs ohne Klartext, `changed`-EventEmitter für Hot-Reload (z.B. OIDC-Client-Invalidate in [routes/auth.js](../routes/auth.js) bei `app.public_url`/`auth.google.*`-Wechsel). `/admin/settings`-Routen ([routes/admin-settings.js](../routes/admin-settings.js)) mit GET/PUT/DELETE + Test-Probes (`test-provider`, `test-oauth`). Frontend `AdminSettingsCard` ([public/js/cards/admin-settings-card.js](../public/js/cards/admin-settings-card.js)) mit 8 Tabs (auth, provider, model, backend, jobs, cron, pdfa, advanced) + Save-Diff (sendet nur dirty Keys). ENV-Reads in Konsumenten bleiben vorerst als Fallback — Strict-ENV-Kill verschiebt sich auf Folge-Refactor. Tests: `tests/unit/app-settings.test.js`, `tests/unit/admin-settings-routes.test.js`.
+- Phase 4c1 (First-Run-Setup-Wizard): [routes/setup.js](../routes/setup.js) mit `GET /setup` (HTML), `GET /setup/state` (Steps + Values + Masked-Flags), `POST /setup/:step` (publicUrl/oauth/emails/ai/backend/smtp je atomar, Encrypted-Sentinel `__unchanged__` honored, leerer Secret-Wert = kein Overwrite), `POST /setup/test/{oauth,provider,backend,smtp}` (smtp-Probe Stub bis Phase 4c2), `POST /setup/complete` (setzt `app.setup_completed=true` + spiegelt `ADMIN_EMAIL` nach `auth.admin_email`). Standalone-Wizard-Frontend ([public/setup.html](../public/setup.html) + [public/js/setup.js](../public/js/setup.js) + [public/css/setup.css](../public/css/setup.css)) ohne Alpine, eigene Inline-i18n (DE/EN aus `navigator.language`). Admin-only via `requireAdmin`. `/config` liefert `setupCompleted`-Flag; `toggleAdminUsersCard` + `toggleAdminSettingsCard` redirecten auf `/setup`, solange Admin nicht abgeschlossen hat. Tests: `tests/unit/setup-routes.test.js` (18 Cases — Guards, Step-Validierung, Encrypted-Sentinel, Complete, smtp-Stub).
+- Phase 4c2 (SMTP-Mailer): nodemailer-Dep, [lib/mailer.js](../lib/mailer.js) als Singleton-Service mit Mode-Auflösung (`disabled`/`gmail-oauth`/`gmail-app-password`/`generic`), In-Memory-Rate-Limit (30/min Default), Settings-Change-Event-Hook (Cache-Invalidate bei `smtp.*`-Wechsel), Test-Transport-Factory für Tests. [lib/mailer-templates.js](../lib/mailer-templates.js) mit `invite` + `test`-Template, i18n-Lookup (de/en), HTML-Escape gegen Injection. Admin-Routen `GET /admin/settings/smtp/test-config` + `POST /admin/settings/smtp/test-send`. Frontend `AdminSettingsCard`-Tab „SMTP / Mailer" mit Mode-abhängigen Feldern + Test-Mail-Button. ENCRYPTED_KEYS-Set in `app-settings.js` deckt `smtp.gmail.client_secret`, `smtp.gmail.refresh_token`, `smtp.gmail.app_password`, `smtp.password` ab. Tests: `tests/unit/mailer.test.mjs` (Templates inkl. Escape, getStatus, send-Pfade, jsonTransport-Roundtrip, Settings-Reload).
 - Phase 0b Backend (Backfill-Job in [routes/jobs/backfill.js](../routes/jobs/backfill.js), Upserts in [db/backfill.js](../db/backfill.js), Mock-BookStack `book_id]?=`-Filter-Fix, 5 Integration-Tests in [tests/integration/backfill.test.js](../tests/integration/backfill.test.js)). Frontend-Trigger-Punkte siehe Phase-0b-Block unten.
 4a/4c/4b zuerst, weil User-Identität, `app.backend`-Schalter und ACL die SSoT für alle folgenden Phasen sind. Lese-Modus (4b1, Print-CSS + readOnly) direkt nach 4b, weil viewer-Rolle erst dann existiert. Phase 7 (Suche) **vor** Phase 8, damit FTS schon steht, wenn Admin Backend wechselt — Index wird beim Bulk-Copy mitgefüllt.
 
@@ -640,143 +641,19 @@ Neue Keys: `export.scope.book`, `export.scope.chapter`, `export.scope.page`, `ex
 
 ---
 
-## Phase 4c1 — First-Run-Setup-Wizard (`/setup`)
+## Phase 4c1 — First-Run-Setup-Wizard (`/setup`) — erledigt
 
-Ziel: Frische Installation, leere DB, keine Google-Credentials → Admin loggt sich via `ADMIN_PASSWORD` ein und wird durch initiales Setup geführt (Google-OAuth-Config, KI-Provider, Storage-Backend). Wizard ist auch nach Abschluss erneut aufrufbar (= „Settings neu durchgehen"-Pfad), Trigger-Logik ist nur die initiale Pflicht-Weiterleitung.
+Implementiert; siehe Erledigt-Block oben für Code-Pfade + Test. Aktuelle Invarianten:
 
-### Voraussetzung
+- **Trigger**: Admin-Session ohne `app.setup_completed=true` → `toggleAdmin{Users,Settings}Card` redirected auf `/setup` (Frontend-Guard auf `setupCompleted`-Flag aus `/config`). `/setup` bleibt nach `setup_completed=true` aufrufbar — Wizard zeigt dann ersten Schritt, kein Auto-Redirect mehr.
+- **Wizard-Reihenfolge**: welcome → public-url → oauth → emails → ai → backend → smtp → done. Jeder Schritt schreibt atomar; Encrypted-Felder akzeptieren leeren String (= behalten) oder Klartext (= überschreiben).
+- **Banner „Setup unvollständig"**: derzeit kein Hauptansicht-Banner — Wizard-Redirect über Admin-Karten reicht. Banner kann nachgereicht werden, sobald sich konkrete Lücken-Signale (z.B. fehlender KI-Provider) als störend zeigen.
+- **`auth.admin_email`** wird bei `/setup/complete` aus `process.env.ADMIN_EMAIL` gespiegelt; UI nutzt den Wert read-only (Spiegel, keine Edit-Möglichkeit über Wizard).
+- **smtp-Test-Probe** ist Stub bis Phase 4c2 — antwortet `{ ok: false, error: 'MAILER_NOT_AVAILABLE' }`, sobald `lib/mailer.js` fehlt. Sobald 4c2 fertig ist, übernimmt der Mailer-Singleton den Versand.
 
-`ADMIN_EMAIL` + `ADMIN_PASSWORD` sind in `.env` gesetzt (siehe Phase 4c `.env`-Endzustand). Ohne `ADMIN_PASSWORD` ist kein First-Run möglich — App startet, weist beim Aufruf auf fehlende ENV hin.
-
-### Trigger-Bedingung
-
-Bei jedem Request einer eingeloggten Admin-Session: solange `app_settings.app.setup_completed` nicht `true` ist → `/admin/*`-Karten redirecten auf `/setup`. Andere App-Bereiche sind verfügbar, zeigen aber Banner „Setup unvollständig — KI-Features deaktiviert" wenn entsprechende Settings fehlen. `/setup` bleibt nach `setup_completed=true` erreichbar (Admin kann jederzeit Schritte erneut durchgehen), wird aber nicht mehr aktiv redirected.
-
-### Zugriffsschutz
-
-`/setup/*` Routen sind **Admin-only** — Guard via Session (`global_role='admin'`). Erreichbar nach `POST /auth/admin-login` (Phase 4a, Pfad B). Kein localhost-Only-Trick, kein ENV-Override nötig — Passwort-Login ist der Schutzmechanismus.
-
-### Wizard-Schritte
-
-1. **Begrüssung**: Anzeige der erkannten `ADMIN_EMAIL` (read-only). Hinweis: „Diese Email ist als Admin via `.env` konfiguriert. Du kannst dich zusätzlich via Google-OAuth mit derselben Email einloggen, sobald OAuth eingerichtet ist."
-2. **Öffentliche URL** (Pflicht, sobald OAuth oder Invites laufen): `app.public_url` setzen — ohne Slash am Ende. Wird für OIDC-Callback, Invite-Mails und Share-Links genutzt. Leer = OIDC-Login wirft beim ersten Auth-Versuch.
-3. **Google-OAuth** (optional, überspringbar): `client_id` + `client_secret`. Anzeige der zu hinterlegenden Redirect-URI (`${app.public_url}/auth/callback`). Test-Button → Discovery-Doc-Fetch. Skip → reine Passwort-Auth, weitere User können nur via Invite + Passwort-fähiger zweiter Mechanismus (späterer Ausbau, vorerst nicht in Scope).
-3. **Allowed-Emails** (optional, nur relevant bei OAuth aktiv): kommaseparierte Liste oder leer (= alle Google-Konten, die in `app_users` als `status='active'` existieren, dürfen rein).
-4. **KI-Provider** (optional, kann später): Provider-Wahl + minimaler Setup (Claude-Key oder Ollama-Host). Test-Button. Überspringen → App ohne KI-Features bis Admin-Konsole-Nachzug.
-5. **Storage-Backend**: `localdb` (Default) oder `bookstack` (Base-URL + Token-ID/-Secret + Test-Button).
-6. **SMTP / Mailer** (optional, überspringbar): Mode-Auswahl `disabled|gmail-oauth|gmail-app-password|generic`. Bei Gmail-OAuth Hinweis-Box mit Schritt-Anleitung (Google-Cloud-Project, OAuth-Client `Web application`, Scope `https://mail.google.com/`, Refresh-Token-Beschaffung via [OAuth-Playground](https://developers.google.com/oauthplayground/)); Refresh-Token-Feld + From-Email. Bei App-Passwort kurzer Hinweis auf 2FA-Pflicht. Test-Mail-Button (an From-Email). Skip → `smtp.mode='disabled'`, Invites zeigen Token in UI statt zu mailen, Request-Register fällt auf In-App-Inbox zurück (siehe 4a2).
-7. **Fertig**: Wizard setzt `app.setup_completed=true` und `auth.admin_email` (Spiegel von ENV) für UI-Anzeige. Redirect zur Hauptansicht.
-
-Jeder Schritt schreibt sofort in `app_settings` (kein Bulk-Commit am Ende). Bei Abbruch springt Wizard beim nächsten Aufruf zum ersten unbefüllten Schritt; nach `setup_completed=true` startet er auf Schritt 1 und lässt durch alle Schritte navigieren.
-
-### Routen
-
-- `GET /setup` → Wizard-Page (Admin-Session erforderlich). [public/setup.html](../public/setup.html) + [public/css/setup.css](../public/css/setup.css) + [public/js/setup.js](../public/js/setup.js).
-- `GET /setup/state` → welche Schritte abgeschlossen sind, plus `admin_email` (read-only).
-- `POST /setup/:step` → speichert Werte des Schritts. Guard: `global_role='admin'` (kein „setup_completed"-Bypass mehr nötig, weil Admin-Login als Gate dient).
-- `POST /setup/test/{provider,backend,oauth,smtp}` → Test-Probes.
-- `POST /setup/complete` → setzt `app.setup_completed=true`.
-
-### i18n
-
-`setup.welcome.title`, `setup.welcome.adminEmailHint`, `setup.step.{oauth,emails,ai,backend,smtp,done}.{title,description,hint}`, `setup.button.{next,back,test,skip,finish}`, `setup.error.{required,invalidEmail,oauthFail,backendFail,smtpFail}`, `setup.banner.incomplete`.
-
-### Sicherheit
-
-- Setup-Routen no-cache (`Cache-Control: no-store`).
-- Test-Probes loggen ohne Klartext-Secrets (Masking im Logger-Layer).
-- Wizard arbeitet ausschliesslich mit Admin-Session — kein Pre-Auth-Pfad, der versehentlich öffentlich exponiert wird.
-
----
-
-## Phase 4c2 — SMTP-Mailer (Gmail/Workspace via OAuth2 oder App-Passwort)
-
-Ziel: App kann transactional Mails versenden (Invite-Token, Registrierungsanfragen, Admin-Benachrichtigungen). Gmail/Workspace ist Primärziel (Self-Hosted-Betreiber haben meist Google-Konto), Generic-SMTP als Fallback für eigenen Mailserver. Admin konfiguriert über `AdminSettingsCard`-Tab „SMTP / Mailer".
-
-### Voraussetzung
-
-Phase 4c (Admin-Settings) — `smtp.*`-Keys (siehe „Verwaltete Keys") leben in `app_settings`, Secrets encrypted via `MASTER_KEY`.
-
-### Dependency
-
-`nodemailer` (neu in `package.json`). Unterstützt Gmail-OAuth2 (`xoauth2`), App-Passwort und Generic-SMTP nativ. Kein zusätzlicher Google-API-Client nötig — Refresh-Token-Flow steckt in nodemailer-Transport-Config.
-
-### Modul-Layout
-
-- [lib/mailer.js](../lib/mailer.js) — Singleton-Service. `getTransporter()` baut nodemailer-Transport aus aktuellen `app_settings`-Werten, cached pro Boot. Hört auf `app-settings:changed`-Event (Phase 4c) und reinitialisiert bei `smtp.*`-Änderung.
-- [lib/mailer-templates.js](../lib/mailer-templates.js) — i18n-fähige Templates (Subject + HTML + Plain-Text). Pro Template `{ subjectKey, render(ctx, locale) }`. Templates: `invite`, `registration-request-admin`, `registration-approved`, `registration-denied`, `test`.
-- `mailer.send({ to, template, ctx, locale })` → resolved Template, dispatcht Transport. Bei `smtp.mode='disabled'` → no-op + Winston-`warn` (Caller bekommt `{ sent: false, reason: 'disabled' }`, muss UI-Fallback machen).
-
-### Gmail-OAuth2-Flow (empfohlen)
-
-**Einmaliges Setup durch Admin** (Dokumentiert im Wizard 4c1 + AdminSettingsCard-Hinweis-Box):
-1. Google-Cloud-Console → neues Projekt → OAuth-Consent-Screen (interner Modus für Workspace, „Testing" für Privat-Gmail).
-2. Credentials → OAuth-Client-ID, Typ „Web application", Redirect-URI `https://developers.google.com/oauthplayground` (für Refresh-Token-Beschaffung).
-3. OAuth-Playground → Settings → eigene Client-ID/Secret eintragen → Scope `https://mail.google.com/` autorisieren → „Exchange authorization code" → Refresh-Token kopieren.
-4. In `AdminSettingsCard`-SMTP-Tab eintragen: `client_id`, `client_secret`, `refresh_token`, `user` (Gmail-Adresse). „Test-Mail" senden.
-
-**Runtime**: nodemailer-Transport mit
-```js
-{ service: 'gmail', auth: { type: 'OAuth2', user, clientId, clientSecret, refreshToken } }
-```
-Access-Token wird intern bei Bedarf via Refresh-Token nachgeholt — kein expliziter Token-Refresh-Cron nötig.
-
-### Gmail-App-Passwort-Flow (Fallback)
-
-Für Accounts mit 2FA, wo OAuth-Setup zu aufwendig ist:
-1. [Google-Konto](https://myaccount.google.com/apppasswords) → App-Passwort erstellen → 16-stelligen Code kopieren.
-2. In Card eintragen: `user`, `app_password`.
-
-**Runtime**: `{ service: 'gmail', auth: { user, pass: appPassword } }`. App-Passwort umgeht 2FA für SMTP — bewusst akzeptiert, weil Self-Host-Pattern.
-
-### Generic-SMTP
-
-Klassische `host`/`port`/`secure`/`user`/`password`-Felder für eigenen Mailserver. Nodemailer-Transport `{ host, port, secure, auth: { user, pass } }`.
-
-### Routen
-
-- `GET /admin/settings/smtp/test-config` → liest aktuelle Werte (maskiert), prüft Vollständigkeit pro Mode, gibt `{ ready: bool, missing: [keys] }`.
-- `POST /admin/settings/smtp/test-send` `{ to? }` → sendet `test`-Template an `to` (Default: `from_email`). Liefert `{ ok, latencyMs, error? }`. Guard: `global_role='admin'`.
-
-### Rate-Limit
-
-Pro Boot in-Memory-Counter pro Minute. Default 30/min (Gmail-Throttle ist 100/h für „less secure"-Pfade, ~500/Tag — 30/min im Burst, Backoff bei 429). Bei Überlauf → `mailer.send` queued in-Memory mit 1s-Backoff, nicht persistent. Migrationspfad für persistente Mail-Queue: bewusst out-of-scope (Self-Host-Lasten klein, keine Massen-Mails).
-
-### i18n
-
-Beide Locales pflegen — Subject + Body via `t(key, params)`:
-- `mail.subject.invite`, `mail.subject.registrationRequestAdmin`, `mail.subject.registrationApproved`, `mail.subject.registrationDenied`, `mail.subject.test`.
-- `mail.body.invite.{intro,cta,expires,footer}` mit `{inviterName, role, inviteUrl, expiresAt}`.
-- `mail.body.registrationRequestAdmin.{intro,emailLine,messageLine,actionCta,footer}` mit `{requesterEmail, message, approveUrl}`.
-- `mail.body.registrationApproved.{intro,cta,footer}` mit `{loginUrl}`.
-- `mail.body.registrationDenied.{intro,reasonLine,footer}` mit `{reason}`.
-- Admin-UI: `admin.settings.smtp.{mode,fromEmail,fromName,replyTo,gmail.user,gmail.refreshToken,gmail.appPassword,host,port,secure,test.ok,test.fail,test.disabled,hint.gmailOauth,hint.gmailAppPassword}`.
-
-Empfänger-Locale: `app_users.language` (oder Browser-Default beim Request-Register-Antragsteller, fällt auf `de` zurück).
-
-### Logging
-
-- `[INFO][mailer|admin@…|] sent template=invite to=u@x.com latencyMs=234`
-- `[WARN][mailer|…|] disabled — invite token left in UI for u@x.com`
-- `[ERROR][mailer|…|] gmail-oauth refresh-token revoked — admin muss neu autorisieren`
-
-Klartext-Secrets nie loggen (nodemailer-Debug standardmässig aus; `LOG_LEVEL=debug` schaltet rohes SMTP-Protokoll ein — dokumentiert als Troubleshooting-only).
-
-### Tests
-
-- [tests/unit/mailer.test.mjs](../tests/unit/mailer.test.mjs) — Template-Rendering pro Locale, Mode-Switch (`disabled` → no-op), Settings-Reload-Event.
-- Integration: nodemailer-Stream-Transport (`jsonTransport`) statt echtem SMTP. Echte Gmail-Pings nur manuell via „Test-Mail"-Button.
-
-### Sicherheit
-
-- Alle Auth-Secrets (`client_secret`, `refresh_token`, `app_password`, generic `password`) `encrypted=1` in `app_settings`.
-- Mail-Body escapest User-Input (`requesterEmail`, `message`) — sonst HTML-Injection via Registrierungs-Message. `lib/mailer-templates.js` nutzt Plain-`String`-Templating mit HTML-Escape-Helper aus [public/js/utils.js](../public/js/utils.js) (auf Server-Seite via dynamischen Import oder kleine Server-Kopie).
-- Reply-To überschreibbar, From nicht — From muss mit authentifiziertem Konto matchen, sonst rejected Gmail die Mail.
-- Keine Bounce-Verarbeitung (out-of-scope) — Admin sieht in Logs, ob Versand fehlschlug.
-
-### Aufwand
-
-Klein — 1 neue Dep, 1 Lib-Modul + Templates, ein Tab in `AdminSettingsCard`, ein Wizard-Step. Hauptaufwand ist sauberes i18n + Klar-Doku der Gmail-OAuth-Setup-Schritte.
+Offene Restpunkte (nicht-blockierend):
+- Banner „Setup unvollständig" in der Haupt-SPA, falls KI- oder Backend-Settings fehlen.
+- Globale i18n-Keys für Banner (Wizard selbst kommt mit eigenen Inline-Strings aus).
 
 ---
 
