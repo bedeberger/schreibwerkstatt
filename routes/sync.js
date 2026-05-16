@@ -6,9 +6,18 @@ const { aclParamGuard, requireBookAccess, sendACLError } = require('../lib/acl')
 const { CHARS_PER_TOKEN } = require('../lib/ai');
 const { toIntId } = require('../lib/validate');
 const contentStore = require('../lib/content-store');
+const appSettings = require('../lib/app-settings');
 const { computePageIndex, writePageIndex, writeFigureMentionsForPageAllUsers, tokenizeNamesForStopwords } = require('../lib/page-index');
 const { invalidateBookPageCache } = require('./jobs/chat');
 const { localIsoDate } = require('../lib/local-date');
+
+// Phase 1 (BookStack-Exit): Sync-Worker laeuft nur im `bookstack`-Backend.
+// Im `localdb`-Mode ist die DB autoritativ — kein BookStack-Pull noetig; Cron-
+// und manuelle Trigger werden zu no-op.
+function _isBookstackBackend() {
+  const sel = String(appSettings.get('app.backend') || 'bookstack').toLowerCase();
+  return sel === 'bookstack';
+}
 
 const router = express.Router();
 // Sync ist Write-Pfad (Pages-Upsert, Stats-Recompute) → editor+.
@@ -344,6 +353,10 @@ async function _syncAllBooksInner() {
 }
 
 async function syncAllBooks() {
+  if (!_isBookstackBackend()) {
+    logger.info('Sync uebersprungen: app.backend != bookstack (Phase 1).');
+    return;
+  }
   const t0 = Date.now();
   logger.info('Sync gestartet.');
   try {
@@ -536,6 +549,9 @@ router.post('/page-stats/:book_id', express.json(), async (req, res) => {
 
 // POST /sync/book/:book_id – manueller Trigger für ein Buch
 router.post('/book/:book_id', async (req, res) => {
+  if (!_isBookstackBackend()) {
+    return res.status(409).json({ error_code: 'SYNC_DISABLED_LOCALDB' });
+  }
   const bookId = toIntId(req.params.book_id);
   if (!bookId) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
   const token = getTokenForRequest(req) || getAnyUserToken();

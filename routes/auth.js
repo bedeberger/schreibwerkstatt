@@ -163,17 +163,6 @@ router.get('/auth/callback', async (req, res) => {
     const userAgent = req.headers['user-agent'] || null;
     const lang = _bodyLang(req);
 
-    // Optionale E-Mail-Whitelist (auth.allowed_emails: a@b.com,c@d.com)
-    const allowed = appSettings.get('auth.allowed_emails');
-    if (allowed) {
-      const list = allowed.split(',').map(e => e.trim().toLowerCase());
-      if (!list.includes(email)) {
-        logger.warn('Login verweigert (nicht in ALLOWED_EMAILS).', { user: email });
-        appUsers.recordAuditEvent(email, 'login-denied', { ip, userAgent, meta: { method: 'oidc', reason: 'not-in-allowed-emails' } });
-        return _renderDenied(res, lang, 'notInvited');
-      }
-    }
-
     // Phase 4a: app_users-Lookup + Status-Gate + Invite-Accept-Flow.
     let user = appUsers.getUser(email);
     if (user) {

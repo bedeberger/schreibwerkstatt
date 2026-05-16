@@ -119,7 +119,7 @@ router.post('/pages/:page_id/lektorat-finding', jsonBody, async (req, res) => {
     const page = await contentStore.loadPage(pageId, token);
     const out = _safeReplace(page?.body_html || page?.html || '', original, replacement);
     if (!out || !out.ok) return res.status(409).json({ error_code: out?.reason || 'APPLY_FAILED' });
-    const saved = await contentStore.savePage(pageId, { html: out.body }, token);
+    const saved = await contentStore.savePage(pageId, { html: out.body, source: 'lektorat-apply' }, req);
 
     // applied_errors_json fortschreiben (mit De-Dup auf `original`).
     let applied = [];
@@ -186,7 +186,7 @@ router.post('/pages/:page_id/chat-vorschlag', jsonBody, async (req, res) => {
     const page = await contentStore.loadPage(pageId, token);
     const out = _safeReplace(page?.body_html || page?.html || '', original, replacement);
     if (!out || !out.ok) return res.status(409).json({ error_code: out?.reason || 'APPLY_FAILED' });
-    const saved = await contentStore.savePage(pageId, { html: out.body }, token);
+    const saved = await contentStore.savePage(pageId, { html: out.body, source: 'chat-apply' }, req);
 
     vorschlaege[vIdx].applied = true;
     vorschlaege[vIdx].applied_at = new Date().toISOString();

@@ -24,6 +24,7 @@
   <link rel="stylesheet" href="css/admin-users.css">
   <link rel="stylesheet" href="css/admin-settings.css">
   <link rel="stylesheet" href="css/admin-usage.css">
+  <link rel="stylesheet" href="css/admin-home.css">
   <link rel="stylesheet" href="css/export.css">
   <link rel="stylesheet" href="css/pdf-export.css">
   <link rel="stylesheet" href="css/komplett-status.css">
@@ -131,7 +132,7 @@
     <p class="subtitle"><span x-text="t('app.subtitle')"></span></p>
   </div>
   <div class="header-actions" x-show="currentUser">
-    <div class="header-action-cluster">
+    <div class="header-action-cluster" x-show="!isAdminOnly">
       <div id="partial-komplett-status"></div>
     </div>
     <div id="partial-avatar-menu"></div>
@@ -142,7 +143,7 @@
 <div id="partial-token-setup"></div>
 
 <!-- Bücherliste & Seitenauswahl -->
-<div class="card card--book-selector" x-show="showBookCard" x-cloak>
+<div class="card card--book-selector" x-show="showBookCard && !isAdminOnly" x-cloak>
   <label x-text="t('book.label')"></label>
   <div class="row book-selector-row">
     <div x-data="combobox({ placeholder: () => t('book.chooseBook'), compact: false, footer: { label: () => t('book.create.action'), action: () => openCreateBook() } })"
@@ -200,11 +201,12 @@
 
 </div>
 
-<div class="layout">
-<div class="layout-sidebar">
+<div class="layout" :class="{ 'layout--no-sidebar': isAdminOnly }">
+<div class="layout-sidebar" x-show="!isAdminOnly">
   <div id="partial-sidebar"></div>
 </div><!-- end layout-sidebar -->
 <div class="layout-main" id="main-content" tabindex="-1">
+<div id="partial-admin-home"></div>
 <div id="partial-bookoverview"></div>
 <div id="partial-buchreview"></div>
 <div id="partial-kapitelreview"></div>

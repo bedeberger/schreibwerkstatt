@@ -28,7 +28,6 @@ router.use(requireAdmin);
 router.get('/state', (req, res) => {
   const setupCompleted = appSettings.get('app.setup_completed') === true;
   const publicUrl = appSettings.get('app.public_url') || '';
-  const allowedEmails = appSettings.get('auth.allowed_emails') || '';
   const provider = appSettings.get('ai.provider') || 'claude';
   const backend = appSettings.get('app.backend') || 'localdb';
   const ollamaHost = appSettings.get('ai.ollama.host') || '';
@@ -50,7 +49,6 @@ router.get('/state', (req, res) => {
     steps: {
       publicUrl: !!publicUrl,
       oauth: hasGoogleId && hasGoogleSecret,
-      emails: !!allowedEmails,
       ai: provider === 'claude' ? hasClaudeKey
         : provider === 'ollama' ? !!ollamaHost
         : provider === 'llama'  ? !!llamaHost
@@ -62,7 +60,6 @@ router.get('/state', (req, res) => {
     },
     values: {
       publicUrl,
-      allowedEmails,
       provider,
       claudeModel,
       ollamaHost,
@@ -129,9 +126,6 @@ router.post('/:step', express.json(), (req, res) => {
     } else if (step === 'oauth') {
       queue('auth.google.client_id', body.clientId);
       queue('auth.google.client_secret', body.clientSecret);
-    } else if (step === 'emails') {
-      const csv = typeof body.allowedEmails === 'string' ? body.allowedEmails.trim() : '';
-      queue('auth.allowed_emails', csv);
     } else if (step === 'ai') {
       const provider = String(body.provider || '').toLowerCase();
       if (!['claude', 'ollama', 'llama'].includes(provider)) {

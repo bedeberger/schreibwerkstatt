@@ -31,6 +31,13 @@ try {
 try { appSettings.bootstrapFromEnv(); }
 catch (e) { logger.warn(`app-settings.bootstrapFromEnv: ${e.message}`); }
 
+// Phase 1 Devmode-Seed: nur bei LOCAL_DEV_MODE + app.backend='localdb' und
+// leerer books-Tabelle. Idempotent durch COUNT-Check.
+try {
+  const { runDevSeedIfNeeded } = require('./lib/dev-seed');
+  runDevSeedIfNeeded();
+} catch (e) { logger.warn(`runDevSeedIfNeeded: ${e.message}`); }
+
 const authRouter = require('./routes/auth');
 const historyRouter = require('./routes/history');
 const figuresRouter = require('./routes/figures');
@@ -148,8 +155,6 @@ app.use(session({
 
 if (LOCAL_DEV_MODE) {
   logger.warn('LOCAL_DEV_MODE aktiv – OAuth wird übersprungen, automatische Dev-Session!');
-} else if (!appSettings.get('auth.allowed_emails')) {
-  logger.warn('auth.allowed_emails nicht gesetzt – ALLE Google-Konten haben Zugriff! Bitte in App-Einstellungen einschränken.');
 }
 
 // ALS-Logging-Context: jeder logger.*-Call innerhalb des Request-Scopes erbt
@@ -223,7 +228,7 @@ app.use((req, res, next) => {
 
 // ── Auth-Guard ────────────────────────────────────────────────────────────────
 // API-Pfade → 401 JSON; HTML-Pfade → Redirect zu /auth/login
-const API_PREFIXES = ['/history/', '/figures/', '/locations/', '/jobs/', '/sync/', '/chat/', '/booksettings/', '/content/', '/books/', '/apply/', '/me/', '/admin/', '/setup/', '/config', '/claude', '/ollama', '/llama'];
+const API_PREFIXES = ['/history/', '/figures/', '/locations/', '/jobs/', '/sync/', '/chat/', '/booksettings/', '/content/', '/books/', '/apply/', '/me/', '/admin/', '/config', '/claude', '/ollama', '/llama'];
 
 app.use((req, res, next) => {
   if (req.session?.user) return next();
@@ -303,7 +308,6 @@ app.use('/admin/users', require('./routes/admin-users'));
 app.use('/admin/settings', require('./routes/admin-settings'));
 app.use('/admin/usage', require('./routes/admin-usage'));
 app.use('/admin/registration-requests', require('./routes/admin-registration-requests'));
-app.use('/setup', require('./routes/setup'));
 
 // Logout: usage-Tabelle behält Einträge (User-Wiederkehr → Top-3 sofort wieder da).
 // Wenn Datenschutz erforderlich, Cleanup über Job/Cron auf Last-Seen-Basis.

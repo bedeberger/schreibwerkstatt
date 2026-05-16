@@ -152,7 +152,7 @@
   "bs.apiErrorDetail":           "BookStack API Fehler {status}: {detail}",
   "bs.unsafeHtml":               "Korrigiertes HTML wirkt unvollständig – Speichern abgebrochen.",
   "bs.loadingPage":              "Lade aktuelle Seite…",
-  "bs.savingToBookStack":        "Speichere in BookStack…",
+  "bs.savingToBookStack":        "Speichere…",
 
   "stilkorrektur.workingChars":  "KI überarbeitet Stil… ({chars} Zeichen)",
   "stilkorrektur.workingTokens": "KI überarbeitet Stil… ↑{tokIn}↓~{tokOutEst} Tokens",
@@ -161,7 +161,7 @@
 
   "common.unknownError":         "Unbekannter Fehler",
 
-  "tree.connecting":             "Verbinde mit BookStack…",
+  "tree.connecting":             "Lade Buchliste…",
   "tree.loadingPages":           "Lade Seiten…",
   "tree.booksFound":             "{n} Buch/Bücher gefunden.",
   "tree.chapterFallback":        "Kapitel",
@@ -169,7 +169,7 @@
   "chat.pageNotLoaded":          "Seiteninhalt nicht geladen – bitte Seite neu auswählen.",
   "chat.originalNotFound":       "Originaltext nicht mehr in der Seite gefunden.",
   "chat.pageLoadFailed":         "Seiteninhalt konnte nicht geladen werden.",
-  "chat.changeSaved":            "Änderung in BookStack gespeichert.",
+  "chat.changeSaved":            "Änderung gespeichert.",
   "chat.saveFailedPrefix":       "Fehler beim Speichern: ",
   "common.asOf":                 "Stand: {date}",
   "common.noDataYet":            "Noch keine Daten vorhanden. Bitte auf «Alle aktualisieren» klicken.",
@@ -1063,7 +1063,7 @@
   "editor.draft":                "Entwurf {when}",
   "editor.saved":                "gespeichert {when}",
   "editor.draftTitle":           "Lokaler Entwurf – noch nicht auf dem Server",
-  "editor.savedTitle":           "Auf BookStack gespeichert",
+  "editor.savedTitle":           "Gespeichert",
   "editor.openInBookstack":      "In BookStack öffnen",
   "editor.revisions":            "{n} Versionen",
   "editor.revisionsTitle":       "Versionsverlauf in BookStack öffnen",
@@ -1286,6 +1286,14 @@
   "admin.settings.help.advancedGlobal": "Greifen unabhängig vom Provider.",
   "admin.settings.help.advancedClaude": "Wirksam nur bei `ai.provider = claude`. Steuern Retries, Timeout und Parallelität gegen Anthropic-TPM-Limits.",
   "admin.settings.saved":        "{count} Einstellung(en) gespeichert.",
+
+  "admin.home.title":            "Administration",
+  "admin.home.usersLabel":       "Konten",
+  "admin.home.settingsLabel":    "System",
+  "admin.home.usageLabel":       "Auslastung",
+  "tile.adminUsers.desc":        "Einladungen, Rollen und Status",
+  "tile.adminSettings.desc":     "Auth, Provider, Budgets, Backend",
+  "tile.adminUsage.desc":        "Verbrauch, Limits und Kosten",
 
   "admin.users.title":           "Benutzer-Verwaltung",
   "admin.users.invite":          "Benutzer einladen",

@@ -4667,6 +4667,54 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 111 abgeschlossen (Phase 4a2 Public Landing + Request-Register: registration_requests).');
   }
 
+  if (version < 112) {
+    // Phase 2 (BookStack-Exit, docs/bookstack-exit.md): Eigene Page-Revisions.
+    // Jeder Save-Pfad ueber die content-store-Facade schreibt eine Revision
+    // vor dem Backend-Write. source-Tag unterscheidet Editor/Focus/Chat-Apply
+    // /Lektorat-Apply/Sync/Import/Conflict-Pfade. Retention via
+    // app.page_revision_limit (Default 50, per-page) — Cleanup-Hook in
+    // lib/cache-cleanup.js POLICIES.
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS page_revisions (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        page_id       INTEGER NOT NULL REFERENCES pages(page_id) ON DELETE CASCADE,
+        book_id       INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        body_html     TEXT NOT NULL,
+        body_markdown TEXT,
+        chars         INTEGER,
+        words         INTEGER,
+        tok           INTEGER,
+        source        TEXT NOT NULL CHECK(source IN
+                          ('focus','main','chat-apply','lektorat-apply',
+                           'bookstack-sync','import','conflict')),
+        user_email    TEXT,
+        created_at    TEXT DEFAULT (datetime('now')),
+        summary       TEXT
+      )
+    `).run();
+    db.prepare(
+      'CREATE INDEX IF NOT EXISTS idx_page_revisions_page ON page_revisions(page_id, created_at DESC)'
+    ).run();
+    db.prepare(
+      'CREATE INDEX IF NOT EXISTS idx_page_revisions_book ON page_revisions(book_id, created_at DESC)'
+    ).run();
+
+    const fkErrors112 = db.pragma('foreign_key_check');
+    if (fkErrors112.length) {
+      throw new Error(`Migration 112: foreign_key_check meldet ${fkErrors112.length} Verstoesse: ${JSON.stringify(fkErrors112.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 112').run();
+    logger.info('DB-Migration auf Version 112 abgeschlossen (Phase 2 BookStack-Exit: page_revisions).');
+  }
+
+  if (version < 113) {
+    // auth.allowed_emails entfernt: Zugriff wird ausschliesslich ueber
+    // app_users (Invite/Approval/Status) gesteuert. Stale-Setting purgen.
+    db.prepare("DELETE FROM app_settings WHERE key = 'auth.allowed_emails'").run();
+    db.prepare('UPDATE schema_version SET version = 113').run();
+    logger.info('DB-Migration auf Version 113 abgeschlossen (auth.allowed_emails entfernt).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

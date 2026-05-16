@@ -1,0 +1,38 @@
+<!-- Admin-Landing: Tile-Grid mit Direkt-Einstiegen in die Admin-Karten.
+     Erscheint nur für plain Admin (currentUser.isAdmin && !devMode), wenn
+     keine andere Admin-/Profil-Karte offen ist. Sidebar + Buchwahl sind in
+     diesem Modus ausgeblendet — die App reduziert sich auf reine Verwaltung. -->
+<div class="card card--bookoverview book-overview"
+     x-show="isAdminOnly
+             && !showAdminUsersCard
+             && !showAdminSettingsCard
+             && !showAdminUsageCard
+             && !showUserSettingsCard"
+     x-cloak>
+  <div class="card-header">
+    <span class="card-title" x-text="t('admin.home.title')"></span>
+  </div>
+  <div class="overview-grid">
+    <button type="button"
+            class="overview-tile internal-link card--admin-users"
+            @click="toggleAdminUsersCard()">
+      <div class="overview-tile-label" x-text="t('admin.home.usersLabel')"></div>
+      <div class="overview-tile-value" x-text="t('admin.users.title')"></div>
+      <div class="overview-tile-desc" x-text="t('tile.adminUsers.desc')"></div>
+    </button>
+    <button type="button"
+            class="overview-tile internal-link card--admin-settings"
+            @click="toggleAdminSettingsCard()">
+      <div class="overview-tile-label" x-text="t('admin.home.settingsLabel')"></div>
+      <div class="overview-tile-value" x-text="t('admin.settings.title')"></div>
+      <div class="overview-tile-desc" x-text="t('tile.adminSettings.desc')"></div>
+    </button>
+    <button type="button"
+            class="overview-tile internal-link card--admin-usage"
+            @click="toggleAdminUsageCard()">
+      <div class="overview-tile-label" x-text="t('admin.home.usageLabel')"></div>
+      <div class="overview-tile-value" x-text="t('admin.usage.title')"></div>
+      <div class="overview-tile-desc" x-text="t('tile.adminUsage.desc')"></div>
+    </button>
+  </div>
+</div>

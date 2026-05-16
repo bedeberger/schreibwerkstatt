@@ -6,7 +6,6 @@
     { id: 'welcome',    key: 'welcome',    label: 'setup.stepper.welcome' },
     { id: 'public-url', key: 'publicUrl',  label: 'setup.stepper.publicUrl' },
     { id: 'oauth',      key: 'oauth',      label: 'setup.stepper.oauth' },
-    { id: 'emails',     key: 'emails',     label: 'setup.stepper.emails' },
     { id: 'ai',         key: 'ai',         label: 'setup.stepper.ai' },
     { id: 'backend',    key: 'backend',    label: 'setup.stepper.backend' },
     { id: 'smtp',       key: 'smtp',       label: 'setup.stepper.smtp' },
@@ -24,8 +23,6 @@
       'setup.step.publicUrl.description': 'Wird für OAuth-Callback, Invite-Mails und Share-Links verwendet. Ohne Slash am Ende.',
       'setup.step.oauth.title': 'Google-OAuth (optional)',
       'setup.step.oauth.description': 'Trage Client-ID und Client-Secret aus der Google-Cloud-Console ein. Redirect-URI bei Google:',
-      'setup.step.emails.title': 'Erlaubte Emails (optional)',
-      'setup.step.emails.description': 'Komma-separierte Liste; leer = alle eingeladenen User dürfen rein.',
       'setup.step.ai.title': 'KI-Provider',
       'setup.step.ai.description': 'Mindestens ein Provider muss konfiguriert sein, sonst sind KI-Features deaktiviert.',
       'setup.step.backend.title': 'Storage-Backend',
@@ -37,13 +34,11 @@
       'setup.stepper.welcome': 'Start',
       'setup.stepper.publicUrl': 'URL',
       'setup.stepper.oauth': 'OAuth',
-      'setup.stepper.emails': 'Emails',
       'setup.stepper.ai': 'KI',
       'setup.stepper.backend': 'Storage',
       'setup.stepper.smtp': 'Mailer',
       'setup.stepper.done': 'Fertig',
       'setup.field.publicUrl': 'Öffentliche URL',
-      'setup.field.allowedEmails': 'Allowed Emails (CSV)',
       'setup.field.provider': 'Provider',
       'setup.field.backend': 'Backend',
       'setup.field.smtpMode': 'Mode',
@@ -82,8 +77,6 @@
       'setup.step.publicUrl.description': 'Used for OAuth callback, invite mails and share links. No trailing slash.',
       'setup.step.oauth.title': 'Google OAuth (optional)',
       'setup.step.oauth.description': 'Enter client ID and secret from Google Cloud Console. Redirect URI to register at Google:',
-      'setup.step.emails.title': 'Allowed emails (optional)',
-      'setup.step.emails.description': 'Comma-separated list; empty = every invited user may sign in.',
       'setup.step.ai.title': 'AI provider',
       'setup.step.ai.description': 'At least one provider must be configured, otherwise AI features stay disabled.',
       'setup.step.backend.title': 'Storage backend',
@@ -95,13 +88,11 @@
       'setup.stepper.welcome': 'Start',
       'setup.stepper.publicUrl': 'URL',
       'setup.stepper.oauth': 'OAuth',
-      'setup.stepper.emails': 'Emails',
       'setup.stepper.ai': 'AI',
       'setup.stepper.backend': 'Storage',
       'setup.stepper.smtp': 'Mailer',
       'setup.stepper.done': 'Done',
       'setup.field.publicUrl': 'Public URL',
-      'setup.field.allowedEmails': 'Allowed emails (CSV)',
       'setup.field.provider': 'Provider',
       'setup.field.backend': 'Backend',
       'setup.field.smtpMode': 'Mode',
@@ -230,7 +221,6 @@
     $('#oauth-redirect').textContent = (v.publicUrl ? v.publicUrl.replace(/\/$/, '') : '${app.public_url}') + '/auth/callback';
     $('#mask-google-id').hidden = !m.googleClientId;
     $('#mask-google-secret').hidden = !m.googleClientSecret;
-    $('#allowedEmails').value = v.allowedEmails || '';
     $('#aiProvider').value = v.provider || 'claude';
     $('#claudeModel').value = v.claudeModel || '';
     $('#ollamaHost').value = v.ollamaHost || '';
@@ -326,8 +316,6 @@
           clientId: $('#googleClientId').value,
           clientSecret: $('#googleClientSecret').value,
         });
-      } else if (step === 'emails') {
-        await postStep('emails', { allowedEmails: $('#allowedEmails').value });
       } else if (step === 'ai') {
         const provider = $('#aiProvider').value;
         const body = { provider };

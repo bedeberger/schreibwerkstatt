@@ -119,16 +119,13 @@ test('bootstrapFromEnv: spiegelt nicht-gesetzte Keys aus ENV', () => {
   // Setze ENV-Werte → Bootstrap soll sie in DB schreiben
   process.env.OLLAMA_HOST = 'http://test-ollama:11434';
   process.env.STALE_DAYS = '14';
-  process.env.ALLOWED_EMAILS = 'a@x.com,b@x.com';
   // Sicherstellen: Keys aktuell nicht in DB
   settings.remove('ai.ollama.host');
   settings.remove('cron.stale_days');
-  settings.remove('auth.allowed_emails');
   const mirrored = settings.bootstrapFromEnv();
-  assert.ok(mirrored >= 3, `erwartet >=3 gespiegelt, got ${mirrored}`);
+  assert.ok(mirrored >= 2, `erwartet >=2 gespiegelt, got ${mirrored}`);
   assert.equal(settings.get('ai.ollama.host'), 'http://test-ollama:11434');
   assert.equal(settings.get('cron.stale_days'), 14);
-  assert.equal(settings.get('auth.allowed_emails'), 'a@x.com,b@x.com');
 });
 
 test('bootstrapFromEnv: ueberschreibt bestehende DB-Werte NICHT', () => {

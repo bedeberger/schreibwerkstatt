@@ -53,7 +53,6 @@ router.get('/config', (req, res) => {
     userSettings: sessionUser ? getUser(sessionUser.email) : null,
     devMode: process.env.LOCAL_DEV_MODE === 'true',
     promptConfig: getPromptConfig(),
-    setupCompleted: appSettings.get('app.setup_completed') === true,
   });
 });
 

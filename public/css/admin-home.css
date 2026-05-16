@@ -1,0 +1,31 @@
+@layer components {
+/* Admin-Home: Tile-Landing für globalen Admin (currentUser.isAdmin && !devMode).
+   Nutzt das book-overview-Tile-Grid + .overview-tile-Atome aus
+   public/css/book-overview/base.css. Hier nur die Tile-Inhalts-Typografie
+   (Label klein/Caps gibt's schon, Value als Card-Titel-Ersatz, Desc als
+   Sekundärtext) — das Grid kommt aus base.css. */
+
+.overview-tile-value {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--color-text);
+  line-height: 1.2;
+}
+
+.overview-tile-desc {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+  line-height: 1.4;
+}
+
+/* Tile als Button: Default-Button-Reset, damit das Tile wie ein klickbares
+   Panel wirkt (Hover/Focus liegen auf .overview-tile.internal-link in base). */
+button.overview-tile {
+  appearance: none;
+  background: var(--color-bg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+}
+}

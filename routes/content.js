@@ -10,6 +10,7 @@
 const express = require('express');
 const logger = require('../logger');
 const contentStore = require('../lib/content-store');
+const pageRevisions = require('../db/page-revisions');
 const { toIntId } = require('../lib/validate');
 const { getTokenForRequest, getAnyUserToken } = require('../db/schema');
 const { setContext, bookParamHandler } = require('../lib/log-context');
@@ -154,10 +155,67 @@ router.put('/pages/:page_id', jsonBody, async (req, res) => {
   });
   const token = _requireToken(req, res);
   if (!token) return;
-  try { res.json(await contentStore.savePage(pageId, req.body || {}, token)); }
+  try { res.json(await contentStore.savePage(pageId, req.body || {}, req)); }
   catch (e) {
     if (e.code === 'EMPTY_BODY') return res.status(400).json({ error_code: 'EMPTY_BODY' });
     _fail(res, e, 'PUT /content/pages/:id');
+  }
+});
+
+// ── Phase 2: Page-Revisions ────────────────────────────────────────────────
+// Schreib-Hook lebt in der content-store-Facade (jeder erfolgreiche
+// savePage → page_revisions-Row). Routen hier sind nur Lese-Pfad + Restore.
+
+// GET /content/pages/:page_id/revisions — Liste (ohne body_html).
+router.get('/pages/:page_id/revisions', async (req, res) => {
+  const pageId = toIntId(req.params.page_id);
+  if (!pageId) return res.status(400).json({ error_code: 'INVALID_PAGE_ID' });
+  if (_guardPage(req, res, pageId, 'viewer') == null) return;
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 500);
+  res.json({ revisions: pageRevisions.listForPage(pageId, limit) });
+});
+
+// GET /content/pages/:page_id/revisions/:rev_id — Voller Body fuer Vorschau.
+router.get('/pages/:page_id/revisions/:rev_id', async (req, res) => {
+  const pageId = toIntId(req.params.page_id);
+  const revId = toIntId(req.params.rev_id);
+  if (!pageId || !revId) return res.status(400).json({ error_code: 'INVALID_ID' });
+  if (_guardPage(req, res, pageId, 'viewer') == null) return;
+  const rev = pageRevisions.get(revId);
+  if (!rev || rev.page_id !== pageId) return res.status(404).json({ error_code: 'REVISION_NOT_FOUND' });
+  res.json({ revision: rev });
+});
+
+// POST /content/pages/:page_id/revisions/:rev_id/restore — Body der Revision
+// wird via Facade als neue Revision (source='main') zurueckgeschrieben.
+// Page-Lock + editor-Rolle wie der normale Save-Pfad.
+router.post('/pages/:page_id/revisions/:rev_id/restore', jsonBody, async (req, res) => {
+  const pageId = toIntId(req.params.page_id);
+  const revId = toIntId(req.params.rev_id);
+  if (!pageId || !revId) return res.status(400).json({ error_code: 'INVALID_ID' });
+  const bookId = _guardPage(req, res, pageId, 'editor');
+  if (bookId == null) return;
+  const email = _userEmail(req);
+  const blocking = bookAccess.getBlockingLockFor(pageId, email);
+  if (blocking) return res.status(423).json({
+    error_code: 'PAGE_LOCKED',
+    locked_by_email: blocking.locked_by_email,
+    expires_at: blocking.expires_at,
+  });
+  const rev = pageRevisions.get(revId);
+  if (!rev || rev.page_id !== pageId) return res.status(404).json({ error_code: 'REVISION_NOT_FOUND' });
+  const token = _requireToken(req, res);
+  if (!token) return;
+  try {
+    const saved = await contentStore.savePage(
+      pageId,
+      { html: rev.body_html, markdown: rev.body_markdown, source: 'main', summary: `restored from #${revId}` },
+      req,
+    );
+    res.json({ ok: true, page: saved, restored_from: revId });
+  } catch (e) {
+    if (e.code === 'EMPTY_BODY') return res.status(400).json({ error_code: 'EMPTY_BODY' });
+    _fail(res, e, 'POST /content/pages/:id/revisions/:rev/restore');
   }
 });
 

@@ -190,15 +190,6 @@ test('POST /setup/backend ungueltig → 400', async () => {
   assert.equal(r.body.error_code, 'BACKEND_INVALID');
 });
 
-test('POST /setup/emails leer ok', async () => {
-  const r = await _req('POST', '/setup/emails', {
-    user: 'alice@example.com', role: 'admin',
-    body: { allowedEmails: 'a@x.com, b@y.com' },
-  });
-  assert.equal(r.status, 200);
-  assert.equal(appSettings.get('auth.allowed_emails'), 'a@x.com, b@y.com');
-});
-
 test('POST /setup/smtp disabled → mode persistiert', async () => {
   const r = await _req('POST', '/setup/smtp', {
     user: 'alice@example.com', role: 'admin',

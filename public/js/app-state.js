@@ -10,7 +10,6 @@
 const shellState = () => ({
   currentUser: null,
   devMode: false,
-  setupCompleted: false,
   sessionExpired: false,
   bookstackTokenInvalid: false,
   serverOffline: false,

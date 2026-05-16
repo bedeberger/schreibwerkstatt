@@ -47,9 +47,6 @@
         <input type="password" x-model="adminSettingsForm['auth.google.client_secret']" :placeholder="$app.t('admin.settings.secret.masked')">
         <small x-show="adminSettingsMap['auth.google.client_secret']?.masked" class="muted-msg muted-msg--sm" x-text="adminSettingsMap['auth.google.client_secret']?.masked"></small>
       </label>
-      <label>auth.allowed_emails (CSV)
-        <input type="text" x-model="adminSettingsForm['auth.allowed_emails']" placeholder="alice@x.com, bob@x.com">
-      </label>
       <label class="checkbox-row">
         <input type="checkbox" :checked="adminSettingsForm['auth.allow_open_signup'] === true || adminSettingsForm['auth.allow_open_signup'] === 'true'"
                @change="adminSettingsForm['auth.allow_open_signup'] = $event.target.checked">

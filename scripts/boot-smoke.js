@@ -15,7 +15,6 @@ const env = {
   ...process.env,
   PORT: String(PORT),
   SESSION_SECRET: 'ci-smoke-secret',
-  ALLOWED_EMAILS: 'ci@example.com',
   ANTHROPIC_API_KEY: 'sk-ci-smoke',
   MODEL_NAME: 'claude-opus-4-7',
   API_PROVIDER: 'claude',

@@ -12,6 +12,10 @@
     gap: 0 1.75rem;
     align-items: start;
   }
+  .layout.layout--no-sidebar {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
 }
 
 /* Grid-Items default `min-width: auto` → Inhalt mit `white-space: nowrap`

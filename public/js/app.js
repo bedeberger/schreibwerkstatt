@@ -454,6 +454,13 @@ document.addEventListener('alpine:init', () => {
     set globalZeitstrahl(v) { Alpine.store('catalog').globalZeitstrahl = v; },
 
     // ── Computed ─────────────────────────────────────────────────────────────
+    // Admin-only View: Globaler Admin (global_role='admin') bekommt eine
+    // reduzierte Oberfläche — keine Sidebar, keine Buchwahl, nur Admin-Tiles
+    // als Landing. Dev-Mode-Admin (LOCAL_DEV_MODE) bleibt davon ausgenommen,
+    // damit lokale Entwicklung mit Admin-Konto die volle UI behält.
+    get isAdminOnly() {
+      return !!this.currentUser?.isAdmin && !this.devMode;
+    },
     // O(1)-Lookup-Maps für Figuren/Orte. Rebuild nur bei Referenz-Wechsel
     // (loadFiguren/loadOrte reassignen, pushen nie). In Render-Loops
     // (figuren.html, orte.html, szenen.html) ersetzen diese ein vielfaches
@@ -707,7 +714,7 @@ document.addEventListener('alpine:init', () => {
         }
         configurePrompts(cfg.promptConfig, cfg.apiProvider || 'claude');
         configureTokenEstimate(cfg.charsPerToken);
-        if (!cfg.bookstackTokenOk) {
+        if (!cfg.bookstackTokenOk && !this.currentUser?.isAdmin) {
           this.showTokenSetup = true;
           return;
         }
@@ -719,13 +726,17 @@ document.addEventListener('alpine:init', () => {
         if (hashParts[0] === 'book' && hashParts[1]) {
           this.selectedBookId = hashParts[1];
         }
-        await this.loadBooks();
-        // Top-3 Recency-Features für Quick-Pills laden (best-effort).
-        this.loadRecentFeatures();
-        if (this.selectedBookId) this.loadRecentPages(this.selectedBookId);
+        // Admin-only-View überspringt Buch-Bootstrap: keine Sidebar, keine
+        // Buchwahl, Landing sind die Admin-Tiles (admin-home-Partial).
+        if (!this.isAdminOnly) {
+          await this.loadBooks();
+          // Top-3 Recency-Features für Quick-Pills laden (best-effort).
+          this.loadRecentFeatures();
+          if (this.selectedBookId) this.loadRecentPages(this.selectedBookId);
+        }
         await this._applyHash();
-        if (this.selectedBookId) this._loadBookRole(this.selectedBookId);
-        this._maybeOpenBookOverview();
+        if (!this.isAdminOnly && this.selectedBookId) this._loadBookRole(this.selectedBookId);
+        if (!this.isAdminOnly) this._maybeOpenBookOverview();
         this._syncUrlNow();
         this._applyingHash = false;
         this._setupHashRouting();

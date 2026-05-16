@@ -152,7 +152,7 @@
   "bs.apiErrorDetail":           "BookStack API error {status}: {detail}",
   "bs.unsafeHtml":               "Corrected HTML looks incomplete – save aborted.",
   "bs.loadingPage":              "Loading current page…",
-  "bs.savingToBookStack":        "Saving to BookStack…",
+  "bs.savingToBookStack":        "Saving…",
 
   "stilkorrektur.workingChars":  "AI rewriting style… ({chars} characters)",
   "stilkorrektur.workingTokens": "AI rewriting style… ↑{tokIn}↓~{tokOutEst} tokens",
@@ -161,7 +161,7 @@
 
   "common.unknownError":         "Unknown error",
 
-  "tree.connecting":             "Connecting to BookStack…",
+  "tree.connecting":             "Loading book list…",
   "tree.loadingPages":           "Loading pages…",
   "tree.booksFound":             "{n} book(s) found.",
   "tree.chapterFallback":        "Chapter",
@@ -169,7 +169,7 @@
   "chat.pageNotLoaded":          "Page content not loaded – please re-select the page.",
   "chat.originalNotFound":       "Original text no longer present on the page.",
   "chat.pageLoadFailed":         "Failed to load page content.",
-  "chat.changeSaved":            "Change saved to BookStack.",
+  "chat.changeSaved":            "Change saved.",
   "chat.saveFailedPrefix":       "Save failed: ",
   "common.asOf":                 "As of: {date}",
   "common.noDataYet":            "No data yet. Please click «Update all».",
@@ -1062,7 +1062,7 @@
   "editor.draft":                "Draft {when}",
   "editor.saved":                "saved {when}",
   "editor.draftTitle":           "Local draft – not yet on the server",
-  "editor.savedTitle":           "Saved to BookStack",
+  "editor.savedTitle":           "Saved",
   "editor.openInBookstack":      "Open in BookStack",
   "editor.revisions":            "{n} revisions",
   "editor.revisionsTitle":       "Open revision history in BookStack",
@@ -1285,6 +1285,14 @@
   "admin.settings.help.advancedGlobal": "Apply regardless of provider.",
   "admin.settings.help.advancedClaude": "Effective only when `ai.provider = claude`. Control retries, timeout and parallelism against Anthropic TPM limits.",
   "admin.settings.saved":        "{count} setting(s) saved.",
+
+  "admin.home.title":            "Administration",
+  "admin.home.usersLabel":       "Accounts",
+  "admin.home.settingsLabel":    "System",
+  "admin.home.usageLabel":       "Usage",
+  "tile.adminUsers.desc":        "Invitations, roles, status",
+  "tile.adminSettings.desc":     "Auth, provider, budgets, backend",
+  "tile.adminUsage.desc":        "Consumption, limits, cost",
 
   "admin.users.title":           "User management",
   "admin.users.invite":          "Invite user",
