@@ -129,6 +129,34 @@ html, body {
   margin-top: var(--space-sm);
 }
 
+.public-form-title {
+  margin: 0 0 var(--space-xs);
+  font-size: var(--font-size-lg);
+  color: var(--color-text);
+}
+
+.public-sep {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  color: var(--color-muted);
+  font-size: var(--font-size-sm);
+  text-transform: lowercase;
+}
+
+.public-sep::before,
+.public-sep::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+
+.public-btn[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .public-msg {
   font-size: var(--font-size-sm);
   margin: 0;

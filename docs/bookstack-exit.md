@@ -55,26 +55,7 @@ Phase-0-Spalten im aktuellen Schema:
 
 ## Offene Phasen (Reihenfolge)
 
-`0b-frontend → 1 → 2 → 3 → 6 → 7 → 8 → 9 → 10 → 11`. Phase 11 (Per-User-AI-Provider) ist additiv und kann eingeschoben werden, sobald `app_users` (steht) + `app_settings` (steht) konsolidiert sind.
-
----
-
-## Phase 0b — Auto-Backfill bei Backend-Switch
-
-Backend steht: `'backfill'`-Job in [routes/jobs/backfill.js](../routes/jobs/backfill.js) (`runBackfillJob` + `POST /jobs/backfill`), Upserts in [db/backfill.js](../db/backfill.js), Auto-Login-Trigger via `maybeAutoBackfillOnLogin` in [routes/auth.js](../routes/auth.js).
-
-**Zu erledigen — Auto-Job beim Storage-Wechsel** (kein User-getriggerter manueller / Lazy-Pfad):
-
-- Hook auf `app-settings:changed` für Key `app.backend`. Bei Wechsel `bookstack` → `localdb` (oder retour-Re-Sync) → einmaliger Server-Job iteriert sequentiell durch alle bekannten User (`SELECT email FROM app_users WHERE status='active'`).
-- Pro User: `runBackfillJob({ userEmail })` ohne `bookId` (Full-Scope) — holt alle für diesen User in BookStack sichtbaren Bücher und legt sie idempotent in `books`/`chapters`/`pages` an (FK-Reihenfolge + `owner_email`-Erst-Backfiller-Regel bleibt).
-- Sequentiell (nicht parallel) — verhindert BS-API-Rate-Limit + DB-Lock-Konflikte. Pro User eigener Job-Run in der Queue mit Tag `[backfill-sweep|<admin>|user=<email>]`.
-- Idempotenz via `findActiveJobId` + Body-Hash-Check; Re-Run bei späterem Backend-Toggle no-op für bereits gespiegelte Inhalte.
-- Status-UI: AdminSettingsCard zeigt Progress (`N/M User backfilled`) im Backend-Tab, solange der Sweep läuft.
-- Trigger-Punkt: [routes/admin-settings.js](../routes/admin-settings.js) Pre-Save-Guard erkennt `app.backend`-Wechsel → nach erfolgreichem `PUT /admin/settings` Sweep-Job in Queue legen.
-
-Kein Button in User-/Buch-Settings, kein Lazy-Pfad beim ersten Page-Open — Storage-Wechsel ist Admin-Operation, Backfill folgt automatisch.
-
-Phase 1 (Sync-Worker) übernimmt nach Erst-Backfill inkrementelle Updates per `updated_at`-Diff (nur relevant solange Backend wieder `bookstack` ist).
+`1 → 2 → 3 → 6 → 7 → 8 → 9 → 10 → 11`. Phase 11 (Per-User-AI-Provider) ist additiv und kann eingeschoben werden, sobald `app_users` (steht) + `app_settings` (steht) konsolidiert sind.
 
 ---
 

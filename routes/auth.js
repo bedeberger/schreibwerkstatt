@@ -70,10 +70,25 @@ function _renderDenied(res, lang, reasonKey) {
     ? { title: 'Access denied', body: { suspended: 'Your account is suspended.', deleted: 'Your account has been deleted.', notInvited: 'No access. Ask your administrator for an invite.' }, cta: 'Use another account' }
     : { title: 'Zugriff verweigert', body: { suspended: 'Dein Konto ist gesperrt.', deleted: 'Dein Konto wurde gelöscht.', notInvited: 'Kein Zugang. Bitte Admin um eine Einladung.' }, cta: 'Anderes Konto verwenden' };
   res.set('Cache-Control', 'no-store');
-  res.send(`<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><title>${t.title}</title>
-<meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body><h1>${t.title}</h1><p>${t.body[reasonKey] || t.body.notInvited}</p>
-<p><a href="/auth/logout">${t.cta}</a></p></body></html>`);
+  res.send(`<!doctype html>
+<html lang="${lang}"><head><meta charset="utf-8"><title>${t.title}</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="/schreibwerkstatt_icon.svg">
+<link rel="stylesheet" href="/css/tokens.css">
+<link rel="stylesheet" href="/css/landing.css">
+</head>
+<body>
+<main class="public-shell">
+  <header class="public-header">
+    <h1>${t.title}</h1>
+    <p class="public-sub">${t.body[reasonKey] || t.body.notInvited}</p>
+  </header>
+  <section class="public-actions">
+    <a class="public-btn" href="/auth/logout">${t.cta}</a>
+  </section>
+</main>
+</body></html>`);
 }
 
 function _bodyLang(req) {
@@ -254,38 +269,37 @@ router.get('/login', (req, res) => {
     ? { title: 'Sign in', google: 'Sign in with Google', adminTitle: 'Admin login', email: 'Admin email', password: 'Password', submit: 'Sign in as admin', or: 'or', noAdmin: 'Admin login disabled.' }
     : { title: 'Anmeldung', google: 'Mit Google anmelden', adminTitle: 'Admin-Login', email: 'Admin-E-Mail', password: 'Passwort', submit: 'Als Admin anmelden', or: 'oder', noAdmin: 'Admin-Login deaktiviert.' };
   res.set('Cache-Control', 'no-store');
-  res.send(`<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><title>${t.title}</title>
+  res.send(`<!doctype html>
+<html lang="${lang}"><head><meta charset="utf-8"><title>${t.title}</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<style>
-  body{font-family:system-ui,sans-serif;max-width:420px;margin:48px auto;padding:0 16px;color:#1a1a1a;background:#fafafa}
-  h1{font-size:1.5em;margin-bottom:24px}
-  .btn-google{display:inline-block;padding:10px 16px;background:#fff;border:1px solid #ccc;border-radius:4px;text-decoration:none;color:#1a1a1a;font-size:1em}
-  .btn-google:hover{background:#f0f0f0}
-  fieldset{border:1px solid #ddd;border-radius:4px;padding:16px;margin-top:24px}
-  legend{padding:0 8px;color:#666;font-size:0.9em}
-  label{display:block;margin-top:8px;font-size:0.9em;color:#555}
-  input[type=email],input[type=password]{width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;font-size:1em;box-sizing:border-box;margin-top:4px}
-  button[type=submit]{margin-top:12px;padding:10px 16px;background:#0070d0;color:#fff;border:0;border-radius:4px;font-size:1em;cursor:pointer}
-  button[type=submit]:hover{background:#005bb0}
-  .err{color:#c00;margin-top:8px;font-size:0.9em;min-height:1.2em}
-  .sep{margin:24px 0;text-align:center;color:#999;font-size:0.9em}
-</style></head>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="/schreibwerkstatt_icon.svg">
+<link rel="stylesheet" href="/css/tokens.css">
+<link rel="stylesheet" href="/css/landing.css">
+</head>
 <body>
-<h1>${t.title}</h1>
-${hasGoogle ? `<p><a class="btn-google" href="/auth/login?returnTo=${encodeURIComponent(returnTo)}">${t.google}</a></p>` : ''}
-${hasGoogle && hasAdminPw ? `<div class="sep">— ${t.or} —</div>` : ''}
-${hasAdminPw ? `<fieldset><legend>${t.adminTitle}</legend>
-<form id="admin-form">
-  <label>${t.email}<input type="email" id="email" required autocomplete="username"></label>
-  <label>${t.password}<input type="password" id="password" required autocomplete="current-password"></label>
-  <button type="submit">${t.submit}</button>
-  <div class="err" id="err"></div>
-</form></fieldset>
-<script>
+<main class="public-shell">
+  <header class="public-header"><h1>${t.title}</h1></header>
+${hasGoogle ? `  <section class="public-actions">
+    <a class="public-btn public-btn--primary" href="/auth/login?returnTo=${encodeURIComponent(returnTo)}">${t.google}</a>
+  </section>
+` : ''}${hasGoogle && hasAdminPw ? `  <div class="public-sep">${t.or}</div>
+` : ''}${hasAdminPw ? `  <form id="admin-form" class="public-form" novalidate>
+    <h2 class="public-form-title">${t.adminTitle}</h2>
+    <label><span>${t.email}</span><input type="email" id="email" required autocomplete="username"></label>
+    <label><span>${t.password}</span><input type="password" id="password" required autocomplete="current-password"></label>
+    <div class="public-form-actions">
+      <button type="submit" class="public-btn public-btn--primary">${t.submit}</button>
+    </div>
+    <p class="public-msg public-msg--err" id="err" hidden></p>
+  </form>
+` : (hasGoogle ? '' : `  <p class="public-sub">${t.noAdmin}</p>
+`)}</main>
+${hasAdminPw ? `<script>
 document.getElementById('admin-form').addEventListener('submit', async e => {
   e.preventDefault();
   const err = document.getElementById('err');
-  err.textContent = '';
+  err.hidden = true; err.textContent = '';
   const email = document.getElementById('email').value.trim();
   const password = document.getElementById('password').value;
   try {
@@ -302,11 +316,13 @@ document.getElementById('admin-form').addEventListener('submit', async e => {
     } else {
       err.textContent = ${JSON.stringify(lang === 'en' ? 'Invalid credentials.' : 'Falsche Zugangsdaten.')};
     }
+    err.hidden = false;
   } catch (ex) {
     err.textContent = ex.message;
+    err.hidden = false;
   }
 });
-</script>` : (hasGoogle ? '' : `<p>${t.noAdmin}</p>`)}
+</script>` : ''}
 </body></html>`);
 });
 
@@ -382,9 +398,23 @@ router.get('/auth/logout', (req, res) => {
     res.set('Cache-Control', 'no-store');
     res.send(`<!doctype html>
 <html lang="${lang}"><head><meta charset="utf-8"><title>${t.title}</title>
-<meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body><h1>${t.title}</h1><p>${t.body}</p>
-<p><a href="/auth/login">${t.cta}</a></p></body></html>`);
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="/schreibwerkstatt_icon.svg">
+<link rel="stylesheet" href="/css/tokens.css">
+<link rel="stylesheet" href="/css/landing.css">
+</head>
+<body>
+<main class="public-shell">
+  <header class="public-header">
+    <h1>${t.title}</h1>
+    <p class="public-sub">${t.body}</p>
+  </header>
+  <section class="public-actions">
+    <a class="public-btn public-btn--primary" href="/auth/login">${t.cta}</a>
+  </section>
+</main>
+</body></html>`);
   });
 });
 
