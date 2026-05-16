@@ -1,8 +1,14 @@
 'use strict';
-const { bsGet: _bsGet, bsGetAll: _bsGetAll, BOOKSTACK_URL: BS_URL } = require('../../../lib/bookstack');
+// Job-spezifische Helper rund um Buch-Kontext (Buch-Settings + Locale + Prompts).
+//
+// Die frueher hier definierten bsGet/bsGetAll-Wrapper sind weggefallen — Jobs
+// verwenden direkt `require('lib/content-store')` und wrappen Errors bei Bedarf
+// ueber `bsHttpError` aus shared/jobs.js. So bleibt content-store die SSoT,
+// und es gibt keinen zweiten Layer mehr, der bs*-Aufrufe versteckt.
+
+const { BOOKSTACK_URL: BS_URL } = require('../../../lib/bookstack');
 const { getBookSettings } = require('../../../db/schema');
 const { getPrompts } = require('../../../lib/prompts-loader');
-const { i18nError } = require('./jobs');
 
 /**
  * Gibt das Locale-Prompts-Objekt für ein Buch zurück – augmentiert mit Buchtyp und Buchkontext.
@@ -18,24 +24,4 @@ async function getBookPrompts(bookId, userEmail = null) {
   return getLocalePromptsForBook(locale, settings.buchtyp || null, settings.buch_kontext || null, !!settings.is_finished);
 }
 
-// Wrapped `lib/bookstack.js` – mappt Nicht-OK-Responses auf i18nError, damit
-// Job-UI die Meldung übersetzt anzeigen kann.
-async function bsGet(path, userToken) {
-  try {
-    return await _bsGet(path, userToken);
-  } catch (e) {
-    if (e.status) throw i18nError('job.error.bookstack', { status: e.status, text: e.bodyText });
-    throw e;
-  }
-}
-
-async function bsGetAll(path, userToken) {
-  try {
-    return await _bsGetAll(path, userToken);
-  } catch (e) {
-    if (e.status) throw i18nError('job.error.bookstack', { status: e.status, text: e.bodyText });
-    throw e;
-  }
-}
-
-module.exports = { BS_URL, bsGet, bsGetAll, getBookPrompts };
+module.exports = { BS_URL, getBookPrompts };

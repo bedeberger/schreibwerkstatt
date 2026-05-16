@@ -81,7 +81,15 @@ async function bsGet(reqPath, _token) {
       throw err;
     }
     const page = state.pages.find(p => p.id === id) || { id, name: 'Unknown' };
-    return { id, html: body, name: page.name };
+    return {
+      id,
+      html: body,
+      name: page.name,
+      book_id: page.book_id ?? null,
+      chapter_id: page.chapter_id ?? null,
+      updated_at: page.updated_at || '',
+      priority: page.priority ?? page.position ?? 0,
+    };
   }
   throw new Error(`mock-bookstack bsGet: unhandled ${reqPath}`);
 }

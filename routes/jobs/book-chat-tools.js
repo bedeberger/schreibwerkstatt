@@ -6,7 +6,8 @@
 
 const { db, getUser } = require('../../db/schema');
 const { INPUT_BUDGET_CHARS } = require('../../lib/ai');
-const { bsGet, htmlToText } = require('./shared');
+const { htmlToText } = require('./shared');
+const contentStore = require('../../lib/content-store');
 const { inClause } = require('../../lib/validate');
 const { listDraftFigures, getDraftFigure, listWerkstattRuns, getWerkstattRun } = require('../../db/draft-figures');
 const { resolveI18nTree, resolveI18n } = require('../../lib/i18n-server');
@@ -388,7 +389,7 @@ async function tool_get_pages(input, ctx) {
   for (const pageId of toFetch) {
     if (ctx.jobSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
     try {
-      const pd = await bsGet(`pages/${pageId}`, ctx.userToken);
+      const pd = await contentStore.loadPage(pageId, ctx.userToken);
       const text = htmlToText(pd.html || '');
       const pageRow = db.prepare(`
         SELECT p.page_name, c.chapter_name FROM pages p

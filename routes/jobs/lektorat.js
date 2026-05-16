@@ -6,13 +6,14 @@ const {
   loadLektoratCache, saveLektoratCache,
 } = require('../../db/schema');
 const {
-  makeJobLogger, updateJob, completeJob, failJob, i18nError,
+  makeJobLogger, updateJob, completeJob, failJob, i18nError, bsHttpError,
   aiCall, getPrompts, getBookPrompts,
-  htmlToText, bsGet, bsGetAll, jobAbortControllers,
+  htmlToText, jobAbortControllers,
   _modelName, tps,
   jobs, runningJobs, createJob, enqueueJob, jobKey, findActiveJobId,
   jsonBody,
 } = require('./shared');
+const contentStore = require('../../lib/content-store');
 
 function _sigHash(obj) {
   return crypto.createHash('sha1').update(JSON.stringify(obj ?? null)).digest('hex').slice(0, 12);
@@ -59,12 +60,12 @@ function findPreviousPage(pages, currentPageId, currentChapterId) {
     : pages;
   const pool = (sameChapter.length > 0 ? sameChapter : pages)
     .slice()
-    .sort((a, b) => (a.priority || 0) - (b.priority || 0));
+    .sort((a, b) => (a.position || 0) - (b.position || 0));
   const idx = pool.findIndex(p => String(p.id) === String(currentPageId));
   if (idx > 0) return pool[idx - 1];
   // Fallback: falls die aktuelle Seite nicht in der Liste ist, letzte Seite vor ihr im Buch nehmen
   if (idx === -1 && currentChapterId && sameChapter.length === 0) {
-    const allSorted = pages.slice().sort((a, b) => (a.priority || 0) - (b.priority || 0));
+    const allSorted = pages.slice().sort((a, b) => (a.position || 0) - (b.position || 0));
     const i2 = allSorted.findIndex(p => String(p.id) === String(currentPageId));
     return i2 > 0 ? allSorted[i2 - 1] : null;
   }
@@ -119,7 +120,7 @@ async function runCheckJob(jobId, pageId, bookId, userEmail, userToken) {
     logger.info(`Start: Seite #${pageId}`);
     updateJob(jobId, { statusText: 'job.phase.loadingPageContent', progress: 5 });
 
-    const pd = await bsGet('pages/' + pageId, userToken);
+    const pd = await contentStore.loadPage(pageId, userToken).catch(e => { throw bsHttpError(e); });
 
     const html = pd.html;
     const text = htmlToText(html);
@@ -146,10 +147,10 @@ async function runCheckJob(jobId, pageId, bookId, userEmail, userToken) {
     let previousExcerpt = null;
     if (bookId && !local) {
       try {
-        const allPages = await bsGetAll('pages?filter[book_id]=' + bookId, userToken);
+        const allPages = await contentStore.listPages(bookId, userToken);
         const prev = findPreviousPage(allPages, pageId, pd.chapter_id);
         if (prev) {
-          const prevPd = await bsGet('pages/' + prev.id, userToken);
+          const prevPd = await contentStore.loadPage(prev.id, userToken);
           previousExcerpt = lastParagraph(htmlToText(prevPd.html));
         }
       } catch (e) {
@@ -244,7 +245,7 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
   const local = _isLocalProvider();
   try {
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
-    const pages = await bsGetAll('pages?filter[book_id]=' + bookId, userToken);
+    const pages = await contentStore.listPages(bookId, userToken).catch(e => { throw bsHttpError(e); });
     if (!pages.length) { completeJob(jobId, { empty: true }); return; }
     logger.info(`Start: ${pages.length} Seiten`);
 
@@ -262,7 +263,7 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
     const processPage = async (p, i) => {
       if (jobAbortControllers.get(jobId)?.signal.aborted) throw new DOMException('Aborted', 'AbortError');
       try {
-        const pd = await bsGet('pages/' + p.id, userToken);
+        const pd = await contentStore.loadPage(p.id, userToken).catch(e => { throw bsHttpError(e); });
         const text = htmlToText(pd.html).trim();
         if (!text) return;
 
@@ -280,7 +281,7 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
               previousExcerpt = lastParaCache.get(prev.id);
             } else {
               try {
-                const prevPd = await bsGet('pages/' + prev.id, userToken);
+                const prevPd = await contentStore.loadPage(prev.id, userToken);
                 previousExcerpt = lastParagraph(htmlToText(prevPd.html));
                 lastParaCache.set(prev.id, previousExcerpt);
               } catch (_) { /* Vorseite fehlschlägt → kein Kontext, nicht kritisch */ }

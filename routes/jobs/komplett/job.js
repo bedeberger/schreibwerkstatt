@@ -8,13 +8,14 @@ const {
 } = require('../../../db/schema');
 const { narrativeLabels } = require('../narrative-labels');
 const {
-  makeJobLogger, updateJob, completeJob, failJob, i18nError,
+  makeJobLogger, updateJob, completeJob, failJob, i18nError, bsHttpError,
   aiCall, toSystemBlocks, getPrompts, getBookPrompts,
   loadPageContents, groupByChapter, buildSinglePassBookText, cleanPageTextForClaude,
-  bsGetAll, SINGLE_PASS_LIMIT, BATCH_SIZE, jobAbortControllers,
+  SINGLE_PASS_LIMIT, BATCH_SIZE, jobAbortControllers,
   _modelName, fmtTok, tps,
   createJob, enqueueJob, findActiveJobId,
 } = require('../shared');
+const contentStore = require('../../../lib/content-store');
 const { runNonCritical, buildBookSystemBlockText } = require('./utils');
 const { invalidateRenamedChapterCaches, loadAndValidateCheckpoint, restorePhase1FromCheckpoint } = require('./checkpoint');
 const { remapSzenen, remapAssignments, saveSzenenAndEvents, saveKontinuitaetResult } = require('./remap');
@@ -55,8 +56,8 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
     // ── Seiten laden ──────────────────────────────────────────────────────────
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
     const [chaptersData, pages] = await Promise.all([
-      bsGetAll('chapters?filter[book_id]=' + bookId, userToken),
-      bsGetAll('pages?filter[book_id]=' + bookId, userToken),
+      contentStore.listChapters(bookId, userToken).catch(e => { throw bsHttpError(e); }),
+      contentStore.listPages(bookId, userToken).catch(e => { throw bsHttpError(e); }),
     ]);
     if (!pages.length) { completeJob(jobId, { empty: true }); return; }
 
@@ -248,8 +249,8 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
 
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
     const [chaptersData, pages] = await Promise.all([
-      bsGetAll('chapters?filter[book_id]=' + bookId, userToken),
-      bsGetAll('pages?filter[book_id]=' + bookId, userToken),
+      contentStore.listChapters(bookId, userToken).catch(e => { throw bsHttpError(e); }),
+      contentStore.listPages(bookId, userToken).catch(e => { throw bsHttpError(e); }),
     ]);
     if (!pages.length) { completeJob(jobId, { empty: true }); return; }
 
@@ -372,7 +373,7 @@ async function runKomplettAnalyseAll() {
   let books;
   for (const u of users) {
     try {
-      books = await bsGetAll('books', { id: u.token_id, pw: u.token_pw });
+      books = await contentStore.listBooks({ id: u.token_id, pw: u.token_pw });
       break;
     } catch (e) {
       logger.warn(`Nacht-Analyse: Bücherliste mit Token von ${u.email} fehlgeschlagen – nächsten versuchen.`);

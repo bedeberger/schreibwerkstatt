@@ -6,14 +6,15 @@ const {
   loadChapterMacroReviewCache, saveChapterMacroReviewCache,
 } = require('../../db/schema');
 const {
-  makeJobLogger, updateJob, completeJob, failJob, i18nError,
+  makeJobLogger, updateJob, completeJob, failJob, i18nError, bsHttpError,
   aiCall, getPrompts, getBookPrompts,
-  bsGet, bsGetAll, jobAbortControllers,
+  jobAbortControllers,
   htmlToText, splitGroupsIntoChunks,
   _modelName, tps,
   jobs, runningJobs, createJob, enqueueJob, jobKey, findActiveJobId,
   jsonBody, BATCH_SIZE, SINGLE_PASS_LIMIT, PER_CHUNK_LIMIT,
 } = require('./shared');
+const contentStore = require('../../lib/content-store');
 const { narrativeLabels } = require('./narrative-labels');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
@@ -48,12 +49,12 @@ async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookNa
   const optionsSig = _sigHash({ narrative, schwerpunkt: reviewSchwerpunkt });
   try {
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
-    // Alle Buchseiten holen; Kapitel-Filter läuft clientseitig – BookStack
-    // liefert in `/pages?filter[book_id]=` bereits `chapter_id` pro Seite.
-    const allPages = await bsGetAll('pages?filter[book_id]=' + bookId, userToken);
+    // Alle Buchseiten holen; Kapitel-Filter läuft clientseitig – die Page-Metas
+    // enthalten bereits `chapter_id`.
+    const allPages = await contentStore.listPages(bookId, userToken).catch(e => { throw bsHttpError(e); });
     const pages = allPages
       .filter(p => String(p.chapter_id || '') === String(chapterId))
-      .sort((a, b) => (a.priority || 0) - (b.priority || 0));
+      .sort((a, b) => (a.position || 0) - (b.position || 0));
 
     if (!pages.length) { completeJob(jobId, { empty: true, chapterName }); return; }
     logger.info(`Start: «${chapterName}» chap=${chapterId}, ${pages.length} Seiten`);
@@ -96,7 +97,7 @@ async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookNa
         statusParams: { from: i + 1, to: Math.min(i + BATCH_SIZE, pages.length), total: pages.length },
       });
       const results = await Promise.allSettled(pages.slice(i, i + BATCH_SIZE).map(async p => {
-        const pd = await bsGet('pages/' + p.id, userToken);
+        const pd = await contentStore.loadPage(p.id, userToken).catch(e => { throw bsHttpError(e); });
         const text = htmlToText(pd.html).trim();
         if (!text) return null;
         return { title: p.name, text };

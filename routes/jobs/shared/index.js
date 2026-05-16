@@ -39,13 +39,12 @@ module.exports = {
   findActiveJobId: jobsMod.findActiveJobId,
   fmtTok: jobsMod.fmtTok,
   i18nError: jobsMod.i18nError,
+  bsHttpError: jobsMod.bsHttpError,
 
   _modelName: model._modelName,
   settledAll: ai.settledAll,
 
   BS_URL: bs.BS_URL,
-  bsGet: bs.bsGet,
-  bsGetAll: bs.bsGetAll,
 
   htmlToText: ai.htmlToText,
   cleanPageTextForClaude: ai.cleanPageTextForClaude,

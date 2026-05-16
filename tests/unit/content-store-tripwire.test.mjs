@@ -18,24 +18,14 @@ const SCAN_DIRS = [
   join(REPO_ROOT, 'lib'),
 ];
 
-// Erlaubte Aufrufer von `bs*`-Wrappern:
+// Erlaubte Aufrufer von `bs*`-Wrappern: nach Schritt 4b nur noch:
 //   - lib/bookstack.js: Definition der Wrapper.
 //   - lib/content-store.js: Domain-SSoT, konsumiert bs* intern.
-//   - lib/load-book-contents.js: PDF-Export-Helper, wird in Schritt 5 mit
-//     content-store konsolidiert.
-//   - routes/sync.js: nightly Buchstatistik-Sync, konsumiert bs* fuer
-//     Buecher-Discovery + Page-Index — wird in Schritt 5 migriert.
-//   - routes/jobs/**: Job-Handler mit Token aus Job-Context. Sub-Step
-//     Schritt 4b migriert sie auf content-store.
 const ALLOW_BS_CALLERS = new Set([
   'lib/bookstack.js',
   'lib/content-store.js',
-  'lib/load-book-contents.js',
-  'routes/sync.js',
 ]);
-const ALLOW_PREFIXES = [
-  'routes/jobs/', // alle Job-Handler bis Schritt 4b
-];
+const ALLOW_PREFIXES = [];
 
 const BS_RE = /\bbs(Get|GetAll|Put|Post|Delete|Batch)\b/;
 

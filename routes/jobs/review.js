@@ -7,14 +7,15 @@ const {
   loadBookReviewCache, saveBookReviewCache,
 } = require('../../db/schema');
 const {
-  makeJobLogger, updateJob, completeJob, failJob, i18nError,
+  makeJobLogger, updateJob, completeJob, failJob, i18nError, bsHttpError,
   aiCall, getPrompts, getBookPrompts,
   loadPageContents, groupByChapter, splitGroupsIntoChunks, buildSinglePassBookText,
-  bsGetAll, SINGLE_PASS_LIMIT, PER_CHUNK_LIMIT, BATCH_SIZE, jobAbortControllers, settledAll,
+  SINGLE_PASS_LIMIT, PER_CHUNK_LIMIT, BATCH_SIZE, jobAbortControllers, settledAll,
   _modelName, tps,
   jobs, runningJobs, createJob, enqueueJob, jobKey, findActiveJobId,
   jsonBody,
 } = require('./shared');
+const contentStore = require('../../lib/content-store');
 const { narrativeLabels } = require('./narrative-labels');
 const { loadReviewKomplettContext } = require('./review-context');
 const { toIntId } = require('../../lib/validate');
@@ -72,8 +73,8 @@ async function runReviewJob(jobId, bookId, bookName, userEmail, userToken) {
   try {
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
     const [chaptersData, pages] = await Promise.all([
-      bsGetAll('chapters?filter[book_id]=' + bookId, userToken),
-      bsGetAll('pages?filter[book_id]=' + bookId, userToken),
+      contentStore.listChapters(bookId, userToken).catch(e => { throw bsHttpError(e); }),
+      contentStore.listPages(bookId, userToken).catch(e => { throw bsHttpError(e); }),
     ]);
 
     if (!pages.length) { completeJob(jobId, { empty: true }); return; }

@@ -4,7 +4,7 @@ const logger = require('../logger');
 const { runWithContext, getContext, bookParamHandler } = require('../lib/log-context');
 const { CHARS_PER_TOKEN } = require('../lib/ai');
 const { toIntId } = require('../lib/validate');
-const { bsGet, bsGetAll } = require('../lib/bookstack');
+const contentStore = require('../lib/content-store');
 const { computePageIndex, writePageIndex, writeFigureMentionsForPageAllUsers, tokenizeNamesForStopwords } = require('../lib/page-index');
 const { invalidateBookPageCache } = require('./jobs/chat');
 const { localIsoDate } = require('../lib/local-date');
@@ -138,9 +138,9 @@ const PREVIEW_CHARS = 800;
 
 async function syncPagesCache(bookId, token) {
   const [pages, chapters, bookMeta] = await Promise.all([
-    bsGetAll(`pages?filter[book_id]=${bookId}`, token),
-    bsGetAll(`chapters?filter[book_id]=${bookId}`, token),
-    bsGet(`books/${bookId}`, token).catch(() => null),
+    contentStore.listPages(bookId, token),
+    contentStore.listChapters(bookId, token),
+    contentStore.loadBook(bookId, token).catch(() => null),
   ]);
   // pages.book_id REFERENCES books — Buch upserten, falls noch keine Sync lief
   // (frisches BookStack-Buch, das Cron noch nicht erfasst hat).
@@ -159,7 +159,7 @@ async function syncPagesCache(bookId, token) {
     for (let i = 0; i < toFetch.length; i += BATCH) {
       await Promise.allSettled(toFetch.slice(i, i + BATCH).map(async p => {
         try {
-          const pd = await bsGet(`pages/${p.id}`, token);
+          const pd = await contentStore.loadPage(p.id, token);
           const text = htmlToText(pd.html || '').trim();
           stmtPrev.run(text ? text.slice(0, PREVIEW_CHARS) : null, p.id);
         } catch { /* einzelne Seite überspringen */ }
@@ -172,9 +172,9 @@ async function syncPagesCache(bookId, token) {
 
 async function syncBook(bookId, token) {
   const [pages, book, chapters] = await Promise.all([
-    bsGetAll(`pages?filter[book_id]=${bookId}`, token),
-    bsGet(`books/${bookId}`, token),
-    bsGetAll(`chapters?filter[book_id]=${bookId}`, token),
+    contentStore.listPages(bookId, token),
+    contentStore.loadBook(bookId, token),
+    contentStore.listChapters(bookId, token),
   ]);
   const chapterCount = chapters.length;
 
@@ -211,7 +211,7 @@ async function syncBook(bookId, token) {
   for (let i = 0; i < pages.length; i += BATCH) {
     const batch = pages.slice(i, i + BATCH);
     const results = await Promise.allSettled(batch.map(async p => {
-      const pd = await bsGet(`pages/${p.id}`, token);
+      const pd = await contentStore.loadPage(p.id, token);
       const text = htmlToText(pd.html || '');
       const { words, chars, tok, wordList, sentences } = computeStats(pd.html || '');
       const preview = text.trim().slice(0, PREVIEW_CHARS);
@@ -306,7 +306,7 @@ async function _syncAllBooksInner() {
   const bookOwners = new Map(); // bookId → { name, tokens: [user, ...] }
   for (const u of users) {
     try {
-      const books = await bsGetAll('books', u);
+      const books = await contentStore.listBooks(u);
       for (const b of books) {
         upsertBook(b);
         const entry = bookOwners.get(b.id);
@@ -450,14 +450,14 @@ router.post('/page-stats/:book_id', express.json(), async (req, res) => {
   }
 
   try {
-    const pages = await bsGetAll(`pages?filter[book_id]=${bookId}`, token);
+    const pages = await contentStore.listPages(bookId, token);
 
     // FK-Vorbereitung: page_stats.book_id → books, page_stats.page_id → pages.
     if (requestedIds) {
       // Lazy-Pfad: nur die angefragten pages-Rows einsetzen, kein Chapter-/Prune-Aufwand.
       const bookRow = db.prepare('SELECT 1 FROM books WHERE book_id = ?').get(bookId);
       if (!bookRow) {
-        const bookMeta = await bsGet(`books/${bookId}`, token).catch(() => null);
+        const bookMeta = await contentStore.loadBook(bookId, token).catch(() => null);
         if (bookMeta) upsertBook(bookMeta);
       }
       const stmt = db.prepare(`
@@ -474,8 +474,8 @@ router.post('/page-stats/:book_id', express.json(), async (req, res) => {
       })();
     } else {
       // Full-Backfill: vollwertiger pages-Cache-Update (Chapters, Prune, Reconcile).
-      const chapters = await bsGetAll(`chapters?filter[book_id]=${bookId}`, token);
-      const bookMeta = await bsGet(`books/${bookId}`, token).catch(() => null);
+      const chapters = await contentStore.listChapters(bookId, token);
+      const bookMeta = await contentStore.loadBook(bookId, token).catch(() => null);
       if (bookMeta) upsertBook(bookMeta);
       _upsertPagesCache(bookId, pages, chapters);
     }
@@ -497,7 +497,7 @@ router.post('/page-stats/:book_id', express.json(), async (req, res) => {
     for (let i = 0; i < stale.length; i += BATCH) {
       const slice = stale.slice(i, i + BATCH);
       const results = await Promise.allSettled(slice.map(async p => {
-        const pd = await bsGet(`pages/${p.id}`, token);
+        const pd = await contentStore.loadPage(p.id, token);
         const { words, chars, tok } = computeStats(pd.html || '');
         return { page_id: p.id, book_id: bookId, tok, words, chars, updated_at: p.updated_at || null, cached_at: now };
       }));

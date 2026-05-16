@@ -18,7 +18,7 @@ const {
   jsonBody,
 } = require('./shared');
 const { getTokenForRequest, getPdfExportProfile, getPdfExportProfileCover, getBookSettings } = require('../../db/schema');
-const { bsGet } = require('../../lib/bookstack');
+const contentStore = require('../../lib/content-store');
 const { loadBookContents } = require('../../lib/load-book-contents');
 const { renderPdfBuffer } = require('../../lib/pdf-render');
 const { validatePdfa } = require('../../lib/pdfa-validate');
@@ -53,7 +53,7 @@ async function runPdfExportJob(jobId, { bookId, profileId, userEmail, userToken 
     if (profile.user_email !== userEmail) throw i18nError('job.error.forbidden');
 
     updateJob(jobId, { progress: 10, statusText: 'job.phase.loadBook' });
-    const book = await bsGet(`books/${bookId}`, userToken);
+    const book = await contentStore.loadBook(bookId, userToken);
     log.info(`Start PDF-Export «${book.name}» (book=${bookId}, profile=${profile.name})`);
 
     updateJob(jobId, { progress: 20, statusText: 'job.phase.loadPages' });
