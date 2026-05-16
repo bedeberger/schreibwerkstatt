@@ -652,7 +652,6 @@ Ziel: `.env` schrumpft auf **reines Boot-/Infra-Layer**. Alles, was zur Laufzeit
 |---|---|
 | `PORT` | Express bindet vor DB-Open. |
 | `DB_PATH` | Wir öffnen erst die DB damit. |
-| `APP_URL` | OAuth-Callback-URL muss vor Auth-Init feststehen. |
 | `SESSION_SECRET` | Express-Session-Middleware initialisiert vor DB-Read. |
 | `MASTER_KEY` | AES-256-GCM-Root, verschlüsselt selbst die DB-Settings (Henne/Ei — kann nicht in der DB liegen). Existiert bereits für BookStack-Tokens, [lib/crypto.js](../lib/crypto.js). |
 | `ADMIN_EMAIL` | Identität des Bootstrap-/Persistent-Admins. Wird beim Server-Start als `app_users`-Row angelegt mit `global_role='admin'`, `status='active'`. |
@@ -797,7 +796,8 @@ Bei jedem Request einer eingeloggten Admin-Session: solange `app_settings.app.se
 ### Wizard-Schritte
 
 1. **Begrüssung**: Anzeige der erkannten `ADMIN_EMAIL` (read-only). Hinweis: „Diese Email ist als Admin via `.env` konfiguriert. Du kannst dich zusätzlich via Google-OAuth mit derselben Email einloggen, sobald OAuth eingerichtet ist."
-2. **Google-OAuth** (optional, überspringbar): `client_id` + `client_secret`. Anzeige der zu hinterlegenden Redirect-URI (`${APP_URL}/auth/callback`). Test-Button → Discovery-Doc-Fetch. Skip → reine Passwort-Auth, weitere User können nur via Invite + Passwort-fähiger zweiter Mechanismus (späterer Ausbau, vorerst nicht in Scope).
+2. **Öffentliche URL** (Pflicht, sobald OAuth oder Invites laufen): `app.public_url` setzen — ohne Slash am Ende. Wird für OIDC-Callback, Invite-Mails und Share-Links genutzt. Leer = OIDC-Login wirft beim ersten Auth-Versuch.
+3. **Google-OAuth** (optional, überspringbar): `client_id` + `client_secret`. Anzeige der zu hinterlegenden Redirect-URI (`${app.public_url}/auth/callback`). Test-Button → Discovery-Doc-Fetch. Skip → reine Passwort-Auth, weitere User können nur via Invite + Passwort-fähiger zweiter Mechanismus (späterer Ausbau, vorerst nicht in Scope).
 3. **Allowed-Emails** (optional, nur relevant bei OAuth aktiv): kommaseparierte Liste oder leer (= alle Google-Konten, die in `app_users` als `status='active'` existieren, dürfen rein).
 4. **KI-Provider** (optional, kann später): Provider-Wahl + minimaler Setup (Claude-Key oder Ollama-Host). Test-Button. Überspringen → App ohne KI-Features bis Admin-Konsole-Nachzug.
 5. **Storage-Backend**: `localdb` (Default) oder `bookstack` (Base-URL + Token-ID/-Secret + Test-Button).

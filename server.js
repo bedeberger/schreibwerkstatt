@@ -11,7 +11,8 @@ const { runWithContext } = require('./lib/log-context');
 
 // DB-Setup + Migrationen laufen beim Import
 const { db, cleanupStuckJobRuns, upsertUserLogin, touchUserLastSeen, addUserActivity, pruneStaleByAge } = require('./db/schema');
-const { ensureAdminFromEnv } = require('./db/app-users');
+const appUsers = require('./db/app-users');
+const { ensureAdminFromEnv } = appUsers;
 const appSettings = require('./lib/app-settings');
 
 // Phase 4a Admin-Bootstrap: ADMIN_EMAIL aus ENV → app_users-Row mit
@@ -121,7 +122,6 @@ if (!sessionSecret) {
   }
 }
 
-const isHttps = (process.env.APP_URL || '').startsWith('https');
 const sessionStore = new SqliteStore({
   client: db,
   expired: { clear: true, intervalMs: 15 * 60 * 1000 }, // alle 15 min abgelaufene Sessions löschen
@@ -136,7 +136,10 @@ app.use(session({
   saveUninitialized: false,
   cookie: {
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 Tage
-    secure: isHttps,
+    // `'auto'` leitet `secure` aus `req.secure` ab — funktioniert dank
+    // `app.set('trust proxy', 1)` hinter NGINX/Traefik via `X-Forwarded-Proto`.
+    // Eliminiert die Abhängigkeit zu APP_URL beim Boot (jetzt in app_settings).
+    secure: 'auto',
     httpOnly: true,
     sameSite: 'lax',
   },
@@ -208,8 +211,17 @@ const API_PREFIXES = ['/history/', '/figures/', '/locations/', '/jobs/', '/sync/
 app.use((req, res, next) => {
   if (req.session?.user) return next();
   if (LOCAL_DEV_MODE) {
-    req.session.user = { email: 'dev@local', name: 'Dev (lokal)' };
+    req.session.user = { email: 'dev@local', name: 'Dev (lokal)', role: 'admin' };
     upsertUserLogin('dev@local', 'Dev (lokal)');
+    try {
+      const existing = appUsers.getUser('dev@local');
+      if (!existing) {
+        appUsers.createUser({ email: 'dev@local', displayName: 'Dev (lokal)', globalRole: 'admin', status: 'active' });
+      } else if (existing.global_role !== 'admin' || existing.status !== 'active') {
+        if (existing.global_role !== 'admin') appUsers.setGlobalRole('dev@local', 'admin');
+        if (existing.status !== 'active') appUsers.setStatus('dev@local', 'active');
+      }
+    } catch (e) { logger.warn(`dev-mode admin upsert: ${e.message}`); }
     if (process.env.TOKEN_ID && process.env.TOKEN_KENNWORT) {
       req.session.bookstackToken = { id: process.env.TOKEN_ID, pw: process.env.TOKEN_KENNWORT };
     }
@@ -266,6 +278,7 @@ app.use('/draft-figures', draftFiguresRouter);
 app.use('/content', contentRouter);
 app.use('/book-editor', require('./routes/book-editor'));
 app.use('/admin/users', require('./routes/admin-users'));
+app.use('/admin/settings', require('./routes/admin-settings'));
 
 // Logout: usage-Tabelle behält Einträge (User-Wiederkehr → Top-3 sofort wieder da).
 // Wenn Datenschutz erforderlich, Cleanup über Job/Cron auf Last-Seen-Basis.

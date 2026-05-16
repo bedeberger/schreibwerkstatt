@@ -6,19 +6,41 @@ const { getUserToken, setUserToken, upsertUserLogin, getTokenForRequest } = requ
 const { maybeAutoBackfillOnLogin } = require('./jobs/backfill');
 const appUsers = require('../db/app-users');
 const rateLimit = require('../lib/admin-login-ratelimit');
+const appSettings = require('../lib/app-settings');
 
 const router = express.Router();
 
-// OIDC-Client wird einmalig initialisiert und gecacht
+// Öffentliche Basis-URL: SSoT ist app_settings (`app.public_url`). Im
+// LOCAL_DEV_MODE fällt der Default auf den lokalen Dev-Port — sonst muss der
+// Admin den Wert in der Settings-UI gesetzt haben, damit OIDC-Callback +
+// Invite-Mails funktionieren.
+function getPublicUrl() {
+  const fromDb = appSettings.get('app.public_url');
+  if (fromDb) return String(fromDb).replace(/\/$/, '');
+  if (process.env.LOCAL_DEV_MODE === 'true') {
+    return `http://localhost:${process.env.PORT || 3737}`;
+  }
+  return '';
+}
+
+// OIDC-Client wird einmalig initialisiert und gecacht. Bei Änderung relevanter
+// app_settings-Keys (public_url, google.client_id/secret) verworfen, damit die
+// neue Konfiguration beim nächsten Login greift — ohne Server-Restart.
 let oidcClient = null;
+appSettings.on('changed', ({ key }) => {
+  if (key === 'app.public_url' || key === 'auth.google.client_id' || key === 'auth.google.client_secret') {
+    oidcClient = null;
+  }
+});
 
 async function getClient() {
   if (oidcClient) return oidcClient;
   const googleIssuer = await Issuer.discover('https://accounts.google.com');
-  const appUrl = (process.env.APP_URL || 'http://localhost:3737').replace(/\/$/, '');
+  const appUrl = getPublicUrl();
+  if (!appUrl) throw new Error('app.public_url ist nicht gesetzt — Admin muss die öffentliche URL in den App-Einstellungen hinterlegen.');
   oidcClient = new googleIssuer.Client({
-    client_id: process.env.GOOGLE_CLIENT_ID,
-    client_secret: process.env.GOOGLE_CLIENT_SECRET,
+    client_id: appSettings.get('auth.google.client_id') || process.env.GOOGLE_CLIENT_ID,
+    client_secret: appSettings.get('auth.google.client_secret') || process.env.GOOGLE_CLIENT_SECRET,
     redirect_uris: [`${appUrl}/auth/callback`],
     response_types: ['code'],
   });
@@ -99,7 +121,7 @@ router.get('/auth/login', async (req, res) => {
 router.get('/auth/callback', async (req, res) => {
   try {
     const client = await getClient();
-    const appUrl = (process.env.APP_URL || 'http://localhost:3737').replace(/\/$/, '');
+    const appUrl = getPublicUrl();
     const params = client.callbackParams(req);
     // Passenden pending-Flow suchen (Mehrtab-Support). `oidcPending` ist seit
     // Multi-Tab-Refactor die einzige Quelle; ältere `oidcState`/`oidcNonce`-
