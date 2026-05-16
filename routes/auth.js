@@ -99,6 +99,8 @@ function _bodyLang(req) {
 // GET /auth/login → redirect zu Google (oder direkt zu / im LOCAL_DEV_MODE)
 router.get('/auth/login', async (req, res) => {
   if (process.env.LOCAL_DEV_MODE === 'true') {
+    // Logout-Marker raeumen, damit der Guard wieder eine Dev-Session anlegen darf.
+    res.clearCookie('sw_devout', { path: '/' });
     return res.redirect('/');
   }
   if (!appSettings.get('auth.google.client_id') || !appSettings.get('auth.google.client_secret')) {
@@ -268,6 +270,9 @@ router.get('/login', (req, res) => {
   const t = lang === 'en'
     ? { title: 'Sign in', google: 'Sign in with Google', adminTitle: 'Admin login', email: 'Admin email', password: 'Password', submit: 'Sign in as admin', or: 'or', noAdmin: 'Admin login disabled.' }
     : { title: 'Anmeldung', google: 'Mit Google anmelden', adminTitle: 'Admin-Login', email: 'Admin-E-Mail', password: 'Passwort', submit: 'Als Admin anmelden', or: 'oder', noAdmin: 'Admin-Login deaktiviert.' };
+  const msgInvalid = lang === 'en' ? 'Invalid credentials.' : 'Falsche Zugangsdaten.';
+  const msgRateTpl = lang === 'en' ? 'Too many attempts. Retry in {sec}s.' : 'Zu viele Versuche. Erneut in {sec}s.';
+  const escAttr = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
   res.set('Cache-Control', 'no-store');
   res.send(`<!doctype html>
 <html lang="${lang}"><head><meta charset="utf-8"><title>${t.title}</title>
@@ -284,7 +289,7 @@ ${hasGoogle ? `  <section class="public-actions">
     <a class="public-btn public-btn--primary" href="/auth/login?returnTo=${encodeURIComponent(returnTo)}">${t.google}</a>
   </section>
 ` : ''}${hasGoogle && hasAdminPw ? `  <div class="public-sep">${t.or}</div>
-` : ''}${hasAdminPw ? `  <form id="admin-form" class="public-form" novalidate>
+` : ''}${hasAdminPw ? `  <form id="admin-form" class="public-form" novalidate data-returnto="${escAttr(returnTo)}" data-msg-invalid="${escAttr(msgInvalid)}" data-msg-rate-tpl="${escAttr(msgRateTpl)}">
     <h2 class="public-form-title">${t.adminTitle}</h2>
     <label><span>${t.email}</span><input type="email" id="email" required autocomplete="username"></label>
     <label><span>${t.password}</span><input type="password" id="password" required autocomplete="current-password"></label>
@@ -295,34 +300,7 @@ ${hasGoogle ? `  <section class="public-actions">
   </form>
 ` : (hasGoogle ? '' : `  <p class="public-sub">${t.noAdmin}</p>
 `)}</main>
-${hasAdminPw ? `<script>
-document.getElementById('admin-form').addEventListener('submit', async e => {
-  e.preventDefault();
-  const err = document.getElementById('err');
-  err.hidden = true; err.textContent = '';
-  const email = document.getElementById('email').value.trim();
-  const password = document.getElementById('password').value;
-  try {
-    const r = await fetch('/auth/admin-login', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
-    if (r.ok) { window.location.href = ${JSON.stringify(returnTo)}; return; }
-    const j = await r.json().catch(() => ({}));
-    if (r.status === 429) {
-      const sec = j.retryAfter || 900;
-      err.textContent = ${lang === 'en' ? `'Too many attempts. Retry in ' + sec + 's.'` : `'Zu viele Versuche. Erneut in ' + sec + 's.'`};
-    } else {
-      err.textContent = ${JSON.stringify(lang === 'en' ? 'Invalid credentials.' : 'Falsche Zugangsdaten.')};
-    }
-    err.hidden = false;
-  } catch (ex) {
-    err.textContent = ex.message;
-    err.hidden = false;
-  }
-});
-</script>` : ''}
+${hasAdminPw ? `<script src="/js/admin-login.js"></script>` : ''}
 </body></html>`);
 });
 
@@ -391,6 +369,14 @@ router.get('/auth/logout', (req, res) => {
     if (email) {
       const durMin = loginAt ? Math.round((Date.now() - loginAt) / 60000) : null;
       logger.info(`Logout${durMin != null ? ` (Session ${durMin} min)` : ''}`, { user: email });
+    }
+    // Session-Cookie aus dem Browser raeumen — `destroy()` loescht nur Server-State,
+    // Browser haelt `connect.sid` sonst weiter und schickt ihn beim naechsten Request mit.
+    res.clearCookie('connect.sid', { path: '/', httpOnly: true, sameSite: 'lax', secure: req.secure });
+    // LOCAL_DEV_MODE: Guard legt sonst sofort wieder eine Dev-Session an. Marker
+    // sperrt das, bis der User aktiv /auth/login aufruft (1 Tag genuegt fuer Tests).
+    if (process.env.LOCAL_DEV_MODE === 'true') {
+      res.cookie('sw_devout', '1', { path: '/', httpOnly: true, sameSite: 'lax', maxAge: 24 * 60 * 60 * 1000 });
     }
     const t = lang === 'en'
       ? { title: 'Signed out', body: 'You have been signed out.', cta: 'Sign in again' }

@@ -8,7 +8,10 @@ import path from 'node:path';
 
 const require_ = createRequire(import.meta.url);
 
-const csKey = require_.resolve('../../lib/content-store.js');
+// Phase 1: content-store ist jetzt ein Folder mit index.js (Backend-Facade).
+// require.resolve trifft den Folder-Pfad — den Cache-Key brauchen wir
+// fuer den Mock-Override.
+const csKey = require_.resolve('../../lib/content-store');
 const lcKey = require_.resolve('../../lib/load-contents.js');
 
 function installFakeContentStore(impl) {

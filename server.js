@@ -184,6 +184,7 @@ const PUBLIC_ASSETS = new Set([
   '/schreibwerkstatt_icon.svg',
   '/schreibwerkstatt_icon.ico',
   '/favicon.ico',
+  '/js/admin-login.js',
 ]);
 // Pre-auth-erlaubte Prefixes: landing.html + register.html ziehen /css/tokens.css
 // + /css/landing.css (+ deren @import-Sub-Tokens) und Variable-Fonts aus /fonts/.
@@ -226,7 +227,10 @@ const API_PREFIXES = ['/history/', '/figures/', '/locations/', '/jobs/', '/sync/
 
 app.use((req, res, next) => {
   if (req.session?.user) return next();
-  if (LOCAL_DEV_MODE) {
+  // Dev-Logout-Marker (gesetzt durch /auth/logout): Auto-Dev-Session unterbinden,
+  // damit der User Logout/Login-Flow wie in Prod testen kann. /auth/login raeumt
+  // den Marker.
+  if (LOCAL_DEV_MODE && !/(?:^|;\s*)sw_devout=1(?:;|$)/.test(req.headers.cookie || '')) {
     req.session.user = { email: 'dev@local', name: 'Dev (lokal)', role: 'admin' };
     upsertUserLogin('dev@local', 'Dev (lokal)');
     try {

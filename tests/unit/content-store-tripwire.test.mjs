@@ -1,11 +1,12 @@
-// Server-seitiger Tripwire: BookStack-API darf nur ueber lib/content-store.js
-// erreichbar sein. Direkte `bs*`-Aufrufe in Routen/Jobs/Libs sind ein
-// Architektur-Verstoss gegen die Repo-Indirektion — siehe Schritt 6 des
-// Plans (docs/bookstack-exit.md).
+// Server-seitiger Tripwire: BookStack-API darf nur ueber das BookStack-Backend
+// der Content-Store-Facade erreichbar sein. Direkte `bs*`-Aufrufe in
+// Routen/Jobs/Libs sind ein Architektur-Verstoss — siehe Phase 1 des Plans
+// (docs/bookstack-exit.md).
 //
-// Allowlist enthält Dateien, die noch nicht migriert sind (Job-Handler
-// rufen direkt bsGet/bsGetAll mit Token aus Job-Context — Migration folgt
-// in Schritt 4b/5).
+// Erlaubt: lib/bookstack.js (Wrapper-Definition),
+//          lib/content-store/backends/bookstack.js (Backend-Variante),
+//          routes/sync.js (Per-User-Replica-Worker),
+//          routes/jobs/shared/bookstack.js (Job-Helper mit Token-Context).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -18,12 +19,17 @@ const SCAN_DIRS = [
   join(REPO_ROOT, 'lib'),
 ];
 
-// Erlaubte Aufrufer von `bs*`-Wrappern: nach Schritt 4b nur noch:
+// Erlaubte Aufrufer von `bs*`-Wrappern (Phase 1):
 //   - lib/bookstack.js: Definition der Wrapper.
-//   - lib/content-store.js: Domain-SSoT, konsumiert bs* intern.
+//   - lib/content-store/backends/bookstack.js: BookStack-Backend der Facade.
+//   - routes/sync.js: Per-User-Replica-Worker (Cron + manueller Sync).
+//   - routes/jobs/shared/bookstack.js: Job-Helper, der Token-Context fuer
+//     Buch-Settings-Reads braucht.
 const ALLOW_BS_CALLERS = new Set([
   'lib/bookstack.js',
-  'lib/content-store.js',
+  'lib/content-store/backends/bookstack.js',
+  'routes/sync.js',
+  'routes/jobs/shared/bookstack.js',
 ]);
 const ALLOW_PREFIXES = [];
 
@@ -78,14 +84,12 @@ test('no bs* calls in routes/lib outside content-store + allowed legacy callers'
 });
 
 // Routen/Libs duerfen BookStack-Origin nicht direkt referenzieren — alles geht
-// ueber content-store. Allowlist analog zu bs*-Check. routes/proxies.js
-// bleibt als Allowed: CSP-Origin-Berechnung + `/api/*`-Proxy-Mount sind
-// notwendige Setup-Punkte fuer den BookStack-Pass-Through-Proxy (wird mit
-// Schritt 5/Phase 7 demontiert).
+// ueber content-store. routes/proxies.js bleibt als Allowed: CSP-Origin-
+// Berechnung + `/api/*`-Proxy-Mount fuer den BookStack-Pass-Through.
 const ALLOW_BS_URL = new Set([
   'lib/bookstack.js',
-  'lib/content-store.js',
-  'routes/proxies.js',     // CSP-Origin + /api/* Proxy-Mount (Schritt 5/Phase 7)
+  'lib/content-store/backends/bookstack.js',
+  'routes/proxies.js',
   'lib/pdf-render/images.js', // Asset-Proxy: BookStack-Image-URLs aufloesen
 ]);
 
