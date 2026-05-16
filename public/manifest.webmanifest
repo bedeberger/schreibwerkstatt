@@ -1,7 +1,7 @@
 {
-  "name": "BookStack Lektorat",
-  "short_name": "Lektorat",
-  "description": "KI-gestützte Rechtschreibprüfung und Stilanalyse für BookStack.",
+  "name": "Schreibwerkstatt",
+  "short_name": "Schreibwerkstatt",
+  "description": "Schreiben, Lektorat und Buchanalyse mit KI auf BookStack-Basis.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

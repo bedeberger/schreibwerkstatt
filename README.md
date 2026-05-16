@@ -1,6 +1,6 @@
 # bookstack-lektorat
 
-KI-gestütztes Lektorat-Tool für [BookStack](https://www.bookstackapp.com/). Eigenständiger Node.js-Service, der sich per BookStack-API anbindet.
+Schreiben, Lektorat und Buchanalyse mit KI — auf Basis von [BookStack](https://www.bookstackapp.com/). Eigenständiger Node.js-Service, der sich per BookStack-API anbindet.
 
 ## Features
 

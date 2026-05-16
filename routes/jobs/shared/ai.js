@@ -199,7 +199,10 @@ async function aiCall(jobId, tok, prompt, system, fromPct, toPct, expectedChars 
     ? Math.min(maxTokens, MAX_TOKENS_OUT)
     : MAX_TOKENS_OUT;
   const signal = jobAbortControllers.get(jobId)?.signal;
-  const { text, truncated, tokensIn, tokensOut, cacheReadIn = 0, cacheCreationIn = 0, genDurationMs } = await callAI(prompt, system, onProgress, maxTokensOverride, signal, provider, jsonSchema);
+  // Anthropic-Prefill `'{'`: zwingt Claude in JSON-Modus ab dem ersten Token.
+  // Schaltet Markdown-Fences + Pre-Text aus, macht parseJSON deterministisch.
+  // Lokale Provider ignorieren das Argument (Grammar via jsonSchema deckt JSON).
+  const { text, truncated, tokensIn, tokensOut, cacheReadIn = 0, cacheCreationIn = 0, genDurationMs } = await callAI(prompt, system, onProgress, maxTokensOverride, signal, provider, jsonSchema, '{');
   tok.inflight?.delete(callId);
   tok.in += tokensIn;
   tok.out += tokensOut;

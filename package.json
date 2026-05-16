@@ -1,7 +1,7 @@
 {
   "name": "bookstack-lektorat",
   "version": "1.0.0",
-  "description": "KI-Lektorat für BookStack – Der Amoklauf",
+  "description": "Schreiben, Lektorat und Buchanalyse mit KI auf BookStack-Basis",
   "license": "AGPL-3.0-or-later",
   "main": "server.js",
   "scripts": {
