@@ -114,3 +114,37 @@ test('isEncryptedKey: bekannte Keys werden erkannt', () => {
   assert.equal(settings.isEncryptedKey('app.bookstack.token_secret'), true);
   assert.equal(settings.isEncryptedKey('ai.provider'), false);
 });
+
+test('bootstrapFromEnv: spiegelt nicht-gesetzte Keys aus ENV', () => {
+  // Setze ENV-Werte → Bootstrap soll sie in DB schreiben
+  process.env.OLLAMA_HOST = 'http://test-ollama:11434';
+  process.env.STALE_DAYS = '14';
+  process.env.ALLOWED_EMAILS = 'a@x.com,b@x.com';
+  // Sicherstellen: Keys aktuell nicht in DB
+  settings.remove('ai.ollama.host');
+  settings.remove('cron.stale_days');
+  settings.remove('auth.allowed_emails');
+  const mirrored = settings.bootstrapFromEnv();
+  assert.ok(mirrored >= 3, `erwartet >=3 gespiegelt, got ${mirrored}`);
+  assert.equal(settings.get('ai.ollama.host'), 'http://test-ollama:11434');
+  assert.equal(settings.get('cron.stale_days'), 14);
+  assert.equal(settings.get('auth.allowed_emails'), 'a@x.com,b@x.com');
+});
+
+test('bootstrapFromEnv: ueberschreibt bestehende DB-Werte NICHT', () => {
+  settings.set('ai.ollama.host', 'http://manual-set:11434', { updatedBy: 'admin' });
+  process.env.OLLAMA_HOST = 'http://env-different:11434';
+  settings.bootstrapFromEnv();
+  assert.equal(settings.get('ai.ollama.host'), 'http://manual-set:11434');
+});
+
+test('bootstrapFromEnv: ungesetzte ENV → kein Eintrag', () => {
+  delete process.env.NONEXISTENT_TEST_VAR;
+  settings.remove('jobs.book_chat.token_budget');
+  delete process.env.BOOK_CHAT_TOKEN_BUDGET;
+  settings.bootstrapFromEnv();
+  // Default greift
+  assert.equal(settings.get('jobs.book_chat.token_budget'), 0);
+  // Aber DB-Row darf nicht gesetzt sein
+  assert.equal(settings.has('jobs.book_chat.token_budget'), false);
+});
