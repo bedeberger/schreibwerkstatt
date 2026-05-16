@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 103, 53 Tabellen (ohne `sqlite_*`/`schema_version`/`sessions`).
+Stand: Schema-Version 106, 53 Tabellen (ohne `sqlite_*`/`schema_version`/`sessions`).
 
 Quelle: Live-Dump aus [schreibwerkstatt.db](../schreibwerkstatt.db) (`.schema --indent`) + [db/migrations.js](../db/migrations.js). Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -111,28 +111,43 @@ erDiagram
 ```mermaid
 erDiagram
   books {
-    INTEGER book_id PK "= BookStack-ID"
+    INTEGER book_id PK "AUTOINCREMENT, Watermark >=1_000_000"
     TEXT    name
     TEXT    slug
     TEXT    created_at
     TEXT    updated_at
     TEXT    last_seen_at
+    TEXT    description
+    BLOB    cover_image
+    TEXT    owner_email "Erst-Backfiller / Phase 4b book_access-Bridge"
   }
   chapters {
-    INTEGER chapter_id  PK
-    INTEGER book_id     FK
+    INTEGER chapter_id  PK "AUTOINCREMENT, Watermark >=1_000_000"
+    INTEGER book_id     FK "ON DELETE CASCADE"
     TEXT    chapter_name
     TEXT    updated_at
     TEXT    last_seen_at
+    INTEGER position
+    INTEGER priority "BookStack-Mirror"
+    TEXT    slug
+    TEXT    description
   }
   pages {
-    INTEGER page_id    PK
+    INTEGER page_id    PK "AUTOINCREMENT, Watermark >=1_000_000"
     INTEGER book_id    FK
     INTEGER chapter_id FK "ON DELETE SET NULL"
     TEXT    page_name
     TEXT    updated_at
     TEXT    preview_text
     TEXT    last_seen_at
+    TEXT    body_html "localdb-Wahrheit ab Phase 1; Cache vor Phase 1"
+    TEXT    body_markdown
+    INTEGER position
+    INTEGER priority "BookStack-Mirror"
+    TEXT    slug
+    TEXT    local_updated_at
+    TEXT    remote_updated_at
+    INTEGER dirty "Konflikterkennung Sync-Pull"
   }
   page_stats {
     INTEGER page_id          PK,FK

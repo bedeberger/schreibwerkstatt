@@ -55,9 +55,8 @@ Bewusst out-of-scope (User-Wunsch): Attachments (werden nicht genutzt → kein M
 
 | # | Phase | Reversibel? | User-Impact | Abhängigkeiten |
 |---|---|---|---|---|
-| 0 | Schema-Skelett | ja | keiner | — |
-| 0b | Initial Backfill (BookStack → DB) | ja | keiner | 0 |
-| 1 | `localdb`-Backend implementieren (Content-Store-Variante) | ja (Flag) | keiner solange `app.backend='bookstack'` | 0, 0b |
+| 0b | Initial Backfill (BookStack → DB) | ja | keiner | — |
+| 1 | `localdb`-Backend implementieren (Content-Store-Variante) | ja (Flag) | keiner solange `app.backend='bookstack'` | 0b |
 | 2 | Eigene Page-Revisions | ja | feinere History (beide Backends) | 0 |
 | 3 | Eigene Sortierung | ja | `localdb`-only nativ; `bookstack` weiter via BS-`priority` | 0, 1 |
 | 4a | App-User-Verwaltung | mittel (FK-Recreate) | Admin-Karte; restriktive Logins; User-Invite-Flag | 0 |
@@ -76,10 +75,13 @@ Bewusst out-of-scope (User-Wunsch): Attachments (werden nicht genutzt → kein M
 | 10 | Schema-Squash | ja | keiner | 9 |
 | 11 | Per-User-AI-Provider-Override | ja (additiv) | Admin weist pro User claude/ollama/llama zu; User folgt sonst globalem Default | 4a, 4c, 4d |
 
-**Start-Reihenfolge:** 0 → 0b → 4a → 4c → 4c1 → 4c2 → 4a2 → 4d → 4b → 4b1 → 4b2 → 2 → 6 → 1 → 3 → 7 → 8 → 9 → 10.
+**Start-Reihenfolge:** 0b → 4a → 4c → 4c1 → 4c2 → 4a2 → 4d → 4b → 4b1 → 4b2 → 2 → 6 → 1 → 3 → 7 → 8 → 9 → 10.
 10 (Squash) zuletzt — Squash vorher wäre Wegwerfarbeit, weil bis dahin viele Migrationen dazukommen. Phase 11 (Per-User-AI-Provider-Override) ist additiv und kann nach 4d eingeschoben werden, sobald die Hauptkette steht.
 
-**Erledigt:** Phase 0c (PRAGMA-Tuning, [db/connection.js](../db/connection.js) + `PRAGMA optimize` im SIGTERM-Handler von [server.js](../server.js)) und Phase 0d (TTL-Cache-Cleanup, [lib/cache-cleanup.js](../lib/cache-cleanup.js) im 23:00-Cron-Tick, manuell via `npm run cache:cleanup [-- --vacuum]`, Smoke-Tests in `tests/unit/db-pragmas.test.js` + `tests/unit/cache-cleanup.test.js`).
+**Erledigt:**
+- Phase 0c (PRAGMA-Tuning, [db/connection.js](../db/connection.js) + `PRAGMA optimize` im SIGTERM-Handler von [server.js](../server.js)).
+- Phase 0d (TTL-Cache-Cleanup, [lib/cache-cleanup.js](../lib/cache-cleanup.js) im 23:00-Cron-Tick, manuell via `npm run cache:cleanup [-- --vacuum]`).
+- Phase 0 (Schema-Skelett, Migration 105 + 106 in [db/migrations.js](../db/migrations.js): additive Phase-0-Spalten auf pages/chapters/books + AUTOINCREMENT-Recreate mit `sqlite_sequence`-Wasserzeichen `≥ 1_000_000`). Dauerhafte Invariante steht oben in „Schema-Invariante (aus Phase 0)". Tests: `tests/unit/db-pragmas.test.js`, `tests/unit/cache-cleanup.test.js`, `tests/unit/schema-phase0.test.js`.
 4a/4c/4b zuerst, weil User-Identität, `app.backend`-Schalter und ACL die SSoT für alle folgenden Phasen sind. Lese-Modus (4b1, Print-CSS + readOnly) direkt nach 4b, weil viewer-Rolle erst dann existiert. Phase 7 (Suche) **vor** Phase 8, damit FTS schon steht, wenn Admin Backend wechselt — Index wird beim Bulk-Copy mitgefüllt.
 
 4d (Token-Budget + Cost) folgt 4a (braucht `app_users.global_role='admin'`). Vor 4b einsortiert, weil Kostenkontrolle vor Sharing-Welle (mehr Co-Editoren = mehr KI-Calls) bestehen muss; rein additiv (neue Spalten/Tabelle/Routen, kein Refactor) und kann bei Bedarf vorgezogen werden.
@@ -90,78 +92,31 @@ Bewusst out-of-scope (User-Wunsch): Attachments (werden nicht genutzt → kein M
 
 ---
 
-## Phase 0 — Schema-Skelett
+## Schema-Invariante (aus Phase 0, dauerhaft)
 
-Heute schon vorhanden: `books`, `pages`, `chapters` mit PKs = BookStack-IDs. Body, Order und Owner fehlen.
+`books`/`chapters`/`pages` sind `INTEGER PRIMARY KEY AUTOINCREMENT` mit `sqlite_sequence`-Wasserzeichen `≥ 1_000_000`. Heisst:
 
-**Migration N+1** (additiv, keine FK-Brüche):
+- **Bestandsrows** behalten ihre BookStack-IDs (`<100k` typisch). Alle ~40 FK-Spalten (`figures.book_id`, `page_stats.page_id`, `chapter_reviews.chapter_id`, `page_revisions.page_id`, `lektorat_time.page_id`, `chat_sessions.page_id`, `pdf_export_profile.book_id`, …) bleiben gültig.
+- **Neue `localdb`-Items** kriegen IDs `≥ 1_000_001`. Klare Trennung vom BookStack-Range — Phase 8-Backend-Switch bleibt konfliktfrei, BS-Re-Imports landen im freien Range.
+- **Gelöschte IDs** werden nicht wiederverwendet (AUTOINCREMENT-Garantie) → keine „Zombie-FK".
+- **Sentinel `book_id = 0`** (User-Default-PDF-Profile) bleibt safe.
+- App-eigene Surrogat-Tabellen (`figures.id`, `locations.id`, `figure_scenes.id`, `ideen.id`, …) sind unverändert.
 
-```sql
-ALTER TABLE pages ADD COLUMN body_html TEXT;
-ALTER TABLE pages ADD COLUMN body_markdown TEXT;
-ALTER TABLE pages ADD COLUMN position INTEGER;
-ALTER TABLE pages ADD COLUMN priority INTEGER;
-ALTER TABLE pages ADD COLUMN slug TEXT;
-ALTER TABLE pages ADD COLUMN local_updated_at TEXT;
-ALTER TABLE pages ADD COLUMN remote_updated_at TEXT;
-ALTER TABLE pages ADD COLUMN dirty INTEGER DEFAULT 0;
+Phase-0-Spalten im aktuellen Schema:
 
-ALTER TABLE chapters ADD COLUMN position INTEGER;
-ALTER TABLE chapters ADD COLUMN priority INTEGER;
-ALTER TABLE chapters ADD COLUMN slug TEXT;
-ALTER TABLE chapters ADD COLUMN description TEXT;
+- `pages`: `body_html`, `body_markdown`, `position`, `priority`, `slug`, `local_updated_at`, `remote_updated_at`, `dirty` (NOT NULL DEFAULT 0). FK `chapter_id → chapters(chapter_id) ON DELETE SET NULL` weiter aktiv. Index `idx_pages_dirty WHERE dirty = 1` für Sync-Pull.
+- `chapters`: `position`, `priority`, `slug`, `description`. FK `book_id → books(book_id) ON DELETE CASCADE` weiter aktiv.
+- `books`: `description`, `cover_image BLOB`, `owner_email`. Index `idx_books_owner_email` für ACL-Filter.
 
-ALTER TABLE books ADD COLUMN description TEXT;
-ALTER TABLE books ADD COLUMN cover_image BLOB;
-ALTER TABLE books ADD COLUMN owner_email TEXT;
-ALTER TABLE books ADD COLUMN created_at TEXT;
-```
+`dirty` + `remote_updated_at` = Konflikterkennung beim BookStack-Sync-Pull (Phase 1). `owner_email` wird beim Backfill (Phase 0b) mit Session-User befüllt, sofern leer; ab Phase 4b regelt `book_access` die Sichtbarkeit.
 
-`dirty` + `remote_updated_at` = Konflikterkennung bei Sync-Pull (Phase 1). `owner_email` wird bei Buch-Discovery (`upsertBook` in [routes/sync.js](../routes/sync.js)) mit Session-User befüllt, sofern leer.
-
-**Migration N+1b** (FK-Recreate, gleicher Migrations-Lauf): `books`/`chapters`/`pages` auf `INTEGER PRIMARY KEY AUTOINCREMENT` umstellen, damit Phase 1 sauber neue IDs vergeben kann. Heute fehlt `AUTOINCREMENT` (BookStack lieferte die Werte) — ohne AUTOINCREMENT würde SQLite gelöschte IDs wiederverwenden, was bei Sentinel-naher Logik (`book_id=0` als User-Default in `pdf_export_profile`) und alten Job-Results gefährlich wäre.
-
-```sql
--- Recreate-Pattern aus CLAUDE.md, einmalig pro Tabelle.
-db.pragma('foreign_keys = OFF');
-
-CREATE TABLE books_new (
-  book_id INTEGER PRIMARY KEY AUTOINCREMENT,
-  -- restliche Spalten identisch zu books
-  ...
-);
-INSERT INTO books_new SELECT * FROM books;  -- bestehende IDs bleiben erhalten
-DROP TABLE books; ALTER TABLE books_new RENAME TO books;
--- analog für chapters + pages
-
--- Wasserzeichen: nächste neu vergebene ID strikt > MAX(bisherige IDs, BookStack-Range).
--- `localdb`-Neu-Items starten ab 1_000_000, um BookStack-Range frei zu halten für
--- spätere BS-Imports und um Backend-Hopping konfliktfrei zu machen.
-INSERT OR REPLACE INTO sqlite_sequence (name, seq)
-  VALUES ('books',    MAX(1000000, (SELECT COALESCE(MAX(book_id),    0) FROM books))),
-         ('chapters', MAX(1000000, (SELECT COALESCE(MAX(chapter_id), 0) FROM chapters))),
-         ('pages',    MAX(1000000, (SELECT COALESCE(MAX(page_id),    0) FROM pages)));
-
-db.pragma('foreign_keys = ON');
-db.pragma('foreign_key_check');  -- muss leer sein
-```
-
-**Folgen:**
-
-- Bestehende Rows behalten ihre IDs für immer. Alle ~40 FK-Spalten (`figures.book_id`, `page_stats.page_id`, `chapter_reviews.chapter_id`, `page_revisions.page_id`, `lektorat_time.page_id`, `chat_sessions.page_id`, `pdf_export_profile.book_id`, …) bleiben gültig. Historie ungebrochen.
-- Neue Bücher/Kapitel/Seiten im `localdb`-Mode: SQLite vergibt `seq + 1` aus `sqlite_sequence`. Klare Trennung von BookStack-Range — bei Bedarf später Re-Import aus BookStack ohne ID-Konflikt.
-- Im `bookstack`-Mode bleibt BookStack die ID-Quelle; lokale Tabellen übernehmen die externen IDs wie heute (Phase 0b/1) — Wasserzeichen wird durch BS-IDs nicht überschritten, kollidiert also nicht.
-- IDs aus gelöschten Rows werden **nicht** wiederverwendet (AUTOINCREMENT-Garantie). Schützt vor „Zombie-FK".
-- Sentinel `book_id = 0` (User-Default-PDF-Profile) bleibt safe — Wasserzeichen springt direkt auf 1_000_000.
-- App-eigene Surrogat-Tabellen (`figures.id`, `locations.id`, `figure_scenes.id`, `ideen.id`, …) bleiben unverändert.
-
-**Alternativlösung verworfen:** UUIDs / ULIDs als PKs. Würde alle ~40 FK-Spalten + sämtlichen Client-Code (URL-Parameter `:book_id`, Hash-Router, Job-Results, Caches) brechen. Kein Mehrwert für Self-Hosted-App.
+**Verworfen:** UUIDs/ULIDs als PKs — würde alle ~40 FK-Spalten + Client-Code (URL-Parameter `:book_id`, Hash-Router, Job-Results, Caches) brechen ohne Mehrwert für Self-Hosted.
 
 ---
 
 ## Phase 0b — Initial Backfill (Bulk-Copy BookStack → DB)
 
-Ziel: Vollabzug aller BookStack-Bücher/Kapitel/Seiten in lokale Tabellen nach Migration N+1, **pro User mit dessen eigenem Session-Token**. Phase 1 (Sync-Worker) übernimmt danach inkrementelle Updates; ohne Backfill liesse Phase 1 die DB für einen Neu-User leer.
+Ziel: Vollabzug aller BookStack-Bücher/Kapitel/Seiten in lokale Tabellen (Phase-0-Schema steht bereits, siehe „Schema-Invariante"), **pro User mit dessen eigenem Session-Token**. Phase 1 (Sync-Worker) übernimmt danach inkrementelle Updates; ohne Backfill liesse Phase 1 die DB für einen Neu-User leer.
 
 **Per-User-Backfill** — kein Admin-Token, kein globaler Run. Jeder User backfilled mit seinem eigenen Session-`bookstackToken` exakt jene Bücher, die BookStack ihm zeigt. Konsistent mit Privacy-Boundary (Phase 4b): Buch-Sichtbarkeit bleibt durch BookStack-Permissions definiert, kein Admin-Bypass.
 
@@ -194,7 +149,7 @@ Ziel: Vollabzug aller BookStack-Bücher/Kapitel/Seiten in lokale Tabellen nach M
 - `figure_id`, `location_id`, `scene_id` etc. sind app-interne Surrogate (kein BookStack-Pendant) — unverändert, kein Konflikt.
 - Test-Pflicht: Backfill-Unit-Test validiert nach jedem Buch `db.pragma('foreign_key_check')` → muss leer sein. Sonst Abbruch + Rollback.
 
-**Sequenz:** Migration N+1 läuft beim nächsten App-Start automatisch (additiv, schnell). Backfill stösst jeder User für sich an — nach Login einmalig oder via Sync-Button. Phase 1 (Sync-Worker) übernimmt dann inkrementell.
+**Sequenz:** Phase-0-Migrationen (105 + 106) sind bereits live. Backfill stösst jeder User für sich an — nach Login einmalig oder via Sync-Button. Phase 1 (Sync-Worker) übernimmt dann inkrementell.
 
 **Idempotenz-Garantie:** Endpoint darf jederzeit re-getriggert werden — z.B. wenn neue Bücher in BookStack auftauchen oder lokale Bodies nach Schema-Bumps neu gefüllt werden müssen. Phase 1 macht denselben Diff-Check (`updated_at`); Backfill ist „kalter Sync-Worker-Lauf für genau einen User".
 
@@ -226,7 +181,7 @@ content-store.js  (Facade, dispatcht auf gewählten Backend)
 - `createBook(name, owner_email)` / `createChapter` / `createPage` → `INSERT` ohne expliziten PK; SQLite vergibt aus `sqlite_sequence` (Wasserzeichen ≥ 1_000_000 aus Phase 0).
 - Kein HTTP, kein Token, keine BookStack-Berührung.
 
-**ID-Strategie**: BookStack-IDs sind positive Integer aus BS-DB (typisch < 100k). `localdb`-Neu-Items beginnen ab `seq+1 ≥ 1_000_001` dank Wasserzeichen in `sqlite_sequence` (Migration N+1b, Phase 0). Klare Trennung, kein Kollisionsrisiko bei späterer Backend-Migration. FK-Constraints bleiben intakt, weil `books`/`chapters`/`pages` ihre PKs unverändert führen.
+**ID-Strategie**: BookStack-IDs sind positive Integer aus BS-DB (typisch < 100k). `localdb`-Neu-Items beginnen ab `seq+1 ≥ 1_000_001` dank Wasserzeichen in `sqlite_sequence` (siehe „Schema-Invariante" oben). Klare Trennung, kein Kollisionsrisiko bei späterer Backend-Migration. FK-Constraints bleiben intakt, weil `books`/`chapters`/`pages` ihre PKs unverändert führen.
 
 **Bookstack-Backend** `lib/content-store/backends/bookstack.js`:
 - Aktueller Code aus [routes/content.js](../routes/content.js) und [lib/bookstack.js](../lib/bookstack.js) bleibt funktional — wird nur hinter der Facade gekapselt.
@@ -1816,7 +1771,6 @@ Ollama/Llama serialisieren heute global über einen Mutex (CLAUDE.md „KI-Provi
 
 | Phase | Aufwand | Risiko |
 |---|---|---|
-| 0 | 0.5 Tag | niedrig |
 | 1 | 4-6 Tage | mittel (Backend-Disjunktion, Test-Pflege gegen beide) |
 | 2 | 2-3 Tage | niedrig |
 | 3 | 2-3 Tage | niedrig |

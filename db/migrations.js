@@ -4075,6 +4075,177 @@ function runMigrations() {
     logger.info('DB-Migration auf Version 104 abgeschlossen (chat_messages.client_msg_id + job_id für Idempotency).');
   }
 
+  if (version < 105) {
+    // Phase 0 (BookStack-Exit, docs/bookstack-exit.md): additives Schema-Skelett
+    // fuer pages/chapters/books — Body, Order, Owner, Slug, Dirty-Flag fuer
+    // spaeteren Sync-Worker.
+    //
+    // pages.body_html/body_markdown: lokale Wahrheit ab Phase 1 (localdb-Backend);
+    //   bis dahin Cache, der beim Backfill (Phase 0b) gefuellt wird.
+    // pages/chapters.position/priority: Sortierung; position lokal, priority
+    //   spiegelt BookStack-`priority` im bookstack-Mode.
+    // pages.local_updated_at/remote_updated_at/dirty: Konflikterkennung beim
+    //   Sync-Pull (Phase 1, bookstack-Mode).
+    // books.owner_email: Erst-Backfiller (Phase 0b); spaetere Sharing-Regel
+    //   via book_access (Phase 4b).
+    // books.cover_image: BLOB, optional; ersetzt heutigen Pfad ueber externe
+    //   Datei im Custom-PDF-Export (Phase 4b2-Konsolidierung).
+    const pagesCols105 = db.pragma('table_info(pages)').map(c => c.name);
+    if (!pagesCols105.includes('body_html'))         db.prepare('ALTER TABLE pages ADD COLUMN body_html TEXT').run();
+    if (!pagesCols105.includes('body_markdown'))     db.prepare('ALTER TABLE pages ADD COLUMN body_markdown TEXT').run();
+    if (!pagesCols105.includes('position'))          db.prepare('ALTER TABLE pages ADD COLUMN position INTEGER').run();
+    if (!pagesCols105.includes('priority'))          db.prepare('ALTER TABLE pages ADD COLUMN priority INTEGER').run();
+    if (!pagesCols105.includes('slug'))              db.prepare('ALTER TABLE pages ADD COLUMN slug TEXT').run();
+    if (!pagesCols105.includes('local_updated_at'))  db.prepare('ALTER TABLE pages ADD COLUMN local_updated_at TEXT').run();
+    if (!pagesCols105.includes('remote_updated_at')) db.prepare('ALTER TABLE pages ADD COLUMN remote_updated_at TEXT').run();
+    if (!pagesCols105.includes('dirty'))             db.prepare('ALTER TABLE pages ADD COLUMN dirty INTEGER NOT NULL DEFAULT 0').run();
+
+    const chapCols105 = db.pragma('table_info(chapters)').map(c => c.name);
+    if (!chapCols105.includes('position'))    db.prepare('ALTER TABLE chapters ADD COLUMN position INTEGER').run();
+    if (!chapCols105.includes('priority'))    db.prepare('ALTER TABLE chapters ADD COLUMN priority INTEGER').run();
+    if (!chapCols105.includes('slug'))        db.prepare('ALTER TABLE chapters ADD COLUMN slug TEXT').run();
+    if (!chapCols105.includes('description')) db.prepare('ALTER TABLE chapters ADD COLUMN description TEXT').run();
+
+    const booksCols105 = db.pragma('table_info(books)').map(c => c.name);
+    if (!booksCols105.includes('description')) db.prepare('ALTER TABLE books ADD COLUMN description TEXT').run();
+    if (!booksCols105.includes('cover_image')) db.prepare('ALTER TABLE books ADD COLUMN cover_image BLOB').run();
+    if (!booksCols105.includes('owner_email')) db.prepare('ALTER TABLE books ADD COLUMN owner_email TEXT').run();
+    // books.created_at existiert bereits seit Migration 85 — kein ALTER.
+
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_books_owner_email ON books(owner_email)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_pages_dirty       ON pages(dirty) WHERE dirty = 1').run();
+
+    const fkErrors105 = db.pragma('foreign_key_check');
+    if (fkErrors105.length) {
+      throw new Error(`Migration 105: foreign_key_check meldet ${fkErrors105.length} Verstoesse: ${JSON.stringify(fkErrors105.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 105').run();
+    logger.info('DB-Migration auf Version 105 abgeschlossen (Phase 0 Schema-Skelett: pages/chapters/books additive Spalten fuer Body, Order, Owner, Dirty-Flag).');
+  }
+
+  if (version < 106) {
+    // Phase 0 (BookStack-Exit): books/chapters/pages auf INTEGER PRIMARY KEY
+    // AUTOINCREMENT umstellen. Wasserzeichen >= 1_000_000, damit `localdb`-Mode
+    // (Phase 1) frische IDs ausserhalb des BookStack-Range vergibt.
+    //
+    // Bestandsrows behalten ihre BookStack-IDs (INSERT SELECT preserve), alle
+    // ~40 FK-Spalten (figures.book_id, page_revisions.page_id, …) bleiben
+    // gueltig — keine ID-Map noetig.
+    //
+    // Recreate-Pattern aus CLAUDE.md: foreign_keys=OFF -> CREATE _new -> INSERT
+    // SELECT -> DROP old -> RENAME -> recreate indexes -> foreign_keys=ON ->
+    // foreign_key_check. Reihenfolge: books -> chapters -> pages (FK-Kette).
+    db.pragma('foreign_keys = OFF');
+
+    // 1) books
+    db.prepare('DROP TABLE IF EXISTS books_new').run();
+    db.prepare(`
+      CREATE TABLE books_new (
+        book_id      INTEGER PRIMARY KEY AUTOINCREMENT,
+        name         TEXT    NOT NULL,
+        slug         TEXT,
+        created_at   TEXT    NOT NULL,
+        updated_at   TEXT    NOT NULL,
+        last_seen_at TEXT,
+        description  TEXT,
+        cover_image  BLOB,
+        owner_email  TEXT
+      )
+    `).run();
+    db.prepare(`
+      INSERT INTO books_new (book_id, name, slug, created_at, updated_at, last_seen_at, description, cover_image, owner_email)
+      SELECT                book_id, name, slug, created_at, updated_at, last_seen_at, description, cover_image, owner_email
+        FROM books
+    `).run();
+    db.prepare('DROP TABLE books').run();
+    db.prepare('ALTER TABLE books_new RENAME TO books').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_books_last_seen   ON books(last_seen_at)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_books_owner_email ON books(owner_email)').run();
+
+    // 2) chapters
+    db.prepare('DROP TABLE IF EXISTS chapters_new').run();
+    db.prepare(`
+      CREATE TABLE chapters_new (
+        chapter_id   INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id      INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        chapter_name TEXT    NOT NULL,
+        updated_at   TEXT,
+        last_seen_at TEXT,
+        position     INTEGER,
+        priority     INTEGER,
+        slug         TEXT,
+        description  TEXT
+      )
+    `).run();
+    db.prepare(`
+      INSERT INTO chapters_new (chapter_id, book_id, chapter_name, updated_at, last_seen_at, position, priority, slug, description)
+      SELECT                   chapter_id, book_id, chapter_name, updated_at, last_seen_at, position, priority, slug, description
+        FROM chapters
+    `).run();
+    db.prepare('DROP TABLE chapters').run();
+    db.prepare('ALTER TABLE chapters_new RENAME TO chapters').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_chapters_last_seen ON chapters(last_seen_at)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_chapters_book_id   ON chapters(book_id)').run();
+
+    // 3) pages
+    db.prepare('DROP TABLE IF EXISTS pages_new').run();
+    db.prepare(`
+      CREATE TABLE pages_new (
+        page_id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id           INTEGER NOT NULL,
+        page_name         TEXT,
+        chapter_id        INTEGER REFERENCES chapters(chapter_id) ON DELETE SET NULL,
+        updated_at        TEXT,
+        preview_text      TEXT,
+        last_seen_at      TEXT,
+        body_html         TEXT,
+        body_markdown     TEXT,
+        position          INTEGER,
+        priority          INTEGER,
+        slug              TEXT,
+        local_updated_at  TEXT,
+        remote_updated_at TEXT,
+        dirty             INTEGER NOT NULL DEFAULT 0
+      )
+    `).run();
+    db.prepare(`
+      INSERT INTO pages_new (page_id, book_id, page_name, chapter_id, updated_at, preview_text, last_seen_at,
+                             body_html, body_markdown, position, priority, slug, local_updated_at, remote_updated_at, dirty)
+      SELECT                page_id, book_id, page_name, chapter_id, updated_at, preview_text, last_seen_at,
+                             body_html, body_markdown, position, priority, slug, local_updated_at, remote_updated_at, dirty
+        FROM pages
+    `).run();
+    db.prepare('DROP TABLE pages').run();
+    db.prepare('ALTER TABLE pages_new RENAME TO pages').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_pages_book_id     ON pages(book_id)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_pages_chapter_id  ON pages(chapter_id)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_pages_dirty       ON pages(dirty) WHERE dirty = 1').run();
+
+    // Wasserzeichen: nextID >= MAX(1_000_000, MAX(existing_id)). Trennt
+    // localdb-Range (>=1_000_001) sauber vom BookStack-Range (<100k typisch).
+    //
+    // sqlite_sequence hat keinen UNIQUE-Constraint auf `name` — INSERT OR REPLACE
+    // wuerde Duplikate erzeugen, weil das INSERT INTO ... SELECT oben bereits
+    // automatisch eine Row mit dem alten max(rowid) angelegt hat. Erst DELETE,
+    // dann INSERT, damit pro Tabelle genau eine Wasserzeichen-Row entsteht.
+    const WATERMARK = 1_000_000;
+    const maxBook    = db.prepare('SELECT COALESCE(MAX(book_id),    0) AS m FROM books').get().m;
+    const maxChapter = db.prepare('SELECT COALESCE(MAX(chapter_id), 0) AS m FROM chapters').get().m;
+    const maxPage    = db.prepare('SELECT COALESCE(MAX(page_id),    0) AS m FROM pages').get().m;
+    db.prepare(`DELETE FROM sqlite_sequence WHERE name IN ('books','chapters','pages')`).run();
+    db.prepare(`INSERT INTO sqlite_sequence (name, seq) VALUES ('books',    ?)`).run(Math.max(WATERMARK, maxBook));
+    db.prepare(`INSERT INTO sqlite_sequence (name, seq) VALUES ('chapters', ?)`).run(Math.max(WATERMARK, maxChapter));
+    db.prepare(`INSERT INTO sqlite_sequence (name, seq) VALUES ('pages',    ?)`).run(Math.max(WATERMARK, maxPage));
+
+    db.pragma('foreign_keys = ON');
+    const fkErrors106 = db.pragma('foreign_key_check');
+    if (fkErrors106.length) {
+      throw new Error(`Migration 106: foreign_key_check meldet ${fkErrors106.length} Verstoesse: ${JSON.stringify(fkErrors106.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 106').run();
+    logger.info('DB-Migration auf Version 106 abgeschlossen (books/chapters/pages auf AUTOINCREMENT umgestellt, sqlite_sequence Wasserzeichen >= 1_000_000).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {
