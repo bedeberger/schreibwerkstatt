@@ -42,7 +42,7 @@ Editor + WYSIWYG ändern sich nicht: App nutzt eigenen CodeMirror-basierten Edit
 - Auth/User-Liste/Rollen/Permissions.
 - WYSIWYG-Editor (TinyMCE).
 - Volltextsuche.
-- Export (`/api/books/:id/export/{fmt}`, nur Buch-Scope, PDF/HTML/TXT/MD) — wird in Phase 4b2 durch Eigenbau ersetzt; im `localdb`-Backend nicht mehr verfügbar.
+- Export (`/api/books/:id/export/{fmt}`, nur Buch-Scope, PDF/HTML/TXT/MD) — durch Eigenbau ersetzt (Phase 4b2: Sync-Route `GET /export/:scope/:id/:fmt` + Builder pro Format); im `localdb`-Backend ohnehin nicht verfügbar.
 - Templates, Shelves.
 
 App verwendet schon eigenständig: Google-OIDC-Login, Custom-PDF-Export, Focus-Editor, alle KI-Jobs, Page-Stats, Job-Queue. BookStack bleibt für Persistenz + WYSIWYG + User-DB.
@@ -62,7 +62,7 @@ Bewusst out-of-scope (User-Wunsch): Attachments (werden nicht genutzt → kein M
 | 4a2 | Public Landing + Request-Register | ja | Öffentliche Startseite mit Login + Registrierungsanfrage; Admin moderiert Anfragen | 4c2 |
 | 4b | Book-ACL + Sharing (owner/editor/lektor/viewer) | ja | Buchliste filtert auf Shares; Rollen-Matrix | — |
 | 4b1 ✓ | Lese-Modus (Print-CSS + readOnly) | ja | Druckansicht + readOnly für viewer | 4b |
-| 4b2 | Export-Konsolidierung (Eigenbau alle Scopes + Formate) | ja | Export-Karte für Buch/Kapitel/Seite; kein BookStack-Pass-Through mehr | 4b |
+| 4b2 ✓ | Export-Konsolidierung (Eigenbau alle Scopes + Formate) | ja | Export-Karte für Buch/Kapitel/Seite; kein BookStack-Pass-Through mehr | 4b |
 | 4c1 ✓ | First-Run-Setup-Wizard (`/setup`) | ja | Admin loggt sich via `ADMIN_PASSWORD` ein und konfiguriert OAuth/KI/Backend/SMTP Schritt für Schritt; auch später wieder aufrufbar | — |
 | 4d | Token-Budget + Cost-Tracking (Admin) | ja (additiv) | Admin-Karte Usage; pro-User-Monats-Budget hard/soft; 429 bei Hard-Cap | — |
 | 6 | Tags/Kategorien | ja | Filter-UI (beide Backends) | — |
@@ -1339,7 +1339,7 @@ Ollama/Llama serialisieren heute global über einen Mutex (CLAUDE.md „KI-Provi
 | 3 | 2-3 Tage | niedrig |
 | 4b | 4-5 Tage | mittel (Rollen-Matrix + Apply-Routen + minRole-Filter) |
 | 4b1 | 0.5-1 Tag | niedrig (Print-CSS + readOnly-Guard, keine neuen Tabellen) |
-| 4b2 | 3-4 Tage | mittel (6 Format-Builder, Pass-Through-Cut, Sync- + Job-Route auf einen Loader) |
+| 4b2 ✓ | 3-4 Tage | erledigt |
 | 4c1 | 1-2 Tage | niedrig (eigenständige Wizard-Page, kleines Form-State-Modell) |
 | 5 | — | ENTFÄLLT |
 | 6 | 2-3 Tage | niedrig |
