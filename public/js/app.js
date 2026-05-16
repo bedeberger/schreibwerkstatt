@@ -701,7 +701,6 @@ document.addEventListener('alpine:init', () => {
           this.currentUser.daily_goal_chars = cfg.userSettings.daily_goal_chars ?? null;
         }
         this.devMode = !!cfg.devMode;
-        this.setupCompleted = !!cfg.setupCompleted;
         this.promptConfig = cfg.promptConfig || {};
         if (cfg.userSettings?.theme && cfg.userSettings.theme !== this.themePref) {
           this.themePref = cfg.userSettings.theme;

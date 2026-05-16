@@ -209,28 +209,16 @@ export const appViewMethods = {
     this.showUserSettingsCard = true;
   },
   toggleAdminUsersCard() {
-    if (this.currentUser?.role === 'admin' && !this.setupCompleted) {
-      window.location.href = '/setup';
-      return;
-    }
     if (this.showAdminUsersCard) { this.showAdminUsersCard = false; return; }
     this._closeOtherMainCards('adminUsers');
     this.showAdminUsersCard = true;
   },
   toggleAdminSettingsCard() {
-    if (this.currentUser?.role === 'admin' && !this.setupCompleted) {
-      window.location.href = '/setup';
-      return;
-    }
     if (this.showAdminSettingsCard) { this.showAdminSettingsCard = false; return; }
     this._closeOtherMainCards('adminSettings');
     this.showAdminSettingsCard = true;
   },
   toggleAdminUsageCard() {
-    if (this.currentUser?.role === 'admin' && !this.setupCompleted) {
-      window.location.href = '/setup';
-      return;
-    }
     if (this.showAdminUsageCard) { this.showAdminUsageCard = false; return; }
     this._closeOtherMainCards('adminUsage');
     this.showAdminUsageCard = true;
