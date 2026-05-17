@@ -5384,6 +5384,70 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 126 abgeschlossen (page_locks.reason+edit).');
   }
 
+  if (version < 127) {
+    // Musikbibliothek: songs/song_figures/song_chapters/song_scenes, parallel
+    // zu locations. songs hält Titel + Interpret + Genre + kontext_typ
+    // (hört/spielt/erwähnt/leitmotiv/diegetisch). UNIQUE(book_id, song_uid,
+    // user_email) erlaubt UPSERT-Pattern aus saveSongsToDb.
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS songs (
+        id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id                  INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        song_uid                 TEXT    NOT NULL,
+        titel                    TEXT    NOT NULL,
+        interpret                TEXT,
+        genre                    TEXT,
+        kontext_typ              TEXT,
+        beschreibung             TEXT,
+        stimmung                 TEXT,
+        erste_erwaehnung         TEXT,
+        erste_erwaehnung_page_id INTEGER REFERENCES pages(page_id) ON DELETE SET NULL,
+        sort_order               INTEGER DEFAULT 0,
+        user_email               TEXT,
+        updated_at               TEXT NOT NULL,
+        UNIQUE(book_id, song_uid, user_email)
+      )
+    `).run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_songs_book_id ON songs(book_id, user_email)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_songs_erste_page ON songs(erste_erwaehnung_page_id)').run();
+
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS song_figures (
+        song_id     INTEGER NOT NULL REFERENCES songs(id)    ON DELETE CASCADE,
+        figure_id   INTEGER NOT NULL REFERENCES figures(id)  ON DELETE CASCADE,
+        kontext_typ TEXT,
+        PRIMARY KEY (song_id, figure_id)
+      )
+    `).run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_sf_figure ON song_figures(figure_id)').run();
+
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS song_chapters (
+        song_id     INTEGER NOT NULL REFERENCES songs(id)             ON DELETE CASCADE,
+        chapter_id  INTEGER NOT NULL REFERENCES chapters(chapter_id)  ON DELETE CASCADE,
+        haeufigkeit INTEGER DEFAULT 1,
+        PRIMARY KEY (song_id, chapter_id)
+      )
+    `).run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_sc_chapter_id ON song_chapters(chapter_id)').run();
+
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS song_scenes (
+        scene_id INTEGER NOT NULL REFERENCES figure_scenes(id) ON DELETE CASCADE,
+        song_id  INTEGER NOT NULL REFERENCES songs(id)         ON DELETE CASCADE,
+        PRIMARY KEY (scene_id, song_id)
+      )
+    `).run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_song_scenes_song ON song_scenes(song_id)').run();
+
+    const fkErrors127 = db.pragma('foreign_key_check');
+    if (fkErrors127.length) {
+      throw new Error(`Migration 127: foreign_key_check meldet ${fkErrors127.length} Verstoesse: ${JSON.stringify(fkErrors127.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 127').run();
+    logger.info('DB-Migration auf Version 127 abgeschlossen (songs, song_figures, song_chapters, song_scenes).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

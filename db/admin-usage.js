@@ -121,9 +121,12 @@ function listUsersWithUsage({ from, to } = {}) {
 
 // ── Job-Run-Liste (paginiert; mit/ohne User-Filter) ─────────────────────────
 
-function _buildJobsQuery({ email, includeWhere }) {
+function _buildJobsQuery({ emailCount, includeWhere }) {
   const where = ['queued_at >= ?', 'queued_at < ?'];
-  if (email) where.push('user_email = ?');
+  if (emailCount > 0) {
+    const placeholders = new Array(emailCount).fill('?').join(',');
+    where.push(`user_email IN (${placeholders})`);
+  }
   if (includeWhere) where.push(includeWhere);
   return `
     SELECT id, job_id, user_email, type, book_id, label, status,
@@ -136,9 +139,12 @@ function _buildJobsQuery({ email, includeWhere }) {
      LIMIT ? OFFSET ?`;
 }
 
-function _buildJobsCountQuery({ email, includeWhere }) {
+function _buildJobsCountQuery({ emailCount, includeWhere }) {
   const where = ['queued_at >= ?', 'queued_at < ?'];
-  if (email) where.push('user_email = ?');
+  if (emailCount > 0) {
+    const placeholders = new Array(emailCount).fill('?').join(',');
+    where.push(`user_email IN (${placeholders})`);
+  }
   if (includeWhere) where.push(includeWhere);
   return `SELECT COUNT(*) AS n FROM job_runs WHERE ${where.join(' AND ')}`;
 }
@@ -149,17 +155,16 @@ function _adminEmailWhereClause(set) {
   return `(user_email IS NULL OR user_email NOT IN (${list}))`;
 }
 
-function getJobRuns({ email, from, to, limit = 50, offset = 0 } = {}) {
+function getJobRuns({ emails, email, from, to, limit = 50, offset = 0 } = {}) {
+  const list = Array.isArray(emails) ? emails : (email ? [email] : []);
   const { fromIso, toIso } = _resolveRange({ from, to });
   const lim = Math.max(1, Math.min(500, Number(limit) || 50));
   const off = Math.max(0, Number(offset) || 0);
-  const adminFilter = email ? null : _adminEmailWhereClause(_adminEmailSet());
-  const listSql  = _buildJobsQuery({ email, includeWhere: adminFilter });
-  const countSql = _buildJobsCountQuery({ email, includeWhere: adminFilter });
-  const args = email
-    ? [fromIso, toIso, email, lim, off]
-    : [fromIso, toIso, lim, off];
-  const countArgs = email ? [fromIso, toIso, email] : [fromIso, toIso];
+  const adminFilter = list.length ? null : _adminEmailWhereClause(_adminEmailSet());
+  const listSql  = _buildJobsQuery({ emailCount: list.length, includeWhere: adminFilter });
+  const countSql = _buildJobsCountQuery({ emailCount: list.length, includeWhere: adminFilter });
+  const args = [fromIso, toIso, ...list, lim, off];
+  const countArgs = [fromIso, toIso, ...list];
   const rows = db.prepare(listSql).all(...args).map(r => ({
     id: r.id, jobId: r.job_id, userEmail: r.user_email, type: r.type, bookId: r.book_id, label: r.label,
     status: r.status, queuedAt: r.queued_at, startedAt: r.started_at, endedAt: r.ended_at,
@@ -174,11 +179,14 @@ function getJobRuns({ email, from, to, limit = 50, offset = 0 } = {}) {
 
 // ── Chat-Messages (paginiert; mit/ohne User-Filter) ─────────────────────────
 
-function _buildChatQuery({ email, includeWhere }) {
+function _buildChatQuery({ emailCount, includeWhere }) {
   const where = [
     "cm.created_at >= ?", "cm.created_at < ?", "cm.role = 'assistant'",
   ];
-  if (email) where.push('cs.user_email = ?');
+  if (emailCount > 0) {
+    const placeholders = new Array(emailCount).fill('?').join(',');
+    where.push(`cs.user_email IN (${placeholders})`);
+  }
   if (includeWhere) where.push(includeWhere);
   return `
     SELECT cm.id, cm.session_id, cs.user_email, cm.created_at,
@@ -192,11 +200,14 @@ function _buildChatQuery({ email, includeWhere }) {
      LIMIT ? OFFSET ?`;
 }
 
-function _buildChatCountQuery({ email, includeWhere }) {
+function _buildChatCountQuery({ emailCount, includeWhere }) {
   const where = [
     "cm.created_at >= ?", "cm.created_at < ?", "cm.role = 'assistant'",
   ];
-  if (email) where.push('cs.user_email = ?');
+  if (emailCount > 0) {
+    const placeholders = new Array(emailCount).fill('?').join(',');
+    where.push(`cs.user_email IN (${placeholders})`);
+  }
   if (includeWhere) where.push(includeWhere);
   return `
     SELECT COUNT(*) AS n
@@ -211,17 +222,16 @@ function _adminChatWhereClause(set) {
   return `cs.user_email NOT IN (${list})`;
 }
 
-function getChatMessages({ email, from, to, limit = 50, offset = 0 } = {}) {
+function getChatMessages({ emails, email, from, to, limit = 50, offset = 0 } = {}) {
+  const list = Array.isArray(emails) ? emails : (email ? [email] : []);
   const { fromIso, toIso } = _resolveRange({ from, to });
   const lim = Math.max(1, Math.min(500, Number(limit) || 50));
   const off = Math.max(0, Number(offset) || 0);
-  const adminFilter = email ? null : _adminChatWhereClause(_adminEmailSet());
-  const listSql  = _buildChatQuery({ email, includeWhere: adminFilter });
-  const countSql = _buildChatCountQuery({ email, includeWhere: adminFilter });
-  const args = email
-    ? [fromIso, toIso, email, lim, off]
-    : [fromIso, toIso, lim, off];
-  const countArgs = email ? [fromIso, toIso, email] : [fromIso, toIso];
+  const adminFilter = list.length ? null : _adminChatWhereClause(_adminEmailSet());
+  const listSql  = _buildChatQuery({ emailCount: list.length, includeWhere: adminFilter });
+  const countSql = _buildChatCountQuery({ emailCount: list.length, includeWhere: adminFilter });
+  const args = [fromIso, toIso, ...list, lim, off];
+  const countArgs = [fromIso, toIso, ...list];
   const rows = db.prepare(listSql).all(...args).map(r => ({
     id: r.id, sessionId: r.session_id, userEmail: r.user_email, createdAt: r.created_at,
     sessionKind: r.session_kind, bookId: r.book_id, pageId: r.page_id,

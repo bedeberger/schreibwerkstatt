@@ -58,6 +58,40 @@ export const adminUsageMethods = {
     await this.adminUsageLoadTab();
   },
 
+  // Options-Liste fuer den User-Filter-Combobox in Jobs/Chat-Tabs.
+  // Bezieht Users aus dem Users-Tab; laedt lazy, wenn der Tab noch nicht
+  // besucht wurde.
+  adminUsageUserFilterOptions() {
+    const list = this.adminUsageUsersList || [];
+    return list.map(u => ({
+      value: u.email,
+      label: u.displayName ? `${u.displayName} (${u.email})` : u.email,
+    }));
+  },
+
+  async _adminUsageEnsureUsers() {
+    if (this.adminUsageUsersList.length) return;
+    try {
+      const data = await this._adminUsageFetch('/admin/usage/users');
+      this.adminUsageUsersList = (data.users || []).map(u => ({
+        ...u,
+        _draftBudget: u.monthlyBudgetUsd ?? '',
+        _draftMode: u.budgetMode || 'none',
+        _saving: false,
+        _savedAt: 0,
+      }));
+    } catch {}
+  },
+
+  adminUsageRemoveFilterUser(email) {
+    this.adminUsageFilterUsers = (this.adminUsageFilterUsers || []).filter(e => e !== email);
+  },
+
+  adminUsageDrillDownToJobs(email) {
+    this.adminUsageFilterUsers = [email];
+    this.adminUsageSelectTab('jobs');
+  },
+
   async adminUsageLoadTab() {
     this.adminUsageError = '';
     const tab = this.adminUsageTab;
@@ -130,9 +164,12 @@ export const adminUsageMethods = {
   async adminUsageLoadJobs() {
     if (this.adminUsageLoading) return;
     this.adminUsageLoading = true;
+    this._adminUsageEnsureUsers();
     try {
       const qs = new URLSearchParams();
-      if (this.adminUsageFilterUser) qs.set('user', this.adminUsageFilterUser);
+      for (const email of (this.adminUsageFilterUsers || [])) {
+        if (email) qs.append('user', email);
+      }
       qs.set('limit', '50');
       qs.set('offset', String(this.adminUsageJobsOffset || 0));
       const data = await this._adminUsageFetch(`/admin/usage/jobs?${qs.toString()}`);
@@ -146,9 +183,12 @@ export const adminUsageMethods = {
   async adminUsageLoadChat() {
     if (this.adminUsageLoading) return;
     this.adminUsageLoading = true;
+    this._adminUsageEnsureUsers();
     try {
       const qs = new URLSearchParams();
-      if (this.adminUsageFilterUser) qs.set('user', this.adminUsageFilterUser);
+      for (const email of (this.adminUsageFilterUsers || [])) {
+        if (email) qs.append('user', email);
+      }
       qs.set('limit', '50');
       qs.set('offset', String(this.adminUsageChatOffset || 0));
       const data = await this._adminUsageFetch(`/admin/usage/chat?${qs.toString()}`);

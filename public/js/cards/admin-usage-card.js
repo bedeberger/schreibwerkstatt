@@ -20,8 +20,8 @@ export function registerAdminUsageCard() {
     // Users-Tab
     adminUsageUsersList: [],
 
-    // Filter fuer Jobs/Chat-Drilldown
-    adminUsageFilterUser: '',
+    // Filter fuer Jobs/Chat-Drilldown — Array von Emails (Multi-Select).
+    adminUsageFilterUsers: [],
 
     // Jobs-Tab
     adminUsageJobsList: [],
@@ -54,7 +54,10 @@ export function registerAdminUsageCard() {
       });
       this.$watch(() => this.adminUsageFrom, () => { if (window.__app.showAdminUsageCard) this.adminUsageLoadTab(); });
       this.$watch(() => this.adminUsageTo,   () => { if (window.__app.showAdminUsageCard) this.adminUsageLoadTab(); });
-      this.$watch(() => this.adminUsageFilterUser, () => {
+      // Multi-Select-Filter: bei jeder Array-Veraenderung Pagination zuruecksetzen
+      // und (falls Jobs/Chat-Tab offen) neu laden. JSON-Stringify als Deps, weil
+      // Alpine $watch auf primitiver Gleichheit prueft, nicht auf Array-Inhalt.
+      this.$watch(() => JSON.stringify(this.adminUsageFilterUsers), () => {
         this.adminUsageJobsOffset = 0;
         this.adminUsageChatOffset = 0;
         if (this.adminUsageTab === 'jobs' || this.adminUsageTab === 'chat') this.adminUsageLoadTab();

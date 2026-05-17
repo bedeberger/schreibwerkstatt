@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 126, 81 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 127, 85 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -19,6 +19,7 @@ erDiagram
   books ||--o{ figures               : has
   books ||--o{ locations             : has
   books ||--o{ figure_scenes         : has
+  books ||--o{ songs                 : has
   books ||--o{ figure_relations      : has
   books ||--o{ zeitstrahl_events     : has
   books ||--o{ continuity_checks     : has
@@ -67,6 +68,7 @@ erDiagram
   pages ||--o{ lektorat_time         : on
   pages ||--o{ lektorat_cache        : cached
   pages ||--o{ locations             : firstMention
+  pages ||--o{ songs                 : firstMention
   pages ||--o{ figures               : firstMention
   pages ||--|| page_locks            : locked
   pages ||--o{ page_revisions        : has
@@ -96,6 +98,7 @@ erDiagram
   figures ||--o{ figure_events           : has
   figures ||--o{ scene_figures           : in
   figures ||--o{ location_figures        : at
+  figures ||--o{ song_figures            : likes
   figures ||--o{ page_figure_mentions    : mentioned
   figures ||--o{ continuity_issue_figures: ref
   figures ||--o{ zeitstrahl_event_figures: ref
@@ -107,8 +110,14 @@ erDiagram
   locations ||--o{ location_figures      : has
   locations ||--o{ location_chapters     : at
 
+  songs ||--o{ song_scenes               : in
+  songs ||--o{ song_figures              : has
+  songs ||--o{ song_chapters             : at
+
   figure_scenes ||--o{ scene_figures     : has
   figure_scenes ||--o{ scene_locations   : has
+  figure_scenes ||--o{ song_scenes       : has
+  chapters ||--o{ song_chapters          : has
 
   zeitstrahl_events ||--o{ zeitstrahl_event_chapters : refs
   zeitstrahl_events ||--o{ zeitstrahl_event_pages    : refs
@@ -404,6 +413,36 @@ erDiagram
     INTEGER chapter_id  PK,FK
     INTEGER haeufigkeit
   }
+  songs {
+    INTEGER id           PK
+    INTEGER book_id      FK
+    TEXT    song_uid
+    TEXT    titel
+    TEXT    interpret
+    TEXT    genre
+    TEXT    kontext_typ  "hört|spielt|erwähnt|leitmotiv|diegetisch"
+    TEXT    beschreibung
+    TEXT    stimmung
+    TEXT    erste_erwaehnung
+    INTEGER erste_erwaehnung_page_id FK "SET NULL"
+    INTEGER sort_order
+    TEXT    user_email
+    TEXT    updated_at
+  }
+  song_figures {
+    INTEGER song_id     PK,FK
+    INTEGER figure_id   PK,FK
+    TEXT    kontext_typ "Override pro Figur (z.B. hört vs. spielt)"
+  }
+  song_chapters {
+    INTEGER song_id     PK,FK
+    INTEGER chapter_id  PK,FK
+    INTEGER haeufigkeit
+  }
+  song_scenes {
+    INTEGER scene_id PK,FK
+    INTEGER song_id  PK,FK
+  }
 
   figures   ||--o{ figure_tags        : tagged
   figures   ||--o{ figure_relations   : from
@@ -413,11 +452,17 @@ erDiagram
   figures   ||--o{ page_figure_mentions: mentioned
   figures   ||--o{ scene_figures      : in
   figures   ||--o{ location_figures   : at
+  figures   ||--o{ song_figures       : likes
   figure_scenes ||--o{ scene_figures  : has
   figure_scenes ||--o{ scene_locations: has
+  figure_scenes ||--o{ song_scenes    : has
   locations ||--o{ scene_locations    : in
   locations ||--o{ location_figures   : has
   locations ||--o{ location_chapters  : at
+  songs     ||--o{ song_figures       : has
+  songs     ||--o{ song_chapters      : at
+  songs     ||--o{ song_scenes        : in
+  chapters  ||--o{ song_chapters      : has
 ```
 
 ### 3a · Figuren-Werkstatt (isoliert, kein Promotion-Pfad zu `figures`)

@@ -268,22 +268,31 @@ export const appJobsCoreMethods = {
       'werkstatt-consistency': 'toast.job.werkstattConsistency',
     };
     const labelKey = labels[detail.type];
-    if (!labelKey) return;
-    const severity = job.status === 'done' ? 'ok' : 'err';
-    const suffixKey = job.status === 'done' ? 'toast.job.done' : 'toast.job.failed';
-    const label = this.t(labelKey);
+    const isError = job.status !== 'done';
+    // Errors immer toasten — auch für Job-Typen ohne explizites Label
+    // (z.B. synonyme, lektorat-single). Sonst landet AI_UNREACHABLE nur im Log.
+    if (!labelKey && !isError) return;
+    const severity = isError ? 'err' : 'ok';
+    const suffixKey = isError ? 'toast.job.failed' : 'toast.job.done';
+    const label = labelKey ? this.t(labelKey) : (detail.type || this.t('toast.job.fallback'));
     const suffix = this.t(suffixKey);
-    const message = `${label} ${suffix}`;
+    let message = `${label} ${suffix}`;
+    if (isError && job.error) {
+      const detailText = this.t(job.error, job.errorParams || {});
+      if (detailText && detailText !== job.error) message += `: ${detailText}`;
+      else if (job.error) message += `: ${job.error}`;
+    }
     this._showJobToast({ message, severity, jobType: detail.type, bookId: detail.bookId ?? null });
   },
 
   _showJobToast({ message, severity, jobType, bookId }) {
     if (this._jobToastTimer) { clearTimeout(this._jobToastTimer); this._jobToastTimer = null; }
     this.jobToast = { message, severity, jobType, bookId };
+    const ttl = severity === 'err' ? 9000 : 4500;
     this._jobToastTimer = setTimeout(() => {
       this.jobToast = null;
       this._jobToastTimer = null;
-    }, 4500);
+    }, ttl);
   },
 
   _dismissJobToast() {

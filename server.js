@@ -51,6 +51,7 @@ const authRouter = require('./routes/auth');
 const historyRouter = require('./routes/history');
 const figuresRouter = require('./routes/figures');
 const locationsRouter = require('./routes/locations');
+const songsRouter = require('./routes/songs');
 const { router: jobsRouter, runKomplettAnalyseAll } = require('./routes/jobs');
 const chatRouter = require('./routes/chat');
 const ideenRouter = require('./routes/ideen');
@@ -233,7 +234,7 @@ app.use((req, res, next) => {
 
 // ── Auth-Guard ────────────────────────────────────────────────────────────────
 // API-Pfade → 401 JSON; HTML-Pfade → Redirect zu /auth/login
-const API_PREFIXES = ['/history/', '/figures/', '/locations/', '/jobs/', '/sync/', '/chat/', '/booksettings/', '/content/', '/books/', '/apply/', '/me/', '/admin/', '/local/', '/config', '/claude', '/ollama', '/llama'];
+const API_PREFIXES = ['/history/', '/figures/', '/locations/', '/songs/', '/jobs/', '/sync/', '/chat/', '/booksettings/', '/content/', '/books/', '/apply/', '/me/', '/admin/', '/local/', '/config', '/claude', '/ollama', '/llama'];
 
 app.use((req, res, next) => {
   if (req.session?.user) return next();
@@ -292,6 +293,7 @@ app.use(proxiesRouter);
 app.use('/history', historyRouter);
 app.use('/figures', figuresRouter);
 app.use('/locations', locationsRouter);
+app.use('/songs', songsRouter);
 app.use('/jobs', jobsRouter);
 app.use('/chat', chatRouter);
 app.use('/ideen', ideenRouter);

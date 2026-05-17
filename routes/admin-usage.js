@@ -46,25 +46,38 @@ router.get('/users', (req, res) => {
   res.json({ users: rows, from: range.from || null, to: range.to || null });
 });
 
-// GET /admin/usage/jobs?user=&from=&to=&limit=&offset=
+// Normalisiert `?user=` (string | string[]) zu einem deduplizierten,
+// lowercased Email-Array. Leeres Array = kein User-Filter.
+function _emails(req) {
+  const raw = req.query.user;
+  const arr = Array.isArray(raw) ? raw : (raw == null ? [] : [raw]);
+  const seen = new Set();
+  for (const v of arr) {
+    const e = String(v).toLowerCase().trim();
+    if (e) seen.add(e);
+  }
+  return [...seen];
+}
+
+// GET /admin/usage/jobs?user=&from=&to=&limit=&offset=  (user repeatable)
 router.get('/jobs', (req, res) => {
-  const email = (req.query.user || '').toString().toLowerCase().trim() || null;
+  const emails = _emails(req);
   const range = _range(req);
   const limit = parseInt(req.query.limit, 10) || 50;
   const offset = parseInt(req.query.offset, 10) || 0;
-  const result = adminUsage.getJobRuns({ email, ...range, limit, offset });
-  _auditView(req, 'jobs', { target: email || '*all*', ...range });
+  const result = adminUsage.getJobRuns({ emails, ...range, limit, offset });
+  _auditView(req, 'jobs', { target: emails.length ? emails.join(',') : '*all*', ...range });
   res.json(result);
 });
 
-// GET /admin/usage/chat?user=&from=&to=&limit=&offset=
+// GET /admin/usage/chat?user=&from=&to=&limit=&offset=  (user repeatable)
 router.get('/chat', (req, res) => {
-  const email = (req.query.user || '').toString().toLowerCase().trim() || null;
+  const emails = _emails(req);
   const range = _range(req);
   const limit = parseInt(req.query.limit, 10) || 50;
   const offset = parseInt(req.query.offset, 10) || 0;
-  const result = adminUsage.getChatMessages({ email, ...range, limit, offset });
-  _auditView(req, 'chat', { target: email || '*all*', ...range });
+  const result = adminUsage.getChatMessages({ emails, ...range, limit, offset });
+  _auditView(req, 'chat', { target: emails.length ? emails.join(',') : '*all*', ...range });
   res.json(result);
 });
 

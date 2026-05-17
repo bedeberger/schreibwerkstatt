@@ -36,11 +36,25 @@ const _insertStmt = db.prepare(`
      @source, @user_email, @summary)
 `);
 
+const _lastBodyStmt = db.prepare(`
+  SELECT body_html
+    FROM page_revisions
+   WHERE page_id = ?
+   ORDER BY created_at DESC, id DESC
+   LIMIT 1
+`);
+
+// Dedup: identischer Body zur juengsten Revision derselben Seite → skip.
+// Autosave-Bursts und Edits, die nach cleanPageHtml byte-identisch landen,
+// erzeugen sonst Duplikat-Rows und lassen den Side-by-Side-Diff im Viewer
+// faelschlich „unchanged" anzeigen.
 function insert({ pageId, bookId, bodyHtml, bodyMarkdown = null, source, userEmail = null, summary = null }) {
   if (!Number.isInteger(pageId) || pageId <= 0) throw new Error('page-revisions.insert: pageId required');
   if (!Number.isInteger(bookId) || bookId <= 0) throw new Error('page-revisions.insert: bookId required');
   if (typeof bodyHtml !== 'string') throw new Error('page-revisions.insert: bodyHtml required');
   if (!VALID_SOURCES.has(source)) throw new Error(`page-revisions.insert: invalid source "${source}"`);
+  const last = _lastBodyStmt.get(pageId);
+  if (last && last.body_html === bodyHtml) return null;
   const { chars, words, tok } = _statsFromHtml(bodyHtml);
   const result = _insertStmt.run({
     page_id: pageId,

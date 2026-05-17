@@ -82,7 +82,7 @@
               <div class="admin-usage-actions">
                 <button type="button" @click="adminUsageSaveBudget(u)" :disabled="u._saving"
                         x-text="u._saving ? $app.t('common.saving') : (u._savedAt && (Date.now() - u._savedAt < 2000) ? $app.t('common.saved') : $app.t('common.save'))"></button>
-                <button type="button" @click="adminUsageFilterUser = u.email; adminUsageSelectTab('jobs')"
+                <button type="button" @click="adminUsageDrillDownToJobs(u.email)"
                         x-text="$app.t('admin.usage.user.drillDown')"></button>
               </div>
             </td>
@@ -98,8 +98,20 @@
     <div class="admin-usage-filter">
       <label>
         <span x-text="$app.t('admin.usage.filter.user')"></span>
-        <input type="email" x-model="adminUsageFilterUser" :placeholder="$app.t('admin.users.email')">
+        <div x-data="combobox({ placeholder: $app.t('admin.usage.filter.allUsers'), multiple: true })"
+             x-modelable="value" x-model="adminUsageFilterUsers"
+             x-effect="options = adminUsageUserFilterOptions()"></div>
       </label>
+    </div>
+    <div class="admin-usage-filter-chips" x-show="adminUsageFilterUsers.length">
+      <template x-for="email in adminUsageFilterUsers" :key="email">
+        <span class="admin-usage-filter-chip">
+          <span x-text="email"></span>
+          <button type="button" class="admin-usage-filter-chip-remove"
+                  :aria-label="$app.t('common.remove')"
+                  @click="adminUsageRemoveFilterUser(email)">×</button>
+        </span>
+      </template>
     </div>
     <table class="admin-usage-table" x-show="adminUsageJobsList.length">
       <thead>
@@ -141,8 +153,20 @@
     <div class="admin-usage-filter">
       <label>
         <span x-text="$app.t('admin.usage.filter.user')"></span>
-        <input type="email" x-model="adminUsageFilterUser" :placeholder="$app.t('admin.users.email')">
+        <div x-data="combobox({ placeholder: $app.t('admin.usage.filter.allUsers'), multiple: true })"
+             x-modelable="value" x-model="adminUsageFilterUsers"
+             x-effect="options = adminUsageUserFilterOptions()"></div>
       </label>
+    </div>
+    <div class="admin-usage-filter-chips" x-show="adminUsageFilterUsers.length">
+      <template x-for="email in adminUsageFilterUsers" :key="email">
+        <span class="admin-usage-filter-chip">
+          <span x-text="email"></span>
+          <button type="button" class="admin-usage-filter-chip-remove"
+                  :aria-label="$app.t('common.remove')"
+                  @click="adminUsageRemoveFilterUser(email)">×</button>
+        </span>
+      </template>
     </div>
     <table class="admin-usage-table" x-show="adminUsageChatList.length">
       <thead>

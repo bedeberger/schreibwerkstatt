@@ -49,6 +49,45 @@ test('page_revisions: insert + listForPage + countForPage', () => {
   assert.ok(list[0].chars > 0);
 });
 
+test('page_revisions: Dedup gegen juengste Revision', () => {
+  upsertBookByName(905, 'Test-Buch P2 Dedup');
+  _seedPage(905, 90501);
+
+  const id1 = pageRevisions.insert({
+    pageId: 90501, bookId: 905,
+    bodyHtml: '<p>identisch</p>',
+    source: 'main', userEmail: 'a@x.test',
+  });
+  assert.ok(id1);
+
+  // Identischer Body → skip, gibt null zurueck.
+  const id2 = pageRevisions.insert({
+    pageId: 90501, bookId: 905,
+    bodyHtml: '<p>identisch</p>',
+    source: 'focus', userEmail: 'a@x.test',
+  });
+  assert.equal(id2, null);
+  assert.equal(pageRevisions.countForPage(90501), 1);
+
+  // Geaenderter Body → neue Row.
+  const id3 = pageRevisions.insert({
+    pageId: 90501, bookId: 905,
+    bodyHtml: '<p>anders</p>',
+    source: 'main', userEmail: 'a@x.test',
+  });
+  assert.ok(id3);
+  assert.equal(pageRevisions.countForPage(90501), 2);
+
+  // Wieder zurueck auf alten Body → KEIN Dedup (juengste = "anders").
+  const id4 = pageRevisions.insert({
+    pageId: 90501, bookId: 905,
+    bodyHtml: '<p>identisch</p>',
+    source: 'main', userEmail: 'a@x.test',
+  });
+  assert.ok(id4);
+  assert.equal(pageRevisions.countForPage(90501), 3);
+});
+
 test('page_revisions: invalid source wirft', () => {
   upsertBookByName(902, 'Test-Buch P2 B');
   _seedPage(902, 90201);
