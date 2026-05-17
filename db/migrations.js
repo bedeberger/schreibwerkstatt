@@ -5323,6 +5323,31 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 124 abgeschlossen (budget_alerts).');
   }
 
+  if (version < 125) {
+    // page_presence: Live-Heartbeat fuer „X editiert gerade Seite Y".
+    // Client pingt waehrend Edit-Mode alle 30s; Server filtert Stale-Eintraege
+    // (>90s) bei jedem List-Read. Pure Ephemeral-Tabelle, kein Audit-Wert.
+    // CASCADE auf pages/app_users: geloeschte Seite/User raeumt die Pings mit.
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS page_presence (
+        page_id     INTEGER NOT NULL REFERENCES pages(page_id)    ON DELETE CASCADE,
+        user_email  TEXT    NOT NULL REFERENCES app_users(email)  ON DELETE CASCADE,
+        book_id     INTEGER NOT NULL REFERENCES books(book_id)    ON DELETE CASCADE,
+        last_ping_at TEXT   NOT NULL DEFAULT (datetime('now')),
+        PRIMARY KEY (page_id, user_email)
+      )
+    `).run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_page_presence_book ON page_presence(book_id, last_ping_at DESC)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_page_presence_ping ON page_presence(last_ping_at)').run();
+
+    const fkErrors125 = db.pragma('foreign_key_check');
+    if (fkErrors125.length) {
+      throw new Error(`Migration 125: foreign_key_check meldet ${fkErrors125.length} Verstoesse: ${JSON.stringify(fkErrors125.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 125').run();
+    logger.info('DB-Migration auf Version 125 abgeschlossen (page_presence).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

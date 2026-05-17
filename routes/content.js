@@ -9,6 +9,7 @@ const express = require('express');
 const logger = require('../logger');
 const contentStore = require('../lib/content-store');
 const pageRevisions = require('../db/page-revisions');
+const pagePresence = require('../db/page-presence');
 const bookOrder = require('../db/book-order');
 const { toIntId } = require('../lib/validate');
 const { setContext, bookParamHandler } = require('../lib/log-context');
@@ -224,6 +225,61 @@ router.put('/pages/:page_id', jsonBody, async (req, res) => {
     });
     _fail(res, e, 'PUT /content/pages/:id');
   }
+});
+
+// ── Page-Presence ──────────────────────────────────────────────────────────
+// Heartbeat-Pings, damit die UI „Alice editiert gerade Seite X" anzeigen kann.
+// Client pingt waehrend Edit-Mode alle 30s; Server filtert Stale-Eintraege
+// (>90s) bei jedem List-Read.
+
+// POST /content/pages/:page_id/presence — Heartbeat. Min-Role viewer reicht;
+// Lese-Rollen koennen auch nur „lesen-da" signalisieren wenn wir das spaeter
+// brauchen. Auf editor-Rolle gaten, falls Datenschutz das verlangt — derzeit
+// keine Anforderung dafuer.
+router.post('/pages/:page_id/presence', async (req, res) => {
+  const pageId = toIntId(req.params.page_id);
+  if (!pageId) return res.status(400).json({ error_code: 'INVALID_PAGE_ID' });
+  const bookId = _guardPage(req, res, pageId, 'editor');
+  if (bookId == null) return;
+  const email = _userEmail(req);
+  if (!email) return res.status(401).json({ error_code: 'NOT_LOGGED_IN' });
+  try { pagePresence.ping(pageId, email, bookId); }
+  catch (e) { return _fail(res, e, 'POST /content/pages/:id/presence'); }
+  res.json({ ok: true });
+});
+
+// DELETE /content/pages/:page_id/presence — Eigener Edit-Exit (cancel/blur).
+// Optional — Stale-Filter wuerde den Eintrag eh nach 90s entfernen, aber
+// expliziter Abmelden gibt der UI sofortige Korrektheit.
+router.delete('/pages/:page_id/presence', async (req, res) => {
+  const pageId = toIntId(req.params.page_id);
+  if (!pageId) return res.status(400).json({ error_code: 'INVALID_PAGE_ID' });
+  const bookId = _guardPage(req, res, pageId, 'viewer');
+  if (bookId == null) return;
+  const email = _userEmail(req);
+  if (!email) return res.status(401).json({ error_code: 'NOT_LOGGED_IN' });
+  try { pagePresence.leave(pageId, email); }
+  catch (e) { return _fail(res, e, 'DELETE /content/pages/:id/presence'); }
+  res.json({ ok: true });
+});
+
+// GET /content/books/:book_id/presence — Liste aktiver Editor-Sessions am Buch.
+// Filtert eigene Sessions aus (der User selbst soll nicht in der „andere
+// editieren"-Liste auftauchen). Liefert pro page_id ggf. mehrere User.
+router.get('/books/:book_id/presence', aclParamGuard('viewer'), (req, res) => {
+  const email = _userEmail(req);
+  let rows;
+  try { rows = pagePresence.listForBook(req.bookId); }
+  catch (e) { return _fail(res, e, 'GET /content/books/:id/presence'); }
+  const filtered = rows
+    .filter(r => !email || String(r.user_email).toLowerCase() !== String(email).toLowerCase())
+    .map(r => ({
+      page_id: r.page_id,
+      user_email: r.user_email,
+      user_display_name: r.user_display_name || r.user_email,
+      last_ping_at: r.last_ping_at,
+    }));
+  res.json({ presence: filtered });
 });
 
 // ── Page-Revisions ─────────────────────────────────────────────────────────
