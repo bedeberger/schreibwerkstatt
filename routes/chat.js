@@ -361,6 +361,12 @@ router.post('/send', jsonBody, enforceBudget, async (req, res) => {
     );
     db.prepare('UPDATE chat_sessions SET last_message_at = ? WHERE id = ?').run(assistantNow, session.id);
 
+    if (userEmail) {
+      const notify = require('../lib/notify');
+      notify.maybeNotifyBudgetOverrun(userEmail)
+        .catch(e => logger.warn(`[chat/send] notify budget: ${e.message}`));
+    }
+
     // Meta-Event mit IDs + Token-Counts + Vorschlägen ans Frontend
     res.write(`data: ${JSON.stringify({
       type: 'meta',

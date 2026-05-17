@@ -89,6 +89,41 @@ export const appUiMethods = {
     return this._deriveKapitel(this.orte, o => o.kapitel);
   },
 
+  // ── Email-Display-Lookup ────────────────────────────────────────────────
+  // Liefert den lesbaren Anzeigenamen zu einer Email. Erstaufruf triggert das
+  // Lazy-Load via `/me/users-light`; bis dahin Email als Platzhalter, damit
+  // die UI nichts springt. Unbekannte Emails (nicht mehr in app_users) bleiben
+  // als Email zurueckgegeben — kein Hard-Fail, weil Revisionen historische
+  // User behalten duerfen, die zwischenzeitlich entfernt wurden.
+  userDisplayName(email) {
+    if (!email) return '';
+    if (!this._usersByEmail && !this._usersByEmailLoading) this._loadUsersLight();
+    const hit = this._usersByEmail?.get(String(email).toLowerCase());
+    return hit?.display_name || email;
+  },
+
+  async _loadUsersLight() {
+    if (this._usersByEmailLoading) return;
+    this._usersByEmailLoading = true;
+    try {
+      const r = await fetch('/me/users-light');
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data = await r.json();
+      const map = new Map();
+      for (const u of (data?.users || [])) {
+        if (u?.email) map.set(String(u.email).toLowerCase(), { display_name: u.display_name || null });
+      }
+      this._usersByEmail = map;
+    } catch (e) {
+      console.warn('[users-light]', e);
+      // Leere Map setzen, damit Folge-Aufrufe nicht in Endlos-Retry laufen;
+      // Re-Try beim naechsten Session-Boot.
+      this._usersByEmail = new Map();
+    } finally {
+      this._usersByEmailLoading = false;
+    }
+  },
+
   // ── Datum / Save-Status ─────────────────────────────────────────────────
   formatDate(iso) {
     if (!iso) return '';

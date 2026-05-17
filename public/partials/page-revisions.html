@@ -24,7 +24,10 @@
            :data-tip="$app.t('editor.revisions.viewer.openTitle')">
         <span class="history-date" x-text="$app.formatDate(rev.created_at)"></span>
         <span class="badge badge-ok" x-text="sourceLabel(rev.source)"></span>
-        <span class="tag" x-show="rev.user_email" x-text="rev.user_email"></span>
+        <span class="tag"
+              x-show="rev.user_email"
+              x-text="isOwnRevision(rev) ? $app.t('editor.revisions.byYou') : $app.userDisplayName(rev.user_email)"
+              :data-tip="rev.user_email"></span>
         <span class="tag" x-text="formatChars(rev.chars) + ' ' + $app.t('editor.revisions.chars')"></span>
         <button type="button"
                 class="btn-toggle-saved btn-toggle-saved--off"
@@ -49,7 +52,10 @@
           <div class="revision-viewer__meta">
             <span class="history-date" x-text="$app.formatDate(viewerRev.created_at)"></span>
             <span class="badge badge-ok" x-text="sourceLabel(viewerRev.source)"></span>
-            <span class="tag" x-show="viewerRev.user_email" x-text="viewerRev.user_email"></span>
+            <span class="tag"
+                  x-show="viewerRev.user_email"
+                  x-text="isOwnRevision(viewerRev) ? $app.t('editor.revisions.byYou') : $app.userDisplayName(viewerRev.user_email)"
+                  :data-tip="viewerRev.user_email"></span>
             <span class="tag" x-text="formatChars(viewerRev.chars) + ' ' + $app.t('editor.revisions.chars')"></span>
           </div>
           <button type="button"

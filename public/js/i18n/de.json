@@ -1071,6 +1071,7 @@
   "editor.revisions":            "{n} Versionen",
   "editor.revisions.count":             "{n} Versionen",
   "editor.revisions.chars":             "Zeichen",
+  "editor.revisions.byYou":             "Du",
   "editor.revisions.restore":           "Wiederherstellen",
   "editor.revisions.restoring":         "Wird wiederhergestellt…",
   "editor.revisions.restoreTitle":      "Diese Version als aktuellen Stand setzen",

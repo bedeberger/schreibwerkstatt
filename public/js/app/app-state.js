@@ -24,6 +24,12 @@ const shellState = () => ({
   isMac: false,
   promptConfig: {},
   _abortCtrl: null,
+  // Email → Display-Name-Map fuer Revision-Listen, Tree-Toasts, Konflikt-Hinweise.
+  // Lazy gefuellt via `/me/users-light` beim ersten Zugriff in `userDisplayName`.
+  // Map-Form (statt POJO) damit Lookups O(1) bleiben und Alpine den Reactor
+  // nicht bei jeder Property-Zugriffsfolge feuert.
+  _usersByEmail: null,
+  _usersByEmailLoading: false,
 });
 
 const aiProviderState = () => ({

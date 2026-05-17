@@ -154,6 +154,11 @@ function completeJob(id, result, tokensPerSec = null, detail = null) {
   runningJobs.delete(jobDedupKey(job));
   jobAbortControllers.delete(id);
   _scheduleJobCleanup(id);
+  if (job.userEmail) {
+    const notify = require('../../../lib/notify');
+    notify.maybeNotifyBudgetOverrun(job.userEmail)
+      .catch(e => logger.warn(`notify budget: ${e.message}`, _jobLogCtx(job)));
+  }
 }
 
 function failJob(id, err) {
@@ -179,6 +184,21 @@ function failJob(id, err) {
   runningJobs.delete(jobDedupKey(job));
   jobAbortControllers.delete(id);
   _scheduleJobCleanup(id);
+  if (!isCancelled) {
+    const notify = require('../../../lib/notify');
+    const httpStatus = (err && typeof err.status === 'number') ? err.status : null;
+    if (errorMsg === 'job.error.aiTruncated') {
+      notify.maybeNotifyTokenCapHit(job, errorMsg)
+        .catch(e => logger.warn(`notify token-cap: ${e.message}`, _jobLogCtx(job)));
+    } else {
+      notify.maybeNotifyJobFailed(job, errorMsg, httpStatus)
+        .catch(e => logger.warn(`notify job-fail: ${e.message}`, _jobLogCtx(job)));
+    }
+    if (job.userEmail) {
+      notify.maybeNotifyBudgetOverrun(job.userEmail)
+        .catch(e => logger.warn(`notify budget: ${e.message}`, _jobLogCtx(job)));
+    }
+  }
 }
 
 function cancelJob(id, userEmail) {

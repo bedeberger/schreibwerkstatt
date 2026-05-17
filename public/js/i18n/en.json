@@ -1070,6 +1070,7 @@
   "editor.revisions":            "{n} revisions",
   "editor.revisions.count":             "{n} revisions",
   "editor.revisions.chars":             "chars",
+  "editor.revisions.byYou":             "You",
   "editor.revisions.restore":           "Restore",
   "editor.revisions.restoring":         "Restoring…",
   "editor.revisions.restoreTitle":      "Set this version as current",

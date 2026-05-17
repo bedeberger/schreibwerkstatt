@@ -78,6 +78,18 @@ router.get('/settings', (req, res) => {
   });
 });
 
+/**
+ * Email → Display-Name-Map fuer Anzeige in Revision-Listen, Tree-Toasts und
+ * generelle „Wer hat editiert"-Hints. Nur active/invited User. Keine PII
+ * ausserhalb dessen, was die Buch-Mitglieder ohnehin via book_access sehen.
+ */
+router.get('/users-light', (_req, res) => {
+  const rows = appUsers.listUsers().filter(u => u.status === 'active' || u.status === 'invited');
+  res.json({
+    users: rows.map(u => ({ email: u.email, display_name: u.display_name || null })),
+  });
+});
+
 /** Partielles Update. Nicht übergebene Felder bleiben unverändert;
  *  leerer String oder null setzt das Feld zurück. */
 router.patch('/settings', jsonBody, (req, res) => {

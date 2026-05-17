@@ -77,6 +77,12 @@ export function registerPageRevisionsCard() {
       }
     },
 
+    isOwnRevision(rev) {
+      if (!rev?.user_email) return false;
+      const me = window.__app?.currentUser?.email;
+      return !!me && String(me).toLowerCase() === String(rev.user_email).toLowerCase();
+    },
+
     sourceLabel(src) {
       const app = window.__app;
       const key = `editor.revisions.source.${src}`;

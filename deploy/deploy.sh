@@ -32,9 +32,11 @@ if [ -d "$OLD_INSTALL_DIR" ] && [ ! -d "$INSTALL_DIR" ]; then
 fi
 
 # DB-Backup vor Deploy via dediziertes Backup-Script.
+# Skript aus Runner-Checkout nutzen (nicht $INSTALL_DIR/deploy/backup.sh) — rsync
+# kommt erst danach, neu hinzugefuegte Skripte liegen sonst noch nicht im Ziel.
 # Config (Pfad, Retention) via .env – siehe deploy/backup.sh.
 if [ -f "$INSTALL_DIR/schreibwerkstatt.db" ]; then
-  if ! bash "$INSTALL_DIR/deploy/backup.sh" "$INSTALL_DIR/.env"; then
+  if ! bash ./deploy/backup.sh "$INSTALL_DIR/.env"; then
     echo "✗ DB-Backup fehlgeschlagen – Deploy abgebrochen"
     exit 1
   fi
