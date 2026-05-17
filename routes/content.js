@@ -107,6 +107,47 @@ router.get('/books/:book_id/tree', aclParamGuard('viewer'), async (req, res) => 
   catch (e) { _fail(res, e, 'GET /content/books/:id/tree'); }
 });
 
+// GET /content/books/:book_id/changes?since=<iso> — Seiten, die seit `since`
+// von ANDEREN Usern editiert wurden (last_editor_email != session.email).
+// Polling-Endpoint fuer das Collab-Toast-Signal. Ohne `since` liefert er den
+// Server-„jetzt"-Stempel + leeres Array (Baseline-Sync). Cap 200 Rows.
+router.get('/books/:book_id/changes', aclParamGuard('viewer'), (req, res) => {
+  const email = _userEmail(req);
+  const sinceRaw = (req.query?.since || '').toString().trim();
+  const nowIso = new Date().toISOString();
+  if (!sinceRaw) return res.json({ now: nowIso, changes: [] });
+  const since = !Number.isNaN(Date.parse(sinceRaw)) ? sinceRaw : nowIso;
+  let rows = [];
+  try {
+    rows = db.prepare(`
+      SELECT p.page_id, p.page_name, p.chapter_id,
+             p.updated_at, p.last_editor_email,
+             u.display_name AS last_editor_name
+        FROM pages p
+        LEFT JOIN app_users u ON u.email = p.last_editor_email
+       WHERE p.book_id = ?
+         AND p.updated_at > ?
+         AND p.last_editor_email IS NOT NULL
+         AND (? IS NULL OR p.last_editor_email <> ?)
+       ORDER BY p.updated_at ASC
+       LIMIT 200
+    `).all(req.bookId, since, email, email);
+  } catch (e) {
+    return _fail(res, e, 'GET /content/books/:id/changes');
+  }
+  res.json({
+    now: nowIso,
+    changes: rows.map(r => ({
+      page_id: r.page_id,
+      page_name: r.page_name || '',
+      chapter_id: r.chapter_id || null,
+      updated_at: r.updated_at,
+      last_editor_email: r.last_editor_email,
+      last_editor_name: r.last_editor_name || r.last_editor_email,
+    })),
+  });
+});
+
 // Eigene Sortierung.
 //
 // GET /content/books/:book_id/order — Tree-Snapshot + Audit-Meta. Auto-init:
