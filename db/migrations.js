@@ -5299,6 +5299,30 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 123 abgeschlossen (pages.last_editor_email).');
   }
 
+  if (version < 124) {
+    // budget_alerts: Dedup-Tabelle fuer Budget-Overrun-Mails. Pro
+    // (email, period='YYYY-MM') hoechstens ein Eintrag => Mail wird exakt einmal
+    // pro Monat verschickt. ON DELETE CASCADE: geloeschter User raeumt seine
+    // Alerts gleich mit.
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS budget_alerts (
+        email   TEXT NOT NULL,
+        period  TEXT NOT NULL,
+        sent_at TEXT NOT NULL DEFAULT (datetime('now')),
+        PRIMARY KEY (email, period),
+        FOREIGN KEY (email) REFERENCES app_users(email) ON DELETE CASCADE
+      )
+    `).run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_budget_alerts_period ON budget_alerts(period)').run();
+
+    const fkErrors124 = db.pragma('foreign_key_check');
+    if (fkErrors124.length) {
+      throw new Error(`Migration 124: foreign_key_check meldet ${fkErrors124.length} Verstoesse: ${JSON.stringify(fkErrors124.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 124').run();
+    logger.info('DB-Migration auf Version 124 abgeschlossen (budget_alerts).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

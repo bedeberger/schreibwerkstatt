@@ -129,6 +129,14 @@ function listUsers() {
   return _stmtListUsers.all();
 }
 
+const _stmtActiveAdminEmails = db.prepare(`
+  SELECT email FROM app_users WHERE global_role = 'admin' AND status = 'active'
+`);
+
+function getActiveAdminEmails() {
+  return _stmtActiveAdminEmails.all().map(r => r.email).filter(Boolean);
+}
+
 function createUser({ email, displayName = null, globalRole = 'user', status = 'active', language = 'de', canInviteUsers = 1, invitedBy = null }) {
   const e = _normEmail(email);
   if (!e) throw new Error('createUser: email required');
@@ -291,7 +299,7 @@ function ensureAdminFromEnv() {
 }
 
 module.exports = {
-  getUser, listUsers, createUser, touchLogin,
+  getUser, listUsers, getActiveAdminEmails, createUser, touchLogin,
   setStatus, setGlobalRole, setCanInviteUsers, setBudget, softDeleteUser,
   setAiProviderOverride,
   recordAuditEvent, listAuditForUser,
