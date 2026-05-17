@@ -1,6 +1,5 @@
 'use strict';
-// Phase 4a2 (BookStack-Exit, docs/bookstack-exit.md): Helper-API ueber
-// registration_requests. Konsumiert von POST /register (oeffentlich) und vom
+// Helper-API ueber registration_requests. Konsumiert von POST /register (oeffentlich) und vom
 // Admin-Workflow in /admin/registration-requests (approve/deny/expire).
 //
 // Pending-Status ist Partial-UNIQUE pro Email: ein Duplikat wirft auf der

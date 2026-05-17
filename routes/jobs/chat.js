@@ -1,6 +1,6 @@
 'use strict';
 const express = require('express');
-const { db, getTokenForRequest } = require('../../db/schema');
+const { db } = require('../../db/schema');
 const { callAIChat, callAIWithTools, parseJSONLenient, chatTemperature, CHARS_PER_TOKEN, MAX_TOKENS_OUT, INPUT_BUDGET_TOKENS, INPUT_BUDGET_CHARS } = require('../../lib/ai');
 const {
   _promptConfig,
@@ -408,7 +408,7 @@ function _handleChatPost(req, res, { jobType, sessionSelect, labelFn, runFn }) {
   ).run(session.id, message.trim(), now, clientMsgId);
   db.prepare('UPDATE chat_sessions SET last_message_at = ? WHERE id = ?').run(now, session.id);
 
-  const userToken = getTokenForRequest(req);
+  const userToken = null;
 
   const { key: label, params: labelParams } = labelFn(session);
   const jobId = createJob(jobType, session.book_id || 0, userEmail, label, labelParams, session_id);

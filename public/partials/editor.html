@@ -8,10 +8,6 @@
               :class="{ 'save-indicator--draft': lastSavedKind() === 'draft', 'save-indicator--offline': saveOffline }"
               x-text="lastSavedKind() === 'draft' ? t('editor.draft', { when: lastSavedLabel() }) : t('editor.saved', { when: lastSavedLabel() })"
               :data-tip="lastSavedKind() === 'draft' ? t('editor.draftTitle') : t('editor.savedTitle')"></span>
-        <span class="card-subline-sep" aria-hidden="true" x-show="backend === 'bookstack' && lastSavedLabel() && currentPage?.url">·</span>
-        <a x-show="backend === 'bookstack' && currentPage?.url" :href="currentPage?.url" target="_blank" rel="noopener" class="card-subline-link" x-text="t('editor.openInBookstack')"></a>
-        <span class="card-subline-sep" aria-hidden="true" x-show="backend === 'bookstack' && currentPage?.url && currentPage?.revision_count > 0">·</span>
-        <a x-show="backend === 'bookstack' && currentPage?.url && currentPage?.revision_count > 0" :href="currentPage?.url + '/revisions'" target="_blank" rel="noopener" class="card-subline-link" :data-tip="t('editor.revisionsTitle')" x-text="t('editor.revisions', { n: currentPage?.revision_count })"></a>
         <span x-show="focusMode && editMode" class="focus-live-counter">
           <span x-text="t('editor.focus.counterTotal', { words: focusCountWords, chars: focusCountChars })"></span>
           <span class="focus-live-counter--today"

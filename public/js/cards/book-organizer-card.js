@@ -332,7 +332,6 @@ export function registerBookOrganizerCard() {
           name,
         });
         if (!created?.id) return;
-        await root.bsRegisterChapterLocally(created);
         const treeEntry = {
           type: 'chapter',
           id: created.id,
@@ -340,9 +339,6 @@ export function registerBookOrganizerCard() {
           priority: created.priority ?? Number.MAX_SAFE_INTEGER,
           open: true,
           solo: false,
-          url: root.bookstackUrl && created.book_slug && created.slug
-            ? `${root.bookstackUrl}/books/${created.book_slug}/chapter/${created.slug}`
-            : null,
           pages: [],
         };
         root.tree.push(treeEntry);
@@ -376,13 +372,9 @@ export function registerBookOrganizerCard() {
         const chapName = chapterId
           ? root.tree.find(it => it.type === 'chapter' && !it.solo && String(it.id) === String(chapterId))?.name || null
           : null;
-        await root.bsRegisterPageLocally(created, chapterId ? { id: chapterId, name: chapName } : null);
         const newPage = {
           ...created,
           chapterName: chapName,
-          url: root.bookstackUrl && created.book_slug && created.slug
-            ? `${root.bookstackUrl}/books/${created.book_slug}/page/${created.slug}`
-            : null,
         };
         root.pages.push(newPage);
         if (chapterId) {

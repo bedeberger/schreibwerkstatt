@@ -325,9 +325,6 @@ export const treeMethods = {
         ...p,
         priority: p.position, // legacy alias fuer UI-Sortierung + drag/drop
         chapterName: p.chapter_id ? (chMap[p.chapter_id] || this.t('tree.chapterFallback')) : null,
-        url: this.bookstackUrl && p.book_slug && p.slug
-          ? `${this.bookstackUrl}/books/${p.book_slug}/page/${p.slug}`
-          : null,
       });
 
       this.pages = [
@@ -343,9 +340,6 @@ export const treeMethods = {
           priority: c.position,
           open: true,
           solo: false,
-          url: this.bookstackUrl && c.book_slug && c.slug
-            ? `${this.bookstackUrl}/books/${c.book_slug}/chapter/${c.slug}`
-            : null,
           pages: this.pages.filter(p => p.chapter_id === c.id),
         })),
         ...this.pages.filter(p => !p.chapter_id).map(p => ({
@@ -355,7 +349,6 @@ export const treeMethods = {
           priority: p.priority,
           open: true,
           solo: true,
-          url: null,
           pages: [p],
         })),
       ].sort((a, b) => a.priority - b.priority);
@@ -452,14 +445,10 @@ export const treeMethods = {
         priority: localPriority,
         open: true,
         solo: false,
-        url: this.bookstackUrl && created.book_slug && created.slug
-          ? `${this.bookstackUrl}/books/${created.book_slug}/chapter/${created.slug}`
-          : null,
         pages: [],
       };
       this.tree = [...this.tree, chapterItem].sort((a, b) => a.priority - b.priority);
       if (this._chapterOrderMap) this._chapterOrderMap.set(chapterItem.name, this._chapterOrderMap.size);
-      await this.bsRegisterChapterLocally(created);
       return chapterItem;
     } catch (e) {
       console.error('[createChapter]', e);

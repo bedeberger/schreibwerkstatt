@@ -93,10 +93,6 @@ export const ACTIONS = [
     requiresBook: true,
     aliases: ['analyse','vollanalyse','reload','aktualisieren','refresh','komplett'],
     run: (root) => { root.alleAktualisieren(); } },
-  { key: 'action.tokenChange',    kind: 'action', group: 'app', labelKey: 'palette.action.token',     descKey: 'palette.action.token.desc',
-    requiresBookstack: true,
-    aliases: ['bookstack','api','credentials','login','token'],
-    run: (root) => { root.openTokenChange(); } },
   { key: 'action.swReload',       kind: 'action', group: 'app', labelKey: 'palette.action.swReload',  descKey: 'palette.action.swReload.desc',
     aliases: ['cache','update','refresh','sw','service-worker','neu-laden'],
     run: () => {
@@ -114,40 +110,60 @@ export const ACTIONS = [
 // Alle Hauptkarten mit Exklusivitäts-Verhalten. Superset von FEATURES
 // (enthält zusätzlich nicht-Palette-Karten wie kapitelReview und userSettings,
 // die via Sidebar bzw. Avatar-Menu geöffnet werden, aber dieselbe „eine Karte
-// gleichzeitig"-Regel folgen). Wird von `_closeOtherMainCards`, `resetView`
-// und `_maybeOpenBookOverview` in [public/js/app-view.js](public/js/app-view.js)
-// gelesen — neue Hauptkarte braucht nur einen Eintrag hier, die View-Logik
-// bleibt drift-frei.
-//   `key`  – Argument für `_closeOtherMainCards(keep)`.
-//   `flag` – Show-State-Flag am Root.
+// gleichzeitig"-Regel folgen). Wird von `_closeOtherMainCards`, `resetView`,
+// `_maybeOpenBookOverview` und vom generischen `_toggleCard` in
+// [public/js/app-view.js](public/js/app-view.js) gelesen — neue Hauptkarte
+// braucht nur einen Eintrag hier, die View-Logik bleibt drift-frei.
+//
+// Felder:
+//   `key`     – Argument für `_closeOtherMainCards(keep)` + `card:refresh`-detail.name.
+//   `flag`    – Show-State-Flag am Root.
+//   `toggle`  – Methodenname am Root. `_toggleCard` generiert die Methode aus
+//               diesem Eintrag (Alpine-spread-fähig), Aufrufer (Template, Hash-
+//               Router, Palette) rufen sie wie eine handgeschriebene Methode.
+//   `bespoke` – true: keine Generierung, die Methode lebt in einem anderen
+//               Modul (z.B. kapitelReview, oder bewusst gesonderte Logik).
+//   `onReclick` – 'close' (default) schliesst die Karte beim 2. Klick;
+//                 'refresh' dispatcht `card:refresh` und lässt sie offen.
+//   `requiresBook` – true: ohne `selectedBookId` öffnet die Karte nicht.
+//   `loadDeps` – Pre-Open-Bedingungen: `{ method, skipIfNonEmpty }`. Wird
+//                `this[method](selectedBookId)` aufgerufen, wenn
+//                `this[skipIfNonEmpty]` leer ist. Wird nach `flag = true`
+//                gestartet (Karte sichtbar, Daten laden im Hintergrund),
+//                aber awaited — damit der Aufruf-Promise erst nach Daten resolve't.
+//   `auditEvent` – Event-Name für `logAuditEvent` nach dem Öffnen (`book`-Detail).
+//   `extraRefreshOnOpen` – belt-and-braces: nach Open zusätzlich einmalig
+//                `card:refresh` dispatchen (für $watch-Race-Conditions).
 export const EXCLUSIVE_CARDS = [
-  { key: 'bookOverview',   flag: 'showBookOverviewCard' },
-  { key: 'bookReview',     flag: 'showBookReviewCard' },
-  { key: 'kapitelReview',  flag: 'showKapitelReviewCard' },
-  { key: 'figures',        flag: 'showFiguresCard' },
-  { key: 'figurWerkstatt', flag: 'showFigurWerkstattCard' },
-  { key: 'szenen',         flag: 'showSzenenCard' },
-  { key: 'ereignisse',     flag: 'showEreignisseCard' },
-  { key: 'bookStats',      flag: 'showBookStatsCard' },
-  { key: 'stil',           flag: 'showStilCard' },
-  { key: 'fehlerHeatmap',  flag: 'showFehlerHeatmapCard' },
-  { key: 'bookChat',       flag: 'showBookChatCard' },
-  { key: 'orte',           flag: 'showOrteCard' },
-  { key: 'kontinuitaet',   flag: 'showKontinuitaetCard' },
-  { key: 'bookSettings',   flag: 'showBookSettingsCard' },
-  { key: 'userSettings',   flag: 'showUserSettingsCard' },
-  { key: 'adminUsers',     flag: 'showAdminUsersCard' },
-  { key: 'adminSettings',  flag: 'showAdminSettingsCard' },
-  { key: 'adminUsage',     flag: 'showAdminUsageCard' },
-  { key: 'adminCategories', flag: 'showAdminCategoriesCard' },
-  { key: 'adminBooks',     flag: 'showAdminBooksCard' },
-  { key: 'adminBackendMigration', flag: 'showAdminBackendMigrationCard' },
-  { key: 'finetuneExport', flag: 'showFinetuneExportCard' },
-  { key: 'export',         flag: 'showExportCard' },
-  { key: 'pdfExport',      flag: 'showPdfExportCard' },
-  { key: 'bookOrganizer',  flag: 'showBookOrganizerCard' },
-  { key: 'bookEditor',     flag: 'showBookEditorCard' },
-  { key: 'search',         flag: 'showSearchCard' },
+  { key: 'bookOverview',   flag: 'showBookOverviewCard',   toggle: 'toggleBookOverviewCard',   onReclick: 'refresh', requiresBook: true },
+  { key: 'bookReview',     flag: 'showBookReviewCard',     toggle: 'toggleBookReviewCard',     onReclick: 'refresh' },
+  { key: 'kapitelReview',  flag: 'showKapitelReviewCard',  toggle: 'toggleKapitelReviewCard',  bespoke: true },
+  { key: 'figures',        flag: 'showFiguresCard',        toggle: 'toggleFiguresCard',        onReclick: 'refresh' },
+  { key: 'figurWerkstatt', flag: 'showFigurWerkstattCard', toggle: 'toggleFigurWerkstattCard', onReclick: 'refresh', requiresBook: true, extraRefreshOnOpen: true },
+  { key: 'szenen',         flag: 'showSzenenCard',         toggle: 'toggleSzenenCard',         onReclick: 'refresh',
+    loadDeps: [{ method: 'loadFiguren', skipIfNonEmpty: 'figuren' }, { method: 'loadOrte', skipIfNonEmpty: 'orte' }] },
+  { key: 'ereignisse',     flag: 'showEreignisseCard',     toggle: 'toggleEreignisseCard',     onReclick: 'refresh',
+    loadDeps: [{ method: 'loadFiguren', skipIfNonEmpty: 'figuren' }] },
+  { key: 'bookStats',      flag: 'showBookStatsCard',      toggle: 'toggleBookStatsCard',      onReclick: 'close' },
+  { key: 'stil',           flag: 'showStilCard',           toggle: 'toggleStilCard',           onReclick: 'close' },
+  { key: 'fehlerHeatmap',  flag: 'showFehlerHeatmapCard',  toggle: 'toggleFehlerHeatmapCard',  onReclick: 'close' },
+  { key: 'bookChat',       flag: 'showBookChatCard',       toggle: 'toggleBookChatCard',       onReclick: 'refresh', requiresBook: true, auditEvent: 'bookChatOpened' },
+  { key: 'orte',           flag: 'showOrteCard',           toggle: 'toggleOrteCard',           onReclick: 'refresh',
+    loadDeps: [{ method: 'loadFiguren', skipIfNonEmpty: 'figuren' }] },
+  { key: 'kontinuitaet',   flag: 'showKontinuitaetCard',   toggle: 'toggleKontinuitaetCard',   onReclick: 'refresh' },
+  { key: 'bookSettings',   flag: 'showBookSettingsCard',   toggle: 'toggleBookSettingsCard',   onReclick: 'close' },
+  { key: 'userSettings',   flag: 'showUserSettingsCard',   toggle: 'toggleUserSettingsCard',   onReclick: 'close' },
+  { key: 'adminUsers',     flag: 'showAdminUsersCard',     toggle: 'toggleAdminUsersCard',     onReclick: 'close' },
+  { key: 'adminSettings',  flag: 'showAdminSettingsCard',  toggle: 'toggleAdminSettingsCard',  onReclick: 'close' },
+  { key: 'adminUsage',     flag: 'showAdminUsageCard',     toggle: 'toggleAdminUsageCard',     onReclick: 'close' },
+  { key: 'adminCategories',flag: 'showAdminCategoriesCard',toggle: 'toggleAdminCategoriesCard',onReclick: 'close' },
+  { key: 'adminBooks',     flag: 'showAdminBooksCard',     toggle: 'toggleAdminBooksCard',     onReclick: 'close' },
+  { key: 'finetuneExport', flag: 'showFinetuneExportCard', toggle: 'toggleFinetuneExportCard', onReclick: 'close' },
+  { key: 'export',         flag: 'showExportCard',         toggle: 'toggleExportCard',         onReclick: 'close' },
+  { key: 'pdfExport',      flag: 'showPdfExportCard',      toggle: 'togglePdfExportCard',      onReclick: 'close' },
+  { key: 'bookOrganizer',  flag: 'showBookOrganizerCard',  toggle: 'toggleBookOrganizerCard',  onReclick: 'refresh', requiresBook: true },
+  { key: 'bookEditor',     flag: 'showBookEditorCard',     toggle: 'toggleBookEditorCard',     onReclick: 'refresh', requiresBook: true },
+  { key: 'search',         flag: 'showSearchCard',         toggle: 'toggleSearchCard',         onReclick: 'refresh' },
 ];
 
 export const FEATURE_GROUPS = ['review', 'world', 'tools', 'app'];
@@ -177,7 +193,6 @@ export function isFeatureAvailable(feature, ctx) {
   if (!feature) return false;
   if (feature.requiresBook && !ctx.selectedBookId) return false;
   if (feature.requiresPages && !(ctx.pages && ctx.pages.length > 0)) return false;
-  if (feature.requiresBookstack && ctx.backend !== 'bookstack') return false;
   return true;
 }
 

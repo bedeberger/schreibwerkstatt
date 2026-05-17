@@ -1346,7 +1346,6 @@
   "tile.adminUsage.desc":        "Consumption, limits, cost",
   "tile.adminCategories.desc":   "Manage categories and tags",
   "tile.adminBooks.desc":        "Assign owner, overview",
-  "tile.adminBackendMigration.desc": "Bulk-copy BookStack → local DB",
 
   "admin.books.title":           "Book administration",
   "admin.books.ownerlessHeading": "Books without owner",

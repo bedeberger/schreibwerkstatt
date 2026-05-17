@@ -104,11 +104,6 @@
   <a class="session-banner-btn" :href="'/auth/login?returnTo=' + encodeURIComponent(location.pathname + location.search)" x-text="t('session.relogin')"></a>
 </div>
 
-<div class="session-banner" x-show="bookstackTokenInvalid && !sessionExpired" x-cloak>
-  <span class="session-banner-text" x-text="t('session.bookstackTokenInvalid')"></span>
-  <button type="button" class="session-banner-btn" @click="openTokenChange()" x-text="t('profile.changeToken')"></button>
-</div>
-
 <div class="session-banner" x-show="serverOffline && !sessionExpired" x-cloak>
   <span class="session-banner-text" x-text="t('session.serverOffline')"></span>
   <button type="button" class="session-banner-btn" @click="location.reload()" x-text="t('session.retry')"></button>
@@ -140,8 +135,6 @@
 </div>
 <div class="dev-banner" x-show="devMode" x-cloak x-text="t('dev.banner')"></div>
 
-<div id="partial-token-setup"></div>
-
 <!-- Bücherliste & Seitenauswahl -->
 <div class="card card--book-selector" x-show="currentUser && showBookCard && !isAdminOnly" x-cloak>
   <label x-text="t('book.label')"></label>
@@ -150,7 +143,6 @@
          x-modelable="value" x-model="selectedBookId"
          x-effect="options = filteredBooks().map(b => ({value: String(b.id), label: b.name}))"
          @combobox-change="resetView();"></div>
-    <a x-show="backend === 'bookstack'" :href="selectedBookUrl || '#'" target="_blank" rel="noopener" class="btn-bookstack-link" :class="{ 'btn-bookstack-link--hidden': !selectedBookUrl }" :tabindex="selectedBookUrl ? 0 : -1" :aria-hidden="!selectedBookUrl" :data-tip="t('book.openInBookstack')" x-text="t('book.bookstack')"></a>
   </div>
 
   <!-- Phase 6: Filter-Pills (Kategorie + Tags). Reines Frontend-Filter -->
@@ -189,38 +181,6 @@
     <kbd class="palette-hero-kbd" x-text="isMac ? '⌘K' : 'Ctrl+K'"></kbd>
   </button>
 
-  <!-- BookStack-Volltextsuche (im aktuellen Buch) -->
-  <div class="bookstack-search" x-show="selectedBookId" x-cloak>
-    <div class="bookstack-search-input-wrap">
-      <input type="text"
-             class="bookstack-search-input"
-             x-model="bookstackSearch"
-             @input="onBookstackSearchInput()"
-             @keydown.escape="clearBookstackSearch(); $event.target.blur()"
-             @keydown.enter.prevent="selectActiveBookstackHit()"
-             @keydown.arrow-down="onBookstackSearchKeydown($event)"
-             @keydown.arrow-up="onBookstackSearchKeydown($event)"
-             :placeholder="t(backend === 'localdb' ? 'book.search.placeholderLocal' : 'book.search.placeholder')"
-             :aria-label="t(backend === 'localdb' ? 'book.search.placeholderLocal' : 'book.search.placeholder')"
-             :data-tip="t('book.search.placeholderTitle')">
-      <button type="button" class="bookstack-search-clear"
-              x-show="bookstackSearch"
-              @mousedown.prevent="clearBookstackSearch()"
-              :data-tip="t('book.search.clear')"
-              :aria-label="t('book.search.clear')">×</button>
-    </div>
-    <div class="bookstack-search-results" x-show="bookstackSearch.trim().length >= 2">
-      <div class="bookstack-search-status" x-show="bookstackSearchLoading" x-text="t('book.search.loading')"></div>
-      <div class="bookstack-search-status bookstack-search-status--error" x-show="!bookstackSearchLoading && bookstackSearchError" x-text="bookstackSearchError"></div>
-      <div class="bookstack-search-empty" x-show="!bookstackSearchLoading && !bookstackSearchError && bookstackSearched && bookstackSearchResults.length === 0" x-text="t('book.search.noResults')"></div>
-      <template x-for="(hit, hitIdx) in bookstackSearchResults" :key="hit.id">
-        <div class="bookstack-search-item" :class="{ 'is-current': currentPage && currentPage.id === hit.id, 'is-active': hitIdx === bookstackSearchActiveIndex }" :data-bs-idx="hitIdx" x-show="!bookstackSearchLoading" @click="selectPageFromBookstackSearch(hit)">
-          <div class="bookstack-search-item-title" x-html="escPreserveStrong(hit.preview_html?.name || hit.name)"></div>
-          <div class="bookstack-search-item-snippet" x-html="escPreserveStrong(hit.preview_html?.content || '')" x-show="hit.preview_html?.content"></div>
-        </div>
-      </template>
-    </div>
-  </div>
 
 </div>
 
@@ -260,7 +220,6 @@
 <div id="partial-admin-usage"></div>
 <div id="partial-admin-categories"></div>
 <div id="partial-admin-books"></div>
-<div id="partial-admin-backend-migration"></div>
 <!-- Edit-Toolbar (Bubble + Slash) – teleportiert nach <body>, hier nur Scope-Host -->
 <div id="partial-editor-toolbar"></div>
 <div id="partial-editor-find"></div>

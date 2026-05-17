@@ -79,12 +79,6 @@
       <span class="avatar-menu-item-label" x-text="t('admin.categories.title')"></span>
     </button>
 
-    <button type="button" class="avatar-menu-item" role="menuitem"
-            x-show="currentUser?.role === 'admin'"
-            @click="showAvatarMenu = false; toggleAdminBackendMigrationCard()">
-      <span class="avatar-menu-item-label" x-text="t('admin.migrate.title')"></span>
-    </button>
-
     <div class="avatar-menu-divider"></div>
 
     <div class="avatar-menu-provider" :data-tip="t('header.providerTitle')">

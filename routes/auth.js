@@ -2,8 +2,7 @@ const crypto = require('crypto');
 const express = require('express');
 const { Issuer, generators } = require('openid-client');
 const logger = require('../logger');
-const { getUserToken, setUserToken, upsertUserLogin, getTokenForRequest } = require('../db/schema');
-const { maybeAutoBackfillOnLogin } = require('./jobs/backfill');
+const { upsertUserLogin } = require('../db/schema');
 const appUsers = require('../db/app-users');
 const rateLimit = require('../lib/admin-login-ratelimit');
 const appSettings = require('../lib/app-settings');
@@ -231,12 +230,7 @@ router.get('/auth/callback', async (req, res) => {
     upsertUserLogin(email, claims.name || email);
     appUsers.touchLogin(email, claims.name || null);
     appUsers.recordAuditEvent(email, 'login', { ip, userAgent, meta: { method: 'oidc' } });
-    // Gespeicherten BookStack-Token in Session laden (falls vorhanden)
-    const stored = getUserToken(email);
-    if (stored) req.session.bookstackToken = { id: stored.token_id, pw: stored.token_pw };
-    logger.info(`Login${stored ? ' (Token geladen)' : ' (kein Token hinterlegt)'}`, { user: email });
-    // Phase 0b Auto-Trigger: leere DB → Backfill anstossen.
-    if (stored) maybeAutoBackfillOnLogin(email, req.session.bookstackToken);
+    logger.info('Login', { user: email });
     res.redirect(returnTo);
   } catch (err) {
     logger.error('Auth callback error: ' + err.message);
@@ -413,24 +407,6 @@ router.get('/auth/me', (req, res) => {
     if (u && u.ai_provider_override) aiProviderSource = 'override';
   } catch { /* best-effort */ }
   res.json({ ...req.session.user, aiProvider, aiProviderSource });
-});
-
-// GET /auth/token → ob ein BookStack-Token hinterlegt ist (kein Klartext!)
-router.get('/auth/token', (req, res) => {
-  if (!req.session?.user) return res.status(401).json({ error_code: 'NOT_LOGGED_IN' });
-  res.json({ hasToken: !!getTokenForRequest(req) });
-});
-
-// PUT /auth/token → BookStack-Token speichern (DB + Session)
-router.put('/auth/token', express.json(), (req, res) => {
-  if (!req.session?.user) return res.status(401).json({ error_code: 'NOT_LOGGED_IN' });
-  const { tokenId, tokenPw } = req.body || {};
-  if (!tokenId || !tokenPw) return res.status(400).json({ error_code: 'TOKEN_ID_PW_REQUIRED' });
-  const email = req.session.user.email;
-  setUserToken(email, tokenId, tokenPw);
-  req.session.bookstackToken = { id: tokenId, pw: tokenPw };
-  logger.info('BookStack-Token gespeichert.');
-  res.json({ ok: true });
 });
 
 module.exports = router;

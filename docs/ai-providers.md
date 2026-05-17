@@ -6,7 +6,7 @@ Code: [lib/ai.js](../lib/ai.js). Drei Provider, ein Vertrag.
 
 Admin setzt `ai.provider` global in `app_settings` (`claude` (Default) | `ollama` | `llama`). Pro User kann ein Override via `app_users.ai_provider_override` gesetzt werden — siehe „Per-User-Override" weiter unten.
 
-### Auflösungs-Reihenfolge (Phase 11)
+### Auflösungs-Reihenfolge
 
 `lib/ai.js#resolveProvider({ userEmail })`:
 
@@ -28,7 +28,7 @@ Admin setzt `ai.provider` global in `app_settings` (`claude` (Default) | `ollama
 
 Ollama/Llama-Locks serialisieren *pro Provider*, nicht pro User. VRAM verträgt keine Parallelität.
 
-### Cache-Key-Erweiterung (Phase 11)
+### Cache-Key-Erweiterung
 
 `provider`-Spalte ist Pflicht-Teil des PRIMARY KEY in: `chapter_extract_cache`, `book_extract_cache`, `chapter_review_cache`, `book_review_cache`, `chapter_macro_review_cache`, `synonym_cache`, `lektorat_cache`. Ohne den Split würde Claude-Output an Ollama-User ausgeliefert. Migration 117 backfillt bestehende Eintraege mit dem zur Migrationszeit aktiven Globalwert.
 

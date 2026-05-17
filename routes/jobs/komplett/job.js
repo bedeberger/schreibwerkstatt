@@ -4,8 +4,10 @@ const {
   db,
   saveCheckpoint, loadCheckpoint, deleteCheckpoint,
   backfillLocationChaptersFromScenes,
-  getAllUserTokens, getBookSettings,
+  getBookSettings,
 } = require('../../../db/schema');
+const appUsers = require('../../../db/app-users');
+const bookAccess = require('../../../db/book-access');
 const { narrativeLabels } = require('../narrative-labels');
 const {
   makeJobLogger, updateJob, completeJob, failJob, i18nError, bsHttpError,
@@ -365,38 +367,39 @@ async function runKomplettAnalyseAll() {
     return;
   }
 
-  const users = getAllUserTokens();
-  if (!users.length) {
-    logger.warn('Nacht-Analyse übersprungen: kein BookStack-Token in der Datenbank.');
+  const activeUsers = appUsers.listUsers().filter(u => u.status === 'active');
+  if (!activeUsers.length) {
+    logger.warn('Nacht-Analyse übersprungen: keine aktiven User.');
     return;
   }
 
-  let books;
-  for (const u of users) {
-    try {
-      books = await contentStore.listBooks({ id: u.token_id, pw: u.token_pw });
-      break;
-    } catch (e) {
-      logger.warn(`Nacht-Analyse: Bücherliste mit Token von ${u.email} fehlgeschlagen – nächsten versuchen.`);
+  const books = await contentStore.listBooks(null);
+  if (!books.length) {
+    logger.info('Nacht-Analyse: keine Bücher vorhanden.');
+    return;
+  }
+
+  // Pro Buch nur User mit book_access enqueuen — Privacy-Boundary respektiert.
+  const accessByBook = new Map();
+  for (const u of activeUsers) {
+    for (const row of bookAccess.listBookIdsForUser(u.email)) {
+      if (!accessByBook.has(row.book_id)) accessByBook.set(row.book_id, []);
+      accessByBook.get(row.book_id).push(u.email);
     }
   }
-  if (!books) {
-    logger.error('Nacht-Analyse abgebrochen: kein gültiger Token für Bücherliste gefunden.');
-    return;
-  }
 
-  logger.info(`Nacht-Analyse: ${books.length} Buch/Bücher × ${users.length} User`);
+  logger.info(`Nacht-Analyse: ${books.length} Buch/Bücher, ${activeUsers.length} aktive User.`);
   let queued = 0;
   for (const book of books) {
-    for (const u of users) {
-      if (findActiveJobId('komplett-analyse', book.id, u.email)) {
-        logger.info(`Nacht-Analyse: Buch ${book.id} / ${u.email} läuft bereits – überspringe.`);
+    const emails = accessByBook.get(book.id) || [];
+    for (const email of emails) {
+      if (findActiveJobId('komplett-analyse', book.id, email)) {
+        logger.info(`Nacht-Analyse: Buch ${book.id} / ${email} läuft bereits – überspringe.`);
         continue;
       }
       const label = `Nacht · ${book.name}`;
-      const userToken = { id: u.token_id, pw: u.token_pw };
-      const jobId = createJob('komplett-analyse', book.id, u.email, label);
-      enqueueJob(jobId, () => runKomplettAnalyseJob(jobId, book.id, book.name, u.email, userToken, cronProvider));
+      const jobId = createJob('komplett-analyse', book.id, email, label);
+      enqueueJob(jobId, () => runKomplettAnalyseJob(jobId, book.id, book.name, email, null, cronProvider));
       queued++;
     }
   }

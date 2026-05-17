@@ -3,8 +3,7 @@ const express = require('express');
 const {
   deleteChapterExtractCache,
   getLatestContinuityCheck,
-  getTokenForRequest,
-} = require('../../../db/schema');
+  } = require('../../../db/schema');
 const { toIntId } = require('../../../lib/validate');
 const { setContext } = require('../../../lib/log-context');
 const { aclParamGuard, requireBookAccess, sendACLError } = require('../../../lib/acl');
@@ -24,7 +23,7 @@ komplettRouter.post('/komplett-analyse', jsonBody, (req, res) => {
   try { requireBookAccess(req, book_id, 'editor'); }
   catch (e) { if (sendACLError(res, e)) return; throw e; }
   const userEmail = req.session?.user?.email || null;
-  const userToken = getTokenForRequest(req);
+  const userToken = null;
   const existing = findActiveJobId('komplett-analyse', book_id, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });
   const label = book_name ? 'job.label.komplettBook' : 'job.label.komplett';
@@ -42,7 +41,7 @@ komplettRouter.post('/kontinuitaet', jsonBody, (req, res) => {
   try { requireBookAccess(req, book_id, 'editor'); }
   catch (e) { if (sendACLError(res, e)) return; throw e; }
   const userEmail = req.session?.user?.email || null;
-  const userToken = getTokenForRequest(req);
+  const userToken = null;
   const existing = findActiveJobId('kontinuitaet', book_id, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });
   const label = book_name ? 'job.label.kontinuitaetBook' : 'job.label.kontinuitaet';

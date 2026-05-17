@@ -1,7 +1,7 @@
 'use strict';
 
 const express = require('express');
-const { getTokenForRequest, getBookSettings } = require('../../../db/schema');
+const { getBookSettings } = require('../../../db/schema');
 const {
   makeJobLogger, updateJob, completeJob, failJob, bsHttpError,
   loadPageContents,
@@ -204,7 +204,7 @@ finetuneExportRouter.post('/finetune-export', jsonBody, (req, res) => {
     return res.status(400).json({ error_code: 'FINETUNE_NO_TYPES' });
   }
   const userEmail = req.session?.user?.email || null;
-  const userToken = getTokenForRequest(req);
+  const userToken = null;
   const existing = findActiveJobId('finetune-export', book_id, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });
   const label = book_name ? 'job.label.finetuneExportBook' : 'job.label.finetuneExport';

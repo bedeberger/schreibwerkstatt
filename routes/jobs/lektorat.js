@@ -2,7 +2,7 @@
 const crypto = require('crypto');
 const express = require('express');
 const {
-  db, getBookLocale, getBookSettings, getChapterFigures, getChapterFigureRelations, getChapterLocations, getTokenForRequest,
+  db, getBookLocale, getBookSettings, getChapterFigures, getChapterFigureRelations, getChapterLocations,
   loadLektoratCache, saveLektoratCache,
 } = require('../../db/schema');
 const {
@@ -401,7 +401,7 @@ lektoratRouter.post('/check', jsonBody, (req, res) => {
   try { requireBookAccess(req, book_id, 'lektor'); }
   catch (e) { if (sendACLError(res, e)) return; throw e; }
   const userEmail = req.session?.user?.email || null;
-  const userToken = getTokenForRequest(req);
+  const userToken = null;
   const existing = findActiveJobId('check', page_id, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });
   const label = 'job.label.checkPage';
@@ -419,7 +419,7 @@ lektoratRouter.post('/batch-check', jsonBody, (req, res) => {
   try { requireBookAccess(req, book_id, 'lektor'); }
   catch (e) { if (sendACLError(res, e)) return; throw e; }
   const userEmail = req.session?.user?.email || null;
-  const userToken = getTokenForRequest(req);
+  const userToken = null;
   const existing = findActiveJobId('batch-check', book_id, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });
   const label = book_name ? 'job.label.batchCheckBook' : 'job.label.batchCheck';

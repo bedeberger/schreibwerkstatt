@@ -318,13 +318,9 @@ export function registerKapitelReviewCard() {
         });
         root.newPageTitle = '';
         if (!created?.id) return;
-        await root.bsRegisterPageLocally(created, { id: chapter.id, name: chapter.name });
         const newPage = {
           ...created,
           chapterName: chapter.name,
-          url: root.bookstackUrl && created.book_slug && created.slug
-            ? `${root.bookstackUrl}/books/${created.book_slug}/page/${created.slug}`
-            : null,
         };
         root.pages.push(newPage);
         const chapterItem = root.tree.find(i =>

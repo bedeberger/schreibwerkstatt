@@ -84,47 +84,12 @@ export const adminSettingsMethods = {
       this.adminSettingsSavedCount = dirty.length;
       this.adminSettingsSaved = true;
       setTimeout(() => { this.adminSettingsSaved = false; }, 2500);
-      const backendChanged = dirty.some(d => d.key === 'app.backend');
       await this.adminSettingsLoad();
-      // Phase 0b: Backend-Wechsel triggert Server-Sweep — Polling starten,
-      // damit Progress live im Backend-Tab erscheint, ohne Reload.
-      if (backendChanged) await this.adminSettingsSweepLoad({ pollIfActive: true });
     } catch (e) {
       this.adminSettingsError = e.message;
     } finally {
       this.adminSettingsSaving = false;
     }
-  },
-
-  // Phase 0b: Backfill-Sweep-Status + Polling im Backend-Tab.
-  async adminSettingsSweepLoad({ pollIfActive = false } = {}) {
-    try {
-      const r = await fetch('/jobs/backfill/sweep', { credentials: 'same-origin' });
-      if (!r.ok) return;
-      const data = await r.json();
-      this.adminSettingsSweep = { ...data.sweep, counts: data.counts };
-      const running = (data.counts?.running || 0) + (data.counts?.queued || 0);
-      if (pollIfActive && running > 0) this._adminSettingsStartSweepPoll();
-      else if (running === 0) this._adminSettingsStopSweepPoll();
-    } catch (_) { /* still */ }
-  },
-
-  _adminSettingsStartSweepPoll() {
-    if (this._sweepPollTimer) return;
-    this._sweepPollTimer = setInterval(() => this.adminSettingsSweepLoad(), 3000);
-  },
-
-  _adminSettingsStopSweepPoll() {
-    if (!this._sweepPollTimer) return;
-    clearInterval(this._sweepPollTimer);
-    this._sweepPollTimer = null;
-  },
-
-  adminSettingsSweepProgress() {
-    const s = this.adminSettingsSweep;
-    if (!s || !s.total) return 0;
-    const done = (s.counts?.done || 0) + (s.counts?.failed || 0) + (s.skipped || 0);
-    return Math.min(100, Math.round((done / s.total) * 100));
   },
 
   async adminSettingsTest(kind) {

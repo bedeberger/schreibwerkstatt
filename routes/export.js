@@ -9,7 +9,6 @@
 
 const express = require('express');
 const logger = require('../logger');
-const { getTokenForRequest } = require('../db/schema');
 const { loadContents } = require('../lib/load-contents');
 const { FORMATS } = require('../lib/export-builders');
 const { buildExportFilename } = require('../lib/filenames');
@@ -30,21 +29,17 @@ router.get('/:scope/:id/:fmt', async (req, res) => {
   const spec = FORMATS[fmt];
   if (!spec) return res.status(400).json({ error_code: 'BAD_FORMAT' });
 
-  const token = getTokenForRequest(req);
-  if (!token) return res.status(401).json({ error_code: 'BOOKSTACK_UNAUTHED' });
-
   let bundle;
   try {
-    bundle = await loadContents({ scope, id }, token);
+    bundle = await loadContents({ scope, id }, req);
   } catch (e) {
     if (e.code === 'BOOK_EMPTY')      return res.status(400).json({ error_code: 'BOOK_EMPTY' });
     if (e.code === 'CHAPTER_EMPTY')   return res.status(400).json({ error_code: 'CHAPTER_EMPTY' });
     if (e.code === 'PAGE_EMPTY')      return res.status(400).json({ error_code: 'PAGE_EMPTY' });
     if (e.code === 'CHAPTER_NOT_FOUND') return res.status(404).json({ error_code: 'CHAPTER_NOT_FOUND' });
-    if (e.status === 401 || e.status === 403) return res.status(401).json({ error_code: 'BOOKSTACK_UNAUTHED' });
     if (e.status === 404) return res.status(404).json({ error_code: 'NOT_FOUND' });
     logger.error(`Export-Load fehlgeschlagen (scope=${scope}, id=${id}): ${e.message}`);
-    return res.status(502).json({ error_code: 'BOOKSTACK_UNREACHABLE' });
+    return res.status(502).json({ error_code: 'EXPORT_FAILED' });
   }
   if (bundle.book?.id) setContext({ book: bundle.book.id });
   if (bundle.book?.id) {
@@ -55,7 +50,7 @@ router.get('/:scope/:id/:fmt', async (req, res) => {
 
   let buf;
   try {
-    buf = await spec.build(bundle, { token, lang: 'de' });
+    buf = await spec.build(bundle, { lang: 'de' });
   } catch (e) {
     logger.error(`Export-Build fehlgeschlagen (scope=${scope}, id=${id}, fmt=${fmt}): ${e.message}`);
     return res.status(502).json({ error_code: 'EXPORT_FAILED' });

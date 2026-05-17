@@ -8,9 +8,12 @@ const appUsers = require('../db/app-users');
 const bookAccess = require('../db/book-access');
 const bookCategories = require('../db/book-categories');
 const bookTags = require('../db/book-tags');
+const books = require('../db/books');
 const { aclParamGuard, requireBookAccess, ACLError, sendACLError } = require('../lib/acl');
 const { db } = require('../db/connection');
 const logger = require('../logger');
+const mailer = require('../lib/mailer');
+const appSettings = require('../lib/app-settings');
 
 const router = express.Router();
 const jsonBody = express.json({ limit: '64kb' });
@@ -19,6 +22,26 @@ const VALID_SHARE_ROLES = ['editor', 'lektor', 'viewer'];
 
 function _normEmail(e) { return (e || '').toString().trim().toLowerCase(); }
 function _userEmail(req) { return req.session?.user?.email || null; }
+
+function _notifyBookShared({ target, granter, bookId, role }) {
+  try {
+    const targetUser = appUsers.getUser(target);
+    const granterUser = appUsers.getUser(granter);
+    const locale = targetUser?.language === 'en' ? 'en' : 'de';
+    const inviterName = granterUser?.display_name || granter;
+    const bookName = books.getBookName(bookId) || `Buch ${bookId}`;
+    const base = (appSettings.get('app.public_url') || '').replace(/\/$/, '');
+    const bookUrl = base ? `${base}/#book/${bookId}` : '';
+    mailer.send({
+      to: target,
+      template: 'book-shared',
+      locale,
+      ctx: { inviterName, bookName, role, bookUrl },
+    }).catch(e => logger.warn(`book-shared mail failed to=${target}: ${e.message}`));
+  } catch (e) {
+    logger.warn(`book-shared mail prep failed to=${target}: ${e.message}`);
+  }
+}
 
 // ── Access-Liste pro Buch ───────────────────────────────────────────────────
 
@@ -73,6 +96,7 @@ router.post('/:book_id/share', aclParamGuard('owner'), jsonBody, (req, res) => {
       meta: { event: 'book-shared', book_id: req.bookId, role, by: granter },
     });
     logger.info(`Buch geteilt: book=${req.bookId} ${target} role=${role} by ${granter}`);
+    _notifyBookShared({ target, granter, bookId: req.bookId, role });
     res.json({ ok: true, email: target, role });
   } catch (e) {
     logger.error(`POST /books/:id/share fehlgeschlagen: ${e.message}`);

@@ -7,7 +7,6 @@ require('./migrations');
 
 const figures = require('./figures');
 const pages = require('./pages');
-const tokens = require('./tokens');
 const pdfExport = require('./pdf-export');
 const fonts = require('./fonts');
 const books = require('./books');
@@ -360,7 +359,7 @@ function _parseChapterKey(key) {
   return { chapterId, phase };
 }
 
-// Phase 11: provider in PK. Caller MUSS den resolvten Provider durchreichen,
+// provider in PK. Caller MUSS den resolvten Provider durchreichen,
 // sonst landet Claude-Output unter '' (Backfill-Default) und Ollama-User
 // kriegt es ausgeliefert.
 const _loadChapterCache = db.prepare(
@@ -926,12 +925,6 @@ module.exports = {
   upsertBookByName:   books.upsertBookByName,
   getBookName:        books.getBookName,
   pruneStaleByAge:    books.pruneStaleByAge,
-  // tokens
-  getUserToken:       tokens.getUserToken,
-  setUserToken:       tokens.setUserToken,
-  getAnyUserToken:    tokens.getAnyUserToken,
-  getAllUserTokens:   tokens.getAllUserTokens,
-  getTokenForRequest: tokens.getTokenForRequest,
   // local
   saveZeitstrahlEvents,
   saveOrteToDb,

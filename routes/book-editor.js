@@ -13,7 +13,6 @@ const express = require('express');
 const contentStore = require('../lib/content-store');
 const { aclParamGuard } = require('../lib/acl');
 const { toIntId } = require('../lib/validate');
-const { getTokenForRequest } = require('../db/schema');
 const logger = require('../logger');
 
 const router = express.Router();
@@ -23,7 +22,6 @@ router.param('book_id', aclParamGuard('viewer'));
 router.get('/:book_id/contents', async (req, res) => {
   const bookId = toIntId(req.params.book_id);
   if (!bookId) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
-  if (!getTokenForRequest(req)) return res.status(401).json({ error_code: 'NO_TOKEN' });
 
   try {
     const tree = await contentStore.bookTree(bookId, req);

@@ -134,8 +134,8 @@ erDiagram
     TEXT    last_seen_at
     TEXT    description
     BLOB    cover_image
-    TEXT    owner_email "Erst-Backfiller / Phase 4b book_access-Bridge"
-    INTEGER category_id FK "Phase 6, ON DELETE SET NULL"
+    TEXT    owner_email "Erst-Backfiller / book_access-Bridge"
+    INTEGER category_id FK "ON DELETE SET NULL"
   }
   book_categories {
     INTEGER id          PK
@@ -168,7 +168,7 @@ erDiagram
     TEXT    updated_at
     TEXT    last_seen_at
     INTEGER position
-    INTEGER priority "Mirror aus bookstack-Backend; im localdb-Mode App-eigen"
+    INTEGER priority
     TEXT    slug
     TEXT    description
   }
@@ -180,10 +180,10 @@ erDiagram
     TEXT    updated_at
     TEXT    preview_text
     TEXT    last_seen_at
-    TEXT    body_html "Wahrheit im localdb-Mode; Cache im bookstack-Mode"
+    TEXT    body_html
     TEXT    body_markdown
     INTEGER position
-    INTEGER priority "Mirror aus bookstack-Backend; im localdb-Mode App-eigen"
+    INTEGER priority
     TEXT    slug
     TEXT    local_updated_at
     TEXT    remote_updated_at
@@ -220,7 +220,7 @@ erDiagram
     INTEGER chars
     INTEGER words
     INTEGER tok
-    TEXT    source        "focus|main|chat-apply|lektorat-apply|bookstack-sync|import|conflict"
+    TEXT    source        "focus|main|chat-apply|lektorat-apply|import|conflict"
     TEXT    user_email
     TEXT    created_at
     TEXT    summary
@@ -270,7 +270,7 @@ erDiagram
     TEXT    erzaehlperspektive
     TEXT    erzaehlzeit
     INTEGER is_finished              "0|1, blendet Schreib-Tracking aus"
-    INTEGER allow_lektor_book_chat   "Phase 4b: Lektor darf Buch-Chat (Default 0)"
+    INTEGER allow_lektor_book_chat   "Lektor darf Buch-Chat (Default 0)"
     TEXT    updated_at
   }
 
@@ -631,7 +631,7 @@ erDiagram
     TEXT    user_email   PK
     INTEGER chapter_id   PK,FK
     TEXT    phase        PK
-    TEXT    provider     PK "Phase 11"
+    TEXT    provider     PK
     TEXT    pages_sig
     TEXT    extract_json
     TEXT    cached_at
@@ -639,7 +639,7 @@ erDiagram
   book_extract_cache {
     INTEGER book_id      PK,FK
     TEXT    user_email   PK
-    TEXT    provider     PK "Phase 11"
+    TEXT    provider     PK
     TEXT    pages_sig
     TEXT    extract_json
     TEXT    cached_at
@@ -649,7 +649,7 @@ erDiagram
     TEXT    user_email   PK
     INTEGER chapter_id   PK,FK
     TEXT    phase        PK
-    TEXT    provider     PK "Phase 11"
+    TEXT    provider     PK
     TEXT    pages_sig
     TEXT    review_json
     TEXT    cached_at
@@ -657,7 +657,7 @@ erDiagram
   book_review_cache {
     INTEGER book_id      PK,FK
     TEXT    user_email   PK
-    TEXT    provider     PK "Phase 11"
+    TEXT    provider     PK
     TEXT    pages_sig
     TEXT    review_json
     TEXT    cached_at
@@ -666,14 +666,14 @@ erDiagram
     INTEGER book_id      PK,FK
     TEXT    user_email   PK
     INTEGER chapter_id   PK,FK
-    TEXT    provider     PK "Phase 11"
+    TEXT    provider     PK
     TEXT    pages_sig
     TEXT    review_json
     TEXT    cached_at
   }
   synonym_cache {
     TEXT    user_email   PK
-    TEXT    provider     PK "Phase 11"
+    TEXT    provider     PK
     TEXT    key_hash     PK
     TEXT    result_json
     TEXT    cached_at
@@ -682,7 +682,7 @@ erDiagram
     INTEGER book_id      PK,FK
     TEXT    user_email   PK
     INTEGER page_id      PK,FK
-    TEXT    provider     PK "Phase 11"
+    TEXT    provider     PK
     TEXT    ctx_sig
     TEXT    result_json
     TEXT    cached_at
@@ -713,9 +713,9 @@ erDiagram
     TEXT    invited_by
     TEXT    invited_at
     TEXT    created_at
-    REAL    monthly_budget_usd "Phase 4d: NULL = kein numerisches Limit"
-    TEXT    budget_mode        "Phase 4d: none | soft | hard (Default none)"
-    TEXT    ai_provider_override "Phase 11: NULL = follows global ai.provider; CHECK in ('claude','ollama','llama')"
+    REAL    monthly_budget_usd "NULL = kein numerisches Limit"
+    TEXT    budget_mode        "none | soft | hard (Default none)"
+    TEXT    ai_provider_override "NULL = follows global ai.provider; CHECK in ('claude','ollama','llama')"
   }
   user_invites {
     INTEGER id           PK "AUTOINCREMENT"
@@ -738,7 +738,7 @@ erDiagram
     TEXT    created_at
   }
   book_access {
-    INTEGER book_id     PK,FK "books(book_id) CASCADE — Phase 4b"
+    INTEGER book_id     PK,FK "books(book_id) CASCADE"
     TEXT    user_email  PK,FK "app_users(email) CASCADE"
     TEXT    role        "owner | editor | lektor | viewer"
     TEXT    granted_at
@@ -755,7 +755,7 @@ erDiagram
     TEXT    revoked_at
   }
   page_locks {
-    INTEGER page_id            PK,FK "pages(page_id) CASCADE — Phase 4b"
+    INTEGER page_id            PK,FK "pages(page_id) CASCADE"
     INTEGER book_id            FK "books(book_id) CASCADE"
     TEXT    locked_by_email    FK "app_users(email) CASCADE"
     TEXT    reason             "lektorat"

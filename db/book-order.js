@@ -1,5 +1,5 @@
 'use strict';
-// Phase 3 (BookStack-Exit, docs/bookstack-exit.md): SSoT fuer Buch-Hierarchie.
+// SSoT fuer Buch-Hierarchie.
 //
 // order_json-Format (zwei Ebenen, Buch -> Kapitel|Seite -> Seite):
 //   [
@@ -202,7 +202,7 @@ function buildFromCurrentState(bookId) {
 // Reconciliation: stored tree mit aktuellem DB-Stand abgleichen. Items, die
 // in der DB nicht (mehr) existieren, fliegen raus; neue Items werden ans Ende
 // angehaengt (Kapitel als leeres Top-Level-Kapitel, Seiten als Top-Level).
-// Verwendet vom Lese-Pfad nach BookStack-Sync (Phase 1) oder nach
+// Verwendet vom Lese-Pfad nach BookStack-Sync oder nach
 // CRUD-Operationen, die book_order nicht selbst pflegen.
 function reconcile(bookId, storedTree) {
   const { chapterIds, pageIds } = _knownIds(bookId);

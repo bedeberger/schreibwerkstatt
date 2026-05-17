@@ -1,10 +1,9 @@
 const express = require('express');
 const logger = require('../logger');
 const { MAX_TOKENS_OUT, MODEL_CONTEXT, CHARS_PER_TOKEN, ollamaTemp, llamaTemp } = require('../lib/ai');
-const { getBookLocale, getUser, getTokenForRequest } = require('../db/schema');
+const { getBookLocale, getUser } = require('../db/schema');
 const { getPrompts, getPromptConfig } = require('../lib/prompts-loader');
 const { toIntId } = require('../lib/validate');
-const { BOOKSTACK_URL } = require('../lib/bookstack');
 const appSettings = require('../lib/app-settings');
 
 // Allowlist für den /claude-, /ollama- und /llama-Proxy: Client darf kein beliebiges
@@ -40,11 +39,7 @@ router.get('/config', (req, res) => {
       isAdmin: appUser?.global_role === 'admin',
     };
   }
-  const backend = appSettings.get('app.backend') || 'bookstack';
   res.json({
-    backend,
-    bookstackUrl: backend === 'localdb' ? '' : BOOKSTACK_URL.replace(/\/$/, ''),
-    bookstackTokenOk: !!getTokenForRequest(req),
     claudeMaxTokens: MAX_TOKENS_OUT,
     claudeModel: appSettings.get('ai.claude.model') || 'claude-sonnet-4-6',
     apiProvider: appSettings.get('ai.provider') || 'claude',

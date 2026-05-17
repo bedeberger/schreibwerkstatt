@@ -9,7 +9,6 @@
              && !showAdminUsageCard
              && !showAdminCategoriesCard
              && !showAdminBooksCard
-             && !showAdminBackendMigrationCard
              && !showUserSettingsCard"
      x-cloak>
   <div class="card-header">
@@ -50,13 +49,6 @@
       <div class="overview-tile-label" x-text="t('admin.home.booksLabel')"></div>
       <div class="overview-tile-value" x-text="t('admin.books.title')"></div>
       <div class="overview-tile-desc" x-text="t('tile.adminBooks.desc')"></div>
-    </button>
-    <button type="button"
-            class="overview-tile internal-link card--admin-backend-migration"
-            @click="toggleAdminBackendMigrationCard()">
-      <div class="overview-tile-label" x-text="t('admin.home.migrationLabel')"></div>
-      <div class="overview-tile-value" x-text="t('admin.migrate.title')"></div>
-      <div class="overview-tile-desc" x-text="t('tile.adminBackendMigration.desc')"></div>
     </button>
   </div>
 </div>

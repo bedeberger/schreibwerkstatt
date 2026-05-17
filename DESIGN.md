@@ -952,9 +952,7 @@ Verbindlich pro Tile-Typ. `grid-auto-flow: row dense` füllt mittlere Lücken, T
 
 ## Print-Styles
 
-**Status:** Nicht supported. Browser-Print für Karten/Editor ist undefiniert. Wer ein Buch oder einen Bericht als PDF braucht, nutzt:
-- Custom-PDF-Export für Bücher ([routes/jobs/pdf-export.js](routes/jobs/pdf-export.js))
-- BookStack-Upstream-PDF für einzelne Seiten (`/export/book/:id/pdf`)
+**Status:** Nicht supported. Browser-Print für Karten/Editor ist undefiniert. Wer ein Buch oder einen Bericht als PDF braucht, nutzt den Custom-PDF-Export ([routes/jobs/pdf-export.js](routes/jobs/pdf-export.js)).
 
 Kein eigenes `@media print {}` pro Karte einführen — der Aufwand für sauberes Print-Layout wäre erheblich (Page-Breaks, Header/Footer, Schwarzweiss-Fallbacks) und nicht im Scope.
 
@@ -1144,7 +1142,7 @@ Siehe Section „Reduced-Motion" oben.
 
 ### Lang-Attribut
 
-Inhalte in einer Locale, die vom `<html lang="...">`-Default abweicht, bekommen `lang="de"` / `lang="en"` am Container. Relevant für Chat-Antworten, BookStack-Page-HTML (User-Sprache pro Buch).
+Inhalte in einer Locale, die vom `<html lang="...">`-Default abweicht, bekommen `lang="de"` / `lang="en"` am Container. Relevant für Chat-Antworten und Seiten-HTML (User-Sprache pro Buch).
 
 ---
 
@@ -1207,13 +1205,13 @@ Welche Datei besitzt welche Klassen. Bei neuer Klasse: erst hier prüfen, ob ein
 | [ideen.css](public/css/ideen.css) | Ideen-Karte. |
 | [book-settings.css](public/css/book-settings.css) | Buch-Einstellungen Job-Stats-Tabellen. |
 | [pdf-export.css](public/css/pdf-export.css) | PDF-Export-Profile + Tabs. |
-| [export.css](public/css/export.css) | BookStack-Export (Buch). |
+| [export.css](public/css/export.css) | Buch-Export. |
 | [zeitleiste.css](public/css/zeitleiste.css) | Globaler Zeitstrahl. |
 | [komplett-status.css](public/css/komplett-status.css) | Komplettanalyse-Status-Header. |
 | [tokens-est.css](public/css/tokens-est.css) | Token-Schätzung Inline-Badges + Tooltip. |
 | [page-list.css](public/css/page-list.css) | Seiten-Liste in Sidebar. |
 | [page-view.css](public/css/page-view.css) | (siehe Editor). |
-| [search.css](public/css/search.css) | BookStack-Suche, Buchwahl. |
+| [search.css](public/css/search.css) | Volltext-Suche, Buchwahl. |
 | [safari-fallback.css](public/css/safari-fallback.css) | Safari < 16.2 `color-mix()`-Fallbacks via `@supports not (...)`. **Wichtig: muss spät in der Cascade geladen werden** (Override-Wirkung), darum eigenes File und nicht in misc.css gemergt. |
 
 ### book-overview/ (Subfolder, dichtes Tile-Grid)

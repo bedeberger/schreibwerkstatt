@@ -1,12 +1,12 @@
 'use strict';
-// Phase 4a (BookStack-Exit, docs/bookstack-exit.md): Helper-API ueber app_users,
-// user_invites, user_sessions_audit. Keine direkte SQL aus Konsumenten.
+// Helper-API ueber app_users, user_invites, user_sessions_audit.
+// Keine direkte SQL aus Konsumenten.
 //
 // Identity-Trennung:
 //   - `app_users`            — wer darf einloggen + global_role + status
 //   - `users`                — Profil/Settings (locale, theme, ...) (Migration 41)
 //   - `user_sessions_audit`  — Login/Logout/Role-Change-Events
-//   - `user_invites`         — Token-basierte Einladungen (Phase 4a)
+//   - `user_invites`         — Token-basierte Einladungen
 //
 // `users.email` ist FK auf `app_users.email` ON DELETE CASCADE — Hard-Delete
 // raeumt Profil mit weg. Default ist Soft-Delete via `status='deleted'`,
@@ -58,7 +58,7 @@ const _stmtListUsers = db.prepare(`
    ORDER BY created_at DESC, email
 `);
 
-// Phase 11: Admin setzt Provider-Override pro User. NULL/'' loescht den Override
+// Admin setzt Provider-Override pro User. NULL/'' loescht den Override
 // (User folgt global ai.provider). Validierung in der Route, hier nur Persistenz.
 const _stmtSetAiProvider = db.prepare(`
   UPDATE app_users SET ai_provider_override = ? WHERE email = ?
@@ -165,7 +165,7 @@ function setCanInviteUsers(email, flag) {
   _stmtSetInviteFlag.run(flag ? 1 : 0, _normEmail(email));
 }
 
-// Phase 4d: Admin setzt Monats-Budget. `usd=null` entfernt das numerische
+// Admin setzt Monats-Budget. `usd=null` entfernt das numerische
 // Limit; `mode='none'` deaktiviert Pruefung komplett.
 function setBudget(email, { usd, mode }) {
   const e = _normEmail(email);

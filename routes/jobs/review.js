@@ -2,7 +2,7 @@
 const crypto = require('crypto');
 const express = require('express');
 const {
-  db, getBookSettings, getTokenForRequest, upsertBookByName,
+  db, getBookSettings, upsertBookByName,
   loadChapterReviewCache, saveChapterReviewCache,
   loadBookReviewCache, saveBookReviewCache,
 } = require('../../db/schema');
@@ -200,7 +200,7 @@ reviewRouter.post('/review', jsonBody, (req, res) => {
   try { requireBookAccess(req, book_id, 'editor'); }
   catch (e) { if (sendACLError(res, e)) return; throw e; }
   const userEmail = req.session?.user?.email || null;
-  const userToken = getTokenForRequest(req);
+  const userToken = null;
   const existing = findActiveJobId('review', book_id, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });
   const label = book_name ? 'job.label.reviewBook' : 'job.label.review';

@@ -1,6 +1,6 @@
 # schreibwerkstatt
 
-Schreiben, Lektorat und Buchanalyse mit KI. Storage-Backend wählbar (Admin-Setting `app.backend` in `app_settings`): `localdb` (SQLite, Default für Neu-Installationen) oder `bookstack` ([BookStack](https://www.bookstackapp.com/) via API, optional). Beide First-Class via Content-Store-Facade ([lib/content-store/](lib/content-store/)). Deployment (LXC + systemd) und Env-Variablen: siehe [README.md](README.md).
+Schreiben, Lektorat und Buchanalyse mit KI. Inhalte (Bücher/Kapitel/Seiten) liegen lokal in SQLite und werden ausschliesslich über die Content-Store-Facade ([lib/content-store/](lib/content-store/)) gelesen und geschrieben. Deployment (LXC + systemd) und Env-Variablen: siehe [README.md](README.md).
 
 **Lokal starten:** `npm install && npm start` (Port 3737). Tests: `npm test` (Playwright, erstmalig `npx playwright install chromium`).
 
@@ -17,8 +17,7 @@ Themen-Spickzettel ausgelagert (Drift-Schutz: CLAUDE.md-Regeln, Details in den S
 - [docs/buchchat-tools.md](docs/buchchat-tools.md) — Agentic Buch-Chat: Tool-Inventar (19 Stück), `ctx`-Vertrag, Truncation, Loop-Constraints, neues Tool anlegen.
 - [docs/focus-editor.md](docs/focus-editor.md) — Focus-Editor: State-Machine, Submodule (`focus/`), Trampoline-Pattern, Granularitäten, Recenter-Pipeline, Auto-`<p>`-Slot, Snapshot, Pflicht-Invarianten.
 - [docs/state-modell.md](docs/state-modell.md) — Frontend-State-Modell: 3 Ebenen (Root/Sub/Store), 14 Slices, Lifecycle, `setupCardLifecycle`, Event-Bus, Editor-Modi (4 Flags, Invarianten, erlaubte Kombinationen).
-- [docs/finetuning.md](docs/finetuning.md), [docs/wordpress-import.md](docs/wordpress-import.md), [docs/bookstack-templates.md](docs/bookstack-templates.md) — Spezialthemen.
-- [docs/bookstack-exit.md](docs/bookstack-exit.md) — **Multi-Backend-Architektur + Migrationsplan** (Ausnahme zur Stand-only-Regel): `app.backend = 'localdb' | 'bookstack'` als Admin-Setting, beide First-Class via Content-Store-Facade. Plus: User-Verwaltung mit Privacy-Boundary „Admin sieht keine Bücher", ACL/Sharing, Tags, FTS, Backend-Migration-Tool (Bulk-Copy). Erledigte Schritte werden gestrichen, dauerhafte Architektur-Blöcke bleiben.
+- [docs/finetuning.md](docs/finetuning.md) — Finetune-Export.
 
 ## Doku-Stil dieser Datei
 
@@ -36,11 +35,9 @@ CLAUDE.md beschreibt **ausschliesslich den aktuellen Stand**. Keine Historie, ke
   - **Automatisch übersetzen, ungefragt:** jeder neue User-sichtbare String wird beim Hinzufügen sofort in beide Locale-Dateien eingetragen — egal ob Frontend-Label, Server-Status, Fehlertext, Placeholder oder Tooltip. Nie nur DE (oder nur EN) committen und auf „mach ich später" verschieben.
   - **Persistierte User-Nachrichten (z.B. Chat-Fallbacks in DB):** als `__i18n:bereich.feld__`-Marker speichern; Frontend löst beim Rendern via `t()` auf. So bleibt die Locale-Wahl des späteren Betrachters massgeblich.
   - **Ausnahme:** Winston-Logs (`logger.info/warn/error`) bleiben vorläufig deutsch — sie gehen nur in `schreibwerkstatt.log`/Console, nicht an den User.
-- **Content-Store-Facade als einziger Eintrittspunkt für Buchinhalte** — Pages/Chapters/Books werden ausschliesslich via `require('lib/content-store')` gelesen und geschrieben. Dispatch nach `app.backend` ist Detail der Facade. **`bs*`-Calls (`bsGet`/`bsPut`/`bsGetAll`) leben nur in [lib/bookstack.js](lib/bookstack.js) + [lib/content-store/backends/bookstack.js](lib/content-store/backends/bookstack.js) + [routes/sync.js](routes/sync.js) + [routes/jobs/shared/bookstack.js](routes/jobs/shared/bookstack.js) + [routes/proxies.js](routes/proxies.js) + [lib/pdf-render/images.js](lib/pdf-render/images.js)** — Tripwire ([tests/unit/content-store-tripwire.test.mjs](tests/unit/content-store-tripwire.test.mjs)) bricht CI bei neuen Vorkommen.
-- **`bsGetAll` statt `bsGet` für Listen** (nur `bookstack`-Backend-interner Code) — BookStack paginiert (Standard 20 Einträge). `bsGetAll` iteriert alle Seiten automatisch.
+- **Content-Store-Facade als einziger Eintrittspunkt für Buchinhalte** — Pages/Chapters/Books werden ausschliesslich via `require('lib/content-store')` gelesen und geschrieben. Direkte SQL-Zugriffe auf `pages`/`chapters`/`books` aus Route-/Job-Handlern sind verboten.
 - **HTML→Text-Normalisierung für Stats: Frontend MUSS Server matchen** — `page_stats.chars`/`words`/`tok` werden auf zwei Pfaden befüllt: a) Server-Sync ([routes/sync.js](routes/sync.js)#htmlToText: Tags zu Single-Space, `\s+` collapsed, getrimmt) und b) Frontend nach Page-Save ([tree.js](public/js/book/tree.js)#`_syncPageStatsAfterSave`). Beide Pfade MÜSSEN dieselbe Normalisierung verwenden. `DOMParser().body.textContent` behält Whitespace zwischen Block-Tags und bläst `tokEsts.chars` gegenüber dem Cron-Snapshot auf — Frontend-Save-Pfad nutzt deshalb dieselben zwei Regex-Replacements wie Server. `tok = Math.round(chars / CHARS_PER_TOKEN)` (Text-Tokens, gleiche Quelle wie chars; kein Prompt-Overhead). Beide Pfade müssen die Formel synchron halten. `/history/page-stats/batch` persistiert blind, kein Server-Recompute. Test: [tests/unit/page-stats-normalization.test.mjs](tests/unit/page-stats-normalization.test.mjs).
-- **Read-Modify-Write nur mit `bsGet(..., { fresh: true })`** (nur `bookstack`-Mode) — jeder Pfad, der eine Page liest, modifiziert und zurückschreibt (Lektorat-Save, Chat-Vorschlag-Apply, History-Apply, Pre-Send-Refresh des Seiten-Chats), MUSS im `bookstack`-Mode den Read mit `fresh: true` machen. Sonst liefert der SW-API_CACHE (SWR) eine Pre-Edit-Fassung; der nachfolgende PUT überschreibt frische Server-Edits aus dem Fokus-Editor mit Stale-Daten. `_bsWrite` postet nach jedem erfolgreichen Schreibvorgang `invalidate-api` an den SW als zweite Schutzschicht; `fresh: true` bleibt trotzdem Pflicht pro RMW-Pfad. **`localdb`-Mode:** kein Cache zwischen Frontend-Read und Frontend-Write; Pflicht entfällt — aber Pfade nutzen weiter dieselben Helpers, also schadet `fresh: true` nicht. Test: [tests/unit/stale-write.test.mjs](tests/unit/stale-write.test.mjs).
-- **Job-Ergebnisse mit `updatedAt`-Staleness-Check** — Server-Jobs, deren Resultate auf einem Snapshot des Seitenstands operieren (Lektorat-Findings mit Positionen, Chat-Antworten mit `vorschlaege.original`), liefern `updatedAt: pd.updated_at`. Der Client vergleicht im `onDone` mit `currentPage.updated_at`; weicht es ab (User hat während der Analyse gespeichert), wird das Ergebnis verworfen statt angewandt. Backend-agnostisch — beide Backends liefern `updated_at` über die Content-Store-Facade.
+- **Job-Ergebnisse mit `updatedAt`-Staleness-Check** — Server-Jobs, deren Resultate auf einem Snapshot des Seitenstands operieren (Lektorat-Findings mit Positionen, Chat-Antworten mit `vorschlaege.original`), liefern `updatedAt: pd.updated_at`. Der Client vergleicht im `onDone` mit `currentPage.updated_at`; weicht es ab (User hat während der Analyse gespeichert), wird das Ergebnis verworfen statt angewandt.
 - **401-Handling zentral** — ein globaler `window.fetch`-Wrapper in `public/js/app.js` fängt alle 401-Antworten ab und dispatcht `session-expired`; Alpine zeigt daraufhin den Session-Banner. Feature-Module prüfen 401 nicht selbst und dürfen das Event nicht unterdrücken. Kein Auto-Redirect – User soll ungespeicherte Inhalte retten können.
 - **Logging-Context: `book` immer mitgeben** — jede neue Route mit Buchscope MUSS den `book`-Slot im Log-Tag `[scope|user|book|jobId]` füllen, damit Buch-scoped Requests filterbar bleiben.
   - **URL-Param-Routes (`:book_id`):** im Router einmalig `router.param('book_id', bookParamHandler)` aus [lib/log-context.js](lib/log-context.js) registrieren — deckt alle `:book_id`-Routes dieses Routers ab.
@@ -190,17 +187,17 @@ DB-Code lebt in [db/](db/), aufgeteilt auf thematische Files: [connection.js](db
 
 - **Jede neue Tabelle integriert sich via FK** ins bestehende Schema. Lose `*_id`-Spalten (`book_id`, `page_id`, `chapter_id`, `figure_id`, `location_id`, …) ohne `REFERENCES` sind verboten.
 - Refs auf lokale PKs/UNIQUE-Targets MÜSSEN als FK deklariert werden:
-  - `books(book_id)` (PK; externe BookStack-ID, analog `pages.page_id`/`chapters.chapter_id`)
+  - `books(book_id)` (PK; INTEGER, global eindeutig — analog `pages.page_id`/`chapters.chapter_id`)
   - `pages(page_id)` (PK)
-  - `chapters(chapter_id)` (PK; global eindeutig — BookStack-ID)
+  - `chapters(chapter_id)` (PK; global eindeutig)
   - `figures(id)` (PK; nicht `figures.fig_id` — TEXT, nicht UNIQUE alleine)
   - `locations(id)`, `figure_scenes(id)`, `chat_sessions(id)`, `continuity_*(id)`
 - ON-DELETE-Strategie bewusst wählen:
   - `CASCADE` für reine Caches/Aggregationen (page_stats, chapter_reviews, figure_appearances, location_chapters, lektorat_time, page_figure_mentions, chat_sessions[kind=page], page_checks)
   - `SET NULL` für user-kuratierte Daten (figure_events.page_id/chapter_id, figure_scenes.page_id/chapter_id, locations.erste_erwaehnung_page_id, ideen.page_id, continuity_issue_chapters.chapter_id, page_checks.chapter_id, pages.chapter_id)
-- **Snapshot-Spalten verboten** (`chapter_name`, `kapitel`, `seite`, `page_name`, `book_name`) — keine Ausnahmen. Display-Werte zur Lese-Zeit per JOIN auf `chapters`/`pages`/`books`/`figures`. Wahrheit lebt nur in `pages.page_name`, `chapters.chapter_name`, `books.name` (BookStack-Sync-Caches) und `figures.name` (User-Stamm). Snapshot-Fallback nur bei nullbarem FK, wenn KI-Output keine ID liefern konnte (z. B. `continuity_issue_figures.figur_name` mit nullable `figure_id`).
+- **Snapshot-Spalten verboten** (`chapter_name`, `kapitel`, `seite`, `page_name`, `book_name`) — keine Ausnahmen. Display-Werte zur Lese-Zeit per JOIN auf `chapters`/`pages`/`books`/`figures`. Wahrheit lebt nur in `pages.page_name`, `chapters.chapter_name`, `books.name` und `figures.name` (User-Stamm). Snapshot-Fallback nur bei nullbarem FK, wenn KI-Output keine ID liefern konnte (z. B. `continuity_issue_figures.figur_name` mit nullable `figure_id`).
 - Index auf jede neue FK-Spalte Pflicht (`CREATE INDEX idx_xx_yy ON …`).
-- `book_id`-Spalten referenzieren `books(book_id)` (PK). Discovery via `upsertBook(b)` / `upsertBookByName(bookId, name)` in [routes/sync.js](routes/sync.js) bzw. [db/schema.js](db/schema.js) — jede BookStack-Buch-Berührung upserted in `books`, danach sind FK-CASCADE-Pfade aktiv.
+- `book_id`-Spalten referenzieren `books(book_id)` (PK). Buchanlage ausschliesslich über die Content-Store-Facade.
 
 ### Sentinel-freie Modellierung
 
@@ -248,8 +245,7 @@ Keine Schemaänderung. `figure_relations.typ` ist Freitext. Neuen Typ in der `BZ
 Browser → NGINX (HTTPS) → Express (Port 3737)
   /auth/*    → Google OIDC (Login/Callback/Logout/Me)
   /config    → Modell-Config + User (keine Credentials)
-  /api/*     → BookStack-Proxy (nur im `bookstack`-Mode aktiv; Token aus Session, serverseitig)
-  /content/* → Content-Store-Facade (Books/Chapters/Pages, Order, Revisions; backend-agnostisch)
+  /content/* → Content-Store-Facade (Books/Chapters/Pages, Order, Revisions)
   /claude    → api.anthropic.com (ANTHROPIC_API_KEY-Injection, SSE)
   /ollama    → Ollama /api/chat (NDJSON → SSE normalisiert)
   /jobs/*    → Hintergrund-Jobs (Status-Polling, alle KI-Analysen)
@@ -261,8 +257,8 @@ Browser → NGINX (HTTPS) → Express (Port 3737)
   /booksettings/* → Per-Buch-Settings (Buchtyp, Freitext)
   /me/*           → User-Settings (Sprache, Modell-Override)
   /sync/*         → Buchstatistik-Sync (manuell + Cron)
-  /export/*       → Buch-Export (PDF/HTML/Markdown/Plaintext/EPUB; `bookstack`-Mode via /export/{fmt}, `localdb` via App-Builder)
-  /search/*       → FTS5-Volltextsuche (backend-agnostisch)
+  /export/*       → Buch-Export (PDF/HTML/Markdown/Plaintext/EPUB via App-eigenen Builder)
+  /search/*       → FTS5-Volltextsuche
   /local/*        → Kategorien + Tags (Pool global, Zuordnung pro Buch via ACL)
   /pdf-export/*   → Custom-PDF-Export-Profile (CRUD + Cover-Upload + Font-Liste)
   /jobs/pdf-export → Render-Job (eigene pdfkit-Pipeline mit PDF/A-2B)
@@ -274,9 +270,9 @@ Cron (täglich 02:00) → syncAllBooks() → page_stats + book_stats_history
 
 **Auth:** Alle Routen ausser `/auth/*` sind durch Session-Guard geschützt. HTML-Requests → Redirect auf Login. API-Requests → `401 JSON`.
 
-**Credentials:** KI-Aufrufe laufen über Server-Proxies — der Server hält alle API-Keys. Im `bookstack`-Mode injiziert der BookStack-Proxy zusätzlich `req.session.bookstackToken` serverseitig; im `localdb`-Mode entfällt das.
+**Credentials:** KI-Aufrufe laufen über Server-Proxies — der Server hält alle API-Keys.
 
-**Content-Store-Facade ([lib/content-store/](lib/content-store/)):** zentrale Storage-Abstraktion. `index.js` dispatcht per `app.backend` aus `app_settings` an `backends/bookstack.js` oder `backends/localdb.js`. Hot-Reload via `app-settings:changed`-Event ohne Restart. Konsumenten (Routes, Jobs, Sync) importieren ausschliesslich die Facade — kein direkter Backend-Zugriff ausser in der Tripwire-Allowlist.
+**Content-Store-Facade ([lib/content-store/](lib/content-store/)):** zentrale Storage-Abstraktion über das SQLite-Backend. Bündelt Page-Revisions, Tree-Overlay (book_order) und FTS-Index-Hooks am Schreib-Chokepoint. Konsumenten (Routes, Jobs, Sync) importieren ausschliesslich die Facade.
 
 ## KI-Provider
 
@@ -332,7 +328,7 @@ Ziel: Buch im Modell **internalisieren** (Stil, Welt, Figuren, Fakten, Plot). Da
 
 ## Custom PDF-Export
 
-**Eigener Renderer**, nicht der BookStack-Upstream-PDF (der bleibt unter `/export/book/:id/pdf`). Ziel: druckfertige PDF/A-2B-Konformität mit User-konfigurierbarem Layout, Fonts, Cover, Kapitelgliederung.
+**Eigener Renderer** mit druckfertiger PDF/A-2B-Konformität und User-konfigurierbarem Layout, Fonts, Cover, Kapitelgliederung.
 
 **Pipeline:**
 ```
@@ -357,7 +353,7 @@ Ziel: Buch im Modell **internalisieren** (Stil, Welt, Figuren, Fakten, Plot). Da
 **Wichtige Invarianten:**
 - `font.body` braucht `family` aus der Whitelist (lib/font-fetch.js#FONT_LIST). PUT validiert; bad font → 400 `FONT_NOT_ALLOWED`.
 - Cover-Bilder werden bei Upload **und** beim Render durch sharp geschleust (defensiv-doppelt; PDF/A erlaubt kein Alpha/CMYK).
-- `pageStructure: 'flatten'` (Default) verkettet alle BookStack-Pages eines Kapitels ohne Per-Page-Heading; `'nested'` rendert pro Page einen h2-Sub-Heading.
+- `pageStructure: 'flatten'` (Default) verkettet alle Seiten eines Kapitels ohne Per-Page-Heading; `'nested'` rendert pro Page einen h2-Sub-Heading.
 - Job-Result-JSON enthält Metadaten (Größe, MIME, PDF/A-Status), **nicht** den Buffer — der lebt in `routes/jobs/pdf-export.js#pdfResults` und wird über `/jobs/pdf-export/:id/file` gestreamt.
 - veraPDF-Failure ist **non-fatal**: Datei wird trotzdem geliefert, Frontend zeigt Warnung.
 
@@ -390,17 +386,17 @@ server.js              – Express-Setup, Auth-Guard, Cron, Route-Mounting
 logger.js              – Winston-Config
 lib/
   ai.js                – callAI(), Provider-Dispatch, JSON-Parsing
-  bookstack.js         – authHeader, bsGet, bsGetAll-Paginierung
-  crypto.js            – AES-256-GCM für persistierte Tokens (`enc:v1:`-Prefix)
+  content-store/       – Storage-Facade über SQLite (Pages/Chapters/Books, Revisions, FTS-Hooks)
+  crypto.js            – AES-256-GCM für persistierte Secrets (`enc:v1:`-Prefix)
   filenames.js         – Einheitlicher Filename-Builder mit Timestamp + Slug
   page-index.js        – Pro-Seite-Metriken (Pronomen, Dialog, Figuren-Mentions) für Agentic Buch-Chat
   prompts-loader.js    – Lazy-Import von public/js/prompts.js aus CJS-Kontext
   validate.js          – Eingabe-Validierung an Request-Grenzen (strikte Int-Parser)
 db/                    – SQLite split: connection, migrations, schema,
-                         figures, pages, tokens
+                         figures, pages, token-usage, pdf-export, fonts
 routes/
   auth.js                  – Google OIDC
-  proxies.js               – KI-Provider-Proxies + BookStack-Proxy
+  proxies.js               – KI-Provider-Proxies
   jobs.js                  – Job-Router (mountet alle Feature-Router)
   jobs/shared.js           – Job-Queue, Limits, loadPageContents, Hilfsfunktionen
   jobs/lektorat.js         – Seiten-Lektorat + Batch-Check
@@ -413,7 +409,7 @@ routes/
   jobs/finetune-export/    – Finetune-Sample-Generator (eigener Router)
   jobs/narrative-labels.js – POV-/Tempus-Labels (Helper, kein Router)
   chat.js                  – Seiten-Chat (SSE)
-  export.js                – BookStack-Buch-Export (Timestamp-Filename)
+  export.js                – Buch-Export (Timestamp-Filename, PDF/HTML/MD/Plaintext/EPUB)
   usage.js                 – Feature-Usage-Tracking (ALLOWED_KEYS-Allowlist)
   figures.js, locations.js, history.js, sync.js, booksettings.js,
   usersettings.js, ideen.js
@@ -434,8 +430,7 @@ public/
                          app-hash-router, app-navigation, app-chrome, app-komplett
   js/admin/            – Admin-Karten-Methoden (admin-categories, admin-login,
                          admin-settings, admin-usage, admin-users)
-  js/api/              – Server-Communication: api-ai, api-bookstack,
-                         bookstack-search, offline-sync
+  js/api/              – Server-Communication: api-ai (Provider-Calls)
   js/chat/             – chat (Seiten-Chat), chat-base (gespreaded),
                          book-chat (Buch-Chat)
   js/book/             – Buch-/Seiten-/Kapitel-Fachmodule:
@@ -485,7 +480,7 @@ public/
 `npm test` führt Unit-, Integration- und E2E-Tests nacheinander aus. Einzeln: `npm run test:unit` (Node built-in, parallelisiert, kein Browser), `npm run test:integration` (Node built-in, sequenziell, Job-Pipelines gegen Mock-AI), `npm run test:e2e` (Playwright, Chromium nötig). Setup: [tests/](tests/), [playwright.config.js](playwright.config.js).
 
 **Unit** (`tests/unit/*.test.{js,mjs}`, `node --test`) — decken ab:
-- JSON-Fallback-Kette ([ai.test.js](tests/unit/ai.test.js)), BookStack-Pagination ([bookstack.test.js](tests/unit/bookstack.test.js)), Stil-/Figuren-Metriken ([page-index.test.js](tests/unit/page-index.test.js)), Prompts-Build ([prompts.test.mjs](tests/unit/prompts.test.mjs)), XSS-Escape-Invariante ([escape-xss.test.mjs](tests/unit/escape-xss.test.mjs)), Request-Validierung ([validate.test.js](tests/unit/validate.test.js)), Job-Reconnect-Events ([job-reconnect.test.mjs](tests/unit/job-reconnect.test.mjs)), Hash-Router ([hash-router.test.mjs](tests/unit/hash-router.test.mjs)), Card-Exklusivität ([card-exclusivity.test.mjs](tests/unit/card-exclusivity.test.mjs)), Editor-Focus-Granularität ([editor-focus.test.mjs](tests/unit/editor-focus.test.mjs), [focus-granularity.test.mjs](tests/unit/focus-granularity.test.mjs)), Szenen-Filter ([szenen-filter.test.mjs](tests/unit/szenen-filter.test.mjs)), Ideen-Prompt + Schema ([ideen-prompt.test.mjs](tests/unit/ideen-prompt.test.mjs), [ideen-schema.test.js](tests/unit/ideen-schema.test.js)), Shared-Jobs-Helper ([shared-jobs.test.js](tests/unit/shared-jobs.test.js)), HTML-Cleaner ([html-clean.test.js](tests/unit/html-clean.test.js)), Page-Stats-Normalisierung ([page-stats-normalization.test.mjs](tests/unit/page-stats-normalization.test.mjs)), Stale-Write-Schutz ([stale-write.test.mjs](tests/unit/stale-write.test.mjs)), PDF-Export ([pdf-export-db.test.js](tests/unit/pdf-export-db.test.js), [pdf-export-defaults.test.js](tests/unit/pdf-export-defaults.test.js), [pdf-html-walker.test.mjs](tests/unit/pdf-html-walker.test.mjs), [pdf-render.test.mjs](tests/unit/pdf-render.test.mjs)), Palette-Fuzzy ([palette-fuzzy.test.mjs](tests/unit/palette-fuzzy.test.mjs)), Streak-Heatmap ([streak-heatmap.test.mjs](tests/unit/streak-heatmap.test.mjs)), Local-Date ([local-date.test.mjs](tests/unit/local-date.test.mjs), [local-date-server.test.js](tests/unit/local-date-server.test.js)), Book-Overview-Load ([book-overview-load.test.mjs](tests/unit/book-overview-load.test.mjs)).
+- JSON-Fallback-Kette ([ai.test.js](tests/unit/ai.test.js)), Stil-/Figuren-Metriken ([page-index.test.js](tests/unit/page-index.test.js)), Prompts-Build ([prompts.test.mjs](tests/unit/prompts.test.mjs)), XSS-Escape-Invariante ([escape-xss.test.mjs](tests/unit/escape-xss.test.mjs)), Request-Validierung ([validate.test.js](tests/unit/validate.test.js)), Job-Reconnect-Events ([job-reconnect.test.mjs](tests/unit/job-reconnect.test.mjs)), Hash-Router ([hash-router.test.mjs](tests/unit/hash-router.test.mjs)), Card-Exklusivität ([card-exclusivity.test.mjs](tests/unit/card-exclusivity.test.mjs)), Editor-Focus-Granularität ([editor-focus.test.mjs](tests/unit/editor-focus.test.mjs), [focus-granularity.test.mjs](tests/unit/focus-granularity.test.mjs)), Szenen-Filter ([szenen-filter.test.mjs](tests/unit/szenen-filter.test.mjs)), Ideen-Prompt + Schema ([ideen-prompt.test.mjs](tests/unit/ideen-prompt.test.mjs), [ideen-schema.test.js](tests/unit/ideen-schema.test.js)), Shared-Jobs-Helper ([shared-jobs.test.js](tests/unit/shared-jobs.test.js)), HTML-Cleaner ([html-clean.test.js](tests/unit/html-clean.test.js)), Page-Stats-Normalisierung ([page-stats-normalization.test.mjs](tests/unit/page-stats-normalization.test.mjs)), Stale-Write-Schutz ([stale-write.test.mjs](tests/unit/stale-write.test.mjs)), PDF-Export ([pdf-export-db.test.js](tests/unit/pdf-export-db.test.js), [pdf-export-defaults.test.js](tests/unit/pdf-export-defaults.test.js), [pdf-html-walker.test.mjs](tests/unit/pdf-html-walker.test.mjs), [pdf-render.test.mjs](tests/unit/pdf-render.test.mjs)), Palette-Fuzzy ([palette-fuzzy.test.mjs](tests/unit/palette-fuzzy.test.mjs)), Streak-Heatmap ([streak-heatmap.test.mjs](tests/unit/streak-heatmap.test.mjs)), Local-Date ([local-date.test.mjs](tests/unit/local-date.test.mjs), [local-date-server.test.js](tests/unit/local-date-server.test.js)), Book-Overview-Load ([book-overview-load.test.mjs](tests/unit/book-overview-load.test.mjs)).
 
 **Integration** (`tests/integration/*.test.js`, `node --test`, sequenziell mit Mock-AI):
 - [tests/integration/komplett.test.js](tests/integration/komplett.test.js) – Komplettanalyse-Pipeline (Vollextraktion, Konsolidierung, Block 2).

@@ -10,13 +10,13 @@ const logger = require('./logger');
 const { runWithContext } = require('./lib/log-context');
 
 // DB-Setup + Migrationen laufen beim Import
-const { db, cleanupStuckJobRuns, upsertUserLogin, touchUserLastSeen, addUserActivity, pruneStaleByAge, setUserToken } = require('./db/schema');
+const { db, cleanupStuckJobRuns, upsertUserLogin, touchUserLastSeen, addUserActivity, pruneStaleByAge } = require('./db/schema');
 const appUsers = require('./db/app-users');
 const bookAccess = require('./db/book-access');
 const { ensureAdminFromEnv } = appUsers;
 const appSettings = require('./lib/app-settings');
 
-// Phase 4a Admin-Bootstrap: ADMIN_EMAIL aus ENV → app_users-Row mit
+// Admin-Bootstrap: ADMIN_EMAIL aus ENV → app_users-Row mit
 // global_role='admin'. Idempotent + ENV-Wechsel-tauglich (kein Restart-Zwang).
 try {
   const r = ensureAdminFromEnv();
@@ -25,21 +25,20 @@ try {
   logger.warn(`ensureAdminFromEnv: ${e.message}`);
 }
 
-// Phase 4c Settings-Bootstrap: ENV-Werte einmalig in app_settings spiegeln,
+// Settings-Bootstrap: ENV-Werte einmalig in app_settings spiegeln,
 // solange noch keine DB-Row existiert. Idempotent — bestehende DB-Werte
 // werden nicht ueberschrieben.
 try { appSettings.bootstrapFromEnv(); }
 catch (e) { logger.warn(`app-settings.bootstrapFromEnv: ${e.message}`); }
 
-// Phase 1 Devmode-Seed: nur bei LOCAL_DEV_MODE + app.backend='localdb' und
+// Devmode-Seed: nur bei LOCAL_DEV_MODE + app.backend='localdb' und
 // leerer books-Tabelle. Idempotent durch COUNT-Check.
 try {
   const { runDevSeedIfNeeded } = require('./lib/dev-seed');
   runDevSeedIfNeeded();
 } catch (e) { logger.warn(`runDevSeedIfNeeded: ${e.message}`); }
 
-// Phase 7: Initial-Reindex der FTS5-Tabellen, wenn Migration 116 die Marker-
-// Row gesetzt hat (Bestandsdaten brauchen einen Full-Index nach dem Upgrade).
+// Initial-Reindex der FTS5-Tabellen, wenn die Marker-Row gesetzt ist.
 // In setImmediate, damit Boot nicht blockiert.
 setImmediate(() => {
   try {
@@ -58,7 +57,6 @@ const ideenRouter = require('./routes/ideen');
 const bookSettingsRouter = require('./routes/booksettings');
 const userSettingsRouter = require('./routes/usersettings');
 const { router: proxiesRouter } = require('./routes/proxies');
-const { BOOKSTACK_URL } = require('./lib/bookstack');
 const { router: syncRouter, syncAllBooks } = require('./routes/sync');
 const { runCacheCleanup } = require('./lib/cache-cleanup');
 const exportRouter = require('./routes/export');
@@ -77,16 +75,11 @@ app.set('trust proxy', 1);
 // 'unsafe-eval' ist Pflicht für Alpine.js v3 (kompiliert Direktiven dynamisch).
 // 'unsafe-inline' bei style-src ist nötig, weil Alpine `:style` zur Laufzeit
 // inline-style-Attribute setzt (z.B. progress-bar via --progress).
-// img-src enthält die BookStack-Origin (Editor-Preview rendert Server-HTML mit
-// absoluten BookStack-Bild-URLs) plus data:/blob: für Generated Charts/Graphs
-// plus *.googleusercontent.com für Google-Profilbilder im Avatar-Menü.
+// img-src deckt data:/blob: für Generated Charts/Graphs plus
+// *.googleusercontent.com für Google-Profilbilder im Avatar-Menü.
 // connect-src 'self' deckt alle XHR/SSE-Endpunkte (Server proxy'd Anthropic +
 // Ollama; Storage geht ueber /content/*); Plausible darf an seine eigene Origin posten.
 const PLAUSIBLE_ORIGIN = 'https://analytics.david-berger.ch';
-const cspBookstackOrigin = (() => {
-  try { return new URL(BOOKSTACK_URL).origin; }
-  catch { return null; }
-})();
 const HCAPTCHA_ORIGINS = ['https://hcaptcha.com', 'https://*.hcaptcha.com'];
 app.use(helmet({
   contentSecurityPolicy: {
@@ -95,7 +88,7 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-eval'", PLAUSIBLE_ORIGIN, ...HCAPTCHA_ORIGINS],
       styleSrc: ["'self'", "'unsafe-inline'", ...HCAPTCHA_ORIGINS],
-      imgSrc: ["'self'", 'data:', 'blob:', 'https://*.googleusercontent.com', ...(cspBookstackOrigin ? [cspBookstackOrigin] : [])],
+      imgSrc: ["'self'", 'data:', 'blob:', 'https://*.googleusercontent.com'],
       fontSrc: ["'self'"],
       connectSrc: ["'self'", PLAUSIBLE_ORIGIN, ...HCAPTCHA_ORIGINS],
       frameSrc: ["'self'", ...HCAPTCHA_ORIGINS],
@@ -184,7 +177,7 @@ app.use((req, res, next) => {
 // ── Auth-Routen (öffentlich) ──────────────────────────────────────────────────
 app.use(authRouter);
 
-// ── Public-Routen (Phase 4a2, vor Auth-Guard) ────────────────────────────────
+// ── Public-Routen (vor Auth-Guard) ───────────────────────────────────────────
 // /landing, /register (GET+POST) und Unauth-Override fuer GET /. Eingeloggte
 // und LOCAL_DEV_MODE laufen ueber `next()` weiter — Guard + staticServe
 // liefern dann die SPA-Shell.
@@ -259,9 +252,6 @@ app.use((req, res, next) => {
         if (existing.status !== 'active') appUsers.setStatus('dev@local', 'active');
       }
     } catch (e) { logger.warn(`dev-mode admin upsert: ${e.message}`); }
-    if (process.env.TOKEN_ID && process.env.TOKEN_KENNWORT) {
-      req.session.bookstackToken = { id: process.env.TOKEN_ID, pw: process.env.TOKEN_KENNWORT };
-    }
     return next();
   }
   if (API_PREFIXES.some(p => req.path.startsWith(p))) {
@@ -353,9 +343,6 @@ function bootstrapDevAccess(stage) {
       appUsers.createUser({ email, displayName: 'Dev (lokal)', globalRole: 'admin', status: 'active' });
     }
     upsertUserLogin(email, 'Dev (lokal)');
-    if (process.env.TOKEN_ID && process.env.TOKEN_KENNWORT) {
-      setUserToken(email, process.env.TOKEN_ID, process.env.TOKEN_KENNWORT);
-    }
     const books = db.prepare('SELECT book_id FROM books').all();
     let granted = 0;
     for (const { book_id } of books) {
@@ -374,7 +361,6 @@ function bootstrapDevAccess(stage) {
 
 const server = app.listen(PORT, '0.0.0.0', () => {
   logger.info(`Lektorat läuft auf http://0.0.0.0:${PORT}`);
-  logger.info(`BookStack Ziel: ${BOOKSTACK_URL}`);
 
   bootstrapDevAccess('boot');
 
@@ -474,7 +460,7 @@ try {
         logger.error('Cron Cache-Cleanup Fehler: ' + e.message);
       }
 
-      // Phase 7: FTS5-Optimize. Faltet die Segmente zu einem grossen B-Tree
+      // FTS5-Optimize. Faltet die Segmente zu einem grossen B-Tree
       // zusammen — billig nach naechtlichen Schreibern, beschleunigt Querys.
       try {
         const searchIndex = require('./lib/search');
@@ -483,7 +469,7 @@ try {
         logger.error('Cron Search-Optimize Fehler: ' + e.message);
       }
 
-      // Phase 4b: abgelaufene page_locks wegraeumen. Funktional ist es nicht
+      // Abgelaufene page_locks wegraeumen. Funktional ist es nicht
       // noetig (Guards filtern `WHERE expires_at > now`), nur DB-Hygiene.
       try {
         const { purgeExpiredLocks } = require('./db/book-access');
@@ -519,7 +505,7 @@ try {
   }, { timezone: cronTz });
   logger.info(`Cron-Job registriert: Stale-Cleanup täglich 04:00 (${cronTz}, Schwelle ${staleDays} Tage)`);
 
-  // Phase 4a2: 02:30 – pending registration_requests aelter als N Tage auf
+  // 02:30 – pending registration_requests aelter als N Tage auf
   // 'expired' setzen. Default 30 Tage; konfigurierbar via app_settings
   // auth.registration.expire_days. Status-Wechsel ohne Mail (siehe Spec).
   cron.schedule('30 2 * * *', () => {

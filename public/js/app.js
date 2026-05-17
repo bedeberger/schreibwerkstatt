@@ -1,11 +1,9 @@
 import { fetchJson, configureTokenEstimate, escHtml } from './utils.js';
 import { configurePrompts } from './prompts.js';
 
-import { bookstackMethods } from './api/api-bookstack.js';
 import { aiMethods } from './api/api-ai.js';
 import { historyMethods } from './book/history.js';
 import { treeMethods } from './book/tree.js';
-import { bookstackSearchMethods } from './api/bookstack-search.js';
 import { lektoratMethods } from './editor/lektorat.js';
 import { kapitelReviewMethods } from './book/kapitel-review.js';
 import { registerBookReviewCard } from './cards/book-review-card.js';
@@ -37,7 +35,6 @@ import { registerAdminSettingsCard } from './cards/admin-settings-card.js';
 import { registerAdminUsageCard } from './cards/admin-usage-card.js';
 import { registerAdminCategoriesCard } from './cards/admin-categories-card.js';
 import { registerAdminBooksCard } from './cards/admin-books-card.js';
-import { registerAdminBackendMigrationCard } from './cards/admin-backend-migration-card.js';
 import { registerFinetuneExportCard } from './cards/finetune-export-card.js';
 import { registerExportCard } from './cards/export-card.js';
 import { registerPdfExportCard } from './cards/pdf-export-card.js';
@@ -69,29 +66,17 @@ import { appJobsCoreMethods } from './app/app-jobs-core.js';
 import { appViewMethods } from './app/app-view.js';
 import { appNavigationMethods } from './app/app-navigation.js';
 import { appHashRouterMethods } from './app/app-hash-router.js';
-import { offlineSyncMethods } from './api/offline-sync.js';
 import { bookCreateMethods } from './book/book-create.js';
 
 // Globaler fetch-Wrapper: fängt 401-Antworten ab und signalisiert Session-Ablauf
 // via 'session-expired'-Event. Alpine zeigt daraufhin einen Banner. Kein Auto-
 // Redirect – User soll ungespeicherte Änderungen (Editor, Chat) retten können.
-// Sonderfall BOOKSTACK_UNAUTHED: der Google-Login ist gültig, nur der
-// BookStack-Token ist abgelaufen/ungültig → eigenes Event 'bookstack-token-invalid'.
 const __origFetch = window.fetch.bind(window);
 window.fetch = async function(...args) {
   const res = await __origFetch(...args);
-  if (res.status === 401) {
-    let code = '';
-    try { code = (await res.clone().json())?.error_code || ''; } catch (_) {}
-    if (code === 'BOOKSTACK_UNAUTHED') {
-      if (!window.__bookstackUnauthedNotified) {
-        window.__bookstackUnauthedNotified = true;
-        window.dispatchEvent(new CustomEvent('bookstack-token-invalid'));
-      }
-    } else if (!window.__sessionExpiredNotified) {
-      window.__sessionExpiredNotified = true;
-      window.dispatchEvent(new CustomEvent('session-expired'));
-    }
+  if (res.status === 401 && !window.__sessionExpiredNotified) {
+    window.__sessionExpiredNotified = true;
+    window.dispatchEvent(new CustomEvent('session-expired'));
   }
   return res;
 };
@@ -221,7 +206,6 @@ document.addEventListener('alpine:init', () => {
   registerAdminUsageCard();
   registerAdminCategoriesCard();
   registerAdminBooksCard();
-  registerAdminBackendMigrationCard();
   registerFinetuneExportCard();
   registerExportCard();
   registerPdfExportCard();
@@ -588,10 +572,7 @@ document.addEventListener('alpine:init', () => {
     },
 
     get selectedBookUrl() {
-      const book = this.books.find(b => String(b.id) === String(this.selectedBookId));
-      return book?.slug && this.bookstackUrl
-        ? `${this.bookstackUrl}/books/${book.slug}`
-        : null;
+      return null;
     },
 
     get filteredTree() {
@@ -652,7 +633,6 @@ document.addEventListener('alpine:init', () => {
         if (this.themePref === 'auto') this._applyTheme();
       }, { signal });
       window.addEventListener('session-expired', () => { this.sessionExpired = true; }, { signal });
-      window.addEventListener('bookstack-token-invalid', () => { this.bookstackTokenInvalid = true; }, { signal });
       window.addEventListener('job:finished', (e) => this._onJobFinished(e.detail), { signal });
       window.addEventListener('beforeunload', (e) => {
         if (this.editMode && this.editDirty) { e.preventDefault(); e.returnValue = ''; }
@@ -663,7 +643,6 @@ document.addEventListener('alpine:init', () => {
       // Kein $watch('tree') — refresh mutiert item.stats und würde sich rekursiv
       // selbst triggern (Alpine-Deep-Reactivity → Browser-Freeze).
       this.$watch('tokEsts', () => this._refreshChapterStats());
-      this._setupOfflineSync();
       // Shell zuerst aufbauen: i18n + Partials brauchen nur statische Assets
       // (Service Worker cacht sie). /config kann danach scheitern, ohne dass
       // das UI leer bleibt – Offline-Banner erscheint stattdessen.
@@ -699,8 +678,6 @@ document.addEventListener('alpine:init', () => {
           this.uiLocale = locale;
         }
         document.documentElement.setAttribute('lang', `${locale}-${region}`);
-        this.bookstackUrl = cfg.bookstackUrl || '';
-        this.backend = cfg.backend || 'bookstack';
         if (cfg.claudeModel) this.claudeModel = cfg.claudeModel;
         if (cfg.claudeMaxTokens) this.claudeMaxTokens = cfg.claudeMaxTokens;
         if (cfg.apiProvider) this.apiProvider = cfg.apiProvider;
@@ -725,10 +702,6 @@ document.addEventListener('alpine:init', () => {
         }
         configurePrompts(cfg.promptConfig, cfg.apiProvider || 'claude');
         configureTokenEstimate(cfg.charsPerToken);
-        if (this.backend === 'bookstack' && !cfg.bookstackTokenOk && !this.currentUser?.isAdmin) {
-          this.showTokenSetup = true;
-          return;
-        }
 
         // Hash vorab auswerten, damit loadBooks das gewünschte Buch wählt.
         // _applyingHash unterdrückt Watcher/URL-Writes während der Initialisierung.
@@ -779,11 +752,9 @@ document.addEventListener('alpine:init', () => {
     },
 
     // ── Methoden aus Modulen ─────────────────────────────────────────────────
-    ...bookstackMethods,
     ...aiMethods,
     ...historyMethods,
     ...treeMethods,
-    ...bookstackSearchMethods,
     ...lektoratMethods,
     ...kapitelReviewMethods,
     ...figurenMethods,
@@ -810,7 +781,6 @@ document.addEventListener('alpine:init', () => {
     ...appViewMethods,
     ...appNavigationMethods,
     ...appHashRouterMethods,
-    ...offlineSyncMethods,
     ...featuresUsageMethods,
     ...bookCreateMethods,
   }));

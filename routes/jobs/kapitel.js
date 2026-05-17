@@ -2,7 +2,7 @@
 const crypto = require('crypto');
 const express = require('express');
 const {
-  db, getBookSettings, getTokenForRequest, upsertBookByName,
+  db, getBookSettings, upsertBookByName,
   loadChapterMacroReviewCache, saveChapterMacroReviewCache,
 } = require('../../db/schema');
 const {
@@ -194,7 +194,7 @@ kapitelRouter.post('/chapter-review', jsonBody, (req, res) => {
   try { requireBookAccess(req, book_id, 'editor'); }
   catch (e) { if (sendACLError(res, e)) return; throw e; }
   const userEmail = req.session?.user?.email || null;
-  const userToken = getTokenForRequest(req);
+  const userToken = null;
   // Dedup auf Kapitel-Ebene – parallele Reviews unterschiedlicher Kapitel sind ok.
   const existing = findActiveJobId('chapter-review', chapter_id, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });

@@ -13,7 +13,6 @@ const contentStore = require('../lib/content-store');
 const pageRevisions = require('../db/page-revisions');
 const bookOrder = require('../db/book-order');
 const { toIntId } = require('../lib/validate');
-const { getTokenForRequest, getAnyUserToken } = require('../db/schema');
 const { setContext, bookParamHandler } = require('../lib/log-context');
 const { aclParamGuard, requireBookAccess, sendACLError, ACLError } = require('../lib/acl');
 const bookAccess = require('../db/book-access');
@@ -54,13 +53,6 @@ function _guardChapter(req, res, chapterId, minRole) {
 const jsonBody = express.json({ limit: '10mb' });
 const NAME_MAX = 255;
 
-function _requireToken(req, res) {
-  const t = getTokenForRequest(req) || getAnyUserToken();
-  if (t) return t;
-  res.status(503).json({ error_code: 'NO_BOOKSTACK_TOKEN' });
-  return null;
-}
-
 function _fail(res, e, opName) {
   const status = e?.status || 500;
   const bodySnippet = e?.bodyText ? ' | body: ' + String(e.bodyText).slice(0, 200) : '';
@@ -82,10 +74,8 @@ router.get('/books', async (req, res) => {
   if (accessRows.length === 0) return res.json([]);
   const allowedIds = new Set(accessRows.map(r => r.book_id));
   const roleByBook = new Map(accessRows.map(r => [r.book_id, r.role]));
-  const token = _requireToken(req, res);
-  if (!token) return;
   try {
-    const all = await contentStore.listBooks(token);
+    const all = await contentStore.listBooks(req);
     const meta = new Map(
       db.prepare('SELECT book_id, owner_email, category_id FROM books').all()
         .map(r => [r.book_id, { owner_email: r.owner_email, category_id: r.category_id }])
@@ -107,19 +97,15 @@ router.get('/books', async (req, res) => {
 
 // GET /content/books/:book_id — Buch-Detail.
 router.get('/books/:book_id', aclParamGuard('viewer'), async (req, res) => {
-  const token = _requireToken(req, res);
-  if (!token) return;
   try {
-    const book = await contentStore.loadBook(req.bookId, token);
+    const book = await contentStore.loadBook(req.bookId, req);
     res.json({ ...book, role: req.bookRole });
   } catch (e) { _fail(res, e, 'GET /content/books/:id'); }
 });
 
 // GET /content/books/:book_id/tree — Hierarchie als `{ chapters, topPages }`.
 router.get('/books/:book_id/tree', aclParamGuard('viewer'), async (req, res) => {
-  const token = _requireToken(req, res);
-  if (!token) return;
-  try { res.json(await contentStore.bookTree(req.bookId, token)); }
+  try { res.json(await contentStore.bookTree(req.bookId, req)); }
   catch (e) { _fail(res, e, 'GET /content/books/:id/tree'); }
 });
 
@@ -160,9 +146,7 @@ router.get('/chapters/:chapter_id', async (req, res) => {
   const chapterId = toIntId(req.params.chapter_id);
   if (!chapterId) return res.status(400).json({ error_code: 'INVALID_CHAPTER_ID' });
   if (_guardChapter(req, res, chapterId, 'viewer') == null) return;
-  const token = _requireToken(req, res);
-  if (!token) return;
-  try { res.json(await contentStore.loadChapter(chapterId, token)); }
+  try { res.json(await contentStore.loadChapter(chapterId, req)); }
   catch (e) { _fail(res, e, 'GET /content/chapters/:id'); }
 });
 
@@ -171,9 +155,7 @@ router.get('/pages/:page_id', async (req, res) => {
   const pageId = toIntId(req.params.page_id);
   if (!pageId) return res.status(400).json({ error_code: 'INVALID_PAGE_ID' });
   if (_guardPage(req, res, pageId, 'viewer') == null) return;
-  const token = _requireToken(req, res);
-  if (!token) return;
-  try { res.json(await contentStore.loadPage(pageId, token)); }
+  try { res.json(await contentStore.loadPage(pageId, req)); }
   catch (e) { _fail(res, e, 'GET /content/pages/:id'); }
 });
 
@@ -192,8 +174,6 @@ router.put('/pages/:page_id', jsonBody, async (req, res) => {
     locked_by_email: blocking.locked_by_email,
     expires_at: blocking.expires_at,
   });
-  const token = _requireToken(req, res);
-  if (!token) return;
   try { res.json(await contentStore.savePage(pageId, req.body || {}, req)); }
   catch (e) {
     if (e.code === 'EMPTY_BODY') return res.status(400).json({ error_code: 'EMPTY_BODY' });
@@ -243,8 +223,6 @@ router.post('/pages/:page_id/revisions/:rev_id/restore', jsonBody, async (req, r
   });
   const rev = pageRevisions.get(revId);
   if (!rev || rev.page_id !== pageId) return res.status(404).json({ error_code: 'REVISION_NOT_FOUND' });
-  const token = _requireToken(req, res);
-  if (!token) return;
   try {
     const saved = await contentStore.savePage(
       pageId,
@@ -271,15 +249,13 @@ router.post('/pages', jsonBody, async (req, res) => {
   setContext({ book: effBookId });
   try { requireBookAccess(req, effBookId, 'editor'); }
   catch (e) { if (sendACLError(res, e)) return; throw e; }
-  const token = _requireToken(req, res);
-  if (!token) return;
   try {
     const created = await contentStore.createPage({
       book_id: bookIdRaw || undefined,
       chapter_id: chapterIdRaw || undefined,
       name,
       html: req.body?.html,
-    }, token);
+    }, req);
     res.json(created);
   } catch (e) { _fail(res, e, 'POST /content/pages'); }
 });
@@ -289,10 +265,8 @@ router.delete('/pages/:page_id', async (req, res) => {
   const pageId = toIntId(req.params.page_id);
   if (!pageId) return res.status(400).json({ error_code: 'INVALID_PAGE_ID' });
   if (_guardPage(req, res, pageId, 'editor') == null) return;
-  const token = _requireToken(req, res);
-  if (!token) return;
   try {
-    await contentStore.deletePage(pageId, token);
+    await contentStore.deletePage(pageId, req);
     res.json({ ok: true });
   } catch (e) { _fail(res, e, 'DELETE /content/pages/:id'); }
 });
@@ -306,15 +280,13 @@ router.post('/chapters', jsonBody, async (req, res) => {
   setContext({ book: bookId });
   try { requireBookAccess(req, bookId, 'editor'); }
   catch (e) { if (sendACLError(res, e)) return; throw e; }
-  const token = _requireToken(req, res);
-  if (!token) return;
   try {
     const created = await contentStore.createChapter({
       book_id: bookId,
       name,
       position: req.body?.position,
       description: req.body?.description,
-    }, token);
+    }, req);
     res.json(created);
   } catch (e) { _fail(res, e, 'POST /content/chapters'); }
 });
@@ -330,9 +302,7 @@ router.put('/chapters/:chapter_id', jsonBody, async (req, res) => {
     return res.status(400).json({ error_code: 'EMPTY_BODY' });
   }
   if (_guardChapter(req, res, chapterId, 'editor') == null) return;
-  const token = _requireToken(req, res);
-  if (!token) return;
-  try { res.json(await contentStore.updateChapter(chapterId, req.body || {}, token)); }
+  try { res.json(await contentStore.updateChapter(chapterId, req.body || {}, req)); }
   catch (e) { _fail(res, e, 'PUT /content/chapters/:id'); }
 });
 
@@ -341,20 +311,16 @@ router.delete('/chapters/:chapter_id', async (req, res) => {
   const chapterId = toIntId(req.params.chapter_id);
   if (!chapterId) return res.status(400).json({ error_code: 'INVALID_CHAPTER_ID' });
   if (_guardChapter(req, res, chapterId, 'editor') == null) return;
-  const token = _requireToken(req, res);
-  if (!token) return;
   try {
-    await contentStore.deleteChapter(chapterId, token);
+    await contentStore.deleteChapter(chapterId, req);
     res.json({ ok: true });
   } catch (e) { _fail(res, e, 'DELETE /content/chapters/:id'); }
 });
 
 // DELETE /content/books/:book_id — Buch loeschen. minRole owner.
 router.delete('/books/:book_id', aclParamGuard('owner'), async (req, res) => {
-  const token = _requireToken(req, res);
-  if (!token) return;
   try {
-    await contentStore.deleteBook(req.bookId, token);
+    await contentStore.deleteBook(req.bookId, req);
     res.json({ ok: true });
   } catch (e) { _fail(res, e, 'DELETE /content/books/:id'); }
 });
@@ -363,8 +329,6 @@ router.delete('/books/:book_id', aclParamGuard('owner'), async (req, res) => {
 // Mit book_id: viewer-Guard auf Buch. Ohne book_id: filtert auf
 // book_access-Buecher des Users (Cross-Book-Suche).
 router.get('/search', async (req, res) => {
-  const token = _requireToken(req, res);
-  if (!token) return;
   const query = (req.query?.query || '').toString().trim();
   const bookId = req.query?.book_id ? toIntId(req.query.book_id) : null;
   const count = req.query?.count;
@@ -377,7 +341,7 @@ router.get('/search', async (req, res) => {
   const email = _userEmail(req);
   const allowedIds = new Set(bookAccess.listBookIdsForUser(email).map(r => r.book_id));
   try {
-    const hits = await contentStore.searchPages(query, { bookId, count }, token);
+    const hits = await contentStore.searchPages(query, { bookId, count }, req);
     const filtered = bookId ? hits : hits.filter(h => !h.book_id || allowedIds.has(h.book_id));
     res.json({ hits: filtered });
   } catch (e) { _fail(res, e, 'GET /content/search'); }
@@ -386,8 +350,6 @@ router.get('/search', async (req, res) => {
 // POST /content/books — Neues Buch anlegen. Anleger wird automatisch Owner
 // via book_access-Row.
 router.post('/books', jsonBody, async (req, res) => {
-  const token = _requireToken(req, res);
-  if (!token) return;
   const email = _userEmail(req);
   if (!email) return res.status(401).json({ error_code: 'NOT_LOGGED_IN' });
   const name = (req.body?.name || '').toString().trim();
@@ -395,7 +357,7 @@ router.post('/books', jsonBody, async (req, res) => {
   if (!name) return res.status(400).json({ error_code: 'NAME_REQUIRED' });
   if (name.length > NAME_MAX) return res.status(400).json({ error_code: 'NAME_TOO_LONG', params: { max: NAME_MAX } });
   try {
-    const created = await contentStore.createBook({ name, description }, token);
+    const created = await contentStore.createBook({ name, description }, req);
     setContext({ book: created.id });
     // Owner-Grant + books.owner_email setzen (idempotent).
     try {

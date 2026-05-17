@@ -26,7 +26,7 @@
   <div x-show="!adminSettingsLoading && Object.keys(adminSettingsMap).length">
     <!-- Tab-Leiste -->
     <nav class="admin-settings-tabs" role="tablist">
-      <template x-for="t in ['auth','provider','budget','backend','smtp','jobs','cron','pdfa','advanced']" :key="t">
+      <template x-for="t in ['auth','provider','budget','smtp','jobs','cron','pdfa','advanced']" :key="t">
         <button type="button" role="tab"
                 :class="['admin-settings-tab', adminSettingsTab === t ? 'is-active' : '']"
                 @click="adminSettingsSwitchTab(t)"
@@ -119,51 +119,6 @@
       <label>ai.claude.context_window <input type="number" min="8000" x-model.number="adminSettingsForm['ai.claude.context_window']"></label>
       <label>ai.claude.max_tokens_out <input type="number" min="1024" x-model.number="adminSettingsForm['ai.claude.max_tokens_out']"></label>
       <label>ai.chars_per_token <input type="number" step="0.1" min="1" max="10" x-model.number="adminSettingsForm['ai.chars_per_token']"></label>
-    </section>
-
-    <!-- Storage-Backend-Tab -->
-    <section x-show="adminSettingsTab === 'backend'" class="admin-settings-section">
-      <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.backend.switchWarning')"></p>
-      <label>app.backend
-        <select x-model="adminSettingsForm['app.backend']">
-          <option value="bookstack">bookstack</option>
-          <option value="localdb">localdb</option>
-        </select>
-      </label>
-      <div x-show="adminSettingsForm['app.backend'] === 'bookstack'">
-        <label>app.bookstack.base_url <input type="url" x-model="adminSettingsForm['app.bookstack.base_url']"></label>
-        <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.bookstack.tokenHint')"></p>
-      </div>
-
-      <!-- Phase 0b: Auto-Sweep-Progress nach Backend-Wechsel -->
-      <div x-show="adminSettingsSweep && adminSettingsSweep.startedAt" class="admin-settings-sweep">
-        <h4 x-text="$app.t('admin.settings.backend.sweep.title')"></h4>
-        <p class="muted-msg muted-msg--sm">
-          <span x-text="$app.t('admin.settings.backend.sweep.range', {
-            from: adminSettingsSweep?.fromBackend || '?',
-            to: adminSettingsSweep?.toBackend || '?'
-          })"></span>
-        </p>
-        <p>
-          <span x-text="$app.t('admin.settings.backend.sweep.enqueued', {
-            n: adminSettingsSweep?.enqueued || 0,
-            total: adminSettingsSweep?.total || 0
-          })"></span>
-          <span x-show="adminSettingsSweep?.skipped"
-                x-text="$app.t('admin.settings.backend.sweep.skipped', { n: adminSettingsSweep?.skipped || 0 })"></span>
-        </p>
-        <div class="progress-bar" :style="{ '--progress': adminSettingsSweepProgress() + '%' }"></div>
-        <p class="muted-msg muted-msg--sm">
-          <span x-text="$app.t('admin.settings.backend.sweep.running', { n: adminSettingsSweep?.counts?.running || 0 })"></span>
-          ·
-          <span x-text="$app.t('admin.settings.backend.sweep.queued', { n: adminSettingsSweep?.counts?.queued || 0 })"></span>
-          ·
-          <span x-text="$app.t('admin.settings.backend.sweep.done', { n: adminSettingsSweep?.counts?.done || 0 })"></span>
-          <span x-show="adminSettingsSweep?.counts?.failed">
-            · <span x-text="$app.t('admin.settings.backend.sweep.failed', { n: adminSettingsSweep?.counts?.failed || 0 })"></span>
-          </span>
-        </p>
-      </div>
     </section>
 
     <!-- SMTP / Mailer-Tab -->

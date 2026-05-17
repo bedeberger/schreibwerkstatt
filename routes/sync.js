@@ -1,26 +1,15 @@
 const express = require('express');
-const { db, getAnyUserToken, getAllUserTokens, reconcilePageIds, pruneStaleBookData, getTokenForRequest, upsertBook } = require('../db/schema'); // getAnyUserToken used in POST /book/:book_id
+const { db, reconcilePageIds, pruneStaleBookData, upsertBook } = require('../db/schema');
 const logger = require('../logger');
 const { runWithContext, getContext } = require('../lib/log-context');
 const { aclParamGuard, requireBookAccess, sendACLError } = require('../lib/acl');
 const { CHARS_PER_TOKEN } = require('../lib/ai');
 const { toIntId } = require('../lib/validate');
 const contentStore = require('../lib/content-store');
-const appSettings = require('../lib/app-settings');
 const { computePageIndex, writePageIndex, writeFigureMentionsForPageAllUsers, tokenizeNamesForStopwords } = require('../lib/page-index');
 const { invalidateBookPageCache } = require('./jobs/chat');
 const { localIsoDate } = require('../lib/local-date');
 const searchIndex = require('../lib/search');
-
-// Sync-Worker laeuft backend-agnostisch. Im `bookstack`-Mode pullt er pro
-// User-Token; im `localdb`-Mode liest contentStore lokal — kein Token noetig.
-// Why: page_stats-Style-Metriken + book_stats_history werden ausschliesslich
-// hier befuellt; ohne backend-agnostischen Pfad bleiben Heatmaps + Timeline
-// im localdb-Mode leer.
-function _isBookstackBackend() {
-  const sel = String(appSettings.get('app.backend') || 'bookstack').toLowerCase();
-  return sel === 'bookstack';
-}
 
 const router = express.Router();
 // Sync ist Write-Pfad (Pages-Upsert, Stats-Recompute) → editor+.
@@ -30,9 +19,8 @@ function htmlToText(html) {
   return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-// undici-Fehler ("fetch failed") verstecken Ursache in e.cause. Ohne Auflösung
-// steht im Log nur "fetch failed" — Diagnose unmöglich. Helper packt code +
-// nested cause-message aus, plus optional HTTP-status/bodyText von bsGet-Errors.
+// undici-Fehler ("fetch failed") verstecken Ursache in e.cause. Helper packt
+// code + nested cause-message aus, plus optional HTTP-status/bodyText.
 function _errDetail(e) {
   const parts = [e.message];
   const cause = e.cause;
@@ -129,7 +117,7 @@ function _upsertPagesCache(bookId, pages, chapters) {
     }
   })();
 
-  // In BookStack gelöschte Seiten/Kapitel aus Cache + Historie entfernen.
+  // Gelöschte Seiten/Kapitel aus Cache + Historie entfernen.
   // Muss VOR reconcilePageIds() laufen, damit reconcile nicht versucht, verwaiste
   // Einträge anhand der (bereits gelöschten) Pages zu heilen.
   const pruned = pruneStaleBookData(bookId, pages.map(p => p.id), chapters.map(c => c.id));
@@ -156,8 +144,6 @@ async function syncPagesCache(bookId, ctx) {
     contentStore.listChapters(bookId, ctx),
     contentStore.loadBook(bookId, ctx).catch(() => null),
   ]);
-  // pages.book_id REFERENCES books — Buch upserten, falls noch keine Sync lief
-  // (frisches BookStack-Buch, das Cron noch nicht erfasst hat).
   if (bookMeta) upsertBook(bookMeta);
   _upsertPagesCache(bookId, pages, chapters);
 
@@ -318,75 +304,23 @@ async function syncBook(bookId, ctx) {
 }
 
 async function _syncAllBooksInner() {
-  if (!_isBookstackBackend()) {
-    // Localdb-Pfad: keine Tokens, keine Permissions-Filter — alle Buecher
-    // direkt aus der lokalen DB enumerieren. contentStore liest aus SQLite.
-    const books = db.prepare('SELECT book_id FROM books ORDER BY book_id').all();
-    if (!books.length) {
-      logger.info('Sync (localdb): keine Buecher vorhanden.');
-      return;
-    }
-    logger.info(`Sync (localdb): ${books.length} Buch/Buecher.`);
-    for (const { book_id: bookId } of books) {
-      await runWithContext({ ...getContext(), book: bookId }, async () => {
-        try { await syncBook(bookId, null); }
-        catch (e) { logger.error(`Sync Buch ${bookId} (localdb) fehlgeschlagen: ${_errDetail(e)}`); }
-      });
-    }
+  const books = db.prepare('SELECT book_id FROM books ORDER BY book_id').all();
+  if (!books.length) {
+    logger.info('Sync: keine Buecher vorhanden.');
     return;
   }
-
-  const users = getAllUserTokens();
-  if (!users.length) {
-    logger.warn('Sync übersprungen: kein BookStack-Token in der Datenbank hinterlegt.');
-    return;
-  }
-
-  // Pro User die für ihn sichtbaren Bücher holen und nach book_id deduplizieren.
-  // BookStack filtert /api/books per Permissions – ein einzelner Token sieht nicht
-  // zwingend alle Bücher der Instanz. Union über alle User stellt sicher, dass
-  // jedes Buch erfasst wird, an dem mindestens ein User mitarbeitet.
-  const bookOwners = new Map(); // bookId → { name, tokens: [user, ...] }
-  for (const u of users) {
-    try {
-      const books = await contentStore.listBooks(u);
-      for (const b of books) {
-        upsertBook(b);
-        const entry = bookOwners.get(b.id);
-        if (entry) entry.tokens.push(u);
-        else bookOwners.set(b.id, { name: b.name, tokens: [u] });
-      }
-    } catch (e) {
-      logger.warn(`Sync: Bücherliste mit Token von ${u.email} fehlgeschlagen: ${_errDetail(e)}`);
-    }
-  }
-
-  if (!bookOwners.size) {
-    logger.error('Sync abgebrochen: kein User-Token konnte eine Bücherliste laden.');
-    return;
-  }
-
-  logger.info(`Sync: ${bookOwners.size} Buch/Bücher (dedupliziert), ${users.length} User`);
-  for (const [bookId, { tokens }] of bookOwners) {
+  logger.info(`Sync: ${books.length} Buch/Buecher.`);
+  for (const { book_id: bookId } of books) {
     await runWithContext({ ...getContext(), book: bookId }, async () => {
-      let synced = false;
-      for (const u of tokens) {
-        try {
-          await syncBook(bookId, u);
-          synced = true;
-          break;
-        } catch (e) {
-          logger.warn(`Sync Buch ${bookId} mit Token von ${u.email} fehlgeschlagen: ${_errDetail(e)}`);
-        }
-      }
-      if (!synced) logger.error(`Sync Buch ${bookId}: alle berechtigten User-Tokens fehlgeschlagen.`);
+      try { await syncBook(bookId, null); }
+      catch (e) { logger.error(`Sync Buch ${bookId} fehlgeschlagen: ${_errDetail(e)}`); }
     });
   }
 }
 
 async function syncAllBooks() {
   const t0 = Date.now();
-  logger.info(`Sync gestartet (backend=${_isBookstackBackend() ? 'bookstack' : 'localdb'}).`);
+  logger.info('Sync gestartet.');
   try {
     await _syncAllBooksInner();
   } finally {
@@ -463,18 +397,13 @@ router.post('/chapters/upsert', express.json(), (req, res) => {
 router.post('/pages/:book_id', async (req, res) => {
   const bookId = toIntId(req.params.book_id);
   if (!bookId) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
-  let ctx = null;
-  if (_isBookstackBackend()) {
-    ctx = getTokenForRequest(req) || getAnyUserToken();
-    if (!ctx) return res.status(503).json({ error_code: 'NO_BOOKSTACK_TOKEN' });
-  }
   if (req.query.source === 'manual') {
     logger.info(`«Seiten laden» geklickt (book=${bookId})`);
   } else if (req.query.source === 'bookSwitch') {
     logger.info(`Buch gewechselt (book=${bookId})`);
   }
   try {
-    await syncPagesCache(bookId, ctx);
+    await syncPagesCache(bookId, null);
     res.json({ ok: true });
   } catch (e) {
     logger.error('pages-Cache Sync Fehler: ' + _errDetail(e));
@@ -489,11 +418,7 @@ router.post('/pages/:book_id', async (req, res) => {
 router.post('/page-stats/:book_id', express.json(), async (req, res) => {
   const bookId = toIntId(req.params.book_id);
   if (!bookId) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
-  let ctx = null;
-  if (_isBookstackBackend()) {
-    ctx = getTokenForRequest(req) || getAnyUserToken();
-    if (!ctx) return res.status(503).json({ error_code: 'NO_BOOKSTACK_TOKEN' });
-  }
+  const ctx = null;
 
   const requestedIds = Array.isArray(req.body?.ids)
     ? Array.from(new Set(req.body.ids.map(toIntId).filter(Boolean)))
@@ -585,13 +510,8 @@ router.post('/page-stats/:book_id', express.json(), async (req, res) => {
 router.post('/book/:book_id', async (req, res) => {
   const bookId = toIntId(req.params.book_id);
   if (!bookId) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
-  let ctx = null;
-  if (_isBookstackBackend()) {
-    ctx = getTokenForRequest(req) || getAnyUserToken();
-    if (!ctx) return res.status(503).json({ error_code: 'NO_BOOKSTACK_TOKEN' });
-  }
   try {
-    const result = await syncBook(bookId, ctx);
+    const result = await syncBook(bookId, null);
     res.json({ ok: true, ...result });
   } catch (e) {
     logger.error('Sync-Route Fehler: ' + _errDetail(e));

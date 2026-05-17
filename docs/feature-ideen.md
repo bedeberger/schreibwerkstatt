@@ -11,18 +11,7 @@
 ## Datenbank
 - Migrationshistorie löschen
 
-## BookStack
-- Historie irgendwann entfernen von BookStack
-- Readme aktualisieren
-- BookStack komplett raus, eliminieren inklusive Migrationscripts und Helper
-
-## Kapitel Management
-- Ideen auch auf dem Kapitel
-- War so original im BookStack
-
 ## Refactoring
-- in app-view.js die ganzen Toggelings vereinheitlichen irgendwie
--- Ist irgendwie supermühsam dort 
 - Was ist?
 -- focus-harness.html braucht denselben CSS-Link (CLAUDE.md-Regel).
 - DB FK aktualisieren

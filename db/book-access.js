@@ -1,6 +1,5 @@
 'use strict';
-// Phase 4b (BookStack-Exit, docs/bookstack-exit.md): SSoT-Helper fuer
-// book_access + page_locks. Konsumenten (lib/acl.js, Sharing-Routen,
+// SSoT-Helper fuer book_access + page_locks. Konsumenten (lib/acl.js, Sharing-Routen,
 // Apply-only-Routen) gehen ausschliesslich hierdurch.
 //
 // Rollen-Hierarchie absteigend: owner > editor > lektor > viewer.

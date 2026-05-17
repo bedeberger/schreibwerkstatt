@@ -115,7 +115,7 @@ function pruneStaleBookData(bookId, validPageIds, validChapterIds) {
 
   if (stalePageIds.length === 0 && staleChapterIds.length === 0) return counts;
 
-  // Phase 7: Volltext-Index synchron halten. Lazy-Import, weil pages.js auch
+  // Volltext-Index synchron halten. Lazy-Import, weil pages.js auch
   // im Stale-Cleanup-Cron-Pfad geladen wird — Search-Failure darf den Prune
   // nicht abbrechen.
   let _searchIndex = null;

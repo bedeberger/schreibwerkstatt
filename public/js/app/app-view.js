@@ -2,10 +2,53 @@ import { htmlToText, fetchJson, escHtml } from '../utils.js';
 import { EXCLUSIVE_CARDS } from '../cards/feature-registry.js';
 import { contentRepo } from '../repo/content.js';
 
+// Generischer Karten-Toggle. Liest Behavior-Felder aus EXCLUSIVE_CARDS-Entry
+// (onReclick, requiresBook, loadDeps, auditEvent, extraRefreshOnOpen) und
+// kapselt die Open/Close/Refresh-Pfade. Bespoke-Toggles (kapitelReview, ideen,
+// chat, tree) leben weiterhin als eigene Methoden.
+async function _toggleCardGeneric(entry) {
+  if (this[entry.flag]) {
+    if (entry.onReclick === 'refresh') {
+      window.dispatchEvent(new CustomEvent('card:refresh', { detail: { name: entry.key } }));
+    } else {
+      this[entry.flag] = false;
+    }
+    return;
+  }
+  if (entry.requiresBook && !this.selectedBookId) return;
+  this._closeOtherMainCards(entry.key);
+  this[entry.flag] = true;
+  if (entry.auditEvent) this.logAuditEvent?.(entry.auditEvent, { book: this.selectedBookId });
+  if (entry.extraRefreshOnOpen) {
+    window.dispatchEvent(new CustomEvent('card:refresh', { detail: { name: entry.key } }));
+  }
+  if (entry.loadDeps?.length) {
+    const tasks = [];
+    for (const dep of entry.loadDeps) {
+      const empty = !(this[dep.skipIfNonEmpty]?.length);
+      if (empty && typeof this[dep.method] === 'function') {
+        tasks.push(this[dep.method](this.selectedBookId));
+      }
+    }
+    if (tasks.length) await Promise.all(tasks);
+  }
+}
+
+// Auto-generierte Toggle-Methoden — eine pro EXCLUSIVE_CARDS-Eintrag (ausser
+// `bespoke: true`). Werden in `appViewMethods` gespreaded, damit Alpine sie
+// als reguläre Methoden auf der Root-Component sieht (Templates, Hash-Router,
+// Palette rufen `toggleXxxCard()` direkt).
+const generatedToggles = {};
+for (const entry of EXCLUSIVE_CARDS) {
+  if (entry.bespoke || !entry.toggle) continue;
+  generatedToggles[entry.toggle] = async function() { return _toggleCardGeneric.call(this, entry); };
+}
+
 // View-Steuerung: Exklusivität zwischen Buch-/Seiten-Karten, Seitenauswahl,
 // Reset-Logik beim Buch-/Seitenwechsel. Buchebenen-Features und Editor sind
 // gegenseitig exklusiv (siehe CLAUDE.md-Regel "Feature-Toggle").
 export const appViewMethods = {
+  ...generatedToggles,
   async selectPage(p) {
     if (this.currentPage && this.currentPage.id === p.id) {
       // Re-Klick auf bereits offene Seite: SW-Cache umgehen und frischen
@@ -149,18 +192,14 @@ export const appViewMethods = {
     }
   },
 
-  // Karten-Toggles: Root hält die `showXxxCard`-Flags (Single Source of Truth
-  // für Hash-Router + Exklusivität); die Sub-Komponente reagiert per $watch
-  // und lädt ihre Daten selbst.
-  toggleBookOverviewCard() {
-    if (this.showBookOverviewCard) {
-      window.dispatchEvent(new CustomEvent('card:refresh', { detail: { name: 'bookOverview' } }));
-      return;
-    }
-    if (!this.selectedBookId) return;
-    this._closeOtherMainCards('bookOverview');
-    this.showBookOverviewCard = true;
-  },
+  // Karten-Toggles für alle Hauptkarten werden aus EXCLUSIVE_CARDS generiert
+  // (siehe `_toggleCardGeneric` + `generatedToggles` oben). Hier nur die
+  // Bespoke-Toggles, die nicht ins Schema passen:
+  // - `_maybeOpenBookOverview` (Default-Landing)
+  // - `toggleIdeenCard`/`toggleChatCard` (Mutex im Slot neben Editor)
+  // - `toggleTreeCard` (active-job-check + resetPage on close)
+  // `toggleKapitelReviewCard` lebt in book/kapitel-review.js (eigene Logik).
+
   // Default-Landing: öffnet Übersicht, wenn Buch gewählt ist und keine andere
   // Hauptkarte/Editor aktiv. Wird beim Buchwechsel + bei `#book/:id`-Deeplink
   // ohne View aufgerufen.
@@ -171,176 +210,7 @@ export const appViewMethods = {
     if (anyOpen) return;
     this.showBookOverviewCard = true;
   },
-  toggleStilCard() {
-    if (this.showStilCard) { this.showStilCard = false; return; }
-    this._closeOtherMainCards('stil');
-    this.showStilCard = true;
-  },
-  toggleFehlerHeatmapCard() {
-    if (this.showFehlerHeatmapCard) { this.showFehlerHeatmapCard = false; return; }
-    this._closeOtherMainCards('fehlerHeatmap');
-    this.showFehlerHeatmapCard = true;
-  },
-  toggleBookStatsCard() {
-    if (this.showBookStatsCard) { this.showBookStatsCard = false; return; }
-    this._closeOtherMainCards('bookStats');
-    this.showBookStatsCard = true;
-  },
-  toggleBookSettingsCard() {
-    if (this.showBookSettingsCard) { this.showBookSettingsCard = false; return; }
-    this._closeOtherMainCards('bookSettings');
-    this.showBookSettingsCard = true;
-  },
-  toggleUserSettingsCard() {
-    if (this.showUserSettingsCard) { this.showUserSettingsCard = false; return; }
-    this._closeOtherMainCards('userSettings');
-    this.showUserSettingsCard = true;
-  },
-  toggleAdminUsersCard() {
-    if (this.showAdminUsersCard) { this.showAdminUsersCard = false; return; }
-    this._closeOtherMainCards('adminUsers');
-    this.showAdminUsersCard = true;
-  },
-  toggleAdminSettingsCard() {
-    if (this.showAdminSettingsCard) { this.showAdminSettingsCard = false; return; }
-    this._closeOtherMainCards('adminSettings');
-    this.showAdminSettingsCard = true;
-  },
-  toggleAdminUsageCard() {
-    if (this.showAdminUsageCard) { this.showAdminUsageCard = false; return; }
-    this._closeOtherMainCards('adminUsage');
-    this.showAdminUsageCard = true;
-  },
-  toggleAdminCategoriesCard() {
-    if (this.showAdminCategoriesCard) { this.showAdminCategoriesCard = false; return; }
-    this._closeOtherMainCards('adminCategories');
-    this.showAdminCategoriesCard = true;
-  },
-  toggleAdminBooksCard() {
-    if (this.showAdminBooksCard) { this.showAdminBooksCard = false; return; }
-    this._closeOtherMainCards('adminBooks');
-    this.showAdminBooksCard = true;
-  },
-  toggleAdminBackendMigrationCard() {
-    if (this.showAdminBackendMigrationCard) { this.showAdminBackendMigrationCard = false; return; }
-    this._closeOtherMainCards('adminBackendMigration');
-    this.showAdminBackendMigrationCard = true;
-  },
-  toggleFinetuneExportCard() {
-    if (this.showFinetuneExportCard) { this.showFinetuneExportCard = false; return; }
-    this._closeOtherMainCards('finetuneExport');
-    this.showFinetuneExportCard = true;
-  },
-  toggleExportCard() {
-    if (this.showExportCard) { this.showExportCard = false; return; }
-    this._closeOtherMainCards('export');
-    this.showExportCard = true;
-  },
-  togglePdfExportCard() {
-    if (this.showPdfExportCard) { this.showPdfExportCard = false; return; }
-    this._closeOtherMainCards('pdfExport');
-    this.showPdfExportCard = true;
-  },
-  toggleBookOrganizerCard() {
-    if (this.showBookOrganizerCard) {
-      window.dispatchEvent(new CustomEvent('card:refresh', { detail: { name: 'bookOrganizer' } }));
-      return;
-    }
-    if (!this.selectedBookId) return;
-    this._closeOtherMainCards('bookOrganizer');
-    this.showBookOrganizerCard = true;
-  },
-  toggleBookEditorCard() {
-    if (this.showBookEditorCard) {
-      window.dispatchEvent(new CustomEvent('card:refresh', { detail: { name: 'bookEditor' } }));
-      return;
-    }
-    if (!this.selectedBookId) return;
-    this._closeOtherMainCards('bookEditor');
-    this.showBookEditorCard = true;
-  },
-  toggleSearchCard() {
-    if (this.showSearchCard) {
-      window.dispatchEvent(new CustomEvent('card:refresh', { detail: { name: 'search' } }));
-      return;
-    }
-    this._closeOtherMainCards('search');
-    this.showSearchCard = true;
-  },
-  // Abweichend von den anderen Toggles: erneuter Klick schliesst NICHT, sondern
-  // refresht die History. Sub-Komponente lauscht auf `card:refresh`
-  // mit name='kontinuitaet'.
-  toggleKontinuitaetCard() {
-    if (this.showKontinuitaetCard) {
-      window.dispatchEvent(new CustomEvent('card:refresh', { detail: { name: 'kontinuitaet' } }));
-      return;
-    }
-    this._closeOtherMainCards('kontinuitaet');
-    this.showKontinuitaetCard = true;
-  },
-  async toggleEreignisseCard() {
-    if (this.showEreignisseCard) {
-      window.dispatchEvent(new CustomEvent('card:refresh', { detail: { name: 'ereignisse' } }));
-      return;
-    }
-    this._closeOtherMainCards('ereignisse');
-    this.showEreignisseCard = true;
-    // Figuren werden für den Figur-Filter gebraucht.
-    if (!this.figuren.length) {
-      await this.loadFiguren(this.selectedBookId);
-    }
-  },
-  async toggleOrteCard() {
-    if (this.showOrteCard) {
-      window.dispatchEvent(new CustomEvent('card:refresh', { detail: { name: 'orte' } }));
-      return;
-    }
-    this._closeOtherMainCards('orte');
-    this.showOrteCard = true;
-    if (!this.figuren.length) await this.loadFiguren(this.selectedBookId);
-  },
-  async toggleSzenenCard() {
-    if (this.showSzenenCard) {
-      window.dispatchEvent(new CustomEvent('card:refresh', { detail: { name: 'szenen' } }));
-      return;
-    }
-    this._closeOtherMainCards('szenen');
-    this.showSzenenCard = true;
-    const tasks = [];
-    if (!this.figuren.length) tasks.push(this.loadFiguren(this.selectedBookId));
-    if (!this.orte.length) tasks.push(this.loadOrte(this.selectedBookId));
-    if (tasks.length) await Promise.all(tasks);
-  },
-  toggleFiguresCard() {
-    if (this.showFiguresCard) {
-      window.dispatchEvent(new CustomEvent('card:refresh', { detail: { name: 'figuren' } }));
-      return;
-    }
-    this._closeOtherMainCards('figures');
-    this.showFiguresCard = true;
-  },
-  toggleFigurWerkstattCard() {
-    if (this.showFigurWerkstattCard) {
-      window.dispatchEvent(new CustomEvent('card:refresh', { detail: { name: 'figurWerkstatt' } }));
-      return;
-    }
-    if (!this.selectedBookId) return;
-    this._closeOtherMainCards('figurWerkstatt');
-    this.showFigurWerkstattCard = true;
-    // Belt-and-braces: explizit triggern, falls $watch in setupCardLifecycle
-    // beim Übergang false→true verpasst (z.B. Deep-Link mit zeitgleichem
-    // book:changed). onCardRefresh ist idempotent (kein dirty bei frischer
-    // Karte) und ruft loadDrafts.
-    window.dispatchEvent(new CustomEvent('card:refresh', { detail: { name: 'figurWerkstatt' } }));
-  },
-  toggleBookReviewCard() {
-    if (this.showBookReviewCard) {
-      window.dispatchEvent(new CustomEvent('card:refresh', { detail: { name: 'bookReview' } }));
-      return;
-    }
-    this._closeOtherMainCards('bookReview');
-    this.showBookReviewCard = true;
-  },
+
   // Seiten-Ideen: lebt parallel zum Editor wie Seiten-Chat. Mutually exclusive
   // mit Chat — nur eines kann gleichzeitig aktiv sein (gleicher Slot).
   toggleIdeenCard() {
@@ -372,17 +242,6 @@ export const appViewMethods = {
     if (this.showIdeenCard) this.showIdeenCard = false;
     this.showChatCard = true;
     this.logAuditEvent?.('chatOpened', { book: this.selectedBookId, page: this.currentPage.id });
-  },
-  // Buch-Chat: exklusive Hauptkarte wie alle anderen.
-  toggleBookChatCard() {
-    if (this.showBookChatCard) {
-      window.dispatchEvent(new CustomEvent('card:refresh', { detail: { name: 'bookChat' } }));
-      return;
-    }
-    if (!this.selectedBookId) return;
-    this._closeOtherMainCards('bookChat');
-    this.showBookChatCard = true;
-    this.logAuditEvent?.('bookChatOpened', { book: this.selectedBookId });
   },
   // Seitenwechsel: Seiten-Chat resetten (Chat ist pro Seite).
   resetChat() {

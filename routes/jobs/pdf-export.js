@@ -16,7 +16,7 @@ const {
   i18nError,
   jsonBody,
 } = require('./shared');
-const { getTokenForRequest, getPdfExportProfile, getPdfExportProfileCover, getBookSettings } = require('../../db/schema');
+const { getPdfExportProfile, getPdfExportProfileCover, getBookSettings } = require('../../db/schema');
 const { loadContents } = require('../../lib/load-contents');
 const { renderPdfBuffer } = require('../../lib/pdf-render');
 const { validatePdfa } = require('../../lib/pdfa-validate');
@@ -129,7 +129,7 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, userEmail, u
 
 router.post('/pdf-export', jsonBody, async (req, res) => {
   const userEmail = req.session?.user?.email || null;
-  const userToken = getTokenForRequest(req);
+  const userToken = null;
   if (!userToken) return res.status(401).json({ error_code: 'BOOKSTACK_UNAUTHED' });
 
   const rawScope = String(req.body?.scope || 'book').toLowerCase();

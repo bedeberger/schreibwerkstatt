@@ -85,10 +85,6 @@ export const shortcutsMethods = {
     return this._focusInputEl(document.querySelector('.page-search'));
   },
 
-  focusBookSearch() {
-    return this._focusInputEl(document.querySelector('.bookstack-search-input'));
-  },
-
   // Pages aus filteredTree als flache, navigierbare Liste – Reihenfolge wie
   // sichtbar (Kapitel → Pages, dann Stand-alone Pages).
   _pageSearchFlatPages() {
@@ -162,16 +158,10 @@ export const shortcutsMethods = {
 
   // Cmd/Ctrl+P → Seitenbaum-Filter
   // Cmd/Ctrl+K → Command-Palette
-  // Cmd/Ctrl+Shift+F → BookStack-Volltextsuche im aktuellen Buch
   // Greift auch in Inputs/Editor – preventDefault ist Pflicht (sonst Browser-Print/Find).
   handleNavHotkey(event) {
     if (!(event.ctrlKey || event.metaKey)) return;
     const key = (event.key || '').toLowerCase();
-    if (event.shiftKey && !event.altKey && key === 'f') {
-      if (!this.focusBookSearch()) return;
-      event.preventDefault();
-      return;
-    }
     if (event.altKey || event.shiftKey) return;
     if (key === 'p') {
       if (!this.focusTreeSearch()) return;

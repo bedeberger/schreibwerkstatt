@@ -1,6 +1,5 @@
 'use strict';
-// Phase 6 (BookStack-Exit, docs/bookstack-exit.md): CRUD fuer book_tags +
-// book_tag_assignments. Tag-Pool global, jeder Auth-User darf neue Tags
+// CRUD fuer book_tags + book_tag_assignments. Tag-Pool global, jeder Auth-User darf neue Tags
 // anlegen. Loeschen ist admin-only (via Route-Guard).
 
 const { db } = require('./connection');

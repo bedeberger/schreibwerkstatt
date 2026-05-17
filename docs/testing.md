@@ -5,7 +5,7 @@ Drei Suiten, sequenziell via `npm test`. Erstmaliges Setup: `npx playwright inst
 | Suite | Runner | Pfad | Befehl | Charakter |
 |-------|--------|------|--------|-----------|
 | Unit | `node --test` | [tests/unit/](../tests/unit/) | `npm run test:unit` | Pure, parallelisiert (concurrency 4), kein Browser |
-| Integration | `node --test` | [tests/integration/](../tests/integration/) | `npm run test:integration` | Sequenziell, Mock-AI, Content-Store gegen In-Memory-SQLite, Mock-BookStack nur fuer `bookstack`-Mode-Suites |
+| Integration | `node --test` | [tests/integration/](../tests/integration/) | `npm run test:integration` | Sequenziell, Mock-AI, Content-Store gegen Test-SQLite |
 | E2E | Playwright | [tests/e2e/](../tests/e2e/) | `npm run test:e2e` | Chromium gegen `tests/server.js` mit Fixture-Harness |
 
 ## Wann welche Suite?
@@ -62,13 +62,9 @@ Handler-API:
 - `match: ({ prompt, system, schema }) => bool` — first-match wins.
 - `reply: object | string | function | { __raw: {...} }` — Object → JSON, `__raw` reicht volle `callAI`-Response durch (fuer truncated etc).
 
-## Integration: Mock-BookStack (nur `bookstack`-Mode)
+## Integration: Test-DB
 
-[tests/integration/_helpers/mock-bookstack.js](../tests/integration/_helpers/mock-bookstack.js) stubt `lib/bookstack.bsGet`/`bsGetAll` fuer Suiten, die das `bookstack`-Backend testen. Helper: register Books, Chapters, Pages, dann Jobs laufen lassen. Im `localdb`-Mode laeuft die Content-Store-Facade direkt auf der Test-SQLite — kein Mock noetig.
-
-Backend-Parametrisierung: pro Job-Typ-Suite die Variante `for (const backend of ['localdb','bookstack'])` durchlaufen, App-Setting `app.backend` setzen, dann jeweils mit/ohne BookStack-Mock testen.
-
-[tests/integration/_helpers/setup.js](../tests/integration/_helpers/setup.js) hebt eine frische SQLite-Test-DB hoch (Migrations laufen einmal pro Suite).
+[tests/integration/_helpers/setup.js](../tests/integration/_helpers/setup.js) hebt eine frische SQLite-Test-DB hoch (Migrations laufen einmal pro Suite). Content-Store-Facade liest und schreibt direkt darauf.
 
 ## E2E
 

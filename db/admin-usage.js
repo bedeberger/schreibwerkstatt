@@ -1,5 +1,5 @@
 'use strict';
-// Phase 4d (BookStack-Exit, docs/bookstack-exit.md): Admin-Usage-Queries.
+// Admin-Usage-Queries.
 //
 // Cost lebt in lib/pricing.js (Re-Compute zur Lese-Zeit). Hier werden nur
 // die noetigen Token-/Modell-/Provider-Felder geladen, costUsd() pro Row
@@ -7,7 +7,7 @@
 //
 // Privacy-Boundary: keine Joins auf books.name — `book_id` bleibt anonyme
 // Integer-Spalte fuer den Admin. Wer Buchnamen sehen will, braucht ACL-
-// Zugriff via Phase 4b.
+// Zugriff via book_access.
 
 const { db } = require('./connection');
 const { costUsd } = require('../lib/pricing');

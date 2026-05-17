@@ -18,20 +18,12 @@ const bookAccess = require('../db/book-access');
 const { requireBookAccess, sendACLError } = require('../lib/acl');
 const { db } = require('../db/connection');
 const { setContext } = require('../lib/log-context');
-const { getTokenForRequest, getAnyUserToken } = require('../db/schema');
 const logger = require('../logger');
 
 const router = express.Router();
 const jsonBody = express.json({ limit: '256kb' });
 
 function _userEmail(req) { return req.session?.user?.email || null; }
-
-function _requireToken(req, res) {
-  const t = getTokenForRequest(req) || getAnyUserToken();
-  if (t) return t;
-  res.status(503).json({ error_code: 'NO_BOOKSTACK_TOKEN' });
-  return null;
-}
 
 function _pageBookId(pageId) {
   const r = db.prepare('SELECT book_id FROM pages WHERE page_id = ?').get(parseInt(pageId, 10));
@@ -114,9 +106,8 @@ router.post('/pages/:page_id/lektorat-finding', jsonBody, async (req, res) => {
   const replacement = finding.vorschlag ?? finding.korrektur ?? null;
   if (!original || replacement == null) return res.status(400).json({ error_code: 'FINDING_HAS_NO_REPLACEMENT' });
 
-  const token = _requireToken(req, res); if (!token) return;
   try {
-    const page = await contentStore.loadPage(pageId, token);
+    const page = await contentStore.loadPage(pageId, req);
     const out = _safeReplace(page?.body_html || page?.html || '', original, replacement);
     if (!out || !out.ok) return res.status(409).json({ error_code: out?.reason || 'APPLY_FAILED' });
     const saved = await contentStore.savePage(pageId, { html: out.body, source: 'lektorat-apply' }, req);
@@ -181,9 +172,8 @@ router.post('/pages/:page_id/chat-vorschlag', jsonBody, async (req, res) => {
   const replacement = v.vorschlag ?? v.korrektur ?? null;
   if (!original || replacement == null) return res.status(400).json({ error_code: 'VORSCHLAG_HAS_NO_REPLACEMENT' });
 
-  const token = _requireToken(req, res); if (!token) return;
   try {
-    const page = await contentStore.loadPage(pageId, token);
+    const page = await contentStore.loadPage(pageId, req);
     const out = _safeReplace(page?.body_html || page?.html || '', original, replacement);
     if (!out || !out.ok) return res.status(409).json({ error_code: out?.reason || 'APPLY_FAILED' });
     const saved = await contentStore.savePage(pageId, { html: out.body, source: 'chat-apply' }, req);

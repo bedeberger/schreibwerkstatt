@@ -1,5 +1,5 @@
 'use strict';
-// Phase 6 (BookStack-Exit, docs/bookstack-exit.md): CRUD fuer book_categories.
+// CRUD fuer book_categories.
 // Admin-only Pool (global sichtbar). Bucher referenzieren via books.category_id;
 // FK ON DELETE SET NULL — Loeschen einer Kategorie loescht keine Buecher.
 // Hierarchie via parent_id (max 2 Ebenen empfohlen, nicht erzwungen).

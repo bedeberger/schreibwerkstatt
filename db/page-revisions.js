@@ -1,5 +1,5 @@
 'use strict';
-// Phase 2 (BookStack-Exit, docs/bookstack-exit.md): CRUD fuer page_revisions.
+// CRUD fuer page_revisions.
 // Schreib-Pfad: content-store-Facade ruft `insert()` vor jedem Backend-Save.
 // Lese-Pfad: routes/content.js Revisions-Endpoints.
 // Retention: lib/cache-cleanup.js POLICIES ruft `pruneOverLimit()` taeglich.

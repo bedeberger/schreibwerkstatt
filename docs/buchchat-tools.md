@@ -9,7 +9,6 @@ Jede Tool-Funktion: `(input, ctx) → JSON-serialisierbares Objekt` (sync oder a
 `ctx` (gebaut in [chat.js#L460](../routes/jobs/chat.js#L460)):
 - `bookId` — aus `chat_sessions.book_id` der aktiven Session.
 - `userEmail` — Owner-Scope für alle Reads (Reviews, Ideen, Werkstatt sind user-scoped).
-- `userToken` — BookStack-Token, nur im `bookstack`-Mode gesetzt; `get_pages` braucht ihn dort fuer den Live-Read. Im `localdb`-Mode `null` — `get_pages` liest dann direkt aus der App-DB via Content-Store-Facade.
 - `jobSignal` — `AbortController.signal`, wird vor jedem Tool-Call und im Loop geprüft.
 - `logger` — Job-Child-Logger.
 

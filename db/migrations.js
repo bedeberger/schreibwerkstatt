@@ -2669,7 +2669,7 @@ function _runMigrationsLocked() {
   }
 
   if (version < 81) {
-    // FK-Anreicherung Phase 3a: book_id -> books(bookstack_book_id) fuer 15
+    // FK-Anreicherung: book_id -> books(bookstack_book_id) fuer 15
     // nicht-strukturelle Tabellen (Caches, Stats, Logs, Konfigurations-
     // Singletons, Job-Tracking). Strukturelle Tabellen (chat_sessions,
     // book_reviews, chapter_reviews, ideen, page_checks, locations,
@@ -2987,7 +2987,7 @@ function _runMigrationsLocked() {
   }
 
   if (version < 82) {
-    // FK-Anreicherung Phase 3b: book_id -> books(bookstack_book_id) fuer
+    // FK-Anreicherung: book_id -> books(bookstack_book_id) fuer
     // strukturelle Tabellen — chat_sessions, book_reviews, chapter_reviews,
     // ideen, page_checks, locations, figure_scenes, pages, chapters, figures,
     // figure_relations. Alle CASCADE — Inhalt ist an Buchexistenz gebunden.
@@ -4127,20 +4127,17 @@ function _runMigrationsLocked() {
   }
 
   if (version < 105) {
-    // Phase 0 (BookStack-Exit, docs/bookstack-exit.md): additives Schema-Skelett
-    // fuer pages/chapters/books — Body, Order, Owner, Slug, Dirty-Flag fuer
-    // spaeteren Sync-Worker.
+    // Additives Schema-Skelett fuer pages/chapters/books — Body, Order, Owner,
+    // Slug, Dirty-Flag fuer Sync-Worker.
     //
-    // pages.body_html/body_markdown: lokale Wahrheit ab Phase 1 (localdb-Backend);
-    //   bis dahin Cache, der beim Backfill (Phase 0b) gefuellt wird.
+    // pages.body_html/body_markdown: lokale Wahrheit im localdb-Backend; im
+    //   bookstack-Mode Cache, der beim Backfill gefuellt wird.
     // pages/chapters.position/priority: Sortierung; position lokal, priority
     //   spiegelt BookStack-`priority` im bookstack-Mode.
     // pages.local_updated_at/remote_updated_at/dirty: Konflikterkennung beim
-    //   Sync-Pull (Phase 1, bookstack-Mode).
-    // books.owner_email: Erst-Backfiller (Phase 0b); spaetere Sharing-Regel
-    //   via book_access (Phase 4b).
-    // books.cover_image: BLOB, optional; ersetzt heutigen Pfad ueber externe
-    //   Datei im Custom-PDF-Export (Phase 4b2-Konsolidierung).
+    //   Sync-Pull (bookstack-Mode).
+    // books.owner_email: Erst-Backfiller; Sharing-Regel via book_access.
+    // books.cover_image: BLOB, optional.
     const pagesCols105 = db.pragma('table_info(pages)').map(c => c.name);
     if (!pagesCols105.includes('body_html'))         db.prepare('ALTER TABLE pages ADD COLUMN body_html TEXT').run();
     if (!pagesCols105.includes('body_markdown'))     db.prepare('ALTER TABLE pages ADD COLUMN body_markdown TEXT').run();
@@ -4171,13 +4168,13 @@ function _runMigrationsLocked() {
       throw new Error(`Migration 105: foreign_key_check meldet ${fkErrors105.length} Verstoesse: ${JSON.stringify(fkErrors105.slice(0, 5))}`);
     }
     db.prepare('UPDATE schema_version SET version = 105').run();
-    logger.info('DB-Migration auf Version 105 abgeschlossen (Phase 0 Schema-Skelett: pages/chapters/books additive Spalten fuer Body, Order, Owner, Dirty-Flag).');
+    logger.info('DB-Migration auf Version 105 abgeschlossen (Schema-Skelett: pages/chapters/books additive Spalten fuer Body, Order, Owner, Dirty-Flag).');
   }
 
   if (version < 106) {
-    // Phase 0 (BookStack-Exit): books/chapters/pages auf INTEGER PRIMARY KEY
-    // AUTOINCREMENT umstellen. Wasserzeichen >= 1_000_000, damit `localdb`-Mode
-    // (Phase 1) frische IDs ausserhalb des BookStack-Range vergibt.
+    // books/chapters/pages auf INTEGER PRIMARY KEY AUTOINCREMENT umstellen.
+    // Wasserzeichen >= 1_000_000, damit `localdb`-Mode frische IDs ausserhalb
+    // des BookStack-Range vergibt.
     //
     // Bestandsrows behalten ihre BookStack-IDs (INSERT SELECT preserve), alle
     // ~40 FK-Spalten (figures.book_id, page_revisions.page_id, …) bleiben
@@ -4298,7 +4295,7 @@ function _runMigrationsLocked() {
   }
 
   if (version < 107) {
-    // Phase 4a (BookStack-Exit, docs/bookstack-exit.md): App-eigene User-DB.
+    // App-eigene User-DB.
     // Drei neue Tabellen: app_users (Identity + Role + Status), user_invites
     // (Token-Workflow), user_sessions_audit (Login-Events fuer Admin).
     //
@@ -4453,12 +4450,11 @@ function _runMigrationsLocked() {
       throw new Error(`Migration 107: foreign_key_check meldet ${fkErrors107.length} Verstoesse: ${JSON.stringify(fkErrors107.slice(0, 5))}`);
     }
     db.prepare('UPDATE schema_version SET version = 107').run();
-    logger.info('DB-Migration auf Version 107 abgeschlossen (Phase 4a App-User-DB: app_users + user_invites + user_sessions_audit, users.email FK auf app_users).');
+    logger.info('DB-Migration auf Version 107 abgeschlossen (App-User-DB: app_users + user_invites + user_sessions_audit, users.email FK auf app_users).');
   }
 
   if (version < 108) {
-    // Phase 4c (BookStack-Exit, docs/bookstack-exit.md): app_settings als
-    // Runtime-Config-Store. Auth-/KI-Provider-/Storage-Backend-/Job-Tuning-/
+    // app_settings als Runtime-Config-Store. Auth-/KI-Provider-/Storage-Backend-/Job-Tuning-/
     // Cron-/PDF-A-Werte wandern aus `.env` in die DB; ENV bleibt nur fuer
     // Boot-Layer (PORT, DB_PATH, APP_URL, SESSION_SECRET, ADMIN_EMAIL/PASSWORD,
     // TZ, LOG_LEVEL, LOCAL_DEV_MODE, VERAPDF_BIN).
@@ -4495,11 +4491,11 @@ function _runMigrationsLocked() {
       throw new Error(`Migration 108: foreign_key_check meldet ${fkErrors108.length} Verstoesse: ${JSON.stringify(fkErrors108.slice(0, 5))}`);
     }
     db.prepare('UPDATE schema_version SET version = 108').run();
-    logger.info('DB-Migration auf Version 108 abgeschlossen (Phase 4c app_settings + app_settings_audit).');
+    logger.info('DB-Migration auf Version 108 abgeschlossen (app_settings + app_settings_audit).');
   }
 
   if (version < 109) {
-    // Phase 4b (BookStack-Exit, docs/bookstack-exit.md): Book-ACL + Sharing.
+    // Book-ACL + Sharing.
     //
     // book_access ist SSoT fuer "wer darf was am Buch". Vier Rollen (Hierarchie
     // absteigend): owner > editor > lektor > viewer. Buchlisten + alle
@@ -4590,11 +4586,11 @@ function _runMigrationsLocked() {
       throw new Error(`Migration 109: foreign_key_check meldet ${fkErrors109.length} Verstoesse: ${JSON.stringify(fkErrors109.slice(0, 5))}`);
     }
     db.prepare('UPDATE schema_version SET version = 109').run();
-    logger.info('DB-Migration auf Version 109 abgeschlossen (Phase 4b Book-ACL: book_access + book_share_invites + page_locks + book_settings.allow_lektor_book_chat).');
+    logger.info('DB-Migration auf Version 109 abgeschlossen (Book-ACL: book_access + book_share_invites + page_locks + book_settings.allow_lektor_book_chat).');
   }
 
   if (version < 110) {
-    // Phase 4d (BookStack-Exit, docs/bookstack-exit.md): Token-Budget pro User.
+    // Token-Budget pro User.
     //
     // monthly_budget_usd = NULL => kein numerisches Limit (nur sinnvoll mit
     //   mode != 'none').
@@ -4647,12 +4643,11 @@ function _runMigrationsLocked() {
       throw new Error(`Migration 110: foreign_key_check meldet ${fkErrors110.length} Verstoesse: ${JSON.stringify(fkErrors110.slice(0, 5))}`);
     }
     db.prepare('UPDATE schema_version SET version = 110').run();
-    logger.info('DB-Migration auf Version 110 abgeschlossen (Phase 4d Token-Budget: app_users.monthly_budget_usd + budget_mode).');
+    logger.info('DB-Migration auf Version 110 abgeschlossen (Token-Budget: app_users.monthly_budget_usd + budget_mode).');
   }
 
   if (version < 111) {
-    // Phase 4a2 (BookStack-Exit, docs/bookstack-exit.md): Public-Landing +
-    // Request-Register. Frische Besucher koennen Zugang anfordern; Admin
+    // Public-Landing + Request-Register. Frische Besucher koennen Zugang anfordern; Admin
     // moderiert via AdminUsersCard. Partial UNIQUE blockiert nur pending-
     // Requests pro Email — abgelehnte / abgelaufene erlauben neuen Antrag.
     db.prepare(`
@@ -4686,11 +4681,11 @@ function _runMigrationsLocked() {
       throw new Error(`Migration 111: foreign_key_check meldet ${fkErrors111.length} Verstoesse: ${JSON.stringify(fkErrors111.slice(0, 5))}`);
     }
     db.prepare('UPDATE schema_version SET version = 111').run();
-    logger.info('DB-Migration auf Version 111 abgeschlossen (Phase 4a2 Public Landing + Request-Register: registration_requests).');
+    logger.info('DB-Migration auf Version 111 abgeschlossen (Public Landing + Request-Register: registration_requests).');
   }
 
   if (version < 112) {
-    // Phase 2 (BookStack-Exit, docs/bookstack-exit.md): Eigene Page-Revisions.
+    // Eigene Page-Revisions.
     // Jeder Save-Pfad ueber die content-store-Facade schreibt eine Revision
     // vor dem Backend-Write. source-Tag unterscheidet Editor/Focus/Chat-Apply
     // /Lektorat-Apply/Sync/Import/Conflict-Pfade. Retention via
@@ -4726,7 +4721,7 @@ function _runMigrationsLocked() {
       throw new Error(`Migration 112: foreign_key_check meldet ${fkErrors112.length} Verstoesse: ${JSON.stringify(fkErrors112.slice(0, 5))}`);
     }
     db.prepare('UPDATE schema_version SET version = 112').run();
-    logger.info('DB-Migration auf Version 112 abgeschlossen (Phase 2 BookStack-Exit: page_revisions).');
+    logger.info('DB-Migration auf Version 112 abgeschlossen (page_revisions).');
   }
 
   if (version < 113) {
@@ -4738,7 +4733,7 @@ function _runMigrationsLocked() {
   }
 
   if (version < 114) {
-    // Phase 3 (BookStack-Exit, docs/bookstack-exit.md): Eigene Sortierung.
+    // Eigene Sortierung.
     // book_order ist SSoT fuer Buch-Hierarchie (Kapitel + Seiten, inkl.
     // Top-Level-Seiten). pages.position/chapters.position/pages.chapter_id
     // werden vom PUT-Hook aus order_json materialisiert (fuer Querys/JOINs).
@@ -4756,11 +4751,11 @@ function _runMigrationsLocked() {
       throw new Error(`Migration 114: foreign_key_check meldet ${fkErrors114.length} Verstoesse: ${JSON.stringify(fkErrors114.slice(0, 5))}`);
     }
     db.prepare('UPDATE schema_version SET version = 114').run();
-    logger.info('DB-Migration auf Version 114 abgeschlossen (Phase 3 BookStack-Exit: book_order).');
+    logger.info('DB-Migration auf Version 114 abgeschlossen (book_order).');
   }
 
   if (version < 115) {
-    // Phase 6 (BookStack-Exit, docs/bookstack-exit.md): Kategorien + Tags.
+    // Kategorien + Tags.
     // book_categories: hierarchisch (parent_id), admin-verwaltet, global.
     // book_tags: flach, jeder Auth-User darf erzeugen, admin loescht.
     // book_tag_assignments: M:N-Bridge zwischen books und book_tags.
@@ -4820,11 +4815,11 @@ function _runMigrationsLocked() {
       throw new Error(`Migration 115: foreign_key_check meldet ${fkErrors115.length} Verstoesse: ${JSON.stringify(fkErrors115.slice(0, 5))}`);
     }
     db.prepare('UPDATE schema_version SET version = 115').run();
-    logger.info('DB-Migration auf Version 115 abgeschlossen (Phase 6 BookStack-Exit: book_categories, book_tags, book_tag_assignments).');
+    logger.info('DB-Migration auf Version 115 abgeschlossen (book_categories, book_tags, book_tag_assignments).');
   }
 
   if (version < 116) {
-    // Phase 7 (BookStack-Exit, docs/bookstack-exit.md): SQLite-FTS5-Volltextsuche.
+    // SQLite-FTS5-Volltextsuche.
     // search_index   – Haupt-Index (BM25, Titel 5x staerker als Body), Unicode61
     //                  mit remove_diacritics=2 (Umlaut-Folding DE+EN), tokenchars
     //                  '-_' fuer Bindestrich-Woerter.
@@ -4871,11 +4866,11 @@ function _runMigrationsLocked() {
       throw new Error(`Migration 116: foreign_key_check meldet ${fkErrors116.length} Verstoesse: ${JSON.stringify(fkErrors116.slice(0, 5))}`);
     }
     db.prepare('UPDATE schema_version SET version = 116').run();
-    logger.info('DB-Migration auf Version 116 abgeschlossen (Phase 7 BookStack-Exit: FTS5 search_index + search_trigram + search_meta).');
+    logger.info('DB-Migration auf Version 116 abgeschlossen (FTS5 search_index + search_trigram + search_meta).');
   }
 
   if (version < 117) {
-    // Phase 11 (BookStack-Exit, docs/bookstack-exit.md): Per-User-AI-Provider-Override.
+    // Per-User-AI-Provider-Override.
     // 1) app_users.ai_provider_override (NULL = follows global ai.provider).
     // 2) provider-Spalte in alle 7 KI-Caches. Verhindert, dass Claude-Output an
     //    Ollama-User ausgeliefert wird (oder umgekehrt). Teil des PRIMARY KEY.
@@ -5048,11 +5043,11 @@ function _runMigrationsLocked() {
       throw new Error(`Migration 117: foreign_key_check meldet ${fkErrors117.length} Verstoesse: ${JSON.stringify(fkErrors117.slice(0, 5))}`);
     }
     db.prepare('UPDATE schema_version SET version = 117').run();
-    logger.info(`DB-Migration auf Version 117 abgeschlossen (Phase 11: ai_provider_override + provider-Spalte in 7 KI-Caches; Backfill auf '${defaultProvider117}').`);
+    logger.info(`DB-Migration auf Version 117 abgeschlossen (ai_provider_override + provider-Spalte in 7 KI-Caches; Backfill auf '${defaultProvider117}').`);
   }
 
   if (version < 118) {
-    // BookStack-Exit Phase 1: Backfill setzte books.owner_email aber legte
+    // Backfill setzte books.owner_email aber legte
     // keine book_access-Row an. Migration 109 spiegelte einmalig die damals
     // existenten Owner; alle danach via Backfill angelegten Buecher fielen
     // durch — /content/books filtert strikt ueber book_access und liefert
@@ -5079,9 +5074,9 @@ function _runMigrationsLocked() {
   }
 
   if (version < 119) {
-    // Phase 11 Followup: 'ai-provider-changed' im user_sessions_audit-Event-CHECK
-    // aufnehmen. Migration 110 hatte 'budget-changed' + 'usage-viewed' ergaenzt;
-    // Phase 11 braucht den naechsten Eintrag fuer Override-Aenderungen via AdminUsersCard.
+    // 'ai-provider-changed' im user_sessions_audit-Event-CHECK aufnehmen.
+    // Migration 110 hatte 'budget-changed' + 'usage-viewed' ergaenzt; hier
+    // kommt der naechste Eintrag fuer Override-Aenderungen via AdminUsersCard.
     db.pragma('foreign_keys = OFF');
     db.prepare('DROP TABLE IF EXISTS user_sessions_audit_new').run();
     db.prepare(`
@@ -5112,7 +5107,97 @@ function _runMigrationsLocked() {
       throw new Error(`Migration 119: foreign_key_check meldet ${fkErrors119.length} Verstoesse: ${JSON.stringify(fkErrors119.slice(0, 5))}`);
     }
     db.prepare('UPDATE schema_version SET version = 119').run();
-    logger.info(`DB-Migration auf Version 119 abgeschlossen (Phase 11 followup: audit-Event 'ai-provider-changed').`);
+    logger.info(`DB-Migration auf Version 119 abgeschlossen (audit-Event 'ai-provider-changed').`);
+  }
+
+  if (version < 120) {
+    // BookStack-Backend entfernt — Cleanup:
+    // 1. user_tokens-Tabelle droppen (BookStack-API-Tokens pro User).
+    // 2. pages.remote_updated_at + pages.dirty droppen (Sync-Conflict-Detection).
+    // 3. page_revisions.source-CHECK ohne 'bookstack-sync' neu setzen.
+    // 4. app_settings: app.backend + app.migrate.source_readonly + app.bookstack.base_url loeschen.
+    db.pragma('foreign_keys = OFF');
+
+    db.prepare('DROP TABLE IF EXISTS user_tokens').run();
+
+    // pages: Spalten remote_updated_at + dirty entfernen via Recreate.
+    const pagesCols = db.pragma('table_info(pages)').map(c => c.name);
+    if (pagesCols.includes('remote_updated_at') || pagesCols.includes('dirty')) {
+      db.prepare('DROP INDEX IF EXISTS idx_pages_dirty').run();
+      db.prepare('DROP TABLE IF EXISTS pages_new').run();
+      db.prepare(`
+        CREATE TABLE pages_new (
+          page_id        INTEGER PRIMARY KEY,
+          book_id        INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+          page_name      TEXT NOT NULL,
+          chapter_id     INTEGER REFERENCES chapters(chapter_id) ON DELETE SET NULL,
+          updated_at     TEXT,
+          last_seen_at   TEXT,
+          preview_text   TEXT,
+          body_html      TEXT,
+          body_markdown  TEXT,
+          position       INTEGER,
+          priority       INTEGER,
+          slug           TEXT,
+          local_updated_at TEXT
+        )
+      `).run();
+      db.prepare(`
+        INSERT INTO pages_new (page_id, book_id, page_name, chapter_id, updated_at, last_seen_at,
+                               preview_text, body_html, body_markdown, position, priority, slug, local_updated_at)
+        SELECT page_id, book_id, page_name, chapter_id, updated_at, last_seen_at,
+               preview_text, body_html, body_markdown, position, priority, slug, local_updated_at
+        FROM pages
+      `).run();
+      db.prepare('DROP TABLE pages').run();
+      db.prepare('ALTER TABLE pages_new RENAME TO pages').run();
+      db.prepare('CREATE INDEX IF NOT EXISTS idx_pages_book_id ON pages(book_id)').run();
+      db.prepare('CREATE INDEX IF NOT EXISTS idx_pages_chapter_id ON pages(chapter_id)').run();
+    }
+
+    // page_revisions: CHECK-Constraint ohne 'bookstack-sync' setzen.
+    const prCols = db.pragma('table_info(page_revisions)').map(c => c.name);
+    if (prCols.length > 0) {
+      db.prepare('DROP TABLE IF EXISTS page_revisions_new').run();
+      db.prepare(`
+        CREATE TABLE page_revisions_new (
+          id            INTEGER PRIMARY KEY AUTOINCREMENT,
+          page_id       INTEGER NOT NULL REFERENCES pages(page_id) ON DELETE CASCADE,
+          book_id       INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+          body_html     TEXT NOT NULL,
+          body_markdown TEXT,
+          source        TEXT NOT NULL CHECK(source IN
+                          ('focus','main','chat-apply','lektorat-apply','import','conflict')),
+          user_email    TEXT,
+          summary       TEXT,
+          created_at    TEXT DEFAULT (datetime('now'))
+        )
+      `).run();
+      // 'bookstack-sync' auf 'import' mappen (semantisch naechstes Aequivalent).
+      db.prepare(`
+        INSERT INTO page_revisions_new (id, page_id, book_id, body_html, body_markdown, source, user_email, summary, created_at)
+        SELECT id, page_id, book_id, body_html, body_markdown,
+               CASE source WHEN 'bookstack-sync' THEN 'import' ELSE source END,
+               user_email, summary, created_at
+        FROM page_revisions
+      `).run();
+      db.prepare('DROP TABLE page_revisions').run();
+      db.prepare('ALTER TABLE page_revisions_new RENAME TO page_revisions').run();
+      db.prepare('CREATE INDEX IF NOT EXISTS idx_page_revisions_page ON page_revisions(page_id, created_at DESC)').run();
+      db.prepare('CREATE INDEX IF NOT EXISTS idx_page_revisions_book ON page_revisions(book_id, created_at DESC)').run();
+    }
+
+    // BookStack-spezifische app_settings entfernen.
+    db.prepare(`DELETE FROM app_settings WHERE key IN ('app.backend','app.migrate.source_readonly','app.bookstack.base_url')`).run();
+
+    db.pragma('foreign_keys = ON');
+
+    const fkErrors120 = db.pragma('foreign_key_check');
+    if (fkErrors120.length) {
+      throw new Error(`Migration 120: foreign_key_check meldet ${fkErrors120.length} Verstoesse: ${JSON.stringify(fkErrors120.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 120').run();
+    logger.info('DB-Migration auf Version 120 abgeschlossen (BookStack-Backend entfernt).');
   }
 
   // Schutzchecks: idempotent bei jedem Start.

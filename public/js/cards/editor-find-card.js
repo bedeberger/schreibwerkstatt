@@ -43,10 +43,6 @@ export function registerEditorFindCard() {
         } else if (app.showBookEditorCard) {
           event.preventDefault();
           window.dispatchEvent(new CustomEvent('book-editor:open-find'));
-        } else if (app.selectedBookId) {
-          event.preventDefault();
-          const input = document.querySelector('.bookstack-search-input');
-          if (input) { input.focus(); input.select?.(); }
         }
       }, { signal });
 
