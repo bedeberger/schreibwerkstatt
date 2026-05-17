@@ -126,6 +126,7 @@
   --card-accent-settings: #5a5a5a;
   --card-accent-bookeditor: #7a5a3a;
   --card-accent-search: #3a6a7a;
+  --card-accent-songs: #a04a8e;
 
   /* Job-Queue-Footer */
   --color-queue-bar-bg: var(--color-surface);
@@ -265,6 +266,7 @@
   --card-accent-settings: #989286;
   --card-accent-bookeditor: #c69a78;
   --card-accent-search: #7ec2d0;
+  --card-accent-songs: #d68ac6;
 
   --color-border-contrast: #d8d8d8;
 

@@ -18,148 +18,163 @@
 
   <div x-show="!bookSettingsLoading" class="card-form-grid">
 
-    <div class="card-form-row">
-      <label class="card-form-label" x-text="$app.t('book.settings.language')"></label>
-      <div class="book-settings-options">
-        <label class="book-settings-option">
-          <input type="radio" name="bs-lang" value="de" x-model="bookSettingsLanguage" @change="bookSettingsRegion = (bookSettingsLanguage === 'de' ? 'CH' : 'US'); bookSettingsBuchtyp = ''">
-          <span x-text="$app.t('lang.de')"></span>
-        </label>
-        <label class="book-settings-option">
-          <input type="radio" name="bs-lang" value="en" x-model="bookSettingsLanguage" @change="bookSettingsRegion = (bookSettingsLanguage === 'de' ? 'CH' : 'US'); bookSettingsBuchtyp = ''">
-          <span x-text="$app.t('lang.en')"></span>
-        </label>
+    <section class="book-settings-section">
+      <h3 class="book-settings-section-title" x-text="$app.t('book.settings.section.basics')"></h3>
+
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('book.settings.language')"></label>
+        <div class="book-settings-options">
+          <label class="book-settings-option">
+            <input type="radio" name="bs-lang" value="de" x-model="bookSettingsLanguage" @change="bookSettingsRegion = (bookSettingsLanguage === 'de' ? 'CH' : 'US'); bookSettingsBuchtyp = ''">
+            <span x-text="$app.t('lang.de')"></span>
+          </label>
+          <label class="book-settings-option">
+            <input type="radio" name="bs-lang" value="en" x-model="bookSettingsLanguage" @change="bookSettingsRegion = (bookSettingsLanguage === 'de' ? 'CH' : 'US'); bookSettingsBuchtyp = ''">
+            <span x-text="$app.t('lang.en')"></span>
+          </label>
+        </div>
       </div>
-    </div>
 
-    <div class="card-form-row">
-      <label class="card-form-label" x-text="$app.t('book.settings.region')"></label>
-      <div class="book-settings-options">
-        <template x-if="bookSettingsLanguage === 'de'">
-          <div class="book-settings-options">
-            <label class="book-settings-option">
-              <input type="radio" name="bs-region" value="CH" x-model="bookSettingsRegion">
-              <span x-text="$app.t('region.de.CH')"></span>
-            </label>
-            <label class="book-settings-option">
-              <input type="radio" name="bs-region" value="DE" x-model="bookSettingsRegion">
-              <span x-text="$app.t('region.de.DE')"></span>
-            </label>
-          </div>
-        </template>
-        <template x-if="bookSettingsLanguage === 'en'">
-          <div class="book-settings-options">
-            <label class="book-settings-option">
-              <input type="radio" name="bs-region" value="US" x-model="bookSettingsRegion">
-              <span x-text="$app.t('region.en.US')"></span>
-            </label>
-            <label class="book-settings-option">
-              <input type="radio" name="bs-region" value="GB" x-model="bookSettingsRegion">
-              <span x-text="$app.t('region.en.GB')"></span>
-            </label>
-          </div>
-        </template>
-      </div>
-    </div>
-
-    <div class="card-form-row">
-      <label class="card-form-label" x-text="$app.t('book.settings.buchtyp')"></label>
-      <div x-data="combobox($app.t('book.settings.buchtyp'), $app.t('book.settings.buchtyp.none'))"
-           x-modelable="value" x-model="bookSettingsBuchtyp"
-           x-effect="options = bookSettingsBuchtypOptions()"
-></div>
-    </div>
-
-    <div class="card-form-row">
-      <label class="card-form-label" x-text="$app.t('book.settings.pov')"></label>
-      <div x-data="combobox($app.t('book.settings.pov'), $app.t('book.settings.pov.none'))"
-           x-modelable="value" x-model="bookSettingsErzaehlperspektive"
-           x-effect="options = bookSettingsPovOptions()"
-></div>
-    </div>
-
-    <div class="card-form-row">
-      <label class="card-form-label" x-text="$app.t('book.settings.tempus')"></label>
-      <div x-data="combobox($app.t('book.settings.tempus'), $app.t('book.settings.tempus.none'))"
-           x-modelable="value" x-model="bookSettingsErzaehlzeit"
-           x-effect="options = bookSettingsTempusOptions()"
-></div>
-    </div>
-
-    <p class="card-form-hint"
-       x-show="bookSettingsBuchtyp === 'kurzgeschichten' && (bookSettingsErzaehlperspektive || bookSettingsErzaehlzeit)"
-       x-text="$app.t('book.settings.pov.kurzgeschichtenHint')"></p>
-
-    <!-- Kategorie + Tags -->
-    <div class="card-form-row">
-      <label class="card-form-label" x-text="$app.t('book.category')"></label>
-      <div x-data="combobox($app.t('book.category'), $app.t('categories.empty'))"
-           x-modelable="value" x-model="bookCategoryId"
-           x-effect="options = bookCategoryOptions()"
-           @combobox-change="saveBookCategory()"></div>
-    </div>
-
-    <div class="card-form-row card-form-row--top">
-      <label class="card-form-label" x-text="$app.t('book.tags')"></label>
-      <div class="book-tags-editor">
-        <div class="book-tags-pool" x-show="tagPool.length > 0">
-          <template x-for="tag in tagPool" :key="tag.id">
-            <button type="button"
-                    class="book-tag-chip"
-                    :class="{ 'is-active': bookTagIds.includes(tag.id) }"
-                    @click="toggleBookTag(tag.id)"
-                    x-text="tag.name"></button>
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('book.settings.region')"></label>
+        <div class="book-settings-options">
+          <template x-if="bookSettingsLanguage === 'de'">
+            <div class="book-settings-options">
+              <label class="book-settings-option">
+                <input type="radio" name="bs-region" value="CH" x-model="bookSettingsRegion">
+                <span x-text="$app.t('region.de.CH')"></span>
+              </label>
+              <label class="book-settings-option">
+                <input type="radio" name="bs-region" value="DE" x-model="bookSettingsRegion">
+                <span x-text="$app.t('region.de.DE')"></span>
+              </label>
+            </div>
+          </template>
+          <template x-if="bookSettingsLanguage === 'en'">
+            <div class="book-settings-options">
+              <label class="book-settings-option">
+                <input type="radio" name="bs-region" value="US" x-model="bookSettingsRegion">
+                <span x-text="$app.t('region.en.US')"></span>
+              </label>
+              <label class="book-settings-option">
+                <input type="radio" name="bs-region" value="GB" x-model="bookSettingsRegion">
+                <span x-text="$app.t('region.en.GB')"></span>
+              </label>
+            </div>
           </template>
         </div>
-        <p class="muted-msg muted-msg--sm" x-show="tagPool.length === 0" x-text="$app.t('tags.empty')"></p>
-        <div class="book-tags-new">
-          <input type="text"
-                 class="card-form-input"
-                 x-model="newTagName"
-                 :placeholder="$app.t('tag.new')"
-                 @keydown.enter.prevent="createInlineTag()"
-                 :disabled="newTagBusy"
-                 maxlength="80">
-          <button type="button" @click="createInlineTag()" :disabled="newTagBusy || !newTagName.trim()" x-text="$app.t('common.new')"></button>
+      </div>
+    </section>
+
+    <section class="book-settings-section">
+      <h3 class="book-settings-section-title" x-text="$app.t('book.settings.section.narrative')"></h3>
+
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('book.settings.buchtyp')"></label>
+        <div x-data="combobox($app.t('book.settings.buchtyp'), $app.t('book.settings.buchtyp.none'))"
+             x-modelable="value" x-model="bookSettingsBuchtyp"
+             x-effect="options = bookSettingsBuchtypOptions()"
+  ></div>
+      </div>
+
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('book.settings.pov')"></label>
+        <div x-data="combobox($app.t('book.settings.pov'), $app.t('book.settings.pov.none'))"
+             x-modelable="value" x-model="bookSettingsErzaehlperspektive"
+             x-effect="options = bookSettingsPovOptions()"
+  ></div>
+      </div>
+
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('book.settings.tempus')"></label>
+        <div x-data="combobox($app.t('book.settings.tempus'), $app.t('book.settings.tempus.none'))"
+             x-modelable="value" x-model="bookSettingsErzaehlzeit"
+             x-effect="options = bookSettingsTempusOptions()"
+  ></div>
+      </div>
+
+      <p class="card-form-hint"
+         x-show="bookSettingsBuchtyp === 'kurzgeschichten' && (bookSettingsErzaehlperspektive || bookSettingsErzaehlzeit)"
+         x-text="$app.t('book.settings.pov.kurzgeschichtenHint')"></p>
+    </section>
+
+    <section class="book-settings-section">
+      <h3 class="book-settings-section-title" x-text="$app.t('book.settings.section.taxonomy')"></h3>
+
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('book.category')"></label>
+        <div x-data="combobox($app.t('book.category'), $app.t('categories.empty'))"
+             x-modelable="value" x-model="bookCategoryId"
+             x-effect="options = bookCategoryOptions()"
+             @combobox-change="saveBookCategory()"></div>
+      </div>
+
+      <div class="card-form-row card-form-row--top">
+        <label class="card-form-label" x-text="$app.t('book.tags')"></label>
+        <div class="book-tags-editor">
+          <div class="book-tags-pool" x-show="tagPool.length > 0">
+            <template x-for="tag in tagPool" :key="tag.id">
+              <button type="button"
+                      class="book-tag-chip"
+                      :class="{ 'is-active': bookTagIds.includes(tag.id) }"
+                      @click="toggleBookTag(tag.id)"
+                      x-text="tag.name"></button>
+            </template>
+          </div>
+          <p class="muted-msg muted-msg--sm" x-show="tagPool.length === 0" x-text="$app.t('tags.empty')"></p>
+          <div class="book-tags-new">
+            <input type="text"
+                   class="card-form-input"
+                   x-model="newTagName"
+                   :placeholder="$app.t('tag.new')"
+                   @keydown.enter.prevent="createInlineTag()"
+                   :disabled="newTagBusy"
+                   maxlength="80">
+            <button type="button" @click="createInlineTag()" :disabled="newTagBusy || !newTagName.trim()" x-text="$app.t('common.new')"></button>
+          </div>
         </div>
       </div>
-    </div>
+    </section>
 
-    <div class="card-form-row card-form-row--top">
-      <label class="card-form-label" for="bs-buchkontext" x-text="$app.t('book.settings.context')"></label>
-      <div class="book-settings-kontext-wrap">
-        <textarea
-          id="bs-buchkontext"
-          class="card-form-textarea"
-          x-model="bookSettingsBuchKontext"
-          :placeholder="$app.t('book.settings.contextPlaceholder')"
-          rows="4"
-          maxlength="1000"
-        ></textarea>
-        <p class="card-form-hint" x-text="(bookSettingsBuchKontext || '').length + ' / 1000'"></p>
-      </div>
-    </div>
+    <section class="book-settings-section">
+      <h3 class="book-settings-section-title" x-text="$app.t('book.settings.section.context')"></h3>
 
-    <div class="card-form-row">
-      <label class="card-form-label" x-text="$app.t('book.settings.status')"></label>
-      <div class="form-stack">
-        <label class="form-check">
-          <input type="checkbox" id="bs-finished" x-model="bookSettingsIsFinished">
-          <span>
-            <span class="form-check-title" x-text="$app.t('book.settings.finished')"></span>
-            <span class="form-check-desc" x-text="$app.t('book.settings.finished.desc')"></span>
-          </span>
-        </label>
+      <div class="card-form-row card-form-row--top">
+        <label class="card-form-label" for="bs-buchkontext" x-text="$app.t('book.settings.context')"></label>
+        <div class="book-settings-kontext-wrap">
+          <textarea
+            id="bs-buchkontext"
+            class="card-form-textarea"
+            x-model="bookSettingsBuchKontext"
+            :placeholder="$app.t('book.settings.contextPlaceholder')"
+            rows="4"
+            maxlength="1000"
+          ></textarea>
+          <p class="card-form-hint" x-text="(bookSettingsBuchKontext || '').length + ' / 1000'"></p>
+        </div>
       </div>
-    </div>
+
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('book.settings.status')"></label>
+        <div class="form-stack">
+          <label class="form-check">
+            <input type="checkbox" id="bs-finished" x-model="bookSettingsIsFinished">
+            <span>
+              <span class="form-check-title" x-text="$app.t('book.settings.finished')"></span>
+              <span class="form-check-desc" x-text="$app.t('book.settings.finished.desc')"></span>
+            </span>
+          </label>
+        </div>
+      </div>
+    </section>
 
     <p class="card-form-saved" x-show="bookSettingsSaved" x-cloak x-transition.opacity.duration.250ms x-text="$app.t('common.settingsSaved')"></p>
     <p class="card-form-error" x-show="bookSettingsError" x-text="bookSettingsError"></p>
 
     <!-- Sharing + Buch-Chat-Opt-In für Lektor. Sichtbar für alle
          Buch-Berechtigten (read-only für nicht-Owner). -->
-    <section class="book-settings-stats">
-      <h3 class="book-settings-stats-title" x-text="$app.t('book.share.title')"></h3>
+    <section class="book-settings-section">
+      <h3 class="book-settings-section-title" x-text="$app.t('book.share.title')"></h3>
 
       <div class="card-form-row">
         <label class="card-form-label" x-text="$app.t('book.share.lektorBookChatLabel')"></label>
@@ -180,9 +195,10 @@
       <div x-show="!bookAccessLoading && bookAccessList.length" class="book-share-list">
         <template x-for="entry in bookAccessList" :key="entry.user_email">
           <div class="book-share-row">
+            <span class="book-share-avatar" :style="shareAvatarStyle(entry)" x-text="shareInitials(entry)" aria-hidden="true"></span>
             <div class="book-share-row-main">
-              <span class="book-share-email" x-text="entry.user_email"></span>
-              <span class="book-share-displayname muted" x-show="entry.display_name" x-text="entry.display_name"></span>
+              <span class="book-share-displayname" x-text="entry.display_name || entry.user_email"></span>
+              <span class="book-share-email muted" x-show="entry.display_name" x-text="entry.user_email"></span>
             </div>
             <div class="book-share-row-actions">
               <template x-if="entry.role === 'owner' || !bookAccessIsOwner()">
@@ -211,19 +227,36 @@
       <div x-show="bookAccessIsOwner()" class="book-share-invite">
         <label class="card-form-label" x-text="$app.t('book.share.inviteLabel')"></label>
         <div class="book-share-invite-row">
-          <input type="email" class="card-form-input"
-                 x-model="shareEmail"
-                 :placeholder="$app.t('book.share.invitePlaceholder')"
-                 :disabled="shareBusy">
+          <div class="book-share-invite-typeahead">
+            <input type="email" class="card-form-input"
+                   x-model="shareEmail"
+                   :placeholder="$app.t('book.share.invitePlaceholder')"
+                   :disabled="shareBusy"
+                   autocomplete="off"
+                   @focus="shareSuggestOpen = true"
+                   @input="shareSuggestOpen = true"
+                   @keydown.escape="shareSuggestOpen = false"
+                   @blur="setTimeout(() => shareSuggestOpen = false, 150)">
+            <ul x-show="shareSuggestOpen && shareSuggestions().length" x-cloak class="book-share-suggest">
+              <template x-for="s in shareSuggestions()" :key="s.key">
+                <li class="book-share-suggest-item"
+                    :class="{'book-share-suggest-item--invite': s.kind === 'invite'}"
+                    @mousedown.prevent="pickShareSuggestion(s)">
+                  <span class="book-share-suggest-main" x-text="s.label"></span>
+                  <span class="book-share-suggest-sub muted" x-show="s.sub" x-text="s.sub"></span>
+                </li>
+              </template>
+            </ul>
+          </div>
           <div class="book-share-role-combo"
                x-data="combobox($app.t('book.share.role.editor'))"
                x-modelable="value" x-model="shareRole"
                x-effect="options = bookAccessRoleOptions()"></div>
           <button type="button" class="btn-compact"
-                  @click="shareBookAccessAdd()"
+                  @click="submitShareInvite()"
                   :disabled="shareBusy || !shareEmail">
             <span x-show="shareBusy" class="spinner"></span>
-            <span x-text="$app.t('book.share.inviteBtn')"></span>
+            <span x-text="shareSubmitLabel()"></span>
           </button>
         </div>
       </div>

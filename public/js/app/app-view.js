@@ -352,6 +352,7 @@ export const appViewMethods = {
     this._stopCollabPoll?.();
     this.figuren = [];
     this.orte = [];
+    this.songs = [];
     this.szenen = [];
     this.globalZeitstrahl = [];
     this.werkstattDrafts = [];
@@ -378,11 +379,13 @@ export const appViewMethods = {
 
     this.selectedFigurId = null;
     this.selectedOrtId = null;
+    this.selectedSongId = null;
     this.selectedSzeneId = null;
     this.lastCheckId = null;
 
     this.szenenUpdatedAt = null;
     this.orteUpdatedAt = null;
+    this.songsUpdatedAt = null;
 
     this.recentPageIds = [];
     if (typeof this.loadRecentPages === 'function' && this.selectedBookId) {
@@ -450,6 +453,14 @@ export const appViewMethods = {
     this.orteFilters.figurId = '';
     this.orteFilters.kapitel = '';
     this.orteFilters.szeneId = '';
+    this.songs = [];
+    this.selectedSongId = null;
+    this.songsFilters.figurId = '';
+    this.songsFilters.kapitel = '';
+    this.songsFilters.szeneId = '';
+    this.songsFilters.genre = '';
+    this.songsFilters.kontextTyp = '';
+    this.songsFilters.suche = '';
     if (this._komplettPollTimer) { clearInterval(this._komplettPollTimer); this._komplettPollTimer = null; }
     this.alleAktualisierenLastRun = null;
     this.alleAktualisierenProgress = 0;

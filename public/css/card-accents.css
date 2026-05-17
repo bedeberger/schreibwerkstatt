@@ -25,4 +25,5 @@
   .card--bookoverview  { --card-accent: var(--card-accent-organize); }
   .card--bookeditor    { --card-accent: var(--card-accent-bookeditor); }
   .card--search        { --card-accent: var(--card-accent-search); }
+  .card--songs         { --card-accent: var(--card-accent-songs); }
 }

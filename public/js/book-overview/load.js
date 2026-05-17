@@ -29,7 +29,7 @@ export const loadMethods = {
     this.overviewLoading = true;
     this.overviewBookId = bookId;
     try {
-      const [stats, coverage, heat, reviews, recent, figuren, szenen, orte, lektoratTime, settings] = await Promise.all([
+      const [stats, coverage, heat, reviews, recent, figuren, szenen, orte, songs, lektoratTime, settings] = await Promise.all([
         fetchJsonRetry(`/history/book-stats/${bookId}`).catch(() => []),
         fetchJsonRetry(`/history/coverage/${bookId}`).catch(() => null),
         fetchJsonRetry(`/history/fehler-heatmap/${bookId}?mode=open`).catch(() => null),
@@ -38,6 +38,7 @@ export const loadMethods = {
         fetchJsonRetry(`/figures/${bookId}`).catch(() => null),
         fetchJsonRetry(`/figures/scenes/${bookId}`).catch(() => null),
         fetchJsonRetry(`/locations/${bookId}`).catch(() => null),
+        fetchJsonRetry(`/songs/${bookId}`).catch(() => null),
         fetchJsonRetry(`/history/lektorat-time/${bookId}`).catch(() => null),
         fetchJsonRetry(`/booksettings/${bookId}`).catch(() => null),
       ]);
@@ -52,6 +53,7 @@ export const loadMethods = {
       this.overviewFiguren = Array.isArray(figuren?.figuren) ? figuren.figuren : [];
       this.overviewSzenen = Array.isArray(szenen?.szenen) ? szenen.szenen : [];
       this.overviewOrte = Array.isArray(orte?.orte) ? orte.orte : [];
+      this.overviewSongs = Array.isArray(songs?.songs) ? songs.songs : [];
       this.overviewLektoratTime = lektoratTime || null;
       this.overviewIsFinished = !!settings?.is_finished;
       this._memos = {};
@@ -178,6 +180,7 @@ export const loadMethods = {
     this.overviewFiguren = [];
     this.overviewSzenen = [];
     this.overviewOrte = [];
+    this.overviewSongs = [];
     this.overviewLektoratTime = null;
     this.overviewIsFinished = false;
     this.overviewBookId = null;

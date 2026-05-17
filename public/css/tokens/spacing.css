@@ -3,6 +3,7 @@
 :root {
   /* === Spacing-Scale — 4-Pixel-Raster ===
      Margins/Gaps/Row-Gaps. Ad-hoc Pixel-Werte nur, wenn wirklich kein Token passt. */
+  --space-2xs: 2px;
   --space-xs:  4px;
   --space-sm:  8px;
   --space-md:  12px;

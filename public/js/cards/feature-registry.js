@@ -38,6 +38,8 @@ export const FEATURES = [
     aliases: ['scenes','beats','sequences','akt'] },
   { key: 'orte',           kind: 'toggle', group: 'world',  labelKey: 'tile.orte',           descKey: 'tile.orte.desc',           flag: 'showOrteCard',           toggle: 'toggleOrteCard',           requiresBook: true, minRole: 'editor',
     aliases: ['locations','schauplaetze','places','setting','welt','world'] },
+  { key: 'songs',          kind: 'toggle', group: 'world',  labelKey: 'tile.songs',          descKey: 'tile.songs.desc',          flag: 'showSongsCard',          toggle: 'toggleSongsCard',          requiresBook: true, minRole: 'editor',
+    aliases: ['musik','music','songs','musikstuecke','musikstücke','playlist','soundtrack','band','interpret','tracks'] },
   { key: 'ereignisse',     kind: 'toggle', group: 'world',  labelKey: 'tile.events',         descKey: 'tile.events.desc',         flag: 'showEreignisseCard',     toggle: 'toggleEreignisseCard',     requiresBook: true, minRole: 'editor',
     aliases: ['events','timeline','zeitstrahl','plot','chronologie'] },
   // Werkzeug
@@ -153,6 +155,8 @@ export const EXCLUSIVE_CARDS = [
   { key: 'fehlerHeatmap',  flag: 'showFehlerHeatmapCard',  toggle: 'toggleFehlerHeatmapCard',  onReclick: 'close' },
   { key: 'bookChat',       flag: 'showBookChatCard',       toggle: 'toggleBookChatCard',       onReclick: 'refresh', requiresBook: true, auditEvent: 'bookChatOpened' },
   { key: 'orte',           flag: 'showOrteCard',           toggle: 'toggleOrteCard',           onReclick: 'refresh',
+    loadDeps: [{ method: 'loadFiguren', skipIfNonEmpty: 'figuren' }] },
+  { key: 'songs',          flag: 'showSongsCard',          toggle: 'toggleSongsCard',          onReclick: 'refresh',
     loadDeps: [{ method: 'loadFiguren', skipIfNonEmpty: 'figuren' }] },
   { key: 'kontinuitaet',   flag: 'showKontinuitaetCard',   toggle: 'toggleKontinuitaetCard',   onReclick: 'refresh' },
   { key: 'bookSettings',   flag: 'showBookSettingsCard',   toggle: 'toggleBookSettingsCard',   onReclick: 'close' },

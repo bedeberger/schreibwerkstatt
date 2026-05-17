@@ -32,6 +32,8 @@ export const appHashRouterMethods = {
       parts.push('figur', String(this.selectedFigurId));
     } else if (this.showOrteCard && this.selectedOrtId) {
       parts.push('ort', String(this.selectedOrtId));
+    } else if (this.showSongsCard && this.selectedSongId) {
+      parts.push('song', String(this.selectedSongId));
     } else if (this.showSzenenCard && this.selectedSzeneId) {
       parts.push('szene', String(this.selectedSzeneId));
     } else if (this.showKapitelReviewCard && this.kapitelReviewChapterId) {
@@ -41,6 +43,7 @@ export const appHashRouterMethods = {
     } else if (this.showFiguresCard) parts.push('figuren');
     else if (this.showFigurWerkstattCard) parts.push('werkstatt');
     else if (this.showOrteCard) parts.push('orte');
+    else if (this.showSongsCard) parts.push('songs');
     else if (this.showSzenenCard) parts.push('szenen');
     else if (this.showEreignisseCard) parts.push('ereignisse');
     else if (this.showKontinuitaetCard) parts.push('kontinuitaet');
@@ -71,6 +74,7 @@ export const appHashRouterMethods = {
     const view = parts[2] || 'book';
     const kind = view === 'figur' ? 'figuren'
       : view === 'ort' ? 'orte'
+      : view === 'song' ? 'songs'
       : view === 'szene' ? 'szenen'
       : view;
     return bookId + ':' + kind;
@@ -233,6 +237,19 @@ export const appHashRouterMethods = {
             else this._closeOtherMainCards('orte');
           }
           break;
+        case 'song':
+          if (arg) await this.openSongById(arg);
+          else {
+            this.selectedSongId = null;
+            if (!this.showSongsCard) await this.toggleSongsCard();
+            else this._closeOtherMainCards('songs');
+          }
+          break;
+        case 'songs':
+          this.selectedSongId = null;
+          if (!this.showSongsCard) await this.toggleSongsCard();
+          else this._closeOtherMainCards('songs');
+          break;
         case 'figuren':
           this.selectedFigurId = null;
           if (!this.showFiguresCard) await this.toggleFiguresCard();
@@ -333,8 +350,8 @@ export const appHashRouterMethods = {
     this._teardownHashRouting();
     const watchers = [
       'selectedBookId', 'currentPage', 'showEditorCard',
-      'selectedFigurId', 'selectedOrtId', 'selectedSzeneId',
-      'showFiguresCard', 'showFigurWerkstattCard', 'showOrteCard', 'showSzenenCard', 'showEreignisseCard',
+      'selectedFigurId', 'selectedOrtId', 'selectedSongId', 'selectedSzeneId',
+      'showFiguresCard', 'showFigurWerkstattCard', 'showOrteCard', 'showSongsCard', 'showSzenenCard', 'showEreignisseCard',
       'showKontinuitaetCard', 'showBookReviewCard', 'showBookChatCard',
       'showKapitelReviewCard', 'kapitelReviewChapterId',
       'werkstattDraftId',

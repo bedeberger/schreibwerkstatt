@@ -1,0 +1,109 @@
+<!-- Musik -->
+<!--
+  Alpine.data-Sub-Komponente — siehe public/js/cards/songs-card.js.
+  Fachdaten (songs, figuren) leben in Alpine.store('catalog');
+  songsFilters + selectedSongId bleiben im Root.
+-->
+<div class="card card--songs" x-data="songsCard" x-show="$app.showSongsCard" x-cloak>
+  <div class="card-header card-header--subline">
+    <div class="card-header-titlebar">
+      <span class="card-title" x-text="$app.t('songs.title', { name: $app.selectedBookName })"></span>
+      <div class="card-subline" x-show="$app.alleAktualisierenLastRun && !songsLoading">
+        <span class="card-timestamp" x-text="$app.t('common.asOf', { date: $app.alleAktualisierenLastRun })"></span>
+      </div>
+    </div>
+  </div>
+
+  <div x-show="songsProgress > 0" class="progress-bar-wrap">
+    <div class="progress-bar" :style="{ '--progress': songsProgress + '%' }"></div>
+  </div>
+  <div x-show="songsStatus" class="card-status" x-html="songsStatus"></div>
+
+  <div x-show="$app.songs.length === 0 && !songsLoading && !songsStatus" class="card-status" x-text="$app.t('common.noDataYet')"></div>
+
+  <!-- Skeleton -->
+  <div x-show="songsLoading && $app.songs.length === 0" class="entity-skeleton entity-list--accented" x-cloak>
+    <template x-for="i in 6" :key="i">
+      <div class="entity-skeleton-row">
+        <span class="entity-skeleton-cell entity-skeleton-cell--anchor"></span>
+        <span class="entity-skeleton-cell entity-skeleton-cell--title"></span>
+        <span class="entity-skeleton-cell entity-skeleton-cell--meta"></span>
+      </div>
+    </template>
+  </div>
+
+  <!-- Filter-Leiste -->
+  <div x-show="$app.songs.length > 0" class="filter-bar">
+    <input type="text" x-model="$app.songsFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
+    <div x-data="combobox($app.t('filter.figur'), $app.t('filter.allFiguren'))"
+         x-modelable="value" x-model="$app.songsFilters.figurId"
+         x-effect="options = $app.figuren.filter(f => $app.songs.some(s => (s.figuren || []).some(x => (x.fig_id || x) === f.id))).map(f => ({value: f.id, label: f.kurzname || f.name}))">
+    </div>
+    <div x-data="combobox($app.t('filter.chapter'), $app.t('filter.allChapters'))"
+         x-modelable="value" x-model="$app.songsFilters.kapitel"
+         x-effect="options = $app.songsKapitelListe().map(k => ({value: k, label: k}))">
+    </div>
+    <div x-data="combobox($app.t('songs.filter.genre'), $app.t('songs.filter.allGenres'))"
+         x-modelable="value" x-model="$app.songsFilters.genre"
+         x-effect="options = $app.songsGenreListe().map(g => ({value: g, label: g}))">
+    </div>
+    <div x-data="combobox($app.t('songs.filter.kontextTyp'), $app.t('songs.filter.allKontextTypen'))"
+         x-modelable="value" x-model="$app.songsFilters.kontextTyp"
+         x-effect="options = $app.songsKontextTypListe().map(k => ({value: k, label: $app.t('songs.kontextTyp.' + k, { _default: k })}))">
+    </div>
+    <span class="filter-count" x-text="$app.songsFiltered.length + ' / ' + $app.songs.length"></span>
+  </div>
+
+  <!-- Songliste -->
+  <div x-show="$app.songs.length > 0" class="entity-list entity-list--accented song-list">
+    <template x-for="s in $app.songsFiltered" :key="s.id">
+      <div>
+        <div class="entity-row" :data-song-id="s.id" @click="$app.selectedSongId = $app.selectedSongId === s.id ? null : s.id">
+          <span x-show="s.kontext_typ" class="tag entity-typ-tag" x-text="$app.t('songs.kontextTyp.' + s.kontext_typ, { _default: s.kontext_typ })"></span>
+          <span class="entity-row-title">
+            <span x-text="s.titel"></span>
+            <span x-show="s.interpret" class="song-interpret"><span class="song-sep">:</span> <span x-text="s.interpret"></span></span>
+          </span>
+          <span x-show="s.genre" class="song-genre" x-text="s.genre"></span>
+          <template x-if="s.kapitel?.length">
+            <span class="kapitel-badges">
+              <span class="kapitel-badge kapitel-badge--primary internal-link" @click.stop="$app.openKapitelByName(s.kapitel[0].name)" x-text="s.kapitel[0].name"></span>
+              <template x-if="s.kapitel.length > 1">
+                <span class="kapitel-badge kapitel-badge--more" x-text="'+' + (s.kapitel.length - 1)"></span>
+              </template>
+            </span>
+          </template>
+          <span class="history-chevron" :class="{ open: $app.selectedSongId === s.id }">›</span>
+        </div>
+        <div x-show="$app.selectedSongId === s.id" class="entity-detail">
+          <p x-show="s.beschreibung" x-text="s.beschreibung" class="entity-detail-text"></p>
+          <div x-show="s.stimmung" class="entity-meta-row">
+            <span class="entity-meta-label" x-text="$app.t('songs.stimmung')"></span>
+            <span x-text="s.stimmung"></span>
+          </div>
+          <div x-show="s.erste_erwaehnung" class="entity-meta-row">
+            <span class="entity-meta-label" x-text="$app.t('songs.firstMention')"></span>
+            <template x-if="s.erste_erwaehnung_page_id">
+              <span class="internal-link" @click.stop="$app.gotoPageById(s.erste_erwaehnung_page_id)" x-text="s.erste_erwaehnung"></span>
+            </template>
+            <template x-if="!s.erste_erwaehnung_page_id">
+              <span x-text="s.erste_erwaehnung"></span>
+            </template>
+          </div>
+          <div x-show="s.figuren?.length > 0" class="entity-meta-row">
+            <span class="entity-meta-label" x-text="$app.t('songs.figuren')"></span>
+            <template x-for="f in s.figuren" :key="(f.fig_id || f)">
+              <span class="tag internal-link" @click.stop="$app.openFigurById(f.fig_id || f)" x-text="$app.figurenById.get(f.fig_id || f)?.kurzname || $app.figurenById.get(f.fig_id || f)?.name || (f.fig_id || f)"></span>
+            </template>
+          </div>
+          <div x-show="s.kapitel?.length > 1" class="entity-meta-row">
+            <span class="entity-meta-label" x-text="$app.t('songs.kapitel')"></span>
+            <template x-for="k in s.kapitel" :key="k.name">
+              <span class="tag internal-link" @click.stop="$app.openKapitelByName(k.name)" x-text="k.name + (k.haeufigkeit > 1 ? ' ×' + k.haeufigkeit : '')"></span>
+            </template>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
+</div>

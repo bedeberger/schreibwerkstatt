@@ -23,6 +23,9 @@ export function registerBookSettingsCard() {
     shareEmail: '',
     shareRole: 'viewer',
     shareBusy: false,
+    // Typeahead-Pool für Sharing-Suggestions (Email → Display-Name aus app_users).
+    shareUserPool: [],
+    shareSuggestOpen: false,
     // Kategorie + Tags.
     categoryPool: [],
     tagPool: [],
@@ -51,8 +54,8 @@ export function registerBookSettingsCard() {
     init() {
       this._lifecycle = setupCardLifecycle(this, {
         showFlag: 'showBookSettingsCard',
-        onShow: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats(), this.loadBookAccess(), this.loadBookCategoriesAndTags()]),
-        load: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats(), this.loadBookAccess(), this.loadBookCategoriesAndTags()]),
+        onShow: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats(), this.loadBookAccess(), this.loadBookCategoriesAndTags(), this.loadShareUserPool()]),
+        load: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats(), this.loadBookAccess(), this.loadBookCategoriesAndTags(), this.loadShareUserPool()]),
         resetState: {
           expandedJobType: null,
           bookJobRuns: {},

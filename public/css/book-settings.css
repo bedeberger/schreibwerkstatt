@@ -129,29 +129,52 @@
 .book-share-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
+  gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-card-bg-subtle, var(--color-card-bg));
 }
+.book-share-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--avatar-bg, var(--color-card-bg-subtle, var(--color-card-bg)));
+  color: var(--avatar-fg, var(--color-text));
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  user-select: none;
+}
 .book-share-row-main {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   min-width: 0;
-}
-.book-share-email {
-  font-weight: 500;
+  flex: 1;
 }
 .book-share-displayname {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.book-share-email {
   font-size: var(--font-size-xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .book-share-row-actions {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  margin-left: auto;
 }
 .book-share-row-controls {
   display: flex;
@@ -176,6 +199,44 @@
 }
 .book-share-invite-row input { flex: 1; min-width: 0; }
 .book-share-invite-row .book-share-role-combo { width: 130px; }
+.book-share-invite-typeahead {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+.book-share-invite-typeahead input { width: 100%; }
+.book-share-suggest {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: 240px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm, 0 4px 12px rgba(0,0,0,.18));
+}
+.book-share-suggest-item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+}
+.book-share-suggest-item:hover,
+.book-share-suggest-item:focus { background: var(--color-hover-bg, rgba(127,127,127,.12)); }
+.book-share-suggest-main { color: var(--color-text); }
+.book-share-suggest-sub { font-size: var(--font-size-xs); }
+.book-share-suggest-item--invite .book-share-suggest-main {
+  color: var(--color-accent, var(--color-text));
+  font-weight: 500;
+}
 
 /* Lock-Banner (page_locks). Sitzt im Editor-Header analog
    zum Session-Banner. */
@@ -193,12 +254,12 @@
 
 @media (max-width: 600px) {
   .book-share-row {
-    flex-direction: column;
-    align-items: flex-start;
+    flex-wrap: wrap;
   }
   .book-share-row-actions {
     width: 100%;
     flex-wrap: wrap;
+    margin-left: 0;
   }
   .book-share-invite-row {
     flex-direction: column;

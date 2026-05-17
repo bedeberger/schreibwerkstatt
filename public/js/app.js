@@ -17,6 +17,7 @@ import { lektoratTimeMethods } from './book/lektorat-time.js';
 import { registerCatalogStore } from './cards/catalog-store.js';
 import { registerEreignisseCard } from './cards/ereignisse-card.js';
 import { registerOrteCard } from './cards/orte-card.js';
+import { registerSongsCard } from './cards/songs-card.js';
 import { registerSzenenCard } from './cards/szenen-card.js';
 import { registerFigurenCard } from './cards/figuren-card.js';
 import { registerFigurWerkstattCard } from './cards/figur-werkstatt-card.js';
@@ -27,6 +28,7 @@ import { registerIdeenCard } from './cards/ideen-card.js';
 import { registerBookChatCard } from './cards/book-chat-card.js';
 import { szenenMethods } from './book/szenen.js';
 import { orteMethods } from './book/orte.js';
+import { songsMethods } from './book/songs.js';
 import { registerKontinuitaetCard } from './cards/kontinuitaet-card.js';
 import { registerBookSettingsCard } from './cards/book-settings-card.js';
 import { registerUserSettingsCard } from './cards/user-settings-card.js';
@@ -216,6 +218,7 @@ document.addEventListener('alpine:init', () => {
   registerKontinuitaetCard();
   registerEreignisseCard();
   registerOrteCard();
+  registerSongsCard();
   registerSzenenCard();
   registerFigurenCard();
   registerFigurWerkstattCard();
@@ -553,6 +556,39 @@ document.addEventListener('alpine:init', () => {
           return c !== 0 ? c : this._pageIdx(a.name) - this._pageIdx(b.name);
         });
     },
+    get songsFiltered() {
+      const f = this.songsFilters;
+      const q = f.suche ? f.suche.toLowerCase() : '';
+      const figId = f.figurId;
+      return this.songs.filter(s => {
+        if (q) {
+          const hay = `${s.titel || ''} ${s.interpret || ''} ${s.genre || ''} ${s.beschreibung || ''}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        if (figId && !(s.figuren || []).some(x => (x.fig_id || x) === figId)) return false;
+        if (f.kapitel && !(s.kapitel || []).some(k => k.name === f.kapitel)) return false;
+        if (f.genre && s.genre !== f.genre) return false;
+        if (f.kontextTyp && s.kontext_typ !== f.kontextTyp) return false;
+        return true;
+      }).sort((a, b) => {
+        const aK = Math.min(...(a.kapitel || []).map(k => this._chapterIdx(k.name)), 9999);
+        const bK = Math.min(...(b.kapitel || []).map(k => this._chapterIdx(k.name)), 9999);
+        if (aK !== bK) return aK - bK;
+        return (a.titel || '').localeCompare(b.titel || '', 'de');
+      });
+    },
+    get songsByFigurId() {
+      const map = new Map();
+      for (const s of (this.songs || [])) {
+        for (const f of (s.figuren || [])) {
+          const id = f.fig_id || f;
+          if (!id) continue;
+          if (!map.has(id)) map.set(id, []);
+          map.get(id).push(s);
+        }
+      }
+      return map;
+    },
     get orteFiltered() {
       const q = this.orteFilters.suche ? this.orteFilters.suche.toLowerCase() : '';
       return this.orte.filter(o =>
@@ -829,6 +865,7 @@ document.addEventListener('alpine:init', () => {
     ...lektoratTimeMethods,
     ...szenenMethods,
     ...orteMethods,
+    ...songsMethods,
     ...i18nMethods,
     ...pageViewMethods,
     ...editorEditMethods,

@@ -187,6 +187,15 @@
             <span class="bewertung-section-title bewertung-section-title--inline" x-text="$app.t('figuren.field.ersteErwaehnung') + ' '"></span>
             <span class="figur-detail-value" x-text="f.erste_erwaehnung"></span>
           </div>
+          <!-- Musikgeschmack — abgeleitet aus song_figures-Rollup -->
+          <div x-show="$app.songsByFigurId.get(f.id)?.length" class="figur-musikgeschmack">
+            <div class="bewertung-section-title" x-text="$app.t('figuren.field.musikgeschmack')"></div>
+            <div class="figur-tags-row">
+              <template x-for="s in ($app.songsByFigurId.get(f.id) || [])" :key="s.id">
+                <span class="tag internal-link" @click.stop="$app.openSongById(s.id)" x-text="(s.titel || '') + (s.interpret ? ' — ' + s.interpret : '')"></span>
+              </template>
+            </div>
+          </div>
           <!-- Schlüsselzitate -->
           <div x-show="f.schluesselzitate?.length">
             <div class="bewertung-section-title" x-text="$app.t('figuren.field.schluesselzitate')"></div>

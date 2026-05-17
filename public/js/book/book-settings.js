@@ -315,6 +315,130 @@ export const bookSettingsMethods = {
     return window.__app.currentBookRole === 'owner';
   },
 
+  shareInitials(entry) {
+    const name = (entry?.display_name || '').trim();
+    if (name) {
+      const parts = name.split(/\s+/).filter(Boolean);
+      if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+      return parts[0].slice(0, 2).toUpperCase();
+    }
+    const local = (entry?.user_email || '').split('@')[0];
+    return local.slice(0, 2).toUpperCase();
+  },
+
+  shareAvatarStyle(entry) {
+    // Deterministischer Hue aus Email → distinkte Farbe pro User, Light/Dark via HSL.
+    const src = (entry?.user_email || '');
+    let h = 0;
+    for (let i = 0; i < src.length; i++) h = (h * 31 + src.charCodeAt(i)) >>> 0;
+    const hue = h % 360;
+    return {
+      '--avatar-bg': `hsl(${hue} 55% 88%)`,
+      '--avatar-fg': `hsl(${hue} 45% 28%)`,
+    };
+  },
+
+  async loadShareUserPool() {
+    try {
+      const data = await fetchJson('/me/users-light');
+      this.shareUserPool = Array.isArray(data?.users) ? data.users : [];
+    } catch (e) {
+      // Pool ist optional — Suggestions bleiben leer, Invite-Pfad geht weiter.
+      this.shareUserPool = [];
+    }
+  },
+
+  _shareEmailValid(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  },
+
+  shareCanInvite() {
+    return !!window.__app.currentUser?.can_invite_users;
+  },
+
+  shareSuggestions() {
+    const q = (this.shareEmail || '').trim().toLowerCase();
+    const taken = new Set((this.bookAccessList || []).map(e => (e.user_email || '').toLowerCase()));
+    const pool = (this.shareUserPool || []).filter(u => !taken.has((u.email || '').toLowerCase()));
+    let matches = pool;
+    if (q) {
+      matches = pool.filter(u =>
+        u.email.toLowerCase().includes(q) ||
+        (u.display_name || '').toLowerCase().includes(q));
+    }
+    const list = matches.slice(0, 8).map(u => ({
+      kind: 'user',
+      key: 'user:' + u.email,
+      email: u.email,
+      label: u.email,
+      sub: u.display_name || '',
+    }));
+    // Invite-Option, wenn Eingabe eine gültige Email ist, kein User matcht und
+    // der aktuelle User Invite-Recht hat. Auch nicht anzeigen, wenn die Email
+    // bereits Zugriff hat.
+    if (q && this._shareEmailValid(q) && !taken.has(q) && this.shareCanInvite()) {
+      const exact = pool.find(u => u.email.toLowerCase() === q);
+      if (!exact) {
+        list.push({
+          kind: 'invite',
+          key: 'invite:' + q,
+          email: q,
+          label: window.__app.t('book.share.inviteOption', { email: q }),
+          sub: '',
+        });
+      }
+    }
+    return list;
+  },
+
+  pickShareSuggestion(s) {
+    if (!s) return;
+    this.shareEmail = s.email;
+    this.shareSuggestOpen = false;
+    if (s.kind === 'invite') {
+      this.submitShareInvite();
+    }
+  },
+
+  shareSubmitLabel() {
+    const q = (this.shareEmail || '').trim().toLowerCase();
+    if (!q) return window.__app.t('book.share.inviteBtn');
+    const taken = new Set((this.bookAccessList || []).map(e => (e.user_email || '').toLowerCase()));
+    if (taken.has(q)) return window.__app.t('book.share.inviteBtn');
+    const known = (this.shareUserPool || []).some(u => u.email.toLowerCase() === q);
+    if (!known && this._shareEmailValid(q) && this.shareCanInvite()) {
+      return window.__app.t('book.share.inviteAndShareBtn');
+    }
+    return window.__app.t('book.share.inviteBtn');
+  },
+
+  async submitShareInvite() {
+    if (!this.bookAccessIsOwner()) return;
+    const bookId = window.__app.selectedBookId;
+    const email = (this.shareEmail || '').trim().toLowerCase();
+    if (!bookId || !email) return;
+    const known = (this.shareUserPool || []).some(u => u.email.toLowerCase() === email);
+    if (!known && this._shareEmailValid(email) && this.shareCanInvite()) {
+      this.shareBusy = true;
+      this.bookAccessError = '';
+      try {
+        const r = await fetch('/me/invite', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(window.__app.tError(data) || `HTTP ${r.status}`);
+        await this.loadShareUserPool();
+      } catch (e) {
+        this.bookAccessError = e.message;
+        this.shareBusy = false;
+        return;
+      }
+    }
+    await this.shareBookAccessAdd();
+  },
+
   async shareBookAccessAdd() {
     if (!this.bookAccessIsOwner()) return;
     const bookId = window.__app.selectedBookId;
@@ -332,6 +456,7 @@ export const bookSettingsMethods = {
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(window.__app.tError(data) || `HTTP ${r.status}`);
       this.shareEmail = '';
+      this.shareSuggestOpen = false;
       await this.loadBookAccess();
     } catch (e) {
       this.bookAccessError = e.message;

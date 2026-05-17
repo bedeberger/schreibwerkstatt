@@ -298,4 +298,48 @@
   .ort-stimmung { max-width: 100%; }
 }
 
+/* === Songs / Musikbibliothek — Liste + Detail-Komponenten ===
+   Layout via .entity-list. Akzent --card-accent-songs in card-accents.css. */
+.song-list { padding: 0 0 1rem; }
+.song-interpret {
+  color: var(--color-muted);
+  font-style: italic;
+  margin-left: 0.25em;
+}
+.song-interpret .song-sep {
+  color: var(--color-muted);
+  margin-right: 0.25em;
+}
+.song-genre {
+  font-size: 11px;
+  color: var(--card-accent);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 18%;
+}
+
+/* kontext_typ als Anker — analog zu .card--orte. */
+.card--songs .entity-typ-tag {
+  background: transparent;
+  border: 0;
+  color: var(--card-accent);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0;
+  min-width: 64px;
+  text-align: left;
+}
+
+@media (max-width: 600px) {
+  .song-list { padding: 0 0 0.75rem; }
+  .song-genre { max-width: 100%; }
+  .song-interpret { display: block; margin-left: 0; font-size: 12px; }
+}
+
 }

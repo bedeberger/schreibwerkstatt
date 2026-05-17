@@ -147,6 +147,7 @@ const cardsState = () => ({
   showEreignisseCard: false,
   showSzenenCard: false,
   showOrteCard: false,
+  showSongsCard: false,
   showKontinuitaetCard: false,
   showBookStatsCard: false,
   showStilCard: false,
@@ -314,6 +315,19 @@ const orteState = () => ({
   },
 });
 
+const songsState = () => ({
+  songsUpdatedAt: null,
+  selectedSongId: null,
+  songsFilters: {
+    figurId: '',
+    kapitel: '',
+    szeneId: '',
+    genre: '',
+    kontextTyp: '',
+    suche: '',
+  },
+});
+
 // _checkDoneBeforeChat wird von toggleChatCard + resetPage verwendet (Editor-nah).
 const chatsState = () => ({
   _checkDoneBeforeChat: false,
@@ -403,6 +417,7 @@ export function initialLektoratState() {
     ...ereignisseState(),
     ...szenenState(),
     ...orteState(),
+    ...songsState(),
     ...chatsState(),
     ...featuresUsageState(),
     ...bookCreateState(),

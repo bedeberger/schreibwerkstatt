@@ -6,13 +6,13 @@
 }
 
 .card--admin-usage > .tabs {
-  margin-bottom: var(--space-sm);
+  margin-bottom: var(--space-lg);
 }
 
 .admin-usage-range {
   display: flex;
-  gap: var(--space-md);
-  margin-bottom: var(--space-md);
+  gap: var(--space-lg);
+  margin-bottom: var(--space-lg);
   flex-wrap: wrap;
 }
 
@@ -33,13 +33,13 @@
 }
 
 .admin-usage-pane {
-  margin-top: var(--space-sm);
+  margin-top: var(--space-lg);
 }
 
 .admin-usage-filter {
   display: flex;
-  gap: var(--space-md);
-  margin-bottom: var(--space-sm);
+  gap: var(--space-lg);
+  margin-bottom: var(--space-lg);
 }
 
 .admin-usage-filter label {
@@ -111,7 +111,7 @@
 .admin-usage-table th,
 .admin-usage-table td {
   text-align: left;
-  padding: var(--space-sm) var(--space-xs);
+  padding: var(--space-md) var(--space-sm);
   border-bottom: 1px solid var(--color-border);
   vertical-align: middle;
 }
@@ -168,12 +168,12 @@
 .admin-usage-totals {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
-  gap: var(--space-md);
-  margin-bottom: var(--space-md);
+  gap: var(--space-lg);
+  margin-bottom: var(--space-lg);
 }
 
 .admin-usage-kpi {
-  padding: var(--space-md);
+  padding: var(--space-lg);
   background: var(--color-tag-bg);
   border-radius: var(--radius-md);
   border-left: 3px solid var(--card-accent);
@@ -195,12 +195,12 @@
 .admin-usage-charts {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
-  gap: var(--space-md);
+  gap: var(--space-lg);
 }
 
 .admin-usage-charts figure {
   margin: 0;
-  padding: var(--space-md);
+  padding: var(--space-lg);
   background: var(--color-tag-bg);
   border-radius: var(--radius-md);
 }
@@ -208,7 +208,7 @@
 .admin-usage-charts figcaption {
   font-size: var(--font-size-sm);
   color: var(--color-muted);
-  margin-bottom: var(--space-sm);
+  margin-bottom: var(--space-md);
 }
 
 .admin-usage-chart-canvas {
@@ -217,14 +217,14 @@
 }
 
 .admin-usage-series {
-  margin-top: var(--space-md);
-  padding: var(--space-sm);
+  margin-top: var(--space-lg);
+  padding: var(--space-md);
   background: var(--color-tag-bg);
   border-radius: var(--radius-md);
 }
 
 .admin-usage-h3--spaced {
-  margin-top: var(--space-md);
+  margin-top: var(--space-xl);
 }
 
 @media (max-width: 720px) {

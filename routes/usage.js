@@ -23,6 +23,7 @@ const ALLOWED_KEYS = new Set([
   'werkstatt',
   'szenen',
   'orte',
+  'songs',
   'ereignisse',
   'bookchat',
   'stats',
