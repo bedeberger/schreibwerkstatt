@@ -1114,6 +1114,7 @@
   "editor.revisions.viewer.loading":        "Inhalt wird geladen…",
   "editor.revisions.viewer.error":          "Fehler:",
   "editor.revisions.viewer.diffLoading":    "Vergleich wird berechnet…",
+  "editor.revisions.viewer.diffSkip":       "… {n} Absätze unverändert …",
   "editor.revisions.viewer.noChanges":      "Keine Unterschiede zur aktuellen Version.",
   "editor.revisions.viewer.restore":        "Diese Version wiederherstellen",
 

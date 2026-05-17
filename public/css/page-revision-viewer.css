@@ -132,15 +132,97 @@
 }
 
 /* === Diff-Body ===
-   Wort-Level: <ins> grun, <del> rot durchgestrichen, <span.diff-eq> neutral.
-   Whitespace beibehalten via white-space: pre-wrap, damit Renderer-Output
-   ohne <p>-Tags trotzdem als Prosa lesbar bleibt. */
+   Block-aware: parseBlocks splittet Quell-HTML in <p>/<h*>/<li>/<blockquote>/
+   <pre>, jeder Block wird als eigener Wrapper gerendert. Aenderungen sind als
+   Block ganz markiert (added/removed) oder gepaart mit Inline-Word-Diff
+   (changed). Unveraenderte Strecken > 1 Block kollabieren zu .diff-block--skip. */
 .revision-diff-body {
-  white-space: pre-wrap;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
   word-wrap: break-word;
   line-height: 1.6;
   font-size: var(--font-size-md, 1rem);
 }
+
+.revision-diff-body .diff-block {
+  padding: 0.45rem 0.7rem;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid transparent;
+  background: var(--color-surface);
+}
+.revision-diff-body .diff-block--eq {
+  color: var(--color-muted);
+  background: transparent;
+  border-left-color: var(--color-border);
+}
+.revision-diff-body .diff-block--added {
+  background: var(--color-ok-bg);
+  color: var(--color-ok-text);
+  border-left-color: var(--color-ok-text);
+}
+.revision-diff-body .diff-block--removed {
+  background: var(--color-err-bg);
+  color: var(--color-err-text);
+  border-left-color: var(--color-err-text);
+}
+.revision-diff-body .diff-block--removed del.diff-del {
+  text-decoration: line-through;
+}
+.revision-diff-body .diff-block--added ins.diff-add {
+  text-decoration: none;
+}
+.revision-diff-body .diff-block--changed {
+  background: var(--color-card-bg);
+  border-left-color: var(--color-primary);
+}
+.revision-diff-body .diff-block--skip {
+  text-align: center;
+  font-style: italic;
+  color: var(--color-muted);
+  background: transparent;
+  border-left: 0;
+  border-top: 1px dashed var(--color-border);
+  border-bottom: 1px dashed var(--color-border);
+  border-radius: 0;
+  padding: 0.35rem 0.7rem;
+  font-size: var(--font-size-sm, 0.875rem);
+}
+
+/* Block-Tag-Spezifika: Headings groesser/fetter, li mit Bullet, blockquote
+   eingerueckt, pre monospace. */
+.revision-diff-body .diff-block--h1,
+.revision-diff-body .diff-block--h2,
+.revision-diff-body .diff-block--h3,
+.revision-diff-body .diff-block--h4,
+.revision-diff-body .diff-block--h5,
+.revision-diff-body .diff-block--h6 {
+  font-weight: 700;
+  margin: 0;
+}
+.revision-diff-body .diff-block--h1 { font-size: 1.4rem; }
+.revision-diff-body .diff-block--h2 { font-size: 1.25rem; }
+.revision-diff-body .diff-block--h3 { font-size: 1.1rem; }
+.revision-diff-body .diff-block--li {
+  padding-left: 1.6rem;
+  position: relative;
+}
+.revision-diff-body .diff-block--li::before {
+  content: "•";
+  position: absolute;
+  left: 0.7rem;
+  color: var(--color-muted);
+}
+.revision-diff-body .diff-block--blockquote {
+  font-style: italic;
+  padding-left: 1rem;
+}
+.revision-diff-body .diff-block--pre {
+  font-family: var(--font-mono, monospace);
+  white-space: pre-wrap;
+}
+
+/* Inline-Marker in --changed-Bloecken: Wort-Diff. */
 .revision-diff-body .diff-add,
 .revision-diff-body ins.diff-add {
   background: var(--color-ok-bg);

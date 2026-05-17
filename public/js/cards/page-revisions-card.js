@@ -152,7 +152,8 @@ export function registerPageRevisionsCard() {
       try {
         const diffLib = await loadDiff();
         const currentHtml = app?.originalHtml || '';
-        const out = renderWordDiff(currentHtml, this.viewerBody, diffLib);
+        const skipLabel = (n) => app?.t?.('editor.revisions.viewer.diffSkip', { n }) || `… ${n} …`;
+        const out = renderWordDiff(currentHtml, this.viewerBody, diffLib, { skipLabel });
         this.viewerDiffHtml = out.html;
         this.viewerDiffUnchanged = out.unchanged;
       } catch (e) {

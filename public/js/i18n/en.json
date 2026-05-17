@@ -1113,6 +1113,7 @@
   "editor.revisions.viewer.loading":        "Loading content…",
   "editor.revisions.viewer.error":          "Error:",
   "editor.revisions.viewer.diffLoading":    "Computing diff…",
+  "editor.revisions.viewer.diffSkip":       "… {n} paragraphs unchanged …",
   "editor.revisions.viewer.noChanges":      "No differences from the current version.",
   "editor.revisions.viewer.restore":        "Restore this version",
 
