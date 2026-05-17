@@ -11,12 +11,37 @@ import { escHtml } from './utils.js';
 const BLOCK_TAGS = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'blockquote', 'pre'];
 const BLOCK_RE = new RegExp(`<(${BLOCK_TAGS.join('|')})\\b[^>]*>([\\s\\S]*?)<\\/\\1>`, 'gi');
 
-// Identische HTML→Text-Normalisierung wie routes/sync.js und db/page-revisions.js.
+// Identische HTML→Text-Normalisierung wie routes/sync.js und db/page-revisions.js
+// (fallback fuer Node-Tests; im Browser laeuft _parseBlocksDOM).
 export function htmlToPlainText(html) {
   return String(html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+// Browser-Pfad: DOMParser dekodiert Entities (&nbsp;, &auml;, …) und kennt
+// nested Tags. Regex-Pfad kann das nicht und laesst Entities literal stehen,
+// die danach im Diff als „Steuerzeichen" auftauchen.
+function _parseBlocksDOM(html) {
+  if (typeof DOMParser === 'undefined') return null;
+  try {
+    const doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
+    const nodes = doc.body ? doc.body.querySelectorAll(BLOCK_TAGS.join(',')) : [];
+    if (!nodes.length) {
+      const text = (doc.body?.textContent || '').replace(/\s+/g, ' ').trim();
+      return text ? [{ tag: 'p', text }] : [];
+    }
+    const out = [];
+    for (const el of nodes) {
+      const tag = el.tagName.toLowerCase();
+      const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
+      if (text) out.push({ tag, text });
+    }
+    return out;
+  } catch { return null; }
+}
+
 export function parseBlocks(html) {
+  const dom = _parseBlocksDOM(html);
+  if (dom !== null) return dom;
   const src = String(html || '');
   const matches = [...src.matchAll(BLOCK_RE)];
   if (!matches.length) {
