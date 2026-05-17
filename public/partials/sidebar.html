@@ -71,10 +71,11 @@
       <div x-show="item.solo || item.open" class="tree-chapter-pages">
         <template x-for="page in item.pages" :key="page.id">
           <div class="page-item"
-               :class="{ selected: currentPage?.id === page.id, 'page-item--empty': tokEsts[page.id] && tokEsts[page.id].words === 0, 'page-item--kb-active': _pageSearchActivePageId() === page.id }"
+               :class="{ selected: currentPage?.id === page.id, 'page-item--empty': tokEsts[page.id] && tokEsts[page.id].words === 0, 'page-item--kb-active': _pageSearchActivePageId() === page.id, 'page-item--remote-edit': recentRemoteEdits.has(page.id) }"
                :data-page-id="page.id" role="button" tabindex="0"
                :aria-current="currentPage?.id === page.id ? 'page' : null"
-               @click="selectPage(page)">
+               :data-tip="recentRemoteEdits.has(page.id) ? t('collab.tree.remoteEditTip') : null"
+               @click="selectPage(page); _clearRemoteEditMark(page.id)">
             <span class="page-name">
               <span class="page-status-dot" :class="'page-status-' + pageStatus(page)"
                 @mouseenter.stop="_showStatusTip($el, page)"

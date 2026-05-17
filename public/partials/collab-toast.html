@@ -1,0 +1,20 @@
+<template x-if="collabToast">
+  <div class="job-toast job-toast--ok job-toast--collab"
+       role="status"
+       aria-live="polite"
+       x-cloak>
+    <span class="job-toast-msg"
+          x-text="collabToast.currentPage
+            ? t('collab.toast.currentPage', { user: collabToast.user || t('edit.conflict.unknownUser') })
+            : (collabToast.count && collabToast.count > 1
+                ? t('collab.toast.batch', { count: collabToast.count })
+                : t('collab.toast.otherPage', {
+                    user: collabToast.user || t('edit.conflict.unknownUser'),
+                    page: collabToast.pageName || ''
+                  }))"></span>
+    <button type="button"
+            class="job-toast-close"
+            :aria-label="t('common.close')"
+            @click="_dismissCollabToast()">×</button>
+  </div>
+</template>

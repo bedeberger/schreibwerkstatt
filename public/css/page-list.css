@@ -28,6 +28,23 @@
   color: var(--color-text);
 }
 
+/* Externer Edit: anderer User hat diese Seite seit dem letzten Poll-Tick
+   geschrieben. Marker bleibt, bis der User die Seite einmal anklickt. */
+.page-item.page-item--remote-edit {
+  position: relative;
+}
+.page-item.page-item--remote-edit::before {
+  content: "";
+  position: absolute;
+  left: -4px;
+  top: 50%;
+  width: 3px;
+  height: 60%;
+  transform: translateY(-50%);
+  background: var(--color-warn, var(--color-accent));
+  border-radius: var(--radius-sm);
+}
+
 .page-name {
   display: flex;
   align-items: flex-start;
