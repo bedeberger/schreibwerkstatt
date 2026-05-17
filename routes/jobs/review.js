@@ -21,6 +21,7 @@ const { loadReviewKomplettContext } = require('./review-context');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
 const appSettings = require('../../lib/app-settings');
+const { resolveProvider } = require('../../lib/ai');
 
 // Stabile, kurze Signatur für strukturierte Prompt-Vars (narrative,
 // reviewSchwerpunkt, komplettContext). Identischer Inhalt → identische Sig.
@@ -65,7 +66,7 @@ async function runReviewJob(jobId, bookId, bookName, userEmail, userToken) {
 
   const bookIdInt = parseInt(bookId);
   const email = userEmail || '';
-  const effectiveProvider = appSettings.get('ai.provider') || 'claude';
+  const effectiveProvider = resolveProvider({ userEmail });
   // Cache-Version: Modellname + Prompts-Schema-Version. Ändert sich eins davon,
   // werden alle persistierten Review-Caches automatisch verworfen.
   const cacheVersion = `${_modelName(effectiveProvider)}:${PROMPTS_VERSION || ''}`;
@@ -100,7 +101,7 @@ async function runReviewJob(jobId, bookId, bookName, userEmail, userToken) {
       updateJob(jobId, { progress: 65, statusText: 'job.phase.aiBookReview' });
       const bookText = buildSinglePassBookText(groups, groupOrder);
       const bookPagesSig = buildBookReviewPagesSig(pageContents, { bookName, optionsSig, cacheVersion });
-      const cached = loadBookReviewCache(bookIdInt, email, bookPagesSig);
+      const cached = loadBookReviewCache(bookIdInt, email, bookPagesSig, effectiveProvider);
       if (cached) {
         logger.info(`Single-Pass-Review – Cache-HIT (pages_sig match) – spart Review-Call.`);
         updateJob(jobId, { progress: 97, statusText: 'job.phase.checkpointLoaded' });
@@ -111,7 +112,7 @@ async function runReviewJob(jobId, bookId, bookName, userEmail, userToken) {
           SYSTEM_BUCHBEWERTUNG,
           65, 97, 5000, 0.2, null, undefined, SCHEMA_REVIEW,
         );
-        saveBookReviewCache(bookIdInt, email, bookPagesSig, r);
+        saveBookReviewCache(bookIdInt, email, bookPagesSig, r, effectiveProvider);
       }
     } else {
       const { chunkOrder, chunks } = splitGroupsIntoChunks(groups, groupOrder, PER_CHUNK_LIMIT);
@@ -125,7 +126,7 @@ async function runReviewJob(jobId, bookId, bookName, userEmail, userToken) {
         const fromPct = 65 + Math.round((gi / chunkOrder.length) * 25);
         const toPct   = 65 + Math.round(((gi + 1) / chunkOrder.length) * 25);
         const pagesSig = buildChapterPagesSig(chunk, { narrativeSig, cacheVersion });
-        const cached = loadChapterReviewCache(bookIdInt, email, key, pagesSig);
+        const cached = loadChapterReviewCache(bookIdInt, email, key, pagesSig, effectiveProvider);
         if (cached) {
           cacheHits++;
           completed++;
@@ -148,7 +149,7 @@ async function runReviewJob(jobId, bookId, bookName, userEmail, userToken) {
           SYSTEM_KAPITELANALYSE,
           fromPct, toPct, 1500, 0.2, null, undefined, SCHEMA_CHAPTER_ANALYSIS,
         );
-        saveChapterReviewCache(bookIdInt, email, key, pagesSig, ca);
+        saveChapterReviewCache(bookIdInt, email, key, pagesSig, ca, effectiveProvider);
         completed++;
         logger.info(`[${completed}/${chunkOrder.length}] «${chunk.name}» analysiert (${chunk.pages.length} Seiten)`);
         return { name: chunk.name, pageCount: chunk.pages.length, ...ca };

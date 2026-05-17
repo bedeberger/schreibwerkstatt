@@ -1,8 +1,8 @@
 // Buchschreibungsentwicklung – Zeitliniendiagramm.
 // Methoden werden in Alpine.data('bookStatsCard') gespreadet; Root-Zugriffe via window.__app.
 
-import { fetchJson } from './utils.js';
-import { loadChart } from './lazy-libs.js';
+import { fetchJson } from '../utils.js';
+import { loadChart } from '../lazy-libs.js';
 
 const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 

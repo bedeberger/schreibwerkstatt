@@ -2,7 +2,7 @@
 // pro Seite. Offene Ideen werden im Seiten-Chat als Kontext eingespielt
 // (Backend-seitig via getOpenIdeen — kein Datentransfer aus dieser Karte).
 
-import { fetchJson } from './utils.js';
+import { fetchJson } from '../utils.js';
 
 export const ideenMethods = {
   // ── Lifecycle ────────────────────────────────────────────────────────────

@@ -38,7 +38,7 @@ CLAUDE.md beschreibt **ausschliesslich den aktuellen Stand**. Keine Historie, ke
   - **Ausnahme:** Winston-Logs (`logger.info/warn/error`) bleiben vorläufig deutsch — sie gehen nur in `schreibwerkstatt.log`/Console, nicht an den User.
 - **Content-Store-Facade als einziger Eintrittspunkt für Buchinhalte** — Pages/Chapters/Books werden ausschliesslich via `require('lib/content-store')` gelesen und geschrieben. Dispatch nach `app.backend` ist Detail der Facade. **`bs*`-Calls (`bsGet`/`bsPut`/`bsGetAll`) leben nur in [lib/bookstack.js](lib/bookstack.js) + [lib/content-store/backends/bookstack.js](lib/content-store/backends/bookstack.js) + [routes/sync.js](routes/sync.js) + [routes/jobs/shared/bookstack.js](routes/jobs/shared/bookstack.js) + [routes/proxies.js](routes/proxies.js) + [lib/pdf-render/images.js](lib/pdf-render/images.js)** — Tripwire ([tests/unit/content-store-tripwire.test.mjs](tests/unit/content-store-tripwire.test.mjs)) bricht CI bei neuen Vorkommen.
 - **`bsGetAll` statt `bsGet` für Listen** (nur `bookstack`-Backend-interner Code) — BookStack paginiert (Standard 20 Einträge). `bsGetAll` iteriert alle Seiten automatisch.
-- **HTML→Text-Normalisierung für Stats: Frontend MUSS Server matchen** — `page_stats.chars`/`words`/`tok` werden auf zwei Pfaden befüllt: a) Server-Sync ([routes/sync.js](routes/sync.js)#htmlToText: Tags zu Single-Space, `\s+` collapsed, getrimmt) und b) Frontend nach Page-Save ([tree.js](public/js/tree.js)#`_syncPageStatsAfterSave`). Beide Pfade MÜSSEN dieselbe Normalisierung verwenden. `DOMParser().body.textContent` behält Whitespace zwischen Block-Tags und bläst `tokEsts.chars` gegenüber dem Cron-Snapshot auf — Frontend-Save-Pfad nutzt deshalb dieselben zwei Regex-Replacements wie Server. `tok = Math.round(chars / CHARS_PER_TOKEN)` (Text-Tokens, gleiche Quelle wie chars; kein Prompt-Overhead). Beide Pfade müssen die Formel synchron halten. `/history/page-stats/batch` persistiert blind, kein Server-Recompute. Test: [tests/unit/page-stats-normalization.test.mjs](tests/unit/page-stats-normalization.test.mjs).
+- **HTML→Text-Normalisierung für Stats: Frontend MUSS Server matchen** — `page_stats.chars`/`words`/`tok` werden auf zwei Pfaden befüllt: a) Server-Sync ([routes/sync.js](routes/sync.js)#htmlToText: Tags zu Single-Space, `\s+` collapsed, getrimmt) und b) Frontend nach Page-Save ([tree.js](public/js/book/tree.js)#`_syncPageStatsAfterSave`). Beide Pfade MÜSSEN dieselbe Normalisierung verwenden. `DOMParser().body.textContent` behält Whitespace zwischen Block-Tags und bläst `tokEsts.chars` gegenüber dem Cron-Snapshot auf — Frontend-Save-Pfad nutzt deshalb dieselben zwei Regex-Replacements wie Server. `tok = Math.round(chars / CHARS_PER_TOKEN)` (Text-Tokens, gleiche Quelle wie chars; kein Prompt-Overhead). Beide Pfade müssen die Formel synchron halten. `/history/page-stats/batch` persistiert blind, kein Server-Recompute. Test: [tests/unit/page-stats-normalization.test.mjs](tests/unit/page-stats-normalization.test.mjs).
 - **Read-Modify-Write nur mit `bsGet(..., { fresh: true })`** (nur `bookstack`-Mode) — jeder Pfad, der eine Page liest, modifiziert und zurückschreibt (Lektorat-Save, Chat-Vorschlag-Apply, History-Apply, Pre-Send-Refresh des Seiten-Chats), MUSS im `bookstack`-Mode den Read mit `fresh: true` machen. Sonst liefert der SW-API_CACHE (SWR) eine Pre-Edit-Fassung; der nachfolgende PUT überschreibt frische Server-Edits aus dem Fokus-Editor mit Stale-Daten. `_bsWrite` postet nach jedem erfolgreichen Schreibvorgang `invalidate-api` an den SW als zweite Schutzschicht; `fresh: true` bleibt trotzdem Pflicht pro RMW-Pfad. **`localdb`-Mode:** kein Cache zwischen Frontend-Read und Frontend-Write; Pflicht entfällt — aber Pfade nutzen weiter dieselben Helpers, also schadet `fresh: true` nicht. Test: [tests/unit/stale-write.test.mjs](tests/unit/stale-write.test.mjs).
 - **Job-Ergebnisse mit `updatedAt`-Staleness-Check** — Server-Jobs, deren Resultate auf einem Snapshot des Seitenstands operieren (Lektorat-Findings mit Positionen, Chat-Antworten mit `vorschlaege.original`), liefern `updatedAt: pd.updated_at`. Der Client vergleicht im `onDone` mit `currentPage.updated_at`; weicht es ab (User hat während der Analyse gespeichert), wird das Ergebnis verworfen statt angewandt. Backend-agnostisch — beide Backends liefern `updated_at` über die Content-Store-Facade.
 - **401-Handling zentral** — ein globaler `window.fetch`-Wrapper in `public/js/app.js` fängt alle 401-Antworten ab und dispatcht `session-expired`; Alpine zeigt daraufhin den Session-Banner. Feature-Module prüfen 401 nicht selbst und dürfen das Event nicht unterdrücken. Kein Auto-Redirect – User soll ungespeicherte Inhalte retten können.
@@ -101,7 +101,7 @@ Der Frontend-Scope ist in **Alpine.data-Sub-Komponenten** aufgeteilt:
 5. `showXxxCard`-Flag in `app-state.js` → `cardsState`.
 6. **Pflicht: Eintrag in `EXCLUSIVE_CARDS` ([public/js/cards/feature-registry.js](public/js/cards/feature-registry.js))** — `{ key: 'xxx', flag: 'showXxxCard' }`. `_closeOtherMainCards`, `resetView` und `_maybeOpenBookOverview` iterieren darüber; ohne Eintrag bricht Exklusivität + Home-Klick öffnet keine Übersicht.
 7. **Eintrag in `FEATURES` ([public/js/cards/feature-registry.js](public/js/cards/feature-registry.js))** (Single Source of Truth für Quick-Pills + Command-Palette + Usage-Tracking) — bei `kind: 'toggle'` zusätzlich Key in `ALLOWED_KEYS` von [routes/usage.js](routes/usage.js) ergänzen, sonst verwirft `/usage/track` lautlos. Karten, die nicht in der Palette erscheinen sollen (`kapitelReview`, `userSettings`), bleiben nur in `EXCLUSIVE_CARDS`.
-8. Hash-Router: in `_currentHashView` ([public/js/app-hash-router.js](public/js/app-hash-router.js)) Parse-/Build-Branch ergänzen + Flag in der Liste am Ende der Datei aufnehmen.
+8. Hash-Router: in `_currentHashView` ([public/js/app/app-hash-router.js](public/js/app/app-hash-router.js)) Parse-/Build-Branch ergänzen + Flag in der Liste am Ende der Datei aufnehmen.
 
 ### Root-Zugriff aus Sub-Komponenten (`$app` / `window.__app`)
 
@@ -421,13 +421,26 @@ public/
   partials/            – HTML-Partials, geladen per _loadPartials()
   js/app.js            – Alpine-Root (`x-data="lektorat"`), Methoden-Spreads,
                          `$app`-Magic, window.__app-Referenz
-  js/app-state.js      – Root-State-Slices (shell, ai, navigation, editor,
-                         cards-Flags, Editor-Findings, …)
-  js/app-view.js       – Root-Toggle-Methoden (toggleXxxCard), selectPage,
-                         resetView/_resetBookScopedState mit Event-Dispatches
-  js/app-ui.js         – Filter-/Sort-Helper, Partial-Loader
-  js/app-jobs-core.js  – Job-Queue, checkPendingJobs, _startPoll-Wrapper
-  js/app-hash-router.js, app-navigation.js, app-chrome.js, app-komplett.js
+  js/app/              – Root-Slices: app-state (Root-State, cards-Flags),
+                         app-view (toggleXxxCard, selectPage, resetView),
+                         app-ui (Filter/Sort, Partial-Loader),
+                         app-jobs-core (Job-Queue, checkPendingJobs, _startPoll),
+                         app-hash-router, app-navigation, app-chrome, app-komplett
+  js/admin/            – Admin-Karten-Methoden (admin-categories, admin-login,
+                         admin-settings, admin-usage, admin-users)
+  js/api/              – Server-Communication: api-ai, api-bookstack,
+                         bookstack-search, offline-sync
+  js/chat/             – chat (Seiten-Chat), chat-base (gespreaded),
+                         book-chat (Buch-Chat)
+  js/book/             – Buch-/Seiten-/Kapitel-Fachmodule:
+                         tree, page-view, history, book-create, book-settings,
+                         bookstats, review, kapitel-review, fehler-heatmap,
+                         stil-heatmap, kontinuitaet, ereignisse, orte, szenen,
+                         figuren, ideen, finetune-export, lektorat-time,
+                         writing-time, export
+  js/editor/           – Editor-Fachmodule (utils, edit, focus, find, synonyme,
+                         figur-lookup, toolbar, lektorat, shortcuts). Cards leben
+                         in cards/editor-*-card.js und importieren von hier.
   js/cards/            – Alpine.data-Sub-Komponenten (24 Karten + Shared)
     catalog-store.js          – Alpine.store('catalog') für figuren/orte/szenen/globalZeitstrahl
     feature-registry.js       – SSoT für Karten-Features + Aktionen + Provider-Hooks
@@ -455,24 +468,10 @@ public/
                          (spart ~800 KB JS am initialen Page-Load)
   js/features-usage.js – Root-Spread: $watch auf Show-Flags, POST /usage/track,
                          GET /usage/recent für Palette-Section „Zuletzt"
-  js/chat-base.js      – Geteilte Chat-Methoden (spreaded in chat-card + book-chat-card)
-  js/*.js              – Fachmodule, die in Sub-Komponenten oder Root gespreadet werden
-                         (figuren, orte, szenen, kontinuitaet, graph, review,
-                          stil-heatmap, fehler-heatmap, bookstats, writing-time,
-                          book-settings, user-settings, kapitel-review, ereignisse,
-                          chat, book-chat)
-                       – Editor-/Findings-Module (bleiben im Root-Spread):
-                          page-view, editor/edit, editor/utils,
-                          shortcuts, tree, history,
-                          api-ai, api-bookstack, bookstack-search, offline-sync,
-                          i18n
-                       – Module hinter eigenen Cards (gespreaded in *-card.js):
-                          editor/focus, editor/toolbar, editor/find,
-                          editor/synonyme, editor/figur-lookup, editor/lektorat,
-                          ideen, finetune-export
-  js/editor/           – Editor-Fachmodule (utils, edit, focus, find, synonyme,
-                         figur-lookup, toolbar, lektorat). Cards leben weiter
-                         in cards/editor-*-card.js und importieren von hier.
+  js/user-settings.js  – Pro-User-Einstellungen (Sprache, Modell-Override)
+  js/i18n.js, js/i18n/ – t/tRaw + DE/EN-JSONs
+  js/theme-init.js, js/plausible-init.js, js/tooltip.js, js/fullscreen.js,
+  js/lazy-libs.js      – Cross-cutting Top-Level-Module
 ```
 
 ## Tests

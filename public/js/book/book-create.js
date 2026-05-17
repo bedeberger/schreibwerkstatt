@@ -4,7 +4,7 @@
 // erfasst der User dort im zweiten Schritt). Server-Route persistiert die
 // lokale books-Row, damit Book-Settings-FK direkt funktioniert.
 
-import { contentRepo } from './repo/content.js';
+import { contentRepo } from '../repo/content.js';
 
 export const bookCreateMethods = {
   openCreateBook() {

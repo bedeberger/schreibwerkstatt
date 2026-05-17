@@ -62,6 +62,7 @@
         <tr>
           <th x-text="$app.t('admin.users.email')"></th>
           <th x-text="$app.t('admin.users.role')"></th>
+          <th x-text="$app.t('admin.users.aiProvider')"></th>
           <th x-text="$app.t('admin.users.status')"></th>
           <th x-text="$app.t('admin.users.lastLogin')"></th>
           <th></th>
@@ -81,6 +82,16 @@
                      { value: 'admin', label: $app.t('admin.users.role.admin') },
                    ]"
                    @combobox-change="if ($event.detail && $event.detail !== u.global_role) adminUsersUpdate(u, { global_role: $event.detail })"></div>
+            </td>
+            <td>
+              <div x-data="combobox($app.t('admin.users.aiProvider'))"
+                   x-effect="value = u.ai_provider_override || ''; options = [
+                     { value: '',        label: $app.t('admin.users.aiProvider.global', { provider: adminUsersGlobalProvider }) },
+                     { value: 'claude',  label: 'claude' },
+                     { value: 'ollama',  label: 'ollama' },
+                     { value: 'llama',   label: 'llama' },
+                   ]"
+                   @combobox-change="if ($event.detail !== (u.ai_provider_override || '')) adminUsersUpdate(u, { ai_provider_override: $event.detail || null })"></div>
             </td>
             <td>
               <span class="badge" :class="'badge--status-' + u.status" x-text="$app.t('admin.users.status.' + u.status)"></span>

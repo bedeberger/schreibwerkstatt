@@ -5029,6 +5029,33 @@ function _runMigrationsLocked() {
     logger.info(`DB-Migration auf Version 117 abgeschlossen (Phase 11: ai_provider_override + provider-Spalte in 7 KI-Caches; Backfill auf '${defaultProvider117}').`);
   }
 
+  if (version < 118) {
+    // BookStack-Exit Phase 1: Backfill setzte books.owner_email aber legte
+    // keine book_access-Row an. Migration 109 spiegelte einmalig die damals
+    // existenten Owner; alle danach via Backfill angelegten Buecher fielen
+    // durch — /content/books filtert strikt ueber book_access und liefert
+    // leere Liste. Mirror erneut ausfuehren (idempotent, INSERT OR IGNORE).
+    const ownerInsert118 = db.prepare(`
+      INSERT OR IGNORE INTO book_access (book_id, user_email, role, granted_by)
+      SELECT b.book_id, b.owner_email, 'owner', 'migration-118'
+        FROM books b
+       WHERE b.owner_email IS NOT NULL
+         AND b.owner_email <> ''
+         AND EXISTS (SELECT 1 FROM app_users u WHERE u.email = b.owner_email)
+    `);
+    const ownerRows118 = ownerInsert118.run().changes;
+    if (ownerRows118 > 0) {
+      logger.info(`Migration 118: ${ownerRows118} Owner-Row(s) aus books.owner_email nach book_access nachgespiegelt.`);
+    }
+
+    const fkErrors118 = db.pragma('foreign_key_check');
+    if (fkErrors118.length) {
+      throw new Error(`Migration 118: foreign_key_check meldet ${fkErrors118.length} Verstoesse: ${JSON.stringify(fkErrors118.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 118').run();
+    logger.info('DB-Migration auf Version 118 abgeschlossen (Re-Mirror books.owner_email -> book_access fuer Backfill-Buecher).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

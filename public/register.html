@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="/css/tokens.css">
   <link rel="stylesheet" href="/css/landing.css">
 </head>
-<body data-captcha-site-key="{{captchaSiteKey}}">
+<body>
   <main class="public-shell">
     <header class="public-header">
       <h1>{{title}}</h1>
@@ -47,68 +47,7 @@
     </footer>
   </main>
 
-  <script>
-    (function () {
-      var siteKey = document.body.dataset.captchaSiteKey || '';
-      if (siteKey) {
-        document.getElementById('captcha-slot').hidden = false;
-        var s = document.createElement('script');
-        s.src = 'https://js.hcaptcha.com/1/api.js';
-        s.async = true; s.defer = true;
-        document.head.appendChild(s);
-      }
-      var form = document.getElementById('register-form');
-      var msg  = document.getElementById('register-msg');
-      var I18N = {
-        success:  {{i18nSuccessJson}},
-        rateLimit:{{i18nRateLimitJson}},
-        invalid:  {{i18nInvalidJson}},
-        error:    {{i18nErrorJson}}
-      };
-      form.addEventListener('submit', async function (e) {
-        e.preventDefault();
-        msg.hidden = true; msg.className = 'public-msg';
-        var data = new FormData(form);
-        var captchaToken = null;
-        if (siteKey && typeof hcaptcha !== 'undefined') {
-          try { captchaToken = hcaptcha.getResponse(); } catch {}
-        }
-        var payload = {
-          email:       (data.get('email') || '').trim(),
-          displayName: (data.get('displayName') || '').trim() || null,
-          message:     (data.get('message') || '').trim() || null,
-          captchaToken: captchaToken
-        };
-        try {
-          var r = await fetch('/register', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-          if (r.status === 202) {
-            form.reset();
-            msg.textContent = I18N.success;
-            msg.className = 'public-msg public-msg--ok';
-            msg.hidden = false;
-            return;
-          }
-          var j = {}; try { j = await r.json(); } catch {}
-          if (r.status === 429) {
-            msg.textContent = I18N.rateLimit;
-          } else if (r.status === 400) {
-            msg.textContent = j.error_code === 'EMAIL_INVALID' ? I18N.invalid : I18N.error;
-          } else {
-            msg.textContent = I18N.error;
-          }
-          msg.className = 'public-msg public-msg--err';
-          msg.hidden = false;
-        } catch (ex) {
-          msg.textContent = I18N.error;
-          msg.className = 'public-msg public-msg--err';
-          msg.hidden = false;
-        }
-      });
-    }());
-  </script>
+  <script type="application/json" id="register-config">{{configJson}}</script>
+  <script src="/js/register.js" defer></script>
 </body>
 </html>

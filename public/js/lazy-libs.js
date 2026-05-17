@@ -11,6 +11,7 @@ let _visPromise = null;
 let _chartPromise = null;
 let _jsMindPromise = null;
 let _sortablePromise = null;
+let _diffPromise = null;
 
 function _loadScript(src) {
   return new Promise((resolve, reject) => {
@@ -61,4 +62,14 @@ export function loadSortable() {
       .catch(err => { _sortablePromise = null; throw err; });
   }
   return _sortablePromise;
+}
+
+export function loadDiff() {
+  if (typeof window.Diff !== 'undefined') return Promise.resolve(window.Diff);
+  if (!_diffPromise) {
+    _diffPromise = _loadScript('vendor/diff-9.0.0.min.js')
+      .then(() => window.Diff)
+      .catch(err => { _diffPromise = null; throw err; });
+  }
+  return _diffPromise;
 }

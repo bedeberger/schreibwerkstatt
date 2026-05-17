@@ -8,7 +8,7 @@
 // Draft verändert) → Draft liegen lassen, editor-edit fragt beim nächsten
 // Öffnen nach.
 
-import { contentRepo } from './repo/content.js';
+import { contentRepo } from '../repo/content.js';
 
 const DRAFT_PREFIX = 'editor_draft_';
 

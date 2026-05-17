@@ -2,7 +2,7 @@
 // Greift auf page_stats zu (gefüllt vom Sync-Job über lib/page-index.js).
 // Methoden werden in Alpine.data('stilCard') gespreadet; Root-Zugriffe via window.__app.
 
-import { fetchJson, formatNumber, heatmapCellVars, localeTag, minMaxBy } from './utils.js';
+import { fetchJson, formatNumber, heatmapCellVars, localeTag, minMaxBy } from '../utils.js';
 
 // Metrik-Schlüssel → i18n-Label. Reihenfolge = Spaltenreihenfolge in der Heatmap.
 // sampleBucket: Schlüssel im pro-Seite `style_samples`-Objekt bzw. 'repetition'

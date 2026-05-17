@@ -2,7 +2,7 @@
 // $root.loadFiguren() gerufen). Die eigentliche Extraktion läuft als Teil
 // von POST /jobs/komplett-analyse.
 
-import { fetchJson } from './utils.js';
+import { fetchJson } from '../utils.js';
 
 const _VALID_TYPES = new Set(['hauptfigur', 'nebenfigur', 'antagonist', 'mentor', 'randfigur', 'andere']);
 

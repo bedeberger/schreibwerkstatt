@@ -1,6 +1,6 @@
 // Schauplatz-Methoden am Root-Spread (von app-view, Szenen-Trigger, toggleOrteCard gerufen).
 
-import { fetchJson } from './utils.js';
+import { fetchJson } from '../utils.js';
 
 export const orteMethods = {
   async loadOrte(bookId) {

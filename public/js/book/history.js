@@ -1,9 +1,9 @@
 // History-Methoden (werden in die Alpine-Komponente gespreadet)
 // `this` bezieht sich auf die Alpine-Komponente.
 
-import { escHtml, fetchJson } from './utils.js';
+import { escHtml, fetchJson } from '../utils.js';
 import { sortByPosition, SOFT_TYPEN } from './page-view.js';
-import { contentRepo } from './repo/content.js';
+import { contentRepo } from '../repo/content.js';
 
 export const historyMethods = {
   async loadPageHistory(pageId) {

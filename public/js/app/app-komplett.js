@@ -1,4 +1,4 @@
-import { fetchJson, clearStatusAfter, formatLastRun } from './utils.js';
+import { fetchJson, clearStatusAfter, formatLastRun } from '../utils.js';
 
 // Komplett-Analyse-Pipeline-UI: Start, Polling, Phasen-Indikator,
 // Last-Run-Anzeige, Kapitel-Cache-Reset.

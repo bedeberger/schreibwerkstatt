@@ -3,7 +3,7 @@
 // dasselbe Markup teilen (Header/Stars/Summary/Achsen/Stärken/Schwächen/
 // Empfehlungen/Zitate/Fazit) – nur die Achsen-Liste unterscheidet sich.
 
-import { escHtml, escMd, renderStars, noteTip } from './utils.js';
+import { escHtml, escMd, renderStars, noteTip } from '../utils.js';
 
 // Mapping Prio → severity-tag-Variante. Reuse statt eigene Badge-Klassen.
 // hoch = rot (kritisch), mittel = amber, niedrig = grau.

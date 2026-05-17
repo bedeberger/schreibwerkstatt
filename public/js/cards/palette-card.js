@@ -196,9 +196,11 @@ export function registerPaletteCard() {
         return [{ key: parsed.provider.key, labelKey: parsed.provider.sectionKey, items }];
       }
 
+      const availableActions = root.devMode ? ACTIONS.filter(a => a.key !== 'action.logout') : ACTIONS;
+
       // Befehls-Modus: nur Aktionen.
       if (parsed.mode === 'commands') {
-        const items = this._matchActions(ACTIONS, parsed.q, ctx, t);
+        const items = this._matchActions(availableActions, parsed.q, ctx, t);
         if (!items.length) return [];
         return [{ key: 'commands', labelKey: 'palette.section.commands', items }];
       }
@@ -266,7 +268,7 @@ export function registerPaletteCard() {
             sections.push({ key: groupKey, labelKey: GROUP_LABEL_KEY[groupKey], items });
           }
         }
-        const actionItems = this._matchActions(ACTIONS, q, ctx, t);
+        const actionItems = this._matchActions(availableActions, q, ctx, t);
         if (actionItems.length) {
           sections.push({ key: 'app', labelKey: GROUP_LABEL_KEY.app, items: actionItems });
         }
@@ -280,7 +282,7 @@ export function registerPaletteCard() {
           item.indices = m.indices;
           matched.push(item);
         }
-        for (const a of ACTIONS) {
+        for (const a of availableActions) {
           const m = this._matchFeatureFuzzy(a, q, t);
           if (!m) continue;
           const item = this._actionItem(a, ctx);

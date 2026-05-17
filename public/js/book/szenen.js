@@ -1,6 +1,6 @@
 // Szenenanalyse-Methoden am Root-Spread (von komplett-Job, app-view, orteCard gerufen).
 
-import { fetchJson } from './utils.js';
+import { fetchJson } from '../utils.js';
 
 export const szenenMethods = {
   async loadSzenen(bookId) {

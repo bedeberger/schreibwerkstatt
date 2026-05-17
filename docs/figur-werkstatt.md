@@ -94,7 +94,7 @@ Sub-Komponente `figurWerkstattCard` ([public/js/cards/figur-werkstatt-card.js](.
 
 **Lifecycle:** `setupCardLifecycle({ name:'figurWerkstatt', showFlag:'showFigurWerkstattCard', timerKeys:['_brainstormPollTimer','_consistencyPollTimer'], load: loadDrafts, onCardRefresh: dirty-confirm + reload })`. Extra-Listener: `Cmd/Ctrl+S` → saveDraft, `beforeunload` mit `isDirty()`-Schutz, `figur-werkstatt:select { draftId }` für Hash-Deep-Link.
 
-**Hash-Router:** `werkstattDraftId` lebt am Root als SSoT (`figurWerkstattState`, [public/js/app-state.js](../public/js/app-state.js)). Sub spiegelt via `$watch('selectedDraftId', id => __app.werkstattDraftId = id)`. Permalink-Resolve bei kalt-geladener Sub via `_pendingDraftId`-Park bis `loadDrafts` fertig.
+**Hash-Router:** `werkstattDraftId` lebt am Root als SSoT (`figurWerkstattState`, [public/js/app/app-state.js](../public/js/app/app-state.js)). Sub spiegelt via `$watch('selectedDraftId', id => __app.werkstattDraftId = id)`. Permalink-Resolve bei kalt-geladener Sub via `_pendingDraftId`-Park bis `loadDrafts` fertig.
 
 **jsMind-Editor:**
 

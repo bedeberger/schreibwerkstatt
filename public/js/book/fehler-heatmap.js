@@ -2,7 +2,7 @@
 // Daten kommen live aus /history/fehler-heatmap/:book_id — kein KI-Call, keine Sync-Phase.
 // Methoden werden in Alpine.data('fehlerHeatmapCard') gespreadet; Root-Zugriffe via window.__app.
 
-import { fetchJson, formatNumber, heatmapCellVars, minMaxBy } from './utils.js';
+import { fetchJson, formatNumber, heatmapCellVars, minMaxBy } from '../utils.js';
 
 // Cluster-Gruppierung der Typen-Spalten. Reihenfolge in den Cluster-Arrays = Spalten-Reihenfolge.
 // Muss mit VALID_TYPEN in routes/jobs/lektorat.js kompatibel sein.

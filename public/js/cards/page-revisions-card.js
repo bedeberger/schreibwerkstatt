@@ -1,9 +1,13 @@
 // Alpine.data('pageRevisionsCard') — Phase 2 (BookStack-Exit): App-eigene
 // Revisionsliste pro Seite. Lebt unter dem Editor parallel zur
 // Lektorat-Verlaufsleiste (pageHistoryCard). Read aus
-// GET /content/pages/:id/revisions, Restore via POST .../restore.
+// GET /content/pages/:id/revisions, Voll-Body aus .../:rev_id, Restore via
+// POST .../restore. Viewer ist natives <dialog>: Tabs "Inhalt | Vergleich",
+// Diff-Lib lazy.
 
 import { fetchJson } from '../utils.js';
+import { loadDiff } from '../lazy-libs.js';
+import { renderWordDiff } from '../page-revision-diff.js';
 
 export function registerPageRevisionsCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -14,9 +18,19 @@ export function registerPageRevisionsCard() {
     restoringId: null,
     _pageId: null,
 
+    // Viewer-State (Phase 2: Inhalt-/Vergleichs-Modal).
+    viewerOpen: false,
+    viewerRev: null,
+    viewerBody: '',
+    viewerMode: 'content',     // 'content' | 'diff'
+    viewerLoading: false,
+    viewerError: '',
+    viewerDiffHtml: '',
+    viewerDiffUnchanged: false,
+    viewerDiffLoading: false,
+
     init() {
       const app = window.__app;
-      // Initial-Load, falls beim Mount bereits eine Seite offen ist.
       const cur = app?.currentPage?.id || null;
       if (cur) this.loadRevisions(cur);
 
@@ -25,8 +39,6 @@ export function registerPageRevisionsCard() {
         this.loadRevisions(pid);
       });
 
-      // Nach erfolgreichem Save fuegt der Server eine neue Revision an —
-      // Reload, damit die neue Row sofort sichtbar wird, ohne Page-Reload.
       this._onRevisionsChanged = (e) => {
         const pid = e?.detail?.pageId;
         if (!pid || pid !== this._pageId) return;
@@ -47,6 +59,7 @@ export function registerPageRevisionsCard() {
       this.loading = false;
       this.restoringId = null;
       this._pageId = null;
+      this.closeViewer();
     },
 
     async loadRevisions(pageId) {
@@ -66,7 +79,6 @@ export function registerPageRevisionsCard() {
 
     sourceLabel(src) {
       const app = window.__app;
-      // i18n-Key pro Source. Fallback: rohe Source als Tag-Text.
       const key = `editor.revisions.source.${src}`;
       const out = app?.t?.(key);
       return out && out !== key ? out : src;
@@ -76,6 +88,83 @@ export function registerPageRevisionsCard() {
       const app = window.__app;
       const locale = app?.uiLocale === 'en' ? 'en-US' : 'de-CH';
       return Number(n || 0).toLocaleString(locale);
+    },
+
+    // ── Viewer ───────────────────────────────────────────────────────────────
+    async openViewer(rev) {
+      if (!rev?.id) return;
+      const app = window.__app;
+      const pageId = app?.currentPage?.id;
+      if (!pageId) return;
+
+      this.viewerOpen = true;
+      this.viewerRev = rev;
+      this.viewerMode = 'content';
+      this.viewerBody = '';
+      this.viewerError = '';
+      this.viewerDiffHtml = '';
+      this.viewerDiffUnchanged = false;
+      this.viewerLoading = true;
+
+      // Natives <dialog> via DOM-Referenz oeffnen.
+      this.$nextTick(() => {
+        const dlg = this.$refs?.viewerDialog;
+        if (dlg && typeof dlg.showModal === 'function' && !dlg.open) dlg.showModal();
+      });
+
+      try {
+        const data = await fetchJson(`/content/pages/${pageId}/revisions/${rev.id}`);
+        const rev2 = data?.revision || null;
+        if (!rev2) throw new Error('REVISION_NOT_FOUND');
+        this.viewerBody = String(rev2.body_html || '');
+      } catch (e) {
+        console.error('[pageRevisions:viewer:load]', e);
+        this.viewerError = e.message || 'load failed';
+      } finally {
+        this.viewerLoading = false;
+      }
+    },
+
+    closeViewer() {
+      this.viewerOpen = false;
+      this.viewerRev = null;
+      this.viewerBody = '';
+      this.viewerMode = 'content';
+      this.viewerError = '';
+      this.viewerDiffHtml = '';
+      this.viewerDiffUnchanged = false;
+      const dlg = this.$refs?.viewerDialog;
+      if (dlg && dlg.open) dlg.close();
+    },
+
+    async setViewerMode(mode) {
+      if (mode !== 'content' && mode !== 'diff') return;
+      this.viewerMode = mode;
+      if (mode === 'diff' && !this.viewerDiffHtml && !this.viewerError) {
+        await this._ensureDiff();
+      }
+    },
+
+    async _ensureDiff() {
+      const app = window.__app;
+      if (!this.viewerBody) return;
+      this.viewerDiffLoading = true;
+      try {
+        const diffLib = await loadDiff();
+        const currentHtml = app?.originalHtml || '';
+        const out = renderWordDiff(currentHtml, this.viewerBody, diffLib);
+        this.viewerDiffHtml = out.html;
+        this.viewerDiffUnchanged = out.unchanged;
+      } catch (e) {
+        console.error('[pageRevisions:viewer:diff]', e);
+        this.viewerError = e.message || 'diff failed';
+      } finally {
+        this.viewerDiffLoading = false;
+      }
+    },
+
+    async restoreFromViewer() {
+      if (this.viewerRev) await this.restore(this.viewerRev);
     },
 
     async restore(rev) {
@@ -95,12 +184,12 @@ export function registerPageRevisionsCard() {
           const body = await r.json().catch(() => ({}));
           throw new Error(body?.error_code || `HTTP ${r.status}`);
         }
-        // Editor + Stats refreshen
         if (typeof app._refetchCurrentPage === 'function') {
           await app._refetchCurrentPage();
         }
         await this.loadRevisions(pageId);
         app.setStatus?.(app.t('editor.revisions.restored'), false, 4000);
+        this.closeViewer();
       } catch (e) {
         console.error('[pageRevisions:restore]', e);
         app.setStatus?.(app.t('editor.revisions.restoreFailed') + ' ' + (e.message || ''), true, 6000);

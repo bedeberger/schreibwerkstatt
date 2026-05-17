@@ -8,13 +8,21 @@ export const adminUsersMethods = {
     this.adminUsersLoading = true;
     this.adminUsersError = '';
     try {
-      const r = await fetch('/admin/users', { credentials: 'same-origin' });
-      if (!r.ok) {
-        const j = await r.json().catch(() => ({}));
-        throw new Error(j.error_code || `HTTP ${r.status}`);
+      const [usersResp, settingResp] = await Promise.all([
+        fetch('/admin/users', { credentials: 'same-origin' }),
+        fetch('/admin/settings/ai.provider', { credentials: 'same-origin' }).catch(() => null),
+      ]);
+      if (!usersResp.ok) {
+        const j = await usersResp.json().catch(() => ({}));
+        throw new Error(j.error_code || `HTTP ${usersResp.status}`);
       }
-      const data = await r.json();
+      const data = await usersResp.json();
       this.adminUsersList = data.users || [];
+      if (settingResp && settingResp.ok) {
+        const s = await settingResp.json().catch(() => null);
+        const v = s && (s.value || s.value_json);
+        if (typeof v === 'string') this.adminUsersGlobalProvider = v;
+      }
     } catch (e) {
       this.adminUsersError = e.message;
     } finally {

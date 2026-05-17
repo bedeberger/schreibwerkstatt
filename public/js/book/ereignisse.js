@@ -1,7 +1,7 @@
 // Ereignisse/Zeitstrahl-Methoden am Root-Spread (figuren.js ruft
 // _buildGlobalZeitstrahl, app-komplett.js ruft _reloadZeitstrahl).
 
-import { fetchJson } from './utils.js';
+import { fetchJson } from '../utils.js';
 
 export const ereignisseMethods = {
   _buildGlobalZeitstrahl() {

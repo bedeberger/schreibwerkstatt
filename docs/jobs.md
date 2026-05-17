@@ -82,7 +82,7 @@ startPoll(this, {
 
 Server-Restart verliert In-Memory-Jobs. Mitigation:
 - `localStorage` per Card hält `lsKey: jobId` während der Job läuft. Bei `onNotFound` (404) → cleanup.
-- `checkPendingJobs()` (Root, [public/js/app-jobs-core.js](../public/js/app-jobs-core.js)) liest `/jobs/queue` beim Login und dispatched `job:reconnect` `{ type, jobId, job, extra? }` → Karten übernehmen Loading-State + starten Polling.
+- `checkPendingJobs()` (Root, [public/js/app/app-jobs-core.js](../public/js/app/app-jobs-core.js)) liest `/jobs/queue` beim Login und dispatched `job:reconnect` `{ type, jobId, job, extra? }` → Karten übernehmen Loading-State + starten Polling.
 
 ## Events am `window`
 

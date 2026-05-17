@@ -15,6 +15,7 @@ const {
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
 const appSettings = require('../../lib/app-settings');
+const { resolveProvider } = require('../../lib/ai');
 
 const synonymeRouter = express.Router();
 
@@ -32,13 +33,14 @@ async function runSynonymJob(jobId, wort, satz, bookId, userEmail) {
   const { buildSynonymPrompt, SCHEMA_SYNONYM, PROMPTS_VERSION } = prompts;
   const { SYSTEM_SYNONYM } = await getBookPrompts(bookId, userEmail);
   const bookSettings = bookId ? getBookSettings(bookId, userEmail) : null;
-  const cacheVersion = `${_modelName(appSettings.get('ai.provider') || 'claude')}:${PROMPTS_VERSION || ''}`;
+  const effectiveProvider = resolveProvider({ userEmail });
+  const cacheVersion = `${_modelName(effectiveProvider)}:${PROMPTS_VERSION || ''}`;
   const keyHash = _synonymKeyHash(wort, satz, bookSettings, cacheVersion);
   try {
     logger.info(`Start: «${wort}»`);
     updateJob(jobId, { statusText: 'job.phase.searchingSynonyms', progress: 10 });
 
-    const cached = loadSynonymCache(userEmail, keyHash);
+    const cached = loadSynonymCache(userEmail, keyHash, effectiveProvider);
     if (cached) {
       logger.info(`«${wort}» – Cache-HIT, spart Synonym-Call.`);
       completeJob(jobId, { synonyme: cached, tokensIn: 0, tokensOut: 0, cached: true },
@@ -67,7 +69,7 @@ async function runSynonymJob(jobId, wort, satz, bookId, userEmail) {
         return true;
       });
 
-    saveSynonymCache(userEmail, keyHash, synonyme);
+    saveSynonymCache(userEmail, keyHash, synonyme, effectiveProvider);
 
     completeJob(jobId, { synonyme, tokensIn: tok.in, tokensOut: tok.out },
       tps(tok), `«${wort}» ${synonyme.length} Vorschläge`);

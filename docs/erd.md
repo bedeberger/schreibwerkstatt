@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 115, 65 Tabellen (ohne `sqlite_*`/`schema_version`/`sessions`).
+Stand: Schema-Version 117, 65 Tabellen (ohne `sqlite_*`/`schema_version`/`sessions`).
 
 Quelle: Live-Dump aus [schreibwerkstatt.db](../schreibwerkstatt.db) (`.schema --indent`) + [db/migrations.js](../db/migrations.js). Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -631,6 +631,7 @@ erDiagram
     TEXT    user_email   PK
     INTEGER chapter_id   PK,FK
     TEXT    phase        PK
+    TEXT    provider     PK "Phase 11"
     TEXT    pages_sig
     TEXT    extract_json
     TEXT    cached_at
@@ -638,6 +639,7 @@ erDiagram
   book_extract_cache {
     INTEGER book_id      PK,FK
     TEXT    user_email   PK
+    TEXT    provider     PK "Phase 11"
     TEXT    pages_sig
     TEXT    extract_json
     TEXT    cached_at
@@ -647,6 +649,7 @@ erDiagram
     TEXT    user_email   PK
     INTEGER chapter_id   PK,FK
     TEXT    phase        PK
+    TEXT    provider     PK "Phase 11"
     TEXT    pages_sig
     TEXT    review_json
     TEXT    cached_at
@@ -654,6 +657,7 @@ erDiagram
   book_review_cache {
     INTEGER book_id      PK,FK
     TEXT    user_email   PK
+    TEXT    provider     PK "Phase 11"
     TEXT    pages_sig
     TEXT    review_json
     TEXT    cached_at
@@ -662,12 +666,14 @@ erDiagram
     INTEGER book_id      PK,FK
     TEXT    user_email   PK
     INTEGER chapter_id   PK,FK
+    TEXT    provider     PK "Phase 11"
     TEXT    pages_sig
     TEXT    review_json
     TEXT    cached_at
   }
   synonym_cache {
     TEXT    user_email   PK
+    TEXT    provider     PK "Phase 11"
     TEXT    key_hash     PK
     TEXT    result_json
     TEXT    cached_at
@@ -676,6 +682,7 @@ erDiagram
     INTEGER book_id      PK,FK
     TEXT    user_email   PK
     INTEGER page_id      PK,FK
+    TEXT    provider     PK "Phase 11"
     TEXT    ctx_sig
     TEXT    result_json
     TEXT    cached_at
@@ -708,6 +715,7 @@ erDiagram
     TEXT    created_at
     REAL    monthly_budget_usd "Phase 4d: NULL = kein numerisches Limit"
     TEXT    budget_mode        "Phase 4d: none | soft | hard (Default none)"
+    TEXT    ai_provider_override "Phase 11: NULL = follows global ai.provider; CHECK in ('claude','ollama','llama')"
   }
   user_invites {
     INTEGER id           PK "AUTOINCREMENT"

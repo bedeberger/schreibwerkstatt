@@ -2,8 +2,8 @@
 // Methoden werden in Alpine.data('bookSettingsCard') gespreadet;
 // Root-Zugriffe via window.__app.
 
-import { fetchJson } from './utils.js';
-import { contentRepo } from './repo/content.js';
+import { fetchJson } from '../utils.js';
+import { contentRepo } from '../repo/content.js';
 
 export const bookSettingsMethods = {
   async loadBookSettings() {

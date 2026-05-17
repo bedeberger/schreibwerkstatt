@@ -8,7 +8,7 @@ Verbindlicher Aufbau des Alpine-State. Vor jeder UI-Änderung die richtige Ebene
 2. **Sub-Komponenten `Alpine.data('xxxCard')`** in [public/js/cards/](../public/js/cards/) — eine pro UI-Card. Eigener fachlicher State + `init()`/`destroy()`. Karten haben **keine** eigenen `showXxxCard`-Flags (Root ist SSoT); sie hören via `$watch(() => window.__app.showXxxCard)` auf Öffnen/Schliessen.
 3. **`Alpine.store('catalog')`** ([public/js/cards/catalog-store.js](../public/js/cards/catalog-store.js)) — geteilte Fach-Daten `figuren / orte / szenen / globalZeitstrahl`. Root spiegelt sie via Getter/Setter-Proxy ([public/js/app.js:439-446](../public/js/app.js#L439-L446)), damit `this.figuren = …` und `this.figuren.push(…)` weiter funktionieren. Karten lesen via `$store.catalog` oder `$app.figuren`.
 
-## Root-State-Slices ([public/js/app-state.js](../public/js/app-state.js))
+## Root-State-Slices ([public/js/app/app-state.js](../public/js/app/app-state.js))
 
 `initialLektoratState()` spreadet **14 Slice-Funktionen** in ein flaches Root-Objekt. Neues Feld → in den passenden Slice:
 
@@ -140,9 +140,9 @@ Vier orthogonale Modi am Editor — kein Single-Enum, sondern Boolean-Flags am R
 | Modus | Flag | Slice / Datei | Enter | Exit |
 |-------|------|---------------|-------|------|
 | **Viewmodus** (Lesen) | _kein_ (= alle anderen `false`) | — | Default | — |
-| **Prüfmodus** | `checkDone: true` | `lektoratState` ([app-state.js:199](../public/js/app-state.js#L199)) | `runCheck()` ([editor/lektorat.js:42](../public/js/editor/lektorat.js#L42)) → Polling → Setzen bei Done ([editor/lektorat.js:175](../public/js/editor/lektorat.js#L175)) oder `loadHistoryEntry` ([history.js:142](../public/js/history.js#L142)) | `closeFindings()` ([editor/lektorat.js:28](../public/js/editor/lektorat.js#L28)) |
-| **Editmodus** | `editMode: true` | `editorState` ([app-state.js:87](../public/js/app-state.js#L87)) | `startEdit()` ([editor/edit.js:147](../public/js/editor/edit.js#L147)) | `cancelEdit()` ([editor/edit.js:211](../public/js/editor/edit.js#L211)) / `saveEdit()` ([editor/edit.js:237](../public/js/editor/edit.js#L237)) |
-| **Fokusmodus** | `focusMode: true` | `focusModeState` ([app-state.js](../public/js/app-state.js)) | `enterFocusMode()` / `startFocusEdit()` / Cmd+Shift+E | `exitFocusMode()` / Esc / Cmd+Shift+E |
+| **Prüfmodus** | `checkDone: true` | `lektoratState` ([app-state.js:199](../public/js/app/app-state.js#L199)) | `runCheck()` ([editor/lektorat.js:42](../public/js/editor/lektorat.js#L42)) → Polling → Setzen bei Done ([editor/lektorat.js:175](../public/js/editor/lektorat.js#L175)) oder `loadHistoryEntry` ([history.js:142](../public/js/book/history.js#L142)) | `closeFindings()` ([editor/lektorat.js:28](../public/js/editor/lektorat.js#L28)) |
+| **Editmodus** | `editMode: true` | `editorState` ([app-state.js:87](../public/js/app/app-state.js#L87)) | `startEdit()` ([editor/edit.js:147](../public/js/editor/edit.js#L147)) | `cancelEdit()` ([editor/edit.js:211](../public/js/editor/edit.js#L211)) / `saveEdit()` ([editor/edit.js:237](../public/js/editor/edit.js#L237)) |
+| **Fokusmodus** | `focusMode: true` | `focusModeState` ([app-state.js](../public/js/app/app-state.js)) | `enterFocusMode()` / `startFocusEdit()` / Cmd+Shift+E | `exitFocusMode()` / Esc / Cmd+Shift+E |
 
 **Begleit-State pro Modus:**
 - Prüfmodus: `lektoratFindings`, `selectedFindings`, `correctedHtml`, `hasErrors`, `analysisOut`, `appliedOriginals`, `appliedHistoricCorrections`, `lastCheckId`, `activeHistoryEntryId`, `checkProgress`, `checkStatus`, `_checkPollTimer`.
@@ -166,8 +166,8 @@ Vier orthogonale Modi am Editor — kein Single-Enum, sondern Boolean-Flags am R
 1. `focusMode === true` ⇒ `editMode === true`. Enforced in [editor/focus/card.js:45](../public/js/editor/focus/card.js#L45) (`enterFocusMode` bricht bei `!editMode` ab) und [editor/edit.js:234](../public/js/editor/edit.js#L234) (`cancelEdit` ruft `exitFocusMode` zuerst).
 2. `runCheck` darf nicht im Editmodus starten. Template-Guard: Prüfen-Button steht in `<template x-if="!editMode">` ([editor.html:44](../public/partials/editor.html#L44)).
 3. `closeFindings`-Button im Editmodus nur sichtbar wenn `!focusMode` ([editor.html:82](../public/partials/editor.html#L82)) — im Fokus sind Findings ohnehin ausgeblendet.
-4. **Chat-Modus** (showChatCard) snapshotet `checkDone` in `_checkDoneBeforeChat` und setzt `checkDone=false` ([chat-base.js:129](../public/js/chat-base.js#L129)); beim Schliessen Restore ([app-view.js:310-320](../public/js/app-view.js#L310-L320)). Ohne diesen Snapshot würde der Chat Findings doppelt rendern.
-5. **Reset-Reihenfolge in `resetPage()`** ([app-view.js:378](../public/js/app-view.js#L378)): `exitFocusMode` → `_stopAutosave` → Chat-Reset → Card-Flags → Editor-State (`editMode/editDirty/editSaving`) → Lektorat-State (`checkDone/findings/...`). Diese Reihenfolge ist Pflicht — Fokus zuerst, weil `exitFocusMode` `editMode/editDirty` liest.
+4. **Chat-Modus** (showChatCard) snapshotet `checkDone` in `_checkDoneBeforeChat` und setzt `checkDone=false` ([chat-base.js:129](../public/js/chat/chat-base.js#L129)); beim Schliessen Restore ([app-view.js:310-320](../public/js/app/app-view.js#L310-L320)). Ohne diesen Snapshot würde der Chat Findings doppelt rendern.
+5. **Reset-Reihenfolge in `resetPage()`** ([app-view.js:378](../public/js/app/app-view.js#L378)): `exitFocusMode` → `_stopAutosave` → Chat-Reset → Card-Flags → Editor-State (`editMode/editDirty/editSaving`) → Lektorat-State (`checkDone/findings/...`). Diese Reihenfolge ist Pflicht — Fokus zuerst, weil `exitFocusMode` `editMode/editDirty` liest.
 6. `saveEdit` im Fokus bleibt im Fokus+Edit ([editor/edit.js:318](../public/js/editor/edit.js#L318)) — User möchte weiter schreiben. Erst sauberer Exit räumt Edit-Mode auf, dann flusht `exitFocusMode` per `quickSave` ([editor/focus/card.js:349-351](../public/js/editor/focus/card.js#L349-L351)).
 7. Hotkey Cmd+Shift+E ([editor/focus/trampoline.js:28](../public/js/editor/focus/trampoline.js#L28) → [editor/focus/card.js:245](../public/js/editor/focus/card.js#L245)) wirkt nur bei `showEditorCard` und routet zustandsabhängig: in Fokus → exit, in Edit → enter, sonst → startFocusEdit (Edit + Fokus in einem Schritt).
 

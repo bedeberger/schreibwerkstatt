@@ -2,8 +2,8 @@
 // gespreadet). Job-Flow (runKontinuitaetCheck + startKontinuitaetPoll) nutzt
 // shared `startPoll`-Helper; eigene Toggle-Logik bleibt (kein createCardJobFeature).
 
-import { fetchJson, escHtml } from './utils.js';
-import { startPoll } from './cards/job-helpers.js';
+import { fetchJson, escHtml } from '../utils.js';
+import { startPoll } from '../cards/job-helpers.js';
 
 export const kontinuitaetMethods = {
   async _loadKontinuitaetHistory() {

@@ -2,8 +2,8 @@
 //   1. FEATURES (public/js/cards/feature-registry.js, kind:'toggle')
 //   2. EXCLUSIVE_CARDS (same file)
 //   3. ALLOWED_KEYS (routes/usage.js — Tracking-Allowlist)
-//   4. Hash-Router-watchers + apply-Branch (public/js/app-hash-router.js)
-//   5. showXxxCard-Flags (public/js/app-state.js#cardsState)
+//   4. Hash-Router-watchers + apply-Branch (public/js/app/app-hash-router.js)
+//   5. showXxxCard-Flags (public/js/app/app-state.js#cardsState)
 //
 // Fehlt eine neue Karte in (3), verwirft `/usage/track` 400 → keine Recency-
 // Position. Fehlt sie in (2), bricht Exklusivität. Fehlt sie in (4),
@@ -40,7 +40,7 @@ function parseAllowedKeys() {
 
 // ── cardsState-Flags aus app-state.js parsen ────────────────────────────────
 function parseCardsStateFlags() {
-  const src = read('public/js/app-state.js');
+  const src = read('public/js/app/app-state.js');
   const m = src.match(/const\s+cardsState\s*=\s*\(\)\s*=>\s*\(\{([\s\S]*?)\}\)/);
   assert.ok(m, 'cardsState in app-state.js gefunden');
   const flags = [];
@@ -52,7 +52,7 @@ function parseCardsStateFlags() {
 
 // ── Hash-Router-watchers + apply-View-Cases parsen ──────────────────────────
 function parseHashRouterFlags() {
-  const src = read('public/js/app-hash-router.js');
+  const src = read('public/js/app/app-hash-router.js');
   // watchers-Array in _setupHashRouting.
   const m = src.match(/const\s+watchers\s*=\s*\[([\s\S]*?)\]/);
   assert.ok(m, 'watchers-Array im Hash-Router gefunden');
@@ -177,7 +177,7 @@ test('Hash-Router-watchers haben keinen toten Flag (alle existieren im State)', 
 // ──────────────────────────────────────────────────────────────────────────
 
 test('Jede FEATURE.toggle-Methode existiert in app-view.js', () => {
-  const src = read('public/js/app-view.js');
+  const src = read('public/js/app/app-view.js');
   const toggles = FEATURES.filter(f => f.kind === 'toggle');
   const missing = toggles.filter(f => {
     const re = new RegExp(`\\b${f.toggle}\\s*\\(\\)\\s*\\{`, 'm');

@@ -3,8 +3,8 @@
 // `this` ist die Card; Root-Zugriffe laufen über window.__app. Der Root setzt
 // die showXxxCard-Flag, die Card reagiert per $watch und ruft onVisible().
 
-import { escHtml, fmtTok, renderChatMarkdown, fetchJson } from './utils.js';
-import { startPoll, runningJobStatus } from './cards/job-helpers.js';
+import { escHtml, fmtTok, renderChatMarkdown, fetchJson } from '../utils.js';
+import { startPoll, runningJobStatus } from '../cards/job-helpers.js';
 
 function _newClientMsgId() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {

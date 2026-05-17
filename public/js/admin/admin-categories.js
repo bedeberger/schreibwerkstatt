@@ -2,7 +2,7 @@
 // Kategorien- + Tag-Pool. CRUD-Methoden werden in
 // Alpine.data('adminCategoriesCard') gespreadet.
 
-import { fetchJson } from './utils.js';
+import { fetchJson } from '../utils.js';
 
 export const adminCategoriesMethods = {
   async loadAll() {

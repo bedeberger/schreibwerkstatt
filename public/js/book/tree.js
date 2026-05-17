@@ -1,5 +1,5 @@
-import { htmlToText, CHARS_PER_TOKEN, fetchJson, localeTag, relativeDay } from './utils.js';
-import { contentRepo } from './repo/content.js';
+import { htmlToText, CHARS_PER_TOKEN, fetchJson, localeTag, relativeDay } from '../utils.js';
+import { contentRepo } from '../repo/content.js';
 
 // Buch-/Seiten-Lade-Methoden (werden in die Alpine-Komponente gespreadet)
 // `this` bezieht sich auf die Alpine-Komponente.

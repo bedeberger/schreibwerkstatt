@@ -1,6 +1,6 @@
-import { htmlToText, fetchJson, escHtml } from './utils.js';
-import { EXCLUSIVE_CARDS } from './cards/feature-registry.js';
-import { contentRepo } from './repo/content.js';
+import { htmlToText, fetchJson, escHtml } from '../utils.js';
+import { EXCLUSIVE_CARDS } from '../cards/feature-registry.js';
+import { contentRepo } from '../repo/content.js';
 
 // View-Steuerung: Exklusivität zwischen Buch-/Seiten-Karten, Seitenauswahl,
 // Reset-Logik beim Buch-/Seitenwechsel. Buchebenen-Features und Editor sind

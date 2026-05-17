@@ -1,8 +1,8 @@
 // Seitenansicht-Methoden: Formatierte HTML-Ansicht mit Inline-Fehlermarkierung
 // und Figurenkontext-Panel. `this` bezieht sich auf die Alpine-Komponente.
 
-import { escHtml, htmlToText, fetchJson, findInHtml } from './utils.js';
-import { tRaw } from './i18n.js';
+import { escHtml, htmlToText, fetchJson, findInHtml } from '../utils.js';
+import { tRaw } from '../i18n.js';
 import { _sanitizeFigur } from './figuren.js';
 
 // Weiche Typen: standardmässig nicht vorausgewählt (User entscheidet pro Finding)

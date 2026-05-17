@@ -30,6 +30,7 @@ const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
 const { requireBookAccess, sendACLError } = require('../../lib/acl');
 const appSettings = require('../../lib/app-settings');
+const { resolveProvider } = require('../../lib/ai');
 
 function _pageBookId(pageId) {
   const r = db.prepare('SELECT book_id FROM pages WHERE page_id = ?').get(parseInt(pageId, 10));
@@ -122,7 +123,8 @@ async function runCheckJob(jobId, pageId, bookId, userEmail, userToken) {
   const { SYSTEM_LEKTORAT_BLOCKS: SYSTEM_LEKTORAT, STOPWORDS: lektoratStopwords, ERKLAERUNG_RULE: lektoratErklaerungRule, KORREKTUR_REGELN: lektoratKorrekturRegeln } = await getBookPrompts(bookId, userEmail);
   const locale = bookId ? getBookLocale(bookId, userEmail) : 'de-CH';
   const bookSettings = bookId ? getBookSettings(bookId, userEmail) : null;
-  const cacheVersion = `${_modelName(appSettings.get('ai.provider') || 'claude')}:${PROMPTS_VERSION || ''}`;
+  const effectiveProvider = resolveProvider({ userEmail });
+  const cacheVersion = `${_modelName(effectiveProvider)}:${PROMPTS_VERSION || ''}`;
   try {
     logger.info(`Start: Seite #${pageId}`);
     updateJob(jobId, { statusText: 'job.phase.loadingPageContent', progress: 5 });
@@ -178,7 +180,7 @@ async function runCheckJob(jobId, pageId, bookId, userEmail, userToken) {
       sw: lektoratStopwords, er: lektoratErklaerungRule, kr: lektoratKorrekturRegeln,
       pe: previousExcerpt, cn: chapterName, pn: pd.name, cv: cacheVersion, lc: langCode,
     }) : null;
-    const cached = ctxSig ? loadLektoratCache(bookId, userEmail, pageId, ctxSig) : null;
+    const cached = ctxSig ? loadLektoratCache(bookId, userEmail, pageId, ctxSig, effectiveProvider) : null;
 
     let result;
     if (cached) {
@@ -204,10 +206,10 @@ async function runCheckJob(jobId, pageId, bookId, userEmail, userToken) {
       if (!Array.isArray(result?.fehler)) throw i18nError('job.error.fehlerArrayMissing');
       result.fehler = validateLektoratFehler(result.fehler, locale);
 
-      if (ctxSig) saveLektoratCache(bookId, userEmail, pageId, ctxSig, result);
+      if (ctxSig) saveLektoratCache(bookId, userEmail, pageId, ctxSig, result, effectiveProvider);
     }
 
-    const model = _modelName(appSettings.get('ai.provider') || 'claude');
+    const model = _modelName(effectiveProvider);
     const szenen = Array.isArray(result?.szenen) ? result.szenen : [];
 
     const info = db.prepare(`INSERT INTO page_checks
@@ -241,7 +243,8 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
   const logger = makeJobLogger(jobId);
   const prompts = await getPrompts();
   const { buildBatchLektoratPrompt, SCHEMA_LEKTORAT, PROMPTS_VERSION } = prompts;
-  const cacheVersion = `${_modelName(appSettings.get('ai.provider') || 'claude')}:${PROMPTS_VERSION || ''}`;
+  const effectiveProvider = resolveProvider({ userEmail });
+  const cacheVersion = `${_modelName(effectiveProvider)}:${PROMPTS_VERSION || ''}`;
   const { SYSTEM_LEKTORAT_BLOCKS: SYSTEM_LEKTORAT, STOPWORDS: batchStopwords, ERKLAERUNG_RULE: batchErklaerungRule, KORREKTUR_REGELN: batchKorrekturRegeln } = await getBookPrompts(bookId, userEmail);
   const locale = getBookLocale(bookId, userEmail);
   const langCode = (locale || 'de-CH').split('-')[0];
@@ -260,7 +263,7 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
     // bereits via Mutex in lib/ai.js serialisiert – Pool=1 verhindert pile-up im aiCall.
     const concurrency = local ? 1 : (parseInt(appSettings.get('ai.lektorat_batch_concurrency'), 10) || 4);
     const tok = { in: 0, out: 0, ms: 0, inflight: new Map() };
-    const model = _modelName(appSettings.get('ai.provider') || 'claude');
+    const model = _modelName(effectiveProvider);
     let done = 0, totalErrors = 0;
 
     // Letzten-Absatz-Cache pro page_id, damit die Vorseiten-Extraktion im Batch
@@ -308,7 +311,7 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
           sw: batchStopwords, er: batchErklaerungRule, kr: batchKorrekturRegeln,
           pe: previousExcerpt, cn: chapterName, pn: p.name, cv: cacheVersion, lc: langCode,
         });
-        const cached = loadLektoratCache(bookId, userEmail, p.id, ctxSig);
+        const cached = loadLektoratCache(bookId, userEmail, p.id, ctxSig, effectiveProvider);
 
         let result;
         if (cached) {
@@ -339,7 +342,7 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
 
           if (!Array.isArray(result?.fehler)) throw new Error('fehler-Array fehlt');
           result.fehler = validateLektoratFehler(result.fehler, locale);
-          saveLektoratCache(bookId, userEmail, p.id, ctxSig, result);
+          saveLektoratCache(bookId, userEmail, p.id, ctxSig, result, effectiveProvider);
         }
         const fehler = result.fehler || [];
         totalErrors += fehler.length;

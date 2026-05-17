@@ -10,6 +10,7 @@ export function registerAdminUsersCard() {
     adminUsersList: [],
     adminUsersLoading: false,
     adminUsersError: '',
+    adminUsersGlobalProvider: 'claude',  // Phase 11: fuer Provider-Combobox-Label "Global: …"
     adminUsersInviteEmail: '',
     adminUsersInviteRole: 'user',
     adminUsersInviting: false,

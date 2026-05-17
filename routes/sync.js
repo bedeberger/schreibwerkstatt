@@ -12,9 +12,11 @@ const { invalidateBookPageCache } = require('./jobs/chat');
 const { localIsoDate } = require('../lib/local-date');
 const searchIndex = require('../lib/search');
 
-// Phase 1 (BookStack-Exit): Sync-Worker laeuft nur im `bookstack`-Backend.
-// Im `localdb`-Mode ist die DB autoritativ — kein BookStack-Pull noetig; Cron-
-// und manuelle Trigger werden zu no-op.
+// Sync-Worker laeuft backend-agnostisch. Im `bookstack`-Mode pullt er pro
+// User-Token; im `localdb`-Mode liest contentStore lokal — kein Token noetig.
+// Why: page_stats-Style-Metriken + book_stats_history werden ausschliesslich
+// hier befuellt; ohne backend-agnostischen Pfad bleiben Heatmaps + Timeline
+// im localdb-Mode leer.
 function _isBookstackBackend() {
   const sel = String(appSettings.get('app.backend') || 'bookstack').toLowerCase();
   return sel === 'bookstack';
@@ -148,11 +150,11 @@ function _upsertPagesCache(bookId, pages, chapters) {
 
 const PREVIEW_CHARS = 800;
 
-async function syncPagesCache(bookId, token) {
+async function syncPagesCache(bookId, ctx) {
   const [pages, chapters, bookMeta] = await Promise.all([
-    contentStore.listPages(bookId, token),
-    contentStore.listChapters(bookId, token),
-    contentStore.loadBook(bookId, token).catch(() => null),
+    contentStore.listPages(bookId, ctx),
+    contentStore.listChapters(bookId, ctx),
+    contentStore.loadBook(bookId, ctx).catch(() => null),
   ]);
   // pages.book_id REFERENCES books — Buch upserten, falls noch keine Sync lief
   // (frisches BookStack-Buch, das Cron noch nicht erfasst hat).
@@ -171,7 +173,7 @@ async function syncPagesCache(bookId, token) {
     for (let i = 0; i < toFetch.length; i += BATCH) {
       await Promise.allSettled(toFetch.slice(i, i + BATCH).map(async p => {
         try {
-          const pd = await contentStore.loadPage(p.id, token);
+          const pd = await contentStore.loadPage(p.id, ctx);
           const text = htmlToText(pd.html || '').trim();
           stmtPrev.run(text ? text.slice(0, PREVIEW_CHARS) : null, p.id);
         } catch { /* einzelne Seite überspringen */ }
@@ -182,11 +184,11 @@ async function syncPagesCache(bookId, token) {
   logger.info(`pages-Cache Buch ${bookId}: ${pages.length} Seiten, ${toFetch.length} Vorschau(en) nachgeladen.`);
 }
 
-async function syncBook(bookId, token) {
+async function syncBook(bookId, ctx) {
   const [pages, book, chapters] = await Promise.all([
-    contentStore.listPages(bookId, token),
-    contentStore.loadBook(bookId, token),
-    contentStore.listChapters(bookId, token),
+    contentStore.listPages(bookId, ctx),
+    contentStore.loadBook(bookId, ctx),
+    contentStore.listChapters(bookId, ctx),
   ]);
   const chapterCount = chapters.length;
 
@@ -223,7 +225,7 @@ async function syncBook(bookId, token) {
   for (let i = 0; i < pages.length; i += BATCH) {
     const batch = pages.slice(i, i + BATCH);
     const results = await Promise.allSettled(batch.map(async p => {
-      const pd = await contentStore.loadPage(p.id, token);
+      const pd = await contentStore.loadPage(p.id, ctx);
       const text = htmlToText(pd.html || '');
       const { words, chars, tok, wordList, sentences } = computeStats(pd.html || '');
       const preview = text.trim().slice(0, PREVIEW_CHARS);
@@ -316,6 +318,24 @@ async function syncBook(bookId, token) {
 }
 
 async function _syncAllBooksInner() {
+  if (!_isBookstackBackend()) {
+    // Localdb-Pfad: keine Tokens, keine Permissions-Filter — alle Buecher
+    // direkt aus der lokalen DB enumerieren. contentStore liest aus SQLite.
+    const books = db.prepare('SELECT book_id FROM books ORDER BY book_id').all();
+    if (!books.length) {
+      logger.info('Sync (localdb): keine Buecher vorhanden.');
+      return;
+    }
+    logger.info(`Sync (localdb): ${books.length} Buch/Buecher.`);
+    for (const { book_id: bookId } of books) {
+      await runWithContext({ ...getContext(), book: bookId }, async () => {
+        try { await syncBook(bookId, null); }
+        catch (e) { logger.error(`Sync Buch ${bookId} (localdb) fehlgeschlagen: ${_errDetail(e)}`); }
+      });
+    }
+    return;
+  }
+
   const users = getAllUserTokens();
   if (!users.length) {
     logger.warn('Sync übersprungen: kein BookStack-Token in der Datenbank hinterlegt.');
@@ -365,12 +385,8 @@ async function _syncAllBooksInner() {
 }
 
 async function syncAllBooks() {
-  if (!_isBookstackBackend()) {
-    logger.info('Sync uebersprungen: app.backend != bookstack (Phase 1).');
-    return;
-  }
   const t0 = Date.now();
-  logger.info('Sync gestartet.');
+  logger.info(`Sync gestartet (backend=${_isBookstackBackend() ? 'bookstack' : 'localdb'}).`);
   try {
     await _syncAllBooksInner();
   } finally {
@@ -447,15 +463,18 @@ router.post('/chapters/upsert', express.json(), (req, res) => {
 router.post('/pages/:book_id', async (req, res) => {
   const bookId = toIntId(req.params.book_id);
   if (!bookId) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
-  const token = getTokenForRequest(req) || getAnyUserToken();
-  if (!token) return res.status(503).json({ error_code: 'NO_BOOKSTACK_TOKEN' });
+  let ctx = null;
+  if (_isBookstackBackend()) {
+    ctx = getTokenForRequest(req) || getAnyUserToken();
+    if (!ctx) return res.status(503).json({ error_code: 'NO_BOOKSTACK_TOKEN' });
+  }
   if (req.query.source === 'manual') {
     logger.info(`«Seiten laden» geklickt (book=${bookId})`);
   } else if (req.query.source === 'bookSwitch') {
     logger.info(`Buch gewechselt (book=${bookId})`);
   }
   try {
-    await syncPagesCache(bookId, token);
+    await syncPagesCache(bookId, ctx);
     res.json({ ok: true });
   } catch (e) {
     logger.error('pages-Cache Sync Fehler: ' + _errDetail(e));
@@ -470,8 +489,11 @@ router.post('/pages/:book_id', async (req, res) => {
 router.post('/page-stats/:book_id', express.json(), async (req, res) => {
   const bookId = toIntId(req.params.book_id);
   if (!bookId) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
-  const token = getTokenForRequest(req) || getAnyUserToken();
-  if (!token) return res.status(503).json({ error_code: 'NO_BOOKSTACK_TOKEN' });
+  let ctx = null;
+  if (_isBookstackBackend()) {
+    ctx = getTokenForRequest(req) || getAnyUserToken();
+    if (!ctx) return res.status(503).json({ error_code: 'NO_BOOKSTACK_TOKEN' });
+  }
 
   const requestedIds = Array.isArray(req.body?.ids)
     ? Array.from(new Set(req.body.ids.map(toIntId).filter(Boolean)))
@@ -481,14 +503,14 @@ router.post('/page-stats/:book_id', express.json(), async (req, res) => {
   }
 
   try {
-    const pages = await contentStore.listPages(bookId, token);
+    const pages = await contentStore.listPages(bookId, ctx);
 
     // FK-Vorbereitung: page_stats.book_id → books, page_stats.page_id → pages.
     if (requestedIds) {
       // Lazy-Pfad: nur die angefragten pages-Rows einsetzen, kein Chapter-/Prune-Aufwand.
       const bookRow = db.prepare('SELECT 1 FROM books WHERE book_id = ?').get(bookId);
       if (!bookRow) {
-        const bookMeta = await contentStore.loadBook(bookId, token).catch(() => null);
+        const bookMeta = await contentStore.loadBook(bookId, ctx).catch(() => null);
         if (bookMeta) upsertBook(bookMeta);
       }
       const stmt = db.prepare(`
@@ -505,8 +527,8 @@ router.post('/page-stats/:book_id', express.json(), async (req, res) => {
       })();
     } else {
       // Full-Backfill: vollwertiger pages-Cache-Update (Chapters, Prune, Reconcile).
-      const chapters = await contentStore.listChapters(bookId, token);
-      const bookMeta = await contentStore.loadBook(bookId, token).catch(() => null);
+      const chapters = await contentStore.listChapters(bookId, ctx);
+      const bookMeta = await contentStore.loadBook(bookId, ctx).catch(() => null);
       if (bookMeta) upsertBook(bookMeta);
       _upsertPagesCache(bookId, pages, chapters);
     }
@@ -528,7 +550,7 @@ router.post('/page-stats/:book_id', express.json(), async (req, res) => {
     for (let i = 0; i < stale.length; i += BATCH) {
       const slice = stale.slice(i, i + BATCH);
       const results = await Promise.allSettled(slice.map(async p => {
-        const pd = await contentStore.loadPage(p.id, token);
+        const pd = await contentStore.loadPage(p.id, ctx);
         const { words, chars, tok } = computeStats(pd.html || '');
         return { page_id: p.id, book_id: bookId, tok, words, chars, updated_at: p.updated_at || null, cached_at: now };
       }));
@@ -561,15 +583,15 @@ router.post('/page-stats/:book_id', express.json(), async (req, res) => {
 
 // POST /sync/book/:book_id – manueller Trigger für ein Buch
 router.post('/book/:book_id', async (req, res) => {
-  if (!_isBookstackBackend()) {
-    return res.status(409).json({ error_code: 'SYNC_DISABLED_LOCALDB' });
-  }
   const bookId = toIntId(req.params.book_id);
   if (!bookId) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
-  const token = getTokenForRequest(req) || getAnyUserToken();
-  if (!token) return res.status(503).json({ error_code: 'NO_BOOKSTACK_TOKEN' });
+  let ctx = null;
+  if (_isBookstackBackend()) {
+    ctx = getTokenForRequest(req) || getAnyUserToken();
+    if (!ctx) return res.status(503).json({ error_code: 'NO_BOOKSTACK_TOKEN' });
+  }
   try {
-    const result = await syncBook(bookId, token);
+    const result = await syncBook(bookId, ctx);
     res.json({ ok: true, ...result });
   } catch (e) {
     logger.error('Sync-Route Fehler: ' + _errDetail(e));

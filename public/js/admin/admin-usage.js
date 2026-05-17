@@ -3,7 +3,7 @@
 // `window.__app`. Privacy: Admin sieht USD/Tokens + book_id (anonym), keine
 // Buchtitel.
 
-import { loadChart } from './lazy-libs.js';
+import { loadChart } from '../lazy-libs.js';
 
 function _fmt(n, locale, opts) {
   if (n === null || n === undefined || !Number.isFinite(n)) return '—';

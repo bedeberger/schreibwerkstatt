@@ -125,6 +125,15 @@ function _renderRegister(req, res) {
   const s = _strings(lang);
   const captchaSiteKey = appSettings.get('auth.captcha.site_key') || '';
   res.set('Cache-Control', 'no-store');
+  const config = {
+    captchaSiteKey,
+    i18n: {
+      success:   s.success,
+      rateLimit: s.rateLimit,
+      invalid:   s.invalid,
+      error:     s.error,
+    },
+  };
   res.type('html').send(_render('register.html', {
     lang,
     title:          s.registerTitle,
@@ -136,10 +145,7 @@ function _renderRegister(req, res) {
     backToLanding:  s.backToLanding,
     footerHint:     s.registerFooter,
     captchaSiteKey,
-    i18nSuccessJson:   JSON.stringify(s.success),
-    i18nRateLimitJson: JSON.stringify(s.rateLimit),
-    i18nInvalidJson:   JSON.stringify(s.invalid),
-    i18nErrorJson:     JSON.stringify(s.error),
+    configJson:     JSON.stringify(config).replace(/</g, '\\u003c'),
   }));
 }
 

@@ -2,7 +2,7 @@
 // /content/search; AbortController + seq-Guard erhalten, da die Suche
 // debounced auf jedem Tastendruck feuert.
 
-import { contentRepo } from './repo/content.js';
+import { contentRepo } from '../repo/content.js';
 
 export const bookstackSearchMethods = {
   onBookstackSearchInput() {

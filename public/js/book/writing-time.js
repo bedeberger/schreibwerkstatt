@@ -5,7 +5,7 @@
 //
 // `this` zeigt auf die Alpine-Komponente (via spread in app.js).
 
-import { fetchJson } from './utils.js';
+import { fetchJson } from '../utils.js';
 
 const HEARTBEAT_MS = 15000;
 

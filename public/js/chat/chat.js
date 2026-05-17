@@ -1,6 +1,6 @@
-import { escHtml, findInHtml, clearStatusAfter } from './utils.js';
+import { escHtml, findInHtml, clearStatusAfter } from '../utils.js';
 import { makeChatMethods } from './chat-base.js';
-import { contentRepo } from './repo/content.js';
+import { contentRepo } from '../repo/content.js';
 
 // Seiten-Chat-Methoden (werden in Alpine.data('chatCard') gespreadet).
 // Gemeinsame Logik kommt aus chat-base.js; hier nur Seiten-Chat-Spezifika.

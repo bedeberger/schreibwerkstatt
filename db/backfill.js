@@ -11,6 +11,15 @@
 const { db } = require('./connection');
 const logger = require('../logger');
 
+// ACL-Mirror nach Backfill: nur Owner-Row anlegen, wenn der User noch keine
+// Zugriffsrolle am Buch hat. Existierende Sharings (editor/viewer/lektor)
+// werden nicht ueberschrieben — Backfill darf nicht zur Privilege-Escalation
+// werden. ON CONFLICT IGNORE haelt das idempotent.
+const _stmtEnsureOwnerAccess = db.prepare(`
+  INSERT OR IGNORE INTO book_access (book_id, user_email, role, granted_by)
+  VALUES (?, ?, 'owner', 'backfill')
+`);
+
 const _stmtUpsertBookFull = db.prepare(`
   INSERT INTO books (book_id, name, slug, description, created_at, updated_at, last_seen_at, owner_email)
   VALUES (@book_id, @name, @slug, @description, @created_at, @updated_at, @last_seen_at, @owner_email)
@@ -145,6 +154,9 @@ function backfillBookTransactional({ book, chapters, pages, ownerEmail }) {
     }
     for (const p of pages) {
       if (upsertPageFromBackfill(p, { seenAt })) pageCount++;
+    }
+    if (ownerEmail && book?.id) {
+      _stmtEnsureOwnerAccess.run(book.id, ownerEmail);
     }
   })();
 

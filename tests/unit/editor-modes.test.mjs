@@ -74,7 +74,7 @@ test('I3: saveEdit hat Fokus-Branch, der editMode NICHT räumt', () => {
 
 // ── I4: resetPage Reset-Reihenfolge ──────────────────────────────────────────
 test('I4: resetPage hält Reset-Reihenfolge: focus → autosave → chat → edit → lektorat', () => {
-  const src = read('public/js/app-view.js');
+  const src = read('public/js/app/app-view.js');
   const m = src.match(/resetPage\s*\(\)\s*\{[\s\S]*?\n  \}/);
   assert.ok(m, 'resetPage gefunden');
   const body = m[0];
@@ -103,7 +103,7 @@ test('I4: resetPage hält Reset-Reihenfolge: focus → autosave → chat → edi
 
 // ── I5: chat-base#onVisible Snapshot-Reihenfolge ────────────────────────────
 test('I5: chat-base#onVisible snapshotet checkDone bevor es auf false geht', () => {
-  const src = read('public/js/chat-base.js');
+  const src = read('public/js/chat/chat-base.js');
   const m = src.match(/async function onVisible\s*\(\)\s*\{[\s\S]*?\n  \}/);
   assert.ok(m, 'onVisible gefunden');
   const body = m[0];
@@ -117,7 +117,7 @@ test('I5: chat-base#onVisible snapshotet checkDone bevor es auf false geht', () 
 
 // ── I6: Restore beim Chat/Ideen-Close ────────────────────────────────────────
 test('I6: toggleChatCard restauriert checkDone aus _checkDoneBeforeChat', () => {
-  const src = read('public/js/app-view.js');
+  const src = read('public/js/app/app-view.js');
   const m = src.match(/toggleChatCard\s*\(\)\s*\{[\s\S]*?\n  \}/);
   assert.ok(m, 'toggleChatCard gefunden');
   const body = m[0];
@@ -130,7 +130,7 @@ test('I6: toggleChatCard restauriert checkDone aus _checkDoneBeforeChat', () => 
 });
 
 test('I6: toggleIdeenCard restauriert checkDone analog zu Chat', () => {
-  const src = read('public/js/app-view.js');
+  const src = read('public/js/app/app-view.js');
   const m = src.match(/toggleIdeenCard\s*\(\)\s*\{[\s\S]*?\n  \}/);
   assert.ok(m, 'toggleIdeenCard gefunden');
   const body = m[0];

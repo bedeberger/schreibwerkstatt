@@ -1,4 +1,4 @@
-import { escPreserveStrong, fetchText } from './utils.js';
+import { escPreserveStrong, fetchText } from '../utils.js';
 
 // Pure Filter-Logik für die Szenen-Liste. Getrennt von Alpine-Getter, damit
 // Unit-Tests den Kapitel-Filter direkt gegen Fixtures prüfen können.

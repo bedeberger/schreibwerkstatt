@@ -345,6 +345,13 @@ router.post('/auth/admin-login', express.json(), (req, res) => {
 // Kein Auto-Redirect zu /auth/login: Google-Session wäre meist noch aktiv und
 // würde uns sofort silent wieder einloggen. User klickt aktiv "Erneut anmelden".
 router.get('/auth/logout', (req, res) => {
+  // LOCAL_DEV_MODE: Logout no-op — der Guard wuerde sofort eine neue Dev-Admin-
+  // Session anlegen, dadurch waere der Logout/Login-Zyklus visuell folgenlos und
+  // verwirrend. UI versteckt den Logout-Link im Dev-Mode ohnehin; manuelle URL-
+  // Aufrufe landen einfach wieder auf `/`.
+  if (process.env.LOCAL_DEV_MODE === 'true') {
+    return res.redirect('/');
+  }
   const email = req.session.user?.email;
   const loginAt = req.session.loginAt;
   const accept = String(req.headers['accept-language'] || '').toLowerCase();
@@ -396,7 +403,16 @@ router.get('/auth/logout', (req, res) => {
 // GET /auth/me → aktueller User (JSON, für Frontend)
 router.get('/auth/me', (req, res) => {
   if (!req.session?.user) return res.status(401).json({ error_code: 'NOT_LOGGED_IN' });
-  res.json(req.session.user);
+  // Phase 11: resolvter AI-Provider + Override-Quelle (read-only fuer Frontend).
+  let aiProvider = null, aiProviderSource = 'global';
+  try {
+    const { resolveProvider } = require('../lib/ai');
+    const appUsers = require('../db/app-users');
+    aiProvider = resolveProvider({ userEmail: req.session.user.email });
+    const u = appUsers.getUser(req.session.user.email);
+    if (u && u.ai_provider_override) aiProviderSource = 'override';
+  } catch { /* best-effort */ }
+  res.json({ ...req.session.user, aiProvider, aiProviderSource });
 });
 
 // GET /auth/token → ob ein BookStack-Token hinterlegt ist (kein Klartext!)

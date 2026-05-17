@@ -87,16 +87,18 @@ const cspBookstackOrigin = (() => {
   try { return new URL(BOOKSTACK_URL).origin; }
   catch { return null; }
 })();
+const HCAPTCHA_ORIGINS = ['https://hcaptcha.com', 'https://*.hcaptcha.com'];
 app.use(helmet({
   contentSecurityPolicy: {
     useDefaults: false,
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-eval'", PLAUSIBLE_ORIGIN],
-      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'", "'unsafe-eval'", PLAUSIBLE_ORIGIN, ...HCAPTCHA_ORIGINS],
+      styleSrc: ["'self'", "'unsafe-inline'", ...HCAPTCHA_ORIGINS],
       imgSrc: ["'self'", 'data:', 'blob:', 'https://*.googleusercontent.com', ...(cspBookstackOrigin ? [cspBookstackOrigin] : [])],
       fontSrc: ["'self'"],
-      connectSrc: ["'self'", PLAUSIBLE_ORIGIN],
+      connectSrc: ["'self'", PLAUSIBLE_ORIGIN, ...HCAPTCHA_ORIGINS],
+      frameSrc: ["'self'", ...HCAPTCHA_ORIGINS],
       workerSrc: ["'self'"],
       manifestSrc: ["'self'"],
       objectSrc: ["'none'"],

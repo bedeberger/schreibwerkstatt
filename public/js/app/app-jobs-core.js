@@ -1,6 +1,6 @@
-import { escHtml, fmtTok, fetchJson } from './utils.js';
-import { startPoll as _startPollFn, runningJobStatus as _runningJobStatusFn } from './cards/job-helpers.js';
-import { EXCLUSIVE_CARDS } from './cards/feature-registry.js';
+import { escHtml, fmtTok, fetchJson } from '../utils.js';
+import { startPoll as _startPollFn, runningJobStatus as _runningJobStatusFn } from '../cards/job-helpers.js';
+import { EXCLUSIVE_CARDS } from '../cards/feature-registry.js';
 
 // Auto-Open für Reconnect-Pfade: nur wenn keine Hauptkarte/Editor offen ist.
 // Verhindert, dass ein spät resolvender Reconnect den vom User geöffneten

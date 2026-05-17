@@ -1,6 +1,6 @@
-import { buildStilkorrekturPrompt } from './prompts.js';
-import { SAFETY_HTML_RATIO, replaceInHtml, stripFocusArtefacts, fmtTok } from './utils.js';
-import { contentRepo } from './repo/content.js';
+import { buildStilkorrekturPrompt } from '../prompts.js';
+import { SAFETY_HTML_RATIO, replaceInHtml, stripFocusArtefacts, fmtTok } from '../utils.js';
+import { contentRepo } from '../repo/content.js';
 
 // Editor-/Lektorat-Domain-Methoden, die in die Alpine-Komponente gespreadet
 // werden. `this` bezeigt auf die Alpine-Wurzel. Storage-Zugriff laeuft

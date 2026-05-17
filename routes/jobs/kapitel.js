@@ -19,6 +19,7 @@ const { narrativeLabels } = require('./narrative-labels');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
 const appSettings = require('../../lib/app-settings');
+const { resolveProvider } = require('../../lib/ai');
 
 function _sigHash(obj) {
   return crypto.createHash('sha1').update(JSON.stringify(obj ?? null)).digest('hex').slice(0, 12);
@@ -46,7 +47,8 @@ async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookNa
   const bookIdInt = parseInt(bookId);
   const chapterIdInt = parseInt(chapterId);
   const email = userEmail || '';
-  const cacheVersion = `${_modelName(appSettings.get('ai.provider') || 'claude')}:${PROMPTS_VERSION || ''}`;
+  const effectiveProvider = resolveProvider({ userEmail });
+  const cacheVersion = `${_modelName(effectiveProvider)}:${PROMPTS_VERSION || ''}`;
   const optionsSig = _sigHash({ narrative, schwerpunkt: reviewSchwerpunkt });
   try {
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
@@ -64,11 +66,11 @@ async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookNa
     // chapterName + bookName + optionsSig + cacheVersion fliessen ebenfalls ein.
     const pagesSig = pages.map(p => `${p.id}:${p.updated_at || ''}`).sort().join('|')
                      + `||${chapterName}||${bookName}||${optionsSig}||${cacheVersion}`;
-    const cached = loadChapterMacroReviewCache(bookIdInt, email, chapterIdInt, pagesSig);
+    const cached = loadChapterMacroReviewCache(bookIdInt, email, chapterIdInt, pagesSig, effectiveProvider);
     if (cached) {
       logger.info(`«${chapterName}» – Cache-HIT (pages_sig match) – spart Kapitel-Review-Call.`);
       updateJob(jobId, { progress: 97, statusText: 'job.phase.checkpointLoaded' });
-      const model = _modelName(appSettings.get('ai.provider') || 'claude');
+      const model = _modelName(effectiveProvider);
       if (bookName) upsertBookByName(bookIdInt, bookName);
       db.prepare(`INSERT INTO chapter_reviews
         (book_id, chapter_id, reviewed_at, review_json, model, user_email)
@@ -156,9 +158,9 @@ async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookNa
 
     if (r?.gesamtnote == null) throw i18nError('job.error.gesamtnoteMissing');
 
-    saveChapterMacroReviewCache(bookIdInt, email, chapterIdInt, pagesSig, r);
+    saveChapterMacroReviewCache(bookIdInt, email, chapterIdInt, pagesSig, r, effectiveProvider);
 
-    const model = _modelName(appSettings.get('ai.provider') || 'claude');
+    const model = _modelName(effectiveProvider);
     if (bookName) upsertBookByName(parseInt(bookId), bookName);
     db.prepare(`INSERT INTO chapter_reviews
       (book_id, chapter_id, reviewed_at, review_json, model, user_email)
