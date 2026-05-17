@@ -10,10 +10,6 @@
      base.css               → .progress-bar-wrap / .progress-bar
    Diese Datei enthält nur PDF-spezifische Eigenheiten. */
 
-.pdf-export-card {
-  --card-accent: var(--color-accent);
-}
-
 /* === Profile-Bar (eigenes Pattern: dynamische Pill-Reihe) === */
 .pdfx-profile-bar {
   display: flex;

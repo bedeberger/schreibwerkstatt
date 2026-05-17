@@ -1,9 +1,8 @@
 @layer components {
 /* === Szenen-Karte: Akzentfarbe + Severity-Bar links =================
-   Akzent = --card-accent-szenen (violett, Erzähl-Beat). Severity-Punkt
+   Akzent = --card-accent-szenen, Mapping in card-accents.css. Severity-Punkt
    wird zur vertikalen Bar (Heatmap-Effekt beim Scannen).
 */
-.card--szenen { --card-accent: var(--card-accent-szenen); }
 /* Severity in der Liste: Text-Tag via .severity-tag (entity-list.css).
    Übersichts-Badges (.severity-dot--*) bleiben unverändert als runde Dots. */
 

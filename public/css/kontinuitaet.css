@@ -2,9 +2,8 @@
 /* === Kontinuitätsprüfung ===
    Listen-/Detail-/Filter-/Dot-Layout via .entity-list + .severity-* aus
    entity-list.css. Hier nur Karten-spezifische Ergänzungen.
-   Akzentfarbe = --card-accent-kontinuitaet (bernstein-rot, Warn-Charakter).
+   Akzentfarbe = --card-accent-kontinuitaet, Mapping in card-accents.css.
 */
-.card--kontinuitaet { --card-accent: var(--card-accent-kontinuitaet); }
 /* Schwere-Tag als Anker links: shared .severity-tag aus entity-list.css. */
 
 @media (max-width: 600px) {

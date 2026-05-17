@@ -1,10 +1,6 @@
 /* AdminUsageCard.
    Akzentfarbe per --card-accent (Mapping siehe public/css/card-accents.css). */
 
-.card--admin-usage {
-  --card-accent: var(--card-accent-admin-usage, var(--color-accent));
-}
-
 .card--admin-usage > .tabs {
   margin-bottom: var(--space-lg);
 }

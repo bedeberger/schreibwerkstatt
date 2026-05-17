@@ -9,21 +9,29 @@
    hier verlinken, Klasse `card--<key>` am Wurzel-Div setzen. */
 
 @layer components {
-  .card--figuren       { --card-accent: var(--card-accent-figuren); }
-  .card--ereignisse    { --card-accent: var(--card-accent-ereignisse); }
-  .card--heatmap       { --card-accent: var(--card-accent-heatmap); }
-  .card--bookstats     { --card-accent: var(--card-accent-bookstats); }
-  .card--review        { --card-accent: var(--card-accent-review); }
-  .card--kapitel       { --card-accent: var(--card-accent-kapitel); }
-  .card--chat          { --card-accent: var(--card-accent-chat); }
-  .card--ideen         { --card-accent: var(--card-accent-ideen); }
-  .card--finetune      { --card-accent: var(--card-accent-finetune); }
-  .card--pdfexport     { --card-accent: var(--card-accent-pdfexport); }
-  .card--settings      { --card-accent: var(--card-accent-settings); }
-  .card--stil          { --card-accent: var(--card-accent-stil); }
-  .card--export        { --card-accent: var(--card-accent-settings); }
-  .card--bookoverview  { --card-accent: var(--card-accent-organize); }
-  .card--bookeditor    { --card-accent: var(--card-accent-bookeditor); }
-  .card--search        { --card-accent: var(--card-accent-search); }
-  .card--songs         { --card-accent: var(--card-accent-songs); }
+  .card--figuren          { --card-accent: var(--card-accent-figuren); }
+  .card--ereignisse       { --card-accent: var(--card-accent-ereignisse); }
+  .card--heatmap          { --card-accent: var(--card-accent-heatmap); }
+  .card--bookstats        { --card-accent: var(--card-accent-bookstats); }
+  .card--review           { --card-accent: var(--card-accent-review); }
+  .card--kapitel          { --card-accent: var(--card-accent-kapitel); }
+  .card--chat             { --card-accent: var(--card-accent-chat); }
+  .card--ideen            { --card-accent: var(--card-accent-ideen); }
+  .card--finetune         { --card-accent: var(--card-accent-finetune); }
+  .card--pdfexport        { --card-accent: var(--card-accent-pdfexport); }
+  .card--settings         { --card-accent: var(--card-accent-settings); }
+  .card--stil             { --card-accent: var(--card-accent-stil); }
+  .card--export           { --card-accent: var(--card-accent-settings); }
+  .card--bookoverview     { --card-accent: var(--card-accent-organize); }
+  .card--bookeditor       { --card-accent: var(--card-accent-bookeditor); }
+  .card--search           { --card-accent: var(--card-accent-search); }
+  .card--songs            { --card-accent: var(--card-accent-songs); }
+  .card--kontinuitaet     { --card-accent: var(--card-accent-kontinuitaet); }
+  .card--szenen           { --card-accent: var(--card-accent-szenen); }
+  .card--organizer        { --card-accent: var(--card-accent-organize); }
+  .card--werkstatt        { --card-accent: var(--card-accent-werkstatt); }
+  .card--admin-usage      { --card-accent: var(--card-accent-admin-usage, var(--color-accent)); }
+  .card--admin-users      { --card-accent: var(--card-accent-admin-users, var(--color-accent)); }
+  .card--admin-settings   { --card-accent: var(--card-accent-admin-settings, var(--color-accent)); }
+  .card--admin-categories { --card-accent: var(--card-accent-admin-users, var(--color-primary)); }
 }

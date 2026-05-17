@@ -63,6 +63,17 @@ CLAUDE.md beschreibt **ausschliesslich den aktuellen Stand**. Keine Historie, ke
   - `emptyLabel` (2. Positional-Arg oder `{emptyLabel}`) erzeugt „Alle"-Option mit Wert `''`. Weglassen für Pflichtauswahl.
   - Optional `@combobox-change="…"` für Side-Effects bei Auswahl.
   - Referenz: [public/index.html](public/index.html) (Buchwahl, non-compact), [public/partials/szenen.html](public/partials/szenen.html) (Filter-Combobox).
+- **`numInput` statt `<input type="number">`** — alle Zahlen-Felder nutzen `Alpine.data('numInput')` aus [public/js/num-input.js](public/js/num-input.js). Native `type=number` versteckt Tausender-Separatoren und akzeptiert nur Browser-Locale-Decimal — Swiss-User (de-CH: `.`-Decimal, `’`-Tausender) sehen falsche Anzeige. Pflicht-Pattern (3 Attribute):
+  ```html
+  <input type="text"
+         x-data="numInput({ step: 0.1, min: 0, max: 2 })"
+         x-modelable="value" x-model="form['key']">
+  ```
+  - `init()` setzt `inputmode`/`autocomplete`/`spellcheck` und hängt Event-Handler an — keine `@input/@blur/@focus` im Konsumenten.
+  - Config: `step`, `min`, `max`, optional `decimals` (sonst aus `step` abgeleitet), `integer: true` (Shortcut für step=1+inputmode=numeric), `grouping: false` (Tausender unterdrücken).
+  - Anzeige nutzt `uiLocale` (de→de-CH, en→en-US). Bei Focus rohe Edit-Form ohne Tausender; bei Blur reformatiert + clamped.
+  - Parser akzeptiert sowohl `.` als auch `,` als Decimal — User-Habit-tolerant.
+  - **Niemals** `x-model.number` parallel — der Component-State ist bereits Number.
 - **File-Limits / Modularität** — JS-Module > 600 LOC, HTML-Partials > 250 LOC, CSS-Files > 600 LOC werden gesplittet in `<name>/`-Subfolder mit thematischen Sub-Files. Pattern: Facade-File `<name>.js` re-exportiert Sub-Module; Sub-Module gruppieren Methoden nach Domäne (z.B. `load/stats/coverage/figuren/orte/kapitel/recent/format`). Beispiele: [public/js/prompts/](public/js/prompts/), [public/js/book-overview/](public/js/book-overview/), [public/css/book-overview/](public/css/book-overview/), [public/partials/bookoverview-*.html](public/partials/bookoverview-snapshot.html). HTML-Partials werden via `_loadPartials` mit `<div id="partial-<name>">`-Placeholdern nested geladen (5-Pässe-Schleife, max 1-2 Verschachtelungstiefen). CSS-Subfolder via einzelne `<link>`-Tags in [public/index.html](public/index.html) (Cascade-Order = Lade-Order, base zuerst). Tile-Compute-Methoden, die mehrfach pro Render gerendert werden, sind Pflicht-memoized.
 - **Memo-Pattern: ein Helper pro Modul** — Aggregat-Methoden, die im Template mehrfach pro Render aufgerufen werden, MÜSSEN memoized sein. Genau **ein** `_memo(key, deps[], fn)`-Helper pro Modul mit Array-Deps-Vergleich (shallow `===`). Kein Mix aus `_memo`/`_memoN`/handrolled Cache-Vergleichen. Helper auf `this`, gemeinsamer `this._memos`-Speicher pro Card-Instanz. `loadXxx`/`resetXxx` weisen `this._memos = {}` zu (Cache-Reset bei Daten-Reload). Pure Compute-Body (ohne `this._memo`) als `_computeXxx` extrahieren, vom memoizierten Wrapper aufrufen — testbar ohne Alpine. Referenz: [public/js/book-overview/load.js](public/js/book-overview/load.js)#`_memo`.
 - **State explizit deklariert** — fachlicher Karten-State gehört entweder in `app-state.js` (wenn root-relevant) oder als Initial-Feld im `Alpine.data`-Objekt. Lazy `this._privates`, die nur in Methoden auftauchen, sind verboten — nicht inventarisierbar via Lookup. Ausnahme: kurzlebige Re-Entry-Guards in async-Methoden (z.B. `_loadingBookId`, `_staleCheckBookId`), wenn klar als solche dokumentiert.

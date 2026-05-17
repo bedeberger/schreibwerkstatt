@@ -3,10 +3,6 @@
    admin-users-audit. Akzentfarbe per --card-accent (Mapping siehe
    public/css/card-accents.css). */
 
-.card--admin-users {
-  --card-accent: var(--card-accent-admin-users, var(--color-accent));
-}
-
 .admin-users-invite {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -198,8 +194,8 @@
   }
 }
 
-/* Kategorie- + Tag-Pool. Wiederverwendet admin-users-Table-Stilistik. */
-.card--admin-categories { --card-accent: var(--card-accent-admin-users, var(--color-primary)); }
+/* Kategorie- + Tag-Pool. Wiederverwendet admin-users-Table-Stilistik.
+   Akzent-Mapping in card-accents.css. */
 .admin-pool-section { margin-top: var(--space-xl); }
 .admin-pool-section:first-child { margin-top: 0; }
 .admin-pool-create {

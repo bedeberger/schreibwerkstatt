@@ -1,8 +1,4 @@
-/* AdminSettingsCard. */
-
-.card--admin-settings {
-  --card-accent: var(--card-accent-admin-settings, var(--color-accent));
-}
+/* AdminSettingsCard. Akzent-Mapping in card-accents.css. */
 
 .admin-settings-tabs {
   display: flex;

@@ -1,9 +1,8 @@
 @layer components {
 /* === Buchorganizer ===
    DnD-fähige Reorder/Move-Card für Kapitel + Seiten.
-   Akzentfarbe = --card-accent-organize (blaugrau, neutral wie ein File-Manager).
+   Akzentfarbe = --card-accent-organize, Mapping in card-accents.css.
 */
-.card--organizer { --card-accent: var(--card-accent-organize); }
 
 .card--organizer .organizer-hint {
   margin: 4px 0 12px;
