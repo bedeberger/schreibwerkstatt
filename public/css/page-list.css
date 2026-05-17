@@ -45,6 +45,24 @@
   border-radius: var(--radius-sm);
 }
 
+/* Live-Presence: anderer User editiert gerade diese Seite (Heartbeat <90s).
+   Kleines Initial in einem Akzent-Chip neben dem Page-Namen. */
+.presence-pip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  line-height: 1;
+}
+
 .page-name {
   display: flex;
   align-items: flex-start;

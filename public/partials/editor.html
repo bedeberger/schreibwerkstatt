@@ -88,6 +88,17 @@
   <div class="card-status" x-show="checkStatus" x-html="checkStatus"></div>
   <div id="status" x-html="statusHtml"></div>
 
+  <!-- Live-Presence-Hinweis: andere User editieren dieselbe Seite gerade.
+       Kein Block — nur Hinweis, damit kein Schock beim spaeteren 409.  -->
+  <div class="editor-presence-banner"
+       x-show="currentPage && presenceFor(currentPage.id).length > 0"
+       x-cloak>
+    <span class="editor-presence-banner__text"
+          x-text="presenceFor(currentPage?.id).length === 1
+            ? t('collab.presence.bannerOne', { user: presenceFor(currentPage.id)[0].user_display_name })
+            : t('collab.presence.bannerMany', { count: presenceFor(currentPage?.id).length })"></span>
+  </div>
+
   <!-- Cross-User-Konflikt aus _checkPageConflict / Server-OCC. Bleibt im
        Fokusmodus sichtbar (eigene Klasse, nicht via #status versteckt). -->
   <div class="editor-conflict-banner" role="alert" x-show="editConflict" x-cloak>

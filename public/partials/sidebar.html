@@ -81,6 +81,11 @@
                 @mouseenter.stop="_showStatusTip($el, page)"
                 @mouseleave.stop="_hideStatusTip()"></span>
               <span x-text="page.name"></span>
+              <template x-for="p in presenceFor(page.id)" :key="p.user_email">
+                <span class="presence-pip"
+                      :data-tip="t('collab.presence.editing', { user: p.user_display_name })"
+                      x-text="(p.user_display_name || '?').slice(0,1).toUpperCase()"></span>
+              </template>
             </span>
             <span x-show="tokEsts[page.id] || ideenCounts[page.id] > 0" class="tok-stats">
               <template x-if="tokEsts[page.id]?.words > 0">
