@@ -9,27 +9,8 @@ export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"
 
 INSTALL_DIR="/opt/schreibwerkstatt"
 SERVICE="schreibwerkstatt"
-OLD_INSTALL_DIR="/opt/lektorat"
-OLD_SERVICE="lektorat"
 
 echo "=== Deploy schreibwerkstatt ==="
-
-# Einmalige Migration, falls dieser Runner noch unter dem alten Pfad läuft
-if [ -d "$OLD_INSTALL_DIR" ] && [ ! -d "$INSTALL_DIR" ]; then
-  echo "Migriere $OLD_INSTALL_DIR → $INSTALL_DIR ..."
-  systemctl is-active --quiet "$OLD_SERVICE" && systemctl stop "$OLD_SERVICE" || true
-  systemctl is-enabled --quiet "$OLD_SERVICE" 2>/dev/null && systemctl disable "$OLD_SERVICE" || true
-  rm -f "/etc/systemd/system/${OLD_SERVICE}.service"
-  mv "$OLD_INSTALL_DIR" "$INSTALL_DIR"
-  [ -f "$INSTALL_DIR/lektorat.db" ]     && mv "$INSTALL_DIR/lektorat.db"     "$INSTALL_DIR/schreibwerkstatt.db"
-  [ -f "$INSTALL_DIR/lektorat.db-wal" ] && mv "$INSTALL_DIR/lektorat.db-wal" "$INSTALL_DIR/schreibwerkstatt.db-wal"
-  [ -f "$INSTALL_DIR/lektorat.db-shm" ] && mv "$INSTALL_DIR/lektorat.db-shm" "$INSTALL_DIR/schreibwerkstatt.db-shm"
-  for f in "$INSTALL_DIR"/lektorat*.log*; do
-    [ -e "$f" ] || continue
-    mv "$f" "${f/lektorat/schreibwerkstatt}"
-  done
-  systemctl daemon-reload
-fi
 
 # DB-Backup vor Deploy via dediziertes Backup-Script.
 # Skript aus Runner-Checkout nutzen (nicht $INSTALL_DIR/deploy/backup.sh) — rsync

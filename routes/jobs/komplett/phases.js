@@ -134,6 +134,16 @@ async function runPhase1(ctx) {
     if (settledOpts.warmup) {
       log.info(`Phase 1 Multi-Pass – ${chunkTexts.length} Chunks, Warmup-Pass + Concurrency=${claudeConcurrency} (TPM-Schutz).`);
     }
+    // Progress wird pro abgeschlossenem Chunk gebumpt – nicht via aiCall-Stream.
+    // Parallele Chunks würden sonst alle in 12-28 ticken, jeder mit eigenem
+    // chars/dynExpectedChars: der schnellste Stream pusht die Bar früh auf 28
+    // (Clamp lässt sie dort sitzen) während andere noch streamen. Monotone
+    // Chunk-Completion-Updates = ehrlicher Verlauf.
+    let chunksDone = 0;
+    const bumpChunkProgress = () => {
+      chunksDone++;
+      updateJob(jobId, { progress: 12 + Math.round((chunksDone / chunkTexts.length) * 16) });
+    };
     const settled = await settledAll(
       chunkTexts.map(({ chunk, key, pagesSig, chText }, chunkIdx) => async () => {
         const chunkLabel = `Chunk ${chunkIdx + 1}/${chunkTexts.length} «${chunk.name}»`;
@@ -141,14 +151,15 @@ async function runPhase1(ctx) {
 
         if (!isSplit) {
           const cached = loadChapterExtractCache(bookIdInt, email, key, pagesSig, effectiveProvider);
-          if (cached) { cacheHits++; log.info(`${chunkLabel} – Cache-HIT.`); return cached; }
+          if (cached) { cacheHits++; log.info(`${chunkLabel} – Cache-HIT.`); bumpChunkProgress(); return cached; }
           log.info(`${chunkLabel} – Cache-MISS, KI-Call…`);
           const result = await retryOnTransientAi(() => call(jobId, tok,
             prompts.buildExtraktionKomplettChapterPrompt(chunk.name, bookName, chunk.pages.length, chText),
-            sys.SYSTEM_KOMPLETT_EXTRAKTION_BLOCKS, 12, 28, 14000, 0.2, null, prompts.SCHEMA_KOMPLETT_EXTRAKTION,
+            sys.SYSTEM_KOMPLETT_EXTRAKTION_BLOCKS, null, null, 14000, 0.2, null, prompts.SCHEMA_KOMPLETT_EXTRAKTION,
           ), { log, label: chunkLabel });
           saveChapterExtractCache(bookIdInt, email, key, pagesSig, result, effectiveProvider);
           log.info(`${chunkLabel} – OK (fig=${result?.figuren?.length ?? 0} orte=${result?.orte?.length ?? 0} songs=${result?.songs?.length ?? 0} sz=${result?.szenen?.length ?? 0}).`);
+          bumpChunkProgress();
           return result;
         }
 
@@ -163,7 +174,7 @@ async function runPhase1(ctx) {
           log.info(`${chunkLabel} Pass A (Figuren) – KI-Call…`);
           passA = await retryOnTransientAi(() => call(jobId, tok,
             prompts.buildExtraktionFigurenPassPrompt(chunk.name, bookName, chunk.pages.length, chText),
-            sys.SYSTEM_KOMPLETT_FIGUREN_PASS_BLOCKS, 12, 20, 8000, 0.2, null, prompts.SCHEMA_KOMPLETT_FIGUREN_PASS,
+            sys.SYSTEM_KOMPLETT_FIGUREN_PASS_BLOCKS, null, null, 8000, 0.2, null, prompts.SCHEMA_KOMPLETT_FIGUREN_PASS,
           ), { log, label: `${chunkLabel} Pass A` });
           saveChapterExtractCache(bookIdInt, email, figKey, pagesSig, passA, effectiveProvider);
         }
@@ -174,7 +185,7 @@ async function runPhase1(ctx) {
           log.info(`${chunkLabel} Pass B (Orte/Szenen) – KI-Call…`);
           passB = await retryOnTransientAi(() => call(jobId, tok,
             prompts.buildExtraktionOrtePassPrompt(chunk.name, bookName, chunk.pages.length, chText),
-            sys.SYSTEM_KOMPLETT_ORTE_PASS_BLOCKS, 20, 28, 6000, 0.2, null, prompts.SCHEMA_KOMPLETT_ORTE_PASS,
+            sys.SYSTEM_KOMPLETT_ORTE_PASS_BLOCKS, null, null, 6000, 0.2, null, prompts.SCHEMA_KOMPLETT_ORTE_PASS,
           ), { log, label: `${chunkLabel} Pass B` });
           saveChapterExtractCache(bookIdInt, email, ortKey, pagesSig, passB, effectiveProvider);
         }
@@ -188,6 +199,7 @@ async function runPhase1(ctx) {
           szenen:      passB?.szenen      || [],
         };
         log.info(`${chunkLabel} – Split-OK (fig=${merged.figuren.length} orte=${merged.orte.length} songs=${merged.songs.length} sz=${merged.szenen.length}).`);
+        bumpChunkProgress();
         return merged;
       }),
       settledOpts,
@@ -391,7 +403,7 @@ async function runPhase3Songs(ctx, chapterSongs, figurenKompakt, isSinglePass, i
 
   let songs;
   if (isSinglePass) {
-    updateJob(jobId, { progress: 56, statusText: 'job.phase.consolidatingSongs' });
+    updateJob(jobId, { statusText: 'job.phase.consolidatingSongs' });
     const raw = chapterSongs[0]?.songs || [];
     songs = raw.map((s, i) => ({
       ...s,
@@ -402,15 +414,17 @@ async function runPhase3Songs(ctx, chapterSongs, figurenKompakt, isSinglePass, i
     }));
     log.info(`Phase 3 Songs übersprungen (Single-Pass, ${songs.length} Songs aus P1 übernommen).`);
   } else {
-    updateJob(jobId, { progress: 56, statusText: 'job.phase.consolidatingSongs' });
+    updateJob(jobId, { statusText: 'job.phase.consolidatingSongs' });
     const hasInput = chapterSongs.some(cs => (cs.songs || []).length > 0);
     if (!hasInput) {
       songs = [];
       log.info(`Phase 3 Songs übersprungen (keine Songs in Pass B – KI-Call gespart).`);
     } else {
+      // Songs-Range 55→56 (klein, ~3K Out): lässt 56→58 frei für P3b.
+      // Vorher überlappten Songs 56-58 mit P3b 55-58 → sichtbarer Range-Konflikt.
       const songsResultRaw = await call(jobId, tok,
         prompts.buildSongsConsolidationPrompt(bookName, chapterSongs, figurenKompakt),
-        sys.SYSTEM_ORTE_BLOCKS, 56, 58, 3000, 0.2, null, prompts.SCHEMA_SONGS_KONSOL,
+        sys.SYSTEM_ORTE_BLOCKS, 55, 56, 3000, 0.2, null, prompts.SCHEMA_SONGS_KONSOL,
       );
       const raw = Array.isArray(songsResultRaw?.songs) ? songsResultRaw.songs : [];
       songs = raw.map((s, i) => ({
@@ -463,7 +477,7 @@ async function runPhase3OrteCall(ctx, chapterOrte, figurenKompaktForPrompt) {
 async function runPhase3b(ctx, figuren) {
   const { jobId, bookIdInt, email, call, tok, log, prompts, sys, singlePassLimit, bookName, fullBookText, pageContents } = ctx;
 
-  updateJob(jobId, { progress: 55, statusText: 'job.phase.crossChapterRelations' });
+  updateJob(jobId, { progress: 56, statusText: 'job.phase.crossChapterRelations' });
 
   // Welle 3 · Co-Occurrence-basierter Textauswahl: Statt fullBookText zu trunkieren
   // (was bei lokalen Modellen bis zu 2/3 des Buchs verwirft), zielen wir auf
@@ -529,7 +543,7 @@ async function runPhase3b(ctx, figuren) {
 
   const bzResult = await call(jobId, tok,
     prompts.buildKapiteluebergreifendeBeziehungenPrompt(bookName, figuren, textForPrompt),
-    sys.SYSTEM_FIGUREN_BLOCKS, 55, 58, 2000, 0.2, null, prompts.SCHEMA_BEZIEHUNGEN,
+    sys.SYSTEM_FIGUREN_BLOCKS, 56, 58, 2000, 0.2, null, prompts.SCHEMA_BEZIEHUNGEN,
   );
   const newBz = Array.isArray(bzResult?.beziehungen) ? bzResult.beziehungen : [];
   if (newBz.length > 0) addFigurenBeziehungen(bookIdInt, newBz, email, ctx.idMaps);

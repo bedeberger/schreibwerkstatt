@@ -95,7 +95,7 @@ export const appKomplettMethods = {
     const p = this.alleAktualisierenProgress;
     // Thresholds entsprechen den Server-Progress-Punkten nach den jeweiligen aiCalls:
     //   orteConsolidate=55 = Ende aiCall Phase 3 (43→55)
-    //   chapterRelations=58 = Ende aiCall Phase 3b (55→58, nur Multi-Pass)
+    //   chapterRelations=58 = Ende aiCall Phase 3b (56→58, nur Multi-Pass)
     //   szenenEvents=78    = Ende Szenen-Remap/Save (58→78)
     //   timeline=82        = Ende aiCall Phase 6 (78→82)
     //   continuity=97      = Ende aiCall Phase 8 (82→97, breite Range für langen Call)
