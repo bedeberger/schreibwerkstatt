@@ -94,9 +94,16 @@ test('savePage → PUT /content/pages/:id mit JSON-Body', async () => {
   assert.equal(out.id, 1);
 });
 
-test('savePage dispatcht invalidate-content an SW', async () => {
+test('savePage dispatcht invalidate-content an SW (inkl. revisions sub-path bei html-Body)', async () => {
   mockFetch(() => ok({ id: 7 }));
   await contentRepo.savePage(7, { html: '<p>x</p>' });
+  assert.equal(postedMessages.length, 1);
+  assert.deepEqual(postedMessages[0], { type: 'invalidate-content', paths: ['pages/7', 'pages/7/revisions'] });
+});
+
+test('savePage ohne html invalidiert nur die Seite, nicht den Revisions-Pfad', async () => {
+  mockFetch(() => ok({ id: 7 }));
+  await contentRepo.savePage(7, { name: 'rename only' });
   assert.equal(postedMessages.length, 1);
   assert.deepEqual(postedMessages[0], { type: 'invalidate-content', paths: ['pages/7'] });
 });

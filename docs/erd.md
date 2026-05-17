@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 119, 79 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 122, 79 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -86,6 +86,7 @@ erDiagram
   chapters ||--o{ chapter_extract_cache  : cached
   chapters ||--o{ chapter_review_cache   : cached
   chapters ||--o{ chapter_macro_review_cache : cached
+  chapters ||--o{ ideen                  : at
   chapters ||--o{ pages                  : groups
   chapters ||--o{ page_checks            : ref
 
@@ -253,7 +254,8 @@ erDiagram
   ideen {
     INTEGER id          PK
     INTEGER book_id     FK
-    INTEGER page_id     FK "ON DELETE SET NULL"
+    INTEGER page_id     FK "ON DELETE SET NULL, XOR mit chapter_id"
+    INTEGER chapter_id  FK "ON DELETE SET NULL, XOR mit page_id"
     TEXT    user_email
     TEXT    content
     INTEGER erledigt
@@ -283,6 +285,7 @@ erDiagram
   books     ||--o{ page_revisions : has
   books     ||--|| book_order  : has
   pages     ||--o{ ideen       : at
+  chapters  ||--o{ ideen       : at
   books     ||--o{ ideen       : has
   books     ||--|| book_settings : has
 ```

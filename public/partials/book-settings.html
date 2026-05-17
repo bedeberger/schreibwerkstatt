@@ -190,18 +190,15 @@
               </template>
               <template x-if="bookAccessIsOwner() && entry.role !== 'owner'">
                 <div class="book-share-row-controls">
-                  <select class="book-share-role-select"
-                          :value="entry.role"
-                          @change="changeBookAccessRole(entry.user_email, $event.target.value)">
-                    <template x-for="opt in bookAccessRoleOptions()" :key="opt.value">
-                      <option :value="opt.value" :selected="opt.value === entry.role" x-text="opt.label"></option>
-                    </template>
-                  </select>
-                  <button type="button" class="book-share-btn-transfer"
+                  <div class="book-share-role-combo"
+                       x-data="combobox($app.t('book.share.role.editor'))"
+                       x-effect="value = entry.role; options = bookAccessRoleOptions()"
+                       @combobox-change="if ($event.detail && $event.detail !== entry.role) changeBookAccessRole(entry.user_email, $event.detail)"></div>
+                  <button type="button" class="btn-compact book-share-btn-transfer"
                           @click="transferOwnership(entry.user_email)"
-                          :title="$app.t('book.share.transferTooltip')"
+                          :data-tip="$app.t('book.share.transferTooltip')"
                           x-text="$app.t('book.share.transferBtn')"></button>
-                  <button type="button" class="book-share-btn-revoke"
+                  <button type="button" class="btn-compact book-share-btn-revoke"
                           @click="revokeBookAccess(entry.user_email)"
                           x-text="$app.t('book.share.revokeBtn')"></button>
                 </div>
@@ -218,12 +215,11 @@
                  x-model="shareEmail"
                  :placeholder="$app.t('book.share.invitePlaceholder')"
                  :disabled="shareBusy">
-          <select class="book-share-role-select" x-model="shareRole" :disabled="shareBusy">
-            <template x-for="opt in bookAccessRoleOptions()" :key="opt.value">
-              <option :value="opt.value" x-text="opt.label"></option>
-            </template>
-          </select>
-          <button type="button"
+          <div class="book-share-role-combo"
+               x-data="combobox($app.t('book.share.role.editor'))"
+               x-modelable="value" x-model="shareRole"
+               x-effect="options = bookAccessRoleOptions()"></div>
+          <button type="button" class="btn-compact"
                   @click="shareBookAccessAdd()"
                   :disabled="shareBusy || !shareEmail">
             <span x-show="shareBusy" class="spinner"></span>

@@ -213,6 +213,14 @@ const lektoratState = () => ({
   _tokenEstGen: 0,
   pageLastChecked: {},
   ideenCounts: {},
+  chapterIdeenCounts: {},
+  // Scope der aktuell offenen Ideen-Karte: 'page' (neben Editor) oder
+  // 'chapter' (neben Kapitelreview). ideenChapterId nur in 'chapter'-Modus
+  // gesetzt. currentPageIdeenOpenCount/currentChapterIdeenOpenCount halten die
+  // Badge-Counts fuer den jeweiligen Toggle-Button.
+  ideenScope: 'page',
+  ideenChapterId: null,
+  currentChapterIdeenOpenCount: 0,
   showTokLegend: false,
   tokLegendPos: { x: 0, y: 0 },
   tokTooltipData: null,

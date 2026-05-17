@@ -201,12 +201,10 @@ async function runBookChatJob(jobId, sessionId, userMsgId, message, userEmail, u
     const { SYSTEM_BOOK_CHAT: bookChatSys, STOPWORDS: bookChatSW } = await getBookPrompts(session.book_id, userEmail);
     const bookChatStopwords = new Set(bookChatSW || []);
 
-    if (!userToken) throw i18nError('job.error.noBookstackToken');
-
     const cacheKey = `${session.book_id}:${userEmail}`;
     const jobSignal = jobAbortControllers.get(jobId)?.signal;
 
-    // ── Schritt 1: Seiten aus Cache oder frisch von BookStack laden ─────────────
+    // ── Schritt 1: Seiten aus Cache oder frisch via Content-Store laden ─────────
     let pageContents;
     const cached = _bookPageCache.get(cacheKey);
     if (cached && Date.now() - cached.loadedAt < _BOOK_PAGE_CACHE_TTL_MS) {

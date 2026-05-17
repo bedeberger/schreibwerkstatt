@@ -132,10 +132,14 @@ export const contentRepo = {
   // Server cleant html, mapped position→priority. Bei Body-Change schreibt die
   // content-store-Facade eine page_revisions-Row mit `source` (Default 'main') —
   // Frontend dispatcht danach `page-revisions:changed`, damit die Revisionsliste
-  // sich aktualisiert ohne Page-Reload.
+  // sich aktualisiert ohne Page-Reload. SW-Invalidation muss neben der Page
+  // auch die Revisionsliste umfassen, sonst liefert SWR beim folgenden Reload
+  // der Liste den Stand vor dem Save.
   async savePage(id, body) {
-    const out = await _write('PUT', 'pages/' + id, body);
-    if (typeof body?.html === 'string' && typeof window !== 'undefined') {
+    const hasHtml = typeof body?.html === 'string';
+    const inv = hasHtml ? ['pages/' + id, 'pages/' + id + '/revisions'] : ['pages/' + id];
+    const out = await _write('PUT', 'pages/' + id, body, inv);
+    if (hasHtml && typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('page-revisions:changed', { detail: { pageId: id } }));
     }
     return out;

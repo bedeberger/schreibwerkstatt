@@ -129,8 +129,6 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, userEmail, u
 
 router.post('/pdf-export', jsonBody, async (req, res) => {
   const userEmail = req.session?.user?.email || null;
-  const userToken = null;
-  if (!userToken) return res.status(401).json({ error_code: 'BOOKSTACK_UNAUTHED' });
 
   const rawScope = String(req.body?.scope || 'book').toLowerCase();
   const scope = VALID_SCOPES.has(rawScope) ? rawScope : null;
@@ -151,16 +149,15 @@ router.post('/pdf-export', jsonBody, async (req, res) => {
     const contentStore = require('../../lib/content-store');
     try {
       if (scope === 'chapter') {
-        const ch = await contentStore.loadChapter(entityId, userToken);
+        const ch = await contentStore.loadChapter(entityId, req);
         bookId = ch?.book_id || 0;
       } else if (scope === 'page') {
-        const pg = await contentStore.loadPage(entityId, userToken);
+        const pg = await contentStore.loadPage(entityId, req);
         bookId = pg?.book_id || 0;
       }
     } catch (e) {
       if (e.status === 404) return res.status(404).json({ error_code: 'NOT_FOUND' });
-      if (e.status === 401 || e.status === 403) return res.status(401).json({ error_code: 'BOOKSTACK_UNAUTHED' });
-      return res.status(502).json({ error_code: 'BOOKSTACK_UNREACHABLE' });
+      return res.status(502).json({ error_code: 'CONTENT_LOAD_FAILED' });
     }
   }
   if (bookId) setContext({ book: bookId });

@@ -909,18 +909,28 @@ function tool_list_ideen(input, ctx) {
   const chapterFilter = Number.isInteger(input?.chapter_id) ? input.chapter_id : null;
   const limit = Math.min(200, Math.max(1, Number.isInteger(input?.limit) ? input.limit : IDEEN_DEFAULT_LIMIT));
 
+  // Ideen können entweder an einer Seite oder an einem Kapitel hängen (XOR).
+  // `effective_chapter_id` deckt beide Quellen ab: direkt-am-Kapitel-Idee
+  // (i.chapter_id) ODER an einer Seite, die zum Kapitel gehört (p.chapter_id).
   let sql = `
     SELECT i.id, i.content, i.erledigt, i.erledigt_at, i.created_at, i.updated_at,
-           i.page_id, p.page_name, p.chapter_id, c.chapter_name
+           i.page_id, p.page_name,
+           COALESCE(i.chapter_id, p.chapter_id) AS effective_chapter_id,
+           COALESCE(cc.chapter_name, cp.chapter_name) AS chapter_name,
+           CASE WHEN i.page_id IS NOT NULL THEN 'page' ELSE 'chapter' END AS scope
     FROM ideen i
-    LEFT JOIN pages    p ON p.page_id    = i.page_id
-    LEFT JOIN chapters c ON c.chapter_id = p.chapter_id AND c.book_id = i.book_id
+    LEFT JOIN pages    p  ON p.page_id    = i.page_id
+    LEFT JOIN chapters cc ON cc.chapter_id = i.chapter_id AND cc.book_id = i.book_id
+    LEFT JOIN chapters cp ON cp.chapter_id = p.chapter_id AND cp.book_id = i.book_id
     WHERE i.book_id = ? AND i.user_email = ?
   `;
   const params = [ctx.bookId, userEmail];
   if (erledigtFilter !== null) { sql += ' AND i.erledigt = ?'; params.push(erledigtFilter); }
   if (pageFilter    !== null) { sql += ' AND i.page_id = ?'; params.push(pageFilter); }
-  if (chapterFilter !== null) { sql += ' AND p.chapter_id = ?'; params.push(chapterFilter); }
+  if (chapterFilter !== null) {
+    sql += ' AND COALESCE(i.chapter_id, p.chapter_id) = ?';
+    params.push(chapterFilter);
+  }
   sql += ' ORDER BY i.erledigt ASC, i.updated_at DESC, i.id DESC';
 
   const rows = db.prepare(sql).all(...params);
@@ -929,6 +939,7 @@ function tool_list_ideen(input, ctx) {
   const total = rows.length;
   const limited = rows.slice(0, limit).map(r => ({
     id: r.id,
+    scope: r.scope,
     content: r.content && r.content.length > IDEEN_CONTENT_CHARS
       ? r.content.slice(0, IDEEN_CONTENT_CHARS) + '…'
       : (r.content || ''),
@@ -938,7 +949,7 @@ function tool_list_ideen(input, ctx) {
     updated_at: r.updated_at,
     page_id: r.page_id,
     page_name: r.page_name || null,
-    chapter_id: r.chapter_id ?? null,
+    chapter_id: r.effective_chapter_id ?? null,
     chapter_name: r.chapter_name || null,
   }));
 

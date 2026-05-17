@@ -60,8 +60,16 @@ npm install --omit=dev --quiet
 # Systemd Service installieren
 echo "Installiere systemd service..."
 cp deploy/schreibwerkstatt.service "/etc/systemd/system/${SERVICE}.service"
+
+# Backup-Service + täglicher Timer (Config via .env; siehe deploy/backup.sh)
+echo "Installiere Backup-Timer..."
+cp deploy/schreibwerkstatt-backup.service /etc/systemd/system/
+cp deploy/schreibwerkstatt-backup.timer   /etc/systemd/system/
+chmod +x "$INSTALL_DIR/deploy/backup.sh"
+
 systemctl daemon-reload
 systemctl enable "$SERVICE"
+systemctl enable --now schreibwerkstatt-backup.timer
 systemctl restart "$SERVICE"
 
 # Status prüfen

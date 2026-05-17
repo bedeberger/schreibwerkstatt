@@ -1,15 +1,25 @@
 'use strict';
 const { db } = require('../../../db/schema');
 
-/** Offene Ideen einer Seite (user-spezifisch). Werden im Seiten-Chat als Kontext eingespielt. */
+/**
+ * Offene Ideen einer Seite + des umliegenden Kapitels (user-spezifisch).
+ * Werden im Seiten-Chat als Kontext eingespielt. Kapitel-Ideen sind oft
+ * relevanter fuer Folgeseiten als rein seitenspezifische Notizen — daher
+ * mit-eingespielt. `scope` ('page'|'chapter') unterscheidet im Prompt-Output.
+ */
 function getOpenIdeen(pageId, userEmail) {
   if (!pageId || !userEmail) return [];
   return db.prepare(`
-    SELECT content, created_at
-    FROM ideen
-    WHERE page_id = ? AND user_email = ? AND erledigt = 0
-    ORDER BY created_at ASC
-  `).all(pageId, userEmail);
+    SELECT 'page' AS scope, i.content, i.created_at
+    FROM ideen i
+    WHERE i.page_id = ? AND i.user_email = ? AND i.erledigt = 0
+    UNION ALL
+    SELECT 'chapter' AS scope, i.content, i.created_at
+    FROM ideen i
+    JOIN pages p ON p.chapter_id = i.chapter_id
+    WHERE p.page_id = ? AND i.user_email = ? AND i.erledigt = 0
+    ORDER BY scope ASC, created_at ASC
+  `).all(pageId, userEmail, pageId, userEmail);
 }
 
 /**

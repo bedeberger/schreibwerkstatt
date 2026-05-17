@@ -15,10 +15,12 @@ import { SYSTEM_CHAT, SYSTEM_BOOK_CHAT } from './core.js';
  * @param {string|null} openingPageText Snapshot beim Chat-Öffnen; nur setzen wenn
  *                                      ungleich pageText (sonst null → keine
  *                                      redundante Section).
- * @param {Array}       ideen           Offene Ideen des Autors für diese Seite —
- *                                      Notizen zu möglichen Fortsetzungen, Szenen,
- *                                      Ankern. KI darf sie aufgreifen/diskutieren,
- *                                      aber nicht eigenmächtig in Vorschläge umwandeln.
+ * @param {Array}       ideen           Offene Ideen des Autors für diese Seite +
+ *                                      das umliegende Kapitel — Notizen zu möglichen
+ *                                      Fortsetzungen, Szenen, Ankern. Jedes Item hat
+ *                                      `scope: 'page'|'chapter'`. KI darf sie
+ *                                      aufgreifen/diskutieren, aber nicht
+ *                                      eigenmächtig in Vorschläge umwandeln.
  * @param {Object|null} lektorat        Letztes Lektorat dieser Seite aus page_checks
  *                                      ({ checked_at, fehler, stilanalyse, fazit }).
  *                                      Kann gegenüber pageText veraltet sein.
@@ -51,13 +53,14 @@ export function buildChatSystemPrompt(pageName, pageText, figuren, review, syste
   }
 
   if (Array.isArray(ideen) && ideen.length > 0) {
-    parts.push('=== OFFENE IDEEN (Notizen des Autors für diese Seite) ===');
+    parts.push('=== OFFENE IDEEN (Notizen des Autors für diese Seite + das umliegende Kapitel) ===');
     for (const i of ideen) {
       const datum = i.created_at ? ` (${i.created_at.slice(0, 10)})` : '';
-      parts.push(`- ${i.content}${datum}`);
+      const tag = i.scope === 'chapter' ? '[Kapitel] ' : '[Seite] ';
+      parts.push(`- ${tag}${i.content}${datum}`);
     }
     parts.push('');
-    parts.push('Hinweis: Diese Ideen sind Notizen des Autors zu möglichen Fortsetzungen, Szenen oder inhaltlichen Ankern. Greife sie auf, hinterfrage oder ergänze sie konversationell — wandle sie aber nicht eigenmächtig in vorschlaege-Einträge um, solange der Autor nicht danach fragt.');
+    parts.push('Hinweis: Diese Ideen sind Notizen des Autors zu möglichen Fortsetzungen, Szenen oder inhaltlichen Ankern. [Kapitel]-Notizen gelten fürs ganze Kapitel, [Seite]-Notizen nur für diese Seite. Greife sie auf, hinterfrage oder ergänze sie konversationell — wandle sie aber nicht eigenmächtig in vorschlaege-Einträge um, solange der Autor nicht danach fragt.');
     parts.push('');
   }
 
@@ -314,13 +317,13 @@ export const BOOK_CHAT_TOOLS = [
   },
   {
     name: 'list_ideen',
-    description: 'Listet die Notizen/Ideen, die der User im Editor zu einzelnen Seiten gespeichert hat (mit Kapitel-/Seitenkontext). Ideal um offene Anmerkungen aufzugreifen, oder zu beantworten "was wollte ich an Kapitel X noch ändern?". Filterbar nach erledigt, page_id, chapter_id. Offene Ideen erscheinen zuerst.',
+    description: 'Listet die Notizen/Ideen, die der User zu einzelnen Seiten oder ganzen Kapiteln gespeichert hat (mit Kapitel-/Seitenkontext). Jede Idee hat `scope: "page"` oder `"chapter"`. Ideal um offene Anmerkungen aufzugreifen, oder zu beantworten "was wollte ich an Kapitel X noch ändern?". Filterbar nach erledigt, page_id, chapter_id (Chapter-Filter umfasst sowohl direkt-am-Kapitel-Ideen als auch Ideen zu Seiten des Kapitels). Offene Ideen erscheinen zuerst.',
     input_schema: {
       type: 'object',
       properties: {
         erledigt:   { type: 'boolean', description: 'true = nur erledigte, false = nur offene. Ohne Angabe: beide.' },
         page_id:    { type: 'integer', description: 'Nur Ideen zu dieser Seite.' },
-        chapter_id: { type: 'integer', description: 'Nur Ideen zu Seiten dieses Kapitels.' },
+        chapter_id: { type: 'integer', description: 'Nur Ideen zu diesem Kapitel (direkt-am-Kapitel + Seiten des Kapitels).' },
         limit:      { type: 'integer', description: 'Maximale Anzahl (default 50, max 200).' },
       },
       required: [],

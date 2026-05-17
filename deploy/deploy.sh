@@ -31,18 +31,10 @@ if [ -d "$OLD_INSTALL_DIR" ] && [ ! -d "$INSTALL_DIR" ]; then
   systemctl daemon-reload
 fi
 
-# DB-Backup vor Deploy (sicher online via sqlite3 .backup, hält letzte 10)
-DB_FILE="$INSTALL_DIR/schreibwerkstatt.db"
-BACKUP_DIR="$INSTALL_DIR/backups"
-if [ -f "$DB_FILE" ]; then
-  mkdir -p "$BACKUP_DIR"
-  TS=$(date '+%Y%m%d-%H%M%S')
-  BACKUP_FILE="$BACKUP_DIR/schreibwerkstatt-$TS.db"
-  if sqlite3 "$DB_FILE" ".backup '$BACKUP_FILE'"; then
-    gzip "$BACKUP_FILE"
-    echo "✓ DB-Backup: ${BACKUP_FILE}.gz"
-    ls -1t "$BACKUP_DIR"/schreibwerkstatt-*.db.gz 2>/dev/null | tail -n +11 | xargs -r rm -f
-  else
+# DB-Backup vor Deploy via dediziertes Backup-Script.
+# Config (Pfad, Retention) via .env – siehe deploy/backup.sh.
+if [ -f "$INSTALL_DIR/schreibwerkstatt.db" ]; then
+  if ! bash "$INSTALL_DIR/deploy/backup.sh" "$INSTALL_DIR/.env"; then
     echo "✗ DB-Backup fehlgeschlagen – Deploy abgebrochen"
     exit 1
   fi
@@ -55,7 +47,7 @@ fi
 rsync -a --delete \
   --exclude='.env' --exclude='node_modules' --exclude='.git' \
   --exclude='schreibwerkstatt.db' --exclude='schreibwerkstatt.db-wal' --exclude='schreibwerkstatt.db-shm' \
-  --exclude='schreibwerkstatt.log*' --exclude='backups' --exclude='ai_parse_fails' \
+  --exclude='schreibwerkstatt.log*' --exclude='backup' --exclude='backups' --exclude='ai_parse_fails' \
   ./ "$INSTALL_DIR/"
 
 # Ownership auf github-runner setzen
@@ -69,6 +61,15 @@ npm install --omit=dev --quiet
 if [ -f "$INSTALL_DIR/deploy/schreibwerkstatt.service" ]; then
   cp "$INSTALL_DIR/deploy/schreibwerkstatt.service" /etc/systemd/system/
   systemctl daemon-reload
+fi
+
+# Backup-Service + Timer installieren / aktualisieren
+if [ -f "$INSTALL_DIR/deploy/schreibwerkstatt-backup.service" ]; then
+  cp "$INSTALL_DIR/deploy/schreibwerkstatt-backup.service" /etc/systemd/system/
+  cp "$INSTALL_DIR/deploy/schreibwerkstatt-backup.timer"   /etc/systemd/system/
+  chmod +x "$INSTALL_DIR/deploy/backup.sh"
+  systemctl daemon-reload
+  systemctl enable --now schreibwerkstatt-backup.timer >/dev/null
 fi
 
 # Service starten oder neu starten

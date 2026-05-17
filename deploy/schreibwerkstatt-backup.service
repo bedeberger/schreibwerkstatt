@@ -1,0 +1,12 @@
+[Unit]
+Description=Schreibwerkstatt DB-Backup (sqlite3 .backup + Retention)
+After=schreibwerkstatt.service
+
+[Service]
+Type=oneshot
+User=github-runner
+WorkingDirectory=/opt/schreibwerkstatt
+EnvironmentFile=-/opt/schreibwerkstatt/.env
+ExecStart=/bin/bash /opt/schreibwerkstatt/deploy/backup.sh /opt/schreibwerkstatt/.env
+StandardOutput=journal
+StandardError=journal

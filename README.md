@@ -85,7 +85,19 @@ git pull && npm ci --omit=dev && systemctl restart lektorat
 
 ## Backup
 
-SQLite-DB (`schreibwerkstatt.db`) im Working-Directory sichern. Enthält Buchinhalte, Revisions, Settings, Caches.
+Tägliches Online-Backup der SQLite-DB läuft automatisch via systemd-Timer (`schreibwerkstatt-backup.timer`, Default 03:00 lokale Zeit). Nutzt `sqlite3 .backup` (lock-frei, WAL-konsistent), gzip-komprimiert, plus Retention nach `mtime`. Vor jedem Deploy zusätzlich ein Snapshot.
+
+Konfigurierbar via `.env`:
+
+```env
+BACKUP_DIR=/opt/schreibwerkstatt/backup
+BACKUP_RETENTION_DAYS=30
+BACKUP_DB_FILE=/opt/schreibwerkstatt/schreibwerkstatt.db
+```
+
+Script: [deploy/backup.sh](deploy/backup.sh). Units: [deploy/schreibwerkstatt-backup.service](deploy/schreibwerkstatt-backup.service), [deploy/schreibwerkstatt-backup.timer](deploy/schreibwerkstatt-backup.timer). Manuell: `systemctl start schreibwerkstatt-backup.service`. Status: `systemctl list-timers schreibwerkstatt-backup`.
+
+Empfehlung: Backup-Ordner zusätzlich offsite spiegeln (rsync nach NAS/S3) – sonst gleicher Datenträger = gleicher Single-Point-of-Failure.
 
 ## Prompts anpassen
 
