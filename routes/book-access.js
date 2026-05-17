@@ -232,25 +232,32 @@ router.get('/pages/:page_id/lock', (req, res) => {
   res.json({ lock: lock || null });
 });
 
+const _VALID_LOCK_REASONS = new Set(['lektorat', 'edit']);
+
 router.post('/pages/:page_id/lock', jsonBody, (req, res) => {
   const pageId = parseInt(req.params.page_id, 10);
   if (!Number.isInteger(pageId) || pageId <= 0) return res.status(400).json({ error_code: 'INVALID_PAGE_ID' });
   const email = _userEmail(req);
   if (!email) return res.status(401).json({ error_code: 'NOT_LOGGED_IN' });
+  // reason aus Body, Default 'lektorat' (Backwards-Compat). 'edit' braucht
+  // nur 'editor'-Rolle, 'lektorat' braucht 'lektor'-Rolle.
+  const reason = _VALID_LOCK_REASONS.has(req.body?.reason) ? req.body.reason : 'lektorat';
+  const minRole = reason === 'edit' ? 'editor' : 'lektor';
   let bookId;
   try {
-    ({ bookId } = _resolvePageRole(req, pageId, 'lektor'));
+    ({ bookId } = _resolvePageRole(req, pageId, minRole));
   } catch (e) {
     const sent = sendACLError(res, e); if (sent) return; throw e;
   }
   try {
-    const lock = bookAccess.acquireLock(pageId, bookId, email, 'lektorat');
+    const lock = bookAccess.acquireLock(pageId, bookId, email, reason);
     res.json({ lock });
   } catch (e) {
     if (e.code === 'PAGE_LOCKED') {
       return res.status(423).json({
         error_code: 'PAGE_LOCKED',
         locked_by_email: e.lock.locked_by_email,
+        reason: e.lock.reason,
         expires_at: e.lock.expires_at,
       });
     }

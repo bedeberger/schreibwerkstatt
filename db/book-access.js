@@ -147,10 +147,17 @@ function getPageLock(pageId) {
 
 // Liefert den aktiven Lock NUR wenn er von einem anderen User gehalten wird.
 // Der eigene Lock blockt den Holder nicht.
+//
+// Soft-Lock-Branch: 'edit'-Locks sind advisory (UI-Hint) und sollen den
+// PUT-/Apply-Pfad nicht blockieren. Caller, die echte Mutual-Exclusion
+// brauchen (Lektorat-Substring-Replace), holen den Lock weiterhin via
+// `getPageLock`. PUT/Apply-Handler benutzen diese Funktion, die nur
+// 'lektorat' als blockierend zurueckgibt.
 function getBlockingLockFor(pageId, currentEmail) {
   const lock = getPageLock(pageId);
   if (!lock) return null;
   if (_normEmail(lock.locked_by_email) === _normEmail(currentEmail)) return null;
+  if (lock.reason !== 'lektorat') return null;
   return lock;
 }
 
