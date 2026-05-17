@@ -1,5 +1,5 @@
 'use strict';
-// Phase 7 (BookStack-Exit): End-to-End-Test fuer den FTS5-Search-Index.
+// End-to-End-Test fuer den FTS5-Search-Index.
 // Indexiert Pages/Chapters/Books/Figures via lib/search Upserts, fragt zurueck
 // und prueft ACL-Filter, BM25-Reihenfolge, Trigram-Fallback.
 

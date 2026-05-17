@@ -10,7 +10,7 @@ function bootstrap() {
   process.env.DB_PATH = dbFile;
   process.env.LOG_LEVEL = process.env.LOG_LEVEL || 'error';
 
-  // Phase 4c-E: ENV fuer migrierte Keys ist tot. Migrationen laufen, dann
+  // ENV fuer migrierte Keys ist tot. Migrationen laufen, dann
   // app_settings-Overrides fuer Test-Budget direkt in die DB — bevor lib/ai
   // (via mock-ai) seine Context-/Token-Defaults aus app_settings liest.
   require('../../../db/connection');

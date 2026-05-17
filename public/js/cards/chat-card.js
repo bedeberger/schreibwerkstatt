@@ -5,7 +5,7 @@
 //   chatLoading, chatProgress, chatStatus, _chatPollTimer, _chatPendingRefresh.
 // Root behält: showChatCard (Hash-Router), currentPage, originalHtml,
 //   saveApplying, lektoratFindings, checkDone, _checkDoneBeforeChat,
-//   bsGet, _loadApplyAndSave, updatePageView, selectedBookId, t.
+//   _loadApplyAndSave, updatePageView, selectedBookId, t.
 
 import { chatMethods } from '../chat/chat.js';
 import { setupCardLifecycle } from './card-lifecycle.js';

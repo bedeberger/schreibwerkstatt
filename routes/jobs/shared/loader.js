@@ -52,7 +52,7 @@ async function loadPageContents(pages, chMap, minLength, onBatch, userToken, sig
     onBatch,
     signal,
     onError: (_p, e) => {
-      if (e.status) throw i18nError('job.error.bookstack', { status: e.status, text: e.bodyText });
+      if (e.status) throw i18nError('job.error.contentStore', { status: e.status, text: e.bodyText });
       throw e;
     },
   }).then(loaded => loaded

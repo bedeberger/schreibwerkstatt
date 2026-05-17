@@ -221,7 +221,6 @@ const JOB_TYPE_LABELS = {
   'chat':             'job.label.chat',
   'synonym':          'job.label.synonym',
   'finetune-export':  'job.label.finetuneExport',
-  'backfill':         'job.label.backfillAll',
 };
 
 // Job-Typen, die vom Superjob (komplett-analyse) abgedeckt werden und nicht in der Statistik erscheinen sollen

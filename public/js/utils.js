@@ -348,8 +348,8 @@ const STRIP_STYLE_TAGS = new Set([
  *
  * Chrome friert beim Tippen oder Pasten in `contenteditable` die Computed-
  * Styles auf jedem Block ein (z.B. `<p style="margin:0.4em 0px;color:rgb(...);
- * font-family:Lato,...">`). Wenn dieses HTML via `bsPut` an BookStack geht,
- * überschreiben die Inline-Styles dort die echten Block-Styles (`.poem` &Co)
+ * font-family:Lato,...">`). Werden diese Inline-Styles mitgespeichert,
+ * überschreiben sie beim Rendern die echten Block-Styles (`.poem` &Co)
  * und das Resultat sieht kaputt aus.
  *
  * Idempotent. Behält `style` auf img/table/td/col/figure/iframe.
