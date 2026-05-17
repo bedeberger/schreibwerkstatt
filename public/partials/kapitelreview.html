@@ -35,6 +35,17 @@
       </span>
       <div class="card-actions">
         <button type="button"
+                @click="$app.toggleChapterIdeenCard($app.kapitelReviewChapterId)"
+                :class="{ primary: $app.showIdeenCard && $app.ideenScope === 'chapter' }"
+                :disabled="!$app.kapitelReviewChapterId"
+                :data-tip="$app.t('ideen.chapter.toggleTitle')">
+          <span x-text="$app.t('ideen.chapter.toggle')"></span>
+          <span class="btn-count"
+                x-show="($app.chapterIdeenCounts[$app.kapitelReviewChapterId] || 0) > 0"
+                x-text="$app.chapterIdeenCounts[$app.kapitelReviewChapterId]"
+                :data-tip="$app.t('ideen.openCountTitle', { n: $app.chapterIdeenCounts[$app.kapitelReviewChapterId] })"></span>
+        </button>
+        <button type="button"
                 @click="runKapitelReview()"
                 :disabled="kapitelReviewLoading || !$app.kapitelReviewChapterId">
           <span x-show="kapitelReviewLoading" class="spinner"></span>

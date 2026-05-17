@@ -61,10 +61,24 @@ function _clientIp(req) {
 const STRINGS = {
   de: {
     landingTitle:   'Schreibwerkstatt',
-    landingSubtitle:'Schreiben, Lektorat und Buchanalyse mit KI.',
+    landingSubtitle:'Schreiben, Lektorat und Buchanalyse mit KI — in einer Umgebung.',
     loginLabel:     'Anmelden',
     registerLabel:  'Zugang anfordern',
-    landingFooter:  'Self-hosted by the operator. Datenschutz: bitte beim Betreiber erfragen.',
+    landingFooter:  'Selbst gehostet vom Betreiber. Fragen zum Datenschutz bitte direkt an den Betreiber.',
+
+    featuresTitle:  'Kernfunktionen',
+    feat1Title:     'Schreiben',
+    feat1Desc:      'Ablenkungsfreier Fokus-Editor mit Kapitelstruktur, Auto-Save, Versionshistorie und Suche.',
+    feat2Title:     'KI-Lektorat',
+    feat2Desc:      'Findet Stilbrüche, Wiederholungen, schwache Verben, Passivketten und Tempuswechsel — Seite für Seite.',
+    feat3Title:     'Buchanalyse',
+    feat3Desc:      'Extrahiert Figuren, Schauplätze, Szenen, Zeitstrahl und Kontinuitätsprobleme aus dem ganzen Manuskript.',
+    feat4Title:     'Sparrings-Chat',
+    feat4Desc:      'Seiten-Chat für gezielte Textstellen und agentischer Buch-Chat mit Zugriff auf Figuren, Orte, Szenen.',
+    feat5Title:     'Bewertung',
+    feat5Desc:      'Buch- und Kapitel-Review aus Lektor-Perspektive mit Stärken, Schwächen und konkreten Verbesserungen.',
+    feat6Title:     'Export',
+    feat6Desc:      'Druckfertiges PDF/A, EPUB, Markdown und Trainingsdaten für eigene Finetunes.',
 
     registerTitle:    'Zugang anfordern',
     registerSub:      'Wir antworten per Mail an die angegebene Adresse, sobald deine Anfrage geprueft wurde.',
@@ -81,10 +95,24 @@ const STRINGS = {
   },
   en: {
     landingTitle:   'Schreibwerkstatt',
-    landingSubtitle:'Writing, editing and book analysis with AI.',
+    landingSubtitle:'Writing, editing and book analysis with AI — in one workspace.',
     loginLabel:     'Sign in',
     registerLabel:  'Request access',
-    landingFooter:  'Self-hosted by the operator. For privacy questions please contact the operator.',
+    landingFooter:  'Self-hosted by the operator. For privacy questions please contact the operator directly.',
+
+    featuresTitle:  'Core features',
+    feat1Title:     'Writing',
+    feat1Desc:      'Distraction-free focus editor with chapter structure, auto-save, revision history and search.',
+    feat2Title:     'AI editing',
+    feat2Desc:      'Catches style breaks, repetitions, weak verbs, passive chains and tense shifts — page by page.',
+    feat3Title:     'Book analysis',
+    feat3Desc:      'Extracts characters, locations, scenes, timeline and continuity issues across the whole manuscript.',
+    feat4Title:     'Sparring chat',
+    feat4Desc:      'Page chat for specific passages and an agentic book chat with access to characters, places and scenes.',
+    feat5Title:     'Reviews',
+    feat5Desc:      'Book and chapter reviews from an editor’s angle, with strengths, weaknesses and concrete fixes.',
+    feat6Title:     'Export',
+    feat6Desc:      'Print-ready PDF/A, EPUB, Markdown and training data for your own finetunes.',
 
     registerTitle:    'Request access',
     registerSub:      'We will reply by email to the address you provide once your request has been reviewed.',
@@ -117,6 +145,13 @@ function _renderLanding(req, res) {
     loginLabel:    s.loginLabel,
     registerLabel: s.registerLabel,
     footer:        s.landingFooter,
+    featuresTitle: s.featuresTitle,
+    feat1Title:    s.feat1Title, feat1Desc: s.feat1Desc,
+    feat2Title:    s.feat2Title, feat2Desc: s.feat2Desc,
+    feat3Title:    s.feat3Title, feat3Desc: s.feat3Desc,
+    feat4Title:    s.feat4Title, feat4Desc: s.feat4Desc,
+    feat5Title:    s.feat5Title, feat5Desc: s.feat5Desc,
+    feat6Title:    s.feat6Title, feat6Desc: s.feat6Desc,
   }));
 }
 

@@ -3,7 +3,15 @@
 
 export const kapitelReviewMethods = {
   async toggleKapitelReviewCard() {
-    if (this.showKapitelReviewCard) { this.showKapitelReviewCard = false; return; }
+    if (this.showKapitelReviewCard) {
+      this.showKapitelReviewCard = false;
+      // Kapitel-Ideen-Karte lebt neben der Kapitelreview-Karte und schliesst
+      // gemeinsam mit ihr.
+      if (this.ideenScope === 'chapter' && this.showIdeenCard) {
+        this.showIdeenCard = false;
+      }
+      return;
+    }
     this._closeOtherMainCards('kapitelReview');
     this.showKapitelReviewCard = true;
   },

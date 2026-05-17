@@ -1,18 +1,29 @@
 // Methoden für die Ideen-Karte (Sub-Komponente). Verwaltet User-Notizen
-// pro Seite. Offene Ideen werden im Seiten-Chat als Kontext eingespielt
-// (Backend-seitig via getOpenIdeen — kein Datentransfer aus dieser Karte).
+// pro Seite ODER pro Kapitel — Scope-Switch via app.ideenScope.
+// Offene Ideen werden im Seiten-Chat als Kontext eingespielt (Backend-seitig
+// via getOpenIdeen: Page-Ideen + Chapter-Ideen des umliegenden Kapitels).
 
 import { fetchJson } from '../utils.js';
+
+// Aktive Scope-IDs aus Root lesen. Liefert { kind, id } oder null.
+function _activeScope(app) {
+  if (!app) return null;
+  if (app.ideenScope === 'chapter') {
+    return app.ideenChapterId ? { kind: 'chapter', id: app.ideenChapterId } : null;
+  }
+  return app.currentPage?.id ? { kind: 'page', id: app.currentPage.id } : null;
+}
 
 export const ideenMethods = {
   // ── Lifecycle ────────────────────────────────────────────────────────────
   async loadIdeen() {
     const app = window.__app;
-    const pageId = app?.currentPage?.id;
-    if (!pageId) { this.ideen = []; return; }
+    const scope = _activeScope(app);
+    if (!scope) { this.ideen = []; return; }
     this.loading = true;
     try {
-      const rows = await fetchJson(`/ideen?page_id=${pageId}`);
+      const qs = scope.kind === 'chapter' ? `chapter_id=${scope.id}` : `page_id=${scope.id}`;
+      const rows = await fetchJson(`/ideen?${qs}`);
       this.ideen = Array.isArray(rows) ? rows : [];
       this.errorMessage = '';
       this._publishIdeenCount();
@@ -83,21 +94,19 @@ export const ideenMethods = {
     const content = (this.newContent || '').trim();
     if (!content) { this.errorMessage = app.t('ideen.error.contentRequired'); return; }
     if (content.length > 4000) { this.errorMessage = app.t('ideen.error.contentTooLong'); return; }
-    const page = app.currentPage;
+    const scope = _activeScope(app);
     const bookId = app.selectedBookId;
-    if (!page?.id || !bookId) return;
+    if (!scope || !bookId) return;
 
     this.busy = true;
     try {
+      const body = { book_id: bookId, content };
+      if (scope.kind === 'page') body.page_id = scope.id;
+      else                       body.chapter_id = scope.id;
       const row = await fetchJson('/ideen', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          book_id: bookId,
-          page_id: page.id,
-          page_name: page.name || null,
-          content,
-        }),
+        body: JSON.stringify(body),
       });
       // Neueste offene Idee nach oben (Liste ist nach erledigt ASC, created_at DESC sortiert)
       this.ideen = [row, ...this.ideen];
@@ -190,24 +199,24 @@ export const ideenMethods = {
     const app = window.__app;
     const targetId = parseInt(this.moveTargetId, 10);
     if (!targetId) return;
-    const target = (app.pages || []).find(p => p.id === targetId);
-    if (!target) return;
 
     this.busy = true;
     try {
+      // Body je nach Idee-Scope (within-kind move): Page-Idee → page_id,
+      // Chapter-Idee → chapter_id. Backend lehnt Cross-Kind ab.
+      const body = idee.page_id != null ? { page_id: targetId } : { chapter_id: targetId };
       await fetchJson(`/ideen/${idee.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ page_id: targetId, page_name: target.name || null }),
+        body: JSON.stringify(body),
       });
       this.ideen = this.ideen.filter(i => i.id !== idee.id);
       this.movingId = null;
       this.moveTargetId = '';
       this.errorMessage = '';
       this._publishIdeenCount();
-      // Ziel-Seite: open count +1 (Backend lehnt Move bei erledigt ab).
-      const tgtPrev = (app.ideenCounts && app.ideenCounts[targetId]) || 0;
-      this._setTreeIdeenCount(targetId, tgtPrev + 1);
+      // Ziel-Counts bumpen (Backend lehnt Move bei erledigt ab → +1 sicher).
+      this._bumpTreeCountForTarget(idee, targetId);
     } catch (e) {
       this.errorMessage = app.t('ideen.error.move');
     } finally {
@@ -238,22 +247,43 @@ export const ideenMethods = {
   // ── Helpers ──────────────────────────────────────────────────────────────
   _publishIdeenCount() {
     const app = window.__app;
-    const pageId = app?.currentPage?.id;
-    if (!pageId) return;
+    const scope = _activeScope(app);
+    if (!scope) return;
     const count = (this.ideen || []).filter(i => !i.erledigt).length;
-    if (app.currentPage?.id === pageId) app.currentPageIdeenOpenCount = count;
-    // Tree-Indikator (sanftes Badge im Seitenbaum) synchron halten.
-    this._setTreeIdeenCount(pageId, count);
+    if (scope.kind === 'page') {
+      if (app.currentPage?.id === scope.id) app.currentPageIdeenOpenCount = count;
+    } else {
+      if (app.ideenChapterId === scope.id) app.currentChapterIdeenOpenCount = count;
+    }
+    this._setTreeIdeenCount(scope, count);
   },
 
-  // Patched ideenCounts-Map am Root für den Sidebar-Indikator.
-  _setTreeIdeenCount(pageId, count) {
+  // Patched ideenCounts/chapterIdeenCounts-Map am Root für Sidebar-Indikator.
+  _setTreeIdeenCount(scope, count) {
     const app = window.__app;
-    if (!app || !pageId) return;
-    const next = { ...(app.ideenCounts || {}) };
-    if (count > 0) next[pageId] = count;
-    else delete next[pageId];
-    app.ideenCounts = next;
+    if (!app || !scope?.id) return;
+    if (scope.kind === 'page') {
+      const next = { ...(app.ideenCounts || {}) };
+      if (count > 0) next[scope.id] = count;
+      else           delete next[scope.id];
+      app.ideenCounts = next;
+    } else {
+      const next = { ...(app.chapterIdeenCounts || {}) };
+      if (count > 0) next[scope.id] = count;
+      else           delete next[scope.id];
+      app.chapterIdeenCounts = next;
+    }
+  },
+
+  _bumpTreeCountForTarget(idee, targetId) {
+    const app = window.__app;
+    if (!app) return;
+    const isPage = idee.page_id != null;
+    const mapKey = isPage ? 'ideenCounts' : 'chapterIdeenCounts';
+    const prev = (app[mapKey] && app[mapKey][targetId]) || 0;
+    const next = { ...(app[mapKey] || {}) };
+    next[targetId] = prev + 1;
+    app[mapKey] = next;
   },
 
   _replaceIdee(row) {

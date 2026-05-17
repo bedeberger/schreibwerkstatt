@@ -147,7 +147,13 @@ export const lektoratMethods = {
     }
 
     onProgress(85, this.t('lektorat.saving'));
-    const saved = await contentRepo.savePage(this.currentPage.id, { html: finalHtml, name: this.currentPage.name });
+    // `page.updated_at` ist der frisch geladene Stand; PUT optimistisch gegen
+    // genau diesen Stamp. Wenn dazwischen jemand schreibt → 409 vom Server.
+    const saved = await contentRepo.savePage(this.currentPage.id, {
+      html: finalHtml,
+      name: this.currentPage.name,
+      expected_updated_at: page.updated_at || null,
+    });
     if (saved?.updated_at) this.currentPage.updated_at = saved.updated_at;
     // Uebernommene Korrekturen sind direkte Folge des Lektorats — Seite soll
     // nicht unmittelbar danach auf "seit Lektorat bearbeitet" flippen.

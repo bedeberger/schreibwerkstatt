@@ -5269,6 +5269,36 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 122 abgeschlossen (ideen.chapter_id FK + XOR-CHECK).');
   }
 
+  if (version < 123) {
+    // pages.last_editor_email: Wer hat zuletzt diese Seite geschrieben.
+    // Quelle fuer Tree-/Toast-Hinweise „andere User hat editiert" sowie fuer
+    // den /content/books/:id/changes-Endpoint (Phase 3). Nullable, kein FK
+    // auf app_users (Display-Truth lebt in page_revisions; Email reicht als
+    // Anzeige-Hint, Drop eines Users soll den Save-Pfad nicht brechen).
+    const pagesCols123 = db.pragma('table_info(pages)').map(c => c.name);
+    if (!pagesCols123.includes('last_editor_email')) {
+      db.prepare('ALTER TABLE pages ADD COLUMN last_editor_email TEXT').run();
+    }
+    // Backfill aus juengster page_revisions-Row (best effort).
+    db.prepare(`
+      UPDATE pages
+         SET last_editor_email = (
+           SELECT user_email FROM page_revisions r
+            WHERE r.page_id = pages.page_id
+              AND r.user_email IS NOT NULL
+            ORDER BY r.created_at DESC LIMIT 1
+         )
+       WHERE last_editor_email IS NULL
+    `).run();
+
+    const fkErrors123 = db.pragma('foreign_key_check');
+    if (fkErrors123.length) {
+      throw new Error(`Migration 123: foreign_key_check meldet ${fkErrors123.length} Verstoesse: ${JSON.stringify(fkErrors123.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 123').run();
+    logger.info('DB-Migration auf Version 123 abgeschlossen (pages.last_editor_email).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

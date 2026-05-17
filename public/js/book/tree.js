@@ -300,6 +300,7 @@ export const treeMethods = {
       this.tokEsts = {};
       this.pageLastChecked = {};
       this.ideenCounts = {};
+      this.chapterIdeenCounts = {};
       this.tree = [];
       this.pages = [];
       this._tokenEstGen++;
@@ -368,15 +369,17 @@ export const treeMethods = {
       }
       this._refreshChapterStats();
 
-      // Gecachte Stats + Page-Ages + Ideen-Counts aus DB laden
+      // Gecachte Stats + Page-Ages + Ideen-Counts (Page + Chapter) aus DB laden
       try {
-        const [statsCache, ageMap, ideenMap] = await Promise.all([
+        const [statsCache, ageMap, ideenMap, chapterIdeenMap] = await Promise.all([
           fetchJson('/history/page-stats/' + bookId),
           fetchJson('/history/page-ages/' + bookId),
           fetchJson('/ideen/counts?book_id=' + bookId).catch(() => ({})),
+          fetchJson('/ideen/counts?book_id=' + bookId + '&kind=chapter').catch(() => ({})),
         ]);
         this.pageLastChecked = ageMap || {};
         this.ideenCounts = ideenMap || {};
+        this.chapterIdeenCounts = chapterIdeenMap || {};
         // Cache-Hits in einem Rutsch zuweisen (statt Index-Assign in der Loop),
         // damit der tokEsts-$watch in app.js#init feuert und die Kapitel-Stats
         // synchron mit dem ersten Tree-Render aktualisiert.

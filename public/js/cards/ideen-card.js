@@ -1,6 +1,7 @@
-// Alpine.data('ideenCard') — Sub-Komponente für Seiten-Ideen.
-// Lebt parallel zum Editor wie der Seiten-Chat (kein _closeOtherMainCards).
-// Eigener State; Root behält showIdeenCard, currentPage, selectedBookId, t.
+// Alpine.data('ideenCard') — Sub-Komponente für Seiten- ODER Kapitel-Ideen.
+// Scope-Switch via $app.ideenScope ('page'|'chapter'); $app.ideenChapterId
+// nur in 'chapter'-Modus gesetzt. Lebt parallel zum Editor bzw. neben der
+// Kapitelreview-Karte (kein _closeOtherMainCards).
 
 import { ideenMethods } from '../book/ideen.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
@@ -25,8 +26,9 @@ export function registerIdeenCard() {
     init() {
       this._lifecycle = setupCardLifecycle(this, {
         showFlag: 'showIdeenCard',
-        // showNeedsBookId=false: Ideen sind seiten-, nicht buchgebunden — onShow soll
-        // auch greifen, wenn kein Buch in der Combobox aktiv ist (currentPage reicht).
+        // showNeedsBookId=false: Ideen sind seiten-/kapitel-, nicht buch-
+        // gebunden — onShow soll auch greifen, wenn kein Buch in der Combobox
+        // aktiv ist (currentPage bzw. ideenChapterId reicht).
         showNeedsBookId: false,
         onShow: async () => {
           await this.loadIdeen();
@@ -40,8 +42,31 @@ export function registerIdeenCard() {
         extraListeners: [{ type: 'ideen:reset', handler: () => this.resetIdeen() }],
       });
 
+      // Page-Modus: Seitenwechsel triggert Reload (wenn offen).
       this.$watch(() => window.__app.currentPage?.id, async (pid) => {
+        if (window.__app.ideenScope !== 'page') return;
         if (!pid) { this.resetIdeen(); return; }
+        if (window.__app.showIdeenCard) await this.loadIdeen();
+      });
+
+      // Chapter-Modus: Kapitelwechsel triggert Reload (wenn offen).
+      this.$watch(() => window.__app.ideenChapterId, async (cid) => {
+        if (window.__app.ideenScope !== 'chapter') return;
+        if (!cid) { this.resetIdeen(); return; }
+        if (window.__app.showIdeenCard) await this.loadIdeen();
+      });
+
+      // Kapitelreview-Kapitelwahl synchronisieren: wechselt User dort das
+      // Kapitel (Combobox/Sidebar), wandert die Chapter-Ideen-Karte mit.
+      this.$watch(() => window.__app.kapitelReviewChapterId, (cid) => {
+        if (window.__app.ideenScope !== 'chapter') return;
+        const id = parseInt(cid, 10);
+        if (id) window.__app.ideenChapterId = id;
+      });
+
+      // Scope-Wechsel: State leeren + neu laden (falls Karte offen).
+      this.$watch(() => window.__app.ideenScope, async () => {
+        this.resetIdeen();
         if (window.__app.showIdeenCard) await this.loadIdeen();
       });
 

@@ -543,13 +543,21 @@ document.addEventListener('alpine:init', () => {
         : safe;
     },
 
-    // Zielseiten für Ideen-Verschieben-Combobox: Seiten gleichen Kapitels,
-    // aktuelle Seite ausgeschlossen. Liegt am Root, weil x-effect der
-    // Combobox-Sub-x-data nur $app/Magics, nicht Karten-Methoden sieht.
+    // Zielseiten/-kapitel für Ideen-Verschieben-Combobox.
+    // Scope 'page': Seiten gleichen Kapitels, aktuelle Seite ausgeschlossen.
+    // Scope 'chapter': andere Kapitel des Buches, aktuelles Kapitel ausgeschlossen.
+    // Liegt am Root, weil x-effect der Combobox-Sub-x-data nur $app/Magics,
+    // nicht Karten-Methoden sieht.
     ideenMovePickerOptions() {
+      const tree = this.tree || [];
+      if (this.ideenScope === 'chapter') {
+        const curCid = this.ideenChapterId;
+        return tree
+          .filter(it => it.type === 'chapter' && !it.solo && it.id !== curCid)
+          .map(it => ({ value: it.id, label: it.name }));
+      }
       const cur = this.currentPage;
       if (!cur?.id) return [];
-      const tree = this.tree || [];
       const pages = cur.chapter_id
         ? (tree.find(it => it.type === 'chapter' && !it.solo && it.id === cur.chapter_id)?.pages || [])
             .filter(p => p.id !== cur.id)

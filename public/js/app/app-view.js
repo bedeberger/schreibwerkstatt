@@ -214,7 +214,10 @@ export const appViewMethods = {
   // Seiten-Ideen: lebt parallel zum Editor wie Seiten-Chat. Mutually exclusive
   // mit Chat — nur eines kann gleichzeitig aktiv sein (gleicher Slot).
   toggleIdeenCard() {
-    if (this.showIdeenCard) { this.showIdeenCard = false; return; }
+    if (this.showIdeenCard && this.ideenScope === 'page') {
+      this.showIdeenCard = false;
+      return;
+    }
     if (!this.currentPage) return;
     if (this.showChatCard) {
       this.showChatCard = false;
@@ -223,6 +226,22 @@ export const appViewMethods = {
         this._checkDoneBeforeChat = false;
       }
     }
+    this.ideenScope = 'page';
+    this.ideenChapterId = null;
+    this.showIdeenCard = true;
+  },
+  // Kapitel-Ideen: lebt parallel zur Kapitelreview-Karte (gleicher Slot wie
+  // Page-Modus). Kein _closeOtherMainCards — Kapitelreview bleibt offen.
+  toggleChapterIdeenCard(chapterId) {
+    const cid = parseInt(chapterId, 10);
+    if (!cid) return;
+    if (this.showIdeenCard && this.ideenScope === 'chapter' && this.ideenChapterId === cid) {
+      this.showIdeenCard = false;
+      return;
+    }
+    if (this.showChatCard) this.showChatCard = false;
+    this.ideenScope = 'chapter';
+    this.ideenChapterId = cid;
     this.showIdeenCard = true;
   },
   // Seiten-Chat: lebt neben dem Editor, schließt NICHT den Editor. Toggle
@@ -286,7 +305,9 @@ export const appViewMethods = {
     this._uninstallOnlineRetry?.();
     this.resetChat();
     this.showChatCard = false;
-    this.showIdeenCard = false;
+    // Page-Ideen-Karte schliessen; Chapter-Ideen bleiben offen (Slot lebt
+    // neben Kapitelreview, nicht neben Editor).
+    if (this.ideenScope === 'page') this.showIdeenCard = false;
     this._checkDoneBeforeChat = false;
     this.currentPage = null;
     this.currentPageEmpty = false;
@@ -343,6 +364,14 @@ export const appViewMethods = {
     this.activeHistoryEntryId = null;
     this.tokEsts = {};
     this.ideenCounts = {};
+    this.chapterIdeenCounts = {};
+    this.currentChapterIdeenOpenCount = 0;
+    // Chapter-Ideen-Scope verwerfen beim Buchwechsel.
+    if (this.ideenScope === 'chapter') {
+      this.showIdeenCard = false;
+      this.ideenChapterId = null;
+      this.ideenScope = 'page';
+    }
     this._tokenEstGen++;
     if (typeof this._teardownStatsObserver === 'function') this._teardownStatsObserver();
 

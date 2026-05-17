@@ -346,6 +346,7 @@ export function registerBookEditorCard() {
         const saved = await contentRepo.savePage(block.pageId, {
           html: newHtml,
           name: block.name,
+          expected_updated_at: block.originalUpdatedAt || null,
         });
         block.originalHtml = newHtml;
         if (saved?.updated_at) block.originalUpdatedAt = saved.updated_at;
@@ -355,7 +356,18 @@ export function registerBookEditorCard() {
         this.dirtyCount = Math.max(0, this.dirtyCount - 1);
         app._syncPageStatsAfterSave?.({ id: block.pageId, updated_at: block.originalUpdatedAt }, newHtml);
       } catch (e) {
-        block.saveError = e.message || app.t('bookEditor.saveFailed');
+        if (e?.status === 409 && e?.code === 'PAGE_CONFLICT') {
+          block.conflict = {
+            remoteUserName: e.body?.server_editor_name || null,
+            remoteUpdatedAt: e.body?.server_updated_at || null,
+            remoteHtml: null,
+          };
+          block.saveError = app.t('bookEditor.conflictHint', {
+            user: e.body?.server_editor_name || app.t('edit.conflict.unknownUser'),
+          });
+        } else {
+          block.saveError = e.message || app.t('bookEditor.saveFailed');
+        }
       } finally {
         block.saving = false;
         this.savingCount = Math.max(0, this.savingCount - 1);

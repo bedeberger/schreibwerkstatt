@@ -175,6 +175,12 @@ router.put('/pages/:page_id', jsonBody, async (req, res) => {
   try { res.json(await contentStore.savePage(pageId, req.body || {}, req)); }
   catch (e) {
     if (e.code === 'EMPTY_BODY') return res.status(400).json({ error_code: 'EMPTY_BODY' });
+    if (e.code === 'PAGE_CONFLICT') return res.status(409).json({
+      error_code: 'PAGE_CONFLICT',
+      server_updated_at: e.serverUpdatedAt || null,
+      server_editor_email: e.serverEditorEmail || null,
+      server_editor_name: e.serverEditorDisplay || e.serverEditorEmail || null,
+    });
     _fail(res, e, 'PUT /content/pages/:id');
   }
 });

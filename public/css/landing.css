@@ -23,14 +23,25 @@ html, body {
   gap: var(--space-xl);
 }
 
+.public-shell--wide {
+  max-width: 880px;
+}
+
+.public-header {
+  text-align: center;
+  padding: var(--space-lg) 0 0;
+}
+
 .public-header h1 {
   font-size: var(--font-size-2xl);
   margin: 0 0 var(--space-xs);
+  letter-spacing: -0.01em;
 }
 
 .public-sub {
   color: var(--color-muted);
   margin: 0;
+  font-size: var(--font-size-md);
 }
 
 .public-actions {
@@ -42,6 +53,74 @@ html, body {
   border-radius: var(--radius-md);
   padding: var(--space-xl);
 }
+
+.public-actions--inline {
+  flex-direction: row;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+.public-actions--inline .public-btn {
+  min-width: 180px;
+}
+
+.public-features {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.public-features-title {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  text-align: center;
+}
+
+.public-feature-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-md);
+}
+
+.public-feature {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--card-accent, var(--color-primary));
+  border-radius: var(--radius-md);
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.public-feature h3 {
+  margin: 0;
+  font-size: var(--font-size-md);
+  color: var(--card-accent, var(--color-text));
+}
+
+.public-feature p {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+  line-height: 1.55;
+}
+
+.public-feature--bookeditor   { --card-accent: var(--card-accent-bookeditor); }
+.public-feature--stil         { --card-accent: var(--card-accent-stil); }
+.public-feature--figuren      { --card-accent: var(--card-accent-figuren); }
+.public-feature--chat         { --card-accent: var(--card-accent-chat); }
+.public-feature--review       { --card-accent: var(--card-accent-review); }
+.public-feature--pdfexport    { --card-accent: var(--card-accent-pdfexport); }
 
 .public-btn {
   display: inline-block;
@@ -182,8 +261,16 @@ html, body {
   text-align: center;
 }
 
+@media (max-width: 720px) {
+  .public-feature-grid { grid-template-columns: 1fr; }
+}
+
 @media (max-width: 480px) {
   .public-shell { padding: var(--space-lg) var(--space-md); }
-  .public-actions, .public-form { padding: var(--space-lg); }
+  .public-actions:not(.public-actions--inline),
+  .public-form { padding: var(--space-lg); }
+  .public-actions--inline { flex-direction: column; }
+  .public-actions--inline .public-btn { width: 100%; }
   .public-form-actions { flex-direction: column-reverse; align-items: stretch; gap: var(--space-sm); }
+  .public-feature { padding: var(--space-md); }
 }

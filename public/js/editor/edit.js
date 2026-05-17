@@ -325,6 +325,7 @@ export const editorEditMethods = {
         html: newHtml,
         name: this.currentPage.name,
         source: this.focusMode ? 'focus' : 'main',
+        expected_updated_at: this.currentPage.updated_at || null,
       });
       if (saved?.updated_at) this.currentPage.updated_at = saved.updated_at;
 
@@ -356,6 +357,20 @@ export const editorEditMethods = {
         this.setStatus(this.t('edit.changesSaved'), false, 5000);
       }
     } catch (e) {
+      if (e?.status === 409 && e?.code === 'PAGE_CONFLICT') {
+        // Race: zwischen Pre-Check und PUT hat anderer User geschrieben.
+        // Draft sichern + Conflict-Banner setzen; User muss erneut entscheiden.
+        writeDraft(this.currentPage.id, newHtml, this.originalHtml, this.currentPage.updated_at);
+        this.lastDraftSavedAt = Date.now();
+        this.saveOffline = true;
+        this.editConflict = {
+          remoteUserName: e.body?.server_editor_name || null,
+          remoteUpdatedAt: e.body?.server_updated_at || null,
+        };
+        this.setStatus(this.t('edit.conflict.kept'), false, 8000);
+        this.editSaving = false;
+        return;
+      }
       console.error('[saveEdit]', e);
       // Netzwerkfehler → Draft behalten, Offline-Modus aktivieren, Auto-Retry.
       writeDraft(this.currentPage.id, newHtml, this.originalHtml, this.currentPage.updated_at);
@@ -427,6 +442,7 @@ export const editorEditMethods = {
         html: newHtml,
         name: this.currentPage.name,
         source: this.focusMode ? 'focus' : 'main',
+        expected_updated_at: this.currentPage.updated_at || null,
       });
       if (saved?.updated_at) this.currentPage.updated_at = saved.updated_at;
       this.originalHtml = newHtml;
@@ -444,6 +460,20 @@ export const editorEditMethods = {
       this.updatePageView();
       this.setStatus(this.t('edit.savedAt', { time: new Date().toLocaleTimeString(localeTag) }), false, 2500);
     } catch (e) {
+      if (e?.status === 409 && e?.code === 'PAGE_CONFLICT') {
+        // Race nach Pre-Check: anderer User war im selben Tick schneller.
+        // Quiet-Pfad: Draft bleibt, Banner setzen, kein Modal.
+        this.saveOffline = true;
+        this.editConflict = {
+          remoteUserName: e.body?.server_editor_name || null,
+          remoteUpdatedAt: e.body?.server_updated_at || null,
+        };
+        this.setStatus(this.t('edit.conflict.unsavedHint', {
+          user: e.body?.server_editor_name || this.t('edit.conflict.unknownUser'),
+        }), false, 8000);
+        this.editSaving = false;
+        return;
+      }
       console.error('[quickSave]', e);
       this.saveOffline = true;
       this.setStatus(this.t('edit.saveFailedRetry'), false, 6000);

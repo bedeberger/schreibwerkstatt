@@ -129,6 +129,7 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, userEmail, u
 
 router.post('/pdf-export', jsonBody, async (req, res) => {
   const userEmail = req.session?.user?.email || null;
+  const userToken = null;
 
   const rawScope = String(req.body?.scope || 'book').toLowerCase();
   const scope = VALID_SCOPES.has(rawScope) ? rawScope : null;

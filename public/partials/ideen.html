@@ -3,8 +3,10 @@
      Offene Ideen werden im Seiten-Chat als Kontext mitgegeben. -->
 <div class="card card--ideen" id="ideen-card" x-data="ideenCard" x-show="$app.showIdeenCard" x-cloak>
   <div class="card-header">
-    <span class="card-title" x-text="$app.t('ideen.title')"></span>
-    <span class="card-subtitle ideen-subtitle" x-text="$app.t('ideen.chatNote')"></span>
+    <span class="card-title"
+          x-text="$app.ideenScope === 'chapter' ? $app.t('ideen.titleChapter') : $app.t('ideen.title')"></span>
+    <span class="card-subtitle ideen-subtitle"
+          x-text="$app.ideenScope === 'chapter' ? $app.t('ideen.chatNoteChapter') : $app.t('ideen.chatNote')"></span>
   </div>
 
   <div x-show="errorMessage" class="card-status card-status--error" x-text="errorMessage"></div>
@@ -13,8 +15,8 @@
     <textarea
       class="ideen-input"
       x-model="newContent"
-      :placeholder="$app.t('ideen.placeholder')"
-      :aria-label="$app.t('ideen.placeholder')"
+      :placeholder="$app.ideenScope === 'chapter' ? $app.t('ideen.placeholderChapter') : $app.t('ideen.placeholder')"
+      :aria-label="$app.ideenScope === 'chapter' ? $app.t('ideen.placeholderChapter') : $app.t('ideen.placeholder')"
       rows="2"
       :disabled="busy"
       @keydown.enter="if(!$event.isComposing && $event.keyCode !== 229 && !$event.shiftKey && !$event.ctrlKey && !$event.metaKey) { $event.preventDefault(); addIdee(); }"
@@ -28,8 +30,9 @@
 
   <!-- Move-Picker (Single-Instance, ausserhalb x-for damit Combobox sauber initialisiert) -->
   <div x-show="movingId !== null" class="idee-move-panel" x-cloak>
-    <span class="ideen-move-label" x-text="$app.t('ideen.moveTo')"></span>
-    <div x-data="combobox($app.t('ideen.moveSelectPlaceholder'), null)"
+    <span class="ideen-move-label"
+          x-text="$app.ideenScope === 'chapter' ? $app.t('ideen.moveToChapter') : $app.t('ideen.moveTo')"></span>
+    <div x-data="combobox($app.ideenScope === 'chapter' ? $app.t('ideen.moveSelectPlaceholderChapter') : $app.t('ideen.moveSelectPlaceholder'), null)"
          x-modelable="value" x-model="moveTargetId"
          x-effect="options = $app.ideenMovePickerOptions()"
          class="idee-move-combo"></div>
@@ -40,7 +43,8 @@
   <div class="ideen-list">
     <div x-show="loading" class="ideen-loading" x-text="$app.t('common.loading')"></div>
 
-    <div x-show="!loading && ideen.length === 0" class="ideen-empty" x-text="$app.t('ideen.empty')"></div>
+    <div x-show="!loading && ideen.length === 0" class="ideen-empty"
+         x-text="$app.ideenScope === 'chapter' ? $app.t('ideen.emptyChapter') : $app.t('ideen.empty')"></div>
 
     <!-- Offene Ideen -->
     <template x-if="!loading && offeneIdeen().length > 0">

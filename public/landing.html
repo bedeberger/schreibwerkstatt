@@ -10,15 +10,45 @@
   <link rel="stylesheet" href="/css/landing.css">
 </head>
 <body>
-  <main class="public-shell">
+  <main class="public-shell public-shell--wide">
     <header class="public-header">
       <h1>{{appName}}</h1>
       <p class="public-sub">{{subtitle}}</p>
     </header>
 
-    <section class="public-actions">
+    <section class="public-actions public-actions--inline">
       <a class="public-btn public-btn--primary" href="/login">{{loginLabel}}</a>
       <a class="public-btn" href="/register">{{registerLabel}}</a>
+    </section>
+
+    <section class="public-features" aria-label="{{featuresTitle}}">
+      <h2 class="public-features-title">{{featuresTitle}}</h2>
+      <ul class="public-feature-grid">
+        <li class="public-feature public-feature--bookeditor">
+          <h3>{{feat1Title}}</h3>
+          <p>{{feat1Desc}}</p>
+        </li>
+        <li class="public-feature public-feature--stil">
+          <h3>{{feat2Title}}</h3>
+          <p>{{feat2Desc}}</p>
+        </li>
+        <li class="public-feature public-feature--figuren">
+          <h3>{{feat3Title}}</h3>
+          <p>{{feat3Desc}}</p>
+        </li>
+        <li class="public-feature public-feature--chat">
+          <h3>{{feat4Title}}</h3>
+          <p>{{feat4Desc}}</p>
+        </li>
+        <li class="public-feature public-feature--review">
+          <h3>{{feat5Title}}</h3>
+          <p>{{feat5Desc}}</p>
+        </li>
+        <li class="public-feature public-feature--pdfexport">
+          <h3>{{feat6Title}}</h3>
+          <p>{{feat6Desc}}</p>
+        </li>
+      </ul>
     </section>
 
     <footer class="public-footer">

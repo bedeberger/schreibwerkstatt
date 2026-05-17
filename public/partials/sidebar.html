@@ -62,6 +62,10 @@
               @mouseenter.stop="_showTokTip($el, item.stats, { _chapterOnly: true })"
               @mouseleave.stop="_hideTokTip()"></span>
           </template>
+          <span x-show="!item.solo && chapterIdeenCounts[item.id] > 0"
+                class="ideen-count-badge"
+                x-text="chapterIdeenCounts[item.id]"
+                :data-tip="t('ideen.openCountTitle', { n: chapterIdeenCounts[item.id] })"></span>
         </span>
       </div>
       <div x-show="item.solo || item.open" class="tree-chapter-pages">
