@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 128, 85 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 128, 75 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -77,7 +77,12 @@ erDiagram
 
   app_users ||--o{ book_access       : grants
   app_users ||--o{ page_locks        : holds
+  app_users ||--o{ page_presence     : pings
   app_users ||--o{ budget_alerts     : dedupes
+
+  user_invites ||--o{ registration_requests : "linked invite"
+  pages ||--o{ page_presence         : "online viewers"
+  books ||--o{ page_presence         : has
 
   chapters ||--o{ figure_appearances     : has
   chapters ||--o{ figure_events          : at
@@ -808,10 +813,16 @@ erDiagram
     INTEGER page_id            PK,FK "pages(page_id) CASCADE"
     INTEGER book_id            FK "books(book_id) CASCADE"
     TEXT    locked_by_email    FK "app_users(email) CASCADE"
-    TEXT    reason             "lektorat"
+    TEXT    reason             "lektorat | edit"
     TEXT    acquired_at
     TEXT    expires_at         "TTL 30 min, Heartbeat verlängert"
     TEXT    last_heartbeat_at
+  }
+  page_presence {
+    INTEGER page_id      PK,FK "pages(page_id) CASCADE"
+    TEXT    user_email   PK,FK "app_users(email) CASCADE"
+    INTEGER book_id      FK    "books(book_id) CASCADE"
+    TEXT    last_ping_at "Default now"
   }
   budget_alerts {
     TEXT email   PK,FK "app_users(email) CASCADE"
@@ -832,11 +843,19 @@ erDiagram
     TEXT    last_login_at
     TEXT    last_seen_at
   }
-  user_tokens {
-    TEXT email      PK,FK "users(email) CASCADE"
-    TEXT token_id   "AES-256-GCM"
-    TEXT token_pw   "AES-256-GCM"
-    TEXT updated_at
+  registration_requests {
+    INTEGER id            PK "AUTOINCREMENT"
+    TEXT    email
+    TEXT    display_name
+    TEXT    message
+    TEXT    ip
+    TEXT    user_agent
+    TEXT    status        "pending | approved | denied | expired"
+    TEXT    created_at
+    TEXT    reviewed_at
+    TEXT    reviewed_by
+    TEXT    review_reason
+    INTEGER invite_id     FK "user_invites(id) SET NULL"
   }
   user_activity {
     TEXT    user_email PK
@@ -895,7 +914,43 @@ erDiagram
     INTEGER fetched_at
   }
 
+  app_settings {
+    TEXT    key        PK
+    TEXT    value_json
+    INTEGER encrypted  "0|1, AES-256-GCM bei 1"
+    TEXT    updated_at
+    TEXT    updated_by
+  }
+  app_settings_audit {
+    INTEGER id         PK "AUTOINCREMENT"
+    TEXT    key
+    TEXT    old_hash
+    TEXT    new_hash
+    TEXT    updated_by
+    TEXT    updated_at
+  }
+  search_index {
+    TEXT kind      "UNINDEXED — page|chapter|figure|location|scene|song"
+    TEXT entity_id "UNINDEXED"
+    TEXT book_id   "UNINDEXED"
+    TEXT lang      "UNINDEXED"
+    TEXT title     "FTS5"
+    TEXT body      "FTS5 — unicode61 remove_diacritics 2"
+  }
+  search_trigram {
+    TEXT kind      "UNINDEXED"
+    TEXT entity_id "UNINDEXED"
+    TEXT book_id   "UNINDEXED"
+    TEXT title     "FTS5 — trigram tokenizer"
+  }
+  search_meta {
+    TEXT key        PK
+    TEXT value
+    TEXT updated_at
+  }
+
   chat_sessions ||--o{ chat_messages : has
+  user_invites  ||--o{ registration_requests : "linked invite"
 ```
 
 ---

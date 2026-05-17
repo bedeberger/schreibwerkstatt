@@ -38,14 +38,15 @@ function loadAndValidateCheckpoint(bookIdInt, email, log, jobId) {
 
 /** Stellt Phase-1-Ergebnisse aus einem validen Checkpoint wieder her. */
 function restorePhase1FromCheckpoint(cp, tok, log, jobId) {
-  const { chapterFiguren, chapterOrte, chapterFakten, chapterSzenen, chapterAssignments } = cp;
+  const { chapterFiguren, chapterOrte, chapterSongs, chapterFakten, chapterSzenen, chapterAssignments } = cp;
   if (cp.tokIn != null) { tok.in = cp.tokIn; tok.out = cp.tokOut || 0; tok.ms = cp.tokMs || 0; }
   const figTotal = (chapterFiguren || []).reduce((s, c) => s + (c.figuren?.length || 0), 0);
   const orteTotal = (chapterOrte || []).reduce((s, c) => s + (c.orte?.length || 0), 0);
+  const songsTotal = (chapterSongs || []).reduce((s, c) => s + (c.songs?.length || 0), 0);
   const szTotal = (chapterSzenen || []).reduce((s, c) => s + (c.szenen?.length || 0), 0);
-  log.info(`Phase 1 aus Checkpoint – ${chapterFiguren.length} Kapitel, fig=${figTotal} orte=${orteTotal} sz=${szTotal} (${fmtTok(tok.in)}↑ ${fmtTok(tok.out)}↓)`);
+  log.info(`Phase 1 aus Checkpoint – ${chapterFiguren.length} Kapitel, fig=${figTotal} orte=${orteTotal} songs=${songsTotal} sz=${szTotal} (${fmtTok(tok.in)}↑ ${fmtTok(tok.out)}↓)`);
   updateJob(jobId, { progress: 28, statusText: 'job.phase.checkpointLoaded', tokensIn: tok.in, tokensOut: tok.out });
-  return { chapterFiguren, chapterOrte, chapterFakten, chapterSzenen, chapterAssignments };
+  return { chapterFiguren, chapterOrte, chapterSongs: chapterSongs || [], chapterFakten, chapterSzenen, chapterAssignments };
 }
 
 module.exports = { invalidateRenamedChapterCaches, loadAndValidateCheckpoint, restorePhase1FromCheckpoint };

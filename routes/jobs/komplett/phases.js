@@ -2,7 +2,7 @@
 const {
   db,
   saveFigurenToDb, addFigurenBeziehungen, updateFigurenSoziogramm,
-  saveZeitstrahlEvents, saveOrteToDb,
+  saveZeitstrahlEvents, saveOrteToDb, saveSongsToDb,
   saveCheckpoint,
   loadChapterExtractCache, saveChapterExtractCache,
   getBookSettings,
@@ -38,7 +38,7 @@ async function runPhase1(ctx) {
 
   log.info(`Phase 1 – ${totalChars} Zeichen, ${effectiveProvider} → ${totalChars <= singlePassLimit ? 'Single-Pass' : `Multi-Pass (${groupOrder.length} Kapitel → ${chunkOrder.length} Chunks)`}`);
 
-  let chapterFiguren, chapterOrte, chapterFakten, chapterSzenen, chapterAssignments;
+  let chapterFiguren, chapterOrte, chapterSongs, chapterFakten, chapterSzenen, chapterAssignments;
 
   if (totalChars <= singlePassLimit) {
     // ── Single-Pass ──
@@ -50,6 +50,7 @@ async function runPhase1(ctx) {
     if (cached && Array.isArray(cached.chapterFiguren) && cached.chapterFiguren[0]?.figuren?.length > 0) {
       chapterFiguren     = cached.chapterFiguren;
       chapterOrte        = cached.chapterOrte        || [{ kapitel: 'Gesamtbuch', orte: [] }];
+      chapterSongs       = cached.chapterSongs       || [{ kapitel: 'Gesamtbuch', songs: [] }];
       chapterFakten      = cached.chapterFakten      || [{ kapitel: 'Gesamtbuch', fakten: [] }];
       chapterSzenen      = cached.chapterSzenen      || [{ kapitel: 'Gesamtbuch', szenen: [] }];
       chapterAssignments = cached.chapterAssignments || [{ kapitel: 'Gesamtbuch', assignments: [] }];
@@ -75,16 +76,17 @@ async function runPhase1(ctx) {
         );
       }
       const passA = { figuren: r?.figuren, assignments: r?.assignments };
-      const passB = { orte: r?.orte, fakten: r?.fakten, szenen: r?.szenen };
+      const passB = { orte: r?.orte, songs: r?.songs, fakten: r?.fakten, szenen: r?.szenen };
       chapterFiguren     = [{ kapitel: 'Gesamtbuch', figuren:     passA.figuren     || [] }];
       chapterOrte        = [{ kapitel: 'Gesamtbuch', orte:        passB.orte        || [] }];
+      chapterSongs       = [{ kapitel: 'Gesamtbuch', songs:       passB.songs       || [] }];
       chapterFakten      = [{ kapitel: 'Gesamtbuch', fakten:      passB.fakten      || [] }];
       chapterSzenen      = [{ kapitel: 'Gesamtbuch', szenen:      passB.szenen      || [] }];
       chapterAssignments = [{ kapitel: 'Gesamtbuch', assignments: passA.assignments || [] }];
       const totalEvents = (passA.assignments || []).reduce((s, a) => s + (a.lebensereignisse?.length || 0), 0);
-      log.info(`Single-Pass OK – fig=${chapterFiguren[0].figuren.length} orte=${chapterOrte[0].orte.length} sz=${chapterSzenen[0].szenen.length} (${totalEvents} Ereignisse)`);
+      log.info(`Single-Pass OK – fig=${chapterFiguren[0].figuren.length} orte=${chapterOrte[0].orte.length} songs=${chapterSongs[0].songs.length} sz=${chapterSzenen[0].szenen.length} (${totalEvents} Ereignisse)`);
       saveChapterExtractCache(bookIdInt, email, '__singlepass__', bookPagesSig, {
-        chapterFiguren, chapterOrte, chapterFakten, chapterSzenen, chapterAssignments,
+        chapterFiguren, chapterOrte, chapterSongs, chapterFakten, chapterSzenen, chapterAssignments,
       }, effectiveProvider);
     }
   } else {
@@ -134,7 +136,7 @@ async function runPhase1(ctx) {
             sys.SYSTEM_KOMPLETT_EXTRAKTION_BLOCKS, 12, 28, 14000, 0.2, null, prompts.SCHEMA_KOMPLETT_EXTRAKTION,
           );
           saveChapterExtractCache(bookIdInt, email, key, pagesSig, result, effectiveProvider);
-          log.info(`${chunkLabel} – OK (fig=${result?.figuren?.length ?? 0} orte=${result?.orte?.length ?? 0} sz=${result?.szenen?.length ?? 0}).`);
+          log.info(`${chunkLabel} – OK (fig=${result?.figuren?.length ?? 0} orte=${result?.orte?.length ?? 0} songs=${result?.songs?.length ?? 0} sz=${result?.szenen?.length ?? 0}).`);
           return result;
         }
 
