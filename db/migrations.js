@@ -5448,6 +5448,23 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 127 abgeschlossen (songs, song_figures, song_chapters, song_scenes).');
   }
 
+  if (version < 128) {
+    // page_locks-Recreate in Migration 126 hat die Indexe (idx_page_locks_book,
+    // idx_page_locks_user, idx_page_locks_expires) verloren — SQLite verwirft
+    // Indexe beim DROP TABLE. Neu anlegen, damit FK-Lookups (book_id,
+    // locked_by_email) und Expire-Sweeps wieder einen Index haben.
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_page_locks_book    ON page_locks(book_id)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_page_locks_user    ON page_locks(locked_by_email)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_page_locks_expires ON page_locks(expires_at)').run();
+
+    const fkErrors128 = db.pragma('foreign_key_check');
+    if (fkErrors128.length) {
+      throw new Error(`Migration 128: foreign_key_check meldet ${fkErrors128.length} Verstoesse: ${JSON.stringify(fkErrors128.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 128').run();
+    logger.info('DB-Migration auf Version 128 abgeschlossen (page_locks-Indexe wiederhergestellt).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

@@ -197,6 +197,37 @@ const ORTE_RULES = `Regeln:
 - kapitel: absteigend nach Häufigkeit; haeufigkeit = Anzahl Seiten/Abschnitte in denen der Ort aktiv vorkommt
 - Kein Cap auf Anzahl Orte – vollständige Erfassung wichtiger als Kürze`;
 
+// ── Musik-Schema (Songs/Musikstücke) ────────────────────────────────────────
+// Parallel zu ORTE_SCHEMA. Pflicht-Feld kontext_typ (hört/spielt/erwähnt/
+// leitmotiv/diegetisch); figuren = wer hört/spielt/komponiert/singt.
+
+const SONGS_SCHEMA = `{
+  "songs": [
+    {
+      "id": "song_1",
+      "titel": "Exakter Titel des Songs/Stücks wie im Text genannt",
+      "interpret": "Interpret, Band, Komponist oder Soundtrack (leer wenn nicht belegt)",
+      "genre": "Hip-Hop|Rock|Pop|Klassik|Jazz|Electronic|Volksmusik|Soundtrack|Schlager|Punk|Metal|Country|Blues|Folk|R&B|Reggae|Chanson|Lied|Hymne|andere – leer wenn unklar",
+      "kontext_typ": "hört|spielt|erwähnt|leitmotiv|diegetisch",
+      "beschreibung": "1-2 Sätze: in welcher Szene/Situation der Song auftaucht, welche Funktion er hat",
+      "stimmung": "Grundatmosphäre in 2-3 Worten (z.B. melancholisch, euphorisch, beklemmend)",
+      "erste_erwaehnung": "Kapitelname oder Seitenname der ersten Erwähnung (leer wenn unklar)",
+      "kapitel": [{ "name": "Kapitelname", "haeufigkeit": 2 }],
+      "figuren": ["fig_1", "fig_2"]
+    }
+  ]
+}`;
+
+const SONGS_RULES = `Regeln:
+- Eindeutige IDs (song_1, song_2, …)
+- SEHR GROSSZÜGIG erfassen: jeden namentlich genannten Song, Track, Klassik-Stück, Hymne, Soundtrack, jede konkrete Band/Interpret-Erwähnung als eigenen Eintrag, auch bei einmaliger Erwähnung.
+- KEINE generischen Genre-Erwähnungen ohne konkreten Titel/Interpret («Klassische Musik im Hintergrund» reicht nicht). Pflicht: mindestens titel ODER interpret.
+- kontext_typ: «hört» = Figur konsumiert (Radio, Kopfhörer, Konzert); «spielt» = Figur produziert aktiv (Instrument, Gesang); «erwähnt» = Song wird im Dialog/Erzähltext genannt, ohne dass jemand ihn hört oder spielt; «leitmotiv» = Song zieht sich als wiederkehrendes Motiv durchs Buch; «diegetisch» = Musik im Hintergrund einer Szene (Bar, Auto, Party) ohne aktive Figur-Bindung.
+- figuren: nur IDs aus der gelieferten Figurenliste (leer lassen wenn keine Figur klar zuordenbar oder Figurenliste fehlt)
+- kapitel: absteigend nach Häufigkeit; haeufigkeit = Anzahl Seiten/Abschnitte mit aktivem Vorkommen
+- Klassische Stücke ohne Interpret: Komponist als interpret eintragen («Beethoven» für «Mondscheinsonate»)
+- Kein Cap – vollständige Erfassung wichtiger als Kürze`;
+
 // ── Fakten-Schema (verwendet in Komplett-Analyse und Kontinuität) ────────────
 
 const FAKTEN_SCHEMA = `"fakten": [
@@ -267,6 +298,7 @@ Antworte mit diesem JSON-Schema:
 {
   ${_schemaBody(FIGUREN_BASIS_SCHEMA)},
   ${_schemaBody(ORTE_SCHEMA)},
+  ${_schemaBody(SONGS_SCHEMA)},
   ${FAKTEN_SCHEMA},
   "szenen": [
     {
@@ -300,11 +332,12 @@ Antworte mit diesem JSON-Schema:
     return `${schemaPart}
 
 Kernregeln:
-- IDs eindeutig (fig_1, ort_1, …); Beziehungen nur zwischen IDs aus dieser Liste.
+- IDs eindeutig (fig_1, ort_1, song_1, …); Beziehungen nur zwischen IDs aus dieser Liste.
 - KONSERVATIV: Nur aufnehmen was im Text eindeutig belegt ist. Im Zweifel weglassen.
 - Keine historischen/realen Personen die nur erwähnt werden.
 - kapitel[].name: immer der Kapitelname (aus dem ## Header oder dem Prompt-Kontext), niemals Seitentitel.
 - figuren_namen / orte_namen / figur_name: Klarnamen exakt wie im Text.
+- Songs: nur mit konkretem Titel oder Interpret aufnehmen; kontext_typ Pflicht.
 - Ereignisse: datum als JJJJ; ohne errechenbares Jahr weglassen. Gleiches Ereignis bei allen beteiligten Figuren identisch formulieren.
 - Leere Arrays wenn nichts gefunden.`;
   }
@@ -316,6 +349,9 @@ ${figurenBasisRules(kontext)}
 
 Schauplatz-Regeln:
 ${ORTE_RULES}
+
+Musik-Regeln:
+${SONGS_RULES}
 
 ${FAKTEN_RULES}
 
@@ -385,11 +421,12 @@ Ereignis-Regeln:
 - Nur Figuren ausgeben die mindestens ein Ereignis haben.`;
 }
 
-/** Schema-Block nur für Orte + Fakten + Szenen (Pass B, Lokalmodus). */
+/** Schema-Block nur für Orte + Songs + Fakten + Szenen (Pass B, Lokalmodus). */
 function buildKomplettSchemaOrteSzenen(_kontext = '') {
-  const schemaPart = `Antworte mit diesem JSON-Schema (nur Schauplätze, Fakten, Szenen):
+  const schemaPart = `Antworte mit diesem JSON-Schema (nur Schauplätze, Musikstücke, Fakten, Szenen):
 {
   ${_schemaBody(ORTE_SCHEMA)},
+  ${_schemaBody(SONGS_SCHEMA)},
   ${FAKTEN_SCHEMA},
   "szenen": [
     {
@@ -411,12 +448,16 @@ Kernregeln:
 - KONSERVATIV: Nur was eindeutig belegt ist.
 - kapitel[].name: aus ## Header oder Prompt-Kontext, OHNE «## »-Markierung.
 - Szene.seite: reiner Titel eines ### Headers aus dem aktuellen ## Kapitel, OHNE «### »-Markierung. NIE der Kapitelname. Im Zweifel leer.
+- Songs: nur mit konkretem Titel oder Interpret aufnehmen; kontext_typ Pflicht.
 - Leere Arrays wenn nichts gefunden.`;
   }
   return `${schemaPart}
 
 Schauplatz-Regeln:
 ${ORTE_RULES}
+
+Musik-Regeln:
+${SONGS_RULES}
 
 ${FAKTEN_RULES}
 
@@ -456,7 +497,7 @@ export function buildExtraktionKomplettChapterPrompt(chapterName, bookName, page
     ? '<text>Der Buchtext steht im System-Prompt oben.</text>'
     : `<${isSinglePass ? 'buchtext' : 'kapiteltext'} seiten="${pageCount}">\n${chText}\n</${isSinglePass ? 'buchtext' : 'kapiteltext'}>`;
   return `<aufgabe>
-Extrahiere aus ${scope} in einem Durchgang: alle Figuren, alle Schauplätze, alle kontinuitätsrelevanten Fakten, alle Szenen und alle Lebensereignisse der Figuren.
+Extrahiere aus ${scope} in einem Durchgang: alle Figuren, alle Schauplätze, alle Musikstücke/Songs, alle kontinuitätsrelevanten Fakten, alle Szenen und alle Lebensereignisse der Figuren.
 </aufgabe>
 
 ${kapitelNote}
@@ -494,7 +535,7 @@ export function buildExtraktionOrtePassPrompt(chapterName, bookName, pageCount, 
     ? '<text>Der Buchtext steht im System-Prompt oben.</text>'
     : `<${isSinglePass ? 'buchtext' : 'kapiteltext'} seiten="${pageCount}">\n${chText}\n</${isSinglePass ? 'buchtext' : 'kapiteltext'}>`;
   return `<aufgabe>
-Extrahiere aus ${scope} AUSSCHLIESSLICH: alle Schauplätze, alle kontinuitätsrelevanten Fakten und alle Szenen. Figuren-Stammdaten nicht – die sind separat erfasst. In Szenen nur Figurennamen als Referenz nennen.
+Extrahiere aus ${scope} AUSSCHLIESSLICH: alle Schauplätze, alle Musikstücke/Songs, alle kontinuitätsrelevanten Fakten und alle Szenen. Figuren-Stammdaten nicht – die sind separat erfasst. In Szenen und Songs nur Figurennamen/IDs als Referenz nennen.
 </aufgabe>
 
 ${kapitelNote}
@@ -532,6 +573,30 @@ Regeln:
 
 Ereignisse:
 ${JSON.stringify(events, null, 2)}`;
+}
+
+export function buildSongsConsolidationPrompt(bookName, chapterSongs, figurenKompakt) {
+  const synthInput = chapterSongs.map(cs =>
+    `## Kapitel: ${cs.kapitel}\n` + (cs.songs || []).map(s =>
+      `- «${s.titel || ''}»${s.interpret ? ` — ${s.interpret}` : ''} (${s.genre || 'andere'} / ${s.kontext_typ || '?'}): ${s.beschreibung || ''}` +
+      (s.stimmung ? ` | Stimmung: ${s.stimmung}` : '') +
+      (s.figuren?.length ? ` | Figuren: ${s.figuren.join(', ')}` : '') +
+      (s.kapitel?.length ? ` | Kapitel: ` + s.kapitel.map(k => k.name + (k.haeufigkeit > 1 ? ' ×' + k.haeufigkeit : '')).join(', ') : '')
+    ).join('\n')
+  ).join('\n\n');
+  const figurenStr = figurenKompakt && figurenKompakt.length
+    ? '\n\nBekannte Figuren (nur diese IDs in «figuren» verwenden):\n' + figurenKompakt.map(f => `${f.id}: ${f.name}`).join('\n')
+    : '';
+  return `Konsolidiere die folgenden Musik-Analysen aller Kapitel des Buchs «${bookName}» zu einer einheitlichen Gesamtliste. Dedupliziere Songs anhand von Titel+Interpret (gleicher Song = ein Eintrag, Kapitel-Liste mergen), führe Informationen zusammen und vergib stabile IDs (song_1, song_2, …).${figurenStr}
+
+Kapitelanalysen:
+
+${synthInput}
+
+Antworte mit diesem JSON-Schema:
+${SONGS_SCHEMA}
+
+${SONGS_RULES}`;
 }
 
 export function buildLocationsConsolidationPrompt(bookName, chapterOrte, figurenKompakt) {
@@ -730,6 +795,19 @@ const _ortSchema = _obj({
   figuren: { type: 'array', items: _str },
 });
 
+const _songSchema = _obj({
+  id: _str,
+  titel: _str,
+  interpret: _str,
+  genre: _str,
+  kontext_typ: _str,
+  beschreibung: _str,
+  stimmung: _str,
+  erste_erwaehnung: _str,
+  kapitel: { type: 'array', items: _obj({ name: _str, haeufigkeit: _num }) },
+  figuren: { type: 'array', items: _str },
+});
+
 const _faktSchema = _obj({ kategorie: _str, subjekt: _str, fakt: _str, seite: _str });
 
 export let SCHEMA_KOMPLETT_EXTRAKTION = null;
@@ -777,6 +855,7 @@ function _buildExtraktionSchema() {
   return _obj({
     figuren: { type: 'array', items: _figurSchema },
     orte: { type: 'array', items: _ortSchema },
+    songs: { type: 'array', items: _songSchema },
     fakten: { type: 'array', items: _faktSchema },
     szenen: _szenenField(),
     assignments: _assignmentsField(),
@@ -793,6 +872,7 @@ function _buildFigurenPassSchema() {
 function _buildOrtePassSchema() {
   return _obj({
     orte: { type: 'array', items: _ortSchema },
+    songs: { type: 'array', items: _songSchema },
     fakten: { type: 'array', items: _faktSchema },
     szenen: _szenenField(),
   });
@@ -820,6 +900,8 @@ _rebuildKomplettSchemas();
 // ── Statische Schemas (nicht _isLocal-abhängig) ──────────────────────────────
 
 export const SCHEMA_ORTE_KONSOL = _obj({ orte: { type: 'array', items: _ortSchema } });
+
+export const SCHEMA_SONGS_KONSOL = _obj({ songs: { type: 'array', items: _songSchema } });
 
 export const SCHEMA_SOZIOGRAMM_KONSOL = _obj({
   figuren:     { type: 'array', items: _obj({ id: _str, sozialschicht: _str }) },

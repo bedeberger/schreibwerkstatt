@@ -81,6 +81,7 @@ export {
   buildExtraktionOrtePassPrompt,
   buildZeitstrahlConsolidationPrompt,
   buildLocationsConsolidationPrompt,
+  buildSongsConsolidationPrompt,
   buildKontinuitaetChapterFactsPrompt,
   buildKontinuitaetCheckPrompt,
   buildKontinuitaetSinglePassPrompt,
