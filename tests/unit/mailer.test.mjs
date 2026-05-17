@@ -1,4 +1,4 @@
-// Phase 4c2 (BookStack-Exit, docs/bookstack-exit.md): Mailer + Templates.
+// Mailer + Templates.
 // Mailer ist Gmail-only (App-Password via nodemailer service:'gmail').
 
 import test from 'node:test';

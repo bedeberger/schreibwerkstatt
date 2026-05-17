@@ -3,7 +3,7 @@
 const express = require('express');
 const { getBookSettings } = require('../../../db/schema');
 const {
-  makeJobLogger, updateJob, completeJob, failJob, bsHttpError,
+  makeJobLogger, updateJob, completeJob, failJob, contentHttpError,
   loadPageContents,
   jobs, createJob, enqueueJob, findActiveJobId,
   jobAbortControllers, BATCH_SIZE,
@@ -32,8 +32,8 @@ async function runFinetuneExportJob(jobId, bookId, bookName, userEmail, userToke
     logger.info(`Start: «${bookName}» types=${Object.entries(opts.types).filter(([,v]) => v).map(([k]) => k).join(',')}`);
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
     const [chaptersData, pages] = await Promise.all([
-      contentStore.listChapters(bookId, userToken).catch(e => { throw bsHttpError(e); }),
-      contentStore.listPages(bookId, userToken).catch(e => { throw bsHttpError(e); }),
+      contentStore.listChapters(bookId, userToken).catch(e => { throw contentHttpError(e); }),
+      contentStore.listPages(bookId, userToken).catch(e => { throw contentHttpError(e); }),
     ]);
     if (!pages.length) { completeJob(jobId, { empty: true }); return; }
 

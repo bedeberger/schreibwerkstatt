@@ -63,14 +63,12 @@ function i18nError(key, params = null) {
 }
 
 /**
- * Helper: BookStack-/content-store-Errors mit `e.status` in i18nError-Form
- * uebersetzen. Job-Handler wrappen ihre content-store-Calls damit, sodass
- * Frontend dieselbe Fehlermeldung sehen wie zuvor mit dem shared/bookstack.js-
- * Wrapper. Andere Fehler (Abort, AssertionError, ...) werden unveraendert
- * weitergeworfen.
+ * Helper: content-store-Errors mit `e.status` in i18nError-Form uebersetzen.
+ * Job-Handler wrappen ihre content-store-Calls damit. Andere Fehler (Abort,
+ * AssertionError, ...) werden unveraendert weitergeworfen.
  */
-function bsHttpError(e) {
-  if (e?.status) return i18nError('job.error.bookstack', { status: e.status, text: e.bodyText });
+function contentHttpError(e) {
+  if (e?.status) return i18nError('job.error.contentStore', { status: e.status, text: e.bodyText });
   return e;
 }
 
@@ -232,7 +230,7 @@ const STATS_EXCLUDED_TYPES = ['figures', 'soziogramm', 'szenen', 'locations', 'f
 module.exports = {
   makeJobLogger,
   fmtTok, fmtDuration, _jobDurationFmt, _jobLogCtx, tps,
-  i18nError, bsHttpError,
+  i18nError, contentHttpError,
   findActiveJobId,
   createJob, updateJob, completeJob, failJob, cancelJob,
   JOB_TYPE_LABELS, STATS_EXCLUDED_TYPES,

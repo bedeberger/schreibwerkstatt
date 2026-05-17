@@ -1,6 +1,6 @@
-// Phase 4b: Jeder FEATURES-Eintrag braucht ein explizites `minRole` —
-// implizites Default (`editor`) wäre per Plan-Vorgabe verboten, weil
-// Viewer/Lektor sonst Cards sehen, die sie nicht aufrufen dürfen.
+// Jeder FEATURES-Eintrag braucht ein explizites `minRole` — implizites
+// Default (`editor`) ist verboten, weil Viewer/Lektor sonst Cards sehen, die
+// sie nicht aufrufen dürfen.
 //
 // hasMinRole + featuresVisibleFor sind die SSoT für Frontend-Sichtbarkeit.
 

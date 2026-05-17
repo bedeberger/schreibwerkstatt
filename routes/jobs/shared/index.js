@@ -51,7 +51,7 @@ module.exports = {
   findActiveJobId: jobsMod.findActiveJobId,
   fmtTok: jobsMod.fmtTok,
   i18nError: jobsMod.i18nError,
-  bsHttpError: jobsMod.bsHttpError,
+  contentHttpError: jobsMod.contentHttpError,
 
   _modelName: model._modelName,
   settledAll: ai.settledAll,

@@ -7,7 +7,7 @@ const {
   loadBookReviewCache, saveBookReviewCache,
 } = require('../../db/schema');
 const {
-  makeJobLogger, updateJob, completeJob, failJob, i18nError, bsHttpError,
+  makeJobLogger, updateJob, completeJob, failJob, i18nError, contentHttpError,
   aiCall, getPrompts, getBookPrompts,
   loadPageContents, groupByChapter, splitGroupsIntoChunks, buildSinglePassBookText,
   SINGLE_PASS_LIMIT, PER_CHUNK_LIMIT, BATCH_SIZE, jobAbortControllers, settledAll,
@@ -75,8 +75,8 @@ async function runReviewJob(jobId, bookId, bookName, userEmail, userToken) {
   try {
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
     const [chaptersData, pages] = await Promise.all([
-      contentStore.listChapters(bookId, userToken).catch(e => { throw bsHttpError(e); }),
-      contentStore.listPages(bookId, userToken).catch(e => { throw bsHttpError(e); }),
+      contentStore.listChapters(bookId, userToken).catch(e => { throw contentHttpError(e); }),
+      contentStore.listPages(bookId, userToken).catch(e => { throw contentHttpError(e); }),
     ]);
 
     if (!pages.length) { completeJob(jobId, { empty: true }); return; }

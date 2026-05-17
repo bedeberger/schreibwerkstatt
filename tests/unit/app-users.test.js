@@ -1,5 +1,5 @@
 'use strict';
-// Phase 4a Sub-Step A: Migration 107 + db/app-users.js Helper-API.
+// Migration 107 + db/app-users.js Helper-API.
 //
 // Test laeuft Migrations-Pipeline auf eine Tmp-DB, seedet vor der Mig 107
 // `users` + `job_runs` + `chat_sessions` + `user_tokens` Rows mit distinct

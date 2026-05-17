@@ -1,4 +1,4 @@
-// Phase 4d: PRICING + costUsd().
+// PRICING + costUsd().
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PRICING, costUsd, fallbackFamily } from '../../lib/pricing.js';

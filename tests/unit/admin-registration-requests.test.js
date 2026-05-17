@@ -1,6 +1,6 @@
 'use strict';
-// Phase 4a2 (BookStack-Exit, docs/bookstack-exit.md): /admin/registration-
-// requests-Endpoints. Approve erzeugt user_invites-Row + setzt status='approved'.
+// /admin/registration-requests-Endpoints.
+// Approve erzeugt user_invites-Row + setzt status='approved'.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');

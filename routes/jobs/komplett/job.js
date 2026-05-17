@@ -10,7 +10,7 @@ const appUsers = require('../../../db/app-users');
 const bookAccess = require('../../../db/book-access');
 const { narrativeLabels } = require('../narrative-labels');
 const {
-  makeJobLogger, updateJob, completeJob, failJob, i18nError, bsHttpError,
+  makeJobLogger, updateJob, completeJob, failJob, i18nError, contentHttpError,
   aiCall, toSystemBlocks, getPrompts, getBookPrompts,
   loadPageContents, groupByChapter, buildSinglePassBookText, cleanPageTextForClaude,
   SINGLE_PASS_LIMIT, BATCH_SIZE, jobAbortControllers,
@@ -59,8 +59,8 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
     // ── Seiten laden ──────────────────────────────────────────────────────────
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
     const [chaptersData, pages] = await Promise.all([
-      contentStore.listChapters(bookId, userToken).catch(e => { throw bsHttpError(e); }),
-      contentStore.listPages(bookId, userToken).catch(e => { throw bsHttpError(e); }),
+      contentStore.listChapters(bookId, userToken).catch(e => { throw contentHttpError(e); }),
+      contentStore.listPages(bookId, userToken).catch(e => { throw contentHttpError(e); }),
     ]);
     if (!pages.length) { completeJob(jobId, { empty: true }); return; }
 
@@ -252,8 +252,8 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
 
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
     const [chaptersData, pages] = await Promise.all([
-      contentStore.listChapters(bookId, userToken).catch(e => { throw bsHttpError(e); }),
-      contentStore.listPages(bookId, userToken).catch(e => { throw bsHttpError(e); }),
+      contentStore.listChapters(bookId, userToken).catch(e => { throw contentHttpError(e); }),
+      contentStore.listPages(bookId, userToken).catch(e => { throw contentHttpError(e); }),
     ]);
     if (!pages.length) { completeJob(jobId, { empty: true }); return; }
 

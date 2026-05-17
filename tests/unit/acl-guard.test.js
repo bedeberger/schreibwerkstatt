@@ -1,5 +1,5 @@
 'use strict';
-// Phase 4b: lib/acl.js Guard-Middleware. Smoke-Tests gegen einen minimalen
+// lib/acl.js Guard-Middleware. Smoke-Tests gegen einen minimalen
 // Express-Mock, damit Verhalten reproduzierbar bleibt.
 
 const test = require('node:test');

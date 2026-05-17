@@ -1,5 +1,5 @@
 'use strict';
-// Phase 4c Sub-Step C: /admin/settings-Endpoints.
+// /admin/settings-Endpoints.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');

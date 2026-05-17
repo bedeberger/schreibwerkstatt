@@ -1,7 +1,8 @@
 // Unit-Tests fuer lib/content-mapper.js: round-trip BookStack-JSON → Domain-Shape.
-// SSoT-Test: wenn BookStack-API jemals Felder umbenennt (oder Phase 1 das Shape
-// aus lokalen Tabellen baut), faengt dieser Test Drift gegen die Vertraege ab,
-// auf die routes/content.js und kuenftige Repo-Konsumenten bauen.
+// SSoT-Test: wenn BookStack-API jemals Felder umbenennt (oder das localdb-
+// Backend das Shape aus lokalen Tabellen baut), faengt dieser Test Drift gegen
+// die Vertraege ab, auf die routes/content.js und kuenftige Repo-Konsumenten
+// bauen.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

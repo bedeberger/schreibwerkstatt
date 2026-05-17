@@ -6,7 +6,7 @@ const {
   loadLektoratCache, saveLektoratCache,
 } = require('../../db/schema');
 const {
-  makeJobLogger, updateJob, completeJob, failJob, i18nError, bsHttpError,
+  makeJobLogger, updateJob, completeJob, failJob, i18nError, contentHttpError,
   aiCall, getPrompts, getBookPrompts,
   htmlToText, jobAbortControllers,
   _modelName, tps,
@@ -129,7 +129,7 @@ async function runCheckJob(jobId, pageId, bookId, userEmail, userToken) {
     logger.info(`Start: Seite #${pageId}`);
     updateJob(jobId, { statusText: 'job.phase.loadingPageContent', progress: 5 });
 
-    const pd = await contentStore.loadPage(pageId, userToken).catch(e => { throw bsHttpError(e); });
+    const pd = await contentStore.loadPage(pageId, userToken).catch(e => { throw contentHttpError(e); });
 
     const html = pd.html;
     const text = htmlToText(html);
@@ -255,7 +255,7 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
   const local = _isLocalProvider();
   try {
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
-    const pages = await contentStore.listPages(bookId, userToken).catch(e => { throw bsHttpError(e); });
+    const pages = await contentStore.listPages(bookId, userToken).catch(e => { throw contentHttpError(e); });
     if (!pages.length) { completeJob(jobId, { empty: true }); return; }
     logger.info(`Start: ${pages.length} Seiten`);
 
@@ -273,7 +273,7 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
     const processPage = async (p, i) => {
       if (jobAbortControllers.get(jobId)?.signal.aborted) throw new DOMException('Aborted', 'AbortError');
       try {
-        const pd = await contentStore.loadPage(p.id, userToken).catch(e => { throw bsHttpError(e); });
+        const pd = await contentStore.loadPage(p.id, userToken).catch(e => { throw contentHttpError(e); });
         const text = htmlToText(pd.html).trim();
         if (!text) return;
 

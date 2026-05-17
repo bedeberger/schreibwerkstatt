@@ -1,5 +1,5 @@
 'use strict';
-// Phase 3 (BookStack-Exit): book_order — Validator, Materializer, Overlay,
+// book_order — Validator, Materializer, Overlay,
 // Reconcile. Integration-Test (echte SQLite, lokales Schema).
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'integration-test-secret';

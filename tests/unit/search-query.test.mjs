@@ -1,4 +1,4 @@
-// Phase 7 (BookStack-Exit): Unit-Tests fuer lib/search.js Query-Parser +
+// Unit-Tests fuer lib/search.js Query-Parser +
 // HTML-Text-Normalisierung. Voller Index-Flow wird in der Integration getestet.
 
 import { test } from 'node:test';

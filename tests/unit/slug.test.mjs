@@ -1,4 +1,4 @@
-// Phase 6 (BookStack-Exit): slugify + uniqueSlug.
+// slugify + uniqueSlug.
 import { test } from 'node:test';
 import assert from 'node:assert';
 

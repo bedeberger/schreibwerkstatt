@@ -6,7 +6,7 @@ const {
   loadChapterMacroReviewCache, saveChapterMacroReviewCache,
 } = require('../../db/schema');
 const {
-  makeJobLogger, updateJob, completeJob, failJob, i18nError, bsHttpError,
+  makeJobLogger, updateJob, completeJob, failJob, i18nError, contentHttpError,
   aiCall, getPrompts, getBookPrompts,
   jobAbortControllers,
   htmlToText, splitGroupsIntoChunks,
@@ -54,7 +54,7 @@ async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookNa
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
     // Alle Buchseiten holen; Kapitel-Filter läuft clientseitig – die Page-Metas
     // enthalten bereits `chapter_id`.
-    const allPages = await contentStore.listPages(bookId, userToken).catch(e => { throw bsHttpError(e); });
+    const allPages = await contentStore.listPages(bookId, userToken).catch(e => { throw contentHttpError(e); });
     const pages = allPages
       .filter(p => String(p.chapter_id || '') === String(chapterId))
       .sort((a, b) => (a.position || 0) - (b.position || 0));
@@ -100,7 +100,7 @@ async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookNa
         statusParams: { from: i + 1, to: Math.min(i + BATCH_SIZE, pages.length), total: pages.length },
       });
       const results = await Promise.allSettled(pages.slice(i, i + BATCH_SIZE).map(async p => {
-        const pd = await contentStore.loadPage(p.id, userToken).catch(e => { throw bsHttpError(e); });
+        const pd = await contentStore.loadPage(p.id, userToken).catch(e => { throw contentHttpError(e); });
         const text = htmlToText(pd.html).trim();
         if (!text) return null;
         return { title: p.name, text };

@@ -1,6 +1,5 @@
 'use strict';
-// Phase 4a (BookStack-Exit, docs/bookstack-exit.md): In-Memory-Rate-Limit
-// fuer POST /auth/admin-login (5 Fehler/IP/15 min → 429).
+// In-Memory-Rate-Limit fuer POST /auth/admin-login (5 Fehler/IP/15 min → 429).
 
 const test = require('node:test');
 const assert = require('node:assert/strict');

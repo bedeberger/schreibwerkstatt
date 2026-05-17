@@ -1,5 +1,5 @@
 'use strict';
-// Phase 4c (BookStack-Exit, docs/bookstack-exit.md): app_settings + Helper-API.
+// app_settings + Helper-API.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');

@@ -1,4 +1,4 @@
-// Phase 4d: checkBudget + enforceBudget.
+// checkBudget + enforceBudget.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import os from 'os';

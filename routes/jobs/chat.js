@@ -4,7 +4,7 @@ const { db } = require('../../db/schema');
 const { callAIChat, callAIWithTools, parseJSONLenient, chatTemperature, CHARS_PER_TOKEN, MAX_TOKENS_OUT, INPUT_BUDGET_TOKENS, INPUT_BUDGET_CHARS } = require('../../lib/ai');
 const {
   _promptConfig,
-  makeJobLogger, updateJob, completeJob, failJob, i18nError, bsHttpError,
+  makeJobLogger, updateJob, completeJob, failJob, i18nError, contentHttpError,
   getPrompts, getBookPrompts,
   htmlToText, jobAbortControllers,
   jobs, runningJobs, createJob, enqueueJob, jobKey, findActiveJobId,
@@ -217,7 +217,7 @@ async function runBookChatJob(jobId, sessionId, userMsgId, message, userEmail, u
       let pages;
       try { pages = await contentStore.listPages(session.book_id, userToken); }
       catch (e) {
-        if (e?.status) throw i18nError('job.error.bookstackPageList', { status: e.status });
+        if (e?.status) throw i18nError('job.error.contentStorePageList', { status: e.status });
         throw e;
       }
 

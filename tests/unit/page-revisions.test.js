@@ -1,5 +1,5 @@
 'use strict';
-// Phase 2 (BookStack-Exit): page_revisions CRUD + Retention.
+// page_revisions CRUD + Retention.
 const test = require('node:test');
 const assert = require('node:assert');
 const path = require('node:path');
