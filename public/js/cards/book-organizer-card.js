@@ -19,6 +19,7 @@
 import { setupCardLifecycle } from './card-lifecycle.js';
 import { loadSortable } from '../lazy-libs.js';
 import { contentRepo } from '../repo/content.js';
+import { _sortSoloFirst } from '../book/tree.js';
 
 // Guard gegen Sortable v1.15.6 Race: `_onDragOver` kann auf einer destroyten
 // Instanz (this.el === null) feuern, wenn Alpine x-for nach einem Drop neu
@@ -223,20 +224,17 @@ export function registerBookOrganizerCard() {
     // /content/books/:id/order geschickt. Server validiert + materialisiert
     // chapters.position/pages.position/pages.chapter_id in einer Transaction.
     _buildTreeFromWorkstate() {
+      // Seiten ohne Kapitel zuerst (UI-Invariante), dann Kapitel in workTree-Order.
       const tree = [];
-      const chapterById = new Map(this.workTree.map(c => [c.id, c]));
-      // Reihenfolge: Kapitel in workTree-Order, dazwischen ggf. Top-Level-Seiten.
-      // Aktuelles UI gruppiert workTree-Kapitel oben und soloPages danach
-      // (Bestandsverhalten). Wir behalten das bei.
+      for (const p of this.soloPages) {
+        tree.push({ type: 'page', id: p.id });
+      }
       for (const c of this.workTree) {
         tree.push({
           type: 'chapter',
           id: c.id,
           children: c.pages.map(p => ({ type: 'page', id: p.id })),
         });
-      }
-      for (const p of this.soloPages) {
-        tree.push({ type: 'page', id: p.id });
       }
       return tree;
     },
@@ -342,7 +340,7 @@ export function registerBookOrganizerCard() {
           pages: [],
         };
         root.tree.push(treeEntry);
-        root.tree.sort((a, b) => a.priority - b.priority);
+        root.tree.sort(_sortSoloFirst);
         this._rebuildChapterOrderMap();
         if (typeof root._refreshChapterStats === 'function') root._refreshChapterStats();
         await this._rerender();
@@ -398,7 +396,7 @@ export function registerBookOrganizerCard() {
             url: null,
             pages: [newPage],
           });
-          root.tree.sort((a, b) => a.priority - b.priority);
+          root.tree.sort(_sortSoloFirst);
         }
         root.tokEsts[newPage.id] = { tok: 0, words: 0, chars: 0 };
         this._rebuildPageOrderMaps();
@@ -504,7 +502,7 @@ export function registerBookOrganizerCard() {
           if (p !== undefined) it.priority = p;
         }
       }
-      root.tree.sort((a, b) => a.priority - b.priority);
+      root.tree.sort(_sortSoloFirst);
       this._rebuildChapterOrderMap();
       this._resortRootPages();
       this._rebuildPageOrderMaps();
@@ -573,7 +571,7 @@ export function registerBookOrganizerCard() {
           pages: [rp],
         });
       }
-      root.tree.sort((a, b) => a.priority - b.priority);
+      root.tree.sort(_sortSoloFirst);
     },
 
     _resortRootPages() {

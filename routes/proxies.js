@@ -62,6 +62,7 @@ router.get('/config', (req, res) => {
     userSettings,
     devMode: process.env.LOCAL_DEV_MODE === 'true',
     promptConfig: getPromptConfig(),
+    appTimezone: appSettings.get('app.timezone') || 'Europe/Zurich',
   });
 });
 

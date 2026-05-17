@@ -2,7 +2,7 @@
 // require()'d wird (sync.js, history.js).
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { localIsoDate, localIsoDaysAgo, DEFAULT_TZ } = require('../../lib/local-date.js');
+const { localIsoDate, localIsoDaysAgo, currentTz } = require('../../lib/local-date.js');
 
 test('server localIsoDate: Format YYYY-MM-DD', () => {
   const iso = localIsoDate();
@@ -27,6 +27,7 @@ test('server localIsoDaysAgo: chronologisch + DST-stabil', () => {
   assert.ok(dates.has(today));
 });
 
-test('server DEFAULT_TZ: env-aware Fallback', () => {
-  assert.ok(typeof DEFAULT_TZ === 'string' && DEFAULT_TZ.length > 0);
+test('server currentTz: app_settings-aware Fallback', () => {
+  const tz = currentTz();
+  assert.ok(typeof tz === 'string' && tz.length > 0);
 });

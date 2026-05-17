@@ -1,4 +1,4 @@
-import { htmlToText, CHARS_PER_TOKEN, fetchJson, localeTag, relativeDay } from '../utils.js';
+import { htmlToText, CHARS_PER_TOKEN, fetchJson, localeTag, relativeDay, tzOpts } from '../utils.js';
 import { contentRepo } from '../repo/content.js';
 
 // Buch-/Seiten-Lade-Methoden (werden in die Alpine-Komponente gespreadet)
@@ -16,10 +16,17 @@ function _diffDays(then, now = new Date()) {
 }
 
 function _fmtTime(d, locale) {
-  return d.toLocaleTimeString(localeTag(locale), { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleTimeString(localeTag(locale), tzOpts({ hour: '2-digit', minute: '2-digit' }));
 }
 function _fmtDateShort(d, locale) {
-  return d.toLocaleDateString(localeTag(locale), { day: '2-digit', month: '2-digit' });
+  return d.toLocaleDateString(localeTag(locale), tzOpts({ day: '2-digit', month: '2-digit' }));
+}
+
+// Tree-Sort-Invariante: Solo-Seiten (ohne Kapitel) immer vor Kapiteln.
+// Innerhalb der Gruppen nach `priority`.
+export function _sortSoloFirst(a, b) {
+  if (!!a.solo !== !!b.solo) return a.solo ? -1 : 1;
+  return (a.priority ?? 0) - (b.priority ?? 0);
 }
 
 export const treeMethods = {
@@ -59,6 +66,10 @@ export const treeMethods = {
     if (editedSince) lines.push(this.t('sidebar.status.editedSince'));
     else if (rec.pending) lines.push(this.t('sidebar.status.pending'));
     lines.push(lektLine);
+    const myEmail = this.currentUser?.email || null;
+    if (rec.by && myEmail && rec.by !== myEmail) {
+      lines.push(this.t('sidebar.status.lektoratBy', { user: rec.by }));
+    }
     if (pageLine) lines.push(pageLine);
     return lines;
   },
@@ -67,7 +78,11 @@ export const treeMethods = {
     if (pageId == null) return;
     this.pageLastChecked = {
       ...this.pageLastChecked,
-      [pageId]: { at: new Date().toISOString(), pending: !!pending },
+      [pageId]: {
+        at: new Date().toISOString(),
+        pending: !!pending,
+        by: this.currentUser?.email || null,
+      },
     };
   },
 
@@ -328,21 +343,13 @@ export const treeMethods = {
         chapterName: p.chapter_id ? (chMap[p.chapter_id] || this.t('tree.chapterFallback')) : null,
       });
 
+      // Seiten ohne Kapitel immer zuerst — danach Kapitel in Tree-Reihenfolge.
       this.pages = [
-        ...sortedChapters.flatMap(c => c.pages.map(decoratePage)),
         ...tree.topPages.map(decoratePage),
+        ...sortedChapters.flatMap(c => c.pages.map(decoratePage)),
       ];
 
       this.tree = [
-        ...sortedChapters.map(c => ({
-          type: 'chapter',
-          id: c.id,
-          name: c.name,
-          priority: c.position,
-          open: true,
-          solo: false,
-          pages: this.pages.filter(p => p.chapter_id === c.id),
-        })),
         ...this.pages.filter(p => !p.chapter_id).map(p => ({
           type: 'chapter',
           id: 'solo-' + p.id,
@@ -352,7 +359,16 @@ export const treeMethods = {
           solo: true,
           pages: [p],
         })),
-      ].sort((a, b) => a.priority - b.priority);
+        ...sortedChapters.map(c => ({
+          type: 'chapter',
+          id: c.id,
+          name: c.name,
+          priority: c.position,
+          open: true,
+          solo: false,
+          pages: this.pages.filter(p => p.chapter_id === c.id),
+        })),
+      ];
 
       // Persistent sort maps – built once per book load, used by all filter sorting
       this._chapterOrderMap = new Map();
@@ -450,7 +466,7 @@ export const treeMethods = {
         solo: false,
         pages: [],
       };
-      this.tree = [...this.tree, chapterItem].sort((a, b) => a.priority - b.priority);
+      this.tree = [...this.tree, chapterItem].sort(_sortSoloFirst);
       if (this._chapterOrderMap) this._chapterOrderMap.set(chapterItem.name, this._chapterOrderMap.size);
       return chapterItem;
     } catch (e) {

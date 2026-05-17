@@ -76,7 +76,7 @@
    -section-divider / -saved / -error / -textarea leben in card-form.css. */
 .book-settings-options {
   display: flex;
-  gap: 20px;
+  gap: var(--space-20);
   flex-wrap: wrap;
 }
 .book-settings-option {

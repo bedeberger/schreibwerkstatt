@@ -355,7 +355,7 @@ body.focus-mode.focus-cursor-hidden .page-content-view--editing * {
 .save-indicator {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
   font-size: var(--font-size-xs);
   color: var(--color-subtle);
   margin-left: var(--space-sm);
@@ -470,7 +470,7 @@ body.focus-mode #editor-card .save-indicator { opacity: 1; }
   border-radius: 50%;
   background: color-mix(in srgb, var(--color-warn-text) 35%, transparent);
   color: var(--color-bg);
-  font-size: 0.7em;
+  font-size: var(--font-em-70);
   line-height: 1;
 }
 .editor-draft-banner__text { flex: 1 1 auto; }

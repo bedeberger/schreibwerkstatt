@@ -442,7 +442,7 @@ try {
   const cron = require('node-cron');
   // Zeitzone explizit setzen – ohne expliziten Wert läuft node-cron in Server-TZ.
   // In manchen LXC-Templates ist die TZ UTC → "23:00" wäre dann 00:00/01:00 CH-Zeit.
-  const cronTz = appSettings.get('cron.timezone') || process.env.TZ || 'Europe/Zurich';
+  const cronTz = appSettings.get('app.timezone') || 'Europe/Zurich';
 
   // 23:00 – Buchstatistik-Sync + hängende Jobs bereinigen + TTL-Cache-Cleanup.
   // Tagesscharfe Statistik: recorded_at am Tag X reflektiert Inhalte vom Tag X.

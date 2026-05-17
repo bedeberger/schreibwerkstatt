@@ -222,7 +222,7 @@
   .severity-tag {
     min-width: 0;
     padding: var(--space-2xs) 5px;
-    font-size: 9px;
+    font-size: var(--font-size-micro);
   }
   .filter-search-input { width: 100%; }
   .filter-bar > .combobox-wrap--compact { flex: 1 1 45%; min-width: 0; }

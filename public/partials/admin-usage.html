@@ -141,7 +141,7 @@
             <td x-text="adminUsageInt(r.cacheCreationIn)"></td>
             <td x-text="adminUsageMoney(r.usd)"></td>
             <td x-text="r.bookId ? ('#' + r.bookId) : '—'"></td>
-            <td x-text="new Date(r.queuedAt).toLocaleString($app.uiLocale === 'en' ? 'en-US' : 'de-CH')"></td>
+            <td x-text="new Date(r.queuedAt).toLocaleString($app.uiLocale === 'en' ? 'en-US' : 'de-CH', { timeZone: $app.appTimezone })"></td>
           </tr>
         </template>
       </tbody>
@@ -194,7 +194,7 @@
             <td x-text="adminUsageInt(r.cacheReadIn)"></td>
             <td x-text="adminUsageMoney(r.usd)"></td>
             <td x-text="r.bookId ? ('#' + r.bookId) : '—'"></td>
-            <td x-text="new Date(r.createdAt).toLocaleString($app.uiLocale === 'en' ? 'en-US' : 'de-CH')"></td>
+            <td x-text="new Date(r.createdAt).toLocaleString($app.uiLocale === 'en' ? 'en-US' : 'de-CH', { timeZone: $app.appTimezone })"></td>
           </tr>
         </template>
       </tbody>
@@ -285,7 +285,7 @@
             <td x-text="r.email"></td>
             <td x-text="r.featureKey"></td>
             <td x-text="adminUsageInt(r.count)"></td>
-            <td x-text="r.lastUsed ? new Date(r.lastUsed).toLocaleString($app.uiLocale === 'en' ? 'en-US' : 'de-CH') : '—'"></td>
+            <td x-text="r.lastUsed ? new Date(r.lastUsed).toLocaleString($app.uiLocale === 'en' ? 'en-US' : 'de-CH', { timeZone: $app.appTimezone }) : '—'"></td>
           </tr>
         </template>
       </tbody>

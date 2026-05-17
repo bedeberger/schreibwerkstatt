@@ -94,8 +94,8 @@ body.sidebar-resizing iframe {
 /* Innerhalb der Card-Padding gehalten, damit die Trennlinie vor der History
    exakt wie der Border-Bottom im .card-header aussieht (beide inset). */
 .card-history-section {
-  margin-top: 20px;
-  padding-top: 18px;
+  margin-top: var(--space-20);
+  padding-top: var(--space-18);
   border-top: 1px solid var(--color-border);
 }
 /* Variante ohne Trennlinie: wenn die History direkt auf den Card-Header

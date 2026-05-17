@@ -152,7 +152,7 @@
 /* Active-Selection-Highlight (border-left + bg) übernimmt Fokus-Rolle. */
 .palette-item:focus-visible { outline: none; }
 .palette-empty {
-  padding: 18px 16px;
+  padding: var(--space-18) 16px;
   font-size: var(--font-size-sm);
   color: var(--color-muted);
   text-align: center;

@@ -1,7 +1,7 @@
 // Buchschreibungsentwicklung – Zeitliniendiagramm.
 // Methoden werden in Alpine.data('bookStatsCard') gespreadet; Root-Zugriffe via window.__app.
 
-import { fetchJson } from '../utils.js';
+import { fetchJson, tzOpts } from '../utils.js';
 import { loadChart } from '../lazy-libs.js';
 
 const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -102,7 +102,7 @@ export const bookstatsMethods = {
       const result = await fetchJson('/sync/book/' + window.__app.selectedBookId, { method: 'POST' });
       if (result.error) throw new Error(result.error);
       const localeTag = (window.__app.uiLocale === 'en') ? 'en-US' : 'de-CH';
-      const now = new Date().toLocaleTimeString(localeTag, { hour: '2-digit', minute: '2-digit' });
+      const now = new Date().toLocaleTimeString(localeTag, tzOpts({ hour: '2-digit', minute: '2-digit' }));
       this.bookStatsSyncStatus = window.__app.t('bookstats.syncDone', { time: now });
       await this.loadBookStats(window.__app.selectedBookId);
       // page_stats-Cache in tokEsts übernehmen, falls Seiten geladen

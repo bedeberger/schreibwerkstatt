@@ -21,6 +21,24 @@
   --font-size-xl:      22px;  /* Card-Title-Standard */
   --font-size-2xl:     26px;  /* Hero/Card-Title-prominent */
   --font-size-3xl:     30px;  /* Hero-Stat-Value */
+  --font-size-4xl:     38px;  /* Hero-Stat-XL (Bookoverview-Hero) */
+
+  /* === Em-Scale (relativ zum Parent) ===
+     Reading-Frame Headings + Inline-Markup (sup/sub/code) + Dialog-Sub-Text.
+     Em statt px: skaliert mit Parent-Font, bleibt korrekt bei Reader-Zoom. */
+  --font-em-70:  0.7em;
+  --font-em-75:  0.75em;
+  --font-em-80:  0.8em;
+  --font-em-85:  0.85em;
+  --font-em-90:  0.9em;   /* h6, inline code */
+  --font-em-95:  0.95em;  /* h5 */
+  --font-em-100: 1em;
+  --font-em-105: 1.05em;  /* h4 */
+  --font-em-110: 1.1em;
+  --font-em-115: 1.15em;  /* h3 */
+  --font-em-130: 1.3em;   /* h2 */
+  --font-em-140: 1.4em;
+  --font-em-150: 1.5em;   /* h1 */
 
   /* === Font-Weight === */
   --fw-regular:    400;

@@ -51,7 +51,7 @@
 .bookstack-search-input-wrap { position: relative; }
 .bookstack-search-input {
   width: 100%;
-  padding: 7px 30px 7px 10px;
+  padding: var(--space-6) 30px 7px 10px;
   border: 0.5px solid var(--color-border-input);
   border-radius: var(--radius-md);
   font-size: var(--font-size-sm);

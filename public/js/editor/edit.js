@@ -1,4 +1,4 @@
-import { htmlToText, stripFocusArtefacts, cleanContentArtefacts, collapseEmptyBlocks, stripTrailingEmptyBlocks } from '../utils.js';
+import { htmlToText, stripFocusArtefacts, cleanContentArtefacts, collapseEmptyBlocks, stripTrailingEmptyBlocks, tzOpts } from '../utils.js';
 import { sortByPosition, buildHighlightedHtml } from '../book/page-view.js';
 import { installEditCounter } from './focus.js';
 import { contentRepo } from '../repo/content.js';
@@ -404,7 +404,7 @@ export const editorEditMethods = {
 
     if (!navigator.onLine) {
       this.saveOffline = true;
-      this.setStatus(this.t('edit.offlineSavedAt', { time: new Date().toLocaleTimeString(localeTag) }), false, 3000);
+      this.setStatus(this.t('edit.offlineSavedAt', { time: new Date().toLocaleTimeString(localeTag, tzOpts()) }), false, 3000);
       return;
     }
 
@@ -450,7 +450,7 @@ export const editorEditMethods = {
       // Sidebar-Lektorat-Status flippt auf 'warn' (updated_at > checkedAt) — Server-Map nachladen.
       this.refreshPageAges?.();
       this.updatePageView();
-      this.setStatus(this.t('edit.savedAt', { time: new Date().toLocaleTimeString(localeTag) }), false, 2500);
+      this.setStatus(this.t('edit.savedAt', { time: new Date().toLocaleTimeString(localeTag, tzOpts()) }), false, 2500);
     } catch (e) {
       if (e?.status === 409 && e?.code === 'PAGE_CONFLICT') {
         // Race nach Pre-Check: anderer User war im selben Tick schneller.

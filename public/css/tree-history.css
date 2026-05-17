@@ -18,7 +18,7 @@
 }
 
 .progress-bar-wrap + .card-status {
-  margin-bottom: 20px;
+  margin-bottom: var(--space-20);
 }
 
 /* === Tree view === */

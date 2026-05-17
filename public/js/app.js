@@ -1,4 +1,4 @@
-import { fetchJson, configureTokenEstimate, escHtml } from './utils.js';
+import { fetchJson, configureTokenEstimate, configureAppTimezone, escHtml } from './utils.js';
 import { configurePrompts } from './prompts.js';
 
 import { aiMethods } from './api/api-ai.js';
@@ -790,6 +790,8 @@ document.addEventListener('alpine:init', () => {
         }
         configurePrompts(cfg.promptConfig, cfg.apiProvider || 'claude');
         configureTokenEstimate(cfg.charsPerToken);
+        configureAppTimezone(cfg.appTimezone);
+        if (cfg.appTimezone) this.appTimezone = cfg.appTimezone;
 
         // Hash vorab auswerten, damit loadBooks das gewünschte Buch wählt.
         // _applyingHash unterdrückt Watcher/URL-Writes während der Initialisierung.

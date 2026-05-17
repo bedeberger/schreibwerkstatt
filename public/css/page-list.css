@@ -1,7 +1,7 @@
 @layer components {
 /* === Page list === */
 .page-item {
-  padding: 7px 8px 7px 6px;
+  padding: var(--space-6) 8px 7px 6px;
   border: 0.5px solid transparent;
   border-radius: var(--radius-md);
   margin-bottom: var(--space-3);
@@ -136,7 +136,7 @@
 }
 .muted-msg--block {
   display: block;
-  padding: 20px;
+  padding: var(--space-20);
   text-align: center;
 }
 

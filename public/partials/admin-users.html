@@ -97,7 +97,7 @@
               <span class="badge" :class="'badge--status-' + u.status" x-text="$app.t('admin.users.status.' + u.status)"></span>
             </td>
             <td>
-              <span class="muted-msg muted-msg--sm" x-text="u.last_seen_at ? new Date(u.last_seen_at).toLocaleString(($app.uiLocale === 'en' ? 'en-US' : 'de-CH')) : '—'"></span>
+              <span class="muted-msg muted-msg--sm" x-text="u.last_seen_at ? new Date(u.last_seen_at).toLocaleString(($app.uiLocale === 'en' ? 'en-US' : 'de-CH'), { timeZone: $app.appTimezone }) : '—'"></span>
             </td>
             <td class="admin-users-actions">
               <button type="button"
@@ -121,7 +121,7 @@
         <template x-for="ev in adminUsersAuditEvents" :key="ev.id">
           <li>
             <span class="badge" :class="'badge--event-' + ev.event" x-text="ev.event"></span>
-            <span class="muted-msg muted-msg--sm" x-text="new Date(ev.created_at).toLocaleString(($app.uiLocale === 'en' ? 'en-US' : 'de-CH'))"></span>
+            <span class="muted-msg muted-msg--sm" x-text="new Date(ev.created_at).toLocaleString(($app.uiLocale === 'en' ? 'en-US' : 'de-CH'), { timeZone: $app.appTimezone })"></span>
             <span class="muted-msg" x-show="ev.ip" x-text="' • ' + ev.ip"></span>
             <pre class="admin-users-meta" x-show="ev.meta_json" x-text="ev.meta_json"></pre>
           </li>
@@ -188,7 +188,7 @@
               <pre class="admin-users-meta" x-show="req.message" x-text="req.message"></pre>
             </td>
             <td>
-              <span class="muted-msg muted-msg--sm" x-text="new Date(req.created_at + 'Z').toLocaleString(($app.uiLocale === 'en' ? 'en-US' : 'de-CH'))"></span>
+              <span class="muted-msg muted-msg--sm" x-text="new Date(req.created_at + 'Z').toLocaleString(($app.uiLocale === 'en' ? 'en-US' : 'de-CH'), { timeZone: $app.appTimezone })"></span>
               <span class="muted-msg muted-msg--sm" x-show="req.ip" x-text="' • ' + req.ip"></span>
             </td>
             <td>
@@ -210,7 +210,7 @@
               <template x-if="req.status !== 'pending'">
                 <span class="muted-msg muted-msg--sm">
                   <span x-show="req.reviewed_at"
-                        x-text="new Date(req.reviewed_at + 'Z').toLocaleString(($app.uiLocale === 'en' ? 'en-US' : 'de-CH')) + (req.reviewed_by ? ' · ' + req.reviewed_by : '')"></span>
+                        x-text="new Date(req.reviewed_at + 'Z').toLocaleString(($app.uiLocale === 'en' ? 'en-US' : 'de-CH'), { timeZone: $app.appTimezone }) + (req.reviewed_by ? ' · ' + req.reviewed_by : '')"></span>
                   <span x-show="req.review_reason" x-text="' · ' + req.review_reason"></span>
                 </span>
               </template>

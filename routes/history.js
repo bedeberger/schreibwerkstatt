@@ -328,43 +328,45 @@ router.get('/style-stats/:book_id', (req, res) => {
   res.json({ pages, last_updated: lastUpdated });
 });
 
-// Pro Seite: letzter Check-Zeitpunkt + Pending-Flag (user-spezifisch). Frontend
-// berechnet Staleness/Edited-Since. "Pending" = jüngster Check hat Fehler, wurde
-// aber weder geöffnet noch übernommen (saved_at NULL).
+// Pro Seite: letzter Check-Zeitpunkt + Pending-Flag. Cross-User — alle Editoren
+// mit Buchzugriff sehen denselben Status, damit Co-Editoren wissen, was schon
+// geprüft ist. Findings/Reviews bleiben weiterhin user-spezifisch.
+// "Pending" = jüngster Check hat Fehler, wurde weder geöffnet noch übernommen.
 // Wenn Korrekturen aus einem Check übernommen wurden, zählt saved_at — sonst
 // würde das anschliessende BookStack-updated_at die Seite sofort wieder auf
 // "bearbeitet seit Lektorat" (warn) flippen.
+// `by` enthält die E-Mail des Editors, der den jüngsten Check gemacht hat
+// (oder null) — Frontend zeigt das als „geprüft von …" im Tooltip.
 router.get('/page-ages/:book_id', (req, res) => {
-  const user_email = req.session?.user?.email || null;
   const bookId = toIntId(req.params.book_id);
   if (!bookId) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
   const rows = db.prepare(`
     WITH latest AS (
-      SELECT page_id, checked_at, saved_at, error_count,
+      SELECT page_id, checked_at, saved_at, error_count, user_email,
              ROW_NUMBER() OVER (PARTITION BY page_id ORDER BY checked_at DESC) AS rn
       FROM page_checks
-      WHERE book_id = ? AND user_email = ?
+      WHERE book_id = ?
     )
     SELECT page_id,
            CASE WHEN saved_at IS NOT NULL AND saved_at > checked_at THEN saved_at ELSE checked_at END AS at,
-           CASE WHEN saved_at IS NULL AND error_count > 0 THEN 1 ELSE 0 END AS pending
+           CASE WHEN saved_at IS NULL AND error_count > 0 THEN 1 ELSE 0 END AS pending,
+           user_email AS by_email
     FROM latest
     WHERE rn = 1
-  `).all(bookId, user_email);
+  `).all(bookId);
   const map = {};
-  for (const r of rows) map[r.page_id] = { at: r.at, pending: !!r.pending };
+  for (const r of rows) map[r.page_id] = { at: r.at, pending: !!r.pending, by: r.by_email || null };
   res.json(map);
 });
 
-// Lektorat-Abdeckung: wie viele Seiten eines Buchs wurden schon geprüft (user-spezifisch)
+// Lektorat-Abdeckung: wie viele Seiten eines Buchs wurden schon geprüft. Cross-User.
 router.get('/coverage/:book_id', (req, res) => {
-  const user_email = req.session?.user?.email || null;
   const bookId = toIntId(req.params.book_id);
   if (!bookId) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
   const { total } = db.prepare('SELECT COUNT(*) as total FROM page_stats WHERE book_id = ?').get(bookId);
   const { checked } = db.prepare(
-    'SELECT COUNT(DISTINCT page_id) as checked FROM page_checks WHERE book_id = ? AND user_email = ?'
-  ).get(bookId, user_email);
+    'SELECT COUNT(DISTINCT page_id) as checked FROM page_checks WHERE book_id = ?'
+  ).get(bookId);
   const pct = total > 0 ? Math.round((checked / total) * 100) : 0;
   res.json({ checked_pages: checked, total_pages: total, pct });
 });

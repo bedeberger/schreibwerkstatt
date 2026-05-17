@@ -1,4 +1,4 @@
-import { escPreserveStrong, fetchText } from '../utils.js';
+import { escPreserveStrong, fetchText, tzOpts } from '../utils.js';
 
 // Pure Filter-Logik für die Szenen-Liste. Getrennt von Alpine-Getter, damit
 // Unit-Tests den Kapitel-Filter direkt gegen Fixtures prüfen können.
@@ -173,10 +173,10 @@ export const appUiMethods = {
   formatDate(iso) {
     if (!iso) return '';
     const tag = this.uiLocale === 'en' ? 'en-US' : 'de-CH';
-    return new Date(iso).toLocaleString(tag, {
+    return new Date(iso).toLocaleString(tag, tzOpts({
       day: '2-digit', month: '2-digit', year: 'numeric',
       hour: '2-digit', minute: '2-digit',
-    });
+    }));
   },
 
   escPreserveStrong,
@@ -210,9 +210,9 @@ export const appUiMethods = {
     const tag = this.uiLocale === 'en' ? 'en-US' : 'de-CH';
     const sameDay = d.toDateString() === new Date().toDateString();
     if (sameDay) {
-      return d.toLocaleTimeString(tag, { hour: '2-digit', minute: '2-digit' });
+      return d.toLocaleTimeString(tag, tzOpts({ hour: '2-digit', minute: '2-digit' }));
     }
-    return d.toLocaleString(tag, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleString(tag, tzOpts({ day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }));
   },
 
   lastSavedLabel() { return this._formatSaveTs(this._saveStatus().ts); },

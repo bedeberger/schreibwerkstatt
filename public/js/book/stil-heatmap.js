@@ -2,7 +2,7 @@
 // Greift auf page_stats zu (gefüllt vom Sync-Job über lib/page-index.js).
 // Methoden werden in Alpine.data('stilCard') gespreadet; Root-Zugriffe via window.__app.
 
-import { fetchJson, formatNumber, heatmapCellVars, localeTag, minMaxBy } from '../utils.js';
+import { fetchJson, formatNumber, heatmapCellVars, localeTag, minMaxBy, tzOpts } from '../utils.js';
 
 // Metrik-Schlüssel → i18n-Label. Reihenfolge = Spaltenreihenfolge in der Heatmap.
 // sampleBucket: Schlüssel im pro-Seite `style_samples`-Objekt bzw. 'repetition'
@@ -176,8 +176,8 @@ export const stilMethods = {
     const d = new Date(iso);
     if (isNaN(d.getTime())) return '';
     const tag = localeTag(window.__app.uiLocale);
-    const date = d.toLocaleDateString(tag, { year: 'numeric', month: '2-digit', day: '2-digit' });
-    const time = d.toLocaleTimeString(tag, { hour: '2-digit', minute: '2-digit' });
+    const date = d.toLocaleDateString(tag, tzOpts({ year: 'numeric', month: '2-digit', day: '2-digit' }));
+    const time = d.toLocaleTimeString(tag, tzOpts({ hour: '2-digit', minute: '2-digit' }));
     return window.__app.t('stil.lastUpdated', { date, time });
   },
 

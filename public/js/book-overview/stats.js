@@ -1,7 +1,7 @@
 // Schreibstatistik-Tiles: Hero-Snapshot, Sparkline, 7-Tage-Bars, Heute-Ring,
 // Streak-Heatmap. Visualisierungen als reines Inline-SVG (kein Chart.js) —
 // Overview soll instant beim Buchwechsel sichtbar sein, ohne Lazy-Lib-Load.
-import { localIsoDate, localIsoDaysAgo } from '../utils.js';
+import { localIsoDate, localIsoDaysAgo, tzOpts } from '../utils.js';
 
 export const statsMethods = {
   // Hero-Snapshot: live-aggregiert aus `tokEsts` (gleiche Quelle wie Sidebar-Σ),
@@ -79,7 +79,7 @@ export const statsMethods = {
       const charsByDate = new Map();
       for (const s of a) charsByDate.set(s.recorded_at, Number(s.chars) || 0);
       const tag = window.__app?.uiLocale === 'en' ? 'en-US' : 'de-CH';
-      const fmt = new Intl.DateTimeFormat(tag, { weekday: 'short' });
+      const fmt = new Intl.DateTimeFormat(tag, tzOpts({ weekday: 'short' }));
       const todayIso = localIsoDate();
       const todayDelta = this._charsTodayDelta();
       const days = [];
@@ -164,7 +164,7 @@ export const statsMethods = {
       const endX = pts[pts.length - 1][0];
       const endY = pts[pts.length - 1][1];
       const tag = window.__app?.uiLocale === 'en' ? 'en-US' : 'de-CH';
-      const dateFmt = new Intl.DateTimeFormat(tag, { day: 'numeric', month: 'short', year: 'numeric' });
+      const dateFmt = new Intl.DateTimeFormat(tag, tzOpts({ day: 'numeric', month: 'short', year: 'numeric' }));
       const numFmt = (n) => Number(n || 0).toLocaleString(tag);
       const unit = window.__app?.t?.('bookstats.unit.z') || 'Z';
       const points = slice.map((s, i) => {
@@ -292,7 +292,7 @@ export const statsMethods = {
       const totalActiveDays = linear.filter(x => x.delta != null && x.delta > 0).length;
 
       const tag = window.__app?.uiLocale === 'en' ? 'en-US' : 'de-CH';
-      const dayFmt = new Intl.DateTimeFormat(tag, { weekday: 'short' });
+      const dayFmt = new Intl.DateTimeFormat(tag, tzOpts({ weekday: 'short' }));
       const dayLabels = [];
       // Wochenstart Mo: nehme einen Mo als Referenz (z.B. 4. Jan 2027 ist Mo)
       const monRef = new Date(2027, 0, 4); // 2027-01-04 ist Mo

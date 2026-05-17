@@ -702,6 +702,7 @@
   "sidebar.status.pageUpdatedOn":     "Page updated {date}, {time}",
   "sidebar.status.editedSince":  "Edited since last review",
   "sidebar.status.pending":      "Review result pending",
+  "sidebar.status.lektoratBy":   "Reviewed by {user}",
 
   "tok.words":                   "{n} words",
   "tok.tokens":                  "~{n} tokens",
@@ -1343,6 +1344,7 @@
   "admin.settings.section.budget":   "Token budget",
   "admin.settings.provider.active":  "Active",
   "admin.settings.help.providerChoice": "Selects which provider is actually used. Fields below remain editable regardless — changes apply on switch.",
+  "admin.settings.help.appTimezone":    "IANA time zone (e.g. Europe/Zurich). Applies to cron jobs, server date buckets (streak, page_stats), and all GUI date formatters — browser time zone is overridden.",
   "admin.settings.help.budgetGlobal":   "Applies to every provider. `context_window` = full model window (input + output). `max_tokens_out` = output cap. `chars_per_token` scales token estimates.",
   "admin.settings.help.advancedGlobal": "Apply regardless of provider.",
   "admin.settings.help.advancedClaude": "Effective only when `ai.provider = claude`. Control retries, timeout and parallelism against Anthropic TPM limits.",

@@ -424,7 +424,7 @@ select[aria-invalid="true"],
 
 .form-inline {
   display: flex;
-  gap: 20px;
+  gap: var(--space-20);
   flex-wrap: wrap;
   align-items: center;
 }

@@ -18,6 +18,10 @@ const shellState = () => ({
   focusGranularity: 'paragraph',
   uiLocale: '',
   defaultRegion: '',
+  // App-weite Zeitzone (vom Server via /config → app_settings.app.timezone).
+  // In Templates ueber `$app.appTimezone` lesbar; gilt fuer Datums-Buckets +
+  // alle Date-Display-Formatter (toLocaleString, Intl.DateTimeFormat).
+  appTimezone: 'Europe/Zurich',
   // Plattform-Detect für Tasten-Hint-Anzeige (⌘ vs. Ctrl). Wird in init()
   // gesetzt; default true wäre auf Windows falsch, default false ist sichere
   // Annahme bevor JS gelaufen ist (Hero erscheint mit Ctrl, dann snap auf ⌘ falls Mac).

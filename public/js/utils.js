@@ -9,6 +9,24 @@ export function configureTokenEstimate(value) {
   if (Number.isFinite(v) && v > 0) CHARS_PER_TOKEN = v;
 }
 
+// App-weite Zeitzone (Single Source of Truth, kommt vom Server via /config
+// → app_settings.app.timezone). Treibt localIsoDate, Date-Display-Formatter
+// (toLocaleString, Intl.DateTimeFormat) und Streak-Buckets. Browser-TZ wird
+// damit ueberschrieben, damit GUI-Zeit zur Server-Zeit passt — z.B. ein in
+// Zurich gehosteter Server zeigt fuer einen User, der gerade in NY ist,
+// trotzdem Zurich-Zeit.
+export let appTimezone = 'Europe/Zurich';
+
+export function configureAppTimezone(tz) {
+  if (typeof tz === 'string' && tz.length > 0) appTimezone = tz;
+}
+
+// Helper fuer Intl-Options-Bag: mergt `timeZone: appTimezone` in einen
+// Options-Object, ohne ein explizites timeZone zu ueberschreiben.
+export function tzOpts(opts = {}) {
+  return opts.timeZone ? opts : { ...opts, timeZone: appTimezone };
+}
+
 /**
  * Fetch mit Pflicht-OK-Check und JSON-Parsing. Wirft bei HTTP-Fehlern,
  * damit der `.then(r => r.json())`-Pattern nicht stillschweigend HTML-
@@ -81,13 +99,13 @@ export function formatLastRun(isoStr, t, uiLocale) {
   const d = new Date(isoStr);
   if (isNaN(d.getTime())) return '';
   const tag = localeTag(uiLocale);
-  const time = d.toLocaleTimeString(tag, { hour: '2-digit', minute: '2-digit' });
+  const time = d.toLocaleTimeString(tag, tzOpts({ hour: '2-digit', minute: '2-digit' }));
   const now = new Date();
   const dDay  = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const diffDays = Math.round((today - dDay) / 86400000);
   if (diffDays < 7) return t('job.lastRun.rel', { rel: relativeDay(diffDays, uiLocale), time });
-  const date = d.toLocaleDateString(tag, { day: '2-digit', month: '2-digit' });
+  const date = d.toLocaleDateString(tag, tzOpts({ day: '2-digit', month: '2-digit' }));
   return t('job.lastRun.dateAt', { date, time });
 }
 
@@ -111,8 +129,9 @@ export function formatNumber(value, uiLocale, decimals = 1) {
 // Datums-Strings mappen. Beide Seiten müssen lokal-konsistent sein.
 //
 // 'en-CA' liefert Format YYYY-MM-DD, ist sortier-tauglich, immutable per ECMA-402.
+// timeZone ist die app-weite appTimezone (matcht Server-Datums-Buckets).
 export function localIsoDate(d = new Date()) {
-  return d.toLocaleDateString('en-CA');
+  return d.toLocaleDateString('en-CA', { timeZone: appTimezone });
 }
 
 // Lokales ISO-Datum n Tage in der Vergangenheit, kollisionssicher über

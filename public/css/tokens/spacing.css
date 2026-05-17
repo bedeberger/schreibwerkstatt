@@ -16,6 +16,8 @@
   --space-md:  12px;
   --space-14:  14px;  /* zwischen md und lg — Komponenten-Bottom-Margin */
   --space-lg:  16px;
+  --space-18:  18px;  /* zwischen lg und xl — Hero-Padding */
+  --space-20:  20px;  /* zwischen lg und xl — Container-Gaps */
   --space-xl:  24px;
   --space-2xl: 32px;
 

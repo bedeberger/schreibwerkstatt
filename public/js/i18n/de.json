@@ -702,6 +702,7 @@
   "sidebar.status.pageUpdatedOn":     "Seite aktualisiert {date}, {time}",
   "sidebar.status.editedSince":  "Seit dem Lektorat bearbeitet",
   "sidebar.status.pending":      "Lektorat noch nicht angesehen",
+  "sidebar.status.lektoratBy":   "Geprüft von {user}",
 
   "tok.words":                   "{n} Wörter",
   "tok.tokens":                  "~{n} Tokens",
@@ -1344,6 +1345,7 @@
   "admin.settings.section.budget":   "Token-Budget",
   "admin.settings.provider.active":  "Aktiv",
   "admin.settings.help.providerChoice": "Bestimmt, welcher Provider tatsächlich verwendet wird. Felder unten bearbeitbar unabhängig davon — Werte werden bei Wechsel sofort wirksam.",
+  "admin.settings.help.appTimezone":    "IANA-Zeitzone (z.B. Europe/Zurich). Gilt für Cron-Jobs, Server-Datums-Buckets (Streak, page_stats) und alle GUI-Datums-Formatter — Browser-Zeitzone wird übersteuert.",
   "admin.settings.help.budgetGlobal":   "Gilt für alle Provider. `context_window` = gesamtes Modellfenster (Input + Output). `max_tokens_out` = Output-Cap. `chars_per_token` skaliert Token-Schätzungen.",
   "admin.settings.help.advancedGlobal": "Greifen unabhängig vom Provider.",
   "admin.settings.help.advancedClaude": "Wirksam nur bei `ai.provider = claude`. Steuern Retries, Timeout und Parallelität gegen Anthropic-TPM-Limits.",

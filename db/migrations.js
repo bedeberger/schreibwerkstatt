@@ -5647,6 +5647,29 @@ function _runMigrationsLocked() {
     logger.info(`DB-Migration auf Version 130 abgeschlossen (FK-Hardening: ${CASCADE_TABLES.length} CASCADE + ${SET_NULL_TABLES.length} SET NULL Tabellen auf app_users(email)).`);
   }
 
+  if (version < 131) {
+    // Rename app_setting key cron.timezone -> app.timezone. Setting deckt jetzt
+    // Cron, Server-Datums-Buckets (lib/local-date.js) und Frontend-Display-
+    // Formatter ab (GUI-Zeit muss zur Server-Zeit passen, unabhaengig vom
+    // Browser-Standort des Users).
+    const oldRow = db.prepare("SELECT value_json, encrypted, updated_by FROM app_settings WHERE key = 'cron.timezone'").get();
+    const hasNew = db.prepare("SELECT 1 FROM app_settings WHERE key = 'app.timezone'").get();
+    if (oldRow && !hasNew) {
+      db.prepare(`
+        INSERT INTO app_settings (key, value_json, encrypted, updated_at, updated_by)
+        VALUES ('app.timezone', @value_json, @encrypted, datetime('now'), @updated_by)
+      `).run({ value_json: oldRow.value_json, encrypted: oldRow.encrypted, updated_by: oldRow.updated_by || 'migration-131' });
+    }
+    db.prepare("DELETE FROM app_settings WHERE key = 'cron.timezone'").run();
+
+    const fkErrors131 = db.pragma('foreign_key_check');
+    if (fkErrors131.length) {
+      throw new Error(`Migration 131: foreign_key_check meldet ${fkErrors131.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 131').run();
+    logger.info('DB-Migration auf Version 131 abgeschlossen (rename cron.timezone -> app.timezone).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

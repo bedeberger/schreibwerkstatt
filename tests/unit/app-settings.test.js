@@ -35,7 +35,7 @@ test('app_settings + app_settings_audit existieren', () => {
 
 test('DEFAULTS greift fuer nicht gesetzte Keys', () => {
   assert.equal(settings.get('ai.provider'), 'claude');
-  assert.equal(settings.get('cron.timezone'), 'Europe/Zurich');
+  assert.equal(settings.get('app.timezone'), 'Europe/Zurich');
   assert.equal(settings.get('jobs.max_concurrent'), 1);
 });
 
@@ -75,8 +75,8 @@ test('changed-Event feuert bei set', () => {
   let captured = null;
   const fn = ev => { captured = ev; };
   settings.on('changed', fn);
-  settings.set('cron.timezone', 'UTC', { updatedBy: 'tester@x' });
-  assert.equal(captured?.key, 'cron.timezone');
+  settings.set('app.timezone', 'UTC', { updatedBy: 'tester@x' });
+  assert.equal(captured?.key, 'app.timezone');
   assert.equal(captured?.updatedBy, 'tester@x');
   settings.off('changed', fn);
 });
