@@ -64,11 +64,15 @@ export function registerIdeenCard() {
         if (id) window.__app.ideenChapterId = id;
       });
 
-      // Scope-Wechsel: State leeren + neu laden (falls Karte offen).
-      this.$watch(() => window.__app.ideenScope, async () => {
+      // Scope-Wechsel: State leeren + neu laden (falls Karte offen) +
+      // Card-Element in passenden Slot verschieben (page → #partial-ideen
+      // neben Editor, chapter → #kapitel-ideen-slot neben Kapitelreview).
+      this.$watch(() => window.__app.ideenScope, async (scope) => {
+        this._relocate(scope);
         this.resetIdeen();
         if (window.__app.showIdeenCard) await this.loadIdeen();
       });
+      this.$nextTick(() => this._relocate(window.__app.ideenScope));
 
       // Move-Picker neben aktive Idee verschieben (DOM-Move, weil Combobox
       // in x-for nicht sauber initialisiert — daher Single-Panel ausserhalb).
@@ -83,6 +87,12 @@ export function registerIdeenCard() {
         const item = this.$el.querySelector(`[data-idee-id="${id}"]`);
         if (item && item.parentNode) item.parentNode.insertBefore(panel, item.nextSibling);
       });
+    },
+
+    _relocate(scope) {
+      const targetId = scope === 'chapter' ? 'kapitel-ideen-slot' : 'partial-ideen';
+      const target = document.getElementById(targetId);
+      if (target && this.$el.parentNode !== target) target.appendChild(this.$el);
     },
 
     destroy() {

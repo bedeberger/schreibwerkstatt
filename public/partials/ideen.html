@@ -2,11 +2,13 @@
      Sub-Komponente, lebt parallel zum Editor (kein _closeOtherMainCards).
      Offene Ideen werden im Seiten-Chat als Kontext mitgegeben. -->
 <div class="card card--ideen" id="ideen-card" x-data="ideenCard" x-show="$app.showIdeenCard" x-cloak>
-  <div class="card-header">
-    <span class="card-title"
-          x-text="$app.ideenScope === 'chapter' ? $app.t('ideen.titleChapter') : $app.t('ideen.title')"></span>
-    <span class="card-subtitle ideen-subtitle"
-          x-text="$app.ideenScope === 'chapter' ? $app.t('ideen.chatNoteChapter') : $app.t('ideen.chatNote')"></span>
+  <div class="card-header card-header--subline">
+    <div class="card-header-titlebar">
+      <span class="card-title"
+            x-text="$app.ideenScope === 'chapter' ? $app.t('ideen.titleChapter') : $app.t('ideen.title')"></span>
+      <div class="card-subline"
+           x-text="$app.ideenScope === 'chapter' ? $app.t('ideen.chatNoteChapter') : $app.t('ideen.chatNote')"></div>
+    </div>
   </div>
 
   <div x-show="errorMessage" class="card-status card-status--error" x-text="errorMessage"></div>
@@ -32,7 +34,7 @@
   <div x-show="movingId !== null" class="idee-move-panel" x-cloak>
     <span class="ideen-move-label"
           x-text="$app.ideenScope === 'chapter' ? $app.t('ideen.moveToChapter') : $app.t('ideen.moveTo')"></span>
-    <div x-data="combobox($app.ideenScope === 'chapter' ? $app.t('ideen.moveSelectPlaceholderChapter') : $app.t('ideen.moveSelectPlaceholder'), null)"
+    <div x-data="combobox(() => $app.ideenScope === 'chapter' ? $app.t('ideen.moveSelectPlaceholderChapter') : $app.t('ideen.moveSelectPlaceholder'), null)"
          x-modelable="value" x-model="moveTargetId"
          x-effect="options = $app.ideenMovePickerOptions()"
          class="idee-move-combo"></div>

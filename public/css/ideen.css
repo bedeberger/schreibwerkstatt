@@ -3,12 +3,6 @@
    Notizen pro Seite. Offene Ideen werden als Chat-Kontext mitgegeben.
    Layout: Header + Subtitle, Eingabezeile, dann zwei Sections (offen/erledigt).
    Eckige Status-Badges via var(--radius-sm). */
-.ideen-subtitle {
-  font-size: var(--font-size-xs);
-  color: var(--color-muted);
-  margin-left: 8px;
-  font-weight: 400;
-}
 .card-status--error {
   color: var(--color-danger, #c62828);
 }

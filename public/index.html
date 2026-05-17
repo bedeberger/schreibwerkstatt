@@ -192,7 +192,10 @@
 <div id="partial-admin-home"></div>
 <div id="partial-bookoverview"></div>
 <div id="partial-buchreview"></div>
-<div id="partial-kapitelreview"></div>
+<div class="kapitel-ideen-wrap" :class="{ 'kapitel-ideen-split': showKapitelReviewCard && showIdeenCard && ideenScope === 'chapter' }">
+  <div id="partial-kapitelreview" class="display-contents"></div>
+  <div id="kapitel-ideen-slot" class="display-contents"></div>
+</div>
 <div id="partial-figuren"></div>
 <div id="partial-figur-werkstatt"></div>
 <div id="partial-szenen"></div>
