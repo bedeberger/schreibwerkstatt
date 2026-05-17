@@ -32,12 +32,22 @@ export const appCollabMethods = {
     }
     this._collabSince = null;
     this.recentRemoteEdits = new Set();
+    this.livePresenceByPage = {};
     this._dismissCollabToast();
+    this._stopPresenceHeartbeat();
   },
 
   async _collabPollOnce(bookId) {
     if (document.hidden) return;
     if (!bookId || String(bookId) !== String(this.selectedBookId)) return;
+    // Beide Reads parallel: /changes (Diff seit since) + /presence (Live-Heartbeat).
+    await Promise.all([
+      this._collabFetchChanges(bookId),
+      this._collabFetchPresence(bookId),
+    ]);
+  },
+
+  async _collabFetchChanges(bookId) {
     const url = '/content/books/' + bookId + '/changes'
       + (this._collabSince ? '?since=' + encodeURIComponent(this._collabSince) : '');
     let data;
@@ -55,6 +65,28 @@ export const appCollabMethods = {
     const changes = Array.isArray(data.changes) ? data.changes : [];
     if (changes.length === 0) return;
     this._applyCollabChanges(changes);
+  },
+
+  async _collabFetchPresence(bookId) {
+    let data;
+    try {
+      const r = await fetch('/content/books/' + bookId + '/presence');
+      if (!r.ok) return;
+      data = await r.json();
+    } catch { return; }
+    const rows = Array.isArray(data?.presence) ? data.presence : [];
+    const map = {};
+    for (const p of rows) {
+      if (!p?.page_id) continue;
+      const key = String(p.page_id);
+      if (!map[key]) map[key] = [];
+      map[key].push({
+        user_email: p.user_email,
+        user_display_name: p.user_display_name || p.user_email,
+        last_ping_at: p.last_ping_at,
+      });
+    }
+    this.livePresenceByPage = map;
   },
 
   _applyCollabChanges(changes) {
@@ -130,5 +162,59 @@ export const appCollabMethods = {
     if (!pageId || !this.recentRemoteEdits.has(pageId)) return;
     this.recentRemoteEdits.delete(pageId);
     this.recentRemoteEdits = new Set(this.recentRemoteEdits);
+  },
+
+  // Liefert das Presence-Array fuer eine Seite (nur fremde User; eigene
+  // sind serverseitig schon ausgefiltert). [] wenn niemand.
+  presenceFor(pageId) {
+    if (!pageId) return [];
+    return this.livePresenceByPage[String(pageId)] || [];
+  },
+
+  // ── Eigener Heartbeat ──────────────────────────────────────────────────
+  // Im Edit-Mode pingt der Client alle 30s, damit andere User „X editiert
+  // hier" sehen. Verlassen via DELETE bei cancel/save. Page-Wechsel waehrend
+  // Edit ist nicht moeglich (Editor zerstoert sich), aber zur Sicherheit
+  // hardcoded: bei pageId-Wechsel wird der alte Ping abgemeldet.
+  _startPresenceHeartbeat(pageId) {
+    if (!pageId) return;
+    if (this._presencePingPageId && this._presencePingPageId !== pageId) {
+      this._sendPresenceLeave(this._presencePingPageId);
+    }
+    this._presencePingPageId = pageId;
+    this._sendPresencePing(pageId);
+    if (this._presencePingTimer) clearInterval(this._presencePingTimer);
+    this._presencePingTimer = setInterval(() => {
+      if (this._presencePingPageId) this._sendPresencePing(this._presencePingPageId);
+    }, 30 * 1000);
+  },
+
+  _stopPresenceHeartbeat() {
+    if (this._presencePingTimer) {
+      clearInterval(this._presencePingTimer);
+      this._presencePingTimer = null;
+    }
+    const pid = this._presencePingPageId;
+    this._presencePingPageId = null;
+    if (pid) this._sendPresenceLeave(pid);
+  },
+
+  _sendPresencePing(pageId) {
+    if (!pageId) return;
+    try {
+      fetch('/content/pages/' + pageId + '/presence', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      }).catch(() => {});
+    } catch {}
+  },
+
+  _sendPresenceLeave(pageId) {
+    if (!pageId) return;
+    try {
+      fetch('/content/pages/' + pageId + '/presence', {
+        method: 'DELETE',
+      }).catch(() => {});
+    } catch {}
   },
 };

@@ -229,6 +229,9 @@ export const editorEditMethods = {
     this._startAutosave();
     this._installOnlineRetry();
     this._installFindingMarkWatcher();
+    // Presence-Heartbeat: anderen Usern signalisieren „hier editiert wer".
+    // Stopp im cancelEdit/saveEdit (Non-Focus-Pfad).
+    this._startPresenceHeartbeat?.(this.currentPage.id);
     // Counter erst nach Alpine-x-show-Flush installieren — vorher existiert
     // .page-content-view--editing noch nicht im DOM.
     setTimeout(() => { if (this.editMode) installEditCounter(this); }, 0);
@@ -248,6 +251,7 @@ export const editorEditMethods = {
     this._uninstallOnlineRetry();
     this._uninstallFindingMarkWatcher();
     this._editCounterCtx?.teardown?.();
+    this._stopPresenceHeartbeat?.();
     this.lastDraftSavedAt = null;
     this.editMode = false;
     this.editDirty = false;
@@ -351,6 +355,7 @@ export const editorEditMethods = {
         this._uninstallOnlineRetry();
         this._uninstallFindingMarkWatcher();
         this._editCounterCtx?.teardown?.();
+        this._stopPresenceHeartbeat?.();
         this.editMode = false;
         this.closeSynonymMenu?.();
         this.closeSynonymPicker?.();

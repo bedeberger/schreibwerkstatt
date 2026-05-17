@@ -339,6 +339,13 @@ const collabState = () => ({
   recentRemoteEdits: new Set(),
   collabToast: null,
   _collabToastTimer: null,
+  // Presence: Map<pageId, [{ user_email, user_display_name, last_ping_at }]>
+  // — andere User, die gerade Seiten dieses Buchs editieren. Updated im
+  // gleichen Poll-Tick wie /changes; UI rendert via livePresenceByPage.
+  livePresenceByPage: {},
+  // Eigener Heartbeat: aktiver Edit-Mode pingt den Server alle 30s.
+  _presencePingTimer: null,
+  _presencePingPageId: null,
 });
 
 // Modal-State fuer Buch-Erstellung (Trigger: Combobox-Footer "+ Neues Buch").
