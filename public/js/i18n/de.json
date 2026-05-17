@@ -104,6 +104,7 @@
   "phase.extract":               "Vollextraktion",
   "phase.figurenConsolidate":    "Figuren konsolidieren",
   "phase.orteConsolidate":       "Orte konsolidieren",
+  "phase.songsConsolidate":      "Musikbibliothek",
   "phase.chapterRelations":      "Kap. Beziehungen",
   "phase.szenenEvents":          "Szenen + Ereignisse",
   "phase.timeline":              "Zeitstrahl",

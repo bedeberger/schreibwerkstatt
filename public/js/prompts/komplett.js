@@ -49,7 +49,7 @@ export const figurenBasisRules = (kontext = '') => `Regeln:
 - wohnadresse: Wohnort oder Wohnadresse der Figur, so präzise wie textnah belegt (z.B. «Zürich», «Bahnhofstrasse 12, Bern», «kleines Bauernhaus am Waldrand»). Nur ausfüllen wenn explizit aus dem Text hervorgeht. Leer wenn nicht erwähnt – nicht spekulieren.
 - entwicklung: "statisch" wenn die Figur über das Buch hinweg unverändert bleibt, sonst 1 Satz zum Wandel. Leer wenn nicht eindeutig.
 - sozialschicht: gesellschaftliche Schicht der Figur${kontext ? ` (${kontext})` : ''} – nur vergeben wenn eindeutig belegt; wirtschaftselite=Unternehmerfamilien/Direktoren, gehobenes_buergertum=Akademiker/freie Berufe/obere Kader, mittelschicht=Angestellte/Beamte/mittlere Kader, arbeiterschicht=Fabrik-/Bauarbeiter/Servicepersonal, migrantenmilieu=Zugewanderte/zweite Generation, prekariat=Sozialhilfe/Randständige/Langzeitarbeitslose, unterwelt=kriminelles Milieu, andere=nicht eindeutig
-- beziehungen.machtverhaltnis: Machtasymmetrie: +2=Gegenüber (figur_id) dominiert klar, +1=Gegenüber hat leichten Vorteil, 0=symmetrisch, -1=diese Figur hat leichten Vorteil, -2=diese Figur dominiert klar; weglassen oder 0 wenn unklar
+- beziehungen.machtverhaltnis: ganzzahlig im Bereich -2 bis 2 (KEIN führendes Plus-Zeichen). Machtasymmetrie: 2=Gegenüber (figur_id) dominiert klar, 1=Gegenüber hat leichten Vorteil, 0=symmetrisch, -1=diese Figur hat leichten Vorteil, -2=diese Figur dominiert klar; weglassen oder 0 wenn unklar
 - beziehungen.belege: 1-3 Stellen (Kapitelname + Seitentitel) an denen die Beziehung klar wird. Genau wie im Text stehen lassen; leer lassen wenn unsicher. Seitennamen aus ### Überschriften, Kapitelnamen aus ## Überschriften oder dem Prompt-Kontext.
 - Beziehungstypen: typ beschreibt die ROLLE von figur_id (NICHT der aktuellen Figur!). Bei Figur X der Eintrag {figur_id: Y, typ: elternteil} bedeutet: Y IST der Elternteil von X. Konkretes Beispiel: Robert hat Mutter Sandra → bei Robert eintragen {figur_id: «<Sandras fig_id>», typ: elternteil, machtverhaltnis: 2}. patronage=Schutzherrschaft (figur_id = Patron), geschaeft=wirtschaftliche Beziehung, geschwister=undirektional, übrige selbsterklärend
 - Pro Figurenpaar höchstens EINE Beziehung eintragen – aus der Perspektive EINER Figur. Keine widersprüchlichen Angaben (z.B. nicht gleichzeitig elternteil und kind für dasselbe Paar)
@@ -122,7 +122,7 @@ Regeln:
 - von/zu: nur IDs aus der obigen Figurenliste
 - Jede Beziehung nur einmal eintragen (nicht von→zu UND zu→von für denselben Typ)
 - Keine Beziehungen die bereits in «Bekannte Beziehungen» stehen
-- machtverhaltnis: Machtasymmetrie: +2=Gegenüber («zu») dominiert klar, +1=Gegenüber hat leichten Vorteil, 0=symmetrisch, -1=diese Figur («von») hat leichten Vorteil, -2=diese Figur dominiert klar; weglassen oder 0 wenn unklar
+- machtverhaltnis: ganzzahlig im Bereich -2 bis 2 (KEIN führendes Plus-Zeichen). Machtasymmetrie: 2=Gegenüber («zu») dominiert klar, 1=Gegenüber hat leichten Vorteil, 0=symmetrisch, -1=diese Figur («von») hat leichten Vorteil, -2=diese Figur dominiert klar; weglassen oder 0 wenn unklar
 - belege: 1-3 Stellen (Kapitelname + Seitentitel) an denen die Beziehung sichtbar wird. Seitennamen aus ### Überschriften, Kapitel aus ## Überschriften des übergebenen Textes.
 - Leeres Array wenn keine neuen kapitelübergreifenden Beziehungen eindeutig belegt sind`;
 }
@@ -167,7 +167,7 @@ Regeln sozialschicht:
 Regeln beziehungen (machtverhaltnis):
 - Nur Beziehungen der obigen Liste – keine neuen Paare, keine Pfeile zwischen Figuren ohne bestehende Beziehung
 - from_fig_id / to_fig_id: exakt die figur_id aus dem obigen Beziehungsfeld («von» = die Figur in deren Block die Beziehung steht, «zu» = figur_id darin)
-- machtverhaltnis: +2=to_fig_id dominiert klar, +1=to_fig_id hat leichten Vorteil, 0=symmetrisch, -1=from_fig_id hat leichten Vorteil, -2=from_fig_id dominiert klar
+- machtverhaltnis: ganzzahlig im Bereich -2 bis 2 (KEIN führendes Plus-Zeichen). 2=to_fig_id dominiert klar, 1=to_fig_id hat leichten Vorteil, 0=symmetrisch, -1=from_fig_id hat leichten Vorteil, -2=from_fig_id dominiert klar
 - HOLISTISCH bewerten: wer hat strukturelle Macht (Kapital, Hierarchie, Wissen), wer psychologische (Manipulation, Autorität)? Im Zweifel 0
 - Pro ungeordnetem Paar (A,B) nur EIN Eintrag – nicht sowohl A→B als auch B→A
 - Beziehungen weglassen wenn machtverhaltnis unklar oder 0 ist und der preliminary-Wert ebenfalls 0/leer war`;

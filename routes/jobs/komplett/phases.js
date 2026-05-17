@@ -403,7 +403,7 @@ async function runPhase3Songs(ctx, chapterSongs, figurenKompakt, isSinglePass, i
 
   let songs;
   if (isSinglePass) {
-    updateJob(jobId, { statusText: 'job.phase.consolidatingSongs' });
+    updateJob(jobId, { progress: 56, statusText: 'job.phase.consolidatingSongs' });
     const raw = chapterSongs[0]?.songs || [];
     songs = raw.map((s, i) => ({
       ...s,
@@ -418,6 +418,7 @@ async function runPhase3Songs(ctx, chapterSongs, figurenKompakt, isSinglePass, i
     const hasInput = chapterSongs.some(cs => (cs.songs || []).length > 0);
     if (!hasInput) {
       songs = [];
+      updateJob(jobId, { progress: 56 });
       log.info(`Phase 3 Songs übersprungen (keine Songs in Pass B – KI-Call gespart).`);
     } else {
       // Songs-Range 55→56 (klein, ~3K Out): lässt 56→58 frei für P3b.
