@@ -48,9 +48,14 @@ if [ -f "$DB_FILE" ]; then
   fi
 fi
 
-# Dateien synchronisieren (.env und node_modules bleiben unangetastet)
-rsync -a --exclude='.env' --exclude='node_modules' --exclude='.git' \
+# Dateien synchronisieren (.env und node_modules bleiben unangetastet).
+# --delete: entfernt aus dem Repo geloeschte Dateien auch auf Prod. Ohne diesen
+# Flag bleiben Stale-Module liegen und Node-Resolution kann sie statt der
+# neuen Variante laden (z.B. lib/foo.js maskiert lib/foo/index.js).
+rsync -a --delete \
+  --exclude='.env' --exclude='node_modules' --exclude='.git' \
   --exclude='schreibwerkstatt.db' --exclude='schreibwerkstatt.db-wal' --exclude='schreibwerkstatt.db-shm' \
+  --exclude='schreibwerkstatt.log*' --exclude='backups' --exclude='ai_parse_fails' \
   ./ "$INSTALL_DIR/"
 
 # Ownership auf github-runner setzen
