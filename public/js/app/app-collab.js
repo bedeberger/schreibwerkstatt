@@ -33,6 +33,7 @@ export const appCollabMethods = {
     this._collabSince = null;
     this.recentRemoteEdits = new Set();
     this.livePresenceByPage = {};
+    this.foreignEditLock = null;
     this._dismissCollabToast();
     this._stopPresenceHeartbeat();
   },
@@ -45,6 +46,13 @@ export const appCollabMethods = {
       this._collabFetchChanges(bookId),
       this._collabFetchPresence(bookId),
     ]);
+    // Stale-Cleanup fuer foreignEditLock: Wenn der gespeicherte fremde Lock
+    // laut expires_at abgelaufen ist, null'en — Server-Cron purged nur 1x/Tag
+    // und wir wollen das Banner nicht 24h zu lang stehen lassen.
+    if (this.foreignEditLock?.expires_at) {
+      const exp = Date.parse(this.foreignEditLock.expires_at);
+      if (Number.isFinite(exp) && exp < Date.now()) this.foreignEditLock = null;
+    }
   },
 
   async _collabFetchChanges(bookId) {
