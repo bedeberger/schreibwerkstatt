@@ -2,7 +2,7 @@
 // Fachlicher State lebt hier, `showBookSettingsCard` + `toggleBookSettingsCard`
 // im Root. Daten werden beim Öffnen / Buchwechsel nachgeladen.
 
-import { bookSettingsMethods } from '../book-settings.js';
+import { bookSettingsMethods } from '../book/book-settings.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
 
 export function registerBookSettingsCard() {

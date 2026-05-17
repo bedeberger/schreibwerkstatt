@@ -4,7 +4,7 @@
 // ein Alpine-Reaktivitäts-Proxy würde die Chart-Instanz beschädigen. destroy()
 // räumt beide auf.
 
-import { bookstatsMethods, _destroyStatsChart, _disconnectThemeObserver } from '../bookstats.js';
+import { bookstatsMethods, _destroyStatsChart, _disconnectThemeObserver } from '../book/bookstats.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
 
 export function registerBookStatsCard() {

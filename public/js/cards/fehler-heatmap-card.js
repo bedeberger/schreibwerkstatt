@@ -1,6 +1,6 @@
 // Alpine.data('fehlerHeatmapCard') — Sub-Komponente der Fehler-Heatmap.
 
-import { fehlerHeatmapMethods } from '../fehler-heatmap.js';
+import { fehlerHeatmapMethods } from '../book/fehler-heatmap.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
 
 export function registerFehlerHeatmapCard() {

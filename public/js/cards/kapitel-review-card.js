@@ -6,7 +6,7 @@
 // laufenden Reviews.
 
 import { fetchJson, escHtml, renderStars, noteTip } from '../utils.js';
-import { renderReviewHtml, CHAPTER_REVIEW_AXES } from '../review.js';
+import { renderReviewHtml, CHAPTER_REVIEW_AXES } from '../book/review.js';
 import { startPoll, runningJobStatus } from './job-helpers.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
 import { contentRepo } from '../repo/content.js';

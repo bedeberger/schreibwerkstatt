@@ -6,7 +6,7 @@
 //     dispatched ein zusätzliches kapitel-review:select-Event mit chapterId
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { appHashRouterMethods } from '../../public/js/app-hash-router.js';
+import { appHashRouterMethods } from '../../public/js/app/app-hash-router.js';
 
 // ── DOM-Stubs ────────────────────────────────────────────────────────────────
 const events = [];

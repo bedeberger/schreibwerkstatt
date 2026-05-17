@@ -1,7 +1,7 @@
 // Alpine.data('exportCard') — Sub-Komponente der Buch-Export-Karte.
 // Fachlicher State lebt hier, `showExportCard` + `toggleExportCard` im Root.
 
-import { exportMethods } from '../export.js';
+import { exportMethods } from '../book/export.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
 
 export function registerExportCard() {
@@ -10,21 +10,37 @@ export function registerExportCard() {
     bookExportLoading: null,
     bookExportError: '',
     exportScope: 'book',
+    exportChapterId: null,
+    exportPageId: null,
     _lifecycle: null,
 
     init() {
       this._lifecycle = setupCardLifecycle(this, {
-        resetState: { bookExportLoading: null, bookExportError: '', exportScope: 'book' },
+        resetState: {
+          bookExportLoading: null,
+          bookExportError: '',
+          exportScope: 'book',
+          exportChapterId: null,
+          exportPageId: null,
+        },
       });
-      // Wenn aktuelle Auswahl (Page/Chapter) entfaellt, Scope auf naechst-
-      // weiteres Granulat zurueckfallen lassen.
-      this.$watch(() => window.__app?.currentPage?.id, () => this._reconcileScope());
-      this.$watch(() => window.__app?.currentPage?.chapter_id, () => this._reconcileScope());
+      this.$watch(() => this.exportScope, () => this._ensurePicked());
+      this.$watch(() => window.__app?.currentPage?.id, () => this._ensurePicked());
     },
 
-    _reconcileScope() {
-      const valid = this.exportScopeOptions().map(o => o.value);
-      if (!valid.includes(this.exportScope)) this.exportScope = 'book';
+    _ensurePicked() {
+      const app = window.__app;
+      const cur = app?.currentPage;
+      if (this.exportScope === 'chapter') {
+        const opts = this.exportChapterOptions();
+        const valid = opts.some(o => o.value === this.exportChapterId);
+        if (!valid) this.exportChapterId = cur?.chapter_id || opts[0]?.value || null;
+      }
+      if (this.exportScope === 'page') {
+        const opts = this.exportPageOptions();
+        const valid = opts.some(o => o.value === this.exportPageId);
+        if (!valid) this.exportPageId = cur?.id || opts[0]?.value || null;
+      }
     },
 
     destroy() { this._lifecycle?.destroy(); },

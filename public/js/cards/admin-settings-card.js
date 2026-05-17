@@ -2,7 +2,7 @@
 // fuer Admin-Settings. Sichtbarkeit ueber $app.currentUser.role; State +
 // Lifecycle hier, Show-Flag (`showAdminSettingsCard`) im Root.
 
-import { adminSettingsMethods } from '../admin-settings.js';
+import { adminSettingsMethods } from '../admin/admin-settings.js';
 
 export function registerAdminSettingsCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;

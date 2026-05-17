@@ -168,7 +168,7 @@ erDiagram
     TEXT    updated_at
     TEXT    last_seen_at
     INTEGER position
-    INTEGER priority "BookStack-Mirror"
+    INTEGER priority "Mirror aus bookstack-Backend; im localdb-Mode App-eigen"
     TEXT    slug
     TEXT    description
   }
@@ -180,10 +180,10 @@ erDiagram
     TEXT    updated_at
     TEXT    preview_text
     TEXT    last_seen_at
-    TEXT    body_html "localdb-Wahrheit ab Phase 1; Cache vor Phase 1"
+    TEXT    body_html "Wahrheit im localdb-Mode; Cache im bookstack-Mode"
     TEXT    body_markdown
     INTEGER position
-    INTEGER priority "BookStack-Mirror"
+    INTEGER priority "Mirror aus bookstack-Backend; im localdb-Mode App-eigen"
     TEXT    slug
     TEXT    local_updated_at
     TEXT    remote_updated_at

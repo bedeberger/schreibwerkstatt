@@ -42,7 +42,7 @@ globalThis.document = globalThis.document || {
   globalThis.__origNavigatorDesc = desc;
 }
 
-const { bookstackMethods } = await import('../../public/js/api-bookstack.js');
+const { bookstackMethods } = await import('../../public/js/api/api-bookstack.js');
 const { lektoratMethods } = await import('../../public/js/editor/lektorat.js');
 
 // ── Schicht 1 ────────────────────────────────────────────────────────────────

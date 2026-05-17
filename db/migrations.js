@@ -4852,6 +4852,183 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 116 abgeschlossen (Phase 7 BookStack-Exit: FTS5 search_index + search_trigram + search_meta).');
   }
 
+  if (version < 117) {
+    // Phase 11 (BookStack-Exit, docs/bookstack-exit.md): Per-User-AI-Provider-Override.
+    // 1) app_users.ai_provider_override (NULL = follows global ai.provider).
+    // 2) provider-Spalte in alle 7 KI-Caches. Verhindert, dass Claude-Output an
+    //    Ollama-User ausgeliefert wird (oder umgekehrt). Teil des PRIMARY KEY.
+    // Backfill: bestehende Cache-Eintraege bekommen den aktuellen Globalwert
+    //   `ai.provider` aus app_settings.
+    const auCols117 = db.pragma('table_info(app_users)').map(c => c.name);
+    if (!auCols117.includes('ai_provider_override')) {
+      db.prepare(`
+        ALTER TABLE app_users ADD COLUMN ai_provider_override TEXT
+          CHECK(ai_provider_override IN ('claude','ollama','llama') OR ai_provider_override IS NULL)
+      `).run();
+    }
+
+    let defaultProvider117 = 'claude';
+    try {
+      const row = db.prepare("SELECT value_json FROM app_settings WHERE key = 'ai.provider'").get();
+      if (row && row.value_json) {
+        const parsed = JSON.parse(row.value_json);
+        if (typeof parsed === 'string' && ['claude','ollama','llama'].includes(parsed)) {
+          defaultProvider117 = parsed;
+        }
+      }
+    } catch { /* leave default */ }
+
+    db.pragma('foreign_keys = OFF');
+
+    const recreate117 = (table, createSql, copySql, indexSql) => {
+      db.prepare(`DROP TABLE IF EXISTS ${table}_new`).run();
+      db.prepare(createSql).run();
+      db.prepare(copySql).run(defaultProvider117);
+      db.prepare(`DROP TABLE ${table}`).run();
+      db.prepare(`ALTER TABLE ${table}_new RENAME TO ${table}`).run();
+      if (indexSql) db.prepare(indexSql).run();
+    };
+
+    recreate117(
+      'chapter_extract_cache',
+      `CREATE TABLE chapter_extract_cache_new (
+         book_id      INTEGER NOT NULL,
+         user_email   TEXT    NOT NULL DEFAULT '',
+         chapter_id   INTEGER NOT NULL REFERENCES chapters(chapter_id) ON DELETE CASCADE,
+         phase        TEXT    NOT NULL DEFAULT '',
+         provider     TEXT    NOT NULL DEFAULT '',
+         pages_sig    TEXT    NOT NULL,
+         extract_json TEXT    NOT NULL,
+         cached_at    TEXT    NOT NULL,
+         PRIMARY KEY (book_id, user_email, chapter_id, phase, provider)
+       )`,
+      `INSERT OR REPLACE INTO chapter_extract_cache_new
+         (book_id, user_email, chapter_id, phase, provider, pages_sig, extract_json, cached_at)
+       SELECT book_id, user_email, chapter_id, phase, ?, pages_sig, extract_json, cached_at
+         FROM chapter_extract_cache`,
+      null,
+    );
+
+    recreate117(
+      'book_extract_cache',
+      `CREATE TABLE book_extract_cache_new (
+         book_id      INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+         user_email   TEXT    NOT NULL DEFAULT '',
+         provider     TEXT    NOT NULL DEFAULT '',
+         pages_sig    TEXT    NOT NULL,
+         extract_json TEXT    NOT NULL,
+         cached_at    TEXT    NOT NULL,
+         PRIMARY KEY (book_id, user_email, provider)
+       )`,
+      `INSERT OR REPLACE INTO book_extract_cache_new
+         (book_id, user_email, provider, pages_sig, extract_json, cached_at)
+       SELECT book_id, user_email, ?, pages_sig, extract_json, cached_at
+         FROM book_extract_cache`,
+      null,
+    );
+
+    recreate117(
+      'chapter_review_cache',
+      `CREATE TABLE chapter_review_cache_new (
+         book_id     INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+         user_email  TEXT    NOT NULL DEFAULT '',
+         chapter_id  INTEGER NOT NULL REFERENCES chapters(chapter_id) ON DELETE CASCADE,
+         phase       TEXT    NOT NULL DEFAULT '',
+         provider    TEXT    NOT NULL DEFAULT '',
+         pages_sig   TEXT    NOT NULL,
+         review_json TEXT    NOT NULL,
+         cached_at   TEXT    NOT NULL,
+         PRIMARY KEY (book_id, user_email, chapter_id, phase, provider)
+       )`,
+      `INSERT OR REPLACE INTO chapter_review_cache_new
+         (book_id, user_email, chapter_id, phase, provider, pages_sig, review_json, cached_at)
+       SELECT book_id, user_email, chapter_id, phase, ?, pages_sig, review_json, cached_at
+         FROM chapter_review_cache`,
+      `CREATE INDEX IF NOT EXISTS idx_crc_book_user ON chapter_review_cache(book_id, user_email)`,
+    );
+
+    recreate117(
+      'book_review_cache',
+      `CREATE TABLE book_review_cache_new (
+         book_id     INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+         user_email  TEXT    NOT NULL DEFAULT '',
+         provider    TEXT    NOT NULL DEFAULT '',
+         pages_sig   TEXT    NOT NULL,
+         review_json TEXT    NOT NULL,
+         cached_at   TEXT    NOT NULL,
+         PRIMARY KEY (book_id, user_email, provider)
+       )`,
+      `INSERT OR REPLACE INTO book_review_cache_new
+         (book_id, user_email, provider, pages_sig, review_json, cached_at)
+       SELECT book_id, user_email, ?, pages_sig, review_json, cached_at
+         FROM book_review_cache`,
+      `CREATE INDEX IF NOT EXISTS idx_brc_book_user ON book_review_cache(book_id, user_email)`,
+    );
+
+    recreate117(
+      'chapter_macro_review_cache',
+      `CREATE TABLE chapter_macro_review_cache_new (
+         book_id     INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+         user_email  TEXT    NOT NULL DEFAULT '',
+         chapter_id  INTEGER NOT NULL REFERENCES chapters(chapter_id) ON DELETE CASCADE,
+         provider    TEXT    NOT NULL DEFAULT '',
+         pages_sig   TEXT    NOT NULL,
+         review_json TEXT    NOT NULL,
+         cached_at   TEXT    NOT NULL,
+         PRIMARY KEY (book_id, user_email, chapter_id, provider)
+       )`,
+      `INSERT OR REPLACE INTO chapter_macro_review_cache_new
+         (book_id, user_email, chapter_id, provider, pages_sig, review_json, cached_at)
+       SELECT book_id, user_email, chapter_id, ?, pages_sig, review_json, cached_at
+         FROM chapter_macro_review_cache`,
+      `CREATE INDEX IF NOT EXISTS idx_cmrc_book_user ON chapter_macro_review_cache(book_id, user_email)`,
+    );
+
+    recreate117(
+      'synonym_cache',
+      `CREATE TABLE synonym_cache_new (
+         user_email  TEXT    NOT NULL DEFAULT '',
+         provider    TEXT    NOT NULL DEFAULT '',
+         key_hash    TEXT    NOT NULL,
+         result_json TEXT    NOT NULL,
+         cached_at   TEXT    NOT NULL,
+         PRIMARY KEY (user_email, provider, key_hash)
+       )`,
+      `INSERT OR REPLACE INTO synonym_cache_new
+         (user_email, provider, key_hash, result_json, cached_at)
+       SELECT user_email, ?, key_hash, result_json, cached_at
+         FROM synonym_cache`,
+      `CREATE INDEX IF NOT EXISTS idx_sc_user ON synonym_cache(user_email)`,
+    );
+
+    recreate117(
+      'lektorat_cache',
+      `CREATE TABLE lektorat_cache_new (
+         book_id     INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+         user_email  TEXT    NOT NULL DEFAULT '',
+         page_id     INTEGER NOT NULL REFERENCES pages(page_id) ON DELETE CASCADE,
+         provider    TEXT    NOT NULL DEFAULT '',
+         ctx_sig     TEXT    NOT NULL,
+         result_json TEXT    NOT NULL,
+         cached_at   TEXT    NOT NULL,
+         PRIMARY KEY (book_id, user_email, page_id, provider)
+       )`,
+      `INSERT OR REPLACE INTO lektorat_cache_new
+         (book_id, user_email, page_id, provider, ctx_sig, result_json, cached_at)
+       SELECT book_id, user_email, page_id, ?, ctx_sig, result_json, cached_at
+         FROM lektorat_cache`,
+      `CREATE INDEX IF NOT EXISTS idx_lc_book_user ON lektorat_cache(book_id, user_email)`,
+    );
+
+    db.pragma('foreign_keys = ON');
+    const fkErrors117 = db.pragma('foreign_key_check');
+    if (fkErrors117.length) {
+      throw new Error(`Migration 117: foreign_key_check meldet ${fkErrors117.length} Verstoesse: ${JSON.stringify(fkErrors117.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 117').run();
+    logger.info(`DB-Migration auf Version 117 abgeschlossen (Phase 11: ai_provider_override + provider-Spalte in 7 KI-Caches; Backfill auf '${defaultProvider117}').`);
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

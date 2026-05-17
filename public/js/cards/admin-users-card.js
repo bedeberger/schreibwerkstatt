@@ -2,7 +2,7 @@
 // fuer die Admin-User-Liste. Sichtbarkeit ueber $app.currentUser.role; State
 // + Lifecycle hier, Show-Flag (`showAdminUsersCard`) im Root.
 
-import { adminUsersMethods } from '../admin-users.js';
+import { adminUsersMethods } from '../admin/admin-users.js';
 
 export function registerAdminUsersCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;

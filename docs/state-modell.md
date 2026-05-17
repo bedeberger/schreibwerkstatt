@@ -14,9 +14,9 @@ Verbindlicher Aufbau des Alpine-State. Vor jeder UI-Änderung die richtige Ebene
 
 | Slice | Inhalt |
 |-------|--------|
-| `shellState` | currentUser, devMode, sessionExpired, themePref, focusGranularity, uiLocale, isMac, bookstackUrl, promptConfig, Token-Setup-Modal, `_abortCtrl` |
+| `shellState` | currentUser, devMode, sessionExpired, themePref, focusGranularity, uiLocale, isMac, currentBackend (`'localdb'`/`'bookstack'`), bookstackUrl (nur im `bookstack`-Mode gesetzt), promptConfig, Token-Setup-Modal, `_abortCtrl` |
 | `aiProviderState` | claudeModel, claudeMaxTokens, apiProvider, ollamaModel, llamaModel |
-| `navigationState` | books, selectedBookId, pages, tree, Hash-Router-Internals (`_applyingHash`, `_hashInitialized`, …), Order-Maps, pageSearch, BookStack-Search |
+| `navigationState` | books, selectedBookId, pages, tree, Hash-Router-Internals (`_applyingHash`, `_hashInitialized`, …), Order-Maps, pageSearch, bookstack-Search (nur `bookstack`-Mode) |
 | `editorState` | currentPage, renderedPageHtml, editMode, editDirty, editSaving, Auto-Save-Timer (`_autosaveIdleTimer`, `_autosaveMaxTimer`, `_draftTimer`), originalHtml/correctedHtml, hasErrors, newPage-Felder |
 | `focusModeState` | focusMode, focusCountWords, focusCountChars, focusCountWordsDelta, focusCountCharsDelta (Live-Counter im Fokus-Header) |
 | `editorPopupState` | Spiegel-Flags `_figurLookupOpen`, `_synonymMenuOpen`, `_synonymPickerOpen` (für Escape-Routing in `editor-focus-onKey`) + `_figurLookupIndex` (Lookup-Cache) |
@@ -119,7 +119,7 @@ Custom-Events am `window`. Vollständige Liste:
 | `book-stats:select` | Hash-Router | book-stats-card | Statistik-Tab wählen |
 | `palette:open` | global | palette-card | Command-Palette öffnen |
 | `app:update-available` | Service-Worker-Listener | Root-Banner | Update-Hinweis |
-| `session-expired` / `bookstack-token-invalid` | `fetch`-Wrapper | Root | Banner zeigen |
+| `session-expired` / `bookstack-token-invalid` | `fetch`-Wrapper | Root | Banner zeigen (`bookstack-token-invalid` nur im `bookstack`-Mode) |
 
 ## Karten-Inventar (Alpine.data-Names)
 
@@ -131,7 +131,7 @@ Alle in [public/js/app.js:205-234](../public/js/app.js#L205-L234) via `registerX
 ## Was bleibt im Root (nicht in Subs auslagern)
 
 - Alle Show-Flags (Exklusivität!), Hash-Router, Auto-Save, Selection-Management, Editor-Edit-Mode, Job-Queue, Cross-Cutting-Loader (`loadFiguren` etc.), `_abortCtrl`-basiertes globales Listener-Setup.
-- Editor-Module: `page-view`, `editor/edit`, `editor/utils`, `tree`, `history`, `api-ai`, `api-bookstack`, `bookstack-search`, `offline-sync`, `i18n`, `shortcuts` — gespreaded in den Root, nicht in eigene Subs.
+- Editor-Module: `page-view`, `editor/edit`, `editor/utils`, `tree`, `history`, `api-ai`, `api-bookstack` (im `bookstack`-Mode aktiv), `bookstack-search` (im `bookstack`-Mode aktiv), `offline-sync`, `i18n`, `shortcuts` — gespreaded in den Root, nicht in eigene Subs.
 
 ## Editor-Modi (4 Stück, **Konsistenz kritisch**)
 

@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { applySzenenFilters, appUiMethods } = await import('../../public/js/app-ui.js');
+const { applySzenenFilters, appUiMethods } = await import('../../public/js/app/app-ui.js');
 
 function makeCtx(overrides = {}) {
   return {

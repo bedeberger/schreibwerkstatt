@@ -1,6 +1,6 @@
 // Alpine.data('stilCard') — Sub-Komponente der Stil-Heatmap.
 
-import { stilMethods } from '../stil-heatmap.js';
+import { stilMethods } from '../book/stil-heatmap.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
 
 export function registerStilCard() {

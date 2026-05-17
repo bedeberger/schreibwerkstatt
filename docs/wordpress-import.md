@@ -1,5 +1,7 @@
 # WordPress-Import
 
+> **Nur fuer `bookstack`-Backend.** Im `localdb`-Mode aktuell nicht unterstuetzt — Script schreibt direkt gegen die BookStack-API.
+
 One-Shot-Import einer WordPress-Site in BookStack via mysqldump-Datei. Liest Posts (`status=publish, type=post`) plus Categories aus dem Dump, sortiert nach Veröffentlichungsdatum aufsteigend (älteste zuerst), gruppiert pro Yoast-Primary-Category oder pro Jahr in BookStack-Kapitel.
 
 **Script:** [scripts/wp-import.js](../scripts/wp-import.js)

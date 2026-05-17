@@ -2,7 +2,7 @@
 // Whitelist-Filter, Severity-Mapping, Auto-Dismiss-Verhalten via Stub-Timer.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { appJobsCoreMethods } from '../../public/js/app-jobs-core.js';
+import { appJobsCoreMethods } from '../../public/js/app/app-jobs-core.js';
 
 function makeCtx() {
   return {

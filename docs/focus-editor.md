@@ -1,6 +1,6 @@
 # Focus-Editor
 
-Vollbild-Schreibmodus mit Absatz-/Satz-Spotlight, Typewriter-Scroll und Live-Word-/Char-Counter. Heilige Kuh: jede Änderung an diesem Modul muss dieses Dokument konsultieren. Drift in den Invarianten = sichtbares „Flattern", verlorene Edits oder Phantom-Revisionen in BookStack.
+Vollbild-Schreibmodus mit Absatz-/Satz-Spotlight, Typewriter-Scroll und Live-Word-/Char-Counter. Heilige Kuh: jede Änderung an diesem Modul muss dieses Dokument konsultieren. Drift in den Invarianten = sichtbares „Flattern", verlorene Edits oder Phantom-Revisionen im Storage-Backend.
 
 Code: [public/js/editor/focus.js](../public/js/editor/focus.js) (Facade) → [public/js/editor/focus/](../public/js/editor/focus/) (Submodule), [public/js/cards/editor-focus-card.js](../public/js/cards/editor-focus-card.js) (Alpine.data-Sub), [public/css/focus-mode.css](../public/css/focus-mode.css). Tests: [tests/e2e/focus-editor.spec.js](../tests/e2e/focus-editor.spec.js), [tests/unit/editor-focus.test.mjs](../tests/unit/editor-focus.test.mjs), [tests/unit/focus-granularity.test.mjs](../tests/unit/focus-granularity.test.mjs).
 
@@ -124,7 +124,7 @@ Beim Enter springt der Caret an Buchende. `jumpToTrailingParagraph` ([dom-blocks
 
 **Pflicht-Eigenschaften:**
 - NICHT als dirty markieren (kein `_markEditDirty`). Der Slot ist nur Schreibanker; tippt der User, greift `@input`-Handler regulär.
-- Exit räumt den Slot ab, falls noch leer — sonst Phantom-Revision in BookStack bei jedem Open-Close-Cycle.
+- Exit räumt den Slot ab, falls noch leer — sonst Phantom-Revision (Backend-agnostisch via Content-Store) bei jedem Open-Close-Cycle.
 - Nur `<p>` recyceln, keine leeren Headings/Listen — sonst zerstört Recycling User-Struktur.
 
 ## Snapshot-Wiederaufnahme
@@ -152,7 +152,7 @@ Beim Enter springt der Caret an Buchende. `jumpToTrailingParagraph` ([dom-blocks
 2. **Listener nur via `AbortController`-Signal.** Jeder `addEventListener` im `_focusInstall` bekommt `{ signal }`. Kein manueller `removeEventListener`. Teardown ist ein `abort()`.
 3. **IO observe nur addedNodes, unobserve removedNodes.** Vollscan bei jeder Mutation = O(n²) bei grossen Pastes. Removed-Nodes müssen aus `visibleBlocks` raus, sonst IO-Refs auf abgehängten Knoten.
 4. **`setActiveBlock` querySelectorAll, nicht querySelector.** Chromium kopiert beim Paragraph-Split die `.focus-paragraph-active`-Klasse auf beide `<p>` — Vollscan räumt die Leiche ab.
-5. **`classList.remove` + `removeAttribute('class')` wenn leer.** Sonst bleibt `class=""` stehen → BookStack-Revision beim nächsten Save (Diff zur ursprünglich attributlosen Fassung).
+5. **`classList.remove` + `removeAttribute('class')` wenn leer.** Sonst bleibt `class=""` stehen → unnötige Revision beim nächsten Save (Diff zur ursprünglich attributlosen Fassung).
 6. **`findBlockFromNode` liefert outermost-Ancestor.** Innermost-Match würde bei `<blockquote><p>…</p></blockquote>` nur den inneren `<p>` aktiv markieren — der äussere Wrapper bleibt opacity-gedimmt und multipliziert auf das Kind.
 7. **DIV NICHT in `BLOCK_TAGS`.** Chromium Default-Paragraph-Separator soll `<p>` erzeugen; DIV-Aufnahme würde Garantie aushebeln und Margin-/Spacing-Annahmen kippen.
 8. **`_focusUpdateActive` RAF in try/catch.** Ein DOM-Edge-Case (Shadow-Root-Range, obskurer Range-Fehler) darf den Editor nicht stillstellen. Fehler → `reportError('updateActive', err)`, nächster Tick versucht neu.

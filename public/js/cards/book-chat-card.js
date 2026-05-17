@@ -7,7 +7,7 @@
 // Root behält: showBookChatCard (Hash-Router), selectedBookId,
 //   selectedBookName, t.
 
-import { bookChatMethods } from '../book-chat.js';
+import { bookChatMethods } from '../chat/book-chat.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
 
 export function registerBookChatCard() {

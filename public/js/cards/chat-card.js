@@ -7,7 +7,7 @@
 //   saveApplying, lektoratFindings, checkDone, _checkDoneBeforeChat,
 //   bsGet, _loadApplyAndSave, updatePageView, selectedBookId, t.
 
-import { chatMethods } from '../chat.js';
+import { chatMethods } from '../chat/chat.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
 
 export function registerChatCard() {

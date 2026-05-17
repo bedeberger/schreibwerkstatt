@@ -13,7 +13,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { bookCreateMethods } = await import('../../public/js/book-create.js');
+const { bookCreateMethods } = await import('../../public/js/book/book-create.js');
 
 function makeDialogStub() {
   return {

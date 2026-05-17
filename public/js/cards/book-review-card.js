@@ -7,7 +7,7 @@
 //   - `bookReviewHistory` (tree.js/loadPages schreibt, user-settings liest)
 //   - `loadBookReviewHistory` (history.js), `_closeOtherMainCards`, `t`
 
-import { renderReviewHtml, BOOK_REVIEW_AXES } from '../review.js';
+import { renderReviewHtml, BOOK_REVIEW_AXES } from '../book/review.js';
 import { escHtml, renderStars, noteTip } from '../utils.js';
 import { createCardJobFeature } from './job-feature-card.js';
 import { setupCardLifecycle } from './card-lifecycle.js';

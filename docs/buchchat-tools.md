@@ -9,7 +9,7 @@ Jede Tool-Funktion: `(input, ctx) → JSON-serialisierbares Objekt` (sync oder a
 `ctx` (gebaut in [chat.js#L460](../routes/jobs/chat.js#L460)):
 - `bookId` — aus `chat_sessions.book_id` der aktiven Session.
 - `userEmail` — Owner-Scope für alle Reads (Reviews, Ideen, Werkstatt sind user-scoped).
-- `userToken` — BookStack-Token (nur `get_pages` braucht ihn via `bsGet`).
+- `userToken` — BookStack-Token, nur im `bookstack`-Mode gesetzt; `get_pages` braucht ihn dort fuer den Live-Read. Im `localdb`-Mode `null` — `get_pages` liest dann direkt aus der App-DB via Content-Store-Facade.
 - `jobSignal` — `AbortController.signal`, wird vor jedem Tool-Call und im Loop geprüft.
 - `logger` — Job-Child-Logger.
 
@@ -42,7 +42,7 @@ Jede Tool-Funktion: `(input, ctx) → JSON-serialisierbares Objekt` (sync oder a
 
 | Tool | Input | Zweck | Quelle |
 |------|-------|-------|--------|
-| `get_pages` | `ids: integer[]` (max 20), `max_chars_per_page?` | Volltext bestimmter Seiten + falls vorhanden `latest_check {checked_at, error_count, fazit, stilanalyse}` aus `page_checks`. | BookStack `bsGet('pages/:id')` + `page_checks` |
+| `get_pages` | `ids: integer[]` (max 20), `max_chars_per_page?` | Volltext bestimmter Seiten + falls vorhanden `latest_check {checked_at, error_count, fazit, stilanalyse}` aus `page_checks`. | Content-Store-Facade `loadPage(id)` (backend-agnostisch) + `page_checks` |
 | `search_passages` | `pattern`, `regex?`, `max_results?` (default 10, max 30) | Volltext-Suche; liefert Treffer mit Snippet ±120 Zeichen. | `pages.raw_html` → `htmlToText` |
 
 ### Figuren
@@ -89,7 +89,7 @@ Jede Tool-Funktion: `(input, ctx) → JSON-serialisierbares Objekt` (sync oder a
 2. In der `TOOLS`-Map ([book-chat-tools.js#L1472](../routes/jobs/book-chat-tools.js#L1472)) registrieren.
 3. Schema in [chat.js#BOOK_CHAT_TOOLS](../public/js/prompts/chat.js#L174) ergänzen: `name`, `description` (kostet Input-Tokens — knapp halten, aber **Beispiele** für „wann nutzt das Modell mich" reinpacken), `input_schema`. Property-Descriptions geben Default-/Max-Werte an, damit das Modell sie nicht aus Resultaten zurückrechnen muss.
 4. Result-Shape so wählen, dass `_truncateResult` greift, wenn nötig: `{ results: [...] }` mit `> 5` Items aktiviert den Listen-Kürzungs-Pfad mit `truncated`-Flag.
-5. Bei BookStack-/DB-Reads `userEmail`-Scope nicht vergessen — alle user-scoped Daten (Reviews, Ideen, Werkstatt, Lektorat-Checks) sind pro User isoliert.
+5. Bei Content-Store-/DB-Reads `userEmail`-Scope nicht vergessen — alle user-scoped Daten (Reviews, Ideen, Werkstatt, Lektorat-Checks) sind pro User isoliert.
 6. `jobSignal` ist im Loop bereits überwacht; lange Reads sollten ihn dennoch konsultieren wenn praktikabel.
 
 ## Frontend

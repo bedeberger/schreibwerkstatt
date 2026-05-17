@@ -1,7 +1,7 @@
 // Alpine.data('kontinuitaetCard') — Sub-Komponente der Kontinuitätsprüfung.
 // Job-Polling implementiert die Karte selbst (manueller Flow, kein createCardJobFeature).
 
-import { kontinuitaetMethods } from '../kontinuitaet.js';
+import { kontinuitaetMethods } from '../book/kontinuitaet.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
 
 export function registerKontinuitaetCard() {

@@ -26,6 +26,7 @@ const shellState = () => ({
   // Annahme bevor JS gelaufen ist (Hero erscheint mit Ctrl, dann snap auf ⌘ falls Mac).
   isMac: false,
   bookstackUrl: '',
+  backend: 'bookstack',
   promptConfig: {},
   showTokenSetup: false,
   tokenSetupId: '',

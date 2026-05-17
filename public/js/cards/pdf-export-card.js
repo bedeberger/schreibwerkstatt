@@ -22,6 +22,8 @@ export function registerPdfExportCard() {
     activeProfileId: null,
     activeProfile: null,        // { id, name, config, has_cover, ... }
     exportScope: 'book',
+    exportChapterId: null,
+    exportPageId: null,
     // Form-Mount-Gate: getrennt von activeProfile, damit Alpine die x-if-DOM
     // sicher unmounten kann, BEVOR activeProfile auf null/neuen Wert wechselt.
     // Sonst feuern x-model/x-effect-Closures (combobox-x-data) noch ein Mal mit
@@ -72,6 +74,8 @@ export function registerPdfExportCard() {
         // Wechsel triggert KEINE Neuladung.
         if (!this.profiles.length) await this.loadProfiles();
       });
+      this.$watch(() => this.exportScope, () => this._ensureExportPicked());
+      this.$watch(() => window.__app?.currentPage?.id, () => this._ensureExportPicked());
 
       // book:changed räumt nur den laufenden Export-State (Buchwechsel = neuer
       // Render-Kontext). Profile-Liste bleibt erhalten.
@@ -393,16 +397,42 @@ export function registerPdfExportCard() {
     exportScopeOptions() {
       const app = window.__app;
       const opts = [{ value: 'book', label: app?.t?.('export.scope.book') || 'Buch' }];
-      if (app?.currentPage?.chapter_id) opts.push({ value: 'chapter', label: app.t('export.scope.chapter') });
-      if (app?.currentPage?.id)         opts.push({ value: 'page',    label: app.t('export.scope.page') });
+      if (this.exportChapterOptions().length) opts.push({ value: 'chapter', label: app.t('export.scope.chapter') });
+      if (this.exportPageOptions().length)    opts.push({ value: 'page',    label: app.t('export.scope.page') });
       return opts;
+    },
+    exportChapterOptions() {
+      const app = window.__app;
+      if (!app || !Array.isArray(app.tree)) return [];
+      return app.tree
+        .filter(c => c.type === 'chapter' && !c.solo)
+        .map(c => ({ value: c.id, label: c.name }));
+    },
+    exportPageOptions() {
+      const app = window.__app;
+      if (!app || !Array.isArray(app.pages)) return [];
+      return app.pages.map(p => ({ value: p.id, label: p.name }));
+    },
+    _ensureExportPicked() {
+      const app = window.__app;
+      const cur = app?.currentPage;
+      if (this.exportScope === 'chapter') {
+        const opts = this.exportChapterOptions();
+        const valid = opts.some(o => o.value === this.exportChapterId);
+        if (!valid) this.exportChapterId = cur?.chapter_id || opts[0]?.value || null;
+      }
+      if (this.exportScope === 'page') {
+        const opts = this.exportPageOptions();
+        const valid = opts.some(o => o.value === this.exportPageId);
+        if (!valid) this.exportPageId = cur?.id || opts[0]?.value || null;
+      }
     },
     _exportEntity() {
       const app = window.__app;
       if (!app) return null;
       const scope = this.exportScope || 'book';
-      if (scope === 'page' && app.currentPage?.id) return { scope: 'page', id: app.currentPage.id };
-      if (scope === 'chapter' && app.currentPage?.chapter_id) return { scope: 'chapter', id: app.currentPage.chapter_id };
+      if (scope === 'page' && this.exportPageId) return { scope: 'page', id: this.exportPageId };
+      if (scope === 'chapter' && this.exportChapterId) return { scope: 'chapter', id: this.exportChapterId };
       const bid = app.selectedBookId;
       return bid ? { scope: 'book', id: parseInt(bid) } : null;
     },

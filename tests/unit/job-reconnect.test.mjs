@@ -8,7 +8,7 @@
 //   - 404 → kein Event, localStorage geräumt
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { appJobsCoreMethods } from '../../public/js/app-jobs-core.js';
+import { appJobsCoreMethods } from '../../public/js/app/app-jobs-core.js';
 
 // ── Stubs ────────────────────────────────────────────────────────────────────
 const events = [];

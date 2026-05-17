@@ -8,7 +8,7 @@
 // sind. Die Sub bündelt nur UI-Methoden (`handleFindingPointer`,
 // `_isHardFinding`) und das Partial-Scope für DOM-Isolation.
 
-import { isHardFinding } from '../page-view.js';
+import { isHardFinding } from '../book/page-view.js';
 
 // Split-Modus Media Query — dieselbe Schwelle wie page-view.js.
 const splitMQ = typeof window !== 'undefined' ? window.matchMedia('(min-width: 1100px)') : null;

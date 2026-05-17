@@ -1,5 +1,5 @@
 import { htmlToText, stripFocusArtefacts, cleanContentArtefacts, collapseEmptyBlocks, stripTrailingEmptyBlocks } from '../utils.js';
-import { sortByPosition, buildHighlightedHtml } from '../page-view.js';
+import { sortByPosition, buildHighlightedHtml } from '../book/page-view.js';
 import { installEditCounter } from './focus.js';
 import { contentRepo } from '../repo/content.js';
 

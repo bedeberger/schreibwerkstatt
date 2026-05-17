@@ -200,8 +200,8 @@
              @keydown.enter.prevent="selectActiveBookstackHit()"
              @keydown.arrow-down="onBookstackSearchKeydown($event)"
              @keydown.arrow-up="onBookstackSearchKeydown($event)"
-             :placeholder="t('book.search.placeholder')"
-             :aria-label="t('book.search.placeholder')"
+             :placeholder="t(backend === 'localdb' ? 'book.search.placeholderLocal' : 'book.search.placeholder')"
+             :aria-label="t(backend === 'localdb' ? 'book.search.placeholderLocal' : 'book.search.placeholder')"
              :data-tip="t('book.search.placeholderTitle')">
       <button type="button" class="bookstack-search-clear"
               x-show="bookstackSearch"

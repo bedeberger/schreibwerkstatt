@@ -1,5 +1,7 @@
 # BookStack-Templates integrieren
 
+> **Nur fuer `bookstack`-Backend.** Im `localdb`-Mode irrelevant — der Custom-PDF-Export der App ([routes/jobs/pdf-export.js](../routes/jobs/pdf-export.js)) deckt PDF-Anpassungen bereits ab.
+
 [`themes/custom/`](../themes/custom/) erweitert BookStack an zwei Stellen:
 
 - **PDF-Export** (Buch, Kapitel, Seite) in B5, Playfair Display / EB Garamond, mit Inhaltsverzeichnis und laufenden Kopfzeilen.

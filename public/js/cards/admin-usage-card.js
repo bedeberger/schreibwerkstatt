@@ -2,7 +2,7 @@
 // fuer die Admin-Usage-Karte. Sichtbarkeit ueber $app.currentUser.isAdmin;
 // State + Lifecycle hier, Show-Flag (`showAdminUsageCard`) im Root.
 
-import { adminUsageMethods } from '../admin-usage.js';
+import { adminUsageMethods } from '../admin/admin-usage.js';
 
 export function registerAdminUsageCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;

@@ -40,8 +40,10 @@ router.get('/config', (req, res) => {
       isAdmin: appUser?.global_role === 'admin',
     };
   }
+  const backend = appSettings.get('app.backend') || 'bookstack';
   res.json({
-    bookstackUrl: BOOKSTACK_URL.replace(/\/$/, ''),
+    backend,
+    bookstackUrl: backend === 'localdb' ? '' : BOOKSTACK_URL.replace(/\/$/, ''),
     bookstackTokenOk: !!getTokenForRequest(req),
     claudeMaxTokens: MAX_TOKENS_OUT,
     claudeModel: appSettings.get('ai.claude.model') || 'claude-sonnet-4-6',

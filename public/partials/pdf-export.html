@@ -26,6 +26,14 @@
         <div x-data="combobox($app.t('export.scope.label'))"
              x-modelable="value" x-model="exportScope"
              x-effect="options = exportScopeOptions()"></div>
+        <div x-show="exportScope === 'chapter'"
+             x-data="combobox($app.t('export.scope.pickChapter'))"
+             x-modelable="value" x-model="exportChapterId"
+             x-effect="options = exportChapterOptions()"></div>
+        <div x-show="exportScope === 'page'"
+             x-data="combobox($app.t('export.scope.pickPage'))"
+             x-modelable="value" x-model="exportPageId"
+             x-effect="options = exportPageOptions()"></div>
       </div>
       <button type="button"
               class="primary"

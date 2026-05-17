@@ -1,5 +1,5 @@
 import { escHtml, fetchJson } from '../utils.js';
-import { sortByPosition, SOFT_TYPEN } from '../page-view.js';
+import { sortByPosition, SOFT_TYPEN } from '../book/page-view.js';
 
 // Lektorat-Workflow-Methoden (werden in die Alpine-Komponente gespreadet)
 // `this` bezieht sich auf die Alpine-Komponente.

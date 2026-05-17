@@ -7,7 +7,7 @@
 //     bleibt neben Editor offen
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { appViewMethods } from '../../public/js/app-view.js';
+import { appViewMethods } from '../../public/js/app/app-view.js';
 
 // Minimal-DOM-Stubs für Module die window.dispatchEvent nutzen.
 globalThis.window = globalThis.window || { dispatchEvent: () => {} };

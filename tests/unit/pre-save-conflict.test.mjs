@@ -19,7 +19,7 @@ globalThis.document = globalThis.document || {
   createElement: () => ({ innerHTML: '', querySelectorAll: () => [], appendChild: () => {} }),
 };
 
-const { bookstackMethods } = await import('../../public/js/api-bookstack.js');
+const { bookstackMethods } = await import('../../public/js/api/api-bookstack.js');
 
 let originalFetch;
 let originalNavigatorDesc;

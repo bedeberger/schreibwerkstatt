@@ -14,7 +14,7 @@
 //                      mit einem CLI-Trainer arbeitest, der `dataset_text_field`
 //                      erwartet.
 
-import { finetuneExportMethods } from '../finetune-export.js';
+import { finetuneExportMethods } from '../book/finetune-export.js';
 import { createCardJobFeature } from './job-feature-card.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
 

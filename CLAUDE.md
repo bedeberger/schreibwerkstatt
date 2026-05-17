@@ -1,6 +1,6 @@
 # schreibwerkstatt
 
-Schreiben, Lektorat und Buchanalyse mit KI. Auf BookStack-Basis (bewusste Abhängigkeit — Storage, Auth, Editor). Deployment (LXC + systemd) und Env-Variablen: siehe [README.md](README.md).
+Schreiben, Lektorat und Buchanalyse mit KI. Storage-Backend wählbar (Admin-Setting `app.backend` in `app_settings`): `localdb` (SQLite, Default für Neu-Installationen) oder `bookstack` ([BookStack](https://www.bookstackapp.com/) via API, optional). Beide First-Class via Content-Store-Facade ([lib/content-store/](lib/content-store/)). Deployment (LXC + systemd) und Env-Variablen: siehe [README.md](README.md).
 
 **Lokal starten:** `npm install && npm start` (Port 3737). Tests: `npm test` (Playwright, erstmalig `npx playwright install chromium`).
 
@@ -36,10 +36,11 @@ CLAUDE.md beschreibt **ausschliesslich den aktuellen Stand**. Keine Historie, ke
   - **Automatisch übersetzen, ungefragt:** jeder neue User-sichtbare String wird beim Hinzufügen sofort in beide Locale-Dateien eingetragen — egal ob Frontend-Label, Server-Status, Fehlertext, Placeholder oder Tooltip. Nie nur DE (oder nur EN) committen und auf „mach ich später" verschieben.
   - **Persistierte User-Nachrichten (z.B. Chat-Fallbacks in DB):** als `__i18n:bereich.feld__`-Marker speichern; Frontend löst beim Rendern via `t()` auf. So bleibt die Locale-Wahl des späteren Betrachters massgeblich.
   - **Ausnahme:** Winston-Logs (`logger.info/warn/error`) bleiben vorläufig deutsch — sie gehen nur in `schreibwerkstatt.log`/Console, nicht an den User.
-- **`bsGetAll` statt `bsGet` für Listen** — BookStack paginiert (Standard 20 Einträge). `bsGetAll` iteriert alle Seiten automatisch.
+- **Content-Store-Facade als einziger Eintrittspunkt für Buchinhalte** — Pages/Chapters/Books werden ausschliesslich via `require('lib/content-store')` gelesen und geschrieben. Dispatch nach `app.backend` ist Detail der Facade. **`bs*`-Calls (`bsGet`/`bsPut`/`bsGetAll`) leben nur in [lib/bookstack.js](lib/bookstack.js) + [lib/content-store/backends/bookstack.js](lib/content-store/backends/bookstack.js) + [routes/sync.js](routes/sync.js) + [routes/jobs/shared/bookstack.js](routes/jobs/shared/bookstack.js) + [routes/proxies.js](routes/proxies.js) + [lib/pdf-render/images.js](lib/pdf-render/images.js)** — Tripwire ([tests/unit/content-store-tripwire.test.mjs](tests/unit/content-store-tripwire.test.mjs)) bricht CI bei neuen Vorkommen.
+- **`bsGetAll` statt `bsGet` für Listen** (nur `bookstack`-Backend-interner Code) — BookStack paginiert (Standard 20 Einträge). `bsGetAll` iteriert alle Seiten automatisch.
 - **HTML→Text-Normalisierung für Stats: Frontend MUSS Server matchen** — `page_stats.chars`/`words`/`tok` werden auf zwei Pfaden befüllt: a) Server-Sync ([routes/sync.js](routes/sync.js)#htmlToText: Tags zu Single-Space, `\s+` collapsed, getrimmt) und b) Frontend nach Page-Save ([tree.js](public/js/tree.js)#`_syncPageStatsAfterSave`). Beide Pfade MÜSSEN dieselbe Normalisierung verwenden. `DOMParser().body.textContent` behält Whitespace zwischen Block-Tags und bläst `tokEsts.chars` gegenüber dem Cron-Snapshot auf — Frontend-Save-Pfad nutzt deshalb dieselben zwei Regex-Replacements wie Server. `tok = Math.round(chars / CHARS_PER_TOKEN)` (Text-Tokens, gleiche Quelle wie chars; kein Prompt-Overhead). Beide Pfade müssen die Formel synchron halten. `/history/page-stats/batch` persistiert blind, kein Server-Recompute. Test: [tests/unit/page-stats-normalization.test.mjs](tests/unit/page-stats-normalization.test.mjs).
-- **Read-Modify-Write nur mit `bsGet(..., { fresh: true })`** — jeder Pfad, der eine BookStack-Seite liest, modifiziert und mit `bsPut` zurückschreibt (Lektorat-Save, Chat-Vorschlag-Apply, History-Apply, Pre-Send-Refresh des Seiten-Chats), MUSS den Read mit `fresh: true` machen. Sonst liefert der SW-API_CACHE (SWR) eine Pre-Edit-Fassung; der nachfolgende PUT überschreibt frische Server-Edits aus dem Fokus-Editor mit Stale-Daten. `_bsWrite` postet nach jedem erfolgreichen Schreibvorgang `invalidate-api` an den SW als zweite Schutzschicht; `fresh: true` bleibt trotzdem Pflicht pro RMW-Pfad. Test: [tests/unit/stale-write.test.mjs](tests/unit/stale-write.test.mjs).
-- **Job-Ergebnisse mit `updatedAt`-Staleness-Check** — Server-Jobs, deren Resultate auf einem Snapshot des BookStack-Seitenstands operieren (Lektorat-Findings mit Positionen, Chat-Antworten mit `vorschlaege.original`), liefern `updatedAt: pd.updated_at`. Der Client vergleicht im `onDone` mit `currentPage.updated_at`; weicht es ab (User hat während der Analyse gespeichert), wird das Ergebnis verworfen statt angewandt. Sonst landen positionsbasierte Findings auf verschobenem Text und überschreiben die User-Edits.
+- **Read-Modify-Write nur mit `bsGet(..., { fresh: true })`** (nur `bookstack`-Mode) — jeder Pfad, der eine Page liest, modifiziert und zurückschreibt (Lektorat-Save, Chat-Vorschlag-Apply, History-Apply, Pre-Send-Refresh des Seiten-Chats), MUSS im `bookstack`-Mode den Read mit `fresh: true` machen. Sonst liefert der SW-API_CACHE (SWR) eine Pre-Edit-Fassung; der nachfolgende PUT überschreibt frische Server-Edits aus dem Fokus-Editor mit Stale-Daten. `_bsWrite` postet nach jedem erfolgreichen Schreibvorgang `invalidate-api` an den SW als zweite Schutzschicht; `fresh: true` bleibt trotzdem Pflicht pro RMW-Pfad. **`localdb`-Mode:** kein Cache zwischen Frontend-Read und Frontend-Write; Pflicht entfällt — aber Pfade nutzen weiter dieselben Helpers, also schadet `fresh: true` nicht. Test: [tests/unit/stale-write.test.mjs](tests/unit/stale-write.test.mjs).
+- **Job-Ergebnisse mit `updatedAt`-Staleness-Check** — Server-Jobs, deren Resultate auf einem Snapshot des Seitenstands operieren (Lektorat-Findings mit Positionen, Chat-Antworten mit `vorschlaege.original`), liefern `updatedAt: pd.updated_at`. Der Client vergleicht im `onDone` mit `currentPage.updated_at`; weicht es ab (User hat während der Analyse gespeichert), wird das Ergebnis verworfen statt angewandt. Backend-agnostisch — beide Backends liefern `updated_at` über die Content-Store-Facade.
 - **401-Handling zentral** — ein globaler `window.fetch`-Wrapper in `public/js/app.js` fängt alle 401-Antworten ab und dispatcht `session-expired`; Alpine zeigt daraufhin den Session-Banner. Feature-Module prüfen 401 nicht selbst und dürfen das Event nicht unterdrücken. Kein Auto-Redirect – User soll ungespeicherte Inhalte retten können.
 - **Logging-Context: `book` immer mitgeben** — jede neue Route mit Buchscope MUSS den `book`-Slot im Log-Tag `[scope|user|book|jobId]` füllen, damit Buch-scoped Requests filterbar bleiben.
   - **URL-Param-Routes (`:book_id`):** im Router einmalig `router.param('book_id', bookParamHandler)` aus [lib/log-context.js](lib/log-context.js) registrieren — deckt alle `:book_id`-Routes dieses Routers ab.
@@ -243,7 +244,8 @@ Keine Schemaänderung. `figure_relations.typ` ist Freitext. Neuen Typ in der `BZ
 Browser → NGINX (HTTPS) → Express (Port 3737)
   /auth/*    → Google OIDC (Login/Callback/Logout/Me)
   /config    → Modell-Config + User (keine Credentials)
-  /api/*     → BookStack-Proxy (Token aus Session, serverseitig)
+  /api/*     → BookStack-Proxy (nur im `bookstack`-Mode aktiv; Token aus Session, serverseitig)
+  /content/* → Content-Store-Facade (Books/Chapters/Pages, Order, Revisions; backend-agnostisch)
   /claude    → api.anthropic.com (ANTHROPIC_API_KEY-Injection, SSE)
   /ollama    → Ollama /api/chat (NDJSON → SSE normalisiert)
   /jobs/*    → Hintergrund-Jobs (Status-Polling, alle KI-Analysen)
@@ -255,7 +257,9 @@ Browser → NGINX (HTTPS) → Express (Port 3737)
   /booksettings/* → Per-Buch-Settings (Buchtyp, Freitext)
   /me/*           → User-Settings (Sprache, Modell-Override)
   /sync/*         → Buchstatistik-Sync (manuell + Cron)
-  /export/*       → Buch-Export (BookStack /export/{fmt} mit Timestamp-Filename)
+  /export/*       → Buch-Export (PDF/HTML/Markdown/Plaintext/EPUB; `bookstack`-Mode via /export/{fmt}, `localdb` via App-Builder)
+  /search/*       → FTS5-Volltextsuche (backend-agnostisch)
+  /local/*        → Kategorien + Tags (Pool global, Zuordnung pro Buch via ACL)
   /pdf-export/*   → Custom-PDF-Export-Profile (CRUD + Cover-Upload + Font-Liste)
   /jobs/pdf-export → Render-Job (eigene pdfkit-Pipeline mit PDF/A-2B)
   /usage/*        → Feature-Usage-Tracking (Recency für Palette/Quick-Pills)
@@ -266,7 +270,9 @@ Cron (täglich 02:00) → syncAllBooks() → page_stats + book_stats_history
 
 **Auth:** Alle Routen ausser `/auth/*` sind durch Session-Guard geschützt. HTML-Requests → Redirect auf Login. API-Requests → `401 JSON`.
 
-**Credentials:** KI-Aufrufe laufen über Server-Proxies — der Server hält alle API-Keys. Der BookStack-Proxy injiziert `req.session.bookstackToken` serverseitig.
+**Credentials:** KI-Aufrufe laufen über Server-Proxies — der Server hält alle API-Keys. Im `bookstack`-Mode injiziert der BookStack-Proxy zusätzlich `req.session.bookstackToken` serverseitig; im `localdb`-Mode entfällt das.
+
+**Content-Store-Facade ([lib/content-store/](lib/content-store/)):** zentrale Storage-Abstraktion. `index.js` dispatcht per `app.backend` aus `app_settings` an `backends/bookstack.js` oder `backends/localdb.js`. Hot-Reload via `app-settings:changed`-Event ohne Restart. Konsumenten (Routes, Jobs, Sync) importieren ausschliesslich die Facade — kein direkter Backend-Zugriff ausser in der Tripwire-Allowlist.
 
 ## KI-Provider
 

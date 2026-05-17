@@ -1,6 +1,11 @@
 # schreibwerkstatt
 
-Schreiben, Lektorat und Buchanalyse mit KI — auf Basis von [BookStack](https://www.bookstackapp.com/). Eigenständiger Node.js-Service, der sich per BookStack-API anbindet.
+Schreiben, Lektorat und Buchanalyse mit KI. Eigenständiger Node.js-Service. Storage-Backend wählbar:
+
+- **SQLite (`localdb`, Default für Neu-Installationen)** — Bücher/Kapitel/Seiten lokal in SQLite. Keine externe Abhängigkeit.
+- **BookStack (`bookstack`, optional)** — Inhalte leben im [BookStack](https://www.bookstackapp.com/); App synct via API. Sinnvoll, wer BookStack-UI parallel weiter nutzen will.
+
+Admin schaltet via `app.backend` in den App-Einstellungen. Wechsel ist Bulk-Copy-Job, kein Hot-Swap.
 
 ## Features
 
@@ -25,8 +30,8 @@ Schreiben, Lektorat und Buchanalyse mit KI — auf Basis von [BookStack](https:/
 - **Ideen-Sammlung** – Notiz-Sammelbox pro Buch oder Seite.
 - **Command-Palette** (Cmd/Ctrl+K bzw. `/`) – Fuzzy-Suche über Karten, Aktionen, Seiten, Kapitel, Figuren, Orte, Szenen. Prefix-Modi: `>` Befehle, `#` Seiten, `!` Kapitel, `@` Figuren, `$` Orte, `%` Szenen.
 - **Fine-Tuning-Export** – JSONL-Trainingsdaten (Stil, Szenen, Dialoge, Q&A, Korrekturen). Anleitung: [docs/finetuning.md](docs/finetuning.md).
-- **WordPress-Import** – One-Shot-Import einer WP-Site aus mysqldump-Datei in ein BookStack-Buch (Categories → Chapter, älteste Posts zuerst nach Jahrgang). Anleitung: [docs/wordpress-import.md](docs/wordpress-import.md).
-- **Buch-Export** – BookStack-Native-Formate (PDF, HTML, Markdown, Plaintext, EPUB) mit Timestamp-Filename.
+- **WordPress-Import** – One-Shot-Import einer WP-Site aus mysqldump-Datei in ein BookStack-Buch (nur `bookstack`-Backend; Categories → Chapter, älteste Posts zuerst nach Jahrgang). Anleitung: [docs/wordpress-import.md](docs/wordpress-import.md).
+- **Buch-Export** – PDF, HTML, Markdown, Plaintext, EPUB mit Timestamp-Filename. Im `bookstack`-Mode via BookStack-Native-Export, im `localdb`-Mode via App-eigenen Builder.
 - **Custom-PDF-Export** – Eigener Renderer (pdfkit) mit druckfertiger PDF/A-2B-Konformität. Konfigurierbares Layout (Seitenformat, Ränder, Kapitelumbrüche), freie Schriftwahl aus Google Fonts (runtime download, 30-Tage-Cache), Cover-Bild, Inhaltsverzeichnis, mehrere Profile pro Buch+User. Optional Server-Validierung via veraPDF (separat installieren, siehe unten).
 - **Bucheinstellungen** – Sprache, Buchtyp, Erzählperspektive, Erzählzeit, Freitext-Kontext fliessen in alle Prompts.
 - **Theme** – Hell/Dunkel/Auto, Sprachumschaltung Deutsch/Englisch.
@@ -35,6 +40,7 @@ Schreiben, Lektorat und Buchanalyse mit KI — auf Basis von [BookStack](https:/
 
 - Öffentliche HTTPS-URL (Reverse-Proxy mit TLS).
 - Google OAuth2 Credentials, Callback `https://<domain>/auth/callback`.
+- **Nur für `bookstack`-Mode:** laufende BookStack-Instanz + API-Token pro User. Im `localdb`-Mode entfällt das komplett.
 
 ## Quick Start (LXC / Bare Metal)
 
@@ -84,14 +90,25 @@ java -cp installer-${VERAPDF_VERSION}.jar org.verapdf.apps.Installer -options au
 git pull && npm ci --omit=dev && systemctl restart lektorat
 ```
 
-## BookStack-Token
+## BookStack-Token (nur `bookstack`-Mode)
 
-Nach erstem Login:
+Im `localdb`-Mode kein Token nötig — überspringen.
+
+Im `bookstack`-Mode nach erstem Login:
 
 1. BookStack: **Profil → API-Tokens → Token erstellen**
 2. Token-ID und Secret in das Formular eintragen.
 
 Jeder Nutzer hinterlegt seinen eigenen Token.
+
+## Backend wechseln
+
+Admin-Karte „Backend-Migration": Bulk-Copy `bookstack → localdb` mit ID-Erhalt + optionalem Cutover (`app.backend` flippt auf `localdb`). Quellbackend wird währenddessen Read-Only-geflaggt. Symmetrischer Pfad `localdb → bookstack` ist offen (Phase 8b).
+
+## Backup
+
+- **`localdb`-Mode:** SQLite-DB (`schreibwerkstatt.db`) im Working-Directory sichern. Enthält Buchinhalte, Revisions, Settings, Caches.
+- **`bookstack`-Mode:** BookStack-DB nach dessen Vorgaben sichern; App-DB sichert nur Caches + App-State (Reviews, Chats, Figuren, Settings).
 
 ## Prompts anpassen
 
@@ -111,7 +128,7 @@ Per-Buch in der UI (Bucheinstellungen): Buchtyp und Freitext-Kontext.
 
 > Niemals in Produktion – Auth-Guard wird komplett deaktiviert.
 
-## BookStack-Templates
+## BookStack-Templates (nur `bookstack`-Mode)
 
 [`themes/custom/`](themes/custom/) enthält ein BookStack-Theme mit angepasstem PDF-Export (B5, Playfair Display / EB Garamond, Inhaltsverzeichnis, laufende Kopfzeilen) und einem Block-Format „Gedicht" (TinyMCE + Lexical).
 

@@ -2,7 +2,7 @@
 // Lebt parallel zum Editor wie der Seiten-Chat (kein _closeOtherMainCards).
 // Eigener State; Root behält showIdeenCard, currentPage, selectedBookId, t.
 
-import { ideenMethods } from '../ideen.js';
+import { ideenMethods } from '../book/ideen.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
 
 export function registerIdeenCard() {

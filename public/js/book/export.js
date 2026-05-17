@@ -39,14 +39,8 @@ export const exportMethods = {
     const app = window.__app;
     if (!app) return null;
     const scope = this.exportScope || 'book';
-    if (scope === 'page') {
-      const pid = app.currentPage?.id;
-      if (pid) return { scope: 'page', id: pid };
-    }
-    if (scope === 'chapter') {
-      const cid = app.currentPage?.chapter_id;
-      if (cid) return { scope: 'chapter', id: cid };
-    }
+    if (scope === 'page' && this.exportPageId) return { scope: 'page', id: this.exportPageId };
+    if (scope === 'chapter' && this.exportChapterId) return { scope: 'chapter', id: this.exportChapterId };
     const bid = app.selectedBookId;
     if (bid) return { scope: 'book', id: parseInt(bid) };
     return null;
@@ -55,8 +49,22 @@ export const exportMethods = {
   exportScopeOptions() {
     const app = window.__app;
     const opts = [{ value: 'book', label: app?.t?.('export.scope.book') || 'Buch' }];
-    if (app?.currentPage?.chapter_id) opts.push({ value: 'chapter', label: app.t('export.scope.chapter') });
-    if (app?.currentPage?.id)         opts.push({ value: 'page',    label: app.t('export.scope.page') });
+    if (this.exportChapterOptions().length) opts.push({ value: 'chapter', label: app.t('export.scope.chapter') });
+    if (this.exportPageOptions().length)    opts.push({ value: 'page',    label: app.t('export.scope.page') });
     return opts;
+  },
+
+  exportChapterOptions() {
+    const app = window.__app;
+    if (!app || !Array.isArray(app.tree)) return [];
+    return app.tree
+      .filter(c => c.type === 'chapter' && !c.solo)
+      .map(c => ({ value: c.id, label: c.name }));
+  },
+
+  exportPageOptions() {
+    const app = window.__app;
+    if (!app || !Array.isArray(app.pages)) return [];
+    return app.pages.map(p => ({ value: p.id, label: p.name }));
   },
 };

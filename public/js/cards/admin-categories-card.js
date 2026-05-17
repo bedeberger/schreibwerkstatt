@@ -2,7 +2,7 @@
 // den Kategorien-/Tag-Pool (Admin-only). State + Lifecycle hier, Show-Flag
 // (`showAdminCategoriesCard`) im Root.
 
-import { adminCategoriesMethods } from '../admin-categories.js';
+import { adminCategoriesMethods } from '../admin/admin-categories.js';
 
 export function registerAdminCategoriesCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;

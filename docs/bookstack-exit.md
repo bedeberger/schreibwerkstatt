@@ -55,9 +55,9 @@ Phase-0-Spalten im aktuellen Schema:
 
 ## Offene Phasen (Reihenfolge)
 
-`8 → 9 → 10 → 11`. Phase 11 (Per-User-AI-Provider) ist additiv und kann eingeschoben werden, sobald `app_users` (steht) + `app_settings` (steht) konsolidiert sind.
+`8b (localdb → bookstack) → 10 → 11`. Phase 11 (Per-User-AI-Provider) ist additiv und kann eingeschoben werden, sobald `app_users` (steht) + `app_settings` (steht) konsolidiert sind.
 
-Phase 1 (`localdb`-Backend) + Phase 2 (Page-Revisions) + Phase 3 (Eigene Sortierung) + Phase 6 (Tags + Kategorien) + Phase 7 (FTS5-Volltextsuche) gelandet — siehe Code-Pfade in den jeweiligen Abschnitten.
+Erledigt: Phase 1 (`localdb`-Backend) + Phase 2 (Page-Revisions) + Phase 3 (Eigene Sortierung) + Phase 6 (Tags + Kategorien) + Phase 7 (FTS5-Volltextsuche) + Phase 8a (bookstack → localdb) + Phase 9 (Doku-Sweep) — siehe Code-Pfade in den jeweiligen Abschnitten.
 
 ---
 
@@ -219,21 +219,14 @@ FK-Repair iteriert alle ~40 FK-Spalten und mapped `source_id → target_id` via 
 
 ---
 
-## Phase 9 — Doku-Update (Multi-Backend-Sweep)
+## Phase 9 — Doku-Update (Multi-Backend-Sweep) (erledigt)
 
-Nach Phase 8 ist Backend-Pluralität betrieblich Realität. Reine Doku-Phase, kein Code-Risiko.
+Doku-Sweep abgeschlossen. Konkret:
 
-**Zu aktualisieren:**
-
-- **[README.md](../README.md)** — Intro: „Storage-Backend wählbar: SQLite (Default) oder BookStack." Deployment in zwei Varianten: Minimal-Setup (App + SQLite) als Default, BookStack-Setup optional. ENV-Variablen `BOOKSTACK_BASE_URL`/`BOOKSTACK_TOKEN_ID`/`BOOKSTACK_TOKEN_SECRET` als „optional, nur bei `app.backend=bookstack`". Architektur-Diagramm: BookStack-Box gestrichelt.
-- **[CLAUDE.md](../CLAUDE.md)** — Header: „BookStack als optionales Storage-Backend (eines von zweien)". Architektur-Überblick: Content-Store-Facade als zentrale Storage-Abstraktion. Harte Regeln: `bsGetAll`/`bsGet`/`bsPut`-Regel auf „nur in `lib/bookstack.js` + `lib/content-store/backends/bookstack.js`" verschärfen; `bsGet(..., { fresh: true })`-Regel gilt nur im `bookstack`-Mode. Read-Modify-Write-Pfade um localdb-Variante ergänzen.
-- **Deploy-Doku**: Zwei Setup-Pfade. Backup-Strategie pro Backend.
-- **Spickzettel-Sweep** in [docs/](./) — [bookstack-templates.md](bookstack-templates.md) bleibt (nur `bookstack`-Mode); [erd.md](erd.md), [jobs.md](jobs.md), [i18n.md](i18n.md), [ai-providers.md](ai-providers.md), [testing.md](testing.md), [figur-werkstatt.md](figur-werkstatt.md), [buchchat-tools.md](buchchat-tools.md), [focus-editor.md](focus-editor.md), [state-modell.md](state-modell.md), [finetuning.md](finetuning.md), [wordpress-import.md](wordpress-import.md): auf BookStack-Annahmen grep'pen.
-- **[bookstack-exit.md](bookstack-exit.md)** (diese Datei) — bei Abschluss aller Phasen wird daraus „Multi-Backend-Architektur-Spickzettel" (Backends, Content-Store-Facade, Migration-Tool); alle Phasen-Blöcke verschwinden.
-- **Tests-Doku** — Integration-Tests laufen gegen beide Backends.
-- **i18n-Restposten** — Phase 1 hat den Save-Pfad bereits entbookstackifiziert. Phase 9 grep't beide Locale-Files erneut auf `BookStack`/`bookstack`-Strings: (a) backend-spezifisch (Conditional auf `$app.currentBackend`), (b) generisch umformuliert, (c) tot → entfernen.
-
-Reihenfolge: README + CLAUDE.md zuerst, dann Deploy-Block, dann Spickzettel.
+- **[README.md](../README.md)** — Intro auf Backend-Wahl umgestellt (SQLite Default, BookStack optional). BookStack-Voraussetzungen + Token-Setup als `bookstack`-Mode-only markiert. Backup-Block pro Backend; Backend-Wechsel-Hinweis auf Admin-Migration-Card.
+- **[CLAUDE.md](../CLAUDE.md)** — Header listet beide Backends + Content-Store-Facade. Harte Regel ergänzt: Content-Store-Facade ist Pflicht-Einstieg, `bs*`-Calls nur in Tripwire-Allowlist. `bsGet(..., { fresh: true })`-Regel jetzt explizit `bookstack`-Mode. Architektur-Überblick: `/content/*` + `/search/*` + `/local/*` Routen ergänzt; Content-Store-Facade als zentrale Abstraktion dokumentiert.
+- **Spickzettel-Sweep:** [erd.md](erd.md) (`body_html` als Wahrheit im localdb-/Cache im bookstack-Mode, `priority` als bedingter Mirror), [testing.md](testing.md) (Mock-BookStack nur für `bookstack`-Mode-Suiten; Parametrisierung `for (const backend of [...])`), [focus-editor.md](focus-editor.md) (Phantom-Revision-Hinweise backend-agnostisch), [buchchat-tools.md](buchchat-tools.md) (`userToken` + `get_pages` jetzt backend-bedingt), [state-modell.md](state-modell.md) (`currentBackend` neuer Shell-State, bookstack-Search/api-bookstack als `bookstack`-Mode-only), [wordpress-import.md](wordpress-import.md) + [bookstack-templates.md](bookstack-templates.md) (Header-Disclaimer `bookstack`-Mode-only).
+- **i18n-Restposten:** offen gelassen. Strings (`book.openInBookstack`, `editor.openInBookstack`, `editor.revisionsTitle`, `bs.timeout*`, `bs.apiError*`, `session.bookstackTokenInvalid`, `tokenSetup.*`, `profile.bookstackToken`, `error.NO_BOOKSTACK_TOKEN`/`BOOKSTACK_UNAUTHED`/`BOOKSTACK_UNREACHABLE`, `job.error.noBookstackToken`/`bookstack*`, `palette.action.token`, `book.settings.deleteBook*`, `bookOrganizer.confirmDelete*`, `pdfExport.chapter.pageStructure*`/`pageBreakBetweenPages`, `editor.revisions.source.bookstack-sync`, `admin.settings.bookstack.tokenHint`) sind im `bookstack`-Mode weiterhin aktiv. Conditional Rendering via `$app.currentBackend === 'bookstack'` ist Code-Arbeit → separater Issue, kein Doku-Risiko.
 
 ---
 
@@ -358,8 +351,7 @@ Bestehende Cache-Einträge bekommen `provider = ai.provider`-Default im Backfill
 
 | Phase | Aufwand | Risiko |
 |---|---|---|
-| 8 | 4–6 Tage | mittel-hoch (Bulk-Copy + FK-Repair + ID-Map + Round-Trip-Tests) |
-| 9 | 1–2 Tage | niedrig (Doku-Sweep) |
+| 8b | 3–4 Tage | mittel-hoch (FK-Repair + ID-Map + Round-Trip-Tests) |
 | 10 | 1–2 Tage | mittel (Diff-Test gegen Bestand) |
 | 11 | 1.5–2 Tage | niedrig-mittel (Cache-Key-Migration, Per-Call-Resolve) |
 
