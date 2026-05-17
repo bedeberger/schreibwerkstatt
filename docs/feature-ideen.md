@@ -1,10 +1,6 @@
 ## AI Provider
 - Ollama weiterhin mit maximal Jobs konfigurieren
 
-## Email Benachrichtigungen
-- Nur für Admin bei abgestürzter Job-Analyse
-- Bei Überschreiten des Limits
-
 ## Datenbank
 - Migrationshistorie löschen
 

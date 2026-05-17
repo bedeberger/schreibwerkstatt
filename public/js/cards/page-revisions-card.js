@@ -7,7 +7,7 @@
 
 import { fetchJson } from '../utils.js';
 import { loadDiff } from '../lazy-libs.js';
-import { renderWordDiff } from '../page-revision-diff.js';
+import { renderSideBySide } from '../page-revision-diff.js';
 
 export function registerPageRevisionsCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -151,15 +151,18 @@ export function registerPageRevisionsCard() {
       }
     },
 
+    // Diff vergleicht aktuelle Revision (rechte Spalte = juenger) gegen
+    // Vorgaenger-Revision (linke Spalte = aelter). Aelteste Revision: kein
+    // Vorgaenger → leerer String, alles wird als "added" gerendert.
     async _ensureDiff() {
       const app = window.__app;
-      if (!this.viewerBody) return;
+      if (!this.viewerBody || !this.viewerRev?.id) return;
       this.viewerDiffLoading = true;
       try {
         const diffLib = await loadDiff();
-        const currentHtml = app?.originalHtml || '';
+        const prevHtml = await this._loadPrevRevisionBody();
         const skipLabel = (n) => app?.t?.('editor.revisions.viewer.diffSkip', { n }) || `… ${n} …`;
-        const out = renderWordDiff(currentHtml, this.viewerBody, diffLib, { skipLabel });
+        const out = renderSideBySide(prevHtml, this.viewerBody, diffLib, { skipLabel });
         this.viewerDiffHtml = out.html;
         this.viewerDiffUnchanged = out.unchanged;
       } catch (e) {
@@ -167,6 +170,25 @@ export function registerPageRevisionsCard() {
         this.viewerError = e.message || 'diff failed';
       } finally {
         this.viewerDiffLoading = false;
+      }
+    },
+
+    // Liste ist DESC sortiert (juengste zuerst). Vorgaenger der geklickten
+    // Revision ist also der NEXT-Index. Keine Vorgaengerin → leerer String.
+    async _loadPrevRevisionBody() {
+      const idx = this.revisions.findIndex(r => r.id === this.viewerRev?.id);
+      if (idx < 0) return '';
+      const prev = this.revisions[idx + 1];
+      if (!prev?.id) return '';
+      const app = window.__app;
+      const pageId = app?.currentPage?.id;
+      if (!pageId) return '';
+      try {
+        const data = await fetchJson(`/content/pages/${pageId}/revisions/${prev.id}`);
+        return String(data?.revision?.body_html || '');
+      } catch (e) {
+        console.error('[pageRevisions:viewer:prev]', e);
+        return '';
       }
     },
 

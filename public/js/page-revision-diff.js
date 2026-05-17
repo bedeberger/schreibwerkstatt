@@ -1,11 +1,10 @@
-// Block-aware Diff fuer Revisions-Viewer.
+// Side-by-Side Block-Diff fuer Revisions-Viewer.
 // Pure-Function: keine DOM-/Alpine-Abhaengigkeit, damit testbar via node:test.
 // Konsument lazy-loaded jsdiff (window.Diff) und reicht es als `diffLib` rein.
 //
 // Pipeline: parseBlocks(HTML) -> diffLib.diffArrays(blockTexts) -> Pair-Changes
 // (zip adjacent del+add) -> collapseContext (1 Block vor/nach jeder Change,
-// Rest als Skip) -> renderEntries (semantische Block-Wrapper, Word-Diff fuer
-// paired Changes via diffLib.diffWords).
+// Rest als Skip) -> renderSideBySide (zwei Spalten, Word-Diff inline pro Seite).
 
 import { escHtml } from './utils.js';
 
@@ -17,8 +16,6 @@ export function htmlToPlainText(html) {
   return String(html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-// Splittet HTML in Block-Elemente. Ohne erkannte Blocks fallback auf einen
-// Pseudo-`<p>` mit der Gesamttext-Normalisierung.
 export function parseBlocks(html) {
   const src = String(html || '');
   const matches = [...src.matchAll(BLOCK_RE)];
@@ -47,17 +44,13 @@ function attachBlocks(parts, oldBlocks, newBlocks) {
       for (let k = 0; k < items.length; k++) entries.push({ kind: 'del', block: oldBlocks[oldIdx++] });
     } else {
       for (let k = 0; k < items.length; k++) {
-        entries.push({ kind: 'eq', block: newBlocks[newIdx] });
-        oldIdx++;
-        newIdx++;
+        entries.push({ kind: 'eq', oldBlock: oldBlocks[oldIdx++], newBlock: newBlocks[newIdx++] });
       }
     }
   }
   return entries;
 }
 
-// Zip aufeinanderfolgende del/add zu `change`. Ueberschuss bleibt als reines
-// del/add. Verbessert Lesbarkeit: identische Position = inline Word-Diff.
 function pairChanges(raw) {
   const out = [];
   let i = 0;
@@ -79,8 +72,6 @@ function pairChanges(raw) {
   return out;
 }
 
-// Context = 1 Block vor und nach jeder Change. Laengere unveraenderte Strecken
-// werden zu einem `skip`-Eintrag mit Anzahl gefaltet.
 function collapseContext(entries, context = 1) {
   const isChange = entries.map(e => e.kind !== 'eq');
   const keep = entries.map((_, i) => {
@@ -104,21 +95,47 @@ function collapseContext(entries, context = 1) {
   return out;
 }
 
-function blockWrap(tag, inner, modClass) {
-  const useTag = /^h[1-6]$/.test(tag) ? tag : 'div';
-  return `<${useTag} class="diff-block diff-block--${tag} ${modClass}">${inner}</${useTag}>`;
+// Bei Heading-Tags semantische Tags rendern, sonst <div>.
+function cellTag(tag) {
+  return /^h[1-6]$/.test(tag) ? tag : 'div';
 }
 
-function renderWordsInline(oldText, newText, diffLib) {
+function cellOpen(tag, modClasses) {
+  const t = cellTag(tag);
+  return `<${t} class="diff-cell diff-cell--${tag} ${modClasses}">`;
+}
+function cellClose(tag) {
+  return `</${cellTag(tag)}>`;
+}
+
+// Renders only `removed` + `eq` parts (Alt-Spalte).
+function renderWordsLeft(oldText, newText, diffLib) {
   const parts = diffLib.diffWords(oldText, newText);
   let html = '';
   for (const part of parts) {
+    if (part.added) continue;
     const safe = escHtml(part.value);
-    if (part.added) html += `<ins class="diff-add">${safe}</ins>`;
-    else if (part.removed) html += `<del class="diff-del">${safe}</del>`;
+    if (part.removed) html += `<del class="diff-del">${safe}</del>`;
     else html += `<span class="diff-eq">${safe}</span>`;
   }
   return html;
+}
+
+// Renders only `added` + `eq` parts (Neu-Spalte).
+function renderWordsRight(oldText, newText, diffLib) {
+  const parts = diffLib.diffWords(oldText, newText);
+  let html = '';
+  for (const part of parts) {
+    if (part.removed) continue;
+    const safe = escHtml(part.value);
+    if (part.added) html += `<ins class="diff-add">${safe}</ins>`;
+    else html += `<span class="diff-eq">${safe}</span>`;
+  }
+  return html;
+}
+
+function emptyCell(tag, side) {
+  return `${cellOpen(tag, `diff-cell--empty diff-cell--${side}`)}<span class="diff-empty-mark" aria-hidden="true">·</span>${cellClose(tag)}`;
 }
 
 function defaultSkipLabel(n) {
@@ -129,27 +146,42 @@ function renderEntries(view, diffLib, skipLabel) {
   let html = '';
   for (const e of view) {
     if (e.kind === 'eq') {
-      html += blockWrap(e.block.tag, escHtml(e.block.text), 'diff-block--eq');
+      const tag = e.newBlock?.tag || e.oldBlock?.tag || 'p';
+      const safe = escHtml(e.newBlock?.text ?? e.oldBlock?.text ?? '');
+      html += cellOpen(tag, 'diff-cell--eq diff-cell--left') + safe + cellClose(tag);
+      html += cellOpen(tag, 'diff-cell--eq diff-cell--right') + safe + cellClose(tag);
     } else if (e.kind === 'add') {
-      html += blockWrap(e.block.tag, `<ins class="diff-add">${escHtml(e.block.text)}</ins>`, 'diff-block--added');
+      html += emptyCell(e.block.tag, 'left');
+      html += cellOpen(e.block.tag, 'diff-cell--added diff-cell--right')
+        + `<ins class="diff-add">${escHtml(e.block.text)}</ins>`
+        + cellClose(e.block.tag);
     } else if (e.kind === 'del') {
-      html += blockWrap(e.block.tag, `<del class="diff-del">${escHtml(e.block.text)}</del>`, 'diff-block--removed');
+      html += cellOpen(e.block.tag, 'diff-cell--removed diff-cell--left')
+        + `<del class="diff-del">${escHtml(e.block.text)}</del>`
+        + cellClose(e.block.tag);
+      html += emptyCell(e.block.tag, 'right');
     } else if (e.kind === 'change') {
-      html += blockWrap(e.to.tag, renderWordsInline(e.from.text, e.to.text, diffLib), 'diff-block--changed');
+      html += cellOpen(e.from.tag, 'diff-cell--changed diff-cell--left')
+        + renderWordsLeft(e.from.text, e.to.text, diffLib)
+        + cellClose(e.from.tag);
+      html += cellOpen(e.to.tag, 'diff-cell--changed diff-cell--right')
+        + renderWordsRight(e.from.text, e.to.text, diffLib)
+        + cellClose(e.to.tag);
     } else if (e.kind === 'skip') {
       const label = (typeof skipLabel === 'function' ? skipLabel(e.count) : defaultSkipLabel(e.count));
-      html += `<div class="diff-block diff-block--skip">${escHtml(label)}</div>`;
+      html += `<div class="diff-cell diff-cell--skip">${escHtml(label)}</div>`;
     }
   }
   return html;
 }
 
-// Public API. `diffLib` ist das vom jsdiff-UMD-Bundle exportierte Modul
-// (window.Diff). `opts.skipLabel(n)` rendert das i18n-Label fuer kollabierte
-// Stretches; fehlt es, greift ein englischer Default.
-export function renderWordDiff(oldHtml, newHtml, diffLib, opts) {
+// Public API. Vergleicht oldHtml (linke Spalte, ältere Revision) gegen newHtml
+// (rechte Spalte, jüngere Revision). `diffLib` ist das vom jsdiff-UMD-Bundle
+// exportierte Modul (window.Diff). `opts.skipLabel(n)` rendert das i18n-Label
+// fuer kollabierte Stretches; fehlt es, greift ein englischer Default.
+export function renderSideBySide(oldHtml, newHtml, diffLib, opts) {
   if (!diffLib || typeof diffLib.diffWords !== 'function' || typeof diffLib.diffArrays !== 'function') {
-    throw new Error('renderWordDiff: diffLib.diffWords/diffArrays missing');
+    throw new Error('renderSideBySide: diffLib.diffWords/diffArrays missing');
   }
   const oldBlocks = parseBlocks(oldHtml);
   const newBlocks = parseBlocks(newHtml);

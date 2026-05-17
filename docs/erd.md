@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 123, 79 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 124, 80 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -75,6 +75,7 @@ erDiagram
 
   app_users ||--o{ book_access       : grants
   app_users ||--o{ page_locks        : holds
+  app_users ||--o{ budget_alerts     : dedupes
 
   chapters ||--o{ figure_appearances     : has
   chapters ||--o{ figure_events          : at
@@ -766,6 +767,11 @@ erDiagram
     TEXT    acquired_at
     TEXT    expires_at         "TTL 30 min, Heartbeat verlängert"
     TEXT    last_heartbeat_at
+  }
+  budget_alerts {
+    TEXT email   PK,FK "app_users(email) CASCADE"
+    TEXT period  PK   "YYYY-MM (UTC) — 1 Mail pro User pro Monat"
+    TEXT sent_at
   }
   users {
     TEXT    email             PK,FK "app_users(email) CASCADE"
