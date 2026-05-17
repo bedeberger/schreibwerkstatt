@@ -327,6 +327,20 @@ const featuresUsageState = () => ({
   recentPageIds: [],
 });
 
+// Collaboration-Signal: Seiten dieses Buchs, die seit dem letzten Poll von
+// einem ANDEREN User editiert wurden. Quelle: GET /content/books/:id/changes.
+//   _collabSince:        Server-Stempel, gegen den der naechste Poll vergleicht.
+//   recentRemoteEdits:   Set von page_id, die der Tree als „extern geaendert"
+//                        markieren soll. Cleared beim Klick auf die Seite.
+//   collabToast:         { user, pageName, pageId, count?, currentPage? } | null
+const collabState = () => ({
+  _collabSince: null,
+  _collabPollTimer: null,
+  recentRemoteEdits: new Set(),
+  collabToast: null,
+  _collabToastTimer: null,
+});
+
 // Modal-State fuer Buch-Erstellung (Trigger: Combobox-Footer "+ Neues Buch").
 // Eigener Slice statt Inline in cardsState, weil Open/Close keine Show-Flag-
 // Exklusivitaet braucht — Modal liegt ueber allem (natives <dialog>).
@@ -379,6 +393,7 @@ export function initialLektoratState() {
     ...chatsState(),
     ...featuresUsageState(),
     ...bookCreateState(),
+    ...collabState(),
     ...jobsState(),
   };
 }

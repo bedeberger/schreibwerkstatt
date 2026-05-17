@@ -63,6 +63,7 @@ import { appUiMethods, applySzenenFilters } from './app/app-ui.js';
 import { appChromeMethods } from './app/app-chrome.js';
 import { appKomplettMethods } from './app/app-komplett.js';
 import { appJobsCoreMethods } from './app/app-jobs-core.js';
+import { appCollabMethods } from './app/app-collab.js';
 import { appViewMethods } from './app/app-view.js';
 import { appNavigationMethods } from './app/app-navigation.js';
 import { appHashRouterMethods } from './app/app-hash-router.js';
@@ -749,8 +750,10 @@ document.addEventListener('alpine:init', () => {
           await this.loadPages({ source: 'bookSwitch' });
           await this._reloadVisibleBookCards();
           this._maybeOpenBookOverview();
+          this._startCollabPoll(newVal);
         });
         this._startJobQueuePoll();
+        if (this.selectedBookId) this._startCollabPoll(this.selectedBookId);
         this._setupWritingTime();
         this._setupLektoratTime();
       } catch (e) {
@@ -786,6 +789,7 @@ document.addEventListener('alpine:init', () => {
     ...appChromeMethods,
     ...appKomplettMethods,
     ...appJobsCoreMethods,
+    ...appCollabMethods,
     ...appViewMethods,
     ...appNavigationMethods,
     ...appHashRouterMethods,

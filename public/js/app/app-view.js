@@ -349,6 +349,7 @@ export const appViewMethods = {
     window.dispatchEvent(new CustomEvent('book:changed', {
       detail: { bookId: this.selectedBookId },
     }));
+    this._stopCollabPoll?.();
     this.figuren = [];
     this.orte = [];
     this.szenen = [];
