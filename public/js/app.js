@@ -61,7 +61,7 @@ import { registerPaletteCard } from './cards/palette-card.js';
 import { shortcutsMethods } from './editor/shortcuts.js';
 import { featuresUsageMethods } from './features-usage.js';
 import { initialLektoratState } from './app/app-state.js';
-import { appUiMethods, applySzenenFilters } from './app/app-ui.js';
+import { appUiMethods, applySzenenFilters, applySongsFilters } from './app/app-ui.js';
 import { appChromeMethods } from './app/app-chrome.js';
 import { appKomplettMethods } from './app/app-komplett.js';
 import { appJobsCoreMethods } from './app/app-jobs-core.js';
@@ -557,20 +557,7 @@ document.addEventListener('alpine:init', () => {
         });
     },
     get songsFiltered() {
-      const f = this.songsFilters;
-      const q = f.suche ? f.suche.toLowerCase() : '';
-      const figId = f.figurId;
-      return this.songs.filter(s => {
-        if (q) {
-          const hay = `${s.titel || ''} ${s.interpret || ''} ${s.genre || ''} ${s.beschreibung || ''}`.toLowerCase();
-          if (!hay.includes(q)) return false;
-        }
-        if (figId && !(s.figuren || []).some(x => (x.fig_id || x) === figId)) return false;
-        if (f.kapitel && !(s.kapitel || []).some(k => k.name === f.kapitel)) return false;
-        if (f.genre && s.genre !== f.genre) return false;
-        if (f.kontextTyp && s.kontext_typ !== f.kontextTyp) return false;
-        return true;
-      }).sort((a, b) => {
+      return applySongsFilters(this.songs, this.songsFilters).sort((a, b) => {
         const aK = Math.min(...(a.kapitel || []).map(k => this._chapterIdx(k.name)), 9999);
         const bK = Math.min(...(b.kapitel || []).map(k => this._chapterIdx(k.name)), 9999);
         if (aK !== bK) return aK - bK;

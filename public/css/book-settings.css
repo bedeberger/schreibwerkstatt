@@ -1,17 +1,29 @@
 @layer components {
-/* ── Job-Statistiken (inline in Buch-Einstellungen) ──────────────────────── */
+/* ── Thematische Sub-Sections in der BuchSettings-Card ────────────────────
+   Lockert das Formular auf: jede logische Gruppe (Sprache, Erzählweise,
+   Kategorisierung, Kontext, Sharing, Job-Stats) sitzt in einer eigenen
+   Section mit subtilem Top-Trennstrich und kleinem Caps-Title.
+   `.book-settings-stats` ist Alt-Alias für Konsumenten ausserhalb der
+   BookSettings (Admin-Karten). */
+.book-settings-section,
 .book-settings-stats {
-  margin-top: 1.75rem;
+  margin-top: 2rem;
   padding-top: 1.25rem;
   border-top: 0.5px solid var(--color-border);
 }
+.book-settings-section:first-of-type {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+.book-settings-section-title,
 .book-settings-stats-title {
   font-size: var(--font-size-xs);
   font-weight: 700;
   color: var(--color-muted);
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  margin: 0 0 0.6rem;
+  margin: 0 0 1rem;
 }
 .job-stats-scroll {
   overflow-x: auto;

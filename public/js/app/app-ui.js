@@ -5,6 +5,24 @@ import { escPreserveStrong, fetchText } from '../utils.js';
 // Kapitel-Filter matcht per Name (die Kapitelnamen in den Szenen stammen aus
 // dem Komplett-Job und sind dort bereits auf die echten BookStack-Namen
 // normalisiert).
+// Pure Filter-Logik für die Musik-Liste. Songs[].figuren kann String (fig_id)
+// oder Object ({ fig_id }) enthalten — je nachdem ob der Server das per-Figur-
+// Kontext-Override mitliefert. Filter normalisiert beide Formen.
+export function applySongsFilters(songs, filters) {
+  const q = filters.suche ? filters.suche.toLowerCase() : '';
+  return (songs || []).filter(s => {
+    if (q) {
+      const hay = `${s.titel || ''} ${s.interpret || ''} ${s.genre || ''} ${s.beschreibung || ''}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (filters.figurId && !(s.figuren || []).some(x => (x.fig_id || x) === filters.figurId)) return false;
+    if (filters.kapitel && !(s.kapitel || []).some(k => k.name === filters.kapitel)) return false;
+    if (filters.genre && s.genre !== filters.genre) return false;
+    if (filters.kontextTyp && s.kontext_typ !== filters.kontextTyp) return false;
+    return true;
+  });
+}
+
 export function applySzenenFilters(szenen, filters) {
   const q = filters.suche ? filters.suche.toLowerCase() : '';
   return (szenen || []).filter(s =>

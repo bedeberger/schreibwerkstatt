@@ -30,6 +30,7 @@ import { reviewMethods } from './book-overview/review.js';
 import { figurenMethods } from './book-overview/figuren.js';
 import { szenenMethods } from './book-overview/szenen.js';
 import { orteMethods } from './book-overview/orte.js';
+import { songsMethods as overviewSongsMethods } from './book-overview/songs.js';
 import { kapitelMethods } from './book-overview/kapitel.js';
 import { recentMethods } from './book-overview/recent.js';
 import { formatMethods } from './book-overview/format.js';
@@ -42,6 +43,7 @@ export const bookOverviewMethods = {
   ...figurenMethods,
   ...szenenMethods,
   ...orteMethods,
+  ...overviewSongsMethods,
   ...kapitelMethods,
   ...recentMethods,
   ...formatMethods,
