@@ -178,6 +178,8 @@ Wiederkehrende Werte gehen über Tokens. Ad-hoc-Werte (`box-shadow: 0 4px 12px .
 
 **Hier (visuelles):**
 
+**Grösse muss mit umliegenden Form-Elementen matchen** — Combobox in Zeile mit `<input>`/`<button>` MUSS dieselbe Geometrie haben. Helper ist per Default **compact**; neben default-Input/Button → Object-Form `combobox({ placeholder, compact: false })`. Details + Compact-/Default-Sets siehe [Regel: Gleiche Höhe pro Form-Zeile](#regel-gleiche-höhe-pro-form-zeile).
+
 **Klassen** ([public/css/card-form.css](public/css/card-form.css)):
 - `.combobox-wrap` — Wrapper, vom Helper auto-gesetzt (mit `--compact` per Default).
 - `.combobox-trigger` — Button-Look (gleiche Höhe wie `<input>` über `--size-default-padding-y`).
@@ -358,6 +360,19 @@ In einer Form-Zeile (Inputs, Comboboxes, Buttons nebeneinander in Flex/Grid mit 
 Stolperfalle: `combobox(placeholder)` ist **default compact**. Steht der combobox neben einem nackten `<input>` oder `<button>` ohne `.btn-compact`, sieht das ungleich aus → Object-Form `combobox({ placeholder, compact: false })` verwenden. Umgekehrt: wenn die Zeile sonst nur Compact-Elemente hat (Filter-Bars, Table-Row-Controls), bleibt der Default-Compact-Combobox richtig.
 
 Filter-Bars (`.filter-bar`, `.admin-usage-filter`, `.admin-users-requests-filter`) sind bewusst rein compact (Search-Input + Compact-Combobox + Compact-Buttons) — kein Mix zulässig.
+
+### Regel: Forms folgen der UI-Locale
+
+Alle Form-Inputs (Datums-/Zeit-Picker, Zahlen, Auswahllisten, Platzhalter, Hint-/Error-/Saved-Texte, Validation-Messages, Format-Beispiele) richten sich nach der aktiven UI-Locale (`this.uiLocale`), **nicht** nach Browser-Default oder Buchsprache.
+
+- **Labels, Placeholder, Hints, Optionen:** ausschliesslich via `t('bereich.feld')` / `tRaw()` (siehe Harte Regel „UI-Strings nur in `public/js/i18n/{de,en}.json`"). Kein hartcodiertes DE/EN-Markup in Partials.
+- **Zahlen, Datum, Zeit:** `Intl.NumberFormat` / `Intl.DateTimeFormat` mit Locale-Tag aus `this.uiLocale` (DE → `de-CH`, EN → `en-CH`/`en-US` je nach `defaultRegion`). DE-CH: Dezimal `.`, Tausender `’`; EN-US: Dezimal `.`, Tausender `,`. Nie statisch `'de-DE'` o.ä. setzen.
+- **Inputs mit nativer Lokalisierung** (`<input type="number|date|time">`): erben das `lang`-Attribut vom `<html lang>`-Sync (gesetzt in [public/js/i18n.js](public/js/i18n.js) bei Locale-Wechsel). **Kein** eigenes `lang=`-Override am Input.
+- **Combobox-Optionen / Sortierung:** Labels via `t()`; String-Sort `localeCompare(b, this.uiLocale)`.
+- **Format-Helper** (`formatLastRun`, Schweizer-Zahlen-Util, …) bekommen `this.uiLocale` als Parameter, lesen ihn nicht aus globaler Konstante.
+- **Buchsprache ≠ UI-Locale:** Buchinhalt kann DE sein, während UI auf EN läuft. Form-Chrome folgt UI, nicht Inhalt.
+
+Reaktivität: `t()` referenziert `this.uiLocale` (siehe [public/js/i18n.js](public/js/i18n.js)), Alpine re-rendert bei Locale-Wechsel automatisch. Eigene Format-Methoden müssen `void this.uiLocale;` als Reaktivitäts-Anker enthalten, sonst frieren formatierte Werte bei Sprachwechsel ein.
 
 ### Regel: Keine parallele Reinvention
 

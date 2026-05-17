@@ -108,7 +108,7 @@
 .overview-presence-cell--empty .overview-presence-fill { display: none; }
 .overview-presence-num {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-base);
   font-size: 10px;
   font-weight: 700;
   color: var(--color-text);

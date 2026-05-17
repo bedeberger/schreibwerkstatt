@@ -142,7 +142,7 @@ export const adminUsageMethods = {
     row._saving = true;
     this.adminUsageError = '';
     try {
-      const usd = row._draftBudget === '' ? null : Number(row._draftBudget);
+      const usd = (row._draftBudget === '' || row._draftBudget == null) ? null : Number(row._draftBudget);
       const body = { monthly_budget_usd: usd, budget_mode: row._draftMode };
       const r = await fetch(`/admin/users/${encodeURIComponent(row.email)}`, {
         method: 'PUT',

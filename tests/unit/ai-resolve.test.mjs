@@ -88,6 +88,7 @@ test('Synonym-Cache: provider trennt Eintraege', () => {
   const ctx = _bootstrap();
   try {
     const schema = require_('../../db/schema');
+    ctx.appUsers.createUser({ email: 'a@b' });
     schema.saveSynonymCache('a@b', 'k1', [{ wort: 'X' }], 'claude');
     schema.saveSynonymCache('a@b', 'k1', [{ wort: 'Y' }], 'ollama');
     const claude = schema.loadSynonymCache('a@b', 'k1', 'claude');
@@ -102,6 +103,7 @@ test('Lektorat-Cache: provider trennt Eintraege', () => {
   try {
     const schema = require_('../../db/schema');
     const db = require_('../../db/connection').db;
+    ctx.appUsers.createUser({ email: 'a@b' });
     const now = new Date().toISOString();
     const bookId = db.prepare(`INSERT INTO books (name, slug, description, owner_email, created_at, updated_at) VALUES ('B','b','','a@b',?,?)`).run(now, now).lastInsertRowid;
     const pageId = db.prepare(`INSERT INTO pages (book_id, page_name, body_html, updated_at, local_updated_at) VALUES (?, 'P', '<p>x</p>', ?, ?)`).run(bookId, now, now).lastInsertRowid;

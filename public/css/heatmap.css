@@ -59,7 +59,7 @@
   text-align: right;
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: var(--z-sticky);
 }
 /* Cluster-Kopfzeile: gruppiert die Typen-Spalten thematisch. */
 .heatmap-cluster-row th.heatmap-cluster-head {
@@ -88,14 +88,14 @@
 .heatmap-table tbody th.heatmap-rowhead {
   position: sticky;
   left: 0;
-  z-index: 1;
+  z-index: var(--z-sticky);
   background: var(--color-surface);
   white-space: normal;
   min-width: 140px;
 }
 .heatmap-table thead th.heatmap-rowhead {
   left: 0;
-  z-index: 2;
+  z-index: calc(var(--z-sticky) + 1);
   white-space: normal;
 }
 .heatmap-rowhead-main {

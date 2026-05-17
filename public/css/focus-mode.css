@@ -421,7 +421,7 @@ body.focus-mode .editor-conflict-banner {
   top: 8px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 60;
+  z-index: var(--z-banner);
   max-width: min(720px, calc(100vw - 32px));
   box-shadow: 0 6px 24px rgba(0,0,0,0.18);
   margin: 0;

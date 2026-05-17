@@ -47,7 +47,7 @@
 /* Karte, die das Such-Overlay enthält, muss über spätere .card-Geschwister
    liegen — sonst verdecken Sidebar/Editor die absolut positionierten
    Ergebnisse (jede .card ist via transform-Animation eigener Stacking-Context). */
-.card--book-selector { position: relative; z-index: 20; }
+.card--book-selector { position: relative; z-index: var(--z-sticky); }
 .bookstack-search-input-wrap { position: relative; }
 .bookstack-search-input {
   width: 100%;
@@ -90,7 +90,7 @@
   background: var(--color-card-bg);
   max-height: 320px;
   overflow-y: auto;
-  z-index: 10;
+  z-index: var(--z-popover);
   box-shadow: var(--shadow-md);
 }
 .bookstack-search-empty {

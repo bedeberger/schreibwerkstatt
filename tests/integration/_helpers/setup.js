@@ -34,7 +34,11 @@ function bootstrap() {
     INSERT OR IGNORE INTO app_users (email, display_name, global_role, status, language, can_invite_users, first_seen_at, created_at)
     VALUES (?, ?, 'user', 'active', 'de', 1, datetime('now'), datetime('now'))
   `);
-  for (const email of ['alice@example.com', 'bob@example.com', 'admin@example.com']) {
+  for (const email of [
+    'alice@example.com', 'bob@example.com', 'admin@example.com', 'test@example.com',
+    'tester@test.dev', 'autor@test.dev', 'owner@test.dev', 'eindringling@test.dev',
+    'autor@werk.dev', 'me@werk.dev', 'other@werk.dev',
+  ]) {
     insUser.run(email, email.split('@')[0]);
   }
 

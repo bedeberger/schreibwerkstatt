@@ -58,6 +58,7 @@ import { registerLektoratFindingsCard } from './cards/lektorat-findings-card.js'
 import { registerPageHistoryCard } from './cards/page-history-card.js';
 import { registerPageRevisionsCard } from './cards/page-revisions-card.js';
 import { registerPaletteCard } from './cards/palette-card.js';
+import { registerNumInput } from './num-input.js';
 import { shortcutsMethods } from './editor/shortcuts.js';
 import { featuresUsageMethods } from './features-usage.js';
 import { initialLektoratState } from './app/app-state.js';
@@ -236,6 +237,7 @@ document.addEventListener('alpine:init', () => {
   registerPageHistoryCard();
   registerPageRevisionsCard();
   registerPaletteCard();
+  registerNumInput();
 
   // combobox(placeholder, emptyLabel) — Legacy-Positional-Form.
   // combobox({ placeholder, emptyLabel, compact }) — Object-Form (Default `compact: true`).

@@ -10,10 +10,15 @@ const tmp = path.join('/tmp', `pdfx-db-test-${process.pid}-${Date.now()}.db`);
 process.env.DB_PATH = tmp;
 
 const schema = require('../../db/schema');
+const appUsers = require('../../db/app-users');
 
 test('CRUD-Cycle für pdf_export_profile', () => {
   const userA = 'a@x.test';
   const userB = 'b@x.test';
+
+  // Mig 130 FK: user_email braucht app_users-Row.
+  appUsers.createUser({ email: userA, displayName: 'A' });
+  appUsers.createUser({ email: userB, displayName: 'B' });
 
   // Mig 81: pdf_export_profile.book_id FK -> books(bookstack_book_id).
   // Test-Buch im books-Cache anlegen.

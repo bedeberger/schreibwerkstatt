@@ -126,7 +126,7 @@
   opacity: 0.45;
   transform: translateX(-50%);
   pointer-events: none;
-  z-index: 1;
+  z-index: var(--z-base);
 }
 /* Erste/letzte Zeile: kein Überhang nach oben/unten. */
 .overview-chapter-list > li:first-child .overview-chapter-bar-track .overview-chapter-median-tick { top: 0; }

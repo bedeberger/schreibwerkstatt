@@ -11,6 +11,12 @@ process.env.DB_PATH = tmp;
 
 const schema = require('../../db/schema');
 const { db } = require('../../db/connection');
+const appUsers = require('../../db/app-users');
+
+// Mig 130 FK: user_email braucht app_users-Row.
+for (const e of ['a@x.test', 'b@x.test', 'cascade@x.test', 'imp@x.test']) {
+  appUsers.createUser({ email: e, displayName: e });
+}
 
 function sampleMindmap(name = 'Anna') {
   return {

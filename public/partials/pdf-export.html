@@ -126,8 +126,8 @@
             <div class="card-form-row">
               <label class="card-form-label" x-text="$app.t('pdfExport.layout.widthMm') + ' / ' + $app.t('pdfExport.layout.heightMm')"></label>
               <div class="card-form-field pdfx-inline-pair">
-                <input type="number" min="50" max="500" x-model.number="activeProfile.config.layout.customWidthMm" class="pdfx-num-input">
-                <input type="number" min="50" max="700" x-model.number="activeProfile.config.layout.customHeightMm" class="pdfx-num-input">
+                <input type="text" x-data="numInput({ step: 1, min: 50, max: 500 })" x-modelable="value" x-model="activeProfile.config.layout.customWidthMm" class="pdfx-num-input">
+                <input type="text" x-data="numInput({ step: 1, min: 50, max: 700 })" x-modelable="value" x-model="activeProfile.config.layout.customHeightMm" class="pdfx-num-input">
               </div>
             </div>
           </template>
@@ -152,10 +152,10 @@
             </button>
             <div x-show="secOpen.margins" x-cloak class="collapsible-section">
               <div class="pdfx-num-grid pdfx-num-grid--4">
-                <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.top')"></span><input type="number" min="5" max="80" x-model.number="activeProfile.config.layout.marginsMm.top" class="pdfx-num-input"></label>
-                <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.right')"></span><input type="number" min="5" max="80" x-model.number="activeProfile.config.layout.marginsMm.right" class="pdfx-num-input"></label>
-                <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.bottom')"></span><input type="number" min="5" max="80" x-model.number="activeProfile.config.layout.marginsMm.bottom" class="pdfx-num-input"></label>
-                <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.left')"></span><input type="number" min="5" max="80" x-model.number="activeProfile.config.layout.marginsMm.left" class="pdfx-num-input"></label>
+                <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.top')"></span><input type="text" x-data="numInput({ step: 1, min: 5, max: 80 })" x-modelable="value" x-model="activeProfile.config.layout.marginsMm.top" class="pdfx-num-input"></label>
+                <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.right')"></span><input type="text" x-data="numInput({ step: 1, min: 5, max: 80 })" x-modelable="value" x-model="activeProfile.config.layout.marginsMm.right" class="pdfx-num-input"></label>
+                <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.bottom')"></span><input type="text" x-data="numInput({ step: 1, min: 5, max: 80 })" x-modelable="value" x-model="activeProfile.config.layout.marginsMm.bottom" class="pdfx-num-input"></label>
+                <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.left')"></span><input type="text" x-data="numInput({ step: 1, min: 5, max: 80 })" x-modelable="value" x-model="activeProfile.config.layout.marginsMm.left" class="pdfx-num-input"></label>
               </div>
             </div>
           </div>
@@ -171,10 +171,10 @@
             <div x-show="secOpen.bodyInset" x-cloak class="collapsible-section">
               <p class="card-form-field-note" x-text="$app.t('pdfExport.layout.bodyInsetHint')"></p>
               <div class="pdfx-num-grid pdfx-num-grid--4">
-                <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.top')"></span><input type="number" min="0" max="60" x-model.number="activeProfile.config.layout.bodyInsetMm.top" class="pdfx-num-input"></label>
-                <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.right')"></span><input type="number" min="0" max="60" x-model.number="activeProfile.config.layout.bodyInsetMm.right" class="pdfx-num-input"></label>
-                <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.bottom')"></span><input type="number" min="0" max="60" x-model.number="activeProfile.config.layout.bodyInsetMm.bottom" class="pdfx-num-input"></label>
-                <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.left')"></span><input type="number" min="0" max="60" x-model.number="activeProfile.config.layout.bodyInsetMm.left" class="pdfx-num-input"></label>
+                <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.top')"></span><input type="text" x-data="numInput({ step: 1, min: 0, max: 60 })" x-modelable="value" x-model="activeProfile.config.layout.bodyInsetMm.top" class="pdfx-num-input"></label>
+                <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.right')"></span><input type="text" x-data="numInput({ step: 1, min: 0, max: 60 })" x-modelable="value" x-model="activeProfile.config.layout.bodyInsetMm.right" class="pdfx-num-input"></label>
+                <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.bottom')"></span><input type="text" x-data="numInput({ step: 1, min: 0, max: 60 })" x-modelable="value" x-model="activeProfile.config.layout.bodyInsetMm.bottom" class="pdfx-num-input"></label>
+                <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.left')"></span><input type="text" x-data="numInput({ step: 1, min: 0, max: 60 })" x-modelable="value" x-model="activeProfile.config.layout.bodyInsetMm.left" class="pdfx-num-input"></label>
               </div>
             </div>
           </div>
@@ -216,7 +216,7 @@
               <div class="card-form-row">
                 <label class="card-form-label" x-text="$app.t('pdfExport.layout.pageNumberStart')"></label>
                 <div class="card-form-field">
-                  <input type="number" min="1" max="9999" x-model.number="activeProfile.config.layout.pageNumberStart" class="pdfx-num-input">
+                  <input type="text" x-data="numInput({ step: 1, min: 1, max: 9999 })" x-modelable="value" x-model="activeProfile.config.layout.pageNumberStart" class="pdfx-num-input">
                 </div>
               </div>
             </div>
@@ -255,16 +255,16 @@
               <div class="card-form-row">
                 <label class="card-form-label" x-text="$app.t('pdfExport.font.sizePt')"></label>
                 <div class="card-form-field">
-                  <input type="number" min="6" max="72" x-model.number="activeProfile.config.font[role].sizePt" class="pdfx-num-input">
+                  <input type="text" x-data="numInput({ step: 1, min: 6, max: 72 })" x-modelable="value" x-model="activeProfile.config.font[role].sizePt" class="pdfx-num-input">
                 </div>
               </div>
             </template>
 
             <template x-if="role === 'heading'">
               <div class="pdfx-num-grid pdfx-num-grid--3">
-                <label class="pdfx-num-field"><span>h1 (pt)</span><input type="number" min="10" max="60" x-model.number="activeProfile.config.font.heading.sizes.h1" class="pdfx-num-input"></label>
-                <label class="pdfx-num-field"><span>h2 (pt)</span><input type="number" min="9"  max="48" x-model.number="activeProfile.config.font.heading.sizes.h2" class="pdfx-num-input"></label>
-                <label class="pdfx-num-field"><span>h3 (pt)</span><input type="number" min="8"  max="36" x-model.number="activeProfile.config.font.heading.sizes.h3" class="pdfx-num-input"></label>
+                <label class="pdfx-num-field"><span>h1 (pt)</span><input type="text" x-data="numInput({ step: 1, min: 10, max: 60 })" x-modelable="value" x-model="activeProfile.config.font.heading.sizes.h1" class="pdfx-num-input"></label>
+                <label class="pdfx-num-field"><span>h2 (pt)</span><input type="text" x-data="numInput({ step: 1, min: 9,  max: 48 })" x-modelable="value" x-model="activeProfile.config.font.heading.sizes.h2" class="pdfx-num-input"></label>
+                <label class="pdfx-num-field"><span>h3 (pt)</span><input type="text" x-data="numInput({ step: 1, min: 8,  max: 36 })" x-modelable="value" x-model="activeProfile.config.font.heading.sizes.h3" class="pdfx-num-input"></label>
               </div>
             </template>
 
@@ -273,13 +273,13 @@
                 <div class="card-form-row">
                   <label class="card-form-label" x-text="$app.t('pdfExport.font.lineHeight')"></label>
                   <div class="card-form-field">
-                    <input type="number" step="0.05" min="0.8" max="3" x-model.number="activeProfile.config.font.body.lineHeight" class="pdfx-num-input">
+                    <input type="text" x-data="numInput({ step: 0.05, min: 0.8, max: 3 })" x-modelable="value" x-model="activeProfile.config.font.body.lineHeight" class="pdfx-num-input">
                   </div>
                 </div>
                 <div class="card-form-row">
                   <label class="card-form-label" x-text="$app.t('pdfExport.font.paragraphGap')"></label>
                   <div class="card-form-field">
-                    <input type="number" step="0.05" min="0" max="3" x-model.number="activeProfile.config.font.body.paragraphGap" class="pdfx-num-input">
+                    <input type="text" x-data="numInput({ step: 0.05, min: 0, max: 3 })" x-modelable="value" x-model="activeProfile.config.font.body.paragraphGap" class="pdfx-num-input">
                   </div>
                 </div>
               </div>
@@ -338,7 +338,7 @@
           <div class="card-form-row">
             <label class="card-form-label" x-text="$app.t('pdfExport.chapter.spaceBeforeMm')"></label>
             <div class="card-form-field">
-              <input type="number" min="0" max="200" x-model.number="activeProfile.config.chapter.spaceBeforeMm" class="pdfx-num-input">
+              <input type="text" x-data="numInput({ step: 1, min: 0, max: 200 })" x-modelable="value" x-model="activeProfile.config.chapter.spaceBeforeMm" class="pdfx-num-input">
             </div>
           </div>
           <div class="card-form-row">

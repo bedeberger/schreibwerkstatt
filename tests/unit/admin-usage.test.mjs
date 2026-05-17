@@ -151,6 +151,7 @@ test('getChatMessages: ohne email liefert alle Non-Admin-User', () => {
 });
 
 test('listFeatureUsage + featureUsageTotals', () => {
+  seedUser('feat@ex.com');
   db.prepare(`INSERT INTO user_feature_usage (user_email, feature_key, last_used, use_count)
               VALUES (?, ?, ?, ?)`).run('feat@ex.com', 'overview', Date.now(), 5);
   db.prepare(`INSERT INTO user_feature_usage (user_email, feature_key, last_used, use_count)
@@ -165,6 +166,7 @@ test('listFeatureUsage + featureUsageTotals', () => {
 
 test('listTimeUsage: Schreib- + Lektorat-Sekunden gemerged', () => {
   const today = new Date().toISOString().slice(0, 10);
+  seedUser('t@ex.com');
   seedBook(5050, 'time-test');
   // FK: lektorat_time.page_id → pages(page_id). Seeded.
   db.prepare(`INSERT OR IGNORE INTO pages (page_id, book_id, page_name, updated_at)

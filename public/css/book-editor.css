@@ -201,7 +201,7 @@
   .book-editor-chapter-header {
     position: sticky;
     top: 0;
-    z-index: 2;
+    z-index: var(--z-sticky);
     padding: var(--space-md) 0 var(--space-sm);
     background: var(--color-page-view-bg);
     margin-block: var(--space-lg) 0;
@@ -362,7 +362,7 @@
     position: fixed;
     right: var(--space-md);
     bottom: var(--space-md);
-    z-index: 1000;
+    z-index: var(--z-popover);
     display: flex;
     flex-direction: column;
     gap: var(--space-xs);

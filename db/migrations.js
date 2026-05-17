@@ -5539,6 +5539,114 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 129 abgeschlossen (users in app_users konsolidiert, DROP users).');
   }
 
+  if (version < 130) {
+    // FK-Hardening: 33 Tabellen mit `user_email` bekommen einen FK auf
+    // app_users(email). Strategie pro Tabelle:
+    //   - CASCADE: Caches/Logs/User-spezifische Daten, deren Wert ohne User wegfaellt.
+    //   - SET NULL: inhaltliche Daten (Figuren, Orte, Songs, ...), die als anonyme
+    //     Spur erhalten bleiben sollen. Voraussetzung: user_email-Spalte nullable.
+    //
+    // Vorab-Cleanup: Rows mit user_email='' oder unbekannter Email werden
+    // bereinigt — CASCADE-Tabellen geloescht, SET-NULL-Tabellen genullt — damit
+    // der spaetere foreign_key_check sauber durchgeht.
+
+    db.pragma('foreign_keys = OFF');
+
+    const CASCADE_TABLES = [
+      'book_extract_cache', 'book_review_cache', 'chapter_extract_cache',
+      'chapter_macro_review_cache', 'chapter_review_cache', 'chat_sessions',
+      'draft_figures', 'finetune_ai_cache', 'ideen', 'job_checkpoints',
+      'lektorat_cache', 'lektorat_time', 'pdf_export_profile', 'synonym_cache',
+      'user_activity', 'user_feature_usage', 'user_page_usage',
+      'werkstatt_runs', 'writing_time', 'zeitstrahl_events',
+    ];
+    // user_sessions_audit absichtlich ausgenommen: enthaelt auch Events vor
+    // User-Existenz (login-denied, role-changed bei Approval-Vorgaengen) und
+    // braucht daher keinen FK auf app_users(email). Anonymisierung beim
+    // User-Loeschen geschieht ueber softDeleteUser-Workflow, nicht via CASCADE.
+    const SET_NULL_TABLES = [
+      'book_reviews', 'chapter_reviews', 'continuity_checks', 'continuity_issues',
+      'figure_relations', 'figure_scenes', 'figures', 'job_runs', 'locations',
+      'page_checks', 'page_revisions', 'songs',
+    ];
+
+    let cleanupDeleted = 0;
+    for (const t of CASCADE_TABLES) {
+      const r = db.prepare(
+        `DELETE FROM ${t} WHERE user_email = '' OR user_email IS NULL OR user_email NOT IN (SELECT email FROM app_users)`
+      ).run();
+      cleanupDeleted += r.changes;
+    }
+    let cleanupNulled = 0;
+    for (const t of SET_NULL_TABLES) {
+      const r = db.prepare(
+        `UPDATE ${t} SET user_email = NULL WHERE user_email = '' OR (user_email IS NOT NULL AND user_email NOT IN (SELECT email FROM app_users))`
+      ).run();
+      cleanupNulled += r.changes;
+    }
+    if (cleanupDeleted || cleanupNulled) {
+      logger.info(`Mig 130 Pre-Cleanup: ${cleanupDeleted} Orphan-Rows geloescht, ${cleanupNulled} user_email genullt.`);
+    }
+
+    // Dynamischer Recreate-Helper: zieht das aktuelle CREATE TABLE aus
+    // sqlite_master, haengt die FK-Klausel an, recreated die Tabelle mit
+    // Datenkopie + Index-Wiederherstellung.
+    const _addUserFk = (table, onDelete) => {
+      const orig = db.prepare(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name = ?"
+      ).get(table);
+      if (!orig || !orig.sql) {
+        throw new Error(`Migration 130: Tabelle ${table} nicht gefunden`);
+      }
+      const indexes = db.prepare(
+        "SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name = ? AND sql IS NOT NULL"
+      ).all(table);
+
+      // CREATE TABLE "<name>" → CREATE TABLE <name>_new
+      const nameRe = new RegExp('CREATE TABLE\\s+(?:IF NOT EXISTS\\s+)?"?' + table + '"?', 'i');
+      let newSql = orig.sql.replace(nameRe, 'CREATE TABLE ' + table + '_new');
+
+      // FK-Klausel vor schliessender ) einhaengen.
+      const fkClause = `,\n        FOREIGN KEY (user_email) REFERENCES app_users(email) ON DELETE ${onDelete}\n      `;
+      const lastParen = newSql.lastIndexOf(')');
+      if (lastParen < 0) throw new Error(`Migration 130: kein ) in CREATE fuer ${table}`);
+      newSql = newSql.slice(0, lastParen) + fkClause + newSql.slice(lastParen);
+
+      db.prepare(`DROP TABLE IF EXISTS ${table}_new`).run();
+      db.exec(newSql);
+      db.prepare(`INSERT INTO ${table}_new SELECT * FROM ${table}`).run();
+      db.prepare(`DROP TABLE ${table}`).run();
+      db.prepare(`ALTER TABLE ${table}_new RENAME TO ${table}`).run();
+      for (const ix of indexes) db.exec(ix.sql);
+    };
+
+    for (const t of CASCADE_TABLES) _addUserFk(t, 'CASCADE');
+    for (const t of SET_NULL_TABLES) _addUserFk(t, 'SET NULL');
+
+    // Index auf jede FK-Spalte (Pflicht laut CLAUDE.md: jede FK-Spalte hat Index).
+    // Ausgenommen: Tabellen, deren PRIMARY KEY user_email als ERSTES Feld
+    // fuehrt — der PK-Index deckt user_email-Lookups bereits ab. Composite-
+    // PKs, die mit book_id (o.ae.) starten, decken user_email NICHT ab und
+    // brauchen einen eigenen Index.
+    const PK_LEADS_WITH_USER_EMAIL = new Set([
+      'user_activity', 'user_feature_usage', 'user_page_usage', 'synonym_cache',
+    ]);
+    const NEEDS_USER_INDEX = [...CASCADE_TABLES, ...SET_NULL_TABLES]
+      .filter(t => !PK_LEADS_WITH_USER_EMAIL.has(t));
+    for (const t of NEEDS_USER_INDEX) {
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_${t}_user_email ON ${t}(user_email)`);
+    }
+
+    db.pragma('foreign_keys = ON');
+
+    const fkErrors130 = db.pragma('foreign_key_check');
+    if (fkErrors130.length) {
+      throw new Error(`Migration 130: foreign_key_check meldet ${fkErrors130.length} Verstoesse: ${JSON.stringify(fkErrors130.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 130').run();
+    logger.info(`DB-Migration auf Version 130 abgeschlossen (FK-Hardening: ${CASCADE_TABLES.length} CASCADE + ${SET_NULL_TABLES.length} SET NULL Tabellen auf app_users(email)).`);
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

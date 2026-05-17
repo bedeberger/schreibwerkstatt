@@ -57,11 +57,13 @@
   margin-left: auto;
   align-items: center;
 }
+.pdfx-profile-create > .combobox-wrap { width: 180px; }
 
 .pdfx-scope-picker {
   display: inline-flex;
-  min-width: 180px;
+  gap: 0.4rem;
 }
+.pdfx-scope-picker > .combobox-wrap { width: 180px; }
 
 /* === Profilname (Inline-Edit-Input) === */
 .pdfx-name-input {

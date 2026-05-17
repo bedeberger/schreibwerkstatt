@@ -71,11 +71,11 @@
       <div class="form-inline">
         <label class="form-inline-field">
           <span x-text="$app.t('finetune.length.min')"></span>
-          <input type="number" id="ft-min-chars" name="ft-min-chars" min="80" max="5000" step="20" x-model.number="finetuneMinChars" class="form-num">
+          <input type="text" id="ft-min-chars" name="ft-min-chars" x-data="numInput({ step: 20, min: 80, max: 5000 })" x-modelable="value" x-model="finetuneMinChars" class="form-num">
         </label>
         <label class="form-inline-field">
           <span x-text="$app.t('finetune.length.max')"></span>
-          <input type="number" id="ft-max-chars" name="ft-max-chars" min="200" max="16000" step="100" x-model.number="finetuneMaxChars" class="form-num">
+          <input type="text" id="ft-max-chars" name="ft-max-chars" x-data="numInput({ step: 100, min: 200, max: 16000 })" x-modelable="value" x-model="finetuneMaxChars" class="form-num">
         </label>
       </div>
     </div>
@@ -85,11 +85,11 @@
       <div class="form-inline">
         <label class="form-inline-field">
           <span x-text="$app.t('finetune.valSplit.ratio')"></span>
-          <input type="number" id="ft-val-split" name="ft-val-split" min="0" max="0.5" step="0.05" x-model.number="finetuneValSplit" class="form-num">
+          <input type="text" id="ft-val-split" name="ft-val-split" x-data="numInput({ step: 0.05, min: 0, max: 0.5 })" x-modelable="value" x-model="finetuneValSplit" class="form-num">
         </label>
         <label class="form-inline-field">
           <span x-text="$app.t('finetune.valSplit.seed')"></span>
-          <input type="number" id="ft-val-seed" name="ft-val-seed" min="0" max="999999" step="1" x-model.number="finetuneValSeed" class="form-num">
+          <input type="text" id="ft-val-seed" name="ft-val-seed" x-data="numInput({ step: 1, min: 0, max: 999999 })" x-modelable="value" x-model="finetuneValSeed" class="form-num">
         </label>
       </div>
     </div>
@@ -123,11 +123,11 @@
         <div class="form-inline">
           <label class="form-inline-field">
             <span x-text="$app.t('finetune.ai.reversePromptsPerPage')"></span>
-            <input type="number" id="ft-ai-rev-per-page" name="ft-ai-rev-per-page" min="1" max="8" step="1" x-model.number="finetuneAiReversePromptsPerPage" class="form-num">
+            <input type="text" id="ft-ai-rev-per-page" name="ft-ai-rev-per-page" x-data="numInput({ step: 1, min: 1, max: 8 })" x-modelable="value" x-model="finetuneAiReversePromptsPerPage" class="form-num">
           </label>
           <label class="form-inline-field">
             <span x-text="$app.t('finetune.ai.factQAPerEntity')"></span>
-            <input type="number" id="ft-ai-qa-per-entity" name="ft-ai-qa-per-entity" min="2" max="8" step="1" x-model.number="finetuneAiFactQAPerEntity" class="form-num">
+            <input type="text" id="ft-ai-qa-per-entity" name="ft-ai-qa-per-entity" x-data="numInput({ step: 1, min: 2, max: 8 })" x-modelable="value" x-model="finetuneAiFactQAPerEntity" class="form-num">
           </label>
         </div>
       </div>
@@ -139,7 +139,7 @@
         <div class="form-inline">
           <label class="form-inline-field">
             <span x-text="$app.t('finetune.unsloth.maxSeqTokens')"></span>
-            <input type="number" id="ft-max-seq-tokens" name="ft-max-seq-tokens" min="0" max="16384" step="512" x-model.number="finetuneMaxSeqTokens" class="form-num">
+            <input type="text" id="ft-max-seq-tokens" name="ft-max-seq-tokens" x-data="numInput({ step: 512, min: 0, max: 16384 })" x-modelable="value" x-model="finetuneMaxSeqTokens" class="form-num">
           </label>
         </div>
         <label class="form-check">

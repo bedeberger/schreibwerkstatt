@@ -10,6 +10,7 @@ process.env.DB_PATH = tmp;
 const { db } = require('../../db/connection');
 require('../../db/migrations');
 const { upsertBookByName } = require('../../db/books');
+const appUsers = require('../../db/app-users');
 const pageRevisions = require('../../db/page-revisions');
 
 function _seedPage(bookId, pageId, name = 'Seite') {
@@ -17,6 +18,10 @@ function _seedPage(bookId, pageId, name = 'Seite') {
     'INSERT INTO pages (page_id, book_id, page_name, updated_at) VALUES (?, ?, ?, ?)'
   ).run(pageId, bookId, name, new Date().toISOString());
 }
+
+// Mig 130 FK: user_email braucht app_users-Row.
+appUsers.createUser({ email: 'a@x.test', displayName: 'A' });
+appUsers.createUser({ email: 'b@x.test', displayName: 'B' });
 
 test('page_revisions: insert + listForPage + countForPage', () => {
   upsertBookByName(901, 'Test-Buch P2 A');

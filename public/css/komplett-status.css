@@ -16,7 +16,7 @@
   padding: 3px 8px;
   white-space: nowrap;
   pointer-events: none;
-  z-index: 20;
+  z-index: var(--z-popover);
 }
 .komplett-status-panel {
   position: absolute;

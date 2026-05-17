@@ -43,7 +43,7 @@
   background: transparent;
   border-radius: var(--radius-sm);
   transition: background var(--transition-slow);
-  z-index: 5;
+  z-index: var(--z-base);
   touch-action: none;
 }
 .sidebar-resize-handle:hover,
