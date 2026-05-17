@@ -9,7 +9,7 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
-  width: min(960px, calc(100% - 2rem));
+  width: min(1200px, calc(100% - 2rem));
   max-height: calc(100vh - 4rem);
   padding: 0;
   margin: auto;
@@ -97,10 +97,6 @@
   font-style: normal;
 }
 
-.revision-viewer__content {
-  /* page-content-view setzt eigene Prose-Styles. */
-}
-
 .revision-viewer__foot {
   display: flex;
   justify-content: flex-end;
@@ -131,52 +127,69 @@
   border-color: var(--color-primary-hover);
 }
 
-/* === Diff-Body ===
-   Block-aware: parseBlocks splittet Quell-HTML in <p>/<h*>/<li>/<blockquote>/
-   <pre>, jeder Block wird als eigener Wrapper gerendert. Aenderungen sind als
-   Block ganz markiert (added/removed) oder gepaart mit Inline-Word-Diff
-   (changed). Unveraenderte Strecken > 1 Block kollabieren zu .diff-block--skip. */
+/* === Side-by-Side Diff-Body ===
+   Zwei Spalten (links Vorgaenger, rechts geklickte Revision). Block-Pairs
+   stehen auf gleicher Grid-Row; Pure-Add/Pure-Del haben eine leere Gegenzelle.
+   Inline-Wort-Diff: linke Spalte zeigt nur del+eq, rechte nur ins+eq. */
 .revision-diff-body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 0.6rem;
+  row-gap: 0.35rem;
   word-wrap: break-word;
-  line-height: 1.6;
+  line-height: 1.55;
   font-size: var(--font-size-md, 1rem);
 }
 
-.revision-diff-body .diff-block {
-  padding: 0.45rem 0.7rem;
+.revision-diff-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 0.6rem;
+  margin-bottom: 0.5rem;
+  font-size: var(--font-size-sm, 0.875rem);
+  font-weight: 600;
+  color: var(--color-muted);
+}
+.revision-diff-header span {
+  padding: 0.25rem 0.55rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.revision-diff-body .diff-cell {
+  padding: 0.4rem 0.65rem;
   border-radius: var(--radius-sm);
   border-left: 3px solid transparent;
   background: var(--color-surface);
+  min-height: 1em;
 }
-.revision-diff-body .diff-block--eq {
+.revision-diff-body .diff-cell--eq {
   color: var(--color-muted);
   background: transparent;
   border-left-color: var(--color-border);
 }
-.revision-diff-body .diff-block--added {
-  background: var(--color-ok-bg);
-  color: var(--color-ok-text);
-  border-left-color: var(--color-ok-text);
-}
-.revision-diff-body .diff-block--removed {
+.revision-diff-body .diff-cell--removed,
+.revision-diff-body .diff-cell--changed.diff-cell--left {
   background: var(--color-err-bg);
   color: var(--color-err-text);
   border-left-color: var(--color-err-text);
 }
-.revision-diff-body .diff-block--removed del.diff-del {
-  text-decoration: line-through;
+.revision-diff-body .diff-cell--added,
+.revision-diff-body .diff-cell--changed.diff-cell--right {
+  background: var(--color-ok-bg);
+  color: var(--color-ok-text);
+  border-left-color: var(--color-ok-text);
 }
-.revision-diff-body .diff-block--added ins.diff-add {
-  text-decoration: none;
+.revision-diff-body .diff-cell--empty {
+  background: transparent;
+  border-left-color: transparent;
 }
-.revision-diff-body .diff-block--changed {
-  background: var(--color-card-bg);
-  border-left-color: var(--color-primary);
+.revision-diff-body .diff-empty-mark {
+  color: var(--color-muted);
+  opacity: 0.4;
 }
-.revision-diff-body .diff-block--skip {
+
+.revision-diff-body .diff-cell--skip {
+  grid-column: 1 / -1;
   text-align: center;
   font-style: italic;
   color: var(--color-muted);
@@ -189,61 +202,52 @@
   font-size: var(--font-size-sm, 0.875rem);
 }
 
-/* Block-Tag-Spezifika: Headings groesser/fetter, li mit Bullet, blockquote
-   eingerueckt, pre monospace. */
-.revision-diff-body .diff-block--h1,
-.revision-diff-body .diff-block--h2,
-.revision-diff-body .diff-block--h3,
-.revision-diff-body .diff-block--h4,
-.revision-diff-body .diff-block--h5,
-.revision-diff-body .diff-block--h6 {
+/* Heading-Tags semantisch behalten. */
+.revision-diff-body .diff-cell--h1,
+.revision-diff-body .diff-cell--h2,
+.revision-diff-body .diff-cell--h3,
+.revision-diff-body .diff-cell--h4,
+.revision-diff-body .diff-cell--h5,
+.revision-diff-body .diff-cell--h6 {
   font-weight: 700;
   margin: 0;
 }
-.revision-diff-body .diff-block--h1 { font-size: 1.4rem; }
-.revision-diff-body .diff-block--h2 { font-size: 1.25rem; }
-.revision-diff-body .diff-block--h3 { font-size: 1.1rem; }
-.revision-diff-body .diff-block--li {
+.revision-diff-body .diff-cell--h1 { font-size: 1.4rem; }
+.revision-diff-body .diff-cell--h2 { font-size: 1.25rem; }
+.revision-diff-body .diff-cell--h3 { font-size: 1.1rem; }
+.revision-diff-body .diff-cell--li {
   padding-left: 1.6rem;
   position: relative;
 }
-.revision-diff-body .diff-block--li::before {
+.revision-diff-body .diff-cell--li::before {
   content: "•";
   position: absolute;
   left: 0.7rem;
   color: var(--color-muted);
 }
-.revision-diff-body .diff-block--blockquote {
+.revision-diff-body .diff-cell--blockquote {
   font-style: italic;
   padding-left: 1rem;
 }
-.revision-diff-body .diff-block--pre {
+.revision-diff-body .diff-cell--pre {
   font-family: var(--font-mono, monospace);
   white-space: pre-wrap;
 }
 
-/* Inline-Marker in --changed-Bloecken: Wort-Diff. */
+/* Inline-Wort-Marker. */
 .revision-diff-body .diff-add,
 .revision-diff-body ins.diff-add {
-  background: var(--color-ok-bg);
-  color: var(--color-ok-text);
   text-decoration: none;
-  padding: 0 2px;
-  border-radius: 2px;
+  font-weight: 600;
 }
 .revision-diff-body .diff-del,
 .revision-diff-body del.diff-del {
-  background: var(--color-err-bg);
-  color: var(--color-err-text);
   text-decoration: line-through;
-  padding: 0 2px;
-  border-radius: 2px;
+  font-weight: 600;
 }
-.revision-diff-body .diff-eq { color: var(--color-text); }
+.revision-diff-body .diff-eq { color: inherit; opacity: 0.85; }
 
-/* === Liste-Row clickable ===
-   Pointer + Hover-Highlight in der Revisionsliste, damit klar ist dass
-   Row → Viewer oeffnet. Restore-Button erbt nicht (separates Styling). */
+/* === Liste-Row clickable === */
 .page-revisions-list .history-item--clickable {
   cursor: pointer;
 }
@@ -262,5 +266,12 @@
   .revision-viewer__body { padding-left: 0.75rem; padding-right: 0.75rem; }
   .revision-viewer__foot { flex-direction: column-reverse; }
   .revision-viewer__btn { width: 100%; }
+
+  /* Side-by-Side wird bei schmalem Viewport gestapelt: Alt oben, Neu unten,
+     skip-Marker spannt sich nicht mehr ueber zwei Spalten. */
+  .revision-diff-body,
+  .revision-diff-header { grid-template-columns: 1fr; }
+  .revision-diff-body .diff-cell--skip { grid-column: 1; }
+  .revision-diff-body .diff-cell--empty { display: none; }
 }
 }

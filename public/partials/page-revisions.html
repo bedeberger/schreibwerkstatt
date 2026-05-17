@@ -104,10 +104,13 @@
             <div x-show="!viewerDiffLoading && viewerDiffUnchanged" x-cloak
                  class="revision-viewer__hint"
                  x-text="$app.t('editor.revisions.viewer.noChanges')"></div>
-            <div x-show="!viewerDiffLoading && !viewerDiffUnchanged"
-                 x-cloak
-                 class="revision-diff-body"
-                 x-html="viewerDiffHtml"></div>
+            <div x-show="!viewerDiffLoading && !viewerDiffUnchanged" x-cloak>
+              <div class="revision-diff-header" aria-hidden="true">
+                <span x-text="$app.t('editor.revisions.viewer.colPrev')"></span>
+                <span x-text="$app.t('editor.revisions.viewer.colThis')"></span>
+              </div>
+              <div class="revision-diff-body" x-html="viewerDiffHtml"></div>
+            </div>
           </div>
         </div>
 
