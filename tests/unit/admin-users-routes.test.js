@@ -50,13 +50,10 @@ test.after(() => {
 });
 
 // Seed: alice=admin, bob=user mit invite-Recht, carol=user ohne Invite-Recht.
+// Settings leben jetzt in app_users (Mig 129) — createUser reicht.
 appUsers.createUser({ email: 'alice@example.com', displayName: 'Alice', globalRole: 'admin' });
 appUsers.createUser({ email: 'bob@example.com',   displayName: 'Bob',   globalRole: 'user', canInviteUsers: 1 });
 appUsers.createUser({ email: 'carol@example.com', displayName: 'Carol', globalRole: 'user', canInviteUsers: 0 });
-// users-Settings-Row, damit /me/settings nicht 404 liefert.
-db.prepare(`INSERT INTO users (email, name, created_at) VALUES ('alice@example.com','Alice',datetime('now'))`).run();
-db.prepare(`INSERT INTO users (email, name, created_at) VALUES ('bob@example.com',  'Bob',  datetime('now'))`).run();
-db.prepare(`INSERT INTO users (email, name, created_at) VALUES ('carol@example.com','Carol',datetime('now'))`).run();
 
 function _request(method, urlPath, { user = null, role = 'user', body = null } = {}) {
   return new Promise((resolve, reject) => {

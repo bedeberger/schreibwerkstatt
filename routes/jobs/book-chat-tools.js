@@ -4,7 +4,8 @@
 // ctx = { bookId, userEmail, userToken, jobSignal, logger }
 // Übersicht aller Tools + Vertrag: docs/buchchat-tools.md
 
-const { db, getUser } = require('../../db/schema');
+const { db } = require('../../db/schema');
+const { getUser } = require('../../db/app-users');
 const { INPUT_BUDGET_CHARS } = require('../../lib/ai');
 const { htmlToText } = require('./shared');
 const contentStore = require('../../lib/content-store');
@@ -1334,7 +1335,7 @@ const WERKSTATT_CONSISTENCY_PROBLEM_PREVIEW = 240;
 const WERKSTATT_BRAINSTORM_BEGRUENDUNG_PREVIEW = 160;
 
 function _userLocale(userEmail) {
-  return getUser(userEmail)?.locale || 'de';
+  return getUser(userEmail)?.language || 'de';
 }
 
 function _flattenMindmapTree(node, indent = 0, out = []) {

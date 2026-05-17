@@ -41,9 +41,9 @@ test.after(() => {
   try { fs.unlinkSync(tmpDb + '-shm'); } catch {}
 });
 
-test('schema_version >= 107', () => {
+test('schema_version >= 129', () => {
   const v = db.prepare('SELECT version FROM schema_version').get().version;
-  assert.ok(v >= 107, `schema_version=${v} < 107`);
+  assert.ok(v >= 129, `schema_version=${v} < 129`);
 });
 
 test('app_users + user_invites + user_sessions_audit existieren', () => {
@@ -59,12 +59,17 @@ test('user_invites: partial UNIQUE-Index aktiv', () => {
   assert.match(idx.sql, /WHERE\s+revoked_at\s+IS\s+NULL/i);
 });
 
-test('users.email FK auf app_users(email) ON DELETE CASCADE', () => {
-  const fkInfo = db.pragma('foreign_key_list(users)');
-  const fk = fkInfo.find(f => f.from === 'email');
-  assert.ok(fk, 'FK auf email fehlt');
-  assert.equal(fk.table, 'app_users');
-  assert.equal(fk.on_delete, 'CASCADE');
+test('users-Tabelle entfernt (Migration 129)', () => {
+  const t = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='users'").get();
+  assert.equal(t, undefined, 'users-Tabelle haette in Mig 129 gedropt werden muessen');
+});
+
+test('app_users hat konsolidierte Settings-Spalten', () => {
+  const cols = db.pragma('table_info(app_users)').map(c => c.name);
+  for (const c of ['last_login_at', 'theme', 'default_buchtyp', 'default_language',
+                   'default_region', 'focus_granularity', 'daily_goal_chars']) {
+    assert.ok(cols.includes(c), `app_users.${c} fehlt`);
+  }
 });
 
 test('createUser + getUser', () => {
@@ -182,15 +187,41 @@ test('ensureAdminFromEnv: bestehender admin wird nicht angefasst', () => {
   assert.equal(r.action, 'exists');
 });
 
-test('FK CASCADE: hard-delete app_users entfernt users-Row', () => {
-  appUsers.createUser({ email: 'fkdel@example.com', displayName: 'FK Test' });
-  // users-Row anlegen (Pflicht-FK auf app_users existiert jetzt)
-  db.prepare(`
-    INSERT INTO users (email, name, created_at) VALUES ('fkdel@example.com', 'FK Test', datetime('now'))
-  `).run();
-  db.prepare('DELETE FROM app_users WHERE email = ?').run('fkdel@example.com');
-  const users = db.prepare('SELECT email FROM users WHERE email = ?').get('fkdel@example.com');
-  assert.equal(users, undefined, 'users-Row haette cascadiert werden muessen');
+test('updateUserSettings + getUser: language + theme + default_* persistiert', () => {
+  appUsers.createUser({ email: 'settings@example.com', displayName: 'Settings User' });
+  appUsers.updateUserSettings('settings@example.com', {
+    language: 'en',
+    theme: 'dark',
+    default_buchtyp: 'roman',
+    default_language: 'en',
+    default_region: 'US',
+    focus_granularity: 'sentence',
+    daily_goal_chars: 1200,
+  });
+  const u = appUsers.getUser('settings@example.com');
+  assert.equal(u.language, 'en');
+  assert.equal(u.theme, 'dark');
+  assert.equal(u.default_buchtyp, 'roman');
+  assert.equal(u.default_region, 'US');
+  assert.equal(u.focus_granularity, 'sentence');
+  assert.equal(u.daily_goal_chars, 1200);
+});
+
+test('touchUserLastSeen aktualisiert last_seen_at', () => {
+  const before = appUsers.getUser('settings@example.com').last_seen_at;
+  appUsers.touchUserLastSeen('settings@example.com', '2099-01-01T00:00:00.000Z');
+  const after = appUsers.getUser('settings@example.com').last_seen_at;
+  assert.equal(after, '2099-01-01T00:00:00.000Z');
+  assert.notEqual(after, before);
+});
+
+test('addUserActivity summiert seconds pro (user, Tag)', () => {
+  appUsers.addUserActivity('settings@example.com', 30, '2099-01-02T08:00:00.000Z');
+  appUsers.addUserActivity('settings@example.com', 45, '2099-01-02T09:00:00.000Z');
+  const row = db.prepare(
+    'SELECT seconds FROM user_activity WHERE user_email = ? AND date = ?'
+  ).get('settings@example.com', '2099-01-02');
+  assert.equal(row.seconds, 75);
 });
 
 test('foreign_key_check nach Mig 107 leer', () => {

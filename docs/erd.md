@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 128, 75 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 129, 74 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -760,14 +760,21 @@ erDiagram
     TEXT    avatar_url
     TEXT    global_role      "admin | user (Default user)"
     TEXT    status           "invited | active | suspended | deleted"
-    TEXT    language
+    TEXT    language         "UI-Sprache (de | en)"
     TEXT    model_override
     INTEGER can_invite_users "Default 1; Admin entzieht bei Missbrauch"
     TEXT    first_seen_at
     TEXT    last_seen_at
+    TEXT    last_login_at
     TEXT    invited_by
     TEXT    invited_at
     TEXT    created_at
+    TEXT    theme             "auto | light | dark"
+    TEXT    default_buchtyp
+    TEXT    default_language  "Buch-Default (de | en)"
+    TEXT    default_region    "Buch-Default (CH | DE | US | GB)"
+    TEXT    focus_granularity "paragraph | sentence | window-3 | typewriter-only"
+    INTEGER daily_goal_chars  "NULL → Frontend-Fallback 1500"
     REAL    monthly_budget_usd "NULL = kein numerisches Limit"
     TEXT    budget_mode        "none | soft | hard (Default none)"
     TEXT    ai_provider_override "NULL = follows global ai.provider; CHECK in ('claude','ollama','llama')"
@@ -828,20 +835,6 @@ erDiagram
     TEXT email   PK,FK "app_users(email) CASCADE"
     TEXT period  PK   "YYYY-MM (UTC) — 1 Mail pro User pro Monat"
     TEXT sent_at
-  }
-  users {
-    TEXT    email             PK,FK "app_users(email) CASCADE"
-    TEXT    name
-    TEXT    locale
-    TEXT    theme
-    TEXT    default_buchtyp
-    TEXT    default_language
-    TEXT    default_region
-    TEXT    focus_granularity
-    INTEGER daily_goal_chars  "NULL → Frontend-Fallback 1500"
-    TEXT    created_at
-    TEXT    last_login_at
-    TEXT    last_seen_at
   }
   registration_requests {
     INTEGER id            PK "AUTOINCREMENT"

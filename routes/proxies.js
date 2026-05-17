@@ -1,7 +1,8 @@
 const express = require('express');
 const logger = require('../logger');
 const { MAX_TOKENS_OUT, MODEL_CONTEXT, CHARS_PER_TOKEN, ollamaTemp, llamaTemp } = require('../lib/ai');
-const { getBookLocale, getUser } = require('../db/schema');
+const { getBookLocale } = require('../db/schema');
+const appUsers = require('../db/app-users');
 const { getPrompts, getPromptConfig } = require('../lib/prompts-loader');
 const { toIntId } = require('../lib/validate');
 const appSettings = require('../lib/app-settings');
@@ -26,11 +27,10 @@ const jsonBody = express.json();
 // Modell-Konfiguration ans Frontend liefern (keine Credentials)
 router.get('/config', (req, res) => {
   const sessionUser = req.session?.user || null;
-  // role + can_invite_users aus app_users (SSoT) ueber sessionUser
-  // mergen — Frontend nutzt das fuer Admin-Karte + Invite-Dialog.
   let user = sessionUser;
+  let userSettings = null;
   if (sessionUser) {
-    const appUser = require('../db/app-users').getUser(sessionUser.email);
+    const appUser = appUsers.getUser(sessionUser.email);
     user = {
       ...sessionUser,
       role: appUser?.global_role || 'user',
@@ -38,6 +38,18 @@ router.get('/config', (req, res) => {
       can_invite_users: appUser?.can_invite_users ? 1 : 0,
       isAdmin: appUser?.global_role === 'admin',
     };
+    if (appUser) {
+      // `locale` ist API-Vertrag; app_users-Spalte heisst `language`.
+      userSettings = {
+        locale:            appUser.language,
+        theme:             appUser.theme,
+        default_buchtyp:   appUser.default_buchtyp,
+        default_language:  appUser.default_language,
+        default_region:    appUser.default_region,
+        focus_granularity: appUser.focus_granularity,
+        daily_goal_chars:  appUser.daily_goal_chars,
+      };
+    }
   }
   res.json({
     claudeMaxTokens: MAX_TOKENS_OUT,
@@ -47,7 +59,7 @@ router.get('/config', (req, res) => {
     ollamaModel: appSettings.get('ai.ollama.model') || 'llama3.2',
     llamaModel:  appSettings.get('ai.llama.model')  || 'llama3.2',
     user,
-    userSettings: sessionUser ? getUser(sessionUser.email) : null,
+    userSettings,
     devMode: process.env.LOCAL_DEV_MODE === 'true',
     promptConfig: getPromptConfig(),
   });

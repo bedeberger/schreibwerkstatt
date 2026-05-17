@@ -1,16 +1,18 @@
 'use strict';
-// Helper-API ueber app_users, user_invites, user_sessions_audit.
+// Helper-API ueber app_users, user_invites, user_sessions_audit, user_activity.
 // Keine direkte SQL aus Konsumenten.
 //
-// Identity-Trennung:
-//   - `app_users`            — wer darf einloggen + global_role + status
-//   - `users`                — Profil/Settings (locale, theme, ...) (Migration 41)
+// `app_users` ist die SSoT fuer User: Identity (email, display_name, role,
+// status), Profil/Settings (language, theme, default_buchtyp/language/region,
+// focus_granularity, daily_goal_chars), Login-Spuren (first_seen_at,
+// last_seen_at, last_login_at) und Budget/Provider-Overrides.
+// Begleittabellen:
 //   - `user_sessions_audit`  — Login/Logout/Role-Change-Events
 //   - `user_invites`         — Token-basierte Einladungen
+//   - `user_activity`        — aktive Sekunden pro (user, Tag)
 //
-// `users.email` ist FK auf `app_users.email` ON DELETE CASCADE — Hard-Delete
-// raeumt Profil mit weg. Default ist Soft-Delete via `status='deleted'`,
-// dabei bleibt das Profil zur Anonymisierung erhalten.
+// Default ist Soft-Delete via `status='deleted'`; Hard-Delete via DELETE-Row
+// raeumt abhaengige Tabellen via FK CASCADE/SET NULL.
 
 const crypto = require('crypto');
 const { db } = require('./connection');
@@ -18,7 +20,9 @@ const { db } = require('./connection');
 const _stmtFindByEmail = db.prepare(`
   SELECT id, email, display_name, avatar_url, global_role, status, language,
          model_override, can_invite_users, first_seen_at, last_seen_at,
-         invited_by, invited_at, created_at,
+         invited_by, invited_at, created_at, last_login_at,
+         theme, default_buchtyp, default_language, default_region,
+         focus_granularity, daily_goal_chars,
          monthly_budget_usd, budget_mode, ai_provider_override
     FROM app_users
    WHERE email = ?
@@ -33,9 +37,34 @@ const _stmtInsertUser = db.prepare(`
 const _stmtTouchLogin = db.prepare(`
   UPDATE app_users
      SET last_seen_at  = datetime('now'),
+         last_login_at = datetime('now'),
          first_seen_at = COALESCE(first_seen_at, datetime('now')),
          display_name  = COALESCE(?, display_name)
    WHERE email = ?
+`);
+
+const _stmtTouchLastSeen = db.prepare(`
+  UPDATE app_users SET last_seen_at = ? WHERE email = ?
+`);
+
+const _stmtUpdateUserSettings = db.prepare(`
+  UPDATE app_users
+     SET language          = ?,
+         theme             = ?,
+         default_buchtyp   = ?,
+         default_language  = ?,
+         default_region    = ?,
+         focus_granularity = ?,
+         daily_goal_chars  = ?
+   WHERE email = ?
+`);
+
+const _stmtAddUserActivity = db.prepare(`
+  INSERT INTO user_activity (user_email, date, seconds, first_at, last_at)
+  VALUES (?, ?, ?, ?, ?)
+  ON CONFLICT(user_email, date) DO UPDATE SET
+    seconds = seconds + excluded.seconds,
+    last_at = excluded.last_at
 `);
 
 const _stmtSetStatus = db.prepare(`
@@ -159,6 +188,37 @@ function touchLogin(email, displayName = null) {
   const e = _normEmail(email);
   if (!e) return;
   _stmtTouchLogin.run(displayName, e);
+}
+
+/** Setzt last_seen_at auf nowIso. Throttling macht der Aufrufer. */
+function touchUserLastSeen(email, nowIso = new Date().toISOString()) {
+  const e = _normEmail(email);
+  if (!e) return;
+  _stmtTouchLastSeen.run(nowIso, e);
+}
+
+/** Partielles Settings-Update. Null-Werte setzen die Spalte zurueck. */
+function updateUserSettings(email, settings) {
+  const e = _normEmail(email);
+  if (!e) return;
+  _stmtUpdateUserSettings.run(
+    settings.language          ?? null,
+    settings.theme             ?? null,
+    settings.default_buchtyp   ?? null,
+    settings.default_language  ?? null,
+    settings.default_region    ?? null,
+    settings.focus_granularity ?? null,
+    settings.daily_goal_chars  ?? null,
+    e,
+  );
+}
+
+/** Summiert aktive Sekunden fuer (user, Tag) in user_activity. */
+function addUserActivity(email, seconds, nowIso = new Date().toISOString()) {
+  const e = _normEmail(email);
+  if (!e || !(seconds > 0)) return;
+  const date = nowIso.slice(0, 10);
+  _stmtAddUserActivity.run(e, date, Math.round(seconds), nowIso, nowIso);
 }
 
 function setStatus(email, status) {
@@ -300,6 +360,7 @@ function ensureAdminFromEnv() {
 
 module.exports = {
   getUser, listUsers, getActiveAdminEmails, createUser, touchLogin,
+  touchUserLastSeen, updateUserSettings, addUserActivity,
   setStatus, setGlobalRole, setCanInviteUsers, setBudget, softDeleteUser,
   setAiProviderOverride,
   recordAuditEvent, listAuditForUser,

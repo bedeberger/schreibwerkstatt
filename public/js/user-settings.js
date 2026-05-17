@@ -9,7 +9,7 @@ export const userSettingsMethods = {
     this.userSettingsLoading = true;
     try {
       const data = await fetchJson('/me/settings');
-      this.userSettingsProfile          = { email: data.email, name: data.name, created_at: data.created_at, last_login_at: data.last_login_at };
+      this.userSettingsProfile          = { email: data.email, name: data.display_name, created_at: data.created_at, last_login_at: data.last_login_at };
       this.userSettingsDefaultLanguage  = data.default_language  || '';
       this.userSettingsDefaultRegion    = data.default_region    || '';
       this.userSettingsDefaultBuchtyp   = data.default_buchtyp   || '';

@@ -2,7 +2,6 @@ const crypto = require('crypto');
 const express = require('express');
 const { Issuer, generators } = require('openid-client');
 const logger = require('../logger');
-const { upsertUserLogin } = require('../db/schema');
 const appUsers = require('../db/app-users');
 const rateLimit = require('../lib/admin-login-ratelimit');
 const appSettings = require('../lib/app-settings');
@@ -227,7 +226,6 @@ router.get('/auth/callback', async (req, res) => {
     };
     req.session.loginAt = Date.now();
     req.session.lastSeen = Date.now();
-    upsertUserLogin(email, claims.name || email);
     appUsers.touchLogin(email, claims.name || null);
     appUsers.recordAuditEvent(email, 'login', { ip, userAgent, meta: { method: 'oidc' } });
     logger.info('Login', { user: email });
@@ -327,7 +325,6 @@ router.post('/auth/admin-login', express.json(), (req, res) => {
   req.session.user = { email: givenEmail, name: 'Admin', picture: null, role: 'admin' };
   req.session.loginAt = Date.now();
   req.session.lastSeen = Date.now();
-  upsertUserLogin(givenEmail, 'Admin');
   logger.info('Admin-Login (ENV-Pfad).', { user: givenEmail });
   req.session.save(err => {
     if (err) return res.status(500).json({ error_code: 'SESSION_SAVE_FAILED' });

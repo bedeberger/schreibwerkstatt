@@ -1,7 +1,7 @@
 'use strict';
 const express = require('express');
-const { getUser, updateUserSettings } = require('../db/schema');
 const appUsers = require('../db/app-users');
+const { getUser, updateUserSettings } = appUsers;
 const { setContext } = require('../lib/log-context');
 const logger = require('../logger');
 
@@ -60,22 +60,35 @@ const NUMERIC_FIELDS = [
   { key: 'daily_goal_chars', min: DAILY_GOAL_MIN, max: DAILY_GOAL_MAX, label: 'daily_goal_chars' },
 ];
 
+// app_users.language ist die Spalte; nach aussen heisst sie `locale` (API-Vertrag).
+function toResponse(u) {
+  if (!u) return null;
+  return {
+    email:             u.email,
+    created_at:        u.created_at,
+    last_login_at:     u.last_login_at,
+    last_seen_at:      u.last_seen_at,
+    locale:            u.language,
+    theme:             u.theme,
+    default_buchtyp:   u.default_buchtyp,
+    default_language:  u.default_language,
+    default_region:    u.default_region,
+    focus_granularity: u.focus_granularity,
+    daily_goal_chars:  u.daily_goal_chars,
+    role:              u.global_role || 'user',
+    status:            u.status || 'active',
+    can_invite_users:  u.can_invite_users ? 1 : 0,
+    display_name:      u.display_name || null,
+    model_override:    u.model_override || null,
+  };
+}
+
 /** Aktuelles User-Profil samt Einstellungen + app_users-Identity. */
 router.get('/settings', (req, res) => {
   const email = req.session.user.email;
   const user = getUser(email);
   if (!user) return res.status(404).json({ error_code: 'USER_PROFILE_NOT_FOUND' });
-  // Identity-Felder aus app_users mitliefern. Frontend nutzt
-  // role + can_invite_users fuer UI-Gates (Admin-Karte, Invite-Dialog).
-  const app = appUsers.getUser(email);
-  res.json({
-    ...user,
-    role: app?.global_role || 'user',
-    status: app?.status || 'active',
-    can_invite_users: app?.can_invite_users ? 1 : 0,
-    display_name: app?.display_name || null,
-    model_override: app?.model_override || null,
-  });
+  res.json(toResponse(user));
 });
 
 /**
@@ -89,6 +102,17 @@ router.get('/users-light', (_req, res) => {
     users: rows.map(u => ({ email: u.email, display_name: u.display_name || null })),
   });
 });
+
+// API-Key (extern) → app_users-Spaltenname (intern). `locale` mappt auf `language`.
+const FIELD_TO_COLUMN = {
+  locale:            'language',
+  theme:             'theme',
+  default_buchtyp:   'default_buchtyp',
+  default_language:  'default_language',
+  default_region:    'default_region',
+  focus_granularity: 'focus_granularity',
+  daily_goal_chars:  'daily_goal_chars',
+};
 
 /** Partielles Update. Nicht übergebene Felder bleiben unverändert;
  *  leerer String oder null setzt das Feld zurück. */
@@ -116,18 +140,20 @@ router.patch('/settings', jsonBody, (req, res) => {
 
   const merged = {};
   for (const { key } of FIELDS) {
-    if (body[key] === undefined)           merged[key] = existing[key];
-    else if (body[key] === '' || body[key] === null) merged[key] = null;
-    else                                   merged[key] = body[key];
+    const col = FIELD_TO_COLUMN[key];
+    if (body[key] === undefined)                     merged[col] = existing[col];
+    else if (body[key] === '' || body[key] === null) merged[col] = null;
+    else                                             merged[col] = body[key];
   }
   for (const { key } of NUMERIC_FIELDS) {
-    if (body[key] === undefined)           merged[key] = existing[key];
-    else if (body[key] === '' || body[key] === null) merged[key] = null;
-    else                                   merged[key] = Number(body[key]);
+    const col = FIELD_TO_COLUMN[key];
+    if (body[key] === undefined)                     merged[col] = existing[col];
+    else if (body[key] === '' || body[key] === null) merged[col] = null;
+    else                                             merged[col] = Number(body[key]);
   }
 
   updateUserSettings(email, merged);
-  res.json({ ok: true, ...getUser(email) });
+  res.json({ ok: true, ...toResponse(getUser(email)) });
 });
 
 // User-Selbst-Invite. Gate via app_users.can_invite_users; Admins

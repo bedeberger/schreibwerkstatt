@@ -5465,6 +5465,80 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 128 abgeschlossen (page_locks-Indexe wiederhergestellt).');
   }
 
+  if (version < 129) {
+    // users-Tabelle in app_users einfalten. Beide hielten parallel Profil-/Identitaets-
+    // daten — users diente nur als Settings-Satellit (locale/theme/focus_granularity/
+    // daily_goal_chars/default_*) mit FK app_users(email) CASCADE. Spalten wandern
+    // nach app_users, users wird gedropt.
+    const auCols = db.pragma('table_info(app_users)').map(c => c.name);
+    const addCol = (name, decl) => {
+      if (!auCols.includes(name)) db.exec(`ALTER TABLE app_users ADD COLUMN ${name} ${decl}`);
+    };
+    addCol('last_login_at',     'TEXT');
+    addCol('theme',             'TEXT');
+    addCol('default_buchtyp',   'TEXT');
+    addCol('default_language',  'TEXT');
+    addCol('default_region',    'TEXT');
+    addCol('focus_granularity', 'TEXT');
+    addCol('daily_goal_chars',  'INTEGER');
+
+    const usersExists = db.prepare(
+      "SELECT 1 FROM sqlite_master WHERE type='table' AND name='users'"
+    ).get();
+    if (usersExists) {
+      db.exec(`
+        UPDATE app_users
+           SET last_login_at     = (SELECT u.last_login_at     FROM users u WHERE u.email = app_users.email),
+               theme             = (SELECT u.theme             FROM users u WHERE u.email = app_users.email),
+               default_buchtyp   = (SELECT u.default_buchtyp   FROM users u WHERE u.email = app_users.email),
+               default_language  = (SELECT u.default_language  FROM users u WHERE u.email = app_users.email),
+               default_region    = (SELECT u.default_region    FROM users u WHERE u.email = app_users.email),
+               focus_granularity = (SELECT u.focus_granularity FROM users u WHERE u.email = app_users.email),
+               daily_goal_chars  = (SELECT u.daily_goal_chars  FROM users u WHERE u.email = app_users.email)
+         WHERE email IN (SELECT email FROM users);
+      `);
+      db.exec(`
+        UPDATE app_users
+           SET language = (SELECT u.locale FROM users u WHERE u.email = app_users.email)
+         WHERE EXISTS (SELECT 1 FROM users u WHERE u.email = app_users.email AND u.locale IS NOT NULL);
+      `);
+      db.exec(`
+        UPDATE app_users
+           SET display_name = (SELECT u.name FROM users u WHERE u.email = app_users.email)
+         WHERE display_name IS NULL
+           AND EXISTS (SELECT 1 FROM users u WHERE u.email = app_users.email AND u.name IS NOT NULL);
+      `);
+      db.exec(`
+        UPDATE app_users
+           SET last_seen_at = (SELECT u.last_seen_at FROM users u WHERE u.email = app_users.email)
+         WHERE EXISTS (
+           SELECT 1 FROM users u
+            WHERE u.email = app_users.email
+              AND u.last_seen_at IS NOT NULL
+              AND (app_users.last_seen_at IS NULL OR u.last_seen_at > app_users.last_seen_at)
+         );
+      `);
+      db.exec(`
+        UPDATE app_users
+           SET created_at = (SELECT u.created_at FROM users u WHERE u.email = app_users.email)
+         WHERE EXISTS (
+           SELECT 1 FROM users u
+            WHERE u.email = app_users.email
+              AND u.created_at IS NOT NULL
+              AND (app_users.created_at IS NULL OR u.created_at < app_users.created_at)
+         );
+      `);
+      db.exec('DROP TABLE users');
+    }
+
+    const fkErrors129 = db.pragma('foreign_key_check');
+    if (fkErrors129.length) {
+      throw new Error(`Migration 129: foreign_key_check meldet ${fkErrors129.length} Verstoesse: ${JSON.stringify(fkErrors129.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 129').run();
+    logger.info('DB-Migration auf Version 129 abgeschlossen (users in app_users konsolidiert, DROP users).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

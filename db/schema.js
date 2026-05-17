@@ -616,71 +616,6 @@ function deleteFinetuneAiCache(bookId, userEmail) {
   return _deleteFtAiCache.run(parseInt(bookId), userEmail || '').changes;
 }
 
-// ── User-Profile & Einstellungen ──────────────────────────────────────────────
-
-const _upsertUserLogin = db.prepare(`
-  INSERT INTO users (email, name, created_at, last_login_at)
-  VALUES (?, ?, datetime('now'), datetime('now'))
-  ON CONFLICT(email) DO UPDATE SET
-    name          = excluded.name,
-    last_login_at = excluded.last_login_at
-`);
-const _getUser = db.prepare(
-  'SELECT email, name, created_at, last_login_at, last_seen_at, locale, theme, default_buchtyp, default_language, default_region, focus_granularity, daily_goal_chars FROM users WHERE email = ?'
-);
-const _updateUserSettings = db.prepare(`
-  UPDATE users
-  SET locale = ?, theme = ?, default_buchtyp = ?, default_language = ?, default_region = ?, focus_granularity = ?, daily_goal_chars = ?
-  WHERE email = ?
-`);
-const _touchUserLastSeen = db.prepare(
-  "UPDATE users SET last_seen_at = ? WHERE email = ?"
-);
-const _addUserActivity = db.prepare(`
-  INSERT INTO user_activity (user_email, date, seconds, first_at, last_at)
-  VALUES (?, ?, ?, ?, ?)
-  ON CONFLICT(user_email, date) DO UPDATE SET
-    seconds = seconds + excluded.seconds,
-    last_at = excluded.last_at
-`);
-
-/** Upsert User bei Login – aktualisiert name + last_login_at. */
-function upsertUserLogin(email, name) {
-  _upsertUserLogin.run(email, name || email);
-}
-
-/** Gibt User-Profil zurück oder null. */
-function getUser(email) {
-  return _getUser.get(email) || null;
-}
-
-/** Aktualisiert `last_seen_at` auf jetzt. Throttling macht der Aufrufer. */
-function touchUserLastSeen(email, nowIso = new Date().toISOString()) {
-  if (!email) return;
-  _touchUserLastSeen.run(nowIso, email);
-}
-
-/** Summiert aktive Sekunden für (user, Tag). Aufrufer clamped/heuristisiert selbst. */
-function addUserActivity(email, seconds, nowIso = new Date().toISOString()) {
-  if (!email || !(seconds > 0)) return;
-  const date = nowIso.slice(0, 10);
-  _addUserActivity.run(email, date, Math.round(seconds), nowIso, nowIso);
-}
-
-/** Aktualisiert alle Settings-Felder. Null-Werte setzen die Spalte zurück. */
-function updateUserSettings(email, settings) {
-  _updateUserSettings.run(
-    settings.locale ?? null,
-    settings.theme ?? null,
-    settings.default_buchtyp ?? null,
-    settings.default_language ?? null,
-    settings.default_region ?? null,
-    settings.focus_granularity ?? null,
-    settings.daily_goal_chars ?? null,
-    email
-  );
-}
-
 // ── Buch-Einstellungen (Sprache + Region) ─────────────────────────────────────
 
 const _getBookSettings = db.prepare('SELECT language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat FROM book_settings WHERE book_id = ?');
@@ -707,7 +642,7 @@ function getBookSettings(bookId, userEmail = null) {
     allow_lektor_book_chat: row.allow_lektor_book_chat ? 1 : 0,
   };
   if (userEmail) {
-    const u = _getUser.get(userEmail);
+    const u = require('./app-users').getUser(userEmail);
     if (u && (u.default_language || u.default_buchtyp)) {
       const language = u.default_language || 'de';
       const region   = u.default_region   || (language === 'en' ? 'US' : 'CH');
@@ -1035,8 +970,6 @@ module.exports = {
   backfillLocationChaptersFromScenes,
   saveContinuityCheck,
   getLatestContinuityCheck,
-  upsertUserLogin, getUser, updateUserSettings,
-  touchUserLastSeen, addUserActivity,
   saveCheckpoint, loadCheckpoint, deleteCheckpoint,
   insertJobRun, startJobRun, endJobRun, cleanupStuckJobRuns,
   getDailyTokenUsage:    tokenUsage.getDailyTokenUsage,

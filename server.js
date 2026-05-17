@@ -10,10 +10,10 @@ const logger = require('./logger');
 const { runWithContext } = require('./lib/log-context');
 
 // DB-Setup + Migrationen laufen beim Import
-const { db, cleanupStuckJobRuns, upsertUserLogin, touchUserLastSeen, addUserActivity, pruneStaleByAge } = require('./db/schema');
+const { db, cleanupStuckJobRuns, pruneStaleByAge } = require('./db/schema');
 const appUsers = require('./db/app-users');
 const bookAccess = require('./db/book-access');
-const { ensureAdminFromEnv } = appUsers;
+const { ensureAdminFromEnv, touchUserLastSeen, addUserActivity } = appUsers;
 const appSettings = require('./lib/app-settings');
 
 // Admin-Bootstrap: ADMIN_EMAIL aus ENV → app_users-Row mit
@@ -243,7 +243,6 @@ app.use((req, res, next) => {
   // den Marker.
   if (LOCAL_DEV_MODE && !/(?:^|;\s*)sw_devout=1(?:;|$)/.test(req.headers.cookie || '')) {
     req.session.user = { email: 'dev@local', name: 'Dev (lokal)', role: 'admin' };
-    upsertUserLogin('dev@local', 'Dev (lokal)');
     try {
       const existing = appUsers.getUser('dev@local');
       if (!existing) {
@@ -252,6 +251,7 @@ app.use((req, res, next) => {
         if (existing.global_role !== 'admin') appUsers.setGlobalRole('dev@local', 'admin');
         if (existing.status !== 'active') appUsers.setStatus('dev@local', 'active');
       }
+      appUsers.touchLogin('dev@local', 'Dev (lokal)');
     } catch (e) { logger.warn(`dev-mode admin upsert: ${e.message}`); }
     return next();
   }
@@ -264,7 +264,7 @@ app.use((req, res, next) => {
 // ── Aktivitäts-Tracking ──────────────────────────────────────────────────────
 // Pro authentifiziertem Request wird die Differenz zum letzten Request als aktive
 // Zeit gezählt – aber nur, wenn die Lücke < 5 min ist (danach gilt der User als
-// weg gewesen). `users.last_seen_at` wird nur alle 60 s in die DB geschrieben,
+// weg gewesen). `app_users.last_seen_at` wird nur alle 60 s in die DB geschrieben,
 // um Write-Last niedrig zu halten.
 const ACTIVITY_GAP_MS      = 5 * 60 * 1000;
 const LAST_SEEN_THROTTLE_MS = 60 * 1000;
@@ -344,7 +344,7 @@ function bootstrapDevAccess(stage) {
     if (!appUsers.getUser(email)) {
       appUsers.createUser({ email, displayName: 'Dev (lokal)', globalRole: 'admin', status: 'active' });
     }
-    upsertUserLogin(email, 'Dev (lokal)');
+    appUsers.touchLogin(email, 'Dev (lokal)');
     const books = db.prepare('SELECT book_id FROM books').all();
     let granted = 0;
     for (const { book_id } of books) {

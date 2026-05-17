@@ -15,7 +15,7 @@ const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
 const { db } = require('../../db/connection');
 const { getDraftFigure, insertWerkstattRun } = require('../../db/draft-figures');
-const { getUser } = require('../../db/schema');
+const { getUser } = require('../../db/app-users');
 const { resolveI18n, resolveI18nTree } = require('../../lib/i18n-server');
 
 const figurWerkstattRouter = express.Router();
@@ -85,7 +85,7 @@ async function runBrainstormJob(jobId, draftId, knotenId, userEmail) {
     if (!draft) throw i18nError('job.error.werkstatt.draftMissing');
     if (draft.user_email !== userEmail) throw i18nError('job.error.forbidden');
 
-    const locale = getUser(userEmail)?.locale || 'de';
+    const locale = getUser(userEmail)?.language || 'de';
     const found = _findKnoten(draft.mindmap?.data, knotenId);
     if (!found) throw i18nError('job.error.werkstatt.knotenMissing');
     const { pfad: rawPfad, node: zielKnoten } = found;
@@ -150,7 +150,7 @@ async function runConsistencyJob(jobId, draftId, userEmail) {
     if (!draft) throw i18nError('job.error.werkstatt.draftMissing');
     if (draft.user_email !== userEmail) throw i18nError('job.error.forbidden');
 
-    const locale = getUser(userEmail)?.locale || 'de';
+    const locale = getUser(userEmail)?.language || 'de';
     const mindmapResolved = resolveI18nTree(draft.mindmap, locale);
 
     const { SYSTEM_FIGUREN_BLOCKS: SYSTEM_FIGUREN, BUCH_KONTEXT } = await getBookPrompts(draft.book_id, userEmail);
