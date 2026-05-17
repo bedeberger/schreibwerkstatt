@@ -137,6 +137,91 @@ test('localdb: deletePage entfernt Row + wirft NOT_FOUND auf Re-Delete', async (
   await assert.rejects(() => ctx.contentStore.deletePage(pageId), { code: 'NOT_FOUND' });
 });
 
+test('localdb: savePage mit expected_updated_at = aktueller Stand → ok, setzt last_editor_email', async () => {
+  const bookId = _seedBook();
+  const pageId = _seedPage(bookId, null);
+  const before = await ctx.contentStore.loadPage(pageId);
+  await new Promise(r => setTimeout(r, 5));
+
+  const ctxReq = { session: { user: { email: 'alice@example.com' } } };
+  const saved = await ctx.contentStore.savePage(
+    pageId,
+    { html: '<p>Update durch Alice</p>', expected_updated_at: before.updated_at },
+    ctxReq,
+  );
+  assert.equal(saved.html, '<p>Update durch Alice</p>');
+  assert.equal(saved.last_editor_email, 'alice@example.com');
+  assert.notEqual(saved.updated_at, before.updated_at);
+});
+
+test('localdb: savePage mit stale expected_updated_at → PAGE_CONFLICT', async () => {
+  const bookId = _seedBook();
+  const pageId = _seedPage(bookId, null);
+  const v0 = await ctx.contentStore.loadPage(pageId);
+  await new Promise(r => setTimeout(r, 5));
+
+  // Erster Save durch Bob — Stamp veraltet.
+  await ctx.contentStore.savePage(
+    pageId,
+    { html: '<p>Bob writes first</p>', expected_updated_at: v0.updated_at },
+    { session: { user: { email: 'bob@example.com' } } },
+  );
+
+  // Alice schreibt mit dem (jetzt staleen) Stamp aus v0 → 409.
+  await assert.rejects(
+    () => ctx.contentStore.savePage(
+      pageId,
+      { html: '<p>Alice late</p>', expected_updated_at: v0.updated_at },
+      { session: { user: { email: 'alice@example.com' } } },
+    ),
+    (err) => {
+      assert.equal(err.code, 'PAGE_CONFLICT');
+      assert.equal(err.status, 409);
+      assert.equal(err.serverEditorEmail, 'bob@example.com');
+      assert.ok(err.serverUpdatedAt);
+      return true;
+    },
+  );
+
+  // Bobs Inhalt steht weiterhin in der DB — kein Overwrite durch Alice.
+  const final = await ctx.contentStore.loadPage(pageId);
+  assert.equal(final.html, '<p>Bob writes first</p>');
+  assert.equal(final.last_editor_email, 'bob@example.com');
+});
+
+test('localdb: savePage ohne expected_updated_at → kein Conflict-Check (Legacy-Pfad)', async () => {
+  const bookId = _seedBook();
+  const pageId = _seedPage(bookId, null);
+  await new Promise(r => setTimeout(r, 5));
+  // Server-Job ohne Editor-Snapshot soll weiterhin schreiben koennen.
+  const saved = await ctx.contentStore.savePage(
+    pageId,
+    { html: '<p>Cron</p>' },
+    null,
+  );
+  assert.equal(saved.html, '<p>Cron</p>');
+  assert.equal(saved.last_editor_email, null);
+});
+
+test('localdb: Rename ohne html ueberschreibt last_editor_email nicht', async () => {
+  const bookId = _seedBook();
+  const pageId = _seedPage(bookId, null);
+  await ctx.contentStore.savePage(
+    pageId,
+    { html: '<p>Initial</p>' },
+    { session: { user: { email: 'alice@example.com' } } },
+  );
+  // Reine Rename-Operation (kein html-Field) durch Bob.
+  await ctx.contentStore.savePage(
+    pageId,
+    { name: 'Renamed by Bob' },
+    { session: { user: { email: 'bob@example.com' } } },
+  );
+  const p = await ctx.contentStore.loadPage(pageId);
+  assert.equal(p.name, 'Renamed by Bob');
+  assert.equal(p.last_editor_email, 'alice@example.com', 'Body-Autor bleibt Alice');
+});
+
 test('localdb: loadPagesBatch laeuft sequentiell ohne Token', async () => {
   const bookId = _seedBook();
   const chapterId = _seedChapter(bookId);
