@@ -8,7 +8,7 @@
 //   `toggle` – Methodenname am Root, der die Karte ein-/ausschaltet.
 //   `requiresPages` – disabled, wenn Buch leer.
 //   `requiresBook`  – disabled, wenn kein Buch gewählt.
-//   `minRole`       – Buch-Rolle, ab der die Karte sichtbar ist (Phase 4b).
+//   `minRole`       – Buch-Rolle, ab der die Karte sichtbar ist.
 //                     Hierarchie: viewer < lektor < editor < owner. Pflichtfeld.
 //
 // Aktionen (`kind: 'action'`): einmalige Befehle (Theme wechseln, Logout …).
@@ -59,7 +59,7 @@ export const FEATURES = [
   // Editor: viewer (read-only) / lektor (apply-only) / editor+ (frei).
   { key: 'bookEditor',     kind: 'toggle', group: 'tools',  labelKey: 'tile.bookEditor',     descKey: 'tile.bookEditor.desc',     flag: 'showBookEditorCard',    toggle: 'toggleBookEditorCard',     requiresPages: true, minRole: 'viewer',
     aliases: ['bucheditor','book-editor','stream','endlos','endless','single-page','one-page','edit-all','alle-bearbeiten','volltext','full-text','suchen-ersetzen','search-replace','find-replace','suchen','ersetzen'] },
-  // Volltextsuche (Phase 7 BookStack-Exit). minRole viewer — Search filtert
+  // Volltextsuche. minRole viewer — Search filtert
   // serverseitig zusaetzlich nach book_access; jeder Auth-User darf suchen,
   // sieht aber nur eigene Buecher.
   { key: 'search',         kind: 'toggle', group: 'tools',  labelKey: 'tile.search',         descKey: 'tile.search.desc',         flag: 'showSearchCard',        toggle: 'toggleSearchCard',         minRole: 'viewer',
@@ -125,6 +125,10 @@ export const ACTIONS = [
 //               Modul (z.B. kapitelReview, oder bewusst gesonderte Logik).
 //   `onReclick` – 'close' (default) schliesst die Karte beim 2. Klick;
 //                 'refresh' dispatcht `card:refresh` und lässt sie offen.
+//   `refreshName` – Override für `card:refresh`-detail.name, falls die Sub-
+//                Komponente einen anderen Listener-Namen verwendet als der
+//                Karten-Key (z.B. key='figures' aber Sub hört auf 'figuren').
+//                Default: `key`.
 //   `requiresBook` – true: ohne `selectedBookId` öffnet die Karte nicht.
 //   `loadDeps` – Pre-Open-Bedingungen: `{ method, skipIfNonEmpty }`. Wird
 //                `this[method](selectedBookId)` aufgerufen, wenn
@@ -138,7 +142,7 @@ export const EXCLUSIVE_CARDS = [
   { key: 'bookOverview',   flag: 'showBookOverviewCard',   toggle: 'toggleBookOverviewCard',   onReclick: 'refresh', requiresBook: true },
   { key: 'bookReview',     flag: 'showBookReviewCard',     toggle: 'toggleBookReviewCard',     onReclick: 'refresh' },
   { key: 'kapitelReview',  flag: 'showKapitelReviewCard',  toggle: 'toggleKapitelReviewCard',  bespoke: true },
-  { key: 'figures',        flag: 'showFiguresCard',        toggle: 'toggleFiguresCard',        onReclick: 'refresh' },
+  { key: 'figures',        flag: 'showFiguresCard',        toggle: 'toggleFiguresCard',        onReclick: 'refresh', refreshName: 'figuren' },
   { key: 'figurWerkstatt', flag: 'showFigurWerkstattCard', toggle: 'toggleFigurWerkstattCard', onReclick: 'refresh', requiresBook: true, extraRefreshOnOpen: true },
   { key: 'szenen',         flag: 'showSzenenCard',         toggle: 'toggleSzenenCard',         onReclick: 'refresh',
     loadDeps: [{ method: 'loadFiguren', skipIfNonEmpty: 'figuren' }, { method: 'loadOrte', skipIfNonEmpty: 'orte' }] },
@@ -205,7 +209,7 @@ export function unavailabilityReasonKey(feature, ctx) {
   return null;
 }
 
-// Rolle-Hierarchie (Phase 4b): viewer < lektor < editor < owner.
+// Rolle-Hierarchie: viewer < lektor < editor < owner.
 // SSoT für Frontend-Visibility-Checks (Quick-Pills, Command-Palette, Sidebar).
 // Server-Guard ist autoritativ (lib/acl.js), das hier ist UX.
 export const ROLE_RANK = { viewer: 1, lektor: 2, editor: 3, owner: 4 };

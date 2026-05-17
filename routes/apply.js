@@ -1,6 +1,5 @@
 'use strict';
-// Phase 4b (BookStack-Exit, docs/bookstack-exit.md): Apply-only-Routen fuer
-// `lektor`-Rolle. Differenziert zwischen "freiem Save" (PUT /content/pages/:id,
+// Apply-only-Routen fuer `lektor`-Rolle. Differenziert zwischen "freiem Save" (PUT /content/pages/:id,
 // minRole editor) und Apply einer persistierten Suggestion (lektor+).
 //
 // Beide Routen laden die Suggestion serverseitig aus DB, machen den

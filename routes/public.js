@@ -1,5 +1,5 @@
 'use strict';
-// Phase 4a2 (BookStack-Exit, docs/bookstack-exit.md): Public-Landing + Register.
+// Public-Landing + Register.
 //
 // Routen (alle vor dem Auth-Guard in server.js gemountet):
 //   GET  /              — eingeloggt → next(), unauth → landing.html

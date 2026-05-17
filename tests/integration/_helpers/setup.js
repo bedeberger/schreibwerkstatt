@@ -41,7 +41,6 @@ function bootstrap() {
   const mockAi = require('./mock-ai');
   const mockBs = require('./mock-bookstack');
   mockAi.install();
-  mockBs.install();
 
   // Now safe to require pipeline modules — they'll pick up the mocked deps.
   const komplett = require('../../../routes/jobs/komplett');

@@ -176,15 +176,22 @@ test('Hash-Router-watchers haben keinen toten Flag (alle existieren im State)', 
 // FEATURE.toggle-Methoden müssen existieren (app-view.js)
 // ──────────────────────────────────────────────────────────────────────────
 
-test('Jede FEATURE.toggle-Methode existiert in app-view.js', () => {
-  const src = read('public/js/app/app-view.js');
+test('Jede FEATURE.toggle-Methode existiert (bespoke in app-view.js/kapitel-review.js oder generiert aus EXCLUSIVE_CARDS)', () => {
+  // Hauptkarten-Toggles werden aus EXCLUSIVE_CARDS generiert (siehe
+  // appViewMethods in app-view.js). Spezial-Toggles bleiben handgeschrieben.
+  const appViewSrc = read('public/js/app/app-view.js');
+  const kapitelReviewSrc = read('public/js/book/kapitel-review.js');
+  const generatedToggles = new Set(
+    EXCLUSIVE_CARDS.filter(e => !e.bespoke && e.toggle).map(e => e.toggle)
+  );
   const toggles = FEATURES.filter(f => f.kind === 'toggle');
   const missing = toggles.filter(f => {
+    if (generatedToggles.has(f.toggle)) return false;
     const re = new RegExp(`\\b${f.toggle}\\s*\\(\\)\\s*\\{`, 'm');
-    return !re.test(src);
+    return !re.test(appViewSrc) && !re.test(kapitelReviewSrc);
   }).map(f => f.toggle);
   assert.deepEqual(missing, [],
-    `FEATURE.toggle-Methoden fehlen in app-view.js: ${JSON.stringify(missing)}`);
+    `FEATURE.toggle-Methoden fehlen (nicht in app-view.js, nicht in kapitel-review.js, nicht in EXCLUSIVE_CARDS-Generator): ${JSON.stringify(missing)}`);
 });
 
 // ──────────────────────────────────────────────────────────────────────────

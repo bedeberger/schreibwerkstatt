@@ -16,14 +16,14 @@ export function registerBookSettingsCard() {
     bookSettingsErzaehlzeit: '',
     bookSettingsIsFinished: false,
     bookSettingsAllowLektorBookChat: false,
-    // Phase 4b Sharing: Access-Liste + Invite-Form.
+    // Sharing: Access-Liste + Invite-Form.
     bookAccessList: [],
     bookAccessLoading: false,
     bookAccessError: '',
     shareEmail: '',
     shareRole: 'viewer',
     shareBusy: false,
-    // Phase 6: Kategorie + Tags.
+    // Kategorie + Tags.
     categoryPool: [],
     tagPool: [],
     bookCategoryId: '',

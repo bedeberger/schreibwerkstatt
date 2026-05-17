@@ -218,7 +218,7 @@ export function registerBookOrganizerCard() {
       }
     },
 
-    // Phase 3 (BookStack-Exit): Single-Tree-PUT. Statt per-Item update fuer
+    // Single-Tree-PUT. Statt per-Item update fuer
     // alle veraenderten Items wird der vollstaendige Tree atomar an
     // /content/books/:id/order geschickt. Server validiert + materialisiert
     // chapters.position/pages.position/pages.chapter_id in einer Transaction.

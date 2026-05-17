@@ -8,8 +8,7 @@ const logger = require('../logger');
 
 const router = express.Router();
 // Figuren/Orte/Szenen sind nur fuer editor+ relevant (Buchwelt-CRUD); Lektor
-// und Viewer sehen die Karten nicht — Server folgt der Frontend-Sicht (siehe
-// docs/bookstack-exit.md Phase 4b Karten-Sichtbarkeit).
+// und Viewer sehen die Karten nicht — Server folgt der Frontend-Sicht.
 router.param('book_id', aclParamGuard('editor'));
 const jsonBody = express.json();
 

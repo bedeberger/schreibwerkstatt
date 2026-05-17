@@ -1,7 +1,6 @@
 'use strict';
 const appSettings = require('../lib/app-settings');
-// Phase 4a (BookStack-Exit, docs/bookstack-exit.md): Admin-Routen fuer
-// User-Verwaltung. Alle hinter requireAdmin (Mittelweg über lib/admin-mw.js).
+// Admin-Routen fuer User-Verwaltung. Alle hinter requireAdmin (lib/admin-mw.js).
 //
 // Endpoints:
 //   GET    /admin/users                — Liste aller User (kein Audit-Spam)
@@ -11,7 +10,7 @@ const appSettings = require('../lib/app-settings');
 //   DELETE /admin/users/:email         — Soft-Delete (status='deleted')
 //
 // Privacy: Admin sieht hier nur User-Identitaet/Rolle/Status, keine Buecher.
-// Buchsichtbarkeit kommt mit Phase 4b ueber book_access.
+// Buchsichtbarkeit laeuft ueber book_access.
 
 const express = require('express');
 const appUsers = require('../db/app-users');
@@ -86,7 +85,7 @@ router.put('/:email', express.json(), (req, res) => {
   if (can_invite_users !== undefined) {
     appUsers.setCanInviteUsers(target, !!can_invite_users);
   }
-  // Phase 4d: Budget-Felder. Beide muessen zusammen kommen — Mode + USD bilden
+  // Budget-Felder. Beide muessen zusammen kommen — Mode + USD bilden
   // eine Einheit, sonst sind Defaults missverstaendlich.
   if (monthly_budget_usd !== undefined || budget_mode !== undefined) {
     const nextMode = budget_mode !== undefined ? budget_mode : (user.budget_mode || 'none');
@@ -103,7 +102,7 @@ router.put('/:email', express.json(), (req, res) => {
       return res.status(400).json({ error_code: 'BUDGET_INVALID', detail: e.message });
     }
   }
-  // Phase 11: AI-Provider-Override. NULL/'' = follows global ai.provider.
+  // AI-Provider-Override. NULL/'' = follows global ai.provider.
   // Validierung: Provider muss konfiguriert sein. Ollama/Llama brauchen host.
   if (ai_provider_override !== undefined) {
     const next = (ai_provider_override === null || ai_provider_override === '') ? null : String(ai_provider_override).toLowerCase();

@@ -1,4 +1,4 @@
-/* Phase 4c (BookStack-Exit): AdminSettingsCard. */
+/* AdminSettingsCard. */
 
 .card--admin-settings {
   --card-accent: var(--card-accent-admin-settings, var(--color-accent));

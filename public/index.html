@@ -145,7 +145,7 @@
          @combobox-change="resetView();"></div>
   </div>
 
-  <!-- Phase 6: Filter-Pills (Kategorie + Tags). Reines Frontend-Filter -->
+  <!-- Filter-Pills (Kategorie + Tags). Reines Frontend-Filter -->
   <div class="book-filter-row" x-show="bookFilterCategoryPool.length || bookFilterTagPool.length" x-cloak>
     <template x-for="cat in bookFilterCategoryPool" :key="cat.id">
       <button type="button"

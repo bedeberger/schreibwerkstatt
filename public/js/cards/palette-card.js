@@ -51,7 +51,7 @@ export function registerPaletteCard() {
 
       window.addEventListener('palette:open', () => this.openPalette(), { signal });
       window.addEventListener('palette:close', () => this.closePalette(), { signal });
-      // Phase 7: Async-Provider (Fulltext) signalisiert via 'palette:rerender'
+      // Async-Provider (Fulltext) signalisiert via 'palette:rerender'
       // dass sich der Cache geaendert hat — Sections-Cache nullen, damit
       // paletteSections() neu rechnet.
       window.addEventListener('palette:rerender', () => {
@@ -174,7 +174,7 @@ export function registerPaletteCard() {
     _buildSections(root, ctx) {
       const parsed = parseQuery(this.paletteQuery);
       const t = (k, p) => (root.t ? root.t(k, p) : k);
-      // Phase 4b minRole-Filter: bei aktivem Buch nur Cards anbieten, die der
+      // minRole-Filter: bei aktivem Buch nur Cards anbieten, die der
       // aktuellen Buch-Rolle entsprechen. Ohne Buch (Quick-Pills Home-Screen)
       // FEATURES unverändert lassen — Cards mit `requiresBook` sind dann eh
       // disabled.

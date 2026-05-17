@@ -14,7 +14,7 @@
 export const appHashRouterMethods = {
   _computeHash() {
     if (this.showUserSettingsCard) return '#profil';
-    // Phase 7: Volltextsuche ist book-unabhaengig — eigener Top-Level-Hash.
+    // Volltextsuche ist book-unabhaengig — eigener Top-Level-Hash.
     if (this.showSearchCard) return '#search';
     if (this.showAdminUsersCard) return '#admin/users';
     if (this.showAdminSettingsCard) return '#admin/settings';

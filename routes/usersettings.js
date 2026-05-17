@@ -65,7 +65,7 @@ router.get('/settings', (req, res) => {
   const email = req.session.user.email;
   const user = getUser(email);
   if (!user) return res.status(404).json({ error_code: 'USER_PROFILE_NOT_FOUND' });
-  // Phase 4a: Identity-Felder aus app_users mitliefern. Frontend nutzt
+  // Identity-Felder aus app_users mitliefern. Frontend nutzt
   // role + can_invite_users fuer UI-Gates (Admin-Karte, Invite-Dialog).
   const app = appUsers.getUser(email);
   res.json({
@@ -118,7 +118,7 @@ router.patch('/settings', jsonBody, (req, res) => {
   res.json({ ok: true, ...getUser(email) });
 });
 
-// Phase 4a: User-Selbst-Invite. Gate via app_users.can_invite_users; Admins
+// User-Selbst-Invite. Gate via app_users.can_invite_users; Admins
 // duerfen ueber /admin/users/invite mit role='admin' arbeiten, hier zwingend
 // role='user'. Use-Case: Buch-Sharing-Dialog laedt frische Email ein.
 router.post('/invite', jsonBody, (req, res) => {

@@ -129,7 +129,7 @@ function saveSzenenAndEvents(bookIdInt, email, szenen, assignments, locIdToDbId,
     saveZeitstrahlEvents(bookIdInt, email, []);
     updateFigurenEvents(bookIdInt, assignments, email, idMaps);
   }
-  // Phase 7: figure_scenes neu indexieren — Full-Replace pro Buch (kind/book
+  // figure_scenes neu indexieren — Full-Replace pro Buch (kind/book
   // droppen, dann Re-Upsert aller aktuellen Rows).
   searchIndex.removeKindForBook('scene', bookIdInt);
   const sceneRows = db.prepare('SELECT id FROM figure_scenes WHERE book_id = ?').all(bookIdInt);

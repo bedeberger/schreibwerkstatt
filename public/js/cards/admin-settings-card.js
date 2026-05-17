@@ -1,6 +1,5 @@
-// Phase 4c (BookStack-Exit, docs/bookstack-exit.md): Alpine-Sub-Komponente
-// fuer Admin-Settings. Sichtbarkeit ueber $app.currentUser.role; State +
-// Lifecycle hier, Show-Flag (`showAdminSettingsCard`) im Root.
+// Alpine-Sub-Komponente fuer Admin-Settings. Sichtbarkeit ueber $app.currentUser.role;
+// State + Lifecycle hier, Show-Flag (`showAdminSettingsCard`) im Root.
 
 import { adminSettingsMethods } from '../admin/admin-settings.js';
 
@@ -17,7 +16,7 @@ export function registerAdminSettingsCard() {
     adminSettingsTab: 'auth',
     adminSettingsTestResult: null,
 
-    // Phase 0b: Backfill-Sweep-State + Polling
+    // Backfill-Sweep-State + Polling
     adminSettingsSweep: null,
     _sweepPollTimer: null,
 

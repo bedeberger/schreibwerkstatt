@@ -1,4 +1,4 @@
-/* Phase 4c1 (BookStack-Exit): Standalone-Wizard. Eigene Seite ausserhalb der
+/* Standalone-Wizard. Eigene Seite ausserhalb der
    SPA-Shell, deshalb keine Layer-Einordnung. tokens.css liefert Custom-Props. */
 
 * { box-sizing: border-box; }

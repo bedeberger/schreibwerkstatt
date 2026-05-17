@@ -1,6 +1,5 @@
 'use strict';
-// Phase 4a2 (BookStack-Exit, docs/bookstack-exit.md): Admin-Workflow fuer
-// Zugangs-Anfragen. Alle Routen hinter requireAdmin.
+// Admin-Workflow fuer Zugangs-Anfragen. Alle Routen hinter requireAdmin.
 //
 // Endpoints:
 //   GET    /admin/registration-requests              — Liste (status-Filter ueber ?status=)

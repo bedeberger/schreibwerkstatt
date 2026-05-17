@@ -1,6 +1,5 @@
 'use strict';
-// Phase 4b (BookStack-Exit, docs/bookstack-exit.md): Sharing- und Page-Lock-
-// Routen. Mount-Punkt: /books — die Router-Pfade enthalten alle :book_id und
+// Sharing- und Page-Lock-Routen. Mount-Punkt: /books — die Router-Pfade enthalten alle :book_id und
 // laufen durch aclParamGuard fuer Logging-Context + Mindestrolle.
 
 const express = require('express');
@@ -159,7 +158,7 @@ router.post('/:book_id/transfer-ownership', aclParamGuard('owner'), jsonBody, (r
   }
 });
 
-// ── Kategorie + Tags (Phase 6) ──────────────────────────────────────────────
+// ── Kategorie + Tags ────────────────────────────────────────────────────────
 //
 // Pool wird ueber /local/categories und /local/tags verwaltet (admin-only fuer
 // Mutationen). Hier nur Zuordnung auf das Buch — editor+ erforderlich.

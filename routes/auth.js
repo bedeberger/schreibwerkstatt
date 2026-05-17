@@ -62,7 +62,7 @@ function _passwordsMatch(expected, given) {
   return crypto.timingSafeEqual(a, b);
 }
 
-// Phase 4a Status-Gates: 'suspended' / 'deleted' → 403, audit + denied-Render.
+// Status-Gates: 'suspended' / 'deleted' → 403, audit + denied-Render.
 function _renderDenied(res, lang, reasonKey) {
   res.status(403);
   const t = lang === 'en'
@@ -162,7 +162,7 @@ router.get('/auth/callback', async (req, res) => {
     const userAgent = req.headers['user-agent'] || null;
     const lang = _bodyLang(req);
 
-    // Phase 4a: app_users-Lookup + Status-Gate + Invite-Accept-Flow.
+    // app_users-Lookup + Status-Gate + Invite-Accept-Flow.
     let user = appUsers.getUser(email);
     if (user) {
       if (user.status === 'suspended') {
@@ -397,7 +397,7 @@ router.get('/auth/logout', (req, res) => {
 // GET /auth/me → aktueller User (JSON, für Frontend)
 router.get('/auth/me', (req, res) => {
   if (!req.session?.user) return res.status(401).json({ error_code: 'NOT_LOGGED_IN' });
-  // Phase 11: resolvter AI-Provider + Override-Quelle (read-only fuer Frontend).
+  // Resolvter AI-Provider + Override-Quelle (read-only fuer Frontend).
   let aiProvider = null, aiProviderSource = 'global';
   try {
     const { resolveProvider } = require('../lib/ai');

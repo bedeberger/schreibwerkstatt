@@ -9,10 +9,22 @@ const queue    = require('./queue');
 const jobsMod  = require('./jobs');
 const model    = require('./model');
 const ai       = require('./ai');
-const bs       = require('./bookstack');
 const loader   = require('./loader');
 const queries  = require('./queries');
 const router   = require('./router');
+
+const { getBookSettings } = require('../../../db/schema');
+
+// Buch-Locale-Prompts mit Buchtyp + Buchkontext augmentieren. Liest
+// book_settings, fallback auf User-Defaults wenn `userEmail` gesetzt.
+async function getBookPrompts(bookId, userEmail = null) {
+  const { getLocalePromptsForBook } = await getPrompts();
+  const settings = bookId
+    ? getBookSettings(bookId, userEmail)
+    : { language: 'de', region: 'CH', buchtyp: null, buch_kontext: null, is_finished: 0 };
+  const locale = `${settings.language}-${settings.region}`;
+  return getLocalePromptsForBook(locale, settings.buchtyp || null, settings.buch_kontext || null, !!settings.is_finished);
+}
 
 // Rückwärtskompatibler Export – einige Module lesen _promptConfig direkt.
 const _promptConfig = getPromptConfig();
@@ -56,7 +68,7 @@ module.exports = {
   toSystemBlocks: ai.toSystemBlocks,
 
   getPrompts,
-  getBookPrompts: bs.getBookPrompts,
+  getBookPrompts,
 
   getFiguren: queries.getFiguren,
   getLatestReview: queries.getLatestReview,

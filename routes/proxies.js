@@ -26,7 +26,7 @@ const jsonBody = express.json();
 // Modell-Konfiguration ans Frontend liefern (keine Credentials)
 router.get('/config', (req, res) => {
   const sessionUser = req.session?.user || null;
-  // Phase 4a: role + can_invite_users aus app_users (SSoT) ueber sessionUser
+  // role + can_invite_users aus app_users (SSoT) ueber sessionUser
   // mergen — Frontend nutzt das fuer Admin-Karte + Invite-Dialog.
   let user = sessionUser;
   if (sessionUser) {

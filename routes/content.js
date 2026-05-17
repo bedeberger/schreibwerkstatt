@@ -3,9 +3,7 @@
 //
 // Diese Datei ist nur noch eine duenne HTTP-Schicht: Validierung, Token-Check,
 // Logging-Context — die eigentliche Storage-Logik (inkl. Mapper + cleanPageHtml)
-// lebt in [lib/content-store.js](../lib/content-store.js). Phase 1 des Exit-
-// Plans tauscht den content-store-Inhalt auf Local-DB; die Routen aendern sich
-// dabei nicht.
+// lebt in [lib/content-store.js](../lib/content-store.js).
 
 const express = require('express');
 const logger = require('../logger');
@@ -109,7 +107,7 @@ router.get('/books/:book_id/tree', aclParamGuard('viewer'), async (req, res) => 
   catch (e) { _fail(res, e, 'GET /content/books/:id/tree'); }
 });
 
-// Phase 3 (BookStack-Exit): Eigene Sortierung.
+// Eigene Sortierung.
 //
 // GET /content/books/:book_id/order — Tree-Snapshot + Audit-Meta. Auto-init:
 // keine Row -> aus aktuellen pages.position/chapters.position bauen; vorhandene
@@ -181,7 +179,7 @@ router.put('/pages/:page_id', jsonBody, async (req, res) => {
   }
 });
 
-// ── Phase 2: Page-Revisions ────────────────────────────────────────────────
+// ── Page-Revisions ─────────────────────────────────────────────────────────
 // Schreib-Hook lebt in der content-store-Facade (jeder erfolgreiche
 // savePage → page_revisions-Row). Routen hier sind nur Lese-Pfad + Restore.
 

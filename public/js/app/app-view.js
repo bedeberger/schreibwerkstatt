@@ -9,7 +9,7 @@ import { contentRepo } from '../repo/content.js';
 async function _toggleCardGeneric(entry) {
   if (this[entry.flag]) {
     if (entry.onReclick === 'refresh') {
-      window.dispatchEvent(new CustomEvent('card:refresh', { detail: { name: entry.key } }));
+      window.dispatchEvent(new CustomEvent('card:refresh', { detail: { name: entry.refreshName || entry.key } }));
     } else {
       this[entry.flag] = false;
     }

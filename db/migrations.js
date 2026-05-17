@@ -5127,13 +5127,13 @@ function _runMigrationsLocked() {
       db.prepare('DROP TABLE IF EXISTS pages_new').run();
       db.prepare(`
         CREATE TABLE pages_new (
-          page_id        INTEGER PRIMARY KEY,
-          book_id        INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
-          page_name      TEXT NOT NULL,
+          page_id        INTEGER PRIMARY KEY AUTOINCREMENT,
+          book_id        INTEGER NOT NULL,
+          page_name      TEXT,
           chapter_id     INTEGER REFERENCES chapters(chapter_id) ON DELETE SET NULL,
           updated_at     TEXT,
-          last_seen_at   TEXT,
           preview_text   TEXT,
+          last_seen_at   TEXT,
           body_html      TEXT,
           body_markdown  TEXT,
           position       INTEGER,
@@ -5153,6 +5153,16 @@ function _runMigrationsLocked() {
       db.prepare('ALTER TABLE pages_new RENAME TO pages').run();
       db.prepare('CREATE INDEX IF NOT EXISTS idx_pages_book_id ON pages(book_id)').run();
       db.prepare('CREATE INDEX IF NOT EXISTS idx_pages_chapter_id ON pages(chapter_id)').run();
+      // Wasserzeichen wiederherstellen: AUTOINCREMENT-Counter min. 1_000_000,
+      // damit neue localdb-IDs >= 1_000_001 vergeben werden (Phase-0-Garantie).
+      const existing = db.prepare("SELECT seq FROM sqlite_sequence WHERE name = 'pages'").get();
+      if (existing) {
+        if (existing.seq < 1000000) {
+          db.prepare("UPDATE sqlite_sequence SET seq = 1000000 WHERE name = 'pages'").run();
+        }
+      } else {
+        db.prepare("INSERT INTO sqlite_sequence(name, seq) VALUES ('pages', 1000000)").run();
+      }
     }
 
     // page_revisions: CHECK-Constraint ohne 'bookstack-sync' setzen.
@@ -5166,6 +5176,9 @@ function _runMigrationsLocked() {
           book_id       INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
           body_html     TEXT NOT NULL,
           body_markdown TEXT,
+          chars         INTEGER,
+          words         INTEGER,
+          tok           INTEGER,
           source        TEXT NOT NULL CHECK(source IN
                           ('focus','main','chat-apply','lektorat-apply','import','conflict')),
           user_email    TEXT,
@@ -5175,8 +5188,8 @@ function _runMigrationsLocked() {
       `).run();
       // 'bookstack-sync' auf 'import' mappen (semantisch naechstes Aequivalent).
       db.prepare(`
-        INSERT INTO page_revisions_new (id, page_id, book_id, body_html, body_markdown, source, user_email, summary, created_at)
-        SELECT id, page_id, book_id, body_html, body_markdown,
+        INSERT INTO page_revisions_new (id, page_id, book_id, body_html, body_markdown, chars, words, tok, source, user_email, summary, created_at)
+        SELECT id, page_id, book_id, body_html, body_markdown, chars, words, tok,
                CASE source WHEN 'bookstack-sync' THEN 'import' ELSE source END,
                user_email, summary, created_at
         FROM page_revisions
@@ -5198,6 +5211,17 @@ function _runMigrationsLocked() {
     }
     db.prepare('UPDATE schema_version SET version = 120').run();
     logger.info('DB-Migration auf Version 120 abgeschlossen (BookStack-Backend entfernt).');
+  }
+
+  if (version < 121) {
+    // Fix: Migration 120 (initial) hatte chars/words/tok in page_revisions
+    // versehentlich nicht mit-recreatet. Nachruesten via ALTER ADD COLUMN.
+    const prCols = db.pragma('table_info(page_revisions)').map(c => c.name);
+    if (!prCols.includes('chars')) db.prepare('ALTER TABLE page_revisions ADD COLUMN chars INTEGER').run();
+    if (!prCols.includes('words')) db.prepare('ALTER TABLE page_revisions ADD COLUMN words INTEGER').run();
+    if (!prCols.includes('tok'))   db.prepare('ALTER TABLE page_revisions ADD COLUMN tok INTEGER').run();
+    db.prepare('UPDATE schema_version SET version = 121').run();
+    logger.info('DB-Migration auf Version 121 abgeschlossen (page_revisions chars/words/tok nachgeruestet).');
   }
 
   // Schutzchecks: idempotent bei jedem Start.

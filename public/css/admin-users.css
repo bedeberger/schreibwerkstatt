@@ -1,4 +1,4 @@
-/* Phase 4a (BookStack-Exit): AdminUsersCard.
+/* AdminUsersCard.
    Layout-Slots: card--admin-users, admin-users-invite, admin-users-table,
    admin-users-audit. Akzentfarbe per --card-accent (Mapping siehe
    public/css/card-accents.css). */
@@ -143,7 +143,7 @@
 .badge--event-role-changed { background: var(--color-accent-bg); color: var(--color-accent-text); }
 .badge--event-deleted      { background: var(--color-tag-bg);    color: var(--color-muted); }
 
-/* Phase 4a2: Tab-Navigation + Requests-Tab */
+/* Tab-Navigation + Requests-Tab */
 .admin-users-tabs {
   display: flex;
   gap: var(--space-xs);
@@ -198,7 +198,7 @@
   }
 }
 
-/* Phase 6: Kategorie- + Tag-Pool. Wiederverwendet admin-users-Table-Stilistik. */
+/* Kategorie- + Tag-Pool. Wiederverwendet admin-users-Table-Stilistik. */
 .card--admin-categories { --card-accent: var(--card-accent-admin-users, var(--color-primary)); }
 .admin-pool-section { margin-top: var(--space-md); }
 .admin-pool-section:first-child { margin-top: 0; }

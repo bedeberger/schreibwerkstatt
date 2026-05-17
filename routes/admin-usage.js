@@ -1,5 +1,5 @@
 'use strict';
-// Phase 4d (BookStack-Exit, docs/bookstack-exit.md): Admin-Usage-Routen.
+// Admin-Usage-Routen.
 // Hinter requireAdmin (lib/admin-mw.js). Privacy-Boundary: Admin sieht
 // Job-Typen, Modelle, Token-Counts, USD-Kosten und anonyme `book_id` —
 // keine Prompt-Inhalte, keine Chat-Texte, keine Buchtitel.

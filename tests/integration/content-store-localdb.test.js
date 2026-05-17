@@ -1,11 +1,8 @@
 'use strict';
-// Phase 1: localdb-Backend der Content-Store-Facade. Verifiziert, dass
+// localdb-Backend der Content-Store-Facade. Verifiziert, dass
 //   - der Vertrag (loadBook/listBooks/loadPage/savePage/createPage/bookTree/…)
 //     gegen lokale SQLite-Tabellen funktioniert.
-//   - Domain-Shape mit dem BookStack-Backend uebereinstimmt (id/name/html/
-//     position/chapter_id/book_id).
-//   - app.backend='localdb' den Dispatch aus dem Facade-index korrekt
-//     umstellt.
+//   - Domain-Shape (id/name/html/position/chapter_id/book_id) stabil bleibt.
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'integration-test-secret';
 
@@ -18,9 +15,7 @@ let ctx;
 test.before(() => {
   ctx = bootstrap();
   ctx.contentStore = require('../../lib/content-store');
-  ctx.appSettings = require('../../lib/app-settings');
   ctx.connection = require('../../db/connection');
-  ctx.appSettings.set('app.backend', 'localdb', { updatedBy: 'test' });
 });
 test.after(() => { ctx.cleanup(); });
 
@@ -51,10 +46,6 @@ function _seedPage(bookId, chapterId, { name = 'Seite 1', html = '<p>Inhalt</p>'
   return r.lastInsertRowid;
 }
 
-test('currentBackend liefert localdb nach Setting-Switch', () => {
-  assert.equal(ctx.contentStore.currentBackend(), 'localdb');
-});
-
 test('localdb: listBooks + loadBook (Domain-Shape)', async () => {
   const bookId = _seedBook({ name: 'Lib-Test-Buch' });
   const books = await ctx.contentStore.listBooks();
@@ -83,12 +74,10 @@ test('localdb: loadPage liefert html + chapter_id + position', async () => {
   assert.equal(p.position, 7);
 });
 
-test('localdb: savePage updated body_html + local_updated_at, setzt dirty=0', async () => {
+test('localdb: savePage updated body_html + local_updated_at', async () => {
   const bookId = _seedBook();
   const chapterId = _seedChapter(bookId);
   const pageId = _seedPage(bookId, chapterId);
-
-  ctx.connection.db.prepare('UPDATE pages SET dirty = 1 WHERE page_id = ?').run(pageId);
 
   const before = await ctx.contentStore.loadPage(pageId);
   await new Promise(r => setTimeout(r, 5)); // updated_at-Unterschied
@@ -97,9 +86,6 @@ test('localdb: savePage updated body_html + local_updated_at, setzt dirty=0', as
 
   assert.equal(after.html, '<p>Neu</p>');
   assert.notEqual(after.updated_at, before.updated_at);
-
-  const row = ctx.connection.db.prepare('SELECT dirty FROM pages WHERE page_id = ?').get(pageId);
-  assert.equal(row.dirty, 0, 'savePage setzt dirty zurueck');
 });
 
 test('localdb: createPage vergibt ID >= 1_000_001 (Phase-0-Wasserzeichen)', async () => {
@@ -128,7 +114,7 @@ test('localdb: bookTree gruppiert nach Kapitel + Top-Level', async () => {
   assert.equal(tree.topPages[0].name, 'Top');
 });
 
-test('localdb: searchPages (LIKE-Fallback bis Phase 7)', async () => {
+test('localdb: searchPages (LIKE-Fallback)', async () => {
   const bookId = _seedBook();
   const chapterId = _seedChapter(bookId);
   _seedPage(bookId, chapterId, { name: 'Aldous Huxley', html: '<p>Schöne neue Welt</p>' });

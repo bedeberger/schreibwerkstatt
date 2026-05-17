@@ -1,5 +1,5 @@
 'use strict';
-// Phase 6 (BookStack-Exit, docs/bookstack-exit.md): Tag-Pool-Routen.
+// Tag-Pool-Routen.
 // Mount: app.use('/local/tags', router).
 //
 // GET    /         — alle User: Pool lesen.

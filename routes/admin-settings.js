@@ -1,6 +1,5 @@
 'use strict';
-// Phase 4c (BookStack-Exit, docs/bookstack-exit.md): Admin-Routen fuer
-// app_settings. Hinter requireAdmin (lib/admin-mw.js).
+// Admin-Routen fuer app_settings. Hinter requireAdmin (lib/admin-mw.js).
 //
 // Endpoints:
 //   GET   /admin/settings           — Liste aller Keys (encrypted maskiert)
@@ -115,7 +114,7 @@ router.post('/test-oauth', async (req, res) => {
   }
 });
 
-// Phase 4c2: SMTP-Test-Endpoints.
+// SMTP-Test-Endpoints.
 //
 // GET /admin/settings/smtp/test-config — Mailer-Status (mode, fromEmail,
 // ready-Flag, fehlende Pflichtfelder). Kein Klartext-Secret.

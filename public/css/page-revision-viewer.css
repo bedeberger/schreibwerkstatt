@@ -1,5 +1,5 @@
 @layer components {
-/* === Page-Revision-Viewer (Phase 2, BookStack-Exit) ===
+/* === Page-Revision-Viewer ===
    Natives <dialog> mit Tab-Toggle Inhalt|Vergleich. Aufgerufen aus
    page-revisions-card.js#openViewer(). Backdrop ueber ::backdrop. */
 

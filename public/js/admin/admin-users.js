@@ -1,4 +1,4 @@
-// Phase 4a (BookStack-Exit, docs/bookstack-exit.md): AdminUsersCard-Methods.
+// AdminUsersCard-Methods.
 // Wird im adminUsersCard-Alpine-Scope gespreaded. Root-Zugriffe ueber
 // `window.__app`, weil Alpine-Magics in JS-Methoden nicht zuverlaessig sind.
 
@@ -125,7 +125,7 @@ export const adminUsersMethods = {
     } catch {}
   },
 
-  // ─── Phase 4a2: Registration-Requests ──────────────────────────────────
+  // ─── Registration-Requests ─────────────────────────────────────────────
 
   async adminUsersRequestsLoad() {
     if (this.adminUsersRequestsLoading) return;

@@ -1,5 +1,5 @@
 'use strict';
-// Phase 6 (BookStack-Exit, docs/bookstack-exit.md): Kategorie-Pool-Routen.
+// Kategorie-Pool-Routen.
 // Mount: app.use('/local/categories', router).
 //
 // GET    /         — alle User: Pool lesen.

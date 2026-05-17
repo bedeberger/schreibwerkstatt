@@ -95,13 +95,3 @@ test('F1: editor/lektorat.js onDone hat Discard-Guard auf updatedAt-Mismatch', (
     'Discard-Branch darf lektoratFindings nicht setzen');
 });
 
-test('F1-Bonus: stale-write.test.mjs-Sentinel (Verhaltenstest existiert separat)', () => {
-  // Hinweis: das tatsächliche Verhalten (onDone verwirft Ergebnis) ist in
-  // tests/unit/stale-write.test.mjs abgedeckt. Wir asserten hier, dass dieser
-  // Test existiert — verhindert versehentliches Löschen.
-  const p = path.join(repo, 'tests/unit/stale-write.test.mjs');
-  assert.ok(fs.existsSync(p), 'stale-write.test.mjs muss vorhanden sein');
-  const src = fs.readFileSync(p, 'utf8');
-  assert.match(src, /runCheck onDone verwirft Ergebnis/,
-    'Verhaltens-Test "runCheck onDone verwirft Ergebnis" darf nicht verschwinden');
-});

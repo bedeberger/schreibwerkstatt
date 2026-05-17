@@ -1,5 +1,5 @@
 'use strict';
-// Phase 7 (BookStack-Exit, docs/bookstack-exit.md): Volltextsuche-API.
+// Volltextsuche-API.
 //
 // GET /search?q=...&kind=page,chapter&book_id=42&limit=50&offset=0
 //   - ACL strikt: JOIN gegen book_access via session.user.email.

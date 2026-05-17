@@ -1,4 +1,4 @@
-// Phase 4d (BookStack-Exit, docs/bookstack-exit.md): AdminUsageCard-Methods.
+// AdminUsageCard-Methods.
 // Wird im adminUsageCard-Alpine-Scope gespreaded. Root-Zugriffe ueber
 // `window.__app`. Privacy: Admin sieht USD/Tokens + book_id (anonym), keine
 // Buchtitel.

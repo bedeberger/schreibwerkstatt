@@ -1,4 +1,4 @@
-// Block-aware Diff fuer Revisions-Viewer (Phase 2, BookStack-Exit).
+// Block-aware Diff fuer Revisions-Viewer.
 // Pure-Function: keine DOM-/Alpine-Abhaengigkeit, damit testbar via node:test.
 // Konsument lazy-loaded jsdiff (window.Diff) und reicht es als `diffLib` rein.
 //

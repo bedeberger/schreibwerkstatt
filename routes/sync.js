@@ -273,7 +273,7 @@ async function syncBook(bookId, ctx) {
     catch (e) { logger.warn(`Figuren-Mentions für Seite ${item.page_id} fehlgeschlagen: ${e.message}`); }
   }
 
-  // Phase 7: Volltext-Index nach Sync-Pull aktualisieren. Buch-Meta + Kapitel
+  // Volltext-Index nach Sync-Pull aktualisieren. Buch-Meta + Kapitel
   // werden ueber upsertBook/upsertChapters in _upsertPagesCache implizit
   // beruehrt; Seiten haben nach upsertPageStatsMany die neuen body_html-Werte.
   try {

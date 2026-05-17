@@ -1,4 +1,4 @@
-// Alpine.data('searchCard') — Volltextsuche (Phase 7 BookStack-Exit).
+// Alpine.data('searchCard') — Volltextsuche.
 // Liest aus FTS5 ueber GET /search. Filter: Kind-Multiselect + Buch-Scope
 // (aktuelles Buch oder alle sichtbaren). Treffer-Klick navigiert via Hash-
 // Router (Seite/Kapitel) oder oeffnet die zugehoerige Karte (Figur/Ort).

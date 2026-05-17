@@ -36,7 +36,7 @@ const aiProviderState = () => ({
 
 const navigationState = () => ({
   books: [],
-  // Phase 6: Buchliste-Filter (UI-only, persistiert nicht; reines Frontend-Filter
+  // Buchliste-Filter (UI-only, persistiert nicht; reines Frontend-Filter
   // ueber die per /content/books gelieferten category_id + tags-Felder).
   bookFilterCategoryId: '',
   bookFilterTagIds: [],
@@ -47,8 +47,8 @@ const navigationState = () => ({
   // Per-Buch ACL-Rolle aus /books/:id/access. `currentBookRole` ist die Rolle
   // fuer selectedBookId (Snapshot fuer $watch + Getter `canEdit`/`canReview`).
   // null = nicht ermittelbar (kein Zugriff oder Endpoint-Fehler) → Frontend
-  // faellt auf Legacy-Verhalten zurueck (canEdit=true), bis Phase 4b alle
-  // Schreibpfade serverseitig enforced. `bookRoles` cached pro Buch.
+  // faellt auf Legacy-Verhalten zurueck (canEdit=true), bis serverseitige
+  // Schreibpfade enforced sind. `bookRoles` cached pro Buch.
   bookRoles: {},
   currentBookRole: null,
   pages: [],

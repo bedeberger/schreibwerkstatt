@@ -119,7 +119,7 @@
   }
 }
 
-/* Phase 4b Sharing-Section innerhalb der BookSettings-Card. */
+/* Sharing-Section innerhalb der BookSettings-Card. */
 .book-share-list {
   display: flex;
   flex-direction: column;
@@ -186,7 +186,7 @@
 }
 .book-share-invite-row input { flex: 1; min-width: 0; }
 
-/* Lock-Banner (Phase 4b page_locks). Sitzt im Editor-Header analog
+/* Lock-Banner (page_locks). Sitzt im Editor-Header analog
    zum Session-Banner. */
 .page-lock-banner {
   display: flex;
@@ -219,7 +219,7 @@
   }
 }
 
-/* Phase 6: Kategorie + Tags. Chip-Toggle-Pool + Inline-Create. */
+/* Kategorie + Tags. Chip-Toggle-Pool + Inline-Create. */
 .book-tags-editor {
   display: flex;
   flex-direction: column;

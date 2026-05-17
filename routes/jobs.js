@@ -14,7 +14,7 @@ const { finetuneExportRouter } = require('./jobs/finetune-export');
 const { pdfExportRouter } = require('./jobs/pdf-export');
 const { figurWerkstattRouter } = require('./jobs/figur-werkstatt');
 
-// Phase 4d: Budget-Enforcement greift VOR allen Sub-Routern, sonst lassen sich
+// Budget-Enforcement greift VOR allen Sub-Routern, sonst lassen sich
 // die Job-POSTs unter /jobs/* nicht mit einer einzigen Middleware kapseln.
 // enforceBudget skipped non-POST und non-Claude-Provider intern.
 router.use((req, res, next) => {
