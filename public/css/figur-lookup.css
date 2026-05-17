@@ -16,8 +16,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 8px 12px;
+  gap: var(--space-sm);
+  padding: var(--space-sm) 12px;
   border-bottom: 1px solid var(--color-border);
 }
 .figur-lookup-name {
@@ -36,7 +36,7 @@
 }
 .figur-lookup-close:hover { color: var(--color-text); }
 .figur-lookup-body {
-  padding: 8px 12px;
+  padding: var(--space-sm) 12px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -54,7 +54,7 @@
 .figur-lookup-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: var(--space-xs);
 }
 .figur-lookup-meta {
   font-size: 0.75rem;
@@ -71,7 +71,7 @@
   background: transparent;
   border: none;
   border-radius: 0 0 var(--radius-md) var(--radius-md);
-  padding: 8px 12px;
+  padding: var(--space-sm) 12px;
   cursor: pointer;
   color: var(--color-muted);
   font-size: 0.85rem;

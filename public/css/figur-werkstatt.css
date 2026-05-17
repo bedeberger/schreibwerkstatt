@@ -43,7 +43,7 @@
 .werkstatt-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-2xs);
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
@@ -52,7 +52,7 @@
 .werkstatt-list-item {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-2xs);
   padding: var(--space-sm) var(--space-md);
   background: transparent;
   border: 0;
@@ -138,7 +138,7 @@
 }
 .werkstatt-detail-name {
   font-family: var(--font-serif);
-  font-size: 22px;
+  font-size: var(--font-size-xl);
   margin: 0;
   line-height: var(--lh-tight);
 }
@@ -194,7 +194,7 @@
 .werkstatt-mindmap-controls {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-xs);
 }
 
 /* Overlay-Variante: Toolbar oben rechts in der Mindmap-Canvas-Ecke,
@@ -204,7 +204,7 @@
   top: 8px;
   right: 8px;
   z-index: var(--z-sticky);
-  padding: 4px;
+  padding: var(--space-xs);
   background: color-mix(in srgb, var(--color-surface) 88%, transparent);
   border: var(--border-thin) solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -256,7 +256,7 @@
   width: 18px;
   height: 18px;
   line-height: 16px;
-  font-size: 14px;
+  font-size: var(--font-size-base);
   font-weight: var(--fw-semibold);
   border-radius: var(--radius-sm);
   border-color: var(--color-border);
@@ -322,7 +322,7 @@
   z-index: var(--z-popover);
   display: flex;
   flex-direction: column;
-  padding: 4px 0;
+  padding: var(--space-xs) 0;
 }
 .werkstatt-context-item {
   display: block;
@@ -353,7 +353,7 @@
 .werkstatt-context-sep {
   height: 1px;
   background: var(--color-border);
-  margin: 4px 0;
+  margin: var(--space-xs) 0;
 }
 
 /* Mindmap-Container fokus-sichtbar (Tastatur-Nav-Indikator) */

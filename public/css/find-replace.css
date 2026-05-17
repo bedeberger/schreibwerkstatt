@@ -17,7 +17,7 @@
   z-index: var(--z-toolbar);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-xs);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-md);
@@ -28,7 +28,7 @@
 .edit-find-row {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-xs);
 }
 .edit-find-input {
   flex: 1 1 auto;

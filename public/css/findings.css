@@ -6,8 +6,8 @@
   gap: 6px;
   cursor: pointer;
   border-left: 2px solid var(--color-border);
-  padding: 8px 12px;
-  margin: 8px 0;
+  padding: var(--space-sm) 12px;
+  margin: var(--space-sm) 0;
   font-size: var(--font-size-base);
 }
 .finding.error { border-color: var(--color-err-border); }
@@ -20,7 +20,7 @@
   text-decoration-color: var(--color-muted);
 }
 .finding.finding--applied .finding-checkbox { cursor: not-allowed; }
-.finding-checkbox { flex-shrink: 0; margin-top: 2px; cursor: pointer; }
+.finding-checkbox { flex-shrink: 0; margin-top: var(--space-2xs); cursor: pointer; }
 .finding > .badge { flex-shrink: 0; }
 .finding-content { flex: 1; min-width: 0; overflow-x: auto; }
 
@@ -29,7 +29,7 @@
 .finding-original {
   display: block;
   background: color-mix(in srgb, var(--color-danger, #c0392b) 15%, transparent);
-  padding: 2px 6px;
+  padding: var(--space-2xs) 6px;
   border-radius: var(--radius-sm);
   word-break: break-word;
   width: fit-content;
@@ -39,7 +39,7 @@
   display: block;
   margin-top: 3px;
   background: color-mix(in srgb, var(--color-success, #27ae60) 15%, transparent);
-  padding: 2px 6px;
+  padding: var(--space-2xs) 6px;
   border-radius: var(--radius-sm);
   word-break: break-word;
   width: fit-content;
@@ -50,7 +50,7 @@
   display: block;
   color: var(--color-muted);
   font-size: var(--font-size-xs);
-  margin-top: 4px;
+  margin-top: var(--space-xs);
   overflow-wrap: break-word;
 }
 

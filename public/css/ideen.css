@@ -10,11 +10,11 @@
   display: flex;
   gap: 6px;
   align-items: flex-end;
-  margin: 8px 0 12px;
+  margin: var(--space-sm) 0 12px;
 }
 .ideen-input {
   flex: 1;
-  padding: 8px 10px;
+  padding: var(--space-sm) 10px;
   border: 0.5px solid var(--color-border-input);
   border-radius: var(--radius-md);
   font-size: var(--font-size-base);
@@ -32,9 +32,9 @@
   text-align: center;
   color: var(--color-subtle);
   font-size: var(--font-size-sm);
-  padding: 16px 0;
+  padding: var(--space-lg) 0;
 }
-.ideen-section { margin-top: 12px; }
+.ideen-section { margin-top: var(--space-md); }
 .ideen-section-title {
   font-size: var(--font-size-xs);
   font-weight: 400;
@@ -55,7 +55,7 @@
 .idee-item--erledigt .idee-content { text-decoration: line-through; }
 .idee-status-badge {
   display: inline-block;
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   background: var(--color-surface);
@@ -94,7 +94,7 @@
   background: transparent;
   color: var(--color-muted);
   border-radius: var(--radius-sm);
-  font-size: 16px;
+  font-size: var(--font-size-reading);
   line-height: 1;
   cursor: pointer;
 }
@@ -108,7 +108,7 @@
 .idee-menu-popover {
   position: fixed;
   min-width: 180px;
-  padding: 4px;
+  padding: var(--space-xs);
   background: var(--color-surface);
   border: 0.5px solid var(--color-border);
   border-radius: var(--radius-sm);

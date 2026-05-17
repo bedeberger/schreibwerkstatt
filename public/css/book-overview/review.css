@@ -2,8 +2,8 @@
 /* Sterne-Tile: 6 Sterne (voll/halb/leer) + Datum + Trend-Pfeil. */
 .overview-stars {
   display: flex;
-  gap: 2px;
-  font-size: 22px;
+  gap: var(--space-2xs);
+  font-size: var(--font-size-xl);
   line-height: 1;
 }
 .overview-star { color: var(--color-border); }
@@ -20,7 +20,7 @@
   justify-content: space-between;
   align-items: baseline;
   font-size: var(--font-size-sm);
-  margin-top: 2px;
+  margin-top: var(--space-2xs);
 }
 .overview-review-date { color: var(--color-muted); font-size: var(--font-size-xs); }
 .overview-review-trend {
@@ -29,8 +29,8 @@
 }
 
 @media (max-width: 480px) {
-  .overview-stars { font-size: 18px; }
+  .overview-stars { font-size: var(--font-size-lg); }
   /* Sterne + Trend ggf. eng — Wrap erlauben. */
-  .overview-review-meta { flex-wrap: wrap; gap: 4px; }
+  .overview-review-meta { flex-wrap: wrap; gap: var(--space-xs); }
 }
 }

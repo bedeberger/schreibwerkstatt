@@ -6,7 +6,7 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-2xs);
   max-height: min(280px, 40vh);
   overflow-y: auto;
 }
@@ -14,7 +14,7 @@
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  gap: 12px;
+  gap: var(--space-md);
   padding: 6px 8px;
   border-radius: var(--radius-sm);
   cursor: pointer;
@@ -24,7 +24,7 @@
 .overview-recent-name {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-sm);
   flex: 1 1 auto;
   min-width: 0;
   font-size: var(--font-size-sm);
@@ -61,10 +61,10 @@
 @media (max-width: 480px) {
   .overview-recent-list { max-height: min(220px, 40vh); }
   /* Recent: Meta unter Name — sonst kollidiert mit langen Page-Titeln. */
-  .overview-recent-item { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .overview-recent-item { flex-direction: column; align-items: flex-start; gap: var(--space-2xs); }
   .overview-recent-meta { width: 100%; justify-content: flex-start; }
   /* Quick-Actions: Buttons volle Zeile, gleichmässig. */
-  .overview-actions { gap: 4px; }
+  .overview-actions { gap: var(--space-xs); }
   .overview-actions .btn-compact { flex: 1 1 calc(50% - 4px); min-width: 0; }
 }
 }

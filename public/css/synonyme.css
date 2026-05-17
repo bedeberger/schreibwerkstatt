@@ -5,7 +5,7 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-top: 4px;
+  margin-top: var(--space-xs);
 }
 
 .syn-entry {
@@ -18,13 +18,13 @@
 .syn-vorkommen-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-top: 8px;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
 }
 
 .syn-vorkommen {
   border-top: 0.5px solid var(--color-border);
-  padding-top: 8px;
+  padding-top: var(--space-sm);
 }
 
 .syn-vorkommen--applied {
@@ -46,14 +46,14 @@
 }
 
 .syn-applied-inline {
-  margin-top: 2px;
+  margin-top: var(--space-2xs);
 }
 
 .syn-entry-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xs);
 }
 
 .syn-wort {
@@ -77,7 +77,7 @@
   color: var(--color-muted);
   font-size: var(--font-size-sm);
   font-style: italic;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-sm);
 }
 
 .syn-buttons {
@@ -87,7 +87,7 @@
 }
 
 .syn-btn {
-  font-size: 12px;
+  font-size: var(--font-size-mini);
   padding: 3px 12px;
   border: 0.5px solid var(--color-primary);
   color: var(--color-primary);

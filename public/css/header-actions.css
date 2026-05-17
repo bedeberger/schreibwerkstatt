@@ -12,7 +12,7 @@
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  padding: 2px;
+  padding: var(--space-2xs);
   background: var(--color-hover);
   border: 0.5px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -53,7 +53,7 @@
   justify-content: center;
   width: 16px;
   height: 16px;
-  font-size: 14px;
+  font-size: var(--font-size-base);
   line-height: 1;
   color: var(--color-muted);
   flex-shrink: 0;
@@ -102,7 +102,7 @@
   border: 0.5px solid transparent;
   border-radius: var(--radius-sm);
   color: var(--color-muted);
-  font-size: 14px;
+  font-size: var(--font-size-base);
   line-height: 1;
   cursor: pointer;
   font-family: inherit;
@@ -123,7 +123,7 @@
   border-color: var(--color-border);
 }
 .header-icon-btn--cache {
-  font-size: 13px;
+  font-size: var(--font-size-sm);
 }
 
 /* Avatar-Button (Trigger für Identitäts-Menü) */
@@ -178,7 +178,7 @@
   animation: cardFadeIn var(--transition-base) both;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-2xs);
 }
 
 .avatar-menu-header {
@@ -219,7 +219,7 @@
   min-width: 0;
 }
 .avatar-menu-name {
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   color: var(--color-text);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -237,7 +237,7 @@
   padding: 0.4rem 0.5rem 0.25rem;
 }
 .avatar-menu-label {
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 700;
   color: var(--color-subtle);
   text-transform: uppercase;
@@ -247,9 +247,9 @@
 
 .theme-segmented {
   display: flex;
-  gap: 2px;
+  gap: var(--space-2xs);
   background: var(--color-hover);
-  padding: 2px;
+  padding: var(--space-2xs);
   border-radius: var(--radius-sm);
 }
 .theme-segmented-btn {
@@ -259,7 +259,7 @@
   padding: var(--pad-badge);
   border-radius: calc(var(--radius-sm) - 2px);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--font-size-mini);
   color: var(--color-muted);
   cursor: pointer;
   transition: background var(--transition-base), color var(--transition-base);
@@ -289,7 +289,7 @@
   border: none;
   border-radius: var(--radius-sm);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   color: var(--color-text);
   text-align: left;
   text-decoration: none;
@@ -334,9 +334,9 @@
 .user-settings-profile {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  font-size: 13px;
-  padding-top: 4px;
+  gap: var(--space-2xs);
+  font-size: var(--font-size-sm);
+  padding-top: var(--space-xs);
 }
 
 }

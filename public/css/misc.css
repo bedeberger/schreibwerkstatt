@@ -3,7 +3,7 @@
 .batch-status {
   font-size: var(--font-size-sm);
   color: var(--color-muted);
-  margin-top: 4px;
+  margin-top: var(--space-xs);
 }
 
 /* === Card-Actions (Button-Gruppe im card-header) === */
@@ -28,7 +28,7 @@
   width: 1px;
   align-self: stretch;
   background: var(--color-border);
-  margin: 4px 2px;
+  margin: var(--space-xs) 2px;
 }
 
 @media (max-width: 700px) {
@@ -51,12 +51,12 @@
   background: none;
   border: none;
   color: var(--color-muted);
-  font-size: 18px;
+  font-size: var(--font-size-lg);
   line-height: 1;
-  padding: 2px 6px;
+  padding: var(--space-2xs) 6px;
   cursor: pointer;
   border-radius: 0;
-  margin-left: 4px;
+  margin-left: var(--space-xs);
   flex-shrink: 0;
 }
 .btn-card-close:hover {
@@ -70,7 +70,7 @@
   align-self: center;
   white-space: nowrap;
   flex-shrink: 0;
-  padding: 2px 8px;
+  padding: var(--space-2xs) 8px;
   font-size: var(--font-size-xs);
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -101,7 +101,7 @@
 /* Drei Badges (T/W/Z) rechts im page-item */
 .tok-stats {
   display: flex;
-  gap: 4px;
+  gap: var(--space-xs);
   align-items: center;
   flex-shrink: 0;
   margin-top: 1px;
@@ -110,9 +110,9 @@
 /* Summen-Badges neben der Button-Gruppe (Buchebene) */
 .tok-totals {
   display: flex;
-  gap: 4px;
+  gap: var(--space-xs);
   align-items: center;
-  margin-left: 4px;
+  margin-left: var(--space-xs);
   flex-wrap: wrap;
   min-width: 0;
 }

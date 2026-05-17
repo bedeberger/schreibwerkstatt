@@ -1,8 +1,8 @@
 @layer components {
 /* === Token-Schätzung === */
 .tok-badge {
-  font-size: 10px;
-  padding: 2px 6px;
+  font-size: var(--font-size-micro);
+  padding: var(--space-2xs) 6px;
   border-radius: var(--radius-sm);
   font-weight: 400;
   flex-shrink: 0;
@@ -40,7 +40,7 @@
 }
 .tok-tt-hint {
   color: var(--color-subtle);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   margin-top: 6px;
   border-top: 1px solid var(--color-border);
   padding-top: 5px;
@@ -75,13 +75,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  margin-top: 8px;
-  margin-bottom: 4px;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+  margin-bottom: var(--space-xs);
 }
 .figuren-graph-toolbar-zoom {
   display: flex;
-  gap: 4px;
+  gap: var(--space-xs);
   flex-shrink: 0;
 }
 
@@ -92,7 +92,7 @@
   color: var(--color-muted);
   cursor: pointer;
   font-family: var(--font-sans);
-  font-size: 15px;
+  font-size: var(--font-size-md);
   line-height: 1;
   padding: 3px 9px;
   min-width: 28px;
@@ -105,7 +105,7 @@
 }
 
 .graph-tool-btn--reset {
-  font-size: 13px;
+  font-size: var(--font-size-sm);
 }
 
 .figuren-graph-wrap {
@@ -138,8 +138,8 @@
   background: var(--color-surface);
   display: flex;
   flex-direction: column;
-  padding: 12px;
-  gap: 8px;
+  padding: var(--space-md);
+  gap: var(--space-sm);
 }
 .figuren-graph-wrap:fullscreen .figuren-graph-container {
   flex: 1;
@@ -156,7 +156,7 @@
   background: var(--color-surface);
   display: flex;
   flex-direction: column;
-  padding: 8px;
+  padding: var(--space-sm);
   gap: 6px;
 }
 .figuren-graph-wrap.is-fullscreen .figuren-graph-container {
@@ -170,11 +170,11 @@
 .figur-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 14px;
+  gap: var(--space-sm) 14px;
   font-size: var(--font-size-xs);
   color: var(--color-muted);
   align-items: center;
-  margin-bottom: 4px;
+  margin-bottom: var(--space-xs);
 }
 
 .figur-legend-dot {
@@ -192,11 +192,11 @@
 .figur-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
+  gap: var(--space-sm);
+  padding: var(--space-sm) 10px;
   border: 0.5px solid var(--color-border);
   border-radius: var(--radius-md);
-  margin-bottom: 2px;
+  margin-bottom: var(--space-2xs);
   cursor: pointer;
   user-select: none;
 }
@@ -237,7 +237,7 @@
 
 .kapitel-badge {
   font-size: var(--font-size-xs);
-  padding: 2px 7px;
+  padding: var(--space-2xs) 7px;
   border-radius: 0;
   white-space: nowrap;
 }
@@ -254,7 +254,7 @@
 }
 
 .kapitel-badge--more {
-  padding: 2px 6px;
+  padding: var(--space-2xs) 6px;
   background: var(--color-tag-bg);
   color: var(--color-muted);
   font-weight: 700;
@@ -273,7 +273,7 @@
   display: flex;
   align-items: baseline;
   gap: 6px;
-  padding: 4px 0;
+  padding: var(--space-xs) 0;
   border-bottom: 0.5px solid var(--color-border);
   flex-wrap: wrap;
 }
@@ -283,7 +283,7 @@
   --rel-hue: var(--palette-gray);
   font-size: var(--font-size-xs);
   font-weight: 400;
-  padding: 2px 7px;
+  padding: var(--space-2xs) 7px;
   border-radius: 0;
   flex-shrink: 0;
   background: color-mix(in srgb, var(--rel-hue) var(--figpal-bg-mix), var(--color-surface));
@@ -304,7 +304,7 @@
   font-size: var(--font-size-xs);
   font-weight: 700;
   letter-spacing: 1px;
-  margin-left: 2px;
+  margin-left: var(--space-2xs);
 }
 .figur-bz-macht--positiv { color: var(--color-primary); }
 .figur-bz-macht--negativ { color: var(--color-err-border); }

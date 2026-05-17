@@ -33,7 +33,7 @@
 
   .tabs-btn {
     position: relative;
-    padding: 8px 14px;
+    padding: var(--space-sm) 14px;
     font-size: var(--font-size-sm);
     font-weight: 500;
     background: transparent;

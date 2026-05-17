@@ -74,7 +74,7 @@
     width: 100%;
   }
   .book-settings-options {
-    gap: 12px;
+    gap: var(--space-md);
   }
   .book-settings-select {
     min-width: 0;
@@ -127,7 +127,7 @@
   background: none;
   border: 1px solid var(--color-border);
   color: var(--color-muted);
-  padding: 2px 10px;
+  padding: var(--space-2xs) 10px;
   border-radius: var(--radius-sm);
   font-family: inherit;
   cursor: pointer;

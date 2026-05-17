@@ -28,7 +28,7 @@
   .lektorat-split-findings {
     overflow-y: auto;
     height: 100%;
-    padding-right: 4px;
+    padding-right: var(--space-xs);
   }
 }
 
@@ -93,7 +93,7 @@
   background: var(--color-mark-ins-bg);
   border-radius: var(--radius-sm);
   padding: 0 2px;
-  margin-left: 2px;
+  margin-left: var(--space-2xs);
 }
 
 /* Chat-Änderungsvorschläge im Preview – gleicher Look wie Lektorat-Korrekturen:
@@ -117,7 +117,7 @@
   background: var(--color-mark-ins-bg);
   border-radius: var(--radius-sm);
   padding: 0 2px;
-  margin-left: 2px;
+  margin-left: var(--space-2xs);
 }
 
 /* Korrektur-Tooltip auf Inline-Mark (positioniert per JS) */
@@ -128,7 +128,7 @@
   min-width: 180px;
   max-width: 340px;
   width: max-content;
-  padding: 8px 10px;
+  padding: var(--space-sm) 10px;
   background: var(--color-tooltip-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -142,7 +142,7 @@
   white-space: normal;
   cursor: default;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-xs);
 }
 .lektorat-tip--visible { display: flex; }
 .lektorat-tip .badge { align-self: flex-start; }
@@ -160,7 +160,7 @@
 
 /* === Figure Context Panel === */
 .figure-context-panel {
-  margin: 12px 0 0;
+  margin: var(--space-md) 0 0;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-bg);
@@ -169,19 +169,19 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 12px;
+  padding: var(--space-sm) 12px;
   cursor: pointer;
   user-select: none;
 }
 .figure-context-header:hover { background: var(--color-hover-light); }
 .figure-context-title { display: flex; align-items: center; gap: 6px; font-size: var(--font-size-sm); font-weight: 400; }
 .figure-context-icon { font-size: var(--font-size-xs); font-weight: 700; background: var(--color-accent-bg); color: var(--color-accent-text); width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
-.figure-context-body { padding: 4px 12px 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+.figure-context-body { padding: var(--space-xs) 12px 10px; display: flex; flex-wrap: wrap; gap: 6px; }
 .figure-context-chip {
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-xs);
   padding: 3px 8px;
   font-size: var(--font-size-sm);
   background: var(--color-tooltip-bg);
@@ -190,7 +190,7 @@
   cursor: default;
 }
 .figure-context-chip:hover { border-color: var(--color-accent); }
-.figure-context-chip .tag { font-size: 10px; padding: 0 4px; }
+.figure-context-chip .tag { font-size: var(--font-size-micro); padding: 0 4px; }
 .figure-context-tooltip {
   position: absolute;
   top: calc(100% + 6px);
@@ -207,11 +207,11 @@
   line-height: 1.5;
   color: var(--color-muted);
 }
-.figure-context-tooltip-name { font-weight: 700; margin-bottom: 4px; }
-.figure-context-tooltip-row { margin-bottom: 2px; }
+.figure-context-tooltip-name { font-weight: 700; margin-bottom: var(--space-xs); }
+.figure-context-tooltip-row { margin-bottom: var(--space-2xs); }
 .figure-context-label { font-weight: 400; color: var(--color-subtle); }
 .figure-context-tooltip-desc {
-  margin-top: 4px;
+  margin-top: var(--space-xs);
   color: var(--color-subtle);
   line-height: 1.5;
 }

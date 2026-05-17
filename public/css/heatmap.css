@@ -4,7 +4,7 @@
   position: relative;
   width: 100%;
   height: 220px;
-  margin: 12px 0 10px;
+  margin: var(--space-md) 0 10px;
 }
 
 .book-stats-controls {
@@ -20,8 +20,8 @@
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
-  margin-top: 8px;
-  padding-top: 8px;
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
   border-top: 0.5px solid var(--color-border);
 }
 
@@ -33,7 +33,7 @@
 .heatmap-legend {
   font-size: var(--font-size-sm);
   color: var(--color-muted);
-  margin-bottom: 8px;
+  margin-bottom: var(--space-sm);
 }
 .heatmap-scroll {
   overflow-x: auto;
@@ -69,7 +69,7 @@
   letter-spacing: 0.04em;
   color: var(--color-fg-muted, var(--color-muted));
   border-bottom: 0.5px solid var(--color-border);
-  padding-bottom: 2px;
+  padding-bottom: var(--space-2xs);
 }
 .heatmap-cluster-row th + th.heatmap-cluster-head {
   border-left: 0.5px solid var(--color-border);
@@ -106,7 +106,7 @@
   display: block;
   font-size: var(--font-size-xs, 11px);
   color: var(--color-muted);
-  margin-top: 2px;
+  margin-top: var(--space-2xs);
 }
 .heatmap-numcol {
   color: var(--color-muted);
@@ -144,7 +144,7 @@
 /* Coverage-Progress in Rowhead (Fehler-Heatmap) */
 .heatmap-coverage {
   display: block;
-  margin-top: 4px;
+  margin-top: var(--space-xs);
   height: 3px;
   background: var(--color-border);
   border-radius: var(--radius-sm);
@@ -171,7 +171,7 @@
   .heatmap-rowhead-main { font-size: var(--font-size-sm); }
   .heatmap-coverage { max-width: 100px; }
   .heatmap-cluster-row th.heatmap-cluster-head {
-    font-size: 10px;
+    font-size: var(--font-size-micro);
     padding-bottom: 1px;
   }
 }
@@ -187,7 +187,7 @@
 
 /* Heatmap-Detail-Panel (aufklappbar unter der Tabelle) */
 .heatmap-detail {
-  margin-top: 12px;
+  margin-top: var(--space-md);
   padding: 10px 12px;
   border: 0.5px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -197,13 +197,13 @@
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-sm);
 }
 .heatmap-detail-title {
   font-weight: 500;
 }
 .heatmap-detail-close {
-  padding: 2px 8px;
+  padding: var(--space-2xs) 8px;
   font-size: var(--font-size-sm);
   background: transparent;
   color: var(--color-muted);
@@ -227,8 +227,8 @@
 .heatmap-detail-page-header {
   display: flex;
   align-items: baseline;
-  gap: 8px;
-  margin-bottom: 4px;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xs);
 }
 .heatmap-detail-page-count {
   font-size: var(--font-size-xs, 11px);
@@ -236,15 +236,15 @@
 }
 .heatmap-detail-sample {
   font-size: var(--font-size-sm);
-  margin-left: 8px;
-  padding: 4px 0;
+  margin-left: var(--space-sm);
+  padding: var(--space-xs) 0;
 }
 .heatmap-detail-token-groups {
   display: grid;
   grid-template-columns: max-content 1fr;
-  column-gap: 8px;
-  row-gap: 8px;
-  margin-left: 8px;
+  column-gap: var(--space-sm);
+  row-gap: var(--space-sm);
+  margin-left: var(--space-sm);
   font-size: var(--font-size-sm);
   align-items: baseline;
 }
@@ -257,13 +257,13 @@
 .heatmap-detail-token-sentences {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-xs);
   min-width: 0;
 }
 .heatmap-detail-original {
   display: block;
   background: color-mix(in srgb, var(--color-danger, #c0392b) 15%, transparent);
-  padding: 2px 6px;
+  padding: var(--space-2xs) 6px;
   border-radius: var(--radius-sm);
   width: fit-content;
   max-width: 100%;
@@ -272,7 +272,7 @@
   display: block;
   margin-top: 3px;
   background: color-mix(in srgb, var(--color-success, #27ae60) 15%, transparent);
-  padding: 2px 6px;
+  padding: var(--space-2xs) 6px;
   border-radius: var(--radius-sm);
   width: fit-content;
   max-width: 100%;
@@ -280,13 +280,13 @@
 .heatmap-detail-erklaerung {
   font-size: var(--font-size-xs, 11px);
   color: var(--color-muted);
-  margin-top: 2px;
+  margin-top: var(--space-2xs);
 }
 
 .stil-repetitions-words {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: var(--space-xs);
 }
 .stil-repetition-word {
   font-variant-numeric: tabular-nums;

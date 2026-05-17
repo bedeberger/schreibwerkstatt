@@ -9,10 +9,10 @@
 .global-zeitstrahl-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-sm);
   cursor: pointer;
   user-select: none;
-  padding: 2px 0;
+  padding: var(--space-2xs) 0;
 }
 
 .global-zeitstrahl-header:hover .global-zeitstrahl-heading { color: var(--color-primary); }
@@ -22,15 +22,15 @@
 .gz-consolidate-btn {
   margin-left: auto;
   font-size: 0.78rem;
-  padding: 2px 10px;
+  padding: var(--space-2xs) 10px;
   min-width: 110px;
 }
 
 .gz-status-row {
-  padding: 4px 0 2px;
+  padding: var(--space-xs) 0 2px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-xs);
 }
 
 
@@ -101,7 +101,7 @@
 }
 
 .gz-extern-badge {
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 400;
   padding: 1px 6px;
   background: var(--color-err-bg);
@@ -124,12 +124,12 @@
   flex-wrap: wrap;
   gap: 3px;
   align-items: center;
-  margin-bottom: 2px;
+  margin-bottom: var(--space-2xs);
 }
 
 .gz-kapitel-link {
   font-size: var(--font-size-xs);
-  padding: 2px 7px;
+  padding: var(--space-2xs) 7px;
   font-weight: 700;
   background: var(--color-text);
   color: var(--color-surface);
@@ -138,16 +138,16 @@
 
 .gz-seite {
   font-size: var(--font-size-xs);
-  padding: 2px 7px;
+  padding: var(--space-2xs) 7px;
   background: var(--color-tag-bg);
   color: var(--color-muted);
   white-space: nowrap;
   align-self: flex-start;
-  margin-bottom: 2px;
+  margin-bottom: var(--space-2xs);
 }
 
 .gz-bedeutung {
-  font-size: 12px;
+  font-size: var(--font-size-mini);
   color: var(--color-muted);
   font-style: italic;
   overflow-wrap: anywhere;
@@ -157,14 +157,14 @@
   display: flex;
   flex-wrap: wrap;
   gap: 3px;
-  margin-top: 2px;
+  margin-top: var(--space-2xs);
 }
 
 .gz-figur-badge {
   --fig-hue: var(--palette-gray);
   font-size: var(--font-size-xs);
   font-weight: 400;
-  padding: 2px 6px;
+  padding: var(--space-2xs) 6px;
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--fig-hue) var(--figpal-bg-mix), var(--color-surface));
   color:      color-mix(in srgb, var(--fig-hue) var(--figpal-text-mix), var(--color-text));

@@ -8,8 +8,8 @@
   padding: 0;
   display: grid;
   grid-template-columns: minmax(120px, 22%) 1fr auto;
-  column-gap: 12px;
-  row-gap: 4px;
+  column-gap: var(--space-md);
+  row-gap: var(--space-xs);
   max-height: min(360px, 50vh);
   overflow-y: auto;
 }
@@ -171,7 +171,7 @@
 @media (max-width: 700px) {
   .overview-chapter-row {
     grid-template-columns: 1fr;
-    gap: 4px;
+    gap: var(--space-xs);
   }
   .overview-chapter-meta {
     justify-content: flex-end;
@@ -188,7 +188,7 @@
 @container (max-width: 380px) {
   .overview-chapter-row {
     grid-template-columns: 1fr;
-    gap: 4px;
+    gap: var(--space-xs);
   }
   .overview-chapter-meta {
     justify-content: flex-end;

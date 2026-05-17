@@ -117,7 +117,7 @@ body.focus-mode :is(.page-content-view, .page-content-view--editing) {
     padding-right: max(1.1rem, env(safe-area-inset-right, 0px));
   }
   body.focus-mode #editor-card .card-header {
-    padding: 8px 12px;
+    padding: var(--space-sm) 12px;
     opacity: var(--opacity-disabled);
   }
 }
@@ -337,7 +337,7 @@ body.focus-mode.focus-cursor-hidden .page-content-view--editing * {
   display: inline-block;
   font-size: var(--font-size-xs);
   color: var(--color-subtle);
-  margin-left: 8px;
+  margin-left: var(--space-sm);
   vertical-align: middle;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -351,7 +351,7 @@ body.focus-mode.focus-cursor-hidden .page-content-view--editing * {
   display: inline-block;
   font-size: var(--font-size-xs);
   color: var(--color-subtle);
-  margin-left: 8px;
+  margin-left: var(--space-sm);
   vertical-align: middle;
   font-variant-numeric: tabular-nums;
 }
@@ -366,7 +366,7 @@ body.focus-mode.focus-cursor-hidden .page-content-view--editing * {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 14px;
+  padding: var(--space-sm) 14px;
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--color-error, #b33) 14%, transparent);
   border: 1px solid color-mix(in srgb, var(--color-error, #b33) 45%, transparent);

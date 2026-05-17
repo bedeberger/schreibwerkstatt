@@ -1,8 +1,8 @@
 @layer utilities {
 /* === Icon-Buttons (quadratisch, für Diff/Chat/Synonyme) === */
 .btn-icon {
-  padding: 8px 11px;
-  font-size: 15px;
+  padding: var(--space-sm) 11px;
+  font-size: var(--font-size-md);
   min-width: 36px;
 }
 
@@ -14,7 +14,7 @@
 .list-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 .list-header--between { justify-content: space-between; }
 .list-header--wrap { flex-wrap: wrap; }
@@ -41,16 +41,16 @@
   margin-left: 6px;
   text-decoration: none;
   display: inline-block;
-  padding: 2px 8px;
+  padding: var(--space-2xs) 8px;
   font-weight: 600;
   letter-spacing: 0.02em;
   vertical-align: middle;
 }
 .display-contents { display: contents; }
 .editor-section { margin-top: 1rem; }
-.stilbox--spaced { margin-top: 12px; }
+.stilbox--spaced { margin-top: var(--space-md); }
 .stilbox--review-summary { margin-bottom: 14px; }
-.fazit--review { margin-top: 16px; }
+.fazit--review { margin-top: var(--space-lg); }
 .review-stars { font-size: var(--font-size-xs); }
 .muted-msg--spaced { margin-top: 14px; }
 .chat-skeleton-line--wide { width: 72%; }
@@ -71,7 +71,7 @@
   padding-bottom: calc(3px + env(safe-area-inset-bottom));
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-sm);
   flex-wrap: wrap;
   font-size: var(--font-size-xs);
   box-shadow: var(--shadow-inset-top);
@@ -83,7 +83,7 @@
   color: var(--color-muted);
   font-weight: 700;
   white-space: nowrap;
-  margin-right: 2px;
+  margin-right: var(--space-2xs);
 }
 .job-queue-pill {
   display: flex;
@@ -122,7 +122,7 @@
 }
 .job-queue-pill-status::before {
   content: '·';
-  margin-right: 4px;
+  margin-right: var(--space-xs);
 }
 .job-queue-pill--running .job-queue-pill-status {
   color: var(--color-running);
@@ -153,10 +153,10 @@
   border-radius: 0;
   color: var(--color-muted);
   cursor: pointer;
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 700;
   line-height: 1;
-  padding: 2px 6px;
+  padding: var(--space-2xs) 6px;
   white-space: nowrap;
 }
 .job-queue-toggle-btn:hover {
@@ -177,7 +177,7 @@
   }
   .job-queue-pill {
     width: 100%;
-    padding: 8px 10px;
+    padding: var(--space-sm) 10px;
     min-height: 44px;
     box-sizing: border-box;
   }
@@ -196,7 +196,7 @@
   }
   .job-queue-toggle-btn {
     width: 100%;
-    padding: 12px;
+    padding: var(--space-md);
     font-size: var(--font-size-xs);
     min-height: 44px;
   }
@@ -210,7 +210,7 @@
    Buttons gleich verteilt). */
 .row {
   display: flex;
-  gap: 8px;
+  gap: var(--space-sm);
   align-items: flex-end;
   flex-wrap: wrap;
 }

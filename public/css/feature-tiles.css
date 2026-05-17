@@ -13,11 +13,11 @@
   border-radius: var(--radius-md);
   background: var(--color-bg);
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--font-size-base);
   color: var(--color-muted);
   text-align: left;
   font-family: inherit;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-sm);
   transition: border-color var(--transition-base), box-shadow var(--transition-base), background var(--transition-base);
 }
 .palette-hero:hover {
@@ -31,7 +31,7 @@
 }
 .palette-hero:active { transform: none; }
 .palette-hero-icon {
-  font-size: 14px;
+  font-size: var(--font-size-base);
   color: var(--color-accent);
   font-weight: 600;
 }
@@ -41,7 +41,7 @@
 .palette-hero-kbd {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: var(--font-size-xs);
-  padding: 2px 6px;
+  padding: var(--space-2xs) 6px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   color: var(--color-muted);
@@ -73,7 +73,7 @@
 .palette-input {
   width: 100%;
   padding: 14px 16px;
-  font-size: 16px;
+  font-size: var(--font-size-reading);
   border: none;
   border-bottom: 1px solid var(--color-border);
   background: transparent;
@@ -92,10 +92,10 @@
   padding: 6px 0;
   flex: 1;
 }
-.palette-section { padding: 4px 0; }
+.palette-section { padding: var(--space-xs) 0; }
 .palette-section-label {
   padding: 6px 16px 4px;
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -106,7 +106,7 @@
   flex-direction: column;
   align-items: flex-start;
   width: 100%;
-  padding: 8px 16px;
+  padding: var(--space-sm) 16px;
   background: transparent;
   border: none;
   cursor: pointer;
@@ -116,7 +116,7 @@
   border-left: 2px solid transparent;
 }
 .palette-item-label {
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   font-weight: 500;
 }
 .palette-item-desc {
@@ -127,7 +127,7 @@
   font-size: var(--font-size-xs);
   color: var(--color-muted);
   line-height: 1.4;
-  margin-top: 2px;
+  margin-top: var(--space-2xs);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -153,7 +153,7 @@
 .palette-item:focus-visible { outline: none; }
 .palette-empty {
   padding: 18px 16px;
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   color: var(--color-muted);
   text-align: center;
 }
@@ -164,9 +164,9 @@
   padding: 0;
 }
 .palette-toast {
-  padding: 8px 14px;
+  padding: var(--space-sm) 14px;
   border-top: 1px solid var(--color-border);
-  font-size: 12px;
+  font-size: var(--font-size-mini);
   color: var(--color-muted);
   background: var(--color-bg);
 }
@@ -184,7 +184,7 @@
 }
 .palette-mode-pill kbd {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   padding: 1px 5px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -198,18 +198,18 @@
 .palette-legend-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 10px;
+  gap: var(--space-xs) 10px;
 }
 .palette-legend-row {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-xs);
   font-size: var(--font-size-xs);
   color: var(--color-muted);
 }
 .palette-legend-row kbd {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   padding: 0 4px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -222,7 +222,7 @@
   /* Hero: kbd-Hint weg (Mobile hat keine physische Tastatur), Padding etwas
      grösser für Tap-Komfort. */
   .palette-hero-kbd { display: none; }
-  .palette-hero { padding: 12px 14px; }
+  .palette-hero { padding: var(--space-md) 14px; }
   /* Palette-Modal: Soft-Keyboard verdeckt sonst Panel. Wenig Padding-Top,
      volle vertikale Reichweite. Safe-Area für Notch/Home-Indicator. */
   .palette-overlay {
@@ -232,7 +232,7 @@
     max-height: calc(100vh - 6vh - env(safe-area-inset-bottom, 0px));
   }
   .palette-item {
-    padding: 12px 16px;
+    padding: var(--space-md) 16px;
     min-width: 0;
   }
   .palette-item-label,
@@ -244,8 +244,8 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .palette-item-label { font-size: 14px; }
-  .palette-item-desc  { font-size: 12px; }
+  .palette-item-label { font-size: var(--font-size-base); }
+  .palette-item-desc  { font-size: var(--font-size-mini); }
   .palette-item-preview {
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -253,7 +253,7 @@
     width: 100%;
     overflow: hidden;
     white-space: normal;
-    font-size: 12px;
+    font-size: var(--font-size-mini);
   }
 }
 

@@ -8,14 +8,18 @@
 
   /* === Font-Size-Scale ===
      Editorial-Skala, 4-Stufen modular: xs/sm/base/md (UI),
-     lg/xl/2xl (Sub-Headings, Section-Heading, Card-Title). */
-  --font-size-xs:   11px;
-  --font-size-sm:   13px;
-  --font-size-base: 14px;
-  --font-size-md:   15px;
-  --font-size-lg:   18px;   /* Sub-Heading, Section-Heading-Stufe 2 */
-  --font-size-xl:   22px;   /* Card-Title-Standard */
-  --font-size-2xl:  26px;   /* Hero/Card-Title-prominent */
+     lg/xl/2xl (Sub-Headings, Section-Heading, Card-Title).
+     micro/mini/reading: semantische Sub-Stufen für dichte UI bzw. Long-Form. */
+  --font-size-micro:   10px;  /* Micro-Labels, Token-Stats, Caption */
+  --font-size-mini:    12px;  /* Compact-UI zwischen xs und sm */
+  --font-size-xs:      11px;
+  --font-size-sm:      13px;
+  --font-size-base:    14px;
+  --font-size-md:      15px;
+  --font-size-reading: 16px;  /* Long-Form-Reading (Editor, Page-View) */
+  --font-size-lg:      18px;  /* Sub-Heading, Section-Heading-Stufe 2 */
+  --font-size-xl:      22px;  /* Card-Title-Standard */
+  --font-size-2xl:     26px;  /* Hero/Card-Title-prominent */
 
   /* === Font-Weight === */
   --fw-regular:    400;

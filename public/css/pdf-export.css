@@ -170,7 +170,7 @@
   border: 0.5px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-bg);
-  font-size: 18px;
+  font-size: var(--font-size-lg);
 }
 
 /* === Farbpicker pro Schriftrolle ===
@@ -193,7 +193,7 @@
   cursor: pointer;
   box-sizing: border-box;
 }
-.pdfx-color-picker::-webkit-color-swatch-wrapper { padding: 2px; }
+.pdfx-color-picker::-webkit-color-swatch-wrapper { padding: var(--space-2xs); }
 .pdfx-color-picker::-webkit-color-swatch { border: none; border-radius: 2px; }
 .pdfx-color-text {
   font-size: var(--font-size-sm);

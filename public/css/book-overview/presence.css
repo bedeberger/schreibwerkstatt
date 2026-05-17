@@ -46,7 +46,7 @@
 .overview-presence-col-head {
   font-weight: 500;
   color: var(--color-muted);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   text-align: center;
   padding: 0 2px;
   /* Lange Kapitelnamen rotieren — schmale Spalten. */
@@ -109,7 +109,7 @@
 .overview-presence-num {
   position: relative;
   z-index: var(--z-base);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 700;
   color: var(--color-text);
   font-variant-numeric: tabular-nums;

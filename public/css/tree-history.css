@@ -4,8 +4,8 @@
   height: 4px;
   background: var(--color-tag-bg);
   border-radius: 0;
-  margin-top: 12px;
-  margin-bottom: 12px;
+  margin-top: var(--space-md);
+  margin-bottom: var(--space-md);
   overflow: hidden;
 }
 
@@ -22,13 +22,13 @@
 }
 
 /* === Tree view === */
-.tree-chapter { margin-bottom: 16px; }
+.tree-chapter { margin-bottom: var(--space-lg); }
 
 .tree-chapter-header {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   column-gap: 6px;
-  row-gap: 2px;
+  row-gap: var(--space-2xs);
   align-items: start;
   padding: 6px 10px 6px 2px;
   border: 0.5px solid transparent;
@@ -38,9 +38,9 @@
   font-size: var(--font-size-base);
   color: var(--color-text);
   user-select: none;
-  margin-bottom: 2px;
+  margin-bottom: var(--space-2xs);
 }
-.tree-chapter-header > .tree-chevron { padding-top: 2px; }
+.tree-chapter-header > .tree-chevron { padding-top: var(--space-2xs); }
 .tree-chapter-header > span:not(.tree-chevron):not(.tree-chapter-meta) {
   min-width: 0;
   overflow-wrap: anywhere;
@@ -51,7 +51,7 @@
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
-  margin-top: 2px;
+  margin-top: var(--space-2xs);
 }
 .tree-chapter-header:hover { background: var(--color-hover); }
 .tree-chapter-header--empty { opacity: var(--opacity-hint); font-weight: 400; font-style: italic; }
@@ -65,9 +65,9 @@
 /* Guide-Linie für die Seiten eines Kapitels */
 .tree-chapter-pages {
   position: relative;
-  margin-left: 12px;
+  margin-left: var(--space-md);
   padding-left: 10px;
-  padding-top: 2px;
+  padding-top: var(--space-2xs);
 }
 .tree-chapter-pages::before {
   content: '';
@@ -95,7 +95,7 @@
 
 .tree-chevron {
   display: inline-block;
-  font-size: 16px;
+  font-size: var(--font-size-reading);
   line-height: 1;
   color: var(--color-subtle);
   width: 14px;
@@ -119,12 +119,12 @@
   color: var(--color-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-sm);
 }
 
 .history-bar {
   margin-top: 1rem;
-  padding-top: 12px;
+  padding-top: var(--space-md);
   border-top: 1px solid var(--color-border);
 }
 
@@ -132,10 +132,10 @@
   display: flex;
   align-items: center;
   gap: 6px 10px;
-  padding: 8px 12px;
+  padding: var(--space-sm) 12px;
   border-radius: var(--radius-md);
   border: 0.5px solid var(--color-border);
-  margin-bottom: 4px;
+  margin-bottom: var(--space-xs);
   cursor: pointer;
   user-select: none;
   flex-wrap: wrap;
@@ -167,9 +167,9 @@
 }
 
 .history-item-delete {
-  font-size: 14px;
+  font-size: var(--font-size-base);
   line-height: 1;
-  padding: 2px 5px;
+  padding: var(--space-2xs) 5px;
   border: none;
   background: none;
   color: var(--color-subtle);
@@ -184,7 +184,7 @@
 @media (max-width: 480px) {
   .history-item-delete {
     padding: 6px 10px;
-    font-size: 16px;
+    font-size: var(--font-size-reading);
   }
 }
 
@@ -192,14 +192,14 @@
   border: 0.5px solid var(--color-border);
   border-top: none;
   border-radius: 0;
-  padding: 12px 14px 14px;
+  padding: var(--space-md) 14px 14px;
   margin-bottom: 6px;
   background: var(--color-bg);
 }
 
 .btn-toggle-saved {
   font-size: var(--font-size-xs);
-  padding: 2px 8px;
+  padding: var(--space-2xs) 8px;
   border-radius: 0;
   border: 1px solid transparent;
   cursor: pointer;
@@ -211,7 +211,7 @@
 .btn-toggle-saved--off { background: var(--color-warn-bg); color: var(--color-warn-text); border-color: var(--color-warn-text); }
 
 .history-chevron {
-  font-size: 16px;
+  font-size: var(--font-size-reading);
   color: var(--color-subtle);
   transition: transform var(--transition-slow);
   display: inline-block;
@@ -222,7 +222,7 @@
   border: 0.5px solid var(--color-border);
   border-top: 0.5px dashed var(--color-border);
   border-radius: 0 0 var(--radius-md) var(--radius-md);
-  padding: 16px 18px 18px;
+  padding: var(--space-lg) 18px 18px;
   margin: 0 0 8px;
   background: transparent;
 }
@@ -237,11 +237,11 @@
   margin: 0 0 14px;
   border-radius: 0;
 }
-.history-detail .bewertung-section { margin-top: 16px; }
+.history-detail .bewertung-section { margin-top: var(--space-lg); }
 .history-detail .bewertung-header { margin-bottom: 10px; }
 
 .btn-delete-history {
-  padding: 4px 12px;
+  padding: var(--space-xs) 12px;
   font-size: var(--font-size-xs);
   border: 1px solid var(--color-err-text);
   background: none;
@@ -252,7 +252,7 @@
   opacity: 0.55;
   transition: opacity var(--transition-slow);
   display: inline-block;
-  margin-top: 16px;
+  margin-top: var(--space-lg);
 }
 .btn-delete-history:hover { opacity: 1; }
 
@@ -260,7 +260,7 @@
    Reuse .history-bar + .history-item; Liste klappbar via .collapsible-toggle
    (Default zu). Cursor auf history-item bleibt default — Restore-Button am Ende.
    Kein `width: 100%` auf Toggle (Wackel-Shift, DESIGN.md). */
-.page-revisions-list { margin-top: 8px; }
+.page-revisions-list { margin-top: var(--space-sm); }
 .page-revisions-list .history-item { cursor: default; }
 .page-revisions-list .history-item:hover { background: transparent; }
 .page-revisions-list .btn-toggle-saved { margin-left: auto; }

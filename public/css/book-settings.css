@@ -32,18 +32,18 @@
 .job-stats-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: var(--font-size-mini);
 }
 .job-stats-table th {
   text-align: left;
   color: var(--color-muted);
   font-weight: 400;
-  padding: 2px 12px 5px 0;
+  padding: var(--space-2xs) 12px 5px 0;
   border-bottom: 0.5px solid var(--color-border);
   white-space: nowrap;
 }
 .job-stats-table td {
-  padding: 4px 12px 4px 0;
+  padding: var(--space-xs) 12px 4px 0;
   border-bottom: 0.5px solid var(--color-separator-on-dark);
   white-space: nowrap;
 }
@@ -57,8 +57,8 @@
 .job-stats-empty,
 .job-stats-loading {
   color: var(--color-muted);
-  font-size: 12px;
-  padding: 4px 0;
+  font-size: var(--font-size-mini);
+  padding: var(--space-xs) 0;
 }
 .job-stats-row--clickable { cursor: pointer; }
 .job-stats-row--clickable:hover td { background: var(--color-hover-bg, rgba(255,255,255,0.04)); }
@@ -78,7 +78,7 @@
   text-align: left;
   color: var(--color-muted);
   font-weight: 400;
-  padding: 2px 12px 4px 0;
+  padding: var(--space-2xs) 12px 4px 0;
   border-bottom: 0.5px solid var(--color-border);
   white-space: nowrap;
 }
@@ -91,13 +91,13 @@
 .job-runs-empty {
   color: var(--color-muted);
   font-size: var(--font-size-xs);
-  padding: 4px 0;
+  padding: var(--space-xs) 0;
 }
 .job-run-status {
   display: inline-block;
   padding: 1px 6px;
   border-radius: var(--radius-sm);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   background: var(--color-badge-bg, rgba(255,255,255,0.06));
 }
 .job-run-status--done      { color: var(--color-ok-light, #6cc472); }
@@ -121,7 +121,7 @@
   }
   .job-stats-table th,
   .job-stats-table td {
-    padding-right: 8px;
+    padding-right: var(--space-sm);
   }
   .job-stats-table th:first-child,
   .job-stats-table td:first-child {
@@ -220,7 +220,7 @@
   max-height: 280px;
   overflow-y: auto;
   margin: 0;
-  padding: 4px 0;
+  padding: var(--space-xs) 0;
   list-style: none;
   background: var(--color-surface);
   border: 0.5px solid var(--color-border-focus);
@@ -231,7 +231,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 2px;
+  gap: var(--space-2xs);
   padding: var(--space-2) var(--space-3);
   cursor: pointer;
   font-size: var(--font-size-base);

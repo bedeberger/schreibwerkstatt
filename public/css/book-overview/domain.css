@@ -10,7 +10,7 @@
 }
 .overview-fig-count {
   font-family: var(--font-serif);
-  font-size: 22px;
+  font-size: var(--font-size-xl);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
@@ -47,7 +47,7 @@
   width: 22px;
   height: 22px;
   border-radius: var(--radius-sm);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 600;
   letter-spacing: 0.02em;
   color: var(--color-bg);
@@ -108,7 +108,7 @@
   font-size: var(--font-size-xs);
   color: var(--color-muted);
 }
-.overview-stacked-key { display: inline-flex; align-items: center; gap: 4px; }
+.overview-stacked-key { display: inline-flex; align-items: center; gap: var(--space-xs); }
 .overview-stacked-key::before {
   content: '';
   width: 8px;
@@ -123,6 +123,6 @@
   .overview-fig-count { font-size: 20px; }
 }
 @media (max-width: 480px) {
-  .overview-fig-count { font-size: 18px; }
+  .overview-fig-count { font-size: var(--font-size-lg); }
 }
 }

@@ -11,7 +11,7 @@
   background: var(--color-surface);
   border: 0.5px solid var(--color-border);
   border-radius: var(--radius-sm);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   color: var(--color-muted);
   padding: 3px 8px;
   white-space: nowrap;
@@ -49,7 +49,7 @@
   justify-content: space-between;
   align-items: baseline;
   gap: 0.5rem;
-  font-size: 12px;
+  font-size: var(--font-size-mini);
   color: var(--color-muted);
   margin-bottom: 0.65rem;
 }
@@ -69,8 +69,8 @@
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  font-size: 12px;
-  padding: 2px 0;
+  font-size: var(--font-size-mini);
+  padding: var(--space-2xs) 0;
   color: var(--color-subtle);
 }
 .komplett-phase-item.is-done {
@@ -83,7 +83,7 @@
 .komplett-phase-icon {
   width: 14px;
   text-align: center;
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   flex-shrink: 0;
 }
 .komplett-phase-item.is-done .komplett-phase-icon {

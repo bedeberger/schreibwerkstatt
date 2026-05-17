@@ -9,8 +9,8 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 4px 0 8px;
-  margin-bottom: 12px;
+  padding: var(--space-xs) 0 8px;
+  margin-bottom: var(--space-md);
 }
 
 /* Nachrichten-Zeile */
@@ -46,8 +46,8 @@
 .chat-skeleton-wrapper {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 4px 0 2px;
+  gap: var(--space-sm);
+  padding: var(--space-xs) 0 2px;
 }
 .chat-skeleton-line {
   height: 13px;
@@ -60,8 +60,8 @@
 
 /* Token-Info */
 .chat-token-info {
-  margin-top: 4px;
-  font-size: 10px;
+  margin-top: var(--space-xs);
+  font-size: var(--font-size-micro);
   color: var(--color-subtle);
   text-align: right;
 }
@@ -91,9 +91,9 @@
   color: var(--color-subtle);
 }
 .chat-context-toggle {
-  margin-left: 4px;
+  margin-left: var(--space-xs);
   padding: 0 4px;
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   background: none;
   border: 0.5px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -113,7 +113,7 @@
   display: inline-block;
   margin-left: 6px;
   padding: 0 5px;
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   border: 0.5px solid var(--color-border);
   border-radius: var(--radius-sm);
   color: var(--color-subtle);
@@ -127,7 +127,7 @@
 
 /* Markdown in Antworten */
 .chat-heading {
-  margin: 8px 0 4px;
+  margin: var(--space-sm) 0 4px;
   font-weight: 700;
   line-height: 1.3;
 }
@@ -139,7 +139,7 @@
   padding: 0;
 }
 .chat-list--ol { list-style-type: decimal; }
-.chat-list li { margin-bottom: 2px; }
+.chat-list li { margin-bottom: var(--space-2xs); }
 .chat-hr {
   border: none;
   border-top: 1px solid var(--color-border);
@@ -180,13 +180,13 @@
 .chat-vorschlag {
   border: 0.5px solid var(--color-border);
   border-left: 2px solid var(--color-primary);
-  padding: 8px 10px;
+  padding: var(--space-sm) 10px;
   background: var(--color-surface);
   font-size: var(--font-size-sm);
 }
 .chat-vorschlag-title {
   font-weight: 700;
-  margin-bottom: 4px;
+  margin-bottom: var(--space-xs);
   overflow-wrap: anywhere;
 }
 .chat-vorschlag--applied {
@@ -199,7 +199,7 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: 6px;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 .chat-vorschlag-label {
   font-size: var(--font-size-xs);
@@ -210,7 +210,7 @@
 }
 .chat-vorschlag-btn {
   font-size: var(--font-size-xs);
-  padding: 2px 10px;
+  padding: var(--space-2xs) 10px;
   border: 0.5px solid var(--color-primary);
   color: var(--color-primary);
   background: transparent;
@@ -223,7 +223,7 @@
 .chat-vorschlag-btn:disabled { opacity: var(--opacity-muted); cursor: default; }
 
 .chat-vorschlag-diff {
-  margin-bottom: 4px;
+  margin-bottom: var(--space-xs);
 }
 .chat-vorschlag-begruendung {
   color: var(--color-muted);
@@ -233,7 +233,7 @@
 .chat-vorschlag-error {
   color: var(--color-err-text);
   font-size: var(--font-size-xs);
-  margin-top: 4px;
+  margin-top: var(--space-xs);
 }
 
 /* Eingabebereich */
@@ -244,7 +244,7 @@
 }
 .chat-input {
   flex: 1;
-  padding: 8px 10px;
+  padding: var(--space-sm) 10px;
   border: 0.5px solid var(--color-border-input);
   border-radius: var(--radius-md);
   font-size: var(--font-size-base);
@@ -267,7 +267,7 @@
 .chat-input-hint {
   font-size: var(--font-size-xs);
   color: var(--color-subtle);
-  margin-top: 4px;
+  margin-top: var(--space-xs);
   text-align: right;
 }
 
@@ -276,7 +276,7 @@
   text-align: center;
   color: var(--color-subtle);
   font-size: var(--font-size-sm);
-  padding: 24px 0 12px;
+  padding: var(--space-xl) 0 12px;
 }
 
 /* Session-History */
@@ -291,10 +291,10 @@
 .chat-session-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-sm);
   padding: 6px 8px;
   border: 0.5px solid var(--color-border);
-  margin-bottom: 4px;
+  margin-bottom: var(--space-xs);
   cursor: pointer;
   background: var(--color-bg);
 }
@@ -312,21 +312,21 @@
   text-overflow: ellipsis;
 }
 .chat-session-meta {
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   color: var(--color-subtle);
   white-space: nowrap;
   flex-shrink: 0;
 }
 .chat-session-delete {
   padding: 0 4px;
-  font-size: 14px;
+  font-size: var(--font-size-base);
   flex-shrink: 0;
 }
 
 @media (max-width: 480px) {
   .chat-session-delete {
     padding: 6px 10px;
-    font-size: 16px;
+    font-size: var(--font-size-reading);
   }
 }
 

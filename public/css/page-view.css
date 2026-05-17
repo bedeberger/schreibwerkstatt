@@ -8,7 +8,7 @@
   background: var(--color-page-view-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  margin: 12px auto;
+  margin: var(--space-md) auto;
   line-height: 1.7;
   font-family: var(--font-serif);
   font-size: 17px;
@@ -74,7 +74,7 @@
 .page-content-view ul, .page-content-view ol { padding-left: 1.5em; margin: 0.4em 0; }
 .page-content-view img { max-width: 100%; height: auto; border-radius: var(--radius-md); }
 .page-content-view hr { border: none; border-top: 1px solid var(--color-border); margin: 1em 0; }
-.page-content-view pre { background: var(--color-bg); padding: 10px 12px; border-radius: var(--radius-md); overflow-x: auto; font-size: 13px; }
+.page-content-view pre { background: var(--color-bg); padding: 10px 12px; border-radius: var(--radius-md); overflow-x: auto; font-size: var(--font-size-sm); }
 .page-content-view code { background: var(--color-bg); padding: 1px 4px; border-radius: var(--radius-sm); font-size: 0.9em; }
 .page-content-view pre code { background: none; padding: 0; }
 
@@ -82,7 +82,7 @@
    Zeilenumbrüchen und ohne Silbentrennung (Verse sind verslängen-gebunden). */
 .page-content-view .poem {
   border-left: 3px solid var(--color-border);
-  padding-left: 12px;
+  padding-left: var(--space-md);
   margin: 0.6em 0;
   color: var(--color-subtle);
   font-style: italic;

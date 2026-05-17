@@ -6,7 +6,7 @@
 .overview-hero-row {
   display: flex;
   align-items: baseline;
-  gap: 24px;
+  gap: var(--space-xl);
   flex-wrap: wrap;
 }
 .overview-hero-num {
@@ -35,11 +35,11 @@
 .overview-substat {
   display: flex;
   align-items: baseline;
-  gap: 4px;
+  gap: var(--space-xs);
 }
 .overview-substat-value {
   font-family: var(--font-serif);
-  font-size: 18px;
+  font-size: var(--font-size-lg);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
@@ -105,7 +105,7 @@
 .overview-bars7 {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
+  gap: var(--space-xs);
   align-items: end;
   min-height: 60px;
 }
@@ -113,7 +113,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-xs);
   min-width: 0;
 }
 .overview-bar7-track {
@@ -133,13 +133,13 @@
 .overview-bar7-fill--pos { background: var(--color-success, #4caf50); }
 .overview-bar7-fill--neg { background: var(--color-danger,  #d32f2f); }
 .overview-bar7-label {
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   color: var(--color-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 .overview-bars7-total {
-  margin-top: 2px;
+  margin-top: var(--space-2xs);
   font-size: var(--font-size-sm);
   font-weight: 500;
 }
@@ -157,7 +157,7 @@
 }
 .overview-donut-text {
   font-family: var(--font-serif);
-  font-size: 14px;
+  font-size: var(--font-size-base);
   font-weight: 500;
   fill: var(--color-text);
   font-variant-numeric: tabular-nums;
@@ -189,7 +189,7 @@
 /* ── Streak-Heatmap (52 Wochen × 7 Tage GitHub-Stil) ─────────────────────── */
 .overview-streak-meta {
   display: flex;
-  gap: 12px;
+  gap: var(--space-md);
   flex-wrap: wrap;
   font-size: var(--font-size-xs);
   color: var(--color-muted);
@@ -206,7 +206,7 @@
      Kollaps in schmalen Layouts; horizontaler Scroll bei Engstellen. */
   min-height: 96px;
   overflow-x: auto;
-  padding-bottom: 4px;
+  padding-bottom: var(--space-xs);
 }
 .overview-streak-week {
   display: contents;
@@ -231,8 +231,8 @@
 .overview-streak-legend {
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin-top: 8px;
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
   font-size: var(--font-size-xs);
   color: var(--color-muted);
 }
@@ -246,7 +246,7 @@
 }
 
 @media (max-width: 600px) {
-  .overview-streak-grid { min-height: 70px; gap: 2px; }
+  .overview-streak-grid { min-height: 70px; gap: var(--space-2xs); }
   .overview-streak-cell { min-width: 7px; }
 }
 
@@ -254,13 +254,13 @@
 @media (max-width: 700px) {
   .overview-hero-value { font-size: 30px; }
   .overview-hero-row { gap: 14px; }
-  .overview-substat-value { font-size: 16px; }
+  .overview-substat-value { font-size: var(--font-size-reading); }
 }
 @media (max-width: 480px) {
-  .overview-hero-value { font-size: 26px; }
+  .overview-hero-value { font-size: var(--font-size-2xl); }
   .overview-hero-row { gap: 10px; }
   .overview-substats { gap: 10px; }
-  .overview-substat-value { font-size: 15px; }
+  .overview-substat-value { font-size: var(--font-size-md); }
   .overview-sparkline { height: 48px; }
   .overview-bars7 { min-height: 52px; }
   .overview-bar7-track { height: 40px; }

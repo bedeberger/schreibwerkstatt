@@ -3,7 +3,7 @@
 /* Alpine.js – verhindert Flash of unstyled content */
 [x-cloak] { display: none !important; }
 
-.book-selector-row { margin-bottom: 12px; }
+.book-selector-row { margin-bottom: var(--space-md); }
 
 /* Filter-Pills fuer Buchliste. Sitzt unter dem Combobox-Row. */
 .book-filter-row {
@@ -11,7 +11,7 @@
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-md);
 }
 .book-filter-pill {
   padding: 3px 10px;
@@ -68,7 +68,7 @@
   background: transparent;
   border: none;
   color: var(--color-muted);
-  font-size: 16px;
+  font-size: var(--font-size-reading);
   line-height: 1;
   cursor: pointer;
 }
@@ -100,7 +100,7 @@
   text-align: center;
 }
 .bookstack-search-item {
-  padding: 8px 10px;
+  padding: var(--space-sm) 10px;
   border-bottom: 0.5px solid var(--color-border);
   cursor: pointer;
 }
@@ -124,7 +124,7 @@
   margin-bottom: 3px;
 }
 .bookstack-search-item-snippet {
-  font-size: 12px;
+  font-size: var(--font-size-mini);
   color: var(--color-muted);
   line-height: 1.4;
   overflow: hidden;
@@ -169,7 +169,7 @@
 }
 .search-q {
   flex: 1;
-  padding: 8px 32px 8px 10px;
+  padding: var(--space-sm) 32px 8px 10px;
   border: 0.5px solid var(--color-border-input);
   border-radius: var(--radius-md);
   font-size: var(--font-size-md);
@@ -186,7 +186,7 @@
   background: transparent;
   border: none;
   color: var(--color-muted);
-  font-size: 18px;
+  font-size: var(--font-size-lg);
   cursor: pointer;
 }
 .search-clear:hover { color: var(--color-text); }
@@ -194,14 +194,14 @@
 .search-filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-sm);
   align-items: center;
   margin-bottom: 10px;
 }
 .search-kind-pills {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: var(--space-xs);
 }
 .kind-pill {
   padding: 3px 9px;
@@ -233,12 +233,12 @@
 }
 
 .search-status {
-  padding: 4px 0;
+  padding: var(--space-xs) 0;
   font-size: var(--font-size-sm);
   color: var(--color-muted);
 }
 .search-status--error { color: var(--color-schwach-text); }
-.search-status--meta { color: var(--color-muted); font-size: 12px; }
+.search-status--meta { color: var(--color-muted); font-size: var(--font-size-mini); }
 
 .search-results {
   list-style: none;
@@ -249,7 +249,7 @@
   gap: 6px;
 }
 .search-hit {
-  padding: 8px 10px;
+  padding: var(--space-sm) 10px;
   border: 0.5px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-card-bg);
@@ -258,7 +258,7 @@
 .search-hit:hover { background: var(--color-hover); border-color: var(--card-accent); }
 .search-hit-row {
   display: flex;
-  gap: 8px;
+  gap: var(--space-sm);
   align-items: baseline;
   margin-bottom: 3px;
 }
@@ -266,7 +266,7 @@
   padding: 1px 6px;
   border: 0.5px solid var(--color-border);
   border-radius: var(--radius-sm);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   text-transform: uppercase;
   color: var(--color-muted);
   flex-shrink: 0;

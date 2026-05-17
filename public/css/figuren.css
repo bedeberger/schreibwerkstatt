@@ -22,12 +22,12 @@
 }
 
 /* === Figuren: Kanten-Legende === */
-.figur-legend--soziogramm { flex-wrap: wrap; row-gap: 4px; }
+.figur-legend--soziogramm { flex-wrap: wrap; row-gap: var(--space-xs); }
 
 .figur-legend-entry {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-xs);
 }
 
 /* === Figuren: kollabierbare Legende === */
@@ -35,10 +35,10 @@
   margin-bottom: 6px;
 }
 .figur-legend-body {
-  margin-top: 4px;
+  margin-top: var(--space-xs);
 }
 .figur-legend-body .figur-soziogramm-hint {
-  margin: 4px 0 0;
+  margin: var(--space-xs) 0 0;
 }
 .figur-legend-sep {
   display: inline-block;
@@ -64,7 +64,7 @@
 /* === Figuren: Soziogramm-Hint + Actions === */
 .soziogramm-placeholder {
   display: block;
-  padding: 32px 20px;
+  padding: var(--space-2xl) 20px;
   text-align: center;
   line-height: 1.6;
 }
@@ -72,7 +72,7 @@
 .figur-soziogramm-hint {
   font-size: var(--font-size-xs);
   color: var(--color-muted);
-  margin: 4px 0 8px;
+  margin: var(--space-xs) 0 8px;
 }
 .figur-soziogramm-actions {
   display: flex;
@@ -112,12 +112,12 @@
 /* === Figuren: Kerninfo (Rolle/Motivation/Konflikt/Entwicklung) === */
 .figur-kerninfo {
   margin-bottom: 10px;
-  padding: 8px 10px;
+  padding: var(--space-sm) 10px;
   background: var(--color-surface-alt, var(--color-surface));
   border-left: 2px solid var(--color-border);
   border-radius: var(--radius-sm);
 }
-.figur-kerninfo-row { font-size: var(--font-size-sm); line-height: 1.5; margin-bottom: 2px; }
+.figur-kerninfo-row { font-size: var(--font-size-sm); line-height: 1.5; margin-bottom: var(--space-2xs); }
 .figur-kerninfo-row:last-child { margin-bottom: 0; }
 
 /* === Figuren: Schlüsselzitate === */
@@ -132,7 +132,7 @@
 /* === Figuren: Beziehungs-Belege === */
 .figur-bz-belege {
   display: inline-flex;
-  gap: 4px;
+  gap: var(--space-xs);
   flex-wrap: wrap;
   margin-left: 6px;
 }
@@ -156,15 +156,15 @@
   border: 0.5px solid var(--color-border);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
-  padding: 8px 10px;
+  padding: var(--space-sm) 10px;
   font-size: var(--font-size-sm);
   max-width: 240px;
   line-height: 1.4;
 }
 .figur-tooltip.visible { display: block; }
-.figur-tooltip strong { display: block; margin-bottom: 2px; }
+.figur-tooltip strong { display: block; margin-bottom: var(--space-2xs); }
 .figur-tooltip em { color: var(--color-muted); font-style: normal; font-size: var(--font-size-xs); }
-.figur-tooltip p { margin: 4px 0 0; color: var(--color-text); white-space: pre-wrap; }
+.figur-tooltip p { margin: var(--space-xs) 0 0; color: var(--color-text); white-space: pre-wrap; }
 
 /* === Figuren: Listen-Bereich === */
 /* Verhindert Scroll-Anchoring im Listen-Bereich: wenn figur-detail aufklappt,
@@ -175,7 +175,7 @@
   overflow-anchor: none;
 }
 .figur-list-section {
-  margin-top: 16px;
+  margin-top: var(--space-lg);
   border-top: 0.5px solid var(--color-border);
   padding-top: 14px;
 }
@@ -183,9 +183,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-md);
   flex-wrap: wrap;
-  margin-bottom: 4px;
+  margin-bottom: var(--space-xs);
 }
 .figur-list-header .history-heading {
   margin-bottom: 0;
@@ -199,7 +199,7 @@
   align-items: center;
 }
 .figuren-graph-filter-btn {
-  padding: 2px 9px;
+  padding: var(--space-2xs) 9px;
   font-size: var(--font-size-sm);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -228,8 +228,8 @@
 .card-status {
   font-size: var(--font-size-sm);
   color: var(--color-muted);
-  margin-top: 8px;
-  margin-bottom: 8px;
+  margin-top: var(--space-sm);
+  margin-bottom: var(--space-sm);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -238,10 +238,10 @@
 .figur-beschreibung {
   font-size: var(--font-size-sm);
   line-height: 1.6;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-sm);
 }
 
-.figur-detail-row { margin-bottom: 8px; }
+.figur-detail-row { margin-bottom: var(--space-sm); }
 
 .bewertung-section-title--inline { display: inline; }
 
@@ -254,7 +254,7 @@
   margin-bottom: 10px;
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: var(--space-xs);
 }
 
 .figur-bz-list { margin-bottom: 10px; }
@@ -285,7 +285,7 @@
 }
 
 .figur-bz-hint {
-  font-size: 12px;
+  font-size: var(--font-size-mini);
   color: var(--color-muted);
 }
 

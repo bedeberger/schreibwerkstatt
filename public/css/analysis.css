@@ -1,7 +1,7 @@
 @layer components {
 /* === Stil-/Analyseboxen === */
 .stilbox {
-  margin-top: 12px;
+  margin-top: var(--space-md);
   padding: 14px;
   background: var(--color-bg);
   border-radius: var(--radius-md);
@@ -11,8 +11,8 @@
 
 
 .fazit {
-  margin-top: 8px;
-  margin-bottom: 16px;
+  margin-top: var(--space-sm);
+  margin-bottom: var(--space-lg);
   font-size: var(--font-size-sm);
   color: var(--color-muted);
   font-style: italic;
@@ -27,7 +27,7 @@
 .szene-header {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 .szene-titel {
   font-weight: 400;
@@ -79,8 +79,8 @@
 .bewertung-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 4px;
+  gap: var(--space-md);
+  margin-bottom: var(--space-xs);
 }
 
 .bewertung-header-note {
@@ -107,7 +107,7 @@
 /* === Listen === */
 .bullet-list { list-style: none; padding: 0; margin: 0; }
 .bullet-list li {
-  padding: 4px 0 4px 16px;
+  padding: var(--space-xs) 0 4px 16px;
   font-size: var(--font-size-base);
   position: relative;
   line-height: 1.5;
@@ -122,8 +122,8 @@
   display: grid;
   grid-template-columns: auto 1fr;
   align-items: start;
-  column-gap: 12px;
-  row-gap: 4px;
+  column-gap: var(--space-md);
+  row-gap: var(--space-xs);
   font-size: var(--font-size-base);
   line-height: 1.5;
 }
@@ -132,7 +132,7 @@
   grid-column: 2;
   grid-row: 1;
   align-self: center;
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -144,7 +144,7 @@
 /* === Review-Beispielzitate === */
 .zitate-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
 .zitat-item {
-  padding: 8px 12px;
+  padding: var(--space-sm) 12px;
   background: var(--color-bg);
   border-left: 3px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -152,12 +152,12 @@
 .zitat-item--staerke   { border-left-color: var(--color-ok-border); }
 .zitat-item--schwaeche { border-left-color: var(--color-err-border); }
 .zitat-label {
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--color-muted);
-  margin-bottom: 4px;
+  margin-bottom: var(--space-xs);
 }
 .zitat-text {
   margin: 0 0 4px 0;
@@ -177,7 +177,7 @@
   font-weight: 500;
   font-size: var(--font-size-md);
   letter-spacing: -0.005em;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-sm);
 }
 
 .section-heading-top {
@@ -194,7 +194,7 @@
   color: var(--color-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  margin: 12px 0 6px;
+  margin: var(--space-md) 0 6px;
 }
 
 .finding-header {
@@ -205,7 +205,7 @@
 
 .finding-toggle-group {
   display: flex;
-  gap: 4px;
+  gap: var(--space-xs);
 }
 
 /* Eingearbeitete Korrekturen: kompakte Liste bereits gespeicherter Fehler,
@@ -214,7 +214,7 @@
    stattdessen Durchstrich am Original und Grid-Ausrichtung der Badge-Spalte. */
 .applied-history {
   margin-top: 20px;
-  padding-top: 12px;
+  padding-top: var(--space-md);
   border-top: 1px solid var(--color-border);
 }
 .applied-history .section-heading {
@@ -226,8 +226,8 @@
   display: grid;
   grid-template-columns: minmax(90px, max-content) minmax(0, 1fr);
   align-items: baseline;
-  column-gap: 12px;
-  padding: 4px 0;
+  column-gap: var(--space-md);
+  padding: var(--space-xs) 0;
   font-size: var(--font-size-sm);
 }
 .applied-history-item > .badge {

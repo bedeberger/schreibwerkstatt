@@ -28,7 +28,7 @@
 .book-export-buttons {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-sm);
   align-items: center;
 }
 

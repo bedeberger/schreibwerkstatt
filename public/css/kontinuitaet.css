@@ -18,7 +18,7 @@
 /* Wrap + visuelle Hierarchie leben in `.collapsible-wrap` / `.collapsible-section`
    (entity-list.css). Hier nur noch der Text-Stil für die Summary. */
 .kontinuitaet-summary {
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   color: var(--color-muted);
   line-height: 1.5;
 }
@@ -28,14 +28,14 @@
   background: var(--color-ok-bg);
   border: 1px solid var(--color-ok-border);
   padding: var(--pad-detail);
-  font-size: 13px;
+  font-size: var(--font-size-sm);
 }
 
 /* Stellen-Paar in der Zeile (Stelle A ↔ Stelle B) */
 .kontinuitaet-row-stellen {
   flex: 1;
   min-width: 0;
-  font-size: 12px;
+  font-size: var(--font-size-mini);
   color: var(--color-muted);
   display: flex;
   align-items: center;
@@ -83,7 +83,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   cursor: pointer;
 }
 .book-settings-option input[type="radio"] {
@@ -93,12 +93,12 @@
   cursor: pointer;
 }
 .book-settings-locale-display {
-  margin: 8px 0 0;
-  font-size: 12px;
+  margin: var(--space-sm) 0 0;
+  font-size: var(--font-size-mini);
   color: var(--color-muted);
 }
 .book-settings-select {
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   padding: var(--pad-badge);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -109,29 +109,29 @@
 .book-settings-kontext-wrap {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-xs);
   min-width: 0;
 }
 .book-settings-danger-zone {
-  margin-top: 24px;
-  padding: 12px 14px;
+  margin-top: var(--space-xl);
+  padding: var(--space-md) 14px;
   border: 1px solid var(--color-err-border);
   border-radius: var(--radius-sm);
   background: var(--color-err-bg);
 }
 .book-settings-danger-title {
-  font-size: 12px;
+  font-size: var(--font-size-mini);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--color-err-text);
-  margin-bottom: 8px;
+  margin-bottom: var(--space-sm);
 }
 .book-settings-danger-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-lg);
   flex-wrap: wrap;
 }
 .book-settings-danger-section + .book-settings-danger-section {
@@ -141,14 +141,14 @@
 }
 .book-settings-danger-text {
   flex: 1;
-  font-size: 12px;
+  font-size: var(--font-size-mini);
   color: var(--color-err-text);
   line-height: 1.4;
   min-width: 240px;
 }
 .book-settings-btn-danger {
   padding: 6px 12px;
-  font-size: 12px;
+  font-size: var(--font-size-mini);
   border: 1px solid var(--color-err-text);
   background: var(--color-surface);
   color: var(--color-err-text);
@@ -167,7 +167,7 @@
 }
 .book-settings-danger-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--space-sm);
   align-items: center;
   flex-wrap: wrap;
 }

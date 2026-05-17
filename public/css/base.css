@@ -128,7 +128,7 @@ code {
   background: var(--color-tag-bg);
   padding: 1px 5px;
   border-radius: var(--radius-sm);
-  font-size: 12px;
+  font-size: var(--font-size-mini);
 }
 
 }

@@ -5,7 +5,7 @@
 */
 
 .card--organizer .organizer-hint {
-  margin: 4px 0 12px;
+  margin: var(--space-xs) 0 12px;
 }
 
 .organizer-list {
@@ -22,15 +22,15 @@
 }
 
 .organizer-chapter--solo {
-  margin-bottom: 16px;
+  margin-bottom: var(--space-lg);
   border-style: dashed;
 }
 
 .organizer-chapter-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
+  gap: var(--space-sm);
+  padding: var(--space-sm) 10px;
   background: var(--color-hover-light);
   border-bottom: 1px solid var(--color-border);
 }
@@ -38,7 +38,7 @@
 .organizer-chapter-label {
   font-weight: 600;
   color: var(--color-muted);
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   letter-spacing: 0.02em;
   flex: 1;
 }
@@ -63,7 +63,7 @@
   color: var(--color-subtle);
   cursor: grab;
   user-select: none;
-  font-size: 14px;
+  font-size: var(--font-size-base);
   letter-spacing: -2px;
   flex-shrink: 0;
 }
@@ -76,7 +76,7 @@
   border: 1px solid transparent;
   background: transparent;
   border-radius: var(--radius-sm);
-  padding: 4px 6px;
+  padding: var(--space-xs) 6px;
   font: inherit;
   color: var(--color-text);
 }
@@ -96,18 +96,18 @@
 .organizer-pages {
   list-style: none;
   margin: 0;
-  padding: 4px 6px 6px;
+  padding: var(--space-xs) 6px 6px;
   min-height: 28px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-2xs);
 }
 
 .organizer-page {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 6px;
+  padding: var(--space-xs) 6px;
   border-radius: var(--radius-sm);
   background: transparent;
   transition: background-color 0.12s;
@@ -119,9 +119,9 @@
   background: transparent;
   color: var(--color-subtle);
   cursor: pointer;
-  font-size: 16px;
+  font-size: var(--font-size-reading);
   line-height: 1;
-  padding: 2px 6px;
+  padding: var(--space-2xs) 6px;
   border-radius: var(--radius-sm);
   flex-shrink: 0;
 }
@@ -133,11 +133,11 @@
   cursor: not-allowed;
   opacity: 0.4;
 }
-.organizer-delete-btn--chapter { margin-left: 4px; }
+.organizer-delete-btn--chapter { margin-left: var(--space-xs); }
 
 .organizer-empty {
   padding: 6px 8px;
-  font-size: 12px;
+  font-size: var(--font-size-mini);
   color: var(--color-subtle);
   font-style: italic;
 }
@@ -171,7 +171,7 @@
     justify-content: flex-end;
   }
   .organizer-name {
-    font-size: 14px;
+    font-size: var(--font-size-base);
   }
 }
 }

@@ -3,7 +3,7 @@
 .filter-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-sm);
   flex-wrap: wrap;
   margin-bottom: 10px;
   padding-bottom: 10px;
@@ -11,7 +11,7 @@
 }
 .filter-count { font-size: var(--font-size-xs); color: var(--color-muted); margin-left: auto; }
 .filter-search-input {
-  font-size: 12px;
+  font-size: var(--font-size-mini);
   line-height: 1.4;
   padding: 3px 8px;
   border: 0.5px solid var(--color-border);
@@ -39,7 +39,7 @@
   padding: 0.55rem 0.5rem;
   cursor: pointer;
   border-bottom: 1px solid var(--color-border);
-  font-size: 14px;
+  font-size: var(--font-size-base);
   position: relative;
 }
 .entity-row:hover { background: var(--color-hover); }
@@ -76,7 +76,7 @@
   white-space: nowrap;
 }
 .entity-row-meta {
-  font-size: 12px;
+  font-size: var(--font-size-mini);
   color: var(--color-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -94,7 +94,7 @@
   padding: 0.6rem 0.5rem 0.8rem 1rem;
   background: var(--color-hover);
   border-bottom: 1px solid var(--color-border);
-  font-size: 13px;
+  font-size: var(--font-size-sm);
 }
 .entity-detail-text {
   margin: 0 0 0.4rem;
@@ -117,7 +117,7 @@
   white-space: nowrap;
 }
 .entity-meta-value {
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   color: var(--color-text);
   line-height: 1.5;
 }
@@ -140,7 +140,7 @@
    Geteilt zwischen Szenen (stark/mittel/schwach) und Kontinuität
    (kritisch/mittel/niedrig). Text statt nur Farbe → barrierearm. */
 .severity-tag {
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -221,7 +221,7 @@
   }
   .severity-tag {
     min-width: 0;
-    padding: 2px 5px;
+    padding: var(--space-2xs) 5px;
     font-size: 9px;
   }
   .filter-search-input { width: 100%; }
@@ -239,7 +239,7 @@
   gap: 6px;
   background: transparent;
   border: none;
-  padding: 4px 0;
+  padding: var(--space-xs) 0;
   font-size: var(--font-size-xs);
   font-weight: 700;
   text-transform: uppercase;
@@ -256,13 +256,13 @@
    beim Öffnen verursacht (PDF-Export-Karte). Mehrere Wraps untereinander
    stapeln dann sauber als Block. */
 .collapsible-wrap {
-  padding: 4px 0 12px;
-  margin-bottom: 8px;
+  padding: var(--space-xs) 0 12px;
+  margin-bottom: var(--space-sm);
 }
 .collapsible-section {
   padding: 0.4rem 0.75rem 0.6rem;
   border-left: 3px solid var(--color-border);
-  margin: 8px 0;
+  margin: var(--space-sm) 0;
 }
 
 /* === Schauplätze (Orte) — Liste + Detail-Komponenten ===
@@ -271,7 +271,7 @@
 .ort-stimmung {
   font-style: italic;
   color: var(--color-muted);
-  font-size: 12px;
+  font-size: var(--font-size-mini);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -284,7 +284,7 @@
   background: transparent;
   border: 0;
   color: var(--card-accent);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -311,7 +311,7 @@
   margin-right: 0.25em;
 }
 .song-genre {
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   color: var(--card-accent);
   font-weight: 600;
   text-transform: uppercase;
@@ -327,7 +327,7 @@
   background: transparent;
   border: 0;
   color: var(--card-accent);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -339,7 +339,7 @@
 @media (max-width: 600px) {
   .song-list { padding: 0 0 0.75rem; }
   .song-genre { max-width: 100%; }
-  .song-interpret { display: block; margin-left: 0; font-size: 12px; }
+  .song-interpret { display: block; margin-left: 0; font-size: var(--font-size-mini); }
 }
 
 }
