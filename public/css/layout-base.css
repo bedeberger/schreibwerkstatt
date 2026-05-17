@@ -52,7 +52,7 @@
 }
 body.focus-mode .session-banner--offline {
   padding: 0.15rem 0.6rem;
-  font-size: 0.7rem;
+  font-size: var(--font-size-xs);
   font-weight: 400;
   background: transparent;
   color: var(--color-muted);

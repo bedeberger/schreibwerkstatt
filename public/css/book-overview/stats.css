@@ -12,7 +12,7 @@
 .overview-hero-num {
   display: flex;
   align-items: baseline;
-  gap: 6px;
+  gap: var(--space-6);
 }
 .overview-hero-value {
   font-family: var(--font-serif);
@@ -29,7 +29,7 @@
 .overview-substats {
   display: flex;
   flex-wrap: wrap;
-  gap: 14px;
+  gap: var(--space-14);
   align-items: baseline;
 }
 .overview-substat {
@@ -130,8 +130,8 @@
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
   transition: height 0.18s ease;
 }
-.overview-bar7-fill--pos { background: var(--color-success, #4caf50); }
-.overview-bar7-fill--neg { background: var(--color-danger,  #d32f2f); }
+.overview-bar7-fill--pos { background: var(--color-success); }
+.overview-bar7-fill--neg { background: var(--color-err-text); }
 .overview-bar7-label {
   font-size: var(--font-size-micro);
   color: var(--color-muted);
@@ -148,7 +148,7 @@
 .overview-donut-row {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: var(--space-14);
 }
 .overview-donut {
   width: 72px;
@@ -236,7 +236,7 @@
   font-size: var(--font-size-xs);
   color: var(--color-muted);
 }
-.overview-streak-legend-label { margin-right: 6px; }
+.overview-streak-legend-label { margin-right: var(--space-6); }
 .overview-streak-legend .overview-streak-cell {
   width: 11px;
   min-width: 11px;
@@ -253,18 +253,18 @@
 /* ── Mobile ──────────────────────────────────────────────────────────────── */
 @media (max-width: 700px) {
   .overview-hero-value { font-size: 30px; }
-  .overview-hero-row { gap: 14px; }
+  .overview-hero-row { gap: var(--space-14); }
   .overview-substat-value { font-size: var(--font-size-reading); }
 }
 @media (max-width: 480px) {
   .overview-hero-value { font-size: var(--font-size-2xl); }
-  .overview-hero-row { gap: 10px; }
-  .overview-substats { gap: 10px; }
+  .overview-hero-row { gap: var(--space-10); }
+  .overview-substats { gap: var(--space-10); }
   .overview-substat-value { font-size: var(--font-size-md); }
   .overview-sparkline { height: 48px; }
   .overview-bars7 { min-height: 52px; }
   .overview-bar7-track { height: 40px; }
   .overview-donut { width: 60px; height: 60px; }
-  .overview-donut-row { gap: 10px; }
+  .overview-donut-row { gap: var(--space-10); }
 }
 }

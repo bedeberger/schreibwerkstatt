@@ -5,7 +5,7 @@
 .user-chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
   padding: var(--space-2xs) 8px 2px 2px;
   border-radius: var(--radius-sm);
   background: var(--color-bg-soft, transparent);

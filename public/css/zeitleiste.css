@@ -3,7 +3,7 @@
 .global-zeitstrahl-section {
   margin-top: 20px;
   border-top: 0.5px solid var(--color-border);
-  padding-top: 14px;
+  padding-top: var(--space-14);
 }
 
 .global-zeitstrahl-header {
@@ -21,7 +21,7 @@
 
 .gz-consolidate-btn {
   margin-left: auto;
-  font-size: 0.78rem;
+  font-size: var(--font-size-mini);
   padding: var(--space-2xs) 10px;
   min-width: 110px;
 }
@@ -42,13 +42,13 @@
 
 .global-zeitstrahl-body {
   position: relative;
-  margin-top: 14px;
+  margin-top: var(--space-14);
   padding-left: 28px;
   border-left: 2px solid var(--color-border);
 }
 
 .figur-detail .global-zeitstrahl-body {
-  margin-left: 14px;
+  margin-left: var(--space-14);
 }
 
 .gz-item {
@@ -90,7 +90,7 @@
 .gz-datum-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
 }
 
 .gz-datum {

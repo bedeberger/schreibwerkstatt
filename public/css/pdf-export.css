@@ -65,7 +65,7 @@
 .pdfx-name-input {
   width: 100%;
   max-width: 260px;
-  padding: 6px 8px;
+  padding: var(--space-6) 8px;
   border: 0.5px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
@@ -90,7 +90,7 @@
 .pdfx-text-input,
 .pdfx-num-input {
   width: 100%;
-  padding: 6px 8px;
+  padding: var(--space-6) 8px;
   border: 0.5px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-surface);

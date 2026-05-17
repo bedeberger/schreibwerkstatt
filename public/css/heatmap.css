@@ -10,15 +10,15 @@
 .book-stats-controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 10px;
+  gap: var(--space-6);
+  margin-top: var(--space-10);
   align-items: flex-start;
 }
 
 .book-stats-current {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
   flex-wrap: wrap;
   margin-top: var(--space-sm);
   padding-top: var(--space-sm);
@@ -28,7 +28,7 @@
 
 /* === Heatmap (shared: Stil + Fehler) === */
 .heatmap-wrap {
-  margin-top: 10px;
+  margin-top: var(--space-10);
 }
 .heatmap-legend {
   font-size: var(--font-size-sm);
@@ -47,7 +47,7 @@
 }
 .heatmap-table th,
 .heatmap-table td {
-  padding: 6px 10px;
+  padding: var(--space-6) 10px;
   text-align: right;
   border-bottom: 0.5px solid var(--color-border);
   white-space: nowrap;
@@ -116,7 +116,7 @@
   transition: background var(--transition-slow);
 }
 .heatmap-cell--tinted {
-  background: color-mix(in srgb, var(--color-danger, #c0392b) var(--heatmap-t, 0%), var(--color-success, #27ae60));
+  background: color-mix(in srgb, var(--color-err-text) var(--heatmap-t, 0%), var(--color-success));
   opacity: var(--heatmap-opacity, 1);
 }
 .heatmap-cell--primary {
@@ -188,7 +188,7 @@
 /* Heatmap-Detail-Panel (aufklappbar unter der Tabelle) */
 .heatmap-detail {
   margin-top: var(--space-md);
-  padding: 10px 12px;
+  padding: var(--space-10) 12px;
   border: 0.5px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-surface-alt, var(--color-surface));
@@ -214,10 +214,10 @@
 .heatmap-detail-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-10);
 }
 .heatmap-detail-page {
-  padding: 6px 0;
+  padding: var(--space-6) 0;
   border-top: 0.5px dashed var(--color-border);
 }
 .heatmap-detail-page:first-child {
@@ -262,7 +262,7 @@
 }
 .heatmap-detail-original {
   display: block;
-  background: color-mix(in srgb, var(--color-danger, #c0392b) 15%, transparent);
+  background: color-mix(in srgb, var(--color-err-text) 15%, transparent);
   padding: var(--space-2xs) 6px;
   border-radius: var(--radius-sm);
   width: fit-content;
@@ -271,7 +271,7 @@
 .heatmap-detail-korrektur {
   display: block;
   margin-top: 3px;
-  background: color-mix(in srgb, var(--color-success, #27ae60) 15%, transparent);
+  background: color-mix(in srgb, var(--color-success) 15%, transparent);
   padding: var(--space-2xs) 6px;
   border-radius: var(--radius-sm);
   width: fit-content;

@@ -94,6 +94,11 @@ const editorState = () => ({
   // bleibt bis zum nächsten erfolgreichen Save oder bis User explizit
   // entscheidet. Form: `{ remoteUserName, remoteUpdatedAt }`.
   editConflict: null,
+  // Local-Draft-Hinweis für nicht-editMode: localStorage hat ungespeicherten
+  // Entwurf für aktuell geöffnete Seite (z. B. nach Server-Crash mid-write,
+  // Tab geschlossen + wieder geöffnet). Form `{ savedAt }`. Banner bietet
+  // Resume (öffnet Edit-Mode + Draft-Restore via startEdit) oder Discard.
+  pendingDraft: null,
   lastAutosaveAt: null,
   lastDraftSavedAt: null,
   _autosaveIdleTimer: null,

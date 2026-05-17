@@ -10,7 +10,7 @@
   top: -3rem;
   z-index: var(--z-toast);
   background: var(--color-primary);
-  color: var(--color-on-primary, #fff);
+  color: var(--color-on-primary);
   padding: 0.5rem 0.875rem;
   border-radius: var(--radius-sm);
   font-weight: 600;

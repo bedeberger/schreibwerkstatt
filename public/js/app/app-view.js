@@ -1,6 +1,7 @@
 import { htmlToText, fetchJson, escHtml } from '../utils.js';
 import { EXCLUSIVE_CARDS } from '../cards/feature-registry.js';
 import { contentRepo } from '../repo/content.js';
+import { readDraft, clearDraft } from '../editor/draft-storage.js';
 
 // Generischer Karten-Toggle. Liest Behavior-Felder aus EXCLUSIVE_CARDS-Entry
 // (onReclick, requiresBook, loadDeps, auditEvent, extraRefreshOnOpen) und
@@ -92,6 +93,7 @@ export const appViewMethods = {
       if (pd.updated_at) p.updated_at = pd.updated_at;
       this.currentPageEmpty = !htmlToText(html).trim();
       this.analysisOut = '';
+      this._refreshPendingDraft(p.id, html);
     } catch (e) {
       console.error('[selectPage load-page]', e);
       this.setStatus(this.t('chat.pageLoadFailed'));
@@ -148,10 +150,49 @@ export const appViewMethods = {
       this._updatePageViewHeight();
       if (pd.updated_at) this.currentPage.updated_at = pd.updated_at;
       this.currentPageEmpty = !htmlToText(html).trim();
+      this._refreshPendingDraft(pageId, html);
     } catch (e) {
       console.error('[refetchCurrentPage]', e);
       this.setStatus(this.t('chat.pageLoadFailed'));
     }
+  },
+
+  // Draft-Recovery: nach Page-Load prüfen, ob lokaler Entwurf im localStorage
+  // vom Server-HTML abweicht (z. B. nach Server-Crash mid-write + Tab-Reopen).
+  // Wenn ja: `pendingDraft`-Banner zeigt User Wiederaufnahme-Option an. Im
+  // editMode überspringen — `startEdit` hat den Draft bereits geladen.
+  _refreshPendingDraft(pageId, originalHtml) {
+    if (this.editMode) { this.pendingDraft = null; return; }
+    const draft = readDraft(pageId);
+    if (draft && draft.html && draft.html !== originalHtml) {
+      this.pendingDraft = { savedAt: draft.savedAt || Date.now() };
+    } else {
+      // Stale-Draft (= identisch zu Server-HTML) räumen, damit alter Eintrag
+      // bei nächster Visit nicht wieder triggert.
+      if (draft) { try { clearDraft(pageId); } catch {} }
+      this.pendingDraft = null;
+    }
+  },
+
+  // Banner-Action „Weiterbearbeiten": Edit-Mode öffnen, startEdit lädt Draft
+  // automatisch und setzt `editDirty=true`.
+  resumeDraft() {
+    if (!this.currentPage) return;
+    this.pendingDraft = null;
+    this.startEdit();
+  },
+
+  // Banner-Action „Verwerfen": lokalen Entwurf löschen, Banner schliessen.
+  async discardDraft() {
+    if (!this.currentPage) return;
+    const ok = await this.appConfirm({
+      message: this.t('edit.draftRecovery.discardConfirm'),
+      confirmLabel: this.t('edit.draftRecovery.discard'),
+      danger: true,
+    });
+    if (!ok) return;
+    try { clearDraft(this.currentPage.id); } catch {}
+    this.pendingDraft = null;
   },
 
   // Schliesst die anderen Hauptkarten (nicht Tree – der bleibt immer aktiv).
@@ -322,6 +363,7 @@ export const appViewMethods = {
     this.editMode = false;
     this.editDirty = false;
     this.editSaving = false;
+    this.pendingDraft = null;
     this.lastAutosaveAt = null;
     this.lastDraftSavedAt = null;
     this.showEditorCard = false;

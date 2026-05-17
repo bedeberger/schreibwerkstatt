@@ -7,7 +7,7 @@
    Übersichts-Badges (.severity-dot--*) bleiben unverändert als runde Dots. */
 
 @media (max-width: 600px) {
-  .szenen-uebersicht-grid { gap: var(--space-sm); padding: 6px 0 8px; }
+  .szenen-uebersicht-grid { gap: var(--space-sm); padding: var(--space-6) 0 8px; }
 }
 
 /* Stelle (Kapitel + Seite) ist primäre Info — bleibt auch <480px sichtbar
@@ -27,7 +27,7 @@
 .figur-szenen-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-6);
   margin: var(--space-xs) 0 10px 0;
 }
 
@@ -62,7 +62,7 @@
 
 /* === Szenen-Karte: Hinweis === */
 .szenen-empty-hint {
-  padding: 14px 16px;
+  padding: var(--space-14) 16px;
   font-size: var(--font-size-sm);
   color: var(--color-muted);
   background: var(--color-tag-bg);

@@ -8,7 +8,7 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-10);
   padding: var(--space-xs) 0 8px;
   margin-bottom: var(--space-md);
 }
@@ -17,7 +17,7 @@
 .chat-msg {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-6);
 }
 .chat-msg--user  { align-items: flex-end; }
 .chat-msg--assistant { align-items: flex-start; }
@@ -68,7 +68,7 @@
 
 /* Kontext-Quellenangabe (Buch-Chat) */
 .chat-context-info {
-  margin-top: 6px;
+  margin-top: var(--space-6);
   padding-top: 5px;
   border-top: 0.5px solid var(--color-border);
   font-size: var(--font-size-xs);
@@ -111,7 +111,7 @@
 }
 .chat-context-badge {
   display: inline-block;
-  margin-left: 6px;
+  margin-left: var(--space-6);
   padding: 0 5px;
   font-size: var(--font-size-micro);
   border: 0.5px solid var(--color-border);
@@ -135,7 +135,7 @@
 .chat-heading--2 { font-size: 1.0em; }
 .chat-heading--3 { font-size: 0.95em; color: var(--color-muted); }
 .chat-list {
-  margin: 6px 0 6px 18px;
+  margin: var(--space-6) 0 6px 18px;
   padding: 0;
 }
 .chat-list--ol { list-style-type: decimal; }
@@ -156,7 +156,7 @@
 .chat-table {
   border-collapse: collapse;
   font-size: 0.9em;
-  margin: 6px 0;
+  margin: var(--space-6) 0;
 }
 .chat-table th,
 .chat-table td {
@@ -173,7 +173,7 @@
 .chat-vorschlaege {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-6);
 }
 /* Bubble-Breite nur im Chat-Kontext, sonst volle Breite. */
 .chat-msg .chat-vorschlaege { max-width: 88%; }
@@ -198,7 +198,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 6px;
+  margin-bottom: var(--space-6);
   gap: var(--space-sm);
 }
 .chat-vorschlag-label {
@@ -239,7 +239,7 @@
 /* Eingabebereich */
 .chat-input-row {
   display: flex;
-  gap: 6px;
+  gap: var(--space-6);
   align-items: flex-end;
 }
 .chat-input {
@@ -286,13 +286,13 @@
   color: var(--color-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  margin-bottom: 6px;
+  margin-bottom: var(--space-6);
 }
 .chat-session-item {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  padding: 6px 8px;
+  padding: var(--space-6) 8px;
   border: 0.5px solid var(--color-border);
   margin-bottom: var(--space-xs);
   cursor: pointer;
@@ -325,7 +325,7 @@
 
 @media (max-width: 480px) {
   .chat-session-delete {
-    padding: 6px 10px;
+    padding: var(--space-6) 10px;
     font-size: var(--font-size-reading);
   }
 }

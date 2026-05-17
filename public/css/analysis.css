@@ -2,7 +2,7 @@
 /* === Stil-/Analyseboxen === */
 .stilbox {
   margin-top: var(--space-md);
-  padding: 14px;
+  padding: var(--space-14);
   background: var(--color-bg);
   border-radius: var(--radius-md);
   font-size: var(--font-size-base);
@@ -19,7 +19,7 @@
 }
 
 .szene-item {
-  padding: 6px 0;
+  padding: var(--space-6) 0;
   border-bottom: 1px solid var(--color-border);
 }
 .szene-item:last-child { border-bottom: none; }
@@ -88,13 +88,13 @@
   color: var(--color-muted);
 }
 
-.bewertung-section { margin-top: 14px; }
+.bewertung-section { margin-top: var(--space-14); }
 
 .bewertung-section-title {
   font-weight: 400;
   font-size: var(--font-size-sm);
   color: var(--color-muted);
-  margin-bottom: 6px;
+  margin-bottom: var(--space-6);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -117,7 +117,7 @@
 .bullet-list.neg li::before     { content: '−'; color: var(--color-err-text); }
 
 /* === Review-Empfehlungen (prio + kategorie + text) === */
-.rec-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 14px; }
+.rec-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: var(--space-14); }
 .rec-item {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -142,7 +142,7 @@
 .rec-text { grid-column: 1 / -1; grid-row: 2; color: var(--color-text); }
 
 /* === Review-Beispielzitate === */
-.zitate-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.zitate-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: var(--space-10); }
 .zitat-item {
   padding: var(--space-sm) 12px;
   background: var(--color-bg);
@@ -185,7 +185,7 @@
   font-weight: 500;
   font-size: var(--font-size-md);
   letter-spacing: -0.005em;
-  margin: 14px 0 8px;
+  margin: var(--space-14) 0 8px;
 }
 
 .section-heading-sub {
@@ -220,7 +220,7 @@
 .applied-history .section-heading {
   color: var(--color-muted);
   font-size: var(--font-size-sm);
-  margin-bottom: 10px;
+  margin-bottom: var(--space-10);
 }
 .applied-history-item {
   display: grid;

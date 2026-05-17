@@ -2,6 +2,7 @@ import { htmlToText, stripFocusArtefacts, cleanContentArtefacts, collapseEmptyBl
 import { sortByPosition, buildHighlightedHtml } from '../book/page-view.js';
 import { installEditCounter } from './focus.js';
 import { contentRepo } from '../repo/content.js';
+import { readDraft, writeDraft, clearDraft } from './draft-storage.js';
 
 // Auto-Save nach BookStack: idle-debounce + max-Cap. Jede Schreibaktion
 // resettet den Idle-Timer; läuft der User durchgehend, greift der Max-Timer.
@@ -9,8 +10,6 @@ import { contentRepo } from '../repo/content.js';
 const AUTOSAVE_IDLE_MS = 60000;
 const AUTOSAVE_MAX_MS = 120000;
 const DRAFT_DEBOUNCE_MS = 500;
-const DRAFT_KEY = (pageId) => `editor_draft_${pageId}`;
-
 // Entfernt Korrekturvorschlags-Markup vor dem Speichern nach BookStack:
 //   - .lektorat-mark / .chat-mark → unwrap (Originaltext behalten)
 //   - .lektorat-ins / .chat-mark-ins → komplett entfernen (nur Vorschlagstext)
@@ -52,25 +51,6 @@ function normalizeForCompare(html) {
   if (!wrap) return '';
   normalizeEditorBlocks(wrap);
   return stripLektoratMarks(wrap.innerHTML);
-}
-
-function readDraft(pageId) {
-  try {
-    const raw = localStorage.getItem(DRAFT_KEY(pageId));
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
-}
-
-function writeDraft(pageId, html, originalHtml, originalUpdatedAt) {
-  try {
-    localStorage.setItem(DRAFT_KEY(pageId), JSON.stringify({
-      html, originalHtml, originalUpdatedAt: originalUpdatedAt || null, savedAt: Date.now(),
-    }));
-  } catch { /* quota – ignoriert */ }
-}
-
-function clearDraft(pageId) {
-  try { localStorage.removeItem(DRAFT_KEY(pageId)); } catch {}
 }
 
 // Legacy-BookStack-Seiten enthalten teilweise bare Text-Nodes und Inline-
@@ -177,6 +157,7 @@ export const editorEditMethods = {
     this.editDirty = false;
     this.editSaving = false;
     this.saveOffline = false;
+    this.pendingDraft = null;
 
     // Chromium/Safari-Default ist 'div' → Enter an bare Text oder am
     // Editor-Root erzeugt <div> statt <p>, damit fehlt der Absatz-Abstand
@@ -261,6 +242,7 @@ export const editorEditMethods = {
     this.editDirty = false;
     this.editSaving = false;
     this.saveOffline = false;
+    this.pendingDraft = null;
     this.closeSynonymMenu?.();
     this.closeSynonymPicker?.();
     this.closeFigurLookup?.();

@@ -9,7 +9,7 @@
 .book-filter-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--space-6);
   align-items: center;
   margin-bottom: var(--space-md);
 }
@@ -43,7 +43,7 @@
 .book-filter-clear:hover { color: var(--color-text); }
 
 /* === BookStack-Volltextsuche === */
-.bookstack-search { margin-bottom: 14px; position: relative; }
+.bookstack-search { margin-bottom: var(--space-14); position: relative; }
 /* Karte, die das Such-Overlay enthält, muss über spätere .card-Geschwister
    liegen — sonst verdecken Sidebar/Editor die absolut positionierten
    Ergebnisse (jede .card ist via transform-Animation eigener Stacking-Context). */
@@ -74,7 +74,7 @@
 }
 .bookstack-search-clear:hover { color: var(--color-text); }
 .bookstack-search-status {
-  padding: 6px 10px;
+  padding: var(--space-6) 10px;
   font-size: var(--font-size-sm);
   color: var(--color-muted);
 }
@@ -94,7 +94,7 @@
   box-shadow: var(--shadow-md);
 }
 .bookstack-search-empty {
-  padding: 10px;
+  padding: var(--space-10);
   font-size: var(--font-size-sm);
   color: var(--color-muted);
   text-align: center;
@@ -139,8 +139,8 @@
   background: var(--color-accent-soft);
 }
 
-.search-wrap { margin-bottom: 10px; }
-.batch-wrap { margin-bottom: 10px; }
+.search-wrap { margin-bottom: var(--space-10); }
+.batch-wrap { margin-bottom: var(--space-10); }
 .tok-stats-wrap { display: contents; }
 
 /* === Seitensuche === */
@@ -163,9 +163,9 @@
 .search-q-row {
   position: relative;
   display: flex;
-  gap: 6px;
+  gap: var(--space-6);
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: var(--space-10);
 }
 .search-q {
   flex: 1;
@@ -196,7 +196,7 @@
   flex-wrap: wrap;
   gap: var(--space-sm);
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: var(--space-10);
 }
 .search-kind-pills {
   display: flex;
@@ -246,7 +246,7 @@
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-6);
 }
 .search-hit {
   padding: var(--space-sm) 10px;

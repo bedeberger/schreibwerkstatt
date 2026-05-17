@@ -3,7 +3,7 @@
 .finding {
   display: flex;
   align-items: flex-start;
-  gap: 6px;
+  gap: var(--space-6);
   cursor: pointer;
   border-left: 2px solid var(--color-border);
   padding: var(--space-sm) 12px;
@@ -28,7 +28,7 @@
    getönte Pillen statt Strikethrough, damit die Liste ruhig lesbar bleibt. */
 .finding-original {
   display: block;
-  background: color-mix(in srgb, var(--color-danger, #c0392b) 15%, transparent);
+  background: color-mix(in srgb, var(--color-err-text) 15%, transparent);
   padding: var(--space-2xs) 6px;
   border-radius: var(--radius-sm);
   word-break: break-word;
@@ -38,7 +38,7 @@
 .finding-korrektur {
   display: block;
   margin-top: 3px;
-  background: color-mix(in srgb, var(--color-success, #27ae60) 15%, transparent);
+  background: color-mix(in srgb, var(--color-success) 15%, transparent);
   padding: var(--space-2xs) 6px;
   border-radius: var(--radius-sm);
   word-break: break-word;

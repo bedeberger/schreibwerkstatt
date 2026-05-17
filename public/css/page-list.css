@@ -73,7 +73,7 @@
 .page-name {
   display: flex;
   align-items: flex-start;
-  gap: 6px;
+  gap: var(--space-6);
   min-width: 0;
 }
 .page-name .page-status-dot { margin-top: 5px; }
@@ -155,7 +155,7 @@
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
   vertical-align: middle;
-  margin-right: 6px;
+  margin-right: var(--space-6);
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 

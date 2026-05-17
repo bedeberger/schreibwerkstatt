@@ -5,8 +5,8 @@
   align-items: center;
   gap: var(--space-sm);
   flex-wrap: wrap;
-  margin-bottom: 10px;
-  padding-bottom: 10px;
+  margin-bottom: var(--space-10);
+  padding-bottom: var(--space-10);
   border-bottom: 1px solid var(--color-border);
 }
 .filter-count { font-size: var(--font-size-xs); color: var(--color-muted); margin-left: auto; }
@@ -236,7 +236,7 @@
 .collapsible-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
   background: transparent;
   border: none;
   padding: var(--space-xs) 0;

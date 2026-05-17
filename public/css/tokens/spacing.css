@@ -1,12 +1,17 @@
 /* Spacing-, Padding-, Radius-, Border-Tokens. */
 
 :root {
-  /* === Spacing-Scale — 4-Pixel-Raster ===
-     Margins/Gaps/Row-Gaps. Ad-hoc Pixel-Werte nur, wenn wirklich kein Token passt. */
+  /* === Spacing-Scale — 4-Pixel-Raster + Zwischenstufen ===
+     Margins/Gaps/Row-Gaps. Hauptstufen 2xs/xs/sm/md/lg/xl/2xl im 4-px-Raster.
+     Zwischenstufen (6/10/14) für dichte UI-Reihen, wenn 4-px-Sprung zu grob.
+     Ad-hoc Pixel-Werte nur, wenn wirklich kein Token passt. */
   --space-2xs: 2px;
   --space-xs:  4px;
+  --space-6:   6px;   /* zwischen xs und sm — dichte Inline-Gaps */
   --space-sm:  8px;
+  --space-10:  10px;  /* zwischen sm und md — Card-internes Padding */
   --space-md:  12px;
+  --space-14:  14px;  /* zwischen md und lg — Komponenten-Bottom-Margin */
   --space-lg:  16px;
   --space-xl:  24px;
   --space-2xl: 32px;

@@ -13,19 +13,19 @@
   letter-spacing: 0.02em;
   text-transform: uppercase;
   color: var(--color-muted);
-  margin-bottom: 6px;
+  margin-bottom: var(--space-6);
 }
 .kapitel-pages-list {
   display: flex;
   flex-direction: column;
   gap: var(--space-2xs);
-  margin-bottom: 10px;
+  margin-bottom: var(--space-10);
 }
 .kapitel-page-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: var(--space-10);
   padding: 5px 8px;
   border-radius: var(--radius-sm);
   cursor: pointer;
@@ -47,7 +47,7 @@
 .kapitel-page-stats {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
   flex-shrink: 0;
 }
 .kapitel-page-edited {
@@ -58,9 +58,9 @@
 }
 .kapitel-new-page {
   display: flex;
-  gap: 6px;
+  gap: var(--space-6);
   align-items: center;
-  margin-top: 10px;
+  margin-top: var(--space-10);
 }
 .kapitel-new-page-input {
   flex: 1;
@@ -77,8 +77,8 @@
 .kapitel-add-forms {
   display: grid;
   grid-template-columns: 1fr max-content;
-  gap: 6px;
-  margin-top: 10px;
+  gap: var(--space-6);
+  margin-top: var(--space-10);
 }
 .kapitel-add-forms .kapitel-new-page { display: contents; }
 .kapitel-add-forms .kapitel-new-page > button { width: 100%; }
@@ -87,7 +87,7 @@
   grid-column: 1 / -1;
   border: 0;
   border-top: 1px solid var(--color-border);
-  margin: 6px 0;
+  margin: var(--space-6) 0;
   width: 100%;
 }
 

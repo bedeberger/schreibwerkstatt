@@ -17,7 +17,7 @@
   background: transparent;
   border: none;
   padding: var(--space-xs) 10px;
-  font-size: 0.85rem;
+  font-size: var(--font-size-sm);
   color: var(--color-text);
   cursor: pointer;
   line-height: 1.2;
@@ -28,7 +28,7 @@
 .edit-bubble-btn:active { background: var(--color-hover-strong); }
 .edit-bubble-btn--bold   { font-weight: 700; }
 .edit-bubble-btn--italic { font-style: italic; }
-.edit-bubble-btn--syn    { font-size: 0.78rem; padding-inline: var(--space-sm); border-left: 1px solid var(--color-border); }
+.edit-bubble-btn--syn    { font-size: var(--font-size-mini); padding-inline: var(--space-sm); border-left: 1px solid var(--color-border); }
 
 .edit-slash-menu {
   position: fixed;
@@ -43,7 +43,7 @@
 }
 .edit-slash-hint {
   padding: var(--space-xs) 10px 6px;
-  font-size: 0.72rem;
+  font-size: var(--font-size-xs);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--color-muted);
@@ -56,8 +56,8 @@
   text-align: left;
   background: transparent;
   border: none;
-  padding: 6px 12px;
-  font-size: 0.9rem;
+  padding: var(--space-6) 12px;
+  font-size: var(--font-size-base);
   color: var(--color-text);
   cursor: pointer;
   font-family: inherit;

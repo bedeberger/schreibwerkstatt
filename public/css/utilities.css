@@ -38,7 +38,7 @@
 
 /* === Utility-Klassen === */
 .tag--link {
-  margin-left: 6px;
+  margin-left: var(--space-6);
   text-decoration: none;
   display: inline-block;
   padding: var(--space-2xs) 8px;
@@ -49,10 +49,10 @@
 .display-contents { display: contents; }
 .editor-section { margin-top: 1rem; }
 .stilbox--spaced { margin-top: var(--space-md); }
-.stilbox--review-summary { margin-bottom: 14px; }
+.stilbox--review-summary { margin-bottom: var(--space-14); }
 .fazit--review { margin-top: var(--space-lg); }
 .review-stars { font-size: var(--font-size-xs); }
-.muted-msg--spaced { margin-top: 14px; }
+.muted-msg--spaced { margin-top: var(--space-14); }
 .chat-skeleton-line--wide { width: 72%; }
 .chat-skeleton-line--narrow { width: 48%; }
 
@@ -88,7 +88,7 @@
 .job-queue-pill {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
   background: var(--color-queue-pill-bg);
   border: 1px solid var(--color-queue-pill-border);
   border-radius: 0;
@@ -166,9 +166,9 @@
 
 @media (max-width: 600px) {
   .job-queue-bar {
-    padding: 6px 10px;
+    padding: var(--space-6) 10px;
     padding-bottom: calc(6px + env(safe-area-inset-bottom));
-    gap: 6px;
+    gap: var(--space-6);
     max-height: 50vh;
   }
   .job-queue-label {
@@ -185,7 +185,7 @@
     flex: 1 1 auto;
   }
   .job-queue-cancel-btn {
-    padding: 10px 8px;
+    padding: var(--space-10) 8px;
     margin: -10px -8px -10px 0;
     font-size: var(--font-size-sm);
     min-width: 44px;

@@ -182,6 +182,16 @@ export const appUiMethods = {
   escPreserveStrong,
 
   _saveStatus() {
+    // Reihenfolge: aktive Vorgänge zuerst (saving), dann Fehlerzustände
+    // (offline), dann normale Resultate (draft/saved). saveOffline bleibt
+    // sticky bis nächster erfolgreicher Save → User sieht Retry-Zustand
+    // durchgehend, nicht nur im Moment des Fehlers.
+    if (this.editSaving) {
+      return { ts: this.lastDraftSavedAt || this.lastAutosaveAt || 0, kind: 'saving' };
+    }
+    if (this.saveOffline) {
+      return { ts: this.lastDraftSavedAt || this.lastAutosaveAt || 0, kind: 'offline' };
+    }
     const server = Math.max(
       this.lastAutosaveAt || 0,
       this.currentPage?.updated_at ? new Date(this.currentPage.updated_at).getTime() : 0,
@@ -191,7 +201,7 @@ export const appUiMethods = {
       ? this.lastDraftSavedAt : 0;
     if (draft) return { ts: draft, kind: 'draft' };
     if (server) return { ts: server, kind: 'saved' };
-    return { ts: 0, kind: '' };
+    return { ts: 0, kind: 'none' };
   },
 
   _formatSaveTs(ts) {
@@ -207,6 +217,37 @@ export const appUiMethods = {
 
   lastSavedLabel() { return this._formatSaveTs(this._saveStatus().ts); },
   lastSavedKind() { return this._saveStatus().kind; },
+
+  // Lokalisierter Text fürs Save-Status-Pill (Card-Subline + Focus-Header).
+  // 'saving'  → „Speichert…"
+  // 'offline' → „Offline – wartet auf Verbindung" (mit letztem Draft-Zeitstempel,
+  //             falls vorhanden)
+  // 'draft'   → „Entwurf {when}" (nur Focus-Mode, lokaler ungespeicherter Stand)
+  // 'saved'   → „gespeichert {when}"
+  // 'none'    → leer (keine Status-Anzeige)
+  saveIndicatorText() {
+    const { ts, kind } = this._saveStatus();
+    const when = ts ? this._formatSaveTs(ts) : '';
+    if (kind === 'saving') return this.t('edit.status.saving');
+    if (kind === 'offline') {
+      return when
+        ? this.t('edit.status.offlineWith', { when })
+        : this.t('edit.status.offline');
+    }
+    if (kind === 'draft') return this.t('editor.draft', { when });
+    if (kind === 'saved') return this.t('editor.saved', { when });
+    return '';
+  },
+
+  // Tooltip pro Kind — Detail zum Status-Pill (data-tip CSS-Hover).
+  saveIndicatorTip() {
+    const kind = this._saveStatus().kind;
+    if (kind === 'saving') return this.t('edit.status.savingTip');
+    if (kind === 'offline') return this.t('edit.status.offlineTip');
+    if (kind === 'draft') return this.t('editor.draftTitle');
+    if (kind === 'saved') return this.t('editor.savedTitle');
+    return '';
+  },
 
   // ── Partials laden ───────────────────────────────────────────────────────
   // DOM-Auto-Discovery: jeder `<div id="partial-$name">` bekommt seinen

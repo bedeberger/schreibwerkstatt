@@ -32,7 +32,7 @@
 
 /* === Figuren: kollabierbare Legende === */
 .figur-legend-wrap {
-  margin-bottom: 6px;
+  margin-bottom: var(--space-6);
 }
 .figur-legend-body {
   margin-top: var(--space-xs);
@@ -77,8 +77,8 @@
 .figur-soziogramm-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 6px;
+  gap: var(--space-10);
+  margin-bottom: var(--space-6);
 }
 /* === Figuren: Sozialschicht- + Präsenz-Badge ===
    Gemeinsames Pattern (vgl. .palette-badge in utilities.css). Setzt
@@ -88,7 +88,7 @@
 .figur-praesenz-badge {
   --badge-hue: var(--palette-gray);
   font-size: var(--font-size-xs);
-  margin-left: 6px;
+  margin-left: var(--space-6);
   background: color-mix(in srgb, var(--badge-hue) var(--figpal-bg-mix), var(--color-surface));
   color:      color-mix(in srgb, var(--badge-hue) var(--figpal-text-mix), var(--color-text));
 }
@@ -111,7 +111,7 @@
 
 /* === Figuren: Kerninfo (Rolle/Motivation/Konflikt/Entwicklung) === */
 .figur-kerninfo {
-  margin-bottom: 10px;
+  margin-bottom: var(--space-10);
   padding: var(--space-sm) 10px;
   background: var(--color-surface-alt, var(--color-surface));
   border-left: 2px solid var(--color-border);
@@ -121,7 +121,7 @@
 .figur-kerninfo-row:last-child { margin-bottom: 0; }
 
 /* === Figuren: Schlüsselzitate === */
-.figur-zitate-list { margin-bottom: 10px; }
+.figur-zitate-list { margin-bottom: var(--space-10); }
 .figur-zitat {
   font-style: italic;
   color: var(--color-muted);
@@ -134,7 +134,7 @@
   display: inline-flex;
   gap: var(--space-xs);
   flex-wrap: wrap;
-  margin-left: 6px;
+  margin-left: var(--space-6);
 }
 .figur-bz-beleg {
   font-size: var(--font-size-xs);
@@ -145,7 +145,7 @@
 }
 
 /* === Figuren: Graph-Bereich === */
-.figur-graph-section { margin-top: 14px; position: relative; }
+.figur-graph-section { margin-top: var(--space-14); position: relative; }
 
 .figur-tooltip {
   display: none;
@@ -177,7 +177,7 @@
 .figur-list-section {
   margin-top: var(--space-lg);
   border-top: 0.5px solid var(--color-border);
-  padding-top: 14px;
+  padding-top: var(--space-14);
 }
 .figur-list-header {
   display: flex;
@@ -232,7 +232,7 @@
   margin-bottom: var(--space-sm);
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
 }
 
 .figur-beschreibung {
@@ -247,17 +247,17 @@
 
 .figur-detail-value { font-size: var(--font-size-sm); }
 
-.figur-eigenschaften-list { margin-bottom: 10px; }
+.figur-eigenschaften-list { margin-bottom: var(--space-10); }
 
 .figur-tags-row {
   font-size: var(--font-size-sm);
-  margin-bottom: 10px;
+  margin-bottom: var(--space-10);
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-xs);
 }
 
-.figur-bz-list { margin-bottom: 10px; }
+.figur-bz-list { margin-bottom: var(--space-10); }
 
 .figur-bz-name {
   font-size: var(--font-size-sm);

@@ -174,9 +174,9 @@
   user-select: none;
 }
 .figure-context-header:hover { background: var(--color-hover-light); }
-.figure-context-title { display: flex; align-items: center; gap: 6px; font-size: var(--font-size-sm); font-weight: 400; }
+.figure-context-title { display: flex; align-items: center; gap: var(--space-6); font-size: var(--font-size-sm); font-weight: 400; }
 .figure-context-icon { font-size: var(--font-size-xs); font-weight: 700; background: var(--color-accent-bg); color: var(--color-accent-text); width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
-.figure-context-body { padding: var(--space-xs) 12px 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+.figure-context-body { padding: var(--space-xs) 12px 10px; display: flex; flex-wrap: wrap; gap: var(--space-6); }
 .figure-context-chip {
   position: relative;
   display: inline-flex;
@@ -198,7 +198,7 @@
   z-index: var(--z-popover);
   min-width: 220px;
   max-width: 320px;
-  padding: 10px 12px;
+  padding: var(--space-10) 12px;
   background: var(--color-tooltip-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);

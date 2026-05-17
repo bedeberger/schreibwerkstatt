@@ -4,14 +4,14 @@
 .syn-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-10);
   margin-top: var(--space-xs);
 }
 
 .syn-entry {
   border: 0.5px solid var(--color-border);
   border-left: 2px solid var(--color-primary);
-  padding: 10px 12px;
+  padding: var(--space-10) 12px;
   background: var(--color-surface);
 }
 
@@ -34,7 +34,7 @@
 .syn-passage {
   font-size: var(--font-size-sm);
   color: var(--color-muted);
-  margin-bottom: 6px;
+  margin-bottom: var(--space-6);
   line-height: 1.5;
 }
 
@@ -83,7 +83,7 @@
 .syn-buttons {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--space-6);
 }
 
 .syn-btn {

@@ -45,7 +45,7 @@
 }
 .book-create-error {
   font-size: var(--font-size-sm);
-  color: var(--color-err-text, #b91c1c);
+  color: var(--color-err-text);
 }
 .book-create-actions {
   display: flex;
@@ -66,7 +66,7 @@
 .book-create-btn:disabled { opacity: var(--opacity-hint); cursor: not-allowed; }
 .book-create-btn--primary {
   background: var(--color-primary);
-  color: var(--color-on-primary, #fff);
+  color: var(--color-on-primary);
   border-color: var(--color-primary);
 }
 .book-create-btn--primary:hover:not(:disabled) { background: var(--color-primary-hover); }

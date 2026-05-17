@@ -4,11 +4,11 @@
    Layout: Header + Subtitle, Eingabezeile, dann zwei Sections (offen/erledigt).
    Eckige Status-Badges via var(--radius-sm). */
 .card-status--error {
-  color: var(--color-danger, #c62828);
+  color: var(--color-err-text);
 }
 .ideen-input-row {
   display: flex;
-  gap: 6px;
+  gap: var(--space-6);
   align-items: flex-end;
   margin: var(--space-sm) 0 12px;
 }
@@ -41,14 +41,14 @@
   color: var(--color-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  margin-bottom: 6px;
+  margin-bottom: var(--space-6);
 }
 .idee-item {
   position: relative;
   border: 0.5px solid var(--color-border);
   background: var(--color-bg);
-  padding: 10px 38px 10px 12px;
-  margin-bottom: 6px;
+  padding: var(--space-10) 38px 10px 12px;
+  margin-bottom: var(--space-6);
   border-radius: var(--radius-sm);
 }
 .idee-item--erledigt { opacity: var(--opacity-disabled); }
@@ -63,7 +63,7 @@
   color: var(--color-muted);
   padding: 1px 6px;
   border-radius: var(--radius-sm);
-  margin-bottom: 6px;
+  margin-bottom: var(--space-6);
 }
 .idee-status-badge--erledigt { color: var(--color-subtle); }
 .idee-content {
@@ -72,8 +72,8 @@
   word-wrap: break-word;
   line-height: 1.5;
 }
-.idee-edit { display: flex; flex-direction: column; gap: 6px; }
-.idee-edit-actions { display: flex; gap: 6px; justify-content: flex-end; }
+.idee-edit { display: flex; flex-direction: column; gap: var(--space-6); }
+.idee-edit-actions { display: flex; gap: var(--space-6); justify-content: flex-end; }
 .idee-edit-actions button {
   font-size: var(--font-size-xs);
   padding: 3px 8px;
@@ -123,7 +123,7 @@
   text-align: left;
   background: transparent;
   border: none;
-  padding: 6px 10px;
+  padding: var(--space-6) 10px;
   font-size: var(--font-size-xs);
   color: var(--color-text);
   border-radius: var(--radius-sm);
@@ -131,7 +131,7 @@
 }
 .idee-menu-popover button:hover:not(:disabled) { background: var(--color-bg); }
 .idee-menu-popover button:disabled { opacity: var(--opacity-muted); cursor: default; }
-.idee-menu-popover .idee-menu-item--danger { color: var(--color-danger, #c62828); }
+.idee-menu-popover .idee-menu-item--danger { color: var(--color-err-text); }
 .ideen-move-label {
   font-size: var(--font-size-xs);
   color: var(--color-subtle);
@@ -140,9 +140,9 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  margin: 6px 0;
+  gap: var(--space-6);
+  padding: var(--space-6) 8px;
+  margin: var(--space-6) 0;
   border: 0.5px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-surface);

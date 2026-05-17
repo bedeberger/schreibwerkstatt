@@ -228,7 +228,7 @@
   border-radius: var(--radius-sm);
   font-family: var(--font-sans);
   font-size: var(--font-size-base);
-  padding: 6px 10px;
+  padding: var(--space-6) 10px;
   box-shadow: var(--shadow-sm);
 }
 .werkstatt-mindmap jmnode.root {

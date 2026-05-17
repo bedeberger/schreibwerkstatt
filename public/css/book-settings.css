@@ -63,9 +63,9 @@
 .job-stats-row--clickable { cursor: pointer; }
 .job-stats-row--clickable:hover td { background: var(--color-hover-bg, rgba(255,255,255,0.04)); }
 .job-stats-row--open td { background: var(--color-hover-bg, rgba(255,255,255,0.04)); }
-.job-stats-row--clickable .history-chevron { margin-right: 6px; }
+.job-stats-row--clickable .history-chevron { margin-right: var(--space-6); }
 .job-stats-runs-row td {
-  padding: 6px 0 10px 18px !important;
+  padding: var(--space-6) 0 10px 18px !important;
   border-bottom: 0.5px solid var(--color-separator-on-dark);
   background: var(--color-card-bg);
 }
@@ -100,7 +100,7 @@
   font-size: var(--font-size-micro);
   background: var(--color-badge-bg, rgba(255,255,255,0.06));
 }
-.job-run-status--done      { color: var(--color-ok-light, #6cc472); }
+.job-run-status--done      { color: var(--color-success); }
 .job-run-status--error     { color: var(--color-err-light); }
 .job-run-status--cancelled { color: var(--color-muted); }
 .job-run-status--running,
@@ -197,7 +197,7 @@
   flex: 0 0 auto;
   width: 130px;
 }
-.book-share-btn-revoke { color: var(--color-danger, #c44); }
+.book-share-btn-revoke { color: var(--color-err-text); }
 .book-share-invite-row {
   display: flex;
   gap: var(--space-2);
@@ -267,8 +267,8 @@
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
-  background: var(--color-warning-bg, #fff7e0);
-  border: 1px solid var(--color-warning-border, #e0c060);
+  background: var(--color-warn-bg);
+  border: 1px solid var(--color-style-border);
   border-radius: var(--radius-sm);
   margin-bottom: var(--space-2);
   font-size: var(--font-size-sm);

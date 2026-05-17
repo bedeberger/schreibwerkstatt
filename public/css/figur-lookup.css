@@ -22,7 +22,7 @@
 }
 .figur-lookup-name {
   font-weight: 600;
-  font-size: 0.95rem;
+  font-size: var(--font-size-md);
   color: var(--color-text);
 }
 .figur-lookup-close {
@@ -39,17 +39,17 @@
   padding: var(--space-sm) 12px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  font-size: 0.9rem;
+  gap: var(--space-6);
+  font-size: var(--font-size-base);
 }
 .figur-lookup-row {
   display: flex;
-  gap: 6px;
+  gap: var(--space-6);
   align-items: baseline;
 }
 .figur-lookup-label {
   color: var(--color-muted);
-  font-size: 0.8rem;
+  font-size: var(--font-size-mini);
 }
 .figur-lookup-tags {
   display: flex;
@@ -57,7 +57,7 @@
   gap: var(--space-xs);
 }
 .figur-lookup-meta {
-  font-size: 0.75rem;
+  font-size: var(--font-size-mini);
   color: var(--color-muted);
 }
 .figur-lookup-footer {
@@ -74,7 +74,7 @@
   padding: var(--space-sm) 12px;
   cursor: pointer;
   color: var(--color-muted);
-  font-size: 0.85rem;
+  font-size: var(--font-size-sm);
   text-align: left;
   transform: none;
 }
@@ -85,7 +85,7 @@
 .figur-lookup-link:active { transform: none; }
 .figur-lookup-link::after {
   content: '›';
-  font-size: 1rem;
+  font-size: var(--font-size-reading);
   line-height: 1;
   opacity: var(--opacity-muted);
 }

@@ -15,7 +15,7 @@
   justify-content: space-between;
   align-items: baseline;
   gap: var(--space-md);
-  padding: 6px 8px;
+  padding: var(--space-6) 8px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   min-width: 0;
@@ -37,7 +37,7 @@
 }
 .overview-recent-meta {
   display: inline-flex;
-  gap: 10px;
+  gap: var(--space-10);
   flex: 0 0 auto;
   font-size: var(--font-size-xs);
   color: var(--color-muted);
@@ -55,7 +55,7 @@
 .overview-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--space-6);
 }
 
 @media (max-width: 480px) {

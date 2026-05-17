@@ -4,10 +4,13 @@
     <div class="card-header-titlebar">
       <span class="card-title" x-text="t('editor.title', { name: currentPage?.name || '–' })"></span>
       <div class="card-subline">
-        <span class="save-indicator" x-show="lastSavedLabel()"
-              :class="{ 'save-indicator--draft': lastSavedKind() === 'draft', 'save-indicator--offline': saveOffline }"
-              x-text="lastSavedKind() === 'draft' ? t('editor.draft', { when: lastSavedLabel() }) : t('editor.saved', { when: lastSavedLabel() })"
-              :data-tip="lastSavedKind() === 'draft' ? t('editor.draftTitle') : t('editor.savedTitle')"></span>
+        <span class="save-indicator"
+              x-show="editMode || lastSavedKind() !== 'none'"
+              :class="'save-indicator--' + lastSavedKind()"
+              :data-tip="saveIndicatorTip()">
+          <span class="save-indicator__dot" aria-hidden="true"></span>
+          <span class="save-indicator__text" x-text="saveIndicatorText()"></span>
+        </span>
         <span x-show="focusMode && editMode" class="focus-live-counter">
           <span x-text="t('editor.focus.counterTotal', { words: focusCountWords, chars: focusCountChars })"></span>
           <span class="focus-live-counter--today"
@@ -109,6 +112,21 @@
             user: foreignEditLock?.user_display_name || t('edit.conflict.unknownUser'),
             until: foreignEditLock?.expires_at ? formatDate(foreignEditLock.expires_at) : ''
           })"></span>
+  </div>
+
+  <!-- Local-Draft-Recovery: localStorage hat ungespeicherten Entwurf für
+       offene Seite (z. B. nach Server-Crash mid-write + Tab-Reopen). User
+       wählt Resume (öffnet Edit) oder Discard. -->
+  <div class="editor-draft-banner" role="status" x-show="pendingDraft && !editMode" x-cloak>
+    <span class="editor-draft-banner__icon" aria-hidden="true">●</span>
+    <span class="editor-draft-banner__text"
+          x-text="t('edit.draftRecovery.banner', { when: pendingDraft?.savedAt ? formatDate(pendingDraft.savedAt) : '' })"></span>
+    <button type="button" class="editor-draft-banner__action"
+            @click="resumeDraft()"
+            x-text="t('edit.draftRecovery.resume')"></button>
+    <button type="button" class="editor-draft-banner__discard"
+            @click="discardDraft()"
+            x-text="t('edit.draftRecovery.discard')"></button>
   </div>
 
   <!-- Cross-User-Konflikt aus _checkPageConflict / Server-OCC. Bleibt im

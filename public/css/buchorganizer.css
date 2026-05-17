@@ -11,7 +11,7 @@
 .organizer-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-10);
 }
 
 .organizer-chapter {
@@ -51,7 +51,7 @@
 .organizer-chapter-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
 }
 
 .organizer-drag-handle {
@@ -106,7 +106,7 @@
 .organizer-page {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
   padding: var(--space-xs) 6px;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -136,7 +136,7 @@
 .organizer-delete-btn--chapter { margin-left: var(--space-xs); }
 
 .organizer-empty {
-  padding: 6px 8px;
+  padding: var(--space-6) 8px;
   font-size: var(--font-size-mini);
   color: var(--color-subtle);
   font-style: italic;

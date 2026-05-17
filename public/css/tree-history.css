@@ -27,10 +27,10 @@
 .tree-chapter-header {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  column-gap: 6px;
+  column-gap: var(--space-6);
   row-gap: var(--space-2xs);
   align-items: start;
-  padding: 6px 10px 6px 2px;
+  padding: var(--space-6) 10px 6px 2px;
   border: 0.5px solid transparent;
   border-radius: var(--radius-md);
   cursor: pointer;
@@ -49,7 +49,7 @@
 .tree-chapter-meta {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
   flex-shrink: 0;
   margin-top: var(--space-2xs);
 }
@@ -66,7 +66,7 @@
 .tree-chapter-pages {
   position: relative;
   margin-left: var(--space-md);
-  padding-left: 10px;
+  padding-left: var(--space-10);
   padding-top: var(--space-2xs);
 }
 .tree-chapter-pages::before {
@@ -131,7 +131,7 @@
 .history-item {
   display: flex;
   align-items: center;
-  gap: 6px 10px;
+  gap: var(--space-6) 10px;
   padding: var(--space-sm) 12px;
   border-radius: var(--radius-md);
   border: 0.5px solid var(--color-border);
@@ -183,7 +183,7 @@
 
 @media (max-width: 480px) {
   .history-item-delete {
-    padding: 6px 10px;
+    padding: var(--space-6) 10px;
     font-size: var(--font-size-reading);
   }
 }
@@ -193,7 +193,7 @@
   border-top: none;
   border-radius: 0;
   padding: var(--space-md) 14px 14px;
-  margin-bottom: 6px;
+  margin-bottom: var(--space-6);
   background: var(--color-bg);
 }
 
@@ -238,7 +238,7 @@
   border-radius: 0;
 }
 .history-detail .bewertung-section { margin-top: var(--space-lg); }
-.history-detail .bewertung-header { margin-bottom: 10px; }
+.history-detail .bewertung-header { margin-bottom: var(--space-10); }
 
 .btn-delete-history {
   padding: var(--space-xs) 12px;

@@ -13,7 +13,7 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: var(--space-10);
   margin: 0 0 12px;
 }
 .book-export-scope-label {
@@ -35,7 +35,7 @@
 .book-export-buttons button {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
 }
 
 .book-export-buttons button.is-running {
@@ -43,7 +43,7 @@
 }
 
 @media (max-width: 600px) {
-  .book-export-buttons { gap: 6px; }
+  .book-export-buttons { gap: var(--space-6); }
   .book-export-buttons button { flex: 1 1 calc(50% - 6px); justify-content: center; }
 }
 }

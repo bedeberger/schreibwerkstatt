@@ -44,7 +44,7 @@
   gap: 0.5rem;
 }
 .revision-viewer__close {
-  font-size: 1.4rem;
+  font-size: var(--font-size-xl);
   line-height: 1;
   background: transparent;
   border: 0;
@@ -212,7 +212,7 @@
   font-weight: 700;
   margin: 0;
 }
-.revision-diff-body .diff-cell--h1 { font-size: 1.4rem; }
+.revision-diff-body .diff-cell--h1 { font-size: var(--font-size-xl); }
 .revision-diff-body .diff-cell--h2 { font-size: 1.25rem; }
 .revision-diff-body .diff-cell--h3 { font-size: 1.1rem; }
 .revision-diff-body .diff-cell--li {

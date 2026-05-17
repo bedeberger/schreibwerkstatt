@@ -17,7 +17,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-10);
   padding-bottom: var(--space-md);
   margin-bottom: var(--space-lg);
   border-bottom: 1px solid var(--color-border);
@@ -74,7 +74,7 @@
 .card-header-aside {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: var(--space-14);
   flex-wrap: wrap;
   justify-content: flex-end;
   min-width: 0;
@@ -84,7 +84,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-xs);
-  padding-right: 14px;
+  padding-right: var(--space-14);
   border-right: 0.5px solid var(--color-border);
 }
 @media (max-width: 700px) {
@@ -93,8 +93,8 @@
   .card-header-aside .tok-stats {
     padding-right: 0;
     border-right: none;
-    padding-bottom: 6px;
-    margin-bottom: 6px;
+    padding-bottom: var(--space-6);
+    margin-bottom: var(--space-6);
     border-bottom: 0.5px solid var(--color-border);
     width: 100%;
   }
@@ -105,7 +105,7 @@ label {
   font-size: var(--font-size-sm);
   color: var(--color-muted);
   display: block;
-  margin-bottom: 6px;
+  margin-bottom: var(--space-6);
 }
 
 input[type=text],
@@ -161,7 +161,7 @@ select:focus {
   color: var(--color-text);
   cursor: pointer;
   text-align: left;
-  gap: 6px;
+  gap: var(--space-6);
 }
 .combobox-trigger:hover { background: var(--color-hover); }
 .combobox-trigger:active { transform: none; }
@@ -290,7 +290,7 @@ select:focus {
   grid-template-columns: 170px 1fr;
   align-items: start;
   gap: var(--space-lg);
-  margin-bottom: 14px;
+  margin-bottom: var(--space-14);
 }
 .card-form-row--top {
   align-items: flex-start;
@@ -298,13 +298,13 @@ select:focus {
 .card-form-label {
   font-weight: 700;
   font-size: var(--font-size-sm);
-  padding-top: 6px;
+  padding-top: var(--space-6);
   color: var(--color-text);
 }
 .card-form-field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-6);
   min-width: 0;
 }
 .card-form-field-note {
@@ -318,7 +318,7 @@ select:focus {
   color: var(--color-muted);
   line-height: 1.4;
   margin: 22px 0 14px;
-  padding-top: 14px;
+  padding-top: var(--space-14);
   border-top: 0.5px solid var(--color-border);
 }
 .card-form-saved {
@@ -328,7 +328,7 @@ select:focus {
   font-weight: 400;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
   transition: opacity 250ms ease;
 }
 /* Inline neben Button (z.B. figur-werkstatt, pdf-export) — vertikal mittig
@@ -383,7 +383,7 @@ select:focus {
   width: 100%;
   font-size: var(--font-size-sm);
   font-family: inherit;
-  padding: 6px 8px;
+  padding: var(--space-6) 8px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
@@ -419,7 +419,7 @@ select[aria-invalid="true"],
 .form-stack {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-10);
 }
 
 .form-inline {
@@ -449,7 +449,7 @@ select[aria-invalid="true"],
 .form-check {
   display: grid;
   grid-template-columns: 18px 1fr;
-  gap: 10px;
+  gap: var(--space-10);
   align-items: start;
   cursor: pointer;
   line-height: 1.4;
@@ -475,8 +475,8 @@ select[aria-invalid="true"],
 }
 
 .form-section {
-  margin-top: 14px;
-  padding-top: 14px;
+  margin-top: var(--space-14);
+  padding-top: var(--space-14);
   border-top: 0.5px solid var(--color-border);
 }
 .form-stats {
@@ -486,7 +486,7 @@ select[aria-invalid="true"],
   margin-bottom: var(--space-md);
 }
 .form-size-hint {
-  margin-left: 6px;
+  margin-left: var(--space-6);
   font-weight: 400;
   opacity: var(--opacity-strong);
 }
@@ -494,13 +494,13 @@ select[aria-invalid="true"],
 @media (max-width: 600px) {
   .card-form-row {
     grid-template-columns: 1fr;
-    gap: 6px;
+    gap: var(--space-6);
   }
   .card-form-label {
     padding-top: 0;
   }
   .form-inline {
-    gap: 10px 16px;
+    gap: var(--space-10) 16px;
   }
   .form-inline-field {
     flex: 1 1 calc(50% - 16px);

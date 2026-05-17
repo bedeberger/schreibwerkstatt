@@ -32,7 +32,7 @@ button.success:hover { background: var(--color-success-hover); }
 /* Count-Badge in Action-Buttons (Ideen, Chat). Eckig (Projektregel). */
 .btn-count {
   display: inline-block;
-  margin-left: 6px;
+  margin-left: var(--space-6);
   padding: 0 6px;
   font-size: var(--font-size-xs);
   font-weight: 600;

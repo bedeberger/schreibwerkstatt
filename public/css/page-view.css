@@ -32,7 +32,7 @@
    auf den unmodifizierten Default zurück. */
 .page-content-view p:has(.lektorat-mark) {
   position: relative;
-  padding-right: 14px;
+  padding-right: var(--space-14);
 }
 .page-content-view p:has(.lektorat-mark)::after {
   content: "";
@@ -69,12 +69,12 @@
    schlucken — Original-HTML bleibt unverändert (nur Display-Stripping). */
 .page-content-view blockquote + br { display: none; }
 .page-content-view table { border-collapse: collapse; margin: 0.6em 0; width: 100%; }
-.page-content-view th, .page-content-view td { border: 1px solid var(--color-border); padding: 6px 10px; text-align: left; }
+.page-content-view th, .page-content-view td { border: 1px solid var(--color-border); padding: var(--space-6) 10px; text-align: left; }
 .page-content-view th { background: var(--color-bg); font-weight: 700; }
 .page-content-view ul, .page-content-view ol { padding-left: 1.5em; margin: 0.4em 0; }
 .page-content-view img { max-width: 100%; height: auto; border-radius: var(--radius-md); }
 .page-content-view hr { border: none; border-top: 1px solid var(--color-border); margin: 1em 0; }
-.page-content-view pre { background: var(--color-bg); padding: 10px 12px; border-radius: var(--radius-md); overflow-x: auto; font-size: var(--font-size-sm); }
+.page-content-view pre { background: var(--color-bg); padding: var(--space-10) 12px; border-radius: var(--radius-md); overflow-x: auto; font-size: var(--font-size-sm); }
 .page-content-view code { background: var(--color-bg); padding: 1px 4px; border-radius: var(--radius-sm); font-size: 0.9em; }
 .page-content-view pre code { background: none; padding: 0; }
 
@@ -98,7 +98,7 @@
 .page-content-view .callout {
   border-left: 4px solid var(--color-border);
   background: var(--color-bg);
-  padding: 10px 14px;
+  padding: var(--space-10) 14px;
   margin: 0.6em 0;
   border-radius: var(--radius-sm);
 }
