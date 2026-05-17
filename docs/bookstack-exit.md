@@ -81,6 +81,10 @@ lib/content-store/
 - **Sync-Worker** ([routes/sync.js](../routes/sync.js)): backend-agnostisch. `syncBook(bookId, ctx)` liest via Content-Store-Facade — im `bookstack`-Mode mit Per-User-Token-ctx (`getAllUserTokens`-Loop in `_syncAllBooksInner`), im `localdb`-Mode mit `ctx=null` und Buch-Enumeration direkt aus `books`-Tabelle. `_isBookstackBackend()` schaltet nur die Branch im inneren Loop; alle Routen (`POST /sync/book/:book_id`, `POST /sync/pages/:book_id`, `POST /sync/page-stats/:book_id`) fordern Token nur im `bookstack`-Mode. Befüllt in beiden Modes: `page_stats` (inkl. Style-Metriken `sentences`/`dialog_chars`/`filler_count`/`passive_count`/`adverb_count`/`pronoun_counts`/`lix`/`flesch_de`), `page_figure_mentions`, `book_stats_history`-Tagessnapshot. Cron-Tick 02:00 in [server.js](../server.js) unverändert.
 - **Tripwire** ([tests/unit/content-store-tripwire.test.mjs](../tests/unit/content-store-tripwire.test.mjs)): `bs*`-Calls + `BOOKSTACK_URL`-Referenzen nur in `lib/bookstack.js` + `lib/content-store/backends/bookstack.js` + `routes/sync.js` + `routes/jobs/shared/bookstack.js` + `routes/proxies.js` + `lib/pdf-render/images.js`.
 
+### ACL-Mirror nach Backfill
+
+Backfill ([db/backfill.js](../db/backfill.js)) setzt `books.owner_email` und legt im selben Transaction-Block per `INSERT OR IGNORE` eine `book_access(role='owner', granted_by='backfill')`-Row an — ohne Privilege-Escalation fuer bestehende Sharings. Migration 118 spiegelt zusaetzlich `books.owner_email → book_access` retro fuer alle Buecher, deren Owner in `app_users` existiert (Backfill-Buecher aus dem Zeitraum vor diesem Fix). Buecher mit Owner-Email ohne `app_users`-Eintrag bleiben ownerless — Admin weist ueber [routes/admin-books.js](../routes/admin-books.js) (`POST /admin/books/:id/assign-owner`) plus `AdminBooksCard` ([public/js/cards/admin-books-card.js](../public/js/cards/admin-books-card.js) + [public/partials/admin-books.html](../public/partials/admin-books.html)) einen aktiven User zu. Tile in [admin-home.html](../public/partials/admin-home.html); Hash `#admin/books`; Reassignment bestehender Owner laeuft weiter ueber `/books/:id/transfer-ownership`.
+
 ### Devmode-Seed ([lib/dev-seed.js](../lib/dev-seed.js))
 
 Auto-Seed bei `LOCAL_DEV_MODE=true` + `LOCAL_DEV_SEED!=false` + `app.backend='localdb'` + leerer `books`-Tabelle. 4 Guards alle Pflicht. Inhalt: 1 Buch (`'Devmode-Testbuch'`, `owner_email='dev@local'`) + 2 Kapitel + 5 Pages mit Kafka-„Verwandlung"-Public-Domain-Prosa. IDs ≥ 1_000_001. Hook in [server.js](../server.js) nach `bootstrapFromEnv()`. Test: [tests/unit/dev-seed.test.mjs](../tests/unit/dev-seed.test.mjs).
@@ -293,6 +297,5 @@ Implementiert; Code-Pfade:
 |---|---|---|
 | 8b | 3–4 Tage | mittel-hoch (FK-Repair + ID-Map + Round-Trip-Tests) |
 | 10 | 1–2 Tage | mittel (Diff-Test gegen Bestand) |
-| 11 | 1.5–2 Tage | niedrig-mittel (Cache-Key-Migration, Per-Call-Resolve) |
 
-**Realistischer Rahmen:** ≈ 20–35 Vollzeit-Tage Coding für offene Phasen. Test-Sweep gegen beide Backends + i18n-Doppelpflege + ERD-Update sind im Tages-Wert nicht voll abgebildet.
+**Realistischer Rahmen:** ≈ 4–6 Vollzeit-Tage Coding für offene Phasen. Test-Sweep gegen beide Backends + i18n-Doppelpflege + ERD-Update sind im Tages-Wert nicht voll abgebildet.

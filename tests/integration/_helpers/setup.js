@@ -27,6 +27,17 @@ function bootstrap() {
   upsert.run('ai.provider', JSON.stringify('claude'));
   upsert.run('jobs.max_concurrent', JSON.stringify(1));
 
+  // app_users-Rows fuer Test-Identitaeten — Backfill/Backend-Migrate-Job
+  // schreiben in book_access (FK auf app_users.email). Ohne Seed bricht
+  // jeder Job mit "FOREIGN KEY constraint failed".
+  const insUser = db.prepare(`
+    INSERT OR IGNORE INTO app_users (email, display_name, global_role, status, language, can_invite_users, first_seen_at, created_at)
+    VALUES (?, ?, 'user', 'active', 'de', 1, datetime('now'), datetime('now'))
+  `);
+  for (const email of ['alice@example.com', 'bob@example.com', 'admin@example.com']) {
+    insUser.run(email, email.split('@')[0]);
+  }
+
   const mockAi = require('./mock-ai');
   const mockBs = require('./mock-bookstack');
   mockAi.install();
