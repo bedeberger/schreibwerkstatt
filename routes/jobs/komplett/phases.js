@@ -46,7 +46,7 @@ async function runPhase1(ctx) {
     // Key: chapter_key='__singlepass__' + Gesamt-Seitensignatur. Überlebt Job-Ende
     // (der Anthropic-Prompt-Cache deckt nur eine 1h-Fensterspanne ab).
     const bookPagesSig = buildBookPagesSig(pageContents, getBookSettings(bookIdInt, email), cacheVersion);
-    const cached = loadChapterExtractCache(bookIdInt, email, '__singlepass__', bookPagesSig);
+    const cached = loadChapterExtractCache(bookIdInt, email, '__singlepass__', bookPagesSig, effectiveProvider);
     if (cached && Array.isArray(cached.chapterFiguren) && cached.chapterFiguren[0]?.figuren?.length > 0) {
       chapterFiguren     = cached.chapterFiguren;
       chapterOrte        = cached.chapterOrte        || [{ kapitel: 'Gesamtbuch', orte: [] }];
@@ -85,7 +85,7 @@ async function runPhase1(ctx) {
       log.info(`Single-Pass OK – fig=${chapterFiguren[0].figuren.length} orte=${chapterOrte[0].orte.length} sz=${chapterSzenen[0].szenen.length} (${totalEvents} Ereignisse)`);
       saveChapterExtractCache(bookIdInt, email, '__singlepass__', bookPagesSig, {
         chapterFiguren, chapterOrte, chapterFakten, chapterSzenen, chapterAssignments,
-      });
+      }, effectiveProvider);
     }
   } else {
     // ── Multi-Pass mit Delta-Cache ──
@@ -126,22 +126,22 @@ async function runPhase1(ctx) {
         log.info(`${chunkLabel} – ${chunk.pages.length} Seiten${isSplit ? ' (Split-Pässe)' : ''}`);
 
         if (!isSplit) {
-          const cached = loadChapterExtractCache(bookIdInt, email, key, pagesSig);
+          const cached = loadChapterExtractCache(bookIdInt, email, key, pagesSig, effectiveProvider);
           if (cached) { cacheHits++; log.info(`${chunkLabel} – Cache-HIT.`); return cached; }
           log.info(`${chunkLabel} – Cache-MISS, KI-Call…`);
           const result = await call(jobId, tok,
             prompts.buildExtraktionKomplettChapterPrompt(chunk.name, bookName, chunk.pages.length, chText),
             sys.SYSTEM_KOMPLETT_EXTRAKTION_BLOCKS, 12, 28, 14000, 0.2, null, prompts.SCHEMA_KOMPLETT_EXTRAKTION,
           );
-          saveChapterExtractCache(bookIdInt, email, key, pagesSig, result);
+          saveChapterExtractCache(bookIdInt, email, key, pagesSig, result, effectiveProvider);
           log.info(`${chunkLabel} – OK (fig=${result?.figuren?.length ?? 0} orte=${result?.orte?.length ?? 0} sz=${result?.szenen?.length ?? 0}).`);
           return result;
         }
 
         const figKey = `${key}:figuren`;
         const ortKey = `${key}:orte`;
-        const cachedFig = loadChapterExtractCache(bookIdInt, email, figKey, pagesSig);
-        const cachedOrt = loadChapterExtractCache(bookIdInt, email, ortKey, pagesSig);
+        const cachedFig = loadChapterExtractCache(bookIdInt, email, figKey, pagesSig, effectiveProvider);
+        const cachedOrt = loadChapterExtractCache(bookIdInt, email, ortKey, pagesSig, effectiveProvider);
 
         let passA = cachedFig;
         if (passA) { cacheHits++; log.info(`${chunkLabel} Pass A (Figuren) – Cache-HIT.`); }
@@ -151,7 +151,7 @@ async function runPhase1(ctx) {
             prompts.buildExtraktionFigurenPassPrompt(chunk.name, bookName, chunk.pages.length, chText),
             sys.SYSTEM_KOMPLETT_FIGUREN_PASS_BLOCKS, 12, 20, 8000, 0.2, null, prompts.SCHEMA_KOMPLETT_FIGUREN_PASS,
           );
-          saveChapterExtractCache(bookIdInt, email, figKey, pagesSig, passA);
+          saveChapterExtractCache(bookIdInt, email, figKey, pagesSig, passA, effectiveProvider);
         }
 
         let passB = cachedOrt;
@@ -162,7 +162,7 @@ async function runPhase1(ctx) {
             prompts.buildExtraktionOrtePassPrompt(chunk.name, bookName, chunk.pages.length, chText),
             sys.SYSTEM_KOMPLETT_ORTE_PASS_BLOCKS, 20, 28, 6000, 0.2, null, prompts.SCHEMA_KOMPLETT_ORTE_PASS,
           );
-          saveChapterExtractCache(bookIdInt, email, ortKey, pagesSig, passB);
+          saveChapterExtractCache(bookIdInt, email, ortKey, pagesSig, passB, effectiveProvider);
         }
 
         const merged = {

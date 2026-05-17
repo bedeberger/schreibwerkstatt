@@ -76,13 +76,11 @@
             </td>
             <td>
               <div x-data="combobox($app.t('admin.users.role'))"
-                   x-modelable="value"
-                   :x-init="'$watch(\'value\', v => { if (v && v !== ' + JSON.stringify(u.global_role) + ') adminUsersUpdate(' + JSON.stringify(u) + ', { global_role: v }); })'"
-                   :value="u.global_role"
-                   x-effect="options = [
+                   x-effect="value = u.global_role; options = [
                      { value: 'user',  label: $app.t('admin.users.role.user') },
                      { value: 'admin', label: $app.t('admin.users.role.admin') },
-                   ]"></div>
+                   ]"
+                   @combobox-change="if ($event.detail && $event.detail !== u.global_role) adminUsersUpdate(u, { global_role: $event.detail })"></div>
             </td>
             <td>
               <span class="badge" :class="'badge--status-' + u.status" x-text="$app.t('admin.users.status.' + u.status)"></span>

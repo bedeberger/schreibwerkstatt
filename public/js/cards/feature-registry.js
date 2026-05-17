@@ -94,6 +94,7 @@ export const ACTIONS = [
     aliases: ['analyse','vollanalyse','reload','aktualisieren','refresh','komplett'],
     run: (root) => { root.alleAktualisieren(); } },
   { key: 'action.tokenChange',    kind: 'action', group: 'app', labelKey: 'palette.action.token',     descKey: 'palette.action.token.desc',
+    requiresBookstack: true,
     aliases: ['bookstack','api','credentials','login','token'],
     run: (root) => { root.openTokenChange(); } },
   { key: 'action.swReload',       kind: 'action', group: 'app', labelKey: 'palette.action.swReload',  descKey: 'palette.action.swReload.desc',
@@ -175,6 +176,7 @@ export function isFeatureAvailable(feature, ctx) {
   if (!feature) return false;
   if (feature.requiresBook && !ctx.selectedBookId) return false;
   if (feature.requiresPages && !(ctx.pages && ctx.pages.length > 0)) return false;
+  if (feature.requiresBookstack && ctx.backend !== 'bookstack') return false;
   return true;
 }
 

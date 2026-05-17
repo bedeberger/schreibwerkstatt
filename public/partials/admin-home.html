@@ -37,6 +37,13 @@
       <div class="overview-tile-desc" x-text="t('tile.adminUsage.desc')"></div>
     </button>
     <button type="button"
+            class="overview-tile internal-link card--admin-categories"
+            @click="toggleAdminCategoriesCard()">
+      <div class="overview-tile-label" x-text="t('admin.home.categoriesLabel')"></div>
+      <div class="overview-tile-value" x-text="t('admin.categories.title')"></div>
+      <div class="overview-tile-desc" x-text="t('tile.adminCategories.desc')"></div>
+    </button>
+    <button type="button"
             class="overview-tile internal-link card--admin-backend-migration"
             @click="toggleAdminBackendMigrationCard()">
       <div class="overview-tile-label" x-text="t('admin.home.migrationLabel')"></div>

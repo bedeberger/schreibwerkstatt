@@ -139,6 +139,7 @@ export function registerPaletteCard() {
         selectedBookId: root.selectedBookId,
         pages: root.pages,
         bookRole: root.currentBookRole || null,
+        backend: root.backend || 'bookstack',
       };
     },
 
@@ -152,6 +153,7 @@ export function registerPaletteCard() {
         this.paletteQuery,
         ctx.selectedBookId || '',
         ctx.bookRole || '',
+        ctx.backend || '',
         (ctx.pages || []).length,
         (root.figuren || []).length,
         (root.orte || []).length,
@@ -324,6 +326,7 @@ export function registerPaletteCard() {
     _matchActions(actions, q, ctx, t) {
       const out = [];
       for (const a of actions) {
+        if (a.requiresBookstack && ctx.backend !== 'bookstack') continue;
         const item = this._actionItem(a, ctx);
         if (!q) { out.push(item); continue; }
         const m = this._matchFeatureFuzzy(a, q, t);

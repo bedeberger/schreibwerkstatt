@@ -722,7 +722,7 @@ document.addEventListener('alpine:init', () => {
         }
         configurePrompts(cfg.promptConfig, cfg.apiProvider || 'claude');
         configureTokenEstimate(cfg.charsPerToken);
-        if (!cfg.bookstackTokenOk && !this.currentUser?.isAdmin) {
+        if (this.backend === 'bookstack' && !cfg.bookstackTokenOk && !this.currentUser?.isAdmin) {
           this.showTokenSetup = true;
           return;
         }

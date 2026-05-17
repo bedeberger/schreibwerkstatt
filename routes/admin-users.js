@@ -1,4 +1,5 @@
 'use strict';
+const appSettings = require('../lib/app-settings');
 // Phase 4a (BookStack-Exit, docs/bookstack-exit.md): Admin-Routen fuer
 // User-Verwaltung. Alle hinter requireAdmin (Mittelweg über lib/admin-mw.js).
 //
@@ -58,7 +59,7 @@ router.put('/:email', express.json(), (req, res) => {
   const user = appUsers.getUser(target);
   if (!user) return res.status(404).json({ error_code: 'USER_NOT_FOUND' });
 
-  const { global_role, status, can_invite_users, monthly_budget_usd, budget_mode } = req.body || {};
+  const { global_role, status, can_invite_users, monthly_budget_usd, budget_mode, ai_provider_override } = req.body || {};
   const ip = _clientIp(req);
   const userAgent = req.headers['user-agent'] || null;
   const actor = req.session.user.email;
@@ -100,6 +101,31 @@ router.put('/:email', express.json(), (req, res) => {
       }
     } catch (e) {
       return res.status(400).json({ error_code: 'BUDGET_INVALID', detail: e.message });
+    }
+  }
+  // Phase 11: AI-Provider-Override. NULL/'' = follows global ai.provider.
+  // Validierung: Provider muss konfiguriert sein. Ollama/Llama brauchen host.
+  if (ai_provider_override !== undefined) {
+    const next = (ai_provider_override === null || ai_provider_override === '') ? null : String(ai_provider_override).toLowerCase();
+    if (next !== null && !['claude','ollama','llama'].includes(next)) {
+      return res.status(400).json({ error_code: 'AI_PROVIDER_INVALID' });
+    }
+    if (next === 'ollama' && !appSettings.get('ai.ollama.host')) {
+      return res.status(400).json({ error_code: 'AI_PROVIDER_NOT_CONFIGURED', detail: 'ollama' });
+    }
+    if (next === 'llama' && !appSettings.get('ai.llama.host')) {
+      return res.status(400).json({ error_code: 'AI_PROVIDER_NOT_CONFIGURED', detail: 'llama' });
+    }
+    if (next === 'claude' && !appSettings.get('ai.claude.api_key')) {
+      return res.status(400).json({ error_code: 'AI_PROVIDER_NOT_CONFIGURED', detail: 'claude' });
+    }
+    if (next !== (user.ai_provider_override || null)) {
+      try { appUsers.setAiProviderOverride(target, next); }
+      catch (e) { return res.status(400).json({ error_code: 'AI_PROVIDER_INVALID', detail: e.message }); }
+      appUsers.recordAuditEvent(target, 'ai-provider-changed', {
+        ip, userAgent,
+        meta: { from: user.ai_provider_override || null, to: next, by: actor },
+      });
     }
   }
 

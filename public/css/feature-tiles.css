@@ -123,6 +123,21 @@
   font-size: var(--font-size-xs);
   color: var(--color-muted);
 }
+.palette-item-preview {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  line-height: 1.4;
+  margin-top: 2px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.palette-item-preview mark {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  padding: 0 1px;
+}
 .palette-item--active {
   background: var(--color-hover);
   border-left-color: var(--color-accent);
@@ -231,6 +246,15 @@
   }
   .palette-item-label { font-size: 14px; }
   .palette-item-desc  { font-size: 12px; }
+  .palette-item-preview {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    width: 100%;
+    overflow: hidden;
+    white-space: normal;
+    font-size: 12px;
+  }
 }
 
 }

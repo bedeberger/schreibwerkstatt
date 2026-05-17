@@ -360,44 +360,47 @@ function _parseChapterKey(key) {
   return { chapterId, phase };
 }
 
+// Phase 11: provider in PK. Caller MUSS den resolvten Provider durchreichen,
+// sonst landet Claude-Output unter '' (Backfill-Default) und Ollama-User
+// kriegt es ausgeliefert.
 const _loadChapterCache = db.prepare(
   `SELECT extract_json FROM chapter_extract_cache
-   WHERE book_id = ? AND user_email = ? AND chapter_id = ? AND phase = ? AND pages_sig = ?`
+   WHERE book_id = ? AND user_email = ? AND chapter_id = ? AND phase = ? AND provider = ? AND pages_sig = ?`
 );
 const _saveChapterCache = db.prepare(
   `INSERT OR REPLACE INTO chapter_extract_cache
-   (book_id, user_email, chapter_id, phase, pages_sig, extract_json, cached_at)
-   VALUES (?, ?, ?, ?, ?, ?, ?)`
+   (book_id, user_email, chapter_id, phase, provider, pages_sig, extract_json, cached_at)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 );
 const _loadBookCache = db.prepare(
   `SELECT extract_json FROM book_extract_cache
-   WHERE book_id = ? AND user_email = ? AND pages_sig = ?`
+   WHERE book_id = ? AND user_email = ? AND provider = ? AND pages_sig = ?`
 );
 const _saveBookCache = db.prepare(
   `INSERT OR REPLACE INTO book_extract_cache
-   (book_id, user_email, pages_sig, extract_json, cached_at)
-   VALUES (?, ?, ?, ?, ?)`
+   (book_id, user_email, provider, pages_sig, extract_json, cached_at)
+   VALUES (?, ?, ?, ?, ?, ?)`
 );
 
-function loadChapterExtractCache(bookId, userEmail, chapterKey, pagesSig) {
+function loadChapterExtractCache(bookId, userEmail, chapterKey, pagesSig, provider = '') {
   const parsed = _parseChapterKey(chapterKey);
   if (!parsed) return null;
   const row = parsed.book
-    ? _loadBookCache.get(parseInt(bookId), userEmail || '', pagesSig)
-    : _loadChapterCache.get(parseInt(bookId), userEmail || '', parsed.chapterId, parsed.phase, pagesSig);
+    ? _loadBookCache.get(parseInt(bookId), userEmail || '', provider || '', pagesSig)
+    : _loadChapterCache.get(parseInt(bookId), userEmail || '', parsed.chapterId, parsed.phase, provider || '', pagesSig);
   if (!row) return null;
   try { return JSON.parse(row.extract_json); } catch { return null; }
 }
 
-function saveChapterExtractCache(bookId, userEmail, chapterKey, pagesSig, extract) {
+function saveChapterExtractCache(bookId, userEmail, chapterKey, pagesSig, extract, provider = '') {
   const parsed = _parseChapterKey(chapterKey);
   if (!parsed) return;
   const json = JSON.stringify(extract);
   const now = new Date().toISOString();
   if (parsed.book) {
-    _saveBookCache.run(parseInt(bookId), userEmail || '', pagesSig, json, now);
+    _saveBookCache.run(parseInt(bookId), userEmail || '', provider || '', pagesSig, json, now);
   } else {
-    _saveChapterCache.run(parseInt(bookId), userEmail || '', parsed.chapterId, parsed.phase, pagesSig, json, now);
+    _saveChapterCache.run(parseInt(bookId), userEmail || '', parsed.chapterId, parsed.phase, provider || '', pagesSig, json, now);
   }
 }
 
@@ -420,51 +423,51 @@ function deleteChapterExtractCache(bookId, userEmail) {
 // Cache: '<chapter_id>(__sub<N>)?' oder '__singlepass__'.
 const _loadChapterReviewCache = db.prepare(
   `SELECT review_json FROM chapter_review_cache
-   WHERE book_id = ? AND user_email = ? AND chapter_id = ? AND phase = ? AND pages_sig = ?`
+   WHERE book_id = ? AND user_email = ? AND chapter_id = ? AND phase = ? AND provider = ? AND pages_sig = ?`
 );
 const _saveChapterReviewCache = db.prepare(
   `INSERT OR REPLACE INTO chapter_review_cache
-   (book_id, user_email, chapter_id, phase, pages_sig, review_json, cached_at)
-   VALUES (?, ?, ?, ?, ?, ?, ?)`
+   (book_id, user_email, chapter_id, phase, provider, pages_sig, review_json, cached_at)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 );
 const _loadBookReviewCache = db.prepare(
   `SELECT review_json FROM book_review_cache
-   WHERE book_id = ? AND user_email = ? AND pages_sig = ?`
+   WHERE book_id = ? AND user_email = ? AND provider = ? AND pages_sig = ?`
 );
 const _saveBookReviewCache = db.prepare(
   `INSERT OR REPLACE INTO book_review_cache
-   (book_id, user_email, pages_sig, review_json, cached_at)
-   VALUES (?, ?, ?, ?, ?)`
+   (book_id, user_email, provider, pages_sig, review_json, cached_at)
+   VALUES (?, ?, ?, ?, ?, ?)`
 );
 
-function loadChapterReviewCache(bookId, userEmail, chapterKey, pagesSig) {
+function loadChapterReviewCache(bookId, userEmail, chapterKey, pagesSig, provider = '') {
   const parsed = _parseChapterKey(chapterKey);
   if (!parsed || parsed.book) return null;
   const row = _loadChapterReviewCache.get(
-    parseInt(bookId), userEmail || '', parsed.chapterId, parsed.phase, pagesSig
+    parseInt(bookId), userEmail || '', parsed.chapterId, parsed.phase, provider || '', pagesSig
   );
   if (!row) return null;
   try { return JSON.parse(row.review_json); } catch { return null; }
 }
 
-function saveChapterReviewCache(bookId, userEmail, chapterKey, pagesSig, review) {
+function saveChapterReviewCache(bookId, userEmail, chapterKey, pagesSig, review, provider = '') {
   const parsed = _parseChapterKey(chapterKey);
   if (!parsed || parsed.book) return;
   _saveChapterReviewCache.run(
-    parseInt(bookId), userEmail || '', parsed.chapterId, parsed.phase,
+    parseInt(bookId), userEmail || '', parsed.chapterId, parsed.phase, provider || '',
     pagesSig, JSON.stringify(review), new Date().toISOString(),
   );
 }
 
-function loadBookReviewCache(bookId, userEmail, pagesSig) {
-  const row = _loadBookReviewCache.get(parseInt(bookId), userEmail || '', pagesSig);
+function loadBookReviewCache(bookId, userEmail, pagesSig, provider = '') {
+  const row = _loadBookReviewCache.get(parseInt(bookId), userEmail || '', provider || '', pagesSig);
   if (!row) return null;
   try { return JSON.parse(row.review_json); } catch { return null; }
 }
 
-function saveBookReviewCache(bookId, userEmail, pagesSig, review) {
+function saveBookReviewCache(bookId, userEmail, pagesSig, review, provider = '') {
   _saveBookReviewCache.run(
-    parseInt(bookId), userEmail || '', pagesSig,
+    parseInt(bookId), userEmail || '', provider || '', pagesSig,
     JSON.stringify(review), new Date().toISOString(),
   );
 }
@@ -487,28 +490,28 @@ function deleteReviewCache(bookId, userEmail) {
 // werden bewusst NICHT gecached (sehr seltener Fall, eigene Tabelle wäre Overhead).
 const _loadChapterMacroReviewCache = db.prepare(
   `SELECT review_json FROM chapter_macro_review_cache
-   WHERE book_id = ? AND user_email = ? AND chapter_id = ? AND pages_sig = ?`
+   WHERE book_id = ? AND user_email = ? AND chapter_id = ? AND provider = ? AND pages_sig = ?`
 );
 const _saveChapterMacroReviewCache = db.prepare(
   `INSERT OR REPLACE INTO chapter_macro_review_cache
-   (book_id, user_email, chapter_id, pages_sig, review_json, cached_at)
-   VALUES (?, ?, ?, ?, ?, ?)`
+   (book_id, user_email, chapter_id, provider, pages_sig, review_json, cached_at)
+   VALUES (?, ?, ?, ?, ?, ?, ?)`
 );
 const _deleteChapterMacroReviewCache = db.prepare(
   `DELETE FROM chapter_macro_review_cache WHERE book_id = ? AND user_email = ?`
 );
 
-function loadChapterMacroReviewCache(bookId, userEmail, chapterId, pagesSig) {
+function loadChapterMacroReviewCache(bookId, userEmail, chapterId, pagesSig, provider = '') {
   const row = _loadChapterMacroReviewCache.get(
-    parseInt(bookId), userEmail || '', parseInt(chapterId), pagesSig
+    parseInt(bookId), userEmail || '', parseInt(chapterId), provider || '', pagesSig
   );
   if (!row) return null;
   try { return JSON.parse(row.review_json); } catch { return null; }
 }
 
-function saveChapterMacroReviewCache(bookId, userEmail, chapterId, pagesSig, review) {
+function saveChapterMacroReviewCache(bookId, userEmail, chapterId, pagesSig, review, provider = '') {
   _saveChapterMacroReviewCache.run(
-    parseInt(bookId), userEmail || '', parseInt(chapterId),
+    parseInt(bookId), userEmail || '', parseInt(chapterId), provider || '',
     pagesSig, JSON.stringify(review), new Date().toISOString(),
   );
 }
@@ -520,22 +523,22 @@ function deleteChapterMacroReviewCache(bookId, userEmail) {
 // ── Delta-Cache: Synonym-Suche (synonyme.js) ──────────────────────────────────
 // Key-Hash deckt wort + satz + buchtyp + locale + cacheVersion ab. Pro User.
 const _loadSynonymCache = db.prepare(
-  `SELECT result_json FROM synonym_cache WHERE user_email = ? AND key_hash = ?`
+  `SELECT result_json FROM synonym_cache WHERE user_email = ? AND provider = ? AND key_hash = ?`
 );
 const _saveSynonymCache = db.prepare(
-  `INSERT OR REPLACE INTO synonym_cache (user_email, key_hash, result_json, cached_at)
-   VALUES (?, ?, ?, ?)`
+  `INSERT OR REPLACE INTO synonym_cache (user_email, provider, key_hash, result_json, cached_at)
+   VALUES (?, ?, ?, ?, ?)`
 );
 const _deleteSynonymCache = db.prepare(`DELETE FROM synonym_cache WHERE user_email = ?`);
 
-function loadSynonymCache(userEmail, keyHash) {
-  const row = _loadSynonymCache.get(userEmail || '', keyHash);
+function loadSynonymCache(userEmail, keyHash, provider = '') {
+  const row = _loadSynonymCache.get(userEmail || '', provider || '', keyHash);
   if (!row) return null;
   try { return JSON.parse(row.result_json); } catch { return null; }
 }
 
-function saveSynonymCache(userEmail, keyHash, result) {
-  _saveSynonymCache.run(userEmail || '', keyHash, JSON.stringify(result), new Date().toISOString());
+function saveSynonymCache(userEmail, keyHash, result, provider = '') {
+  _saveSynonymCache.run(userEmail || '', provider || '', keyHash, JSON.stringify(result), new Date().toISOString());
 }
 
 function deleteSynonymCache(userEmail) {
@@ -547,28 +550,28 @@ function deleteSynonymCache(userEmail) {
 // beziehungen), narrative, Stopwords/Regeln und cacheVersion ab.
 const _loadLektoratCache = db.prepare(
   `SELECT result_json FROM lektorat_cache
-   WHERE book_id = ? AND user_email = ? AND page_id = ? AND ctx_sig = ?`
+   WHERE book_id = ? AND user_email = ? AND page_id = ? AND provider = ? AND ctx_sig = ?`
 );
 const _saveLektoratCache = db.prepare(
   `INSERT OR REPLACE INTO lektorat_cache
-   (book_id, user_email, page_id, ctx_sig, result_json, cached_at)
-   VALUES (?, ?, ?, ?, ?, ?)`
+   (book_id, user_email, page_id, provider, ctx_sig, result_json, cached_at)
+   VALUES (?, ?, ?, ?, ?, ?, ?)`
 );
 const _deleteLektoratCache = db.prepare(
   `DELETE FROM lektorat_cache WHERE book_id = ? AND user_email = ?`
 );
 
-function loadLektoratCache(bookId, userEmail, pageId, ctxSig) {
+function loadLektoratCache(bookId, userEmail, pageId, ctxSig, provider = '') {
   const row = _loadLektoratCache.get(
-    parseInt(bookId), userEmail || '', parseInt(pageId), ctxSig
+    parseInt(bookId), userEmail || '', parseInt(pageId), provider || '', ctxSig
   );
   if (!row) return null;
   try { return JSON.parse(row.result_json); } catch { return null; }
 }
 
-function saveLektoratCache(bookId, userEmail, pageId, ctxSig, result) {
+function saveLektoratCache(bookId, userEmail, pageId, ctxSig, result, provider = '') {
   _saveLektoratCache.run(
-    parseInt(bookId), userEmail || '', parseInt(pageId),
+    parseInt(bookId), userEmail || '', parseInt(pageId), provider || '',
     ctxSig, JSON.stringify(result), new Date().toISOString(),
   );
 }

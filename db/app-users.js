@@ -19,7 +19,7 @@ const _stmtFindByEmail = db.prepare(`
   SELECT id, email, display_name, avatar_url, global_role, status, language,
          model_override, can_invite_users, first_seen_at, last_seen_at,
          invited_by, invited_at, created_at,
-         monthly_budget_usd, budget_mode
+         monthly_budget_usd, budget_mode, ai_provider_override
     FROM app_users
    WHERE email = ?
 `);
@@ -53,10 +53,25 @@ const _stmtSetInviteFlag = db.prepare(`
 const _stmtListUsers = db.prepare(`
   SELECT id, email, display_name, global_role, status, language,
          can_invite_users, first_seen_at, last_seen_at, created_at,
-         monthly_budget_usd, budget_mode
+         monthly_budget_usd, budget_mode, ai_provider_override
     FROM app_users
    ORDER BY created_at DESC, email
 `);
+
+// Phase 11: Admin setzt Provider-Override pro User. NULL/'' loescht den Override
+// (User folgt global ai.provider). Validierung in der Route, hier nur Persistenz.
+const _stmtSetAiProvider = db.prepare(`
+  UPDATE app_users SET ai_provider_override = ? WHERE email = ?
+`);
+function setAiProviderOverride(email, provider) {
+  const e = _normEmail(email);
+  if (!e) throw new Error('setAiProviderOverride: email required');
+  const v = (provider === null || provider === undefined || provider === '') ? null : String(provider).toLowerCase();
+  if (v !== null && !['claude','ollama','llama'].includes(v)) {
+    throw new Error("setAiProviderOverride: provider must be null|'claude'|'ollama'|'llama'");
+  }
+  _stmtSetAiProvider.run(v, e);
+}
 
 const _stmtSetBudget = db.prepare(`
   UPDATE app_users SET monthly_budget_usd = ?, budget_mode = ? WHERE email = ?
@@ -278,6 +293,7 @@ function ensureAdminFromEnv() {
 module.exports = {
   getUser, listUsers, createUser, touchLogin,
   setStatus, setGlobalRole, setCanInviteUsers, setBudget, softDeleteUser,
+  setAiProviderOverride,
   recordAuditEvent, listAuditForUser,
   createInvite, findInviteByToken, inviteStatus, acceptInvite, revokeInvite, listActiveInvites,
   ensureAdminFromEnv,

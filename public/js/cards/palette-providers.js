@@ -282,6 +282,7 @@ export const PROVIDERS = [
         providerKey: 'fulltext',
         label: h.title || (t('search.untitled') || ''),
         sub: t('search.kind.' + h.kind) || h.kind,
+        snippet: h.snippet || '',
         score: 0,
         indices: [],
         available: true,

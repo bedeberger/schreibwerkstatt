@@ -104,6 +104,7 @@
     <table class="admin-usage-table" x-show="adminUsageJobsList.length">
       <thead>
         <tr>
+          <th x-text="$app.t('admin.users.email')"></th>
           <th x-text="$app.t('admin.usage.job.type')"></th>
           <th x-text="$app.t('admin.usage.job.model')"></th>
           <th x-text="$app.t('admin.usage.column.tokensIn')"></th>
@@ -118,6 +119,7 @@
       <tbody>
         <template x-for="r in adminUsageJobsList" :key="r.id">
           <tr>
+            <td x-text="r.userEmail || '—'"></td>
             <td x-text="r.type"></td>
             <td x-text="r.model || '—'"></td>
             <td x-text="adminUsageInt(r.tokensIn)"></td>
@@ -131,8 +133,7 @@
         </template>
       </tbody>
     </table>
-    <div x-show="!adminUsageFilterUser" class="muted-msg" x-text="$app.t('admin.usage.filter.userHint')"></div>
-    <div x-show="adminUsageFilterUser && !adminUsageJobsList.length && !adminUsageLoading" class="muted-msg" x-text="$app.t('admin.usage.empty')"></div>
+    <div x-show="!adminUsageJobsList.length && !adminUsageLoading" class="muted-msg" x-text="$app.t('admin.usage.empty')"></div>
   </div>
 
   <!-- ── Chat-Tab ──────────────────────────────────────────────────────── -->
@@ -146,6 +147,7 @@
     <table class="admin-usage-table" x-show="adminUsageChatList.length">
       <thead>
         <tr>
+          <th x-text="$app.t('admin.users.email')"></th>
           <th x-text="$app.t('admin.usage.chat.kind')"></th>
           <th x-text="$app.t('admin.usage.job.model')"></th>
           <th x-text="$app.t('admin.usage.column.tokensIn')"></th>
@@ -159,6 +161,7 @@
       <tbody>
         <template x-for="r in adminUsageChatList" :key="r.id">
           <tr>
+            <td x-text="r.userEmail || '—'"></td>
             <td x-text="r.sessionKind"></td>
             <td x-text="r.model || '—'"></td>
             <td x-text="adminUsageInt(r.tokensIn)"></td>
@@ -171,8 +174,7 @@
         </template>
       </tbody>
     </table>
-    <div x-show="!adminUsageFilterUser" class="muted-msg" x-text="$app.t('admin.usage.filter.userHint')"></div>
-    <div x-show="adminUsageFilterUser && !adminUsageChatList.length && !adminUsageLoading" class="muted-msg" x-text="$app.t('admin.usage.empty')"></div>
+    <div x-show="!adminUsageChatList.length && !adminUsageLoading" class="muted-msg" x-text="$app.t('admin.usage.empty')"></div>
   </div>
 
   <!-- ── Summary-Tab ───────────────────────────────────────────────────── -->

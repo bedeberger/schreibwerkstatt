@@ -1,5 +1,5 @@
 // Phase 4d: admin-usage DB-Queries (listUsersWithUsage, monthlyTotals,
-// listFeatureUsage, listTimeUsage, getJobRunsForUser, getChatMessagesForUser).
+// listFeatureUsage, listTimeUsage, getJobRuns, getChatMessages).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import os from 'os';
@@ -103,26 +103,51 @@ test('monthlyTotals: Top-User + byModel + byType', () => {
   assert.ok(types.includes('check'));
 });
 
-test('getJobRunsForUser: paginiert + Cost pro Row', () => {
+test('getJobRuns: User-Filter paginiert + Cost pro Row', () => {
   seedUser('p@ex.com');
   for (let i = 0; i < 5; i++) {
     insertJobRun({ email: 'p@ex.com', tokensIn: 100_000, tokensOut: 0 });
   }
-  const r = adminUsage.getJobRunsForUser('p@ex.com', { limit: 3 });
+  const r = adminUsage.getJobRuns({ email: 'p@ex.com', limit: 3 });
   assert.equal(r.total, 5);
   assert.equal(r.rows.length, 3);
+  assert.equal(r.rows[0].userEmail, 'p@ex.com');
   // 100k @ 3 USD/Mio = 0.30 USD pro Row
   assert.equal(Math.round(r.rows[0].usd * 100) / 100, 0.30);
 });
 
-test('getChatMessagesForUser: filtert assistant + paginiert', () => {
+test('getJobRuns: ohne email liefert alle Non-Admin-User', () => {
+  seedUser('all1@ex.com');
+  seedUser('all2@ex.com');
+  insertJobRun({ email: 'all1@ex.com', tokensIn: 50_000, tokensOut: 0 });
+  insertJobRun({ email: 'all2@ex.com', tokensIn: 50_000, tokensOut: 0 });
+  const r = adminUsage.getJobRuns({ limit: 500 });
+  const emails = new Set(r.rows.map(x => x.userEmail));
+  assert.ok(emails.has('all1@ex.com'));
+  assert.ok(emails.has('all2@ex.com'));
+});
+
+test('getChatMessages: User-Filter + assistant + paginiert', () => {
   seedUser('c@ex.com');
   seedBook(5002);
   insertChatMsg({ email: 'c@ex.com', bookId: 5002, tokensIn: 200_000, tokensOut: 0 });
   insertChatMsg({ email: 'c@ex.com', bookId: 5002, tokensIn: 200_000, tokensOut: 0 });
-  const r = adminUsage.getChatMessagesForUser('c@ex.com', {});
+  const r = adminUsage.getChatMessages({ email: 'c@ex.com' });
   assert.equal(r.total, 2);
   assert.equal(r.rows[0].sessionKind, 'book');
+  assert.equal(r.rows[0].userEmail, 'c@ex.com');
+});
+
+test('getChatMessages: ohne email liefert alle Non-Admin-User', () => {
+  seedUser('chat1@ex.com');
+  seedUser('chat2@ex.com');
+  seedBook(5102);
+  insertChatMsg({ email: 'chat1@ex.com', bookId: 5102, tokensIn: 1000, tokensOut: 0 });
+  insertChatMsg({ email: 'chat2@ex.com', bookId: 5102, tokensIn: 1000, tokensOut: 0 });
+  const r = adminUsage.getChatMessages({ limit: 500 });
+  const emails = new Set(r.rows.map(x => x.userEmail));
+  assert.ok(emails.has('chat1@ex.com'));
+  assert.ok(emails.has('chat2@ex.com'));
 });
 
 test('listFeatureUsage + featureUsageTotals', () => {

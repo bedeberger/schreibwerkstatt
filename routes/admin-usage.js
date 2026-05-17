@@ -46,27 +46,25 @@ router.get('/users', (req, res) => {
   res.json({ users: rows, from: range.from || null, to: range.to || null });
 });
 
-// GET /admin/usage/users/:email/jobs?from=&to=&limit=&offset=
-router.get('/users/:email/jobs', (req, res) => {
-  const email = (req.params.email || '').toLowerCase();
-  if (!email) return res.status(400).json({ error_code: 'EMAIL_REQUIRED' });
+// GET /admin/usage/jobs?user=&from=&to=&limit=&offset=
+router.get('/jobs', (req, res) => {
+  const email = (req.query.user || '').toString().toLowerCase().trim() || null;
   const range = _range(req);
   const limit = parseInt(req.query.limit, 10) || 50;
   const offset = parseInt(req.query.offset, 10) || 0;
-  const result = adminUsage.getJobRunsForUser(email, { ...range, limit, offset });
-  _auditView(req, 'jobs', { target: email, ...range });
+  const result = adminUsage.getJobRuns({ email, ...range, limit, offset });
+  _auditView(req, 'jobs', { target: email || '*all*', ...range });
   res.json(result);
 });
 
-// GET /admin/usage/users/:email/chat?from=&to=&limit=&offset=
-router.get('/users/:email/chat', (req, res) => {
-  const email = (req.params.email || '').toLowerCase();
-  if (!email) return res.status(400).json({ error_code: 'EMAIL_REQUIRED' });
+// GET /admin/usage/chat?user=&from=&to=&limit=&offset=
+router.get('/chat', (req, res) => {
+  const email = (req.query.user || '').toString().toLowerCase().trim() || null;
   const range = _range(req);
   const limit = parseInt(req.query.limit, 10) || 50;
   const offset = parseInt(req.query.offset, 10) || 0;
-  const result = adminUsage.getChatMessagesForUser(email, { ...range, limit, offset });
-  _auditView(req, 'chat', { target: email, ...range });
+  const result = adminUsage.getChatMessages({ email, ...range, limit, offset });
+  _auditView(req, 'chat', { target: email || '*all*', ...range });
   res.json(result);
 });
 

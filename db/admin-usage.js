@@ -119,78 +119,118 @@ function listUsersWithUsage({ from, to } = {}) {
   });
 }
 
-// ── Job-Run-Liste pro User (paginiert) ──────────────────────────────────────
+// ── Job-Run-Liste (paginiert; mit/ohne User-Filter) ─────────────────────────
 
-const _stmtJobsForUser = db.prepare(`
-  SELECT id, job_id, type, book_id, label, status,
-         queued_at, started_at, ended_at,
-         provider, model,
-         tokens_in, tokens_out, cache_read_in, cache_creation_in
-    FROM job_runs
-   WHERE user_email = ? AND queued_at >= ? AND queued_at < ?
-   ORDER BY queued_at DESC
-   LIMIT ? OFFSET ?
-`);
+function _buildJobsQuery({ email, includeWhere }) {
+  const where = ['queued_at >= ?', 'queued_at < ?'];
+  if (email) where.push('user_email = ?');
+  if (includeWhere) where.push(includeWhere);
+  return `
+    SELECT id, job_id, user_email, type, book_id, label, status,
+           queued_at, started_at, ended_at,
+           provider, model,
+           tokens_in, tokens_out, cache_read_in, cache_creation_in
+      FROM job_runs
+     WHERE ${where.join(' AND ')}
+     ORDER BY queued_at DESC
+     LIMIT ? OFFSET ?`;
+}
 
-const _stmtJobsCountForUser = db.prepare(`
-  SELECT COUNT(*) AS n FROM job_runs
-   WHERE user_email = ? AND queued_at >= ? AND queued_at < ?
-`);
+function _buildJobsCountQuery({ email, includeWhere }) {
+  const where = ['queued_at >= ?', 'queued_at < ?'];
+  if (email) where.push('user_email = ?');
+  if (includeWhere) where.push(includeWhere);
+  return `SELECT COUNT(*) AS n FROM job_runs WHERE ${where.join(' AND ')}`;
+}
 
-function getJobRunsForUser(email, { from, to, limit = 50, offset = 0 } = {}) {
-  if (!email) return { rows: [], total: 0 };
+function _adminEmailWhereClause(set) {
+  if (!set.size) return null;
+  const list = [...set].map(e => `'${e.replace(/'/g, "''")}'`).join(',');
+  return `(user_email IS NULL OR user_email NOT IN (${list}))`;
+}
+
+function getJobRuns({ email, from, to, limit = 50, offset = 0 } = {}) {
   const { fromIso, toIso } = _resolveRange({ from, to });
   const lim = Math.max(1, Math.min(500, Number(limit) || 50));
   const off = Math.max(0, Number(offset) || 0);
-  const rows = _stmtJobsForUser.all(email, fromIso, toIso, lim, off).map(r => ({
-    id: r.id, jobId: r.job_id, type: r.type, bookId: r.book_id, label: r.label,
+  const adminFilter = email ? null : _adminEmailWhereClause(_adminEmailSet());
+  const listSql  = _buildJobsQuery({ email, includeWhere: adminFilter });
+  const countSql = _buildJobsCountQuery({ email, includeWhere: adminFilter });
+  const args = email
+    ? [fromIso, toIso, email, lim, off]
+    : [fromIso, toIso, lim, off];
+  const countArgs = email ? [fromIso, toIso, email] : [fromIso, toIso];
+  const rows = db.prepare(listSql).all(...args).map(r => ({
+    id: r.id, jobId: r.job_id, userEmail: r.user_email, type: r.type, bookId: r.book_id, label: r.label,
     status: r.status, queuedAt: r.queued_at, startedAt: r.started_at, endedAt: r.ended_at,
     provider: r.provider, model: r.model,
     tokensIn: r.tokens_in, tokensOut: r.tokens_out,
     cacheReadIn: r.cache_read_in, cacheCreationIn: r.cache_creation_in,
     usd: _cost(r),
   }));
-  const total = _stmtJobsCountForUser.get(email, fromIso, toIso).n;
+  const total = db.prepare(countSql).get(...countArgs).n;
   return { rows, total };
 }
 
-// ── Chat-Messages pro User (paginiert) ──────────────────────────────────────
+// ── Chat-Messages (paginiert; mit/ohne User-Filter) ─────────────────────────
 
-const _stmtChatForUser = db.prepare(`
-  SELECT cm.id, cm.session_id, cm.created_at,
-         cs.kind AS session_kind, cs.book_id, cs.page_id,
-         cm.provider, cm.model,
-         cm.tokens_in, cm.tokens_out, cm.cache_read_in, cm.cache_creation_in
-    FROM chat_messages cm
-    JOIN chat_sessions cs ON cs.id = cm.session_id
-   WHERE cs.user_email = ? AND cm.created_at >= ? AND cm.created_at < ?
-         AND cm.role = 'assistant'
-   ORDER BY cm.created_at DESC
-   LIMIT ? OFFSET ?
-`);
+function _buildChatQuery({ email, includeWhere }) {
+  const where = [
+    "cm.created_at >= ?", "cm.created_at < ?", "cm.role = 'assistant'",
+  ];
+  if (email) where.push('cs.user_email = ?');
+  if (includeWhere) where.push(includeWhere);
+  return `
+    SELECT cm.id, cm.session_id, cs.user_email, cm.created_at,
+           cs.kind AS session_kind, cs.book_id, cs.page_id,
+           cm.provider, cm.model,
+           cm.tokens_in, cm.tokens_out, cm.cache_read_in, cm.cache_creation_in
+      FROM chat_messages cm
+      JOIN chat_sessions cs ON cs.id = cm.session_id
+     WHERE ${where.join(' AND ')}
+     ORDER BY cm.created_at DESC
+     LIMIT ? OFFSET ?`;
+}
 
-const _stmtChatCountForUser = db.prepare(`
-  SELECT COUNT(*) AS n
-    FROM chat_messages cm
-    JOIN chat_sessions cs ON cs.id = cm.session_id
-   WHERE cs.user_email = ? AND cm.created_at >= ? AND cm.created_at < ?
-         AND cm.role = 'assistant'
-`);
+function _buildChatCountQuery({ email, includeWhere }) {
+  const where = [
+    "cm.created_at >= ?", "cm.created_at < ?", "cm.role = 'assistant'",
+  ];
+  if (email) where.push('cs.user_email = ?');
+  if (includeWhere) where.push(includeWhere);
+  return `
+    SELECT COUNT(*) AS n
+      FROM chat_messages cm
+      JOIN chat_sessions cs ON cs.id = cm.session_id
+     WHERE ${where.join(' AND ')}`;
+}
 
-function getChatMessagesForUser(email, { from, to, limit = 50, offset = 0 } = {}) {
-  if (!email) return { rows: [], total: 0 };
+function _adminChatWhereClause(set) {
+  if (!set.size) return null;
+  const list = [...set].map(e => `'${e.replace(/'/g, "''")}'`).join(',');
+  return `cs.user_email NOT IN (${list})`;
+}
+
+function getChatMessages({ email, from, to, limit = 50, offset = 0 } = {}) {
   const { fromIso, toIso } = _resolveRange({ from, to });
   const lim = Math.max(1, Math.min(500, Number(limit) || 50));
   const off = Math.max(0, Number(offset) || 0);
-  const rows = _stmtChatForUser.all(email, fromIso, toIso, lim, off).map(r => ({
-    id: r.id, sessionId: r.session_id, createdAt: r.created_at,
+  const adminFilter = email ? null : _adminChatWhereClause(_adminEmailSet());
+  const listSql  = _buildChatQuery({ email, includeWhere: adminFilter });
+  const countSql = _buildChatCountQuery({ email, includeWhere: adminFilter });
+  const args = email
+    ? [fromIso, toIso, email, lim, off]
+    : [fromIso, toIso, lim, off];
+  const countArgs = email ? [fromIso, toIso, email] : [fromIso, toIso];
+  const rows = db.prepare(listSql).all(...args).map(r => ({
+    id: r.id, sessionId: r.session_id, userEmail: r.user_email, createdAt: r.created_at,
     sessionKind: r.session_kind, bookId: r.book_id, pageId: r.page_id,
     provider: r.provider, model: r.model,
     tokensIn: r.tokens_in, tokensOut: r.tokens_out,
     cacheReadIn: r.cache_read_in, cacheCreationIn: r.cache_creation_in,
     usd: _cost(r),
   }));
-  const total = _stmtChatCountForUser.get(email, fromIso, toIso).n;
+  const total = db.prepare(countSql).get(...countArgs).n;
   return { rows, total };
 }
 
@@ -383,7 +423,7 @@ function dailyTimeSeries(email, bookId, { from, to } = {}) {
 
 module.exports = {
   listUsersWithUsage,
-  getJobRunsForUser, getChatMessagesForUser,
+  getJobRuns, getChatMessages,
   monthlyTotals,
   listFeatureUsage, featureUsageTotals,
   listTimeUsage, dailyTimeSeries,
