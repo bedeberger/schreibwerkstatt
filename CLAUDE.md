@@ -231,7 +231,7 @@ db.prepare('UPDATE schema_version SET version = N').run();
 
 **Pflicht nach jeder neuen Migration: `npm run squash:regen`** — regeneriert [db/squashed-schema.js](db/squashed-schema.js) aus einem frischen Migration-Run. Wer das vergisst, lässt den Drift-Test in CI rot.
 
-**Pflicht: [docs/erd.md](docs/erd.md) im selben Commit aktualisieren.** Stand-Zeile (Schema-Version + Tabellen-Anzahl) bumpen; betroffene Block-Definitionen (neue Spalten, geänderte Typen) anpassen; bei neuen Tabellen einen Block + die FK-Kanten in Section 1 (Übersicht) und ggf. im passenden thematischen Sub-Diagramm ergänzen; bei neuen FK-Kanten auf bestehende Tabellen die Kante in Section 1 nachziehen. ERD bleibt sonst still drift-anfällig — die Stand-Zeile lügt, Mermaid-Beziehungen werden falsch.
+**Pflicht: [docs/erd.md](docs/erd.md) im selben Commit aktualisieren.** Stand-Zeile (Schema-Version + Tabellen-Anzahl) bumpen; betroffene Block-Definitionen (neue Spalten, geänderte Typen) anpassen; bei neuen Tabellen einen Block + die FK-Kanten in Section 1 (Übersicht) und ggf. im passenden thematischen Sub-Diagramm ergänzen; bei neuen FK-Kanten auf bestehende Tabellen die Kante in Section 1 nachziehen. Drift gegated durch [tests/unit/erd-drift.test.mjs](tests/unit/erd-drift.test.mjs): prüft Stand-Zeile (Schema-Version + Tabellen-Anzahl) und Set-Gleichheit der Mermaid-Block-Definitionen (`name {`) gegen `sqlite_master` (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables). Vergessene Tabelle → CI rot.
 
 ### Neuer Beziehungstyp
 

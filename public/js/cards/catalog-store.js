@@ -8,12 +8,14 @@ export function registerCatalogStore() {
   window.Alpine.store('catalog', {
     figuren: [],
     orte: [],
+    songs: [],
     szenen: [],
     globalZeitstrahl: [],
 
     clear() {
       this.figuren = [];
       this.orte = [];
+      this.songs = [];
       this.szenen = [];
       this.globalZeitstrahl = [];
     },

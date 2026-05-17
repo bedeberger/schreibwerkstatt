@@ -486,6 +486,8 @@ document.addEventListener('alpine:init', () => {
     set figuren(v) { Alpine.store('catalog').figuren = v; },
     get orte() { return Alpine.store('catalog').orte; },
     set orte(v) { Alpine.store('catalog').orte = v; },
+    get songs() { return Alpine.store('catalog').songs; },
+    set songs(v) { Alpine.store('catalog').songs = v; },
     get szenen() { return Alpine.store('catalog').szenen; },
     set szenen(v) { Alpine.store('catalog').szenen = v; },
     get globalZeitstrahl() { return Alpine.store('catalog').globalZeitstrahl; },

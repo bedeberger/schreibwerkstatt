@@ -23,7 +23,7 @@ const { runNonCritical, buildBookSystemBlockText } = require('./utils');
 const { invalidateRenamedChapterCaches, loadAndValidateCheckpoint, restorePhase1FromCheckpoint } = require('./checkpoint');
 const { remapSzenen, remapAssignments, saveSzenenAndEvents, saveKontinuitaetResult } = require('./remap');
 const {
-  runPhase1, runPhase2, runPhase3, runPhase3b, runZeitstrahl,
+  runPhase1, runPhase2, runPhase3, runPhase3Songs, runPhase3b, runZeitstrahl,
   buildPrelimFigurenKompakt, runPhase3OrteCall,
 } = require('./phases');
 
@@ -128,7 +128,7 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
     const p1 = cp?.phase === 'p1_full_done'
       ? restorePhase1FromCheckpoint(cp, tok, log, jobId)
       : await runPhase1(ctx);
-    const { chapterFiguren, chapterOrte, chapterFakten, chapterSzenen, chapterAssignments } = p1;
+    const { chapterFiguren, chapterOrte, chapterSongs, chapterFakten, chapterSzenen, chapterAssignments } = p1;
 
     // ── Phase 2 + 3: Figuren + Orte konsolidieren ────────────────────────────
     // Multi-Pass Claude: P2 (Figuren-AI) und P3 (Orte-AI) sind unabhängig und
@@ -155,6 +155,9 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
       ({ orte, ortNameToId, ortNameToIdLower } =
         await runPhase3(ctx, chapterOrte, figurenKompakt, isSinglePass, idRemap));
     }
+
+    // ── Phase 3 Songs: Musikbibliothek konsolidieren ─────────────────────────
+    const { songs } = await runPhase3Songs(ctx, chapterSongs || [], figurenKompakt, isSinglePass, idRemap);
 
     // ── Phase 3b: Kapitelübergreifende Beziehungen (non-critical, nur Multi-Pass) ──
     if (chapterFiguren.length > 1 && figuren.length >= 2) {
@@ -222,9 +225,10 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
     completeJob(jobId, {
       figCount:    figuren.length,
       orteCount:   orte.length,
+      songsCount:  songs.length,
       szenenCount: szenenResult.szenenCount,
       tokensIn: tok.in, tokensOut: tok.out,
-    }, tps(tok), `fig=${figuren.length} orte=${orte.length} szenen=${szenenResult.szenenCount}`);
+    }, tps(tok), `fig=${figuren.length} orte=${orte.length} songs=${songs.length} szenen=${szenenResult.szenenCount}`);
   } catch (e) {
     if (e.name !== 'AbortError') {
       const cause = e.cause?.message || e.cause?.code || '';

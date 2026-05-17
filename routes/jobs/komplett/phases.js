@@ -171,10 +171,11 @@ async function runPhase1(ctx) {
           figuren:     passA?.figuren     || [],
           assignments: passA?.assignments || [],
           orte:        passB?.orte        || [],
+          songs:       passB?.songs       || [],
           fakten:      passB?.fakten      || [],
           szenen:      passB?.szenen      || [],
         };
-        log.info(`${chunkLabel} – Split-OK (fig=${merged.figuren.length} orte=${merged.orte.length} sz=${merged.szenen.length}).`);
+        log.info(`${chunkLabel} – Split-OK (fig=${merged.figuren.length} orte=${merged.orte.length} songs=${merged.songs.length} sz=${merged.szenen.length}).`);
         return merged;
       }),
       settledOpts,
@@ -186,12 +187,13 @@ async function runPhase1(ctx) {
     }
     chapterFiguren     = extractField(settled, chunkTexts, 'figuren');
     chapterOrte        = extractField(settled, chunkTexts, 'orte');
+    chapterSongs       = extractField(settled, chunkTexts, 'songs');
     chapterFakten      = extractField(settled, chunkTexts, 'fakten');
     chapterSzenen      = extractField(settled, chunkTexts, 'szenen');
     chapterAssignments = extractField(settled, chunkTexts, 'assignments');
 
     const failedChunks = settled.filter(r => r.status === 'rejected');
-    log.info(`Phase 1 Multi-Pass – ${settled.length - failedChunks.length}/${settled.length} OK (${cacheHits} Cache-Hits), fig=${chapterFiguren.reduce((s, c) => s + c.figuren.length, 0)} orte=${chapterOrte.reduce((s, c) => s + c.orte.length, 0)} sz=${chapterSzenen.reduce((s, c) => s + c.szenen.length, 0)}`);
+    log.info(`Phase 1 Multi-Pass – ${settled.length - failedChunks.length}/${settled.length} OK (${cacheHits} Cache-Hits), fig=${chapterFiguren.reduce((s, c) => s + c.figuren.length, 0)} orte=${chapterOrte.reduce((s, c) => s + c.orte.length, 0)} songs=${chapterSongs.reduce((s, c) => s + (c.songs?.length || 0), 0)} sz=${chapterSzenen.reduce((s, c) => s + c.szenen.length, 0)}`);
     if (failedChunks.length > 0) {
       const failedDetails = chunkTexts
         .map((ct, i) => ({ ct, r: settled[i] }))
@@ -203,10 +205,10 @@ async function runPhase1(ctx) {
 
   saveCheckpoint('komplett-analyse', bookIdInt, email, {
     phase: 'p1_full_done',
-    chapterFiguren, chapterOrte, chapterFakten, chapterSzenen, chapterAssignments,
+    chapterFiguren, chapterOrte, chapterSongs, chapterFakten, chapterSzenen, chapterAssignments,
     tokIn: tok.in, tokOut: tok.out, tokMs: tok.ms,
   });
-  return { chapterFiguren, chapterOrte, chapterFakten, chapterSzenen, chapterAssignments };
+  return { chapterFiguren, chapterOrte, chapterSongs, chapterFakten, chapterSzenen, chapterAssignments };
 }
 
 /** Phase 2: Figuren konsolidieren + Soziogramm + Name→ID Lookup.
@@ -366,6 +368,51 @@ async function runPhase3(ctx, chapterOrte, figurenKompakt, isSinglePass, idRemap
     ortNameToIdLower[o.name.toLowerCase()] = o.id;
   }
   return { orte, ortNameToId, ortNameToIdLower };
+}
+
+/** Phase 3 Songs: Musikbibliothek konsolidieren analog zu Orten.
+ *  Single-Pass: Songs aus Pass B übernehmen (figuren-Refs gegen idRemap+validFigIds filtern).
+ *  Multi-Pass: KI-Call konsolidiert dedupliziert (Titel+Interpret) über alle Kapitel. */
+async function runPhase3Songs(ctx, chapterSongs, figurenKompakt, isSinglePass, idRemap) {
+  const { jobId, bookIdInt, bookName, email, call, tok, log, prompts, sys, idMaps } = ctx;
+  const validFigIds = new Set(figurenKompakt.map(f => f.id));
+
+  let songs;
+  if (isSinglePass) {
+    updateJob(jobId, { progress: 56, statusText: 'job.phase.consolidatingSongs' });
+    const raw = chapterSongs[0]?.songs || [];
+    songs = raw.map((s, i) => ({
+      ...s,
+      id: s.id || ('song_' + (i + 1)),
+      figuren: (s.figuren || [])
+        .map(fid => idRemap?.[fid] || fid)
+        .filter(fid => validFigIds.has(fid)),
+    }));
+    log.info(`Phase 3 Songs übersprungen (Single-Pass, ${songs.length} Songs aus P1 übernommen).`);
+  } else {
+    updateJob(jobId, { progress: 56, statusText: 'job.phase.consolidatingSongs' });
+    const hasInput = chapterSongs.some(cs => (cs.songs || []).length > 0);
+    if (!hasInput) {
+      songs = [];
+      log.info(`Phase 3 Songs übersprungen (keine Songs in Pass B – KI-Call gespart).`);
+    } else {
+      const songsResultRaw = await call(jobId, tok,
+        prompts.buildSongsConsolidationPrompt(bookName, chapterSongs, figurenKompakt),
+        sys.SYSTEM_ORTE_BLOCKS, 56, 58, 3000, 0.2, null, prompts.SCHEMA_SONGS_KONSOL,
+      );
+      const raw = Array.isArray(songsResultRaw?.songs) ? songsResultRaw.songs : [];
+      songs = raw.map((s, i) => ({
+        ...s,
+        id: s.id || ('song_' + (i + 1)),
+        figuren: (s.figuren || [])
+          .map(fid => idRemap?.[fid] || fid)
+          .filter(fid => validFigIds.has(fid)),
+      }));
+    }
+  }
+  saveSongsToDb(bookIdInt, songs, email, idMaps.chNameToId, idMaps.pageNameToIdByChapter);
+  log.info(`${songs.length} Songs gespeichert.`);
+  return { songs };
 }
 
 /** Pre-Merge figurenKompakt aus chapterFiguren – für parallelen Orte-Call vor P2-Merge.
@@ -543,6 +590,6 @@ async function runZeitstrahl(ctx, opts = {}) {
 }
 
 module.exports = {
-  runPhase1, runPhase2, runPhase3,
+  runPhase1, runPhase2, runPhase3, runPhase3Songs,
   buildPrelimFigurenKompakt, runPhase3OrteCall, runPhase3b, runZeitstrahl,
 };
