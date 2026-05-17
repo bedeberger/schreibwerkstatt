@@ -72,6 +72,7 @@ function makeCtx() {
     resetPage() { /* noop */ },
     loadFiguren: async () => {},
     loadOrte: async () => {},
+    _ensurePartial: async () => true,
     ...appViewMethods,
   };
 }
@@ -121,101 +122,101 @@ test('_closeOtherMainCards: schliesst Editor + Seiten-Chat (Seitenebene exklusiv
   assert.equal(c.showTreeCard, true, 'Tree bleibt aktiv');
 });
 
-test('toggleChatCard: lebt parallel zum Editor (Seiten-Chat-Ausnahme)', () => {
+test('toggleChatCard: lebt parallel zum Editor (Seiten-Chat-Ausnahme)', async () => {
   // Anders als Hauptkarten ruft toggleChatCard KEIN _closeOtherMainCards.
   // Editor bleibt offen, Tree bleibt offen.
   const c = makeCtx();
   c.showEditorCard = true;
   c.showTreeCard = true;
-  c.toggleChatCard();
+  await c.toggleChatCard();
   assert.equal(c.showChatCard, true);
   assert.equal(c.showEditorCard, true,
     'Seiten-Chat schliesst Editor NICHT – läuft daneben');
   assert.equal(c.showTreeCard, true);
 });
 
-test('toggleStilCard: öffnet & schliesst andere Karten', () => {
+test('toggleStilCard: öffnet & schliesst andere Karten', async () => {
   const c = makeCtx();
   c.showBookReviewCard = true;
-  c.toggleStilCard();
+  await c.toggleStilCard();
   assert.equal(c.showStilCard, true);
   assert.equal(c.showBookReviewCard, false, 'Andere Hauptkarte muss schliessen');
 });
 
-test('toggleStilCard: zweiter Klick schliesst (Settings-Pattern)', () => {
+test('toggleStilCard: zweiter Klick schliesst (Settings-Pattern)', async () => {
   const c = makeCtx();
-  c.toggleStilCard();
-  c.toggleStilCard();
+  await c.toggleStilCard();
+  await c.toggleStilCard();
   assert.equal(c.showStilCard, false);
 });
 
-test('toggleFiguresCard: zweiter Klick dispatcht card:refresh statt zu schliessen', () => {
+test('toggleFiguresCard: zweiter Klick dispatcht card:refresh statt zu schliessen', async () => {
   const c = makeCtx();
   const events = [];
   globalThis.window.dispatchEvent = (e) => events.push({ type: e.type, detail: e.detail });
-  c.toggleFiguresCard();
+  await c.toggleFiguresCard();
   assert.equal(c.showFiguresCard, true);
-  c.toggleFiguresCard();
+  await c.toggleFiguresCard();
   assert.equal(c.showFiguresCard, true,
     'Refresh-Pattern: erneuter Klick schliesst NICHT, sondern dispatcht card:refresh');
   assert.deepEqual(events.pop(), { type: 'card:refresh', detail: { name: 'figuren' } });
 });
 
-test('toggleBookChatCard: braucht selectedBookId – ohne Buch kein Open', () => {
+test('toggleBookChatCard: braucht selectedBookId – ohne Buch kein Open', async () => {
   const c = makeCtx();
   c.selectedBookId = null;
-  c.toggleBookChatCard();
+  await c.toggleBookChatCard();
   assert.equal(c.showBookChatCard, false,
     'BookChat ohne Buch-Auswahl darf nicht öffnen');
 });
 
-test('toggleChatCard: schliesst Ideen-Card (gleicher Slot neben Editor)', () => {
+test('toggleChatCard: schliesst Ideen-Card (gleicher Slot neben Editor)', async () => {
   const c = makeCtx();
   c.showIdeenCard = true;
-  c.toggleChatCard();
+  await c.toggleChatCard();
   assert.equal(c.showChatCard, true);
   assert.equal(c.showIdeenCard, false,
     'Ideen und Chat teilen den Slot – nur eines aktiv');
 });
 
-test('toggleChatCard: ohne currentPage nicht öffnen', () => {
+test('toggleChatCard: ohne currentPage nicht öffnen', async () => {
   const c = makeCtx();
   c.currentPage = null;
-  c.toggleChatCard();
+  await c.toggleChatCard();
   assert.equal(c.showChatCard, false);
 });
 
-test('resetView: schliesst alle Hauptkarten und öffnet bookOverview (Home-Klick)', () => {
+test('resetView: schliesst alle Hauptkarten und öffnet bookOverview (Home-Klick)', async () => {
   // Regression: figurWerkstatt war früher nicht in resetView gelistet → Home-Klick
   // aus Werkstatt liess Flag true → _maybeOpenBookOverview skipte → keine Übersicht.
   // Mit Registry-driven Reset darf das nicht mehr passieren — neue Karten kommen
   // automatisch durch EXCLUSIVE_CARDS.
   const c = makeCtx();
   c.showFigurWerkstattCard = true;
-  c.resetView();
+  await c.resetView();
   assert.equal(c.showFigurWerkstattCard, false, 'Werkstatt-Flag muss nach resetView false sein');
   assert.equal(c.showBookOverviewCard, true, 'bookOverview ist Default-Home');
 });
 
-test('resetView: kein zweiter Tab offen → bookOverview öffnet', () => {
+test('resetView: kein zweiter Tab offen → bookOverview öffnet', async () => {
   const c = makeCtx();
   c.showBookOrganizerCard = true;
   c.showExportCard = true;
   c.showPdfExportCard = true;
-  c.resetView();
+  await c.resetView();
   assert.equal(c.showBookOrganizerCard, false);
   assert.equal(c.showExportCard, false);
   assert.equal(c.showPdfExportCard, false);
   assert.equal(c.showBookOverviewCard, true);
 });
 
-test('toggleKontinuitaetCard: refresh-Pattern beim erneuten Klick', () => {
+test('toggleKontinuitaetCard: refresh-Pattern beim erneuten Klick', async () => {
   const c = makeCtx();
   const events = [];
   globalThis.window.dispatchEvent = (e) => events.push({ type: e.type, detail: e.detail });
-  c.toggleKontinuitaetCard();
+  await c.toggleKontinuitaetCard();
   assert.equal(c.showKontinuitaetCard, true);
-  c.toggleKontinuitaetCard();
+  await c.toggleKontinuitaetCard();
   assert.equal(c.showKontinuitaetCard, true);
   const last = events.pop();
   assert.equal(last.type, 'card:refresh');

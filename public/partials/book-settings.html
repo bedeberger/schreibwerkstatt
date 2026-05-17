@@ -348,7 +348,8 @@
                 <td colspan="5">
                   <div x-show="bookJobRunsLoading && !bookJobRuns[row.type]" class="job-runs-loading" x-text="$app.t('jobStats.loading')"></div>
                   <div x-show="bookJobRuns[row.type] && bookJobRuns[row.type].length === 0" class="job-runs-empty" x-text="$app.t('jobStats.runs.empty')"></div>
-                  <table x-show="bookJobRuns[row.type] && bookJobRuns[row.type].length > 0" class="job-runs-table">
+                  <div class="table-scroll" x-show="bookJobRuns[row.type] && bookJobRuns[row.type].length > 0">
+                  <table class="job-runs-table">
                     <thead>
                       <tr>
                         <th x-text="$app.t('jobStats.runs.col.when')"></th>
@@ -376,6 +377,7 @@
                       </template>
                     </tbody>
                   </table>
+                  </div>
                 </td>
               </tr>
           </tbody>

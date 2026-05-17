@@ -18,6 +18,7 @@ async function _toggleCardGeneric(entry) {
   }
   if (entry.requiresBook && !this.selectedBookId) return;
   this._closeOtherMainCards(entry.key);
+  if (entry.partial) await this._ensurePartial(entry.partial);
   this[entry.flag] = true;
   if (entry.auditEvent) this.logAuditEvent?.(entry.auditEvent, { book: this.selectedBookId });
   if (entry.extraRefreshOnOpen) {
@@ -66,6 +67,17 @@ export const appViewMethods = {
     // (Buch oder Seite) aktiv. Helper deckt alle showXxxCard-Flags ab und
     // ruft resetPage(); kein Argument = nichts behalten.
     this._closeOtherMainCards();
+    // Editor + Sub-Partials parallel laden. Sub-Karten (toolbar, find, synonyme,
+    // figur-lookup, focus) sind Geschwister-Partials, keine nested children —
+    // werden vom Cascade-Helper deshalb nicht automatisch mitgezogen.
+    await Promise.all([
+      this._ensurePartial('editor'),
+      this._ensurePartial('editor-toolbar'),
+      this._ensurePartial('editor-find'),
+      this._ensurePartial('editor-figur-lookup'),
+      this._ensurePartial('editor-synonyme'),
+      this._ensurePartial('editor-focus'),
+    ]);
     this.currentPage = p;
     this.showEditorCard = true;
     this.$nextTick(() => this._scrollToEditorCard());
@@ -244,17 +256,18 @@ export const appViewMethods = {
   // Default-Landing: öffnet Übersicht, wenn Buch gewählt ist und keine andere
   // Hauptkarte/Editor aktiv. Wird beim Buchwechsel + bei `#book/:id`-Deeplink
   // ohne View aufgerufen.
-  _maybeOpenBookOverview() {
+  async _maybeOpenBookOverview() {
     if (!this.selectedBookId) return;
     if (this.showEditorCard) return;
     const anyOpen = EXCLUSIVE_CARDS.some(c => this[c.flag]);
     if (anyOpen) return;
+    await this._ensurePartial('bookoverview');
     this.showBookOverviewCard = true;
   },
 
   // Seiten-Ideen: lebt parallel zum Editor wie Seiten-Chat. Mutually exclusive
   // mit Chat — nur eines kann gleichzeitig aktiv sein (gleicher Slot).
-  toggleIdeenCard() {
+  async toggleIdeenCard() {
     if (this.showIdeenCard && this.ideenScope === 'page') {
       this.showIdeenCard = false;
       return;
@@ -267,13 +280,14 @@ export const appViewMethods = {
         this._checkDoneBeforeChat = false;
       }
     }
+    await this._ensurePartial('ideen');
     this.ideenScope = 'page';
     this.ideenChapterId = null;
     this.showIdeenCard = true;
   },
   // Kapitel-Ideen: lebt parallel zur Kapitelreview-Karte (gleicher Slot wie
   // Page-Modus). Kein _closeOtherMainCards — Kapitelreview bleibt offen.
-  toggleChapterIdeenCard(chapterId) {
+  async toggleChapterIdeenCard(chapterId) {
     const cid = parseInt(chapterId, 10);
     if (!cid) return;
     if (this.showIdeenCard && this.ideenScope === 'chapter' && this.ideenChapterId === cid) {
@@ -281,6 +295,7 @@ export const appViewMethods = {
       return;
     }
     if (this.showChatCard) this.showChatCard = false;
+    await this._ensurePartial('ideen');
     this.ideenScope = 'chapter';
     this.ideenChapterId = cid;
     this.showIdeenCard = true;
@@ -289,7 +304,7 @@ export const appViewMethods = {
   // merkt sich checkDone-Snapshot (Chat soll Findings temporär verbergen).
   // checkDoneBeforeChat wird in chat-base beim onVisible gesetzt.
   // Mutually exclusive mit Ideen — gleicher Slot neben Editor.
-  toggleChatCard() {
+  async toggleChatCard() {
     if (this.showChatCard) {
       this.showChatCard = false;
       if (this._checkDoneBeforeChat && this.lektoratFindings?.length > 0) {
@@ -300,6 +315,7 @@ export const appViewMethods = {
     }
     if (!this.currentPage) return;
     if (this.showIdeenCard) this.showIdeenCard = false;
+    await this._ensurePartial('chat');
     this.showChatCard = true;
     this.logAuditEvent?.('chatOpened', { book: this.selectedBookId, page: this.currentPage.id });
   },
@@ -462,7 +478,7 @@ export const appViewMethods = {
 
   // Setzt alles zurück: Seiten-Level (via resetPage) + Buch-Level.
   // Sub-Komponenten hören auf `view:reset` und resetten eigenen State.
-  resetView() {
+  async resetView() {
     window.dispatchEvent(new CustomEvent('view:reset'));
     this.resetPage();
     // Kapitel in der Sidebar bleiben geöffnet (kein c.open = false)
@@ -512,6 +528,6 @@ export const appViewMethods = {
     this.showKomplettStatus = false;
     this.resetBookChat();
     // Default-Home: nach komplettem Reset Übersicht öffnen, falls Buch gewählt.
-    this._maybeOpenBookOverview();
+    await this._maybeOpenBookOverview();
   },
 };

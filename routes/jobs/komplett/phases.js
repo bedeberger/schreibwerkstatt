@@ -9,7 +9,7 @@ const {
 } = require('../../../db/schema');
 const { recomputeBookFigureMentions } = require('../../../lib/page-index');
 const {
-  i18nError, settledAll, splitGroupsIntoChunks, PER_CHUNK_LIMIT, updateJob,
+  i18nError, settledAll, retryOnTransientAi, splitGroupsIntoChunks, PER_CHUNK_LIMIT, updateJob,
   toSystemBlocks,
 } = require('../shared');
 const {
@@ -103,6 +103,18 @@ async function runPhase1(ctx) {
         chText: chunk.pages.map(p => `### ${p.title}\n${p.text}`).join('\n\n---\n\n'),
       };
     });
+    // Claude-Warmup laeuft seriell (settledAll(..., {warmup:true})) und schreibt
+    // den Prompt-Cache fuer die parallelen Folge-Chunks. Damit der serielle
+    // Pass keine Verzoegerung kostet, faengt der kleinste Chunk an
+    // (Seitenzahl als Proxy; bei Gleichstand stabile chunkOrder-Reihenfolge).
+    if (effectiveProvider === 'claude' && chunkTexts.length > 1) {
+      const minIdx = chunkTexts.reduce((best, ct, i, arr) =>
+        ct.chunk.pages.length < arr[best].chunk.pages.length ? i : best, 0);
+      if (minIdx > 0) {
+        const [smallest] = chunkTexts.splice(minIdx, 1);
+        chunkTexts.unshift(smallest);
+      }
+    }
     let cacheHits = 0;
     // Welle 4 · #11 – für lokale Modelle zweigeteilte Extraktion:
     //   Pass A: figuren + assignments (fokussiertes Schema)
@@ -131,10 +143,10 @@ async function runPhase1(ctx) {
           const cached = loadChapterExtractCache(bookIdInt, email, key, pagesSig, effectiveProvider);
           if (cached) { cacheHits++; log.info(`${chunkLabel} – Cache-HIT.`); return cached; }
           log.info(`${chunkLabel} – Cache-MISS, KI-Call…`);
-          const result = await call(jobId, tok,
+          const result = await retryOnTransientAi(() => call(jobId, tok,
             prompts.buildExtraktionKomplettChapterPrompt(chunk.name, bookName, chunk.pages.length, chText),
             sys.SYSTEM_KOMPLETT_EXTRAKTION_BLOCKS, 12, 28, 14000, 0.2, null, prompts.SCHEMA_KOMPLETT_EXTRAKTION,
-          );
+          ), { log, label: chunkLabel });
           saveChapterExtractCache(bookIdInt, email, key, pagesSig, result, effectiveProvider);
           log.info(`${chunkLabel} – OK (fig=${result?.figuren?.length ?? 0} orte=${result?.orte?.length ?? 0} songs=${result?.songs?.length ?? 0} sz=${result?.szenen?.length ?? 0}).`);
           return result;
@@ -149,10 +161,10 @@ async function runPhase1(ctx) {
         if (passA) { cacheHits++; log.info(`${chunkLabel} Pass A (Figuren) – Cache-HIT.`); }
         else {
           log.info(`${chunkLabel} Pass A (Figuren) – KI-Call…`);
-          passA = await call(jobId, tok,
+          passA = await retryOnTransientAi(() => call(jobId, tok,
             prompts.buildExtraktionFigurenPassPrompt(chunk.name, bookName, chunk.pages.length, chText),
             sys.SYSTEM_KOMPLETT_FIGUREN_PASS_BLOCKS, 12, 20, 8000, 0.2, null, prompts.SCHEMA_KOMPLETT_FIGUREN_PASS,
-          );
+          ), { log, label: `${chunkLabel} Pass A` });
           saveChapterExtractCache(bookIdInt, email, figKey, pagesSig, passA, effectiveProvider);
         }
 
@@ -160,10 +172,10 @@ async function runPhase1(ctx) {
         if (passB) { cacheHits++; log.info(`${chunkLabel} Pass B (Orte/Szenen) – Cache-HIT.`); }
         else {
           log.info(`${chunkLabel} Pass B (Orte/Szenen) – KI-Call…`);
-          passB = await call(jobId, tok,
+          passB = await retryOnTransientAi(() => call(jobId, tok,
             prompts.buildExtraktionOrtePassPrompt(chunk.name, bookName, chunk.pages.length, chText),
             sys.SYSTEM_KOMPLETT_ORTE_PASS_BLOCKS, 20, 28, 6000, 0.2, null, prompts.SCHEMA_KOMPLETT_ORTE_PASS,
-          );
+          ), { log, label: `${chunkLabel} Pass B` });
           saveChapterExtractCache(bookIdInt, email, ortKey, pagesSig, passB, effectiveProvider);
         }
 

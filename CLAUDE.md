@@ -91,7 +91,7 @@ CLAUDE.md beschreibt **ausschliesslich den aktuellen Stand**. Keine Historie, ke
 3. Router in `routes/jobs.js` mounten
 4. Prompt-Builder im passenden Submodul unter `public/js/prompts/` ergänzen (z.B. `prompts/komplett.js` für Pipeline-Prompts, `prompts/review.js` für Bewertungen) und in der Facade `public/js/prompts.js` re-exportieren — **bei schemarelevanter Änderung `PROMPTS_VERSION` (in `prompts/core.js`) bumpen** (invalidiert `chapter_extract_cache`/`book_extract_cache` (Komplettanalyse), `chapter_review_cache`/`book_review_cache` (Buchbewertung), `chapter_macro_review_cache` (Kapitelbewertung), `synonym_cache`, `lektorat_cache`)
 5. Schema-Validierung nach `callAI` nicht vergessen
-6. Dedup-Check im POST-Handler: `findActiveJobId(type, entityId, userEmail)` aus `routes/jobs/shared.js` (NICHT `runningJobs.get(...) && jobs.has(...)` — matcht sonst auch fertige Jobs)
+6. Dedup-Check im POST-Handler: `findActiveJobId(type, entityId, userEmail)` aus `routes/jobs/shared/` (NICHT `runningJobs.get(...) && jobs.has(...)` — matcht sonst auch fertige Jobs)
 7. Logging-Context: `setContext({ book: book_id })` (aus [lib/log-context.js](lib/log-context.js)) im POST-Handler nach `toIntId`-Validierung, damit der `book`-Slot im Log-Tag gefüllt ist (siehe Harte Regel „Logging-Context")
 
 ### Frontend (neue Karte als `Alpine.data`-Sub-Komponente)
@@ -256,25 +256,33 @@ Keine Schemaänderung. `figure_relations.typ` ist Freitext. Neuen Typ in der `BZ
 Browser → NGINX (HTTPS) → Express (Port 3737)
   /auth/*    → Google OIDC (Login/Callback/Logout/Me)
   /config    → Modell-Config + User (keine Credentials)
-  /content/* → Content-Store-Facade (Books/Chapters/Pages, Order, Revisions)
-  /claude    → api.anthropic.com (ANTHROPIC_API_KEY-Injection, SSE)
-  /ollama    → Ollama /api/chat (NDJSON → SSE normalisiert)
-  /jobs/*    → Hintergrund-Jobs (Status-Polling, alle KI-Analysen)
-  /chat/*    → Seiten-Chat (SSE-Streaming) + Buch-Chat-Sessions
-  /history/* → Job-Verlauf (SQLite)
-  /figures/* → Figuren-CRUD (SQLite)
-  /locations/*    → Orte-CRUD (SQLite)
-  /ideen/*        → Ideen-CRUD (SQLite)
-  /booksettings/* → Per-Buch-Settings (Buchtyp, Freitext)
-  /me/*           → User-Settings (Sprache, Modell-Override)
-  /sync/*         → Buchstatistik-Sync (manuell + Cron)
-  /export/*       → Buch-Export (PDF/HTML/Markdown/Plaintext/EPUB via App-eigenen Builder)
-  /search/*       → FTS5-Volltextsuche
-  /local/*        → Kategorien + Tags (Pool global, Zuordnung pro Buch via ACL)
-  /pdf-export/*   → Custom-PDF-Export-Profile (CRUD + Cover-Upload + Font-Liste)
+  /content/*       → Content-Store-Facade (Books/Chapters/Pages, Order, Revisions)
+  /book-editor/*   → Page-Save/Apply, Locks, Presence
+  /book-access/*   → ACL: User ↔ Book (Owner/Editor/Reader)
+  /claude          → api.anthropic.com (ANTHROPIC_API_KEY-Injection, SSE)
+  /ollama          → Ollama /api/chat (NDJSON → SSE normalisiert)
+  /jobs/*          → Hintergrund-Jobs (Status-Polling, alle KI-Analysen)
+  /chat/*          → Seiten-Chat (SSE-Streaming) + Buch-Chat-Sessions
+  /history/*       → Job-Verlauf (SQLite)
+  /figures/*       → Figuren-CRUD (SQLite)
+  /draft-figures/* → Figuren-Drafts (Brainstorming vor Übernahme)
+  /locations/*     → Orte-CRUD (SQLite)
+  /ideen/*         → Ideen-CRUD (SQLite)
+  /songs/*         → Songs-Feature (Buch-Soundtrack)
+  /booksettings/*  → Per-Buch-Settings (Buchtyp, Freitext)
+  /me/*            → User-Settings (Sprache, Modell-Override)
+  /sync/*          → Buchstatistik-Sync (manuell + Cron)
+  /export/*        → Buch-Export (PDF/HTML/Markdown/Plaintext/EPUB via App-eigenen Builder)
+  /search/*        → FTS5-Volltextsuche
+  /categories/*    → Kategorie-Pool (CRUD, Zuordnung pro Buch via ACL)
+  /tags/*          → Tag-Pool (CRUD, Zuordnung pro Buch)
+  /pdf-export/*    → Custom-PDF-Export-Profile (CRUD + Cover-Upload + Font-Liste)
   /jobs/pdf-export → Render-Job (eigene pdfkit-Pipeline mit PDF/A-2B)
-  /usage/*        → Feature-Usage-Tracking (Recency für Palette/Quick-Pills)
-  /          → public/index.html (SPA)
+  /usage/*         → Feature-Usage-Tracking (Recency für Palette/Quick-Pills)
+  /apply/*         → Public-Registration-Apply (Beta-Antrag)
+  /admin/books, /admin/registration-requests, /admin/settings, /admin/usage, /admin/users
+  /public/*        → Unauthentifizierte Endpoints (Health, Marketing)
+  /                → public/index.html (SPA)
 
 Cron (täglich 02:00) → syncAllBooks() → page_stats + book_stats_history
 ```
@@ -305,7 +313,7 @@ Drei Provider, konfiguriert via `API_PROVIDER` in `.env`:
 
 ## Two-Tier-Analyse
 
-Jobs in `routes/jobs/` verwenden ein Single-Pass/Multi-Pass-Muster. Limits und Batch-Grössen sind als Konstanten in `routes/jobs/shared.js` definiert — `SINGLE_PASS_LIMIT` und `PER_CHUNK_LIMIT` skalieren dynamisch aus `INPUT_BUDGET_CHARS` (70% / 35%).
+Jobs in `routes/jobs/` verwenden ein Single-Pass/Multi-Pass-Muster. Limits und Batch-Grössen sind als Konstanten in `routes/jobs/shared/` definiert — `SINGLE_PASS_LIMIT` und `PER_CHUNK_LIMIT` skalieren dynamisch aus `INPUT_BUDGET_CHARS` (70% / 35%).
 
 ## Komplettanalyse-Job
 
@@ -326,7 +334,7 @@ Block 2 [parallel]:
   Phase 8 – Kontinuitätscheck (Single-Pass: voller Text, Multi-Pass: Fakten)
 ```
 
-**Standalone-Kontinuitätscheck:** `POST /jobs/kontinuitaet` — läuft Phase 8 einzeln, ohne die volle Pipeline. Exportiert `runKontinuitaetJob` aus `routes/jobs/komplett.js`.
+**Standalone-Kontinuitätscheck:** `POST /jobs/kontinuitaet` — läuft Phase 8 einzeln, ohne die volle Pipeline. Exportiert `runKontinuitaetJob` aus `routes/jobs/komplett/job.js`.
 
 **Wichtige Mechanismen:**
 - **Delta-Cache:** Phase 1 (Multi-Pass) prüft `chapter_extract_cache` in der DB. Cache-Key enthält `pages_sig` (sortierte `page_id:updated_at`-Paare). Ändert sich eine Seite → Cache-Miss → Neu-Extraktion. Single-Pass wird nicht gecacht.
@@ -390,101 +398,30 @@ Ziel: Buch im Modell **internalisieren** (Stil, Welt, Figuren, Fakten, Plot). Da
 
 Winston (`logger.js`): Level `info`, Ausgabe in `schreibwerkstatt.log` (5 MB, 3 Dateien rotiert) + Console. Jobs nutzen Child-Logger mit Kontext: `logger.child({ job, user, book })` → Format: `[INFO][lektorat|user@mail.com|42] Nachricht` (das `lektorat` im Beispiel ist der Job-Typ, nicht die App).
 
-## Projektstruktur
+## Projektstruktur (thematische Cluster)
 
-```
-server.js              – Express-Setup, Auth-Guard, Cron, Route-Mounting
-logger.js              – Winston-Config
-lib/
-  ai.js                – callAI(), Provider-Dispatch, JSON-Parsing
-  content-store/       – Storage-Facade über SQLite (Pages/Chapters/Books, Revisions, FTS-Hooks)
-  crypto.js            – AES-256-GCM für persistierte Secrets (`enc:v1:`-Prefix)
-  filenames.js         – Einheitlicher Filename-Builder mit Timestamp + Slug
-  page-index.js        – Pro-Seite-Metriken (Pronomen, Dialog, Figuren-Mentions) für Agentic Buch-Chat
-  prompts-loader.js    – Lazy-Import von public/js/prompts.js aus CJS-Kontext
-  validate.js          – Eingabe-Validierung an Request-Grenzen (strikte Int-Parser)
-db/                    – SQLite split: connection, migrations, schema,
-                         figures, pages, token-usage, pdf-export, fonts
-routes/
-  auth.js                  – Google OIDC
-  proxies.js               – KI-Provider-Proxies
-  jobs.js                  – Job-Router (mountet alle Feature-Router)
-  jobs/shared.js           – Job-Queue, Limits, loadPageContents, Hilfsfunktionen
-  jobs/lektorat.js         – Seiten-Lektorat + Batch-Check
-  jobs/review.js           – Buchbewertung
-  jobs/kapitel.js          – Kapitelbewertung
-  jobs/komplett.js         – Komplettanalyse-Pipeline (inkl. Kontinuitätscheck)
-  jobs/chat.js             – Buch-Chat (klassisch + Agentic-Dispatch)
-  jobs/book-chat-tools.js  – Tool-Implementierungen für Agentic Buch-Chat
-  jobs/synonyme.js         – Synonym-Vorschläge
-  jobs/finetune-export/    – Finetune-Sample-Generator (eigener Router)
-  jobs/narrative-labels.js – POV-/Tempus-Labels (Helper, kein Router)
-  chat.js                  – Seiten-Chat (SSE)
-  export.js                – Buch-Export (Timestamp-Filename, PDF/HTML/MD/Plaintext/EPUB)
-  usage.js                 – Feature-Usage-Tracking (ALLOWED_KEYS-Allowlist)
-  figures.js, locations.js, history.js, sync.js, booksettings.js,
-  usersettings.js, ideen.js
-public/
-  index.html           – SPA-Shell
-  css/                 – Thematische Stylesheets, geladen via <link>-Tags
-                         in index.html. Reihenfolge = Cascade-Reihenfolge.
-                         tokens.css (Custom-Props, Dark-Theme, Fonts) UNLAYERED;
-                         alle anderen via @layer base/components/utilities.
-                         Grosse Cards als Subfolder (z.B. css/book-overview/).
-  partials/            – HTML-Partials, geladen per _loadPartials()
-  js/app.js            – Alpine-Root (`x-data="lektorat"`), Methoden-Spreads,
-                         `$app`-Magic, window.__app-Referenz
-  js/app/              – Root-Slices: app-state (Root-State, cards-Flags),
-                         app-view (toggleXxxCard, selectPage, resetView),
-                         app-ui (Filter/Sort, Partial-Loader),
-                         app-jobs-core (Job-Queue, checkPendingJobs, _startPoll),
-                         app-hash-router, app-navigation, app-chrome, app-komplett
-  js/admin/            – Admin-Karten-Methoden (admin-categories, admin-login,
-                         admin-settings, admin-usage, admin-users)
-  js/api/              – Server-Communication: api-ai (Provider-Calls)
-  js/chat/             – chat (Seiten-Chat), chat-base (gespreaded),
-                         book-chat (Buch-Chat)
-  js/book/             – Buch-/Seiten-/Kapitel-Fachmodule:
-                         tree, page-view, history, book-create, book-settings,
-                         bookstats, review, kapitel-review, fehler-heatmap,
-                         stil-heatmap, kontinuitaet, ereignisse, orte, szenen,
-                         figuren, ideen, finetune-export, lektorat-time,
-                         writing-time, export
-  js/editor/           – Editor-Fachmodule (utils, edit, focus, find, synonyme,
-                         figur-lookup, toolbar, lektorat, shortcuts). Cards leben
-                         in cards/editor-*-card.js und importieren von hier.
-  js/cards/            – Alpine.data-Sub-Komponenten (24 Karten + Shared)
-    catalog-store.js          – Alpine.store('catalog') für figuren/orte/szenen/globalZeitstrahl
-    feature-registry.js       – SSoT für Karten-Features + Aktionen + Provider-Hooks
-                                (gelesen von Quick-Pills, Command-Palette, Usage-Tracking)
-    job-helpers.js            – pure `startPoll(ctx, cfg)` + `runningJobStatus(translate, …)`
-    job-feature-card.js       – `createCardJobFeature(cfg)` für Sub-Komponenten
-    palette-card.js           – Command-Palette (Cmd/Ctrl+K, `/`)
-    palette-fuzzy.js          – Fuzzy-Match + Highlight
-    palette-providers.js      – Such-Provider (Seiten, Kapitel, Figuren, Orte, Szenen)
-    stil-card.js, fehler-heatmap-card.js, book-stats-card.js
-    book-settings-card.js, user-settings-card.js
-    kontinuitaet-card.js, ereignisse-card.js, orte-card.js, szenen-card.js
-    figuren-card.js           – inkl. vis-network-Graph-Lifecycle
-    book-review-card.js, kapitel-review-card.js
-    chat-card.js, book-chat-card.js
-    ideen-card.js, finetune-export-card.js
-    editor-find-card.js, editor-synonyme-card.js, editor-figur-lookup-card.js,
-    editor-toolbar-card.js, editor-focus-card.js
-    lektorat-findings-card.js, page-history-card.js
-  js/prompts.js        – Facade: Re-Exports + configurePrompts-Orchestrator
-  js/prompts/          – Submodule pro Job-Typ (state, schema-utils, blocks, core,
-                         lektorat, review, komplett, chat, synonym, finetune)
-  js/utils.js          – Gemeinsame Hilfsfunktionen
-  js/lazy-libs.js      – On-demand-Loader für vis-network und Chart.js
-                         (spart ~800 KB JS am initialen Page-Load)
-  js/features-usage.js – Root-Spread: $watch auf Show-Flags, POST /usage/track,
-                         GET /usage/recent für Palette-Section „Zuletzt"
-  js/user-settings.js  – Pro-User-Einstellungen (Sprache, Modell-Override)
-  js/i18n.js, js/i18n/ – t/tRaw + DE/EN-JSONs
-  js/theme-init.js, js/plausible-init.js, js/tooltip.js, js/fullscreen.js,
-  js/lazy-libs.js      – Cross-cutting Top-Level-Module
-```
+Vollständiges Inventar via `ls`/`find` — hier nur Einstiege und Cluster, damit Drift gegen Datei-Listings nicht jeden Refactor bricht.
+
+- `server.js` — Express-Setup, Auth-Guard, Cron, Route-Mounting.
+- `logger.js` — Winston-Config.
+- **`lib/`** — Server-Libs. Highlights:
+  - `ai.js` (callAI + Provider-Dispatch + JSON-Fallback), `content-store/` (Pages/Chapters/Books-Facade), `html-clean.js` (Page-HTML-Sanitization, **SSoT** vor jedem DB-Write).
+  - PDF/Export: `pdf-render.js` + `pdf-render/` (Pipeline), `pdf-export-defaults.js`, `pdfa-validate.js`, `font-fetch.js`, `cover-prepare.js`, `export-builders/` (HTML/MD/EPUB/Plaintext).
+  - Cross-cutting: `acl.js`, `admin-mw.js`, `admin-login-ratelimit.js`, `register-ratelimit.js`, `app-settings.js`, `budget.js`, `pricing.js`, `cache-cleanup.js`, `content-mapper.js`, `crypto.js`, `dev-seed.js`, `draft-mindmap-builder.js`, `filenames.js`, `i18n-server.js`, `load-contents.js`, `local-date.js`, `log-context.js`, `mailer.js` + `mailer-templates.js`, `notify.js`, `page-index.js`, `prompts-loader.js`, `search.js`, `slug.js`, `validate.js`.
+- **`db/`** — SQLite-Split. Einstieg: `connection.js`, `migrations.js`, `schema.js`, `squashed-schema.js` (Fresh-DB-Fast-Path). Eine Domäne pro File: `books`, `pages`, `page-revisions`, `page-presence`, `figures`, `draft-figures`, `book-access`, `book-categories`, `book-tags`, `book-order`, `app-users`, `registration-requests`, `token-usage`, `admin-usage`, `budget-alerts`, `pdf-export`, `fonts`.
+- **`routes/`** — Ein Router pro Feature. Namen entsprechen der Routen-Tabelle oben.
+  - `jobs.js` mountet alle Job-Sub-Router. Subfolder: `jobs/shared/` (Queue, AI-Helper, Loader, Model, Queries, Router, State) und `jobs/komplett/` (Pipeline: index, job, phases, checkpoint, figuren-merge, remap, utils). Single-File-Job-Router: `lektorat`, `review`, `kapitel`, `chat`, `synonyme`, `figur-werkstatt`, `pdf-export`. Helper-Files (kein Router): `narrative-labels`, `book-chat-tools`, `review-context`. `finetune-export/` als Subfolder mit eigenem Router.
+- **`public/`** — SPA.
+  - `index.html` Shell; `partials/` werden via `_loadPartials()` nested geladen.
+  - `css/` thematisch gesplittet (eine Datei pro Komponente; grosse Cards als Subfolder, z.B. `book-overview/`). `tokens.css` Facade-File (importiert `tokens/`-Module); Cascade via `@layer base, components, utilities`. `tokens.css` selbst unlayered.
+  - `js/app.js` Alpine-Root; `js/app/` Root-Slices (`app-state`, `app-view`, `app-ui`, `app-jobs-core`, `app-hash-router`, `app-navigation`, `app-chrome`, `app-komplett`, `app-collab`).
+  - `js/cards/` — Alpine-Sub-Komponenten, eine pro Karte. **SSoT-Liste in [feature-registry.js](public/js/cards/feature-registry.js)** — nicht hier pflegen. Shared neben den Karten: `catalog-store.js`, `feature-registry.js`, `job-helpers.js`, `job-feature-card.js`, `card-lifecycle.js`, `palette-card.js`/`palette-fuzzy.js`/`palette-providers.js`.
+  - `js/book/` — Buch-/Seiten-Fachmodule (tree, page-view, history, review, kapitel-review, fehler-/stil-heatmap, kontinuitaet, ereignisse, orte, szenen, figuren, ideen, finetune-export, lektorat-time, writing-time, export, songs, book-create, book-settings, bookstats).
+  - `js/editor/` — Editor-Fachmodule (`utils`, `edit`, `focus/` + `focus.js`, `find`, `synonyme`, `figur-lookup`, `toolbar`, `lektorat`, `shortcuts`, `draft-storage`). Cards in `cards/editor-*-card.js` importieren von hier.
+  - Feature-eigene Submodul-Cluster (Facade-File + gleichnamiger Subfolder): `book-overview.js` + `book-overview/`, `figur-werkstatt.js` + `figur-werkstatt/`, `graph.js` + `graph/`.
+  - Weitere Cluster: `js/chat/`, `js/admin/`, `js/api/`, `js/i18n/`, `js/repo/`.
+  - `js/prompts.js` Facade; `js/prompts/` Submodule pro Job-Typ (state, schema-utils, blocks, core, lektorat, review, komplett, chat, synonym, finetune, figur-werkstatt).
+  - Cross-cutting Top-Level: `utils.js`, `lazy-libs.js` (vis-network/Chart.js on-demand), `features-usage.js`, `user-settings.js`, `num-input.js`, `page-revision-diff.js`, `theme-init.js`, `plausible-init.js`, `tooltip.js`, `fullscreen.js`, `register.js`.
 
 ## Tests
 

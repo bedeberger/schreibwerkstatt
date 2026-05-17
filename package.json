@@ -1,7 +1,7 @@
 {
   "name": "schreibwerkstatt",
   "version": "1.0.0",
-  "description": "Schreibwerkstatt — Schreiben, Lektorat und Buchanalyse mit KI auf BookStack-Basis",
+  "description": "Schreibwerkstatt — Schreiben, Lektorat und Buchanalyse mit KI",
   "license": "AGPL-3.0-or-later",
   "main": "server.js",
   "scripts": {

@@ -13,6 +13,7 @@ export const kapitelReviewMethods = {
       return;
     }
     this._closeOtherMainCards('kapitelReview');
+    await this._ensurePartial('kapitelreview');
     this.showKapitelReviewCard = true;
   },
 

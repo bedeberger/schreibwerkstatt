@@ -678,7 +678,7 @@ export function renderChatMarkdown(text) {
     const rows = lines.slice(2).map(row => row.split('|').slice(1, -1).map(c => c.trim()));
     const thead = `<tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>`;
     const tbody = rows.map(row => `<tr>${row.map(c => `<td>${c}</td>`).join('')}</tr>`).join('');
-    return `<table class="chat-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table>`;
+    return `<div class="table-scroll"><table class="chat-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table></div>`;
   });
 
   // Ungeordnete Listen: Zeilen mit «- » oder «* » → temporäres <uli>-Tag

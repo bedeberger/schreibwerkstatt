@@ -55,6 +55,7 @@ module.exports = {
 
   _modelName: model._modelName,
   settledAll: ai.settledAll,
+  retryOnTransientAi: ai.retryOnTransientAi,
 
   htmlToText: ai.htmlToText,
   cleanPageTextForClaude: ai.cleanPageTextForClaude,

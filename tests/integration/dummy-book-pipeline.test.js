@@ -4,7 +4,7 @@
 // Verifiziert, dass Komplettanalyse + Standalone-Kontinuitätscheck mit
 // realistischer Prosa (statt `Anna ging weiter durch das Land.`) durchlaufen.
 //
-// Token-Budget aus setup.js: ai.claude.context_window=10000 → INPUT_BUDGET ~24K
+// Token-Budget aus _helpers/setup.js: ai.claude.context_window=10000 → INPUT_BUDGET ~24K
 // chars → SINGLE_PASS_LIMIT=20000 → das Buch (~17K) läuft Single-Pass.
 
 const test = require('node:test');

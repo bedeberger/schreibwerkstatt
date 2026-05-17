@@ -250,34 +250,71 @@ export const appUiMethods = {
   },
 
   // ── Partials laden ───────────────────────────────────────────────────────
-  // DOM-Auto-Discovery: jeder `<div id="partial-$name">` bekommt seinen
-  // Inhalt aus `/partials/$name.html`. Partials dürfen weitere
-  // `partial-*`-Container enthalten – die Schleife iteriert, bis nichts
-  // Neues mehr auftaucht (Schutzlimit gegen zirkuläre Referenzen).
-  async _loadPartials() {
-    const loadPass = async () => {
-      const empty = [...document.querySelectorAll('[id^="partial-"]')]
-        .filter(el => el.childElementCount === 0);
-      if (empty.length === 0) return 0;
-      await Promise.all(empty.map(async el => {
-        const name = el.id.replace(/^partial-/, '');
-        const html = await fetchText(`/partials/${name}.html`);
-        el.innerHTML = html;
-        Alpine.initTree(el);
-      }));
-      return empty.length;
-    };
+  // Boot lädt nur die ESSENTIAL-Partials (immer sichtbarer Shell-Anteil).
+  // Karten-Partials werden lazy geladen, wenn der zugehörige Toggle das erste
+  // Mal feuert (siehe `_ensurePartial`). Spart beim Cold-Boot ~50 Fetches +
+  // Alpine.initTree-Walks für Karten, die der User nie öffnet.
+  //
+  // Trust: Partial-HTML kommt vom eigenen Server (statische Dateien unter
+  // /partials/), Auth-pflichtig. innerHTML-Injection ist daher sicher; XSS
+  // wird durch die `x-html`-Escape-Regel (siehe CLAUDE.md) abgedeckt, nicht
+  // hier.
+  async _loadEssentialPartials() {
+    const ESSENTIAL = [
+      'avatar-menu', 'komplett-status', 'sidebar',
+      'palette', 'job-toast', 'collab-toast', 'shortcuts',
+    ];
+    await Promise.all(ESSENTIAL.map(name => this._ensurePartial(name)));
+  },
+
+  // Lazy-Load eines einzelnen Partials. Idempotent: zweiter Aufruf liefert die
+  // bereits laufende Promise zurück (verhindert Doppel-Fetch bei parallelen
+  // Toggle-Klicks). Aufrufer-Pattern: `await this._ensurePartial('figuren')`
+  // direkt vor dem Setzen des Show-Flags in der Toggle-Methode.
+  async _ensurePartial(name) {
+    if (!name) return false;
+    const el = document.getElementById(`partial-${name}`);
+    if (!el) return false;
+    if (el.childElementCount > 0) return true;
+    this._partialPromises ||= {};
+    if (this._partialPromises[name]) return this._partialPromises[name];
+    this._partialPromises[name] = (async () => {
+      try {
+        await this._injectPartial(el, name);
+        await this._cascadePartialsInside(el);
+        return true;
+      } catch (e) {
+        console.error(`[ensurePartial:${name}]`, e);
+        delete this._partialPromises[name];
+        return false;
+      }
+    })();
+    return this._partialPromises[name];
+  },
+
+  // Rekursiv alle leeren `partial-*`-Container im Subtree füllen.
+  // Wird intern nach jeder Partial-Injektion gerufen — Cascade endet, wenn
+  // ein Pass nichts mehr findet (Schutzlimit 5 gegen Zirkularität).
+  async _cascadePartialsInside(root) {
     let safety = 5;
-    while (safety-- > 0 && await loadPass() > 0) { /* weiter */ }
-    // Falls nach 5 Iterationen immer noch leere `partial-*`-Container existieren,
-    // ist die Verschachtelung tiefer als erwartet (oder zirkulär). Stilles
-    // Aufgeben würde leere Karten produzieren — Hinweis loggen, damit der Bug
-    // im DevTools-Console sichtbar wird.
-    const stillEmpty = [...document.querySelectorAll('[id^="partial-"]')]
-      .filter(el => el.childElementCount === 0)
-      .map(el => el.id);
-    if (stillEmpty.length > 0) {
-      console.warn(`[loadPartials] Schutzlimit (5 Pässe) erreicht, leer geblieben:`, stillEmpty);
+    while (safety-- > 0) {
+      const empty = [...root.querySelectorAll('[id^="partial-"]')]
+        .filter(el => el.childElementCount === 0);
+      if (empty.length === 0) return;
+      await Promise.all(empty.map(async el => {
+        try {
+          await this._injectPartial(el, el.id.replace(/^partial-/, ''));
+        } catch (e) {
+          console.error(`[cascadePartial:${el.id}]`, e);
+        }
+      }));
     }
+  },
+
+  // Helper: fetcht Partial, injiziert in Element, initialisiert Alpine.
+  async _injectPartial(el, name) {
+    const html = await fetchText(`/partials/${name}.html`);
+    el.innerHTML = html;
+    Alpine.initTree(el);
   },
 };

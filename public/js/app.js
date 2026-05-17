@@ -747,7 +747,7 @@ document.addEventListener('alpine:init', () => {
         this.uiLocale = fallbackLocale;
         document.documentElement.setAttribute('lang', fallbackLocale);
         document.documentElement.removeAttribute('data-i18n-loading');
-        await this._loadPartials();
+        await this._loadEssentialPartials();
         this._initSidebarResize();
       } catch (e) {
         console.error('[init:shell]', e);
@@ -809,7 +809,9 @@ document.addEventListener('alpine:init', () => {
         }
         // Admin-only-View überspringt Buch-Bootstrap: keine Sidebar, keine
         // Buchwahl, Landing sind die Admin-Tiles (admin-home-Partial).
-        if (!this.isAdminOnly) {
+        if (this.isAdminOnly) {
+          await this._ensurePartial('admin-home');
+        } else {
           await this.loadBooks();
           // Top-3 Recency-Features für Quick-Pills laden (best-effort).
           this.loadRecentFeatures();
@@ -817,7 +819,7 @@ document.addEventListener('alpine:init', () => {
         }
         await this._applyHash();
         if (!this.isAdminOnly && this.selectedBookId) this._loadBookRole(this.selectedBookId);
-        if (!this.isAdminOnly) this._maybeOpenBookOverview();
+        if (!this.isAdminOnly) await this._maybeOpenBookOverview();
         this._syncUrlNow();
         this._applyingHash = false;
         this._setupHashRouting();

@@ -129,3 +129,73 @@ test('findActiveJobId: scope type – anderer Job-Typ matcht nicht', () => {
 test('findActiveJobId: kein Job → null (kein Crash)', () => {
   assert.equal(shared.findActiveJobId('does-not-exist', 'no-id', 'no@one'), null);
 });
+
+test('retryOnTransientAi: Erfolg im ersten Versuch ruft fn nur einmal', async () => {
+  let calls = 0;
+  const out = await shared.retryOnTransientAi(async () => { calls++; return 'ok'; });
+  assert.equal(out, 'ok');
+  assert.equal(calls, 1);
+});
+
+test('retryOnTransientAi: retried bei Claude-Timeout (code=AI_TIMEOUT)', async () => {
+  let calls = 0;
+  const out = await shared.retryOnTransientAi(async () => {
+    calls++;
+    if (calls === 1) {
+      const e = new Error('Claude-Timeout nach 600000ms');
+      e.code = 'AI_TIMEOUT';
+      throw e;
+    }
+    return 'recovered';
+  });
+  assert.equal(out, 'recovered');
+  assert.equal(calls, 2);
+});
+
+test('retryOnTransientAi: retried bei terminated-Fehler (Undici-Socket-Reset)', async () => {
+  let calls = 0;
+  const out = await shared.retryOnTransientAi(async () => {
+    calls++;
+    if (calls === 1) throw new TypeError('terminated');
+    return 'recovered';
+  });
+  assert.equal(out, 'recovered');
+  assert.equal(calls, 2);
+});
+
+test('retryOnTransientAi: deterministischer Fehler wird sofort weitergeworfen', async () => {
+  let calls = 0;
+  await assert.rejects(
+    shared.retryOnTransientAi(async () => { calls++; throw new Error('job.error.aiInvalidJson'); }),
+    /aiInvalidJson/,
+  );
+  assert.equal(calls, 1);
+});
+
+test('retryOnTransientAi: AbortError reicht durch ohne Retry', async () => {
+  let calls = 0;
+  await assert.rejects(
+    shared.retryOnTransientAi(async () => {
+      calls++;
+      const e = new Error('aborted');
+      e.name = 'AbortError';
+      throw e;
+    }),
+    /aborted/,
+  );
+  assert.equal(calls, 1);
+});
+
+test('retryOnTransientAi: nach tries-Verschoepfung wird letzter Fehler geworfen', async () => {
+  let calls = 0;
+  await assert.rejects(
+    shared.retryOnTransientAi(async () => {
+      calls++;
+      const e = new Error('Claude-Timeout nach 600000ms');
+      e.code = 'AI_TIMEOUT';
+      throw e;
+    }, { tries: 2 }),
+    /Claude-Timeout/,
+  );
+  assert.equal(calls, 2);
+});

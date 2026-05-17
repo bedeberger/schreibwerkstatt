@@ -2,9 +2,7 @@
 // Parses tests/fixtures/dummy-book.md into a structured form:
 //   { meta: { title, genre, language, contextText },
 //     chapters: [{ title, pages: [{ title, markdown }] }] }
-// Geteilt zwischen scripts/seed-dummy-book.js (BookStack-Upload) und den
-// Integration-Tests (Mock-BookStack-Seeding). Beide nutzen dieselbe Quelle,
-// damit lokales Dev-Buch und Test-Daten deckungsgleich bleiben.
+// Quelle für Integration-Test-Seeding.
 
 const fs = require('fs');
 const path = require('path');

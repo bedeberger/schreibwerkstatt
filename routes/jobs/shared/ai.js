@@ -4,6 +4,38 @@ const appSettings = require('../../../lib/app-settings');
 const { jobAbortControllers } = require('./state');
 const { updateJob, i18nError } = require('./jobs');
 
+// Transient-Klassifikator: Claude-Streams droppen gelegentlich mid-flight als
+// 'terminated' (Undici-Socket-Reset) oder werden vom Hard-Timeout (`AI_TIMEOUT`)
+// nach `ai.claude.timeout_ms` abgebrochen. Beides ist nicht-fatal: ein erneuter
+// Versuch erwischt typischerweise einen warmen Anthropic-Prompt-Cache (von
+// parallelen oder vorhergehenden Chunks geschrieben) und laeuft deutlich
+// schneller durch. JSON-Parse-Failures (Modell-Output) sind dagegen
+// deterministisch → kein Retry.
+function _isTransientAiError(e) {
+  if (!e) return false;
+  if (e.code === 'AI_TIMEOUT') return true;
+  const msg = (e.message || '').toLowerCase();
+  if (msg.includes('terminated')) return true;
+  if (e.cause && /UND_ERR_SOCKET|ECONNRESET|other side closed/i.test(String(e.cause?.code || e.cause?.message || ''))) return true;
+  return false;
+}
+
+/** Fuehrt `fn` aus und retried bei transient AI-Fehlern (max. `tries`-1 Re-Versuche).
+ *  AbortError wird sofort weitergereicht; deterministische Fehler ebenfalls. */
+async function retryOnTransientAi(fn, { tries = 2, log = null, label = '' } = {}) {
+  let lastErr;
+  for (let attempt = 1; attempt <= tries; attempt++) {
+    try { return await fn(); }
+    catch (e) {
+      if (e.name === 'AbortError') throw e;
+      if (!_isTransientAiError(e) || attempt === tries) throw e;
+      lastErr = e;
+      if (log) log.warn(`${label || 'AI-Call'} transient (${e.message}) – Retry ${attempt}/${tries - 1}.`);
+    }
+  }
+  throw lastErr;
+}
+
 // ── Lokaler-Provider-kompatibler Promise.allSettled-Ersatz ────────────────────
 // Ollama und Llama verarbeiten Requests sequenziell. Bei parallelen Calls mit
 // grossem Kontext läuft der VRAM voll → fetch failed. Daher serialisieren.
@@ -234,6 +266,7 @@ async function aiCall(jobId, tok, prompt, system, fromPct, toPct, expectedChars 
 
 module.exports = {
   settledAll,
+  retryOnTransientAi, _isTransientAiError,
   HTML_NAMED_ENTITIES, _CLAUDE_ENTITY_MAP,
   cleanPageTextForClaude, htmlToText,
   PROGRESS_THROTTLE_MS,

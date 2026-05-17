@@ -5670,6 +5670,22 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 131 abgeschlossen (rename cron.timezone -> app.timezone).');
   }
 
+  if (version < 132) {
+    // Composite-Index fuer /history/page-ages/:book_id (cross-user). Bestehender
+    // (book_id, user_email)-Index taugt nur als Left-Prefix fuer WHERE book_id=?,
+    // zwingt SQLite aber bei ROW_NUMBER() OVER (PARTITION BY page_id ORDER BY
+    // checked_at DESC) zum Extra-Sort. (book_id, page_id, checked_at DESC)
+    // deckt Filter + PARTITION BY + ORDER BY ab.
+    db.exec('CREATE INDEX IF NOT EXISTS idx_pc_book_page_date ON page_checks(book_id, page_id, checked_at DESC)');
+
+    const fkErrors132 = db.pragma('foreign_key_check');
+    if (fkErrors132.length) {
+      throw new Error(`Migration 132: foreign_key_check meldet ${fkErrors132.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 132').run();
+    logger.info('DB-Migration auf Version 132 abgeschlossen (Index idx_pc_book_page_date fuer page-ages-Query).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {
