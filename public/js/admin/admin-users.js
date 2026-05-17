@@ -20,7 +20,7 @@ export const adminUsersMethods = {
       this.adminUsersList = data.users || [];
       if (settingResp && settingResp.ok) {
         const s = await settingResp.json().catch(() => null);
-        const v = s && (s.value || s.value_json);
+        const v = s?.setting?.value;
         if (typeof v === 'string') this.adminUsersGlobalProvider = v;
       }
     } catch (e) {

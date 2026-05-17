@@ -5056,6 +5056,43 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 118 abgeschlossen (Re-Mirror books.owner_email -> book_access fuer Backfill-Buecher).');
   }
 
+  if (version < 119) {
+    // Phase 11 Followup: 'ai-provider-changed' im user_sessions_audit-Event-CHECK
+    // aufnehmen. Migration 110 hatte 'budget-changed' + 'usage-viewed' ergaenzt;
+    // Phase 11 braucht den naechsten Eintrag fuer Override-Aenderungen via AdminUsersCard.
+    db.pragma('foreign_keys = OFF');
+    db.prepare('DROP TABLE IF EXISTS user_sessions_audit_new').run();
+    db.prepare(`
+      CREATE TABLE user_sessions_audit_new (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_email TEXT NOT NULL,
+        event      TEXT NOT NULL CHECK(event IN
+                       ('login','logout','login-denied','suspended','reactivated',
+                        'role-changed','deleted','budget-changed','usage-viewed',
+                        'ai-provider-changed')),
+        ip         TEXT,
+        user_agent TEXT,
+        meta_json  TEXT,
+        created_at TEXT DEFAULT (datetime('now'))
+      )
+    `).run();
+    db.prepare(`
+      INSERT INTO user_sessions_audit_new (id, user_email, event, ip, user_agent, meta_json, created_at)
+      SELECT id, user_email, event, ip, user_agent, meta_json, created_at FROM user_sessions_audit
+    `).run();
+    db.prepare('DROP TABLE user_sessions_audit').run();
+    db.prepare('ALTER TABLE user_sessions_audit_new RENAME TO user_sessions_audit').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_user_audit_user ON user_sessions_audit(user_email, created_at DESC)').run();
+    db.pragma('foreign_keys = ON');
+
+    const fkErrors119 = db.pragma('foreign_key_check');
+    if (fkErrors119.length) {
+      throw new Error(`Migration 119: foreign_key_check meldet ${fkErrors119.length} Verstoesse: ${JSON.stringify(fkErrors119.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 119').run();
+    logger.info(`DB-Migration auf Version 119 abgeschlossen (Phase 11 followup: audit-Event 'ai-provider-changed').`);
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

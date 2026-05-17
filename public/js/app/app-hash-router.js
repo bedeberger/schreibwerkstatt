@@ -23,6 +23,7 @@ export const appHashRouterMethods = {
       return '#admin/usage' + (tab && tab !== 'users' ? '/' + tab : '');
     }
     if (this.showAdminCategoriesCard) return '#admin/categories';
+    if (this.showAdminBooksCard) return '#admin/books';
     if (this.showAdminBackendMigrationCard) return '#admin/migration';
     if (!this.selectedBookId) return '';
     const parts = ['book', this.selectedBookId];
@@ -168,6 +169,8 @@ export const appHashRouterMethods = {
           else if (!tab) this.adminUsageTab = 'users';
         } else if (sub === 'categories') {
           if (!this.showAdminCategoriesCard) await this.toggleAdminCategoriesCard();
+        } else if (sub === 'books') {
+          if (!this.showAdminBooksCard) await this.toggleAdminBooksCard();
         } else if (sub === 'migration') {
           if (!this.showAdminBackendMigrationCard) await this.toggleAdminBackendMigrationCard();
         }
@@ -341,7 +344,7 @@ export const appHashRouterMethods = {
       'showBookStatsCard', 'showStilCard', 'showFehlerHeatmapCard',
       'showBookSettingsCard', 'showUserSettingsCard',
       'showAdminUsersCard', 'showAdminSettingsCard', 'showAdminUsageCard', 'adminUsageTab',
-      'showAdminCategoriesCard', 'showAdminBackendMigrationCard',
+      'showAdminCategoriesCard', 'showAdminBooksCard', 'showAdminBackendMigrationCard',
       'showFinetuneExportCard',
       'showExportCard',
       'showPdfExportCard',

@@ -1360,7 +1360,7 @@
   "admin.books.col.assign":      "Owner zuweisen",
   "admin.books.selectUser":      "Benutzer wählen…",
   "admin.books.assignBtn":       "Zuweisen",
-  "admin.books.assignConfirm":   "Buch „{name}" {email} als Owner zuweisen?",
+  "admin.books.assignConfirm":   "Buch „{name}“ {email} als Owner zuweisen?",
   "admin.books.error.emailRequired": "E-Mail erforderlich.",
 
   "admin.migrate.title":         "Backend-Migration",
