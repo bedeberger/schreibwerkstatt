@@ -32,7 +32,8 @@
       </div>
 
       <p class="muted-msg muted-msg--sm" x-show="categories.length === 0" x-text="$app.t('categories.empty')"></p>
-      <table class="admin-pool-table" x-show="categories.length">
+      <div class="table-scroll" x-show="categories.length">
+      <table class="admin-pool-table">
         <thead>
           <tr>
             <th x-text="$app.t('admin.cat.col.name')"></th>
@@ -53,6 +54,7 @@
           </template>
         </tbody>
       </table>
+      </div>
     </section>
 
     <section class="admin-pool-section">
@@ -70,7 +72,8 @@
       </div>
 
       <p class="muted-msg muted-msg--sm" x-show="tags.length === 0" x-text="$app.t('tags.empty')"></p>
-      <table class="admin-pool-table" x-show="tags.length">
+      <div class="table-scroll" x-show="tags.length">
+      <table class="admin-pool-table">
         <thead>
           <tr>
             <th x-text="$app.t('admin.tag.col.name')"></th>
@@ -93,6 +96,7 @@
           </template>
         </tbody>
       </table>
+      </div>
     </section>
   </div>
 </div>

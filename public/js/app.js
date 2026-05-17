@@ -122,8 +122,13 @@ if ('serviceWorker' in navigator) {
         // — sonst Banner zeigen, damit der User erst speichern kann. Die neue
         // SW-Version bedient zwar schon Assets, aber alte JS-Module laufen
         // noch; Reload räumt das mit dem nächsten User-Klick auf.
+        // hadController-Snapshot: beim First-Install (Tab ohne Controller
+        // geladen) feuert clients.claim() ein controllerchange — ohne Snapshot
+        // würde die Seite direkt nach dem ersten Laden nochmal reloaden.
+        const hadController = !!navigator.serviceWorker.controller;
         let reloaded = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (!hadController) return;
           if (reloaded) return;
           reloaded = true;
           const app = window.__app;
@@ -741,10 +746,12 @@ document.addEventListener('alpine:init', () => {
         await configureI18n(fallbackLocale);
         this.uiLocale = fallbackLocale;
         document.documentElement.setAttribute('lang', fallbackLocale);
+        document.documentElement.removeAttribute('data-i18n-loading');
         await this._loadPartials();
         this._initSidebarResize();
       } catch (e) {
         console.error('[init:shell]', e);
+        document.documentElement.removeAttribute('data-i18n-loading');
       }
 
       let cfg = null;

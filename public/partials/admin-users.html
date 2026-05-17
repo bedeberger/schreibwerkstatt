@@ -57,7 +57,8 @@
     </fieldset>
 
     <!-- User-Tabelle -->
-    <table class="admin-users-table" x-show="adminUsersList.length">
+    <div class="table-scroll" x-show="adminUsersList.length">
+    <table class="admin-users-table">
       <thead>
         <tr>
           <th x-text="$app.t('admin.users.email')"></th>
@@ -113,6 +114,7 @@
         </template>
       </tbody>
     </table>
+    </div>
 
     <!-- Audit-Drawer -->
     <div class="admin-users-audit" x-show="adminUsersAuditEmail">
@@ -167,7 +169,8 @@
       </div>
     </div>
 
-    <table class="admin-users-table" x-show="adminUsersRequestsList.length">
+    <div class="table-scroll" x-show="adminUsersRequestsList.length">
+    <table class="admin-users-table">
       <thead>
         <tr>
           <th x-text="$app.t('admin.users.requests.email')"></th>
@@ -219,6 +222,7 @@
         </template>
       </tbody>
     </table>
+    </div>
 
     <p class="muted-msg" x-show="!adminUsersRequestsLoading && !adminUsersRequestsList.length"
        x-text="$app.t('admin.users.requests.empty')"></p>

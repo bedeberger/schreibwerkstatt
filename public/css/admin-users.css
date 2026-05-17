@@ -181,16 +181,40 @@
 .badge--status-denied   { background: var(--color-err-bg);   color: var(--color-err-text); }
 .badge--status-expired  { background: var(--color-tag-bg);   color: var(--color-muted); }
 
-@media (max-width: 720px) {
-  .admin-users-invite-row {
-    grid-template-columns: 1fr;
-  }
+@media (max-width: 768px) {
   .admin-users-table th:nth-child(4),
   .admin-users-table td:nth-child(4) {
     display: none;
   }
+}
+
+@media (max-width: 600px) {
+  .admin-users-invite,
+  .admin-users-audit {
+    padding: var(--space-md);
+  }
+  .admin-users-invite-row {
+    grid-template-columns: 1fr;
+  }
+  .admin-users-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  .admin-users-tabs button {
+    flex-shrink: 0;
+    padding: var(--space-sm) var(--space-md);
+  }
   .admin-users-requests-filter {
     flex-wrap: wrap;
+    gap: var(--space-sm);
+  }
+  .admin-users-actions {
+    white-space: normal;
+  }
+  .admin-users-actions button + button {
+    margin-left: 0;
+    margin-top: var(--space-2xs);
   }
 }
 

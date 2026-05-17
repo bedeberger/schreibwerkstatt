@@ -94,8 +94,10 @@
 
 .admin-usage-filter-chip-remove:hover { color: var(--color-text); }
 
-@media (max-width: 640px) {
+@media (max-width: 600px) {
+  .admin-usage-filter input,
   .admin-usage-filter .combobox-wrap--compact { min-width: 0; width: 100%; }
+  .admin-usage-filter label { width: 100%; }
 }
 
 .admin-usage-table {
@@ -223,9 +225,18 @@
   margin-top: var(--space-xl);
 }
 
-@media (max-width: 720px) {
+@media (max-width: 600px) {
   .admin-usage-range,
   .admin-usage-filter {
     flex-direction: column;
+    gap: var(--space-md);
   }
+  .admin-usage-range label { width: 100%; }
+  .admin-usage-range input[type="date"] { width: 100%; }
+  .admin-usage-kpi { padding: var(--space-md); }
+  .admin-usage-charts figure { padding: var(--space-md); }
+  .admin-usage-chart-canvas { height: 200px; }
+  .admin-usage-totals { gap: var(--space-md); }
+  .admin-usage-actions { flex-wrap: wrap; }
+  .admin-usage-actions button { width: 100%; }
 }

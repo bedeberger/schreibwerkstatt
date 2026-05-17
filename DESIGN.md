@@ -408,6 +408,21 @@ CSS: [public/css/entity-list.css](public/css/entity-list.css). Wiederverwendbar 
 
 ---
 
+## Table-Scroll (`.table-scroll`)
+
+**Use:** Wrapper um breite Tabellen, damit sie auf engen Viewports horizontal scrollen statt aus der Karte zu ragen. Pflicht für mehrspaltige Admin-/Listen-Tables.
+
+**Markup:**
+```html
+<div class="table-scroll" x-show="rows.length">
+  <table class="admin-users-table">…</table>
+</div>
+```
+
+CSS: [public/css/utilities.css](public/css/utilities.css). `overflow-x: auto` + `max-width: 100%` am Wrapper; `min-width: 100%` an der Table.
+
+---
+
 ## Card-Status / Loading / Empty / Error
 
 | Zustand        | Klasse               | Inhalt |

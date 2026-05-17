@@ -43,7 +43,8 @@
 
   <!-- ── Users-Tab ─────────────────────────────────────────────────────── -->
   <div x-show="adminUsageTab === 'users'" class="admin-usage-pane">
-    <table class="admin-usage-table" x-show="adminUsageUsersList.length">
+    <div class="table-scroll" x-show="adminUsageUsersList.length">
+    <table class="admin-usage-table">
       <thead>
         <tr>
           <th x-text="$app.t('admin.users.email')"></th>
@@ -91,6 +92,7 @@
         </template>
       </tbody>
     </table>
+    </div>
     <div x-show="!adminUsageUsersList.length && !adminUsageLoading" class="muted-msg" x-text="$app.t('admin.usage.empty')"></div>
   </div>
 
@@ -114,7 +116,8 @@
         </span>
       </template>
     </div>
-    <table class="admin-usage-table" x-show="adminUsageJobsList.length">
+    <div class="table-scroll" x-show="adminUsageJobsList.length">
+    <table class="admin-usage-table">
       <thead>
         <tr>
           <th x-text="$app.t('admin.users.email')"></th>
@@ -146,6 +149,7 @@
         </template>
       </tbody>
     </table>
+    </div>
     <div x-show="!adminUsageJobsList.length && !adminUsageLoading" class="muted-msg" x-text="$app.t('admin.usage.empty')"></div>
   </div>
 
@@ -169,7 +173,8 @@
         </span>
       </template>
     </div>
-    <table class="admin-usage-table" x-show="adminUsageChatList.length">
+    <div class="table-scroll" x-show="adminUsageChatList.length">
+    <table class="admin-usage-table">
       <thead>
         <tr>
           <th x-text="$app.t('admin.users.email')"></th>
@@ -199,6 +204,7 @@
         </template>
       </tbody>
     </table>
+    </div>
     <div x-show="!adminUsageChatList.length && !adminUsageLoading" class="muted-msg" x-text="$app.t('admin.usage.empty')"></div>
   </div>
 
@@ -252,7 +258,8 @@
   <!-- ── Features-Tab ──────────────────────────────────────────────────── -->
   <div x-show="adminUsageTab === 'features'" class="admin-usage-pane">
     <h3 x-text="$app.t('admin.usage.feature.totals')"></h3>
-    <table class="admin-usage-table" x-show="adminUsageFeatureTotals.length">
+    <div class="table-scroll" x-show="adminUsageFeatureTotals.length">
+    <table class="admin-usage-table">
       <thead>
         <tr>
           <th x-text="$app.t('admin.usage.feature.key')"></th>
@@ -268,9 +275,11 @@
         </template>
       </tbody>
     </table>
+    </div>
 
     <h3 class="admin-usage-h3--spaced" x-text="$app.t('admin.usage.feature.byUser')"></h3>
-    <table class="admin-usage-table" x-show="adminUsageFeatureItems.length">
+    <div class="table-scroll" x-show="adminUsageFeatureItems.length">
+    <table class="admin-usage-table">
       <thead>
         <tr>
           <th x-text="$app.t('admin.users.email')"></th>
@@ -290,11 +299,13 @@
         </template>
       </tbody>
     </table>
+    </div>
   </div>
 
   <!-- ── Zeit-Tab ──────────────────────────────────────────────────────── -->
   <div x-show="adminUsageTab === 'time'" class="admin-usage-pane">
-    <table class="admin-usage-table" x-show="adminUsageTimeItems.length">
+    <div class="table-scroll" x-show="adminUsageTimeItems.length">
+    <table class="admin-usage-table">
       <thead>
         <tr>
           <th x-text="$app.t('admin.users.email')"></th>
@@ -321,8 +332,10 @@
         </template>
       </tbody>
     </table>
+    </div>
 
     <div class="admin-usage-series" x-show="adminUsageTimeSeries.length">
+      <div class="table-scroll">
       <table class="admin-usage-table">
         <thead>
           <tr>
@@ -343,6 +356,7 @@
           </template>
         </tbody>
       </table>
+      </div>
     </div>
   </div>
 </div>

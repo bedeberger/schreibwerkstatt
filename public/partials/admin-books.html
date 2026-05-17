@@ -16,7 +16,8 @@
       <h3 class="book-settings-stats-title" x-text="$app.t('admin.books.ownerlessHeading')"></h3>
       <p class="muted-msg muted-msg--sm" x-show="ownerlessBooks().length === 0" x-text="$app.t('admin.books.ownerlessEmpty')"></p>
 
-      <table class="admin-pool-table" x-show="ownerlessBooks().length">
+      <div class="table-scroll" x-show="ownerlessBooks().length">
+      <table class="admin-pool-table">
         <thead>
           <tr>
             <th x-text="$app.t('admin.books.col.id')"></th>
@@ -51,13 +52,15 @@
           </template>
         </tbody>
       </table>
+      </div>
     </section>
 
     <section class="admin-pool-section">
       <h3 class="book-settings-stats-title" x-text="$app.t('admin.books.ownedHeading')"></h3>
       <p class="muted-msg muted-msg--sm" x-show="ownedBooks().length === 0" x-text="$app.t('admin.books.ownedEmpty')"></p>
 
-      <table class="admin-pool-table" x-show="ownedBooks().length">
+      <div class="table-scroll" x-show="ownedBooks().length">
+      <table class="admin-pool-table">
         <thead>
           <tr>
             <th x-text="$app.t('admin.books.col.id')"></th>
@@ -77,6 +80,7 @@
           </template>
         </tbody>
       </table>
+      </div>
     </section>
   </div>
 </div>

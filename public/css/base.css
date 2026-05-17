@@ -54,6 +54,11 @@ html {
   scrollbar-gutter: stable;
 }
 
+/* FOUC-Schutz: Body bleibt unsichtbar bis i18n-Bundle geladen — sonst rendert
+   Alpine `t('key')` kurz als rohen Key. Attribut wird in app.js#init() nach
+   configureI18n() entfernt. */
+html[data-i18n-loading] body { visibility: hidden; }
+
 body {
   font-family: var(--font-sans);
   color: var(--color-text);

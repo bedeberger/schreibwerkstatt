@@ -124,9 +124,21 @@
   font-size: var(--font-size-sm);
 }
 
-@media (max-width: 720px) {
+@media (max-width: 600px) {
   .admin-settings-tabs {
     overflow-x: auto;
     flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
   }
+  .admin-settings-tab {
+    flex-shrink: 0;
+    padding: var(--space-sm) var(--space-md);
+  }
+  .admin-settings-subsection,
+  .admin-settings-sweep {
+    padding: var(--space-md);
+  }
+  .admin-settings-actions { flex-wrap: wrap; }
+  .admin-settings-actions button { flex: 1 0 auto; }
 }

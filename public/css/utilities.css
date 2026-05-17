@@ -223,4 +223,14 @@
   .row > input { flex: 1 0 100%; }
   .row > button { flex: 1; }
 }
+
+/* === Table-Scroll: Wrapper, der breite Tabellen auf engen Viewports horizontal
+   scrollen laesst, statt aus der Karte herauszuragen. Wrapper-Div um <table>:
+     <div class="table-scroll"><table>…</table></div> */
+.table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+.table-scroll > table { min-width: 100%; }
 }

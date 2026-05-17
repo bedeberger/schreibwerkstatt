@@ -80,6 +80,34 @@ test('renderTemplate: unbekanntes Template wirft', () => {
   assert.throws(() => renderTemplate('does-not-exist', {}, 'de'), /unknown template/);
 });
 
+test('renderTemplate: job-failed-admin loest errorMsg-Key + errorParams via i18n-server auf', () => {
+  const r = renderTemplate('job-failed-admin', {
+    jobType: 'komplett-analyse', jobId: 'abc',
+    userEmail: 'u@x', bookId: '1', bookName: 'B',
+    errorMsg: 'job.error.phase1Incomplete',
+    errorParams: { count: 2, details: 'Kap 3: terminated; Kap 7: parseFailed' },
+    provider: 'claude', model: 'sonnet-4-6',
+    tokensIn: 1000, tokensOut: 200, duration: '5m',
+  }, 'de');
+  assert.match(r.text, /Phase 1 unvollst.ndig: 2 Chunks fehlgeschlagen/);
+  assert.match(r.text, /Kap 3: terminated; Kap 7: parseFailed/);
+  // Kein roher i18n-Key mehr in der gerenderten Nachricht.
+  assert.doesNotMatch(r.text, /job\.error\.phase1Incomplete/);
+});
+
+test('renderTemplate: job-failed-admin EN-Locale rendert englische Fehlernachricht', () => {
+  const r = renderTemplate('job-failed-admin', {
+    jobType: 'komplett-analyse', jobId: 'abc',
+    userEmail: 'u@x', bookId: '1', bookName: 'B',
+    errorMsg: 'job.error.phase1Incomplete',
+    errorParams: { count: 1, details: 'Ch 4: rate_limit' },
+    provider: 'claude', model: 'sonnet-4-6',
+    tokensIn: 0, tokensOut: 0, duration: '1m',
+  }, 'en');
+  assert.match(r.text, /Phase 1 incomplete: 1 chunks failed/);
+  assert.match(r.text, /Ch 4: rate_limit/);
+});
+
 test('mailer.getStatus: ohne Config → mode=disabled, ready=false, missing listet user+app_password', () => {
   clearSmtp();
   const s = mailer.getStatus();

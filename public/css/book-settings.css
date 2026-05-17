@@ -109,10 +109,9 @@
 .job-run-error {
   color: var(--color-err-light);
   font-size: var(--font-size-xs);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
 }
 .job-run-muted { color: var(--color-muted); }
 @media (max-width: 600px) {
