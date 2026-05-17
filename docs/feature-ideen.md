@@ -23,3 +23,6 @@
 ## Gemeinsames Bearbeiten
 - versionhistory zeigt, wer geupdatet hat
 - Bei geänderten Seiten von anderen Users; toast aktivieren oder so
+
+## Rolle Lektor
+- kann auch editieren, aber alles als Draft, ein Editor muss es abnehnehmen
