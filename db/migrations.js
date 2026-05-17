@@ -5348,6 +5348,42 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 125 abgeschlossen (page_presence).');
   }
 
+  if (version < 126) {
+    // page_locks.reason: 'edit' als zweiter Reason-Wert. Soft-Lock fuer den
+    // Free-Edit-Pfad (startEdit acquired ihn, anderer User sieht „X editiert
+    // bis HH:MM"). 'lektorat' bleibt Hard-Lock (blockt PUT mit 423); 'edit'
+    // wird beim PUT als advisory behandelt (kein 423, nur UI-Signal).
+    // CHECK-Constraint erweitert via Table-Recreate (SQLite-Pflicht).
+    db.pragma('foreign_keys = OFF');
+    db.prepare('DROP TABLE IF EXISTS page_locks_new').run();
+    db.prepare(`
+      CREATE TABLE page_locks_new (
+        page_id           INTEGER PRIMARY KEY REFERENCES pages(page_id)     ON DELETE CASCADE,
+        book_id           INTEGER NOT NULL    REFERENCES books(book_id)     ON DELETE CASCADE,
+        locked_by_email   TEXT    NOT NULL    REFERENCES app_users(email)   ON DELETE CASCADE,
+        reason            TEXT    NOT NULL CHECK(reason IN ('lektorat','edit')),
+        acquired_at       TEXT    NOT NULL DEFAULT (datetime('now')),
+        expires_at        TEXT    NOT NULL,
+        last_heartbeat_at TEXT    NOT NULL DEFAULT (datetime('now'))
+      )
+    `).run();
+    db.prepare(`
+      INSERT INTO page_locks_new (page_id, book_id, locked_by_email, reason, acquired_at, expires_at, last_heartbeat_at)
+      SELECT page_id, book_id, locked_by_email, reason, acquired_at, expires_at, last_heartbeat_at
+        FROM page_locks
+    `).run();
+    db.prepare('DROP TABLE page_locks').run();
+    db.prepare('ALTER TABLE page_locks_new RENAME TO page_locks').run();
+    db.pragma('foreign_keys = ON');
+
+    const fkErrors126 = db.pragma('foreign_key_check');
+    if (fkErrors126.length) {
+      throw new Error(`Migration 126: foreign_key_check meldet ${fkErrors126.length} Verstoesse: ${JSON.stringify(fkErrors126.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 126').run();
+    logger.info('DB-Migration auf Version 126 abgeschlossen (page_locks.reason+edit).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {
