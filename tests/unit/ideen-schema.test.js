@@ -1,6 +1,7 @@
 'use strict';
-// ideen-Tabelle: CRUD + User-Isolation gegen frische In-Memory-DB.
-// Wir replizieren das Migrations-DDL hier, damit der Test ohne schreibwerkstatt.db läuft.
+// ideen-Tabelle: CRUD + User-Isolation + Scope-XOR (page_id XOR chapter_id)
+// gegen frische In-Memory-DB. Wir replizieren das Migrations-DDL hier, damit
+// der Test ohne schreibwerkstatt.db läuft.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -13,14 +14,16 @@ function freshDb() {
     CREATE TABLE ideen (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       book_id     INTEGER NOT NULL,
-      page_id     INTEGER NOT NULL,
-      page_name   TEXT,
+      page_id     INTEGER,
+      chapter_id  INTEGER,
       user_email  TEXT NOT NULL,
       content     TEXT NOT NULL,
       erledigt    INTEGER NOT NULL DEFAULT 0,
       erledigt_at TEXT,
       created_at  TEXT NOT NULL,
-      updated_at  TEXT NOT NULL
+      updated_at  TEXT NOT NULL,
+      CHECK ((page_id IS NOT NULL AND chapter_id IS NULL)
+          OR (page_id IS NULL AND chapter_id IS NOT NULL))
     )
   `).run();
   return db;
@@ -77,4 +80,57 @@ test('ideen: DELETE nur eigene Zeilen (Ownership-Pattern)', () => {
   // eigener User → gelöscht
   const r2 = db.prepare('DELETE FROM ideen WHERE id = ? AND user_email = ?').run(id, 'a@x.de');
   assert.equal(r2.changes, 1);
+});
+
+test('ideen: Scope-XOR — Kapitel-Idee mit chapter_id alleine erlaubt', () => {
+  const db = freshDb();
+  const now = new Date().toISOString();
+  db.prepare(`INSERT INTO ideen (book_id, chapter_id, user_email, content, created_at, updated_at)
+              VALUES (1, 5, 'u@x.de', 'Kapitel-Idee', ?, ?)`).run(now, now);
+  const row = db.prepare('SELECT page_id, chapter_id FROM ideen WHERE user_email = ?').get('u@x.de');
+  assert.equal(row.page_id, null);
+  assert.equal(row.chapter_id, 5);
+});
+
+test('ideen: Scope-XOR — beide gesetzt → CHECK schlägt fehl', () => {
+  const db = freshDb();
+  const now = new Date().toISOString();
+  assert.throws(() => {
+    db.prepare(`INSERT INTO ideen (book_id, page_id, chapter_id, user_email, content, created_at, updated_at)
+                VALUES (1, 10, 5, 'u@x.de', 'Beides', ?, ?)`).run(now, now);
+  }, /CHECK constraint failed/);
+});
+
+test('ideen: Scope-XOR — keins gesetzt → CHECK schlägt fehl', () => {
+  const db = freshDb();
+  const now = new Date().toISOString();
+  assert.throws(() => {
+    db.prepare(`INSERT INTO ideen (book_id, user_email, content, created_at, updated_at)
+                VALUES (1, 'u@x.de', 'Keins', ?, ?)`).run(now, now);
+  }, /CHECK constraint failed/);
+});
+
+test('ideen: Counts pro kind (page vs chapter)', () => {
+  const db = freshDb();
+  const now = new Date().toISOString();
+  db.prepare(`INSERT INTO ideen (book_id, page_id, user_email, content, created_at, updated_at)
+              VALUES (1, 10, 'u@x.de', 'P1', ?, ?)`).run(now, now);
+  db.prepare(`INSERT INTO ideen (book_id, page_id, user_email, content, created_at, updated_at)
+              VALUES (1, 10, 'u@x.de', 'P2', ?, ?)`).run(now, now);
+  db.prepare(`INSERT INTO ideen (book_id, chapter_id, user_email, content, created_at, updated_at)
+              VALUES (1, 5, 'u@x.de', 'C1', ?, ?)`).run(now, now);
+
+  const pageCounts = db.prepare(`
+    SELECT page_id AS scope_id, COUNT(*) AS n FROM ideen
+    WHERE book_id = ? AND user_email = ? AND erledigt = 0 AND page_id IS NOT NULL
+    GROUP BY page_id
+  `).all(1, 'u@x.de');
+  assert.deepEqual(pageCounts, [{ scope_id: 10, n: 2 }]);
+
+  const chapCounts = db.prepare(`
+    SELECT chapter_id AS scope_id, COUNT(*) AS n FROM ideen
+    WHERE book_id = ? AND user_email = ? AND erledigt = 0 AND chapter_id IS NOT NULL
+    GROUP BY chapter_id
+  `).all(1, 'u@x.de');
+  assert.deepEqual(chapCounts, [{ scope_id: 5, n: 1 }]);
 });
