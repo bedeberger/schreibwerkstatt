@@ -294,9 +294,10 @@ document.addEventListener('alpine:init', () => {
       return this._allOptions.filter(o => String(o.label).toLowerCase().includes(q));
     },
     get selectedLabel() {
-      if (this.value === '' || this.value === null || this.value === undefined) return this.emptyLabel || '';
-      const opt = this._allOptions.find(o => String(o.value) === String(this.value));
-      return opt ? opt.label : '';
+      const v = this.value ?? '';
+      const opt = this._allOptions.find(o => String(o.value) === String(v));
+      if (opt) return opt.label;
+      return this.emptyLabel || '';
     },
 
     toggle() {

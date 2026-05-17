@@ -7,7 +7,7 @@
     <span class="card-title" x-text="$app.t('overview.title', { name: $app.selectedBookName })"></span>
     <div class="card-actions">
       <a class="btn-bookstack-link" target="_blank" rel="noopener"
-         x-show="$app.selectedBookUrl"
+         x-show="$app.backend === 'bookstack' && $app.selectedBookUrl"
          :href="$app.selectedBookUrl"
          x-text="$app.t('book.bookstack')"></a>
       <button type="button" @click="loadBookOverview($app.selectedBookId)" :disabled="overviewLoading">

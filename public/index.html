@@ -150,7 +150,7 @@
          x-modelable="value" x-model="selectedBookId"
          x-effect="options = filteredBooks().map(b => ({value: String(b.id), label: b.name}))"
          @combobox-change="resetView();"></div>
-    <a :href="selectedBookUrl || '#'" target="_blank" rel="noopener" class="btn-bookstack-link" :class="{ 'btn-bookstack-link--hidden': !selectedBookUrl }" :tabindex="selectedBookUrl ? 0 : -1" :aria-hidden="!selectedBookUrl" :data-tip="t('book.openInBookstack')" x-text="t('book.bookstack')"></a>
+    <a x-show="backend === 'bookstack'" :href="selectedBookUrl || '#'" target="_blank" rel="noopener" class="btn-bookstack-link" :class="{ 'btn-bookstack-link--hidden': !selectedBookUrl }" :tabindex="selectedBookUrl ? 0 : -1" :aria-hidden="!selectedBookUrl" :data-tip="t('book.openInBookstack')" x-text="t('book.bookstack')"></a>
   </div>
 
   <!-- Phase 6: Filter-Pills (Kategorie + Tags). Reines Frontend-Filter -->

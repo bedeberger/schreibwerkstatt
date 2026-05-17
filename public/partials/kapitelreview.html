@@ -9,10 +9,10 @@
   <div class="card-header card-header--subline">
     <div class="card-header-titlebar">
       <span class="card-title" x-text="$app.t('kapitelReview.title', { name: kapitelReviewSelectedChapter()?.name || $app.selectedBookName })"></span>
-      <div class="card-subline" x-show="kapitelReviewSelectedChapter()?.url || kapitelReviewLastEditAt()">
+      <div class="card-subline" x-show="($app.backend === 'bookstack' && kapitelReviewSelectedChapter()?.url) || kapitelReviewLastEditAt()">
         <span x-show="kapitelReviewLastEditAt()" x-text="$app.t('kapitelReview.lastEdit', { when: $app.formatDate(kapitelReviewLastEditAt()) })"></span>
-        <span class="card-subline-sep" aria-hidden="true" x-show="kapitelReviewLastEditAt() && kapitelReviewSelectedChapter()?.url">·</span>
-        <a x-show="kapitelReviewSelectedChapter()?.url" :href="kapitelReviewSelectedChapter()?.url" target="_blank" rel="noopener" class="card-subline-link" x-text="$app.t('editor.openInBookstack')"></a>
+        <span class="card-subline-sep" aria-hidden="true" x-show="$app.backend === 'bookstack' && kapitelReviewLastEditAt() && kapitelReviewSelectedChapter()?.url">·</span>
+        <a x-show="$app.backend === 'bookstack' && kapitelReviewSelectedChapter()?.url" :href="kapitelReviewSelectedChapter()?.url" target="_blank" rel="noopener" class="card-subline-link" x-text="$app.t('editor.openInBookstack')"></a>
       </div>
     </div>
     <div class="card-header-aside">
