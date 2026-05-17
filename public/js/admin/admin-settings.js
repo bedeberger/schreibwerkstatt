@@ -1,4 +1,4 @@
-// Phase 4c (BookStack-Exit, docs/bookstack-exit.md): AdminSettingsCard-Methods.
+// AdminSettingsCard-Methods.
 
 export const adminSettingsMethods = {
   async adminSettingsLoad() {

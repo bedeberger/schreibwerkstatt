@@ -26,7 +26,7 @@ export const bookSettingsMethods = {
     }
   },
 
-  // Phase 6 (BookStack-Exit): Kategorie + Tags. Pool global; pro Buch eine
+  // Kategorie + Tags. Pool global; pro Buch eine
   // Kategorie (optional) + N Tags (Multi-Select). Inline-Create fuer Tags.
   async loadBookCategoriesAndTags() {
     const bookId = window.__app.selectedBookId;
@@ -293,7 +293,7 @@ export const bookSettingsMethods = {
     }
   },
 
-  // ── Phase 4b Sharing ───────────────────────────────────────────────────────
+  // ── Sharing ────────────────────────────────────────────────────────────────
 
   async loadBookAccess() {
     const bookId = window.__app.selectedBookId;

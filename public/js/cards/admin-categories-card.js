@@ -1,6 +1,5 @@
-// Phase 6 (BookStack-Exit, docs/bookstack-exit.md): Alpine-Sub-Komponente fuer
-// den Kategorien-/Tag-Pool (Admin-only). State + Lifecycle hier, Show-Flag
-// (`showAdminCategoriesCard`) im Root.
+// Alpine-Sub-Komponente fuer den Kategorien-/Tag-Pool (Admin-only). State +
+// Lifecycle hier, Show-Flag (`showAdminCategoriesCard`) im Root.
 
 import { adminCategoriesMethods } from '../admin/admin-categories.js';
 

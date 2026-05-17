@@ -1,6 +1,6 @@
 'use strict';
-// Phase 4a2 (BookStack-Exit, docs/bookstack-exit.md): Public-Landing +
-// POST /register. User-Enumeration-Antwortgleichheit + Rate-Limit + Captcha-
+// Public-Landing + POST /register. User-Enumeration-Antwortgleichheit +
+// Rate-Limit + Captcha-
 // Skip bei Nicht-Konfiguration.
 
 const test = require('node:test');

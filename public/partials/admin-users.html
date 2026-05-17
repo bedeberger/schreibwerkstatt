@@ -16,7 +16,7 @@
   <div x-show="adminUsersLoading" class="muted-msg" x-text="$app.t('common.loading')"></div>
   <div x-show="adminUsersError" class="error-msg" x-text="adminUsersError"></div>
 
-  <!-- Phase 4a2: Tab-Navigation Users / Requests -->
+  <!-- Tab-Navigation Users / Requests -->
   <nav class="admin-users-tabs" role="tablist">
     <button type="button" role="tab"
             :class="adminUsersTab === 'users' ? 'is-active' : ''"
@@ -132,7 +132,7 @@
 
   </div>
 
-  <!-- Phase 4a2: Registration-Requests-Tab -->
+  <!-- Registration-Requests-Tab -->
   <div class="card-form-grid" x-show="!adminUsersLoading && adminUsersTab === 'requests'">
 
     <div class="admin-users-requests-filter">

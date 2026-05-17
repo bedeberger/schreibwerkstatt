@@ -1,6 +1,5 @@
 'use strict';
-// Phase 4a (BookStack-Exit, docs/bookstack-exit.md): Login-Landing-Page +
-// POST /auth/admin-login Smoke-Tests.
+// Login-Landing-Page + POST /auth/admin-login Smoke-Tests.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');

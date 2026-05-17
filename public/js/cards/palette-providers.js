@@ -239,7 +239,7 @@ export const PROVIDERS = [
     },
   },
   {
-    // Volltextsuche-Provider (Phase 7 BookStack-Exit). Async — feuert
+    // Volltextsuche-Provider. Async — feuert
     // `/search?q=...` und cached pro Query bis zur naechsten Eingabe.
     key: 'fulltext',
     prefix: '?',

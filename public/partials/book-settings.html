@@ -90,7 +90,7 @@
        x-show="bookSettingsBuchtyp === 'kurzgeschichten' && (bookSettingsErzaehlperspektive || bookSettingsErzaehlzeit)"
        x-text="$app.t('book.settings.pov.kurzgeschichtenHint')"></p>
 
-    <!-- Phase 6: Kategorie + Tags -->
+    <!-- Kategorie + Tags -->
     <div class="card-form-row">
       <label class="card-form-label" x-text="$app.t('book.category')"></label>
       <div x-data="combobox($app.t('book.category'), $app.t('categories.empty'))"
@@ -156,7 +156,7 @@
     <p class="card-form-saved" x-show="bookSettingsSaved" x-cloak x-transition.opacity.duration.250ms x-text="$app.t('common.settingsSaved')"></p>
     <p class="card-form-error" x-show="bookSettingsError" x-text="bookSettingsError"></p>
 
-    <!-- Phase 4b: Sharing + Buch-Chat-Opt-In für Lektor. Sichtbar für alle
+    <!-- Sharing + Buch-Chat-Opt-In für Lektor. Sichtbar für alle
          Buch-Berechtigten (read-only für nicht-Owner). -->
     <section class="book-settings-stats">
       <h3 class="book-settings-stats-title" x-text="$app.t('book.share.title')"></h3>

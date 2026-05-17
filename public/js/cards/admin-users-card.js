@@ -10,7 +10,7 @@ export function registerAdminUsersCard() {
     adminUsersList: [],
     adminUsersLoading: false,
     adminUsersError: '',
-    adminUsersGlobalProvider: 'claude',  // Phase 11: fuer Provider-Combobox-Label "Global: …"
+    adminUsersGlobalProvider: 'claude',  // fuer Provider-Combobox-Label "Global: …"
     adminUsersInviteEmail: '',
     adminUsersInviteRole: 'user',
     adminUsersInviting: false,
@@ -18,7 +18,7 @@ export function registerAdminUsersCard() {
     adminUsersCopied: false,
     adminUsersAuditEmail: null,
     adminUsersAuditEvents: [],
-    // Phase 4a2: Registration-Requests-Tab.
+    // Registration-Requests-Tab.
     adminUsersTab: 'users',                  // 'users' | 'requests'
     adminUsersRequestsList: [],
     adminUsersRequestsStatus: 'pending',     // pending|approved|denied|expired|all

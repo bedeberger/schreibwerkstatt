@@ -1,5 +1,4 @@
-// Phase 6 (BookStack-Exit, docs/bookstack-exit.md): Admin-Karte fuer den
-// Kategorien- + Tag-Pool. CRUD-Methoden werden in
+// Admin-Karte fuer den Kategorien- + Tag-Pool. CRUD-Methoden werden in
 // Alpine.data('adminCategoriesCard') gespreadet.
 
 import { fetchJson } from '../utils.js';

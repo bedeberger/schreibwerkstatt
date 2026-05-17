@@ -1,5 +1,5 @@
 'use strict';
-// Phase 6 (BookStack-Exit): CRUD + FK-Verhalten fuer book_categories,
+// CRUD + FK-Verhalten fuer book_categories,
 // book_tags, book_tag_assignments.
 
 const test = require('node:test');

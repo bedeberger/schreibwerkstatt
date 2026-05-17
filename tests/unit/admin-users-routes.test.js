@@ -1,5 +1,5 @@
 'use strict';
-// Phase 4a Sub-Step C: /admin/users + /me/invite Endpoints.
+// /admin/users + /me/invite Endpoints.
 //
 // Test mountet die Router auf einer Mini-Express-Instanz und ruft sie
 // via http direkt auf (kein Playwright / Supertest noetig). Session wird

@@ -1,4 +1,4 @@
-// Phase 11: resolveProvider Reihenfolge — User-Override > Global > Default.
+// resolveProvider Reihenfolge — User-Override > Global > Default.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

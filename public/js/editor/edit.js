@@ -119,6 +119,27 @@ export const editorEditMethods = {
     return document.querySelector('#editor-card .page-content-view--editing');
   },
 
+  // Pre-Save-Conflict-Check für Read-Modify-Write-Pfade. Vor PUT die Seite
+  // frisch lesen und `updated_at` mit Editor-Snapshot vergleichen; Mismatch =
+  // anderer User hat zwischendrin gespeichert. Liefert null bei keiner
+  // Diskrepanz, sonst { remoteUpdatedAt, remoteUserName, remoteHtml }.
+  // Wirft nicht — Aufrufer entscheidet bei Read-Fehler.
+  async _checkPageConflict(pageId, expectedUpdatedAt) {
+    if (!expectedUpdatedAt) return null;
+    let remote;
+    try {
+      remote = await contentRepo.loadPage(pageId, { fresh: true });
+    } catch {
+      return null;
+    }
+    if (!remote?.updated_at || remote.updated_at === expectedUpdatedAt) return null;
+    return {
+      remoteUpdatedAt: remote.updated_at,
+      remoteUserName: remote.updated_by_name || null,
+      remoteHtml: remote.html || '',
+    };
+  },
+
   // Nach jedem erfolgreichen Save: Findings, deren `original`-Text nicht mehr
   // im neuen HTML vorkommt, gelten als behoben und fliegen raus. Gilt sowohl
   // für saveEdit (expliziter Save) als auch quickSave (Ctrl+S/Autosave) –
@@ -149,7 +170,7 @@ export const editorEditMethods = {
   startEdit() {
     if (!this.currentPage || this.originalHtml === null) return;
     if (this.checkLoading || this.saveApplying != null) return;
-    // Phase 4b1: viewer/lektor duerfen Page-HTML nicht direkt mutieren.
+    // viewer/lektor duerfen Page-HTML nicht direkt mutieren.
     // Defense-in-depth zum verstecken Button-Hide in editor.html.
     if (!this.canEdit()) return;
     this.editMode = true;
@@ -353,7 +374,7 @@ export const editorEditMethods = {
   // Stilles Speichern (Ctrl+S / Auto-Save): bleibt im Editor.
   async quickSave() {
     if (!this.editMode || !this.currentPage || this.editSaving) return;
-    // Phase 4b1: ohne Edit-Recht kein Auto-Save (Defense; startEdit blockt
+    // Ohne Edit-Recht kein Auto-Save (Defense; startEdit blockt
     // ohnehin den Eintritt — aber Race mit Role-Refresh waehrend Edit-Session).
     if (!this.canEdit()) return;
     const el = this._getEditEl();

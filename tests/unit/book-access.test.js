@@ -1,6 +1,6 @@
 'use strict';
-// Phase 4b (BookStack-Exit, docs/bookstack-exit.md): db/book-access.js Helper,
-// Rollen-Hierarchie, Migration-109 Backfill, Page-Lock-Lifecycle.
+// db/book-access.js Helper, Rollen-Hierarchie, Migration-109 Backfill,
+// Page-Lock-Lifecycle.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');

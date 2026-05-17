@@ -1,5 +1,5 @@
-// Alpine.data('pageRevisionsCard') — Phase 2 (BookStack-Exit): App-eigene
-// Revisionsliste pro Seite. Lebt unter dem Editor parallel zur
+// Alpine.data('pageRevisionsCard') — App-eigene Revisionsliste pro Seite.
+// Lebt unter dem Editor parallel zur
 // Lektorat-Verlaufsleiste (pageHistoryCard). Read aus
 // GET /content/pages/:id/revisions, Voll-Body aus .../:rev_id, Restore via
 // POST .../restore. Viewer ist natives <dialog>: Tabs "Inhalt | Vergleich",
@@ -18,7 +18,7 @@ export function registerPageRevisionsCard() {
     restoringId: null,
     _pageId: null,
 
-    // Viewer-State (Phase 2: Inhalt-/Vergleichs-Modal).
+    // Viewer-State (Inhalt-/Vergleichs-Modal).
     viewerOpen: false,
     viewerRev: null,
     viewerBody: '',

@@ -1,6 +1,6 @@
 'use strict';
-// Phase 4a2 (BookStack-Exit, docs/bookstack-exit.md): registration_requests
-// DB-Helper. Partial-UNIQUE blockt pending-Duplikate; expireStale schiebt
+// registration_requests DB-Helper. Partial-UNIQUE blockt pending-Duplikate;
+// expireStale schiebt
 // alte pending-Requests auf 'expired'.
 
 const test = require('node:test');

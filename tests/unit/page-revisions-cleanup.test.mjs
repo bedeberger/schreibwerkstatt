@@ -1,4 +1,4 @@
-// Phase 2: page_revisions Retention via cache-cleanup-Policy
+// page_revisions Retention via cache-cleanup-Policy
 // `per-page-limit` aus app.page_revision_limit.
 
 import { test } from 'node:test';

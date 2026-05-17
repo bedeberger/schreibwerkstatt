@@ -1,4 +1,4 @@
-// Phase 4d: admin-usage DB-Queries (listUsersWithUsage, monthlyTotals,
+// admin-usage DB-Queries (listUsersWithUsage, monthlyTotals,
 // listFeatureUsage, listTimeUsage, getJobRuns, getChatMessages).
 import test from 'node:test';
 import assert from 'node:assert/strict';

@@ -187,7 +187,7 @@ export const treeMethods = {
     try {
       this.setStatus(this.t('tree.connecting'), true);
       this.books = await contentRepo.listBooks();
-      // Phase 6: Pool fuer Filter-Pills aus aktuellem Bestand ableiten.
+      // Pool fuer Filter-Pills aus aktuellem Bestand ableiten.
       const catIds = new Set();
       const tagMap = new Map();
       for (const b of this.books) {
@@ -217,7 +217,7 @@ export const treeMethods = {
     }
   },
 
-  // Phase 6: Filter-Logik fuer Buchliste. AND-Kombination: Kategorie + alle
+  // Filter-Logik fuer Buchliste. AND-Kombination: Kategorie + alle
   // gewaehlten Tags muessen am Buch hinterlegt sein. Leere Filter = kein Filter.
   filteredBooks() {
     const cat = this.bookFilterCategoryId;
@@ -244,7 +244,7 @@ export const treeMethods = {
     this.bookFilterTagIds = [];
   },
 
-  // Phase 4b/4b1: ACL-Rolle aus /books/:id/access laden + cachen. Getter
+  // ACL-Rolle aus /books/:id/access laden + cachen. Getter
   // `canEdit`/`canReview`/`isViewer` lesen ausschliesslich `currentBookRole`.
   async _loadBookRole(bookId) {
     const id = bookId ? String(bookId) : '';

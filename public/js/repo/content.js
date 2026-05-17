@@ -2,9 +2,7 @@
 //
 // Caller (Editor, Lektorat, Chat, History, Tree) reden nur noch hierhin —
 // nicht mehr direkt mit BookStack-Pfaden unter /api/*. Antwort-Shape ist das
-// App-Domain-Shape aus lib/content-mapper.js. Phase 1 des Exit-Plans tauscht
-// die /content/*-Server-Implementierung gegen Local-DB; dieses Modul aendert
-// sich dabei nicht.
+// App-Domain-Shape aus lib/content-mapper.js.
 //
 // Diese Datei + lib/content-mapper.js + routes/content.js sind zusammen mit
 // public/js/api-bookstack.js und lib/bookstack.js die EINZIGEN Stellen, an
@@ -109,7 +107,7 @@ export const contentRepo = {
   // GET /content/books/:id/tree → { chapters: [{...c, pages: [...]}], topPages: [...] }
   bookTree(id, opts)            { return _get('books/' + id + '/tree', opts); },
 
-  // Phase 3 (BookStack-Exit): Sortier-SSoT.
+  // Sortier-SSoT.
   // GET → { tree, updated_at, updated_by }; PUT { order_json } setzt den
   // vollstaendigen Baum atomar (Validierung + Materialisierung in Tx).
   loadOrder(id, opts)           { return _get('books/' + id + '/order', opts); },
