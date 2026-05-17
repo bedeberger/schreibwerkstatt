@@ -64,18 +64,25 @@ export const appKomplettMethods = {
         this.alleAktualisierenStatus = `${this.t('common.errorColon')}${job.error ? this.t(job.error, job.errorParams) : this.t('app.jobFailed')}`;
       },
       onDone: async () => {
-        await Promise.all([
-          this.loadFiguren(bookId),
-          this.loadOrte(bookId),
-          this.loadSzenen(bookId),
-          this._loadKontinuitaetHistory(),
-          this.loadLastKomplettRun(bookId),
-          this._reloadZeitstrahl(),
-        ]);
-        this.alleAktualisierenLoading = false;
-        const doneMsg = this.t('common.finished');
-        this.alleAktualisierenStatus = doneMsg;
-        clearStatusAfter(this, 'alleAktualisierenStatus', doneMsg, 4000);
+        try {
+          // _loadKontinuitaetHistory lebt auf kontinuitaetCard (nicht im Root) —
+          // Card per card:refresh-Event reloaden lassen (Lifecycle hört darauf).
+          window.dispatchEvent(new CustomEvent('card:refresh', { detail: { name: 'kontinuitaet' } }));
+          await Promise.all([
+            this.loadFiguren(bookId),
+            this.loadOrte(bookId),
+            this.loadSzenen(bookId),
+            this.loadLastKomplettRun(bookId),
+            this._reloadZeitstrahl(),
+          ]);
+        } finally {
+          // Loading-Flag MUSS auch dann zurück, wenn ein Sibling-Reload wirft —
+          // sonst bleibt Button-Ring + Status-Panel auf "running" hängen.
+          this.alleAktualisierenLoading = false;
+          const doneMsg = this.t('common.finished');
+          this.alleAktualisierenStatus = doneMsg;
+          clearStatusAfter(this, 'alleAktualisierenStatus', doneMsg, 4000);
+        }
       },
     });
   },
