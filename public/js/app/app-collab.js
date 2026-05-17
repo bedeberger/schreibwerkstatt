@@ -217,4 +217,95 @@ export const appCollabMethods = {
       }).catch(() => {});
     } catch {}
   },
+
+  // ── Soft-Edit-Lock ────────────────────────────────────────────────────
+  // Beim Editor-Start: POST /books/pages/:id/lock mit reason='edit'. Heartbeat
+  // alle 5 Minuten (TTL 30min serverseitig). Bei 423 (fremder lektorat-Lock)
+  // verweigern wir den Edit gar nicht — der PUT haengt sich daran nicht auf,
+  // weil getBlockingLockFor nur 'lektorat' meldet (Phase 2 OCC reicht).
+  // Fremder 'edit'-Lock landet als foreignEditLock im Banner.
+  async _acquireEditLock(pageId) {
+    if (!pageId) return null;
+    try {
+      const r = await fetch('/books/pages/' + pageId + '/lock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: 'edit' }),
+      });
+      if (r.status === 423) {
+        const body = await r.json().catch(() => ({}));
+        this.foreignEditLock = {
+          user_email: body.locked_by_email || null,
+          user_display_name: this.userDisplayName?.(body.locked_by_email) || body.locked_by_email,
+          expires_at: body.expires_at || null,
+          reason: body.reason || 'lektorat',
+        };
+        return null;
+      }
+      if (!r.ok) return null;
+      const data = await r.json();
+      this._currentEditLock = data?.lock || null;
+      this.foreignEditLock = null;
+      this._startLockHeartbeat(pageId);
+      return this._currentEditLock;
+    } catch { return null; }
+  },
+
+  _startLockHeartbeat(pageId) {
+    if (this._lockHeartbeatTimer) clearInterval(this._lockHeartbeatTimer);
+    // 5min-Tick — Server-TTL ist 30min, doppelt-sicher gegen verlorene Pings.
+    this._lockHeartbeatTimer = setInterval(() => {
+      if (!this._currentEditLock || !pageId) return;
+      this._sendLockHeartbeat(pageId);
+    }, 5 * 60 * 1000);
+  },
+
+  async _sendLockHeartbeat(pageId) {
+    try {
+      const r = await fetch('/books/pages/' + pageId + '/lock/heartbeat', { method: 'POST' });
+      if (r.status === 423) {
+        // Anderer User hat in der Zwischenzeit (Hard-Pfad: 'lektorat') uebernommen.
+        const body = await r.json().catch(() => ({}));
+        this.foreignEditLock = {
+          user_email: body.locked_by_email || null,
+          user_display_name: this.userDisplayName?.(body.locked_by_email) || body.locked_by_email,
+          expires_at: body.expires_at || null,
+          reason: body.reason || 'lektorat',
+        };
+        this._currentEditLock = null;
+        if (this._lockHeartbeatTimer) clearInterval(this._lockHeartbeatTimer);
+        this._lockHeartbeatTimer = null;
+        return;
+      }
+      if (!r.ok) return;
+      const data = await r.json();
+      this._currentEditLock = data?.lock || this._currentEditLock;
+    } catch {}
+  },
+
+  _releaseEditLock(pageId) {
+    if (this._lockHeartbeatTimer) {
+      clearInterval(this._lockHeartbeatTimer);
+      this._lockHeartbeatTimer = null;
+    }
+    this._currentEditLock = null;
+    if (!pageId) return;
+    try {
+      fetch('/books/pages/' + pageId + '/lock', { method: 'DELETE' }).catch(() => {});
+    } catch {}
+  },
+
+  // Best-Effort-Release beim Tab-Close. `navigator.sendBeacon` ist der einzige
+  // verlaessliche Pfad waehrend `beforeunload`/`pagehide` — normales fetch wird
+  // vom Browser oft gekillt. POST mit JSON-Body, sendBeacon kann das.
+  _beaconReleaseEditLock(pageId) {
+    if (!pageId || typeof navigator === 'undefined' || !navigator.sendBeacon) return;
+    try {
+      const blob = new Blob([JSON.stringify({ method: 'DELETE' })], { type: 'application/json' });
+      // Server hat keinen sendBeacon-Endpoint mit DELETE-Semantik — Workaround:
+      // Wir nutzen fetch mit keepalive:true (Fallback) bzw. sendBeacon mit POST
+      // auf einen kuenstlichen Release-Marker. Pragmatischer: fetch mit keepalive.
+      fetch('/books/pages/' + pageId + '/lock', { method: 'DELETE', keepalive: true }).catch(() => {});
+    } catch {}
+  },
 };

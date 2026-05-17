@@ -249,12 +249,14 @@ document.addEventListener('alpine:init', () => {
     return {
     open: false,
     query: '',
-    value: null,
+    // Single mode: scalar; Multi mode: Array. x-modelable seeded from parent.
+    value: cfg.multiple ? [] : null,
     options: [],
     _disabled: false,
     _placeholder: cfg.placeholder ?? null,
     _emptyLabel: cfg.emptyLabel ?? null,
     _compact: cfg.compact !== false,
+    _multiple: !!cfg.multiple,
     _footer: (cfg.footer && typeof cfg.footer.action === 'function') ? cfg.footer : null,
     _onOutside: null,
     highlighted: -1,
@@ -269,6 +271,10 @@ document.addEventListener('alpine:init', () => {
       return this._emptyLabel;
     },
     get _allOptions() {
+      // emptyLabel-Sentinel passt nur fuer Single-Mode (leere Auswahl =
+      // explizite "Alle"-Option). In Multi-Mode bedeutet `value=[]` bereits
+      // "keine Auswahl" -> kein Sentinel-Eintrag im Dropdown.
+      if (this._multiple) return this.options;
       return this.emptyLabel
         ? [{ value: '', label: this.emptyLabel }, ...this.options]
         : this.options;
@@ -278,7 +284,20 @@ document.addEventListener('alpine:init', () => {
       const q = this.query.toLowerCase();
       return this._allOptions.filter(o => String(o.label).toLowerCase().includes(q));
     },
+    _isSelected(val) {
+      if (this._multiple) {
+        const arr = Array.isArray(this.value) ? this.value : [];
+        return arr.some(v => String(v) === String(val));
+      }
+      return String(this.value ?? '') === String(val);
+    },
     get selectedLabel() {
+      if (this._multiple) {
+        const arr = Array.isArray(this.value) ? this.value : [];
+        if (!arr.length) return '';
+        const t = window.__app?.t;
+        return t ? t('common.multiSelected', { n: arr.length }) : `${arr.length}`;
+      }
       const v = this.value ?? '';
       const opt = this._allOptions.find(o => String(o.value) === String(v));
       if (opt) return opt.label;
@@ -290,7 +309,15 @@ document.addEventListener('alpine:init', () => {
       if (this.open) { this.close(); return; }
       this.open = true;
       this.query = '';
-      this.highlighted = this._allOptions.findIndex(o => String(o.value) === String(this.value));
+      // Multi-Mode: highlight erste selektierte Option (oder 0).
+      if (this._multiple) {
+        const arr = Array.isArray(this.value) ? this.value : [];
+        this.highlighted = arr.length
+          ? this._allOptions.findIndex(o => arr.some(v => String(v) === String(o.value)))
+          : 0;
+      } else {
+        this.highlighted = this._allOptions.findIndex(o => String(o.value) === String(this.value));
+      }
       this.$nextTick(() => {
         this._decideOpenDirection();
         this.$refs.cbInput?.focus();
@@ -313,6 +340,17 @@ document.addEventListener('alpine:init', () => {
       this.openUp = false;
     },
     select(val) {
+      if (this._multiple) {
+        const arr = Array.isArray(this.value) ? this.value : [];
+        const idx = arr.findIndex(v => String(v) === String(val));
+        // Neues Array zuweisen, damit x-modelable + Watchers reagieren —
+        // arr.splice mutiert in-place und triggert keine Proxy-Setter.
+        this.value = idx >= 0
+          ? arr.filter((_, i) => i !== idx)
+          : [...arr, val];
+        this.$dispatch('combobox-change', this.value);
+        return;
+      }
       this.value = val;
       this.close();
       this.$dispatch('combobox-change', val);
@@ -378,6 +416,10 @@ document.addEventListener('alpine:init', () => {
       // verweist auf die aktuell via Tastatur markierte Option.
       this.$el.setAttribute('role', 'combobox');
       this.$el.setAttribute('aria-haspopup', 'listbox');
+      if (this._multiple) {
+        this.$el.classList.add('combobox-wrap--multi');
+        this.$el.setAttribute('aria-multiselectable', 'true');
+      }
       // Bei Query-Änderung Highlight an Filter-Liste angleichen, sonst zeigt der
       // alte Index ins gefilterte Array hinein und Enter selektiert undefined.
       this.$watch('query', () => {
@@ -399,8 +441,8 @@ document.addEventListener('alpine:init', () => {
               <li class="combobox-option"
                   role="option"
                   :id="$id('cb-opt') + '-' + i"
-                  :aria-selected="String(opt.value) === String(value) ? 'true' : 'false'"
-                  :class="{'combobox-option--selected': String(opt.value) === String(value), 'combobox-option--hl': i === highlighted}"
+                  :aria-selected="_isSelected(opt.value) ? 'true' : 'false'"
+                  :class="{'combobox-option--selected': _isSelected(opt.value), 'combobox-option--hl': i === highlighted}"
                   @click="select(opt.value)" @mouseenter="highlighted = i"
                   x-text="opt.label"></li>
             </template>
@@ -645,6 +687,13 @@ document.addEventListener('alpine:init', () => {
       window.addEventListener('job:finished', (e) => this._onJobFinished(e.detail), { signal });
       window.addEventListener('beforeunload', (e) => {
         if (this.editMode && this.editDirty) { e.preventDefault(); e.returnValue = ''; }
+        // Best-Effort: eigenen Soft-Lock + Presence-Eintrag freigeben, damit
+        // andere User nicht 30 Min auf einen verwaisten „X editiert"-Hinweis
+        // schauen. fetch + keepalive:true ueberlebt den Unload.
+        if (this.editMode && this.currentPage?.id) {
+          this._beaconReleaseEditLock?.(this.currentPage.id);
+          this._sendPresenceLeave?.(this.currentPage.id);
+        }
       }, { signal });
       // Kapitel-Stats werden bei jeder tokEsts-Reassignment neu berechnet.
       // Mutationen via Index-Assign (this.tokEsts[id] = …) feuern den Watcher

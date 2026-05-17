@@ -346,6 +346,12 @@ const collabState = () => ({
   // Eigener Heartbeat: aktiver Edit-Mode pingt den Server alle 30s.
   _presencePingTimer: null,
   _presencePingPageId: null,
+  // Soft-Lock-State: eigener gehaltener Lock + fremder Lock auf der offenen
+  // Seite (Banner-Quelle). _currentEditLock haelt {expires_at, reason}; ein
+  // fremder Lock (foreignEditLock) ist {user_email, user_display_name, ...}.
+  _currentEditLock: null,
+  _lockHeartbeatTimer: null,
+  foreignEditLock: null,
 });
 
 // Modal-State fuer Buch-Erstellung (Trigger: Combobox-Footer "+ Neues Buch").
