@@ -128,17 +128,14 @@ export const adminUsageMethods = {
 
   // ── Tab: Jobs ──────────────────────────────────────────────────────────────
   async adminUsageLoadJobs() {
-    if (!this.adminUsageFilterUser) {
-      this.adminUsageJobsList = [];
-      this.adminUsageJobsTotal = 0;
-      return;
-    }
     if (this.adminUsageLoading) return;
     this.adminUsageLoading = true;
     try {
-      const data = await this._adminUsageFetch(
-        `/admin/usage/users/${encodeURIComponent(this.adminUsageFilterUser)}/jobs?limit=50&offset=${this.adminUsageJobsOffset || 0}`
-      );
+      const qs = new URLSearchParams();
+      if (this.adminUsageFilterUser) qs.set('user', this.adminUsageFilterUser);
+      qs.set('limit', '50');
+      qs.set('offset', String(this.adminUsageJobsOffset || 0));
+      const data = await this._adminUsageFetch(`/admin/usage/jobs?${qs.toString()}`);
       this.adminUsageJobsList = data.rows || [];
       this.adminUsageJobsTotal = data.total || 0;
     } catch (e) { this.adminUsageError = e.message; }
@@ -147,17 +144,14 @@ export const adminUsageMethods = {
 
   // ── Tab: Chat ──────────────────────────────────────────────────────────────
   async adminUsageLoadChat() {
-    if (!this.adminUsageFilterUser) {
-      this.adminUsageChatList = [];
-      this.adminUsageChatTotal = 0;
-      return;
-    }
     if (this.adminUsageLoading) return;
     this.adminUsageLoading = true;
     try {
-      const data = await this._adminUsageFetch(
-        `/admin/usage/users/${encodeURIComponent(this.adminUsageFilterUser)}/chat?limit=50&offset=${this.adminUsageChatOffset || 0}`
-      );
+      const qs = new URLSearchParams();
+      if (this.adminUsageFilterUser) qs.set('user', this.adminUsageFilterUser);
+      qs.set('limit', '50');
+      qs.set('offset', String(this.adminUsageChatOffset || 0));
+      const data = await this._adminUsageFetch(`/admin/usage/chat?${qs.toString()}`);
       this.adminUsageChatList = data.rows || [];
       this.adminUsageChatTotal = data.total || 0;
     } catch (e) { this.adminUsageError = e.message; }

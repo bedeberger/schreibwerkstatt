@@ -2,6 +2,28 @@ const fs = require('fs');
 const path = require('path');
 const { db, DB_FILE } = require('./connection');
 const logger = require('../logger');
+const { SQUASHED_SCHEMA, SQUASHED_VERSION } = require('./squashed-schema');
+
+// Fresh-DB fast path: skip 119-step legacy migration chain by installing the
+// squashed final schema as a single SQL batch. Detection: schema_version table
+// is missing iff this is a brand-new install (legacy initial block always
+// creates it). On legacy installs we fall through to the unchanged top-level
+// skeleton (idempotent IF NOT EXISTS) plus runMigrations() chain.
+//
+// Drift between SQUASHED_SCHEMA and the legacy chain is gated by
+// tests/unit/squash-drift.test.mjs.
+const _hasSchemaVersion = db.prepare(
+  "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'"
+).get();
+// FORCE_LEGACY_MIGRATIONS=1 makes the squash-drift test exercise the legacy
+// migration chain even on a fresh DB. Never set in production.
+const IS_FRESH_INSTALL =
+  !_hasSchemaVersion && process.env.FORCE_LEGACY_MIGRATIONS !== '1';
+
+if (IS_FRESH_INSTALL) {
+  db.exec(SQUASHED_SCHEMA);
+  logger.info(`DB frisch initialisiert via Schema-Squash (Version ${SQUASHED_VERSION}).`);
+}
 
 // Serialisiert parallele Migrations-Runner (z.B. node --test --test-concurrency
 // mit geteiltem DB_PATH). Ohne Lock racen mehrere Worker auf ALTER TABLE und
@@ -26,7 +48,7 @@ function _withMigrationLock(fn) {
   }
 }
 
-db.exec(`
+if (!IS_FRESH_INSTALL) db.exec(`
   CREATE TABLE IF NOT EXISTS page_checks (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     page_id     INTEGER NOT NULL,

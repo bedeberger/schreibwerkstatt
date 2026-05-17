@@ -228,7 +228,11 @@ db.prepare('UPDATE schema_version SET version = N').run();
 8. `db.pragma('foreign_keys = ON')` + `foreign_key_check`
 9. `UPDATE schema_version`
 
-**Initial-Schema-Block** (oben in `migrations.js`) ist der „Stand vor allen Migrationen". Nur additive Changes (neue Spalten via ALTER ADD COLUMN, neue Tabellen). FK-Anreicherung gehört in eigene Migrationen via Recreate-Pattern, nicht ins Initial-Schema — sonst brechen Daten-Migrationen, die ihre eigenen Vorbedingungen aus alten Spalten lesen, auf frischen DBs.
+**Initial-Schema-Block** (oben in `migrations.js`) ist der „Stand vor allen Migrationen" für **Legacy-Installationen**. Nur additive Changes (neue Spalten via ALTER ADD COLUMN, neue Tabellen). FK-Anreicherung gehört in eigene Migrationen via Recreate-Pattern, nicht ins Initial-Schema — sonst brechen Daten-Migrationen, die ihre eigenen Vorbedingungen aus alten Spalten lesen, auf frischen DBs.
+
+**Fresh-DB-Fast-Path:** Brand-neue Installationen (keine `schema_version`-Tabelle) installieren stattdessen [db/squashed-schema.js](db/squashed-schema.js) in einem einzigen `db.exec`-Call (End-Zustand nach allen Migrationen) und überspringen die Legacy-Chain komplett. `runMigrations()` sieht direkt `version === SQUASHED_VERSION` und ist no-op. Drift zwischen Squashed-Snapshot und Legacy-Chain ist durch [tests/unit/squash-drift.test.mjs](tests/unit/squash-drift.test.mjs) gegated.
+
+**Pflicht nach jeder neuen Migration: `npm run squash:regen`** — regeneriert [db/squashed-schema.js](db/squashed-schema.js) aus einem frischen Migration-Run. Wer das vergisst, lässt den Drift-Test in CI rot.
 
 **Pflicht: [docs/erd.md](docs/erd.md) im selben Commit aktualisieren.** Stand-Zeile (Schema-Version + Tabellen-Anzahl) bumpen; betroffene Block-Definitionen (neue Spalten, geänderte Typen) anpassen; bei neuen Tabellen einen Block + die FK-Kanten in Section 1 (Übersicht) und ggf. im passenden thematischen Sub-Diagramm ergänzen; bei neuen FK-Kanten auf bestehende Tabellen die Kante in Section 1 nachziehen. ERD bleibt sonst still drift-anfällig — die Stand-Zeile lügt, Mermaid-Beziehungen werden falsch.
 

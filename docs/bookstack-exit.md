@@ -55,9 +55,9 @@ Phase-0-Spalten im aktuellen Schema:
 
 ## Offene Phasen (Reihenfolge)
 
-`8b (localdb → bookstack) → 10`.
+`8b (localdb → bookstack)`.
 
-Erledigt: Phase 1 (`localdb`-Backend) + Phase 2 (Page-Revisions) + Phase 3 (Eigene Sortierung) + Phase 6 (Tags + Kategorien) + Phase 7 (FTS5-Volltextsuche) + Phase 8a (bookstack → localdb) + Phase 9 (Doku-Sweep) + Phase 11 (Per-User-AI-Provider-Override) — siehe Code-Pfade in den jeweiligen Abschnitten.
+Erledigt: Phase 1 (`localdb`-Backend) + Phase 2 (Page-Revisions) + Phase 3 (Eigene Sortierung) + Phase 6 (Tags + Kategorien) + Phase 7 (FTS5-Volltextsuche) + Phase 8a (bookstack → localdb) + Phase 9 (Doku-Sweep) + Phase 10 (Schema-Squash) + Phase 11 (Per-User-AI-Provider-Override) — siehe Code-Pfade in den jeweiligen Abschnitten.
 
 ---
 
@@ -235,28 +235,25 @@ Doku-Sweep abgeschlossen. Konkret:
 
 ---
 
-## Phase 10 — Schema-Squash
+## Phase 10 — Schema-Squash (erledigt)
 
-100+ Migrationen zu einem konsolidierten Initial-Schema kollabieren. Nach Phase 9 ist die DB-Struktur stabil. Squash entfernt Wegwerf-Migrationen (FK-Recreate-Zwischenschritte, Reverted-Columns), reduziert Boot-Zeit auf frischen Installs.
+Implementiert; Code-Pfade:
 
-**Vorgehen:**
+- **Snapshot** ([db/squashed-schema.js](../db/squashed-schema.js)): Auto-generierter Single-Batch mit dem Endzustand nach allen 118 Migrationen — 79 Tabellen (inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`), 88 Indexe, `sqlite_sequence`-Watermarks (`books`/`chapters`/`pages` = 1_000_000) und finalem `schema_version = SQUASHED_VERSION` (119). Datei niemals von Hand editieren; regenerieren via `npm run squash:regen`.
+- **Fresh-Path-Detect** ([db/migrations.js](../db/migrations.js)): Vor jedem Top-Level-Statement wird `sqlite_master` auf `schema_version` geprüft. Fehlt sie → brand-neue Installation → SQUASHED_SCHEMA in einem Schritt einspielen; `runMigrations()` sieht direkt `version === 119` und ist no-op. Vorhanden → Legacy-Pfad: das alte Top-Level-Skelett (idempotente `IF NOT EXISTS`-Creates) + die unveränderte 1..119-Migration-Kette läuft wie bisher.
+- **Test-Hook**: `FORCE_LEGACY_MIGRATIONS=1` (env) zwingt fresh DBs auf den Legacy-Pfad — ausschliesslich für den Drift-Test.
+- **Tooling**:
+  - [tools/dump-schema.js](../tools/dump-schema.js) — bootet fresh DB unter `$DB_PATH` (oder tmp), läuft `runMigrations()`, dumpt `sqlite_master` in kanonischer Form (sortiert nach `(type, name)`, FTS5-Shadow-Tables + `sqlite_autoindex_*` ausgefiltert, `sqlite_sequence`-Watermarks + `schema_version`-Row angehängt).
+  - [tools/regen-squashed.js](../tools/regen-squashed.js) — ruft den Dumper, schreibt `db/squashed-schema.js` mit detektierter Versionsnummer. Npm-Script: `npm run squash:regen`.
+- **Drift-Gate** ([tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs), 2 Cases):
+  1. Spawn 2 Child-Prozesse (Squashed-Fresh + `FORCE_LEGACY_MIGRATIONS=1`-Legacy), Dumps byte-equal.
+  2. SQUASHED_SCHEMA auf In-Memory-DB anwenden, `foreign_key_check` leer, `schema_version === SQUASHED_VERSION`, AUTOINCREMENT-Watermarks gesetzt.
+- **CLAUDE.md** (Neuer Pflicht-Block): „Nach jeder neuen Migration `npm run squash:regen` im selben Commit" — sonst rot im Drift-Gate.
+- **ERD** ([docs/erd.md](erd.md)): Quelle umgestellt auf `db/squashed-schema.js`; Stand-Zeile auf v119/79 Tabellen.
 
-1. **Cut-Schema generieren.** Auf frischer DB Migrationen 1–N durchlaufen, dann `sqlite3 db.sqlite '.schema'` → kanonisches CREATE-Skript. Manuell aufräumen: konsistente Spalten-Reihenfolge, FK-Aktionen explizit, Indexe pro Tabelle gruppiert.
-2. **Tooling: `tools/squash-migrations.js`** — generiert CREATE-Skript aus Roh-Migration-DB, vergleicht via `.schema` mit alt-migrierter DB. Byte-Diff = leer, sonst Stop.
-3. **Neuer Initial-Block** in [db/migrations.js](../db/migrations.js): Migrationen 1..N werden zu einem Branch, der bei `version === 0` das `SQUASHED_SCHEMA` einspielt und `schema_version` auf N setzt.
-4. **Compat-Branch** für Bestandsinstallationen: `if (version > 0 && version < N) { … legacy 1..N … }` bleibt 1 Major-Release lang. Danach Breaking-Change.
-5. **[docs/erd.md](erd.md)** Stand-Zeile + Blöcke aus `SQUASHED_SCHEMA` regenerieren.
-6. **Tests:**
-   - Frische DB: Migration läuft, `foreign_key_check` leer, Smoke-Insert pro Tabelle.
-   - Bestandsdaten: Pre-Squash-Snapshot durch Compat-Branch ziehen, Frische-Schema-Diff = leer.
-   - CI: „No-drift"-Check zwischen Bestand- und Frisch-Pfad.
-7. **Indexe + Triggers separat squashen.** Reihenfolge: Tables → Indexes → Triggers → Views → Virtual Tables (FTS5).
+**Performance-Effekt:** Boot auf fresh DBs überspringt 118 sequentielle `ALTER`/`CREATE`-Anweisungen. Integration-Suite-Laufzeit von ~1.7s auf ~0.6s (Suiten initialisieren ihre Test-DB via fresh-Path).
 
-**Anti-Patterns vermeiden:**
-- Kein `DROP TABLE … RECREATE` im gesquashten Block — Squash ist „Initial Install".
-- Keine ENV-Bedingungen, keine Data-Backfills (UPDATE) im Squash.
-
-**Rollback:** Squashed-Block durch Compat-Branch ersetzen (alle Original-Migrationen liegen in `git`).
+**Bewusst nicht gemacht:** Kein „Snapshot überlebt 1 Major-Release"-Cutoff der Legacy-Migrationen. Compat-Branch bleibt unbegrenzt — pro Migration unter 200 LOC, ein zukünftiger Schnitt risiko-frei nachholbar.
 
 ---
 
@@ -296,6 +293,5 @@ Implementiert; Code-Pfade:
 | Phase | Aufwand | Risiko |
 |---|---|---|
 | 8b | 3–4 Tage | mittel-hoch (FK-Repair + ID-Map + Round-Trip-Tests) |
-| 10 | 1–2 Tage | mittel (Diff-Test gegen Bestand) |
 
-**Realistischer Rahmen:** ≈ 4–6 Vollzeit-Tage Coding für offene Phasen. Test-Sweep gegen beide Backends + i18n-Doppelpflege + ERD-Update sind im Tages-Wert nicht voll abgebildet.
+**Realistischer Rahmen:** ≈ 3–4 Vollzeit-Tage Coding für die offene Phase 8b. Test-Sweep gegen beide Backends + i18n-Doppelpflege + ERD-Update sind im Tages-Wert nicht voll abgebildet.
