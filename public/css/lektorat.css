@@ -182,7 +182,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-xs);
-  padding: 3px 8px;
+  padding: var(--space-3) 8px;
   font-size: var(--font-size-sm);
   background: var(--color-tooltip-bg);
   border: 1px solid var(--color-border);

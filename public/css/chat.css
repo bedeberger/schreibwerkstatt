@@ -69,7 +69,7 @@
 /* Kontext-Quellenangabe (Buch-Chat) */
 .chat-context-info {
   margin-top: var(--space-6);
-  padding-top: 5px;
+  padding-top: var(--space-5);
   border-top: 0.5px solid var(--color-border);
   font-size: var(--font-size-xs);
   color: var(--color-subtle);
@@ -149,7 +149,7 @@
   font-family: monospace;
   font-size: 0.9em;
   background: var(--color-hover-strong);
-  padding: 1px 5px;
+  padding: var(--space-1) 5px;
   border-radius: var(--radius-sm);
 }
 
@@ -161,7 +161,7 @@
 .chat-table th,
 .chat-table td {
   border: 1px solid var(--color-border);
-  padding: 3px 8px;
+  padding: var(--space-3) 8px;
   text-align: left;
 }
 .chat-table thead th {

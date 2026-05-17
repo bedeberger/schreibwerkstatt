@@ -61,7 +61,7 @@
   background: var(--color-surface);
   border: 0.5px solid var(--color-border);
   color: var(--color-muted);
-  padding: 1px 6px;
+  padding: var(--space-1) 6px;
   border-radius: var(--radius-sm);
   margin-bottom: var(--space-6);
 }
@@ -76,7 +76,7 @@
 .idee-edit-actions { display: flex; gap: var(--space-6); justify-content: flex-end; }
 .idee-edit-actions button {
   font-size: var(--font-size-xs);
-  padding: 3px 8px;
+  padding: var(--space-3) 8px;
 }
 .idee-menu {
   position: absolute;

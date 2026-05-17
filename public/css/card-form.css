@@ -253,9 +253,9 @@ select:focus {
   right: auto;
   min-width: 180px;
 }
-.combobox-wrap--compact .combobox-search { font-size: var(--size-compact-font-size); padding: 5px 8px; }
-.combobox-wrap--compact .combobox-option { font-size: var(--size-compact-font-size); padding: 5px 8px; }
-.combobox-wrap--compact .combobox-empty { font-size: var(--size-compact-font-size); padding: 5px 8px; }
+.combobox-wrap--compact .combobox-search { font-size: var(--size-compact-font-size); padding: var(--space-5) 8px; }
+.combobox-wrap--compact .combobox-option { font-size: var(--size-compact-font-size); padding: var(--space-5) 8px; }
+.combobox-wrap--compact .combobox-empty { font-size: var(--size-compact-font-size); padding: var(--space-5) 8px; }
 
 /* Optionaler Footer-Button (cfg.footer.{label,action}). Sitzt unterhalb der
    Liste, durch border-top abgesetzt. Keine Tastatur-Nav (bewusst aussen vor —
@@ -275,7 +275,7 @@ select:focus {
 }
 .combobox-footer-btn:hover,
 .combobox-footer-btn:focus-visible { background: var(--color-hover); outline: none; }
-.combobox-wrap--compact .combobox-footer-btn { font-size: var(--size-compact-font-size); padding: 5px 8px; }
+.combobox-wrap--compact .combobox-footer-btn { font-size: var(--size-compact-font-size); padding: var(--space-5) 8px; }
 
 /* === Form-Patterns (in Karten wiederverwendbar) ===
    Grid-Klassen .card-form-grid / -row / -label und Wertspalten-Bausteine
@@ -455,7 +455,7 @@ select[aria-invalid="true"],
   line-height: 1.4;
 }
 .form-check input[type="checkbox"] {
-  margin-top: 3px;
+  margin-top: var(--space-3);
   accent-color: var(--color-primary);
   width: 15px;
   height: 15px;

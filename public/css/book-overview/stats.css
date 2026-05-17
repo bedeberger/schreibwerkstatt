@@ -200,7 +200,7 @@
   display: grid;
   grid-auto-flow: column;
   grid-template-rows: repeat(7, 1fr);
-  gap: 3px;
+  gap: var(--space-3);
   width: 100%;
   /* Aspect: 53 Spalten × 7 Reihen, Zelle ~ quadratisch. min-Höhe verhindert
      Kollaps in schmalen Layouts; horizontaler Scroll bei Engstellen. */
@@ -252,7 +252,7 @@
 
 /* ── Mobile ──────────────────────────────────────────────────────────────── */
 @media (max-width: 700px) {
-  .overview-hero-value { font-size: 30px; }
+  .overview-hero-value { font-size: var(--font-size-3xl); }
   .overview-hero-row { gap: var(--space-14); }
   .overview-substat-value { font-size: var(--font-size-reading); }
 }

@@ -138,7 +138,7 @@
 }
 .figur-bz-beleg {
   font-size: var(--font-size-xs);
-  padding: 1px 6px;
+  padding: var(--space-1) 6px;
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--color-border) 20%, var(--color-surface));
   color: var(--color-muted);
@@ -195,7 +195,7 @@
 .figuren-graph-filter {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: var(--space-5);
   align-items: center;
 }
 .figuren-graph-filter-btn {

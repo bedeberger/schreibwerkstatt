@@ -14,7 +14,7 @@
 .overview-error-bar-item {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: var(--space-3);
 }
 .overview-error-bar-head {
   display: flex;

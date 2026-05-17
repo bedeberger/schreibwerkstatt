@@ -51,7 +51,7 @@ button.primary .btn-count {
 .badge {
   display: inline-block;
   font-size: var(--font-size-mini);
-  padding: 3px 10px;
+  padding: var(--space-3) 10px;
   border-radius: 0;
   font-weight: 400;
 }

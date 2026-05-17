@@ -161,7 +161,7 @@
 @media (max-width: 700px) {
   .heatmap-table th,
   .heatmap-table td {
-    padding: 5px 6px;
+    padding: var(--space-5) 6px;
     font-size: var(--font-size-xs, 11px);
   }
   .heatmap-table tbody th.heatmap-rowhead {
@@ -172,7 +172,7 @@
   .heatmap-coverage { max-width: 100px; }
   .heatmap-cluster-row th.heatmap-cluster-head {
     font-size: var(--font-size-micro);
-    padding-bottom: 1px;
+    padding-bottom: var(--space-1);
   }
 }
 /* 17 Typen-Spalten + 2 Meta-Spalten → bei mittleren Viewports/Containern dichter packen,
@@ -180,8 +180,8 @@
 @media (max-width: 1100px) {
   .heatmap-table thead tr:nth-child(2) th,
   .heatmap-table tbody td.heatmap-cell {
-    padding-left: 5px;
-    padding-right: 5px;
+    padding-left: var(--space-5);
+    padding-right: var(--space-5);
   }
 }
 
@@ -270,7 +270,7 @@
 }
 .heatmap-detail-korrektur {
   display: block;
-  margin-top: 3px;
+  margin-top: var(--space-3);
   background: color-mix(in srgb, var(--color-success) 15%, transparent);
   padding: var(--space-2xs) 6px;
   border-radius: var(--radius-sm);

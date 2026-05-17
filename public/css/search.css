@@ -14,7 +14,7 @@
   margin-bottom: var(--space-md);
 }
 .book-filter-pill {
-  padding: 3px 10px;
+  padding: var(--space-3) 10px;
   border: 0.5px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-bg);
@@ -32,7 +32,7 @@
 .book-filter-pill--tag { font-style: italic; }
 .book-filter-clear {
   margin-left: auto;
-  padding: 3px 8px;
+  padding: var(--space-3) 8px;
   border: none;
   background: transparent;
   color: var(--color-muted);
@@ -121,7 +121,7 @@
   font-size: var(--font-size-sm);
   font-weight: 500;
   color: var(--color-text);
-  margin-bottom: 3px;
+  margin-bottom: var(--space-3);
 }
 .bookstack-search-item-snippet {
   font-size: var(--font-size-mini);
@@ -204,7 +204,7 @@
   gap: var(--space-xs);
 }
 .kind-pill {
-  padding: 3px 9px;
+  padding: var(--space-3) 9px;
   border: 0.5px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-bg);
@@ -219,7 +219,7 @@
 }
 .search-scope-toggle {
   margin-left: auto;
-  padding: 3px 9px;
+  padding: var(--space-3) 9px;
   border: 0.5px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-bg);
@@ -260,10 +260,10 @@
   display: flex;
   gap: var(--space-sm);
   align-items: baseline;
-  margin-bottom: 3px;
+  margin-bottom: var(--space-3);
 }
 .search-hit-kind {
-  padding: 1px 6px;
+  padding: var(--space-1) 6px;
   border: 0.5px solid var(--color-border);
   border-radius: var(--radius-sm);
   font-size: var(--font-size-xs);

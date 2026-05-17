@@ -41,7 +41,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  margin-bottom: 3px;
+  margin-bottom: var(--space-3);
 }
 
 .figur-szene-ort {
@@ -57,7 +57,7 @@
 .figur-szene-kommentar {
   font-size: var(--font-size-mini);
   color: var(--color-muted);
-  margin-top: 3px;
+  margin-top: var(--space-3);
 }
 
 /* === Szenen-Karte: Hinweis === */
@@ -89,8 +89,8 @@
 .szenen-count-badges {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
-  margin-top: 5px;
+  gap: var(--space-5);
+  margin-top: var(--space-5);
 }
 
 /* Kapitel-Badge mit Qualitäts-Dots */
@@ -99,7 +99,7 @@
   align-items: center;
   gap: var(--space-xs);
   font-size: var(--font-size-xs);
-  padding: 3px 7px 3px 7px;
+  padding: var(--space-3) 7px 3px 7px;
   border-radius: 0;
   background: var(--color-tag-bg);
   color: var(--color-text);
@@ -141,7 +141,7 @@
 .szenen-figur-count-badge {
   font-size: var(--font-size-micro);
   font-weight: 400;
-  padding: 1px 7px;
+  padding: var(--space-1) 7px;
   border-radius: 0;
   background: var(--color-tag-bg);
   color: var(--color-muted);

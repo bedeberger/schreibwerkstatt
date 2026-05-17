@@ -91,7 +91,7 @@ kbd {
   align-items: center;
   justify-content: center;
   min-width: 1.5em;
-  padding: 1px 6px;
+  padding: var(--space-1) 6px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: var(--font-size-xs);
   font-weight: var(--fw-medium);
@@ -109,7 +109,7 @@ kbd {
   cursor: pointer;
   font-family: var(--font-serif);
   font-weight: 600;
-  font-size: 30px;
+  font-size: var(--font-size-3xl);
   letter-spacing: -0.022em;
   font-feature-settings: "kern", "liga", "dlig", "calt", "onum", "ss01";
   text-rendering: optimizeLegibility;
@@ -126,7 +126,7 @@ kbd {
 code {
   font-family: monospace;
   background: var(--color-tag-bg);
-  padding: 1px 5px;
+  padding: var(--space-1) 5px;
   border-radius: var(--radius-sm);
   font-size: var(--font-size-mini);
 }

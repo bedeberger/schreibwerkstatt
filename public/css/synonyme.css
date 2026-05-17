@@ -61,7 +61,7 @@
   font-size: var(--font-size-base);
   background: var(--color-accent-bg);
   color: var(--color-accent-text);
-  padding: 1px 6px;
+  padding: var(--space-1) 6px;
   border-radius: var(--radius-sm);
 }
 
@@ -69,7 +69,7 @@
   font-size: var(--font-size-xs);
   color: var(--color-ok-text);
   background: var(--color-ok-bg);
-  padding: 1px 7px;
+  padding: var(--space-1) 7px;
   font-weight: 400;
 }
 
@@ -88,7 +88,7 @@
 
 .syn-btn {
   font-size: var(--font-size-mini);
-  padding: 3px 12px;
+  padding: var(--space-3) 12px;
   border: 0.5px solid var(--color-primary);
   color: var(--color-primary);
   background: color-mix(in srgb, var(--color-primary) 8%, transparent);

@@ -11,7 +11,7 @@
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-md);
-  padding: 3px;
+  padding: var(--space-3);
 }
 .edit-bubble-btn {
   background: transparent;
@@ -48,7 +48,7 @@
   letter-spacing: 0.05em;
   color: var(--color-muted);
   border-bottom: 1px solid var(--color-border);
-  margin-bottom: 3px;
+  margin-bottom: var(--space-3);
 }
 .edit-slash-item {
   display: block;

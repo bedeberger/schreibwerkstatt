@@ -20,6 +20,7 @@
   --font-size-lg:      18px;  /* Sub-Heading, Section-Heading-Stufe 2 */
   --font-size-xl:      22px;  /* Card-Title-Standard */
   --font-size-2xl:     26px;  /* Hero/Card-Title-prominent */
+  --font-size-3xl:     30px;  /* Hero-Stat-Value */
 
   /* === Font-Weight === */
   --fw-regular:    400;

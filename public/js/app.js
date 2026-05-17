@@ -127,7 +127,10 @@ if ('serviceWorker' in navigator) {
           if (reloaded) return;
           reloaded = true;
           const app = window.__app;
-          if (app?.editMode && app?.editDirty) {
+          // Niemals auto-reloaden, wenn der User aktiv editiert oder im
+          // Fokusmodus liest/schreibt. Auto-Save kann editDirty zwischendurch
+          // auf false flippen — focusMode/editMode als härteres Signal.
+          if (app?.editMode || app?.focusMode || app?.editDirty) {
             app.updateAvailable = true;
             return;
           }

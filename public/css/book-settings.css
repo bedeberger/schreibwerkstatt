@@ -83,7 +83,7 @@
   white-space: nowrap;
 }
 .job-runs-table td {
-  padding: 3px 12px 3px 0;
+  padding: var(--space-3) 12px 3px 0;
   white-space: nowrap;
   vertical-align: top;
 }
@@ -95,7 +95,7 @@
 }
 .job-run-status {
   display: inline-block;
-  padding: 1px 6px;
+  padding: var(--space-1) 6px;
   border-radius: var(--radius-sm);
   font-size: var(--font-size-micro);
   background: var(--color-badge-bg, rgba(255,255,255,0.06));
@@ -166,7 +166,7 @@
 .book-share-row-main {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: var(--space-1);
   min-width: 0;
   flex: 1;
 }

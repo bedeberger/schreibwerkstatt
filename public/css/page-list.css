@@ -4,7 +4,7 @@
   padding: 7px 8px 7px 6px;
   border: 0.5px solid transparent;
   border-radius: var(--radius-md);
-  margin-bottom: 3px;
+  margin-bottom: var(--space-3);
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   column-gap: var(--space-sm);
@@ -76,7 +76,7 @@
   gap: var(--space-6);
   min-width: 0;
 }
-.page-name .page-status-dot { margin-top: 5px; }
+.page-name .page-status-dot { margin-top: var(--space-5); }
 .page-name > span:not(.page-status-dot) {
   min-width: 0;
   overflow-wrap: anywhere;

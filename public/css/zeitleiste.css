@@ -83,7 +83,7 @@
 .gz-content {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: var(--space-3);
   min-width: 0;
 }
 
@@ -103,7 +103,7 @@
 .gz-extern-badge {
   font-size: var(--font-size-micro);
   font-weight: 400;
-  padding: 1px 6px;
+  padding: var(--space-1) 6px;
   background: var(--color-err-bg);
   color: var(--color-err-text);
 }
@@ -122,7 +122,7 @@
 .gz-kapitel {
   display: inline-flex;
   flex-wrap: wrap;
-  gap: 3px;
+  gap: var(--space-3);
   align-items: center;
   margin-bottom: var(--space-2xs);
 }
@@ -156,7 +156,7 @@
 .gz-figuren-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 3px;
+  gap: var(--space-3);
   margin-top: var(--space-2xs);
 }
 

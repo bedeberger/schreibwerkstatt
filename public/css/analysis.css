@@ -34,7 +34,7 @@
   font-size: var(--font-size-sm);
 }
 .szene-kommentar {
-  margin-top: 3px;
+  margin-top: var(--space-3);
   font-size: var(--font-size-sm);
   color: var(--color-muted);
 }

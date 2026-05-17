@@ -215,7 +215,7 @@
 .avatar-menu-header-text {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: var(--space-1);
   min-width: 0;
 }
 .avatar-menu-name {

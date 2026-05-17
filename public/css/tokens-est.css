@@ -36,14 +36,14 @@
   display: flex;
   align-items: center;
   gap: var(--space-6);
-  margin-bottom: 3px;
+  margin-bottom: var(--space-3);
 }
 .tok-tt-hint {
   color: var(--color-subtle);
   font-size: var(--font-size-micro);
   margin-top: var(--space-6);
   border-top: 1px solid var(--color-border);
-  padding-top: 5px;
+  padding-top: var(--space-5);
 }
 .tok-tt-enter { transition: opacity var(--transition-base); }
 .tok-tt-hidden { opacity: 0; }
@@ -94,7 +94,7 @@
   font-family: var(--font-sans);
   font-size: var(--font-size-md);
   line-height: 1;
-  padding: 3px 9px;
+  padding: var(--space-3) 9px;
   min-width: 28px;
   transition: background var(--transition-fast), color var(--transition-fast);
 }
@@ -184,7 +184,7 @@
   height: 10px;
   border-radius: 0;
   border: 1.5px solid var(--fig-hue);
-  margin-right: 3px;
+  margin-right: var(--space-3);
   vertical-align: middle;
   background: color-mix(in srgb, var(--fig-hue) var(--figpal-bg-mix), var(--color-surface));
 }
@@ -231,7 +231,7 @@
 .kapitel-badges {
   display: inline-flex;
   flex-wrap: wrap;
-  gap: 3px;
+  gap: var(--space-3);
   align-items: center;
 }
 
