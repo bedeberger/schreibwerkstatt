@@ -192,47 +192,56 @@
       <div x-show="bookAccessLoading" class="muted-msg" x-text="$app.t('common.loading')"></div>
       <p class="card-form-error" x-show="bookAccessError" x-text="bookAccessError"></p>
 
-      <div x-show="!bookAccessLoading && bookAccessList.length" class="book-share-list">
-        <template x-for="entry in bookAccessList" :key="entry.user_email">
-          <div class="book-share-row">
-            <span class="book-share-avatar" :style="shareAvatarStyle(entry)" x-text="shareInitials(entry)" aria-hidden="true"></span>
-            <div class="book-share-row-main">
-              <span class="book-share-displayname" x-text="entry.display_name || entry.user_email"></span>
-              <span class="book-share-email muted" x-show="entry.display_name" x-text="entry.user_email"></span>
+      <div class="card-form-row card-form-row--top" x-show="!bookAccessLoading && bookAccessList.length">
+        <label class="card-form-label" x-text="$app.t('book.share.membersLabel')"></label>
+        <div class="book-share-list">
+          <template x-for="entry in bookAccessList" :key="entry.user_email">
+            <div class="book-share-row">
+              <span class="book-share-avatar" x-text="shareInitials(entry)" aria-hidden="true"></span>
+              <div class="book-share-row-main">
+                <span class="book-share-displayname" x-text="entry.display_name || entry.user_email"></span>
+                <span class="book-share-email muted" x-show="entry.display_name" x-text="entry.user_email"></span>
+              </div>
+              <div class="book-share-row-actions">
+                <template x-if="entry.role === 'owner' || !bookAccessIsOwner()">
+                  <span class="badge" x-text="$app.t('book.share.role.' + entry.role)"></span>
+                </template>
+                <template x-if="bookAccessIsOwner() && entry.role !== 'owner'">
+                  <div class="book-share-row-controls">
+                    <div class="book-share-role-combo"
+                         x-data="combobox($app.t('book.share.role.editor'))"
+                         x-effect="value = entry.role; options = bookAccessRoleOptions()"
+                         @combobox-change="if ($event.detail && $event.detail !== entry.role) changeBookAccessRole(entry.user_email, $event.detail)"></div>
+                    <button type="button" class="btn-compact book-share-btn-transfer"
+                            @click="transferOwnership(entry.user_email)"
+                            :data-tip="$app.t('book.share.transferTooltip')"
+                            x-text="$app.t('book.share.transferBtn')"></button>
+                    <button type="button" class="btn-compact book-share-btn-revoke"
+                            @click="revokeBookAccess(entry.user_email)"
+                            x-text="$app.t('book.share.revokeBtn')"></button>
+                  </div>
+                </template>
+              </div>
             </div>
-            <div class="book-share-row-actions">
-              <template x-if="entry.role === 'owner' || !bookAccessIsOwner()">
-                <span class="badge" x-text="$app.t('book.share.role.' + entry.role)"></span>
-              </template>
-              <template x-if="bookAccessIsOwner() && entry.role !== 'owner'">
-                <div class="book-share-row-controls">
-                  <div class="book-share-role-combo"
-                       x-data="combobox($app.t('book.share.role.editor'))"
-                       x-effect="value = entry.role; options = bookAccessRoleOptions()"
-                       @combobox-change="if ($event.detail && $event.detail !== entry.role) changeBookAccessRole(entry.user_email, $event.detail)"></div>
-                  <button type="button" class="btn-compact book-share-btn-transfer"
-                          @click="transferOwnership(entry.user_email)"
-                          :data-tip="$app.t('book.share.transferTooltip')"
-                          x-text="$app.t('book.share.transferBtn')"></button>
-                  <button type="button" class="btn-compact book-share-btn-revoke"
-                          @click="revokeBookAccess(entry.user_email)"
-                          x-text="$app.t('book.share.revokeBtn')"></button>
-                </div>
-              </template>
-            </div>
-          </div>
-        </template>
+          </template>
+        </div>
       </div>
 
-      <div x-show="bookAccessIsOwner()" class="book-share-invite">
+      <div class="card-form-row card-form-row--top" x-show="bookAccessIsOwner()">
         <label class="card-form-label" x-text="$app.t('book.share.inviteLabel')"></label>
         <div class="book-share-invite-row">
           <div class="book-share-invite-typeahead">
-            <input type="email" class="card-form-input"
+            <input type="text" class="card-form-input"
                    x-model="shareEmail"
                    :placeholder="$app.t('book.share.invitePlaceholder')"
                    :disabled="shareBusy"
                    autocomplete="off"
+                   autocorrect="off"
+                   autocapitalize="off"
+                   spellcheck="false"
+                   name="book-share-invite"
+                   role="combobox"
+                   aria-autocomplete="list"
                    @focus="shareSuggestOpen = true"
                    @input="shareSuggestOpen = true"
                    @keydown.escape="shareSuggestOpen = false"
@@ -249,10 +258,10 @@
             </ul>
           </div>
           <div class="book-share-role-combo"
-               x-data="combobox($app.t('book.share.role.editor'))"
+               x-data="combobox({ placeholder: $app.t('book.share.role.editor'), compact: false })"
                x-modelable="value" x-model="shareRole"
                x-effect="options = bookAccessRoleOptions()"></div>
-          <button type="button" class="btn-compact"
+          <button type="button"
                   @click="submitShareInvite()"
                   :disabled="shareBusy || !shareEmail">
             <span x-show="shareBusy" class="spinner"></span>

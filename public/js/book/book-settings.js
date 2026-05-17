@@ -326,16 +326,8 @@ export const bookSettingsMethods = {
     return local.slice(0, 2).toUpperCase();
   },
 
-  shareAvatarStyle(entry) {
-    // Deterministischer Hue aus Email → distinkte Farbe pro User, Light/Dark via HSL.
-    const src = (entry?.user_email || '');
-    let h = 0;
-    for (let i = 0; i < src.length; i++) h = (h * 31 + src.charCodeAt(i)) >>> 0;
-    const hue = h % 360;
-    return {
-      '--avatar-bg': `hsl(${hue} 55% 88%)`,
-      '--avatar-fg': `hsl(${hue} 45% 28%)`,
-    };
+  shareAvatarStyle() {
+    return {};
   },
 
   async loadShareUserPool() {
@@ -370,8 +362,8 @@ export const bookSettingsMethods = {
       kind: 'user',
       key: 'user:' + u.email,
       email: u.email,
-      label: u.email,
-      sub: u.display_name || '',
+      label: u.display_name || u.email,
+      sub: u.display_name ? u.email : '',
     }));
     // Invite-Option, wenn Eingabe eine gültige Email ist, kein User matcht und
     // der aktuelle User Invite-Recht hat. Auch nicht anzeigen, wenn die Email

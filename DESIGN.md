@@ -348,6 +348,17 @@ Pure-CSS-Border ohne `aria-invalid` ist Anti-Pattern — Screen-Reader liest son
 
 Grid kollabiert auf 1 Spalte (in card-form.css). `.form-inline` reflowed auf 50/50 (`flex 1 1 calc(50% - 16px)`); `.form-num` wird flex-fluid.
 
+### Regel: Gleiche Höhe pro Form-Zeile
+
+In einer Form-Zeile (Inputs, Comboboxes, Buttons nebeneinander in Flex/Grid mit `align-items: center`/`stretch`) müssen alle Elemente dieselbe Geometrie haben — **entweder alle default oder alle compact**, kein Mix.
+
+- Default-Set: `<input>`, `<button>` (ohne `.btn-compact`), `combobox({ compact: false })` → alle nutzen `--size-default-padding-y` (8px) + `--font-size-base` (14px).
+- Compact-Set: `.btn-compact`, default-`combobox(...)` (Helper setzt `--compact` auto), Compact-Input (eigene Klasse mit `--size-compact-padding`/`--size-compact-font-size`) → alle nutzen `--size-compact-padding` (4px y) + `--size-compact-font-size` (12px).
+
+Stolperfalle: `combobox(placeholder)` ist **default compact**. Steht der combobox neben einem nackten `<input>` oder `<button>` ohne `.btn-compact`, sieht das ungleich aus → Object-Form `combobox({ placeholder, compact: false })` verwenden. Umgekehrt: wenn die Zeile sonst nur Compact-Elemente hat (Filter-Bars, Table-Row-Controls), bleibt der Default-Compact-Combobox richtig.
+
+Filter-Bars (`.filter-bar`, `.admin-usage-filter`, `.admin-users-requests-filter`) sind bewusst rein compact (Search-Input + Compact-Combobox + Compact-Buttons) — kein Mix zulässig.
+
 ### Regel: Keine parallele Reinvention
 
 Wer eine neue Settings-/Export-Karte baut, nutzt diese Klassen direkt (siehe [public/partials/user-settings.html](public/partials/user-settings.html), [public/partials/finetune-export.html](public/partials/finetune-export.html)). Kein eigenes `.xxx-form` / `.xxx-row` / `.xxx-check` mehr. Verstößt gegen die Style-Konsistenz-Regel oben.

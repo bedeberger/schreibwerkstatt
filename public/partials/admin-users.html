@@ -37,7 +37,7 @@
         <input type="email" x-model="adminUsersInviteEmail"
                :placeholder="$app.t('admin.users.invite.emailPlaceholder')"
                :disabled="adminUsersInviting">
-        <div x-data="combobox($app.t('admin.users.role'))"
+        <div x-data="combobox({ placeholder: $app.t('admin.users.role'), compact: false })"
              x-modelable="value" x-model="adminUsersInviteRole"
              x-effect="options = [
                { value: 'user',  label: $app.t('admin.users.role.user') },
