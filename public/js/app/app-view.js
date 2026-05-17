@@ -390,7 +390,6 @@ export const appViewMethods = {
   resetView() {
     window.dispatchEvent(new CustomEvent('view:reset'));
     this.resetPage();
-    this.clearBookstackSearch();
     // Kapitel in der Sidebar bleiben geöffnet (kein c.open = false)
     this.showTreeCard = true;
     // Alle Hauptkarten schliessen (Single-Source aus feature-registry).

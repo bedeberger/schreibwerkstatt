@@ -118,7 +118,7 @@ export const lektoratMethods = {
   // gleich folgende PUT wuerde frische Server-Edits mit Stale-Daten
   // ueberschreiben.
   async _loadApplyAndSave(selectedErrors, selectedStyles, onProgress) {
-    onProgress(10, this.t('bs.loadingPage'));
+    onProgress(10, this.t('lektorat.loadingPage'));
     const page = await contentRepo.loadPage(this.currentPage.id, { fresh: true });
     page.html = stripFocusArtefacts(page.html || '');
 
@@ -143,10 +143,10 @@ export const lektoratMethods = {
     }
 
     if (finalHtml.length < page.html.length * SAFETY_HTML_RATIO) {
-      throw new Error(this.t('bs.unsafeHtml'));
+      throw new Error(this.t('lektorat.unsafeHtml'));
     }
 
-    onProgress(85, this.t('bs.savingToBookStack'));
+    onProgress(85, this.t('lektorat.saving'));
     const saved = await contentRepo.savePage(this.currentPage.id, { html: finalHtml, name: this.currentPage.name });
     if (saved?.updated_at) this.currentPage.updated_at = saved.updated_at;
     // Uebernommene Korrekturen sind direkte Folge des Lektorats — Seite soll

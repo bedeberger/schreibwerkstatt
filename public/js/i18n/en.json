@@ -23,6 +23,9 @@
   "job.analyseDone":             "Analysis complete.",
 
   "lektorat.starting":           "Starting editor…",
+  "lektorat.loadingPage":        "Loading current page…",
+  "lektorat.unsafeHtml":         "Corrected HTML looks incomplete – save aborted.",
+  "lektorat.saving":             "Saving…",
   "lektorat.correctionsSaved":   "✓ Corrections saved.",
   "lektorat.section.szenen":     "Scenes",
   "lektorat.section.stilanalyse": "Style analysis",

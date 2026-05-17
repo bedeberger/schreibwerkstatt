@@ -23,6 +23,9 @@
   "job.analyseDone":             "Analyse abgeschlossen.",
 
   "lektorat.starting":           "Starte Lektorat…",
+  "lektorat.loadingPage":        "Lade aktuelle Seite…",
+  "lektorat.unsafeHtml":         "Korrigiertes HTML wirkt unvollständig – Speichern abgebrochen.",
+  "lektorat.saving":             "Speichere…",
   "lektorat.correctionsSaved":   "✓ Korrekturen gespeichert.",
   "lektorat.section.szenen":     "Szenen",
   "lektorat.section.stilanalyse": "Stilanalyse",
