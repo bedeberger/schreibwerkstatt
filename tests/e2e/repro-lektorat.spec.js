@@ -31,10 +31,22 @@ test('lektorat reproducible bug', async ({ page }) => {
   })));
 
   // Click "Prüfen" button (real UI interaction)
-  const checkBtn = page.locator('button:has-text("Prüfen"), button:has-text("Check")').first();
-  console.log('check button visible:', await checkBtn.isVisible());
-  await checkBtn.click();
-  console.log('clicked check');
+  const allBtns = await page.locator('button').all();
+  for (const b of allBtns) {
+    const txt = (await b.textContent())?.trim();
+    if (/prüfen|check/i.test(txt || '')) {
+      console.log('btn found:', JSON.stringify({ text: txt, visible: await b.isVisible(), enabled: await b.isEnabled() }));
+    }
+  }
+  const checkBtn = page.locator('button:has-text("Prüfen")').first();
+  console.log('check button visible:', await checkBtn.isVisible(), 'enabled:', await checkBtn.isEnabled());
+  // attach probe to verify Alpine handler fires
+  await page.evaluate(() => {
+    const orig = window.__app.runCheck;
+    window.__app.runCheck = function(...args){ window.__rcCalls = (window.__rcCalls||0)+1; return orig.apply(this, args); };
+  });
+  await checkBtn.click({ force: true });
+  console.log('clicked check; runCheck calls:', await page.evaluate(() => window.__rcCalls || 0));
 
   // Wait briefly to see state right after click
   await page.waitForTimeout(2000);
