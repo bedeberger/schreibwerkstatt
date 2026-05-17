@@ -55,9 +55,9 @@ Phase-0-Spalten im aktuellen Schema:
 
 ## Offene Phasen (Reihenfolge)
 
-`8b (localdb → bookstack) → 10 → 11`. Phase 11 (Per-User-AI-Provider) ist additiv und kann eingeschoben werden, sobald `app_users` (steht) + `app_settings` (steht) konsolidiert sind.
+`8b (localdb → bookstack) → 10`.
 
-Erledigt: Phase 1 (`localdb`-Backend) + Phase 2 (Page-Revisions) + Phase 3 (Eigene Sortierung) + Phase 6 (Tags + Kategorien) + Phase 7 (FTS5-Volltextsuche) + Phase 8a (bookstack → localdb) + Phase 9 (Doku-Sweep) — siehe Code-Pfade in den jeweiligen Abschnitten.
+Erledigt: Phase 1 (`localdb`-Backend) + Phase 2 (Page-Revisions) + Phase 3 (Eigene Sortierung) + Phase 6 (Tags + Kategorien) + Phase 7 (FTS5-Volltextsuche) + Phase 8a (bookstack → localdb) + Phase 9 (Doku-Sweep) + Phase 11 (Per-User-AI-Provider-Override) — siehe Code-Pfade in den jeweiligen Abschnitten.
 
 ---
 
@@ -255,85 +255,24 @@ Doku-Sweep abgeschlossen. Konkret:
 
 ---
 
-## Phase 11 — Per-User-AI-Provider-Override
+## Phase 11 — Per-User-AI-Provider-Override (erledigt)
 
-Admin weist pro User KI-Provider zu. Globaler `ai.provider` aus `app_settings` bleibt Default.
+Implementiert; Code-Pfade:
 
-### Modell
+- **Migration 117** ([db/migrations.js](../db/migrations.js)): `app_users.ai_provider_override TEXT` (NULL = follows global; CHECK `IN ('claude','ollama','llama') OR NULL`). `provider`-Spalte in alle 7 KI-Caches (Teil des PRIMARY KEY): `chapter_extract_cache`, `book_extract_cache`, `chapter_review_cache`, `book_review_cache`, `chapter_macro_review_cache`, `synonym_cache`, `lektorat_cache`. Backfill bestehender Cache-Eintraege auf den aktuellen `ai.provider`-Globalwert.
+- **Resolver** ([lib/ai.js](../lib/ai.js)): `resolveProvider({ userEmail })` liest ALS-Ctx oder explizites `userEmail` → `app_users.ai_provider_override` → `app_settings.ai.provider` → `'claude'`. `callAIChat`/`callAIWithTools` rufen den Resolver, wenn `provider` nicht explizit uebergeben wird.
+- **Per-Provider-Kontext** ([lib/ai.js](../lib/ai.js)): `getContextConfigFor(provider)` liefert `{ contextWindow, maxTokensOut, charsPerToken, inputBudgetTokens, inputBudgetChars }` aus `ai.<provider>.context_window` + `ai.<provider>.max_tokens_out`. Defaults: claude 200 000, ollama/llama 32 000. Boot-Konstanten (`INPUT_BUDGET_TOKENS` etc.) bleiben Claude-Default fuer Backwards-Compat; neue Pfade nutzen den Helper.
+- **DB-Helper** ([db/app-users.js](../db/app-users.js)): `setAiProviderOverride(email, provider|null)` mit Validierung; `getUser`/`listUsers` liefern `ai_provider_override`.
+- **Admin-Route** ([routes/admin-users.js](../routes/admin-users.js)): `PUT /admin/users/:email` akzeptiert `ai_provider_override`. Validiert gegen konfigurierte Provider (`ai.<p>.host`/`ai.claude.api_key`); fehlend → `400 AI_PROVIDER_NOT_CONFIGURED`. Audit-Event `ai-provider-changed`.
+- **/auth/me** ([routes/auth.js](../routes/auth.js)): Antwort enthaelt `aiProvider` (resolvt) + `aiProviderSource: 'global' | 'override'`.
+- **Cache-Helpers** ([db/schema.js](../db/schema.js)): `loadXxxCache(…, provider)` / `saveXxxCache(…, provider)`. Caller in [routes/jobs/komplett/phases.js](../routes/jobs/komplett/phases.js), [routes/jobs/review.js](../routes/jobs/review.js), [routes/jobs/kapitel.js](../routes/jobs/kapitel.js), [routes/jobs/lektorat.js](../routes/jobs/lektorat.js), [routes/jobs/synonyme.js](../routes/jobs/synonyme.js) reichen den `effectiveProvider` (am Job-Start einmal resolvt) durch.
+- **Admin-UI** ([public/js/cards/admin-users-card.js](../public/js/cards/admin-users-card.js) + [public/partials/admin-users.html](../public/partials/admin-users.html)): Spalte „KI-Provider" mit Combobox `(Global: <name>)` | `claude` | `ollama` | `llama`. Auswahl `(Global)` setzt Override = NULL. `adminUsersGlobalProvider` wird aus `/admin/settings/ai.provider` mitgeladen.
+- **i18n** (de + en): `admin.users.aiProvider`, `admin.users.aiProvider.global`, `admin.users.aiProvider.notConfigured`, `admin.users.aiProvider.effective`, `error.AI_PROVIDER_INVALID`, `error.AI_PROVIDER_NOT_CONFIGURED`, `chat.providerHint`.
+- **Tests**: [tests/unit/ai-resolve.test.mjs](../tests/unit/ai-resolve.test.mjs) — Auflösungs-Reihenfolge (Default/Global/Override/NULL-Fallback), Validierung des Override-Werts, per-Provider-Context, Synonym- + Lektorat-Cache mit Provider-Split.
 
-Provider-**Wahl** pro User; Provider-**Credentials** bleiben global in `app_settings`. Kein Per-User-API-Key (Future-Work).
+**Mutex** bleibt providerspezifisch (nicht userspezifisch) — VRAM ungeteilt. **In-Flight-Jobs** beim Override-Wechsel laufen mit dem alten Provider zu Ende (Closure haelt den Singleton).
 
-### Migration
-
-```sql
-ALTER TABLE app_users ADD COLUMN ai_provider_override TEXT
-  CHECK(ai_provider_override IN ('claude','ollama','llama') OR ai_provider_override IS NULL);
-```
-
-`NULL` = User folgt globalem `ai.provider`. Non-NULL gewinnt. Bestand bleibt `NULL` → identisches Verhalten.
-
-### Auflösungs-Reihenfolge
-
-In [lib/ai.js](../lib/ai.js) `callAI(ctx, …)`:
-
-1. `ctx.userEmail` → `app_users.ai_provider_override`.
-2. Fallback: `app_settings.ai.provider`.
-3. Hardcoded Default (`'claude'`).
-
-`ctx.userEmail` muss in jeden `callAI`-Pfad durchgereicht werden. Worker: aus `job.userEmail` im ALS-Context von [routes/jobs/shared/queue.js](../routes/jobs/shared/queue.js). SSE-Routes: `req.session.email`.
-
-**`MODEL_TOKEN`/`MODEL_CONTEXT`-Implikation:** Provider-Wechsel ändert Kontextfenster (Claude 200k, lokal 32k–128k). `INPUT_BUDGET_TOKENS` muss **pro Call** vom resolvten Provider abhängen, nicht vom Boot-Default. `SINGLE_PASS_LIMIT`/`PER_CHUNK_LIMIT` (Module-Konstanten in [routes/jobs/shared.js](../routes/jobs/shared.js)) → pro Job-Run aus `aiClient.contextWindow` neu berechnet. Cache-Keys bekommen `provider`-Feld (s.u.).
-
-### Admin-UI — Erweiterung `AdminUsersCard`
-
-- Spalte „Provider" mit Combobox: `(Global: claude)` | `claude` | `ollama` | `llama`. Auswahl `(Global)` setzt `ai_provider_override = NULL`.
-- `PUT /admin/users/:email` akzeptiert `ai_provider_override` (Admin-only).
-- Anzeige des effektiven Providers: `claude (Global)` für Default-Follower, `ollama (Override)` für Override-User.
-- Validierung: Combobox-Optionen aus konfigurierten Providern; `ollama` ohne `ai.ollama.host` → disabled. API-Guard als zweite Schicht: PUT lehnt Override auf nicht-konfigurierten Provider mit 400 ab.
-
-### Self-Service — bewusst nein
-
-Kein User-sichtbares Override in [routes/usersettings.js](../routes/usersettings.js). Cost-Verteilung gehört zum Admin-Kontrakt. `GET /me` liefert den resolvten Provider read-only (`{ … aiProvider: 'claude' }`) für Frontend-Statuszeile.
-
-### Hot-Reload
-
-Pro Provider ein Singleton (`claudeClient`, `ollamaClient`, `llamaClient`), `callAI` wählt nach resolvtem Provider. Per-User-Override-Wechsel triggert kein Client-Rebuild — nur Routing-Tabelle ändert sich.
-
-### Mutex / VRAM-Schutz
-
-Ollama/Llama-Mutex bleibt providerspezifisch, nicht userspezifisch — VRAM verträgt keine Parallelität. UI-Hinweis: „Lokale Provider serialisieren Job-Pipeline".
-
-### Cost-Tracking-Integration
-
-`callAI` gibt resolvten Provider zurück, `recordTokenUsage(provider, …)` schreibt in bestehende `token_usage.provider`-Spalte. Admin-Dashboard aus Phase 4d zeigt Kosten pro User korrekt aufgeschlüsselt.
-
-### Cache-Key-Erweiterung (Pflicht)
-
-Cache-Keys ohne Provider würden Claude-Output an Ollama-User ausliefern. `provider`-Spalte in den Caches (`chapter_extract_cache`, `book_extract_cache`, `chapter_review_cache`, `book_review_cache`, `chapter_macro_review_cache`, `synonym_cache`, `lektorat_cache`) **Pflicht** mit dieser Migration. UNIQUE-Indexe anpassen.
-
-Bestehende Cache-Einträge bekommen `provider = ai.provider`-Default im Backfill.
-
-### i18n
-
-`admin.users.aiProvider`, `admin.users.aiProvider.global`, `admin.users.aiProvider.notConfigured`, `admin.users.aiProvider.effective` (`{provider} ({source})`-Pattern). `chat.providerHint` (`Antwortet via {provider}`).
-
-### Tests
-
-- Unit: `tests/unit/ai-resolve.test.mjs` — Override > Global > Default, NULL-Fallback, ungültiger Override.
-- Unit: `tests/unit/context-budget-per-provider.test.mjs` — `INPUT_BUDGET_TOKENS` skaliert; Cache-Key enthält Provider.
-- Integration: `tests/integration/per-user-provider.test.js` — drei Mock-User mit Overrides, Job-Run, richtiger Mock-AI-Endpoint.
-- E2E: Smoke gegen `AdminUsersCard`-Combobox.
-
-### Risiko / Edge-Cases
-
-- **In-Flight-Jobs beim Override-Wechsel:** Job hält alten Client-Singleton via Closure → läuft mit altem Provider zu Ende. Akzeptabel.
-- **Buch-Owner ≠ Job-Starter:** Provider des **Job-Starters** zählt; Cost-Budget gehört zum Starter.
-
-### Doku
-
-- [docs/erd.md](erd.md) — `ai_provider_override`-Spalte + `provider`-Spalten in Cache-Blöcken + Stand-Zeile.
-- [docs/ai-providers.md](ai-providers.md) — Auflösungs-Reihenfolge, Cache-Key-Erweiterung.
-- [CLAUDE.md](../CLAUDE.md) — KI-Provider-Block: Per-User-Override-Hinweis (kurz, Verweis auf `ai-providers.md`).
+**Bewusst nicht implementiert:** Self-Service-Override in [routes/usersettings.js](../routes/usersettings.js) (Cost-Verteilung = Admin-Kontrakt). Per-User-API-Keys (Future-Work).
 
 ---
 

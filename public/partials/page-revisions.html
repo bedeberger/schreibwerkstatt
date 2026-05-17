@@ -1,7 +1,8 @@
 <!-- Phase 2 (BookStack-Exit): App-eigene Revisionsliste pro Seite.
      Container in editor.html hat display:contents, damit dieser Wrapper
      direkt Geschwister im Editor-Layout bleibt. Collapsible via
-     .collapsible-toggle + .history-chevron (DESIGN.md). -->
+     .collapsible-toggle + .history-chevron (DESIGN.md). Klick auf Row
+     oeffnet Viewer (<dialog>) mit Inhalt-/Vergleichs-Tab. -->
 <div x-data="pageRevisionsCard"
      x-show="$app.currentPage && revisions.length > 0"
      class="history-bar page-revisions-bar">
@@ -14,18 +15,108 @@
   </button>
   <div x-show="open" x-cloak class="page-revisions-list">
     <template x-for="rev in revisions" :key="rev.id">
-      <div class="history-item">
+      <div class="history-item history-item--clickable"
+           role="button"
+           tabindex="0"
+           @click="openViewer(rev)"
+           @keydown.enter.prevent="openViewer(rev)"
+           @keydown.space.prevent="openViewer(rev)"
+           :data-tip="$app.t('editor.revisions.viewer.openTitle')">
         <span class="history-date" x-text="$app.formatDate(rev.created_at)"></span>
         <span class="badge badge-ok" x-text="sourceLabel(rev.source)"></span>
         <span class="tag" x-show="rev.user_email" x-text="rev.user_email"></span>
         <span class="tag" x-text="formatChars(rev.chars) + ' ' + $app.t('editor.revisions.chars')"></span>
         <button type="button"
                 class="btn-toggle-saved btn-toggle-saved--off"
-                @click="restore(rev)"
+                @click.stop="restore(rev)"
                 :disabled="restoringId === rev.id"
                 :data-tip="$app.t('editor.revisions.restoreTitle')"
                 x-text="restoringId === rev.id ? $app.t('editor.revisions.restoring') : $app.t('editor.revisions.restore')"></button>
       </div>
     </template>
   </div>
+
+  <!-- Viewer: natives <dialog>, geoeffnet via showModal() im openViewer(). -->
+  <dialog class="revision-viewer"
+          x-ref="viewerDialog"
+          @close="viewerOpen = false"
+          @keydown.escape="closeViewer()"
+          @keydown.window.meta.enter.prevent="viewerOpen && restoreFromViewer()"
+          @keydown.window.ctrl.enter.prevent="viewerOpen && restoreFromViewer()">
+    <template x-if="viewerOpen && viewerRev">
+      <div class="revision-viewer__inner">
+        <header class="revision-viewer__head">
+          <div class="revision-viewer__meta">
+            <span class="history-date" x-text="$app.formatDate(viewerRev.created_at)"></span>
+            <span class="badge badge-ok" x-text="sourceLabel(viewerRev.source)"></span>
+            <span class="tag" x-show="viewerRev.user_email" x-text="viewerRev.user_email"></span>
+            <span class="tag" x-text="formatChars(viewerRev.chars) + ' ' + $app.t('editor.revisions.chars')"></span>
+          </div>
+          <button type="button"
+                  class="revision-viewer__close"
+                  @click="closeViewer()"
+                  :data-tip="$app.t('editor.revisions.viewer.close')"
+                  aria-label="Close">×</button>
+        </header>
+
+        <nav class="revision-viewer__tabs" role="tablist">
+          <button type="button"
+                  role="tab"
+                  class="revision-viewer__tab"
+                  :class="{ 'is-active': viewerMode === 'content' }"
+                  :aria-selected="viewerMode === 'content'"
+                  @click="setViewerMode('content')"
+                  x-text="$app.t('editor.revisions.viewer.tabContent')"></button>
+          <button type="button"
+                  role="tab"
+                  class="revision-viewer__tab"
+                  :class="{ 'is-active': viewerMode === 'diff' }"
+                  :aria-selected="viewerMode === 'diff'"
+                  @click="setViewerMode('diff')"
+                  x-text="$app.t('editor.revisions.viewer.tabDiff')"></button>
+        </nav>
+
+        <div class="revision-viewer__body">
+          <div x-show="viewerLoading" x-cloak class="revision-viewer__hint"
+               x-text="$app.t('editor.revisions.viewer.loading')"></div>
+          <div x-show="viewerError" x-cloak class="revision-viewer__hint revision-viewer__hint--error"
+               x-text="$app.t('editor.revisions.viewer.error') + ' ' + viewerError"></div>
+
+          <!-- Inhalt-Tab: gerendertes Body-HTML der Revision. Body kommt aus
+               page_revisions.body_html → bereits via lib/html-clean.js gefiltert
+               beim ehemaligen Save. -->
+          <div x-show="!viewerLoading && !viewerError && viewerMode === 'content'"
+               x-cloak
+               class="revision-viewer__content page-content-view"
+               x-html="viewerBody"></div>
+
+          <!-- Vergleichs-Tab: Word-Level-Diff gegen aktuelle Seite. -->
+          <div x-show="!viewerLoading && !viewerError && viewerMode === 'diff'" x-cloak
+               class="revision-viewer__diff">
+            <div x-show="viewerDiffLoading" x-cloak class="revision-viewer__hint"
+                 x-text="$app.t('editor.revisions.viewer.diffLoading')"></div>
+            <div x-show="!viewerDiffLoading && viewerDiffUnchanged" x-cloak
+                 class="revision-viewer__hint"
+                 x-text="$app.t('editor.revisions.viewer.noChanges')"></div>
+            <div x-show="!viewerDiffLoading && !viewerDiffUnchanged"
+                 x-cloak
+                 class="revision-diff-body"
+                 x-html="viewerDiffHtml"></div>
+          </div>
+        </div>
+
+        <footer class="revision-viewer__foot">
+          <button type="button"
+                  class="revision-viewer__btn"
+                  @click="closeViewer()"
+                  x-text="$app.t('editor.revisions.viewer.close')"></button>
+          <button type="button"
+                  class="revision-viewer__btn revision-viewer__btn--primary"
+                  @click="restoreFromViewer()"
+                  :disabled="restoringId === viewerRev?.id || viewerLoading"
+                  x-text="restoringId === viewerRev?.id ? $app.t('editor.revisions.restoring') : $app.t('editor.revisions.viewer.restore')"></button>
+        </footer>
+      </div>
+    </template>
+  </dialog>
 </div>

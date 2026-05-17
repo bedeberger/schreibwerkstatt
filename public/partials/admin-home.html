@@ -8,6 +8,7 @@
              && !showAdminSettingsCard
              && !showAdminUsageCard
              && !showAdminCategoriesCard
+             && !showAdminBooksCard
              && !showAdminBackendMigrationCard
              && !showUserSettingsCard"
      x-cloak>
@@ -42,6 +43,13 @@
       <div class="overview-tile-label" x-text="t('admin.home.categoriesLabel')"></div>
       <div class="overview-tile-value" x-text="t('admin.categories.title')"></div>
       <div class="overview-tile-desc" x-text="t('tile.adminCategories.desc')"></div>
+    </button>
+    <button type="button"
+            class="overview-tile internal-link card--admin-books"
+            @click="toggleAdminBooksCard()">
+      <div class="overview-tile-label" x-text="t('admin.home.booksLabel')"></div>
+      <div class="overview-tile-value" x-text="t('admin.books.title')"></div>
+      <div class="overview-tile-desc" x-text="t('tile.adminBooks.desc')"></div>
     </button>
     <button type="button"
             class="overview-tile internal-link card--admin-backend-migration"

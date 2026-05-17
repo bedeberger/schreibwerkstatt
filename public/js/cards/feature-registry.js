@@ -140,6 +140,7 @@ export const EXCLUSIVE_CARDS = [
   { key: 'adminSettings',  flag: 'showAdminSettingsCard' },
   { key: 'adminUsage',     flag: 'showAdminUsageCard' },
   { key: 'adminCategories', flag: 'showAdminCategoriesCard' },
+  { key: 'adminBooks',     flag: 'showAdminBooksCard' },
   { key: 'adminBackendMigration', flag: 'showAdminBackendMigrationCard' },
   { key: 'finetuneExport', flag: 'showFinetuneExportCard' },
   { key: 'export',         flag: 'showExportCard' },

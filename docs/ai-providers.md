@@ -4,7 +4,43 @@ Code: [lib/ai.js](../lib/ai.js). Drei Provider, ein Vertrag.
 
 ## Provider-Auswahl
 
-`API_PROVIDER` in `.env`: `claude` (Default) | `ollama` | `llama`.
+Admin setzt `ai.provider` global in `app_settings` (`claude` (Default) | `ollama` | `llama`). Pro User kann ein Override via `app_users.ai_provider_override` gesetzt werden — siehe „Per-User-Override" weiter unten.
+
+### Auflösungs-Reihenfolge (Phase 11)
+
+`lib/ai.js#resolveProvider({ userEmail })`:
+
+1. `app_users.ai_provider_override` (NULL = follows global)
+2. `app_settings.ai.provider`
+3. Hardcoded `'claude'`
+
+`userEmail` kommt aus dem ALS-Context (Job-Queue: `runWithContext({ user: job.userEmail, … })`) oder explizit (Routes/SSE via `req.session.email`). Job-Pfade resolven den Provider einmalig am Job-Start (siehe `effectiveProvider` in `routes/jobs/review.js`, `kapitel.js`, `lektorat.js`, `synonyme.js`, `komplett/`). In-Flight-Override-Wechsel ändert den laufenden Job nicht.
+
+### Per-User-Override
+
+- **Wahl** pro User; **Credentials** bleiben global in `app_settings`. Kein Per-User-API-Key.
+- Admin setzt den Override in der AdminUsersCard (Combobox `(Global: …)` | `claude` | `ollama` | `llama`). PUT `/admin/users/:email` mit `{ ai_provider_override: 'ollama' | null }`. NULL/'' löscht den Override.
+- API-Guard: Override auf nicht-konfigurierten Provider → `400 AI_PROVIDER_NOT_CONFIGURED`.
+- `GET /auth/me` liefert den resolvten Provider read-only (`{ … aiProvider, aiProviderSource: 'global' | 'override' }`) für die Frontend-Statuszeile.
+- Self-Service nein. Cost-Verteilung gehört zum Admin-Kontrakt.
+
+### Mutex bleibt providerspezifisch
+
+Ollama/Llama-Locks serialisieren *pro Provider*, nicht pro User. VRAM verträgt keine Parallelität.
+
+### Cache-Key-Erweiterung (Phase 11)
+
+`provider`-Spalte ist Pflicht-Teil des PRIMARY KEY in: `chapter_extract_cache`, `book_extract_cache`, `chapter_review_cache`, `book_review_cache`, `chapter_macro_review_cache`, `synonym_cache`, `lektorat_cache`. Ohne den Split würde Claude-Output an Ollama-User ausgeliefert. Migration 117 backfillt bestehende Eintraege mit dem zur Migrationszeit aktiven Globalwert.
+
+Cache-Helpers (`db/schema.js`): `loadXxxCache(…, provider)` / `saveXxxCache(…, provider)`. Caller muessen den resolvten Provider durchreichen.
+
+### Per-Provider-Kontextfenster
+
+`app_settings.ai.<provider>.context_window` + `ai.<provider>.max_tokens_out` pro Provider (`claude`/`ollama`/`llama`). `lib/ai.js#getContextConfigFor(provider)` liefert `{ contextWindow, maxTokensOut, charsPerToken, inputBudgetTokens, inputBudgetChars }`. Boot-Konstanten (`INPUT_BUDGET_TOKENS` etc.) bleiben fuer Backwards-Compat als Claude-Default exportiert; neue Code-Pfade nutzen den Helper.
+
+## Legacy: `API_PROVIDER` (Boot-Fallback)
+
+`API_PROVIDER` in `.env`: `claude` (Default) | `ollama` | `llama`. Wird nur beim ersten Boot in `ai.provider` gespiegelt; danach ist `app_settings` SSoT.
 
 | Provider | Env-Vars | Streaming | Tool-Use | Caching |
 |----------|----------|-----------|----------|---------|

@@ -1,0 +1,82 @@
+<!-- Admin: Buecher-Uebersicht + Owner-Zuweisung fuer ownerless Buecher -->
+<div class="card card--admin-books" x-data="adminBooksCard" x-show="$app.showAdminBooksCard" x-cloak>
+  <div class="card-header">
+    <span class="card-title" x-text="$app.t('admin.books.title')"></span>
+    <div class="card-actions">
+      <button type="button" @click="loadAll()" :disabled="loading" x-text="$app.t('common.refresh')"></button>
+    </div>
+  </div>
+
+  <div x-show="loading" class="muted-msg" x-text="$app.t('common.loading')"></div>
+  <p class="card-form-error" x-show="error" x-text="error"></p>
+
+  <div class="card-form-grid" x-show="!loading">
+
+    <section class="admin-pool-section">
+      <h3 class="book-settings-stats-title" x-text="$app.t('admin.books.ownerlessHeading')"></h3>
+      <p class="muted-msg muted-msg--sm" x-show="ownerlessBooks().length === 0" x-text="$app.t('admin.books.ownerlessEmpty')"></p>
+
+      <table class="admin-pool-table" x-show="ownerlessBooks().length">
+        <thead>
+          <tr>
+            <th x-text="$app.t('admin.books.col.id')"></th>
+            <th x-text="$app.t('admin.books.col.name')"></th>
+            <th x-text="$app.t('admin.books.col.aclCount')"></th>
+            <th x-text="$app.t('admin.books.col.assign')"></th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="b in ownerlessBooks()" :key="b.book_id">
+            <tr>
+              <td><code class="muted-msg muted-msg--sm" x-text="b.book_id"></code></td>
+              <td x-text="b.name"></td>
+              <td x-text="b.acl_count"></td>
+              <td>
+                <select class="card-form-input"
+                        @change="setAssignTarget(b.book_id, $event.target.value)">
+                  <option value="" x-text="$app.t('admin.books.selectUser')"></option>
+                  <template x-for="u in users" :key="u.email">
+                    <option :value="u.email" x-text="u.email"></option>
+                  </template>
+                </select>
+              </td>
+              <td class="admin-pool-actions">
+                <button type="button"
+                        @click="assignOwner(b)"
+                        :disabled="busy || !(assignTarget[b.book_id])"
+                        x-text="$app.t('admin.books.assignBtn')"></button>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="admin-pool-section">
+      <h3 class="book-settings-stats-title" x-text="$app.t('admin.books.ownedHeading')"></h3>
+      <p class="muted-msg muted-msg--sm" x-show="ownedBooks().length === 0" x-text="$app.t('admin.books.ownedEmpty')"></p>
+
+      <table class="admin-pool-table" x-show="ownedBooks().length">
+        <thead>
+          <tr>
+            <th x-text="$app.t('admin.books.col.id')"></th>
+            <th x-text="$app.t('admin.books.col.name')"></th>
+            <th x-text="$app.t('admin.books.col.owner')"></th>
+            <th x-text="$app.t('admin.books.col.aclCount')"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="b in ownedBooks()" :key="b.book_id">
+            <tr>
+              <td><code class="muted-msg muted-msg--sm" x-text="b.book_id"></code></td>
+              <td x-text="b.name"></td>
+              <td x-text="b.owner_email"></td>
+              <td x-text="b.acl_count"></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </section>
+  </div>
+</div>

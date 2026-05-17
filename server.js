@@ -318,6 +318,7 @@ app.use('/apply', require('./routes/apply'));
 app.use('/books', require('./routes/book-access'));
 app.use('/book-editor', require('./routes/book-editor'));
 app.use('/admin/users', require('./routes/admin-users'));
+app.use('/admin/books', require('./routes/admin-books'));
 app.use('/admin/settings', require('./routes/admin-settings'));
 app.use('/admin/usage', require('./routes/admin-usage'));
 app.use('/admin/registration-requests', require('./routes/admin-registration-requests'));

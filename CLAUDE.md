@@ -290,6 +290,8 @@ Drei Provider, konfiguriert via `API_PROVIDER` in `.env`:
 
 **JSON-Parsing:** `lib/ai.js` hat mehrstufigen Fallback: `JSON.parse()` → `extractBalancedJson()` → `jsonrepair()`.
 
+**Per-User-Override:** Admin setzt `app_users.ai_provider_override` pro User; `lib/ai.js#resolveProvider({ userEmail })` löst per Call auf (Override > globaler `ai.provider` > `'claude'`). Job-Pfade resolven am Job-Start einmal in `effectiveProvider`. Cache-Tabellen haben `provider` im PRIMARY KEY (verhindert Cross-Provider-Bleeding). Details: [docs/ai-providers.md](docs/ai-providers.md).
+
 ## Two-Tier-Analyse
 
 Jobs in `routes/jobs/` verwenden ein Single-Pass/Multi-Pass-Muster. Limits und Batch-Grössen sind als Konstanten in `routes/jobs/shared.js` definiert — `SINGLE_PASS_LIMIT` und `PER_CHUNK_LIMIT` skalieren dynamisch aus `INPUT_BUDGET_CHARS` (70% / 35%).

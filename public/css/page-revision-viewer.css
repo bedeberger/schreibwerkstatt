@@ -1,0 +1,184 @@
+@layer components {
+/* === Page-Revision-Viewer (Phase 2, BookStack-Exit) ===
+   Natives <dialog> mit Tab-Toggle Inhalt|Vergleich. Aufgerufen aus
+   page-revisions-card.js#openViewer(). Backdrop ueber ::backdrop. */
+
+.revision-viewer {
+  background: var(--color-card-bg);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  width: min(960px, calc(100% - 2rem));
+  max-height: calc(100vh - 4rem);
+  padding: 0;
+  margin: auto;
+}
+.revision-viewer[open] {
+  display: flex;
+  flex-direction: column;
+}
+.revision-viewer::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.revision-viewer__inner {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.revision-viewer__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+}
+.revision-viewer__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.revision-viewer__close {
+  font-size: 1.4rem;
+  line-height: 1;
+  background: transparent;
+  border: 0;
+  color: var(--color-text);
+  cursor: pointer;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-sm);
+}
+.revision-viewer__close:hover { background: var(--color-hover); }
+
+.revision-viewer__tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.6rem 1rem 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.revision-viewer__tab {
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  padding: 0.45rem 0.9rem;
+  font: inherit;
+  font-weight: 600;
+  color: var(--color-muted);
+  cursor: pointer;
+  border-top-left-radius: var(--radius-sm);
+  border-top-right-radius: var(--radius-sm);
+  margin-bottom: -1px;
+}
+.revision-viewer__tab:hover { color: var(--color-text); }
+.revision-viewer__tab.is-active {
+  color: var(--color-text);
+  border-color: var(--color-border);
+  background: var(--color-card-bg);
+}
+
+.revision-viewer__body {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 1rem 1.25rem;
+  min-height: 0;
+}
+.revision-viewer__hint {
+  color: var(--color-muted);
+  font-style: italic;
+  padding: 0.5rem 0;
+}
+.revision-viewer__hint--error {
+  color: var(--color-err-text);
+  font-style: normal;
+}
+
+.revision-viewer__content {
+  /* page-content-view setzt eigene Prose-Styles. */
+}
+
+.revision-viewer__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.revision-viewer__btn {
+  padding: 0.45rem 1rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.revision-viewer__btn:hover:not(:disabled) { background: var(--color-hover); }
+.revision-viewer__btn:disabled { opacity: var(--opacity-hint); cursor: not-allowed; }
+.revision-viewer__btn--primary {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  border-color: var(--color-primary);
+}
+.revision-viewer__btn--primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+}
+
+/* === Diff-Body ===
+   Wort-Level: <ins> grun, <del> rot durchgestrichen, <span.diff-eq> neutral.
+   Whitespace beibehalten via white-space: pre-wrap, damit Renderer-Output
+   ohne <p>-Tags trotzdem als Prosa lesbar bleibt. */
+.revision-diff-body {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  line-height: 1.6;
+  font-size: var(--font-size-md, 1rem);
+}
+.revision-diff-body .diff-add,
+.revision-diff-body ins.diff-add {
+  background: var(--color-ok-bg);
+  color: var(--color-ok-text);
+  text-decoration: none;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+.revision-diff-body .diff-del,
+.revision-diff-body del.diff-del {
+  background: var(--color-err-bg);
+  color: var(--color-err-text);
+  text-decoration: line-through;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+.revision-diff-body .diff-eq { color: var(--color-text); }
+
+/* === Liste-Row clickable ===
+   Pointer + Hover-Highlight in der Revisionsliste, damit klar ist dass
+   Row → Viewer oeffnet. Restore-Button erbt nicht (separates Styling). */
+.page-revisions-list .history-item--clickable {
+  cursor: pointer;
+}
+.page-revisions-list .history-item--clickable:hover {
+  background: var(--color-hover);
+}
+
+@media (max-width: 640px) {
+  .revision-viewer {
+    width: 100%;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+  .revision-viewer__head,
+  .revision-viewer__foot,
+  .revision-viewer__body { padding-left: 0.75rem; padding-right: 0.75rem; }
+  .revision-viewer__foot { flex-direction: column-reverse; }
+  .revision-viewer__btn { width: 100%; }
+}
+}

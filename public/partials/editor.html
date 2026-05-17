@@ -57,7 +57,6 @@
           </span>
           <span class="action-sep" aria-hidden="true"></span>
           <span class="action-group">
-            <button type="button" @click="readerPrint()" :data-tip="t('reader.printHint')" x-text="t('reader.print')"></button>
             <button type="button" @click="toggleChatCard()" x-show="canReview()" :class="{ primary: showChatCard }" :disabled="currentPageEmpty" :data-tip="t('editor.btn.chatTitle')">
               <span x-text="t('editor.btn.chat')"></span>
               <span class="btn-count" x-show="currentPageChatSessionCount > 0" x-text="currentPageChatSessionCount" :data-tip="t('editor.btn.chatCountTitle', { n: currentPageChatSessionCount })"></span>
