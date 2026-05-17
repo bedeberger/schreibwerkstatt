@@ -148,7 +148,7 @@ router.get('/auth/callback', async (req, res) => {
     if (!flow) {
       logger.warn(`Auth callback: kein passender Login-Flow für state=${params.state}`);
       return res.status(400).send(
-        'Anmeldung abgelaufen oder ungültig. <a href="/auth/login">Erneut anmelden</a>'
+        'Anmeldung abgelaufen oder ungültig. <a href="/login">Erneut anmelden</a>'
       );
     }
     const tokenSet = await client.callback(
@@ -387,7 +387,7 @@ router.get('/auth/logout', (req, res) => {
     <p class="public-sub">${t.body}</p>
   </header>
   <section class="public-actions">
-    <a class="public-btn public-btn--primary" href="/auth/login">${t.cta}</a>
+    <a class="public-btn public-btn--primary" href="/login">${t.cta}</a>
   </section>
 </main>
 </body></html>`);

@@ -101,7 +101,7 @@
 
 <div class="session-banner" x-show="sessionExpired" x-cloak>
   <span class="session-banner-text" x-text="t('session.expired')"></span>
-  <a class="session-banner-btn" :href="'/auth/login?returnTo=' + encodeURIComponent(location.pathname + location.search)" x-text="t('session.relogin')"></a>
+  <a class="session-banner-btn" :href="'/login?returnTo=' + encodeURIComponent(location.pathname + location.search)" x-text="t('session.relogin')"></a>
 </div>
 
 <div class="session-banner" x-show="serverOffline && !sessionExpired" x-cloak>

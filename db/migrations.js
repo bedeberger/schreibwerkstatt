@@ -5224,6 +5224,51 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 121 abgeschlossen (page_revisions chars/words/tok nachgeruestet).');
   }
 
+  if (version < 122) {
+    // Ideen pro Kapitel: chapter_id FK + XOR-CHECK (entweder page_id oder
+    // chapter_id, nicht beides/keins). Recreate-Pattern, weil SQLite weder
+    // FK noch CHECK via ALTER nachruestet.
+    db.pragma('foreign_keys = OFF');
+    db.prepare('DROP TABLE IF EXISTS ideen_new').run();
+    db.prepare(`
+      CREATE TABLE ideen_new (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id     INTEGER NOT NULL REFERENCES books(book_id)       ON DELETE CASCADE,
+        page_id     INTEGER          REFERENCES pages(page_id)       ON DELETE SET NULL,
+        chapter_id  INTEGER          REFERENCES chapters(chapter_id) ON DELETE SET NULL,
+        user_email  TEXT    NOT NULL,
+        content     TEXT    NOT NULL,
+        erledigt    INTEGER NOT NULL DEFAULT 0,
+        erledigt_at TEXT,
+        created_at  TEXT    NOT NULL,
+        updated_at  TEXT    NOT NULL,
+        CHECK ((page_id IS NOT NULL AND chapter_id IS NULL)
+            OR (page_id IS NULL AND chapter_id IS NOT NULL))
+      )
+    `).run();
+    db.prepare(`
+      INSERT INTO ideen_new (id, book_id, page_id, chapter_id, user_email, content,
+                             erledigt, erledigt_at, created_at, updated_at)
+      SELECT id, book_id, page_id, NULL, user_email, content,
+             erledigt, erledigt_at, created_at, updated_at
+      FROM ideen
+      WHERE page_id IS NOT NULL
+    `).run();
+    db.prepare('DROP TABLE ideen').run();
+    db.prepare('ALTER TABLE ideen_new RENAME TO ideen').run();
+    db.prepare('CREATE INDEX idx_ideen_page_user    ON ideen(page_id, user_email)').run();
+    db.prepare('CREATE INDEX idx_ideen_chapter_user ON ideen(chapter_id, user_email)').run();
+    db.prepare('CREATE INDEX idx_ideen_book_user    ON ideen(book_id, user_email)').run();
+    db.pragma('foreign_keys = ON');
+
+    const fkErrors122 = db.pragma('foreign_key_check');
+    if (fkErrors122.length) {
+      throw new Error(`Migration 122: foreign_key_check meldet ${fkErrors122.length} Verstoesse: ${JSON.stringify(fkErrors122.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 122').run();
+    logger.info('DB-Migration auf Version 122 abgeschlossen (ideen.chapter_id FK + XOR-CHECK).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {
