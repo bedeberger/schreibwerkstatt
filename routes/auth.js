@@ -283,7 +283,7 @@ ${hasGoogle ? `  <section class="public-actions">
   </form>
 ` : (hasGoogle ? '' : `  <p class="public-sub">${t.noAdmin}</p>
 `)}</main>
-${hasAdminPw ? `<script src="/js/admin-login.js"></script>` : ''}
+${hasAdminPw ? `<script src="/js/admin/admin-login.js"></script>` : ''}
 </body></html>`);
 });
 

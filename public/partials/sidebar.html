@@ -83,8 +83,9 @@
               <span x-text="page.name"></span>
               <template x-for="p in presenceFor(page.id)" :key="p.user_email">
                 <span class="presence-pip"
+                      :style="`--avatar-hue: ${userAvatarHue(p.user_email)}`"
                       :data-tip="t('collab.presence.editing', { user: p.user_display_name })"
-                      x-text="(p.user_display_name || '?').slice(0,1).toUpperCase()"></span>
+                      x-text="userInitials(p.user_email)"></span>
               </template>
             </span>
             <span x-show="tokEsts[page.id] || ideenCounts[page.id] > 0" class="tok-stats">

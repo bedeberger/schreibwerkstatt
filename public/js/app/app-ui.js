@@ -102,6 +102,33 @@ export const appUiMethods = {
     return hit?.display_name || email;
   },
 
+  // Initialen-Bubble. Versucht erst den display_name (2 Tokens: „Alice Müller"
+  // → „AM"); faellt sonst auf die Email-Local-Part zurueck (mit Separator-
+  // Split: „david.berger" → „DB"). Single-Token-Namen liefern 1 Buchstaben.
+  // Maximal 2 Zeichen, immer uppercase.
+  userInitials(email) {
+    if (!email) return '?';
+    const name = this.userDisplayName(email);
+    const isEmail = String(name).indexOf('@') > -1;
+    const source = isEmail ? String(email).split('@')[0] : String(name);
+    const tokens = source.split(/[\s._-]+/).filter(Boolean);
+    if (tokens.length === 0) return '?';
+    const first = tokens[0][0] || '';
+    const second = tokens.length > 1 ? (tokens[1][0] || '') : '';
+    return (first + second).toUpperCase().slice(0, 2);
+  },
+
+  // Deterministische Akzentfarbe pro Email, damit zwei verschiedene User in
+  // einer Liste visuell auseinanderzuhalten sind. Hash → Hue → HSL, Sat/L
+  // an Theme-Tokens halten. Konsistent ueber Reloads (kein Random).
+  userAvatarHue(email) {
+    if (!email) return 0;
+    const s = String(email).toLowerCase();
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+    return Math.abs(h) % 360;
+  },
+
   async _loadUsersLight() {
     if (this._usersByEmailLoading) return;
     this._usersByEmailLoading = true;

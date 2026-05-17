@@ -1,0 +1,49 @@
+/* user-chip: Avatar (Initialen-Bubble, deterministische Hue per Email) + Name.
+   Verwendet in Revisions-Liste, Konflikt-Banner, ggf. spaeter Tree-Tooltip.
+   --avatar-hue als Inline-Style aus userAvatarHue(email) gesetzt. */
+
+.user-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px 2px 2px;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-soft, transparent);
+  border: 1px solid var(--color-border, transparent);
+  font-size: var(--font-size-xs);
+  line-height: 1.2;
+}
+
+.user-chip--self {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft, transparent);
+  color: var(--color-accent);
+}
+
+.user-chip__avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
+  font-weight: 700;
+  background: hsl(var(--avatar-hue, 220) 60% 88%);
+  color: hsl(var(--avatar-hue, 220) 60% 28%);
+  border-radius: var(--radius-sm);
+  line-height: 1;
+}
+
+@media (prefers-color-scheme: dark) {
+  .user-chip__avatar {
+    background: hsl(var(--avatar-hue, 220) 40% 22%);
+    color: hsl(var(--avatar-hue, 220) 70% 78%);
+  }
+}
+
+.user-chip__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 14em;
+}

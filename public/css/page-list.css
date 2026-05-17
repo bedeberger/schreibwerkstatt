@@ -46,7 +46,7 @@
 }
 
 /* Live-Presence: anderer User editiert gerade diese Seite (Heartbeat <90s).
-   Kleines Initial in einem Akzent-Chip neben dem Page-Namen. */
+   Initialen-Bubble; --avatar-hue pro User aus userAvatarHue(email). */
 .presence-pip {
   display: inline-flex;
   align-items: center;
@@ -56,11 +56,18 @@
   margin-left: 4px;
   font-size: 10px;
   font-weight: 600;
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
-  border: 1px solid var(--color-accent);
+  background: hsl(var(--avatar-hue, 220) 60% 88%);
+  color: hsl(var(--avatar-hue, 220) 60% 28%);
+  border: 1px solid hsl(var(--avatar-hue, 220) 60% 50%);
   border-radius: var(--radius-sm);
   line-height: 1;
+}
+@media (prefers-color-scheme: dark) {
+  .presence-pip {
+    background: hsl(var(--avatar-hue, 220) 40% 22%);
+    color: hsl(var(--avatar-hue, 220) 70% 78%);
+    border-color: hsl(var(--avatar-hue, 220) 60% 50%);
+  }
 }
 
 .page-name {
