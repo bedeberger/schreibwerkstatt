@@ -99,6 +99,18 @@
             : t('collab.presence.bannerMany', { count: presenceFor(currentPage?.id).length })"></span>
   </div>
 
+  <!-- Soft-Edit-Lock-Hinweis: anderer User hatte Editor zuletzt offen
+       (last_heartbeat <30min). Reine Info; kein Save-Block (OCC schuetzt). -->
+  <div class="editor-presence-banner editor-presence-banner--lock"
+       x-show="foreignEditLock"
+       x-cloak>
+    <span class="editor-presence-banner__text"
+          x-text="t('collab.lock.banner', {
+            user: foreignEditLock?.user_display_name || t('edit.conflict.unknownUser'),
+            until: foreignEditLock?.expires_at ? formatDate(foreignEditLock.expires_at) : ''
+          })"></span>
+  </div>
+
   <!-- Cross-User-Konflikt aus _checkPageConflict / Server-OCC. Bleibt im
        Fokusmodus sichtbar (eigene Klasse, nicht via #status versteckt). -->
   <div class="editor-conflict-banner" role="alert" x-show="editConflict" x-cloak>
