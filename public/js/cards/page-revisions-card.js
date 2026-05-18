@@ -42,7 +42,7 @@ export function registerPageRevisionsCard() {
       this._onRevisionsChanged = (e) => {
         const pid = e?.detail?.pageId;
         if (!pid || pid !== this._pageId) return;
-        this.loadRevisions(pid);
+        this.loadRevisions(pid, { fresh: true });
       };
       window.addEventListener('page-revisions:changed', this._onRevisionsChanged);
     },
@@ -62,12 +62,13 @@ export function registerPageRevisionsCard() {
       this.closeViewer();
     },
 
-    async loadRevisions(pageId) {
+    async loadRevisions(pageId, { fresh = false } = {}) {
       if (!pageId) return;
       this._pageId = pageId;
       this.loading = true;
       try {
-        const data = await fetchJson(`/content/pages/${pageId}/revisions`);
+        const url = `/content/pages/${pageId}/revisions${fresh ? '?__fresh=1' : ''}`;
+        const data = await fetchJson(url);
         this.revisions = Array.isArray(data?.revisions) ? data.revisions : [];
       } catch (e) {
         console.error('[pageRevisions:load]', e);

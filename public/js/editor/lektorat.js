@@ -153,6 +153,7 @@ export const lektoratMethods = {
       html: finalHtml,
       name: this.currentPage.name,
       expected_updated_at: page.updated_at || null,
+      source: 'lektorat-apply',
     });
     if (saved?.updated_at) this.currentPage.updated_at = saved.updated_at;
     // Uebernommene Korrekturen sind direkte Folge des Lektorats — Seite soll
