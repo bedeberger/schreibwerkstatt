@@ -40,8 +40,8 @@
   user-select: none;
   margin-bottom: var(--space-2xs);
 }
-.tree-chapter-header > .tree-chevron { padding-top: var(--space-2xs); }
-.tree-chapter-header > span:not(.tree-chevron):not(.tree-chapter-meta) {
+.tree-chapter-header > .history-chevron { padding-top: var(--space-2xs); }
+.tree-chapter-header > span:not(.history-chevron):not(.tree-chapter-meta) {
   min-width: 0;
   overflow-wrap: anywhere;
 }
@@ -92,28 +92,6 @@
   padding-top: 0;
 }
 .tree-chapter--solo > .tree-chapter-pages::before { display: none; }
-
-.tree-chevron {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  color: var(--color-subtle);
-  flex-shrink: 0;
-  position: relative;
-}
-.tree-chevron::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-color: currentColor;
-  -webkit-mask: var(--icon-chevron-right) center / 70% no-repeat;
-          mask: var(--icon-chevron-right) center / 70% no-repeat;
-  opacity: 0.45;
-  transition: opacity var(--transition-slow);
-}
-.tree-chevron.open::before { opacity: 0; }
-.tree-chapter-header:hover .tree-chevron::before { opacity: 0.7; }
-
 
 /* === History === */
 .history-heading {

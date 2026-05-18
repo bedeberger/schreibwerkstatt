@@ -61,7 +61,7 @@
            @keydown.arrow-right.prevent="if (item.pages.length > 0 && !item.open) item.open = true"
            @keydown.arrow-left.prevent="if (item.pages.length > 0 && item.open) item.open = false"
            @click="_onChapterHeaderActivate(item)">
-        <span class="tree-chevron" :class="{ open: item.open }" x-show="item.pages.length > 0"
+        <span class="history-chevron" :class="{ open: item.open }" x-show="item.pages.length > 0"
               @click.stop="if (!pageSearch && item.pages.length > 0) item.open = !item.open"></span>
         <span x-text="item.name"></span>
         <span class="tree-chapter-meta">

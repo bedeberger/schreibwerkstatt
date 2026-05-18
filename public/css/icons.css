@@ -31,7 +31,7 @@ button:has(> .icon) {
 }
 
 /* CSS-Pseudo-Icon: nutzt mask-image, damit currentColor weiterhin greift
-   (z.B. fuer .history-chevron / .tree-chevron, die rotieren).
+   (z.B. fuer .history-chevron, die rotieren).
    Konsument setzt --icon: url("data:image/svg+xml,…"). */
 .icon-mask {
   display: inline-block;

@@ -147,12 +147,15 @@ select:focus {
 /* === Combobox (Searchable Select) === */
 .combobox-wrap {
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 .combobox-trigger {
   display: flex;
   align-items: center;
   justify-content: space-between;
   width: 100%;
+  flex: 1 1 auto;
   padding: var(--size-default-padding-y) 10px;
   border: 0.5px solid var(--color-border-input);
   border-radius: var(--radius-md);

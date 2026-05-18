@@ -350,7 +350,7 @@ Niemals `x-text` für Icon-Buttons mit zwei Zuständen — `x-text` setzt `textC
 
 Neuer Bedarf → Lucide-SVG von [lucide.dev](https://lucide.dev) als `<symbol>` in `public/icons.svg` ergänzen + `SHELL_CACHE` in `public/sw.js` bumpen.
 
-**Mask-Variante für CSS-Pseudo-Elements:** Wo Icons aus CSS-Pseudo gerendert werden (rotierende Disclosure-Marker, `.history-chevron`, `.tree-chevron`, `.card-form-saved::before`), gibt es vorgehaltene `--icon-…`-Custom-Properties in `:root` (siehe `icons.css`). Konsumiert via:
+**Mask-Variante für CSS-Pseudo-Elements:** Wo Icons aus CSS-Pseudo gerendert werden (rotierende Disclosure-Marker, `.history-chevron`, `.card-form-saved::before`), gibt es vorgehaltene `--icon-…`-Custom-Properties in `:root` (siehe `icons.css`). Konsumiert via:
 ```css
 .my-thing::before {
   content: '';
@@ -695,7 +695,6 @@ Niemals reine `<div>`s mit Inline-Text dafür — immer durch `.card-status*`-Kl
 | Pattern | Glyph (Fallback) | Lucide-Icon | Rotation |
 |---------|------------------|-------------|----------|
 | Collapsible-Toggle (`.history-chevron`) | `›` | `chevron-right` (gerendert via `mask: var(--icon-chevron-right)`) | 0° → 90° (Klasse `.open`) |
-| Tree-Disclosure (`.tree-chevron`) | `›` | `chevron-right` (via `::before` + Mask) | sichtbar/unsichtbar (Opacity, Klasse `.open` blendet aus) |
 | Combobox-Trigger (`.combobox-chevron`) | `▾` | (noch Unicode-Glyph; auf `chevron-down`-Mask migrieren, sobald Touch) | 0° → 180° (Klasse `--open`) |
 | Disclosure (sonstig) | nicht erfinden — vorhandenes Muster nehmen |
 
@@ -866,7 +865,7 @@ Kein Skeleton ohne Shimmer-Animation. CSS-File-Referenzen: [entity-list.css](pub
 **Klassen** [public/css/tree-history.css](public/css/tree-history.css):
 - `.tree-chapter` / `.tree-chapter-header` / `.tree-chapter-header--active`
 - `.tree-chapter-meta` — Counter rechts
-- `.tree-chevron` / `.tree-chevron.open` — gleicher Rotations-Mechanismus wie Section-Toggle (nur Klassenpräfix anders)
+- `.history-chevron` / `.history-chevron.open` — wiederverwendetes Rotations-Pattern (0° → 90°)
 - `.tree-chapter-pages::before` — visuelle Guide-Linie zu Children
 
 Nur in Sidebar-Tree verwendet. Bei neuer hierarchischer Liste: erst prüfen, ob die Tree-Klassen passen.

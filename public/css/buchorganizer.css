@@ -148,7 +148,7 @@
 
 .organizer-toolbar {
   display: flex;
-  align-items: stretch;
+  align-items: center;
   gap: var(--space-sm);
   flex-wrap: nowrap;
   margin: var(--space-sm) 0 var(--space-md);
@@ -165,7 +165,7 @@
   min-width: 140px;
 }
 .organizer-jump .combobox-trigger {
-  height: 34px;
+  min-height: 34px;
   padding-block: 0;
   box-sizing: border-box;
 }
