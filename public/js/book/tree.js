@@ -174,18 +174,20 @@ export const treeMethods = {
     }
   },
 
-  _onChapterHeaderActivate(item) {
+  async _onChapterHeaderActivate(item) {
     if (this.pageSearch) return;
     // Leeres Kapitel → kapitel-review-card öffnen, damit User direkt eine
     // erste Seite anlegen kann. openKapitelReviewForChapter filtert 0-Seiten-
     // Kapitel via kapitelReviewChapterOptions() raus, deswegen direkt setzen.
+    // chapterId zuerst am Root setzen, dann toggle awaiten — toggle lädt das
+    // Partial via `_ensurePartial`; ohne await bleibt die Karte leer.
     if (item.pages.length === 0) {
-      this._closeOtherMainCards('kapitelReview');
-      this.showKapitelReviewCard = true;
       this.kapitelReviewChapterId = String(item.id);
+      if (!this.showKapitelReviewCard) await this.toggleKapitelReviewCard();
+      else this._closeOtherMainCards('kapitelReview');
       return;
     }
-    if (this._bookQualifiesForChapterReview()) this.openKapitelReviewForChapter(item.id);
+    if (this._bookQualifiesForChapterReview()) await this.openKapitelReviewForChapter(item.id);
     else item.open = !item.open;
   },
 

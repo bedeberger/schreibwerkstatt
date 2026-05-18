@@ -25,19 +25,6 @@ export function registerKapitelReviewCard() {
     _lifecycle: null,
 
     init() {
-      const onSelectChapter = (e) => {
-        const chapterId = e.detail?.chapterId;
-        if (!chapterId) return;
-        // Auch frisch angelegte (noch 0-seitige) Kapitel akzeptieren — die Karte
-        // dient dann als Einstieg fürs Anlegen der ersten Seite.
-        const tree = window.__app.tree || [];
-        const exists = tree.some(i =>
-          i.type === 'chapter' && !i.solo && String(i.id) === String(chapterId)
-        );
-        if (!exists) return;
-        window.__app.kapitelReviewChapterId = String(chapterId);
-      };
-
       // Backstop für Done-Events ohne lokalen per-Slot-Poller (z.B. Job lief in
       // anderem Tab oder Slot wurde durch Buchwechsel zerstört). Lädt History
       // neu, damit der Eintrag in der Card auftaucht.
@@ -86,7 +73,6 @@ export function registerKapitelReviewCard() {
         onBookChanged: (e, ctx) => reset(ctx),
         onViewReset:   (e, ctx) => reset(ctx),
         extraListeners: [
-          { type: 'kapitel-review:select', handler: onSelectChapter },
           { type: 'job:reconnect',         handler: onJobReconnect },
           { type: 'job:finished',          handler: onJobFinished },
         ],
@@ -353,9 +339,7 @@ export function registerKapitelReviewCard() {
 
     // Neues Kapitel direkt unter dem aktuell angezeigten Kapitel einhängen
     // und sofort zum neuen Kapitel navigieren, damit der User dort eine
-    // erste Seite anlegen kann. ID wird direkt am Root gesetzt — der
-    // kapitel-review:select-Handler filtert via kapitelReviewChapterOptions()
-    // 0-Seiten-Kapitel raus und wäre für ein frisches Kapitel ein No-Op.
+    // erste Seite anlegen kann.
     async createSiblingChapter() {
       const root = window.__app;
       const current = this.kapitelReviewSelectedChapter();

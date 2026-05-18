@@ -295,13 +295,12 @@ export const appHashRouterMethods = {
           if (!this.showBookReviewCard) await this.toggleBookReviewCard();
           break;
         case 'kapitel':
+          // Root-SSoT vor Toggle setzen — `_openKapitelReview` validiert nach
+          // dem Partial-Load via `stillValid`. Ein Event wäre race-anfällig:
+          // bei Deep-Link ist die Sub-Komponente erst nach `_ensurePartial`
+          // gemountet, ein vorher dispatchtes Event ginge verloren.
+          if (arg) this.kapitelReviewChapterId = String(arg);
           if (!this.showKapitelReviewCard) await this.toggleKapitelReviewCard();
-          if (arg) {
-            // Sub übernimmt den Chapter-Wechsel via `kapitel-review:select`-Event.
-            // Bei Deep-Link `#book/X/kapitel/Y` ist die Sub evtl. noch nicht
-            // gemountet — Event wird dann vom init()-Listener verarbeitet.
-            window.dispatchEvent(new CustomEvent('kapitel-review:select', { detail: { chapterId: String(arg) } }));
-          }
           break;
         case 'chat':
           if (!this.showBookChatCard) await this.toggleBookChatCard();

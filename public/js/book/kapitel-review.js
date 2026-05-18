@@ -21,9 +21,9 @@ export const kapitelReviewMethods = {
     if (!chapterId) return;
     const opts = this.kapitelReviewChapterOptions();
     if (!opts.some(c => String(c.id) === String(chapterId))) return;
-    window.dispatchEvent(new CustomEvent('kapitel-review:select', {
-      detail: { chapterId },
-    }));
+    // chapterId am Root-SSoT zuerst setzen, dann toggle awaiten — vor dem
+    // Partial-Load gibt es keinen Listener für ein `kapitel-review:select`-Event.
+    this.kapitelReviewChapterId = String(chapterId);
     if (!this.showKapitelReviewCard) {
       await this.toggleKapitelReviewCard();
     }

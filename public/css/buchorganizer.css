@@ -249,6 +249,12 @@
   .organizer-jump {
     width: 100%;
   }
+  /* flex-basis kippt im Column-Mode auf die Höhe — `flex: 0 1 220px` würde
+     den Wrapper 220px hoch machen und einen leeren Block unter dem Trigger
+     reservieren. Auf Mobile shrink-to-content. */
+  .organizer-jump {
+    flex: 0 0 auto;
+  }
   .organizer-page .organizer-delete-btn {
     margin-left: auto;
   }

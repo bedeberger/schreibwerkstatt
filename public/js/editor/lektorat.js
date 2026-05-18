@@ -117,7 +117,7 @@ export const lektoratMethods = {
   // nach kurz zuvor gesetzten Edits noch die alte Fassung liefern und der
   // gleich folgende PUT wuerde frische Server-Edits mit Stale-Daten
   // ueberschreiben.
-  async _loadApplyAndSave(selectedErrors, selectedStyles, onProgress) {
+  async _loadApplyAndSave(selectedErrors, selectedStyles, onProgress, source = 'lektorat-apply') {
     onProgress(10, this.t('lektorat.loadingPage'));
     const page = await contentRepo.loadPage(this.currentPage.id, { fresh: true });
     page.html = stripFocusArtefacts(page.html || '');
@@ -153,7 +153,7 @@ export const lektoratMethods = {
       html: finalHtml,
       name: this.currentPage.name,
       expected_updated_at: page.updated_at || null,
-      source: 'lektorat-apply',
+      source,
     });
     if (saved?.updated_at) this.currentPage.updated_at = saved.updated_at;
     // Uebernommene Korrekturen sind direkte Folge des Lektorats — Seite soll

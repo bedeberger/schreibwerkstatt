@@ -132,6 +132,7 @@ export const chatMethods = {
           root.saveApplying = pct;
           if (text) this.chatStatus = `<span class="spinner"></span>${escHtml(text)}`;
         },
+        'chat-apply',
       );
       if (!samePage()) return;
       root.originalHtml = finalHtml;
