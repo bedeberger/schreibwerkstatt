@@ -219,6 +219,218 @@ test('ensureTree sortiert neue Seite mit chapter_id unter bestehendes Kapitel', 
   assert.equal(topPage, undefined, 'Seite erscheint nicht zusätzlich top-level');
 });
 
+test('validateTree wirft auf NOT_ARRAY', () => {
+  const bookId = seedBook('not-array');
+  let err;
+  try { bookOrder.validateTree({ not: 'array' }, bookId); } catch (e) { err = e; }
+  assert.equal(err?.code, 'NOT_ARRAY');
+});
+
+test('validateTree wirft auf BAD_TYPE', () => {
+  const bookId = seedBook('bad-type');
+  let err;
+  try { bookOrder.validateTree([{ type: 'section', id: 1 }], bookId); } catch (e) { err = e; }
+  assert.equal(err?.code, 'BAD_TYPE');
+});
+
+test('validateTree wirft auf BAD_ID (negative/float/null)', () => {
+  const bookId = seedBook('bad-id');
+  for (const badId of [0, -1, 1.5, null, '1', undefined]) {
+    let err;
+    try { bookOrder.validateTree([{ type: 'chapter', id: badId, children: [] }], bookId); } catch (e) { err = e; }
+    assert.equal(err?.code, 'BAD_ID', `id=${String(badId)}`);
+  }
+});
+
+test('validateTree wirft auf DUPLICATE_CHAPTER', () => {
+  const bookId = seedBook('dup-chapter');
+  const c1 = seedChapter(bookId, 'C1');
+  const tree = [
+    { type: 'chapter', id: c1, children: [] },
+    { type: 'chapter', id: c1, children: [] },
+  ];
+  let err;
+  try { bookOrder.validateTree(tree, bookId); } catch (e) { err = e; }
+  assert.equal(err?.code, 'DUPLICATE_CHAPTER');
+});
+
+test('validateTree wirft auf CHILDREN_NOT_ARRAY', () => {
+  const bookId = seedBook('children-not-array');
+  const c1 = seedChapter(bookId, 'C1');
+  let err;
+  try { bookOrder.validateTree([{ type: 'chapter', id: c1, children: 'oops' }], bookId); } catch (e) { err = e; }
+  assert.equal(err?.code, 'CHILDREN_NOT_ARRAY');
+});
+
+test('validateTree wirft auf PAGE_HAS_CHILDREN', () => {
+  const bookId = seedBook('page-has-children');
+  const c1 = seedChapter(bookId, 'C1');
+  const p1 = seedPage(bookId, c1, 'P1');
+  const tree = [
+    { type: 'chapter', id: c1, children: [{ type: 'page', id: p1, children: [{ type: 'page', id: 99 }] }] },
+  ];
+  let err;
+  try { bookOrder.validateTree(tree, bookId); } catch (e) { err = e; }
+  assert.equal(err?.code, 'PAGE_HAS_CHILDREN');
+});
+
+test('validateTree wirft auf MISSING_CHAPTER', () => {
+  const bookId = seedBook('miss-chapter');
+  const c1 = seedChapter(bookId, 'C1');
+  seedChapter(bookId, 'C2');
+  const tree = [{ type: 'chapter', id: c1, children: [] }];
+  let err;
+  try { bookOrder.validateTree(tree, bookId); } catch (e) { err = e; }
+  assert.equal(err?.code, 'MISSING_CHAPTER');
+});
+
+test('materializeTree haelt Positionen pro Bucket lueckenlos + 0-basiert', () => {
+  const bookId = seedBook('positions-bucketed');
+  const cA = seedChapter(bookId, 'A');
+  const cB = seedChapter(bookId, 'B');
+  const ids = [];
+  for (let i = 0; i < 4; i++) ids.push(seedPage(bookId, cA, `A${i}`, 99));
+  for (let i = 0; i < 3; i++) ids.push(seedPage(bookId, cB, `B${i}`, 99));
+  for (let i = 0; i < 2; i++) ids.push(seedPage(bookId, null, `T${i}`, 99));
+
+  bookOrder.putOrder(bookId, [
+    { type: 'chapter', id: cA, children: ids.slice(0, 4).map(id => ({ type: 'page', id })) },
+    { type: 'page', id: ids[7] },
+    { type: 'chapter', id: cB, children: ids.slice(4, 7).map(id => ({ type: 'page', id })) },
+    { type: 'page', id: ids[8] },
+  ], 'test');
+
+  // Chapter-Positionen: 0,1 (Top-Pages dazwischen werden separat indiziert).
+  assert.equal(db.prepare('SELECT position FROM chapters WHERE chapter_id = ?').get(cA).position, 0);
+  assert.equal(db.prepare('SELECT position FROM chapters WHERE chapter_id = ?').get(cB).position, 1);
+
+  // Pages pro Kapitel: 0..n-1
+  const posOf = (id) => db.prepare('SELECT position, chapter_id FROM pages WHERE page_id = ?').get(id);
+  ids.slice(0, 4).forEach((id, i) => { const r = posOf(id); assert.equal(r.position, i); assert.equal(r.chapter_id, cA); });
+  ids.slice(4, 7).forEach((id, i) => { const r = posOf(id); assert.equal(r.position, i); assert.equal(r.chapter_id, cB); });
+  // Top-Pages: 0..n-1, chapter_id=null
+  assert.equal(posOf(ids[7]).position, 0); assert.equal(posOf(ids[7]).chapter_id, null);
+  assert.equal(posOf(ids[8]).position, 1); assert.equal(posOf(ids[8]).chapter_id, null);
+});
+
+test('putOrder ist idempotent (zweimal → identischer Stand)', () => {
+  const bookId = seedBook('idempotent');
+  const c1 = seedChapter(bookId, 'C1');
+  const p1 = seedPage(bookId, c1, 'P1');
+  const tree = [{ type: 'chapter', id: c1, children: [{ type: 'page', id: p1 }] }];
+  bookOrder.putOrder(bookId, tree, 'alice');
+  const r1 = bookOrder.getOrder(bookId);
+  bookOrder.putOrder(bookId, tree, 'bob');
+  const r2 = bookOrder.getOrder(bookId);
+  assert.deepEqual(r2.tree, r1.tree);
+  assert.equal(r2.updated_by, 'bob');
+});
+
+test('ensureTree ohne books-Row liefert leeren Tree (defensiv, kein FK-Throw)', () => {
+  const r = bookOrder.ensureTree(999_999_999);
+  assert.deepEqual(r.tree, []);
+  assert.equal(r.updated_at, null);
+});
+
+test('ensureTree ist idempotent (zweiter Aufruf ändert order_json nicht)', () => {
+  const bookId = seedBook('ensure-idempotent');
+  seedChapter(bookId, 'C1');
+  seedPage(bookId, null, 'Top');
+  const r1 = bookOrder.ensureTree(bookId);
+  const r2 = bookOrder.ensureTree(bookId);
+  assert.deepEqual(r2.tree, r1.tree);
+  assert.equal(r2.updated_at, r1.updated_at, 'kein Reconcile-Write bei stable state');
+});
+
+test('reconcile entfernt stale Page (im order_json, aber nicht mehr in pages)', () => {
+  const bookId = seedBook('stale-page');
+  const c1 = seedChapter(bookId, 'C1');
+  const p1 = seedPage(bookId, c1, 'P1');
+  const p2 = seedPage(bookId, c1, 'P2');
+  bookOrder.putOrder(bookId, [
+    { type: 'chapter', id: c1, children: [{ type: 'page', id: p1 }, { type: 'page', id: p2 }] },
+  ], 'test');
+  db.prepare('DELETE FROM pages WHERE page_id = ?').run(p1);
+
+  const r = bookOrder.ensureTree(bookId);
+  const c1Entry = r.tree.find(e => e.type === 'chapter' && e.id === c1);
+  assert.deepEqual(c1Entry.children, [{ type: 'page', id: p2 }]);
+});
+
+test('reconcile filtert Duplikate im stored Tree (Korruptionsschutz)', () => {
+  const bookId = seedBook('dup-stored');
+  const c1 = seedChapter(bookId, 'C1');
+  const p1 = seedPage(bookId, c1, 'P1');
+  // Direct-Write korruptes JSON: P1 doppelt.
+  db.prepare(`INSERT INTO book_order (book_id, order_json, updated_at, updated_by)
+              VALUES (?, ?, '2026-01-01T00:00:00.000Z', 'test')`).run(
+    bookId,
+    JSON.stringify([
+      { type: 'chapter', id: c1, children: [{ type: 'page', id: p1 }, { type: 'page', id: p1 }] },
+    ])
+  );
+
+  const r = bookOrder.ensureTree(bookId);
+  const c1Entry = r.tree.find(e => e.type === 'chapter' && e.id === c1);
+  assert.deepEqual(c1Entry.children, [{ type: 'page', id: p1 }], 'Duplikat weggefiltert');
+});
+
+test('reconcile: Page mit chapter_id zu geloeschtem Kapitel landet top-level', () => {
+  const bookId = seedBook('orphan-chapter-id');
+  const cVisible = seedChapter(bookId, 'C1');
+  const cGhost = seedChapter(bookId, 'CGhost');
+  const pOrphan = seedPage(bookId, cGhost, 'Orphan');
+  // Overlay kennt cGhost nicht; pOrphan ist orphan im Sinn der Reconcile.
+  bookOrder.putOrder(bookId, [
+    { type: 'chapter', id: cVisible, children: [] },
+    { type: 'chapter', id: cGhost, children: [{ type: 'page', id: pOrphan }] },
+  ], 'test');
+  // Jetzt cGhost loeschen — pages.chapter_id wird via FK ON DELETE SET NULL
+  // genullt, also ist die Page in DB top-level. Reconcile soll sie ohne
+  // Stale-Referenz top-level einsortieren.
+  db.prepare('DELETE FROM chapters WHERE chapter_id = ?').run(cGhost);
+  assert.equal(
+    db.prepare('SELECT chapter_id FROM pages WHERE page_id = ?').get(pOrphan).chapter_id,
+    null,
+    'FK ON DELETE SET NULL hat geklappt'
+  );
+
+  const r = bookOrder.ensureTree(bookId);
+  const top = r.tree.find(e => e.type === 'page' && e.id === pOrphan);
+  assert.ok(top, 'Page landet top-level wenn ihr Chapter weg ist');
+  const ghostStillThere = r.tree.find(e => e.type === 'chapter' && e.id === cGhost);
+  assert.equal(ghostStillThere, undefined, 'gelöschtes Kapitel wegfiltern');
+});
+
+test('bookTree initialisiert order_json beim ersten Aufruf', async () => {
+  const bookId = seedBook('first-read');
+  const c1 = seedChapter(bookId, 'C1');
+  seedPage(bookId, c1, 'P1');
+
+  assert.equal(bookOrder.getOrder(bookId), null, 'noch keine Row');
+  await contentStore.bookTree(bookId);
+  const r = bookOrder.getOrder(bookId);
+  assert.ok(r?.tree?.length, 'Row jetzt initialisiert');
+  assert.equal(r.tree[0].type, 'chapter');
+  assert.equal(r.tree[0].id, c1);
+});
+
+test('bookTree: chapter_id im Output folgt order_json, nicht pages.chapter_id', async () => {
+  const bookId = seedBook('chapter-id-override');
+  const c1 = seedChapter(bookId, 'C1');
+  // Page in DB top-level (chapter_id=null), aber order_json packt sie unter c1.
+  const pTopInDb = seedPage(bookId, null, 'P');
+  bookOrder.putOrder(bookId, [
+    { type: 'chapter', id: c1, children: [{ type: 'page', id: pTopInDb }] },
+  ], 'test');
+
+  const tree = await contentStore.bookTree(bookId);
+  const c1Out = tree.chapters.find(c => c.id === c1);
+  assert.equal(c1Out.pages.length, 1);
+  assert.equal(c1Out.pages[0].id, pTopInDb);
+  assert.equal(c1Out.pages[0].chapter_id, c1, 'Output-chapter_id folgt Overlay-Bucket');
+});
+
 test('content-store bookTree liest order_json (Overlay)', async () => {
   const bookId = seedBook('overlay');
   const cA = seedChapter(bookId, 'A', 0);

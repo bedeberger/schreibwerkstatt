@@ -49,7 +49,7 @@
          x-data="combobox($app.t('bookOrganizer.jumpToPlaceholder'))"
          x-modelable="value" x-model="jumpToChapterId"
          x-effect="options = workTree.map(c => ({ value: c.id, label: c.name }))"
-         @combobox-change="jumpToChapter($event.detail.value)"></div>
+         @combobox-change="jumpToChapter($event.detail)"></div>
   </div>
 
   <div x-show="organizerProgress > 0" class="progress-bar-wrap">
@@ -83,7 +83,7 @@
                x-data="combobox($app.t('bookOrganizer.moveTo'))"
                x-modelable="value" x-model="moveComboValue"
                x-effect="options = chapterMoveOptions(0)"
-               @combobox-change="movePageToChapter(page.id, $event.detail.value); moveComboValue = ''"></div>
+               @combobox-change="movePageToChapter(page.id, $event.detail); moveComboValue = ''"></div>
           <button type="button" class="organizer-delete-btn" @click="deletePage(page.id)" :disabled="organizerSaving"
                   :data-tip="$app.t('bookOrganizer.deletePage')" :aria-label="$app.t('bookOrganizer.deletePage')">×</button>
         </li>
@@ -134,7 +134,7 @@
                    x-data="combobox($app.t('bookOrganizer.moveTo'))"
                    x-modelable="value" x-model="moveComboValue"
                    x-effect="options = chapterMoveOptions(ch.id)"
-                   @combobox-change="movePageToChapter(page.id, $event.detail.value); moveComboValue = ''"></div>
+                   @combobox-change="movePageToChapter(page.id, $event.detail); moveComboValue = ''"></div>
               <button type="button" class="organizer-delete-btn" @click="deletePage(page.id)" :disabled="organizerSaving"
                       :data-tip="$app.t('bookOrganizer.deletePage')" :aria-label="$app.t('bookOrganizer.deletePage')">×</button>
             </li>

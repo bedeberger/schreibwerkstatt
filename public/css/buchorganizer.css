@@ -210,6 +210,11 @@
   min-width: 140px;
   flex-shrink: 0;
 }
+/* Trigger an Seitentitel-Input-Höhe angleichen (Row-Alignment). */
+.organizer-move-combo .combobox-trigger {
+  font-size: var(--font-size-base);
+  padding: var(--space-xs) 8px;
+}
 
 /* SortableJS-Klassen für Drag-Zustände */
 .organizer-page.sortable-ghost,
