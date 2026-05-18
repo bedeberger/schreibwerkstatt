@@ -362,9 +362,12 @@ export const appViewMethods = {
     this._uninstallOnlineRetry?.();
     this.resetChat();
     this.showChatCard = false;
-    // Page-Ideen-Karte schliessen; Chapter-Ideen bleiben offen (Slot lebt
-    // neben Kapitelreview, nicht neben Editor).
-    if (this.ideenScope === 'page') this.showIdeenCard = false;
+    // Ideen-Karte schliessen — gilt für beide Scopes. Page-Scope sitzt im
+    // Editor-Slot, Chapter-Scope ist an Kapitelreview gekoppelt (das via
+    // `_closeOtherMainCards` ebenfalls geschlossen wird).
+    this.showIdeenCard = false;
+    this.ideenChapterId = null;
+    this.ideenScope = 'page';
     this._checkDoneBeforeChat = false;
     this.currentPage = null;
     this.currentPageEmpty = false;
