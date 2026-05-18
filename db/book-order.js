@@ -248,11 +248,25 @@ function reconcile(bookId, storedTree) {
     reconciled.push({ type: 'chapter', id: chId, children });
   }
 
-  // Restliche Seiten (Top-Level oder Waisen mit chapter_id, das aber im Tree
-  // fehlt) ans Top-Level-Ende.
+  // Restliche Seiten: bevorzugt unter ihrem Kapitel einsortieren (pages.chapter_id).
+  // Top-Level nur, wenn chapter_id NULL ist oder das Kapitel nicht im Tree liegt.
+  // Why: createPage/Direct-Insert pflegt book_order nicht. Ohne Bucket-Lookup
+  // landen frisch angelegte Kapitel-Seiten beim ersten bookTree-Read als Waisen.
   const missingPages = [...pageIds].filter(id => !seenPages.has(id)).sort((a, b) => a - b);
-  for (const pId of missingPages) {
-    reconciled.push({ type: 'page', id: pId });
+  if (missingPages.length) {
+    const placeholders = missingPages.map(() => '?').join(',');
+    const rows = db.prepare(
+      `SELECT page_id, chapter_id FROM pages WHERE page_id IN (${placeholders})`
+    ).all(...missingPages);
+    const chapterByPage = new Map(rows.map(r => [r.page_id, r.chapter_id]));
+    const chapterEntry = new Map();
+    for (const e of reconciled) if (e.type === 'chapter') chapterEntry.set(e.id, e);
+    for (const pId of missingPages) {
+      const chId = chapterByPage.get(pId) || null;
+      const ch = chId ? chapterEntry.get(chId) : null;
+      if (ch) ch.children.push({ type: 'page', id: pId });
+      else reconciled.push({ type: 'page', id: pId });
+    }
   }
 
   return reconciled;

@@ -200,6 +200,25 @@ test('ensureTree reconciliert neue + geloeschte Items', () => {
   assert.deepEqual(c2Entry.children, [{ type: 'page', id: p2 }]);
 });
 
+test('ensureTree sortiert neue Seite mit chapter_id unter bestehendes Kapitel', () => {
+  const bookId = seedBook('reconcile-page-into-chapter');
+  const c1 = seedChapter(bookId, 'C1');
+  bookOrder.putOrder(bookId, [
+    { type: 'chapter', id: c1, children: [] },
+  ], 'test');
+
+  // Neue Seite per Direct-Insert mit chapter_id (simuliert createPage-Pfad,
+  // der book_order nicht selbst pflegt).
+  const pNew = seedPage(bookId, c1, 'Neue Seite');
+
+  const r = bookOrder.ensureTree(bookId);
+  const c1Entry = r.tree.find(e => e.type === 'chapter' && e.id === c1);
+  assert.deepEqual(c1Entry.children, [{ type: 'page', id: pNew }],
+    'neue Seite landet unter ihrem Kapitel, nicht als Top-Level-Waise');
+  const topPage = r.tree.find(e => e.type === 'page' && e.id === pNew);
+  assert.equal(topPage, undefined, 'Seite erscheint nicht zusätzlich top-level');
+});
+
 test('content-store bookTree liest order_json (Overlay)', async () => {
   const bookId = seedBook('overlay');
   const cA = seedChapter(bookId, 'A', 0);
