@@ -7,6 +7,7 @@ export const persistMethods = {
     this._snapshotFromRoot();
     await this.$nextTick();
     this._initSortables();
+    this._refreshSortableDisabled();
   },
 
   _snapshotFromRoot() {
@@ -24,6 +25,7 @@ export const persistMethods = {
       .map(it => it.pages[0])
       .filter(Boolean)
       .map(p => ({ id: p.id, name: p.name, chapter_id: 0 }));
+    this._recomputeInitialOpenState();
   },
 
   // Deep-Clone von workTree+soloPages für History-Records. JSON-Roundtrip

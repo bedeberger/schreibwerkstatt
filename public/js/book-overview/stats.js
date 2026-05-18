@@ -109,12 +109,12 @@ export const statsMethods = {
     const a = this.overviewStats;
     if (!a || a.length < 2) return null;
     const tokEsts = window.__app?.tokEsts || {};
-    return this._memo('sevenDayDelta', [a, tokEsts], () => {
+    const tree = window.__app?.tree || [];
+    return this._memo('sevenDayDelta', [a, tokEsts, tree], () => {
       // Latest = Live-Summe wenn vorhanden (raw, kein Math.max — sonst
       // gewinnt Cron-Snapshot bei Lösch-Edits und überzeichnet net-Delta).
       // Konsistent zu Heute-Ring (_charsTodayDelta).
-      let liveChars = 0;
-      for (const id of Object.keys(tokEsts)) liveChars += Number(tokEsts[id]?.chars) || 0;
+      const liveChars = aggregateLiveBookStats(tokEsts, tree).chars;
       const latestSnapshot = a[a.length - 1];
       const latestChars = liveChars > 0 ? liveChars : (Number(latestSnapshot.chars) || 0);
       const cutoff = localIsoDaysAgo(7);
@@ -189,7 +189,8 @@ export const statsMethods = {
   overviewStreakHeatmap() {
     const a = this.overviewStats || [];
     const tokEsts = window.__app?.tokEsts || {};
-    return this._memo('streakHeatmap', [a, tokEsts], () => {
+    const tree = window.__app?.tree || [];
+    return this._memo('streakHeatmap', [a, tokEsts, tree], () => {
       const WEEKS = 52;
       const charsByDate = new Map();
       for (const s of a) charsByDate.set(s.recorded_at, Number(s.chars) || 0);
@@ -312,7 +313,8 @@ export const statsMethods = {
   overviewTodayRing(goalChars = 1500) {
     const a = this.overviewStats || [];
     const tokEsts = window.__app?.tokEsts || {};
-    return this._memo('todayRing:' + goalChars, [a, tokEsts], () => {
+    const tree = window.__app?.tree || [];
+    return this._memo('todayRing:' + goalChars, [a, tokEsts, tree], () => {
       const chars = this._charsTodayDelta();
       const goal = Math.max(1, Number(goalChars) || 1500);
       const pct = Math.max(0, Math.min(100, Math.round((chars / goal) * 100)));

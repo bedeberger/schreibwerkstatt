@@ -9,9 +9,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-// Server-Normalisierung (Spiegel von routes/sync.js#htmlToText).
-function serverNormalize(html) {
-  return String(html || '')
+// Server-Normalisierung (Spiegel von routes/sync.js#htmlToText +
+// computeStats(html, prefix) — prefix=page_name fliesst in chars/words ein).
+function serverNormalize(html, prefix = '') {
+  const combined = (prefix ? prefix + ' ' : '') + (html || '');
+  return combined
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -20,8 +22,10 @@ function serverNormalize(html) {
 // Frontend-Normalisierung (Spiegel des aktuellen tree.js#_syncPageStatsAfterSave-
 // Codes — wenn dieser Test bricht, ist die Frontend-Inline-Logik divergiert
 // und tokEsts wird wieder driften).
-function frontendNormalize(html) {
-  return String(html || '')
+function frontendNormalize(html, prefix = '') {
+  const pre = String(prefix || '').trim();
+  const combined = (pre ? pre + ' ' : '') + String(html || '');
+  return combined
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -44,6 +48,25 @@ for (const [html, label] of CASES) {
   test(`Normalisierung match: ${label}`, () => {
     const s = serverNormalize(html);
     const f = frontendNormalize(html);
+    assert.equal(f, s, `Frontend "${f}" != Server "${s}"`);
+    assert.equal(f.length, s.length);
+  });
+}
+
+// Mit prefix: page_name fliesst in chars/words ein (Überschrift gehört zum
+// Buchumfang). Server + Frontend müssen identisch normalisieren.
+const PREFIX_CASES = [
+  ['Kapitel 1: Anfang', '<p>Es war einmal.</p>', 'normaler Titel + Body'],
+  ['', '<p>Body</p>', 'leerer Prefix'],
+  ['Titel', '', 'leerer Body, nur Titel'],
+  ['  Titel mit Spaces  ', '<p>x</p>', 'Prefix mit Padding-Whitespace'],
+  ['Eins', '<h1>Zwei</h1><p>Drei</p>', 'Mehrere Blocks im Body'],
+];
+
+for (const [prefix, html, label] of PREFIX_CASES) {
+  test(`Normalisierung mit Prefix: ${label}`, () => {
+    const s = serverNormalize(html, prefix);
+    const f = frontendNormalize(html, prefix);
     assert.equal(f, s, `Frontend "${f}" != Server "${s}"`);
     assert.equal(f.length, s.length);
   });

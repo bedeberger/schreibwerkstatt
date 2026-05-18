@@ -8,6 +8,7 @@ import { persistMethods } from './book-organizer/persist.js';
 import { mirrorMethods } from './book-organizer/mirror.js';
 import { crudMethods } from './book-organizer/crud.js';
 import { historyMethods } from './book-organizer/history.js';
+import { viewMethods } from './book-organizer/view.js';
 
 export const bookOrganizerMethods = {
   ...dndMethods,
@@ -15,4 +16,5 @@ export const bookOrganizerMethods = {
   ...mirrorMethods,
   ...crudMethods,
   ...historyMethods,
+  ...viewMethods,
 };

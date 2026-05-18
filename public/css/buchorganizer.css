@@ -142,6 +142,37 @@
   font-style: italic;
 }
 
+.organizer-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  margin: var(--space-sm) 0 var(--space-md);
+}
+.organizer-toolbar .page-search {
+  flex: 1 1 220px;
+  min-width: 220px;
+}
+.organizer-jump {
+  min-width: 200px;
+}
+
+.organizer-chapter-toggle {
+  background: transparent;
+  border: 0;
+  padding: 0 var(--space-2xs);
+  cursor: pointer;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.organizer-move-combo {
+  min-width: 140px;
+  flex-shrink: 0;
+}
+
 /* SortableJS-Klassen für Drag-Zustände */
 .organizer-page.sortable-ghost,
 .organizer-chapter.sortable-ghost {

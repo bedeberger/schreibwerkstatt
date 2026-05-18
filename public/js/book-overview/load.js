@@ -2,7 +2,7 @@
 // loadBookOverview ruft 10 Endpoints parallel und schreibt das Resultat in den
 // State. _checkBookStatsStaleness läuft anschliessend silent im Hintergrund;
 // resetBookOverview leert State + Memos beim Buchwechsel.
-import { fetchJson } from '../utils.js';
+import { fetchJson, aggregateLiveBookStats } from '../utils.js';
 
 // Retry once mit kurzem Backoff: bei 9 parallelen Endpoints fängt das
 // 5xx-/Netzwerk-Blips ab, ohne dass das Tile stumm leer rendert.
@@ -126,8 +126,8 @@ export const loadMethods = {
         const stats = this.overviewStats || [];
         const lastSnapshot = stats.length ? stats[stats.length - 1] : null;
         const tokEsts = app.tokEsts || {};
-        let liveChars = 0;
-        for (const id of Object.keys(tokEsts)) liveChars += Number(tokEsts[id]?.chars) || 0;
+        const tree = app.tree || [];
+        const liveChars = aggregateLiveBookStats(tokEsts, tree).chars;
         const snapshotChars = Number(lastSnapshot?.chars) || 0;
         if (liveChars > 0 && snapshotChars > 0) {
           const diff = Math.abs(liveChars - snapshotChars);

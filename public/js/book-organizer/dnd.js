@@ -114,4 +114,32 @@ export const dndMethods = {
     }
     return this.soloPages.find(p => p.id === id) || null;
   },
+
+  // Move-Pfad ohne Drag — Combobox „Verschieben nach …". Nutzt dieselbe
+  // Mutations- und Persist-Sequenz wie _onPageDrop, inklusive History-Push.
+  async movePageToChapter(pageId, targetChIdRaw) {
+    if (this.organizerSaving) return;
+    const targetChId = parseInt(targetChIdRaw, 10) || 0;
+    const page = this._findPage(pageId);
+    if (!page) return;
+    const fromChapId = page.chapter_id || 0;
+    if (fromChapId === targetChId) return;
+    const before = this._snapshotWorkstate();
+    const removed = this._removePageFromBucket(fromChapId, pageId);
+    if (!removed) return;
+    removed.chapter_id = targetChId;
+    const bucket = targetChId === 0
+      ? this.soloPages
+      : this.workTree.find(c => c.id === targetChId)?.pages;
+    if (!bucket) {
+      const src = fromChapId === 0
+        ? this.soloPages
+        : this.workTree.find(c => c.id === fromChapId)?.pages;
+      src?.push(removed);
+      return;
+    }
+    bucket.push(removed);
+    const ok = await this._persistOrder({ affectedChapters: [fromChapId, targetChId] });
+    if (ok) this._recordReorder(before);
+  },
 };

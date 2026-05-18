@@ -30,6 +30,10 @@ export function registerBookOrganizerCard() {
     organizerProgress: 0,
     workTree: [],      // [{ id, name, pages: [{ id, name, chapter_id }] }]
     soloPages: [],     // [{ id, name, chapter_id: 0 }]
+    chapterOpen: {},   // { [chapter_id]: bool } — per-Buch UI-Sicht
+    organizerSearch: '',
+    jumpToChapterId: '',
+    moveComboValue: '', // dummy-Slot für Move-Combobox (Action-Trigger, kein Persist)
     _sortables: [],
     _lifecycle: null,
     _undoStack: [],
@@ -43,6 +47,7 @@ export function registerBookOrganizerCard() {
         showFlag: 'showBookOrganizerCard',
         resetState: {
           workTree: [], soloPages: [],
+          chapterOpen: {}, organizerSearch: '', jumpToChapterId: '', moveComboValue: '',
           organizerStatus: '', organizerProgress: 0, organizerSaving: false,
           _undoStack: [], _redoStack: [], _inHistoryFlight: false,
         },
@@ -56,6 +61,7 @@ export function registerBookOrganizerCard() {
           ctx._destroySortables();
           Object.assign(ctx, {
             workTree: [], soloPages: [],
+            chapterOpen: {}, organizerSearch: '', jumpToChapterId: '', moveComboValue: '',
             organizerStatus: '', organizerProgress: 0, organizerSaving: false,
             _undoStack: [], _redoStack: [], _inHistoryFlight: false,
           });
@@ -67,6 +73,7 @@ export function registerBookOrganizerCard() {
           ctx._destroySortables();
           Object.assign(ctx, {
             workTree: [], soloPages: [],
+            chapterOpen: {}, organizerSearch: '', jumpToChapterId: '', moveComboValue: '',
             _undoStack: [], _redoStack: [], _inHistoryFlight: false,
           });
         },
@@ -98,6 +105,11 @@ export function registerBookOrganizerCard() {
         }
       };
       window.addEventListener('keydown', this._onHistoryKeydown, { signal: this._lifecycle.signal });
+
+      // Bei aktiver Suche bricht Reorder über gefiltertem DOM die Reihenfolge —
+      // Sortable-Instances werden in dem Fall disabled, statt das Suchfeld
+      // selbst zu sperren.
+      this.$watch('organizerSearch', () => this._refreshSortableDisabled());
     },
 
     destroy() {
