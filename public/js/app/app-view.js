@@ -485,10 +485,13 @@ export const appViewMethods = {
     if (this.isAdminOnly) return;
     if (this.editMode || this.editDirty) return;
     if (!this.selectedBookId) {
+      // Kein Buch vorher selektiert → loadBooks muss intern loadPages für Books[0] anstossen.
       try { await this.loadBooks(); } catch (e) {}
       return;
     }
-    try { await this.loadBooks(); } catch (e) {}
+    // Buchliste refreshen, aber internen loadPages-Trigger unterdrücken — wir rufen
+    // loadPages danach mit source='wake' (kein Pre-Clear) explizit auf.
+    try { await this.loadBooks({ source: 'wake' }); } catch (e) {}
     try { await this.loadPages({ source: 'wake' }); } catch (e) {}
     for (const c of EXCLUSIVE_CARDS) {
       if (this[c.flag]) {

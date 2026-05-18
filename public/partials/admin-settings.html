@@ -26,7 +26,7 @@
   <div x-show="!adminSettingsLoading && Object.keys(adminSettingsMap).length">
     <!-- Tab-Leiste -->
     <nav class="admin-settings-tabs" role="tablist">
-      <template x-for="t in ['auth','provider','budget','smtp','jobs','cron','pdfa','analytics','advanced']" :key="t">
+      <template x-for="t in ['auth','provider','smtp','jobs','cron','pdfa','analytics','advanced']" :key="t">
         <button type="button" role="tab"
                 :class="['admin-settings-tab', adminSettingsTab === t ? 'is-active' : '']"
                 @click="adminSettingsSwitchTab(t)"
@@ -57,22 +57,22 @@
       </div>
     </section>
 
-    <!-- Provider-Tab: Auswahl + alle drei Provider-Sub-Sektionen parallel -->
+    <!-- Provider-Tab: Sub-Tabs pro Provider, aktiver markiert via Badge -->
     <section x-show="adminSettingsTab === 'provider'" class="admin-settings-section">
-      <label>ai.provider
-        <select x-model="adminSettingsForm['ai.provider']">
-          <option value="claude">Claude</option>
-          <option value="ollama">Ollama</option>
-          <option value="llama">Llama</option>
-        </select>
-        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.providerChoice')"></small>
-      </label>
+      <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.providerChoice')"></p>
 
-      <div :class="['admin-settings-subsection', adminSettingsForm['ai.provider'] === 'claude' ? 'is-active-provider' : '']">
-        <h4 class="admin-settings-subheading">
-          <span x-text="$app.t('admin.settings.section.claude')"></span>
-          <span x-show="adminSettingsForm['ai.provider'] === 'claude'" class="admin-settings-active-badge" x-text="$app.t('admin.settings.provider.active')"></span>
-        </h4>
+      <nav class="admin-settings-subtabs" role="tablist">
+        <template x-for="p in ['claude','ollama','llama']" :key="p">
+          <button type="button" role="tab"
+                  :class="['admin-settings-subtab', adminSettingsProviderSubtab === p ? 'is-active' : '', adminSettingsForm['ai.provider'] === p ? 'is-default-provider' : '']"
+                  @click="adminSettingsProviderSubtab = p">
+            <span x-text="$app.t('admin.settings.section.' + p)"></span>
+            <span x-show="adminSettingsForm['ai.provider'] === p" class="admin-settings-active-badge" x-text="$app.t('admin.settings.provider.active')"></span>
+          </button>
+        </template>
+      </nav>
+
+      <div x-show="adminSettingsProviderSubtab === 'claude'" class="admin-settings-subsection">
         <label>ai.claude.api_key
           <input type="password" x-model="adminSettingsForm['ai.claude.api_key']" :placeholder="$app.t('admin.settings.secret.masked')">
           <small x-show="adminSettingsMap['ai.claude.api_key']?.masked" class="muted-msg muted-msg--sm" x-text="adminSettingsMap['ai.claude.api_key']?.masked"></small>
@@ -80,13 +80,17 @@
         <label>ai.claude.model
           <input type="text" x-model="adminSettingsForm['ai.claude.model']" placeholder="claude-sonnet-4-6">
         </label>
+        <label>ai.claude.context_window
+          <input type="text" x-data="numInput({ integer: true, min: 8000 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.context_window']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.contextWindow')"></small>
+        </label>
+        <label>ai.claude.max_tokens_out
+          <input type="text" x-data="numInput({ integer: true, min: 1024 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.max_tokens_out']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.maxTokensOut')"></small>
+        </label>
       </div>
 
-      <div :class="['admin-settings-subsection', adminSettingsForm['ai.provider'] === 'ollama' ? 'is-active-provider' : '']">
-        <h4 class="admin-settings-subheading">
-          <span x-text="$app.t('admin.settings.section.ollama')"></span>
-          <span x-show="adminSettingsForm['ai.provider'] === 'ollama'" class="admin-settings-active-badge" x-text="$app.t('admin.settings.provider.active')"></span>
-        </h4>
+      <div x-show="adminSettingsProviderSubtab === 'ollama'" class="admin-settings-subsection">
         <label>ai.ollama.host
           <input type="url" x-model="adminSettingsForm['ai.ollama.host']" placeholder="http://localhost:11434">
         </label>
@@ -96,29 +100,37 @@
         <label>ai.ollama.temperature
           <input type="text" x-data="numInput({ step: 0.1, min: 0, max: 2 })" x-modelable="value" x-model="adminSettingsForm['ai.ollama.temperature']">
         </label>
+        <label>ai.ollama.context_window
+          <input type="text" x-data="numInput({ integer: true, min: 2048 })" x-modelable="value" x-model="adminSettingsForm['ai.ollama.context_window']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.contextWindow')"></small>
+        </label>
+        <label>ai.ollama.max_tokens_out
+          <input type="text" x-data="numInput({ integer: true, min: 512 })" x-modelable="value" x-model="adminSettingsForm['ai.ollama.max_tokens_out']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.maxTokensOut')"></small>
+        </label>
       </div>
 
-      <div :class="['admin-settings-subsection', adminSettingsForm['ai.provider'] === 'llama' ? 'is-active-provider' : '']">
-        <h4 class="admin-settings-subheading">
-          <span x-text="$app.t('admin.settings.section.llama')"></span>
-          <span x-show="adminSettingsForm['ai.provider'] === 'llama'" class="admin-settings-active-badge" x-text="$app.t('admin.settings.provider.active')"></span>
-        </h4>
+      <div x-show="adminSettingsProviderSubtab === 'llama'" class="admin-settings-subsection">
         <label>ai.llama.host <input type="url" x-model="adminSettingsForm['ai.llama.host']" placeholder="http://localhost:8080"></label>
         <label>ai.llama.model <input type="text" x-model="adminSettingsForm['ai.llama.model']"></label>
         <label>ai.llama.temperature <input type="text" x-data="numInput({ step: 0.1, min: 0, max: 2 })" x-modelable="value" x-model="adminSettingsForm['ai.llama.temperature']"></label>
+        <label>ai.llama.context_window
+          <input type="text" x-data="numInput({ integer: true, min: 2048 })" x-modelable="value" x-model="adminSettingsForm['ai.llama.context_window']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.contextWindow')"></small>
+        </label>
+        <label>ai.llama.max_tokens_out
+          <input type="text" x-data="numInput({ integer: true, min: 512 })" x-modelable="value" x-model="adminSettingsForm['ai.llama.max_tokens_out']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.maxTokensOut')"></small>
+        </label>
       </div>
 
       <div class="admin-settings-actions">
+        <button type="button"
+                @click="adminSettingsForm['ai.provider'] = adminSettingsProviderSubtab"
+                :disabled="adminSettingsForm['ai.provider'] === adminSettingsProviderSubtab"
+                x-text="$app.t('admin.settings.provider.makeActive')"></button>
         <button type="button" @click="adminSettingsTest('provider')" x-text="$app.t('admin.settings.test.connection')"></button>
       </div>
-    </section>
-
-    <!-- Budget-Tab: globale Token-Limits (gelten fuer alle Provider) -->
-    <section x-show="adminSettingsTab === 'budget'" class="admin-settings-section">
-      <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.budgetGlobal')"></p>
-      <label>ai.claude.context_window <input type="text" x-data="numInput({ step: 1, min: 8000 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.context_window']"></label>
-      <label>ai.claude.max_tokens_out <input type="text" x-data="numInput({ step: 1, min: 1024 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.max_tokens_out']"></label>
-      <label>ai.chars_per_token <input type="text" x-data="numInput({ step: 0.1, min: 1, max: 10 })" x-modelable="value" x-model="adminSettingsForm['ai.chars_per_token']"></label>
     </section>
 
     <!-- SMTP / Mailer-Tab -->
@@ -212,6 +224,10 @@
         <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.advancedGlobal')"></p>
         <label>ai.chat_temperature <input type="text" x-data="numInput({ step: 0.1, min: 0, max: 2 })" x-modelable="value" x-model="adminSettingsForm['ai.chat_temperature']"></label>
         <label>ai.lektorat_batch_concurrency <input type="text" x-data="numInput({ step: 1, min: 1, max: 8 })" x-modelable="value" x-model="adminSettingsForm['ai.lektorat_batch_concurrency']"></label>
+        <label>ai.chars_per_token
+          <input type="text" x-data="numInput({ step: 0.1, min: 1, max: 10 })" x-modelable="value" x-model="adminSettingsForm['ai.chars_per_token']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.charsPerToken')"></small>
+        </label>
       </div>
 
       <div :class="['admin-settings-subsection', adminSettingsForm['ai.provider'] === 'claude' ? 'is-active-provider' : '']">

@@ -198,10 +198,13 @@ export const treeMethods = {
     this.showPageStatusTip = false;
   },
 
-  async loadBooks() {
+  async loadBooks(opts = {}) {
     try {
       this.setStatus(this.t('tree.connecting'), true);
       this.books = await contentRepo.listBooks();
+      // Wake-Refresh: Caller (_refreshAfterWake) triggert loadPages selbst mit source='wake'.
+      // Hier weiterzureichen würde Tree erneut clearen (loadPages ohne source) → Flicker.
+      const skipLoadPages = opts.source === 'wake';
       // Pool fuer Filter-Pills aus aktuellem Bestand ableiten.
       const catIds = new Set();
       const tagMap = new Map();
@@ -225,7 +228,7 @@ export const treeMethods = {
       this.showBookCard = true;
       this.setStatus(this.t('tree.booksFound', { n: this.books.length }), false, 4000);
       if (this.selectedBookId) this._loadBookRole(this.selectedBookId);
-      await this.loadPages();
+      if (!skipLoadPages) await this.loadPages();
     } catch (e) {
       console.error('[loadBooks]', e);
       this.setStatus(this.t('common.errorColon') + e.message);
@@ -311,13 +314,17 @@ export const treeMethods = {
     this.figurenStatus = '';
     try {
       this.setStatus(this.t('tree.loadingPages'), true);
-      this.pageSearch = '';
-      this.tokEsts = {};
-      this.pageLastChecked = {};
-      this.ideenCounts = {};
-      this.chapterIdeenCounts = {};
-      this.tree = [];
-      this.pages = [];
+      // Wake-Refresh nicht vorab clearen — Tree bliebe sonst bis zum Response leer (Flicker).
+      // Reassignment am Ende ersetzt die Daten in-place.
+      if (opts.source !== 'wake') {
+        this.pageSearch = '';
+        this.tokEsts = {};
+        this.pageLastChecked = {};
+        this.ideenCounts = {};
+        this.chapterIdeenCounts = {};
+        this.tree = [];
+        this.pages = [];
+      }
       this._tokenEstGen++;
       // Buchwechsel: SW-CONTENT_CACHE (SWR) kann stale Listen liefern, daher fresh.
       // Initialer Load greift normal aufs Cache (offline-resilient).

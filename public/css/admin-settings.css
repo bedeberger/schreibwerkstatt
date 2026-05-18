@@ -49,6 +49,37 @@
   gap: var(--space-md);
 }
 
+.admin-settings-subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-md);
+}
+
+.admin-settings-subtab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  background: var(--color-tag-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-sm) var(--space-md);
+  color: var(--color-muted);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.admin-settings-subtab.is-active {
+  color: var(--color-text);
+  border-color: var(--card-accent);
+  background: var(--color-accent-bg);
+  font-weight: 600;
+}
+
+.admin-settings-subtab.is-default-provider {
+  border-color: var(--card-accent);
+}
+
 .admin-settings-subsection {
   display: grid;
   gap: var(--space-lg);

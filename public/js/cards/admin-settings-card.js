@@ -14,6 +14,7 @@ export function registerAdminSettingsCard() {
     adminSettingsSavedCount: 0,
     adminSettingsError: '',
     adminSettingsTab: 'auth',
+    adminSettingsProviderSubtab: 'claude',
     adminSettingsTestResult: null,
 
     _onViewReset: null,

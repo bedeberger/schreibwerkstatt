@@ -17,6 +17,10 @@ export const adminSettingsMethods = {
       // Form-State aus map kopieren — Form-Inputs schreiben in form, Save
       // diff't vs. map und sendet nur geaenderte Keys ans Backend.
       this.adminSettingsForm = this._adminSettingsBuildForm(map);
+      const cur = this.adminSettingsForm['ai.provider'];
+      if (cur === 'claude' || cur === 'ollama' || cur === 'llama') {
+        this.adminSettingsProviderSubtab = cur;
+      }
     } catch (e) {
       this.adminSettingsError = e.message;
     } finally {
