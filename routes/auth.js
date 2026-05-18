@@ -399,19 +399,4 @@ router.get('/auth/logout', (req, res) => {
   });
 });
 
-// GET /auth/me → aktueller User (JSON, für Frontend)
-router.get('/auth/me', (req, res) => {
-  if (!req.session?.user) return res.status(401).json({ error_code: 'NOT_LOGGED_IN' });
-  // Resolvter AI-Provider + Override-Quelle (read-only fuer Frontend).
-  let aiProvider = null, aiProviderSource = 'global';
-  try {
-    const { resolveProvider } = require('../lib/ai');
-    const appUsers = require('../db/app-users');
-    aiProvider = resolveProvider({ userEmail: req.session.user.email });
-    const u = appUsers.getUser(req.session.user.email);
-    if (u && u.ai_provider_override) aiProviderSource = 'override';
-  } catch { /* best-effort */ }
-  res.json({ ...req.session.user, aiProvider, aiProviderSource });
-});
-
 module.exports = router;

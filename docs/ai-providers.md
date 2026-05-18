@@ -21,7 +21,7 @@ Admin setzt `ai.provider` global in `app_settings` (`claude` (Default) | `ollama
 - **Wahl** pro User; **Credentials** bleiben global in `app_settings`. Kein Per-User-API-Key.
 - Admin setzt den Override in der AdminUsersCard (Combobox `(Global: …)` | `claude` | `ollama` | `llama`). PUT `/admin/users/:email` mit `{ ai_provider_override: 'ollama' | null }`. NULL/'' löscht den Override.
 - API-Guard: Override auf nicht-konfigurierten Provider → `400 AI_PROVIDER_NOT_CONFIGURED`.
-- `GET /auth/me` liefert den resolvten Provider read-only (`{ … aiProvider, aiProviderSource: 'global' | 'override' }`) für die Frontend-Statuszeile.
+- `GET /config` liefert den resolvten Provider read-only (`apiProvider`) für die Frontend-Statuszeile.
 - Self-Service nein. Cost-Verteilung gehört zum Admin-Kontrakt.
 
 ### Mutex bleibt providerspezifisch

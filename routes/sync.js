@@ -2,7 +2,7 @@ const express = require('express');
 const { db, reconcilePageIds, pruneStaleBookData, upsertBook } = require('../db/schema');
 const logger = require('../logger');
 const { runWithContext, getContext } = require('../lib/log-context');
-const { aclParamGuard, requireBookAccess, sendACLError } = require('../lib/acl');
+const { aclParamGuard } = require('../lib/acl');
 const { CHARS_PER_TOKEN } = require('../lib/ai');
 const { toIntId } = require('../lib/validate');
 const contentStore = require('../lib/content-store');
@@ -330,69 +330,6 @@ async function syncAllBooks() {
   }
 }
 
-// GET /sync/pages/:book_id – gecachte Seiten-Vorschautexte liefern
-router.get('/pages/:book_id', (req, res) => {
-  const bookId = toIntId(req.params.book_id);
-  if (!bookId) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
-  const rows = db.prepare(
-    'SELECT page_id, preview_text, updated_at FROM pages WHERE book_id = ?'
-  ).all(bookId);
-  const result = {};
-  for (const r of rows) result[r.page_id] = { preview_text: r.preview_text, updated_at: r.updated_at };
-  res.json(result);
-});
-
-// POST /sync/pages/upsert – einzelne Seite (+ optional Kapitel) sofort lokal
-// registrieren. Wird nach BookStack-Page-Create gerufen, damit FK-abhängige
-// Features (ideen, page_checks, figure_scenes …) auf der frischen Seite nicht
-// in `FOREIGN KEY constraint failed` rennen, bis der nächste Sync läuft.
-router.post('/pages/upsert', express.json(), (req, res) => {
-  const bookId      = toIntId(req.body?.book_id);
-  const pageId      = toIntId(req.body?.page_id);
-  const pageName    = (req.body?.page_name || '').toString();
-  const chapterId   = req.body?.chapter_id ? toIntId(req.body.chapter_id) : null;
-  const chapterName = req.body?.chapter_name ? req.body.chapter_name.toString() : null;
-  const updatedAt   = req.body?.updated_at ? req.body.updated_at.toString() : new Date().toISOString();
-  if (!bookId || !pageId) return res.status(400).json({ error_code: 'BOOKID_PAGEID_REQ' });
-  if (!db.prepare('SELECT 1 FROM books WHERE book_id = ?').get(bookId)) {
-    return res.status(400).json({ error_code: 'BOOK_NOT_FOUND' });
-  }
-  try { requireBookAccess(req, bookId, 'editor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
-
-  const seenAt = new Date().toISOString();
-  db.transaction(() => {
-    let effectiveChapterId = chapterId;
-    if (chapterId) {
-      if (chapterName) {
-        _upsertChapterStmt.run(chapterId, bookId, chapterName, updatedAt, seenAt);
-      } else if (!db.prepare('SELECT 1 FROM chapters WHERE chapter_id = ?').get(chapterId)) {
-        effectiveChapterId = null;
-      }
-    }
-    _upsertPageCacheStmt.run(pageId, bookId, pageName, effectiveChapterId, updatedAt, seenAt);
-  })();
-  res.json({ ok: true });
-});
-
-// POST /sync/chapters/upsert – einzelnes Kapitel sofort lokal registrieren.
-// Symmetrisch zu /pages/upsert; nötig nach BookStack-Chapter-Create, damit
-// nachfolgende Features mit chapter_id-FK nicht warten müssen.
-router.post('/chapters/upsert', express.json(), (req, res) => {
-  const bookId      = toIntId(req.body?.book_id);
-  const chapterId   = toIntId(req.body?.chapter_id);
-  const chapterName = (req.body?.chapter_name || '').toString();
-  const updatedAt   = req.body?.updated_at ? req.body.updated_at.toString() : new Date().toISOString();
-  if (!bookId || !chapterId || !chapterName) return res.status(400).json({ error_code: 'FIELDS_REQ' });
-  if (!db.prepare('SELECT 1 FROM books WHERE book_id = ?').get(bookId)) {
-    return res.status(400).json({ error_code: 'BOOK_NOT_FOUND' });
-  }
-  try { requireBookAccess(req, bookId, 'editor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
-  _upsertChapterStmt.run(chapterId, bookId, chapterName, updatedAt, new Date().toISOString());
-  res.json({ ok: true });
-});
-
 // POST /sync/pages/:book_id – leichtgewichtiger pages-Cache-Update (ohne Seiten-Inhalte)
 router.post('/pages/:book_id', async (req, res) => {
   const bookId = toIntId(req.params.book_id);
@@ -517,13 +454,6 @@ router.post('/book/:book_id', async (req, res) => {
     logger.error('Sync-Route Fehler: ' + _errDetail(e));
     res.status(500).json({ error: e.message });
   }
-});
-
-// POST /sync/all – alle Bücher. Admin-only (globale Operation).
-const { requireAdmin } = require('../lib/admin-mw');
-router.post('/all', requireAdmin, async (_req, res) => {
-  syncAllBooks().catch(e => logger.error('Sync /all Fehler: ' + _errDetail(e)));
-  res.json({ ok: true, message: 'Sync gestartet' });
 });
 
 module.exports = { router, syncAllBooks, syncBook, syncPagesCache };

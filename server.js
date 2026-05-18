@@ -294,7 +294,7 @@ app.use((req, res, next) => {
 
 // ── Auth-Guard ────────────────────────────────────────────────────────────────
 // API-Pfade → 401 JSON; HTML-Pfade → Redirect zu /auth/login
-const API_PREFIXES = ['/history/', '/figures/', '/locations/', '/songs/', '/jobs/', '/sync/', '/chat/', '/booksettings/', '/content/', '/books/', '/apply/', '/me/', '/admin/', '/local/', '/config', '/claude', '/ollama', '/llama'];
+const API_PREFIXES = ['/history/', '/figures/', '/locations/', '/songs/', '/jobs/', '/sync/', '/chat/', '/booksettings/', '/content/', '/books/', '/me/', '/admin/', '/local/', '/config', '/claude', '/ollama', '/llama'];
 
 app.use((req, res, next) => {
   if (req.session?.user) return next();
@@ -366,7 +366,6 @@ app.use('/usage', usageRouter);
 app.use('/draft-figures', draftFiguresRouter);
 app.use('/content', contentRouter);
 app.use('/search', require('./routes/search'));
-app.use('/apply', require('./routes/apply'));
 app.use('/books', require('./routes/book-access'));
 app.use('/book-editor', require('./routes/book-editor'));
 app.use('/admin/users', require('./routes/admin-users'));

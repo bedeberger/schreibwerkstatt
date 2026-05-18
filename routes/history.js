@@ -1,5 +1,5 @@
 const express = require('express');
-const { db, upsertBookByName } = require('../db/schema');
+const { db } = require('../db/schema');
 const { toIntId } = require('../lib/validate');
 const { localIsoDate } = require('../lib/local-date');
 const { setContext } = require('../lib/log-context');
@@ -21,25 +21,7 @@ function _guardBook(req, res, bookId, minRole) {
   catch (e) { return !sendACLError(res, e); }
 }
 
-// Lektorat-Ergebnis speichern (lektor+, weil Lektor selbst Findings triggern darf).
-router.post('/check', jsonBody, (req, res) => {
-  const { page_id, book_id, error_count, errors_json, stilanalyse, fazit, model } = req.body;
-  if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
-  if (!_guardBook(req, res, book_id, 'lektor')) return;
-  const user_email = req.session?.user?.email || null;
-  const result = db.prepare(`
-    INSERT INTO page_checks (page_id, book_id, checked_at, error_count, errors_json, stilanalyse, fazit, model, user_email)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
-    page_id, book_id,
-    new Date().toISOString(),
-    error_count || 0,
-    JSON.stringify(errors_json || []),
-    stilanalyse || null, fazit || null, model || null, user_email
-  );
-  res.json({ id: result.lastInsertRowid });
-});
-
-// Lauf als «in BookStack gespeichert» markieren (oder zurücksetzen)
+// Lauf als gespeichert markieren (oder zurücksetzen).
 router.patch('/check/:id/saved', jsonBody, (req, res) => {
   const saved = req.body?.saved !== undefined ? (req.body.saved ? 1 : 0) : 1;
   const saved_at = saved ? new Date().toISOString() : null;
@@ -131,24 +113,6 @@ router.get('/check/:id/details', (req, res) => {
     szenen_json: r.szenen_json ? JSON.parse(r.szenen_json) : null,
     stilkorrektur_log: r.stilkorrektur_log ? JSON.parse(r.stilkorrektur_log) : null,
   });
-});
-
-// Buchbewertung speichern (editor+, weil sie eine Analyse persistiert).
-router.post('/review', jsonBody, (req, res) => {
-  const { book_id, book_name, review_json, model } = req.body;
-  if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
-  if (!_guardBook(req, res, book_id, 'editor')) return;
-  const user_email = req.session?.user?.email || null;
-  upsertBookByName(book_id, book_name);
-  const result = db.prepare(`
-    INSERT INTO book_reviews (book_id, reviewed_at, review_json, model, user_email)
-    VALUES (?, ?, ?, ?, ?)`).run(
-    book_id,
-    new Date().toISOString(),
-    JSON.stringify(review_json || null),
-    model || null, user_email
-  );
-  res.json({ id: result.lastInsertRowid });
 });
 
 // Lektorat-Prüfung löschen

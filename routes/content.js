@@ -200,7 +200,6 @@ router.get('/pages/:page_id', async (req, res) => {
 });
 
 // PUT /content/pages/:page_id — Free-Edit-Pfad. minRole editor.
-// Lektor nutzt /apply/pages/:id/* (Substring-Replace mit DB-Validierung).
 // Blockiert durch fremden Page-Lock (lektorat-Session).
 router.put('/pages/:page_id', jsonBody, async (req, res) => {
   const pageId = toIntId(req.params.page_id);

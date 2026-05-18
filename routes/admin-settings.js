@@ -114,15 +114,6 @@ router.post('/test-oauth', async (req, res) => {
   }
 });
 
-// SMTP-Test-Endpoints.
-//
-// GET /admin/settings/smtp/test-config — Mailer-Status (mode, fromEmail,
-// ready-Flag, fehlende Pflichtfelder). Kein Klartext-Secret.
-router.get('/smtp/test-config', (req, res) => {
-  const mailer = require('../lib/mailer');
-  res.json({ status: mailer.getStatus() });
-});
-
 // POST /admin/settings/smtp/test-send { to? } — sendet ein 'test'-Template
 // an `to` (Default: Gmail-User des Mailers). Liefert { ok, latencyMs, error? }.
 router.post('/smtp/test-send', express.json(), async (req, res) => {

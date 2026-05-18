@@ -281,7 +281,6 @@ Browser → NGINX (HTTPS) → Express (Port 3737)
   /pdf-export/*    → Custom-PDF-Export-Profile (CRUD + Cover-Upload + Font-Liste)
   /jobs/pdf-export → Render-Job (eigene pdfkit-Pipeline mit PDF/A-2B)
   /usage/*         → Feature-Usage-Tracking (Recency für Palette/Quick-Pills)
-  /apply/*         → Public-Registration-Apply (Beta-Antrag)
   /admin/books, /admin/registration-requests, /admin/settings, /admin/usage, /admin/users
   /public/*        → Unauthentifizierte Endpoints (Health, Marketing)
   /                → public/index.html (SPA)
