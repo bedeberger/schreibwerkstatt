@@ -206,6 +206,18 @@ Checkliste bei neuer Combobox-Platzierung:
 
 Bekannte Stolperstellen, die diese Regel verletzten und gefixt wurden: `.organizer-chapter` (Buchorganizer-Kapitel-Karten mit Move-Combobox pro Page).
 
+### Mobile + lange Labels (Viewport-Overflow)
+
+`.combobox-wrap--compact .combobox-dropdown` setzt `right: auto; min-width: 180px;` (Desktop-Default, damit kleine Trigger trotzdem brauchbares Popover bekommen) und `.combobox-option { white-space: nowrap }`. Auf Mobile mit langen Option-Labels (Kapitel-/Figur-/Ort-/Szenen-Namen) bläst die Liste sich auf Content-Breite auf und schiebt den Dropdown über den rechten Viewport-Rand → Horizontal-Scroll.
+
+**Global gelöst** in [public/css/card-form.css](public/css/card-form.css) (Combobox-Block, `@media (max-width: 600px)`):
+
+- `.combobox-dropdown { max-width: calc(100vw - 16px) }` — Hard Cap gegen Viewport.
+- `.combobox-wrap--compact .combobox-dropdown { left:0; right:0; min-width:0; max-width:100% }` — Dropdown bindet an Wrap-Breite, kein 180px-Minimum mehr.
+- `.combobox-option { white-space: normal; overflow-wrap: anywhere }` — lange Labels wrappen statt zu überlaufen.
+
+**Regel:** Keine per-Karte Mobile-Override mehr für Dropdown-Breite / Option-Wrap. Wer eine compact-Combobox in einer schmalen Mobile-Spalte nutzt, bekommt das Verhalten geschenkt. Falls eine Karte _absichtlich_ ein anderes Layout will (z. B. fixe Breite), das pro-Karte begründen und im Karten-CSS überschreiben — nicht im Combobox-Default.
+
 ### Reaktivität bei Datenquelle aus Karten-Scope (häufiger „Liste leer"-Bug)
 
 `<div x-data="combobox(...)">` ist eine **nested x-data** innerhalb der Karten-x-data. Methods am Karten-Scope, die in `x-effect` der Combobox aufgerufen werden und **reaktive Karten-Daten via `this.xxx` lesen**, werden nicht zuverlässig getrackt — Combobox bleibt leer, auch nachdem die Daten nachgeladen wurden. Bestätigt durch Werkstattkommentar bei [`ideenMovePickerOptions` in public/js/app.js](public/js/app.js) („x-effect der Combobox-Sub-x-data nur `$app`/Magics, nicht Karten-Methoden sieht").

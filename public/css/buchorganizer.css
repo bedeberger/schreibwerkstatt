@@ -229,15 +229,14 @@
 @media (max-width: 600px) {
   .organizer-chapter-header {
     flex-wrap: wrap;
+    row-gap: var(--space-xs);
   }
   .organizer-chapter-meta {
-    order: 3;
-    margin-left: 0;
+    margin-left: auto;
   }
-  .organizer-chapter-actions {
-    order: 4;
-    width: 100%;
-    justify-content: flex-end;
+  .organizer-chapter-actions .btn-compact,
+  .organizer-move-combo {
+    display: none;
   }
   .organizer-name {
     font-size: var(--font-size-base);
@@ -250,21 +249,8 @@
   .organizer-jump {
     width: 100%;
   }
-  .organizer-move-combo {
-    width: 100%;
-  }
-  .organizer-page {
-    flex-wrap: wrap;
-  }
-  .card--organizer .combobox-wrap--compact .combobox-dropdown {
-    left: 0;
-    right: 0;
-    min-width: 0;
-    max-width: 100%;
-  }
-  .card--organizer .combobox-wrap--compact .combobox-option {
-    white-space: normal;
-    overflow-wrap: anywhere;
+  .organizer-page .organizer-delete-btn {
+    margin-left: auto;
   }
 }
 }

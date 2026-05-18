@@ -277,6 +277,27 @@ select:focus {
 .combobox-footer-btn:focus-visible { background: var(--color-hover); outline: none; }
 .combobox-wrap--compact .combobox-footer-btn { font-size: var(--size-compact-font-size); padding: var(--space-5) 8px; }
 
+/* Mobile: Dropdown darf Viewport nicht horizontal sprengen.
+   Compact-Variante setzt sonst `min-width: 180px` + `right: auto`, kombiniert mit
+   `white-space: nowrap` auf Optionen → lange Labels (Kapitel-/Figur-/Ort-Namen)
+   schieben Dropdown über den rechten Viewport-Rand und erzeugen Horizontal-Scroll.
+   Auf Mobile: Dropdown an Wrap-Breite binden, lange Options wrappen. */
+@media (max-width: 600px) {
+  .combobox-dropdown {
+    max-width: calc(100vw - 16px);
+  }
+  .combobox-wrap--compact .combobox-dropdown {
+    left: 0;
+    right: 0;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .combobox-option {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
 /* === Form-Patterns (in Karten wiederverwendbar) ===
    Grid-Klassen .card-form-grid / -row / -label und Wertspalten-Bausteine
    .form-stack / -inline / -check etc. Komplettes Markup-Muster siehe
