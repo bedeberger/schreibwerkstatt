@@ -204,5 +204,19 @@
   .organizer-name {
     font-size: var(--font-size-base);
   }
+  .organizer-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .organizer-toolbar .page-search,
+  .organizer-jump {
+    width: 100%;
+  }
+  .organizer-move-combo {
+    width: 100%;
+  }
+  .organizer-page {
+    flex-wrap: wrap;
+  }
 }
 }

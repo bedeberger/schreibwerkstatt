@@ -630,6 +630,9 @@
   "bookOrganizer.redo":           "Redo",
   "bookOrganizer.undoTip":        "Undo (Cmd/Ctrl+Z) — up to 10 steps",
   "bookOrganizer.redoTip":        "Redo (Cmd/Ctrl+Shift+Z)",
+  "bookOrganizer.searchPlaceholder": "Search chapter or page…",
+  "bookOrganizer.jumpToPlaceholder": "Jump to chapter…",
+  "bookOrganizer.moveTo":         "Move to…",
 
   "overview.title":              "Overview: {name}",
   "overview.refresh":            "Refresh",

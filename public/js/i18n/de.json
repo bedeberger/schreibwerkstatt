@@ -630,6 +630,9 @@
   "bookOrganizer.redo":           "Wiederherstellen",
   "bookOrganizer.undoTip":        "Rückgängig (Cmd/Strg+Z) — max. 10 Schritte",
   "bookOrganizer.redoTip":        "Wiederherstellen (Cmd/Strg+Shift+Z)",
+  "bookOrganizer.searchPlaceholder": "Kapitel oder Seite suchen…",
+  "bookOrganizer.jumpToPlaceholder": "Springe zu Kapitel…",
+  "bookOrganizer.moveTo":         "Verschieben nach…",
 
   "overview.title":              "Übersicht: {name}",
   "overview.refresh":            "Neu laden",

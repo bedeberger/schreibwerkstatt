@@ -92,14 +92,15 @@ test('overviewOrtPresence invalidiert Memo wenn tree nachgeladen wird', () => {
   const orte = [{ id: 1, name: 'Olten', kapitel: [{ chapter_id: 10, name: 'Kap A', haeufigkeit: 3 }] }];
   ctx.overviewOrte = orte;
 
-  // Phase 1: tree leer → null
+  // Phase 1: tree leer → empty { places: [], rows: [] } (Template guards via .length)
   globalThis.window = { __app: { tree: [] } };
-  assert.equal(ctx.overviewOrtPresence(), null, 'leerer tree → null');
+  const phase1 = ctx.overviewOrtPresence();
+  assert.deepEqual(phase1, { places: [], rows: [] }, 'leerer tree → empty');
 
-  // Phase 2: tree befüllt → muss neu computen, nicht null aus Cache
+  // Phase 2: tree befüllt → muss neu computen, nicht empty aus Cache
   globalThis.window = { __app: { tree: [{ type: 'chapter', id: 10, name: 'Kap A' }] } };
   const result = ctx.overviewOrtPresence();
-  assert.ok(result, 'mit befülltem tree muss Resultat kommen');
+  assert.ok(result.places.length > 0, 'mit befülltem tree muss Resultat kommen');
   assert.equal(result.places.length, 1);
   assert.equal(result.rows.length, 1);
 });
@@ -110,11 +111,12 @@ test('overviewFigurePresence invalidiert Memo wenn tree nachgeladen wird', () =>
   ctx.overviewSzenen = [{ chapter_id: 10, kapitel: 'Kap A', fig_ids: [1] }];
 
   globalThis.window = { __app: { tree: [] } };
-  assert.equal(ctx.overviewFigurePresence(), null, 'leerer tree → null');
+  const phase1 = ctx.overviewFigurePresence();
+  assert.deepEqual(phase1, { figures: [], rows: [] }, 'leerer tree → empty');
 
   globalThis.window = { __app: { tree: [{ type: 'chapter', id: 10, name: 'Kap A' }] } };
   const result = ctx.overviewFigurePresence();
-  assert.ok(result, 'mit tree muss Resultat kommen');
+  assert.ok(result.figures.length > 0, 'mit tree muss Resultat kommen');
   assert.equal(result.figures.length, 1);
   assert.equal(result.rows.length, 1);
 });
