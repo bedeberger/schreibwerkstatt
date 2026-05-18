@@ -27,7 +27,7 @@ function drainQueue() {
     job.startedAt = new Date().toISOString();
     const ctx = { job: job.type, user: job.userEmail || null, book: job.bookId, jobId };
     runWithContext(ctx, () => {
-      try { startJobRun(jobId, job.startedAt); } catch (e) { logger.error(`startJobRun: ${e.message}`); }
+      try { startJobRun(jobId); } catch (e) { logger.error(`startJobRun: ${e.message}`); }
       // Job-Module loggen Start mit eigenem Detail (Pages-Count, Buchname etc.).
       // jobId steht via ALS-Ctx im Tag — kein zentrales Generik-Start nötig.
       fn()

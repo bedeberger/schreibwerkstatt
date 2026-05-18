@@ -4,6 +4,7 @@
 // Buchtitel.
 
 import { loadChart } from '../lazy-libs.js';
+import { localIsoDate } from '../utils.js';
 
 function _fmt(n, locale, opts) {
   if (n === null || n === undefined || !Number.isFinite(n)) return '—';
@@ -39,7 +40,7 @@ export const adminUsageMethods = {
   async adminUsageEnter() {
     if (!this.adminUsageInitialized) {
       this.adminUsageInitialized = true;
-      // Default: aktueller Monat (firstOfMonth UTC → now)
+      // Default: aktueller Monat in app.timezone (matcht Server-Buckets).
       this.adminUsageFrom = this._adminUsageMonthStart();
       this.adminUsageTo = '';
     }
@@ -47,9 +48,7 @@ export const adminUsageMethods = {
   },
 
   _adminUsageMonthStart() {
-    const now = new Date();
-    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
-      .toISOString().slice(0, 10);
+    return localIsoDate().slice(0, 7) + '-01';
   },
 
   async adminUsageSelectTab(tab) {

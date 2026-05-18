@@ -17,13 +17,13 @@ const draftFigures = require('./draft-figures');
 // ── Job-Laufzeiten ────────────────────────────────────────────────────────────
 const _stmtInsJobRun = db.prepare(
   `INSERT INTO job_runs (job_id, type, book_id, user_email, label, provider, model, status, queued_at)
-   VALUES (?, ?, ?, ?, ?, ?, ?, 'queued', ?)`
+   VALUES (?, ?, ?, ?, ?, ?, ?, 'queued', ${NOW_ISO_SQL})`
 );
 const _stmtStartJobRun = db.prepare(
-  `UPDATE job_runs SET status = 'running', started_at = ? WHERE job_id = ?`
+  `UPDATE job_runs SET status = 'running', started_at = ${NOW_ISO_SQL} WHERE job_id = ?`
 );
 const _stmtEndJobRun = db.prepare(
-  `UPDATE job_runs SET status = ?, ended_at = ?, tokens_in = ?, tokens_out = ?, cache_read_in = ?, cache_creation_in = ?, tokens_per_sec = ?, error = ?, error_params = ? WHERE job_id = ?`
+  `UPDATE job_runs SET status = ?, ended_at = ${NOW_ISO_SQL}, tokens_in = ?, tokens_out = ?, cache_read_in = ?, cache_creation_in = ?, tokens_per_sec = ?, error = ?, error_params = ? WHERE job_id = ?`
 );
 
 function insertJobRun(job) {
@@ -36,16 +36,15 @@ function insertJobRun(job) {
   _stmtInsJobRun.run(
     job.id, job.type, bookId, job.userEmail || null, job.label || null,
     job.provider || null, job.model || null,
-    new Date().toISOString(),
   );
 }
-function startJobRun(jobId, startedAt) {
-  _stmtStartJobRun.run(startedAt, jobId);
+function startJobRun(jobId) {
+  _stmtStartJobRun.run(jobId);
 }
-function endJobRun(jobId, status, endedAt, tokensIn, tokensOut, cacheReadIn, cacheCreationIn, tokensPerSec, error, errorParams = null) {
+function endJobRun(jobId, status, tokensIn, tokensOut, cacheReadIn, cacheCreationIn, tokensPerSec, error, errorParams = null) {
   const paramsJson = errorParams ? JSON.stringify(errorParams) : null;
   _stmtEndJobRun.run(
-    status, endedAt,
+    status,
     tokensIn || 0, tokensOut || 0,
     cacheReadIn || 0, cacheCreationIn || 0,
     tokensPerSec ?? null, error || null, paramsJson, jobId,
@@ -55,11 +54,10 @@ function endJobRun(jobId, status, endedAt, tokensIn, tokensOut, cacheReadIn, cac
 /** Setzt alle hängenden job_runs (status 'running' oder 'queued') auf 'error'.
  *  Gibt die Anzahl bereinigter Einträge zurück. */
 function cleanupStuckJobRuns() {
-  const now = new Date().toISOString();
   const result = db.prepare(
-    `UPDATE job_runs SET status = 'error', ended_at = ?, error = 'Job-Prozess gestorben (Server-Neustart oder Absturz)'
+    `UPDATE job_runs SET status = 'error', ended_at = ${NOW_ISO_SQL}, error = 'Job-Prozess gestorben (Server-Neustart oder Absturz)'
      WHERE status IN ('running', 'queued')`
-  ).run(now);
+  ).run();
   return result.changes;
 }
 

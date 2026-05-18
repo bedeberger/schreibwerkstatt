@@ -14,7 +14,7 @@ delete process.env.ADMIN_EMAIL;
 require('../../db/migrations');
 const { db } = require('../../db/connection');
 const appUsers = require('../../db/app-users');
-const { checkBudget, enforceBudget, firstOfCurrentMonthUtc, sumCostUsdSince } = require('../../lib/budget');
+const { checkBudget, enforceBudget, firstOfCurrentMonthIso, sumCostUsdSince } = require('../../lib/budget');
 
 function seedUser(email, mode = 'none', budget = null) {
   appUsers.createUser({ email });
@@ -117,7 +117,7 @@ test('sumCostUsdSince: aggregiert ueber job_runs + chat_messages', () => {
     VALUES (?, 'assistant', 'hi', 1000000, 0, 'claude', 'claude-sonnet-4-6', 0, 0, datetime('now'))
   `).run(csResult.lastInsertRowid);
 
-  const total = sumCostUsdSince('agg@ex.com', firstOfCurrentMonthUtc());
+  const total = sumCostUsdSince('agg@ex.com', firstOfCurrentMonthIso());
   // 2 Mio Input @ 3 USD/Mio = 6 USD
   assert.equal(Math.round(total * 100) / 100, 6.00);
 });

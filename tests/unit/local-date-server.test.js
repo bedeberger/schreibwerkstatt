@@ -2,7 +2,7 @@
 // require()'d wird (sync.js, history.js).
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { localIsoDate, localIsoDaysAgo, currentTz } = require('../../lib/local-date.js');
+const { localIsoDate, localIsoDaysAgo, localMonthStartIso, localMonthPeriod, currentTz } = require('../../lib/local-date.js');
 
 test('server localIsoDate: Format YYYY-MM-DD', () => {
   const iso = localIsoDate();
@@ -30,4 +30,29 @@ test('server localIsoDaysAgo: chronologisch + DST-stabil', () => {
 test('server currentTz: app_settings-aware Fallback', () => {
   const tz = currentTz();
   assert.ok(typeof tz === 'string' && tz.length > 0);
+});
+
+test('localMonthStartIso: 1. des Monats 00:00 in tz, als UTC-Instant', () => {
+  // 1. Mai 2026 00:00 in Europe/Zurich (CEST, +02:00) = 30. April 22:00 UTC.
+  const d = new Date('2026-05-15T12:00:00Z');
+  assert.equal(localMonthStartIso(d, 'Europe/Zurich'), '2026-04-30T22:00:00.000Z');
+  // In UTC ist Monatsbeginn exakt der 1. um 00:00 UTC.
+  assert.equal(localMonthStartIso(d, 'UTC'), '2026-05-01T00:00:00.000Z');
+  // Edge: erste Stunden des Monats lokal, aber UTC noch im Vormonat.
+  const edge = new Date('2026-05-01T00:30:00Z'); // CEST: 02:30 am 1.5.
+  assert.equal(localMonthStartIso(edge, 'Europe/Zurich'), '2026-04-30T22:00:00.000Z');
+});
+
+test('localMonthStartIso: TZ-Boundary kippt Monatsbucket', () => {
+  // UTC 30.04 22:00 → Zurich 1.5 00:00 → Zurich-Monat = Mai
+  const d = new Date('2026-04-30T22:30:00Z');
+  assert.equal(localMonthStartIso(d, 'Europe/Zurich'), '2026-04-30T22:00:00.000Z');
+  // Selbe Instant in UTC = April-Monat
+  assert.equal(localMonthStartIso(d, 'UTC'), '2026-04-01T00:00:00.000Z');
+});
+
+test('localMonthPeriod: YYYY-MM in tz', () => {
+  const d = new Date('2026-04-30T22:30:00Z');
+  assert.equal(localMonthPeriod(d, 'Europe/Zurich'), '2026-05');
+  assert.equal(localMonthPeriod(d, 'UTC'), '2026-04');
 });

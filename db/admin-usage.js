@@ -11,7 +11,7 @@
 
 const { db } = require('./connection');
 const { costUsd } = require('../lib/pricing');
-const { firstOfCurrentMonthUtc } = require('../lib/budget');
+const { firstOfCurrentMonthIso } = require('../lib/budget');
 
 function _isoOrNull(v) {
   if (!v) return null;
@@ -20,7 +20,7 @@ function _isoOrNull(v) {
 }
 
 function _resolveRange({ from, to } = {}) {
-  const fromIso = _isoOrNull(from) || firstOfCurrentMonthUtc();
+  const fromIso = _isoOrNull(from) || firstOfCurrentMonthIso();
   const toIso   = _isoOrNull(to)   || new Date(Date.now() + 86400_000).toISOString();
   return { fromIso, toIso };
 }

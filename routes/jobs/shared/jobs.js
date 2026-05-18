@@ -137,7 +137,7 @@ function completeJob(id, result, tokensPerSec = null, detail = null) {
   if (!job) return;
   Object.assign(job, { status: 'done', progress: 100, result, tokensPerSec, endedAt: new Date().toISOString() });
   try {
-    endJobRun(id, 'done', job.endedAt, job.tokensIn, job.tokensOut, job.cacheReadIn, job.cacheCreationIn, tokensPerSec, null);
+    endJobRun(id, 'done', job.tokensIn, job.tokensOut, job.cacheReadIn, job.cacheCreationIn, tokensPerSec, null);
   } catch (e) {
     logger.error(`endJobRun: ${e.message}`, _jobLogCtx(job));
   }
@@ -170,7 +170,7 @@ function failJob(id, err) {
   const errorParams = isCancelled ? null : (err?.i18nParams || null);
   Object.assign(job, { status, error: errorMsg, errorParams, progress: isCancelled ? job.progress : 0, endedAt: new Date().toISOString() });
   try {
-    endJobRun(id, status, job.endedAt, job.tokensIn, job.tokensOut, job.cacheReadIn, job.cacheCreationIn, null, errorMsg, errorParams);
+    endJobRun(id, status, job.tokensIn, job.tokensOut, job.cacheReadIn, job.cacheCreationIn, null, errorMsg, errorParams);
   } catch (e) {
     logger.error(`endJobRun: ${e.message}`, _jobLogCtx(job));
   }
@@ -208,9 +208,8 @@ function cancelJob(id, userEmail) {
   if (job.status === 'queued') {
     const idx = jobQueue.findIndex(e => e.jobId === id);
     if (idx !== -1) jobQueue.splice(idx, 1);
-    const endedAt = new Date().toISOString();
-    Object.assign(job, { status: 'cancelled', error: 'job.cancelled', errorParams: null, endedAt });
-    try { endJobRun(id, 'cancelled', endedAt, 0, 0, 0, 0, null, 'Abgebrochen'); } catch (e) {
+    Object.assign(job, { status: 'cancelled', error: 'job.cancelled', errorParams: null, endedAt: new Date().toISOString() });
+    try { endJobRun(id, 'cancelled', 0, 0, 0, 0, null, 'Abgebrochen'); } catch (e) {
       logger.error(`endJobRun: ${e.message}`, { job: job.type, user: job.userEmail, book: job.bookId });
     }
     runningJobs.delete(jobDedupKey(job));

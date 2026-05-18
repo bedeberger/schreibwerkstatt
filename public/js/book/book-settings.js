@@ -275,12 +275,6 @@ export const bookSettingsMethods = {
     this.bookDeleteError = '';
     try {
       await contentRepo.deleteBook(bookId);
-      const r = await fetch(`/booksettings/${bookId}/book`, { method: 'DELETE' });
-      if (!r.ok) {
-        let errData = null;
-        try { errData = await r.json(); } catch (_) {}
-        throw new Error(errData ? app.tError(errData) : `HTTP ${r.status}`);
-      }
       app.showBookSettingsCard = false;
       app.selectedBookId = '';
       app.resetView();
