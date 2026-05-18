@@ -3,7 +3,7 @@
 //   - URL → State: _applyHash interpretiert Hash und ruft die Toggle-Methoden
 //   - push vs. replace: gleiche Kategorie → replace, Kategoriewechsel → push
 //   - Deep-Link (Reload): Sub-Karten werden via Toggle gemountet, kapitel-review
-//     dispatched ein zusätzliches kapitel-review:select-Event mit chapterId
+//     setzt chapterId direkt am Root-SSoT bevor toggle awaited wird
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { appHashRouterMethods } from '../../public/js/app/app-hash-router.js';
@@ -237,16 +237,15 @@ test('_applyHash: Deep-Link auf #book/42/figur/7 → openFigurById', async () =>
   assert.equal(c.showFiguresCard, true);
 });
 
-test('_applyHash: Deep-Link auf #book/42/kapitel/123 → öffnet Kapitel-Review + dispatcht select-Event', async () => {
+test('_applyHash: Deep-Link auf #book/42/kapitel/123 → öffnet Kapitel-Review + setzt chapterId am Root', async () => {
   events.length = 0;
   const c = makeCtx({ hash: '#book/42/kapitel/123' });
   await c._applyHash();
   assert.equal(c.showKapitelReviewCard, true);
-  // Sub-Komponente lauscht auf kapitel-review:select – Hash-Router dispatcht
-  // ein Event statt direkt am State zu schreiben (Sub evtl. noch nicht gemountet).
-  const sel = events.find(e => e.type === 'kapitel-review:select');
-  assert.ok(sel, 'kapitel-review:select Event fehlt – Sub könnte chapterId nicht erhalten');
-  assert.equal(sel.detail.chapterId, '123');
+  // chapterId lebt am Root als SSoT — Hash-Router schreibt direkt, Sub liest
+  // reaktiv via $app.kapitelReviewChapterId. Vor dem Partial-Load gibt es keinen
+  // Listener für ein Event, daher kein Dispatch.
+  assert.equal(c.kapitelReviewChapterId, '123');
 });
 
 test('_applyHash: Deep-Link auf #book/42/werkstatt/7 → öffnet Werkstatt + dispatcht select-Event', async () => {
