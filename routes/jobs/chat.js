@@ -21,6 +21,15 @@ const chatRouter = express.Router();
 
 // ── Hilfsfunktionen ──────────────────────────────────────────────────────────
 
+function _sanitizeVorschlaege(arr) {
+  if (!Array.isArray(arr)) return [];
+  return arr.filter(v => {
+    const orig = typeof v?.original === 'string' ? v.original.trim() : '';
+    const ers  = typeof v?.ersatz   === 'string' ? v.ersatz.trim()   : '';
+    return orig && ers && orig !== ers;
+  });
+}
+
 function _parseChatResponse(text) {
   // Lenient: bei kaputtem JSON (z.B. unescaptes `"` oder typografische Quotes
   // im Modell-Output) wenigstens `antwort` per Regex retten. Vorschläge gehen
@@ -29,7 +38,7 @@ function _parseChatResponse(text) {
   if (r.ok) {
     return {
       antwort: r.parsed.antwort ?? text,
-      vorschlaege: r.parsed.vorschlaege ?? [],
+      vorschlaege: _sanitizeVorschlaege(r.parsed.vorschlaege),
     };
   }
   return {
