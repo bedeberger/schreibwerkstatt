@@ -10,11 +10,12 @@ import { setLastPageId, getLastPageId, getFilters } from '../local-prefs.js';
 // jeweils nur die genannten Keys. SSoT für persist (app.js-Watcher),
 // restore (`_restoreBookPrefs`) und reset (`resetView`).
 export const FILTER_SCOPES = [
-  ['figurenFilters',    { kapitel: '', seite: '', suche: '' }],
-  ['ereignisseFilters', { figurId: '', kapitel: '', seite: '', suche: '' }],
-  ['szenenFilters',     { wertung: '', figurId: '', kapitel: '', ortId: '', suche: '' }],
-  ['orteFilters',       { figurId: '', kapitel: '', szeneId: '', suche: '' }],
-  ['songsFilters',      { figurId: '', kapitel: '', szeneId: '', genre: '', kontextTyp: '', suche: '' }],
+  ['figurenFilters',      { kapitel: '', seite: '', suche: '' }],
+  ['ereignisseFilters',   { figurId: '', kapitel: '', seite: '', suche: '' }],
+  ['szenenFilters',       { wertung: '', figurId: '', kapitel: '', ortId: '', suche: '' }],
+  ['orteFilters',         { figurId: '', kapitel: '', szeneId: '', suche: '' }],
+  ['songsFilters',        { figurId: '', kapitel: '', szeneId: '', genre: '', kontextTyp: '', suche: '' }],
+  ['kontinuitaetFilters', { figurId: '', kapitel: '', schwere: '' }],
 ];
 
 // Generischer Karten-Toggle. Liest Behavior-Felder aus EXCLUSIVE_CARDS-Entry

@@ -11,33 +11,19 @@ export function registerKontinuitaetCard() {
     kontinuitaetLoading: false,
     kontinuitaetProgress: 0,
     kontinuitaetStatus: '',
-    kontinuitaetFilters: { figurId: '', kapitel: '', schwere: '' },
     selectedKontinuitaetIssueKey: null,
     kontinuitaetSummaryOpen: false,
     _kontinuitaetPollTimer: null,
     _lifecycle: null,
 
     init() {
-      const resetState = {
-        kontinuitaetResult: null,
-        kontinuitaetLoading: false,
-        kontinuitaetProgress: 0,
-        kontinuitaetStatus: '',
-        'kontinuitaetFilters.figurId': '',
-        'kontinuitaetFilters.kapitel': '',
-        'kontinuitaetFilters.schwere': '',
-        selectedKontinuitaetIssueKey: null,
-      };
-      // resetState mit verschachtelten Filter-Keys: Object.assign greift nicht
-      // tief — eigene Reset-Override für korrektes Zurücksetzen der Filter.
+      // kontinuitaetFilters lebt am Root (FILTER_SCOPES, localStorage-Persist).
+      // Reset/Restore übernimmt der Root via book:changed / view:reset.
       const doReset = (ctx) => {
         ctx.kontinuitaetResult = null;
         ctx.kontinuitaetLoading = false;
         ctx.kontinuitaetProgress = 0;
         ctx.kontinuitaetStatus = '';
-        ctx.kontinuitaetFilters.figurId = '';
-        ctx.kontinuitaetFilters.kapitel = '';
-        ctx.kontinuitaetFilters.schwere = '';
         ctx.selectedKontinuitaetIssueKey = null;
       };
 

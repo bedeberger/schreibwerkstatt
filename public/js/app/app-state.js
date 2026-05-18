@@ -340,6 +340,16 @@ const songsState = () => ({
   },
 });
 
+// Kontinuitäts-Filter am Root (analog figuren/ereignisse/…), damit der
+// FILTER_SCOPES-Persist-/Restore-/Reset-Pfad sie pro Buch im localStorage hält.
+const kontinuitaetState = () => ({
+  kontinuitaetFilters: {
+    figurId: '',
+    kapitel: '',
+    schwere: '',
+  },
+});
+
 // _checkDoneBeforeChat wird von toggleChatCard + resetPage verwendet (Editor-nah).
 const chatsState = () => ({
   _checkDoneBeforeChat: false,
@@ -441,6 +451,7 @@ export function initialLektoratState() {
     ...szenenState(),
     ...orteState(),
     ...songsState(),
+    ...kontinuitaetState(),
     ...chatsState(),
     ...featuresUsageState(),
     ...bookCreateState(),

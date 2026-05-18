@@ -98,6 +98,7 @@ export const kontinuitaetMethods = {
   // ginge verloren, und der Wert wäre zur Spread-Zeit `[]`.
   kontinuitaetIssuesFiltered() {
     const root = window.__app;
+    const filters = root.kontinuitaetFilters;
     const chapters = (root.tree || []).filter(t => t.type === 'chapter');
     const chapterNames = new Set(chapters.map(t => t.name));
     const fromStelle = (s) => {
@@ -107,25 +108,25 @@ export const kontinuitaetMethods = {
       return chapterNames.has(c) ? c : null;
     };
     return (this.kontinuitaetResult?.issues || []).filter(issue => {
-      if (this.kontinuitaetFilters.figurId) {
+      if (filters.figurId) {
         if (issue.fig_ids?.length) {
-          if (!issue.fig_ids.includes(this.kontinuitaetFilters.figurId)) return false;
+          if (!issue.fig_ids.includes(filters.figurId)) return false;
         } else {
-          const selectedName = root.figuren.find(f => f.id === this.kontinuitaetFilters.figurId)?.name || '';
+          const selectedName = root.figuren.find(f => f.id === filters.figurId)?.name || '';
           if (selectedName && !(issue.figuren || []).includes(selectedName)) return false;
         }
       }
-      if (this.kontinuitaetFilters.kapitel) {
-        const f = this.kontinuitaetFilters.kapitel;
+      if (filters.kapitel) {
+        const f = filters.kapitel;
         const selectedId = chapters.find(t => t.name === f)?.id;
         const idMatch    = selectedId !== undefined && issue.chapter_ids?.includes(selectedId);
         const nameMatch  = (issue.kapitel || []).includes(f);
         const stelleMatch = fromStelle(issue.stelle_a) === f || fromStelle(issue.stelle_b) === f;
         if (!idMatch && !nameMatch && !stelleMatch) return false;
       }
-      if (this.kontinuitaetFilters.schwere) {
+      if (filters.schwere) {
         const s = issue.schwere || 'niedrig';
-        if (s !== this.kontinuitaetFilters.schwere) return false;
+        if (s !== filters.schwere) return false;
       }
       return true;
     });
