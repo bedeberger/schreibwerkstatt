@@ -113,6 +113,7 @@
   gap: var(--space-xs);
   align-items: center;
   margin-left: var(--space-xs);
+  margin-bottom: var(--space-md);
   flex-wrap: wrap;
   min-width: 0;
 }

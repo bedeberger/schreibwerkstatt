@@ -341,7 +341,9 @@
                 <td x-text="$app.formatLastRun(row.lastRun)"></td>
                 <td>
                   <span x-text="row.count"></span>
-                  <span x-show="row.errorCount > 0" class="job-stats-errors" x-text="' / ' + row.errorCount + ' ✕'"></span>
+                  <span x-show="row.errorCount > 0" class="job-stats-errors">
+                    / <span x-text="row.errorCount"></span> <svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg>
+                  </span>
                 </td>
               </tr>
               <tr x-show="expandedJobType === row.type" class="job-stats-runs-row">

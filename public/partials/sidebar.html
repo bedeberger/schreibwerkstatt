@@ -15,12 +15,12 @@
               @click="tree.forEach(c => { if (!c.solo) c.open = true })"
               :disabled="!!pageSearch"
               :data-tip="t('sidebar.expandAll')"
-              :aria-label="t('sidebar.expandAll')">⌄</button>
+              :aria-label="t('sidebar.expandAll')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#chevron-down"/></svg></button>
       <button type="button" class="graph-tool-btn"
               @click="tree.forEach(c => { if (!c.solo) c.open = false })"
               :disabled="!!pageSearch"
               :data-tip="t('sidebar.collapseAll')"
-              :aria-label="t('sidebar.collapseAll')">⌃</button>
+              :aria-label="t('sidebar.collapseAll')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#chevron-up"/></svg></button>
     </div>
   </div>
   <div x-show="!pageSearch && tokTotals.any" class="tok-totals">

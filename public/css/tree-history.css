@@ -95,16 +95,19 @@
 
 .tree-chevron {
   display: inline-block;
-  font-size: var(--font-size-reading);
-  line-height: 1;
-  color: var(--color-subtle);
   width: 14px;
-  text-align: center;
+  height: 14px;
+  color: var(--color-subtle);
   flex-shrink: 0;
+  position: relative;
 }
 .tree-chevron::before {
-  content: '›';
-  display: inline-block;
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-color: currentColor;
+  -webkit-mask: var(--icon-chevron-right) center / 70% no-repeat;
+          mask: var(--icon-chevron-right) center / 70% no-repeat;
   opacity: 0.45;
   transition: opacity var(--transition-slow);
 }
@@ -211,10 +214,19 @@
 .btn-toggle-saved--off { background: var(--color-warn-bg); color: var(--color-warn-text); border-color: var(--color-warn-text); }
 
 .history-chevron {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
   font-size: var(--font-size-reading);
   color: var(--color-subtle);
+  background-color: currentColor;
+  -webkit-mask: var(--icon-chevron-right) center / contain no-repeat;
+          mask: var(--icon-chevron-right) center / contain no-repeat;
   transition: transform var(--transition-slow);
-  display: inline-block;
+  vertical-align: -0.125em;
+  text-indent: 100%;
+  white-space: nowrap;
+  overflow: hidden;
 }
 .history-chevron.open { transform: rotate(90deg); }
 

@@ -57,6 +57,9 @@
   font-size: var(--font-size-xs);
   color: var(--color-subtle);
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
 }
 .komplett-phase-list {
   list-style: none;
@@ -82,8 +85,11 @@
 }
 .komplett-phase-icon {
   width: 14px;
-  text-align: center;
-  font-size: var(--font-size-micro);
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
   flex-shrink: 0;
 }
 .komplett-phase-item.is-done .komplett-phase-icon {

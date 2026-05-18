@@ -18,7 +18,6 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-card-bg);
-  overflow: hidden;
 }
 
 .organizer-chapter--solo {
@@ -33,6 +32,8 @@
   padding: var(--space-sm) 10px;
   background: var(--color-hover-light);
   border-bottom: 1px solid var(--color-border);
+  border-top-left-radius: calc(var(--radius-sm) - 1px);
+  border-top-right-radius: calc(var(--radius-sm) - 1px);
 }
 
 .organizer-chapter-label {

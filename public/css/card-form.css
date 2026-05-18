@@ -340,8 +340,15 @@ select:focus {
   margin: 0;
 }
 .card-form-saved::before {
-  content: "✓";
-  font-weight: 600;
+  content: "";
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.125em;
+  margin-right: 0.25em;
+  background-color: currentColor;
+  -webkit-mask: var(--icon-check) center / contain no-repeat;
+          mask: var(--icon-check) center / contain no-repeat;
 }
 .card-form-error {
   margin: var(--space-sm) 0 0;

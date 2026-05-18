@@ -17,6 +17,7 @@ Token-Referenz (Farben, Radien, Spacing, Schriftgrössen): [public/css/tokens.cs
 **Komponenten**
 - [Karten](#karten-card) — `.card` + Akzentfarben
 - [Buttons](#buttons) — Hierarchie, Counter
+- [Icon-System](#icon-system-lucide-sprite) — `<svg class="icon"><use href="/icons.svg#name"/></svg>` (Lucide-Sprite)
 - [Icon-Toolbar](#icon-toolbar-graph-tool-btn) — Zoom/Reset/Fullscreen-Cluster über Canvas-Viewports
 - [Toolbar-Action-Group](#toolbar-action-group-segmentierter-icon-cluster-neben-form-feldern) — segmentierte Icon-Reihe bündig mit Search/Combobox
 - [Badges & Tags](#badges--tags) — eckig, Severity, Hue-Palette
@@ -192,6 +193,19 @@ Wiederkehrende Werte gehen über Tokens. Ad-hoc-Werte (`box-shadow: 0 4px 12px .
 
 **Regel:** Wrapper-Div leer lassen (Helper überschreibt `innerHTML`). Pflicht-Pattern: `x-data="combobox(placeholder, emptyLabel?)" x-modelable="value" x-model="ref" x-effect="options = …"`.
 
+### Dropdown darf nicht geclippt werden
+
+`.combobox-dropdown` ist `position: absolute` innerhalb `.combobox-wrap`. Jeder Vorfahr mit `overflow: hidden`/`clip`/`auto`/`scroll` clipt das geöffnete Dropdown — Liste unsichtbar, Bug unauffällig (Trigger reagiert normal, nur Optionen weg).
+
+**Regel:** Container, die eine Combobox umschliessen, dürfen **kein** `overflow: hidden`/`clip`/`auto`/`scroll` haben. Wenn runde Ecken einen Hintergrund clippen müssen (klassischer Use-Case für `overflow: hidden` am Card-/Section-Wrapper), stattdessen den **inneren** Hintergrund-Container (Header, Liste) mit passendem `border-radius` versehen — nicht den Aussen-Container clippen.
+
+Checkliste bei neuer Combobox-Platzierung:
+- Vorfahren bis zur nächsten Card/Modal auf `overflow:` prüfen (DevTools: Computed → Filter „overflow").
+- Falls Clipping zwingend (z. B. virtualisierte Liste), Combobox **ausserhalb** des clippenden Containers platzieren. `_decideOpenDirection` schaltet zwar bei wenig Platz unten auf `--up`, das hilft aber nicht, wenn der clippende Vorfahr beide Richtungen abschneidet.
+- `transform`/`filter`/`will-change`/`contain` auf Vorfahren erzeugen einen Containing-Block — heute irrelevant (Dropdown ist absolute), wird relevant falls auf `position: fixed` umgestellt wird.
+
+Bekannte Stolperstellen, die diese Regel verletzten und gefixt wurden: `.organizer-chapter` (Buchorganizer-Kapitel-Karten mit Move-Combobox pro Page).
+
 ### Reaktivität bei Datenquelle aus Karten-Scope (häufiger „Liste leer"-Bug)
 
 `<div x-data="combobox(...)">` ist eine **nested x-data** innerhalb der Karten-x-data. Methods am Karten-Scope, die in `x-effect` der Combobox aufgerufen werden und **reaktive Karten-Daten via `this.xxx` lesen**, werden nicht zuverlässig getrackt — Combobox bleibt leer, auch nachdem die Daten nachgeladen wurden. Bestätigt durch Werkstattkommentar bei [`ideenMovePickerOptions` in public/js/app.js](public/js/app.js) („x-effect der Combobox-Sub-x-data nur `$app`/Magics, nicht Karten-Methoden sieht").
@@ -292,9 +306,68 @@ mit `myCardOptions() { return this.cardData.map(...); }` am Karten-Scope.
 
 ---
 
+## Icon-System (Lucide-Sprite)
+
+**Use:** Single Source of Truth für alle UI-Icons. Lucide-Icon-Set (ISC, [lucide.dev](https://lucide.dev)) als statischer SVG-Sprite. Keine Unicode-Glyphen als Icons mehr.
+
+**Sprite:** [public/icons.svg](public/icons.svg) — `<symbol id="…" viewBox="0 0 24 24">` pro Icon. Stroke/Fill werden NICHT auf den Pfaden gesetzt; sie erben über die `.icon`-CSS-Klasse (Shadow-DOM-Cascade).
+
+**CSS:** [public/css/icons.css](public/css/icons.css). Klasse `.icon` setzt `width/height: 1em`, `fill: none`, `stroke: currentColor`, `stroke-width: 2`, `stroke-linecap/linejoin: round`, `vertical-align: -0.125em`, `pointer-events: none`. Skaliert automatisch über `font-size` des Parents.
+
+**Markup (statisches Icon):**
+```html
+<svg class="icon" aria-hidden="true">
+  <use href="/icons.svg#chevron-right"/>
+</svg>
+```
+
+**Markup (reaktives Icon mit Alpine):**
+```html
+<svg class="icon" aria-hidden="true">
+  <use :href="isOpen ? '/icons.svg#chevron-up' : '/icons.svg#chevron-down'"/>
+</svg>
+```
+
+Niemals `x-text` für Icon-Buttons mit zwei Zuständen — `x-text` setzt `textContent` und killt das SVG. Stattdessen `<use :href="…">` reaktiv binden, oder zwei `<template x-if>`-Branches.
+
+**Verfügbare Icons (Stand v1, Lucide-Namen):**
+- Chevrons / Arrows: `chevron-left/right/up/down`, `arrow-left/right/up/down`
+- Aktionen: `check`, `x`, `plus`, `minus`, `pencil`, `trash`, `search`, `play`, `undo`, `redo`
+- Status: `circle`, `alert-triangle`, `loader`
+- Viewport: `maximize`, `maximize-2`, `minimize-2`, `scan`
+
+Neuer Bedarf → Lucide-SVG von [lucide.dev](https://lucide.dev) als `<symbol>` in `public/icons.svg` ergänzen + `SHELL_CACHE` in `public/sw.js` bumpen.
+
+**Mask-Variante für CSS-Pseudo-Elements:** Wo Icons aus CSS-Pseudo gerendert werden (rotierende Disclosure-Marker, `.history-chevron`, `.tree-chevron`, `.card-form-saved::before`), gibt es vorgehaltene `--icon-…`-Custom-Properties in `:root` (siehe `icons.css`). Konsumiert via:
+```css
+.my-thing::before {
+  content: '';
+  display: inline-block;
+  width: 1em; height: 1em;
+  background-color: currentColor;
+  -webkit-mask: var(--icon-chevron-right) center / contain no-repeat;
+          mask: var(--icon-chevron-right) center / contain no-repeat;
+}
+```
+Mehr Masken in `:root` ergänzen, sobald sie ein zweites Mal gebraucht werden (Lucide-Pfad als URL-encoded SVG data-URL eintragen).
+
+**Erlaubte Unicode-Ausnahmen (keine Icons im engeren Sinn):**
+- Repetitions-Indikatoren (z.B. `↑↑↑` als Intensität-Skala für Machtverhältnis in Figuren-Beziehungen) — Icons als Sequenz wären visuell muddled.
+- Mathematische / typografische Zeichen im Fliesstext (`∑`, `·`, `–`) — kein Icon-Charakter.
+- Fallback-Glyphen in Chevron-Spans (`›`) bleiben markup-seitig als Fallback bei CSS-disabled (visuell ausgeblendet via `text-indent: 100%`).
+
+**Regeln:**
+- **Keine Icon-Bibliothek per `<script>`** (Lucide-JS oder Heroicons via NPM-Build) — Sprite-Approach reicht, kein JS-Overhead, kein Build-Step.
+- **`fill="none"` / `stroke="currentColor"` nicht auf `<symbol>` setzen** — Shadow-DOM-Vererbung greift nur, wenn die Properties am konsumierenden `<svg>` (via `.icon`-Klasse) liegen. Pfade bleiben attributfrei.
+- **`aria-hidden="true"` an jedem dekorativen Icon-SVG** — bei Icon-only-Buttons immer auch `aria-label` am Button (nicht am SVG).
+- **Hex-Farbe / inline-stroke**: nicht setzen. Farbe steuert das CSS-Parent über `color: …`.
+- **`width: 1em`**-Default heisst: Icon-Grösse folgt Parent-`font-size`. Will man fixe 18px: `style="font-size:18px"` am SVG oder `.icon--md`.
+
+---
+
 ## Icon-Toolbar (`.graph-tool-btn`)
 
-**Use:** Kompakte Icon-Button-Reihe für Canvas-/Viewport-Steuerung (Zoom +/−, Reset, Fullscreen-Toggle). Genutzt von Figuren-Graph (vis-network) und Figur-Werkstatt-Mindmap (jsMind). Erste Wahl für jeden weiteren Graph/Map/Canvas-Viewer.
+**Use:** Kompakte Icon-Button-Reihe für Canvas-/Viewport-Steuerung (Zoom +/−, Reset, Fullscreen-Toggle). Genutzt von Figuren-Graph (vis-network) und Figur-Werkstatt-Mindmap (jsMind). Erste Wahl für jeden weiteren Graph/Map/Canvas-Viewer. Icons kommen aus dem [Lucide-Sprite](#icon-system-lucide-sprite).
 
 **Markup (Overlay-Variante, oben rechts in Canvas-Ecke):**
 ```html
@@ -302,19 +375,28 @@ mit `myCardOptions() { return this.cardData.map(...); }` am Karten-Scope.
   <div class="…-mindmap-controls …-mindmap-controls--overlay">
     <button type="button" class="graph-tool-btn"
             :data-tip="$app.t('graph.zoomIn')" :aria-label="$app.t('graph.zoomIn')"
-            @click="…zoomIn()">+</button>
+            @click="…zoomIn()">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#plus"/></svg>
+    </button>
     <button type="button" class="graph-tool-btn"
             :data-tip="$app.t('graph.zoomOut')" :aria-label="$app.t('graph.zoomOut')"
-            @click="…zoomOut()">−</button>
-    <button type="button" class="graph-tool-btn graph-tool-btn--reset"
+            @click="…zoomOut()">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#minus"/></svg>
+    </button>
+    <button type="button" class="graph-tool-btn"
             :data-tip="$app.t('graph.reset')" :aria-label="$app.t('graph.reset')"
-            @click="…fit()">&#x26F6;</button>
+            @click="…fit()">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#scan"/></svg>
+    </button>
     <button type="button" class="graph-tool-btn"
             :aria-pressed="fullscreen"
             :data-tip="fullscreen ? $app.t('graph.fullscreenClose') : $app.t('graph.fullscreen')"
             :aria-label="fullscreen ? $app.t('graph.fullscreenClose') : $app.t('graph.fullscreen')"
-            @click="toggleFullscreen()"
-            x-text="fullscreen ? '✕' : '⤢'"></button>
+            @click="toggleFullscreen()">
+      <svg class="icon" aria-hidden="true">
+        <use :href="fullscreen ? '/icons.svg#minimize-2' : '/icons.svg#maximize-2'"/>
+      </svg>
+    </button>
   </div>
 </div>
 ```
@@ -324,32 +406,41 @@ mit `myCardOptions() { return this.cardData.map(...); }` am Karten-Scope.
 <div class="figuren-graph-toolbar">
   <span class="card-status">…Legende…</span>
   <div class="figuren-graph-toolbar-zoom">
-    <button class="graph-tool-btn">+</button>
+    <button class="graph-tool-btn"><svg class="icon"><use href="/icons.svg#plus"/></svg></button>
     …
   </div>
 </div>
 ```
 
+**Icon-Map (Pflicht-Vokabular pro Aktion):**
+
+| Aktion | Lucide-Icon | Hinweis |
+|--------|-------------|---------|
+| Zoom in | `plus` | — |
+| Zoom out | `minus` | — |
+| Reset / Fit-to-View | `scan` | Vier Ecken-Klammern, viewport-semantisch |
+| Fullscreen öffnen | `maximize-2` | Diagonale Pfeile auswärts |
+| Fullscreen schliessen | `minimize-2` | Diagonale Pfeile einwärts |
+| Undo / Redo | `undo` / `redo` | Action-Group-Variante (siehe unten) |
+| Expand-all / Collapse-all | `chevron-down` / `chevron-up` | Action-Group-Variante |
+
+Neue Aktionen erweitern diese Tabelle und das Sprite (siehe [Icon-System](#icon-system-lucide-sprite)).
+
 **Klassen** ([public/css/tokens-est.css](public/css/tokens-est.css), Overlay-Modifier in [public/css/figur-werkstatt.css](public/css/figur-werkstatt.css)):
-- `.graph-tool-btn` — quadratischer Icon-Button (28px min, `--radius-sm`, `--border-thin` solid `--color-border`, `--color-muted` Text, Hover-Tint via `--color-surface`).
-- `.graph-tool-btn--reset` — kleinere Schrift (`--font-size-sm`) für mehrzeichige Glyphen (`⛶`).
+- `.graph-tool-btn` — quadratischer Icon-Button (28px min, `--radius-sm`, `--border-thin` solid `--color-border`, `--color-muted` Text, Hover-Tint via `--color-surface`). Innenliegendes `<svg.icon>` zentriert sich automatisch (`line-height: 1`).
+- `.graph-tool-btn--reset` — Legacy-Override für mehrzeichige Glyphen; mit SVG-Icons nicht mehr nötig (kann beim nächsten Refactor entfernt werden).
 - `.graph-tool-btn[aria-pressed="true"]` — aktiver Toggle (Fullscreen ein): `--color-history-active-bg` Hintergrund, `--color-primary` Border + Text. Greift automatisch — Konsument setzt nur `:aria-pressed`.
 - `.figuren-graph-toolbar` — Inline-Wrapper: `display: flex; justify-content: space-between; gap: --space-sm`, oberhalb/unterhalb der Canvas.
 - `.figuren-graph-toolbar-zoom` — Button-Cluster mit `gap: --space-xs`, `flex-shrink: 0`.
 - `.<viewer>-mindmap-controls--overlay` — Overlay-Wrapper: `position: absolute; top: 8px; right: 8px`, `--color-surface` 88% mit `backdrop-filter: blur(4px)`, `--border-thin` + `--radius-sm` + `--shadow-sm`, `z-index: --z-sticky`. Parent muss `position: relative`.
 
-**Glyphen-Konvention (Unicode, keine SVGs/Lib-Icons):**
-- `+` / `−` — Zoom in/out (echtes Minus `−`, nicht Hyphen)
-- `⛶` (`&#x26F6;`) — Reset / Fit-to-View
-- `⤢` — Fullscreen öffnen
-- `✕` — Fullscreen schliessen
-- `aria-pressed`-Toggle, wenn Button zwei Zustände kennt (Fullscreen). Reine Aktionen (Zoom/Reset) ohne `aria-pressed`.
-
 **Regeln:**
 - **Kein eigenes Button-Vokabular pro Viewer.** Neuer Graph/Map/Canvas → `.graph-tool-btn` wiederverwenden, ggf. eigenen Wrapper-Modifier (`--overlay` analog). Kein `.figuren-zoom-btn` o.ä. parallel anlegen.
-- **Tooltip Pflicht** über `data-tip` (sofort-Hover, siehe [Sofort-Tooltip](#sofort-tooltip-data-tip--default-variante)), `aria-label` zusätzlich für Screen-Reader — die Glyphen sind allein nicht selbsterklärend.
-- **Overlay-Position** nicht ohne Grund verschieben — oben-rechts ist konsistent über Figuren-Graph (Inline) + Werkstatt (Overlay). Neuer Viewer wählt Overlay, sobald die Canvas die volle Karten-Breite einnimmt; Inline-Variante nur, wenn daneben ohnehin eine Legende/Status-Zeile sitzt.
-- **Klassen-Präfix** weiterhin `graph-tool-btn` — nicht in `toolbar-btn` o.ä. umbenennen; Pattern teilt sich Vokabular über mehrere Features, der Name ist die Klammer.
+- **Icons aus Sprite, nicht Unicode.** `<svg class="icon"><use href="/icons.svg#name"/></svg>` ist Pflicht. Unicode-Glyphen (`+`, `−`, `⤢`, `⛶`, `✕`) im Button-Markup sind seit Lucide-Migration verboten — Icon-Map oben ist der Index.
+- **Toggle-Icons via `<use :href="…">`** (reaktiv), nicht via `x-text` — `x-text` ersetzt den SVG-Inhalt.
+- **Tooltip Pflicht** über `data-tip` (sofort-Hover, siehe [Sofort-Tooltip](#sofort-tooltip-data-tip--default-variante)), `aria-label` zusätzlich für Screen-Reader.
+- **Overlay-Position** nicht ohne Grund verschieben — oben-rechts ist konsistent über Figuren-Graph (Inline) + Werkstatt (Overlay).
+- **Klassen-Präfix** weiterhin `graph-tool-btn` — nicht in `toolbar-btn` o.ä. umbenennen; Pattern teilt sich Vokabular über mehrere Features.
 
 **Beispiele:** [public/partials/figuren.html:86-100](public/partials/figuren.html#L86), [public/partials/figur-werkstatt.html:210-233](public/partials/figur-werkstatt.html#L210).
 
@@ -359,19 +450,27 @@ mit `myCardOptions() { return this.cardData.map(...); }` am Karten-Scope.
 
 **Use:** Reihe von 2–5 Icon-Aktionen, **vertikal exakt mit Suchfeld + Combobox in derselben Toolbar bündig**. Eingesetzt im Buchorganizer (Undo/Redo/Expand-all/Collapse-all neben Such-Input + Sprung-Combobox) und in der Sidebar (Expand-all/Collapse-all neben Page-Search). Unterscheidet sich vom Canvas-Pattern oben dadurch, dass die Buttons **als Segment** zusammenstehen (geteilte Border, gerundete Aussenseiten) und an die Höhe ihrer Toolbar-Nachbarn gekoppelt sind.
 
-**Markup:**
+**Markup:** (Icons aus [Lucide-Sprite](#icon-system-lucide-sprite))
 ```html
 <div class="<feature>-toolbar">
   <input type="text" class="page-search" x-model="search" :placeholder="…">
   <div class="btn-group <feature>-action-group">
     <button type="button" class="graph-tool-btn <feature>-icon-btn"
-            @click="undo()" :data-tip="…" :aria-label="…"><span class="<feature>-icon">↺</span></button>
+            @click="undo()" :data-tip="…" :aria-label="…">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#undo"/></svg>
+    </button>
     <button type="button" class="graph-tool-btn <feature>-icon-btn"
-            @click="redo()" :data-tip="…" :aria-label="…"><span class="<feature>-icon">↻</span></button>
+            @click="redo()" :data-tip="…" :aria-label="…">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#redo"/></svg>
+    </button>
     <button type="button" class="graph-tool-btn <feature>-icon-btn"
-            @click="expandAll()" :data-tip="…" :aria-label="…"><span class="<feature>-icon">▾</span></button>
+            @click="expandAll()" :data-tip="…" :aria-label="…">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#chevron-down"/></svg>
+    </button>
     <button type="button" class="graph-tool-btn <feature>-icon-btn"
-            @click="collapseAll()" :data-tip="…" :aria-label="…"><span class="<feature>-icon">▴</span></button>
+            @click="collapseAll()" :data-tip="…" :aria-label="…">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#chevron-up"/></svg>
+    </button>
   </div>
   <div class="<feature>-jump"
        x-data="combobox($app.t('…'))" x-modelable="value" x-model="jumpId"
@@ -405,7 +504,7 @@ mit `myCardOptions() { return this.cardData.map(...); }` am Karten-Scope.
   width: 34px; height: 34px;
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 0; padding: 0;
-  font-size: 0;                  /* Glyph rendert über inneren <span> */
+  font-size: var(--font-size-base); /* steuert SVG-Grösse (1em im .icon) */
   line-height: 1; box-sizing: border-box;
   border-radius: 0;
 }
@@ -420,20 +519,13 @@ mit `myCardOptions() { return this.cardData.map(...); }` am Karten-Scope.
 .<feature>-action-group .graph-tool-btn + .graph-tool-btn {
   border-left-width: 0;          /* doppelte Border vermeiden */
 }
-.<feature>-action-group .<feature>-icon {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 16px; height: 16px;
-  font-size: 14px; line-height: 1;
-  font-family: system-ui, -apple-system, 'Segoe UI Symbol', sans-serif;
-}
 ```
 
 **Regeln:**
 - **Vertikal-Alignment Pflicht:** Toolbar IMMER `align-items: stretch` und Nachbar-Elemente (Input, Combobox-Trigger, Buttons) auf **gleiche fixe Höhe** (`34px`-Standard). Ohne stretch + fixe Höhe ergeben Padding-Differenzen schräge Auslinierungen — der häufigste Bug bei diesem Pattern.
 - **Combobox-Trigger anpassen:** `.combobox-trigger` hat Eigenpadding via `--size-compact-padding`. In der Toolbar mit `height: 34px; padding-block: 0;` override, sonst überragt der Trigger die Action-Group. Wrapper-Div bleibt leer (Helper überschreibt `innerHTML`).
 - **Segment-Style statt Gap:** Buttons rücken aneinander (`gap: 0` auf Action-Group, `border-left-width: 0` auf Folge-Buttons). Aussenseiten gerundet via `:first-child` / `:last-child`. Liest sich als zusammengehörige Gruppe. Wer Lücke statt Segment will: anderes Pattern verwenden (z.B. `card-actions`).
-- **Glyph-Wrapper Pflicht:** `<span class="<feature>-icon">` um das Unicode-Zeichen, `font-size: 0` auf dem Button. Verhindert vertikales Verspringen durch wechselnde Glyph-Metriken (↺ vs ▾ vs × haben unterschiedliche Bounding-Boxes) und erzwingt einheitliche `system-ui`-Renderung über Fonts wie Inter/Crimson, deren Symbol-Glyphen sonst inkonsistent aussehen.
-- **Glyphen** (Unicode, keine SVGs): `↺`/`↻` Undo/Redo (CCW/CW-Pfeil), `▾`/`▴` Expand-/Collapse-All (kleines Dreieck nach unten/oben), `⌄`/`⌃` als Alternative (Chevron-only). Konsistent mit `.history-chevron` (siehe [Chevron-Konventionen](#chevron-konventionen)).
+- **Icons aus Sprite, kein Glyph-Wrapper mehr.** `<svg class="icon"><use href="/icons.svg#name"/></svg>` direkt im Button. `.icon` (1em-Quadrat) zentriert sich via Button-Flex automatisch — keine `font-size: 0`-Tricks, kein `<span class="…-icon">`-Wrapper, keine Font-Metrik-Wackelei. Icon-Map siehe [Icon-Toolbar](#icon-toolbar-graph-tool-btn).
 - **Disabled-State** via `:disabled` (z.B. Undo bei leerem Stack). Greift automatisch durch `.graph-tool-btn`-Default-Styling.
 - **Mobile:** Im `@media (max-width: 600px)`-Block Toolbar zu `flex-direction: column; align-items: stretch` drehen; Search + Combobox auf `width: 100%`. Action-Group bleibt horizontal (segmentierte Reihe), nimmt eigene Zeile ein.
 
@@ -588,11 +680,14 @@ Niemals reine `<div>`s mit Inline-Text dafür — immer durch `.card-status*`-Kl
 
 ## Chevron-Konventionen
 
-| Pattern | Marker | Rotation |
-|---------|--------|----------|
-| Collapsible-Toggle | `›` | 0° → 90° (Klasse `.open`) |
-| Combobox-Trigger   | `▾` | 0° → 180° (Klasse `--open`) |
+| Pattern | Glyph (Fallback) | Lucide-Icon | Rotation |
+|---------|------------------|-------------|----------|
+| Collapsible-Toggle (`.history-chevron`) | `›` | `chevron-right` (gerendert via `mask: var(--icon-chevron-right)`) | 0° → 90° (Klasse `.open`) |
+| Tree-Disclosure (`.tree-chevron`) | `›` | `chevron-right` (via `::before` + Mask) | sichtbar/unsichtbar (Opacity, Klasse `.open` blendet aus) |
+| Combobox-Trigger (`.combobox-chevron`) | `▾` | (noch Unicode-Glyph; auf `chevron-down`-Mask migrieren, sobald Touch) | 0° → 180° (Klasse `--open`) |
 | Disclosure (sonstig) | nicht erfinden — vorhandenes Muster nehmen |
+
+Markup-Fallback-Glyph (`›`) bleibt im DOM, wird per `text-indent: 100%; overflow: hidden` versteckt. Schadlos bei deaktiviertem CSS, kein Screen-Reader-Lärm (Konsumenten setzen `aria-hidden="true"` am Chevron-Span).
 
 Kein neuer Marker ohne Eintrag hier.
 
