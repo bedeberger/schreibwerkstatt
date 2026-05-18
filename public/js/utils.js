@@ -100,9 +100,13 @@ export function formatLastRun(isoStr, t, uiLocale) {
   if (isNaN(d.getTime())) return '';
   const tag = localeTag(uiLocale);
   const time = d.toLocaleTimeString(tag, tzOpts({ hour: '2-digit', minute: '2-digit' }));
-  const now = new Date();
-  const dDay  = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  // Tag-Bucket in appTimezone (nicht Browser-TZ): localIsoDate respektiert
+  // app_settings.app.timezone, damit „heute/gestern" konsistent mit den
+  // Server-Buckets (lib/local-date.js) und den restlichen TZ-Formattern bleibt
+  // — auch wenn der Browser des Users in einer anderen TZ steht. UTC-Mittag-
+  // Anker macht den Day-Diff DST-sicher.
+  const dDay = new Date(localIsoDate(d) + 'T12:00:00Z');
+  const today = new Date(localIsoDate(new Date()) + 'T12:00:00Z');
   const diffDays = Math.round((today - dDay) / 86400000);
   if (diffDays < 7) return t('job.lastRun.rel', { rel: relativeDay(diffDays, uiLocale), time });
   const date = d.toLocaleDateString(tag, tzOpts({ day: '2-digit', month: '2-digit' }));
