@@ -408,6 +408,7 @@
          x-ref="confirmDialogInput"
          x-model="confirmDialogInputValue"
          :placeholder="confirmDialogInputPlaceholder"
+         autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other"
          @keydown.enter.prevent="_resolveConfirmDialog(true)">
   <div class="confirm-dialog-actions">
     <button type="button" class="confirm-dialog-btn confirm-dialog-btn--cancel"

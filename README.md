@@ -1,6 +1,6 @@
 # schreibwerkstatt
 
-Schreiben, Lektorat und Buchanalyse mit KI. Eigenständiger Node.js-Service, Multi-User mit Rollen-ACL pro Buch. Inhalte (Bücher/Kapitel/Seiten) leben lokal in SQLite — keine externe Storage-Abhängigkeit.
+Schreiben, Lektorat und Buchanalyse mit KI. Eigenständiger Node.js-Service, Multi-User mit Rollen-ACL pro Buch. Inhalte (Bücher/Kapitel/Seiten) liegen lokal in SQLite — keine externe Storage-Abhängigkeit.
 
 ## Features
 
@@ -36,7 +36,7 @@ Schreiben, Lektorat und Buchanalyse mit KI. Eigenständiger Node.js-Service, Mul
 - **Presence** – Mit-Anwesende pro Seite/Buch sichtbar (Avatar-Pip im Sidebar-Tree, Banner im Editor).
 - **Page-Locks** – Soft-Lock beim Edit, automatische Heartbeats, Banner bei fremdem Lock.
 - **Registrierung mit Approval** – Selbst-Registrierung mit Admin-Approval; Anti-Enumeration; optional Captcha.
-- **Admin-Konsole** – Web-UI für User, Bücher, Settings, Kategorien, Usage. Kein direktes File-Editing nötig.
+- **Admin-Konsole** – Web-UI für User, Bücher, Settings, Kategorien, Usage.
 
 ### Export & Tooling
 - **Command-Palette** (Cmd/Ctrl+K bzw. `/`) – Fuzzy-Suche über Karten, Aktionen, Seiten, Kapitel, Figuren, Orte, Szenen. Prefix-Modi: `>` `#` `!` `@` `$` `%`.
@@ -50,25 +50,21 @@ Schreiben, Lektorat und Buchanalyse mit KI. Eigenständiger Node.js-Service, Mul
 
 - Node.js v20+.
 - Öffentliche HTTPS-URL (Reverse-Proxy mit TLS) für Produktion.
-- Login-Pfad: **Admin-Bootstrap** (Email+Passwort via ENV) und/oder **Google OAuth2** (Callback `https://<domain>/auth/callback`). Mindestens einer muss konfiguriert sein. Google-Credentials werden in der Admin-Konsole gepflegt, kein Restart nötig.
+- Login-Pfad: **Admin-Bootstrap** (Email+Passwort via ENV) und/oder **Google OAuth2** (Callback `https://<domain>/auth/callback`). Mindestens einer muss konfiguriert sein.
 
-## Quick Start (LXC / Bare Metal)
+## Quick Start
 
 ```bash
 git clone https://github.com/<user>/schreibwerkstatt.git
 cd schreibwerkstatt
-cp .env.example .env
-# Nur SESSION_SECRET ist Pflicht (32+ Hex-Zeichen). Optional: ADMIN_EMAIL +
-# ADMIN_PASSWORD für den ersten Login ohne Google.
+cp .env.example .env   # SESSION_SECRET (32+ Hex) ist Pflicht
 npm ci --omit=dev
-node server.js    # Port 3737
+node server.js         # Port 3737
 ```
 
-Konfiguration (KI-Provider, Google-OAuth, App-URL, Modell-Limits, Mailer, Cron, veraPDF) läuft über die **Admin-Konsole**. Alle Werte landen in `app_settings` (SQLite); Änderungen greifen ohne Restart.
+KI-Provider, Google-OAuth, App-URL, Modell-Limits, Mailer, Cron, veraPDF konfiguriert die **Admin-Konsole** (Tabelle `app_settings`, kein Restart nötig).
 
-Legacy: liegt ein bekannter alter Key in der ENV (`ANTHROPIC_API_KEY`, `MODEL_TOKEN`, `GOOGLE_CLIENT_ID`, `APP_URL`, …), wird er beim Server-Start einmalig in `app_settings` gespiegelt (`ENV_MAP` in [lib/app-settings.js](lib/app-settings.js)). Danach ist die DB Wahrheit.
-
-Produktiv: systemd-Service via [deploy/schreibwerkstatt.service](deploy/schreibwerkstatt.service) (User/WorkingDirectory anpassen, dann `systemctl enable --now schreibwerkstatt`). Erst-Install: `bash deploy/install.sh`. CD via [deploy/deploy.sh](deploy/deploy.sh).
+Produktiv: systemd-Service via [deploy/schreibwerkstatt.service](deploy/schreibwerkstatt.service), Erst-Install `bash deploy/install.sh`, CD `bash deploy/deploy.sh`.
 
 ### Reverse-Proxy
 
@@ -86,62 +82,45 @@ proxy_send_timeout 300s;
 Ohne veraPDF läuft die Validierung im Skip-Modus, das PDF wird trotzdem geliefert. Für strikte Validierung:
 
 ```bash
-apk add --no-cache openjdk17-jre-headless curl unzip   # Alpine
-# oder: apt-get install -y default-jre-headless curl unzip   # Debian/Ubuntu
+apt-get install -y default-jre-headless curl unzip   # oder: apk add openjdk17-jre-headless curl unzip
 
 VERAPDF_VERSION=1.26.2
 curl -sSL "https://software.verapdf.org/releases/verapdf-greenfield-${VERAPDF_VERSION}.zip" -o /tmp/verapdf.zip
 mkdir -p /opt/verapdf && unzip -q /tmp/verapdf.zip -d /opt/verapdf
 cd /opt/verapdf/verapdf-greenfield-${VERAPDF_VERSION}
 java -cp installer-${VERAPDF_VERSION}.jar org.verapdf.apps.Installer -options auto-install-options.xml
-# /opt/verapdf-installation in PATH aufnehmen oder VERAPDF_BIN setzen
+# /opt/verapdf-installation in PATH oder VERAPDF_BIN setzen
 ```
 
 ### Update
 
 ```bash
-git pull && npm ci --omit=dev && systemctl restart lektorat
+git pull && npm ci --omit=dev && systemctl restart schreibwerkstatt
 ```
 
 ## Admin-Konsole
 
-Erreichbar unter `/admin` für User mit `global_role = 'admin'`. Karten:
+Unter `/admin` für User mit `global_role = 'admin'`:
 - **Users** — Rollen, Sperren, Provider-Override pro User.
 - **Books** — alle Bücher mit ACL-Einsicht/Übertragung.
 - **Registrierungs-Anfragen** — Approval-Queue für `/register`-Selbstanmeldungen.
-- **Settings** — KI-Provider + Keys, Google OAuth, App-URL, Modell-Limits, Mailer, Cron, veraPDF-Flavour. Wirkt sofort (kein Restart).
+- **Settings** — KI-Provider + Keys, Google OAuth, App-URL, Modell-Limits, Mailer, Cron, veraPDF-Flavour.
 - **Kategorien & Tags** — globaler Pool, Zuordnung pro Buch via ACL.
 - **Usage** — Token-Verbrauch pro User/Provider/Job-Typ.
 
-Admin wird über `ADMIN_EMAIL` in `.env` als globale Admin-Rolle gespiegelt (idempotent beim Start). Passwort lebt ausschliesslich in der ENV (timing-safe-equal-Vergleich, Rate-Limit pro IP).
+`ADMIN_EMAIL` in `.env` wird beim Start als globale Admin-Rolle gespiegelt (idempotent). Passwort lebt ausschliesslich in der ENV (timing-safe Vergleich, Rate-Limit pro IP).
 
 ## Backup
 
-Tägliches Online-Backup der SQLite-DB läuft automatisch via systemd-Timer (`schreibwerkstatt-backup.timer`, Default 03:00 lokale Zeit). Nutzt `sqlite3 .backup` (lock-frei, WAL-konsistent), gzip-komprimiert, plus Retention nach `mtime`. Vor jedem Deploy zusätzlich ein Snapshot.
+Tägliches Online-Backup der SQLite-DB via systemd-Timer (`schreibwerkstatt-backup.timer`, Default 03:00). `sqlite3 .backup` (lock-frei, WAL-konsistent), gzip-komprimiert, Retention nach `mtime`. Pre-Deploy zusätzlicher Snapshot.
 
-Konfigurierbar via `.env`:
+Konfig via `.env`: `BACKUP_DIR`, `BACKUP_RETENTION_DAYS`, `BACKUP_DB_FILE`. Script + Units: [deploy/backup.sh](deploy/backup.sh), [deploy/schreibwerkstatt-backup.service](deploy/schreibwerkstatt-backup.service), [deploy/schreibwerkstatt-backup.timer](deploy/schreibwerkstatt-backup.timer).
 
-```env
-BACKUP_DIR=/opt/schreibwerkstatt/backup
-BACKUP_RETENTION_DAYS=30
-BACKUP_DB_FILE=/opt/schreibwerkstatt/schreibwerkstatt.db
-```
-
-Script: [deploy/backup.sh](deploy/backup.sh). Units: [deploy/schreibwerkstatt-backup.service](deploy/schreibwerkstatt-backup.service), [deploy/schreibwerkstatt-backup.timer](deploy/schreibwerkstatt-backup.timer). Manuell: `systemctl start schreibwerkstatt-backup.service`. Status: `systemctl list-timers schreibwerkstatt-backup`.
-
-Empfehlung: Backup-Ordner zusätzlich offsite spiegeln (rsync nach NAS/S3) – sonst gleicher Datenträger = gleicher Single-Point-of-Failure.
+Backup-Ordner offsite spiegeln (rsync nach NAS/S3) — sonst Single-Point-of-Failure.
 
 ## Prompts anpassen
 
-`prompt-config.json` im Projektroot. Pflichtdatei – Server startet sonst nicht. Änderungen aktiv beim nächsten Serverstart.
-
-Konfigurierbar:
-- `locales` – Locale-Map (`de-CH`, `de-DE`, `en-US`, `en-GB`) mit Regeln, Rollen, Stoppwortlisten.
-- `buchtypen` – Genre-Typen pro Sprache (`de`, `en`) mit Label und Kontext-Text.
-- `erklaerungRule` – globale Fehlerfilter-Regel.
-- `defaultLocale` – Fallback ohne Buch-Konfiguration.
-
-Per-Buch in der UI (Bucheinstellungen): Buchtyp und Freitext-Kontext.
+`prompt-config.json` im Projektroot (Pflichtdatei). Konfigurierbar: `locales` (`de-CH`/`de-DE`/`en-US`/`en-GB` mit Regeln, Rollen, Stoppwortlisten), `buchtypen` (Genre pro Sprache mit Label + Kontext), `erklaerungRule` (globale Fehlerfilter-Regel), `defaultLocale`. Per-Buch in der UI: Buchtyp + Freitext-Kontext. Änderungen beim nächsten Serverstart aktiv.
 
 ## Lokale Entwicklung
 
@@ -154,28 +133,22 @@ Per-Buch in der UI (Bucheinstellungen): Buchtyp und Freitext-Kontext.
 ### Plattformen & Modelle
 
 - **[Anthropic Claude](https://www.anthropic.com/)** – KI-Modell (Anthropic Usage Policies; Outputs frei nutzbar)
-- **[Ollama](https://ollama.com/)** (MIT) / **[llama.cpp](https://github.com/ggerganov/llama.cpp)** (MIT) / **[LM Studio](https://lmstudio.ai/)** – lokale LLMs (`API_PROVIDER=ollama` oder `llama`)
-- **[OpenThesaurus](https://www.openthesaurus.de/)** – Synonyme (Daten unter LGPL/CC-BY-SA; Nutzung via öffentliche API zur Laufzeit, keine Redistribution)
-- **[veraPDF](https://verapdf.org/)** – PDF/A-Validierung (GPL-3.0; aufgerufen als externer Prozess)
+- **[Ollama](https://ollama.com/)** (MIT) / **[llama.cpp](https://github.com/ggerganov/llama.cpp)** (MIT) / **[LM Studio](https://lmstudio.ai/)** – lokale LLMs
+- **[OpenThesaurus](https://www.openthesaurus.de/)** – Synonyme (LGPL/CC-BY-SA; Nutzung via öffentliche API, keine Redistribution)
+- **[veraPDF](https://verapdf.org/)** – PDF/A-Validierung (GPL-3.0; externer Prozess)
 
 ### Frontend-Libraries (vendored in [public/vendor/](public/vendor/))
 
-- **[Alpine.js](https://alpinejs.dev/)** – Frontend-Framework (MIT)
-- **[vis-network](https://visjs.github.io/vis-network/)** – Beziehungsgraph (Apache-2.0 + MIT)
-- **[Chart.js](https://www.chartjs.org/)** – Diagramme (MIT)
-- **[SortableJS](https://github.com/SortableJS/Sortable)** – Drag&Drop für Buchorganizer (MIT)
-- **[jsMind](https://github.com/hizzgdev/jsmind)** – Mindmap-Editor / Figuren-Werkstatt (BSD-3-Clause)
+- **[Alpine.js](https://alpinejs.dev/)** (MIT), **[vis-network](https://visjs.github.io/vis-network/)** (Apache-2.0 + MIT), **[Chart.js](https://www.chartjs.org/)** (MIT), **[SortableJS](https://github.com/SortableJS/Sortable)** (MIT), **[jsMind](https://github.com/hizzgdev/jsmind)** (BSD-3-Clause).
 
-Die Originallizenztexte der vendored Libraries liegen in [public/vendor/LICENSES/](public/vendor/LICENSES/).
+Originallizenztexte: [public/vendor/LICENSES/](public/vendor/LICENSES/).
 
 ### Fonts
 
 - **[Inter](https://rsms.me/inter/)** © Rasmus Andersson – SIL Open Font License 1.1
 - **[Source Serif 4](https://github.com/adobe-fonts/source-serif)** © Adobe – SIL Open Font License 1.1
 
-Lokal ausgelieferte Schriftdateien liegen in [public/fonts/](public/fonts/); die zugehörige OFL-Lizenz unter [public/fonts/OFL.txt](public/fonts/OFL.txt).
-
-Der Custom-PDF-Export lädt zur Laufzeit Familien aus **[Google Fonts](https://fonts.google.com/)** (jeweils SIL OFL 1.1 oder Apache-2.0) und bettet sie in die erzeugten PDFs ein. Beide Lizenzen erlauben Embedding ohne Royalty.
+Schriftdateien in [public/fonts/](public/fonts/), Lizenz [public/fonts/OFL.txt](public/fonts/OFL.txt). Custom-PDF-Export bettet zur Laufzeit Google-Fonts-Familien ein (jeweils SIL OFL 1.1 oder Apache-2.0).
 
 ### Server-Dependencies
 
@@ -183,8 +156,6 @@ Vollständige Liste in [package.json](package.json) – durchgehend OSI-genehmig
 
 ## Lizenz
 
-Dieses Projekt steht unter der **GNU Affero General Public License v3.0** (AGPL-3.0) – siehe [LICENSE](LICENSE). Wer den Dienst über ein Netzwerk anbietet, muss den modifizierten Quellcode den Nutzern verfügbar machen (§ 13 AGPL).
+**GNU Affero General Public License v3.0** (AGPL-3.0) – siehe [LICENSE](LICENSE). Wer den Dienst über ein Netzwerk anbietet, muss den modifizierten Quellcode den Nutzern verfügbar machen (§ 13 AGPL).
 
-Lizenzhinweise zu Drittsoftware:
-- Vendored Frontend-Libraries: [public/vendor/LICENSES/](public/vendor/LICENSES/)
-- Mitgelieferte Schriften (Inter, Source Serif 4): [public/fonts/OFL.txt](public/fonts/OFL.txt)
+Drittsoftware-Lizenzen: [public/vendor/LICENSES/](public/vendor/LICENSES/), Schriften [public/fonts/OFL.txt](public/fonts/OFL.txt).

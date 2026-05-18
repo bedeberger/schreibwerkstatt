@@ -38,6 +38,7 @@
                  @blur="onRenamePage(page.id, $event)"
                  @keydown.enter.prevent="$event.target.blur()"
                  :disabled="organizerSaving"
+                 autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other"
                  :aria-label="$app.t('bookOrganizer.renamePage')">
           <button type="button" class="organizer-delete-btn" @click="deletePage(page.id)" :disabled="organizerSaving"
                   :data-tip="$app.t('bookOrganizer.deletePage')" :aria-label="$app.t('bookOrganizer.deletePage')">×</button>
@@ -57,6 +58,7 @@
                  @blur="onRenameChapter(ch.id, $event)"
                  @keydown.enter.prevent="$event.target.blur()"
                  :disabled="organizerSaving"
+                 autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other"
                  :aria-label="$app.t('bookOrganizer.renameChapter')">
           <span class="organizer-chapter-meta tag" x-text="ch.pages.length === 1 ? $app.t('sidebar.pagesCountOne') : $app.t('sidebar.pagesCount', { n: ch.pages.length })"></span>
           <div class="organizer-chapter-actions">
@@ -75,6 +77,7 @@
                      @blur="onRenamePage(page.id, $event)"
                      @keydown.enter.prevent="$event.target.blur()"
                      :disabled="organizerSaving"
+                     autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other"
                      :aria-label="$app.t('bookOrganizer.renamePage')">
               <button type="button" class="organizer-delete-btn" @click="deletePage(page.id)" :disabled="organizerSaving"
                       :data-tip="$app.t('bookOrganizer.deletePage')" :aria-label="$app.t('bookOrganizer.deletePage')">×</button>
