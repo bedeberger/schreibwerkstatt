@@ -41,6 +41,7 @@ function defaultMindmap(name) {
           { id: 'beziehungen',     topic: '__i18n:werkstatt.tree.beziehungen__' },
           { id: 'konflikt',        topic: '__i18n:werkstatt.tree.konflikt__' },
           { id: 'bogen',           topic: '__i18n:werkstatt.tree.bogen__' },
+          { id: 'musikgeschmack',  topic: '__i18n:werkstatt.tree.musikgeschmack__' },
         ]},
         { id: 'stimme', topic: '__i18n:werkstatt.tree.stimme__', expanded: true, children: [
           { id: 'sprechweise', topic: '__i18n:werkstatt.tree.sprechweise__' },

@@ -79,31 +79,63 @@ app.set('trust proxy', 1);
 // img-src deckt data:/blob: für Generated Charts/Graphs plus
 // *.googleusercontent.com für Google-Profilbilder im Avatar-Menü.
 // connect-src 'self' deckt alle XHR/SSE-Endpunkte (Server proxy'd Anthropic +
-// Ollama; Storage geht ueber /content/*); Plausible darf an seine eigene Origin posten.
-const PLAUSIBLE_ORIGIN = 'https://analytics.david-berger.ch';
+// Ollama; Storage geht ueber /content/*); Plausible-Origin wird zur Laufzeit
+// aus app_settings ergänzt, falls Analytics aktiv ist.
 const HCAPTCHA_ORIGINS = ['https://hcaptcha.com', 'https://*.hcaptcha.com'];
+
+function plausibleOriginFromSettings() {
+  if (!appSettings.get('analytics.plausible.enabled')) return '';
+  const url = String(appSettings.get('analytics.plausible.script_url') || '').trim();
+  if (!url) return '';
+  try { return new URL(url).origin; }
+  catch { return ''; }
+}
+
+function buildCspHeader() {
+  const plausible = plausibleOriginFromSettings();
+  const scriptSrc  = ["'self'", "'unsafe-eval'", ...(plausible ? [plausible] : []), ...HCAPTCHA_ORIGINS];
+  const styleSrc   = ["'self'", "'unsafe-inline'", ...HCAPTCHA_ORIGINS];
+  const imgSrc     = ["'self'", 'data:', 'blob:', 'https://*.googleusercontent.com'];
+  const fontSrc    = ["'self'"];
+  const connectSrc = ["'self'", ...(plausible ? [plausible] : []), ...HCAPTCHA_ORIGINS];
+  const frameSrc   = ["'self'", ...HCAPTCHA_ORIGINS];
+  const dir = {
+    'default-src':  ["'self'"],
+    'script-src':   scriptSrc,
+    'style-src':    styleSrc,
+    'img-src':      imgSrc,
+    'font-src':     fontSrc,
+    'connect-src':  connectSrc,
+    'frame-src':    frameSrc,
+    'worker-src':   ["'self'"],
+    'manifest-src': ["'self'"],
+    'object-src':   ["'none'"],
+    'base-uri':     ["'self'"],
+    'frame-ancestors': ["'self'"],
+    'form-action':  ["'self'"],
+  };
+  return Object.entries(dir).map(([k, v]) => `${k} ${v.join(' ')}`).join('; ');
+}
+
+// CSP-Cache: rebuild bei app_settings 'changed'-Event.
+let _cspHeader = buildCspHeader();
+appSettings.on('changed', (evt) => {
+  if (!evt || !evt.key) return;
+  if (evt.key === 'analytics.plausible.enabled' || evt.key === 'analytics.plausible.script_url') {
+    _cspHeader = buildCspHeader();
+  }
+});
+
 app.use(helmet({
-  contentSecurityPolicy: {
-    useDefaults: false,
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-eval'", PLAUSIBLE_ORIGIN, ...HCAPTCHA_ORIGINS],
-      styleSrc: ["'self'", "'unsafe-inline'", ...HCAPTCHA_ORIGINS],
-      imgSrc: ["'self'", 'data:', 'blob:', 'https://*.googleusercontent.com'],
-      fontSrc: ["'self'"],
-      connectSrc: ["'self'", PLAUSIBLE_ORIGIN, ...HCAPTCHA_ORIGINS],
-      frameSrc: ["'self'", ...HCAPTCHA_ORIGINS],
-      workerSrc: ["'self'"],
-      manifestSrc: ["'self'"],
-      objectSrc: ["'none'"],
-      baseUri: ["'self'"],
-      frameAncestors: ["'self'"],
-      formAction: ["'self'"],
-    },
-  },
+  contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false,
   crossOriginResourcePolicy: { policy: 'same-origin' },
 }));
+
+app.use((req, res, next) => {
+  res.setHeader('Content-Security-Policy', _cspHeader);
+  next();
+});
 
 // gzip aktiv, aber SSE-Streams (text/event-stream) und Responses mit
 // `x-no-compression` ausgenommen — Kompression würde Stream-Chunks bis zum
@@ -333,6 +365,35 @@ app.use((req, _res, next) => {
     }
   }
   next();
+});
+
+// Plausible-Bootstrap dynamisch rendern: enabled+URL aus app_settings.
+// Disabled → no-op JS, damit das <script>-Tag im HTML keine Console-Error wirft.
+// Cache-Control: no-store, damit Admin-Toggle ohne Browser-Reload-Hack greift.
+app.get('/js/plausible-init.js', (req, res) => {
+  res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store');
+  const enabled = !!appSettings.get('analytics.plausible.enabled');
+  const scriptUrl = String(appSettings.get('analytics.plausible.script_url') || '').trim();
+  if (!enabled || !scriptUrl) {
+    return res.send('/* plausible disabled */\n');
+  }
+  const safeUrl = JSON.stringify(scriptUrl);
+  res.send(
+    `// Plausible-Bootstrap (self-hosted Instanz). Nur auf Produktions-Hosts\n` +
+    `// (kein localhost/.local). URL ist im Admin-Settings-UI konfiguriert.\n` +
+    `(function () {\n` +
+    `  var h = location.hostname;\n` +
+    `  if (h === 'localhost' || h === '127.0.0.1' || h === '::1' || h.endsWith('.local')) return;\n` +
+    `  var s = document.createElement('script');\n` +
+    `  s.async = true;\n` +
+    `  s.src = ${safeUrl};\n` +
+    `  document.head.appendChild(s);\n` +
+    `  window.plausible = window.plausible || function () { (plausible.q = plausible.q || []).push(arguments); };\n` +
+    `  plausible.init = plausible.init || function (i) { plausible.o = i || {}; };\n` +
+    `  plausible.init({ hashBasedRouting: true });\n` +
+    `})();\n`
+  );
 });
 
 app.use(staticServe);

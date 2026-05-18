@@ -19,7 +19,7 @@ test.after(() => { ctx.cleanup(); });
 
 test.beforeEach(() => {
   ctx.mockAi.reset();
-  ctx.mockBs.reset();
+  ctx.dbSeed.reset();
 });
 
 const USER = 'tester@test.dev';
@@ -40,7 +40,7 @@ test('Dummy-Buch: Fixture-Loader liefert deterministische IDs', () => {
 
 test('Dummy-Buch Komplettanalyse Single-Pass → done, 5 Figuren, 4 Orte, Kontinuitätsprobleme', async () => {
   const BOOK_ID = 102;
-  const fix = dummy.seedDummyBook(ctx.mockBs, BOOK_ID);
+  const fix = dummy.seedDummyBook(ctx.dbSeed, BOOK_ID);
   dummy.registerKomplettAiMocks(ctx.mockAi);
 
   const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, USER, 'job.label.komplett');
@@ -75,7 +75,7 @@ test('Dummy-Buch Komplettanalyse Single-Pass → done, 5 Figuren, 4 Orte, Kontin
 
 test('Dummy-Buch Standalone-Kontinuitätscheck → 2 Probleme', async () => {
   const BOOK_ID = 103;
-  const fix = dummy.seedDummyBook(ctx.mockBs, BOOK_ID);
+  const fix = dummy.seedDummyBook(ctx.dbSeed, BOOK_ID);
   dummy.registerKomplettAiMocks(ctx.mockAi);
 
   const jobId = ctx.shared.createJob('kontinuitaet', BOOK_ID, USER, 'job.label.kontinuitaet');

@@ -12,7 +12,7 @@ test.after(() => { ctx.cleanup(); });
 
 test.beforeEach(() => {
   ctx.mockAi.reset();
-  ctx.mockBs.reset();
+  ctx.dbSeed.reset();
 });
 
 function reviewResponse(note = 4.2) {
@@ -60,7 +60,7 @@ function chapterReviewResponse(note = 4.0) {
 
 test('Buch-Review Single-Pass: 1 Kapitel → 1 AI-Call, book_reviews-Zeile', async () => {
   const BOOK_ID = 80;
-  ctx.mockBs.setBook({
+  ctx.dbSeed.setBook({
     chapters: [{ id: 8100, book_id: BOOK_ID, name: 'Kap 1' }],
     pages: [{ id: 8200, book_id: BOOK_ID, chapter_id: 8100, name: 'S 1', updated_at: '' }],
     pageBodies: { 8200: '<p>' + 'Anna ging weiter. '.repeat(60) + '</p>' },
@@ -97,7 +97,7 @@ test('Buch-Review Multi-Pass: 3 Kapitel → 3 Analysen + 1 Final = 4 Calls', asy
     pages.push({ id: 8400 + i, book_id: BOOK_ID, chapter_id: 8300 + i, name: `S ${i + 1}`, updated_at: '' });
     bodies[8400 + i] = '<p>' + 'Anna ging weiter durch das Land. '.repeat(280) + '</p>';
   }
-  ctx.mockBs.setBook({ chapters, pages, pageBodies: bodies });
+  ctx.dbSeed.setBook({ chapters, pages, pageBodies: bodies });
 
   // Chapter analysis schema (no gesamtnote).
   ctx.mockAi.on(
@@ -126,7 +126,7 @@ test('Buch-Review Multi-Pass: 3 Kapitel → 3 Analysen + 1 Final = 4 Calls', asy
 
 test('Buch-Review: fehlt gesamtnote → failJob', async () => {
   const BOOK_ID = 82;
-  ctx.mockBs.setBook({
+  ctx.dbSeed.setBook({
     chapters: [{ id: 8500, book_id: BOOK_ID, name: 'K' }],
     pages: [{ id: 8600, book_id: BOOK_ID, chapter_id: 8500, name: 'S', updated_at: '' }],
     pageBodies: { 8600: '<p>' + 'x '.repeat(150) + '</p>' },
@@ -148,7 +148,7 @@ test('Buch-Review: fehlt gesamtnote → failJob', async () => {
 
 test('Buch-Review Cache: Single-Pass-Rerun trifft book_review_cache → 0 AI-Calls', async () => {
   const BOOK_ID = 88;
-  ctx.mockBs.setBook({
+  ctx.dbSeed.setBook({
     chapters: [{ id: 8800, book_id: BOOK_ID, name: 'Kap 1' }],
     pages: [{ id: 8801, book_id: BOOK_ID, chapter_id: 8800, name: 'S 1', updated_at: '2026-05-01T10:00:00Z' }],
     pageBodies: { 8801: '<p>' + 'Anna ging weiter. '.repeat(60) + '</p>' },
@@ -192,7 +192,7 @@ test('Buch-Review Cache: Multi-Pass — geänderte Seite invalidiert nur 1 Kapit
     pages.push({ id: 8910 + i, book_id: BOOK_ID, chapter_id: 8900 + i, name: `S ${i + 1}`, updated_at: '2026-05-01T10:00:00Z' });
     bodies[8910 + i] = '<p>' + 'Anna ging weiter durch das Land. '.repeat(280) + '</p>';
   }
-  ctx.mockBs.setBook({ chapters, pages, pageBodies: bodies });
+  ctx.dbSeed.setBook({ chapters, pages, pageBodies: bodies });
 
   ctx.mockAi.on(
     (e) => e.schemaKeys.includes('themen') && e.schemaKeys.includes('qualitaet'),
@@ -219,7 +219,7 @@ test('Buch-Review Cache: Multi-Pass — geänderte Seite invalidiert nur 1 Kapit
 
   // Seite in Kapitel 2 ändert sich → updated_at neu.
   pages[1].updated_at = '2026-05-02T11:00:00Z';
-  ctx.mockBs.setBook({ chapters, pages, pageBodies: bodies });
+  ctx.dbSeed.setBook({ chapters, pages, pageBodies: bodies });
 
   ctx.mockAi.reset();
   ctx.mockAi.on(
@@ -243,7 +243,7 @@ test('Buch-Review Cache: Multi-Pass — geänderte Seite invalidiert nur 1 Kapit
 
 test('Buch-Review: leeres Buch → result.empty', async () => {
   const BOOK_ID = 83;
-  ctx.mockBs.setBook({ chapters: [], pages: [], pageBodies: {}, books: [{ id: BOOK_ID, name: 'Leer' }] });
+  ctx.dbSeed.setBook({ chapters: [], pages: [], pageBodies: {}, books: [{ id: BOOK_ID, name: 'Leer' }] });
 
   const jobId = ctx.shared.createJob('review', BOOK_ID, 'tester@test.dev', 'job.label.review');
   ctx.shared.enqueueJob(jobId, () =>
@@ -260,7 +260,7 @@ test('Buch-Review: leeres Buch → result.empty', async () => {
 test('Kapitel-Review: 1 Kapitel → 1 AI-Call, chapter_reviews-Zeile', async () => {
   const BOOK_ID = 90;
   const CHAPTER_ID = 9100;
-  ctx.mockBs.setBook({
+  ctx.dbSeed.setBook({
     chapters: [{ id: CHAPTER_ID, book_id: BOOK_ID, name: 'Kap A' }],
     pages: [
       { id: 9200, book_id: BOOK_ID, chapter_id: CHAPTER_ID, name: 'S 1', priority: 0 },
@@ -301,7 +301,7 @@ test('Kapitel-Review: 1 Kapitel → 1 AI-Call, chapter_reviews-Zeile', async () 
 test('Kapitel-Review Cache: Rerun trifft chapter_macro_review_cache → 0 AI-Calls', async () => {
   const BOOK_ID = 93;
   const CHAPTER_ID = 9800;
-  ctx.mockBs.setBook({
+  ctx.dbSeed.setBook({
     chapters: [{ id: CHAPTER_ID, book_id: BOOK_ID, name: 'Kap A' }],
     pages: [
       { id: 9810, book_id: BOOK_ID, chapter_id: CHAPTER_ID, name: 'S 1', priority: 0, updated_at: '2026-05-01T10:00:00Z' },
@@ -353,7 +353,7 @@ test('Kapitel-Review Cache: Rerun trifft chapter_macro_review_cache → 0 AI-Cal
 test('Kapitel-Review: leeres Kapitel → result.empty, kein AI-Call', async () => {
   const BOOK_ID = 91;
   const CHAPTER_ID = 9400;
-  ctx.mockBs.setBook({
+  ctx.dbSeed.setBook({
     chapters: [{ id: CHAPTER_ID, book_id: BOOK_ID, name: 'Kap leer' }],
     pages: [{ id: 9500, book_id: BOOK_ID, chapter_id: 9999, name: 'fremd', priority: 0 }],
     pageBodies: { 9500: '<p>fremd</p>' },
@@ -372,7 +372,7 @@ test('Kapitel-Review: leeres Kapitel → result.empty, kein AI-Call', async () =
 test('Kapitel-Review: AI ohne gesamtnote → failJob', async () => {
   const BOOK_ID = 92;
   const CHAPTER_ID = 9600;
-  ctx.mockBs.setBook({
+  ctx.dbSeed.setBook({
     chapters: [{ id: CHAPTER_ID, book_id: BOOK_ID, name: 'K' }],
     pages: [{ id: 9700, book_id: BOOK_ID, chapter_id: CHAPTER_ID, name: 'S', priority: 0 }],
     pageBodies: { 9700: '<p>Anna ging in den Wald.</p>' },

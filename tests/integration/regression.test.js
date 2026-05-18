@@ -12,12 +12,12 @@ test.after(() => { ctx.cleanup(); });
 
 test.beforeEach(() => {
   ctx.mockAi.reset();
-  ctx.mockBs.reset();
+  ctx.dbSeed.reset();
 });
 
 test('truncated: callAI gibt truncated=true → Job → error (kein partial in DB)', async () => {
   const BOOK_ID = 70;
-  ctx.mockBs.setBook({
+  ctx.dbSeed.setBook({
     chapters: [{ id: 9100, book_id: BOOK_ID, name: 'K1' }],
     pages: [{ id: 9200, book_id: BOOK_ID, chapter_id: 9100, name: 'S1', updated_at: '' }],
     pageBodies: { 9200: '<p>' + 'x '.repeat(150) + '</p>' },
@@ -45,7 +45,7 @@ test('truncated: callAI gibt truncated=true → Job → error (kein partial in D
 
 test('AbortError: cancel während Job-Lauf → status cancelled', async () => {
   const BOOK_ID = 71;
-  ctx.mockBs.setBook({
+  ctx.dbSeed.setBook({
     chapters: [{ id: 9300, book_id: BOOK_ID, name: 'K1' }],
     pages: [{ id: 9400, book_id: BOOK_ID, chapter_id: 9300, name: 'S1', updated_at: '' }],
     pageBodies: { 9400: '<p>' + 'x '.repeat(150) + '</p>' },

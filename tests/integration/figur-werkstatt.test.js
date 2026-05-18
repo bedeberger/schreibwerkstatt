@@ -18,7 +18,7 @@ test.after(() => { ctx.cleanup(); });
 
 test.beforeEach(() => {
   ctx.mockAi.reset();
-  ctx.mockBs.reset();
+  ctx.dbSeed.reset();
 });
 
 function sampleMindmap(name = 'Anna') {
@@ -63,7 +63,7 @@ function consistencyResponse() {
 test('Brainstorm: Mindmap-Knoten → Vorschläge ins Job-Result', async () => {
   const BOOK_ID = 6101;
   const userEmail = 'autor@test.dev';
-  ctx.mockBs.setBook({ chapters: [], pages: [], pageBodies: {} });
+  ctx.dbSeed.setBook({ chapters: [], pages: [], pageBodies: {} });
   // book row needed (FK)
   ctx.dbSchema.upsertBookByName(BOOK_ID, 'Werkstatt-Buch');
 
@@ -96,7 +96,7 @@ test('Brainstorm: Mindmap-Knoten → Vorschläge ins Job-Result', async () => {
 test('Brainstorm: KI ohne vorschlaege-Array → failJob', async () => {
   const BOOK_ID = 6102;
   const userEmail = 'autor@test.dev';
-  ctx.mockBs.setBook({ chapters: [], pages: [], pageBodies: {} });
+  ctx.dbSeed.setBook({ chapters: [], pages: [], pageBodies: {} });
   ctx.dbSchema.upsertBookByName(BOOK_ID, 'B');
 
   const draft = draftFigDb.createDraftFigure(BOOK_ID, userEmail, {
@@ -118,7 +118,7 @@ test('Brainstorm: KI ohne vorschlaege-Array → failJob', async () => {
 test('Brainstorm: unbekannter Knoten → failJob mit knotenMissing', async () => {
   const BOOK_ID = 6103;
   const userEmail = 'autor@test.dev';
-  ctx.mockBs.setBook({ chapters: [], pages: [], pageBodies: {} });
+  ctx.dbSeed.setBook({ chapters: [], pages: [], pageBodies: {} });
   ctx.dbSchema.upsertBookByName(BOOK_ID, 'B');
 
   const draft = draftFigDb.createDraftFigure(BOOK_ID, userEmail, {
@@ -138,7 +138,7 @@ test('Brainstorm: unbekannter Knoten → failJob mit knotenMissing', async () =>
 
 test('Brainstorm: fremde draft → failJob forbidden', async () => {
   const BOOK_ID = 6104;
-  ctx.mockBs.setBook({ chapters: [], pages: [], pageBodies: {} });
+  ctx.dbSeed.setBook({ chapters: [], pages: [], pageBodies: {} });
   ctx.dbSchema.upsertBookByName(BOOK_ID, 'B');
 
   const draft = draftFigDb.createDraftFigure(BOOK_ID, 'owner@test.dev', {
@@ -160,7 +160,7 @@ test('Brainstorm: fremde draft → failJob forbidden', async () => {
 test('Consistency: Konflikte mit Severity-Skala + Fazit', async () => {
   const BOOK_ID = 6201;
   const userEmail = 'autor@test.dev';
-  ctx.mockBs.setBook({ chapters: [], pages: [], pageBodies: {} });
+  ctx.dbSeed.setBook({ chapters: [], pages: [], pageBodies: {} });
   ctx.dbSchema.upsertBookByName(BOOK_ID, 'B');
 
   const draft = draftFigDb.createDraftFigure(BOOK_ID, userEmail, {
@@ -188,7 +188,7 @@ test('Consistency: Konflikte mit Severity-Skala + Fazit', async () => {
 test('Consistency: ungültige Severity → fallback "mittel"', async () => {
   const BOOK_ID = 6202;
   const userEmail = 'autor@test.dev';
-  ctx.mockBs.setBook({ chapters: [], pages: [], pageBodies: {} });
+  ctx.dbSeed.setBook({ chapters: [], pages: [], pageBodies: {} });
   ctx.dbSchema.upsertBookByName(BOOK_ID, 'B');
 
   const draft = draftFigDb.createDraftFigure(BOOK_ID, userEmail, {
@@ -213,7 +213,7 @@ test('Consistency: ungültige Severity → fallback "mittel"', async () => {
 test('Consistency: leeres konflikte-Array + Fazit ist gültig', async () => {
   const BOOK_ID = 6203;
   const userEmail = 'autor@test.dev';
-  ctx.mockBs.setBook({ chapters: [], pages: [], pageBodies: {} });
+  ctx.dbSeed.setBook({ chapters: [], pages: [], pageBodies: {} });
   ctx.dbSchema.upsertBookByName(BOOK_ID, 'B');
 
   const draft = draftFigDb.createDraftFigure(BOOK_ID, userEmail, {
@@ -236,7 +236,7 @@ test('Consistency: leeres konflikte-Array + Fazit ist gültig', async () => {
 test('Consistency: KI ohne fazit → failJob', async () => {
   const BOOK_ID = 6204;
   const userEmail = 'autor@test.dev';
-  ctx.mockBs.setBook({ chapters: [], pages: [], pageBodies: {} });
+  ctx.dbSeed.setBook({ chapters: [], pages: [], pageBodies: {} });
   ctx.dbSchema.upsertBookByName(BOOK_ID, 'B');
 
   const draft = draftFigDb.createDraftFigure(BOOK_ID, userEmail, {

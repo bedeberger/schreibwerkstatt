@@ -12,7 +12,7 @@ test.after(() => { ctx.cleanup(); });
 
 test.beforeEach(() => {
   ctx.mockAi.reset();
-  ctx.mockBs.reset();
+  ctx.dbSeed.reset();
 });
 
 function lektoratResponse(errorCount = 1) {
@@ -33,7 +33,7 @@ function lektoratResponse(errorCount = 1) {
 test('Lektorat-Cache: identischer Re-Run trifft lektorat_cache → 0 AI-Calls', async () => {
   const BOOK_ID = 200;
   const PAGE_ID = 2001;
-  ctx.mockBs.setBook({
+  ctx.dbSeed.setBook({
     chapters: [{ id: 2010, book_id: BOOK_ID, name: 'Kap A' }],
     pages: [{ id: PAGE_ID, book_id: BOOK_ID, chapter_id: 2010, name: 'S 1', updated_at: '2026-05-01T10:00:00Z' }],
     pageBodies: { [PAGE_ID]: '<p>Anna ging in den wald.</p>' },
@@ -71,7 +71,7 @@ test('Lektorat-Cache: identischer Re-Run trifft lektorat_cache → 0 AI-Calls', 
 test('Lektorat-Cache: updated_at-Wechsel invalidiert Cache', async () => {
   const BOOK_ID = 201;
   const PAGE_ID = 2011;
-  ctx.mockBs.setBook({
+  ctx.dbSeed.setBook({
     chapters: [{ id: 2020, book_id: BOOK_ID, name: 'Kap B' }],
     pages: [{ id: PAGE_ID, book_id: BOOK_ID, chapter_id: 2020, name: 'S 1', updated_at: '2026-05-01T10:00:00Z' }],
     pageBodies: { [PAGE_ID]: '<p>Test.</p>' },
@@ -90,7 +90,7 @@ test('Lektorat-Cache: updated_at-Wechsel invalidiert Cache', async () => {
   assert.equal(ctx.mockAi.log.length, 1);
 
   // Seite ändert sich.
-  ctx.mockBs.setBook({
+  ctx.dbSeed.setBook({
     chapters: [{ id: 2020, book_id: BOOK_ID, name: 'Kap B' }],
     pages: [{ id: PAGE_ID, book_id: BOOK_ID, chapter_id: 2020, name: 'S 1', updated_at: '2026-05-02T11:00:00Z' }],
     pageBodies: { [PAGE_ID]: '<p>Test geändert.</p>' },
@@ -108,7 +108,7 @@ test('Lektorat-Cache: updated_at-Wechsel invalidiert Cache', async () => {
 
 test('Batch-Lektorat-Cache: zweiter Lauf nur für geänderte Seite', async () => {
   const BOOK_ID = 202;
-  ctx.mockBs.setBook({
+  ctx.dbSeed.setBook({
     chapters: [{ id: 2030, book_id: BOOK_ID, name: 'Kap C' }],
     pages: [
       { id: 2031, book_id: BOOK_ID, chapter_id: 2030, name: 'S 1', updated_at: '2026-05-01T10:00:00Z' },
@@ -136,7 +136,7 @@ test('Batch-Lektorat-Cache: zweiter Lauf nur für geänderte Seite', async () =>
   assert.equal(ctx.mockAi.log.length, 3, '1. Batch = 3 Seiten-Calls');
 
   // Eine Seite ändert sich.
-  ctx.mockBs.setBook({
+  ctx.dbSeed.setBook({
     chapters: [{ id: 2030, book_id: BOOK_ID, name: 'Kap C' }],
     pages: [
       { id: 2031, book_id: BOOK_ID, chapter_id: 2030, name: 'S 1', updated_at: '2026-05-01T10:00:00Z' },

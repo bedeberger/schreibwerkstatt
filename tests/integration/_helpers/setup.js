@@ -43,7 +43,7 @@ function bootstrap() {
   }
 
   const mockAi = require('./mock-ai');
-  const mockBs = require('./mock-bookstack');
+  const dbSeed = require('./db-seed');
   mockAi.install();
 
   // Now safe to require pipeline modules — they'll pick up the mocked deps.
@@ -61,7 +61,7 @@ function bootstrap() {
     try { fs.unlinkSync(`${dbFile}-shm`); } catch (_) {}
   }
 
-  return { mockAi, mockBs, komplett, review, kapitel, lektorat, synonyme, shared, dbSchema, dbFile, cleanup };
+  return { mockAi, dbSeed, komplett, review, kapitel, lektorat, synonyme, shared, dbSchema, dbFile, cleanup };
 }
 
 async function waitForJob(shared, jobId, { timeoutMs = 5000 } = {}) {

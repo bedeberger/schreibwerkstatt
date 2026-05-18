@@ -1,8 +1,6 @@
 'use strict';
 // Seeder fuer Integration-Tests. Schreibt Buecher/Kapitel/Seiten direkt in
-// die lokalen SQLite-Tabellen — Content-Store-Localdb-Backend liest sie dann
-// ueber die Facade. Name aus historischen Gruenden beibehalten (Tests rufen
-// `ctx.mockBs.setBook(...)`).
+// die lokalen SQLite-Tabellen — Content-Store-Facade liest sie dann von dort.
 
 function _seedDb({ chapters, pages, pageBodies = {}, books = [] }) {
   const { db } = require('../../../db/connection');
@@ -68,8 +66,6 @@ function setBook({ chapters = [], pages = [], pageBodies = {}, books = [] } = {}
   _seedDb({ chapters, pages, pageBodies, books });
 }
 
-function install() { /* no-op: localdb-Backend liest direkt aus SQLite */ }
-
 function reset() { _wipeDb(); }
 
-module.exports = { install, setBook, reset };
+module.exports = { setBook, reset };

@@ -34,37 +34,54 @@ Ollama/Llama-Locks serialisieren *pro Provider*, nicht pro User. VRAM verträgt 
 
 Cache-Helpers (`db/schema.js`): `loadXxxCache(…, provider)` / `saveXxxCache(…, provider)`. Caller muessen den resolvten Provider durchreichen.
 
-### Per-Provider-Kontextfenster
+## Konfiguration: `app_settings` als SSoT
 
-`app_settings.ai.<provider>.context_window` + `ai.<provider>.max_tokens_out` pro Provider (`claude`/`ollama`/`llama`). `lib/ai.js#getContextConfigFor(provider)` liefert `{ contextWindow, maxTokensOut, charsPerToken, inputBudgetTokens, inputBudgetChars }`. Boot-Konstanten (`INPUT_BUDGET_TOKENS` etc.) bleiben fuer Backwards-Compat als Claude-Default exportiert; neue Code-Pfade nutzen den Helper.
+Alle KI-Konfig liegt in der `app_settings`-Tabelle. Admin-PUT via `/admin/settings`. `.env`-Vars sind nur **Boot-Spiegel**: beim ersten Start gespiegelt in `app_settings`, danach nie wieder gelesen (Mapping: [lib/app-settings.js:270-278](../lib/app-settings.js#L270-L278)). Änderungen am Setting per Admin-UI/PUT erfordern App-Restart (Werte werden beim Modul-Load gefrosted).
 
-## Legacy: `API_PROVIDER` (Boot-Fallback)
+| Setting-Key | Default | Boot-Env | Bedeutung |
+|-------------|---------|----------|-----------|
+| `ai.provider` | `claude` | `API_PROVIDER` | Globaler Provider (`claude` \| `ollama` \| `llama`) |
+| `ai.claude.api_key` | – | `ANTHROPIC_API_KEY` | Pflicht bei Claude |
+| `ai.claude.model` | `claude-sonnet-4-6` | `MODEL_NAME` | |
+| `ai.claude.context_window` | 200 000 | `MODEL_CONTEXT` | Gesamtfenster (Input+Output) |
+| `ai.claude.max_tokens_out` | 64 000 | `MODEL_TOKEN` | Output-Cap (`MAX_TOKENS_OUT`) |
+| `ai.claude.retry_max` | 3 | – | Retry-Attempts bei 429/529 |
+| `ai.claude.timeout_ms` | 600 000 | – | Hard-Timeout (10 min) |
+| `ai.ollama.host` | `http://localhost:11434` | `OLLAMA_HOST` | |
+| `ai.ollama.model` | `llama3.2` | `OLLAMA_MODEL` | |
+| `ai.ollama.temperature` | 0.7 | `OLLAMA_TEMPERATURE` | Default `0.2` für Lock-Logik |
+| `ai.ollama.context_window` | 32 000 | – | Per-Provider-Override |
+| `ai.ollama.max_tokens_out` | 16 000 | – | |
+| `ai.llama.host` | `http://localhost:8080` | `LLAMA_HOST` | |
+| `ai.llama.model` | `llama3.2` | `LLAMA_MODEL` | |
+| `ai.llama.temperature` | 0.7 | `LLAMA_TEMPERATURE` | Default `0.1` für Lock-Logik |
+| `ai.llama.context_window` | 32 000 | – | |
+| `ai.llama.max_tokens_out` | 16 000 | – | |
+| `ai.chars_per_token` | provider-default (3 Claude / 4 lokal) | – | Tokenizer-Heuristik (Boot-frozen) |
+| `ai.chat_temperature` | – | – | Override nur für Seiten-/Buch-Chat |
 
-`API_PROVIDER` in `.env`: `claude` (Default) | `ollama` | `llama`. Wird nur beim ersten Boot in `ai.provider` gespiegelt; danach ist `app_settings` SSoT.
-
-| Provider | Env-Vars | Streaming | Tool-Use | Caching |
-|----------|----------|-----------|----------|---------|
-| `claude` | `ANTHROPIC_API_KEY`, `MODEL_NAME` | SSE | Ja (`callAIWithTools`) | `cache_control: ephemeral`, optional `ttl: '1h'` |
-| `ollama` | `OLLAMA_HOST`, `OLLAMA_MODEL`, `OLLAMA_TEMPERATURE` | NDJSON | Nein | Nein |
-| `llama` | `LLAMA_HOST`, `LLAMA_MODEL`, `LLAMA_TEMPERATURE` | OpenAI-SSE | Nein | Nein |
+| Provider | Streaming | Tool-Use | Caching |
+|----------|-----------|----------|---------|
+| `claude` | SSE | Ja (`callAIWithTools`) | `cache_control: ephemeral`, optional `ttl: '1h'` |
+| `ollama` | NDJSON | Nein | Nein |
+| `llama` | OpenAI-SSE | Nein | Nein |
 
 Ollama + Llama laufen über globalen **Mutex** (`withOllamaLock`/`withLlamaLock`) — VRAM-Schutz, parallele Calls würden Modelle abschmieren lassen. Jobs laufen weiter parallel; nur die KI-Calls serialisieren am Server.
 
 ## Token-Budgets
 
-Aus `.env`:
+Boot-Konstanten in `lib/ai.js` lesen den **Claude-Globalwert** beim Modul-Load:
+- `MODEL_CONTEXT = ai.claude.context_window` (Default 200 000). Bei lokalen Modellen auf native Kontextgrösse setzen (Mistral-Small3.2 / Llama-3.1: 128 000, ältere: 32 000 / 8 000).
+- `MAX_TOKENS_OUT = ai.claude.max_tokens_out` (Default 64 000). Job-spezifische Overrides per `Math.min` gedeckelt.
+- `CHARS_PER_TOKEN`: Default `3` (Claude) / `4` (lokal), Override via `ai.chars_per_token`. Tokenizer-Heuristik für Char→Token-Umrechnung.
 
-| Var | Default | Bedeutung |
-|-----|---------|-----------|
-| `MODEL_CONTEXT` | 200 000 | Gesamtes Kontextfenster (Input + Output). Bei lokalen Modellen auf native Kontextgrösse setzen (Mistral-Small3.2 / Llama-3.1: 128 000). |
-| `MODEL_TOKEN` | 64 000 | Output-Cap (`MAX_TOKENS_OUT`). Job-spezifische Overrides per `Math.min` gedeckelt. |
-| `CHARS_PER_TOKEN` | 3 (Claude) / 1.5 (lokal) | Tokenizer-Heuristik für Char-Token-Umrechnung. |
-
-Abgeleitet (`lib/ai.js`):
-- `INPUT_BUDGET_TOKENS = MODEL_CONTEXT − MODEL_TOKEN − 2000` (`CONTEXT_SAFETY_MARGIN`).
+Abgeleitet:
+- `INPUT_BUDGET_TOKENS = MODEL_CONTEXT − MAX_TOKENS_OUT − 2000` (`CONTEXT_SAFETY_MARGIN`).
 - `INPUT_BUDGET_CHARS = INPUT_BUDGET_TOKENS × CHARS_PER_TOKEN`.
 
-Hard-Check: `MODEL_TOKEN + 2000 < MODEL_CONTEXT`, sonst Crash beim Start (verhindert lokale-Provider-400-Fehler durch `max_tokens > num_ctx`).
+Hard-Check beim Boot: `MAX_TOKENS_OUT + 2000 < MODEL_CONTEXT`, sonst Crash (verhindert lokale-Provider-400-Fehler durch `max_tokens > num_ctx`).
+
+**Per-Provider via `getContextConfigFor(provider)`** ([lib/ai.js:968](../lib/ai.js#L968)): liefert `{ contextWindow, maxTokensOut, charsPerToken, inputBudgetTokens, inputBudgetChars }` aus `ai.<provider>.context_window` + `ai.<provider>.max_tokens_out`. Fallback-Defaults: `claude=200000`, `ollama=32000`, `llama=32000` (`PROVIDER_CONTEXT_DEFAULTS`). Boot-Konstanten bleiben Claude-spezifisch für Backwards-Compat; neue Code-Pfade mit auflösbarem `userEmail` nutzen den Helper.
 
 Job-Konstanten skalieren automatisch:
 - `SINGLE_PASS_LIMIT = 0.7 × INPUT_BUDGET_CHARS`
@@ -119,7 +136,7 @@ if (!parsed.fehler) throw new Error('Pflichtfeld `fehler` fehlt.');
 
 ## JSON-Parse-Fallback-Kette
 
-`parseJSON(text)` in [lib/ai.js](../lib/ai.js) (Lines 810+):
+`parseJSON(text)` in [lib/ai.js](../lib/ai.js):
 
 1. Strip ```` ```json ```` -Fences, trim.
 2. `JSON.parse()` direkt.
@@ -142,16 +159,17 @@ Fixt die "unescaped `"` im String"-Klasse von Bugs, die mistral-small3.2 ohne Sc
 
 ## Retries (nur Claude)
 
-Transiente Fehler retryen mit Exp-Backoff (1s/2s/4s + Jitter, max `CLAUDE_RETRY_MAX`=3):
+Transiente Fehler retryen mit Exp-Backoff (1s/2s/4s + Jitter, max `ai.claude.retry_max` = 3):
 - HTTP 429 (Rate-Limit) — respektiert `retry-after`-Header.
 - HTTP 529 (Overloaded).
+- HTTP 503 mit `error.type === 'overloaded_error'` (Body-Typ-Detection via `_isOverloadedBody`).
 - Stream-Event `overloaded_error` — nur retry wenn noch kein Text emittiert (sonst Output-Duplikat).
 
 Nicht-retryable: alle anderen Status-Codes.
 
 ## Timeouts (Claude)
 
-Hard-Timeout via `CLAUDE_TIMEOUT_MS` (Default 10 min). `_combineSignals` merged User-Cancel und Timeout in einen AbortController. Marker `state.timedOut` unterscheidet Timeout (`code: 'AI_TIMEOUT'`) von User-Cancel (`AbortError`).
+Hard-Timeout via `ai.claude.timeout_ms` (Default 600 000 ms = 10 min). `_combineSignals` merged User-Cancel und Timeout in einen AbortController. Marker `state.timedOut` unterscheidet Timeout (`code: 'AI_TIMEOUT'`) von User-Cancel (`AbortError`).
 
 ## Connection-Fehler (lokal)
 
@@ -180,4 +198,4 @@ Schemas werden per `_rebuildLektoratSchema()`/`_rebuildKomplettSchemas()` provid
 
 ## Chat-Temperatur
 
-`CHAT_TEMPERATURE`-Env überschreibt Provider-Defaults nur für Seiten-Chat und Buch-Chat. Andere Job-Typen (Review, Lektorat, Komplett) bleiben deterministisch (Temp 0.1-0.2).
+`ai.chat_temperature` (app_settings) überschreibt Provider-Defaults nur für Seiten-Chat und Buch-Chat. Andere Job-Typen (Review, Lektorat, Komplett) bleiben deterministisch (Provider-Defaults: Ollama 0.2, Llama 0.1).

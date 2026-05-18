@@ -4,7 +4,7 @@ Vollbild-Schreibmodus mit Absatz-/Satz-Spotlight, Typewriter-Scroll und Live-Wor
 
 Code: [public/js/editor/focus.js](../public/js/editor/focus.js) (Facade) → [public/js/editor/focus/](../public/js/editor/focus/) (Submodule), [public/js/cards/editor-focus-card.js](../public/js/cards/editor-focus-card.js) (Alpine.data-Sub), [public/css/focus-mode.css](../public/css/focus-mode.css). Tests: [tests/e2e/focus-editor.spec.js](../tests/e2e/focus-editor.spec.js), [tests/unit/editor-focus.test.mjs](../tests/unit/editor-focus.test.mjs), [tests/unit/focus-granularity.test.mjs](../tests/unit/focus-granularity.test.mjs).
 
-Trigger: Hotkey `Cmd/Ctrl+Shift+E` (überall im Editor; aus Lesemodus → startet Edit + Fokus in einem). Body-Listener in [public/index.html](../public/index.html#L92) routet via `handleFocusHotkey`.
+Trigger: Hotkey `Cmd/Ctrl+Shift+E` (überall im Editor; aus Lesemodus → startet Edit + Fokus in einem). Body-Listener in [public/index.html](../public/index.html#L227) routet via `handleFocusHotkey`.
 
 ## Root vs. Sub: Trampoline-Pattern
 
@@ -88,7 +88,7 @@ selectionchange / input / scroll / focus → _focusUpdateActive(…)
 - **Aktive Textmarkierung blockt Recenter** — User zieht Auswahl auf, Viewport darf nicht springen.
 - **Klick markiert `pointerIntent`** ([card.js:153-157](../public/js/editor/focus/card.js#L153-L157)) — folgender `selectionchange` recentert NICHT (Klick ist absichtliche Positionsänderung). Flag fällt nach `POINTER_GRACE_MS=300` ms automatisch zurück (Klick in leeren Margin erzeugt keinen selectionchange).
 - **Typewriter-Schwelle dynamisch** ([typewriter.js:11-18](../public/js/editor/focus/typewriter.js#L11-L18)): `max(16, line-height * 0.5)`. Statisches 16 px scrollte schon bei subpixel-Jitter — halbe Zeilenhöhe ist die natürliche „echte Zeilenwechsel"-Grenze.
-- **`expectedScroll`-Counter** ([typewriter.js:50](../public/js/editor/focus/typewriter.js#L50)): programmatischer Scroll inkrementiert; `onScroll` dekrementiert und feuert kein Recenter. Counter > Zeitfenster, weil ScrollEnd nicht zuverlässig in allen Engines.
+- **`expectedScroll`-Counter** ([typewriter.js:81](../public/js/editor/focus/typewriter.js#L81)): programmatischer Scroll inkrementiert; `onScroll` dekrementiert und feuert kein Recenter. Counter > Zeitfenster, weil ScrollEnd nicht zuverlässig in allen Engines.
 - **`getCaretRect`-Dreistufenpfad** ([typewriter.js](../public/js/editor/focus/typewriter.js)):
   1. `range.getClientRects()[0]` — Standardfall, deckt 95 %.
   2. `range.getBoundingClientRect()` — Fallback bei leerer Rect-Liste.

@@ -26,7 +26,7 @@
   <div x-show="!adminSettingsLoading && Object.keys(adminSettingsMap).length">
     <!-- Tab-Leiste -->
     <nav class="admin-settings-tabs" role="tablist">
-      <template x-for="t in ['auth','provider','budget','smtp','jobs','cron','pdfa','advanced']" :key="t">
+      <template x-for="t in ['auth','provider','budget','smtp','jobs','cron','pdfa','analytics','advanced']" :key="t">
         <button type="button" role="tab"
                 :class="['admin-settings-tab', adminSettingsTab === t ? 'is-active' : '']"
                 @click="adminSettingsSwitchTab(t)"
@@ -186,6 +186,20 @@
         <input type="checkbox" :checked="adminSettingsForm['pdfa.disabled'] === true || adminSettingsForm['pdfa.disabled'] === 'true'"
                @change="adminSettingsForm['pdfa.disabled'] = $event.target.checked">
         <span>pdfa.disabled</span>
+      </label>
+    </section>
+
+    <!-- Analytics-Tab: Plausible (self-hosted) -->
+    <section x-show="adminSettingsTab === 'analytics'" class="admin-settings-section">
+      <label class="checkbox-row">
+        <input type="checkbox" :checked="adminSettingsForm['analytics.plausible.enabled'] === true || adminSettingsForm['analytics.plausible.enabled'] === 'true'"
+               @change="adminSettingsForm['analytics.plausible.enabled'] = $event.target.checked">
+        <span x-text="$app.t('admin.settings.analytics.enabledLabel')"></span>
+      </label>
+      <label>
+        <span x-text="$app.t('admin.settings.analytics.scriptUrlLabel')"></span>
+        <input type="url" x-model="adminSettingsForm['analytics.plausible.script_url']" placeholder="https://analytics.example.com/js/pa-XXXX.js">
+        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.analytics.scriptUrlHint')"></small>
       </label>
     </section>
 

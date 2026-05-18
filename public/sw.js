@@ -7,7 +7,7 @@
 //  - Auth/KI/Job-Queue/SSE: Network-Only, nie cachen
 //  - Version-Bump der Konstanten invalidiert den jeweiligen Cache
 
-const SHELL_CACHE = 'schreibwerkstatt-shell-v605';
+const SHELL_CACHE = 'schreibwerkstatt-shell-v606';
 const CONTENT_CACHE = 'schreibwerkstatt-content-v1';
 const CONFIG_CACHE = 'schreibwerkstatt-config-v2';
 const ACTIVE_CACHES = new Set([SHELL_CACHE, CONTENT_CACHE, CONFIG_CACHE]);
@@ -39,8 +39,14 @@ const PARTIAL_REGEX = /^\/partials\//;
 // im UI hängenbleiben.
 const I18N_REGEX = /^\/js\/i18n\/[a-z]{2}\.json$/i;
 
+// /js/plausible-init.js wird vom Server dynamisch aus app_settings gerendert
+// (Plausible an/aus + URL). Niemals cachen, sonst greift Admin-Toggle nicht
+// ohne Hard-Reload + SW-Invalidate.
+const PLAUSIBLE_INIT_PATH = '/js/plausible-init.js';
+
 function isShellRequest(url) {
   if (url.pathname === '/' || url.pathname === '/index.html') return true;
+  if (url.pathname === PLAUSIBLE_INIT_PATH) return false;
   if (PARTIAL_REGEX.test(url.pathname)) return true;
   if (SHELL_ASSET_REGEX.test(url.pathname)) return true;
   return false;

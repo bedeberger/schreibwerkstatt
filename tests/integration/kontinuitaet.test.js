@@ -14,13 +14,13 @@ test.after(() => { ctx.cleanup(); });
 
 test.beforeEach(() => {
   ctx.mockAi.reset();
-  ctx.mockBs.reset();
+  ctx.dbSeed.reset();
 });
 
 test('Kontinuität single-pass: 1 Kapitel, 1 Seite, AI liefert 1 Problem', async () => {
   const BOOK_ID = 42;
 
-  ctx.mockBs.setBook({
+  ctx.dbSeed.setBook({
     chapters: [{ id: 100, book_id: BOOK_ID, name: 'Kapitel Eins' }],
     pages: [{ id: 200, book_id: BOOK_ID, chapter_id: 100, name: 'Seite Eins', updated_at: '2026-01-01' }],
     pageBodies: {
@@ -67,7 +67,7 @@ test('Kontinuität single-pass: 1 Kapitel, 1 Seite, AI liefert 1 Problem', async
 
 test('Kontinuität: leeres Buch → result.empty', async () => {
   const BOOK_ID = 43;
-  ctx.mockBs.setBook({ chapters: [], pages: [], pageBodies: {}, books: [{ id: BOOK_ID, name: 'Leer' }] });
+  ctx.dbSeed.setBook({ chapters: [], pages: [], pageBodies: {}, books: [{ id: BOOK_ID, name: 'Leer' }] });
 
   const jobId = ctx.shared.createJob('kontinuitaet', BOOK_ID, 'tester@test.dev', 'job.label.kontinuitaet');
   ctx.shared.enqueueJob(jobId, () =>
@@ -82,7 +82,7 @@ test('Kontinuität: leeres Buch → result.empty', async () => {
 
 test('Kontinuität: AI ohne zusammenfassung → failJob', async () => {
   const BOOK_ID = 44;
-  ctx.mockBs.setBook({
+  ctx.dbSeed.setBook({
     chapters: [{ id: 110, book_id: BOOK_ID, name: 'K1' }],
     pages: [{ id: 210, book_id: BOOK_ID, chapter_id: 110, name: 'S1', updated_at: '' }],
     pageBodies: { 210: '<p>' + 'x'.repeat(200) + '</p>' },

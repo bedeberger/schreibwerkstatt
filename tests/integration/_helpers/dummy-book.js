@@ -1,7 +1,7 @@
 'use strict';
 // Seed-Helper für Integration-Tests. Spielt die Dummy-Buch-Fixture
-// (tests/fixtures/dummy-book.md, 4 Kapitel × 2 Seiten) in das Mock-BookStack
-// ein, damit Pipeline-Tests reproduzierbar gegen echte Prosa laufen können.
+// (tests/fixtures/dummy-book.md, 4 Kapitel × 2 Seiten) via db-seed in die
+// Test-SQLite ein, damit Pipeline-Tests reproduzierbar gegen echte Prosa laufen.
 //
 // IDs sind deterministisch aus bookId abgeleitet:
 //   chapter_id = bookId * 1000 + chapterIndex     (z.B. 102001..102004)
@@ -73,9 +73,9 @@ function buildDummyBookFixture(bookId) {
   return { chapters, pages, pageBodies, books, idMap, meta: META };
 }
 
-function seedDummyBook(mockBs, bookId) {
+function seedDummyBook(dbSeed, bookId) {
   const fixture = buildDummyBookFixture(bookId);
-  mockBs.setBook({
+  dbSeed.setBook({
     chapters: fixture.chapters,
     pages: fixture.pages,
     pageBodies: fixture.pageBodies,

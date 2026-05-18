@@ -15,11 +15,11 @@ test.after(() => { ctx.cleanup(); });
 
 test.beforeEach(() => {
   ctx.mockAi.reset();
-  ctx.mockBs.reset();
+  ctx.dbSeed.reset();
 });
 
 function seedTinyBook(bookId) {
-  ctx.mockBs.setBook({
+  ctx.dbSeed.setBook({
     chapters: [{ id: 1100, book_id: bookId, name: 'Kapitel Eins' }],
     pages: [{ id: 1200, book_id: bookId, chapter_id: 1100, name: 'Seite Eins', updated_at: '2026-01-01' }],
     pageBodies: { 1200: '<p>' + 'Anna ging in den Wald. Es war kalt. '.repeat(40) + '</p>' },
@@ -105,7 +105,7 @@ test('Komplettanalyse Single-Pass: 1 Kapitel, P1 + P8 → done', async () => {
 
 test('Komplettanalyse: leeres Buch → result.empty, kein AI-Call', async () => {
   const BOOK_ID = 51;
-  ctx.mockBs.setBook({ chapters: [], pages: [], pageBodies: {}, books: [{ id: BOOK_ID, name: 'Leer' }] });
+  ctx.dbSeed.setBook({ chapters: [], pages: [], pageBodies: {}, books: [{ id: BOOK_ID, name: 'Leer' }] });
 
   const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
   ctx.shared.enqueueJob(jobId, () =>
@@ -130,7 +130,7 @@ function seedMultiChapterBook(bookId, chapters = 3) {
     // ~9000 chars body each → 27K total → multi-pass with 3 chunks under PER_CHUNK_LIMIT=10000.
     bodies[pid] = '<p>' + 'Anna ging weiter durch das Land. '.repeat(280) + '</p>';
   }
-  ctx.mockBs.setBook({ chapters: cs, pages: ps, pageBodies: bodies });
+  ctx.dbSeed.setBook({ chapters: cs, pages: ps, pageBodies: bodies });
 }
 
 function extraktionResponseFor(chapterName) {
@@ -249,7 +249,7 @@ test('Komplettanalyse Delta-Cache: Touch einer Seite → nur dieser Chunk re-ext
   assert.equal(run1Calls, 6, `run 1: expected 6 AI calls, got ${run1Calls}`);
 
   // Touch one page: change updated_at on page 3001 (chapter 2).
-  const cur = ctx.mockBs;
+  const cur = ctx.dbSeed;
   const seeded = { ...cur };
   // setBook again with one page mutated.
   const chapters = [
@@ -267,7 +267,7 @@ test('Komplettanalyse Delta-Cache: Touch einer Seite → nur dieser Chunk re-ext
     3001: '<p>' + 'Anna ging weiter durch das Land. '.repeat(280) + '</p>',
     3002: '<p>' + 'Anna ging weiter durch das Land. '.repeat(280) + '</p>',
   };
-  ctx.mockBs.setBook({ chapters, pages, pageBodies: bodies });
+  ctx.dbSeed.setBook({ chapters, pages, pageBodies: bodies });
 
   // Run 2: only chunk for page 3001 should re-extract.
   const jobId2 = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
