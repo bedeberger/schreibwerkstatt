@@ -1,7 +1,7 @@
 'use strict';
 const express = require('express');
 const { db } = require('../../db/schema');
-const { callAIChat, callAIWithTools, parseJSONLenient, chatTemperature, CHARS_PER_TOKEN, MAX_TOKENS_OUT, INPUT_BUDGET_TOKENS, INPUT_BUDGET_CHARS } = require('../../lib/ai');
+const { callAIChat, callAIWithTools, parseJSONLenient, chatTemperature, getContextConfigFor, resolveProvider } = require('../../lib/ai');
 const {
   _promptConfig,
   makeJobLogger, updateJob, completeJob, failJob, i18nError, contentHttpError,
@@ -63,6 +63,7 @@ function _bookChatBuildHistory(sessionId, tailMessages = 10) {
 async function runChatJob(jobId, sessionId, userMsgId, message, userEmail, userToken) {
   const logger = makeJobLogger(jobId);
   const { buildChatSystemPrompt, SCHEMA_CHAT } = await getPrompts();
+  const aiCfg = getContextConfigFor(resolveProvider({ userEmail }));
   try {
     updateJob(jobId, { statusText: 'job.phase.preparing', progress: 5 });
 
@@ -112,7 +113,7 @@ async function runChatJob(jobId, sessionId, userMsgId, message, userEmail, userT
     const onProgress = ({ chars, tokIn }) => {
       const updates = { progress: Math.min(97, 10 + Math.round(chars / 50)) };
       if (tokIn > 0)  updates.tokensIn  = tokIn;
-      if (chars > 0)  updates.tokensOut = Math.floor(chars / CHARS_PER_TOKEN);
+      if (chars > 0)  updates.tokensOut = Math.floor(chars / aiCfg.charsPerToken);
       updateJob(jobId, updates);
     };
 
@@ -122,7 +123,7 @@ async function runChatJob(jobId, sessionId, userMsgId, message, userEmail, userT
     // gespeicherte Chat-Nachricht dieselben Tokens zeigen (statt eines
     // Streaming-Zwischenstands).
     updateJob(jobId, { tokensIn, tokensOut, cacheReadIn, cacheCreationIn });
-    if (truncated) throw i18nError('job.error.aiTruncated', { max: MAX_TOKENS_OUT, tokIn: tokensIn, tokOut: tokensOut, total: tokensIn + tokensOut });
+    if (truncated) throw i18nError('job.error.aiTruncated', { max: aiCfg.maxTokensOut, tokIn: tokensIn, tokOut: tokensOut, total: tokensIn + tokensOut });
 
     const { antwort, vorschlaege } = _parseChatResponse(text);
     if (antwort === text && vorschlaege.length === 0) {
@@ -187,6 +188,7 @@ function _scorePageRelevance(query, text, stopwords = _BOOK_CHAT_STOPWORDS) {
 async function runBookChatJob(jobId, sessionId, userMsgId, message, userEmail, userToken) {
   const logger = makeJobLogger(jobId);
   const { buildBookChatSystemPrompt, SCHEMA_BOOK_CHAT } = await getPrompts();
+  const aiCfg = getContextConfigFor(resolveProvider({ userEmail }));
   try {
     updateJob(jobId, { statusText: 'job.phase.preparing', progress: 5 });
 
@@ -253,12 +255,12 @@ async function runBookChatJob(jobId, sessionId, userMsgId, message, userEmail, u
     const historyChars = historyWithoutLast.reduce((s, m) => s + (m.content?.length || 0), 0);
 
     // ── Schritt 3: Dynamisches Text-Budget ──────────────────────────────────────
-    // INPUT_BUDGET_CHARS = (MODEL_CONTEXT − MODEL_TOKEN − Sicherheitspuffer) · CHARS_PER_TOKEN.
-    // Davon noch Platz für System-Prompt und History reservieren.
+    // aiCfg.inputBudgetChars = (context_window − max_tokens_out − Sicherheitspuffer) · chars_per_token
+    // pro effektivem Provider. Davon noch Platz für System-Prompt und History reservieren.
     const SYSTEM_OVERHEAD_CHARS = 8000;   // ~2k Tokens für System-Prompt-Overhead
     const TEXT_CHAR_BUDGET = Math.max(
       20000,
-      Math.floor((INPUT_BUDGET_CHARS - historyChars - SYSTEM_OVERHEAD_CHARS) * 0.98)
+      Math.floor((aiCfg.inputBudgetChars - historyChars - SYSTEM_OVERHEAD_CHARS) * 0.98)
     );
 
     // ── Schritt 4: Relevanz-Scoring + Seitenauswahl ─────────────────────────────
@@ -317,7 +319,7 @@ async function runBookChatJob(jobId, sessionId, userMsgId, message, userEmail, u
     const onProgress = ({ chars, tokIn }) => {
       const updates = { progress: Math.min(97, 50 + Math.round(chars / 50)) };
       if (tokIn > 0)  updates.tokensIn  = tokIn;
-      if (chars > 0)  updates.tokensOut = Math.floor(chars / CHARS_PER_TOKEN);
+      if (chars > 0)  updates.tokensOut = Math.floor(chars / aiCfg.charsPerToken);
       updateJob(jobId, updates);
     };
 
@@ -326,7 +328,7 @@ async function runBookChatJob(jobId, sessionId, userMsgId, message, userEmail, u
     // erst am Streaming-Ende; ohne diesen Update bleibt die Status-Anzeige auf
     // einem Zwischenstand und weicht von der DB-Nachricht ab).
     updateJob(jobId, { tokensIn, tokensOut, cacheReadIn, cacheCreationIn });
-    if (truncated) throw i18nError('job.error.aiTruncated', { max: MAX_TOKENS_OUT, tokIn: tokensIn, tokOut: tokensOut, total: tokensIn + tokensOut });
+    if (truncated) throw i18nError('job.error.aiTruncated', { max: aiCfg.maxTokensOut, tokIn: tokensIn, tokOut: tokensOut, total: tokensIn + tokensOut });
 
     const { antwort } = _parseChatResponse(text);
     if (antwort === text) {
@@ -423,16 +425,16 @@ function _bookChatMaxToolIter() {
   return parseInt(appSettings.get('jobs.book_chat.max_tool_iter'), 10) || 6;
 }
 // Per-Iteration-Limit für Input-Tokens (Context-Window-Schutz, nicht kumulativ).
-// Default leitet sich aus INPUT_BUDGET_TOKENS (= MODEL_CONTEXT − MODEL_TOKEN − Puffer) ab.
+// Default = `ai.<provider>.context_window` − `ai.<provider>.max_tokens_out` − Puffer.
 // Prompt-Caching macht wiederholte Tokens ohnehin billig, deshalb kein Summen-Budget.
-function _bookChatTokenBudget() {
-  return parseInt(appSettings.get('jobs.book_chat.token_budget'), 10) || INPUT_BUDGET_TOKENS;
+function _bookChatTokenBudget(aiCfg) {
+  return parseInt(appSettings.get('jobs.book_chat.token_budget'), 10) || aiCfg.inputBudgetTokens;
 }
 // Per-Tool-Result-Cap: damit eine einzelne Tool-Antwort nicht allein das Budget sprengt.
 // Annahme: bis zu 6 Iterationen × ~3 Tool-Calls × Sicherheitsfaktor 2 ⇒ /36.
 // Min 4000 Zeichen, damit Tool-Results bei kleinen Kontextfenstern noch brauchbar sind.
-function _toolResultCapChars(maxIter) {
-  return Math.max(4000, Math.floor(INPUT_BUDGET_CHARS / (maxIter * 6)));
+function _toolResultCapChars(maxIter, aiCfg) {
+  return Math.max(4000, Math.floor(aiCfg.inputBudgetChars / (maxIter * 6)));
 }
 
 function _bookChatUseAgent() {
@@ -446,6 +448,7 @@ function _bookChatUseAgent() {
 async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEmail, userToken) {
   const logger = makeJobLogger(jobId);
   const { buildBookChatAgentSystemPrompt, BOOK_CHAT_TOOLS } = await getPrompts();
+  const aiCfg = getContextConfigFor(resolveProvider({ userEmail }));
   try {
     updateJob(jobId, { statusText: 'job.phase.preparing', progress: 5 });
 
@@ -461,8 +464,8 @@ async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEma
     const review  = getLatestReview(session.book_id, userEmail);
     const { SYSTEM_BOOK_CHAT: bookChatSys } = await getBookPrompts(session.book_id, userEmail);
     const maxToolIter = _bookChatMaxToolIter();
-    const tokenBudget = _bookChatTokenBudget();
-    const toolResultCap = _toolResultCapChars(maxToolIter);
+    const tokenBudget = _bookChatTokenBudget(aiCfg);
+    const toolResultCap = _toolResultCapChars(maxToolIter, aiCfg);
     const systemPrompt = buildBookChatAgentSystemPrompt(
       session.book_name || '', figuren, review, bookChatSys, maxToolIter
     );
@@ -497,7 +500,7 @@ async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEma
       const onProgress = ({ chars, tokIn }) => {
         const updates = {};
         if (tokIn > 0)  updates.tokensIn  = totalTokIn + tokIn;
-        if (chars > 0)  updates.tokensOut = totalTokOut + Math.floor(chars / CHARS_PER_TOKEN);
+        if (chars > 0)  updates.tokensOut = totalTokOut + Math.floor(chars / aiCfg.charsPerToken);
         if (Object.keys(updates).length) updateJob(jobId, updates);
       };
 
@@ -518,7 +521,7 @@ async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEma
         cacheReadIn: totalCacheRead, cacheCreationIn: totalCacheCreation,
       });
 
-      if (result.truncated) throw i18nError('job.error.aiTruncated', { max: MAX_TOKENS_OUT, tokIn: totalTokIn, tokOut: totalTokOut, total: totalTokIn + totalTokOut });
+      if (result.truncated) throw i18nError('job.error.aiTruncated', { max: aiCfg.maxTokensOut, tokIn: totalTokIn, tokOut: totalTokOut, total: totalTokIn + totalTokOut });
 
       if (result.tokensIn > tokenBudget) {
         logger.warn(`Context-Budget überschritten (${result.tokensIn}/${tokenBudget} Input-Tokens) – Loop abgebrochen.`);
