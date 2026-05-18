@@ -147,4 +147,12 @@
    plus Caret/Selektion über soft hyphens ist fehleranfällig. */
 .page-content-view--editing { hyphens: none; -webkit-hyphens: none; }
 
+/* Mobile: schmaler Viewport → Paragraphs brechen mehrzeilig; intra-<p>
+   line-height (1.7em) wirkt sonst grösser als inter-<p> Margin (0.4em).
+   Para-Margin auf Zeilenabstand-Niveau heben, sonst sehen Absatzwechsel
+   enger aus als normale Zeilenumbrüche. */
+@media (max-width: 600px) {
+  .page-content-view p { margin: 0.7em 0; }
+}
+
 }
