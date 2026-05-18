@@ -38,6 +38,10 @@ export const dndMethods = {
         handle: '.organizer-drag-handle--chapter',
         animation: 150,
         draggable: '.organizer-chapter',
+        // Kapitel reordern nur innerhalb chapter-list. pull:false verhindert,
+        // dass page-list-Sortables (put:true) ein Kapitel als Drop akzeptieren
+        // — sonst landet das Kapitel-DOM im page-list eines anderen Kapitels.
+        group: { name: 'chapters', pull: false, put: false },
         emptyInsertThreshold: 0,
         onChoose: markIgnore,
         onUnchoose: unmarkIgnore,
@@ -50,7 +54,7 @@ export const dndMethods = {
         handle: '.organizer-drag-handle',
         animation: 150,
         draggable: '.organizer-page',
-        group: { name: 'pages', pull: true, put: true },
+        group: { name: 'pages', pull: true, put: ['pages'] },
         emptyInsertThreshold: 0,
         onChoose: markIgnore,
         onUnchoose: unmarkIgnore,

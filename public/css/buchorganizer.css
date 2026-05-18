@@ -144,7 +144,7 @@
 
 .organizer-toolbar {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: var(--space-sm);
   flex-wrap: nowrap;
   margin: var(--space-sm) 0 var(--space-md);
@@ -152,30 +152,49 @@
 .organizer-toolbar .page-search {
   flex: 1 1 0;
   min-width: 120px;
+  height: 34px;
+  padding: 0 10px;
+  box-sizing: border-box;
 }
 .organizer-jump {
   flex: 0 1 220px;
   min-width: 140px;
 }
+.organizer-jump .combobox-trigger {
+  height: 34px;
+  padding-block: 0;
+  box-sizing: border-box;
+}
 .organizer-action-group {
   display: inline-flex;
   align-items: stretch;
-  align-self: stretch;
-  gap: var(--space-2xs);
+  gap: 0;
   flex-shrink: 0;
 }
 .organizer-action-group .graph-tool-btn {
+  width: 34px;
+  height: 34px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  aspect-ratio: 1 / 1;
-  height: auto;
   min-width: 0;
-  padding: 0 var(--space-xs);
+  padding: 0;
   font-size: var(--font-size-base);
   line-height: 1;
+  box-sizing: border-box;
+  border-radius: 0;
 }
-
+.organizer-action-group .graph-tool-btn:first-child {
+  border-top-left-radius: var(--radius-md);
+  border-bottom-left-radius: var(--radius-md);
+}
+.organizer-action-group .graph-tool-btn:last-child {
+  border-top-right-radius: var(--radius-md);
+  border-bottom-right-radius: var(--radius-md);
+}
+.organizer-action-group .graph-tool-btn + .graph-tool-btn {
+  border-left-width: 0;
+}
 .organizer-chapter-toggle {
   background: transparent;
   border: 0;
@@ -186,6 +205,7 @@
   align-items: center;
   flex-shrink: 0;
 }
+.organizer-chapter-header:hover .tree-chevron::before { opacity: 0.7; }
 
 .organizer-move-combo {
   min-width: 140px;

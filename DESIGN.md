@@ -18,6 +18,7 @@ Token-Referenz (Farben, Radien, Spacing, Schriftgrössen): [public/css/tokens.cs
 - [Karten](#karten-card) — `.card` + Akzentfarben
 - [Buttons](#buttons) — Hierarchie, Counter
 - [Icon-Toolbar](#icon-toolbar-graph-tool-btn) — Zoom/Reset/Fullscreen-Cluster über Canvas-Viewports
+- [Toolbar-Action-Group](#toolbar-action-group-segmentierter-icon-cluster-neben-form-feldern) — segmentierte Icon-Reihe bündig mit Search/Combobox
 - [Badges & Tags](#badges--tags) — eckig, Severity, Hue-Palette
 - [Combobox](#combobox-auswahlfeld) — ersetzt `<select>`
 - [Tabs / Modus-Toggle](#tabs--modus-toggle) — `.tabs` + `.tabs-btn`
@@ -351,6 +352,92 @@ mit `myCardOptions() { return this.cardData.map(...); }` am Karten-Scope.
 - **Klassen-Präfix** weiterhin `graph-tool-btn` — nicht in `toolbar-btn` o.ä. umbenennen; Pattern teilt sich Vokabular über mehrere Features, der Name ist die Klammer.
 
 **Beispiele:** [public/partials/figuren.html:86-100](public/partials/figuren.html#L86), [public/partials/figur-werkstatt.html:210-233](public/partials/figur-werkstatt.html#L210).
+
+---
+
+## Toolbar-Action-Group (segmentierter Icon-Cluster neben Form-Feldern)
+
+**Use:** Reihe von 2–5 Icon-Aktionen, **vertikal exakt mit Suchfeld + Combobox in derselben Toolbar bündig**. Eingesetzt im Buchorganizer (Undo/Redo/Expand-all/Collapse-all neben Such-Input + Sprung-Combobox) und in der Sidebar (Expand-all/Collapse-all neben Page-Search). Unterscheidet sich vom Canvas-Pattern oben dadurch, dass die Buttons **als Segment** zusammenstehen (geteilte Border, gerundete Aussenseiten) und an die Höhe ihrer Toolbar-Nachbarn gekoppelt sind.
+
+**Markup:**
+```html
+<div class="<feature>-toolbar">
+  <input type="text" class="page-search" x-model="search" :placeholder="…">
+  <div class="btn-group <feature>-action-group">
+    <button type="button" class="graph-tool-btn <feature>-icon-btn"
+            @click="undo()" :data-tip="…" :aria-label="…"><span class="<feature>-icon">↺</span></button>
+    <button type="button" class="graph-tool-btn <feature>-icon-btn"
+            @click="redo()" :data-tip="…" :aria-label="…"><span class="<feature>-icon">↻</span></button>
+    <button type="button" class="graph-tool-btn <feature>-icon-btn"
+            @click="expandAll()" :data-tip="…" :aria-label="…"><span class="<feature>-icon">▾</span></button>
+    <button type="button" class="graph-tool-btn <feature>-icon-btn"
+            @click="collapseAll()" :data-tip="…" :aria-label="…"><span class="<feature>-icon">▴</span></button>
+  </div>
+  <div class="<feature>-jump"
+       x-data="combobox($app.t('…'))" x-modelable="value" x-model="jumpId"
+       x-effect="options = …" @combobox-change="…"></div>
+</div>
+```
+
+**CSS (Beispiel aus [public/css/buchorganizer.css](public/css/buchorganizer.css)):**
+```css
+.<feature>-toolbar {
+  display: flex;
+  align-items: stretch;          /* Pflicht — sonst stretcht Action-Group nicht */
+  gap: var(--space-sm);
+  flex-wrap: nowrap;
+}
+.<feature>-toolbar .page-search {
+  flex: 1 1 0; min-width: 120px;
+  height: 34px; padding: 0 10px; box-sizing: border-box;
+}
+.<feature>-jump { flex: 0 1 220px; min-width: 140px; }
+.<feature>-jump .combobox-trigger {
+  height: 34px; padding-block: 0; box-sizing: border-box;
+}
+.<feature>-action-group {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 0;                        /* Segment-Look: keine Lücke zwischen Buttons */
+  flex-shrink: 0;
+}
+.<feature>-action-group .graph-tool-btn {
+  width: 34px; height: 34px;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 0; padding: 0;
+  font-size: 0;                  /* Glyph rendert über inneren <span> */
+  line-height: 1; box-sizing: border-box;
+  border-radius: 0;
+}
+.<feature>-action-group .graph-tool-btn:first-child {
+  border-top-left-radius: var(--radius-md);
+  border-bottom-left-radius: var(--radius-md);
+}
+.<feature>-action-group .graph-tool-btn:last-child {
+  border-top-right-radius: var(--radius-md);
+  border-bottom-right-radius: var(--radius-md);
+}
+.<feature>-action-group .graph-tool-btn + .graph-tool-btn {
+  border-left-width: 0;          /* doppelte Border vermeiden */
+}
+.<feature>-action-group .<feature>-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px;
+  font-size: 14px; line-height: 1;
+  font-family: system-ui, -apple-system, 'Segoe UI Symbol', sans-serif;
+}
+```
+
+**Regeln:**
+- **Vertikal-Alignment Pflicht:** Toolbar IMMER `align-items: stretch` und Nachbar-Elemente (Input, Combobox-Trigger, Buttons) auf **gleiche fixe Höhe** (`34px`-Standard). Ohne stretch + fixe Höhe ergeben Padding-Differenzen schräge Auslinierungen — der häufigste Bug bei diesem Pattern.
+- **Combobox-Trigger anpassen:** `.combobox-trigger` hat Eigenpadding via `--size-compact-padding`. In der Toolbar mit `height: 34px; padding-block: 0;` override, sonst überragt der Trigger die Action-Group. Wrapper-Div bleibt leer (Helper überschreibt `innerHTML`).
+- **Segment-Style statt Gap:** Buttons rücken aneinander (`gap: 0` auf Action-Group, `border-left-width: 0` auf Folge-Buttons). Aussenseiten gerundet via `:first-child` / `:last-child`. Liest sich als zusammengehörige Gruppe. Wer Lücke statt Segment will: anderes Pattern verwenden (z.B. `card-actions`).
+- **Glyph-Wrapper Pflicht:** `<span class="<feature>-icon">` um das Unicode-Zeichen, `font-size: 0` auf dem Button. Verhindert vertikales Verspringen durch wechselnde Glyph-Metriken (↺ vs ▾ vs × haben unterschiedliche Bounding-Boxes) und erzwingt einheitliche `system-ui`-Renderung über Fonts wie Inter/Crimson, deren Symbol-Glyphen sonst inkonsistent aussehen.
+- **Glyphen** (Unicode, keine SVGs): `↺`/`↻` Undo/Redo (CCW/CW-Pfeil), `▾`/`▴` Expand-/Collapse-All (kleines Dreieck nach unten/oben), `⌄`/`⌃` als Alternative (Chevron-only). Konsistent mit `.history-chevron` (siehe [Chevron-Konventionen](#chevron-konventionen)).
+- **Disabled-State** via `:disabled` (z.B. Undo bei leerem Stack). Greift automatisch durch `.graph-tool-btn`-Default-Styling.
+- **Mobile:** Im `@media (max-width: 600px)`-Block Toolbar zu `flex-direction: column; align-items: stretch` drehen; Search + Combobox auf `width: 100%`. Action-Group bleibt horizontal (segmentierte Reihe), nimmt eigene Zeile ein.
+
+**Beispiele:** [public/partials/buchorganizer.html:16-50](public/partials/buchorganizer.html#L16) (4 Buttons + Search + Combobox), [public/partials/sidebar.html:11-22](public/partials/sidebar.html#L11) (2 Buttons neben Search, kein Combobox).
 
 ---
 

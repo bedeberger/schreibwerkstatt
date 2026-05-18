@@ -152,11 +152,12 @@
   padding: 0 10px;
   box-sizing: border-box;
 }
-.sidebar-action-group {
+.btn-group.sidebar-action-group {
   display: inline-flex;
   align-items: stretch;
-  gap: var(--space-2xs);
+  gap: 0;
   flex-shrink: 0;
+  margin-bottom: 0;
 }
 .sidebar-action-group .graph-tool-btn {
   width: 34px;

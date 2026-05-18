@@ -20,22 +20,22 @@
            class="page-search"
            autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other">
     <div class="btn-group organizer-action-group">
-      <button type="button" class="graph-tool-btn"
+      <button type="button" class="graph-tool-btn organizer-icon-btn"
               @click="historyUndo()"
               :disabled="_undoStack.length === 0 || organizerSaving"
               :data-tip="$app.t('bookOrganizer.undoTip')"
-              :aria-label="$app.t('bookOrganizer.undo')">↶</button>
-      <button type="button" class="graph-tool-btn"
+              :aria-label="$app.t('bookOrganizer.undo')">↺</button>
+      <button type="button" class="graph-tool-btn organizer-icon-btn"
               @click="historyRedo()"
               :disabled="_redoStack.length === 0 || organizerSaving"
               :data-tip="$app.t('bookOrganizer.redoTip')"
-              :aria-label="$app.t('bookOrganizer.redo')">↷</button>
-      <button type="button" class="graph-tool-btn"
+              :aria-label="$app.t('bookOrganizer.redo')">↻</button>
+      <button type="button" class="graph-tool-btn organizer-icon-btn"
               @click="expandAll()"
               :disabled="workTree.length === 0 || !!organizerSearch"
               :data-tip="$app.t('sidebar.expandAll')"
               :aria-label="$app.t('sidebar.expandAll')">⌄</button>
-      <button type="button" class="graph-tool-btn"
+      <button type="button" class="graph-tool-btn organizer-icon-btn"
               @click="collapseAll()"
               :disabled="workTree.length === 0 || !!organizerSearch"
               :data-tip="$app.t('sidebar.collapseAll')"
@@ -99,7 +99,7 @@
                   @click.stop="toggleChapter(ch.id)"
                   :aria-expanded="!!chapterOpen[ch.id]"
                   :aria-label="$app.t(chapterOpen[ch.id] ? 'sidebar.collapseAll' : 'sidebar.expandAll')">
-            <span class="history-chevron" :class="{ open: organizerSearch ? true : chapterOpen[ch.id] }">›</span>
+            <span class="tree-chevron" :class="{ open: organizerSearch ? true : chapterOpen[ch.id] }"></span>
           </button>
           <input type="text" class="organizer-name organizer-name--chapter" :value="ch.name"
                  @blur="onRenameChapter(ch.id, $event)"

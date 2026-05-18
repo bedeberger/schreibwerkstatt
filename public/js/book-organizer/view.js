@@ -88,9 +88,9 @@ export const viewMethods = {
   // Options-Array für Move-Combobox pro Page. Inline im x-effect aufrufbar,
   // weil die gelesenen Reactive-Felder (workTree, ch.name) Alpine-getrackt sind.
   chapterMoveOptions(currentChId) {
-    const t = window.__app.t;
+    const root = window.__app;
     const opts = [];
-    if (currentChId !== 0) opts.push({ value: 0, label: t('bookOrganizer.soloHeader') });
+    if (currentChId !== 0) opts.push({ value: 0, label: root.t('bookOrganizer.soloHeader') });
     for (const ch of this.workTree) {
       if (ch.id === currentChId) continue;
       opts.push({ value: ch.id, label: ch.name });
