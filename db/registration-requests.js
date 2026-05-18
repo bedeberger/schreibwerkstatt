@@ -7,6 +7,7 @@
 // liefert dieselbe 202-Antwort zurueck — keine User-Enumeration.
 
 const { db } = require('./connection');
+const { NOW_ISO_SQL } = require('./now');
 
 const EXPIRE_DAYS = 30;
 
@@ -15,8 +16,8 @@ function _normEmail(email) {
 }
 
 const _stmtInsert = db.prepare(`
-  INSERT INTO registration_requests (email, display_name, message, ip, user_agent)
-  VALUES (?, ?, ?, ?, ?)
+  INSERT INTO registration_requests (email, display_name, message, ip, user_agent, created_at)
+  VALUES (?, ?, ?, ?, ?, ${NOW_ISO_SQL})
 `);
 
 const _stmtFindById = db.prepare(`
@@ -45,7 +46,7 @@ const _stmtListRecent = db.prepare(`
 const _stmtApprove = db.prepare(`
   UPDATE registration_requests
      SET status      = 'approved',
-         reviewed_at = datetime('now'),
+         reviewed_at = ${NOW_ISO_SQL},
          reviewed_by = ?,
          invite_id   = ?
    WHERE id = ? AND status = 'pending'
@@ -54,7 +55,7 @@ const _stmtApprove = db.prepare(`
 const _stmtDeny = db.prepare(`
   UPDATE registration_requests
      SET status        = 'denied',
-         reviewed_at   = datetime('now'),
+         reviewed_at   = ${NOW_ISO_SQL},
          reviewed_by   = ?,
          review_reason = ?
    WHERE id = ? AND status = 'pending'

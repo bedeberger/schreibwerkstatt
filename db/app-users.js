@@ -16,6 +16,7 @@
 
 const crypto = require('crypto');
 const { db } = require('./connection');
+const { NOW_ISO_SQL } = require('./now');
 
 const _stmtFindByEmail = db.prepare(`
   SELECT id, email, display_name, avatar_url, global_role, status, language,
@@ -30,15 +31,15 @@ const _stmtFindByEmail = db.prepare(`
 
 const _stmtInsertUser = db.prepare(`
   INSERT INTO app_users (email, display_name, global_role, status, language,
-                         can_invite_users, first_seen_at, invited_by, invited_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         can_invite_users, first_seen_at, invited_by, invited_at, created_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ${NOW_ISO_SQL})
 `);
 
 const _stmtTouchLogin = db.prepare(`
   UPDATE app_users
-     SET last_seen_at  = datetime('now'),
-         last_login_at = datetime('now'),
-         first_seen_at = COALESCE(first_seen_at, datetime('now')),
+     SET last_seen_at  = ${NOW_ISO_SQL},
+         last_login_at = ${NOW_ISO_SQL},
+         first_seen_at = COALESCE(first_seen_at, ${NOW_ISO_SQL}),
          display_name  = COALESCE(?, display_name)
    WHERE email = ?
 `);
@@ -107,8 +108,8 @@ const _stmtSetBudget = db.prepare(`
 `);
 
 const _stmtInsertAudit = db.prepare(`
-  INSERT INTO user_sessions_audit (user_email, event, ip, user_agent, meta_json)
-  VALUES (?, ?, ?, ?, ?)
+  INSERT INTO user_sessions_audit (user_email, event, ip, user_agent, meta_json, created_at)
+  VALUES (?, ?, ?, ?, ?, ${NOW_ISO_SQL})
 `);
 
 const _stmtListAudit = db.prepare(`
@@ -132,16 +133,16 @@ const _stmtInviteFindActiveByEmail = db.prepare(`
 `);
 
 const _stmtInviteInsert = db.prepare(`
-  INSERT INTO user_invites (email, global_role, invite_token, invited_by, expires_at)
-  VALUES (?, ?, ?, ?, ?)
+  INSERT INTO user_invites (email, global_role, invite_token, invited_by, invited_at, expires_at)
+  VALUES (?, ?, ?, ?, ${NOW_ISO_SQL}, ?)
 `);
 
 const _stmtInviteAccept = db.prepare(`
-  UPDATE user_invites SET accepted_at = datetime('now') WHERE id = ?
+  UPDATE user_invites SET accepted_at = ${NOW_ISO_SQL} WHERE id = ?
 `);
 
 const _stmtInviteRevoke = db.prepare(`
-  UPDATE user_invites SET revoked_at = datetime('now') WHERE id = ? AND accepted_at IS NULL
+  UPDATE user_invites SET revoked_at = ${NOW_ISO_SQL} WHERE id = ? AND accepted_at IS NULL
 `);
 
 function _normEmail(email) {
@@ -291,7 +292,7 @@ function createInvite({ email, globalRole = 'user', invitedBy, expiresInDays = 1
   // erlaubt sonst keinen zweiten Eintrag.
   const existing = _stmtInviteFindActiveByEmail.get(e);
   if (existing) {
-    db.prepare(`UPDATE user_invites SET revoked_at = datetime('now') WHERE id = ?`).run(existing.id);
+    db.prepare(`UPDATE user_invites SET revoked_at = ${NOW_ISO_SQL} WHERE id = ?`).run(existing.id);
   }
   const token = _newToken();
   const expiresAt = new Date(Date.now() + Math.max(1, expiresInDays) * 86400_000).toISOString();

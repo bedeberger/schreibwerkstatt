@@ -3,13 +3,14 @@
 // Periode ist 'YYYY-MM' in UTC (deckungsgleich mit lib/budget.js#firstOfCurrentMonthUtc).
 
 const { db } = require('./connection');
+const { NOW_ISO_SQL } = require('./now');
 
 const _stmtWasSent = db.prepare(`
   SELECT 1 FROM budget_alerts WHERE email = ? AND period = ?
 `);
 
 const _stmtMarkSent = db.prepare(`
-  INSERT OR IGNORE INTO budget_alerts (email, period) VALUES (?, ?)
+  INSERT OR IGNORE INTO budget_alerts (email, period, sent_at) VALUES (?, ?, ${NOW_ISO_SQL})
 `);
 
 function currentPeriodUtc() {

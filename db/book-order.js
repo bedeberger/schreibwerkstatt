@@ -21,6 +21,7 @@
 
 const { db } = require('./connection');
 require('./migrations');
+const { NOW_ISO_SQL } = require('./now');
 
 class TreeValidationError extends Error {
   constructor(code, detail = null) {
@@ -133,10 +134,10 @@ function getOrder(bookId) {
 
 const _upsertStmt = db.prepare(`
   INSERT INTO book_order (book_id, order_json, updated_at, updated_by)
-  VALUES (?, ?, datetime('now'), ?)
+  VALUES (?, ?, ${NOW_ISO_SQL}, ?)
   ON CONFLICT(book_id) DO UPDATE SET
     order_json = excluded.order_json,
-    updated_at = datetime('now'),
+    updated_at = ${NOW_ISO_SQL},
     updated_by = excluded.updated_by
 `);
 

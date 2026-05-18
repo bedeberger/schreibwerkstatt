@@ -4,6 +4,7 @@
 // migrierten Spalten anlegen.
 const { db } = require('./connection');
 require('./migrations');
+const { NOW_ISO_SQL } = require('./now');
 
 const figures = require('./figures');
 const pages = require('./pages');
@@ -314,7 +315,7 @@ function backfillLocationChaptersFromScenes(bookId, userEmail) {
 
 const _saveCheckpoint = db.prepare(`
   INSERT INTO job_checkpoints (job_type, book_id, user_email, data, updated_at)
-  VALUES (?, ?, ?, ?, datetime('now'))
+  VALUES (?, ?, ?, ?, ${NOW_ISO_SQL})
   ON CONFLICT(job_type, book_id, user_email) DO UPDATE SET
     data = excluded.data, updated_at = excluded.updated_at
 `);

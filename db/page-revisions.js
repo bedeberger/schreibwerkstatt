@@ -7,6 +7,7 @@
 const { db } = require('./connection');
 require('./migrations');
 const { CHARS_PER_TOKEN } = require('../lib/ai');
+const { NOW_ISO_SQL } = require('./now');
 
 const VALID_SOURCES = new Set([
   'focus', 'main', 'chat-apply', 'lektorat-apply',
@@ -30,10 +31,10 @@ function _statsFromHtml(html) {
 const _insertStmt = db.prepare(`
   INSERT INTO page_revisions
     (page_id, book_id, body_html, body_markdown, chars, words, tok,
-     source, user_email, summary)
+     source, user_email, summary, created_at)
   VALUES
     (@page_id, @book_id, @body_html, @body_markdown, @chars, @words, @tok,
-     @source, @user_email, @summary)
+     @source, @user_email, @summary, ${NOW_ISO_SQL})
 `);
 
 const _lastBodyStmt = db.prepare(`

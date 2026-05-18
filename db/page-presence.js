@@ -5,6 +5,7 @@
 // Aufraeum-Cron (Stale-Filter beim Read reicht).
 
 const { db } = require('./connection');
+const { NOW_ISO_SQL } = require('./now');
 
 // Stale-Grenze: doppelter Ping-Interval + Puffer fuer Netz-Hickups. 90s ist
 // konservativ — wer 90s lang nicht gepingt hat, hat den Tab geschlossen oder
@@ -17,9 +18,9 @@ function _staleCutoffIso() {
 
 const _stmtUpsert = db.prepare(`
   INSERT INTO page_presence (page_id, user_email, book_id, last_ping_at)
-  VALUES (?, ?, ?, datetime('now'))
+  VALUES (?, ?, ?, ${NOW_ISO_SQL})
   ON CONFLICT(page_id, user_email)
-  DO UPDATE SET last_ping_at = datetime('now')
+  DO UPDATE SET last_ping_at = ${NOW_ISO_SQL}
 `);
 
 function ping(pageId, userEmail, bookId) {

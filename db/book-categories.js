@@ -6,6 +6,7 @@
 
 const { db } = require('./connection');
 require('./migrations');
+const { NOW_ISO_SQL } = require('./now');
 const { slugify, uniqueSlug } = require('../lib/slug');
 
 const _stmtList = db.prepare(`
@@ -33,8 +34,8 @@ function _slugExists(slug) {
 }
 
 const _stmtInsert = db.prepare(`
-  INSERT INTO book_categories (parent_id, name, slug, color, position, created_by)
-  VALUES (@parent_id, @name, @slug, @color, @position, @created_by)
+  INSERT INTO book_categories (parent_id, name, slug, color, position, created_by, created_at)
+  VALUES (@parent_id, @name, @slug, @color, @position, @created_by, ${NOW_ISO_SQL})
 `);
 
 function create({ name, parentId = null, color = null, position = 0, createdBy = null }) {

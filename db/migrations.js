@@ -5686,6 +5686,61 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 132 abgeschlossen (Index idx_pc_book_page_date fuer page-ages-Query).');
   }
 
+  if (version < 133) {
+    // SQLite-`datetime('now')` liefert "YYYY-MM-DD HH:MM:SS" (UTC ohne TZ-Marker).
+    // JS `new Date("...")` parsed das als lokale Browser-Zeit statt UTC; das UI
+    // zeigt dann die UTC-Uhr unter app.timezone-Label (CEST: 2 h zu frueh).
+    // Code-Pfade schreiben jetzt ISO+Z via `NOW_ISO_SQL` (db/now.js). Backfill
+    // alle Spalten, die von Default oder Inline-`datetime('now')` gefuellt
+    // wurden: GLOB matched genau die "YYYY-MM-DD HH:MM:SS"-Form,
+    // `strftime('%Y-%m-%dT%H:%M:%fZ', value)` parst die als UTC und liefert
+    // die ISO+Z-Form.
+    const tsCols = [
+      ['app_settings', 'updated_at'],
+      ['app_settings_audit', 'updated_at'],
+      ['app_users', 'created_at'],
+      ['app_users', 'first_seen_at'],
+      ['app_users', 'last_seen_at'],
+      ['app_users', 'last_login_at'],
+      ['app_users', 'invited_at'],
+      ['book_access', 'granted_at'],
+      ['book_categories', 'created_at'],
+      ['book_order', 'updated_at'],
+      ['book_share_invites', 'invited_at'],
+      ['book_share_invites', 'accepted_at'],
+      ['book_share_invites', 'revoked_at'],
+      ['book_tag_assignments', 'assigned_at'],
+      ['book_tags', 'created_at'],
+      ['budget_alerts', 'sent_at'],
+      ['page_locks', 'acquired_at'],
+      ['page_locks', 'last_heartbeat_at'],
+      ['page_presence', 'last_ping_at'],
+      ['page_revisions', 'created_at'],
+      ['registration_requests', 'created_at'],
+      ['registration_requests', 'reviewed_at'],
+      ['search_meta', 'updated_at'],
+      ['user_invites', 'invited_at'],
+      ['user_invites', 'accepted_at'],
+      ['user_invites', 'revoked_at'],
+      ['user_sessions_audit', 'created_at'],
+    ];
+    for (const [tbl, col] of tsCols) {
+      db.prepare(
+        `UPDATE ${tbl}
+            SET ${col} = strftime('%Y-%m-%dT%H:%M:%fZ', ${col})
+          WHERE ${col} IS NOT NULL
+            AND ${col} GLOB '????-??-?? ??:??:??'`
+      ).run();
+    }
+
+    const fkErrors133 = db.pragma('foreign_key_check');
+    if (fkErrors133.length) {
+      throw new Error(`Migration 133: foreign_key_check meldet ${fkErrors133.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 133').run();
+    logger.info('DB-Migration auf Version 133 abgeschlossen (Timestamp-Backfill UTC-no-Z -> ISO+Z).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

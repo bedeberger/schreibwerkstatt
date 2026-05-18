@@ -7,6 +7,7 @@
 // das vergleichen darf — sonst driften Guards.
 
 const { db } = require('./connection');
+const { NOW_ISO_SQL } = require('./now');
 
 const ROLE_RANK = { viewer: 1, lektor: 2, editor: 3, owner: 4 };
 
@@ -67,11 +68,11 @@ function listBookIdsForUser(email) {
 }
 
 const _stmtUpsertAccess = db.prepare(`
-  INSERT INTO book_access (book_id, user_email, role, granted_by)
-  VALUES (?, ?, ?, ?)
+  INSERT INTO book_access (book_id, user_email, role, granted_at, granted_by)
+  VALUES (?, ?, ?, ${NOW_ISO_SQL}, ?)
   ON CONFLICT(book_id, user_email) DO UPDATE SET
     role       = excluded.role,
-    granted_at = datetime('now'),
+    granted_at = ${NOW_ISO_SQL},
     granted_by = excluded.granted_by
 `);
 
@@ -179,11 +180,11 @@ function _acquireOrExtendLock(pageId, bookId, email, reason) {
     throw err;
   }
   db.prepare(`
-    INSERT INTO page_locks (page_id, book_id, locked_by_email, reason, expires_at, last_heartbeat_at)
-    VALUES (?, ?, ?, ?, ?, datetime('now'))
+    INSERT INTO page_locks (page_id, book_id, locked_by_email, reason, acquired_at, expires_at, last_heartbeat_at)
+    VALUES (?, ?, ?, ?, ${NOW_ISO_SQL}, ?, ${NOW_ISO_SQL})
     ON CONFLICT(page_id) DO UPDATE SET
       expires_at        = excluded.expires_at,
-      last_heartbeat_at = datetime('now'),
+      last_heartbeat_at = ${NOW_ISO_SQL},
       locked_by_email   = excluded.locked_by_email,
       reason            = excluded.reason
   `).run(pid, bid, e, reason || 'lektorat', expires);
@@ -208,7 +209,7 @@ function heartbeatLock(pageId, email) {
   }
   const expires = new Date(Date.now() + LOCK_TTL_MS).toISOString();
   db.prepare(`
-    UPDATE page_locks SET expires_at = ?, last_heartbeat_at = datetime('now') WHERE page_id = ?
+    UPDATE page_locks SET expires_at = ?, last_heartbeat_at = ${NOW_ISO_SQL} WHERE page_id = ?
   `).run(expires, pid);
   return getPageLock(pid);
 }

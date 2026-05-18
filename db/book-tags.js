@@ -4,6 +4,7 @@
 
 const { db } = require('./connection');
 require('./migrations');
+const { NOW_ISO_SQL } = require('./now');
 const { slugify, uniqueSlug } = require('../lib/slug');
 
 const _stmtList = db.prepare(`
@@ -36,7 +37,7 @@ function _slugExists(slug) {
 }
 
 const _stmtInsert = db.prepare(`
-  INSERT INTO book_tags (name, slug, color, created_by) VALUES (?, ?, ?, ?)
+  INSERT INTO book_tags (name, slug, color, created_by, created_at) VALUES (?, ?, ?, ?, ${NOW_ISO_SQL})
 `);
 
 function create({ name, color = null, createdBy = null }) {
@@ -84,8 +85,8 @@ function listForBook(bookId) {
 }
 
 const _stmtAssign = db.prepare(`
-  INSERT INTO book_tag_assignments (book_id, tag_id, assigned_by)
-  VALUES (?, ?, ?)
+  INSERT INTO book_tag_assignments (book_id, tag_id, assigned_by, assigned_at)
+  VALUES (?, ?, ?, ${NOW_ISO_SQL})
   ON CONFLICT(book_id, tag_id) DO NOTHING
 `);
 const _stmtUnassign = db.prepare(

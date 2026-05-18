@@ -10,6 +10,7 @@ const bookTags = require('../db/book-tags');
 const books = require('../db/books');
 const { aclParamGuard, requireBookAccess, ACLError, sendACLError } = require('../lib/acl');
 const { db } = require('../db/connection');
+const { NOW_ISO_SQL } = require('../db/now');
 const logger = require('../logger');
 const mailer = require('../lib/mailer');
 const appSettings = require('../lib/app-settings');
@@ -79,13 +80,13 @@ router.post('/:book_id/share', aclParamGuard('owner'), jsonBody, (req, res) => {
     db.transaction(() => {
       bookAccess.grantAccess(req.bookId, target, role, granter);
       db.prepare(`
-        INSERT INTO book_share_invites (book_id, invitee_email, role, invited_by, accepted_at)
-        VALUES (?, ?, ?, ?, datetime('now'))
+        INSERT INTO book_share_invites (book_id, invitee_email, role, invited_by, invited_at, accepted_at)
+        VALUES (?, ?, ?, ?, ${NOW_ISO_SQL}, ${NOW_ISO_SQL})
         ON CONFLICT(book_id, invitee_email) DO UPDATE SET
           role        = excluded.role,
           invited_by  = excluded.invited_by,
-          invited_at  = datetime('now'),
-          accepted_at = datetime('now'),
+          invited_at  = ${NOW_ISO_SQL},
+          accepted_at = ${NOW_ISO_SQL},
           revoked_at  = NULL
       `).run(req.bookId, target, role, granter);
     })();
