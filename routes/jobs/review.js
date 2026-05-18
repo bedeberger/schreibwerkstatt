@@ -10,7 +10,7 @@ const {
   makeJobLogger, updateJob, completeJob, failJob, i18nError, contentHttpError,
   aiCall, getPrompts, getBookPrompts,
   loadPageContents, groupByChapter, splitGroupsIntoChunks, buildSinglePassBookText,
-  SINGLE_PASS_LIMIT, PER_CHUNK_LIMIT, BATCH_SIZE, jobAbortControllers, settledAll,
+  chunkLimitsFor, BATCH_SIZE, jobAbortControllers, settledAll,
   _modelName, tps,
   jobs, runningJobs, createJob, enqueueJob, jobKey, findActiveJobId,
   jsonBody,
@@ -67,6 +67,7 @@ async function runReviewJob(jobId, bookId, bookName, userEmail, userToken) {
   const bookIdInt = parseInt(bookId);
   const email = userEmail || '';
   const effectiveProvider = resolveProvider({ userEmail });
+  const { singlePass: SINGLE_PASS_LIMIT, perChunk: PER_CHUNK_LIMIT } = chunkLimitsFor(effectiveProvider);
   // Cache-Version: Modellname + Prompts-Schema-Version. Ändert sich eins davon,
   // werden alle persistierten Review-Caches automatisch verworfen.
   const cacheVersion = `${_modelName(effectiveProvider)}:${PROMPTS_VERSION || ''}`;

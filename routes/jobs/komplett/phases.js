@@ -9,7 +9,7 @@ const {
 } = require('../../../db/schema');
 const { recomputeBookFigureMentions } = require('../../../lib/page-index');
 const {
-  i18nError, settledAll, retryOnTransientAi, splitGroupsIntoChunks, PER_CHUNK_LIMIT, updateJob,
+  i18nError, settledAll, retryOnTransientAi, splitGroupsIntoChunks, updateJob,
   toSystemBlocks,
 } = require('../shared');
 const {
@@ -30,10 +30,12 @@ const appSettings = require('../../../lib/app-settings');
  */
 async function runPhase1(ctx) {
   const { jobId, bookIdInt, bookName, email, call, tok, log,
-    effectiveProvider, singlePassLimit, cacheVersion,
+    effectiveProvider, singlePassLimit, perChunkLimit: ctxPerChunkLimit, cacheVersion,
     prompts, sys, pageContents, groups, groupOrder, totalChars, fullBookText } = ctx;
 
-  const perChunkLimit = effectiveProvider === 'claude' ? singlePassLimit : PER_CHUNK_LIMIT;
+  // Claude packt alles in einen Chunk (singlePassLimit als obere Schranke), lokale
+  // Provider chunken nach `ai.<provider>.context_window` (siehe ctx.perChunkLimit aus chunkLimitsFor).
+  const perChunkLimit = effectiveProvider === 'claude' ? singlePassLimit : ctxPerChunkLimit;
   const { chunkOrder, chunks } = splitGroupsIntoChunks(groups, groupOrder, perChunkLimit);
 
   log.info(`Phase 1 – ${totalChars} Zeichen, ${effectiveProvider} → ${totalChars <= singlePassLimit ? 'Single-Pass' : `Multi-Pass (${groupOrder.length} Kapitel → ${chunkOrder.length} Chunks)`}`);

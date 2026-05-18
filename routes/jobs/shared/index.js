@@ -80,6 +80,7 @@ module.exports = {
   SINGLE_PASS_LIMIT: loader.SINGLE_PASS_LIMIT,
   PER_CHUNK_LIMIT: loader.PER_CHUNK_LIMIT,
   BATCH_SIZE: loader.BATCH_SIZE,
+  chunkLimitsFor: loader.chunkLimitsFor,
 
   jsonBody, jsonBodyLarge,
   sharedRouter: router.sharedRouter,

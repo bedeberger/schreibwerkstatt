@@ -12,7 +12,7 @@ const {
   htmlToText, splitGroupsIntoChunks,
   _modelName, tps,
   jobs, runningJobs, createJob, enqueueJob, jobKey, findActiveJobId,
-  jsonBody, BATCH_SIZE, SINGLE_PASS_LIMIT, PER_CHUNK_LIMIT,
+  jsonBody, BATCH_SIZE, chunkLimitsFor,
 } = require('./shared');
 const contentStore = require('../../lib/content-store');
 const { narrativeLabels } = require('./narrative-labels');
@@ -48,6 +48,7 @@ async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookNa
   const chapterIdInt = parseInt(chapterId);
   const email = userEmail || '';
   const effectiveProvider = resolveProvider({ userEmail });
+  const { singlePass: SINGLE_PASS_LIMIT, perChunk: PER_CHUNK_LIMIT } = chunkLimitsFor(effectiveProvider);
   const cacheVersion = `${_modelName(effectiveProvider)}:${PROMPTS_VERSION || ''}`;
   const optionsSig = _sigHash({ narrative, schwerpunkt: reviewSchwerpunkt });
   try {

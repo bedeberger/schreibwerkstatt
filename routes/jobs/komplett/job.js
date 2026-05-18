@@ -13,7 +13,7 @@ const {
   makeJobLogger, updateJob, completeJob, failJob, i18nError, contentHttpError,
   aiCall, toSystemBlocks, getPrompts, getBookPrompts,
   loadPageContents, groupByChapter, buildSinglePassBookText, cleanPageTextForClaude,
-  SINGLE_PASS_LIMIT, BATCH_SIZE, jobAbortControllers,
+  chunkLimitsFor, BATCH_SIZE, jobAbortControllers,
   _modelName, fmtTok, tps,
   createJob, enqueueJob, findActiveJobId,
 } = require('../shared');
@@ -46,9 +46,9 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
   const call = (jobId_, tok_, prompt_, system_, fromPct, toPct, expectedChars, outputRatio, maxTokens, schema) =>
     aiCall(jobId_, tok_, prompt_, system_, fromPct, toPct, expectedChars, outputRatio, maxTokens, provider, schema);
   const effectiveProvider = provider || appSettings.get('ai.provider') || 'claude';
-  // SINGLE_PASS_LIMIT skaliert jetzt dynamisch mit MODEL_CONTEXT (siehe shared/loader.js).
-  // Bei 200K-Kontext ≈ 420K Zeichen Single-Pass – reicht für fast alle Bücher.
-  const singlePassLimit = SINGLE_PASS_LIMIT;
+  // Per-Provider-Skalierung aus dessen `ai.<p>.context_window` (lib/ai.js#getContextConfigFor).
+  // Bei Claude 200K-Kontext ≈ 420K Zeichen Single-Pass – reicht für fast alle Bücher.
+  const { singlePass: singlePassLimit, perChunk: perChunkLimit } = chunkLimitsFor(effectiveProvider);
   const prompts = await getPrompts();
   const sys = await getBookPrompts(bookId, email);
   const tok = { in: 0, out: 0, ms: 0, inflight: new Map() };
@@ -120,7 +120,7 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
 
     const ctx = {
       jobId, bookIdInt, bookName, email, call, tok, log,
-      effectiveProvider, singlePassLimit, cacheVersion, prompts, sys,
+      effectiveProvider, singlePassLimit, perChunkLimit, cacheVersion, prompts, sys,
       idMaps, pageContents, groups, groupOrder, totalChars, fullBookText,
     };
 
@@ -246,7 +246,7 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
   const call = (jobId_, tok_, prompt_, system_, fromPct, toPct, expectedChars, outputRatio, maxTokens, schema) =>
     aiCall(jobId_, tok_, prompt_, system_, fromPct, toPct, expectedChars, outputRatio, maxTokens, provider, schema);
   const effectiveProvider = provider || appSettings.get('ai.provider') || 'claude';
-  const singlePassLimit = SINGLE_PASS_LIMIT;
+  const { singlePass: singlePassLimit } = chunkLimitsFor(effectiveProvider);
   const prompts = await getPrompts();
   const sys = await getBookPrompts(bookId, email);
 

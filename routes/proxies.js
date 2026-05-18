@@ -1,6 +1,6 @@
 const express = require('express');
 const logger = require('../logger');
-const { MAX_TOKENS_OUT, MODEL_CONTEXT, CHARS_PER_TOKEN, ollamaTemp, llamaTemp } = require('../lib/ai');
+const { MAX_TOKENS_OUT, MODEL_CONTEXT, CHARS_PER_TOKEN, ollamaTemp, llamaTemp, getContextConfigFor } = require('../lib/ai');
 const { getBookLocale } = require('../db/schema');
 const appUsers = require('../db/app-users');
 const { getPrompts, getPromptConfig } = require('../lib/prompts-loader');
@@ -127,10 +127,11 @@ router.post('/ollama', jsonBody, async (req, res) => {
     const messages = [{ role: 'system', content: systemPrompt }];
     for (const m of (req.body.messages || [])) messages.push(m);
 
+    const ollamaCfg = getContextConfigFor('ollama');
     const upstream = await fetch(`${ollamaHost}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, messages, stream: true, options: { num_ctx: MODEL_CONTEXT, think: false, temperature: ollamaTemp() } }),
+      body: JSON.stringify({ model, messages, stream: true, options: { num_ctx: ollamaCfg.contextWindow, num_predict: ollamaCfg.maxTokensOut, think: false, temperature: ollamaTemp() } }),
     });
 
     if (!upstream.ok) {
@@ -211,6 +212,7 @@ router.post('/llama', jsonBody, async (req, res) => {
     const messages = [{ role: 'system', content: systemPrompt }];
     for (const m of (req.body.messages || [])) messages.push(m);
 
+    const llamaCfg = getContextConfigFor('llama');
     const upstream = await fetch(`${llamaHost}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -220,7 +222,7 @@ router.post('/llama', jsonBody, async (req, res) => {
         stream: true,
         stream_options: { include_usage: true },
         temperature: llamaTemp(),
-        max_tokens: MAX_TOKENS_OUT,
+        max_tokens: llamaCfg.maxTokensOut,
       }),
     });
 

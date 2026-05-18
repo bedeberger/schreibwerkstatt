@@ -1,21 +1,32 @@
 'use strict';
 const { db } = require('../../../db/schema');
-const { INPUT_BUDGET_CHARS } = require('../../../lib/ai');
+const { INPUT_BUDGET_CHARS, getContextConfigFor } = require('../../../lib/ai');
 const contentStore = require('../../../lib/content-store');
 const { inClause } = require('../../../lib/validate');
 const { i18nError } = require('./jobs');
 const { htmlToText } = require('./ai');
 
-// Multi-Pass-Grenzen skalieren mit dem Input-Budget (MODEL_CONTEXT − MODEL_TOKEN).
+// Multi-Pass-Grenzen skalieren mit dem Input-Budget (context_window − max_tokens_out).
 // SINGLE_PASS_LIMIT: Schwelle, ab der in Chunks zerlegt wird. 70% des Budgets für
 //   Buchtext, 30% für System-Prompt + Schema + Output-Reserve.
 // PER_CHUNK_LIMIT:   Max-Grösse eines einzelnen Chunks. Kleinere lokale Modelle
 //   (Mistral Small u.ä.) verlieren bei grossen Inputs Extraktionsqualität;
 //   Obergrenze 200K Zeichen kappt absurde Werte bei grossen Kontextfenstern.
 // Untergrenzen (20K/10K Zeichen) verhindern zu kleine Pässe bei Misconfig.
+// Boot-Konstanten lesen Claude-Defaults; per-Job-Pfade nutzen `chunkLimitsFor(provider)`,
+// damit Ollama/Llama mit eigenen Kontextfenstern korrekt skaliert werden.
 const SINGLE_PASS_LIMIT = Math.max(20000, Math.min(600000, Math.floor(INPUT_BUDGET_CHARS * 0.70)));
 const PER_CHUNK_LIMIT   = Math.max(10000, Math.min(200000, Math.floor(INPUT_BUDGET_CHARS * 0.35)));
 const BATCH_SIZE = 15;
+
+function chunkLimitsFor(provider) {
+  const cfg = getContextConfigFor(provider);
+  const budget = cfg.inputBudgetChars;
+  return {
+    singlePass: Math.max(20000, Math.min(600000, Math.floor(budget * 0.70))),
+    perChunk:   Math.max(10000, Math.min(200000, Math.floor(budget * 0.35))),
+  };
+}
 
 async function loadPageContents(pages, chMap, minLength, onBatch, userToken, signal = null) {
   // Vor-Filter via preview_text aus dem pages-Cache: wenn ein gespeicherter
@@ -129,6 +140,6 @@ function buildSinglePassBookText(groups, groupOrder) {
 }
 
 module.exports = {
-  SINGLE_PASS_LIMIT, PER_CHUNK_LIMIT, BATCH_SIZE,
+  SINGLE_PASS_LIMIT, PER_CHUNK_LIMIT, BATCH_SIZE, chunkLimitsFor,
   loadPageContents, groupByChapter, splitGroupsIntoChunks, buildSinglePassBookText,
 };
