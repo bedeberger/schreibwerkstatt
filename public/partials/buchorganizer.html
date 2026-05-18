@@ -102,7 +102,7 @@
                   @click.stop="toggleChapter(ch.id)"
                   :aria-expanded="!!chapterOpen[ch.id]"
                   :aria-label="$app.t(chapterOpen[ch.id] ? 'sidebar.collapseAll' : 'sidebar.expandAll')">
-            <span class="tree-chevron" :class="{ open: organizerSearch ? true : chapterOpen[ch.id] }"></span>
+            <span class="history-chevron" :class="{ open: organizerSearch ? true : chapterOpen[ch.id] }"></span>
           </button>
           <input type="text" class="organizer-name organizer-name--chapter" :value="ch.name"
                  @blur="onRenameChapter(ch.id, $event)"
