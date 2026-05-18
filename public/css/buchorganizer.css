@@ -151,10 +151,27 @@
 }
 .organizer-toolbar .page-search {
   flex: 1 1 220px;
-  min-width: 220px;
+  min-width: 0;
 }
 .organizer-jump {
   min-width: 200px;
+  flex-shrink: 0;
+}
+.organizer-action-group {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  flex-shrink: 0;
+}
+.organizer-action-group .graph-tool-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-base);
+  line-height: 1;
+  padding: 0;
 }
 
 .organizer-chapter-toggle {

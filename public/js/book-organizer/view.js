@@ -45,7 +45,10 @@ export const viewMethods = {
     this.chapterOpen = next;
   },
 
-  get filteredWorkTree() {
+  // Methoden statt ES-Getter — beim {...viewMethods}-Spread in der Facade
+  // würden Getter aufgerufen (this=POJO, workTree=undefined) und das Ergebnis
+  // als statisches Property eingefroren. Methoden bleiben durch Spread erhalten.
+  filteredWorkTree() {
     const q = (this.organizerSearch || '').trim().toLowerCase();
     if (!q) return this.workTree;
     return this.workTree.map(ch => {
@@ -56,7 +59,7 @@ export const viewMethods = {
     }).filter(Boolean);
   },
 
-  get filteredSoloPages() {
+  filteredSoloPages() {
     const q = (this.organizerSearch || '').trim().toLowerCase();
     if (!q) return this.soloPages;
     return this.soloPages.filter(p => p.name.toLowerCase().includes(q));

@@ -8,16 +8,6 @@
   <div class="card-header">
     <span class="card-title" x-text="$app.t('bookOrganizer.title', { name: $app.selectedBookName })"></span>
     <div class="card-actions">
-      <button type="button" class="graph-tool-btn"
-              @click="historyUndo()"
-              :disabled="_undoStack.length === 0 || organizerSaving"
-              :data-tip="$app.t('bookOrganizer.undoTip')"
-              :aria-label="$app.t('bookOrganizer.undo')">↶</button>
-      <button type="button" class="graph-tool-btn"
-              @click="historyRedo()"
-              :disabled="_redoStack.length === 0 || organizerSaving"
-              :data-tip="$app.t('bookOrganizer.redoTip')"
-              :aria-label="$app.t('bookOrganizer.redo')">↷</button>
       <button type="button" @click="createChapter()" :disabled="organizerSaving" x-text="$app.t('bookOrganizer.newChapter')"></button>
       <button type="button" @click="createPage(0)" :disabled="organizerSaving" x-text="$app.t('bookOrganizer.newSoloPage')"></button>
     </div>
@@ -29,9 +19,27 @@
            :aria-label="$app.t('bookOrganizer.searchPlaceholder')"
            class="page-search"
            autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other">
-    <div class="btn-group" x-show="!organizerSearch && workTree.length > 0">
-      <button type="button" class="btn-compact" @click="expandAll()" x-text="$app.t('sidebar.expandAll')"></button>
-      <button type="button" class="btn-compact" @click="collapseAll()" x-text="$app.t('sidebar.collapseAll')"></button>
+    <div class="btn-group organizer-action-group">
+      <button type="button" class="graph-tool-btn"
+              @click="historyUndo()"
+              :disabled="_undoStack.length === 0 || organizerSaving"
+              :data-tip="$app.t('bookOrganizer.undoTip')"
+              :aria-label="$app.t('bookOrganizer.undo')">↶</button>
+      <button type="button" class="graph-tool-btn"
+              @click="historyRedo()"
+              :disabled="_redoStack.length === 0 || organizerSaving"
+              :data-tip="$app.t('bookOrganizer.redoTip')"
+              :aria-label="$app.t('bookOrganizer.redo')">↷</button>
+      <button type="button" class="graph-tool-btn"
+              @click="expandAll()"
+              :disabled="workTree.length === 0 || !!organizerSearch"
+              :data-tip="$app.t('sidebar.expandAll')"
+              :aria-label="$app.t('sidebar.expandAll')">⌄</button>
+      <button type="button" class="graph-tool-btn"
+              @click="collapseAll()"
+              :disabled="workTree.length === 0 || !!organizerSearch"
+              :data-tip="$app.t('sidebar.collapseAll')"
+              :aria-label="$app.t('sidebar.collapseAll')">⌃</button>
     </div>
     <div class="organizer-jump"
          x-show="workTree.length > 0 && !organizerSearch"
@@ -51,7 +59,7 @@
   <p class="organizer-hint muted-msg muted-msg--sm" x-text="$app.t('bookOrganizer.hint')"></p>
 
   <!-- Solo-Pages (kein Kapitel) zuerst -->
-  <div class="organizer-chapter organizer-chapter--solo" x-show="filteredSoloPages.length > 0 || (workTree.length === 0 && !organizerSearch)">
+  <div class="organizer-chapter organizer-chapter--solo" x-show="filteredSoloPages().length > 0 || (workTree.length === 0 && !organizerSearch)">
     <div class="organizer-chapter-header">
       <span class="organizer-chapter-label" x-text="$app.t('bookOrganizer.soloHeader')"></span>
       <div class="organizer-chapter-actions">
@@ -59,7 +67,7 @@
       </div>
     </div>
     <ul class="organizer-pages" data-organizer="page-list" :data-chapter-id="0">
-      <template x-for="page in filteredSoloPages" :key="page.id">
+      <template x-for="page in filteredSoloPages()" :key="page.id">
         <li class="organizer-page" :data-page-id="page.id">
           <span class="organizer-drag-handle" :data-tip="$app.t('bookOrganizer.dragHint')" aria-hidden="true">⋮⋮</span>
           <input type="text" class="organizer-name" :value="page.name"
@@ -77,13 +85,13 @@
                   :data-tip="$app.t('bookOrganizer.deletePage')" :aria-label="$app.t('bookOrganizer.deletePage')">×</button>
         </li>
       </template>
-      <li class="organizer-empty" x-show="filteredSoloPages.length === 0 && !organizerSearch" x-text="$app.t('bookOrganizer.noSoloPages')"></li>
+      <li class="organizer-empty" x-show="filteredSoloPages().length === 0 && !organizerSearch" x-text="$app.t('bookOrganizer.noSoloPages')"></li>
     </ul>
   </div>
 
   <!-- Kapitel-Liste -->
   <div class="organizer-list" data-organizer="chapter-list">
-    <template x-for="ch in filteredWorkTree" :key="ch.id">
+    <template x-for="ch in filteredWorkTree()" :key="ch.id">
       <div class="organizer-chapter" :data-chapter-id="ch.id">
         <div class="organizer-chapter-header">
           <span class="organizer-drag-handle organizer-drag-handle--chapter" :data-tip="$app.t('bookOrganizer.dragHint')" aria-hidden="true">⋮⋮</span>
@@ -132,6 +140,6 @@
         </ul>
       </div>
     </template>
-    <div class="muted-msg muted-msg--sm" x-show="organizerSearch && filteredWorkTree.length === 0 && filteredSoloPages.length === 0" x-text="$app.t('sidebar.noPagesFound')"></div>
+    <div class="muted-msg muted-msg--sm" x-show="organizerSearch && filteredWorkTree().length === 0 && filteredSoloPages().length === 0" x-text="$app.t('sidebar.noPagesFound')"></div>
   </div>
 </div>
