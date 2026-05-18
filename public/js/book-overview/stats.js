@@ -2,6 +2,7 @@
 // Streak-Heatmap. Visualisierungen als reines Inline-SVG (kein Chart.js) —
 // Overview soll instant beim Buchwechsel sichtbar sein, ohne Lazy-Lib-Load.
 import { localIsoDate, localIsoDaysAgo, tzOpts, aggregateLiveBookStats } from '../utils.js';
+import { computeTodayRing, computeCharsTodayDelta } from '../today-ring.js';
 
 export const statsMethods = {
   // Hero-Snapshot: live-aggregiert aus `tokEsts` (gleiche Quelle wie Sidebar-Σ),
@@ -39,27 +40,9 @@ export const statsMethods = {
     const a = this.overviewStats || [];
     const tokEsts = window.__app?.tokEsts || {};
     const tree = window.__app?.tree || [];
-    return this._memo('charsTodayDelta', [a, tokEsts, tree], () => {
-      const todayIso = localIsoDate();
-      const liveChars = aggregateLiveBookStats(tokEsts, tree).chars;
-      let cronTodayChars = null;
-      let prevChars = null;
-      for (let i = a.length - 1; i >= 0; i--) {
-        const r = a[i];
-        if (!r?.recorded_at) continue;
-        if (r.recorded_at === todayIso && cronTodayChars == null) {
-          cronTodayChars = Number(r.chars) || 0;
-          continue;
-        }
-        if (r.recorded_at < todayIso && prevChars == null) {
-          prevChars = Number(r.chars) || 0;
-          break;
-        }
-      }
-      const curChars = liveChars > 0 ? liveChars : cronTodayChars;
-      if (curChars == null || prevChars == null) return 0;
-      return Math.max(0, curChars - prevChars);
-    });
+    return this._memo('charsTodayDelta', [a, tokEsts, tree], () =>
+      computeCharsTodayDelta(a, tokEsts, tree)
+    );
   },
 
   // Letzte 7 Kalendertage. Pro Tag: Zeichen-Delta zum Vortags-Snapshot.
@@ -307,24 +290,15 @@ export const statsMethods = {
     });
   },
 
-  // Heute-Ring: Donut-Math für Tagesziel. Konsumiert _charsTodayDelta() —
-  // selbe Quelle wie 7-Tage-Bar (heute) und 7-Tage-Total. Negative Deltas
-  // werden auf 0 geklemmt; ohne prior Snapshot kein Delta möglich → 0.
+  // Heute-Ring: Donut-Math für Tagesziel. Shared Compute mit dem Header-Donut
+  // ueber [public/js/today-ring.js] — beide bleiben deckungsgleich. Memo
+  // verhindert Re-Compute pro Render (Tile ruft die Methode 6× pro Render).
   overviewTodayRing(goalChars = 1500) {
     const a = this.overviewStats || [];
     const tokEsts = window.__app?.tokEsts || {};
     const tree = window.__app?.tree || [];
-    return this._memo('todayRing:' + goalChars, [a, tokEsts, tree], () => {
-      const chars = this._charsTodayDelta();
-      const goal = Math.max(1, Number(goalChars) || 1500);
-      const pct = Math.max(0, Math.min(100, Math.round((chars / goal) * 100)));
-      const r = 28;
-      const circ = 2 * Math.PI * r;
-      const dash = (pct / 100) * circ;
-      const gap = circ - dash;
-      const reached = chars >= goal;
-      const active = chars > 0;
-      return { chars, goal, pct, r, c: circ, dash, gap, reached, active };
-    });
+    return this._memo('todayRing:' + goalChars, [a, tokEsts, tree], () =>
+      computeTodayRing({ stats: a, tokEsts, tree, goalChars, r: 28 })
+    );
   },
 };

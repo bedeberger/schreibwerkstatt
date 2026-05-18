@@ -17,6 +17,10 @@ export const appCollabMethods = {
   _startCollabPoll(bookId) {
     this._stopCollabPoll();
     if (!bookId) return;
+    // Single-User-Bücher pollen nicht. `_loadBookRole` ruft uns nach erfolgreichem
+    // ACL-Read erneut auf, sobald `bookSharedFlags[id]` true ist.
+    const id = String(bookId);
+    if (this.bookSharedFlags[id] !== true) return;
     // Erster Tick holt sich den Server-Stempel als Baseline — sonst wuerden
     // historische Edits beim Buchwechsel als „neu" gemeldet.
     this._collabSince = null;
@@ -186,6 +190,8 @@ export const appCollabMethods = {
   // hardcoded: bei pageId-Wechsel wird der alte Ping abgemeldet.
   _startPresenceHeartbeat(pageId) {
     if (!pageId) return;
+    // Single-User-Buch: niemand sieht "X editiert hier" → keine Pings.
+    if (this.bookSharedFlags[String(this.selectedBookId)] !== true) return;
     if (this._presencePingPageId && this._presencePingPageId !== pageId) {
       this._sendPresenceLeave(this._presencePingPageId);
     }

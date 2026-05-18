@@ -204,6 +204,10 @@ export const appHashRouterMethods = {
         window.dispatchEvent(new CustomEvent('book:changed', {
           detail: { bookId: this.selectedBookId },
         }));
+        // Initialer Bootstrap: _resetBookScopedState wird hier nicht gerufen,
+        // also Filter-Restore explizit. View-Argumente (Figur-Kapitel etc.)
+        // überschreiben Filter danach gezielt — Reihenfolge wichtig.
+        this._restoreBookPrefs?.(this.selectedBookId);
       }
 
       const view = parts[2];

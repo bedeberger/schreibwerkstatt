@@ -150,6 +150,9 @@ export const bookSettingsMethods = {
         throw new Error(data ? window.__app.tError(data) : `HTTP ${r.status}`);
       }
       this.bookSettingsSaved = true;
+      // Header-Donut konsumiert dailyProgressIsFinished am Root — direkt
+      // synchronisieren, damit Toggle Buch-Abschluss ohne Reload greift.
+      if (window.__app) window.__app.dailyProgressIsFinished = !!this.bookSettingsIsFinished;
       if (this._savedAtTimer) clearTimeout(this._savedAtTimer);
       this._savedAtTimer = setTimeout(() => { this.bookSettingsSaved = false; this._savedAtTimer = null; }, 2500);
     } catch (e) {

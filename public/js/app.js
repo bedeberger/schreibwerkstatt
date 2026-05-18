@@ -1,5 +1,6 @@
 import { fetchJson, configureTokenEstimate, configureAppTimezone, escHtml } from './utils.js';
 import { configurePrompts } from './prompts.js';
+import { setFilters } from './local-prefs.js';
 
 import { aiMethods } from './api/api-ai.js';
 import { historyMethods } from './book/history.js';
@@ -830,6 +831,10 @@ document.addEventListener('alpine:init', () => {
           this.loadRecentFeatures();
           if (this.selectedBookId) this.loadRecentPages(this.selectedBookId);
           if (this.selectedBookId) this.loadDailyProgress(this.selectedBookId);
+          // Gespeicherte Filter pro Buch anwenden, bevor Hash-Router das
+          // initiale View setzt (Filter-Restore + Hash-getriebene Argumente
+          // koexistieren so deterministisch).
+          if (this.selectedBookId) this._restoreBookPrefs(this.selectedBookId);
         }
         await this._applyHash();
         if (!this.isAdminOnly && this.selectedBookId) this._loadBookRole(this.selectedBookId);
@@ -846,6 +851,19 @@ document.addEventListener('alpine:init', () => {
         // _applyingHash unterdrückt Doppelladen während Hash-Anwendung.
         // _resetBookScopedState() räumt buchspezifische Daten/Caches ab, damit
         // keine Figuren/Orte/Chats/Stats des alten Buchs im UI stehenbleiben.
+        // Filter-Persistenz: deep-watch jeden Filter-Scope, schreibt bei
+        // jeder Mutation in localStorage. Restore beim Buchwechsel passiert
+        // in `_resetBookScopedState`/`_restoreBookPrefs`; initialer Restore
+        // im Hash-Router (isInitialApply-Branch), bevor View-Argumente Filter
+        // setzen.
+        const FILTER_KEYS = ['figurenFilters','ereignisseFilters','szenenFilters','orteFilters','songsFilters'];
+        for (const key of FILTER_KEYS) {
+          this.$watch(key, (val) => {
+            if (!this.selectedBookId) return;
+            setFilters(this.currentUser?.email, this.selectedBookId, key, val);
+          }, { deep: true });
+        }
+
         this.$watch('selectedBookId', async (newVal, oldVal) => {
           if (this._applyingHash) return;
           if (!newVal) return;

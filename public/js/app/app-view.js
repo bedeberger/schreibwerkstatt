@@ -1,7 +1,20 @@
-import { htmlToText, fetchJson, escHtml, aggregateLiveBookStats, localIsoDate } from '../utils.js';
+import { htmlToText, fetchJson, escHtml } from '../utils.js';
+import { computeTodayRing } from '../today-ring.js';
 import { EXCLUSIVE_CARDS } from '../cards/feature-registry.js';
 import { contentRepo } from '../repo/content.js';
 import { readDraft, clearDraft } from '../editor/draft-storage.js';
+import { setLastPageId, getLastPageId, getFilters } from '../local-prefs.js';
+
+// Karten-Scopes, deren Filter pro Buch im localStorage persistiert werden.
+// Defaults werden bei Buchwechsel angewandt; gespeicherte Werte überschreiben
+// jeweils nur die genannten Keys.
+const FILTER_SCOPES = [
+  ['figurenFilters',    { kapitel: '', seite: '', suche: '' }],
+  ['ereignisseFilters', { figurId: '', kapitel: '', seite: '', suche: '' }],
+  ['szenenFilters',     { wertung: '', figurId: '', kapitel: '', ortId: '', suche: '' }],
+  ['orteFilters',       { figurId: '', kapitel: '', szeneId: '', suche: '' }],
+  ['songsFilters',      { figurId: '', kapitel: '', szeneId: '', genre: '', kontextTyp: '', suche: '' }],
+];
 
 // Generischer Karten-Toggle. Liest Behavior-Felder aus EXCLUSIVE_CARDS-Entry
 // (onReclick, requiresBook, loadDeps, auditEvent, extraRefreshOnOpen) und
@@ -85,6 +98,7 @@ export const appViewMethods = {
     if (typeof this._trackPageUsage === 'function' && this.selectedBookId) {
       this._trackPageUsage(p.id, this.selectedBookId);
     }
+    setLastPageId(this.currentUser?.email, this.selectedBookId, p.id);
 
     this._loadPageBadgeCounts(p.id);
 
@@ -256,11 +270,23 @@ export const appViewMethods = {
   // Default-Landing: öffnet Übersicht, wenn Buch gewählt ist und keine andere
   // Hauptkarte/Editor aktiv. Wird beim Buchwechsel + bei `#book/:id`-Deeplink
   // ohne View aufgerufen.
-  async _maybeOpenBookOverview() {
+  async _maybeOpenBookOverview({ restoreLastPage = true } = {}) {
     if (!this.selectedBookId) return;
     if (this.showEditorCard) return;
     const anyOpen = EXCLUSIVE_CARDS.some(c => this[c.flag]);
     if (anyOpen) return;
+    // Letzte Seite restaurieren, falls vorhanden und im aktuellen Buch noch
+    // existiert. Bei explizitem Home-Klick (resetView) übersprungen.
+    if (restoreLastPage) {
+      const lastId = getLastPageId(this.currentUser?.email, this.selectedBookId);
+      if (lastId && Array.isArray(this.pages) && this.pages.length) {
+        const page = this.pages.find(p => p.id === lastId);
+        if (page) {
+          await this.selectPage(page);
+          return;
+        }
+      }
+    }
     await this._ensurePartial('bookoverview');
     this.showBookOverviewCard = true;
   },
@@ -452,6 +478,7 @@ export const appViewMethods = {
     if (typeof this.loadRecentPages === 'function' && this.selectedBookId) {
       this.loadRecentPages(this.selectedBookId);
     }
+    this._restoreBookPrefs(this.selectedBookId);
 
     // Root-gehaltene Pollers stoppen (zielen sonst auf altes Buch).
     const timers = [
@@ -474,6 +501,23 @@ export const appViewMethods = {
     this.showKomplettStatus = false;
     this.resetDailyProgress();
     if (this.selectedBookId) this.loadDailyProgress(this.selectedBookId);
+  },
+
+  // Setzt jeden Filter-Scope zuerst auf Defaults zurück, dann überlagert
+  // gespeicherte Werte aus localStorage. Wird bei Buchwechsel und beim
+  // initialen Bootstrap aufgerufen.
+  _restoreBookPrefs(bookId) {
+    const email = this.currentUser?.email;
+    for (const [stateKey, defaults] of FILTER_SCOPES) {
+      const target = this[stateKey];
+      if (!target) continue;
+      const saved = bookId ? getFilters(email, bookId, stateKey) : null;
+      for (const k of Object.keys(defaults)) {
+        target[k] = (saved && Object.prototype.hasOwnProperty.call(saved, k))
+          ? saved[k]
+          : defaults[k];
+      }
+    }
   },
 
   async _reloadVisibleBookCards() {
@@ -557,21 +601,28 @@ export const appViewMethods = {
     this.showKomplettStatus = false;
     this.resetBookChat();
     // Default-Home: nach komplettem Reset Übersicht öffnen, falls Buch gewählt.
-    await this._maybeOpenBookOverview();
+    // Kein lastPage-Restore — Home-Klick ist expliziter Wunsch nach Overview.
+    await this._maybeOpenBookOverview({ restoreLastPage: false });
   },
 
   // Tages-Schreibziel-Donut im Header. Eigener Loader (statt Book-Overview-
   // Card-State zu spiegeln), damit der Donut auch sichtbar ist, wenn die
-  // Overview-Karte nie geoeffnet wurde. Dedupe via _dailyProgressLoadingBookId;
+  // Overview-Karte nie geoeffnet wurde. Faecht stats + booksettings parallel —
+  // is_finished gated die Sichtbarkeit (kein Donut auf abgeschlossenen Buechern,
+  // analog zur Book-Overview-Karte). Dedupe via _dailyProgressLoadingBookId;
   // stale Responses (Buch waehrend des Loads gewechselt) werden verworfen.
   async loadDailyProgress(bookId) {
     if (!bookId) return;
     if (this._dailyProgressLoadingBookId === bookId) return;
     this._dailyProgressLoadingBookId = bookId;
     try {
-      const stats = await fetchJson(`/history/book-stats/${bookId}`).catch(() => []);
+      const [stats, settings] = await Promise.all([
+        fetchJson(`/history/book-stats/${bookId}`).catch(() => []),
+        fetchJson(`/booksettings/${bookId}`).catch(() => null),
+      ]);
       if (this.selectedBookId != bookId) return;
       this.dailyProgressStats = Array.isArray(stats) ? stats : [];
+      this.dailyProgressIsFinished = !!settings?.is_finished;
       this.dailyProgressBookId = bookId;
     } finally {
       if (this._dailyProgressLoadingBookId === bookId) this._dailyProgressLoadingBookId = null;
@@ -580,44 +631,19 @@ export const appViewMethods = {
 
   resetDailyProgress() {
     this.dailyProgressStats = [];
+    this.dailyProgressIsFinished = false;
     this.dailyProgressBookId = null;
   },
 
-  // Donut-Math fuer Header-Today-Ring. Spiegelt overviewTodayRing aus
-  // book-overview/stats.js, liest aber Root-State. Live-Delta = Live-Σ chars
-  // − letzter Snapshot strikt vor heute; negativ wird auf 0 geklemmt.
+  // Header-Today-Ring: kleiner Donut (r=14). Shared Math mit Overview-Tile in
+  // [public/js/today-ring.js] — beide Donuts driften nie auseinander.
   headerTodayRing() {
-    const goalChars = Number(this.currentUser?.daily_goal_chars) || 1500;
-    const goal = Math.max(1, goalChars);
-    const a = this.dailyProgressStats || [];
-    const tokEsts = this.tokEsts || {};
-    const tree = this.tree || [];
-    const todayIso = localIsoDate();
-    const liveChars = aggregateLiveBookStats(tokEsts, tree).chars;
-    let cronTodayChars = null;
-    let prevChars = null;
-    for (let i = a.length - 1; i >= 0; i--) {
-      const r = a[i];
-      if (!r?.recorded_at) continue;
-      if (r.recorded_at === todayIso && cronTodayChars == null) {
-        cronTodayChars = Number(r.chars) || 0;
-        continue;
-      }
-      if (r.recorded_at < todayIso && prevChars == null) {
-        prevChars = Number(r.chars) || 0;
-        break;
-      }
-    }
-    const curChars = liveChars > 0 ? liveChars : cronTodayChars;
-    let chars = 0;
-    if (curChars != null && prevChars != null) chars = Math.max(0, curChars - prevChars);
-    const pct = Math.max(0, Math.min(100, Math.round((chars / goal) * 100)));
-    const r = 14;
-    const circ = 2 * Math.PI * r;
-    const dash = (pct / 100) * circ;
-    const gap = circ - dash;
-    const reached = chars >= goal;
-    const active = chars > 0;
-    return { chars, goal, pct, r, dash, gap, reached, active };
+    return computeTodayRing({
+      stats: this.dailyProgressStats,
+      tokEsts: this.tokEsts,
+      tree: this.tree,
+      goalChars: this.currentUser?.daily_goal_chars || 1500,
+      r: 14,
+    });
   },
 };

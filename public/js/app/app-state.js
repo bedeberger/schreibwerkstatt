@@ -61,6 +61,9 @@ const navigationState = () => ({
   // Schreibpfade enforced sind. `bookRoles` cached pro Buch.
   bookRoles: {},
   currentBookRole: null,
+  // Per-Buch: true wenn mind. 2 ACL-Eintraege (Owner + N) → Collab-Poller + Presence-Pings
+  // erst dann starten. Single-User-Bücher pollen nicht. Befüllt in `_loadBookRole`.
+  bookSharedFlags: {},
   pages: [],
   tree: [],
   _applyingHash: false,
@@ -393,6 +396,7 @@ const bookCreateState = () => ({
 const dailyProgressState = () => ({
   dailyProgressBookId: null,
   dailyProgressStats: [],
+  dailyProgressIsFinished: false,
   _dailyProgressLoadingBookId: null,
 });
 

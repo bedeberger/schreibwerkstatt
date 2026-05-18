@@ -296,6 +296,7 @@ export const treeMethods = {
       return;
     }
     let role = null;
+    let shared = false;
     try {
       const res = await fetch('/books/' + encodeURIComponent(id) + '/access', {
         headers: { Accept: 'application/json' },
@@ -303,12 +304,17 @@ export const treeMethods = {
       if (res.ok) {
         const data = await res.json();
         role = data?.my_role || null;
+        shared = Array.isArray(data?.access) && data.access.length > 1;
       }
     } catch (e) {
       // Netzwerk-Fehler → role bleibt null (Legacy-Fallback: canEdit=true)
     }
     this.bookRoles[id] = role;
-    if (String(this.selectedBookId) === id) this.currentBookRole = role;
+    this.bookSharedFlags[id] = shared;
+    if (String(this.selectedBookId) === id) {
+      this.currentBookRole = role;
+      if (shared) this._startCollabPoll?.(id);
+    }
   },
 
   // Edit-Recht (Page-HTML schreiben): editor + owner. lektor + viewer nein.
