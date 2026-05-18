@@ -75,6 +75,7 @@ function _renderDenied(res, lang, reasonKey) {
 <link rel="icon" href="/schreibwerkstatt_icon.svg">
 <link rel="stylesheet" href="/css/tokens.css">
 <link rel="stylesheet" href="/css/landing.css">
+<script defer src="/js/plausible-init.js"></script>
 </head>
 <body>
 <main class="public-shell">
@@ -262,6 +263,7 @@ router.get('/login', (req, res) => {
 <link rel="icon" href="/schreibwerkstatt_icon.svg">
 <link rel="stylesheet" href="/css/tokens.css">
 <link rel="stylesheet" href="/css/landing.css">
+<script defer src="/js/plausible-init.js"></script>
 </head>
 <body>
 <main class="public-shell">
@@ -376,6 +378,7 @@ router.get('/auth/logout', (req, res) => {
 <link rel="icon" href="/schreibwerkstatt_icon.svg">
 <link rel="stylesheet" href="/css/tokens.css">
 <link rel="stylesheet" href="/css/landing.css">
+<script defer src="/js/plausible-init.js"></script>
 </head>
 <body>
 <main class="public-shell">

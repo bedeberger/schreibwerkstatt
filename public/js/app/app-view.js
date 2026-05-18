@@ -476,6 +476,27 @@ export const appViewMethods = {
     // `loadPages()` übernimmt den Rest (figuren + bookReviewHistory).
   },
 
+  // Nach Sleep/Wake: in-flight Fetches sind tot, Listen können leer hängen
+  // (Tab überlebt im Memory, aber TCP-Sockets sind weg). `/config` triggert
+  // 401-Check über globalen Wrapper; Editor-Sessions bleiben unberührt.
+  async _refreshAfterWake() {
+    try { await fetch('/config', { credentials: 'same-origin' }); } catch (e) {}
+    if (this.sessionExpired) return;
+    if (this.isAdminOnly) return;
+    if (this.editMode || this.editDirty) return;
+    if (!this.selectedBookId) {
+      try { await this.loadBooks(); } catch (e) {}
+      return;
+    }
+    try { await this.loadBooks(); } catch (e) {}
+    try { await this.loadPages({ source: 'wake' }); } catch (e) {}
+    for (const c of EXCLUSIVE_CARDS) {
+      if (this[c.flag]) {
+        window.dispatchEvent(new CustomEvent('card:refresh', { detail: { name: c.key } }));
+      }
+    }
+  },
+
   // Setzt alles zurück: Seiten-Level (via resetPage) + Buch-Level.
   // Sub-Komponenten hören auf `view:reset` und resetten eigenen State.
   async resetView() {

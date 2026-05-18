@@ -720,6 +720,17 @@ document.addEventListener('alpine:init', () => {
       }, { signal });
       window.addEventListener('session-expired', () => { this.sessionExpired = true; }, { signal });
       window.addEventListener('job:finished', (e) => this._onJobFinished(e.detail), { signal });
+      // Sleep/Wake-Recovery: bei längerer Hide-Phase (>30 s) Daten neu laden,
+      // sonst bleiben Listen leer (in-flight Fetches sterben mit TCP-Socket).
+      let _hiddenAt = 0;
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') { _hiddenAt = Date.now(); return; }
+        if (!_hiddenAt) return;
+        const delta = Date.now() - _hiddenAt;
+        _hiddenAt = 0;
+        if (delta < 30_000) return;
+        this._refreshAfterWake();
+      }, { signal });
       window.addEventListener('beforeunload', (e) => {
         if (this.editMode && this.editDirty) { e.preventDefault(); e.returnValue = ''; }
         // Best-Effort: eigenen Soft-Lock + Presence-Eintrag freigeben, damit

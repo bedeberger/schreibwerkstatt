@@ -216,6 +216,34 @@ app.use(authRouter);
 // liefern dann die SPA-Shell.
 app.use(require('./routes/public'));
 
+// Plausible-Bootstrap dynamisch rendern: enabled+URL aus app_settings.
+// Disabled oder leere URL → no-op JS (kein Tracking, keine Console-Error).
+// Admin-Toggle ist die einzige Aktivierungs-Bedingung — keine Host-/Env-Filter.
+// Vor dem Auth-Guard, damit Landing/Login/Register das Script ebenfalls laden.
+// Cache-Control: no-store, damit Toggle ohne Browser-Reload-Hack greift.
+app.get('/js/plausible-init.js', (req, res) => {
+  res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store');
+  const enabled = !!appSettings.get('analytics.plausible.enabled');
+  const scriptUrl = String(appSettings.get('analytics.plausible.script_url') || '').trim();
+  if (!enabled || !scriptUrl) {
+    return res.send('/* plausible disabled */\n');
+  }
+  const safeUrl = JSON.stringify(scriptUrl);
+  res.send(
+    `// Plausible-Bootstrap. URL aus Admin-Settings (analytics.plausible.script_url).\n` +
+    `(function () {\n` +
+    `  var s = document.createElement('script');\n` +
+    `  s.async = true;\n` +
+    `  s.src = ${safeUrl};\n` +
+    `  document.head.appendChild(s);\n` +
+    `  window.plausible = window.plausible || function () { (plausible.q = plausible.q || []).push(arguments); };\n` +
+    `  plausible.init = plausible.init || function (i) { plausible.o = i || {}; };\n` +
+    `  plausible.init({ hashBasedRouting: true });\n` +
+    `})();\n`
+  );
+});
+
 // ── Öffentliche PWA-Assets (vor Auth-Guard) ──────────────────────────────────
 // Browser holen manifest.webmanifest und sw.js ohne Credentials; hinter dem
 // Auth-Guard würde das in einen Google-OIDC-Redirect laufen und CORS-Fehler werfen.
@@ -365,33 +393,6 @@ app.use((req, _res, next) => {
     }
   }
   next();
-});
-
-// Plausible-Bootstrap dynamisch rendern: enabled+URL aus app_settings.
-// Disabled oder leere URL → no-op JS (kein Tracking, keine Console-Error).
-// Admin-Toggle ist die einzige Aktivierungs-Bedingung — keine Host-/Env-Filter.
-// Cache-Control: no-store, damit Toggle ohne Browser-Reload-Hack greift.
-app.get('/js/plausible-init.js', (req, res) => {
-  res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-store');
-  const enabled = !!appSettings.get('analytics.plausible.enabled');
-  const scriptUrl = String(appSettings.get('analytics.plausible.script_url') || '').trim();
-  if (!enabled || !scriptUrl) {
-    return res.send('/* plausible disabled */\n');
-  }
-  const safeUrl = JSON.stringify(scriptUrl);
-  res.send(
-    `// Plausible-Bootstrap. URL aus Admin-Settings (analytics.plausible.script_url).\n` +
-    `(function () {\n` +
-    `  var s = document.createElement('script');\n` +
-    `  s.async = true;\n` +
-    `  s.src = ${safeUrl};\n` +
-    `  document.head.appendChild(s);\n` +
-    `  window.plausible = window.plausible || function () { (plausible.q = plausible.q || []).push(arguments); };\n` +
-    `  plausible.init = plausible.init || function (i) { plausible.o = i || {}; };\n` +
-    `  plausible.init({ hashBasedRouting: true });\n` +
-    `})();\n`
-  );
 });
 
 app.use(staticServe);
