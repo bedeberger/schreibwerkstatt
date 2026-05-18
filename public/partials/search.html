@@ -6,15 +6,18 @@
   </div>
 
   <div class="search-q-row">
-    <input
-      type="search"
-      class="search-q"
-      x-model="q"
-      :placeholder="$app.t('search.placeholder')"
-      :aria-label="$app.t('search.placeholder')"
-      @input="onInput()"
-      @keydown.enter.prevent="runSearch()"
-    />
+    <span class="search-affix">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=635#search"/></svg>
+      <input
+        type="search"
+        class="search-q"
+        x-model="q"
+        :placeholder="$app.t('search.placeholder')"
+        :aria-label="$app.t('search.placeholder')"
+        @input="onInput()"
+        @keydown.enter.prevent="runSearch()"
+      />
+    </span>
     <button type="button"
       class="btn-compact search-clear"
       x-show="q"

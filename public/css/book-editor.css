@@ -343,6 +343,11 @@
     font-size: var(--font-size-sm);
     color: var(--color-text);
   }
+  .book-editor-conflict__icon {
+    font-size: 16px;
+    color: var(--color-err-text);
+    flex-shrink: 0;
+  }
 
   /* Header-Counter — minimalistisch. */
   .book-editor-counter {

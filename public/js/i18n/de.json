@@ -766,6 +766,7 @@
   "kapitelReview.history":          "Frühere Kapitel-Reviews",
   "kapitelReview.lastEdit":         "Zuletzt bearbeitet: {when}",
   "kapitelReview.pagesHeading":     "Seiten im Kapitel ({n})",
+  "kapitelReview.emptyHint":        "Dieses Kapitel hat noch keine Seiten — leg gleich die erste an.",
   "kapitelReview.newPagePlaceholder": "Titel der neuen Seite…",
   "kapitelReview.newPageAdd":       "Seite anlegen",
   "kapitelReview.newChapterPlaceholder": "Titel des nächsten Kapitels…",

@@ -405,15 +405,8 @@ body.focus-mode #editor-card .save-indicator { opacity: 1; }
   margin: var(--space-6) 12px 0;
 }
 .editor-conflict-banner__icon {
-  font-weight: 700;
-  width: 1.4em;
-  height: 1.4em;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--color-err-text) 35%, transparent);
-  color: var(--color-bg);
+  font-size: 18px;
+  flex-shrink: 0;
 }
 .editor-conflict-banner__text { flex: 1 1 auto; }
 .editor-conflict-banner__action {

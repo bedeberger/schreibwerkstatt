@@ -120,6 +120,9 @@
   background: var(--color-err-bg);
 }
 .book-settings-danger-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
   font-size: var(--font-size-mini);
   font-weight: 600;
   text-transform: uppercase;

@@ -1,5 +1,5 @@
 /* Lucide-Icons via SVG-Sprite (public/icons.svg).
-   Markup: <svg class="icon" aria-hidden="true"><use href="/icons.svg#NAME"/></svg>
+   Markup: <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=635#NAME"/></svg>
    Stroke/Fill werden hier auf dem konsumierenden <svg> deklariert; <use>
    creates a shadow tree that inherits via cascade. */
 
@@ -22,6 +22,13 @@
 .icon--sm { font-size: 14px; stroke-width: 2.25; }
 .icon--md { font-size: 18px; }
 .icon--lg { font-size: 22px; stroke-width: 1.75; }
+
+/* Button mit Icon + Text: inline-flex sorgt fuer konsistenten Gap und vertikale Achse. */
+button:has(> .icon) {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+}
 
 /* CSS-Pseudo-Icon: nutzt mask-image, damit currentColor weiterhin greift
    (z.B. fuer .history-chevron / .tree-chevron, die rotieren).

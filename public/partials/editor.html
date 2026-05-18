@@ -132,7 +132,7 @@
   <!-- Cross-User-Konflikt aus _checkPageConflict / Server-OCC. Bleibt im
        Fokusmodus sichtbar (eigene Klasse, nicht via #status versteckt). -->
   <div class="editor-conflict-banner" role="alert" x-show="editConflict" x-cloak>
-    <span class="editor-conflict-banner__icon" aria-hidden="true">!</span>
+    <svg class="icon editor-conflict-banner__icon" aria-hidden="true"><use href="/icons.svg?v=635#alert-triangle"/></svg>
     <span class="editor-conflict-banner__text"
           x-text="t('edit.conflict.banner', {
             user: editConflict?.remoteUserName || t('edit.conflict.unknownUser'),

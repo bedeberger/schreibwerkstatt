@@ -275,9 +275,11 @@ const staticServe = express.static(path.join(__dirname, 'public'), {
     // Service-Worker-Version fest und sehen Asset-Updates nicht.
     if (/(?:^|[\\/])sw\.js$/i.test(filePath)) {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    } else if (/\.(png|jpe?g|gif|webp|svg|ico|woff2?)$/i.test(filePath)) {
+    } else if (/\.(png|jpe?g|gif|webp|ico|woff2?)$/i.test(filePath)) {
       res.setHeader('Cache-Control', 'public, max-age=604800');
     } else {
+      // SVG-Sprites zählen als Code (Icon-Set wird editiert) — wie JS/CSS via
+      // ETag revalidieren, sonst halten Browser bis zu 7 Tage alte Versionen.
       res.setHeader('Cache-Control', 'no-cache');
     }
   },

@@ -23,15 +23,15 @@
       </button>
       <span class="card-form-saved" x-show="savedAt" x-cloak x-transition.opacity.duration.250ms x-text="$app.t('pdfExport.saved')"></span>
       <div class="pdfx-scope-picker" x-show="!exporting">
-        <div x-data="combobox($app.t('export.scope.label'))"
+        <div x-data="combobox({ placeholder: $app.t('export.scope.label'), compact: false })"
              x-modelable="value" x-model="exportScope"
              x-effect="options = exportScopeOptions()"></div>
         <div x-show="exportScope === 'chapter'"
-             x-data="combobox($app.t('export.scope.pickChapter'))"
+             x-data="combobox({ placeholder: $app.t('export.scope.pickChapter'), compact: false })"
              x-modelable="value" x-model="exportChapterId"
              x-effect="options = exportChapterOptions()"></div>
         <div x-show="exportScope === 'page'"
-             x-data="combobox($app.t('export.scope.pickPage'))"
+             x-data="combobox({ placeholder: $app.t('export.scope.pickPage'), compact: false })"
              x-modelable="value" x-model="exportPageId"
              x-effect="options = exportPageOptions()"></div>
       </div>
@@ -40,8 +40,10 @@
               x-show="!exporting"
               :disabled="!$app.selectedBookId"
               :data-tip="!$app.selectedBookId ? $app.t('pdfExport.export.noBookHint') : ''"
-              @click="exportPdf()"
-              x-text="$app.t('pdfExport.export')"></button>
+              @click="exportPdf()">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=635#download"/></svg>
+        <span x-text="$app.t('pdfExport.export')"></span>
+      </button>
       <button type="button"
               x-show="exporting"
               @click="cancelExport()">

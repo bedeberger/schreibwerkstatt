@@ -59,7 +59,10 @@
   <template x-if="kapitelReviewSelectedChapter()">
     <div class="kapitel-pages-section">
       <div class="kapitel-pages-heading" x-text="$app.t('kapitelReview.pagesHeading', { n: kapitelReviewSelectedChapter().pages.length })"></div>
-      <div class="kapitel-pages-list">
+      <div class="kapitel-empty-hint"
+           x-show="kapitelReviewSelectedChapter().pages.length === 0"
+           x-text="$app.t('kapitelReview.emptyHint')"></div>
+      <div class="kapitel-pages-list" x-show="kapitelReviewSelectedChapter().pages.length > 0">
         <template x-for="page in kapitelReviewSelectedChapter().pages" :key="page.id">
           <div class="kapitel-page-row" @click="$app.selectPage(page)" :data-tip="$app.pageStatusTooltip(page).join(' · ')">
             <span class="kapitel-page-name">

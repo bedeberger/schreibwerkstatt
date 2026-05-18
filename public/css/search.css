@@ -152,6 +152,23 @@
   padding: 0 10px;
   box-sizing: border-box;
 }
+
+/* Generisches Suchfeld-Affix: <span class="search-affix"><svg .icon/> + <input/></span> */
+.search-affix {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.search-affix > .icon {
+  position: absolute;
+  left: 10px;
+  color: var(--color-muted);
+  font-size: 14px;
+  pointer-events: none;
+}
+.search-affix.search-affix > input { padding-left: 30px; }
 .btn-group.sidebar-action-group {
   display: inline-flex;
   align-items: stretch;

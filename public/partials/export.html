@@ -12,15 +12,15 @@
 
   <div class="book-export-scope">
     <label class="book-export-scope-label" x-text="$app.t('export.scope.label')"></label>
-    <div x-data="combobox($app.t('export.scope.label'))"
+    <div x-data="combobox({ placeholder: $app.t('export.scope.label'), compact: false })"
          x-modelable="value" x-model="exportScope"
          x-effect="options = exportScopeOptions()"></div>
     <div x-show="exportScope === 'chapter'"
-         x-data="combobox($app.t('export.scope.pickChapter'))"
+         x-data="combobox({ placeholder: $app.t('export.scope.pickChapter'), compact: false })"
          x-modelable="value" x-model="exportChapterId"
          x-effect="options = exportChapterOptions()"></div>
     <div x-show="exportScope === 'page'"
-         x-data="combobox($app.t('export.scope.pickPage'))"
+         x-data="combobox({ placeholder: $app.t('export.scope.pickPage'), compact: false })"
          x-modelable="value" x-model="exportPageId"
          x-effect="options = exportPageOptions()"></div>
   </div>
@@ -32,6 +32,7 @@
               :disabled="!!bookExportLoading || !$app.selectedBookId"
               @click="bookExport(fmt)">
         <span x-show="bookExportLoading === fmt" class="spinner"></span>
+        <svg x-show="bookExportLoading !== fmt" class="icon" aria-hidden="true"><use href="/icons.svg?v=635#download"/></svg>
         <span x-text="$app.t('book.export.' + fmt)"></span>
       </button>
     </template>

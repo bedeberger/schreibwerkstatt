@@ -272,7 +272,10 @@
     </section>
 
     <div class="book-settings-danger-zone">
-      <div class="book-settings-danger-title" x-text="$app.t('book.settings.dangerZone')"></div>
+      <div class="book-settings-danger-title">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=635#alert-triangle"/></svg>
+        <span x-text="$app.t('book.settings.dangerZone')"></span>
+      </div>
 
       <div class="book-settings-danger-section">
         <div class="book-settings-danger-row">
@@ -342,7 +345,7 @@
                 <td>
                   <span x-text="row.count"></span>
                   <span x-show="row.errorCount > 0" class="job-stats-errors">
-                    / <span x-text="row.errorCount"></span> <svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg>
+                    / <span x-text="row.errorCount"></span> <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=635#x"/></svg>
                   </span>
                 </td>
               </tr>
