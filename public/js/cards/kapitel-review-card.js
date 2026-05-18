@@ -28,8 +28,13 @@ export function registerKapitelReviewCard() {
       const onSelectChapter = (e) => {
         const chapterId = e.detail?.chapterId;
         if (!chapterId) return;
-        const opts = this.kapitelReviewChapterOptions();
-        if (!opts.some(c => String(c.id) === String(chapterId))) return;
+        // Auch frisch angelegte (noch 0-seitige) Kapitel akzeptieren — die Karte
+        // dient dann als Einstieg fürs Anlegen der ersten Seite.
+        const tree = window.__app.tree || [];
+        const exists = tree.some(i =>
+          i.type === 'chapter' && !i.solo && String(i.id) === String(chapterId)
+        );
+        if (!exists) return;
         window.__app.kapitelReviewChapterId = String(chapterId);
       };
 
@@ -190,14 +195,20 @@ export function registerKapitelReviewCard() {
     // Wird beim Öffnen der Karte (über den $watch) aufgerufen — setzt ein
     // Default-Kapitel und lädt die History.
     async _openKapitelReview() {
-      const current = window.__app.kapitelReviewChapterId;
-      const eligible = this.kapitelReviewChapterOptions();
-      const stillValid = current && eligible.some(c => String(c.id) === String(current));
+      const root = window.__app;
+      const current = root.kapitelReviewChapterId;
+      // Gültig = irgendein Kapitel im Tree (auch 0-seitige), damit ein per
+      // Sidebar/Hash gezielt gewähltes neues Kapitel nicht überschrieben wird.
+      const tree = root.tree || [];
+      const stillValid = current && tree.some(i =>
+        i.type === 'chapter' && !i.solo && String(i.id) === String(current)
+      );
       if (!stillValid) {
-        window.__app.kapitelReviewChapterId = eligible.length ? String(eligible[0].id) : '';
+        const eligible = this.kapitelReviewChapterOptions();
+        root.kapitelReviewChapterId = eligible.length ? String(eligible[0].id) : '';
       }
-      if (window.__app.selectedBookId) {
-        await this.loadKapitelReviewHistory(window.__app.selectedBookId);
+      if (root.selectedBookId) {
+        await this.loadKapitelReviewHistory(root.selectedBookId);
       }
     },
 
