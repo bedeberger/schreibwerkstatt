@@ -140,6 +140,36 @@
 }
 
 .search-wrap { margin-bottom: var(--space-10); }
+.sidebar-search-wrap {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-2xs);
+}
+.sidebar-search-wrap .page-search {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 34px;
+  padding: 0 10px;
+  box-sizing: border-box;
+}
+.sidebar-action-group {
+  display: inline-flex;
+  align-items: stretch;
+  gap: var(--space-2xs);
+  flex-shrink: 0;
+}
+.sidebar-action-group .graph-tool-btn {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-base);
+  line-height: 1;
+  padding: 0;
+  box-sizing: border-box;
+  border-radius: var(--radius-md);
+}
 .batch-wrap { margin-bottom: var(--space-10); }
 .tok-stats-wrap { display: contents; }
 

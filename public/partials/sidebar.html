@@ -7,19 +7,27 @@
       <button type="button" @click="batchCheck()" :disabled="!pages.length" :data-tip="t('sidebar.checkAllTitle')" x-text="t('sidebar.checkAll')"></button>
     </div>
   </div>
-  <!-- Suche -->
-  <div class="search-wrap">
+  <!-- Suche + Expand/Collapse -->
+  <div class="search-wrap sidebar-search-wrap">
     <input type="text" x-model="pageSearch" @input="onPageSearchInput()" @keydown="onPageSearchKeydown($event)" :placeholder="t('sidebar.searchPage')" :aria-label="t('sidebar.searchPage')" :data-tip="t('sidebar.searchPageTitle')" class="page-search">
+    <div class="btn-group sidebar-action-group">
+      <button type="button" class="graph-tool-btn"
+              @click="tree.forEach(c => { if (!c.solo) c.open = true })"
+              :disabled="!!pageSearch"
+              :data-tip="t('sidebar.expandAll')"
+              :aria-label="t('sidebar.expandAll')">⌄</button>
+      <button type="button" class="graph-tool-btn"
+              @click="tree.forEach(c => { if (!c.solo) c.open = false })"
+              :disabled="!!pageSearch"
+              :data-tip="t('sidebar.collapseAll')"
+              :aria-label="t('sidebar.collapseAll')">⌃</button>
+    </div>
   </div>
-  <div x-show="!pageSearch" class="btn-group">
-    <button type="button" @click="tree.forEach(c => { if (!c.solo) c.open = true })" class="btn-compact" x-text="t('sidebar.expandAll')"></button>
-    <button type="button" @click="tree.forEach(c => { if (!c.solo) c.open = false })" class="btn-compact" x-text="t('sidebar.collapseAll')"></button>
-    <span x-show="tokTotals.any" class="tok-totals">
-      <span class="tok-badge tok-neutral" x-text="'∑ ' + tokTotals.chars.toLocaleString(_numLocale) + ' ' + t('bookstats.unit.z')"></span>
-      <span class="tok-badge tok-neutral" x-text="'∑ ' + tokTotals.normseiten.toLocaleString(_numLocale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' ' + t('bookstats.unit.ns')"></span>
-      <span class="tok-badge tok-neutral" x-text="'∑ ' + tokTotals.words.toLocaleString(_numLocale) + ' ' + t('bookstats.unit.w')"></span>
-      <span class="tok-badge tok-neutral" x-text="'∑ ' + tokTotals.tok.toLocaleString(_numLocale) + ' ' + t('bookstats.unit.t')"></span>
-    </span>
+  <div x-show="!pageSearch && tokTotals.any" class="tok-totals">
+    <span class="tok-badge tok-neutral" x-text="'∑ ' + tokTotals.chars.toLocaleString(_numLocale) + ' ' + t('bookstats.unit.z')"></span>
+    <span class="tok-badge tok-neutral" x-text="'∑ ' + tokTotals.normseiten.toLocaleString(_numLocale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' ' + t('bookstats.unit.ns')"></span>
+    <span class="tok-badge tok-neutral" x-text="'∑ ' + tokTotals.words.toLocaleString(_numLocale) + ' ' + t('bookstats.unit.w')"></span>
+    <span class="tok-badge tok-neutral" x-text="'∑ ' + tokTotals.tok.toLocaleString(_numLocale) + ' ' + t('bookstats.unit.t')"></span>
   </div>
   <!-- Batch-Fortschritt -->
   <div x-show="batchLoading || batchStatus" class="batch-wrap">

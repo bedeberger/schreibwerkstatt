@@ -146,32 +146,34 @@
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   margin: var(--space-sm) 0 var(--space-md);
 }
 .organizer-toolbar .page-search {
-  flex: 1 1 220px;
-  min-width: 0;
+  flex: 1 1 0;
+  min-width: 120px;
 }
 .organizer-jump {
-  min-width: 200px;
-  flex-shrink: 0;
+  flex: 0 1 220px;
+  min-width: 140px;
 }
 .organizer-action-group {
   display: inline-flex;
-  align-items: center;
+  align-items: stretch;
+  align-self: stretch;
   gap: var(--space-2xs);
   flex-shrink: 0;
 }
 .organizer-action-group .graph-tool-btn {
-  width: 32px;
-  height: 32px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  aspect-ratio: 1 / 1;
+  height: auto;
+  min-width: 0;
+  padding: 0 var(--space-xs);
   font-size: var(--font-size-base);
   line-height: 1;
-  padding: 0;
 }
 
 .organizer-chapter-toggle {
