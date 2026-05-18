@@ -1332,7 +1332,7 @@
   "admin.settings.tab.smtp":     "SMTP / Mailer",
   "admin.settings.analytics.enabledLabel": "Plausible tracking active",
   "admin.settings.analytics.scriptUrlLabel": "Bootstrap script URL",
-  "admin.settings.analytics.scriptUrlHint": "Full URL to the Plausible tracker JS, e.g. https://analytics.example.com/js/pa-XXXX.js. The origin is added to the CSP automatically. Tracking runs only on production hostnames (no localhost/.local).",
+  "admin.settings.analytics.scriptUrlHint": "Full URL to the Plausible tracker JS, e.g. https://analytics.example.com/js/pa-XXXX.js. The origin is added to the CSP automatically. Tracking runs on every host as soon as the checkbox is enabled.",
   "admin.settings.smtp.hint":    "Gmail account for invite + notification mails. Active as soon as address and app password are set. Host/port/TLS are implicit via service:'gmail' (smtp.gmail.com:465 TLS).",
   "admin.settings.smtp.appPasswordHint": "2FA must be enabled. Generate the 16-character app password at:",
   "admin.settings.test.connection": "Test connection",

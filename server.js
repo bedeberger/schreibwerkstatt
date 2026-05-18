@@ -368,8 +368,9 @@ app.use((req, _res, next) => {
 });
 
 // Plausible-Bootstrap dynamisch rendern: enabled+URL aus app_settings.
-// Disabled → no-op JS, damit das <script>-Tag im HTML keine Console-Error wirft.
-// Cache-Control: no-store, damit Admin-Toggle ohne Browser-Reload-Hack greift.
+// Disabled oder leere URL → no-op JS (kein Tracking, keine Console-Error).
+// Admin-Toggle ist die einzige Aktivierungs-Bedingung — keine Host-/Env-Filter.
+// Cache-Control: no-store, damit Toggle ohne Browser-Reload-Hack greift.
 app.get('/js/plausible-init.js', (req, res) => {
   res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
   res.setHeader('Cache-Control', 'no-store');
@@ -380,11 +381,8 @@ app.get('/js/plausible-init.js', (req, res) => {
   }
   const safeUrl = JSON.stringify(scriptUrl);
   res.send(
-    `// Plausible-Bootstrap (self-hosted Instanz). Nur auf Produktions-Hosts\n` +
-    `// (kein localhost/.local). URL ist im Admin-Settings-UI konfiguriert.\n` +
+    `// Plausible-Bootstrap. URL aus Admin-Settings (analytics.plausible.script_url).\n` +
     `(function () {\n` +
-    `  var h = location.hostname;\n` +
-    `  if (h === 'localhost' || h === '127.0.0.1' || h === '::1' || h.endsWith('.local')) return;\n` +
     `  var s = document.createElement('script');\n` +
     `  s.async = true;\n` +
     `  s.src = ${safeUrl};\n` +

@@ -1333,7 +1333,7 @@
   "admin.settings.tab.smtp":     "SMTP / Mailer",
   "admin.settings.analytics.enabledLabel": "Plausible-Tracking aktiv",
   "admin.settings.analytics.scriptUrlLabel": "Bootstrap-Script-URL",
-  "admin.settings.analytics.scriptUrlHint": "Voller Pfad zum Plausible-Tracker-JS, z.B. https://analytics.example.com/js/pa-XXXX.js. Origin wird automatisch in die CSP übernommen. Tracking läuft nur auf Produktions-Hostnamen (kein localhost/.local).",
+  "admin.settings.analytics.scriptUrlHint": "Voller Pfad zum Plausible-Tracker-JS, z.B. https://analytics.example.com/js/pa-XXXX.js. Origin wird automatisch in die CSP übernommen. Tracking läuft auf allen Hosts, sobald die Checkbox aktiviert ist.",
   "admin.settings.smtp.hint":    "Gmail-Konto für Invite- und Notification-Mails. Aktiv sobald Adresse und App-Passwort gesetzt sind. Host/Port/TLS sind via service:'gmail' implizit (smtp.gmail.com:465 TLS).",
   "admin.settings.smtp.appPasswordHint": "2FA muss aktiv sein. App-Passwort (16 Zeichen) erzeugen unter:",
   "admin.settings.test.connection": "Verbindung testen",
