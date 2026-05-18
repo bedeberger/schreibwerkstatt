@@ -8,7 +8,7 @@
 }
 ::highlight(edit-find-current) {
   background: var(--color-accent);
-  color: #1a1a1a;
+  color: var(--color-on-accent);
 }
 
 /* left/top werden in editor-find.js aus der Editor-Karten-Box berechnet. */

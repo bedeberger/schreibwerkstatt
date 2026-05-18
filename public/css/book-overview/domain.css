@@ -85,8 +85,8 @@
 .overview-ort-dot[data-typ="stadt"]      { background: var(--color-accent); }
 .overview-ort-dot[data-typ="gebaeude"]   { background: var(--color-warn-text); }
 .overview-ort-dot[data-typ="raum"]       { background: var(--color-success); }
-.overview-ort-dot[data-typ="landschaft"] { background: #6aa9c2; }
-.overview-ort-dot[data-typ="region"]     { background: #9b6dbf; }
+.overview-ort-dot[data-typ="landschaft"] { background: var(--ort-typ-landschaft); }
+.overview-ort-dot[data-typ="region"]     { background: var(--ort-typ-region); }
 
 /* ── Szenen: Stacked-Bar Wertungs-Verteilung ─────────────────────────────── */
 .overview-stacked-bar {

@@ -175,11 +175,10 @@
 
 /* === Farbpicker pro Schriftrolle ===
    Native <input type=color> + danebenstehendes Hex-Textfeld; beide x-modeled
-   auf dasselbe config-Feld. flex-direction: row explizit, weil
-   `.card-form-field` flex-column erzwingt — würde Picker + Hex untereinander
-   stacken statt nebeneinander. */
-.pdfx-color-field {
-  flex-direction: row !important;
+   auf dasselbe config-Feld. Compound-Selector mit `.card-form-field` für
+   gleiche Spezifität wie die Basis-Rule (flex-column → row override). */
+.card-form-field.pdfx-color-field {
+  flex-direction: row;
   align-items: center;
   gap: 0.5rem;
 }

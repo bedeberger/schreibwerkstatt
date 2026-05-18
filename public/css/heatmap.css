@@ -80,8 +80,8 @@
 .heatmap-table tbody td.heatmap-cluster-start {
   border-left: 0.5px solid var(--color-border);
 }
-.heatmap-rowhead {
-  text-align: left !important;
+.heatmap-table .heatmap-rowhead {
+  text-align: left;
   font-weight: 500;
 }
 /* Erste Spalte bleibt beim horizontalen Scrollen sichtbar */

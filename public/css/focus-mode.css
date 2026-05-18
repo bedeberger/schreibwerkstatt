@@ -163,11 +163,10 @@ body.focus-mode:not(.focus-mode--typewriter-only)
      „extra grau" auffällt. Snap-Out auf dim. */
 }
 
-/* Aktiver Block im Light-Mode auf reines Schwarz heben (statt --color-text
-   #1a1a1a), damit der Kontrast zu den dim-Blöcken (opacity 0.35) deutlich
-   ist. Dark-Theme behält --color-text. */
-:root:not([data-theme="dark"]) body.focus-mode :is(.page-content-view, .page-content-view--editing) .focus-paragraph-active {
-  color: #000;
+/* Aktiver Block hebt sich vom dim-Block (opacity 0.35) ab. Token-Werte:
+   Light = #000, Dark = --color-text (siehe tokens/colors.css). */
+body.focus-mode :is(.page-content-view, .page-content-view--editing) .focus-paragraph-active {
+  color: var(--color-focus-active-text);
 }
 
 /* Window-3-Modus: Nachbarn (prev/next) bekommen abgeschwächten Mid-Tone,
