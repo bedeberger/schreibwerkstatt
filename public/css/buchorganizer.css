@@ -256,5 +256,15 @@
   .organizer-page {
     flex-wrap: wrap;
   }
+  .card--organizer .combobox-wrap--compact .combobox-dropdown {
+    left: 0;
+    right: 0;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .card--organizer .combobox-wrap--compact .combobox-option {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
 }
 }
