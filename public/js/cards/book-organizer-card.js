@@ -33,7 +33,6 @@ export function registerBookOrganizerCard() {
     chapterOpen: {},   // { [chapter_id]: bool } — per-Buch UI-Sicht
     organizerSearch: '',
     jumpToChapterId: '',
-    moveComboValue: '', // dummy-Slot für Move-Combobox (Action-Trigger, kein Persist)
     _sortables: [],
     _lifecycle: null,
     _undoStack: [],
@@ -47,7 +46,7 @@ export function registerBookOrganizerCard() {
         showFlag: 'showBookOrganizerCard',
         resetState: {
           workTree: [], soloPages: [],
-          chapterOpen: {}, organizerSearch: '', jumpToChapterId: '', moveComboValue: '',
+          chapterOpen: {}, organizerSearch: '', jumpToChapterId: '',
           organizerStatus: '', organizerProgress: 0, organizerSaving: false,
           _undoStack: [], _redoStack: [], _inHistoryFlight: false,
         },
@@ -61,7 +60,7 @@ export function registerBookOrganizerCard() {
           ctx._destroySortables();
           Object.assign(ctx, {
             workTree: [], soloPages: [],
-            chapterOpen: {}, organizerSearch: '', jumpToChapterId: '', moveComboValue: '',
+            chapterOpen: {}, organizerSearch: '', jumpToChapterId: '',
             organizerStatus: '', organizerProgress: 0, organizerSaving: false,
             _undoStack: [], _redoStack: [], _inHistoryFlight: false,
           });
@@ -73,7 +72,7 @@ export function registerBookOrganizerCard() {
           ctx._destroySortables();
           Object.assign(ctx, {
             workTree: [], soloPages: [],
-            chapterOpen: {}, organizerSearch: '', jumpToChapterId: '', moveComboValue: '',
+            chapterOpen: {}, organizerSearch: '', jumpToChapterId: '',
             _undoStack: [], _redoStack: [], _inHistoryFlight: false,
           });
         },

@@ -74,6 +74,9 @@
 .organizer-name {
   flex: 1;
   min-width: 0;
+  box-sizing: border-box;
+  height: 28px;
+  line-height: 1.2;
   border: 1px solid transparent;
   background: transparent;
   border-radius: var(--radius-sm);
@@ -212,6 +215,9 @@
 }
 /* Trigger an Seitentitel-Input-Höhe angleichen (Row-Alignment). */
 .organizer-move-combo .combobox-trigger {
+  box-sizing: border-box;
+  height: 28px;
+  line-height: 1.2;
   font-size: var(--font-size-base);
   padding: var(--space-xs) 8px;
 }

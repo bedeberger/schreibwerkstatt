@@ -80,10 +80,9 @@
                  autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other"
                  :aria-label="$app.t('bookOrganizer.renamePage')">
           <div class="organizer-move-combo"
-               x-data="combobox($app.t('bookOrganizer.moveTo'))"
-               x-modelable="value" x-model="moveComboValue"
+               x-data="combobox({ placeholder: $app.t('bookOrganizer.moveTo'), transient: true })"
                x-effect="options = chapterMoveOptions(0)"
-               @combobox-change="movePageToChapter(page.id, $event.detail); moveComboValue = ''"></div>
+               @combobox-change="movePageToChapter(page.id, $event.detail)"></div>
           <button type="button" class="organizer-delete-btn" @click="deletePage(page.id)" :disabled="organizerSaving"
                   :data-tip="$app.t('bookOrganizer.deletePage')" :aria-label="$app.t('bookOrganizer.deletePage')">×</button>
         </li>
@@ -131,10 +130,9 @@
                      autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other"
                      :aria-label="$app.t('bookOrganizer.renamePage')">
               <div class="organizer-move-combo"
-                   x-data="combobox($app.t('bookOrganizer.moveTo'))"
-                   x-modelable="value" x-model="moveComboValue"
+                   x-data="combobox({ placeholder: $app.t('bookOrganizer.moveTo'), transient: true })"
                    x-effect="options = chapterMoveOptions(ch.id)"
-                   @combobox-change="movePageToChapter(page.id, $event.detail); moveComboValue = ''"></div>
+                   @combobox-change="movePageToChapter(page.id, $event.detail)"></div>
               <button type="button" class="organizer-delete-btn" @click="deletePage(page.id)" :disabled="organizerSaving"
                       :data-tip="$app.t('bookOrganizer.deletePage')" :aria-label="$app.t('bookOrganizer.deletePage')">×</button>
             </li>

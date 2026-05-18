@@ -270,6 +270,7 @@ document.addEventListener('alpine:init', () => {
     _emptyLabel: cfg.emptyLabel ?? null,
     _compact: cfg.compact !== false,
     _multiple: !!cfg.multiple,
+    _transient: !!cfg.transient,
     _footer: (cfg.footer && typeof cfg.footer.action === 'function') ? cfg.footer : null,
     _onOutside: null,
     highlighted: -1,
@@ -367,6 +368,7 @@ document.addEventListener('alpine:init', () => {
       this.value = val;
       this.close();
       this.$dispatch('combobox-change', val);
+      if (this._transient) this.value = null;
     },
     // Footer-Action (optionaler cfg.footer.action) — z. B. "+ Neues Buch …".
     // Schliesst Dropdown vor dem Handler-Call, damit ein folgendes Modal nicht
