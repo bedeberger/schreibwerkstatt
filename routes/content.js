@@ -352,7 +352,7 @@ router.post('/pages', jsonBody, async (req, res) => {
   catch (e) { if (sendACLError(res, e)) return; throw e; }
   try {
     const created = await contentStore.createPage({
-      book_id: bookIdRaw || undefined,
+      book_id: effBookId,
       chapter_id: chapterIdRaw || undefined,
       name,
       html: req.body?.html,
