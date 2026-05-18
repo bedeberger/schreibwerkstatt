@@ -8,6 +8,18 @@
   <div class="card-header">
     <span class="card-title" x-text="$app.t('bookOrganizer.title', { name: $app.selectedBookName })"></span>
     <div class="card-actions">
+      <button type="button" class="btn-compact"
+              @click="historyUndo()"
+              :disabled="_undoStack.length === 0 || organizerSaving"
+              :data-tip="$app.t('bookOrganizer.undoTip')"
+              :aria-label="$app.t('bookOrganizer.undo')"
+              x-text="$app.t('bookOrganizer.undo')"></button>
+      <button type="button" class="btn-compact"
+              @click="historyRedo()"
+              :disabled="_redoStack.length === 0 || organizerSaving"
+              :data-tip="$app.t('bookOrganizer.redoTip')"
+              :aria-label="$app.t('bookOrganizer.redo')"
+              x-text="$app.t('bookOrganizer.redo')"></button>
       <button type="button" @click="createChapter()" :disabled="organizerSaving" x-text="$app.t('bookOrganizer.newChapter')"></button>
       <button type="button" @click="createPage(0)" :disabled="organizerSaving" x-text="$app.t('bookOrganizer.newSoloPage')"></button>
     </div>

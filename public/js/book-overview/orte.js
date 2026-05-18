@@ -28,14 +28,15 @@ export const orteMethods = {
     const orte = this.overviewOrte || [];
     const tree = window.__app?.tree || [];
     return this._memo('ortPresence', [orte, tree], () => {
+      const empty = { places: [], rows: [] };
       const app = window.__app;
-      if (!app || orte.length === 0) return null;
+      if (!app || orte.length === 0) return empty;
       // Solo-Wrapper (Spezialseiten ohne Kapitel) ausklammern — sie sind in tree
       // als type:'chapter' mit solo:true verpackt (siehe tree.js loadPages).
       const chapters = (app.tree || [])
         .filter(i => i.type === 'chapter' && !i.solo)
         .map(c => ({ id: c.id, name: c.name }));
-      if (chapters.length === 0) return null;
+      if (chapters.length === 0) return empty;
 
       const MAX_COLS = 20;
 
@@ -63,7 +64,7 @@ export const orteMethods = {
         return { id: o.id, name: o.name, typ: o.typ || 'andere', byId, byName, total };
       }).filter(c => c.total > 0);
 
-      if (candidates.length === 0) return null;
+      if (candidates.length === 0) return empty;
       candidates.sort((a, b) => b.total - a.total);
       const selected = candidates.slice(0, MAX_COLS);
 

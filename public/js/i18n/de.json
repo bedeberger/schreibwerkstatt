@@ -626,6 +626,10 @@
   "bookOrganizer.createFailed":   "Anlegen fehlgeschlagen: {detail}",
   "bookOrganizer.deleteFailed":   "Löschen fehlgeschlagen: {detail}",
   "bookOrganizer.pageInEditorWarn": "Seite ist im Editor offen. Bitte zuerst schliessen.",
+  "bookOrganizer.undo":           "Rückgängig",
+  "bookOrganizer.redo":           "Wiederherstellen",
+  "bookOrganizer.undoTip":        "Rückgängig (Cmd/Strg+Z) — max. 10 Schritte",
+  "bookOrganizer.redoTip":        "Wiederherstellen (Cmd/Strg+Shift+Z)",
 
   "overview.title":              "Übersicht: {name}",
   "overview.refresh":            "Neu laden",

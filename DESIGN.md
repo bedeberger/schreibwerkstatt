@@ -17,6 +17,7 @@ Token-Referenz (Farben, Radien, Spacing, Schriftgrössen): [public/css/tokens.cs
 **Komponenten**
 - [Karten](#karten-card) — `.card` + Akzentfarben
 - [Buttons](#buttons) — Hierarchie, Counter
+- [Icon-Toolbar](#icon-toolbar-graph-tool-btn) — Zoom/Reset/Fullscreen-Cluster über Canvas-Viewports
 - [Badges & Tags](#badges--tags) — eckig, Severity, Hue-Palette
 - [Combobox](#combobox-auswahlfeld) — ersetzt `<select>`
 - [Tabs / Modus-Toggle](#tabs--modus-toggle) — `.tabs` + `.tabs-btn`
@@ -287,6 +288,69 @@ mit `myCardOptions() { return this.cardData.map(...); }` am Karten-Scope.
 - `:disabled` — Opacity 0.4, cursor not-allowed
 
 **Counter in Button:** `<span class="btn-count">N</span>` rechts vom Label.
+
+---
+
+## Icon-Toolbar (`.graph-tool-btn`)
+
+**Use:** Kompakte Icon-Button-Reihe für Canvas-/Viewport-Steuerung (Zoom +/−, Reset, Fullscreen-Toggle). Genutzt von Figuren-Graph (vis-network) und Figur-Werkstatt-Mindmap (jsMind). Erste Wahl für jeden weiteren Graph/Map/Canvas-Viewer.
+
+**Markup (Overlay-Variante, oben rechts in Canvas-Ecke):**
+```html
+<div class="<viewer>-canvas" style="position: relative">
+  <div class="…-mindmap-controls …-mindmap-controls--overlay">
+    <button type="button" class="graph-tool-btn"
+            :data-tip="$app.t('graph.zoomIn')" :aria-label="$app.t('graph.zoomIn')"
+            @click="…zoomIn()">+</button>
+    <button type="button" class="graph-tool-btn"
+            :data-tip="$app.t('graph.zoomOut')" :aria-label="$app.t('graph.zoomOut')"
+            @click="…zoomOut()">−</button>
+    <button type="button" class="graph-tool-btn graph-tool-btn--reset"
+            :data-tip="$app.t('graph.reset')" :aria-label="$app.t('graph.reset')"
+            @click="…fit()">&#x26F6;</button>
+    <button type="button" class="graph-tool-btn"
+            :aria-pressed="fullscreen"
+            :data-tip="fullscreen ? $app.t('graph.fullscreenClose') : $app.t('graph.fullscreen')"
+            :aria-label="fullscreen ? $app.t('graph.fullscreenClose') : $app.t('graph.fullscreen')"
+            @click="toggleFullscreen()"
+            x-text="fullscreen ? '✕' : '⤢'"></button>
+  </div>
+</div>
+```
+
+**Markup (Inline-Variante, unter Canvas — Legende links, Zoom-Cluster rechts):**
+```html
+<div class="figuren-graph-toolbar">
+  <span class="card-status">…Legende…</span>
+  <div class="figuren-graph-toolbar-zoom">
+    <button class="graph-tool-btn">+</button>
+    …
+  </div>
+</div>
+```
+
+**Klassen** ([public/css/tokens-est.css](public/css/tokens-est.css), Overlay-Modifier in [public/css/figur-werkstatt.css](public/css/figur-werkstatt.css)):
+- `.graph-tool-btn` — quadratischer Icon-Button (28px min, `--radius-sm`, `--border-thin` solid `--color-border`, `--color-muted` Text, Hover-Tint via `--color-surface`).
+- `.graph-tool-btn--reset` — kleinere Schrift (`--font-size-sm`) für mehrzeichige Glyphen (`⛶`).
+- `.graph-tool-btn[aria-pressed="true"]` — aktiver Toggle (Fullscreen ein): `--color-history-active-bg` Hintergrund, `--color-primary` Border + Text. Greift automatisch — Konsument setzt nur `:aria-pressed`.
+- `.figuren-graph-toolbar` — Inline-Wrapper: `display: flex; justify-content: space-between; gap: --space-sm`, oberhalb/unterhalb der Canvas.
+- `.figuren-graph-toolbar-zoom` — Button-Cluster mit `gap: --space-xs`, `flex-shrink: 0`.
+- `.<viewer>-mindmap-controls--overlay` — Overlay-Wrapper: `position: absolute; top: 8px; right: 8px`, `--color-surface` 88% mit `backdrop-filter: blur(4px)`, `--border-thin` + `--radius-sm` + `--shadow-sm`, `z-index: --z-sticky`. Parent muss `position: relative`.
+
+**Glyphen-Konvention (Unicode, keine SVGs/Lib-Icons):**
+- `+` / `−` — Zoom in/out (echtes Minus `−`, nicht Hyphen)
+- `⛶` (`&#x26F6;`) — Reset / Fit-to-View
+- `⤢` — Fullscreen öffnen
+- `✕` — Fullscreen schliessen
+- `aria-pressed`-Toggle, wenn Button zwei Zustände kennt (Fullscreen). Reine Aktionen (Zoom/Reset) ohne `aria-pressed`.
+
+**Regeln:**
+- **Kein eigenes Button-Vokabular pro Viewer.** Neuer Graph/Map/Canvas → `.graph-tool-btn` wiederverwenden, ggf. eigenen Wrapper-Modifier (`--overlay` analog). Kein `.figuren-zoom-btn` o.ä. parallel anlegen.
+- **Tooltip Pflicht** über `data-tip` (sofort-Hover, siehe [Sofort-Tooltip](#sofort-tooltip-data-tip--default-variante)), `aria-label` zusätzlich für Screen-Reader — die Glyphen sind allein nicht selbsterklärend.
+- **Overlay-Position** nicht ohne Grund verschieben — oben-rechts ist konsistent über Figuren-Graph (Inline) + Werkstatt (Overlay). Neuer Viewer wählt Overlay, sobald die Canvas die volle Karten-Breite einnimmt; Inline-Variante nur, wenn daneben ohnehin eine Legende/Status-Zeile sitzt.
+- **Klassen-Präfix** weiterhin `graph-tool-btn` — nicht in `toolbar-btn` o.ä. umbenennen; Pattern teilt sich Vokabular über mehrere Features, der Name ist die Klammer.
+
+**Beispiele:** [public/partials/figuren.html:86-100](public/partials/figuren.html#L86), [public/partials/figur-werkstatt.html:210-233](public/partials/figur-werkstatt.html#L210).
 
 ---
 

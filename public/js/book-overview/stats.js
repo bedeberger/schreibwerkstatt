@@ -1,7 +1,7 @@
 // Schreibstatistik-Tiles: Hero-Snapshot, Sparkline, 7-Tage-Bars, Heute-Ring,
 // Streak-Heatmap. Visualisierungen als reines Inline-SVG (kein Chart.js) —
 // Overview soll instant beim Buchwechsel sichtbar sein, ohne Lazy-Lib-Load.
-import { localIsoDate, localIsoDaysAgo, tzOpts } from '../utils.js';
+import { localIsoDate, localIsoDaysAgo, tzOpts, aggregateLiveBookStats } from '../utils.js';
 
 export const statsMethods = {
   // Hero-Snapshot: live-aggregiert aus `tokEsts` (gleiche Quelle wie Sidebar-Σ),
@@ -14,19 +14,13 @@ export const statsMethods = {
     const app = window.__app;
     const tokEsts = app?.tokEsts || {};
     const pages = app?.pages || [];
+    const tree = app?.tree || [];
     const stats = this.overviewStats || [];
-    return this._memo('latest', [stats, tokEsts, pages], () => {
+    return this._memo('latest', [stats, tokEsts, pages, tree], () => {
       const ids = Object.keys(tokEsts);
       const histLast = stats.length ? stats[stats.length - 1] : null;
       if (!ids.length) return histLast;
-      let chars = 0, words = 0, tok = 0;
-      for (const id of ids) {
-        const e = tokEsts[id];
-        if (!e) continue;
-        chars += Number(e.chars) || 0;
-        words += Number(e.words) || 0;
-        tok += Number(e.tok) || 0;
-      }
+      const { chars, words, tok } = aggregateLiveBookStats(tokEsts, tree);
       const page_count = pages.length || ids.length;
       const chapter_count = new Set(
         pages.map(p => p.chapter_id).filter(Boolean)
@@ -44,10 +38,10 @@ export const statsMethods = {
   _charsTodayDelta() {
     const a = this.overviewStats || [];
     const tokEsts = window.__app?.tokEsts || {};
-    return this._memo('charsTodayDelta', [a, tokEsts], () => {
+    const tree = window.__app?.tree || [];
+    return this._memo('charsTodayDelta', [a, tokEsts, tree], () => {
       const todayIso = localIsoDate();
-      let liveChars = 0;
-      for (const id of Object.keys(tokEsts)) liveChars += Number(tokEsts[id]?.chars) || 0;
+      const liveChars = aggregateLiveBookStats(tokEsts, tree).chars;
       let cronTodayChars = null;
       let prevChars = null;
       for (let i = a.length - 1; i >= 0; i--) {
@@ -75,7 +69,8 @@ export const statsMethods = {
   overviewLast7Days() {
     const a = this.overviewStats || [];
     const tokEsts = window.__app?.tokEsts || {};
-    return this._memo('last7Days', [a, tokEsts], () => {
+    const tree = window.__app?.tree || [];
+    return this._memo('last7Days', [a, tokEsts, tree], () => {
       const charsByDate = new Map();
       for (const s of a) charsByDate.set(s.recorded_at, Number(s.chars) || 0);
       const tag = window.__app?.uiLocale === 'en' ? 'en-US' : 'de-CH';

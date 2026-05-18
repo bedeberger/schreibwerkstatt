@@ -77,6 +77,33 @@ export function localeTag(uiLocale) {
   return uiLocale === 'en' ? 'en-US' : 'de-CH';
 }
 
+// Live-Σ Zeichen/Wörter/Tokens über alle Seiten + Kapitelnamen. Spiegelt
+// routes/sync.js#syncBook-Total: per-Seite-Stats (page_name bereits drin) +
+// chapterNameStats für jedes Kapitel. Solo-Kapitel (Wrapper um Einzelseiten)
+// werden übersprungen, weil page_name schon im tokEsts-Eintrag enthalten ist.
+export function aggregateLiveBookStats(tokEsts, tree) {
+  let chars = 0, words = 0, tok = 0;
+  for (const id of Object.keys(tokEsts || {})) {
+    const e = tokEsts[id];
+    if (!e) continue;
+    chars += Number(e.chars) || 0;
+    words += Number(e.words) || 0;
+    tok += Number(e.tok) || 0;
+  }
+  for (const item of tree || []) {
+    if (!item || item.type !== 'chapter' || item.solo) continue;
+    const ch = String(item.name || '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!ch) continue;
+    chars += ch.length;
+    words += ch.split(/\s+/).length;
+    tok += Math.round(ch.length / CHARS_PER_TOKEN);
+  }
+  return { chars, words, tok };
+}
+
 // Pro Locale gecacht — Intl.RelativeTimeFormat-Konstruktion ist nicht gratis,
 // und _fmtRelativeLine wird pro Sidebar-Render mehrfach aufgerufen.
 const _RTF_CACHE = new Map();

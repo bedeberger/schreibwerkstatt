@@ -43,15 +43,16 @@ export const figurenMethods = {
   },
 
   _computeFigurePresence(figs, sz) {
+    const empty = { figures: [], rows: [] };
     const app = window.__app;
-    if (!app || figs.length === 0 || sz.length === 0) return null;
+    if (!app || figs.length === 0 || sz.length === 0) return empty;
     const tree = app.tree || [];
     // Solo-Wrapper (Spezialseiten ohne Kapitel) ausklammern — sie sind in tree
     // als type:'chapter' mit solo:true verpackt (siehe tree.js loadPages).
     const chapters = tree
       .filter(i => i.type === 'chapter' && !i.solo)
       .map(c => ({ id: c.id, name: c.name }));
-    if (chapters.length === 0) return null;
+    if (chapters.length === 0) return empty;
 
     const MAX_COLS = 20;
 
@@ -89,7 +90,7 @@ export const figurenMethods = {
       candidates.push({ id: figId, name: f.kurzname || f.name, m, total: m.total });
     }
     candidates.sort((a, b) => b.total - a.total);
-    if (candidates.length === 0) return null;
+    if (candidates.length === 0) return empty;
 
     const selected = candidates.slice(0, MAX_COLS);
 

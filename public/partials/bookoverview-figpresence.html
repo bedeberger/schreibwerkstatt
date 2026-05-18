@@ -2,7 +2,7 @@
      Cell-Wert = Anzahl Szenen pro (Figur, Kapitel). Cell-Intensität = per Spalte skaliert.
      Horizontaler Scroll bei vielen Figuren. Leere Zellen = Figur fehlt im Kapitel.
      Immer medium — Matrix mit Spalten-Header braucht Breite (siehe DESIGN.md). -->
-<template x-if="overviewFigurePresence()">
+<template x-if="overviewFigurePresence().figures.length > 0">
   <div class="overview-tile overview-tile--medium">
     <div class="overview-tile-label" x-text="$app.t('overview.figPresence')"></div>
     <div class="overview-presence-wrap">

@@ -626,6 +626,10 @@
   "bookOrganizer.createFailed":   "Create failed: {detail}",
   "bookOrganizer.deleteFailed":   "Delete failed: {detail}",
   "bookOrganizer.pageInEditorWarn": "Page is open in the editor. Please close it first.",
+  "bookOrganizer.undo":           "Undo",
+  "bookOrganizer.redo":           "Redo",
+  "bookOrganizer.undoTip":        "Undo (Cmd/Ctrl+Z) — up to 10 steps",
+  "bookOrganizer.redoTip":        "Redo (Cmd/Ctrl+Shift+Z)",
 
   "overview.title":              "Overview: {name}",
   "overview.refresh":            "Refresh",

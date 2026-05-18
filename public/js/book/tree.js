@@ -96,11 +96,13 @@ export const treeMethods = {
   // textContent (behält Whitespace zwischen Block-Tags) gegenüber dem
   // Cron-Snapshot, und Heute-Ring/7-Tage-Bars driften nach jedem Save.
   //
-  // tok = chars / CHARS_PER_TOKEN — Text-Tokens, gleiche Quelle wie chars.
-  // Identische Formel in routes/sync.js#computeStats.
+  // Seitenname fliesst in chars/words ein (Überschrift gehört zum Buchumfang) —
+  // analog routes/sync.js#computeStats. tok = chars / CHARS_PER_TOKEN.
   _syncPageStatsAfterSave(page, html) {
     if (!page?.id) return;
-    const normalized = String(html || '')
+    const prefix = String(page?.name || '').trim();
+    const combined = (prefix ? prefix + ' ' : '') + String(html || '');
+    const normalized = combined
       .replace(/<[^>]+>/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
@@ -147,6 +149,20 @@ export const treeMethods = {
       for (const p of item.pages) {
         const e = ts[p.id];
         if (e) { words += e.words; chars += e.chars; tok += e.tok; count++; }
+      }
+      // Echte Kapitel: chapter_name einmal addieren. Solo-Kapitel (kein
+      // echtes Kapitel — Wrapper um einzelne Seite) übergehen: page_name
+      // ist schon in der Seitenstatistik enthalten.
+      if (count && !item.solo) {
+        const chName = String(item.name || '')
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+        if (chName) {
+          chars += chName.length;
+          words += chName.split(/\s+/).length;
+          tok += Math.round(chName.length / CHARS_PER_TOKEN);
+        }
       }
       item.stats = count
         ? {
