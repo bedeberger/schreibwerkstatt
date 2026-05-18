@@ -265,4 +265,9 @@
 .page-revisions-list .history-item:hover { background: transparent; }
 .page-revisions-list .btn-toggle-saved { margin-left: auto; }
 
+/* Delta-Tag: Zeichen-Unterschied zur Vorgaengerversion. */
+.revision-delta--pos { background: var(--color-ok-bg); color: var(--color-ok-text); }
+.revision-delta--neg { background: var(--color-err-bg); color: var(--color-err-text); }
+.revision-delta--zero { opacity: 0.6; }
+
 }

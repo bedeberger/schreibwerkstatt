@@ -14,7 +14,7 @@
     <span x-text="$app.t('editor.revisions.count', { n: revisions.length })"></span>
   </button>
   <div x-show="open" x-cloak class="page-revisions-list">
-    <template x-for="rev in revisions" :key="rev.id">
+    <template x-for="(rev, idx) in revisions" :key="rev.id">
       <div class="history-item history-item--clickable"
            role="button"
            tabindex="0"
@@ -35,6 +35,12 @@
                 x-text="isOwnRevision(rev) ? $app.t('editor.revisions.byYou') : $app.userDisplayName(rev.user_email)"></span>
         </span>
         <span class="tag" x-text="formatChars(rev.chars) + ' ' + $app.t('editor.revisions.chars')"></span>
+        <template x-if="charsDelta(idx) !== null">
+          <span class="tag revision-delta"
+                :class="charsDelta(idx) > 0 ? 'revision-delta--pos' : (charsDelta(idx) < 0 ? 'revision-delta--neg' : 'revision-delta--zero')"
+                :data-tip="$app.t('editor.revisions.deltaTitle')"
+                x-text="formatDelta(charsDelta(idx))"></span>
+        </template>
         <button type="button"
                 class="btn-toggle-saved btn-toggle-saved--off"
                 @click.stop="restore(rev)"

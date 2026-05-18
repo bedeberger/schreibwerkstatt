@@ -1110,6 +1110,7 @@
   "editor.revisions":            "{n} revisions",
   "editor.revisions.count":             "{n} revisions",
   "editor.revisions.chars":             "chars",
+  "editor.revisions.deltaTitle":        "Change vs previous version",
   "editor.revisions.byYou":             "You",
   "collab.toast.currentPage":           "{user} updated this page.",
   "collab.toast.otherPage":             "{user} updated \"{page}\".",

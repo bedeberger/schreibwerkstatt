@@ -97,6 +97,24 @@ export function registerPageRevisionsCard() {
       return Number(n || 0).toLocaleString(locale);
     },
 
+    // Liste DESC sortiert (juengste zuerst). Vorgaengerin = revisions[idx+1].
+    // Aelteste Revision hat keine Vorgaengerin → null (kein Delta-Tag).
+    charsDelta(idx) {
+      const cur = this.revisions[idx];
+      const prev = this.revisions[idx + 1];
+      if (!cur || !prev) return null;
+      const a = Number(cur.chars || 0);
+      const b = Number(prev.chars || 0);
+      return a - b;
+    },
+
+    formatDelta(d) {
+      if (d == null) return '';
+      const app = window.__app;
+      const locale = app?.uiLocale === 'en' ? 'en-US' : 'de-CH';
+      return Number(d).toLocaleString(locale, { signDisplay: 'exceptZero' });
+    },
+
     // ── Viewer ───────────────────────────────────────────────────────────────
     async openViewer(rev) {
       if (!rev?.id) return;
