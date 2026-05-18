@@ -166,7 +166,7 @@ select:focus {
 .combobox-trigger:hover { background: var(--color-hover); }
 .combobox-trigger:active { transform: none; }
 .combobox-trigger:focus-visible { outline: none; border-color: var(--color-border-focus); }
-.combobox-wrap:has(.combobox-dropdown[style*="display"]:not([style*="display: none"])) .combobox-trigger,
+.combobox-trigger[aria-expanded="true"],
 .combobox-trigger:focus-within { border-color: var(--color-border-focus); }
 .combobox-value {
   flex: 1;
