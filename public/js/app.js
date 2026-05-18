@@ -60,6 +60,7 @@ import { registerPageHistoryCard } from './cards/page-history-card.js';
 import { registerPageRevisionsCard } from './cards/page-revisions-card.js';
 import { registerPaletteCard } from './cards/palette-card.js';
 import { registerNumInput } from './num-input.js';
+import { registerCombobox } from './combobox.js';
 import { shortcutsMethods } from './editor/shortcuts.js';
 import { featuresUsageMethods } from './features-usage.js';
 import { initialLektoratState } from './app/app-state.js';
@@ -68,10 +69,11 @@ import { appChromeMethods } from './app/app-chrome.js';
 import { appKomplettMethods } from './app/app-komplett.js';
 import { appJobsCoreMethods } from './app/app-jobs-core.js';
 import { appCollabMethods } from './app/app-collab.js';
-import { appViewMethods } from './app/app-view.js';
+import { appViewMethods, FILTER_SCOPES } from './app/app-view.js';
 import { appNavigationMethods } from './app/app-navigation.js';
 import { appHashRouterMethods } from './app/app-hash-router.js';
 import { bookCreateMethods } from './book/book-create.js';
+import { rootGetterDescriptors } from './app/app-root-getters.js';
 
 // Globaler fetch-Wrapper: fängt 401-Antworten ab und signalisiert Session-Ablauf
 // via 'session-expired'-Event. Alpine zeigt daraufhin einen Banner. Kein Auto-
@@ -247,249 +249,14 @@ document.addEventListener('alpine:init', () => {
   registerPageRevisionsCard();
   registerPaletteCard();
   registerNumInput();
+  registerCombobox();
 
-  // combobox(placeholder, emptyLabel) — Legacy-Positional-Form.
-  // combobox({ placeholder, emptyLabel, compact }) — Object-Form (Default `compact: true`).
-  // init() uebernimmt automatisch: combobox-wrap[--compact]-Klassen, document-Mousedown
-  // (Outside-Close), Element-Keydown (Tastatur-Navigation). Konsumenten brauchen
-  // weder `@click.outside`, noch `@keydown`, noch eine eigene Klasse — nur
-  // `x-data="combobox(...)"`, `x-modelable="value" x-model="ref"` und
-  // `x-effect="options = [...]"` (per DESIGN.md Variante 1).
-  Alpine.data('combobox', (placeholderOrCfg = null, emptyLabelArg = null) => {
-    const cfg = (placeholderOrCfg && typeof placeholderOrCfg === 'object')
-      ? placeholderOrCfg
-      : { placeholder: placeholderOrCfg, emptyLabel: emptyLabelArg, compact: true };
-    if (cfg.compact === undefined) cfg.compact = true;
-    return {
-    open: false,
-    query: '',
-    // Single mode: scalar; Multi mode: Array. x-modelable seeded from parent.
-    value: cfg.multiple ? [] : null,
-    options: [],
-    _disabled: false,
-    _placeholder: cfg.placeholder ?? null,
-    _emptyLabel: cfg.emptyLabel ?? null,
-    _compact: cfg.compact !== false,
-    _multiple: !!cfg.multiple,
-    _transient: !!cfg.transient,
-    _footer: (cfg.footer && typeof cfg.footer.action === 'function') ? cfg.footer : null,
-    _onOutside: null,
-    highlighted: -1,
-    openUp: false,
-
-    get placeholder() {
-      const p = this._placeholder;
-      if (typeof p === 'function') return p() ?? window.__app?.t?.('common.choose') ?? 'Auswählen…';
-      return p ?? window.__app?.t?.('common.choose') ?? 'Auswählen…';
-    },
-    get emptyLabel() {
-      return this._emptyLabel;
-    },
-    get _allOptions() {
-      // emptyLabel-Sentinel passt nur fuer Single-Mode (leere Auswahl =
-      // explizite "Alle"-Option). In Multi-Mode bedeutet `value=[]` bereits
-      // "keine Auswahl" -> kein Sentinel-Eintrag im Dropdown.
-      if (this._multiple) return this.options;
-      return this.emptyLabel
-        ? [{ value: '', label: this.emptyLabel }, ...this.options]
-        : this.options;
-    },
-    get filtered() {
-      if (!this.query) return this._allOptions;
-      const q = this.query.toLowerCase();
-      return this._allOptions.filter(o => String(o.label).toLowerCase().includes(q));
-    },
-    _isSelected(val) {
-      if (this._multiple) {
-        const arr = Array.isArray(this.value) ? this.value : [];
-        return arr.some(v => String(v) === String(val));
-      }
-      return String(this.value ?? '') === String(val);
-    },
-    get selectedLabel() {
-      if (this._multiple) {
-        const arr = Array.isArray(this.value) ? this.value : [];
-        if (!arr.length) return '';
-        const t = window.__app?.t;
-        return t ? t('common.multiSelected', { n: arr.length }) : `${arr.length}`;
-      }
-      const v = this.value ?? '';
-      const opt = this._allOptions.find(o => String(o.value) === String(v));
-      if (opt) return opt.label;
-      return this.emptyLabel || '';
-    },
-
-    toggle() {
-      if (this._disabled) return;
-      if (this.open) { this.close(); return; }
-      this.open = true;
-      this.query = '';
-      // Multi-Mode: highlight erste selektierte Option (oder 0).
-      if (this._multiple) {
-        const arr = Array.isArray(this.value) ? this.value : [];
-        this.highlighted = arr.length
-          ? this._allOptions.findIndex(o => arr.some(v => String(v) === String(o.value)))
-          : 0;
-      } else {
-        this.highlighted = this._allOptions.findIndex(o => String(o.value) === String(this.value));
-      }
-      this.$nextTick(() => {
-        this._decideOpenDirection();
-        this.$refs.cbInput?.focus();
-      });
-    },
-    _decideOpenDirection() {
-      const trigger = this.$el.querySelector('.combobox-trigger');
-      const dropdown = this.$el.querySelector('.combobox-dropdown');
-      if (!trigger || !dropdown) { this.openUp = false; return; }
-      const triggerRect = trigger.getBoundingClientRect();
-      const dropdownH = dropdown.getBoundingClientRect().height || 250;
-      const spaceBelow = window.innerHeight - triggerRect.bottom;
-      const spaceAbove = triggerRect.top;
-      this.openUp = spaceBelow < dropdownH && spaceAbove > spaceBelow;
-    },
-    close() {
-      this.open = false;
-      this.query = '';
-      this.highlighted = -1;
-      this.openUp = false;
-    },
-    select(val) {
-      if (this._multiple) {
-        const arr = Array.isArray(this.value) ? this.value : [];
-        const idx = arr.findIndex(v => String(v) === String(val));
-        // Neues Array zuweisen, damit x-modelable + Watchers reagieren —
-        // arr.splice mutiert in-place und triggert keine Proxy-Setter.
-        this.value = idx >= 0
-          ? arr.filter((_, i) => i !== idx)
-          : [...arr, val];
-        this.$dispatch('combobox-change', this.value);
-        return;
-      }
-      this.value = val;
-      this.close();
-      this.$dispatch('combobox-change', val);
-      if (this._transient) this.value = null;
-    },
-    // Footer-Action (optionaler cfg.footer.action) — z. B. "+ Neues Buch …".
-    // Schliesst Dropdown vor dem Handler-Call, damit ein folgendes Modal nicht
-    // mit offenem Dropdown konkurriert.
-    triggerFooter() {
-      const f = this._footer;
-      if (!f || typeof f.action !== 'function') return;
-      this.close();
-      try { f.action(); } catch (e) { console.error('[combobox.footer]', e); }
-    },
-    // Label lazy ausrechnen — ein `cfg.footer.label = t('...')` wuerde sonst
-    // den i18n-String zum x-data-Init-Zeitpunkt einfrieren, der vor
-    // `configureI18n` liegen kann (Raw-Key im UI). Function-Form erlaubt
-    // Re-Evaluation pro Template-Render und reagiert auf uiLocale-Wechsel.
-    get _footerLabel() {
-      const f = this._footer;
-      if (!f) return '';
-      return typeof f.label === 'function' ? f.label() : (f.label || '');
-    },
-    onKeydown(e) {
-      if (!this.open) {
-        if (e.key === 'ArrowDown' || e.key === 'Enter') { e.preventDefault(); this.toggle(); }
-        return;
-      }
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        this.highlighted = Math.min(this.highlighted + 1, this.filtered.length - 1);
-        this._scrollHl();
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        this.highlighted = Math.max(this.highlighted - 1, 0);
-        this._scrollHl();
-      } else if (e.key === 'Enter') {
-        e.preventDefault();
-        if (this.highlighted >= 0 && this.filtered[this.highlighted]) this.select(this.filtered[this.highlighted].value);
-      } else if (e.key === 'Escape') {
-        e.preventDefault(); this.close();
-      }
-    },
-    _scrollHl() {
-      this.$nextTick(() => {
-        const list = this.$el.querySelector('.combobox-list');
-        const item = list?.children[this.highlighted];
-        item?.scrollIntoView({ block: 'nearest' });
-      });
-    },
-    init() {
-      // Wrap-Klassen automatisch (frueher musste der Konsument
-      // class="combobox-wrap [combobox-wrap--compact]" selbst setzen).
-      this.$el.classList.add('combobox-wrap');
-      if (this._compact) this.$el.classList.add('combobox-wrap--compact');
-
-      // Outside-Click + Keydown intern (frueher @click.outside / @keydown im Markup).
-      this._onOutside = (e) => { if (!this.$el.contains(e.target)) this.close(); };
-      document.addEventListener('mousedown', this._onOutside);
-      this.$el.addEventListener('keydown', (e) => this.onKeydown(e));
-
-      // ARIA: das gesamte Widget verhält sich wie ein Combobox mit Listbox-Popup.
-      // aria-expanded gibt Screenreadern den Öffnungszustand, aria-activedescendant
-      // verweist auf die aktuell via Tastatur markierte Option.
-      this.$el.setAttribute('role', 'combobox');
-      this.$el.setAttribute('aria-haspopup', 'listbox');
-      if (this._multiple) {
-        this.$el.classList.add('combobox-wrap--multi');
-        this.$el.setAttribute('aria-multiselectable', 'true');
-      }
-      // Bei Query-Änderung Highlight an Filter-Liste angleichen, sonst zeigt der
-      // alte Index ins gefilterte Array hinein und Enter selektiert undefined.
-      this.$watch('query', () => {
-        this.highlighted = this.filtered.length > 0 ? 0 : -1;
-      });
-      this.$el.innerHTML = `
-        <button type="button" class="combobox-trigger" @click="toggle()"
-                :aria-expanded="open ? 'true' : 'false'"
-                :aria-label="selectedLabel || placeholder">
-          <span class="combobox-value" x-text="selectedLabel || placeholder"></span>
-          <svg class="combobox-chevron" :class="{'combobox-chevron--open': open}" width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M1.5 3.5L5 7L8.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </button>
-        <div class="combobox-dropdown" :class="{'combobox-dropdown--up': openUp}" x-show="open" x-cloak>
-          <input type="text" class="combobox-search" x-model="query" x-ref="cbInput"
-                 :placeholder="$app.t('common.searchShort')" role="searchbox" :aria-label="$app.t('common.searchShort')">
-          <ul class="combobox-list" role="listbox"
-              :aria-activedescendant="highlighted >= 0 ? ($id('cb-opt') + '-' + highlighted) : null">
-            <template x-for="(opt, i) in filtered" :key="opt.value">
-              <li class="combobox-option"
-                  role="option"
-                  :id="$id('cb-opt') + '-' + i"
-                  :aria-selected="_isSelected(opt.value) ? 'true' : 'false'"
-                  :class="{'combobox-option--selected': _isSelected(opt.value), 'combobox-option--hl': i === highlighted}"
-                  @click="select(opt.value)" @mouseenter="highlighted = i"
-                  x-text="opt.label"></li>
-            </template>
-            <li class="combobox-empty" x-show="filtered.length === 0" x-text="$app.t('find.noMatches')"></li>
-          </ul>
-          <button type="button" class="combobox-footer-btn"
-                  x-show="_footer" x-cloak
-                  @click="triggerFooter()"
-                  x-text="_footerLabel"></button>
-        </div>
-      `;
-      // Alpine processed das frisch gesetzte innerHTML nicht zuverlaessig, wenn
-      // die Combobox innerhalb eines spaet hydratisierten Subtrees liegt
-      // (template x-if mit nested x-data-Wrappern, Beispiel pdfExportCard).
-      // Combobox-Wraps direkt unter dem Karten-Scope rendern korrekt; Wraps
-      // innerhalb <template x-if="activeProfile"> bekamen Trigger-Markup ohne
-      // ausgewertete Direktiven (`:aria-label="selectedLabel || placeholder"`
-      // blieb roh, selectedLabel wurde nie evaluiert). Expliziter initTree-
-      // Aufruf schliesst die Luecke unabhaengig vom Render-Pfad.
-      window.Alpine.initTree(this.$el);
-    },
-    destroy() {
-      if (this._onOutside) {
-        document.removeEventListener('mousedown', this._onOutside);
-        this._onOutside = null;
-      }
-    },
-  };
-  });
-
-  Alpine.data('lektorat', () => ({
+  Alpine.data('lektorat', () => {
+    // Root-Getter (z.B. tokTotals) leben in app/app-root-getters.js als
+    // Property-Descriptors. Object-Spread würde Getter zur Spread-Zeit
+    // einmalig auswerten und als statischen Wert kopieren — darum
+    // descriptor-basiertes Object.defineProperties auf dem fertigen Objekt.
+    const obj = ({
     // ── State ────────────────────────────────────────────────────────────────
     ...initialLektoratState(),
 
@@ -674,24 +441,6 @@ document.addEventListener('alpine:init', () => {
       }).filter(Boolean);
     },
 
-    get tokTotals() {
-      const ts = this.tokEsts;
-      if (this._tokTotalsCache?.tokRef === ts) return this._tokTotalsCache.value;
-      let chars = 0, words = 0, tok = 0;
-      const keys = Object.keys(ts);
-      for (const k of keys) {
-        const v = ts[k];
-        chars += v.chars; words += v.words; tok += v.tok;
-      }
-      const value = {
-        chars, words, tok,
-        normseiten: Math.round((chars / 1500) * 10) / 10,
-        any: keys.length > 0,
-      };
-      this._tokTotalsCache = { tokRef: ts, value };
-      return value;
-    },
-
     // AbortController `_abortCtrl` (initialisiert via app-state.js) hält alle
     // globalen Listener dieser Komponente. `destroy()` (Alpine-Hook) ruft abort()
     // → alle Listener werden automatisch entfernt. Schützt vor doppelter
@@ -856,8 +605,7 @@ document.addEventListener('alpine:init', () => {
         // in `_resetBookScopedState`/`_restoreBookPrefs`; initialer Restore
         // im Hash-Router (isInitialApply-Branch), bevor View-Argumente Filter
         // setzen.
-        const FILTER_KEYS = ['figurenFilters','ereignisseFilters','szenenFilters','orteFilters','songsFilters'];
-        for (const key of FILTER_KEYS) {
+        for (const [key] of FILTER_SCOPES) {
           this.$watch(key, (val) => {
             if (!this.selectedBookId) return;
             setFilters(this.currentUser?.email, this.selectedBookId, key, val);
@@ -926,5 +674,8 @@ document.addEventListener('alpine:init', () => {
     ...appHashRouterMethods,
     ...featuresUsageMethods,
     ...bookCreateMethods,
-  }));
+    });
+    Object.defineProperties(obj, rootGetterDescriptors);
+    return obj;
+  });
 });

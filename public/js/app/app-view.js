@@ -7,8 +7,9 @@ import { setLastPageId, getLastPageId, getFilters } from '../local-prefs.js';
 
 // Karten-Scopes, deren Filter pro Buch im localStorage persistiert werden.
 // Defaults werden bei Buchwechsel angewandt; gespeicherte Werte überschreiben
-// jeweils nur die genannten Keys.
-const FILTER_SCOPES = [
+// jeweils nur die genannten Keys. SSoT für persist (app.js-Watcher),
+// restore (`_restoreBookPrefs`) und reset (`resetView`).
+export const FILTER_SCOPES = [
   ['figurenFilters',    { kapitel: '', seite: '', suche: '' }],
   ['ereignisseFilters', { figurId: '', kapitel: '', seite: '', suche: '' }],
   ['szenenFilters',     { wertung: '', figurId: '', kapitel: '', ortId: '', suche: '' }],
@@ -566,32 +567,21 @@ export const appViewMethods = {
     this.figurenStatus = '';
     this.figurenProgress = 0;
     this.selectedFigurId = null;
-    this.figurenFilters.kapitel = '';
-    this.figurenFilters.seite = '';
     this.globalZeitstrahl = [];
     this.showGlobalZeitstrahl = false;
-    this.ereignisseFilters.figurId = '';
-    this.ereignisseFilters.kapitel = '';
-    this.ereignisseFilters.seite = '';
     this.szenen = [];
     this.szenenUpdatedAt = null;
     this.selectedSzeneId = null;
-    this.szenenFilters.wertung = '';
-    this.szenenFilters.figurId = '';
-    this.szenenFilters.kapitel = '';
-    this.szenenFilters.ortId = '';
     this.orte = [];
-    this.orteFilters.figurId = '';
-    this.orteFilters.kapitel = '';
-    this.orteFilters.szeneId = '';
     this.songs = [];
     this.selectedSongId = null;
-    this.songsFilters.figurId = '';
-    this.songsFilters.kapitel = '';
-    this.songsFilters.szeneId = '';
-    this.songsFilters.genre = '';
-    this.songsFilters.kontextTyp = '';
-    this.songsFilters.suche = '';
+    // Filter-Reset einheitlich über FILTER_SCOPES — deckt auch `suche`-Keys
+    // ab, die früher nur teilweise gesetzt wurden (drift-freie SSoT).
+    for (const [stateKey, defaults] of FILTER_SCOPES) {
+      const target = this[stateKey];
+      if (!target) continue;
+      for (const k of Object.keys(defaults)) target[k] = defaults[k];
+    }
     if (this._komplettPollTimer) { clearInterval(this._komplettPollTimer); this._komplettPollTimer = null; }
     this.alleAktualisierenLastRun = null;
     this.alleAktualisierenProgress = 0;
