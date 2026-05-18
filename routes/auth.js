@@ -5,6 +5,7 @@ const logger = require('../logger');
 const appUsers = require('../db/app-users');
 const rateLimit = require('../lib/admin-login-ratelimit');
 const appSettings = require('../lib/app-settings');
+const { tServer } = require('../lib/i18n-server');
 
 const router = express.Router();
 
@@ -61,15 +62,11 @@ function _passwordsMatch(expected, given) {
   return crypto.timingSafeEqual(a, b);
 }
 
-// Status-Gates: 'suspended' / 'deleted' → 403, audit + denied-Render.
-function _renderDenied(res, lang, reasonKey) {
-  res.status(403);
-  const t = lang === 'en'
-    ? { title: 'Access denied', body: { suspended: 'Your account is suspended.', deleted: 'Your account has been deleted.', notInvited: 'No access. Ask your administrator for an invite.' }, cta: 'Use another account' }
-    : { title: 'Zugriff verweigert', body: { suspended: 'Dein Konto ist gesperrt.', deleted: 'Dein Konto wurde gelöscht.', notInvited: 'Kein Zugang. Bitte Admin um eine Einladung.' }, cta: 'Anderes Konto verwenden' };
-  res.set('Cache-Control', 'no-store');
-  res.send(`<!doctype html>
-<html lang="${lang}"><head><meta charset="utf-8"><title>${t.title}</title>
+// Gemeinsames Pre-Auth-Page-Skeleton. Wird vor SPA-Boot ausgeliefert, darum
+// kein Alpine, sondern Server-HTML mit minimalem Asset-Set (tokens + landing).
+function _renderPublicShell({ lang, title, mainHtml, scripts = '' }) {
+  return `<!doctype html>
+<html lang="${lang}"><head><meta charset="utf-8"><title>${title}</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="/schreibwerkstatt_icon.svg">
@@ -78,16 +75,37 @@ function _renderDenied(res, lang, reasonKey) {
 <script defer src="/js/plausible-init.js"></script>
 </head>
 <body>
-<main class="public-shell">
+${mainHtml}
+${scripts}</body></html>`;
+}
+
+function _escAttr(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
+const DENIED_REASONS = new Set(['suspended', 'deleted', 'notInvited']);
+
+// Status-Gates: 'suspended' / 'deleted' → 403, audit + denied-Render.
+function _renderDenied(res, lang, reasonKey) {
+  const reason = DENIED_REASONS.has(reasonKey) ? reasonKey : 'notInvited';
+  const title = tServer('auth.denied.title', lang);
+  const body = tServer(`auth.denied.${reason}`, lang);
+  const cta = tServer('auth.denied.cta', lang);
+  res.status(403);
+  res.set('Cache-Control', 'no-store');
+  res.send(_renderPublicShell({
+    lang,
+    title,
+    mainHtml: `<main class="public-shell">
   <header class="public-header">
-    <h1>${t.title}</h1>
-    <p class="public-sub">${t.body[reasonKey] || t.body.notInvited}</p>
+    <h1>${title}</h1>
+    <p class="public-sub">${body}</p>
   </header>
   <section class="public-actions">
-    <a class="public-btn" href="/auth/logout">${t.cta}</a>
+    <a class="public-btn" href="/auth/logout">${cta}</a>
   </section>
-</main>
-</body></html>`);
+</main>`,
+  }));
 }
 
 function _bodyLang(req) {
@@ -249,42 +267,36 @@ router.get('/login', (req, res) => {
   const hasAdminPw = !!process.env.ADMIN_PASSWORD;
   const returnTo = typeof req.query.returnTo === 'string' && req.query.returnTo.startsWith('/') && !req.query.returnTo.startsWith('//')
     ? req.query.returnTo : '/';
-  const t = lang === 'en'
-    ? { title: 'Sign in', google: 'Sign in with Google', adminTitle: 'Admin login', email: 'Admin email', password: 'Password', submit: 'Sign in as admin', or: 'or', noAdmin: 'Admin login disabled.' }
-    : { title: 'Anmeldung', google: 'Mit Google anmelden', adminTitle: 'Admin-Login', email: 'Admin-E-Mail', password: 'Passwort', submit: 'Als Admin anmelden', or: 'oder', noAdmin: 'Admin-Login deaktiviert.' };
-  const msgInvalid = lang === 'en' ? 'Invalid credentials.' : 'Falsche Zugangsdaten.';
-  const msgRateTpl = lang === 'en' ? 'Too many attempts. Retry in {sec}s.' : 'Zu viele Versuche. Erneut in {sec}s.';
-  const escAttr = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-  res.set('Cache-Control', 'no-store');
-  res.send(`<!doctype html>
-<html lang="${lang}"><head><meta charset="utf-8"><title>${t.title}</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="robots" content="noindex, nofollow">
-<link rel="icon" href="/schreibwerkstatt_icon.svg">
-<link rel="stylesheet" href="/css/tokens.css">
-<link rel="stylesheet" href="/css/landing.css">
-<script defer src="/js/plausible-init.js"></script>
-</head>
-<body>
-<main class="public-shell">
-  <header class="public-header"><h1>${t.title}</h1></header>
-${hasGoogle ? `  <section class="public-actions">
-    <a class="public-btn public-btn--primary" href="/auth/login?returnTo=${encodeURIComponent(returnTo)}">${t.google}</a>
+  const t = (k) => tServer(k, lang);
+  const title = t('auth.login.title');
+  const googleBlock = hasGoogle ? `  <section class="public-actions">
+    <a class="public-btn public-btn--primary" href="/auth/login?returnTo=${encodeURIComponent(returnTo)}">${t('auth.login.google')}</a>
   </section>
-` : ''}${hasGoogle && hasAdminPw ? `  <div class="public-sep">${t.or}</div>
-` : ''}${hasAdminPw ? `  <form id="admin-form" class="public-form" novalidate data-returnto="${escAttr(returnTo)}" data-msg-invalid="${escAttr(msgInvalid)}" data-msg-rate-tpl="${escAttr(msgRateTpl)}">
-    <h2 class="public-form-title">${t.adminTitle}</h2>
-    <label><span>${t.email}</span><input type="email" id="email" required autocomplete="username"></label>
-    <label><span>${t.password}</span><input type="password" id="password" required autocomplete="current-password"></label>
+` : '';
+  const orBlock = hasGoogle && hasAdminPw ? `  <div class="public-sep">${t('auth.login.or')}</div>
+` : '';
+  const adminBlock = hasAdminPw
+    ? `  <form id="admin-form" class="public-form" novalidate data-returnto="${_escAttr(returnTo)}" data-msg-invalid="${_escAttr(t('auth.login.errInvalid'))}" data-msg-rate-tpl="${_escAttr(t('auth.login.errRateTpl'))}">
+    <h2 class="public-form-title">${t('auth.login.adminTitle')}</h2>
+    <label><span>${t('auth.login.email')}</span><input type="email" id="email" required autocomplete="username"></label>
+    <label><span>${t('auth.login.password')}</span><input type="password" id="password" required autocomplete="current-password"></label>
     <div class="public-form-actions">
-      <button type="submit" class="public-btn public-btn--primary">${t.submit}</button>
+      <button type="submit" class="public-btn public-btn--primary">${t('auth.login.submit')}</button>
     </div>
     <p class="public-msg public-msg--err" id="err" hidden></p>
   </form>
-` : (hasGoogle ? '' : `  <p class="public-sub">${t.noAdmin}</p>
-`)}</main>
-${hasAdminPw ? `<script src="/js/admin/admin-login.js"></script>` : ''}
-</body></html>`);
+`
+    : (hasGoogle ? '' : `  <p class="public-sub">${t('auth.login.noAdmin')}</p>
+`);
+  res.set('Cache-Control', 'no-store');
+  res.send(_renderPublicShell({
+    lang,
+    title,
+    mainHtml: `<main class="public-shell">
+  <header class="public-header"><h1>${title}</h1></header>
+${googleBlock}${orBlock}${adminBlock}</main>`,
+    scripts: hasAdminPw ? `<script src="/js/admin/admin-login.js"></script>\n` : '',
+  }));
 });
 
 // POST /auth/admin-login → ENV-getriebener Admin-Login.
@@ -367,30 +379,23 @@ router.get('/auth/logout', (req, res) => {
     if (process.env.LOCAL_DEV_MODE === 'true') {
       res.cookie('sw_devout', '1', { path: '/', httpOnly: true, sameSite: 'lax', maxAge: 24 * 60 * 60 * 1000 });
     }
-    const t = lang === 'en'
-      ? { title: 'Signed out', body: 'You have been signed out.', cta: 'Sign in again' }
-      : { title: 'Abgemeldet', body: 'Du wurdest abgemeldet.', cta: 'Erneut anmelden' };
+    const title = tServer('auth.logout.title', lang);
+    const body = tServer('auth.logout.body', lang);
+    const cta = tServer('auth.logout.cta', lang);
     res.set('Cache-Control', 'no-store');
-    res.send(`<!doctype html>
-<html lang="${lang}"><head><meta charset="utf-8"><title>${t.title}</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="robots" content="noindex, nofollow">
-<link rel="icon" href="/schreibwerkstatt_icon.svg">
-<link rel="stylesheet" href="/css/tokens.css">
-<link rel="stylesheet" href="/css/landing.css">
-<script defer src="/js/plausible-init.js"></script>
-</head>
-<body>
-<main class="public-shell">
+    res.send(_renderPublicShell({
+      lang,
+      title,
+      mainHtml: `<main class="public-shell">
   <header class="public-header">
-    <h1>${t.title}</h1>
-    <p class="public-sub">${t.body}</p>
+    <h1>${title}</h1>
+    <p class="public-sub">${body}</p>
   </header>
   <section class="public-actions">
-    <a class="public-btn public-btn--primary" href="/login">${t.cta}</a>
+    <a class="public-btn public-btn--primary" href="/login">${cta}</a>
   </section>
-</main>
-</body></html>`);
+</main>`,
+    }));
   });
 });
 
