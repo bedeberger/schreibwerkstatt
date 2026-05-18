@@ -386,6 +386,16 @@ const bookCreateState = () => ({
   bookCreateError: '',
 });
 
+// Tages-Schreibziel im Header: Donut links neben Avatar. Pulsiert bei aktivem
+// Schreibtag. Daten leben am Root, damit der Donut unabhaengig von der
+// Buch-Overview-Karte sichtbar ist. `dailyProgressStats` ist die rohe
+// /history/book-stats/:bookId-Liste; Tagesdelta berechnet `headerTodayRing()`.
+const dailyProgressState = () => ({
+  dailyProgressBookId: null,
+  dailyProgressStats: [],
+  _dailyProgressLoadingBookId: null,
+});
+
 const jobsState = () => ({
   jobQueueItems: [],
   jobQueueExpanded: false,
@@ -431,6 +441,7 @@ export function initialLektoratState() {
     ...featuresUsageState(),
     ...bookCreateState(),
     ...collabState(),
+    ...dailyProgressState(),
     ...jobsState(),
   };
 }

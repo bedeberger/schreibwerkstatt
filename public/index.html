@@ -261,6 +261,28 @@
     <div class="header-action-cluster" x-show="currentUser && !isAdminOnly" x-cloak>
       <div id="partial-komplett-status"></div>
     </div>
+    <!-- Heute-Ring im Header: Donut links neben Avatar. Pulsiert bei aktivem
+         Schreibtag, fuellt sich gegen daily_goal_chars. Klick oeffnet Buch-Overview. -->
+    <template x-if="currentUser && !isAdminOnly && selectedBookId && dailyProgressBookId == selectedBookId">
+      <button type="button"
+              class="header-today-ring"
+              :class="{ 'header-today-ring--active': headerTodayRing().active, 'header-today-ring--reached': headerTodayRing().reached }"
+              @click="toggleBookOverviewCard()"
+              :data-tip="headerTodayRing().active
+                ? t('overview.today.meta', { chars: headerTodayRing().chars.toLocaleString(uiLocale === 'de' ? 'de-CH' : 'en-US'), goal: headerTodayRing().goal.toLocaleString(uiLocale === 'de' ? 'de-CH' : 'en-US') })
+                : t('overview.today.idle')"
+              :aria-label="t('overview.today.aria', { chars: headerTodayRing().chars, goal: headerTodayRing().goal, pct: headerTodayRing().pct })">
+        <svg viewBox="0 0 36 36" aria-hidden="true">
+          <circle cx="18" cy="18" :r="headerTodayRing().r"
+                  fill="none" stroke="var(--color-border)" stroke-width="4"></circle>
+          <circle cx="18" cy="18" :r="headerTodayRing().r"
+                  fill="none" stroke="var(--color-accent)" stroke-width="4"
+                  stroke-linecap="round"
+                  :stroke-dasharray="headerTodayRing().dash + ' ' + headerTodayRing().gap"
+                  transform="rotate(-90 18 18)"></circle>
+        </svg>
+      </button>
+    </template>
     <div id="partial-avatar-menu"></div>
   </div>
 </div>

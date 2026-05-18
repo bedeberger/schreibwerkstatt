@@ -339,4 +339,38 @@
   padding-top: var(--space-xs);
 }
 
+/* Heute-Ring im Header: kleiner Donut links neben Avatar. Pulsiert bei
+   aktivem Schreibtag; sat-Grün bei erreichtem Ziel. */
+.header-today-ring {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: var(--color-surface);
+  border: 0.5px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-base), border-color var(--transition-base);
+}
+.header-today-ring:hover {
+  background: var(--color-hover);
+  border-color: var(--color-border-input);
+}
+.header-today-ring svg {
+  width: 22px;
+  height: 22px;
+  display: block;
+}
+.header-today-ring--active circle:nth-of-type(2) {
+  animation: overviewTodayPulse 2.4s ease-in-out infinite;
+}
+.header-today-ring--reached circle:nth-of-type(2) {
+  stroke: var(--color-success);
+}
+@media (prefers-reduced-motion: reduce) {
+  .header-today-ring--active circle:nth-of-type(2) { animation: none; }
+}
+
 }

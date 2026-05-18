@@ -829,6 +829,7 @@ document.addEventListener('alpine:init', () => {
           // Top-3 Recency-Features für Quick-Pills laden (best-effort).
           this.loadRecentFeatures();
           if (this.selectedBookId) this.loadRecentPages(this.selectedBookId);
+          if (this.selectedBookId) this.loadDailyProgress(this.selectedBookId);
         }
         await this._applyHash();
         if (!this.isAdminOnly && this.selectedBookId) this._loadBookRole(this.selectedBookId);

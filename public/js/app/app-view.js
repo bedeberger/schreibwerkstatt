@@ -1,4 +1,4 @@
-import { htmlToText, fetchJson, escHtml } from '../utils.js';
+import { htmlToText, fetchJson, escHtml, aggregateLiveBookStats, localIsoDate } from '../utils.js';
 import { EXCLUSIVE_CARDS } from '../cards/feature-registry.js';
 import { contentRepo } from '../repo/content.js';
 import { readDraft, clearDraft } from '../editor/draft-storage.js';
@@ -472,6 +472,8 @@ export const appViewMethods = {
     this.alleAktualisierenTokOut = 0;
     this.alleAktualisierenTps = null;
     this.showKomplettStatus = false;
+    this.resetDailyProgress();
+    if (this.selectedBookId) this.loadDailyProgress(this.selectedBookId);
   },
 
   async _reloadVisibleBookCards() {
@@ -556,5 +558,66 @@ export const appViewMethods = {
     this.resetBookChat();
     // Default-Home: nach komplettem Reset Übersicht öffnen, falls Buch gewählt.
     await this._maybeOpenBookOverview();
+  },
+
+  // Tages-Schreibziel-Donut im Header. Eigener Loader (statt Book-Overview-
+  // Card-State zu spiegeln), damit der Donut auch sichtbar ist, wenn die
+  // Overview-Karte nie geoeffnet wurde. Dedupe via _dailyProgressLoadingBookId;
+  // stale Responses (Buch waehrend des Loads gewechselt) werden verworfen.
+  async loadDailyProgress(bookId) {
+    if (!bookId) return;
+    if (this._dailyProgressLoadingBookId === bookId) return;
+    this._dailyProgressLoadingBookId = bookId;
+    try {
+      const stats = await fetchJson(`/history/book-stats/${bookId}`).catch(() => []);
+      if (this.selectedBookId != bookId) return;
+      this.dailyProgressStats = Array.isArray(stats) ? stats : [];
+      this.dailyProgressBookId = bookId;
+    } finally {
+      if (this._dailyProgressLoadingBookId === bookId) this._dailyProgressLoadingBookId = null;
+    }
+  },
+
+  resetDailyProgress() {
+    this.dailyProgressStats = [];
+    this.dailyProgressBookId = null;
+  },
+
+  // Donut-Math fuer Header-Today-Ring. Spiegelt overviewTodayRing aus
+  // book-overview/stats.js, liest aber Root-State. Live-Delta = Live-Σ chars
+  // − letzter Snapshot strikt vor heute; negativ wird auf 0 geklemmt.
+  headerTodayRing() {
+    const goalChars = Number(this.currentUser?.daily_goal_chars) || 1500;
+    const goal = Math.max(1, goalChars);
+    const a = this.dailyProgressStats || [];
+    const tokEsts = this.tokEsts || {};
+    const tree = this.tree || [];
+    const todayIso = localIsoDate();
+    const liveChars = aggregateLiveBookStats(tokEsts, tree).chars;
+    let cronTodayChars = null;
+    let prevChars = null;
+    for (let i = a.length - 1; i >= 0; i--) {
+      const r = a[i];
+      if (!r?.recorded_at) continue;
+      if (r.recorded_at === todayIso && cronTodayChars == null) {
+        cronTodayChars = Number(r.chars) || 0;
+        continue;
+      }
+      if (r.recorded_at < todayIso && prevChars == null) {
+        prevChars = Number(r.chars) || 0;
+        break;
+      }
+    }
+    const curChars = liveChars > 0 ? liveChars : cronTodayChars;
+    let chars = 0;
+    if (curChars != null && prevChars != null) chars = Math.max(0, curChars - prevChars);
+    const pct = Math.max(0, Math.min(100, Math.round((chars / goal) * 100)));
+    const r = 14;
+    const circ = 2 * Math.PI * r;
+    const dash = (pct / 100) * circ;
+    const gap = circ - dash;
+    const reached = chars >= goal;
+    const active = chars > 0;
+    return { chars, goal, pct, r, dash, gap, reached, active };
   },
 };
