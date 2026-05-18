@@ -833,6 +833,11 @@ document.addEventListener('alpine:init', () => {
         if (!this.isAdminOnly) await this._maybeOpenBookOverview();
         this._syncUrlNow();
         this._applyingHash = false;
+        if (this.selectedBookId) {
+          try {
+            localStorage.setItem(`sw:lastBookId:${this.currentUser?.email || ''}`, String(this.selectedBookId));
+          } catch (_) {}
+        }
         this._setupHashRouting();
         // Buchwechsel (Combobox, Hash-Nav oder programmatisch) → Seiten/Tree neu laden.
         // _applyingHash unterdrückt Doppelladen während Hash-Anwendung.
@@ -846,6 +851,9 @@ document.addEventListener('alpine:init', () => {
           // _resetBookScopedState löscht User-Eingaben (Filter, offene Karten),
           // also überspringen.
           if (String(newVal) === String(oldVal)) return;
+          try {
+            localStorage.setItem(`sw:lastBookId:${this.currentUser?.email || ''}`, String(newVal));
+          } catch (_) {}
           this._resetBookScopedState();
           this._loadBookRole(newVal);
           await this.loadPages({ source: 'bookSwitch' });

@@ -239,7 +239,13 @@ export const treeMethods = {
       }
       this.bookFilterTagPool = [...tagMap.values()].sort((a, b) => a.name.localeCompare(b.name));
       if (!this.selectedBookId || !this.books.some(b => String(b.id) === String(this.selectedBookId))) {
-        this.selectedBookId = String(this.books[0]?.id || '');
+        let restored = '';
+        try {
+          const key = `sw:lastBookId:${this.currentUser?.email || ''}`;
+          const stored = localStorage.getItem(key);
+          if (stored && this.books.some(b => String(b.id) === String(stored))) restored = String(stored);
+        } catch (_) {}
+        this.selectedBookId = restored || String(this.books[0]?.id || '');
       }
       this.showBookCard = true;
       this.setStatus(this.t('tree.booksFound', { n: this.books.length }), false, 4000);

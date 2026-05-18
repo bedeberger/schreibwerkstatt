@@ -11,9 +11,10 @@
 
 .book-export-scope {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   flex-wrap: wrap;
   gap: var(--space-10);
+  margin: 0 0 12px;
 }
 .book-export-scope-label {
   color: var(--color-muted);
