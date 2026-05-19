@@ -23,6 +23,13 @@ export function isEmptyParagraph(el) {
 // Liefert das auto-erzeugte <p> zurück (oder null, falls bestehender leerer
 // Absatz recycelt wurde). Caller speichert die Referenz, um beim Exit gezielt
 // aufzuräumen statt blind den letzten leeren Block zu killen.
+//
+// Empty-Paragraph-Recycling auf frischen Seiten: `<p></p>` ohne Kinder bekommt
+// `<br>` als Schreib-Slot — ohne den ist die `<p>`-Box in Chrome zero-height,
+// Caret rendert nicht und `beforeinput` routet ins Leere. Editor-Container
+// danach erneut fokussieren: die DOM-Mutation während eines aktiven Focus-
+// Zustands invalidiert Chrome's Caret-Renderer, ein zweiter `focus()`-Call
+// nach `addRange` triggert den erneuten Caret-Paint.
 export function jumpToTrailingParagraph(container) {
   if (!container) return null;
   const last = container.lastElementChild;
@@ -30,10 +37,6 @@ export function jumpToTrailingParagraph(container) {
   let added = null;
   if (isEmptyParagraph(last)) {
     target = last;
-    // Frisch-erzeugte Seiten landen als `<p></p>` ohne Kinder. Eine Selection
-    // mit Offset 0 in einem element-node ohne Text/BR empfängt keine
-    // `beforeinput`/`input`-Events → User kann nicht tippen. `<br>` als
-    // Schreib-Slot ergänzen (analog zum frisch erzeugten <p> unten).
     if (!target.hasChildNodes()) target.appendChild(document.createElement('br'));
   } else {
     const p = document.createElement('p');
@@ -49,6 +52,14 @@ export function jumpToTrailingParagraph(container) {
   if (sel) {
     sel.removeAllRanges();
     sel.addRange(range);
+  }
+  // Chrome verliert nach Mid-Focus-Mutation den Caret-Paint — explizit den
+  // contenteditable-Container re-fokussieren. `preventScroll: true` damit
+  // der nachfolgende scrollIntoView die Centerung übernimmt (sonst zwei
+  // konkurrierende Scrolls).
+  if (typeof container.focus === 'function') {
+    try { container.focus({ preventScroll: true }); }
+    catch { container.focus(); }
   }
   // Direkter Sync-Scroll auf den Ziel-Absatz. scrollIntoView ist synchron,
   // triggert Reflow und ist deterministisch — verlässlicher als ein späterer
