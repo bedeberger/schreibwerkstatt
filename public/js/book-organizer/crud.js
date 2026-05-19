@@ -6,7 +6,8 @@ import { _sortSoloFirst } from '../book/tree.js';
 export const crudMethods = {
   onRenameChapter(id, ev) {
     const newName = (ev?.target?.value || '').trim();
-    const ch = this.workTree.find(c => c.id === id);
+    const found = this._findChapter(id);
+    const ch = found?.node;
     if (!ch || !newName || ch.name === newName) {
       if (ch && ev?.target) ev.target.value = ch.name;
       return;
@@ -21,9 +22,10 @@ export const crudMethods = {
     const root = window.__app;
     try {
       await contentRepo.updateChapter(id, { name: newName });
-      const ch = this.workTree.find(c => c.id === id);
+      const ch = this._findChapter(id)?.node;
       if (ch) ch.name = newName;
-      // In-place mirror: chapter entry in root.tree + _chapterOrderMap.
+      // In-place mirror: chapter entry in root.tree + _chapterOrderMap (nur
+      // Top-Level — Sub-Kapitel sind in root.tree noch nicht abgebildet).
       for (const it of root.tree) {
         if (it.type === 'chapter' && !it.solo && it.id === id) it.name = newName;
       }
@@ -31,7 +33,7 @@ export const crudMethods = {
       return true;
     } catch (e) {
       root.setStatus(root.t('bookOrganizer.saveFailed', { detail: e.message }));
-      const ch = this.workTree.find(c => c.id === id);
+      const ch = this._findChapter(id)?.node;
       if (ch && inputEl) inputEl.value = ch.name;
       return false;
     }
@@ -187,10 +189,15 @@ export const crudMethods = {
 
   async deleteChapter(id) {
     const root = window.__app;
-    const ch = this.workTree.find(c => c.id === id);
+    const found = this._findChapter(id);
+    const ch = found?.node;
     if (!ch) return;
     if (ch.pages.length > 0) {
       root.setStatus(root.t('bookOrganizer.chapterNotEmpty', { name: ch.name, n: ch.pages.length }));
+      return;
+    }
+    if ((ch.subchapters?.length || 0) > 0) {
+      root.setStatus(root.t('bookOrganizer.chapterHasSubchapters', { name: ch.name }));
       return;
     }
     if (root.currentPage && root.currentPage.chapter_id === id) {
@@ -205,14 +212,13 @@ export const crudMethods = {
     });
     if (!ok) return;
     await this._deleteChapterRaw(id);
-    // Delete ist nicht reversibel (kein Snapshot) → komplette History invalidieren.
     this._clearHistory();
   },
 
-  // Silent delete — kein Confirm. Genutzt von Undo-of-create-chapter.
   async _deleteChapterRaw(id) {
     const root = window.__app;
-    const ch = this.workTree.find(c => c.id === id);
+    const found = this._findChapter(id);
+    const ch = found?.node;
     if (!ch) return false;
     return await this._runMutation(async () => {
       await contentRepo.deleteChapter(id);
@@ -226,15 +232,108 @@ export const crudMethods = {
           root.tree.splice(i, 1);
         }
       }
-      const wIdx = this.workTree.findIndex(c => c.id === id);
-      if (wIdx >= 0) this.workTree.splice(wIdx, 1);
+      // Aus workTree entfernen (nested-aware).
+      if (found.parentList && found.index >= 0) {
+        found.parentList.splice(found.index, 1);
+      }
       this._rebuildChapterOrderMap();
       this._rebuildPageOrderMaps();
       if (typeof root._refreshChapterStats === 'function') root._refreshChapterStats();
+      // Subchapter-Delete: Sidebar (flach) ist inkonsistent → fullReload.
+      if (found.node.depth > 1) await root.loadPages?.();
       await this.$nextTick();
       this._destroySortables();
       this._initSortables();
     }, 'bookOrganizer.deleteFailed');
+  },
+
+  // Neues Sub-Kapitel unter einem bestehenden Kapitel anlegen.
+  async createSubchapter(parentChapterId) {
+    const root = window.__app;
+    const parent = this._findChapter(parentChapterId)?.node;
+    if (!parent) return;
+    if (parent.depth >= 3) {
+      root.setStatus(root.t('bookOrganizer.maxDepthReached'));
+      return;
+    }
+    const name = await root.appPrompt({
+      message: root.t('bookOrganizer.promptChapterName'),
+      placeholder: root.t('bookOrganizer.placeholderChapterName'),
+      confirmLabel: root.t('bookOrganizer.create'),
+    });
+    if (!name) return;
+    let createdId = null;
+    const ok = await this._runMutation(async () => {
+      const created = await contentRepo.createChapter({
+        book_id: parseInt(root.selectedBookId, 10),
+        name,
+        parent_chapter_id: parentChapterId,
+      });
+      if (!created?.id) return;
+      createdId = created.id;
+      // workTree mit neuem Sub-Kapitel ergaenzen + Eltern-Open.
+      const newNode = {
+        id: created.id,
+        name: created.name || name,
+        depth: parent.depth + 1,
+        parent_id: parent.id,
+        pages: [],
+        subchapters: [],
+      };
+      parent.subchapters = [...(parent.subchapters || []), newNode];
+      this.chapterOpen = { ...this.chapterOpen, [parent.id]: true, [created.id]: true };
+      await this._rerender();
+    }, 'bookOrganizer.createFailed');
+    if (ok && createdId != null) this._recordCreateChapter(createdId, name);
+  },
+
+  // Promote: Kapitel ein Level hoeher (rueckt aus dem Eltern-Kapitel raus,
+  // wird Geschwister des bisherigen Elternteils). Top-Level: no-op.
+  async promoteChapter(id) {
+    if (this.organizerSaving) return;
+    const found = this._findChapter(id);
+    if (!found || found.node.depth <= 1) return;
+    const before = this._snapshotWorkstate();
+    // Aus aktuellem parentList entfernen.
+    const node = found.node;
+    found.parentList.splice(found.index, 1);
+    // Eltern-Suchen → in dessen parentList eintragen, direkt nach dem Elternteil.
+    const parentLoc = this._findChapter(found.parent.id);
+    if (!parentLoc) {
+      // Theoretisch unmoeglich; sicherheitshalber zurueckschieben.
+      found.parentList.splice(found.index, 0, node);
+      return;
+    }
+    parentLoc.parentList.splice(parentLoc.index + 1, 0, node);
+    // depth/parent_id aktualisieren rekursiv.
+    this._reassignDepth(node, node.depth - 1, parentLoc.parent ? parentLoc.parent.id : null);
+    const ok = await this._persistOrder({ fullReload: true });
+    if (ok) this._recordReorder(before);
+  },
+
+  // Demote: Kapitel ein Level tiefer (wird Sub-Kapitel des Vor-Geschwisters).
+  async demoteChapter(id) {
+    if (this.organizerSaving) return;
+    if (!this.canDemoteChapter(id)) return;
+    const found = this._findChapter(id);
+    if (!found) return;
+    const before = this._snapshotWorkstate();
+    const node = found.node;
+    const newParent = found.parentList[found.index - 1];
+    found.parentList.splice(found.index, 1);
+    newParent.subchapters = [...(newParent.subchapters || []), node];
+    this._reassignDepth(node, newParent.depth + 1, newParent.id);
+    this.chapterOpen = { ...this.chapterOpen, [newParent.id]: true };
+    const ok = await this._persistOrder({ fullReload: true });
+    if (ok) this._recordReorder(before);
+  },
+
+  _reassignDepth(node, depth, parentId) {
+    node.depth = depth;
+    node.parent_id = parentId;
+    for (const sub of (node.subchapters || [])) {
+      this._reassignDepth(sub, depth + 1, node.id);
+    }
   },
 
   async deletePage(id) {

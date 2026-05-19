@@ -48,7 +48,7 @@
          x-show="workTree.length > 0 && !organizerSearch"
          x-data="combobox($app.t('bookOrganizer.jumpToPlaceholder'))"
          x-modelable="value" x-model="jumpToChapterId"
-         x-effect="options = workTree.map(c => ({ value: c.id, label: c.name }))"
+         x-effect="options = jumpChapterOptions()"
          @combobox-change="jumpToChapter($event.detail)"></div>
   </div>
 
@@ -79,23 +79,23 @@
                  :disabled="organizerSaving"
                  autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other"
                  :aria-label="$app.t('bookOrganizer.renamePage')">
-          <template x-if="blogStatusFor(page)">
-            <span class="badge" :class="'badge--blog-' + blogStatusFor(page)"
-                  :data-tip="blogStatusLabel(blogStatusFor(page))"
-                  x-text="blogStatusLabel(blogStatusFor(page))"></span>
+          <template x-if="$app.blogStatusFor(page)">
+            <span class="badge" :class="'badge--blog-' + $app.blogStatusFor(page)"
+                  :data-tip="$app.blogStatusLabel($app.blogStatusFor(page))"
+                  x-text="$app.blogStatusLabel($app.blogStatusFor(page))"></span>
           </template>
-          <template x-if="canBlogPush(page)">
+          <template x-if="$app.canBlogPush(page)">
             <button type="button" class="btn-compact organizer-blog-push"
-                    @click="pushPageToBlog(page.id)"
-                    :disabled="!!blogPushBusy[page.id]"
+                    @click="$app.pushPageToBlog(page.id)"
+                    :disabled="!!$app.blogPushBusy[page.id]"
                     :data-tip="$app.t('blog.action.push')"
                     :aria-label="$app.t('blog.action.push')">
               <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=635#arrow-up"/></svg>
             </button>
           </template>
-          <template x-if="blogStatusFor(page) === 'conflict'">
+          <template x-if="$app.blogStatusFor(page) === 'conflict'">
             <button type="button" class="btn-compact organizer-blog-conflict"
-                    @click="openBlogConflict(page.id)"
+                    @click="$app.openBlogConflict(page.id)"
                     :data-tip="$app.t('blog.action.resolveConflict')"
                     x-text="$app.t('blog.action.resolveConflict')"></button>
           </template>
@@ -111,10 +111,15 @@
     </ul>
   </div>
 
-  <!-- Kapitel-Liste -->
-  <div class="organizer-list" data-organizer="chapter-list">
+  <!--
+    Kapitel-Liste — unrolled 3 levels (max-depth=3). Markup pro Level identisch;
+    pflegt nur den x-for-Aliasnamen (ch / sub / subsub). Indent via CSS-Custom-
+    Prop --depth auf .organizer-chapter, Drop-Targets via data-chapter-children.
+  -->
+  <div class="organizer-list" data-organizer="chapter-list" data-organizer-depth="1">
     <template x-for="ch in filteredWorkTree()" :key="ch.id">
-      <div class="organizer-chapter" :data-chapter-id="ch.id">
+      <div class="organizer-chapter" :class="'organizer-chapter--depth-' + ch.depth"
+           :data-chapter-id="ch.id" :style="{ '--depth': ch.depth }">
         <div class="organizer-chapter-header">
           <span class="organizer-drag-handle organizer-drag-handle--chapter" :data-tip="$app.t('bookOrganizer.dragHint')" aria-hidden="true">⋮⋮</span>
           <button type="button" class="organizer-chapter-toggle"
@@ -126,15 +131,30 @@
           <input type="text" class="organizer-name organizer-name--chapter" :value="ch.name"
                  @blur="onRenameChapter(ch.id, $event)"
                  @keydown.enter.prevent="$event.target.blur()"
+                 @keydown.tab="onChapterTab($event, ch.id)"
                  :disabled="organizerSaving"
                  autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other"
                  :aria-label="$app.t('bookOrganizer.renameChapter')">
           <span class="organizer-chapter-meta tag" x-text="ch.pages.length === 1 ? $app.t('sidebar.pagesCountOne') : $app.t('sidebar.pagesCount', { n: ch.pages.length })"></span>
+          <span class="organizer-chapter-meta tag" x-show="ch.subchapters?.length"
+                x-text="$app.t('bookOrganizer.subchaptersCount', { n: ch.subchapters.length })"></span>
           <div class="organizer-chapter-actions">
             <button type="button" class="btn-compact" @click="createPage(ch.id)" :disabled="organizerSaving" x-text="$app.t('bookOrganizer.addPageHere')"></button>
+            <button type="button" class="btn-compact" @click="createSubchapter(ch.id)"
+                    :disabled="organizerSaving || ch.depth >= 3"
+                    :data-tip="ch.depth >= 3 ? $app.t('bookOrganizer.maxDepthReached') : $app.t('bookOrganizer.addSubchapter')"
+                    x-text="$app.t('bookOrganizer.addSubchapter')"></button>
+            <button type="button" class="organizer-icon-btn"
+                    @click="promoteChapter(ch.id)" :disabled="organizerSaving || !canPromoteChapter(ch.id)"
+                    :data-tip="$app.t('bookOrganizer.promote')"
+                    :aria-label="$app.t('bookOrganizer.promote')">←</button>
+            <button type="button" class="organizer-icon-btn"
+                    @click="demoteChapter(ch.id)" :disabled="organizerSaving || !canDemoteChapter(ch.id)"
+                    :data-tip="$app.t('bookOrganizer.demote')"
+                    :aria-label="$app.t('bookOrganizer.demote')">→</button>
             <button type="button" class="organizer-delete-btn organizer-delete-btn--chapter" @click="deleteChapter(ch.id)"
-                    :disabled="organizerSaving || ch.pages.length > 0"
-                    :data-tip="ch.pages.length > 0 ? $app.t('bookOrganizer.deleteChapterNotEmptyHint') : $app.t('bookOrganizer.deleteChapter')"
+                    :disabled="organizerSaving || ch.pages.length > 0 || (ch.subchapters?.length || 0) > 0"
+                    :data-tip="(ch.pages.length > 0 || (ch.subchapters?.length || 0) > 0) ? $app.t('bookOrganizer.deleteChapterNotEmptyHint') : $app.t('bookOrganizer.deleteChapter')"
                     :aria-label="$app.t('bookOrganizer.deleteChapter')">×</button>
           </div>
         </div>
@@ -149,23 +169,23 @@
                      :disabled="organizerSaving"
                      autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other"
                      :aria-label="$app.t('bookOrganizer.renamePage')">
-              <template x-if="blogStatusFor(page)">
-                <span class="blog-badge" :class="'blog-badge--' + blogStatusFor(page)"
-                      :data-tip="blogStatusLabel(blogStatusFor(page))"
-                      x-text="blogStatusLabel(blogStatusFor(page))"></span>
+              <template x-if="$app.blogStatusFor(page)">
+                <span class="blog-badge" :class="'blog-badge--' + $app.blogStatusFor(page)"
+                      :data-tip="$app.blogStatusLabel($app.blogStatusFor(page))"
+                      x-text="$app.blogStatusLabel($app.blogStatusFor(page))"></span>
               </template>
-              <template x-if="canBlogPush(page)">
+              <template x-if="$app.canBlogPush(page)">
                 <button type="button" class="btn-compact organizer-blog-push"
-                        @click="pushPageToBlog(page.id)"
-                        :disabled="!!blogPushBusy[page.id]"
+                        @click="$app.pushPageToBlog(page.id)"
+                        :disabled="!!$app.blogPushBusy[page.id]"
                         :data-tip="$app.t('blog.action.push')"
                         :aria-label="$app.t('blog.action.push')">
                   <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=635#arrow-up"/></svg>
                 </button>
               </template>
-              <template x-if="blogStatusFor(page) === 'conflict'">
+              <template x-if="$app.blogStatusFor(page) === 'conflict'">
                 <button type="button" class="btn-compact organizer-blog-conflict"
-                        @click="openBlogConflict(page.id)"
+                        @click="$app.openBlogConflict(page.id)"
                         :data-tip="$app.t('blog.action.resolveConflict')"
                         x-text="$app.t('blog.action.resolveConflict')"></button>
               </template>
@@ -177,48 +197,178 @@
                       :data-tip="$app.t('bookOrganizer.deletePage')" :aria-label="$app.t('bookOrganizer.deletePage')">×</button>
             </li>
           </template>
-          <li class="organizer-empty" x-show="ch.pages.length === 0" x-text="$app.t('bookOrganizer.noPagesInChapter')"></li>
+          <li class="organizer-empty" x-show="ch.pages.length === 0 && !(ch.subchapters?.length)" x-text="$app.t('bookOrganizer.noPagesInChapter')"></li>
         </ul>
+
+        <!-- Level 2: Sub-Kapitel -->
+        <div class="organizer-subchapters" data-organizer="chapter-list"
+             :data-parent-chapter-id="ch.id" data-organizer-depth="2"
+             x-show="(ch.subchapters?.length || 0) > 0 && (organizerSearch ? true : chapterOpen[ch.id])">
+          <template x-for="sub in (ch.subchapters || [])" :key="sub.id">
+            <div class="organizer-chapter" :class="'organizer-chapter--depth-' + sub.depth"
+                 :data-chapter-id="sub.id" :style="{ '--depth': sub.depth }">
+              <div class="organizer-chapter-header">
+                <span class="organizer-drag-handle organizer-drag-handle--chapter" :data-tip="$app.t('bookOrganizer.dragHint')" aria-hidden="true">⋮⋮</span>
+                <button type="button" class="organizer-chapter-toggle"
+                        @click.stop="toggleChapter(sub.id)"
+                        :aria-expanded="!!chapterOpen[sub.id]"
+                        :aria-label="$app.t(chapterOpen[sub.id] ? 'sidebar.collapseAll' : 'sidebar.expandAll')">
+                  <span class="history-chevron" :class="{ open: organizerSearch ? true : chapterOpen[sub.id] }"></span>
+                </button>
+                <input type="text" class="organizer-name organizer-name--chapter" :value="sub.name"
+                       @blur="onRenameChapter(sub.id, $event)"
+                       @keydown.enter.prevent="$event.target.blur()"
+                       @keydown.tab="onChapterTab($event, sub.id)"
+                       :disabled="organizerSaving"
+                       autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other"
+                       :aria-label="$app.t('bookOrganizer.renameChapter')">
+                <span class="organizer-chapter-meta tag" x-text="sub.pages.length === 1 ? $app.t('sidebar.pagesCountOne') : $app.t('sidebar.pagesCount', { n: sub.pages.length })"></span>
+                <span class="organizer-chapter-meta tag" x-show="sub.subchapters?.length"
+                      x-text="$app.t('bookOrganizer.subchaptersCount', { n: sub.subchapters.length })"></span>
+                <div class="organizer-chapter-actions">
+                  <button type="button" class="btn-compact" @click="createPage(sub.id)" :disabled="organizerSaving" x-text="$app.t('bookOrganizer.addPageHere')"></button>
+                  <button type="button" class="btn-compact" @click="createSubchapter(sub.id)"
+                          :disabled="organizerSaving || sub.depth >= 3"
+                          :data-tip="sub.depth >= 3 ? $app.t('bookOrganizer.maxDepthReached') : $app.t('bookOrganizer.addSubchapter')"
+                          x-text="$app.t('bookOrganizer.addSubchapter')"></button>
+                  <button type="button" class="organizer-icon-btn"
+                          @click="promoteChapter(sub.id)" :disabled="organizerSaving || !canPromoteChapter(sub.id)"
+                          :data-tip="$app.t('bookOrganizer.promote')"
+                          :aria-label="$app.t('bookOrganizer.promote')">←</button>
+                  <button type="button" class="organizer-icon-btn"
+                          @click="demoteChapter(sub.id)" :disabled="organizerSaving || !canDemoteChapter(sub.id)"
+                          :data-tip="$app.t('bookOrganizer.demote')"
+                          :aria-label="$app.t('bookOrganizer.demote')">→</button>
+                  <button type="button" class="organizer-delete-btn organizer-delete-btn--chapter" @click="deleteChapter(sub.id)"
+                          :disabled="organizerSaving || sub.pages.length > 0 || (sub.subchapters?.length || 0) > 0"
+                          :data-tip="(sub.pages.length > 0 || (sub.subchapters?.length || 0) > 0) ? $app.t('bookOrganizer.deleteChapterNotEmptyHint') : $app.t('bookOrganizer.deleteChapter')"
+                          :aria-label="$app.t('bookOrganizer.deleteChapter')">×</button>
+                </div>
+              </div>
+              <ul class="organizer-pages" data-organizer="page-list" :data-chapter-id="sub.id"
+                  x-show="organizerSearch ? true : chapterOpen[sub.id]">
+                <template x-for="page in sub.pages" :key="page.id">
+                  <li class="organizer-page" :data-page-id="page.id">
+                    <span class="organizer-drag-handle" :data-tip="$app.t('bookOrganizer.dragHint')" aria-hidden="true">⋮⋮</span>
+                    <input type="text" class="organizer-name" :value="page.name"
+                           @blur="onRenamePage(page.id, $event)"
+                           @keydown.enter.prevent="$event.target.blur()"
+                           :disabled="organizerSaving"
+                           autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other"
+                           :aria-label="$app.t('bookOrganizer.renamePage')">
+                    <div class="organizer-move-combo"
+                         x-data="combobox({ placeholder: $app.t('bookOrganizer.moveTo'), transient: true })"
+                         x-effect="options = chapterMoveOptions(sub.id)"
+                         @combobox-change="movePageToChapter(page.id, $event.detail)"></div>
+                    <button type="button" class="organizer-delete-btn" @click="deletePage(page.id)" :disabled="organizerSaving"
+                            :data-tip="$app.t('bookOrganizer.deletePage')" :aria-label="$app.t('bookOrganizer.deletePage')">×</button>
+                  </li>
+                </template>
+                <li class="organizer-empty" x-show="sub.pages.length === 0 && !(sub.subchapters?.length)" x-text="$app.t('bookOrganizer.noPagesInChapter')"></li>
+              </ul>
+
+              <!-- Level 3: Sub-Sub-Kapitel (terminale Tiefe) -->
+              <div class="organizer-subchapters" data-organizer="chapter-list"
+                   :data-parent-chapter-id="sub.id" data-organizer-depth="3"
+                   x-show="(sub.subchapters?.length || 0) > 0 && (organizerSearch ? true : chapterOpen[sub.id])">
+                <template x-for="subsub in (sub.subchapters || [])" :key="subsub.id">
+                  <div class="organizer-chapter" :class="'organizer-chapter--depth-' + subsub.depth"
+                       :data-chapter-id="subsub.id" :style="{ '--depth': subsub.depth }">
+                    <div class="organizer-chapter-header">
+                      <span class="organizer-drag-handle organizer-drag-handle--chapter" :data-tip="$app.t('bookOrganizer.dragHint')" aria-hidden="true">⋮⋮</span>
+                      <button type="button" class="organizer-chapter-toggle"
+                              @click.stop="toggleChapter(subsub.id)"
+                              :aria-expanded="!!chapterOpen[subsub.id]"
+                              :aria-label="$app.t(chapterOpen[subsub.id] ? 'sidebar.collapseAll' : 'sidebar.expandAll')">
+                        <span class="history-chevron" :class="{ open: organizerSearch ? true : chapterOpen[subsub.id] }"></span>
+                      </button>
+                      <input type="text" class="organizer-name organizer-name--chapter" :value="subsub.name"
+                             @blur="onRenameChapter(subsub.id, $event)"
+                             @keydown.enter.prevent="$event.target.blur()"
+                             @keydown.tab="onChapterTab($event, subsub.id)"
+                             :disabled="organizerSaving"
+                             autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other"
+                             :aria-label="$app.t('bookOrganizer.renameChapter')">
+                      <span class="organizer-chapter-meta tag" x-text="subsub.pages.length === 1 ? $app.t('sidebar.pagesCountOne') : $app.t('sidebar.pagesCount', { n: subsub.pages.length })"></span>
+                      <div class="organizer-chapter-actions">
+                        <button type="button" class="btn-compact" @click="createPage(subsub.id)" :disabled="organizerSaving" x-text="$app.t('bookOrganizer.addPageHere')"></button>
+                        <button type="button" class="organizer-icon-btn"
+                                @click="promoteChapter(subsub.id)" :disabled="organizerSaving || !canPromoteChapter(subsub.id)"
+                                :data-tip="$app.t('bookOrganizer.promote')"
+                                :aria-label="$app.t('bookOrganizer.promote')">←</button>
+                        <button type="button" class="organizer-delete-btn organizer-delete-btn--chapter" @click="deleteChapter(subsub.id)"
+                                :disabled="organizerSaving || subsub.pages.length > 0"
+                                :data-tip="subsub.pages.length > 0 ? $app.t('bookOrganizer.deleteChapterNotEmptyHint') : $app.t('bookOrganizer.deleteChapter')"
+                                :aria-label="$app.t('bookOrganizer.deleteChapter')">×</button>
+                      </div>
+                    </div>
+                    <ul class="organizer-pages" data-organizer="page-list" :data-chapter-id="subsub.id"
+                        x-show="organizerSearch ? true : chapterOpen[subsub.id]">
+                      <template x-for="page in subsub.pages" :key="page.id">
+                        <li class="organizer-page" :data-page-id="page.id">
+                          <span class="organizer-drag-handle" :data-tip="$app.t('bookOrganizer.dragHint')" aria-hidden="true">⋮⋮</span>
+                          <input type="text" class="organizer-name" :value="page.name"
+                                 @blur="onRenamePage(page.id, $event)"
+                                 @keydown.enter.prevent="$event.target.blur()"
+                                 :disabled="organizerSaving"
+                                 autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other"
+                                 :aria-label="$app.t('bookOrganizer.renamePage')">
+                          <div class="organizer-move-combo"
+                               x-data="combobox({ placeholder: $app.t('bookOrganizer.moveTo'), transient: true })"
+                               x-effect="options = chapterMoveOptions(subsub.id)"
+                               @combobox-change="movePageToChapter(page.id, $event.detail)"></div>
+                          <button type="button" class="organizer-delete-btn" @click="deletePage(page.id)" :disabled="organizerSaving"
+                                  :data-tip="$app.t('bookOrganizer.deletePage')" :aria-label="$app.t('bookOrganizer.deletePage')">×</button>
+                        </li>
+                      </template>
+                      <li class="organizer-empty" x-show="subsub.pages.length === 0" x-text="$app.t('bookOrganizer.noPagesInChapter')"></li>
+                    </ul>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+        </div>
       </div>
     </template>
     <div class="muted-msg muted-msg--sm" x-show="organizerSearch && filteredWorkTree().length === 0 && filteredSoloPages().length === 0" x-text="$app.t('sidebar.noPagesFound')"></div>
   </div>
 
   <!-- Konflikt-Diff-Modal: zeigt App-Inhalt vs. WP-Inhalt, User wählt die Quelle. -->
-  <div class="blog-conflict-overlay" x-show="!!blogConflictOpen" x-cloak
-       @keydown.escape.window="closeBlogConflict()">
+  <div class="blog-conflict-overlay" x-show="!!$app.blogConflictOpen" x-cloak
+       @keydown.escape.window="$app.closeBlogConflict()">
     <div class="blog-conflict-modal">
       <div class="blog-conflict-header">
         <span class="card-title" x-text="$app.t('blog.conflict.title')"></span>
-        <button type="button" class="organizer-delete-btn" @click="closeBlogConflict()" aria-label="✕">×</button>
+        <button type="button" class="organizer-delete-btn" @click="$app.closeBlogConflict()" aria-label="✕">×</button>
       </div>
-      <template x-if="!blogConflictData">
+      <template x-if="!$app.blogConflictData">
         <div class="muted-msg" x-text="$app.t('common.loading')"></div>
       </template>
-      <template x-if="blogConflictData">
+      <template x-if="$app.blogConflictData">
         <div class="blog-conflict-body">
           <div class="blog-conflict-side">
             <div class="blog-conflict-side-header">
               <h4 x-text="$app.t('blog.conflict.local')"></h4>
-              <span class="muted" x-text="blogConflictData.local.name"></span>
+              <span class="muted" x-text="$app.blogConflictData.local.name"></span>
             </div>
-            <div class="blog-conflict-content" x-html="blogConflictData.local.html"></div>
+            <div class="blog-conflict-content" x-html="$app.blogConflictData.local.html"></div>
           </div>
           <div class="blog-conflict-side">
             <div class="blog-conflict-side-header">
               <h4 x-text="$app.t('blog.conflict.remote')"></h4>
-              <span class="muted" x-text="blogConflictData.remote.title"></span>
+              <span class="muted" x-text="$app.blogConflictData.remote.title"></span>
             </div>
-            <div class="blog-conflict-content" x-html="blogConflictData.remote.html"></div>
+            <div class="blog-conflict-content" x-html="$app.blogConflictData.remote.html"></div>
           </div>
         </div>
       </template>
-      <div class="blog-conflict-actions" x-show="blogConflictData">
-        <button type="button" @click="resolveBlogConflict('app')"
+      <div class="blog-conflict-actions" x-show="$app.blogConflictData">
+        <button type="button" @click="$app.resolveBlogConflict('app')"
                 x-text="$app.t('blog.conflict.keepApp')"></button>
-        <button type="button" @click="resolveBlogConflict('wp')"
+        <button type="button" @click="$app.resolveBlogConflict('wp')"
                 x-text="$app.t('blog.conflict.takeWp')"></button>
-        <button type="button" class="btn-compact" @click="closeBlogConflict()"
+        <button type="button" class="btn-compact" @click="$app.closeBlogConflict()"
                 x-text="$app.t('common.cancel')"></button>
       </div>
     </div>

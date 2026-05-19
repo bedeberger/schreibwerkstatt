@@ -25,6 +25,26 @@
   border-style: dashed;
 }
 
+/* Sub-Kapitel-Container: visuell unter dem Eltern-Kapitel-Header eingerueckt.
+   Padding-Inline skaliert mit --depth (1 = top-level, 2/3 = nested). */
+.organizer-subchapters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: var(--space-8) var(--space-sm) var(--space-sm);
+  border-top: 1px dashed var(--color-border);
+  background: color-mix(in srgb, var(--card-accent) 4%, transparent);
+}
+.organizer-subchapters > .organizer-chapter {
+  margin-inline-start: var(--space-lg);
+}
+.organizer-chapter--depth-2 > .organizer-chapter-header,
+.organizer-chapter--depth-3 > .organizer-chapter-header {
+  background: color-mix(in srgb, var(--card-accent) 8%, var(--color-hover-light));
+}
+.organizer-chapter--depth-2 .organizer-name--chapter { font-weight: 500; }
+.organizer-chapter--depth-3 .organizer-name--chapter { font-weight: 400; font-style: italic; }
+
 .organizer-chapter-header {
   display: flex;
   align-items: center;
@@ -249,6 +269,13 @@
   .organizer-chapter-actions .btn-compact,
   .organizer-move-combo {
     display: none;
+  }
+  /* Mobile: kleinere Indentation, Sub-Kapitel-Spalte sonst zu schmal. */
+  .organizer-subchapters > .organizer-chapter {
+    margin-inline-start: var(--space-sm);
+  }
+  .organizer-subchapters {
+    padding-inline: var(--space-xs);
   }
   .organizer-name {
     font-size: var(--font-size-base);

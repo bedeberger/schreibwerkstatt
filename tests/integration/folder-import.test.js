@@ -80,17 +80,34 @@ test('folder-import (merge): docx + odt aus YYYY/Monat → Kapitel pro Jahr, Sei
   const job = ctx.shared.jobs.get(jobId);
   assert.equal(job.status, 'done', `Job-Status: ${job.status}, err: ${job.error || '-'}`);
   assert.equal(job.result.pagesCreated, 4);
-  assert.equal(job.result.chaptersCreated, 2);
+  // 2 Year-Chapters (2023, 2024) + 3 Month-Sub-Chapters (12/2023, 01/2024, 03/2024)
+  assert.equal(job.result.yearChaptersCreated, 2);
+  assert.equal(job.result.monthSubChaptersCreated, 3);
+  assert.equal(job.result.chaptersCreated, 5);
   assert.equal(job.result.bookId, book.id);
 
-  // Content-Store-Check: 2 Kapitel (2023, 2024), 4 Seiten gesamt
   const chapters = await contentStore.listChapters(book.id, { session: { user: { email: userEmail } } });
-  const yearNames = chapters.map(c => c.name).sort();
-  assert.deepEqual(yearNames, ['2023', '2024']);
+  const yearChapters = chapters.filter(c => !c.parent_chapter_id).map(c => c.name).sort();
+  assert.deepEqual(yearChapters, ['2023', '2024']);
+
+  // Sub-Chapter pro Monat. Name-Format: "YYYY Monatsname"
+  const subChapters = chapters.filter(c => c.parent_chapter_id).map(c => c.name).sort();
+  assert.deepEqual(subChapters, ['2023 Dezember', '2024 Januar', '2024 März']);
+
+  // Jeder Sub-Chapter referenziert sein Year-Chapter via parent_chapter_id
+  const yearByName = new Map(chapters.filter(c => !c.parent_chapter_id).map(c => [c.name, c.id]));
+  for (const sub of chapters.filter(c => c.parent_chapter_id)) {
+    const yearPrefix = sub.name.slice(0, 4);
+    assert.equal(sub.parent_chapter_id, yearByName.get(yearPrefix));
+  }
 
   const pages = await contentStore.listPages(book.id, { session: { user: { email: userEmail } } });
   const pageNames = pages.map(p => p.name).sort();
   assert.deepEqual(pageNames, ['2023-12-30', '2023-12-31', '2024-01-01', '2024-03-05']);
+
+  // Pages haengen am Sub-Chapter (Month), nicht am Year-Chapter
+  const subIds = new Set(chapters.filter(c => c.parent_chapter_id).map(c => c.id));
+  for (const p of pages) assert.ok(subIds.has(p.chapter_id), `Page ${p.name} sollte an Month-Sub-Chapter haengen`);
 });
 
 test('folder-import: leeres Archiv → failJob mit emptyArchive', async () => {
@@ -225,10 +242,14 @@ test('folder-import: month-only Fallback fuer Datei ohne Datum im Namen/Inhalt',
   // Page-Name: "2006-11 warum ich notizen mag" (Thema aus Filename)
   assert.match(pages[0].name, /^2006-11 warum ich notizen mag/);
 
-  // Im richtigen Jahres-Kapitel
+  // Year-Chapter "2006" + Month-Sub-Chapter "11 November"
   const chapters = await contentStore.listChapters(book.id, { session: { user: { email: userEmail } } });
-  assert.equal(chapters.length, 1);
-  assert.equal(chapters[0].name, '2006');
+  const yearCh = chapters.find(c => c.name === '2006' && !c.parent_chapter_id);
+  const subCh = chapters.find(c => c.name === '2006 November');
+  assert.ok(yearCh);
+  assert.ok(subCh);
+  assert.equal(subCh.parent_chapter_id, yearCh.id);
+  assert.equal(pages[0].chapter_id, subCh.id);
 });
 
 test('folder-import: persoenliches_NN.abw + Monat-Ordner → korrektes Datum', async () => {

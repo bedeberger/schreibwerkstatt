@@ -1,6 +1,8 @@
 # Folder-Import
 
-Importiert Tagebuch-Archive mit Struktur `<YYYY>/<Monat>/<Tagesdatei>` aus ZIP. Erzeugt **ein Kapitel pro Jahr**, **eine Seite pro Tagesdatei** (Page-Name = ISO-Datum `YYYY-MM-DD`). Modi: `new-book` (Buch anlegen) oder `merge` (in bestehendes Buch importieren).
+Importiert Tagebuch-Archive mit Struktur `<YYYY>/<Monat>/<Tagesdatei>` aus ZIP. Erzeugt **ein Top-Level-Kapitel pro Jahr**, **ein Sub-Kapitel pro Monat** (parent_chapter_id zeigt aufs Jahr-Kapitel; Sub-Name-Format `YYYY Monatsname` z.B. `2020 November`), **eine Seite pro Tagesdatei** unterhalb des Monat-Sub-Kapitels (Page-Name = ISO-Datum `YYYY-MM-DD`). Modi: `new-book` (Buch anlegen) oder `merge` (in bestehendes Buch importieren).
+
+Bei `year-only`-Fallback (kein Monat ableitbar) hängt die Seite direkt am Year-Chapter, ohne Month-Sub.
 
 ## Architektur
 
@@ -49,6 +51,17 @@ Beispiele:
 - **Underscore vor Zahl:** `persoenliches_23.abw` → `\b` matched nicht zwischen `_` und Digit. Pattern nutzt deshalb Lookarounds `(?<!\d)(\d{1,2})(?!\d)`.
 - **Doppel-Extension:** `persoenliches_03.odt.docx` → Strip-Loop entfernt mehrere Alpha-Extensions, bis nur noch der Body übrig bleibt.
 - **Eindeutigkeit Pflicht:** Nur wenn **genau eine** 1-31-Zahl im stripped Body steht (`Datei 5 und 12.docx` → null).
+
+## Chapter-Hierarchie (Migration 135)
+
+`chapters.parent_chapter_id` (FK auf `chapters(chapter_id)`, ON DELETE SET NULL). Content-Store-Backend ([lib/content-store/backends/localdb.js](../lib/content-store/backends/localdb.js)) propagiert das Feld in `createChapter`/`loadChapter`/`listChapters` und `_chapterRow`. Position-Scope bei `createChapter`: bei gesetztem `parent_chapter_id` zählt die Position innerhalb des Parents, sonst auf Top-Level. Worker-Caches:
+
+- `chapterByYear: Map<number, chapter_id>` — Year-Chapter (Top-Level)
+- `chapterByYearMonth: Map<"YYYY-MM", chapter_id>` — Month-Sub-Chapter
+
+Im Merge-Modus werden bestehende Year- und Month-Sub-Chapter aus dem Buch eingelesen und wiederverwendet (Match via Name+Position).
+
+**Frontend-Hinweis:** [public/js/book/tree.js](../public/js/book/tree.js) und der Book-Organizer rendern Chapter aktuell flach (alle Chapter als Siblings). Die Hierarchie liegt korrekt in der DB; eine nested-Rendering-UI ist separate Arbeit.
 
 ## Pflicht-Invarianten
 

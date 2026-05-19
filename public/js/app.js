@@ -64,6 +64,7 @@ import { registerNumInput } from './num-input.js';
 import { registerCombobox } from './combobox.js';
 import { shortcutsMethods } from './editor/shortcuts.js';
 import { featuresUsageMethods } from './features-usage.js';
+import { blogSyncMethods } from './book/blog-sync.js';
 import { initialLektoratState } from './app/app-state.js';
 import { appUiMethods, applySzenenFilters, applySongsFilters } from './app/app-ui.js';
 import { appChromeMethods } from './app/app-chrome.js';
@@ -464,6 +465,7 @@ document.addEventListener('alpine:init', () => {
       // Tracking-Watcher früh registrieren, damit auch Karten-Öffnungen
       // während der initialen Hash-Anwendung erfasst werden.
       this.setupFeatureUsageWatchers();
+      this.setupBlogSync();
       // Plattform-Detect für Tasten-Hints (⌘ vs. Ctrl).
       const ua = navigator.userAgent || '';
       const plat = navigator.platform || '';
@@ -684,6 +686,7 @@ document.addEventListener('alpine:init', () => {
     ...appNavigationMethods,
     ...appHashRouterMethods,
     ...featuresUsageMethods,
+    ...blogSyncMethods,
     ...bookCreateMethods,
     });
     Object.defineProperties(obj, rootGetterDescriptors);

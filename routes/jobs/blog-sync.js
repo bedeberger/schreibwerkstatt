@@ -31,6 +31,36 @@ function _newer(a, b) {
   return String(a) > String(b);
 }
 
+// Chapter-Resolver: WP-Posts werden nach Veroeffentlichungsjahr gebuendelt.
+// chapter_name = "YYYY". Get-or-create pro Job, Cache als Map year→chapter_id
+// erspart Mehrfach-Lookups.
+async function _resolveYearChapter(bookId, year, cache) {
+  if (cache.has(year)) return cache.get(year);
+  const existing = await contentStore.listChapters(bookId, null);
+  for (const ch of existing) {
+    if (String(ch.name) === year) {
+      cache.set(year, ch.id);
+      return ch.id;
+    }
+  }
+  const created = await contentStore.createChapter({ book_id: bookId, name: year }, null);
+  cache.set(year, created.id);
+  return created.id;
+}
+
+function _postYear(post) {
+  const src = post.date_gmt || post.date || post.modified_gmt || '';
+  const y = String(src).slice(0, 4);
+  return /^\d{4}$/.test(y) ? y : 'Undatiert';
+}
+
+function _postPageName(post) {
+  const src = post.date_gmt || post.date || post.modified_gmt || '';
+  const day = String(src).slice(0, 10);
+  const title = (post.title && (post.title.rendered || post.title.raw)) || post.slug || `Post ${post.id}`;
+  return /^\d{4}-\d{2}-\d{2}$/.test(day) ? `${day}: ${title}` : title;
+}
+
 function _resolveBlogConn(bookId) {
   const conn = blogs.getConnection(bookId);
   if (!conn) {
@@ -71,6 +101,7 @@ async function runBlogImportJob(jobId, bookId, userEmail) {
     let totalPages = 1;
     let totalCount = 0;
     let imported = 0;
+    const chapterCache = new Map();
 
     do {
       if (_abortSignal(jobId)?.aborted) throw new DOMException('Aborted', 'AbortError');
@@ -80,13 +111,15 @@ async function runBlogImportJob(jobId, bookId, userEmail) {
 
       for (const post of posts) {
         if (_abortSignal(jobId)?.aborted) throw new DOMException('Aborted', 'AbortError');
-        const title = (post.title && (post.title.rendered || post.title.raw)) || post.slug || `Post ${post.id}`;
+        const pageName = _postPageName(post);
+        const year = _postYear(post);
+        const chapterId = await _resolveYearChapter(bookId, year, chapterCache);
         const rawHtml = (post.content && (post.content.raw || post.content.rendered)) || '';
         const appHtml = wpToAppHtml(rawHtml) || '<p></p>';
         const created = await contentStore.createPage({
           book_id: bookId,
-          chapter_id: null,
-          name: title,
+          chapter_id: chapterId,
+          name: pageName,
           html: appHtml,
         }, null);
         blogs.upsertLink({
@@ -141,6 +174,7 @@ async function runBlogPullJob(jobId, bookId, userEmail) {
     let created = 0;
     let conflicts = 0;
     let skipped = 0;
+    const chapterCache = new Map();
 
     do {
       if (_abortSignal(jobId)?.aborted) throw new DOMException('Aborted', 'AbortError');
@@ -154,13 +188,15 @@ async function runBlogPullJob(jobId, bookId, userEmail) {
         if (_abortSignal(jobId)?.aborted) throw new DOMException('Aborted', 'AbortError');
         const link = blogs.getLinkByPost(conn.id, post.id);
         const wpModified = post.modified_gmt || post.date_gmt || '';
-        const title = (post.title && (post.title.rendered || post.title.raw)) || post.slug || `Post ${post.id}`;
+        const pageName = _postPageName(post);
         const rawHtml = (post.content && (post.content.raw || post.content.rendered)) || '';
         const appHtml = wpToAppHtml(rawHtml) || '<p></p>';
 
         if (!link) {
+          const year = _postYear(post);
+          const chapterId = await _resolveYearChapter(bookId, year, chapterCache);
           const createdPage = await contentStore.createPage({
-            book_id: bookId, chapter_id: null, name: title, html: appHtml,
+            book_id: bookId, chapter_id: chapterId, name: pageName, html: appHtml,
           }, null);
           blogs.upsertLink({
             pageId: createdPage.id,
@@ -189,7 +225,7 @@ async function runBlogPullJob(jobId, bookId, userEmail) {
           continue;
         }
         if (wpHasNew && !appHasLocalEdit) {
-          await contentStore.savePage(link.page_id, { name: title, html: appHtml }, null);
+          await contentStore.savePage(link.page_id, { name: pageName, html: appHtml }, null);
           blogs.markLinkPulled(link.page_id, {
             wpModifiedAt: wpModified,
             wpStatus: post.status || null,

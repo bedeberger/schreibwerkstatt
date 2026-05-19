@@ -32,19 +32,20 @@ export const dndMethods = {
     // und wirft "page is not defined". Nach Drag wieder entfernen.
     const markIgnore = (evt) => evt.item?.setAttribute('x-ignore', '');
     const unmarkIgnore = (evt) => evt.item?.removeAttribute('x-ignore');
-    const chapterListEl = this.$root.querySelector('[data-organizer="chapter-list"]');
-    if (chapterListEl) {
-      this._sortables.push(new Sortable(chapterListEl, {
+    // Eine Chapter-Liste pro Tiefe — alle teilen die `chapters`-Gruppe, damit
+    // Kapitel zwischen Levels per DnD wandern koennen. Drop-Ziel-Validierung
+    // (max-depth, kein-eigener-Subtree) im onAdd/onMove-Hook.
+    const chapterLists = this.$root.querySelectorAll('[data-organizer="chapter-list"]');
+    for (const el of chapterLists) {
+      this._sortables.push(new Sortable(el, {
         handle: '.organizer-drag-handle--chapter',
         animation: 150,
         draggable: '.organizer-chapter',
-        // Kapitel reordern nur innerhalb chapter-list. pull:false verhindert,
-        // dass page-list-Sortables (put:true) ein Kapitel als Drop akzeptieren
-        // — sonst landet das Kapitel-DOM im page-list eines anderen Kapitels.
-        group: { name: 'chapters', pull: false, put: false },
+        group: { name: 'chapters', pull: true, put: ['chapters'] },
         emptyInsertThreshold: 0,
         onChoose: markIgnore,
         onUnchoose: unmarkIgnore,
+        onMove: (evt) => this._validateChapterMove(evt),
         onEnd: (evt) => { unmarkIgnore(evt); this._onChapterDrop(evt); },
       }));
     }
@@ -63,6 +64,28 @@ export const dndMethods = {
     }
   },
 
+  // Sortable.onMove: blockt Drops, die max-depth verletzen oder ein Kapitel in
+  // seinen eigenen Subtree (oder sich selbst) ziehen wuerden. Return false →
+  // Drop wird nicht akzeptiert.
+  _validateChapterMove(evt) {
+    const movedId = parseInt(evt.dragged?.dataset?.chapterId, 10);
+    if (!Number.isFinite(movedId)) return true;
+    const toEl = evt.to;
+    const targetDepth = parseInt(toEl?.dataset?.organizerDepth, 10) || 1;
+    const targetParentId = parseInt(toEl?.dataset?.parentChapterId, 10) || null;
+    // Kein Drop in sich selbst.
+    if (targetParentId === movedId) return false;
+    const found = this._findChapter(movedId);
+    if (!found) return true;
+    // Kein Drop in eigenen Subtree.
+    const descIds = this._descendantIdsOf(found.node);
+    if (targetParentId != null && descIds.has(targetParentId)) return false;
+    // Max-Depth-Check: targetDepth + (subtreeDepth - 1) <= 3.
+    const subDepth = this._subtreeDepth(found.node);
+    if (targetDepth + subDepth - 1 > 3) return false;
+    return true;
+  },
+
   _parseChapterIdAttr(el) {
     const raw = el?.dataset?.chapterId;
     if (raw == null || raw === '' || raw === 'null' || raw === '0') return 0;
@@ -71,16 +94,54 @@ export const dndMethods = {
 
   async _onChapterDrop(evt) {
     if (this.organizerSaving) return;
-    if (evt.oldIndex === evt.newIndex) return;
+    const sameBucket = evt.from === evt.to;
+    if (sameBucket && evt.oldIndex === evt.newIndex) return;
     const before = this._snapshotWorkstate();
-    const ids = [...evt.to.querySelectorAll('.organizer-chapter[data-chapter-id]')]
-      .map(el => parseInt(el.dataset.chapterId, 10));
-    const idxOf = new Map(ids.map((id, i) => [id, i]));
-    // In-place sort: kein Reassignment, sonst rendert Alpine x-for neu und
-    // konkurriert mit Sortable's bereits gesetzter DOM-Reihenfolge.
-    this.workTree.sort((a, b) => (idxOf.get(a.id) ?? 0) - (idxOf.get(b.id) ?? 0));
-    const ok = await this._persistOrder();
+
+    // Existierende Nodes per ID indexieren — Pages + Renames bleiben erhalten,
+    // wenn wir den Tree neu aus DOM-Reihenfolge zusammenbauen.
+    const nodeById = new Map();
+    function collect(list) {
+      for (const c of list) {
+        nodeById.set(c.id, c);
+        collect(c.subchapters || []);
+      }
+    }
+    collect(this.workTree);
+
+    const topContainer = this.$root.querySelector('.organizer-list[data-organizer="chapter-list"]');
+    const newWorkTree = topContainer ? this._rebuildFromDom(topContainer, 1, null, nodeById) : this.workTree;
+
+    // Reassignen (statt in-place sort) — Tiefe + parent_id-Felder muessen neu
+    // gesetzt sein. Alpine x-for reagiert; SortableJS-DOM-Stand bleibt im Sync,
+    // weil wir neu rerendern.
+    this.workTree = newWorkTree;
+    const ok = await this._persistOrder({ fullReload: !sameBucket });
     if (ok) this._recordReorder(before);
+  },
+
+  _rebuildFromDom(containerEl, depth, parentId, nodeById) {
+    const out = [];
+    for (const chEl of containerEl.children) {
+      if (!chEl.classList.contains('organizer-chapter')) continue;
+      const id = parseInt(chEl.dataset.chapterId, 10);
+      if (!Number.isFinite(id)) continue;
+      const existing = nodeById.get(id) || { id, name: '', pages: [], subchapters: [] };
+      let subList = null;
+      for (const desc of chEl.children) {
+        if (desc.classList.contains('organizer-subchapters')) { subList = desc; break; }
+      }
+      const subs = subList ? this._rebuildFromDom(subList, depth + 1, id, nodeById) : [];
+      out.push({
+        id,
+        name: existing.name,
+        pages: existing.pages || [],
+        depth,
+        parent_id: parentId,
+        subchapters: subs,
+      });
+    }
+    return out;
   },
 
   async _onPageDrop(evt) {
@@ -93,30 +154,49 @@ export const dndMethods = {
     const pageObj = this._removePageFromBucket(fromChapId, pageId);
     if (!pageObj) return;
     pageObj.chapter_id = toChapId;
-    const newOrder = [...evt.to.querySelectorAll('.organizer-page[data-page-id]')]
+    const newOrder = [...evt.to.querySelectorAll(':scope > .organizer-page[data-page-id]')]
       .map(el => parseInt(el.dataset.pageId, 10));
     const targetIdx = newOrder.indexOf(pageId);
-    const bucket = toChapId === 0 ? this.soloPages : this.workTree.find(c => c.id === toChapId)?.pages;
+    const bucket = this._pagesBucket(toChapId);
     if (!bucket) return;
     bucket.splice(targetIdx >= 0 ? targetIdx : bucket.length, 0, pageObj);
+    // Subchapter-Pages koennen tief liegen → fullReload, damit root.tree
+    // (flach) konsistent bleibt.
+    const fullReload = toChapId !== 0 && this._chapterDepth(toChapId) > 1;
     const affected = [toChapId, fromChapId !== toChapId ? fromChapId : null].filter(v => v != null);
-    const ok = await this._persistOrder({ affectedChapters: affected });
+    const ok = await this._persistOrder(fullReload ? { fullReload: true } : { affectedChapters: affected });
     if (ok) this._recordReorder(before);
   },
 
+  _pagesBucket(chapId) {
+    if (chapId === 0) return this.soloPages;
+    const found = this._findChapter(chapId);
+    return found?.node?.pages || null;
+  },
+
+  _chapterDepth(chapId) {
+    const found = this._findChapter(chapId);
+    return found?.node?.depth || 1;
+  },
+
   _removePageFromBucket(chapId, pageId) {
-    const bucket = chapId === 0 ? this.soloPages : this.workTree.find(c => c.id === chapId)?.pages;
+    const bucket = this._pagesBucket(chapId);
     if (!bucket) return null;
     const idx = bucket.findIndex(p => p.id === pageId);
     return idx >= 0 ? bucket.splice(idx, 1)[0] : null;
   },
 
   _findPage(id) {
-    for (const c of this.workTree) {
-      const p = c.pages.find(p => p.id === id);
-      if (p) return p;
+    function walk(list) {
+      for (const c of list) {
+        const p = c.pages.find(pp => pp.id === id);
+        if (p) return p;
+        const deep = walk(c.subchapters || []);
+        if (deep) return deep;
+      }
+      return null;
     }
-    return this.soloPages.find(p => p.id === id) || null;
+    return walk(this.workTree) || this.soloPages.find(p => p.id === id) || null;
   },
 
   // Move-Pfad ohne Drag — Combobox „Verschieben nach …". Nutzt dieselbe
@@ -132,18 +212,18 @@ export const dndMethods = {
     const removed = this._removePageFromBucket(fromChapId, pageId);
     if (!removed) return;
     removed.chapter_id = targetChId;
-    const bucket = targetChId === 0
-      ? this.soloPages
-      : this.workTree.find(c => c.id === targetChId)?.pages;
+    const bucket = this._pagesBucket(targetChId);
     if (!bucket) {
-      const src = fromChapId === 0
-        ? this.soloPages
-        : this.workTree.find(c => c.id === fromChapId)?.pages;
+      const src = this._pagesBucket(fromChapId);
       src?.push(removed);
       return;
     }
     bucket.push(removed);
-    const ok = await this._persistOrder({ affectedChapters: [fromChapId, targetChId] });
+    const fullReload = (targetChId !== 0 && this._chapterDepth(targetChId) > 1)
+                   || (fromChapId !== 0 && this._chapterDepth(fromChapId) > 1);
+    const ok = await this._persistOrder(fullReload
+      ? { fullReload: true }
+      : { affectedChapters: [fromChapId, targetChId] });
     if (ok) this._recordReorder(before);
   },
 };

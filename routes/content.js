@@ -381,11 +381,13 @@ router.post('/chapters', jsonBody, async (req, res) => {
   try { requireBookAccess(req, bookId, 'editor'); }
   catch (e) { if (sendACLError(res, e)) return; throw e; }
   try {
+    const parentChapterId = Number.isFinite(req.body?.parent_chapter_id) ? req.body.parent_chapter_id : null;
     const created = await contentStore.createChapter({
       book_id: bookId,
       name,
       position: req.body?.position,
       description: req.body?.description,
+      parent_chapter_id: parentChapterId,
     }, req);
     res.json(created);
   } catch (e) { _fail(res, e, 'POST /content/chapters'); }

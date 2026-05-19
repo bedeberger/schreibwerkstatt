@@ -100,12 +100,18 @@ export function registerBookSettingsCard() {
       });
 
       // Blog-Sync: bei Job-Ende Status nachladen, lokale Job-IDs nullen.
+      // Filter lose: jeder blog-* Job-Done räumt beide Spinner-Flags und
+      // triggert root.loadPages, weil Import/Pull neue Pages + Chapters
+      // anlegen und der Sidebar-Tree sonst veraltet ist.
       this._onBlogJobFinished = (ev) => {
         const t = ev?.detail?.type;
         if (t !== 'blog-import' && t !== 'blog-pull' && t !== 'blog-push') return;
-        if (ev.detail.jobId === this.blogImportJobId) this.blogImportJobId = null;
-        if (ev.detail.jobId === this.blogPullJobId)   this.blogPullJobId   = null;
+        this.blogImportJobId = null;
+        this.blogPullJobId = null;
         this.loadBlogStatus();
+        if (t === 'blog-import' || t === 'blog-pull') {
+          window.__app.loadPages?.();
+        }
       };
       window.addEventListener('job:finished', this._onBlogJobFinished);
     },

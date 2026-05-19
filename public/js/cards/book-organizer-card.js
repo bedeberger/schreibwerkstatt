@@ -39,14 +39,6 @@ export function registerBookOrganizerCard() {
     _redoStack: [],
     _inHistoryFlight: false,
     _onHistoryKeydown: null,
-    // Blog-Sync (WordPress) — nur aktiv, wenn Buch-Typ 'blog' UND Connection da.
-    // blogLinksMap: pageId → { wp_post_id, wp_modified_at, last_pulled_at, last_pushed_at, conflict_state }.
-    blogConnected: false,
-    blogLinksMap: {},
-    blogPushBusy: {},
-    blogConflictOpen: null,
-    blogConflictData: null,
-    _onBlogJobFinished: null,
 
     init() {
       this._lifecycle = setupCardLifecycle(this, {
@@ -61,7 +53,6 @@ export function registerBookOrganizerCard() {
         onShow: async () => {
           await loadSortable();
           await this._rerender();
-          await this.loadBlogLinks();
         },
         // book:changed feuert VOR loadPages — Sortable cleanen + State leeren,
         // der pages:loaded-Listener unten greift, sobald loadPages fertig ist.
@@ -93,18 +84,9 @@ export function registerBookOrganizerCard() {
             if (!window.__app.showBookOrganizerCard) return;
             await loadSortable();
             await this._rerender();
-            await this.loadBlogLinks();
           } },
         ],
       });
-
-      this._onBlogJobFinished = (ev) => {
-        const t = ev?.detail?.type;
-        if (t !== 'blog-import' && t !== 'blog-pull' && t !== 'blog-push') return;
-        if (!window.__app?.showBookOrganizerCard) return;
-        this.loadBlogLinks();
-      };
-      window.addEventListener('job:finished', this._onBlogJobFinished, { signal: this._lifecycle.signal });
 
       // Cmd/Ctrl+Z / Cmd/Ctrl+Shift+Z + Cmd/Ctrl+Y. Nur wenn Karte sichtbar
       // und Fokus nicht in einem Input/Textarea (sonst greift die native

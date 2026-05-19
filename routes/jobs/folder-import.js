@@ -334,6 +334,7 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
 
       // Month-Sub-Chapter (parent = year-chapter). Wenn Monat unbekannt (z.B.
       // year-only-Fallback), die Seite direkt ans Year-Chapter haengen.
+      // Name-Format: "YYYY Monatsname" (z.B. "2020 November").
       let chapterId = yearChapterId;
       const isoMonth = f.isoDate.slice(5, 7);
       const monthNum = parseInt(isoMonth, 10);
@@ -341,7 +342,7 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
         const ymKey = `${f.year}-${isoMonth}`;
         let subId = chapterByYearMonth.get(ymKey);
         if (!subId) {
-          const subName = `${isoMonth} ${MONTH_NAMES_DE[monthNum - 1]}`;
+          const subName = `${f.year} ${MONTH_NAMES_DE[monthNum - 1]}`;
           const sub = await contentStore.createChapter(
             { book_id: effBookId, name: subName, parent_chapter_id: yearChapterId, position: monthNum },
             { session: { user: { email: userEmail } } },
