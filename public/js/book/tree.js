@@ -240,7 +240,8 @@ export const treeMethods = {
       this.books = await contentRepo.listBooks();
       // Wake-Refresh: Caller (_refreshAfterWake) triggert loadPages selbst mit source='wake'.
       // Hier weiterzureichen würde Tree erneut clearen (loadPages ohne source) → Flicker.
-      const skipLoadPages = opts.source === 'wake';
+      // skipPages: für Metadaten-only-Refreshes (Kategorie/Tag/Rename) — Pagetree bleibt stehen.
+      const skipLoadPages = opts.source === 'wake' || opts.skipPages === true;
       // Pool fuer Filter-Pills aus aktuellem Bestand ableiten.
       const catIds = new Set();
       const tagMap = new Map();

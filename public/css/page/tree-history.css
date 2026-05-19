@@ -104,6 +104,11 @@
   padding-top: 0;
 }
 .tree-chapter--solo > .tree-chapter-pages::before { display: none; }
+.tree-chapter--solo > .tree-chapter-pages > .page-item { margin-bottom: 0; }
+/* Solo direkt vor regulaerem Kapitel: kein extra Header-Vorspann. */
+.tree-chapter--solo + .tree-chapter:not(.tree-chapter--solo) > .tree-chapter-header {
+  padding-top: var(--space-2xs);
+}
 
 /* === History === */
 .history-heading {

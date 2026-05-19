@@ -69,7 +69,7 @@ export const bookSettingsMethods = {
         const data = await r.json().catch(() => ({}));
         throw new Error(window.__app.tError(data) || `HTTP ${r.status}`);
       }
-      await window.__app.loadBooks();
+      await window.__app.loadBooks({ skipPages: true });
     } catch (e) {
       this.bookSettingsError = e.message;
     }
@@ -95,7 +95,7 @@ export const bookSettingsMethods = {
         const data = await r.json().catch(() => ({}));
         throw new Error(window.__app.tError(data) || `HTTP ${r.status}`);
       }
-      await window.__app.loadBooks();
+      await window.__app.loadBooks({ skipPages: true });
     } catch (e) {
       this.bookSettingsError = e.message;
     }
@@ -162,7 +162,7 @@ export const bookSettingsMethods = {
       }
       this.bookSettingsSaved = true;
       if (newName !== (currentBook?.name || '')) {
-        await window.__app.loadBooks?.();
+        await window.__app.loadBooks?.({ skipPages: true });
       }
       // Header-Donut konsumiert dailyProgressIsFinished + dailyProgressDailyGoalChars
       // am Root — direkt spiegeln, damit Toggle Buch-Abschluss und neues Tagesziel
