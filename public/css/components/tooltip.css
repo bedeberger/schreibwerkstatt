@@ -1,0 +1,44 @@
+@layer components {
+/* === Geteilter Tooltip-Layer für [data-tip] ===
+   Ein einziges Element pro Seite, von public/js/tooltip.js positioniert. */
+.tip-layer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: var(--z-popover);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.08s ease;
+  max-width: min(360px, 90vw);
+}
+.tip-layer.tip-visible {
+  opacity: 1;
+}
+.tip-bubble {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--pad-badge);
+  font-size: var(--font-size-mini);
+  line-height: 1.3;
+  box-shadow: var(--shadow-md);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.tip-arrow {
+  position: absolute;
+  width: 0;
+  height: 0;
+  border: 4px solid transparent;
+  transform: translateX(-50%);
+}
+.tip-layer[data-placement='top'] .tip-arrow {
+  top: 100%;
+  border-top-color: var(--color-border);
+}
+.tip-layer[data-placement='bottom'] .tip-arrow {
+  bottom: 100%;
+  border-bottom-color: var(--color-border);
+}
+}

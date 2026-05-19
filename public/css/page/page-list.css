@@ -159,4 +159,24 @@
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* Drei Badges (T/W/Z) rechts im page-item */
+.tok-stats {
+  display: flex;
+  gap: var(--space-xs);
+  align-items: center;
+  flex-shrink: 0;
+  margin-top: var(--space-1);
+}
+
+/* Summen-Badges neben der Button-Gruppe (Buchebene) */
+.tok-totals {
+  display: flex;
+  gap: var(--space-xs);
+  align-items: center;
+  margin-left: var(--space-xs);
+  margin-bottom: var(--space-md);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
 }

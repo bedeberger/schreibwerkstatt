@@ -4,33 +4,38 @@ Verbindlicher Aufbau des Alpine-State. Vor jeder UI-Änderung die richtige Ebene
 
 ## Drei Ebenen
 
-1. **Root `Alpine.data('lektorat')`** ([public/js/app.js:430](../public/js/app.js#L430)) — `x-data="lektorat"` am `<body>`. SSoT für: Navigation, Session/Shell, i18n-Locale, **alle `showXxxCard`-Flags** (Hash-Router + Exklusivität), Job-Queue, Editor-Edit-Mode, Auto-Save, Selection. Cross-Cutting-Methoden: `t/tRaw`, `bsGet/bsGetAll`, `loadFiguren/loadOrte/loadSzenen`, `selectPage`, `gotoStelle`, `_closeOtherMainCards`.
+1. **Root `Alpine.data('lektorat')`** ([public/js/app.js:254](../public/js/app.js#L254)) — `x-data="lektorat"` am `<body>`. SSoT für: Navigation, Session/Shell, i18n-Locale, **alle `showXxxCard`-Flags** (Hash-Router + Exklusivität), Job-Queue, Editor-Edit-Mode, Auto-Save, Selection. Cross-Cutting-Methoden: `t/tRaw`, `bsGet/bsGetAll`, `loadFiguren/loadOrte/loadSzenen`, `selectPage`, `gotoStelle`, `_closeOtherMainCards`.
 2. **Sub-Komponenten `Alpine.data('xxxCard')`** in [public/js/cards/](../public/js/cards/) — eine pro UI-Card. Eigener fachlicher State + `init()`/`destroy()`. Karten haben **keine** eigenen `showXxxCard`-Flags (Root ist SSoT); sie hören via `$watch(() => window.__app.showXxxCard)` auf Öffnen/Schliessen.
-3. **`Alpine.store('catalog')`** ([public/js/cards/catalog-store.js](../public/js/cards/catalog-store.js)) — geteilte Fach-Daten `figuren / orte / szenen / globalZeitstrahl`. Root spiegelt sie via Getter/Setter-Proxy ([public/js/app.js:439-446](../public/js/app.js#L439-L446)), damit `this.figuren = …` und `this.figuren.push(…)` weiter funktionieren. Karten lesen via `$store.catalog` oder `$app.figuren`.
+3. **`Alpine.store('catalog')`** ([public/js/cards/catalog-store.js](../public/js/cards/catalog-store.js)) — geteilte Fach-Daten `figuren / orte / songs / szenen / globalZeitstrahl`. Root spiegelt sie via Getter/Setter-Proxy ([public/js/app.js:268-277](../public/js/app.js#L268-L277)), damit `this.figuren = …` und `this.figuren.push(…)` weiter funktionieren. Karten lesen via `$store.catalog` oder `$app.figuren`.
 
 ## Root-State-Slices ([public/js/app/app-state.js](../public/js/app/app-state.js))
 
-`initialLektoratState()` spreadet **14 Slice-Funktionen** in ein flaches Root-Objekt. Neues Feld → in den passenden Slice:
+`initialLektoratState()` spreadet **25 Slice-Funktionen** in ein flaches Root-Objekt. Neues Feld → in den passenden Slice:
 
 | Slice | Inhalt |
 |-------|--------|
-| `shellState` | currentUser, devMode, sessionExpired, themePref, focusGranularity, uiLocale, isMac, promptConfig, `_abortCtrl` |
+| `shellState` | currentUser, devMode, appReady, sessionExpired, serverOffline, isOffline, updateAvailable, themePref, focusGranularity, uiLocale, defaultRegion, appTimezone, isMac, promptConfig, `_abortCtrl`, `_usersByEmail`/Loading |
 | `aiProviderState` | claudeModel, claudeMaxTokens, apiProvider, ollamaModel, llamaModel |
-| `navigationState` | books, selectedBookId, pages, tree, Hash-Router-Internals (`_applyingHash`, `_hashInitialized`, …), Order-Maps, pageSearch |
-| `editorState` | currentPage, renderedPageHtml, editMode, editDirty, editSaving, Auto-Save-Timer (`_autosaveIdleTimer`, `_autosaveMaxTimer`, `_draftTimer`), originalHtml/correctedHtml, hasErrors, newPage-Felder |
-| `focusModeState` | focusMode, focusCountWords, focusCountChars, focusCountWordsDelta, focusCountCharsDelta (Live-Counter im Fokus-Header) |
+| `navigationState` | books, bookFilter\*, selectedBookId, bookRoles/currentBookRole/bookSharedFlags (ACL), pages, tree, Hash-Router-Internals (`_applyingHash`, `_hashInitialized`, `_inHashApply`, `_hashUpdatePending`, `_navDepth`), Order-Maps (`_chapterOrderMap`, `_pageOrderMap`, `_pageIdOrderMap`), pageSearch, newChapter-Felder |
+| `editorState` | currentPage, currentPageEmpty/IdeenOpenCount/ChatSessionCount, renderedPageHtml, chapterFigures, originalHtml/correctedHtml, hasErrors, editMode, editDirty, editSaving, saveOffline, editConflict, pendingDraft, lastAutosaveAt/lastDraftSavedAt, Auto-Save-Timer (`_autosaveIdleTimer`, `_autosaveMaxTimer`, `_draftTimer`, `_onlineHandler`), newPage-Felder |
+| `focusModeState` | focusMode, focusCountWords/Chars + Deltas (Live-Counter im Fokus-Header) |
 | `editorPopupState` | Spiegel-Flags `_figurLookupOpen`, `_synonymMenuOpen`, `_synonymPickerOpen` (für Escape-Routing in `editor-focus-onKey`) + `_figurLookupIndex` (Lookup-Cache) |
-| `cardsState` | **Alle `showXxxCard`-Flags** (showBookCard, showFiguresCard, showEditorCard, showChatCard, showAvatarMenu, …) — exklusiv via `_closeOtherMainCards(keep)` |
+| `cardsState` | **Alle `showXxxCard`-Flags** inkl. Admin-Karten (showAdminUsers/Settings/Usage/Categories/BooksCard), showSongsCard, showKontinuitaetCard, showSearchCard, showKomplettStatus, showAvatarMenu, adminUsageTab — exklusiv via `_closeOtherMainCards(keep)` |
 | `statusState` | status, statusSpinner, `_statusTimer` |
-| `confirmDialogState` | Eigener Modal-Ersatz für `window.confirm` (verhindert macOS-Vollbild-Bug) |
-| `lektoratState` | analysisOut, lektoratFindings, selectedFindings, appliedOriginals, checkLoading/Progress/Status, Token-Estimates (`tokEsts`, `_tokenEstGen`), pageHistory, ideenCounts, pageLastChecked, `_checkPollTimer` |
+| `confirmDialogState` | Native-`<dialog>`-Modal-Ersatz für `window.confirm`/prompt (verhindert macOS-Vollbild-Bug) inkl. Input-Mode + Resolver |
+| `lektoratState` | analysisOut, lektoratFindings, selectedFindings, appliedOriginals, appliedHistoricCorrections, checkDone/Loading/Progress/Status, saveApplying, batchLoading/Progress/Status, lastCheckId, pageHistory, activeHistoryEntryId, Token-Estimates (`tokEsts`, `_tokenEstGen`), pageLastChecked, ideenCounts/chapterIdeenCounts, ideenScope/ideenChapterId/currentChapterIdeenOpenCount, showTokLegend/tokTooltipData/showPageStatusTip, `_statsObserver*` |
 | `bookReviewState` | bookReviewHistory (von tree.js geschrieben, von user-settings beim Reset gelesen → Root) |
 | `kapitelReviewState` | kapitelReviewChapterId (Hash-Router-SSoT) |
+| `figurWerkstattState` | werkstattDraftId (Hash-Router-SSoT), werkstattDrafts (Spiegel für Command-Palette-Indexer) |
 | `figurenState` | figurenLoading/Progress/Status, selectedFigurId, figurenFilters, `_figuresPollTimer` (Reconnect-relevant → Root) |
-| `ereignisseState` / `szenenState` / `orteState` | Filter + selectedXxxId (von app-navigation geschrieben) + UpdatedAt |
+| `ereignisseState` / `szenenState` / `orteState` / `songsState` | Filter + selectedXxxId (von app-navigation geschrieben) + UpdatedAt |
+| `kontinuitaetState` | kontinuitaetFilters (figurId/kapitel/schwere) — Persist/Restore über FILTER_SCOPES |
 | `chatsState` | `_checkDoneBeforeChat` |
 | `featuresUsageState` | recentFeatureKeys (Top-3 Quick-Pills), recentPageIds (Palette) |
-| `jobsState` | jobQueueItems, jobQueueExpanded, alleAktualisierenLoading/Status/Progress/Tps, `_jobQueueTimer` |
+| `bookCreateState` | bookCreateName/Busy/Error (Buch-Erstellung-Modal aus Combobox-Footer) |
+| `collabState` | `_collabSince`, `_collabPollTimer`, recentRemoteEdits (Set), collabToast/`_collabToastTimer`, livePresenceByPage, Heartbeat-Timer (`_presencePingTimer`/`_presencePingPageId`), Lock-State (`_currentEditLock`, `_lockHeartbeatTimer`, foreignEditLock) |
+| `dailyProgressState` | dailyProgressBookId/Stats/IsFinished, `_dailyProgressLoadingBookId` (Header-Donut neben Avatar) |
+| `jobsState` | jobQueueItems, jobQueueExpanded, alleAktualisierenLoading/Status/Progress/Tps/Tok\*/PassMode/LastRun, `_jobQueueTimer`, **jobToast** + `_jobToastTimer` (globaler Job-Done-Toast, Severity ok/err) |
 
 **Regel:** Slices sind Funktionen (nicht Konstanten), damit jede Komponenten-Instanz frische Arrays/Objekte erhält. Sonst geteilte Referenzen.
 

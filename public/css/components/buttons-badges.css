@@ -61,4 +61,45 @@ button.primary .btn-count {
 /* Source-Marker: importierter Werkstatt-Draft zeigt Herkunfts-Figur. */
 .badge-source { background: var(--color-tag-bg); color: var(--color-muted); }
 
+.btn-bookstack-link {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding: var(--space-2xs) 8px;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border-radius: var(--radius-sm);
+  background: var(--color-tag-bg);
+  color: var(--color-muted);
+  text-decoration: none;
+}
+.btn-bookstack-link:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+.btn-bookstack-link--hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+.row > .btn-bookstack-link { flex: 0 0 auto; }
+
+/* === Button-Gruppe (Expand/Collapse) === */
+.btn-group {
+  display: flex;
+  gap: var(--space-6);
+  margin-bottom: var(--space-10);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* === Compact Buttons === */
+/* Grösse synchron mit .combobox-wrap--compact über --size-compact-*. */
+.btn-compact {
+  font-size: var(--size-compact-font-size);
+  padding: var(--size-compact-padding);
+}
+
 }

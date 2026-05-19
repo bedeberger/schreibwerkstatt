@@ -233,4 +233,11 @@
   -webkit-overflow-scrolling: touch;
 }
 .table-scroll > table { min-width: 100%; }
+
+/* === Batch-Check === */
+.batch-status {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+  margin-top: var(--space-xs);
+}
 }
