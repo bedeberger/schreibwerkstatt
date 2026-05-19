@@ -223,6 +223,7 @@
   "book.create.errorGeneric":    "Erstellen fehlgeschlagen: {msg}",
 
   "book.settings.title":         "Einstellungen: {name}",
+  "book.settings.name":          "Buchtitel",
   "book.settings.section.basics":    "Sprache & Region",
   "book.settings.section.narrative": "Erzählweise",
   "book.settings.section.taxonomy":  "Kategorisierung",

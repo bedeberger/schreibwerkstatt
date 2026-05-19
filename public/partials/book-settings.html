@@ -24,6 +24,16 @@
       <h3 class="book-settings-section-title" x-text="$app.t('book.settings.section.basics')"></h3>
 
       <div class="card-form-row">
+        <label class="card-form-label" for="bs-name" x-text="$app.t('book.settings.name')"></label>
+        <input type="text"
+               id="bs-name"
+               class="card-form-input"
+               x-model="bookSettingsName"
+               :placeholder="$app.t('book.create.namePlaceholder')"
+               maxlength="255">
+      </div>
+
+      <div class="card-form-row">
         <label class="card-form-label" x-text="$app.t('book.settings.language')"></label>
         <div class="book-settings-options">
           <label class="book-settings-option">

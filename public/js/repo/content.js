@@ -187,6 +187,10 @@ export const contentRepo = {
     return _write('POST', 'books', body);
   },
 
+  async updateBook(id, body) {
+    return _write('PUT', 'books/' + id, body, ['books', 'books/' + id]);
+  },
+
   async deleteBook(id) {
     return _write('DELETE', 'books/' + id);
   },

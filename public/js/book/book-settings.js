@@ -11,6 +11,8 @@ export const bookSettingsMethods = {
     this.bookSettingsLoading = true;
     try {
       const data = await fetchJson(`/booksettings/${window.__app.selectedBookId}`);
+      const book = window.__app.books.find(b => String(b.id) === String(window.__app.selectedBookId));
+      this.bookSettingsName       = book?.name || '';
       this.bookSettingsLanguage  = data.language    || 'de';
       this.bookSettingsRegion    = data.region      || 'CH';
       this.bookSettingsBuchtyp   = data.buchtyp     || '';
@@ -131,6 +133,13 @@ export const bookSettingsMethods = {
     this.bookSettingsSaved  = false;
     this.bookSettingsError  = '';
     try {
+      const bookId = window.__app.selectedBookId;
+      const currentBook = window.__app.books.find(b => String(b.id) === String(bookId));
+      const newName = (this.bookSettingsName || '').trim();
+      if (!newName) throw new Error(window.__app.t('book.create.errorEmpty'));
+      if (newName !== (currentBook?.name || '')) {
+        await contentRepo.updateBook(bookId, { name: newName });
+      }
       const r = await fetch(`/booksettings/${window.__app.selectedBookId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -152,6 +161,9 @@ export const bookSettingsMethods = {
         throw new Error(data ? window.__app.tError(data) : `HTTP ${r.status}`);
       }
       this.bookSettingsSaved = true;
+      if (newName !== (currentBook?.name || '')) {
+        await window.__app.loadBooks?.();
+      }
       // Header-Donut konsumiert dailyProgressIsFinished + dailyProgressDailyGoalChars
       // am Root — direkt spiegeln, damit Toggle Buch-Abschluss und neues Tagesziel
       // ohne Reload greifen.

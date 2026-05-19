@@ -8,6 +8,7 @@ import { setupCardLifecycle } from './card-lifecycle.js';
 export function registerBookSettingsCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
   window.Alpine.data('bookSettingsCard', () => ({
+    bookSettingsName: '',
     bookSettingsLanguage: 'de',
     bookSettingsRegion: 'CH',
     bookSettingsBuchtyp: '',

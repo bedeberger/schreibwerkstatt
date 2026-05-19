@@ -419,6 +419,22 @@ router.delete('/chapters/:chapter_id', async (req, res) => {
   } catch (e) { _fail(res, e, 'DELETE /content/chapters/:id'); }
 });
 
+// PUT /content/books/:book_id — Buch-Update (rename / description). minRole editor.
+router.put('/books/:book_id', aclParamGuard('editor'), jsonBody, async (req, res) => {
+  const hasName = typeof req.body?.name === 'string';
+  const hasDesc = typeof req.body?.description === 'string';
+  if (!hasName && !hasDesc) return res.status(400).json({ error_code: 'EMPTY_BODY' });
+  const body = { ...req.body };
+  if (hasName) {
+    const trimmed = body.name.trim();
+    if (!trimmed) return res.status(400).json({ error_code: 'NAME_REQUIRED' });
+    if (trimmed.length > NAME_MAX) return res.status(400).json({ error_code: 'NAME_TOO_LONG', params: { max: NAME_MAX } });
+    body.name = trimmed;
+  }
+  try { res.json(await contentStore.updateBook(req.bookId, body, req)); }
+  catch (e) { _fail(res, e, 'PUT /content/books/:id'); }
+});
+
 // DELETE /content/books/:book_id — Buch loeschen. minRole owner.
 router.delete('/books/:book_id', aclParamGuard('owner'), async (req, res) => {
   try {
