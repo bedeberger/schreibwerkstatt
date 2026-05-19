@@ -135,6 +135,11 @@
   cursor: text;
   max-height: 70vh;
   font-size: calc(1em * var(--editor-zoom, 1));
+  /* In .page-editor-wrap (flex-column) absorbiert das `margin-inline: auto` sonst
+     den gesamten Cross-Axis-Slot und collapsed das contenteditable auf Content-
+     Breite (bei wenig Text auf ~10ch). Width 100% claimt die volle Cross-Axis,
+     max-width cappt, margin auto zentriert den Rest. */
+  width: 100%;
 }
 
 /* Fit-Width: Reading-Frame-max-width auf .page-content-view (64ch + padding)
