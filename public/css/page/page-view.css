@@ -152,7 +152,7 @@
 }
 .page-editor-toolbar {
   position: absolute;
-  top: var(--space-xs);
+  top: calc(-1 * var(--space-2xl));
   right: var(--space-xs);
   display: flex;
   gap: var(--space-xs);

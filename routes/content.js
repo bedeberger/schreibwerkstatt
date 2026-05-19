@@ -16,6 +16,7 @@ const { setContext, bookParamHandler } = require('../lib/log-context');
 const { aclParamGuard, requireBookAccess, sendACLError, ACLError } = require('../lib/acl');
 const bookAccess = require('../db/book-access');
 const { db } = require('../db/connection');
+const { localIsoDaysAgo } = require('../lib/local-date');
 
 const router = express.Router();
 router.param('book_id', bookParamHandler);
@@ -480,6 +481,16 @@ router.post('/books', jsonBody, async (req, res) => {
       bookAccess.grantAccess(created.id, email, 'owner', email);
     } catch (gErr) {
       logger.warn(`Auto-Owner-Grant fuer book=${created.id} fehlgeschlagen: ${gErr.message}`);
+    }
+    // Baseline-Snapshot Vortag: gibt dem Tages-Donut einen prevChars-Wert,
+    // damit erstes Schreiben am Anlege-Tag bereits korrekt als Delta zaehlt.
+    try {
+      db.prepare(`
+        INSERT OR IGNORE INTO book_stats_history (book_id, recorded_at, page_count, words, chars, tok, unique_words, chapter_count)
+        VALUES (?, ?, 0, 0, 0, 0, 0, 0)
+      `).run(created.id, localIsoDaysAgo(1));
+    } catch (sErr) {
+      logger.warn(`Baseline-Snapshot fuer book=${created.id} fehlgeschlagen: ${sErr.message}`);
     }
     logger.info(`Buch erstellt id=${created.id} name="${created.name}" owner=${email}`);
     res.json({ ...created, role: 'owner' });

@@ -205,10 +205,8 @@ export const toolbarCardMethods = {
     if (item.tag === 'hr') {
       replacement = document.createElement('hr');
       block.parentNode.replaceChild(replacement, block);
-      // hr ist void – einen folgenden leeren Absatz anhängen, damit der
-      // User weiterschreiben kann.
       const next = document.createElement('p');
-      next.innerHTML = '<br>';
+      next.appendChild(document.createElement('br'));
       replacement.insertAdjacentElement('afterend', next);
       caretTarget = next;
     } else if (item.list) {
