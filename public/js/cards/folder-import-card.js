@@ -94,6 +94,12 @@ export function registerFolderImportCard() {
       return true;
     },
 
+    fmtLogTime(iso) {
+      if (!iso) return '';
+      const tag = localeTag(window.__app?.uiLocale);
+      return new Date(iso).toLocaleTimeString(tag, tzOpts({ hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    },
+
     get runningStatusHtml() {
       if (!this.jobId) return '';
       return runningJobStatus(

@@ -105,7 +105,7 @@ Unter `/admin` für User mit `global_role = 'admin'`:
 - **Books** — alle Bücher mit ACL-Einsicht/Übertragung.
 - **Registrierungs-Anfragen** — Approval-Queue für `/register`-Selbstanmeldungen.
 - **Settings** — KI-Provider + Keys, Google OAuth, App-URL, Modell-Limits, Mailer, Cron, veraPDF-Flavour.
-- **Kategorien & Tags** — globaler Pool, Zuordnung pro Buch via ACL.
+- **Kategorien** — globaler Pool, Zuordnung pro Buch via ACL.
 - **Usage** — Token-Verbrauch pro User/Provider/Job-Typ.
 
 `ADMIN_EMAIL` in `.env` wird beim Start als globale Admin-Rolle gespiegelt (idempotent). Passwort lebt ausschliesslich in der ENV (timing-safe Vergleich, Rate-Limit pro IP).

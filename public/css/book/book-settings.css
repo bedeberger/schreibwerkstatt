@@ -288,47 +288,7 @@
   }
   .book-share-invite-row .book-share-role-combo { width: 100%; flex: 1 1 auto; }
   .book-share-row-controls .book-share-role-combo { width: 100%; }
-  .book-tags-new {
-    flex-direction: column;
-    align-items: stretch;
-  }
 }
-
-/* Kategorie + Tags. Chip-Toggle-Pool + Inline-Create. */
-.book-tags-editor {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  min-width: 0;
-}
-.book-tags-pool {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-.book-tag-chip {
-  display: inline-block;
-  padding: var(--pad-badge, 4px 8px);
-  font-size: var(--font-size-xs);
-  border: 0.5px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--color-muted);
-  cursor: pointer;
-  transition: background var(--transition-base), color var(--transition-base), border-color var(--transition-base);
-}
-.book-tag-chip:hover { background: var(--color-hover); color: var(--color-text); }
-.book-tag-chip.is-active {
-  background: var(--color-primary);
-  color: var(--color-surface);
-  border-color: var(--color-primary);
-}
-.book-tags-new {
-  display: flex;
-  gap: var(--space-2);
-  align-items: center;
-}
-.book-tags-new input { flex: 1; min-width: 0; }
 
 /* Blog-Sync-Tab (WordPress-Verbindung) */
 .blog-status-panel {

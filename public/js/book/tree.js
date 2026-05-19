@@ -244,12 +244,8 @@ export const treeMethods = {
       const skipLoadPages = opts.source === 'wake' || opts.skipPages === true;
       // Pool fuer Filter-Pills aus aktuellem Bestand ableiten.
       const catIds = new Set();
-      const tagMap = new Map();
       for (const b of this.books) {
         if (b.category_id) catIds.add(b.category_id);
-        for (const t of (b.tags || [])) {
-          if (!tagMap.has(t.id)) tagMap.set(t.id, t);
-        }
       }
       // Kategorie-Namen aus globalem Pool nachladen (kein Snapshot pro Buch).
       if (catIds.size > 0 && this.bookFilterCategoryPool.length === 0) {
@@ -258,7 +254,6 @@ export const treeMethods = {
           if (r.ok) this.bookFilterCategoryPool = (await r.json()).categories || [];
         } catch (_) {}
       }
-      this.bookFilterTagPool = [...tagMap.values()].sort((a, b) => a.name.localeCompare(b.name));
       if (!this.selectedBookId || !this.books.some(b => String(b.id) === String(this.selectedBookId))) {
         let restored = '';
         try {
@@ -278,20 +273,11 @@ export const treeMethods = {
     }
   },
 
-  // Filter-Logik fuer Buchliste. AND-Kombination: Kategorie + alle
-  // gewaehlten Tags muessen am Buch hinterlegt sein. Leere Filter = kein Filter.
+  // Filter-Logik fuer Buchliste. Leere Filter = kein Filter.
   filteredBooks() {
     const cat = this.bookFilterCategoryId;
-    const tagIds = this.bookFilterTagIds || [];
-    if (!cat && tagIds.length === 0) return this.books;
-    return this.books.filter(b => {
-      if (cat && String(b.category_id) !== String(cat)) return false;
-      if (tagIds.length > 0) {
-        const bookTagIds = new Set((b.tags || []).map(t => t.id));
-        for (const tid of tagIds) if (!bookTagIds.has(tid)) return false;
-      }
-      return true;
-    });
+    if (!cat) return this.books;
+    return this.books.filter(b => String(b.category_id) === String(cat));
   },
 
   bookCountForCategory(catId) {
@@ -302,15 +288,8 @@ export const treeMethods = {
     return n;
   },
 
-  toggleBookFilterTag(tagId) {
-    const i = this.bookFilterTagIds.indexOf(tagId);
-    if (i >= 0) this.bookFilterTagIds.splice(i, 1);
-    else this.bookFilterTagIds.push(tagId);
-  },
-
   clearBookFilters() {
     this.bookFilterCategoryId = '';
-    this.bookFilterTagIds = [];
   },
 
   // ACL-Rolle aus /books/:id/access laden + cachen. Getter

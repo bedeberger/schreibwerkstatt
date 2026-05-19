@@ -33,7 +33,6 @@
   background: rgba(255, 255, 255, 0.25);
   color: var(--color-surface);
 }
-.book-filter-pill--tag { font-style: italic; }
 .book-filter-clear {
   margin-left: auto;
   padding: var(--space-3) 8px;

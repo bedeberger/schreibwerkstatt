@@ -54,12 +54,10 @@ const aiProviderState = () => ({
 const navigationState = () => ({
   books: [],
   // Buchliste-Filter (UI-only, persistiert nicht; reines Frontend-Filter
-  // ueber die per /content/books gelieferten category_id + tags-Felder).
+  // ueber das per /content/books gelieferte category_id-Feld).
   bookFilterCategoryId: '',
-  bookFilterTagIds: [],
   // Pool fuer Filter-Pills in der Buchliste — wird beim Login einmal geladen.
   bookFilterCategoryPool: [],
-  bookFilterTagPool: [],
   selectedBookId: '',
   // Per-Buch ACL-Rolle aus /books/:id/access. `currentBookRole` ist die Rolle
   // fuer selectedBookId (Snapshot fuer $watch + Getter `canEdit`/`canReview`).

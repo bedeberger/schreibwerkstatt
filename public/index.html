@@ -311,8 +311,8 @@
          @combobox-change="resetView();"></div>
   </div>
 
-  <!-- Filter-Pills (Kategorie + Tags). Reines Frontend-Filter -->
-  <div class="book-filter-row" x-show="bookFilterCategoryPool.length || bookFilterTagPool.length" x-cloak>
+  <!-- Filter-Pills (Kategorie). Reines Frontend-Filter -->
+  <div class="book-filter-row" x-show="bookFilterCategoryPool.length" x-cloak>
     <template x-for="cat in bookFilterCategoryPool" :key="cat.id">
       <button type="button"
               class="book-filter-pill"
@@ -322,16 +322,9 @@
         <span class="btn-count" x-text="bookCountForCategory(cat.id)"></span>
       </button>
     </template>
-    <template x-for="tag in bookFilterTagPool" :key="'t' + tag.id">
-      <button type="button"
-              class="book-filter-pill book-filter-pill--tag"
-              :class="{ 'is-active': bookFilterTagIds.includes(tag.id) }"
-              @click="toggleBookFilterTag(tag.id)"
-              x-text="tag.name"></button>
-    </template>
     <button type="button"
             class="book-filter-clear"
-            x-show="bookFilterCategoryId || bookFilterTagIds.length"
+            x-show="bookFilterCategoryId"
             @click="clearBookFilters()"
             x-text="t('book.filter.clear')"></button>
   </div>

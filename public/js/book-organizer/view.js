@@ -40,18 +40,31 @@ export const viewMethods = {
 
   toggleChapter(id) {
     this.chapterOpen = { ...this.chapterOpen, [id]: !this.chapterOpen[id] };
+    this._refreshSortablesAfterTick();
   },
 
   expandAll() {
     const next = {};
     for (const id of _walkAllIds(this.workTree)) next[id] = true;
     this.chapterOpen = next;
+    this._refreshSortablesAfterTick();
   },
 
   collapseAll() {
     const next = {};
     for (const id of _walkAllIds(this.workTree)) next[id] = false;
     this.chapterOpen = next;
+    this._refreshSortablesAfterTick();
+  },
+
+  // Pages-UL ist x-if-gated: nach Open/Close erscheinen/verschwinden ULs im DOM,
+  // Sortable muss daher neu gebunden werden. Debounce via nextTick.
+  _refreshSortablesAfterTick() {
+    this.$nextTick(() => {
+      this._destroySortables();
+      this._initSortables();
+      this._refreshSortableDisabled();
+    });
   },
 
   // Rekursiver Suchfilter: zeigt Kapitel, wenn Name-Match ODER ein Sub-/Page

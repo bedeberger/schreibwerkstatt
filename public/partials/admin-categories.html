@@ -1,4 +1,4 @@
-<!-- Admin: Kategorien + Tags -->
+<!-- Admin: Kategorien -->
 <!--
   Alpine.data-Sub-Komponente — siehe public/js/cards/admin-categories-card.js.
   `showAdminCategoriesCard` + `toggleAdminCategoriesCard` im Root. Nur sichtbar
@@ -57,46 +57,5 @@
       </div>
     </section>
 
-    <section class="admin-pool-section">
-      <h3 class="book-settings-stats-title" x-text="$app.t('book.tags')"></h3>
-
-      <div class="admin-pool-create">
-        <input type="text"
-               class="card-form-input"
-               x-model="newTagName"
-               :placeholder="$app.t('admin.tag.namePlaceholder')"
-               @keydown.enter.prevent="createTag()"
-               :disabled="busy"
-               maxlength="80">
-        <button type="button" @click="createTag()" :disabled="busy || !newTagName.trim()" x-text="$app.t('common.new')"></button>
-      </div>
-
-      <p class="muted-msg muted-msg--sm" x-show="tags.length === 0" x-text="$app.t('tags.empty')"></p>
-      <div class="table-scroll" x-show="tags.length">
-      <table class="admin-pool-table">
-        <thead>
-          <tr>
-            <th x-text="$app.t('admin.tag.col.name')"></th>
-            <th x-text="$app.t('admin.tag.col.slug')"></th>
-            <th x-text="$app.t('admin.tag.col.usage')"></th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          <template x-for="tag in tags" :key="tag.id">
-            <tr>
-              <td x-text="tag.name"></td>
-              <td><code class="muted-msg muted-msg--sm" x-text="tag.slug"></code></td>
-              <td x-text="tag.book_count || 0"></td>
-              <td class="admin-pool-actions">
-                <button type="button" @click="renameTag(tag)" x-text="$app.t('admin.tag.rename')"></button>
-                <button type="button" class="danger" @click="deleteTag(tag)" x-text="$app.t('common.delete')"></button>
-              </td>
-            </tr>
-          </template>
-        </tbody>
-      </table>
-      </div>
-    </section>
   </div>
 </div>

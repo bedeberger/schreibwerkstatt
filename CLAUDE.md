@@ -297,7 +297,6 @@ Browser → NGINX (HTTPS) → Express (Port 3737)
   /export/*        → Buch-Export (PDF/HTML/Markdown/Plaintext/EPUB via App-eigenen Builder)
   /search/*        → FTS5-Volltextsuche
   /categories/*    → Kategorie-Pool (CRUD, Zuordnung pro Buch via ACL)
-  /tags/*          → Tag-Pool (CRUD, Zuordnung pro Buch)
   /pdf-export/*    → Custom-PDF-Export-Profile (CRUD + Cover-Upload + Font-Liste)
   /jobs/pdf-export → Render-Job (eigene pdfkit-Pipeline mit PDF/A-2B)
   /usage/*         → Feature-Usage-Tracking (Recency für Palette/Quick-Pills)
@@ -428,7 +427,7 @@ Vollständiges Inventar via `ls`/`find` — hier nur Einstiege und Cluster, dami
   - `ai.js` (callAI + Provider-Dispatch + JSON-Fallback), `content-store/` (Pages/Chapters/Books-Facade), `html-clean.js` (Page-HTML-Sanitization, **SSoT** vor jedem DB-Write).
   - PDF/Export: `pdf-render.js` + `pdf-render/` (Pipeline), `pdf-export-defaults.js`, `pdfa-validate.js`, `font-fetch.js`, `cover-prepare.js`, `export-builders/` (HTML/MD/EPUB/Plaintext).
   - Cross-cutting: `acl.js`, `admin-mw.js`, `admin-login-ratelimit.js`, `register-ratelimit.js`, `app-settings.js`, `budget.js`, `pricing.js`, `cache-cleanup.js`, `content-mapper.js`, `crypto.js`, `dev-seed.js`, `draft-mindmap-builder.js`, `filenames.js`, `i18n-server.js`, `load-contents.js`, `local-date.js`, `log-context.js`, `mailer.js` + `mailer-templates.js`, `notify.js`, `page-index.js`, `prompts-loader.js`, `search.js`, `slug.js`, `validate.js`.
-- **`db/`** — SQLite-Split. Einstieg: `connection.js`, `migrations.js`, `schema.js`, `squashed-schema.js` (Fresh-DB-Fast-Path). Eine Domäne pro File: `books`, `pages`, `page-revisions`, `page-presence`, `figures`, `draft-figures`, `book-access`, `book-categories`, `book-tags`, `book-order`, `app-users`, `registration-requests`, `token-usage`, `admin-usage`, `budget-alerts`, `pdf-export`, `fonts`.
+- **`db/`** — SQLite-Split. Einstieg: `connection.js`, `migrations.js`, `schema.js`, `squashed-schema.js` (Fresh-DB-Fast-Path). Eine Domäne pro File: `books`, `pages`, `page-revisions`, `page-presence`, `figures`, `draft-figures`, `book-access`, `book-categories`, `book-order`, `app-users`, `registration-requests`, `token-usage`, `admin-usage`, `budget-alerts`, `pdf-export`, `fonts`.
 - **`routes/`** — Ein Router pro Feature. Namen entsprechen der Routen-Tabelle oben.
   - `jobs.js` mountet alle Job-Sub-Router. Subfolder: `jobs/shared/` (Queue, AI-Helper, Loader, Model, Queries, Router, State) und `jobs/komplett/` (Pipeline: index, job, phases, checkpoint, figuren-merge, remap, utils). Single-File-Job-Router: `lektorat`, `review`, `kapitel`, `chat`, `synonyme`, `figur-werkstatt`, `pdf-export`. Helper-Files (kein Router): `narrative-labels`, `book-chat-tools`, `review-context`. `finetune-export/` als Subfolder mit eigenem Router.
 - **`public/`** — SPA.

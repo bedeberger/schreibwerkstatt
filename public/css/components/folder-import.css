@@ -205,6 +205,37 @@
     border-radius: var(--radius-sm);
   }
 
+  .folder-import-log {
+    margin-top: var(--space-sm);
+    max-height: 320px;
+    overflow-y: auto;
+    font-size: var(--font-size-sm);
+    font-family: var(--font-mono, monospace);
+    background: var(--color-bg);
+    border-radius: var(--radius-sm);
+    padding: var(--space-sm);
+    list-style: none;
+  }
+
+  .folder-import-log-line {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: var(--space-sm);
+    padding: 2px 0;
+    border-bottom: 1px solid var(--color-border-subtle, transparent);
+  }
+
+  .folder-import-log-line:last-child { border-bottom: none; }
+
+  .folder-import-log-line time {
+    color: var(--color-text-muted);
+    white-space: nowrap;
+  }
+
+  .folder-import-log-line.is-warn span {
+    color: var(--color-warn, #c66);
+  }
+
   @media (max-width: 640px) {
     .folder-import-mode { flex-direction: column; }
     .folder-import-radio { width: 100%; }

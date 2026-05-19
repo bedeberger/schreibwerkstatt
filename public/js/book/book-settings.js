@@ -29,24 +29,19 @@ export const bookSettingsMethods = {
     }
   },
 
-  // Kategorie + Tags. Pool global; pro Buch eine
-  // Kategorie (optional) + N Tags (Multi-Select). Inline-Create fuer Tags.
-  async loadBookCategoriesAndTags() {
+  // Kategorie. Pool global; pro Buch eine Kategorie (optional).
+  async loadBookCategory() {
     const bookId = window.__app.selectedBookId;
     if (!bookId) return;
     try {
-      const [pool, tagPool, categoryRes, tagsRes] = await Promise.all([
+      const [pool, categoryRes] = await Promise.all([
         fetchJson('/local/categories'),
-        fetchJson('/local/tags'),
         fetchJson(`/books/${bookId}/category`),
-        fetchJson(`/books/${bookId}/tags`),
       ]);
       this.categoryPool = pool.categories || [];
-      this.tagPool      = tagPool.tags || [];
       this.bookCategoryId = categoryRes.category?.id || '';
-      this.bookTagIds     = (tagsRes.tags || []).map(t => t.id);
     } catch (e) {
-      console.error('[book-settings] Kategorien/Tags laden fehlgeschlagen:', e);
+      console.error('[book-settings] Kategorie laden fehlgeschlagen:', e);
     }
   },
 
@@ -72,58 +67,6 @@ export const bookSettingsMethods = {
       await window.__app.loadBooks({ skipPages: true });
     } catch (e) {
       this.bookSettingsError = e.message;
-    }
-  },
-
-  async toggleBookTag(tagId) {
-    const i = this.bookTagIds.indexOf(tagId);
-    if (i >= 0) this.bookTagIds.splice(i, 1);
-    else this.bookTagIds.push(tagId);
-    await this.saveBookTags();
-  },
-
-  async saveBookTags() {
-    const bookId = window.__app.selectedBookId;
-    if (!bookId) return;
-    try {
-      const r = await fetch(`/books/${bookId}/tags`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tag_ids: this.bookTagIds }),
-      });
-      if (!r.ok) {
-        const data = await r.json().catch(() => ({}));
-        throw new Error(window.__app.tError(data) || `HTTP ${r.status}`);
-      }
-      await window.__app.loadBooks({ skipPages: true });
-    } catch (e) {
-      this.bookSettingsError = e.message;
-    }
-  },
-
-  async createInlineTag() {
-    const name = (this.newTagName || '').trim();
-    if (!name) return;
-    this.newTagBusy = true;
-    try {
-      const r = await fetch('/local/tags', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
-      });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(window.__app.tError(data) || `HTTP ${r.status}`);
-      this.tagPool = [...this.tagPool, { id: data.tag.id, name: data.tag.name, slug: data.tag.slug, color: null }];
-      this.tagPool.sort((a, b) => a.name.localeCompare(b.name));
-      this.newTagName = '';
-      if (!this.bookTagIds.includes(data.tag.id)) {
-        this.bookTagIds.push(data.tag.id);
-        await this.saveBookTags();
-      }
-    } catch (e) {
-      this.bookSettingsError = e.message;
-    } finally {
-      this.newTagBusy = false;
     }
   },
 

@@ -98,7 +98,7 @@
       <ul class="folder-import-log" x-show="open" x-cloak>
         <template x-for="(entry, idx) in (result?.auditLog || [])" :key="idx">
           <li :class="'folder-import-log-line is-' + entry.level">
-            <time x-text="new Date(entry.ts).toLocaleTimeString($app.uiLocale === 'en' ? 'en-US' : 'de-CH')"></time>
+            <time x-text="fmtLogTime(entry.ts)"></time>
             <span x-text="entry.msg"></span>
           </li>
         </template>

@@ -6,7 +6,6 @@ const express = require('express');
 const appUsers = require('../db/app-users');
 const bookAccess = require('../db/book-access');
 const bookCategories = require('../db/book-categories');
-const bookTags = require('../db/book-tags');
 const books = require('../db/books');
 const { aclParamGuard, requireBookAccess, ACLError, sendACLError } = require('../lib/acl');
 const { db } = require('../db/connection');
@@ -159,10 +158,10 @@ router.post('/:book_id/transfer-ownership', aclParamGuard('owner'), jsonBody, (r
   }
 });
 
-// ── Kategorie + Tags ────────────────────────────────────────────────────────
+// ── Kategorie ───────────────────────────────────────────────────────────────
 //
-// Pool wird ueber /local/categories und /local/tags verwaltet (admin-only fuer
-// Mutationen). Hier nur Zuordnung auf das Buch — editor+ erforderlich.
+// Pool wird ueber /local/categories verwaltet (admin-only fuer Mutationen).
+// Hier nur Zuordnung auf das Buch — editor+ erforderlich.
 
 router.get('/:book_id/category', aclParamGuard('viewer'), (req, res) => {
   const row = db.prepare('SELECT category_id FROM books WHERE book_id = ?').get(req.bookId);
@@ -182,23 +181,6 @@ router.put('/:book_id/category', aclParamGuard('editor'), jsonBody, (req, res) =
   } catch (e) {
     if (e.message === 'CATEGORY_NOT_FOUND') return res.status(404).json({ error_code: 'CATEGORY_NOT_FOUND' });
     logger.error(`PUT /books/:id/category: ${e.message}`);
-    res.status(500).json({ error_code: 'UPDATE_FAILED', detail: e.message });
-  }
-});
-
-router.get('/:book_id/tags', aclParamGuard('viewer'), (req, res) => {
-  res.json({ tags: bookTags.listForBook(req.bookId) });
-});
-
-router.put('/:book_id/tags', aclParamGuard('editor'), jsonBody, (req, res) => {
-  const tagIds = Array.isArray(req.body?.tag_ids) ? req.body.tag_ids : null;
-  if (tagIds === null) return res.status(400).json({ error_code: 'TAG_IDS_REQUIRED' });
-  try {
-    const tags = bookTags.setForBook(req.bookId, tagIds, _userEmail(req));
-    res.json({ tags });
-  } catch (e) {
-    if (e.message === 'TAG_NOT_FOUND') return res.status(404).json({ error_code: 'TAG_NOT_FOUND' });
-    logger.error(`PUT /books/:id/tags: ${e.message}`);
     res.status(500).json({ error_code: 'UPDATE_FAILED', detail: e.message });
   }
 });

@@ -121,31 +121,6 @@
              @combobox-change="saveBookCategory()"></div>
       </div>
 
-      <div class="card-form-row card-form-row--top">
-        <label class="card-form-label" x-text="$app.t('book.tags')"></label>
-        <div class="book-tags-editor">
-          <div class="book-tags-pool" x-show="tagPool.length > 0">
-            <template x-for="tag in tagPool" :key="tag.id">
-              <button type="button"
-                      class="book-tag-chip"
-                      :class="{ 'is-active': bookTagIds.includes(tag.id) }"
-                      @click="toggleBookTag(tag.id)"
-                      x-text="tag.name"></button>
-            </template>
-          </div>
-          <p class="muted-msg muted-msg--sm" x-show="tagPool.length === 0" x-text="$app.t('tags.empty')"></p>
-          <div class="book-tags-new">
-            <input type="text"
-                   class="card-form-input"
-                   x-model="newTagName"
-                   :placeholder="$app.t('tag.new')"
-                   @keydown.enter.prevent="createInlineTag()"
-                   :disabled="newTagBusy"
-                   maxlength="80">
-            <button type="button" @click="createInlineTag()" :disabled="newTagBusy || !newTagName.trim()" x-text="$app.t('common.new')"></button>
-          </div>
-        </div>
-      </div>
     </section>
 
     <section class="book-settings-section">

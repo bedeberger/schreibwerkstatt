@@ -110,8 +110,11 @@ export function registerBookOrganizerCard() {
 
       // Bei aktiver Suche bricht Reorder über gefiltertem DOM die Reihenfolge —
       // Sortable-Instances werden in dem Fall disabled, statt das Suchfeld
-      // selbst zu sperren.
-      this.$watch('organizerSearch', () => this._refreshSortableDisabled());
+      // selbst zu sperren. Such-Toggle erzeugt/entfernt zusätzlich x-if-gated
+      // Page-ULs im DOM → Sortable danach neu binden.
+      this.$watch('organizerSearch', () => {
+        this._refreshSortablesAfterTick();
+      });
     },
 
     destroy() {

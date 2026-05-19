@@ -5881,6 +5881,20 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 136 abgeschlossen (Tagesziel pro Buch: book_settings.daily_goal_chars hinzugefuegt, app_users.daily_goal_chars entfernt).');
   }
 
+  if (version < 137) {
+    db.exec(`
+      DROP INDEX IF EXISTS idx_bta_tag;
+      DROP TABLE IF EXISTS book_tag_assignments;
+      DROP TABLE IF EXISTS book_tags;
+    `);
+    const fkErrors137 = db.pragma('foreign_key_check');
+    if (fkErrors137.length) {
+      throw new Error(`Migration 137: foreign_key_check meldet ${fkErrors137.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 137').run();
+    logger.info('DB-Migration auf Version 137 abgeschlossen (Tags-Feature entfernt: book_tags + book_tag_assignments gedroppt).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

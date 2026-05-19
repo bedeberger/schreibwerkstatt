@@ -28,13 +28,9 @@ export function registerBookSettingsCard() {
     // Typeahead-Pool für Sharing-Suggestions (Email → Display-Name aus app_users).
     shareUserPool: [],
     shareSuggestOpen: false,
-    // Kategorie + Tags.
+    // Kategorie.
     categoryPool: [],
-    tagPool: [],
     bookCategoryId: '',
-    bookTagIds: [],
-    newTagName: '',
-    newTagBusy: false,
     bookSettingsLoading: false,
     bookSettingsSaving: false,
     bookSettingsSaved: false,
@@ -66,8 +62,8 @@ export function registerBookSettingsCard() {
     init() {
       this._lifecycle = setupCardLifecycle(this, {
         showFlag: 'showBookSettingsCard',
-        onShow: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats(), this.loadBookAccess(), this.loadBookCategoriesAndTags(), this.loadShareUserPool(), this.loadBlogStatus()]),
-        load: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats(), this.loadBookAccess(), this.loadBookCategoriesAndTags(), this.loadShareUserPool(), this.loadBlogStatus()]),
+        onShow: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats(), this.loadBookAccess(), this.loadBookCategory(), this.loadShareUserPool(), this.loadBlogStatus()]),
+        load: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats(), this.loadBookAccess(), this.loadBookCategory(), this.loadShareUserPool(), this.loadBlogStatus()]),
         resetState: {
           expandedJobType: null,
           bookJobRuns: {},
@@ -79,8 +75,6 @@ export function registerBookSettingsCard() {
           shareEmail: '',
           shareRole: 'viewer',
           bookCategoryId: '',
-          bookTagIds: [],
-          newTagName: '',
           blogConnection: null,
           blogForm: { baseUrl: '', username: '', password: '', defaultStatus: 'draft' },
           blogBusy: false,

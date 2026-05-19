@@ -15,7 +15,6 @@ const { toIntId } = require('../lib/validate');
 const { setContext, bookParamHandler } = require('../lib/log-context');
 const { aclParamGuard, requireBookAccess, sendACLError, ACLError } = require('../lib/acl');
 const bookAccess = require('../db/book-access');
-const bookTags = require('../db/book-tags');
 const { db } = require('../db/connection');
 
 const router = express.Router();
@@ -79,8 +78,6 @@ router.get('/books', async (req, res) => {
       db.prepare('SELECT book_id, owner_email, category_id FROM books').all()
         .map(r => [r.book_id, { owner_email: r.owner_email, category_id: r.category_id }])
     );
-    const visibleIds = all.filter(b => allowedIds.has(b.id)).map(b => b.id);
-    const tagsByBook = bookTags.listAssignmentsForBooks(visibleIds);
     const visible = all
       .filter(b => allowedIds.has(b.id))
       .map(b => ({
@@ -88,7 +85,6 @@ router.get('/books', async (req, res) => {
         role: roleByBook.get(b.id) || null,
         owner_email: meta.get(b.id)?.owner_email || null,
         category_id: meta.get(b.id)?.category_id ?? null,
-        tags: tagsByBook.get(b.id) || [],
       }));
     res.json(visible);
   } catch (e) { _fail(res, e, 'GET /content/books'); }
