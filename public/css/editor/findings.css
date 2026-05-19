@@ -9,6 +9,8 @@
   padding: var(--space-sm) 12px;
   margin: var(--space-sm) 0;
   font-size: var(--font-size-base);
+  scroll-margin-top: 60px;
+  scroll-margin-bottom: 60px;
 }
 .finding.error { border-color: var(--color-err-border); }
 .finding.style { border-color: var(--color-style-border); }

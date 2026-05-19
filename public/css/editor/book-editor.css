@@ -437,12 +437,13 @@
 }
 
 /* Container-Query: schmale Karten-Slots → Stream nutzt ganze Breite, Outline
-   stapelt sich über den Stream als kollabierter Block. */
+   stapelt sich über den Stream als kollabierter Block. Editor lebt in
+   variablem Karten-Slot, darum Container- nicht Media-Query. */
 @container card (max-width: 800px) {
-  .book-editor-layout { grid-template-columns: minmax(0, 1fr); }
+  .book-editor-layout { grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
   .book-editor-outline {
     position: static;
-    max-height: 220px;
+    max-height: 200px;
     border-right: none;
     border-bottom: 1px solid var(--color-border);
     padding-inline-end: 0;
@@ -451,20 +452,11 @@
   }
   .book-editor-stream { max-width: none; padding-inline: var(--space-sm); }
   .book-editor-page-card::before { inset-inline-start: -8px; }
-  .book-editor-find { width: calc(100vw - 2 * var(--space-sm)); right: var(--space-sm); }
 }
 
+/* Media-Query nur für fixed-positionierte Find-Bar — viewport-bezogen,
+   nicht Karten-bezogen. */
 @media (max-width: 600px) {
-  .book-editor-layout { grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
-  .book-editor-outline {
-    position: static;
-    max-height: 200px;
-    border-right: none;
-    border-bottom: 1px solid var(--color-border);
-    padding-inline-end: 0;
-  }
-  .book-editor-stream { max-width: none; padding-inline: var(--space-sm); }
-  .book-editor-page-card::before { inset-inline-start: -8px; }
   .book-editor-find { width: calc(100vw - 24px); right: 12px; bottom: 12px; }
   .book-editor-find-btn--text { min-width: auto; }
 }

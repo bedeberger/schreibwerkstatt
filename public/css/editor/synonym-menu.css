@@ -82,13 +82,16 @@
   padding: 0 4px;
 }
 .synonym-picker-close:hover { color: var(--color-text); }
-.synonym-picker-loading,
-.synonym-picker-error {
+.synonym-picker-loading {
   padding: var(--space-md);
   font-size: var(--font-size-base);
   color: var(--color-muted);
 }
-.synonym-picker-error { color: var(--color-err-text); }
+.synonym-picker-error {
+  padding: var(--space-md);
+  font-size: var(--font-size-base);
+  color: var(--color-err-text);
+}
 .synonym-picker-list {
   overflow-y: auto;
   padding: var(--space-xs);

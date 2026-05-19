@@ -204,6 +204,17 @@ export const editorEditMethods = {
         this.editDirty = true;
         this._scheduleDraftSave();
       }
+      // Caret-Slot: Server liefert neue Seiten als `<p></p>` ohne Kinder
+      // (cleanPageHtml-Fallback). Selection auf Element-Offset 0 in einem
+      // leeren `<p>` empfängt keinen Caret und keine input-Events → User
+      // sieht nichts und kann nicht tippen. `<br>` als Schreib-Slot ergänzen;
+      // html-clean strippt `<p><br></p>` beim nächsten Save wieder.
+      // Pendant zu jumpToTrailingParagraph im Fokus-Modus; hier vorab, weil
+      // auch normaler Edit-Modus den Bug zeigt.
+      const lastBlock = el.lastElementChild;
+      if (lastBlock && lastBlock.tagName === 'P' && !lastBlock.hasChildNodes()) {
+        lastBlock.appendChild(document.createElement('br'));
+      }
     }
     setTimeout(() => this._getEditEl()?.focus(), 0);
 

@@ -50,7 +50,8 @@
   .lektorat-split-findings { margin-top: 1rem; }
 }
 
-/* Inline-Fehlermarkierung */
+/* Inline-Fehlermarkierung. Scroll-Margin für Hover-Sync im Split-Modus,
+   damit Kontext um das Ziel sichtbar bleibt. */
 .lektorat-mark {
   position: relative;
   background: var(--color-mark-bg);
@@ -58,6 +59,8 @@
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background 0.2s;
+  scroll-margin-top: 60px;
+  scroll-margin-bottom: 60px;
 }
 .lektorat-mark:hover { background: var(--color-mark-bg-hover); }
 .lektorat-mark--selected {
@@ -76,13 +79,6 @@
 }
 .hover-sync-flash {
   animation: hoverSyncFlash 1.8s ease-out;
-}
-
-/* Hover-Sync: Scroll-Abstand oben/unten, damit Kontext um das Ziel sichtbar bleibt */
-.finding,
-.lektorat-mark {
-  scroll-margin-top: 60px;
-  scroll-margin-bottom: 60px;
 }
 
 /* Inline-Korrekturvorschlag neben durchgestrichenem Original */
