@@ -93,6 +93,28 @@ const VALID_TYPEN = new Set([
 // und liefern Einträge mit «Korrektur entfällt – Satz ist korrekt» o.Ä. als Erklärung.
 const NON_ERROR_RE = /korrektur entfällt|kein fehler|kein mangel|ist korrekt\b|nicht falsch|eintrag entfällt|im schweizer kontext|vertretbar|akzeptabel|möglicherweise/i;
 
+// Identische Findings (gleicher typ + original + korrektur) entfernen.
+// AI-Output enthält gelegentlich byte-gleiche Duplikate (insb. bei mehrfachem
+// Vorkommen desselben Tokens). Da `original` für die Replace-Logik als
+// Match-String dient, reicht ein Eintrag.
+function dedupFehler(fehler) {
+  const seen = new Set();
+  return fehler.filter(f => {
+    const k = `${f.typ ?? ''}|${f.original ?? ''}|${f.korrektur ?? ''}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
+// Letzter History-Eintrag dieser Seite (für History-Insert-Dedup).
+const _lastPageCheckStmt = db.prepare(`
+  SELECT id, errors_json FROM page_checks
+   WHERE page_id = ? AND user_email IS ?
+   ORDER BY checked_at DESC, id DESC
+   LIMIT 1
+`);
+
 function validateLektoratFehler(fehler, locale) {
   const isCH = locale === 'de-CH';
   return fehler
@@ -187,6 +209,9 @@ async function runCheckJob(jobId, pageId, bookId, userEmail, userToken) {
       logger.info(`Cache-HIT (page=${pageId}) – spart Lektorat-Call.`);
       updateJob(jobId, { progress: 97 });
       result = cached;
+      // Dedup auch auf Cached-Path: ältere Cache-Rows können Duplikate enthalten,
+      // bevor der Dedup-Filter aktiv war.
+      if (Array.isArray(result?.fehler)) result.fehler = dedupFehler(result.fehler);
     } else {
       result = await aiCall(jobId, tok,
         buildLektoratPrompt(text, {
@@ -204,21 +229,34 @@ async function runCheckJob(jobId, pageId, bookId, userEmail, userToken) {
       );
 
       if (!Array.isArray(result?.fehler)) throw i18nError('job.error.fehlerArrayMissing');
-      result.fehler = validateLektoratFehler(result.fehler, locale);
+      result.fehler = dedupFehler(validateLektoratFehler(result.fehler, locale));
 
       if (ctxSig) saveLektoratCache(bookId, userEmail, pageId, ctxSig, result, effectiveProvider);
     }
 
     const model = _modelName(effectiveProvider);
     const szenen = Array.isArray(result?.szenen) ? result.szenen : [];
+    const errorsJson = JSON.stringify(result.fehler);
 
-    const info = db.prepare(`INSERT INTO page_checks
-      (page_id, book_id, chapter_id, checked_at, error_count, errors_json, szenen_json, stilanalyse, fazit, model, user_email)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(parseInt(pageId), parseInt(bookId) || null, pd.chapter_id || null,
-        new Date().toISOString(), result.fehler.length, JSON.stringify(result.fehler),
-        szenen.length > 0 ? JSON.stringify(szenen) : null,
-        result.stilanalyse || null, result.fazit || null, model, userEmail || null);
+    // History-Insert-Dedup: gleicher errors_json wie jüngster Eintrag → kein neuer Row.
+    // Verhindert wiederholte "Prüfen"-Klicks ohne Page-Edit, die identische Findings
+    // produzieren (typisch bei Cache-HIT).
+    const lastCheck = _lastPageCheckStmt.get(parseInt(pageId), userEmail || null);
+    const historyDedup = !!(lastCheck && lastCheck.errors_json === errorsJson);
+    let checkId;
+    if (historyDedup) {
+      checkId = lastCheck.id;
+      logger.info(`History-Dedup: identische Findings wie page_check #${lastCheck.id}, kein neuer Eintrag.`);
+    } else {
+      const info = db.prepare(`INSERT INTO page_checks
+        (page_id, book_id, chapter_id, checked_at, error_count, errors_json, szenen_json, stilanalyse, fazit, model, user_email)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(parseInt(pageId), parseInt(bookId) || null, pd.chapter_id || null,
+          new Date().toISOString(), result.fehler.length, errorsJson,
+          szenen.length > 0 ? JSON.stringify(szenen) : null,
+          result.stilanalyse || null, result.fazit || null, model, userEmail || null);
+      checkId = info.lastInsertRowid;
+    }
 
     completeJob(jobId, {
       fehler: result.fehler,
@@ -228,10 +266,10 @@ async function runCheckJob(jobId, pageId, bookId, userEmail, userToken) {
       originalHtml: html,
       updatedAt: pd.updated_at || null,
       pageName: pd.name,
-      checkId: info.lastInsertRowid,
+      checkId,
       tokensIn: tok.in,
       tokensOut: tok.out,
-    }, tps(tok), `«${pd.name}» page=${pageId}, chap=${pd.chapter_id || '-'}, ${result.fehler.length} Beanstandungen`);
+    }, tps(tok), `«${pd.name}» page=${pageId}, chap=${pd.chapter_id || '-'}, ${result.fehler.length} Beanstandungen${historyDedup ? ' (dedup)' : ''}`);
   } catch (e) {
     if (e.name !== 'AbortError') logger.error(`Fehler (page=${pageId}): ${e.message}`, { stack: e.stack });
     failJob(jobId, e);
@@ -317,6 +355,7 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
         if (cached) {
           logger.info(`[${i + 1}/${pages.length}] «${pd.name}» page=${p.id} – Cache-HIT`);
           result = cached;
+          if (Array.isArray(result?.fehler)) result.fehler = dedupFehler(result.fehler);
         } else {
           // Bei Pool>1 sind feinere Pct-Ranges pro Item nicht sinnvoll
           // (mehrere Calls schreiben gleichzeitig den Job-Progress); progress wird
@@ -341,21 +380,27 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
           );
 
           if (!Array.isArray(result?.fehler)) throw new Error('fehler-Array fehlt');
-          result.fehler = validateLektoratFehler(result.fehler, locale);
+          result.fehler = dedupFehler(validateLektoratFehler(result.fehler, locale));
           saveLektoratCache(bookId, userEmail, p.id, ctxSig, result, effectiveProvider);
         }
         const fehler = result.fehler || [];
         totalErrors += fehler.length;
 
         const szenenBatch = Array.isArray(result?.szenen) ? result.szenen : [];
-        db.prepare(`INSERT INTO page_checks
-          (page_id, book_id, chapter_id, checked_at, error_count, errors_json, szenen_json, stilanalyse, fazit, model, user_email)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-          .run(p.id, parseInt(bookId), p.chapter_id || null, new Date().toISOString(),
-            fehler.length, JSON.stringify(fehler),
-            szenenBatch.length > 0 ? JSON.stringify(szenenBatch) : null,
-            result.stilanalyse || null, result.fazit || null, model, userEmail || null);
-        logger.info(`[${i + 1}/${pages.length}] «${pd.name}» page=${p.id}, ${fehler.length} Beanstandungen`);
+        const errorsJson = JSON.stringify(fehler);
+        const lastCheck = _lastPageCheckStmt.get(p.id, userEmail || null);
+        if (lastCheck && lastCheck.errors_json === errorsJson) {
+          logger.info(`[${i + 1}/${pages.length}] «${pd.name}» page=${p.id}, ${fehler.length} Beanstandungen (dedup, kein neuer Eintrag)`);
+        } else {
+          db.prepare(`INSERT INTO page_checks
+            (page_id, book_id, chapter_id, checked_at, error_count, errors_json, szenen_json, stilanalyse, fazit, model, user_email)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+            .run(p.id, parseInt(bookId), p.chapter_id || null, new Date().toISOString(),
+              fehler.length, errorsJson,
+              szenenBatch.length > 0 ? JSON.stringify(szenenBatch) : null,
+              result.stilanalyse || null, result.fazit || null, model, userEmail || null);
+          logger.info(`[${i + 1}/${pages.length}] «${pd.name}» page=${p.id}, ${fehler.length} Beanstandungen`);
+        }
       } catch (e) {
         if (e.name === 'AbortError') throw e;
         logger.warn(`[${i + 1}/${pages.length}] «${p.name}» übersprungen (page=${p.id}): ${e.message}`);
@@ -429,4 +474,4 @@ lektoratRouter.post('/batch-check', jsonBody, (req, res) => {
   res.json({ jobId });
 });
 
-module.exports = { lektoratRouter, runCheckJob, runBatchCheckJob };
+module.exports = { lektoratRouter, runCheckJob, runBatchCheckJob, dedupFehler, validateLektoratFehler };
