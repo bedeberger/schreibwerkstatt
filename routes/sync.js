@@ -10,14 +10,13 @@ const { computePageIndex, writePageIndex, writeFigureMentionsForPageAllUsers, to
 const { invalidateBookPageCache } = require('./jobs/chat');
 const { localIsoDate } = require('../lib/local-date');
 const searchIndex = require('../lib/search');
+const { htmlToPlainText } = require('../lib/html-text');
 
 const router = express.Router();
 // Sync ist Write-Pfad (Pages-Upsert, Stats-Recompute) → editor+.
 router.param('book_id', aclParamGuard('editor'));
 
-function htmlToText(html) {
-  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-}
+const htmlToText = htmlToPlainText;
 
 // undici-Fehler ("fetch failed") verstecken Ursache in e.cause. Helper packt
 // code + nested cause-message aus, plus optional HTTP-status/bodyText.

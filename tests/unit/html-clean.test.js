@@ -5,7 +5,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { cleanPageHtml, wrapOrphanBlocks, collapseEmptyBlocks, stripTrailingEmptyBlocks } = require('../../lib/html-clean');
+const { cleanPageHtml, wrapOrphanBlocks, collapseEmptyBlocks, stripTrailingEmptyBlocks, stripBlockEdgeNbsp } = require('../../lib/html-clean');
 
 test('collapseEmptyBlocks: leere <p>-Runs auf einen kollabieren', () => {
   assert.equal(
@@ -129,6 +129,52 @@ test('wrapOrphanBlocks: Heading bleibt eigenständiger Block', () => {
 test('cleanPageHtml: heilt Bare-Text-Page wie page 146 (Focus-Editor-Bug)', () => {
   const broken = 'Stefan fand problemlos eine Anstellung bei den SBB-Werkstätten.&nbsp;';
   const out = cleanPageHtml(broken);
-  // linkedom re-encoded &nbsp; als &#160; — semantisch identisch (U+00A0).
-  assert.match(out, /^<p>Stefan fand problemlos eine Anstellung bei den SBB-Werkstätten\.(?:&nbsp;|&#160;)<\/p>$/);
+  // Trailing &nbsp; ist Phantom-Rev-Quelle (Editor-Cursor-Anker) und wird
+  // via stripBlockEdgeNbsp entfernt; sichtbarer Text bleibt unveraendert.
+  assert.equal(out, '<p>Stefan fand problemlos eine Anstellung bei den SBB-Werkstätten.</p>');
+});
+
+test('stripBlockEdgeNbsp: trailing &#160; im Block-Ende wird entfernt', () => {
+  assert.equal(
+    stripBlockEdgeNbsp('<p>Text&#160;</p>'),
+    '<p>Text</p>'
+  );
+});
+
+test('stripBlockEdgeNbsp: leading NBSP am Block-Anfang wird entfernt', () => {
+  assert.equal(
+    stripBlockEdgeNbsp('<p>&#160;Text</p>'),
+    '<p>Text</p>'
+  );
+});
+
+test('stripBlockEdgeNbsp: NBSP mitten im Block bleibt erhalten', () => {
+  // Mid-Block-NBSP ist gewollt (Geviert-Trennung, Vorname&nbsp;Nachname).
+  const out = stripBlockEdgeNbsp('<p>Vorname&#160;Nachname</p>');
+  assert.match(out, /Vorname( |&nbsp;|&#160;)Nachname/);
+});
+
+test('stripBlockEdgeNbsp: trailing NBSP in <li> + <h2>', () => {
+  assert.equal(stripBlockEdgeNbsp('<li>Eintrag&#160;</li>'), '<li>Eintrag</li>');
+  assert.equal(stripBlockEdgeNbsp('<h2>Titel&#160;</h2>'), '<h2>Titel</h2>');
+});
+
+test('stripBlockEdgeNbsp: NBSP nur in einem Block, andere unberuehrt', () => {
+  const out = stripBlockEdgeNbsp('<p>A</p><p>B&#160;</p><p>C</p>');
+  assert.equal(out, '<p>A</p><p>B</p><p>C</p>');
+});
+
+test('cleanPageHtml: trailing NBSP in mehreren Absaetzen alle gestripped', () => {
+  // Reproduziert konkreten Phantom-Rev-Case: rev 158 vs rev 159 in Prod
+  // unterschieden sich nur durch trailing &#160; im letzten <p>.
+  const a = '<p>Text 1.&#160;</p><p>Text 2.</p><p>Text 3.&#160;</p>';
+  const b = '<p>Text 1.</p><p>Text 2.</p><p>Text 3.</p>';
+  assert.equal(cleanPageHtml(a), cleanPageHtml(b));
+});
+
+test('stripBlockEdgeNbsp: idempotent', () => {
+  const input = '<p>X&#160;</p>';
+  const once = stripBlockEdgeNbsp(input);
+  const twice = stripBlockEdgeNbsp(once);
+  assert.equal(once, twice);
 });

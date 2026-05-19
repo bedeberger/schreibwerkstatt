@@ -8,20 +8,15 @@ const { db } = require('./connection');
 require('./migrations');
 const { CHARS_PER_TOKEN } = require('../lib/ai');
 const { NOW_ISO_SQL } = require('./now');
+const { htmlToPlainText } = require('../lib/html-text');
 
 const VALID_SOURCES = new Set([
   'focus', 'main', 'chat-apply', 'lektorat-apply',
   'bookstack-sync', 'import', 'conflict',
 ]);
 
-// Identische HTML→Text-Normalisierung wie routes/sync.js und
-// public/js/tree.js (page_stats-Parity). Drift bricht Token-Schaetzungen.
-function _htmlToText(html) {
-  return String(html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-}
-
 function _statsFromHtml(html) {
-  const text = _htmlToText(html);
+  const text = htmlToPlainText(html);
   const chars = text.length;
   const words = text === '' ? 0 : text.split(/\s+/).length;
   const tok = Math.round(chars / CHARS_PER_TOKEN);
@@ -45,17 +40,22 @@ const _lastBodyStmt = db.prepare(`
    LIMIT 1
 `);
 
-// Dedup: identischer Body zur juengsten Revision derselben Seite → skip.
-// Autosave-Bursts und Edits, die nach cleanPageHtml byte-identisch landen,
-// erzeugen sonst Duplikat-Rows und lassen den Side-by-Side-Diff im Viewer
-// faelschlich „unchanged" anzeigen.
+// Dedup: identischer Body ODER identischer sichtbarer Text zur juengsten
+// Revision derselben Seite → skip. Byte-Vergleich faengt Autosave-Bursts;
+// Plain-Text-Vergleich faengt Phantom-Revs aus rein nicht-sichtbaren
+// HTML-Aenderungen (trailing NBSP, Attribut-Reorder, idempotenter Cleaner-
+// Output), die sonst Revision-Rows mit irrefuehrendem chars-Delta erzeugen
+// und im Side-by-Side-Diff als „unchanged" landen.
 function insert({ pageId, bookId, bodyHtml, bodyMarkdown = null, source, userEmail = null, summary = null }) {
   if (!Number.isInteger(pageId) || pageId <= 0) throw new Error('page-revisions.insert: pageId required');
   if (!Number.isInteger(bookId) || bookId <= 0) throw new Error('page-revisions.insert: bookId required');
   if (typeof bodyHtml !== 'string') throw new Error('page-revisions.insert: bodyHtml required');
   if (!VALID_SOURCES.has(source)) throw new Error(`page-revisions.insert: invalid source "${source}"`);
   const last = _lastBodyStmt.get(pageId);
-  if (last && last.body_html === bodyHtml) return null;
+  if (last) {
+    if (last.body_html === bodyHtml) return null;
+    if (htmlToPlainText(last.body_html) === htmlToPlainText(bodyHtml)) return null;
+  }
   const { chars, words, tok } = _statsFromHtml(bodyHtml);
   const result = _insertStmt.run({
     page_id: pageId,

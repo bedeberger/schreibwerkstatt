@@ -1,35 +1,16 @@
-// Regression-Sentinel: Frontend-Save-Pfad (_syncPageStatsAfterSave in tree.js)
-// MUSS exakt dieselbe HTML→Text-Normalisierung verwenden wie der Server-Sync
-// (routes/sync.js#htmlToText). Andernfalls schreibt jeder Page-Save inflated
-// `chars` in page_stats (DOMParser textContent behält Whitespace zwischen
-// Block-Tags), und Heute-Ring/7-Tage-Bars driften gegenüber dem Cron-Snapshot.
-//
-// Bug-Symptom (vor Fix): Donut zeigte 10'296 Z heute, 7-Tage-Bar derselbe
-// Tag nur +1'845. Differenz war HTML-Inter-Tag-Whitespace, kein realer Text.
+// Regression-Sentinel: Server (lib/html-text.js) und Frontend
+// (public/js/html-text.js) MUSSEN bit-identische Plain-Text-Normalisierung
+// liefern. Konsumiert von routes/sync.js, lib/search.js, db/page-revisions.js,
+// public/js/book/tree.js (_syncPageStatsAfterSave), page-revision-diff.js.
+// Drift bricht page_stats, Token-Schaetzungen, Diff-Anzeige und Phantom-Rev-
+// Dedup.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { htmlToPlainText as feNormalize } from '../../public/js/html-text.js';
 
-// Server-Normalisierung (Spiegel von routes/sync.js#htmlToText +
-// computeStats(html, prefix) — prefix=page_name fliesst in chars/words ein).
-function serverNormalize(html, prefix = '') {
-  const combined = (prefix ? prefix + ' ' : '') + (html || '');
-  return combined
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-// Frontend-Normalisierung (Spiegel des aktuellen tree.js#_syncPageStatsAfterSave-
-// Codes — wenn dieser Test bricht, ist die Frontend-Inline-Logik divergiert
-// und tokEsts wird wieder driften).
-function frontendNormalize(html, prefix = '') {
-  const pre = String(prefix || '').trim();
-  const combined = (pre ? pre + ' ' : '') + String(html || '');
-  return combined
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
+const require_ = createRequire(import.meta.url);
+const { htmlToPlainText: beNormalize } = require_('../../lib/html-text.js');
 
 const CASES = [
   ['<h1>Title</h1>\n<p>Para 1</p>\n<p>Para 2</p>', 'mehrzeiliger HTML mit Block-Boundaries'],
@@ -42,44 +23,52 @@ const CASES = [
   ['Text ohne Tags', 'plain text'],
   ['<p>Wort  mit  Doppelspaces</p>', 'doppel-spaces innerhalb Block'],
   ['<ul><li>A</li><li>B</li><li>C</li></ul>', 'Liste'],
+  ['<p>trailing nbsp&#160;</p>', 'numerische NBSP-Entity am Block-Ende'],
+  ['<p>nbsp&nbsp;named</p>', 'named NBSP-Entity inline'],
+  ['<p>A&amp;B</p>', 'amp-Entity'],
+  ['<p>&lt;tag&gt;</p>', 'lt/gt-Entity'],
+  ['<p>&quot;quote&quot;</p>', 'quot-Entity'],
+  ['<p>hex&#xa0;trail</p>', 'hex-NBSP-Entity'],
+  ['<p>foo&unknown;bar</p>', 'unbekanntes Entity bleibt literal'],
 ];
 
 for (const [html, label] of CASES) {
-  test(`Normalisierung match: ${label}`, () => {
-    const s = serverNormalize(html);
-    const f = frontendNormalize(html);
+  test(`Parity Server↔Frontend: ${label}`, () => {
+    const s = beNormalize(html);
+    const f = feNormalize(html);
     assert.equal(f, s, `Frontend "${f}" != Server "${s}"`);
     assert.equal(f.length, s.length);
   });
 }
 
-// Mit prefix: page_name fliesst in chars/words ein (Überschrift gehört zum
-// Buchumfang). Server + Frontend müssen identisch normalisieren.
-const PREFIX_CASES = [
-  ['Kapitel 1: Anfang', '<p>Es war einmal.</p>', 'normaler Titel + Body'],
-  ['', '<p>Body</p>', 'leerer Prefix'],
-  ['Titel', '', 'leerer Body, nur Titel'],
-  ['  Titel mit Spaces  ', '<p>x</p>', 'Prefix mit Padding-Whitespace'],
-  ['Eins', '<h1>Zwei</h1><p>Drei</p>', 'Mehrere Blocks im Body'],
-];
+test('Entity-Decode: trailing &#160; kollabiert zu Null-Chars', () => {
+  // Pflicht fuer Phantom-Rev-Fix: rev-A endet auf `&#160;`, rev-B nicht.
+  // Vorher zaehlte rev-A 6 Zeichen mehr; nach Decode 0 Zeichen Differenz.
+  const withNbsp = '<p>als gewöhnlich.&#160;</p>';
+  const withoutNbsp = '<p>als gewöhnlich.</p>';
+  assert.equal(beNormalize(withNbsp), beNormalize(withoutNbsp));
+  assert.equal(feNormalize(withNbsp), feNormalize(withoutNbsp));
+});
 
-for (const [prefix, html, label] of PREFIX_CASES) {
-  test(`Normalisierung mit Prefix: ${label}`, () => {
-    const s = serverNormalize(html, prefix);
-    const f = frontendNormalize(html, prefix);
-    assert.equal(f, s, `Frontend "${f}" != Server "${s}"`);
-    assert.equal(f.length, s.length);
-  });
-}
+test('Entity-Decode: named &nbsp; collapsed', () => {
+  assert.equal(beNormalize('<p>a&nbsp;b</p>'), 'a b');
+  assert.equal(feNormalize('<p>a&nbsp;b</p>'), 'a b');
+});
 
-test('Normalisierung: Whitespace-Bias eliminiert', () => {
-  // Pathologisches Beispiel: 50 Paragraphen, jeweils Newline zwischen Tags.
-  // Vor Fix (DOMParser textContent): zusätzlich ~50 Newline-Chars im Output.
-  // Nach Fix: 0 zusätzliche Chars vs Server-Snapshot.
+test('Entity-Decode: numerische Entity wird dekodiert', () => {
+  assert.equal(beNormalize('<p>A&#65;</p>'), 'AA');
+  assert.equal(feNormalize('<p>A&#65;</p>'), 'AA');
+});
+
+test('Unbekanntes Entity bleibt literal', () => {
+  assert.equal(beNormalize('&xx;'), '&xx;');
+  assert.equal(feNormalize('&xx;'), '&xx;');
+});
+
+test('Whitespace-Bias eliminiert (50-Paragraph-Stress)', () => {
   const html = Array.from({ length: 50 }, (_, i) => `<p>Para ${i}</p>`).join('\n');
-  const f = frontendNormalize(html);
-  const s = serverNormalize(html);
+  const f = feNormalize(html);
+  const s = beNormalize(html);
   assert.equal(f, s);
-  // Sanity: Output enthält keine Newlines.
   assert.ok(!f.includes('\n'));
 });

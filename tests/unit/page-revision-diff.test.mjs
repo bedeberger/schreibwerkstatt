@@ -135,6 +135,32 @@ test('renderSideBySide: Heading-Block behaelt semantisches Tag in beiden Spalten
   assert.match(out.html, /<h1 class="diff-cell diff-cell--h1 diff-cell--changed diff-cell--right">/);
 });
 
+test('renderSideBySide: parseBlocks-Miss → Plain-Text-Fallback rendert Change', () => {
+  // Aenderung steckt in <div> (nicht in parseBlocks-BLOCK_TAGS). diffArrays
+  // bekommt [] vs [] und meldet unchanged. Fallback muss htmlToPlainText
+  // vergleichen und einen Change rendern, sonst Phantom-Rev unsichtbar.
+  const lib = mockDiffLib({
+    arrays: [],
+    words: [
+      { value: 'alt', removed: true },
+      { value: 'neu', added: true },
+    ],
+  });
+  const out = renderSideBySide('<div>alt</div>', '<div>neu</div>', lib);
+  assert.equal(out.unchanged, false);
+  assert.match(out.html, /<del class="diff-del">alt<\/del>/);
+  assert.match(out.html, /<ins class="diff-add">neu<\/ins>/);
+});
+
+test('renderSideBySide: identischer Plain-Text trotz Byte-Diff → unchanged', () => {
+  // Sicherheitsnetz, dass Fallback nicht uebersensibel feuert. Beide
+  // Bodies normalisieren zu identischem Plain-Text (trailing NBSP-Entity
+  // wird via decode + \s+ collapsed entfernt).
+  const lib = mockDiffLib({ arrays: [{ value: ['Hallo'] }] });
+  const out = renderSideBySide('<p>Hallo</p>', '<p>Hallo&#160;</p>', lib);
+  assert.equal(out.unchanged, true);
+});
+
 test('renderSideBySide: eq-Block erscheint identisch in beiden Spalten', () => {
   // Anker-Change zwingt eq-Block ins kollabierende Fenster.
   const lib = mockDiffLib({

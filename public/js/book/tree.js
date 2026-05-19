@@ -1,4 +1,5 @@
 import { htmlToText, CHARS_PER_TOKEN, fetchJson, localeTag, relativeDay, tzOpts } from '../utils.js';
+import { htmlToPlainText } from '../html-text.js';
 import { contentRepo } from '../repo/content.js';
 
 // Buch-/Seiten-Lade-Methoden (werden in die Alpine-Komponente gespreadet)
@@ -90,11 +91,11 @@ export const treeMethods = {
   // "leer"-Badge sofort verliert und die Zeichenzahl stimmt. Persistiert
   // den frischen Stat-Eintrag auch in der History-DB.
   //
-  // WICHTIG: Char/Word-Count muss exakt der Server-Normalisierung in
-  // routes/sync.js#htmlToText entsprechen — Tags zu Single-Space, alle
-  // Whitespace-Sequenzen collapsed, getrimmt. Sonst inflated DOMParser's
-  // textContent (behält Whitespace zwischen Block-Tags) gegenüber dem
-  // Cron-Snapshot, und Heute-Ring/7-Tage-Bars driften nach jedem Save.
+  // WICHTIG: Char/Word-Count via lib/html-text.js / public/js/html-text.js
+  // (SSoT). Servers- und Frontend-Pendant dekodieren HTML-Entities, strippen
+  // Tags zu Single-Space, collapse \s+, trim — sonst zaehlt trailing NBSP aus
+  // dem Editor (`&#160;`) als 6 Zeichen mit und treibt Heute-Ring/7-Tage-Bars
+  // gegen den Cron-Snapshot.
   //
   // Seitenname fliesst in chars/words ein (Überschrift gehört zum Buchumfang) —
   // analog routes/sync.js#computeStats. tok = chars / CHARS_PER_TOKEN.
@@ -102,10 +103,7 @@ export const treeMethods = {
     if (!page?.id) return;
     const prefix = String(page?.name || '').trim();
     const combined = (prefix ? prefix + ' ' : '') + String(html || '');
-    const normalized = combined
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
+    const normalized = htmlToPlainText(combined);
     const words = normalized === '' ? 0 : normalized.split(/\s+/).length;
     const stat = {
       tok: Math.round(normalized.length / CHARS_PER_TOKEN),

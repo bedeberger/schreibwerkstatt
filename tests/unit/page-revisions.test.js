@@ -93,6 +93,37 @@ test('page_revisions: Dedup gegen juengste Revision', () => {
   assert.equal(pageRevisions.countForPage(90501), 3);
 });
 
+test('page_revisions: Dedup auf normalisiertem Text (Phantom-Rev-Schutz)', () => {
+  upsertBookByName(906, 'Test-Buch P2 PhantomDedup');
+  _seedPage(906, 90601);
+
+  const id1 = pageRevisions.insert({
+    pageId: 90601, bookId: 906,
+    bodyHtml: '<p>als gewöhnlich.</p>',
+    source: 'main', userEmail: 'a@x.test',
+  });
+  assert.ok(id1);
+
+  // Trailing &#160; aendert Bytes, aber sichtbarer Text identisch.
+  // Dedup auf htmlToPlainText muss greifen → null.
+  const id2 = pageRevisions.insert({
+    pageId: 90601, bookId: 906,
+    bodyHtml: '<p>als gewöhnlich.&#160;</p>',
+    source: 'focus', userEmail: 'a@x.test',
+  });
+  assert.equal(id2, null);
+  assert.equal(pageRevisions.countForPage(90601), 1);
+
+  // Echte Text-Aenderung → neue Row.
+  const id3 = pageRevisions.insert({
+    pageId: 90601, bookId: 906,
+    bodyHtml: '<p>als gewöhnlich. Plus mehr.</p>',
+    source: 'main', userEmail: 'a@x.test',
+  });
+  assert.ok(id3);
+  assert.equal(pageRevisions.countForPage(90601), 2);
+});
+
 test('page_revisions: invalid source wirft', () => {
   upsertBookByName(902, 'Test-Buch P2 B');
   _seedPage(902, 90201);

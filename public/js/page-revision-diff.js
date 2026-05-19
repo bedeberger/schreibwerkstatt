@@ -7,15 +7,12 @@
 // Rest als Skip) -> renderSideBySide (zwei Spalten, Word-Diff inline pro Seite).
 
 import { escHtml } from './utils.js';
+import { htmlToPlainText } from './html-text.js';
+
+export { htmlToPlainText };
 
 const BLOCK_TAGS = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'blockquote', 'pre'];
 const BLOCK_RE = new RegExp(`<(${BLOCK_TAGS.join('|')})\\b[^>]*>([\\s\\S]*?)<\\/\\1>`, 'gi');
-
-// Identische HTML→Text-Normalisierung wie routes/sync.js und db/page-revisions.js
-// (fallback fuer Node-Tests; im Browser laeuft _parseBlocksDOM).
-export function htmlToPlainText(html) {
-  return String(html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-}
 
 // Browser-Pfad: DOMParser dekodiert Entities (&nbsp;, &auml;, …) und kennt
 // nested Tags. Regex-Pfad kann das nicht und laesst Entities literal stehen,
@@ -213,7 +210,20 @@ export function renderSideBySide(oldHtml, newHtml, diffLib, opts) {
   const parts = diffLib.diffArrays(oldBlocks.map(b => b.text), newBlocks.map(b => b.text));
   const entries = attachBlocks(parts, oldBlocks, newBlocks);
   if (!entries.length || !entries.some(e => e.kind !== 'eq')) {
-    return { html: '', unchanged: true };
+    // Fallback: parseBlocks deckt nur p/h1-h6/li/blockquote/pre ab. Aenderungen
+    // in <div>/<table>/<section>/etc. rutschen durch und liefern „unchanged",
+    // obwohl `chars` (htmlToPlainText) sehr wohl differiert. Plain-Text-
+    // Word-Diff als Sicherheitsnetz, damit Phantom-Revs trotzdem sichtbar
+    // werden — single-cell, ein gepaarter Change.
+    const oldText = htmlToPlainText(oldHtml);
+    const newText = htmlToPlainText(newHtml);
+    if (oldText === newText) return { html: '', unchanged: true };
+    const fallbackHtml = renderEntries(
+      [{ kind: 'change', from: { tag: 'p', text: oldText }, to: { tag: 'p', text: newText } }],
+      diffLib,
+      opts?.skipLabel,
+    );
+    return { html: fallbackHtml, unchanged: false };
   }
   const paired = pairChanges(entries);
   const view = collapseContext(paired, 1);

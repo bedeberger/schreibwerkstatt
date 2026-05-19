@@ -181,6 +181,13 @@ export const appViewMethods = {
       if (pd.updated_at) this.currentPage.updated_at = pd.updated_at;
       this.currentPageEmpty = !htmlToText(html).trim();
       this._refreshPendingDraft(pageId, html);
+      // Findings/Marks erhalten: ohne Refilter würden Marks beim Refetch
+      // (Re-Klick, Collab-Remote-Edit, Revision-Restore) verschwinden, obwohl
+      // `checkDone` + `lektoratFindings` noch gesetzt sind.
+      if (this.lektoratFindings?.length > 0) {
+        this._filterFindingsAfterSave?.(html);
+        this.updatePageView();
+      }
     } catch (e) {
       console.error('[refetchCurrentPage]', e);
       this.setStatus(this.t('chat.pageLoadFailed'));

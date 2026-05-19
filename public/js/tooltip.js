@@ -27,6 +27,14 @@
     document.body.appendChild(layer);
   }
 
+  // Native <dialog>.showModal() rendert im Top-Layer; Body-Kinder sind dahinter
+  // verdeckt. Layer in den offenen Dialog umhaengen, wenn das Target dort lebt.
+  function reparentLayer(target) {
+    const dlg = target.closest('dialog[open]');
+    const parent = dlg || document.body;
+    if (layer.parentNode !== parent) parent.appendChild(layer);
+  }
+
   function hide() {
     currentTarget = null;
     if (!layer) return;
@@ -64,6 +72,7 @@
       return;
     }
     ensureLayer();
+    reparentLayer(target);
     currentTarget = target;
     bubble.textContent = text;
     layer.classList.add('tip-visible');
