@@ -5782,6 +5782,21 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 134 abgeschlossen (blog_connections + blog_page_links).');
   }
 
+  if (version < 135) {
+    const chaptersCols135 = db.pragma('table_info(chapters)').map(c => c.name);
+    if (!chaptersCols135.includes('parent_chapter_id')) {
+      db.prepare('ALTER TABLE chapters ADD COLUMN parent_chapter_id INTEGER REFERENCES chapters(chapter_id) ON DELETE SET NULL').run();
+    }
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_chapters_parent ON chapters(parent_chapter_id)').run();
+
+    const fkErrors135 = db.pragma('foreign_key_check');
+    if (fkErrors135.length) {
+      throw new Error(`Migration 135: foreign_key_check meldet ${fkErrors135.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 135').run();
+    logger.info('DB-Migration auf Version 135 abgeschlossen (chapters.parent_chapter_id fuer Hierarchie).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

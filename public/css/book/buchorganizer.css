@@ -272,39 +272,12 @@
   }
 }
 
-/* Blog-Status-Badge im Buchorganizer (eckig, --card-accent-blog) */
-.blog-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 var(--space-2);
-  height: 1.4em;
-  border: 0.5px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  font-size: var(--font-size-xs);
-  line-height: 1;
-  white-space: nowrap;
-  color: var(--color-muted);
-  background: transparent;
-}
-.blog-badge--synced {
-  border-color: var(--card-accent-blog);
-  color: var(--card-accent-blog);
-}
-.blog-badge--push-needed {
-  border-color: var(--card-accent-ideen);
-  color: var(--card-accent-ideen);
-  background: color-mix(in srgb, var(--card-accent-ideen) 10%, transparent);
-}
-.blog-badge--conflict {
-  border-color: var(--card-accent-heatmap);
-  color: var(--card-accent-heatmap);
-  background: color-mix(in srgb, var(--card-accent-heatmap) 12%, transparent);
-}
-.blog-badge--new {
-  border-color: var(--color-border);
-  color: var(--color-muted);
-  background: transparent;
-}
+/* Blog-Status-Pills — Subklassen von .badge (components/buttons-badges.css).
+   Eckig (radius-sm = 0), gefüllter Background, Status-spezifische Farben. */
+.badge--blog-synced      { background: var(--color-tag-bg);  color: var(--card-accent-blog); }
+.badge--blog-push-needed { background: var(--color-warn-bg); color: var(--color-warn-text); }
+.badge--blog-conflict    { background: var(--color-err-bg);  color: var(--color-err-text); }
+.badge--blog-new         { background: var(--color-tag-bg);  color: var(--color-muted); }
 .organizer-blog-push,
 .organizer-blog-conflict {
   flex: none;

@@ -93,17 +93,44 @@ test('validateTree wirft auf unbekannte ID', () => {
   assert.equal(err.code, 'UNKNOWN_CHAPTER');
 });
 
-test('validateTree wirft auf verschachteltes Kapitel', () => {
+test('validateTree akzeptiert verschachteltes Kapitel bis MAX_CHAPTER_DEPTH', () => {
   const bookId = seedBook('nest');
   const c1 = seedChapter(bookId, 'C1');
   const c2 = seedChapter(bookId, 'C2');
+  const c3 = seedChapter(bookId, 'C3');
   const tree = [
-    { type: 'chapter', id: c1, children: [{ type: 'chapter', id: c2, children: [] }] },
+    {
+      type: 'chapter', id: c1, children: [
+        { type: 'chapter', id: c2, children: [
+          { type: 'chapter', id: c3, children: [] },
+        ]},
+      ],
+    },
+  ];
+  assert.doesNotThrow(() => bookOrder.validateTree(tree, bookId));
+});
+
+test('validateTree wirft bei Ueberschreiten von MAX_CHAPTER_DEPTH', () => {
+  const bookId = seedBook('deep');
+  const c1 = seedChapter(bookId, 'C1');
+  const c2 = seedChapter(bookId, 'C2');
+  const c3 = seedChapter(bookId, 'C3');
+  const c4 = seedChapter(bookId, 'C4');
+  const tree = [
+    {
+      type: 'chapter', id: c1, children: [
+        { type: 'chapter', id: c2, children: [
+          { type: 'chapter', id: c3, children: [
+            { type: 'chapter', id: c4, children: [] },
+          ]},
+        ]},
+      ],
+    },
   ];
   let err;
   try { bookOrder.validateTree(tree, bookId); } catch (e) { err = e; }
   assert.ok(err, 'erwarteter Fehler');
-  assert.equal(err.code, 'NESTED_CHAPTER');
+  assert.equal(err.code, 'MAX_DEPTH');
 });
 
 test('materializeTree setzt chapters.position, pages.position, pages.chapter_id', () => {

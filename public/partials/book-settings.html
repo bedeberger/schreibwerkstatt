@@ -353,14 +353,14 @@
             <span x-show="blogBusy && blogAction === 'save'" class="spinner"></span>
             <span x-text="blogConnection ? $app.t('blog.connect.update') : $app.t('blog.connect.save')"></span>
           </button>
-          <button type="button" class="btn-compact"
+          <button type="button"
                   x-show="blogConnection && !blogConnection.initialImportDoneAt"
                   @click="startBlogImport()"
                   :disabled="blogBusy || blogImportJobId">
             <span x-show="blogImportJobId" class="spinner"></span>
             <span x-text="$app.t('blog.action.import')"></span>
           </button>
-          <button type="button" class="btn-compact"
+          <button type="button"
                   x-show="blogConnection?.initialImportDoneAt"
                   @click="startBlogPull()"
                   :disabled="blogBusy || blogPullJobId">

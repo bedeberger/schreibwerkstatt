@@ -80,7 +80,7 @@
                  autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other"
                  :aria-label="$app.t('bookOrganizer.renamePage')">
           <template x-if="blogStatusFor(page)">
-            <span class="blog-badge" :class="'blog-badge--' + blogStatusFor(page)"
+            <span class="badge" :class="'badge--blog-' + blogStatusFor(page)"
                   :data-tip="blogStatusLabel(blogStatusFor(page))"
                   x-text="blogStatusLabel(blogStatusFor(page))"></span>
           </template>
