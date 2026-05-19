@@ -263,7 +263,16 @@
     flex-wrap: wrap;
     row-gap: var(--space-xs);
   }
-  .organizer-chapter-meta {
+  /* Input erzwingt Restbreite der ersten Reihe → Tags + Actions wandern geschlossen
+     in die zweite Reihe. Sonst quetscht eine 2-stellige Sub-Kapitel-Zahl den Input
+     auf 1-2 Zeichen, weil flex-wrap je nach Tag-Länge inkonsistent umbricht. */
+  .organizer-chapter-header .organizer-name--chapter {
+    flex-basis: calc(100% - 60px);
+  }
+  .organizer-chapter-meta:first-of-type {
+    margin-left: 0;
+  }
+  .organizer-chapter-actions {
     margin-left: auto;
   }
   .organizer-chapter-actions .btn-compact,
