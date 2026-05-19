@@ -373,4 +373,23 @@
   .header-today-ring--active circle:nth-of-type(2) { animation: none; }
 }
 
+@media (max-width: 600px) {
+  .header-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    white-space: normal;
+  }
+  .avatar-menu-panel {
+    position: fixed;
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    min-width: 0;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+}
+
 }

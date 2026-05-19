@@ -100,13 +100,7 @@
 }
 
 @media (max-width: 600px) {
-  .header-actions {
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    white-space: normal;
-  }
-  .komplett-status-panel,
-  .avatar-menu-panel {
+  .komplett-status-panel {
     position: fixed;
     bottom: 0;
     left: 0;
