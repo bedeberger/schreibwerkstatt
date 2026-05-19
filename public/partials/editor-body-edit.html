@@ -4,13 +4,39 @@
      wird separat als partial-editor-toolbar geladen. Die Sub-Komponente
      editorToolbarCard installiert selbst einen delegierten keydown-Listener
      auf dem contenteditable — daher kein @keydown hier. -->
-<div x-show="editMode"
-     class="page-content-view page-content-view--editing"
-     contenteditable="true"
-     spellcheck="true"
-     @input="_markEditDirty()"
-     @paste="_onEditPaste($event)"
-     @contextmenu="_onEditContextMenu($event)"
-     @click="_onEditClick($event)"
-     @pointermove="handleMarkPointer($event)"
-     @pointerleave="handleMarkPointerLeave($event)"></div>
+<div x-show="editMode" class="page-editor-wrap">
+  <div class="page-editor-toolbar">
+    <button type="button" class="graph-tool-btn"
+            :data-tip="t('graph.zoomOut')" :aria-label="t('graph.zoomOut')"
+            @click="pageEditorZoomOut()">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=635#minus"/></svg>
+    </button>
+    <button type="button" class="graph-tool-btn"
+            :data-tip="t('graph.zoomIn')" :aria-label="t('graph.zoomIn')"
+            @click="pageEditorZoomIn()">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=635#plus"/></svg>
+    </button>
+    <button type="button" class="graph-tool-btn"
+            :data-tip="t('graph.reset')" :aria-label="t('graph.reset')"
+            @click="pageEditorZoomReset()">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=635#scan"/></svg>
+    </button>
+    <button type="button" class="graph-tool-btn"
+            :aria-pressed="pageEditorFullscreen"
+            :data-tip="pageEditorFullscreen ? t('graph.fullscreenClose') : t('graph.fullscreen')"
+            :aria-label="pageEditorFullscreen ? t('graph.fullscreenClose') : t('graph.fullscreen')"
+            @click="togglePageEditorFullscreen()">
+      <svg class="icon" aria-hidden="true"><use :href="pageEditorFullscreen ? '/icons.svg?v=635#minimize-2' : '/icons.svg?v=635#maximize-2'"/></svg>
+    </button>
+  </div>
+  <div class="page-content-view page-content-view--editing"
+       :style="`--editor-zoom: ${pageEditorZoom}`"
+       contenteditable="true"
+       spellcheck="true"
+       @input="_markEditDirty()"
+       @paste="_onEditPaste($event)"
+       @contextmenu="_onEditContextMenu($event)"
+       @click="_onEditClick($event)"
+       @pointermove="handleMarkPointer($event)"
+       @pointerleave="handleMarkPointerLeave($event)"></div>
+</div>

@@ -122,6 +122,76 @@ test('folder-import: leeres Archiv → failJob mit emptyArchive', async () => {
   assert.match(String(job.error || ''), /emptyArchive/i);
 });
 
+test('folder-import: Datum aus erster Zeile, Filename ohne Datum', async () => {
+  const userEmail = 'tester@test.dev';
+  const book = await contentStore.createBook(
+    { name: 'FirstLine', owner_email: userEmail },
+    { session: { user: { email: userEmail } } },
+  );
+  const { db } = require('../../db/connection');
+  db.prepare(`INSERT OR IGNORE INTO book_access (book_id, user_email, role, granted_at) VALUES (?, ?, 'owner', datetime('now'))`).run(book.id, userEmail);
+
+  // Filenames "tag-a.docx" und "tag-b.docx" tragen kein Datum. Erste Zeile
+  // des Dokuments enthaelt das ISO-Datum.
+  const buffer = await buildArchive([
+    ['2024/01/tag-a.docx', await makeDocx('2024-01-15')],
+    ['2024/02/tag-b.docx', await makeDocx('05.02.2024')],
+  ]);
+
+  const jobId = ctx.shared.createJob(
+    'folder-import', book.id, userEmail,
+    'job.label.folderImport', { name: 'FirstLine' },
+    'merge:' + book.id + ':firstline',
+  );
+  folderImport.importBuffers.set(jobId, { buffer, mode: 'merge', bookName: '', bookId: book.id });
+
+  await folderImport.runFolderImportJob(jobId, {
+    userEmail, mode: 'merge', bookName: '', bookId: book.id,
+  });
+
+  const job = ctx.shared.jobs.get(jobId);
+  assert.equal(job.status, 'done', `Job-Status: ${job.status}, err: ${job.error || '-'}`);
+  assert.equal(job.result.pagesCreated, 2);
+  const pages = await contentStore.listPages(book.id, { session: { user: { email: userEmail } } });
+  const names = pages.map(p => p.name).sort();
+  assert.deepEqual(names, ['2024-01-15', '2024-02-05']);
+});
+
+test('folder-import: AbiWord-Datei (.abw) wird verarbeitet', async () => {
+  const userEmail = 'tester@test.dev';
+  const book = await contentStore.createBook(
+    { name: 'AbwBook', owner_email: userEmail },
+    { session: { user: { email: userEmail } } },
+  );
+  const { db } = require('../../db/connection');
+  db.prepare(`INSERT OR IGNORE INTO book_access (book_id, user_email, role, granted_at) VALUES (?, ?, 'owner', datetime('now'))`).run(book.id, userEmail);
+
+  const abwContent = `<?xml version="1.0"?><abiword><section><p>Hallo aus AbiWord.</p></section></abiword>`;
+  const buffer = await buildArchive([
+    ['2024/03/2024-03-10.abw', Buffer.from(abwContent, 'utf8')],
+  ]);
+
+  const jobId = ctx.shared.createJob(
+    'folder-import', book.id, userEmail,
+    'job.label.folderImport', { name: 'AbwBook' },
+    'merge:' + book.id + ':abw',
+  );
+  folderImport.importBuffers.set(jobId, { buffer, mode: 'merge', bookName: '', bookId: book.id });
+
+  await folderImport.runFolderImportJob(jobId, {
+    userEmail, mode: 'merge', bookName: '', bookId: book.id,
+  });
+
+  const job = ctx.shared.jobs.get(jobId);
+  assert.equal(job.status, 'done');
+  assert.equal(job.result.pagesCreated, 1);
+
+  const pages = await contentStore.listPages(book.id, { session: { user: { email: userEmail } } });
+  assert.equal(pages[0].name, '2024-03-10');
+  const page = await contentStore.loadPage(pages[0].id, { session: { user: { email: userEmail } } });
+  assert.match(page.html, /Hallo aus AbiWord/);
+});
+
 test('folder-import: unbekannte Extension wird skipped', async () => {
   const userEmail = 'tester@test.dev';
   const book = await contentStore.createBook(

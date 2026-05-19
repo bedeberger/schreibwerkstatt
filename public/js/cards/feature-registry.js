@@ -56,7 +56,7 @@ export const FEATURES = [
     aliases: ['download','pdf','epub','html','txt','markdown','md','herunterladen','speichern'] },
   { key: 'pdfExport',      kind: 'toggle', group: 'tools',  labelKey: 'tile.pdfExport',      descKey: 'tile.pdfExport.desc',      flag: 'showPdfExportCard',      toggle: 'togglePdfExportCard',      requiresBook: true, minRole: 'viewer',
     aliases: ['pdf','pdfa','custom','layout','schrift','font','cover','titelbild','print','druck'] },
-  { key: 'folderImport',   kind: 'toggle', group: 'tools',  labelKey: 'tile.folderImport',   descKey: 'tile.folderImport.desc',   flag: 'showFolderImportCard',   toggle: 'toggleFolderImportCard',   minRole: 'viewer',
+  { key: 'folderImport',   kind: 'toggle', group: 'tools',  labelKey: 'tile.folderImport',   descKey: 'tile.folderImport.desc',   flag: 'showFolderImportCard',   toggle: 'toggleFolderImportCard',   minRole: 'editor',
     aliases: ['import','folder','ordner','tagebuch','diary','docx','odt','zip','word','openoffice'] },
   { key: 'bookOrganizer',  kind: 'toggle', group: 'tools',  labelKey: 'tile.bookOrganizer',  descKey: 'tile.bookOrganizer.desc',  flag: 'showBookOrganizerCard', toggle: 'toggleBookOrganizerCard',  requiresBook: true, minRole: 'editor',
     aliases: ['organize','organisieren','sortieren','reorder','umordnen','verschieben','rename','umbenennen','delete','loeschen','create','anlegen','struktur','kapitel','chapter','seiten','pages'] },

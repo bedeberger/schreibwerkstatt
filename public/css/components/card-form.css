@@ -359,7 +359,8 @@ select:focus {
    trotz `.row { align-items: flex-end }`. Margin-top entfernen, sonst sitzt
    Toast in Button-Reihe zu tief. */
 .row > .card-form-saved,
-.card-actions > .card-form-saved {
+.card-actions > .card-form-saved,
+.card-actions > .card-form-error {
   align-self: center;
   margin: 0;
 }

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { detectDate, scoreSample, parseMonthToken } = require('../../lib/import-parsers/date-detect');
+const { detectDate, detectDateInText, firstLineFromHtml, scoreSample, parseMonthToken } = require('../../lib/import-parsers/date-detect');
 
 test('detectDate: YYYY-MM-DD im Filename', () => {
   assert.deepEqual(detectDate('2024-03-05.docx', {}), { iso: '2024-03-05', pattern: 'YYYY-MM-DD' });
@@ -63,6 +63,31 @@ test('scoreSample: 0 bei keinem Treffer', () => {
   ]);
   assert.equal(s.confidence, 0);
   assert.equal(s.pattern, null);
+});
+
+test('firstLineFromHtml: erste nicht-leere Text-Zeile', () => {
+  assert.equal(firstLineFromHtml('<h1>Titel</h1><p>Inhalt</p>'), 'Titel');
+  assert.equal(firstLineFromHtml('<p></p><p>05.03.2024</p><p>Eintrag</p>'), '05.03.2024');
+  assert.equal(firstLineFromHtml('  <p>  &nbsp;  </p><p>Echte Zeile</p>'), 'Echte Zeile');
+  assert.equal(firstLineFromHtml(''), '');
+});
+
+test('detectDateInText: ISO-Datum in erster Zeile', () => {
+  assert.deepEqual(detectDateInText('2024-03-05', {}), { iso: '2024-03-05', pattern: 'YYYY-MM-DD' });
+});
+
+test('detectDateInText: DD.MM.YYYY in erster Zeile', () => {
+  assert.deepEqual(detectDateInText('05.03.2024', {}), { iso: '2024-03-05', pattern: 'DD-MM-YYYY' });
+});
+
+test('detectDateInText: monthname mit Jahr-Kontext', () => {
+  assert.deepEqual(detectDateInText('5. März', { year: 2024 }), { iso: '2024-03-05', pattern: 'DD-monthname' });
+});
+
+test('detectDateInText: ignoriert DD-only (vermeidet "Tag 5" → 5.M.JJJJ Spukfalle)', () => {
+  // detectDateInText soll nur Patterns nehmen, die ein Jahr oder Monatsnamen
+  // enthalten — eine einzelne Zahl ist zu vieldeutig fuer Text.
+  assert.equal(detectDateInText('5', { year: 2024, month: 3 }), null);
 });
 
 test('detectDate: ungültige Datums-Werte zurückweisen', () => {

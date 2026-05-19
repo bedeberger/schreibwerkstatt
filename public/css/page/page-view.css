@@ -134,6 +134,39 @@
   background: var(--color-accent-soft);
   cursor: text;
   max-height: 70vh;
+  font-size: calc(1em * var(--editor-zoom, 1));
+}
+
+/* Edit-Wrap: Toolbar (Zoom + Vollbild) + contenteditable. Toolbar
+   schwebt rechts oben am Wrap-Rand; Buttons reuse .graph-tool-btn-
+   Style (siehe public/css/tokens-est.css). */
+.page-editor-wrap {
+  position: relative;
+}
+.page-editor-toolbar {
+  position: absolute;
+  top: var(--space-xs);
+  right: var(--space-xs);
+  display: flex;
+  gap: var(--space-xs);
+  z-index: 2;
+}
+
+/* Vollbild: Karte als Overlay, Header (Save/Cancel/Status) bleibt sichtbar.
+   CSS-Overlay statt nativer Fullscreen-API, damit die nach <body> teleportierte
+   Bubble-/Slash-Toolbar weiter sichtbar bleibt (native :fullscreen würde nur
+   Karten-Subtree zeigen). Karte scrollt; contenteditable verliert max-height-
+   Cap, damit der gesamte Seiteninhalt ohne nested-scroll lesbar ist. */
+.editor-card--fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  margin: 0;
+  border-radius: 0;
+  overflow: auto;
+}
+.editor-card--fullscreen .page-content-view--editing {
+  max-height: none;
 }
 /* Im Edit-Modus kein text-wrap:pretty/balance — sonst rebalanciert der Browser
    bei jedem Keystroke die letzten Zeilen, Buchstaben hüpfen sichtbar zwischen

@@ -20,6 +20,7 @@ Themen-Spickzettel ausgelagert (Drift-Schutz: CLAUDE.md-Regeln, Details in den S
 - [docs/buchorganizer.md](docs/buchorganizer.md) — Buchorganizer: Slice-Layout, In-Place-Mirror, Undo/Redo-Regeln, DnD-Pitfalls, Pflicht-Mutationssequenz.
 - [docs/graph.md](docs/graph.md) — Figuren-Graph: 3 Modi (Swimlane/Familie/Soziogramm), vis-network-Internals, deterministisches Layout, neuen Beziehungstyp einbinden.
 - [docs/finetuning.md](docs/finetuning.md) — Finetune-Export.
+- [docs/folder-import.md](docs/folder-import.md) — Folder-Import: ZIP mit YYYY/Monat/Tag-Struktur, Kapitel pro Jahr, Date-Detect mit AI-Fallback.
 
 ## Doku-Stil dieser Datei
 

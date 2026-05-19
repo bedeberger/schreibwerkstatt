@@ -7,6 +7,8 @@
   <div class="card-header">
     <span class="card-title" x-text="$app.t('book.settings.title', { name: $app.selectedBookName })"></span>
     <div class="card-actions">
+      <span class="card-form-saved" x-show="bookSettingsSaved" x-cloak x-transition.opacity.duration.250ms x-text="$app.t('common.settingsSaved')"></span>
+      <span class="card-form-error" x-show="bookSettingsError" x-text="bookSettingsError"></span>
       <button type="button" @click="saveBookSettings()" :disabled="bookSettingsSaving || bookSettingsLoading">
         <span x-show="bookSettingsSaving" class="spinner"></span>
         <span x-text="bookSettingsSaving ? $app.t('common.saving') : $app.t('common.save')"></span>
@@ -167,9 +169,6 @@
         </div>
       </div>
     </section>
-
-    <p class="card-form-saved" x-show="bookSettingsSaved" x-cloak x-transition.opacity.duration.250ms x-text="$app.t('common.settingsSaved')"></p>
-    <p class="card-form-error" x-show="bookSettingsError" x-text="bookSettingsError"></p>
 
     <!-- Sharing + Buch-Chat-Opt-In für Lektor. Sichtbar für alle
          Buch-Berechtigten (read-only für nicht-Owner). -->

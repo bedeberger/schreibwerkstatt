@@ -1490,6 +1490,7 @@ Struktur: 8 thematische Subfolder unter [public/css/](public/css/) + Root-Solit√
 | [components/user-chip.css](public/css/components/user-chip.css) | User-Avatar-Chip. |
 | [components/feature-tiles.css](public/css/components/feature-tiles.css) | Palette (Hero/Overlay/Panel/Item), Quick-Pills. |
 | [components/tooltip.css](public/css/components/tooltip.css) | `.tip-layer` / `.tip-bubble` / `.tip-arrow` f√ºr `[data-tip]`. |
+| [components/folder-import.css](public/css/components/folder-import.css) | Folder-Import-Karte (Drop-Zone, Mode-Toggle, Progress, Result). |
 
 ### page/
 | File | Inhalt |

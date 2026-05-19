@@ -5,7 +5,8 @@ import JSZip from 'jszip';
 
 const require = createRequire(import.meta.url);
 const { parseOdt } = require('../../lib/import-parsers/odt');
-const { parseImportFile, extOf } = require('../../lib/import-parsers/dispatch');
+const { parseAbw } = require('../../lib/import-parsers/abw');
+const { parseImportFile, extOf, SUPPORTED_EXTS } = require('../../lib/import-parsers/dispatch');
 
 async function buildOdt(contentXml) {
   const zip = new JSZip();
@@ -92,4 +93,50 @@ test('extOf: lowercase + leer', () => {
 test('parseImportFile: unsupported ext liefert null', async () => {
   const r = await parseImportFile('x.txt', Buffer.from('hi'));
   assert.equal(r, null);
+});
+
+test('SUPPORTED_EXTS: docx + odt + abw', () => {
+  assert.equal(SUPPORTED_EXTS.has('docx'), true);
+  assert.equal(SUPPORTED_EXTS.has('odt'), true);
+  assert.equal(SUPPORTED_EXTS.has('abw'), true);
+  assert.equal(SUPPORTED_EXTS.has('doc'), false);
+  assert.equal(SUPPORTED_EXTS.has('rtf'), false);
+});
+
+test('parseAbw: Heading + Absatz + fetter <c>', async () => {
+  const abw = `<?xml version="1.0"?>
+<abiword version="1.0">
+  <styles>
+    <s type="P" name="Heading 1" props="font-size:18pt"/>
+  </styles>
+  <section>
+    <p style="Heading 1">Titel</p>
+    <p>05.03.2024</p>
+    <p>Erster <c props="font-weight:bold">fetter</c> Absatz.</p>
+  </section>
+</abiword>`;
+  const r = await parseAbw(Buffer.from(abw, 'utf8'));
+  assert.match(r.html, /<h1>Titel<\/h1>/);
+  assert.match(r.html, /<p>05\.03\.2024<\/p>/);
+  assert.match(r.html, /<strong>fetter<\/strong>/);
+});
+
+test('parseAbw: kursiv via font-style:italic', async () => {
+  const abw = `<?xml version="1.0"?>
+<abiword><section>
+  <p>Ein <c props="font-style:italic">kursives</c> Wort.</p>
+</section></abiword>`;
+  const r = await parseAbw(Buffer.from(abw, 'utf8'));
+  assert.match(r.html, /<em>kursives<\/em>/);
+});
+
+test('parseAbw: leeres section liefert Default', async () => {
+  const r = await parseAbw(Buffer.from('<abiword><section></section></abiword>', 'utf8'));
+  assert.equal(r.html, '<p></p>');
+});
+
+test('parseImportFile: .abw wird dispatched', async () => {
+  const abw = `<abiword><section><p>Hallo.</p></section></abiword>`;
+  const r = await parseImportFile('foo.abw', Buffer.from(abw, 'utf8'));
+  assert.match(r.html, /<p>Hallo\.<\/p>/);
 });

@@ -242,6 +242,7 @@ export const editorEditMethods = {
     this.editDirty = false;
     this.editSaving = false;
     this.saveOffline = false;
+    this.pageEditorFullscreen = false;
     this.pendingDraft = null;
     this.closeSynonymMenu?.();
     this.closeSynonymPicker?.();
@@ -344,6 +345,7 @@ export const editorEditMethods = {
         this._stopPresenceHeartbeat?.();
         this._releaseEditLock?.(this.currentPage?.id);
         this.editMode = false;
+        this.pageEditorFullscreen = false;
         this.closeSynonymMenu?.();
         this.closeSynonymPicker?.();
         this.setStatus(this.t('edit.changesSaved'), false, 5000);
@@ -637,6 +639,22 @@ export const editorEditMethods = {
     this._findingMarkEl = el;
     this._findingMarkTimer = () => { if (timer) { clearTimeout(timer); timer = null; } };
     this._findingMarkUnwrap = unwrapStale;
+  },
+
+  togglePageEditorFullscreen() {
+    this.pageEditorFullscreen = !this.pageEditorFullscreen;
+  },
+
+  pageEditorZoomIn() {
+    this.pageEditorZoom = Math.min(2.5, Math.round((this.pageEditorZoom + 0.1) * 100) / 100);
+  },
+
+  pageEditorZoomOut() {
+    this.pageEditorZoom = Math.max(0.7, Math.round((this.pageEditorZoom - 0.1) * 100) / 100);
+  },
+
+  pageEditorZoomReset() {
+    this.pageEditorZoom = 1;
   },
 
   _uninstallFindingMarkWatcher() {

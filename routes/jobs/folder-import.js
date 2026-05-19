@@ -14,8 +14,8 @@ const {
   aiCall, getPrompts, jobs, createJob, enqueueJob, findActiveJobId,
 } = require('./shared');
 const contentStore = require('../../lib/content-store');
-const { detectDate, scoreSample } = require('../../lib/import-parsers/date-detect');
-const { parseImportFile, extOf } = require('../../lib/import-parsers/dispatch');
+const { detectDate, detectDateInText, firstLineFromHtml, scoreSample } = require('../../lib/import-parsers/date-detect');
+const { parseImportFile, extOf, SUPPORTED_EXTS } = require('../../lib/import-parsers/dispatch');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
 const { resolveProvider } = require('../../lib/ai');
@@ -98,7 +98,7 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
         return;
       }
       const ext = extOf(parsed.file);
-      if (ext !== 'docx' && ext !== 'odt') {
+      if (!SUPPORTED_EXTS.has(ext)) {
         skipped.push({ path: relativePath, reason: 'UNSUPPORTED_EXT' });
         return;
       }
@@ -155,28 +155,79 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
       }
     }
 
-    // Pro Datei Datum bestimmen
+    // Pro Datei: Datum aus Filename → erste Zeile (nach Parse) → AI-Map.
+    // Parse passiert HIER (nicht spaeter), damit Fallback-Quelle "erste
+    // Dokumentzeile" verfuegbar ist. HTML + Warnings werden mit-gespeichert,
+    // damit createPage spaeter nicht erneut parst.
+    updateJob(jobId, { progress: 25, statusText: 'job.folder-import.parsing', statusParams: { file: '', current: 0, total: files.length } });
     const enriched = [];
+    const warningsCollected = [];
+    let parseCount = 0;
     for (const f of files) {
+      parseCount += 1;
       const month = _monthFromRaw(f.monthRaw);
       const ctx = { year: f.year, month };
       let isoDate = null;
+      let dateSource = null;
+
       const ruleResult = detectDate(f.file, ctx);
-      if (ruleResult) isoDate = ruleResult.iso;
+      if (ruleResult) { isoDate = ruleResult.iso; dateSource = 'filename'; }
+
+      // Datei jetzt parsen — entweder fuer Date-Fallback oder fuer
+      // spaeteren Page-Insert.
+      let buf;
+      try {
+        buf = await f.zipEntry.async('nodebuffer');
+      } catch (e) {
+        skipped.push({ path: f.relativePath, reason: 'ZIP_READ_FAILED' });
+        continue;
+      }
+      if (buf.length > MAX_FILE_BYTES) {
+        skipped.push({ path: f.relativePath, reason: 'FILE_TOO_LARGE' });
+        continue;
+      }
+      let parsed;
+      try {
+        parsed = await parseImportFile(f.file, buf);
+      } catch (e) {
+        log.warn(`Parse fail ${f.relativePath}: ${e.message}`);
+        skipped.push({ path: f.relativePath, reason: 'PARSE_FAILED' });
+        continue;
+      }
+      if (!parsed) {
+        skipped.push({ path: f.relativePath, reason: 'UNSUPPORTED_EXT' });
+        continue;
+      }
+
+      // Fallback: erste Text-Zeile pruefen
+      if (!isoDate) {
+        const firstLine = firstLineFromHtml(parsed.html);
+        const textResult = detectDateInText(firstLine, ctx);
+        if (textResult) { isoDate = textResult.iso; dateSource = 'first-line'; }
+      }
+
+      // Fallback: AI-Map
       if (!isoDate && aiDateMap) {
         const aiIso = aiDateMap.get(f.fullPath);
-        if (aiIso) isoDate = aiIso;
+        if (aiIso) { isoDate = aiIso; dateSource = 'ai'; }
       }
+
       if (!isoDate) {
         skipped.push({ path: f.relativePath, reason: 'NO_DATE' });
         continue;
       }
-      enriched.push({ ...f, isoDate });
+
+      if (parsed.warnings?.length) {
+        warningsCollected.push({ path: f.relativePath, items: parsed.warnings });
+      }
+      enriched.push({ ...f, isoDate, dateSource, html: parsed.html });
     }
 
     if (!enriched.length) {
       throw i18nError('job.error.noDatesFound');
     }
+
+    log.info(`date-detect breakdown: filename=${enriched.filter(e => e.dateSource === 'filename').length}, first-line=${enriched.filter(e => e.dateSource === 'first-line').length}, ai=${enriched.filter(e => e.dateSource === 'ai').length}`);
 
     // Sortieren chronologisch
     enriched.sort((a, b) => a.isoDate.localeCompare(b.isoDate));
@@ -204,11 +255,10 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
       }
     }
 
-    // Pages anlegen
+    // Pages anlegen (HTML stammt aus Enrichment-Pass)
     const total = enriched.length;
     let current = 0;
     const dateSeen = new Map(); // iso -> count (fuer Duplikat-Suffix)
-    const warnings = [];
     let pagesCreated = 0;
 
     for (const f of enriched) {
@@ -216,7 +266,7 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
       const progress = 30 + Math.round(65 * (current / total));
       updateJob(jobId, {
         progress,
-        statusText: 'job.folder-import.parsing',
+        statusText: 'job.folder-import.creating',
         statusParams: { file: f.relativePath, current, total },
       });
 
@@ -232,34 +282,6 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
         log.info(`Chapter angelegt: ${f.year} (id=${chapterId})`);
       }
 
-      // Parse
-      let buf;
-      try {
-        buf = await f.zipEntry.async('nodebuffer');
-      } catch (e) {
-        skipped.push({ path: f.relativePath, reason: 'ZIP_READ_FAILED' });
-        continue;
-      }
-      if (buf.length > MAX_FILE_BYTES) {
-        skipped.push({ path: f.relativePath, reason: 'FILE_TOO_LARGE' });
-        continue;
-      }
-      let parsed;
-      try {
-        parsed = await parseImportFile(f.file, buf);
-      } catch (e) {
-        log.warn(`Parse fail ${f.relativePath}: ${e.message}`);
-        skipped.push({ path: f.relativePath, reason: 'PARSE_FAILED' });
-        continue;
-      }
-      if (!parsed) {
-        skipped.push({ path: f.relativePath, reason: 'UNSUPPORTED_EXT' });
-        continue;
-      }
-      if (parsed.warnings?.length) {
-        warnings.push({ path: f.relativePath, items: parsed.warnings });
-      }
-
       // Name: ISO-Date, bei Duplikat Suffix
       const count = dateSeen.get(f.isoDate) || 0;
       dateSeen.set(f.isoDate, count + 1);
@@ -271,7 +293,7 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
             book_id: effBookId,
             chapter_id: chapterId,
             name: pageName,
-            html: parsed.html,
+            html: f.html,
           },
           { session: { user: { email: userEmail } } },
         );
@@ -289,7 +311,7 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
       pagesCreated,
       chaptersCreated: chapterByYear.size,
       skipped,
-      warnings,
+      warnings: warningsCollected,
     });
   } catch (e) {
     if (e?.name !== 'AbortError') log.error(`folder-import job ${jobId}: ${e.message}`, { stack: e.stack });

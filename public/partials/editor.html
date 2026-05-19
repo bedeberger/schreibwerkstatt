@@ -1,5 +1,8 @@
 <!-- Seiteneditor & Lektorat -->
-<div class="card" id="editor-card" x-show="showEditorCard" x-cloak>
+<div class="card" id="editor-card"
+     x-show="showEditorCard" x-cloak
+     :class="{ 'editor-card--fullscreen': pageEditorFullscreen }"
+     @keydown.escape.window="pageEditorFullscreen && togglePageEditorFullscreen()">
   <div class="card-header card-header--subline">
     <div class="card-header-titlebar">
       <span class="card-title" x-text="t('editor.title', { name: currentPage?.name || '–' })"></span>
