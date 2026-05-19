@@ -403,3 +403,81 @@ test('dynamicTypewriterThreshold: ohne window/getComputedStyle → fallback', ()
   assert.equal(dynamicTypewriterThreshold(null, 16), 16);
   assert.equal(dynamicTypewriterThreshold(undefined, 21), 21);
 });
+
+// --- jumpToTrailingParagraph -----------------------------------------------
+
+// Stub-DOM: minimal, document.createElement/createRange/getSelection.
+// dom-blocks.js wird hier separat geladen (nicht via focus.js-Facade), damit
+// Globals vor dem Import gesetzt sind.
+function installStubDocument() {
+  function mkNode(tagName) {
+    const node = {
+      tagName: tagName ? tagName.toUpperCase() : null,
+      nodeType: 1,
+      childNodes: [],
+      get lastElementChild() {
+        return this.childNodes.filter(n => n.nodeType === 1).at(-1) || null;
+      },
+      hasChildNodes() { return this.childNodes.length > 0; },
+      appendChild(child) {
+        this.childNodes.push(child);
+        child.parentNode = this;
+        return child;
+      },
+      get textContent() {
+        return this.childNodes.map(c => c.textContent || '').join('');
+      },
+      scrollIntoView() {},
+    };
+    return node;
+  }
+  const sel = {
+    _range: null,
+    rangeCount: 0,
+    getRangeAt() { return null; },
+    removeAllRanges() { this._range = null; },
+    addRange(r) { this._range = r; this.rangeCount = 1; },
+  };
+  globalThis.document = {
+    createElement: (tag) => mkNode(tag),
+    createRange: () => ({ _start: null, setStart(n, o) { this._start = [n, o]; }, collapse() {} }),
+    getSelection: () => sel,
+  };
+  return { mkNode, sel };
+}
+
+const { mkNode } = installStubDocument();
+const { jumpToTrailingParagraph } = await import('../../public/js/editor/focus/dom-blocks.js');
+
+test('jumpToTrailingParagraph: leeres <p> ohne Kinder bekommt <br> (neue-Seite-Bug)', () => {
+  // Frisch erstellte Seite startet mit `<p></p>` ohne Text-Node/BR. Caret
+  // an Offset 0 in element-node ohne Kinder empfängt keine input-Events →
+  // User kann nicht tippen. jumpToTrailingParagraph muss <br> ergänzen.
+  const container = mkNode('div');
+  const emptyP = mkNode('p');
+  container.appendChild(emptyP);
+  const added = jumpToTrailingParagraph(container);
+  assert.equal(added, null, 'leeres <p> recycled, nicht neu angehängt');
+  assert.equal(emptyP.childNodes.length, 1, '<br> als Schreib-Slot ergänzt');
+  assert.equal(emptyP.childNodes[0].tagName, 'BR');
+});
+
+test('jumpToTrailingParagraph: leeres <p> mit <br> bleibt unverändert', () => {
+  const container = mkNode('div');
+  const p = mkNode('p');
+  p.appendChild(mkNode('br'));
+  container.appendChild(p);
+  jumpToTrailingParagraph(container);
+  assert.equal(p.childNodes.length, 1, 'kein doppeltes <br>');
+});
+
+test('jumpToTrailingParagraph: kein leerer Trailing-Block → neuer <p><br>', () => {
+  const container = mkNode('div');
+  const p = mkNode('p');
+  p.appendChild({ nodeType: 3, textContent: 'lorem' });
+  container.appendChild(p);
+  const added = jumpToTrailingParagraph(container);
+  assert.ok(added, 'neuer <p> wurde angehängt');
+  assert.equal(added.tagName, 'P');
+  assert.equal(added.childNodes[0].tagName, 'BR');
+});

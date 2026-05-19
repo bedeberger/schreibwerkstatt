@@ -160,7 +160,7 @@
 
 /* === Figure Context Panel === */
 .figure-context-panel {
-  margin: var(--space-md) 0 0;
+  margin: var(--space-md) 0;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-bg);

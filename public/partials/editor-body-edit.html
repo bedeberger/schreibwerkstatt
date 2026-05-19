@@ -46,6 +46,8 @@
        :style="`--editor-zoom: ${pageEditorZoom}`"
        contenteditable="true"
        spellcheck="true"
+       autocorrect="off"
+       autocapitalize="off"
        @input="_markEditDirty()"
        @paste="_onEditPaste($event)"
        @contextmenu="_onEditContextMenu($event)"

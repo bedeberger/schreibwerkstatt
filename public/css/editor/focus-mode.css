@@ -66,9 +66,14 @@ body.focus-mode #editor-card .editor-preview-wrap {
 }
 /* Die Partial-Hosts liegen zwischen .editor-preview-wrap und .page-content-view;
    display:contents lässt sie aus der Box-Kette verschwinden, damit der Scroll-
-   Container (page-content-view) direkt vom Flex-Parent eine Höhe bekommt. */
-#partial-editor-body-edit,
-#partial-editor-body-view { display: contents; }
+   Container (page-content-view) direkt vom Flex-Parent eine Höhe bekommt.
+   Gilt auch für `.page-editor-wrap` (Toolbar + contenteditable-Wrapper) — die
+   Editor-Toolbar (Zoom/Fullscreen) ist im Fokus-Modus redundant und wird
+   ausgeblendet, der Wrap aus der Box-Kette gelöst. */
+body.focus-mode #partial-editor-body-edit,
+body.focus-mode #partial-editor-body-view,
+body.focus-mode .page-editor-wrap { display: contents; }
+body.focus-mode .page-editor-toolbar { display: none; }
 
 body.focus-mode :is(.page-content-view, .page-content-view--editing) {
   /* overflow-anchor aus: Chrome's Scroll-Anchoring verschiebt den Scrollpunkt

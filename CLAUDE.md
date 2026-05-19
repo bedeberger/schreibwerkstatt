@@ -23,6 +23,10 @@ Themen-Spickzettel ausgelagert (Drift-Schutz: CLAUDE.md-Regeln, Details in den S
 - [docs/folder-import.md](docs/folder-import.md) — Folder-Import: ZIP mit YYYY/Monat/Tag-Struktur, Kapitel pro Jahr, Date-Detect mit AI-Fallback.
 - [docs/chapter-hierarchy.md](docs/chapter-hierarchy.md) — Kapitel-Hierarchie (max 3 Ebenen): Schema (`parent_chapter_id`), SSoT-Tree, Organizer-DnD/Tab-Indent, Sidebar-Indent, Kapitel-Review inkl. Sub-Kapitel, PDF/Export-Builder Depth-Mapping, Pflicht-Invarianten.
 
+## Feature-Pläne
+
+Neue grössere Features werden vor Implementierung als Plan unter [docs/ideen/](docs/ideen/) festgehalten — Skelett: [docs/ideen/_template.md](docs/ideen/_template.md) (verbindliche Sektionsreihenfolge: Header mit Status/Aufwand/Severity, Context, Scope MVP, Out-of-Scope, Done when, Hard-Rule-Audit, Abhängigkeiten, Backend, Frontend, CSS, i18n, DB, Security, Telemetrie, Reversibilität, Tests, Edge-Cases, Kritische Dateien Modify/Create, Offene Fragen). Plan kopieren, Status `Draft` → `Ready` erst wenn „Offene Fragen" leer. Optionale Sektionen als `n/a` markieren statt entfernen (Drift sichtbar).
+
 ## Doku-Stil dieser Datei
 
 CLAUDE.md beschreibt **ausschliesslich den aktuellen Stand**. Keine Historie, keine Migrationsanleitungen, keine „statt X" / „ersetzt Y" / „alte Variante" / „vorher war …" / „Bug-Symptom"-Erzählungen mit konkreten Symptom-Werten. Wer wissen will, was früher anders war, liest `git log`/`git blame`. Beim Refactor: alten Pfad ersatzlos aus der Datei entfernen, nicht als „migriert von" mitschleppen. **Why:**/**Begründungen** für aktuelle Constraints und Invarianten bleiben — sie erklären den aktuellen Code; Bug-Narrative aber nicht.

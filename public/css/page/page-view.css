@@ -144,19 +144,20 @@
   max-width: none;
 }
 
-/* Edit-Wrap: Toolbar (Zoom + Vollbild) + contenteditable. Toolbar
-   schwebt rechts oben am Wrap-Rand; Buttons reuse .graph-tool-btn-
-   Style (siehe public/css/tokens-est.css). */
+/* Edit-Wrap: Toolbar (Zoom + Vollbild) + contenteditable. Toolbar als
+   eigene Row über dem contenteditable, rechts ausgerichtet — bleibt im
+   Flow, damit Geschwister wie `.figure-context-panel` nicht überlagert
+   werden. Buttons reuse .graph-tool-btn-Style (siehe tokens-est.css). */
 .page-editor-wrap {
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 .page-editor-toolbar {
-  position: absolute;
-  top: calc(-1 * var(--space-2xl));
-  right: var(--space-xs);
+  align-self: flex-end;
   display: flex;
   gap: var(--space-xs);
-  z-index: 2;
+  margin-bottom: var(--space-xs);
 }
 
 /* Vollbild: Karte als Overlay, Header (Save/Cancel/Status) bleibt sichtbar.

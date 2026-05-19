@@ -30,6 +30,11 @@ export function jumpToTrailingParagraph(container) {
   let added = null;
   if (isEmptyParagraph(last)) {
     target = last;
+    // Frisch-erzeugte Seiten landen als `<p></p>` ohne Kinder. Eine Selection
+    // mit Offset 0 in einem element-node ohne Text/BR empfängt keine
+    // `beforeinput`/`input`-Events → User kann nicht tippen. `<br>` als
+    // Schreib-Slot ergänzen (analog zum frisch erzeugten <p> unten).
+    if (!target.hasChildNodes()) target.appendChild(document.createElement('br'));
   } else {
     const p = document.createElement('p');
     p.appendChild(document.createElement('br'));
