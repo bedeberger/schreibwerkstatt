@@ -47,15 +47,25 @@ export function registerBookSettingsCard() {
     bookHistoryResetError: '',
     bookDeleteLoading: false,
     bookDeleteError: '',
+    // Blog-Sync (WordPress).
+    blogConnection: null,
+    blogForm: { baseUrl: '', username: '', password: '', defaultStatus: 'draft' },
+    blogBusy: false,
+    blogAction: null,
+    blogMessage: '',
+    blogError: '',
+    blogImportJobId: null,
+    blogPullJobId: null,
     _savedAtTimer: null,
     _resetMsgTimer: null,
     _lifecycle: null,
+    _onBlogJobFinished: null,
 
     init() {
       this._lifecycle = setupCardLifecycle(this, {
         showFlag: 'showBookSettingsCard',
-        onShow: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats(), this.loadBookAccess(), this.loadBookCategoriesAndTags(), this.loadShareUserPool()]),
-        load: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats(), this.loadBookAccess(), this.loadBookCategoriesAndTags(), this.loadShareUserPool()]),
+        onShow: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats(), this.loadBookAccess(), this.loadBookCategoriesAndTags(), this.loadShareUserPool(), this.loadBlogStatus()]),
+        load: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats(), this.loadBookAccess(), this.loadBookCategoriesAndTags(), this.loadShareUserPool(), this.loadBlogStatus()]),
         resetState: {
           expandedJobType: null,
           bookJobRuns: {},
@@ -69,6 +79,13 @@ export function registerBookSettingsCard() {
           bookCategoryId: '',
           bookTagIds: [],
           newTagName: '',
+          blogConnection: null,
+          blogForm: { baseUrl: '', username: '', password: '', defaultStatus: 'draft' },
+          blogBusy: false,
+          blogMessage: '',
+          blogError: '',
+          blogImportJobId: null,
+          blogPullJobId: null,
         },
         resetStateView: {
           bookSettingsSaved: false,
@@ -77,13 +94,29 @@ export function registerBookSettingsCard() {
           bookHistoryResetError: '',
           bookDeleteError: '',
           bookAccessError: '',
+          blogMessage: '',
+          blogError: '',
         },
       });
+
+      // Blog-Sync: bei Job-Ende Status nachladen, lokale Job-IDs nullen.
+      this._onBlogJobFinished = (ev) => {
+        const t = ev?.detail?.type;
+        if (t !== 'blog-import' && t !== 'blog-pull' && t !== 'blog-push') return;
+        if (ev.detail.jobId === this.blogImportJobId) this.blogImportJobId = null;
+        if (ev.detail.jobId === this.blogPullJobId)   this.blogPullJobId   = null;
+        this.loadBlogStatus();
+      };
+      window.addEventListener('job:finished', this._onBlogJobFinished);
     },
 
     destroy() {
       if (this._savedAtTimer) { clearTimeout(this._savedAtTimer); this._savedAtTimer = null; }
       if (this._resetMsgTimer) { clearTimeout(this._resetMsgTimer); this._resetMsgTimer = null; }
+      if (this._onBlogJobFinished) {
+        window.removeEventListener('job:finished', this._onBlogJobFinished);
+        this._onBlogJobFinished = null;
+      }
       this._lifecycle?.destroy();
     },
 

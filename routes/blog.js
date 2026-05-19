@@ -78,14 +78,23 @@ router.post('/:book_id/connect', aclParamGuard('editor'), jsonBody, async (req, 
   catch (e) {
     return res.status(400).json({ error_code: e.code || 'BLOG_INVALID_URL' });
   }
-  if (!username || !password) {
+  if (!username) {
     return res.status(400).json({ error_code: 'BLOG_CREDENTIALS_REQUIRED' });
   }
   if (!['draft', 'publish', 'private'].includes(defaultStatus)) {
     return res.status(400).json({ error_code: 'BLOG_INVALID_STATUS' });
   }
+  // Reuse stored password wenn Client `__keep__` schickt und Connection existiert.
+  // Schutz: PW darf nie an Client zurueck und der bestehende verschlüsselte
+  // Wert wird ueber db/blogs.js entschluesselt.
+  let effectivePw = password;
+  if ((!password || password === '__keep__')) {
+    const existing = blogs.getConnection(bookId);
+    if (existing) effectivePw = existing.password;
+  }
+  if (!effectivePw) return res.status(400).json({ error_code: 'BLOG_CREDENTIALS_REQUIRED' });
   try {
-    const wp = createWpClient({ baseUrl: url, username, password });
+    const wp = createWpClient({ baseUrl: url, username, password: effectivePw });
     const me = await wp.me();
     const canEdit = !!(me && me.capabilities && me.capabilities.edit_posts);
     if (!canEdit) {
@@ -96,7 +105,7 @@ router.post('/:book_id/connect', aclParamGuard('editor'), jsonBody, async (req, 
     return res.status(code === 'BLOG_AUTH_FAILED' ? 401 : 502).json({ error_code: code });
   }
   const conn = blogs.upsertConnection({
-    bookId, baseUrl: url, username, password, defaultStatus,
+    bookId, baseUrl: url, username, password: effectivePw, defaultStatus,
   });
   return res.json({ ok: true, connection: conn });
 });

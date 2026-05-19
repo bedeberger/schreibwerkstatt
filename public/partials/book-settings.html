@@ -270,6 +270,116 @@
       </div>
     </section>
 
+    <section class="book-settings-section" x-show="bookSettingsBuchtyp === 'blog'" x-cloak>
+      <h3 class="book-settings-section-title" x-text="$app.t('blog.connect.title')"></h3>
+
+      <div class="card-form-row" x-show="blogConnection">
+        <label class="card-form-label" x-text="$app.t('blog.status.title')"></label>
+        <div class="blog-status-panel">
+          <div class="blog-status-row">
+            <span class="blog-status-label" x-text="$app.t('blog.status.url')"></span>
+            <span class="blog-status-value" x-text="blogConnection?.baseUrl"></span>
+          </div>
+          <div class="blog-status-row">
+            <span class="blog-status-label" x-text="$app.t('blog.status.user')"></span>
+            <span class="blog-status-value" x-text="blogConnection?.username"></span>
+          </div>
+          <div class="blog-status-row">
+            <span class="blog-status-label" x-text="$app.t('blog.status.imported')"></span>
+            <span class="blog-status-value">
+              <template x-if="blogConnection?.initialImportDoneAt">
+                <span x-text="$app.formatLastRun(blogConnection.initialImportDoneAt)"></span>
+              </template>
+              <template x-if="!blogConnection?.initialImportDoneAt">
+                <span class="muted" x-text="$app.t('blog.status.notImported')"></span>
+              </template>
+            </span>
+          </div>
+          <div class="blog-status-row">
+            <span class="blog-status-label" x-text="$app.t('blog.status.lastPull')"></span>
+            <span class="blog-status-value" x-text="blogConnection?.lastPullAt ? $app.formatLastRun(blogConnection.lastPullAt) : '—'"></span>
+          </div>
+          <div class="blog-status-row">
+            <span class="blog-status-label" x-text="$app.t('blog.status.lastPush')"></span>
+            <span class="blog-status-value" x-text="blogConnection?.lastPushAt ? $app.formatLastRun(blogConnection.lastPushAt) : '—'"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('blog.connect.url')"></label>
+        <input type="url" class="card-form-input"
+               x-model="blogForm.baseUrl"
+               :placeholder="'https://blog.example.com'"
+               :disabled="blogBusy">
+      </div>
+
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('blog.connect.user')"></label>
+        <input type="text" class="card-form-input"
+               x-model="blogForm.username"
+               autocomplete="username"
+               :disabled="blogBusy">
+      </div>
+
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('blog.connect.password')"></label>
+        <input type="password" class="card-form-input"
+               x-model="blogForm.password"
+               autocomplete="current-password"
+               :placeholder="blogConnection ? $app.t('blog.connect.passwordReplace') : ''"
+               :disabled="blogBusy">
+      </div>
+
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('blog.connect.defaultStatus')"></label>
+        <div x-data="combobox($app.t('blog.connect.defaultStatus'))"
+             x-modelable="value" x-model="blogForm.defaultStatus"
+             x-effect="options = blogStatusOptions()"></div>
+      </div>
+
+      <div class="card-form-row card-form-row--top">
+        <span class="card-form-label"></span>
+        <div class="blog-actions">
+          <button type="button"
+                  @click="testBlogConnection()"
+                  :disabled="blogBusy || !blogFormReady()">
+            <span x-show="blogBusy && blogAction === 'test'" class="spinner"></span>
+            <span x-text="$app.t('blog.connect.test')"></span>
+          </button>
+          <button type="button"
+                  @click="saveBlogConnection()"
+                  :disabled="blogBusy || !blogFormReady()">
+            <span x-show="blogBusy && blogAction === 'save'" class="spinner"></span>
+            <span x-text="blogConnection ? $app.t('blog.connect.update') : $app.t('blog.connect.save')"></span>
+          </button>
+          <button type="button" class="btn-compact"
+                  x-show="blogConnection && !blogConnection.initialImportDoneAt"
+                  @click="startBlogImport()"
+                  :disabled="blogBusy || blogImportJobId">
+            <span x-show="blogImportJobId" class="spinner"></span>
+            <span x-text="$app.t('blog.action.import')"></span>
+          </button>
+          <button type="button" class="btn-compact"
+                  x-show="blogConnection?.initialImportDoneAt"
+                  @click="startBlogPull()"
+                  :disabled="blogBusy || blogPullJobId">
+            <span x-show="blogPullJobId" class="spinner"></span>
+            <span x-text="$app.t('blog.action.pull')"></span>
+          </button>
+          <button type="button" class="book-settings-btn-danger"
+                  x-show="blogConnection"
+                  @click="disconnectBlog()"
+                  :disabled="blogBusy">
+            <span x-text="$app.t('blog.connect.disconnect')"></span>
+          </button>
+        </div>
+      </div>
+
+      <p class="card-form-saved" x-show="blogMessage" x-cloak x-transition.opacity.duration.250ms x-text="blogMessage"></p>
+      <p class="card-form-error" x-show="blogError" x-text="blogError"></p>
+    </section>
+
     <div class="book-settings-danger-zone">
       <div class="book-settings-danger-title">
         <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=635#alert-triangle"/></svg>

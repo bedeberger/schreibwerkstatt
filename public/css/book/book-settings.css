@@ -329,3 +329,26 @@
   align-items: center;
 }
 .book-tags-new input { flex: 1; min-width: 0; }
+
+/* Blog-Sync-Tab (WordPress-Verbindung) */
+.blog-status-panel {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: var(--space-3);
+  row-gap: var(--space-1);
+  padding: var(--space-3);
+  border: 0.5px solid var(--color-border);
+  border-left: 3px solid var(--card-accent-blog);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  font-size: var(--font-size-sm);
+}
+.blog-status-row { display: contents; }
+.blog-status-label { color: var(--color-muted); }
+.blog-status-value { color: var(--color-text); word-break: break-all; }
+.blog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
