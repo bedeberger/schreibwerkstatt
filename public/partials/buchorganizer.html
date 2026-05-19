@@ -84,13 +84,21 @@
                   :data-tip="$app.blogStatusLabel($app.blogStatusFor(page))"
                   x-text="$app.blogStatusLabel($app.blogStatusFor(page))"></span>
           </template>
-          <template x-if="$app.canBlogPush(page)">
+          <template x-if="$app.canBlogPush(page) || $app.blogPushBusy[page.id]">
             <button type="button" class="btn-compact organizer-blog-push"
                     @click="$app.pushPageToBlog(page.id)"
                     :disabled="!!$app.blogPushBusy[page.id]"
                     :data-tip="$app.t('blog.action.push')"
                     :aria-label="$app.t('blog.action.push')">
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=635#arrow-up"/></svg>
+              <template x-if="!$app.blogPushBusy[page.id]">
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=635#arrow-up"/></svg>
+              </template>
+              <template x-if="$app.blogPushBusy[page.id]">
+                <span class="display-contents">
+                  <span class="spinner" aria-hidden="true"></span>
+                  <span class="organizer-blog-push-pct" x-text="($app.blogPushProgress[page.id] || 0) + '%'"></span>
+                </span>
+              </template>
             </button>
           </template>
           <template x-if="$app.blogStatusFor(page) === 'conflict'">
@@ -174,13 +182,21 @@
                       :data-tip="$app.blogStatusLabel($app.blogStatusFor(page))"
                       x-text="$app.blogStatusLabel($app.blogStatusFor(page))"></span>
               </template>
-              <template x-if="$app.canBlogPush(page)">
+              <template x-if="$app.canBlogPush(page) || $app.blogPushBusy[page.id]">
                 <button type="button" class="btn-compact organizer-blog-push"
                         @click="$app.pushPageToBlog(page.id)"
                         :disabled="!!$app.blogPushBusy[page.id]"
                         :data-tip="$app.t('blog.action.push')"
                         :aria-label="$app.t('blog.action.push')">
-                  <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=635#arrow-up"/></svg>
+                  <template x-if="!$app.blogPushBusy[page.id]">
+                    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=635#arrow-up"/></svg>
+                  </template>
+                  <template x-if="$app.blogPushBusy[page.id]">
+                    <span class="display-contents">
+                      <span class="spinner" aria-hidden="true"></span>
+                      <span class="organizer-blog-push-pct" x-text="($app.blogPushProgress[page.id] || 0) + '%'"></span>
+                    </span>
+                  </template>
                 </button>
               </template>
               <template x-if="$app.blogStatusFor(page) === 'conflict'">

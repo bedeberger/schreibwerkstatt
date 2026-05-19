@@ -28,13 +28,21 @@
                 :data-tip="blogStatusLabel(blogStatusFor(currentPage))"
                 x-text="blogStatusLabel(blogStatusFor(currentPage))"></span>
         </template>
-        <template x-if="canBlogPush(currentPage)">
+        <template x-if="canBlogPush(currentPage) || blogPushBusy[currentPage?.id]">
           <button type="button" class="btn-compact editor-blog-push"
                   @click="pushPageToBlog(currentPage.id)"
                   :disabled="!!blogPushBusy[currentPage.id]"
                   :data-tip="t('blog.action.push')"
                   :aria-label="t('blog.action.push')">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=635#arrow-up"/></svg>
+            <template x-if="!blogPushBusy[currentPage?.id]">
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=635#arrow-up"/></svg>
+            </template>
+            <template x-if="blogPushBusy[currentPage?.id]">
+              <span class="display-contents">
+                <span class="spinner" aria-hidden="true"></span>
+                <span class="editor-blog-push-pct" x-text="(blogPushProgress[currentPage.id] || 0) + '%'"></span>
+              </span>
+            </template>
           </button>
         </template>
         <template x-if="blogStatusFor(currentPage) === 'conflict'">

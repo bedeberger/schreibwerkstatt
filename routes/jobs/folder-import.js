@@ -267,6 +267,47 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
     // Sortieren chronologisch
     enriched.sort((a, b) => a.isoDate.localeCompare(b.isoDate));
 
+    // Kollisions-Resolve fuer echte Datums-Quellen: zwei Files auf gleichen Tag
+    // wuerden sonst beide den nackten ISO-Namen tragen (mit "(2)"-Suffix). Wir
+    // versuchen: (A) Thema aus jedem File extrahieren und `YYYY-MM-DD <Thema>`
+    // setzen. (B) wo kein Thema ableitbar ist, HTML in den ersten Tageseintrag
+    // mergen — Tagebuch-Semantik: ein Tag = ein Eintrag, kein Datenverlust.
+    const REAL_DATE_SOURCES = new Set(['filename', 'first-line', 'ai', 'mtime']);
+    const mergedAway = new Set();
+    const byDate = new Map();
+    for (const f of enriched) {
+      if (!REAL_DATE_SOURCES.has(f.dateSource)) continue;
+      if (!byDate.has(f.isoDate)) byDate.set(f.isoDate, []);
+      byDate.get(f.isoDate).push(f);
+    }
+    for (const [iso, group] of byDate) {
+      if (group.length < 2) continue;
+      const annotated = group.map(f => ({ f, thema: extractTitle(f.html, f.file) }));
+      const themaful = annotated.filter(x => x.thema);
+      const themaless = annotated.filter(x => !x.thema);
+      if (themaless.length === group.length) {
+        // Alle ohne Thema → in ersten Eintrag mergen
+        const [first, ...rest] = group;
+        const parts = [first.html, ...rest.map(r => r.html)];
+        first.html = parts.join('\n<hr class="day-merge">\n');
+        for (const r of rest) mergedAway.add(r);
+        log.info(`day-merge ${iso}: ${rest.length + 1} Files ohne Thema zusammengefasst`);
+      } else if (themaless.length === 0) {
+        // Alle mit Thema → jeden umbenennen
+        for (const { f, thema } of annotated) f._resolvedName = `${iso} ${thema}`;
+      } else {
+        // Mixed: themaful umbenennen, themaless ins erste themaful-Target mergen
+        const target = themaful[0].f;
+        for (const { f, thema } of themaful) f._resolvedName = `${iso} ${thema}`;
+        for (const { f } of themaless) {
+          target.html = `${target.html}\n<hr class="day-merge">\n${f.html}`;
+          mergedAway.add(f);
+        }
+        log.info(`day-merge ${iso}: ${themaless.length} themalose Files in «${target._resolvedName}» integriert`);
+      }
+    }
+    const resolved = enriched.filter(f => !mergedAway.has(f));
+
     // Buch sicherstellen
     let effBookId = bookId;
     if (mode === 'new-book') {
@@ -306,12 +347,12 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
     }
 
     // Pages anlegen (HTML stammt aus Enrichment-Pass)
-    const total = enriched.length;
+    const total = resolved.length;
     let current = 0;
     const dateSeen = new Map(); // iso -> count (fuer Duplikat-Suffix)
     let pagesCreated = 0;
 
-    for (const f of enriched) {
+    for (const f of resolved) {
       current += 1;
       const progress = 30 + Math.round(65 * (current / total));
       updateJob(jobId, {
@@ -357,8 +398,12 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
       // Page-Name: ISO-Date bei echtem Datum, sonst "YYYY-MM <Thema>" fuer
       // month-only-Eintraege. Thema wird via extractTitle aus Heading/
       // Filename/erster Zeile geholt (siehe lib/import-parsers/date-detect).
+      // _resolvedName setzt der Kollisions-Resolve oben fuer echte Datums-
+      // Quellen mit Kollision (z.B. "2024-03-05 Persoenliches").
       let pageName;
-      if (f.dateSource === 'month-only') {
+      if (f._resolvedName) {
+        pageName = f._resolvedName;
+      } else if (f.dateSource === 'month-only') {
         const ym = f.isoDate.slice(0, 7);
         const thema = extractTitle(f.html, f.file);
         pageName = thema ? `${ym} ${thema}` : ym;

@@ -8,6 +8,7 @@
 //   blogConnected: false        — Buchtyp 'blog' + Connection vorhanden.
 //   blogLinksMap:  {}           — pageId → { wp_post_id, wp_modified_at, last_pulled_at, last_pushed_at, conflict_state }.
 //   blogPushBusy:  {}           — pageId → bool (Push läuft).
+//   blogPushProgress: {}        — pageId → number (0..100, live aus /jobs/:id).
 //   blogConflictOpen: null      — pageId des im Konflikt-Diff offenen Seiten.
 //   blogConflictData: null      — { pageId, local:{name,html}, remote:{title,html,modifiedAt} }.
 
@@ -16,6 +17,8 @@ export function blogState() {
     blogConnected: false,
     blogLinksMap: {},
     blogPushBusy: {},
+    blogPushProgress: {},
+    _blogPushTimers: {},
     blogConflictOpen: null,
     blogConflictData: null,
     _blogSyncInstalled: false,
@@ -28,9 +31,12 @@ export const blogSyncMethods = {
     this._blogSyncInstalled = true;
     window.addEventListener('pages:loaded', () => this.loadBlogLinks());
     window.addEventListener('book:changed', () => {
+      for (const t of Object.values(this._blogPushTimers)) clearInterval(t);
+      this._blogPushTimers = {};
       this.blogConnected = false;
       this.blogLinksMap = {};
       this.blogPushBusy = {};
+      this.blogPushProgress = {};
       this.blogConflictOpen = null;
       this.blogConflictData = null;
     });
@@ -109,6 +115,7 @@ export const blogSyncMethods = {
     if (!bookId) return;
     if (this.blogPushBusy[pageId]) return;
     this.blogPushBusy = { ...this.blogPushBusy, [pageId]: true };
+    this.blogPushProgress = { ...this.blogPushProgress, [pageId]: 0 };
     try {
       const res = await fetch('/jobs/blog-push', {
         method: 'POST',
@@ -117,12 +124,39 @@ export const blogSyncMethods = {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error_code || 'BLOG_PUSH_FAILED');
+      if (data.jobId) this._pollBlogPush(pageId, data.jobId);
     } catch (e) {
       console.error('[blogSync] Push fehlgeschlagen:', e);
-      const next = { ...this.blogPushBusy };
-      delete next[pageId];
-      this.blogPushBusy = next;
+      this._clearBlogPushBusy(pageId);
     }
+  },
+
+  _pollBlogPush(pageId, jobId) {
+    const tick = async () => {
+      try {
+        const resp = await fetch('/jobs/' + jobId);
+        if (resp.status === 404) { this._clearBlogPushBusy(pageId); return; }
+        if (!resp.ok) return;
+        const job = await resp.json();
+        const next = { ...this.blogPushProgress, [pageId]: job.progress || 0 };
+        this.blogPushProgress = next;
+        if (job.status === 'running' || job.status === 'queued') return;
+        this._clearBlogPushBusy(pageId);
+        if (job.status !== 'error' && job.status !== 'cancelled') this.loadBlogLinks();
+      } catch (e) { /* swallow; nächster Tick versucht erneut */ }
+    };
+    if (this._blogPushTimers[pageId]) clearInterval(this._blogPushTimers[pageId]);
+    this._blogPushTimers = { ...this._blogPushTimers, [pageId]: setInterval(tick, 1000) };
+    tick();
+  },
+
+  _clearBlogPushBusy(pageId) {
+    if (this._blogPushTimers[pageId]) {
+      clearInterval(this._blogPushTimers[pageId]);
+      const t = { ...this._blogPushTimers }; delete t[pageId]; this._blogPushTimers = t;
+    }
+    const b = { ...this.blogPushBusy }; delete b[pageId]; this.blogPushBusy = b;
+    const p = { ...this.blogPushProgress }; delete p[pageId]; this.blogPushProgress = p;
   },
 
   async openBlogConflict(pageId) {

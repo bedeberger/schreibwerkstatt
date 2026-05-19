@@ -433,3 +433,78 @@ test('folder-import: unbekannte Extension wird skipped', async () => {
   assert.equal(job.result.pagesCreated, 1);
   assert.ok(job.result.skipped.some(s => s.path.endsWith('notes.txt') && s.reason === 'UNSUPPORTED_EXT'));
 });
+
+test('folder-import: zwei Files gleicher Tag mit Thema → getrennte Pages mit YYYY-MM-DD <Thema>', async () => {
+  const userEmail = 'tester@test.dev';
+  const book = await contentStore.createBook(
+    { name: 'CollideThema', owner_email: userEmail },
+    { session: { user: { email: userEmail } } },
+  );
+  const { db } = require('../../db/connection');
+  db.prepare(`INSERT OR IGNORE INTO book_access (book_id, user_email, role, granted_at) VALUES (?, ?, 'owner', datetime('now'))`).run(book.id, userEmail);
+
+  // Beide Dateien tragen ein extrahierbares Thema (h1 in mammoth via Heading-Style
+  // ist nicht trivial — Filename-Body taugt aber als Thema-Quelle).
+  const buffer = await buildArchive([
+    ['2024/05/Persoenliches 03.docx', await makeDocx('Tagebucheintrag morgens.')],
+    ['2024/05/Arbeit 03.docx', await makeDocx('Tagebucheintrag abends.')],
+  ]);
+
+  const jobId = ctx.shared.createJob(
+    'folder-import', book.id, userEmail,
+    'job.label.folderImport', { name: 'CollideThema' },
+    'merge:' + book.id + ':collide-thema',
+  );
+  folderImport.importBuffers.set(jobId, { buffer, mode: 'merge', bookName: '', bookId: book.id });
+
+  await folderImport.runFolderImportJob(jobId, {
+    userEmail, mode: 'merge', bookName: '', bookId: book.id,
+  });
+
+  const job = ctx.shared.jobs.get(jobId);
+  assert.equal(job.status, 'done', `Job-Status: ${job.status}, err: ${job.error || '-'}`);
+  assert.equal(job.result.pagesCreated, 2);
+  const pages = await contentStore.listPages(book.id, { session: { user: { email: userEmail } } });
+  const names = pages.map(p => p.name).sort();
+  assert.deepEqual(names, ['2024-05-03 Arbeit', '2024-05-03 Persoenliches']);
+});
+
+test('folder-import: zwei Files gleicher Tag ohne Thema → HTML gemerged in eine Page', async () => {
+  const userEmail = 'tester@test.dev';
+  const book = await contentStore.createBook(
+    { name: 'CollideMerge', owner_email: userEmail },
+    { session: { user: { email: userEmail } } },
+  );
+  const { db } = require('../../db/connection');
+  db.prepare(`INSERT OR IGNORE INTO book_access (book_id, user_email, role, granted_at) VALUES (?, ?, 'owner', datetime('now'))`).run(book.id, userEmail);
+
+  // Beide Filenames sind reine ISO-Datumsstrings (Filename-Body nach Strip = '')
+  // und der Text-Body ist ein 1-Zeichen-Marker (firstLine length<2 → kein Thema).
+  // extractTitle liefert '' fuer beide → Merge-Pfad greift.
+  const buffer = await buildArchive([
+    ['2024/05/2024-05-04.docx', await makeDocx('A')],
+    ['2024/05/2024-05-04 (2).docx', await makeDocx('B')],
+  ]);
+
+  const jobId = ctx.shared.createJob(
+    'folder-import', book.id, userEmail,
+    'job.label.folderImport', { name: 'CollideMerge' },
+    'merge:' + book.id + ':collide-merge',
+  );
+  folderImport.importBuffers.set(jobId, { buffer, mode: 'merge', bookName: '', bookId: book.id });
+
+  await folderImport.runFolderImportJob(jobId, {
+    userEmail, mode: 'merge', bookName: '', bookId: book.id,
+  });
+
+  const job = ctx.shared.jobs.get(jobId);
+  assert.equal(job.status, 'done', `Job-Status: ${job.status}, err: ${job.error || '-'}`);
+  assert.equal(job.result.pagesCreated, 1);
+  const pages = await contentStore.listPages(book.id, { session: { user: { email: userEmail } } });
+  assert.equal(pages.length, 1);
+  assert.equal(pages[0].name, '2024-05-04');
+  const page = await contentStore.loadPage(pages[0].id, { session: { user: { email: userEmail } } });
+  assert.match(page.html, /\bA\b/);
+  assert.match(page.html, /\bB\b/);
+  assert.match(page.html, /day-merge/);
+});

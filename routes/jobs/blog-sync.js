@@ -289,16 +289,15 @@ async function runBlogPushJob(jobId, bookId, userEmail, pageIds) {
       }
 
       const wpHtml = appToWpHtml(pageRow.html || pageRow.body_html || '<p></p>');
-      const payload = {
-        title: pageRow.page_name || '',
-        content: wpHtml,
-        status: link ? undefined : conn.defaultStatus,
-      };
 
       try {
         const remote = link
-          ? await wp.updatePost(link.wp_post_id, payload)
-          : await wp.createPost({ ...payload, status: conn.defaultStatus });
+          ? await wp.updatePost(link.wp_post_id, { content: wpHtml })
+          : await wp.createPost({
+              title: pageRow.name || '',
+              content: wpHtml,
+              status: conn.defaultStatus,
+            });
         blogs.upsertLink({
           pageId,
           blogId: conn.id,

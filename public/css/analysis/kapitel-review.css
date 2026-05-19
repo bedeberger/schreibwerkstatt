@@ -1,5 +1,18 @@
 @layer components {
 /* === Kapitel-Review: verdichtete Seitenliste + Quick-Add === */
+
+/* Toggle „Inkl. Sub-Kapitel" in der Action-Bar. */
+.kapitel-include-subs {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+  cursor: pointer;
+  user-select: none;
+}
+.kapitel-include-subs input { margin: 0; cursor: pointer; }
+
 .kapitel-pages-section {
   margin: var(--space-sm) 0 16px;
   padding: var(--space-md) 14px;

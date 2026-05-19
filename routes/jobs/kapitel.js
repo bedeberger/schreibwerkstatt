@@ -20,6 +20,7 @@ const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
 const appSettings = require('../../lib/app-settings');
 const { resolveProvider } = require('../../lib/ai');
+const { getDescendantChapterIds } = require('../../db/book-order');
 
 function _sigHash(obj) {
   return crypto.createHash('sha1').update(JSON.stringify(obj ?? null)).digest('hex').slice(0, 12);
@@ -28,7 +29,7 @@ function _sigHash(obj) {
 const kapitelRouter = express.Router();
 
 // ── Job: Kapitel-Review (Makrobewertung eines einzelnen Kapitels) ────────────
-async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookName, userEmail, userToken) {
+async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookName, userEmail, userToken, { includeSubchapters = false } = {}) {
   const logger = makeJobLogger(jobId);
   const prompts = await getPrompts();
   const {
@@ -50,23 +51,28 @@ async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookNa
   const effectiveProvider = resolveProvider({ userEmail });
   const { singlePass: SINGLE_PASS_LIMIT, perChunk: PER_CHUNK_LIMIT } = chunkLimitsFor(effectiveProvider);
   const cacheVersion = `${_modelName(effectiveProvider)}:${PROMPTS_VERSION || ''}`;
-  const optionsSig = _sigHash({ narrative, schwerpunkt: reviewSchwerpunkt });
+  const optionsSig = _sigHash({ narrative, schwerpunkt: reviewSchwerpunkt, includeSubchapters });
   try {
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
-    // Alle Buchseiten holen; Kapitel-Filter läuft clientseitig – die Page-Metas
-    // enthalten bereits `chapter_id`.
+    // Bei includeSubchapters: rekursiv alle Sub-Kapitel-IDs ermitteln und
+    // Seiten aller Tiefen einbeziehen. Sonst nur direkte Kapitel-Seiten.
+    const chapterIds = includeSubchapters
+      ? new Set(getDescendantChapterIds(chapterIdInt, { includeSelf: true }).map(String))
+      : new Set([String(chapterIdInt)]);
     const allPages = await contentStore.listPages(bookId, userToken).catch(e => { throw contentHttpError(e); });
     const pages = allPages
-      .filter(p => String(p.chapter_id || '') === String(chapterId))
+      .filter(p => chapterIds.has(String(p.chapter_id || '')))
       .sort((a, b) => (a.position || 0) - (b.position || 0));
 
     if (!pages.length) { completeJob(jobId, { empty: true, chapterName }); return; }
-    logger.info(`Start: «${chapterName}» chap=${chapterId}, ${pages.length} Seiten`);
+    logger.info(`Start: «${chapterName}» chap=${chapterId}${includeSubchapters ? ' (+Sub-Kapitel)' : ''}, ${pages.length} Seiten`);
 
-    // pages_sig: jede Seite + ihr updated_at. Ändert sich eine Seite → Cache-Miss.
-    // chapterName + bookName + optionsSig + cacheVersion fliessen ebenfalls ein.
+    // pages_sig: jede Seite + ihr updated_at + Sub-Tree-Kapitelmenge. Ändert
+    // sich eine Seite, ein Sub-Kapitel wird verschoben/hinzugefuegt, oder der
+    // Modus wechselt → Cache-Miss.
+    const chaptersSig = [...chapterIds].sort().join(',');
     const pagesSig = pages.map(p => `${p.id}:${p.updated_at || ''}`).sort().join('|')
-                     + `||${chapterName}||${bookName}||${optionsSig}||${cacheVersion}`;
+                     + `||${chapterName}||${bookName}||${optionsSig}||${chaptersSig}||${cacheVersion}`;
     const cached = loadChapterMacroReviewCache(bookIdInt, email, chapterIdInt, pagesSig, effectiveProvider);
     if (cached) {
       logger.info(`«${chapterName}» – Cache-HIT (pages_sig match) – spart Kapitel-Review-Call.`);
@@ -188,6 +194,7 @@ kapitelRouter.post('/chapter-review', jsonBody, (req, res) => {
   const { chapter_name, book_name } = req.body;
   const book_id = toIntId(req.body?.book_id);
   const chapter_id = toIntId(req.body?.chapter_id);
+  const includeSubchapters = req.body?.include_subchapters === true;
   if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
   if (!chapter_id) return res.status(400).json({ error_code: 'CHAPTER_ID_REQUIRED' });
   setContext({ book: book_id });
@@ -204,6 +211,7 @@ kapitelRouter.post('/chapter-review', jsonBody, (req, res) => {
   const jobId = createJob('chapter-review', book_id, userEmail, label, labelParams, chapter_id);
   enqueueJob(jobId, () => runChapterReviewJob(
     jobId, book_id, chapter_id, chapter_name || '', book_name || '', userEmail, userToken,
+    { includeSubchapters },
   ));
   res.json({ jobId });
 });

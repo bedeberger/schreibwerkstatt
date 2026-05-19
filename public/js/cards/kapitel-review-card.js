@@ -22,6 +22,8 @@ export function registerKapitelReviewCard() {
     kapitelReviewHistory: {},
     selectedKapitelReviewId: null,
     _kapitelReviewByChapter: {}, // { [chapterId]: emptySlot() }
+    // Per-Kapitel-Flag „Sub-Kapitel mitbewerten" (default true wenn Subs vorhanden).
+    _includeSubchaptersByChapter: {},
     _lifecycle: null,
 
     init() {
@@ -206,6 +208,7 @@ export function registerKapitelReviewCard() {
       if (!chapterId) return;
       const chapter = (root.tree || []).find(i => i.type === 'chapter' && String(i.id) === String(chapterId));
       const chapterName = chapter?.name || '';
+      const includeSubchapters = this.kapitelReviewIncludeSubchapters(chapterId);
       const slot = this._ensureSlot(chapterId);
       slot.loading = true;
       slot.progress = 0;
@@ -221,6 +224,7 @@ export function registerKapitelReviewCard() {
             chapter_id: parseInt(chapterId),
             chapter_name: chapterName,
             book_name: bookName,
+            include_subchapters: includeSubchapters,
           }),
         });
         localStorage.setItem(this._lsKeyKapitelReview(chapterId), jobId);
@@ -231,6 +235,70 @@ export function registerKapitelReviewCard() {
         slot.status = '';
         slot.loading = false;
       }
+    },
+
+    // True wenn das Kapitel mindestens ein direktes Sub-Kapitel hat. Liest
+    // root.tree (flach mit parent_id-Annotation aus tree.js).
+    kapitelReviewHasSubchapters(chapterId) {
+      if (!chapterId) return false;
+      const tree = window.__app.tree || [];
+      return tree.some(it =>
+        it.type === 'chapter' && !it.solo && String(it.parent_id) === String(chapterId),
+      );
+    },
+
+    // Liefert alle Nachfahren-Kapitel-IDs (inkl. Self), basierend auf
+    // root.tree-parent_id-Kette. Genutzt fuer Stats-Aggregation und Default-Flag.
+    _kapitelReviewDescendantIds(chapterId) {
+      const tree = window.__app.tree || [];
+      const ids = new Set([String(chapterId)]);
+      let added = true;
+      while (added) {
+        added = false;
+        for (const it of tree) {
+          if (it.type !== 'chapter' || it.solo) continue;
+          if (ids.has(String(it.parent_id)) && !ids.has(String(it.id))) {
+            ids.add(String(it.id));
+            added = true;
+          }
+        }
+      }
+      return ids;
+    },
+
+    // Per-Kapitel-Flag mit Auto-Default: hat Kapitel Sub-Kapitel → true, sonst false.
+    kapitelReviewIncludeSubchapters(chapterId) {
+      const key = String(chapterId || '');
+      if (!key) return false;
+      if (key in this._includeSubchaptersByChapter) return this._includeSubchaptersByChapter[key];
+      return this.kapitelReviewHasSubchapters(chapterId);
+    },
+
+    setKapitelReviewIncludeSubchapters(chapterId, value) {
+      const key = String(chapterId || '');
+      if (!key) return;
+      this._includeSubchaptersByChapter = {
+        ...this._includeSubchaptersByChapter,
+        [key]: !!value,
+      };
+    },
+
+    // Page-Count fuers Run-Label: direkte Seiten oder inkl. Sub-Kapitel.
+    kapitelReviewEffectivePageCount(chapterId) {
+      const id = chapterId || window.__app.kapitelReviewChapterId;
+      if (!id) return 0;
+      const tree = window.__app.tree || [];
+      if (!this.kapitelReviewIncludeSubchapters(id)) {
+        const ch = tree.find(i => i.type === 'chapter' && !i.solo && String(i.id) === String(id));
+        return ch?.pages?.length || 0;
+      }
+      const ids = this._kapitelReviewDescendantIds(id);
+      let n = 0;
+      for (const it of tree) {
+        if (it.type !== 'chapter' || it.solo) continue;
+        if (ids.has(String(it.id))) n += it.pages?.length || 0;
+      }
+      return n;
     },
 
     async deleteKapitelReview(id) {

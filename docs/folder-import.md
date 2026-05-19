@@ -69,7 +69,10 @@ Im Merge-Modus werden bestehende Year- und Month-Sub-Chapter aus dem Buch eingel
 - **Job-Result `bookId`** für Frontend-Nav (lädt Buch + setzt Hash).
 - **Kapitel-Cache by Year:** `chapterByYear`-Map verhindert Dubletten. Merge-Modus liest existierende Year-Chapters (Name = 4-stellige Zahl) und hängt an.
 - **Sortierung chronologisch** vor Page-Create (sonst Position-Skew).
-- **Duplikat-Daten:** Suffix `(2)` am Page-Name (z.B. zwei Files mit `2024-03-05`).
+- **Duplikat-Daten** (echte Datums-Quellen `filename`/`first-line`/`ai`/`mtime`, gleicher Tag): Kollisions-Resolve in zwei Stufen.
+  1. `extractTitle()` pro File: alle mit Thema → Page-Name = `YYYY-MM-DD <Thema>` (eigene Pages).
+  2. Files ohne Thema werden in den ersten Eintrag des Tages **gemerged** (HTML konkateniert mit `<hr class="day-merge">`). Mixed-Fall: themaless-Files gehen ins erste themaful-Target. Garantiert: ein Tag = ein Eintrag pro „Thema", kein nackter `(2)`-Suffix mehr für reine Datums-Pages.
+  - Restliches `(2)`-Suffix greift weiter für synthetische Datums-Quellen (`month-only`/`year-only`) bei identischem aufgelösten Page-Namen.
 - **Datei-Limit 10 MB pro Datei**, ZIP-Limit 200 MB, Mac-Resource-Forks (`._*`, `__MACOSX/`, `.DS_Store`) gefiltert.
 
 ## Frontend

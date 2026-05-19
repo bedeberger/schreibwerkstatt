@@ -435,13 +435,46 @@ document.addEventListener('alpine:init', () => {
     },
 
     get filteredTree() {
-      if (!this.pageSearch) return this.tree;
+      if (!this.pageSearch) {
+        const byId = new Map(this.tree.map(it => [it.id, it]));
+        const isVisible = (item) => {
+          let cur = item;
+          while (cur.parent_id) {
+            const parent = byId.get(cur.parent_id);
+            if (!parent) break;
+            if (!parent.open) return false;
+            cur = parent;
+          }
+          return true;
+        };
+        return this.tree.filter(isVisible);
+      }
       const q = this.pageSearch.toLowerCase();
-      return this.tree.map(item => {
+      // Erste Pass: Kapitel mit matchenden Seiten finden.
+      const matched = new Map(); // chapter-id -> filtered-pages[]
+      for (const item of this.tree) {
+        if (item.solo) {
+          if (item.name.toLowerCase().includes(q) || item.pages[0]?.name?.toLowerCase().includes(q)) {
+            matched.set(item.id, item.pages);
+          }
+          continue;
+        }
         const pages = item.pages.filter(p => p.name.toLowerCase().includes(q));
-        if (!pages.length) return null;
-        return { ...item, pages, open: true };
-      }).filter(Boolean);
+        if (pages.length) matched.set(item.id, pages);
+      }
+      // Zweite Pass: Vorfahren matchender Kapitel auch aufnehmen (mit leerem
+      // Page-Filter), damit nested-Subchapter-Treffer ihren Eltern-Header zeigen.
+      const itemById = new Map(this.tree.map(it => [it.id, it]));
+      const addAncestors = (id) => {
+        const it = itemById.get(id);
+        if (!it?.parent_id) return;
+        if (!matched.has(it.parent_id)) matched.set(it.parent_id, []);
+        addAncestors(it.parent_id);
+      };
+      for (const id of [...matched.keys()]) addAncestors(id);
+      return this.tree
+        .filter(item => matched.has(item.id))
+        .map(item => ({ ...item, pages: matched.get(item.id), open: true }));
     },
 
     // AbortController `_abortCtrl` (initialisiert via app-state.js) hält alle

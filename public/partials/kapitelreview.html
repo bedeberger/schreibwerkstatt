@@ -34,6 +34,14 @@
         </template>
       </span>
       <div class="card-actions">
+        <label class="kapitel-include-subs"
+               x-show="kapitelReviewHasSubchapters($app.kapitelReviewChapterId)"
+               :data-tip="$app.t('kapitelReview.includeSubchaptersTip')">
+          <input type="checkbox"
+                 :checked="kapitelReviewIncludeSubchapters($app.kapitelReviewChapterId)"
+                 @change="setKapitelReviewIncludeSubchapters($app.kapitelReviewChapterId, $event.target.checked)">
+          <span x-text="$app.t('kapitelReview.includeSubchapters')"></span>
+        </label>
         <button type="button"
                 @click="$app.toggleChapterIdeenCard($app.kapitelReviewChapterId)"
                 :class="{ primary: $app.showIdeenCard && $app.ideenScope === 'chapter' }"

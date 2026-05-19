@@ -328,6 +328,15 @@
 ></div>
             </div>
           </div>
+          <div class="card-form-row" x-show="activeProfile.config.chapter.numbering !== 'none'">
+            <label class="card-form-label" x-text="$app.t('pdfExport.chapter.numberingMode')"></label>
+            <div class="card-form-field">
+              <div x-data="combobox($app.t('pdfExport.chapter.numberingMode'))"
+                   x-modelable="value" x-model="activeProfile.config.chapter.numberingMode"
+                   x-effect="options = [{ value: 'nested', label: $app.t('pdfExport.chapter.numberingMode.nested') }, { value: 'flat', label: $app.t('pdfExport.chapter.numberingMode.flat') }]"
+></div>
+            </div>
+          </div>
           <div class="card-form-row">
             <label class="card-form-label" x-text="$app.t('pdfExport.chapter.titleStyle')"></label>
             <div class="card-form-field">
@@ -361,6 +370,10 @@
               <label class="pdfx-check" x-show="activeProfile.config.chapter.pageStructure === 'nested'">
                 <input type="checkbox" x-model="activeProfile.config.chapter.pageTitleRule">
                 <span x-text="$app.t('pdfExport.chapter.pageTitleRule')"></span>
+              </label>
+              <label class="pdfx-check" x-show="activeProfile.config.chapter.breakBefore !== 'none'">
+                <input type="checkbox" x-model="activeProfile.config.chapter.breakBeforeSubchapter">
+                <span x-text="$app.t('pdfExport.chapter.breakBeforeSubchapter')"></span>
               </label>
             </div>
           </div>

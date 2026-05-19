@@ -40,33 +40,35 @@
     <div class="batch-status" x-html="batchStatus"></div>
   </div>
   <template x-for="item in filteredTree" :key="item.id">
-    <div class="tree-chapter" :class="{ 'tree-chapter--solo': item.solo }">
+    <div class="tree-chapter"
+         :class="['tree-chapter--depth-' + (item.depth || 1), { 'tree-chapter--solo': item.solo }]"
+         :style="{ '--depth': item.depth || 1 }">
       <div x-show="!item.solo"
            class="tree-chapter-header"
            role="button"
            tabindex="0"
-           :aria-expanded="item.pages.length > 0 ? (item.open ? 'true' : 'false') : null"
+           :aria-expanded="(item.pages.length > 0 || item.hasChildren) ? (item.open ? 'true' : 'false') : null"
            :class="{
-             'tree-chapter-header--empty': item.pages.length === 0,
+             'tree-chapter-header--empty': item.pages.length === 0 && !item.hasChildren,
              'tree-chapter-header--active': showKapitelReviewCard && String(kapitelReviewChapterId) === String(item.id),
              'tree-chapter-header--reviewable': _bookQualifiesForChapterReview() && item.pages.length > 0,
            }"
            :data-tip="!pageSearch
-             ? (item.pages.length === 0
+             ? ((item.pages.length === 0 && !item.hasChildren)
                  ? t('sidebar.emptyChapterTitle', { name: item.name })
-                 : (_bookQualifiesForChapterReview() ? t('sidebar.reviewChapterTitle', { name: item.name }) : ''))
+                 : (_bookQualifiesForChapterReview() && item.pages.length > 0 ? t('sidebar.reviewChapterTitle', { name: item.name }) : ''))
              : ''"
            @keydown.enter.prevent="_onChapterHeaderActivate(item)"
            @keydown.space.prevent="_onChapterHeaderActivate(item)"
-           @keydown.arrow-right.prevent="if (item.pages.length > 0 && !item.open) item.open = true"
-           @keydown.arrow-left.prevent="if (item.pages.length > 0 && item.open) item.open = false"
+           @keydown.arrow-right.prevent="if ((item.pages.length > 0 || item.hasChildren) && !item.open) item.open = true"
+           @keydown.arrow-left.prevent="if ((item.pages.length > 0 || item.hasChildren) && item.open) item.open = false"
            @click="_onChapterHeaderActivate(item)">
-        <span class="history-chevron" :class="{ open: item.open }" x-show="item.pages.length > 0"
-              @click.stop="if (!pageSearch && item.pages.length > 0) item.open = !item.open"></span>
+        <span class="history-chevron" :class="{ open: item.open }" x-show="item.pages.length > 0 || item.hasChildren"
+              @click.stop="if (!pageSearch && (item.pages.length > 0 || item.hasChildren)) item.open = !item.open"></span>
         <span x-text="item.name"></span>
         <span class="tree-chapter-meta">
           <span class="tag" x-show="item.pages.length >= 1" x-text="item.pages.length === 1 ? t('sidebar.pagesCountOne') : t('sidebar.pagesCount', { n: item.pages.length })"></span>
-          <template x-if="item.pages.length >= 1 && item.stats">
+          <template x-if="item.stats">
             <span class="tok-badge tok-neutral"
               x-text="item.stats.badge"
               @mouseenter.stop="_showTokTip($el, item.stats, { _chapterOnly: true })"

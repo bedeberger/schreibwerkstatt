@@ -310,6 +310,14 @@
   flex: none;
 }
 .organizer-blog-push .icon { width: 0.9em; height: 0.9em; }
+.organizer-blog-push .spinner,
+.organizer-blog-push .organizer-blog-push-pct {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  font-variant-numeric: tabular-nums;
+}
+.organizer-blog-push-pct { font-size: 0.85em; }
 
 /* Konflikt-Diff-Modal */
 .blog-conflict-overlay {

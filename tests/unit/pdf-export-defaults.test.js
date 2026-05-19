@@ -50,6 +50,27 @@ test('validateConfig erhält titleRule und pageTitleRule', () => {
   assert.equal(c.chapter.pageTitleRule, true);
 });
 
+test('validateConfig: numberingMode nested|flat + Default nested', () => {
+  const def = defaultConfig();
+  assert.equal(def.chapter.numberingMode, 'nested');
+  const flat = validateConfig({ chapter: { numberingMode: 'flat' } });
+  assert.equal(flat.chapter.numberingMode, 'flat');
+  const bogus = validateConfig({ chapter: { numberingMode: 'wat' } });
+  assert.equal(bogus.chapter.numberingMode, 'nested');
+});
+
+test('validateConfig: breakBeforeSubchapter Default false, akzeptiert true', () => {
+  const def = defaultConfig();
+  assert.equal(def.chapter.breakBeforeSubchapter, false);
+  const on = validateConfig({ chapter: { breakBeforeSubchapter: true } });
+  assert.equal(on.chapter.breakBeforeSubchapter, true);
+});
+
+test('validateConfig: toc.depth akzeptiert 3', () => {
+  const c = validateConfig({ toc: { depth: 3 } });
+  assert.equal(c.toc.depth, 3);
+});
+
 test('defaultConfig: Trennlinien-Toggles default off', () => {
   const c = defaultConfig();
   assert.equal(c.chapter.titleRule, false);

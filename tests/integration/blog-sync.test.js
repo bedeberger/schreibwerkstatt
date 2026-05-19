@@ -227,9 +227,10 @@ test('Push: lokal editierte Seite wird zu WP gepusht (Update)', async () => {
   const connId = blogs.getConnection(bookId).id;
   blogs.markInitialImportDone(connId);
 
-  // Seed-Page + Link
+  // Seed-Page + Link. Page-Name in App weicht absichtlich vom WP-Titel ab,
+  // damit der Test absichert, dass Push den WP-Titel nicht überschreibt.
   const page = await contentStore.createPage({
-    book_id: bookId, chapter_id: null, name: 'Pushable',
+    book_id: bookId, chapter_id: null, name: 'App-Name',
     html: '<h2>Update</h2><p>Geänderter Text.</p>',
   }, null);
   blogs.upsertLink({
@@ -242,7 +243,7 @@ test('Push: lokal editierte Seite wird zu WP gepusht (Update)', async () => {
 
   const wp = makeWpStub({
     posts: [{
-      id: 11, title: { rendered: 'Pushable', raw: 'Pushable' },
+      id: 11, title: { rendered: 'WP-Original', raw: 'WP-Original' },
       content: { rendered: '<p>alt</p>', raw: '<p>alt</p>' },
       status: 'publish', slug: 'pushable',
       modified_gmt: '2026-04-01T10:00:00', date_gmt: '2026-04-01T10:00:00',
@@ -263,6 +264,41 @@ test('Push: lokal editierte Seite wird zu WP gepusht (Update)', async () => {
     const updatedRemote = wp.posts.find(p => p.id === 11);
     assert.match(updatedRemote.content.raw, /wp:heading/);
     assert.match(updatedRemote.content.raw, /Geänderter Text/);
+    assert.equal(updatedRemote.title.raw, 'WP-Original', 'Update-Push darf WP-Titel nicht überschreiben');
+  } finally {
+    restore();
+  }
+});
+
+test('Push: legt neue WP-Posts mit Page-Name als Titel an', async () => {
+  const bookId = 9005;
+  seedBlogBook(bookId);
+  seedConnection(bookId);
+  const connId = blogs.getConnection(bookId).id;
+  blogs.markInitialImportDone(connId);
+
+  // Page ohne Link → noch nicht in WP
+  const page = await contentStore.createPage({
+    book_id: bookId, chapter_id: null, name: 'Neuer App-Titel',
+    html: '<p>Frischer Eintrag.</p>',
+  }, null);
+
+  const wp = makeWpStub({ posts: [] });
+  const restore = installFetch(wp);
+  try {
+    const jobId = `test-push-new-${Date.now()}`;
+    const { jobs, runningJobs } = ctx.shared;
+    jobs.set(jobId, { id: jobId, type: 'blog-push', bookId, userEmail: null, status: 'running', progress: 0, createdAt: Date.now() });
+    runningJobs.set(jobId, { type: 'blog-push', bookId });
+
+    await blogSync.runBlogPushJob(jobId, bookId, null, [page.id]);
+    const job = jobs.get(jobId);
+    assert.equal(job.status, 'done', JSON.stringify(job.error));
+    assert.equal(job.result.createdRemote, 1);
+
+    const created = wp.posts[0];
+    assert.ok(created, 'WP-Post wurde nicht angelegt');
+    assert.equal(created.title.raw, 'Neuer App-Titel');
   } finally {
     restore();
   }

@@ -143,27 +143,43 @@ export const treeMethods = {
   // Kapitel-Items — Alpine-Reaktivität trägt das Update an die Sidebar.
   _refreshChapterStats() {
     const ts = this.tokEsts || {};
-    for (const item of this.tree || []) {
-      if (item.type !== 'chapter') continue;
+    const items = (this.tree || []).filter(it => it.type === 'chapter');
+    const childMap = new Map();
+    for (const it of items) {
+      if (it.solo || !it.parent_id) continue;
+      const arr = childMap.get(it.parent_id) || [];
+      arr.push(it);
+      childMap.set(it.parent_id, arr);
+    }
+    const nameContrib = (name) => {
+      const ch = String(name || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      if (!ch) return null;
+      return { chars: ch.length, words: ch.split(/\s+/).length, tok: Math.round(ch.length / CHARS_PER_TOKEN) };
+    };
+    const cache = new Map();
+    const subtree = (item) => {
+      if (cache.has(item.id)) return cache.get(item.id);
       let words = 0, chars = 0, tok = 0, count = 0;
       for (const p of item.pages) {
         const e = ts[p.id];
         if (e) { words += e.words; chars += e.chars; tok += e.tok; count++; }
       }
-      // Echte Kapitel: chapter_name einmal addieren. Solo-Kapitel (kein
-      // echtes Kapitel — Wrapper um einzelne Seite) übergehen: page_name
-      // ist schon in der Seitenstatistik enthalten.
-      if (count && !item.solo) {
-        const chName = String(item.name || '')
-          .replace(/<[^>]+>/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim();
-        if (chName) {
-          chars += chName.length;
-          words += chName.split(/\s+/).length;
-          tok += Math.round(chName.length / CHARS_PER_TOKEN);
-        }
+      for (const child of (childMap.get(item.id) || [])) {
+        const s = subtree(child);
+        words += s.words; chars += s.chars; tok += s.tok; count += s.count;
       }
+      // Chapter-Name einmal addieren, wenn dieses Kapitel im Subtree Content hat.
+      // Solo-Wrapper übergehen (page_name liegt bereits in der Seitenstatistik).
+      if (count > 0 && !item.solo) {
+        const nc = nameContrib(item.name);
+        if (nc) { chars += nc.chars; words += nc.words; tok += nc.tok; }
+      }
+      const res = { words, chars, tok, count };
+      cache.set(item.id, res);
+      return res;
+    };
+    for (const item of items) {
+      const { words, chars, tok, count } = subtree(item);
       item.stats = count
         ? {
             words, chars, tok,
@@ -181,10 +197,14 @@ export const treeMethods = {
     // Kapitel via kapitelReviewChapterOptions() raus, deswegen direkt setzen.
     // chapterId zuerst am Root setzen, dann toggle awaiten — toggle lädt das
     // Partial via `_ensurePartial`; ohne await bleibt die Karte leer.
-    if (item.pages.length === 0) {
+    if (item.pages.length === 0 && !item.hasChildren) {
       this.kapitelReviewChapterId = String(item.id);
       if (!this.showKapitelReviewCard) await this.toggleKapitelReviewCard();
       else this._closeOtherMainCards('kapitelReview');
+      return;
+    }
+    if (item.pages.length === 0 && item.hasChildren) {
+      item.open = !item.open;
       return;
     }
     if (this._bookQualifiesForChapterReview()) await this.openKapitelReviewForChapter(item.id);
@@ -368,11 +388,32 @@ export const treeMethods = {
       const qs = opts.source ? `?source=${encodeURIComponent(opts.source)}` : '';
       fetch('/sync/pages/' + bookId + qs, { method: 'POST' }).catch(() => {});
 
-      // contentRepo.bookTree liefert Kapitel mit pre-sortierter pages-Liste
-      // (Domain-Shape: position statt priority) und topPages fuer Seiten ohne
-      // Kapitel. UI-Items behalten internes `priority`-Feld als Sort-Schluessel.
+      // contentRepo.bookTree liefert Kapitel nested (subchapters[]) + topPages
+      // fuer Seiten ohne Kapitel. UI-Items behalten internes `priority`-Feld
+      // als Sort-Schluessel. Sidebar-Tree wird flach + depth-annotiert gebaut:
+      // jedes Kapitel kennt seine Tiefe (1-3) und parent_id; Reihenfolge ist
+      // Depth-First, damit Sub-Kapitel visuell unter ihrem Parent stehen.
       const sortedChapters = tree.chapters;
-      const chMap = Object.fromEntries(sortedChapters.map(c => [c.id, c.name]));
+      const flatChapters = []; // [{ id, name, position, _depth, _parent_id, pages }]
+      const walkChapters = (chapters, depth, parentId) => {
+        for (const c of chapters) {
+          flatChapters.push({
+            id: c.id,
+            name: c.name,
+            position: c.position,
+            pages: c.pages || [],
+            _depth: depth,
+            _parent_id: parentId,
+          });
+          walkChapters(c.subchapters || [], depth + 1, c.id);
+        }
+      };
+      walkChapters(sortedChapters, 1, null);
+      const chMap = Object.fromEntries(flatChapters.map(c => [c.id, c.name]));
+      const childCountMap = new Map();
+      for (const c of flatChapters) {
+        if (c._parent_id) childCountMap.set(c._parent_id, (childCountMap.get(c._parent_id) || 0) + 1);
+      }
 
       const decoratePage = (p) => ({
         ...p,
@@ -383,7 +424,7 @@ export const treeMethods = {
       // Seiten ohne Kapitel immer zuerst — danach Kapitel in Tree-Reihenfolge.
       this.pages = [
         ...tree.topPages.map(decoratePage),
-        ...sortedChapters.flatMap(c => c.pages.map(decoratePage)),
+        ...flatChapters.flatMap(c => c.pages.map(decoratePage)),
       ];
 
       this.tree = [
@@ -392,17 +433,22 @@ export const treeMethods = {
           id: 'solo-' + p.id,
           name: p.name,
           priority: p.priority,
+          depth: 1,
+          parent_id: null,
           open: true,
           solo: true,
           pages: [p],
         })),
-        ...sortedChapters.map(c => ({
+        ...flatChapters.map(c => ({
           type: 'chapter',
           id: c.id,
           name: c.name,
           priority: c.position,
+          depth: c._depth,
+          parent_id: c._parent_id,
           open: true,
           solo: false,
+          hasChildren: (childCountMap.get(c.id) || 0) > 0,
           pages: this.pages.filter(p => p.chapter_id === c.id),
         })),
       ];
