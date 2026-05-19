@@ -1,10 +1,10 @@
 @layer components {
 /* === Page list === */
 .page-item {
-  padding: var(--space-6) 8px 7px 6px;
+  padding: var(--space-3) 8px var(--space-xs) 6px;
   border: 0.5px solid transparent;
   border-radius: var(--radius-md);
-  margin-bottom: var(--space-3);
+  margin-bottom: var(--space-1);
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   column-gap: var(--space-sm);
