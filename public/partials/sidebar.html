@@ -41,7 +41,7 @@
   </div>
   <template x-for="item in filteredTree" :key="item.id">
     <div class="tree-chapter"
-         :class="['tree-chapter--depth-' + (item.depth || 1), { 'tree-chapter--solo': item.solo }]"
+         :class="{ ['tree-chapter--depth-' + (item.depth || 1)]: true, 'tree-chapter--solo': item.solo }"
          :style="{ '--depth': item.depth || 1 }">
       <div x-show="!item.solo"
            class="tree-chapter-header"
