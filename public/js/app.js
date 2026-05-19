@@ -502,19 +502,24 @@ document.addEventListener('alpine:init', () => {
       // Shell zuerst aufbauen: i18n + Partials brauchen nur statische Assets
       // (Service Worker cacht sie). /config kann danach scheitern, ohne dass
       // das UI leer bleibt – Offline-Banner erscheint stattdessen.
+      //
+      // Reveal-Gate: `html[data-app-loading]` versteckt Body bis kompletter
+      // Boot durch. Attribut wird ausschliesslich im finally entfernt — egal
+      // ob i18n scheitert, /config offline ist oder Bootstrap durchläuft.
+      // Ergebnis: ein einziger Reveal-Frame, kein Pop-In zwischen
+      // i18n-Ready → currentUser-Ready → Books-Ready.
       const browserLoc = (navigator.language || 'de').slice(0, 2);
       const supported  = getSupportedLocales();
       const fallbackLocale = supported.includes(browserLoc) ? browserLoc : 'de';
       try {
+      try {
         await configureI18n(fallbackLocale);
         this.uiLocale = fallbackLocale;
         document.documentElement.setAttribute('lang', fallbackLocale);
-        document.documentElement.removeAttribute('data-i18n-loading');
         await this._loadEssentialPartials();
         this._initSidebarResize();
       } catch (e) {
         console.error('[init:shell]', e);
-        document.documentElement.removeAttribute('data-i18n-loading');
       }
 
       let cfg = null;
@@ -637,6 +642,10 @@ document.addEventListener('alpine:init', () => {
       } catch (e) {
         console.error('[init]', e);
         this.setStatus(this.t('app.configLoadError'));
+      }
+      } finally {
+        document.documentElement.removeAttribute('data-app-loading');
+        this.appReady = true;
       }
     },
 

@@ -1,5 +1,8 @@
 // Service Worker: hält die SPA-Shell und Buch-Inhalte offline verfügbar (Zug-Szenario).
 // Strategie:
+//  - Navigate (/, /index.html): Stale-While-Revalidate im SHELL_CACHE
+//    → 0-Latenz-Render bei Repeat-Visit; neues HTML wird parallel geladen.
+//    Deploy-Update fliesst über `skip-waiting` + controllerchange-Reload.
 //  - Shell-Assets (CSS/JS/Icons): Stale-While-Revalidate im SHELL_CACHE
 //  - HTML-Partials: Network-First mit Cache-Fallback (verhindert eingefrorene UI-Bugs)
 //  - Content-GETs (/content/*): Stale-While-Revalidate im CONTENT_CACHE → Navigation + Seiteninhalt offline
@@ -7,7 +10,7 @@
 //  - Auth/KI/Job-Queue/SSE: Network-Only, nie cachen
 //  - Version-Bump der Konstanten invalidiert den jeweiligen Cache
 
-const SHELL_CACHE = 'schreibwerkstatt-shell-v662';
+const SHELL_CACHE = 'schreibwerkstatt-shell-v663';
 const CONTENT_CACHE = 'schreibwerkstatt-content-v1';
 const CONFIG_CACHE = 'schreibwerkstatt-config-v2';
 const ACTIVE_CACHES = new Set([SHELL_CACHE, CONTENT_CACHE, CONFIG_CACHE]);
@@ -76,19 +79,28 @@ self.addEventListener('activate', (event) => {
   })());
 });
 
+// Navigate (HTML-Shell): Stale-While-Revalidate. Repeat-Visits liefern Shell
+// 0-Latenz aus dem Cache, parallel läuft Network-Fetch und aktualisiert den
+// Cache für den nächsten Besuch. Deploy-Updates kommen via `skip-waiting`-
+// Pfad (controllerchange im Client → location.reload), nicht über
+// Per-Navigation-Revalidate — sonst wäre der TTFB-Vorteil weg.
 async function handleNavigate(req) {
   const cache = await caches.open(SHELL_CACHE);
-  try {
-    const net = await fetch(req);
+  const cached = await cache.match(SHELL_PATH) || await cache.match('/');
+  const netPromise = fetch(req).then((net) => {
     if (net && net.ok && net.type !== 'opaqueredirect') {
       cache.put(SHELL_PATH, net.clone());
     }
     return net;
-  } catch {
-    const cached = await cache.match(SHELL_PATH) || await cache.match('/');
-    if (cached) return cached;
-    return new Response('Offline – Shell nicht im Cache.', { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+  }).catch(() => null);
+
+  if (cached) {
+    netPromise.catch(() => {});
+    return cached;
   }
+  const net = await netPromise;
+  if (net) return net;
+  return new Response('Offline – Shell nicht im Cache.', { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
 }
 
 async function handleShellAsset(req) {

@@ -10,6 +10,11 @@
 const shellState = () => ({
   currentUser: null,
   devMode: false,
+  // Single Source of Truth für „Boot komplett". Wird am Ende von init()
+  // (try/finally) auf true gesetzt, parallel zum Entfernen von
+  // `html[data-app-loading]`. Templates können `appReady` als Reveal-Gate
+  // nutzen, der CSS-Selektor übernimmt den Hauptjob.
+  appReady: false,
   sessionExpired: false,
   serverOffline: false,
   isOffline: false,
