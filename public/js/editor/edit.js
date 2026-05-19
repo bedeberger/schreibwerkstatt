@@ -680,6 +680,44 @@ export const editorEditMethods = {
     this.pageEditorZoom = 1;
   },
 
+  // Trennlinie (<hr>) am Caret einfügen + Folge-Absatz für Weiterschreiben.
+  // Verhalten: leerer Block → ersetzen; sonst → nach Block einfügen.
+  // Trigger: Toolbar-Button + Cmd/Ctrl+Shift+H (siehe editor/toolbar.js).
+  insertHorizontalRule() {
+    const editEl = this._getEditEl();
+    if (!editEl) return;
+    editEl.focus();
+    const sel = document.getSelection();
+    let block = null;
+    if (sel && sel.rangeCount) {
+      let cur = sel.getRangeAt(0).startContainer;
+      if (cur && cur.nodeType === 3) cur = cur.parentNode;
+      while (cur && cur !== editEl) {
+        if (cur.nodeType === 1 && cur.matches?.('p, h1, h2, h3, h4, h5, h6, blockquote, pre, li, div.poem')) { block = cur; break; }
+        cur = cur.parentNode;
+      }
+    }
+    const hr = document.createElement('hr');
+    const next = document.createElement('p');
+    next.appendChild(document.createElement('br'));
+    if (!block) {
+      editEl.appendChild(hr);
+      editEl.appendChild(next);
+    } else if ((block.textContent || '').trim() === '') {
+      block.parentNode.replaceChild(hr, block);
+      hr.insertAdjacentElement('afterend', next);
+    } else {
+      block.insertAdjacentElement('afterend', hr);
+      hr.insertAdjacentElement('afterend', next);
+    }
+    const range = document.createRange();
+    range.setStart(next, 0);
+    range.collapse(true);
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+    this._markEditDirty?.();
+  },
+
   _uninstallFindingMarkWatcher() {
     if (this._findingMarkEl) {
       if (this._findingMarkInputHandler) {

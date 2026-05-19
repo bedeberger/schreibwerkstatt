@@ -347,6 +347,7 @@ Niemals `x-text` für Icon-Buttons mit zwei Zuständen — `x-text` setzt `textC
 - Aktionen: `check`, `x`, `plus`, `minus`, `pencil`, `trash`, `search`, `play`, `undo`, `redo`
 - Status: `circle`, `alert-triangle`, `loader`
 - Viewport: `maximize`, `maximize-2`, `minimize-2`, `scan`
+- Editor: `separator-horizontal` (Trennlinie), `move-horizontal` (Fit-Width)
 
 Neuer Bedarf → Lucide-SVG von [lucide.dev](https://lucide.dev) als `<symbol>` in `public/icons.svg` ergänzen + `SHELL_CACHE` in `public/sw.js` bumpen.
 

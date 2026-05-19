@@ -32,7 +32,7 @@
               :disabled="!!bookExportLoading || !$app.selectedBookId"
               @click="bookExport(fmt)">
         <span x-show="bookExportLoading === fmt" class="spinner"></span>
-        <svg x-show="bookExportLoading !== fmt" class="icon" aria-hidden="true"><use href="/icons.svg?v=635#download"/></svg>
+        <svg x-show="bookExportLoading !== fmt" class="icon" aria-hidden="true"><use href="/icons.svg?v=636#download"/></svg>
         <span x-text="$app.t('book.export.' + fmt)"></span>
       </button>
     </template>

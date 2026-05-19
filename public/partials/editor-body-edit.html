@@ -9,31 +9,36 @@
     <button type="button" class="graph-tool-btn"
             :data-tip="t('graph.zoomOut')" :aria-label="t('graph.zoomOut')"
             @click="pageEditorZoomOut()">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=635#minus"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#minus"/></svg>
     </button>
     <button type="button" class="graph-tool-btn"
             :data-tip="t('graph.zoomIn')" :aria-label="t('graph.zoomIn')"
             @click="pageEditorZoomIn()">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=635#plus"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#plus"/></svg>
     </button>
     <button type="button" class="graph-tool-btn"
             :data-tip="t('graph.reset')" :aria-label="t('graph.reset')"
             @click="pageEditorZoomReset()">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=635#scan"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#scan"/></svg>
     </button>
     <button type="button" class="graph-tool-btn"
             :aria-pressed="pageEditorFitWidth"
             :data-tip="pageEditorFitWidth ? t('editor.fitWidthOff') : t('editor.fitWidth')"
             :aria-label="pageEditorFitWidth ? t('editor.fitWidthOff') : t('editor.fitWidth')"
             @click="togglePageEditorFitWidth()">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=635#move-horizontal"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#move-horizontal"/></svg>
     </button>
     <button type="button" class="graph-tool-btn"
             :aria-pressed="pageEditorFullscreen"
             :data-tip="pageEditorFullscreen ? t('graph.fullscreenClose') : t('graph.fullscreen')"
             :aria-label="pageEditorFullscreen ? t('graph.fullscreenClose') : t('graph.fullscreen')"
             @click="togglePageEditorFullscreen()">
-      <svg class="icon" aria-hidden="true"><use :href="pageEditorFullscreen ? '/icons.svg?v=635#minimize-2' : '/icons.svg?v=635#maximize-2'"/></svg>
+      <svg class="icon" aria-hidden="true"><use :href="pageEditorFullscreen ? '/icons.svg?v=636#minimize-2' : '/icons.svg?v=636#maximize-2'"/></svg>
+    </button>
+    <button type="button" class="graph-tool-btn"
+            :data-tip="t('editor.toolbar.hrTitle')" :aria-label="t('editor.toolbar.hrTitle')"
+            @click="insertHorizontalRule()">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#separator-horizontal"/></svg>
     </button>
   </div>
   <div class="page-content-view page-content-view--editing"

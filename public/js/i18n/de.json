@@ -1244,6 +1244,7 @@
   "editor.toolbar.italicTitle":  "Kursiv (Strg/⌘+I)",
   "editor.toolbar.synonymTitle": "Synonyme (Strg/⌘+Shift+S)",
   "editor.toolbar.synonymLabel": "Syn",
+  "editor.toolbar.hrTitle":      "Trennlinie einfügen (Strg/⌘+Shift+H)",
 
   "editor.slash.hint":           "Blocktyp wählen",
   "editor.slash.paragraph":      "Absatz",
@@ -1350,6 +1351,7 @@
   "shortcuts.item.saveEdit":     "Seite speichern (im Bearbeiten-Modus)",
   "shortcuts.item.bold":         "Fett (im Bearbeiten- und Fokus-Modus)",
   "shortcuts.item.italic":       "Kursiv (im Bearbeiten- und Fokus-Modus)",
+  "shortcuts.item.hr":           "Trennlinie einfügen (Gedankenseparator)",
   "shortcuts.item.synonym":      "Synonyme für markiertes Wort (Bearbeiten-Modus)",
   "shortcuts.item.synonymHotkey": "Synonyme für markiertes Wort öffnen",
   "shortcuts.item.figurLookup":  "Figuren-Lookup per Klick auf einen Namen",

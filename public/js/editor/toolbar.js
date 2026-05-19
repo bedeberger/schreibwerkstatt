@@ -131,6 +131,13 @@ export const toolbarCardMethods = {
       }
     }
 
+    // Ctrl/Cmd+Shift+H: Trennlinie (<hr>) am Caret einfügen.
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && !e.altKey && (e.key === 'h' || e.key === 'H')) {
+      e.preventDefault();
+      app.insertHorizontalRule?.();
+      return;
+    }
+
     // Im Fokus-Mode bleibt U (Underline) tabu – die Plättung versteckt
     // das Ergebnis und der User würde unsichtbar formatieren.
     if (app.focusMode) {
