@@ -1466,6 +1466,7 @@
   "job.error.contentStorePageList": "Seitenliste konnte nicht geladen werden (Status {status}).",
 
   "book.category":               "Kategorie",
+  "book.category.none":          "— keine Kategorie —",
   "categories.empty":            "Keine Kategorien angelegt.",
   "book.filter.byCategory":      "Filter nach Kategorie",
   "book.filter.clear":           "Filter zurücksetzen",

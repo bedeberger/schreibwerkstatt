@@ -1465,6 +1465,7 @@
   "job.error.contentStorePageList": "Page list could not be loaded (status {status}).",
 
   "book.category":               "Category",
+  "book.category.none":          "— no category —",
   "categories.empty":            "No categories yet.",
   "book.filter.byCategory":      "Filter by category",
   "book.filter.clear":           "Clear filters",

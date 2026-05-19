@@ -115,7 +115,7 @@
 
       <div class="card-form-row">
         <label class="card-form-label" x-text="$app.t('book.category')"></label>
-        <div x-data="combobox($app.t('book.category'), $app.t('categories.empty'))"
+        <div x-data="combobox($app.t('book.category'), $app.t('book.category.none'))"
              x-modelable="value" x-model="bookCategoryId"
              x-effect="options = bookCategoryOptions()"
              @combobox-change="saveBookCategory()"></div>
