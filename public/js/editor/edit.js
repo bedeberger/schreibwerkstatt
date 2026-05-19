@@ -648,7 +648,24 @@ export const editorEditMethods = {
   },
 
   togglePageEditorFitWidth() {
-    this.pageEditorFitWidth = !this.pageEditorFitWidth;
+    const next = !this.pageEditorFitWidth;
+    if (next) {
+      // Zoom so anpassen, dass Text bei aktiver Seitenbreite die volle
+      // Wrap-Breite ausnutzt: ratio = Container / Reading-Frame.
+      const el = this._getEditEl();
+      const wrap = el?.closest('.page-editor-wrap');
+      if (el && wrap) {
+        const readingW = el.clientWidth;
+        const containerW = wrap.clientWidth;
+        if (readingW > 0 && containerW > readingW) {
+          const ratio = containerW / readingW;
+          this.pageEditorZoom = Math.min(2.5, Math.max(1, Math.round(ratio * 10) / 10));
+        }
+      }
+    } else {
+      this.pageEditorZoom = 1;
+    }
+    this.pageEditorFitWidth = next;
   },
 
   pageEditorZoomIn() {
