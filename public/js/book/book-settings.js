@@ -19,6 +19,7 @@ export const bookSettingsMethods = {
       this.bookSettingsErzaehlzeit        = data.erzaehlzeit        || '';
       this.bookSettingsIsFinished         = !!data.is_finished;
       this.bookSettingsAllowLektorBookChat = !!data.allow_lektor_book_chat;
+      this.bookSettingsDailyGoalChars     = data.daily_goal_chars != null ? Number(data.daily_goal_chars) : 1500;
     } catch (e) {
       console.error('[book-settings] Laden fehlgeschlagen:', e);
     } finally {
@@ -142,6 +143,7 @@ export const bookSettingsMethods = {
           erzaehlzeit:       this.bookSettingsErzaehlzeit          || null,
           is_finished:       this.bookSettingsIsFinished ? 1 : 0,
           allow_lektor_book_chat: this.bookSettingsAllowLektorBookChat ? 1 : 0,
+          daily_goal_chars:  Number.isFinite(Number(this.bookSettingsDailyGoalChars)) ? Number(this.bookSettingsDailyGoalChars) : null,
         }),
       });
       if (!r.ok) {
@@ -150,9 +152,14 @@ export const bookSettingsMethods = {
         throw new Error(data ? window.__app.tError(data) : `HTTP ${r.status}`);
       }
       this.bookSettingsSaved = true;
-      // Header-Donut konsumiert dailyProgressIsFinished am Root — direkt
-      // synchronisieren, damit Toggle Buch-Abschluss ohne Reload greift.
-      if (window.__app) window.__app.dailyProgressIsFinished = !!this.bookSettingsIsFinished;
+      // Header-Donut konsumiert dailyProgressIsFinished + dailyProgressDailyGoalChars
+      // am Root — direkt spiegeln, damit Toggle Buch-Abschluss und neues Tagesziel
+      // ohne Reload greifen.
+      if (window.__app) {
+        window.__app.dailyProgressIsFinished = !!this.bookSettingsIsFinished;
+        window.__app.dailyProgressDailyGoalChars = Number.isFinite(Number(this.bookSettingsDailyGoalChars))
+          ? Number(this.bookSettingsDailyGoalChars) : null;
+      }
       if (this._savedAtTimer) clearTimeout(this._savedAtTimer);
       this._savedAtTimer = setTimeout(() => { this.bookSettingsSaved = false; this._savedAtTimer = null; }, 2500);
     } catch (e) {

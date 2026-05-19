@@ -250,6 +250,8 @@
   "book.settings.status":        "Status",
   "book.settings.finished":      "Buch ist fertig",
   "book.settings.finished.desc": "Blendet die Schreib-pro-Tag-Kacheln in der Buch-Übersicht aus (Trend, 7-Tage-Balken, Heute-Ring, Streak-Heatmap).",
+  "book.settings.dailyGoalChars":     "Tagesziel (Zeichen)",
+  "book.settings.dailyGoalCharsHint": "Zielwert für den Heute-Ring im Header und in der Buch-Übersicht. 1500 Zeichen ≈ 1 Normseite.",
   "book.settings.dangerZone":    "Gefahrenzone",
   "book.settings.dangerText":    "Löscht alle deine Lektorate, Buchbewertungen und Chats zu diesem Buch. Andere Nutzer sind nicht betroffen. Nicht rückgängig zu machen.",
   "book.settings.dangerButton":  "Historie für dieses Buch löschen",
@@ -1614,8 +1616,6 @@
 
   "profile.editorSection":              "Editor",
   "profile.focusGranularity":           "Fokus-Granularität",
-  "profile.dailyGoalChars":             "Tagesziel (Zeichen)",
-  "profile.dailyGoalCharsHint":         "Zielwert für den Heute-Ring auf der Buch-Übersicht. 1500 Zeichen ≈ 1 Normseite.",
   "profile.focusGranularityHint":       "Bestimmt, was im Fokus-Modus hervorgehoben wird – der ganze Absatz, nur ein Satz, ein Absatz-Fenster oder gar nichts (nur Typewriter-Scroll).",
   "profile.focus.paragraph":            "Absatz (Standard)",
   "profile.focus.sentence":             "Satz",

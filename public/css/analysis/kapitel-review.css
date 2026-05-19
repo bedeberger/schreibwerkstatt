@@ -1,19 +1,19 @@
 @layer components {
 /* === Kapitel-Review: verdichtete Seitenliste + Quick-Add === */
 
-/* Toggle „Inkl. Sub-Kapitel" in der Action-Bar.
-   min-height = Button-Höhe, damit Label optisch mit benachbarten Buttons eingemittet wirkt. */
-.kapitel-include-subs {
+/* Toggle „Inkl. Sub-Kapitel" als regulärer Action-Button. Icon-Wechsel
+   signalisiert Zustand (chevron-down = off, check = on). `.primary`-Klasse
+   wird per Alpine gesetzt — gleiche Active-Optik wie Ideen-Button. */
+.kapitel-include-subs-btn {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2xs);
-  min-height: 2.25rem;
-  font-size: var(--font-size-sm);
-  color: var(--color-muted);
-  cursor: pointer;
-  user-select: none;
+  gap: var(--space-6);
 }
-.kapitel-include-subs input { margin: 0; cursor: pointer; }
+.kapitel-include-subs-btn .icon {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
 
 .kapitel-pages-section {
   margin: var(--space-sm) 0 16px;
@@ -117,50 +117,85 @@
 .tok-tree-words,
 .tok-tree-chars { display: none; }
 
-/* === Sub-Kapitel-Sektion: pro Sub eigene Card-im-Card mit Indent-Stufe === */
+/* === Sub-Kapitel-Sektion: aufgelockerte Card-im-Card mit Indent-Stufe === */
 .kapitel-subchapters {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
-  margin-bottom: var(--space-10);
+  gap: var(--space-md);
+  margin: var(--space-md) 0 var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--color-border);
 }
 .kapitel-subchapters-heading {
   font-size: var(--font-size-xs);
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--color-muted);
-  margin-bottom: var(--space-2xs);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  align-self: flex-start;
+}
+.kapitel-subchapters-heading:hover { color: var(--color-text); }
+.kapitel-subchapters-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
 }
 .kapitel-subchapter {
-  padding-left: calc((var(--sub-depth, 1) - 1) * var(--space-md));
-  border-left: 2px solid var(--color-border);
-  padding-top: var(--space-2xs);
-  padding-bottom: var(--space-2xs);
+  margin-left: calc((var(--sub-depth, 1) - 1) * var(--space-lg));
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-bg, #fff);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 1px 0 rgba(0,0,0,0.02);
 }
 .kapitel-subchapter-header {
   display: flex;
   align-items: center;
-  gap: var(--space-6);
-  padding: var(--space-5) var(--space-2xs);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: background var(--transition-base);
+  gap: var(--space-sm);
+  min-height: 1.75rem;
 }
-.kapitel-subchapter-header:hover { background: var(--color-hover-light); }
+.kapitel-subchapter-chevron {
+  background: transparent;
+  border: 0;
+  padding: var(--space-2xs);
+  margin: 0;
+  cursor: pointer;
+  color: var(--color-muted);
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+.kapitel-subchapter-chevron:hover { background: var(--color-hover-light); color: var(--color-text); }
 .kapitel-subchapter-name {
   font-weight: 600;
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-base, 1rem);
   color: var(--color-text);
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: pointer;
+  padding: var(--space-2xs) var(--space-6);
+  border-radius: var(--radius-sm);
+}
+.kapitel-subchapter-name:hover {
+  background: var(--color-hover-light);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
 }
 .kapitel-subchapter .kapitel-pages-list {
-  margin-bottom: 0;
-  margin-left: var(--space-md);
+  margin: var(--space-6) 0 var(--space-2xs) calc(var(--space-lg) + var(--space-2xs));
+  gap: var(--space-2xs);
 }
 
 @media (max-width: 700px) {

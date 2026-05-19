@@ -24,6 +24,10 @@ export function registerKapitelReviewCard() {
     _kapitelReviewByChapter: {}, // { [chapterId]: emptySlot() }
     // Per-Kapitel-Flag „Sub-Kapitel mitbewerten" (default true wenn Subs vorhanden).
     _includeSubchaptersByChapter: {},
+    // Per-Sub-Kapitel Collapse-State in der Sub-Kapitel-Section
+    // (default offen, User kann pro Sub zuklappen).
+    _subOpenByChapter: {},
+    _subSectionOpen: true,
     _lifecycle: null,
 
     init() {
@@ -360,6 +364,23 @@ export function registerKapitelReviewCard() {
       };
       walk(String(id), 1);
       return result;
+    },
+
+    isSubchapterOpen(subId) {
+      const k = String(subId || '');
+      if (!k) return false;
+      return k in this._subOpenByChapter ? !!this._subOpenByChapter[k] : true;
+    },
+
+    toggleSubchapterOpen(subId) {
+      const k = String(subId || '');
+      if (!k) return;
+      const current = this.isSubchapterOpen(k);
+      this._subOpenByChapter = { ...this._subOpenByChapter, [k]: !current };
+    },
+
+    toggleSubSection() {
+      this._subSectionOpen = !this._subSectionOpen;
     },
 
     kapitelReviewSelectedChapter() {

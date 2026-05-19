@@ -14,7 +14,6 @@ export function registerUserSettingsCard() {
     userSettingsDefaultRegion: '',
     userSettingsDefaultBuchtyp: '',
     userSettingsFocusGranularity: 'paragraph',
-    userSettingsDailyGoalChars: 1500,
     userSettingsLoading: false,
     userSettingsSaving: false,
     userSettingsSaved: false,

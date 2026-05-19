@@ -250,6 +250,8 @@
   "book.settings.status":        "Status",
   "book.settings.finished":      "Book is finished",
   "book.settings.finished.desc": "Hides the daily writing tiles in the book overview (trend, 7-day bars, today ring, streak heatmap).",
+  "book.settings.dailyGoalChars":     "Daily goal (characters)",
+  "book.settings.dailyGoalCharsHint": "Target value for the Today ring in the header and on the book overview. 1500 characters ≈ 1 standard page.",
   "book.settings.dangerZone":    "Danger zone",
   "book.settings.dangerText":    "Deletes all your page edits, book reviews and chats for this book. Other users are not affected. This cannot be undone.",
   "book.settings.dangerButton":  "Delete history for this book",
@@ -1613,8 +1615,6 @@
 
   "profile.editorSection":              "Editor",
   "profile.focusGranularity":           "Focus granularity",
-  "profile.dailyGoalChars":             "Daily goal (characters)",
-  "profile.dailyGoalCharsHint":         "Target value for the Today ring on the book overview. 1500 characters ≈ 1 standard page.",
   "profile.focusGranularityHint":       "Controls what gets highlighted in focus mode – the whole paragraph, just one sentence, a paragraph window, or nothing at all (typewriter scroll only).",
   "profile.focus.paragraph":            "Paragraph (default)",
   "profile.focus.sentence":             "Sentence",

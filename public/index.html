@@ -274,7 +274,8 @@
       <div id="partial-komplett-status"></div>
     </div>
     <!-- Heute-Ring im Header: Donut links neben Avatar. Pulsiert bei aktivem
-         Schreibtag, fuellt sich gegen daily_goal_chars. Klick oeffnet Buch-Overview. -->
+         Schreibtag, fuellt sich gegen book_settings.daily_goal_chars (per Buch).
+         Klick oeffnet Buch-Overview. -->
     <template x-if="currentUser && !isAdminOnly && selectedBookId && dailyProgressBookId == selectedBookId && !dailyProgressIsFinished">
       <button type="button"
               class="header-today-ring"

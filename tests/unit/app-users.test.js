@@ -67,9 +67,10 @@ test('users-Tabelle entfernt (Migration 129)', () => {
 test('app_users hat konsolidierte Settings-Spalten', () => {
   const cols = db.pragma('table_info(app_users)').map(c => c.name);
   for (const c of ['last_login_at', 'theme', 'default_buchtyp', 'default_language',
-                   'default_region', 'focus_granularity', 'daily_goal_chars']) {
+                   'default_region', 'focus_granularity']) {
     assert.ok(cols.includes(c), `app_users.${c} fehlt`);
   }
+  assert.ok(!cols.includes('daily_goal_chars'), 'daily_goal_chars lebt seit Mig 136 in book_settings, nicht mehr in app_users');
 });
 
 test('createUser + getUser', () => {
@@ -196,7 +197,6 @@ test('updateUserSettings + getUser: language + theme + default_* persistiert', (
     default_language: 'en',
     default_region: 'US',
     focus_granularity: 'sentence',
-    daily_goal_chars: 1200,
   });
   const u = appUsers.getUser('settings@example.com');
   assert.equal(u.language, 'en');
@@ -204,7 +204,6 @@ test('updateUserSettings + getUser: language + theme + default_* persistiert', (
   assert.equal(u.default_buchtyp, 'roman');
   assert.equal(u.default_region, 'US');
   assert.equal(u.focus_granularity, 'sentence');
-  assert.equal(u.daily_goal_chars, 1200);
 });
 
 test('touchUserLastSeen aktualisiert last_seen_at', () => {

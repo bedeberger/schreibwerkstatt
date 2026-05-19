@@ -21,6 +21,7 @@ export function registerBookOverviewCard() {
     overviewSongs: [],
     overviewLektoratTime: null,
     overviewIsFinished: false,
+    overviewDailyGoalChars: null,
 
     _onBookChanged: null,
     _onViewReset: null,

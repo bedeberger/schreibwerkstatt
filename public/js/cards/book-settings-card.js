@@ -16,6 +16,7 @@ export function registerBookSettingsCard() {
     bookSettingsErzaehlzeit: '',
     bookSettingsIsFinished: false,
     bookSettingsAllowLektorBookChat: false,
+    bookSettingsDailyGoalChars: 1500,
     // Sharing: Access-Liste + Invite-Form.
     bookAccessList: [],
     bookAccessLoading: false,

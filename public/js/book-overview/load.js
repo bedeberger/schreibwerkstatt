@@ -56,6 +56,7 @@ export const loadMethods = {
       this.overviewSongs = Array.isArray(songs?.songs) ? songs.songs : [];
       this.overviewLektoratTime = lektoratTime || null;
       this.overviewIsFinished = !!settings?.is_finished;
+      this.overviewDailyGoalChars = settings?.daily_goal_chars != null ? Number(settings.daily_goal_chars) : null;
       this._memos = {};
     } catch (e) {
       console.error('[loadBookOverview]', e);
@@ -183,6 +184,7 @@ export const loadMethods = {
     this.overviewSongs = [];
     this.overviewLektoratTime = null;
     this.overviewIsFinished = false;
+    this.overviewDailyGoalChars = null;
     this.overviewBookId = null;
     this._memos = {};
   },

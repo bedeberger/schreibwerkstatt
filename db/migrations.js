@@ -5797,6 +5797,90 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 135 abgeschlossen (chapters.parent_chapter_id fuer Hierarchie).');
   }
 
+  if (version < 136) {
+    // Tagesziel wandert vom User-Profil aufs Buch. Pro-Buch-Konfiguration
+    // passt besser, weil ein Autor mehrere Bücher parallel betreut und das
+    // Zielvolumen pro Projekt unterschiedlich ist.
+    const bsCols136 = db.pragma('table_info(book_settings)').map(c => c.name);
+    if (!bsCols136.includes('daily_goal_chars')) {
+      db.prepare('ALTER TABLE book_settings ADD COLUMN daily_goal_chars INTEGER').run();
+    }
+    // Backfill: existierende book_settings-Zeilen erben den daily_goal_chars
+    // ihres Buch-Owners (best effort). NULL bleibt NULL — Frontend fällt auf
+    // 1500 zurück (eine Normseite).
+    db.prepare(`
+      UPDATE book_settings
+         SET daily_goal_chars = (
+           SELECT au.daily_goal_chars
+             FROM books b
+             JOIN app_users au ON au.email = b.owner_email
+            WHERE b.book_id = book_settings.book_id
+              AND au.daily_goal_chars IS NOT NULL
+         )
+       WHERE daily_goal_chars IS NULL
+    `).run();
+
+    // app_users.daily_goal_chars entfällt (Recreate-Pattern).
+    db.pragma('foreign_keys = OFF');
+    db.exec('DROP TABLE IF EXISTS app_users_new');
+    db.exec(`
+      CREATE TABLE app_users_new (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        email            TEXT NOT NULL UNIQUE,
+        display_name     TEXT,
+        avatar_url       TEXT,
+        global_role      TEXT NOT NULL DEFAULT 'user'
+                              CHECK(global_role IN ('admin','user')),
+        status           TEXT NOT NULL DEFAULT 'active'
+                              CHECK(status IN ('invited','active','suspended','deleted')),
+        language         TEXT DEFAULT 'de',
+        model_override   TEXT,
+        can_invite_users INTEGER NOT NULL DEFAULT 1,
+        first_seen_at    TEXT,
+        last_seen_at     TEXT,
+        invited_by       TEXT,
+        invited_at       TEXT,
+        created_at       TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        monthly_budget_usd REAL,
+        budget_mode      TEXT NOT NULL DEFAULT 'none'
+                              CHECK(budget_mode IN ('none','soft','hard')),
+        ai_provider_override TEXT
+                              CHECK(ai_provider_override IN ('claude','ollama','llama') OR ai_provider_override IS NULL),
+        last_login_at    TEXT,
+        theme            TEXT,
+        default_buchtyp  TEXT,
+        default_language TEXT,
+        default_region   TEXT,
+        focus_granularity TEXT
+      )
+    `);
+    db.exec(`
+      INSERT INTO app_users_new (id, email, display_name, avatar_url, global_role, status,
+                                 language, model_override, can_invite_users, first_seen_at,
+                                 last_seen_at, invited_by, invited_at, created_at,
+                                 monthly_budget_usd, budget_mode, ai_provider_override,
+                                 last_login_at, theme, default_buchtyp, default_language,
+                                 default_region, focus_granularity)
+      SELECT id, email, display_name, avatar_url, global_role, status,
+             language, model_override, can_invite_users, first_seen_at,
+             last_seen_at, invited_by, invited_at, created_at,
+             monthly_budget_usd, budget_mode, ai_provider_override,
+             last_login_at, theme, default_buchtyp, default_language,
+             default_region, focus_granularity
+        FROM app_users
+    `);
+    db.exec('DROP TABLE app_users');
+    db.exec('ALTER TABLE app_users_new RENAME TO app_users');
+    db.pragma('foreign_keys = ON');
+
+    const fkErrors136 = db.pragma('foreign_key_check');
+    if (fkErrors136.length) {
+      throw new Error(`Migration 136: foreign_key_check meldet ${fkErrors136.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 136').run();
+    logger.info('DB-Migration auf Version 136 abgeschlossen (Tagesziel pro Buch: book_settings.daily_goal_chars hinzugefuegt, app_users.daily_goal_chars entfernt).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

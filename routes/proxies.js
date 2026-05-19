@@ -47,7 +47,6 @@ router.get('/config', (req, res) => {
         default_language:  appUser.default_language,
         default_region:    appUser.default_region,
         focus_granularity: appUser.focus_granularity,
-        daily_goal_chars:  appUser.daily_goal_chars,
       };
     }
   }

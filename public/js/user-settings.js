@@ -14,7 +14,6 @@ export const userSettingsMethods = {
       this.userSettingsDefaultRegion    = data.default_region    || '';
       this.userSettingsDefaultBuchtyp   = data.default_buchtyp   || '';
       this.userSettingsFocusGranularity = data.focus_granularity || 'paragraph';
-      this.userSettingsDailyGoalChars   = data.daily_goal_chars != null ? Number(data.daily_goal_chars) : 1500;
     } catch (e) {
       console.error('[user-settings] Laden fehlgeschlagen:', e);
     } finally {
@@ -35,7 +34,6 @@ export const userSettingsMethods = {
           default_region:    this.userSettingsDefaultRegion    || null,
           default_buchtyp:   this.userSettingsDefaultBuchtyp   || null,
           focus_granularity: this.userSettingsFocusGranularity || 'paragraph',
-          daily_goal_chars:  Number.isFinite(Number(this.userSettingsDailyGoalChars)) ? Number(this.userSettingsDailyGoalChars) : null,
         }),
       });
       if (!r.ok) {
@@ -47,12 +45,6 @@ export const userSettingsMethods = {
       const region = this.userSettingsDefaultRegion || (window.__app.uiLocale === 'en' ? 'US' : 'CH');
       window.__app.defaultRegion = region;
       document.documentElement.setAttribute('lang', `${window.__app.uiLocale || 'de'}-${region}`);
-      // Tile liest currentUser.daily_goal_chars; sofort spiegeln, damit
-      // Heute-Ring nach Save ohne Reload das neue Ziel zeigt.
-      if (window.__app.currentUser) {
-        window.__app.currentUser.daily_goal_chars = Number.isFinite(Number(this.userSettingsDailyGoalChars))
-          ? Number(this.userSettingsDailyGoalChars) : null;
-      }
       this.userSettingsSaved = true;
       if (this._savedAtTimer) clearTimeout(this._savedAtTimer);
       this._savedAtTimer = setTimeout(() => { this.userSettingsSaved = false; this._savedAtTimer = null; }, 2500);

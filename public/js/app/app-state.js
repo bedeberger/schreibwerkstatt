@@ -418,6 +418,7 @@ const dailyProgressState = () => ({
   dailyProgressBookId: null,
   dailyProgressStats: [],
   dailyProgressIsFinished: false,
+  dailyProgressDailyGoalChars: null,
   _dailyProgressLoadingBookId: null,
 });
 

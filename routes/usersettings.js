@@ -40,11 +40,6 @@ const VALID_REGIONS   = ['CH', 'DE', 'US', 'GB'];
 const VALID_BUCHTYPEN = ['roman', 'kurzgeschichten', 'gesellschaft', 'krimi', 'historisch', 'fantasy_scifi', 'erotik', 'jugend', 'autobiografie', 'andere'];
 const VALID_FOCUS_GRANULARITIES = ['paragraph', 'sentence', 'window-3', 'typewriter-only'];
 
-// Tagesziel: 100 Zeichen ≈ kurzer Tweet (Untergrenze gegen Tippfehler),
-// 50 000 ≈ 33 Normseiten als praktisches Maximum.
-const DAILY_GOAL_MIN = 100;
-const DAILY_GOAL_MAX = 50000;
-
 const FIELDS = [
   { key: 'locale',            allowed: VALID_LOCALES,             label: 'locale' },
   { key: 'theme',             allowed: VALID_THEMES,              label: 'theme' },
@@ -52,12 +47,6 @@ const FIELDS = [
   { key: 'default_language',  allowed: VALID_LANGUAGES,           label: 'default_language' },
   { key: 'default_region',    allowed: VALID_REGIONS,             label: 'default_region' },
   { key: 'focus_granularity', allowed: VALID_FOCUS_GRANULARITIES, label: 'focus_granularity' },
-];
-
-// Numerische Felder mit Range-Check (parallel zu FIELDS, weil
-// Allowed-Array-Schema dort nicht passt).
-const NUMERIC_FIELDS = [
-  { key: 'daily_goal_chars', min: DAILY_GOAL_MIN, max: DAILY_GOAL_MAX, label: 'daily_goal_chars' },
 ];
 
 // app_users.language ist die Spalte; nach aussen heisst sie `locale` (API-Vertrag).
@@ -74,7 +63,6 @@ function toResponse(u) {
     default_language:  u.default_language,
     default_region:    u.default_region,
     focus_granularity: u.focus_granularity,
-    daily_goal_chars:  u.daily_goal_chars,
     role:              u.global_role || 'user',
     status:            u.status || 'active',
     can_invite_users:  u.can_invite_users ? 1 : 0,
@@ -111,7 +99,6 @@ const FIELD_TO_COLUMN = {
   default_language:  'default_language',
   default_region:    'default_region',
   focus_granularity: 'focus_granularity',
-  daily_goal_chars:  'daily_goal_chars',
 };
 
 /** Partielles Update. Nicht übergebene Felder bleiben unverändert;
@@ -130,26 +117,12 @@ router.patch('/settings', jsonBody, (req, res) => {
     }
   }
 
-  for (const { key, min, max, label } of NUMERIC_FIELDS) {
-    if (body[key] === undefined || body[key] === null || body[key] === '') continue;
-    const n = Number(body[key]);
-    if (!Number.isFinite(n) || !Number.isInteger(n) || n < min || n > max) {
-      return res.status(400).json({ error_code: 'INVALID_VALUE', params: { field: label, allowed: `${min}–${max}` } });
-    }
-  }
-
   const merged = {};
   for (const { key } of FIELDS) {
     const col = FIELD_TO_COLUMN[key];
     if (body[key] === undefined)                     merged[col] = existing[col];
     else if (body[key] === '' || body[key] === null) merged[col] = null;
     else                                             merged[col] = body[key];
-  }
-  for (const { key } of NUMERIC_FIELDS) {
-    const col = FIELD_TO_COLUMN[key];
-    if (body[key] === undefined)                     merged[col] = existing[col];
-    else if (body[key] === '' || body[key] === null) merged[col] = null;
-    else                                             merged[col] = Number(body[key]);
   }
 
   updateUserSettings(email, merged);

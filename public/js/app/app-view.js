@@ -625,6 +625,7 @@ export const appViewMethods = {
       if (this.selectedBookId != bookId) return;
       this.dailyProgressStats = Array.isArray(stats) ? stats : [];
       this.dailyProgressIsFinished = !!settings?.is_finished;
+      this.dailyProgressDailyGoalChars = settings?.daily_goal_chars != null ? Number(settings.daily_goal_chars) : null;
       this.dailyProgressBookId = bookId;
     } finally {
       if (this._dailyProgressLoadingBookId === bookId) this._dailyProgressLoadingBookId = null;
@@ -634,6 +635,7 @@ export const appViewMethods = {
   resetDailyProgress() {
     this.dailyProgressStats = [];
     this.dailyProgressIsFinished = false;
+    this.dailyProgressDailyGoalChars = null;
     this.dailyProgressBookId = null;
   },
 
@@ -644,7 +646,7 @@ export const appViewMethods = {
       stats: this.dailyProgressStats,
       tokEsts: this.tokEsts,
       tree: this.tree,
-      goalChars: this.currentUser?.daily_goal_chars || 1500,
+      goalChars: this.dailyProgressDailyGoalChars || 1500,
       r: 14,
     });
   },
