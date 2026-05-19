@@ -4,6 +4,7 @@
 // Bereiche:
 //   - lastPage:<email>:<bookId>            -> letzte geöffnete Seiten-ID
 //   - filters:<email>:<bookId>:<scope>     -> Filter-Objekt pro Karten-Scope
+//   - userpref:<email>:<key>               -> book-unabhängiger User-Pref (JSON)
 
 const PREFIX = 'sw';
 
@@ -54,5 +55,25 @@ export function setFilters(email, bookId, scope, filters) {
   if (!bookId || !scope) return;
   try {
     safeSet(filtersKey(email, bookId, scope), JSON.stringify(filters || {}));
+  } catch {}
+}
+
+// Book-unabhängiger User-Pref. Für View-Settings, die nicht pro Buch variieren
+// (z.B. Chart-Metric in BookStats). JSON-serialisiert, fallback-tolerant.
+function userPrefKey(email, key) {
+  return `${PREFIX}:userpref:${email || ''}:${key}`;
+}
+
+export function getUserPref(email, key, fallback = null) {
+  if (!key) return fallback;
+  const raw = safeGet(userPrefKey(email, key));
+  if (raw == null) return fallback;
+  try { return JSON.parse(raw); } catch { return fallback; }
+}
+
+export function setUserPref(email, key, value) {
+  if (!key) return;
+  try {
+    safeSet(userPrefKey(email, key), JSON.stringify(value));
   } catch {}
 }

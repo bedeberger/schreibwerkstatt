@@ -6,6 +6,10 @@
 
 import { bookstatsMethods, _destroyStatsChart, _disconnectThemeObserver } from '../book/bookstats.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
+import { getUserPref, setUserPref } from '../local-prefs.js';
+
+const METRIC_PREF_KEY = 'bookStatsMetric';
+const METRIC_DEFAULT = 'chars';
 
 export function registerBookStatsCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -13,7 +17,7 @@ export function registerBookStatsCard() {
     bookStatsData: [],
     bookStatsLoading: false,
     bookStatsSyncStatus: '',
-    bookStatsMetric: 'chars',
+    bookStatsMetric: METRIC_DEFAULT,
     bookStatsRange: 0,
     bookStatsCoverage: null,
     bookStatsDelta: null,
@@ -22,6 +26,14 @@ export function registerBookStatsCard() {
     _lifecycle: null,
 
     init() {
+      // Metric-Pref (per-user, book-unabhängig) aus localStorage holen,
+      // damit User die zuletzt gewählte Chart-Metrik wieder bekommt.
+      const email = window.__app?.currentUser?.email;
+      this.bookStatsMetric = getUserPref(email, METRIC_PREF_KEY, METRIC_DEFAULT);
+      this.$watch('bookStatsMetric', (v) => {
+        setUserPref(window.__app?.currentUser?.email, METRIC_PREF_KEY, v);
+      });
+
       // Deep-Link aus Overview-Tiles: metric + range vorab setzen, damit der
       // Chart direkt mit dem gewünschten Filter rendert. Daten sind ggf. schon
       // geladen (renderStatsChart() reicht), sonst zieht der showBookStatsCard-
