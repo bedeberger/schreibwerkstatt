@@ -83,6 +83,8 @@ const navigationState = () => ({
   _pageIdOrderMap: null,
   pageSearch: '',
   pageSearchActiveIndex: 0,
+  _pageSearchActiveId: null,
+  _filteredTreeMemo: null,
   newChapterTitle: '',
   newChapterCreating: false,
   newChapterError: '',

@@ -166,8 +166,8 @@
                     :aria-label="$app.t('bookOrganizer.deleteChapter')">×</button>
           </div>
         </div>
-        <ul class="organizer-pages" data-organizer="page-list" :data-chapter-id="ch.id"
-            x-show="organizerSearch ? true : chapterOpen[ch.id]">
+        <template x-if="organizerSearch ? true : chapterOpen[ch.id]">
+        <ul class="organizer-pages" data-organizer="page-list" :data-chapter-id="ch.id">
           <template x-for="page in ch.pages" :key="page.id">
             <li class="organizer-page" :data-page-id="page.id">
               <span class="organizer-drag-handle" :data-tip="$app.t('bookOrganizer.dragHint')" aria-hidden="true">⋮⋮</span>

@@ -29,6 +29,10 @@
   color: var(--color-surface);
   border-color: var(--color-primary);
 }
+.book-filter-pill.is-active .btn-count {
+  background: rgba(255, 255, 255, 0.25);
+  color: var(--color-surface);
+}
 .book-filter-pill--tag { font-style: italic; }
 .book-filter-clear {
   margin-left: auto;

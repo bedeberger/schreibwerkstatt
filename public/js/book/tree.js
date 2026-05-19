@@ -294,6 +294,14 @@ export const treeMethods = {
     });
   },
 
+  bookCountForCategory(catId) {
+    if (!catId) return 0;
+    const key = String(catId);
+    let n = 0;
+    for (const b of this.books) if (String(b.category_id) === key) n++;
+    return n;
+  },
+
   toggleBookFilterTag(tagId) {
     const i = this.bookFilterTagIds.indexOf(tagId);
     if (i >= 0) this.bookFilterTagIds.splice(i, 1);
@@ -367,6 +375,9 @@ export const treeMethods = {
       // Reassignment am Ende ersetzt die Daten in-place.
       if (opts.source !== 'wake') {
         this.pageSearch = '';
+        this.pageSearchActiveIndex = 0;
+        this._pageSearchActiveId = null;
+        this._filteredTreeMemo = null;
         this.tokEsts = {};
         this.pageLastChecked = {};
         this.ideenCounts = {};

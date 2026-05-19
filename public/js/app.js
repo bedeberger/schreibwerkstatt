@@ -435,8 +435,9 @@ document.addEventListener('alpine:init', () => {
     },
 
     get filteredTree() {
+      const tree = this.tree;
       if (!this.pageSearch) {
-        const byId = new Map(this.tree.map(it => [it.id, it]));
+        const byId = new Map(tree.map(it => [it.id, it]));
         const isVisible = (item) => {
           let cur = item;
           while (cur.parent_id) {
@@ -447,12 +448,16 @@ document.addEventListener('alpine:init', () => {
           }
           return true;
         };
-        return this.tree.filter(isVisible);
+        return tree.filter(isVisible);
       }
       const q = this.pageSearch.toLowerCase();
+      // Memo: Search-Branch ist N²-Gefahr (filteredTree wird pro Page-Row
+      // gelesen). Ref-Vergleich `tree` + identische Query → Cache-Hit.
+      const memo = this._filteredTreeMemo;
+      if (memo && memo.tree === tree && memo.q === q) return memo.val;
       // Erste Pass: Kapitel mit matchenden Seiten finden.
       const matched = new Map(); // chapter-id -> filtered-pages[]
-      for (const item of this.tree) {
+      for (const item of tree) {
         if (item.solo) {
           if (item.name.toLowerCase().includes(q) || item.pages[0]?.name?.toLowerCase().includes(q)) {
             matched.set(item.id, item.pages);
@@ -464,7 +469,7 @@ document.addEventListener('alpine:init', () => {
       }
       // Zweite Pass: Vorfahren matchender Kapitel auch aufnehmen (mit leerem
       // Page-Filter), damit nested-Subchapter-Treffer ihren Eltern-Header zeigen.
-      const itemById = new Map(this.tree.map(it => [it.id, it]));
+      const itemById = new Map(tree.map(it => [it.id, it]));
       const addAncestors = (id) => {
         const it = itemById.get(id);
         if (!it?.parent_id) return;
@@ -472,9 +477,11 @@ document.addEventListener('alpine:init', () => {
         addAncestors(it.parent_id);
       };
       for (const id of [...matched.keys()]) addAncestors(id);
-      return this.tree
+      const val = tree
         .filter(item => matched.has(item.id))
         .map(item => ({ ...item, pages: matched.get(item.id), open: true }));
+      this._filteredTreeMemo = { tree, q, val };
+      return val;
     },
 
     // AbortController `_abortCtrl` (initialisiert via app-state.js) hält alle
@@ -536,6 +543,12 @@ document.addEventListener('alpine:init', () => {
       // Kein $watch('tree') — refresh mutiert item.stats und würde sich rekursiv
       // selbst triggern (Alpine-Deep-Reactivity → Browser-Freeze).
       this.$watch('tokEsts', () => this._refreshChapterStats());
+      // Sidebar-Suche: bei jedem (debounced) pageSearch-Write Index auf
+      // ersten Treffer und kbd-aktive Page-ID neu setzen.
+      this.$watch('pageSearch', () => {
+        this.pageSearchActiveIndex = 0;
+        this._recomputePageSearchActiveId();
+      });
       // Shell zuerst aufbauen: i18n + Partials brauchen nur statische Assets
       // (Service Worker cacht sie). /config kann danach scheitern, ohne dass
       // das UI leer bleibt – Offline-Banner erscheint stattdessen.

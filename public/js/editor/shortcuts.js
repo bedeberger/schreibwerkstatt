@@ -100,19 +100,14 @@ export const shortcutsMethods = {
   },
 
   // ID des aktuell tastatur-aktiven Treffers; null wenn keine Suche aktiv.
-  // Methode statt Getter, weil shortcutsMethods via `...` ins Alpine.data
-  // gespreaded wird (Spread würde den Getter zur Build-Zeit evaluieren).
-  _pageSearchActivePageId() {
-    if (!this.pageSearch) return null;
+  // Wert lebt in `_pageSearchActiveId` (state-Feld), nicht als Getter — sonst
+  // wird per Page-Row aufgerufen → triggert filteredTree-Compute pro Item (N²).
+  _recomputePageSearchActiveId() {
+    if (!this.pageSearch) { this._pageSearchActiveId = null; return; }
     const flat = this._pageSearchFlatPages();
-    if (!flat.length) return null;
+    if (!flat.length) { this._pageSearchActiveId = null; return; }
     const idx = Math.max(0, Math.min(this.pageSearchActiveIndex, flat.length - 1));
-    return flat[idx].id;
-  },
-
-  onPageSearchInput() {
-    // Jede Tipp-Änderung setzt die Auswahl auf den ersten Treffer zurück.
-    this.pageSearchActiveIndex = 0;
+    this._pageSearchActiveId = flat[idx].id;
   },
 
   // ArrowDown/Up navigiert Treffer, Enter wechselt zur Seite, Escape leert
@@ -123,6 +118,7 @@ export const shortcutsMethods = {
       if (this.pageSearch) {
         this.pageSearch = '';
         this.pageSearchActiveIndex = 0;
+        this._pageSearchActiveId = null;
         event.preventDefault();
       } else {
         event.target.blur();
@@ -141,6 +137,7 @@ export const shortcutsMethods = {
         this.selectPage(page);
         this.pageSearch = '';
         this.pageSearchActiveIndex = 0;
+        this._pageSearchActiveId = null;
         event.target.blur();
       }
       return;
@@ -148,6 +145,7 @@ export const shortcutsMethods = {
     event.preventDefault();
     if (k === 'ArrowDown') this.pageSearchActiveIndex = (this.pageSearchActiveIndex + 1) % len;
     else this.pageSearchActiveIndex = (this.pageSearchActiveIndex - 1 + len) % len;
+    this._pageSearchActiveId = flat[this.pageSearchActiveIndex]?.id ?? null;
     this.$nextTick(() => {
       const id = flat[this.pageSearchActiveIndex]?.id;
       if (id == null) return;

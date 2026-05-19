@@ -11,7 +11,7 @@
   <div class="search-wrap sidebar-search-wrap">
     <span class="search-affix">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=635#search"/></svg>
-      <input type="text" x-model="pageSearch" @input="onPageSearchInput()" @keydown="onPageSearchKeydown($event)" :placeholder="t('sidebar.searchPage')" :aria-label="t('sidebar.searchPage')" :data-tip="t('sidebar.searchPageTitle')" class="page-search">
+      <input type="text" x-model.debounce.200ms="pageSearch" @keydown="onPageSearchKeydown($event)" :placeholder="t('sidebar.searchPage')" :aria-label="t('sidebar.searchPage')" :data-tip="t('sidebar.searchPageTitle')" class="page-search">
     </span>
     <div class="btn-group sidebar-action-group">
       <button type="button" class="graph-tool-btn"
@@ -83,7 +83,7 @@
       <div x-show="item.solo || item.open" class="tree-chapter-pages">
         <template x-for="page in item.pages" :key="page.id">
           <div class="page-item"
-               :class="{ selected: currentPage?.id === page.id, 'page-item--empty': tokEsts[page.id] && tokEsts[page.id].words === 0, 'page-item--kb-active': _pageSearchActivePageId() === page.id, 'page-item--remote-edit': recentRemoteEdits.has(page.id) }"
+               :class="{ selected: currentPage?.id === page.id, 'page-item--empty': tokEsts[page.id] && tokEsts[page.id].words === 0, 'page-item--kb-active': _pageSearchActiveId === page.id, 'page-item--remote-edit': recentRemoteEdits.has(page.id) }"
                :data-page-id="page.id" role="button" tabindex="0"
                :aria-current="currentPage?.id === page.id ? 'page' : null"
                :data-tip="recentRemoteEdits.has(page.id) ? t('collab.tree.remoteEditTip') : null"

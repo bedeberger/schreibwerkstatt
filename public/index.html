@@ -317,8 +317,10 @@
       <button type="button"
               class="book-filter-pill"
               :class="{ 'is-active': String(bookFilterCategoryId) === String(cat.id) }"
-              @click="bookFilterCategoryId = String(bookFilterCategoryId) === String(cat.id) ? '' : String(cat.id)"
-              x-text="cat.name"></button>
+              @click="bookFilterCategoryId = String(bookFilterCategoryId) === String(cat.id) ? '' : String(cat.id)">
+        <span x-text="cat.name"></span>
+        <span class="btn-count" x-text="bookCountForCategory(cat.id)"></span>
+      </button>
     </template>
     <template x-for="tag in bookFilterTagPool" :key="'t' + tag.id">
       <button type="button"

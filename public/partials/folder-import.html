@@ -90,6 +90,20 @@
         </template>
       </ul>
     </div>
+    <div x-data="{ open: false }" x-show="(result?.auditLog?.length || 0) > 0" class="folder-import-log-block">
+      <button type="button" class="collapsible-toggle" @click="open = !open" :aria-expanded="open">
+        <svg class="icon history-chevron" :class="{ 'is-open': open }" aria-hidden="true"><use href="/icons.svg#chevron-right"/></svg>
+        <span x-text="$app.t('folderImport.result.logDetails', { n: result?.auditLog?.length || 0 })"></span>
+      </button>
+      <ul class="folder-import-log" x-show="open" x-cloak>
+        <template x-for="(entry, idx) in (result?.auditLog || [])" :key="idx">
+          <li :class="'folder-import-log-line is-' + entry.level">
+            <time x-text="new Date(entry.ts).toLocaleTimeString($app.uiLocale === 'en' ? 'en-US' : 'de-CH')"></time>
+            <span x-text="entry.msg"></span>
+          </li>
+        </template>
+      </ul>
+    </div>
     <div class="folder-import-actions">
       <button type="button" class="btn-compact" @click="reset()" x-text="$app.t('folderImport.again')"></button>
     </div>

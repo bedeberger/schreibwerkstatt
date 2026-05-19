@@ -80,6 +80,19 @@ async function _detectDatesViaAI(samples, log) {
 
 async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) {
   const log = makeJobLogger(jobId);
+  // Audit-Log: jeder User-relevante Schritt landet hier UND in den Winston-Logs.
+  // Result-JSON liefert das Array ans Frontend (Collapsible "Import-Log").
+  const auditLog = [];
+  const skipped = [];
+  const audit = (level, msg) => {
+    auditLog.push({ level, msg, ts: new Date().toISOString() });
+    if (level === 'warn') log.warn(msg);
+    else log.info(msg);
+  };
+  const recordSkip = (path, reason) => {
+    skipped.push({ path, reason });
+    audit('warn', `skip ${path}: ${reason}`);
+  };
   try {
     const entry = importBuffers.get(jobId);
     if (!entry) throw i18nError('job.error.importBufferMissing');
@@ -89,17 +102,16 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
     const zip = await JSZip.loadAsync(buffer);
 
     const files = [];
-    const skipped = [];
     zip.forEach((relativePath, file) => {
       if (file.dir) return;
       const parsed = _parsePath(relativePath);
       if (!parsed) {
-        skipped.push({ path: relativePath, reason: 'BAD_PATH' });
+        recordSkip(relativePath, 'BAD_PATH');
         return;
       }
       const ext = extOf(parsed.file);
       if (!SUPPORTED_EXTS.has(ext)) {
-        skipped.push({ path: relativePath, reason: 'UNSUPPORTED_EXT' });
+        recordSkip(relativePath, 'UNSUPPORTED_EXT');
         return;
       }
       files.push({ relativePath, zipEntry: file, ...parsed });
@@ -108,7 +120,7 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
     if (!files.length) {
       throw i18nError('job.error.emptyArchive');
     }
-    log.info(`folder-import: ${files.length} Dateien gefunden, ${skipped.length} skipped`);
+    audit('info', `${files.length} Dateien gefunden, ${skipped.length} skipped`);
 
     updateJob(jobId, { progress: 10, statusText: 'job.folder-import.detectingDates' });
 
@@ -119,11 +131,11 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
       month: _monthFromRaw(f.monthRaw),
     }));
     const score = scoreSample(samplePool);
-    log.info(`date-detect score: ${(score.confidence * 100).toFixed(0)}% (pattern=${score.pattern || 'none'})`);
+    audit('info', `date-detect score: ${(score.confidence * 100).toFixed(0)}% (pattern=${score.pattern || 'none'})`);
 
     let aiDateMap = null;
     if (score.confidence < CONFIDENCE_THRESHOLD) {
-      log.info(`Confidence < ${CONFIDENCE_THRESHOLD * 100}% -> AI-Fallback`);
+      audit('info', `Confidence < ${CONFIDENCE_THRESHOLD * 100}% -> AI-Fallback`);
       updateJob(jobId, { progress: 15, statusText: 'job.folder-import.aiDateDetect' });
       try {
         const aiSamples = files.slice(0, AI_SAMPLE_SIZE).map(f => ({
@@ -148,10 +160,10 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
               aiDateMap.set(d.path, d.iso);
             }
           }
-          log.info(`AI date-detect: ${aiDateMap.size}/${aiSamples.length} resolved`);
+          audit('info', `AI date-detect: ${aiDateMap.size}/${aiSamples.length} resolved`);
         }
       } catch (e) {
-        log.warn(`AI date-detect failed: ${e.message}`);
+        audit('warn', `AI date-detect failed: ${e.message}`);
       }
     }
 
@@ -179,23 +191,23 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
       try {
         buf = await f.zipEntry.async('nodebuffer');
       } catch (e) {
-        skipped.push({ path: f.relativePath, reason: 'ZIP_READ_FAILED' });
+        recordSkip(f.relativePath, 'ZIP_READ_FAILED');
         continue;
       }
       if (buf.length > MAX_FILE_BYTES) {
-        skipped.push({ path: f.relativePath, reason: 'FILE_TOO_LARGE' });
+        recordSkip(f.relativePath, 'FILE_TOO_LARGE');
         continue;
       }
       let parsed;
       try {
         parsed = await parseImportFile(f.file, buf);
       } catch (e) {
-        log.warn(`Parse fail ${f.relativePath}: ${e.message}`);
-        skipped.push({ path: f.relativePath, reason: 'PARSE_FAILED' });
+        audit('warn', `Parse fail ${f.relativePath}: ${e.message}`);
+        recordSkip(f.relativePath, 'PARSE_FAILED');
         continue;
       }
       if (!parsed) {
-        skipped.push({ path: f.relativePath, reason: 'UNSUPPORTED_EXT' });
+        recordSkip(f.relativePath, 'UNSUPPORTED_EXT');
         continue;
       }
 
@@ -256,7 +268,7 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
       }
 
       if (!isoDate) {
-        skipped.push({ path: f.relativePath, reason: 'NO_DATE' });
+        recordSkip(f.relativePath, 'NO_DATE');
         continue;
       }
 
@@ -270,7 +282,7 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
       throw i18nError('job.error.noDatesFound');
     }
 
-    log.info(`date-detect breakdown: filename=${enriched.filter(e => e.dateSource === 'filename').length}, first-line=${enriched.filter(e => e.dateSource === 'first-line').length}, ai=${enriched.filter(e => e.dateSource === 'ai').length}, mtime=${enriched.filter(e => e.dateSource === 'mtime').length}, month-only=${enriched.filter(e => e.dateSource === 'month-only').length}, year-only=${enriched.filter(e => e.dateSource === 'year-only').length}`);
+    audit('info', `date-detect breakdown: filename=${enriched.filter(e => e.dateSource === 'filename').length}, first-line=${enriched.filter(e => e.dateSource === 'first-line').length}, ai=${enriched.filter(e => e.dateSource === 'ai').length}, mtime=${enriched.filter(e => e.dateSource === 'mtime').length}, month-only=${enriched.filter(e => e.dateSource === 'month-only').length}, year-only=${enriched.filter(e => e.dateSource === 'year-only').length}`);
 
     // Sortieren chronologisch
     enriched.sort((a, b) => a.isoDate.localeCompare(b.isoDate));
@@ -299,7 +311,7 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
         const parts = [first.html, ...rest.map(r => r.html)];
         first.html = parts.join('\n<hr class="day-merge">\n');
         for (const r of rest) mergedAway.add(r);
-        log.info(`day-merge ${iso}: ${rest.length + 1} Files ohne Thema zusammengefasst`);
+        audit('info', `day-merge ${iso}: ${rest.length + 1} Files ohne Thema zusammengefasst`);
       } else if (themaless.length === 0) {
         // Alle mit Thema → jeden umbenennen
         for (const { f, thema } of annotated) f._resolvedName = `${iso} ${thema}`;
@@ -311,7 +323,7 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
           target.html = `${target.html}\n<hr class="day-merge">\n${f.html}`;
           mergedAway.add(f);
         }
-        log.info(`day-merge ${iso}: ${themaless.length} themalose Files in «${target._resolvedName}» integriert`);
+        audit('info', `day-merge ${iso}: ${themaless.length} themalose Files in «${target._resolvedName}» integriert`);
       }
     }
     const resolved = enriched.filter(f => !mergedAway.has(f));
@@ -322,7 +334,7 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
       updateJob(jobId, { progress: 28, statusText: 'job.folder-import.creatingBook' });
       const created = await contentStore.createBook({ name: bookName, owner_email: userEmail }, { session: { user: { email: userEmail } } });
       effBookId = created.id;
-      log.info(`Buch erstellt: «${bookName}» id=${effBookId}`);
+      audit('info', `Buch erstellt: «${bookName}» id=${effBookId}`);
     }
     if (!effBookId) throw i18nError('job.error.bookMissing');
     setContext({ book: effBookId });
@@ -378,7 +390,7 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
         );
         yearChapterId = ch.id;
         chapterByYear.set(f.year, yearChapterId);
-        log.info(`Year-Chapter angelegt: ${f.year} (id=${yearChapterId})`);
+        audit('info', `Year-Chapter angelegt: ${f.year} (id=${yearChapterId})`);
       }
 
       // Month-Sub-Chapter (parent = year-chapter). Wenn Monat unbekannt (z.B.
@@ -398,7 +410,7 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
           );
           subId = sub.id;
           chapterByYearMonth.set(ymKey, subId);
-          log.info(`Month-Sub-Chapter angelegt: ${subName} unter ${f.year} (id=${subId})`);
+          audit('info', `Month-Sub-Chapter angelegt: ${subName} unter ${f.year} (id=${subId})`);
         }
         chapterId = subId;
       }
@@ -439,12 +451,12 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
         );
         pagesCreated += 1;
       } catch (e) {
-        log.warn(`createPage fail ${f.relativePath}: ${e.message}`);
+        audit('warn', `createPage fail ${f.relativePath}: ${e.message}`);
         skipped.push({ path: f.relativePath, reason: 'CREATE_FAILED' });
       }
     }
 
-    log.info(`folder-import done: ${pagesCreated} pages, ${chapterByYear.size} year-chapters, ${chapterByYearMonth.size} month-sub-chapters, ${skipped.length} skipped`);
+    audit('info', `Import abgeschlossen: ${pagesCreated} Seiten, ${chapterByYear.size} Jahres-Kapitel, ${chapterByYearMonth.size} Monats-Sub-Kapitel, ${skipped.length} skipped`);
 
     completeJob(jobId, {
       bookId: effBookId,
@@ -454,6 +466,7 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
       monthSubChaptersCreated: chapterByYearMonth.size,
       skipped,
       warnings: warningsCollected,
+      auditLog,
     });
   } catch (e) {
     if (e?.name !== 'AbortError') log.error(`folder-import job ${jobId}: ${e.message}`, { stack: e.stack });
