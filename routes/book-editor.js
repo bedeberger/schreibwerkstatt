@@ -26,12 +26,10 @@ router.get('/:book_id/contents', async (req, res) => {
   try {
     const tree = await contentStore.bookTree(bookId, req);
 
-    // Flat-Liste in Lesereihenfolge (Kapitel-Seiten gefolgt von Top-Level-Seiten)
-    // analog zur Frontend-Tree-Konstruktion.
-    const flatMetas = [
-      ...tree.chapters.flatMap(c => c.pages.map(p => ({ ...p, _chapterName: c.name }))),
-      ...tree.topPages.map(p => ({ ...p, _chapterName: null })),
-    ];
+    // Flat-Liste in Lesereihenfolge (Depth-First durch alle Kapitel-Ebenen,
+    // dann Top-Level-Seiten). _chapterName ist das direkt umschliessende Kapitel.
+    const flatMetas = contentStore.flattenTree(tree)
+      .map(({ page, chapterName }) => ({ ...page, _chapterName: chapterName }));
 
     const details = await contentStore.loadPagesBatch(flatMetas, req, { batchSize: 15 });
 

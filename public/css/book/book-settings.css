@@ -352,4 +352,12 @@
   gap: var(--space-2);
   align-items: center;
 }
+/* Trennen-Button erbt Default-Button-Geometrie (gleiche Höhe wie Verbinden/
+   Pull/Test in derselben Row), behält aber danger-Farben. */
+.blog-actions .book-settings-btn-danger {
+  padding: var(--size-default-padding-y) 16px;
+  font-size: var(--font-size-base);
+  border-radius: var(--radius-md);
+  border-width: 0.5px;
+}
 }

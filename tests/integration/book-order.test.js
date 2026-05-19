@@ -475,3 +475,72 @@ test('content-store bookTree liest order_json (Overlay)', async () => {
   assert.equal(tree.chapters[1].id, cA);
   assert.deepEqual(tree.chapters[1].pages.map(p => p.id), [pA2, pA1]);
 });
+
+test('content-store bookTree: Sub-Kapitel als subchapters[] verschachtelt', async () => {
+  const bookId = seedBook('nested-tree');
+  const cTop = seedChapter(bookId, 'Top', 0);
+  const cSub = seedChapter(bookId, 'Sub', 1);
+  const pT1 = seedPage(bookId, cTop, 'T1', 0);
+  const pS1 = seedPage(bookId, cSub, 'S1', 0);
+  bookOrder.putOrder(bookId, [
+    { type: 'chapter', id: cTop, children: [
+      { type: 'chapter', id: cSub, children: [{ type: 'page', id: pS1 }] },
+      { type: 'page', id: pT1 },
+    ]},
+  ], 'test');
+
+  const tree = await contentStore.bookTree(bookId);
+  assert.equal(tree.chapters.length, 1);
+  assert.equal(tree.chapters[0].id, cTop);
+  assert.equal(tree.chapters[0].pages.length, 1);
+  assert.equal(tree.chapters[0].pages[0].id, pT1);
+  assert.equal(tree.chapters[0].subchapters.length, 1);
+  assert.equal(tree.chapters[0].subchapters[0].id, cSub);
+  assert.equal(tree.chapters[0].subchapters[0].pages[0].id, pS1);
+});
+
+test('content-store flattenTree: depth-first Seiten + chapterName Mapping', async () => {
+  const bookId = seedBook('flatten');
+  const cTop = seedChapter(bookId, 'Top', 0);
+  const cSub = seedChapter(bookId, 'Sub', 1);
+  const pT1 = seedPage(bookId, cTop, 'T1', 0);
+  const pS1 = seedPage(bookId, cSub, 'S1', 0);
+  const pTop = seedPage(bookId, null, 'TopPage', 0);
+  bookOrder.putOrder(bookId, [
+    { type: 'chapter', id: cTop, children: [
+      { type: 'page', id: pT1 },
+      { type: 'chapter', id: cSub, children: [{ type: 'page', id: pS1 }] },
+    ]},
+    { type: 'page', id: pTop },
+  ], 'test');
+
+  const tree = await contentStore.bookTree(bookId);
+  const flat = contentStore.flattenTree(tree);
+  assert.deepEqual(flat.map(r => r.page.id), [pT1, pS1, pTop]);
+  assert.deepEqual(flat.map(r => r.chapterName), ['Top', 'Sub', null]);
+  assert.deepEqual(flat.map(r => r.depth), [1, 2, 0]);
+});
+
+test('getDescendantChapterIds: rekursive CTE liefert alle Nachfahren', () => {
+  const bookId = seedBook('descendants');
+  const cTop = seedChapter(bookId, 'Top', 0);
+  const cSub = seedChapter(bookId, 'Sub', 1);
+  const cSubSub = seedChapter(bookId, 'SubSub', 2);
+  const cOther = seedChapter(bookId, 'Other', 3);
+  bookOrder.putOrder(bookId, [
+    { type: 'chapter', id: cTop, children: [
+      { type: 'chapter', id: cSub, children: [
+        { type: 'chapter', id: cSubSub, children: [] },
+      ]},
+    ]},
+    { type: 'chapter', id: cOther, children: [] },
+  ], 'test');
+
+  const desc = bookOrder.getDescendantChapterIds(cTop).sort();
+  assert.deepEqual(desc, [cSub, cSubSub].sort());
+
+  const inclSelf = bookOrder.getDescendantChapterIds(cTop, { includeSelf: true }).sort();
+  assert.deepEqual(inclSelf, [cTop, cSub, cSubSub].sort());
+
+  assert.deepEqual(bookOrder.getDescendantChapterIds(cOther), []);
+});

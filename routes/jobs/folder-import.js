@@ -278,14 +278,29 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
     if (!effBookId) throw i18nError('job.error.bookMissing');
     setContext({ book: effBookId });
 
-    // Kapitel-Cache: pro Jahr ein Chapter
-    const chapterByYear = new Map();
+    // Kapitel-Cache: pro Jahr ein Top-Level-Chapter, pro Jahr+Monat ein
+    // Sub-Chapter (parent_chapter_id = Jahr-Chapter-ID).
+    const chapterByYear = new Map();        // year (Number) -> chapter_id
+    const chapterByYearMonth = new Map();   // "YYYY-MM" -> chapter_id
+    const MONTH_NAMES_DE = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
     if (mode === 'merge') {
       const existing = await contentStore.listChapters(effBookId, { session: { user: { email: userEmail } } });
+      // Erst Top-Level (Jahre) cachen, dann Sub-Chapter (Monate) den Parents zuordnen.
       for (const ch of existing) {
+        if (ch.parent_chapter_id) continue;
         const y = parseInt(ch.name, 10);
         if (Number.isFinite(y) && /^\d{4}$/.test(String(ch.name).trim())) {
           chapterByYear.set(y, ch.id);
+        }
+      }
+      for (const ch of existing) {
+        if (!ch.parent_chapter_id) continue;
+        // Match Year via parent → Month via Position (1-12)
+        const parentYear = [...chapterByYear.entries()].find(([, id]) => id === ch.parent_chapter_id)?.[0];
+        if (!Number.isFinite(parentYear)) continue;
+        const monthNum = ch.position;
+        if (Number.isFinite(monthNum) && monthNum >= 1 && monthNum <= 12) {
+          chapterByYearMonth.set(`${parentYear}-${String(monthNum).padStart(2, '0')}`, ch.id);
         }
       }
     }
@@ -305,16 +320,37 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
         statusParams: { file: f.relativePath, current, total },
       });
 
-      // Chapter pro Jahr
-      let chapterId = chapterByYear.get(f.year);
-      if (!chapterId) {
+      // Year-Chapter (Top-Level) sicherstellen
+      let yearChapterId = chapterByYear.get(f.year);
+      if (!yearChapterId) {
         const ch = await contentStore.createChapter(
-          { book_id: effBookId, name: String(f.year) },
+          { book_id: effBookId, name: String(f.year), position: f.year },
           { session: { user: { email: userEmail } } },
         );
-        chapterId = ch.id;
-        chapterByYear.set(f.year, chapterId);
-        log.info(`Chapter angelegt: ${f.year} (id=${chapterId})`);
+        yearChapterId = ch.id;
+        chapterByYear.set(f.year, yearChapterId);
+        log.info(`Year-Chapter angelegt: ${f.year} (id=${yearChapterId})`);
+      }
+
+      // Month-Sub-Chapter (parent = year-chapter). Wenn Monat unbekannt (z.B.
+      // year-only-Fallback), die Seite direkt ans Year-Chapter haengen.
+      let chapterId = yearChapterId;
+      const isoMonth = f.isoDate.slice(5, 7);
+      const monthNum = parseInt(isoMonth, 10);
+      if (Number.isFinite(monthNum) && monthNum >= 1 && monthNum <= 12 && f.dateSource !== 'year-only') {
+        const ymKey = `${f.year}-${isoMonth}`;
+        let subId = chapterByYearMonth.get(ymKey);
+        if (!subId) {
+          const subName = `${isoMonth} ${MONTH_NAMES_DE[monthNum - 1]}`;
+          const sub = await contentStore.createChapter(
+            { book_id: effBookId, name: subName, parent_chapter_id: yearChapterId, position: monthNum },
+            { session: { user: { email: userEmail } } },
+          );
+          subId = sub.id;
+          chapterByYearMonth.set(ymKey, subId);
+          log.info(`Month-Sub-Chapter angelegt: ${subName} unter ${f.year} (id=${subId})`);
+        }
+        chapterId = subId;
       }
 
       // Page-Name: ISO-Date bei echtem Datum, sonst "YYYY-MM <Thema>" fuer
@@ -354,12 +390,14 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
       }
     }
 
-    log.info(`folder-import done: ${pagesCreated} pages, ${chapterByYear.size} chapters, ${skipped.length} skipped`);
+    log.info(`folder-import done: ${pagesCreated} pages, ${chapterByYear.size} year-chapters, ${chapterByYearMonth.size} month-sub-chapters, ${skipped.length} skipped`);
 
     completeJob(jobId, {
       bookId: effBookId,
       pagesCreated,
-      chaptersCreated: chapterByYear.size,
+      chaptersCreated: chapterByYear.size + chapterByYearMonth.size,
+      yearChaptersCreated: chapterByYear.size,
+      monthSubChaptersCreated: chapterByYearMonth.size,
       skipped,
       warnings: warningsCollected,
     });

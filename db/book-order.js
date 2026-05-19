@@ -396,6 +396,23 @@ function ensureTree(bookId, userEmail = null) {
   return getOrder(bookId);
 }
 
+// Liefert alle Nachfahren-Kapitel-IDs (rekursiv) eines Kapitels via
+// chapters.parent_chapter_id. Default exklusive Self. Genutzt von Jobs/Reviews
+// fuer "Kapitel inkl. Sub-Kapitel"-Operationen.
+function getDescendantChapterIds(chapterId, { includeSelf = false } = {}) {
+  const rows = db.prepare(`
+    WITH RECURSIVE descendants(chapter_id) AS (
+      SELECT chapter_id FROM chapters WHERE parent_chapter_id = ?
+      UNION ALL
+      SELECT c.chapter_id FROM chapters c
+        JOIN descendants d ON c.parent_chapter_id = d.chapter_id
+    )
+    SELECT chapter_id FROM descendants
+  `).all(chapterId);
+  const ids = rows.map(r => r.chapter_id);
+  return includeSelf ? [chapterId, ...ids] : ids;
+}
+
 module.exports = {
   MAX_CHAPTER_DEPTH,
   validateTree,
@@ -405,5 +422,6 @@ module.exports = {
   buildFromCurrentState,
   reconcile,
   ensureTree,
+  getDescendantChapterIds,
   TreeValidationError,
 };
