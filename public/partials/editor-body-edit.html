@@ -22,6 +22,13 @@
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=635#scan"/></svg>
     </button>
     <button type="button" class="graph-tool-btn"
+            :aria-pressed="pageEditorFitWidth"
+            :data-tip="pageEditorFitWidth ? t('editor.fitWidthOff') : t('editor.fitWidth')"
+            :aria-label="pageEditorFitWidth ? t('editor.fitWidthOff') : t('editor.fitWidth')"
+            @click="togglePageEditorFitWidth()">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=635#move-horizontal"/></svg>
+    </button>
+    <button type="button" class="graph-tool-btn"
             :aria-pressed="pageEditorFullscreen"
             :data-tip="pageEditorFullscreen ? t('graph.fullscreenClose') : t('graph.fullscreen')"
             :aria-label="pageEditorFullscreen ? t('graph.fullscreenClose') : t('graph.fullscreen')"
@@ -30,6 +37,7 @@
     </button>
   </div>
   <div class="page-content-view page-content-view--editing"
+       :class="{ 'page-content-view--fit-width': pageEditorFitWidth }"
        :style="`--editor-zoom: ${pageEditorZoom}`"
        contenteditable="true"
        spellcheck="true"

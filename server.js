@@ -377,6 +377,7 @@ app.use('/admin/usage', require('./routes/admin-usage'));
 app.use('/admin/registration-requests', require('./routes/admin-registration-requests'));
 app.use('/local/categories', require('./routes/categories'));
 app.use('/local/tags', require('./routes/tags'));
+app.use('/blog', require('./routes/blog'));
 
 // Logout: usage-Tabelle behält Einträge (User-Wiederkehr → Top-3 sofort wieder da).
 // Wenn Datenschutz erforderlich, Cleanup über Job/Cron auf Last-Seen-Basis.

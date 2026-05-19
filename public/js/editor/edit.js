@@ -243,6 +243,7 @@ export const editorEditMethods = {
     this.editSaving = false;
     this.saveOffline = false;
     this.pageEditorFullscreen = false;
+    this.pageEditorFitWidth = false;
     this.pendingDraft = null;
     this.closeSynonymMenu?.();
     this.closeSynonymPicker?.();
@@ -346,6 +347,7 @@ export const editorEditMethods = {
         this._releaseEditLock?.(this.currentPage?.id);
         this.editMode = false;
         this.pageEditorFullscreen = false;
+        this.pageEditorFitWidth = false;
         this.closeSynonymMenu?.();
         this.closeSynonymPicker?.();
         this.setStatus(this.t('edit.changesSaved'), false, 5000);
@@ -643,6 +645,10 @@ export const editorEditMethods = {
 
   togglePageEditorFullscreen() {
     this.pageEditorFullscreen = !this.pageEditorFullscreen;
+  },
+
+  togglePageEditorFitWidth() {
+    this.pageEditorFitWidth = !this.pageEditorFitWidth;
   },
 
   pageEditorZoomIn() {

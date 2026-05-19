@@ -9,14 +9,25 @@ Importiert Tagebuch-Archive mit Struktur `<YYYY>/<Monat>/<Tagesdatei>` aus ZIP. 
 - **Worker:** `runFolderImportJob` ist Job-Queue-konform (Pflicht: KI-Calls nur via Queue). Phasen via `updateJob({ statusText, statusParams })` als i18n-Keys (`job.folder-import.*`).
 - **Parser:** [lib/import-parsers/](../lib/import-parsers/)
   - `docx.js` — `mammoth.convertToHtml`. Bilder droppen, Warnings sammeln.
+  - `doc.js` — Legacy-Word (.doc, OLE) via `word-extractor`. Liefert Plain-Text → Absätze in `<p>` gewrappt. Formatting geht verloren (Trade-off für Pure-JS-Support).
   - `odt.js` — eigener Mini-Parser: ZIP-in-ZIP → `content.xml` via linkedom → Walker (h1-3, p, ul/ol, li, strong/em, br). Stil-Lookup via `office:automatic-styles` für fett/kursiv.
   - `abw.js` — AbiWord (.abw, reines XML). linkedom-Walker über `<section>/<p>/<c>`. Style-Lookup via `<styles>/<s>` für Heading-Level + Inline-Props (`font-weight:bold`, `font-style:italic`).
-  - `dispatch.js` — Extension-Switch + `SUPPORTED_EXTS`-Set.
+  - `dispatch.js` — Extension-Switch + `SUPPORTED_EXTS`-Set (`docx`, `doc`, `odt`, `abw`).
   - `date-detect.js` — Regel-basierte Datums-Heuristik. Zwei API-Layer:
-    - `detectDate(filename, ctx)` — Filename + Pfad-Kontext (6 Patterns inkl. `DD-only`).
-    - `detectDateInText(text, ctx)` — erste Text-Zeile des Dokuments. Eigene Regex-Tabelle ohne `_stripExt` (sonst frisst Extension-Strip das `.2024` am Ende einer Datumszeile). Verzichtet bewusst auf `DD-only` (eine einzelne Zahl in Text ist zu vieldeutig).
+    - `detectDate(filename, ctx)` — Filename + Pfad-Kontext (7 Patterns: `YYYY-MM-DD`, `DD-MM-YYYY`, `YYYYMMDD`, `DD-monthname`, `monthname-DD`, `DD-only`, `DD-anywhere`).
+    - `detectDateInText(text, ctx)` — erste Text-Zeile des Dokuments. Eigene Regex-Tabelle ohne `_stripExt` (sonst frisst Extension-Strip das `.2024` am Ende einer Datumszeile). Verzichtet bewusst auf `DD-only`/`DD-anywhere` (eine einzelne Zahl in Text ist zu vieldeutig).
     - `firstLineFromHtml(html)` — erste nicht-leere Text-Zeile nach Tag-Strip.
+    - `parseMonthToken(token)` — tokenize-tolerant: erkennt `November` in `November 2020`. Strikt: rein-numerische Strings → 1-12; gemischte Strings mit Zahlen → kein Monat (sonst Konflikt mit DD-anywhere-Pfad).
     - `scoreSample(samples)` für Filename-Confidence (Schwelle 80%).
+
+### `DD-anywhere`-Fallback
+
+Letzter Regel-Pfad bevor AI greift. Sucht im stripped Filename nach genau **einer** plausiblen Tageszahl (1-31). Aktiviert nur wenn `ctx.year` UND `ctx.month` aus dem Pfad-Kontext kommen.
+
+Beispiele:
+- `Tagebücher/2020/November 2020/Persönliches 16.docx` → `2020-11-16` ✓
+- `Tagebücher/2020/November 2020/Datei 5 und 12.docx` → null (ambig: 5 oder 12?)
+- `2020/November 2020/Notiz.docx` → null (keine Tageszahl)
 - **AI-Fallback:** `buildDateDetectPrompt` ([public/js/prompts/import.js](../public/js/prompts/import.js)) wenn Filename-Confidence < 80%. Liefert ISO-Datum pro Datei, KI-Spend nur bei unklaren Formaten.
 
 ## Datums-Resolve-Reihenfolge (pro Datei)

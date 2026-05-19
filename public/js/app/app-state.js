@@ -103,6 +103,7 @@ const editorState = () => ({
   saveOffline: false,
   pageEditorFullscreen: false,
   pageEditorZoom: 1,
+  pageEditorFitWidth: false,
   // Cross-User-Konflikt aus _checkPageConflict. quickSave (Auto-Save / Exit-
   // Fokus) zeigt keinen Modal — der Banner ist im Fokus-Header sichtbar und
   // bleibt bis zum nächsten erfolgreichen Save oder bis User explizit

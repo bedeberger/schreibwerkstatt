@@ -90,6 +90,37 @@ test('detectDateInText: ignoriert DD-only (vermeidet "Tag 5" → 5.M.JJJJ Spukfa
   assert.equal(detectDateInText('5', { year: 2024, month: 3 }), null);
 });
 
+test('parseMonthToken: Monatsname mit Jahr im selben String ("November 2020")', () => {
+  assert.equal(parseMonthToken('November 2020'), 11);
+  assert.equal(parseMonthToken('2020 November'), 11);
+  assert.equal(parseMonthToken('Maerz 2024'), 3);
+});
+
+test('parseMonthToken: rein-numerische Monatszahl', () => {
+  assert.equal(parseMonthToken('11'), 11);
+  assert.equal(parseMonthToken('2'), 2);
+  // gemischter String mit Zahl darf KEINEN Monat zurueckgeben (sonst Konflikt
+  // mit DD-anywhere-Pfad: "Persoenliches 16" wuerde sonst 16 als Monat sehen)
+  assert.equal(parseMonthToken('Persoenliches 16'), null);
+});
+
+test('detectDate: DD-anywhere fuer Filename mit Tag-Tag in Mitte', () => {
+  // Tagebücher/2020/November 2020/Persönliches 16.docx
+  const r = detectDate('Persönliches 16.docx', { year: 2020, month: 11 });
+  assert.deepEqual(r, { iso: '2020-11-16', pattern: 'DD-anywhere' });
+});
+
+test('detectDate: DD-anywhere null wenn mehrere Zahlen-Kandidaten', () => {
+  // Ambig: 5 oder 12? Nicht raten.
+  const r = detectDate('Datei 5 und 12.docx', { year: 2020, month: 11 });
+  assert.equal(r, null);
+});
+
+test('detectDate: DD-anywhere null ohne Monats-Kontext', () => {
+  const r = detectDate('Persoenliches 16.docx', { year: 2020 });
+  assert.equal(r, null);
+});
+
 test('detectDate: ungültige Datums-Werte zurückweisen', () => {
   // Februar 30 ist akzeptiert (Regex 1-31, kein Kalender-Check) — bewusst, weil
   // Eingabe sonst zu viele Edge-Cases. Tag > 31 jedoch nicht.

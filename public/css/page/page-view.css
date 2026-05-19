@@ -126,15 +126,22 @@
 .page-content-view .callout.pullquote::before { content: "\201C"; margin-right: 0.05em; color: var(--color-accent-text); }
 .page-content-view .callout.pullquote::after  { content: "\201D"; margin-left: 0.05em;  color: var(--color-accent-text); }
 
-/* Edit-Modus: contenteditable-Preview. */
+/* Edit-Modus: contenteditable-Preview. Linkes Rail + Background-Tint
+   signalisieren Edit-Status; kein 2-px-Outline-Ring (zu laut um den Text). */
 .page-content-view--editing {
-  outline: 2px solid var(--color-primary);
-  outline-offset: -2px;
+  outline: none;
   border-left: 5px solid var(--color-primary);
   background: var(--color-accent-soft);
   cursor: text;
   max-height: 70vh;
   font-size: calc(1em * var(--editor-zoom, 1));
+}
+
+/* Fit-Width: Reading-Frame-max-width auf .page-content-view (64ch + padding)
+   aufheben, contenteditable nutzt volle Wrap-Breite. Bevorzugter
+   Tagebuch-Modus. */
+.page-content-view--fit-width {
+  max-width: none;
 }
 
 /* Edit-Wrap: Toolbar (Zoom + Vollbild) + contenteditable. Toolbar

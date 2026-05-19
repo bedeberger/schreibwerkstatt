@@ -38,6 +38,7 @@
     "pdfkit": "^0.18.0",
     "sharp": "^0.34.5",
     "winston": "^3.19.0",
+    "word-extractor": "^1.0.4",
     "xmlbuilder2": "^4.0.3"
   }
 }

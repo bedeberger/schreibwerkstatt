@@ -95,12 +95,13 @@ test('parseImportFile: unsupported ext liefert null', async () => {
   assert.equal(r, null);
 });
 
-test('SUPPORTED_EXTS: docx + odt + abw', () => {
+test('SUPPORTED_EXTS: docx + odt + abw + doc', () => {
   assert.equal(SUPPORTED_EXTS.has('docx'), true);
   assert.equal(SUPPORTED_EXTS.has('odt'), true);
   assert.equal(SUPPORTED_EXTS.has('abw'), true);
-  assert.equal(SUPPORTED_EXTS.has('doc'), false);
+  assert.equal(SUPPORTED_EXTS.has('doc'), true);
   assert.equal(SUPPORTED_EXTS.has('rtf'), false);
+  assert.equal(SUPPORTED_EXTS.has('txt'), false);
 });
 
 test('parseAbw: Heading + Absatz + fetter <c>', async () => {
