@@ -118,7 +118,10 @@ const _lastPageCheckStmt = db.prepare(`
 function validateLektoratFehler(fehler, locale) {
   const isCH = locale === 'de-CH';
   return fehler
-    .map(f => ({ ...f, typ: f.typ?.toLowerCase?.() }))
+    // `kontext` ist Legacy-Feld aus PROMPTS_VERSION <=15: nirgends gerendert,
+    // AI halluzinierte oft (nicht-substring von `original`). Defensiv strippen,
+    // damit alte Cache-Rows und vereinzelte AI-Antworten kein totes Feld mitschleppen.
+    .map(f => { const { kontext, ...rest } = f; return { ...rest, typ: rest.typ?.toLowerCase?.() }; })
     .filter(f => VALID_TYPEN.has(f.typ))
     .filter(f => f.typ !== 'stil' || (f.korrektur?.trim() && f.korrektur.trim() !== f.original?.trim()))
     // Einträge deren Erklärung verrät, dass es kein echter Fehler ist
@@ -209,9 +212,11 @@ async function runCheckJob(jobId, pageId, bookId, userEmail, userToken) {
       logger.info(`Cache-HIT (page=${pageId}) – spart Lektorat-Call.`);
       updateJob(jobId, { progress: 97 });
       result = cached;
-      // Dedup auch auf Cached-Path: ältere Cache-Rows können Duplikate enthalten,
-      // bevor der Dedup-Filter aktiv war.
-      if (Array.isArray(result?.fehler)) result.fehler = dedupFehler(result.fehler);
+      // Dedup + Legacy-`kontext`-Feld-Strip auf Cached-Path: ältere Cache-Rows
+      // können Duplikate und/oder das tote `kontext`-Feld enthalten.
+      if (Array.isArray(result?.fehler)) {
+        result.fehler = dedupFehler(result.fehler.map(f => { const { kontext, ...rest } = f; return rest; }));
+      }
     } else {
       result = await aiCall(jobId, tok,
         buildLektoratPrompt(text, {
@@ -355,7 +360,9 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
         if (cached) {
           logger.info(`[${i + 1}/${pages.length}] «${pd.name}» page=${p.id} – Cache-HIT`);
           result = cached;
-          if (Array.isArray(result?.fehler)) result.fehler = dedupFehler(result.fehler);
+          if (Array.isArray(result?.fehler)) {
+            result.fehler = dedupFehler(result.fehler.map(f => { const { kontext, ...rest } = f; return rest; }));
+          }
         } else {
           // Bei Pool>1 sind feinere Pct-Ranges pro Item nicht sinnvoll
           // (mehrere Calls schreiben gleichzeitig den Job-Progress); progress wird

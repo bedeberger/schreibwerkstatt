@@ -16,7 +16,7 @@ process.env.DB_PATH = path.join(os.tmpdir(), `schreibwerkstatt-lektorat-dedup-${
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 require('../../db/migrations');
 
-const { dedupFehler } = require('../../routes/jobs/lektorat');
+const { dedupFehler, validateLektoratFehler } = require('../../routes/jobs/lektorat');
 
 test('dedupFehler entfernt byte-gleiche Duplikate (gleicher typ+original+korrektur)', () => {
   const input = [
@@ -54,6 +54,17 @@ test('dedupFehler haelt leeres/null-Korrektur-Feld stabil', () => {
   ];
   // null/undefined kollabieren beide auf '' im Key → alle drei sind Duplikate.
   assert.equal(dedupFehler(input).length, 1);
+});
+
+test('validateLektoratFehler strippt Legacy-Feld `kontext` (PROMPTS_VERSION 16: Feld entfernt)', () => {
+  const input = [
+    { typ: 'rechtschreibung', original: 'foo', korrektur: 'bar', kontext: 'halluzinierter Satz', erklaerung: 'x' },
+  ];
+  const out = validateLektoratFehler(input, 'de-CH');
+  assert.equal(out.length, 1);
+  assert.equal('kontext' in out[0], false, 'kontext-Feld muss entfernt sein');
+  assert.equal(out[0].original, 'foo');
+  assert.equal(out[0].korrektur, 'bar');
 });
 
 test('dedupFehler behaelt Reihenfolge des ersten Vorkommens', () => {

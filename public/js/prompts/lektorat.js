@@ -356,7 +356,6 @@ function _buildLektoratSchema() {
       typ: { type: 'string', enum: _isLocal ? enumLocal : enumCloud },
       original: _str,
       korrektur: _str,
-      kontext: _str,
       erklaerung: _str,
     }),
   };

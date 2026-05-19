@@ -31,6 +31,26 @@ export function sortByPosition(html, fehler) {
     .map(e => e.f);
 }
 
+// Spannt der Match einen Block-Tag-Übergang (z.B. </p><p>) auf, würde ein
+// einzelnes <mark> phrasing-only sein und vom Parser am ersten </p> implizit
+// geschlossen — Folge: nur der erste Absatz erhält die Markierung, das <ins>
+// landet weit unten am Ende des letzten Absatzes. Darum den Match an Block-
+// Grenzen splitten und pro Text-Segment ein eigenes <mark> emittieren.
+const _BLOCK_BOUNDARY_RE = /(<\/(?:p|div|li|blockquote|h[1-6]|ol|ul|tr|td|th|pre)>\s*<(?:p|div|li|blockquote|h[1-6]|ol|ul|tr|td|th|pre)\b[^>]*>)/gi;
+function _wrapMatchedRange(matched, markOpen) {
+  const parts = matched.split(_BLOCK_BOUNDARY_RE);
+  if (parts.length === 1) return markOpen + matched + '</mark>';
+  let out = '';
+  for (let i = 0; i < parts.length; i++) {
+    if (i % 2 === 1) {
+      out += parts[i]; // Block-Grenzen unverändert
+    } else if (parts[i].length > 0) {
+      out += markOpen + parts[i] + '</mark>';
+    }
+  }
+  return out;
+}
+
 /**
  * Baut eine HTML-Version mit <mark>-Tags um Fehlerstellen und optional
  * Chat-Änderungsvorschläge. Iteriert von hinten nach vorne, damit Offsets
@@ -72,19 +92,19 @@ export function buildHighlightedHtml(html, errors, selected, chatProposals = [])
   let result = html;
   for (const p of unique) {
     const originalText = result.slice(p.idx, p.idx + p.len);
+    let markOpen, ins;
     if (p.kind === 'lektorat') {
       const f = errors[p.errIdx];
       const isSel = selected[p.errIdx];
       const sel = isSel ? ' lektorat-mark--selected' : '';
-      const markOpen = `<mark class="lektorat-mark${sel}" data-error-idx="${p.errIdx}">`;
-      const ins = isSel && f.korrektur ? `<ins class="lektorat-ins">${escHtml(f.korrektur)}</ins>` : '';
-      result = result.slice(0, p.idx) + markOpen + originalText + '</mark>' + ins + result.slice(p.idx + p.len);
+      markOpen = `<mark class="lektorat-mark${sel}" data-error-idx="${p.errIdx}">`;
+      ins = isSel && f.korrektur ? `<ins class="lektorat-ins">${escHtml(f.korrektur)}</ins>` : '';
     } else {
       const prop = chatProposals[p.propIdx];
-      const markOpen = `<mark class="chat-mark" data-chat-msg-idx="${prop.msgIdx}" data-chat-v-idx="${prop.vIdx}">`;
-      const ins = `<ins class="chat-mark-ins">${escHtml(prop.ersatz)}</ins>`;
-      result = result.slice(0, p.idx) + markOpen + originalText + '</mark>' + ins + result.slice(p.idx + p.len);
+      markOpen = `<mark class="chat-mark" data-chat-msg-idx="${prop.msgIdx}" data-chat-v-idx="${prop.vIdx}">`;
+      ins = `<ins class="chat-mark-ins">${escHtml(prop.ersatz)}</ins>`;
     }
+    result = result.slice(0, p.idx) + _wrapMatchedRange(originalText, markOpen) + ins + result.slice(p.idx + p.len);
   }
 
   return result;
