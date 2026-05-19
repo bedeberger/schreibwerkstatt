@@ -18,6 +18,8 @@ const { getBookSettings } = require('../../db/schema');
 const { requireBookAccess, sendACLError } = require('../../lib/acl');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
+const { db } = require('../../db/connection');
+const { localIsoDate, localIsoDaysAgo } = require('../../lib/local-date');
 
 const blogSyncRouter = express.Router();
 
@@ -143,6 +145,30 @@ async function runBlogImportJob(jobId, bookId, userEmail) {
 
     blogs.markInitialImportDone(conn.id);
     blogs.touchPull(conn.id);
+
+    // Vortags-Baseline aus Initial-Import (Donut braucht prevChars vor heute,
+    // sonst Schreiben am Import-Tag = 0). Analog folder-import.
+    if (imported > 0) {
+      try {
+        const { syncBook } = require('../sync');
+        await syncBook(bookId, { session: { user: { email: userEmail } } });
+        const yesterday = localIsoDaysAgo(1);
+        const today = localIsoDate();
+        db.prepare(`
+          INSERT INTO book_stats_history (book_id, recorded_at, page_count, words, chars, tok, unique_words, chapter_count, avg_sentence_len, avg_lix, avg_flesch_de)
+          SELECT book_id, ?, page_count, words, chars, tok, unique_words, chapter_count, avg_sentence_len, avg_lix, avg_flesch_de
+            FROM book_stats_history WHERE book_id = ? AND recorded_at = ?
+          ON CONFLICT(book_id, recorded_at) DO UPDATE SET
+            page_count=excluded.page_count, words=excluded.words, chars=excluded.chars, tok=excluded.tok,
+            unique_words=excluded.unique_words, chapter_count=excluded.chapter_count,
+            avg_sentence_len=excluded.avg_sentence_len, avg_lix=excluded.avg_lix, avg_flesch_de=excluded.avg_flesch_de
+        `).run(yesterday, bookId, today);
+        logger.info(`Vortags-Baseline gesetzt (${yesterday}) aus Blog-Import.`);
+      } catch (e) {
+        logger.warn(`Baseline-Snapshot nach Blog-Import fehlgeschlagen: ${e.message}`);
+      }
+    }
+
     logger.info(`Initial-Import: ${imported} Posts importiert.`);
     completeJob(jobId, { imported, totalCount }, null, `${imported} Posts importiert`);
   } catch (e) {
