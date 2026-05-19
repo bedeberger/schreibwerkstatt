@@ -37,7 +37,9 @@ Beispiele:
 1. **Filename** — `detectDate(filename, { year, month })` aus Pfad-Kontext (alle Patterns inkl. `DD-anywhere`)
 2. **Erste Dokumentzeile** — `detectDateInText(firstLineFromHtml(html))`. Parse passiert deshalb VOR der Datums-Sortierung, HTML wird in `enriched[]` zwischengespeichert.
 3. **AI-Map** — falls Filename-Confidence < 80% war und AI-Pass aufgerufen wurde
-4. **mtime (ZIP-Entry-Modified-Date)** — nur akzeptiert wenn `mtime.year === ctx.year` UND `mtime.year >= 1990` (filtert JSZip-Default 1980-01-01 für unset mtimes + Archive-Repacks mit allen Files auf gleicher Zeit). Pfad-Monat hat Vorrang vor mtime-Monat (User-Organisations-Intent schlägt Filesystem-Metadaten) — nur der Tag wird aus mtime gezogen. Wenn ctx.month fehlt: voller mtime-Tag+Monat.
+4. **mtime (ZIP-Entry-Modified-Date)** — Pfad-Jahr ist immer führend (User-Organisations-Intent schlägt Filesystem-Metadaten), mtime liefert nur Monat/Tag. Sanity-Cap: `mtime.year >= 1990` (filtert JSZip-Default 1980-01-01 für unset mtimes). Zwei Modi:
+   - **Pfad-Monat bekannt (strict):** `mtime.year === ctx.year` Pflicht (sonst ist die mtime ein Repack-Artefakt). Pfad-Monat gewinnt, nur der Tag wird aus mtime gezogen.
+   - **Pfad-Monat fehlt (relaxed):** Year-Match-Constraint fällt — mtime liefert Monat+Tag, Pfad-Jahr bleibt. Synthetisches `YYYY-06-15` (year-only) gibt sonst null Information über den Monat; mtime ist die einzige Quelle, die dem File einen echten Monat-Sub-Chapter zuweist. ZIP stört nur `mtime` (keine `ctime`), daher dieses Feld.
 5. **Month-only-Fallback** — nur Jahr+Monat aus Pfad ableitbar. Synthetisches Datum `YYYY-MM-15` für Sortierung. Page-Name = `YYYY-MM <Thema>`. Thema-Quellen:
    1. **Erste Heading** (h1/h2/h3) aus dem geparsten HTML
    2. **Filename-Body** — Trenner zu Spaces, Tag-Zahl am Anfang/Ende abgeschnitten, pure-Zahl-Reste verworfen

@@ -212,22 +212,30 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
         if (aiIso) { isoDate = aiIso; dateSource = 'ai'; }
       }
 
-      // Fallback: ZIP-Entry-Modified-Date (mtime). Nur akzeptieren wenn:
-      //   - Date-Objekt valide UND Jahr >= 1990 (JSZip-Default 1980-01-01 fuer
-      //     unset mtimes wuerde sonst alles auf 1980 setzen)
-      //   - Jahr matched Pfad-Jahr — sonst ist die mtime ein Artefakt
-      //     (Archive-Repack, alle Files auf Archive-Datum gesetzt o.ae.)
-      // Pfad-Monat hat Vorrang vor mtime-Monat (User-Organisations-Intent
-      // schlaegt Filesystem-Metadaten); nur der Tag wird aus mtime gezogen.
+      // Fallback: ZIP-Entry-Modified-Date (mtime). Pfad-Jahr ist immer fuehrend
+      // (User-Organisations-Intent schlaegt Filesystem-Metadaten); mtime liefert
+      // nur Monat/Tag. Sanity-Cap: mtYear >= 1990 (filtert JSZip-Default
+      // 1980-01-01 fuer unset mtimes).
+      //   - Pfad-Monat bekannt: strict — mtYear muss f.year matchen (sonst ist
+      //     mtime ein Repack-Artefakt). Pfad-Monat gewinnt, Tag aus mtime.
+      //   - Pfad-Monat fehlt: relaxed — Year-Match-Constraint fallen lassen,
+      //     mtime liefert Monat+Tag. Synthetisches YYYY-06-15 (year-only) waere
+      //     sonst die einzige Alternative und gibt null Info ueber den Monat.
       if (!isoDate && f.zipEntry?.date instanceof Date && !isNaN(f.zipEntry.date)) {
         const mt = f.zipEntry.date;
         const mtYear = mt.getUTCFullYear();
-        if (mtYear >= 1990 && mtYear === f.year) {
+        if (mtYear >= 1990) {
           const mtMonth = mt.getUTCMonth() + 1;
           const mtDay = mt.getUTCDate();
-          const useMonth = Number.isFinite(month) ? month : mtMonth;
-          isoDate = `${f.year}-${String(useMonth).padStart(2, '0')}-${String(mtDay).padStart(2, '0')}`;
-          dateSource = 'mtime';
+          if (Number.isFinite(month)) {
+            if (mtYear === f.year) {
+              isoDate = `${f.year}-${String(month).padStart(2, '0')}-${String(mtDay).padStart(2, '0')}`;
+              dateSource = 'mtime';
+            }
+          } else {
+            isoDate = `${f.year}-${String(mtMonth).padStart(2, '0')}-${String(mtDay).padStart(2, '0')}`;
+            dateSource = 'mtime';
+          }
         }
       }
 

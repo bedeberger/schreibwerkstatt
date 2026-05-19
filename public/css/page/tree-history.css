@@ -28,6 +28,11 @@
    Padding-Inline-Start skaliert pro Tiefe; depth=1 = 0 Indent. */
 .tree-chapter--depth-2 { padding-inline-start: var(--space-md); margin-bottom: var(--space-sm); }
 .tree-chapter--depth-3 { padding-inline-start: calc(var(--space-md) * 2); margin-bottom: var(--space-sm); }
+/* Parent direkt vor Sub-Kapitel: Abstand reduzieren, sonst optisch zu weit. */
+.tree-chapter:has(+ .tree-chapter--depth-2),
+.tree-chapter--depth-2:has(+ .tree-chapter--depth-3) {
+  margin-bottom: var(--space-2xs);
+}
 .tree-chapter--depth-2 > .tree-chapter-header { font-size: var(--font-size-sm); font-weight: 500; }
 .tree-chapter--depth-3 > .tree-chapter-header { font-size: var(--font-size-sm); font-weight: 400; font-style: italic; }
 

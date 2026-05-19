@@ -323,6 +323,54 @@ test('folder-import: mtime-Fallback wenn kein Datum aus Filename/Heading', async
   assert.equal(pages[0].name, '2020-11-07');
 });
 
+test('folder-import: mtime liefert Monat wenn Pfad nur Jahr traegt', async () => {
+  const userEmail = 'tester@test.dev';
+  const book = await contentStore.createBook(
+    { name: 'MtimeMonthRescue', owner_email: userEmail },
+    { session: { user: { email: userEmail } } },
+  );
+  const { db } = require('../../db/connection');
+  db.prepare(`INSERT OR IGNORE INTO book_access (book_id, user_email, role, granted_at) VALUES (?, ?, 'owner', datetime('now'))`).run(book.id, userEmail);
+
+  // Pfad-Ordner "andere" ist kein Monat-Token -> Pfad liefert nur Jahr.
+  // mtime-Jahr 2024 weicht von Pfad-Jahr 2020 ab; im relaxed-Modus (Pfad-Monat
+  // fehlt) wird mtime trotzdem akzeptiert: Pfad-Jahr bleibt, mtime liefert
+  // Monat+Tag.
+  const archive = new JSZip();
+  archive.file('2020/andere/notiz.docx', await makeDocx('Body ohne Datum.'), {
+    date: new Date(Date.UTC(2024, 10, 7, 12, 0)), // 2024-11-07
+  });
+  const buffer = await archive.generateAsync({ type: 'nodebuffer' });
+
+  const jobId = ctx.shared.createJob(
+    'folder-import', book.id, userEmail,
+    'job.label.folderImport', { name: 'MtimeMonthRescue' },
+    'merge:' + book.id + ':mtime-monthrescue',
+  );
+  folderImport.importBuffers.set(jobId, { buffer, mode: 'merge', bookName: '', bookId: book.id });
+
+  await folderImport.runFolderImportJob(jobId, {
+    userEmail, mode: 'merge', bookName: '', bookId: book.id,
+  });
+
+  const job = ctx.shared.jobs.get(jobId);
+  assert.equal(job.status, 'done', `Job-Status: ${job.status}, err: ${job.error || '-'}`);
+  assert.equal(job.result.pagesCreated, 1);
+
+  const pages = await contentStore.listPages(book.id, { session: { user: { email: userEmail } } });
+  // Pfad-Jahr 2020 + mtime-Monat 11 + mtime-Tag 07
+  assert.equal(pages[0].name, '2020-11-07');
+
+  // Year-Chapter "2020" + Month-Sub "2020 November"
+  const chapters = await contentStore.listChapters(book.id, { session: { user: { email: userEmail } } });
+  const yearCh = chapters.find(c => c.name === '2020' && !c.parent_chapter_id);
+  const subCh = chapters.find(c => c.name === '2020 November');
+  assert.ok(yearCh, 'Year-Chapter 2020 fehlt');
+  assert.ok(subCh, 'Month-Sub "2020 November" fehlt');
+  assert.equal(subCh.parent_chapter_id, yearCh.id);
+  assert.equal(pages[0].chapter_id, subCh.id);
+});
+
 test('folder-import: mtime verworfen wenn Jahr nicht matcht', async () => {
   const userEmail = 'tester@test.dev';
   const book = await contentStore.createBook(
@@ -483,7 +531,7 @@ test('folder-import: zwei Files gleicher Tag ohne Thema → HTML gemerged in ein
   // extractTitle liefert '' fuer beide → Merge-Pfad greift.
   const buffer = await buildArchive([
     ['2024/05/2024-05-04.docx', await makeDocx('A')],
-    ['2024/05/2024-05-04 (2).docx', await makeDocx('B')],
+    ['2024/05/2024-05-04.odt', await makeOdt('B')],
   ]);
 
   const jobId = ctx.shared.createJob(
