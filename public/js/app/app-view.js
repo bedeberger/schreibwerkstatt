@@ -35,6 +35,7 @@ async function _toggleCardGeneric(entry) {
   this._closeOtherMainCards(entry.key);
   if (entry.partial) await this._ensurePartial(entry.partial);
   this[entry.flag] = true;
+  this._scrollToCardByKey(entry.key);
   if (entry.auditEvent) this.logAuditEvent?.(entry.auditEvent, { book: this.selectedBookId });
   if (entry.extraRefreshOnOpen) {
     window.dispatchEvent(new CustomEvent('card:refresh', { detail: { name: entry.key } }));
@@ -226,17 +227,26 @@ export const appViewMethods = {
   // Schliesst die anderen Hauptkarten (nicht Tree – der bleibt immer aktiv).
   // Bewertung, Figuren, Entwicklung und Buch-Chat sind exklusiv.
   // Beim Öffnen einer Buchkarte wird auch die offene Seite geschlossen.
+  // Scroll-zur-Karte gehört NICHT hierher: zum Zeitpunkt dieses Aufrufs ist
+  // das Ziel-Partial bei Cold-Open meist noch leer (Selector findet nichts).
+  // Caller scrollt explizit via `_scrollToCardByKey(key)` nach `await _ensurePartial`
+  // + Flag-Set.
   _closeOtherMainCards(keep) {
     for (const c of EXCLUSIVE_CARDS) {
       if (keep !== c.key) this[c.flag] = false;
     }
     this.resetPage();
-    const target = keep ? EXCLUSIVE_CARDS.find(c => c.key === keep) : null;
-    if (target && typeof this.$nextTick === 'function') {
-      this.$nextTick(() => {
-        this._scrollToCardEl(document.querySelector(`[x-show="$app.${target.flag}"]`));
-      });
-    }
+  },
+
+  // Scrollt zur Karte mit `key` (aus EXCLUSIVE_CARDS). Pflicht: vom Aufrufer
+  // erst aufrufen, nachdem Partial geladen UND Flag gesetzt ist — sonst hat
+  // das `x-show`-Element noch keine DOM-Repräsentation.
+  _scrollToCardByKey(key) {
+    const target = EXCLUSIVE_CARDS.find(c => c.key === key);
+    if (!target || typeof this.$nextTick !== 'function') return;
+    this.$nextTick(() => {
+      this._scrollToCardEl(document.querySelector(`[x-show="$app.${target.flag}"]`));
+    });
   },
 
   // Lädt Badge-Counts (offene Ideen, Chat-Sessions) für die geöffnete Seite.

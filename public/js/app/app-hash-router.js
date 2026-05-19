@@ -230,7 +230,7 @@ export const appHashRouterMethods = {
           else {
             this.selectedFigurId = null;
             if (!this.showFiguresCard) await this.toggleFiguresCard();
-            else this._closeOtherMainCards('figures');
+            else { this._closeOtherMainCards('figures'); this._scrollToCardByKey('figures'); }
           }
           break;
         case 'ort':
@@ -238,7 +238,7 @@ export const appHashRouterMethods = {
           else {
             this.selectedOrtId = null;
             if (!this.showOrteCard) await this.toggleOrteCard();
-            else this._closeOtherMainCards('orte');
+            else { this._closeOtherMainCards('orte'); this._scrollToCardByKey('orte'); }
           }
           break;
         case 'song':
@@ -246,18 +246,18 @@ export const appHashRouterMethods = {
           else {
             this.selectedSongId = null;
             if (!this.showSongsCard) await this.toggleSongsCard();
-            else this._closeOtherMainCards('songs');
+            else { this._closeOtherMainCards('songs'); this._scrollToCardByKey('songs'); }
           }
           break;
         case 'songs':
           this.selectedSongId = null;
           if (!this.showSongsCard) await this.toggleSongsCard();
-          else this._closeOtherMainCards('songs');
+          else { this._closeOtherMainCards('songs'); this._scrollToCardByKey('songs'); }
           break;
         case 'figuren':
           this.selectedFigurId = null;
           if (!this.showFiguresCard) await this.toggleFiguresCard();
-          else this._closeOtherMainCards('figures');
+          else { this._closeOtherMainCards('figures'); this._scrollToCardByKey('figures'); }
           break;
         case 'werkstatt':
           if (!this.showFigurWerkstattCard) await this.toggleFigurWerkstattCard();
@@ -274,20 +274,20 @@ export const appHashRouterMethods = {
         case 'orte':
           this.selectedOrtId = null;
           if (!this.showOrteCard) await this.toggleOrteCard();
-          else this._closeOtherMainCards('orte');
+          else { this._closeOtherMainCards('orte'); this._scrollToCardByKey('orte'); }
           break;
         case 'szene':
           if (arg) await this.openSzeneById(arg);
           else {
             this.selectedSzeneId = null;
             if (!this.showSzenenCard) await this.toggleSzenenCard();
-            else this._closeOtherMainCards('szenen');
+            else { this._closeOtherMainCards('szenen'); this._scrollToCardByKey('szenen'); }
           }
           break;
         case 'szenen':
           this.selectedSzeneId = null;
           if (!this.showSzenenCard) await this.toggleSzenenCard();
-          else this._closeOtherMainCards('szenen');
+          else { this._closeOtherMainCards('szenen'); this._scrollToCardByKey('szenen'); }
           break;
         case 'ereignisse':
           if (!this.showEreignisseCard) await this.toggleEreignisseCard();

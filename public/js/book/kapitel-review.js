@@ -15,6 +15,7 @@ export const kapitelReviewMethods = {
     this._closeOtherMainCards('kapitelReview');
     await this._ensurePartial('kapitelreview');
     this.showKapitelReviewCard = true;
+    this._scrollToCardByKey('kapitelReview');
   },
 
   async openKapitelReviewForChapter(chapterId) {
