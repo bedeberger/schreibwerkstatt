@@ -36,6 +36,7 @@ body.focus-mode #editor-card .card-header {
 body.focus-mode #editor-card .card-header:hover { opacity: 1; }
 
 body.focus-mode #editor-card .tok-stats,
+body.focus-mode #editor-card .editor-blog-status,
 body.focus-mode #editor-card .card-subline-link,
 body.focus-mode #editor-card .card-subline-sep,
 body.focus-mode #editor-card .figure-context-panel,
