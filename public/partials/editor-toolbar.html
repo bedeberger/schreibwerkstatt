@@ -27,7 +27,7 @@
   <template x-teleport="body">
     <div x-show="slashShow && $app.editMode && !$app.focusMode" x-cloak
          class="edit-slash-menu"
-         :style="{ left: slashX + 'px', top: slashY + 'px' }"
+         :style="{ left: slashX + 'px', bottom: slashY + 'px' }"
          @click.outside="_closeSlash()">
       <div class="edit-slash-hint" x-text="$app.t('editor.slash.hint')"></div>
       <template x-for="(it, i) in slashItems()" :key="it.key">

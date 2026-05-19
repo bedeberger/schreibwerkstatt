@@ -43,8 +43,12 @@ export const toolbarCardMethods = {
       this._closeSlash();
       return;
     }
+    // Menü oberhalb des Blocks (näher am Caret in langen Texten, springt nicht
+    // unter Fold). Position als Distanz vom Viewport-Boden, damit das Menü
+    // mit seiner Unterkante am Block-Top „klebt" und nach oben wächst —
+    // unabhängig von eigener Höhe.
     this.slashX = rect.left;
-    this.slashY = rect.bottom + 4;
+    this.slashY = Math.max(4, window.innerHeight - rect.top + 4);
   },
 
   _updateBubble() {
@@ -179,7 +183,7 @@ export const toolbarCardMethods = {
     this.slashIdx = 0;
     const rect = block.getBoundingClientRect();
     this.slashX = rect.left;
-    this.slashY = rect.bottom + 4;
+    this.slashY = Math.max(4, window.innerHeight - rect.top + 4);
     this.slashShow = true;
   },
 
