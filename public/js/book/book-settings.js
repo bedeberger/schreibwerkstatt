@@ -544,9 +544,25 @@ export const bookSettingsMethods = {
         this.blogForm.username      = this.blogConnection.username || '';
         this.blogForm.defaultStatus = this.blogConnection.defaultStatus || 'draft';
       }
+      await this._rehydrateBlogJobs(bookId);
     } catch (e) {
       console.error('[blog] Status laden fehlgeschlagen:', e);
     }
+  },
+
+  // Reload/Tab-Reopen: lokales blogImportJobId/blogPullJobId neu binden, falls
+  // serverseitig noch ein Job für (book, user) läuft — sonst zeigt der Button
+  // weder Spinner noch Disable, bis User erneut klickt.
+  async _rehydrateBlogJobs(bookId) {
+    const probe = async (type) => {
+      try {
+        const { jobId, status } = await fetchJson(`/jobs/active?type=${type}&book_id=${bookId}`);
+        return (jobId && (status === 'running' || status === 'queued')) ? jobId : null;
+      } catch { return null; }
+    };
+    const [importId, pullId] = await Promise.all([probe('blog-import'), probe('blog-pull')]);
+    this.blogImportJobId = importId;
+    this.blogPullJobId = pullId;
   },
 
   blogStatusOptions() {
