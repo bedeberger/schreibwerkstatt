@@ -266,6 +266,9 @@ export const appJobsCoreMethods = {
       'batch-check':           'toast.job.batchCheck',
       'werkstatt-brainstorm':  'toast.job.werkstattBrainstorm',
       'werkstatt-consistency': 'toast.job.werkstattConsistency',
+      'blog-import':           'toast.job.blogImport',
+      'blog-pull':             'toast.job.blogPull',
+      'blog-push':             'toast.job.blogPush',
     };
     const labelKey = labels[detail.type];
     const isError = job.status !== 'done';
@@ -303,36 +306,8 @@ export const appJobsCoreMethods = {
   _startJobQueuePoll() {
     if (this._jobQueueTimer) clearInterval(this._jobQueueTimer);
     if (!this._jobQueueIdsLastSeen) this._jobQueueIdsLastSeen = new Map();
-    let consecutiveFailures = 0;
-    const poll = async () => {
-      try {
-        const items = await fetchJson('/jobs/queue');
-        this._detectFinishedJobs(items);
-        this.jobQueueItems = items;
-        consecutiveFailures = 0;
-        if (this.serverOffline) this.serverOffline = false;
-      } catch (e) {
-        // Ein Setzer schlägt fehl, wenn der Server down ist oder die Session
-        // abgelaufen ist – kein Grund für dauerndes Poll-Spam. Nach 2 Fehlern
-        // in Folge den serverOffline-Banner zeigen, damit der User weiss warum
-        // Aktionen gerade fehlschlagen. Nach 5 Fehlern Polling aussetzen; der
-        // Banner bleibt, Reload-Button lädt neu.
-        console.error('[jobQueuePoll]', e);
-        // Hintergrund-Tab: Browser friert nach einigen Minuten Connections ein,
-        // erste Fetches beim Wakeup schlagen fehl. Solche Fails dürfen weder
-        // zählen noch das Polling stoppen – sonst false-positive Offline-Banner
-        // sobald der User zum Tab zurückkehrt.
-        if (document.hidden) return;
-        consecutiveFailures++;
-        if (consecutiveFailures >= 2 && !this.serverOffline && !this.sessionExpired) {
-          this.serverOffline = true;
-        }
-        if (consecutiveFailures >= 5 && this._jobQueueTimer) {
-          clearInterval(this._jobQueueTimer);
-          this._jobQueueTimer = null;
-        }
-      }
-    };
+    this._jobQueueFailures = 0;
+    const poll = () => this._pollJobQueue();
     poll();
     this._jobQueueTimer = setInterval(poll, 5000);
     // Wakeup: Tab kommt aus Background. Counter resetten, sofort frisch pollen
@@ -340,10 +315,43 @@ export const appJobsCoreMethods = {
     // wieder starten, falls es nach 5 Fehlern eingestellt war.
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) return;
-      consecutiveFailures = 0;
+      this._jobQueueFailures = 0;
       if (!this._jobQueueTimer) this._jobQueueTimer = setInterval(poll, 5000);
       poll();
     }, this._abortCtrl?.signal ? { signal: this._abortCtrl.signal } : false);
+    // Sofort-Refresh: Feature-Module dispatchen `job:enqueued` nach POST,
+    // damit der Footer den frischen Job nicht erst nach bis zu 5s sieht.
+    window.addEventListener('job:enqueued', () => poll());
+  },
+
+  async _pollJobQueue() {
+    try {
+      const items = await fetchJson('/jobs/queue');
+      this._detectFinishedJobs(items);
+      this.jobQueueItems = items;
+      this._jobQueueFailures = 0;
+      if (this.serverOffline) this.serverOffline = false;
+    } catch (e) {
+      // Ein Setzer schlägt fehl, wenn der Server down ist oder die Session
+      // abgelaufen ist – kein Grund für dauerndes Poll-Spam. Nach 2 Fehlern
+      // in Folge den serverOffline-Banner zeigen, damit der User weiss warum
+      // Aktionen gerade fehlschlagen. Nach 5 Fehlern Polling aussetzen; der
+      // Banner bleibt, Reload-Button lädt neu.
+      console.error('[jobQueuePoll]', e);
+      // Hintergrund-Tab: Browser friert nach einigen Minuten Connections ein,
+      // erste Fetches beim Wakeup schlagen fehl. Solche Fails dürfen weder
+      // zählen noch das Polling stoppen – sonst false-positive Offline-Banner
+      // sobald der User zum Tab zurückkehrt.
+      if (document.hidden) return;
+      this._jobQueueFailures = (this._jobQueueFailures || 0) + 1;
+      if (this._jobQueueFailures >= 2 && !this.serverOffline && !this.sessionExpired) {
+        this.serverOffline = true;
+      }
+      if (this._jobQueueFailures >= 5 && this._jobQueueTimer) {
+        clearInterval(this._jobQueueTimer);
+        this._jobQueueTimer = null;
+      }
+    }
   },
 
   async cancelJob(jobId) {

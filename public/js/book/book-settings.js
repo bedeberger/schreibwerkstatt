@@ -630,6 +630,7 @@ export const bookSettingsMethods = {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error_code || 'BLOG_IMPORT_FAILED');
       this.blogImportJobId = data.jobId;
+      window.dispatchEvent(new CustomEvent('job:enqueued', { detail: { type: 'blog-import', jobId: data.jobId } }));
     } catch (e) {
       this.blogError = window.__app.t('blog.error.' + e.message) || e.message;
     }
@@ -647,6 +648,7 @@ export const bookSettingsMethods = {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error_code || 'BLOG_PULL_FAILED');
       this.blogPullJobId = data.jobId;
+      window.dispatchEvent(new CustomEvent('job:enqueued', { detail: { type: 'blog-pull', jobId: data.jobId } }));
     } catch (e) {
       this.blogError = window.__app.t('blog.error.' + e.message) || e.message;
     }

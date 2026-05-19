@@ -1688,6 +1688,9 @@
   "toast.job.batchCheck":            "Batch-Lektorat",
   "toast.job.werkstattBrainstorm":   "Figuren-Brainstorm",
   "toast.job.werkstattConsistency":  "Figuren-Konsistenzcheck",
+  "toast.job.blogImport":            "Blog-Initial-Import",
+  "toast.job.blogPull":              "Blog-Pull",
+  "toast.job.blogPush":              "Blog-Push",
   "toast.job.fallback":              "Job",
 
   "job.error.sessionNotFound":       "Session nicht gefunden.",

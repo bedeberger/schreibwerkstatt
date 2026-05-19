@@ -1687,6 +1687,9 @@
   "toast.job.batchCheck":            "Batch edit",
   "toast.job.werkstattBrainstorm":   "Character brainstorm",
   "toast.job.werkstattConsistency":  "Character consistency check",
+  "toast.job.blogImport":            "Blog initial import",
+  "toast.job.blogPull":              "Blog pull",
+  "toast.job.blogPush":              "Blog push",
   "toast.job.fallback":              "Job",
 
   "job.error.sessionNotFound":       "Session not found.",

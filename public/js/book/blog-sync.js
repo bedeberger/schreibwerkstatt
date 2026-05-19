@@ -124,7 +124,10 @@ export const blogSyncMethods = {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error_code || 'BLOG_PUSH_FAILED');
-      if (data.jobId) this._pollBlogPush(pageId, data.jobId);
+      if (data.jobId) {
+        window.dispatchEvent(new CustomEvent('job:enqueued', { detail: { type: 'blog-push', jobId: data.jobId } }));
+        this._pollBlogPush(pageId, data.jobId);
+      }
     } catch (e) {
       console.error('[blogSync] Push fehlgeschlagen:', e);
       this._clearBlogPushBusy(pageId);
