@@ -19,59 +19,59 @@
           <span class="focus-live-counter--today"
                 x-text="t('editor.focus.counterToday', { wordsDelta: focusCountWordsDelta, charsDelta: focusCountCharsDelta })"></span>
         </span>
+        <span x-show="currentPage && blogStatusFor(currentPage)" class="editor-blog-status">
+          <template x-if="blogStatusFor(currentPage)">
+            <span class="badge" :class="'badge--blog-' + blogStatusFor(currentPage)"
+                  :data-tip="blogStatusLabel(blogStatusFor(currentPage))"
+                  x-text="blogStatusLabel(blogStatusFor(currentPage))"></span>
+          </template>
+          <template x-if="canBlogPush(currentPage) || blogPushBusy[currentPage?.id]">
+            <button type="button" class="btn-compact editor-blog-push"
+                    @click="pushPageToBlog(currentPage.id)"
+                    :disabled="!!blogPushBusy[currentPage.id]"
+                    :data-tip="t('blog.action.push')"
+                    :aria-label="t('blog.action.push')">
+              <template x-if="!blogPushBusy[currentPage?.id]">
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=635#arrow-up"/></svg>
+              </template>
+              <template x-if="blogPushBusy[currentPage?.id]">
+                <span class="display-contents">
+                  <span class="spinner" aria-hidden="true"></span>
+                  <span class="editor-blog-push-pct" x-text="(blogPushProgress[currentPage.id] || 0) + '%'"></span>
+                </span>
+              </template>
+            </button>
+          </template>
+          <template x-if="blogStatusFor(currentPage) === 'conflict'">
+            <button type="button" class="btn-compact editor-blog-conflict"
+                    @click="openBlogConflict(currentPage.id)"
+                    :data-tip="t('blog.action.resolveConflict')"
+                    x-text="t('blog.action.resolveConflict')"></button>
+          </template>
+        </span>
+        <span x-show="currentPage && tokEsts[currentPage.id]" class="tok-stats">
+          <template x-if="tokEsts[currentPage?.id]?.words > 0">
+            <span class="display-contents">
+              <span class="tok-badge tok-neutral"
+                x-text="tokEsts[currentPage.id]?.chars >= 1000 ? '~' + Math.round(tokEsts[currentPage.id].chars/1000) + 'k Z' : tokEsts[currentPage.id]?.chars + ' Z'"></span>
+              <span class="tok-badge tok-neutral"
+                :data-tip="t('bookstats.metric.normseiten')"
+                x-text="(Math.round((tokEsts[currentPage.id]?.chars || 0) / 1500 * 10) / 10).toLocaleString(uiLocale === 'en' ? 'en-US' : 'de-CH', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' ' + t('bookstats.unit.ns')"></span>
+              <span class="tok-badge tok-neutral"
+                x-text="tokEsts[currentPage.id]?.words >= 1000 ? '~' + Math.round(tokEsts[currentPage.id].words/1000) + 'k W' : tokEsts[currentPage.id]?.words + ' W'"></span>
+              <span class="tok-badge"
+                :class="tokEsts[currentPage.id]?.tok > 16000 ? 'tok-high' : tokEsts[currentPage.id]?.tok > 4000 ? 'tok-med' : 'tok-ok'"
+                x-text="tokEsts[currentPage.id]?.tok >= 1000 ? '~' + Math.round(tokEsts[currentPage.id].tok/1000) + 'k T' : '~' + tokEsts[currentPage.id]?.tok + ' T'"
+                ></span>
+            </span>
+          </template>
+          <template x-if="tokEsts[currentPage?.id] && tokEsts[currentPage.id].words === 0">
+            <span class="tok-badge tok-empty" x-text="t('sidebar.empty')"></span>
+          </template>
+        </span>
       </div>
     </div>
     <div class="card-header-aside">
-      <span x-show="currentPage && blogStatusFor(currentPage)" class="editor-blog-status">
-        <template x-if="blogStatusFor(currentPage)">
-          <span class="badge" :class="'badge--blog-' + blogStatusFor(currentPage)"
-                :data-tip="blogStatusLabel(blogStatusFor(currentPage))"
-                x-text="blogStatusLabel(blogStatusFor(currentPage))"></span>
-        </template>
-        <template x-if="canBlogPush(currentPage) || blogPushBusy[currentPage?.id]">
-          <button type="button" class="btn-compact editor-blog-push"
-                  @click="pushPageToBlog(currentPage.id)"
-                  :disabled="!!blogPushBusy[currentPage.id]"
-                  :data-tip="t('blog.action.push')"
-                  :aria-label="t('blog.action.push')">
-            <template x-if="!blogPushBusy[currentPage?.id]">
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=635#arrow-up"/></svg>
-            </template>
-            <template x-if="blogPushBusy[currentPage?.id]">
-              <span class="display-contents">
-                <span class="spinner" aria-hidden="true"></span>
-                <span class="editor-blog-push-pct" x-text="(blogPushProgress[currentPage.id] || 0) + '%'"></span>
-              </span>
-            </template>
-          </button>
-        </template>
-        <template x-if="blogStatusFor(currentPage) === 'conflict'">
-          <button type="button" class="btn-compact editor-blog-conflict"
-                  @click="openBlogConflict(currentPage.id)"
-                  :data-tip="t('blog.action.resolveConflict')"
-                  x-text="t('blog.action.resolveConflict')"></button>
-        </template>
-      </span>
-      <span x-show="currentPage && tokEsts[currentPage.id]" class="tok-stats">
-        <template x-if="tokEsts[currentPage?.id]?.words > 0">
-          <span class="display-contents">
-            <span class="tok-badge tok-neutral"
-              x-text="tokEsts[currentPage.id]?.chars >= 1000 ? '~' + Math.round(tokEsts[currentPage.id].chars/1000) + 'k Z' : tokEsts[currentPage.id]?.chars + ' Z'"></span>
-            <span class="tok-badge tok-neutral"
-              :data-tip="t('bookstats.metric.normseiten')"
-              x-text="(Math.round((tokEsts[currentPage.id]?.chars || 0) / 1500 * 10) / 10).toLocaleString(uiLocale === 'en' ? 'en-US' : 'de-CH', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' ' + t('bookstats.unit.ns')"></span>
-            <span class="tok-badge tok-neutral"
-              x-text="tokEsts[currentPage.id]?.words >= 1000 ? '~' + Math.round(tokEsts[currentPage.id].words/1000) + 'k W' : tokEsts[currentPage.id]?.words + ' W'"></span>
-            <span class="tok-badge"
-              :class="tokEsts[currentPage.id]?.tok > 16000 ? 'tok-high' : tokEsts[currentPage.id]?.tok > 4000 ? 'tok-med' : 'tok-ok'"
-              x-text="tokEsts[currentPage.id]?.tok >= 1000 ? '~' + Math.round(tokEsts[currentPage.id].tok/1000) + 'k T' : '~' + tokEsts[currentPage.id]?.tok + ' T'"
-              ></span>
-          </span>
-        </template>
-        <template x-if="tokEsts[currentPage?.id] && tokEsts[currentPage.id].words === 0">
-          <span class="tok-badge tok-empty" x-text="t('sidebar.empty')"></span>
-        </template>
-      </span>
       <div class="card-actions card-actions--grouped">
       <template x-if="!editMode">
         <span class="display-contents">

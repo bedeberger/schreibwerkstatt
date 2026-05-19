@@ -80,13 +80,11 @@
   min-width: 0;
   margin-left: auto;
 }
-.card-header-aside .tok-stats,
-.card-header-aside .editor-blog-status {
+.card-subline .editor-blog-status,
+.card-subline .tok-stats {
   display: inline-flex;
   align-items: center;
   gap: var(--space-xs);
-  padding-right: var(--space-14);
-  border-right: 0.5px solid var(--color-border);
 }
 .editor-blog-push .icon,
 .editor-blog-conflict .icon { width: 0.9em; height: 0.9em; }
@@ -98,15 +96,6 @@
 @media (max-width: 700px) {
   .card-header--subline { flex-direction: column; align-items: stretch; }
   .card-header-aside { width: 100%; flex-wrap: wrap; }
-  .card-header-aside .tok-stats,
-  .card-header-aside .editor-blog-status {
-    padding-right: 0;
-    border-right: none;
-    padding-bottom: var(--space-6);
-    margin-bottom: var(--space-6);
-    border-bottom: 0.5px solid var(--color-border);
-    width: 100%;
-  }
 }
 
 /* === Form elements === */
