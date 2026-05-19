@@ -132,12 +132,6 @@ n/a falls keine Schema-Änderung.
 - Welche Metriken/Counter (falls vorhanden).
 - Frontend-Tracking (Plausible-Event? Usage-Track?).
 
-## Reversibilität / Rollback
-
-- Feature-Flag (App-Setting) oder ENV-Var?
-- Schema-Migration rückwärtsfähig? Falls nein: explizit erwähnen.
-- Daten-Cleanup-Skript falls Tabelle gedroppt werden müsste.
-
 ## Tests
 
 | Stufe | Datei | Was wird abgedeckt |

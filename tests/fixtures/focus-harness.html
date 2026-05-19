@@ -4,33 +4,48 @@
   <meta charset="UTF-8">
   <title>Focus Editor Test Harness</title>
   <!-- Minimal-CSS für Focus-Tests: tokens.css (Custom-Props + @layer-Ordnung)
-       + focus-mode.css (Dim-Regel + .focus-paragraph-active). Übrige App-CSS
-       laden hier nicht – mehr Files = mehr serielle fs.readFile-Calls im
-       Test-Static-Server, was auf langsamem CI 30s-Timeouts produziert. -->
+       + focus-mode.css (Dim-Regel + .focus-paragraph-active) + page-view.css
+       (Wrapper-Layout `.page-editor-wrap`, sonst greift Focus-Höhenkette nicht
+       und Scroll-Container bekommt keine begrenzte Höhe). DOM unten spiegelt
+       die reale App-Wrapper-Kette aus editor.html + editor-body-edit.html. -->
+
   <link rel="stylesheet" href="/public/css/tokens.css">
   <link rel="stylesheet" href="/public/css/editor/focus-mode.css">
+  <link rel="stylesheet" href="/public/css/page/page-view.css">
   <link rel="stylesheet" href="/public/css/components/job-toast.css">
   <link rel="stylesheet" href="/public/css/page/page-revision-viewer.css">
   <link rel="stylesheet" href="/public/css/components/user-chip.css">
   <style>
     body { margin: 0; font: 16px/1.6 system-ui, sans-serif; }
     #editor-card { height: 100vh; display: flex; flex-direction: column; }
-    .page-content-view {
-      flex: 1; overflow-y: auto; padding: 0 24px;
-      scroll-behavior: auto; /* smooth-scroll abschalten → deterministische Tests */
-    }
     .page-content-view p { margin: 0 0 1em; }
   </style>
 </head>
 <body>
   <div id="editor-card">
-    <!-- Editor (Edit-Modus). -->
-    <div class="page-content-view page-content-view--editing" contenteditable="true"></div>
-    <!-- Versteckter View-Modus-Container. Spiegelt den realen Alpine-x-show-Zustand
-         im Edit-Modus (display:none). Früher fing getScrollContainer() diesen
-         Container via `:not([style*="display: none"])`-Race und verlor die
-         eigentlichen Editor-Blöcke. Der Fallback muss ihn ignorieren. -->
-    <div class="page-content-view" style="display: none;"></div>
+    <!-- Reale Wrapper-Kette aus partials/editor.html + partials/editor-body-edit.html.
+         #partial-editor-body-edit ist im Real-DOM Host-Div mit display:contents
+         (focus-mode.css). .page-editor-wrap enthält Toolbar (Zoom/Fullscreen) +
+         contenteditable; im Focus-Mode wird beides geflattent. Ohne diese
+         Schichten kann der Harness Höhen-Propagations-Bugs nicht sehen. -->
+    <div class="editor-body-wrap">
+      <div class="editor-preview-wrap">
+        <div id="partial-editor-body-edit">
+          <div class="page-editor-wrap">
+            <div class="page-editor-toolbar">
+              <button type="button" class="graph-tool-btn">Z+</button>
+            </div>
+            <div class="page-content-view page-content-view--editing" contenteditable="true"></div>
+          </div>
+        </div>
+        <!-- View-Modus-Container hat im Real-DOM seinen eigenen Partial-Host;
+             im Edit-Modus ist er via x-show display:none. Früher fing
+             getScrollContainer() ihn via `:not([style*="display: none"])`-Race. -->
+        <div id="partial-editor-body-view">
+          <div class="page-content-view" style="display: none;"></div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script type="module">

@@ -35,6 +35,22 @@ test.beforeEach(async ({ page }) => {
   await page.waitForFunction(() => window.harnessReady === true);
 });
 
+test('Focus-Höhenkette: Scroll-Container hat begrenzte Höhe (scrollHeight > clientHeight)', async ({ page }) => {
+  // Regression: Toolbar-Refactor zog `.page-editor-wrap` als neue Flex-Spalte
+  // zwischen `.editor-preview-wrap` und `.page-content-view--editing`. Ohne
+  // `display: contents` / `flex: 1; min-height: 0` auf der neuen Schicht
+  // kollabiert die Höhenkette → contenteditable expandiert auf Content-Höhe
+  // → clientHeight == scrollHeight → kein Scroll. Tests hatten den Bug nicht
+  // gefangen, weil die alte Harness-DOM-Struktur flach war.
+  await enter(page);
+  const dims = await page.evaluate((sel) => {
+    const el = document.querySelector(sel);
+    return { client: el.clientHeight, scroll: el.scrollHeight };
+  }, EDITOR);
+  expect(dims.client).toBeGreaterThan(100);
+  expect(dims.scroll).toBeGreaterThan(dims.client + 200);
+});
+
 test('getScrollContainer greift trotz sichtbarer Schwester `.page-content-view` auf --editing', async ({ page }) => {
   // Produktionsbug: im Edit-Modus existieren zwei `.page-content-view`-Elemente
   // (Edit-Partial + View-Partial, gegenseitig via Alpine-x-show versteckt).
