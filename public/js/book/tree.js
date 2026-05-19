@@ -300,6 +300,13 @@ export const treeMethods = {
           if (r.ok) this.bookFilterCategoryPool = (await r.json()).categories || [];
         } catch (_) {}
       }
+      // Filter aus localStorage restoren (per-User). Nur valide IDs (im Pool und mit Büchern) übernehmen.
+      if (!this.bookFilterCategoryId) {
+        try {
+          const stored = localStorage.getItem(`sw:bookFilterCategoryId:${this.currentUser?.email || ''}`);
+          if (stored && catIds.has(Number(stored))) this.bookFilterCategoryId = String(stored);
+        } catch (_) {}
+      }
       if (!this.selectedBookId || !this.books.some(b => String(b.id) === String(this.selectedBookId))) {
         let restored = '';
         try {
@@ -307,7 +314,14 @@ export const treeMethods = {
           const stored = localStorage.getItem(key);
           if (stored && this.books.some(b => String(b.id) === String(stored))) restored = String(stored);
         } catch (_) {}
-        this.selectedBookId = restored || String(this.books[0]?.id || '');
+        // Filter aktiv → erstes Buch aus gefilterter Liste bevorzugen (z.B. nach deleteBook).
+        let filteredFallback = '';
+        if (this.bookFilterCategoryId) {
+          const filtered = this.filteredBooks();
+          filteredFallback = String(filtered[0]?.id || '');
+          if (restored && !filtered.some(b => String(b.id) === restored)) restored = '';
+        }
+        this.selectedBookId = restored || filteredFallback || String(this.books[0]?.id || '');
       }
       this.showBookCard = true;
       this.setStatus(this.t('tree.booksFound', { n: this.books.length }), false, 4000);

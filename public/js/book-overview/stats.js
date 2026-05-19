@@ -23,9 +23,15 @@ export const statsMethods = {
       if (!ids.length) return histLast;
       const { chars, words, tok } = aggregateLiveBookStats(tokEsts, tree);
       const page_count = pages.length || ids.length;
-      const chapter_count = new Set(
-        pages.map(p => p.chapter_id).filter(Boolean)
-      ).size;
+      // chapter_count zählt nur Top-Level-Kapitel — Sub-Kapitel rollen auf Root.
+      const { rootOf } = this._chapterRollup();
+      const rootIds = new Set();
+      for (const p of pages) {
+        if (!p.chapter_id) continue;
+        const root = rootOf(p.chapter_id);
+        if (root) rootIds.add(Number(root.id));
+      }
+      const chapter_count = rootIds.size;
       return { ...(histLast || {}), chars, words, tok, page_count, chapter_count };
     });
   },

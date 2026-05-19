@@ -31,44 +31,36 @@ export const orteMethods = {
       const empty = { places: [], rows: [] };
       const app = window.__app;
       if (!app || orte.length === 0) return empty;
-      // Solo-Wrapper (Spezialseiten ohne Kapitel) ausklammern — sie sind in tree
-      // als type:'chapter' mit solo:true verpackt (siehe tree.js loadPages).
-      const chapters = (app.tree || [])
-        .filter(i => i.type === 'chapter' && !i.solo)
-        .map(c => ({ id: c.id, name: c.name }));
+      // Sub-Kapitel werden auf ihr Wurzel-Kapitel aggregiert — kapitel-rows
+      // landen via rootOf bzw. rootOfName im Root-Bucket.
+      const { roots, rootOf, rootOfName } = this._chapterRollup();
+      const chapters = roots.map(c => ({ id: c.id, name: c.name }));
       if (chapters.length === 0) return empty;
 
       const MAX_COLS = 20;
 
-      // Spezialseiten ohne Kapitel ausklammern: Orte, die nur dort vorkommen,
-      // dürfen weder Top-N-Selektion noch Matrix-Skalierung beeinflussen.
-      const chapterIds = new Set(chapters.map(c => Number(c.id)));
-      const chapterNames = new Set(chapters.map(c => c.name));
-
       const candidates = orte.map(o => {
         const kap = Array.isArray(o.kapitel) ? o.kapitel : [];
-        const byId = new Map();
-        const byName = new Map();
+        const byRootId = new Map();
         for (const k of kap) {
           const h = Number(k?.haeufigkeit) || 0;
-          const kid = k?.chapter_id != null ? Number(k.chapter_id) : null;
-          const kname = k?.name || '';
-          const inChapter = (kid != null && chapterIds.has(kid))
-                         || (kname && chapterNames.has(kname));
-          if (!inChapter) continue;
-          if (kid != null) byId.set(kid, (byId.get(kid) || 0) + h);
-          if (kname) byName.set(kname, (byName.get(kname) || 0) + h);
+          if (h <= 0) continue;
+          const root = (k?.chapter_id != null ? rootOf(k.chapter_id) : null)
+                     || rootOfName(k?.name);
+          if (!root) continue;
+          const rid = Number(root.id);
+          byRootId.set(rid, (byRootId.get(rid) || 0) + h);
         }
         let total = 0;
-        for (const v of byName.values()) total += v;
-        return { id: o.id, name: o.name, typ: o.typ || 'andere', byId, byName, total };
+        for (const v of byRootId.values()) total += v;
+        return { id: o.id, name: o.name, typ: o.typ || 'andere', byRootId, total };
       }).filter(c => c.total > 0);
 
       if (candidates.length === 0) return empty;
       candidates.sort((a, b) => b.total - a.total);
       const selected = candidates.slice(0, MAX_COLS);
 
-      const lookup = (c, ch) => c.byId.get(Number(ch.id)) ?? c.byName.get(ch.name) ?? 0;
+      const lookup = (c, ch) => c.byRootId.get(Number(ch.id)) ?? 0;
 
       const places = selected.map(c => ({ id: c.id, name: c.name, typ: c.typ }));
       let globalMax = 0;

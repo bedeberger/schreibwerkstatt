@@ -189,6 +189,46 @@ export const loadMethods = {
     this._memos = {};
   },
 
+  // Rollup-Helfer: alle per-Kapitel-Tiles aggregieren Sub-Kapitel auf ihr
+  // Wurzel-Kapitel (Top-Level, depth=1). Tree ist flach + depth-annotiert
+  // (siehe tree.js#loadPages). Solo-Wrapper (Spezialseiten ohne Kapitel)
+  // ausgeklammert — verzerren sonst Median/Skalierung. Name-Map als
+  // Fallback für Server-Rows, die nur `chapter_name` ohne `chapter_id`
+  // liefern (Backfill-Lücken).
+  _chapterRollup() {
+    const tree = window.__app?.tree || [];
+    return this._memo('rollup', [tree], () => {
+      const chs = tree.filter(i => i.type === 'chapter' && !i.solo);
+      const byId = new Map(chs.map(c => [Number(c.id), c]));
+      const byName = new Map(chs.map(c => [c.name, c]));
+      const rootCache = new Map();
+      const rootOf = (id) => {
+        if (id == null) return null;
+        const key = Number(id);
+        if (rootCache.has(key)) return rootCache.get(key);
+        let cur = byId.get(key);
+        const path = [key];
+        while (cur?.parent_id != null) {
+          const pid = Number(cur.parent_id);
+          path.push(pid);
+          cur = byId.get(pid);
+        }
+        for (const k of path) rootCache.set(k, cur || null);
+        return cur || null;
+      };
+      const rootOfName = (name) => {
+        if (!name) return null;
+        const ch = byName.get(name);
+        return ch ? rootOf(ch.id) : null;
+      };
+      // Root = ohne parent_id. Stabiler als depth===1 (legacy/tree-Fixtures
+      // ohne depth-Annotation funktionieren weiter; Tree-Walker setzt depth=1
+      // genau dann, wenn parent_id === null).
+      const roots = chs.filter(c => c.parent_id == null);
+      return { roots, rootOf, rootOfName, byId, byName };
+    });
+  },
+
   // Cache hit nur wenn ALLE Source-Refs (deps) identisch zur letzten Compute.
   // Wichtig für Tiles, die zusätzlich zu `overviewXxx` auch `app.tree`/
   // `app.figuren` lesen — sonst wird ein Compute mit leerem `tree` (während

@@ -662,6 +662,13 @@ document.addEventListener('alpine:init', () => {
           }, { deep: true });
         }
 
+        this.$watch('bookFilterCategoryId', (val) => {
+          try {
+            const key = `sw:bookFilterCategoryId:${this.currentUser?.email || ''}`;
+            if (val) localStorage.setItem(key, String(val));
+            else localStorage.removeItem(key);
+          } catch (_) {}
+        });
         this.$watch('selectedBookId', async (newVal, oldVal) => {
           if (this._applyingHash) return;
           if (!newVal) return;

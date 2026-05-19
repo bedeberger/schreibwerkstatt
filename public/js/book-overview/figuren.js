@@ -46,12 +46,10 @@ export const figurenMethods = {
     const empty = { figures: [], rows: [] };
     const app = window.__app;
     if (!app || figs.length === 0 || sz.length === 0) return empty;
-    const tree = app.tree || [];
-    // Solo-Wrapper (Spezialseiten ohne Kapitel) ausklammern — sie sind in tree
-    // als type:'chapter' mit solo:true verpackt (siehe tree.js loadPages).
-    const chapters = tree
-      .filter(i => i.type === 'chapter' && !i.solo)
-      .map(c => ({ id: c.id, name: c.name }));
+    // Sub-Kapitel werden auf ihr Wurzel-Kapitel aggregiert — Szenen-Counts
+    // landen im Root-Bucket via rootOf(s.chapter_id) bzw. rootOfName(s.kapitel).
+    const { roots, rootOf, rootOfName } = this._chapterRollup();
+    const chapters = roots.map(c => ({ id: c.id, name: c.name }));
     if (chapters.length === 0) return empty;
 
     const MAX_COLS = 20;
@@ -59,29 +57,22 @@ export const figurenMethods = {
     const figByFigId = new Map();
     for (const f of figs) figByFigId.set(f.id, f);
 
-    // Spezialseiten ohne Kapitel ausklammern: Figuren, die nur dort auftreten,
-    // dürfen weder Top-N-Selektion noch Matrix-Skalierung beeinflussen.
-    const chapterIds = new Set(chapters.map(c => Number(c.id)));
-    const chapterNames = new Set(chapters.map(c => c.name));
-
-    const counts = new Map(); // fig_id -> { byId, byName, total }
+    const counts = new Map(); // fig_id -> { byRootId, total }
     for (const s of sz) {
       if (!Array.isArray(s.fig_ids) || s.fig_ids.length === 0) continue;
-      const chapId = s.chapter_id ?? null;
-      const chapName = s.kapitel || '';
-      const inChapter = (chapId != null && chapterIds.has(Number(chapId)))
-                     || (chapName && chapterNames.has(chapName));
-      if (!inChapter) continue;
+      const root = (s.chapter_id != null ? rootOf(s.chapter_id) : null)
+                 || rootOfName(s.kapitel);
+      if (!root) continue;
+      const rid = Number(root.id);
       for (const figId of s.fig_ids) {
         let m = counts.get(figId);
-        if (!m) { m = { byId: new Map(), byName: new Map(), total: 0 }; counts.set(figId, m); }
-        if (chapId != null) m.byId.set(Number(chapId), (m.byId.get(Number(chapId)) || 0) + 1);
-        if (chapName) m.byName.set(chapName, (m.byName.get(chapName) || 0) + 1);
+        if (!m) { m = { byRootId: new Map(), total: 0 }; counts.set(figId, m); }
+        m.byRootId.set(rid, (m.byRootId.get(rid) || 0) + 1);
         m.total++;
       }
     }
 
-    const lookup = (m, ch) => m.byId.get(Number(ch.id)) ?? m.byName.get(ch.name) ?? 0;
+    const lookup = (m, ch) => m.byRootId.get(Number(ch.id)) ?? 0;
 
     const candidates = [];
     for (const [figId, m] of counts) {

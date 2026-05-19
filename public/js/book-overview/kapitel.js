@@ -4,38 +4,42 @@
 import { fmtExactDuration } from '../utils.js';
 
 export const kapitelMethods = {
-  // Kapitel-Verteilung: Zeichen + Wörter + Seiten pro Kapitel.
-  // Liest tree (Lese-Reihenfolge) und tokEsts (Live-Metriken pro Seite).
-  // Diverging-Bar um Median (Zeichen): Track-Mitte = Median, Bars wachsen rechts
-  // (länger als Median) oder links (kürzer). deltaPct = Abweichung gegen Median.
-  // isMax/isMin markieren Extrem-Kapitel (Border-Akzent).
-  // Sortierung: Lese-Reihenfolge aus tree (= Buch-Sortierung der Kapitel).
+  // Kapitel-Verteilung: Zeichen + Wörter + Seiten pro Top-Level-Kapitel.
+  // Sub-Kapitel werden auf ihr Wurzel-Kapitel aggregiert (Pages aller
+  // Descendant-Kapitel zählen zum Root-Bucket). Liest tree (Lese-Reihenfolge)
+  // und tokEsts (Live-Metriken pro Seite). Diverging-Bar um Median (Zeichen):
+  // Track-Mitte = Median, Bars wachsen rechts (länger als Median) oder links
+  // (kürzer). deltaPct = Abweichung gegen Median. isMax/isMin markieren
+  // Extrem-Kapitel (Border-Akzent). Sortierung: Lese-Reihenfolge der Roots.
   overviewChapterDistribution() {
     const app = window.__app;
     if (!app) return [];
     const tree = app.tree || [];
     const tokEsts = app.tokEsts || {};
     return this._memo('chapterDist', [tree, tokEsts], () => {
-      const out = [];
+      const { roots, rootOf } = this._chapterRollup();
+      const buckets = new Map();
+      for (const r of roots) buckets.set(Number(r.id), { id: r.id, name: r.name, pages: 0, words: 0, chars: 0 });
       for (const item of tree) {
-        // Solo-Wrapper für Spezialseiten ohne Kapitel ausklammern (verzerren Median).
         if (item.type !== 'chapter' || item.solo) continue;
+        const root = rootOf(item.id);
+        if (!root) continue;
+        const b = buckets.get(Number(root.id));
+        if (!b) continue;
         const pages = item.pages || [];
-        let words = 0, chars = 0;
+        b.pages += pages.length;
         for (const p of pages) {
           const est = tokEsts[p.id];
           if (!est) continue;
-          words += Number(est.words) || 0;
-          chars += Number(est.chars) || 0;
+          b.words += Number(est.words) || 0;
+          b.chars += Number(est.chars) || 0;
         }
-        out.push({
-          id: item.id,
-          name: item.name,
-          pages: pages.length,
-          words,
-          chars,
-          normseiten: Math.round((chars / 1500) * 10) / 10,
-        });
+      }
+      const out = [];
+      for (const r of roots) {
+        const b = buckets.get(Number(r.id));
+        if (!b) continue;
+        out.push({ ...b, normseiten: Math.round((b.chars / 1500) * 10) / 10 });
       }
       if (out.length === 0) return out;
       const maxChars = Math.max(1, ...out.map(c => c.chars));
@@ -66,35 +70,47 @@ export const kapitelMethods = {
     });
   },
 
-  // Lektorat-Findings pro Kapitel: aus overviewHeat.matrix (mode=open).
-  // Median, Diverging-Bar und Sort basieren auf absoluter Anzahl Findings —
-  // direkt ablesbar, ohne mentalen Umweg über Findings/1k Wörter.
-  // per1k bleibt als sekundärer Wert in der Zeilen-Meta erhalten.
-  // Median nur aus geprüften Kapiteln; ungeprüfte Zeilen behalten den Tick als
-  // Referenz, zeigen aber keinen Bar. Schwelle ≥3 geprüfte Kapitel für Median.
+  // Lektorat-Findings pro Top-Level-Kapitel: aus overviewHeat.matrix (mode=open).
+  // Sub-Kapitel-Rows werden auf ihr Wurzel-Kapitel aggregiert (count, words,
+  // pages_total, pages_checked summiert). Median, Diverging-Bar und Sort
+  // basieren auf absoluter Anzahl Findings — direkt ablesbar, ohne mentalen
+  // Umweg über Findings/1k Wörter. per1k bleibt als sekundärer Wert in der
+  // Zeilen-Meta erhalten. Median nur aus geprüften Kapiteln; ungeprüfte Zeilen
+  // behalten den Tick als Referenz, zeigen aber keinen Bar. Schwelle ≥3
+  // geprüfte Kapitel für Median.
   overviewChapterFindings() {
     const heat = this.overviewHeat;
     if (!heat || !Array.isArray(heat.chapters) || !heat.matrix) return [];
-    return this._memo('chapterFindings', [heat], () => this._computeChapterFindings(heat));
+    const tree = window.__app?.tree || [];
+    return this._memo('chapterFindings', [heat, tree], () => this._computeChapterFindings(heat));
   },
 
   _computeChapterFindings(heat) {
-    const out = [];
+    const { roots, rootOf, rootOfName } = this._chapterRollup();
+    const buckets = new Map();
+    for (const r of roots) buckets.set(Number(r.id), {
+      id: r.id, name: r.name, count: 0, words: 0, pages_total: 0, pages_checked: 0,
+    });
     for (const ch of heat.chapters) {
       if (ch.chapter_id == null) continue;
+      const root = rootOf(ch.chapter_id) || rootOfName(ch.chapter_name);
+      if (!root) continue;
+      const b = buckets.get(Number(root.id));
+      if (!b) continue;
       const typen = heat.matrix[ch.chapter_id] || {};
       let count = 0;
       for (const t of Object.values(typen)) count += Number(t.count) || 0;
-      const per1k = ch.words > 0 ? Math.round((count / ch.words) * 1000 * 10) / 10 : 0;
-      out.push({
-        id: ch.chapter_id,
-        name: ch.chapter_name || '—',
-        count,
-        per1k,
-        words: ch.words,
-        pages_total: ch.pages_total,
-        pages_checked: ch.pages_checked,
-      });
+      b.count += count;
+      b.words += Number(ch.words) || 0;
+      b.pages_total += Number(ch.pages_total) || 0;
+      b.pages_checked += Number(ch.pages_checked) || 0;
+    }
+    const out = [];
+    for (const r of roots) {
+      const b = buckets.get(Number(r.id));
+      if (!b) continue;
+      const per1k = b.words > 0 ? Math.round((b.count / b.words) * 1000 * 10) / 10 : 0;
+      out.push({ ...b, per1k });
     }
     if (out.length === 0) return out;
     const checked = out.filter(c => c.pages_checked > 0);
@@ -141,40 +157,42 @@ export const kapitelMethods = {
     return enriched;
   },
 
-  // Lektoratszeit pro Kapitel: alle Kapitel aus tree, gemerged mit
-  // /history/lektorat-time/:book_id (per_chapter). Untracked = noTime,
-  // analog zum noCheck-Flag der Findings-Tile (gleiches Layout).
-  // Diverging-Bar um Median der Sekunden über tracked Kapitel; Schwelle
-  // ≥3 tracked Kapitel für Median. Sort: tracked nach seconds desc,
-  // noTime ans Ende.
+  // Lektoratszeit pro Top-Level-Kapitel: alle Roots aus tree, Sub-Kapitel-Zeiten
+  // auf ihr Wurzel-Kapitel aggregiert. /history/lektorat-time/:book_id liefert
+  // per_chapter pro direct chapter_id. Untracked = noTime, analog zum
+  // noCheck-Flag der Findings-Tile (gleiches Layout). Diverging-Bar um Median
+  // der Sekunden über tracked Kapitel; Schwelle ≥3 tracked Kapitel für Median.
+  // Sort: tracked nach seconds desc, noTime ans Ende.
   overviewChapterLektoratTime() {
     const tree = window.__app?.tree || [];
-    const chapters = tree.filter(i => i.type === 'chapter');
-    if (chapters.length === 0) return [];
     const lt = this.overviewLektoratTime;
-    return this._memo('chapterLektoratTime', [tree, lt], () => this._computeChapterLektoratTime(chapters, lt));
+    return this._memo('chapterLektoratTime', [tree, lt], () => this._computeChapterLektoratTime(lt));
   },
 
-  _computeChapterLektoratTime(chapters, lt) {
-    const byId = new Map();
-    const byName = new Map();
+  _computeChapterLektoratTime(lt) {
+    const { roots, rootOf, rootOfName } = this._chapterRollup();
+    if (roots.length === 0) return [];
+    const buckets = new Map();
+    for (const r of roots) buckets.set(Number(r.id), {
+      id: r.id, name: r.name, seconds: 0, pages_count: 0,
+    });
     for (const row of (lt?.per_chapter || [])) {
       const sec = Number(row.seconds) || 0;
       if (sec <= 0) continue;
-      if (row.chapter_id != null) byId.set(Number(row.chapter_id), row);
-      if (row.chapter_name) byName.set(row.chapter_name, row);
+      const root = (row.chapter_id != null ? rootOf(row.chapter_id) : null)
+                 || rootOfName(row.chapter_name);
+      if (!root) continue;
+      const b = buckets.get(Number(root.id));
+      if (!b) continue;
+      b.seconds += sec;
+      b.pages_count += Number(row.pages_count) || 0;
     }
-    const out = chapters.map(ch => {
-      const row = byId.get(Number(ch.id)) || byName.get(ch.name) || null;
-      const seconds = row ? (Number(row.seconds) || 0) : 0;
-      return {
-        id: ch.id,
-        name: ch.name,
-        seconds,
-        pages_count: row ? (Number(row.pages_count) || 0) : 0,
-        noTime: seconds <= 0,
-      };
-    });
+    const out = [];
+    for (const r of roots) {
+      const b = buckets.get(Number(r.id));
+      if (!b) continue;
+      out.push({ ...b, noTime: b.seconds <= 0 });
+    }
     const tracked = out.filter(c => !c.noTime);
     const showMedian = tracked.length >= 3;
     let median = 0;
