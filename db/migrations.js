@@ -5741,6 +5741,47 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 133 abgeschlossen (Timestamp-Backfill UTC-no-Z -> ISO+Z).');
   }
 
+  if (version < 134) {
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS blog_connections (
+        id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id                INTEGER NOT NULL UNIQUE REFERENCES books(book_id) ON DELETE CASCADE,
+        base_url               TEXT    NOT NULL,
+        username               TEXT    NOT NULL,
+        password_enc           BLOB    NOT NULL,
+        default_status         TEXT    NOT NULL DEFAULT 'draft' CHECK(default_status IN ('draft','publish','private')),
+        initial_import_done_at TEXT,
+        last_pull_at           TEXT,
+        last_push_at           TEXT,
+        created_at             TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        updated_at             TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      )
+    `).run();
+
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS blog_page_links (
+        page_id         INTEGER PRIMARY KEY REFERENCES pages(page_id) ON DELETE CASCADE,
+        blog_id         INTEGER NOT NULL    REFERENCES blog_connections(id) ON DELETE CASCADE,
+        wp_post_id      INTEGER NOT NULL,
+        wp_modified_at  TEXT    NOT NULL,
+        wp_status       TEXT,
+        wp_slug         TEXT,
+        last_pulled_at  TEXT,
+        last_pushed_at  TEXT,
+        conflict_state  TEXT    CHECK(conflict_state IN ('detected','resolved-app','resolved-wp')),
+        UNIQUE(blog_id, wp_post_id)
+      )
+    `).run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_blog_page_links_blog ON blog_page_links(blog_id)').run();
+
+    const fkErrors134 = db.pragma('foreign_key_check');
+    if (fkErrors134.length) {
+      throw new Error(`Migration 134: foreign_key_check meldet ${fkErrors134.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 134').run();
+    logger.info('DB-Migration auf Version 134 abgeschlossen (blog_connections + blog_page_links).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

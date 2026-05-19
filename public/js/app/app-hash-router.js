@@ -16,6 +16,8 @@ export const appHashRouterMethods = {
     if (this.showUserSettingsCard) return '#profil';
     // Volltextsuche ist book-unabhaengig — eigener Top-Level-Hash.
     if (this.showSearchCard) return '#search';
+    // Folder-Import ist book-unabhaengig (new-book oder merge).
+    if (this.showFolderImportCard) return '#import';
     if (this.showAdminUsersCard) return '#admin/users';
     if (this.showAdminSettingsCard) return '#admin/settings';
     if (this.showAdminUsageCard) {
@@ -148,6 +150,18 @@ export const appHashRouterMethods = {
       this._inHashApply = true;
       try {
         if (!this.showSearchCard) await this.toggleSearchCard();
+      } finally {
+        this._applyingHash = false;
+        this._inHashApply = false;
+      }
+      return;
+    }
+
+    if (parts[0] === 'import') {
+      this._applyingHash = true;
+      this._inHashApply = true;
+      try {
+        if (!this.showFolderImportCard) await this.toggleFolderImportCard();
       } finally {
         this._applyingHash = false;
         this._inHashApply = false;
@@ -369,6 +383,7 @@ export const appHashRouterMethods = {
       'showBookEditorCard',
       'showBookOverviewCard',
       'showSearchCard',
+      'showFolderImportCard',
     ];
     this._hashWatcherTeardowns = [];
     for (const prop of watchers) {

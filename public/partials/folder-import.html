@@ -1,0 +1,97 @@
+<!-- Folder-Import: ZIP-Archiv mit Struktur YYYY/Monat/Tagesdatei. -->
+<div class="card card--folderimport" id="folder-import-card" x-data="folderImportCard" x-show="$app.showFolderImportCard" x-cloak>
+  <div class="card-header">
+    <span class="card-title" x-text="$app.t('folderImport.title')"></span>
+    <span class="card-subtitle" x-text="$app.t('folderImport.subtitle')"></span>
+  </div>
+
+  <div class="folder-import-body" x-show="!jobId">
+    <div class="folder-import-mode">
+      <label class="folder-import-radio">
+        <input type="radio" value="new-book" x-model="mode">
+        <span x-text="$app.t('folderImport.mode.newBook')"></span>
+      </label>
+      <label class="folder-import-radio" :class="{ 'is-disabled': !$app.selectedBookId }">
+        <input type="radio" value="merge" x-model="mode" :disabled="!$app.selectedBookId">
+        <span x-text="$app.t('folderImport.mode.merge')"></span>
+      </label>
+    </div>
+
+    <div class="folder-import-field" x-show="mode === 'new-book'">
+      <label class="folder-import-label" x-text="$app.t('folderImport.bookName')"></label>
+      <input type="text" class="folder-import-input" x-model="bookName"
+             :placeholder="$app.t('folderImport.bookNamePlaceholder')">
+    </div>
+
+    <div class="folder-import-field" x-show="mode === 'merge'">
+      <div class="folder-import-merge-info" x-text="$app.t('folderImport.mergeInto', { name: $app.selectedBookName || '' })"></div>
+    </div>
+
+    <div class="folder-import-drop"
+         :class="{ 'is-drag': dragOver, 'has-file': !!file }"
+         @dragover.prevent="dragOver = true"
+         @dragleave.prevent="dragOver = false"
+         @drop="onDrop($event)">
+      <input type="file" accept=".zip,application/zip" id="folder-import-file"
+             class="folder-import-file-input" @change="onFilePick($event)">
+      <label for="folder-import-file" class="folder-import-drop-label">
+        <div class="folder-import-drop-text" x-show="!file" x-text="$app.t('folderImport.dropZone')"></div>
+        <div class="folder-import-drop-file" x-show="file">
+          <strong x-text="fileName"></strong>
+          <span class="folder-import-size" x-text="(fileSize / 1024 / 1024).toFixed(1) + ' MB'"></span>
+        </div>
+      </label>
+    </div>
+
+    <div class="folder-import-actions">
+      <button type="button" class="btn-compact" :disabled="!canSubmit" @click="submit()">
+        <span x-text="$app.t('folderImport.start')"></span>
+      </button>
+    </div>
+
+    <div class="folder-import-error" x-show="errorMessage" x-text="errorMessage"></div>
+
+    <div class="folder-import-help">
+      <p x-text="$app.t('folderImport.help.line1')"></p>
+      <ul>
+        <li x-text="$app.t('folderImport.help.struct')"></li>
+        <li x-text="$app.t('folderImport.help.formats')"></li>
+        <li x-text="$app.t('folderImport.help.chapters')"></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="folder-import-progress" x-show="jobId && !result">
+    <div class="folder-import-status" x-html="runningStatusHtml"></div>
+    <div class="progress-bar">
+      <div class="progress-bar-fill" :style="{ '--progress': jobProgress + '%' }"></div>
+    </div>
+  </div>
+
+  <div class="folder-import-result" x-show="result">
+    <h3 x-text="$app.t('folderImport.result.title')"></h3>
+    <ul>
+      <li x-text="$app.t('folderImport.result.pages', { n: result?.pagesCreated || 0 })"></li>
+      <li x-text="$app.t('folderImport.result.chapters', { n: result?.chaptersCreated || 0 })"></li>
+      <li x-show="(result?.skipped?.length || 0) > 0"
+          x-text="$app.t('folderImport.result.skipped', { n: result?.skipped?.length || 0 })"></li>
+    </ul>
+    <div x-data="{ open: false }" x-show="(result?.skipped?.length || 0) > 0" class="folder-import-skipped-block">
+      <button type="button" class="collapsible-toggle" @click="open = !open" :aria-expanded="open">
+        <svg class="icon history-chevron" :class="{ 'is-open': open }" aria-hidden="true"><use href="/icons.svg#chevron-right"/></svg>
+        <span x-text="$app.t('folderImport.result.skippedDetails')"></span>
+      </button>
+      <ul class="folder-import-skipped" x-show="open" x-cloak>
+        <template x-for="s in (result?.skipped || [])" :key="s.path">
+          <li>
+            <code x-text="s.path"></code>
+            <span x-text="' — ' + s.reason"></span>
+          </li>
+        </template>
+      </ul>
+    </div>
+    <div class="folder-import-actions">
+      <button type="button" class="btn-compact" @click="reset()" x-text="$app.t('folderImport.again')"></button>
+    </div>
+  </div>
+</div>

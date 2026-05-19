@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 133, 74 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 134, 76 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -51,6 +51,9 @@ erDiagram
   books ||--o{ werkstatt_runs        : has
   books ||--o{ book_tag_assignments  : tagged
   books }o--o| book_categories       : "category_id"
+  books ||--o| blog_connections      : "wp-link"
+  blog_connections ||--o{ blog_page_links : "has"
+  pages ||--o| blog_page_links       : "wp-mirror"
 
   book_categories ||--o{ book_categories : parent
   book_tags ||--o{ book_tag_assignments : assigned
@@ -941,6 +944,35 @@ erDiagram
     TEXT value
     TEXT updated_at
   }
+
+  blog_connections {
+    INTEGER id                     PK
+    INTEGER book_id                FK "UNIQUE — 1 Blog pro Buch"
+    TEXT    base_url               "https:// nur"
+    TEXT    username
+    BLOB    password_enc           "AES via lib/crypto.js"
+    TEXT    default_status         "draft|publish|private"
+    TEXT    initial_import_done_at "NULL = noch nie importiert"
+    TEXT    last_pull_at
+    TEXT    last_push_at
+    TEXT    created_at
+    TEXT    updated_at
+  }
+  blog_page_links {
+    INTEGER page_id        PK "FK pages(page_id) ON DELETE CASCADE"
+    INTEGER blog_id        FK "FK blog_connections(id) ON DELETE CASCADE"
+    INTEGER wp_post_id
+    TEXT    wp_modified_at "last seen wp.modified_gmt"
+    TEXT    wp_status      "publish|draft|private"
+    TEXT    wp_slug
+    TEXT    last_pulled_at
+    TEXT    last_pushed_at
+    TEXT    conflict_state "detected|resolved-app|resolved-wp"
+  }
+
+  books            ||--o| blog_connections  : "wp-link"
+  blog_connections ||--o{ blog_page_links   : has
+  pages            ||--o| blog_page_links   : "wp-mirror"
 
   chat_sessions ||--o{ chat_messages : has
   user_invites  ||--o{ registration_requests : "linked invite"

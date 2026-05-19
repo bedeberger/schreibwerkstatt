@@ -13,6 +13,7 @@ const { synonymeRouter } = require('./jobs/synonyme');
 const { finetuneExportRouter } = require('./jobs/finetune-export');
 const { pdfExportRouter } = require('./jobs/pdf-export');
 const { figurWerkstattRouter } = require('./jobs/figur-werkstatt');
+const { folderImportRouter } = require('./jobs/folder-import');
 
 // Budget-Enforcement greift VOR allen Sub-Routern, sonst lassen sich
 // die Job-POSTs unter /jobs/* nicht mit einer einzigen Middleware kapseln.
@@ -34,6 +35,7 @@ router.use('/', synonymeRouter);
 router.use('/', finetuneExportRouter);
 router.use('/', pdfExportRouter);
 router.use('/', figurWerkstattRouter);
+router.use('/', folderImportRouter);
 router.use('/', sharedRouter);
 
 module.exports = { router, runKomplettAnalyseAll };

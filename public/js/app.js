@@ -44,6 +44,7 @@ import { registerPdfExportCard } from './cards/pdf-export-card.js';
 import { registerBookOrganizerCard } from './cards/book-organizer-card.js';
 import { registerBookEditorCard } from './cards/book-editor-card.js';
 import { registerSearchCard } from './cards/search-card.js';
+import { registerFolderImportCard } from './cards/folder-import-card.js';
 import { configureI18n, i18nMethods, getSupportedLocales } from './i18n.js';
 import { pageViewMethods } from './book/page-view.js';
 import { editorEditMethods } from './editor/edit.js';
@@ -227,6 +228,7 @@ document.addEventListener('alpine:init', () => {
   registerBookOrganizerCard();
   registerBookEditorCard();
   registerSearchCard();
+  registerFolderImportCard();
   registerKontinuitaetCard();
   registerEreignisseCard();
   registerOrteCard();

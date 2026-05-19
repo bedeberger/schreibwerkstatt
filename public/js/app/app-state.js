@@ -183,6 +183,7 @@ const cardsState = () => ({
   showFinetuneExportCard: false,
   showExportCard: false,
   showPdfExportCard: false,
+  showFolderImportCard: false,
   showBookOrganizerCard: false,
   showBookEditorCard: false,
   showSearchCard: false,

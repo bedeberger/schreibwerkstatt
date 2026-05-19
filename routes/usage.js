@@ -31,6 +31,7 @@ const ALLOWED_KEYS = new Set([
   'finetuneExport',
   'export',
   'pdfExport',
+  'folderImport',
   'bookOrganizer',
   'bookEditor',
   'search',

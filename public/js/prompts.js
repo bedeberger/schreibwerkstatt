@@ -121,6 +121,11 @@ export {
 } from './prompts/figur-werkstatt.js';
 
 export {
+  buildDateDetectPrompt,
+  SCHEMA_DATE_DETECT,
+} from './prompts/import.js';
+
+export {
   buildFinetuneAugmentSystem,
   buildFinetuneReversePromptsPrompt,
   buildFinetuneFactQAPrompt,

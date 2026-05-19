@@ -1,0 +1,214 @@
+/* Folder-Import-Karte: ZIP-Upload, Drop-Zone, Progress, Result-Panel.
+   Akzent: var(--card-accent) aus card-accents.css (.card--folderimport). */
+
+@layer components {
+  .card--folderimport {
+    max-width: 720px;
+  }
+
+  .folder-import-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .folder-import-mode {
+    display: flex;
+    gap: var(--space-4);
+    flex-wrap: wrap;
+  }
+
+  .folder-import-radio {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    background: var(--color-bg);
+    transition: border-color 120ms, background 120ms;
+  }
+
+  .folder-import-radio:has(input:checked) {
+    border-color: var(--card-accent);
+    background: color-mix(in srgb, var(--card-accent) 8%, var(--color-bg));
+  }
+
+  .folder-import-radio.is-disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .folder-import-radio input {
+    accent-color: var(--card-accent);
+  }
+
+  .folder-import-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .folder-import-label {
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    color: var(--color-text-muted);
+  }
+
+  .folder-import-input {
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-size: var(--font-size-md);
+  }
+
+  .folder-import-input:focus {
+    border-color: var(--card-accent);
+    outline: none;
+  }
+
+  .folder-import-merge-info {
+    padding: var(--space-2) var(--space-3);
+    background: color-mix(in srgb, var(--card-accent) 6%, var(--color-bg));
+    border-left: 3px solid var(--card-accent);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+  }
+
+  .folder-import-drop {
+    position: relative;
+    border: 2px dashed var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: var(--space-6) var(--space-4);
+    text-align: center;
+    transition: border-color 150ms, background 150ms;
+    background: var(--color-bg);
+  }
+
+  .folder-import-drop.is-drag {
+    border-color: var(--card-accent);
+    background: color-mix(in srgb, var(--card-accent) 8%, var(--color-bg));
+  }
+
+  .folder-import-drop.has-file {
+    border-style: solid;
+    border-color: var(--card-accent);
+  }
+
+  .folder-import-file-input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  .folder-import-drop-label {
+    display: block;
+    cursor: pointer;
+  }
+
+  .folder-import-drop-text {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-md);
+  }
+
+  .folder-import-drop-file {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-1);
+  }
+
+  .folder-import-size {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+  }
+
+  .folder-import-actions {
+    display: flex;
+    gap: var(--space-2);
+    justify-content: flex-end;
+  }
+
+  .folder-import-error {
+    color: var(--color-danger, #b04040);
+    font-size: var(--font-size-sm);
+    padding: var(--space-2) var(--space-3);
+    background: color-mix(in srgb, var(--color-danger, #b04040) 8%, transparent);
+    border-radius: var(--radius-sm);
+  }
+
+  .folder-import-help {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--color-border-subtle, var(--color-border));
+  }
+
+  .folder-import-help ul {
+    margin: var(--space-2) 0 0 var(--space-4);
+    padding: 0;
+  }
+
+  .folder-import-help li {
+    margin-bottom: var(--space-1);
+  }
+
+  .folder-import-progress {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-4) 0;
+  }
+
+  .folder-import-status {
+    font-size: var(--font-size-md);
+  }
+
+  .folder-import-result {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .folder-import-result h3 {
+    margin: 0;
+    font-size: var(--font-size-lg);
+    color: var(--card-accent);
+  }
+
+  .folder-import-result ul {
+    margin: 0;
+    padding-left: var(--space-4);
+  }
+
+  .folder-import-skipped {
+    margin-top: var(--space-2);
+    max-height: 220px;
+    overflow-y: auto;
+    font-size: var(--font-size-sm);
+  }
+
+  .folder-import-skipped li {
+    margin-bottom: var(--space-1);
+  }
+
+  .folder-import-skipped code {
+    font-family: var(--font-mono, monospace);
+    background: var(--color-bg-subtle, var(--color-bg));
+    padding: 1px 4px;
+    border-radius: var(--radius-sm);
+  }
+
+  @media (max-width: 640px) {
+    .folder-import-mode { flex-direction: column; }
+    .folder-import-radio { width: 100%; }
+    .folder-import-actions { justify-content: stretch; }
+    .folder-import-actions .btn-compact { flex: 1; }
+  }
+}
