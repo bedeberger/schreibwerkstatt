@@ -65,8 +65,11 @@ export function registerBookOrganizerCard() {
             _undoStack: [], _redoStack: [], _inHistoryFlight: false,
           });
         },
-        onCardRefresh: async (e, ctx, root) => {
-          await root.loadPages(); // pages:loaded triggert _rerender
+        // Re-Klick auf offene Karte: lokaler Snapshot reicht — Drag/Rename/CRUD
+        // mutieren root.tree in-place, Server-Stand und Card-State sind in
+        // sync. `loadPages` würde Sidebar-Tree clearen + neu fetchen → Flicker.
+        onCardRefresh: async (e, ctx) => {
+          await ctx._rerender();
         },
         onViewReset: (e, ctx) => {
           ctx._destroySortables();

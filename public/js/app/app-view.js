@@ -26,6 +26,7 @@ async function _toggleCardGeneric(entry) {
   if (this[entry.flag]) {
     if (entry.onReclick === 'refresh') {
       window.dispatchEvent(new CustomEvent('card:refresh', { detail: { name: entry.refreshName || entry.key } }));
+      this._scrollToCardByKey(entry.key);
     } else {
       this[entry.flag] = false;
     }
