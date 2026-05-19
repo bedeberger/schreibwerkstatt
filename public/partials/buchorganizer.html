@@ -218,9 +218,9 @@
         </template>
 
         <!-- Level 2: Sub-Kapitel -->
+        <template x-if="(ch.subchapters?.length || 0) > 0 && (organizerSearch ? true : chapterOpen[ch.id])">
         <div class="organizer-subchapters" data-organizer="chapter-list"
-             :data-parent-chapter-id="ch.id" data-organizer-depth="2"
-             x-show="(ch.subchapters?.length || 0) > 0 && (organizerSearch ? true : chapterOpen[ch.id])">
+             :data-parent-chapter-id="ch.id" data-organizer-depth="2">
           <template x-for="sub in (ch.subchapters || [])" :key="sub.id">
             <div class="organizer-chapter" :class="'organizer-chapter--depth-' + sub.depth"
                  :data-chapter-id="sub.id" :style="{ '--depth': sub.depth }">
@@ -262,8 +262,8 @@
                           :aria-label="$app.t('bookOrganizer.deleteChapter')">×</button>
                 </div>
               </div>
-              <ul class="organizer-pages" data-organizer="page-list" :data-chapter-id="sub.id"
-                  x-show="organizerSearch ? true : chapterOpen[sub.id]">
+              <template x-if="organizerSearch ? true : chapterOpen[sub.id]">
+              <ul class="organizer-pages" data-organizer="page-list" :data-chapter-id="sub.id">
                 <template x-for="page in sub.pages" :key="page.id">
                   <li class="organizer-page" :data-page-id="page.id">
                     <span class="organizer-drag-handle" :data-tip="$app.t('bookOrganizer.dragHint')" aria-hidden="true">⋮⋮</span>
@@ -311,11 +311,12 @@
                 </template>
                 <li class="organizer-empty" x-show="sub.pages.length === 0 && !(sub.subchapters?.length)" x-text="$app.t('bookOrganizer.noPagesInChapter')"></li>
               </ul>
+              </template>
 
               <!-- Level 3: Sub-Sub-Kapitel (terminale Tiefe) -->
+              <template x-if="(sub.subchapters?.length || 0) > 0 && (organizerSearch ? true : chapterOpen[sub.id])">
               <div class="organizer-subchapters" data-organizer="chapter-list"
-                   :data-parent-chapter-id="sub.id" data-organizer-depth="3"
-                   x-show="(sub.subchapters?.length || 0) > 0 && (organizerSearch ? true : chapterOpen[sub.id])">
+                   :data-parent-chapter-id="sub.id" data-organizer-depth="3">
                 <template x-for="subsub in (sub.subchapters || [])" :key="subsub.id">
                   <div class="organizer-chapter" :class="'organizer-chapter--depth-' + subsub.depth"
                        :data-chapter-id="subsub.id" :style="{ '--depth': subsub.depth }">
@@ -347,8 +348,8 @@
                                 :aria-label="$app.t('bookOrganizer.deleteChapter')">×</button>
                       </div>
                     </div>
-                    <ul class="organizer-pages" data-organizer="page-list" :data-chapter-id="subsub.id"
-                        x-show="organizerSearch ? true : chapterOpen[subsub.id]">
+                    <template x-if="organizerSearch ? true : chapterOpen[subsub.id]">
+                    <ul class="organizer-pages" data-organizer="page-list" :data-chapter-id="subsub.id">
                       <template x-for="page in subsub.pages" :key="page.id">
                         <li class="organizer-page" :data-page-id="page.id">
                           <span class="organizer-drag-handle" :data-tip="$app.t('bookOrganizer.dragHint')" aria-hidden="true">⋮⋮</span>
@@ -396,12 +397,15 @@
                       </template>
                       <li class="organizer-empty" x-show="subsub.pages.length === 0" x-text="$app.t('bookOrganizer.noPagesInChapter')"></li>
                     </ul>
+                    </template>
                   </div>
                 </template>
               </div>
+              </template>
             </div>
           </template>
         </div>
+        </template>
       </div>
     </template>
     <div class="muted-msg muted-msg--sm" x-show="organizerSearch && filteredWorkTree().length === 0 && filteredSoloPages().length === 0" x-text="$app.t('sidebar.noPagesFound')"></div>

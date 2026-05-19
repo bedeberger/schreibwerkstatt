@@ -184,7 +184,7 @@ export const contentRepo = {
 
   // POST /content/books mit `{ name, description? }`. Server upserted lokale books-Row.
   async createBook(body) {
-    return _write('POST', 'books', body);
+    return _write('POST', 'books', body, ['books']);
   },
 
   async updateBook(id, body) {
@@ -192,7 +192,7 @@ export const contentRepo = {
   },
 
   async deleteBook(id) {
-    return _write('DELETE', 'books/' + id);
+    return _write('DELETE', 'books/' + id, undefined, ['books', 'books/' + id]);
   },
 
   // GET /content/search?query=…&book_id=… → { hits: [Page-Meta] }

@@ -49,10 +49,12 @@ export const bookSettingsMethods = {
     return (this.categoryPool || []).map(c => ({ value: String(c.id), label: c.name }));
   },
 
-  async saveBookCategory() {
+  async saveBookCategory(value) {
     const bookId = window.__app.selectedBookId;
     if (!bookId) return;
-    const raw = this.bookCategoryId;
+    // value aus combobox-change-Event-Detail; x-modelable-Sync zu bookCategoryId
+    // ist beim Dispatch noch nicht propagiert (stale read).
+    const raw = value !== undefined ? value : this.bookCategoryId;
     const cid = raw === '' || raw === null || raw === undefined ? null : parseInt(raw, 10);
     try {
       const r = await fetch(`/books/${bookId}/category`, {

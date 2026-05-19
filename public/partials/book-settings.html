@@ -118,7 +118,7 @@
         <div x-data="combobox($app.t('book.category'), $app.t('book.category.none'))"
              x-modelable="value" x-model="bookCategoryId"
              x-effect="options = bookCategoryOptions()"
-             @combobox-change="saveBookCategory()"></div>
+             @combobox-change="saveBookCategory($event.detail)"></div>
       </div>
 
     </section>
