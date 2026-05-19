@@ -21,7 +21,7 @@
       </div>
       <template x-for="(f, i) in $app.lektoratFindings" :key="i">
         <label class="finding"
-               :class="{ 'error': _isHardFinding(f.typ), 'style': !_isHardFinding(f.typ), 'finding-deselected': !$app.selectedFindings[i], 'finding--applied': $app.appliedOriginals.includes(f.original) }"
+               :class="{ 'error': _isHardFinding(f.typ), 'style': !_isHardFinding(f.typ), 'finding--deselected': !$app.selectedFindings[i], 'finding--applied': $app.appliedOriginals.includes(f.original) }"
                :data-finding-idx="i"
                @pointerenter="handleFindingPointer(i)">
           <input type="checkbox" class="finding-checkbox" :checked="$app.selectedFindings[i]" :disabled="$app.appliedOriginals.includes(f.original)" @change="$app.toggleFinding(i)">

@@ -42,8 +42,7 @@
     max-height: none;
     overflow: visible;
   }
-  .lektorat-split-preview .page-content-view,
-  .lektorat-split-preview > .page-content-view {
+  .lektorat-split-preview .page-content-view {
     max-height: none;
     overflow: visible;
   }
@@ -144,15 +143,6 @@
 .lektorat-tip .badge { align-self: flex-start; }
 .lektorat-tip-korrektur { font-weight: 700; color: var(--color-mark-ins-text); }
 .lektorat-tip-erkl { color: var(--color-subtle); }
-
-/* Flash-Animation beim Scrollen zur Fehlerliste */
-.finding--flash {
-  animation: finding-flash 1.5s ease;
-}
-@keyframes finding-flash {
-  0%, 100% { background: transparent; }
-  20% { background: var(--color-accent-bg); }
-}
 
 /* === Figure Context Panel === */
 .figure-context-panel {

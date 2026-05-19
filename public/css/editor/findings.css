@@ -15,7 +15,7 @@
 .finding.error { border-color: var(--color-err-border); }
 .finding.style { border-color: var(--color-style-border); }
 .finding.ok    { border-color: var(--color-ok-border); }
-.finding.finding-deselected { opacity: 0.55; }
+.finding.finding--deselected { opacity: 0.55; }
 .finding.finding--applied {
   opacity: var(--opacity-muted);
   text-decoration: line-through;

@@ -167,8 +167,6 @@ export const pageViewMethods = {
   // chapterFigures: [],
   // showChapterFigures: false,
 
-  _isHardFinding(typ) { return isHardFinding(typ); },
-
   /** Berechnet max-height für die Seitenansicht basierend auf Textlänge */
   _updatePageViewHeight() {
     // Nach Edits ist tokEsts stale → aktuellen Text aus originalHtml ableiten,
@@ -284,15 +282,5 @@ export const pageViewMethods = {
     const related = e.relatedTarget;
     if (related && tipEl?.contains(related)) return;
     hideTip();
-  },
-
-  /** Hover auf Finding → Preview-Panel zur entsprechenden Markierung scrollen */
-  handleFindingPointer(idx) {
-    if (!splitMQ.matches || !this.checkDone) return;
-    const mark = document.querySelector(`.lektorat-split-preview .lektorat-mark[data-error-idx="${idx}"]`);
-    if (mark) {
-      mark.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      flashEl(mark);
-    }
   },
 };
