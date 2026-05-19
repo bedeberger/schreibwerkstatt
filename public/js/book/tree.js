@@ -203,10 +203,8 @@ export const treeMethods = {
       else this._closeOtherMainCards('kapitelReview');
       return;
     }
-    if (item.pages.length === 0 && item.hasChildren) {
-      item.open = !item.open;
-      return;
-    }
+    // Parent-Kapitel ohne direkte Pages, aber mit Sub-Kapiteln, öffnen das
+    // Review (include_subchapters greift dann automatisch, siehe kapitelReviewIncludeSubchapters).
     if (this._bookQualifiesForChapterReview()) await this.openKapitelReviewForChapter(item.id);
     else item.open = !item.open;
   },

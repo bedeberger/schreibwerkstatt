@@ -51,12 +51,12 @@
            :class="{
              'tree-chapter-header--empty': item.pages.length === 0 && !item.hasChildren,
              'tree-chapter-header--active': showKapitelReviewCard && String(kapitelReviewChapterId) === String(item.id),
-             'tree-chapter-header--reviewable': _bookQualifiesForChapterReview() && item.pages.length > 0,
+             'tree-chapter-header--reviewable': _bookQualifiesForChapterReview() && (item.pages.length > 0 || item.hasChildren),
            }"
            :data-tip="!pageSearch
              ? ((item.pages.length === 0 && !item.hasChildren)
                  ? t('sidebar.emptyChapterTitle', { name: item.name })
-                 : (_bookQualifiesForChapterReview() && item.pages.length > 0 ? t('sidebar.reviewChapterTitle', { name: item.name }) : ''))
+                 : (_bookQualifiesForChapterReview() && (item.pages.length > 0 || item.hasChildren) ? t('sidebar.reviewChapterTitle', { name: item.name }) : ''))
              : ''"
            @keydown.enter.prevent="_onChapterHeaderActivate(item)"
            @keydown.space.prevent="_onChapterHeaderActivate(item)"

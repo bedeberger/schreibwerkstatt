@@ -815,6 +815,8 @@
   "kapitelReview.history":          "Previous chapter reviews",
   "kapitelReview.lastEdit":         "Last edited: {when}",
   "kapitelReview.pagesHeading":     "Pages in chapter ({n})",
+  "kapitelReview.subchaptersHeading": "Sub-chapters ({n})",
+  "kapitelReview.openSubchapterTip":  "Open sub-chapter «{name}»",
   "kapitelReview.emptyHint":        "This chapter has no pages yet — add the first one now.",
   "kapitelReview.newPagePlaceholder": "Title of the new page…",
   "kapitelReview.newPageAdd":       "Add page",

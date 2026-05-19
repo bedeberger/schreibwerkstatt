@@ -238,13 +238,14 @@ export function registerKapitelReviewCard() {
     },
 
     // True wenn das Kapitel mindestens ein direktes Sub-Kapitel hat. Liest
-    // root.tree (flach mit parent_id-Annotation aus tree.js).
+    // den `hasChildren`-Flag aus dem Tree (tree.js setzt ihn aus childCountMap).
     kapitelReviewHasSubchapters(chapterId) {
       if (!chapterId) return false;
       const tree = window.__app.tree || [];
-      return tree.some(it =>
-        it.type === 'chapter' && !it.solo && String(it.parent_id) === String(chapterId),
+      const ch = tree.find(it =>
+        it.type === 'chapter' && !it.solo && String(it.id) === String(chapterId),
       );
+      return !!ch?.hasChildren;
     },
 
     // Liefert alle Nachfahren-Kapitel-IDs (inkl. Self), basierend auf
@@ -318,12 +319,47 @@ export function registerKapitelReviewCard() {
       return chapters.length >= 2 && chapters.some(c => c.pages.length > 1);
     },
 
-    // Liste der Kapitel, die fürs Kapitel-Review anklickbar sind.
+    // Liste der Kapitel, die fürs Kapitel-Review anklickbar sind. Parent-Kapitel
+    // ohne direkte Pages, aber mit Sub-Kapiteln, sind ebenfalls eligible — der
+    // Job lädt bei include_subchapters=true alle Descendant-Pages.
     kapitelReviewChapterOptions() {
       if (!this._bookQualifiesForChapterReview()) return [];
       return (window.__app.tree || [])
-        .filter(i => i.type === 'chapter' && !i.solo && i.pages.length > 0)
-        .map(c => ({ id: c.id, name: c.name, pageCount: c.pages.length }));
+        .filter(i => i.type === 'chapter' && !i.solo
+          && (i.pages.length > 0 || this.kapitelReviewHasSubchapters(i.id)))
+        .map(c => ({ id: c.id, name: c.name, pageCount: this.kapitelReviewEffectivePageCount(c.id) }));
+    },
+
+    // Direkte + transitiv geerbte Sub-Kapitel des aktiven Kapitels, in Tree-
+    // Order (DFS), jedes mit `depthOffset` relativ zum Parent (1, 2, …) und
+    // den eigenen Pages aus root.tree.
+    kapitelReviewSubchapterTree(chapterId) {
+      const id = chapterId || window.__app.kapitelReviewChapterId;
+      if (!id) return [];
+      const tree = window.__app.tree || [];
+      const byParent = new Map();
+      for (const it of tree) {
+        if (it.type !== 'chapter' || it.solo) continue;
+        const pk = String(it.parent_id || '');
+        if (!byParent.has(pk)) byParent.set(pk, []);
+        byParent.get(pk).push(it);
+      }
+      const result = [];
+      const walk = (parentKey, depthOffset) => {
+        const kids = byParent.get(parentKey) || [];
+        for (const k of kids) {
+          result.push({
+            id: k.id,
+            name: k.name,
+            depthOffset,
+            pages: k.pages || [],
+            hasChildren: !!byParent.get(String(k.id))?.length,
+          });
+          walk(String(k.id), depthOffset + 1);
+        }
+      };
+      walk(String(id), 1);
+      return result;
     },
 
     kapitelReviewSelectedChapter() {
@@ -346,16 +382,26 @@ export function registerKapitelReviewCard() {
 
     kapitelReviewChapterStats() {
       const ch = this.kapitelReviewSelectedChapter();
-      if (!ch || !ch.pages?.length) return null;
-      const ests = window.__app.tokEsts || {};
+      if (!ch) return null;
+      const root = window.__app;
+      const ests = root.tokEsts || {};
+      const tree = root.tree || [];
+      const includeSubs = this.kapitelReviewIncludeSubchapters(ch.id);
+      const chapterIds = includeSubs
+        ? this._kapitelReviewDescendantIds(ch.id)
+        : new Set([String(ch.id)]);
       let chars = 0, words = 0, tok = 0, any = false;
-      for (const p of ch.pages) {
-        const e = ests[p.id];
-        if (!e) continue;
-        any = true;
-        chars += e.chars || 0;
-        words += e.words || 0;
-        tok   += e.tok   || 0;
+      for (const it of tree) {
+        if (it.type !== 'chapter' || it.solo) continue;
+        if (!chapterIds.has(String(it.id))) continue;
+        for (const p of it.pages || []) {
+          const e = ests[p.id];
+          if (!e) continue;
+          any = true;
+          chars += e.chars || 0;
+          words += e.words || 0;
+          tok   += e.tok   || 0;
+        }
       }
       return any ? { chars, words, tok } : null;
     },

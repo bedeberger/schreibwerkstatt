@@ -59,8 +59,12 @@ export const kapitelReviewMethods = {
 
   kapitelReviewChapterOptions() {
     if (!this._bookQualifiesForChapterReview()) return [];
-    return (this.tree || [])
-      .filter(i => i.type === 'chapter' && !i.solo && i.pages.length > 0)
+    const tree = this.tree || [];
+    const hasSub = (id) => tree.some(i =>
+      i.type === 'chapter' && !i.solo && String(i.parent_id) === String(id)
+    );
+    return tree
+      .filter(i => i.type === 'chapter' && !i.solo && (i.pages.length > 0 || hasSub(i.id)))
       .map(c => ({ id: c.id, name: c.name, pageCount: c.pages.length }));
   },
 };

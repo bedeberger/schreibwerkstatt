@@ -1,11 +1,13 @@
 @layer components {
 /* === Kapitel-Review: verdichtete Seitenliste + Quick-Add === */
 
-/* Toggle „Inkl. Sub-Kapitel" in der Action-Bar. */
+/* Toggle „Inkl. Sub-Kapitel" in der Action-Bar.
+   min-height = Button-Höhe, damit Label optisch mit benachbarten Buttons eingemittet wirkt. */
 .kapitel-include-subs {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2xs);
+  min-height: 2.25rem;
   font-size: var(--font-size-sm);
   color: var(--color-muted);
   cursor: pointer;
@@ -114,6 +116,52 @@
 /* === Token-Badges: W und Z im Seitenbaum ausblenden === */
 .tok-tree-words,
 .tok-tree-chars { display: none; }
+
+/* === Sub-Kapitel-Sektion: pro Sub eigene Card-im-Card mit Indent-Stufe === */
+.kapitel-subchapters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  margin-bottom: var(--space-10);
+}
+.kapitel-subchapters-heading {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  margin-bottom: var(--space-2xs);
+}
+.kapitel-subchapter {
+  padding-left: calc((var(--sub-depth, 1) - 1) * var(--space-md));
+  border-left: 2px solid var(--color-border);
+  padding-top: var(--space-2xs);
+  padding-bottom: var(--space-2xs);
+}
+.kapitel-subchapter-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-5) var(--space-2xs);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-base);
+}
+.kapitel-subchapter-header:hover { background: var(--color-hover-light); }
+.kapitel-subchapter-name {
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kapitel-subchapter .kapitel-pages-list {
+  margin-bottom: 0;
+  margin-left: var(--space-md);
+}
 
 @media (max-width: 700px) {
   .kapitel-page-row { flex-wrap: wrap; }

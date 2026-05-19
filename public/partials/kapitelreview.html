@@ -68,7 +68,7 @@
     <div class="kapitel-pages-section">
       <div class="kapitel-pages-heading" x-text="$app.t('kapitelReview.pagesHeading', { n: kapitelReviewSelectedChapter().pages.length })"></div>
       <div class="kapitel-empty-hint"
-           x-show="kapitelReviewSelectedChapter().pages.length === 0"
+           x-show="kapitelReviewSelectedChapter().pages.length === 0 && kapitelReviewSubchapterTree($app.kapitelReviewChapterId).length === 0"
            x-text="$app.t('kapitelReview.emptyHint')"></div>
       <div class="kapitel-pages-list" x-show="kapitelReviewSelectedChapter().pages.length > 0">
         <template x-for="page in kapitelReviewSelectedChapter().pages" :key="page.id">
@@ -100,6 +100,58 @@
           </div>
         </template>
       </div>
+
+      <!--
+        Sub-Kapitel-Section: pro Sub Header (klickbar → kapitelReviewChapterId
+        wechseln) + verschachtelte Pages-Liste. Tree-Order, beliebige Tiefe.
+      -->
+      <template x-if="kapitelReviewSubchapterTree($app.kapitelReviewChapterId).length > 0">
+        <div class="kapitel-subchapters">
+          <div class="kapitel-subchapters-heading"
+               x-text="$app.t('kapitelReview.subchaptersHeading', { n: kapitelReviewSubchapterTree($app.kapitelReviewChapterId).length })"></div>
+          <template x-for="sub in kapitelReviewSubchapterTree($app.kapitelReviewChapterId)" :key="sub.id">
+            <div class="kapitel-subchapter" :style="{ '--sub-depth': sub.depthOffset }">
+              <div class="kapitel-subchapter-header internal-link"
+                   role="button" tabindex="0"
+                   @click="$app.kapitelReviewChapterId = String(sub.id)"
+                   :data-tip="$app.t('kapitelReview.openSubchapterTip', { name: sub.name })">
+                <span class="kapitel-subchapter-name" x-text="sub.name"></span>
+                <span class="tag" x-text="sub.pages.length === 1 ? $app.t('sidebar.pagesCountOne') : $app.t('sidebar.pagesCount', { n: sub.pages.length })"></span>
+              </div>
+              <div class="kapitel-pages-list" x-show="sub.pages.length > 0">
+                <template x-for="page in sub.pages" :key="page.id">
+                  <div class="kapitel-page-row" @click="$app.selectPage(page)" :data-tip="$app.pageStatusTooltip(page).join(' · ')">
+                    <span class="kapitel-page-name">
+                      <span class="page-status-dot" :class="'page-status-' + $app.pageStatus(page)"></span>
+                      <span x-text="page.name"></span>
+                    </span>
+                    <span class="kapitel-page-edited" x-show="page.updated_at" x-text="$app.formatDate(page.updated_at)"></span>
+                    <span class="kapitel-page-stats">
+                      <template x-if="$app.tokEsts[page.id] && $app.tokEsts[page.id].words > 0">
+                        <span class="display-contents">
+                          <span class="tok-badge tok-neutral"
+                            x-text="$app.tokEsts[page.id].chars >= 1000 ? '~' + Math.round($app.tokEsts[page.id].chars / 1000) + 'k Z' : $app.tokEsts[page.id].chars + ' Z'"></span>
+                          <span class="tok-badge tok-neutral"
+                            :data-tip="$app.t('bookstats.metric.normseiten')"
+                            x-text="(Math.round(($app.tokEsts[page.id].chars || 0) / 1500 * 10) / 10).toLocaleString($app.uiLocale === 'en' ? 'en-US' : 'de-CH', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' ' + $app.t('bookstats.unit.ns')"></span>
+                          <span class="tok-badge tok-neutral"
+                            x-text="$app.tokEsts[page.id].words >= 1000 ? '~' + Math.round($app.tokEsts[page.id].words / 1000) + 'k W' : $app.tokEsts[page.id].words + ' W'"></span>
+                          <span class="tok-badge"
+                            :class="$app.tokEsts[page.id].tok > 16000 ? 'tok-high' : $app.tokEsts[page.id].tok > 4000 ? 'tok-med' : 'tok-ok'"
+                            x-text="$app.tokEsts[page.id].tok >= 1000 ? '~' + Math.round($app.tokEsts[page.id].tok / 1000) + 'k T' : '~' + $app.tokEsts[page.id].tok + ' T'"></span>
+                        </span>
+                      </template>
+                      <template x-if="$app.tokEsts[page.id] && $app.tokEsts[page.id].words === 0">
+                        <span class="tok-badge tok-empty" x-text="$app.t('sidebar.empty')"></span>
+                      </template>
+                    </span>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+        </div>
+      </template>
 
       <!--
         Beide "Anlegen"-Forms im Grid: 2 Spalten (Input / Button), Forms via
