@@ -115,4 +115,96 @@ router.delete('/:book_id', aclParamGuard('editor'), (req, res) => {
   res.json({ ok });
 });
 
+// Liste aller Page-Link-Stati fuer das Buch. Buchorganizer-Badges + Push-Auswahl
+// lesen hier. Pro Eintrag: page_id, wp_post_id, wp_modified_at, wp_status,
+// last_pulled_at, last_pushed_at, conflict_state.
+router.get('/:book_id/links', aclParamGuard('viewer'), (req, res) => {
+  const conn = blogs.getConnectionPublic(req.bookId);
+  if (!conn) return res.json({ links: [], connected: false });
+  const links = blogs.listLinksForBlog(conn.id);
+  res.json({ links, connected: true });
+});
+
+// WP-seitige Version einer verlinkten Page laden — fuer Konflikt-Diff. Liefert
+// das App-Format-HTML (wpToAppHtml angewandt), damit der Renderer es gegen
+// pages.body_html stellen kann.
+router.get('/:book_id/pages/:page_id/remote', aclParamGuard('viewer'), async (req, res) => {
+  if (!_requireBlogType(req, res)) return;
+  const pageId = parseInt(req.params.page_id, 10);
+  if (!Number.isInteger(pageId) || pageId <= 0) {
+    return res.status(400).json({ error_code: 'PAGE_ID_REQUIRED' });
+  }
+  const link = blogs.getLinkByPage(pageId);
+  if (!link) return res.status(404).json({ error_code: 'BLOG_LINK_MISSING' });
+  const conn = blogs.getConnection(req.bookId);
+  if (!conn || conn.id !== link.blog_id) {
+    return res.status(404).json({ error_code: 'BLOG_NOT_CONNECTED' });
+  }
+  try {
+    const wp = createWpClient({
+      baseUrl: conn.baseUrl,
+      username: conn.username,
+      password: conn.password,
+    });
+    const remote = await wp.getPost(link.wp_post_id);
+    const { wpToAppHtml } = require('../lib/wp-html');
+    return res.json({
+      wpPostId: link.wp_post_id,
+      title: (remote.title && (remote.title.raw || remote.title.rendered)) || '',
+      html: wpToAppHtml((remote.content && (remote.content.raw || remote.content.rendered)) || ''),
+      status: remote.status,
+      modifiedAt: remote.modified_gmt || remote.date_gmt || '',
+    });
+  } catch (e) {
+    const code = e.code || 'BLOG_REMOTE_FETCH_FAILED';
+    return res.status(code === 'BLOG_AUTH_FAILED' ? 401 : 502).json({ error_code: code });
+  }
+});
+
+// Konflikt aufloesen: 'app' oder 'wp' gewinnt. Setzt conflict_state + ggf.
+// schreibt Page mit WP-Inhalt (resolve=wp) oder pushed App-Inhalt (resolve=app).
+// Push selbst laeuft als Job — hier wird nur der Konflikt-Marker geklaert, der
+// User triggert dann explizit den Push.
+router.post('/:book_id/pages/:page_id/resolve', aclParamGuard('editor'), jsonBody, async (req, res) => {
+  if (!_requireBlogType(req, res)) return;
+  const pageId = parseInt(req.params.page_id, 10);
+  if (!Number.isInteger(pageId) || pageId <= 0) {
+    return res.status(400).json({ error_code: 'PAGE_ID_REQUIRED' });
+  }
+  const resolve = (req.body && req.body.resolve) || '';
+  if (resolve !== 'app' && resolve !== 'wp') {
+    return res.status(400).json({ error_code: 'BLOG_RESOLVE_INVALID' });
+  }
+  const link = blogs.getLinkByPage(pageId);
+  if (!link) return res.status(404).json({ error_code: 'BLOG_LINK_MISSING' });
+  const conn = blogs.getConnection(req.bookId);
+  if (!conn || conn.id !== link.blog_id) {
+    return res.status(404).json({ error_code: 'BLOG_NOT_CONNECTED' });
+  }
+  if (resolve === 'wp') {
+    try {
+      const wp = createWpClient({
+        baseUrl: conn.baseUrl, username: conn.username, password: conn.password,
+      });
+      const remote = await wp.getPost(link.wp_post_id);
+      const { wpToAppHtml } = require('../lib/wp-html');
+      const contentStore = require('../lib/content-store');
+      const html = wpToAppHtml((remote.content && (remote.content.raw || remote.content.rendered)) || '') || '<p></p>';
+      const title = (remote.title && (remote.title.raw || remote.title.rendered)) || undefined;
+      await contentStore.savePage(pageId, { html, ...(title ? { name: title } : {}) }, null);
+      blogs.markLinkPulled(pageId, {
+        wpModifiedAt: remote.modified_gmt || remote.date_gmt || '',
+        wpStatus: remote.status || null,
+        wpSlug: remote.slug || null,
+      });
+    } catch (e) {
+      const code = e.code || 'BLOG_REMOTE_FETCH_FAILED';
+      return res.status(code === 'BLOG_AUTH_FAILED' ? 401 : 502).json({ error_code: code });
+    }
+  } else {
+    blogs.setConflictState(pageId, 'resolved-app');
+  }
+  return res.json({ ok: true, resolve });
+});
+
 module.exports = router;

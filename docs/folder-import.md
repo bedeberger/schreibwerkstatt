@@ -32,10 +32,23 @@ Beispiele:
 
 ## Datums-Resolve-Reihenfolge (pro Datei)
 
-1. **Filename** — `detectDate(filename, { year, month })` aus Pfad-Kontext
-2. **Erste Dokumentzeile** — `detectDateInText(firstLineFromHtml(html))` (Parse passiert deshalb VOR der Datums-Sortierung, HTML wird zwischengespeichert)
+1. **Filename** — `detectDate(filename, { year, month })` aus Pfad-Kontext (alle Patterns inkl. `DD-anywhere`)
+2. **Erste Dokumentzeile** — `detectDateInText(firstLineFromHtml(html))`. Parse passiert deshalb VOR der Datums-Sortierung, HTML wird in `enriched[]` zwischengespeichert.
 3. **AI-Map** — falls Filename-Confidence < 80% war und AI-Pass aufgerufen wurde
-4. **Skip** — `reason: 'NO_DATE'`
+4. **mtime (ZIP-Entry-Modified-Date)** — nur akzeptiert wenn `mtime.year === ctx.year` UND `mtime.year >= 1990` (filtert JSZip-Default 1980-01-01 für unset mtimes + Archive-Repacks mit allen Files auf gleicher Zeit). Pfad-Monat hat Vorrang vor mtime-Monat (User-Organisations-Intent schlägt Filesystem-Metadaten) — nur der Tag wird aus mtime gezogen. Wenn ctx.month fehlt: voller mtime-Tag+Monat.
+5. **Month-only-Fallback** — nur Jahr+Monat aus Pfad ableitbar. Synthetisches Datum `YYYY-MM-15` für Sortierung. Page-Name = `YYYY-MM <Thema>`. Thema-Quellen:
+   1. **Erste Heading** (h1/h2/h3) aus dem geparsten HTML
+   2. **Filename-Body** — Trenner zu Spaces, Tag-Zahl am Anfang/Ende abgeschnitten, pure-Zahl-Reste verworfen
+   3. **Erste Text-Zeile** aus HTML
+   4. Wenn nichts brauchbares: nur `YYYY-MM`
+6. **Year-only-Fallback** — nur Pfad-Jahr ableitbar. Synthetisches `YYYY-06-15` für Sortierung. Page-Name = `YYYY <Thema>` (gleiche Thema-Pipeline).
+7. **Skip** — `reason: 'NO_DATE'` (selbst Jahr nicht ableitbar)
+
+### DD-anywhere-Robustheit
+
+- **Underscore vor Zahl:** `persoenliches_23.abw` → `\b` matched nicht zwischen `_` und Digit. Pattern nutzt deshalb Lookarounds `(?<!\d)(\d{1,2})(?!\d)`.
+- **Doppel-Extension:** `persoenliches_03.odt.docx` → Strip-Loop entfernt mehrere Alpha-Extensions, bis nur noch der Body übrig bleibt.
+- **Eindeutigkeit Pflicht:** Nur wenn **genau eine** 1-31-Zahl im stripped Body steht (`Datei 5 und 12.docx` → null).
 
 ## Pflicht-Invarianten
 

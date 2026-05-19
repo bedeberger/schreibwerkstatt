@@ -79,6 +79,26 @@
                  :disabled="organizerSaving"
                  autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other"
                  :aria-label="$app.t('bookOrganizer.renamePage')">
+          <template x-if="blogStatusFor(page)">
+            <span class="blog-badge" :class="'blog-badge--' + blogStatusFor(page)"
+                  :data-tip="blogStatusLabel(blogStatusFor(page))"
+                  x-text="blogStatusLabel(blogStatusFor(page))"></span>
+          </template>
+          <template x-if="canBlogPush(page)">
+            <button type="button" class="btn-compact organizer-blog-push"
+                    @click="pushPageToBlog(page.id)"
+                    :disabled="!!blogPushBusy[page.id]"
+                    :data-tip="$app.t('blog.action.push')"
+                    :aria-label="$app.t('blog.action.push')">
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=635#arrow-up"/></svg>
+            </button>
+          </template>
+          <template x-if="blogStatusFor(page) === 'conflict'">
+            <button type="button" class="btn-compact organizer-blog-conflict"
+                    @click="openBlogConflict(page.id)"
+                    :data-tip="$app.t('blog.action.resolveConflict')"
+                    x-text="$app.t('blog.action.resolveConflict')"></button>
+          </template>
           <div class="organizer-move-combo"
                x-data="combobox({ placeholder: $app.t('bookOrganizer.moveTo'), transient: true })"
                x-effect="options = chapterMoveOptions(0)"
@@ -129,6 +149,26 @@
                      :disabled="organizerSaving"
                      autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other"
                      :aria-label="$app.t('bookOrganizer.renamePage')">
+              <template x-if="blogStatusFor(page)">
+                <span class="blog-badge" :class="'blog-badge--' + blogStatusFor(page)"
+                      :data-tip="blogStatusLabel(blogStatusFor(page))"
+                      x-text="blogStatusLabel(blogStatusFor(page))"></span>
+              </template>
+              <template x-if="canBlogPush(page)">
+                <button type="button" class="btn-compact organizer-blog-push"
+                        @click="pushPageToBlog(page.id)"
+                        :disabled="!!blogPushBusy[page.id]"
+                        :data-tip="$app.t('blog.action.push')"
+                        :aria-label="$app.t('blog.action.push')">
+                  <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=635#arrow-up"/></svg>
+                </button>
+              </template>
+              <template x-if="blogStatusFor(page) === 'conflict'">
+                <button type="button" class="btn-compact organizer-blog-conflict"
+                        @click="openBlogConflict(page.id)"
+                        :data-tip="$app.t('blog.action.resolveConflict')"
+                        x-text="$app.t('blog.action.resolveConflict')"></button>
+              </template>
               <div class="organizer-move-combo"
                    x-data="combobox({ placeholder: $app.t('bookOrganizer.moveTo'), transient: true })"
                    x-effect="options = chapterMoveOptions(ch.id)"
@@ -142,5 +182,45 @@
       </div>
     </template>
     <div class="muted-msg muted-msg--sm" x-show="organizerSearch && filteredWorkTree().length === 0 && filteredSoloPages().length === 0" x-text="$app.t('sidebar.noPagesFound')"></div>
+  </div>
+
+  <!-- Konflikt-Diff-Modal: zeigt App-Inhalt vs. WP-Inhalt, User wählt die Quelle. -->
+  <div class="blog-conflict-overlay" x-show="!!blogConflictOpen" x-cloak
+       @keydown.escape.window="closeBlogConflict()">
+    <div class="blog-conflict-modal">
+      <div class="blog-conflict-header">
+        <span class="card-title" x-text="$app.t('blog.conflict.title')"></span>
+        <button type="button" class="organizer-delete-btn" @click="closeBlogConflict()" aria-label="✕">×</button>
+      </div>
+      <template x-if="!blogConflictData">
+        <div class="muted-msg" x-text="$app.t('common.loading')"></div>
+      </template>
+      <template x-if="blogConflictData">
+        <div class="blog-conflict-body">
+          <div class="blog-conflict-side">
+            <div class="blog-conflict-side-header">
+              <h4 x-text="$app.t('blog.conflict.local')"></h4>
+              <span class="muted" x-text="blogConflictData.local.name"></span>
+            </div>
+            <div class="blog-conflict-content" x-html="blogConflictData.local.html"></div>
+          </div>
+          <div class="blog-conflict-side">
+            <div class="blog-conflict-side-header">
+              <h4 x-text="$app.t('blog.conflict.remote')"></h4>
+              <span class="muted" x-text="blogConflictData.remote.title"></span>
+            </div>
+            <div class="blog-conflict-content" x-html="blogConflictData.remote.html"></div>
+          </div>
+        </div>
+      </template>
+      <div class="blog-conflict-actions" x-show="blogConflictData">
+        <button type="button" @click="resolveBlogConflict('app')"
+                x-text="$app.t('blog.conflict.keepApp')"></button>
+        <button type="button" @click="resolveBlogConflict('wp')"
+                x-text="$app.t('blog.conflict.takeWp')"></button>
+        <button type="button" class="btn-compact" @click="closeBlogConflict()"
+                x-text="$app.t('common.cancel')"></button>
+      </div>
+    </div>
   </div>
 </div>

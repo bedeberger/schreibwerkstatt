@@ -3,7 +3,12 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { detectDate, detectDateInText, firstLineFromHtml, scoreSample, parseMonthToken } = require('../../lib/import-parsers/date-detect');
+const {
+  detectDate, detectDateInText,
+  firstLineFromHtml, firstHeadingFromHtml,
+  titleFromFilename, extractTitle,
+  scoreSample, parseMonthToken,
+} = require('../../lib/import-parsers/date-detect');
 
 test('detectDate: YYYY-MM-DD im Filename', () => {
   assert.deepEqual(detectDate('2024-03-05.docx', {}), { iso: '2024-03-05', pattern: 'YYYY-MM-DD' });
@@ -119,6 +124,45 @@ test('detectDate: DD-anywhere null wenn mehrere Zahlen-Kandidaten', () => {
 test('detectDate: DD-anywhere null ohne Monats-Kontext', () => {
   const r = detectDate('Persoenliches 16.docx', { year: 2020 });
   assert.equal(r, null);
+});
+
+test('detectDate: DD-anywhere mit Underscore vor Zahl', () => {
+  // "persoenliches_23.abw" — Underscore ist \w, daher \b matched dort nicht.
+  // Lookaround-Variante darf trotzdem die 23 finden.
+  const r = detectDate('persoenliches_23.abw', { year: 2007, month: 5 });
+  assert.deepEqual(r, { iso: '2007-05-23', pattern: 'DD-anywhere' });
+});
+
+test('detectDate: DD-anywhere bei doppelter Extension', () => {
+  // "persoenliches_03.odt.docx" — alle Extensions strippen, dann 03 finden
+  const r = detectDate('persoenliches_03.odt.docx', { year: 2010, month: 2 });
+  assert.deepEqual(r, { iso: '2010-02-03', pattern: 'DD-anywhere' });
+});
+
+test('firstHeadingFromHtml: liest h1/h2/h3', () => {
+  assert.equal(firstHeadingFromHtml('<h1>Titel</h1><p>Body</p>'), 'Titel');
+  assert.equal(firstHeadingFromHtml('<h2>Zweiter</h2>'), 'Zweiter');
+  assert.equal(firstHeadingFromHtml('<p>kein heading</p>'), '');
+  assert.equal(firstHeadingFromHtml('<h1>Mit <strong>fett</strong></h1>'), 'Mit fett');
+});
+
+test('titleFromFilename: Trenner zu Spaces, Tageszahl ab', () => {
+  assert.equal(titleFromFilename('persoenliches_03.odt.docx'), 'persoenliches');
+  assert.equal(titleFromFilename('warum ich notizen mag.docx'), 'warum ich notizen mag');
+  assert.equal(titleFromFilename('Persoenliches 16.docx'), 'Persoenliches');
+  assert.equal(titleFromFilename('16 Notiz.docx'), 'Notiz');
+  assert.equal(titleFromFilename('mein-eintrag.abw'), 'mein eintrag');
+});
+
+test('extractTitle: Heading vor Filename vor erster Zeile', () => {
+  // Heading gewinnt
+  assert.equal(extractTitle('<h1>Über das Reisen</h1><p>Body</p>', 'persoenliches_16.docx'), 'Über das Reisen');
+  // Kein Heading → Filename
+  assert.equal(extractTitle('<p>Body</p>', 'warum ich notizen mag.docx'), 'warum ich notizen mag');
+  // Filename leer → erste Zeile
+  assert.equal(extractTitle('<p>Erste Zeile Inhalt</p>', '16.docx'), 'Erste Zeile Inhalt');
+  // Nichts brauchbares
+  assert.equal(extractTitle('', '12.docx'), '');
 });
 
 test('detectDate: ungültige Datums-Werte zurückweisen', () => {

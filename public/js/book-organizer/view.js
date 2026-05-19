@@ -97,4 +97,134 @@ export const viewMethods = {
     }
     return opts;
   },
+
+  // ── Blog-Sync (WordPress) ────────────────────────────────────────────────
+
+  // Endpoint /blog/:book_id/links liefert `connected: false`, wenn Buchtyp
+  // != 'blog' oder keine Connection gespeichert ist — kein zusaetzlicher
+  // Client-Gate noetig.
+  async loadBlogLinks() {
+    const bookId = window.__app.selectedBookId;
+    if (!bookId) {
+      this.blogConnected = false;
+      this.blogLinksMap = {};
+      return;
+    }
+    try {
+      const res = await fetch(`/blog/${bookId}/links`);
+      if (!res.ok) {
+        this.blogConnected = false;
+        this.blogLinksMap = {};
+        return;
+      }
+      const data = await res.json();
+      this.blogConnected = !!data.connected;
+      const map = {};
+      for (const link of (data.links || [])) map[link.page_id] = link;
+      this.blogLinksMap = map;
+    } catch (e) {
+      console.error('[bookOrganizer] Blog-Links laden fehlgeschlagen:', e);
+    }
+  },
+
+  // Liefert Badge-Status für eine Page (oder null = kein Badge).
+  // 'new'        — kein Link → wurde lokal angelegt, noch nie zu WP gepusht.
+  // 'conflict'   — beide Seiten haben Änderungen, conflict_state='detected'.
+  // 'push-needed' — Page lokal geändert seit last_pulled_at/last_pushed_at.
+  // 'synced'     — Stand identisch zum WP-Snapshot.
+  blogStatusFor(page) {
+    if (!this.blogConnected) return null;
+    const link = this.blogLinksMap[page.id];
+    if (!link) return 'new';
+    if (link.conflict_state === 'detected') return 'conflict';
+    const lastSync = link.last_pushed_at || link.last_pulled_at || '';
+    const pageUpdated = page.updated_at || '';
+    if (pageUpdated && lastSync && pageUpdated > lastSync) return 'push-needed';
+    return 'synced';
+  },
+
+  blogStatusLabel(status) {
+    if (!status) return '';
+    const map = {
+      synced: 'blog.status.synced',
+      'push-needed': 'blog.status.pushNeeded',
+      conflict: 'blog.status.conflict',
+      new: 'blog.status.newLocal',
+    };
+    return window.__app.t(map[status] || '');
+  },
+
+  canBlogPush(page) {
+    const s = this.blogStatusFor(page);
+    return s === 'new' || s === 'push-needed';
+  },
+
+  async pushPageToBlog(pageId) {
+    const bookId = window.__app.selectedBookId;
+    if (!bookId) return;
+    if (this.blogPushBusy[pageId]) return;
+    this.blogPushBusy = { ...this.blogPushBusy, [pageId]: true };
+    try {
+      const res = await fetch('/jobs/blog-push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ book_id: bookId, page_ids: [pageId] }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error_code || 'BLOG_PUSH_FAILED');
+    } catch (e) {
+      console.error('[bookOrganizer] Push fehlgeschlagen:', e);
+      const next = { ...this.blogPushBusy };
+      delete next[pageId];
+      this.blogPushBusy = next;
+    }
+  },
+
+  // Konflikt-Diff öffnen: WP-Version laden und in Modal anzeigen.
+  async openBlogConflict(pageId) {
+    const bookId = window.__app.selectedBookId;
+    if (!bookId) return;
+    this.blogConflictOpen = pageId;
+    this.blogConflictData = null;
+    try {
+      const { contentRepo } = await import('../repo/content.js');
+      const [remoteRes, localPage] = await Promise.all([
+        fetch(`/blog/${bookId}/pages/${pageId}/remote`).then(r => r.ok ? r.json() : Promise.reject(r)),
+        contentRepo.loadPage(pageId),
+      ]);
+      this.blogConflictData = {
+        pageId,
+        local: { name: localPage.name || localPage.page_name || '', html: localPage.html || localPage.body_html || '' },
+        remote: { title: remoteRes.title || '', html: remoteRes.html || '', modifiedAt: remoteRes.modifiedAt || '' },
+      };
+    } catch (e) {
+      console.error('[bookOrganizer] Konflikt-Diff laden fehlgeschlagen:', e);
+      this.blogConflictOpen = null;
+    }
+  },
+
+  closeBlogConflict() {
+    this.blogConflictOpen = null;
+    this.blogConflictData = null;
+  },
+
+  async resolveBlogConflict(side) {
+    if (!this.blogConflictOpen) return;
+    const bookId = window.__app.selectedBookId;
+    const pageId = this.blogConflictOpen;
+    try {
+      const res = await fetch(`/blog/${bookId}/pages/${pageId}/resolve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resolve: side }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error_code || 'BLOG_RESOLVE_FAILED');
+      this.closeBlogConflict();
+      await this.loadBlogLinks();
+      if (side === 'wp') window.__app.loadPages?.();
+    } catch (e) {
+      console.error('[bookOrganizer] Resolve fehlgeschlagen:', e);
+    }
+  },
 };

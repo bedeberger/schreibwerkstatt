@@ -1894,6 +1894,13 @@
   "blog.status.pushNeeded":         "Push offen",
   "blog.status.pullNeeded":         "Pull offen",
   "blog.status.conflict":           "Konflikt",
+  "blog.status.newLocal":           "neu, nicht im Blog",
+
+  "blog.conflict.title":            "Konflikt: lokale Änderung vs. Blog-Änderung",
+  "blog.conflict.local":            "Lokal (Schreibwerkstatt)",
+  "blog.conflict.remote":           "Blog (WordPress)",
+  "blog.conflict.keepApp":          "Lokale Version behalten + zum Blog pushen",
+  "blog.conflict.takeWp":           "Blog-Version übernehmen (lokal überschreiben)",
 
   "blog.action.import":             "Initial-Import starten",
   "blog.action.pull":               "Von Blog pullen",

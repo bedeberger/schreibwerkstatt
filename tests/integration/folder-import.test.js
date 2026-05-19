@@ -192,6 +192,196 @@ test('folder-import: AbiWord-Datei (.abw) wird verarbeitet', async () => {
   assert.match(page.html, /Hallo aus AbiWord/);
 });
 
+test('folder-import: month-only Fallback fuer Datei ohne Datum im Namen/Inhalt', async () => {
+  const userEmail = 'tester@test.dev';
+  const book = await contentStore.createBook(
+    { name: 'MonthOnly', owner_email: userEmail },
+    { session: { user: { email: userEmail } } },
+  );
+  const { db } = require('../../db/connection');
+  db.prepare(`INSERT OR IGNORE INTO book_access (book_id, user_email, role, granted_at) VALUES (?, ?, 'owner', datetime('now'))`).run(book.id, userEmail);
+
+  const buffer = await buildArchive([
+    // Filename ohne Tageszahl, Inhalt ohne Datum → nur Year+Month aus Pfad
+    ['2006/november 2006/warum ich notizen mag.docx', await makeDocx('Reine Notiz ohne Datum.')],
+  ]);
+
+  const jobId = ctx.shared.createJob(
+    'folder-import', book.id, userEmail,
+    'job.label.folderImport', { name: 'MonthOnly' },
+    'merge:' + book.id + ':monthonly',
+  );
+  folderImport.importBuffers.set(jobId, { buffer, mode: 'merge', bookName: '', bookId: book.id });
+
+  await folderImport.runFolderImportJob(jobId, {
+    userEmail, mode: 'merge', bookName: '', bookId: book.id,
+  });
+
+  const job = ctx.shared.jobs.get(jobId);
+  assert.equal(job.status, 'done', `Job-Status: ${job.status}, err: ${job.error || '-'}`);
+  assert.equal(job.result.pagesCreated, 1);
+
+  const pages = await contentStore.listPages(book.id, { session: { user: { email: userEmail } } });
+  // Page-Name: "2006-11 warum ich notizen mag" (Thema aus Filename)
+  assert.match(pages[0].name, /^2006-11 warum ich notizen mag/);
+
+  // Im richtigen Jahres-Kapitel
+  const chapters = await contentStore.listChapters(book.id, { session: { user: { email: userEmail } } });
+  assert.equal(chapters.length, 1);
+  assert.equal(chapters[0].name, '2006');
+});
+
+test('folder-import: persoenliches_NN.abw + Monat-Ordner → korrektes Datum', async () => {
+  const userEmail = 'tester@test.dev';
+  const book = await contentStore.createBook(
+    { name: 'AbwNumbered', owner_email: userEmail },
+    { session: { user: { email: userEmail } } },
+  );
+  const { db } = require('../../db/connection');
+  db.prepare(`INSERT OR IGNORE INTO book_access (book_id, user_email, role, granted_at) VALUES (?, ?, 'owner', datetime('now'))`).run(book.id, userEmail);
+
+  const abw = `<?xml version="1.0"?><abiword><section><p>Eintrag.</p></section></abiword>`;
+  const buffer = await buildArchive([
+    ['2007/mai 2007/persoenliches_23.abw', Buffer.from(abw, 'utf8')],
+    ['2010/Februar 2010/persoenliches_03.odt.docx', await makeDocx('docx Eintrag.')],
+  ]);
+
+  const jobId = ctx.shared.createJob(
+    'folder-import', book.id, userEmail,
+    'job.label.folderImport', { name: 'AbwNumbered' },
+    'merge:' + book.id + ':abwnumbered',
+  );
+  folderImport.importBuffers.set(jobId, { buffer, mode: 'merge', bookName: '', bookId: book.id });
+
+  await folderImport.runFolderImportJob(jobId, {
+    userEmail, mode: 'merge', bookName: '', bookId: book.id,
+  });
+
+  const job = ctx.shared.jobs.get(jobId);
+  assert.equal(job.status, 'done');
+  assert.equal(job.result.pagesCreated, 2);
+
+  const pages = await contentStore.listPages(book.id, { session: { user: { email: userEmail } } });
+  const names = pages.map(p => p.name).sort();
+  assert.deepEqual(names, ['2007-05-23', '2010-02-03']);
+});
+
+test('folder-import: mtime-Fallback wenn kein Datum aus Filename/Heading', async () => {
+  const userEmail = 'tester@test.dev';
+  const book = await contentStore.createBook(
+    { name: 'MtimeBook', owner_email: userEmail },
+    { session: { user: { email: userEmail } } },
+  );
+  const { db } = require('../../db/connection');
+  db.prepare(`INSERT OR IGNORE INTO book_access (book_id, user_email, role, granted_at) VALUES (?, ?, 'owner', datetime('now'))`).run(book.id, userEmail);
+
+  // ZIP-Entry mit explizitem date-Feld setzen — JSZip nimmt die Date am Entry an.
+  const archive = new JSZip();
+  archive.file('2020/november 2020/notiz.docx', await makeDocx('Body ohne Datum.'), {
+    date: new Date(Date.UTC(2020, 10, 7, 12, 0, 0)), // 2020-11-07
+  });
+  const buffer = await archive.generateAsync({ type: 'nodebuffer' });
+
+  const jobId = ctx.shared.createJob(
+    'folder-import', book.id, userEmail,
+    'job.label.folderImport', { name: 'MtimeBook' },
+    'merge:' + book.id + ':mtime',
+  );
+  folderImport.importBuffers.set(jobId, { buffer, mode: 'merge', bookName: '', bookId: book.id });
+
+  await folderImport.runFolderImportJob(jobId, {
+    userEmail, mode: 'merge', bookName: '', bookId: book.id,
+  });
+
+  const job = ctx.shared.jobs.get(jobId);
+  assert.equal(job.status, 'done', `Job-Status: ${job.status}, err: ${job.error || '-'}`);
+  assert.equal(job.result.pagesCreated, 1);
+
+  const pages = await contentStore.listPages(book.id, { session: { user: { email: userEmail } } });
+  // Pfad-Monat (November) hat Vorrang vor mtime-Monat → 2020-11-07 (Tag aus mtime)
+  assert.equal(pages[0].name, '2020-11-07');
+});
+
+test('folder-import: mtime verworfen wenn Jahr nicht matcht', async () => {
+  const userEmail = 'tester@test.dev';
+  const book = await contentStore.createBook(
+    { name: 'MtimeMismatch', owner_email: userEmail },
+    { session: { user: { email: userEmail } } },
+  );
+  const { db } = require('../../db/connection');
+  db.prepare(`INSERT OR IGNORE INTO book_access (book_id, user_email, role, granted_at) VALUES (?, ?, 'owner', datetime('now'))`).run(book.id, userEmail);
+
+  // mtime in 2024, aber Pfad sagt 2020 → mtime wird verworfen, Fallback auf
+  // month-only mit YYYY-MM-15.
+  const archive = new JSZip();
+  archive.file('2020/november 2020/notiz.docx', await makeDocx('Body.'), {
+    date: new Date(Date.UTC(2024, 5, 15)),
+  });
+  const buffer = await archive.generateAsync({ type: 'nodebuffer' });
+
+  const jobId = ctx.shared.createJob(
+    'folder-import', book.id, userEmail,
+    'job.label.folderImport', { name: 'MtimeMismatch' },
+    'merge:' + book.id + ':mtimemismatch',
+  );
+  folderImport.importBuffers.set(jobId, { buffer, mode: 'merge', bookName: '', bookId: book.id });
+
+  await folderImport.runFolderImportJob(jobId, {
+    userEmail, mode: 'merge', bookName: '', bookId: book.id,
+  });
+
+  const job = ctx.shared.jobs.get(jobId);
+  assert.equal(job.status, 'done');
+  // Page-Name ist month-only-Format
+  const pages = await contentStore.listPages(book.id, { session: { user: { email: userEmail } } });
+  assert.match(pages[0].name, /^2020-11 /);
+});
+
+test('folder-import: month-only Thema aus Heading (h1 schlaegt Filename)', async () => {
+  const userEmail = 'tester@test.dev';
+  const book = await contentStore.createBook(
+    { name: 'MonthOnlyHeading', owner_email: userEmail },
+    { session: { user: { email: userEmail } } },
+  );
+  const { db } = require('../../db/connection');
+  db.prepare(`INSERT OR IGNORE INTO book_access (book_id, user_email, role, granted_at) VALUES (?, ?, 'owner', datetime('now'))`).run(book.id, userEmail);
+
+  // ODT mit echtem H1 — Filename "persoenliches" ist generisch, Heading sollte
+  // im Page-Name auftauchen.
+  const odtXml = `<?xml version="1.0"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
+  <office:body><office:text>
+    <text:h text:outline-level="1">Über das Reisen</text:h>
+    <text:p>Body-Text.</text:p>
+  </office:text></office:body>
+</office:document-content>`;
+  const JSZipLib = require('jszip');
+  const z = new JSZipLib();
+  z.file('mimetype', 'application/vnd.oasis.opendocument.text');
+  z.file('content.xml', odtXml);
+  const odtBuf = await z.generateAsync({ type: 'nodebuffer' });
+
+  const buffer = await buildArchive([
+    ['2006/november 2006/persoenliches.odt', odtBuf],
+  ]);
+
+  const jobId = ctx.shared.createJob(
+    'folder-import', book.id, userEmail,
+    'job.label.folderImport', { name: 'MonthOnlyHeading' },
+    'merge:' + book.id + ':heading',
+  );
+  folderImport.importBuffers.set(jobId, { buffer, mode: 'merge', bookName: '', bookId: book.id });
+
+  await folderImport.runFolderImportJob(jobId, {
+    userEmail, mode: 'merge', bookName: '', bookId: book.id,
+  });
+
+  const job = ctx.shared.jobs.get(jobId);
+  assert.equal(job.status, 'done');
+  const pages = await contentStore.listPages(book.id, { session: { user: { email: userEmail } } });
+  assert.equal(pages[0].name, '2006-11 Über das Reisen');
+});
+
 test('folder-import: unbekannte Extension wird skipped', async () => {
   const userEmail = 'tester@test.dev';
   const book = await contentStore.createBook(

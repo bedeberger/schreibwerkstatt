@@ -14,7 +14,7 @@ const {
   aiCall, getPrompts, jobs, createJob, enqueueJob, findActiveJobId,
 } = require('./shared');
 const contentStore = require('../../lib/content-store');
-const { detectDate, detectDateInText, firstLineFromHtml, scoreSample } = require('../../lib/import-parsers/date-detect');
+const { detectDate, detectDateInText, firstLineFromHtml, extractTitle, scoreSample } = require('../../lib/import-parsers/date-detect');
 const { parseImportFile, extOf, SUPPORTED_EXTS } = require('../../lib/import-parsers/dispatch');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
@@ -212,6 +212,41 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
         if (aiIso) { isoDate = aiIso; dateSource = 'ai'; }
       }
 
+      // Fallback: ZIP-Entry-Modified-Date (mtime). Nur akzeptieren wenn:
+      //   - Date-Objekt valide UND Jahr >= 1990 (JSZip-Default 1980-01-01 fuer
+      //     unset mtimes wuerde sonst alles auf 1980 setzen)
+      //   - Jahr matched Pfad-Jahr — sonst ist die mtime ein Artefakt
+      //     (Archive-Repack, alle Files auf Archive-Datum gesetzt o.ae.)
+      // Pfad-Monat hat Vorrang vor mtime-Monat (User-Organisations-Intent
+      // schlaegt Filesystem-Metadaten); nur der Tag wird aus mtime gezogen.
+      if (!isoDate && f.zipEntry?.date instanceof Date && !isNaN(f.zipEntry.date)) {
+        const mt = f.zipEntry.date;
+        const mtYear = mt.getUTCFullYear();
+        if (mtYear >= 1990 && mtYear === f.year) {
+          const mtMonth = mt.getUTCMonth() + 1;
+          const mtDay = mt.getUTCDate();
+          const useMonth = Number.isFinite(month) ? month : mtMonth;
+          isoDate = `${f.year}-${String(useMonth).padStart(2, '0')}-${String(mtDay).padStart(2, '0')}`;
+          dateSource = 'mtime';
+        }
+      }
+
+      // Letzter Fallback: nur Jahr+Monat aus Pfad ableitbar → synthetisches
+      // Datum YYYY-MM-15 (Mitte des Monats fuer Sortierung). Page-Name behaelt
+      // den Filename, damit der User sieht, dass kein echtes Datum vorlag.
+      if (!isoDate && Number.isFinite(month)) {
+        isoDate = `${f.year}-${String(month).padStart(2, '0')}-15`;
+        dateSource = 'month-only';
+      }
+
+      // Allerletzter Fallback: nur Jahr ableitbar → synthetisches Mid-Year-
+      // Datum YYYY-06-15 (sortierbar, Page-Name nutzt YYYY + Thema, damit
+      // User sieht dass kein echter Tag vorlag).
+      if (!isoDate && Number.isFinite(f.year)) {
+        isoDate = `${f.year}-06-15`;
+        dateSource = 'year-only';
+      }
+
       if (!isoDate) {
         skipped.push({ path: f.relativePath, reason: 'NO_DATE' });
         continue;
@@ -220,14 +255,14 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
       if (parsed.warnings?.length) {
         warningsCollected.push({ path: f.relativePath, items: parsed.warnings });
       }
-      enriched.push({ ...f, isoDate, dateSource, html: parsed.html });
+      enriched.push({ ...f, isoDate, dateSource, html: parsed.html, month });
     }
 
     if (!enriched.length) {
       throw i18nError('job.error.noDatesFound');
     }
 
-    log.info(`date-detect breakdown: filename=${enriched.filter(e => e.dateSource === 'filename').length}, first-line=${enriched.filter(e => e.dateSource === 'first-line').length}, ai=${enriched.filter(e => e.dateSource === 'ai').length}`);
+    log.info(`date-detect breakdown: filename=${enriched.filter(e => e.dateSource === 'filename').length}, first-line=${enriched.filter(e => e.dateSource === 'first-line').length}, ai=${enriched.filter(e => e.dateSource === 'ai').length}, mtime=${enriched.filter(e => e.dateSource === 'mtime').length}, month-only=${enriched.filter(e => e.dateSource === 'month-only').length}, year-only=${enriched.filter(e => e.dateSource === 'year-only').length}`);
 
     // Sortieren chronologisch
     enriched.sort((a, b) => a.isoDate.localeCompare(b.isoDate));
@@ -282,10 +317,25 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
         log.info(`Chapter angelegt: ${f.year} (id=${chapterId})`);
       }
 
-      // Name: ISO-Date, bei Duplikat Suffix
-      const count = dateSeen.get(f.isoDate) || 0;
-      dateSeen.set(f.isoDate, count + 1);
-      const pageName = count === 0 ? f.isoDate : `${f.isoDate} (${count + 1})`;
+      // Page-Name: ISO-Date bei echtem Datum, sonst "YYYY-MM <Thema>" fuer
+      // month-only-Eintraege. Thema wird via extractTitle aus Heading/
+      // Filename/erster Zeile geholt (siehe lib/import-parsers/date-detect).
+      let pageName;
+      if (f.dateSource === 'month-only') {
+        const ym = f.isoDate.slice(0, 7);
+        const thema = extractTitle(f.html, f.file);
+        pageName = thema ? `${ym} ${thema}` : ym;
+      } else if (f.dateSource === 'year-only') {
+        const thema = extractTitle(f.html, f.file);
+        pageName = thema ? `${f.year} ${thema}` : String(f.year);
+      } else {
+        pageName = f.isoDate;
+      }
+      // Duplikat-Suffix auf pageName (nicht mehr auf isoDate, damit
+      // month-only-Eintraege mit unterschiedlichen Filenames eigenstaendig sind)
+      const seenCount = dateSeen.get(pageName) || 0;
+      dateSeen.set(pageName, seenCount + 1);
+      if (seenCount > 0) pageName = `${pageName} (${seenCount + 1})`;
 
       try {
         await contentStore.createPage(

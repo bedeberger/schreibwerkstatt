@@ -1893,6 +1893,13 @@
   "blog.status.pushNeeded":         "push pending",
   "blog.status.pullNeeded":         "pull pending",
   "blog.status.conflict":           "conflict",
+  "blog.status.newLocal":           "new, not in blog",
+
+  "blog.conflict.title":            "Conflict: local edits vs. blog edits",
+  "blog.conflict.local":            "Local (Schreibwerkstatt)",
+  "blog.conflict.remote":           "Blog (WordPress)",
+  "blog.conflict.keepApp":          "Keep local + push to blog",
+  "blog.conflict.takeWp":           "Take blog version (overwrite local)",
 
   "blog.action.import":             "Start initial import",
   "blog.action.pull":               "Pull from blog",
