@@ -17,6 +17,8 @@ Themen-Spickzettel ausgelagert (Drift-Schutz: CLAUDE.md-Regeln, Details in den S
 - [docs/buchchat-tools.md](docs/buchchat-tools.md) — Agentic Buch-Chat: Tool-Inventar (19 Stück), `ctx`-Vertrag, Truncation, Loop-Constraints, neues Tool anlegen.
 - [docs/focus-editor.md](docs/focus-editor.md) — Focus-Editor: State-Machine, Submodule (`focus/`), Trampoline-Pattern, Granularitäten, Recenter-Pipeline, Auto-`<p>`-Slot, Snapshot, Pflicht-Invarianten.
 - [docs/state-modell.md](docs/state-modell.md) — Frontend-State-Modell: 3 Ebenen (Root/Sub/Store), 14 Slices, Lifecycle, `setupCardLifecycle`, Event-Bus, Editor-Modi (4 Flags, Invarianten, erlaubte Kombinationen).
+- [docs/buchorganizer.md](docs/buchorganizer.md) — Buchorganizer: Slice-Layout, In-Place-Mirror, Undo/Redo-Regeln, DnD-Pitfalls, Pflicht-Mutationssequenz.
+- [docs/graph.md](docs/graph.md) — Figuren-Graph: 3 Modi (Swimlane/Familie/Soziogramm), vis-network-Internals, deterministisches Layout, neuen Beziehungstyp einbinden.
 - [docs/finetuning.md](docs/finetuning.md) — Finetune-Export.
 
 ## Doku-Stil dieser Datei
