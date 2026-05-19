@@ -206,7 +206,53 @@ export const treeMethods = {
     // Parent-Kapitel ohne direkte Pages, aber mit Sub-Kapiteln, öffnen das
     // Review (include_subchapters greift dann automatisch, siehe kapitelReviewIncludeSubchapters).
     if (this._bookQualifiesForChapterReview()) await this.openKapitelReviewForChapter(item.id);
-    else item.open = !item.open;
+    else this.toggleChapterOpen(item);
+  },
+
+  // Persistenter Collapse-State des Sidebar-Trees pro (User, Buch). Default
+  // ist `open: true` (Erstaufruf). Solo-Items werden nicht persistiert —
+  // sie sind reine Page-Wrapper ohne Toggle.
+  _treeOpenStorageKey(bookId) {
+    if (!bookId) return '';
+    return `sw:treeOpen:${this.currentUser?.email || ''}:${bookId}`;
+  },
+  _loadTreeOpenState(bookId) {
+    try {
+      const key = this._treeOpenStorageKey(bookId);
+      if (!key) return {};
+      const raw = localStorage.getItem(key);
+      if (!raw) return {};
+      const obj = JSON.parse(raw);
+      return obj && typeof obj === 'object' ? obj : {};
+    } catch { return {}; }
+  },
+  _persistTreeOpenState() {
+    const bookId = this.selectedBookId;
+    if (!bookId) return;
+    try {
+      const key = this._treeOpenStorageKey(bookId);
+      if (!key) return;
+      const state = {};
+      for (const item of this.tree) {
+        if (item.type === 'chapter' && !item.solo) state[item.id] = !!item.open;
+      }
+      localStorage.setItem(key, JSON.stringify(state));
+    } catch { /* quota / disabled storage — ignore */ }
+  },
+  setChapterOpen(item, value) {
+    if (!item || item.solo) return;
+    item.open = !!value;
+    this._persistTreeOpenState();
+  },
+  toggleChapterOpen(item) {
+    if (!item || item.solo) return;
+    this.setChapterOpen(item, !item.open);
+  },
+  setAllChaptersOpen(value) {
+    for (const item of this.tree) {
+      if (item.type === 'chapter' && !item.solo) item.open = !!value;
+    }
+    this._persistTreeOpenState();
   },
 
   // Sidebar-Tooltip-Helper (Token-Badge + Page-Status). Halten Layout-Code
@@ -416,6 +462,7 @@ export const treeMethods = {
         ...flatChapters.flatMap(c => c.pages.map(decoratePage)),
       ];
 
+      const openState = this._loadTreeOpenState(bookId);
       this.tree = [
         ...this.pages.filter(p => !p.chapter_id).map(p => ({
           type: 'chapter',
@@ -435,7 +482,7 @@ export const treeMethods = {
           priority: c.position,
           depth: c._depth,
           parent_id: c._parent_id,
-          open: true,
+          open: Object.prototype.hasOwnProperty.call(openState, c.id) ? !!openState[c.id] : true,
           solo: false,
           hasChildren: (childCountMap.get(c.id) || 0) > 0,
           pages: this.pages.filter(p => p.chapter_id === c.id),
@@ -540,6 +587,7 @@ export const treeMethods = {
       };
       this.tree = [...this.tree, chapterItem].sort(_sortSoloFirst);
       if (this._chapterOrderMap) this._chapterOrderMap.set(chapterItem.name, this._chapterOrderMap.size);
+      this._persistTreeOpenState();
       return chapterItem;
     } catch (e) {
       console.error('[createChapter]', e);

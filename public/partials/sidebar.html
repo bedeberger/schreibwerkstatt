@@ -15,12 +15,12 @@
     </span>
     <div class="btn-group sidebar-action-group">
       <button type="button" class="graph-tool-btn"
-              @click="tree.forEach(c => { if (!c.solo) c.open = true })"
+              @click="setAllChaptersOpen(true)"
               :disabled="!!pageSearch"
               :data-tip="t('sidebar.expandAll')"
               :aria-label="t('sidebar.expandAll')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=635#chevron-down"/></svg></button>
       <button type="button" class="graph-tool-btn"
-              @click="tree.forEach(c => { if (!c.solo) c.open = false })"
+              @click="setAllChaptersOpen(false)"
               :disabled="!!pageSearch"
               :data-tip="t('sidebar.collapseAll')"
               :aria-label="t('sidebar.collapseAll')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=635#chevron-up"/></svg></button>
@@ -60,11 +60,11 @@
              : ''"
            @keydown.enter.prevent="_onChapterHeaderActivate(item)"
            @keydown.space.prevent="_onChapterHeaderActivate(item)"
-           @keydown.arrow-right.prevent="if ((item.pages.length > 0 || item.hasChildren) && !item.open) item.open = true"
-           @keydown.arrow-left.prevent="if ((item.pages.length > 0 || item.hasChildren) && item.open) item.open = false"
+           @keydown.arrow-right.prevent="if ((item.pages.length > 0 || item.hasChildren) && !item.open) setChapterOpen(item, true)"
+           @keydown.arrow-left.prevent="if ((item.pages.length > 0 || item.hasChildren) && item.open) setChapterOpen(item, false)"
            @click="_onChapterHeaderActivate(item)">
         <span class="history-chevron" :class="{ open: item.open }" x-show="item.pages.length > 0 || item.hasChildren"
-              @click.stop="if (!pageSearch && (item.pages.length > 0 || item.hasChildren)) item.open = !item.open"></span>
+              @click.stop="if (!pageSearch && (item.pages.length > 0 || item.hasChildren)) toggleChapterOpen(item)"></span>
         <span x-text="item.name"></span>
         <span class="tree-chapter-meta">
           <span class="tag" x-show="item.pages.length >= 1" x-text="item.pages.length === 1 ? t('sidebar.pagesCountOne') : t('sidebar.pagesCount', { n: item.pages.length })"></span>
