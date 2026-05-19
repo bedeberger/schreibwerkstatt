@@ -504,7 +504,7 @@ router.post('/folder-import', rawZipBody, async (req, res) => {
     'folder-import',
     bookId || 0,
     userEmail,
-    'job.label.folderImport',
+    'job.label.folderImportBook',
     { name: bookName || `Book #${bookId}` },
     dedupKey,
   );

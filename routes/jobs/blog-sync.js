@@ -371,7 +371,7 @@ blogSyncRouter.post('/blog-push', jsonBody, (req, res) => {
   if (!pageIds.length) return res.status(400).json({ error_code: 'BLOG_PAGE_IDS_REQUIRED' });
   const existing = findActiveJobId('blog-push', book_id, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });
-  const jobId = createJob('blog-push', book_id, userEmail, 'job.label.blogPush', { count: pageIds.length });
+  const jobId = createJob('blog-push', book_id, userEmail, 'job.label.blogPushCount', { count: pageIds.length });
   enqueueJob(jobId, () => runBlogPushJob(jobId, book_id, userEmail, pageIds));
   res.json({ jobId });
 });

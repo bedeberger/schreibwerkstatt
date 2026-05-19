@@ -223,7 +223,7 @@ figurWerkstattRouter.post('/werkstatt-brainstorm', jsonBody, (req, res) => {
   const existing = findActiveJobId('werkstatt-brainstorm', entityKey, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });
 
-  const label = 'job.label.werkstattBrainstorm';
+  const label = 'job.label.werkstattBrainstormFigur';
   const labelParams = { figur: draft.name };
   const jobId = createJob('werkstatt-brainstorm', draft.book_id, userEmail, label, labelParams, entityKey);
   enqueueJob(jobId, () => runBrainstormJob(jobId, draftId, knotenId, userEmail));
@@ -249,7 +249,7 @@ figurWerkstattRouter.post('/werkstatt-consistency', jsonBody, (req, res) => {
   const existing = findActiveJobId('werkstatt-consistency', draftId, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });
 
-  const label = 'job.label.werkstattConsistency';
+  const label = 'job.label.werkstattConsistencyFigur';
   const labelParams = { figur: draft.name };
   const jobId = createJob('werkstatt-consistency', draft.book_id, userEmail, label, labelParams, draftId);
   enqueueJob(jobId, () => runConsistencyJob(jobId, draftId, userEmail));

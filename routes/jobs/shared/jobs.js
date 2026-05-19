@@ -231,15 +231,22 @@ function cancelJob(id, userEmail) {
 // ── Statistik-Konfiguration ───────────────────────────────────────────────────
 // Werte sind i18n-Keys; Frontend übersetzt über t().
 const JOB_TYPE_LABELS = {
-  'check':            'job.label.check',
-  'batch-check':      'job.label.batchCheck',
-  'komplett-analyse': 'job.label.komplett',
-  'review':           'job.label.review',
-  'chapter-review':   'job.label.chapterReview',
-  'book-chat':        'job.label.bookChat',
-  'chat':             'job.label.chat',
-  'synonym':          'job.label.synonym',
-  'finetune-export':  'job.label.finetuneExport',
+  'check':                 'job.label.check',
+  'batch-check':           'job.label.batchCheck',
+  'komplett-analyse':      'job.label.komplett',
+  'review':                'job.label.review',
+  'chapter-review':        'job.label.chapterReview',
+  'book-chat':             'job.label.bookChat',
+  'chat':                  'job.label.chat',
+  'synonym':               'job.label.synonym',
+  'finetune-export':       'job.label.finetuneExport',
+  'folder-import':         'job.label.folderImport',
+  'pdf-export':            'job.label.pdfExport',
+  'blog-import':           'job.label.blogImport',
+  'blog-pull':             'job.label.blogPull',
+  'blog-push':             'job.label.blogPush',
+  'werkstatt-brainstorm':  'job.label.werkstattBrainstorm',
+  'werkstatt-consistency': 'job.label.werkstattConsistency',
 };
 
 // Job-Typen, die vom Superjob (komplett-analyse) abgedeckt werden und nicht in der Statistik erscheinen sollen

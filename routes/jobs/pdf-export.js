@@ -174,7 +174,7 @@ router.post('/pdf-export', jsonBody, async (req, res) => {
   const existing = findActiveJobId('pdf-export', dedupId, userEmail);
   if (existing) return res.json({ jobId: existing, deduplicated: true });
 
-  const jobId = createJob('pdf-export', bookId, userEmail, 'job.label.pdfExport', { profile: profile.name }, dedupId);
+  const jobId = createJob('pdf-export', bookId, userEmail, 'job.label.pdfExportProfile', { profile: profile.name }, dedupId);
   enqueueJob(jobId, () => runPdfExportJob(jobId, { scope, entityId, profileId, userEmail, userToken }));
   res.status(202).json({ jobId });
 });
