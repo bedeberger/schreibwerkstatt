@@ -23,7 +23,7 @@ import { applySentenceHighlight } from './sentence.js';
 import {
   dynamicTypewriterThreshold, getCaretRect, typewriterScroll,
 } from './typewriter.js';
-import { writeFocusSnapshot, clearFocusSnapshot } from './storage.js';
+import { writeFocusSnapshot, clearFocusSnapshot, installEditCounter } from './storage.js';
 
 export const focusCardMethods = {
   toggleFocusMode() {
@@ -71,6 +71,9 @@ export const focusCardMethods = {
         this._focusState = 'active';
         this._focusUpdateActive(true);
         writeFocusSnapshot(app.currentPage?.id);
+        // Live-Counter ist Focus-only (Entscheidung 2026-05-20). Setup nach
+        // _focusInstall, damit der contenteditable-Container existiert.
+        installEditCounter(app);
       } catch (err) {
         reportError('enterFocusMode', err);
         this._focusTeardown();
@@ -357,6 +360,10 @@ export const focusCardMethods = {
 
     this._focusTeardown();
     clearFocusSnapshot();
+
+    // Live-Counter ist Focus-only. Beim Verlassen des Focus-Modes wird der
+    // Listener immer abgerissen — egal ob editMode danach an oder aus ist.
+    app._editCounterCtx?.teardown?.();
 
     app.focusMode = false;
     app.focusActive = false;

@@ -1,6 +1,5 @@
 import { htmlToText, cleanContentArtefacts, tzOpts } from '../utils.js';
 import { sortByPosition, buildHighlightedHtml } from '../book/page-view.js';
-import { installEditCounter } from './shared/edit-counter.js';
 import { contentRepo } from '../repo/content.js';
 import { readDraft, writeDraft, clearDraft } from './draft-storage.js';
 import {
@@ -10,6 +9,7 @@ import {
 import { buildSavePayload, isNoChange } from './shared/save-pipeline.js';
 import { isPageConflict, readConflictBody } from './shared/page-api.js';
 import { getActiveEditorContainer } from './shared/active-editor.js';
+import { installEditCounter } from './shared/edit-counter.js';
 
 // Auto-Save nach BookStack: idle-debounce + max-Cap. Jede Schreibaktion
 // resettet den Idle-Timer; läuft der User durchgehend, greift der Max-Timer.
@@ -158,9 +158,8 @@ export const editorEditMethods = {
     // Soft-Edit-Lock: zusaetzliches UI-Signal mit Ablaufzeit; OCC-Pfad bleibt
     // das echte Safety-Net. Fremder Lock → foreignEditLock-Banner.
     this._acquireEditLock?.(this.currentPage.id);
-    // Counter erst nach Alpine-x-show-Flush installieren — vorher existiert
-    // .page-content-view--editing noch nicht im DOM.
-    setTimeout(() => { if (this.editMode) installEditCounter(this); }, 0);
+    // Counter-Setup wandert in die Focus-Karte (enterFocusMode); Normal-
+    // Editor zeigt keinen Live-Counter (Entscheidung 2026-05-20).
   },
 
   async cancelEdit() {

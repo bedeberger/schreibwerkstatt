@@ -328,11 +328,11 @@ Quality-Gate vor Merge: alle Unit-/Integration-/E2E-Tests grün; Coverage-Kontro
 - **Text-Metrik Normal-Editor**: heutige Schreibmodus-Constraints (Spaltenbreite/Padding/grosszügige Zeilenhöhe) werden deaktiviert. Normal-Editor rendert dichter, Tagebuch-/Blog-Optik.
 - **Hotkey aus Normal-Editor**: schliesst Normal-Editor (Save + Lock-Release + Teardown), öffnet Focus aus Page-View-Snapshot.
 - **Offline-Queue**: gemeinsam über `shared/page-api.js`. Beide Modi nutzen dieselbe Queue.
+- **Lock-Modell**: einheitlich **ein Lock pro Page-Session**. Mode-Wechsel Normal ↔ Focus gibt den Lock nicht frei — `shared/page-api.js` führt einen Save aus, der Lock bleibt bestehen, der neue Modus übernimmt ihn. Release erst beim verlassen der Page (Page-Wechsel, View-Reset, Logout).
+- **Autosave-Frequenz**: in beiden Editoren identisch — `AUTOSAVE_IDLE_MS = 60000` (60 s nach letztem Tippen). `AUTOSAVE_MAX_MS = 120000` bleibt unverändert, deckelt Dauer-Tipper.
+- **Counter-Anzeige**: **nur im Focus-Editor**. Normal-Editor bekommt keinen Live-Counter. `installEditCounter` aus `shared/` wird ausschliesslich von der Focus-Karte aufgerufen. Der heutige Aufruf in `edit.js#startEdit` (Z. 232) entfällt — Counter-Setup wandert komplett in die Focus-Karte.
+- **Snapshot-Restore**: **beide Editoren** bekommen einen sessionStorage-Snapshot mit gleicher Mechanik (`focus.snapshot` und `normal.snapshot`, je TTL 1 h). Beim Reload mountet die zuletzt aktive Karte direkt ohne Detour über die andere. Storage-Keys getrennt, Restore-Pfad jeweils Card-eigen.
 
 ## Offene Fragen
 
-- **Lock-Modell beim Mode-Wechsel**: ein Lock pro Page-Session über beide Modi hinweg, oder pro Edit-Zyklus neu? Heutige Implementierung in [routes/book-editor.js](../../routes/book-editor.js) und Lock-Logik prüfen, bevor die Save+Release-Sequenz im `shared/page-api.js` final wird.
-- **Quick-Save-Frequenz**: bleibt Focus-Autosave (heute über `_scheduleDraftSave`/`_flushDraftSaveNow`) im selben Intervall wie Normal-Editor, oder konservativer (weniger Revisionen pro Session)?
-- **Counter-Anzeige**: nur im Focus, oder auch im Normal-Editor als Notebook-Feature? Falls auch im Normal: `installEditCounter` aus `shared/` muss zwei parallele Anzeigen unterstützen können.
-- **Snapshot-Restore** (`focus.snapshot` in sessionStorage): Mechanismus bleibt erhalten — Restore aus Page-View triggern, ohne dass der Normal-Editor je gemountet wird. Genauer Spec/Test-Pfad (Restore beim Reload während aktivem Focus vs. bei kaltem Page-Load) festlegen.
-- **`EXCLUSIVE_CARDS`-Pattern**: reicht das aktuelle Pattern, um Focus und Normal-Editor wirklich gegenseitig exklusiv zu halten, wenn beide Cardroots existieren (Editor lebt heute teilweise im Root, nicht als Karte)? Eventuell muss die Exklusivitätslogik um „Editor-Modes" erweitert werden.
+- **`EXCLUSIVE_CARDS`-Pattern**: reicht das aktuelle Pattern, um Focus und Normal-Editor wirklich gegenseitig exklusiv zu halten, wenn beide Cardroots existieren? Eventuell muss die Exklusivitätslogik um „Editor-Modes" erweitert werden — wird in Phase 4 entschieden, wenn beide Cardroots gleichzeitig im DOM existieren.

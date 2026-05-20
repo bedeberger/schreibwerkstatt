@@ -25,7 +25,7 @@
           <span class="save-indicator__dot" aria-hidden="true"></span>
           <span class="save-indicator__text" x-text="saveIndicatorText()"></span>
         </span>
-        <span x-show="focusMode && editMode" class="focus-live-counter">
+        <span x-show="focusActive" class="focus-live-counter">
           <span x-text="t('editor.focus.counterTotal', { words: focusCountWords, chars: focusCountChars })"></span>
           <span class="focus-live-counter--today"
                 x-text="t('editor.focus.counterToday', { wordsDelta: focusCountWordsDelta, charsDelta: focusCountCharsDelta })"></span>
