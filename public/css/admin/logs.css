@@ -39,13 +39,16 @@
   .admin-logs-filter-actions {
     display: flex;
     gap: var(--space-2);
-    align-items: flex-end;
+    align-items: stretch;
   }
   .admin-logs-filter-actions button {
     font-size: var(--size-compact-font-size);
     padding: var(--size-compact-padding);
     line-height: 1.4;
     height: auto;
+    flex: 1 1 0;
+    min-width: 0;
+    white-space: nowrap;
   }
 
   .admin-logs-livetail {

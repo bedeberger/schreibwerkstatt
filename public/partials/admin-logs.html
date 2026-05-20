@@ -53,7 +53,7 @@
              :placeholder="$app.t('admin.logs.filter.searchPh')">
     </label>
     <div class="admin-logs-filter-actions">
-      <button type="button" @click="adminLogsApplyFilter()" :disabled="adminLogsLoading" x-text="$app.t('admin.logs.applyFilter')"></button>
+      <button type="button" class="primary" @click="adminLogsApplyFilter()" :disabled="adminLogsLoading" x-text="$app.t('admin.logs.applyFilter')"></button>
       <button type="button" @click="adminLogsClearAndLive()" :disabled="adminLogsLoading" x-show="adminLogsHasFilter()" x-text="$app.t('admin.logs.clearFilter')"></button>
     </div>
   </div>
