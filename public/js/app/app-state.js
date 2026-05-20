@@ -92,7 +92,12 @@ const navigationState = () => ({
   newChapterError: '',
 });
 
-const editorState = () => ({
+// Page-Slice: Inhalt der aktuell geöffneten Seite. Mode-agnostisch — Notebook,
+// Focus und View lesen alle aus diesem Slice. `originalHtml` ist die zuletzt
+// gespeicherte Server-Fassung (Quelle für Diff/Dirty-Check), `renderedPageHtml`
+// die sanitierte Read-Mode-HTML-Fassung. Page-Lifecycle (selectPage, loadPages)
+// schreibt hier.
+const pageState = () => ({
   currentPage: null,
   currentPageEmpty: false,
   currentPageIdeenOpenCount: 0,
@@ -101,8 +106,16 @@ const editorState = () => ({
   chapterFigures: [],
   showChapterFigures: false,
   originalHtml: null,
-  correctedHtml: null,
-  hasErrors: false,
+  newPageTitle: '',
+  newPageCreating: false,
+  newPageError: '',
+});
+
+// Notebook-Slice: Lifecycle des Normal-Editors (Edit-Mode, Autosave, Draft,
+// Zoom, Fullscreen, Konflikt). Pendant zu `focusState`. Diese Felder gehören
+// strikt dem Notebook-Editor — Focus pflegt `focusActive/focusDirty/focusSaving`
+// in `focusState`.
+const notebookState = () => ({
   editMode: false,
   editDirty: false,
   editSaving: false,
@@ -126,9 +139,6 @@ const editorState = () => ({
   _autosaveMaxTimer: null,
   _draftTimer: null,
   _onlineHandler: null,
-  newPageTitle: '',
-  newPageCreating: false,
-  newPageError: '',
 });
 
 // Fokus-State-Slice. Eigener Slice, damit alle vier Editor-Modi-Flags
@@ -233,9 +243,15 @@ const confirmDialogState = () => ({
   _confirmDialogResolve: null,
 });
 
-// Seiten-Lektorat (Finding-Liste, Apply-Flow, Token-Estimates)
+// Seiten-Lektorat (Finding-Liste, Apply-Flow, Token-Estimates). `correctedHtml`
+// ist die Lektorat-überlagerte HTML-Fassung (Overlay über `renderedPageHtml`,
+// nur wenn `checkDone`); `hasErrors` flaggt, ob das Overlay harte Korrekturen
+// enthält. Notebook/Focus berühren beides nicht (Invariante: editMode ⇒
+// !checkDone).
 const lektoratState = () => ({
   analysisOut: '',
+  correctedHtml: null,
+  hasErrors: false,
   lektoratFindings: [],
   selectedFindings: [],
   appliedOriginals: [],
@@ -460,7 +476,8 @@ export function initialLektoratState() {
     ...shellState(),
     ...aiProviderState(),
     ...navigationState(),
-    ...editorState(),
+    ...pageState(),
+    ...notebookState(),
     ...focusState(),
     ...editorPopupState(),
     ...cardsState(),

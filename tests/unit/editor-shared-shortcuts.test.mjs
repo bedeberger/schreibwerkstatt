@@ -96,3 +96,50 @@ test('bindInlineFormattingShortcuts: ohne allowedCommands → Default-Whitelist 
   assert.equal(typeof teardown, 'function');
   teardown();
 });
+
+test('bindInlineFormattingShortcuts: signal-Option hängt Listener an AbortController', () => {
+  const container = document.createElement('div');
+  const calls = [];
+  const orig = container.addEventListener.bind(container);
+  container.addEventListener = (type, fn, opts) => { calls.push({ type, opts }); orig(type, fn, opts); };
+  const ctrl = new AbortController();
+  bindInlineFormattingShortcuts(container, { allowedCommands: ALLOWED, signal: ctrl.signal });
+  const reg = calls.find(c => c.type === 'keydown');
+  assert.ok(reg, 'keydown muss registriert sein');
+  assert.equal(reg.opts?.signal, ctrl.signal, 'signal muss durchgereicht werden');
+});
+
+test('bindInlineFormattingShortcuts: onCommand-Callback fires bei Match', () => {
+  const container = document.createElement('div');
+  let registered = null;
+  const orig = container.addEventListener.bind(container);
+  container.addEventListener = (type, fn) => { if (type === 'keydown') registered = fn; orig(type, fn); };
+  const fired = [];
+  bindInlineFormattingShortcuts(container, {
+    allowedCommands: ALLOWED,
+    onCommand: (cmd) => fired.push(cmd),
+  });
+  // Echtes execCommand existiert in linkedom nicht — Patch akzeptiert das.
+  document.execCommand = () => true;
+  // Direkter Handler-Aufruf (linkedom kennt keinen KeyboardEvent-Constructor).
+  assert.ok(registered, 'keydown-Handler muss registriert sein');
+  registered({
+    key: 'b', metaKey: true, ctrlKey: false, altKey: false, shiftKey: false,
+    preventDefault() {}, stopPropagation() {},
+  });
+  assert.deepEqual(fired, ['bold'], 'onCommand muss mit dem matched Command laufen');
+});
+
+// ────────── Focus-Editor-Integration: Whitelist B/I/U enforced ──────────
+
+test('focus/card.js bindet Whitelist B/I/U via shared/shortcuts.js', async () => {
+  const { readFileSync } = await import('node:fs');
+  const path = await import('node:path');
+  const src = readFileSync(path.join(process.cwd(), 'public/js/editor/focus/card.js'), 'utf8');
+  assert.match(src, /import\s*\{[^}]*bindInlineFormattingShortcuts[^}]*\}\s*from\s*['"]\.\.\/shared\/shortcuts\.js['"]/,
+    'focus/card.js muss bindInlineFormattingShortcuts aus shared/ importieren');
+  assert.match(src, /bindInlineFormattingShortcuts\s*\(\s*container[\s\S]*?allowedCommands:\s*\[\s*['"]bold['"]\s*,\s*['"]italic['"]\s*,\s*['"]underline['"]\s*\]/,
+    'focus/card.js muss bindInlineFormattingShortcuts(container, { allowedCommands: ["bold","italic","underline"] }) rufen');
+  assert.match(src, /bindInlineFormattingShortcuts\([\s\S]*?signal[\s\S]*?\}\)/,
+    'Wiring muss signal an den AbortController hängen — sonst Listener-Leak bei Exit');
+});

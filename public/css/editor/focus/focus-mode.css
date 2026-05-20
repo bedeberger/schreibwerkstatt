@@ -83,6 +83,12 @@ body.palette-open { overflow: hidden; overscroll-behavior: contain; }
    darunterliegende #editor-card.focus-host-Header (Save-Indicator + Live-Counter)
    sichtbar bleibt. Source-Order in index.html (Partial steht nach editor-notebook)
    reicht für Stack-Order auf gleichem z-overlay — Overlay landet über der Card. */
+/* Visibility ausschliesslich über `.is-active` — kein Alpine `x-show`, weil dessen
+   `style.display:none` mit dem synchronen `_focusInstall` racet (Alpine flushed
+   erst NACH unserem $nextTick → contenteditable-offsetParent kurz null →
+   getActiveEditorContainer fiel auf den Normal-Container zurück → alle Focus-
+   Listener am falschen Element → typewriter/highlight/counter/cursor-hide tot). */
+.focus-editor:not(.is-active) { display: none; }
 .focus-editor.is-active {
   position: fixed;
   top: var(--focus-overlay-top, 58px);

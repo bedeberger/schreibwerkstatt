@@ -140,6 +140,111 @@ test('I6: toggleIdeenCard restauriert checkDone analog zu Chat', () => {
   assert.match(body, /this\._checkDoneBeforeChat\s*=\s*false/);
 });
 
+// ── I7: Slice-Disjoint (Post-Split-Drift-Schutz) ─────────────────────────────
+// `pageState`/`notebookState`/`focusState`/`lektoratState` müssen disjunkte
+// Key-Sets haben. Doppelte Felder = Spread-Reihenfolge entscheidet Default —
+// klassische Wirrness-Quelle. Statischer Parse: alle Slice-Funktionen aus
+// app-state.js extrahieren, Keys sammeln, Schnittmenge prüfen.
+test('I7: pageState/notebookState/focusState/lektoratState Slices haben disjunkte Keys', () => {
+  const src = read('public/js/app/app-state.js');
+  const sliceKeys = (sliceName) => {
+    const m = src.match(new RegExp(`const ${sliceName}\\s*=\\s*\\(\\)\\s*=>\\s*\\(\\{([\\s\\S]*?)\\}\\)`));
+    assert.ok(m, `Slice ${sliceName} nicht gefunden`);
+    const body = m[1];
+    const keys = new Set();
+    for (const line of body.split('\n')) {
+      // Nur Top-Level-Keys (kein Nesting in diesen Slices) — Komment-Zeilen
+      // und nested-Object-Lines greift der Regex nicht, weil er auf
+      // `^  <ident>:` (2-Space-Indent vor Doppelpunkt) trifft.
+      const km = line.match(/^\s{2,4}(_?[a-zA-Z][a-zA-Z0-9_]*)\s*:/);
+      if (km) keys.add(km[1]);
+    }
+    assert.ok(keys.size > 0, `Slice ${sliceName} liefert keine Keys (Regex-Drift?)`);
+    return keys;
+  };
+  const slices = {
+    pageState: sliceKeys('pageState'),
+    notebookState: sliceKeys('notebookState'),
+    focusState: sliceKeys('focusState'),
+    lektoratState: sliceKeys('lektoratState'),
+  };
+  const names = Object.keys(slices);
+  for (let i = 0; i < names.length; i++) {
+    for (let j = i + 1; j < names.length; j++) {
+      const a = slices[names[i]];
+      const b = slices[names[j]];
+      const overlap = [...a].filter(k => b.has(k));
+      assert.deepEqual(overlap, [],
+        `${names[i]} ∩ ${names[j]} darf leer sein, gefunden: ${overlap.join(', ')}`);
+    }
+  }
+});
+
+// ── I8: enterFocusFromPageview ruft startEdit VOR enterFocusMode ─────────────
+// Architektur: Focus läuft additiv über editMode (Invariante I1). Der Page-View-
+// Einstieg muss erst Notebook hochfahren (lock, autosave, contenteditable),
+// dann den Focus-Overlay obendrauf legen. Reihenfolge umdrehen = Focus mountet
+// vor Edit-Pipeline → enterFocusMode-Guard `!editMode → return` würde feuern.
+test('I8: enterFocusFromPageview ruft startEdit vor enterFocusMode', () => {
+  const src = read('public/js/editor/focus/card.js');
+  const m = src.match(/enterFocusFromPageview\s*\(\)\s*\{[\s\S]*?\n  \}/);
+  assert.ok(m, 'enterFocusFromPageview gefunden');
+  const body = m[0];
+  const pStart = body.search(/app\.startEdit/);
+  const pEnter = body.search(/enterFocusMode\s*\(\s*\)/);
+  assert.ok(pStart >= 0, 'startEdit-Call vorhanden');
+  assert.ok(pEnter >= 0, 'enterFocusMode-Call vorhanden');
+  assert.ok(pStart < pEnter,
+    'startEdit muss VOR enterFocusMode aufgerufen werden (Notebook-Mount → Focus-Overlay)');
+});
+
+// ── I9: exitFocusMode räumt editMode nur bei !editDirty ──────────────────────
+// Datenverlust-Schutz: User hat im Fokus getippt, Save schlug fehl (offline,
+// 409, Netzwerk). exitFocusMode darf editMode NICHT räumen, sonst landet der
+// User im View-Mode mit Draft im LocalStorage — Edit-Pipeline weg, kein Retry-
+// Trigger, kein sichtbarer Hinweis. Nur sauberer Exit (editDirty=false) räumt.
+test('I9: exitFocusMode setzt editMode=false nur bei !editDirty', () => {
+  const src = read('public/js/editor/focus/card.js');
+  const m = src.match(/async exitFocusMode\s*\(\)\s*\{[\s\S]*?\n  \},/);
+  assert.ok(m, 'exitFocusMode gefunden');
+  const body = m[0];
+  // Pattern: `if (app.editMode && !app.editDirty) { ... app.editMode = false ... }`
+  assert.match(body, /if\s*\(\s*app\.editMode\s*&&\s*!app\.editDirty\s*\)\s*\{[\s\S]*?app\.editMode\s*=\s*false/,
+    'exitFocusMode muss editMode=false in einen `!editDirty`-Guard kapseln');
+  // Negativ-Check: kein nackter `app.editMode = false` ausserhalb des Guards.
+  const matches = [...body.matchAll(/app\.editMode\s*=\s*false/g)];
+  assert.equal(matches.length, 1,
+    `nur EIN editMode=false-Setter erlaubt (gefunden: ${matches.length})`);
+});
+
+// ── I10: Save-Owner — Focus ruft nie contentRepo.savePage direkt ─────────────
+// Save-Pipeline lebt ausschliesslich in notebook/edit.js (`quickSave`/
+// `saveEdit`). Focus delegiert via `app.quickSave?.()` in `exitFocusMode`.
+// Direkter `contentRepo.savePage` aus Focus = Save-Duplikat = Drift zwischen
+// zwei Save-Pfaden (z.B. Konflikt-Check, Findings-Filter, Draft-Clear
+// auseinanderlaufend).
+test('I10: Focus-Submodule importieren/rufen nicht contentRepo.savePage', () => {
+  const focusFiles = [
+    'public/js/editor/focus/card.js',
+    'public/js/editor/focus/dom-blocks.js',
+    'public/js/editor/focus/sentence.js',
+    'public/js/editor/focus/typewriter.js',
+    'public/js/editor/focus/storage.js',
+    'public/js/editor/focus/trampoline.js',
+    'public/js/editor/focus/constants.js',
+    'public/js/cards/editor-focus-card.js',
+  ];
+  for (const f of focusFiles) {
+    const full = path.join(repo, f);
+    if (!fs.existsSync(full)) continue;
+    const src = fs.readFileSync(full, 'utf8');
+    assert.doesNotMatch(src, /contentRepo\s*\.\s*savePage/,
+      `${f}: kein direkter contentRepo.savePage-Call (Save-Owner = notebook/edit.js)`);
+    assert.doesNotMatch(src, /from\s+['"][^'"]*repo\/content['"]/,
+      `${f}: kein Import aus repo/content (Focus delegiert via app.quickSave)`);
+  }
+});
+
 // ── Bonus: Hotkey-Routing (CLAUDE.md Punkt 7) ────────────────────────────────
 test('Cmd+Shift+E Hotkey routet zustandsabhängig (focus → exit, edit → enter)', () => {
   // Der Hotkey-Handler lebt in editor/focus/trampoline.js oder card.js.

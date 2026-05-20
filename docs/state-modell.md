@@ -10,20 +10,21 @@ Verbindlicher Aufbau des Alpine-State. Vor jeder UI-Änderung die richtige Ebene
 
 ## Root-State-Slices ([public/js/app/app-state.js](../public/js/app/app-state.js))
 
-`initialLektoratState()` spreadet **25 Slice-Funktionen** in ein flaches Root-Objekt. Neues Feld → in den passenden Slice:
+`initialLektoratState()` spreadet **26 Slice-Funktionen** in ein flaches Root-Objekt. Neues Feld → in den passenden Slice:
 
 | Slice | Inhalt |
 |-------|--------|
 | `shellState` | currentUser, devMode, appReady, sessionExpired, serverOffline, isOffline, updateAvailable, themePref, focusGranularity, uiLocale, defaultRegion, appTimezone, isMac, promptConfig, `_abortCtrl`, `_usersByEmail`/Loading |
 | `aiProviderState` | claudeModel, claudeMaxTokens, apiProvider, ollamaModel, llamaModel |
 | `navigationState` | books, bookFilter\*, selectedBookId, bookRoles/currentBookRole/bookSharedFlags (ACL), pages, tree, Hash-Router-Internals (`_applyingHash`, `_hashInitialized`, `_inHashApply`, `_hashUpdatePending`, `_navDepth`), Order-Maps (`_chapterOrderMap`, `_pageOrderMap`, `_pageIdOrderMap`), pageSearch, newChapter-Felder |
-| `editorState` | currentPage, currentPageEmpty/IdeenOpenCount/ChatSessionCount, renderedPageHtml, chapterFigures, originalHtml/correctedHtml, hasErrors, editMode, editDirty, editSaving, saveOffline, editConflict, pendingDraft, lastAutosaveAt/lastDraftSavedAt, Auto-Save-Timer (`_autosaveIdleTimer`, `_autosaveMaxTimer`, `_draftTimer`, `_onlineHandler`), newPage-Felder |
-| `focusState` | focusActive, focusDirty, focusSaving, focusCountWords/Chars + Deltas (Live-Counter im Fokus-Header) |
+| `pageState` | Mode-agnostischer Seiten-Inhalt: currentPage, currentPageEmpty/IdeenOpenCount/ChatSessionCount, renderedPageHtml, originalHtml, chapterFigures/showChapterFigures, newPage-Felder. Notebook, Focus und View lesen alle hier |
+| `notebookState` | Notebook-Editor-Lifecycle: editMode, editDirty, editSaving, saveOffline, editConflict, pendingDraft, lastAutosaveAt/lastDraftSavedAt, Auto-Save-Timer (`_autosaveIdleTimer`, `_autosaveMaxTimer`, `_draftTimer`, `_onlineHandler`), pageEditorFullscreen/Zoom/FitWidth |
+| `focusState` | Focus-Editor-Lifecycle: focusActive, focusDirty, focusSaving, focusCountWords/Chars + Deltas (Live-Counter im Fokus-Header) |
 | `editorPopupState` | Spiegel-Flags `_figurLookupOpen`, `_synonymMenuOpen`, `_synonymPickerOpen` (für Escape-Routing in `editor-focus-onKey`) + `_figurLookupIndex` (Lookup-Cache) |
 | `cardsState` | **Alle `showXxxCard`-Flags** inkl. Admin-Karten (showAdminUsers/Settings/Usage/Categories/BooksCard), showSongsCard, showKontinuitaetCard, showSearchCard, showKomplettStatus, showAvatarMenu, adminUsageTab — exklusiv via `_closeOtherMainCards(keep)` |
 | `statusState` | status, statusSpinner, `_statusTimer` |
 | `confirmDialogState` | Native-`<dialog>`-Modal-Ersatz für `window.confirm`/prompt (verhindert macOS-Vollbild-Bug) inkl. Input-Mode + Resolver |
-| `lektoratState` | analysisOut, lektoratFindings, selectedFindings, appliedOriginals, appliedHistoricCorrections, checkDone/Loading/Progress/Status, saveApplying, batchLoading/Progress/Status, lastCheckId, pageHistory, activeHistoryEntryId, Token-Estimates (`tokEsts`, `_tokenEstGen`), pageLastChecked, ideenCounts/chapterIdeenCounts, ideenScope/ideenChapterId/currentChapterIdeenOpenCount, showTokLegend/tokTooltipData/showPageStatusTip, `_statsObserver*` |
+| `lektoratState` | analysisOut, correctedHtml, hasErrors, lektoratFindings, selectedFindings, appliedOriginals, appliedHistoricCorrections, checkDone/Loading/Progress/Status, saveApplying, batchLoading/Progress/Status, lastCheckId, pageHistory, activeHistoryEntryId, Token-Estimates (`tokEsts`, `_tokenEstGen`), pageLastChecked, ideenCounts/chapterIdeenCounts, ideenScope/ideenChapterId/currentChapterIdeenOpenCount, showTokLegend/tokTooltipData/showPageStatusTip, `_statsObserver*` |
 | `bookReviewState` | bookReviewHistory (von tree.js geschrieben, von user-settings beim Reset gelesen → Root) |
 | `kapitelReviewState` | kapitelReviewChapterId (Hash-Router-SSoT) |
 | `figurWerkstattState` | werkstattDraftId (Hash-Router-SSoT), werkstattDrafts (Spiegel für Command-Palette-Indexer) |
@@ -147,12 +148,12 @@ Vier orthogonale Modi am Editor — kein Single-Enum, sondern Boolean-Flags am R
 |-------|------|---------------|-------|------|
 | **Viewmodus** (Lesen) | _kein_ (= alle anderen `false`) | — | Default | — |
 | **Prüfmodus** | `checkDone: true` | `lektoratState` ([app-state.js:219](../public/js/app/app-state.js#L219)) | `runCheck()` ([editor/lektorat.js:201](../public/js/editor/lektorat.js#L201)) → Polling → Setzen bei Done ([editor/lektorat.js:334](../public/js/editor/lektorat.js#L334)) oder `loadHistoryEntry` ([history.js:66](../public/js/book/history.js#L66)) | `closeFindings()` ([editor/lektorat.js:187](../public/js/editor/lektorat.js#L187)) |
-| **Editmodus** | `editMode: true` | `editorState` ([app-state.js:89](../public/js/app/app-state.js#L89)) | `startEdit()` ([editor/edit.js:150](../public/js/editor/edit.js#L150)) | `cancelEdit()` ([editor/edit.js:224](../public/js/editor/edit.js#L224)) / `saveEdit()` ([editor/edit.js:253](../public/js/editor/edit.js#L253)) |
+| **Editmodus** | `editMode: true` | `notebookState` ([app-state.js](../public/js/app/app-state.js)) | `startEdit()` ([editor/notebook/edit.js](../public/js/editor/notebook/edit.js)) | `cancelEdit()` / `saveEdit()` ([editor/notebook/edit.js](../public/js/editor/notebook/edit.js)) |
 | **Fokusmodus** | `focusActive: true` | `focusState` ([app-state.js:129](../public/js/app/app-state.js#L129)) | `enterFocusMode()` / `startFocusEdit()` / Cmd+Shift+E | `exitFocusMode()` / Esc / Cmd+Shift+E |
 
 **Begleit-State pro Modus:**
 - Prüfmodus: `lektoratFindings`, `selectedFindings`, `correctedHtml`, `hasErrors`, `analysisOut`, `appliedOriginals`, `appliedHistoricCorrections`, `lastCheckId`, `activeHistoryEntryId`, `checkProgress`, `checkStatus`, `_checkPollTimer`.
-- Editmodus: `editDirty`, `editSaving`, `saveOffline`, `lastAutosaveAt`, `lastDraftSavedAt`, `_autosaveIdleTimer`, `_autosaveMaxTimer`, `_draftTimer`, `_onlineHandler`, `originalHtml`.
+- Editmodus: `editDirty`, `editSaving`, `saveOffline`, `lastAutosaveAt`, `lastDraftSavedAt`, `_autosaveIdleTimer`, `_autosaveMaxTimer`, `_draftTimer`, `_onlineHandler` (`notebookState`) + `originalHtml` (`pageState`, da Mode-agnostisch).
 - Fokusmodus: `focusCountWords/Chars/*Delta` (`focusState`) + `focusGranularity` (`shellState`) + Sub-Maschine `_focusState` (`idle`/`entering`/`active`/`exiting`) + `_focusGen` (Re-Entry-Guard) in [editorFocusCard](../public/js/cards/editor-focus-card.js).
 
 **Erlaubte Kombinationen** (8 Bool-Tripel, 4 erlaubt):

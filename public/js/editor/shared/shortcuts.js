@@ -31,22 +31,31 @@ export function matchInlineCommand(event, allowedCommands) {
 
 // Hängt einen Keydown-Listener an `container`, der bei passendem Shortcut
 // `document.execCommand(cmd, false, null)` ausführt und das Event
-// preventDefault'et. Liefert die Teardown-Funktion zurück.
+// preventDefault'et. Liefert die Teardown-Funktion zurück; optional über
+// `signal` an einen AbortController gehängt — beide Wege funktionieren parallel.
 //
 // `execCommand` ist deprecated, aber für `bold`/`italic`/`underline` weiterhin
 // in allen aktuellen Browsern unterstützt und der pragmatischste Weg, ohne
 // einen Rich-Text-Editor-Stack einzuziehen. Sollte eine spätere Phase mehr
 // Commands brauchen, lohnt sich der Umstieg auf ein Beziehungs-Modell mit
 // Selection-Range-Mutation.
-export function bindInlineFormattingShortcuts(container, { allowedCommands } = {}) {
+export function bindInlineFormattingShortcuts(container, { allowedCommands, signal, onCommand } = {}) {
   if (!container) return () => {};
   const allow = Array.isArray(allowedCommands) ? allowedCommands : ['bold', 'italic', 'underline'];
   const handler = (event) => {
     const cmd = matchInlineCommand(event, allow);
     if (!cmd) return;
     event.preventDefault();
+    // stopPropagation: verhindert, dass der Notebook-Toolbar-Handler (document-
+    // level Delegation, siehe editor-toolbar-card.js) denselben Cmd+B/I noch-
+    // mal als execCommand laufen lässt und die gerade gesetzte Formatierung
+    // wieder togglet.
+    event.stopPropagation();
     try { document.execCommand(cmd, false, null); } catch {}
+    if (typeof onCommand === 'function') {
+      try { onCommand(cmd); } catch {}
+    }
   };
-  container.addEventListener('keydown', handler);
+  container.addEventListener('keydown', handler, signal ? { signal } : undefined);
   return () => container.removeEventListener('keydown', handler);
 }

@@ -2,18 +2,21 @@
 
 Klassischer Bearbeitungsmodus für eine Seite: `contenteditable` mit Toolbar (Bubble + Slash), Inline-Findings, Draft-/Autosave-Pipeline, Stale-Write-Schutz und Snapshot-Wiederaufnahme. Schwester-Editor: [focus-editor.md](focus-editor.md). Beide teilen die Save-/HTML-Pipeline aus [public/js/editor/shared/](../public/js/editor/shared/) und schreiben über die [Content-Store-Facade](../lib/content-store/).
 
-Code: [public/js/editor/notebook/edit.js](../public/js/editor/notebook/edit.js) (Methods-Spread in Root, `editorEditMethods`), [public/js/editor/notebook/toolbar.js](../public/js/editor/notebook/toolbar.js) (Methods für `editorToolbarCard`), [public/js/editor/notebook/storage.js](../public/js/editor/notebook/storage.js) (Snapshot). Card-Wrapper: [public/js/cards/editor-toolbar-card.js](../public/js/cards/editor-toolbar-card.js). Partials: [public/partials/editor-notebook.html](../public/partials/editor-notebook.html), [public/partials/editor-body-edit.html](../public/partials/editor-body-edit.html), [public/partials/editor-toolbar.html](../public/partials/editor-toolbar.html). CSS: [public/css/editor/notebook/](../public/css/editor/notebook/).
+Code: [public/js/editor/notebook/edit.js](../public/js/editor/notebook/edit.js) (Methods-Spread in Root, `notebookMethods`), [public/js/editor/notebook/toolbar.js](../public/js/editor/notebook/toolbar.js) (Methods für `editorToolbarCard`), [public/js/editor/notebook/storage.js](../public/js/editor/notebook/storage.js) (Snapshot). Card-Wrapper: [public/js/cards/editor-toolbar-card.js](../public/js/cards/editor-toolbar-card.js). Partials: [public/partials/editor-notebook.html](../public/partials/editor-notebook.html), [public/partials/editor-body-edit.html](../public/partials/editor-body-edit.html), [public/partials/editor-toolbar.html](../public/partials/editor-toolbar.html). CSS: [public/css/editor/notebook/](../public/css/editor/notebook/).
 
 Trigger: Edit-Button im Karten-Header (`startEdit`). Snapshot-Restore mountet den Editor automatisch beim Reload, wenn `normal.snapshot` für die aktuell geladene Seite passt.
 
 ## Verortung im Frontend
 
-Heute **noch nicht** als eigenes `Alpine.data`-Sub registriert — `editorEditMethods` werden in den Root (`x-data="lektorat"`) gespreadet ([public/js/app.js#L762](../public/js/app.js#L762)). Toolbar (Bubble + Slash) hingegen ist Sub-Card `editorToolbarCard`. Künftige Entkopplung siehe [docs/ideen/editor-entkopplung.md](ideen/editor-entkopplung.md).
+Lifecycle-Sub `editorNotebookCard` ([public/js/cards/editor-notebook-card.js](../public/js/cards/editor-notebook-card.js)) deckt Reload-Snapshot-Restore + Trampoline-Listener ab. Edit-Pipeline (`startEdit`/`saveEdit`/`cancelEdit`/`quickSave`) lebt aktuell noch im Root als `notebookMethods`-Spread ([public/js/app.js](../public/js/app.js)). Toolbar (Bubble + Slash) ist Sub-Card `editorToolbarCard`.
 
 | Verantwortlichkeit | Wohnt aktuell in |
 |---|---|
-| `editMode`, `editDirty`, `editSaving`, `saveOffline`, `originalHtml`, `pendingDraft`, `editConflict` | Root (`editorState` in [app-state.js](../public/js/app/app-state.js)) |
-| `startEdit`/`saveEdit`/`cancelEdit`/`quickSave` + Autosave/Draft/Online-Retry | Root (`editorEditMethods`) |
+| `editMode`, `editDirty`, `editSaving`, `saveOffline`, `pendingDraft`, `editConflict`, Auto-Save-Timer | Root (`notebookState` in [app-state.js](../public/js/app/app-state.js)) |
+| `currentPage`, `originalHtml`, `renderedPageHtml` (mode-agnostisch — von Notebook/Focus/View geteilt) | Root (`pageState` in [app-state.js](../public/js/app/app-state.js)) |
+| `correctedHtml`, `hasErrors` (Lektorat-Overlay, nur im Prüfmodus aktiv — von page-view über `correctedHtml \|\| renderedPageHtml` konsumiert) | Root (`lektoratState` in [app-state.js](../public/js/app/app-state.js)) |
+| `startEdit`/`saveEdit`/`cancelEdit`/`quickSave` + Autosave/Draft/Online-Retry | Root (`notebookMethods` aus [editor/notebook/edit.js](../public/js/editor/notebook/edit.js)) |
+| Reload-Snapshot-Restore (Pendant zu `_tryRestoreFocus`) | Sub `editorNotebookCard` |
 | Bubble + Slash-Menü State (`bubbleShow`, `slashShow`, …) | Sub `editorToolbarCard` |
 | Container-Lookup (`page-content-view--editing`) | `shared/active-editor.js` (smart-switch mit Focus) |
 

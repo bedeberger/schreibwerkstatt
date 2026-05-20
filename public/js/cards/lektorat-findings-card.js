@@ -2,11 +2,12 @@
 // Panel (Prüf-Ergebnisse + Stilanalyse/Fazit).
 //
 // Bewusst wenig eigener State: lektoratFindings/selectedFindings/
-// appliedOriginals/analysisOut/correctedHtml/checkDone bleiben am Root, weil
-// sie mit editor-edit (Filter nach Save), history (History-Eintrag laden),
-// chat-card (Chat-Proposals-Overlay) und page-view (rendering) eng gekoppelt
-// sind. Die Sub bündelt nur UI-Methoden (`handleFindingPointer`,
-// `_isHardFinding`) und das Partial-Scope für DOM-Isolation.
+// appliedOriginals/analysisOut/correctedHtml/hasErrors/checkDone leben in
+// lektoratState am Root, weil sie mit editor-edit (Filter nach Save), history
+// (History-Eintrag laden), chat-card (Chat-Proposals-Overlay) und page-view
+// (rendering) eng gekoppelt sind. Die Sub bündelt nur UI-Methoden
+// (`handleFindingPointer`, `_isHardFinding`) und das Partial-Scope für
+// DOM-Isolation.
 
 import { isHardFinding } from '../book/page-view.js';
 

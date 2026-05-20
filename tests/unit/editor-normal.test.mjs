@@ -1,6 +1,6 @@
 // Normal-Editor („Notizbuch") — Source-Level-Smoke-Tests.
 //
-// Editor-Pipeline lebt noch im Root via `editorEditMethods`-Spread (siehe
+// Editor-Pipeline lebt noch im Root via `notebookMethods`-Spread (siehe
 // public/js/editor/notebook/edit.js). Diese Tests greppen statisch, dass
 // alle Normal-Hauptfeatures aus dem Plan-Inventar im Source vorhanden sind
 // und mit den geteilten Hilfen aus `editor/shared/` arbeiten. Sie ersetzen

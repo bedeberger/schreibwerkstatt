@@ -23,7 +23,7 @@ const DRAFT_DEBOUNCE_MS = 500;
 // Lib wird auch vom Focus-Editor konsumiert.
 
 
-export const editorEditMethods = {
+export const notebookMethods = {
   // Container-Lookup: einziger Eintrittspunkt für beide Modi.
   _getEditEl() {
     return getActiveEditorContainer();

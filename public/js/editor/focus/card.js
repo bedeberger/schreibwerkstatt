@@ -24,6 +24,7 @@ import {
   dynamicTypewriterThreshold, getCaretRect, typewriterScroll,
 } from './typewriter.js';
 import { writeFocusSnapshot, clearFocusSnapshot, installEditCounter } from './storage.js';
+import { bindInlineFormattingShortcuts } from '../shared/shortcuts.js';
 
 export const focusCardMethods = {
   // Page-View-Direkteinstieg: Edit-Mode hochfahren (falls nicht bereits aktiv)
@@ -64,6 +65,13 @@ export const focusCardMethods = {
     if (focusEl) {
       focusEl.classList.remove('focus-mode--paragraph', 'focus-mode--sentence', 'focus-mode--window-3', 'focus-mode--typewriter-only');
       focusEl.classList.add('focus-mode--' + (app.focusGranularity || 'paragraph'));
+      // `is-active` synchron setzen, damit `getActiveEditorContainer` im
+      // folgenden $nextTick den Focus-Container findet — Alpine's
+      // `:class="{'is-active': focusActive}"` flushed erst nach unserem
+      // $nextTick und liesse _focusInstall sonst auf den Normal-Container
+      // greifen (alle Listener am falschen Element → typewriter/highlight/
+      // counter/cursor-hide tot).
+      focusEl.classList.add('is-active');
     }
 
     this.$nextTick(() => {
@@ -101,7 +109,7 @@ export const focusCardMethods = {
         app.focusActive = false;
         document.body.classList.remove('focus-mode');
         document.getElementById('editor-card')?.classList.remove('focus-host');
-        document.querySelector('.focus-editor')?.classList.remove('focus-mode--paragraph', 'focus-mode--sentence', 'focus-mode--window-3', 'focus-mode--typewriter-only');
+        document.querySelector('.focus-editor')?.classList.remove('is-active', 'focus-mode--paragraph', 'focus-mode--sentence', 'focus-mode--window-3', 'focus-mode--typewriter-only');
         this._focusState = 'idle';
       }
     });
@@ -324,6 +332,14 @@ export const focusCardMethods = {
     container.addEventListener('blur', onBlur, { signal, capture: true });
     container.addEventListener('focus', onFocus, { signal, capture: true });
     window.addEventListener('keydown', onKey, { signal });
+    // Inline-Format-Whitelist im Focus: ausschliesslich Bold/Italic/Underline
+    // per Cmd/Ctrl+B/I/U. Hängt am contenteditable (Container), nicht am
+    // Window — sonst feuern Shortcuts auch ausserhalb des Focus-Editors.
+    bindInlineFormattingShortcuts(container, {
+      allowedCommands: ['bold', 'italic', 'underline'],
+      signal,
+      onCommand: () => { app?._markEditDirty?.(); },
+    });
     window.addEventListener('pointermove', onPointerMove, { signal, passive: true });
     window.addEventListener('resize', syncViewport, { signal });
     window.visualViewport?.addEventListener('resize', syncViewport, { signal });
@@ -403,7 +419,7 @@ export const focusCardMethods = {
     document.getElementById('editor-card')?.classList.remove('focus-host');
     const focusElExit = document.querySelector('.focus-editor');
     if (focusElExit) {
-      focusElExit.classList.remove('focus-mode--paragraph', 'focus-mode--sentence', 'focus-mode--window-3', 'focus-mode--typewriter-only');
+      focusElExit.classList.remove('is-active', 'focus-mode--paragraph', 'focus-mode--sentence', 'focus-mode--window-3', 'focus-mode--typewriter-only');
       focusElExit.classList.remove('focus-cursor-hidden');
     }
     document.documentElement.style.removeProperty('--focus-vh');
