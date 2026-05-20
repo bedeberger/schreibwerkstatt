@@ -287,7 +287,8 @@ export function registerPdfExportCard() {
       if (!f) return '';
       this.loadFontPreview(f.family, f.weight || 400);
       const color = f.color && /^#[0-9a-fA-F]{6}$/.test(f.color) ? f.color : '';
-      return `font-family: '${f.family}', serif; font-weight: ${f.weight || 400};${color ? ` color: ${color};` : ''}`;
+      const italic = f.italic ? ' font-style: italic;' : '';
+      return `font-family: '${f.family}', serif; font-weight: ${f.weight || 400};${color ? ` color: ${color};` : ''}${italic}`;
     },
 
     onFontPick(role, family) {

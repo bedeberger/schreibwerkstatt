@@ -436,10 +436,9 @@
   .book-editor-find-close:hover { color: var(--color-text); }
 }
 
-/* Container-Query: schmale Karten-Slots → Stream nutzt ganze Breite, Outline
-   stapelt sich über den Stream als kollabierter Block. Editor lebt in
-   variablem Karten-Slot, darum Container- nicht Media-Query. */
-@container card (max-width: 800px) {
+/* Mobile: Outline stapelt sich über den Stream, Stream nutzt ganze Breite.
+   Viewport-bezogen — Bucheditor ist Hauptkarte, kein variabler Slot. */
+@media (max-width: 800px) {
   .book-editor-layout { grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
   .book-editor-outline {
     position: static;

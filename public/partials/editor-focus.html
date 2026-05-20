@@ -13,6 +13,31 @@
      Mode-Sonderbehandlung funktionieren. -->
 <div x-data="editorFocusCard" class="display-contents">
   <div class="focus-editor" :class="{ 'is-active': focusActive }">
+    <!-- Mobile-only Action-Bar: Card-Header sitzt unter dem Overlay und ist auf
+         Touch nicht erreichbar (kein Hover → bleibt opacity-disabled, +
+         46px Top-Gap fasst die zwei stacked Header-Reihen nicht). -->
+    <div class="focus-editor__actions" aria-hidden="false">
+      <span class="save-indicator focus-editor__save-indicator"
+            x-show="$app.editMode || $app.lastSavedKind() !== 'none'"
+            :class="'save-indicator--' + $app.lastSavedKind()"
+            :data-tip="$app.saveIndicatorTip()">
+        <span class="save-indicator__dot" aria-hidden="true"></span>
+        <span class="save-indicator__text" x-text="$app.saveIndicatorText()"></span>
+      </span>
+      <button type="button" class="focus-editor__action focus-editor__action--save"
+              @click="$app.saveEdit()"
+              :disabled="$app.editSaving"
+              :aria-label="$app.t('common.save')"
+              :data-tip="$app.t('editor.btn.saveEditTitle')">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#check"/></svg>
+      </button>
+      <button type="button" class="focus-editor__action focus-editor__action--exit"
+              @click="exitFocusMode()"
+              :aria-label="$app.t('editor.btn.leaveFocus')"
+              :data-tip="$app.t('editor.btn.leaveFocusTitle')">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#x"/></svg>
+      </button>
+    </div>
     <div class="focus-editor__content"
          contenteditable="true"
          spellcheck="true"

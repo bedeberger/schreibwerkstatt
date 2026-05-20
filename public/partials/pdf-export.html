@@ -221,6 +221,19 @@
                   <input type="text" x-data="numInput({ step: 1, min: 1, max: 9999 })" x-modelable="value" x-model="activeProfile.config.layout.pageNumberStart" class="pdfx-num-input">
                 </div>
               </div>
+              <div class="card-form-row">
+                <label class="card-form-label">&nbsp;</label>
+                <div class="card-form-field">
+                  <label class="pdfx-check">
+                    <input type="checkbox" x-model="activeProfile.config.layout.headerRule">
+                    <span x-text="$app.t('pdfExport.layout.headerRule')"></span>
+                  </label>
+                  <label class="pdfx-check">
+                    <input type="checkbox" x-model="activeProfile.config.layout.footerRule">
+                    <span x-text="$app.t('pdfExport.layout.footerRule')"></span>
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -228,7 +241,7 @@
 
       <!-- Schrift-Tab -->
       <div class="pdfx-tab-panel" x-show="isTab('font')">
-        <template x-for="role in ['body','heading','title','subtitle','byline']" :key="role">
+        <template x-for="role in ['body','heading','title','subtitle','byline','dedication','year','imprint']" :key="role">
           <div class="pdfx-font-role">
             <h4 class="pdfx-font-role-title" x-text="$app.t('pdfExport.font.' + role)"></h4>
 
@@ -305,6 +318,18 @@
                 <span class="pdfx-color-text" x-text="activeProfile.config.font[role].color"></span>
               </div>
             </div>
+
+            <template x-if="['dedication','imprint','year'].includes(role)">
+              <div class="card-form-row">
+                <label class="card-form-label">&nbsp;</label>
+                <div class="card-form-field">
+                  <label class="pdfx-check">
+                    <input type="checkbox" x-model="activeProfile.config.font[role].italic">
+                    <span x-text="$app.t('pdfExport.font.italic')"></span>
+                  </label>
+                </div>
+              </div>
+            </template>
 
             <div class="pdfx-font-preview" :style="fontPreviewStyle(role)">
               <span x-text="$app.t('pdfExport.font.previewText')"></span>
