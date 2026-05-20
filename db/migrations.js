@@ -5947,6 +5947,48 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 138 abgeschlossen (page_checks.stilkorrektur_log entfernt — Feature nie aktiv).');
   }
 
+  if (version < 139) {
+    // page_revisions.source-CHECK erweitern um 'book' (Bucheditor-Saves).
+    // JS-VALID_SOURCES kennt 'book' seit Bucheditor-Einfuehrung, CHECK nicht →
+    // Inserts liefen still in CHECK-Verletzung und wurden im content-store
+    // weggeloggt; Bucheditor-Edits erzeugten 0 Revisionen.
+    db.pragma('foreign_keys = OFF');
+    db.prepare('DROP TABLE IF EXISTS page_revisions_new').run();
+    db.prepare(`
+      CREATE TABLE page_revisions_new (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        page_id       INTEGER NOT NULL REFERENCES pages(page_id) ON DELETE CASCADE,
+        book_id       INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        body_html     TEXT NOT NULL,
+        body_markdown TEXT,
+        chars         INTEGER,
+        words         INTEGER,
+        tok           INTEGER,
+        source        TEXT NOT NULL CHECK(source IN
+                        ('focus','main','book','chat-apply','lektorat-apply','import','conflict')),
+        user_email    TEXT REFERENCES app_users(email) ON DELETE SET NULL,
+        summary       TEXT,
+        created_at    TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      )
+    `).run();
+    db.prepare(`
+      INSERT INTO page_revisions_new (id, page_id, book_id, body_html, body_markdown, chars, words, tok, source, user_email, summary, created_at)
+      SELECT id, page_id, book_id, body_html, body_markdown, chars, words, tok, source, user_email, summary, created_at
+        FROM page_revisions
+    `).run();
+    db.prepare('DROP TABLE page_revisions').run();
+    db.prepare('ALTER TABLE page_revisions_new RENAME TO page_revisions').run();
+    db.prepare('CREATE INDEX idx_page_revisions_page ON page_revisions(page_id, created_at DESC)').run();
+    db.prepare('CREATE INDEX idx_page_revisions_book ON page_revisions(book_id, created_at DESC)').run();
+    db.pragma('foreign_keys = ON');
+    const fkErrors139 = db.pragma('foreign_key_check');
+    if (fkErrors139.length) {
+      throw new Error(`Migration 139: foreign_key_check meldet ${fkErrors139.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 139').run();
+    logger.info("DB-Migration auf Version 139 abgeschlossen (page_revisions.source-CHECK um 'book' erweitert).");
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

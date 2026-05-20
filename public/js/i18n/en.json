@@ -1189,6 +1189,7 @@
   "editor.revisions.restoreConfirm":    "Set the version from {when} as current? A new revision will be created.",
   "editor.revisions.source.focus":          "Focus",
   "editor.revisions.source.main":           "Editor",
+  "editor.revisions.source.book":           "Book editor",
   "editor.revisions.source.chat-apply":     "Chat",
   "editor.revisions.source.lektorat-apply": "Editorial",
   "editor.revisions.source.import":         "Import",

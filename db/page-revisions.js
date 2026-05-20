@@ -12,7 +12,7 @@ const { htmlToPlainText } = require('../lib/html-text');
 
 const VALID_SOURCES = new Set([
   'focus', 'main', 'book', 'chat-apply', 'lektorat-apply',
-  'bookstack-sync', 'import', 'conflict',
+  'import', 'conflict',
 ]);
 
 function _statsFromHtml(html) {
