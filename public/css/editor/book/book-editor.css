@@ -189,8 +189,8 @@
     padding: var(--space-lg) clamp(18px, 4vw, 40px);
     max-width: 72ch;
     margin-inline: auto;
-    background: var(--color-page-view-bg);
-    color: var(--color-page-view-text);
+    background: var(--color-book-editor-bg);
+    color: var(--color-book-editor-text);
     border-radius: var(--radius-md);
   }
 
@@ -203,7 +203,7 @@
     top: 0;
     z-index: var(--z-sticky);
     padding: var(--space-md) 0 var(--space-sm);
-    background: var(--color-page-view-bg);
+    background: var(--color-book-editor-bg);
     margin-block: var(--space-lg) 0;
   }
   .book-editor-chapter-header:first-child { margin-block-start: 0; }

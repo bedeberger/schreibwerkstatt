@@ -98,6 +98,10 @@
   --color-notebook-rule: rgba(120, 95, 60, 0.16);
   --color-tooltip-bg: #ffffff;
 
+  /* Bucheditor — eigene Paper/Ink-Palette, entkoppelt von Notebook */
+  --color-book-editor-bg: #fbf8f3;
+  --color-book-editor-text: #2a2620;
+
   /* Dev-Banner + Session-Banner */
   --color-dev-banner-bg: #f59e0b;
   --color-dev-banner-text: #1a1a1a;
@@ -259,6 +263,9 @@
   --color-page-view-text: #d8d3c8;
   --color-notebook-rule: rgba(216, 211, 200, 0.09);
   --color-tooltip-bg: #2d2a25;
+
+  --color-book-editor-bg: #1f1d1a;
+  --color-book-editor-text: #d8d3c8;
 
   --color-session-banner-btn-hover: #c44040;
 
