@@ -1,4 +1,28 @@
-<!-- Fokus-Modus-Host: keine sichtbare UI, reiner x-data-Anker für
-     Alpine.data('editorFocusCard'). Hört auf editor:focus:*-Events vom Root
-     und verwaltet die State-Machine + DOM-Listener. -->
-<div x-data="editorFocusCard" class="display-contents"></div>
+<!-- Focus-Mode-Cardroot (Top-Level): eigener contenteditable-Container,
+     lebt als position:fixed-Overlay parallel zu #editor-card (siehe focus-mode.css).
+     focusActive=true blendet ihn ein und sortiert ihn über die Card; der Card-
+     Header bleibt im oberen Gap (--focus-overlay-top) sichtbar, damit Save-
+     Indicator + Focus-Live-Counter weiter erreichbar sind.
+
+     Smart-Switch in shared/active-editor.js findet diesen Container über
+     `.focus-editor.is-active` — solange .is-active fehlt, bleibt der Switch
+     No-Op und Sub-Komponenten bedienen den Normal-Container.
+
+     Event-Handler @input/@paste/@contextmenu/@click identisch zum
+     Normal-Container, damit Save-/Dirty-/Paste-/Synonyme-Pfade ohne
+     Mode-Sonderbehandlung funktionieren. -->
+<div x-data="editorFocusCard" class="display-contents">
+  <div x-show="focusActive" class="focus-editor" :class="{ 'is-active': focusActive }">
+    <div class="page-content-view page-content-view--editing focus-editor__content"
+         contenteditable="true"
+         spellcheck="true"
+         autocorrect="off"
+         autocapitalize="off"
+         @input="_markEditDirty()"
+         @paste="_onEditPaste($event)"
+         @contextmenu="_onEditContextMenu($event)"
+         @click="_onEditClick($event)"
+         @pointermove="handleMarkPointer($event)"
+         @pointerleave="handleMarkPointerLeave($event)"></div>
+  </div>
+</div>

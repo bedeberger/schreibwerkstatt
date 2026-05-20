@@ -411,7 +411,7 @@ export const focusCardMethods = {
     document.documentElement.style.removeProperty('--focus-vh');
     document.documentElement.style.removeProperty('--focus-vh-top');
 
-    document.querySelectorAll('#editor-card .focus-paragraph-active, #editor-card .focus-paragraph-near')
+    document.querySelectorAll('.focus-paragraph-active, .focus-paragraph-near')
       .forEach(el => {
         el.classList.remove('focus-paragraph-active');
         el.classList.remove('focus-paragraph-near');

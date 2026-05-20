@@ -76,20 +76,24 @@ body.palette-open { overflow: hidden; overscroll-behavior: contain; }
    ausgeblendet, der Wrap aus der Box-Kette gelöst. */
 #editor-card.focus-host #partial-editor-body-edit,
 #editor-card.focus-host #partial-editor-body-view,
-#editor-card.focus-host #partial-editor-body-focus,
 #editor-card.focus-host .page-editor-wrap { display: contents; }
 #editor-card.focus-host .page-editor-toolbar { display: none; }
 
-/* Focus-Cardroot selbst ist flex-column-Container, damit das innere
-   contenteditable (`.focus-editor__content` = `.page-content-view--editing`)
-   eine begrenzte Höhe + overflow-y:auto bekommt. `display:contents` würde
-   das Cardroot aus dem Layout-Baum entfernen — funktioniert nicht
-   zuverlässig in Safari/Webkit-Flex-Ketten und nimmt Scroll-Container die
-   Höhe weg. Daher echter Flex-Container. */
+/* Focus-Cardroot lebt als Top-Level-Overlay (editor-focus.html-Partial, ausserhalb
+   #editor-card). position:fixed mit Top-Gap (--focus-overlay-top), damit der
+   darunterliegende #editor-card.focus-host-Header (Save-Indicator + Live-Counter)
+   sichtbar bleibt. Source-Order in index.html (Partial steht nach editor-notebook)
+   reicht für Stack-Order auf gleichem z-overlay — Overlay landet über der Card. */
 .focus-editor.is-active {
+  position: fixed;
+  top: var(--focus-overlay-top, 58px);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--z-overlay);
+  background: var(--color-bg);
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
   min-height: 0;
   width: 100%;
 }
@@ -144,6 +148,9 @@ body.palette-open { overflow: hidden; overscroll-behavior: contain; }
   #editor-card.focus-host .card-header {
     padding: var(--space-sm) 12px;
     opacity: var(--opacity-disabled);
+  }
+  .focus-editor.is-active {
+    top: var(--focus-overlay-top-mobile, 46px);
   }
 }
 .focus-editor .page-content-view--editing::-webkit-scrollbar {
