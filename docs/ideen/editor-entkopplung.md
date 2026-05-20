@@ -20,7 +20,7 @@ Ziel: beide als **gleichrangige** Editier-Modi der Seite — eigene Karten, eige
 ## Scope MVP
 
 - Eigener Alpine-State-Slice für den Focus-Modus (`focusState`), losgelöst von `editorState`. Kein gemeinsames `editMode`-Flag mehr.
-- Focus startet aus dem Page-View ohne Detour über den Normal-Editor. Aus dem Normal-Editor heraus startet er per Hotkey, ohne den Normal-Save-Pfad mitzunehmen.
+- Focus startet aus dem Page-View ohne Detour über den Normal-Editor. **Entry-Pfade aus Page-View: ausschliesslich Hotkey `Cmd/Ctrl+Shift+E` + Focus-Button im Page-View-Header**. Kein Palette-Eintrag, keine Quick-Pill, kein Sidebar-Trigger. Aus dem Normal-Editor heraus startet Focus per Hotkey, schliesst den Normal-Editor sauber.
 - Eigener contenteditable-Container im Focus (gemountet in der Focus-Karte selbst, nicht der Normal-Editor-Container). Snapshot beim Eintritt, Save zurück über die Page-Save-API beim Austritt oder per Quick-Save.
 - **Focus-Feature-Set (fix)**: Typewriter-Scroll inkl. Granularitäten (Highlight-Feature aus User-Settings: `paragraph` / `sentence` / `window-3` / `typewriter-only`), Counter (Words/Chars + Tagesdelta), Synonyme, Figuren-Lookup, Save/Quick-Save mit Offline-Fähigkeit, Snapshot-Restore nach Reload, Inline-Formatierung **ausschliesslich Bold/Italic/Unterstrichen** per Shortcut (`Cmd/Ctrl+B/I/U`). Kein Toolbar-UI, kein Bubble-Menü, keine Lektorat-Findings, keine Page-History, keine Find/Replace im Focus.
 - **Highlight-Granularität bleibt Focus-only**: in [public/partials/user-settings.html](../../public/partials/user-settings.html#L108-L114) wird `userSettingsFocusGranularity` weiter über die Combobox gesetzt; gespeichert in [public/js/user-settings.js](../../public/js/user-settings.js) als `focus_granularity` und live in `window.__app.focusGranularity` gespiegelt. Nach Entkopplung: Setting wirkt ausschliesslich auf Focus-Karte (Live-`$watch`), keinerlei Effekt auf Normal-Editor.
@@ -120,7 +120,8 @@ Karten:
 
 ### Partials
 
-- [public/partials/editor.html](../../public/partials/editor.html) (bestehend) — bleibt Normal-Editor-Partial; alle Focus-Conditionals entfernt. Bindet weiterhin Synonyme- und Figuren-Lookup-Karten ein.
+- [public/partials/editor.html](../../public/partials/editor.html) (bestehend) — bleibt Normal-Editor-Partial; alle Focus-Conditionals entfernt. Bindet weiterhin Synonyme- und Figuren-Lookup-Karten ein. **Focus-Button** (heute in editor.html Z.132) wandert raus.
+- [public/partials/editor-body-view.html](../../public/partials/editor-body-view.html) (Update) — Page-View-Anzeige bekommt im Header zwei Buttons: Edit-Button (öffnet Normal-Editor) und **Focus-Button** (öffnet Focus direkt). Hotkey `Cmd/Ctrl+Shift+E` bleibt global im Body und routet via `handleFocusHotkey` zum selben Entry-Pfad wie der Button.
 - [public/partials/editor-focus.html](../../public/partials/editor-focus.html) (neu) — eigener Partial mit eigenem `<div contenteditable>`, Counter-Anzeige, Granularity-Combobox, **Synonyme- und Figuren-Lookup-Karten** (eingebunden, aber ohne Toolbar/Findings/Find). Mountet bei `focusActive`. Lädt **keine** Toolbar, **keine** Findings, **keine** Find/Replace, **keine** Page-History.
 
 ### Lifecycle / Events
@@ -287,6 +288,7 @@ Quality-Gate vor Merge: alle Unit-/Integration-/E2E-Tests grün; Coverage-Kontro
 | [public/js/cards/feature-registry.js](../../public/js/cards/feature-registry.js) | `EXCLUSIVE_CARDS`-Eintrag für Focus prüfen/ergänzen |
 | [public/css/editor/focus-mode.css](../../public/css/editor/focus-mode.css) | `body.focus-mode` → `.focus-editor`-Cardroot; alle `:not(body.focus-mode)`-Negierungen in den Normal-Editor-CSS-Files entfernen |
 | [public/index.html](../../public/index.html) | neuer Partial-Placeholder für `editor-focus.html`; Hotkey-Body-Listener-Routing aktualisieren |
+| [public/partials/editor-body-view.html](../../public/partials/editor-body-view.html) | Header bekommt Focus-Button neben Edit-Button (gemeinsamer Entry aus Page-View) |
 | [public/sw.js](../../public/sw.js) | `SHELL_CACHE` bump |
 | [public/js/i18n/de.json](../../public/js/i18n/de.json) | neue Keys |
 | [public/js/i18n/en.json](../../public/js/i18n/en.json) | neue Keys |

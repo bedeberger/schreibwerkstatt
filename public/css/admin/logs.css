@@ -47,6 +47,7 @@
     align-items: center;
     gap: var(--space-1);
     border-radius: var(--radius-sm);
+    flex-shrink: 0;
   }
   .admin-logs-livetail--on {
     border-color: var(--color-success);
@@ -151,22 +152,38 @@
     border-radius: var(--radius-sm);
   }
 
-  /* Container-Query: schmaler als ~720px → Log-Row in 2 Zeilen.
-     Mobile-Slot der Admin-Karte ist meist 100vw. */
+  /* Container-Query: Karte hat container-type:inline-size → reagiert auf
+     Slot-Breite, nicht Viewport (admin-home-Slot ist meist =viewport). */
   @container (max-width: 720px) {
     .log-row {
-      grid-template-columns: auto auto auto auto 1fr auto;
+      grid-template-columns: max-content max-content minmax(0, 1fr) auto;
       grid-template-areas:
-        "ts level scope user book toggle"
-        "msg msg msg msg msg msg";
+        "ts level scope toggle"
+        "user user user user"
+        "book book book book"
+        "msg msg msg msg";
+      column-gap: var(--space-2);
     }
     .log-row-ts    { grid-area: ts; }
     .log-badge     { grid-area: level; }
     .log-row-scope { grid-area: scope; }
-    .log-row-user  { grid-area: user; max-width: 140px; }
+    .log-row-user  { grid-area: user; }
     .log-row-book  { grid-area: book; }
-    .log-row-toggle{ grid-area: toggle; }
+    .log-row-toggle{ grid-area: toggle; align-self: start; }
     .log-row-msg   { grid-area: msg; }
+    /* User/Book als Mini-Label statt rohe Werte (sonst kein Kontext). */
+    .log-row-user::before  { content: 'user: '; color: var(--color-faint); }
+    .log-row-book::before  { content: 'book: '; color: var(--color-faint); }
     .admin-logs-filter-label--wide { grid-column: span 1; }
+  }
+
+  @container (max-width: 480px) {
+    .admin-logs-filter { grid-template-columns: 1fr; }
+    .admin-logs-filter-actions { flex-wrap: wrap; }
+    .admin-logs-footer { flex-direction: column; align-items: stretch; }
+    .admin-logs-downloads { flex-direction: column; align-items: stretch; }
+    .admin-logs-download-btn { justify-content: flex-start; }
+    .log-row { padding: var(--space-1) var(--space-2); }
+    .log-row-ts { font-size: var(--font-xs); }
   }
 }
