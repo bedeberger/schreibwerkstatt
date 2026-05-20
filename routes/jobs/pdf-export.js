@@ -52,7 +52,10 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, userEmail, u
     updateJob(jobId, { progress: 10, statusText: 'job.phase.loadBook' });
     const bundle = await loadContents({ scope, id: entityId }, userToken);
     const { book, chapter, page, groups } = bundle;
-    log.info(`Start PDF-Export «${book.name}» (scope=${scope}, entity=${entityId}, profile=${profile.name})`);
+    const scopeDetail = scope === 'chapter' && chapter?.id ? `, chapter=${chapter.id}`
+                      : scope === 'page'    && page?.id    ? `, page=${page.id}`
+                      : '';
+    log.info(`Start PDF-Export «${book.name}» (scope=${scope}${scopeDetail}, profile=${profile.name})`);
 
     updateJob(jobId, { progress: 30, statusText: 'job.phase.loadPages' });
 
@@ -98,7 +101,7 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, userEmail, u
     _scheduleResultCleanup(jobId);
 
     const sizeKb = Math.round(buffer.length / 1024);
-    log.info(`PDF generiert «${filename}» (${sizeKb} KB, scope=${scope}, profile=${profile.name}, pdfa=${validation.available ? (validation.passed ? 'pass' : 'fail') : 'skipped'})`);
+    log.info(`PDF generiert «${filename}» (${sizeKb} KB, scope=${scope}${scopeDetail}, profile=${profile.name}, pdfa=${validation.available ? (validation.passed ? 'pass' : 'fail') : 'skipped'})`);
 
     completeJob(jobId, {
       ready: true,

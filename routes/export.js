@@ -61,6 +61,12 @@ router.get('/:scope/:id/:fmt', async (req, res) => {
   const slug = resolveSlug(bundle);
   const filename = buildExportFilename({ prefix: scope, slug, ext: fmt, date: new Date() });
 
+  const scopeDetail = scope === 'chapter' && bundle.chapter?.id ? `, chapter=${bundle.chapter.id}`
+                    : scope === 'page'    && bundle.page?.id    ? `, page=${bundle.page.id}`
+                    : '';
+  const sizeKb = Math.round(buf.length / 1024);
+  logger.info(`Export «${filename}» (${sizeKb} KB, scope=${scope}${scopeDetail}, fmt=${fmt})`);
+
   res.setHeader('Content-Type', spec.mime);
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
   if (spec.bom) {

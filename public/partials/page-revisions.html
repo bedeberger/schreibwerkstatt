@@ -25,7 +25,7 @@
         <span class="history-date" x-text="$app.formatDate(rev.created_at)"></span>
         <span class="badge badge-ok" x-text="sourceLabel(rev.source)"></span>
         <span class="user-chip"
-              x-show="rev.user_email"
+              x-show="rev.user_email && $app.bookSharedFlags?.[$app.selectedBookId]"
               :class="{ 'user-chip--self': isOwnRevision(rev) }"
               :data-tip="rev.user_email">
           <span class="user-chip__avatar"
@@ -65,7 +65,7 @@
             <span class="history-date" x-text="$app.formatDate(viewerRev.created_at)"></span>
             <span class="badge badge-ok" x-text="sourceLabel(viewerRev.source)"></span>
             <span class="user-chip"
-                  x-show="viewerRev.user_email"
+                  x-show="viewerRev.user_email && $app.bookSharedFlags?.[$app.selectedBookId]"
                   :class="{ 'user-chip--self': isOwnRevision(viewerRev) }"
                   :data-tip="viewerRev.user_email">
               <span class="user-chip__avatar"
