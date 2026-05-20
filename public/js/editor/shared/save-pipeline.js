@@ -1,0 +1,39 @@
+// Save-Payload-Aufbau. Reine Funktionen ohne DOM-Zugriff und ohne Side-Effects,
+// damit beide Editoren (Normal + Focus) bit-identisch denselben PUT-Body
+// erzeugen und das Verhalten isoliert testbar bleibt.
+//
+// Trennung von der Save-API-Schicht (shared/page-api.js) ist Absicht: hier
+// wird beschrieben, *was* gesendet wird, dort *wie* es übertragen wird
+// (Offline-Queue, Retry, Conflict-Handling).
+
+import { normalizeForCompare } from './html-clean.js';
+
+// Vergleicht zwei HTML-Strings nach Anwendung der Vergleichs-Normalform.
+// Liefert true, wenn die normalisierten Fassungen byte-identisch sind —
+// also keine semantische Änderung vorliegt. Bricht früh bei identischer
+// roher Form (häufiger Pfad: User öffnet Edit, klickt Save sofort).
+export function isNoChange(currentHtml, originalHtml) {
+  if (currentHtml === originalHtml) return true;
+  return currentHtml === normalizeForCompare(originalHtml || '');
+}
+
+// Liefert den PUT-Body für /content/pages/:id. Inputs sind reine Strings/
+// Werte; kein `this`, kein DOM. `source` muss vom Aufrufer entschieden
+// werden ('main' für Normal-Editor, 'focus' für Focus-Editor) — die Lib
+// wählt das nicht selbst, weil sie modus-agnostisch ist.
+//
+// Wirft, wenn html oder pageName fehlen — Aufrufer dürfen sich auf die
+// Pflichtfelder verlassen.
+export function buildSavePayload({ html, pageName, source, expectedUpdatedAt }) {
+  if (typeof html !== 'string') throw new Error('buildSavePayload: html required');
+  if (!pageName) throw new Error('buildSavePayload: pageName required');
+  if (source !== 'main' && source !== 'focus') {
+    throw new Error(`buildSavePayload: invalid source ${JSON.stringify(source)}`);
+  }
+  return {
+    html,
+    name: pageName,
+    source,
+    expected_updated_at: expectedUpdatedAt || null,
+  };
+}
