@@ -30,12 +30,13 @@
          Schichten kann der Harness Höhen-Propagations-Bugs nicht sehen. -->
     <div class="editor-body-wrap">
       <div class="editor-preview-wrap">
-        <div id="partial-editor-body-edit">
-          <div class="page-editor-wrap">
-            <div class="page-editor-toolbar">
-              <button type="button" class="graph-tool-btn">Z+</button>
-            </div>
-            <div class="page-content-view page-content-view--editing" contenteditable="true"></div>
+        <!-- Phase-4f: contenteditable lebt im Focus-Cardroot
+             (.focus-editor.is-active). Harness simuliert den aktiven Focus-
+             Editor ohne Normal-Editor-Container (Test fokussiert
+             ausschliesslich auf Focus-Verhalten). -->
+        <div id="partial-editor-body-focus">
+          <div class="focus-editor is-active">
+            <div class="page-content-view page-content-view--editing focus-editor__content" contenteditable="true"></div>
           </div>
         </div>
         <!-- View-Modus-Container hat im Real-DOM seinen eigenen Partial-Host;
