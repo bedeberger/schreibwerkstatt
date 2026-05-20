@@ -23,7 +23,7 @@ import { applySentenceHighlight } from './sentence.js';
 import {
   dynamicTypewriterThreshold, getCaretRect, typewriterScroll,
 } from './typewriter.js';
-import { writeFocusSnapshot, clearFocusSnapshot } from './storage.js';
+import { writeFocusSnapshot, clearFocusSnapshot, installEditCounter } from './storage.js';
 
 export const focusCardMethods = {
   toggleFocusMode() {
@@ -67,6 +67,25 @@ export const focusCardMethods = {
       // re-entered hat → abbrechen.
       if (gen !== this._focusGen || this._focusState !== 'entering') return;
       try {
+        // DOM-Roundtrip Normal → Focus: Inhalt aus dem Normal-Container in
+        // den Focus-Container klonen (kein innerHTML — XSS-Trust kommt vom
+        // eigenen contenteditable; cloneNode bleibt strukturidentisch ohne
+        // Re-Parsing). Beide Container teilen `.page-content-view--editing`;
+        // querySelectorAll liefert sie in DOM-Order (Normal vor Focus).
+        const containers = document.querySelectorAll('.page-content-view--editing');
+        const normalC = containers[0];
+        const focusC = document.querySelector('.focus-editor .page-content-view--editing');
+        if (normalC && focusC && focusC !== normalC) {
+          const clones = Array.from(normalC.childNodes).map(n => n.cloneNode(true));
+          focusC.replaceChildren(...clones);
+        }
+        // Live-Counter ist Container-gebunden — beim Mode-Wechsel teardown
+        // und am neuen aktiven Container (Smart-Switch via shared/active-
+        // editor.js) neu installieren. Andernfalls misst der Counter den
+        // alten (jetzt versteckten) Normal-Container.
+        app._editCounterCtx?.teardown?.();
+        installEditCounter(app);
+
         this._focusInstall();
         this._focusState = 'active';
         this._focusUpdateActive(true);
@@ -308,8 +327,9 @@ export const focusCardMethods = {
 
     showCursor();
 
-    const editEl = document.querySelector('.page-content-view--editing');
-    editEl?.focus();
+    // container ist via shared/active-editor.js: bei aktiver Focus-Karte der
+    // Focus-Cardroot, sonst der Normal-Editor-Container.
+    container?.focus?.({ preventScroll: true });
     this._focusAutoAddedP = jumpToTrailingParagraph(container);
   },
 
@@ -358,6 +378,19 @@ export const focusCardMethods = {
     this._focusTeardown();
     clearFocusSnapshot();
 
+    // DOM-Roundtrip Focus → Normal: aktuellen Focus-Inhalt zurück in den
+    // Normal-Container klonen, bevor focusActive=false greift und Alpine den
+    // Focus-Cardroot via x-show ausblendet. Smart-Switch springt mit
+    // `focusActive=false` automatisch zurück auf den Normal-Container.
+    const focusC = document.querySelector('.focus-editor.is-active .page-content-view--editing');
+    const normalC = document.querySelector('#editor-card .page-editor-wrap .page-content-view--editing');
+    if (focusC && normalC && focusC !== normalC) {
+      const clones = Array.from(focusC.childNodes).map(n => n.cloneNode(true));
+      normalC.replaceChildren(...clones);
+    }
+    // Counter wechselt zurück auf den Normal-Container.
+    app._editCounterCtx?.teardown?.();
+
     app.focusMode = false;
     app.focusActive = false;
     document.body.classList.remove('focus-mode');
@@ -389,6 +422,11 @@ export const focusCardMethods = {
       app.closeSynonymMenu?.();
       app.closeSynonymPicker?.();
       app.closeFigurLookup?.();
+    } else if (app.editMode) {
+      // Unsauberer Exit (Save fehlgeschlagen, editDirty bleibt) — User landet
+      // wieder im Normal-Editor. Counter neu am Normal-Container installieren,
+      // damit Live-Anzeige + Tagesdelta weiterzählen.
+      installEditCounter(app);
     }
 
     // View-Mode + Kennzahlen (Wörter/Zeichen/Token) immer auffrischen, egal

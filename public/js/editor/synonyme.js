@@ -237,6 +237,7 @@ export const synonymCardMethods = {
     const wort = this._synonymWord;
     const satz = this._extractSentence(this._synonymRange, wort);
     const bookId = app?.currentPage?.book_id || null;
+    const pageId = app?.currentPage?.page_id || null;
     this.showSynonymMenu = false;
     this.synonymThesLoading = true;
     this.synonymThesError = '';
@@ -271,7 +272,7 @@ export const synonymCardMethods = {
       const { jobId, error } = await fetchJson('/jobs/synonym', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ wort, satz, book_id: bookId }),
+        body: JSON.stringify({ wort, satz, book_id: bookId, page_id: pageId }),
       });
       if (!jobId) throw new Error(error || app?.t('synonym.jobFailed'));
       this._synonymJobId = jobId;

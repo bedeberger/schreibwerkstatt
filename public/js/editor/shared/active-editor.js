@@ -8,7 +8,9 @@
 // Stand (`#editor-card .page-content-view--editing`).
 
 const NORMAL_SELECTOR = '#editor-card .page-content-view--editing';
-const FOCUS_SELECTOR = '.focus-editor .page-content-view--editing';
+// Phase 4f-Marker: solange `.focus-editor` ohne `.is-active`, ist der
+// Cardroot nur Skeleton (default x-show=false) und der Switch greift nicht.
+const FOCUS_SELECTOR = '.focus-editor.is-active .page-content-view--editing';
 
 // Liefert das contenteditable des aktiven Editors oder null, wenn kein
 // Editor offen ist.

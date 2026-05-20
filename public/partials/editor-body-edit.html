@@ -4,7 +4,7 @@
      wird separat als partial-editor-toolbar geladen. Die Sub-Komponente
      editorToolbarCard installiert selbst einen delegierten keydown-Listener
      auf dem contenteditable — daher kein @keydown hier. -->
-<div x-show="editMode" class="page-editor-wrap normal-editor">
+<div x-show="editMode && !focusActive" class="page-editor-wrap normal-editor">
   <div class="page-editor-toolbar">
     <button type="button" class="graph-tool-btn"
             :data-tip="t('graph.zoomOut')" :aria-label="t('graph.zoomOut')"

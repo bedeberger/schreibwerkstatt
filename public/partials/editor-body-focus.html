@@ -1,0 +1,27 @@
+<!-- Focus-Mode-Cardroot mit eigenem contenteditable. Phase-4f-Skeleton:
+     Der Container existiert im DOM, ist aber default hidden (focusActive=false).
+     enterFocusMode (Phase 4f-real, eigene Session) kopiert HTML aus dem
+     Normal-Container hier rein, setzt .is-active und versteckt den
+     Normal-Container. exitFocusMode kopiert zurück.
+
+     Smart-Switch in shared/active-editor.js findet den Focus-Container über
+     den `.focus-editor.is-active`-Selektor — solange .is-active fehlt, ist
+     der Switch ein No-Op und Sub-Komponenten bedienen weiter den
+     Normal-Container.
+
+     Event-Handler @input/@paste/@contextmenu/@click identisch zum
+     Normal-Container, damit Save-/Dirty-/Paste-/Synonyme-Pfade ohne
+     Mode-Sonderbehandlung funktionieren. -->
+<div x-show="focusActive" class="focus-editor" :class="{ 'is-active': focusActive }">
+  <div class="page-content-view page-content-view--editing focus-editor__content"
+       contenteditable="true"
+       spellcheck="true"
+       autocorrect="off"
+       autocapitalize="off"
+       @input="_markEditDirty()"
+       @paste="_onEditPaste($event)"
+       @contextmenu="_onEditContextMenu($event)"
+       @click="_onEditClick($event)"
+       @pointermove="handleMarkPointer($event)"
+       @pointerleave="handleMarkPointerLeave($event)"></div>
+</div>

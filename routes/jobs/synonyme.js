@@ -27,8 +27,9 @@ function _synonymKeyHash(wort, satz, bookSettings, cacheVersion) {
   return crypto.createHash('sha1').update(raw).digest('hex');
 }
 
-async function runSynonymJob(jobId, wort, satz, bookId, userEmail) {
+async function runSynonymJob(jobId, wort, satz, bookId, userEmail, pageId) {
   const logger = makeJobLogger(jobId);
+  const pageTag = pageId ? ` page=${pageId}` : '';
   const prompts = await getPrompts();
   const { buildSynonymPrompt, SCHEMA_SYNONYM, PROMPTS_VERSION } = prompts;
   const { SYSTEM_SYNONYM } = await getBookPrompts(bookId, userEmail);
@@ -37,12 +38,12 @@ async function runSynonymJob(jobId, wort, satz, bookId, userEmail) {
   const cacheVersion = `${_modelName(effectiveProvider)}:${PROMPTS_VERSION || ''}`;
   const keyHash = _synonymKeyHash(wort, satz, bookSettings, cacheVersion);
   try {
-    logger.info(`Start: «${wort}»`);
+    logger.info(`Start: «${wort}»${pageTag}`);
     updateJob(jobId, { statusText: 'job.phase.searchingSynonyms', progress: 10 });
 
     const cached = loadSynonymCache(userEmail, keyHash, effectiveProvider);
     if (cached) {
-      logger.info(`«${wort}» – Cache-HIT, spart Synonym-Call.`);
+      logger.info(`«${wort}»${pageTag} – Cache-HIT, spart Synonym-Call.`);
       completeJob(jobId, { synonyme: cached, tokensIn: 0, tokensOut: 0, cached: true },
         null, `«${wort}» Cache-HIT ${cached.length} Vorschläge`);
       return;
@@ -74,7 +75,7 @@ async function runSynonymJob(jobId, wort, satz, bookId, userEmail) {
     completeJob(jobId, { synonyme, tokensIn: tok.in, tokensOut: tok.out },
       tps(tok), `«${wort}» ${synonyme.length} Vorschläge`);
   } catch (e) {
-    if (e.name !== 'AbortError') logger.error(`Fehler «${wort}»: ${e.message}`, { stack: e.stack });
+    if (e.name !== 'AbortError') logger.error(`Fehler «${wort}»${pageTag}: ${e.message}`, { stack: e.stack });
     failJob(jobId, e);
   }
 }
@@ -82,6 +83,7 @@ async function runSynonymJob(jobId, wort, satz, bookId, userEmail) {
 synonymeRouter.post('/synonym', jsonBody, (req, res) => {
   const { wort, satz } = req.body || {};
   const book_id = toIntId(req.body?.book_id);
+  const page_id = toIntId(req.body?.page_id);
   if (!wort || typeof wort !== 'string' || !wort.trim()) return res.status(400).json({ error_code: 'WORT_REQUIRED' });
   if (!satz || typeof satz !== 'string' || !satz.trim()) return res.status(400).json({ error_code: 'SATZ_REQUIRED' });
   if (book_id) setContext({ book: book_id });
@@ -97,7 +99,7 @@ synonymeRouter.post('/synonym', jsonBody, (req, res) => {
   const label = 'job.label.synonymWord';
   const labelParams = { word: wort.trim() };
   const jobId = createJob('synonym', book_id || 0, userEmail, label, labelParams, entityKey);
-  enqueueJob(jobId, () => runSynonymJob(jobId, wort.trim(), satz.trim(), book_id || null, userEmail));
+  enqueueJob(jobId, () => runSynonymJob(jobId, wort.trim(), satz.trim(), book_id || null, userEmail, page_id || null));
   res.json({ jobId });
 });
 
