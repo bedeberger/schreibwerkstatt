@@ -21,13 +21,23 @@ else
   SUDO="sudo"
 fi
 
-echo "→ JRE + Tools installieren (Java 11 für IzPack-Installer, Java 21 zur Laufzeit)"
+echo "→ JRE + Tools installieren (Java 8 für IzPack-Installer mit pack200, Default-JRE zur Laufzeit)"
 $SUDO apt-get update -qq
-$SUDO apt-get install -y --no-install-recommends default-jre-headless openjdk-11-jre-headless curl unzip
+$SUDO apt-get install -y --no-install-recommends default-jre-headless curl unzip
 
-JAVA11_BIN="$(ls -1 /usr/lib/jvm/java-11-openjdk-*/bin/java 2>/dev/null | head -n1)"
-if [ -z "$JAVA11_BIN" ]; then
-  echo "✗ Java 11 nicht gefunden — IzPack 5 + Java 17+ wirft ArrayIndexOutOfBoundsException"
+# IzPack 5 nutzt pack200, das ab Java 14 entfernt wurde → ArrayIndexOutOfBoundsException.
+# Installer-Schritt braucht Java 8 oder 11. Ubuntu 24.04 hat nur Java 8 (universe) + 17/21.
+if ! $SUDO apt-get install -y --no-install-recommends openjdk-8-jre-headless; then
+  echo "→ openjdk-8 nicht in Quellen, universe aktivieren"
+  $SUDO apt-get install -y --no-install-recommends software-properties-common
+  $SUDO add-apt-repository -y universe
+  $SUDO apt-get update -qq
+  $SUDO apt-get install -y --no-install-recommends openjdk-8-jre-headless
+fi
+
+JAVA_LEGACY_BIN="$(ls -1 /usr/lib/jvm/java-8-openjdk-*/jre/bin/java /usr/lib/jvm/java-8-openjdk-*/bin/java 2>/dev/null | head -n1)"
+if [ -z "$JAVA_LEGACY_BIN" ]; then
+  echo "✗ Java 8 nicht gefunden — IzPack 5 + Java 14+ wirft ArrayIndexOutOfBoundsException"
   exit 1
 fi
 
@@ -77,8 +87,8 @@ if [ -z "$INSTALLER_JAR" ]; then
   exit 1
 fi
 
-echo "→ Installer ausfuehren: $(basename "$INSTALLER_JAR") (Java 11)"
-$SUDO "$JAVA11_BIN" -jar "$INSTALLER_JAR" "$AUTO_OPTS"
+echo "→ Installer ausfuehren: $(basename "$INSTALLER_JAR") (Java 8)"
+$SUDO "$JAVA_LEGACY_BIN" -jar "$INSTALLER_JAR" "$AUTO_OPTS"
 
 if [ ! -x "$INSTALL_TARGET/verapdf" ]; then
   echo "✗ verapdf-Binary nicht gefunden unter $INSTALL_TARGET/verapdf"
