@@ -122,7 +122,7 @@ router.get('/:book_id/links', aclParamGuard('viewer'), (req, res) => {
   const conn = blogs.getConnectionPublic(req.bookId);
   if (!conn) return res.json({ links: [], connected: false });
   const links = blogs.listLinksForBlog(conn.id);
-  res.json({ links, connected: true });
+  res.json({ links, connected: true, baseUrl: conn.baseUrl });
 });
 
 // WP-seitige Version einer verlinkten Page laden — fuer Konflikt-Diff. Liefert

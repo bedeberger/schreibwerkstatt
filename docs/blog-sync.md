@@ -113,7 +113,8 @@ Voraussetzung: Initial-Import durch. Sonst 400 `IMPORT_FIRST`.
 ### `runBlogPushJob(bookId, pageIds[])` — manuell, Multi-Select
 
 1. pro `pageId`:
-   - kein Link → `createPost({ title, content: appToWpHtml, status: conn.default_status, slug })` → Link anlegen
+   - kein Link → `createPost({ title, content: appToWpHtml, status: conn.default_status, slug })` → Link anlegen.
+     **Datums-Bump:** matcht `page_name` das Pattern `^(\d{4}-\d{2}-\d{2})(:\s.*)$` und das Datum ≠ `localIsoDate()`, wird vor dem Create auf heute umgeschrieben — WP-Titel und lokaler `page_name` synchron via `contentStore.savePage`. Updates rühren den Titel nicht an.
    - Link da, kein Konflikt → `updatePost(id, …)`, `wp_modified_at` aus Response übernehmen
    - `conflict_state='detected'` → skip, Fehler in Job-Result
 2. `last_push_at = NOW_ISO_SQL`

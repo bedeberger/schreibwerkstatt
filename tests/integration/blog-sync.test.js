@@ -304,6 +304,76 @@ test('Push: legt neue WP-Posts mit Page-Name als Titel an', async () => {
   }
 });
 
+test('Push (Create): bumpt YYYY-MM-DD im Titel auf heute, lokal + WP synchron', async () => {
+  const bookId = 9006;
+  seedBlogBook(bookId);
+  seedConnection(bookId);
+  const connId = blogs.getConnection(bookId).id;
+  blogs.markInitialImportDone(connId);
+
+  const page = await contentStore.createPage({
+    book_id: bookId, chapter_id: null,
+    name: '2020-01-01: Mein Eintrag',
+    html: '<p>Inhalt.</p>',
+  }, null);
+
+  const { localIsoDate } = require('../../lib/local-date');
+  const today = localIsoDate();
+  const expected = `${today}: Mein Eintrag`;
+
+  const wp = makeWpStub({ posts: [] });
+  const restore = installFetch(wp);
+  try {
+    const jobId = `test-push-bump-${Date.now()}`;
+    const { jobs, runningJobs } = ctx.shared;
+    jobs.set(jobId, { id: jobId, type: 'blog-push', bookId, userEmail: null, status: 'running', progress: 0, createdAt: Date.now() });
+    runningJobs.set(jobId, { type: 'blog-push', bookId });
+
+    await blogSync.runBlogPushJob(jobId, bookId, null, [page.id]);
+    const job = jobs.get(jobId);
+    assert.equal(job.status, 'done', JSON.stringify(job.error));
+    assert.equal(job.result.createdRemote, 1);
+
+    assert.equal(wp.posts[0].title.raw, expected, 'WP-Titel sollte heute-bumpt sein');
+
+    const reloaded = await contentStore.loadPage(page.id);
+    assert.equal(reloaded.name, expected, 'Lokaler page_name sollte heute-bumpt sein');
+  } finally {
+    restore();
+  }
+});
+
+test('Push (Create): Titel ohne YYYY-MM-DD bleibt unverändert', async () => {
+  const bookId = 9007;
+  seedBlogBook(bookId);
+  seedConnection(bookId);
+  const connId = blogs.getConnection(bookId).id;
+  blogs.markInitialImportDone(connId);
+
+  const page = await contentStore.createPage({
+    book_id: bookId, chapter_id: null,
+    name: 'Kein Datum hier',
+    html: '<p>Inhalt.</p>',
+  }, null);
+
+  const wp = makeWpStub({ posts: [] });
+  const restore = installFetch(wp);
+  try {
+    const jobId = `test-push-nobump-${Date.now()}`;
+    const { jobs, runningJobs } = ctx.shared;
+    jobs.set(jobId, { id: jobId, type: 'blog-push', bookId, userEmail: null, status: 'running', progress: 0, createdAt: Date.now() });
+    runningJobs.set(jobId, { type: 'blog-push', bookId });
+
+    await blogSync.runBlogPushJob(jobId, bookId, null, [page.id]);
+    assert.equal(wp.posts[0].title.raw, 'Kein Datum hier');
+
+    const reloaded = await contentStore.loadPage(page.id);
+    assert.equal(reloaded.name, 'Kein Datum hier');
+  } finally {
+    restore();
+  }
+});
+
 test('Pull: erkennt Konflikt wenn beide Seiten nach last_pulled_at neu', async () => {
   const bookId = 9004;
   seedBlogBook(bookId);

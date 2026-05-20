@@ -15,6 +15,7 @@
 export function blogState() {
   return {
     blogConnected: false,
+    blogBaseUrl: '',
     blogLinksMap: {},
     blogPushBusy: {},
     blogPushProgress: {},
@@ -34,6 +35,7 @@ export const blogSyncMethods = {
       for (const t of Object.values(this._blogPushTimers)) clearInterval(t);
       this._blogPushTimers = {};
       this.blogConnected = false;
+      this.blogBaseUrl = '';
       this.blogLinksMap = {};
       this.blogPushBusy = {};
       this.blogPushProgress = {};

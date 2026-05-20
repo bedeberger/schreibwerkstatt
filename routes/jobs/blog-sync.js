@@ -316,14 +316,33 @@ async function runBlogPushJob(jobId, bookId, userEmail, pageIds) {
 
       const wpHtml = appToWpHtml(pageRow.html || pageRow.body_html || '<p></p>');
 
+      // Beim Create: Datum im Titel (Pattern "YYYY-MM-DD: Rest") auf heute
+      // bumpen, damit der frisch veroeffentlichte Post das Push-Datum
+      // traegt — und lokal nachziehen.
+      let titleForCreate = pageRow.name || '';
+      let renamedLocally = false;
+      if (!link) {
+        const m = /^(\d{4}-\d{2}-\d{2})(:\s.*)$/.exec(titleForCreate);
+        if (m) {
+          const today = localIsoDate();
+          if (m[1] !== today) {
+            titleForCreate = `${today}${m[2]}`;
+            renamedLocally = true;
+          }
+        }
+      }
+
       try {
         const remote = link
           ? await wp.updatePost(link.wp_post_id, { content: wpHtml })
           : await wp.createPost({
-              title: pageRow.name || '',
+              title: titleForCreate,
               content: wpHtml,
               status: conn.defaultStatus,
             });
+        if (renamedLocally) {
+          await contentStore.savePage(pageId, { name: titleForCreate }, null);
+        }
         blogs.upsertLink({
           pageId,
           blogId: conn.id,
