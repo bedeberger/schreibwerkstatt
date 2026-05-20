@@ -88,7 +88,7 @@ export const appViewMethods = {
     // figur-lookup, focus) sind Geschwister-Partials, keine nested children —
     // werden vom Cascade-Helper deshalb nicht automatisch mitgezogen.
     await Promise.all([
-      this._ensurePartial('editor'),
+      this._ensurePartial('editor-notebook'),
       this._ensurePartial('editor-toolbar'),
       this._ensurePartial('editor-find'),
       this._ensurePartial('editor-figur-lookup'),
