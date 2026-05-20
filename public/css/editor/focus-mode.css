@@ -73,9 +73,22 @@ body.focus-mode #editor-card .editor-preview-wrap {
 body.focus-mode #partial-editor-body-edit,
 body.focus-mode #partial-editor-body-view,
 body.focus-mode #partial-editor-body-focus,
-body.focus-mode .focus-editor,
 body.focus-mode .page-editor-wrap { display: contents; }
 body.focus-mode .page-editor-toolbar { display: none; }
+
+/* Focus-Cardroot selbst ist flex-column-Container, damit das innere
+   contenteditable (`.focus-editor__content` = `.page-content-view--editing`)
+   eine begrenzte Höhe + overflow-y:auto bekommt. `display:contents` würde
+   das Cardroot aus dem Layout-Baum entfernen — funktioniert nicht
+   zuverlässig in Safari/Webkit-Flex-Ketten und nimmt Scroll-Container die
+   Höhe weg. Daher echter Flex-Container. */
+body.focus-mode .focus-editor {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+}
 
 body.focus-mode :is(.page-content-view, .page-content-view--editing) {
   /* overflow-anchor aus: Chrome's Scroll-Anchoring verschiebt den Scrollpunkt
