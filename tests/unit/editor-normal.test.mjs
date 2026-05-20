@@ -1,10 +1,11 @@
 // Normal-Editor („Notizbuch") — Source-Level-Smoke-Tests.
 //
-// Editor-Pipeline lebt noch im Root via `notebookMethods`-Spread (siehe
-// public/js/editor/notebook/edit.js). Diese Tests greppen statisch, dass
-// alle Normal-Hauptfeatures aus dem Plan-Inventar im Source vorhanden sind
-// und mit den geteilten Hilfen aus `editor/shared/` arbeiten. Sie ersetzen
-// keine E2E-Coverage — dort werden Behaviors verifiziert.
+// Edit-Pipeline lebt als `notebookEditMethods`-Spread in der Sub-Karte
+// `editorNotebookCard` (public/js/editor/notebook/edit.js); Root spreaded nur
+// die Forwarder aus public/js/editor/notebook/trampoline.js. Diese Tests
+// greppen statisch, dass alle Normal-Hauptfeatures aus dem Plan-Inventar im
+// Source vorhanden sind und mit den geteilten Hilfen aus `editor/shared/`
+// arbeiten. Sie ersetzen keine E2E-Coverage — dort werden Behaviors verifiziert.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';

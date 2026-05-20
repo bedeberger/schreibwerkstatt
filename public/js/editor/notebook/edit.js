@@ -164,7 +164,7 @@ export const notebookEditMethods = {
     // Live-Counter rechnet in beiden Modi (für korrektes Tagesdelta beim
     // Wiedereintritt in den Focus), sichtbar aber nur im Focus-Header
     // (x-show=focusActive in editor.html). Setup nach Alpine-x-show-Flush —
-    // .page-content-view--editing existiert vorher nicht im DOM.
+    // contenteditable existiert vorher nicht im DOM.
     setTimeout(() => { if (app.editMode) installEditCounter(app); }, 0);
     // Snapshot für Reload-Wiederaufnahme. Pendant zu focus/storage.js —
     // beim regulären Exit (cancelEdit/saveEdit) wird er wieder gelöscht.

@@ -158,7 +158,7 @@ Beim Enter springt der Caret an Buchende. `jumpToTrailingParagraph` ([dom-blocks
 8. **`_focusUpdateActive` RAF in try/catch.** Ein DOM-Edge-Case (Shadow-Root-Range, obskurer Range-Fehler) darf den Editor nicht stillstellen. Fehler → `reportError('updateActive', err)`, nächster Tick versucht neu.
 9. **`expectedScroll` ist Counter, nicht Zeitfenster.** Mehrere prog-Scrolls in Folge müssen alle vom `onScroll` verschluckt werden.
 10. **Sentence-Highlight nur via `CSS.highlights`.** Keine DOM-Span-Wraps — sonst Save-Diff bei jedem Caret-Move. Browser ohne Custom-Highlight-API → Sentence-Mode degradiert lautlos auf Paragraph-Visual.
-11. **`overflow-anchor: none`** auf `.page-content-view*` im Fokus. Chrome's Scroll-Anchoring kämpft sonst mit Typewriter-Scroll → sichtbares „Flattern".
+11. **`overflow-anchor: none`** auf `.focus-editor__content`. Chrome's Scroll-Anchoring kämpft sonst mit Typewriter-Scroll → sichtbares „Flattern".
 12. **`x-show="!focusActive"`-Guards für Findings-Close-Button, Toolbar, Bubble.** Findings sind im Fokus ohnehin via CSS ausgeblendet; Buttons trotzdem mit `x-show` raus, damit Tab-Reihenfolge sauber bleibt.
 13. **Typewriter folgt ausschliesslich dem Caret-Rect.** Kein Block-BBox-Fallback im Recenter. `getCaretRect` ist die einzige Ziel-Rect-Quelle; liefert sie `null`, bleibt der Scroll aus. Block-Mitte als Ersatz täuscht Stabilität vor und blockiert Typewriter in langen Absätzen mit Soft-Wraps / `<br>`-Brüchen — `getCaretRect` deckt diese Edge-Cases via Probe-Range-Expansion ab.
 
@@ -179,6 +179,6 @@ Neuer Granularitätsmodus, neue Hotkey, neuer Listener-Pfad:
 2. Wenn neuer Body-Class-Marker: in `_focusInstall` add, in `exitFocusMode` remove, in `$watch(focusGranularity)`-Switch berücksichtigen.
 3. Wenn neuer Listener: ausschliesslich am `ctx.container` oder `window` registrieren mit `{ signal }` aus `_focusInstall`. KEIN globaler `window.addEventListener` ohne AbortController.
 4. State-Machine berühren? Generation-Check im async-Body Pflicht (`if (gen !== this._focusGen) return`).
-5. CSS für neue Markierungs-Klasse in [focus-mode.css](../public/css/editor/focus/focus-mode.css) — selber `@layer components`, `body.focus-mode :is(.page-content-view, .page-content-view--editing) …`.
+5. CSS für neue Markierungs-Klasse in [focus-mode.css](../public/css/editor/focus/focus-mode.css) — selber `@layer components`, Container-Selektor ist `.focus-editor__content` (entkoppelt von Notebook-Editor / `.page-content-view`).
 6. Tests in [tests/unit/editor-focus.test.mjs](../tests/unit/editor-focus.test.mjs) ergänzen (pure Helpers) und ggf. E2E-Case in [tests/e2e/focus-editor.spec.js](../tests/e2e/focus-editor.spec.js).
 7. CLAUDE.md „Editor-Modi"-Tabelle prüfen — bei strukturellen Änderungen am Modus-Set Invarianten-Liste updaten.

@@ -6,7 +6,7 @@
 
 const NORMAL_SELECTOR = '#editor-card .page-content-view--editing';
 // `.is-active` filtert den Skeleton-Cardroot (x-show=false, ohne `.is-active`) aus.
-const FOCUS_SELECTOR = '.focus-editor.is-active .page-content-view--editing';
+const FOCUS_SELECTOR = '.focus-editor.is-active .focus-editor__content';
 
 // Liefert das contenteditable des aktiven Editors oder null, wenn kein
 // Editor offen ist. Focus-Container greift nur, wenn er nicht display:none

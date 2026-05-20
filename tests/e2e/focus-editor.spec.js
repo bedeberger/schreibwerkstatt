@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 
 const HARNESS = '/tests/fixtures/focus-harness.html';
-const EDITOR = '#editor-card .page-content-view--editing';
+const EDITOR = '#editor-card .focus-editor__content';
 
 async function enter(page) {
   // exitFocusMode droppt bei !editDirty zurück in den View-Modus (editMode=false).
@@ -16,7 +16,7 @@ async function enter(page) {
 
 async function placeCaretInParagraph(page, idx) {
   await page.evaluate((i) => {
-    const p = document.querySelectorAll(`${'#editor-card .page-content-view--editing'} p`)[i];
+    const p = document.querySelectorAll(`${'#editor-card .focus-editor__content'} p`)[i];
     const range = document.createRange();
     range.selectNodeContents(p);
     range.collapse(true);
@@ -60,7 +60,7 @@ test('getScrollContainer greift trotz sichtbarer Schwester `.page-content-view` 
   // Fixture enthält beide DIVs – der Scroll-Container muss der Editor sein.
   await enter(page);
   const capturedClass = await page.evaluate(() => window.harness._focusListeners?.container?.className);
-  expect(capturedClass).toMatch(/page-content-view--editing/);
+  expect(capturedClass).toMatch(/focus-editor__content/);
 
   // Und es landet tatsächlich eine aktive Markierung – nicht null.
   await page.waitForTimeout(80);
@@ -105,10 +105,10 @@ test('Pointer-Schonfrist verhindert Recenter (Klick-Verhalten)', async ({ page }
   // unmittelbar gefolgt von selectionchange darf nicht recentern (auch wenn der
   // Cursor weit weg vom Zentrum landet).
   await page.evaluate(() => {
-    const editor = document.querySelector('#editor-card .page-content-view--editing');
+    const editor = document.querySelector('#editor-card .focus-editor__content');
     editor.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
     editor.dispatchEvent(new PointerEvent('pointerup',   { bubbles: true }));
-    const p = document.querySelectorAll('#editor-card .page-content-view--editing p')[40];
+    const p = document.querySelectorAll('#editor-card .focus-editor__content p')[40];
     const range = document.createRange();
     range.selectNodeContents(p);
     range.collapse(true);
@@ -159,7 +159,7 @@ test('Enter erzeugt <p>-Absatz (kein <div>), auch bei bare-text Content', async 
 
   // Bare-Text mit <br> – klassische Problemstelle, wo Chromium ohne Fix <div> produziert.
   await page.evaluate(() => {
-    const el = document.querySelector('#editor-card .page-content-view--editing');
+    const el = document.querySelector('#editor-card .focus-editor__content');
     el.replaceChildren(
       document.createTextNode('Zeile eins.'),
       document.createElement('br'),
@@ -208,7 +208,7 @@ test('Enter im Fokus-Mode zentriert auf den neuen Absatz (Typewriter-Scroll)', a
   // Scroll-Delta erzeugen kann. Caret ans Ende, damit der neue <p> nach
   // Enter die aktive Zeile ist (nicht der verbleibende Rest).
   await page.evaluate(() => {
-    const p = document.querySelectorAll('#editor-card .page-content-view--editing p')[30];
+    const p = document.querySelectorAll('#editor-card .focus-editor__content p')[30];
     const range = document.createRange();
     range.selectNodeContents(p);
     range.collapse(false);
@@ -242,7 +242,7 @@ test('Dim-Logik: nicht-aktive Absätze opacity 0.5, aktiver opacity 1 (2-Absatz-
   // und nicht nur die Klasse – die Class-Logik kann korrekt sein, während
   // die visuelle Wirkung daneben liegt.
   await page.evaluate(() => {
-    const ed = document.querySelector('#editor-card .page-content-view--editing');
+    const ed = document.querySelector('#editor-card .focus-editor__content');
     ed.replaceChildren(
       Object.assign(document.createElement('p'), { textContent: 'Erster Absatz.' }),
       Object.assign(document.createElement('p'), { textContent: 'Zweiter Absatz.' }),
@@ -252,7 +252,7 @@ test('Dim-Logik: nicht-aktive Absätze opacity 0.5, aktiver opacity 1 (2-Absatz-
   await enter(page);
 
   const readState = () => page.evaluate(() => {
-    const ps = [...document.querySelectorAll('#editor-card .page-content-view--editing p')];
+    const ps = [...document.querySelectorAll('#editor-card .focus-editor__content p')];
     return ps.map(p => ({
       text: p.textContent,
       active: p.classList.contains('focus-paragraph-active'),
@@ -278,7 +278,7 @@ test('Dim-Logik: nicht-aktive Absätze opacity 0.5, aktiver opacity 1 (2-Absatz-
 
   // Caret ans Ende von P2, Enter → neuer P. Nach Typing: getippter Absatz aktiv.
   await page.evaluate(() => {
-    const p = document.querySelectorAll('#editor-card .page-content-view--editing p')[1];
+    const p = document.querySelectorAll('#editor-card .focus-editor__content p')[1];
     const r = document.createRange();
     r.selectNodeContents(p); r.collapse(false);
     getSelection().removeAllRanges(); getSelection().addRange(r);
@@ -308,7 +308,7 @@ test('Dim-Logik: greift auch bei Wrapper-Elementen um die <p> (BookStack-Struktu
   // den Wrapper. Der Test forciert genau diese Struktur, damit Regressionen
   // in der Dim-Regel sofort auffallen.
   await page.evaluate(() => {
-    const ed = document.querySelector('#editor-card .page-content-view--editing');
+    const ed = document.querySelector('#editor-card .focus-editor__content');
     const wrap = document.createElement('div');
     wrap.appendChild(Object.assign(document.createElement('p'), { textContent: 'Erster Absatz.' }));
     wrap.appendChild(Object.assign(document.createElement('p'), { textContent: 'Zweiter Absatz.' }));
@@ -319,7 +319,7 @@ test('Dim-Logik: greift auch bei Wrapper-Elementen um die <p> (BookStack-Struktu
 
   // Caret in den zweiten Absatz.
   await page.evaluate(() => {
-    const p = document.querySelectorAll('#editor-card .page-content-view--editing p')[1];
+    const p = document.querySelectorAll('#editor-card .focus-editor__content p')[1];
     const r = document.createRange();
     r.selectNodeContents(p); r.collapse(true);
     getSelection().removeAllRanges(); getSelection().addRange(r);
@@ -327,7 +327,7 @@ test('Dim-Logik: greift auch bei Wrapper-Elementen um die <p> (BookStack-Struktu
   await page.waitForTimeout(80);
 
   const state = await page.evaluate(() => {
-    const ps = [...document.querySelectorAll('#editor-card .page-content-view--editing p')];
+    const ps = [...document.querySelectorAll('#editor-card .focus-editor__content p')];
     return ps.map(p => ({
       active: p.classList.contains('focus-paragraph-active'),
       opacity: parseFloat(getComputedStyle(p).opacity),
@@ -397,7 +397,7 @@ test('Blur des Editors entfernt aktive Markierung', async ({ page }) => {
   expect(await page.locator('.focus-paragraph-active').count()).toBeGreaterThan(0);
 
   await page.evaluate(() => {
-    const el = document.querySelector('#editor-card .page-content-view--editing');
+    const el = document.querySelector('#editor-card .focus-editor__content');
     el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
   });
   await page.waitForTimeout(50);
@@ -411,7 +411,7 @@ test('Chromium-Split: zwei .focus-paragraph-active → setActiveBlock räumt ab'
 
   // Ghost-Klasse auf zweiten Absatz setzen (simuliert Enter-Split-Bug).
   await page.evaluate(() => {
-    document.querySelectorAll('#editor-card .page-content-view--editing p')[6]
+    document.querySelectorAll('#editor-card .focus-editor__content p')[6]
       .classList.add('focus-paragraph-active');
   });
   expect(await page.locator('.focus-paragraph-active').count()).toBe(2);
@@ -453,7 +453,7 @@ test('Save-Fail beim Exit: User bleibt im Edit-Modus (Draft retten)', async ({ p
 test('MutationObserver: 50 neu hinzugefügte <p> werden observiert (inkremental, kein Vollscan)', async ({ page }) => {
   await enter(page);
   await page.evaluate(() => {
-    const editor = document.querySelector('#editor-card .page-content-view--editing');
+    const editor = document.querySelector('#editor-card .focus-editor__content');
     for (let i = 0; i < 50; i++) {
       const p = document.createElement('p');
       p.textContent = `Neuer Absatz ${i}`;
@@ -537,9 +537,9 @@ test('IME-Composition: selectionchange während compositionstart/end kein Recent
   // compositionstart → caret weit unten setzen → selectionchange feuert, darf
   // aber während IME nicht recentern.
   await page.evaluate(() => {
-    const editor = document.querySelector('#editor-card .page-content-view--editing');
+    const editor = document.querySelector('#editor-card .focus-editor__content');
     editor.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
-    const p = document.querySelectorAll('#editor-card .page-content-view--editing p')[40];
+    const p = document.querySelectorAll('#editor-card .focus-editor__content p')[40];
     const range = document.createRange();
     range.selectNodeContents(p);
     range.collapse(true);
@@ -553,7 +553,7 @@ test('IME-Composition: selectionchange während compositionstart/end kein Recent
 
   // compositionend → jetzt Recenter.
   await page.evaluate(() => {
-    const editor = document.querySelector('#editor-card .page-content-view--editing');
+    const editor = document.querySelector('#editor-card .focus-editor__content');
     editor.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
   });
   await page.waitForTimeout(100);
@@ -571,10 +571,10 @@ test('Input-Event triggert Recenter (Undo/Redo-Pfad ohne Caret-Move)', async ({ 
   // Caret weit unten setzen (via Pointer-Pfad, damit selectionchange
   // unterdrückt → nur input soll feuern).
   await page.evaluate(() => {
-    const editor = document.querySelector('#editor-card .page-content-view--editing');
+    const editor = document.querySelector('#editor-card .focus-editor__content');
     editor.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
     editor.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
-    const p = document.querySelectorAll('#editor-card .page-content-view--editing p')[30];
+    const p = document.querySelectorAll('#editor-card .focus-editor__content p')[30];
     const range = document.createRange();
     range.selectNodeContents(p);
     range.collapse(true);
@@ -587,7 +587,7 @@ test('Input-Event triggert Recenter (Undo/Redo-Pfad ohne Caret-Move)', async ({ 
 
   // Input-Event → Recenter muss jetzt greifen.
   await page.evaluate(() => {
-    const editor = document.querySelector('#editor-card .page-content-view--editing');
+    const editor = document.querySelector('#editor-card .focus-editor__content');
     editor.dispatchEvent(new InputEvent('input', { bubbles: true }));
   });
   await page.waitForTimeout(100);
@@ -613,7 +613,7 @@ test('Editor-Focus nach Blur → Recenter (Modal-Zurückkehr-Szenario)', async (
 
   // Blur simuliert offen-Modal → Markierung weg.
   await page.evaluate(() => {
-    const el = document.querySelector('#editor-card .page-content-view--editing');
+    const el = document.querySelector('#editor-card .focus-editor__content');
     el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
   });
   await page.waitForTimeout(50);
@@ -621,7 +621,7 @@ test('Editor-Focus nach Blur → Recenter (Modal-Zurückkehr-Szenario)', async (
 
   // Focus simuliert Modal-Close → Markierung wieder da.
   await page.evaluate(() => {
-    const el = document.querySelector('#editor-card .page-content-view--editing');
+    const el = document.querySelector('#editor-card .focus-editor__content');
     el.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
   });
   await page.waitForTimeout(100);

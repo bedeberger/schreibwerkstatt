@@ -1,9 +1,8 @@
 @layer components {
 /* === Page Content View ===
-   Tagebuch-/Notebook-Optik: cremefarbenes Blatt mit Buchsatz-Mikrotypografie.
-   Gleicher Style-Scope für Read- und Edit-Modus (kein Layout-Sprung beim
-   Toggle); `--editing`-Modifier ergänzt nur Edit-Spezifika (Rail, Tint,
-   hyphens off, wrap normal). */
+   Cremefarbenes Blatt mit Buchsatz-Mikrotypografie. Gleicher Style-Scope für
+   Read- und Edit-Modus (kein Layout-Sprung beim Toggle); `--editing`-Modifier
+   ergänzt nur Edit-Spezifika (Rail, Tint, hyphens off, wrap normal). */
 .page-content-view {
   max-width: calc(64ch + 2 * clamp(18px, 4vw, 40px));
   max-height: var(--pcv-max-h, 60vh);
@@ -14,7 +13,7 @@
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
   margin: var(--space-md) auto;
-  line-height: 1.75;
+  line-height: 1.3;
   font-family: var(--font-serif);
   font-size: var(--font-size-reading);
   color: var(--color-page-view-text);
@@ -46,10 +45,6 @@
 .page-content-view h5 { font-size: var(--font-em-95); margin: 0.3em 0 0.2em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
 .page-content-view h6 { font-size: var(--font-em-90); margin: 0.3em 0 0.2em; font-weight: 700; color: var(--color-muted); }
 .page-content-view p { margin: 0.6em 0; text-wrap: pretty; }
-/* Buchsatz-Erstzeilen-Einzug ab zweitem Absatz — Roman-/Tagebuch-Satz.
-   Reset bei Headings/blockquote/poem/hr läuft automatisch über den
-   `p + p`-Adjacency-Selector (nur Folge-`<p>` nach `<p>` greift). */
-.page-content-view p + p { text-indent: 1.4em; margin-top: 0; }
 
 /* Marginalia: Absätze mit Lektorats-Markierungen bekommen rechts einen
    feinen severity-getönten Akzentstreifen (wie roter Rotstift am Manuskript-
@@ -221,11 +216,9 @@
 /* Mobile: schmaler Viewport → Paragraphs brechen mehrzeilig; intra-<p>
    line-height wirkt sonst grösser als inter-<p> Margin. Para-Margin auf
    Zeilenabstand-Niveau heben, sonst sehen Absatzwechsel enger aus als
-   normale Zeilenumbrüche. Erstzeilen-Einzug bleibt; Margin-Reset auf
-   Folge-<p> dann mit p+p-Margin neu setzen. */
+   normale Zeilenumbrüche. */
 @media (max-width: 600px) {
   .page-content-view p { margin: 0.8em 0; }
-  .page-content-view p + p { margin-top: 0; }
   .page-sheet-caption { font-size: var(--font-em-85); }
 }
 

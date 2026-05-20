@@ -4,21 +4,20 @@
   <meta charset="UTF-8">
   <title>Focus Editor Test Harness</title>
   <!-- Minimal-CSS für Focus-Tests: tokens.css (Custom-Props + @layer-Ordnung)
-       + focus-mode.css (Dim-Regel + .focus-paragraph-active) + page-view.css
-       (Wrapper-Layout `.page-editor-wrap`, sonst greift Focus-Höhenkette nicht
-       und Scroll-Container bekommt keine begrenzte Höhe). DOM unten spiegelt
-       die reale App-Wrapper-Kette aus editor.html + editor-body-edit.html. -->
+       + focus-mode.css (Dim-Regel + .focus-paragraph-active + Container-
+       Basisstyles). Focus-Editor ist entkoppelt von .page-content-view —
+       eigene Klasse `.focus-editor__content`, alle Styles in focus-mode.css.
+       DOM unten spiegelt die reale Wrapper-Kette aus editor.html +
+       editor-body-edit.html. -->
 
   <link rel="stylesheet" href="/public/css/tokens.css">
   <link rel="stylesheet" href="/public/css/editor/focus/focus-mode.css">
-  <link rel="stylesheet" href="/public/css/page/page-view.css">
   <link rel="stylesheet" href="/public/css/components/job-toast.css">
   <link rel="stylesheet" href="/public/css/page/page-revision-viewer.css">
   <link rel="stylesheet" href="/public/css/components/user-chip.css">
   <style>
     body { margin: 0; font: 16px/1.6 system-ui, sans-serif; }
     #editor-card { height: 100vh; display: flex; flex-direction: column; }
-    .page-content-view p { margin: 0 0 1em; }
   </style>
 </head>
 <body>
@@ -36,7 +35,7 @@
              ausschliesslich auf Focus-Verhalten). -->
         <div id="partial-editor-body-focus">
           <div class="focus-editor is-active">
-            <div class="page-content-view page-content-view--editing focus-editor__content" contenteditable="true"></div>
+            <div class="focus-editor__content" contenteditable="true"></div>
           </div>
         </div>
         <!-- View-Modus-Container hat im Real-DOM seinen eigenen Partial-Host;
@@ -53,7 +52,7 @@
     import { focusCardMethods } from '/public/js/editor/focus.js';
 
     // 60 Absätze mit genug Text, dass die Container weit über die Höhe scrollt.
-    const editor = document.querySelector('.page-content-view--editing');
+    const editor = document.querySelector('.focus-editor__content');
     for (let i = 0; i < 60; i++) {
       const p = document.createElement('p');
       p.textContent = `Absatz ${i}: Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.`;

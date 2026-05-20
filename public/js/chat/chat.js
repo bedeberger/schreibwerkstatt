@@ -127,7 +127,6 @@ export const chatMethods = {
       // onProgress setzt saveApplying (→ Editor-Progressbar) und chatStatus.
       const { finalHtml } = await root._loadApplyAndSave(
         [{ original: vorschlag.original, korrektur: vorschlag.ersatz }],
-        [],
         (pct, text) => {
           root.saveApplying = pct;
           if (text) this.chatStatus = `<span class="spinner"></span>${escHtml(text)}`;

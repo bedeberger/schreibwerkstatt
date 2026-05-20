@@ -82,11 +82,10 @@ export const focusCardMethods = {
         // DOM-Roundtrip Normal → Focus: Inhalt aus dem Normal-Container in
         // den Focus-Container klonen (kein innerHTML — XSS-Trust kommt vom
         // eigenen contenteditable; cloneNode bleibt strukturidentisch ohne
-        // Re-Parsing). Beide Container teilen `.page-content-view--editing`;
-        // querySelectorAll liefert sie in DOM-Order (Normal vor Focus).
-        const containers = document.querySelectorAll('.page-content-view--editing');
-        const normalC = containers[0];
-        const focusC = document.querySelector('.focus-editor .page-content-view--editing');
+        // Re-Parsing). Container-Klassen sind entkoppelt: Normal-Editor nutzt
+        // `.page-content-view--editing`, Focus-Editor `.focus-editor__content`.
+        const normalC = document.querySelector('#editor-card .page-content-view--editing');
+        const focusC = document.querySelector('.focus-editor .focus-editor__content');
         if (normalC && focusC && focusC !== normalC) {
           const clones = Array.from(normalC.childNodes).map(n => n.cloneNode(true));
           focusC.replaceChildren(...clones);
@@ -405,7 +404,7 @@ export const focusCardMethods = {
     // Normal-Container klonen, bevor focusActive=false greift und Alpine den
     // Focus-Cardroot via x-show ausblendet. Smart-Switch springt mit
     // `focusActive=false` automatisch zurück auf den Normal-Container.
-    const focusC = document.querySelector('.focus-editor.is-active .page-content-view--editing');
+    const focusC = document.querySelector('.focus-editor.is-active .focus-editor__content');
     const normalC = document.querySelector('#editor-card .page-editor-wrap .page-content-view--editing');
     if (focusC && normalC && focusC !== normalC) {
       const clones = Array.from(focusC.childNodes).map(n => n.cloneNode(true));

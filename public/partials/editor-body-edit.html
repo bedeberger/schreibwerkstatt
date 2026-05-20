@@ -5,9 +5,6 @@
      editorToolbarCard installiert selbst einen delegierten keydown-Listener
      auf dem contenteditable — daher kein @keydown hier. -->
 <div x-show="editMode && !focusActive" class="page-editor-wrap normal-editor">
-  <template x-if="currentPage?.name">
-    <div class="page-sheet-caption" x-text="currentPage.name"></div>
-  </template>
   <div class="page-editor-toolbar">
     <button type="button" class="graph-tool-btn"
             :data-tip="t('graph.zoomOut')" :aria-label="t('graph.zoomOut')"

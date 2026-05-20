@@ -1,6 +1,5 @@
-import { escHtml, fetchJson, SAFETY_HTML_RATIO, replaceInHtml, stripFocusArtefacts, fmtTok } from '../utils.js';
+import { escHtml, fetchJson, SAFETY_HTML_RATIO, replaceInHtml, stripFocusArtefacts } from '../utils.js';
 import { sortByPosition, SOFT_TYPEN } from '../book/page-view.js';
-import { buildStilkorrekturPrompt } from '../prompts.js';
 import { contentRepo } from '../repo/content.js';
 
 // Lektorat-Workflow-Methoden (werden in die Alpine-Komponente gespreadet)
@@ -16,131 +15,19 @@ export const lektoratMethods = {
     return result;
   },
 
-  // Stil-KI-Pipeline: KI ruft buildStilkorrekturPrompt, ergebnis wird
-  // selektiv ins HTML zurueckgeschrieben. log fuer Persistenz in
-  // page_checks.stilkorrektur_log. hardOriginals: Originaltexte der bereits
-  // applizierten Hard-Findings — Stil-Findings mit Substring-Ueberlappung
-  // werden VOR dem KI-Call gedroppt (sonst sucht KI Text, der nicht mehr da
-  // ist).
-  async _applyStilkorrektur(html, selectedStyles, onProgress, hardOriginals = []) {
-    const aiBase = html.length || 1;
-    const log = {
-      requested: selectedStyles.length,
-      returned: 0,
-      applied: 0,
-      items: [],
-      error: null,
-      attempted_at: new Date().toISOString(),
-    };
-    const usableStyles = [];
-    for (const s of selectedStyles) {
-      const orig = s.original || '';
-      const overlap = orig && hardOriginals.some(h => h && (h.includes(orig) || orig.includes(h)));
-      if (overlap) {
-        log.items.push({ original: orig, ersatz: s.korrektur || '', applied: false, reason: 'overlapped_with_hard' });
-      } else {
-        usableStyles.push(s);
-      }
-    }
-    if (usableStyles.length === 0) {
-      console.info(`[stilkorrektur] requested=${log.requested} all dropped (overlapped_with_hard)`);
-      return { html, log, appliedStyles: [] };
-    }
-    this.setStatus(this.t('stilkorrektur.workingChars', { chars: 0 }), true);
-    try {
-      let completionInfo = null;
-      const result = await this.callAI(
-        buildStilkorrekturPrompt(html, usableStyles),
-        'stilkorrektur',
-        (chars, tokIn) => {
-          const status = (tokIn > 0)
-            ? this.t('stilkorrektur.workingTokens', { tokIn: fmtTok(tokIn), tokOutEst: fmtTok(Math.round(chars / 4)) })
-            : this.t('stilkorrektur.workingChars', { chars });
-          this.setStatus(status, true);
-          if (onProgress) onProgress(chars, aiBase);
-        },
-        ({ tokensIn, tokensOut, tokPerSec }) => { completionInfo = { tokensIn, tokensOut, tokPerSec }; }
-      );
-      if (completionInfo) {
-        this.setStatus(this.t('stilkorrektur.done', {
-          tokIn: fmtTok(completionInfo.tokensIn || 0),
-          tokOut: fmtTok(completionInfo.tokensOut || 0),
-          tps: completionInfo.tokPerSec ? Math.round(completionInfo.tokPerSec) : 0,
-        }), true);
-      }
-      const korrekturen = Array.isArray(result?.korrekturen) ? result.korrekturen : [];
-      log.returned = korrekturen.length;
-      let outHtml = html;
-      const styleApplied = new Array(usableStyles.length).fill(false);
-      const countMatches = korrekturen.length === usableStyles.length;
-      for (let i = 0; i < korrekturen.length; i++) {
-        const k = korrekturen[i];
-        const skip = !k.original || !k.ersatz || k.original === k.ersatz;
-        const before = outHtml;
-        const after = skip ? before : replaceInHtml(outHtml, k.original, k.ersatz);
-        const applied = !skip && after !== before;
-        let styleIdx = null;
-        if (Number.isInteger(k.index)) {
-          const cand = k.index - 1;
-          if (cand >= 0 && cand < usableStyles.length) styleIdx = cand;
-        }
-        if (styleIdx === null && countMatches) styleIdx = i;
-        log.items.push({
-          index: k.index ?? null,
-          style_idx: styleIdx,
-          original: k.original || '',
-          ersatz: k.ersatz || '',
-          applied,
-          reason: skip ? 'empty_or_identical' : (applied ? null : 'not_found_in_html'),
-        });
-        if (applied) {
-          log.applied++;
-          outHtml = after;
-          if (styleIdx !== null) styleApplied[styleIdx] = true;
-        }
-      }
-      const appliedStyles = usableStyles.filter((_, i) => styleApplied[i]);
-      const dropped = log.requested - usableStyles.length;
-      console.info(`[stilkorrektur] requested=${log.requested} dropped_overlap=${dropped} returned=${log.returned} applied=${log.applied} mappable=${appliedStyles.length}`);
-      return { html: outHtml, log, appliedStyles };
-    } catch (e) {
-      console.error('[_applyStilkorrektur]', e);
-      log.error = e?.message || String(e);
-      this.setStatus(this.t('stilkorrektur.failed'), true);
-      return { html, log, appliedStyles: [] };
-    }
-  },
-
   // Gemeinsamer Kern fuer Lektorat-Save und History-Apply:
-  // Seite frisch laden → Hard-Korrekturen anwenden → Stilkorrektur → Safety-
-  // Check → Speichern. `fresh: true` umgeht SWR; sonst koennte der CONTENT_CACHE
-  // nach kurz zuvor gesetzten Edits noch die alte Fassung liefern und der
-  // gleich folgende PUT wuerde frische Server-Edits mit Stale-Daten
-  // ueberschreiben.
-  async _loadApplyAndSave(selectedErrors, selectedStyles, onProgress, source = 'lektorat-apply') {
+  // Seite frisch laden → Korrekturen anwenden → Safety-Check → Speichern.
+  // `fresh: true` umgeht SWR; sonst koennte der CONTENT_CACHE nach kurz zuvor
+  // gesetzten Edits noch die alte Fassung liefern und der gleich folgende PUT
+  // wuerde frische Server-Edits mit Stale-Daten ueberschreiben.
+  async _loadApplyAndSave(selectedErrors, onProgress, source = 'lektorat-apply') {
     onProgress(10, this.t('lektorat.loadingPage'));
     const page = await contentRepo.loadPage(this.currentPage.id, { fresh: true });
     page.html = stripFocusArtefacts(page.html || '');
 
-    let finalHtml = selectedErrors.length > 0
+    const finalHtml = selectedErrors.length > 0
       ? this._applyCorrections(page.html, selectedErrors)
       : page.html;
-
-    let stilLog = null;
-    let appliedStyles = [];
-    if (selectedStyles.length > 0) {
-      onProgress(30, null);
-      const hardOriginals = selectedErrors.map(e => e?.original).filter(Boolean);
-      const r = await this._applyStilkorrektur(
-        finalHtml,
-        selectedStyles,
-        (chars, aiBase) => onProgress(Math.min(70, 30 + Math.round((chars / aiBase) * 40)), null),
-        hardOriginals,
-      );
-      finalHtml = r.html;
-      stilLog = r.log;
-      appliedStyles = r.appliedStyles || [];
-    }
 
     if (finalHtml.length < page.html.length * SAFETY_HTML_RATIO) {
       throw new Error(this.t('lektorat.unsafeHtml'));
@@ -160,14 +47,13 @@ export const lektoratMethods = {
     // nicht unmittelbar danach auf "seit Lektorat bearbeitet" flippen.
     this.markPageChecked?.(this.currentPage.id);
     this._syncPageStatsAfterSave?.(this.currentPage, finalHtml);
-    return { finalHtml, stilLog, appliedStyles };
+    return { finalHtml };
   },
 
 
   _recomputeCorrectedHtml() {
     if (!this.originalHtml) return;
-    // Nur Nicht-Stil-Korrekturen können direkt angewendet werden (Stil läuft über KI-Reformulierung erst beim Speichern)
-    const selected = this.lektoratFindings.filter((f, i) => this.selectedFindings[i] && f.typ !== 'stil');
+    const selected = this.lektoratFindings.filter((_, i) => this.selectedFindings[i]);
     this.correctedHtml = selected.length > 0
       ? this._applyCorrections(this.originalHtml, selected)
       : this.originalHtml;
@@ -344,12 +230,9 @@ export const lektoratMethods = {
     if (!this.currentPage) return;
     const selected = this.lektoratFindings.filter((_, i) => this.selectedFindings[i]);
     if (selected.length === 0) return;
-    // Split: Stil-Typ läuft über KI-Reformulierung, Rest über direkte Textersetzung
-    const selectedHard   = selected.filter(f => f.typ !== 'stil');
-    const selectedStyles = selected.filter(f => f.typ === 'stil');
 
     try {
-      const { finalHtml, stilLog, appliedStyles } = await this._loadApplyAndSave(selectedHard, selectedStyles, (pct, text) => {
+      const { finalHtml } = await this._loadApplyAndSave(selected, (pct, text) => {
         this.saveApplying = pct;
         if (text) this.setStatus(text, true);
       });
@@ -357,11 +240,7 @@ export const lektoratMethods = {
       if (this.lastCheckId) {
         try {
           this.saveApplying = 95;
-          // applied = Hard-Findings + tatsächlich übernommene Stil-Findings.
-          // Stil-Findings ohne Match (KI-Original passt nicht ins HTML) bleiben
-          // bewusst draußen — sonst zeigt die History sie als gespeichert, obwohl
-          // sie nie ins BookStack-HTML geschrieben wurden.
-          let applied = [...selectedHard, ...(appliedStyles || [])];
+          let applied = selected;
           let selectedAll = selected;
           // Bei History-Einträgen: mit bereits angewendeten Korrekturen mergen
           if (this.activeHistoryEntryId) {
@@ -376,7 +255,6 @@ export const lektoratMethods = {
             }
           }
           const body = { applied_errors_json: applied, selected_errors_json: selectedAll };
-          if (stilLog) body.stilkorrektur_log = stilLog;
           const r = await fetch('/history/check/' + this.lastCheckId + '/saved', {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },

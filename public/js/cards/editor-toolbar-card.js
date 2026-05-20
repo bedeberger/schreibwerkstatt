@@ -39,11 +39,12 @@ export function registerEditorToolbarCard() {
       }, { capture: true, signal });
 
       // Delegierter Keydown-Listener auf dem contenteditable — filtert per
-      // closest() nach `.page-content-view--editing`, damit wir nur im
-      // Edit-Bereich reagieren.
+      // closest() auf Normal- bzw. Focus-Container, damit wir nur im Edit-
+      // Bereich reagieren. Beide Container haben getrennte Klassen
+      // (entkoppelt), Selektor matcht beide.
       document.addEventListener('keydown', (e) => {
         const target = e.target;
-        if (!target?.closest?.('.page-content-view--editing')) return;
+        if (!target?.closest?.('.page-content-view--editing, .focus-editor__content')) return;
         this._onEditKeydown(e);
       }, { signal });
     },

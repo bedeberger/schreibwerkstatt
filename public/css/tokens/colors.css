@@ -95,6 +95,7 @@
   /* Page-Content-View + Tooltip-Panels */
   --color-page-view-bg: #fbf8f3;
   --color-page-view-text: #2a2620;
+  --color-notebook-rule: rgba(120, 95, 60, 0.16);
   --color-tooltip-bg: #ffffff;
 
   /* Dev-Banner + Session-Banner */
@@ -256,6 +257,7 @@
 
   --color-page-view-bg: #1f1d1a;
   --color-page-view-text: #d8d3c8;
+  --color-notebook-rule: rgba(216, 211, 200, 0.09);
   --color-tooltip-bg: #2d2a25;
 
   --color-session-banner-btn-hover: #c44040;
