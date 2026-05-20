@@ -35,6 +35,7 @@
 .page-content-view h5 { font-size: var(--font-em-95); margin: 0.3em 0 0.2em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
 .page-content-view h6 { font-size: var(--font-em-90); margin: 0.3em 0 0.2em; font-weight: 700; color: var(--color-muted); }
 .page-content-view p { margin: 0.6em 0; text-wrap: pretty; }
+.page-content-view a { overflow-wrap: anywhere; }
 
 /* Marginalia: Absätze mit Lektorats-Markierungen bekommen rechts einen
    feinen severity-getönten Akzentstreifen (wie roter Rotstift am Manuskript-

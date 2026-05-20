@@ -425,7 +425,9 @@
   "pdfExport.toc.enabled":                 "Generate table of contents",
   "pdfExport.toc.title":                   "Heading",
   "pdfExport.toc.depth":                   "Depth",
-  "pdfExport.toc.depthChapters":           "Chapters only",
+  "pdfExport.toc.depthChapters":           "Top chapters only",
+  "pdfExport.toc.depthChaptersSubs":       "Chapters + subchapters",
+  "pdfExport.toc.depthAll":                "All levels (incl. sub-subchapters)",
   "pdfExport.toc.depthChaptersPages":      "Chapters + sub-pages",
   "pdfExport.toc.showPageNumbers":         "Show page numbers",
 
