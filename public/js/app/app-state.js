@@ -131,8 +131,14 @@ const editorState = () => ({
 // Flags (editMode, checkDone, focusMode, plus „Viewmodus" als none-of-above)
 // in app-state.js sichtbar sind. Sub-Komponenten-Maschine `_focusState`/
 // `_focusGen` lebt in editorFocusCard.
+//
+// Phase-4-Entkopplung: `focusActive` ist der neue Mode-agnostische Flag, der
+// in späteren Schritten `focusMode` ablöst. Bis dahin Mirror — wird beim
+// enter/exit gespiegelt, damit Konsumenten schrittweise umsteigen können.
+// Invariante während der Transition: `focusActive === focusMode`.
 const focusModeState = () => ({
   focusMode: false,
+  focusActive: false,
   focusCountWords: 0,
   focusCountChars: 0,
   focusCountWordsDelta: '±0',

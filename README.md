@@ -66,6 +66,10 @@ KI-Provider, Google-OAuth, App-URL, Modell-Limits, Mailer, Cron, veraPDF konfigu
 
 Produktiv: systemd-Service via [deploy/schreibwerkstatt.service](deploy/schreibwerkstatt.service), Erst-Install `bash deploy/install.sh`, CD `bash deploy/deploy.sh`.
 
+### Deploy-Migrations
+
+Einmalige Prod-Anpassungen (Dateisystem-Cleanup, chown-Fixes, sqlite3-Touches) gehören als idempotente Shell-Scripts unter [deploy/migrations/](deploy/migrations/) — Konvention `NNN-slug.sh` (3-stellige fortlaufende Nummer). [deploy/apply-migrations.sh](deploy/apply-migrations.sh) läuft nach jedem Deploy (nach rsync + chown, vor `npm install`), führt nur Scripts aus, deren `NNN` nicht in `$INSTALL_DIR/.deploy-migrations-applied` steht, und appendet bei Erfolg. Script erhält `$INSTALL_DIR` als `$1`. Fehler bricht Deploy ab. Migration trotzdem idempotent schreiben (Marker könnte verloren gehen).
+
 ### Reverse-Proxy
 
 SSE braucht ungepufferte Verbindungen:

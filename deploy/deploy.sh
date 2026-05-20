@@ -33,15 +33,13 @@ rsync -a --delete \
   --exclude='schreibwerkstatt.log*' --exclude='backup' --exclude='backups' --exclude='ai_parse_fails' \
   ./ "$INSTALL_DIR/"
 
-# Alte Log-Rotation (winston ohne tailable) hinterliess schreibwerkstatt1.log..3.log
-# als aktive Targets. Neues Schema: schreibwerkstatt.log = current, .log1..log5 = Archiv.
-# Einmal-Cleanup der numerierten Restdateien aus dem alten Schema.
-for f in "$INSTALL_DIR"/schreibwerkstatt[0-9].log; do
-  [ -e "$f" ] && rm -f "$f"
-done
-
 # Ownership auf github-runner setzen
 chown -R github-runner:github-runner "$INSTALL_DIR"
+
+# Deploy-Migrations: einmalige Scripts unter deploy/migrations/ (z.B. Dateisystem-
+# Cleanup, chown-Fixes, sqlite3-Touches). Marker-Datei .deploy-migrations-applied
+# in $INSTALL_DIR verhindert Doppellauf. Konvention + Beispiele siehe README.md.
+bash "$INSTALL_DIR/deploy/apply-migrations.sh" "$INSTALL_DIR"
 
 # Abhängigkeiten aktualisieren
 cd "$INSTALL_DIR"

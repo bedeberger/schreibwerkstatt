@@ -57,6 +57,7 @@ export const focusCardMethods = {
     const gen = ++this._focusGen;
 
     app.focusMode = true;
+    app.focusActive = true;
     document.body.classList.add('focus-mode');
     document.body.classList.remove('focus-mode--paragraph', 'focus-mode--sentence', 'focus-mode--window-3', 'focus-mode--typewriter-only');
     document.body.classList.add('focus-mode--' + (app.focusGranularity || 'paragraph'));
@@ -75,6 +76,7 @@ export const focusCardMethods = {
         this._focusTeardown();
         clearFocusSnapshot();
         app.focusMode = false;
+        app.focusActive = false;
         document.body.classList.remove('focus-mode');
         this._focusState = 'idle';
       }
@@ -357,6 +359,7 @@ export const focusCardMethods = {
     clearFocusSnapshot();
 
     app.focusMode = false;
+    app.focusActive = false;
     document.body.classList.remove('focus-mode');
     document.body.classList.remove('focus-mode--paragraph', 'focus-mode--sentence', 'focus-mode--window-3', 'focus-mode--typewriter-only');
     document.body.classList.remove('focus-cursor-hidden');
