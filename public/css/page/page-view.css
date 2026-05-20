@@ -23,21 +23,6 @@
   text-rendering: optimizeLegibility;
 }
 
-/* Tagebuch-Caption: Heft-Eintrag-Header über dem Sheet — Page-Name als
-   typografische Marginalie. Max-width matcht .page-content-view, damit
-   die dotted-rule mit der Sheet-Kante fluchtet. */
-.page-sheet-caption {
-  max-width: calc(64ch + 2 * clamp(18px, 4vw, 40px));
-  margin: var(--space-sm) auto 0;
-  padding: 0 clamp(18px, 4vw, 40px) var(--space-2xs);
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: var(--font-em-90);
-  color: var(--color-muted);
-  letter-spacing: 0.04em;
-  text-align: right;
-  border-bottom: 1px dotted var(--color-border);
-}
 .page-content-view h1 { font-size: var(--font-em-150); margin: 0.6em 0 0.3em; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
 .page-content-view h2 { font-size: var(--font-em-130); margin: 0.5em 0 0.3em; font-weight: 700; letter-spacing: -0.005em; text-wrap: balance; }
 .page-content-view h3 { font-size: var(--font-em-115); margin: 0.4em 0 0.2em; font-weight: 700; text-wrap: balance; }
@@ -219,7 +204,6 @@
    normale Zeilenumbrüche. */
 @media (max-width: 600px) {
   .page-content-view p { margin: 0.8em 0; }
-  .page-sheet-caption { font-size: var(--font-em-85); }
 }
 
 }

@@ -1,9 +1,3 @@
-<!-- Lesemodus: gerenderte Seite aus BookStack (inkl. Lektorat-Marks).
-     Caption oberhalb des Sheets = Tagebuch-Heft-Eintragsmarke, zeigt den
-     Page-Name nochmal typografisch (Card-Header bleibt UI-Titel). -->
-<template x-if="!editMode && renderedPageHtml && currentPage?.name">
-  <div class="page-sheet-caption" x-text="currentPage.name"></div>
-</template>
 <div x-show="!editMode && renderedPageHtml"
      class="page-content-view"
      x-html="renderedPageHtml"
