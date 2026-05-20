@@ -1,15 +1,15 @@
-import { htmlToText, cleanContentArtefacts, tzOpts } from '../utils.js';
-import { sortByPosition, buildHighlightedHtml } from '../book/page-view.js';
-import { contentRepo } from '../repo/content.js';
-import { readDraft, writeDraft, clearDraft } from './draft-storage.js';
+import { htmlToText, cleanContentArtefacts, tzOpts } from '../../utils.js';
+import { sortByPosition, buildHighlightedHtml } from '../../book/page-view.js';
+import { contentRepo } from '../../repo/content.js';
+import { readDraft, writeDraft, clearDraft } from '../draft-storage.js';
 import {
   stripLektoratMarks,
   normalizeEditorBlocks,
-} from './shared/html-clean.js';
-import { buildSavePayload, isNoChange } from './shared/save-pipeline.js';
-import { isPageConflict, readConflictBody } from './shared/page-api.js';
-import { getActiveEditorContainer } from './shared/active-editor.js';
-import { installEditCounter } from './shared/edit-counter.js';
+} from '../shared/html-clean.js';
+import { buildSavePayload, isNoChange } from '../shared/save-pipeline.js';
+import { isPageConflict, readConflictBody } from '../shared/page-api.js';
+import { getActiveEditorContainer } from '../shared/active-editor.js';
+import { installEditCounter } from '../shared/edit-counter.js';
 
 // Auto-Save nach BookStack: idle-debounce + max-Cap. Jede Schreibaktion
 // resettet den Idle-Timer; läuft der User durchgehend, greift der Max-Timer.

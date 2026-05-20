@@ -9,7 +9,7 @@
 // delegierte keydown/input-Listener auf das contenteditable, damit der Root
 // keine Toolbar-spezifischen Handler mehr benötigt.
 
-import { toolbarCardMethods } from '../editor/toolbar.js';
+import { toolbarCardMethods } from '../editor/notebook/toolbar.js';
 
 export function registerEditorToolbarCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;

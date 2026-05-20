@@ -43,7 +43,7 @@ test('I1: enterFocusMode bricht ab, wenn editMode false', () => {
 
 // ── I2: cancelEdit ruft exitFocusMode ────────────────────────────────────────
 test('I2: cancelEdit ruft exitFocusMode wenn focusMode aktiv', () => {
-  const src = read('public/js/editor/edit.js');
+  const src = read('public/js/editor/notebook/edit.js');
   const m = src.match(/async cancelEdit\s*\(\)\s*\{[\s\S]*?\n  \}/);
   assert.ok(m, 'cancelEdit gefunden');
   const body = m[0];
@@ -55,7 +55,7 @@ test('I2: cancelEdit ruft exitFocusMode wenn focusMode aktiv', () => {
 
 // ── I3: saveEdit — Fokus bleibt im Fokus ─────────────────────────────────────
 test('I3: saveEdit hat Fokus-Branch, der editMode NICHT räumt', () => {
-  const src = read('public/js/editor/edit.js');
+  const src = read('public/js/editor/notebook/edit.js');
   const m = src.match(/async saveEdit\s*\(\)\s*\{[\s\S]*?\n  \}/);
   assert.ok(m, 'saveEdit gefunden');
   const body = m[0];

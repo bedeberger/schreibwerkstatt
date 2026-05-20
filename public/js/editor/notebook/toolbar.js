@@ -21,7 +21,7 @@ const SLASH_ITEMS = [
   { key: 'hr',         tag: 'hr' },
 ];
 
-import { getEditEl, placeCaretIn, WORD_RE } from './utils.js';
+import { getEditEl, placeCaretIn, WORD_RE } from '../utils.js';
 
 const BLOCK_SEL = 'p, h1, h2, h3, h4, h5, h6, blockquote, pre, li, div.poem';
 

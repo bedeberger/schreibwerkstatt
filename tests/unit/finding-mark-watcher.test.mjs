@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(__dirname, '..', '..');
-const src = fs.readFileSync(path.join(repo, 'public/js/editor/edit.js'), 'utf8');
+const src = fs.readFileSync(path.join(repo, 'public/js/editor/notebook/edit.js'), 'utf8');
 
 const installMatch = src.match(/_installFindingMarkWatcher\s*\(\)\s*\{[\s\S]*?\n  \},/);
 assert.ok(installMatch, '_installFindingMarkWatcher gefunden');

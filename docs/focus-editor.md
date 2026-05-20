@@ -2,7 +2,7 @@
 
 Vollbild-Schreibmodus mit Absatz-/Satz-Spotlight, Typewriter-Scroll und Live-Word-/Char-Counter. Heilige Kuh: jede Änderung an diesem Modul muss dieses Dokument konsultieren. Drift in den Invarianten = sichtbares „Flattern", verlorene Edits oder Phantom-Revisionen im Storage-Backend.
 
-Code: [public/js/editor/focus.js](../public/js/editor/focus.js) (Facade) → [public/js/editor/focus/](../public/js/editor/focus/) (Submodule), [public/js/cards/editor-focus-card.js](../public/js/cards/editor-focus-card.js) (Alpine.data-Sub), [public/css/editor/focus-mode.css](../public/css/editor/focus-mode.css). Tests: [tests/e2e/focus-editor.spec.js](../tests/e2e/focus-editor.spec.js), [tests/unit/editor-focus.test.mjs](../tests/unit/editor-focus.test.mjs), [tests/unit/focus-granularity.test.mjs](../tests/unit/focus-granularity.test.mjs).
+Code: [public/js/editor/focus.js](../public/js/editor/focus.js) (Facade) → [public/js/editor/focus/](../public/js/editor/focus/) (Submodule), [public/js/cards/editor-focus-card.js](../public/js/cards/editor-focus-card.js) (Alpine.data-Sub), [public/css/editor/focus/focus-mode.css](../public/css/editor/focus/focus-mode.css). Tests: [tests/e2e/focus-editor.spec.js](../tests/e2e/focus-editor.spec.js), [tests/unit/editor-focus.test.mjs](../tests/unit/editor-focus.test.mjs), [tests/unit/focus-granularity.test.mjs](../tests/unit/focus-granularity.test.mjs).
 
 Trigger: Hotkey `Cmd/Ctrl+Shift+E` (überall im Editor; aus Lesemodus → startet Edit + Fokus in einem). Body-Listener in [public/index.html](../public/index.html#L227) routet via `handleFocusHotkey`.
 
@@ -179,6 +179,6 @@ Neuer Granularitätsmodus, neue Hotkey, neuer Listener-Pfad:
 2. Wenn neuer Body-Class-Marker: in `_focusInstall` add, in `exitFocusMode` remove, in `$watch(focusGranularity)`-Switch berücksichtigen.
 3. Wenn neuer Listener: ausschliesslich am `ctx.container` oder `window` registrieren mit `{ signal }` aus `_focusInstall`. KEIN globaler `window.addEventListener` ohne AbortController.
 4. State-Machine berühren? Generation-Check im async-Body Pflicht (`if (gen !== this._focusGen) return`).
-5. CSS für neue Markierungs-Klasse in [focus-mode.css](../public/css/editor/focus-mode.css) — selber `@layer components`, `body.focus-mode :is(.page-content-view, .page-content-view--editing) …`.
+5. CSS für neue Markierungs-Klasse in [focus-mode.css](../public/css/editor/focus/focus-mode.css) — selber `@layer components`, `body.focus-mode :is(.page-content-view, .page-content-view--editing) …`.
 6. Tests in [tests/unit/editor-focus.test.mjs](../tests/unit/editor-focus.test.mjs) ergänzen (pure Helpers) und ggf. E2E-Case in [tests/e2e/focus-editor.spec.js](../tests/e2e/focus-editor.spec.js).
 7. CLAUDE.md „Editor-Modi"-Tabelle prüfen — bei strukturellen Änderungen am Modus-Set Invarianten-Liste updaten.

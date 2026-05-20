@@ -48,7 +48,7 @@ import { registerSearchCard } from './cards/search-card.js';
 import { registerFolderImportCard } from './cards/folder-import-card.js';
 import { configureI18n, i18nMethods, getSupportedLocales } from './i18n.js';
 import { pageViewMethods } from './book/page-view.js';
-import { editorEditMethods } from './editor/edit.js';
+import { editorEditMethods } from './editor/notebook/edit.js';
 import { registerEditorFindCard } from './cards/editor-find-card.js';
 import { focusMethods } from './editor/focus.js';
 import { synonymMethods } from './editor/synonyme.js';
