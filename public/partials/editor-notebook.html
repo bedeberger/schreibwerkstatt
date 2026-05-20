@@ -108,10 +108,10 @@
               <span x-show="saveApplying != null" class="spinner"></span><span x-text="saveApplying != null ? t('editor.btn.saveCorrectionsProgress') : t('editor.btn.saveCorrections')"></span>
             </button>
           </span>
-          <span class="action-sep" aria-hidden="true" x-show="canReview() && canEdit()"></span>
-          <span class="action-group" x-show="canEdit()">
+          <span class="action-sep" aria-hidden="true" x-show="canReview() && canEdit() && !checkDone"></span>
+          <span class="action-group" x-show="canEdit() && !checkDone">
             <button type="button" @click="startEdit()" :disabled="checkLoading || saveApplying != null || originalHtml === null" :data-tip="t('editor.btn.editTitle')" x-text="t('editor.btn.edit')"></button>
-            <button type="button" @click="startFocusEdit()" :disabled="checkLoading || saveApplying != null || originalHtml === null" :data-tip="t('editor.btn.focusTitle')" x-text="t('editor.btn.focus')"></button>
+            <button type="button" @click="enterFocusFromPageview()" :disabled="checkLoading || saveApplying != null || originalHtml === null" :data-tip="t('editor.btn.focusTitle')" x-text="t('editor.btn.focus')"></button>
           </span>
           <span class="action-sep" aria-hidden="true"></span>
           <span class="action-group">
@@ -136,8 +136,7 @@
           </span>
           <span class="action-sep" aria-hidden="true"></span>
           <span class="action-group">
-            <button type="button" @click="toggleFocusMode()" :class="{ primary: focusActive }" :data-tip="focusActive ? t('editor.btn.leaveFocusTitle') : t('editor.btn.enterFocusTitle')" x-text="focusActive ? t('editor.btn.leaveFocus') : t('editor.btn.focusShort')"></button>
-            <button type="button" @click="closeFindings()" x-show="checkDone && !focusActive" :data-tip="t('editor.btn.exitCheckTitle')" x-text="t('editor.btn.exitCheck')"></button>
+            <button type="button" @click="focusActive ? exitFocusMode() : enterFocusMode()" :class="{ primary: focusActive }" :data-tip="focusActive ? t('editor.btn.leaveFocusTitle') : t('editor.btn.enterFocusTitle')" x-text="focusActive ? t('editor.btn.leaveFocus') : t('editor.btn.focusShort')"></button>
           </span>
         </span>
       </template>

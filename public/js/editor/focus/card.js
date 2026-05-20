@@ -26,13 +26,13 @@ import {
 import { writeFocusSnapshot, clearFocusSnapshot, installEditCounter } from './storage.js';
 
 export const focusCardMethods = {
-  toggleFocusMode() {
-    if (this._focusState === 'active') this.exitFocusMode();
-    else if (this._focusState === 'idle') this.enterFocusMode();
-    // entering/exiting → ignorieren (kein Double-Trigger).
-  },
-
-  startFocusEdit() {
+  // Page-View-Direkteinstieg: Edit-Mode hochfahren (falls nicht bereits aktiv)
+  // und dann in Fokus eintreten. Quelle: Focus-Button im Page-View-Header und
+  // Hotkey Cmd/Ctrl+Shift+E aus dem Lesemodus. Schritt 5-Stand: Edit-Mode wird
+  // weiterhin durchlaufen (Lock, Auto-Save, contenteditable-Mount), Focus-
+  // Overlay setzt sich anschliessend drüber. Phase 4f-real: Focus-Cardroot
+  // mountet eigenständig, ohne Normal-Editor-Detour.
+  enterFocusFromPageview() {
     const app = window.__app;
     if (!app) return;
     if (!app.editMode) {
@@ -271,7 +271,8 @@ export const focusCardMethods = {
         }
       } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && e.code === 'KeyE') {
         e.preventDefault();
-        this.toggleFocusMode();
+        if (this._focusState === 'active') this.exitFocusMode();
+        else if (this._focusState === 'idle') this.enterFocusMode();
       } else if ((e.key === 'l' || e.key === 'L') && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
         // Vim/emacs-Konvention: Ctrl+L recentert Cursor-Zeile in Viewport-Mitte.
         // Browser-Default (Adress-Leiste fokussieren) wird im Fokus-Modus

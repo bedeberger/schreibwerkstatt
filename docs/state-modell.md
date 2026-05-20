@@ -155,23 +155,22 @@ Vier orthogonale Modi am Editor — kein Single-Enum, sondern Boolean-Flags am R
 - Editmodus: `editDirty`, `editSaving`, `saveOffline`, `lastAutosaveAt`, `lastDraftSavedAt`, `_autosaveIdleTimer`, `_autosaveMaxTimer`, `_draftTimer`, `_onlineHandler`, `originalHtml`.
 - Fokusmodus: `focusCountWords/Chars/*Delta` (`focusState`) + `focusGranularity` (`shellState`) + Sub-Maschine `_focusState` (`idle`/`entering`/`active`/`exiting`) + `_focusGen` (Re-Entry-Guard) in [editorFocusCard](../public/js/cards/editor-focus-card.js).
 
-**Erlaubte Kombinationen** (8 Bool-Tripel, 6 erlaubt):
+**Erlaubte Kombinationen** (8 Bool-Tripel, 4 erlaubt):
 
 | Edit | Focus | Check | Erlaubt? | Bemerkung |
 |------|-------|-------|----------|-----------|
 | 0 | 0 | 0 | ✓ | Viewmodus |
 | 0 | 0 | 1 | ✓ | View + Findings (Split-View) |
 | 1 | 0 | 0 | ✓ | Edit |
-| 1 | 0 | 1 | ✓ | Edit + Findings (Marks im Editor) |
 | 1 | 1 | 0 | ✓ | Edit + Fokus |
-| 1 | 1 | 1 | ✓ | Findings vorhanden, Fokus blendet UI aus |
+| 1 | * | 1 | ✗ | **Invariante: Edit + Prüfmodus forbidden** — `startEdit` bricht bei `checkDone` ab; Edit/Fokus-Buttons sind im Prüfmodus ausgeblendet. |
 | 0 | 1 | * | ✗ | **Invariante: `focusActive → editMode`** |
 
 **Invarianten (Pflicht — bei Änderungen prüfen):**
 
 1. `focusActive === true` ⇒ `editMode === true`. Enforced in [editor/focus/card.js:45](../public/js/editor/focus/card.js#L45) (`enterFocusMode` bricht bei `!editMode` ab) und [editor/edit.js:250](../public/js/editor/edit.js#L250) (`cancelEdit` ruft `exitFocusMode` zuerst).
 2. `runCheck` darf nicht im Editmodus starten. Template-Guard: Prüfen-Button steht in `<template x-if="!editMode">` ([editor.html:43](../public/partials/editor.html#L43)).
-3. `closeFindings`-Button im Editmodus nur sichtbar wenn `!focusActive` ([editor.html:81](../public/partials/editor.html#L81)) — im Fokus sind Findings ohnehin ausgeblendet.
+3. `editMode === true` ⇒ `checkDone === false`. Enforced in [editor/notebook/edit.js#startEdit](../public/js/editor/notebook/edit.js) (Guard `if (this.checkDone) return`) und im Template über `x-show="canEdit() && !checkDone"` auf Edit/Fokus-Buttons ([editor-notebook.html:112](../public/partials/editor-notebook.html#L112)). Findings im Editor sind damit ausgeschlossen — Korrekturen laufen via `saveCorrections` aus dem Prüfmodus, nicht via contenteditable.
 4. **Chat-Modus** (showChatCard) snapshotet `checkDone` in `_checkDoneBeforeChat` und setzt `checkDone=false` ([chat-base.js:129](../public/js/chat/chat-base.js#L129)); beim Schliessen Restore ([app-view.js:317-319](../public/js/app/app-view.js#L317-L319)). Ohne diesen Snapshot würde der Chat Findings doppelt rendern.
 5. **Reset-Reihenfolge in `resetPage()`** ([app-view.js:391](../public/js/app/app-view.js#L391)): `exitFocusMode` → `_stopAutosave` → Chat-Reset → Card-Flags → Editor-State (`editMode/editDirty/editSaving`) → Lektorat-State (`checkDone/findings/...`). Diese Reihenfolge ist Pflicht — Fokus zuerst, weil `exitFocusMode` `editMode/editDirty` liest.
 6. `saveEdit` im Fokus bleibt im Fokus+Edit ([editor/edit.js:337](../public/js/editor/edit.js#L337)) — User möchte weiter schreiben. Erst sauberer Exit räumt Edit-Mode auf, dann flusht `exitFocusMode` per `quickSave` ([editor/focus/card.js:350-351](../public/js/editor/focus/card.js#L350-L351)).

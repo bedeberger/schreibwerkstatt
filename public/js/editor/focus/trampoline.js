@@ -5,21 +5,21 @@
 // damit liegen alle vier Editor-Modi-Flags in einem konsistenten Slice.
 
 export const focusMethods = {
-  toggleFocusMode() {
-    window.dispatchEvent(new CustomEvent('editor:focus:toggle'));
-  },
-
-  startFocusEdit() {
-    // Root wechselt in Edit-Mode (falls nicht bereits), Sub tritt dann in Fokus ein.
-    window.dispatchEvent(new CustomEvent('editor:focus:start-edit'));
-  },
-
   enterFocusMode() {
     window.dispatchEvent(new CustomEvent('editor:focus:enter'));
   },
 
   exitFocusMode() {
     window.dispatchEvent(new CustomEvent('editor:focus:exit'));
+  },
+
+  // Page-View-Direkteinstieg: Sub-Karte trampolinet Edit-Mode hoch und tritt
+  // dann in Fokus ein. Quelle: Focus-Button im Page-View-Header + Hotkey aus
+  // Lesemodus. Pendant zu enter/exit, eigener Event, damit die Sub-Karte den
+  // Mode-Übergang als ein Ganzes verbuchen kann (keine Race zwischen
+  // startEdit() und enterFocusMode()).
+  enterFocusFromPageview() {
+    window.dispatchEvent(new CustomEvent('editor:focus:enter-from-pageview'));
   },
 
   // Global Cmd/Ctrl+Shift+E-Hotkey. Läuft auf dem Body-Listener (siehe index.html),
@@ -37,7 +37,7 @@ export const focusMethods = {
     } else if (this.editMode) {
       window.dispatchEvent(new CustomEvent('editor:focus:enter'));
     } else {
-      window.dispatchEvent(new CustomEvent('editor:focus:start-edit'));
+      window.dispatchEvent(new CustomEvent('editor:focus:enter-from-pageview'));
     }
   },
 };

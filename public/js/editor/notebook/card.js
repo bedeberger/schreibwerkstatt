@@ -7,6 +7,17 @@
 // startEdit/saveEdit/cancelEdit von der Root in die Sub wandern.
 
 import { readNormalSnapshot, clearNormalSnapshot } from './storage.js';
+import { readDraft } from '../draft-storage.js';
+
+// Restore nur, wenn für die Seite ein lokaler Draft (ungespeicherter Inhalt)
+// existiert. Ohne Draft hat der User keinen nennenswerten Edit-State —
+// Snapshot-Reste aus exitFocusMode/_closeOtherMainCards würden den User sonst
+// ungewollt aus „viewing" zurück in den Edit-Modus zwingen.
+function hasUnsavedDraft(pageId, currentHtml) {
+  const draft = readDraft(pageId);
+  if (!draft || !draft.html) return false;
+  return draft.html !== currentHtml;
+}
 
 export const notebookCardMethods = {
   // Reload-Wiederaufnahme: liest den `normal.snapshot` aus sessionStorage und
@@ -36,6 +47,7 @@ export const notebookCardMethods = {
     if (!app.renderedPageHtml) return;
     this._notebookRestoreSnapshot = null;
     clearNormalSnapshot();
+    if (!hasUnsavedDraft(snap.pageId, app.renderedPageHtml)) return;
     app.startEdit?.();
   },
 };

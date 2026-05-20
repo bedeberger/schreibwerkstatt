@@ -36,15 +36,15 @@ view  ──startEdit──▶ edit  ──saveEdit──▶ view
                        └──Reload──▶ Snapshot-Restore (sessionStorage)
 ```
 
-### startEdit ([edit.js:80-168](../public/js/editor/notebook/edit.js#L80-L168))
-1. Guards: `currentPage && originalHtml !== null`, kein laufender Check / Save, `canEdit()`.
+### startEdit
+1. Guards: `currentPage && originalHtml !== null`, kein laufender Check / Save, **nicht im Prüfmodus** (`checkDone === false`), `canEdit()`.
 2. `editMode=true`, Reset `editDirty/editSaving/saveOffline/pendingDraft`.
 3. `execCommand('defaultParagraphSeparator', false, 'p')` einmalig — sonst erzeugt Chrome/Safari `<div>` statt `<p>` bei Enter und Block-Erkennung greift nicht.
 4. Draft aus localStorage lesen ([editor/draft-storage.js](../public/js/editor/draft-storage.js)); wenn vorhanden und ungleich Original → übernehmen + `editDirty=true`.
-5. `el.innerHTML` setzen: Findings vorhanden → `buildHighlightedHtml` (Marks im DOM für Sichtprüfung), sonst Roh-HTML, sonst Platzhalter-`<p><br></p>`.
+5. `el.innerHTML` setzen: Roh-HTML oder Platzhalter-`<p><br></p>` bei leerer Seite.
 6. `normalizeEditorBlocks(el)` — orphan Text-/Inline-Runs in `<p>` wrappen. Weicht `innerHTML` ab → `editDirty=true` + Draft schreiben (Legacy-Reparatur persistieren).
 7. Caret-Slot: leerer letzter `<p>` ohne Kinder bekommt `<br>` — sonst kein Caret + keine `input`-Events.
-8. `_startAutosave` + `_installOnlineRetry` + `_installFindingMarkWatcher`.
+8. `_startAutosave` + `_installOnlineRetry`.
 9. `_startPresenceHeartbeat` + `_acquireEditLock` (Soft-Lock).
 10. `installEditCounter` (zählt in beiden Modi, sichtbar nur im Focus).
 11. `writeNormalSnapshot(pageId)` — sessionStorage für Reload-Restore.
@@ -70,7 +70,7 @@ view  ──startEdit──▶ edit  ──saveEdit──▶ view
 
 ### cancelEdit
 - Bei `editDirty` → `appConfirm` „verwerfen?". Klick „nein" → kein Cleanup, Editor bleibt.
-- Volles Teardown: Draft + Snapshot + Autosave + OnlineRetry + Findings-Watcher + Counter + Presence + Lock.
+- Volles Teardown: Draft + Snapshot + Autosave + OnlineRetry + Counter + Presence + Lock.
 - Wenn `focusActive` → zusätzlich `exitFocusMode` (Focus folgt Edit aus dem Notebook-Pfad; gilt nur, solange Invariante `focusMode ⇒ editMode` aktiv ist).
 
 ## Autosave + Draft
@@ -124,15 +124,6 @@ Sub-Karte `editorToolbarCard` ([cards/editor-toolbar-card.js](../public/js/cards
 4. Fallback Plain-Text wenn kein HTML.
 5. `_markEditDirty()`.
 
-## Finding-Marks-Watcher
-
-Lektorat-/Chat-Marks (`.lektorat-mark` / `.chat-mark`) werden in `startEdit` ins DOM gemerged. Tippt der User **innerhalb** eines Marks, „folgt" das Mark dem Text und persistiert sonst beim Save.
-
-`_installFindingMarkWatcher` ([edit.js#L538-586](../public/js/editor/notebook/edit.js#L538-L586)) hält pro Mark einen Text-Snapshot, debounced auf `input`-Events:
-
-- Mark-Text weicht vom Snapshot ab → Unwrap (Inhalt vor das Mark, Mark + Folge-`.lektorat-ins`/`.chat-mark-ins` löschen).
-- **Caret im Mark** → Aufschieben (Unwrap würde Selection killen, Chromium-Bug). Beim nächsten `input` (Caret raus) oder `blur` → Force-Unwrap.
-
 ## Pflicht-Invarianten
 
 1. **Save-Source explizit:** `buildSavePayload` verlangt `'main'` (Normal-Editor) oder `'focus'` — Aufrufer entscheidet, nicht die Lib. Quelle: `this.focusActive ? 'focus' : 'main'`.
@@ -145,8 +136,9 @@ Lektorat-/Chat-Marks (`.lektorat-mark` / `.chat-mark`) werden in `startEdit` ins
 8. **Caret-Slot `<br>` in leerem `<p>`.** Bei frischen Seiten / `cleanPageHtml`-`<p></p>`-Fallback hat eine kindlose `<p>` zero-height; Caret rendert nicht. Pendant: `ensureTrailingParagraph` aus [shared/auto-slot.js](../public/js/editor/shared/auto-slot.js).
 9. **Conflict-Modal nur im manuellen `saveEdit`.** `quickSave` zeigt Banner statt Modal — Hintergrund-Save darf den User nicht unterbrechen.
 10. **Counter `installEditCounter` läuft ab `startEdit`.** Tagesdelta muss alle Edits zählen, sonst sieht der Focus-Counter beim Wiedereintritt falsche Werte. Anzeige nur im Focus-Header (`x-show=focusActive`).
-11. **Cleanup-Reihenfolge bei `cancelEdit`/`saveEdit` (clean):** Draft → Snapshot → Autosave → OnlineRetry → FindingMarkWatcher → Counter → Presence → Lock → `editMode=false`. Frühes `editMode=false` lässt Teardowns auf bereits genullten Refs laufen.
-12. **Findings-Filter nach jedem Save** (`_filterFindingsAfterSave`): Findings, deren `original`-Text nicht mehr matcht, gelten als behoben. Gilt sowohl für `saveEdit` als auch `quickSave` — sonst zeigt das Panel nach Focus-Edit veraltete Treffer.
+11. **Cleanup-Reihenfolge bei `cancelEdit`/`saveEdit` (clean):** Draft → Snapshot → Autosave → OnlineRetry → Counter → Presence → Lock → `editMode=false`. Frühes `editMode=false` lässt Teardowns auf bereits genullten Refs laufen.
+12. **Edit + Prüfmodus forbidden.** `startEdit` bricht bei `checkDone === true` ab; Edit/Fokus-Buttons sind im Prüfmodus per `x-show="!checkDone"` ausgeblendet. Findings landen damit nie im contenteditable — Korrekturen werden ausschliesslich via `saveCorrections` aus dem Prüfmodus-Header angewandt.
+13. **Findings-Filter nach jedem Save** (`_filterFindingsAfterSave`): Defensive Restbereinigung, falls Findings doch existieren — `original`-Text nicht mehr im neuen HTML → raus. Mit Invariante #12 üblicherweise No-Op.
 
 ## Shared-Lib `public/js/editor/shared/`
 

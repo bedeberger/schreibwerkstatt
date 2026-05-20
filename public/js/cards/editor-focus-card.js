@@ -7,13 +7,14 @@
 //   editor-toolbar/figur-lookup-Checks), `editMode`, `editDirty`, `editSaving`,
 //   `saveOffline`, `lastDraftSavedAt`. Die Sub schreibt `window.__app.focusActive`.
 //
-// Trigger-Events aus dem Root (Trampoline in editor/focus.js):
-//   - `editor:focus:toggle`    — toggle je nach State
-//   - `editor:focus:enter`     — explizit betreten (muss editMode sein)
-//   - `editor:focus:exit`      — verlassen
-//   - `editor:focus:start-edit` — startet Edit-Mode und tritt dann in Fokus ein
+// Trigger-Events aus dem Root (Trampoline in editor/focus/trampoline.js):
+//   - `editor:focus:enter`               — explizit betreten (muss editMode sein)
+//   - `editor:focus:exit`                — verlassen
+//   - `editor:focus:enter-from-pageview` — Page-View-Direkteinstieg: Sub
+//     trampolinet Edit-Mode hoch und tritt dann in Fokus ein.
 
 import { focusCardMethods, readFocusSnapshot, clearFocusSnapshot } from '../editor/focus.js';
+import { readDraft } from '../editor/draft-storage.js';
 
 export function registerEditorFocusCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -31,10 +32,9 @@ export function registerEditorFocusCard() {
       const abort = new AbortController();
       this._focusAbort = abort;
       const { signal } = abort;
-      window.addEventListener('editor:focus:toggle',     () => this.toggleFocusMode(),  { signal });
-      window.addEventListener('editor:focus:enter',      () => this.enterFocusMode(),   { signal });
-      window.addEventListener('editor:focus:exit',       () => this.exitFocusMode(),    { signal });
-      window.addEventListener('editor:focus:start-edit', () => this.startFocusEdit(),   { signal });
+      window.addEventListener('editor:focus:enter',               () => this.enterFocusMode(),         { signal });
+      window.addEventListener('editor:focus:exit',                () => this.exitFocusMode(),          { signal });
+      window.addEventListener('editor:focus:enter-from-pageview', () => this.enterFocusFromPageview(), { signal });
 
       // Live-Switch: User ändert Granularität in den Settings, während Focus
       // aktiv ist → Cardroot-Class + State sofort umstellen, ohne Exit/Re-Enter.
@@ -76,9 +76,14 @@ export function registerEditorFocusCard() {
       // versuchen, sonst Loop bei kaputter Seite.
       this._restoreSnapshot = null;
       // Snapshot wird in startEdit/enterFocusMode wieder gesetzt; hier vorab
-      // löschen, falls startFocusEdit bricht (z.B. checkLoading aktiv).
+      // löschen, falls enterFocusFromPageview bricht (z.B. checkLoading aktiv).
       clearFocusSnapshot();
-      this.startFocusEdit();
+      // Restore nur, wenn ungespeicherter Inhalt da ist. Snapshot allein
+      // (User hat Edit/Fokus betreten ohne zu tippen, dann zurück nach view)
+      // soll User nicht in Edit-Modus zwingen.
+      const draft = readDraft(snap.pageId);
+      if (!draft || !draft.html || draft.html === app.renderedPageHtml) return;
+      this.enterFocusFromPageview();
     },
 
     destroy() {

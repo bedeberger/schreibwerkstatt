@@ -1,5 +1,5 @@
 import { htmlToText, cleanContentArtefacts, tzOpts } from '../../utils.js';
-import { sortByPosition, buildHighlightedHtml } from '../../book/page-view.js';
+import { sortByPosition } from '../../book/page-view.js';
 import { contentRepo } from '../../repo/content.js';
 import { readDraft, writeDraft, clearDraft } from '../draft-storage.js';
 import {
@@ -80,6 +80,9 @@ export const editorEditMethods = {
   startEdit() {
     if (!this.currentPage || this.originalHtml === null) return;
     if (this.checkLoading || this.saveApplying != null) return;
+    // Prüfmodus blockt Edit (Invariante: editMode + checkDone forbidden).
+    // Findings-Apply-Pfad bleibt via saveCorrections, ohne contenteditable.
+    if (this.checkDone) return;
     // viewer/lektor duerfen Page-HTML nicht direkt mutieren.
     // Defense-in-depth zum verstecken Button-Hide in editor.html.
     if (!this.canEdit()) return;
@@ -109,10 +112,7 @@ export const editorEditMethods = {
 
     const el = this._getEditEl();
     if (el) {
-      const findings = this.lektoratFindings || [];
-      if (findings.length > 0 && initialHtml === this.originalHtml) {
-        el.innerHTML = buildHighlightedHtml(this.originalHtml, findings, findings.map(() => false), []);
-      } else if (initialHtml) {
+      if (initialHtml) {
         el.innerHTML = initialHtml;
       } else {
         // Leere Seite: Platzhalter-Absatz, damit der Cursor einen Block hat
@@ -150,7 +150,6 @@ export const editorEditMethods = {
 
     this._startAutosave();
     this._installOnlineRetry();
-    this._installFindingMarkWatcher();
     // Presence-Heartbeat: anderen Usern signalisieren „hier editiert wer".
     // Stopp im cancelEdit/saveEdit (Non-Focus-Pfad).
     this._startPresenceHeartbeat?.(this.currentPage.id);
@@ -180,7 +179,6 @@ export const editorEditMethods = {
     clearNormalSnapshot();
     this._stopAutosave();
     this._uninstallOnlineRetry();
-    this._uninstallFindingMarkWatcher();
     this._editCounterCtx?.teardown?.();
     this._stopPresenceHeartbeat?.();
     this._releaseEditLock?.(this.currentPage?.id);
@@ -289,7 +287,6 @@ export const editorEditMethods = {
         clearNormalSnapshot();
         this._stopAutosave();
         this._uninstallOnlineRetry();
-        this._uninstallFindingMarkWatcher();
         this._editCounterCtx?.teardown?.();
         this._stopPresenceHeartbeat?.();
         this._releaseEditLock?.(this.currentPage?.id);
@@ -524,67 +521,6 @@ export const editorEditMethods = {
     this._onlineHandler = null;
   },
 
-  // Findings-Marks (lektorat/chat) werden in startEdit ins contenteditable
-  // injiziert. Bearbeitet der User Text innerhalb eines Marks, "folgt" der
-  // <mark> dem mutierten Text – sichtbar als rote Markierung um neuen Text,
-  // während die Findings-Liste rechts noch das alte original anzeigt. Damit
-  // das nicht bis zum Save persistiert, läuft hier ein debounced Input-
-  // Listener, der ein Mark unwrapt sobald sein Text vom Snapshot abweicht.
-  //
-  // Why: Unwrap (insertBefore + removeChild) während Caret IM Mark steht
-  // killt in Chromium die Selection — Caret verschwindet sichtbar, Tippen
-  // tot bis User neu klickt. Deshalb Marks mit aktivem Caret überspringen
-  // und auf späteren Input (Caret raus) oder `blur` warten.
-  _installFindingMarkWatcher() {
-    const el = this._getEditEl();
-    if (!el) return;
-    this._uninstallFindingMarkWatcher();
-    const snapshot = new WeakMap();
-    for (const m of el.querySelectorAll('.lektorat-mark, .chat-mark')) {
-      snapshot.set(m, m.textContent);
-    }
-    let timer = null;
-    const unwrapStale = (force = false) => {
-      timer = null;
-      const cur = this._getEditEl();
-      if (!cur) return;
-      const sel = document.getSelection();
-      const anchor = sel && sel.rangeCount > 0 ? sel.anchorNode : null;
-      const focus = sel && sel.rangeCount > 0 ? sel.focusNode : null;
-      for (const m of cur.querySelectorAll('.lektorat-mark, .chat-mark')) {
-        const orig = snapshot.get(m);
-        if (orig == null || m.textContent === orig) continue;
-        if (!force && ((anchor && m.contains(anchor)) || (focus && m.contains(focus)))) {
-          // Caret/Selection liegt im Mark — Unwrap würde Selection killen.
-          // Aufschieben bis nächster Input (Caret raus) oder blur.
-          continue;
-        }
-        const parent = m.parentNode;
-        if (!parent) continue;
-        while (m.firstChild) parent.insertBefore(m.firstChild, m);
-        const ins = m.nextSibling;
-        if (ins && ins.nodeType === 1 && (ins.classList?.contains('lektorat-ins') || ins.classList?.contains('chat-mark-ins'))) {
-          parent.removeChild(ins);
-        }
-        parent.removeChild(m);
-      }
-    };
-    this._findingMarkInputHandler = () => {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => unwrapStale(false), 150);
-    };
-    this._findingMarkBlurHandler = () => {
-      if (timer) { clearTimeout(timer); timer = null; }
-      // Caret weg → auch Marks unwrappen, in denen er gerade noch stand.
-      unwrapStale(true);
-    };
-    el.addEventListener('input', this._findingMarkInputHandler);
-    el.addEventListener('blur', this._findingMarkBlurHandler, true);
-    this._findingMarkEl = el;
-    this._findingMarkTimer = () => { if (timer) { clearTimeout(timer); timer = null; } };
-    this._findingMarkUnwrap = unwrapStale;
-  },
-
   togglePageEditorFullscreen() {
     this.pageEditorFullscreen = !this.pageEditorFullscreen;
   },
@@ -660,20 +596,4 @@ export const editorEditMethods = {
     this._markEditDirty?.();
   },
 
-  _uninstallFindingMarkWatcher() {
-    if (this._findingMarkEl) {
-      if (this._findingMarkInputHandler) {
-        this._findingMarkEl.removeEventListener('input', this._findingMarkInputHandler);
-      }
-      if (this._findingMarkBlurHandler) {
-        this._findingMarkEl.removeEventListener('blur', this._findingMarkBlurHandler, true);
-      }
-    }
-    if (typeof this._findingMarkTimer === 'function') this._findingMarkTimer();
-    this._findingMarkEl = null;
-    this._findingMarkInputHandler = null;
-    this._findingMarkBlurHandler = null;
-    this._findingMarkTimer = null;
-    this._findingMarkUnwrap = null;
-  },
 };

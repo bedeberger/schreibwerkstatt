@@ -1234,9 +1234,13 @@
   "editor.btn.leaveFocusTitle":  "Fokus verlassen (Esc / Strg+Shift+E)",
   "editor.btn.enterFocusTitle":  "Ablenkungsfreier Vollbild-Schreibmodus (Strg+Shift+E)",
 
-  "editor.focus.counter":        "{words} Wörter ({wordsDelta} heute) · {chars} Zeichen ({charsDelta} heute)",
-  "editor.focus.counterTotal":   "{words} Wörter · {chars} Zeichen",
-  "editor.focus.counterToday":   "{wordsDelta} Wörter · {charsDelta} Zeichen heute",
+  "editor.focus.counter":            "{words} Wörter ({wordsDelta} heute) · {chars} Zeichen ({charsDelta} heute)",
+  "editor.focus.counterTotal":       "{words} Wörter · {chars} Zeichen",
+  "editor.focus.counterToday":       "{wordsDelta} Wörter · {charsDelta} Zeichen heute",
+  "editor.focus.openedFromPageView": "Fokusmodus",
+  "editor.focus.savingOnExit":       "Speichere und schliesse Fokus …",
+  "editor.focus.exitConflict":       "Fokus konnte nicht sauber gespeichert werden",
+  "editor.notebook.label":           "Schreibnotizbuch",
 
   "editor.figuresInChapter":     "{n} Figuren in diesem Kapitel",
   "editor.field.geschlecht":     "Geschlecht:",

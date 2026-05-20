@@ -1233,9 +1233,13 @@
   "editor.btn.leaveFocusTitle":  "Leave focus (Esc / Ctrl+Shift+E)",
   "editor.btn.enterFocusTitle":  "Distraction-free fullscreen writing mode (Ctrl+Shift+E)",
 
-  "editor.focus.counter":        "{words} words ({wordsDelta} today) · {chars} chars ({charsDelta} today)",
-  "editor.focus.counterTotal":   "{words} words · {chars} chars",
-  "editor.focus.counterToday":   "{wordsDelta} words · {charsDelta} chars today",
+  "editor.focus.counter":            "{words} words ({wordsDelta} today) · {chars} chars ({charsDelta} today)",
+  "editor.focus.counterTotal":       "{words} words · {chars} chars",
+  "editor.focus.counterToday":       "{wordsDelta} words · {charsDelta} chars today",
+  "editor.focus.openedFromPageView": "Focus mode",
+  "editor.focus.savingOnExit":       "Saving and closing focus …",
+  "editor.focus.exitConflict":       "Focus could not be saved cleanly",
+  "editor.notebook.label":           "Writing notebook",
 
   "editor.figuresInChapter":     "{n} characters in this chapter",
   "editor.field.geschlecht":     "Gender:",

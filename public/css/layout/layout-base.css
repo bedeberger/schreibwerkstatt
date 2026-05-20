@@ -50,7 +50,7 @@
   color: var(--color-warn-text);
   border-bottom: 2px solid var(--color-warn-text);
 }
-body.focus-mode .session-banner--offline {
+:root:has(.focus-editor.is-active) .session-banner--offline {
   padding: 0.15rem 0.6rem;
   font-size: var(--font-size-xs);
   font-weight: 400;
@@ -61,7 +61,7 @@ body.focus-mode .session-banner--offline {
   opacity: 0.55;
   pointer-events: none;
 }
-body.focus-mode .session-banner--offline:hover { opacity: 1; }
+:root:has(.focus-editor.is-active) .session-banner--offline:hover { opacity: 1; }
 
 .site-header-row {
   display: flex;

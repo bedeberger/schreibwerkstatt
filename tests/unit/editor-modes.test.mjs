@@ -148,10 +148,15 @@ test('Cmd+Shift+E Hotkey routet zustandsabhängig (focus → exit, edit → ente
   const trampolinePath = path.join(repo, 'public/js/editor/focus/trampoline.js');
   const srcTramp = fs.existsSync(trampolinePath) ? fs.readFileSync(trampolinePath, 'utf8') : '';
   const combined = srcCard + '\n' + srcTramp;
-  // toggleFocusMode oder Handler müssen zwischen `_focusState === 'active'`
-  // (→ exit) und `_focusState === 'idle'` (→ enter) routen.
+  // Sub-internes Cmd+Shift+E im Focus-Container muss zwischen
+  // `_focusState === 'active'` (→ exit) und `_focusState === 'idle'`
+  // (→ enter) routen. Root-Hotkey (handleFocusHotkey) prüft analog
+  // `focusActive` (→ exit) und `editMode` (→ enter), sonst dispatcht er
+  // `editor:focus:enter-from-pageview`.
   assert.match(combined, /_focusState\s*===\s*['"]active['"][\s\S]*?exitFocusMode/,
-    'Hotkey/Toggle: active-Branch ruft exitFocusMode');
+    'Hotkey: active-Branch ruft exitFocusMode');
   assert.match(combined, /_focusState\s*===\s*['"]idle['"][\s\S]*?enterFocusMode/,
-    'Hotkey/Toggle: idle-Branch ruft enterFocusMode');
+    'Hotkey: idle-Branch ruft enterFocusMode');
+  assert.match(combined, /editor:focus:enter-from-pageview/,
+    'Hotkey: Page-View-Branch dispatcht editor:focus:enter-from-pageview');
 });

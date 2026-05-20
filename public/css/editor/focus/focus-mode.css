@@ -44,7 +44,6 @@ body.palette-open { overflow: hidden; overscroll-behavior: contain; }
 #editor-card.focus-host .card-subline-link,
 #editor-card.focus-host .card-subline-sep,
 #editor-card.focus-host .figure-context-panel,
-#editor-card.focus-host .lektorat-split-findings,
 #editor-card.focus-host .history-bar,
 #editor-card.focus-host .progress-bar-wrap,
 #editor-card.focus-host #status { display: none; }
@@ -170,11 +169,10 @@ body.palette-open { overflow: hidden; overscroll-behavior: contain; }
 /* Im Fokus-Modus liegt #editor-card auf --z-overlay (2000). Popovers, die
    nach <body> teleportiert sind (Synonym-Menu/Picker, Figur-Lookup),
    bleiben sonst mit ihrem Default --z-popover (1000) unter dem Overlay
-   und werden unsichtbar. Im Fokus-Modus über das Overlay heben. */
-body.focus-mode .synonym-menu,
-body.focus-mode .synonym-picker,
-body.focus-mode .figur-lookup,
-body.focus-mode .tip-layer {
+   und werden unsichtbar. Im Fokus-Modus über das Overlay heben.
+   Scope via :has() statt body.focus-mode — Selektor reagiert direkt auf den
+   aktiven Focus-Cardroot, ohne globale Body-Class-Kopplung. */
+:root:has(.focus-editor.is-active) :is(.synonym-menu, .synonym-picker, .figur-lookup, .tip-layer) {
   z-index: calc(var(--z-overlay) + 1);
 }
 
@@ -505,8 +503,10 @@ body.focus-mode .tip-layer {
 
 /* Im Fokus auffälliger und nicht im hidden Header-Bereich. Position oberhalb
    des Editor-Bodys, mit höherem Kontrast, ignoriert die globale #status-
-   display:none-Regel. */
-body.focus-mode .editor-conflict-banner {
+   display:none-Regel. Scope via :has() — Banner lebt im Notebook-Partial
+   (ausserhalb .focus-editor), Pinning wird vom aktiven Focus-Cardroot
+   getriggert, nicht von der body.focus-mode-Class. */
+:root:has(.focus-editor.is-active) .editor-conflict-banner {
   position: fixed;
   top: 8px;
   left: 50%;
@@ -515,25 +515,6 @@ body.focus-mode .editor-conflict-banner {
   max-width: min(720px, calc(100vw - 32px));
   box-shadow: 0 6px 24px rgba(0,0,0,0.18);
   margin: 0;
-}
-
-/* Lektorat-Split im Fokus-Modus deaktivieren: Findings sind via
-   .lektorat-split-findings { display:none } ohnehin ausgeblendet, das
-   2-Col-Grid + 75vh-Höhe reservierten aber Platz und stauchten den
-   Preview auf Halbbreite. */
-#editor-card.focus-host .editor-body-wrap.lektorat-split {
-  display: block;
-  height: auto;
-  min-height: 0;
-  max-height: none;
-}
-#editor-card.focus-host .editor-preview-wrap.lektorat-split-preview {
-  height: auto;
-  overflow: visible;
-}
-.focus-editor .page-content-view--editing.lektorat-split-preview {
-  height: auto;
-  border-radius: 0;
 }
 
 /* Mark-Stripe rechts pro Absatz killen — Marks sind im Fokus visuell
