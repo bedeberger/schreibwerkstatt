@@ -5,6 +5,7 @@
 set -e
 
 VERAPDF_VERSION="${VERAPDF_VERSION:-1.26.2}"
+VERAPDF_MINOR="${VERAPDF_VERSION%.*}"
 INSTALL_BASE="/opt/verapdf"
 INSTALL_TARGET="/opt/verapdf-installation"
 SYMLINK="/usr/local/bin/verapdf"
@@ -28,7 +29,7 @@ TMP_ZIP="$(mktemp --suffix=.zip)"
 trap 'rm -f "$TMP_ZIP"' EXIT
 
 echo "→ veraPDF $VERAPDF_VERSION laden"
-curl -fsSL "https://software.verapdf.org/releases/verapdf-greenfield-${VERAPDF_VERSION}.zip" -o "$TMP_ZIP"
+curl -fsSL "https://software.verapdf.org/rel/${VERAPDF_MINOR}/verapdf-greenfield-${VERAPDF_VERSION}-installer.zip" -o "$TMP_ZIP"
 
 echo "→ entpacken nach $INSTALL_BASE"
 $SUDO mkdir -p "$INSTALL_BASE"
