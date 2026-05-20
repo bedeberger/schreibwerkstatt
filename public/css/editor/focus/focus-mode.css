@@ -166,6 +166,10 @@ body.palette-open { overflow: hidden; overscroll-behavior: contain; }
      Overlay deckt teilweise ab). Mobile bekommt einen voll deckenden Klon im
      `.focus-editor__actions`-Chip. Hier den Original im Header ausblenden. */
   #editor-card.focus-host .card-subline .save-indicator { display: none; }
+  /* Original-Action-Buttons im Card-Header sind mobile durch Overlay verdeckt;
+     ragen nur als faint Linien unterhalb des Titels heraus. Save + Leave gibt
+     es bereits im Overlay-Chip — Header-Actions komplett ausblenden. */
+  #editor-card.focus-host .card-header-aside { display: none; }
   .focus-editor.is-active {
     top: var(--focus-overlay-top-mobile, 46px);
   }
