@@ -41,6 +41,12 @@
     gap: var(--space-2);
     align-items: flex-end;
   }
+  .admin-logs-filter-actions button {
+    font-size: var(--size-compact-font-size);
+    padding: var(--size-compact-padding);
+    line-height: 1.4;
+    height: auto;
+  }
 
   .admin-logs-livetail {
     display: inline-flex;
@@ -68,17 +74,19 @@
     line-height: 1.4;
     border-top: 1px solid var(--color-border);
     margin-top: var(--space-2);
+    overflow-x: auto;
   }
 
   .log-row {
     display: grid;
-    grid-template-columns: 180px 64px 130px 200px 64px minmax(0, 1fr) auto;
+    grid-template-columns: 180px 64px 80px 260px 110px minmax(400px, 1fr) auto;
     column-gap: var(--space-3);
     row-gap: var(--space-1);
     padding: var(--space-2);
     border-bottom: 1px solid var(--color-border);
     align-items: baseline;
     border-left: 3px solid transparent;
+    min-width: 1180px;
   }
   .log-row--error { border-left-color: var(--color-err-border); }
   .log-row--warn  { border-left-color: var(--color-warn-text); }
@@ -155,6 +163,7 @@
   /* Container-Query: Karte hat container-type:inline-size → reagiert auf
      Slot-Breite, nicht Viewport (admin-home-Slot ist meist =viewport). */
   @container (max-width: 720px) {
+    .log-list { overflow-x: visible; }
     .log-row {
       grid-template-columns: max-content max-content minmax(0, 1fr) auto;
       grid-template-areas:
@@ -163,6 +172,7 @@
         "book book book book"
         "msg msg msg msg";
       column-gap: var(--space-2);
+      min-width: 0;
     }
     .log-row-ts    { grid-area: ts; }
     .log-badge     { grid-area: level; }
