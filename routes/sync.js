@@ -38,31 +38,17 @@ function _errDetail(e) {
 }
 
 // Token-Schätzung: Text-Tokens (chars / CHARS_PER_TOKEN), gleiche Quelle wie
-// chars. Hero und Sidebar-Σ zeigen damit ein konstantes Verhältnis.
-// `prefix` (Seitenname) fliesst in chars/words ein — Überschrift gehört zum
-// Buchumfang. Frontend nutzt dieselbe Formel in
-// public/js/tree.js:_syncPageStatsAfterSave.
-function computeStats(html, prefix = '') {
-  const combined = (prefix ? prefix + ' ' : '') + (html || '');
-  const text = htmlToText(combined);
+// chars. Hero und Sidebar-Σ zeigen damit ein konstantes Verhältnis. Nur
+// Seiten-HTML zählt — Seiten- und Kapitelnamen fliessen nicht in den Umfang
+// ein. Frontend nutzt dieselbe Formel in public/js/book/tree.js:_syncPageStatsAfterSave.
+function computeStats(html) {
+  const text = htmlToText(html || '');
   const wordList = text.trim() === '' ? [] : text.trim().split(/\s+/);
   const words = wordList.length;
   const chars = text.length;
   const tok = Math.round(chars / CHARS_PER_TOKEN);
   const sentences = text.trim() === '' ? 0 : text.split(/[.!?]+/).filter(s => s.trim().length > 0).length;
   return { words, chars, tok, wordList, sentences };
-}
-
-// Kapitel-Name-Beitrag zu Buch-Totalen: Σ normalize(chapter_name).
-// Frontend (book-overview/stats.js#overviewLatest, tree.js#_refreshChapterStats)
-// muss diese Logik spiegeln, sonst driftet Live-Σ vs Snapshot.
-function chapterNameStats(chapter_name) {
-  const text = htmlToText(chapter_name || '');
-  if (!text) return { chars: 0, words: 0, tok: 0 };
-  const chars = text.length;
-  const words = text.split(/\s+/).length;
-  const tok = Math.round(chars / CHARS_PER_TOKEN);
-  return { chars, words, tok };
 }
 
 const upsertPageStats = db.prepare(`
@@ -225,7 +211,7 @@ async function syncBook(bookId, ctx) {
     const results = await Promise.allSettled(batch.map(async p => {
       const pd = await contentStore.loadPage(p.id, ctx);
       const text = htmlToText(pd.html || '');
-      const { words, chars, tok, wordList, sentences } = computeStats(pd.html || '', p.name);
+      const { words, chars, tok, wordList, sentences } = computeStats(pd.html || '');
       const preview = text.trim().slice(0, PREVIEW_CHARS);
       return { page_id: p.id, book_id: bookId, tok, words, chars, updated_at: p.updated_at || null, cached_at: now, wordList, sentences, preview, fullText: text };
     }));
@@ -296,18 +282,9 @@ async function syncBook(bookId, ctx) {
     logger.warn(`Search-Index Sync Buch ${bookId} fehlgeschlagen: ${e.message}`);
   }
 
-  // Kapitelnamen einmal pro Kapitel zum Buch-Total addieren (Seitennamen sind
-  // bereits in den per-Seite-Stats enthalten). Erst NACH avgSentenceLen/LIX-
-  // Berechnung, damit Per-Seite-Mittelwerte nicht von Kapiteltiteln verwässert
-  // werden. Solo-Seiten (kein Kapitel) sind hier nicht vertreten — chapters
-  // enthält nur echte Kapitel-Rows.
-  let bookWords = totalWords, bookChars = totalChars, bookTok = totalTok;
-  for (const ch of chapters) {
-    const s = chapterNameStats(ch.name);
-    bookWords += s.words;
-    bookChars += s.chars;
-    bookTok += s.tok;
-  }
+  // Buch-Totale = Σ Seiten-Stats. Seiten- und Kapitelnamen sind kein Teil
+  // des Umfangs (siehe computeStats).
+  const bookWords = totalWords, bookChars = totalChars, bookTok = totalTok;
 
   // Lokales Datum statt UTC: book_stats_history.recorded_at muss zur lokalen
   // User-Wahrnehmung passen. Frontend-Streak/Heute-Ring iteriert ebenfalls
@@ -438,7 +415,7 @@ router.post('/page-stats/:book_id', express.json(), async (req, res) => {
       const slice = stale.slice(i, i + BATCH);
       const results = await Promise.allSettled(slice.map(async p => {
         const pd = await contentStore.loadPage(p.id, ctx);
-        const { words, chars, tok } = computeStats(pd.html || '', p.name);
+        const { words, chars, tok } = computeStats(pd.html || '');
         return { page_id: p.id, book_id: bookId, tok, words, chars, updated_at: p.updated_at || null, cached_at: now };
       }));
       for (const r of results) if (r.status === 'fulfilled') newItems.push(r.value);

@@ -1933,7 +1933,7 @@
   "blog.status.newLocal":           "neu, nicht im Blog",
 
   "blog.conflict.title":            "Konflikt: lokale Änderung vs. Blog-Änderung",
-  "blog.conflict.local":            "Lokal (Schreibwerkstatt)",
+  "blog.conflict.local":            "Lokal ({appName})",
   "blog.conflict.remote":           "Blog (WordPress)",
   "blog.conflict.keepApp":          "Lokale Version behalten + zum Blog pushen",
   "blog.conflict.takeWp":           "Blog-Version übernehmen (lokal überschreiben)",

@@ -29,6 +29,10 @@ const shellState = () => ({
   // In Templates ueber `$app.appTimezone` lesbar; gilt fuer Datums-Buckets +
   // alle Date-Display-Formatter (toLocaleString, Intl.DateTimeFormat).
   appTimezone: 'Europe/Zurich',
+  // App-Name (vom Server via /config → app_settings.app.name). Quelle fuer
+  // <title>, apple-mobile-web-app-title, Site-Header-H1 und Locale-Platzhalter
+  // `{appName}`. Default deckt Hard-Refresh ab, bevor /config geladen ist.
+  appName: 'Schreibwerkstatt',
   // Plattform-Detect für Tasten-Hint-Anzeige (⌘ vs. Ctrl). Wird in init()
   // gesetzt; default true wäre auf Windows falsch, default false ist sichere
   // Annahme bevor JS gelaufen ist (Hero erscheint mit Ctrl, dann snap auf ⌘ falls Mac).

@@ -426,7 +426,7 @@
         <div class="blog-conflict-body">
           <div class="blog-conflict-side">
             <div class="blog-conflict-side-header">
-              <h4 x-text="$app.t('blog.conflict.local')"></h4>
+              <h4 x-text="$app.t('blog.conflict.local', { appName: $app.appName })"></h4>
               <span class="muted" x-text="$app.blogConflictData.local.name"></span>
             </div>
             <div class="blog-conflict-content" x-html="$app.blogConflictData.local.html"></div>

@@ -1932,7 +1932,7 @@
   "blog.status.newLocal":           "new, not in blog",
 
   "blog.conflict.title":            "Conflict: local edits vs. blog edits",
-  "blog.conflict.local":            "Local (Schreibwerkstatt)",
+  "blog.conflict.local":            "Local ({appName})",
   "blog.conflict.remote":           "Blog (WordPress)",
   "blog.conflict.keepApp":          "Keep local + push to blog",
   "blog.conflict.takeWp":           "Take blog version (overwrite local)",

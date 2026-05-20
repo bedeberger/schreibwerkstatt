@@ -692,7 +692,6 @@ export const appViewMethods = {
     return computeTodayRing({
       stats: this.dailyProgressStats,
       tokEsts: this.tokEsts,
-      tree: this.tree,
       goalChars: this.dailyProgressDailyGoalChars || 1500,
       r: 14,
     });

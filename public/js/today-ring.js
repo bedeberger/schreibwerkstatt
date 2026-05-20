@@ -12,9 +12,9 @@ import { aggregateLiveBookStats, localIsoDate } from './utils.js';
 // Reine Zahl: heute geschriebene Zeichen (Live-Σ minus Vortagssnapshot).
 // Wird sowohl vom Donut als auch von 7-Tage-Bar/Total konsumiert, damit alle
 // drei nie auseinander driften.
-export function computeCharsTodayDelta(stats = [], tokEsts = {}, tree = []) {
+export function computeCharsTodayDelta(stats = [], tokEsts = {}) {
   const todayIso = localIsoDate();
-  const liveChars = aggregateLiveBookStats(tokEsts, tree).chars;
+  const liveChars = aggregateLiveBookStats(tokEsts).chars;
   let cronTodayChars = null;
   let prevChars = null;
   const a = Array.isArray(stats) ? stats : [];
@@ -37,9 +37,9 @@ export function computeCharsTodayDelta(stats = [], tokEsts = {}, tree = []) {
 
 // Donut-Geometrie + Flags. Caller waehlt Radius r (28 fuer Overview-Tile,
 // 14 fuer Header-Donut).
-export function computeTodayRing({ stats = [], tokEsts = {}, tree = [], goalChars = 1500, r = 28 } = {}) {
+export function computeTodayRing({ stats = [], tokEsts = {}, goalChars = 1500, r = 28 } = {}) {
   const goal = Math.max(1, Number(goalChars) || 1500);
-  const chars = computeCharsTodayDelta(stats, tokEsts, tree);
+  const chars = computeCharsTodayDelta(stats, tokEsts);
   const pct = Math.max(0, Math.min(100, Math.round((chars / goal) * 100)));
   const circ = 2 * Math.PI * r;
   const dash = (pct / 100) * circ;

@@ -60,7 +60,7 @@ function _clientIp(req) {
 
 const STRINGS = {
   de: {
-    landingTitle:   'Schreibwerkstatt',
+    landingTitle:   '',
     landingSubtitle:'Schreiben, Lektorat und Buchanalyse mit KI — in einer Umgebung.',
     loginLabel:     'Anmelden',
     registerLabel:  'Zugang anfordern',
@@ -94,7 +94,7 @@ const STRINGS = {
     error:            'Anfrage konnte nicht gesendet werden. Bitte später erneut versuchen.',
   },
   en: {
-    landingTitle:   'Schreibwerkstatt',
+    landingTitle:   '',
     landingSubtitle:'Writing, editing and book analysis with AI — in one workspace.',
     loginLabel:     'Sign in',
     registerLabel:  'Request access',
@@ -136,11 +136,12 @@ function _strings(lang) {
 function _renderLanding(req, res) {
   const lang = _bodyLang(req);
   const s = _strings(lang);
+  const appName = appSettings.get('app.name') || 'Schreibwerkstatt';
   res.set('Cache-Control', 'no-store');
   res.type('html').send(_render('landing.html', {
     lang,
-    title:         s.landingTitle,
-    appName:       s.landingTitle,
+    title:         appName,
+    appName,
     subtitle:      s.landingSubtitle,
     loginLabel:    s.loginLabel,
     registerLabel: s.registerLabel,

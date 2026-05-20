@@ -49,7 +49,7 @@ function waitForReady(child) {
     const onData = buf => {
       const s = buf.toString();
       process.stdout.write(`[server] ${s}`);
-      if (s.includes('Lektorat läuft auf') || s.includes('Lektorat l')) {
+      if (s.includes('läuft auf http')) {
         clearTimeout(timer);
         resolve();
       }

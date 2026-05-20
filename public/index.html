@@ -268,7 +268,7 @@
   <div class="site-header-center">
     <h1 @click="resetView()" class="site-title" :data-tip="t('app.titleReset')">
       <img src="schreibwerkstatt_icon.svg" alt="" class="site-logo" width="64" height="64">
-      Schreibwerkstatt
+      <span x-text="appName"></span>
     </h1>
     <p class="subtitle"><span x-text="t('app.subtitle')"></span></p>
   </div>

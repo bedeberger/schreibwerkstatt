@@ -424,7 +424,7 @@ function bootstrapDevAccess(stage) {
 }
 
 const server = app.listen(PORT, '0.0.0.0', () => {
-  logger.info(`Lektorat läuft auf http://0.0.0.0:${PORT}`);
+  logger.info(`${appSettings.get('app.name')} läuft auf http://0.0.0.0:${PORT}`);
 
   bootstrapDevAccess('boot');
 

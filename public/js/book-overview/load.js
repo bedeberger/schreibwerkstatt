@@ -127,8 +127,7 @@ export const loadMethods = {
         const stats = this.overviewStats || [];
         const lastSnapshot = stats.length ? stats[stats.length - 1] : null;
         const tokEsts = app.tokEsts || {};
-        const tree = app.tree || [];
-        const liveChars = aggregateLiveBookStats(tokEsts, tree).chars;
+        const liveChars = aggregateLiveBookStats(tokEsts).chars;
         const snapshotChars = Number(lastSnapshot?.chars) || 0;
         if (liveChars > 0 && snapshotChars > 0) {
           const diff = Math.abs(liveChars - snapshotChars);

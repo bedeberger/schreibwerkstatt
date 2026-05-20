@@ -13,12 +13,14 @@ const NORMAL_SELECTOR = '#editor-card .page-content-view--editing';
 const FOCUS_SELECTOR = '.focus-editor.is-active .page-content-view--editing';
 
 // Liefert das contenteditable des aktiven Editors oder null, wenn kein
-// Editor offen ist.
+// Editor offen ist. Focus-Container greift nur, wenn er nicht display:none
+// ist (offsetParent !== null) — sonst würden Sub-Komponenten in einen
+// unsichtbaren Container schreiben.
 export function getActiveEditorContainer() {
   const app = typeof window !== 'undefined' ? window.__app : null;
   if (app?.focusActive) {
     const focusEl = document.querySelector(FOCUS_SELECTOR);
-    if (focusEl) return focusEl;
+    if (focusEl && focusEl.offsetParent !== null) return focusEl;
   }
   return document.querySelector(NORMAL_SELECTOR);
 }

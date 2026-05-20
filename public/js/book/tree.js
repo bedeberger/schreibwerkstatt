@@ -97,13 +97,11 @@ export const treeMethods = {
   // dem Editor (`&#160;`) als 6 Zeichen mit und treibt Heute-Ring/7-Tage-Bars
   // gegen den Cron-Snapshot.
   //
-  // Seitenname fliesst in chars/words ein (Überschrift gehört zum Buchumfang) —
-  // analog routes/sync.js#computeStats. tok = chars / CHARS_PER_TOKEN.
+  // Nur Seiten-HTML zählt — Seitennamen sind kein Teil des Umfangs (analog
+  // routes/sync.js#computeStats). tok = chars / CHARS_PER_TOKEN.
   _syncPageStatsAfterSave(page, html) {
     if (!page?.id) return;
-    const prefix = String(page?.name || '').trim();
-    const combined = (prefix ? prefix + ' ' : '') + String(html || '');
-    const normalized = htmlToPlainText(combined);
+    const normalized = htmlToPlainText(String(html || ''));
     const words = normalized === '' ? 0 : normalized.split(/\s+/).length;
     const stat = {
       tok: Math.round(normalized.length / CHARS_PER_TOKEN),
@@ -149,11 +147,6 @@ export const treeMethods = {
       arr.push(it);
       childMap.set(it.parent_id, arr);
     }
-    const nameContrib = (name) => {
-      const ch = String(name || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-      if (!ch) return null;
-      return { chars: ch.length, words: ch.split(/\s+/).length, tok: Math.round(ch.length / CHARS_PER_TOKEN) };
-    };
     const cache = new Map();
     const subtree = (item) => {
       if (cache.has(item.id)) return cache.get(item.id);
@@ -165,12 +158,6 @@ export const treeMethods = {
       for (const child of (childMap.get(item.id) || [])) {
         const s = subtree(child);
         words += s.words; chars += s.chars; tok += s.tok; count += s.count;
-      }
-      // Chapter-Name einmal addieren, wenn dieses Kapitel im Subtree Content hat.
-      // Solo-Wrapper übergehen (page_name liegt bereits in der Seitenstatistik).
-      if (count > 0 && !item.solo) {
-        const nc = nameContrib(item.name);
-        if (nc) { chars += nc.chars; words += nc.words; tok += nc.tok; }
       }
       const res = { words, chars, tok, count };
       cache.set(item.id, res);

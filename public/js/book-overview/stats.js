@@ -15,13 +15,12 @@ export const statsMethods = {
     const app = window.__app;
     const tokEsts = app?.tokEsts || {};
     const pages = app?.pages || [];
-    const tree = app?.tree || [];
     const stats = this.overviewStats || [];
-    return this._memo('latest', [stats, tokEsts, pages, tree], () => {
+    return this._memo('latest', [stats, tokEsts, pages], () => {
       const ids = Object.keys(tokEsts);
       const histLast = stats.length ? stats[stats.length - 1] : null;
       if (!ids.length) return histLast;
-      const { chars, words, tok } = aggregateLiveBookStats(tokEsts, tree);
+      const { chars, words, tok } = aggregateLiveBookStats(tokEsts);
       const page_count = pages.length || ids.length;
       // chapter_count zählt nur Top-Level-Kapitel — Sub-Kapitel rollen auf Root.
       const { rootOf } = this._chapterRollup();
@@ -45,9 +44,8 @@ export const statsMethods = {
   _charsTodayDelta() {
     const a = this.overviewStats || [];
     const tokEsts = window.__app?.tokEsts || {};
-    const tree = window.__app?.tree || [];
-    return this._memo('charsTodayDelta', [a, tokEsts, tree], () =>
-      computeCharsTodayDelta(a, tokEsts, tree)
+    return this._memo('charsTodayDelta', [a, tokEsts], () =>
+      computeCharsTodayDelta(a, tokEsts)
     );
   },
 
@@ -58,8 +56,7 @@ export const statsMethods = {
   overviewLast7Days() {
     const a = this.overviewStats || [];
     const tokEsts = window.__app?.tokEsts || {};
-    const tree = window.__app?.tree || [];
-    return this._memo('last7Days', [a, tokEsts, tree], () => {
+    return this._memo('last7Days', [a, tokEsts], () => {
       const charsByDate = new Map();
       for (const s of a) charsByDate.set(s.recorded_at, Number(s.chars) || 0);
       const tag = window.__app?.uiLocale === 'en' ? 'en-US' : 'de-CH';
@@ -98,12 +95,11 @@ export const statsMethods = {
     const a = this.overviewStats;
     if (!a || a.length < 2) return null;
     const tokEsts = window.__app?.tokEsts || {};
-    const tree = window.__app?.tree || [];
-    return this._memo('sevenDayDelta', [a, tokEsts, tree], () => {
+    return this._memo('sevenDayDelta', [a, tokEsts], () => {
       // Latest = Live-Summe wenn vorhanden (raw, kein Math.max — sonst
       // gewinnt Cron-Snapshot bei Lösch-Edits und überzeichnet net-Delta).
       // Konsistent zu Heute-Ring (_charsTodayDelta).
-      const liveChars = aggregateLiveBookStats(tokEsts, tree).chars;
+      const liveChars = aggregateLiveBookStats(tokEsts).chars;
       const latestSnapshot = a[a.length - 1];
       const latestChars = liveChars > 0 ? liveChars : (Number(latestSnapshot.chars) || 0);
       const cutoff = localIsoDaysAgo(7);
@@ -178,8 +174,7 @@ export const statsMethods = {
   overviewStreakHeatmap() {
     const a = this.overviewStats || [];
     const tokEsts = window.__app?.tokEsts || {};
-    const tree = window.__app?.tree || [];
-    return this._memo('streakHeatmap', [a, tokEsts, tree], () => {
+    return this._memo('streakHeatmap', [a, tokEsts], () => {
       const WEEKS = 52;
       const charsByDate = new Map();
       for (const s of a) charsByDate.set(s.recorded_at, Number(s.chars) || 0);
@@ -302,9 +297,8 @@ export const statsMethods = {
   overviewTodayRing(goalChars = 1500) {
     const a = this.overviewStats || [];
     const tokEsts = window.__app?.tokEsts || {};
-    const tree = window.__app?.tree || [];
-    return this._memo('todayRing:' + goalChars, [a, tokEsts, tree], () =>
-      computeTodayRing({ stats: a, tokEsts, tree, goalChars, r: 28 })
+    return this._memo('todayRing:' + goalChars, [a, tokEsts], () =>
+      computeTodayRing({ stats: a, tokEsts, goalChars, r: 28 })
     );
   },
 };

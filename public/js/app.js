@@ -614,6 +614,12 @@ document.addEventListener('alpine:init', () => {
         configureTokenEstimate(cfg.charsPerToken);
         configureAppTimezone(cfg.appTimezone);
         if (cfg.appTimezone) this.appTimezone = cfg.appTimezone;
+        if (cfg.appName) {
+          this.appName = cfg.appName;
+          document.title = cfg.appName;
+          const meta = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+          if (meta) meta.setAttribute('content', cfg.appName);
+        }
 
         // Hash vorab auswerten, damit loadBooks das gewünschte Buch wählt.
         // _applyingHash unterdrückt Watcher/URL-Writes während der Initialisierung.

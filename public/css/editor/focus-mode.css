@@ -72,6 +72,8 @@ body.focus-mode #editor-card .editor-preview-wrap {
    ausgeblendet, der Wrap aus der Box-Kette gelöst. */
 body.focus-mode #partial-editor-body-edit,
 body.focus-mode #partial-editor-body-view,
+body.focus-mode #partial-editor-body-focus,
+body.focus-mode .focus-editor,
 body.focus-mode .page-editor-wrap { display: contents; }
 body.focus-mode .page-editor-toolbar { display: none; }
 
