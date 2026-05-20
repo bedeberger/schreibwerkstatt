@@ -2,7 +2,6 @@ import { fetchJson, configureTokenEstimate, configureAppTimezone, escHtml } from
 import { configurePrompts } from './prompts.js';
 import { setFilters } from './local-prefs.js';
 
-import { aiMethods } from './api/api-ai.js';
 import { historyMethods } from './book/history.js';
 import { treeMethods } from './book/tree.js';
 import { lektoratMethods } from './editor/lektorat.js';
@@ -715,7 +714,6 @@ document.addEventListener('alpine:init', () => {
     },
 
     // ── Methoden aus Modulen ─────────────────────────────────────────────────
-    ...aiMethods,
     ...historyMethods,
     ...treeMethods,
     ...lektoratMethods,

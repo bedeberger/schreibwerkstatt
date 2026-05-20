@@ -5,7 +5,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { cleanPageHtml, wrapOrphanBlocks, collapseEmptyBlocks, stripTrailingEmptyBlocks, stripBlockEdgeNbsp } = require('../../lib/html-clean');
+const { cleanPageHtml, wrapOrphanBlocks, collapseEmptyBlocks, stripTrailingEmptyBlocks, stripBlockEdgeNbsp, flattenDivBlocks } = require('../../lib/html-clean');
 
 test('collapseEmptyBlocks: leere <p>-Runs auf einen kollabieren', () => {
   assert.equal(
@@ -177,4 +177,71 @@ test('stripBlockEdgeNbsp: idempotent', () => {
   const once = stripBlockEdgeNbsp(input);
   const twice = stripBlockEdgeNbsp(once);
   assert.equal(once, twice);
+});
+
+test('flattenDivBlocks: plain <div> mit Textinhalt → <p>', () => {
+  assert.equal(
+    flattenDivBlocks('<div>Hallo</div>'),
+    '<p>Hallo</p>'
+  );
+});
+
+test('flattenDivBlocks: id-Attribut bleibt erhalten', () => {
+  assert.equal(
+    flattenDivBlocks('<div id="bkmrk-x">Text</div>'),
+    '<p id="bkmrk-x">Text</p>'
+  );
+});
+
+test('flattenDivBlocks: page-1056-Case (vier flache divs) → vier <p>', () => {
+  const input = '<p id="bkmrk-a">Eins</p><div id="bkmrk-b">Zwei</div><div id="bkmrk-b">Drei</div><div id="bkmrk-b">Vier</div>';
+  const out = flattenDivBlocks(input);
+  assert.equal(
+    out,
+    '<p id="bkmrk-a">Eins</p><p id="bkmrk-b">Zwei</p><p id="bkmrk-b">Drei</p><p id="bkmrk-b">Vier</p>'
+  );
+});
+
+test('flattenDivBlocks: <div class="poem"> bleibt unverändert', () => {
+  const input = '<div class="poem"><p>Vers 1</p><p>Vers 2</p></div>';
+  assert.equal(flattenDivBlocks(input), input);
+});
+
+test('flattenDivBlocks: Wrapper-<div> mit Block-Kindern bleibt <div>', () => {
+  const input = '<div><p>Inner</p></div>';
+  // Innerer <p> existiert bereits → kein Re-Wrap; äusserer <div> hat
+  // Block-Descendant <p> → kein Convert.
+  assert.equal(flattenDivBlocks(input), input);
+});
+
+test('flattenDivBlocks: verschachtelte div-only-Kette → innerste werden <p>', () => {
+  // Innerer <div> hat keinen Block-Descendant → wird <p>. Äusserer hat danach
+  // <p>-Descendant → bleibt <div>.
+  assert.equal(
+    flattenDivBlocks('<div><div>Innen</div></div>'),
+    '<div><p>Innen</p></div>'
+  );
+});
+
+test('flattenDivBlocks: inline-Markup im div bleibt erhalten', () => {
+  assert.equal(
+    flattenDivBlocks('<div>Hallo <strong>Welt</strong>!</div>'),
+    '<p>Hallo <strong>Welt</strong>!</p>'
+  );
+});
+
+test('flattenDivBlocks: idempotent', () => {
+  const input = '<div>A</div><div>B</div>';
+  const once = flattenDivBlocks(input);
+  const twice = flattenDivBlocks(once);
+  assert.equal(once, twice);
+  assert.equal(once, '<p>A</p><p>B</p>');
+});
+
+test('cleanPageHtml: heilt page-1056-Pattern (div-Absätze → p)', () => {
+  const broken = '<p id="bkmrk-x">Lieblingsszene.</p><div id="bkmrk-y">Eins.</div><div id="bkmrk-y">Zwei.</div><p>Drei.</p>';
+  const out = cleanPageHtml(broken);
+  assert.ok(!/<div/.test(out), 'darf keine <div> mehr enthalten');
+  assert.match(out, /<p id="bkmrk-y">Eins\.<\/p>/);
+  assert.match(out, /<p id="bkmrk-y">Zwei\.<\/p>/);
 });

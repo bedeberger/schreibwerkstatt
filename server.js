@@ -296,7 +296,7 @@ app.use((req, res, next) => {
 
 // ── Auth-Guard ────────────────────────────────────────────────────────────────
 // API-Pfade → 401 JSON; HTML-Pfade → Redirect zu /auth/login
-const API_PREFIXES = ['/history/', '/figures/', '/locations/', '/songs/', '/jobs/', '/sync/', '/chat/', '/booksettings/', '/content/', '/books/', '/me/', '/admin/', '/local/', '/config', '/claude', '/ollama', '/llama'];
+const API_PREFIXES = ['/history/', '/figures/', '/locations/', '/songs/', '/jobs/', '/sync/', '/chat/', '/booksettings/', '/content/', '/books/', '/me/', '/admin/', '/local/', '/config'];
 
 app.use((req, res, next) => {
   if (req.session?.user) return next();
