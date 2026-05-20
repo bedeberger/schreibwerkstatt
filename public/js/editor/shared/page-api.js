@@ -1,8 +1,10 @@
-// Dünner Save-Wrapper. Beide Editoren rufen diese Funktion mit dem reinen
-// PUT-Body aus buildSavePayload. Die Offline-Queue-Anbindung (writeDraft,
-// online-Retry) bleibt am Editor-Lifecycle und wird hier nicht gekapselt —
-// sie hängt am Karten-State (`saveOffline`, `_onlineHandler`), den eine
-// pure Lib nicht kennen darf.
+// Dünner Save-Wrapper. Alle Save-Pfade (Notebook, Focus, Book-Editor,
+// Lektorat-/Chat-Apply) rufen diese Funktion mit dem reinen PUT-Body aus
+// buildSavePayload, damit Payload-Schema + Source-Whitelist nicht pro
+// Aufrufer driften. Die Offline-Queue-Anbindung (writeDraft, online-Retry)
+// bleibt am Editor-Lifecycle und wird hier nicht gekapselt — sie hängt am
+// Karten-State (`saveOffline`, `_onlineHandler`), den eine pure Lib nicht
+// kennen darf.
 //
 // Verantwortung dieser Datei:
 //   - PUT-Aufruf an /content/pages/:id über contentRepo

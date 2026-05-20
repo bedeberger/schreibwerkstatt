@@ -277,6 +277,13 @@ export const focusCardMethods = {
         } else {
           this.exitFocusMode();
         }
+      } else if (e.key === 'Enter' && e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey) {
+        // Shift+Enter = weicher Zeilenumbruch (<br>). Safari/WebKit splittet
+        // sonst den Absatz. execCommand erzwingt cross-browser konsistentes <br>
+        // — gleicher Pfad wie Notebook- und Bucheditor.
+        if (!container.contains(document.activeElement)) return;
+        e.preventDefault();
+        document.execCommand('insertLineBreak');
       } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && e.code === 'KeyE') {
         e.preventDefault();
         if (this._focusState === 'active') this.exitFocusMode();

@@ -140,9 +140,21 @@ Alle in [public/js/app.js:212-252](../public/js/app.js#L212-L252) via `registerX
 - Alle Show-Flags (Exklusivität!), Hash-Router, Auto-Save, Selection-Management, Editor-Edit-Mode, Job-Queue, Cross-Cutting-Loader (`loadFiguren` etc.), `_abortCtrl`-basiertes globales Listener-Setup.
 - Editor-Module: `page-view`, `editor/edit`, `editor/utils`, `tree`, `history`, `api-ai`, `i18n`, `shortcuts` — gespreaded in den Root, nicht in eigene Subs.
 
-## Editor-Modi (4 Stück, **Konsistenz kritisch**)
+## Drei Editoren
 
-Vier orthogonale Modi am Editor — kein Single-Enum, sondern Boolean-Flags am Root. Reihenfolge der Mutations und Invarianten sind **harte Regeln**: jede Änderung am Modus-Setup muss diese Tabelle aktuell halten.
+Die App hat **drei unabhängige Editoren**. Bei Änderungen muss der User benennen, welcher gemeint ist — siehe Harte Regel „Editor-Spezifikation" in [CLAUDE.md](../CLAUDE.md).
+
+| Editor | Scope | Aktivierung | State | Doku |
+|---|---|---|---|---|
+| **Notebook-Editor** | eine Seite (Edit-Modus auf der `editor`-Karte) | `startEdit()` Button | `notebookState` + `editMode`-Flag | [notebook-editor.md](notebook-editor.md) |
+| **Focus-Editor** | eine Seite (Vollbild-Schreibmodus, läuft auf Notebook) | `enterFocusMode()` / Cmd+Shift+E | `focusState` + `focusActive`-Flag | [focus-editor.md](focus-editor.md) |
+| **Bucheditor** | ganzes Buch (eigene Karte `bookEditor`) | `toggleBookEditorCard()` aus Palette/Quick-Pills | Card-lokal in [`bookEditorCard`](../public/js/cards/book-editor-card.js); Root-Flag `showBookEditorCard` (`cardsState`) | [book-editor.md](book-editor.md) |
+
+Bucheditor ist **kein Modus** auf einer Einzelseite — er ist eine eigenständige Karte mit eigener Save-Pipeline (`saveQueue`, pro Block) und keiner Verbindung zu `editMode`/`focusActive`. Exklusivität zum Notebook/Focus läuft über `_closeOtherMainCards` (`EXCLUSIVE_CARDS`-Eintrag in [feature-registry.js](../public/js/cards/feature-registry.js)), nicht über die Modus-Flags.
+
+## Editor-Modi des Notebook-Editors (4 Stück, **Konsistenz kritisch**)
+
+Vier orthogonale Modi am **Notebook-Editor** (nicht am Bucheditor) — kein Single-Enum, sondern Boolean-Flags am Root. Reihenfolge der Mutations und Invarianten sind **harte Regeln**: jede Änderung am Modus-Setup muss diese Tabelle aktuell halten.
 
 | Modus | Flag | Slice / Datei | Enter | Exit |
 |-------|------|---------------|-------|------|

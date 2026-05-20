@@ -142,6 +142,7 @@
                  x-effect="_maybeRehydrate($el, block)"
                  @mousedown="_onBlockMousedown(block, $event)"
                  @click="activateBlock(block)"
+                 @keydown="onBlockKeydown(block, $event)"
                  @input="_onBlockInput(block, $event)"></div>
 
             <div x-show="block.conflict" x-cloak class="book-editor-conflict">

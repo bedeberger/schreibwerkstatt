@@ -1,6 +1,7 @@
 import { escHtml, fetchJson, SAFETY_HTML_RATIO, replaceInHtml, stripFocusArtefacts } from '../utils.js';
 import { sortByPosition, SOFT_TYPEN } from '../book/page-view.js';
 import { contentRepo } from '../repo/content.js';
+import { savePage } from './shared/page-api.js';
 
 // Lektorat-Workflow-Methoden (werden in die Alpine-Komponente gespreadet)
 // `this` bezieht sich auf die Alpine-Komponente.
@@ -36,11 +37,11 @@ export const lektoratMethods = {
     onProgress(85, this.t('lektorat.saving'));
     // `page.updated_at` ist der frisch geladene Stand; PUT optimistisch gegen
     // genau diesen Stamp. Wenn dazwischen jemand schreibt → 409 vom Server.
-    const saved = await contentRepo.savePage(this.currentPage.id, {
+    const saved = await savePage(this.currentPage.id, {
       html: finalHtml,
-      name: this.currentPage.name,
-      expected_updated_at: page.updated_at || null,
+      pageName: this.currentPage.name,
       source,
+      expectedUpdatedAt: page.updated_at || null,
     });
     if (saved?.updated_at) this.currentPage.updated_at = saved.updated_at;
     // Uebernommene Korrekturen sind direkte Folge des Lektorats — Seite soll

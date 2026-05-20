@@ -6,8 +6,8 @@ import {
   stripLektoratMarks,
   normalizeEditorBlocks,
 } from '../shared/html-clean.js';
-import { buildSavePayload, isNoChange } from '../shared/save-pipeline.js';
-import { isPageConflict, readConflictBody } from '../shared/page-api.js';
+import { isNoChange } from '../shared/save-pipeline.js';
+import { savePage, isPageConflict, readConflictBody } from '../shared/page-api.js';
 import { getActiveEditorContainer } from '../shared/active-editor.js';
 import { installEditCounter } from '../shared/edit-counter.js';
 import { writeNormalSnapshot, clearNormalSnapshot } from './storage.js';
@@ -266,12 +266,12 @@ export const notebookEditMethods = {
     app.editSaving = true;
     app.setStatus(app.t('edit.saving'), true);
     try {
-      const saved = await contentRepo.savePage(app.currentPage.id, buildSavePayload({
+      const saved = await savePage(app.currentPage.id, {
         html: newHtml,
         pageName: app.currentPage.name,
         source: app.focusActive ? 'focus' : 'main',
         expectedUpdatedAt: app.currentPage.updated_at,
-      }));
+      });
       if (saved?.updated_at) app.currentPage.updated_at = saved.updated_at;
 
       app.originalHtml = newHtml;
@@ -385,12 +385,12 @@ export const notebookEditMethods = {
         }), false, 8000);
         return;
       }
-      const saved = await contentRepo.savePage(app.currentPage.id, buildSavePayload({
+      const saved = await savePage(app.currentPage.id, {
         html: newHtml,
         pageName: app.currentPage.name,
         source: app.focusActive ? 'focus' : 'main',
         expectedUpdatedAt: app.currentPage.updated_at,
-      }));
+      });
       if (saved?.updated_at) app.currentPage.updated_at = saved.updated_at;
       app.originalHtml = newHtml;
       app.editDirty = false;

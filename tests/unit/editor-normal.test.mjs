@@ -71,9 +71,9 @@ test('Shared-Lib: stripLektoratMarks aus shared/html-clean importiert', () => {
     'Mark-Stripping muss aus shared/ kommen, nicht inline');
 });
 
-test('Shared-Lib: buildSavePayload aus shared/save-pipeline importiert', () => {
-  assert.match(editSrc, /buildSavePayload[\s\S]*from\s+['"]\.\.\/shared\/save-pipeline\.js['"]/,
-    'Save-Payload-Build muss aus shared/save-pipeline');
+test('Shared-Lib: savePage aus shared/page-api importiert (Save geht durch den Wrapper)', () => {
+  assert.match(editSrc, /\bsavePage\b[\s\S]*from\s+['"]\.\.\/shared\/page-api\.js['"]/,
+    'Save muss durch den page-api-Wrapper laufen (der intern buildSavePayload nutzt), nicht raw contentRepo.savePage');
 });
 
 test('Shared-Lib: isPageConflict aus shared/page-api importiert', () => {

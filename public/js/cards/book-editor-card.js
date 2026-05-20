@@ -1,9 +1,10 @@
 // Alpine.data('bookEditorCard') — Bucheditor.
 //
 // Rendert alle Kapitel + Seiten eines Buchs in Lesereihenfolge als Sequenz
-// separater contenteditable-Blöcke. Pro-Block-Save schreibt via
-// contentRepo.savePage, Stale-Schutz via _checkPageConflict. HTML-Quelle ist
-// /content/* (server-cleant in routes/content.js via cleanPageHtml).
+// separater contenteditable-Blöcke. Pro-Block-Save schreibt via savePage()
+// aus editor/shared/page-api.js mit source='book', Stale-Schutz via
+// _checkPageConflict. HTML-Quelle ist /content/* (server-cleant in
+// routes/content.js via cleanPageHtml).
 //
 // Click-aktiviert-Block: Default contenteditable=false; Klick setzt aktive
 // pageId, Caret aus Mousedown-Position. Verlassen flusht Save bei dirty.
@@ -15,7 +16,7 @@
 
 import { setupCardLifecycle } from './card-lifecycle.js';
 import { stripFocusArtefacts, htmlToText, fetchJson, escHtml } from '../utils.js';
-import { contentRepo } from '../repo/content.js';
+import { savePage } from '../editor/shared/page-api.js';
 
 const AUTOSAVE_IDLE_MS = 60000;
 const AUTOSAVE_MAX_MS = 120000;
@@ -343,10 +344,11 @@ export function registerBookEditorCard() {
           });
           return;
         }
-        const saved = await contentRepo.savePage(block.pageId, {
+        const saved = await savePage(block.pageId, {
           html: newHtml,
-          name: block.name,
-          expected_updated_at: block.originalUpdatedAt || null,
+          pageName: block.name,
+          source: 'book',
+          expectedUpdatedAt: block.originalUpdatedAt || null,
         });
         block.originalHtml = newHtml;
         if (saved?.updated_at) block.originalUpdatedAt = saved.updated_at;
@@ -731,6 +733,17 @@ export function registerBookEditorCard() {
       if (mod && !event.shiftKey && !event.altKey && (event.key === 's' || event.key === 'S')) {
         event.preventDefault();
         this.saveAllDirty();
+      }
+    },
+
+    // Shift+Enter = weicher Zeilenumbruch (<br>). Safari/WebKit splittet sonst
+    // den Absatz in zwei <p>. execCommand('insertLineBreak') setzt cross-browser
+    // konsistent ein <br> — gleicher Pfad wie Notebook-Editor.
+    onBlockKeydown(block, event) {
+      if (event.key === 'Enter' && event.shiftKey && !event.altKey && !event.metaKey && !event.ctrlKey) {
+        event.preventDefault();
+        document.execCommand('insertLineBreak');
+        this._markBlockDirty(block);
       }
     },
 

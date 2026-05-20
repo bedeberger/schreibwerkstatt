@@ -1,6 +1,8 @@
 # Focus-Editor
 
-Vollbild-Schreibmodus mit Absatz-/Satz-Spotlight, Typewriter-Scroll und Live-Word-/Char-Counter. Heilige Kuh: jede Änderung an diesem Modul muss dieses Dokument konsultieren. Drift in den Invarianten = sichtbares „Flattern", verlorene Edits oder Phantom-Revisionen im Storage-Backend.
+Vollbild-Schreibmodus **für eine Seite** mit Absatz-/Satz-Spotlight, Typewriter-Scroll und Live-Word-/Char-Counter. Einer von drei unabhängigen Editoren der App; die anderen beiden sind der [Notebook-Editor](notebook-editor.md) (klassischer Einzelseiten-Edit-Modus, auf dem der Focus-Editor als Vollbild-Aufsatz läuft) und der [Bucheditor](book-editor.md) (eigenständige Karte mit Manuskript-Stream über das ganze Buch). Bei Änderungswünschen muss der User immer nennen, welcher Editor gemeint ist (Harte Regel in [CLAUDE.md](../CLAUDE.md)).
+
+Heilige Kuh: jede Änderung an diesem Modul muss dieses Dokument konsultieren. Drift in den Invarianten = sichtbares „Flattern", verlorene Edits oder Phantom-Revisionen im Storage-Backend.
 
 Code: [public/js/editor/focus.js](../public/js/editor/focus.js) (Facade) → [public/js/editor/focus/](../public/js/editor/focus/) (Submodule), [public/js/cards/editor-focus-card.js](../public/js/cards/editor-focus-card.js) (Alpine.data-Sub), [public/css/editor/focus/focus-mode.css](../public/css/editor/focus/focus-mode.css). Tests: [tests/e2e/focus-editor.spec.js](../tests/e2e/focus-editor.spec.js), [tests/unit/editor-focus.test.mjs](../tests/unit/editor-focus.test.mjs), [tests/unit/focus-granularity.test.mjs](../tests/unit/focus-granularity.test.mjs).
 

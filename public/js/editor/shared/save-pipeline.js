@@ -19,15 +19,24 @@ export function isNoChange(currentHtml, originalHtml) {
 
 // Liefert den PUT-Body für /content/pages/:id. Inputs sind reine Strings/
 // Werte; kein `this`, kein DOM. `source` muss vom Aufrufer entschieden
-// werden ('main' für Normal-Editor, 'focus' für Focus-Editor) — die Lib
-// wählt das nicht selbst, weil sie modus-agnostisch ist.
+// werden — die Lib wählt das nicht selbst, weil sie modus-agnostisch ist.
 //
-// Wirft, wenn html oder pageName fehlen — Aufrufer dürfen sich auf die
-// Pflichtfelder verlassen.
+// Erlaubte Quellen (Spiegel von db/page-revisions.js#VALID_SOURCES, ohne
+// die nur-Server-Quellen bookstack-sync/import/conflict):
+//   'main'          — Notebook-Editor
+//   'focus'         — Focus-Editor
+//   'book'          — Buch-Editor (mehrere Pages am Stück)
+//   'lektorat-apply'— Lektorat-Korrekturen übernehmen
+//   'chat-apply'    — Chat-Vorschlag in Seite einsetzen
+//
+// Wirft, wenn html, pageName oder source fehlen/ungültig — Aufrufer dürfen
+// sich auf die Pflichtfelder verlassen.
+const VALID_SOURCES = new Set(['main', 'focus', 'book', 'lektorat-apply', 'chat-apply']);
+
 export function buildSavePayload({ html, pageName, source, expectedUpdatedAt }) {
   if (typeof html !== 'string') throw new Error('buildSavePayload: html required');
   if (!pageName) throw new Error('buildSavePayload: pageName required');
-  if (source !== 'main' && source !== 'focus') {
+  if (!VALID_SOURCES.has(source)) {
     throw new Error(`buildSavePayload: invalid source ${JSON.stringify(source)}`);
   }
   return {
