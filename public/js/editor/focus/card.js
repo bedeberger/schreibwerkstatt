@@ -59,8 +59,13 @@ export const focusCardMethods = {
     app.focusMode = true;
     app.focusActive = true;
     document.body.classList.add('focus-mode');
-    document.body.classList.remove('focus-mode--paragraph', 'focus-mode--sentence', 'focus-mode--window-3', 'focus-mode--typewriter-only');
-    document.body.classList.add('focus-mode--' + (app.focusGranularity || 'paragraph'));
+    const editorCard = document.getElementById('editor-card');
+    if (editorCard) editorCard.classList.add('focus-host');
+    const focusEl = document.querySelector('.focus-editor');
+    if (focusEl) {
+      focusEl.classList.remove('focus-mode--paragraph', 'focus-mode--sentence', 'focus-mode--window-3', 'focus-mode--typewriter-only');
+      focusEl.classList.add('focus-mode--' + (app.focusGranularity || 'paragraph'));
+    }
 
     this.$nextTick(() => {
       // Wenn in der Zwischenzeit jemand exit() gerufen oder schneller
@@ -97,6 +102,8 @@ export const focusCardMethods = {
         app.focusMode = false;
         app.focusActive = false;
         document.body.classList.remove('focus-mode');
+        document.getElementById('editor-card')?.classList.remove('focus-host');
+        document.querySelector('.focus-editor')?.classList.remove('focus-mode--paragraph', 'focus-mode--sentence', 'focus-mode--window-3', 'focus-mode--typewriter-only');
         this._focusState = 'idle';
       }
     });
@@ -189,11 +196,12 @@ export const focusCardMethods = {
     // Auto-Hide-Cursor: Maus 2s ruhig → Cursor unsichtbar. Nächste Bewegung
     // bringt ihn zurück. Nur Klassentoggle, kein Style-Reset.
     const showCursor = () => {
-      document.body.classList.remove('focus-cursor-hidden');
+      const focusEl = document.querySelector('.focus-editor');
+      focusEl?.classList.remove('focus-cursor-hidden');
       clearTimeout(ctx.cursorTimer);
       ctx.cursorTimer = setTimeout(() => {
         if (this._focusState === 'active') {
-          document.body.classList.add('focus-cursor-hidden');
+          document.querySelector('.focus-editor')?.classList.add('focus-cursor-hidden');
         }
       }, CURSOR_HIDE_MS);
     };
@@ -394,8 +402,12 @@ export const focusCardMethods = {
     app.focusMode = false;
     app.focusActive = false;
     document.body.classList.remove('focus-mode');
-    document.body.classList.remove('focus-mode--paragraph', 'focus-mode--sentence', 'focus-mode--window-3', 'focus-mode--typewriter-only');
-    document.body.classList.remove('focus-cursor-hidden');
+    document.getElementById('editor-card')?.classList.remove('focus-host');
+    const focusElExit = document.querySelector('.focus-editor');
+    if (focusElExit) {
+      focusElExit.classList.remove('focus-mode--paragraph', 'focus-mode--sentence', 'focus-mode--window-3', 'focus-mode--typewriter-only');
+      focusElExit.classList.remove('focus-cursor-hidden');
+    }
     document.documentElement.style.removeProperty('--focus-vh');
     document.documentElement.style.removeProperty('--focus-vh-top');
 

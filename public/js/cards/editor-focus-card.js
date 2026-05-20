@@ -37,11 +37,13 @@ export function registerEditorFocusCard() {
       window.addEventListener('editor:focus:start-edit', () => this.startFocusEdit(),   { signal });
 
       // Live-Switch: User ändert Granularität in den Settings, während Focus
-      // aktiv ist → Body-Class + State sofort umstellen, ohne Exit/Re-Enter.
+      // aktiv ist → Cardroot-Class + State sofort umstellen, ohne Exit/Re-Enter.
       this.$watch(() => window.__app?.focusGranularity, (g) => {
         if (this._focusState !== 'active') return;
-        document.body.classList.remove('focus-mode--paragraph', 'focus-mode--sentence', 'focus-mode--window-3', 'focus-mode--typewriter-only');
-        document.body.classList.add('focus-mode--' + (g || 'paragraph'));
+        const focusEl = document.querySelector('.focus-editor');
+        if (!focusEl) return;
+        focusEl.classList.remove('focus-mode--paragraph', 'focus-mode--sentence', 'focus-mode--window-3', 'focus-mode--typewriter-only');
+        focusEl.classList.add('focus-mode--' + (g || 'paragraph'));
         this._focusUpdateActive(false);
       });
 

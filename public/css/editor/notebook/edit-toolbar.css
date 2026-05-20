@@ -65,9 +65,10 @@
 .edit-slash-item:hover,
 .edit-slash-item--active { background: var(--color-hover); }
 
-/* Tabu im Fokus-Mode: strukturell kaltgestellt, unabhängig vom x-show. */
-body.focus-mode .edit-bubble-toolbar,
-body.focus-mode .edit-slash-menu,
-body.focus-mode .edit-find { display: none !important; }
+/* Tabu im Fokus-Mode: strukturell kaltgestellt, unabhängig vom x-show.
+   Scope auf `.focus-host` am Editor-Card (gesetzt in focus/card.js#enterFocusMode). */
+#editor-card.focus-host .edit-bubble-toolbar,
+#editor-card.focus-host .edit-slash-menu,
+#editor-card.focus-host .edit-find { display: none !important; }
 
 }
