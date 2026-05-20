@@ -1,4 +1,11 @@
 <!-- Seiteneditor & Lektorat -->
+<!-- Notebook-Sub-Komponenten-Anker: hostet Snapshot-Restore + Trampoline-Events
+     (Pendant zu editor-focus.html#editorFocusCard). Eigener x-data wäre an der
+     #editor-card-Karte unsauber, weil die Karte selbst alle Root-Felder
+     (editMode, currentPage, ...) via Body-Scope braucht. Lebt unsichtbar als
+     display-contents-Anker am Anfang des Notebook-Partials. -->
+<div x-data="editorNotebookCard" class="display-contents"></div>
+
 <div class="card" id="editor-card"
      x-show="showEditorCard" x-cloak
      :class="{ 'editor-card--fullscreen': pageEditorFullscreen }"

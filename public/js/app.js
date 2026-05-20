@@ -6,7 +6,8 @@ import { aiMethods } from './api/api-ai.js';
 import { historyMethods } from './book/history.js';
 import { treeMethods } from './book/tree.js';
 import { lektoratMethods } from './editor/lektorat.js';
-import { readNormalSnapshot, clearNormalSnapshot } from './editor/notebook/storage.js';
+// readNormalSnapshot/clearNormalSnapshot werden in editor-notebook-card.js via
+// notebook/card.js konsumiert (Restore-Lifecycle dort).
 import { kapitelReviewMethods } from './book/kapitel-review.js';
 import { registerBookReviewCard } from './cards/book-review-card.js';
 import { registerKapitelReviewCard } from './cards/kapitel-review-card.js';
@@ -58,6 +59,7 @@ import { figurLookupMethods } from './editor/figur-lookup.js';
 import { registerEditorFigurLookupCard } from './cards/editor-figur-lookup-card.js';
 import { registerEditorToolbarCard } from './cards/editor-toolbar-card.js';
 import { registerEditorFocusCard } from './cards/editor-focus-card.js';
+import { registerEditorNotebookCard } from './cards/editor-notebook-card.js';
 import { registerLektoratFindingsCard } from './cards/lektorat-findings-card.js';
 import { registerPageHistoryCard } from './cards/page-history-card.js';
 import { registerPageRevisionsCard } from './cards/page-revisions-card.js';
@@ -250,6 +252,7 @@ document.addEventListener('alpine:init', () => {
   registerEditorSynonymeCard();
   registerEditorToolbarCard();
   registerEditorFocusCard();
+  registerEditorNotebookCard();
   registerLektoratFindingsCard();
   registerPageHistoryCard();
   registerPageRevisionsCard();
@@ -700,7 +703,7 @@ document.addEventListener('alpine:init', () => {
         if (this.selectedBookId) this._startCollabPoll(this.selectedBookId);
         this._setupWritingTime();
         this._setupLektoratTime();
-        this._setupNotebookRestore();
+        // _setupNotebookRestore lebt jetzt in editor-notebook-card.js#init.
       } catch (e) {
         console.error('[init]', e);
         this.setStatus(this.t('app.configLoadError'));
@@ -709,35 +712,6 @@ document.addEventListener('alpine:init', () => {
         document.documentElement.removeAttribute('data-app-loading');
         this.appReady = true;
       }
-    },
-
-    // Reload-Wiederaufnahme für den Normal-Editor (Pendant zu
-    // editor-focus-card.js#_tryRestoreFocus). Wird beim Boot einmal gerufen;
-    // hängt $watcher an currentPage.id, renderedPageHtml und showEditorCard.
-    // Erfüllen sie alle die Bedingungen + Snapshot-pageId matcht → startEdit.
-    _setupNotebookRestore() {
-      const snap = readNormalSnapshot();
-      if (!snap) return;
-      this._notebookRestoreSnapshot = snap;
-      const tryRestore = () => this._tryRestoreNotebook();
-      this.$watch(() => this.currentPage?.id, tryRestore);
-      this.$watch(() => this.renderedPageHtml, tryRestore);
-      this.$watch(() => this.showEditorCard, tryRestore);
-      queueMicrotask(tryRestore);
-    },
-
-    _tryRestoreNotebook() {
-      const snap = this._notebookRestoreSnapshot;
-      if (!snap) return;
-      if (this.editMode || this.focusActive) return;
-      if (!this.showEditorCard) return;
-      if (!this.currentPage || this.currentPage.id !== snap.pageId) return;
-      if (!this.renderedPageHtml) return;
-      // Snapshot konsumieren — auch bei späterem Misserfolg nicht erneut
-      // versuchen, sonst Loop bei kaputter Seite.
-      this._notebookRestoreSnapshot = null;
-      clearNormalSnapshot();
-      this.startEdit?.();
     },
 
     // ── Methoden aus Modulen ─────────────────────────────────────────────────

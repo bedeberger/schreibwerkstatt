@@ -15,6 +15,7 @@ Themen-Spickzettel ausgelagert (Drift-Schutz: CLAUDE.md-Regeln, Details in den S
 - [docs/erd.md](docs/erd.md) — Schema-ERD (Mermaid) + offene Schema-Verbesserungen.
 - [docs/figur-werkstatt.md](docs/figur-werkstatt.md) — Figuren-Werkstatt: jsMind-Mindmap, Import aus `figures`, Brainstorm-/Consistency-Jobs, Run-Historie, Hash-Permalinks.
 - [docs/buchchat-tools.md](docs/buchchat-tools.md) — Agentic Buch-Chat: Tool-Inventar (19 Stück), `ctx`-Vertrag, Truncation, Loop-Constraints, neues Tool anlegen.
+- [docs/notebook-editor.md](docs/notebook-editor.md) — Notebook-Editor (Edit-Modus): `editorEditMethods` am Root, Toolbar/Bubble/Slash-Card, Autosave (Idle 60 s / Max 120 s), Draft-Pipeline, Stale-Write-Schutz, Findings-Mark-Watcher, Snapshot, Pflicht-Invarianten.
 - [docs/focus-editor.md](docs/focus-editor.md) — Focus-Editor: State-Machine, Submodule (`focus/`), Trampoline-Pattern, Granularitäten, Recenter-Pipeline, Auto-`<p>`-Slot, Snapshot, Pflicht-Invarianten.
 - [docs/state-modell.md](docs/state-modell.md) — Frontend-State-Modell: 3 Ebenen (Root/Sub/Store), 14 Slices, Lifecycle, `setupCardLifecycle`, Event-Bus, Editor-Modi (4 Flags, Invarianten, erlaubte Kombinationen).
 - [docs/buchorganizer.md](docs/buchorganizer.md) — Buchorganizer: Slice-Layout, In-Place-Mirror, Undo/Redo-Regeln, DnD-Pitfalls, Pflicht-Mutationssequenz.
