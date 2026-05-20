@@ -12,7 +12,7 @@ const { narrativeLabels } = require('../narrative-labels');
 const {
   makeJobLogger, updateJob, completeJob, failJob, i18nError, contentHttpError,
   aiCall, toSystemBlocks, getPrompts, getBookPrompts,
-  loadPageContents, groupByChapter, buildSinglePassBookText, cleanPageTextForClaude,
+  loadOrderedBookContents, loadPageContents, groupByChapter, buildSinglePassBookText, cleanPageTextForClaude,
   chunkLimitsFor, BATCH_SIZE, jobAbortControllers,
   _modelName, fmtTok, tps,
   createJob, enqueueJob, findActiveJobId,
@@ -58,13 +58,10 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
 
     // ── Seiten laden ──────────────────────────────────────────────────────────
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
-    const [chaptersData, pages] = await Promise.all([
-      contentStore.listChapters(bookId, userToken).catch(e => { throw contentHttpError(e); }),
-      contentStore.listPages(bookId, userToken).catch(e => { throw contentHttpError(e); }),
-    ]);
+    const { chMap, chNameToId, chaptersFlat, pages } = await loadOrderedBookContents(bookId, userToken)
+      .catch(e => { throw contentHttpError(e); });
     if (!pages.length) { completeJob(jobId, { empty: true }); return; }
 
-    const chMap = Object.fromEntries(chaptersData.map(c => [c.id, c.name]));
     const pageContents = await loadPageContents(pages, chMap, 30, (i, total) => {
       updateJob(jobId, {
         progress: Math.round((i / total) * 12),
@@ -74,7 +71,7 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
     }, userToken, jobAbortControllers.get(jobId)?.signal);
 
     const idMaps = {
-      chNameToId: Object.fromEntries(chaptersData.map(c => [c.name, c.id])),
+      chNameToId,
       // Kapitel-scoped Page-Lookup gegen Namenskollisionen: derselbe Seitenname
       // kann in mehreren Kapiteln existieren (z.B. «Der Vater» als Kapitelname
       // und als Page-Titel in einem anderen Kapitel). Key 0 = Seiten ohne Kapitel.
@@ -87,7 +84,7 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
         return map;
       })(),
     };
-    invalidateRenamedChapterCaches(bookIdInt, chaptersData, log, jobId);
+    invalidateRenamedChapterCaches(bookIdInt, chaptersFlat, log, jobId);
 
     // Buchtext-Preprocessing (claude-only): unbekannte HTML-Entities (&nbsp;,
     // &mdash;, …), Zero-Width-Zeichen, Soft Hyphen, NBSP, doppelte Spaces raus.
@@ -255,14 +252,10 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
     if (cp) log.info(`Checkpoint gefunden (${cp.nextGi} Kapitel fertig).`);
 
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
-    const [chaptersData, pages] = await Promise.all([
-      contentStore.listChapters(bookId, userToken).catch(e => { throw contentHttpError(e); }),
-      contentStore.listPages(bookId, userToken).catch(e => { throw contentHttpError(e); }),
-    ]);
+    const { chMap, chNameToId, pages } = await loadOrderedBookContents(bookId, userToken)
+      .catch(e => { throw contentHttpError(e); });
     if (!pages.length) { completeJob(jobId, { empty: true }); return; }
 
-    const chMap = Object.fromEntries(chaptersData.map(c => [c.id, c.name]));
-    const chNameToId = Object.fromEntries(chaptersData.map(c => [c.name, c.id]));
     const tok = { in: 0, out: 0, ms: 0 };
 
     // Bekannte Figuren + Orte aus DB laden

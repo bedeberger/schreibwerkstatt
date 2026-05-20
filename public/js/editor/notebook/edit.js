@@ -39,13 +39,22 @@ export const notebookEditMethods = {
   // Wirft nicht — Aufrufer entscheidet bei Read-Fehler.
   async _checkPageConflict(pageId, expectedUpdatedAt) {
     if (!expectedUpdatedAt) return null;
+    // Offline kann es keinen Cross-User-Konflikt geben — der ohnehin folgende
+    // PUT wird ebenfalls scheitern und in den Offline-Banner-Pfad fallen. Modal
+    // hier zu zeigen wäre irreführend (kein verlässlicher Server-Stand).
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return null;
     let remote;
     try {
       remote = await contentRepo.loadPage(pageId, { fresh: true });
-    } catch {
+    } catch (e) {
+      console.warn('[checkPageConflict] read failed, skip modal', { pageId, status: e?.status, code: e?.code, msg: e?.message });
       return null;
     }
-    if (!remote?.updated_at || remote.updated_at === expectedUpdatedAt) return null;
+    if (!remote?.updated_at) {
+      console.warn('[checkPageConflict] remote response without updated_at, skip modal', { pageId });
+      return null;
+    }
+    if (remote.updated_at === expectedUpdatedAt) return null;
     return {
       remoteUpdatedAt: remote.updated_at,
       remoteUserName: remote.updated_by_name || null,

@@ -28,6 +28,34 @@ function chunkLimitsFor(provider) {
   };
 }
 
+// Lädt Buch-Tree (book_order-Overlay angewandt) und liefert chMap mit
+// hierarchischem Pfad ("Teil 1 › Kapitel 1"), chNameToId-Lookup (sowohl raw
+// chapter_name als auch Pfad → id) und pages[] in echter Buchorganizer-
+// Reihenfolge (depth-first). Ersetzt parallele listChapters+listPages-Pfade,
+// die bucket-lokale pages.position interpretieren (Cross-Chapter-Order kaputt)
+// und Sub-Kapitel als Geschwister flachen.
+async function loadOrderedBookContents(bookId, userToken) {
+  const tree = await contentStore.bookTree(bookId, userToken);
+  const chMap = {};        // id → "Vorfahre › … › Kapitel"
+  const chNameToId = {};   // raw chapter_name UND voller Pfad → id (AI-Output toleranter Lookup)
+  const chaptersFlat = []; // [{ id, name, parent_id, path }] depth-first
+  const pages = [];
+  function walk(chapters, prefix, parentId) {
+    for (const c of chapters) {
+      const path = prefix ? `${prefix} › ${c.name}` : c.name;
+      chMap[c.id] = path;
+      chNameToId[c.name] = c.id;
+      chNameToId[path] = c.id;
+      chaptersFlat.push({ id: c.id, name: c.name, parent_id: parentId, path });
+      for (const p of (c.pages || [])) pages.push({ ...p, chapter_id: c.id });
+      walk(c.subchapters || [], path, c.id);
+    }
+  }
+  walk(tree.chapters || [], '', null);
+  for (const p of (tree.topPages || [])) pages.push({ ...p, chapter_id: null });
+  return { chMap, chNameToId, chaptersFlat, pages };
+}
+
 async function loadPageContents(pages, chMap, minLength, onBatch, userToken, signal = null) {
   // Vor-Filter via preview_text aus dem pages-Cache: wenn ein gespeicherter
   // Preview kürzer als minLength ist, ist auch der Volltext zu kurz und wir
@@ -141,5 +169,6 @@ function buildSinglePassBookText(groups, groupOrder) {
 
 module.exports = {
   SINGLE_PASS_LIMIT, PER_CHUNK_LIMIT, BATCH_SIZE, chunkLimitsFor,
+  loadOrderedBookContents,
   loadPageContents, groupByChapter, splitGroupsIntoChunks, buildSinglePassBookText,
 };

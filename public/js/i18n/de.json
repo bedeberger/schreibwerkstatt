@@ -319,6 +319,8 @@
   "pdfExport.exporting":                   "Exportiere …",
   "pdfExport.cancel":                      "Abbrechen",
   "pdfExport.export.noBookHint":           "Bitte zuerst ein Buch wählen.",
+  "pdfExport.includeSubchapters":          "Inkl. Subkapitel",
+  "pdfExport.includeSubchaptersTip":       "Beim Kapitel-Export auch alle Sub-Kapitel mit-rendern (Tree-Reihenfolge, depth-first).",
   "pdfExport.starting":                    "Job wird gestartet …",
   "pdfExport.done":                        "PDF erstellt – Download startet.",
   "pdfExport.pdfaWarning":                 "PDF erstellt, aber PDF/A-Validator meldet Abweichungen. Datei wurde trotzdem geliefert.",
@@ -373,6 +375,9 @@
   "pdfExport.font.color":                  "Farbe",
   "pdfExport.font.colorHintRule":          "auch Farbe der Kapitel-/Seiten-Trennlinie",
   "pdfExport.font.previewText":            "Es war einmal ein König, der hatte drei Söhne …",
+  "pdfExport.font.group.body":             "Fliesstext",
+  "pdfExport.font.group.titlePages":       "Titelei",
+  "pdfExport.font.group.imprint":          "Impressum",
 
   "pdfExport.chapter.breakBefore":         "Seitenumbruch vor Kapitel",
   "pdfExport.chapter.break.always":        "Immer neue Seite",

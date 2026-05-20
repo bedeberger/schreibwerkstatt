@@ -39,7 +39,7 @@ function _scheduleResultCleanup(jobId) {
   t.unref?.();
 }
 
-async function runPdfExportJob(jobId, { scope, entityId, profileId, userEmail, userToken }) {
+async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubchapters, userEmail, userToken }) {
   const log = makeJobLogger(jobId);
   const ctrl = jobAbortControllers.get(jobId);
 
@@ -50,9 +50,9 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, userEmail, u
     if (profile.user_email !== userEmail) throw i18nError('job.error.forbidden');
 
     updateJob(jobId, { progress: 10, statusText: 'job.phase.loadBook' });
-    const bundle = await loadContents({ scope, id: entityId }, userToken);
+    const bundle = await loadContents({ scope, id: entityId, includeSubchapters: !!includeSubchapters }, userToken);
     const { book, chapter, page, groups } = bundle;
-    const scopeDetail = scope === 'chapter' && chapter?.id ? `, chapter=${chapter.id}`
+    const scopeDetail = scope === 'chapter' && chapter?.id ? `, chapter=${chapter.id}${includeSubchapters ? '+sub' : ''}`
                       : scope === 'page'    && page?.id    ? `, page=${page.id}`
                       : '';
     log.info(`Start PDF-Export «${book.name}» (scope=${scope}${scopeDetail}, profile=${profile.name})`);
@@ -141,6 +141,7 @@ router.post('/pdf-export', jsonBody, async (req, res) => {
   const entityId = toIntId(req.body?.entityId ?? req.body?.entity_id ?? req.body?.book_id ?? req.body?.bookId);
   const profileId = toIntId(req.body?.profile_id || req.body?.profileId);
   if (!entityId || !profileId) return res.status(400).json({ error_code: 'ENTITY_OR_PROFILE_REQUIRED' });
+  const includeSubchapters = scope === 'chapter' && (req.body?.include_subchapters === true || req.body?.includeSubchapters === true);
 
   const profile = getPdfExportProfile(profileId);
   if (!profile) return res.status(404).json({ error_code: 'PROFILE_NOT_FOUND' });
@@ -173,12 +174,12 @@ router.post('/pdf-export', jsonBody, async (req, res) => {
     catch (e) { if (sendACLError(res, e)) return; throw e; }
   }
 
-  const dedupId = `${scope}:${entityId}:${profileId}`;
+  const dedupId = `${scope}:${entityId}:${profileId}${includeSubchapters ? ':sub' : ''}`;
   const existing = findActiveJobId('pdf-export', dedupId, userEmail);
   if (existing) return res.json({ jobId: existing, deduplicated: true });
 
   const jobId = createJob('pdf-export', bookId, userEmail, 'job.label.pdfExportProfile', { profile: profile.name }, dedupId);
-  enqueueJob(jobId, () => runPdfExportJob(jobId, { scope, entityId, profileId, userEmail, userToken }));
+  enqueueJob(jobId, () => runPdfExportJob(jobId, { scope, entityId, profileId, includeSubchapters, userEmail, userToken }));
   res.status(202).json({ jobId });
 });
 

@@ -149,20 +149,38 @@
   margin-bottom: 0.6rem;
 }
 
-/* === Schrift-Tab: Rolle-Sektion ===
-   Eine Block pro Schriftrolle (Body/Heading/…), mit dezenter Abgrenzung. */
-.pdfx-font-role {
-  padding: 0.6rem 0;
-  border-top: 0.5px solid var(--color-border);
+/* === Schrift-Tab: Gruppe + Rolle-Akkordeon ===
+   Jede Rolle ist via .collapsible-toggle aufklappbar (Pattern aus DESIGN.md).
+   Body default offen; alle anderen Rollen zu, damit die Liste kurz bleibt. */
+.pdfx-font-group {
+  padding-top: 0.4rem;
 }
-.pdfx-font-role:first-of-type { border-top: none; padding-top: 0.2rem; }
-.pdfx-font-role-title {
+.pdfx-font-group + .pdfx-font-group {
+  margin-top: 1rem;
+  border-top: 0.5px solid var(--color-border);
+  padding-top: 0.8rem;
+}
+.pdfx-font-group-title {
   font-size: var(--font-size-xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--color-muted);
-  margin: 0 0 0.5rem;
+  margin: 0 0 0.4rem;
+}
+.pdfx-font-role { /* override collapsible-wrap-Spacing nicht; nur kompaktere Reihen */
+  padding: 0.15rem 0;
+}
+.pdfx-font-role-toggle {
+  gap: 0.5rem;
+}
+.pdfx-font-role-summary {
+  margin-left: 0.4rem;
+  color: var(--color-muted);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+  font-size: var(--font-size-xs);
 }
 .pdfx-font-preview {
   margin-top: 0.6rem;

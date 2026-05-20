@@ -24,6 +24,7 @@ export function registerPdfExportCard() {
     exportScope: 'book',
     exportChapterId: null,
     exportPageId: null,
+    exportIncludeSubchapters: false,
     // Form-Mount-Gate: getrennt von activeProfile, damit Alpine die x-if-DOM
     // sicher unmounten kann, BEVOR activeProfile auf null/neuen Wert wechselt.
     // Sonst feuern x-model/x-effect-Closures (combobox-x-data) noch ein Mal mit
@@ -41,6 +42,18 @@ export function registerPdfExportCard() {
       headerFooter: false,
       pageStructure: false,
       coverOptions: false,
+    },
+
+    // Pro-Rolle-Akkordeon im Schrift-Tab. `body` default offen, Rest zu.
+    fontRoleOpen: {
+      body: true,
+      heading: false,
+      title: false,
+      subtitle: false,
+      byline: false,
+      dedication: false,
+      year: false,
+      imprint: false,
     },
 
     creating: false,
@@ -75,6 +88,7 @@ export function registerPdfExportCard() {
         if (!this.profiles.length) await this.loadProfiles();
       });
       this.$watch(() => this.exportScope, () => this._ensureExportPicked());
+      this.$watch(() => this.exportChapterId, () => { this.exportIncludeSubchapters = false; });
       this.$watch(() => window.__app?.currentPage?.id, () => this._ensureExportPicked());
 
       // book:changed räumt nur den laufenden Export-State (Buchwechsel = neuer
@@ -322,6 +336,7 @@ export function registerPdfExportCard() {
             scope: ref.scope,
             entityId: ref.id,
             profile_id: this.activeProfile.id,
+            ...(ref.scope === 'chapter' ? { include_subchapters: !!this.exportIncludeSubchapters } : {}),
           }),
         });
         if (!r.ok) {
@@ -408,6 +423,12 @@ export function registerPdfExportCard() {
       return app.tree
         .filter(c => c.type === 'chapter' && !c.solo)
         .map(c => ({ value: c.id, label: c.name }));
+    },
+    selectedChapterHasSubs() {
+      const app = window.__app;
+      if (!app || !Array.isArray(app.tree) || !this.exportChapterId) return false;
+      const ch = app.tree.find(c => c.type === 'chapter' && c.id === this.exportChapterId);
+      return !!ch?.hasChildren;
     },
     exportPageOptions() {
       const app = window.__app;

@@ -319,6 +319,8 @@
   "pdfExport.exporting":                   "Exporting …",
   "pdfExport.cancel":                      "Cancel",
   "pdfExport.export.noBookHint":           "Please select a book first.",
+  "pdfExport.includeSubchapters":          "Incl. subchapters",
+  "pdfExport.includeSubchaptersTip":       "Include all subchapters when exporting a chapter (tree order, depth-first).",
   "pdfExport.starting":                    "Starting job …",
   "pdfExport.done":                        "PDF ready – download starting.",
   "pdfExport.pdfaWarning":                 "PDF generated, but PDF/A validator reported issues. File was delivered anyway.",
@@ -373,6 +375,9 @@
   "pdfExport.font.color":                  "Color",
   "pdfExport.font.colorHintRule":          "also the color of the chapter/page rule",
   "pdfExport.font.previewText":            "Once upon a time there was a king with three sons …",
+  "pdfExport.font.group.body":             "Body",
+  "pdfExport.font.group.titlePages":       "Front matter",
+  "pdfExport.font.group.imprint":          "Imprint",
 
   "pdfExport.chapter.breakBefore":         "Page break before chapter",
   "pdfExport.chapter.break.always":        "Always new page",

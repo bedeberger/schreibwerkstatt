@@ -60,6 +60,7 @@ module.exports = {
   htmlToText: ai.htmlToText,
   cleanPageTextForClaude: ai.cleanPageTextForClaude,
 
+  loadOrderedBookContents: loader.loadOrderedBookContents,
   loadPageContents: loader.loadPageContents,
   groupByChapter: loader.groupByChapter,
   buildSinglePassBookText: loader.buildSinglePassBookText,

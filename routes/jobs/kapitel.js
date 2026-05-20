@@ -9,7 +9,7 @@ const {
   makeJobLogger, updateJob, completeJob, failJob, i18nError, contentHttpError,
   aiCall, getPrompts, getBookPrompts,
   jobAbortControllers,
-  htmlToText, splitGroupsIntoChunks,
+  htmlToText, splitGroupsIntoChunks, loadOrderedBookContents,
   _modelName, tps,
   jobs, runningJobs, createJob, enqueueJob, jobKey, findActiveJobId,
   jsonBody, BATCH_SIZE, chunkLimitsFor,
@@ -59,18 +59,20 @@ async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookNa
     const chapterIds = includeSubchapters
       ? new Set(getDescendantChapterIds(chapterIdInt, { includeSelf: true }).map(String))
       : new Set([String(chapterIdInt)]);
-    const allPages = await contentStore.listPages(bookId, userToken).catch(e => { throw contentHttpError(e); });
-    const pages = allPages
-      .filter(p => chapterIds.has(String(p.chapter_id || '')))
-      .sort((a, b) => (a.position || 0) - (b.position || 0));
+    // Tree-Walk liefert Pages in echter Buchorganizer-Reihenfolge (depth-first)
+    // mit Sub-Kapitel-Pfad in chMap. Filter behält Tree-Order.
+    const { chMap, pages: allPages } = await loadOrderedBookContents(bookId, userToken)
+      .catch(e => { throw contentHttpError(e); });
+    const pages = allPages.filter(p => chapterIds.has(String(p.chapter_id || '')));
 
     if (!pages.length) { completeJob(jobId, { empty: true, chapterName }); return; }
     logger.info(`Start: «${chapterName}» chap=${chapterId}${includeSubchapters ? ' (+Sub-Kapitel)' : ''}, ${pages.length} Seiten`);
 
-    // pages_sig: jede Seite + ihr updated_at + Sub-Tree-Kapitelmenge. Ändert
-    // sich eine Seite, ein Sub-Kapitel wird verschoben/hinzugefuegt, oder der
-    // Modus wechselt → Cache-Miss.
-    const chaptersSig = [...chapterIds].sort().join(',');
+    // pages_sig: jede Seite + ihr updated_at + Sub-Tree-Kapitelmenge inkl. deren
+    // Pfade. Ändert sich eine Seite, ein Sub-Kapitel-Name/Pfad oder der Modus →
+    // Cache-Miss. Sub-Pfad-Hash, damit Sub-Kapitel-Rename den Prompt-Text
+    // invalidiert (sonst landet umbenanntes Sub-Kapitel im stale Cache-Result).
+    const chaptersSig = [...chapterIds].sort().map(id => `${id}:${chMap[id] || ''}`).join(',');
     const pagesSig = pages.map(p => `${p.id}:${p.updated_at || ''}`).sort().join('|')
                      + `||${chapterName}||${bookName}||${optionsSig}||${chaptersSig}||${cacheVersion}`;
     const cached = loadChapterMacroReviewCache(bookIdInt, email, chapterIdInt, pagesSig, effectiveProvider);
@@ -106,11 +108,13 @@ async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookNa
         statusText: 'job.phase.readingPages',
         statusParams: { from: i + 1, to: Math.min(i + BATCH_SIZE, pages.length), total: pages.length },
       });
-      const results = await Promise.allSettled(pages.slice(i, i + BATCH_SIZE).map(async p => {
+      // Index-Map gegen Reorder durch Promise.allSettled.
+      const batch = pages.slice(i, i + BATCH_SIZE);
+      const results = await Promise.allSettled(batch.map(async p => {
         const pd = await contentStore.loadPage(p.id, userToken).catch(e => { throw contentHttpError(e); });
         const text = htmlToText(pd.html).trim();
         if (!text) return null;
-        return { title: p.name, text };
+        return { title: p.name, text, chapterId: p.chapter_id || null };
       }));
       for (const r of results) if (r.status === 'fulfilled' && r.value) contents.push(r.value);
     }
@@ -118,10 +122,33 @@ async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookNa
     if (!contents.length) { completeJob(jobId, { empty: true, chapterName }); return; }
 
     const totalChars = contents.reduce((s, p) => s + p.text.length, 0);
+    // Bei includeSubchapters: Sub-Kapitel-Header zwischen Seiten verschiedener
+    // chapter_ids einstreuen. Pfad relativ zum Top-Kapitel — Top-Pfad wegkürzen,
+    // damit AI nicht den eh schon im Prompt benannten Kapitelnamen doppelt sieht.
+    const topPath = chMap[chapterIdInt] || chapterName || '';
+    function _relPath(chId) {
+      const full = chMap[chId] || '';
+      if (!full || full === topPath) return '';
+      if (topPath && full.startsWith(topPath + ' › ')) return full.slice(topPath.length + 3);
+      return full;
+    }
+    function _buildText(items) {
+      const out = [];
+      let lastChId = null;
+      for (const p of items) {
+        if (includeSubchapters && p.chapterId !== lastChId) {
+          const rel = _relPath(p.chapterId);
+          if (rel) out.push(`## ${rel}`);
+          lastChId = p.chapterId;
+        }
+        out.push(`### ${p.title}\n${p.text}`);
+      }
+      return out.join('\n\n---\n\n');
+    }
     let r;
 
     if (totalChars <= SINGLE_PASS_LIMIT) {
-      const chText = contents.map(p => `### ${p.title}\n${p.text}`).join('\n\n---\n\n');
+      const chText = _buildText(contents);
       updateJob(jobId, { progress: 65, statusText: 'job.phase.aiChapterReview' });
       r = await aiCall(jobId, tok,
         buildChapterReviewPrompt(chapterName, bookName, contents.length, chText, { ...narrative, reviewSchwerpunkt }),
@@ -146,7 +173,7 @@ async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookNa
           statusText: 'job.phase.analyzing',
           statusParams: { current: i + 1, total: chunkOrder.length, name: chapterName },
         });
-        const chunkText = chunk.pages.map(p => `### ${p.title}\n${p.text}`).join('\n\n---\n\n');
+        const chunkText = _buildText(chunk.pages);
         const ca = await aiCall(jobId, tok,
           buildChapterAnalysisPrompt(chapterName, bookName, chunk.pages.length, chunkText, narrative),
           SYSTEM_KAPITELANALYSE,

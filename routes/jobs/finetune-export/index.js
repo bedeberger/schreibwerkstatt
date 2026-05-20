@@ -4,13 +4,11 @@ const express = require('express');
 const { getBookSettings } = require('../../../db/schema');
 const {
   makeJobLogger, updateJob, completeJob, failJob, contentHttpError,
-  loadPageContents,
+  loadOrderedBookContents, loadPageContents,
   jobs, createJob, enqueueJob, findActiveJobId,
   jobAbortControllers, BATCH_SIZE,
   jsonBody,
 } = require('../shared');
-const contentStore = require('../../../lib/content-store');
-
 const { buildExportFilename } = require('../../../lib/filenames');
 const { setContext } = require('../../../lib/log-context');
 const { loadFinetuneData } = require('./data-loader');
@@ -31,13 +29,9 @@ async function runFinetuneExportJob(jobId, bookId, bookName, userEmail, userToke
   try {
     logger.info(`Start: «${bookName}» types=${Object.entries(opts.types).filter(([,v]) => v).map(([k]) => k).join(',')}`);
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
-    const [chaptersData, pages] = await Promise.all([
-      contentStore.listChapters(bookId, userToken).catch(e => { throw contentHttpError(e); }),
-      contentStore.listPages(bookId, userToken).catch(e => { throw contentHttpError(e); }),
-    ]);
+    const { chMap, pages } = await loadOrderedBookContents(bookId, userToken)
+      .catch(e => { throw contentHttpError(e); });
     if (!pages.length) { completeJob(jobId, { empty: true }); return; }
-
-    const chMap = Object.fromEntries(chaptersData.map(c => [c.id, c.name]));
     const pageContents = await loadPageContents(pages, chMap, 30, (i, total) => {
       updateJob(jobId, {
         progress: Math.round((i / total) * 40),

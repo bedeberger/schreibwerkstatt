@@ -30,6 +30,18 @@
              x-data="combobox({ placeholder: $app.t('export.scope.pickChapter'), compact: false })"
              x-modelable="value" x-model="exportChapterId"
              x-effect="options = exportChapterOptions()"></div>
+        <button type="button"
+                class="kapitel-include-subs-btn"
+                x-show="exportScope === 'chapter' && selectedChapterHasSubs()"
+                @click="exportIncludeSubchapters = !exportIncludeSubchapters"
+                :class="{ primary: exportIncludeSubchapters }"
+                :aria-pressed="exportIncludeSubchapters"
+                :data-tip="$app.t('pdfExport.includeSubchaptersTip')">
+          <svg class="icon" aria-hidden="true">
+            <use :href="exportIncludeSubchapters ? '/icons.svg?v=687#check' : '/icons.svg?v=687#chevron-down'"/>
+          </svg>
+          <span x-text="$app.t('pdfExport.includeSubchapters')"></span>
+        </button>
         <div x-show="exportScope === 'page'"
              x-data="combobox({ placeholder: $app.t('export.scope.pickPage'), compact: false })"
              x-modelable="value" x-model="exportPageId"
@@ -241,99 +253,119 @@
 
       <!-- Schrift-Tab -->
       <div class="pdfx-tab-panel" x-show="isTab('font')">
-        <template x-for="role in ['body','heading','title','subtitle','byline','dedication','year','imprint']" :key="role">
-          <div class="pdfx-font-role">
-            <h4 class="pdfx-font-role-title" x-text="$app.t('pdfExport.font.' + role)"></h4>
+        <template x-for="group in [
+            { key: 'body',       roles: ['body','heading'] },
+            { key: 'titlePages', roles: ['title','subtitle','byline','dedication','year'] },
+            { key: 'imprint',    roles: ['imprint'] }
+          ]" :key="group.key">
+          <div class="pdfx-font-group">
+            <h4 class="pdfx-font-group-title" x-text="$app.t('pdfExport.font.group.' + group.key)"></h4>
 
-            <div class="card-form-row">
-              <label class="card-form-label" x-text="$app.t('pdfExport.font.family')"></label>
-              <div class="card-form-field">
-                <div x-data="combobox($app.t('pdfExport.font.family'))"
-                     x-modelable="value" x-model="activeProfile.config.font[role].family"
-                     x-effect="options = fontList.map(f => ({ value: f.family, label: f.family }))"
-                     @combobox-change="onFontPick(role, $event.detail)"
+            <template x-for="role in group.roles" :key="role">
+              <div class="pdfx-font-role collapsible-wrap">
+                <button type="button"
+                        class="collapsible-toggle pdfx-font-role-toggle"
+                        @click="fontRoleOpen[role] = !fontRoleOpen[role]"
+                        :aria-expanded="fontRoleOpen[role]">
+                  <span class="history-chevron" :class="{ open: fontRoleOpen[role] }" aria-hidden="true">›</span>
+                  <span x-text="$app.t('pdfExport.font.' + role)"></span>
+                  <span class="pdfx-font-role-summary"
+                        x-text="activeProfile.config.font[role].family + ' : ' + activeProfile.config.font[role].weight"></span>
+                </button>
+
+                <div x-show="fontRoleOpen[role]" x-cloak class="collapsible-section">
+                  <div class="card-form-row">
+                    <label class="card-form-label" x-text="$app.t('pdfExport.font.family')"></label>
+                    <div class="card-form-field">
+                      <div x-data="combobox($app.t('pdfExport.font.family'))"
+                           x-modelable="value" x-model="activeProfile.config.font[role].family"
+                           x-effect="options = fontList.map(f => ({ value: f.family, label: f.family }))"
+                           @combobox-change="onFontPick(role, $event.detail)"
 ></div>
-              </div>
-            </div>
+                    </div>
+                  </div>
 
-            <div class="card-form-row">
-              <label class="card-form-label" x-text="$app.t('pdfExport.font.weight')"></label>
-              <div class="card-form-field">
-                <div x-data="combobox($app.t('pdfExport.font.weight'))"
-                     x-modelable="value" x-model="activeProfile.config.font[role].weight"
-                     x-effect="options = ((fontList.find(f => f.family === activeProfile?.config?.font?.[role]?.family)?.weights) || [400]).map(w => ({ value: w, label: String(w) }))"
+                  <div class="card-form-row">
+                    <label class="card-form-label" x-text="$app.t('pdfExport.font.weight')"></label>
+                    <div class="card-form-field">
+                      <div x-data="combobox($app.t('pdfExport.font.weight'))"
+                           x-modelable="value" x-model="activeProfile.config.font[role].weight"
+                           x-effect="options = ((fontList.find(f => f.family === activeProfile?.config?.font?.[role]?.family)?.weights) || [400]).map(w => ({ value: w, label: String(w) }))"
 ></div>
-              </div>
-            </div>
+                    </div>
+                  </div>
 
-            <template x-if="role !== 'heading'">
-              <div class="card-form-row">
-                <label class="card-form-label" x-text="$app.t('pdfExport.font.sizePt')"></label>
-                <div class="card-form-field">
-                  <input type="text" x-data="numInput({ step: 1, min: 6, max: 72 })" x-modelable="value" x-model="activeProfile.config.font[role].sizePt" class="pdfx-num-input">
-                </div>
-              </div>
-            </template>
+                  <template x-if="role !== 'heading'">
+                    <div class="card-form-row">
+                      <label class="card-form-label" x-text="$app.t('pdfExport.font.sizePt')"></label>
+                      <div class="card-form-field">
+                        <input type="text" x-data="numInput({ step: 1, min: 6, max: 72 })" x-modelable="value" x-model="activeProfile.config.font[role].sizePt" class="pdfx-num-input">
+                      </div>
+                    </div>
+                  </template>
 
-            <template x-if="role === 'heading'">
-              <div class="pdfx-num-grid pdfx-num-grid--3">
-                <label class="pdfx-num-field"><span>h1 (pt)</span><input type="text" x-data="numInput({ step: 1, min: 10, max: 60 })" x-modelable="value" x-model="activeProfile.config.font.heading.sizes.h1" class="pdfx-num-input"></label>
-                <label class="pdfx-num-field"><span>h2 (pt)</span><input type="text" x-data="numInput({ step: 1, min: 9,  max: 48 })" x-modelable="value" x-model="activeProfile.config.font.heading.sizes.h2" class="pdfx-num-input"></label>
-                <label class="pdfx-num-field"><span>h3 (pt)</span><input type="text" x-data="numInput({ step: 1, min: 8,  max: 36 })" x-modelable="value" x-model="activeProfile.config.font.heading.sizes.h3" class="pdfx-num-input"></label>
-              </div>
-            </template>
+                  <template x-if="role === 'heading'">
+                    <div class="pdfx-num-grid pdfx-num-grid--3">
+                      <label class="pdfx-num-field"><span>h1 (pt)</span><input type="text" x-data="numInput({ step: 1, min: 10, max: 60 })" x-modelable="value" x-model="activeProfile.config.font.heading.sizes.h1" class="pdfx-num-input"></label>
+                      <label class="pdfx-num-field"><span>h2 (pt)</span><input type="text" x-data="numInput({ step: 1, min: 9,  max: 48 })" x-modelable="value" x-model="activeProfile.config.font.heading.sizes.h2" class="pdfx-num-input"></label>
+                      <label class="pdfx-num-field"><span>h3 (pt)</span><input type="text" x-data="numInput({ step: 1, min: 8,  max: 36 })" x-modelable="value" x-model="activeProfile.config.font.heading.sizes.h3" class="pdfx-num-input"></label>
+                    </div>
+                  </template>
 
-            <template x-if="role === 'body'">
-              <div>
-                <div class="card-form-row">
-                  <label class="card-form-label" x-text="$app.t('pdfExport.font.lineHeight')"></label>
-                  <div class="card-form-field">
-                    <input type="text" x-data="numInput({ step: 0.05, min: 0.8, max: 3 })" x-modelable="value" x-model="activeProfile.config.font.body.lineHeight" class="pdfx-num-input">
+                  <template x-if="role === 'body'">
+                    <div>
+                      <div class="card-form-row">
+                        <label class="card-form-label" x-text="$app.t('pdfExport.font.lineHeight')"></label>
+                        <div class="card-form-field">
+                          <input type="text" x-data="numInput({ step: 0.05, min: 0.8, max: 3 })" x-modelable="value" x-model="activeProfile.config.font.body.lineHeight" class="pdfx-num-input">
+                        </div>
+                      </div>
+                      <div class="card-form-row">
+                        <label class="card-form-label" x-text="$app.t('pdfExport.font.paragraphGap')"></label>
+                        <div class="card-form-field">
+                          <input type="text" x-data="numInput({ step: 0.05, min: 0, max: 3 })" x-modelable="value" x-model="activeProfile.config.font.body.paragraphGap" class="pdfx-num-input">
+                        </div>
+                      </div>
+                      <div class="card-form-row">
+                        <label class="card-form-label" x-text="$app.t('pdfExport.font.firstLineIndentMm')"></label>
+                        <div class="card-form-field">
+                          <input type="text" x-data="numInput({ step: 0.5, min: 0, max: 30 })" x-modelable="value" x-model="activeProfile.config.font.body.firstLineIndentMm" class="pdfx-num-input">
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+
+                  <div class="card-form-row">
+                    <label class="card-form-label">
+                      <span x-text="$app.t('pdfExport.font.color')"></span>
+                      <template x-if="role === 'heading'">
+                        <span class="pdfx-color-hint" x-text="$app.t('pdfExport.font.colorHintRule')"></span>
+                      </template>
+                    </label>
+                    <div class="card-form-field pdfx-color-field">
+                      <input type="color" class="pdfx-color-picker" x-model="activeProfile.config.font[role].color">
+                      <span class="pdfx-color-text" x-text="activeProfile.config.font[role].color"></span>
+                    </div>
+                  </div>
+
+                  <template x-if="['dedication','imprint','year'].includes(role)">
+                    <div class="card-form-row">
+                      <label class="card-form-label">&nbsp;</label>
+                      <div class="card-form-field">
+                        <label class="pdfx-check">
+                          <input type="checkbox" x-model="activeProfile.config.font[role].italic">
+                          <span x-text="$app.t('pdfExport.font.italic')"></span>
+                        </label>
+                      </div>
+                    </div>
+                  </template>
+
+                  <div class="pdfx-font-preview" :style="fontPreviewStyle(role)">
+                    <span x-text="$app.t('pdfExport.font.previewText')"></span>
                   </div>
                 </div>
-                <div class="card-form-row">
-                  <label class="card-form-label" x-text="$app.t('pdfExport.font.paragraphGap')"></label>
-                  <div class="card-form-field">
-                    <input type="text" x-data="numInput({ step: 0.05, min: 0, max: 3 })" x-modelable="value" x-model="activeProfile.config.font.body.paragraphGap" class="pdfx-num-input">
-                  </div>
-                </div>
-                <div class="card-form-row">
-                  <label class="card-form-label" x-text="$app.t('pdfExport.font.firstLineIndentMm')"></label>
-                  <div class="card-form-field">
-                    <input type="text" x-data="numInput({ step: 0.5, min: 0, max: 30 })" x-modelable="value" x-model="activeProfile.config.font.body.firstLineIndentMm" class="pdfx-num-input">
-                  </div>
-                </div>
               </div>
             </template>
-
-            <div class="card-form-row">
-              <label class="card-form-label">
-                <span x-text="$app.t('pdfExport.font.color')"></span>
-                <template x-if="role === 'heading'">
-                  <span class="pdfx-color-hint" x-text="$app.t('pdfExport.font.colorHintRule')"></span>
-                </template>
-              </label>
-              <div class="card-form-field pdfx-color-field">
-                <input type="color" class="pdfx-color-picker" x-model="activeProfile.config.font[role].color">
-                <span class="pdfx-color-text" x-text="activeProfile.config.font[role].color"></span>
-              </div>
-            </div>
-
-            <template x-if="['dedication','imprint','year'].includes(role)">
-              <div class="card-form-row">
-                <label class="card-form-label">&nbsp;</label>
-                <div class="card-form-field">
-                  <label class="pdfx-check">
-                    <input type="checkbox" x-model="activeProfile.config.font[role].italic">
-                    <span x-text="$app.t('pdfExport.font.italic')"></span>
-                  </label>
-                </div>
-              </div>
-            </template>
-
-            <div class="pdfx-font-preview" :style="fontPreviewStyle(role)">
-              <span x-text="$app.t('pdfExport.font.previewText')"></span>
-            </div>
           </div>
         </template>
       </div>

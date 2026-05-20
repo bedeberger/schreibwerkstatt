@@ -9,13 +9,12 @@ const {
 const {
   makeJobLogger, updateJob, completeJob, failJob, i18nError, contentHttpError,
   aiCall, getPrompts, getBookPrompts,
-  loadPageContents, groupByChapter, splitGroupsIntoChunks, buildSinglePassBookText,
+  loadOrderedBookContents, loadPageContents, groupByChapter, splitGroupsIntoChunks, buildSinglePassBookText,
   chunkLimitsFor, BATCH_SIZE, jobAbortControllers, settledAll,
   _modelName, tps,
   jobs, runningJobs, createJob, enqueueJob, jobKey, findActiveJobId,
   jsonBody,
 } = require('./shared');
-const contentStore = require('../../lib/content-store');
 const { narrativeLabels } = require('./narrative-labels');
 const { loadReviewKomplettContext } = require('./review-context');
 const { toIntId } = require('../../lib/validate');
@@ -75,14 +74,10 @@ async function runReviewJob(jobId, bookId, bookName, userEmail, userToken) {
   const optionsSig = _sigHash({ schwerpunkt: reviewSchwerpunkt, komplettContext, narrative });
   try {
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
-    const [chaptersData, pages] = await Promise.all([
-      contentStore.listChapters(bookId, userToken).catch(e => { throw contentHttpError(e); }),
-      contentStore.listPages(bookId, userToken).catch(e => { throw contentHttpError(e); }),
-    ]);
+    const { chMap, pages } = await loadOrderedBookContents(bookId, userToken)
+      .catch(e => { throw contentHttpError(e); });
 
     if (!pages.length) { completeJob(jobId, { empty: true }); return; }
-
-    const chMap = Object.fromEntries(chaptersData.map(c => [c.id, c.name]));
     const tok = { in: 0, out: 0, ms: 0 }; // akkumulierte Token über alle KI-Calls
     logger.info(`Start: «${bookName}» ${pages.length} Seiten`);
     const pageContents = await loadPageContents(pages, chMap, 50, (i, total) => {
