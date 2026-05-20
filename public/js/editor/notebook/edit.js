@@ -10,6 +10,7 @@ import { buildSavePayload, isNoChange } from '../shared/save-pipeline.js';
 import { isPageConflict, readConflictBody } from '../shared/page-api.js';
 import { getActiveEditorContainer } from '../shared/active-editor.js';
 import { installEditCounter } from '../shared/edit-counter.js';
+import { writeNormalSnapshot, clearNormalSnapshot } from './storage.js';
 
 // Auto-Save nach BookStack: idle-debounce + max-Cap. Jede Schreibaktion
 // resettet den Idle-Timer; läuft der User durchgehend, greift der Max-Timer.
@@ -163,6 +164,9 @@ export const editorEditMethods = {
     // (x-show=focusActive in editor.html). Setup nach Alpine-x-show-Flush —
     // .page-content-view--editing existiert vorher nicht im DOM.
     setTimeout(() => { if (this.editMode) installEditCounter(this); }, 0);
+    // Snapshot für Reload-Wiederaufnahme. Pendant zu focus/storage.js —
+    // beim regulären Exit (cancelEdit/saveEdit) wird er wieder gelöscht.
+    writeNormalSnapshot(this.currentPage.id);
   },
 
   async cancelEdit() {
@@ -175,6 +179,7 @@ export const editorEditMethods = {
       if (!ok) return;
     }
     if (this.currentPage) clearDraft(this.currentPage.id);
+    clearNormalSnapshot();
     this._stopAutosave();
     this._uninstallOnlineRetry();
     this._uninstallFindingMarkWatcher();
@@ -283,6 +288,7 @@ export const editorEditMethods = {
       if (this.focusActive) {
         this.setStatus(this.t('edit.changesSaved'), false, 3000);
       } else {
+        clearNormalSnapshot();
         this._stopAutosave();
         this._uninstallOnlineRetry();
         this._uninstallFindingMarkWatcher();
