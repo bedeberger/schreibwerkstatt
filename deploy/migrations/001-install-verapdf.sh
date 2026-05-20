@@ -21,9 +21,15 @@ else
   SUDO="sudo"
 fi
 
-echo "→ JRE + Tools installieren"
+echo "→ JRE + Tools installieren (Java 11 für IzPack-Installer, Java 21 zur Laufzeit)"
 $SUDO apt-get update -qq
-$SUDO apt-get install -y --no-install-recommends default-jre-headless curl unzip
+$SUDO apt-get install -y --no-install-recommends default-jre-headless openjdk-11-jre-headless curl unzip
+
+JAVA11_BIN="$(ls -1 /usr/lib/jvm/java-11-openjdk-*/bin/java 2>/dev/null | head -n1)"
+if [ -z "$JAVA11_BIN" ]; then
+  echo "✗ Java 11 nicht gefunden — IzPack 5 + Java 17+ wirft ArrayIndexOutOfBoundsException"
+  exit 1
+fi
 
 TMP_ZIP="$(mktemp --suffix=.zip)"
 trap 'rm -f "$TMP_ZIP"' EXIT
@@ -71,8 +77,8 @@ if [ -z "$INSTALLER_JAR" ]; then
   exit 1
 fi
 
-echo "→ Installer ausfuehren: $(basename "$INSTALLER_JAR")"
-$SUDO java -jar "$INSTALLER_JAR" "$AUTO_OPTS"
+echo "→ Installer ausfuehren: $(basename "$INSTALLER_JAR") (Java 11)"
+$SUDO "$JAVA11_BIN" -jar "$INSTALLER_JAR" "$AUTO_OPTS"
 
 if [ ! -x "$INSTALL_TARGET/verapdf" ]; then
   echo "✗ verapdf-Binary nicht gefunden unter $INSTALL_TARGET/verapdf"
