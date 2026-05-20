@@ -87,12 +87,13 @@ export const appKomplettMethods = {
     });
   },
 
-  async loadLastKomplettRun(bookId) {
+  async loadLastKomplettRun(bookId, { signal } = {}) {
     if (!bookId) return;
     try {
-      const { lastRun } = await fetchJson(`/jobs/last-run?type=komplett-analyse&book_id=${bookId}`);
+      const { lastRun } = await fetchJson(`/jobs/last-run?type=komplett-analyse&book_id=${bookId}`, { signal });
       this.alleAktualisierenLastRun = lastRun ? formatLastRun(lastRun, (k, p) => this.t(k, p), this.uiLocale) : null;
     } catch (e) {
+      if (e?.name === 'AbortError') return;
       console.error('[loadLastKomplettRun]', e);
       this.alleAktualisierenLastRun = null;
     }

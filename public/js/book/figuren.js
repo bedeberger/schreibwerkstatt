@@ -48,14 +48,15 @@ export function _sanitizeFigur(f) {
 }
 
 export const figurenMethods = {
-  async loadFiguren(bookId) {
+  async loadFiguren(bookId, { signal } = {}) {
     try {
-      const data = await fetchJson('/figures/' + bookId);
+      const data = await fetchJson('/figures/' + bookId, { signal });
       this.figuren = (data?.figuren || []).map(_sanitizeFigur);
       this.figurenUpdatedAt = data?.updated_at || null;
       this._figurLookupIndex = null;
       this._buildGlobalZeitstrahl();
     } catch (e) {
+      if (e?.name === 'AbortError') return;
       console.error('[loadFiguren]', e);
     }
   },

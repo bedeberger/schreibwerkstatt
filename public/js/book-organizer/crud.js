@@ -271,18 +271,12 @@ export const crudMethods = {
       });
       if (!created?.id) return;
       createdId = created.id;
-      // workTree mit neuem Sub-Kapitel ergaenzen + Eltern-Open.
-      const newNode = {
-        id: created.id,
-        name: created.name || name,
-        depth: parent.depth + 1,
-        parent_id: parent.id,
-        pages: [],
-        subchapters: [],
-      };
-      parent.subchapters = [...(parent.subchapters || []), newNode];
       this.chapterOpen = { ...this.chapterOpen, [parent.id]: true, [created.id]: true };
-      await this._rerender();
+      // root.tree ist flach + depth-first; ein in-place-Mirror muesste die
+      // Insertion-Position rekonstruieren. Stattdessen fullReload — gleicher
+      // Pfad wie _deleteChapterRaw fuer Sub-Kapitel. pages:loaded triggert
+      // anschliessend _rerender via Card-Listener und befuellt workTree.
+      await root.loadPages?.();
     }, 'bookOrganizer.createFailed');
     if (ok && createdId != null) this._recordCreateChapter(createdId, name);
   },

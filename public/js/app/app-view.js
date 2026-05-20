@@ -487,6 +487,12 @@ export const appViewMethods = {
   // Karten bleiben sichtbar — `_reloadVisibleBookCards()` füllt sie danach neu.
   // Sub-Komponenten hören auf das `book:changed`-Event und resetten/laden selbst.
   _resetBookScopedState() {
+    // Buchwechsel: laufenden bookTree/Stats-/Sub-Load des vorigen Buches
+    // sofort abbrechen — bei sehr grossen Büchern hängt der bookTree-Request
+    // sonst bis zum 30s-Timeout am Netz und blockiert Browser-Slots, während
+    // das neue Buch parallel lädt.
+    this._bookLoadAbort?.abort(new DOMException('book switch', 'AbortError'));
+    this._bookLoadAbort = null;
     window.dispatchEvent(new CustomEvent('book:changed', {
       detail: { bookId: this.selectedBookId },
     }));

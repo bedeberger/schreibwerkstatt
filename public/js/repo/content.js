@@ -27,10 +27,23 @@ function _parseRetryAfter(raw) {
 async function _fetchWithTimeout(url, opts, timeoutMs) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(new Error('content timeout')), timeoutMs);
+  // Externes Signal (z.B. Buchwechsel-Abort vom Caller) mit Timeout-Signal mergen,
+  // damit `_get`/`_write` von aussen unterbrochen werden können.
+  const external = opts?.signal;
+  let detach;
+  if (external) {
+    if (external.aborted) ctrl.abort(external.reason);
+    else {
+      const onAbort = () => ctrl.abort(external.reason);
+      external.addEventListener('abort', onAbort, { once: true });
+      detach = () => external.removeEventListener('abort', onAbort);
+    }
+  }
   try {
     return await fetch(url, { ...opts, signal: ctrl.signal });
   } finally {
     clearTimeout(timer);
+    detach?.();
   }
 }
 
@@ -59,13 +72,13 @@ function _invalidateContentCache(paths) {
   try { ctrl.postMessage({ type: 'invalidate-content', paths: arr }); } catch {}
 }
 
-async function _get(path, { fresh = false } = {}) {
+async function _get(path, { fresh = false, signal } = {}) {
   // `?__fresh=1` umgeht den SW-CONTENT_CACHE — Pflicht fuer Read-Modify-Write-
   // Pfade (Editor-Open, Lektorat-Save) damit der nachfolgende PUT nicht frische
   // Server-Edits mit Stale-Daten ueberschreibt.
   const url = '/content/' + path + (fresh ? (path.includes('?') ? '&' : '?') + '__fresh=1' : '');
   for (let attempt = 0; attempt <= MAX_RETRY_429; attempt++) {
-    const r = await _fetchWithTimeout(url, {}, GET_TIMEOUT_MS);
+    const r = await _fetchWithTimeout(url, { signal }, GET_TIMEOUT_MS);
     if (r.ok) return r.json();
     if (r.status !== 429 || attempt === MAX_RETRY_429) {
       throw _httpError('GET', path, r.status, await _errBody(r));

@@ -44,16 +44,13 @@
   padding: 2px 6px;
   margin: -2px -6px;
   color: inherit;
-  min-width: 0;
   width: 100%;
+  min-width: 0;
   max-width: 100%;
+  box-sizing: border-box;
   font: inherit;
   letter-spacing: inherit;
   line-height: 1.2;
-}
-.card-title--input:hover:not(:disabled) {
-  border-color: var(--color-border-input);
-  background: var(--color-surface);
 }
 .card-title--input:focus {
   outline: none;

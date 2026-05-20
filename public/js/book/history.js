@@ -54,10 +54,11 @@ export const historyMethods = {
     }
   },
 
-  async loadBookReviewHistory(bookId) {
+  async loadBookReviewHistory(bookId, { signal } = {}) {
     try {
-      this.bookReviewHistory = await fetchJson('/history/review/' + bookId);
+      this.bookReviewHistory = await fetchJson('/history/review/' + bookId, { signal });
     } catch (e) {
+      if (e?.name === 'AbortError') return;
       console.error('[loadBookReviewHistory]', e);
     }
   },

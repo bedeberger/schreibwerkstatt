@@ -406,6 +406,15 @@ export const treeMethods = {
     this.figurenLoading = false;
     this.figurenProgress = 0;
     this.figurenStatus = '';
+    // Vorherigen Buch-Load abbrechen (Buchwechsel während laufendem bookTree
+    // bei grossem Buch sonst: Request hängt 30s am Netz, Server verarbeitet
+    // weiter, Browser-Slot blockiert). Stale-Guards verwerfen zwar Resultate,
+    // brechen aber nichts ab. Re-Entry-Guard, nur in dieser Methode + dem
+    // book-switch-Reset gelesen — daher keine Initial-Feld-Deklaration.
+    this._bookLoadAbort?.abort(new DOMException('book switch', 'AbortError'));
+    const loadCtrl = new AbortController();
+    this._bookLoadAbort = loadCtrl;
+    const signal = loadCtrl.signal;
     try {
       this.setStatus(this.t('tree.loadingPages'), true);
       // Wake-Refresh nicht vorab clearen — Tree bliebe sonst bis zum Response leer (Flicker).
@@ -426,14 +435,14 @@ export const treeMethods = {
       // Buchwechsel: SW-CONTENT_CACHE (SWR) kann stale Listen liefern, daher fresh.
       // Initialer Load greift normal aufs Cache (offline-resilient).
       const fresh = opts.source === 'bookSwitch';
-      const tree = await contentRepo.bookTree(bookId, { fresh });
+      const tree = await contentRepo.bookTree(bookId, { fresh, signal });
 
       // Buch wurde gewechselt während die Anfrage lief → veraltete Daten verwerfen.
       if (this.selectedBookId !== bookId) return;
 
       // pages-Cache im Hintergrund aktualisieren (fire-and-forget)
       const qs = opts.source ? `?source=${encodeURIComponent(opts.source)}` : '';
-      fetch('/sync/pages/' + bookId + qs, { method: 'POST' }).catch(() => {});
+      fetch('/sync/pages/' + bookId + qs, { method: 'POST', signal }).catch(() => {});
 
       // contentRepo.bookTree liefert Kapitel nested (subchapters[]) + topPages
       // fuer Seiten ohne Kapitel. UI-Items behalten internes `priority`-Feld
@@ -519,10 +528,10 @@ export const treeMethods = {
       // Gecachte Stats + Page-Ages + Ideen-Counts (Page + Chapter) aus DB laden
       try {
         const [statsCache, ageMap, ideenMap, chapterIdeenMap] = await Promise.all([
-          fetchJson('/history/page-stats/' + bookId),
-          fetchJson('/history/page-ages/' + bookId),
-          fetchJson('/ideen/counts?book_id=' + bookId).catch(() => ({})),
-          fetchJson('/ideen/counts?book_id=' + bookId + '&kind=chapter').catch(() => ({})),
+          fetchJson('/history/page-stats/' + bookId, { signal }),
+          fetchJson('/history/page-ages/' + bookId, { signal }),
+          fetchJson('/ideen/counts?book_id=' + bookId, { signal }).catch(() => ({})),
+          fetchJson('/ideen/counts?book_id=' + bookId + '&kind=chapter', { signal }).catch(() => ({})),
         ]);
         this.pageLastChecked = ageMap || {};
         this.ideenCounts = ideenMap || {};
@@ -551,22 +560,26 @@ export const treeMethods = {
         this._refetchCurrentPage();
       }
       await Promise.all([
-        this.loadBookReviewHistory(bookId),
+        this.loadBookReviewHistory(bookId, { signal }),
         // loadKapitelReviewHistory lebt jetzt in Alpine.data('kapitelReviewCard')
         // und wird beim Öffnen der Karte (bzw. book:changed-Event) geladen.
-        this.loadFiguren(bookId),
-        this.loadLastKomplettRun(bookId),
+        this.loadFiguren(bookId, { signal }),
+        this.loadLastKomplettRun(bookId, { signal }),
       ]);
       this.checkPendingJobs(bookId); // Reconnect nach Tab-Schliessen, kein await
-      this.loadTokenEstimates(this._tokenEstGen); // Hintergrund, kein await
+      this.loadTokenEstimates(this._tokenEstGen, signal); // Hintergrund, kein await
       // Karten, die einen frischen Tree brauchen (Buchorganizer), reagieren
       // explizit auf diesen Event statt auf einen $watch der Tree-Identität —
       // so können dieselben Karten auch In-Place-Mutationen am Tree machen,
       // ohne sich selbst rekursiv neu zu rendern.
       window.dispatchEvent(new CustomEvent('pages:loaded', { detail: { bookId } }));
     } catch (e) {
+      // AbortError = Buchwechsel hat laufenden Load gekillt — kein User-Fehler.
+      if (e?.name === 'AbortError' || signal.aborted) return;
       console.error('[loadPages]', e);
       this.setStatus(this.t('common.errorColon') + e.message);
+    } finally {
+      if (this._bookLoadAbort === loadCtrl) this._bookLoadAbort = null;
     }
   },
 
@@ -621,8 +634,9 @@ export const treeMethods = {
   //      erscheinen, sobald der User scrollt.
   // Beide Pfade sind idempotent; der Generations-Counter `_tokenEstGen`
   // verwirft Resultate aus alten Buch-Läufen.
-  async loadTokenEstimates(gen) {
+  async loadTokenEstimates(gen, signal) {
     if (this._tokenEstGen !== gen) return;
+    if (signal?.aborted) return;
     const bookId = this.selectedBookId;
     if (!bookId || !this.pages.length) return;
     const missing = this.pages.some(p => !this.tokEsts[p.id]);
@@ -635,6 +649,7 @@ export const treeMethods = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: '{}',
+        signal,
       });
       if (!r.ok) return;
       const data = await r.json();
