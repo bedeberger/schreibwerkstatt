@@ -171,7 +171,26 @@
   font-size: 14px;
   pointer-events: none;
 }
-.search-affix.search-affix > input { padding-left: 30px; }
+.search-affix.search-affix > input { padding-left: 30px; padding-right: 28px; }
+.search-affix > .search-clear--icon {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--color-muted);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+.search-affix > .search-clear--icon:hover { color: var(--color-text); background: var(--color-bg-soft); }
+.search-affix > .search-clear--icon > .icon { width: 14px; height: 14px; }
 .btn-group.sidebar-action-group {
   display: inline-flex;
   align-items: stretch;
