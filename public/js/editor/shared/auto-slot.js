@@ -8,9 +8,9 @@
 // `cleanPageHtml` auf der Server-Seite strippt `<p><br></p>` beim Save wieder
 // raus, daher kein Persistenz-Effekt.
 
-function isEmptyParagraph(el) {
+export function isEmptyParagraph(el) {
   if (!el || el.tagName !== 'P') return false;
-  const txt = (el.textContent || '').replace(/ /g, ' ').trim();
+  const txt = (el.textContent || '').replace(/ /g, ' ').trim();
   return txt === '';
 }
 
@@ -21,7 +21,7 @@ function isEmptyParagraph(el) {
 // Block zu killen.
 export function ensureTrailingParagraph(container) {
   if (!container) return null;
-  const doc = container.ownerDocument;
+  const doc = container.ownerDocument || globalThis.document;
   const last = container.lastElementChild;
   if (isEmptyParagraph(last)) {
     if (!last.hasChildNodes()) last.appendChild(doc.createElement('br'));

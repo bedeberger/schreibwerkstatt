@@ -78,7 +78,7 @@ export function normalizeEditorBlocks(el) {
   const flushBefore = (target) => {
     if (!group.length) return;
     const hasContent = group.some(n =>
-      (n.nodeType === 3 && n.textContent.replace(/ /g, ' ').trim()) ||
+      (n.nodeType === 3 && n.textContent.replace(/ /g, ' ').trim()) ||
       (n.nodeType === 1)
     );
     if (!hasContent) { group = []; return; }

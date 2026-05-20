@@ -1,8 +1,14 @@
-import { htmlToText, stripFocusArtefacts, cleanContentArtefacts, collapseEmptyBlocks, stripTrailingEmptyBlocks, tzOpts } from '../utils.js';
+import { htmlToText, cleanContentArtefacts, tzOpts } from '../utils.js';
 import { sortByPosition, buildHighlightedHtml } from '../book/page-view.js';
-import { installEditCounter } from './focus.js';
+import { installEditCounter } from './shared/edit-counter.js';
 import { contentRepo } from '../repo/content.js';
 import { readDraft, writeDraft, clearDraft } from './draft-storage.js';
+import {
+  stripLektoratMarks,
+  normalizeEditorBlocks,
+} from './shared/html-clean.js';
+import { buildSavePayload, isNoChange } from './shared/save-pipeline.js';
+import { isPageConflict, readConflictBody } from './shared/page-api.js';
 
 // Auto-Save nach BookStack: idle-debounce + max-Cap. Jede Schreibaktion
 // resettet den Idle-Timer; läuft der User durchgehend, greift der Max-Timer.
@@ -10,89 +16,10 @@ import { readDraft, writeDraft, clearDraft } from './draft-storage.js';
 const AUTOSAVE_IDLE_MS = 60000;
 const AUTOSAVE_MAX_MS = 120000;
 const DRAFT_DEBOUNCE_MS = 500;
-// Entfernt Korrekturvorschlags-Markup vor dem Speichern nach BookStack:
-//   - .lektorat-mark / .chat-mark → unwrap (Originaltext behalten)
-//   - .lektorat-ins / .chat-mark-ins → komplett entfernen (nur Vorschlagstext)
-// Block-Wrapping (orphan Text-/Inline-Runs → <p>) übernimmt serverseitig
-// `cleanPageHtml` aus lib/html-clean.js — wird in routes/content.js bzw.
-// lib/content-store.js#savePage auf jeden Page-Write angewendet (single
-// chokepoint für Editor, Lektorat-Save, Chat-Apply, Jobs).
-function stripLektoratMarks(html) {
-  let out = html;
-  const hasMark = out && (out.indexOf('lektorat-mark') !== -1 || out.indexOf('chat-mark') !== -1);
-  const hasIns = out && (out.indexOf('lektorat-ins') !== -1 || out.indexOf('chat-mark-ins') !== -1);
-  if (hasMark || hasIns) {
-    const tmp = document.createElement('div');
-    tmp.innerHTML = out;
-    tmp.querySelectorAll('.lektorat-ins, .chat-mark-ins').forEach(ins => {
-      ins.parentNode?.removeChild(ins);
-    });
-    tmp.querySelectorAll('.lektorat-mark, .chat-mark').forEach(mark => {
-      const parent = mark.parentNode;
-      if (!parent) return;
-      while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
-      parent.removeChild(mark);
-    });
-    out = tmp.innerHTML;
-  }
-  return stripTrailingEmptyBlocks(collapseEmptyBlocks(cleanContentArtefacts(stripFocusArtefacts(out))));
-}
+// stripLektoratMarks / normalizeForCompare / normalizeEditorBlocks /
+// ROOT_BLOCK_TAGS leben in public/js/editor/shared/html-clean.js — dieselbe
+// Lib wird auch vom Focus-Editor konsumiert.
 
-// Vergleichs-Normalform: roher BookStack-HTML und Browser-contenteditable-HTML
-// unterscheiden sich byte-genau auch ohne semantische Änderung (Whitespace,
-// Attribut-Reihenfolge, self-closing Tags, fehlende `<p>`-Wrapper). Ohne
-// gemeinsame Normalisierung schlägt `newHtml === originalHtml` fast immer fehl
-// → unnötige BookStack-Revisions bei Focus-/Edit-Toggle ohne echte Änderung.
-// Beide Seiten durch denselben DOM-Roundtrip + Block-Normalizer + Cleaner.
-function normalizeForCompare(html) {
-  if (!html) return '';
-  const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html');
-  const wrap = doc.body.firstChild;
-  if (!wrap) return '';
-  normalizeEditorBlocks(wrap);
-  return stripLektoratMarks(wrap.innerHTML);
-}
-
-// Legacy-BookStack-Seiten enthalten teilweise bare Text-Nodes und Inline-
-// Elemente direkt unterhalb des Editor-Roots (ohne <p>-Wrapper). Der
-// Fokusmodus erkennt solche Runs nicht als Block → keine Absatz-
-// Hervorhebung, CSS-Dim-Regeln (`.page-content-view p:not(...)` etc.) greifen
-// ebenfalls nicht. Fix: orphan text/inline-Runs zwischen echten Block-
-// Elementen in <p> verpacken, einmal beim Edit-Start. Die normalisierte
-// Fassung wird beim nächsten Save nach BookStack zurückgeschrieben.
-const ROOT_BLOCK_TAGS = new Set([
-  'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
-  'BLOCKQUOTE', 'LI', 'PRE', 'UL', 'OL', 'TABLE',
-  'FIGURE', 'HR', 'DIV', 'DL', 'SECTION', 'ARTICLE',
-  'ASIDE', 'HEADER', 'FOOTER', 'NAV', 'MAIN', 'FORM',
-]);
-
-function normalizeEditorBlocks(el) {
-  if (!el) return;
-  let group = [];
-  const flushBefore = (target) => {
-    if (!group.length) return;
-    const hasContent = group.some(n =>
-      (n.nodeType === 3 && n.textContent.replace(/\u00A0/g, ' ').trim()) ||
-      (n.nodeType === 1)
-    );
-    if (!hasContent) { group = []; return; }
-    const p = document.createElement('p');
-    for (const n of group) p.appendChild(n);
-    if (target) el.insertBefore(p, target);
-    else el.appendChild(p);
-    group = [];
-  };
-  const children = Array.from(el.childNodes);
-  for (const child of children) {
-    if (child.nodeType === 1 && ROOT_BLOCK_TAGS.has(child.tagName)) {
-      flushBefore(child);
-    } else {
-      group.push(child);
-    }
-  }
-  flushBefore(null);
-}
 
 export const editorEditMethods = {
   _getEditEl() {
@@ -269,7 +196,7 @@ export const editorEditMethods = {
     const el = this._getEditEl();
     if (!el) return;
     const newHtml = stripLektoratMarks(el.innerHTML);
-    if (newHtml === this.originalHtml || newHtml === normalizeForCompare(this.originalHtml)) {
+    if (isNoChange(newHtml, this.originalHtml)) {
       // Im Fokusmodus nicht aus Edit-/Fokusmodus herausfallen, wenn
       // der User ein zweites Mal Speichern klickt (nichts geändert).
       if (this.focusMode) {
@@ -324,12 +251,12 @@ export const editorEditMethods = {
     this.editSaving = true;
     this.setStatus(this.t('edit.saving'), true);
     try {
-      const saved = await contentRepo.savePage(this.currentPage.id, {
+      const saved = await contentRepo.savePage(this.currentPage.id, buildSavePayload({
         html: newHtml,
-        name: this.currentPage.name,
+        pageName: this.currentPage.name,
         source: this.focusMode ? 'focus' : 'main',
-        expected_updated_at: this.currentPage.updated_at || null,
-      });
+        expectedUpdatedAt: this.currentPage.updated_at,
+      }));
       if (saved?.updated_at) this.currentPage.updated_at = saved.updated_at;
 
       this.originalHtml = newHtml;
@@ -364,16 +291,13 @@ export const editorEditMethods = {
         this.setStatus(this.t('edit.changesSaved'), false, 5000);
       }
     } catch (e) {
-      if (e?.status === 409 && e?.code === 'PAGE_CONFLICT') {
+      if (isPageConflict(e)) {
         // Race: zwischen Pre-Check und PUT hat anderer User geschrieben.
         // Draft sichern + Conflict-Banner setzen; User muss erneut entscheiden.
         writeDraft(this.currentPage.id, newHtml, this.originalHtml, this.currentPage.updated_at);
         this.lastDraftSavedAt = Date.now();
         this.saveOffline = true;
-        this.editConflict = {
-          remoteUserName: e.body?.server_editor_name || null,
-          remoteUpdatedAt: e.body?.server_updated_at || null,
-        };
+        this.editConflict = readConflictBody(e);
         this.setStatus(this.t('edit.conflict.kept'), false, 8000);
         this.editSaving = false;
         return;
@@ -402,7 +326,7 @@ export const editorEditMethods = {
     const el = this._getEditEl();
     if (!el) return;
     const newHtml = stripLektoratMarks(el.innerHTML);
-    if (newHtml === this.originalHtml || newHtml === normalizeForCompare(this.originalHtml)) {
+    if (isNoChange(newHtml, this.originalHtml)) {
       this.editDirty = false;
       clearDraft(this.currentPage.id);
       this.lastDraftSavedAt = null;
@@ -445,12 +369,12 @@ export const editorEditMethods = {
         }), false, 8000);
         return;
       }
-      const saved = await contentRepo.savePage(this.currentPage.id, {
+      const saved = await contentRepo.savePage(this.currentPage.id, buildSavePayload({
         html: newHtml,
-        name: this.currentPage.name,
+        pageName: this.currentPage.name,
         source: this.focusMode ? 'focus' : 'main',
-        expected_updated_at: this.currentPage.updated_at || null,
-      });
+        expectedUpdatedAt: this.currentPage.updated_at,
+      }));
       if (saved?.updated_at) this.currentPage.updated_at = saved.updated_at;
       this.originalHtml = newHtml;
       this.editDirty = false;
@@ -467,14 +391,11 @@ export const editorEditMethods = {
       this.updatePageView();
       this.setStatus(this.t('edit.savedAt', { time: new Date().toLocaleTimeString(localeTag, tzOpts()) }), false, 2500);
     } catch (e) {
-      if (e?.status === 409 && e?.code === 'PAGE_CONFLICT') {
+      if (isPageConflict(e)) {
         // Race nach Pre-Check: anderer User war im selben Tick schneller.
         // Quiet-Pfad: Draft bleibt, Banner setzen, kein Modal.
         this.saveOffline = true;
-        this.editConflict = {
-          remoteUserName: e.body?.server_editor_name || null,
-          remoteUpdatedAt: e.body?.server_updated_at || null,
-        };
+        this.editConflict = readConflictBody(e);
         this.setStatus(this.t('edit.conflict.unsavedHint', {
           user: e.body?.server_editor_name || this.t('edit.conflict.unknownUser'),
         }), false, 8000);
@@ -536,7 +457,7 @@ export const editorEditMethods = {
     const el = this._getEditEl();
     if (!el) return;
     const html = stripLektoratMarks(el.innerHTML);
-    if (html === this.originalHtml || html === normalizeForCompare(this.originalHtml)) {
+    if (isNoChange(html, this.originalHtml)) {
       clearDraft(this.currentPage.id);
       this.lastDraftSavedAt = null;
       return;

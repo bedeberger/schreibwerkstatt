@@ -6,45 +6,24 @@
 //   (würde sonst BookStack-Revisionen beim nächsten Save erzeugen).
 
 import { BLOCK_TAGS, BLOCK_SEL } from './constants.js';
+import { ensureTrailingParagraph } from '../shared/auto-slot.js';
+export { isEmptyParagraph } from '../shared/auto-slot.js';
 
 // Beim Eintritt in den Fokusmodus: Caret an Buchende. Letzter Absatz schon
-// leer → wiederverwenden, sonst neuen `<p><br></p>` anhängen. NICHT als
-// dirty markieren – der neue Absatz ist nur ein „Schreib-Slot". Tippt der
-// User darin, greift der reguläre `@input="_markEditDirty()"`-Handler.
-// Bleibt er leer und der User schliesst Focus-Mode wieder, räumt
-// exitFocusMode den Slot ab → keine Phantom-Revision in BookStack.
-// Nur „echte" leere `<p>` werden recycled (keine leeren Headings/Listen).
-export function isEmptyParagraph(el) {
-  if (!el || el.tagName !== 'P') return false;
-  const txt = (el.textContent || '').replace(/ /g, ' ').trim();
-  return txt === '';
-}
-
-// Liefert das auto-erzeugte <p> zurück (oder null, falls bestehender leerer
-// Absatz recycelt wurde). Caller speichert die Referenz, um beim Exit gezielt
-// aufzuräumen statt blind den letzten leeren Block zu killen.
+// leer → wiederverwenden, sonst neuen `<p><br></p>` anhängen. Slot-DOM-Logik
+// lebt in shared/auto-slot.js — gemeinsam mit dem Normal-Editor. Hier bleibt
+// nur die Focus-spezifische Erweiterung: Caret an den Slot, Container
+// re-fokussieren (Chrome-Caret-Paint-Bug nach Mid-Focus-Mutation), scrollIntoView.
 //
-// Empty-Paragraph-Recycling auf frischen Seiten: `<p></p>` ohne Kinder bekommt
-// `<br>` als Schreib-Slot — ohne den ist die `<p>`-Box in Chrome zero-height,
-// Caret rendert nicht und `beforeinput` routet ins Leere. Editor-Container
-// danach erneut fokussieren: die DOM-Mutation während eines aktiven Focus-
-// Zustands invalidiert Chrome's Caret-Renderer, ein zweiter `focus()`-Call
-// nach `addRange` triggert den erneuten Caret-Paint.
+// NICHT als dirty markieren – der neue Absatz ist nur ein „Schreib-Slot".
+// Bleibt er leer und der User schliesst Focus-Mode wieder, räumt
+// exitFocusMode den Slot via removeAutoAddedParagraph ab → keine
+// Phantom-Revision in BookStack.
 export function jumpToTrailingParagraph(container) {
   if (!container) return null;
-  const last = container.lastElementChild;
-  let target;
-  let added = null;
-  if (isEmptyParagraph(last)) {
-    target = last;
-    if (!target.hasChildNodes()) target.appendChild(document.createElement('br'));
-  } else {
-    const p = document.createElement('p');
-    p.appendChild(document.createElement('br'));
-    container.appendChild(p);
-    target = p;
-    added = p;
-  }
+  const added = ensureTrailingParagraph(container);
+  const target = added || container.lastElementChild;
+  if (!target) return null;
   const range = document.createRange();
   range.setStart(target, 0);
   range.collapse(true);

@@ -30,7 +30,7 @@ const logger = winston.createLogger({
     })
   ),
   transports: [
-    new winston.transports.File({ filename: LOG_FILE, maxsize: 5 * 1024 * 1024, maxFiles: 3 }),
+    new winston.transports.File({ filename: LOG_FILE, maxsize: 5 * 1024 * 1024, maxFiles: 5, tailable: true }),
     new winston.transports.Console(),
   ],
 });

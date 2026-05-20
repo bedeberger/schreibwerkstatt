@@ -419,7 +419,7 @@ Ziel: Buch im Modell **internalisieren** (Stil, Welt, Figuren, Fakten, Plot). Da
 
 ## Logging
 
-Winston (`logger.js`): Level `info`, Ausgabe in `schreibwerkstatt.log` (5 MB, 3 Dateien rotiert) + Console. Jobs nutzen Child-Logger mit Kontext: `logger.child({ job, user, book })` → Format: `[INFO][lektorat|user@mail.com|42] Nachricht` (das `lektorat` im Beispiel ist der Job-Typ, nicht die App).
+Winston (`logger.js`): Level `info`, Ausgabe in `schreibwerkstatt.log` (5 MB, 5 Dateien rotiert, `tailable: true` → `schreibwerkstatt.log` ist immer current, ältere Rotationen liegen als `schreibwerkstatt1.log`..`schreibwerkstatt5.log` daneben) + Console. Jobs nutzen Child-Logger mit Kontext: `logger.child({ job, user, book })` → Format: `[INFO][lektorat|user@mail.com|42] Nachricht` (das `lektorat` im Beispiel ist der Job-Typ, nicht die App).
 
 ## Projektstruktur (thematische Cluster)
 
