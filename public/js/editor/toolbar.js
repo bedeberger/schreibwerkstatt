@@ -53,7 +53,7 @@ export const toolbarCardMethods = {
 
   _updateBubble() {
     const app = window.__app;
-    if (!app?.editMode || app.focusMode) { this.bubbleShow = false; return; }
+    if (!app?.editMode || app.focusActive) { this.bubbleShow = false; return; }
     const sel = document.getSelection();
     if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
       this.bubbleShow = false;
@@ -142,14 +142,10 @@ export const toolbarCardMethods = {
       return;
     }
 
-    // Im Fokus-Mode bleibt U (Underline) tabu – die Plättung versteckt
-    // das Ergebnis und der User würde unsichtbar formatieren.
-    if (app.focusMode) {
-      if ((e.metaKey || e.ctrlKey) && /^[uU]$/.test(e.key)) {
-        e.preventDefault();
-      }
-      return;
-    }
+    // Im Focus-Mode hört die Toolbar auf — Slash-Menü und sonstige
+    // Block-Transforms sind nicht erlaubt. B/I/U laufen weiter via Browser-
+    // Default (Cmd/Ctrl+B/I/U), die Whitelist wird in Phase 2 strenger.
+    if (app.focusActive) return;
 
     // Slash-Menü-Navigation, wenn geöffnet
     if (this.slashShow) {

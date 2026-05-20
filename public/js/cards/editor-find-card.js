@@ -37,7 +37,7 @@ export function registerEditorFindCard() {
         if (!isFind) return;
         const app = window.__app;
         if (!app) return;
-        if (app.editMode && !app.focusMode) {
+        if (app.editMode && !app.focusActive) {
           event.preventDefault();
           this.openFind();
         } else if (app.showBookEditorCard) {

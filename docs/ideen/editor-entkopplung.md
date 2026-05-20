@@ -17,6 +17,13 @@ Zwei klar getrennte Use-Cases:
 
 Ziel: beide als **gleichrangige** Editier-Modi der Seite — eigene Karten, eigener State, eigenes Frontend-DOM, eigene CSS-Files, eigener Trigger-Pfad, eigene Test-Suiten. Code-Sharing ausdrücklich erwünscht und genutzt: gemeinsame Schreib-Pipeline (HTML-Cleaner, Page-Save-API mit Offline-Queue, Lock/Presence, Revisionen, Snapshot-Restore-Infrastruktur). Daten-Schicht eine, UI-Schicht zwei, Tests pro Use-Case eigene Files.
 
+### Bekannte Bugs im aktuellen Focus-Editor (müssen mit Refactor behoben sein)
+
+- **Scroll funktioniert nicht** — Typewriter-Scroll/Recenter greift nicht mehr; Caret läuft aus dem Viewport, Wheel-/Touch-Scroll wirkt blockiert. Ursache vermutlich Body-Class-`body.focus-mode`-Scroll-Lock oder Recenter-Pipeline-Generation-Mismatch. Nach Refactor (Cardroot-Scope statt Body-Class) muss Scrollen wieder zuverlässig laufen — inkl. Burst-Input + RAF-Debounce.
+- **Highlighting/Hervorhebung funktioniert nicht** — Granularitäten (`paragraph`/`sentence`/`window-3`/`typewriter-only`) rendern keine Hervorhebung mehr; CSS-Selektoren matchen vermutlich nicht den aktuellen DOM (Body-Class vs. Cardroot vs. CSS Custom Highlight API). Nach Refactor müssen alle vier Granularitäten live sichtbar sein und auf Settings-Wechsel reagieren.
+
+Beide Bugs sind primäre Treiber für die Entkopplung — der heutige Body-Class-Scope ist instabil, der Refactor verschiebt alle Focus-Styles auf `.focus-editor`-Cardroot und macht Scroll + Highlight wieder deterministisch testbar.
+
 ## Scope MVP
 
 - Eigener Alpine-State-Slice für den Focus-Modus (`focusState`), losgelöst von `editorState`. Kein gemeinsames `editMode`-Flag mehr.
@@ -45,6 +52,8 @@ Ziel: beide als **gleichrangige** Editier-Modi der Seite — eigene Karten, eige
 - User öffnet eine Seite im Page-View, drückt `Cmd/Ctrl+Shift+E` → Focus-Modus startet direkt, ohne dass der Normal-Editor-Container je gemountet wurde (Smoke-Check via DOM-Inspector: kein Normal-Editor-Container im DOM, nur der Focus-Cardroot).
 - User ist im Normal-Editor, drückt `Cmd/Ctrl+Shift+E` → Normal-Editor schliesst sauber (Save, Lock-Release, Listener-Teardown), Focus-Editor öffnet aus Page-View-Snapshot. Beim Beenden des Focus-Editors landet User wieder im Page-View, nicht im Normal-Editor.
 - User editiert im Focus: kein Toolbar-Element, keine Bubble-Menüs, keine Lektorat-Findings, keine Find/Replace-UI, keine Page-History im DOM. Sichtbar sind ausschliesslich Editor-Fläche, Counter, Granularity-Steuerung.
+- **Scroll funktioniert im Focus durchgängig**: Wheel, Touch, Arrow-Keys, Page-Up/Down, Caret-getriebenes Recenter laufen ohne Hänger; Typewriter-Scroll hält die Caret-Position deterministisch in der gewählten Mittelband-Zone. Burst-Input (schnelles Tippen) führt zu keinem Scroll-Lock.
+- **Highlighting funktioniert im Focus für alle vier Granularitäten**: Sichtprüfung pro Granularität, dass die jeweilige Hervorhebung am Cardroot rendert und beim Caret-/Selection-Wechsel mitwandert. `sentence` via CSS Custom Highlight API, `paragraph`/`window-3` via Klassen am Block-Element, `typewriter-only` ohne Hervorhebung (nur Scroll-Mittelband sichtbar).
 - Im Focus lassen sich Synonyme (Trigger wie heute) und Figuren-Lookup (Trigger wie heute) wie gewohnt aufrufen und schliessen — keine Funktionalität gegenüber heute verloren.
 - Im Focus funktionieren exakt **Cmd/Ctrl+B**, **Cmd/Ctrl+I** und **Cmd/Ctrl+U** am Selektionsbereich. Weitere Inline-Shortcuts sind blockiert / no-op.
 - Quick-Save aus dem Focus erzeugt eine Revision mit `source = 'focus'`; aus dem Normal-Editor `source = 'main'`. Keine `'main+focus'`-Mix-Revisionen mehr.
@@ -120,7 +129,7 @@ Karten:
 
 ### Partials
 
-- [public/partials/editor.html](../../public/partials/editor.html) (bestehend) — bleibt Normal-Editor-Partial; alle Focus-Conditionals entfernt. Bindet weiterhin Synonyme- und Figuren-Lookup-Karten ein. **Focus-Button** (heute in editor.html Z.132) wandert raus.
+- [public/partials/editor.html](../../public/partials/editor.html) → umbenannt nach `editor-notebook.html` (Normal-Editor-Partial = Notebook-Cardroot). Alle Focus-Conditionals entfernt. Bindet weiterhin Synonyme- und Figuren-Lookup-Karten ein. **Focus-Button** (heute in editor.html Z.132) wandert raus.
 - [public/partials/editor-body-view.html](../../public/partials/editor-body-view.html) (Update) — Page-View-Anzeige bekommt im Header zwei Buttons: Edit-Button (öffnet Normal-Editor) und **Focus-Button** (öffnet Focus direkt). Hotkey `Cmd/Ctrl+Shift+E` bleibt global im Body und routet via `handleFocusHotkey` zum selben Entry-Pfad wie der Button.
 - [public/partials/editor-focus.html](../../public/partials/editor-focus.html) (neu) — eigener Partial mit eigenem `<div contenteditable>`, Counter-Anzeige, Granularity-Combobox, **Synonyme- und Figuren-Lookup-Karten** (eingebunden, aber ohne Toolbar/Findings/Find). Mountet bei `focusActive`. Lädt **keine** Toolbar, **keine** Findings, **keine** Find/Replace, **keine** Page-History.
 
@@ -144,13 +153,26 @@ Neu, Subfolder mit thematischer Aufteilung:
 - `shared/active-editor.js` — `getActiveEditorContainer()` + `getActiveEditorMode()`. Sub-Komponenten (Synonyme, Figuren-Lookup), die in beiden Modi laufen, fragen hier nach dem Ziel-Container, statt `app.focusMode` zu prüfen.
 - `shared/shortcuts.js` — `bindInlineFormattingShortcuts(container, { allowedCommands })`. Pure Bindings; `allowedCommands`-Whitelist pro Modus. MVP: Focus erlaubt **ausschliesslich** `['bold', 'italic', 'underline']`. Normal-Editor reicht den gleichen Whitelist-Set durch (Toolbar bleibt dort die Primär-Geste); erweiterte Commands erst in Phase 2.
 
-`public/js/editor/edit.js` wird auf den Normal-Editor-Pfad reduziert (Toolbar-Methoden, Selection, Dirty-Check für Normal-Form) und konsumiert ausschliesslich `shared/`. `public/js/editor/focus/` konsumiert ebenfalls `shared/` und behält Focus-spezifische Module (state-machine, recenter-pipeline, dom-blocks, sentence, typewriter, storage).
+### Notebook-Subfolder `public/js/editor/notebook/` (neu, Pendant zu `focus/`)
+
+Normal-Editor = künftiges „Notizbuch". Bekommt eigenen Subfolder, parallel zu `focus/`. Alles Notebook-Spezifische zieht dort ein; Quer-Subs (Synonyme, Figuren-Lookup) bleiben in `cards/` mode-agnostisch.
+
+- `notebook/card.js` — Sub-Komponente-Methoden des Normal-Editors (Mount, startEdit/saveEdit/cancelEdit, Auto-Save-Timer, Lock-Erwerb, Listener-Cleanup, Generation-Counter `_notebookGen`).
+- `notebook/edit.js` — Edit-Methoden (Selection, DOM-Manipulation, Dirty-Check für Normal-Form). Ersatz für heutiges [public/js/editor/edit.js](../../public/js/editor/edit.js).
+- `notebook/toolbar.js` — Toolbar-Bindings + Button-Handler (B/I/U + Phase-2-Wachstumsfläche für Link, Heading, List, Quote).
+- `notebook/storage.js` — sessionStorage-Snapshot `normal.snapshot` (Pendant zu `focus/storage.js`), TTL 1 h.
+- `notebook/trampoline.js` — Root ↔ Notebook-Card-Events (`editor:notebook:{enter,exit}`), falls Trampoline-Pattern hier nötig.
+- `notebook/index.js` — Facade, re-exportiert alle Notebook-Methods für die Card-Registrierung in [public/js/cards/editor-notebook-card.js](../../public/js/cards/editor-notebook-card.js) (Rename aus heutigem editor-Code-Pfad).
+
+`public/js/editor/focus/` bleibt strukturell wie heute (state-machine, recenter-pipeline, dom-blocks, sentence, typewriter, storage, card, trampoline) und konsumiert `shared/`. Beide Subfolder ziehen **alle** gemeinsamen Pipeline-Aufrufe ausschliesslich aus `shared/`; kein Cross-Import `notebook/` ↔ `focus/`.
+
+Datei-Limit pro Modul wie üblich (>600 LOC → splitten). `notebook/edit.js` darf nicht zur Sammeldatei werden — bei Wachstum (Phase 2: Link-Dialog, Margin-Notes, Sidebars) sofort thematisch in eigene Files unter `notebook/` ziehen.
 
 ## CSS
 
-- [public/css/editor/focus-mode.css](../../public/css/editor/focus-mode.css) bleibt, wird aber von `body.focus-mode`-Overrides auf eigenen Scope-Selektor `.focus-editor` umgestellt (Cardroot der Focus-Karte). Body-Class-Schaltung bleibt für globale Layout-Effekte (overflow-anchor, scroll-Locks), für reine Editor-Styles aber unnötig.
-- Normal-Editor-CSS (heutige `editor/`-Files ausser `focus-mode.css`) wird auf den Cardroot `.normal-editor` gescoped. Die heutigen opinionated Schreibmodus-Text-Metrik-Regeln (max-width-Spaltenbreite, grosszügiges Padding, hoher Zeilenabstand, serifenbetonte Schrift falls vorhanden) werden im Normal-Editor **entfernt**. Normal-Editor rendert dichter (default Zeilenhöhe, normales Padding, normale Block-Spacings — Tagebuch-/Blog-Optik). Focus-CSS bleibt davon unberührt.
-- Toolbar/Findings-CSS verlieren ihre `body.focus-mode`-Negierungen (`:not(body.focus-mode) …`) — Normal-Editor lädt die Files, Focus-Karte lädt sie nicht. Cascade-Konflikte fallen weg.
+- **Focus-CSS-Subfolder** [public/css/editor/focus/](../../public/css/editor/) (neu, falls noch nicht existent): `focus-mode.css` zieht hier rein, weitere Focus-spezifische Files (z. B. Granularitäten-Highlight pro File) kommen hinzu. Scope durchgängig `.focus-editor`-Cardroot statt `body.focus-mode`. Body-Class-Schaltung bleibt nur für globale Layout-Effekte (overflow-anchor, scroll-Locks), für reine Editor-Styles entfällt sie.
+- **Notebook-CSS-Subfolder** [public/css/editor/notebook/](../../public/css/editor/) (neu): alle Normal-Editor-Styles (Cardroot `.notebook-editor`), inklusive Toolbar-, Findings-, Find-, Page-History-Styles. Heutige opinionated Schreibmodus-Text-Metrik-Regeln (max-width-Spaltenbreite, grosszügiges Padding, hoher Zeilenabstand, serifenbetonte Schrift falls vorhanden) werden im Notebook **entfernt** — Notebook rendert dichter (default Zeilenhöhe, normales Padding, normale Block-Spacings, Tagebuch-/Blog-Optik). Wachstumsfläche für Phase-2-Notebook-Features (Sidebars, Margin-Notes) lebt hier.
+- Toolbar/Findings-CSS verlieren ihre `body.focus-mode`-Negierungen (`:not(body.focus-mode) …`) — Notebook-Karte lädt die Files, Focus-Karte lädt sie nicht. Cascade-Konflikte fallen weg.
 - Synonyme- und Figuren-Lookup-Karten-CSS (heute Editor-übergreifend) wird Mode-unabhängig — sie reagieren nur auf ihren eigenen Cardroot, nicht auf `body.focus-mode`.
 - Keine neuen Tokens zwingend. Falls Phase 2 für den Normal-Editor eigene Spacing-Tokens braucht, in [public/css/tokens/](../../public/css/tokens/) ergänzen.
 - `SHELL_CACHE` in [public/sw.js](../../public/sw.js) bumpen.
@@ -219,6 +241,9 @@ Schreiben ist Kernfeature → Quality-Gate **hohe Testabdeckung** für beide Edi
 | Entry aus Normal-Editor (Normal schliesst sauber) | ja | ja |
 | State-Machine (idle/entering/active/exiting + Re-Entry-Guard) | ja | — |
 | Typewriter-Scroll | ja | ja |
+| Scrollen (Wheel/Touch/Arrow/PageUp-Down) ohne Lock | ja | ja |
+| Burst-Input ohne Scroll-Hänger | ja | ja |
+| Highlight-Render am `.focus-editor`-Cardroot sichtbar | ja | ja |
 | Highlight-Granularität `paragraph` | ja | ja |
 | Highlight-Granularität `sentence` (CSS Custom Highlight) | ja | ja |
 | Highlight-Granularität `window-3` | ja | ja |
@@ -266,6 +291,8 @@ Quality-Gate vor Merge: alle Unit-/Integration-/E2E-Tests grün; Coverage-Kontro
 - **Hotkey aus Normal-Editor**: Normal-Editor muss vor Focus-Entry sauber savennen und Listener teardownen — sonst doppelte `selectionchange`-Handler. Mitigation: Save+Teardown-Helper in `shared/`, einheitlich aufgerufen. Schwere: high.
 - **Stale-Snapshot beim Re-Entry**: Wenn der User Page wechselt, während Focus speichert, darf der Save nicht auf der alten Page landen. Mitigation: bestehender Stale-Write-Schutz aus [tests/unit/stale-write.test.mjs](../../tests/unit/stale-write.test.mjs) bleibt und wird auf den Focus-Pfad ausgedehnt. Schwere: high.
 - **Listener-Leaks bei schnellem Toggle**: Generation-Counter (`_focusGen`) bleibt im Focus-Modul; analoger Counter im Normal-Editor nötig, falls dort heute keiner existiert. Schwere: med.
+- **Scroll-Lock-Regression (aktueller Bug)**: heute hängt der Scroll im Focus. Verdacht: `body.focus-mode` setzt `overflow-anchor`/`overflow:hidden` oder Recenter-Pipeline triggert in altem Generation-Slot. Mitigation: Body-Class entfällt, Scope wandert auf `.focus-editor`-Cardroot; Recenter-Pipeline läuft strikt gegen aktuelle Generation. E2E-Pflicht: Scroll-Smoke (Wheel + Burst-Tippen) im Focus-Spec. Schwere: high (Kernfeature broken).
+- **Highlight-Selektor-Mismatch (aktueller Bug)**: heute matchen die Granularitäten-Selektoren teilweise auf Body-Class-Scope, der nach Cardroot-Wechsel nicht mehr greift. Mitigation: alle Granularitäten-Styles in `focus-mode.css` auf `.focus-editor`-Cardroot umstellen; Klassen werden am Block-Element gesetzt, CSS-Custom-Highlight-Register läuft pro Cardroot. E2E-Pflicht: alle vier Granularitäten visuell verifiziert. Schwere: high.
 - **Snapshot-Wiederaufnahme nach Reload**: Focus-Snapshot in sessionStorage bleibt. Nach Entkopplung muss er auch wieder Focus restoren, ohne Normal-Editor-Detour. Mitigation: Restore-Pfad in `editor-focus-card.js` direkt aus Page-View aktivieren. Schwere: med.
 - **Auto-`<p>`-Slot doppelt**: Heute zwei Implementierungen — wird in `shared/auto-slot.js` zusammengeführt. Test-Case: leere Seite, Focus-Enter, Schreibe, Save → kein Duplikat-`<p>`. Schwere: med.
 - **Mobile**: heute kein Mobile-Spezial für Focus; bleibt so. Falls Notebook-Features die Mobile-Layouts ändern, bleibt Focus davon unberührt (anderer Cardroot, andere CSS-Datei). Schwere: low.
@@ -277,17 +304,18 @@ Quality-Gate vor Merge: alle Unit-/Integration-/E2E-Tests grün; Coverage-Kontro
 |---|---|
 | [public/js/app/app-state.js](../../public/js/app/app-state.js) | `focusModeState` → `focusState` mit neuen Feldern (`focusActive`, `focusDirty`, `focusSaving`); Trennung von `editorState` |
 | [public/js/app/app-view.js](../../public/js/app/app-view.js) | Hotkey-Routing aus Page-View direkt zu Focus; `_closeOtherMainCards` für Focus-Karte; `selectPage` Mode-agnostisch |
-| [public/js/editor/edit.js](../../public/js/editor/edit.js) | Reduktion auf Normal-Pfad; alle Focus-Branches entfernen; Imports auf `shared/` umstellen |
+| [public/js/editor/edit.js](../../public/js/editor/edit.js) | Move nach `public/js/editor/notebook/edit.js`; Reduktion auf Notebook-Pfad; alle Focus-Branches entfernen; Imports auf `shared/` umstellen |
 | [public/js/editor/focus/card.js](../../public/js/editor/focus/card.js) | Direct-Entry-Pfad aus Page-View; I1-Sequenz entfernt; eigener Container statt Normal-Editor-Container |
 | [public/js/editor/focus/trampoline.js](../../public/js/editor/focus/trampoline.js) | Auf `enter`/`exit` reduzieren; `toggle`/`start-edit` entfernen |
 | [public/js/cards/editor-focus-card.js](../../public/js/cards/editor-focus-card.js) | Cardroot wird selbst Editor-Container; Counter-Setup intern |
-| [public/js/cards/editor-toolbar-card.js](../../public/js/cards/editor-toolbar-card.js) | `if (app.focusMode)`-Guards entfernen; Normal-only |
+| [public/js/cards/editor-toolbar-card.js](../../public/js/cards/editor-toolbar-card.js) | `if (app.focusMode)`-Guards entfernen; Notebook-only; importiert aus `editor/notebook/toolbar.js` |
 | [public/js/cards/editor-figur-lookup-card.js](../../public/js/cards/editor-figur-lookup-card.js) | Mode-agnostisch via `getActiveEditorContainer()` aus `shared/`; bleibt in beiden Modi verfügbar |
 | [public/js/cards/editor-synonyme-card.js](../../public/js/cards/editor-synonyme-card.js) | dito; bleibt in beiden Modi verfügbar |
-| [public/js/cards/editor-find-card.js](../../public/js/cards/editor-find-card.js) | `if (app.focusMode)`-Guards entfernen; Normal-only |
+| [public/js/cards/editor-find-card.js](../../public/js/cards/editor-find-card.js) | `if (app.focusMode)`-Guards entfernen; Notebook-only |
 | [public/js/cards/feature-registry.js](../../public/js/cards/feature-registry.js) | `EXCLUSIVE_CARDS`-Eintrag für Focus prüfen/ergänzen |
-| [public/css/editor/focus-mode.css](../../public/css/editor/focus-mode.css) | `body.focus-mode` → `.focus-editor`-Cardroot; alle `:not(body.focus-mode)`-Negierungen in den Normal-Editor-CSS-Files entfernen |
-| [public/index.html](../../public/index.html) | neuer Partial-Placeholder für `editor-focus.html`; Hotkey-Body-Listener-Routing aktualisieren |
+| [public/css/editor/focus-mode.css](../../public/css/editor/focus-mode.css) | Move nach `public/css/editor/focus/focus-mode.css`; `body.focus-mode` → `.focus-editor`-Cardroot; alle `:not(body.focus-mode)`-Negierungen in den Notebook-CSS-Files entfernen |
+| `public/css/editor/*.css` (übrige Editor-Files) | Move nach `public/css/editor/notebook/`; Scope auf `.notebook-editor`-Cardroot; Schreibmodus-Text-Metrik-Constraints entfernen |
+| [public/index.html](../../public/index.html) | Partial-Placeholder für `editor-focus.html` neu, `editor.html` umbenennen auf `editor-notebook.html`; neue CSS-`<link>`-Liste für `editor/focus/` + `editor/notebook/`-Subfolder; Hotkey-Body-Listener-Routing aktualisieren |
 | [public/partials/editor-body-view.html](../../public/partials/editor-body-view.html) | Header bekommt Focus-Button neben Edit-Button (gemeinsamer Entry aus Page-View) |
 | [public/sw.js](../../public/sw.js) | `SHELL_CACHE` bump |
 | [public/js/i18n/de.json](../../public/js/i18n/de.json) | neue Keys |
@@ -313,6 +341,16 @@ Quality-Gate vor Merge: alle Unit-/Integration-/E2E-Tests grün; Coverage-Kontro
 | `public/js/editor/shared/edit-counter.js` | Per-Container-Counter |
 | `public/js/editor/shared/active-editor.js` | `getActiveEditorContainer()` + `getActiveEditorMode()` für mode-agnostische Subs |
 | `public/js/editor/shared/shortcuts.js` | Inline-Formatting-Shortcuts mit `allowedCommands`-Whitelist (`['bold','italic','underline']` im MVP) |
+| `public/js/editor/notebook/card.js` | Notebook-Card-Methods (Mount, startEdit/saveEdit/cancelEdit, Auto-Save-Timer, Lock, Listener-Cleanup, `_notebookGen`) |
+| `public/js/editor/notebook/edit.js` | Edit-Methoden (Selection, DOM-Manipulation, Dirty-Check). Move-Target aus `public/js/editor/edit.js` |
+| `public/js/editor/notebook/toolbar.js` | Toolbar-Bindings, Button-Handler, Wachstumsfläche für Phase-2-Buttons |
+| `public/js/editor/notebook/storage.js` | sessionStorage-Snapshot `normal.snapshot`, TTL 1 h |
+| `public/js/editor/notebook/trampoline.js` | Root ↔ Notebook-Card-Events `editor:notebook:{enter,exit}` |
+| `public/js/editor/notebook/index.js` | Facade, re-exportiert Notebook-Methods für Card-Registrierung |
+| `public/js/editor/focus/` (falls Files heute flach unter `editor/` liegen) | Subfolder-Aufbau verifizieren; alle Focus-spezifischen Module hier sammeln |
+| `public/css/editor/focus/` | CSS-Subfolder; nimmt `focus-mode.css` + künftige Granularitäten-Splits auf |
+| `public/css/editor/notebook/` | CSS-Subfolder; nimmt alle Notebook-Styles auf (Toolbar, Findings, Find, Page-History, Body-Layout dichter) |
+| `public/partials/editor-notebook.html` | Rename-Target aus `editor.html`; Notebook-Cardroot |
 | `public/partials/editor-focus.html` | Focus-Cardroot mit eigenem contenteditable, eingebundene Synonyme- + Figuren-Lookup-Karten |
 | `tests/unit/editor-normal.test.mjs` | Unit-Tests Normal-Editor isoliert; Hauptfeature-Inventar vollständig |
 | `tests/unit/editor-shared-save.test.mjs` | Unit-Tests für `shared/save-pipeline.js` + `auto-slot.js` + `html-clean.js` |

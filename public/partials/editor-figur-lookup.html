@@ -33,7 +33,7 @@
               <span x-show="figurLookupData.rolle" x-text="figurLookupData.rolle"></span>
             </div>
           </div>
-          <div x-show="$app.editMode && !$app.focusMode" class="figur-lookup-footer">
+          <div x-show="$app.editMode && !$app.focusActive" class="figur-lookup-footer">
             <button type="button" class="figur-lookup-link" @click="openFigurLookupTarget()" x-text="$app.t('figurLookup.open')"></button>
           </div>
         </div>

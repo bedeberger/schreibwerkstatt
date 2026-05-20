@@ -7,7 +7,7 @@
 <div x-data="editorToolbarCard" class="display-contents">
   <!-- Bubble-Toolbar (Inline-Formate) -->
   <template x-teleport="body">
-    <div x-show="bubbleShow && $app.editMode && !$app.focusMode" x-cloak
+    <div x-show="bubbleShow && $app.editMode && !$app.focusActive" x-cloak
          class="edit-bubble-toolbar"
          :style="{ left: bubbleX + 'px', top: bubbleY + 'px' }"
          @mousedown.prevent>
@@ -25,7 +25,7 @@
 
   <!-- Slash-Menü (Block-Transforms) -->
   <template x-teleport="body">
-    <div x-show="slashShow && $app.editMode && !$app.focusMode" x-cloak
+    <div x-show="slashShow && $app.editMode && !$app.focusActive" x-cloak
          class="edit-slash-menu"
          :style="{ left: slashX + 'px', bottom: slashY + 'px' }"
          @click.outside="_closeSlash()">

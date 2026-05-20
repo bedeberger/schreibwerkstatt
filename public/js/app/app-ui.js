@@ -197,7 +197,7 @@ export const appUiMethods = {
       this.currentPage?.updated_at ? new Date(this.currentPage.updated_at).getTime() : 0,
     );
     // Draft-Zeitstempel zählt nur im Fokusmodus und nur wenn er neuer als Server ist.
-    const draft = (this.focusMode && this.lastDraftSavedAt && this.lastDraftSavedAt > server)
+    const draft = (this.focusActive && this.lastDraftSavedAt && this.lastDraftSavedAt > server)
       ? this.lastDraftSavedAt : 0;
     if (draft) return { ts: draft, kind: 'draft' };
     if (server) return { ts: server, kind: 'saved' };

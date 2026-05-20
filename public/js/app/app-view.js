@@ -437,7 +437,7 @@ export const appViewMethods = {
     this.closeSynonymMenu?.();
     this.closeSynonymPicker?.();
     this.closeFigurLookup?.();
-    if (this.focusMode) this.exitFocusMode();
+    if (this.focusActive) this.exitFocusMode();
     this._stopAutosave?.();
     this._uninstallOnlineRetry?.();
     this.resetChat();

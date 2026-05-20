@@ -193,7 +193,7 @@ export const editorEditMethods = {
     this.closeSynonymPicker?.();
     this.closeFigurLookup?.();
     this.updatePageView();
-    if (this.focusMode) this.exitFocusMode();
+    if (this.focusActive) this.exitFocusMode();
   },
 
   async saveEdit() {
@@ -205,7 +205,7 @@ export const editorEditMethods = {
     if (isNoChange(newHtml, this.originalHtml)) {
       // Im Fokusmodus nicht aus Edit-/Fokusmodus herausfallen, wenn
       // der User ein zweites Mal Speichern klickt (nichts geändert).
-      if (this.focusMode) {
+      if (this.focusActive) {
         this.setStatus(this.t('edit.changesSaved'), false, 2000);
         return;
       }
@@ -260,7 +260,7 @@ export const editorEditMethods = {
       const saved = await contentRepo.savePage(this.currentPage.id, buildSavePayload({
         html: newHtml,
         pageName: this.currentPage.name,
-        source: this.focusMode ? 'focus' : 'main',
+        source: this.focusActive ? 'focus' : 'main',
         expectedUpdatedAt: this.currentPage.updated_at,
       }));
       if (saved?.updated_at) this.currentPage.updated_at = saved.updated_at;
@@ -280,7 +280,7 @@ export const editorEditMethods = {
       this.saveOffline = false;
       this.editConflict = null;
       this.updatePageView();
-      if (this.focusMode) {
+      if (this.focusActive) {
         this.setStatus(this.t('edit.changesSaved'), false, 3000);
       } else {
         this._stopAutosave();
@@ -378,7 +378,7 @@ export const editorEditMethods = {
       const saved = await contentRepo.savePage(this.currentPage.id, buildSavePayload({
         html: newHtml,
         pageName: this.currentPage.name,
-        source: this.focusMode ? 'focus' : 'main',
+        source: this.focusActive ? 'focus' : 'main',
         expectedUpdatedAt: this.currentPage.updated_at,
       }));
       if (saved?.updated_at) this.currentPage.updated_at = saved.updated_at;

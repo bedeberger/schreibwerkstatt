@@ -10,7 +10,7 @@
                :value="currentPage.name"
                @blur="renameCurrentPage($event)"
                @keydown.enter.prevent="$event.target.blur()"
-               :disabled="editMode || focusMode"
+               :disabled="editMode || focusActive"
                autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other"
                :aria-label="t('editor.renamePage')">
       </template>
@@ -129,8 +129,8 @@
           </span>
           <span class="action-sep" aria-hidden="true"></span>
           <span class="action-group">
-            <button type="button" @click="toggleFocusMode()" :class="{ primary: focusMode }" :data-tip="focusMode ? t('editor.btn.leaveFocusTitle') : t('editor.btn.enterFocusTitle')" x-text="focusMode ? t('editor.btn.leaveFocus') : t('editor.btn.focusShort')"></button>
-            <button type="button" @click="closeFindings()" x-show="checkDone && !focusMode" :data-tip="t('editor.btn.exitCheckTitle')" x-text="t('editor.btn.exitCheck')"></button>
+            <button type="button" @click="toggleFocusMode()" :class="{ primary: focusActive }" :data-tip="focusActive ? t('editor.btn.leaveFocusTitle') : t('editor.btn.enterFocusTitle')" x-text="focusActive ? t('editor.btn.leaveFocus') : t('editor.btn.focusShort')"></button>
+            <button type="button" @click="closeFindings()" x-show="checkDone && !focusActive" :data-tip="t('editor.btn.exitCheckTitle')" x-text="t('editor.btn.exitCheck')"></button>
           </span>
         </span>
       </template>

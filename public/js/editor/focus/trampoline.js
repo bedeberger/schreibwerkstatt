@@ -32,7 +32,7 @@ export const focusMethods = {
     if (!isCmdShiftE) return;
     if (!this.showEditorCard) return;
     event.preventDefault();
-    if (this.focusMode) {
+    if (this.focusActive) {
       window.dispatchEvent(new CustomEvent('editor:focus:exit'));
     } else if (this.editMode) {
       window.dispatchEvent(new CustomEvent('editor:focus:enter'));

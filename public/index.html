@@ -237,7 +237,7 @@
   <script defer src="js/plausible-init.js"></script>
 </head>
 <body x-data="lektorat"
-      @keydown.ctrl.enter.window="if (showEditorCard && !checkLoading && !focusMode) runCheck()"
+      @keydown.ctrl.enter.window="if (showEditorCard && !checkLoading && !focusActive) runCheck()"
       @keydown.ctrl.s.prevent.window="if (editMode) quickSave()"
       @keydown.meta.s.prevent.window="if (editMode) quickSave()"
       @keydown.window="handleShortcutsHotkey($event); handleFocusHotkey($event); handleNavHotkey($event); handleFindingsHotkey($event); handleTreeKeydown($event); handleSynonymHotkey($event)"

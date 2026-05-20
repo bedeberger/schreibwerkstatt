@@ -1,4 +1,4 @@
-// Schreibzeit-Tracking: summiert die Sekunden, während editMode oder focusMode
+// Schreibzeit-Tracking: summiert die Sekunden, während editMode oder focusActive
 // aktiv sind und der Tab sichtbar ist. Heartbeat alle 15 s, damit bei
 // Crash/Tab-Kill max. dieses Intervall verloren geht. Zusätzlicher Flush bei
 // visibilitychange, pagehide und State-Wechseln.
@@ -14,7 +14,7 @@ export const writingTimeMethods = {
   _writingHeartbeatTimer: null,
 
   _writingTimeActive() {
-    return !!((this.editMode || this.focusMode)
+    return !!((this.editMode || this.focusActive)
       && this.selectedBookId
       && document.visibilityState === 'visible');
   },
@@ -26,7 +26,7 @@ export const writingTimeMethods = {
       else this._stopWritingHeartbeat(false);
     };
     this.$watch('editMode',       sync);
-    this.$watch('focusMode',      sync);
+    this.$watch('focusActive',    sync);
     this.$watch('selectedBookId', () => {
       this._stopWritingHeartbeat(false);
       if (this._writingTimeActive()) this._startWritingHeartbeat();

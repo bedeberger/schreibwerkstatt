@@ -47,7 +47,7 @@ test('I2: cancelEdit ruft exitFocusMode wenn focusMode aktiv', () => {
   const m = src.match(/async cancelEdit\s*\(\)\s*\{[\s\S]*?\n  \}/);
   assert.ok(m, 'cancelEdit gefunden');
   const body = m[0];
-  assert.match(body, /if\s*\(\s*this\.focusMode\s*\)\s*this\.exitFocusMode\s*\(\s*\)/,
+  assert.match(body, /if\s*\(\s*this\.focusActive\s*\)\s*this\.exitFocusMode\s*\(\s*\)/,
     'cancelEdit muss exitFocusMode rufen, wenn focusMode aktiv');
   assert.match(body, /this\.editMode\s*=\s*false/, 'cancelEdit räumt editMode');
   assert.match(body, /this\.editDirty\s*=\s*false/, 'cancelEdit räumt editDirty');
@@ -59,9 +59,9 @@ test('I3: saveEdit hat Fokus-Branch, der editMode NICHT räumt', () => {
   const m = src.match(/async saveEdit\s*\(\)\s*\{[\s\S]*?\n  \}/);
   assert.ok(m, 'saveEdit gefunden');
   const body = m[0];
-  // Branch-Struktur: nach erfolgreichem PUT muss `if (this.focusMode) { … } else { … this.editMode = false; … }`
+  // Branch-Struktur: nach erfolgreichem PUT muss `if (this.focusActive) { … } else { … this.editMode = false; … }`
   // existieren. Im if-Zweig darf editMode NICHT auf false gehen.
-  const ifElseMatch = body.match(/if\s*\(\s*this\.focusMode\s*\)\s*\{([\s\S]*?)\}\s*else\s*\{([\s\S]*?)\}/);
+  const ifElseMatch = body.match(/if\s*\(\s*this\.focusActive\s*\)\s*\{([\s\S]*?)\}\s*else\s*\{([\s\S]*?)\}/);
   assert.ok(ifElseMatch,
     'saveEdit braucht if(focusMode){...}else{...}-Branch für Fokus-Stay');
   const focusBranch = ifElseMatch[1];
@@ -85,7 +85,7 @@ test('I4: resetPage hält Reset-Reihenfolge: focus → autosave → chat → edi
     assert.ok(r >= 0, `Marker fehlt in resetPage: ${re}`);
     return r;
   };
-  const pExitFocus = pos(/this\.focusMode\s*\)\s*this\.exitFocusMode/);
+  const pExitFocus = pos(/this\.focusActive\s*\)\s*this\.exitFocusMode/);
   const pStopAuto  = pos(/this\._stopAutosave\?\.\(\)/);
   const pResetChat = pos(/this\.resetChat\s*\(\)/);
   const pEditOff   = pos(/this\.editMode\s*=\s*false/);
