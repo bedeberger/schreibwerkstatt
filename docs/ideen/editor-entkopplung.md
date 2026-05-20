@@ -330,7 +330,7 @@ Quality-Gate vor Merge: alle Unit-/Integration-/E2E-Tests grün; Coverage-Kontro
 - **Offline-Queue**: gemeinsam über `shared/page-api.js`. Beide Modi nutzen dieselbe Queue.
 - **Lock-Modell**: einheitlich **ein Lock pro Page-Session**. Mode-Wechsel Normal ↔ Focus gibt den Lock nicht frei — `shared/page-api.js` führt einen Save aus, der Lock bleibt bestehen, der neue Modus übernimmt ihn. Release erst beim verlassen der Page (Page-Wechsel, View-Reset, Logout).
 - **Autosave-Frequenz**: in beiden Editoren identisch — `AUTOSAVE_IDLE_MS = 60000` (60 s nach letztem Tippen). `AUTOSAVE_MAX_MS = 120000` bleibt unverändert, deckelt Dauer-Tipper.
-- **Counter-Anzeige**: **nur im Focus-Editor**. Normal-Editor bekommt keinen Live-Counter. `installEditCounter` aus `shared/` wird ausschliesslich von der Focus-Karte aufgerufen. Der heutige Aufruf in `edit.js#startEdit` (Z. 232) entfällt — Counter-Setup wandert komplett in die Focus-Karte.
+- **Counter**: **rechnet in beiden Modi**, **sichtbar nur im Focus**. `installEditCounter` läuft ab `startEdit` weiter (Tagesdelta muss alle Edits zählen — sonst sieht der Focus-Counter beim Wiedereintritt falsche Werte). UI-Show via `x-show="focusActive"` im Header; Normal-Editor zeigt den Counter nicht an. Teardown bleibt an `cancelEdit`/`saveEdit` (Non-Focus-Pfad) gekoppelt — exitFocusMode räumt den Counter nicht ab.
 - **Snapshot-Restore**: **beide Editoren** bekommen einen sessionStorage-Snapshot mit gleicher Mechanik (`focus.snapshot` und `normal.snapshot`, je TTL 1 h). Beim Reload mountet die zuletzt aktive Karte direkt ohne Detour über die andere. Storage-Keys getrennt, Restore-Pfad jeweils Card-eigen.
 
 ## Offene Fragen

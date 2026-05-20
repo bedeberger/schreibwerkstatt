@@ -158,8 +158,11 @@ export const editorEditMethods = {
     // Soft-Edit-Lock: zusaetzliches UI-Signal mit Ablaufzeit; OCC-Pfad bleibt
     // das echte Safety-Net. Fremder Lock → foreignEditLock-Banner.
     this._acquireEditLock?.(this.currentPage.id);
-    // Counter-Setup wandert in die Focus-Karte (enterFocusMode); Normal-
-    // Editor zeigt keinen Live-Counter (Entscheidung 2026-05-20).
+    // Live-Counter rechnet in beiden Modi (für korrektes Tagesdelta beim
+    // Wiedereintritt in den Focus), sichtbar aber nur im Focus-Header
+    // (x-show=focusActive in editor.html). Setup nach Alpine-x-show-Flush —
+    // .page-content-view--editing existiert vorher nicht im DOM.
+    setTimeout(() => { if (this.editMode) installEditCounter(this); }, 0);
   },
 
   async cancelEdit() {
