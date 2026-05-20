@@ -428,7 +428,6 @@
   "pdfExport.toc.depthChapters":           "Top chapters only",
   "pdfExport.toc.depthChaptersSubs":       "Chapters + subchapters",
   "pdfExport.toc.depthAll":                "All levels (incl. sub-subchapters)",
-  "pdfExport.toc.depthChaptersPages":      "Chapters + sub-pages",
   "pdfExport.toc.showPageNumbers":         "Show page numbers",
 
   "pdfExport.extras.hint":                 "All extras are optional. Empty fields are not rendered into the PDF.",

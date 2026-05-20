@@ -428,7 +428,6 @@
   "pdfExport.toc.depthChapters":           "Nur Top-Kapitel",
   "pdfExport.toc.depthChaptersSubs":       "Kapitel + Subkapitel",
   "pdfExport.toc.depthAll":                "Alle Ebenen (inkl. Sub-Subkapitel)",
-  "pdfExport.toc.depthChaptersPages":      "Kapitel + Unter-Seiten",
   "pdfExport.toc.showPageNumbers":         "Seitenzahlen anzeigen",
 
   "pdfExport.extras.hint":                 "Alle Extras sind optional. Leere Felder werden nicht ins PDF gerendert.",

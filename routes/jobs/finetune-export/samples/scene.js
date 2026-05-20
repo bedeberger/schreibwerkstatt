@@ -172,8 +172,9 @@ function buildSceneSamples(ctx) {
   const chapterReviewMap = new Map();
   try {
     const crRows = db.prepare(`
-      SELECT cr1.chapter_name, cr1.review_json
+      SELECT c.chapter_name AS chapter_name, cr1.review_json
       FROM chapter_reviews cr1
+      JOIN chapters c ON c.chapter_id = cr1.chapter_id
       WHERE cr1.book_id = ? AND cr1.user_email = ?
         AND cr1.reviewed_at = (
           SELECT MAX(cr2.reviewed_at) FROM chapter_reviews cr2
