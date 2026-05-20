@@ -382,10 +382,10 @@ test('Escape während editSaving wird ignoriert (kein Exit mitten im Save)', asy
   await page.keyboard.press('Escape');
   await page.waitForTimeout(50);
   const still = await page.evaluate(() => ({
-    focusMode: window.harness.focusMode,
+    focusActive: window.harness.focusActive,
     state: window.harness._focusState,
   }));
-  expect(still.focusMode).toBe(true);
+  expect(still.focusActive).toBe(true);
   expect(still.state).toBe('active');
   await page.evaluate(() => { window.harness.editSaving = false; });
 });
@@ -437,13 +437,13 @@ test('Save-Fail beim Exit: User bleibt im Edit-Modus (Draft retten)', async ({ p
   await page.evaluate(() => window.harness.exitFocusMode());
 
   const after = await page.evaluate(() => ({
-    focusMode: window.harness.focusMode,
+    focusActive: window.harness.focusActive,
     editMode:  window.harness.editMode,
     editDirty: window.harness.editDirty,
     state:     window.harness._focusState,
     listeners: window.harness._focusListeners,
   }));
-  expect(after.focusMode).toBe(false);
+  expect(after.focusActive).toBe(false);
   expect(after.editMode).toBe(true);
   expect(after.editDirty).toBe(true);
   expect(after.state).toBe('idle');
@@ -495,7 +495,7 @@ test('visualViewport-resize debounced: setzt --focus-vh, kein Recenter-Storm', a
 });
 
 test('Enter-Error (fehlender Scroll-Container) → sauberer Rollback', async ({ page }) => {
-  // _focusInstall throwt → try/catch → rollback: focusMode=false,
+  // _focusInstall throwt → try/catch → rollback: focusActive=false,
   // body.focus-mode weg, state=idle. Ohne Rollback würde die body-Klasse
   // bestehen und die App fühlte sich „hängend" an.
   await page.evaluate(() => {
@@ -510,12 +510,12 @@ test('Enter-Error (fehlender Scroll-Container) → sauberer Rollback', async ({ 
   await page.waitForTimeout(50);
 
   const state = await page.evaluate(() => ({
-    focusMode: window.harness.focusMode,
+    focusActive: window.harness.focusActive,
     state: window.harness._focusState,
     bodyFocus: document.body.classList.contains('focus-mode'),
     listeners: window.harness._focusListeners,
   }));
-  expect(state.focusMode).toBe(false);
+  expect(state.focusActive).toBe(false);
   expect(state.state).toBe('idle');
   expect(state.bodyFocus).toBe(false);
   expect(state.listeners).toBeNull();

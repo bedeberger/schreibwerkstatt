@@ -3,7 +3,7 @@
 // Eigener State: findOpen, findTerm, findReplace, findCaseSensitive,
 //   findWholeWord, findMatches, findIndex, findX, findY, _findRecomputeTimer,
 //   _findReflowDetach.
-// Root behält: editMode, focusMode, selectedBookId, setStatus(), t(),
+// Root behält: editMode, focusActive, selectedBookId, setStatus(), t(),
 //   _markEditDirty(). Zugriff via window.__app / $app.
 
 import { editorFindCardMethods } from '../editor/find.js';

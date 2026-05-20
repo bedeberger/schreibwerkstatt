@@ -24,9 +24,7 @@ const DRAFT_DEBOUNCE_MS = 500;
 
 
 export const editorEditMethods = {
-  // Container-Lookup: einziger Eintrittspunkt für beide Modi. shared/active-
-  // editor.js abstrahiert über den heutigen Selektor und wird in Phase 4
-  // auf Cardroot-Switching erweitert.
+  // Container-Lookup: einziger Eintrittspunkt für beide Modi.
   _getEditEl() {
     return getActiveEditorContainer();
   },

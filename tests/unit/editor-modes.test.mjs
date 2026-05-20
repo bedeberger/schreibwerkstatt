@@ -5,8 +5,8 @@
 // Reset-Reihenfolgen umbaut, muss bewusst hier mitkorrigieren.
 //
 // Invarianten:
-//  I1  enterFocusMode verlangt editMode (focusMode ⇒ editMode).
-//  I2  cancelEdit ruft exitFocusMode, wenn focusMode aktiv.
+//  I1  enterFocusMode verlangt editMode (focusActive ⇒ editMode).
+//  I2  cancelEdit ruft exitFocusMode, wenn focusActive.
 //  I3  saveEdit im Fokus bleibt im Fokus (editMode wird NICHT geräumt);
 //      ausserhalb Fokus räumt saveEdit editMode + Listener auf.
 //  I4  resetPage Reset-Reihenfolge: exitFocusMode → _stopAutosave → resetChat
@@ -38,17 +38,17 @@ test('I1: enterFocusMode bricht ab, wenn editMode false', () => {
   assert.match(body, /!app\.editMode/,
     'Guard fehlt: enterFocusMode muss app.editMode prüfen');
   assert.match(body, /if\s*\([^)]*!app\.editMode[^)]*\)\s*return/,
-    'Guard muss bei !editMode mit return abbrechen (focusMode ⇒ editMode)');
+    'Guard muss bei !editMode mit return abbrechen (focusActive ⇒ editMode)');
 });
 
 // ── I2: cancelEdit ruft exitFocusMode ────────────────────────────────────────
-test('I2: cancelEdit ruft exitFocusMode wenn focusMode aktiv', () => {
+test('I2: cancelEdit ruft exitFocusMode wenn focusActive', () => {
   const src = read('public/js/editor/notebook/edit.js');
   const m = src.match(/async cancelEdit\s*\(\)\s*\{[\s\S]*?\n  \}/);
   assert.ok(m, 'cancelEdit gefunden');
   const body = m[0];
   assert.match(body, /if\s*\(\s*this\.focusActive\s*\)\s*this\.exitFocusMode\s*\(\s*\)/,
-    'cancelEdit muss exitFocusMode rufen, wenn focusMode aktiv');
+    'cancelEdit muss exitFocusMode rufen, wenn focusActive');
   assert.match(body, /this\.editMode\s*=\s*false/, 'cancelEdit räumt editMode');
   assert.match(body, /this\.editDirty\s*=\s*false/, 'cancelEdit räumt editDirty');
 });
@@ -63,7 +63,7 @@ test('I3: saveEdit hat Fokus-Branch, der editMode NICHT räumt', () => {
   // existieren. Im if-Zweig darf editMode NICHT auf false gehen.
   const ifElseMatch = body.match(/if\s*\(\s*this\.focusActive\s*\)\s*\{([\s\S]*?)\}\s*else\s*\{([\s\S]*?)\}/);
   assert.ok(ifElseMatch,
-    'saveEdit braucht if(focusMode){...}else{...}-Branch für Fokus-Stay');
+    'saveEdit braucht if(focusActive){...}else{...}-Branch für Fokus-Stay');
   const focusBranch = ifElseMatch[1];
   const exitBranch = ifElseMatch[2];
   assert.doesNotMatch(focusBranch, /this\.editMode\s*=\s*false/,

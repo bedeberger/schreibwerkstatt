@@ -3,9 +3,9 @@
 //
 // Eigener State: _focusState ('idle'|'entering'|'active'|'exiting'),
 //   _focusGen, _focusListeners, _focusVisibleBlocks, _focusRaf.
-// Root behält: `focusMode` (als sichtbare Flag für Templates, CSS, body-Class,
+// Root behält: `focusActive` (als sichtbare Flag für Templates, CSS, body-Class,
 //   editor-toolbar/figur-lookup-Checks), `editMode`, `editDirty`, `editSaving`,
-//   `saveOffline`, `lastDraftSavedAt`. Die Sub schreibt `window.__app.focusMode`.
+//   `saveOffline`, `lastDraftSavedAt`. Die Sub schreibt `window.__app.focusActive`.
 //
 // Trigger-Events aus dem Root (Trampoline in editor/focus.js):
 //   - `editor:focus:toggle`    — toggle je nach State

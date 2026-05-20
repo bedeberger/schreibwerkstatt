@@ -5,7 +5,7 @@
 // Root-Zugriffe via window.__app).
 //
 // Tabu im Fokus-Modus: alle Aktionen und Trigger-Handler sind über
-// `!$app.focusMode` gegated – die Partial-Instanz lebt weiter, reagiert
+// `!$app.focusActive` gegated – die Partial-Instanz lebt weiter, reagiert
 // aber nicht mehr.
 
 // Blocktyp-Definitionen für Slash-Transform. `tag` ist das Zielelement;
@@ -144,7 +144,7 @@ export const toolbarCardMethods = {
 
     // Im Focus-Mode hört die Toolbar auf — Slash-Menü und sonstige
     // Block-Transforms sind nicht erlaubt. B/I/U laufen weiter via Browser-
-    // Default (Cmd/Ctrl+B/I/U), die Whitelist wird in Phase 2 strenger.
+    // Default (Cmd/Ctrl+B/I/U).
     if (app.focusActive) return;
 
     // Slash-Menü-Navigation, wenn geöffnet

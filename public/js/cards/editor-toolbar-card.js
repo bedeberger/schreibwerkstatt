@@ -3,7 +3,7 @@
 //
 // Eigener State: bubbleShow, bubbleX/Y, slashShow, slashX/Y, slashIdx,
 //   _slashBlock.
-// Root behält: editMode, focusMode, _markEditDirty (→ $app / window.__app).
+// Root behält: editMode, focusActive, _markEditDirty (→ $app / window.__app).
 //
 // Die Sub installiert globale Listener (selectionchange, scroll) und
 // delegierte keydown/input-Listener auf das contenteditable, damit der Root

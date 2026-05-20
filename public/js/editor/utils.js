@@ -20,8 +20,6 @@ export function normalizeName(s) {
     .trim();
 }
 
-// Editor-Root aus dem DOM holen. Delegiert an shared/active-editor.js, das
-// in Phase 4 zwischen Normal- und Focus-Cardroot wechselt.
 export function getEditEl() {
   return getActiveEditorContainer();
 }

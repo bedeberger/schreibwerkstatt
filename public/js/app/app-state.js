@@ -131,18 +131,19 @@ const editorState = () => ({
   newPageError: '',
 });
 
-// Fokusmodus-Flag + Live-Counter. Eigener Slice, damit alle vier Editor-Modi-
-// Flags (editMode, checkDone, focusMode, plus „Viewmodus" als none-of-above)
-// in app-state.js sichtbar sind. Sub-Komponenten-Maschine `_focusState`/
-// `_focusGen` lebt in editorFocusCard.
+// Fokus-State-Slice. Eigener Slice, damit alle vier Editor-Modi-Flags
+// (editMode, checkDone, focusActive, plus „Viewmodus" als none-of-above) in
+// app-state.js sichtbar sind. Sub-Komponenten-Maschine `_focusState`/`_focusGen`
+// lebt in editorFocusCard.
 //
-// Phase-4-Entkopplung: `focusActive` ist der neue Mode-agnostische Flag, der
-// in späteren Schritten `focusMode` ablöst. Bis dahin Mirror — wird beim
-// enter/exit gespiegelt, damit Konsumenten schrittweise umsteigen können.
-// Invariante während der Transition: `focusActive === focusMode`.
-const focusModeState = () => ({
-  focusMode: false,
+// `focusActive` ist Single Source of Truth für „Fokusmodus an" (Templates, CSS,
+// Body-Class). `focusDirty`/`focusSaving` sind Mode-spezifische Pendants zu
+// `editDirty`/`editSaving` (Plan: Quick-Save-Pfad im Focus läuft eigenständig,
+// ohne den Normal-Editor-Save-State zu kreuzen).
+const focusState = () => ({
   focusActive: false,
+  focusDirty: false,
+  focusSaving: false,
   focusCountWords: 0,
   focusCountChars: 0,
   focusCountWordsDelta: '±0',
@@ -460,7 +461,7 @@ export function initialLektoratState() {
     ...aiProviderState(),
     ...navigationState(),
     ...editorState(),
-    ...focusModeState(),
+    ...focusState(),
     ...editorPopupState(),
     ...cardsState(),
     ...statusState(),

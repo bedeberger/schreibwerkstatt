@@ -1,7 +1,7 @@
 // Root-Trampoline: dispatcht Events an Alpine.data('editorFocusCard').
-// Root hält `focusMode` als sichtbare Flag (CSS, body-Class, Template-Checks)
+// Root hält `focusActive` als sichtbare Flag (CSS, body-Class, Template-Checks)
 // und die Live-Counter `focusCountWords`/`focusCountChars`, die der Header im
-// Fokus-Modus zeigt. State-Felder leben in `focusModeState` ([app-state.js]) —
+// Fokus-Modus zeigt. State-Felder leben in `focusState` ([app-state.js]) —
 // damit liegen alle vier Editor-Modi-Flags in einem konsistenten Slice.
 
 export const focusMethods = {

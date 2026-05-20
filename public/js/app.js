@@ -141,7 +141,7 @@ if ('serviceWorker' in navigator) {
           const app = window.__app;
           // Niemals auto-reloaden, wenn der User aktiv editiert oder im
           // Fokusmodus liest/schreibt. Auto-Save kann editDirty zwischendurch
-          // auf false flippen — focusMode/editMode als härteres Signal.
+          // auf false flippen — focusActive/editMode als härteres Signal.
           if (app?.editMode || app?.focusActive || app?.editDirty) {
             app.updateAvailable = true;
             return;
@@ -749,7 +749,7 @@ document.addEventListener('alpine:init', () => {
     ...figurenMethods,
     ...ereignisseMethods,
     // writingTimeMethods bleiben im Root: Schreibzeit-Heartbeat lauscht auf
-    // editMode/focusMode, läuft unabhängig von der bookStatsCard-Sichtbarkeit.
+    // editMode/focusActive, läuft unabhängig von der bookStatsCard-Sichtbarkeit.
     ...writingTimeMethods,
     // lektoratTimeMethods analog: lauscht auf checkDone (Prüfmodus) +
     // currentPage.id + selectedBookId; bucht Sekunden pro (User, Buch, Seite, Tag).

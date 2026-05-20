@@ -56,7 +56,6 @@ export const focusCardMethods = {
     this._focusState = 'entering';
     const gen = ++this._focusGen;
 
-    app.focusMode = true;
     app.focusActive = true;
     document.body.classList.add('focus-mode');
     const editorCard = document.getElementById('editor-card');
@@ -99,7 +98,6 @@ export const focusCardMethods = {
         reportError('enterFocusMode', err);
         this._focusTeardown();
         clearFocusSnapshot();
-        app.focusMode = false;
         app.focusActive = false;
         document.body.classList.remove('focus-mode');
         document.getElementById('editor-card')?.classList.remove('focus-host');
@@ -399,7 +397,6 @@ export const focusCardMethods = {
     // Counter wechselt zurück auf den Normal-Container.
     app._editCounterCtx?.teardown?.();
 
-    app.focusMode = false;
     app.focusActive = false;
     document.body.classList.remove('focus-mode');
     document.getElementById('editor-card')?.classList.remove('focus-host');

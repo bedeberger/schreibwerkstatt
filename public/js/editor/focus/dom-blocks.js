@@ -52,8 +52,7 @@ export function jumpToTrailingParagraph(container) {
 
 export function getScrollContainer() {
   // Fokusmodus läuft ausschliesslich im Edit-Modus (Guard in enterFocusMode),
-  // also ist `--editing` immer der gewünschte Scroll-Container. shared/active-
-  // editor.js wählt in Phase 4 dynamisch den Focus-Cardroot.
+  // also ist `--editing` immer der gewünschte Scroll-Container.
   return getActiveEditorContainer();
 }
 

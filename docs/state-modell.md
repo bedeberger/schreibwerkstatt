@@ -18,7 +18,7 @@ Verbindlicher Aufbau des Alpine-State. Vor jeder UI-Änderung die richtige Ebene
 | `aiProviderState` | claudeModel, claudeMaxTokens, apiProvider, ollamaModel, llamaModel |
 | `navigationState` | books, bookFilter\*, selectedBookId, bookRoles/currentBookRole/bookSharedFlags (ACL), pages, tree, Hash-Router-Internals (`_applyingHash`, `_hashInitialized`, `_inHashApply`, `_hashUpdatePending`, `_navDepth`), Order-Maps (`_chapterOrderMap`, `_pageOrderMap`, `_pageIdOrderMap`), pageSearch, newChapter-Felder |
 | `editorState` | currentPage, currentPageEmpty/IdeenOpenCount/ChatSessionCount, renderedPageHtml, chapterFigures, originalHtml/correctedHtml, hasErrors, editMode, editDirty, editSaving, saveOffline, editConflict, pendingDraft, lastAutosaveAt/lastDraftSavedAt, Auto-Save-Timer (`_autosaveIdleTimer`, `_autosaveMaxTimer`, `_draftTimer`, `_onlineHandler`), newPage-Felder |
-| `focusModeState` | focusMode, focusCountWords/Chars + Deltas (Live-Counter im Fokus-Header) |
+| `focusState` | focusActive, focusDirty, focusSaving, focusCountWords/Chars + Deltas (Live-Counter im Fokus-Header) |
 | `editorPopupState` | Spiegel-Flags `_figurLookupOpen`, `_synonymMenuOpen`, `_synonymPickerOpen` (für Escape-Routing in `editor-focus-onKey`) + `_figurLookupIndex` (Lookup-Cache) |
 | `cardsState` | **Alle `showXxxCard`-Flags** inkl. Admin-Karten (showAdminUsers/Settings/Usage/Categories/BooksCard), showSongsCard, showKontinuitaetCard, showSearchCard, showKomplettStatus, showAvatarMenu, adminUsageTab — exklusiv via `_closeOtherMainCards(keep)` |
 | `statusState` | status, statusSpinner, `_statusTimer` |
@@ -148,12 +148,12 @@ Vier orthogonale Modi am Editor — kein Single-Enum, sondern Boolean-Flags am R
 | **Viewmodus** (Lesen) | _kein_ (= alle anderen `false`) | — | Default | — |
 | **Prüfmodus** | `checkDone: true` | `lektoratState` ([app-state.js:219](../public/js/app/app-state.js#L219)) | `runCheck()` ([editor/lektorat.js:201](../public/js/editor/lektorat.js#L201)) → Polling → Setzen bei Done ([editor/lektorat.js:334](../public/js/editor/lektorat.js#L334)) oder `loadHistoryEntry` ([history.js:66](../public/js/book/history.js#L66)) | `closeFindings()` ([editor/lektorat.js:187](../public/js/editor/lektorat.js#L187)) |
 | **Editmodus** | `editMode: true` | `editorState` ([app-state.js:89](../public/js/app/app-state.js#L89)) | `startEdit()` ([editor/edit.js:150](../public/js/editor/edit.js#L150)) | `cancelEdit()` ([editor/edit.js:224](../public/js/editor/edit.js#L224)) / `saveEdit()` ([editor/edit.js:253](../public/js/editor/edit.js#L253)) |
-| **Fokusmodus** | `focusMode: true` | `focusModeState` ([app-state.js:129](../public/js/app/app-state.js#L129)) | `enterFocusMode()` / `startFocusEdit()` / Cmd+Shift+E | `exitFocusMode()` / Esc / Cmd+Shift+E |
+| **Fokusmodus** | `focusActive: true` | `focusState` ([app-state.js:129](../public/js/app/app-state.js#L129)) | `enterFocusMode()` / `startFocusEdit()` / Cmd+Shift+E | `exitFocusMode()` / Esc / Cmd+Shift+E |
 
 **Begleit-State pro Modus:**
 - Prüfmodus: `lektoratFindings`, `selectedFindings`, `correctedHtml`, `hasErrors`, `analysisOut`, `appliedOriginals`, `appliedHistoricCorrections`, `lastCheckId`, `activeHistoryEntryId`, `checkProgress`, `checkStatus`, `_checkPollTimer`.
 - Editmodus: `editDirty`, `editSaving`, `saveOffline`, `lastAutosaveAt`, `lastDraftSavedAt`, `_autosaveIdleTimer`, `_autosaveMaxTimer`, `_draftTimer`, `_onlineHandler`, `originalHtml`.
-- Fokusmodus: `focusCountWords/Chars/*Delta` (`focusModeState`) + `focusGranularity` (`shellState`) + Sub-Maschine `_focusState` (`idle`/`entering`/`active`/`exiting`) + `_focusGen` (Re-Entry-Guard) in [editorFocusCard](../public/js/cards/editor-focus-card.js).
+- Fokusmodus: `focusCountWords/Chars/*Delta` (`focusState`) + `focusGranularity` (`shellState`) + Sub-Maschine `_focusState` (`idle`/`entering`/`active`/`exiting`) + `_focusGen` (Re-Entry-Guard) in [editorFocusCard](../public/js/cards/editor-focus-card.js).
 
 **Erlaubte Kombinationen** (8 Bool-Tripel, 6 erlaubt):
 
@@ -165,13 +165,13 @@ Vier orthogonale Modi am Editor — kein Single-Enum, sondern Boolean-Flags am R
 | 1 | 0 | 1 | ✓ | Edit + Findings (Marks im Editor) |
 | 1 | 1 | 0 | ✓ | Edit + Fokus |
 | 1 | 1 | 1 | ✓ | Findings vorhanden, Fokus blendet UI aus |
-| 0 | 1 | * | ✗ | **Invariante: `focusMode → editMode`** |
+| 0 | 1 | * | ✗ | **Invariante: `focusActive → editMode`** |
 
 **Invarianten (Pflicht — bei Änderungen prüfen):**
 
-1. `focusMode === true` ⇒ `editMode === true`. Enforced in [editor/focus/card.js:45](../public/js/editor/focus/card.js#L45) (`enterFocusMode` bricht bei `!editMode` ab) und [editor/edit.js:250](../public/js/editor/edit.js#L250) (`cancelEdit` ruft `exitFocusMode` zuerst).
+1. `focusActive === true` ⇒ `editMode === true`. Enforced in [editor/focus/card.js:45](../public/js/editor/focus/card.js#L45) (`enterFocusMode` bricht bei `!editMode` ab) und [editor/edit.js:250](../public/js/editor/edit.js#L250) (`cancelEdit` ruft `exitFocusMode` zuerst).
 2. `runCheck` darf nicht im Editmodus starten. Template-Guard: Prüfen-Button steht in `<template x-if="!editMode">` ([editor.html:43](../public/partials/editor.html#L43)).
-3. `closeFindings`-Button im Editmodus nur sichtbar wenn `!focusMode` ([editor.html:81](../public/partials/editor.html#L81)) — im Fokus sind Findings ohnehin ausgeblendet.
+3. `closeFindings`-Button im Editmodus nur sichtbar wenn `!focusActive` ([editor.html:81](../public/partials/editor.html#L81)) — im Fokus sind Findings ohnehin ausgeblendet.
 4. **Chat-Modus** (showChatCard) snapshotet `checkDone` in `_checkDoneBeforeChat` und setzt `checkDone=false` ([chat-base.js:129](../public/js/chat/chat-base.js#L129)); beim Schliessen Restore ([app-view.js:317-319](../public/js/app/app-view.js#L317-L319)). Ohne diesen Snapshot würde der Chat Findings doppelt rendern.
 5. **Reset-Reihenfolge in `resetPage()`** ([app-view.js:391](../public/js/app/app-view.js#L391)): `exitFocusMode` → `_stopAutosave` → Chat-Reset → Card-Flags → Editor-State (`editMode/editDirty/editSaving`) → Lektorat-State (`checkDone/findings/...`). Diese Reihenfolge ist Pflicht — Fokus zuerst, weil `exitFocusMode` `editMode/editDirty` liest.
 6. `saveEdit` im Fokus bleibt im Fokus+Edit ([editor/edit.js:337](../public/js/editor/edit.js#L337)) — User möchte weiter schreiben. Erst sauberer Exit räumt Edit-Mode auf, dann flusht `exitFocusMode` per `quickSave` ([editor/focus/card.js:350-351](../public/js/editor/focus/card.js#L350-L351)).
