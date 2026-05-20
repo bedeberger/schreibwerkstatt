@@ -111,6 +111,11 @@ body.palette-open { overflow: hidden; overscroll-behavior: contain; }
   max-height: none;
   flex: 1 1 auto;
   min-height: 0;
+  /* width:100% Pflicht — in flex-column-Parent kollabiert `margin:0 auto`
+     ohne explizite Breite auf den intrinsischen Inhalts-Wert (Auto-Margin
+     triggert Shrink-Wrap). Leere Seite (`<p><br></p>`) hat intrinsisch w=0,
+     Container schrumpft auf Padding → Caret rendert in 0-px-Spalte. */
+  width: 100%;
   max-width: 60ch;
   margin: 0 auto;
   /* Oben/unten fast halbe Viewporthöhe als Puffer, damit der aktive Absatz
