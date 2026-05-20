@@ -87,7 +87,7 @@ router.get('/settings', (req, res) => {
 router.get('/users-light', (_req, res) => {
   const rows = appUsers.listUsers().filter(u => u.status === 'active' || u.status === 'invited');
   res.json({
-    users: rows.map(u => ({ email: u.email, display_name: u.display_name || null })),
+    users: rows.map(u => ({ email: u.email, display_name: u.display_name || null, global_role: u.global_role || null })),
   });
 });
 

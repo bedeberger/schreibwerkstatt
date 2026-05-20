@@ -219,8 +219,13 @@ function serveStatic(req, res, urlPath) {
   });
 }
 
-http.createServer(async (req, res) => {
+// Connection: close auf jeder Antwort. Verhindert ECONNRESET ("socket hang up"),
+// wenn Playwright's apiRequestContext eine keep-alive Connection wiederverwendet,
+// die der Server nach `keepAliveTimeout` (default 5s) gerade geschlossen hat —
+// passiert reproduzierbar in CI nach längeren Test-Retries.
+const server = http.createServer(async (req, res) => {
   const urlPath = decodeURIComponent(req.url.split('?')[0]);
+  res.setHeader('Connection', 'close');
   try {
     const handled = await handleMockRoute(req, res, urlPath);
     if (!handled) serveStatic(req, res, urlPath);
@@ -228,4 +233,7 @@ http.createServer(async (req, res) => {
     res.writeHead(500, { 'Content-Type': 'text/plain' });
     res.end('server error: ' + e.message);
   }
-}).listen(PORT, () => console.log(`test server on :${PORT}`));
+});
+server.keepAliveTimeout = 70_000;
+server.headersTimeout = 75_000;
+server.listen(PORT, () => console.log(`test server on :${PORT}`));

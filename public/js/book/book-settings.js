@@ -312,7 +312,8 @@ export const bookSettingsMethods = {
   shareSuggestions() {
     const q = (this.shareEmail || '').trim().toLowerCase();
     const taken = new Set((this.bookAccessList || []).map(e => (e.user_email || '').toLowerCase()));
-    const pool = (this.shareUserPool || []).filter(u => !taken.has((u.email || '').toLowerCase()));
+    const pool = (this.shareUserPool || []).filter(u =>
+      !taken.has((u.email || '').toLowerCase()) && u.global_role !== 'admin');
     let matches = pool;
     if (q) {
       matches = pool.filter(u =>
