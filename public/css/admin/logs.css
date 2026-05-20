@@ -17,8 +17,25 @@
     gap: var(--space-1);
     font-size: var(--font-sm);
     color: var(--color-muted);
+    min-width: 0;
   }
-  .admin-logs-filter-label--wide { grid-column: span 2; min-width: 0; }
+  .admin-logs-filter-label--wide { grid-column: span 2; }
+  /* Alle Filter-Inputs gleiche Höhe + Typo wie compact-Combobox. */
+  .admin-logs-filter input.card-form-input,
+  .admin-logs-filter .combobox-trigger {
+    font-size: var(--size-compact-font-size);
+    padding: var(--size-compact-padding);
+    line-height: 1.4;
+    height: auto;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .admin-logs-filter input.card-form-input {
+    border: 0.5px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-bg);
+    color: var(--color-text);
+  }
   .admin-logs-filter-actions {
     display: flex;
     gap: var(--space-2);
@@ -54,9 +71,10 @@
 
   .log-row {
     display: grid;
-    grid-template-columns: 160px 70px 110px 170px 60px 1fr auto;
-    gap: var(--space-2);
-    padding: var(--space-1) var(--space-2);
+    grid-template-columns: 180px 64px 130px 200px 64px minmax(0, 1fr) auto;
+    column-gap: var(--space-3);
+    row-gap: var(--space-1);
+    padding: var(--space-2);
     border-bottom: 1px solid var(--color-border);
     align-items: baseline;
     border-left: 3px solid transparent;
@@ -67,10 +85,10 @@
   .log-row--debug { border-left-color: var(--color-subtle); opacity: 0.7; }
 
   .log-row-ts    { color: var(--color-subtle); white-space: nowrap; }
-  .log-row-scope { color: var(--color-muted); }
-  .log-row-user  { color: var(--color-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .log-row-book  { color: var(--color-muted); }
-  .log-row-msg   { color: var(--color-text); word-break: break-word; }
+  .log-row-scope { color: var(--color-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .log-row-user  { color: var(--color-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .log-row-book  { color: var(--color-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .log-row-msg   { color: var(--color-text); word-break: break-word; min-width: 0; }
 
   .log-badge {
     display: inline-block;

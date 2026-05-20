@@ -22,7 +22,8 @@ Ziel: beide als **gleichrangige** Editier-Modi der Seite — eigene Karten, eige
 - Eigener Alpine-State-Slice für den Focus-Modus (`focusState`), losgelöst von `editorState`. Kein gemeinsames `editMode`-Flag mehr.
 - Focus startet aus dem Page-View ohne Detour über den Normal-Editor. Aus dem Normal-Editor heraus startet er per Hotkey, ohne den Normal-Save-Pfad mitzunehmen.
 - Eigener contenteditable-Container im Focus (gemountet in der Focus-Karte selbst, nicht der Normal-Editor-Container). Snapshot beim Eintritt, Save zurück über die Page-Save-API beim Austritt oder per Quick-Save.
-- **Focus-Feature-Set (fix)**: Typewriter-Scroll inkl. Granularitäten, Counter (Words/Chars + Tagesdelta), Synonyme, Figuren-Lookup, Save/Quick-Save mit Offline-Fähigkeit, Snapshot-Restore nach Reload, Inline-Formatierung **ausschliesslich Bold/Italic/Unterstrichen** per Shortcut (`Cmd/Ctrl+B/I/U`). Kein Toolbar-UI, kein Bubble-Menü, keine Lektorat-Findings, keine Page-History, keine Find/Replace im Focus.
+- **Focus-Feature-Set (fix)**: Typewriter-Scroll inkl. Granularitäten (Highlight-Feature aus User-Settings: `paragraph` / `sentence` / `window-3` / `typewriter-only`), Counter (Words/Chars + Tagesdelta), Synonyme, Figuren-Lookup, Save/Quick-Save mit Offline-Fähigkeit, Snapshot-Restore nach Reload, Inline-Formatierung **ausschliesslich Bold/Italic/Unterstrichen** per Shortcut (`Cmd/Ctrl+B/I/U`). Kein Toolbar-UI, kein Bubble-Menü, keine Lektorat-Findings, keine Page-History, keine Find/Replace im Focus.
+- **Highlight-Granularität bleibt Focus-only**: in [public/partials/user-settings.html](../../public/partials/user-settings.html#L108-L114) wird `userSettingsFocusGranularity` weiter über die Combobox gesetzt; gespeichert in [public/js/user-settings.js](../../public/js/user-settings.js) als `focus_granularity` und live in `window.__app.focusGranularity` gespiegelt. Nach Entkopplung: Setting wirkt ausschliesslich auf Focus-Karte (Live-`$watch`), keinerlei Effekt auf Normal-Editor.
 - **Normal-Editor — Notizbuch-Use-Case**: Toolbar bleibt Primär-Geste (keine erweiterte Shortcut-Liste über die Focus-Whitelist hinaus). Heutige Schreibmodus-Text-Metrik wird **deaktiviert** — Spaltenbreite/Padding/Zeilenhöhe-Constraints aus dem Schreibmodus-Layout fallen, Normal-Editor rendert dichter und freier (Tagebuch-/Blog-Optik). Toolbar wächst künftig um weitere Buttons (Phase 2: Link-Setzen, dann weitere Formatierungen).
 - Geteilte Lib `public/js/editor/shared/`: HTML-Cleaner-Kette (`stripLektoratMarks`, `cleanContentArtefacts`, `collapseEmptyBlocks`), `normalizeForCompare`, Auto-`<p>`-Slot, Page-Save-Aufruf (inkl. Offline-Queue-Hook), Lock-Release-Helper, Shortcut-Bindings für die in beiden Modi erlaubte Inline-Formatierung. Beide Modi rufen dieselben Funktionen, kein gemeinsamer Zustand.
 - `if (app.focusMode)`-Guards in Normal-Editor-Sub-Komponenten (Toolbar, Bubble-Menüs, Lektorat-Findings, Find/Replace, Page-History) entfernen — Focus-Karte mountet diese gar nicht. Sub-Komponenten, die beide Modi brauchen (Synonyme, Figuren-Lookup), werden parametrisiert: sie kennen einen Mode-agnostischen Editor-Container, kein hartes `app.focusMode` mehr.
@@ -45,13 +46,15 @@ Ziel: beide als **gleichrangige** Editier-Modi der Seite — eigene Karten, eige
 - User ist im Normal-Editor, drückt `Cmd/Ctrl+Shift+E` → Normal-Editor schliesst sauber (Save, Lock-Release, Listener-Teardown), Focus-Editor öffnet aus Page-View-Snapshot. Beim Beenden des Focus-Editors landet User wieder im Page-View, nicht im Normal-Editor.
 - User editiert im Focus: kein Toolbar-Element, keine Bubble-Menüs, keine Lektorat-Findings, keine Find/Replace-UI, keine Page-History im DOM. Sichtbar sind ausschliesslich Editor-Fläche, Counter, Granularity-Steuerung.
 - Im Focus lassen sich Synonyme (Trigger wie heute) und Figuren-Lookup (Trigger wie heute) wie gewohnt aufrufen und schliessen — keine Funktionalität gegenüber heute verloren.
-- Im Focus funktionieren die definierten Inline-Formatierungs-Shortcuts (siehe „Open Questions" für finale Liste) — Bold/Italic/Unterstrichen (Default: Cmd/Ctrl+B/I/U) wirken am Selektionsbereich. Kein Toolbar-Pendant.
+- Im Focus funktionieren exakt **Cmd/Ctrl+B**, **Cmd/Ctrl+I** und **Cmd/Ctrl+U** am Selektionsbereich. Weitere Inline-Shortcuts sind blockiert / no-op.
 - Quick-Save aus dem Focus erzeugt eine Revision mit `source = 'focus'`; aus dem Normal-Editor `source = 'main'`. Keine `'main+focus'`-Mix-Revisionen mehr.
-- Offline-Pfad: Focus speichert bei fehlender Verbindung in die lokale Offline-Queue (gleicher Mechanismus wie Normal-Editor), Snapshot-Restore funktioniert nach Reload weiterhin.
-- Normal-Editor kann seine Text-Metrik (Zeilenabstand, Block-Spacings) unabhängig vom Focus ändern — Änderungen in Normal-CSS dürfen nie auf den Focus durchschlagen (Sichtprüfung: Toggle Normal-CSS aus → Focus-Layout unverändert).
+- Offline-Pfad: Focus und Normal-Editor speichern bei fehlender Verbindung in **dieselbe** Offline-Queue über `shared/page-api.js`. Snapshot-Restore funktioniert nach Reload weiterhin, ohne den Normal-Editor zwischendurch zu mounten.
+- Normal-Editor rendert nach Merge **ohne** die heutigen Schreibmodus-Layout-Constraints (Spaltenbreite, Padding, opinionated Zeilenhöhe). Sichtprüfung: Normal-Text wirkt dichter und freier; Tagebuch-/Blog-Optik möglich.
+- Änderungen am Normal-Editor-CSS schlagen nicht auf den Focus durch (Sichtprüfung: Toggle Normal-CSS aus → Focus-Layout unverändert).
 - Bei aktivem Focus klick auf eine andere Seite → Focus speichert + schliesst sauber, neue Seite öffnet im Page-View.
-- `tests/unit/editor-modes.test.mjs` ist neu geschrieben und besteht; alte I1-Assertions entfernt. E2E `tests/e2e/focus-editor.spec.js` deckt den neuen Direct-Entry-Pfad, die Synonyme-/Figuren-Lookup-Trigger im Focus und den Offline-Save ab.
-- Bei deaktivierter Focus-Karte (hypothetisch): Normal-Editor läuft komplett ohne Focus-Code-Import, keine ReferenceErrors.
+- **Getrennte Test-Suiten mit hoher Abdeckung**: Schreiben ist Kernfeature → beide Editoren bekommen je eine eigene, **hauptfeature-vollständige** Test-Suite (Unit + E2E). Quality-Gate: jedes im Scope-MVP genannte Feature pro Editor hat mindestens einen positiven Testfall, kritische Pfade (Save, Dirty-Detection, Listener-Cleanup, Offline) zusätzlich einen Negativ-/Edge-Case-Test. Cross-Mode-Verhalten (Hotkey-Wechsel, gegenseitige Exklusivität) hat eigenen Test-File. Alte `tests/unit/editor-modes.test.mjs` ist neu geschrieben und besteht; alte I1-Assertions entfernt.
+- **Highlight-Granularität getestet**: Settings-Wechsel `paragraph` → `sentence` → `window-3` → `typewriter-only` während aktivem Focus aktualisiert Focus-Render live. Im Normal-Editor sichtbar: kein Effekt, keine Klasse, kein DOM-Change.
+- Bei deaktivierter Focus-Karte (hypothetisch): Normal-Editor läuft komplett ohne Focus-Code-Import, keine ReferenceErrors. Umgekehrt: Bei isoliertem Focus-Mount läuft Focus ohne Normal-Editor-Code, keine ReferenceErrors.
 
 ## Hard-Rule-Audit
 
@@ -138,17 +141,17 @@ Neu, Subfolder mit thematischer Aufteilung:
 - `shared/page-api.js` — dünner Wrapper über `PUT /content/pages/:id` mit konsistenter Fehlerbehandlung (401, Lock-Konflikt, Stale-Write) und Offline-Queue-Anbindung (`saveOffline`-Pfad gleichwertig für beide Modi).
 - `shared/edit-counter.js` — `installEditCounter(container, onCount)`; beide Modi instanziieren ihn jeweils gegen den eigenen Container. Keine globale Single-Instance mehr.
 - `shared/active-editor.js` — `getActiveEditorContainer()` + `getActiveEditorMode()`. Sub-Komponenten (Synonyme, Figuren-Lookup), die in beiden Modi laufen, fragen hier nach dem Ziel-Container, statt `app.focusMode` zu prüfen.
-- `shared/shortcuts.js` — `bindInlineFormattingShortcuts(container, { allowedCommands })`. Pure Bindings für Bold/Italic/Unterstrichen (Default), mit `allowedCommands`-Whitelist pro Modus. Normal-Editor kann zusätzliche Commands freischalten; Focus bleibt minimal.
+- `shared/shortcuts.js` — `bindInlineFormattingShortcuts(container, { allowedCommands })`. Pure Bindings; `allowedCommands`-Whitelist pro Modus. MVP: Focus erlaubt **ausschliesslich** `['bold', 'italic', 'underline']`. Normal-Editor reicht den gleichen Whitelist-Set durch (Toolbar bleibt dort die Primär-Geste); erweiterte Commands erst in Phase 2.
 
 `public/js/editor/edit.js` wird auf den Normal-Editor-Pfad reduziert (Toolbar-Methoden, Selection, Dirty-Check für Normal-Form) und konsumiert ausschliesslich `shared/`. `public/js/editor/focus/` konsumiert ebenfalls `shared/` und behält Focus-spezifische Module (state-machine, recenter-pipeline, dom-blocks, sentence, typewriter, storage).
 
 ## CSS
 
 - [public/css/editor/focus-mode.css](../../public/css/editor/focus-mode.css) bleibt, wird aber von `body.focus-mode`-Overrides auf eigenen Scope-Selektor `.focus-editor` umgestellt (Cardroot der Focus-Karte). Body-Class-Schaltung bleibt für globale Layout-Effekte (overflow-anchor, scroll-Locks), für reine Editor-Styles aber unnötig.
-- Normal-Editor-CSS (heutige `editor/`-Files ausser `focus-mode.css`) wird auf den Cardroot `.normal-editor` gescoped. Damit kann die Normal-Text-Metrik (Zeilenabstand, Block-Spacings, Toolbars) frei wachsen, ohne Focus zu treffen. Konkrete Zeilenabstands-/Spacing-Tokens leben weiterhin in [public/css/tokens/](../../public/css/tokens/) — Werte für Normal können tendenziell dichter werden, Werte für Focus bleiben grosszügig.
+- Normal-Editor-CSS (heutige `editor/`-Files ausser `focus-mode.css`) wird auf den Cardroot `.normal-editor` gescoped. Die heutigen opinionated Schreibmodus-Text-Metrik-Regeln (max-width-Spaltenbreite, grosszügiges Padding, hoher Zeilenabstand, serifenbetonte Schrift falls vorhanden) werden im Normal-Editor **entfernt**. Normal-Editor rendert dichter (default Zeilenhöhe, normales Padding, normale Block-Spacings — Tagebuch-/Blog-Optik). Focus-CSS bleibt davon unberührt.
 - Toolbar/Findings-CSS verlieren ihre `body.focus-mode`-Negierungen (`:not(body.focus-mode) …`) — Normal-Editor lädt die Files, Focus-Karte lädt sie nicht. Cascade-Konflikte fallen weg.
 - Synonyme- und Figuren-Lookup-Karten-CSS (heute Editor-übergreifend) wird Mode-unabhängig — sie reagieren nur auf ihren eigenen Cardroot, nicht auf `body.focus-mode`.
-- Keine neuen Tokens, kein neuer Card-Akzent, kein neuer Subfolder zwingend nötig. Falls Normal-Editor eigene Spacing-Tokens braucht (z. B. `--editor-normal-line-height`, `--editor-normal-block-gap`), in [public/css/tokens/](../../public/css/tokens/) ergänzen, Focus-Pendant nicht ändern.
+- Keine neuen Tokens zwingend. Falls Phase 2 für den Normal-Editor eigene Spacing-Tokens braucht, in [public/css/tokens/](../../public/css/tokens/) ergänzen.
 - `SHELL_CACHE` in [public/sw.js](../../public/sw.js) bumpen.
 - DESIGN.md: kein neuer Pattern-Eintrag; ggf. eine kurze Notiz im Editor-Abschnitt, dass Focus und Normal getrennte Cardroots haben.
 
@@ -182,16 +185,80 @@ n/a — kein Schema-Change.
 
 ## Tests
 
+Schreiben ist Kernfeature → Quality-Gate **hohe Testabdeckung** für beide Editoren. Eigene Test-Suiten pro Use-Case, gemeinsame Tests nur für Shared-Lib und Cross-Mode-Verhalten.
+
+### Hauptfeature-Inventar Normal-Editor (alle abgedeckt)
+
+| Feature | Unit | E2E |
+|---|---|---|
+| Edit-Mode öffnen (startEdit) | ja | ja |
+| Save (saveEdit) inkl. Server-Roundtrip | ja | ja |
+| Quick-Save (Auto-Save während Edit) | ja | ja |
+| Cancel ohne Save (cancelEdit) | ja | ja |
+| Dirty-Check + `normalizeForCompare` | ja | — |
+| Auto-`<p>`-Slot bei leerer Seite | ja | ja |
+| Toolbar-Bindings (alle Toolbar-Buttons) | ja | ja |
+| Synonyme-Trigger + Apply | — | ja |
+| Figuren-Lookup-Trigger + Apply | — | ja |
+| Find/Replace-Karte | — | ja |
+| Lektorat-Findings-Anzeige + Apply | — | ja |
+| Page-History-Karte | — | ja |
+| Offline-Save (Queue-Pfad) | ja | ja |
+| Stale-Write-Schutz | ja | — |
+| Lock-Erwerb / Release | ja | ja |
+| Listener-Cleanup nach Exit | ja | ja |
+| Save-Source = `'main'` in Revision | — | ja |
+| Sichtprüfung: kein Focus-Layout-Constraint | — | manuell |
+
+### Hauptfeature-Inventar Focus-Editor (alle abgedeckt)
+
+| Feature | Unit | E2E |
+|---|---|---|
+| Direct-Entry aus Page-View per Hotkey | ja | ja |
+| Entry aus Normal-Editor (Normal schliesst sauber) | ja | ja |
+| State-Machine (idle/entering/active/exiting + Re-Entry-Guard) | ja | — |
+| Typewriter-Scroll | ja | ja |
+| Highlight-Granularität `paragraph` | ja | ja |
+| Highlight-Granularität `sentence` (CSS Custom Highlight) | ja | ja |
+| Highlight-Granularität `window-3` | ja | ja |
+| Highlight-Granularität `typewriter-only` | ja | ja |
+| Live-Wechsel der Granularität via User-Settings (`$watch`) | ja | ja |
+| Counter Words/Chars (Live + Tagesdelta) | ja | ja |
+| Synonyme-Trigger + Apply im Focus | — | ja |
+| Figuren-Lookup-Trigger + Apply im Focus | — | ja |
+| Inline-Shortcut `bold` (Cmd/Ctrl+B) | ja | ja |
+| Inline-Shortcut `italic` (Cmd/Ctrl+I) | ja | ja |
+| Inline-Shortcut `underline` (Cmd/Ctrl+U) | ja | ja |
+| Andere Shortcuts blockiert (no-op) | ja | — |
+| Save + Quick-Save im Focus | ja | ja |
+| Offline-Save (gemeinsame Queue) | ja | ja |
+| Snapshot-Restore nach Reload | ja | ja |
+| Save-Source = `'focus'` in Revision | — | ja |
+| Recenter-Pipeline (RAF-Debounce, Burst-Input) | ja | ja |
+| Listener-Cleanup nach Exit (Generation-Counter) | ja | ja |
+| Auto-`<p>`-Slot via `shared/auto-slot.js` | ja | ja |
+| Stale-Write-Schutz | ja | — |
+| Mobile-Toggle-Verhalten | — | manuell |
+
+### Test-Dateien
+
 | Stufe | Datei | Was wird abgedeckt |
 |---|---|---|
-| Unit | `tests/unit/editor-modes.test.mjs` (umgeschrieben) | Neue Invariante I1': Focus und Normal gegenseitig exklusiv, Focus kann ohne Normal-Edit aktiv sein |
-| Unit | `tests/unit/editor-shared-save.test.mjs` (neu) | `buildSavePayload`, `normalizeForCompare`, `ensureTrailingParagraph` als pure Funktionen |
-| Unit | `tests/unit/editor-focus.test.mjs` (Update) | Anpassung der Listener-Setup-Erwartungen an den neuen Cardroot |
-| Unit | `tests/unit/focus-granularity.test.mjs` (Update) | Body-Class-Wechsel ggf. → `.focus-editor`-Class-Wechsel |
+| Unit | `tests/unit/editor-normal.test.mjs` (neu) | Normal-Editor isoliert; alle Normal-Hauptfeatures mit Unit-Marker oben |
+| Unit | `tests/unit/editor-focus.test.mjs` (Update) | Focus-Editor isoliert; State-Machine, Listener-Setup im neuen Cardroot, RAF-Recenter, Snapshot-Restore — ohne Normal-Editor-Mount |
+| Unit | `tests/unit/focus-granularity.test.mjs` (Update) | Alle vier Granularitäten, Live-Wechsel via `$watch`, Class/Highlight-Switching auf `.focus-editor`-Cardroot |
+| Unit | `tests/unit/focus-user-settings.test.mjs` (neu) | User-Settings `focus_granularity` Load/Save, Spiegelung in `window.__app.focusGranularity`, Effekt auf Focus + No-Op im Normal |
+| Unit | `tests/unit/editor-modes.test.mjs` (umgeschrieben) | **Cross-Mode**: Invariante I1' (gegenseitige Exklusivität), Hotkey-Wechsel Normal ↔ Focus, Save+Lock-Release-Sequenz beim Wechsel |
+| Unit | `tests/unit/editor-shared-save.test.mjs` (neu) | `buildSavePayload`, `normalizeForCompare`, `ensureTrailingParagraph`, Offline-Queue-Hook als pure Funktionen |
+| Unit | `tests/unit/editor-shared-shortcuts.test.mjs` (neu) | Whitelist-Verhalten: nur `bold`/`italic`/`underline` durchgelassen, alles andere no-op |
 | Unit | `tests/unit/card-exclusivity.test.mjs` (Update) | Focus-Karte im `EXCLUSIVE_CARDS`-Iter mitprüfen |
-| E2E | `tests/e2e/focus-editor.spec.js` (Update) | Direct-Entry aus Page-View, Listener-Cleanup, Save-Source `'focus'`, kein Normal-Editor-DOM während Focus |
-| E2E | `tests/e2e/clean-content.spec.js` (Update) | Sicherstellen, dass `cleanContentArtefacts` aus `shared/` weiter beide Modi bedient |
-| Manuell | — | Hotkey aus Page-View, aus Normal-Editor, aus anderer Karte (sollte nicht greifen). Mobile-Toggle-Verhalten. Schnelle Wechsel-Cycles. |
+| E2E | `tests/e2e/editor-normal.spec.js` (neu) | Normal-Editor-Flow vollständig; alle Normal-Hauptfeatures mit E2E-Marker oben |
+| E2E | `tests/e2e/focus-editor.spec.js` (Update) | Focus-Flow vollständig; alle Focus-Hauptfeatures mit E2E-Marker oben (Direct-Entry, alle 4 Granularitäten, B/I/U, Synonyme, Figuren-Lookup, Offline, Snapshot-Restore) |
+| E2E | `tests/e2e/editor-modes.spec.js` (neu) | **Cross-Mode-E2E**: Hotkey-Wechsel Normal ↔ Focus, mehrere Cycles, keine Listener-Leaks, korrekte Save-Sources, gegenseitige Exklusivität |
+| E2E | `tests/e2e/clean-content.spec.js` (Update) | `cleanContentArtefacts` aus `shared/` bedient weiter beide Modi |
+| Manuell | — | Sichtprüfung: Normal-Editor-Layout ohne Schreibmodus-Constraints (dichter Tagebuch-/Blog-Look). Sichtprüfung: Focus-Layout unverändert vor/nach Refactor. Mobile-Toggle. |
+
+Quality-Gate vor Merge: alle Unit-/Integration-/E2E-Tests grün; Coverage-Kontrolle visuell anhand der Hauptfeature-Inventare (jede Zeile mit „ja" hat im genannten File einen entsprechenden Test).
 
 ## Edge-Cases / Risiken
 
@@ -226,10 +293,12 @@ n/a — kein Schema-Change.
 | [docs/focus-editor.md](../focus-editor.md) | Invarianten neu fassen; I1 ersetzen; State-Machine-Diagramm anpassen |
 | [docs/state-modell.md](../state-modell.md) | Slice-Liste um `focusState` aktualisieren; Editor-Modi-Sektion neu beschreiben |
 | [CLAUDE.md](../../CLAUDE.md) | Editor-Abschnitt prüfen (wahrscheinlich keine Änderung nötig; Trampoline-Hinweis evtl. präzisieren) |
-| [tests/unit/editor-modes.test.mjs](../../tests/unit/editor-modes.test.mjs) | Komplett neu für I1' |
-| [tests/unit/editor-focus.test.mjs](../../tests/unit/editor-focus.test.mjs) | Pfad-Updates |
-| [tests/unit/focus-granularity.test.mjs](../../tests/unit/focus-granularity.test.mjs) | Class-Selector-Updates |
-| [tests/e2e/focus-editor.spec.js](../../tests/e2e/focus-editor.spec.js) | Direct-Entry-Pfad |
+| [tests/unit/editor-modes.test.mjs](../../tests/unit/editor-modes.test.mjs) | Komplett neu für I1' + Cross-Mode |
+| [tests/unit/editor-focus.test.mjs](../../tests/unit/editor-focus.test.mjs) | Pfad-Updates + Hauptfeature-Inventar vollständig |
+| [tests/unit/focus-granularity.test.mjs](../../tests/unit/focus-granularity.test.mjs) | Class-Selector-Updates + alle 4 Granularitäten + Live-Wechsel via `$watch` |
+| [tests/e2e/focus-editor.spec.js](../../tests/e2e/focus-editor.spec.js) | Direct-Entry-Pfad + Hauptfeature-Inventar vollständig (alle 4 Granularitäten, B/I/U, Synonyme, Figuren-Lookup, Offline, Snapshot-Restore) |
+| [public/js/user-settings.js](../../public/js/user-settings.js) | Verifikation: `focus_granularity` Load/Save bleibt unverändert; Spiegelung in `window.__app.focusGranularity` führt zu Live-`$watch` in der Focus-Karte |
+| [public/js/cards/user-settings-card.js](../../public/js/cards/user-settings-card.js) | Verifikation: `userSettingsFocusGranularity` + `userSettingsFocusOptions()` bleiben funktional, Combobox in `user-settings.html` weiter wirksam |
 
 ## Kritische Dateien (Create)
 
@@ -241,21 +310,27 @@ n/a — kein Schema-Change.
 | `public/js/editor/shared/page-api.js` | Page-Save-Wrapper |
 | `public/js/editor/shared/edit-counter.js` | Per-Container-Counter |
 | `public/js/editor/shared/active-editor.js` | `getActiveEditorContainer()` + `getActiveEditorMode()` für mode-agnostische Subs |
-| `public/js/editor/shared/shortcuts.js` | Inline-Formatting-Shortcuts mit `allowedCommands`-Whitelist |
+| `public/js/editor/shared/shortcuts.js` | Inline-Formatting-Shortcuts mit `allowedCommands`-Whitelist (`['bold','italic','underline']` im MVP) |
 | `public/partials/editor-focus.html` | Focus-Cardroot mit eigenem contenteditable, eingebundene Synonyme- + Figuren-Lookup-Karten |
-| `tests/unit/editor-shared-save.test.mjs` | Unit-Tests für `shared/` |
+| `tests/unit/editor-normal.test.mjs` | Unit-Tests Normal-Editor isoliert; Hauptfeature-Inventar vollständig |
+| `tests/unit/editor-shared-save.test.mjs` | Unit-Tests für `shared/save-pipeline.js` + `auto-slot.js` + `html-clean.js` |
 | `tests/unit/editor-shared-shortcuts.test.mjs` | Unit-Tests für Whitelist-Verhalten der Shortcut-Bindings |
+| `tests/unit/focus-user-settings.test.mjs` | Unit-Tests User-Settings ↔ Focus-Granularität (Load/Save, Spiegelung, Live-Effekt nur im Focus) |
+| `tests/e2e/editor-normal.spec.js` | E2E Normal-Editor isoliert; Hauptfeature-Inventar vollständig |
+| `tests/e2e/editor-modes.spec.js` | E2E Cross-Mode-Verhalten |
+
+## Entscheidungen (geklärt 2026-05-20)
+
+- **Shortcut-Whitelist Focus**: ausschliesslich `bold`, `italic`, `underline` (Cmd/Ctrl+B/I/U). Andere Shortcuts no-op.
+- **Shortcut-Set Normal-Editor**: bleibt wie heute. Toolbar ist Primär-Geste; keine Erweiterung über die Focus-Whitelist hinaus im MVP. Phase 2 kann mehr.
+- **Text-Metrik Normal-Editor**: heutige Schreibmodus-Constraints (Spaltenbreite/Padding/grosszügige Zeilenhöhe) werden deaktiviert. Normal-Editor rendert dichter, Tagebuch-/Blog-Optik.
+- **Hotkey aus Normal-Editor**: schliesst Normal-Editor (Save + Lock-Release + Teardown), öffnet Focus aus Page-View-Snapshot.
+- **Offline-Queue**: gemeinsam über `shared/page-api.js`. Beide Modi nutzen dieselbe Queue.
 
 ## Offene Fragen
 
-- **Shortcut-Whitelist im Focus**: User möchte „minimale Formatierung mit Shortcuts". Vorschlag MVP: Cmd/Ctrl+B (Bold), Cmd/Ctrl+I (Italic), Cmd/Ctrl+U (Unterstrichen). Sollen zusätzlich H1/H2/H3 (Cmd+Alt+1/2/3), Listen (Cmd+Shift+7/8), Blockquote, Code-Inline mit rein? Was ist ausdrücklich verboten?
-- **Shortcut-Set im Normal-Editor**: bekommt der Normal-Editor künftig dieselben Shortcuts plus weitere (z. B. Listen-Toggles, Heading-Cycle), oder bleibt Toolbar dort die Primär-Geste?
-- **Text-Metrik im Normal-Editor**: konkrete Ziel-Zeilenhöhe und Block-Spacings? Soll der Normal-Editor weiterhin im selben Lesemodus-Layout (Spaltenbreite, Padding) sein wie heute, nur dichter, oder grundsätzlich anders strukturiert?
 - **Lock-Modell beim Mode-Wechsel**: ein Lock pro Page-Session über beide Modi hinweg, oder pro Edit-Zyklus neu? Heutige Implementierung in [routes/book-editor.js](../../routes/book-editor.js) und Lock-Logik prüfen, bevor die Save+Release-Sequenz im `shared/page-api.js` final wird.
-- **Hotkey aus dem Normal-Editor**: schliesst Normal-Editor oder lässt ihn stehen (zweiter Tab-/Pane-Style)? Dieser Plan unterstellt „schliessen". Bestätigen.
 - **Quick-Save-Frequenz**: bleibt Focus-Autosave (heute über `_scheduleDraftSave`/`_flushDraftSaveNow`) im selben Intervall wie Normal-Editor, oder konservativer (weniger Revisionen pro Session)?
 - **Counter-Anzeige**: nur im Focus, oder auch im Normal-Editor als Notebook-Feature? Falls auch im Normal: `installEditCounter` aus `shared/` muss zwei parallele Anzeigen unterstützen können.
-- **Snapshot-Restore** (`focus.snapshot` in sessionStorage): Mechanismus bleibt erhalten — Restore aus Page-View triggern, ohne dass der Normal-Editor je gemountet wird. Spec/Test-Pfad festlegen.
-- **Offline-Save im Focus**: heute existiert `saveOffline` im Normal-Editor — wird der Focus an dieselbe Offline-Queue angeschlossen, oder bekommt er eine eigene? MVP: gemeinsame Queue über `shared/page-api.js`. Bestätigen.
+- **Snapshot-Restore** (`focus.snapshot` in sessionStorage): Mechanismus bleibt erhalten — Restore aus Page-View triggern, ohne dass der Normal-Editor je gemountet wird. Genauer Spec/Test-Pfad (Restore beim Reload während aktivem Focus vs. bei kaltem Page-Load) festlegen.
 - **`EXCLUSIVE_CARDS`-Pattern**: reicht das aktuelle Pattern, um Focus und Normal-Editor wirklich gegenseitig exklusiv zu halten, wenn beide Cardroots existieren (Editor lebt heute teilweise im Root, nicht als Karte)? Eventuell muss die Exklusivitätslogik um „Editor-Modes" erweitert werden.
-- **DESIGN.md**: kommt der Notebook-Charakter des Normal-Editors als eigener Pattern-Eintrag rein, sobald Phase 2 startet?
