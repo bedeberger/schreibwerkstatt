@@ -28,10 +28,6 @@
        während der cardFadeIn-Animation auf .card. */
     contain: layout style;
     transform: translateZ(0);
-    max-height: calc(100dvh - 120px);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    scrollbar-gutter: stable;
     padding-block: var(--space-sm);
     border-right: 1px solid var(--color-border);
     padding-inline-end: var(--space-md);

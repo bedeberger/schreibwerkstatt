@@ -7,7 +7,7 @@ module.exports = {
   testDir: './tests/e2e',
   testMatch: '**/*.spec.js',
   fullyParallel: false,
-  workers: process.env.CI ? 2 : undefined,
+  workers: process.env.CI ? 4 : undefined,
   retries: process.env.CI ? 2 : 0,
   timeout: 60000,
   use: {
