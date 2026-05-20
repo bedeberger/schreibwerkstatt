@@ -87,7 +87,8 @@
   gap: var(--space-xs);
 }
 .editor-blog-push .icon,
-.editor-blog-conflict .icon { width: 0.9em; height: 0.9em; }
+.editor-blog-conflict .icon,
+.editor-blog-view .icon { width: 0.9em; height: 0.9em; }
 .editor-blog-push-pct {
   font-size: 0.85em;
   font-variant-numeric: tabular-nums;

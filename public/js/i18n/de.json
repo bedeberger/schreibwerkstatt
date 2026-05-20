@@ -1919,6 +1919,7 @@
   "blog.action.pull":               "Von Blog pullen",
   "blog.action.push":               "Zu Blog pushen",
   "blog.action.resolveConflict":    "Konflikt lösen",
+  "blog.action.view":               "In WordPress öffnen",
 
   "blog.error.BLOG_HTTPS_REQUIRED":           "URL muss mit https:// beginnen.",
   "blog.error.BLOG_INVALID_URL":              "URL ist ungültig.",

@@ -60,6 +60,7 @@ export const blogSyncMethods = {
     const bookId = this.selectedBookId;
     if (!bookId) {
       this.blogConnected = false;
+      this.blogBaseUrl = '';
       this.blogLinksMap = {};
       return;
     }
@@ -67,17 +68,30 @@ export const blogSyncMethods = {
       const res = await fetch(`/blog/${bookId}/links`);
       if (!res.ok) {
         this.blogConnected = false;
+        this.blogBaseUrl = '';
         this.blogLinksMap = {};
         return;
       }
       const data = await res.json();
       this.blogConnected = !!data.connected;
+      this.blogBaseUrl = data.baseUrl || '';
       const map = {};
       for (const link of (data.links || [])) map[link.page_id] = link;
       this.blogLinksMap = map;
     } catch (e) {
       console.error('[blogSync] Blog-Links laden fehlgeschlagen:', e);
     }
+  },
+
+  // WordPress-Frontend-URL fuer eine verlinkte Page (`?p=ID` funktioniert
+  // unabhaengig vom Permalink-Setup; bei Drafts liefert WP eine
+  // Preview-/Login-Seite, je nach Session des Browsers).
+  blogViewUrl(page) {
+    if (!page || !this.blogBaseUrl) return '';
+    const link = this.blogLinksMap[page.id];
+    if (!link || !link.wp_post_id) return '';
+    const base = this.blogBaseUrl.replace(/\/$/, '');
+    return `${base}/?p=${link.wp_post_id}`;
   },
 
   // Badge-Status für eine Page (oder null = kein Badge).

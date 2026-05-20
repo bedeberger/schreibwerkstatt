@@ -48,6 +48,14 @@
                     :data-tip="t('blog.action.resolveConflict')"
                     x-text="t('blog.action.resolveConflict')"></button>
           </template>
+          <template x-if="blogViewUrl(currentPage)">
+            <button type="button" class="btn-compact editor-blog-view"
+                    @click="window.open(blogViewUrl(currentPage), '_blank', 'noopener')"
+                    :data-tip="t('blog.action.view')"
+                    :aria-label="t('blog.action.view')">
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=637#external-link"/></svg>
+            </button>
+          </template>
         </span>
         <span x-show="currentPage && tokEsts[currentPage.id]" class="tok-stats">
           <template x-if="tokEsts[currentPage?.id]?.words > 0">
