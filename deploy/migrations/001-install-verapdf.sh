@@ -64,9 +64,15 @@ if [ ! -f "$AUTO_OPTS" ]; then
 EOF
 fi
 
-echo "→ Installer ausfuehren"
-cd "$GREENFIELD_DIR"
-$SUDO java -cp "installer-${VERAPDF_VERSION}.jar" org.verapdf.apps.Installer -options "$AUTO_OPTS"
+INSTALLER_JAR="$(ls "$GREENFIELD_DIR"/*installer*.jar 2>/dev/null | head -n1)"
+if [ -z "$INSTALLER_JAR" ]; then
+  echo "✗ Installer-JAR nicht gefunden in $GREENFIELD_DIR"
+  ls -la "$GREENFIELD_DIR" || true
+  exit 1
+fi
+
+echo "→ Installer ausfuehren: $(basename "$INSTALLER_JAR")"
+$SUDO java -jar "$INSTALLER_JAR" "$AUTO_OPTS"
 
 if [ ! -x "$INSTALL_TARGET/verapdf" ]; then
   echo "✗ verapdf-Binary nicht gefunden unter $INSTALL_TARGET/verapdf"
