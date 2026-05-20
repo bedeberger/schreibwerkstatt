@@ -31,24 +31,25 @@ export function makeChatMethods(cfg) {
 
   async function loadSession(sessionId) {
     try {
-      const data = await fetchJson('/chat/session/' + sessionId);
+      // Session-Payload und Active-Job-Check parallel — beide Reads idempotent,
+      // sequentielle awaits verdoppelten sonst Latenz beim History-Klick.
+      const wantActiveCheck = !this[p.pollTimer] && !this[p.loading];
+      const [data, active] = await Promise.all([
+        fetchJson('/chat/session/' + sessionId),
+        wantActiveCheck
+          ? fetchJson(`/jobs/active?type=${cfg.activeJobType}&book_id=${sessionId}`)
+              .catch((e) => { console.error(`[load${L}Session] active-job check:`, e); return null; })
+          : Promise.resolve(null),
+      ]);
       this[p.sessionId] = data.id;
       this[p.messages] = data.messages || [];
       this[p.status] = '';
       if (cfg.onAfterSessionLoad) cfg.onAfterSessionLoad.call(this);
       this.$nextTick(() => scrollToBottom.call(this));
 
-      // Reconnect: prüfen ob ein Chat-Job für diese Session noch läuft
-      if (!this[p.pollTimer] && !this[p.loading]) {
-        try {
-          const { jobId } = await fetchJson(`/jobs/active?type=${cfg.activeJobType}&book_id=${sessionId}`);
-          if (jobId) {
-            this[p.loading] = true;
-            startPollLocal.call(this, jobId);
-          }
-        } catch (e) {
-          console.error(`[load${L}Session] active-job check:`, e);
-        }
+      if (active && active.jobId) {
+        this[p.loading] = true;
+        startPollLocal.call(this, active.jobId);
       }
     } catch (e) {
       console.error(`[load${L}Session]`, e);

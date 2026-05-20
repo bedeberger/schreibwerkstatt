@@ -23,7 +23,10 @@ const DRAFT_DEBOUNCE_MS = 500;
 // Lib wird auch vom Focus-Editor konsumiert.
 
 
-export const notebookMethods = {
+// Sub-Methoden der Card `editorNotebookCard`. Alle State-Touches gegen
+// `window.__app` (Root). Aufruf von extern: über die Trampoline-Forwarder
+// in [trampoline.js] am Root-Spread (`app.startEdit()` → `__notebookCard.startEdit()`).
+export const notebookEditMethods = {
   // Container-Lookup: einziger Eintrittspunkt für beide Modi.
   _getEditEl() {
     return getActiveEditorContainer();
@@ -55,42 +58,44 @@ export const notebookMethods = {
   // für saveEdit (expliziter Save) als auch quickSave (Ctrl+S/Autosave) –
   // damit das Prüf-Panel auch nach Fokus-Editor-Edits aktuell bleibt.
   _filterFindingsAfterSave(newHtml) {
-    if (!this.lektoratFindings || this.lektoratFindings.length === 0) return;
+    const app = window.__app;
+    if (!app?.lektoratFindings || app.lektoratFindings.length === 0) return;
     const survivors = [];
     const prevSelected = new Map();
-    for (let i = 0; i < this.lektoratFindings.length; i++) {
-      const f = this.lektoratFindings[i];
+    for (let i = 0; i < app.lektoratFindings.length; i++) {
+      const f = app.lektoratFindings[i];
       if (f.original && newHtml.indexOf(f.original) !== -1) {
         survivors.push(f);
-        prevSelected.set(f, !!this.selectedFindings[i]);
+        prevSelected.set(f, !!app.selectedFindings[i]);
       }
     }
-    this.lektoratFindings = sortByPosition(newHtml, survivors);
-    this.selectedFindings = this.lektoratFindings.map(f => prevSelected.get(f) ?? false);
-    this.appliedOriginals = this.appliedOriginals.filter(o => newHtml.indexOf(o) !== -1);
-    if (this.lektoratFindings.length === 0) {
-      this.checkDone = false;
-      this.correctedHtml = null;
-      this.hasErrors = false;
+    app.lektoratFindings = sortByPosition(newHtml, survivors);
+    app.selectedFindings = app.lektoratFindings.map(f => prevSelected.get(f) ?? false);
+    app.appliedOriginals = app.appliedOriginals.filter(o => newHtml.indexOf(o) !== -1);
+    if (app.lektoratFindings.length === 0) {
+      app.checkDone = false;
+      app.correctedHtml = null;
+      app.hasErrors = false;
     } else {
-      this._recomputeCorrectedHtml();
+      app._recomputeCorrectedHtml?.();
     }
   },
 
   startEdit() {
-    if (!this.currentPage || this.originalHtml === null) return;
-    if (this.checkLoading || this.saveApplying != null) return;
+    const app = window.__app;
+    if (!app || !app.currentPage || app.originalHtml === null) return;
+    if (app.checkLoading || app.saveApplying != null) return;
     // Prüfmodus blockt Edit (Invariante: editMode + checkDone forbidden).
     // Findings-Apply-Pfad bleibt via saveCorrections, ohne contenteditable.
-    if (this.checkDone) return;
+    if (app.checkDone) return;
     // viewer/lektor duerfen Page-HTML nicht direkt mutieren.
     // Defense-in-depth zum verstecken Button-Hide in editor.html.
-    if (!this.canEdit()) return;
-    this.editMode = true;
-    this.editDirty = false;
-    this.editSaving = false;
-    this.saveOffline = false;
-    this.pendingDraft = null;
+    if (!app.canEdit?.()) return;
+    app.editMode = true;
+    app.editDirty = false;
+    app.editSaving = false;
+    app.saveOffline = false;
+    app.pendingDraft = null;
 
     // Chromium/Safari-Default ist 'div' → Enter an bare Text oder am
     // Editor-Root erzeugt <div> statt <p>, damit fehlt der Absatz-Abstand
@@ -98,16 +103,16 @@ export const notebookMethods = {
     // Einmal pro Edit-Session genügt, der Flag ist dokumentweit.
     try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch {}
 
-    let initialHtml = this.originalHtml;
+    let initialHtml = app.originalHtml;
 
     // Draft-Wiederherstellung: lokalen Entwurf immer übernehmen, wenn vorhanden
     // und abweichend. Kein Dialog – der User hat den Entwurf bewusst getippt,
     // ihn beim Wiedereintritt zu verwerfen wäre destruktiv.
-    const draft = readDraft(this.currentPage.id);
-    if (draft && draft.html && draft.html !== this.originalHtml) {
+    const draft = readDraft(app.currentPage.id);
+    if (draft && draft.html && draft.html !== app.originalHtml) {
       initialHtml = draft.html;
-      this.editDirty = true;
-      this.lastDraftSavedAt = draft.savedAt || Date.now();
+      app.editDirty = true;
+      app.lastDraftSavedAt = draft.savedAt || Date.now();
     }
 
     const el = this._getEditEl();
@@ -131,7 +136,7 @@ export const notebookMethods = {
       const beforeNormalize = el.innerHTML;
       normalizeEditorBlocks(el);
       if (el.innerHTML !== beforeNormalize) {
-        this.editDirty = true;
+        app.editDirty = true;
         this._scheduleDraftSave();
       }
       // Caret-Slot: Server liefert neue Seiten als `<p></p>` ohne Kinder
@@ -152,268 +157,272 @@ export const notebookMethods = {
     this._installOnlineRetry();
     // Presence-Heartbeat: anderen Usern signalisieren „hier editiert wer".
     // Stopp im cancelEdit/saveEdit (Non-Focus-Pfad).
-    this._startPresenceHeartbeat?.(this.currentPage.id);
+    app._startPresenceHeartbeat?.(app.currentPage.id);
     // Soft-Edit-Lock: zusaetzliches UI-Signal mit Ablaufzeit; OCC-Pfad bleibt
     // das echte Safety-Net. Fremder Lock → foreignEditLock-Banner.
-    this._acquireEditLock?.(this.currentPage.id);
+    app._acquireEditLock?.(app.currentPage.id);
     // Live-Counter rechnet in beiden Modi (für korrektes Tagesdelta beim
     // Wiedereintritt in den Focus), sichtbar aber nur im Focus-Header
     // (x-show=focusActive in editor.html). Setup nach Alpine-x-show-Flush —
     // .page-content-view--editing existiert vorher nicht im DOM.
-    setTimeout(() => { if (this.editMode) installEditCounter(this); }, 0);
+    setTimeout(() => { if (app.editMode) installEditCounter(app); }, 0);
     // Snapshot für Reload-Wiederaufnahme. Pendant zu focus/storage.js —
     // beim regulären Exit (cancelEdit/saveEdit) wird er wieder gelöscht.
-    writeNormalSnapshot(this.currentPage.id);
+    writeNormalSnapshot(app.currentPage.id);
   },
 
   async cancelEdit() {
-    if (this.editDirty) {
-      const ok = await this.appConfirm({
-        message: this.t('edit.cancelConfirm'),
-        confirmLabel: this.t('edit.discardEdit'),
+    const app = window.__app;
+    if (!app) return;
+    if (app.editDirty) {
+      const ok = await app.appConfirm({
+        message: app.t('edit.cancelConfirm'),
+        confirmLabel: app.t('edit.discardEdit'),
         danger: true,
       });
       if (!ok) return;
     }
-    if (this.currentPage) clearDraft(this.currentPage.id);
+    if (app.currentPage) clearDraft(app.currentPage.id);
     clearNormalSnapshot();
     this._stopAutosave();
     this._uninstallOnlineRetry();
-    this._editCounterCtx?.teardown?.();
-    this._stopPresenceHeartbeat?.();
-    this._releaseEditLock?.(this.currentPage?.id);
-    this.lastDraftSavedAt = null;
-    this.editMode = false;
-    this.editDirty = false;
-    this.editSaving = false;
-    this.saveOffline = false;
-    this.pageEditorFullscreen = false;
-    this.pageEditorFitWidth = false;
-    this.pendingDraft = null;
-    this.closeSynonymMenu?.();
-    this.closeSynonymPicker?.();
-    this.closeFigurLookup?.();
-    this.updatePageView();
-    if (this.focusActive) this.exitFocusMode();
+    app._editCounterCtx?.teardown?.();
+    app._stopPresenceHeartbeat?.();
+    app._releaseEditLock?.(app.currentPage?.id);
+    app.lastDraftSavedAt = null;
+    app.editMode = false;
+    app.editDirty = false;
+    app.editSaving = false;
+    app.saveOffline = false;
+    app.pageEditorFullscreen = false;
+    app.pageEditorFitWidth = false;
+    app.pendingDraft = null;
+    app.closeSynonymMenu?.();
+    app.closeSynonymPicker?.();
+    app.closeFigurLookup?.();
+    app.updatePageView?.();
+    if (app.focusActive) app.exitFocusMode?.();
   },
 
   async saveEdit() {
-    if (!this.currentPage) return;
-    if (!this.canEdit()) return;
+    const app = window.__app;
+    if (!app || !app.currentPage) return;
+    if (!app.canEdit?.()) return;
     const el = this._getEditEl();
     if (!el) return;
     const newHtml = stripLektoratMarks(el.innerHTML);
-    if (isNoChange(newHtml, this.originalHtml)) {
+    if (isNoChange(newHtml, app.originalHtml)) {
       // Im Fokusmodus nicht aus Edit-/Fokusmodus herausfallen, wenn
       // der User ein zweites Mal Speichern klickt (nichts geändert).
-      if (this.focusActive) {
-        this.setStatus(this.t('edit.changesSaved'), false, 2000);
+      if (app.focusActive) {
+        app.setStatus(app.t('edit.changesSaved'), false, 2000);
         return;
       }
       // editDirty kann durch startEdit-Normalize gesetzt sein, obwohl der
       // tatsächliche Inhalt sich nicht von normalizeForCompare(original)
       // unterscheidet. cancelEdit darf hier NICHT den Verwerfen-Dialog
       // zeigen — wir sind im Save-Flow, nicht im Cancel-Flow.
-      this.editDirty = false;
+      app.editDirty = false;
       this.cancelEdit();
       return;
     }
 
     const newText = htmlToText(newHtml).trim();
     if (!newText) {
-      this.setStatus(this.t('edit.emptyTextAbort'), false, 5000);
+      app.setStatus(app.t('edit.emptyTextAbort'), false, 5000);
       return;
     }
-    const origText = htmlToText(this.originalHtml || '').trim();
+    const origText = htmlToText(app.originalHtml || '').trim();
     if (origText.length > 50 && newText.length < origText.length * 0.2) {
-      const okShort = await this.appConfirm({
-        message: this.t('edit.shorterConfirm', { newLen: newText.length, oldLen: origText.length }),
+      const okShort = await app.appConfirm({
+        message: app.t('edit.shorterConfirm', { newLen: newText.length, oldLen: origText.length }),
       });
       if (!okShort) return;
     }
 
-    const conflict = await this._checkPageConflict(this.currentPage.id, this.currentPage.updated_at);
+    const conflict = await this._checkPageConflict(app.currentPage.id, app.currentPage.updated_at);
     if (conflict) {
-      this.editConflict = {
+      app.editConflict = {
         remoteUserName: conflict.remoteUserName,
         remoteUpdatedAt: conflict.remoteUpdatedAt,
       };
-      const okOverwrite = await this.appConfirm({
-        message: this.t('edit.conflict.message', {
-          user: conflict.remoteUserName || this.t('edit.conflict.unknownUser'),
-          time: this.formatDate(conflict.remoteUpdatedAt),
+      const okOverwrite = await app.appConfirm({
+        message: app.t('edit.conflict.message', {
+          user: conflict.remoteUserName || app.t('edit.conflict.unknownUser'),
+          time: app.formatDate(conflict.remoteUpdatedAt),
         }),
-        confirmLabel: this.t('edit.conflict.saveAnyway'),
+        confirmLabel: app.t('edit.conflict.saveAnyway'),
         danger: true,
       });
       if (!okOverwrite) {
-        writeDraft(this.currentPage.id, newHtml, this.originalHtml, this.currentPage.updated_at);
-        this.lastDraftSavedAt = Date.now();
-        this.saveOffline = true;
-        this.setStatus(this.t('edit.conflict.kept'), false, 6000);
+        writeDraft(app.currentPage.id, newHtml, app.originalHtml, app.currentPage.updated_at);
+        app.lastDraftSavedAt = Date.now();
+        app.saveOffline = true;
+        app.setStatus(app.t('edit.conflict.kept'), false, 6000);
         return;
       }
     }
 
-    this.editSaving = true;
-    this.setStatus(this.t('edit.saving'), true);
+    app.editSaving = true;
+    app.setStatus(app.t('edit.saving'), true);
     try {
-      const saved = await contentRepo.savePage(this.currentPage.id, buildSavePayload({
+      const saved = await contentRepo.savePage(app.currentPage.id, buildSavePayload({
         html: newHtml,
-        pageName: this.currentPage.name,
-        source: this.focusActive ? 'focus' : 'main',
-        expectedUpdatedAt: this.currentPage.updated_at,
+        pageName: app.currentPage.name,
+        source: app.focusActive ? 'focus' : 'main',
+        expectedUpdatedAt: app.currentPage.updated_at,
       }));
-      if (saved?.updated_at) this.currentPage.updated_at = saved.updated_at;
+      if (saved?.updated_at) app.currentPage.updated_at = saved.updated_at;
 
-      this.originalHtml = newHtml;
-      this.currentPageEmpty = !htmlToText(newHtml).trim();
+      app.originalHtml = newHtml;
+      app.currentPageEmpty = !htmlToText(newHtml).trim();
 
       this._filterFindingsAfterSave(newHtml);
-      this._syncPageStatsAfterSave?.(this.currentPage, newHtml);
+      app._syncPageStatsAfterSave?.(app.currentPage, newHtml);
       // Sidebar-Lektorat-Status flippt auf 'warn' (updated_at > checkedAt) — Server-Map nachladen.
-      this.refreshPageAges?.();
+      app.refreshPageAges?.();
 
-      clearDraft(this.currentPage.id);
-      this.lastAutosaveAt = Date.now();
-      this.lastDraftSavedAt = null;
-      this.editDirty = false;
-      this.saveOffline = false;
-      this.editConflict = null;
-      this.updatePageView();
-      if (this.focusActive) {
-        this.setStatus(this.t('edit.changesSaved'), false, 3000);
+      clearDraft(app.currentPage.id);
+      app.lastAutosaveAt = Date.now();
+      app.lastDraftSavedAt = null;
+      app.editDirty = false;
+      app.saveOffline = false;
+      app.editConflict = null;
+      app.updatePageView?.();
+      if (app.focusActive) {
+        app.setStatus(app.t('edit.changesSaved'), false, 3000);
       } else {
         clearNormalSnapshot();
         this._stopAutosave();
         this._uninstallOnlineRetry();
-        this._editCounterCtx?.teardown?.();
-        this._stopPresenceHeartbeat?.();
-        this._releaseEditLock?.(this.currentPage?.id);
-        this.editMode = false;
-        this.pageEditorFullscreen = false;
-        this.pageEditorFitWidth = false;
-        this.closeSynonymMenu?.();
-        this.closeSynonymPicker?.();
-        this.setStatus(this.t('edit.changesSaved'), false, 5000);
+        app._editCounterCtx?.teardown?.();
+        app._stopPresenceHeartbeat?.();
+        app._releaseEditLock?.(app.currentPage?.id);
+        app.editMode = false;
+        app.pageEditorFullscreen = false;
+        app.pageEditorFitWidth = false;
+        app.closeSynonymMenu?.();
+        app.closeSynonymPicker?.();
+        app.setStatus(app.t('edit.changesSaved'), false, 5000);
       }
     } catch (e) {
       if (isPageConflict(e)) {
         // Race: zwischen Pre-Check und PUT hat anderer User geschrieben.
         // Draft sichern + Conflict-Banner setzen; User muss erneut entscheiden.
-        writeDraft(this.currentPage.id, newHtml, this.originalHtml, this.currentPage.updated_at);
-        this.lastDraftSavedAt = Date.now();
-        this.saveOffline = true;
-        this.editConflict = readConflictBody(e);
-        this.setStatus(this.t('edit.conflict.kept'), false, 8000);
-        this.editSaving = false;
+        writeDraft(app.currentPage.id, newHtml, app.originalHtml, app.currentPage.updated_at);
+        app.lastDraftSavedAt = Date.now();
+        app.saveOffline = true;
+        app.editConflict = readConflictBody(e);
+        app.setStatus(app.t('edit.conflict.kept'), false, 8000);
+        app.editSaving = false;
         return;
       }
       console.error('[saveEdit]', e);
       // Netzwerkfehler → Draft behalten, Offline-Modus aktivieren, Auto-Retry.
-      writeDraft(this.currentPage.id, newHtml, this.originalHtml, this.currentPage.updated_at);
-      this.lastDraftSavedAt = Date.now();
-      this.saveOffline = true;
+      writeDraft(app.currentPage.id, newHtml, app.originalHtml, app.currentPage.updated_at);
+      app.lastDraftSavedAt = Date.now();
+      app.saveOffline = true;
       if (!navigator.onLine) {
-        this.setStatus(this.t('edit.offlineSaved'), false, 8000);
+        app.setStatus(app.t('edit.offlineSaved'), false, 8000);
       } else {
-        this.setStatus(this.t('edit.saveFailed', { msg: e.message }), false, 8000);
+        app.setStatus(app.t('edit.saveFailed', { msg: e.message }), false, 8000);
       }
     } finally {
-      this.editSaving = false;
+      app.editSaving = false;
     }
   },
 
   // Stilles Speichern (Ctrl+S / Auto-Save): bleibt im Editor.
   async quickSave() {
-    if (!this.editMode || !this.currentPage || this.editSaving) return;
+    const app = window.__app;
+    if (!app || !app.editMode || !app.currentPage || app.editSaving) return;
     // Ohne Edit-Recht kein Auto-Save (Defense; startEdit blockt
     // ohnehin den Eintritt — aber Race mit Role-Refresh waehrend Edit-Session).
-    if (!this.canEdit()) return;
+    if (!app.canEdit?.()) return;
     const el = this._getEditEl();
     if (!el) return;
     const newHtml = stripLektoratMarks(el.innerHTML);
-    if (isNoChange(newHtml, this.originalHtml)) {
-      this.editDirty = false;
-      clearDraft(this.currentPage.id);
-      this.lastDraftSavedAt = null;
+    if (isNoChange(newHtml, app.originalHtml)) {
+      app.editDirty = false;
+      clearDraft(app.currentPage.id);
+      app.lastDraftSavedAt = null;
       return;
     }
     const newText = htmlToText(newHtml).trim();
     if (!newText) return;
 
     // Immer zuerst lokal sichern, dann erst Netzwerkversuch.
-    writeDraft(this.currentPage.id, newHtml, this.originalHtml, this.currentPage.updated_at);
-    this.lastDraftSavedAt = Date.now();
+    writeDraft(app.currentPage.id, newHtml, app.originalHtml, app.currentPage.updated_at);
+    app.lastDraftSavedAt = Date.now();
 
-    const localeTag = (this.uiLocale === 'en') ? 'en-US' : 'de-CH';
+    const localeTag = (app.uiLocale === 'en') ? 'en-US' : 'de-CH';
 
     if (!navigator.onLine) {
-      this.saveOffline = true;
-      this.setStatus(this.t('edit.offlineSavedAt', { time: new Date().toLocaleTimeString(localeTag, tzOpts()) }), false, 3000);
+      app.saveOffline = true;
+      app.setStatus(app.t('edit.offlineSavedAt', { time: new Date().toLocaleTimeString(localeTag, tzOpts()) }), false, 3000);
       return;
     }
 
     // editSaving früh setzen — verhindert, dass parallele Auto-Save-Tick + Ctrl+S
     // (oder exitFocusMode-quickSave + Auto-Save-Timer) den gleichen PUT zweimal
-    // absetzen. Vorher prüfte nur saveEdit dieses Flag, quickSave nicht.
-    this.editSaving = true;
+    // absetzen.
+    app.editSaving = true;
     try {
       // Silent-Path: Auto-Save / Pre-Send-Refresh dürfen keinen Modal triggern.
       // Bei Cross-User-Konflikt → Draft bleibt liegen, editConflict-Banner
       // im Editor-Header zeigt Hinweis (auch im Fokusmodus sichtbar). User
       // muss explizit Save-Button drücken (saveEdit), dort fragt appConfirm
       // dann nach Überschreiben.
-      const conflict = await this._checkPageConflict(this.currentPage.id, this.currentPage.updated_at);
+      const conflict = await this._checkPageConflict(app.currentPage.id, app.currentPage.updated_at);
       if (conflict) {
-        this.saveOffline = true;
-        this.editConflict = {
+        app.saveOffline = true;
+        app.editConflict = {
           remoteUserName: conflict.remoteUserName,
           remoteUpdatedAt: conflict.remoteUpdatedAt,
         };
-        this.setStatus(this.t('edit.conflict.unsavedHint', {
-          user: conflict.remoteUserName || this.t('edit.conflict.unknownUser'),
+        app.setStatus(app.t('edit.conflict.unsavedHint', {
+          user: conflict.remoteUserName || app.t('edit.conflict.unknownUser'),
         }), false, 8000);
         return;
       }
-      const saved = await contentRepo.savePage(this.currentPage.id, buildSavePayload({
+      const saved = await contentRepo.savePage(app.currentPage.id, buildSavePayload({
         html: newHtml,
-        pageName: this.currentPage.name,
-        source: this.focusActive ? 'focus' : 'main',
-        expectedUpdatedAt: this.currentPage.updated_at,
+        pageName: app.currentPage.name,
+        source: app.focusActive ? 'focus' : 'main',
+        expectedUpdatedAt: app.currentPage.updated_at,
       }));
-      if (saved?.updated_at) this.currentPage.updated_at = saved.updated_at;
-      this.originalHtml = newHtml;
-      this.editDirty = false;
-      this.saveOffline = false;
-      this.editConflict = null;
-      this.lastAutosaveAt = Date.now();
-      this.lastDraftSavedAt = null;
-      clearDraft(this.currentPage.id);
-      this.currentPageEmpty = !htmlToText(newHtml).trim();
+      if (saved?.updated_at) app.currentPage.updated_at = saved.updated_at;
+      app.originalHtml = newHtml;
+      app.editDirty = false;
+      app.saveOffline = false;
+      app.editConflict = null;
+      app.lastAutosaveAt = Date.now();
+      app.lastDraftSavedAt = null;
+      clearDraft(app.currentPage.id);
+      app.currentPageEmpty = !htmlToText(newHtml).trim();
       this._filterFindingsAfterSave(newHtml);
-      this._syncPageStatsAfterSave?.(this.currentPage, newHtml);
+      app._syncPageStatsAfterSave?.(app.currentPage, newHtml);
       // Sidebar-Lektorat-Status flippt auf 'warn' (updated_at > checkedAt) — Server-Map nachladen.
-      this.refreshPageAges?.();
-      this.updatePageView();
-      this.setStatus(this.t('edit.savedAt', { time: new Date().toLocaleTimeString(localeTag, tzOpts()) }), false, 2500);
+      app.refreshPageAges?.();
+      app.updatePageView?.();
+      app.setStatus(app.t('edit.savedAt', { time: new Date().toLocaleTimeString(localeTag, tzOpts()) }), false, 2500);
     } catch (e) {
       if (isPageConflict(e)) {
         // Race nach Pre-Check: anderer User war im selben Tick schneller.
         // Quiet-Pfad: Draft bleibt, Banner setzen, kein Modal.
-        this.saveOffline = true;
-        this.editConflict = readConflictBody(e);
-        this.setStatus(this.t('edit.conflict.unsavedHint', {
-          user: e.body?.server_editor_name || this.t('edit.conflict.unknownUser'),
+        app.saveOffline = true;
+        app.editConflict = readConflictBody(e);
+        app.setStatus(app.t('edit.conflict.unsavedHint', {
+          user: e.body?.server_editor_name || app.t('edit.conflict.unknownUser'),
         }), false, 8000);
-        this.editSaving = false;
+        app.editSaving = false;
         return;
       }
       console.error('[quickSave]', e);
-      this.saveOffline = true;
-      this.setStatus(this.t('edit.saveFailedRetry'), false, 6000);
+      app.saveOffline = true;
+      app.setStatus(app.t('edit.saveFailedRetry'), false, 6000);
     } finally {
-      this.editSaving = false;
+      app.editSaving = false;
     }
   },
 
@@ -439,16 +448,19 @@ export const notebookMethods = {
   },
 
   _markEditDirty() {
-    if (!this.editMode) return;
-    this.editDirty = true;
+    const app = window.__app;
+    if (!app?.editMode) return;
+    app.editDirty = true;
     this._scheduleDraftSave();
     this._scheduleAutosave();
   },
 
   _scheduleDraftSave() {
-    if (this._draftTimer) clearTimeout(this._draftTimer);
-    this._draftTimer = setTimeout(() => {
-      this._draftTimer = null;
+    const app = window.__app;
+    if (!app) return;
+    if (app._draftTimer) clearTimeout(app._draftTimer);
+    app._draftTimer = setTimeout(() => {
+      app._draftTimer = null;
       this._flushDraftSaveNow();
     }, DRAFT_DEBOUNCE_MS);
   },
@@ -459,33 +471,41 @@ export const notebookMethods = {
   // verlieren. Beim Aufruf nach Debounce-Fire ist _draftTimer bereits null
   // (ungefährlicher No-op).
   _flushDraftSaveNow() {
-    if (this._draftTimer) { clearTimeout(this._draftTimer); this._draftTimer = null; }
-    if (!this.editMode || !this.currentPage) return;
+    const app = window.__app;
+    if (!app) return;
+    if (app._draftTimer) { clearTimeout(app._draftTimer); app._draftTimer = null; }
+    if (!app.editMode || !app.currentPage) return;
     const el = this._getEditEl();
     if (!el) return;
     const html = stripLektoratMarks(el.innerHTML);
-    if (isNoChange(html, this.originalHtml)) {
-      clearDraft(this.currentPage.id);
-      this.lastDraftSavedAt = null;
+    if (isNoChange(html, app.originalHtml)) {
+      clearDraft(app.currentPage.id);
+      app.lastDraftSavedAt = null;
       return;
     }
-    writeDraft(this.currentPage.id, html, this.originalHtml, this.currentPage.updated_at);
-    this.lastDraftSavedAt = Date.now();
+    writeDraft(app.currentPage.id, html, app.originalHtml, app.currentPage.updated_at);
+    app.lastDraftSavedAt = Date.now();
   },
 
   _startAutosave() {
+    const app = window.__app;
+    if (!app) return;
     this._clearAutosaveTimers();
-    if (this.editDirty) this._scheduleAutosave();
+    if (app.editDirty) this._scheduleAutosave();
   },
 
   _stopAutosave() {
+    const app = window.__app;
+    if (!app) return;
     this._clearAutosaveTimers();
-    if (this._draftTimer) { clearTimeout(this._draftTimer); this._draftTimer = null; }
+    if (app._draftTimer) { clearTimeout(app._draftTimer); app._draftTimer = null; }
   },
 
   _clearAutosaveTimers() {
-    if (this._autosaveIdleTimer) { clearTimeout(this._autosaveIdleTimer); this._autosaveIdleTimer = null; }
-    if (this._autosaveMaxTimer) { clearTimeout(this._autosaveMaxTimer); this._autosaveMaxTimer = null; }
+    const app = window.__app;
+    if (!app) return;
+    if (app._autosaveIdleTimer) { clearTimeout(app._autosaveIdleTimer); app._autosaveIdleTimer = null; }
+    if (app._autosaveMaxTimer) { clearTimeout(app._autosaveMaxTimer); app._autosaveMaxTimer = null; }
   },
 
   // Idle-Timer wird bei jedem Edit zurückgesetzt → speichert erst nach
@@ -493,40 +513,50 @@ export const notebookMethods = {
   // weiter und greift bei Dauer-Tippen, sodass spätestens AUTOSAVE_MAX_MS
   // nach der ersten Änderung ein Save ausgelöst wird.
   _scheduleAutosave() {
-    if (this._autosaveIdleTimer) clearTimeout(this._autosaveIdleTimer);
-    this._autosaveIdleTimer = setTimeout(() => this._fireAutosave(), AUTOSAVE_IDLE_MS);
-    if (!this._autosaveMaxTimer) {
-      this._autosaveMaxTimer = setTimeout(() => this._fireAutosave(), AUTOSAVE_MAX_MS);
+    const app = window.__app;
+    if (!app) return;
+    if (app._autosaveIdleTimer) clearTimeout(app._autosaveIdleTimer);
+    app._autosaveIdleTimer = setTimeout(() => this._fireAutosave(), AUTOSAVE_IDLE_MS);
+    if (!app._autosaveMaxTimer) {
+      app._autosaveMaxTimer = setTimeout(() => this._fireAutosave(), AUTOSAVE_MAX_MS);
     }
   },
 
   _fireAutosave() {
+    const app = window.__app;
+    if (!app) return;
     this._clearAutosaveTimers();
-    if (this.editMode && this.editDirty && !this.editSaving) this.quickSave();
+    if (app.editMode && app.editDirty && !app.editSaving) this.quickSave();
   },
 
   _installOnlineRetry() {
-    if (this._onlineHandler) return;
-    this._onlineHandler = () => {
-      if (this.editMode && this.editDirty && this.saveOffline) {
+    const app = window.__app;
+    if (!app || app._onlineHandler) return;
+    app._onlineHandler = () => {
+      if (app.editMode && app.editDirty && app.saveOffline) {
         this.quickSave();
       }
     };
-    window.addEventListener('online', this._onlineHandler);
+    window.addEventListener('online', app._onlineHandler);
   },
 
   _uninstallOnlineRetry() {
-    if (!this._onlineHandler) return;
-    window.removeEventListener('online', this._onlineHandler);
-    this._onlineHandler = null;
+    const app = window.__app;
+    if (!app || !app._onlineHandler) return;
+    window.removeEventListener('online', app._onlineHandler);
+    app._onlineHandler = null;
   },
 
   togglePageEditorFullscreen() {
-    this.pageEditorFullscreen = !this.pageEditorFullscreen;
+    const app = window.__app;
+    if (!app) return;
+    app.pageEditorFullscreen = !app.pageEditorFullscreen;
   },
 
   togglePageEditorFitWidth() {
-    const next = !this.pageEditorFitWidth;
+    const app = window.__app;
+    if (!app) return;
+    const next = !app.pageEditorFitWidth;
     if (next) {
       // Zoom so anpassen, dass Text bei aktiver Seitenbreite die volle
       // Wrap-Breite ausnutzt: ratio = Container / Reading-Frame.
@@ -537,25 +567,31 @@ export const notebookMethods = {
         const containerW = wrap.clientWidth;
         if (readingW > 0 && containerW > readingW) {
           const ratio = containerW / readingW;
-          this.pageEditorZoom = Math.min(2.5, Math.max(1, Math.round(ratio * 10) / 10));
+          app.pageEditorZoom = Math.min(2.5, Math.max(1, Math.round(ratio * 10) / 10));
         }
       }
     } else {
-      this.pageEditorZoom = 1;
+      app.pageEditorZoom = 1;
     }
-    this.pageEditorFitWidth = next;
+    app.pageEditorFitWidth = next;
   },
 
   pageEditorZoomIn() {
-    this.pageEditorZoom = Math.min(2.5, Math.round((this.pageEditorZoom + 0.1) * 100) / 100);
+    const app = window.__app;
+    if (!app) return;
+    app.pageEditorZoom = Math.min(2.5, Math.round((app.pageEditorZoom + 0.1) * 100) / 100);
   },
 
   pageEditorZoomOut() {
-    this.pageEditorZoom = Math.max(0.7, Math.round((this.pageEditorZoom - 0.1) * 100) / 100);
+    const app = window.__app;
+    if (!app) return;
+    app.pageEditorZoom = Math.max(0.7, Math.round((app.pageEditorZoom - 0.1) * 100) / 100);
   },
 
   pageEditorZoomReset() {
-    this.pageEditorZoom = 1;
+    const app = window.__app;
+    if (!app) return;
+    app.pageEditorZoom = 1;
   },
 
   // Trennlinie (<hr>) am Caret einfügen + Folge-Absatz für Weiterschreiben.
@@ -595,5 +631,4 @@ export const notebookMethods = {
     sel?.addRange(range);
     this._markEditDirty?.();
   },
-
 };

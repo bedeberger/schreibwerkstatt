@@ -2,7 +2,8 @@
 // Notebook-spezifischen Methods + Helpers an einer Stelle, damit Cards und
 // Root nur eine Import-Quelle anbinden.
 
-export { notebookMethods } from './edit.js';
+export { notebookEditMethods } from './edit.js';
+export { notebookTrampoline } from './trampoline.js';
 export { toolbarCardMethods } from './toolbar.js';
 export {
   writeNormalSnapshot,

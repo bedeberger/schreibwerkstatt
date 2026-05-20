@@ -51,7 +51,31 @@ export const bookChatMethods = {
       this.bookChatStatus = this._runningJobStatus(job.statusText, job.tokensIn, job.tokensOut, job.maxTokensOut, job.progress, job.tokensPerSec, job.statusParams);
     },
     onPollDone: async function () {
-      await this.loadBookChatSessions();
+      const sid = this.bookChatSessionId;
+      const sessions = this.bookChatSessions || [];
+      const idx = sessions.findIndex(s => s.id === sid);
+      const nowIso = new Date().toISOString();
+      if (idx >= 0) {
+        const row = { ...sessions[idx], last_message_at: nowIso };
+        const next = sessions.slice();
+        next.splice(idx, 1);
+        next.unshift(row);
+        this.bookChatSessions = next;
+      } else {
+        const firstUserMsg = (this.bookChatMessages || []).find(m => m.role === 'user');
+        const root = window.__app;
+        this.bookChatSessions = [
+          {
+            id: sid,
+            book_id: parseInt(root.selectedBookId),
+            book_name: root.selectedBookName,
+            created_at: nowIso,
+            last_message_at: nowIso,
+            preview: firstUserMsg ? firstUserMsg.content : '',
+          },
+          ...sessions,
+        ];
+      }
     },
   }),
 };

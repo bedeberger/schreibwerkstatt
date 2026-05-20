@@ -2,23 +2,42 @@
 
 Klassischer Bearbeitungsmodus für eine Seite: `contenteditable` mit Toolbar (Bubble + Slash), Inline-Findings, Draft-/Autosave-Pipeline, Stale-Write-Schutz und Snapshot-Wiederaufnahme. Schwester-Editor: [focus-editor.md](focus-editor.md). Beide teilen die Save-/HTML-Pipeline aus [public/js/editor/shared/](../public/js/editor/shared/) und schreiben über die [Content-Store-Facade](../lib/content-store/).
 
-Code: [public/js/editor/notebook/edit.js](../public/js/editor/notebook/edit.js) (Methods-Spread in Root, `notebookMethods`), [public/js/editor/notebook/toolbar.js](../public/js/editor/notebook/toolbar.js) (Methods für `editorToolbarCard`), [public/js/editor/notebook/storage.js](../public/js/editor/notebook/storage.js) (Snapshot). Card-Wrapper: [public/js/cards/editor-toolbar-card.js](../public/js/cards/editor-toolbar-card.js). Partials: [public/partials/editor-notebook.html](../public/partials/editor-notebook.html), [public/partials/editor-body-edit.html](../public/partials/editor-body-edit.html), [public/partials/editor-toolbar.html](../public/partials/editor-toolbar.html). CSS: [public/css/editor/notebook/](../public/css/editor/notebook/).
+Code: [public/js/editor/notebook/edit.js](../public/js/editor/notebook/edit.js) (Methods-Spread in Root, `notebookEditMethods`), [public/js/editor/notebook/toolbar.js](../public/js/editor/notebook/toolbar.js) (Methods für `editorToolbarCard`), [public/js/editor/notebook/storage.js](../public/js/editor/notebook/storage.js) (Snapshot). Card-Wrapper: [public/js/cards/editor-toolbar-card.js](../public/js/cards/editor-toolbar-card.js). Partials: [public/partials/editor-notebook.html](../public/partials/editor-notebook.html), [public/partials/editor-body-edit.html](../public/partials/editor-body-edit.html), [public/partials/editor-toolbar.html](../public/partials/editor-toolbar.html). CSS: [public/css/editor/notebook/](../public/css/editor/notebook/).
 
 Trigger: Edit-Button im Karten-Header (`startEdit`). Snapshot-Restore mountet den Editor automatisch beim Reload, wenn `normal.snapshot` für die aktuell geladene Seite passt.
 
 ## Verortung im Frontend
 
-Lifecycle-Sub `editorNotebookCard` ([public/js/cards/editor-notebook-card.js](../public/js/cards/editor-notebook-card.js)) deckt Reload-Snapshot-Restore + Trampoline-Listener ab. Edit-Pipeline (`startEdit`/`saveEdit`/`cancelEdit`/`quickSave`) lebt aktuell noch im Root als `notebookMethods`-Spread ([public/js/app.js](../public/js/app.js)). Toolbar (Bubble + Slash) ist Sub-Card `editorToolbarCard`.
+Sub-Karte `editorNotebookCard` ([public/js/cards/editor-notebook-card.js](../public/js/cards/editor-notebook-card.js)) hostet die volle Edit-Pipeline (`startEdit`/`saveEdit`/`cancelEdit`/`quickSave` + Autosave/Draft/Lock/Presence) und die Reload-Snapshot-Restore. Root spreaded nur dünne Trampoline-Forwarder ([editor/notebook/trampoline.js](../public/js/editor/notebook/trampoline.js)) und greift via `window.__notebookCard` durch — Templates und Cross-Card-Aufrufer (chat.js, focus/card.js, synonyme.js, find.js, toolbar.js, app-view.js) treffen damit weiter die Root-API (`app.startEdit()`, `app._markEditDirty()` …). Toolbar (Bubble + Slash) ist Sub-Card `editorToolbarCard`.
 
-| Verantwortlichkeit | Wohnt aktuell in |
+| Verantwortlichkeit | Wohnt in |
 |---|---|
 | `editMode`, `editDirty`, `editSaving`, `saveOffline`, `pendingDraft`, `editConflict`, Auto-Save-Timer | Root (`notebookState` in [app-state.js](../public/js/app/app-state.js)) |
 | `currentPage`, `originalHtml`, `renderedPageHtml` (mode-agnostisch — von Notebook/Focus/View geteilt) | Root (`pageState` in [app-state.js](../public/js/app/app-state.js)) |
 | `correctedHtml`, `hasErrors` (Lektorat-Overlay, nur im Prüfmodus aktiv — von page-view über `correctedHtml \|\| renderedPageHtml` konsumiert) | Root (`lektoratState` in [app-state.js](../public/js/app/app-state.js)) |
-| `startEdit`/`saveEdit`/`cancelEdit`/`quickSave` + Autosave/Draft/Online-Retry | Root (`notebookMethods` aus [editor/notebook/edit.js](../public/js/editor/notebook/edit.js)) |
-| Reload-Snapshot-Restore (Pendant zu `_tryRestoreFocus`) | Sub `editorNotebookCard` |
+| `startEdit`/`saveEdit`/`cancelEdit`/`quickSave` + Autosave/Draft/Online-Retry + private Helper (`_checkPageConflict`, `_filterFindingsAfterSave`, `_flushDraftSaveNow`, `_markEditDirty`, …) | Sub `editorNotebookCard` ([editor/notebook/edit.js](../public/js/editor/notebook/edit.js)) |
+| Root-API (Templates + Cross-Card-Aufrufer) | Trampoline ([editor/notebook/trampoline.js](../public/js/editor/notebook/trampoline.js)) — forwarded auf `window.__notebookCard` |
+| Reload-Snapshot-Restore (Pendant zu `_tryRestoreFocus`) | Sub `editorNotebookCard` ([editor/notebook/card.js](../public/js/editor/notebook/card.js)) |
 | Bubble + Slash-Menü State (`bubbleShow`, `slashShow`, …) | Sub `editorToolbarCard` |
 | Container-Lookup (`page-content-view--editing`) | `shared/active-editor.js` (smart-switch mit Focus) |
+
+**Trampoline-Pattern:** beide Editoren konsequent gleich strukturiert — Root hält nur Forwarder, Sub die Logik. Notebook nutzt direkte Sub-Ref-Calls (`window.__notebookCard?.X(args)`), weil Methoden Args/Returns durchreichen müssen (z. B. `_checkPageConflict(pageId, expectedUpdatedAt)`, `await quickSave()`). Focus-Trampoline ([editor/focus/trampoline.js](../public/js/editor/focus/trampoline.js)) ist CustomEvent-basiert (4 arg-lose Dispatcher) — pragmatischer Stilunterschied bei gleicher Architektur (siehe [focus-editor.md](focus-editor.md#root-vs-sub-trampoline-pattern)).
+
+## Sheet-Optik (Tagebuch/Notebook)
+
+`.page-content-view` ist der **gemeinsame Style-Scope für Read- und Edit-Modus** — kein Layout-Sprung beim Toggle, gleiche Buchsatz-Typografie in beiden Modi. CSS: [public/css/page/page-view.css](../public/css/page/page-view.css).
+
+**Aktive Tagebuch-Hebel:**
+- **Paper-Sheet-Shadow** — `box-shadow: var(--shadow-sm)` auf `.page-content-view` (Blatt-auf-Tisch-Lift in beiden Modi).
+- **Buchsatz-Erstzeilen-Einzug** — `p + p { text-indent: 1.4em; margin-top: 0; }`. Folge-`<p>`-Selector greift automatisch nicht nach Headings, blockquote, poem, hr (Roman-/Tagebuch-Buchsatz). Mobile (<600 px): Margin auf 0.8em angehoben (Zeilen-Boost), Erstzeilen-Indent bleibt.
+- **Vertikaler Atem** — `padding: 36px clamp(18px, 4vw, 40px)`, `line-height: 1.75`, `<p>`-Margin 0.6em (Desktop).
+- **Heft-Caption** — `.page-sheet-caption` als Sibling vor dem Sheet zeigt `currentPage.name` typografisch (Serif, kursiv, muted, dotted-rule unten, rechtsbündig). Doppelung zum Card-Header bewusst — Sheet ist autark lesbar.
+
+**`--editing`-Modifier** ergänzt nur Edit-Spezifika: linkes Rail (5 px primary), Background-Tint, `hyphens: none`, `text-wrap: wrap` (kein pretty/balance gegen Caret-Wackeln), `cursor: text`. Sheet-Shadow, Padding, Line-height, Erstzeilen-Einzug erbt aus dem Base-Selector — **Read und Edit zeigen identische Typografie**.
+
+**Edit-only-Properties** müssen über `.page-content-view--editing` (oder Kind-Selektoren davon) gehängt werden. Setzt man Edit-Properties direkt auf `.page-content-view`, leaken sie in Read.
+
+**Caption-Slot in Partials:** [editor-body-view.html](../public/partials/editor-body-view.html) (Read), [editor-body-edit.html](../public/partials/editor-body-edit.html) (Edit). Caption lebt **ausserhalb** des contenteditable, sonst landet sie im DB-HTML.
 
 ## Container-Lookup (smart-switch)
 

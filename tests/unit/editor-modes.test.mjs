@@ -47,10 +47,12 @@ test('I2: cancelEdit ruft exitFocusMode wenn focusActive', () => {
   const m = src.match(/async cancelEdit\s*\(\)\s*\{[\s\S]*?\n  \}/);
   assert.ok(m, 'cancelEdit gefunden');
   const body = m[0];
-  assert.match(body, /if\s*\(\s*this\.focusActive\s*\)\s*this\.exitFocusMode\s*\(\s*\)/,
+  // Sub-Methode mutiert Root-State via `app` (= window.__app). Aufruf von
+  // exitFocusMode geht durch dieselbe Trampoline-Schicht zurück in die Focus-Sub.
+  assert.match(body, /if\s*\(\s*app\.focusActive\s*\)\s*app\.exitFocusMode(\?\.|)\(\s*\)/,
     'cancelEdit muss exitFocusMode rufen, wenn focusActive');
-  assert.match(body, /this\.editMode\s*=\s*false/, 'cancelEdit räumt editMode');
-  assert.match(body, /this\.editDirty\s*=\s*false/, 'cancelEdit räumt editDirty');
+  assert.match(body, /app\.editMode\s*=\s*false/, 'cancelEdit räumt editMode');
+  assert.match(body, /app\.editDirty\s*=\s*false/, 'cancelEdit räumt editDirty');
 });
 
 // ── I3: saveEdit — Fokus bleibt im Fokus ─────────────────────────────────────
@@ -59,16 +61,16 @@ test('I3: saveEdit hat Fokus-Branch, der editMode NICHT räumt', () => {
   const m = src.match(/async saveEdit\s*\(\)\s*\{[\s\S]*?\n  \}/);
   assert.ok(m, 'saveEdit gefunden');
   const body = m[0];
-  // Branch-Struktur: nach erfolgreichem PUT muss `if (this.focusActive) { … } else { … this.editMode = false; … }`
+  // Branch-Struktur: nach erfolgreichem PUT muss `if (app.focusActive) { … } else { … app.editMode = false; … }`
   // existieren. Im if-Zweig darf editMode NICHT auf false gehen.
-  const ifElseMatch = body.match(/if\s*\(\s*this\.focusActive\s*\)\s*\{([\s\S]*?)\}\s*else\s*\{([\s\S]*?)\}/);
+  const ifElseMatch = body.match(/if\s*\(\s*app\.focusActive\s*\)\s*\{([\s\S]*?)\}\s*else\s*\{([\s\S]*?)\}/);
   assert.ok(ifElseMatch,
     'saveEdit braucht if(focusActive){...}else{...}-Branch für Fokus-Stay');
   const focusBranch = ifElseMatch[1];
   const exitBranch = ifElseMatch[2];
-  assert.doesNotMatch(focusBranch, /this\.editMode\s*=\s*false/,
+  assert.doesNotMatch(focusBranch, /app\.editMode\s*=\s*false/,
     'Fokus-Branch darf editMode NICHT räumen (User soll weiterschreiben)');
-  assert.match(exitBranch, /this\.editMode\s*=\s*false/,
+  assert.match(exitBranch, /app\.editMode\s*=\s*false/,
     'Nicht-Fokus-Branch räumt editMode');
 });
 

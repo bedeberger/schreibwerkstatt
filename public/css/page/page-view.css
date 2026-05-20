@@ -1,15 +1,20 @@
 @layer components {
-/* === Page Content View === */
+/* === Page Content View ===
+   Tagebuch-/Notebook-Optik: cremefarbenes Blatt mit Buchsatz-Mikrotypografie.
+   Gleicher Style-Scope für Read- und Edit-Modus (kein Layout-Sprung beim
+   Toggle); `--editing`-Modifier ergänzt nur Edit-Spezifika (Rail, Tint,
+   hyphens off, wrap normal). */
 .page-content-view {
   max-width: calc(64ch + 2 * clamp(18px, 4vw, 40px));
   max-height: var(--pcv-max-h, 60vh);
   overflow-y: auto;
-  padding: 28px clamp(18px, 4vw, 40px);
+  padding: 36px clamp(18px, 4vw, 40px);
   background: var(--color-page-view-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
   margin: var(--space-md) auto;
-  line-height: 1.7;
+  line-height: 1.75;
   font-family: var(--font-serif);
   font-size: var(--font-size-reading);
   color: var(--color-page-view-text);
@@ -18,13 +23,33 @@
   font-feature-settings: "kern", "liga", "dlig", "calt", "onum";
   text-rendering: optimizeLegibility;
 }
+
+/* Tagebuch-Caption: Heft-Eintrag-Header über dem Sheet — Page-Name als
+   typografische Marginalie. Max-width matcht .page-content-view, damit
+   die dotted-rule mit der Sheet-Kante fluchtet. */
+.page-sheet-caption {
+  max-width: calc(64ch + 2 * clamp(18px, 4vw, 40px));
+  margin: var(--space-sm) auto 0;
+  padding: 0 clamp(18px, 4vw, 40px) var(--space-2xs);
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--font-em-90);
+  color: var(--color-muted);
+  letter-spacing: 0.04em;
+  text-align: right;
+  border-bottom: 1px dotted var(--color-border);
+}
 .page-content-view h1 { font-size: var(--font-em-150); margin: 0.6em 0 0.3em; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
 .page-content-view h2 { font-size: var(--font-em-130); margin: 0.5em 0 0.3em; font-weight: 700; letter-spacing: -0.005em; text-wrap: balance; }
 .page-content-view h3 { font-size: var(--font-em-115); margin: 0.4em 0 0.2em; font-weight: 700; text-wrap: balance; }
 .page-content-view h4 { font-size: var(--font-em-105); margin: 0.3em 0 0.2em; font-weight: 700; text-wrap: balance; }
 .page-content-view h5 { font-size: var(--font-em-95); margin: 0.3em 0 0.2em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
 .page-content-view h6 { font-size: var(--font-em-90); margin: 0.3em 0 0.2em; font-weight: 700; color: var(--color-muted); }
-.page-content-view p { margin: 0.4em 0; text-wrap: pretty; }
+.page-content-view p { margin: 0.6em 0; text-wrap: pretty; }
+/* Buchsatz-Erstzeilen-Einzug ab zweitem Absatz — Roman-/Tagebuch-Satz.
+   Reset bei Headings/blockquote/poem/hr läuft automatisch über den
+   `p + p`-Adjacency-Selector (nur Folge-`<p>` nach `<p>` greift). */
+.page-content-view p + p { text-indent: 1.4em; margin-top: 0; }
 
 /* Marginalia: Absätze mit Lektorats-Markierungen bekommen rechts einen
    feinen severity-getönten Akzentstreifen (wie roter Rotstift am Manuskript-
@@ -194,11 +219,14 @@
 .page-content-view--editing { hyphens: none; -webkit-hyphens: none; }
 
 /* Mobile: schmaler Viewport → Paragraphs brechen mehrzeilig; intra-<p>
-   line-height (1.7em) wirkt sonst grösser als inter-<p> Margin (0.4em).
-   Para-Margin auf Zeilenabstand-Niveau heben, sonst sehen Absatzwechsel
-   enger aus als normale Zeilenumbrüche. */
+   line-height wirkt sonst grösser als inter-<p> Margin. Para-Margin auf
+   Zeilenabstand-Niveau heben, sonst sehen Absatzwechsel enger aus als
+   normale Zeilenumbrüche. Erstzeilen-Einzug bleibt; Margin-Reset auf
+   Folge-<p> dann mit p+p-Margin neu setzen. */
 @media (max-width: 600px) {
-  .page-content-view p { margin: 0.7em 0; }
+  .page-content-view p { margin: 0.8em 0; }
+  .page-content-view p + p { margin-top: 0; }
+  .page-sheet-caption { font-size: var(--font-em-85); }
 }
 
 }

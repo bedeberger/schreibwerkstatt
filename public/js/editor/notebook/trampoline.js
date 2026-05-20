@@ -1,0 +1,39 @@
+// Root-Trampoline für den Notebook-Editor. Pendant zu editor/focus/trampoline.js.
+//
+// Spread in den Root (`notebookTrampoline` in [app.js]). Methoden sind dünne
+// Forwarder auf die Sub-Komponente `editorNotebookCard`, die ihren Selbst-Ref
+// in `init()` an `window.__notebookCard` legt. Templates (`@click="startEdit()"`)
+// und externe Module (`app.quickSave()`, `app._markEditDirty()`) treffen weiter
+// die Root-API, die echte Logik lebt aber in [notebook/edit.js].
+//
+// `this`-Binding: Forwarder rufen die Sub-Methode via `card.X(...args)`, sodass
+// `this` innerhalb der Sub korrekt der Sub-Proxy ist (Alpine bindet automatisch).
+
+const card = () => window.__notebookCard;
+
+export const notebookTrampoline = {
+  // Public — Templates & cross-card-Aufrufer
+  startEdit() { card()?.startEdit(); },
+  cancelEdit() { return card()?.cancelEdit(); },
+  saveEdit() { return card()?.saveEdit(); },
+  quickSave() { return card()?.quickSave(); },
+  insertHorizontalRule() { card()?.insertHorizontalRule(); },
+  togglePageEditorFullscreen() { card()?.togglePageEditorFullscreen(); },
+  togglePageEditorFitWidth() { card()?.togglePageEditorFitWidth(); },
+  pageEditorZoomIn() { card()?.pageEditorZoomIn(); },
+  pageEditorZoomOut() { card()?.pageEditorZoomOut(); },
+  pageEditorZoomReset() { card()?.pageEditorZoomReset(); },
+
+  // Half-public — von Templates/anderen Modulen (synonyme, find, focus, toolbar,
+  // app-view, book-editor-card) erwartet.
+  _onEditPaste(e) { card()?._onEditPaste(e); },
+  _markEditDirty() { card()?._markEditDirty(); },
+  _flushDraftSaveNow() { card()?._flushDraftSaveNow(); },
+  _stopAutosave() { card()?._stopAutosave(); },
+  _uninstallOnlineRetry() { card()?._uninstallOnlineRetry(); },
+  _filterFindingsAfterSave(html) { card()?._filterFindingsAfterSave(html); },
+  _checkPageConflict(pageId, expectedUpdatedAt) {
+    return card()?._checkPageConflict(pageId, expectedUpdatedAt) ?? null;
+  },
+  _getEditEl() { return card()?._getEditEl() ?? null; },
+};

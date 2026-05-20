@@ -927,19 +927,27 @@ CSS: [public/css/page/page-view.css](public/css/page/page-view.css).
 **Use:** Seiteninhalt im Lese-/Fokus-Modus (Serifenfont, lange Zeilen, Callouts).
 
 **Klassen** [public/css/page/page-view.css](public/css/page/page-view.css):
-- `.page-content-view` — Container mit max-width, Serif-Font
-- `.page-content-view--editing` — Variante während Bearbeitung
+- `.page-content-view` — Container mit max-width, Serif-Font, Paper-Sheet-Shadow
+- `.page-content-view--editing` — Variante während Bearbeitung (Rail + Tint + hyphens off); erbt sonst alles
+- `.page-sheet-caption` — Heft-Eintragsmarke oberhalb des Sheets (kursiv, muted, dotted-rule)
 - Innerhalb: native `h1`–`h6`, `blockquote` werden auto-gestylt
 - `.callout.info` / `.success` / `.warning` / `.danger` — links eingerückte Callout-Boxen
 - `.callout.pullquote` — zentrierte, gross gesetzte Hervorhebung zwischen Absätzen. Kein Border, kein Background — Typografie trägt allein. Auto-Anführungszeichen via `::before`/`::after` in Akzentfarbe.
 - `.poem` — Sonderlayout für Verse (preserve whitespace)
 - `.lektorat-mark` / `.lektorat-mark--selected` — Inline-Annotationen
 
+**Tagebuch-/Notebook-Optik:**
+- Gemeinsamer Style-Scope für Read + Edit — kein Layout-Sprung beim Toggle. `--editing`-Modifier nur additiv. Edit-only-Properties immer über `--editing`-Selektor hängen.
+- `box-shadow: var(--shadow-sm)` — Paper-Sheet-Lift.
+- `p + p { text-indent: 1.4em; margin-top: 0; }` — Buchsatz-Erstzeilen-Einzug ab zweitem Absatz. Adjacency-Selector greift automatisch nicht nach Headings, blockquote, poem, hr.
+- `padding: 36px clamp(18px, 4vw, 40px)`, `line-height: 1.75`, `<p>`-Margin 0.6em (Desktop) / 0.8em (Mobile).
+- Caption-Slot via Partial-Sibling (nicht via `::before`, sonst Caret-Probleme im contenteditable).
+
 **Buchsatz-Mikrotypografie** (am Container `.page-content-view`):
 - `hanging-punctuation: first allow-end last` — Anführungszeichen ragen aus Satzkante.
 - `font-feature-settings: "kern", "liga", "dlig", "calt", "onum"` — Ligaturen + alte Ziffern (Source Serif 4 hat OldStyle-Numerals).
 - `text-rendering: optimizeLegibility`.
-- `text-wrap: pretty` auf `<p>`, `text-wrap: balance` auf Headings (verhindert Witwen/Waisen).
+- `text-wrap: pretty` auf `<p>`, `text-wrap: balance` auf Headings (verhindert Witwen/Waisen). Im Edit-Modus deaktiviert (`wrap: wrap`) gegen Caret-Wackeln.
 
 Nicht selbst Reading-Typografie definieren; immer diesen Frame verwenden.
 
