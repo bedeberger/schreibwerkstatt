@@ -35,7 +35,6 @@ export {
   SYSTEM_KAPITELANALYSE,
   SYSTEM_KAPITELREVIEW,
   SYSTEM_FIGUREN,
-  SYSTEM_STILKORREKTUR,
   SYSTEM_SYNONYM,
   SYSTEM_CHAT,
   SYSTEM_BOOK_CHAT,
@@ -52,9 +51,7 @@ export {
 export {
   buildLektoratPrompt,
   buildBatchLektoratPrompt,
-  buildStilkorrekturPrompt,
   SCHEMA_LEKTORAT,
-  SCHEMA_STILKORREKTUR,
 } from './prompts/lektorat.js';
 
 export {

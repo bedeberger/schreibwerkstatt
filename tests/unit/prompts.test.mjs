@@ -39,7 +39,7 @@ test('configurePrompts (claude): JSON_ONLY-Footer in jedem Analyse-Prompt', asyn
   // JSON_ONLY-Marker: "Antworte ausschliesslich mit einem JSON-Objekt"
   for (const key of [
     'SYSTEM_LEKTORAT', 'SYSTEM_BUCHBEWERTUNG', 'SYSTEM_KAPITELANALYSE',
-    'SYSTEM_KAPITELREVIEW', 'SYSTEM_FIGUREN', 'SYSTEM_STILKORREKTUR',
+    'SYSTEM_KAPITELREVIEW', 'SYSTEM_FIGUREN',
     'SYSTEM_SYNONYM',
   ]) {
     assert.match(m[key], /Antworte ausschliesslich mit einem JSON-Objekt/, `${key} fehlt JSON_ONLY`);
@@ -258,7 +258,7 @@ test('SYSTEM_*_BLOCKS: alle Job-relevanten Prompts haben _BLOCKS-Variante', asyn
   for (const key of [
     'SYSTEM_LEKTORAT_BLOCKS', 'SYSTEM_BUCHBEWERTUNG_BLOCKS',
     'SYSTEM_KAPITELANALYSE_BLOCKS', 'SYSTEM_KAPITELREVIEW_BLOCKS',
-    'SYSTEM_FIGUREN_BLOCKS', 'SYSTEM_STILKORREKTUR_BLOCKS',
+    'SYSTEM_FIGUREN_BLOCKS',
     'SYSTEM_ORTE_BLOCKS', 'SYSTEM_KONTINUITAET_BLOCKS', 'SYSTEM_ZEITSTRAHL_BLOCKS',
     'SYSTEM_KOMPLETT_EXTRAKTION_BLOCKS',
     'SYSTEM_KOMPLETT_FIGUREN_PASS_BLOCKS', 'SYSTEM_KOMPLETT_ORTE_PASS_BLOCKS',

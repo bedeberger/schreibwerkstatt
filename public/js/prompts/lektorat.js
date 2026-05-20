@@ -1,9 +1,9 @@
-// Lektorat-Prompts (Einzel- und Batch-Variante) + Stilkorrektur.
+// Lektorat-Prompts (Einzel- und Batch-Variante).
 // Schema SCHEMA_LEKTORAT ist _isLocal-abhängig und wird via _rebuildLektoratSchema()
 // nach configurePrompts() neu gebaut.
 
 import { _isLocal } from './state.js';
-import { _obj, _str, _num } from './schema-utils.js';
+import { _obj, _str } from './schema-utils.js';
 import {
   _buildStilBlock,
   _buildWiederholungBlock,
@@ -307,33 +307,6 @@ export function buildBatchLektoratPrompt(text, opts = {}) {
   return _buildLektoratPromptBody(text, 'Text:', opts);
 }
 
-export function buildStilkorrekturPrompt(html, styles) {
-  const liste = styles.map((s, i) =>
-    `${i + 1}. Originalstelle (kann durch andere Korrekturen schon verändert sein): "${s.original}"\n   Empfehlung: "${s.korrektur}"\n   Begründung: ${s.erklaerung}`
-  ).join('\n\n');
-
-  return `Du bekommst einen HTML-Text und eine Liste stilistischer Verbesserungsvorschläge. Für jede Stelle entscheidest du selbst, wie die beste Formulierung lautet – die Empfehlung ist ein Hinweis, keine Vorgabe.
-
-Wichtige Regeln für das "original"-Feld:
-- Der HTML-Text unten ist die VERBINDLICHE Wahrheit. Andere Korrekturen können den Wortlaut bereits verändert haben — die "Originalstelle" oben ist daher nur ein Hinweis, NICHT der zu suchende Text.
-- Suche im HTML-Text die Passage, die der Originalstelle entspricht, und gib den jetzt im HTML stehenden Wortlaut zeichen-für-zeichen exakt zurück (inkl. Anführungszeichen-Stil, Whitespace, geschützte Leerzeichen, Tags wenn sie mitten in der Passage liegen).
-- Wenn die Stelle so nicht (mehr) im HTML steht, lass den Eintrag komplett weg — niemals erfinden, niemals approximieren.
-- Wenn die Originalstelle keine Verbesserung braucht (Ersatz wäre identisch oder gleichwertig), lass den Eintrag ebenfalls weg — gib nicht "original" und "ersatz" identisch zurück.
-
-Stilistische Verbesserungen:
-${liste}
-
-Antworte mit diesem JSON-Schema. Das Feld "index" ist die 1-basierte Position aus der nummerierten Liste oben (also 1 für den ersten Eintrag, 2 für den zweiten usw.) — gib es immer korrekt an, damit deine Antwort dem ursprünglichen Vorschlag zugeordnet werden kann:
-{
-  "korrekturen": [
-    { "index": 1, "original": "zeichengenauer Wortlaut aus dem HTML-Text unten", "ersatz": "deine gewählte Ersatzformulierung" }
-  ]
-}
-
-HTML-Text:
-${html}`;
-}
-
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
 // SCHEMA_LEKTORAT ist _isLocal-abhängig (lokale Provider erhalten ein reduziertes
@@ -380,14 +353,3 @@ export function _rebuildLektoratSchema() {
 }
 
 _rebuildLektoratSchema();
-
-// Statisches Schema – nicht _isLocal-abhängig.
-// `index` (1-basiert) referenziert die Position in der Eingabeliste; erlaubt
-// eindeutiges Mapping zurück auf die Stil-Findings auch wenn die KI Einträge
-// auslässt (z.B. weil keine Verbesserung nötig).
-export const SCHEMA_STILKORREKTUR = _obj({
-  korrekturen: {
-    type: 'array',
-    items: _obj({ index: _num, original: _str, ersatz: _str }),
-  },
-});

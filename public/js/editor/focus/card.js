@@ -23,7 +23,8 @@ import { applySentenceHighlight } from './sentence.js';
 import {
   dynamicTypewriterThreshold, getCaretRect, typewriterScroll,
 } from './typewriter.js';
-import { writeFocusSnapshot, clearFocusSnapshot, installEditCounter } from './storage.js';
+import { writeFocusSnapshot, clearFocusSnapshot } from './storage.js';
+import { installEditCounter } from '../shared/edit-counter.js';
 import { bindInlineFormattingShortcuts } from '../shared/shortcuts.js';
 
 export const focusCardMethods = {

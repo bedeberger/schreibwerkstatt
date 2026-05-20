@@ -5895,6 +5895,58 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 137 abgeschlossen (Tags-Feature entfernt: book_tags + book_tag_assignments gedroppt).');
   }
 
+  if (version < 138) {
+    // Stilkorrektur-Feature entfernt: page_checks.stilkorrektur_log war seit Mig 66
+    // angelegt, aber nie vom Frontend befuellt (Spalte immer NULL). Recreate-Pattern,
+    // weil SQLite DROP COLUMN nicht zuverlaessig FK-Constraints beibehaelt.
+    db.pragma('foreign_keys = OFF');
+    db.exec('DROP TABLE IF EXISTS page_checks_new');
+    db.exec(
+      'CREATE TABLE page_checks_new (' +
+      '  id                   INTEGER PRIMARY KEY AUTOINCREMENT,' +
+      '  page_id              INTEGER NOT NULL REFERENCES pages(page_id) ON DELETE CASCADE,' +
+      '  book_id              INTEGER REFERENCES books(book_id) ON DELETE SET NULL,' +
+      '  checked_at           TEXT NOT NULL,' +
+      '  error_count          INTEGER DEFAULT 0,' +
+      '  errors_json          TEXT,' +
+      '  stilanalyse          TEXT,' +
+      '  fazit                TEXT,' +
+      '  model                TEXT,' +
+      '  saved                INTEGER DEFAULT 0,' +
+      '  saved_at             TEXT,' +
+      '  applied_errors_json  TEXT,' +
+      '  user_email           TEXT REFERENCES app_users(email) ON DELETE SET NULL,' +
+      '  selected_errors_json TEXT,' +
+      '  szenen_json          TEXT,' +
+      '  chapter_id           INTEGER REFERENCES chapters(chapter_id) ON DELETE SET NULL' +
+      ')'
+    );
+    db.exec(
+      'INSERT INTO page_checks_new (' +
+      '  id, page_id, book_id, checked_at, error_count, errors_json,' +
+      '  stilanalyse, fazit, model, saved, saved_at, applied_errors_json,' +
+      '  user_email, selected_errors_json, szenen_json, chapter_id' +
+      ') SELECT' +
+      '  id, page_id, book_id, checked_at, error_count, errors_json,' +
+      '  stilanalyse, fazit, model, saved, saved_at, applied_errors_json,' +
+      '  user_email, selected_errors_json, szenen_json, chapter_id' +
+      ' FROM page_checks'
+    );
+    db.exec('DROP TABLE page_checks');
+    db.exec('ALTER TABLE page_checks_new RENAME TO page_checks');
+    db.exec('CREATE INDEX idx_pc_book_page_date  ON page_checks(book_id, page_id, checked_at DESC)');
+    db.exec('CREATE INDEX idx_pc_book_user       ON page_checks(book_id, user_email)');
+    db.exec('CREATE INDEX idx_pc_page_user_date  ON page_checks(page_id, user_email, checked_at DESC)');
+    db.exec('CREATE INDEX idx_page_checks_user_email ON page_checks(user_email)');
+    db.pragma('foreign_keys = ON');
+    const fkErrors138 = db.pragma('foreign_key_check');
+    if (fkErrors138.length) {
+      throw new Error(`Migration 138: foreign_key_check meldet ${fkErrors138.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 138').run();
+    logger.info('DB-Migration auf Version 138 abgeschlossen (page_checks.stilkorrektur_log entfernt — Feature nie aktiv).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

@@ -3,19 +3,19 @@
 //
 // Facade-Datei. Implementierung in `editor/focus/` aufgeteilt:
 //   - constants.js   – Block-Tags/Selektoren, Timing-Konstanten, Feature-Detects
-//   - storage.js     – Snapshot, Tagesbaseline, Edit-Counter
+//   - storage.js     – Focus-Snapshot (sessionStorage)
 //   - dom-blocks.js  – Block-Lookup + active/near-Markierungen
 //   - sentence.js    – Satz-Erkennung am Caret + CSS-Custom-Highlight
 //   - typewriter.js  – Schwelle, Caret-Rect, Scroll-Delta
 //   - trampoline.js  – Root-Methoden (Event-Dispatch an die Sub)
 //   - card.js        – State-Machine + DOM-Handler in Alpine.data('editorFocusCard')
+// Counter-Logik (fmtSigned/dailyDelta/installEditCounter) lebt in
+// editor/shared/edit-counter.js — beide Editoren konsumieren sie von dort.
 
 export { focusMethods } from './focus/trampoline.js';
 export { focusCardMethods } from './focus/card.js';
-export {
-  readFocusSnapshot, clearFocusSnapshot,
-  fmtSigned, dailyDelta, installEditCounter,
-} from './focus/storage.js';
+export { readFocusSnapshot, clearFocusSnapshot } from './focus/storage.js';
+export { fmtSigned, dailyDelta, installEditCounter } from './shared/edit-counter.js';
 export {
   findBlockFromNode, pickCenterBlock, findBlockAtViewportCenter,
   setActiveBlock, setNearBlocks, clearAllFocusMarks,

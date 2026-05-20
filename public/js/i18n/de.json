@@ -159,11 +159,6 @@
   "synonym.kiFailed":            "Fehler bei der KI-Anfrage.",
   "synonym.noneFound":           "Keine passenden Synonyme gefunden.",
 
-  "stilkorrektur.workingChars":  "KI überarbeitet Stil… ({chars} Zeichen)",
-  "stilkorrektur.workingTokens": "KI überarbeitet Stil… ↑{tokIn}↓~{tokOutEst} Tokens",
-  "stilkorrektur.done":          "KI überarbeitet Stil… ↑{tokIn}↓{tokOut} Tokens · {tps} tok/s",
-  "stilkorrektur.failed":        "Stilkorrektur fehlgeschlagen – speichere übrige Korrekturen…",
-
   "common.unknownError":         "Unbekannter Fehler",
 
   "tree.connecting":             "Lade Buchliste…",

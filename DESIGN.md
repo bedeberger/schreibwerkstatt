@@ -1510,17 +1510,20 @@ Struktur: 8 thematische Subfolder unter [public/css/](public/css/) + Root-Solit�
 | [page/tree-history.css](public/css/page/tree-history.css) | Sidebar-Tree, `.history-*`, `.history-chevron`. |
 
 ### editor/
+Drei Editoren leben in eigenen Subfoldern (`book/`, `focus/`, `notebook/`); editor-übergreifende Chrome-Komponenten unter `shared/`. Kein Editor importiert CSS aus einem anderen Editor.
+
 | File | Inhalt |
 |------|--------|
-| [editor/book-editor.css](public/css/editor/book-editor.css) | Editor-Card-Layout (Toolbar, Bubble-Bar, Slash-Menu-Container). |
-| [editor/focus-mode.css](public/css/editor/focus-mode.css) | Fokus-Modus, Save-Indicator, Caret-Pulse. |
-| [editor/edit-toolbar.css](public/css/editor/edit-toolbar.css) | `.edit-bubble-toolbar`, `.edit-slash-menu`. |
-| [editor/find-replace.css](public/css/editor/find-replace.css) | `.edit-find*`. |
+| [editor/shared/editor-chrome.css](public/css/editor/shared/editor-chrome.css) | `.save-indicator`, `.editor-conflict-banner`, `.editor-presence-banner`, `.editor-draft-banner` — von Notebook + Focus + Figur-Werkstatt konsumiert. |
+| [editor/book/book-editor.css](public/css/editor/book/book-editor.css) | Bucheditor (`.book-editor-*`): Outline + Manuskript-Stream. |
+| [editor/focus/focus-mode.css](public/css/editor/focus/focus-mode.css) | Fokus-Modus: `.focus-editor`, `.focus-editor__content`, Caret-Pulse, Live-Counter. |
+| [editor/notebook/edit-toolbar.css](public/css/editor/notebook/edit-toolbar.css) | `.edit-bubble-toolbar`, `.edit-slash-menu`. |
+| [editor/notebook/find-replace.css](public/css/editor/notebook/find-replace.css) | Notebook-Find/Replace (`.edit-find*`). |
+| [editor/notebook/findings.css](public/css/editor/notebook/findings.css) | `.finding` / `.stilbox`. |
+| [editor/notebook/lektorat.css](public/css/editor/notebook/lektorat.css) | `.lektorat-mark`, Findings-Flash, Hover-Sync. |
 | [editor/synonym-menu.css](public/css/editor/synonym-menu.css) | Synonym-Kontextmenü + Picker. |
 | [editor/synonyme.css](public/css/editor/synonyme.css) | Synonyme-Karten-Stile (Listen). |
 | [editor/figur-lookup.css](public/css/editor/figur-lookup.css) | `.figur-lookup` Popover. |
-| [editor/lektorat.css](public/css/editor/lektorat.css) | `.lektorat-mark`, Findings-Flash, Hover-Sync. |
-| [editor/findings.css](public/css/editor/findings.css) | `.finding` / `.stilbox`. |
 
 ### entities/
 | File | Inhalt |

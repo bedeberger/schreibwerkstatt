@@ -159,11 +159,6 @@
   "synonym.kiFailed":            "AI request failed.",
   "synonym.noneFound":           "No suitable synonyms found.",
 
-  "stilkorrektur.workingChars":  "AI rewriting style… ({chars} characters)",
-  "stilkorrektur.workingTokens": "AI rewriting style… ↑{tokIn}↓~{tokOutEst} tokens",
-  "stilkorrektur.done":          "AI rewriting style… ↑{tokIn}↓{tokOut} tokens · {tps} tok/s",
-  "stilkorrektur.failed":        "Style correction failed – saving remaining corrections…",
-
   "common.unknownError":         "Unknown error",
 
   "tree.connecting":             "Loading book list…",

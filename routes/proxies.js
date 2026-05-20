@@ -10,9 +10,7 @@ const appSettings = require('../lib/app-settings');
 // Allowlist für den /claude-, /ollama- und /llama-Proxy: Client darf kein beliebiges
 // `system` schicken. Stattdessen `promptKind` angeben – Server löst den System-Prompt
 // aus prompts.js auf. Verhindert Missbrauch des Proxys als generischer LLM-Zugang.
-const PROMPT_KIND_TO_KEY = {
-  stilkorrektur: 'SYSTEM_STILKORREKTUR',
-};
+const PROMPT_KIND_TO_KEY = {};
 
 async function resolveProxySystemPrompt(promptKind) {
   const key = PROMPT_KIND_TO_KEY[promptKind];

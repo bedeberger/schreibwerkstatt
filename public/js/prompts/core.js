@@ -21,15 +21,15 @@ export const PROMPTS_VERSION = '16';
 
 // Kompakte Ersatzregeln für commonRules[langCode] im Lokal-Modus.
 // Behält nur die Kernregel – WAS GEMELDET WERDEN SOLL ist redundant mit den typ-spezifischen
-// Rule-Blöcken, AUTORENSTIL wird separat über SLIM_AUTORENSTIL_RULE nur an Lektorat/Chat/
-// Stilkorrektur angehängt (nicht an Analyse-Prompts wie figuren/buchbewertung).
+// Rule-Blöcken, AUTORENSTIL wird separat über SLIM_AUTORENSTIL_RULE nur an Lektorat/Chat
+// angehängt (nicht an Analyse-Prompts wie figuren/buchbewertung).
 const SLIM_COMMON_RULES = {
   de: 'GRUNDREGEL: Nur eindeutig, zweifelsfrei falsche Stellen melden. Im Zweifel weglassen.',
   en: 'BASIC RULE: Only flag what is clearly and unambiguously wrong. When in doubt, leave it out.',
 };
 
 // Kompakte Autorenstil-Regel für Lokal-Modus (pendant zu cfg.autorenstilRule).
-// Wird nur an Prompts angehängt, die Textvorschläge erzeugen (Lektorat, Seiten-Chat, Stilkorrektur).
+// Wird nur an Prompts angehängt, die Textvorschläge erzeugen (Lektorat, Seiten-Chat).
 const SLIM_AUTORENSTIL_RULE = {
   de: 'AUTORENSTIL: Korrekturen und Textvorschläge müssen sich in den Stil des vorliegenden Textes einfügen (Satzbau, Rhythmus, Wortwahl, Ton) – als wären sie vom Autor selbst geschrieben. Dein Urteil über Schwächen bleibt davon unberührt: direkt und schonungslos.',
   en: 'AUTHOR STYLE: Corrections and suggested text must fit the style of the given text (sentence structure, rhythm, word choice, tone) — as if written by the author themselves. Your judgment on weaknesses is unaffected: direct and uncompromising.',
@@ -87,7 +87,7 @@ let _defaultLocale = 'de-CH';
 /** Baut ein Locale-Prompts-Objekt aus einer Locale-Config (aus prompt-config.json).
  *  buchKontext: optionaler per-Buch-Kontext (Freitext), wird als soziogramm-Kontext weitergegeben.
  *  autorenstilRule: wird NUR an Prompts angehängt, die Textvorschläge erzeugen
- *  (Lektorat, Seiten-Chat, Stilkorrektur). Analyse-Prompts (buchbewertung, figuren, …)
+ *  (Lektorat, Seiten-Chat). Analyse-Prompts (buchbewertung, figuren, …)
  *  bleiben davon unberührt – dort soll die Kritik nicht durch Autorenstil-Imitation
  *  abgemildert werden.
  */
@@ -104,7 +104,6 @@ function _buildLocalePrompts(localeConfig, globalErklaerungRule, buchKontext = '
   const SYS_KAPITELANALYSE_CORE   = buildSystem(sp.kapitelanalyse    || '', rules);
   const SYS_KAPITELREVIEW_CORE    = buildSystem(sp.kapitelreview     || sp.buchbewertung || '', rules);
   const SYS_FIGUREN_CORE          = buildSystem(sp.figuren           || '', rules);
-  const SYS_STILKORREKTUR_CORE    = buildSystem(sp.stilkorrektur     || '', rulesWithAutorenstil);
   const SYS_ORTE_CORE             = buildSystem(sp.orte              || 'Du bist ein Literaturanalytiker. Du identifizierst Schauplätze und Orte präzise und konservativ – nur was im Text eindeutig belegt ist.', rules);
   const SYS_KONTINUITAET_CORE     = buildSystem(sp.kontinuitaet      || 'Du bist ein sorgfältiger Literaturlektor. Du prüfst einen Roman auf Kontinuitätsfehler und Widersprüche – Figuren, Zeitabläufe, Orte, Objekte und Charakterverhalten.', rules);
   const SYS_ZEITSTRAHL_CORE       = buildSystem(sp.zeitstrahl        || '', rules);
@@ -136,8 +135,6 @@ function _buildLocalePrompts(localeConfig, globalErklaerungRule, buchKontext = '
     SYSTEM_KAPITELREVIEW_BLOCKS: _toCacheBlocks(SYS_KAPITELREVIEW_CORE, bookContextStr),
     SYSTEM_FIGUREN:              _aug(SYS_FIGUREN_CORE),
     SYSTEM_FIGUREN_BLOCKS:       _toCacheBlocks(SYS_FIGUREN_CORE, bookContextStr),
-    SYSTEM_STILKORREKTUR:        _aug(SYS_STILKORREKTUR_CORE),
-    SYSTEM_STILKORREKTUR_BLOCKS: _toCacheBlocks(SYS_STILKORREKTUR_CORE, bookContextStr),
     // Synonym-Suche: schlanker System-Prompt – nur Rolle + Locale-Norm (korrekturRegeln)
     // + optionaler Autor-Kontext. Ohne baseRules/commonRules. buchKontext ist hier bereits
     // im Core eingebaut (buildSystemSynonym) — kein zusätzlicher Cache-Split nötig.
@@ -177,7 +174,6 @@ export let SYSTEM_BUCHBEWERTUNG         = null;
 export let SYSTEM_KAPITELANALYSE        = null;
 export let SYSTEM_KAPITELREVIEW         = null;
 export let SYSTEM_FIGUREN               = null;
-export let SYSTEM_STILKORREKTUR         = null;
 export let SYSTEM_SYNONYM               = null;
 export let SYSTEM_CHAT                  = null;
 export let SYSTEM_BOOK_CHAT             = null;
@@ -218,7 +214,7 @@ export function configureLocales(cfg) {
     for (const [key, localeCfg] of Object.entries(cfg.locales)) {
       const langCode = key.split('-')[0];
       // Für lokale Modelle wird commonRules durch eine Slim-Version ersetzt.
-      // AUTORENSTIL wird separat gehandhabt und nur an Lektorat/Chat/Stilkorrektur angehängt.
+      // AUTORENSTIL wird separat gehandhabt und nur an Lektorat/Chat angehängt.
       const common = _isLocal
         ? (SLIM_COMMON_RULES[langCode] || '')
         : (commonRules[langCode] || '');
@@ -263,7 +259,6 @@ export function configureLocales(cfg) {
   SYSTEM_KAPITELANALYSE        = def.SYSTEM_KAPITELANALYSE        ?? null;
   SYSTEM_KAPITELREVIEW         = def.SYSTEM_KAPITELREVIEW         ?? null;
   SYSTEM_FIGUREN               = def.SYSTEM_FIGUREN               ?? null;
-  SYSTEM_STILKORREKTUR         = def.SYSTEM_STILKORREKTUR         ?? null;
   SYSTEM_SYNONYM               = def.SYSTEM_SYNONYM               ?? null;
   SYSTEM_CHAT                  = def.SYSTEM_CHAT                  ?? null;
   SYSTEM_BOOK_CHAT             = def.SYSTEM_BOOK_CHAT             ?? null;
@@ -309,7 +304,7 @@ export function getLocalePromptsForBook(localeKey, buchtyp, buchKontext, isFinis
   const bookContextStr = bookCtxParts.join('\n\n');
 
   // buchKontext als soziogramm-Kontext weitergeben (figurenBasisRules / SYSTEM_KOMPLETT_EXTRAKTION).
-  // autorenstilRule wird nur an Lektorat/Chat/Stilkorrektur angehängt (siehe _buildLocalePrompts).
+  // autorenstilRule wird nur an Lektorat/Chat angehängt (siehe _buildLocalePrompts).
   const autorenstil = _autorenstilByLocale.get(localeKey) || _autorenstilByLocale.get(_defaultLocale) || '';
   const localChatAddon = _localChatAddonByLocale.get(localeKey) || _localChatAddonByLocale.get(_defaultLocale) || '';
   return _buildLocalePrompts(rawLocale, _erklaerungRule, kontext, autorenstil, localChatAddon, bookContextStr);

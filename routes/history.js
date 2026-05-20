@@ -31,10 +31,6 @@ router.patch('/check/:id/saved', jsonBody, (req, res) => {
   const selected = req.body?.selected_errors_json !== undefined
     ? JSON.stringify(req.body.selected_errors_json)
     : null;
-  const stilLogRaw = req.body?.stilkorrektur_log;
-  const stilLog = (stilLogRaw && typeof stilLogRaw === 'object')
-    ? JSON.stringify(stilLogRaw)
-    : null;
   const user_email = req.session?.user?.email || null;
   const id = toIntId(req.params.id);
   if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
@@ -51,8 +47,8 @@ router.patch('/check/:id/saved', jsonBody, (req, res) => {
   if (!row.book_id) return res.status(400).json({ error_code: 'CHECK_HAS_NO_BOOK' });
   if (!_guardBook(req, res, row.book_id, 'lektor')) return;
 
-  db.prepare('UPDATE page_checks SET saved = ?, saved_at = ?, applied_errors_json = COALESCE(?, applied_errors_json), selected_errors_json = COALESCE(?, selected_errors_json), stilkorrektur_log = COALESCE(?, stilkorrektur_log) WHERE id = ? AND user_email = ? AND book_id = ?')
-    .run(saved, saved_at, applied, selected, stilLog, id, user_email, row.book_id);
+  db.prepare('UPDATE page_checks SET saved = ?, saved_at = ?, applied_errors_json = COALESCE(?, applied_errors_json), selected_errors_json = COALESCE(?, selected_errors_json) WHERE id = ? AND user_email = ? AND book_id = ?')
+    .run(saved, saved_at, applied, selected, id, user_email, row.book_id);
 
   if (saved) {
     const appliedErrors = req.body?.applied_errors_json;
@@ -62,11 +58,6 @@ router.patch('/check/:id/saved', jsonBody, (req, res) => {
       const total = appliedErrors.length;
       logger.info(
         `Lektorat gespeichert: «${row.page_name}» (user=${user_email || '-'}, book=${row.book_id || '-'}, chap=${row.chapter_id || '-'}, page=${row.page_id}, ${total} Korrekturen: R=${counts.rechtschreibung} G=${counts.grammatik} W=${counts.wiederholung} S=${counts.stil})`
-      );
-    }
-    if (stilLogRaw && typeof stilLogRaw === 'object') {
-      logger.info(
-        `Stilkorrektur: «${row.page_name}» (page=${row.page_id}) requested=${stilLogRaw.requested ?? '?'} returned=${stilLogRaw.returned ?? '?'} applied=${stilLogRaw.applied ?? '?'}${stilLogRaw.error ? ` error="${stilLogRaw.error}"` : ''}`
       );
     }
   }
@@ -102,7 +93,7 @@ router.get('/check/:id/details', (req, res) => {
   const id = toIntId(req.params.id);
   if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
   const r = db.prepare(`
-    SELECT book_id, errors_json, applied_errors_json, selected_errors_json, szenen_json, stilkorrektur_log
+    SELECT book_id, errors_json, applied_errors_json, selected_errors_json, szenen_json
     FROM page_checks WHERE id = ? AND user_email = ?`).get(id, user_email);
   if (!r) return res.status(404).json({ error_code: 'NOT_FOUND' });
   if (r.book_id && !_guardBook(req, res, r.book_id, 'viewer')) return;
@@ -111,7 +102,6 @@ router.get('/check/:id/details', (req, res) => {
     applied_errors_json: r.applied_errors_json ? JSON.parse(r.applied_errors_json) : null,
     selected_errors_json: r.selected_errors_json ? JSON.parse(r.selected_errors_json) : null,
     szenen_json: r.szenen_json ? JSON.parse(r.szenen_json) : null,
-    stilkorrektur_log: r.stilkorrektur_log ? JSON.parse(r.stilkorrektur_log) : null,
   });
 });
 

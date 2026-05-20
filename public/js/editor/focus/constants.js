@@ -13,7 +13,6 @@ export const BLOCK_SEL = 'p, h1, h2, h3, h4, h5, h6, blockquote, li, pre, td, th
 export const POINTER_GRACE_MS = 300;
 export const VV_DEBOUNCE_MS = 100;
 export const CURSOR_HIDE_MS = 2000;
-export const COUNTER_DEBOUNCE_MS = 220;
 
 // Schwelle dynamisch aus computed line-height. Im Fokusmodus ist font-size
 // 1.45rem, line-height 1.85 → ~42px. Statisches 16px scrollte schon bei
