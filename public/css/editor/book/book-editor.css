@@ -10,7 +10,7 @@
      der Karte; Stream behält max-width für Reading-Frame. */
   .book-editor-layout {
     display: grid;
-    grid-template-columns: 200px minmax(0, 1fr);
+    grid-template-columns: 280px minmax(0, 1fr);
     gap: var(--space-lg);
     align-items: start;
   }
@@ -28,6 +28,9 @@
        während der cardFadeIn-Animation auf .card. */
     contain: layout style;
     transform: translateZ(0);
+    max-height: calc(100dvh - 120px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
     padding-block: var(--space-sm);
     border-right: 1px solid var(--color-border);
     padding-inline-end: var(--space-md);

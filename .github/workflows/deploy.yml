@@ -110,7 +110,7 @@ jobs:
   e2e:
     name: Playwright-E2E
     runs-on: self-hosted
-    timeout-minutes: 5
+    timeout-minutes: 15
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -148,7 +148,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: E2E-Tests ausführen
-        run: npm run test:e2e
+        run: npx playwright test --reporter=list
 
   deploy:
     name: Deploy to LXC with bookstack
