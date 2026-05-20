@@ -13,6 +13,7 @@
 //     in Alpine.data('editorFigurLookupCard').
 
 import { normalizeName, attachReflow, positionPopupNearRect, rangeForWordAtClientPoint } from './utils.js';
+import { getActiveEditorMode } from './shared/active-editor.js';
 
 function extractYear(geburtstag) {
   if (!geburtstag) return null;
@@ -145,7 +146,7 @@ export const figurLookupCardMethods = {
       // Im Fokus-Modus driftet das Popover vom darunterliegenden Wort weg,
       // sobald der Text scrollt (typewriter-Recenter). Statt mitzuwandern:
       // schliessen, damit der User einen klaren Zustand sieht.
-      if (window.__app?.focusMode) { this.closeFigurLookup(); return; }
+      if (getActiveEditorMode() === 'focus') { this.closeFigurLookup(); return; }
       this._positionFigurLookup();
     });
   },

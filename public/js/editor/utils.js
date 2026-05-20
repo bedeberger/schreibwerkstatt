@@ -2,6 +2,8 @@
 // toolbar): Wort-Regex, Namens-Normalisierung, Caret-Setup,
 // Popup-Positionierung und Reflow-Listener.
 
+import { getActiveEditorContainer } from './shared/active-editor.js';
+
 // Ein "Einzelwort" ist eine zusammenhängende Sequenz aus Buchstaben/Ziffern.
 // Bindestriche und Apostrophe zählen mit, damit «auf-/abwärts» oder «wir's» erfasst werden.
 export const WORD_RE = /^[\p{L}\p{N}][\p{L}\p{N}\-']*$/u;
@@ -18,9 +20,10 @@ export function normalizeName(s) {
     .trim();
 }
 
-// Editor-Root aus dem DOM holen.
+// Editor-Root aus dem DOM holen. Delegiert an shared/active-editor.js, das
+// in Phase 4 zwischen Normal- und Focus-Cardroot wechselt.
 export function getEditEl() {
-  return document.querySelector('#editor-card .page-content-view--editing');
+  return getActiveEditorContainer();
 }
 
 // Setzt den Cursor in ein (oft frisch transformiertes, leeres) Blockelement.

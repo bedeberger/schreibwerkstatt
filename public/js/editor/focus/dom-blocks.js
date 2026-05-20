@@ -7,6 +7,7 @@
 
 import { BLOCK_TAGS, BLOCK_SEL } from './constants.js';
 import { ensureTrailingParagraph } from '../shared/auto-slot.js';
+import { getActiveEditorContainer } from '../shared/active-editor.js';
 export { isEmptyParagraph } from '../shared/auto-slot.js';
 
 // Beim Eintritt in den Fokusmodus: Caret an Buchende. Letzter Absatz schon
@@ -51,11 +52,9 @@ export function jumpToTrailingParagraph(container) {
 
 export function getScrollContainer() {
   // Fokusmodus läuft ausschliesslich im Edit-Modus (Guard in enterFocusMode),
-  // also ist `--editing` immer der gewünschte Scroll-Container. Ein generischer
-  // `:not([style*="display: none"])`-Filter würde in Alpine-x-show-Flush-Races
-  // den leeren View-Container fangen (display:none, 0x0) – Folge wäre: keine
-  // aktive Absatz-Markierung, keine Dim-Transition.
-  return document.querySelector('#editor-card .page-content-view--editing');
+  // also ist `--editing` immer der gewünschte Scroll-Container. shared/active-
+  // editor.js wählt in Phase 4 dynamisch den Focus-Cardroot.
+  return getActiveEditorContainer();
 }
 
 // Gibt den *äussersten* Block-Ancestor unterhalb von `root` zurück. Grund:

@@ -11,6 +11,7 @@
 //   (andere Tage) werden lazy bei jedem Read geprunt.
 
 import { COUNTER_DEBOUNCE_MS } from './constants.js';
+import { getActiveEditorContainer } from '../shared/active-editor.js';
 
 const FOCUS_SNAPSHOT_KEY = 'focus.snapshot';
 const FOCUS_SNAPSHOT_TTL_MS = 60 * 60 * 1000;
@@ -97,7 +98,7 @@ export function installEditCounter(app) {
   if (!app) return () => {};
   if (app._editCounterCtx) return app._editCounterCtx.teardown;
 
-  const container = document.querySelector('#editor-card .page-content-view--editing');
+  const container = getActiveEditorContainer();
   if (!container) return () => {};
 
   let timer = 0;

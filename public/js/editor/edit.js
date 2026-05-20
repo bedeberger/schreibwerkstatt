@@ -9,6 +9,7 @@ import {
 } from './shared/html-clean.js';
 import { buildSavePayload, isNoChange } from './shared/save-pipeline.js';
 import { isPageConflict, readConflictBody } from './shared/page-api.js';
+import { getActiveEditorContainer } from './shared/active-editor.js';
 
 // Auto-Save nach BookStack: idle-debounce + max-Cap. Jede Schreibaktion
 // resettet den Idle-Timer; läuft der User durchgehend, greift der Max-Timer.
@@ -22,8 +23,11 @@ const DRAFT_DEBOUNCE_MS = 500;
 
 
 export const editorEditMethods = {
+  // Container-Lookup: einziger Eintrittspunkt für beide Modi. shared/active-
+  // editor.js abstrahiert über den heutigen Selektor und wird in Phase 4
+  // auf Cardroot-Switching erweitert.
   _getEditEl() {
-    return document.querySelector('#editor-card .page-content-view--editing');
+    return getActiveEditorContainer();
   },
 
   // Pre-Save-Conflict-Check für Read-Modify-Write-Pfade. Vor PUT die Seite
