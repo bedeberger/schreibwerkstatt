@@ -35,29 +35,33 @@
   letter-spacing: -0.01em;
 }
 
-/* Inline-editable Variante (Editor-Card-Header): sieht aus wie Span, wird beim
-   Hover/Focus zur sichtbaren Texteingabe. Logik gleich wie Buchorganizer-Rename. */
-.card-title--input {
+/* Inline-editable Variante (Editor-Card-Header): sieht aus wie Span, beim
+   Focus erscheint Border + Surface-Bg. Doppelklasse-Selektor hebelt globale
+   input[type=text]-Regel (Border + Padding) aus (Specificity 0,2,0 > 0,1,1). */
+.card-title.card-title--input {
   background: transparent;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  padding: 2px 6px;
-  margin: -2px -6px;
+  padding: 0;
   color: inherit;
   width: 100%;
   min-width: 0;
   max-width: 100%;
   box-sizing: border-box;
-  font: inherit;
-  letter-spacing: inherit;
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: var(--font-size-lg);
+  letter-spacing: -0.01em;
   line-height: 1.2;
 }
-.card-title--input:focus {
+.card-title.card-title--input:focus {
   outline: none;
   border-color: var(--color-border-focus);
   background: var(--color-surface);
+  padding: 2px 6px;
+  margin: -3px -7px;
 }
-.card-title--input:disabled {
+.card-title.card-title--input:disabled {
   opacity: 1;
   cursor: default;
 }
