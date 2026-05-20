@@ -374,6 +374,7 @@ app.use('/admin/users', require('./routes/admin-users'));
 app.use('/admin/books', require('./routes/admin-books'));
 app.use('/admin/settings', require('./routes/admin-settings'));
 app.use('/admin/usage', require('./routes/admin-usage'));
+app.use('/admin/logs', require('./routes/admin-logs'));
 app.use('/admin/registration-requests', require('./routes/admin-registration-requests'));
 app.use('/local/categories', require('./routes/categories'));
 app.use('/blog', require('./routes/blog'));

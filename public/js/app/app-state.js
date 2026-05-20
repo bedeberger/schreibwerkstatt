@@ -184,6 +184,7 @@ const cardsState = () => ({
   showAdminUsageCard: false,
   showAdminCategoriesCard: false,
   showAdminBooksCard: false,
+  showAdminLogsCard: false,
   adminUsageTab: 'users',
   showFinetuneExportCard: false,
   showExportCard: false,

@@ -35,4 +35,5 @@
   .card--admin-users      { --card-accent: var(--card-accent-admin-users, var(--color-accent)); }
   .card--admin-settings   { --card-accent: var(--card-accent-admin-settings, var(--color-accent)); }
   .card--admin-categories { --card-accent: var(--card-accent-admin-users, var(--color-primary)); }
+  .card--admin-logs       { --card-accent: var(--card-accent-admin-logs, var(--color-running)); }
 }

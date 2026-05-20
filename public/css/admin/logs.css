@@ -1,0 +1,154 @@
+/* Admin-Logs: Filter-Toolbar, Log-Liste, Stack-Trace-Toggle.
+   Mobile via Container-Query (Karte lebt im Admin-Slot). */
+
+@layer components {
+  .card--admin-logs { --card-accent: var(--card-accent-admin-logs, var(--color-running)); container-type: inline-size; }
+
+  .admin-logs-filter {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--space-2);
+    margin-block: var(--space-3);
+    align-items: end;
+  }
+  .admin-logs-filter-label {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    font-size: var(--font-sm);
+    color: var(--color-muted);
+  }
+  .admin-logs-filter-label--wide { grid-column: span 2; min-width: 0; }
+  .admin-logs-filter-actions {
+    display: flex;
+    gap: var(--space-2);
+    align-items: flex-end;
+  }
+
+  .admin-logs-livetail {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    border-radius: var(--radius-sm);
+  }
+  .admin-logs-livetail--on {
+    border-color: var(--color-success);
+    color: var(--color-success);
+  }
+  .admin-logs-livetail--on .icon {
+    color: var(--color-success);
+    animation: adminLogsPulse 1.6s ease-in-out infinite;
+  }
+  @keyframes adminLogsPulse {
+    0%, 100% { opacity: 0.6; }
+    50%      { opacity: 1; }
+  }
+
+  .log-list {
+    font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+    font-size: var(--font-sm);
+    line-height: 1.4;
+    border-top: 1px solid var(--color-border);
+    margin-top: var(--space-2);
+  }
+
+  .log-row {
+    display: grid;
+    grid-template-columns: 160px 70px 110px 170px 60px 1fr auto;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-2);
+    border-bottom: 1px solid var(--color-border);
+    align-items: baseline;
+    border-left: 3px solid transparent;
+  }
+  .log-row--error { border-left-color: var(--color-err-border); }
+  .log-row--warn  { border-left-color: var(--color-warn-text); }
+  .log-row--info  { border-left-color: transparent; }
+  .log-row--debug { border-left-color: var(--color-subtle); opacity: 0.7; }
+
+  .log-row-ts    { color: var(--color-subtle); white-space: nowrap; }
+  .log-row-scope { color: var(--color-muted); }
+  .log-row-user  { color: var(--color-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .log-row-book  { color: var(--color-muted); }
+  .log-row-msg   { color: var(--color-text); word-break: break-word; }
+
+  .log-badge {
+    display: inline-block;
+    padding: 0 var(--space-1);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-xs);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-align: center;
+    background: var(--color-tag-bg);
+    color: var(--color-muted);
+  }
+  .log-badge--error { background: var(--color-err-bg); color: var(--color-err-text); }
+  .log-badge--warn  { background: var(--color-warn-bg); color: var(--color-warn-text); }
+  .log-badge--info  { background: var(--color-tag-bg); color: var(--color-muted); }
+  .log-badge--debug { background: var(--color-tag-bg); color: var(--color-subtle); }
+
+  .log-row-toggle {
+    background: transparent;
+    border: none;
+    padding: 0 var(--space-1);
+    cursor: pointer;
+    color: var(--color-muted);
+    border-radius: var(--radius-sm);
+  }
+  .log-row-toggle[aria-expanded="true"] .icon { transform: rotate(180deg); }
+  .log-row-toggle .icon { transition: transform 120ms ease; }
+
+  .log-stack {
+    grid-column: 1 / -1;
+    margin: var(--space-1) 0 0;
+    padding: var(--space-2);
+    background: var(--color-hover);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-xs);
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--color-muted);
+  }
+
+  .admin-logs-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+    margin-top: var(--space-3);
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--color-border);
+  }
+  .admin-logs-downloads {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    align-items: center;
+  }
+  .admin-logs-download-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    border-radius: var(--radius-sm);
+  }
+
+  /* Container-Query: schmaler als ~720px → Log-Row in 2 Zeilen.
+     Mobile-Slot der Admin-Karte ist meist 100vw. */
+  @container (max-width: 720px) {
+    .log-row {
+      grid-template-columns: auto auto auto auto 1fr auto;
+      grid-template-areas:
+        "ts level scope user book toggle"
+        "msg msg msg msg msg msg";
+    }
+    .log-row-ts    { grid-area: ts; }
+    .log-badge     { grid-area: level; }
+    .log-row-scope { grid-area: scope; }
+    .log-row-user  { grid-area: user; max-width: 140px; }
+    .log-row-book  { grid-area: book; }
+    .log-row-toggle{ grid-area: toggle; }
+    .log-row-msg   { grid-area: msg; }
+    .admin-logs-filter-label--wide { grid-column: span 1; }
+  }
+}
