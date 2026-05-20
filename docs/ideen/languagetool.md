@@ -212,7 +212,7 @@ MVP ohne Caching, ohne Chunking, ohne Status-Indikator: **1.5–2 Tage**.
 ## Out-of-Scope (Phase 2)
 
 - Per-Page-Caching (`page_languagetool_cache`).
-- Chunking für >50KB-Texte.
+- Chunking für >50KB-Texte
 - User-spezifische Regel-Deaktivierung (persistiert).
 - Buch-Locale-Override (`books.languagetool_locale`).
 - Custom-Dictionary pro User/Buch.
