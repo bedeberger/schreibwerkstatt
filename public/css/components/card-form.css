@@ -35,6 +35,36 @@
   letter-spacing: -0.01em;
 }
 
+/* Inline-editable Variante (Editor-Card-Header): sieht aus wie Span, wird beim
+   Hover/Focus zur sichtbaren Texteingabe. Logik gleich wie Buchorganizer-Rename. */
+.card-title--input {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+  margin: -2px -6px;
+  color: inherit;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  font: inherit;
+  letter-spacing: inherit;
+  line-height: 1.2;
+}
+.card-title--input:hover:not(:disabled) {
+  border-color: var(--color-border-input);
+  background: var(--color-surface);
+}
+.card-title--input:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+  background: var(--color-surface);
+}
+.card-title--input:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
 /* Header mit Subline: Title oben, Meta-Zeile (Timestamp/Save-Indicator/Links) darunter,
    Aside (optionale Badges + Buttons) rechts. Genutzt vom Editor und allen Karten mit
    Stand-/Timestamp-Info (figuren, orte, szenen, ereignisse, kontinuitaet, bookstats, stil). */

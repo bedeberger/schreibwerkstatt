@@ -1169,6 +1169,7 @@
   "fehlerHeatmap.typ.schauplatzmerkmal":   "Schauplatzmerkmal",
 
   "editor.title":                "{name}",
+  "editor.renamePage":           "Seite umbenennen",
   "editor.draft":                "Entwurf {when}",
   "editor.saved":                "gespeichert {when}",
   "editor.draftTitle":           "Lokaler Entwurf – noch nicht auf dem Server",

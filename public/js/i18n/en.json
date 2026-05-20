@@ -1168,6 +1168,7 @@
   "fehlerHeatmap.typ.schauplatzmerkmal":   "Setting trait",
 
   "editor.title":                "{name}",
+  "editor.renamePage":           "Rename page",
   "editor.draft":                "Draft {when}",
   "editor.saved":                "saved {when}",
   "editor.draftTitle":           "Local draft – not yet on the server",

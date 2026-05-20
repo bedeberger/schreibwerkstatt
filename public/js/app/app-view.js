@@ -194,6 +194,40 @@ export const appViewMethods = {
     }
   },
 
+  // Inline-Rename des Seitentitels aus dem Editor-Card-Header. Spiegelt den
+  // neuen Namen in currentPage, root.pages und root.tree (inkl. Solo-Wrapper +
+  // Sub-Kapitel) — Buchorganizer-Pfade pflegen Order-Maps, hier nicht nötig.
+  async renameCurrentPage(ev) {
+    const newName = (ev?.target?.value || '').trim();
+    const page = this.currentPage;
+    if (!page || !newName || page.name === newName) {
+      if (page && ev?.target) ev.target.value = page?.name || '';
+      return;
+    }
+    const oldName = page.name;
+    try {
+      await contentRepo.updatePage(page.id, { name: newName });
+      page.name = newName;
+      const rp = this.pages.find(p => p.id === page.id);
+      if (rp) rp.name = newName;
+      const renameInTree = (items) => {
+        for (const it of items) {
+          if (it.type !== 'chapter') continue;
+          if (it.solo && it.pages?.[0]?.id === page.id) it.name = newName;
+          if (!it.solo) {
+            const cp = it.pages?.find(p => p.id === page.id);
+            if (cp) cp.name = newName;
+          }
+          if (it.subchapters?.length) renameInTree(it.subchapters);
+        }
+      };
+      renameInTree(this.tree);
+    } catch (e) {
+      this.setStatus(this.t('bookOrganizer.saveFailed', { detail: e.message }));
+      if (ev?.target) ev.target.value = oldName;
+    }
+  },
+
   // Draft-Recovery: nach Page-Load prüfen, ob lokaler Entwurf im localStorage
   // vom Server-HTML abweicht (z. B. nach Server-Crash mid-write + Tab-Reopen).
   // Wenn ja: `pendingDraft`-Banner zeigt User Wiederaufnahme-Option an. Im
