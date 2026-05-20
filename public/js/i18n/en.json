@@ -363,6 +363,7 @@
   "pdfExport.font.sizePt":                 "Size (pt)",
   "pdfExport.font.lineHeight":             "Line height",
   "pdfExport.font.paragraphGap":           "Paragraph spacing",
+  "pdfExport.font.firstLineIndentMm":      "First-line indent (mm)",
   "pdfExport.font.color":                  "Color",
   "pdfExport.font.colorHintRule":          "also the color of the chapter/page rule",
   "pdfExport.font.previewText":            "Once upon a time there was a king with three sons …",

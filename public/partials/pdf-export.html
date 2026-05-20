@@ -284,6 +284,12 @@
                     <input type="text" x-data="numInput({ step: 0.05, min: 0, max: 3 })" x-modelable="value" x-model="activeProfile.config.font.body.paragraphGap" class="pdfx-num-input">
                   </div>
                 </div>
+                <div class="card-form-row">
+                  <label class="card-form-label" x-text="$app.t('pdfExport.font.firstLineIndentMm')"></label>
+                  <div class="card-form-field">
+                    <input type="text" x-data="numInput({ step: 0.5, min: 0, max: 30 })" x-modelable="value" x-model="activeProfile.config.font.body.firstLineIndentMm" class="pdfx-num-input">
+                  </div>
+                </div>
               </div>
             </template>
 

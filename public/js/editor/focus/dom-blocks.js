@@ -25,6 +25,11 @@ export function jumpToTrailingParagraph(container) {
   const added = ensureTrailingParagraph(container);
   const target = added || container.lastElementChild;
   if (!target) return null;
+  // Aktiv-Markierung synchron setzen, sonst gilt die Dim-Regel
+  // (opacity 0.35) für den frisch erzeugten Slot bis `_focusUpdateActive`
+  // im nächsten RAF aufräumt — Caret rendert dann bei 35% Alpha und ist
+  // auf leerer Seite optisch unsichtbar. RAF reconciliiert später korrekt.
+  target.classList.add('focus-paragraph-active');
   const range = document.createRange();
   range.setStart(target, 0);
   range.collapse(true);

@@ -428,6 +428,14 @@ function installStubDocument() {
         return this.childNodes.map(c => c.textContent || '').join('');
       },
       scrollIntoView() {},
+      classList: (() => {
+        const set = new Set();
+        return {
+          add: (c) => set.add(c),
+          remove: (c) => set.delete(c),
+          contains: (c) => set.has(c),
+        };
+      })(),
     };
     return node;
   }

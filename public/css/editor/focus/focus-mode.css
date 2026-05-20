@@ -350,20 +350,11 @@ body.palette-open { overflow: hidden; overscroll-behavior: contain; }
   display: none;
 }
 
-/* === Fokus-Modus: Caret-Pulse, Auto-Hide-Cursor, Header-Live-Counter === */
-
-/* Caret pulst dezent — Auge findet die Schreibmarke schneller, ohne dass
-   es nervig blinkt. Reduced-Motion respektieren. */
-@keyframes focus-caret-pulse {
-  0%, 100% { caret-color: var(--color-primary); }
-  50%      { caret-color: var(--color-border-focus); }
-}
-.focus-editor__content {
-  animation: focus-caret-pulse 1.6s ease-in-out infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .focus-editor__content { animation: none; }
-}
+/* === Fokus-Modus: Auto-Hide-Cursor, Header-Live-Counter === */
+/* Caret-Pulse-Animation entfernt: `--color-border-focus` ist rgba(0,0,0,0.4)
+   und der Caret wurde auf leerer Seite (nur `<p><br></p>`, kein umgebender
+   Text als visueller Anker) zur 50%-Keyframe optisch unsichtbar. Native
+   Caret-Blink reicht. */
 
 /* Auto-Hide-Cursor: 2s ohne Mausbewegung → unsichtbar (JS toggelt Klasse).
    Bei Mausbewegung wird die Klasse entfernt. Nur im Editor-Container, damit

@@ -5989,6 +5989,20 @@ function _runMigrationsLocked() {
     logger.info("DB-Migration auf Version 139 abgeschlossen (page_revisions.source-CHECK um 'book' erweitert).");
   }
 
+  if (version < 140) {
+    // Index auf page_revisions.user_email — FK auf app_users.email lief bisher
+    // ohne Index. Reverse-Lookup "alle Revisionen von User X" und FK-Integrity-
+    // Checks beim Löschen eines Users (ON DELETE SET NULL) scannen sonst die
+    // gesamte Tabelle.
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_page_revisions_user ON page_revisions(user_email)').run();
+    const fkErrors140 = db.pragma('foreign_key_check');
+    if (fkErrors140.length) {
+      throw new Error(`Migration 140: foreign_key_check meldet ${fkErrors140.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 140').run();
+    logger.info('DB-Migration auf Version 140 abgeschlossen (idx_page_revisions_user).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {
