@@ -21,28 +21,41 @@ else
   SUDO="sudo"
 fi
 
-echo "→ JRE + Tools installieren (Java 8 für IzPack-Installer mit pack200, Default-JRE zur Laufzeit)"
+echo "→ Default-JRE + Tools installieren (Laufzeit)"
 $SUDO apt-get update -qq
-$SUDO apt-get install -y --no-install-recommends default-jre-headless curl unzip
+$SUDO apt-get install -y --no-install-recommends default-jre-headless curl unzip tar
 
-# IzPack 5 nutzt pack200, das ab Java 14 entfernt wurde → ArrayIndexOutOfBoundsException.
-# Installer-Schritt braucht Java 8 oder 11. Ubuntu 24.04 hat nur Java 8 (universe) + 17/21.
-if ! $SUDO apt-get install -y --no-install-recommends openjdk-8-jre-headless; then
-  echo "→ openjdk-8 nicht in Quellen, universe aktivieren"
-  $SUDO apt-get install -y --no-install-recommends software-properties-common
-  $SUDO add-apt-repository -y universe
-  $SUDO apt-get update -qq
-  $SUDO apt-get install -y --no-install-recommends openjdk-8-jre-headless
-fi
-
-JAVA_LEGACY_BIN="$(ls -1 /usr/lib/jvm/java-8-openjdk-*/jre/bin/java /usr/lib/jvm/java-8-openjdk-*/bin/java 2>/dev/null | head -n1)"
-if [ -z "$JAVA_LEGACY_BIN" ]; then
-  echo "✗ Java 8 nicht gefunden — IzPack 5 + Java 14+ wirft ArrayIndexOutOfBoundsException"
-  exit 1
-fi
-
+TMP_TAR="$(mktemp --suffix=.tar.gz)"
 TMP_ZIP="$(mktemp --suffix=.zip)"
-trap 'rm -f "$TMP_ZIP"' EXIT
+trap 'rm -f "$TMP_TAR" "$TMP_ZIP"' EXIT
+
+# IzPack 5 nutzt pack200, ab Java 14 entfernt → ArrayIndexOutOfBoundsException.
+# Debian 13 / Ubuntu 24.04 paketieren keine Legacy-JRE → Temurin 8 portable.
+TEMURIN_DIR="/opt/temurin8"
+JAVA_LEGACY_BIN="$TEMURIN_DIR/bin/java"
+
+if [ ! -x "$JAVA_LEGACY_BIN" ]; then
+  ARCH="$(dpkg --print-architecture)"
+  case "$ARCH" in
+    amd64) TEMURIN_ARCH="x64" ;;
+    arm64) TEMURIN_ARCH="aarch64" ;;
+    *) echo "✗ Architektur $ARCH ohne Temurin-8-Binary"; exit 1 ;;
+  esac
+
+  echo "→ Temurin JRE 8 ($TEMURIN_ARCH) für IzPack-Installer laden"
+  curl -fsSL "https://api.adoptium.net/v3/binary/latest/8/ga/linux/${TEMURIN_ARCH}/jre/hotspot/normal/eclipse" -o "$TMP_TAR"
+
+  $SUDO mkdir -p "$TEMURIN_DIR"
+  $SUDO tar -xzf "$TMP_TAR" -C "$TEMURIN_DIR" --strip-components=1
+
+  if [ ! -x "$JAVA_LEGACY_BIN" ]; then
+    echo "✗ Temurin-Layout unerwartet, java nicht in $JAVA_LEGACY_BIN"
+    $SUDO ls -la "$TEMURIN_DIR" || true
+    exit 1
+  fi
+fi
+
+echo "→ Java 8 für Installer: $("$JAVA_LEGACY_BIN" -version 2>&1 | head -n1)"
 
 echo "→ veraPDF $VERAPDF_VERSION laden"
 curl -fsSL "https://software.verapdf.org/rel/${VERAPDF_MINOR}/verapdf-greenfield-${VERAPDF_VERSION}-installer.zip" -o "$TMP_ZIP"
