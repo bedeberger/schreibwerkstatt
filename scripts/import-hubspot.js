@@ -29,10 +29,11 @@ const HUBSPOT_BASE = 'https://api.hubapi.com';
 const HUBSPOT_PAGE_SIZE = 100;
 
 function parseArgs(argv) {
-  const out = { dryRun: false, limit: Infinity, listAuthors: false };
+  const out = { dryRun: false, limit: Infinity, listAuthors: false, update: false };
   for (const a of argv.slice(2)) {
     if (a === '--dry-run') out.dryRun = true;
     else if (a === '--list-authors') out.listAuthors = true;
+    else if (a === '--update') out.update = true;
     else if (a.startsWith('--book-id=')) out.bookId = parseInt(a.slice('--book-id='.length), 10);
     else if (a.startsWith('--author-id=')) out.authorId = a.slice('--author-id='.length);
     else if (a.startsWith('--user-email=')) out.userEmail = a.slice('--user-email='.length);
@@ -119,19 +120,77 @@ async function* iterateAuthorPosts(token, authorId, hardLimit) {
   }
 }
 
-// HubSpot postBody → reine Textparagraphen.
-// Strategie: alle HTML-Tags entfernen, pro Block-Element ein <p>…</p> Output.
-// Inline-Formatting (strong/em/a) wird zu Plain-Text geflattened.
-const BLOCK_SEL = 'p, h1, h2, h3, h4, h5, h6, li, blockquote, pre, dt, dd';
+// HubSpot postBody → minimal-formatiertes HTML.
+// Whitelist: Inline (strong, em, a[href], u) + Block (p, h2, h3, ul, ol, li,
+// blockquote). h1 → h2, h4-h6 → h3 (Buch-Doku-Konvention). Alles andere wird
+// gedroppt, dabei Textinhalt erhalten (Tag wird unwrappt).
 const STRIP_SEL = [
   '.hs-cta-wrapper', '.hs-cta-img', '.hs-form',
   '.hs_cos_wrapper_meta_field', '.hs-embed-wrapper',
   'script', 'style', 'iframe', 'noscript',
+  'img', 'figure', 'video', 'audio', 'svg', 'object', 'embed', 'canvas',
 ];
+
+const INLINE_MAP = {
+  STRONG: 'strong', B: 'strong',
+  EM: 'em', I: 'em',
+  U: 'u',
+  A: 'a',
+  BR: 'br',
+};
+const BLOCK_MAP = {
+  P: 'p',
+  H1: 'h2', H2: 'h2',
+  H3: 'h3', H4: 'h3', H5: 'h3', H6: 'h3',
+  UL: 'ul', OL: 'ol', LI: 'li',
+  BLOCKQUOTE: 'blockquote',
+};
 
 function escapeHtml(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
           .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function escapeAttr(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Rekursiver Serializer. node: DOM-Node. inline: true → Element ist in Inline-
+// Kontext (z.B. innerhalb <p>); Block-Tags werden dann unwrappt.
+function serializeNode(node, inline) {
+  if (!node) return '';
+  if (node.nodeType === 3) return escapeHtml(node.textContent || '');
+  if (node.nodeType !== 1) return '';
+  const tag = node.tagName;
+  const out = INLINE_MAP[tag];
+  if (out) {
+    const inner = serializeChildren(node, true);
+    if (!inner.trim() && out !== 'br') return '';
+    if (out === 'br') return '<br>';
+    if (out === 'a') {
+      const href = node.getAttribute('href') || '';
+      if (!/^https?:\/\//i.test(href)) return inner; // unsichere/relative Links unwrappt
+      return `<a href="${escapeAttr(href)}">${inner}</a>`;
+    }
+    return `<${out}>${inner}</${out}>`;
+  }
+  const blockOut = BLOCK_MAP[tag];
+  if (blockOut) {
+    if (inline) return serializeChildren(node, true); // Block in Inline-Kontext → unwrap
+    const innerInline = (blockOut === 'ul' || blockOut === 'ol') ? false : true;
+    const inner = serializeChildren(node, innerInline);
+    if (!inner.trim()) return '';
+    return `<${blockOut}>${inner}</${blockOut}>`;
+  }
+  // Unbekanntes Tag → unwrappen, Kinder behalten.
+  return serializeChildren(node, inline);
+}
+
+function serializeChildren(parent, inline) {
+  let out = '';
+  for (const child of parent.childNodes) out += serializeNode(child, inline);
+  if (inline) return out.replace(/\s+/g, ' ');
+  return out;
 }
 
 function postBodyToText(rawHtml) {
@@ -140,19 +199,13 @@ function postBodyToText(rawHtml) {
   for (const sel of STRIP_SEL) {
     for (const el of Array.from(document.querySelectorAll(sel))) el.remove();
   }
-  const blocks = Array.from(document.querySelectorAll(BLOCK_SEL));
-  const paras = [];
-  for (const el of blocks) {
-    if (el.querySelector(BLOCK_SEL)) continue; // nur Leaf-Bloecke, sonst doppelt
-    const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
-    if (text) paras.push(text);
+  let html = serializeChildren(document.body, false).trim();
+  // Wenn nach Strip nichts Block-artiges uebrig: ganzes Body als ein <p>.
+  if (!/^<(p|h2|h3|ul|ol|blockquote)\b/i.test(html)) {
+    const text = (document.body.textContent || '').replace(/\s+/g, ' ').trim();
+    return text ? `<p>${escapeHtml(text)}</p>` : '';
   }
-  // Fallback: kein Block gefunden → ganzer Body als ein Paragraph.
-  if (!paras.length) {
-    const all = (document.body.textContent || '').replace(/\s+/g, ' ').trim();
-    if (all) paras.push(all);
-  }
-  return paras.map(t => `<p>${escapeHtml(t)}</p>`).join('\n');
+  return html;
 }
 
 function publishDateOf(post) {
@@ -165,9 +218,11 @@ function publishDateOf(post) {
 
 function isoYmd(d) { return d.toISOString().slice(0, 10); }
 
-async function loadExistingPageNames(bookId) {
+async function loadExistingPagesByName(bookId) {
   const pages = await contentStore.listPages(bookId);
-  return new Set(pages.map(p => p.name || ''));
+  const map = new Map();
+  for (const p of pages) map.set(p.name || '', p.id);
+  return map;
 }
 
 async function loadOrCreateYearChapter(bookId, year, cache, ctx, dryRun) {
@@ -208,11 +263,11 @@ async function main() {
 
   const authorId = args.authorId || await pickAuthorInteractive(token);
 
-  console.log(`[hubspot-import] book=${args.bookId} (${book.name}) author=${authorId} user=${user.email} dryRun=${args.dryRun}`);
+  console.log(`[hubspot-import] book=${args.bookId} (${book.name}) author=${authorId} user=${user.email} dryRun=${args.dryRun} update=${args.update}`);
 
-  const existingNames = await loadExistingPageNames(args.bookId);
+  const existingByName = await loadExistingPagesByName(args.bookId);
   const yearCache = new Map();
-  let imported = 0, skipped = 0, dropped = 0, total = 0;
+  let imported = 0, updated = 0, skipped = 0, dropped = 0, total = 0;
 
   for await (const post of iterateAuthorPosts(token, authorId, args.limit)) {
     total += 1;
@@ -221,13 +276,33 @@ async function main() {
     if (!title || !date) { dropped += 1; logger.warn(`[hubspot-import] post ohne Titel/Datum (id=${post.id})`); continue; }
     const ymd = isoYmd(date);
     const pageName = `${ymd}: ${title}`;
-    if (existingNames.has(pageName)) { skipped += 1; console.log(`  skip  ${pageName}`); continue; }
-
-    const year = String(date.getUTCFullYear());
-    const chapterId = await loadOrCreateYearChapter(args.bookId, year, yearCache, ctx, args.dryRun);
+    const existingId = existingByName.get(pageName);
 
     const text = postBodyToText(post.postBody || '');
     if (!text.trim()) { dropped += 1; logger.warn(`[hubspot-import] post ${post.id} leer nach text-extract`); continue; }
+
+    if (existingId && !args.update) {
+      skipped += 1; console.log(`  skip  ${pageName}`); continue;
+    }
+
+    if (existingId && args.update) {
+      if (args.dryRun) {
+        console.log(`  ~     ${pageName} (page=${existingId}, ${text.length} chars)`);
+      } else {
+        await contentStore.savePage(
+          existingId,
+          { html: text, source: 'import', summary: `HubSpot-Import (update): post ${post.id}` },
+          ctx,
+        );
+        console.log(`  ~     ${pageName} (page=${existingId})`);
+      }
+      updated += 1;
+      continue;
+    }
+
+    // Neu anlegen
+    const year = String(date.getUTCFullYear());
+    const chapterId = await loadOrCreateYearChapter(args.bookId, year, yearCache, ctx, args.dryRun);
 
     if (args.dryRun) {
       console.log(`  +     ${pageName} → chapter ${year} (${text.length} chars)`);
@@ -249,13 +324,13 @@ async function main() {
       } catch (e) {
         logger.warn(`[hubspot-import] page_revisions insert failed page=${created.id}: ${e.message}`);
       }
+      existingByName.set(pageName, created.id);
       console.log(`  +     ${pageName} → chapter ${year}`);
     }
-    existingNames.add(pageName);
     imported += 1;
   }
 
-  console.log(`\n[hubspot-import] done. total=${total} imported=${imported} skipped=${skipped} dropped=${dropped}`);
+  console.log(`\n[hubspot-import] done. total=${total} imported=${imported} updated=${updated} skipped=${skipped} dropped=${dropped}`);
 }
 
 main().catch(err => {
