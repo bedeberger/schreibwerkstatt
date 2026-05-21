@@ -13,13 +13,18 @@
   <div class="card-header card-header--subline">
     <div class="card-header-titlebar">
       <template x-if="currentPage && canEdit()">
-        <input type="text" class="card-title card-title--input"
-               :value="currentPage.name"
-               @blur="renameCurrentPage($event)"
-               @keydown.enter.prevent="$event.target.blur()"
-               :disabled="editMode || focusActive"
-               autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other"
-               :aria-label="t('editor.renamePage')">
+        <textarea class="card-title card-title--input" rows="1"
+                  :value="currentPage.name"
+                  x-init="const fit = () => $nextTick(() => { $el.style.height = 'auto'; $el.style.height = $el.scrollHeight + 'px'; });
+                          fit();
+                          $watch('currentPage?.id', fit);
+                          $watch('showEditorCard', v => v && fit());"
+                  @input="$el.style.height = 'auto'; $el.style.height = $el.scrollHeight + 'px'"
+                  @blur="renameCurrentPage($event)"
+                  @keydown.enter.prevent="$event.target.blur()"
+                  :disabled="editMode || focusActive"
+                  autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other"
+                  :aria-label="t('editor.renamePage')"></textarea>
       </template>
       <template x-if="!currentPage || !canEdit()">
         <span class="card-title" x-text="t('editor.title', { name: currentPage?.name || '–' })"></span>

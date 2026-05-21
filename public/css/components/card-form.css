@@ -33,11 +33,15 @@
   font-weight: 500;
   font-size: var(--font-size-lg);
   letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+  min-width: 0;
 }
 
-/* Inline-editable Variante (Editor-Card-Header): sieht aus wie Span, beim
-   Focus erscheint Border + Surface-Bg. Doppelklasse-Selektor hebelt globale
-   input[type=text]-Regel (Border + Padding) aus (Specificity 0,2,0 > 0,1,1). */
+/* Inline-editable Variante (Editor-Card-Header): textarea, sieht aus wie Span;
+   bei Focus erscheint Border + Surface-Bg. Höhe wird vom JS aus scrollHeight
+   gesetzt (Auto-Grow), daher resize:none + overflow:hidden. Wrapping via
+   overflow-wrap:anywhere bricht auch lange Single-Word-Titel. Doppelklasse-
+   Selektor hebelt globale input/textarea-Regeln aus (Specificity 0,2,0). */
 .card-title.card-title--input {
   background: transparent;
   border: 1px solid transparent;
@@ -53,6 +57,11 @@
   font-size: var(--font-size-lg);
   letter-spacing: -0.01em;
   line-height: 1.2;
+  resize: none;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  display: block;
 }
 .card-title.card-title--input:focus {
   outline: none;
