@@ -53,11 +53,19 @@ router.post('/session', jsonBody, async (req, res) => {
   // Orphan-Cleanup: vorher angelegte leere Sessions desselben Users für dieselbe
   // Seite löschen, bevor wir eine neue erstellen. So sammeln sich keine Karteileichen
   // an, wenn der User Chat-Karte mehrmals öffnet/schliesst, ohne zu schreiben.
-  db.prepare(`
+  // Why: 60s-Schonfrist verhindert Race mit parallelem /jobs/chat-Send, der gerade
+  // erst user_msg in eine 30s-junge Session geschrieben hat — Cleanup würde sonst
+  // die Session mitsamt user_msg löschen und der laufende Chat-Job fällt auf
+  // FK-Verletzung beim assistant-msg-INSERT.
+  const cleanupRes = db.prepare(`
     DELETE FROM chat_sessions
-    WHERE page_id = ? AND user_email = ?
+    WHERE page_id = ? AND user_email = ? AND kind = 'page'
+      AND created_at < datetime('now', '-60 seconds')
       AND NOT EXISTS (SELECT 1 FROM chat_messages WHERE session_id = chat_sessions.id)
   `).run(page_id, userEmail);
+  if (cleanupRes.changes > 0) {
+    logger.info(`[chat/session] Orphan-Cleanup: ${cleanupRes.changes} leere page-Session(s) für page=${page_id} entfernt.`);
+  }
 
   upsertBookByName(book_id, book_name);
   const now = new Date().toISOString();
@@ -86,11 +94,15 @@ router.post('/session/book', jsonBody, (req, res) => {
     catch (e) { if (sendACLError(res, e)) return; throw e; }
   }
   // Orphan-Cleanup analog zum Seiten-Chat (siehe Kommentar oben).
-  db.prepare(`
+  const cleanupResBook = db.prepare(`
     DELETE FROM chat_sessions
     WHERE book_id = ? AND kind = 'book' AND user_email = ?
+      AND created_at < datetime('now', '-60 seconds')
       AND NOT EXISTS (SELECT 1 FROM chat_messages WHERE session_id = chat_sessions.id)
   `).run(book_id, userEmail);
+  if (cleanupResBook.changes > 0) {
+    logger.info(`[chat/session/book] Orphan-Cleanup: ${cleanupResBook.changes} leere book-Session(s) für book=${book_id} entfernt.`);
+  }
 
   upsertBookByName(book_id, book_name);
   const now = new Date().toISOString();
