@@ -763,6 +763,7 @@
   "sidebar.emptyChapterTitle":   "Kapitel «{name}» öffnen, um eine erste Seite anzulegen",
   "sidebar.empty":               "leer",
   "sidebar.noPagesFound":        "Keine Seiten gefunden.",
+  "sidebar.emptyBook":           "Dieses Buch hat noch keine Kapitel oder Seiten.",
   "sidebar.resizeHandle":        "Sidebar-Breite verändern (Pfeiltasten zum Anpassen)",
   "sidebar.status.noLektorat":   "Noch kein Lektorat",
   "sidebar.status.lektoratRel":       "Lektorat {rel}, {time}",

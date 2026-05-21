@@ -126,4 +126,10 @@
   <template x-if="filteredTree.length === 0 && pageSearch">
     <div class="muted-msg muted-msg--sm" x-text="t('sidebar.noPagesFound')"></div>
   </template>
+  <template x-if="!pageSearch && selectedBookId && tree.length === 0">
+    <div class="sidebar-empty-book">
+      <div class="muted-msg muted-msg--sm" x-text="t('sidebar.emptyBook')"></div>
+      <button type="button" @click="createChapter()" x-text="t('bookOrganizer.newChapter')"></button>
+    </div>
+  </template>
 </div>

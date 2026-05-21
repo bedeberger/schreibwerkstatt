@@ -763,6 +763,7 @@
   "sidebar.emptyChapterTitle":   "Open chapter «{name}» to add the first page",
   "sidebar.empty":               "empty",
   "sidebar.noPagesFound":        "No pages found.",
+  "sidebar.emptyBook":           "This book has no chapters or pages yet.",
   "sidebar.resizeHandle":        "Resize sidebar (use arrow keys to adjust)",
   "sidebar.status.noLektorat":   "Not yet reviewed",
   "sidebar.status.lektoratRel":       "Reviewed {rel}, {time}",
