@@ -26,7 +26,7 @@ Jede Tool-Funktion: `(input, ctx) → JSON-serialisierbares Objekt` (sync oder a
 
 ## Tools
 
-19 Tools, gruppiert nach Domäne. Alle Read-Only.
+20 Tools, gruppiert nach Domäne. Alle Read-Only ausser `final_answer` (Pflicht-Endpunkt, kein DB-Read).
 
 ### Buch/Kapitel-Überblick
 
@@ -81,6 +81,12 @@ Jede Tool-Funktion: `(input, ctx) → JSON-serialisierbares Objekt` (sync oder a
 | `list_ideen` | `erledigt?`, `page_id?`, `chapter_id?`, `limit?` (default 50, max 200) | Seiten-Ideen/Notizen des Users. Offene zuerst. | `ideen` |
 | `list_werkstatt_drafts` | – | Figuren-Werkstatt-Drafts des Users für das Buch: Name, Archetyp, Quell-Figur, notes-Vorschau, Run-Counts. | `draft_figures` + `werkstatt_runs` |
 | `get_werkstatt_draft` | `draft_id` ∨ `figur_name`, `include_runs?` (default true), `run_limit?` (default 5, max 20) | Werkstatt-Draft inkl. Mindmap (eingerückter Plaintext, User-Locale aufgelöst) + KI-Läufe (Brainstorm/Consistency) gekürzt. | `draft_figures` + `werkstatt_runs` |
+
+### Endpunkt
+
+| Tool | Input | Zweck | Quelle |
+|------|-------|-------|--------|
+| `final_answer` | `antwort: string` | Pflicht-Endpunkt der Loop: Modell ruft das Tool als letzten Schritt mit der finalen Antwort an den User. `runBookChatJobAgent` fängt es vor `executeTool` ab, setzt `finalText = JSON.stringify({antwort})` und bricht den Loop. Ersetzt freies JSON-Output am Ende — Schema des Tools erzwingt die Struktur. Bei mehreren Tool-Uses in einer Iteration terminiert `final_answer` unabhängig von der Position. | – (kein DB-Read) |
 
 ## Neues Tool hinzufügen
 

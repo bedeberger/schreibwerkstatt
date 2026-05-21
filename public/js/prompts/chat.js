@@ -159,11 +159,7 @@ export function buildBookChatAgentSystemPrompt(bookName, figuren, review, system
   }
 
   parts.push(
-    'Deine finale Antwort (nach allen nötigen Werkzeug-Aufrufen) hat dieses JSON-Format:',
-    '{',
-    '  "antwort": "Deine Antwort als Freitext (Markdown erlaubt)"',
-    '}',
-    ...(_isLocal ? [] : ['', JSON_ONLY]),
+    'Liefere deine finale Antwort IMMER über das Werkzeug `final_answer` (Pflicht-Endpunkt). Kein Freitext-Output ohne Tool-Call — auch wenn keine Recherche-Tools nötig sind, muss die Antwort via final_answer kommen. Sprache der Antwort: passe dich der Sprache der Userfrage an, nicht der Sprache dieses Prompts.',
   );
 
   return parts.join('\n');
@@ -405,6 +401,17 @@ export const BOOK_CHAT_TOOLS = [
         run_limit:    { type: 'integer', description: 'Maximale Anzahl Läufe (default 5, max 20). Neueste zuerst.' },
       },
       required: [],
+    },
+  },
+  {
+    name: 'final_answer',
+    description: 'Liefert die finale Antwort an den User. Rufe dieses Werkzeug als ALLERLETZTEN Aufruf einer Runde — danach folgt keine weitere Iteration und keine weitere Recherche. Pflicht-Endpunkt: jede Antwort an den User MUSS über dieses Werkzeug laufen. Freitext ohne final_answer wird nicht als Antwort akzeptiert. Schreibe die Antwort in der Sprache der Userfrage.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        antwort: { type: 'string', description: 'Antwort an den User als Freitext, Markdown erlaubt. Pflichtfeld.' },
+      },
+      required: ['antwort'],
     },
   },
 ];

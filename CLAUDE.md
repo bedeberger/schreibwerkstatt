@@ -14,7 +14,7 @@ Themen-Spickzettel ausgelagert (Drift-Schutz: CLAUDE.md-Regeln, Details in den S
 - [docs/testing.md](docs/testing.md) — Wann Unit/Integration/E2E, Mock-AI-Setup, Harness-Konventionen, häufige Fallen.
 - [docs/erd.md](docs/erd.md) — Schema-ERD (Mermaid) + offene Schema-Verbesserungen.
 - [docs/figur-werkstatt.md](docs/figur-werkstatt.md) — Figuren-Werkstatt: jsMind-Mindmap, Import aus `figures`, Brainstorm-/Consistency-Jobs, Run-Historie, Hash-Permalinks.
-- [docs/buchchat-tools.md](docs/buchchat-tools.md) — Agentic Buch-Chat: Tool-Inventar (19 Stück), `ctx`-Vertrag, Truncation, Loop-Constraints, neues Tool anlegen.
+- [docs/buchchat-tools.md](docs/buchchat-tools.md) — Agentic Buch-Chat: Tool-Inventar (20 Stück inkl. `final_answer`-Endpunkt), `ctx`-Vertrag, Truncation, Loop-Constraints, neues Tool anlegen.
 - **Drei unabhängige Editoren — bei Änderungen MUSS der User nennen, welcher gemeint ist** (siehe Harte Regel „Editor-Spezifikation" weiter unten):
   - [docs/notebook-editor.md](docs/notebook-editor.md) — Notebook-Editor (Einzelseiten-Edit-Modus): `notebookEditMethods` am Root, Toolbar/Bubble/Slash-Card, Autosave (Idle 60 s / Max 120 s), Draft-Pipeline, Stale-Write-Schutz, Findings-Mark-Watcher, Snapshot, Pflicht-Invarianten.
   - [docs/focus-editor.md](docs/focus-editor.md) — Focus-Editor (Vollbild-Schreibmodus auf einer Seite): State-Machine, Submodule (`focus/`), Trampoline-Pattern, Granularitäten, Recenter-Pipeline, Auto-`<p>`-Slot, Snapshot, Pflicht-Invarianten.

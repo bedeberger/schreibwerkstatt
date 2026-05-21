@@ -563,6 +563,26 @@ async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEma
         break;
       }
 
+      // final_answer ist Pflicht-Endpunkt: extrahiert antwort aus Tool-Input,
+      // beendet Loop ohne executeTool/Reply-Round. Wenn das Modell daneben
+      // weitere Tool-Uses emittiert, ignorieren — final_answer terminiert.
+      const finalUse = result.toolUses.find(tu => tu.name === 'final_answer');
+      if (finalUse) {
+        const antwort = typeof finalUse.input?.antwort === 'string' ? finalUse.input.antwort : '';
+        finalText = JSON.stringify({ antwort });
+        toolLog.push({
+          name: 'final_answer',
+          input: { antwort_chars: antwort.length },
+          ok: true,
+          durationMs: 0,
+          resultBytes: antwort.length,
+          truncated: false,
+          iter: iter + 1,
+        });
+        logger.info(`tool=final_answer antwort_chars=${antwort.length} iter=${iter + 1} (terminal)`);
+        break;
+      }
+
       // Tool-Use: alle tool_uses ausführen und als user-tool_result an messages anhängen.
       messages.push({ role: 'assistant', content: result.rawContentBlocks });
       const toolResults = [];
