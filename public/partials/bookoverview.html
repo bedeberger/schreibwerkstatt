@@ -35,10 +35,10 @@
       <div class="overview-tile-label" x-text="$app.t('overview.quickActions')"></div>
       <div class="overview-actions">
         <button type="button" class="btn-compact" @click="$app.toggleBookChatCard()" :disabled="!$app.pages.length" x-text="$app.t('tile.bookchat')"></button>
-        <button type="button" class="btn-compact" @click="$app.toggleKontinuitaetCard()" x-text="$app.t('tile.kontinuitaet')"></button>
-        <button type="button" class="btn-compact" @click="$app.toggleEreignisseCard()" x-text="$app.t('tile.events')"></button>
+        <button type="button" class="btn-compact" @click="$app.toggleKontinuitaetCard()" :disabled="!$app.pages.length" x-text="$app.t('tile.kontinuitaet')"></button>
+        <button type="button" class="btn-compact" @click="$app.toggleEreignisseCard()" :disabled="!$app.pages.length" x-text="$app.t('tile.events')"></button>
         <button type="button" class="btn-compact" @click="$app.toggleBookOrganizerCard()" x-text="$app.t('tile.bookOrganizer')"></button>
-        <button type="button" class="btn-compact" @click="$app.alleAktualisieren()" :disabled="$app.alleAktualisierenLoading" x-text="$app.t('palette.action.komplett')"></button>
+        <button type="button" class="btn-compact" @click="$app.alleAktualisieren()" :disabled="$app.alleAktualisierenLoading || !$app.pages.length" x-text="$app.t('palette.action.komplett')"></button>
       </div>
     </div>
   </div>
