@@ -30,20 +30,39 @@ function _sanitizeVorschlaege(arr) {
   });
 }
 
+// Modell-Drift bei Sonnet/Claude: schreibt Prosa-Antwort, hängt am Ende
+// `\`\`\`json\n{}\n\`\`\`` als Compliance-Theater an. `extractBalancedJson`
+// greift dann das leere `{}` → parseJSON wirkt erfolgreich, aber `antwort`
+// fehlt. Trailing-Fence vor Speicherung entfernen.
+function _stripTrailingEmptyJson(text) {
+  if (typeof text !== 'string') return text;
+  return text
+    .replace(/\s*```(?:json)?\s*\{\s*\}\s*```\s*$/i, '')
+    .replace(/\s*\{\s*\}\s*$/, '')
+    .trim();
+}
+
 function _parseChatResponse(text) {
   // Lenient: bei kaputtem JSON (z.B. unescaptes `"` oder typografische Quotes
   // im Modell-Output) wenigstens `antwort` per Regex retten. Vorschläge gehen
   // nur sicher zu extrahieren, wenn Gesamt-JSON valid ist.
   const r = parseJSONLenient(text, ['antwort']);
-  if (r.ok) {
+  if (r.ok && typeof r.parsed?.antwort === 'string' && r.parsed.antwort.trim()) {
     return {
-      antwort: r.parsed.antwort ?? text,
+      antwort: r.parsed.antwort,
       vorschlaege: _sanitizeVorschlaege(r.parsed.vorschlaege),
+      fallback: false,
     };
   }
+  // r.ok-aber-antwort-leer = Modell schrieb Prosa und trailing leeres `{}`,
+  // das extractBalancedJson erwischt hat. Roh-Prosa speichern, fence weg.
+  if (r.ok) {
+    return { antwort: _stripTrailingEmptyJson(text) || text, vorschlaege: [], fallback: true };
+  }
   return {
-    antwort: r.partial.antwort ?? r.partial._raw ?? text,
+    antwort: r.partial.antwort ?? _stripTrailingEmptyJson(r.partial._raw ?? text) ?? text,
     vorschlaege: [],
+    fallback: true,
   };
 }
 
@@ -127,16 +146,19 @@ async function runChatJob(jobId, sessionId, userMsgId, message, userEmail, userT
     };
 
     const signal = jobAbortControllers.get(jobId)?.signal;
-    const { text, truncated, tokensIn, tokensOut, cacheReadIn = 0, cacheCreationIn = 0, provider, model, genDurationMs } = await callAIChat(aiMessages, systemPrompt, onProgress, null, signal, undefined, SCHEMA_CHAT, chatTemperature());
+    // Prefill erzwingt bei Claude die JSON-Shape (Anthropic-Standardtrick):
+    // Modell muss ab `{"antwort":"` weiterschreiben, kann nicht in Prosa abdriften.
+    // Local-Provider ignorieren prefill — sie haben Grammar-Constrained Decoding via jsonSchema.
+    const { text, truncated, tokensIn, tokensOut, cacheReadIn = 0, cacheCreationIn = 0, provider, model, genDurationMs } = await callAIChat(aiMessages, systemPrompt, onProgress, null, signal, undefined, SCHEMA_CHAT, chatTemperature(), '{"antwort":"');
     // Job-State auf echte Provider-Werte setzen, damit Status-Anzeige und
     // gespeicherte Chat-Nachricht dieselben Tokens zeigen (statt eines
     // Streaming-Zwischenstands).
     updateJob(jobId, { tokensIn, tokensOut, cacheReadIn, cacheCreationIn });
     if (truncated) throw i18nError('job.error.aiTruncated', { max: aiCfg.maxTokensOut, tokIn: tokensIn, tokOut: tokensOut, total: tokensIn + tokensOut });
 
-    const { antwort, vorschlaege } = _parseChatResponse(text);
-    if (antwort === text && vorschlaege.length === 0) {
-      logger.warn('Chat-Antwort kein valides JSON – Rohtext wird gespeichert.');
+    const { antwort, vorschlaege, fallback } = _parseChatResponse(text);
+    if (fallback) {
+      logger.warn('Chat-Antwort kein valides JSON – Rohtext (gesäubert) wird gespeichert.');
     }
 
     // Assistant-Nachricht in DB speichern
@@ -332,16 +354,16 @@ async function runBookChatJob(jobId, sessionId, userMsgId, message, userEmail, u
       updateJob(jobId, updates);
     };
 
-    const { text, truncated, tokensIn, tokensOut, cacheReadIn = 0, cacheCreationIn = 0, provider, model, genDurationMs } = await callAIChat(aiMessages, systemPrompt, onProgress, null, jobSignal, undefined, SCHEMA_BOOK_CHAT, chatTemperature());
+    const { text, truncated, tokensIn, tokensOut, cacheReadIn = 0, cacheCreationIn = 0, provider, model, genDurationMs } = await callAIChat(aiMessages, systemPrompt, onProgress, null, jobSignal, undefined, SCHEMA_BOOK_CHAT, chatTemperature(), '{"antwort":"');
     // Job-State auf echte Provider-Werte setzen (Ollama/Llama melden prompt_tokens
     // erst am Streaming-Ende; ohne diesen Update bleibt die Status-Anzeige auf
     // einem Zwischenstand und weicht von der DB-Nachricht ab).
     updateJob(jobId, { tokensIn, tokensOut, cacheReadIn, cacheCreationIn });
     if (truncated) throw i18nError('job.error.aiTruncated', { max: aiCfg.maxTokensOut, tokIn: tokensIn, tokOut: tokensOut, total: tokensIn + tokensOut });
 
-    const { antwort } = _parseChatResponse(text);
-    if (antwort === text) {
-      logger.warn('Buch-Chat-Antwort kein valides JSON – Rohtext wird gespeichert.');
+    const { antwort, fallback } = _parseChatResponse(text);
+    if (fallback) {
+      logger.warn('Buch-Chat-Antwort kein valides JSON – Rohtext (gesäubert) wird gespeichert.');
     }
 
     // Assistant-Nachricht in DB speichern (vorschlaege=NULL)
@@ -595,9 +617,9 @@ async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEma
       finalText = JSON.stringify({ antwort: '__i18n:chat.errors.maxIterReached__' });
     }
 
-    const { antwort } = _parseChatResponse(finalText);
-    if (antwort === finalText) {
-      logger.warn('Agent-Antwort kein valides JSON – Rohtext wird gespeichert.');
+    const { antwort, fallback } = _parseChatResponse(finalText);
+    if (fallback) {
+      logger.warn('Agent-Antwort kein valides JSON – Rohtext (gesäubert) wird gespeichert.');
     }
 
     // Assistant-Nachricht in DB speichern
