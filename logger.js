@@ -1,6 +1,7 @@
 const path = require('path');
 const winston = require('winston');
 const { getContext } = require('./lib/log-context');
+const jobLogBuffer = require('./lib/job-log-buffer');
 
 const LOG_FILE = path.join(__dirname, 'schreibwerkstatt.log');
 
@@ -26,7 +27,9 @@ const logger = winston.createLogger({
       const t = book != null && book !== '' ? String(book) : '-';
       const j = jobId ? `|${String(jobId).slice(0, 8)}` : '';
       const tail = stack ? `\n${stack}` : '';
-      return `${timestamp} [${level.toUpperCase()}] [${scope}|${u}|${t}${j}] ${message}${tail}`;
+      const out = `${timestamp} [${level.toUpperCase()}] [${scope}|${u}|${t}${j}] ${message}${tail}`;
+      if (jobId) jobLogBuffer.append(jobId, out);
+      return out;
     })
   ),
   transports: [

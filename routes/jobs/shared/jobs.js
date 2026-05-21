@@ -7,6 +7,7 @@ const appSettings = require('../../../lib/app-settings');
 const { jobs, runningJobs, jobAbortControllers, jobQueue, jobKey, jobDedupKey } = require('./state');
 const { _scheduleJobCleanup } = require('./queue');
 const { _modelName } = require('./model');
+const jobLogBuffer = require('../../../lib/job-log-buffer');
 
 // Job-Ctx (type/user/book) wird via ALS in `drainQueue` gesetzt – jeder
 // `logger.*`-Call innerhalb der Job-Funktion erbt ihn automatisch.
@@ -154,6 +155,7 @@ function completeJob(id, result, tokensPerSec = null, detail = null) {
   runningJobs.delete(jobDedupKey(job));
   jobAbortControllers.delete(id);
   _scheduleJobCleanup(id);
+  jobLogBuffer.clear(id);
   if (job.userEmail) {
     const notify = require('../../../lib/notify');
     notify.maybeNotifyBudgetOverrun(job.userEmail)
@@ -181,9 +183,14 @@ function failJob(id, err) {
   } else {
     logger.warn(`Fehlgeschlagen (${_jobDurationFmt(job.startedAt)}): ${errorMsg}`, _jobLogCtx(job));
   }
+  // Log-Snapshot + Stack synchron auf job stashen, BEVOR Buffer geleert wird;
+  // notify-Pfad ist async fire-and-forget und liest die Felder aus job.
+  job._logExcerpt = jobLogBuffer.snapshot(id);
+  job._errorStack = (err && typeof err.stack === 'string') ? err.stack : null;
   runningJobs.delete(jobDedupKey(job));
   jobAbortControllers.delete(id);
   _scheduleJobCleanup(id);
+  jobLogBuffer.clear(id);
   if (!isCancelled) {
     const notify = require('../../../lib/notify');
     const httpStatus = (err && typeof err.status === 'number') ? err.status : null;
@@ -215,6 +222,7 @@ function cancelJob(id, userEmail) {
     runningJobs.delete(jobDedupKey(job));
     jobAbortControllers.delete(id);
     _scheduleJobCleanup(id);
+    jobLogBuffer.clear(id);
     logger.info('Aus Warteschlange entfernt und abgebrochen.', _jobLogCtx(job));
     return true;
   }

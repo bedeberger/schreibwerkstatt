@@ -103,10 +103,24 @@ export function makeChatMethods(cfg) {
         this[p.status] = '';
         await loadSession.call(this, sessionId);
       },
-      onError: (job) => {
+      onError: async (job) => {
+        // Belt-and-suspenders: startPoll clear't Timer eigentlich vor dem
+        // Callback. Doppelt clearen schützt vor stuck `loading=true`-States,
+        // bei denen weder „Neue Session" noch Senden möglich wäre.
+        if (this[p.pollTimer]) { clearInterval(this[p.pollTimer]); this[p.pollTimer] = null; }
         this[p.loading] = false;
         if (p.progress) this[p.progress] = 0;
-        this[p.status] = `<span class="error-msg">${root.t('common.errorColon')}${escHtml(job.error ? root.t(job.error, job.errorParams) : root.t('common.unknownError'))}</span>`;
+        if (p.pendingRefresh) this[p.pendingRefresh] = false;
+        const errLabel = job.error ? root.t(job.error, job.errorParams) : root.t('common.unknownError');
+        const errHtml = `<span class="error-msg">${root.t('common.errorColon')}${escHtml(errLabel)}</span>`;
+        // Server-State neu laden: User-Msg ist serverseitig persistiert
+        // (_handleChatPost), Assistant-Msg fehlt. Optimistischer Stub wird durch
+        // Server-Stand ersetzt; danach kann der User eine neue Session starten
+        // oder eine neue Nachricht senden. loadSession setzt intern status='',
+        // Fehler-HTML deshalb DANACH setzen.
+        try { await loadSession.call(this, sessionId); }
+        catch (e) { console.error(`[${L} onError reload]`, e); }
+        this[p.status] = errHtml;
       },
       onDone: async () => {
         this[p.loading] = false;
