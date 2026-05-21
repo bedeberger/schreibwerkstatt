@@ -2,34 +2,47 @@
 'use strict';
 
 // One-shot HubSpot-Blog-Import in ein bestehendes Buch.
-// Holt PUBLISHED-Posts via /cms/v3/blogs/posts, gruppiert nach Publish-Jahr
-// in Kapitel "YYYY", legt pro Post eine Page mit Name "YYYY-MM-DD: Titel" an.
-// Idempotent: Posts mit existierendem Page-Name werden uebersprungen.
+// - Holt PUBLISHED-Posts via /cms/v3/blogs/posts, gruppiert nach Publish-Jahr
+//   in Kapitel "YYYY", legt pro Post eine Page mit Name "YYYY-MM-DD: Titel" an.
+// - Konvertiert post.postBody zu reinem Text (alle HTML-Tags weg, je Block
+//   ein <p>…</p>).
+// - Idempotent: existierende Page-Names werden uebersprungen.
+// - Autor-Auswahl interaktiv, wenn --author-id fehlt.
+// - User-Attribution via --user-email Pflicht (page_revisions.source='import').
 //
 // Usage:
 //   HUBSPOT_TOKEN=pat-eu1-... node scripts/import-hubspot.js \
-//     --book-id=102 --author-id=12345 [--dry-run] [--limit=N]
+//     --book-id=102 --user-email=david.berger@dotag.ch \
+//     [--author-id=12345] [--list-authors] [--dry-run] [--limit=N]
 
 require('dotenv').config();
 
+const readline = require('readline/promises');
+const { stdin: input, stdout: output } = require('process');
 const { parseHTML } = require('linkedom');
 const contentStore = require('../lib/content-store');
+const pageRevisions = require('../db/page-revisions');
+const appUsers = require('../db/app-users');
 const logger = require('../logger');
 
 const HUBSPOT_BASE = 'https://api.hubapi.com';
 const HUBSPOT_PAGE_SIZE = 100;
 
 function parseArgs(argv) {
-  const out = { dryRun: false, limit: Infinity };
+  const out = { dryRun: false, limit: Infinity, listAuthors: false };
   for (const a of argv.slice(2)) {
     if (a === '--dry-run') out.dryRun = true;
+    else if (a === '--list-authors') out.listAuthors = true;
     else if (a.startsWith('--book-id=')) out.bookId = parseInt(a.slice('--book-id='.length), 10);
     else if (a.startsWith('--author-id=')) out.authorId = a.slice('--author-id='.length);
+    else if (a.startsWith('--user-email=')) out.userEmail = a.slice('--user-email='.length);
     else if (a.startsWith('--limit=')) out.limit = parseInt(a.slice('--limit='.length), 10);
     else { console.error(`Unbekanntes Argument: ${a}`); process.exit(2); }
   }
-  if (!Number.isFinite(out.bookId)) { console.error('--book-id=<int> Pflicht'); process.exit(2); }
-  if (!out.authorId) { console.error('--author-id=<id> Pflicht'); process.exit(2); }
+  if (!out.listAuthors) {
+    if (!Number.isFinite(out.bookId)) { console.error('--book-id=<int> Pflicht'); process.exit(2); }
+    if (!out.userEmail) { console.error('--user-email=<addr> Pflicht'); process.exit(2); }
+  }
   return out;
 }
 
@@ -47,6 +60,42 @@ async function hubspotFetch(path, token, query = {}) {
     throw new Error(`HubSpot ${res.status} ${res.statusText}: ${text.slice(0, 300)}`);
   }
   return res.json();
+}
+
+async function listAuthors(token) {
+  const out = [];
+  let after;
+  while (true) {
+    const data = await hubspotFetch('/cms/v3/blogs/authors', token, { limit: 100, after });
+    const results = Array.isArray(data?.results) ? data.results : [];
+    out.push(...results);
+    after = data?.paging?.next?.after;
+    if (!after) break;
+  }
+  return out;
+}
+
+async function pickAuthorInteractive(token) {
+  console.log('[hubspot-import] lade Autorenliste …');
+  const authors = await listAuthors(token);
+  if (!authors.length) { console.error('Keine Autoren in HubSpot gefunden.'); process.exit(2); }
+  console.log(`\n${authors.length} Autoren gefunden:\n`);
+  authors.forEach((a, i) => {
+    const name = (a.fullName || a.displayName || a.name || '(ohne Name)').trim();
+    const email = a.email ? ` <${a.email}>` : '';
+    console.log(`  [${String(i + 1).padStart(3, ' ')}]  id=${a.id}  ${name}${email}`);
+  });
+  const rl = readline.createInterface({ input, output });
+  const answer = (await rl.question('\nNummer waehlen (oder "q" zum Abbrechen): ')).trim();
+  rl.close();
+  if (answer.toLowerCase() === 'q') { console.log('Abgebrochen.'); process.exit(0); }
+  const idx = parseInt(answer, 10);
+  if (!Number.isFinite(idx) || idx < 1 || idx > authors.length) {
+    console.error(`Ungueltige Auswahl: "${answer}"`); process.exit(2);
+  }
+  const chosen = authors[idx - 1];
+  console.log(`[hubspot-import] gewaehlt: id=${chosen.id} (${chosen.fullName || chosen.name || '?'})\n`);
+  return String(chosen.id);
 }
 
 async function* iterateAuthorPosts(token, authorId, hardLimit) {
@@ -70,33 +119,40 @@ async function* iterateAuthorPosts(token, authorId, hardLimit) {
   }
 }
 
-// HubSpot-spezifische Cruft strippen, bevor content-store-Cleaner laeuft.
-// Entfernt CTA-Wrapper, Forms, eingebettete Meta-Felder, Tracking-Pixel,
-// script/style/iframe-Tags. Inline-Formatting (<strong>, <em>, <a>) bleibt.
-const STRIP_SELECTORS = [
-  '.hs-cta-wrapper',
-  '.hs-cta-img',
-  '.hs-form',
-  '.hs_cos_wrapper_meta_field',
-  '.hs-embed-wrapper',
-  'script',
-  'style',
-  'iframe',
-  'noscript',
+// HubSpot postBody → reine Textparagraphen.
+// Strategie: alle HTML-Tags entfernen, pro Block-Element ein <p>…</p> Output.
+// Inline-Formatting (strong/em/a) wird zu Plain-Text geflattened.
+const BLOCK_SEL = 'p, h1, h2, h3, h4, h5, h6, li, blockquote, pre, dt, dd';
+const STRIP_SEL = [
+  '.hs-cta-wrapper', '.hs-cta-img', '.hs-form',
+  '.hs_cos_wrapper_meta_field', '.hs-embed-wrapper',
+  'script', 'style', 'iframe', 'noscript',
 ];
 
-function stripHubspotCruft(rawHtml) {
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function postBodyToText(rawHtml) {
   if (typeof rawHtml !== 'string' || !rawHtml.trim()) return '';
   const { document } = parseHTML(`<!doctype html><html><body>${rawHtml}</body></html>`);
-  for (const sel of STRIP_SELECTORS) {
+  for (const sel of STRIP_SEL) {
     for (const el of Array.from(document.querySelectorAll(sel))) el.remove();
   }
-  // Tracking-Pixel: 1x1-images mit pixel/track in src
-  for (const img of Array.from(document.querySelectorAll('img'))) {
-    const src = img.getAttribute('src') || '';
-    if (/\/(track|pixel)/i.test(src) || /\bwidth=["']?1\b/.test(img.outerHTML)) img.remove();
+  const blocks = Array.from(document.querySelectorAll(BLOCK_SEL));
+  const paras = [];
+  for (const el of blocks) {
+    if (el.querySelector(BLOCK_SEL)) continue; // nur Leaf-Bloecke, sonst doppelt
+    const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
+    if (text) paras.push(text);
   }
-  return document.body.innerHTML;
+  // Fallback: kein Block gefunden → ganzer Body als ein Paragraph.
+  if (!paras.length) {
+    const all = (document.body.textContent || '').replace(/\s+/g, ' ').trim();
+    if (all) paras.push(all);
+  }
+  return paras.map(t => `<p>${escapeHtml(t)}</p>`).join('\n');
 }
 
 function publishDateOf(post) {
@@ -107,22 +163,20 @@ function publishDateOf(post) {
   return d;
 }
 
-function isoYmd(d) {
-  return d.toISOString().slice(0, 10);
-}
+function isoYmd(d) { return d.toISOString().slice(0, 10); }
 
 async function loadExistingPageNames(bookId) {
   const pages = await contentStore.listPages(bookId);
   return new Set(pages.map(p => p.name || ''));
 }
 
-async function loadOrCreateYearChapter(bookId, year, cache, dryRun) {
+async function loadOrCreateYearChapter(bookId, year, cache, ctx, dryRun) {
   if (cache.has(year)) return cache.get(year);
   const chapters = await contentStore.listChapters(bookId);
   const existing = chapters.find(c => (c.name || '').trim() === year);
   if (existing) { cache.set(year, existing.id); return existing.id; }
   if (dryRun) { cache.set(year, `dry-${year}`); return `dry-${year}`; }
-  const created = await contentStore.createChapter({ book_id: bookId, name: year });
+  const created = await contentStore.createChapter({ book_id: bookId, name: year }, ctx);
   cache.set(year, created.id);
   return created.id;
 }
@@ -132,16 +186,35 @@ async function main() {
   const token = process.env.HUBSPOT_TOKEN;
   if (!token) { console.error('HUBSPOT_TOKEN env-var Pflicht (in .env oder Shell).'); process.exit(2); }
 
-  const book = await contentStore.loadBook(args.bookId).catch(() => null);
+  if (args.listAuthors) {
+    const authors = await listAuthors(token);
+    console.log(`${authors.length} Autoren:\n`);
+    for (const a of authors) {
+      const name = (a.fullName || a.displayName || a.name || '(ohne Name)').trim();
+      console.log(`  id=${a.id}  ${name}${a.email ? ` <${a.email}>` : ''}`);
+    }
+    process.exit(0);
+  }
+
+  const user = appUsers.getUser(args.userEmail);
+  if (!user) { console.error(`User "${args.userEmail}" nicht in app_users gefunden.`); process.exit(2); }
+  if (user.status && user.status !== 'active') {
+    console.error(`User "${args.userEmail}" hat Status "${user.status}" (nicht active).`); process.exit(2);
+  }
+  const ctx = { session: { user: { email: user.email } } };
+
+  const book = await contentStore.loadBook(args.bookId, ctx).catch(() => null);
   if (!book) { console.error(`Buch ${args.bookId} nicht gefunden.`); process.exit(2); }
 
-  console.log(`[hubspot-import] book=${args.bookId} (${book.name}) author=${args.authorId} dryRun=${args.dryRun}`);
+  const authorId = args.authorId || await pickAuthorInteractive(token);
+
+  console.log(`[hubspot-import] book=${args.bookId} (${book.name}) author=${authorId} user=${user.email} dryRun=${args.dryRun}`);
 
   const existingNames = await loadExistingPageNames(args.bookId);
   const yearCache = new Map();
   let imported = 0, skipped = 0, dropped = 0, total = 0;
 
-  for await (const post of iterateAuthorPosts(token, args.authorId, args.limit)) {
+  for await (const post of iterateAuthorPosts(token, authorId, args.limit)) {
     total += 1;
     const title = (post.htmlTitle || post.name || '').trim();
     const date = publishDateOf(post);
@@ -151,15 +224,31 @@ async function main() {
     if (existingNames.has(pageName)) { skipped += 1; console.log(`  skip  ${pageName}`); continue; }
 
     const year = String(date.getUTCFullYear());
-    const chapterId = await loadOrCreateYearChapter(args.bookId, year, yearCache, args.dryRun);
+    const chapterId = await loadOrCreateYearChapter(args.bookId, year, yearCache, ctx, args.dryRun);
 
-    const cleaned = stripHubspotCruft(post.postBody || '');
-    if (!cleaned.trim()) { dropped += 1; logger.warn(`[hubspot-import] post ${post.id} leer nach cleanup`); continue; }
+    const text = postBodyToText(post.postBody || '');
+    if (!text.trim()) { dropped += 1; logger.warn(`[hubspot-import] post ${post.id} leer nach text-extract`); continue; }
 
     if (args.dryRun) {
-      console.log(`  +     ${pageName} → chapter ${year} (${cleaned.length} chars)`);
+      console.log(`  +     ${pageName} → chapter ${year} (${text.length} chars)`);
     } else {
-      await contentStore.createPage({ book_id: args.bookId, chapter_id: chapterId, name: pageName, html: cleaned });
+      const created = await contentStore.createPage(
+        { book_id: args.bookId, chapter_id: chapterId, name: pageName, html: text },
+        ctx,
+      );
+      try {
+        pageRevisions.insert({
+          pageId: created.id,
+          bookId: args.bookId,
+          bodyHtml: created.html || text,
+          bodyMarkdown: null,
+          source: 'import',
+          userEmail: user.email,
+          summary: `HubSpot-Import: post ${post.id}`,
+        });
+      } catch (e) {
+        logger.warn(`[hubspot-import] page_revisions insert failed page=${created.id}: ${e.message}`);
+      }
       console.log(`  +     ${pageName} → chapter ${year}`);
     }
     existingNames.add(pageName);
