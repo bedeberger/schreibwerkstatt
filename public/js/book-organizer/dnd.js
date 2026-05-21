@@ -32,6 +32,12 @@ export const dndMethods = {
     // und wirft "page is not defined". Nach Drag wieder entfernen.
     const markIgnore = (evt) => evt.item?.setAttribute('x-ignore', '');
     const unmarkIgnore = (evt) => evt.item?.removeAttribute('x-ignore');
+    // Auto-Scroll an Dokument-Scrollbarkeit koppeln: passt alles in den
+    // Viewport, deaktivieren — sonst feuert Sortable bei 1-Zeilen-Drags am
+    // Window-Rand. Sensitivity + Speed konservativer als die Sortable-Defaults
+    // (30/10), damit Auto-Scroll nur am echten Edge greift, nicht schon bei
+    // Cursorbewegung mitten auf der Seite.
+    const scrollOpts = this._autoScrollOpts();
     // Eine Chapter-Liste pro Tiefe — alle teilen die `chapters`-Gruppe, damit
     // Kapitel zwischen Levels per DnD wandern koennen. Drop-Ziel-Validierung
     // (max-depth, kein-eigener-Subtree) im onAdd/onMove-Hook.
@@ -43,6 +49,7 @@ export const dndMethods = {
         draggable: '.organizer-chapter',
         group: { name: 'chapters', pull: true, put: ['chapters'] },
         emptyInsertThreshold: 0,
+        ...scrollOpts,
         onChoose: markIgnore,
         onUnchoose: unmarkIgnore,
         onMove: (evt) => this._validateChapterMove(evt),
@@ -57,11 +64,22 @@ export const dndMethods = {
         draggable: '.organizer-page',
         group: { name: 'pages', pull: true, put: ['pages'] },
         emptyInsertThreshold: 0,
+        ...scrollOpts,
         onChoose: markIgnore,
         onUnchoose: unmarkIgnore,
         onEnd: (evt) => { unmarkIgnore(evt); this._onPageDrop(evt); },
       }));
     }
+  },
+
+  _autoScrollOpts() {
+    const overflow = document.documentElement.scrollHeight - window.innerHeight;
+    return {
+      scroll: overflow > 100,
+      scrollSensitivity: 12,
+      scrollSpeed: 6,
+      bubbleScroll: true,
+    };
   },
 
   // Sortable.onMove: blockt Drops, die max-depth verletzen oder ein Kapitel in
