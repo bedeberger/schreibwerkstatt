@@ -146,10 +146,7 @@ async function runChatJob(jobId, sessionId, userMsgId, message, userEmail, userT
     };
 
     const signal = jobAbortControllers.get(jobId)?.signal;
-    // Prefill erzwingt bei Claude die JSON-Shape (Anthropic-Standardtrick):
-    // Modell muss ab `{"antwort":"` weiterschreiben, kann nicht in Prosa abdriften.
-    // Local-Provider ignorieren prefill — sie haben Grammar-Constrained Decoding via jsonSchema.
-    const { text, truncated, tokensIn, tokensOut, cacheReadIn = 0, cacheCreationIn = 0, provider, model, genDurationMs } = await callAIChat(aiMessages, systemPrompt, onProgress, null, signal, undefined, SCHEMA_CHAT, chatTemperature(), '{"antwort":"');
+    const { text, truncated, tokensIn, tokensOut, cacheReadIn = 0, cacheCreationIn = 0, provider, model, genDurationMs } = await callAIChat(aiMessages, systemPrompt, onProgress, null, signal, undefined, SCHEMA_CHAT, chatTemperature());
     // Job-State auf echte Provider-Werte setzen, damit Status-Anzeige und
     // gespeicherte Chat-Nachricht dieselben Tokens zeigen (statt eines
     // Streaming-Zwischenstands).
