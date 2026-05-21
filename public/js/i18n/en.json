@@ -1419,6 +1419,7 @@
   "admin.settings.analytics.scriptUrlHint": "Full URL to the Plausible tracker JS, e.g. https://analytics.example.com/js/pa-XXXX.js. The origin is added to the CSP automatically. Tracking runs on every host as soon as the checkbox is enabled.",
   "admin.settings.smtp.hint":    "Gmail account for invite + notification mails. Active as soon as address and app password are set. Host/port/TLS are implicit via service:'gmail' (smtp.gmail.com:465 TLS).",
   "admin.settings.smtp.appPasswordHint": "2FA must be enabled. Generate the 16-character app password at:",
+  "admin.settings.mail.adminRecipientHint": "Forwarding address for admin notifications (job crash, token cap, budget overrun). Empty = sent to all active admin users. Set = replaces that list entirely; the address does not need to match an app account.",
   "admin.settings.test.connection": "Test connection",
   "admin.settings.test.oauth":   "Test OAuth",
   "admin.settings.test.smtp":    "Send test mail",

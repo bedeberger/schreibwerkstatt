@@ -158,6 +158,11 @@
         <input type="text" x-data="numInput({ step: 1, min: 1, max: 500 })" x-modelable="value" x-model="adminSettingsForm['smtp.rate_limit_per_minute']">
       </label>
 
+      <label>mail.notify.admin_recipient
+        <input type="email" x-model="adminSettingsForm['mail.notify.admin_recipient']" placeholder="(optional)" autocomplete="off">
+        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.mail.adminRecipientHint')"></small>
+      </label>
+
       <div class="admin-settings-actions">
         <button type="button" @click="adminSettingsTest('smtp')" x-text="$app.t('admin.settings.test.smtp')"></button>
       </div>

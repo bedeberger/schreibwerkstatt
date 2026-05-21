@@ -1420,6 +1420,7 @@
   "admin.settings.analytics.scriptUrlHint": "Voller Pfad zum Plausible-Tracker-JS, z.B. https://analytics.example.com/js/pa-XXXX.js. Origin wird automatisch in die CSP übernommen. Tracking läuft auf allen Hosts, sobald die Checkbox aktiviert ist.",
   "admin.settings.smtp.hint":    "Gmail-Konto für Invite- und Notification-Mails. Aktiv sobald Adresse und App-Passwort gesetzt sind. Host/Port/TLS sind via service:'gmail' implizit (smtp.gmail.com:465 TLS).",
   "admin.settings.smtp.appPasswordHint": "2FA muss aktiv sein. App-Passwort (16 Zeichen) erzeugen unter:",
+  "admin.settings.mail.adminRecipientHint": "Forward-Adresse für Admin-Notifications (Job-Crash, Token-Cap, Budget-Overrun). Leer = an alle aktiven Admin-User. Gesetzt = ersetzt diese Liste komplett; die Adresse muss keinem App-Account entsprechen.",
   "admin.settings.test.connection": "Verbindung testen",
   "admin.settings.test.oauth":   "OAuth prüfen",
   "admin.settings.test.smtp":    "Test-Mail senden",
