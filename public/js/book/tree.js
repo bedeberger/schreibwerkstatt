@@ -268,7 +268,7 @@ export const treeMethods = {
   async loadBooks(opts = {}) {
     try {
       this.setStatus(this.t('tree.connecting'), true);
-      this.books = await contentRepo.listBooks();
+      this.books = await contentRepo.listBooks({ fresh: opts.fresh === true });
       // Wake-Refresh: Caller (_refreshAfterWake) triggert loadPages selbst mit source='wake'.
       // Hier weiterzureichen würde Tree erneut clearen (loadPages ohne source) → Flicker.
       // skipPages: für Metadaten-only-Refreshes (Kategorie/Tag/Rename) — Pagetree bleibt stehen.

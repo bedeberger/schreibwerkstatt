@@ -41,7 +41,7 @@ export const bookCreateMethods = {
       const dlg = this.$refs?.bookCreateDialog;
       if (dlg && dlg.open) dlg.close();
       this.bookCreateName = '';
-      await this.loadBooks();
+      await this.loadBooks({ fresh: true });
       this.selectedBookId = String(created.id);
       if (this.toggleBookSettingsCard) {
         if (!this.showBookSettingsCard) this.toggleBookSettingsCard();
