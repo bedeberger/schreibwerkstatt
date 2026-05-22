@@ -192,6 +192,19 @@
 .editor-card--fullscreen .page-content-view--editing {
   max-height: none;
 }
+/* Im Vollbild scrollt die Karte selbst; Header (Titel + Page-Actions) bleibt
+   am oberen Rand sichtbar, damit Save/Cancel/Focus jederzeit erreichbar sind.
+   Sticky-Anchor an top:0 relativ zur scrollenden Karte; Padding-Top der Karte
+   scrollt darunter weg und der Header schnappt an die Viewport-Kante. */
+.editor-card--fullscreen .card-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--color-surface);
+  margin-inline: -1.25rem;
+  margin-top: -1.25rem;
+  padding: 1.25rem 1.25rem var(--space-md);
+}
 /* Im Edit-Modus kein text-wrap:pretty/balance — sonst rebalanciert der Browser
    bei jedem Keystroke die letzten Zeilen, Buchstaben hüpfen sichtbar zwischen
    Zeilen ("nervös"). Standard-Wrap reicht. */

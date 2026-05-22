@@ -186,7 +186,11 @@ export const notebookEditMethods = {
     app.pageEditorFullscreen = prefs.fullscreen;
     app.pageEditorFitWidth = prefs.fitWidth;
     if (prefs.fitWidth) {
-      setTimeout(() => { if (app.editMode && app.pageEditorFitWidth) this._applyFitWidthZoom(); }, 0);
+      setTimeout(() => {
+        if (!app.editMode || !app.pageEditorFitWidth) return;
+        this._applyFitWidthZoom();
+        this._installFitWidthObserver();
+      }, 0);
     }
   },
 
@@ -205,6 +209,7 @@ export const notebookEditMethods = {
     clearNormalSnapshot();
     this._stopAutosave();
     this._uninstallOnlineRetry();
+    this._uninstallFitWidthObserver();
     app._editCounterCtx?.teardown?.();
     app._stopPresenceHeartbeat?.();
     app._releaseEditLock?.(app.currentPage?.id);
@@ -314,6 +319,7 @@ export const notebookEditMethods = {
         clearNormalSnapshot();
         this._stopAutosave();
         this._uninstallOnlineRetry();
+        this._uninstallFitWidthObserver();
         app._editCounterCtx?.teardown?.();
         app._stopPresenceHeartbeat?.();
         app._releaseEditLock?.(app.currentPage?.id);
@@ -466,6 +472,30 @@ export const notebookEditMethods = {
     this._markEditDirty();
   },
 
+  // Copy/Cut nur als text/plain — Notebook-Editor wird als Notizbuch genutzt,
+  // Fragmente landen in fremden Apps. HTML-Clipboard schleppt Inline-Styles
+  // und Custom-Klassen (z.B. .poem, lektorat-Marks) mit, die dort kaputt
+  // rendern oder als Müll erscheinen.
+  _onEditCopy(e) {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed) return;
+    const text = sel.toString();
+    if (!text) return;
+    e.preventDefault();
+    e.clipboardData.setData('text/plain', text);
+  },
+
+  _onEditCut(e) {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed) return;
+    const text = sel.toString();
+    if (!text) return;
+    e.preventDefault();
+    e.clipboardData.setData('text/plain', text);
+    document.execCommand('delete');
+    this._markEditDirty();
+  },
+
   _markEditDirty() {
     const app = window.__app;
     if (!app?.editMode) return;
@@ -579,7 +609,9 @@ export const notebookEditMethods = {
     const next = !app.pageEditorFitWidth;
     if (next) {
       this._applyFitWidthZoom();
+      this._installFitWidthObserver();
     } else {
+      this._uninstallFitWidthObserver();
       app.pageEditorZoom = 1;
     }
     app.pageEditorFitWidth = next;
@@ -601,6 +633,28 @@ export const notebookEditMethods = {
       const ratio = containerW / readingW;
       app.pageEditorZoom = Math.min(2.5, Math.max(1, Math.round(ratio * 10) / 10));
     }
+  },
+
+  // Container-Breite ändert sich bei Fullscreen-Toggle, Window-Resize,
+  // Sidebar-Collapse. Observer hält Fit-Width-Zoom synchron — Intent
+  // (Bool) lebt in localStorage, Zoom wird immer aus Layout abgeleitet.
+  _installFitWidthObserver() {
+    const app = window.__app;
+    if (!app || app._fitWidthObserver) return;
+    const wrap = this._getEditEl()?.closest('.page-editor-wrap');
+    if (!wrap) return;
+    const obs = new ResizeObserver(() => {
+      if (app.editMode && app.pageEditorFitWidth) this._applyFitWidthZoom();
+    });
+    obs.observe(wrap);
+    app._fitWidthObserver = obs;
+  },
+
+  _uninstallFitWidthObserver() {
+    const app = window.__app;
+    if (!app?._fitWidthObserver) return;
+    app._fitWidthObserver.disconnect();
+    app._fitWidthObserver = null;
   },
 
   pageEditorZoomIn() {

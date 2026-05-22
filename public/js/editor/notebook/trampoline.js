@@ -27,6 +27,8 @@ export const notebookTrampoline = {
   // Half-public — von Templates/anderen Modulen (synonyme, find, focus, toolbar,
   // app-view, book-editor-card) erwartet.
   _onEditPaste(e) { card()?._onEditPaste(e); },
+  _onEditCopy(e) { card()?._onEditCopy(e); },
+  _onEditCut(e) { card()?._onEditCut(e); },
   _markEditDirty() { card()?._markEditDirty(); },
   _flushDraftSaveNow() { card()?._flushDraftSaveNow(); },
   _stopAutosave() { card()?._stopAutosave(); },

@@ -178,6 +178,18 @@ export const BOOK_CHAT_TOOLS = [
     input_schema: { type: 'object', properties: {}, required: [] },
   },
   {
+    name: 'list_figures',
+    description: 'Flacher Figurenkatalog des Buchs: pro Figur fig_id, Name, Kurzname, Typ, Rolle, Präsenz und Gesamt-Erwähnungen (aus Index). Leichtgewichtig – ideal als Einstieg, um zu wissen, welche Figuren existieren und welche IDs für die anderen Figuren-Tools nötig sind. Nicht nutzen für Detail einer Figur (Profil, Beziehungen, Lebensereignisse) – dafür `get_figure_profile`.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        sort:  { type: 'string', enum: ['mentions_desc', 'name', 'presence_desc'], description: 'Reihenfolge. Default: mentions_desc (häufigste zuerst).' },
+        limit: { type: 'integer', description: 'Maximale Anzahl (default 50, max 200).' },
+      },
+      required: [],
+    },
+  },
+  {
     name: 'count_pronouns',
     description: 'Zählt Pronomen im ganzen Buch (Summe) oder pro Kapitel (per_chapter=true). Unterscheidet narrativen Text und Dialog. Ideal für Fragen zur Erzählperspektive ("kommt der Ich-Erzähler häufiger vor?").',
     input_schema: {
@@ -218,12 +230,14 @@ export const BOOK_CHAT_TOOLS = [
   },
   {
     name: 'search_passages',
-    description: 'Durchsucht das Buch nach Textstellen. Liefert Treffer mit Kurzkontext (Snippet). Standard: case-insensitive Literal-Suche; mit regex=true als Regex. Nutze dies, wenn du nicht weisst, wo etwas steht, oder ob es überhaupt vorkommt. Nicht nutzen, wenn du bereits page_ids kennst und den vollen Seitentext brauchst – dafür `get_pages`. Auch nicht für Figuren-Auftritte – dafür `get_figure_mentions`.',
+    description: 'Durchsucht das Buch nach Textstellen. Liefert Treffer mit Kurzkontext (Snippet). Standard: case-insensitive Literal-Suche; mit regex=true als Regex. Mit chapter_id/page_id auf ein Kapitel oder eine Seite einschränken (sinnvoll bei häufigen Begriffen, sonst spammt das Buch-weite Resultat). Nutze dies, wenn du nicht weisst, wo etwas steht, oder ob es überhaupt vorkommt. Nicht nutzen, wenn du bereits page_ids kennst und den vollen Seitentext brauchst – dafür `get_pages`. Auch nicht für Figuren-Auftritte – dafür `get_figure_mentions`.',
     input_schema: {
       type: 'object',
       properties: {
         pattern:     { type: 'string',  description: 'Suchmuster (literal oder Regex).' },
         regex:       { type: 'boolean', description: 'true = pattern als Regex interpretieren. Default: false.' },
+        chapter_id:  { type: 'integer', description: 'Optional: Suche auf ein Kapitel einschränken.' },
+        page_id:     { type: 'integer', description: 'Optional: Suche auf eine einzelne Seite einschränken (überschreibt chapter_id-Wirkung).' },
         max_results: { type: 'integer', description: 'Maximale Anzahl Treffer (default 10, max 30).' },
       },
       required: ['pattern'],
@@ -442,8 +456,20 @@ export const BOOK_CHAT_TOOLS = [
     },
   },
   {
+    name: 'list_revisions',
+    description: 'Listet die gespeicherten Revisionen einer Seite (neueste zuerst): rev_id, created_at, source (focus/main/book/chat-apply/lektorat-apply/import/conflict), chars, words, summary. Plus total_revisions. Voraussetzung, um gezielt `diff_page_revisions` zwischen bestimmten Revisionen zu rufen, statt nur den Default-Pfad (zwei jüngste) zu nehmen.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        page_id: { type: 'integer', description: 'Seiten-ID (Pflicht).' },
+        limit:   { type: 'integer', description: 'Maximale Anzahl Revisionen (default 20, max 100).' },
+      },
+      required: ['page_id'],
+    },
+  },
+  {
     name: 'diff_page_revisions',
-    description: 'Vergleicht zwei Revisionen einer Seite (Plain-Text-Word-Diff). Ohne from_rev_id/to_rev_id: die zwei jüngsten Revisionen. Liefert summary{add,del,change}, chars_delta und blocks[{kind:add/del/change, text|from/to}]. Beantwortet "was hat sich an Seite X seit letztem Edit geändert?", "wie hat sich der Text entwickelt?". Revision-IDs holst du dir aktuell nicht über ein Tool – sinnvollerweise nutzt du den Default-Pfad (die zwei jüngsten).',
+    description: 'Vergleicht zwei Revisionen einer Seite (Plain-Text-Word-Diff). Ohne from_rev_id/to_rev_id: die zwei jüngsten Revisionen. Liefert summary{add,del,change}, chars_delta und blocks[{kind:add/del/change, text|from/to}]. Beantwortet "was hat sich an Seite X seit letztem Edit geändert?", "wie hat sich der Text entwickelt?". Für gezielten Vergleich vorher `list_revisions` rufen, um rev_ids zu holen.',
     input_schema: {
       type: 'object',
       properties: {

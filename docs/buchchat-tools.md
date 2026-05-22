@@ -26,13 +26,14 @@ Jede Tool-Funktion: `(input, ctx) → JSON-serialisierbares Objekt` (sync oder a
 
 ## Tools
 
-26 Tools, gruppiert nach Domäne. Alle Read-Only ausser `final_answer` (Pflicht-Endpunkt, kein DB-Read).
+29 Tools, gruppiert nach Domäne. Alle Read-Only ausser `final_answer` (Pflicht-Endpunkt, kein DB-Read).
 
 ### Buch/Kapitel-Überblick
 
 | Tool | Input | Zweck | Quelle |
 |------|-------|-------|--------|
 | `list_chapters` | – | Alle Kapitel + Seiten (`pages[{page_id,page_name,words}]`), `total_pages`/`total_words`. Einstieg für IDs. | `chapters` + `pages` + `page_stats` |
+| `list_figures` | `sort?` (`mentions_desc`/`name`/`presence_desc`), `limit?` (default 50, max 200) | Flacher Figurenkatalog: `fig_id`, Name, Kurzname, Typ, Rolle, Präsenz, `mentions` (Summe aus Index). Light-Einstieg vor ID-basierten Folge-Calls. | `figures` + `page_figure_mentions` |
 | `get_chapter_stats` | `chapter_id` | Wortzahl, Sätze, Dialoganteil, Top-Figuren-Erwähnungen eines Kapitels. | `page_stats` + `page_figure_mentions` |
 | `get_stil_metrics` | `scope: book/chapter/page`, `chapter_id?`, `metric?`, `order?`, `limit?` | Aggregat aus `page_stats`: words/chars/sentences/dialog/filler/passive/adverb/avg_sentence_len/p90/LIX/Flesch. `scope=page` sortiert Top-N. | `page_stats` |
 | `count_pronouns` | `per_chapter?`, `pronouns?[]` | Pronomen-Zählung (Narrativ vs. Dialog). Pronomen-Gruppen: `ich`, `du`, `er`, `sie_sg`, `wir`, `ihr_pl`, `man`. | `page_stats` (Pronomen-Buckets) |
@@ -43,7 +44,7 @@ Jede Tool-Funktion: `(input, ctx) → JSON-serialisierbares Objekt` (sync oder a
 | Tool | Input | Zweck | Quelle |
 |------|-------|-------|--------|
 | `get_pages` | `ids: integer[]` (max 20), `max_chars_per_page?` | Volltext bestimmter Seiten + falls vorhanden `latest_check {checked_at, error_count, fazit, stilanalyse}` aus `page_checks`. | Content-Store-Facade `loadPage(id)` (backend-agnostisch) + `page_checks` |
-| `search_passages` | `pattern`, `regex?`, `max_results?` (default 10, max 30) | Volltext-Suche; liefert Treffer mit Snippet ±120 Zeichen. Offsets kompatibel mit `quote_passage`. | `pages.preview_text` → `htmlToText` |
+| `search_passages` | `pattern`, `regex?`, `chapter_id?`, `page_id?`, `max_results?` (default 10, max 30) | Volltext-Suche; liefert Treffer mit Snippet ±120 Zeichen. Mit `chapter_id`/`page_id` auf Kapitel/Seite eingrenzbar. Offsets kompatibel mit `quote_passage`. | `pages.preview_text` → `htmlToText` |
 | `quote_passage` | `page_id`, `offset`, `length` (max 800), `context_chars?` (default 80, max 300) | Zeichen-genaues Zitat aus einer Seite. Liefert `quote`, `before`/`after`, `page_chars`. Pflicht-Werkzeug vor jeder wörtlichen Zitierung in `final_answer` — kein „aus Erinnerung paraphrasieren". | Content-Store `loadPage` → `htmlToPlainText` |
 | `find_repetitions` | `n?` (2-5, default 3), `scope?` (book/chapter/page), `chapter_id?`/`page_id?`, `min_count?`, `limit?` (default 30, max 100), `ignore_stopwords?` | N-Gramm-Frequenzanalyse mit Stopwort-Filter (DE+EN). Returns `results[{phrase, count, sample_pages}]`. Sprach-Tics/redundante Phrasen. | `pages.body_html` → `htmlToPlainText` |
 | `get_dialogue` | `chapter_id?`, `page_id?`, `figur_id?`/`figur_name?`, `min_length?`, `limit?` (default 30, max 100) | Heuristische Dialog-Extraktion (Anführungszeichen, Speech-Verb+Doppelpunkt, Em-Dash) via `findDialogRanges` aus [lib/page-index.js](../lib/page-index.js). Mit Figur-Filter: ±100-Zeichen-Sprecherheuristik. Offsets kompatibel mit `quote_passage`. | `pages.body_html` → `htmlToPlainText` + `findDialogRanges` |
@@ -83,6 +84,7 @@ Jede Tool-Funktion: `(input, ctx) → JSON-serialisierbares Objekt` (sync oder a
 
 | Tool | Input | Zweck | Quelle |
 |------|-------|-------|--------|
+| `list_revisions` | `page_id`, `limit?` (default 20, max 100) | Revisionsliste einer Seite: `rev_id`, `created_at`, `source`, `chars`, `words`, `summary`. Plus `total_revisions`. Vorstufe zu `diff_page_revisions` mit gezielten rev_ids. | `page_revisions` |
 | `diff_page_revisions` | `page_id`, `from_rev_id?`, `to_rev_id?` | Plain-Text-Word-Diff zweier Revisionen einer Seite (Default: zwei jüngste). Liefert `summary{add,del,change}`, `chars_delta`, `blocks[{kind, text\|from/to}]`. Max 100 Blöcke, je 600 Zeichen geclampt. | `page_revisions` + `jsdiff.diffWordsWithSpace` |
 
 ### Ideen / Werkstatt

@@ -313,11 +313,21 @@ async function tool_search_passages(input, ctx) {
   try { re = _buildSearchRegex(pattern, !!input.regex); }
   catch (e) { return { error: `Ungültiges Regex-Muster: ${e.message}` }; }
 
-  // Kandidaten: zuerst preview_text (gecacht) scannen. Bei Treffer → page_id merken,
-  // bis Limit erreicht ist oder Preview-Scan durch ist.
+  const scopeFilters = [];
+  const scopeParams  = [ctx.bookId];
+  if (Number.isInteger(input.chapter_id)) {
+    scopeFilters.push('chapter_id = ?');
+    scopeParams.push(input.chapter_id);
+  }
+  if (Number.isInteger(input.page_id)) {
+    scopeFilters.push('page_id = ?');
+    scopeParams.push(input.page_id);
+  }
+  const where = ['book_id = ?', 'preview_text IS NOT NULL', ...scopeFilters].join(' AND ');
+
   const pages = db.prepare(
-    'SELECT page_id, page_name, chapter_id, preview_text FROM pages WHERE book_id = ? AND preview_text IS NOT NULL'
-  ).all(ctx.bookId);
+    `SELECT page_id, page_name, chapter_id, preview_text FROM pages WHERE ${where}`
+  ).all(...scopeParams);
 
   const results = [];
   const deadline = Date.now() + 3000; // Hard-Timeout gegen ReDoS
@@ -347,6 +357,8 @@ async function tool_search_passages(input, ctx) {
   return _truncateResult({
     pattern,
     regex: !!input.regex,
+    ...(Number.isInteger(input.chapter_id) ? { chapter_id: input.chapter_id } : {}),
+    ...(Number.isInteger(input.page_id)    ? { page_id:    input.page_id    } : {}),
     results,
     note: pages.length === 0
       ? 'Kein Seiten-Cache. Sync ausführen.'
@@ -1971,10 +1983,104 @@ async function tool_quote_passage(input, ctx) {
   };
 }
 
+// ── list_figures ──────────────────────────────────────────────────────────────
+
+const LIST_FIGURES_DEFAULT_LIMIT = 50;
+const LIST_FIGURES_MAX_LIMIT     = 200;
+
+function tool_list_figures(input, ctx) {
+  const userEmail = ctx.userEmail || null;
+  const limit = Math.min(Math.max(1, input?.limit || LIST_FIGURES_DEFAULT_LIMIT), LIST_FIGURES_MAX_LIMIT);
+  const sort = ['mentions_desc', 'name', 'presence_desc'].includes(input?.sort) ? input.sort : 'mentions_desc';
+
+  const rows = db.prepare(`
+    SELECT f.id, f.fig_id, f.name, f.kurzname, f.typ, f.rolle, f.praesenz,
+           COALESCE(SUM(pfm.count), 0) AS mentions
+    FROM figures f
+    LEFT JOIN page_figure_mentions pfm ON pfm.figure_id = f.id
+    LEFT JOIN pages p ON p.page_id = pfm.page_id AND p.book_id = f.book_id
+    WHERE f.book_id = ? AND f.user_email IS ?
+    GROUP BY f.id
+    ORDER BY f.sort_order, f.id
+  `).all(ctx.bookId, userEmail);
+
+  const PRES_ORDER = { 'haupt': 0, 'protagonist': 0, 'haupt-': 0, 'wichtig': 1, 'neben': 2, 'rand': 3, 'statist': 4 };
+  const presKey = (p) => {
+    if (!p) return 99;
+    const k = String(p).toLowerCase();
+    for (const key of Object.keys(PRES_ORDER)) if (k.includes(key)) return PRES_ORDER[key];
+    return 50;
+  };
+
+  const sorted = [...rows];
+  if (sort === 'mentions_desc') sorted.sort((a, b) => b.mentions - a.mentions || a.id - b.id);
+  else if (sort === 'name')      sorted.sort((a, b) => a.name.localeCompare(b.name));
+  else if (sort === 'presence_desc') sorted.sort((a, b) => presKey(a.praesenz) - presKey(b.praesenz) || b.mentions - a.mentions);
+
+  const sliced = sorted.slice(0, limit);
+  return _truncateResult({
+    total: rows.length,
+    results: sliced.map(r => ({
+      fig_id:   r.fig_id,
+      name:     r.name,
+      kurzname: r.kurzname || null,
+      typ:      r.typ || null,
+      rolle:    r.rolle || null,
+      praesenz: r.praesenz || null,
+      mentions: r.mentions,
+    })),
+    ...(sliced.length < rows.length ? { truncated: true, total_results: rows.length } : {}),
+  });
+}
+
+// ── list_revisions ────────────────────────────────────────────────────────────
+
+const LIST_REVISIONS_DEFAULT_LIMIT = 20;
+const LIST_REVISIONS_MAX_LIMIT     = 100;
+
+function tool_list_revisions(input, ctx) {
+  const pageId = input?.page_id;
+  if (!Number.isInteger(pageId)) return { error: 'page_id fehlt' };
+
+  const pageRow = db.prepare(`
+    SELECT p.page_id, p.page_name, p.chapter_id, c.chapter_name, p.book_id
+    FROM pages p
+    LEFT JOIN chapters c ON c.chapter_id = p.chapter_id AND c.book_id = p.book_id
+    WHERE p.page_id = ?
+  `).get(pageId);
+  if (!pageRow || pageRow.book_id !== ctx.bookId) {
+    return { error: 'Seite nicht im aktuellen Buch.' };
+  }
+
+  const limit = Math.min(Math.max(1, input?.limit || LIST_REVISIONS_DEFAULT_LIMIT), LIST_REVISIONS_MAX_LIMIT);
+  const total = pageRevisions.countForPage(pageId);
+  const revs  = pageRevisions.listForPage(pageId, limit);
+
+  return _truncateResult({
+    page_id:      pageId,
+    page_name:    pageRow.page_name,
+    chapter_id:   pageRow.chapter_id || null,
+    chapter_name: pageRow.chapter_name || null,
+    total_revisions: total,
+    results: revs.map(r => ({
+      rev_id:     r.id,
+      created_at: r.created_at,
+      source:     r.source,
+      user_email: r.user_email || null,
+      chars:      r.chars,
+      words:      r.words,
+      summary:    r.summary || null,
+    })),
+    ...(revs.length < total ? { truncated: true, total_results: total } : {}),
+  });
+}
+
 // ── Dispatch ──────────────────────────────────────────────────────────────────
 
 const TOOLS = {
   list_chapters:          tool_list_chapters,
+  list_figures:           tool_list_figures,
+  list_revisions:         tool_list_revisions,
   count_pronouns:         tool_count_pronouns,
   get_chapter_stats:      tool_get_chapter_stats,
   get_figure_mentions:    tool_get_figure_mentions,

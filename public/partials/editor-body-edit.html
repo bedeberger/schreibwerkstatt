@@ -50,6 +50,8 @@
        autocapitalize="off"
        @input="_markEditDirty()"
        @paste="_onEditPaste($event)"
+       @copy="_onEditCopy($event)"
+       @cut="_onEditCut($event)"
        @contextmenu="_onEditContextMenu($event)"
        @click="_onEditClick($event)"
        @pointermove="handleMarkPointer($event)"
