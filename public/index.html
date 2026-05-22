@@ -266,6 +266,19 @@
   <button type="button" class="session-banner-btn" @click="applyUpdate()" x-text="t('session.applyUpdate')"></button>
 </div>
 
+<!-- LanguageTool-Browser-Extension-Konflikt-Banner. Wird sichtbar, sobald
+     der Spellcheck-Controller die Extension am DOM erkennt. -->
+<div x-data="editorSpellcheckCard" x-show="showBanner" x-cloak
+     class="lt-extension-banner" role="status">
+  <div class="lt-extension-banner__text">
+    <div class="lt-extension-banner__title" x-text="$app.t('spellcheck.extension_conflict.title')"></div>
+    <div x-text="$app.t('spellcheck.extension_conflict.body')"></div>
+  </div>
+  <button type="button" class="lt-extension-banner__dismiss"
+          @click="dismissBanner()"
+          x-text="$app.t('spellcheck.extension_conflict.dismiss')"></button>
+</div>
+
 <div class="site-header-row">
   <div class="site-header-center">
     <h1 @click="resetView()" class="site-title" :data-tip="t('app.titleReset')">

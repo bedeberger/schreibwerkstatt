@@ -50,7 +50,7 @@
     </div>
     <div class="focus-editor__content"
          contenteditable="true"
-         spellcheck="true"
+         :spellcheck="!$app.languagetoolEnabled"
          autocorrect="off"
          autocapitalize="off"
          @input="_markEditDirty()"

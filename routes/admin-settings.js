@@ -118,7 +118,7 @@ router.post('/test-oauth', async (req, res) => {
 // LanguageTool-URL. Pingt /v2/languages (no-Body, billig); ok wenn 200.
 router.post('/test-languagetool', async (req, res) => {
   const enabled = appSettings.get('languagetool.enabled') === true;
-  const url = String(appSettings.get('languagetool.url') || '').replace(/\/$/, '');
+  const url = String(appSettings.get('languagetool.url') || '').replace(/\/$/, '').replace(/\/v2$/i, '');
   if (!url) return res.json({ ok: false, error: 'NO_URL' });
   const t0 = Date.now();
   try {

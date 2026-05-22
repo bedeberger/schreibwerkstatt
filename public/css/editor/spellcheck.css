@@ -11,8 +11,10 @@
  */
 
 .lt-overlay {
+  /* Box (left/top/width/height) wird vom Controller je Render gesetzt,
+   * damit die Overlay-Flaeche exakt der Editor-Flaeche entspricht — auch
+   * wenn Toolbar/Padding ueber dem Editor liegen. */
   position: absolute;
-  inset: 0;
   pointer-events: none;
   z-index: var(--z-spellcheck);
 }

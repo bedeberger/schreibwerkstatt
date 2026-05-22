@@ -49,7 +49,8 @@ router.get('/config', (req, res) => {
     appTimezone: appSettings.get('app.timezone') || 'Europe/Zurich',
     appName: appSettings.get('app.name') || 'Schreibwerkstatt',
     languagetool: {
-      enabled: appSettings.get('languagetool.enabled') === true && !!String(appSettings.get('languagetool.url') || '').trim(),
+      enabled: appSettings.get('languagetool.enabled') === true
+        && !!String(appSettings.get('languagetool.url') || '').replace(/\/$/, '').replace(/\/v2$/i, '').trim(),
     },
   });
 });

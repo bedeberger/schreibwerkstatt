@@ -22,7 +22,7 @@ const TEXT_MAX = 200_000;
 
 router.post('/check', express.json({ limit: '256kb' }), async (req, res) => {
   const enabled = appSettings.get('languagetool.enabled') === true;
-  const url = String(appSettings.get('languagetool.url') || '').replace(/\/$/, '');
+  const url = String(appSettings.get('languagetool.url') || '').replace(/\/$/, '').replace(/\/v2$/i, '');
   if (!enabled || !url) {
     return res.status(404).json({ error: 'languagetool_disabled' });
   }

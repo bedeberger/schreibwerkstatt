@@ -33,6 +33,12 @@ const shellState = () => ({
   // <title>, apple-mobile-web-app-title, Site-Header-H1 und Locale-Platzhalter
   // `{appName}`. Default deckt Hard-Refresh ab, bevor /config geladen ist.
   appName: 'Schreibwerkstatt',
+  // LT-Spellcheck-Aktivierung. /config liefert
+  // `languagetool.enabled` (true wenn Admin enabled + URL gesetzt). Wird in
+  // Editor-Templates via `:spellcheck="!$app.languagetoolEnabled"` gelesen
+  // und vom Spellcheck-Controller (cards/editor-spellcheck/controller.js)
+  // als Master-Switch konsumiert.
+  languagetoolEnabled: false,
   // Plattform-Detect für Tasten-Hint-Anzeige (⌘ vs. Ctrl). Wird in init()
   // gesetzt; default true wäre auf Windows falsch, default false ist sichere
   // Annahme bevor JS gelaufen ist (Hero erscheint mit Ctrl, dann snap auf ⌘ falls Mac).

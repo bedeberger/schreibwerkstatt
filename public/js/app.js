@@ -59,6 +59,8 @@ import { registerEditorFigurLookupCard } from './cards/editor-figur-lookup-card.
 import { registerEditorToolbarCard } from './cards/editor-toolbar-card.js';
 import { registerEditorFocusCard } from './cards/editor-focus-card.js';
 import { registerEditorNotebookCard } from './cards/editor-notebook-card.js';
+import { registerEditorSpellcheckCard } from './cards/editor-spellcheck-card.js';
+import { setupSpellcheckDispatch } from './cards/editor-spellcheck/dispatch.js';
 import { registerLektoratFindingsCard } from './cards/lektorat-findings-card.js';
 import { registerPageHistoryCard } from './cards/page-history-card.js';
 import { registerPageRevisionsCard } from './cards/page-revisions-card.js';
@@ -252,6 +254,7 @@ document.addEventListener('alpine:init', () => {
   registerEditorToolbarCard();
   registerEditorFocusCard();
   registerEditorNotebookCard();
+  registerEditorSpellcheckCard();
   registerLektoratFindingsCard();
   registerPageHistoryCard();
   registerPageRevisionsCard();
@@ -511,6 +514,7 @@ document.addEventListener('alpine:init', () => {
       // während der initialen Hash-Anwendung erfasst werden.
       this.setupFeatureUsageWatchers();
       this.setupBlogSync();
+      setupSpellcheckDispatch(this);
       // Plattform-Detect für Tasten-Hints (⌘ vs. Ctrl).
       const ua = navigator.userAgent || '';
       const plat = navigator.platform || '';
@@ -623,6 +627,7 @@ document.addEventListener('alpine:init', () => {
           const meta = document.querySelector('meta[name="apple-mobile-web-app-title"]');
           if (meta) meta.setAttribute('content', cfg.appName);
         }
+        this.languagetoolEnabled = !!cfg.languagetool?.enabled;
 
         // Hash vorab auswerten, damit loadBooks das gewünschte Buch wählt.
         // _applyingHash unterdrückt Watcher/URL-Writes während der Initialisierung.

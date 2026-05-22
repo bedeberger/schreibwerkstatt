@@ -78,10 +78,21 @@ export function createSpellcheckController({
     overlay.className = 'lt-overlay';
     overlay.setAttribute('data-editor', editorKind);
     overlay.setAttribute('aria-hidden', 'true');
-    // Sibling zum root, damit absolute Positionierung gegen denselben
-    // offset-parent läuft. Root muss position:relative haben (CSS-Pflicht).
+    // Sibling zum root: positioniert gegen denselben offsetParent.
+    // Overlay-Box wird in _syncOverlayBox an root.offsetLeft/Top/Width/Height
+    // angeglichen, damit Squiggles relativ zur Editor-Flaeche sitzen — nicht
+    // zur ganzen Wrap (Toolbar + Editor).
     root.parentNode?.insertBefore(overlay, root.nextSibling);
+    _syncOverlayBox();
     return overlay;
+  }
+
+  function _syncOverlayBox() {
+    if (!overlay || !root) return;
+    overlay.style.left   = `${root.offsetLeft}px`;
+    overlay.style.top    = `${root.offsetTop}px`;
+    overlay.style.width  = `${root.offsetWidth}px`;
+    overlay.style.height = `${root.offsetHeight}px`;
   }
 
   function _removeOverlay() {
@@ -146,6 +157,7 @@ export function createSpellcheckController({
 
   function _renderMatches(matches, table) {
     _ensureOverlay();
+    _syncOverlayBox();
     overlay.replaceChildren();
     squiggles.clear();
     for (const m of matches) {
@@ -192,6 +204,7 @@ export function createSpellcheckController({
 
   function _reposition() {
     if (!attached || !overlay) return;
+    _syncOverlayBox();
     for (const entry of squiggles.values()) {
       const rects = Array.from(entry.range.getClientRects());
       // Match Count? Wenn Anzahl Rects sich zu den Spans nicht deckt — kompletter Re-Render im naechsten Check.
