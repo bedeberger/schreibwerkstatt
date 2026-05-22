@@ -97,9 +97,10 @@ export const adminSettingsMethods = {
   },
 
   async adminSettingsTest(kind) {
-    const path = kind === 'provider' ? '/admin/settings/test-provider'
-               : kind === 'oauth'    ? '/admin/settings/test-oauth'
-               : kind === 'smtp'     ? '/admin/settings/smtp/test-send'
+    const path = kind === 'provider'     ? '/admin/settings/test-provider'
+               : kind === 'oauth'        ? '/admin/settings/test-oauth'
+               : kind === 'smtp'         ? '/admin/settings/smtp/test-send'
+               : kind === 'languagetool' ? '/admin/settings/test-languagetool'
                : null;
     if (!path) return;
     this.adminSettingsTestResult = { kind, running: true };

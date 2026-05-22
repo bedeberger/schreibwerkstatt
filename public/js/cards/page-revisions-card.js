@@ -91,6 +91,13 @@ export function registerPageRevisionsCard() {
       return out && out !== key ? out : src;
     },
 
+    revisionNumber(rev) {
+      if (!rev?.id) return null;
+      const idx = this.revisions.findIndex(r => r.id === rev.id);
+      if (idx < 0) return null;
+      return this.revisions.length - idx;
+    },
+
     formatChars(n) {
       const app = window.__app;
       const locale = app?.uiLocale === 'en' ? 'en-US' : 'de-CH';

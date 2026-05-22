@@ -64,6 +64,17 @@
 }
 .edit-slash-item:hover,
 .edit-slash-item--active { background: var(--color-hover); }
+.edit-slash-query {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--color-text);
+}
+.edit-slash-empty {
+  padding: var(--space-6) 12px;
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
 
 /* Tabu im Fokus-Mode: strukturell kaltgestellt, unabhängig vom x-show.
    Scope auf `.focus-host` am Editor-Card (gesetzt in focus/card.js#enterFocusMode). */

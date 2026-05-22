@@ -1,8 +1,8 @@
 <!-- Focus-Mode-Cardroot (Top-Level): eigener contenteditable-Container,
      lebt als position:fixed-Overlay parallel zu #editor-card (siehe focus-mode.css).
-     focusActive=true blendet ihn ein und sortiert ihn über die Card; der Card-
-     Header bleibt im oberen Gap (--focus-overlay-top) sichtbar, damit Save-
-     Indicator + Focus-Live-Counter weiter erreichbar sind.
+     focusActive=true blendet ihn ein und sortiert ihn über die Card. Focus
+     rendert eigenen Header (.focus-editor__topbar); Notebook-Topbar wird im
+     focus-host komplett ausgeblendet — beide Editoren sind entkoppelt.
 
      Smart-Switch in shared/active-editor.js findet diesen Container über
      `.focus-editor.is-active` — solange .is-active fehlt, bleibt der Switch
@@ -13,30 +13,40 @@
      Mode-Sonderbehandlung funktionieren. -->
 <div x-data="editorFocusCard" class="display-contents">
   <div class="focus-editor" :class="{ 'is-active': focusActive }">
-    <!-- Mobile-only Action-Bar: Card-Header sitzt unter dem Overlay und ist auf
-         Touch nicht erreichbar (kein Hover → bleibt opacity-disabled, +
-         46px Top-Gap fasst die zwei stacked Header-Reihen nicht). -->
-    <div class="focus-editor__actions" aria-hidden="false">
-      <span class="save-indicator focus-editor__save-indicator"
-            x-show="$app.editMode || $app.lastSavedKind() !== 'none'"
-            :class="'save-indicator--' + $app.lastSavedKind()"
-            :data-tip="$app.saveIndicatorTip()">
-        <span class="save-indicator__dot" aria-hidden="true"></span>
-        <span class="save-indicator__text" x-text="$app.saveIndicatorText()"></span>
-      </span>
-      <button type="button" class="focus-editor__action focus-editor__action--save"
-              @click="$app.saveEdit()"
-              :disabled="$app.editSaving"
-              :aria-label="$app.t('common.save')"
-              :data-tip="$app.t('editor.btn.saveEditTitle')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#check"/></svg>
-      </button>
-      <button type="button" class="focus-editor__action focus-editor__action--exit"
-              @click="exitFocusMode()"
-              :aria-label="$app.t('editor.btn.leaveFocus')"
-              :data-tip="$app.t('editor.btn.leaveFocusTitle')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#x"/></svg>
-      </button>
+    <!-- Eigener Focus-Header: voll entkoppelt von der Notebook-Topbar. Notebook-
+         Topbar wird in #editor-card.focus-host komplett ausgeblendet, Focus-
+         Overlay sitzt top:0. Header rendert Titel + Save-Indicator + Live-Counter
+         + Save/Exit-Buttons; identisch auf Desktop und Mobile. -->
+    <div class="focus-editor__topbar">
+      <div class="focus-editor__title-row">
+        <span class="focus-editor__title" x-text="$app.currentPage?.name || '–'"></span>
+        <span class="focus-editor__subline">
+          <span class="save-indicator focus-editor__save-indicator"
+                x-show="$app.editMode || $app.lastSavedKind() !== 'none'"
+                :class="'save-indicator--' + $app.lastSavedKind()"
+                :data-tip="$app.saveIndicatorTip()">
+            <span class="save-indicator__dot" aria-hidden="true"></span>
+            <span class="save-indicator__text" x-text="$app.saveIndicatorText()"></span>
+          </span>
+          <span class="focus-live-counter" x-show="$app.editMode">
+            <span x-text="$app.t('editor.focus.counterTotal', { words: $app.focusCountWords, chars: $app.focusCountChars })"></span>
+            <span class="focus-live-counter--today"
+                  x-text="$app.t('editor.focus.counterToday', { wordsDelta: $app.focusCountWordsDelta, charsDelta: $app.focusCountCharsDelta })"></span>
+          </span>
+        </span>
+      </div>
+      <div class="focus-editor__actions">
+        <button type="button" class="success"
+                @click="$app.saveEdit()"
+                :disabled="$app.editSaving"
+                :data-tip="$app.t('editor.btn.saveEditTitle')">
+          <span x-show="$app.editSaving" class="spinner"></span><span x-text="$app.editSaving ? $app.t('common.saving') : $app.t('common.save')"></span>
+        </button>
+        <button type="button"
+                @click="exitFocusMode()"
+                :data-tip="$app.t('editor.btn.leaveFocusTitle')"
+                x-text="$app.t('editor.btn.leaveFocus')"></button>
+      </div>
     </div>
     <div class="focus-editor__content"
          contenteditable="true"

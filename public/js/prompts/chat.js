@@ -206,19 +206,8 @@ export const BOOK_CHAT_TOOLS = [
     },
   },
   {
-    name: 'get_chapter_stats',
-    description: 'Zusammenfassende Statistik EINES Kapitels: Wortzahl, Satzzahl, Dialoganteil, Top-Figuren-Erwähnungen. Nicht nutzen für Buch-weite Aggregationen über mehrere/alle Kapitel – dafür `get_stil_metrics` (scope="chapter") oder `list_chapters`.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        chapter_id: { type: 'integer', description: 'ID des Kapitels (aus list_chapters).' },
-      },
-      required: ['chapter_id'],
-    },
-  },
-  {
     name: 'get_figure_mentions',
-    description: 'Wo und wie oft wird eine Figur erwähnt? Antwort nach Kapitel und Seite, mit Count je Seite. Ideal für "wann taucht X erstmals auf?", "in welchen Kapiteln kommt X häufig vor?". Leichtgewichtig – nur Auftrittsverteilung. Nicht nutzen für Profil, Beziehungen oder Lebensereignisse von X – dafür `get_figure_profile`. Gib figur_id (bevorzugt) ODER figur_name an.',
+    description: 'Wo und wie oft wird eine Figur erwähnt? Antwort nach Kapitel und Seite, mit Count je Seite. Liefert ausserdem `first_appearance`, `last_appearance`, `total_mentions`, `pages_with_mention` – deckt Arc-Tracking-Fragen ("wann zuerst, wann zuletzt?", "wie lange präsent?") direkt ab. Leichtgewichtig – nur Auftrittsverteilung. Nicht nutzen für Profil, Beziehungen oder Lebensereignisse von X – dafür `get_figure_profile`. Gib figur_id (bevorzugt) ODER figur_name an.',
     input_schema: {
       type: 'object',
       properties: {
@@ -256,14 +245,15 @@ export const BOOK_CHAT_TOOLS = [
     },
   },
   {
-    name: 'list_chapter_reviews',
-    description: 'Liefert die letzten Kapitelbewertungen für dieses Buch und diesen User: pro Kapitel gesamtnote (1.0–6.0), Stärken, Schwächen, Fazit, Zusammenfassung. Antwortet ohne weiteren KI-Call (liest gespeicherte chapter_reviews). Beantwortet direkt Fragen wie „welche Kapitel sind am stärksten/schwächsten?", „wo ist die Dramaturgie am besten?". ohne_bewertung listet noch nicht bewertete Kapitel.',
+    name: 'get_reviews',
+    description: 'Liefert gespeicherte Bewertungen für dieses Buch und diesen User. `scope="book"`: letzte Buchbewertung (gesamtnote 1.0–6.0, Stärken/Schwächen/Fazit/Zusammenfassung). `scope="chapter"` (Default): Liste der Kapitelbewertungen — pro Kapitel gesamtnote, Stärken, Schwächen, Fazit, Zusammenfassung; plus `ohne_bewertung[]` für noch nicht bewertete Kapitel. Antwortet ohne weiteren KI-Call. Beantwortet "wie gut ist das Buch insgesamt?" (book) bzw. "welche Kapitel sind am stärksten/schwächsten?" (chapter).',
     input_schema: {
       type: 'object',
       properties: {
-        chapter_ids: { type: 'array', items: { type: 'integer' }, description: 'Optional: nur diese Kapitel-IDs. Ohne Angabe: alle bewerteten Kapitel.' },
-        sort:        { type: 'string', enum: ['note_desc', 'note_asc', 'chapter'], description: 'Reihenfolge der reviews. Default: note_desc (stärkste zuerst).' },
-        limit:       { type: 'integer', description: 'Maximale Anzahl Reviews (default 30, max 100).' },
+        scope:       { type: 'string', enum: ['book', 'chapter'], description: 'Aggregations-Scope. Default: chapter.' },
+        chapter_ids: { type: 'array', items: { type: 'integer' }, description: 'Nur für scope=chapter: filtert auf diese Kapitel-IDs. Ohne Angabe: alle bewerteten Kapitel.' },
+        sort:        { type: 'string', enum: ['note_desc', 'note_asc', 'chapter'], description: 'Nur für scope=chapter. Default: note_desc (stärkste zuerst).' },
+        limit:       { type: 'integer', description: 'Nur für scope=chapter. Default 30, max 100.' },
       },
       required: [],
     },
@@ -321,11 +311,6 @@ export const BOOK_CHAT_TOOLS = [
     },
   },
   {
-    name: 'get_book_review',
-    description: 'Liefert die letzte gespeicherte Buchbewertung dieses Users: gesamtnote (1.0–6.0), Stärken, Schwächen, Fazit, Zusammenfassung, Modell, Datum. Antwortet ohne KI-Call (liest book_reviews). Beantwortet "wie gut ist das Buch insgesamt?" anhand der existierenden Bewertung. Nicht nutzen für Kapitel-weise Stärken/Schwächen oder Vergleich zwischen Kapiteln – dafür `list_chapter_reviews`.',
-    input_schema: { type: 'object', properties: {}, required: [] },
-  },
-  {
     name: 'list_ideen',
     description: 'Listet die Notizen/Ideen, die der User zu einzelnen Seiten oder ganzen Kapiteln gespeichert hat (mit Kapitel-/Seitenkontext). Jede Idee hat `scope: "page"` oder `"chapter"`. Ideal um offene Anmerkungen aufzugreifen, oder zu beantworten "was wollte ich an Kapitel X noch ändern?". Filterbar nach erledigt, page_id, chapter_id (Chapter-Filter umfasst sowohl direkt-am-Kapitel-Ideen als auch Ideen zu Seiten des Kapitels). Offene Ideen erscheinen zuerst.',
     input_schema: {
@@ -354,26 +339,27 @@ export const BOOK_CHAT_TOOLS = [
   },
   {
     name: 'get_stil_metrics',
-    description: 'Stil- und Lesbarkeitsmetriken aus page_stats. Drei Modi via scope: "book" (Aggregat über das ganze Buch), "chapter" (Aufschlüsselung pro Kapitel), "page" (Top-N-Seiten nach einer Metrik). Liefert words/chars/sentences/dialog_chars/dialog_ratio_percent/filler_count/passive_count/adverb_count/avg_sentence_len/sentence_len_p90/lix/flesch_de. Ideal für "wie viel Passiv im Buch?", "welche Kapitel haben am meisten Dialog?", "welche Seiten haben höchsten LIX (schwere Lesbarkeit)?". Nicht nutzen für Fehleranzahl/Lektorat-Hotspots – dafür `get_lektorat_hotspots`. Metriken zählen Satzmerkmale strukturell, nicht qualitative Findings.',
+    description: 'Stil- und Lesbarkeitsmetriken aus page_stats. Drei Modi via scope: "book" (Aggregat über das ganze Buch), "chapter" (Aufschlüsselung pro Kapitel, optional gefiltert via chapter_id), "page" (Top-N-Seiten nach einer Metrik). Liefert words/chars/sentences/dialog_chars/dialog_ratio_percent/filler_count/passive_count/adverb_count/avg_sentence_len/sentence_len_p90/lix/flesch_de. Mit `include_figures=true` (nur scope=chapter) kommen pro Kapitel Top-5-Figuren-Erwähnungen mit. Ideal für "wie viel Passiv im Buch?", "welche Kapitel haben am meisten Dialog?", "welche Seiten haben höchsten LIX?", "wer ist in Kapitel X am häufigsten?". Nicht nutzen für Fehleranzahl/Lektorat-Hotspots – dafür `get_lektorat_hotspots`.',
     input_schema: {
       type: 'object',
       properties: {
-        scope:      { type: 'string', enum: ['book', 'chapter', 'page'], description: 'Aggregations-Scope. Default: book.' },
-        chapter_id: { type: 'integer', description: 'Nur für scope=chapter: einzelnes Kapitel statt aller.' },
-        metric:     {
+        scope:           { type: 'string', enum: ['book', 'chapter', 'page'], description: 'Aggregations-Scope. Default: book.' },
+        chapter_id:      { type: 'integer', description: 'Nur für scope=chapter: einzelnes Kapitel statt aller.' },
+        include_figures: { type: 'boolean', description: 'Nur für scope=chapter: hängt pro Kapitel `top_figuren` (max 5) an.' },
+        metric:          {
           type: 'string',
           enum: ['filler_count', 'passive_count', 'adverb_count', 'sentences', 'dialog_chars', 'avg_sentence_len', 'sentence_len_p90', 'lix', 'flesch_de'],
           description: 'Nur für scope=page: nach welcher Metrik sortiert wird. Default: passive_count.',
         },
-        order:      { type: 'string', enum: ['asc', 'desc'], description: 'Nur für scope=page: Sortier-Richtung. Default: desc (höchster Wert zuerst).' },
-        limit:      { type: 'integer', description: 'Nur für scope=page: Anzahl Seiten (default 10, max 50).' },
+        order:           { type: 'string', enum: ['asc', 'desc'], description: 'Nur für scope=page: Sortier-Richtung. Default: desc (höchster Wert zuerst).' },
+        limit:           { type: 'integer', description: 'Nur für scope=page: Anzahl Seiten (default 10, max 50).' },
       },
       required: [],
     },
   },
   {
     name: 'list_locations',
-    description: 'Liefert alle Schauplätze/Orte des Buchs: Name, Typ, Beschreibung, Stimmung, erste Erwähnung, betroffene Kapitel (mit Häufigkeit), assoziierte Figuren. Pendant zu Figurenliste, aber für Orte. Filterbar nach chapter_id (nur Orte, die in diesem Kapitel vorkommen).',
+    description: 'Liefert alle Schauplätze/Orte des Buchs: Name, Typ, Beschreibung, Stimmung, erste Erwähnung, betroffene Kapitel (mit Häufigkeit), `last_chapter` (kapitel-genaues Arc-Ende), assoziierte Figuren. Pendant zu Figurenliste, aber für Orte. Filterbar nach chapter_id (nur Orte, die in diesem Kapitel vorkommen).',
     input_schema: {
       type: 'object',
       properties: {
@@ -399,20 +385,15 @@ export const BOOK_CHAT_TOOLS = [
     },
   },
   {
-    name: 'list_werkstatt_drafts',
-    description: 'Listet die Figuren-Werkstatt-Drafts dieses Users für das Buch: pro Draft Name, Archetyp, Quell-Figur (falls Import), notes-Vorschau, Anzahl Brainstorm-/Consistency-Läufe und Metadaten zum letzten KI-Lauf. Werkstatt-Drafts sind vom Katalog (get_figure_profile) getrennte Vorwärts-Entwicklungs-Mindmaps für Figuren. Beantwortet "an welchen Figuren arbeitet der User in der Werkstatt?".',
-    input_schema: { type: 'object', properties: {}, required: [] },
-  },
-  {
-    name: 'get_werkstatt_draft',
-    description: 'Lädt einen Werkstatt-Draft mit kompletter Mindmap (als hierarchischer Plaintext: eingerückte Bullet-Liste der Knoten in User-Locale aufgelöst) und optional die KI-Läufe (Brainstorm-Vorschläge, Consistency-Konflikte+Fazit) gekürzt. Ideal für "was hat der User für Figur X notiert?", "was kam beim Brainstorm raus?", "welche Inkonsistenzen wurden bei der Werkstatt-Figur gefunden?". draft_id (bevorzugt) ODER figur_name angeben.',
+    name: 'werkstatt_drafts',
+    description: 'Figuren-Werkstatt-Drafts dieses Users (Vorwärts-Entwicklungs-Mindmaps, vom Katalog/get_figure_profile getrennt). Ohne Argumente: Liste aller Drafts (Name, Archetyp, Quell-Figur, notes-Vorschau, Brainstorm-/Consistency-Counts, letzter Lauf). Mit `draft_id` oder `figur_name`: Detail-Modus inkl. Mindmap (eingerückter Plaintext in User-Locale) und – optional – die KI-Läufe (Brainstorm-Vorschläge, Consistency-Konflikte+Fazit) gekürzt. Beantwortet "an welchen Figuren arbeitet der User?", "was hat der User für Figur X notiert?", "was kam beim Brainstorm raus?".',
     input_schema: {
       type: 'object',
       properties: {
-        draft_id:     { type: 'integer', description: 'Draft-ID aus list_werkstatt_drafts.' },
-        figur_name:   { type: 'string',  description: 'Alternative: Name des Werkstatt-Drafts (exakt oder Substring).' },
-        include_runs: { type: 'boolean', description: 'true = KI-Läufe (Brainstorm/Consistency) mitliefern. Default: true.' },
-        run_limit:    { type: 'integer', description: 'Maximale Anzahl Läufe (default 5, max 20). Neueste zuerst.' },
+        draft_id:     { type: 'integer', description: 'Detail-Modus: Draft-ID aus dem List-Modus.' },
+        figur_name:   { type: 'string',  description: 'Detail-Modus alternativ: Name des Werkstatt-Drafts (exakt oder Substring).' },
+        include_runs: { type: 'boolean', description: 'Nur Detail-Modus: true = KI-Läufe mitliefern. Default: true.' },
+        run_limit:    { type: 'integer', description: 'Nur Detail-Modus: max. Anzahl Läufe (default 5, max 20).' },
       },
       required: [],
     },
@@ -478,19 +459,6 @@ export const BOOK_CHAT_TOOLS = [
         to_rev_id:   { type: 'integer', description: 'Optional: neuere Revision-ID (Default: neueste).' },
       },
       required: ['page_id'],
-    },
-  },
-  {
-    name: 'find_first_last_mention',
-    description: 'Liefert erste und letzte Erwähnung einer Figur oder eines Orts: für Figuren seiten-genau aus page_figure_mentions (mit total_mentions, pages_with_mention); für Orte kapitel-genau aus location_chapters (Seiten-genaue „last" gibt es nicht im Index). Ideal für Arc-Tracking: "wann taucht X zuerst auf, wann zuletzt?", "wie lange ist Y präsent?". Gib figur_id (bevorzugt) / figur_name ODER loc_id an.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        figur_id:   { type: 'string', description: 'fig_id der Figur.' },
-        figur_name: { type: 'string', description: 'Alternative: Name/Kurzname.' },
-        loc_id:     { type: 'string', description: 'loc_id des Orts.' },
-      },
-      required: [],
     },
   },
   {

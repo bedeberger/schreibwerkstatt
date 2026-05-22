@@ -3,44 +3,11 @@
      position:fixed nicht vom card-Transform-Kontext eingefangen wird. Sie
      wird separat als partial-editor-toolbar geladen. Die Sub-Komponente
      editorToolbarCard installiert selbst einen delegierten keydown-Listener
-     auf dem contenteditable — daher kein @keydown hier. -->
+     auf dem contenteditable — daher kein @keydown hier.
+     Die Page-Editor-Toolbar (Zoom/FitWidth/Fullscreen/HR) lebt im Card-
+     Topbar (editor-notebook.html), damit sie an der sticky Topbar haftet
+     und permanent sichtbar bleibt — besonders im Vollbild beim Scrollen. -->
 <div x-show="editMode && !focusActive" class="page-editor-wrap normal-editor">
-  <div class="page-editor-toolbar">
-    <button type="button" class="graph-tool-btn"
-            :data-tip="t('graph.zoomOut')" :aria-label="t('graph.zoomOut')"
-            @click="pageEditorZoomOut()">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#minus"/></svg>
-    </button>
-    <button type="button" class="graph-tool-btn"
-            :data-tip="t('graph.zoomIn')" :aria-label="t('graph.zoomIn')"
-            @click="pageEditorZoomIn()">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#plus"/></svg>
-    </button>
-    <button type="button" class="graph-tool-btn"
-            :data-tip="t('graph.reset')" :aria-label="t('graph.reset')"
-            @click="pageEditorZoomReset()">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#scan"/></svg>
-    </button>
-    <button type="button" class="graph-tool-btn"
-            :aria-pressed="pageEditorFitWidth"
-            :data-tip="pageEditorFitWidth ? t('editor.fitWidthOff') : t('editor.fitWidth')"
-            :aria-label="pageEditorFitWidth ? t('editor.fitWidthOff') : t('editor.fitWidth')"
-            @click="togglePageEditorFitWidth()">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#move-horizontal"/></svg>
-    </button>
-    <button type="button" class="graph-tool-btn"
-            :aria-pressed="pageEditorFullscreen"
-            :data-tip="pageEditorFullscreen ? t('graph.fullscreenClose') : t('graph.fullscreen')"
-            :aria-label="pageEditorFullscreen ? t('graph.fullscreenClose') : t('graph.fullscreen')"
-            @click="togglePageEditorFullscreen()">
-      <svg class="icon" aria-hidden="true"><use :href="pageEditorFullscreen ? '/icons.svg?v=636#minimize-2' : '/icons.svg?v=636#maximize-2'"/></svg>
-    </button>
-    <button type="button" class="graph-tool-btn"
-            :data-tip="t('editor.toolbar.hrTitle')" :aria-label="t('editor.toolbar.hrTitle')"
-            @click="insertHorizontalRule()">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#separator-horizontal"/></svg>
-    </button>
-  </div>
   <div class="page-content-view page-content-view--editing"
        :class="{ 'page-content-view--fit-width': pageEditorFitWidth }"
        :style="`--editor-zoom: ${pageEditorZoom}`"

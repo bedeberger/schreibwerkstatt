@@ -43,6 +43,12 @@
   flex-wrap: wrap;
   gap: 0.5rem;
 }
+.revision-viewer__title {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-text);
+}
 .revision-viewer__close {
   font-size: var(--font-size-xl);
   line-height: 1;

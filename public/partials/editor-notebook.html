@@ -10,6 +10,10 @@
      x-show="showEditorCard" x-cloak
      :class="{ 'editor-card--fullscreen': pageEditorFullscreen }"
      @keydown.escape.window="pageEditorFullscreen && togglePageEditorFullscreen()">
+  <!-- Sticky-Region im Vollbild: Header + Save-Progress + Lektorat-Status +
+       Save-Bestätigung bleiben oben sichtbar, auch wenn die Karte gescrollt
+       wird. Wrapper umschliesst alles, was beim Speichern Feedback liefert. -->
+  <div class="editor-card__topbar">
   <div class="card-header card-header--subline">
     <div class="card-header-titlebar">
       <template x-if="currentPage && canEdit()">
@@ -160,6 +164,46 @@
   </div>
   <div class="card-status" x-show="checkStatus" x-html="checkStatus"></div>
   <div id="status" x-html="statusHtml"></div>
+  <!-- Page-Editor-Toolbar (Zoom/FitWidth/Fullscreen/HR). Lebt im Topbar, damit
+       sie über die bestehende Sticky-Region permanent sichtbar bleibt — auch
+       beim Scrollen tief in die Seite (Vollbild). -->
+  <div class="page-editor-toolbar" x-show="editMode && !focusActive" x-cloak>
+    <button type="button" class="graph-tool-btn"
+            :data-tip="t('graph.zoomOut')" :aria-label="t('graph.zoomOut')"
+            @click="pageEditorZoomOut()">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#minus"/></svg>
+    </button>
+    <button type="button" class="graph-tool-btn"
+            :data-tip="t('graph.zoomIn')" :aria-label="t('graph.zoomIn')"
+            @click="pageEditorZoomIn()">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#plus"/></svg>
+    </button>
+    <button type="button" class="graph-tool-btn"
+            :data-tip="t('graph.reset')" :aria-label="t('graph.reset')"
+            @click="pageEditorZoomReset()">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#scan"/></svg>
+    </button>
+    <button type="button" class="graph-tool-btn"
+            :aria-pressed="pageEditorFitWidth"
+            :data-tip="pageEditorFitWidth ? t('editor.fitWidthOff') : t('editor.fitWidth')"
+            :aria-label="pageEditorFitWidth ? t('editor.fitWidthOff') : t('editor.fitWidth')"
+            @click="togglePageEditorFitWidth()">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#move-horizontal"/></svg>
+    </button>
+    <button type="button" class="graph-tool-btn"
+            :aria-pressed="pageEditorFullscreen"
+            :data-tip="pageEditorFullscreen ? t('graph.fullscreenClose') : t('graph.fullscreen')"
+            :aria-label="pageEditorFullscreen ? t('graph.fullscreenClose') : t('graph.fullscreen')"
+            @click="togglePageEditorFullscreen()">
+      <svg class="icon" aria-hidden="true"><use :href="pageEditorFullscreen ? '/icons.svg?v=636#minimize-2' : '/icons.svg?v=636#maximize-2'"/></svg>
+    </button>
+    <button type="button" class="graph-tool-btn"
+            :data-tip="t('editor.toolbar.hrTitle')" :aria-label="t('editor.toolbar.hrTitle')"
+            @click="insertHorizontalRule()">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#separator-horizontal"/></svg>
+    </button>
+  </div>
+  </div><!-- /editor-card__topbar -->
 
   <!-- Live-Presence-Hinweis: andere User editieren dieselbe Seite gerade.
        Kein Block — nur Hinweis, damit kein Schock beim spaeteren 409.  -->

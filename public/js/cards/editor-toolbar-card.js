@@ -22,6 +22,7 @@ export function registerEditorToolbarCard() {
     slashX: 0,
     slashY: 0,
     slashIdx: 0,
+    slashQuery: '',
     _slashBlock: null,
     _toolbarAbort: null,
 
@@ -46,6 +47,18 @@ export function registerEditorToolbarCard() {
         const target = e.target;
         if (!target?.closest?.('.page-content-view--editing, .focus-editor__content')) return;
         this._onEditKeydown(e);
+      }, { signal });
+
+      // Checkbox-Toggle in todo-Listen: contenteditable schluckt den nativen
+      // Toggle. Attribut (nicht nur Property) setzen, damit Serialisierung
+      // den State persistiert.
+      document.addEventListener('click', (e) => {
+        const t = e.target;
+        if (!t || t.tagName !== 'INPUT' || t.type !== 'checkbox') return;
+        if (!t.closest('.page-content-view--editing ul.todo, .focus-editor__content ul.todo')) return;
+        if (t.hasAttribute('checked')) t.removeAttribute('checked');
+        else t.setAttribute('checked', '');
+        window.__app?._markEditDirty?.();
       }, { signal });
     },
 

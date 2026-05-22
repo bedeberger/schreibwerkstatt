@@ -114,6 +114,27 @@ router.post('/test-oauth', async (req, res) => {
   }
 });
 
+// POST /admin/settings/test-languagetool — Health-Probe der konfigurierten
+// LanguageTool-URL. Pingt /v2/languages (no-Body, billig); ok wenn 200.
+router.post('/test-languagetool', async (req, res) => {
+  const enabled = appSettings.get('languagetool.enabled') === true;
+  const url = String(appSettings.get('languagetool.url') || '').replace(/\/$/, '');
+  if (!url) return res.json({ ok: false, error: 'NO_URL' });
+  const t0 = Date.now();
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 5000);
+    const r = await fetch(`${url}/v2/languages`, { signal: ctrl.signal });
+    clearTimeout(timer);
+    if (!r.ok) return res.json({ ok: false, status: r.status, latency_ms: Date.now() - t0, enabled });
+    const j = await r.json().catch(() => null);
+    const count = Array.isArray(j) ? j.length : 0;
+    return res.json({ ok: true, status: r.status, latency_ms: Date.now() - t0, language_count: count, enabled });
+  } catch (e) {
+    return res.json({ ok: false, error: e.name === 'AbortError' ? 'TIMEOUT' : e.message, latency_ms: Date.now() - t0, enabled });
+  }
+});
+
 // POST /admin/settings/smtp/test-send { to? } — sendet ein 'test'-Template
 // an `to` (Default: Gmail-User des Mailers). Liefert { ok, latencyMs, error? }.
 router.post('/smtp/test-send', express.json(), async (req, res) => {

@@ -259,12 +259,15 @@ Banner-Render: einmaliger Container über Editor, i18n-Keys `spellcheck.extensio
 
 ### Sprach-Mapping
 
-`books.language` → LT-Param:
-- `de` → `de-CH`
-- `en` → `en-GB`
-- sonst → `auto`
+Buch hat zwei Spalten: `books.language` (`de`/`en`, [routes/booksettings.js#VALID_LANGUAGES](routes/booksettings.js)) + `books.region` (`CH`/`DE`/`US`/`GB`, [routes/booksettings.js#VALID_REGIONS](routes/booksettings.js)). LT-Locale = `${language}-${region}`.
 
-Hartcodiert in Controller, kein Per-Buch-Override im MVP.
+Erlaubte Kombinationen (von LT supported):
+- `de-CH`, `de-DE`, `de-AT` (falls künftig ergänzt)
+- `en-US`, `en-GB`
+
+Falls `language` oder `region` null/leer → Fallback `auto` (LT erkennt selbst).
+
+Mapping-Funktion in Controller, liest aus `$app.currentBook` (Alpine-Reactive). Kein User-Override im MVP — wenn künftig nötig: `books.languagetool_locale`-Spalte (out-of-scope).
 
 ### Card-Registry
 

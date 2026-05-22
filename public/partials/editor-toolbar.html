@@ -29,7 +29,10 @@
          class="edit-slash-menu"
          :style="{ left: slashX + 'px', bottom: slashY + 'px' }"
          @click.outside="_closeSlash()">
-      <div class="edit-slash-hint" x-text="$app.t('editor.slash.hint')"></div>
+      <div class="edit-slash-hint">
+        <span x-show="!slashQuery" x-text="$app.t('editor.slash.hint')"></span>
+        <span x-show="slashQuery" class="edit-slash-query" x-text="'/' + slashQuery"></span>
+      </div>
       <template x-for="(it, i) in slashItems()" :key="it.key">
         <button type="button"
                 class="edit-slash-item"
@@ -39,6 +42,8 @@
                 @mouseenter="slashIdx = i"
                 x-text="it.label"></button>
       </template>
+      <div x-show="slashItems().length === 0" class="edit-slash-empty"
+           x-text="$app.t('editor.slash.noMatch')"></div>
     </div>
   </template>
 </div>

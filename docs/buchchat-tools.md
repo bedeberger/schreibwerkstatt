@@ -26,7 +26,7 @@ Jede Tool-Funktion: `(input, ctx) → JSON-serialisierbares Objekt` (sync oder a
 
 ## Tools
 
-29 Tools, gruppiert nach Domäne. Alle Read-Only ausser `final_answer` (Pflicht-Endpunkt, kein DB-Read).
+24 Tools, gruppiert nach Domäne. Alle Read-Only ausser `final_answer` (Pflicht-Endpunkt, kein DB-Read).
 
 ### Buch/Kapitel-Überblick
 
@@ -34,8 +34,7 @@ Jede Tool-Funktion: `(input, ctx) → JSON-serialisierbares Objekt` (sync oder a
 |------|-------|-------|--------|
 | `list_chapters` | – | Alle Kapitel + Seiten (`pages[{page_id,page_name,words}]`), `total_pages`/`total_words`. Einstieg für IDs. | `chapters` + `pages` + `page_stats` |
 | `list_figures` | `sort?` (`mentions_desc`/`name`/`presence_desc`), `limit?` (default 50, max 200) | Flacher Figurenkatalog: `fig_id`, Name, Kurzname, Typ, Rolle, Präsenz, `mentions` (Summe aus Index). Light-Einstieg vor ID-basierten Folge-Calls. | `figures` + `page_figure_mentions` |
-| `get_chapter_stats` | `chapter_id` | Wortzahl, Sätze, Dialoganteil, Top-Figuren-Erwähnungen eines Kapitels. | `page_stats` + `page_figure_mentions` |
-| `get_stil_metrics` | `scope: book/chapter/page`, `chapter_id?`, `metric?`, `order?`, `limit?` | Aggregat aus `page_stats`: words/chars/sentences/dialog/filler/passive/adverb/avg_sentence_len/p90/LIX/Flesch. `scope=page` sortiert Top-N. | `page_stats` |
+| `get_stil_metrics` | `scope: book/chapter/page`, `chapter_id?`, `include_figures?`, `metric?`, `order?`, `limit?` | Aggregat aus `page_stats`: words/chars/sentences/dialog/filler/passive/adverb/avg_sentence_len/p90/LIX/Flesch. `scope=page` sortiert Top-N. `scope=chapter` + `include_figures=true` hängt Top-5-Figuren-Erwähnungen pro Kapitel an. | `page_stats` (+ `page_figure_mentions` bei `include_figures`) |
 | `count_pronouns` | `per_chapter?`, `pronouns?[]` | Pronomen-Zählung (Narrativ vs. Dialog). Pronomen-Gruppen: `ich`, `du`, `er`, `sie_sg`, `wir`, `ihr_pl`, `man`. | `page_stats` (Pronomen-Buckets) |
 | `get_book_settings` | – | Sprache, Region, Buchtyp (Label aufgelöst), Erzählperspektive + Erzählzeit (Label via [routes/jobs/narrative-labels.js](../routes/jobs/narrative-labels.js)), `buch_kontext` (User-Vorgaben an die KI), `is_finished`, `daily_goal_chars`. Pflicht vor stil-/sprachbezogenen Antworten. | `book_settings` + `books.name` |
 
@@ -53,24 +52,22 @@ Jede Tool-Funktion: `(input, ctx) → JSON-serialisierbares Objekt` (sync oder a
 
 | Tool | Input | Zweck | Quelle |
 |------|-------|-------|--------|
-| `get_figure_mentions` | `figur_id` ∨ `figur_name` | Wo + wie oft eine Figur erwähnt wird, nach Kapitel/Seite. | `page_figure_mentions` |
+| `get_figure_mentions` | `figur_id` ∨ `figur_name` | Wo + wie oft eine Figur erwähnt wird, nach Kapitel/Seite. Liefert ausserdem `first_appearance`, `last_appearance`, `total_mentions`, `pages_with_mention` (Arc-Tracking). | `page_figure_mentions` |
 | `get_figure_profile` | `figur_id` ∨ `figur_name` | Vollprofil: Stammdaten, Tags, Zitate, Lebensereignisse, Szenen, Kapitelauftritte, alle Beziehungen (beide Richtungen). | `figures` + `figure_events` + `figure_scenes` + `figure_relations` + `figure_appearances` |
 | `get_figure_relations` | `figur_id?` ∨ `figur_name?` | Soziogramm: alle Kanten oder nur die einer Figur. Typ, Beschreibung, Machtverhältnis, bis zu 3 Belege. | `figure_relations` |
-| `find_first_last_mention` | `figur_id?` ∨ `figur_name?` ∨ `loc_id?` | Erste + letzte Erwähnung. Figuren seiten-genau aus `page_figure_mentions`, Orte kapitel-genau aus `location_chapters` (+ `locations.erste_erwaehnung_page_id`). Arc-Tracking. | `page_figure_mentions` / `location_chapters` |
 
 ### Orte / Szenen
 
 | Tool | Input | Zweck | Quelle |
 |------|-------|-------|--------|
-| `list_locations` | `chapter_id?` | Alle Schauplätze + Typ, Beschreibung, Stimmung, erste Erwähnung, betroffene Kapitel (mit Häufigkeit), assoziierte Figuren. | `locations` + `location_chapters` + `location_figures` |
+| `list_locations` | `chapter_id?` | Alle Schauplätze + Typ, Beschreibung, Stimmung, erste Erwähnung, betroffene Kapitel (mit Häufigkeit), `last_chapter` (Arc-Ende kapitel-genau), assoziierte Figuren. | `locations` + `location_chapters` + `location_figures` |
 | `list_scenes` | `chapter_id?`, `page_id?`, `figur_id?` ∨ `figur_name?`, `loc_id?`, `limit?` (default 50, max 200) | Szenenkatalog mit Titel, Wertung, Kommentar, Kontext, beteiligte Figuren/Orte. | `figure_scenes` + Bridges |
 
 ### Reviews / Lektorat
 
 | Tool | Input | Zweck | Quelle |
 |------|-------|-------|--------|
-| `get_book_review` | – | Letzte Buchbewertung des Users (gesamtnote, Stärken/Schwächen, Fazit, Zusammenfassung). | `book_reviews` |
-| `list_chapter_reviews` | `chapter_ids?[]`, `sort?` (`note_desc`/`note_asc`/`chapter`), `limit?` (default 30, max 100) | Kapitelbewertungen + `ohne_bewertung[]`. | `chapter_reviews` |
+| `get_reviews` | `scope?` (`book`/`chapter`, default `chapter`), `chapter_ids?[]`, `sort?`, `limit?` | `scope=book`: letzte Buchbewertung (gesamtnote, Stärken/Schwächen, Fazit, Zusammenfassung). `scope=chapter`: Kapitelbewertungen + `ohne_bewertung[]`. | `book_reviews` / `chapter_reviews` |
 | `get_lektorat_hotspots` | `chapter_id?`, `min_errors?`, `limit?` (default 20, max 100) | Aggregat über `page_checks` (letzter Check pro Seite): pro Kapitel total/avg/max Fehler + Top-N-Seiten mit Fazit-Snippet. | `page_checks` |
 
 ### Kontinuität / Zeitstrahl
@@ -92,8 +89,7 @@ Jede Tool-Funktion: `(input, ctx) → JSON-serialisierbares Objekt` (sync oder a
 | Tool | Input | Zweck | Quelle |
 |------|-------|-------|--------|
 | `list_ideen` | `erledigt?`, `page_id?`, `chapter_id?`, `limit?` (default 50, max 200) | Seiten-Ideen/Notizen des Users. Offene zuerst. | `ideen` |
-| `list_werkstatt_drafts` | – | Figuren-Werkstatt-Drafts des Users für das Buch: Name, Archetyp, Quell-Figur, notes-Vorschau, Run-Counts. | `draft_figures` + `werkstatt_runs` |
-| `get_werkstatt_draft` | `draft_id` ∨ `figur_name`, `include_runs?` (default true), `run_limit?` (default 5, max 20) | Werkstatt-Draft inkl. Mindmap (eingerückter Plaintext, User-Locale aufgelöst) + KI-Läufe (Brainstorm/Consistency) gekürzt. | `draft_figures` + `werkstatt_runs` |
+| `werkstatt_drafts` | `draft_id?` ∨ `figur_name?`, `include_runs?` (default true), `run_limit?` (default 5, max 20) | Ohne Selector: Liste aller Werkstatt-Drafts (Name, Archetyp, Quell-Figur, notes-Vorschau, Run-Counts, letzter Lauf). Mit `draft_id`/`figur_name`: Detail inkl. Mindmap (eingerückter Plaintext, User-Locale aufgelöst) + KI-Läufe (Brainstorm/Consistency) gekürzt. | `draft_figures` + `werkstatt_runs` |
 
 ### Endpunkt
 

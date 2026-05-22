@@ -8,9 +8,14 @@
 // `!$app.focusActive` gegated – die Partial-Instanz lebt weiter, reagiert
 // aber nicht mehr.
 
+import { getEditEl, placeCaretIn, WORD_RE } from '../utils.js';
+import { tzOpts, localeTag } from '../../utils.js';
+
 // Blocktyp-Definitionen für Slash-Transform. `tag` ist das Zielelement;
-// `className` optional (aktuell nur für .poem). `list: true` wrappt den
-// Inhalt in ein <li>.
+// `className` optional (aktuell für .poem + .todo). `list: true` wrappt den
+// Inhalt in ein <li>. `todoList: true` erzeugt eine Checkbox-Liste.
+// `insertText: 'date'|'time'|'datetime'` ersetzt den Block durch einen
+// formatierten Datums-/Zeit-Stempel.
 const SLASH_ITEMS = [
   { key: 'paragraph',  tag: 'p' },
   { key: 'h2',         tag: 'h2' },
@@ -18,10 +23,30 @@ const SLASH_ITEMS = [
   { key: 'blockquote', tag: 'blockquote', wrapP: true },
   { key: 'poem',       tag: 'div', className: 'poem', wrapP: true },
   { key: 'list',       tag: 'ul', list: true },
+  { key: 'todo',       tag: 'ul', className: 'todo', todoList: true },
   { key: 'hr',         tag: 'hr' },
+  { key: 'heute',      insertText: 'date' },
+  { key: 'jetzt',      insertText: 'datetime' },
+  { key: 'zeit',       insertText: 'time' },
 ];
 
-import { getEditEl, placeCaretIn, WORD_RE } from '../utils.js';
+// Datums-/Zeit-Stempel im uiLocale + appTimezone. Kein Locale-Param —
+// liest live aus dem Root.
+function _formatStamp(kind) {
+  const app = window.__app;
+  const tag = localeTag(app?.uiLocale);
+  const d = new Date();
+  if (kind === 'date') {
+    return d.toLocaleDateString(tag, tzOpts({ day: '2-digit', month: '2-digit', year: 'numeric' }));
+  }
+  if (kind === 'time') {
+    return d.toLocaleTimeString(tag, tzOpts({ hour: '2-digit', minute: '2-digit' }));
+  }
+  // 'datetime'
+  const date = d.toLocaleDateString(tag, tzOpts({ day: '2-digit', month: '2-digit', year: 'numeric' }));
+  const time = d.toLocaleTimeString(tag, tzOpts({ hour: '2-digit', minute: '2-digit' }));
+  return `${date} ${time}`;
+}
 
 const BLOCK_SEL = 'p, h1, h2, h3, h4, h5, h6, blockquote, pre, li, div.poem';
 
@@ -29,6 +54,21 @@ function findBlock(node, root) {
   let cur = node && node.nodeType === 3 ? node.parentNode : node;
   while (cur && cur !== root) {
     if (cur.nodeType === 1 && cur.matches?.(BLOCK_SEL)) return cur;
+    cur = cur.parentNode;
+  }
+  return null;
+}
+
+// Liefert das umschliessende <li class="todo-item">, falls die Caret-Position
+// in einer Checkbox-Liste liegt. Sonst null.
+function findTodoLi(node, root) {
+  let cur = node && node.nodeType === 3 ? node.parentNode : node;
+  while (cur && cur !== root) {
+    if (cur.nodeType === 1 && cur.tagName === 'LI'
+        && cur.parentNode?.tagName === 'UL'
+        && cur.parentNode.classList?.contains('todo')) {
+      return cur;
+    }
     cur = cur.parentNode;
   }
   return null;
@@ -96,12 +136,18 @@ export const toolbarCardMethods = {
   // der Spread in der Alpine-data-Fabrik würde sonst sofort `this.t`
   // aufrufen (auf toolbarCardMethods selbst), bevor die Komponente steht, und
   // die gesamte Initialisierung scheitern lassen.
+  // Filter: Substring-Match (case-insensitive) auf Label + Key, damit
+  // sowohl DE-Labels („Über") als auch interne Keys („h2") tippbar sind.
   slashItems() {
     const app = window.__app;
-    return SLASH_ITEMS.map(it => ({
+    const q = (this.slashQuery || '').trim().toLowerCase();
+    const items = SLASH_ITEMS.map(it => ({
       key: it.key,
       label: app?.t('editor.slash.' + it.key) || it.key,
     }));
+    if (!q) return items;
+    return items.filter(it =>
+      it.label.toLowerCase().includes(q) || it.key.toLowerCase().includes(q));
   },
 
   _onEditKeydown(e) {
@@ -115,6 +161,54 @@ export const toolbarCardMethods = {
     if (e.key === 'Enter' && e.shiftKey) {
       e.preventDefault();
       document.execCommand('insertLineBreak');
+      app._markEditDirty?.();
+      return;
+    }
+
+    // Enter in einer Checkbox-Liste: neues <li class="todo-item"> mit eigener
+    // Checkbox einfügen. Leere todo-li → aus der Liste raus in <p>.
+    if (e.key === 'Enter' && !e.shiftKey) {
+      const editEl = getEditEl();
+      const sel = editEl ? document.getSelection() : null;
+      if (sel && sel.rangeCount > 0) {
+        const li = findTodoLi(sel.getRangeAt(0).startContainer, editEl);
+        if (li) {
+          e.preventDefault();
+          const text = (li.querySelector('.todo-text')?.textContent || '').trim();
+          if (!text) {
+            // Leere todo-li → in <p> hinter der Liste konvertieren, alte li raus.
+            const ul = li.parentNode;
+            const p = document.createElement('p');
+            p.appendChild(document.createElement('br'));
+            ul.parentNode.insertBefore(p, ul.nextSibling);
+            li.remove();
+            if (!ul.querySelector('li')) ul.remove();
+            placeCaretIn(p);
+          } else {
+            const newLi = document.createElement('li');
+            newLi.className = 'todo-item';
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            const span = document.createElement('span');
+            span.className = 'todo-text';
+            span.appendChild(document.createElement('br'));
+            newLi.appendChild(cb);
+            newLi.appendChild(span);
+            li.parentNode.insertBefore(newLi, li.nextSibling);
+            placeCaretIn(span);
+          }
+          app._markEditDirty?.();
+          return;
+        }
+      }
+    }
+
+    // Cmd/Ctrl+; → Datum, Cmd/Ctrl+Shift+; → Datum+Zeit. Bewährter Office-
+    // Shortcut, im Browser noch frei.
+    if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === ';' || e.code === 'Semicolon')) {
+      e.preventDefault();
+      const stamp = _formatStamp(e.shiftKey ? 'datetime' : 'date');
+      document.execCommand('insertText', false, stamp);
       app._markEditDirty?.();
       return;
     }
@@ -150,11 +244,38 @@ export const toolbarCardMethods = {
     // Slash-Menü-Navigation, wenn geöffnet
     if (this.slashShow) {
       if (e.key === 'Escape')    { e.preventDefault(); this._closeSlash(); return; }
-      if (e.key === 'ArrowDown') { e.preventDefault(); this.slashIdx = (this.slashIdx + 1) % SLASH_ITEMS.length; return; }
-      if (e.key === 'ArrowUp')   { e.preventDefault(); this.slashIdx = (this.slashIdx - 1 + SLASH_ITEMS.length) % SLASH_ITEMS.length; return; }
-      if (e.key === 'Enter')     { e.preventDefault(); this._applySlashItem(SLASH_ITEMS[this.slashIdx]); return; }
-      // Jede andere (Zeichen-)Taste schliesst das Menü.
-      if (e.key.length === 1) { this._closeSlash(); /* Zeichen läuft weiter durch */ }
+      const filtered = this.slashItems();
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (filtered.length) this.slashIdx = (this.slashIdx + 1) % filtered.length;
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (filtered.length) this.slashIdx = (this.slashIdx - 1 + filtered.length) % filtered.length;
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const pick = filtered[this.slashIdx];
+        if (pick) this._applySlashByKey(pick.key);
+        return;
+      }
+      if (e.key === 'Backspace') {
+        e.preventDefault();
+        if (!this.slashQuery) { this._closeSlash(); return; }
+        this.slashQuery = this.slashQuery.slice(0, -1);
+        this.slashIdx = 0;
+        return;
+      }
+      // Druckbare Zeichen filtern die Liste, statt das Menü zu schliessen.
+      // Modifier-Combos (Ctrl/Meta/Alt + Buchstabe) durchlassen.
+      if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        this.slashQuery += e.key;
+        this.slashIdx = 0;
+        return;
+      }
       return;
     }
 
@@ -177,6 +298,7 @@ export const toolbarCardMethods = {
   _openSlashAt(block) {
     this._slashBlock = block;
     this.slashIdx = 0;
+    this.slashQuery = '';
     const rect = block.getBoundingClientRect();
     this.slashX = rect.left;
     this.slashY = Math.max(4, window.innerHeight - rect.top + 4);
@@ -185,6 +307,7 @@ export const toolbarCardMethods = {
 
   _closeSlash() {
     this.slashShow = false;
+    this.slashQuery = '';
     this._slashBlock = null;
     getEditEl()?.focus();
   },
@@ -199,6 +322,27 @@ export const toolbarCardMethods = {
     const block = this._slashBlock;
     if (!editEl || !block || !block.parentNode) { this._closeSlash(); return; }
 
+    // Datums-/Zeit-Stempel: ersetzt den (per Trigger leeren) Block durch
+    // einen <p> mit dem formatierten Stempel-String. Caret hinter den Text,
+    // damit der User direkt weiterschreiben kann.
+    if (item.insertText) {
+      const stamp = _formatStamp(item.insertText);
+      const p = document.createElement('p');
+      p.textContent = stamp;
+      block.parentNode.replaceChild(p, block);
+      const sel = document.getSelection();
+      if (sel) {
+        const range = document.createRange();
+        range.selectNodeContents(p);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+      window.__app?._markEditDirty?.();
+      this._closeSlash();
+      return;
+    }
+
     let replacement;
     let caretTarget;
 
@@ -209,10 +353,27 @@ export const toolbarCardMethods = {
       next.appendChild(document.createElement('br'));
       replacement.insertAdjacentElement('afterend', next);
       caretTarget = next;
+    } else if (item.todoList) {
+      // Checkbox-Liste: <ul class="todo"><li class="todo-item">
+      //   <input type=checkbox><span class="todo-text"><br></span></li></ul>
+      replacement = document.createElement('ul');
+      replacement.className = 'todo';
+      const li = document.createElement('li');
+      li.className = 'todo-item';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      const span = document.createElement('span');
+      span.className = 'todo-text';
+      span.appendChild(document.createElement('br'));
+      li.appendChild(cb);
+      li.appendChild(span);
+      replacement.appendChild(li);
+      block.parentNode.replaceChild(replacement, block);
+      caretTarget = span;
     } else if (item.list) {
       replacement = document.createElement(item.tag);
       const li = document.createElement('li');
-      li.innerHTML = '<br>';
+      li.appendChild(document.createElement('br'));
       replacement.appendChild(li);
       block.parentNode.replaceChild(replacement, block);
       caretTarget = li;

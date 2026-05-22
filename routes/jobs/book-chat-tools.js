@@ -166,58 +166,6 @@ function tool_count_pronouns(input, ctx) {
   return { chapters, scope: 'chapters', pronouns: filterKeys };
 }
 
-// ── get_chapter_stats ─────────────────────────────────────────────────────────
-
-function tool_get_chapter_stats(input, ctx) {
-  const chapterId = input.chapter_id;
-  if (chapterId == null) throw new Error('chapter_id fehlt');
-
-  const chRow = db.prepare('SELECT chapter_id, chapter_name FROM chapters WHERE chapter_id = ? AND book_id = ?')
-    .get(chapterId, ctx.bookId);
-  if (!chRow) return { chapter_id: chapterId, error: 'Kapitel nicht gefunden' };
-
-  const pages = db.prepare(`
-    SELECT p.page_id, p.page_name, ps.words, ps.chars, ps.sentences, ps.dialog_chars, ps.pronoun_counts
-    FROM pages p
-    LEFT JOIN page_stats ps ON ps.page_id = p.page_id
-    WHERE p.chapter_id = ? AND p.book_id = ?
-    ORDER BY p.page_id
-  `).all(chapterId, ctx.bookId);
-
-  let words = 0, chars = 0, sentences = 0, dialogChars = 0;
-  for (const p of pages) {
-    words += p.words || 0;
-    chars += p.chars || 0;
-    sentences += p.sentences || 0;
-    dialogChars += p.dialog_chars || 0;
-  }
-  const dialogRatio = chars > 0 ? Math.round((dialogChars / chars) * 1000) / 1000 : 0;
-
-  // Top-5 Figuren dieses Kapitels
-  const topFiguren = db.prepare(`
-    SELECT f.fig_id, f.name, f.user_email, SUM(pfm.count) AS total
-    FROM page_figure_mentions pfm
-    JOIN pages p  ON p.page_id = pfm.page_id
-    JOIN figures f ON f.id = pfm.figure_id
-    WHERE p.chapter_id = ? AND p.book_id = ? AND f.user_email IS ?
-    GROUP BY f.id
-    ORDER BY total DESC
-    LIMIT 5
-  `).all(chapterId, ctx.bookId, ctx.userEmail || null);
-
-  return {
-    chapter_id: chapterId,
-    chapter_name: chRow.chapter_name,
-    pages: pages.length,
-    words,
-    sentences,
-    chars,
-    dialog_chars: dialogChars,
-    dialog_ratio: dialogRatio,
-    top_figuren: topFiguren.map(f => ({ fig_id: f.fig_id, name: f.name, mentions: f.total })),
-  };
-}
-
 // ── get_figure_mentions ───────────────────────────────────────────────────────
 
 function _findFigure(input, ctx) {
@@ -266,10 +214,9 @@ function tool_get_figure_mentions(input, ctx) {
   }
 
   const total = mentions.reduce((s, m) => s + m.count, 0);
-  // Erstes Vorkommen
   const first = mentions[0];
+  const last  = mentions[mentions.length - 1];
 
-  // Nach Kapitel gruppieren
   const byChapter = new Map();
   for (const m of mentions) {
     const key = m.chapter_id ?? 0;
@@ -283,11 +230,20 @@ function tool_get_figure_mentions(input, ctx) {
     fig_id: figRow.fig_id,
     name: figRow.name,
     total_mentions: total,
+    pages_with_mention: mentions.length,
     first_appearance: {
       chapter_id: first.chapter_id,
       chapter_name: first.chapter_name || '(ohne Kapitel)',
       page_id: first.page_id,
       page_name: first.page_name,
+      count: first.count,
+    },
+    last_appearance: {
+      chapter_id: last.chapter_id,
+      chapter_name: last.chapter_name || '(ohne Kapitel)',
+      page_id: last.page_id,
+      page_name: last.page_name,
+      count: last.count,
     },
     by_chapter: [...byChapter.values()],
   });
@@ -435,12 +391,49 @@ async function tool_get_pages(input, ctx) {
   });
 }
 
-// ── list_chapter_reviews ─────────────────────────────────────────────────────
+// ── get_reviews ──────────────────────────────────────────────────────────────
 
 const CHAPTER_REVIEW_FAZIT_CHARS = 400;
 const CHAPTER_REVIEW_DEFAULT_LIMIT = 30;
+const BOOK_REVIEW_FAZIT_CHARS = 600;
 
-function tool_list_chapter_reviews(input, ctx) {
+function _getBookReview(ctx) {
+  const userEmail = ctx.userEmail || null;
+  const row = db.prepare(`
+    SELECT br.reviewed_at, br.review_json, br.model, b.name AS book_name
+    FROM book_reviews br
+    LEFT JOIN books b ON b.book_id = br.book_id
+    WHERE br.book_id = ? AND br.user_email IS ?
+    ORDER BY br.reviewed_at DESC
+    LIMIT 1
+  `).get(ctx.bookId, userEmail);
+  if (!row) {
+    return { scope: 'book', hint: 'Noch keine Buchbewertung vorhanden. Job „Buchbewertung" ausführen.' };
+  }
+  let parsed = null;
+  try { parsed = row.review_json ? JSON.parse(row.review_json) : null; } catch { parsed = null; }
+  if (!parsed) {
+    return { scope: 'book', error: 'Buchbewertung kann nicht geparst werden.', reviewed_at: row.reviewed_at };
+  }
+  const fazit = parsed.fazit || null;
+  return _truncateResult({
+    scope: 'book',
+    book_name: row.book_name || null,
+    reviewed_at: row.reviewed_at,
+    gesamtnote: typeof parsed.gesamtnote === 'number' ? parsed.gesamtnote : null,
+    zusammenfassung: parsed.zusammenfassung || null,
+    fazit: fazit && fazit.length > BOOK_REVIEW_FAZIT_CHARS
+      ? fazit.slice(0, BOOK_REVIEW_FAZIT_CHARS) + '…'
+      : fazit,
+    staerken: Array.isArray(parsed.staerken) ? parsed.staerken : [],
+    schwaechen: Array.isArray(parsed.schwaechen) ? parsed.schwaechen : [],
+    model: row.model || null,
+  });
+}
+
+function tool_get_reviews(input, ctx) {
+  const scope = input?.scope === 'book' ? 'book' : 'chapter';
+  if (scope === 'book') return _getBookReview(ctx);
   const userEmail = ctx.userEmail || null;
   const chapterIdsFilter = Array.isArray(input?.chapter_ids)
     ? input.chapter_ids.filter(n => Number.isInteger(n))
@@ -508,6 +501,7 @@ function tool_list_chapter_reviews(input, ctx) {
     .map(c => ({ chapter_id: c.chapter_id, chapter_name: c.chapter_name }));
 
   return _truncateResult({
+    scope: 'chapter',
     reviews: limited,
     total,
     sort,
@@ -875,46 +869,6 @@ function tool_get_timeline(input, ctx) {
   });
 }
 
-// ── get_book_review ───────────────────────────────────────────────────────────
-
-const BOOK_REVIEW_FAZIT_CHARS = 600;
-
-function tool_get_book_review(_input, ctx) {
-  const userEmail = ctx.userEmail || null;
-  const row = db.prepare(`
-    SELECT br.reviewed_at, br.review_json, br.model, b.name AS book_name
-    FROM book_reviews br
-    LEFT JOIN books b ON b.book_id = br.book_id
-    WHERE br.book_id = ? AND br.user_email IS ?
-    ORDER BY br.reviewed_at DESC
-    LIMIT 1
-  `).get(ctx.bookId, userEmail);
-
-  if (!row) {
-    return { hint: 'Noch keine Buchbewertung vorhanden. Job „Buchbewertung" ausführen.' };
-  }
-
-  let parsed = null;
-  try { parsed = row.review_json ? JSON.parse(row.review_json) : null; } catch { parsed = null; }
-  if (!parsed) {
-    return { error: 'Buchbewertung kann nicht geparst werden.', reviewed_at: row.reviewed_at };
-  }
-
-  const fazit = parsed.fazit || null;
-  return _truncateResult({
-    book_name: row.book_name || null,
-    reviewed_at: row.reviewed_at,
-    gesamtnote: typeof parsed.gesamtnote === 'number' ? parsed.gesamtnote : null,
-    zusammenfassung: parsed.zusammenfassung || null,
-    fazit: fazit && fazit.length > BOOK_REVIEW_FAZIT_CHARS
-      ? fazit.slice(0, BOOK_REVIEW_FAZIT_CHARS) + '…'
-      : fazit,
-    staerken: Array.isArray(parsed.staerken) ? parsed.staerken : [],
-    schwaechen: Array.isArray(parsed.schwaechen) ? parsed.schwaechen : [],
-    model: row.model || null,
-  });
-}
-
 // ── list_ideen ────────────────────────────────────────────────────────────────
 
 const IDEEN_DEFAULT_LIMIT = 50;
@@ -1105,6 +1059,7 @@ function tool_get_stil_metrics(input, ctx) {
 
   if (scope === 'chapter') {
     const chapterFilter = Number.isInteger(input?.chapter_id) ? input.chapter_id : null;
+    const includeFigures = !!input?.include_figures;
     let sql = `
       SELECT p.chapter_id, c.chapter_name,
              COUNT(*) AS pages,
@@ -1126,20 +1081,39 @@ function tool_get_stil_metrics(input, ctx) {
     sql += ' GROUP BY p.chapter_id, c.chapter_name ORDER BY p.chapter_id';
     const rows = db.prepare(sql).all(...params);
     if (!rows.length) return { hint: 'Keine Stil-Metriken vorhanden.' };
+
+    const topFigStmt = includeFigures ? db.prepare(`
+      SELECT f.fig_id, f.name, SUM(pfm.count) AS total
+      FROM page_figure_mentions pfm
+      JOIN pages p  ON p.page_id = pfm.page_id
+      JOIN figures f ON f.id = pfm.figure_id
+      WHERE p.chapter_id = ? AND p.book_id = ? AND f.user_email IS ?
+      GROUP BY f.id
+      ORDER BY total DESC
+      LIMIT 5
+    `) : null;
+
     return _truncateResult({
       scope: 'chapter',
-      chapters: rows.map(r => ({
-        chapter_id: r.chapter_id,
-        chapter_name: r.chapter_name || '(ohne Kapitel)',
-        pages: r.pages, words: r.words, chars: r.chars,
-        sentences: r.sentences, dialog_chars: r.dialog_chars,
-        dialog_ratio_percent: r.chars ? Math.round((r.dialog_chars / r.chars) * 1000) / 10 : null,
-        filler_count: r.filler_count, passive_count: r.passive_count, adverb_count: r.adverb_count,
-        avg_sentence_len: r.avg_sentence_len ? Math.round(r.avg_sentence_len * 10) / 10 : null,
-        sentence_len_p90: r.sentence_len_p90 ? Math.round(r.sentence_len_p90 * 10) / 10 : null,
-        lix: r.lix != null ? Math.round(r.lix * 10) / 10 : null,
-        flesch_de: r.flesch_de != null ? Math.round(r.flesch_de * 10) / 10 : null,
-      })),
+      chapters: rows.map(r => {
+        const out = {
+          chapter_id: r.chapter_id,
+          chapter_name: r.chapter_name || '(ohne Kapitel)',
+          pages: r.pages, words: r.words, chars: r.chars,
+          sentences: r.sentences, dialog_chars: r.dialog_chars,
+          dialog_ratio_percent: r.chars ? Math.round((r.dialog_chars / r.chars) * 1000) / 10 : null,
+          filler_count: r.filler_count, passive_count: r.passive_count, adverb_count: r.adverb_count,
+          avg_sentence_len: r.avg_sentence_len ? Math.round(r.avg_sentence_len * 10) / 10 : null,
+          sentence_len_p90: r.sentence_len_p90 ? Math.round(r.sentence_len_p90 * 10) / 10 : null,
+          lix: r.lix != null ? Math.round(r.lix * 10) / 10 : null,
+          flesch_de: r.flesch_de != null ? Math.round(r.flesch_de * 10) / 10 : null,
+        };
+        if (includeFigures) {
+          const top = topFigStmt.all(r.chapter_id, ctx.bookId, ctx.userEmail || null);
+          out.top_figuren = top.map(f => ({ fig_id: f.fig_id, name: f.name, mentions: f.total }));
+        }
+        return out;
+      }),
     });
   }
 
@@ -1231,18 +1205,22 @@ function tool_list_locations(input, ctx) {
   }
 
   return _truncateResult({
-    locations: rows.map(r => ({
-      loc_id: r.loc_id,
-      name: r.name,
-      typ: r.typ || null,
-      beschreibung: r.beschreibung || null,
-      stimmung: r.stimmung || null,
-      erste_erwaehnung: r.erste_erwaehnung || null,
-      erste_erwaehnung_page_id: r.erste_erwaehnung_page_id || null,
-      erste_erwaehnung_page_name: r.erste_erwaehnung_page_name || null,
-      kapitel: chByLoc.get(r.id) || [],
-      figuren: fgByLoc.get(r.id) || [],
-    })),
+    locations: rows.map(r => {
+      const kap = chByLoc.get(r.id) || [];
+      return {
+        loc_id: r.loc_id,
+        name: r.name,
+        typ: r.typ || null,
+        beschreibung: r.beschreibung || null,
+        stimmung: r.stimmung || null,
+        erste_erwaehnung: r.erste_erwaehnung || null,
+        erste_erwaehnung_page_id: r.erste_erwaehnung_page_id || null,
+        erste_erwaehnung_page_name: r.erste_erwaehnung_page_name || null,
+        kapitel: kap,
+        last_chapter: kap.length ? kap[kap.length - 1] : null,
+        figuren: fgByLoc.get(r.id) || [],
+      };
+    }),
     total: rows.length,
   });
 }
@@ -1391,54 +1369,54 @@ function _findDraftByNameOrId(input, ctx) {
   return null;
 }
 
-function tool_list_werkstatt_drafts(_input, ctx) {
+function tool_werkstatt_drafts(input, ctx) {
   const userEmail = ctx.userEmail || '';
   const locale = _userLocale(userEmail);
-  const drafts = listDraftFigures(ctx.bookId, userEmail);
-  if (!drafts.length) {
-    return {
-      drafts: [],
-      hint: 'Keine Figuren-Werkstatt-Drafts vorhanden. User legt sie über die Werkstatt-Karte (tile.werkstatt) an.',
-    };
+
+  const hasSelector = Number.isInteger(input?.draft_id)
+    || (typeof input?.figur_name === 'string' && input.figur_name.trim());
+
+  if (!hasSelector) {
+    const drafts = listDraftFigures(ctx.bookId, userEmail);
+    if (!drafts.length) {
+      return {
+        drafts: [],
+        hint: 'Keine Figuren-Werkstatt-Drafts vorhanden. User legt sie über die Werkstatt-Karte (tile.werkstatt) an.',
+      };
+    }
+    const items = drafts.map(d => {
+      const runRows = listWerkstattRuns(d.id, userEmail);
+      const counts = { brainstorm: 0, consistency: 0 };
+      for (const r of runRows) {
+        if (r.kind === 'brainstorm') counts.brainstorm++;
+        else if (r.kind === 'consistency') counts.consistency++;
+      }
+      const lastRun = runRows[0] || null;
+      const notes = d.notes || null;
+      return {
+        draft_id: d.id,
+        name: d.name,
+        archetype: d.archetype || null,
+        source_figure_name: d.source_figure_name || null,
+        notes: notes && notes.length > WERKSTATT_NOTES_PREVIEW_CHARS
+          ? notes.slice(0, WERKSTATT_NOTES_PREVIEW_CHARS) + '…'
+          : notes,
+        updated_at: d.updated_at,
+        runs: counts,
+        ...(lastRun ? { last_run: _summarizeRunListItem(lastRun, locale) } : {}),
+      };
+    });
+    return _truncateResult({ drafts: items, total: items.length });
   }
 
-  const items = drafts.map(d => {
-    const runRows = listWerkstattRuns(d.id, userEmail);
-    const counts = { brainstorm: 0, consistency: 0 };
-    for (const r of runRows) {
-      if (r.kind === 'brainstorm') counts.brainstorm++;
-      else if (r.kind === 'consistency') counts.consistency++;
-    }
-    const lastRun = runRows[0] || null;
-    const notes = d.notes || null;
-    return {
-      draft_id: d.id,
-      name: d.name,
-      archetype: d.archetype || null,
-      source_figure_name: d.source_figure_name || null,
-      notes: notes && notes.length > WERKSTATT_NOTES_PREVIEW_CHARS
-        ? notes.slice(0, WERKSTATT_NOTES_PREVIEW_CHARS) + '…'
-        : notes,
-      updated_at: d.updated_at,
-      runs: counts,
-      ...(lastRun ? { last_run: _summarizeRunListItem(lastRun, locale) } : {}),
-    };
-  });
-
-  return _truncateResult({ drafts: items, total: items.length });
-}
-
-function tool_get_werkstatt_draft(input, ctx) {
-  const userEmail = ctx.userEmail || '';
   const draft = _findDraftByNameOrId(input, ctx);
   if (!draft) {
     return {
       error: 'Werkstatt-Draft nicht gefunden',
-      hint: 'Per draft_id (aus list_werkstatt_drafts) oder figur_name suchen.',
+      hint: 'Per draft_id (aus dem List-Modus ohne Argumente) oder figur_name suchen.',
     };
   }
 
-  const locale = _userLocale(userEmail);
   const resolvedRoot = draft.mindmap?.data ? resolveI18nTree(draft.mindmap.data, locale) : null;
   const mindmapText = resolvedRoot ? _flattenMindmapTree(resolvedRoot).join('\n') : '';
 
@@ -1842,93 +1820,6 @@ function tool_diff_page_revisions(input, ctx) {
   });
 }
 
-// ── find_first_last_mention ───────────────────────────────────────────────────
-
-function _firstLastForFigure(figRow, ctx) {
-  const rows = db.prepare(`
-    SELECT p.page_id, p.page_name, p.chapter_id, c.chapter_name, pfm.count
-    FROM page_figure_mentions pfm
-    JOIN pages p      ON p.page_id = pfm.page_id
-    LEFT JOIN chapters c ON c.chapter_id = p.chapter_id AND c.book_id = p.book_id
-    WHERE pfm.figure_id = ? AND p.book_id = ?
-    ORDER BY p.chapter_id, p.page_id
-  `).all(figRow.id, ctx.bookId);
-  if (!rows.length) return null;
-  const first = rows[0];
-  const last  = rows[rows.length - 1];
-  const total = rows.reduce((s, r) => s + r.count, 0);
-  return {
-    target_type: 'figure',
-    fig_id: figRow.fig_id,
-    name:   figRow.name,
-    first: {
-      page_id: first.page_id, page_name: first.page_name,
-      chapter_id: first.chapter_id, chapter_name: first.chapter_name || null,
-      count: first.count,
-    },
-    last: {
-      page_id: last.page_id, page_name: last.page_name,
-      chapter_id: last.chapter_id, chapter_name: last.chapter_name || null,
-      count: last.count,
-    },
-    total_mentions: total,
-    pages_with_mention: rows.length,
-  };
-}
-
-function _firstLastForLocation(locRow) {
-  const chs = db.prepare(`
-    SELECT lc.chapter_id, c.chapter_name, lc.haeufigkeit
-    FROM location_chapters lc
-    LEFT JOIN chapters c ON c.chapter_id = lc.chapter_id
-    WHERE lc.location_id = ?
-    ORDER BY lc.chapter_id
-  `).all(locRow.id);
-
-  if (!chs.length && !locRow.erste_erwaehnung_page_id) return null;
-
-  const firstPageRow = locRow.erste_erwaehnung_page_id
-    ? db.prepare('SELECT page_id, page_name, chapter_id FROM pages WHERE page_id = ?').get(locRow.erste_erwaehnung_page_id)
-    : null;
-
-  return {
-    target_type: 'location',
-    loc_id: locRow.loc_id,
-    name:   locRow.name,
-    first: firstPageRow ? {
-      page_id: firstPageRow.page_id, page_name: firstPageRow.page_name,
-      chapter_id: firstPageRow.chapter_id,
-    } : (chs[0] ? { chapter_id: chs[0].chapter_id, chapter_name: chs[0].chapter_name || null } : null),
-    last_chapter: chs.length ? {
-      chapter_id: chs[chs.length - 1].chapter_id,
-      chapter_name: chs[chs.length - 1].chapter_name || null,
-      haeufigkeit: chs[chs.length - 1].haeufigkeit,
-    } : null,
-    chapters: chs.length,
-    note: 'Orte werden kapitelgenau indiziert; Seiten-genaue „last" nur via search_passages erreichbar.',
-  };
-}
-
-function tool_find_first_last_mention(input, ctx) {
-  if (input?.figur_id || input?.figur_name) {
-    const figRow = _findFigure(input, ctx);
-    if (!figRow) return { error: 'Figur nicht gefunden' };
-    const result = _firstLastForFigure(figRow, ctx);
-    if (!result) return { fig_id: figRow.fig_id, name: figRow.name, error: 'Keine Index-Erwähnungen. Komplettanalyse oder Sync ausführen.' };
-    return result;
-  }
-  if (input?.loc_id) {
-    const locRow = db.prepare(
-      'SELECT id, loc_id, name, erste_erwaehnung_page_id FROM locations WHERE book_id = ? AND loc_id = ? AND user_email IS ?'
-    ).get(ctx.bookId, input.loc_id, ctx.userEmail || null);
-    if (!locRow) return { error: 'Ort nicht gefunden' };
-    const result = _firstLastForLocation(locRow);
-    if (!result) return { loc_id: locRow.loc_id, name: locRow.name, error: 'Keine Index-Daten für diesen Ort.' };
-    return result;
-  }
-  return { error: 'figur_id/figur_name oder loc_id erforderlich' };
-}
-
 // ── quote_passage ─────────────────────────────────────────────────────────────
 
 const QUOTE_DEFAULT_CONTEXT = 80;
@@ -2082,29 +1973,25 @@ const TOOLS = {
   list_figures:           tool_list_figures,
   list_revisions:         tool_list_revisions,
   count_pronouns:         tool_count_pronouns,
-  get_chapter_stats:      tool_get_chapter_stats,
   get_figure_mentions:    tool_get_figure_mentions,
   search_passages:        tool_search_passages,
   get_pages:              tool_get_pages,
-  list_chapter_reviews:   tool_list_chapter_reviews,
+  get_reviews:            tool_get_reviews,
   get_figure_relations:   tool_get_figure_relations,
   get_figure_profile:     tool_get_figure_profile,
   list_continuity_issues: tool_list_continuity_issues,
   get_timeline:           tool_get_timeline,
-  get_book_review:        tool_get_book_review,
   list_ideen:             tool_list_ideen,
   get_lektorat_hotspots:  tool_get_lektorat_hotspots,
   get_stil_metrics:       tool_get_stil_metrics,
   list_locations:         tool_list_locations,
   list_scenes:            tool_list_scenes,
-  list_werkstatt_drafts:  tool_list_werkstatt_drafts,
-  get_werkstatt_draft:    tool_get_werkstatt_draft,
-  get_book_settings:        tool_get_book_settings,
-  find_repetitions:         tool_find_repetitions,
-  get_dialogue:             tool_get_dialogue,
-  diff_page_revisions:      tool_diff_page_revisions,
-  find_first_last_mention:  tool_find_first_last_mention,
-  quote_passage:            tool_quote_passage,
+  werkstatt_drafts:       tool_werkstatt_drafts,
+  get_book_settings:      tool_get_book_settings,
+  find_repetitions:       tool_find_repetitions,
+  get_dialogue:           tool_get_dialogue,
+  diff_page_revisions:    tool_diff_page_revisions,
+  quote_passage:          tool_quote_passage,
 };
 
 async function executeTool(name, input, ctx) {

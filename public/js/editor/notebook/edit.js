@@ -180,18 +180,11 @@ export const notebookEditMethods = {
     writeNormalSnapshot(app.currentPage.id);
 
     // Layout-Prefs (Fullscreen + Seitenbreite) aus localStorage restoren.
-    // Fit-Width-Zoom wird nach DOM-Mount aus der Container-Breite hergeleitet
-    // (wie beim Toggle), damit das Verhältnis zur aktuellen Viewport-Breite stimmt.
+    // Fit-Width skaliert die Schrift jetzt per CSS Container-Query (cqi) —
+    // kein JS-Pfad, kein Zoom-Vorab-Compute mehr.
     const prefs = readEditorPrefs();
     app.pageEditorFullscreen = prefs.fullscreen;
     app.pageEditorFitWidth = prefs.fitWidth;
-    if (prefs.fitWidth) {
-      setTimeout(() => {
-        if (!app.editMode || !app.pageEditorFitWidth) return;
-        this._applyFitWidthZoom();
-        this._installFitWidthObserver();
-      }, 0);
-    }
   },
 
   async cancelEdit() {
@@ -209,7 +202,6 @@ export const notebookEditMethods = {
     clearNormalSnapshot();
     this._stopAutosave();
     this._uninstallOnlineRetry();
-    this._uninstallFitWidthObserver();
     app._editCounterCtx?.teardown?.();
     app._stopPresenceHeartbeat?.();
     app._releaseEditLock?.(app.currentPage?.id);
@@ -313,13 +305,12 @@ export const notebookEditMethods = {
       app.saveOffline = false;
       app.editConflict = null;
       app.updatePageView?.();
-      if (app.focusActive) {
-        app.setStatus(app.t('edit.changesSaved'), false, 3000);
-      } else {
+      // Kein extra setStatus — Save-Indicator in der Subline zeigt schon
+      // "gespeichert HH:MM"; doppelte Notification wäre redundant.
+      if (!app.focusActive) {
         clearNormalSnapshot();
         this._stopAutosave();
         this._uninstallOnlineRetry();
-        this._uninstallFitWidthObserver();
         app._editCounterCtx?.teardown?.();
         app._stopPresenceHeartbeat?.();
         app._releaseEditLock?.(app.currentPage?.id);
@@ -328,8 +319,8 @@ export const notebookEditMethods = {
         app.pageEditorFitWidth = false;
         app.closeSynonymMenu?.();
         app.closeSynonymPicker?.();
-        app.setStatus(app.t('edit.changesSaved'), false, 5000);
       }
+      app.setStatus('');
     } catch (e) {
       if (isPageConflict(e)) {
         // Race: zwischen Pre-Check und PUT hat anderer User geschrieben.
@@ -430,7 +421,9 @@ export const notebookEditMethods = {
       // Sidebar-Lektorat-Status flippt auf 'warn' (updated_at > checkedAt) — Server-Map nachladen.
       app.refreshPageAges?.();
       app.updatePageView?.();
-      app.setStatus(app.t('edit.savedAt', { time: new Date().toLocaleTimeString(localeTag, tzOpts()) }), false, 2500);
+      // Kein setStatus — Save-Indicator in der Subline zeigt schon
+      // "gespeichert HH:MM"; doppelte Notification wäre redundant.
+      app.setStatus('');
     } catch (e) {
       if (isPageConflict(e)) {
         // Race nach Pre-Check: anderer User war im selben Tick schneller.
@@ -603,58 +596,14 @@ export const notebookEditMethods = {
     writeEditorPrefs({ fullscreen: app.pageEditorFullscreen, fitWidth: app.pageEditorFitWidth });
   },
 
+  // Fit-Width ist Pure-CSS (Container-Query in page-view.css). Toggle ändert
+  // nur die Klasse; Font-Scaling übernimmt cqi-Calc. Manueller Zoom (--editor-zoom)
+  // multipliziert sich orthogonal — beim Toggle hier nicht angefasst.
   togglePageEditorFitWidth() {
     const app = window.__app;
     if (!app) return;
-    const next = !app.pageEditorFitWidth;
-    if (next) {
-      this._applyFitWidthZoom();
-      this._installFitWidthObserver();
-    } else {
-      this._uninstallFitWidthObserver();
-      app.pageEditorZoom = 1;
-    }
-    app.pageEditorFitWidth = next;
-    writeEditorPrefs({ fullscreen: app.pageEditorFullscreen, fitWidth: next });
-  },
-
-  // Zoom so anpassen, dass Text bei aktiver Seitenbreite die volle Wrap-
-  // Breite ausnutzt: ratio = Container / Reading-Frame. Auch beim Restore
-  // aus localStorage nach startEdit aufgerufen, deshalb extrahiert.
-  _applyFitWidthZoom() {
-    const app = window.__app;
-    if (!app) return;
-    const el = this._getEditEl();
-    const wrap = el?.closest('.page-editor-wrap');
-    if (!el || !wrap) return;
-    const readingW = el.clientWidth;
-    const containerW = wrap.clientWidth;
-    if (readingW > 0 && containerW > readingW) {
-      const ratio = containerW / readingW;
-      app.pageEditorZoom = Math.min(2.5, Math.max(1, Math.round(ratio * 10) / 10));
-    }
-  },
-
-  // Container-Breite ändert sich bei Fullscreen-Toggle, Window-Resize,
-  // Sidebar-Collapse. Observer hält Fit-Width-Zoom synchron — Intent
-  // (Bool) lebt in localStorage, Zoom wird immer aus Layout abgeleitet.
-  _installFitWidthObserver() {
-    const app = window.__app;
-    if (!app || app._fitWidthObserver) return;
-    const wrap = this._getEditEl()?.closest('.page-editor-wrap');
-    if (!wrap) return;
-    const obs = new ResizeObserver(() => {
-      if (app.editMode && app.pageEditorFitWidth) this._applyFitWidthZoom();
-    });
-    obs.observe(wrap);
-    app._fitWidthObserver = obs;
-  },
-
-  _uninstallFitWidthObserver() {
-    const app = window.__app;
-    if (!app?._fitWidthObserver) return;
-    app._fitWidthObserver.disconnect();
-    app._fitWidthObserver = null;
+    app.pageEditorFitWidth = !app.pageEditorFitWidth;
+    writeEditorPrefs({ fullscreen: app.pageEditorFullscreen, fitWidth: app.pageEditorFitWidth });
   },
 
   pageEditorZoomIn() {

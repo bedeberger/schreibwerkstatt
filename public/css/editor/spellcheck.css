@@ -1,0 +1,203 @@
+/* LanguageTool-Spellcheck — shared zwischen Notebook-, Focus- und Bucheditor.
+ * Overlay liegt als Sibling neben dem contenteditable-Root (siehe
+ * cards/editor-spellcheck/controller.js#_ensureOverlay). Eltern-Container des
+ * Editors MUSS position:relative haben, damit absolute Positionierung gegen
+ * denselben offset-parent laeuft. Squiggle-Spans liegen ueber dem Text und
+ * sind klickbar; der eigentliche Editor-Text bleibt durch pointer-events
+ * unberuehrt.
+ *
+ * Pro-Editor-Tweaks via [data-editor="focus"]/[data-editor="book"] auf dem
+ * Overlay-Container.
+ */
+
+.lt-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: var(--z-spellcheck);
+}
+
+.lt-squiggle {
+  position: absolute;
+  pointer-events: auto;
+  cursor: pointer;
+  /* Wavy-Underline via inline SVG-Background; Farbe via Custom-Prop steuerbar. */
+  --lt-color: var(--color-danger, #d33);
+  background-repeat: repeat-x;
+  background-position: 0 100%;
+  background-size: 6px 3px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 3'><path d='M0 2 Q1.5 0 3 2 T6 2' fill='none' stroke='%23d33' stroke-width='1'/></svg>");
+  border-radius: 0;
+  /* Spans selbst transparent; nur Underline sichtbar. */
+  background-color: transparent;
+}
+
+.lt-squiggle:focus-visible {
+  outline: 2px solid var(--lt-color);
+  outline-offset: 1px;
+}
+
+.lt-squiggle--typo {
+  --lt-color: var(--color-danger, #d33);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 3'><path d='M0 2 Q1.5 0 3 2 T6 2' fill='none' stroke='%23d33' stroke-width='1'/></svg>");
+}
+
+.lt-squiggle--grammar {
+  --lt-color: var(--color-info, #2c6fb3);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 3'><path d='M0 2 Q1.5 0 3 2 T6 2' fill='none' stroke='%232c6fb3' stroke-width='1'/></svg>");
+}
+
+.lt-squiggle--style {
+  --lt-color: var(--color-warning, #c97a00);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 3'><path d='M0 2 Q1.5 0 3 2 T6 2' fill='none' stroke='%23c97a00' stroke-width='1'/></svg>");
+}
+
+/* Popover — fixed positioniert; Controller setzt left/top inline. */
+.lt-popover {
+  position: fixed;
+  z-index: var(--z-popover);
+  background: var(--color-surface, #fff);
+  color: var(--color-text, #111);
+  border: 1px solid var(--color-border, #ccc);
+  border-radius: var(--radius-sm, 4px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+  padding: 12px;
+  max-width: 340px;
+  min-width: 220px;
+  font-size: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lt-popover__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.lt-popover__badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm, 4px);
+  background: color-mix(in srgb, var(--lt-color, #d33) 12%, transparent);
+  color: var(--lt-color, #d33);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.lt-popover__badge.lt-squiggle--typo    { --lt-color: var(--color-danger, #d33); }
+.lt-popover__badge.lt-squiggle--grammar { --lt-color: var(--color-info, #2c6fb3); }
+.lt-popover__badge.lt-squiggle--style   { --lt-color: var(--color-warning, #c97a00); }
+
+.lt-popover__title {
+  font-weight: 600;
+  color: var(--color-text, #111);
+}
+
+.lt-popover__message {
+  margin: 0;
+  color: var(--color-text-muted, #555);
+  line-height: 1.35;
+}
+
+.lt-popover__empty {
+  margin: 0;
+  color: var(--color-text-muted, #777);
+  font-style: italic;
+}
+
+.lt-popover__replacements {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.lt-popover__replacement {
+  appearance: none;
+  border: 1px solid var(--color-border, #ccc);
+  background: var(--color-surface-alt, #f6f6f6);
+  color: var(--color-text, #111);
+  border-radius: var(--radius-sm, 4px);
+  padding: 4px 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  line-height: 1.2;
+}
+
+.lt-popover__replacement:hover,
+.lt-popover__replacement:focus-visible {
+  background: var(--color-accent-bg, #eef);
+  border-color: var(--color-accent, #4a6df0);
+}
+
+.lt-popover__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-top: 1px solid var(--color-border, #ccc);
+  padding-top: 8px;
+}
+
+.lt-popover__ignore,
+.lt-popover__info {
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted, #555);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 2px 4px;
+  text-decoration: none;
+}
+
+.lt-popover__ignore:hover,
+.lt-popover__info:hover {
+  color: var(--color-text, #111);
+  text-decoration: underline;
+}
+
+/* Extension-Konflikt-Banner — leichter Notice-Stil, wird in den Editor-Templates
+ * via <div class="lt-extension-banner" x-show="..."> gerendert. */
+.lt-extension-banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: color-mix(in srgb, var(--color-warning, #c97a00) 10%, transparent);
+  border: 1px solid var(--color-warning, #c97a00);
+  border-radius: var(--radius-sm, 4px);
+  color: var(--color-text, #111);
+  font-size: 0.9rem;
+}
+
+.lt-extension-banner__text { line-height: 1.35; }
+.lt-extension-banner__title { font-weight: 600; margin-bottom: 2px; }
+
+.lt-extension-banner__dismiss {
+  appearance: none;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--color-text-muted, #555);
+  padding: 2px 6px;
+}
+
+.lt-extension-banner__dismiss:hover { color: var(--color-text, #111); }
+
+/* Per-Editor-Hooks (leer im MVP, vorhanden fuer kuenftige Tweaks). */
+.lt-overlay[data-editor="focus"] { /* Focus-spezifische Anpassungen hier */ }
+.lt-overlay[data-editor="book"]  { /* Bucheditor-spezifische Anpassungen hier */ }
+
+/* Mobile: Wavy-Underline minimal staerker fuer Touch-Sichtbarkeit. */
+@media (max-width: 640px) {
+  .lt-squiggle { background-size: 5px 3px; }
+  .lt-popover { max-width: calc(100vw - 24px); }
+}

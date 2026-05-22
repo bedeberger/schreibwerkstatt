@@ -105,6 +105,38 @@
   text-indent: 0;
 }
 
+/* Checkbox-Listen (Slash `/todo`). Markup:
+   <ul class="todo">
+     <li class="todo-item"><input type="checkbox"><span class="todo-text">…</span></li>
+   </ul>
+   Checkbox bleibt klickbar im contenteditable, weil das Default-Bullet weg
+   ist und Toggle-Handler in editor-toolbar-card.js das `checked`-Attribut
+   serialisierungs-stabil pflegt. */
+.page-content-view ul.todo {
+  list-style: none;
+  padding-left: 0;
+  margin: 0.4em 0;
+}
+.page-content-view ul.todo > li.todo-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  margin: 0.15em 0;
+}
+.page-content-view ul.todo > li.todo-item > input[type="checkbox"] {
+  margin-top: 0.35em;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.page-content-view ul.todo > li.todo-item > .todo-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.page-content-view ul.todo > li.todo-item > input[type="checkbox"]:checked + .todo-text {
+  text-decoration: line-through;
+  color: var(--color-muted);
+}
+
 /* BookStack-Callouts (div.callout.info / .warning / .danger / .success) */
 .page-content-view .callout {
   border-left: 4px solid var(--color-border);
@@ -154,26 +186,37 @@
 }
 
 /* Fit-Width: Reading-Frame-max-width auf .page-content-view (64ch + padding)
-   aufheben, contenteditable nutzt volle Wrap-Breite. Bevorzugter
-   Tagebuch-Modus. */
-.page-content-view--fit-width {
+   aufheben, contenteditable nutzt volle Wrap-Breite. Font skaliert per
+   Container-Query: ratio = wrap-Breite / natürliche Lesebreite (700px ≈
+   64ch + 2*clamp(18-40px) bei Standard-Reading-Font). Clamp deckelt 1×–2.5×.
+   Manueller Zoom (--editor-zoom) multipliziert sich on top. Kein JS-Pfad,
+   kein ResizeObserver — Browser handlet Resize + Fullscreen-Toggle nativ. */
+.page-content-view--editing.page-content-view--fit-width {
   max-width: none;
+  font-size: calc(1em * var(--editor-zoom, 1) * clamp(1, 100cqi / 700px, 2.5));
 }
 
-/* Edit-Wrap: Toolbar (Zoom + Vollbild) + contenteditable. Toolbar als
-   eigene Row über dem contenteditable, rechts ausgerichtet — bleibt im
-   Flow, damit Geschwister wie `.figure-context-panel` nicht überlagert
-   werden. Buttons reuse .graph-tool-btn-Style (siehe tokens-est.css). */
+/* Edit-Wrap: contenteditable. Toolbar (Zoom/FitWidth/Fullscreen/HR) lebt nicht
+   mehr hier, sondern im sticky `.editor-card__topbar` (editor-notebook.html),
+   damit sie beim Scrollen permanent sichtbar bleibt.
+   `container-type: inline-size` aktiviert Container-Query-Units (cqi) für
+   Fit-Width-Font-Scaling. */
 .page-editor-wrap {
   position: relative;
   display: flex;
   flex-direction: column;
+  container-type: inline-size;
 }
 .page-editor-toolbar {
-  align-self: flex-end;
   display: flex;
+  justify-content: flex-end;
   gap: var(--space-xs);
-  margin-bottom: var(--space-xs);
+  margin-top: var(--space-xs);
+}
+.page-editor-toolbar .graph-tool-btn[aria-pressed="true"] {
+  background: var(--color-history-active-bg);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 /* Vollbild: Karte als Overlay, Header (Save/Cancel/Status) bleibt sichtbar.
@@ -188,22 +231,25 @@
   margin: 0;
   border-radius: 0;
   overflow: auto;
+  padding-top: 0;
 }
 .editor-card--fullscreen .page-content-view--editing {
   max-height: none;
 }
-/* Im Vollbild scrollt die Karte selbst; Header (Titel + Page-Actions) bleibt
-   am oberen Rand sichtbar, damit Save/Cancel/Focus jederzeit erreichbar sind.
+/* Im Vollbild scrollt die Karte selbst; Topbar (Header + Save-Progress +
+   Lektorat-Status + Save-Bestätigung aus #status) bleibt am oberen Rand
+   sichtbar, damit Save/Cancel/Focus + Save-Feedback jederzeit lesbar sind.
    Sticky-Anchor an top:0 relativ zur scrollenden Karte; Padding-Top der Karte
-   scrollt darunter weg und der Header schnappt an die Viewport-Kante. */
-.editor-card--fullscreen .card-header {
+   scrollt darunter weg und die Topbar schnappt an die Viewport-Kante.
+   Wrapper statt nur .card-header, weil #status (Speicher-Toast) sonst aus
+   dem Sichtbereich scrollt, sobald der User tief in der Seite editiert. */
+.editor-card--fullscreen .editor-card__topbar {
   position: sticky;
   top: 0;
   z-index: 1;
   background: var(--color-surface);
   margin-inline: -1.25rem;
-  margin-top: -1.25rem;
-  padding: 1.25rem 1.25rem var(--space-md);
+  padding: var(--space-sm) 1.25rem var(--space-md);
 }
 /* Im Edit-Modus kein text-wrap:pretty/balance — sonst rebalanciert der Browser
    bei jedem Keystroke die letzten Zeilen, Buchstaben hüpfen sichtbar zwischen

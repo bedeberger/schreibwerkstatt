@@ -368,6 +368,7 @@ app.use('/usage', usageRouter);
 app.use('/draft-figures', draftFiguresRouter);
 app.use('/content', contentRouter);
 app.use('/search', require('./routes/search'));
+app.use('/languagetool', require('./routes/languagetool'));
 app.use('/books', require('./routes/book-access'));
 app.use('/book-editor', require('./routes/book-editor'));
 app.use('/admin/users', require('./routes/admin-users'));

@@ -62,6 +62,8 @@
       <div class="revision-viewer__inner">
         <header class="revision-viewer__head">
           <div class="revision-viewer__meta">
+            <h2 class="revision-viewer__title"
+                x-text="$app.t('editor.revisions.viewer.title', { n: revisionNumber(viewerRev) })"></h2>
             <span class="history-date" x-text="$app.formatDate(viewerRev.created_at)"></span>
             <span class="badge badge-ok" x-text="sourceLabel(viewerRev.source)"></span>
             <span class="user-chip"
