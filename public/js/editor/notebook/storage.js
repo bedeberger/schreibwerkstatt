@@ -36,3 +36,29 @@ export function readNormalSnapshot() {
     return snap;
   } catch { return null; }
 }
+
+// User-Prefs für Notebook-Editor-Layout (Fullscreen + Seitenbreite). Persistiert
+// in localStorage über alle Tabs/Sessions hinweg. Zoom-Level bewusst nicht
+// persistiert — bei aktivem Fit-Width wird er aus Containerbreite hergeleitet.
+const EDITOR_PREFS_KEY = 'notebook.editorPrefs';
+
+export function readEditorPrefs() {
+  try {
+    const raw = localStorage.getItem(EDITOR_PREFS_KEY);
+    if (!raw) return { fullscreen: false, fitWidth: false };
+    const prefs = JSON.parse(raw);
+    return {
+      fullscreen: !!prefs?.fullscreen,
+      fitWidth: !!prefs?.fitWidth,
+    };
+  } catch { return { fullscreen: false, fitWidth: false }; }
+}
+
+export function writeEditorPrefs(prefs) {
+  try {
+    localStorage.setItem(EDITOR_PREFS_KEY, JSON.stringify({
+      fullscreen: !!prefs?.fullscreen,
+      fitWidth: !!prefs?.fitWidth,
+    }));
+  } catch {}
+}

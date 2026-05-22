@@ -26,7 +26,7 @@ Jede Tool-Funktion: `(input, ctx) → JSON-serialisierbares Objekt` (sync oder a
 
 ## Tools
 
-20 Tools, gruppiert nach Domäne. Alle Read-Only ausser `final_answer` (Pflicht-Endpunkt, kein DB-Read).
+26 Tools, gruppiert nach Domäne. Alle Read-Only ausser `final_answer` (Pflicht-Endpunkt, kein DB-Read).
 
 ### Buch/Kapitel-Überblick
 
@@ -36,13 +36,17 @@ Jede Tool-Funktion: `(input, ctx) → JSON-serialisierbares Objekt` (sync oder a
 | `get_chapter_stats` | `chapter_id` | Wortzahl, Sätze, Dialoganteil, Top-Figuren-Erwähnungen eines Kapitels. | `page_stats` + `page_figure_mentions` |
 | `get_stil_metrics` | `scope: book/chapter/page`, `chapter_id?`, `metric?`, `order?`, `limit?` | Aggregat aus `page_stats`: words/chars/sentences/dialog/filler/passive/adverb/avg_sentence_len/p90/LIX/Flesch. `scope=page` sortiert Top-N. | `page_stats` |
 | `count_pronouns` | `per_chapter?`, `pronouns?[]` | Pronomen-Zählung (Narrativ vs. Dialog). Pronomen-Gruppen: `ich`, `du`, `er`, `sie_sg`, `wir`, `ihr_pl`, `man`. | `page_stats` (Pronomen-Buckets) |
+| `get_book_settings` | – | Sprache, Region, Buchtyp (Label aufgelöst), Erzählperspektive + Erzählzeit (Label via [routes/jobs/narrative-labels.js](../routes/jobs/narrative-labels.js)), `buch_kontext` (User-Vorgaben an die KI), `is_finished`, `daily_goal_chars`. Pflicht vor stil-/sprachbezogenen Antworten. | `book_settings` + `books.name` |
 
 ### Seiten-Text
 
 | Tool | Input | Zweck | Quelle |
 |------|-------|-------|--------|
 | `get_pages` | `ids: integer[]` (max 20), `max_chars_per_page?` | Volltext bestimmter Seiten + falls vorhanden `latest_check {checked_at, error_count, fazit, stilanalyse}` aus `page_checks`. | Content-Store-Facade `loadPage(id)` (backend-agnostisch) + `page_checks` |
-| `search_passages` | `pattern`, `regex?`, `max_results?` (default 10, max 30) | Volltext-Suche; liefert Treffer mit Snippet ±120 Zeichen. | `pages.raw_html` → `htmlToText` |
+| `search_passages` | `pattern`, `regex?`, `max_results?` (default 10, max 30) | Volltext-Suche; liefert Treffer mit Snippet ±120 Zeichen. Offsets kompatibel mit `quote_passage`. | `pages.preview_text` → `htmlToText` |
+| `quote_passage` | `page_id`, `offset`, `length` (max 800), `context_chars?` (default 80, max 300) | Zeichen-genaues Zitat aus einer Seite. Liefert `quote`, `before`/`after`, `page_chars`. Pflicht-Werkzeug vor jeder wörtlichen Zitierung in `final_answer` — kein „aus Erinnerung paraphrasieren". | Content-Store `loadPage` → `htmlToPlainText` |
+| `find_repetitions` | `n?` (2-5, default 3), `scope?` (book/chapter/page), `chapter_id?`/`page_id?`, `min_count?`, `limit?` (default 30, max 100), `ignore_stopwords?` | N-Gramm-Frequenzanalyse mit Stopwort-Filter (DE+EN). Returns `results[{phrase, count, sample_pages}]`. Sprach-Tics/redundante Phrasen. | `pages.body_html` → `htmlToPlainText` |
+| `get_dialogue` | `chapter_id?`, `page_id?`, `figur_id?`/`figur_name?`, `min_length?`, `limit?` (default 30, max 100) | Heuristische Dialog-Extraktion (Anführungszeichen, Speech-Verb+Doppelpunkt, Em-Dash) via `findDialogRanges` aus [lib/page-index.js](../lib/page-index.js). Mit Figur-Filter: ±100-Zeichen-Sprecherheuristik. Offsets kompatibel mit `quote_passage`. | `pages.body_html` → `htmlToPlainText` + `findDialogRanges` |
 
 ### Figuren
 
@@ -51,6 +55,7 @@ Jede Tool-Funktion: `(input, ctx) → JSON-serialisierbares Objekt` (sync oder a
 | `get_figure_mentions` | `figur_id` ∨ `figur_name` | Wo + wie oft eine Figur erwähnt wird, nach Kapitel/Seite. | `page_figure_mentions` |
 | `get_figure_profile` | `figur_id` ∨ `figur_name` | Vollprofil: Stammdaten, Tags, Zitate, Lebensereignisse, Szenen, Kapitelauftritte, alle Beziehungen (beide Richtungen). | `figures` + `figure_events` + `figure_scenes` + `figure_relations` + `figure_appearances` |
 | `get_figure_relations` | `figur_id?` ∨ `figur_name?` | Soziogramm: alle Kanten oder nur die einer Figur. Typ, Beschreibung, Machtverhältnis, bis zu 3 Belege. | `figure_relations` |
+| `find_first_last_mention` | `figur_id?` ∨ `figur_name?` ∨ `loc_id?` | Erste + letzte Erwähnung. Figuren seiten-genau aus `page_figure_mentions`, Orte kapitel-genau aus `location_chapters` (+ `locations.erste_erwaehnung_page_id`). Arc-Tracking. | `page_figure_mentions` / `location_chapters` |
 
 ### Orte / Szenen
 
@@ -73,6 +78,12 @@ Jede Tool-Funktion: `(input, ctx) → JSON-serialisierbares Objekt` (sync oder a
 |------|-------|-------|--------|
 | `list_continuity_issues` | `schwere?`, `typ?`, `chapter_id?`, `limit?` (default 30, max 100) | Befunde des letzten Kontinuitätschecks: Typ, Schwere, Beschreibung, `stelle_a`/`stelle_b`, Empfehlung, betroffene Figuren + Kapitel. | `continuity_issues` + Bridges |
 | `get_timeline` | `figur_id?` ∨ `figur_name?`, `typ?`, `limit?` (default 60, max 200) | Konsolidierter Zeitstrahl (`zeitstrahl_events`) chronologisch nach `sort_order`. | `zeitstrahl_events` + Bridges |
+
+### Revisionen
+
+| Tool | Input | Zweck | Quelle |
+|------|-------|-------|--------|
+| `diff_page_revisions` | `page_id`, `from_rev_id?`, `to_rev_id?` | Plain-Text-Word-Diff zweier Revisionen einer Seite (Default: zwei jüngste). Liefert `summary{add,del,change}`, `chars_delta`, `blocks[{kind, text\|from/to}]`. Max 100 Blöcke, je 600 Zeichen geclampt. | `page_revisions` + `jsdiff.diffWordsWithSpace` |
 
 ### Ideen / Werkstatt
 

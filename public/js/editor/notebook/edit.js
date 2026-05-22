@@ -10,7 +10,7 @@ import { isNoChange } from '../shared/save-pipeline.js';
 import { savePage, isPageConflict, readConflictBody } from '../shared/page-api.js';
 import { getActiveEditorContainer } from '../shared/active-editor.js';
 import { installEditCounter } from '../shared/edit-counter.js';
-import { writeNormalSnapshot, clearNormalSnapshot } from './storage.js';
+import { writeNormalSnapshot, clearNormalSnapshot, readEditorPrefs, writeEditorPrefs } from './storage.js';
 
 // Auto-Save nach BookStack: idle-debounce + max-Cap. Jede Schreibaktion
 // resettet den Idle-Timer; läuft der User durchgehend, greift der Max-Timer.
@@ -178,6 +178,16 @@ export const notebookEditMethods = {
     // Snapshot für Reload-Wiederaufnahme. Pendant zu focus/storage.js —
     // beim regulären Exit (cancelEdit/saveEdit) wird er wieder gelöscht.
     writeNormalSnapshot(app.currentPage.id);
+
+    // Layout-Prefs (Fullscreen + Seitenbreite) aus localStorage restoren.
+    // Fit-Width-Zoom wird nach DOM-Mount aus der Container-Breite hergeleitet
+    // (wie beim Toggle), damit das Verhältnis zur aktuellen Viewport-Breite stimmt.
+    const prefs = readEditorPrefs();
+    app.pageEditorFullscreen = prefs.fullscreen;
+    app.pageEditorFitWidth = prefs.fitWidth;
+    if (prefs.fitWidth) {
+      setTimeout(() => { if (app.editMode && app.pageEditorFitWidth) this._applyFitWidthZoom(); }, 0);
+    }
   },
 
   async cancelEdit() {
@@ -560,6 +570,7 @@ export const notebookEditMethods = {
     const app = window.__app;
     if (!app) return;
     app.pageEditorFullscreen = !app.pageEditorFullscreen;
+    writeEditorPrefs({ fullscreen: app.pageEditorFullscreen, fitWidth: app.pageEditorFitWidth });
   },
 
   togglePageEditorFitWidth() {
@@ -567,22 +578,29 @@ export const notebookEditMethods = {
     if (!app) return;
     const next = !app.pageEditorFitWidth;
     if (next) {
-      // Zoom so anpassen, dass Text bei aktiver Seitenbreite die volle
-      // Wrap-Breite ausnutzt: ratio = Container / Reading-Frame.
-      const el = this._getEditEl();
-      const wrap = el?.closest('.page-editor-wrap');
-      if (el && wrap) {
-        const readingW = el.clientWidth;
-        const containerW = wrap.clientWidth;
-        if (readingW > 0 && containerW > readingW) {
-          const ratio = containerW / readingW;
-          app.pageEditorZoom = Math.min(2.5, Math.max(1, Math.round(ratio * 10) / 10));
-        }
-      }
+      this._applyFitWidthZoom();
     } else {
       app.pageEditorZoom = 1;
     }
     app.pageEditorFitWidth = next;
+    writeEditorPrefs({ fullscreen: app.pageEditorFullscreen, fitWidth: next });
+  },
+
+  // Zoom so anpassen, dass Text bei aktiver Seitenbreite die volle Wrap-
+  // Breite ausnutzt: ratio = Container / Reading-Frame. Auch beim Restore
+  // aus localStorage nach startEdit aufgerufen, deshalb extrahiert.
+  _applyFitWidthZoom() {
+    const app = window.__app;
+    if (!app) return;
+    const el = this._getEditEl();
+    const wrap = el?.closest('.page-editor-wrap');
+    if (!el || !wrap) return;
+    const readingW = el.clientWidth;
+    const containerW = wrap.clientWidth;
+    if (readingW > 0 && containerW > readingW) {
+      const ratio = containerW / readingW;
+      app.pageEditorZoom = Math.min(2.5, Math.max(1, Math.round(ratio * 10) / 10));
+    }
   },
 
   pageEditorZoomIn() {

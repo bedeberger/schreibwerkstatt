@@ -404,6 +404,84 @@ export const BOOK_CHAT_TOOLS = [
     },
   },
   {
+    name: 'get_book_settings',
+    description: 'Liefert die Stamm-Einstellungen des Buchs: Sprache, Region, Buchtyp (roman/krimi/lyrik/sachbuch/…), Erzählperspektive (Ich/3.Person personal/auktorial/…), Erzählzeit (Präteritum/Präsens), is_finished-Status, freier buch_kontext-Text (Vorgaben des Users an die KI). Pflichtig vor jeder Stilfrage oder vor jedem Vorschlag, der Sprache/Tonfall/Tempus berührt – sonst kollidiert die Antwort mit den expliziten User-Vorgaben.',
+    input_schema: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'find_repetitions',
+    description: 'Findet N-Gramm-Wiederholungen (häufige Wortgruppen) im Buchtext – ideal für Sprach-Tics, Lieblings-Formulierungen, redundante Phrasen. Standard: n=3 (Tri-Gramme), scope=book, min_count=5, Stopwort-Filter aktiv (sonst dominieren "und der die"). Returns results[{phrase, count, sample_pages:[{page_id,page_name,count}]}]. Nicht nutzen, um eine einzelne bekannte Phrase zu suchen – dafür `search_passages`.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        n:                { type: 'integer', description: 'Wortzahl der N-Gramme (2-5). Default: 3.' },
+        scope:            { type: 'string', enum: ['book', 'chapter', 'page'], description: 'Default: book.' },
+        chapter_id:       { type: 'integer', description: 'Pflicht für scope=chapter.' },
+        page_id:          { type: 'integer', description: 'Pflicht für scope=page.' },
+        min_count:        { type: 'integer', description: 'Mindesthäufigkeit. Default: 5 (book) bzw. 2.' },
+        limit:            { type: 'integer', description: 'Max. Treffer (default 30, max 100).' },
+        ignore_stopwords: { type: 'boolean', description: 'true (default): N-Gramme nur aus Funktionswörtern werden ignoriert.' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'get_dialogue',
+    description: 'Extrahiert Dialog-Passagen (heuristisch via Anführungszeichen «»/„"/""/»«, Speech-Verb+Doppelpunkt, Em-Dash am Zeilenanfang). Mit figur_id/figur_name nur Dialoge, in deren ±100 Zeichen Umfeld der Figurenname vorkommt (Sprecher-Heuristik). Liefert results[{page_id, page_name, offset, length, text, before, after}] – die offsets sind kompatibel mit `quote_passage` und `search_passages`. Ideal für "wie spricht X?", "Dialoge in Kapitel 3", "wo wird viel gesprochen?". Einfache gerade Quotes (\'…\') werden bewusst NICHT erkannt (Apostroph-False-Positives).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        chapter_id: { type: 'integer', description: 'Nur Dialoge dieses Kapitels.' },
+        page_id:    { type: 'integer', description: 'Nur Dialoge dieser Seite.' },
+        figur_id:   { type: 'string',  description: 'Nur Dialoge im Umfeld dieser Figur (fig_id).' },
+        figur_name: { type: 'string',  description: 'Alternative: Name/Kurzname.' },
+        min_length: { type: 'integer', description: 'Minimale Dialog-Länge in Zeichen (default 4).' },
+        limit:      { type: 'integer', description: 'Max. Dialoge (default 30, max 100).' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'diff_page_revisions',
+    description: 'Vergleicht zwei Revisionen einer Seite (Plain-Text-Word-Diff). Ohne from_rev_id/to_rev_id: die zwei jüngsten Revisionen. Liefert summary{add,del,change}, chars_delta und blocks[{kind:add/del/change, text|from/to}]. Beantwortet "was hat sich an Seite X seit letztem Edit geändert?", "wie hat sich der Text entwickelt?". Revision-IDs holst du dir aktuell nicht über ein Tool – sinnvollerweise nutzt du den Default-Pfad (die zwei jüngsten).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        page_id:     { type: 'integer', description: 'Seiten-ID (Pflicht).' },
+        from_rev_id: { type: 'integer', description: 'Optional: ältere Revision-ID (Default: zweitneueste).' },
+        to_rev_id:   { type: 'integer', description: 'Optional: neuere Revision-ID (Default: neueste).' },
+      },
+      required: ['page_id'],
+    },
+  },
+  {
+    name: 'find_first_last_mention',
+    description: 'Liefert erste und letzte Erwähnung einer Figur oder eines Orts: für Figuren seiten-genau aus page_figure_mentions (mit total_mentions, pages_with_mention); für Orte kapitel-genau aus location_chapters (Seiten-genaue „last" gibt es nicht im Index). Ideal für Arc-Tracking: "wann taucht X zuerst auf, wann zuletzt?", "wie lange ist Y präsent?". Gib figur_id (bevorzugt) / figur_name ODER loc_id an.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        figur_id:   { type: 'string', description: 'fig_id der Figur.' },
+        figur_name: { type: 'string', description: 'Alternative: Name/Kurzname.' },
+        loc_id:     { type: 'string', description: 'loc_id des Orts.' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'quote_passage',
+    description: 'Liefert ein zeichengenaues Zitat aus einer Seite (offset+length im Plain-Text, kompatibel mit den offsets aus `search_passages` und `get_dialogue`). Liefert page_name, chapter_name, quote (exakte Passage), before/after-Kontext und page_chars. Nutze dies vor JEDEM wörtlichen Zitat in der finalen Antwort – nie aus Erinnerung paraphrasieren oder aus get_pages-Ausschnitten Quotes zusammenkürzen. Max length: 800 Zeichen; max context_chars: 300.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        page_id:       { type: 'integer', description: 'Seiten-ID (Pflicht).' },
+        offset:        { type: 'integer', description: 'Start-Offset im Plain-Text (Pflicht, >=0).' },
+        length:        { type: 'integer', description: 'Länge in Zeichen (Pflicht, 1-800).' },
+        context_chars: { type: 'integer', description: 'Vor-/Nach-Kontext (default 80, max 300, 0 = ohne).' },
+      },
+      required: ['page_id', 'offset', 'length'],
+    },
+  },
+  {
     name: 'final_answer',
     description: 'Liefert die finale Antwort an den User. Rufe dieses Werkzeug als ALLERLETZTEN Aufruf einer Runde — danach folgt keine weitere Iteration und keine weitere Recherche. Pflicht-Endpunkt: jede Antwort an den User MUSS über dieses Werkzeug laufen. Freitext ohne final_answer wird nicht als Antwort akzeptiert. Schreibe die Antwort in der Sprache der Userfrage.',
     input_schema: {

@@ -4,7 +4,7 @@
 // ctx = { bookId, userEmail, userToken, jobSignal, logger }
 // Übersicht aller Tools + Vertrag: docs/buchchat-tools.md
 
-const { db } = require('../../db/schema');
+const { db, getBookSettings } = require('../../db/schema');
 const { getUser } = require('../../db/app-users');
 const { INPUT_BUDGET_CHARS } = require('../../lib/ai');
 const { htmlToText } = require('./shared');
@@ -12,6 +12,11 @@ const contentStore = require('../../lib/content-store');
 const { inClause } = require('../../lib/validate');
 const { listDraftFigures, getDraftFigure, listWerkstattRuns, getWerkstattRun } = require('../../db/draft-figures');
 const { resolveI18nTree, resolveI18n } = require('../../lib/i18n-server');
+const { findDialogRanges } = require('../../lib/page-index');
+const { htmlToPlainText } = require('../../lib/html-text');
+const pageRevisions = require('../../db/page-revisions');
+const { narrativeLabels } = require('./narrative-labels');
+const { diffWordsWithSpace } = require('diff');
 
 // Obergrenzen schützen das Token-Budget gegen ausufernde Tool-Calls. Skaliert mit
 // MODEL_CONTEXT, damit User mit grösserem Kontextfenster reichere Tool-Antworten
@@ -1481,6 +1486,491 @@ function tool_get_werkstatt_draft(input, ctx) {
   });
 }
 
+// ── get_book_settings ─────────────────────────────────────────────────────────
+
+const BUCHTYP_LABELS_DE = {
+  roman: 'Roman',
+  kurzgeschichten: 'Kurzgeschichten',
+  gesellschaft: 'Gesellschaftsroman',
+  krimi: 'Krimi / Thriller',
+  historisch: 'Historischer Roman',
+  fantasy_scifi: 'Fantasy / Science-Fiction',
+  erotik: 'Erotik',
+  jugend: 'Jugendbuch / Kinderbuch',
+  autobiografie: 'Autobiografie / Memoir',
+  tagebuch: 'Tagebuch',
+  sachbuch: 'Sachbuch',
+  lyrik: 'Lyrik',
+  essay: 'Essay',
+  blog: 'Blog',
+  satire: 'Satire',
+  andere: 'Andere',
+};
+
+function tool_get_book_settings(_input, ctx) {
+  const userEmail = ctx.userEmail || null;
+  const settings = getBookSettings(ctx.bookId, userEmail);
+  const bookRow = db.prepare('SELECT name FROM books WHERE book_id = ?').get(ctx.bookId);
+  const labels = narrativeLabels(settings);
+  return {
+    book_id:                  ctx.bookId,
+    book_name:                bookRow?.name || null,
+    language:                 settings.language,
+    region:                   settings.region,
+    locale:                   `${settings.language}-${settings.region}`,
+    buchtyp:                  settings.buchtyp || null,
+    buchtyp_label:            settings.buchtyp ? (BUCHTYP_LABELS_DE[settings.buchtyp] || settings.buchtyp) : null,
+    erzaehlperspektive:       settings.erzaehlperspektive || null,
+    erzaehlperspektive_label: labels.erzaehlperspektive,
+    erzaehlzeit:              settings.erzaehlzeit || null,
+    erzaehlzeit_label:        labels.erzaehlzeit,
+    buch_kontext:             settings.buch_kontext || null,
+    is_finished:              settings.is_finished ? 1 : 0,
+    daily_goal_chars:         settings.daily_goal_chars || null,
+  };
+}
+
+// ── find_repetitions ──────────────────────────────────────────────────────────
+
+const REPETITIONS_DEFAULT_LIMIT = 30;
+const REPETITIONS_MAX_LIMIT     = 100;
+const REPETITIONS_SAMPLE_PAGES  = 5;
+const REPETITION_STOPWORDS = new Set([
+  'der','die','das','den','dem','des','ein','eine','einen','einem','einer','eines',
+  'und','oder','aber','doch','denn','sondern','als','wie','wenn','dass','daß','weil',
+  'in','im','an','am','auf','auch','aus','bei','beim','mit','nach','von','vom','vor',
+  'zu','zum','zur','über','unter','durch','für','um','ohne','gegen','seit','bis',
+  'ist','war','sind','waren','sein','seine','seinen','seinem','seiner','wird','werden',
+  'wurde','wurden','hat','hatte','haben','hatten','kann','konnte','soll','sollte',
+  'mag','mochte','muss','musste','will','wollte','er','sie','es','wir','ihr','sich',
+  'mir','dir','ihm','ihn','ihnen','mich','dich','uns','euch','mein','dein','sein',
+  'unser','euer','nicht','nur','noch','schon','immer','dann','so','sehr',
+  'mehr','wieder','etwas','nichts','jetzt','dort','hier','heute','gestern','morgen',
+  'the','a','an','and','or','but','as','if','when','that','because','of','in','on',
+  'at','by','for','to','with','from','up','about','into','over','after','it','he',
+  'she','they','we','his','her','their','our','my','your','is','are','was','were',
+  'be','been','being','have','has','had','do','does','did','can','could','will',
+  'would','should','may','might','must','not','no','yes','so','very','more','only',
+]);
+
+const _TOKEN_RE = /[a-zäöüß][a-zäöüß'-]*/gi;
+
+function _tokenizeForRepetitions(text) {
+  const tokens = [];
+  for (const m of text.toLowerCase().matchAll(_TOKEN_RE)) {
+    if (m[0].length >= 2) tokens.push(m[0]);
+  }
+  return tokens;
+}
+
+function _ngramFreq(tokens, n, ignoreStopwords) {
+  const freq = new Map();
+  if (tokens.length < n) return freq;
+  for (let i = 0; i <= tokens.length - n; i++) {
+    let allStop = true;
+    for (let k = 0; k < n; k++) {
+      if (!REPETITION_STOPWORDS.has(tokens[i + k])) { allStop = false; break; }
+    }
+    if (ignoreStopwords && allStop) continue;
+    const phrase = tokens.slice(i, i + n).join(' ');
+    freq.set(phrase, (freq.get(phrase) || 0) + 1);
+  }
+  return freq;
+}
+
+function tool_find_repetitions(input, ctx) {
+  const n = [2, 3, 4, 5].includes(input?.n) ? input.n : 3;
+  const scope = ['book', 'chapter', 'page'].includes(input?.scope) ? input.scope : 'book';
+  const ignoreStopwords = input?.ignore_stopwords !== false;
+  const minCount = Math.max(2, Number.isInteger(input?.min_count) ? input.min_count : (scope === 'book' ? 5 : 2));
+  const limit = Math.min(REPETITIONS_MAX_LIMIT, Math.max(1, Number.isInteger(input?.limit) ? input.limit : REPETITIONS_DEFAULT_LIMIT));
+
+  let sql = 'SELECT page_id, page_name, chapter_id, body_html FROM pages WHERE book_id = ? AND body_html IS NOT NULL';
+  const params = [ctx.bookId];
+  if (scope === 'chapter') {
+    if (!Number.isInteger(input?.chapter_id)) return { error: 'chapter_id fehlt (scope=chapter)' };
+    sql += ' AND chapter_id = ?';
+    params.push(input.chapter_id);
+  } else if (scope === 'page') {
+    if (!Number.isInteger(input?.page_id)) return { error: 'page_id fehlt (scope=page)' };
+    sql += ' AND page_id = ?';
+    params.push(input.page_id);
+  }
+  const pages = db.prepare(sql).all(...params);
+  if (!pages.length) {
+    return { results: [], hint: 'Keine Seiten mit body_html im gewählten Scope. Sync ausführen.' };
+  }
+
+  const totalFreq = new Map();
+  const perPage = new Map();
+  const pageInfo = new Map();
+  for (const p of pages) {
+    pageInfo.set(p.page_id, { page_name: p.page_name, chapter_id: p.chapter_id });
+    const text = htmlToPlainText(p.body_html);
+    const tokens = _tokenizeForRepetitions(text);
+    const freq = _ngramFreq(tokens, n, ignoreStopwords);
+    for (const [phrase, count] of freq) {
+      totalFreq.set(phrase, (totalFreq.get(phrase) || 0) + count);
+      if (!perPage.has(phrase)) perPage.set(phrase, new Map());
+      perPage.get(phrase).set(p.page_id, count);
+    }
+  }
+
+  const filtered = [...totalFreq.entries()]
+    .filter(([, c]) => c >= minCount)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+
+  const total = filtered.length;
+  const top = filtered.slice(0, limit).map(([phrase, count]) => {
+    const samples = [...(perPage.get(phrase) || new Map()).entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, REPETITIONS_SAMPLE_PAGES)
+      .map(([pageId, c]) => {
+        const info = pageInfo.get(pageId);
+        return { page_id: pageId, page_name: info?.page_name || null, count: c };
+      });
+    return { phrase, count, sample_pages: samples };
+  });
+
+  return _truncateResult({
+    n,
+    scope,
+    min_count: minCount,
+    pages_scanned: pages.length,
+    total_results: total,
+    results: top,
+    ...(total > top.length ? { truncated: true } : {}),
+  });
+}
+
+// ── get_dialogue ──────────────────────────────────────────────────────────────
+
+const DIALOGUE_DEFAULT_LIMIT  = 30;
+const DIALOGUE_MAX_LIMIT      = 100;
+const DIALOGUE_CONTEXT_CHARS  = 80;
+const DIALOGUE_SPEAKER_WINDOW = 100;
+
+function _figureNamePatterns(figRow) {
+  const names = [];
+  if (figRow.name) names.push(figRow.name);
+  if (figRow.kurzname && figRow.kurzname !== figRow.name) names.push(figRow.kurzname);
+  return names;
+}
+
+function tool_get_dialogue(input, ctx) {
+  const limit = Math.min(DIALOGUE_MAX_LIMIT, Math.max(1, Number.isInteger(input?.limit) ? input.limit : DIALOGUE_DEFAULT_LIMIT));
+  const minLen = Math.max(1, Number.isInteger(input?.min_length) ? input.min_length : 4);
+
+  let figRow = null;
+  let figNames = null;
+  if (input?.figur_id || input?.figur_name) {
+    figRow = _findFigure(input, ctx);
+    if (!figRow) return { error: 'Figur nicht gefunden' };
+    figNames = _figureNamePatterns(figRow).map(n => n.toLowerCase());
+  }
+
+  let sql = 'SELECT page_id, page_name, chapter_id, body_html FROM pages WHERE book_id = ? AND body_html IS NOT NULL';
+  const params = [ctx.bookId];
+  if (Number.isInteger(input?.chapter_id)) { sql += ' AND chapter_id = ?'; params.push(input.chapter_id); }
+  if (Number.isInteger(input?.page_id))    { sql += ' AND page_id    = ?'; params.push(input.page_id); }
+  sql += ' ORDER BY chapter_id, page_id';
+  const pages = db.prepare(sql).all(...params);
+  if (!pages.length) return { results: [], hint: 'Keine Seiten im Scope.' };
+
+  const results = [];
+  let totalFound = 0;
+  for (const p of pages) {
+    const text = htmlToPlainText(p.body_html);
+    const ranges = findDialogRanges(text);
+    for (const [a, b] of ranges) {
+      const segment = text.slice(a, b).trim();
+      if (segment.length < minLen) continue;
+      if (figNames) {
+        const winStart = Math.max(0, a - DIALOGUE_SPEAKER_WINDOW);
+        const winEnd   = Math.min(text.length, b + DIALOGUE_SPEAKER_WINDOW);
+        const ctxLower = text.slice(winStart, winEnd).toLowerCase();
+        if (!figNames.some(n => ctxLower.includes(n))) continue;
+      }
+      totalFound++;
+      if (results.length >= limit) continue;
+      const before = text.slice(Math.max(0, a - DIALOGUE_CONTEXT_CHARS), a).trim();
+      const after  = text.slice(b, Math.min(text.length, b + DIALOGUE_CONTEXT_CHARS)).trim();
+      results.push({
+        page_id:    p.page_id,
+        page_name:  p.page_name,
+        chapter_id: p.chapter_id,
+        offset:     a,
+        length:     b - a,
+        text:       segment,
+        before:     before || null,
+        after:      after  || null,
+      });
+    }
+    if (results.length >= limit && !figNames) break;
+  }
+
+  return _truncateResult({
+    ...(figRow ? { figur: { fig_id: figRow.fig_id, name: figRow.name } } : {}),
+    results,
+    total_results: totalFound,
+    ...(totalFound > results.length ? { truncated: true, shown: results.length } : {}),
+    hint: 'Heuristische Dialog-Erkennung (Anführungszeichen, Speech-Verb+Doppelpunkt, Em-Dash). Einfache gerade Quotes werden ignoriert.',
+  });
+}
+
+// ── diff_page_revisions ───────────────────────────────────────────────────────
+
+const DIFF_MAX_BLOCKS   = 100;
+const DIFF_MAX_TEXT_LEN = 600;
+
+function _diffBlocks(oldText, newText) {
+  const parts = diffWordsWithSpace(oldText, newText);
+  const blocks = [];
+  let i = 0;
+  while (i < parts.length) {
+    const p = parts[i];
+    if (p.removed && parts[i + 1]?.added) {
+      blocks.push({ kind: 'change', from: p.value, to: parts[i + 1].value });
+      i += 2;
+    } else if (p.added) {
+      blocks.push({ kind: 'add', text: p.value });
+      i += 1;
+    } else if (p.removed) {
+      blocks.push({ kind: 'del', text: p.value });
+      i += 1;
+    } else {
+      i += 1;
+    }
+  }
+  return blocks;
+}
+
+function _clampDiffPart(s) {
+  if (s == null) return s;
+  return s.length > DIFF_MAX_TEXT_LEN ? s.slice(0, DIFF_MAX_TEXT_LEN) + '…' : s;
+}
+
+function tool_diff_page_revisions(input, ctx) {
+  const pageId = input?.page_id;
+  if (!Number.isInteger(pageId)) return { error: 'page_id fehlt' };
+
+  const pageRow = db.prepare(`
+    SELECT p.page_id, p.page_name, c.chapter_name, p.book_id
+    FROM pages p
+    LEFT JOIN chapters c ON c.chapter_id = p.chapter_id AND c.book_id = p.book_id
+    WHERE p.page_id = ?
+  `).get(pageId);
+  if (!pageRow || pageRow.book_id !== ctx.bookId) {
+    return { error: 'Seite nicht im aktuellen Buch.' };
+  }
+
+  let fromRev = null;
+  let toRev   = null;
+  if (Number.isInteger(input?.from_rev_id) && Number.isInteger(input?.to_rev_id)) {
+    fromRev = pageRevisions.get(input.from_rev_id);
+    toRev   = pageRevisions.get(input.to_rev_id);
+    if (!fromRev || !toRev) return { error: 'Revision-ID nicht gefunden.' };
+    if (fromRev.page_id !== pageId || toRev.page_id !== pageId) {
+      return { error: 'Revision gehört nicht zur Seite.' };
+    }
+  } else {
+    const recent = pageRevisions.listForPage(pageId, 2);
+    if (recent.length < 2) {
+      return { error: 'Weniger als 2 Revisionen vorhanden.', total_revisions: recent.length };
+    }
+    toRev   = pageRevisions.get(recent[0].id);
+    fromRev = pageRevisions.get(recent[1].id);
+  }
+
+  const oldText = htmlToPlainText(fromRev.body_html);
+  const newText = htmlToPlainText(toRev.body_html);
+  if (oldText === newText) {
+    return {
+      page_id: pageId,
+      page_name: pageRow.page_name,
+      from: { id: fromRev.id, created_at: fromRev.created_at, source: fromRev.source, chars: fromRev.chars },
+      to:   { id: toRev.id,   created_at: toRev.created_at,   source: toRev.source,   chars: toRev.chars   },
+      unchanged: true,
+    };
+  }
+
+  const blocks = _diffBlocks(oldText, newText);
+  const summary = { add: 0, del: 0, change: 0 };
+  for (const b of blocks) summary[b.kind]++;
+
+  const limited = blocks.slice(0, DIFF_MAX_BLOCKS).map(b => {
+    if (b.kind === 'change') return { kind: 'change', from: _clampDiffPart(b.from), to: _clampDiffPart(b.to) };
+    return { kind: b.kind, text: _clampDiffPart(b.text) };
+  });
+
+  return _truncateResult({
+    page_id:   pageId,
+    page_name: pageRow.page_name,
+    chapter_name: pageRow.chapter_name || null,
+    from: {
+      id:         fromRev.id,
+      created_at: fromRev.created_at,
+      source:     fromRev.source,
+      user_email: fromRev.user_email || null,
+      chars:      fromRev.chars,
+      words:      fromRev.words,
+    },
+    to: {
+      id:         toRev.id,
+      created_at: toRev.created_at,
+      source:     toRev.source,
+      user_email: toRev.user_email || null,
+      chars:      toRev.chars,
+      words:      toRev.words,
+    },
+    chars_delta: (toRev.chars || 0) - (fromRev.chars || 0),
+    summary,
+    blocks: limited,
+    ...(blocks.length > limited.length ? { truncated: true, total_blocks: blocks.length } : {}),
+  });
+}
+
+// ── find_first_last_mention ───────────────────────────────────────────────────
+
+function _firstLastForFigure(figRow, ctx) {
+  const rows = db.prepare(`
+    SELECT p.page_id, p.page_name, p.chapter_id, c.chapter_name, pfm.count
+    FROM page_figure_mentions pfm
+    JOIN pages p      ON p.page_id = pfm.page_id
+    LEFT JOIN chapters c ON c.chapter_id = p.chapter_id AND c.book_id = p.book_id
+    WHERE pfm.figure_id = ? AND p.book_id = ?
+    ORDER BY p.chapter_id, p.page_id
+  `).all(figRow.id, ctx.bookId);
+  if (!rows.length) return null;
+  const first = rows[0];
+  const last  = rows[rows.length - 1];
+  const total = rows.reduce((s, r) => s + r.count, 0);
+  return {
+    target_type: 'figure',
+    fig_id: figRow.fig_id,
+    name:   figRow.name,
+    first: {
+      page_id: first.page_id, page_name: first.page_name,
+      chapter_id: first.chapter_id, chapter_name: first.chapter_name || null,
+      count: first.count,
+    },
+    last: {
+      page_id: last.page_id, page_name: last.page_name,
+      chapter_id: last.chapter_id, chapter_name: last.chapter_name || null,
+      count: last.count,
+    },
+    total_mentions: total,
+    pages_with_mention: rows.length,
+  };
+}
+
+function _firstLastForLocation(locRow) {
+  const chs = db.prepare(`
+    SELECT lc.chapter_id, c.chapter_name, lc.haeufigkeit
+    FROM location_chapters lc
+    LEFT JOIN chapters c ON c.chapter_id = lc.chapter_id
+    WHERE lc.location_id = ?
+    ORDER BY lc.chapter_id
+  `).all(locRow.id);
+
+  if (!chs.length && !locRow.erste_erwaehnung_page_id) return null;
+
+  const firstPageRow = locRow.erste_erwaehnung_page_id
+    ? db.prepare('SELECT page_id, page_name, chapter_id FROM pages WHERE page_id = ?').get(locRow.erste_erwaehnung_page_id)
+    : null;
+
+  return {
+    target_type: 'location',
+    loc_id: locRow.loc_id,
+    name:   locRow.name,
+    first: firstPageRow ? {
+      page_id: firstPageRow.page_id, page_name: firstPageRow.page_name,
+      chapter_id: firstPageRow.chapter_id,
+    } : (chs[0] ? { chapter_id: chs[0].chapter_id, chapter_name: chs[0].chapter_name || null } : null),
+    last_chapter: chs.length ? {
+      chapter_id: chs[chs.length - 1].chapter_id,
+      chapter_name: chs[chs.length - 1].chapter_name || null,
+      haeufigkeit: chs[chs.length - 1].haeufigkeit,
+    } : null,
+    chapters: chs.length,
+    note: 'Orte werden kapitelgenau indiziert; Seiten-genaue „last" nur via search_passages erreichbar.',
+  };
+}
+
+function tool_find_first_last_mention(input, ctx) {
+  if (input?.figur_id || input?.figur_name) {
+    const figRow = _findFigure(input, ctx);
+    if (!figRow) return { error: 'Figur nicht gefunden' };
+    const result = _firstLastForFigure(figRow, ctx);
+    if (!result) return { fig_id: figRow.fig_id, name: figRow.name, error: 'Keine Index-Erwähnungen. Komplettanalyse oder Sync ausführen.' };
+    return result;
+  }
+  if (input?.loc_id) {
+    const locRow = db.prepare(
+      'SELECT id, loc_id, name, erste_erwaehnung_page_id FROM locations WHERE book_id = ? AND loc_id = ? AND user_email IS ?'
+    ).get(ctx.bookId, input.loc_id, ctx.userEmail || null);
+    if (!locRow) return { error: 'Ort nicht gefunden' };
+    const result = _firstLastForLocation(locRow);
+    if (!result) return { loc_id: locRow.loc_id, name: locRow.name, error: 'Keine Index-Daten für diesen Ort.' };
+    return result;
+  }
+  return { error: 'figur_id/figur_name oder loc_id erforderlich' };
+}
+
+// ── quote_passage ─────────────────────────────────────────────────────────────
+
+const QUOTE_DEFAULT_CONTEXT = 80;
+const QUOTE_MAX_LENGTH      = 800;
+const QUOTE_MAX_CONTEXT     = 300;
+
+async function tool_quote_passage(input, ctx) {
+  const pageId = input?.page_id;
+  const offset = input?.offset;
+  const length = input?.length;
+  if (!Number.isInteger(pageId)) return { error: 'page_id fehlt' };
+  if (!Number.isInteger(offset) || offset < 0) return { error: 'offset (>= 0) fehlt' };
+  if (!Number.isInteger(length) || length <= 0) return { error: 'length (> 0) fehlt' };
+  if (length > QUOTE_MAX_LENGTH) return { error: `length zu gross (max ${QUOTE_MAX_LENGTH}).` };
+
+  const contextChars = Math.min(QUOTE_MAX_CONTEXT, Math.max(0, Number.isInteger(input?.context_chars) ? input.context_chars : QUOTE_DEFAULT_CONTEXT));
+
+  const pageRow = db.prepare(`
+    SELECT p.page_id, p.page_name, p.book_id, c.chapter_id, c.chapter_name
+    FROM pages p
+    LEFT JOIN chapters c ON c.chapter_id = p.chapter_id AND c.book_id = p.book_id
+    WHERE p.page_id = ?
+  `).get(pageId);
+  if (!pageRow || pageRow.book_id !== ctx.bookId) {
+    return { error: 'Seite nicht im aktuellen Buch.' };
+  }
+  if (!ctx.userToken) return { error: 'Kein BookStack-Token in der Session.' };
+
+  if (ctx.jobSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
+  const pd = await contentStore.loadPage(pageId, ctx.userToken);
+  const text = htmlToPlainText(pd.html || '');
+  if (offset >= text.length) {
+    return { error: `offset (${offset}) liegt ausserhalb des Texts (Länge ${text.length}).` };
+  }
+  const end = Math.min(text.length, offset + length);
+  const quote = text.slice(offset, end);
+  const before = contextChars ? text.slice(Math.max(0, offset - contextChars), offset) : '';
+  const after  = contextChars ? text.slice(end, Math.min(text.length, end + contextChars)) : '';
+
+  return {
+    page_id:      pageId,
+    page_name:    pageRow.page_name,
+    chapter_id:   pageRow.chapter_id || null,
+    chapter_name: pageRow.chapter_name || null,
+    offset,
+    length:       end - offset,
+    page_chars:   text.length,
+    quote,
+    ...(before ? { before } : {}),
+    ...(after  ? { after  } : {}),
+    ...(end - offset < length ? { clamped_to_eot: true } : {}),
+  };
+}
+
 // ── Dispatch ──────────────────────────────────────────────────────────────────
 
 const TOOLS = {
@@ -1503,6 +1993,12 @@ const TOOLS = {
   list_scenes:            tool_list_scenes,
   list_werkstatt_drafts:  tool_list_werkstatt_drafts,
   get_werkstatt_draft:    tool_get_werkstatt_draft,
+  get_book_settings:        tool_get_book_settings,
+  find_repetitions:         tool_find_repetitions,
+  get_dialogue:             tool_get_dialogue,
+  diff_page_revisions:      tool_diff_page_revisions,
+  find_first_last_mention:  tool_find_first_last_mention,
+  quote_passage:            tool_quote_passage,
 };
 
 async function executeTool(name, input, ctx) {
