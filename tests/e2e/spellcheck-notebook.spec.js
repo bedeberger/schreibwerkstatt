@@ -1,17 +1,53 @@
 // E2E: Spellcheck-Controller im Notebook-Editor-Setup.
 // Harness mountet den Controller direkt; LT-Endpoint ist im Test-Server
 // gemockt (Walld -> Tippfehler, scheinet -> Grammatik).
+//
+// Squiggles werden ueber die CSS Custom Highlight API gerendert (kein
+// DOM-Element pro Match) — Tests greifen Highlight-Sets aus `CSS.highlights`
+// ab und klicken via Maus-Koordinaten ins highlight-Range.
 
 const { test, expect } = require('@playwright/test');
 
 const HARNESS = '/tests/fixtures/spellcheck-harness.html?kind=notebook';
 
+async function squiggleCount(page) {
+  return page.evaluate(() => {
+    return ['lt-typo', 'lt-grammar', 'lt-style'].reduce((sum, k) => {
+      const h = CSS.highlights.get(k);
+      return sum + (h ? h.size : 0);
+    }, 0);
+  });
+}
+
+async function waitForSquiggles(page, timeout = 5000) {
+  await page.waitForFunction(() => {
+    return ['lt-typo', 'lt-grammar', 'lt-style'].some((k) => {
+      const h = CSS.highlights.get(k);
+      return h && h.size > 0;
+    });
+  }, null, { timeout });
+}
+
+async function clickFirstSquiggle(page) {
+  const pt = await page.evaluate(() => {
+    for (const k of ['lt-typo', 'lt-grammar', 'lt-style']) {
+      const h = CSS.highlights.get(k);
+      if (!h || !h.size) continue;
+      const range = h.values().next().value;
+      const r = range.getBoundingClientRect();
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    }
+    return null;
+  });
+  if (!pt) throw new Error('no squiggle present');
+  await page.mouse.click(pt.x, pt.y);
+}
+
 test('notebook: squiggle erscheint nach Debounce', async ({ page }) => {
   await page.goto(HARNESS);
   await page.waitForFunction(() => window.__harnessReady === true);
-  // Initial-Check: debounce 1.5s nicht noetig, attach loest Sofort-Check aus.
-  await page.waitForSelector('.lt-squiggle', { timeout: 5000 });
-  const count = await page.locator('.lt-squiggle').count();
+  await waitForSquiggles(page);
+  const count = await squiggleCount(page);
   expect(count).toBeGreaterThanOrEqual(2);
 });
 
@@ -26,8 +62,8 @@ test('notebook: status-badge zeigt match-count', async ({ page }) => {
 test('notebook: klick auf squiggle oeffnet popover', async ({ page }) => {
   await page.goto(HARNESS);
   await page.waitForFunction(() => window.__harnessReady === true);
-  await page.waitForSelector('.lt-squiggle');
-  await page.locator('.lt-squiggle').first().dispatchEvent('mousedown');
+  await waitForSquiggles(page);
+  await clickFirstSquiggle(page);
   await page.waitForSelector('.lt-popover');
   const replacements = await page.locator('.lt-popover__replacement').count();
   expect(replacements).toBeGreaterThanOrEqual(1);
@@ -36,8 +72,8 @@ test('notebook: klick auf squiggle oeffnet popover', async ({ page }) => {
 test('notebook: replacement-klick ersetzt text', async ({ page }) => {
   await page.goto(HARNESS);
   await page.waitForFunction(() => window.__harnessReady === true);
-  await page.waitForSelector('.lt-squiggle');
-  await page.locator('.lt-squiggle').first().dispatchEvent('mousedown');
+  await waitForSquiggles(page);
+  await clickFirstSquiggle(page);
   await page.waitForSelector('.lt-popover');
   await page.locator('.lt-popover__replacement').first().click();
   // Walld -> Wald (erstes Replacement).

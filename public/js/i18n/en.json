@@ -1274,6 +1274,7 @@
   "editor.slash.heute":          "Insert date",
   "editor.slash.jetzt":          "Insert date + time",
   "editor.slash.zeit":           "Insert time",
+  "editor.slash.quotes":         "Normalize quotation marks",
 
   "editor.synonym.searchFor":    "Find synonym for «{word}»",
   "editor.synonym.titleFor":     "Synonyms for «{word}»",

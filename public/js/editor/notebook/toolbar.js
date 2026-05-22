@@ -10,12 +10,14 @@
 
 import { getEditEl, placeCaretIn, WORD_RE } from '../utils.js';
 import { tzOpts, localeTag } from '../../utils.js';
+import { normalizeQuotes, resolveQuoteStyle } from './quote-normalize.js';
 
 // Blocktyp-Definitionen für Slash-Transform. `tag` ist das Zielelement;
 // `className` optional (aktuell für .poem + .todo). `list: true` wrappt den
 // Inhalt in ein <li>. `todoList: true` erzeugt eine Checkbox-Liste.
 // `insertText: 'date'|'time'|'datetime'` ersetzt den Block durch einen
-// formatierten Datums-/Zeit-Stempel.
+// formatierten Datums-/Zeit-Stempel. `action: '<id>'` triggert eine
+// page-scoped Aktion ohne Block-Transform.
 const SLASH_ITEMS = [
   { key: 'paragraph',  tag: 'p' },
   { key: 'h2',         tag: 'h2' },
@@ -28,6 +30,7 @@ const SLASH_ITEMS = [
   { key: 'heute',      insertText: 'date' },
   { key: 'jetzt',      insertText: 'datetime' },
   { key: 'zeit',       insertText: 'time' },
+  { key: 'quotes',     action: 'normalize-quotes' },
 ];
 
 // Datums-/Zeit-Stempel im uiLocale + appTimezone. Kein Locale-Param —
@@ -322,6 +325,15 @@ export const toolbarCardMethods = {
     const block = this._slashBlock;
     if (!editEl || !block || !block.parentNode) { this._closeSlash(); return; }
 
+    // Page-scoped Aktion ohne Block-Transform (z.B. Anführungszeichen
+    // normalisieren). Block bleibt leer, Caret kehrt nach der Aktion dorthin
+    // zurück.
+    if (item.action === 'normalize-quotes') {
+      this._closeSlash();
+      this._runNormalizeQuotes(editEl, block);
+      return;
+    }
+
     // Datums-/Zeit-Stempel: ersetzt den (per Trigger leeren) Block durch
     // einen <p> mit dem formatierten Stempel-String. Caret hinter den Text,
     // damit der User direkt weiterschreiben kann.
@@ -397,5 +409,28 @@ export const toolbarCardMethods = {
     placeCaretIn(caretTarget);
     window.__app?._markEditDirty?.();
     this._closeSlash();
+  },
+
+  async _runNormalizeQuotes(editEl, block) {
+    const app = window.__app;
+    const bookId = app?.selectedBookId;
+    if (!bookId) return;
+    let style;
+    try {
+      const r = await fetch(`/booksettings/${bookId}`, { credentials: 'same-origin' });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data = await r.json();
+      style = resolveQuoteStyle(data.language, data.region);
+    } catch (e) {
+      console.error('[quote-normalize] booksettings fetch failed', e);
+      return;
+    }
+    const count = normalizeQuotes(editEl, style);
+    if (count > 0) {
+      app._markEditDirty?.();
+      editEl.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    if (block && block.isConnected) placeCaretIn(block);
+    else editEl.focus();
   },
 };

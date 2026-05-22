@@ -158,7 +158,8 @@
                    :id="'werkstatt-name-' + selectedDraftId"
                    x-model="editName"
                    :aria-invalid="!editName.trim()"
-                   :placeholder="$app.t('werkstatt.field.name')">
+                   :placeholder="$app.t('werkstatt.field.name')"
+                   data-spellcheck="spelling">
           </div>
         </div>
 
@@ -185,7 +186,8 @@
                       class="card-form-textarea"
                       x-model="editNotes"
                       rows="4"
-                      :placeholder="$app.t('werkstatt.field.notes')"></textarea>
+                      :placeholder="$app.t('werkstatt.field.notes')"
+                      data-spellcheck="spelling"></textarea>
           </div>
         </div>
       </div>

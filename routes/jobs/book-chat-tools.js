@@ -1369,51 +1369,52 @@ function _findDraftByNameOrId(input, ctx) {
   return null;
 }
 
-function tool_werkstatt_drafts(input, ctx) {
+function tool_list_werkstatt_drafts(_input, ctx) {
   const userEmail = ctx.userEmail || '';
   const locale = _userLocale(userEmail);
 
-  const hasSelector = Number.isInteger(input?.draft_id)
-    || (typeof input?.figur_name === 'string' && input.figur_name.trim());
-
-  if (!hasSelector) {
-    const drafts = listDraftFigures(ctx.bookId, userEmail);
-    if (!drafts.length) {
-      return {
-        drafts: [],
-        hint: 'Keine Figuren-Werkstatt-Drafts vorhanden. User legt sie über die Werkstatt-Karte (tile.werkstatt) an.',
-      };
-    }
-    const items = drafts.map(d => {
-      const runRows = listWerkstattRuns(d.id, userEmail);
-      const counts = { brainstorm: 0, consistency: 0 };
-      for (const r of runRows) {
-        if (r.kind === 'brainstorm') counts.brainstorm++;
-        else if (r.kind === 'consistency') counts.consistency++;
-      }
-      const lastRun = runRows[0] || null;
-      const notes = d.notes || null;
-      return {
-        draft_id: d.id,
-        name: d.name,
-        archetype: d.archetype || null,
-        source_figure_name: d.source_figure_name || null,
-        notes: notes && notes.length > WERKSTATT_NOTES_PREVIEW_CHARS
-          ? notes.slice(0, WERKSTATT_NOTES_PREVIEW_CHARS) + '…'
-          : notes,
-        updated_at: d.updated_at,
-        runs: counts,
-        ...(lastRun ? { last_run: _summarizeRunListItem(lastRun, locale) } : {}),
-      };
-    });
-    return _truncateResult({ drafts: items, total: items.length });
+  const drafts = listDraftFigures(ctx.bookId, userEmail);
+  if (!drafts.length) {
+    return {
+      drafts: [],
+      total: 0,
+      hint: 'Keine Figuren-Werkstatt-Drafts vorhanden. User legt sie über die Werkstatt-Karte (tile.werkstatt) an.',
+    };
   }
+  const items = drafts.map(d => {
+    const runRows = listWerkstattRuns(d.id, userEmail);
+    const counts = { brainstorm: 0, consistency: 0 };
+    for (const r of runRows) {
+      if (r.kind === 'brainstorm') counts.brainstorm++;
+      else if (r.kind === 'consistency') counts.consistency++;
+    }
+    const lastRun = runRows[0] || null;
+    const notes = d.notes || null;
+    return {
+      draft_id: d.id,
+      name: d.name,
+      archetype: d.archetype || null,
+      source_figure_name: d.source_figure_name || null,
+      notes: notes && notes.length > WERKSTATT_NOTES_PREVIEW_CHARS
+        ? notes.slice(0, WERKSTATT_NOTES_PREVIEW_CHARS) + '…'
+        : notes,
+      updated_at: d.updated_at,
+      runs: counts,
+      ...(lastRun ? { last_run: _summarizeRunListItem(lastRun, locale) } : {}),
+    };
+  });
+  return _truncateResult({ drafts: items, total: items.length });
+}
+
+function tool_get_werkstatt_draft(input, ctx) {
+  const userEmail = ctx.userEmail || '';
+  const locale = _userLocale(userEmail);
 
   const draft = _findDraftByNameOrId(input, ctx);
   if (!draft) {
     return {
       error: 'Werkstatt-Draft nicht gefunden',
-      hint: 'Per draft_id (aus dem List-Modus ohne Argumente) oder figur_name suchen.',
+      hint: 'Per draft_id (aus list_werkstatt_drafts) oder figur_name suchen.',
     };
   }
 
@@ -1471,8 +1472,7 @@ function tool_werkstatt_drafts(input, ctx) {
     notes: draft.notes || null,
     updated_at: draft.updated_at,
     mindmap_text: mindmapText,
-    ...(runs.length ? { runs } : {}),
-    ...(includeRuns && !runs.length ? { runs_hint: 'Keine KI-Läufe (Brainstorm/Consistency) bisher.' } : {}),
+    ...(includeRuns ? { runs } : {}),
   });
 }
 
@@ -1820,6 +1820,104 @@ function tool_diff_page_revisions(input, ctx) {
   });
 }
 
+// ── find_first_last_mention ───────────────────────────────────────────────────
+
+function tool_find_first_last_mention(input, ctx) {
+  const userEmail = ctx.userEmail || null;
+  const hasFigSelector = (typeof input?.figur_id === 'string' && input.figur_id.trim())
+                      || (typeof input?.figur_name === 'string' && input.figur_name.trim());
+  const hasLocSelector = typeof input?.loc_id === 'string' && input.loc_id.trim();
+
+  if (!hasFigSelector && !hasLocSelector) {
+    return { error: 'figur_id, figur_name oder loc_id erforderlich.' };
+  }
+
+  if (hasFigSelector) {
+    const figRow = _findFigure(input, ctx);
+    if (!figRow) {
+      return { error: 'Figur nicht gefunden', hint: 'Prüfe die Figurenliste im System-Prompt.' };
+    }
+    const mentions = db.prepare(`
+      SELECT p.page_id, p.page_name, p.chapter_id, c.chapter_name, pfm.count, pfm.first_offset
+      FROM page_figure_mentions pfm
+      JOIN pages p      ON p.page_id = pfm.page_id
+      LEFT JOIN chapters c ON c.chapter_id = p.chapter_id AND c.book_id = p.book_id
+      WHERE pfm.figure_id = ? AND p.book_id = ?
+      ORDER BY p.chapter_id, p.page_id
+    `).all(figRow.id, ctx.bookId);
+    if (!mentions.length) {
+      return {
+        fig_id: figRow.fig_id,
+        name: figRow.name,
+        error: 'Keine Index-Erwähnung vorhanden. Komplettanalyse/Sync ausführen, um den Figuren-Index zu aktualisieren.',
+      };
+    }
+    const first = mentions[0];
+    const last  = mentions[mentions.length - 1];
+    const total = mentions.reduce((s, m) => s + m.count, 0);
+    return {
+      fig_id: figRow.fig_id,
+      name: figRow.name,
+      total_mentions: total,
+      pages_with_mention: mentions.length,
+      first_appearance: {
+        chapter_id: first.chapter_id,
+        chapter_name: first.chapter_name || '(ohne Kapitel)',
+        page_id: first.page_id,
+        page_name: first.page_name,
+        first_offset: first.first_offset,
+        count: first.count,
+      },
+      last_appearance: {
+        chapter_id: last.chapter_id,
+        chapter_name: last.chapter_name || '(ohne Kapitel)',
+        page_id: last.page_id,
+        page_name: last.page_name,
+        count: last.count,
+      },
+    };
+  }
+
+  // loc_id-Pfad
+  const locRow = db.prepare(
+    'SELECT id, loc_id, name FROM locations WHERE book_id = ? AND user_email IS ? AND loc_id = ?'
+  ).get(ctx.bookId, userEmail, input.loc_id.trim());
+  if (!locRow) {
+    return { error: 'Ort nicht gefunden', hint: 'Prüfe loc_id via list_locations.' };
+  }
+  const chRows = db.prepare(`
+    SELECT lc.chapter_id, c.chapter_name, lc.haeufigkeit
+    FROM location_chapters lc
+    LEFT JOIN chapters c ON c.chapter_id = lc.chapter_id
+    WHERE lc.location_id = ?
+    ORDER BY lc.chapter_id
+  `).all(locRow.id);
+  if (!chRows.length) {
+    return {
+      loc_id: locRow.loc_id,
+      name: locRow.name,
+      error: 'Keine Index-Erwähnung vorhanden. Komplettanalyse/Sync ausführen, um den Orte-Index zu aktualisieren.',
+    };
+  }
+  const first = chRows[0];
+  const last  = chRows[chRows.length - 1];
+  return {
+    loc_id: locRow.loc_id,
+    name: locRow.name,
+    chapters_with_mention: chRows.length,
+    first_appearance: {
+      chapter_id: first.chapter_id,
+      chapter_name: first.chapter_name || '(ohne Kapitel)',
+      haeufigkeit: first.haeufigkeit,
+    },
+    last_appearance: {
+      chapter_id: last.chapter_id,
+      chapter_name: last.chapter_name || '(ohne Kapitel)',
+      haeufigkeit: last.haeufigkeit,
+    },
+  };
+}
+
 // ── quote_passage ─────────────────────────────────────────────────────────────
 
 const QUOTE_DEFAULT_CONTEXT = 80;
@@ -1986,11 +2084,13 @@ const TOOLS = {
   get_stil_metrics:       tool_get_stil_metrics,
   list_locations:         tool_list_locations,
   list_scenes:            tool_list_scenes,
-  werkstatt_drafts:       tool_werkstatt_drafts,
+  list_werkstatt_drafts:  tool_list_werkstatt_drafts,
+  get_werkstatt_draft:    tool_get_werkstatt_draft,
   get_book_settings:      tool_get_book_settings,
   find_repetitions:       tool_find_repetitions,
   get_dialogue:           tool_get_dialogue,
   diff_page_revisions:    tool_diff_page_revisions,
+  find_first_last_mention: tool_find_first_last_mention,
   quote_passage:          tool_quote_passage,
 };
 

@@ -89,7 +89,9 @@ Jede Tool-Funktion: `(input, ctx) → JSON-serialisierbares Objekt` (sync oder a
 | Tool | Input | Zweck | Quelle |
 |------|-------|-------|--------|
 | `list_ideen` | `erledigt?`, `page_id?`, `chapter_id?`, `limit?` (default 50, max 200) | Seiten-Ideen/Notizen des Users. Offene zuerst. | `ideen` |
-| `werkstatt_drafts` | `draft_id?` ∨ `figur_name?`, `include_runs?` (default true), `run_limit?` (default 5, max 20) | Ohne Selector: Liste aller Werkstatt-Drafts (Name, Archetyp, Quell-Figur, notes-Vorschau, Run-Counts, letzter Lauf). Mit `draft_id`/`figur_name`: Detail inkl. Mindmap (eingerückter Plaintext, User-Locale aufgelöst) + KI-Läufe (Brainstorm/Consistency) gekürzt. | `draft_figures` + `werkstatt_runs` |
+| `list_werkstatt_drafts` | — | Liste aller Werkstatt-Drafts (Name, Archetyp, Quell-Figur, notes-Vorschau, Run-Counts, letzter Lauf). | `draft_figures` + `werkstatt_runs` |
+| `get_werkstatt_draft` | `draft_id?` ∨ `figur_name?`, `include_runs?` (default true), `run_limit?` (default 5, max 20) | Detail eines Drafts inkl. Mindmap (eingerückter Plaintext, User-Locale aufgelöst) + KI-Läufe (Brainstorm/Consistency) gekürzt. | `draft_figures` + `werkstatt_runs` |
+| `find_first_last_mention` | `figur_id?` ∨ `figur_name?` ∨ `loc_id?` | Erste + letzte Erwähnung einer Figur (page-level) bzw. eines Orts (chapter-level). Schmaler als `get_figure_mentions`. | `page_figure_mentions` / `location_chapters` |
 
 ### Endpunkt
 

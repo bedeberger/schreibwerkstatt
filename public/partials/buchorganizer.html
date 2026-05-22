@@ -77,7 +77,7 @@
                  @blur="onRenamePage(page.id, $event)"
                  @keydown.enter.prevent="$event.target.blur()"
                  :disabled="organizerSaving"
-                 autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other"
+                 autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other" data-spellcheck="spelling"
                  :aria-label="$app.t('bookOrganizer.renamePage')">
           <template x-if="$app.blogStatusFor(page)">
             <span class="badge" :class="'badge--blog-' + $app.blogStatusFor(page)"
@@ -141,7 +141,7 @@
                  @keydown.enter.prevent="$event.target.blur()"
                  @keydown.tab="onChapterTab($event, ch.id)"
                  :disabled="organizerSaving"
-                 autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other"
+                 autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other" data-spellcheck="spelling"
                  :aria-label="$app.t('bookOrganizer.renameChapter')">
           <span class="organizer-chapter-meta tag" x-text="ch.pages.length === 1 ? $app.t('sidebar.pagesCountOne') : $app.t('sidebar.pagesCount', { n: ch.pages.length })"></span>
           <span class="organizer-chapter-meta tag" x-show="ch.subchapters?.length"
@@ -175,7 +175,7 @@
                      @blur="onRenamePage(page.id, $event)"
                      @keydown.enter.prevent="$event.target.blur()"
                      :disabled="organizerSaving"
-                     autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other"
+                     autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other" data-spellcheck="spelling"
                      :aria-label="$app.t('bookOrganizer.renamePage')">
               <template x-if="$app.blogStatusFor(page)">
                 <span class="badge" :class="'badge--blog-' + $app.blogStatusFor(page)"
@@ -237,7 +237,7 @@
                        @keydown.enter.prevent="$event.target.blur()"
                        @keydown.tab="onChapterTab($event, sub.id)"
                        :disabled="organizerSaving"
-                       autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other"
+                       autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other" data-spellcheck="spelling"
                        :aria-label="$app.t('bookOrganizer.renameChapter')">
                 <span class="organizer-chapter-meta tag" x-text="sub.pages.length === 1 ? $app.t('sidebar.pagesCountOne') : $app.t('sidebar.pagesCount', { n: sub.pages.length })"></span>
                 <span class="organizer-chapter-meta tag" x-show="sub.subchapters?.length"
@@ -271,7 +271,7 @@
                            @blur="onRenamePage(page.id, $event)"
                            @keydown.enter.prevent="$event.target.blur()"
                            :disabled="organizerSaving"
-                           autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other"
+                           autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other" data-spellcheck="spelling"
                            :aria-label="$app.t('bookOrganizer.renamePage')">
                     <template x-if="$app.blogStatusFor(page)">
                       <span class="badge" :class="'badge--blog-' + $app.blogStatusFor(page)"
@@ -333,7 +333,7 @@
                              @keydown.enter.prevent="$event.target.blur()"
                              @keydown.tab="onChapterTab($event, subsub.id)"
                              :disabled="organizerSaving"
-                             autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other"
+                             autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other" data-spellcheck="spelling"
                              :aria-label="$app.t('bookOrganizer.renameChapter')">
                       <span class="organizer-chapter-meta tag" x-text="subsub.pages.length === 1 ? $app.t('sidebar.pagesCountOne') : $app.t('sidebar.pagesCount', { n: subsub.pages.length })"></span>
                       <div class="organizer-chapter-actions">
@@ -357,7 +357,7 @@
                                  @blur="onRenamePage(page.id, $event)"
                                  @keydown.enter.prevent="$event.target.blur()"
                                  :disabled="organizerSaving"
-                                 autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other"
+                                 autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other" data-spellcheck="spelling"
                                  :aria-label="$app.t('bookOrganizer.renamePage')">
                           <template x-if="$app.blogStatusFor(page)">
                             <span class="badge" :class="'badge--blog-' + $app.blogStatusFor(page)"

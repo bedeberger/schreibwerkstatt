@@ -2,8 +2,9 @@
 // User-Custom-Dictionary fuer LanguageTool-Spellcheck.
 //
 // Wort-Eintraege werden vor dem Caching der LT-Response gefiltert: Matches,
-// deren beanstandetes Wort im Dictionary steht, fallen raus. Cache wird beim
-// Add/Remove fuer die betroffenen Seiten geleert.
+// deren beanstandetes Wort im Dictionary steht, fallen raus. Beim Add/Remove
+// wird der LT-Cache nur fuer Pages geleert, in deren body_html das Wort
+// vorkommt (Scope: betroffenes Buch bzw. alle Buecher mit book_access).
 //
 // Granularitaet:
 //   - book_id = 0     -> User-globaler Eintrag (alle Buecher)
@@ -35,15 +36,26 @@ const _stmtDelete = db.prepare(
   `DELETE FROM user_dictionary
    WHERE user_email = ? AND book_id = ? AND word = ? AND lang = ?`
 );
-const _stmtPurgeCacheGlobal = db.prepare(
+// Wort-scoped Purge: nur Pages mit body_html LIKE %word% verlieren ihren Cache.
+// LIKE COLLATE NOCASE deckt ASCII-Case ab; Umlaute bleiben case-sensitive --
+// gut genug fuer Invalidierung (False-Positive heisst ein Re-Fetch, False-
+// Negative gibt's nicht, weil die geschriebene Form im HTML steht).
+const _stmtPurgeCacheByWordGlobal = db.prepare(
   `DELETE FROM page_languagetool_cache
-   WHERE page_id IN (SELECT page_id FROM pages WHERE book_id IN (
-     SELECT book_id FROM book_access WHERE user_email = ?
-   ))`
+   WHERE page_id IN (
+     SELECT p.page_id FROM pages p
+     JOIN book_access ba ON ba.book_id = p.book_id
+     WHERE ba.user_email = ?
+       AND p.body_html LIKE ? ESCAPE '\\' COLLATE NOCASE
+   )`
 );
-const _stmtPurgeCacheForBook = db.prepare(
+const _stmtPurgeCacheByWordForBook = db.prepare(
   `DELETE FROM page_languagetool_cache
-   WHERE page_id IN (SELECT page_id FROM pages WHERE book_id = ?)`
+   WHERE page_id IN (
+     SELECT page_id FROM pages
+     WHERE book_id = ?
+       AND body_html LIKE ? ESCAPE '\\' COLLATE NOCASE
+   )`
 );
 
 function listForUser(userEmail) {
@@ -63,26 +75,31 @@ function getCheckSet(userEmail, bookId, lang) {
 
 function add(userEmail, { word, bookId = 0, lang = '*' }) {
   if (!userEmail || !word || !word.trim()) return false;
-  _stmtInsert.run(userEmail, bookId || 0, word.trim(), lang || '*');
-  _purgeCache(userEmail, bookId);
+  const w = word.trim();
+  _stmtInsert.run(userEmail, bookId || 0, w, lang || '*');
+  _purgeCacheForWord(userEmail, bookId, w);
   return true;
 }
 
 function remove(userEmail, { word, bookId = 0, lang = '*' }) {
   if (!userEmail || !word) return 0;
   const r = _stmtDelete.run(userEmail, bookId || 0, word, lang || '*');
-  if (r.changes > 0) _purgeCache(userEmail, bookId);
+  if (r.changes > 0) _purgeCacheForWord(userEmail, bookId, word);
   return r.changes;
 }
 
-function _purgeCache(userEmail, bookId) {
-  // Cache muss geleert werden, da der gefilterte Match jetzt nicht mehr (oder
-  // doch wieder) als Treffer erscheinen soll. Bei book_id=0 sind alle Buecher
-  // des Users betroffen; sonst nur das gewaehlte Buch.
+function _likeEscape(s) {
+  return String(s).replace(/[\\%_]/g, (c) => '\\' + c);
+}
+
+function _purgeCacheForWord(userEmail, bookId, word) {
+  // Cache nur fuer Pages leeren, deren body_html das Wort enthaelt. Bei
+  // book_id=0 sind alle Buecher des Users im Scope, sonst nur das gewaehlte.
+  const pattern = `%${_likeEscape(word)}%`;
   if (bookId && bookId > 0) {
-    _stmtPurgeCacheForBook.run(bookId);
+    _stmtPurgeCacheByWordForBook.run(bookId, pattern);
   } else {
-    _stmtPurgeCacheGlobal.run(userEmail);
+    _stmtPurgeCacheByWordGlobal.run(userEmail, pattern);
   }
 }
 

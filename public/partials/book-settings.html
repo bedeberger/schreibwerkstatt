@@ -30,7 +30,8 @@
                class="card-form-input"
                x-model="bookSettingsName"
                :placeholder="$app.t('book.create.namePlaceholder')"
-               maxlength="255">
+               maxlength="255"
+               data-spellcheck="spelling">
       </div>
 
       <div class="card-form-row">
@@ -136,6 +137,7 @@
             :placeholder="$app.t('book.settings.contextPlaceholder')"
             rows="4"
             maxlength="1000"
+            data-spellcheck="spelling"
           ></textarea>
           <p class="card-form-hint" x-text="(bookSettingsBuchKontext || '').length + ' / 1000'"></p>
         </div>

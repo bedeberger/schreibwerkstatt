@@ -185,7 +185,8 @@
                  x-model="$app.newPageTitle"
                  :placeholder="$app.t('kapitelReview.newPagePlaceholder')"
                  :aria-label="$app.t('kapitelReview.newPagePlaceholder')"
-                 :disabled="$app.newPageCreating">
+                 :disabled="$app.newPageCreating"
+                 data-spellcheck="spelling">
           <button type="submit"
                   :disabled="$app.newPageCreating || !$app.newPageTitle.trim()">
             <span x-show="$app.newPageCreating" class="spinner"></span>
@@ -202,7 +203,8 @@
                  x-model="$app.newChapterTitle"
                  :placeholder="$app.t('kapitelReview.newChapterPlaceholder')"
                  :aria-label="$app.t('kapitelReview.newChapterPlaceholder')"
-                 :disabled="$app.newChapterCreating">
+                 :disabled="$app.newChapterCreating"
+                 data-spellcheck="spelling">
           <button type="submit"
                   :disabled="$app.newChapterCreating || !$app.newChapterTitle.trim()">
             <span x-show="$app.newChapterCreating" class="spinner"></span>

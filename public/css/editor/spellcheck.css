@@ -329,3 +329,71 @@
 @media (max-width: 640px) {
   .lt-popover { max-width: calc(100vw - 24px); }
 }
+
+/* ─── Form-Field-Variante (input/textarea, [data-spellcheck="spelling"]) ──
+ * Badge: inline-block neben Feld, kein absolutes Positioning. Popover-Variante
+ * mit Match-Liste; jeder Match-Eintrag hat Wort + Vorschlaege + Ignore/Dict. */
+
+.lt-badge--form {
+  position: static;
+  transform: none;
+  vertical-align: middle;
+  margin-left: 6px;
+  cursor: pointer;
+  appearance: none;
+  border-color: var(--color-border, #ccc);
+}
+
+/* Quiet: weniger visuelles Rauschen wenn nichts zu zeigen. Wird vom JS gesetzt
+ * fuer idle/clean/disabled. Hover/Fokus aufs Feld macht Badge wieder voll
+ * sichtbar (Container-Hover). */
+.lt-badge--form.lt-badge--quiet {
+  opacity: 0.35;
+}
+.lt-badge--form.lt-badge--quiet:hover,
+.lt-badge--form:focus-visible,
+*:focus-within > .lt-badge--form,
+*:hover > .lt-badge--form {
+  opacity: 0.9;
+}
+
+/* Form-Popover liegt im body, absolute via JS positioniert. */
+.lt-popover--form {
+  max-width: 320px;
+  min-width: 220px;
+}
+
+.lt-popover__match {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--color-border, #eee);
+}
+.lt-popover__match:last-child { border-bottom: none; padding-bottom: 0; }
+.lt-popover__match:first-child { padding-top: 0; }
+
+.lt-popover__match-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.lt-popover__match-word {
+  font-weight: 600;
+  color: var(--color-danger, #d33);
+  font-family: var(--font-mono, monospace);
+}
+
+.lt-popover__match-msg {
+  color: var(--color-text-muted, #555);
+  font-size: 0.72rem;
+  line-height: 1.3;
+}
+
+.lt-popover__row-actions {
+  display: flex;
+  gap: 6px;
+}
+

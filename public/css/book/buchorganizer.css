@@ -243,19 +243,42 @@
   padding: var(--space-xs) 8px;
 }
 
-/* SortableJS-Klassen für Drag-Zustände */
-.organizer-page.sortable-ghost,
-.organizer-chapter.sortable-ghost {
-  opacity: 0.4;
-  background: var(--color-accent-soft);
+/* SortableJS-Drag-Zustände (eigene Klassen via baseOpts in dnd.js) —
+   klare Landezone, damit User vor Loslassen sieht, wo das Item landet. */
+
+/* Ghost: Slot an der Ziel-Position. Gestrichelter Rahmen + transparenter
+   Hintergrund + reservierte Item-Höhe. Inhalt wird unsichtbar, damit der
+   Klon-Drag-Preview die einzige sichtbare Repräsentation bleibt. */
+.organizer-page.organizer-ghost,
+.organizer-chapter.organizer-ghost {
+  background: color-mix(in srgb, var(--card-accent) 14%, transparent);
+  border: 1px dashed var(--card-accent);
+  border-radius: var(--radius-sm);
 }
-.organizer-page.sortable-chosen,
-.organizer-chapter.sortable-chosen {
+.organizer-page.organizer-ghost > *,
+.organizer-chapter.organizer-ghost > * {
+  visibility: hidden;
+}
+.organizer-chapter.organizer-ghost {
+  min-height: 44px;
+}
+
+/* Chosen: Item bei mousedown vor Drag-Start — kurzer Highlight-Frame. */
+.organizer-page.organizer-chosen,
+.organizer-chapter.organizer-chosen {
   background: var(--color-accent-bg);
 }
-.organizer-page.sortable-drag,
-.organizer-chapter.sortable-drag {
-  box-shadow: 0 6px 16px var(--color-shadow);
+
+/* Drag-Klon: das Element, das mit dem Cursor mitschwebt (forceFallback klont
+   in <body>). Schatten + Tilt suggeriert "in der Hand". */
+.organizer-page.organizer-drag-active,
+.organizer-chapter.organizer-drag-active {
+  box-shadow: 0 12px 28px var(--color-shadow);
+  background: var(--color-card-bg);
+  border: 1px solid var(--card-accent);
+  border-radius: var(--radius-sm);
+  opacity: 0.95;
+  cursor: grabbing;
 }
 
 @media (max-width: 600px) {

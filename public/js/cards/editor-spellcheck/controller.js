@@ -320,9 +320,11 @@ export function createSpellcheckController({
     } catch { return null; }
     for (const [id, entry] of squiggles) {
       try {
-        // probe innerhalb entry.range?  start <= probe < end
+        // probe innerhalb entry.range?  entry.start <= probe.start < entry.end.
+        // START_TO_START: entry.range.start vs probe.start (<=0 → entry start <= probe).
+        // START_TO_END:   entry.range.end   vs probe.start (>0  → entry end  >  probe).
         const startCmp = entry.range.compareBoundaryPoints(Range.START_TO_START, probe);
-        const endCmp   = entry.range.compareBoundaryPoints(Range.END_TO_START, probe);
+        const endCmp   = entry.range.compareBoundaryPoints(Range.START_TO_END, probe);
         if (startCmp <= 0 && endCmp > 0) return id;
       } catch { /* range invalid */ }
     }

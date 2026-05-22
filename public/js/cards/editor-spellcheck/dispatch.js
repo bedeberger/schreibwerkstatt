@@ -9,10 +9,12 @@
 // Sprache: aus aktuellem Buch (books[i] mit language+region) → `${l}-${r}`.
 
 import { createSpellcheckController } from './controller.js';
+import { createFormFieldSpellcheck } from './form-controller.js';
 
 const NOTEBOOK_SEL = '.page-content-view--editing';
 const FOCUS_SEL = '.focus-editor__content';
 const BOOK_SEL = '.book-editor-page-body[contenteditable="true"]';
+const FORM_FIELD_SEL = 'input[data-spellcheck="spelling"], textarea[data-spellcheck="spelling"]';
 // Focus-Editor: `.focus-editor__content` ist gleichzeitig contenteditable-root
 // UND Scroll-Container (overflow-y:auto, siehe focus-mode.css). Scroll-Events
 // bubblen nicht — Listener muss am scrollenden Element selbst sitzen, sonst
@@ -166,7 +168,7 @@ export function setupSpellcheckDispatch(app) {
     requestAnimationFrame(() => requestAnimationFrame(fn));
   }
 
-  app.$watch('languagetoolEnabled', _evaluate);
+  app.$watch('languagetoolEnabled', () => { _evaluate(); _evalForms(); });
   app.$watch('editMode',            _evaluate);
   app.$watch('focusActive',         _evaluate);
   app.$watch('showBookEditorCard',  _evaluate);
@@ -174,11 +176,104 @@ export function setupSpellcheckDispatch(app) {
   // anderem Locale-Context.
   app.$watch('selectedBookId',      () => {
     if (current) _evaluate();
+    _refreshAllForms();
   });
 
   // Initial-Eval (falls bereits ein Editor offen ist beim Boot).
   _evaluate();
 
+  // ─── Form-Felder (input/textarea mit data-spellcheck="spelling") ────────
+  // Eine Controller-Instanz pro Feld. focusin-getrieben (Lazy-Mount), Cleanup
+  // ueber MutationObserver auf DOM-Entfernung. Lebt parallel zu den drei
+  // grossen Editoren — kein Single-Active-Constraint.
+  const formCtls = new WeakMap();      // el -> ctl
+  const formCtlSet = new Set();        // alle aktiven Controller (fuer Bulk-Detach)
+  let formObserver = null;
+
+  function _ensureFormCtl(el) {
+    if (!el || formCtls.has(el)) return formCtls.get(el);
+    const ctl = createFormFieldSpellcheck({
+      el,
+      getBookLocale: _locale,
+      getBookId: _bookId,
+      isEnabled: _isEnabled,
+      i18n: (k) => (typeof app.t === 'function' ? app.t(k) : k),
+    });
+    formCtls.set(el, ctl);
+    formCtlSet.add(ctl);
+    ctl.attach();
+    return ctl;
+  }
+
+  function _detachFormCtl(el) {
+    const ctl = formCtls.get(el);
+    if (!ctl) return;
+    try { ctl.detach(); } catch {}
+    formCtls.delete(el);
+    formCtlSet.delete(ctl);
+  }
+
+  function _detachAllForms() {
+    for (const ctl of Array.from(formCtlSet)) {
+      try { ctl.detach(); } catch {}
+      formCtlSet.delete(ctl);
+    }
+  }
+
+  function _refreshAllForms() {
+    for (const ctl of formCtlSet) {
+      try { ctl.refresh(); } catch {}
+    }
+  }
+
+  function _onFocusIn(ev) {
+    if (!_isEnabled()) return;
+    const t = ev.target;
+    if (!t || !t.matches || !t.matches(FORM_FIELD_SEL)) return;
+    _ensureFormCtl(t);
+  }
+
+  function _setupFormObserver() {
+    if (formObserver) return;
+    formObserver = new MutationObserver((muts) => {
+      for (const m of muts) {
+        if (m.type !== 'childList') continue;
+        for (const node of m.removedNodes) {
+          if (node.nodeType !== 1) continue;
+          if (node.matches?.(FORM_FIELD_SEL)) _detachFormCtl(node);
+          const inner = node.querySelectorAll?.(FORM_FIELD_SEL);
+          if (inner && inner.length) inner.forEach(_detachFormCtl);
+        }
+      }
+    });
+    formObserver.observe(document.body, { childList: true, subtree: true });
+  }
+
+  function _teardownFormObserver() {
+    if (formObserver) { formObserver.disconnect(); formObserver = null; }
+  }
+
+  function _evalForms() {
+    if (_isEnabled()) {
+      _setupFormObserver();
+      document.addEventListener('focusin', _onFocusIn, true);
+      // Schon-fokussiertes Feld einmalig nachziehen.
+      const active = document.activeElement;
+      if (active && active.matches?.(FORM_FIELD_SEL)) _ensureFormCtl(active);
+    } else {
+      document.removeEventListener('focusin', _onFocusIn, true);
+      _detachAllForms();
+      _teardownFormObserver();
+    }
+  }
+
+  _evalForms();
+
   // Cleanup-Hook (App-Destroy ist rare; best-effort).
-  window.addEventListener('beforeunload', () => { _detach(); _teardownBookObserver(); });
+  window.addEventListener('beforeunload', () => {
+    _detach();
+    _teardownBookObserver();
+    _detachAllForms();
+    _teardownFormObserver();
+  });
 }

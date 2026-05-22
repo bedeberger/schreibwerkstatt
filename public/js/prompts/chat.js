@@ -385,15 +385,33 @@ export const BOOK_CHAT_TOOLS = [
     },
   },
   {
-    name: 'werkstatt_drafts',
-    description: 'Figuren-Werkstatt-Drafts dieses Users (Vorwärts-Entwicklungs-Mindmaps, vom Katalog/get_figure_profile getrennt). Ohne Argumente: Liste aller Drafts (Name, Archetyp, Quell-Figur, notes-Vorschau, Brainstorm-/Consistency-Counts, letzter Lauf). Mit `draft_id` oder `figur_name`: Detail-Modus inkl. Mindmap (eingerückter Plaintext in User-Locale) und – optional – die KI-Läufe (Brainstorm-Vorschläge, Consistency-Konflikte+Fazit) gekürzt. Beantwortet "an welchen Figuren arbeitet der User?", "was hat der User für Figur X notiert?", "was kam beim Brainstorm raus?".',
+    name: 'list_werkstatt_drafts',
+    description: 'Listet die Figuren-Werkstatt-Drafts dieses Users (Vorwärts-Entwicklungs-Mindmaps, vom Katalog/get_figure_profile getrennt): Name, Archetyp, Quell-Figur, notes-Vorschau, Brainstorm-/Consistency-Counts, letzter Lauf. Beantwortet "an welchen Figuren arbeitet der User?". Für Details (Mindmap-Text + Run-Inhalte) anschliessend `get_werkstatt_draft` rufen.',
+    input_schema: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'get_werkstatt_draft',
+    description: 'Detail-Output eines Figuren-Werkstatt-Drafts: Mindmap (eingerückter Plaintext in User-Locale) + KI-Läufe (Brainstorm-Vorschläge, Consistency-Konflikte+Fazit) gekürzt. Liefert "was hat der User für Figur X notiert?", "was kam beim Brainstorm raus?". Auswahl per `draft_id` (aus list_werkstatt_drafts) oder `figur_name` (exakt oder Substring, case-insensitive).',
     input_schema: {
       type: 'object',
       properties: {
-        draft_id:     { type: 'integer', description: 'Detail-Modus: Draft-ID aus dem List-Modus.' },
-        figur_name:   { type: 'string',  description: 'Detail-Modus alternativ: Name des Werkstatt-Drafts (exakt oder Substring).' },
-        include_runs: { type: 'boolean', description: 'Nur Detail-Modus: true = KI-Läufe mitliefern. Default: true.' },
-        run_limit:    { type: 'integer', description: 'Nur Detail-Modus: max. Anzahl Läufe (default 5, max 20).' },
+        draft_id:     { type: 'integer', description: 'Draft-ID aus list_werkstatt_drafts.' },
+        figur_name:   { type: 'string',  description: 'Alternative: Name des Werkstatt-Drafts (exakt oder Substring).' },
+        include_runs: { type: 'boolean', description: 'true = KI-Läufe mitliefern. Default: true.' },
+        run_limit:    { type: 'integer', description: 'Max. Anzahl Läufe (default 5, max 20).' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'find_first_last_mention',
+    description: 'Liefert erste + letzte Erwähnung einer Figur (page_figure_mentions) oder eines Orts (location_chapters). Schmaler als `get_figure_mentions` – nur die zwei Endpunkte, ohne Per-Kapitel-Aggregat. Beantwortet "wo erscheint X zuerst?", "wann verschwindet X aus dem Buch?". Pflicht: `figur_id` ∨ `figur_name` ∨ `loc_id`. Ohne Index (Komplettanalyse fehlt): freundlicher Fehler statt 0-Werten.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        figur_id:   { type: 'string', description: 'fig_id der Figur.' },
+        figur_name: { type: 'string', description: 'Alternativ: Name/Kurzname der Figur.' },
+        loc_id:     { type: 'string', description: 'Alternative: loc_id eines Ortes (aus list_locations).' },
       },
       required: [],
     },

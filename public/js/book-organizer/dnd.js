@@ -21,6 +21,18 @@ export const dndMethods = {
     this._sortables = [];
   },
 
+  // Nach jedem erfolgreichen Drop: Sortable-Instanzen frisch an aktuelles DOM
+  // binden. Alpine-x-for rekonziliert nach workTree-Reassignment (Chapter-Drop)
+  // bzw. loadPages-Reload (Cross-Level) und kann Container-Elemente austauschen
+  // — Sortable-Refs zeigen sonst auf stale Nodes und folgende Drops verschieben
+  // Items in unsichtbaren alten Listen.
+  async _reattachSortables() {
+    this._destroySortables();
+    await this.$nextTick();
+    this._initSortables();
+    this._refreshSortableDisabled();
+  },
+
   _initSortables() {
     const Sortable = window.Sortable;
     if (!Sortable) return;
@@ -32,24 +44,45 @@ export const dndMethods = {
     // und wirft "page is not defined". Nach Drag wieder entfernen.
     const markIgnore = (evt) => evt.item?.setAttribute('x-ignore', '');
     const unmarkIgnore = (evt) => evt.item?.removeAttribute('x-ignore');
-    // Auto-Scroll an Dokument-Scrollbarkeit koppeln: passt alles in den
-    // Viewport, deaktivieren — sonst feuert Sortable bei 1-Zeilen-Drags am
-    // Window-Rand. Sensitivity + Speed konservativer als die Sortable-Defaults
-    // (30/10), damit Auto-Scroll nur am echten Edge greift, nicht schon bei
-    // Cursorbewegung mitten auf der Seite.
     const scrollOpts = this._autoScrollOpts();
+    // Präzisions-Tuning (gegen "Nachbar verrutscht beim Ziehen"-Bug):
+    // - forceFallback: konsistenter Klon-Ghost im <body>, umgeht HTML5-DnD-
+    //   Browser-Quirks (sprunghafter Cursor, ungenaue dragover-Targets).
+    // - swapThreshold 0.65: Swap erst, wenn Cursor 65% in Ziel-Item — Default
+    //   1.0 swappt schon bei minimaler Überlappung, dann "flackern" Nachbarn.
+    // - invertSwap: Backward-Drops in nested Listen werden stabil erkannt.
+    // - fallbackTolerance 5: 5px Bewegung nötig bevor Drag startet — Klick auf
+    //   Handle-Span löst nicht versehentlich Drag aus.
+    // - revertOnSpill: Drop außerhalb gültiger Liste (Toolbar, Empty-Bereich)
+    //   springt zurück statt Item-Loss.
+    // - direction vertical: Sortable optimiert Swap-Berechnung explizit.
+    // - chosenClass/ghostClass/dragClass: eigene CSS-Klassen für klares
+    //   visuelles Feedback (Pickup-Highlight, Ghost-Slot, Hover-Karte).
+    const baseOpts = {
+      animation: 150,
+      forceFallback: true,
+      fallbackOnBody: true,
+      fallbackTolerance: 5,
+      swapThreshold: 0.65,
+      invertSwap: true,
+      direction: 'vertical',
+      revertOnSpill: true,
+      emptyInsertThreshold: 8,
+      ...scrollOpts,
+      chosenClass: 'organizer-chosen',
+      ghostClass: 'organizer-ghost',
+      dragClass: 'organizer-drag-active',
+    };
     // Eine Chapter-Liste pro Tiefe — alle teilen die `chapters`-Gruppe, damit
     // Kapitel zwischen Levels per DnD wandern koennen. Drop-Ziel-Validierung
-    // (max-depth, kein-eigener-Subtree) im onAdd/onMove-Hook.
+    // (max-depth, kein-eigener-Subtree) im onMove-Hook.
     const chapterLists = this.$root.querySelectorAll('[data-organizer="chapter-list"]');
     for (const el of chapterLists) {
       this._sortables.push(new Sortable(el, {
+        ...baseOpts,
         handle: '.organizer-drag-handle--chapter',
-        animation: 150,
         draggable: '.organizer-chapter',
         group: { name: 'chapters', pull: true, put: ['chapters'] },
-        emptyInsertThreshold: 0,
-        ...scrollOpts,
         onChoose: markIgnore,
         onUnchoose: unmarkIgnore,
         onMove: (evt) => this._validateChapterMove(evt),
@@ -59,12 +92,10 @@ export const dndMethods = {
     const pageLists = this.$root.querySelectorAll('[data-organizer="page-list"]');
     for (const el of pageLists) {
       this._sortables.push(new Sortable(el, {
+        ...baseOpts,
         handle: '.organizer-drag-handle',
-        animation: 150,
         draggable: '.organizer-page',
         group: { name: 'pages', pull: true, put: ['pages'] },
-        emptyInsertThreshold: 0,
-        ...scrollOpts,
         onChoose: markIgnore,
         onUnchoose: unmarkIgnore,
         onEnd: (evt) => { unmarkIgnore(evt); this._onPageDrop(evt); },
@@ -136,6 +167,7 @@ export const dndMethods = {
     this.workTree = newWorkTree;
     const ok = await this._persistOrder({ fullReload: !sameBucket });
     if (ok) this._recordReorder(before);
+    await this._reattachSortables();
   },
 
   _rebuildFromDom(containerEl, depth, parentId, nodeById) {
@@ -184,6 +216,7 @@ export const dndMethods = {
     const affected = [toChapId, fromChapId !== toChapId ? fromChapId : null].filter(v => v != null);
     const ok = await this._persistOrder(fullReload ? { fullReload: true } : { affectedChapters: affected });
     if (ok) this._recordReorder(before);
+    if (fullReload) await this._reattachSortables();
   },
 
   _pagesBucket(chapId) {
@@ -243,5 +276,6 @@ export const dndMethods = {
       ? { fullReload: true }
       : { affectedChapters: [fromChapId, targetChId] });
     if (ok) this._recordReorder(before);
+    if (fullReload) await this._reattachSortables();
   },
 };

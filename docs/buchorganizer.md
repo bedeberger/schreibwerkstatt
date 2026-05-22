@@ -95,9 +95,11 @@ Zwei Sortable-Gruppen:
 
 `onChoose`/`onUnchoose`: setzen `x-ignore` auf das Drag-Item. Sortable klont das Item als Fallback-Ghost (`cloneNode(true)`) in `<body>`. Ohne `x-ignore` würde Alpines MutationObserver `:value="page.name"` ausserhalb des `x-for`-Scopes evaluieren und „page is not defined" werfen.
 
-`_onChapterDrop` sortiert `workTree` **in-place** (kein Reassignment) — Sortable hat das DOM bereits in neue Reihenfolge gebracht, ein Reassignment würde Alpine `x-for` neu rendern und mit Sortable kollidieren.
+`_onChapterDrop` rebuildt `workTree` aus dem aktuellen DOM (`_rebuildFromDom` rekursiv ab Top-Level-Chapter-List), weil ein Drop zwischen Levels `depth`/`parent_id` neu setzen muss. Reassignment auf `this.workTree` ist nötig — Alpine-x-for rekonziliert per `key=id` stabil; **danach Pflicht: `_reattachSortables()`**, weil Alpine bei depth-Wechseln Container austauscht und Sortable sonst auf stale DOM-Nodes zeigt → folgende Drops verrücken Items in unsichtbaren alten Listen.
 
-`_onPageDrop` liest `fromChapId`/`toChapId` aus `dataset.chapterId` der `<ul>`-Wrapper, entfernt Page aus Source-Bucket, setzt neue `chapter_id`, fügt am Target-Index ein. `affectedChapters: [fromChapId, toChapId]` → Mirror-Pfad spiegelt nur diese beiden Buckets.
+`_onPageDrop` liest `fromChapId`/`toChapId` aus `dataset.chapterId` der `<ul>`-Wrapper, entfernt Page aus Source-Bucket, setzt neue `chapter_id`, fügt am Target-Index ein. `affectedChapters: [fromChapId, toChapId]` → Mirror-Pfad spiegelt nur diese beiden Buckets. Bei `fullReload` (Sub-Kapitel-Move via `loadPages`) folgt `_reattachSortables()`; Same-Level-Page-Drops mutieren Buckets in-place und brauchen keinen Reattach.
+
+**Sortable-Options (Präzisions-Tuning, in `_initSortables`):** `forceFallback: true` (konsistenter Klon-Ghost via `<body>`, umgeht HTML5-DnD-Quirks), `swapThreshold: 0.65` (Swap erst bei 65% Cursor-im-Ziel — Default 1.0 swappt schon bei minimaler Überlappung → Nachbar-Flackern), `invertSwap: true` (stabile Backward-Drops in nested Listen), `fallbackTolerance: 5` (5px-Move bevor Drag startet), `revertOnSpill: true` (Drop ausserhalb gültiger Liste springt zurück), `direction: 'vertical'`. Drag-Visuals via eigene Klassen `organizer-ghost`/`organizer-chosen`/`organizer-drag-active` (CSS in `book/buchorganizer.css`).
 
 `_patchSortableOnce` patcht `Sortable.prototype._onDragOver` (v1.15.6): bei `this.el === null` (destroyte Instanz, Alpine `x-for`-Reconciliation läuft parallel) wird no-op statt zu crashen.
 
@@ -141,7 +143,7 @@ Records (siehe `history.js`):
 
 - **Kein `loadPages()` nach erfolgreicher Mutation.** Nur im Error-Path von `_runMutation`.
 - **Kein `$watch(root.tree)`.** `pages:loaded`-Event ist die einzige zugelassene Re-Snapshot-Quelle.
-- **Reorder-Path mutiert `workTree` in-place** (`Array.prototype.sort` ohne Reassignment). Reassignment kollidiert mit Sortable-DOM-State.
+- **Chapter-Drop reassignt `workTree`** (Rebuild aus DOM, damit `depth`/`parent_id` für Cross-Level stimmen) und ruft danach Pflicht-`_reattachSortables()`. Page-Drop ohne Level-Wechsel mutiert Buckets in-place.
 - **Snapshots via `JSON.parse(JSON.stringify(…))`**, nicht `structuredClone`.
 - **Delete clear't History.** Create-Undo invalidiert Redo-Stack.
 - **Suche disabled Sortable**, nicht das Suchfeld.
