@@ -435,6 +435,34 @@ export function registerPdfExportCard() {
       if (!app || !Array.isArray(app.pages)) return [];
       return app.pages.map(p => ({ value: p.id, label: p.name }));
     },
+
+    // Optionen fuer Kapitel-ohne-Nummer-Auswahl (Multi-Combobox).
+    // Tiefen werden via Einrueckung im Label sichtbar — Cascade-Hinweis: ist
+    // ein Top-Kapitel hier gewaehlt, sind auch alle Subs automatisch unnumbered.
+    unnumberedChapterPickOptions() {
+      const app = window.__app;
+      if (!app || !Array.isArray(app.tree)) return [];
+      return app.tree
+        .filter(c => c.type === 'chapter' && !c.solo)
+        .map(c => ({
+          value: c.id,
+          label: ((c.depth || 1) > 1 ? '— '.repeat((c.depth || 1) - 1) : '') + c.name,
+        }));
+    },
+    unnumberedChapterChips() {
+      const ids = this.activeProfile?.config?.chapter?.unnumberedChapterIds || [];
+      const opts = this.unnumberedChapterPickOptions();
+      return ids
+        .map(id => {
+          const o = opts.find(x => x.value === id);
+          return o ? { id, label: o.label } : { id, label: '#' + id };
+        });
+    },
+    removeUnnumberedChapter(id) {
+      if (!this.activeProfile) return;
+      const arr = this.activeProfile.config.chapter.unnumberedChapterIds || [];
+      this.activeProfile.config.chapter.unnumberedChapterIds = arr.filter(v => v !== id);
+    },
     _ensureExportPicked() {
       const app = window.__app;
       const cur = app?.currentPage;

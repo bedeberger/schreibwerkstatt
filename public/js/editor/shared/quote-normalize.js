@@ -24,8 +24,8 @@ const STYLES = {
   'de-AT': { ldquo: '„', rdquo: '“', lsquo: '‚', rsquo: '‘', apostrophe: '’' },
   // English: "…" / '…'
   'en':    { ldquo: '“', rdquo: '”', lsquo: '‘', rsquo: '’', apostrophe: '’' },
-  // Französisch: « … », ‹ … ›  (NBSP innen)
-  'fr':    { ldquo: '« ', rdquo: ' »', lsquo: '‹ ', rsquo: ' ›', apostrophe: '’' },
+  // Französisch: « … », ‹ … ›  (NBSP U+00A0 innen — schmal-fest, kein Umbruch)
+  'fr':    { ldquo: '« ', rdquo: ' »', lsquo: '‹ ', rsquo: ' ›', apostrophe: '’' },
   // Italienisch (Italien): «…» aussen, "…" innen
   'it-IT': { ldquo: '«', rdquo: '»', lsquo: '“', rsquo: '”', apostrophe: '’' },
 };
@@ -59,8 +59,12 @@ const CLOSE_CTX = /[\s)\]}.,;:!?»›"”’]/;
 // Trigger-Set: alle Quote-Glyphen, die re-klassifiziert werden. Style-fremde
 // (z.B. `„` in de-CH oder `«` in en) werden umgeschrieben; style-konforme
 // klassifizieren sich auf sich selbst zurück (idempotent).
-const DOUBLE_QUOTES = new Set(['"', '„', '“', '”', '«', '»']);
-const SINGLE_QUOTES = new Set(["'", '‚', '‘', '’', '‹', '›']);
+const DOUBLE_LEFT  = new Set(['„', '“', '«']);
+const DOUBLE_RIGHT = new Set(['”', '»']);
+const SINGLE_LEFT  = new Set(['‚', '‘', '‹']);
+const SINGLE_RIGHT = new Set(['’', '›']);
+const ASCII_DOUBLE = '"';
+const ASCII_SINGLE = "'";
 
 const SPACES = new Set([' ', ' ']);
 
@@ -68,29 +72,47 @@ function _isLetterDigit(ch) {
   return !!ch && LETTER_DIGIT.test(ch);
 }
 
-function _classifyDouble(prev, next, style) {
+// Letzter non-ws-Char ist Buchstabe/Ziffer/Satzzeichen/schliessendes Quote?
+// → Schliess-Hinweis im Ambig-Fall (prev und next beide whitespace).
+const CLOSE_HINT = /[\p{L}\p{N}.,;:!?»›"”’]/u;
+
+function _classifyDouble(c, prev, prevNonWs, next, style) {
   const prevOpen  = !prev || OPEN_CTX.test(prev);
   const nextClose = !next || CLOSE_CTX.test(next);
-  // Eindeutige Fälle
-  if (prevOpen && !nextClose) return style.ldquo;   // ` "Wort` → öffnend
-  if (!prevOpen && nextClose) return style.rdquo;   // `Wort" ` → schliessend
-  // Ambig: beide oder keiner — prev-Seite gibt den Ausschlag
+  if (prevOpen && !nextClose) return style.ldquo;
+  if (!prevOpen && nextClose) return style.rdquo;
+  // Ambig (z.B. FR mit NBSP beidseitig): inhärent gerichtete Glyphen
+  // entscheiden, sonst prev-non-ws-Hinweis, sonst Default open.
+  if (DOUBLE_LEFT.has(c))  return style.ldquo;
+  if (DOUBLE_RIGHT.has(c)) return style.rdquo;
+  if (prevNonWs && CLOSE_HINT.test(prevNonWs)) return style.rdquo;
   if (prevOpen) return style.ldquo;
   return style.rdquo;
 }
 
-function _classifySingle(prev, next, style) {
+function _classifySingle(c, prev, prevNonWs, next, style) {
   const prevLD = _isLetterDigit(prev);
   const nextLD = _isLetterDigit(next);
-  if (prevLD && nextLD) return style.apostrophe;    // `don't`
+  if (prevLD && nextLD) return style.apostrophe;    // `don't`, `Marie's`
   const prevOpen  = !prev || OPEN_CTX.test(prev);
   const nextClose = !next || CLOSE_CTX.test(next);
-  if (prevOpen && !nextClose) return style.lsquo;   // ` 'Wort`
-  if (!prevOpen && nextClose) return style.rsquo;   // `Wort' `
-  // Ambig (z.B. `kids' ` mit prevLD && nextClose) → Apostroph als sicherste Wahl
+  if (prevOpen && !nextClose) return style.lsquo;
+  if (!prevOpen && nextClose) return style.rsquo;
+  // Ambig
+  if (SINGLE_LEFT.has(c))  return style.lsquo;
+  if (c === '›')           return style.rsquo;
+  if (c === '’')           return prevLD ? style.apostrophe : style.rsquo;
   if (prevLD) return style.apostrophe;
+  if (prevNonWs && CLOSE_HINT.test(prevNonWs)) return style.rsquo;
   if (prevOpen) return style.lsquo;
   return style.apostrophe;
+}
+
+function _isDoubleQuote(c) {
+  return c === ASCII_DOUBLE || DOUBLE_LEFT.has(c) || DOUBLE_RIGHT.has(c);
+}
+function _isSingleQuote(c) {
+  return c === ASCII_SINGLE || SINGLE_LEFT.has(c) || SINGLE_RIGHT.has(c);
 }
 
 // Eigene Walk-Logik statt TreeWalker — linkedom (Unit-Test-Umgebung)
@@ -139,6 +161,7 @@ function _normalizeBlock(blockEl, style) {
 
   let count = 0;
   let prevChar = '';
+  let prevNonWs = '';
 
   for (let nodeIdx = 0; nodeIdx < textNodes.length; nodeIdx++) {
     const node = textNodes[nodeIdx];
@@ -147,30 +170,39 @@ function _normalizeBlock(blockEl, style) {
     let out = '';
     for (let i = 0; i < s.length; i++) {
       const c = s[i];
-      const isDouble = DOUBLE_QUOTES.has(c);
-      const isSingle = !isDouble && SINGLE_QUOTES.has(c);
+      const isDouble = _isDoubleQuote(c);
+      const isSingle = !isDouble && _isSingleQuote(c);
       if (!isDouble && !isSingle) {
         out += c;
         prevChar = c;
+        if (!SPACES.has(c)) prevNonWs = c;
         continue;
       }
       const next = i + 1 < s.length ? s[i + 1] : _peekNext(textNodes, nodeIdx);
       const repl = isDouble
-        ? _classifyDouble(prevChar, next, style)
-        : _classifySingle(prevChar, next, style);
-      // Idempotenz: Source enthält an [i..] bereits exakt das Replacement.
-      if (s.startsWith(repl, i)) {
-        out += repl;
-        i += repl.length - 1;
-        prevChar = repl[repl.length - 1];
-        continue;
+        ? _classifyDouble(c, prevChar, prevNonWs, next, style)
+        : _classifySingle(c, prevChar, prevNonWs, next, style);
+      // Idempotenz: out-Tail + Source enthalten bereits exakt repl an dieser
+      // Stelle. matchOffset = 1, falls out mit demselben Space (NBSP / reg)
+      // wie repl[0] endet — dann konsumieren wir nur repl.slice(1) aus dem
+      // Source. Match nur bei exakt gleichem Space-Typ (NBSP ≠ reg space),
+      // sonst würde reg space → NBSP nicht ersetzt.
+      const matchOffset = (out.length && out[out.length - 1] === repl[0]) ? 1 : 0;
+      const emitted = s.startsWith(repl.slice(matchOffset), i) ? repl.slice(matchOffset) : null;
+      if (emitted !== null) {
+        out += emitted;
+        i += emitted.length - 1;
+      } else {
+        const srcNext = i + 1 < s.length ? s[i + 1] : '';
+        const applied = _applyRepl(out, srcNext, repl);
+        out = applied.out;
+        i += applied.skip;
+        count++;
       }
-      const srcNext = i + 1 < s.length ? s[i + 1] : '';
-      const applied = _applyRepl(out, srcNext, repl);
-      out = applied.out;
-      i += applied.skip;
-      count++;
       prevChar = repl[repl.length - 1] || c;
+      for (let k = repl.length - 1; k >= 0; k--) {
+        if (!SPACES.has(repl[k])) { prevNonWs = repl[k]; break; }
+      }
     }
     if (out !== s) node.nodeValue = out;
   }
@@ -202,6 +234,13 @@ export function normalizeQuotesInRange(range, style) {
 
   let count = 0;
   let prevChar = '';
+  let prevNonWs = '';
+
+  const _updateNonWs = (str) => {
+    for (let k = str.length - 1; k >= 0; k--) {
+      if (!SPACES.has(str[k])) { prevNonWs = str[k]; return; }
+    }
+  };
 
   for (let nodeIdx = 0; nodeIdx < all.length; nodeIdx++) {
     const node = all[nodeIdx];
@@ -209,16 +248,17 @@ export function normalizeQuotesInRange(range, style) {
     if (!s) continue;
 
     if (!range.intersectsNode(node)) {
-      // Ausserhalb der Range: nichts ändern, prevChar aber fortschreiben für
-      // Kontext der nächsten in-Range-Node.
+      // Ausserhalb der Range: nichts ändern, prevChar/prevNonWs fortschreiben
+      // für Kontext der nächsten in-Range-Node.
       prevChar = s[s.length - 1];
+      _updateNonWs(s);
       continue;
     }
 
     const startOff = node === range.startContainer ? range.startOffset : 0;
     const endOff   = node === range.endContainer   ? range.endOffset   : s.length;
     if (startOff >= endOff) {
-      if (s.length) prevChar = s[s.length - 1];
+      if (s.length) { prevChar = s[s.length - 1]; _updateNonWs(s); }
       continue;
     }
 
@@ -226,40 +266,45 @@ export function normalizeQuotesInRange(range, style) {
     if (startOff > 0) {
       out = s.slice(0, startOff);
       prevChar = out[out.length - 1];
+      _updateNonWs(out);
     }
     for (let i = startOff; i < endOff; i++) {
       const c = s[i];
-      const isDouble = DOUBLE_QUOTES.has(c);
-      const isSingle = !isDouble && SINGLE_QUOTES.has(c);
+      const isDouble = _isDoubleQuote(c);
+      const isSingle = !isDouble && _isSingleQuote(c);
       if (!isDouble && !isSingle) {
         out += c;
         prevChar = c;
+        if (!SPACES.has(c)) prevNonWs = c;
         continue;
       }
       const next = i + 1 < s.length ? s[i + 1] : _peekNext(all, nodeIdx);
       const repl = isDouble
-        ? _classifyDouble(prevChar, next, style)
-        : _classifySingle(prevChar, next, style);
+        ? _classifyDouble(c, prevChar, prevNonWs, next, style)
+        : _classifySingle(c, prevChar, prevNonWs, next, style);
+      const matchOffset = (out.length && out[out.length - 1] === repl[0]) ? 1 : 0;
+      const consumeLen = repl.length - matchOffset;
       // Idempotenz nur innerhalb der Range prüfen — Match darf nicht
       // ausserhalb der User-Selection greifen.
-      if ((i + repl.length) <= endOff && s.startsWith(repl, i)) {
-        out += repl;
-        i += repl.length - 1;
-        prevChar = repl[repl.length - 1];
-        continue;
+      if ((i + consumeLen) <= endOff && s.startsWith(repl.slice(matchOffset), i)) {
+        out += repl.slice(matchOffset);
+        i += consumeLen - 1;
+      } else {
+        // Skip nur innerhalb der Range — sonst würde ein post-Range-Space
+        // gefressen, der ausserhalb der User-Selection liegt.
+        const srcNext = (i + 1) < endOff ? s[i + 1] : '';
+        const applied = _applyRepl(out, srcNext, repl);
+        out = applied.out;
+        i += applied.skip;
+        count++;
       }
-      // Skip nur innerhalb der Range — sonst würde ein post-Range-Space
-      // gefressen, der ausserhalb der User-Selection liegt.
-      const srcNext = (i + 1) < endOff ? s[i + 1] : '';
-      const applied = _applyRepl(out, srcNext, repl);
-      out = applied.out;
-      i += applied.skip;
-      count++;
       prevChar = repl[repl.length - 1] || c;
+      _updateNonWs(repl);
     }
     if (endOff < s.length) {
       out += s.slice(endOff);
       prevChar = out[out.length - 1];
+      _updateNonWs(out.slice(endOff));
     }
     if (out !== s) node.nodeValue = out;
   }
