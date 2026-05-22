@@ -1260,6 +1260,7 @@
   "editor.toolbar.synonymTitle": "Synonyms (Ctrl/⌘+Shift+S)",
   "editor.toolbar.synonymLabel": "Syn",
   "editor.toolbar.hrTitle":      "Insert horizontal rule (Ctrl/⌘+Shift+H)",
+  "editor.toolbar.quotesTitle":  "Normalize quotation marks",
 
   "editor.slash.hint":           "Choose block type",
   "editor.slash.noMatch":        "No matches",

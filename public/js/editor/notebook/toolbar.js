@@ -10,7 +10,7 @@
 
 import { getEditEl, placeCaretIn, WORD_RE } from '../utils.js';
 import { tzOpts, localeTag } from '../../utils.js';
-import { normalizeQuotes, resolveQuoteStyle } from './quote-normalize.js';
+import { runQuoteNormalize } from '../shared/quote-normalize.js';
 
 // Blocktyp-Definitionen für Slash-Transform. `tag` ist das Zielelement;
 // `className` optional (aktuell für .poem + .todo). `list: true` wrappt den
@@ -414,18 +414,8 @@ export const toolbarCardMethods = {
   async _runNormalizeQuotes(editEl, block) {
     const app = window.__app;
     const bookId = app?.selectedBookId;
-    if (!bookId) return;
-    let style;
-    try {
-      const r = await fetch(`/booksettings/${bookId}`, { credentials: 'same-origin' });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const data = await r.json();
-      style = resolveQuoteStyle(data.language, data.region);
-    } catch (e) {
-      console.error('[quote-normalize] booksettings fetch failed', e);
-      return;
-    }
-    const count = normalizeQuotes(editEl, style);
+    const { ok, count } = await runQuoteNormalize({ bookId, rootEl: editEl });
+    if (!ok) return;
     if (count > 0) {
       app._markEditDirty?.();
       editEl.dispatchEvent(new Event('input', { bubbles: true }));

@@ -1,4 +1,4 @@
-// Anführungszeichen-Normalisierer für den Notebook-Editor.
+// Anführungszeichen-Normalisierer für Notebook- + Focus-Editor.
 //
 // Walk über Blöcke des Edit-Roots; ersetzt gerade `"` / `'` durch
 // typografische Varianten gemäss Buch-Locale (book_settings.language +
@@ -8,6 +8,10 @@
 // Klassifikation rein kontextbasiert — kein Open/Close-State. Jeder Quote
 // wird anhand der Nachbarschaftszeichen (prev/next) eigenständig entschieden;
 // ein einzelner ungerader Quote vergiftet nicht alle folgenden.
+//
+// Zwei Scopes: `normalizeQuotes(rootEl, style)` für Page-weit (Slash-Item
+// Notebook + Focus-Topbar), `normalizeQuotesInRange(range, style)` für eine
+// Selection-Range (Bubble-Toolbar Notebook).
 
 const STYLES = {
   // Schweiz / Liechtenstein: Guillemets aussen, Single-Guillemets innen
@@ -147,6 +151,90 @@ export function normalizeQuotes(rootEl, style) {
   let total = 0;
   for (const b of blocks) total += _normalizeBlock(b, style);
   return total;
+}
+
+// Selection-Scope-Variante: nur Zeichen innerhalb von `range` werden
+// transformiert. Zeichen ausserhalb der Range werden nicht mutiert, dienen
+// aber als prev/next-Kontext für Klassifikation an den Range-Grenzen.
+export function normalizeQuotesInRange(range, style) {
+  if (!range || range.collapsed || !style) return 0;
+  const anchor = range.commonAncestorContainer;
+  const common = anchor.nodeType === 1 ? anchor : anchor.parentElement;
+  if (!common) return 0;
+
+  const all = [];
+  _collectTextNodes(common, SKIP_SEL, all);
+  if (!all.length) return 0;
+
+  let count = 0;
+  let prevChar = '';
+
+  for (let nodeIdx = 0; nodeIdx < all.length; nodeIdx++) {
+    const node = all[nodeIdx];
+    const s = node.nodeValue;
+    if (!s) continue;
+
+    if (!range.intersectsNode(node)) {
+      // Ausserhalb der Range: nichts ändern, prevChar aber fortschreiben für
+      // Kontext der nächsten in-Range-Node.
+      prevChar = s[s.length - 1];
+      continue;
+    }
+
+    const startOff = node === range.startContainer ? range.startOffset : 0;
+    const endOff   = node === range.endContainer   ? range.endOffset   : s.length;
+    if (startOff >= endOff) {
+      if (s.length) prevChar = s[s.length - 1];
+      continue;
+    }
+
+    let out = '';
+    if (startOff > 0) {
+      out = s.slice(0, startOff);
+      prevChar = out[out.length - 1];
+    }
+    for (let i = startOff; i < endOff; i++) {
+      const c = s[i];
+      if (c !== '"' && c !== "'") {
+        out += c;
+        prevChar = c;
+        continue;
+      }
+      const next = i + 1 < s.length ? s[i + 1] : _peekNext(all, nodeIdx);
+      const repl = c === '"'
+        ? _classifyDouble(prevChar, next, style)
+        : _classifySingle(prevChar, next, style);
+      out += repl;
+      count++;
+      prevChar = repl[repl.length - 1] || c;
+    }
+    if (endOff < s.length) {
+      out += s.slice(endOff);
+      prevChar = out[out.length - 1];
+    }
+    if (out !== s) node.nodeValue = out;
+  }
+  return count;
+}
+
+// Lädt Buch-Locale + ruft die passende Normalize-Variante auf. Gemeinsamer
+// Aufrufer für Notebook-Slash, Bubble-Selection und Focus-Topbar.
+export async function runQuoteNormalize({ bookId, rootEl, range = null }) {
+  if (!bookId || !rootEl) return { ok: false, count: 0 };
+  let style;
+  try {
+    const r = await fetch(`/booksettings/${bookId}`, { credentials: 'same-origin' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    style = resolveQuoteStyle(data.language, data.region);
+  } catch (e) {
+    console.error('[quote-normalize] booksettings fetch failed', e);
+    return { ok: false, count: 0 };
+  }
+  const count = range
+    ? normalizeQuotesInRange(range, style)
+    : normalizeQuotes(rootEl, style);
+  return { ok: true, count };
 }
 
 export const __test__ = { STYLES, _normalizeBlock, _classifyDouble, _classifySingle };

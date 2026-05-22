@@ -15,11 +15,28 @@ globalThis.Node = window.Node;
 globalThis.NodeFilter = window.NodeFilter;
 globalThis.HTMLElement = window.HTMLElement;
 
-const { resolveQuoteStyle, normalizeQuotes } = await import('../../public/js/editor/notebook/quote-normalize.js');
+const { resolveQuoteStyle, normalizeQuotes, normalizeQuotesInRange } = await import('../../public/js/editor/shared/quote-normalize.js');
 
 function makeRoot(fragment) {
   const { document: d } = parseHTML(`<!doctype html><html><body><div id="root">${fragment}</div></body></html>`);
   return d.getElementById('root');
+}
+
+// Minimal-Range-Shim — linkedom hat keine setStart/setEnd-API mit Offset.
+// Reicht für die Eigenschaften, die normalizeQuotesInRange liest.
+function makeRange(startContainer, startOffset, endContainer, endOffset) {
+  return {
+    collapsed: startContainer === endContainer && startOffset === endOffset,
+    commonAncestorContainer:
+      startContainer === endContainer
+        ? startContainer
+        : (startContainer.parentNode || startContainer),
+    startContainer, startOffset, endContainer, endOffset,
+    intersectsNode(node) {
+      // Tests benutzen aktuell nur Single-Text-Node-Ranges. Erweitern bei Bedarf.
+      return node === startContainer || node === endContainer;
+    },
+  };
 }
 
 test('resolveQuoteStyle: de-CH liefert Guillemets', () => {
@@ -199,4 +216,37 @@ test('normalizeQuotes: Quote über <em> hinweg → next-Kontext aus folgendem Te
   const style = resolveQuoteStyle('de', 'CH');
   normalizeQuotes(root, style);
   assert.equal(root.querySelector('p').textContent, 'Er rief «Hallo Welt» laut.');
+});
+
+test('normalizeQuotesInRange: nur Selection wird transformiert', () => {
+  const root = makeRoot('<p>"Eins" und "Zwei"</p>');
+  const style = resolveQuoteStyle('de', 'CH');
+  const p = root.querySelector('p');
+  const t = p.firstChild;
+  // Selektiere genau "Eins" inkl. der umgebenden geraden Quotes (offsets 0..6).
+  const range = makeRange(t, 0, t, 6);
+  const count = normalizeQuotesInRange(range, style);
+  assert.equal(count, 2);
+  assert.equal(p.textContent, '«Eins» und "Zwei"');
+});
+
+test('normalizeQuotesInRange: leere Range → 0', () => {
+  const root = makeRoot('<p>"foo"</p>');
+  const style = resolveQuoteStyle('de', 'CH');
+  const p = root.querySelector('p');
+  const range = makeRange(p.firstChild, 2, p.firstChild, 2);
+  assert.equal(normalizeQuotesInRange(range, style), 0);
+  assert.equal(p.textContent, '"foo"');
+});
+
+test('normalizeQuotesInRange: prev-Kontext aus Text vor Range', () => {
+  // Range umschliesst `"Hallo"` (offsets 9..17). prev-Kontext ist Whitespace
+  // VOR der Range → erstes `"` wird öffnend, zweites schliessend.
+  const root = makeRoot('<p>Er sagte "Hallo" laut.</p>');
+  const style = resolveQuoteStyle('de', 'CH');
+  const p = root.querySelector('p');
+  const t = p.firstChild;
+  const range = makeRange(t, 9, t, 17);
+  normalizeQuotesInRange(range, style);
+  assert.equal(p.textContent, 'Er sagte «Hallo» laut.');
 });

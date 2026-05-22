@@ -23,6 +23,7 @@ export const notebookTrampoline = {
   pageEditorZoomIn() { card()?.pageEditorZoomIn(); },
   pageEditorZoomOut() { card()?.pageEditorZoomOut(); },
   pageEditorZoomReset() { card()?.pageEditorZoomReset(); },
+  normalizeQuotes() { return card()?.normalizeQuotes(); },
 
   // Half-public — von Templates/anderen Modulen (synonyme, find, focus, toolbar,
   // app-view, book-editor-card) erwartet.

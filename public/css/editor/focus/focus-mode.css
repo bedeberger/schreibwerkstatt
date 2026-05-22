@@ -140,7 +140,6 @@ body.palette-open { overflow: hidden; overscroll-behavior: contain; }
   gap: var(--space-xs);
   flex: 0 0 auto;
 }
-
 .focus-editor__content {
   /* overflow-anchor aus: Chrome's Scroll-Anchoring verschiebt den Scrollpunkt
      bei Content-Mutationen (contenteditable-Split, IO-triggered repaints) und

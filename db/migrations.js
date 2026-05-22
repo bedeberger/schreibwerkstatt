@@ -6061,6 +6061,21 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 142 abgeschlossen (user_dictionary.lang auto -> *).');
   }
 
+  if (version < 143) {
+    // page_languagetool_cache einmalig leeren: Vor Migration 142 wurden
+    // user_dictionary-Eintraege mit lang='auto' gespeichert; der LT-Filter-
+    // Lookup matchte nie und schrieb unfiltered Matches in den Cache. Diese
+    // Rows leben weiter, bis ihr content_hash invalidiert wird. Pauschaler
+    // Wipe erzwingt frische, korrekt gefilterte Caches.
+    const cleared = db.prepare('DELETE FROM page_languagetool_cache').run();
+    const fkErrors143 = db.pragma('foreign_key_check');
+    if (fkErrors143.length) {
+      throw new Error(`Migration 143: foreign_key_check meldet ${fkErrors143.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 143').run();
+    logger.info(`DB-Migration auf Version 143 abgeschlossen (page_languagetool_cache geleert, ${cleared.changes} Rows).`);
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

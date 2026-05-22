@@ -11,6 +11,7 @@ import { savePage, isPageConflict, readConflictBody } from '../shared/page-api.j
 import { getActiveEditorContainer } from '../shared/active-editor.js';
 import { installEditCounter } from '../shared/edit-counter.js';
 import { writeNormalSnapshot, clearNormalSnapshot, readEditorPrefs, writeEditorPrefs } from './storage.js';
+import { runQuoteNormalize } from '../shared/quote-normalize.js';
 
 // Auto-Save nach BookStack: idle-debounce + max-Cap. Jede Schreibaktion
 // resettet den Idle-Timer; läuft der User durchgehend, greift der Max-Timer.
@@ -624,6 +625,22 @@ export const notebookEditMethods = {
     const app = window.__app;
     if (!app) return;
     app.pageEditorZoom = 1;
+  },
+
+  async normalizeQuotes() {
+    const app = window.__app;
+    if (!app?.selectedBookId) return;
+    const editEl = this._getEditEl();
+    if (!editEl) return;
+    const { ok, count } = await runQuoteNormalize({
+      bookId: app.selectedBookId,
+      rootEl: editEl,
+    });
+    if (!ok) return;
+    if (count > 0) {
+      app._markEditDirty?.();
+      editEl.dispatchEvent(new Event('input', { bubbles: true }));
+    }
   },
 
   // Trennlinie (<hr>) am Caret einfügen + Folge-Absatz für Weiterschreiben.

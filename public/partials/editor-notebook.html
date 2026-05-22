@@ -202,6 +202,11 @@
             @click="insertHorizontalRule()">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#separator-horizontal"/></svg>
     </button>
+    <button type="button" class="graph-tool-btn"
+            :data-tip="t('editor.toolbar.quotesTitle')" :aria-label="t('editor.toolbar.quotesTitle')"
+            @click="normalizeQuotes()">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#quote"/></svg>
+    </button>
   </div>
   </div><!-- /editor-card__topbar -->
 

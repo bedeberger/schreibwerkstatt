@@ -1261,6 +1261,7 @@
   "editor.toolbar.synonymTitle": "Synonyme (Strg/⌘+Shift+S)",
   "editor.toolbar.synonymLabel": "Syn",
   "editor.toolbar.hrTitle":      "Trennlinie einfügen (Strg/⌘+Shift+H)",
+  "editor.toolbar.quotesTitle":  "Anführungszeichen normalisieren",
 
   "editor.slash.hint":           "Blocktyp wählen",
   "editor.slash.noMatch":        "Keine Treffer",
