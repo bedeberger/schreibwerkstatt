@@ -141,11 +141,84 @@ test('normalizeQuotes: keine Quotes → count 0, kein Mutate', () => {
   assert.equal(root.innerHTML, html);
 });
 
-test('normalizeQuotes: bereits typografische Quotes bleiben', () => {
-  const root = makeRoot('<p>Er sagte „Hallo“ und «Welt».</p>');
+test('normalizeQuotes: style-konforme Quotes bleiben (idempotent)', () => {
+  const root = makeRoot('<p>Er sagte «Hallo» laut.</p>');
   const style = resolveQuoteStyle('de', 'CH');
   const count = normalizeQuotes(root, style);
   assert.equal(count, 0);
+  assert.equal(root.querySelector('p').textContent, 'Er sagte «Hallo» laut.');
+});
+
+test('normalizeQuotes: fremder Style (de-DE „…") → de-CH «…»', () => {
+  const root = makeRoot('<p>Er sagte „Hallo“ laut.</p>');
+  const style = resolveQuoteStyle('de', 'CH');
+  const count = normalizeQuotes(root, style);
+  assert.equal(count, 2);
+  assert.equal(root.querySelector('p').textContent, 'Er sagte «Hallo» laut.');
+});
+
+test('normalizeQuotes: en Smart-Quotes → de-CH Guillemets', () => {
+  const root = makeRoot('<p>He said “Hello” loud.</p>');
+  const style = resolveQuoteStyle('de', 'CH');
+  normalizeQuotes(root, style);
+  assert.equal(root.querySelector('p').textContent, 'He said «Hello» loud.');
+});
+
+test('normalizeQuotes: de-CH Guillemets → de-DE „…"', () => {
+  const root = makeRoot('<p>Er sagte «Hallo» laut.</p>');
+  const style = resolveQuoteStyle('de', 'DE');
+  const count = normalizeQuotes(root, style);
+  assert.equal(count, 2);
+  assert.equal(root.querySelector('p').textContent, 'Er sagte „Hallo“ laut.');
+});
+
+test('normalizeQuotes: gemischt ASCII + typografisch → Style-konform', () => {
+  const root = makeRoot('<p>Er sagte „Hallo" und "Welt“ laut.</p>');
+  const style = resolveQuoteStyle('de', 'CH');
+  normalizeQuotes(root, style);
+  assert.equal(root.querySelector('p').textContent, 'Er sagte «Hallo» und «Welt» laut.');
+});
+
+test('normalizeQuotes: nested single (typografisch) → de-CH inner Guillemets', () => {
+  const root = makeRoot('<p>Er sagte: «Sie meinte ‚sofort‘, sagte er.»</p>');
+  const style = resolveQuoteStyle('de', 'CH');
+  normalizeQuotes(root, style);
+  assert.equal(
+    root.querySelector('p').textContent,
+    'Er sagte: «Sie meinte ‹sofort›, sagte er.»',
+  );
+});
+
+test('normalizeQuotes: Apostroph U+2019 zwischen Buchstaben bleibt', () => {
+  const root = makeRoot('<p>Marie’s Buch und don’t go</p>');
+  const style = resolveQuoteStyle('de', 'CH');
+  const count = normalizeQuotes(root, style);
+  assert.equal(count, 0);
+  assert.equal(root.querySelector('p').textContent, 'Marie’s Buch und don’t go');
+});
+
+test('normalizeQuotes: FR-Style fügt NBSP innen ein', () => {
+  const root = makeRoot('<p>Il a dit "Bonjour" fort.</p>');
+  const style = resolveQuoteStyle('fr', '');
+  normalizeQuotes(root, style);
+  // « + NBSP + Bonjour + NBSP + »
+  assert.equal(root.querySelector('p').textContent, 'Il a dit « Bonjour » fort.');
+});
+
+test('normalizeQuotes: FR-Style idempotent (keine Doppel-NBSP)', () => {
+  const root = makeRoot('<p>Il a dit « Bonjour » fort.</p>');
+  const style = resolveQuoteStyle('fr', '');
+  const count = normalizeQuotes(root, style);
+  assert.equal(count, 0);
+  assert.equal(root.querySelector('p').textContent, 'Il a dit « Bonjour » fort.');
+});
+
+test('normalizeQuotes: FR-Style frisst bestehenden regulären Space', () => {
+  const root = makeRoot('<p>Il a dit « Bonjour » fort.</p>');
+  const style = resolveQuoteStyle('fr', '');
+  normalizeQuotes(root, style);
+  // Reguläre Spaces werden zu NBSP (kein Doppel-Space).
+  assert.equal(root.querySelector('p').textContent, 'Il a dit « Bonjour » fort.');
 });
 
 test('normalizeQuotes: drei Quote-Paare nacheinander, korrekt klassifiziert', () => {

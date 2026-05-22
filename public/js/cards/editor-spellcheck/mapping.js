@@ -27,6 +27,16 @@ const BLOCK_TAGS = new Set([
 // damit das Modul auch in linkedom laeuft (kein NodeFilter-Constructor).
 const SHOW_ELEMENT_AND_TEXT = 1 | 4;
 
+// LT-eigene UI-Inseln (Popover, Badge) leben innerhalb des Editor-Roots,
+// damit Scroll sie nativ mitnimmt. Ihre Texte (Regelmeldungen, Buttons) sollen
+// NICHT in den LT-Eingabe-Stream wandern — sonst pruefte LT seine eigene UI.
+function _isSkippedIsland(el) {
+  if (!el || el.nodeType !== 1) return false;
+  const cl = el.classList;
+  if (!cl) return false;
+  return cl.contains('lt-popover') || cl.contains('lt-badge');
+}
+
 export function buildOffsetTable(root) {
   if (!root) return { text: '', positions: [] };
   const doc = root.ownerDocument || document;
@@ -35,9 +45,17 @@ export function buildOffsetTable(root) {
   let text = '';
   const positions = [];
   let pendingBreak = '';
+  let skipRoot = null; // gesetzt solange Walker im Subtree einer LT-Insel laeuft
   let cur = walker.nextNode();
   while (cur) {
+    if (skipRoot && !skipRoot.contains(cur)) skipRoot = null;
+    if (skipRoot) { cur = walker.nextNode(); continue; }
     if (cur.nodeType === 1 /* ELEMENT */) {
+      if (_isSkippedIsland(cur)) {
+        skipRoot = cur;
+        cur = walker.nextNode();
+        continue;
+      }
       const tag = cur.tagName;
       if (tag === 'BR') {
         pendingBreak = '\n';

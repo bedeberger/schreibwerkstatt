@@ -25,6 +25,7 @@ Themen-Spickzettel ausgelagert (Drift-Schutz: CLAUDE.md-Regeln, Details in den S
 - [docs/finetuning.md](docs/finetuning.md) — Finetune-Export.
 - [docs/folder-import.md](docs/folder-import.md) — Folder-Import: ZIP mit YYYY/Monat/Tag-Struktur, Kapitel pro Jahr, Date-Detect mit AI-Fallback.
 - [docs/chapter-hierarchy.md](docs/chapter-hierarchy.md) — Kapitel-Hierarchie (max 3 Ebenen): Schema (`parent_chapter_id`), SSoT-Tree, Organizer-DnD/Tab-Indent, Sidebar-Indent, Kapitel-Review inkl. Sub-Kapitel, PDF/Export-Builder Depth-Mapping, Pflicht-Invarianten.
+- [docs/languagetool.md](docs/languagetool.md) — LanguageTool-Integration (Self-Hosted, regelbasiert, sync Proxy als Ausnahme zur Job-Queue-Regel): Dispatch über 3 Editoren + Form-Felder, CSS-Custom-Highlights für Squiggles, Chunking + Per-Page-Cache, Custom-Dictionary, Extension-Konflikt-Detection, Pflicht-Invarianten.
 
 ## Feature-Pläne
 

@@ -1,8 +1,10 @@
 // Anführungszeichen-Normalisierer für Notebook- + Focus-Editor.
 //
-// Walk über Blöcke des Edit-Roots; ersetzt gerade `"` / `'` durch
-// typografische Varianten gemäss Buch-Locale (book_settings.language +
-// region). Apostroph zwischen Buchstaben/Ziffern → U+2019.
+// Walk über Blöcke des Edit-Roots; ersetzt gerade `"` / `'` und alle
+// typografischen Quote-Varianten (`„` `“` `”` `‚` `‘` `’` `«` `»` `‹` `›`)
+// durch das Buch-Locale (book_settings.language + region). Bereits style-
+// konforme Quotes bleiben unverändert. Apostroph zwischen Buchstaben/
+// Ziffern → U+2019.
 // Skip: <pre>, <code>, <script>, <style>.
 //
 // Klassifikation rein kontextbasiert — kein Open/Close-State. Jeder Quote
@@ -53,6 +55,14 @@ const OPEN_CTX  = /[\s({\[–—\-«‹„‚“‘]/;
 // Schliess-Kontext: Whitespace, Klammer-zu, Satzzeichen, bereits gesetzte
 // schliessende Quote-Varianten.
 const CLOSE_CTX = /[\s)\]}.,;:!?»›"”’]/;
+
+// Trigger-Set: alle Quote-Glyphen, die re-klassifiziert werden. Style-fremde
+// (z.B. `„` in de-CH oder `«` in en) werden umgeschrieben; style-konforme
+// klassifizieren sich auf sich selbst zurück (idempotent).
+const DOUBLE_QUOTES = new Set(['"', '„', '“', '”', '«', '»']);
+const SINGLE_QUOTES = new Set(["'", '‚', '‘', '’', '‹', '›']);
+
+const SPACES = new Set([' ', ' ']);
 
 function _isLetterDigit(ch) {
   return !!ch && LETTER_DIGIT.test(ch);
@@ -110,6 +120,18 @@ function _peekNext(textNodes, nodeIdx) {
   return '';
 }
 
+// Wendet ein Replacement an und dedupliziert Leerzeichen an Style-Grenzen
+// (FR-Style hat NBSP innerhalb der Guillemets: `« …` / `… »`). Wenn `out`
+// mit Space endet und `repl` mit Space beginnt → ein Space droppen. Wenn
+// `repl` mit Space endet und Source-Next ein Space ist → Source-Skip 1.
+function _applyRepl(out, srcNext, repl) {
+  if (SPACES.has(repl[0]) && out.length && SPACES.has(out[out.length - 1])) {
+    out = out.slice(0, -1);
+  }
+  const skip = SPACES.has(repl[repl.length - 1]) && SPACES.has(srcNext) ? 1 : 0;
+  return { out: out + repl, skip };
+}
+
 function _normalizeBlock(blockEl, style) {
   const textNodes = [];
   _collectTextNodes(blockEl, SKIP_SEL, textNodes);
@@ -125,16 +147,28 @@ function _normalizeBlock(blockEl, style) {
     let out = '';
     for (let i = 0; i < s.length; i++) {
       const c = s[i];
-      if (c !== '"' && c !== "'") {
+      const isDouble = DOUBLE_QUOTES.has(c);
+      const isSingle = !isDouble && SINGLE_QUOTES.has(c);
+      if (!isDouble && !isSingle) {
         out += c;
         prevChar = c;
         continue;
       }
       const next = i + 1 < s.length ? s[i + 1] : _peekNext(textNodes, nodeIdx);
-      const repl = c === '"'
+      const repl = isDouble
         ? _classifyDouble(prevChar, next, style)
         : _classifySingle(prevChar, next, style);
-      out += repl;
+      // Idempotenz: Source enthält an [i..] bereits exakt das Replacement.
+      if (s.startsWith(repl, i)) {
+        out += repl;
+        i += repl.length - 1;
+        prevChar = repl[repl.length - 1];
+        continue;
+      }
+      const srcNext = i + 1 < s.length ? s[i + 1] : '';
+      const applied = _applyRepl(out, srcNext, repl);
+      out = applied.out;
+      i += applied.skip;
       count++;
       prevChar = repl[repl.length - 1] || c;
     }
@@ -195,16 +229,31 @@ export function normalizeQuotesInRange(range, style) {
     }
     for (let i = startOff; i < endOff; i++) {
       const c = s[i];
-      if (c !== '"' && c !== "'") {
+      const isDouble = DOUBLE_QUOTES.has(c);
+      const isSingle = !isDouble && SINGLE_QUOTES.has(c);
+      if (!isDouble && !isSingle) {
         out += c;
         prevChar = c;
         continue;
       }
       const next = i + 1 < s.length ? s[i + 1] : _peekNext(all, nodeIdx);
-      const repl = c === '"'
+      const repl = isDouble
         ? _classifyDouble(prevChar, next, style)
         : _classifySingle(prevChar, next, style);
-      out += repl;
+      // Idempotenz nur innerhalb der Range prüfen — Match darf nicht
+      // ausserhalb der User-Selection greifen.
+      if ((i + repl.length) <= endOff && s.startsWith(repl, i)) {
+        out += repl;
+        i += repl.length - 1;
+        prevChar = repl[repl.length - 1];
+        continue;
+      }
+      // Skip nur innerhalb der Range — sonst würde ein post-Range-Space
+      // gefressen, der ausserhalb der User-Selection liegt.
+      const srcNext = (i + 1) < endOff ? s[i + 1] : '';
+      const applied = _applyRepl(out, srcNext, repl);
+      out = applied.out;
+      i += applied.skip;
       count++;
       prevChar = repl[repl.length - 1] || c;
     }

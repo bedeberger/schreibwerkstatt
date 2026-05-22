@@ -89,6 +89,19 @@ test('locateOffset out-of-range returns null', () => {
   assert.equal(locateOffset(table, 100, 5), null);
 });
 
+test('LT-popover subtree is skipped (does not pollute LT input)', () => {
+  const root = makeRoot('<p>Hallo Welt.</p><div class="lt-popover"><p>Diesen Text musst du nicht prüfen.</p><button>Vorschlag</button></div>');
+  const { text, positions } = buildOffsetTable(root);
+  assert.equal(text, 'Hallo Welt.');
+  assert.equal(positions.length, 1);
+});
+
+test('LT-badge subtree is skipped', () => {
+  const root = makeRoot('<p>Hi.</p><div class="lt-badge">3</div>');
+  const { text } = buildOffsetTable(root);
+  assert.equal(text, 'Hi.');
+});
+
 test('positions cover entire text-node span', () => {
   const root = makeRoot('<p>abc<span>def</span>ghi</p>');
   const { text, positions } = buildOffsetTable(root);
