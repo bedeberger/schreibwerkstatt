@@ -398,6 +398,11 @@ export const treeMethods = {
     // weiter, Browser-Slot blockiert). Stale-Guards verwerfen zwar Resultate,
     // brechen aber nichts ab. Re-Entry-Guard, nur in dieser Methode + dem
     // book-switch-Reset gelesen — daher keine Initial-Feld-Deklaration.
+    console.warn('[DBG loadPages.enter]', {
+      bookId,
+      source: opts.source || null,
+      hadAbort: !!this._bookLoadAbort,
+    });
     this._bookLoadAbort?.abort(new DOMException('book switch', 'AbortError'));
     const loadCtrl = new AbortController();
     this._bookLoadAbort = loadCtrl;
@@ -423,9 +428,19 @@ export const treeMethods = {
       // Initialer Load greift normal aufs Cache (offline-resilient).
       const fresh = opts.source === 'bookSwitch';
       const tree = await contentRepo.bookTree(bookId, { fresh, signal });
+      console.warn('[DBG loadPages.treeRecv]', {
+        bookId,
+        currentBookId: this.selectedBookId,
+        chapters: tree?.chapters?.length ?? null,
+        topPages: tree?.topPages?.length ?? null,
+        aborted: signal.aborted,
+      });
 
       // Buch wurde gewechselt während die Anfrage lief → veraltete Daten verwerfen.
-      if (this.selectedBookId !== bookId) return;
+      if (this.selectedBookId !== bookId) {
+        console.warn('[DBG loadPages.staleGuard]', { bookId, currentBookId: this.selectedBookId });
+        return;
+      }
 
       // pages-Cache im Hintergrund aktualisieren (fire-and-forget)
       const qs = opts.source ? `?source=${encodeURIComponent(opts.source)}` : '';
@@ -561,11 +576,20 @@ export const treeMethods = {
       // ohne sich selbst rekursiv neu zu rendern.
       window.dispatchEvent(new CustomEvent('pages:loaded', { detail: { bookId } }));
     } catch (e) {
+      console.warn('[DBG loadPages.catch]', {
+        bookId,
+        currentBookId: this.selectedBookId,
+        errName: e?.name,
+        errMsg: e?.message,
+        aborted: signal.aborted,
+        treeLen: this.tree?.length,
+      });
       // AbortError = Buchwechsel hat laufenden Load gekillt — kein User-Fehler.
       if (e?.name === 'AbortError' || signal.aborted) return;
       console.error('[loadPages]', e);
       this.setStatus(this.t('common.errorColon') + e.message);
     } finally {
+      console.warn('[DBG loadPages.exit]', { bookId, treeLen: this.tree?.length });
       if (this._bookLoadAbort === loadCtrl) this._bookLoadAbort = null;
     }
   },

@@ -491,6 +491,11 @@ export const appViewMethods = {
     // sofort abbrechen — bei sehr grossen Büchern hängt der bookTree-Request
     // sonst bis zum 30s-Timeout am Netz und blockiert Browser-Slots, während
     // das neue Buch parallel lädt.
+    console.warn('[DBG resetBookScoped]', {
+      bookId: this.selectedBookId,
+      hadAbort: !!this._bookLoadAbort,
+      caller: new Error().stack?.split('\n').slice(1, 4).join(' | '),
+    });
     this._bookLoadAbort?.abort(new DOMException('book switch', 'AbortError'));
     this._bookLoadAbort = null;
     window.dispatchEvent(new CustomEvent('book:changed', {
