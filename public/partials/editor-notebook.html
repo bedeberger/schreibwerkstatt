@@ -15,10 +15,17 @@
       <template x-if="currentPage && canEdit()">
         <textarea class="card-title card-title--input" rows="1"
                   :value="currentPage.name"
-                  x-init="const fit = () => $nextTick(() => { $el.style.height = 'auto'; $el.style.height = $el.scrollHeight + 'px'; });
+                  x-init="const fit = () => $nextTick(() => {
+                            if (!$el.offsetParent && $el.style.position !== 'fixed') return;
+                            $el.style.height = 'auto';
+                            const h = $el.scrollHeight;
+                            if (h > 0) $el.style.height = h + 'px';
+                          });
                           fit();
                           $watch('currentPage?.id', fit);
-                          $watch('showEditorCard', v => v && fit());"
+                          $watch('currentPage?.name', fit);
+                          $watch('showEditorCard', v => v && fit());
+                          $watch('pageEditorFullscreen', fit);"
                   @input="$el.style.height = 'auto'; $el.style.height = $el.scrollHeight + 'px'"
                   @blur="renameCurrentPage($event)"
                   @keydown.enter.prevent="$event.target.blur()"

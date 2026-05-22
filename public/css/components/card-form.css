@@ -62,6 +62,9 @@
   overflow-wrap: anywhere;
   white-space: pre-wrap;
   display: block;
+  /* Floor gegen scrollHeight=0 wenn Auto-Grow misst während Karte display:none
+     (Boot mit Vollbild-Pref, Card-Switch-Race). Eine Zeile bleibt sichtbar. */
+  min-height: 1.2em;
 }
 .card-title.card-title--input:focus {
   outline: none;
