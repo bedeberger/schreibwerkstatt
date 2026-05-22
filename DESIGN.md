@@ -10,7 +10,7 @@ Token-Referenz (Farben, Radien, Spacing, Schriftgrössen): [public/css/tokens.cs
 - [Doku-Template](#doku-template-pflicht-für-neue-sections) — Pflicht-Aufbau pro Section
 - [Token-Pflicht](#token-pflicht-keine-ad-hoc-werte) — Schatten, Padding, Spacing, Transition, Opacity, Z-Index
 - [Mikro-Typografie](#mikro-typografie-memory-regeln) — Doppelpunkt, Zahlen, Icons, Konsistenz
-- [Mobile-Breakpoints](#mobile-breakpoints) — 480/600/768/1024
+- [Mobile-Breakpoints + Darkmode](#mobile-breakpoints--darkmode) — 480/600/768/1024 + Token-Pflicht für Farben
 - [Container-Queries vs. Media-Queries](#container-queries-vs-media-queries)
 - [Print-Styles](#print-styles) — nicht supported
 
@@ -714,15 +714,29 @@ Kein neuer Marker ohne Eintrag hier.
 
 ---
 
-## Mobile-Breakpoints
+## Mobile-Breakpoints + Darkmode
 
-**Pflicht:** Jede neue UI-Komponente bekommt im selben Commit Mobile-Breakpoints (`@media (max-width: 600px)`). Nie auf später verschieben.
+**Pflicht:** Jede neue CSS-Klasse / UI-Komponente bekommt im selben Commit **beides**: Mobile-Breakpoint + Darkmode-Verhalten. Nie auf später verschieben.
 
-**Standard-Set** (CSS-Custom-Properties funktionieren in `@media` nicht — diese vier Werte ausschliesslich verwenden):
+### Mobile
+
+`@media (max-width: 600px)` Pflicht-Default. Standard-Set (CSS-Custom-Properties funktionieren in `@media` nicht — diese vier Werte ausschliesslich verwenden):
 - `480px` — Phone-Small (sehr enge Devices, harter Reflow)
 - `600px` — Phone-Large (Default-Mobile-Breakpoint)
 - `768px` — Tablet
 - `1024px` — Desktop-Compact
+
+### Darkmode
+
+Toggle via `:root[data-theme="dark"]`. **Regel:** Farben/Backgrounds/Borders/Shadows nur über Tokens (`--color-text`, `--color-muted`, `--color-subtle`, `--color-faint`, `--surface-*`, `--border-*`, `--shadow-*`, `--card-accent-*`) — kein hartcoded `#hex`/`rgb()`. Tokens spiegeln Light/Dark automatisch in [tokens/colors.css](public/css/tokens/colors.css).
+
+Pflicht-Check pro neuer Klasse:
+1. Im Dark-Theme öffnen — Kontrast lesbar? (`--color-text` auf `--surface-*` ≥ 4.5:1)
+2. Borders sichtbar? (`--border-strong` oder `--border-base`, nicht statisches `#ddd`)
+3. Akzentfarben aus `--card-accent-*` (Light + Dark im Token gepflegt)?
+4. Image/SVG-Assets: hellem Theme-Hintergrund nicht unsichtbar (z. B. dunkles SVG-Icon auf dunklem Surface → `currentColor` oder Theme-spezifischer Filter)?
+
+Neuer Hue / Surface / Border: Token in beiden Theme-Blöcken (`:root` + `:root[data-theme="dark"]`) in [tokens/colors.css](public/css/tokens/colors.css) ergänzen. Kein Pro-Karten-`[data-theme="dark"]`-Override — alles über Tokens.
 
 ---
 
@@ -1779,7 +1793,7 @@ Wer ein neues Pattern einführt:
 3. Doku-Template (oben) eingehalten? Use → Markup → Klassen → Regeln → Beispiele.
 4. SHELL_CACHE in [public/sw.js](public/sw.js) bumpen (CSS/JS-Änderung).
 5. i18n-Strings in beide Locales eintragen (CLAUDE.md-Regel).
-6. Mobile-Breakpoints im selben Commit (CLAUDE.md-Regel).
+6. Mobile-Breakpoints **und** Darkmode-Verhalten im selben Commit (siehe [Mobile-Breakpoints + Darkmode](#mobile-breakpoints--darkmode)) — Farben/Borders/Shadows nur via Tokens, kein hartcoded `#hex`.
 7. Spacing/Padding/Schatten/Transition aus Tokens (`--space-*`, `--pad-*`, `--shadow-*`, `--transition-*`) — keine ad-hoc Pixel-Werte ohne Begründung.
 8. `prefers-reduced-motion`-Override gesetzt (sofern Animation/Transition mit Bewegung)?
 9. A11y-Attribute (`aria-*`, `role`, Focus-Trap bei Modal, `aria-invalid` bei Inputs) gesetzt?

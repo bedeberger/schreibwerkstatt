@@ -15,19 +15,19 @@
  * 'none', damit die Welle auch unter Buchstabenstielen (g, p, y) durchläuft —
  * sonst entstehen optische Lücken im Match. */
 ::highlight(lt-typo) {
-  text-decoration: underline wavy var(--color-danger, #d33);
+  text-decoration: underline wavy var(--color-err-border);
   text-decoration-thickness: 1px;
   text-underline-offset: 2px;
   text-decoration-skip-ink: none;
 }
 ::highlight(lt-grammar) {
-  text-decoration: underline wavy var(--color-info, #2c6fb3);
+  text-decoration: underline wavy var(--color-running);
   text-decoration-thickness: 1px;
   text-underline-offset: 2px;
   text-decoration-skip-ink: none;
 }
 ::highlight(lt-style) {
-  text-decoration: underline wavy var(--color-warning, #c97a00);
+  text-decoration: underline wavy var(--color-style-border);
   text-decoration-thickness: 1px;
   text-underline-offset: 2px;
   text-decoration-skip-ink: none;
@@ -36,20 +36,20 @@
 /* Popover-Badge-Kategorie setzt die `--lt-color`-Custom-Property fuer den
  * eingefaerbten Header-Chip. Klassennamen historisch `lt-squiggle--*`, weil
  * der Controller dieselben Strings fuer Kategorie-Mapping erzeugt. */
-.lt-popover__badge.lt-squiggle--typo    { --lt-color: var(--color-danger, #d33); }
-.lt-popover__badge.lt-squiggle--grammar { --lt-color: var(--color-info, #2c6fb3); }
-.lt-popover__badge.lt-squiggle--style   { --lt-color: var(--color-warning, #c97a00); }
+.lt-popover__badge.lt-squiggle--typo    { --lt-color: var(--color-err-text); }
+.lt-popover__badge.lt-squiggle--grammar { --lt-color: var(--color-running); }
+.lt-popover__badge.lt-squiggle--style   { --lt-color: var(--color-warn-text); }
 
 /* Popover — absolut im Scroll-Layer (Controller setzt left/top inline).
  * Scrollt nativ mit dem Anker mit (kein scroll-Listener noetig). */
 .lt-popover {
   position: absolute;
   z-index: var(--z-popover);
-  background: var(--color-surface, #fff);
-  color: var(--color-text, #111);
-  border: 1px solid var(--color-border, #ccc);
-  border-radius: var(--radius-sm, 4px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 16px var(--color-shadow-med);
   padding: 8px;
   max-width: 280px;
   min-width: 180px;
@@ -69,9 +69,9 @@
 .lt-popover__badge {
   display: inline-block;
   padding: 1px 5px;
-  border-radius: var(--radius-sm, 4px);
-  background: color-mix(in srgb, var(--lt-color, #d33) 12%, transparent);
-  color: var(--lt-color, #d33);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--lt-color) 18%, transparent);
+  color: var(--lt-color);
   font-size: 0.65rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -80,18 +80,18 @@
 
 .lt-popover__title {
   font-weight: 600;
-  color: var(--color-text, #111);
+  color: var(--color-text);
 }
 
 .lt-popover__message {
   margin: 0;
-  color: var(--color-text-muted, #555);
+  color: var(--color-muted);
   line-height: 1.35;
 }
 
 .lt-popover__empty {
   margin: 0;
-  color: var(--color-text-muted, #777);
+  color: var(--color-muted);
   font-style: italic;
 }
 
@@ -103,10 +103,10 @@
 
 .lt-popover__replacement {
   appearance: none;
-  border: 1px solid var(--color-border, #ccc);
-  background: var(--color-surface-alt, #f6f6f6);
-  color: var(--color-text, #111);
-  border-radius: var(--radius-sm, 4px);
+  border: 1px solid var(--color-border);
+  background: var(--color-hover);
+  color: var(--color-text);
+  border-radius: var(--radius-sm);
   padding: 2px 6px;
   font-size: 0.8rem;
   cursor: pointer;
@@ -115,8 +115,9 @@
 
 .lt-popover__replacement:hover,
 .lt-popover__replacement:focus-visible {
-  background: var(--color-accent-bg, #eef);
-  border-color: var(--color-accent, #4a6df0);
+  background: var(--color-accent-bg);
+  border-color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 .lt-popover__footer {
@@ -124,7 +125,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 6px;
-  border-top: 1px solid var(--color-border, #ccc);
+  border-top: 1px solid var(--color-border);
   padding-top: 6px;
 }
 
@@ -134,7 +135,7 @@
   appearance: none;
   background: transparent;
   border: none;
-  color: var(--color-text-muted, #555);
+  color: var(--color-muted);
   cursor: pointer;
   font-size: 0.75rem;
   padding: 1px 3px;
@@ -144,7 +145,7 @@
 .lt-popover__ignore:hover,
 .lt-popover__dict:hover,
 .lt-popover__info:hover {
-  color: var(--color-text, #111);
+  color: var(--color-text);
   text-decoration: underline;
 }
 
@@ -163,10 +164,10 @@
   align-items: center;
   gap: 4px;
   padding: 3px 6px;
-  border-radius: var(--radius-sm, 4px);
-  border: 1px solid transparent;
-  background: var(--color-bg-elevated, #fff);
-  color: var(--color-text-muted, #666);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-muted);
   font-size: 0.7rem;
   line-height: 1;
   pointer-events: auto;
@@ -180,30 +181,30 @@
 }
 
 .lt-badge[data-state="loading"] {
-  color: var(--color-info, #06f);
+  color: var(--color-running);
 }
 .lt-badge[data-state="loading"] .icon {
   animation: lt-badge-spin 1s linear infinite;
 }
 
 .lt-badge[data-state="clean"] {
-  color: var(--color-success, #2a8);
-  border-color: color-mix(in srgb, var(--color-success, #2a8) 40%, transparent);
+  color: var(--color-ok-text);
+  border-color: color-mix(in srgb, var(--color-ok-border) 40%, transparent);
 }
 
 .lt-badge[data-state="matches"] {
-  color: var(--color-warning, #c97a00);
-  border-color: color-mix(in srgb, var(--color-warning, #c97a00) 40%, transparent);
+  color: var(--color-warn-text);
+  border-color: color-mix(in srgb, var(--color-warn-text) 40%, transparent);
 }
 
 .lt-badge[data-state="extension"],
 .lt-badge[data-state="error"] {
-  color: var(--color-danger, #c00);
-  border-color: color-mix(in srgb, var(--color-danger, #c00) 40%, transparent);
+  color: var(--color-err-text);
+  border-color: color-mix(in srgb, var(--color-err-border) 40%, transparent);
 }
 
 .lt-badge[data-state="disabled"] {
-  color: var(--color-text-muted, #999);
+  color: var(--color-subtle);
   opacity: 0.5;
 }
 
@@ -226,10 +227,10 @@
   display: inline-block;
   min-width: 1.5em;
   padding: 0 6px;
-  border: 1px solid var(--color-border, #ddd);
-  border-radius: var(--radius-sm, 4px);
-  background: var(--color-bg-muted, #f6f6f6);
-  color: var(--color-text-muted, #666);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-tag-bg);
+  color: var(--color-muted);
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
   line-height: 1.5;
@@ -246,8 +247,10 @@
 .lt-dict-search input {
   width: 100%;
   padding: 4px 8px;
-  border: 1px solid var(--color-border, #ddd);
-  border-radius: var(--radius-sm, 4px);
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
   font-size: 0.85rem;
 }
 
@@ -265,8 +268,8 @@
   align-items: center;
   gap: 8px;
   padding: 3px 6px;
-  border: 1px solid var(--color-border, #ddd);
-  border-radius: var(--radius-sm, 4px);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
   font-size: 0.85rem;
 }
 
@@ -277,17 +280,17 @@
 .lt-dict-remove {
   appearance: none;
   background: transparent;
-  border: 1px solid var(--color-border, #ddd);
-  border-radius: var(--radius-sm, 4px);
-  color: var(--color-text-muted, #666);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-muted);
   cursor: pointer;
   font-size: 0.75rem;
   padding: 1px 6px;
 }
 
 .lt-dict-remove:hover {
-  color: var(--color-danger, #c00);
-  border-color: var(--color-danger, #c00);
+  color: var(--color-err-text);
+  border-color: var(--color-err-border);
 }
 
 /* Extension-Konflikt-Banner — leichter Notice-Stil, wird in den Editor-Templates
@@ -299,10 +302,10 @@
   gap: 12px;
   padding: 10px 12px;
   margin-bottom: 8px;
-  background: color-mix(in srgb, var(--color-warning, #c97a00) 10%, transparent);
-  border: 1px solid var(--color-warning, #c97a00);
-  border-radius: var(--radius-sm, 4px);
-  color: var(--color-text, #111);
+  background: var(--color-warn-bg);
+  border: 1px solid var(--color-style-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
   font-size: 0.9rem;
 }
 
@@ -315,11 +318,11 @@
   border: none;
   cursor: pointer;
   font-size: 0.85rem;
-  color: var(--color-text-muted, #555);
+  color: var(--color-muted);
   padding: 2px 6px;
 }
 
-.lt-extension-banner__dismiss:hover { color: var(--color-text, #111); }
+.lt-extension-banner__dismiss:hover { color: var(--color-text); }
 
 /* Per-Editor-Hooks (leer im MVP, vorhanden fuer kuenftige Tweaks). */
 .lt-popover[data-editor="focus"] { /* Focus-spezifische Anpassungen hier */ }
@@ -341,7 +344,7 @@
   margin-left: 6px;
   cursor: pointer;
   appearance: none;
-  border-color: var(--color-border, #ccc);
+  border-color: var(--color-border);
 }
 
 /* Quiet: weniger visuelles Rauschen wenn nichts zu zeigen. Wird vom JS gesetzt
@@ -368,7 +371,7 @@
   flex-direction: column;
   gap: 4px;
   padding: 6px 0;
-  border-bottom: 1px solid var(--color-border, #eee);
+  border-bottom: 1px solid var(--color-border);
 }
 .lt-popover__match:last-child { border-bottom: none; padding-bottom: 0; }
 .lt-popover__match:first-child { padding-top: 0; }
@@ -382,12 +385,12 @@
 
 .lt-popover__match-word {
   font-weight: 600;
-  color: var(--color-danger, #d33);
+  color: var(--color-err-text);
   font-family: var(--font-mono, monospace);
 }
 
 .lt-popover__match-msg {
-  color: var(--color-text-muted, #555);
+  color: var(--color-muted);
   font-size: 0.72rem;
   line-height: 1.3;
 }
