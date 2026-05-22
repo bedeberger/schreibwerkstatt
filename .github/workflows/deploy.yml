@@ -65,7 +65,7 @@ jobs:
           fi
 
           echo "→ Keine <style>-Blöcke in HTML"
-          hits=$(grep -rn '<style' public/ 2>/dev/null || true)
+          hits=$(grep -rn --include='*.html' '<style' public/ 2>/dev/null || true)
           if [ -n "$hits" ]; then
             echo "::error::<style>-Blöcke gefunden — alle Styles gehören in public/style.css:"
             echo "$hits"

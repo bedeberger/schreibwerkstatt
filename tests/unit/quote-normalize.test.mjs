@@ -125,10 +125,78 @@ test('normalizeQuotes: keine Quotes → count 0, kein Mutate', () => {
 });
 
 test('normalizeQuotes: bereits typografische Quotes bleiben', () => {
-  // Strikte Erwartung: nur straight `"` und `'` werden ersetzt; bereits
-  // typografische Zeichen bleiben (v1-Verhalten).
   const root = makeRoot('<p>Er sagte „Hallo“ und «Welt».</p>');
   const style = resolveQuoteStyle('de', 'CH');
   const count = normalizeQuotes(root, style);
   assert.equal(count, 0);
+});
+
+test('normalizeQuotes: drei Quote-Paare nacheinander, korrekt klassifiziert', () => {
+  const root = makeRoot('<p>"Eins" sagte er, "Zwei" rief sie, "Drei" murmelte ich.</p>');
+  const style = resolveQuoteStyle('de', 'CH');
+  normalizeQuotes(root, style);
+  assert.equal(
+    root.querySelector('p').textContent,
+    '«Eins» sagte er, «Zwei» rief sie, «Drei» murmelte ich.',
+  );
+});
+
+test('normalizeQuotes: Klammern um Quote', () => {
+  const root = makeRoot('<p>Er sagte ("Hallo") laut.</p>');
+  const style = resolveQuoteStyle('de', 'CH');
+  normalizeQuotes(root, style);
+  assert.equal(root.querySelector('p').textContent, 'Er sagte («Hallo») laut.');
+});
+
+test('normalizeQuotes: Punkt vor schliessendem Quote', () => {
+  const root = makeRoot('<p>Er sagte "Hallo." und ging.</p>');
+  const style = resolveQuoteStyle('de', 'CH');
+  normalizeQuotes(root, style);
+  assert.equal(root.querySelector('p').textContent, 'Er sagte «Hallo.» und ging.');
+});
+
+test('normalizeQuotes: nur ein Quote, am Wortanfang → öffnend', () => {
+  const root = makeRoot('<p>Hier nur "ein offener Quote ohne Ende.</p>');
+  const style = resolveQuoteStyle('de', 'CH');
+  normalizeQuotes(root, style);
+  assert.equal(root.querySelector('p').textContent, 'Hier nur «ein offener Quote ohne Ende.');
+});
+
+test('normalizeQuotes: nur ein Quote, am Wortende → schliessend', () => {
+  const root = makeRoot('<p>Schliessendes ohne Anfang", sagte er.</p>');
+  const style = resolveQuoteStyle('de', 'CH');
+  normalizeQuotes(root, style);
+  assert.equal(root.querySelector('p').textContent, 'Schliessendes ohne Anfang», sagte er.');
+});
+
+test('normalizeQuotes: Em-Dash vor öffnendem Quote', () => {
+  const root = makeRoot('<p>Er rief — "Halt!" — und blieb stehen.</p>');
+  const style = resolveQuoteStyle('de', 'CH');
+  normalizeQuotes(root, style);
+  assert.equal(root.querySelector('p').textContent, 'Er rief — «Halt!» — und blieb stehen.');
+});
+
+test('normalizeQuotes: nested single in double', () => {
+  const root = makeRoot('<p>Er sagte: "Sie meinte \'sofort\', sagte er."</p>');
+  const style = resolveQuoteStyle('de', 'CH');
+  normalizeQuotes(root, style);
+  assert.equal(
+    root.querySelector('p').textContent,
+    'Er sagte: «Sie meinte ‹sofort›, sagte er.»',
+  );
+});
+
+test('normalizeQuotes: Possessiv-Apostroph kids\'', () => {
+  const root = makeRoot('<p>the kids\' books</p>');
+  const style = resolveQuoteStyle('en', '');
+  normalizeQuotes(root, style);
+  // kids' = Apostroph (nicht schliessendes Single-Quote)
+  assert.equal(root.querySelector('p').textContent, 'the kids’ books');
+});
+
+test('normalizeQuotes: Quote über <em> hinweg → next-Kontext aus folgendem Text-Node', () => {
+  const root = makeRoot('<p>Er rief "<em>Hallo Welt</em>" laut.</p>');
+  const style = resolveQuoteStyle('de', 'CH');
+  normalizeQuotes(root, style);
+  assert.equal(root.querySelector('p').textContent, 'Er rief «Hallo Welt» laut.');
 });
