@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="de-CH">
+<head>
+  <meta charset="UTF-8">
+  <title>Spellcheck Test Harness</title>
+  <link rel="stylesheet" href="/public/css/tokens.css">
+  <link rel="stylesheet" href="/public/css/editor/spellcheck.css">
+  <style>
+    body { margin: 0; padding: 24px; font: 16px/1.6 system-ui, sans-serif; }
+    .editor-wrap { position: relative; max-width: 720px; margin: 0 auto; }
+    .editor-root {
+      min-height: 200px;
+      padding: 12px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      outline: none;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="editor-wrap">
+    <div class="editor-root" id="editor" contenteditable="true" spellcheck="false"><p>Der Jungen ging in den Walld. Die Sonne scheinet hell.</p></div>
+  </div>
+
+  <script type="module">
+    import { createSpellcheckController } from '/public/js/cards/editor-spellcheck/controller.js';
+
+    const params = new URLSearchParams(location.search);
+    const kind = params.get('kind') || 'notebook';
+
+    const root = document.getElementById('editor');
+    root.classList.add({
+      notebook: 'page-content-view--editing',
+      focus: 'focus-editor__content',
+      book: 'book-editor-page-body',
+    }[kind]);
+
+    const ctl = createSpellcheckController({
+      root,
+      scrollContainer: window,
+      getHtml: () => root.innerHTML,
+      onApplyReplacement: (range, text) => {
+        range.deleteContents();
+        range.insertNode(document.createTextNode(text));
+        root.dispatchEvent(new Event('input', { bubbles: true }));
+      },
+      editorKind: kind,
+      getBookLocale: () => 'de-DE',
+      getBookId: () => 1,
+      getPageId: () => 1,
+      isEnabled: () => true,
+      i18n: (key) => key,
+    });
+
+    ctl.attach();
+
+    window.__spellcheckCtl = ctl;
+    window.__harnessReady = true;
+  </script>
+</body>
+</html>

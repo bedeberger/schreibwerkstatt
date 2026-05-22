@@ -1,99 +1,82 @@
 /* LanguageTool-Spellcheck — shared zwischen Notebook-, Focus- und Bucheditor.
- * Overlay liegt als Sibling neben dem contenteditable-Root (siehe
- * cards/editor-spellcheck/controller.js#_ensureOverlay). Eltern-Container des
- * Editors MUSS position:relative haben, damit absolute Positionierung gegen
- * denselben offset-parent laeuft. Squiggle-Spans liegen ueber dem Text und
- * sind klickbar; der eigentliche Editor-Text bleibt durch pointer-events
- * unberuehrt.
+ *
+ * Squiggles werden nativ via CSS Custom Highlight API gerendert (CSS.highlights
+ * + ::highlight()-Pseudo). Browser zeichnet die wavy-Underline am Text-Lauf —
+ * scrollt nativ mit, kein DOM-Overlay, kein JS-Reposition.
+ *
+ * Popover wird vom Controller ins Scroll-Layer eingehaengt (Scroll-Container
+ * bei Notebook/Focus, body bei Bucheditor mit Window-Scroll). `position:
+ * absolute`, Koordinaten relativ zum Host — scrollt nativ mit dem Anker.
  *
  * Pro-Editor-Tweaks via [data-editor="focus"]/[data-editor="book"] auf dem
- * Overlay-Container.
- */
+ * Popover. */
 
-.lt-overlay {
-  /* Box (left/top/width/height) wird vom Controller je Render gesetzt,
-   * damit die Overlay-Flaeche exakt der Editor-Flaeche entspricht — auch
-   * wenn Toolbar/Padding ueber dem Editor liegen. */
-  position: absolute;
-  pointer-events: none;
-  z-index: var(--z-spellcheck);
+/* Native Squiggles via Highlight API. text-decoration-skip-ink ist explizit
+ * 'none', damit die Welle auch unter Buchstabenstielen (g, p, y) durchläuft —
+ * sonst entstehen optische Lücken im Match. */
+::highlight(lt-typo) {
+  text-decoration: underline wavy var(--color-danger, #d33);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  text-decoration-skip-ink: none;
+}
+::highlight(lt-grammar) {
+  text-decoration: underline wavy var(--color-info, #2c6fb3);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  text-decoration-skip-ink: none;
+}
+::highlight(lt-style) {
+  text-decoration: underline wavy var(--color-warning, #c97a00);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  text-decoration-skip-ink: none;
 }
 
-.lt-squiggle {
-  position: absolute;
-  pointer-events: auto;
-  cursor: pointer;
-  /* Wavy-Underline via inline SVG-Background; Farbe via Custom-Prop steuerbar. */
-  --lt-color: var(--color-danger, #d33);
-  background-repeat: repeat-x;
-  background-position: 0 100%;
-  background-size: 6px 3px;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 3'><path d='M0 2 Q1.5 0 3 2 T6 2' fill='none' stroke='%23d33' stroke-width='1'/></svg>");
-  border-radius: 0;
-  /* Spans selbst transparent; nur Underline sichtbar. */
-  background-color: transparent;
-}
+/* Popover-Badge-Kategorie setzt die `--lt-color`-Custom-Property fuer den
+ * eingefaerbten Header-Chip. Klassennamen historisch `lt-squiggle--*`, weil
+ * der Controller dieselben Strings fuer Kategorie-Mapping erzeugt. */
+.lt-popover__badge.lt-squiggle--typo    { --lt-color: var(--color-danger, #d33); }
+.lt-popover__badge.lt-squiggle--grammar { --lt-color: var(--color-info, #2c6fb3); }
+.lt-popover__badge.lt-squiggle--style   { --lt-color: var(--color-warning, #c97a00); }
 
-.lt-squiggle:focus-visible {
-  outline: 2px solid var(--lt-color);
-  outline-offset: 1px;
-}
-
-.lt-squiggle--typo {
-  --lt-color: var(--color-danger, #d33);
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 3'><path d='M0 2 Q1.5 0 3 2 T6 2' fill='none' stroke='%23d33' stroke-width='1'/></svg>");
-}
-
-.lt-squiggle--grammar {
-  --lt-color: var(--color-info, #2c6fb3);
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 3'><path d='M0 2 Q1.5 0 3 2 T6 2' fill='none' stroke='%232c6fb3' stroke-width='1'/></svg>");
-}
-
-.lt-squiggle--style {
-  --lt-color: var(--color-warning, #c97a00);
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 3'><path d='M0 2 Q1.5 0 3 2 T6 2' fill='none' stroke='%23c97a00' stroke-width='1'/></svg>");
-}
-
-/* Popover — fixed positioniert; Controller setzt left/top inline. */
+/* Popover — absolut im Scroll-Layer (Controller setzt left/top inline).
+ * Scrollt nativ mit dem Anker mit (kein scroll-Listener noetig). */
 .lt-popover {
-  position: fixed;
+  position: absolute;
   z-index: var(--z-popover);
   background: var(--color-surface, #fff);
   color: var(--color-text, #111);
   border: 1px solid var(--color-border, #ccc);
   border-radius: var(--radius-sm, 4px);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
-  padding: 12px;
-  max-width: 340px;
-  min-width: 220px;
-  font-size: 0.9rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  padding: 8px;
+  max-width: 280px;
+  min-width: 180px;
+  font-size: 0.8rem;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .lt-popover__header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
 .lt-popover__badge {
   display: inline-block;
-  padding: 2px 6px;
+  padding: 1px 5px;
   border-radius: var(--radius-sm, 4px);
   background: color-mix(in srgb, var(--lt-color, #d33) 12%, transparent);
   color: var(--lt-color, #d33);
-  font-size: 0.75rem;
+  font-size: 0.65rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-
-.lt-popover__badge.lt-squiggle--typo    { --lt-color: var(--color-danger, #d33); }
-.lt-popover__badge.lt-squiggle--grammar { --lt-color: var(--color-info, #2c6fb3); }
-.lt-popover__badge.lt-squiggle--style   { --lt-color: var(--color-warning, #c97a00); }
 
 .lt-popover__title {
   font-weight: 600;
@@ -115,7 +98,7 @@
 .lt-popover__replacements {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 3px;
 }
 
 .lt-popover__replacement {
@@ -124,8 +107,8 @@
   background: var(--color-surface-alt, #f6f6f6);
   color: var(--color-text, #111);
   border-radius: var(--radius-sm, 4px);
-  padding: 4px 8px;
-  font-size: 0.9rem;
+  padding: 2px 6px;
+  font-size: 0.8rem;
   cursor: pointer;
   line-height: 1.2;
 }
@@ -140,27 +123,171 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
   border-top: 1px solid var(--color-border, #ccc);
-  padding-top: 8px;
+  padding-top: 6px;
 }
 
 .lt-popover__ignore,
+.lt-popover__dict,
 .lt-popover__info {
   appearance: none;
   background: transparent;
   border: none;
   color: var(--color-text-muted, #555);
   cursor: pointer;
-  font-size: 0.85rem;
-  padding: 2px 4px;
+  font-size: 0.75rem;
+  padding: 1px 3px;
   text-decoration: none;
 }
 
 .lt-popover__ignore:hover,
+.lt-popover__dict:hover,
 .lt-popover__info:hover {
   color: var(--color-text, #111);
   text-decoration: underline;
+}
+
+.lt-popover__dict[disabled] {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Floating-Status-Badge oben-rechts im Editor. Pointer-events: auto fuers
+ * Tooltip-Hover; nicht klickbar (Status-Info nur). */
+.lt-badge {
+  position: absolute;
+  z-index: var(--z-overlay-spellcheck, 9);
+  transform: translateX(-100%);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border-radius: var(--radius-sm, 4px);
+  border: 1px solid transparent;
+  background: var(--color-bg-elevated, #fff);
+  color: var(--color-text-muted, #666);
+  font-size: 0.7rem;
+  line-height: 1;
+  pointer-events: auto;
+  user-select: none;
+  opacity: 0.85;
+  transition: opacity 0.2s;
+}
+
+.lt-badge:hover {
+  opacity: 1;
+}
+
+.lt-badge[data-state="loading"] {
+  color: var(--color-info, #06f);
+}
+.lt-badge[data-state="loading"] .icon {
+  animation: lt-badge-spin 1s linear infinite;
+}
+
+.lt-badge[data-state="clean"] {
+  color: var(--color-success, #2a8);
+  border-color: color-mix(in srgb, var(--color-success, #2a8) 40%, transparent);
+}
+
+.lt-badge[data-state="matches"] {
+  color: var(--color-warning, #c97a00);
+  border-color: color-mix(in srgb, var(--color-warning, #c97a00) 40%, transparent);
+}
+
+.lt-badge[data-state="extension"],
+.lt-badge[data-state="error"] {
+  color: var(--color-danger, #c00);
+  border-color: color-mix(in srgb, var(--color-danger, #c00) 40%, transparent);
+}
+
+.lt-badge[data-state="disabled"] {
+  color: var(--color-text-muted, #999);
+  opacity: 0.5;
+}
+
+.lt-badge__icon .icon {
+  width: 12px;
+  height: 12px;
+}
+
+.lt-badge__label {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+@keyframes lt-badge-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Custom-Dictionary-Liste in User-Settings. Klappbar via .collapsible-toggle. */
+.lt-dict-count {
+  display: inline-block;
+  min-width: 1.5em;
+  padding: 0 6px;
+  border: 1px solid var(--color-border, #ddd);
+  border-radius: var(--radius-sm, 4px);
+  background: var(--color-bg-muted, #f6f6f6);
+  color: var(--color-text-muted, #666);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.lt-dict-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.lt-dict-search input {
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--color-border, #ddd);
+  border-radius: var(--radius-sm, 4px);
+  font-size: 0.85rem;
+}
+
+.lt-dict-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.lt-dict-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 6px;
+  border: 1px solid var(--color-border, #ddd);
+  border-radius: var(--radius-sm, 4px);
+  font-size: 0.85rem;
+}
+
+.lt-dict-word {
+  font-family: var(--font-mono, monospace);
+}
+
+.lt-dict-remove {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--color-border, #ddd);
+  border-radius: var(--radius-sm, 4px);
+  color: var(--color-text-muted, #666);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 1px 6px;
+}
+
+.lt-dict-remove:hover {
+  color: var(--color-danger, #c00);
+  border-color: var(--color-danger, #c00);
 }
 
 /* Extension-Konflikt-Banner — leichter Notice-Stil, wird in den Editor-Templates
@@ -195,11 +322,10 @@
 .lt-extension-banner__dismiss:hover { color: var(--color-text, #111); }
 
 /* Per-Editor-Hooks (leer im MVP, vorhanden fuer kuenftige Tweaks). */
-.lt-overlay[data-editor="focus"] { /* Focus-spezifische Anpassungen hier */ }
-.lt-overlay[data-editor="book"]  { /* Bucheditor-spezifische Anpassungen hier */ }
+.lt-popover[data-editor="focus"] { /* Focus-spezifische Anpassungen hier */ }
+.lt-popover[data-editor="book"]  { /* Bucheditor-spezifische Anpassungen hier */ }
 
-/* Mobile: Wavy-Underline minimal staerker fuer Touch-Sichtbarkeit. */
+/* Mobile: Popover-Breite gegen Viewport begrenzen. */
 @media (max-width: 640px) {
-  .lt-squiggle { background-size: 5px 3px; }
   .lt-popover { max-width: calc(100vw - 24px); }
 }

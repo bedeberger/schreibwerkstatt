@@ -117,5 +117,46 @@
 
     <p class="card-form-saved" x-show="userSettingsSaved" x-cloak x-transition.opacity.duration.250ms x-text="$app.t('profile.savedMsg')"></p>
     <p class="card-form-error" x-show="userSettingsError" x-text="userSettingsError"></p>
+
+    <template x-if="$app.languagetoolEnabled">
+      <div class="card-form-row card-form-row--dict">
+        <button type="button"
+                class="collapsible-toggle"
+                @click="dictOpen = !dictOpen"
+                :aria-expanded="dictOpen">
+          <svg class="icon history-chevron" :class="{ 'is-open': dictOpen }" aria-hidden="true"><use href="/icons.svg#chevron-right"/></svg>
+          <span x-text="$app.t('spellcheck.dict.title')"></span>
+          <span class="lt-dict-count" x-text="dictEntries.length"></span>
+        </button>
+        <div class="lt-dict-body" x-show="dictOpen" x-cloak>
+          <template x-if="!dictEntries.length">
+            <p class="muted-msg muted-msg--sm" x-text="$app.t('spellcheck.dict.empty')"></p>
+          </template>
+          <template x-if="dictEntries.length">
+            <div class="lt-dict-search">
+              <input type="search"
+                     x-model="dictFilter"
+                     :placeholder="$app.t('spellcheck.dict.searchPlaceholder')">
+            </div>
+          </template>
+          <div class="lt-dict-list" x-show="dictEntries.length">
+            <template x-for="e in dictEntriesFiltered" :key="e.word + '|' + e.book_id + '|' + e.lang">
+              <div class="lt-dict-row">
+                <span class="lt-dict-word" x-text="e.word"></span>
+                <span class="lt-dict-scope muted-msg muted-msg--sm">
+                  <span x-text="e.book_id ? $app.t('spellcheck.dict.scope_book') : $app.t('spellcheck.dict.scope_global')"></span>
+                  <span>: </span>
+                  <span x-text="e.lang === '*' ? $app.t('spellcheck.dict.scope_lang_any') : e.lang"></span>
+                </span>
+                <button type="button" class="lt-dict-remove" @click="removeDictEntry(e)" x-text="$app.t('spellcheck.dict.remove')"></button>
+              </div>
+            </template>
+            <template x-if="dictEntries.length && !dictEntriesFiltered.length">
+              <p class="muted-msg muted-msg--sm" x-text="$app.t('spellcheck.dict.noMatch')"></p>
+            </template>
+          </div>
+        </div>
+      </div>
+    </template>
   </div>
 </div>

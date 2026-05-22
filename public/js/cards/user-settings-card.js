@@ -18,7 +18,16 @@ export function registerUserSettingsCard() {
     userSettingsSaving: false,
     userSettingsSaved: false,
     userSettingsError: '',
+    dictEntries: [],
+    dictOpen: false,
+    dictFilter: '',
     _savedAtTimer: null,
+
+    get dictEntriesFiltered() {
+      const q = (this.dictFilter || '').trim().toLowerCase();
+      if (!q) return this.dictEntries;
+      return this.dictEntries.filter(e => (e.word || '').toLowerCase().includes(q));
+    },
 
     _onViewReset: null,
 
@@ -26,6 +35,7 @@ export function registerUserSettingsCard() {
       this.$watch(() => window.__app.showUserSettingsCard, async (visible) => {
         if (!visible) return;
         await this.loadUserSettings();
+        await this.loadDictEntries();
       });
 
       this._onViewReset = () => {
@@ -33,6 +43,29 @@ export function registerUserSettingsCard() {
         this.userSettingsError = '';
       };
       window.addEventListener('view:reset', this._onViewReset);
+    },
+
+    async loadDictEntries() {
+      if (!window.__app.languagetoolEnabled) { this.dictEntries = []; return; }
+      try {
+        const r = await fetch('/dictionary', { credentials: 'same-origin' });
+        if (!r.ok) { this.dictEntries = []; return; }
+        const j = await r.json();
+        this.dictEntries = Array.isArray(j.entries) ? j.entries : [];
+      } catch { this.dictEntries = []; }
+    },
+
+    async removeDictEntry(entry) {
+      if (!entry || !entry.word) return;
+      try {
+        await fetch('/dictionary', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ word: entry.word, bookId: entry.book_id, lang: entry.lang }),
+        });
+      } catch {}
+      await this.loadDictEntries();
     },
 
     destroy() {

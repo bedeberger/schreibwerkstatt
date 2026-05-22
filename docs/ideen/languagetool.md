@@ -21,16 +21,20 @@ Nur Self-Hosted-Modus. Kein Premium-/API-Key-Pfad (Datenschutz + Self-Hosting-Ch
 - Extension-Konflikt-Detection (LT-Browser-Extension) → Banner + App-Overlay pausiert.
 - Text-Normalisierung als Shared-Helper (`lib/text-normalize.js`), Server + Frontend nutzen denselben.
 
-## Out-of-Scope (Phase 2)
+## Out-of-Scope (Phase 3)
 
-- Per-Page-Cache (`page_languagetool_cache`).
-- Chunking für Texte >50KB.
-- Persistente Ignore-Liste pro User/Buch.
-- Custom-Dictionary.
 - Premium/API-Key-Modus.
-- Status-Indikator in Editor-Toolbar.
 - Buch-Locale-Override (`books.languagetool_locale`).
 - Touch-Popover-Tweaks für Mobile.
+- Persistente Ignore-Liste pro Match (orthogonal zum Custom-Dictionary).
+
+## Phase 2 (umgesetzt)
+
+- Chunking >50KB: `lib/languagetool-chunk.js` splittet an Paragraph-/Satz-Boundaries, Pool 4, Offset-Merge.
+- Per-Page-Cache: `page_languagetool_cache` (FK CASCADE auf `pages`), Hash via sha1 ueber LT-Eingabe.
+- Custom-Dictionary: `user_dictionary` (book_id=0 = global, lang='*' = sprachuebergreifend), Filter im Proxy nach LT-Call, Add via Popover-Button, Verwaltung in User-Settings.
+- Status-Badge: floating oben-rechts im Editor, States `loading|matches|clean|extension|error|disabled`, Match-Count als Label.
+- E2E pro Editor: `tests/e2e/spellcheck-{notebook,focus,book}.spec.js` mit gemeinsamem Harness `tests/fixtures/spellcheck-harness.html`.
 
 ## Done when
 

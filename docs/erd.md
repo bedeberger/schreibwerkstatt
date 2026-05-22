@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 140, 74 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 142, 76 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -69,6 +69,7 @@ erDiagram
   pages ||--o{ ideen                 : at
   pages ||--o{ lektorat_time         : on
   pages ||--o{ lektorat_cache        : cached
+  pages ||--o{ page_languagetool_cache : cached
   pages ||--o{ locations             : firstMention
   pages ||--o{ songs                 : firstMention
   pages ||--o{ figures               : firstMention
@@ -741,6 +742,21 @@ erDiagram
     TEXT    sig
     TEXT    result_json
     TEXT    cached_at
+  }
+  page_languagetool_cache {
+    INTEGER page_id      PK,FK "CASCADE"
+    TEXT    content_hash PK    "sha1 ueber LT-Eingabetext"
+    TEXT    lang         PK    "LT-Locale-Tag (de-CH, en-US, auto)"
+    INTEGER picky        PK    "0/1, picky-Mode an/aus"
+    TEXT    matches_json       "JSON-Array von LT-Matches"
+    TEXT    created_at
+  }
+  user_dictionary {
+    TEXT    user_email PK,FK "CASCADE auf app_users"
+    INTEGER book_id    PK    "0 = global, sonst pro Buch"
+    TEXT    word       PK    "User-spezifisches Wort"
+    TEXT    lang       PK    "* = alle Sprachen, sonst Locale-Tag"
+    TEXT    created_at
   }
 
   app_users {

@@ -13,14 +13,18 @@ import { createSpellcheckController } from './controller.js';
 const NOTEBOOK_SEL = '.page-content-view--editing';
 const FOCUS_SEL = '.focus-editor__content';
 const BOOK_SEL = '.book-editor-page-body[contenteditable="true"]';
-const FOCUS_SCROLL_SEL = '.focus-editor';
-const BOOK_SCROLL_SEL = '.book-editor-scroll, .book-editor-card__scroll, .book-editor-card';
+// Focus-Editor: `.focus-editor__content` ist gleichzeitig contenteditable-root
+// UND Scroll-Container (overflow-y:auto, siehe focus-mode.css). Scroll-Events
+// bubblen nicht — Listener muss am scrollenden Element selbst sitzen, sonst
+// feuert `_reposition` beim internen Scroll nicht und Squiggles kleben fest.
+const FOCUS_SCROLL_SEL = '.focus-editor__content';
+const BOOK_CARD_SEL = '.card--bookeditor';
 
 export function setupSpellcheckDispatch(app) {
   if (!app || typeof app.$watch !== 'function') return;
 
   let current = null;        // { kind, root, ctl }
-  let blockObserver = null;  // MutationObserver fuer Bucheditor (Block-Wechsel)
+  let bookBlockObserver = null;  // MutationObserver fuer Bucheditor (Block-Wechsel) — lebt unabhaengig vom Controller
 
   function _currentBook() {
     const id = app.selectedBookId;
@@ -39,6 +43,10 @@ export function setupSpellcheckDispatch(app) {
   function _bookId() {
     const id = app.selectedBookId;
     return id ? Number(id) : null;
+  }
+  function _pageId() {
+    const pid = app.currentPage?.page_id ?? app.currentPage?.id ?? null;
+    return pid ? Number(pid) : null;
   }
   function _isEnabled() { return !!app.languagetoolEnabled; }
 
@@ -70,7 +78,26 @@ export function setupSpellcheckDispatch(app) {
       try { current.ctl.detach(); } catch {}
     }
     current = null;
-    if (blockObserver) { blockObserver.disconnect(); blockObserver = null; }
+  }
+
+  function _setupBookObserver() {
+    if (bookBlockObserver) return;
+    const card = document.querySelector(BOOK_CARD_SEL);
+    if (!card) return;
+    bookBlockObserver = new MutationObserver(() => {
+      if (!_isEnabled() || !app.showBookEditorCard) return;
+      const active = document.querySelector(BOOK_SEL);
+      if (active && active !== current?.root) {
+        _attachKind('book');
+      } else if (!active && current?.kind === 'book') {
+        _detach();
+      }
+    });
+    bookBlockObserver.observe(card, { attributes: true, subtree: true, attributeFilter: ['contenteditable'] });
+  }
+
+  function _teardownBookObserver() {
+    if (bookBlockObserver) { bookBlockObserver.disconnect(); bookBlockObserver = null; }
   }
 
   function _attachKind(kind) {
@@ -83,9 +110,16 @@ export function setupSpellcheckDispatch(app) {
       scrollContainer = document.querySelector(FOCUS_SCROLL_SEL);
     } else if (kind === 'notebook') {
       root = document.querySelector(NOTEBOOK_SEL);
+      // `.page-content-view--editing` ist selbst der Scroll-Container
+      // (overflow-y:auto + max-height:70vh). `_findScrollParent` startet bei
+      // parentElement und wuerde Root ueberspringen — explizit setzen, damit
+      // Wheel-Forwarding (controller.js) die Squiggles-bubbled-Wheel-Events
+      // an den richtigen Scroller weiterleitet.
+      scrollContainer = root;
     } else if (kind === 'book') {
       root = document.querySelector(BOOK_SEL);
-      scrollContainer = root?.closest(BOOK_SCROLL_SEL.split(',')[0].trim()) || null;
+      // Bucheditor scrollt am Window — controller#_findScrollParent loest auf.
+      scrollContainer = null;
     }
     if (!root) return;
     const ctl = createSpellcheckController({
@@ -96,40 +130,32 @@ export function setupSpellcheckDispatch(app) {
       editorKind: kind,
       getBookLocale: _locale,
       getBookId: _bookId,
+      getPageId: _pageId,
       isEnabled: _isEnabled,
       i18n: (k) => (typeof app.t === 'function' ? app.t(k) : k),
     });
     ctl.attach();
     current = { kind, root, ctl };
-
-    if (kind === 'book') {
-      // Bucheditor-Block-Wechsel: aktiver Block hat contenteditable="true";
-      // Switch -> Controller neu attachen.
-      const card = document.querySelector('.book-editor-card, .book-editor');
-      if (card) {
-        blockObserver = new MutationObserver(() => {
-          const active = document.querySelector(BOOK_SEL);
-          if (active && active !== current?.root) {
-            _attachKind('book');
-          } else if (!active && current?.kind === 'book') {
-            _detach();
-          }
-        });
-        blockObserver.observe(card, { attributes: true, subtree: true, attributeFilter: ['contenteditable'] });
-      }
-    }
   }
 
   function _evaluate() {
-    if (!_isEnabled()) { _detach(); return; }
+    if (!_isEnabled()) { _detach(); _teardownBookObserver(); return; }
     // Prioritaet: Focus > Notebook > Bucheditor (kann nicht ko-existieren).
     if (app.focusActive) {
+      _teardownBookObserver();
       _afterPaint(() => _attachKind('focus'));
     } else if (app.editMode) {
+      _teardownBookObserver();
       _afterPaint(() => _attachKind('notebook'));
     } else if (app.showBookEditorCard) {
-      _afterPaint(() => _attachKind('book'));
+      // Block-Observer lebt so lange Bucheditor offen ist — unabhaengig
+      // davon, ob gerade ein Block aktiv (contenteditable="true") ist.
+      _afterPaint(() => {
+        _setupBookObserver();
+        _attachKind('book');
+      });
     } else {
+      _teardownBookObserver();
       _detach();
     }
   }
@@ -154,5 +180,5 @@ export function setupSpellcheckDispatch(app) {
   _evaluate();
 
   // Cleanup-Hook (App-Destroy ist rare; best-effort).
-  window.addEventListener('beforeunload', _detach);
+  window.addEventListener('beforeunload', () => { _detach(); _teardownBookObserver(); });
 }

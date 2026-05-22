@@ -9,12 +9,23 @@
 //
 // Pipeline pro attach:
 //   input/MutationObserver -> debounce 1500ms -> _runCheck() ->
-//   fetch /languagetool/check -> _renderOverlay() via mapping.js.
-// Re-Position via ResizeObserver + scroll-Listener; kein Re-Fetch dabei.
+//   fetch /languagetool/check -> _renderMatches() registriert DOM-Ranges in
+//   CSS.highlights (typo/grammar/style). Browser rendert die wavy-Underline
+//   nativ via ::highlight()-Regeln — keine DOM-Spans pro Match, kein
+//   JS-Reposition bei Scroll. Ranges aktualisieren sich beim Editieren
+//   automatisch via DOM-Mutation; bei strukturellen Aenderungen invalidiert
+//   der naechste Check.
 //
-// DOM-Mutation invalidiert pending Check (requestId-Counter + HTML-Snapshot).
-// LT-Browser-Extension-Detection pausiert das Overlay solange Marker am body
-// existieren.
+// Popover wird ins Scroll-Layer eingehaengt (Scroll-Container bei
+// Notebook/Focus, body bei Bucheditor mit Window-Scroll). Position absolute
+// in Scroll-Content-Koordinaten — laeuft beim Scrollen kompositiv mit, ohne
+// Scroll-Listener.
+//
+// Badge bleibt am Editor-Eck (Sibling zu root, gleiches offsetParent) und
+// zeigt Status (loading/clean/matches/error/extension/disabled).
+//
+// LT-Browser-Extension-Detection pausiert Highlights solange Extension-Marker
+// im DOM existieren.
 
 import { escHtml } from '../../utils.js';
 import { buildOffsetTable, rangeFromOffset } from './mapping.js';
@@ -28,6 +39,15 @@ const EXTENSION_SELECTORS = [
   '[class*="languagetool"]',
 ];
 
+const HL_TYPO    = 'lt-typo';
+const HL_GRAMMAR = 'lt-grammar';
+const HL_STYLE   = 'lt-style';
+const HL_KEYS    = [HL_TYPO, HL_GRAMMAR, HL_STYLE];
+
+const supportsHighlightApi = typeof CSS !== 'undefined'
+  && CSS.highlights
+  && typeof Highlight !== 'undefined';
+
 export function createSpellcheckController({
   root,
   scrollContainer,
@@ -36,16 +56,24 @@ export function createSpellcheckController({
   editorKind = 'notebook',
   getBookLocale,
   getBookId,
+  getPageId,
   isEnabled = () => true,
   i18n = (key) => key,
 }) {
   if (!root) throw new Error('spellcheck: root required');
 
-  // State (Closure).
-  let overlay = null;
-  let popover = null;
-  const squiggles = new Map(); // matchId -> { match, range, els: [], rectBoxes: [] }
+  // Per-Instance Highlight-Buckets. CSS.highlights ist global; pro Instanz
+  // wird ein frischer Highlight registriert und beim detach() geleert.
+  const highlights = { [HL_TYPO]: null, [HL_GRAMMAR]: null, [HL_STYLE]: null };
+  const squiggles = new Map(); // matchId -> { match, range, category }
   const ignored = new Set();   // matchId session-only
+
+  let popover = null;
+  let popoverHost = null;
+  let popoverAnchorRange = null;
+
+  let badge = null;
+  let badgeState = 'idle';
 
   let mutationObs = null;
   let resizeObs = null;
@@ -64,46 +92,134 @@ export function createSpellcheckController({
     return `${m.offset}:${m.length}:${m.rule?.id || ''}`;
   }
 
-  function _categoryClass(match) {
+  function _extractMatchedWord(m) {
+    const ctx = m?.context;
+    if (!ctx || typeof ctx.text !== 'string') return '';
+    const word = ctx.text.substr(ctx.offset || 0, ctx.length || 0).trim();
+    return word.length > 0 && word.length <= 80 ? word : '';
+  }
+
+  function _categoryKey(match) {
     const id = match.rule?.id || '';
     const cat = match.rule?.category?.id || '';
-    if (id.includes('SPELL') || cat === 'TYPOS') return 'lt-squiggle--typo';
-    if (cat === 'STYLE' || cat === 'REDUNDANCY' || cat === 'TYPOGRAPHY') return 'lt-squiggle--style';
+    if (id.includes('SPELL') || cat === 'TYPOS') return HL_TYPO;
+    if (cat === 'STYLE' || cat === 'REDUNDANCY' || cat === 'TYPOGRAPHY') return HL_STYLE;
+    return HL_GRAMMAR;
+  }
+
+  function _badgeClassFor(match) {
+    const k = _categoryKey(match);
+    if (k === HL_TYPO) return 'lt-squiggle--typo';
+    if (k === HL_STYLE) return 'lt-squiggle--style';
     return 'lt-squiggle--grammar';
   }
 
-  function _ensureOverlay() {
-    if (overlay) return overlay;
-    overlay = document.createElement('div');
-    overlay.className = 'lt-overlay';
-    overlay.setAttribute('data-editor', editorKind);
-    overlay.setAttribute('aria-hidden', 'true');
-    // Sibling zum root: positioniert gegen denselben offsetParent.
-    // Overlay-Box wird in _syncOverlayBox an root.offsetLeft/Top/Width/Height
-    // angeglichen, damit Squiggles relativ zur Editor-Flaeche sitzen — nicht
-    // zur ganzen Wrap (Toolbar + Editor).
-    root.parentNode?.insertBefore(overlay, root.nextSibling);
-    _syncOverlayBox();
-    return overlay;
+  function _ensureHighlights() {
+    if (!supportsHighlightApi) return false;
+    for (const key of HL_KEYS) {
+      if (!highlights[key]) {
+        highlights[key] = new Highlight();
+        CSS.highlights.set(key, highlights[key]);
+      }
+    }
+    return true;
   }
 
-  function _syncOverlayBox() {
-    if (!overlay || !root) return;
-    overlay.style.left   = `${root.offsetLeft}px`;
-    overlay.style.top    = `${root.offsetTop}px`;
-    overlay.style.width  = `${root.offsetWidth}px`;
-    overlay.style.height = `${root.offsetHeight}px`;
+  function _clearHighlights() {
+    for (const key of HL_KEYS) {
+      if (highlights[key]) highlights[key].clear();
+    }
   }
 
-  function _removeOverlay() {
-    if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
-    overlay = null;
-    squiggles.clear();
+  // ─── Badge ───────────────────────────────────────────────────────────────
+
+  function _ensureBadge() {
+    if (badge) return badge;
+    badge = document.createElement('div');
+    badge.className = 'lt-badge';
+    badge.setAttribute('data-editor', editorKind);
+    badge.setAttribute('role', 'status');
+    badge.setAttribute('aria-live', 'polite');
+    root.parentNode?.insertBefore(badge, root.nextSibling);
+    _syncBadgePosition();
+    return badge;
   }
+
+  function _syncBadgePosition() {
+    if (!badge || !root) return;
+    badge.style.top  = `${root.offsetTop + 6}px`;
+    badge.style.left = `${root.offsetLeft + root.offsetWidth - 8}px`;
+  }
+
+  function _removeBadge() {
+    if (badge && badge.parentNode) badge.parentNode.removeChild(badge);
+    badge = null;
+    badgeState = 'idle';
+  }
+
+  function _makeIcon(name) {
+    const NS = 'http://www.w3.org/2000/svg';
+    const XLINK = 'http://www.w3.org/1999/xlink';
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('class', 'icon');
+    const use = document.createElementNS(NS, 'use');
+    use.setAttribute('href', `/icons.svg#${name}`);
+    use.setAttributeNS(XLINK, 'xlink:href', `/icons.svg#${name}`);
+    svg.appendChild(use);
+    return svg;
+  }
+
+  function _updateBadge(state, opts = {}) {
+    badgeState = state;
+    _ensureBadge();
+    _syncBadgePosition();
+    badge.setAttribute('data-state', state);
+    let icon = 'check';
+    let label = '';
+    let title = '';
+    if (state === 'extension') {
+      icon = 'alert-triangle';
+      title = i18n('spellcheck.extension_conflict.title');
+    } else if (state === 'error') {
+      icon = 'alert-triangle';
+      title = i18n('spellcheck.status.error');
+    } else if (state === 'loading') {
+      icon = 'loader';
+      title = i18n('spellcheck.status.active');
+    } else if (state === 'matches') {
+      icon = 'alert-triangle';
+      const n = Number(opts.count || 0);
+      label = String(n);
+      title = i18n('spellcheck.status.matches').replace('{n}', String(n));
+    } else if (state === 'clean') {
+      icon = 'check';
+      title = i18n('spellcheck.status.no_matches');
+    } else if (state === 'disabled') {
+      icon = 'x';
+      title = i18n('spellcheck.status.disabled');
+    }
+    badge.setAttribute('data-tip', title);
+    badge.setAttribute('aria-label', title);
+    badge.replaceChildren();
+    const iconWrap = document.createElement('span');
+    iconWrap.className = 'lt-badge__icon';
+    iconWrap.appendChild(_makeIcon(icon));
+    badge.appendChild(iconWrap);
+    if (label) {
+      const labelSpan = document.createElement('span');
+      labelSpan.className = 'lt-badge__label';
+      labelSpan.textContent = label;
+      badge.appendChild(labelSpan);
+    }
+  }
+
+  // ─── Popover ─────────────────────────────────────────────────────────────
 
   function _closePopover() {
     if (popover && popover.parentNode) popover.parentNode.removeChild(popover);
     popover = null;
+    popoverHost = null;
+    popoverAnchorRange = null;
   }
 
   function _scheduleCheck() {
@@ -121,124 +237,131 @@ export function createSpellcheckController({
     const myReq = ++seq;
     const table = buildOffsetTable(root);
     if (!table.text.trim()) {
-      _renderMatches([], table);
+      _renderMatches([]);
+      _updateBadge('clean');
       return;
     }
     lastHtmlSnapshot = getHtml ? getHtml() : root.innerHTML;
     const language = getBookLocale ? getBookLocale() : 'auto';
     const bookId = getBookId ? getBookId() : null;
+    const pageId = getPageId ? getPageId() : null;
+
+    _updateBadge('loading');
 
     try {
       const resp = await fetch('/languagetool/check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: table.text, language, bookId }),
+        body: JSON.stringify({ text: table.text, language, bookId, pageId }),
         signal: abortCtrl.signal,
         credentials: 'same-origin',
       });
       if (resp.status === 404) {
-        // Disabled — kein Retry.
-        _renderMatches([], table);
+        _renderMatches([]);
+        _updateBadge('disabled');
         return;
       }
-      if (!resp.ok) return;
+      if (!resp.ok) { _updateBadge('error'); return; }
       const json = await resp.json();
       if (myReq !== seq) return; // stale
       const currentSnap = getHtml ? getHtml() : root.innerHTML;
       if (currentSnap !== lastHtmlSnapshot) return; // DOM mutated mid-flight
-      _renderMatches(Array.isArray(json.matches) ? json.matches : [], table);
+      const matches = Array.isArray(json.matches) ? json.matches : [];
+      _renderMatches(matches, table);
+      const visibleCount = matches.filter((m) => !ignored.has(_matchId(m))).length;
+      _updateBadge(visibleCount ? 'matches' : 'clean', { count: visibleCount });
     } catch (err) {
       if (err && err.name !== 'AbortError') {
-        // soft-fail: kein Editor-Bruch
+        _updateBadge('error');
         return;
       }
     }
   }
 
   function _renderMatches(matches, table) {
-    _ensureOverlay();
-    _syncOverlayBox();
-    overlay.replaceChildren();
+    if (!_ensureHighlights()) return;
+    _clearHighlights();
     squiggles.clear();
+    if (!table) return;
     for (const m of matches) {
       const id = _matchId(m);
       if (ignored.has(id)) continue;
       const range = rangeFromOffset(table, m.offset, m.length);
       if (!range) continue;
-      const rects = Array.from(range.getClientRects());
-      if (!rects.length) continue;
-      const els = [];
-      for (const rect of rects) {
-        const span = document.createElement('span');
-        span.className = `lt-squiggle ${_categoryClass(m)}`;
-        span.setAttribute('data-match-id', id);
-        span.setAttribute('role', 'button');
-        span.setAttribute('tabindex', '0');
-        span.setAttribute('data-tip', m.message || '');
-        _positionSquiggle(span, rect);
-        span.addEventListener('mousedown', (ev) => {
-          ev.preventDefault();
-          ev.stopPropagation();
-          _openPopover(id, rect);
-        });
-        span.addEventListener('keydown', (ev) => {
-          if (ev.key === 'Enter' || ev.key === ' ') {
-            ev.preventDefault();
-            _openPopover(id, rect);
-          }
-        });
-        overlay.appendChild(span);
-        els.push(span);
-      }
-      squiggles.set(id, { match: m, range, els });
+      const cat = _categoryKey(m);
+      highlights[cat].add(range);
+      squiggles.set(id, { match: m, range, category: cat });
     }
   }
 
-  function _positionSquiggle(span, rect) {
-    const overlayRect = overlay.getBoundingClientRect();
-    span.style.left = `${rect.left - overlayRect.left}px`;
-    span.style.top = `${rect.top - overlayRect.top}px`;
-    span.style.width = `${rect.width}px`;
-    span.style.height = `${rect.height}px`;
+  // ─── Click-Hit-Test ──────────────────────────────────────────────────────
+  // User klickt in Editor-Text. Caret-Position via caretPositionFromPoint
+  // (Standard) bzw. caretRangeFromPoint (Webkit-Fallback). Match-Lookup ueber
+  // gespeicherte Ranges (kein DOM-Element pro Squiggle mehr).
+
+  function _caretFromPoint(x, y) {
+    if (typeof document.caretPositionFromPoint === 'function') {
+      const pos = document.caretPositionFromPoint(x, y);
+      if (pos) return { node: pos.offsetNode, offset: pos.offset };
+    }
+    if (typeof document.caretRangeFromPoint === 'function') {
+      const r = document.caretRangeFromPoint(x, y);
+      if (r) return { node: r.startContainer, offset: r.startOffset };
+    }
+    return null;
   }
 
-  function _reposition() {
-    if (!attached || !overlay) return;
-    _syncOverlayBox();
-    for (const entry of squiggles.values()) {
-      const rects = Array.from(entry.range.getClientRects());
-      // Match Count? Wenn Anzahl Rects sich zu den Spans nicht deckt — kompletter Re-Render im naechsten Check.
-      if (rects.length !== entry.els.length) {
-        _scheduleCheck();
-        return;
-      }
-      for (let i = 0; i < rects.length; i++) {
-        _positionSquiggle(entry.els[i], rects[i]);
-      }
+  function _findMatchAtCaret(node, offset) {
+    if (!node) return null;
+    const probe = document.createRange();
+    try {
+      probe.setStart(node, offset);
+      probe.collapse(true);
+    } catch { return null; }
+    for (const [id, entry] of squiggles) {
+      try {
+        // probe innerhalb entry.range?  start <= probe < end
+        const startCmp = entry.range.compareBoundaryPoints(Range.START_TO_START, probe);
+        const endCmp   = entry.range.compareBoundaryPoints(Range.END_TO_START, probe);
+        if (startCmp <= 0 && endCmp > 0) return id;
+      } catch { /* range invalid */ }
     }
-    if (popover && popover._anchorRect) {
-      _positionPopoverNear(popover, popover._anchorRect);
-    }
+    return null;
   }
 
-  function _openPopover(matchId, anchorRect) {
+  function _onRootMousedown(ev) {
+    if (ev.button !== 0) return;
+    if (popover && popover.contains(ev.target)) return;
+    if (!squiggles.size) return;
+    const pt = _caretFromPoint(ev.clientX, ev.clientY);
+    if (!pt) return;
+    const id = _findMatchAtCaret(pt.node, pt.offset);
+    if (!id) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    _openPopover(id);
+  }
+
+  function _openPopover(matchId) {
     _closePopover();
     const entry = squiggles.get(matchId);
     if (!entry) return;
     const m = entry.match;
+    popoverAnchorRange = entry.range;
 
     popover = document.createElement('div');
     popover.className = 'lt-popover';
     popover.setAttribute('role', 'dialog');
-    popover._anchorRect = anchorRect;
+    popover.setAttribute('contenteditable', 'false');
+    popover.setAttribute('data-editor', editorKind);
 
     const header = document.createElement('div');
     header.className = 'lt-popover__header';
-    const badge = document.createElement('span');
-    badge.className = `lt-popover__badge ${_categoryClass(m)}`;
-    badge.textContent = m.rule?.category?.name || m.shortMessage || '';
-    header.appendChild(badge);
-    if (m.shortMessage && m.shortMessage !== badge.textContent) {
+    const catBadge = document.createElement('span');
+    catBadge.className = `lt-popover__badge ${_badgeClassFor(m)}`;
+    catBadge.textContent = m.rule?.category?.name || m.shortMessage || '';
+    header.appendChild(catBadge);
+    if (m.shortMessage && m.shortMessage !== catBadge.textContent) {
       const title = document.createElement('span');
       title.className = 'lt-popover__title';
       title.textContent = m.shortMessage;
@@ -267,6 +390,9 @@ export function createSpellcheckController({
         btn.type = 'button';
         btn.className = 'lt-popover__replacement';
         btn.textContent = r.value || '';
+        // mousedown.preventDefault: verhindert dass Editor-Selection beim Klick
+        // verschoben wird (Buttons sitzen innerhalb contenteditable-Subtree).
+        btn.addEventListener('mousedown', (ev) => ev.preventDefault());
         btn.addEventListener('click', () => _applyReplacement(matchId, r.value || ''));
         list.appendChild(btn);
       }
@@ -279,18 +405,55 @@ export function createSpellcheckController({
     ignoreBtn.type = 'button';
     ignoreBtn.className = 'lt-popover__ignore';
     ignoreBtn.textContent = i18n('spellcheck.popover.ignore');
+    ignoreBtn.addEventListener('mousedown', (ev) => ev.preventDefault());
     ignoreBtn.addEventListener('click', () => {
       ignored.add(matchId);
-      _closePopover();
-      // re-render via current matches: einfacher: triggert _scheduleCheck nicht,
-      // sondern entfernt sofort die Spans.
       const entry2 = squiggles.get(matchId);
       if (entry2) {
-        for (const el of entry2.els) el.remove();
+        highlights[entry2.category]?.delete(entry2.range);
         squiggles.delete(matchId);
       }
+      _closePopover();
     });
     footer.appendChild(ignoreBtn);
+
+    const isSpell = (m.rule?.id || '').includes('SPELL') || (m.rule?.category?.id || '') === 'TYPOS';
+    if (isSpell) {
+      const word = _extractMatchedWord(m);
+      if (word) {
+        const dictBtn = document.createElement('button');
+        dictBtn.type = 'button';
+        dictBtn.className = 'lt-popover__dict';
+        dictBtn.textContent = i18n('spellcheck.popover.add_to_dict');
+        dictBtn.addEventListener('mousedown', (ev) => ev.preventDefault());
+        dictBtn.addEventListener('click', async () => {
+          dictBtn.disabled = true;
+          try {
+            const bookId = getBookId ? getBookId() : null;
+            const rawLang = getBookLocale ? getBookLocale() : '*';
+            const lang = (!rawLang || rawLang === 'auto') ? '*' : rawLang;
+            const resp = await fetch('/dictionary', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ word, bookId, lang }),
+              credentials: 'same-origin',
+            });
+            if (resp.ok) {
+              const entry3 = squiggles.get(matchId);
+              if (entry3) {
+                highlights[entry3.category]?.delete(entry3.range);
+                squiggles.delete(matchId);
+              }
+              _closePopover();
+              _scheduleCheck();
+            } else {
+              dictBtn.disabled = false;
+            }
+          } catch { dictBtn.disabled = false; }
+        });
+        footer.appendChild(dictBtn);
+      }
+    }
 
     const urlInfo = Array.isArray(m.rule?.urls) && m.rule.urls[0]?.value;
     if (urlInfo) {
@@ -304,13 +467,16 @@ export function createSpellcheckController({
     }
     popover.appendChild(footer);
 
-    document.body.appendChild(popover);
-    _positionPopoverNear(popover, anchorRect);
+    _mountPopover();
 
-    // Outside-Click schliesst.
+    // Outside-Click schliesst. setTimeout: aktueller mousedown soll nicht
+    // gleich wieder schliessen.
     setTimeout(() => {
       const onDocClick = (ev) => {
-        if (!popover) return;
+        if (!popover) {
+          document.removeEventListener('mousedown', onDocClick, true);
+          return;
+        }
         if (popover.contains(ev.target)) return;
         _closePopover();
         document.removeEventListener('mousedown', onDocClick, true);
@@ -319,18 +485,92 @@ export function createSpellcheckController({
     }, 0);
   }
 
-  function _positionPopoverNear(el, anchorRect) {
+  function _mountPopover() {
+    if (!popover || !popoverAnchorRange) return;
+    const anchorRect = popoverAnchorRange.getBoundingClientRect();
+
+    // Strategie: Popover wird ins Scroll-Layer eingehaengt, damit Scroll den
+    // Popover physisch mitnimmt (kein JS-Reposition, kein 1-Frame-Trail).
+    //
+    //   - scrollEl == window/scrollingElement: Popover an body, position
+    //     absolute, document-Koordinaten (anchorRect + window.scrollX/Y).
+    //     Window-Scroll bewegt body-Kinder nativ.
+    //   - scrollEl interner Container (Notebook=.page-content-view--editing,
+    //     Focus=.focus-editor__content, beide gleichzeitig contenteditable):
+    //     Popover als Kind dort einhaengen, position absolute in
+    //     Scroll-Content-Koordinaten. Popover ist contenteditable="false"
+    //     und damit eine nicht-editbare Insel; Caret/Selection greift nicht
+    //     hinein. MutationObserver filtert popover-eigene Mutationen heraus
+    //     (sonst triggert das Anhaengen einen Re-Check, der die Squiggles
+    //     wegnimmt bevor der User klicken kann).
+    const useScrollerHost = scrollEl
+      && scrollEl !== window
+      && scrollEl !== document.scrollingElement
+      && scrollEl !== document.documentElement
+      && scrollEl !== document.body;
+
+    if (useScrollerHost) {
+      // Offset-Parent fuer absolute child sicherstellen.
+      if (getComputedStyle(scrollEl).position === 'static') {
+        scrollEl.style.position = 'relative';
+      }
+      popoverHost = scrollEl;
+      popoverHost.appendChild(popover);
+      _positionInsideScroller(popover, anchorRect, popoverHost);
+    } else {
+      popoverHost = document.body;
+      popoverHost.appendChild(popover);
+      _positionInBodyAbsolute(popover, anchorRect);
+    }
+  }
+
+  function _positionInsideScroller(el, anchorRect, host) {
+    const hostRect = host.getBoundingClientRect();
+    const padding = 8;
+    const pr = el.getBoundingClientRect();
+    // Vertical: clamp/flip gegen Viewport.
+    let viewportTop = anchorRect.bottom + 4;
+    if (viewportTop + pr.height + padding > window.innerHeight) {
+      viewportTop = anchorRect.top - pr.height - 4;
+    }
+    if (viewportTop < padding) viewportTop = padding;
+    // Horizontal: clamp gegen Host-Sichtbereich (Popover bleibt im Scroll-Slot).
+    let viewportLeft = anchorRect.left;
+    const hostRight = hostRect.left + host.clientWidth;
+    if (viewportLeft + pr.width + padding > hostRight) {
+      viewportLeft = Math.max(hostRect.left + padding, hostRight - pr.width - padding);
+    }
+    if (viewportLeft < hostRect.left + padding) viewportLeft = hostRect.left + padding;
+    el.style.left = `${viewportLeft - hostRect.left + host.scrollLeft}px`;
+    el.style.top  = `${viewportTop  - hostRect.top  + host.scrollTop}px`;
+  }
+
+  function _positionInBodyAbsolute(el, anchorRect) {
     const padding = 8;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     const pr = el.getBoundingClientRect();
-    let left = anchorRect.left;
-    let top = anchorRect.bottom + 4;
-    if (left + pr.width + padding > vw) left = Math.max(padding, vw - pr.width - padding);
-    if (top + pr.height + padding > vh) top = anchorRect.top - pr.height - 4;
-    if (top < padding) top = padding;
-    el.style.left = `${Math.max(padding, left)}px`;
-    el.style.top = `${top}px`;
+    let viewportLeft = anchorRect.left;
+    let viewportTop = anchorRect.bottom + 4;
+    if (viewportLeft + pr.width + padding > vw) {
+      viewportLeft = Math.max(padding, vw - pr.width - padding);
+    }
+    if (viewportTop + pr.height + padding > vh) {
+      viewportTop = anchorRect.top - pr.height - 4;
+    }
+    if (viewportTop < padding) viewportTop = padding;
+    el.style.left = `${viewportLeft + window.scrollX}px`;
+    el.style.top  = `${viewportTop  + window.scrollY}px`;
+  }
+
+  function _remountPopover() {
+    if (!popover || !popoverAnchorRange || !popoverHost) return;
+    const anchorRect = popoverAnchorRange.getBoundingClientRect();
+    if (popoverHost === document.body) {
+      _positionInBodyAbsolute(popover, anchorRect);
+    } else {
+      _positionInsideScroller(popover, anchorRect, popoverHost);
+    }
   }
 
   function _applyReplacement(matchId, text) {
@@ -341,8 +581,7 @@ export function createSpellcheckController({
       try { onApplyReplacement(entry.range, text); }
       catch { /* host-side errors swallowed; next check rebuilds */ }
     }
-    // Spans entfernen; nächster Check baut frisch auf.
-    for (const el of entry.els) el.remove();
+    highlights[entry.category]?.delete(entry.range);
     squiggles.delete(matchId);
     _scheduleCheck();
   }
@@ -358,10 +597,10 @@ export function createSpellcheckController({
     const present = _detectExtension();
     if (present && !extensionDetected) {
       extensionDetected = true;
-      // Overlay leeren, App-Squiggles pausieren.
-      if (overlay) overlay.replaceChildren();
+      _clearHighlights();
       squiggles.clear();
       _closePopover();
+      _updateBadge('extension');
       window.dispatchEvent(new CustomEvent('languagetool:extension-detected'));
     } else if (!present && extensionDetected) {
       extensionDetected = false;
@@ -370,22 +609,60 @@ export function createSpellcheckController({
     }
   }
 
+  // MutationObserver-Filter: ignoriere Mutationen, die nur das Popover-Subtree
+  // betreffen (Popover ist contenteditable="false"-Insel im Editor-Root). Sonst
+  // triggert das Anhaengen/Entfernen des Popover einen Re-Check, der die
+  // Squiggles vor dem User-Klick verwirft.
+  function _isPopoverOnlyMutation(m) {
+    if (!popover) return false;
+    if (m.type === 'characterData' || m.type === 'attributes') {
+      return popover.contains(m.target);
+    }
+    if (m.type === 'childList') {
+      const added = m.addedNodes ? Array.from(m.addedNodes) : [];
+      const removed = m.removedNodes ? Array.from(m.removedNodes) : [];
+      if (added.length === 0 && removed.length === 0) return false;
+      const allSelf = (n) => n === popover || popover.contains(n);
+      return added.every(allSelf) && removed.every(allSelf);
+    }
+    return false;
+  }
+
   function attach() {
     if (attached) return;
     attached = true;
-    _ensureOverlay();
 
-    mutationObs = new MutationObserver(() => _scheduleCheck());
+    if (!supportsHighlightApi) {
+      // Stiller Skip — App laeuft, nur ohne LT-Markierungen.
+      _updateBadge('disabled');
+      return;
+    }
+
+    _ensureHighlights();
+    _ensureBadge();
+
+    mutationObs = new MutationObserver((muts) => {
+      for (const m of muts) {
+        if (_isPopoverOnlyMutation(m)) continue;
+        _scheduleCheck();
+        return;
+      }
+    });
     mutationObs.observe(root, { childList: true, subtree: true, characterData: true });
     root.addEventListener('input', _scheduleCheck);
+    root.addEventListener('mousedown', _onRootMousedown, true);
 
     if (typeof ResizeObserver !== 'undefined') {
-      resizeObs = new ResizeObserver(() => _reposition());
+      // Resize verschiebt Anker — Popover neu positionieren + Badge an Ecke
+      // halten. Squiggles selbst aktualisiert der Browser via Highlight-Range
+      // automatisch.
+      resizeObs = new ResizeObserver(() => {
+        _syncBadgePosition();
+        _remountPopover();
+      });
       resizeObs.observe(root);
     }
     scrollEl = scrollContainer || _findScrollParent(root);
-    if (scrollEl) scrollEl.addEventListener('scroll', _reposition, { passive: true });
-    window.addEventListener('resize', _reposition);
 
     extensionObs = new MutationObserver(() => _updateExtensionState());
     extensionObs.observe(document.body, { childList: true, subtree: true, attributes: true });
@@ -404,18 +681,18 @@ export function createSpellcheckController({
     if (resizeObs) { resizeObs.disconnect(); resizeObs = null; }
     if (extensionObs) { extensionObs.disconnect(); extensionObs = null; }
     root.removeEventListener('input', _scheduleCheck);
-    if (scrollEl) scrollEl.removeEventListener('scroll', _reposition);
-    window.removeEventListener('resize', _reposition);
+    root.removeEventListener('mousedown', _onRootMousedown, true);
     scrollEl = null;
     _closePopover();
-    _removeOverlay();
+    _clearHighlights();
+    squiggles.clear();
+    _removeBadge();
   }
 
   function refresh() {
     _scheduleCheck();
   }
 
-  // Hilfen
   function _findScrollParent(el) {
     let p = el.parentElement;
     while (p) {

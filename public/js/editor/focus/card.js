@@ -295,6 +295,14 @@ export const focusCardMethods = {
       showCursor();
     };
 
+    // Klick ins Padding (oberhalb/unterhalb/neben der Textspalte) soll Caret
+    // nicht an Anfang/Ende der Seite werfen. Wheel-Scroll braucht aber
+    // pointer-events:auto am Container — preventDefault nur, wenn das Target
+    // wirklich der Container selbst ist (nicht ein Absatz darin).
+    const onPaddingMousedown = (e) => {
+      if (e.target === container) e.preventDefault();
+    };
+
     // Mobile-Tastatur: visualViewport schrumpft UND kann scrollen
     // (Android Chrome: offsetTop wird non-zero, wenn die KB den fixed
     // Container nach oben schiebt). Debounced, damit KB-Öffnen-Storm
@@ -329,6 +337,7 @@ export const focusCardMethods = {
     container.addEventListener('scroll', onScroll, { passive: true, signal });
     container.addEventListener('pointerdown', markPointer, { signal });
     container.addEventListener('pointerup', markPointer, { signal });
+    container.addEventListener('mousedown', onPaddingMousedown, { signal });
     container.addEventListener('blur', onBlur, { signal, capture: true });
     container.addEventListener('focus', onFocus, { signal, capture: true });
     window.addEventListener('keydown', onKey, { signal });

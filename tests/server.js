@@ -188,6 +188,42 @@ async function handleMockRoute(req, res, urlPath) {
     return true;
   }
 
+  // /languagetool/check Mock fuer Spellcheck-E2E-Specs.
+  // Liefert deterministische Matches: jedes Vorkommen von "Walld" -> Tippfehler,
+  // "scheinet" -> Grammatik. Body { text } UTF-8 JSON.
+  if (urlPath === '/languagetool/check' && req.method === 'POST') {
+    const body = await readBody(req);
+    let p = {};
+    try { p = JSON.parse(body); } catch {}
+    const text = typeof p.text === 'string' ? p.text : '';
+    const matches = [];
+    let i = 0;
+    while ((i = text.indexOf('Walld', i)) >= 0) {
+      matches.push({
+        message: 'Tippfehler', shortMessage: 'Tippfehler',
+        offset: i, length: 5,
+        rule: { id: 'GERMAN_SPELLER_RULE', category: { id: 'TYPOS', name: 'Rechtschreibung' } },
+        replacements: [{ value: 'Wald' }, { value: 'Wand' }],
+        context: { text: text.slice(Math.max(0, i - 5), i + 10), offset: Math.min(5, i), length: 5 },
+      });
+      i += 5;
+    }
+    i = 0;
+    while ((i = text.indexOf('scheinet', i)) >= 0) {
+      matches.push({
+        message: 'Falsche Konjugation', shortMessage: 'Grammatik',
+        offset: i, length: 8,
+        rule: { id: 'GRAMMAR_RULE', category: { id: 'GRAMMAR', name: 'Grammatik' } },
+        replacements: [{ value: 'scheint' }],
+        context: { text: text.slice(Math.max(0, i - 5), i + 13), offset: Math.min(5, i), length: 8 },
+      });
+      i += 8;
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ matches, language: { code: 'de-DE' } }));
+    return true;
+  }
+
   // Inspect-Endpoint für die Tests: aktuelle Mock-State-Werte.
   if (urlPath === '/__mock/state' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/json' });

@@ -6003,6 +6003,64 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 140 abgeschlossen (idx_page_revisions_user).');
   }
 
+  if (version < 141) {
+    // LanguageTool-Cache pro Page + User-Custom-Dictionary (Phase-2-Features).
+    // page_languagetool_cache: PK = (page_id, content_hash, lang, picky) --
+    // mehrere Eintraege pro Page moeglich (Sprachwechsel, Picky-Toggle). FK
+    // CASCADE; Cache-Eintrag fuer geloeschte Page macht keinen Sinn.
+    // user_dictionary: User-spezifisches Woerterbuch. book_id=0 = global,
+    // sonst pro Buch. lang='*' = alle Sprachen, sonst LT-Locale-Tag.
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS page_languagetool_cache (
+        page_id INTEGER NOT NULL,
+        content_hash TEXT NOT NULL,
+        lang TEXT NOT NULL,
+        picky INTEGER NOT NULL DEFAULT 0,
+        matches_json TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        PRIMARY KEY (page_id, content_hash, lang, picky),
+        FOREIGN KEY (page_id) REFERENCES pages(page_id) ON DELETE CASCADE
+      )
+    `).run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_page_lt_cache_created ON page_languagetool_cache(created_at)').run();
+
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS user_dictionary (
+        user_email TEXT NOT NULL,
+        book_id INTEGER NOT NULL DEFAULT 0,
+        word TEXT NOT NULL,
+        lang TEXT NOT NULL DEFAULT '*',
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        PRIMARY KEY (user_email, book_id, word, lang),
+        FOREIGN KEY (user_email) REFERENCES app_users(email) ON DELETE CASCADE
+      )
+    `).run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_user_dictionary_user ON user_dictionary(user_email)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_user_dictionary_book ON user_dictionary(book_id)').run();
+
+    const fkErrors141 = db.pragma('foreign_key_check');
+    if (fkErrors141.length) {
+      throw new Error(`Migration 141: foreign_key_check meldet ${fkErrors141.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 141').run();
+    logger.info('DB-Migration auf Version 141 abgeschlossen (page_languagetool_cache, user_dictionary).');
+  }
+
+  if (version < 142) {
+    // user_dictionary.lang='auto' normalisieren auf '*': 'auto' war kein
+    // gueltiger LT-Locale-Tag — Lookup `lang='*' OR lang=:current` matched
+    // bei Page-Locale 'de-CH' nie. Eintraege waren tote Daten + UI-Display
+    // zeigte sinnlose "Nur dieses Buch: auto"-Zeile.
+    db.prepare("UPDATE OR IGNORE user_dictionary SET lang='*' WHERE lang='auto'").run();
+    db.prepare("DELETE FROM user_dictionary WHERE lang='auto'").run();
+    const fkErrors142 = db.pragma('foreign_key_check');
+    if (fkErrors142.length) {
+      throw new Error(`Migration 142: foreign_key_check meldet ${fkErrors142.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 142').run();
+    logger.info('DB-Migration auf Version 142 abgeschlossen (user_dictionary.lang auto -> *).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

@@ -307,7 +307,9 @@ export const notebookEditMethods = {
       app.updatePageView?.();
       // Kein extra setStatus — Save-Indicator in der Subline zeigt schon
       // "gespeichert HH:MM"; doppelte Notification wäre redundant.
-      if (!app.focusActive) {
+      if (app.focusActive) {
+        // Fokus bleibt aktiv — User schreibt weiter; editMode/Listener bleiben.
+      } else {
         clearNormalSnapshot();
         this._stopAutosave();
         this._uninstallOnlineRetry();

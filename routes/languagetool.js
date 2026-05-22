@@ -6,9 +6,13 @@
 // Disabled / no-URL -> 404 { error: 'languagetool_disabled' } (Frontend
 // behandelt als "Feature aus", kein Retry).
 //
-// LT-Server-Timeout: 10s. Bei Cap überschritten -> 408.
-// Upstream-Fehler -> 502 mit upstream-Status. Body-Cap 200 KB (LT-Server-Limit
-// ~100KB Free-Server; wir cappen vorsichtig höher).
+// Chunking: Texte > CHUNK_MAX (50KB) werden in lib/languagetool-chunk.js an
+// Paragraph-/Satz-Boundaries gesplittet, parallel mit Pool 4 an LT geschickt
+// und mit zurueckgeschobenen Offsets gemerged.
+//
+// Body-Cap 600 KB (text bis TEXT_MAX 500 KB, JSON-Overhead). LT-Timeout 10s
+// pro Chunk; bei Abbruch eines Chunks bricht der gesamte Request mit 408 ab.
+// Upstream-Fehler -> 502 mit erstem-fehlerhaften upstream-Status.
 
 const express = require('express');
 const logger = require('../logger');
@@ -16,11 +20,16 @@ const appSettings = require('../lib/app-settings');
 const { toIntId } = require('../lib/validate');
 const { setContext } = require('../lib/log-context');
 const { getBookLocale } = require('../db/schema');
+const { chunkText, adjustMatches, CHUNK_MAX } = require('../lib/languagetool-chunk');
+const ltCache = require('../db/languagetool-cache');
+const dict = require('../db/user-dictionary');
 
 const router = express.Router();
-const TEXT_MAX = 200_000;
+const TEXT_MAX = 500_000;
+const PARALLEL = 4;
+const UPSTREAM_TIMEOUT_MS = 10_000;
 
-router.post('/check', express.json({ limit: '256kb' }), async (req, res) => {
+router.post('/check', express.json({ limit: '600kb' }), async (req, res) => {
   const enabled = appSettings.get('languagetool.enabled') === true;
   const url = String(appSettings.get('languagetool.url') || '').replace(/\/$/, '').replace(/\/v2$/i, '');
   if (!enabled || !url) {
@@ -38,51 +47,102 @@ router.post('/check', express.json({ limit: '256kb' }), async (req, res) => {
   if (bookId) setContext({ book: bookId });
   const userEmail = req.session?.user?.email || null;
 
-  // Sprache: Client darf overriden (LT-konformer Tag); sonst aus Buch-Locale,
-  // sonst 'auto'.
-  let language = typeof body.language === 'string' && body.language.trim()
-    ? body.language.trim()
-    : null;
-  if (!language && bookId) {
+  // Book ist SSoT fuer Locale: bookId vorhanden -> getBookLocale gewinnt.
+  // Body.language nur als Fallback (Aufrufe ohne Buchscope).
+  let language = null;
+  if (bookId) {
     try { language = getBookLocale(bookId, userEmail); } catch { /* noop */ }
   }
-  if (!language) language = 'auto';
+  if (!language) {
+    const raw = typeof body.language === 'string' ? body.language.trim() : '';
+    language = raw && raw !== 'auto' ? raw : 'auto';
+  }
 
   const picky = appSettings.get('languagetool.picky') === true;
-
-  const params = new URLSearchParams();
-  params.set('text', text);
-  params.set('language', language);
-  if (picky) params.set('level', 'picky');
-
+  const pageId = toIntId(body.pageId);
   const log = logger.child({ job: 'lt', user: userEmail || '-', book: bookId || '-' });
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 10_000);
-  const t0 = Date.now();
-  try {
-    const upstream = await fetch(`${url}/v2/check`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
-      body: params.toString(),
-      signal: ctrl.signal,
-    });
-    if (!upstream.ok) {
-      log.warn(`upstream ${upstream.status} latency=${Date.now() - t0}ms`);
-      return res.status(502).json({ error: 'languagetool_upstream', upstream_status: upstream.status });
+
+  // Cache-Lookup: nur wenn pageId gesetzt. Bucheditor (Block-Scope) sendet
+  // pageId weiterhin, aber Hash basiert auf dem Block-Text -- d.h. Notebook-
+  // und Bucheditor-Caches kollidieren nicht (unterschiedliche Hashes).
+  const contentHash = pageId ? ltCache.hashText(text) : null;
+  if (pageId && contentHash) {
+    const cached = ltCache.getCached({ pageId, contentHash, lang: language, picky });
+    if (cached) {
+      return res.json({ matches: cached, language: null, chunks: 0, cached: true });
     }
-    const json = await upstream.json();
-    // Pass-through: matches + language. Software-Block weglassen (Versions-Noise).
-    res.json({
-      matches: Array.isArray(json?.matches) ? json.matches : [],
-      language: json?.language || null,
-    });
+  }
+
+  const chunks = chunkText(text, CHUNK_MAX);
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), UPSTREAM_TIMEOUT_MS);
+  const t0 = Date.now();
+
+  try {
+    const allMatches = [];
+    let languageMeta = null;
+    let cursor = 0;
+    async function worker() {
+      while (cursor < chunks.length) {
+        const idx = cursor++;
+        const c = chunks[idx];
+        const matches = await _callLT(url, c.text, language, picky, ctrl.signal);
+        if (idx === 0 && matches.language) languageMeta = matches.language;
+        for (const m of adjustMatches(c.offset, matches.matches)) allMatches.push(m);
+      }
+    }
+    const workers = Array.from({ length: Math.min(PARALLEL, chunks.length) }, () => worker());
+    await Promise.all(workers);
+    allMatches.sort((a, b) => (a.offset || 0) - (b.offset || 0));
+
+    // Custom-Dictionary-Filter: User-Woerter aus den Matches entfernen.
+    let filtered = allMatches;
+    if (userEmail) {
+      try {
+        const dictSet = dict.getCheckSet(userEmail, bookId, language);
+        if (dictSet.size) filtered = dict.filterMatches(allMatches, dictSet);
+      } catch (e) { log.warn(`dict filter failed: ${e.message}`); }
+    }
+
+    if (pageId && contentHash) {
+      try { ltCache.setCached({ pageId, contentHash, lang: language, picky, matches: filtered }); }
+      catch (e) { log.warn(`cache set failed: ${e.message}`); }
+    }
+    res.json({ matches: filtered, language: languageMeta, chunks: chunks.length });
   } catch (err) {
     const isAbort = err && (err.name === 'AbortError' || err.code === 'ABORT_ERR');
+    if (err && err.upstreamStatus) {
+      log.warn(`upstream ${err.upstreamStatus} latency=${Date.now() - t0}ms`);
+      return res.status(502).json({ error: 'languagetool_upstream', upstream_status: err.upstreamStatus });
+    }
     log.warn(`fetch ${isAbort ? 'TIMEOUT' : err.message} latency=${Date.now() - t0}ms`);
     return res.status(isAbort ? 408 : 502).json({ error: isAbort ? 'languagetool_timeout' : 'languagetool_fetch_failed' });
   } finally {
     clearTimeout(timer);
   }
 });
+
+async function _callLT(url, text, language, picky, signal) {
+  const params = new URLSearchParams();
+  params.set('text', text);
+  params.set('language', language);
+  if (picky) params.set('level', 'picky');
+  const upstream = await fetch(`${url}/v2/check`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
+    body: params.toString(),
+    signal,
+  });
+  if (!upstream.ok) {
+    const err = new Error('upstream_error');
+    err.upstreamStatus = upstream.status;
+    throw err;
+  }
+  const json = await upstream.json();
+  return {
+    matches: Array.isArray(json?.matches) ? json.matches : [],
+    language: json?.language || null,
+  };
+}
 
 module.exports = router;
