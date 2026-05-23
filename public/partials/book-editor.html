@@ -144,7 +144,10 @@
                  @mousedown="_onBlockMousedown(block, $event)"
                  @click="activateBlock(block)"
                  @keydown="onBlockKeydown(block, $event)"
-                 @input="_onBlockInput(block, $event)"></div>
+                 @input="_onBlockInput(block, $event)"
+                 @paste="_onBlockPaste(block, $event)"
+                 @copy="_onBlockCopy(block, $event)"
+                 @cut="_onBlockCut(block, $event)"></div>
 
             <div x-show="block.conflict" x-cloak class="book-editor-conflict">
               <svg class="icon book-editor-conflict__icon" aria-hidden="true"><use href="/icons.svg?v=636#alert-triangle"/></svg>

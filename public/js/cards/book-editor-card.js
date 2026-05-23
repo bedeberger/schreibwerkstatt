@@ -16,6 +16,7 @@
 
 import { setupCardLifecycle } from './card-lifecycle.js';
 import { stripFocusArtefacts, htmlToText, fetchJson, escHtml } from '../utils.js';
+import { handleEditorPaste, handleEditorCopy, handleEditorCut } from '../editor/shared/paste.js';
 import { savePage } from '../editor/shared/page-api.js';
 
 const AUTOSAVE_IDLE_MS = 60000;
@@ -258,6 +259,25 @@ export function registerBookEditorCard() {
       const el = event.currentTarget;
       block.html = el.innerHTML;
       this._markBlockDirty(block);
+    },
+
+    _onBlockPaste(block, e) {
+      if (block.kind !== 'page' || this.activePageId !== block.pageId) return;
+      if (handleEditorPaste(e)) {
+        // execCommand triggert kein input-Event in allen Browsern → manuell.
+        block.html = e.currentTarget.innerHTML;
+        this._markBlockDirty(block);
+      }
+    },
+
+    _onBlockCopy(_block, e) { handleEditorCopy(e); },
+
+    _onBlockCut(block, e) {
+      if (block.kind !== 'page' || this.activePageId !== block.pageId) return;
+      if (handleEditorCut(e)) {
+        block.html = e.currentTarget.innerHTML;
+        this._markBlockDirty(block);
+      }
     },
 
     _markBlockDirty(block) {

@@ -371,6 +371,83 @@ export function stripFocusArtefacts(html) {
   return tmp.innerHTML;
 }
 
+// Whitelist erlaubter Tags beim Paste. Alles ausserhalb wird zu Text reduziert
+// (Tag-Hülle entfernt, Text-Inhalt bleibt). Tags spiegeln den Editor-Toolbar-
+// Output (Notebook/Focus/Bucheditor schreiben dasselbe Markup).
+const PASTE_ALLOWED_TAGS = new Set([
+  'P', 'BR', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
+  'BLOCKQUOTE', 'UL', 'OL', 'LI', 'HR', 'PRE',
+  'STRONG', 'B', 'EM', 'I', 'U', 'S', 'STRIKE', 'CODE', 'MARK', 'SUB', 'SUP',
+  'A', 'DIV',
+]);
+// Attribute, die pro Tag erhalten bleiben. Alles andere wird gestrippt
+// (insbesondere on*-Handler, style, id, class, data-*).
+const PASTE_ALLOWED_ATTRS = {
+  A: new Set(['href']),
+  DIV: new Set(['class']), // nur .poem (siehe Filter unten)
+};
+
+/**
+ * Sanitisiert Clipboard-HTML auf eine im Editor unterstützte Form. Wird vor
+ * `document.execCommand('insertHTML', …)` aufgerufen. Parsing via DOMParser
+ * statt innerHTML — Subtree hängt nie im Live-DOM, on*-Handler werden vor
+ * Insert gestrippt.
+ *
+ * - Whitelist-Tags bleiben (Inhalt wandert mit), unbekannte Tags werden
+ *   unwrapped (Text bleibt, Hülle weg).
+ * - Skripte/Styles/Metadaten + ihre Subtrees fliegen komplett raus.
+ * - `<div>` bleibt nur als `<div class="poem">`, sonst unwrapped.
+ * - Alle Attribute weg, ausser denen in `PASTE_ALLOWED_ATTRS`.
+ * - Anschliessend durch `cleanContentArtefacts` für inline-style-Reste.
+ */
+export function sanitizePasteHtml(html) {
+  if (!html) return '';
+  const doc = new DOMParser().parseFromString('<div id="r">' + html + '</div>', 'text/html');
+  const root = doc.getElementById('r');
+  if (!root) return '';
+
+  root.querySelectorAll('script, style, meta, link, title, iframe, object, embed, noscript')
+    .forEach(el => el.remove());
+
+  let guard = 32;
+  let changed = true;
+  while (changed && guard-- > 0) {
+    changed = false;
+    const all = Array.from(root.querySelectorAll('*'));
+    for (const el of all) {
+      const tag = el.tagName;
+      if (tag === 'DIV' && !(el.getAttribute('class') || '').split(/\s+/).includes('poem')) {
+        _unwrap(el);
+        changed = true;
+        continue;
+      }
+      if (!PASTE_ALLOWED_TAGS.has(tag)) {
+        _unwrap(el);
+        changed = true;
+        continue;
+      }
+      const allowedAttrs = PASTE_ALLOWED_ATTRS[tag] || null;
+      for (const attr of Array.from(el.attributes)) {
+        if (!allowedAttrs || !allowedAttrs.has(attr.name)) el.removeAttribute(attr.name);
+      }
+      if (tag === 'DIV') el.setAttribute('class', 'poem');
+      if (tag === 'A' && !el.getAttribute('href')) {
+        _unwrap(el);
+        changed = true;
+      }
+    }
+  }
+
+  return cleanContentArtefacts(root.innerHTML);
+}
+
+function _unwrap(el) {
+  const parent = el.parentNode;
+  if (!parent) return;
+  while (el.firstChild) parent.insertBefore(el.firstChild, el);
+  parent.removeChild(el);
+}
+
 // Tags, auf denen `style` IMMER unerwünscht ist (Block-Styling kommt über
 // .poem/.callout/style.css; der Editor selbst setzt nie inline-style).
 // Strukturelemente wie img/table/td/col/figure/iframe bleiben unangetastet,

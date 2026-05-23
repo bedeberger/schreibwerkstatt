@@ -1,4 +1,5 @@
-import { htmlToText, cleanContentArtefacts, tzOpts } from '../../utils.js';
+import { htmlToText, tzOpts } from '../../utils.js';
+import { handleEditorPaste, handleEditorCopy, handleEditorCut } from '../shared/paste.js';
 import { sortByPosition } from '../../book/page-view.js';
 import { contentRepo } from '../../repo/content.js';
 import { readDraft, writeDraft, clearDraft } from '../draft-storage.js';
@@ -447,49 +448,14 @@ export const notebookEditMethods = {
     }
   },
 
-  // Paste-Handler: Browser injiziert beim Paste (besonders aus anderen
-  // BookStack-Seiten / Websites mit Lato) Computed-Styles inline auf jeden
-  // Block. Ohne Sanitisierung landen `<p style="font-family:Lato;color:..."`-
-  // Hüllen in der DB und überschreiben dort .poem & Co. Wir parsen das
-  // Clipboard-HTML, kleinen es durch den gleichen Cleaner wie der Save-Pfad
-  // und fügen sauber via execCommand ein.
   _onEditPaste(e) {
-    const cd = e.clipboardData;
-    if (!cd) return;
-    e.preventDefault();
-
-    const html = cd.getData('text/html');
-    if (html) {
-      document.execCommand('insertHTML', false, cleanContentArtefacts(html));
-    } else {
-      const text = cd.getData('text/plain') || '';
-      if (text) document.execCommand('insertText', false, text);
-    }
-    this._markEditDirty();
+    if (handleEditorPaste(e)) this._markEditDirty();
   },
 
-  // Copy/Cut nur als text/plain — Notebook-Editor wird als Notizbuch genutzt,
-  // Fragmente landen in fremden Apps. HTML-Clipboard schleppt Inline-Styles
-  // und Custom-Klassen (z.B. .poem, lektorat-Marks) mit, die dort kaputt
-  // rendern oder als Müll erscheinen.
-  _onEditCopy(e) {
-    const sel = window.getSelection();
-    if (!sel || sel.isCollapsed) return;
-    const text = sel.toString();
-    if (!text) return;
-    e.preventDefault();
-    e.clipboardData.setData('text/plain', text);
-  },
+  _onEditCopy(e) { handleEditorCopy(e); },
 
   _onEditCut(e) {
-    const sel = window.getSelection();
-    if (!sel || sel.isCollapsed) return;
-    const text = sel.toString();
-    if (!text) return;
-    e.preventDefault();
-    e.clipboardData.setData('text/plain', text);
-    document.execCommand('delete');
-    this._markEditDirty();
+    if (handleEditorCut(e)) this._markEditDirty();
   },
 
   _markEditDirty() {

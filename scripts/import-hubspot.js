@@ -193,8 +193,13 @@ function serializeChildren(parent, inline) {
   return out;
 }
 
+function stripJinja(s) {
+  return s.replace(/\{\{[\s\S]*?\}\}/g, '').replace(/\{%[\s\S]*?%\}/g, '').replace(/\{#[\s\S]*?#\}/g, '');
+}
+
 function postBodyToText(rawHtml) {
   if (typeof rawHtml !== 'string' || !rawHtml.trim()) return '';
+  rawHtml = stripJinja(rawHtml);
   const { document } = parseHTML(`<!doctype html><html><body>${rawHtml}</body></html>`);
   for (const sel of STRIP_SEL) {
     for (const el of Array.from(document.querySelectorAll(sel))) el.remove();

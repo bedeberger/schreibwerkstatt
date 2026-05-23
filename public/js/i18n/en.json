@@ -1224,6 +1224,10 @@
   "editor.revisions.viewer.colPrev":        "Previous version",
   "editor.revisions.viewer.colThis":        "This version",
   "editor.revisions.viewer.restore":        "Restore this version",
+  "editor.revisions.viewer.prev":           "Previous",
+  "editor.revisions.viewer.next":           "Next",
+  "editor.revisions.viewer.prevTitle":      "Show older revision (←)",
+  "editor.revisions.viewer.nextTitle":      "Show newer revision (→)",
 
   "editor.btn.check":            "Check",
   "editor.btn.checkTitle":       "Run check (Ctrl+Enter)",

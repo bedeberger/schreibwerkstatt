@@ -1225,6 +1225,10 @@
   "editor.revisions.viewer.colPrev":        "Vorherige Version",
   "editor.revisions.viewer.colThis":        "Diese Version",
   "editor.revisions.viewer.restore":        "Diese Version wiederherstellen",
+  "editor.revisions.viewer.prev":           "Vorherige",
+  "editor.revisions.viewer.next":           "Nächste",
+  "editor.revisions.viewer.prevTitle":      "Ältere Version anzeigen (←)",
+  "editor.revisions.viewer.nextTitle":      "Neuere Version anzeigen (→)",
 
   "editor.btn.check":            "Prüfen",
   "editor.btn.checkTitle":       "Lektorat starten (Strg+Enter)",

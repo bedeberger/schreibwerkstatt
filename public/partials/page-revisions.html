@@ -56,15 +56,18 @@
           x-ref="viewerDialog"
           @close="viewerOpen = false"
           @keydown.escape="closeViewer()"
+          @keydown.left.prevent="hasPrevRev() && gotoRev('prev')"
+          @keydown.right.prevent="hasNextRev() && gotoRev('next')"
           @keydown.window.meta.enter.prevent="viewerOpen && restoreFromViewer()"
           @keydown.window.ctrl.enter.prevent="viewerOpen && restoreFromViewer()">
     <template x-if="viewerOpen && viewerRev">
       <div class="revision-viewer__inner">
         <header class="revision-viewer__head">
           <div class="revision-viewer__meta">
-            <h2 class="revision-viewer__title"
-                x-text="$app.t('editor.revisions.viewer.title', { n: revisionNumber(viewerRev) })"></h2>
-            <span class="history-date" x-text="$app.formatDate(viewerRev.created_at)"></span>
+            <h2 class="revision-viewer__title">
+              <span x-text="$app.t('editor.revisions.viewer.title', { n: revisionNumber(viewerRev) })"></span>
+              <span class="revision-viewer__date" x-text="$app.formatDate(viewerRev.created_at)"></span>
+            </h2>
             <span class="badge badge-ok" x-text="sourceLabel(viewerRev.source)"></span>
             <span class="user-chip"
                   x-show="viewerRev.user_email && $app.bookSharedFlags?.[$app.selectedBookId]"
@@ -135,15 +138,35 @@
         </div>
 
         <footer class="revision-viewer__foot">
-          <button type="button"
-                  class="revision-viewer__btn"
-                  @click="closeViewer()"
-                  x-text="$app.t('editor.revisions.viewer.close')"></button>
-          <button type="button"
-                  class="revision-viewer__btn revision-viewer__btn--primary"
-                  @click="restoreFromViewer()"
-                  :disabled="restoringId === viewerRev?.id || viewerLoading"
-                  x-text="restoringId === viewerRev?.id ? $app.t('editor.revisions.restoring') : $app.t('editor.revisions.viewer.restore')"></button>
+          <div class="revision-viewer__nav">
+            <button type="button"
+                    class="revision-viewer__btn"
+                    @click="gotoRev('prev')"
+                    :disabled="!hasPrevRev()"
+                    :data-tip="$app.t('editor.revisions.viewer.prevTitle')">
+              <span aria-hidden="true">←</span>
+              <span x-text="$app.t('editor.revisions.viewer.prev')"></span>
+            </button>
+            <button type="button"
+                    class="revision-viewer__btn"
+                    @click="gotoRev('next')"
+                    :disabled="!hasNextRev()"
+                    :data-tip="$app.t('editor.revisions.viewer.nextTitle')">
+              <span x-text="$app.t('editor.revisions.viewer.next')"></span>
+              <span aria-hidden="true">→</span>
+            </button>
+          </div>
+          <div class="revision-viewer__foot-actions">
+            <button type="button"
+                    class="revision-viewer__btn"
+                    @click="closeViewer()"
+                    x-text="$app.t('editor.revisions.viewer.close')"></button>
+            <button type="button"
+                    class="revision-viewer__btn revision-viewer__btn--primary"
+                    @click="restoreFromViewer()"
+                    :disabled="restoringId === viewerRev?.id || viewerLoading"
+                    x-text="restoringId === viewerRev?.id ? $app.t('editor.revisions.restoring') : $app.t('editor.revisions.viewer.restore')"></button>
+          </div>
         </footer>
       </div>
     </template>

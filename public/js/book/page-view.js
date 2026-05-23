@@ -2,6 +2,7 @@
 // und Figurenkontext-Panel. `this` bezieht sich auf die Alpine-Komponente.
 
 import { escHtml, htmlToText, fetchJson, findInHtml } from '../utils.js';
+import { handleEditorCopy } from '../editor/shared/paste.js';
 import { tRaw } from '../i18n.js';
 import { _sanitizeFigur } from './figuren.js';
 
@@ -303,4 +304,10 @@ export const pageViewMethods = {
     if (related && tipEl?.contains(related)) return;
     hideTip();
   },
+
+  // Copy aus Page-View: nur text/plain ins Clipboard (gemeinsam mit allen
+  // Editoren). Browser-Default würde text/html mitsenden, was in Outlook
+  // & Co. zusätzliche Absatzabstände, Inline-Styles und Lektorat-Marks
+  // rendert. `sel.toString()` liefert den Block-getrennten Plain-Text.
+  handleViewCopy(e) { handleEditorCopy(e); },
 };

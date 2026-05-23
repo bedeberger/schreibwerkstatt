@@ -2,5 +2,6 @@
      class="page-content-view"
      x-html="renderedPageHtml"
      @click="handleMarkClick($event)"
+     @copy="handleViewCopy($event)"
      @pointermove="handleMarkPointer($event)"
      @pointerleave="handleMarkPointerLeave($event)"></div>

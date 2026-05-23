@@ -129,6 +129,7 @@ export function registerPageRevisionsCard() {
       const pageId = app?.currentPage?.id;
       if (!pageId) return;
 
+      const firstOpen = !this.viewerOpen;
       this.viewerOpen = true;
       this.viewerRev = rev;
       this.viewerMode = 'content';
@@ -138,11 +139,12 @@ export function registerPageRevisionsCard() {
       this.viewerDiffUnchanged = false;
       this.viewerLoading = true;
 
-      // Natives <dialog> via DOM-Referenz oeffnen.
-      this.$nextTick(() => {
-        const dlg = this.$refs?.viewerDialog;
-        if (dlg && typeof dlg.showModal === 'function' && !dlg.open) dlg.showModal();
-      });
+      if (firstOpen) {
+        this.$nextTick(() => {
+          const dlg = this.$refs?.viewerDialog;
+          if (dlg && typeof dlg.showModal === 'function' && !dlg.open) dlg.showModal();
+        });
+      }
 
       try {
         const data = await fetchJson(`/content/pages/${pageId}/revisions/${rev.id}`);
@@ -155,6 +157,22 @@ export function registerPageRevisionsCard() {
       } finally {
         this.viewerLoading = false;
       }
+    },
+
+    // Liste DESC sortiert (juengste zuerst). 'prev' = aelter = idx+1.
+    // 'next' = neuer = idx-1.
+    _siblingRev(direction) {
+      if (!this.viewerRev?.id) return null;
+      const idx = this.revisions.findIndex(r => r.id === this.viewerRev.id);
+      if (idx < 0) return null;
+      const target = direction === 'prev' ? idx + 1 : idx - 1;
+      return this.revisions[target] || null;
+    },
+    hasPrevRev() { return !!this._siblingRev('prev'); },
+    hasNextRev() { return !!this._siblingRev('next'); },
+    gotoRev(direction) {
+      const target = this._siblingRev(direction);
+      if (target) this.openViewer(target);
     },
 
     closeViewer() {
