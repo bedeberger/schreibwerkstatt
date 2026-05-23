@@ -171,6 +171,21 @@
                 <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.bottom')"></span><input type="text" x-data="numInput({ step: 1, min: 5, max: 80 })" x-modelable="value" x-model="activeProfile.config.layout.marginsMm.bottom" class="pdfx-num-input"></label>
                 <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.left')"></span><input type="text" x-data="numInput({ step: 1, min: 5, max: 80 })" x-modelable="value" x-model="activeProfile.config.layout.marginsMm.left" class="pdfx-num-input"></label>
               </div>
+              <label class="pdfx-check">
+                <input type="checkbox" x-model="activeProfile.config.layout.mirrorMargins">
+                <span x-text="$app.t('pdfExport.layout.mirrorMargins')"></span>
+              </label>
+              <p class="card-form-field-note" x-text="$app.t('pdfExport.layout.mirrorMarginsHint')"></p>
+              <label class="pdfx-check">
+                <input type="checkbox" x-model="activeProfile.config.layout.hyphenate">
+                <span x-text="$app.t('pdfExport.layout.hyphenate')"></span>
+              </label>
+              <p class="card-form-field-note" x-text="$app.t('pdfExport.layout.hyphenateHint')"></p>
+              <label class="pdfx-check">
+                <input type="checkbox" x-model="activeProfile.config.layout.widowOrphanControl">
+                <span x-text="$app.t('pdfExport.layout.widowOrphan')"></span>
+              </label>
+              <p class="card-form-field-note" x-text="$app.t('pdfExport.layout.widowOrphanHint')"></p>
             </div>
           </div>
 
@@ -244,6 +259,41 @@
                     <input type="checkbox" x-model="activeProfile.config.layout.footerRule">
                     <span x-text="$app.t('pdfExport.layout.footerRule')"></span>
                   </label>
+                  <label class="pdfx-check">
+                    <input type="checkbox" x-model="activeProfile.config.layout.showHeaderOnChapterStart">
+                    <span x-text="$app.t('pdfExport.layout.showHeaderOnChapterStart')"></span>
+                  </label>
+                  <label class="pdfx-check">
+                    <input type="checkbox" x-model="activeProfile.config.layout.showFooterOnChapterStart">
+                    <span x-text="$app.t('pdfExport.layout.showFooterOnChapterStart')"></span>
+                  </label>
+                </div>
+              </div>
+              <div x-show="activeProfile.config.layout.mirrorMargins" x-cloak>
+                <p class="card-form-field-note" x-text="$app.t('pdfExport.layout.versoSlotsHint')"></p>
+                <div class="card-form-row">
+                  <label class="card-form-label" x-text="$app.t('pdfExport.layout.headerVersoLeft')"></label>
+                  <div class="card-form-field"><input x-model="activeProfile.config.layout.headerVersoLeft" class="pdfx-text-input"></div>
+                </div>
+                <div class="card-form-row">
+                  <label class="card-form-label" x-text="$app.t('pdfExport.layout.headerVersoCenter')"></label>
+                  <div class="card-form-field"><input x-model="activeProfile.config.layout.headerVersoCenter" class="pdfx-text-input"></div>
+                </div>
+                <div class="card-form-row">
+                  <label class="card-form-label" x-text="$app.t('pdfExport.layout.headerVersoRight')"></label>
+                  <div class="card-form-field"><input x-model="activeProfile.config.layout.headerVersoRight" class="pdfx-text-input"></div>
+                </div>
+                <div class="card-form-row">
+                  <label class="card-form-label" x-text="$app.t('pdfExport.layout.footerVersoLeft')"></label>
+                  <div class="card-form-field"><input x-model="activeProfile.config.layout.footerVersoLeft" class="pdfx-text-input"></div>
+                </div>
+                <div class="card-form-row">
+                  <label class="card-form-label" x-text="$app.t('pdfExport.layout.footerVersoCenter')"></label>
+                  <div class="card-form-field"><input x-model="activeProfile.config.layout.footerVersoCenter" class="pdfx-text-input"></div>
+                </div>
+                <div class="card-form-row">
+                  <label class="card-form-label" x-text="$app.t('pdfExport.layout.footerVersoRight')"></label>
+                  <div class="card-form-field"><input x-model="activeProfile.config.layout.footerVersoRight" class="pdfx-text-input"></div>
                 </div>
               </div>
             </div>
@@ -330,6 +380,15 @@
                         <label class="card-form-label" x-text="$app.t('pdfExport.font.firstLineIndentMm')"></label>
                         <div class="card-form-field">
                           <input type="text" x-data="numInput({ step: 0.5, min: 0, max: 30 })" x-modelable="value" x-model="activeProfile.config.font.body.firstLineIndentMm" class="pdfx-num-input">
+                        </div>
+                      </div>
+                      <div class="card-form-row">
+                        <label class="card-form-label" x-text="$app.t('pdfExport.font.numerals')"></label>
+                        <div class="card-form-field">
+                          <div x-data="combobox($app.t('pdfExport.font.numerals'))"
+                               x-modelable="value" x-model="activeProfile.config.font.body.numerals"
+                               x-effect="options = [{ value: 'auto', label: $app.t('pdfExport.font.numerals.auto') }, { value: 'lining', label: $app.t('pdfExport.font.numerals.lining') }, { value: 'oldstyle', label: $app.t('pdfExport.font.numerals.oldstyle') }]"
+></div>
                         </div>
                       </div>
                     </div>

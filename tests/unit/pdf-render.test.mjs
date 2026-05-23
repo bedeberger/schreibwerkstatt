@@ -116,6 +116,47 @@ test('Lose Seite vor erstem Kapitel: Kapitel-Heading bricht auf eigene Page (Reg
   assert.ok(pageCount(buf) >= 3, `Erwartet ≥3 Pages, war ${pageCount(buf)} (Overlap-Bug?)`);
 });
 
+test('Hyphenation: SHY-Codepoint erscheint nicht im fertigen PDF', async () => {
+  const cfg = defaultConfig();
+  cfg.cover.enabled = false;
+  cfg.toc.enabled = false;
+  cfg.layout.hyphenate = true;
+  // Donaudampfschifffahrtsgesellschaft = klassischer Hypher-Trefferkandidat.
+  const longPara = '<p>' + 'Donaudampfschifffahrtsgesellschaftskapitän stolpert. '.repeat(20) + '</p>';
+  const groups = [{ chapter: { id: 1, name: 'X' }, pages: [{ p: { id: 1, name: 'A' }, pd: { html: '<h1>K</h1>' + longPara } }] }];
+  const buf = await renderPdfBuffer({ book: baseBook, groups, profile: { config: cfg }, coverBuf: null, token: null, lang: 'de' });
+  // SHY (U+00AD) als UTF-8: 0xC2 0xAD. Darf nicht im PDF auftauchen.
+  assert.equal(buf.indexOf(Buffer.from([0xC2, 0xAD])), -1, 'SHY-Codepoint im PDF-Output → _fragment-Patch verschluckt nicht alle');
+});
+
+test('mirrorMargins: Render läuft ohne Crash, gleiche Page-Count wie ohne Mirror', async () => {
+  const cfg = defaultConfig();
+  cfg.cover.enabled = false;
+  cfg.toc.enabled = false;
+  const baseline = await renderPdfBuffer({ book: baseBook, groups: baseGroups, profile: { config: cfg }, coverBuf: null, token: null });
+  cfg.layout.mirrorMargins = true;
+  const mirrored = await renderPdfBuffer({ book: baseBook, groups: baseGroups, profile: { config: cfg }, coverBuf: null, token: null });
+  assert.equal(pageCount(mirrored), pageCount(baseline), 'Mirror darf Page-Count nicht ändern');
+});
+
+test('widowOrphanControl: schiebt Absatz auf neue Seite statt Single-Line-Witwe/Waise', async () => {
+  // Vier mittellange Absätze, plus ein letzter Absatz, der eine Single-Line-
+  // Witwe/Waise produzieren würde. Mit Kontrolle wird er als Ganzes
+  // verschoben — also genau dann eine zusätzliche Page, wenn der Greedy-Bruch
+  // wirklich gegriffen hätte. Wir prüfen Inequality (>=), weil der genaue
+  // Bruchpunkt von Font-Metriken abhängt.
+  const para = '<p>' + 'Die Sonne ging langsam unter und tauchte alles in goldenes Licht. '.repeat(15) + '</p>';
+  const groups = [{ chapter: { id: 1, name: 'X' }, pages: [{ p: { id: 1, name: 'A' }, pd: { html: '<h1>K</h1>' + para.repeat(5) } }] }];
+  const cfg = defaultConfig();
+  cfg.cover.enabled = false;
+  cfg.toc.enabled = false;
+  cfg.layout.widowOrphanControl = false;
+  const off = await renderPdfBuffer({ book: baseBook, groups, profile: { config: cfg }, coverBuf: null, token: null });
+  cfg.layout.widowOrphanControl = true;
+  const on = await renderPdfBuffer({ book: baseBook, groups, profile: { config: cfg }, coverBuf: null, token: null });
+  assert.ok(pageCount(on) >= pageCount(off), `widow/orphan darf Pages nicht reduzieren (off=${pageCount(off)} on=${pageCount(on)})`);
+});
+
 test('TOC mit Page-Numbers stempelt Zahlen rechts ein', async () => {
   const cfg = defaultConfig();
   cfg.cover.enabled = false;

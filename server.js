@@ -501,6 +501,14 @@ function shutdown(signal) {
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT',  () => shutdown('SIGINT'));
 
+process.on('unhandledRejection', (reason) => {
+  logger.error('unhandledRejection', { reason: reason instanceof Error ? { message: reason.message, stack: reason.stack } : reason });
+});
+process.on('uncaughtException', (err) => {
+  logger.error('uncaughtException', { message: err.message, stack: err.stack });
+  shutdown('uncaughtException', err);
+});
+
 // Tägliche Cron-Jobs (node-cron)
 try {
   const cron = require('node-cron');

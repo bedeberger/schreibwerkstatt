@@ -106,6 +106,35 @@ test('validateConfig: Hex-Farben akzeptiert (6-stellig, 3-stellig, lowercase)', 
   assert.equal(c.font.title.color,   '#012345');
 });
 
+test('defaultConfig: mirrorMargins/hyphenate/chapter-start-toggles vorhanden', () => {
+  const c = defaultConfig();
+  assert.equal(c.layout.mirrorMargins, false);
+  assert.equal(c.layout.hyphenate, true);
+  assert.equal(c.layout.showHeaderOnChapterStart, false);
+  assert.equal(c.layout.showFooterOnChapterStart, false);
+  assert.equal(c.layout.headerVersoLeft, '');
+  assert.equal(c.layout.headerVersoCenter, '');
+  assert.equal(c.layout.headerVersoRight, '');
+  assert.equal(c.layout.footerVersoLeft, '');
+  assert.equal(c.layout.footerVersoCenter, '');
+  assert.equal(c.layout.footerVersoRight, '');
+});
+
+test('validateConfig: mirrorMargins akzeptiert true, verso-Slots passieren', () => {
+  const c = validateConfig({ layout: {
+    mirrorMargins: true,
+    hyphenate: false,
+    showFooterOnChapterStart: true,
+    headerVersoCenter: '{title}',
+    footerVersoCenter: '{page}',
+  }});
+  assert.equal(c.layout.mirrorMargins, true);
+  assert.equal(c.layout.hyphenate, false);
+  assert.equal(c.layout.showFooterOnChapterStart, true);
+  assert.equal(c.layout.headerVersoCenter, '{title}');
+  assert.equal(c.layout.footerVersoCenter, '{page}');
+});
+
 test('validateConfig: Bad Hex fällt auf Default zurück', () => {
   const d = defaultConfig();
   const c = validateConfig({ font: {
