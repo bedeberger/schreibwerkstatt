@@ -217,7 +217,7 @@
   "book.create.errorEmpty":      "Bitte Titel eingeben.",
   "book.create.errorGeneric":    "Erstellen fehlgeschlagen: {msg}",
 
-  "book.settings.title":         "Einstellungen: {name}",
+  "book.settings.title":         "Einstellungen",
   "book.settings.name":          "Buchtitel",
   "book.settings.section.basics":    "Sprache & Region",
   "book.settings.section.narrative": "Erzählweise",
@@ -627,7 +627,7 @@
   "search.kind.scene":           "Szene",
   "search.kind.idea":            "Idee",
 
-  "bookEditor.title":            "Bucheditor: {name}",
+  "bookEditor.title":            "Bucheditor",
   "bookEditor.loading":          "Buchinhalt wird geladen …",
   "bookEditor.empty":            "Keine Seiten im Buch.",
   "bookEditor.missingPages":     "{n} Seite(n) konnten nicht geladen werden.",
@@ -656,7 +656,7 @@
   "bookEditor.find.placeholder": "Im ganzen Buch suchen …",
   "bookEditor.find.replacedAll": "{n} Treffer ersetzt.",
 
-  "bookOrganizer.title":         "Buchorganizer: {name}",
+  "bookOrganizer.title":         "Buchorganizer",
   "bookOrganizer.hint":          "Per Drag&Drop ordnen. Klick auf Namen zum Umbenennen. Tab/Shift+Tab im Kapitel-Feld rückt ein/aus (max 3 Ebenen).",
   "bookOrganizer.addSubchapter": "Sub-Kapitel",
   "bookOrganizer.subchaptersCount": "{n} Sub-Kapitel",
@@ -698,7 +698,7 @@
   "bookOrganizer.jumpToPlaceholder": "Springe zu Kapitel…",
   "bookOrganizer.moveTo":         "Verschieben nach…",
 
-  "overview.title":              "Übersicht: {name}",
+  "overview.title":              "Übersicht",
   "overview.refresh":            "Neu laden",
   "overview.loading":            "Lade Übersicht…",
   "overview.empty":              "Noch keine Daten. Lade Seiten oder starte eine Komplettanalyse.",
@@ -814,7 +814,7 @@
   "jobQueue.expand":              "{count} weitere anzeigen",
   "jobQueue.collapse":            "Weniger anzeigen",
 
-  "review.title":                "Buchbewertung: {name}",
+  "review.title":                "Buchbewertung",
   "review.start":                "Buch bewerten",
   "review.rerun":                "Neu bewerten",
   "review.history":              "Frühere Bewertungen",
@@ -822,7 +822,7 @@
   "review.strengths":            "Stärken",
   "review.weaknesses":           "Schwächen",
 
-  "kapitelReview.title":            "{name}",
+  "kapitelReview.title":            "Kapitel-Bewertung",
   "kapitelReview.start":            "Kapitel bewerten",
   "kapitelReview.rerun":            "Neu bewerten",
   "kapitelReview.includeSubchapters":    "Inkl. Sub-Kapitel",
@@ -846,7 +846,7 @@
   "kapitelReview.section.perspektive": "Perspektive",
   "kapitelReview.section.figuren":     "Figuren",
 
-  "figuren.title":               "Figuren: {name}",
+  "figuren.title":               "Figuren",
   "figuren.heading":             "Figuren",
   "figuren.modeGraph":           "Figurengraph",
   "figuren.modeFamilie":         "Familie",
@@ -855,7 +855,7 @@
   "figuren.soziogramm.hint":     "Pfeilstärke = Machtasymmetrie · Knotenzeilen = Gesellschaftsschicht · Pfeilrichtung = Mächtiger → Schwächerer · Innerhalb der Schicht: Mächtige oben, Untergebene unten",
   "figuren.legend.toggle":       "Legende",
 
-  "werkstatt.title":             "Figuren-Werkstatt: {name}",
+  "werkstatt.title":             "Figuren-Werkstatt",
   "werkstatt.subline":           "Vorwärts-Entwurf — keine Verbindung zu extrahierten Figuren",
   "werkstatt.empty.title":       "Noch keine Werkstatt-Figuren",
   "werkstatt.empty.hint":        "Lege eine erste Figur an und entwickle sie als Mindmap aus.",
@@ -1022,7 +1022,7 @@
   "graph.empty.sozialschicht":   "Noch keine Sozialschichten analysiert.<br>Bitte auf «Alle aktualisieren» klicken, um Schichtzugehörigkeit und Machtstrukturen zu ermitteln.",
   "graph.empty.familie":         "Keine Familienbeziehungen gefunden.",
 
-  "szenen.title":                "Szenen: {name}",
+  "szenen.title":                "Szenen",
   "szenen.byFigur":              "Pro Figur",
   "szenen.byKapitel":            "Pro Kapitel",
   "szenen.bySeite":              "Pro Seite",
@@ -1033,17 +1033,17 @@
   "szenen.distribution":         "Verteilung",
   "szenen.orte":                 "Orte:",
 
-  "events.title":                "Ereignisse: {name}",
+  "events.title":                "Ereignisse",
   "events.worldEvent":           "Weltgeschehen",
 
-  "orte.title":                  "Schauplätze: {name}",
+  "orte.title":                  "Schauplätze",
   "orte.firstMention":           "Erste Erwähnung:",
   "orte.figuren":                "Figuren:",
   "orte.kapitel":                "Kapitel:",
   "orte.szenen":                 "Szenen:",
   "orte.typAndere":              "andere",
 
-  "songs.title":                 "Musik: {name}",
+  "songs.title":                 "Musik",
   "songs.firstMention":          "Erste Erwähnung:",
   "songs.figuren":               "Figuren:",
   "songs.kapitel":                "Kapitel:",
@@ -1058,7 +1058,7 @@
   "songs.kontextTyp.leitmotiv":  "Leitmotiv",
   "songs.kontextTyp.diegetisch": "diegetisch",
 
-  "kontinuitaet.title":          "Kontinuität: {name}",
+  "kontinuitaet.title":          "Kontinuität",
   "kontinuitaet.noIssues":       "Keine Kontinuitätsprobleme gefunden.",
   "kontinuitaet.noMatch":        "Keine Probleme für den gewählten Filter.",
   "kontinuitaet.gotoTitle":      "Zur Stelle springen: {name}",
@@ -1068,7 +1068,7 @@
   "kontinuitaet.summary":           "Zusammenfassung",
   "kontinuitaet.empfehlung":        "Empfehlung:",
 
-  "bookstats.title":             "Buchentwicklung: {name}",
+  "bookstats.title":             "Buchentwicklung",
   "bookstats.lastSnapshot":      "Letzter Snapshot: {date}",
   "bookstats.chartFallback":     "Diagramm zur Buchentwicklung (nur grafisch verfügbar).",
   "bookstats.sync":              "Synchronisieren",
@@ -1109,7 +1109,7 @@
   "bookstats.lektoratAvg":       "Ø {m} min/aktiver Tag (Lektorat)",
   "bookstats.emptyState":        "Noch keine Daten vorhanden. Klicke «Synchronisieren» um den ersten Snapshot zu erfassen.",
 
-  "stil.title":                  "Stil-Heatmap: {name}",
+  "stil.title":                  "Stil-Heatmap",
   "stil.lastUpdated":            "Stand: {date} {time}",
   "stil.recompute":              "Neu berechnen",
   "stil.computing":              "Berechne Stil-Metriken…",
@@ -1141,7 +1141,7 @@
   "stil.detail.title":           "{metric} — {chapter}",
   "stil.detail.empty":           "Keine konkreten Treffer in diesem Kapitel gespeichert.",
 
-  "fehlerHeatmap.title":         "Fehler-Heatmap: {name}",
+  "fehlerHeatmap.title":         "Fehler-Heatmap",
   "fehlerHeatmap.emptyState":    "Noch keine Lektorat-Läufe vorhanden. Öffne eine Seite und starte die Prüfung.",
   "fehlerHeatmap.legend":        "Zahl in der Zelle = Anzahl Befunde dieses Fehlertyps im Kapitel. Farbe pro Spalte: Rot = im Buchvergleich viele, Grün = wenige. Schraffiert = Kapitel nicht oder nur teilweise geprüft. Tooltip zeigt Anzahl auf Seiten und Befunde pro 1000 Wörter.",
   "fehlerHeatmap.chapter":       "Kapitel",
@@ -1324,8 +1324,8 @@
   "editor.history.markDone":     "Als umgesetzt markieren",
   "editor.history.markOpen":     "Als nicht umgesetzt markieren",
 
-  "chat.title":                  "Chat: {name}",
-  "chat.titleBook":              "Buch-Chat: {name}",
+  "chat.title":                  "Seiten-Chat",
+  "chat.titleBook":              "Buch-Chat",
   "chat.newSession":             "+ Neu",
   "chat.newSessionTitle":        "Neues Gespräch starten",
   "chat.emptyPage":              "Starte das Gespräch mit einer Frage zur Seite «{name}».",
@@ -1830,7 +1830,7 @@
   "job.error.werkstatt.fazitMissing":      "KI-Antwort enthält kein Fazit.",
   "job.error.forbidden":                   "Zugriff verweigert.",
 
-  "finetune.title":                  "Fine-Tuning-Export: {name}",
+  "finetune.title":                  "Fine-Tuning-Export",
   "finetune.lead":                   "Erzeugt JSONL-Trainingsdaten aus Buchtext, Figuren, Ereignissen, Szenen und Schauplätzen. Chat-Format (messages) plus optional vorgerendertes Tekken-V7-text-Feld, direkt ladbar in Unsloth Studio oder Unsloth-CLI. Defaults sind auf Mistral-Small-3.2-24B abgestimmt (131072 Token Kontext, Voll-Kapitel-Samples aktiv). Für QLoRA auf 20-24 GB max_seq_tokens auf 4096 setzen.",
   "finetune.generate":               "Generieren",
   "finetune.generating":             "Generiere…",

@@ -217,7 +217,7 @@
   "book.create.errorEmpty":      "Please enter a title.",
   "book.create.errorGeneric":    "Create failed: {msg}",
 
-  "book.settings.title":         "Settings: {name}",
+  "book.settings.title":         "Settings",
   "book.settings.name":          "Book title",
   "book.settings.section.basics":    "Language & Region",
   "book.settings.section.narrative": "Narrative style",
@@ -627,7 +627,7 @@
   "search.kind.scene":           "Scene",
   "search.kind.idea":            "Idea",
 
-  "bookEditor.title":            "Book editor: {name}",
+  "bookEditor.title":            "Book editor",
   "bookEditor.loading":          "Loading book content …",
   "bookEditor.empty":            "Book has no pages.",
   "bookEditor.missingPages":     "{n} page(s) could not be loaded.",
@@ -656,7 +656,7 @@
   "bookEditor.find.placeholder": "Search across the entire book …",
   "bookEditor.find.replacedAll": "{n} matches replaced.",
 
-  "bookOrganizer.title":         "Book organizer: {name}",
+  "bookOrganizer.title":         "Book organizer",
   "bookOrganizer.hint":          "Drag to reorder. Click a name to rename. Tab/Shift+Tab in the chapter field indents/outdents (max 3 levels).",
   "bookOrganizer.addSubchapter": "Sub-chapter",
   "bookOrganizer.subchaptersCount": "{n} sub-chapters",
@@ -698,7 +698,7 @@
   "bookOrganizer.jumpToPlaceholder": "Jump to chapter…",
   "bookOrganizer.moveTo":         "Move to…",
 
-  "overview.title":              "Overview: {name}",
+  "overview.title":              "Overview",
   "overview.refresh":            "Refresh",
   "overview.loading":            "Loading overview…",
   "overview.empty":              "No data yet. Load pages or start a full analysis.",
@@ -814,7 +814,7 @@
   "jobQueue.expand":              "Show {count} more",
   "jobQueue.collapse":            "Show less",
 
-  "review.title":                "Book review: {name}",
+  "review.title":                "Book review",
   "review.start":                "Review book",
   "review.rerun":                "Re-review",
   "review.history":              "Previous reviews",
@@ -822,7 +822,7 @@
   "review.strengths":            "Strengths",
   "review.weaknesses":           "Weaknesses",
 
-  "kapitelReview.title":            "{name}",
+  "kapitelReview.title":            "Chapter review",
   "kapitelReview.start":            "Review chapter",
   "kapitelReview.rerun":            "Re-review",
   "kapitelReview.includeSubchapters":    "Incl. sub-chapters",
@@ -846,7 +846,7 @@
   "kapitelReview.section.perspektive": "Perspective",
   "kapitelReview.section.figuren":     "Characters",
 
-  "figuren.title":               "Characters: {name}",
+  "figuren.title":               "Characters",
   "figuren.heading":             "Characters",
   "figuren.modeGraph":           "Character graph",
   "figuren.modeFamilie":         "Family",
@@ -855,7 +855,7 @@
   "figuren.soziogramm.hint":     "Arrow thickness = power asymmetry · Node rows = social class · Arrow direction = stronger → weaker · Within a class: powerful at top, subordinates at bottom",
   "figuren.legend.toggle":       "Legend",
 
-  "werkstatt.title":             "Character Workshop: {name}",
+  "werkstatt.title":             "Character Workshop",
   "werkstatt.subline":           "Forward draft — not linked to extracted characters",
   "werkstatt.empty.title":       "No workshop characters yet",
   "werkstatt.empty.hint":        "Create a first character and develop it as a mindmap.",
@@ -1021,7 +1021,7 @@
   "graph.empty.sozialschicht":   "No social classes analysed yet.<br>Please click \"Update all\" to determine class membership and power structures.",
   "graph.empty.familie":         "No family relationships found.",
 
-  "szenen.title":                "Scenes: {name}",
+  "szenen.title":                "Scenes",
   "szenen.byFigur":              "By character",
   "szenen.byKapitel":            "By chapter",
   "szenen.bySeite":              "By page",
@@ -1032,17 +1032,17 @@
   "szenen.distribution":         "Distribution",
   "szenen.orte":                 "Locations:",
 
-  "events.title":                "Events: {name}",
+  "events.title":                "Events",
   "events.worldEvent":           "World event",
 
-  "orte.title":                  "Locations: {name}",
+  "orte.title":                  "Locations",
   "orte.firstMention":           "First mention:",
   "orte.figuren":                "Characters:",
   "orte.kapitel":                "Chapters:",
   "orte.szenen":                 "Scenes:",
   "orte.typAndere":              "other",
 
-  "songs.title":                 "Music: {name}",
+  "songs.title":                 "Music",
   "songs.firstMention":          "First mention:",
   "songs.figuren":               "Characters:",
   "songs.kapitel":                "Chapters:",
@@ -1057,7 +1057,7 @@
   "songs.kontextTyp.leitmotiv":  "leitmotif",
   "songs.kontextTyp.diegetisch": "diegetic",
 
-  "kontinuitaet.title":          "Continuity: {name}",
+  "kontinuitaet.title":          "Continuity",
   "kontinuitaet.noIssues":       "No continuity issues found.",
   "kontinuitaet.noMatch":        "No issues matching the selected filter.",
   "kontinuitaet.gotoTitle":      "Jump to location: {name}",
@@ -1067,7 +1067,7 @@
   "kontinuitaet.summary":           "Summary",
   "kontinuitaet.empfehlung":        "Recommendation:",
 
-  "bookstats.title":             "Book progress: {name}",
+  "bookstats.title":             "Book progress",
   "bookstats.lastSnapshot":      "Last snapshot: {date}",
   "bookstats.chartFallback":     "Book development chart (graphical only).",
   "bookstats.sync":              "Synchronise",
@@ -1108,7 +1108,7 @@
   "bookstats.lektoratAvg":       "avg {m} min/active day (proofreading)",
   "bookstats.emptyState":        "No data yet. Click \"Synchronise\" to capture the first snapshot.",
 
-  "stil.title":                  "Style heatmap: {name}",
+  "stil.title":                  "Style heatmap",
   "stil.lastUpdated":            "As of {date} {time}",
   "stil.recompute":              "Recompute",
   "stil.computing":              "Computing style metrics…",
@@ -1140,7 +1140,7 @@
   "stil.detail.title":           "{metric} — {chapter}",
   "stil.detail.empty":           "No concrete examples stored for this chapter.",
 
-  "fehlerHeatmap.title":         "Issue heatmap: {name}",
+  "fehlerHeatmap.title":         "Issue heatmap",
   "fehlerHeatmap.emptyState":    "No editing runs yet. Open a page and run a check.",
   "fehlerHeatmap.legend":        "Cell number = findings of this issue type in the chapter. Colour per column: red = many compared to the rest of the book, green = few. Hatched = chapter not yet or only partially checked. Tooltip shows page count and findings per 1000 words.",
   "fehlerHeatmap.chapter":       "Chapter",
@@ -1323,8 +1323,8 @@
   "editor.history.markDone":     "Mark as applied",
   "editor.history.markOpen":     "Mark as not applied",
 
-  "chat.title":                  "Chat: {name}",
-  "chat.titleBook":              "Book chat: {name}",
+  "chat.title":                  "Page chat",
+  "chat.titleBook":              "Book chat",
   "chat.newSession":             "+ New",
   "chat.newSessionTitle":        "Start new conversation",
   "chat.emptyPage":              "Start the conversation with a question about the page \"{name}\".",
@@ -1829,7 +1829,7 @@
   "job.error.werkstatt.fazitMissing":      "AI response did not contain verdict.",
   "job.error.forbidden":                   "Access denied.",
 
-  "finetune.title":                  "Fine-tuning export: {name}",
+  "finetune.title":                  "Fine-tuning export",
   "finetune.lead":                   "Generates JSONL training data from book text, characters, events, scenes, and locations. Chat format (messages) plus optional pre-rendered Tekken-V7 text field, loads directly in Unsloth Studio or the Unsloth CLI. Defaults tuned for Mistral-Small-3.2-24B (131072-token context, full-chapter samples enabled). For QLoRA on 20-24 GB set max_seq_tokens to 4096.",
   "finetune.generate":               "Generate",
   "finetune.generating":             "Generating…",

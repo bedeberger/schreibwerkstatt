@@ -5,7 +5,10 @@
 -->
 <div class="card card--settings" x-data="bookSettingsCard" x-show="$app.showBookSettingsCard" x-cloak>
   <div class="card-header">
-    <span class="card-title" x-text="$app.t('book.settings.title', { name: $app.selectedBookName })"></span>
+    <div class="card-header-titlebar">
+      <span class="card-eyebrow" x-text="$app.selectedBookName"></span>
+      <span class="card-title" x-text="$app.t('book.settings.title')"></span>
+    </div>
     <div class="card-actions">
       <span class="card-form-saved" x-show="bookSettingsSaved" x-cloak x-transition.opacity.duration.250ms x-text="$app.t('common.settingsSaved')"></span>
       <span class="card-form-error" x-show="bookSettingsError" x-text="bookSettingsError"></span>

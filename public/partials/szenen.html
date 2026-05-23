@@ -7,7 +7,8 @@
 <div class="card card--szenen" x-data="szenenCard" x-show="$app.showSzenenCard" x-cloak>
   <div class="card-header card-header--subline">
     <div class="card-header-titlebar">
-      <span class="card-title" x-text="$app.t('szenen.title', { name: $app.selectedBookName })"></span>
+      <span class="card-eyebrow" x-text="$app.selectedBookName"></span>
+      <span class="card-title" x-text="$app.t('szenen.title')"></span>
       <div class="card-subline" x-show="$app.alleAktualisierenLastRun && !szenenLoading">
         <span class="card-timestamp" x-text="$app.t('common.asOf', { date: $app.alleAktualisierenLastRun })"></span>
       </div>

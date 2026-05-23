@@ -6,7 +6,10 @@
 -->
 <div class="card card--organizer" x-data="bookOrganizerCard" x-show="$app.showBookOrganizerCard" x-cloak>
   <div class="card-header">
-    <span class="card-title" x-text="$app.t('bookOrganizer.title', { name: $app.selectedBookName })"></span>
+    <div class="card-header-titlebar">
+      <span class="card-eyebrow" x-text="$app.selectedBookName"></span>
+      <span class="card-title" x-text="$app.t('bookOrganizer.title')"></span>
+    </div>
     <div class="card-actions">
       <button type="button" @click="createChapter()" :disabled="organizerSaving" x-text="$app.t('bookOrganizer.newChapter')"></button>
       <button type="button" @click="createPage(0)" :disabled="organizerSaving" x-text="$app.t('bookOrganizer.newSoloPage')"></button>

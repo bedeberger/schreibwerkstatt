@@ -169,7 +169,24 @@ Wiederkehrende Werte gehen über Tokens. Ad-hoc-Werte (`box-shadow: 0 4px 12px .
 **Akzentfarbe pro Karte (Single-Source-of-Truth):**
 - Hue-Tokens in [tokens/colors.css](public/css/tokens/colors.css) als `--card-accent-<key>` für alle Karten definiert (Light + Dark spiegelt).
 - Mapping `.card--<key> { --card-accent: var(--card-accent-<key>); }` zentral in [public/css/card-accents.css](public/css/card-accents.css).
-- Neue Karte: Hue in `tokens/colors.css` ergänzen (Light + Dark), Mapping in `card-accents.css`, Klasse `card--<key>` am Wurzel-Div setzen. Pro-Karten-CSS-Datei nur noch konsumieren (`background: var(--card-accent)`), nicht selbst deklarieren.
+- `.card` rendert `--card-accent` automatisch als 2px Top-Border (Fallback `--color-border`). Pro-Karten-CSS muss den Stripe nicht selbst deklarieren — nur ergänzende Anwendungen (Anchor-Bar, Title-Underline) brauchen `var(--card-accent)`.
+- Neue Karte: Hue in `tokens/colors.css` ergänzen (Light + Dark), Mapping in `card-accents.css`, Klasse `card--<key>` am Wurzel-Div setzen.
+
+**Eyebrow (optional, Editorial-Pattern):**
+- Kleine, gesperrte Caps-Zeile über dem `.card-title` für Kontext-Label (Buchname, Sektion, Rubrik), wenn der Titel selbst die Funktion benennt.
+- Markup: `.card-eyebrow` als erstes Element in `.card-header-titlebar`, danach `.card-title`. Column-Flex sorgt für visuelle Order.
+- Use-Case: Titel = Funktion ("Übersicht", "Statistik", "Lektorat"), Eyebrow = Subjekt (Buchname). Vermeidet redundante Titel-Strings vom Typ "Übersicht: {name}".
+- CSS in [public/css/components/card-form.css](public/css/components/card-form.css), Konsumenten setzen nur Markup.
+
+```html
+<div class="card-header">
+  <div class="card-header-titlebar">
+    <span class="card-eyebrow" x-text="$app.selectedBookName"></span>
+    <span class="card-title" x-text="$app.t('overview.title')"></span>
+  </div>
+  <div class="card-actions">…</div>
+</div>
+```
 
 ---
 

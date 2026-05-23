@@ -3,7 +3,8 @@
 <div class="card card--werkstatt" x-data="figurWerkstattCard" x-show="$app.showFigurWerkstattCard" x-cloak>
   <div class="card-header card-header--subline">
     <div class="card-header-titlebar">
-      <span class="card-title" x-text="$app.t('werkstatt.title', { name: $app.selectedBookName })"></span>
+      <span class="card-eyebrow" x-text="$app.selectedBookName"></span>
+      <span class="card-title" x-text="$app.t('werkstatt.title')"></span>
       <div class="card-subline">
         <span x-text="$app.t('werkstatt.subline')"></span>
       </div>

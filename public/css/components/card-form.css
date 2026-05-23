@@ -47,6 +47,21 @@
   min-width: 0;
 }
 
+/* Eyebrow: kleine, gesperrte Caps-Zeile ueber dem .card-title. Editorial-
+   Pattern fuer Kontext-Label (z.B. Buchname, Sektion, Rubrik) wenn der
+   Titel selbst die Funktion benennt. Sitzt in .card-header-titlebar VOR
+   dem .card-title (DOM-Order = visuelle Order, column-flex). */
+.card-eyebrow {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  font-weight: var(--fw-medium);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-subtle);
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
 /* Inline-editable Variante (Editor-Card-Header): textarea, sieht aus wie Span;
    bei Focus erscheint Border + Surface-Bg. Höhe wird vom JS aus scrollHeight
    gesetzt (Auto-Grow), daher resize:none + overflow:hidden. Wrapping via

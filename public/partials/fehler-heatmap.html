@@ -6,7 +6,10 @@
 -->
 <div class="card card--heatmap" x-data="fehlerHeatmapCard" x-show="$app.showFehlerHeatmapCard" x-cloak>
   <div class="card-header">
-    <span class="card-title" x-text="$app.t('fehlerHeatmap.title', { name: $app.selectedBookName })"></span>
+    <div class="card-header-titlebar">
+      <span class="card-eyebrow" x-text="$app.selectedBookName"></span>
+      <span class="card-title" x-text="$app.t('fehlerHeatmap.title')"></span>
+    </div>
     <div class="card-actions">
       <div class="tabs">
         <button type="button"

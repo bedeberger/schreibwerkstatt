@@ -8,7 +8,10 @@
 -->
 <div class="card card--review" x-data="bookReviewCard" x-show="$app.showBookReviewCard" x-cloak>
   <div class="card-header">
-    <span class="card-title" x-text="$app.t('review.title', { name: $app.selectedBookName })"></span>
+    <div class="card-header-titlebar">
+      <span class="card-eyebrow" x-text="$app.selectedBookName"></span>
+      <span class="card-title" x-text="$app.t('review.title')"></span>
+    </div>
     <div class="card-actions">
       <button type="button" @click="runBookReview()" :disabled="bookReviewLoading">
         <span x-show="bookReviewLoading" class="spinner"></span>

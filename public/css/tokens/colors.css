@@ -302,6 +302,23 @@
 
   --color-border-contrast: #d8d8d8;
 
+  /* Figuren-Palette — desaturiert + aufgehellt für Dark-BG.
+     Mix-Rezepte (figpal-*) bauen daraus Badge-BG/Text/Border. */
+  --palette-blue:   #6a9fce;
+  --palette-red:    #e87a78;
+  --palette-green:  #8fc454;
+  --palette-pink:   #d999c0;
+  --palette-purple: #a87ec8;
+  --palette-amber:  #d4a93a;
+  --palette-orange: #d68856;
+  --palette-brown:  #b08754;
+  --palette-wine:   #b06868;
+  --palette-gray:   #9a948a;
+  --palette-gray-light: #6e685f;
+  --palette-dark:   #5a544a;
+
+  --color-dev-banner-bg: #d68a0a;
+
   --figpal-bg-mix:     30%;
   --figpal-text-mix:   72%;
   --figpal-border-mix: 55%;

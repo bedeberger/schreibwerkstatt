@@ -4,7 +4,10 @@
      hier entspricht der visuellen Reihenfolge im Grid (grid-auto-flow: row dense). -->
 <div class="card card--bookoverview book-overview" x-data="bookOverviewCard" x-show="$app.showBookOverviewCard" x-cloak>
   <div class="card-header">
-    <span class="card-title" x-text="$app.t('overview.title', { name: $app.selectedBookName })"></span>
+    <div class="card-header-titlebar">
+      <span class="card-eyebrow" x-text="$app.selectedBookName"></span>
+      <span class="card-title" x-text="$app.t('overview.title')"></span>
+    </div>
     <div class="card-actions">
       <button type="button" @click="loadBookOverview($app.selectedBookId)" :disabled="overviewLoading">
         <span x-show="overviewLoading" class="spinner"></span>
