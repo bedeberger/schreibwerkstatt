@@ -61,6 +61,91 @@ test('resolveQuoteStyle: en ohne Region', () => {
   assert.equal(s.rdquo, '”');
 });
 
+test('resolveQuoteStyle: en-US liefert modernen Stil', () => {
+  const s = resolveQuoteStyle('en', 'US');
+  assert.equal(s.ldquo, '“');
+  assert.equal(s.rdquo, '”');
+  assert.equal(s.lsquo, '‘');
+  assert.equal(s.rsquo, '’');
+  assert.equal(s.apostrophe, '’');
+});
+
+test('resolveQuoteStyle: en-GB modern (Oxford 2014+) = en-US', () => {
+  const s = resolveQuoteStyle('en', 'GB');
+  assert.equal(s.ldquo, '“');
+  assert.equal(s.rdquo, '”');
+  assert.equal(s.lsquo, '‘');
+  assert.equal(s.rsquo, '’');
+  assert.equal(s.apostrophe, '’');
+});
+
+test('normalizeQuotes: en-GB Outer-Quotes', () => {
+  const root = makeRoot('<p>She said "Hello" loudly.</p>');
+  const style = resolveQuoteStyle('en', 'GB');
+  normalizeQuotes(root, style);
+  assert.equal(root.querySelector('p').textContent, 'She said “Hello” loudly.');
+});
+
+test('normalizeQuotes: en-GB nested single in double', () => {
+  const root = makeRoot('<p>She said "I heard \'hi\' loudly".</p>');
+  const style = resolveQuoteStyle('en', 'GB');
+  normalizeQuotes(root, style);
+  assert.equal(root.querySelector('p').textContent, 'She said “I heard ‘hi’ loudly”.');
+});
+
+test('normalizeQuotes: en — Leading-Apostroph \'tis', () => {
+  const root = makeRoot('<p>\'tis the season</p>');
+  const style = resolveQuoteStyle('en', '');
+  normalizeQuotes(root, style);
+  assert.equal(root.querySelector('p').textContent, '’tis the season');
+});
+
+test('normalizeQuotes: en — \'em (Pronomen-Kontraktion)', () => {
+  const root = makeRoot('<p>Get \'em all.</p>');
+  const style = resolveQuoteStyle('en', '');
+  normalizeQuotes(root, style);
+  assert.equal(root.querySelector('p').textContent, 'Get ’em all.');
+});
+
+test('normalizeQuotes: en — \'90s Year-Shorthand', () => {
+  const root = makeRoot('<p>The \'90s were wild.</p>');
+  const style = resolveQuoteStyle('en', '');
+  normalizeQuotes(root, style);
+  assert.equal(root.querySelector('p').textContent, 'The ’90s were wild.');
+});
+
+test('normalizeQuotes: en — rock \'n\' roll', () => {
+  const root = makeRoot('<p>rock \'n\' roll</p>');
+  const style = resolveQuoteStyle('en', '');
+  normalizeQuotes(root, style);
+  // Beide ' werden zu ’ — leading via Kontraktions-Liste, trailing via
+  // rsquo (das in en U+2019 == apostrophe ist).
+  assert.equal(root.querySelector('p').textContent, 'rock ’n’ roll');
+});
+
+test('normalizeQuotes: en — \'cause (because-Kurzform)', () => {
+  const root = makeRoot('<p>I left \'cause it was late.</p>');
+  const style = resolveQuoteStyle('en', '');
+  normalizeQuotes(root, style);
+  assert.equal(root.querySelector('p').textContent, 'I left ’cause it was late.');
+});
+
+test('normalizeQuotes: en — Leading-Quote bei NICHT-Kontraktion bleibt lsquo', () => {
+  // 'hello' ist kein Leading-Apostroph-Wort → echte Single-Quote-Klammer.
+  const root = makeRoot('<p>He said \'hello\' to me.</p>');
+  const style = resolveQuoteStyle('en', '');
+  normalizeQuotes(root, style);
+  assert.equal(root.querySelector('p').textContent, 'He said ‘hello’ to me.');
+});
+
+test('normalizeQuotes: de-CH — \'tis bleibt OHNE Kontraktions-Behandlung (nicht-en)', () => {
+  // de-CH ist kein English-Style → Leading-Apostroph wird zu lsquo (‹).
+  const root = makeRoot('<p>\'tis the season</p>');
+  const style = resolveQuoteStyle('de', 'CH');
+  normalizeQuotes(root, style);
+  assert.equal(root.querySelector('p').textContent, '‹tis the season');
+});
+
 test('resolveQuoteStyle: Fallback bei unbekannter Sprache', () => {
   const s = resolveQuoteStyle('zz', 'XX');
   // Default ist de-CH

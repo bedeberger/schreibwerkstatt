@@ -22,8 +22,11 @@ const STYLES = {
   // Deutschland / Österreich: „…" aussen, ‚…' innen
   'de-DE': { ldquo: '„', rdquo: '“', lsquo: '‚', rsquo: '‘', apostrophe: '’' },
   'de-AT': { ldquo: '„', rdquo: '“', lsquo: '‚', rsquo: '‘', apostrophe: '’' },
-  // English: "…" / '…'
-  'en':    { ldquo: '“', rdquo: '”', lsquo: '‘', rsquo: '’', apostrophe: '’' },
+  // English modern (en-US: Chicago/AP/MLA; en-GB: Oxford 2014+/Cambridge/Guardian/
+  // BBC): outer double curly, inner single curly. Apostroph U+2019.
+  'en':    { ldquo: '“', rdquo: '”', lsquo: '‘', rsquo: '’', apostrophe: '’', lang: 'en' },
+  'en-US': { ldquo: '“', rdquo: '”', lsquo: '‘', rsquo: '’', apostrophe: '’', lang: 'en' },
+  'en-GB': { ldquo: '“', rdquo: '”', lsquo: '‘', rsquo: '’', apostrophe: '’', lang: 'en' },
   // Französisch: « … », ‹ … ›  (NBSP U+00A0 innen — schmal-fest, kein Umbruch)
   'fr':    { ldquo: '« ', rdquo: ' »', lsquo: '‹ ', rsquo: ' ›', apostrophe: '’' },
   // Italienisch (Italien): «…» aussen, "…" innen
@@ -66,6 +69,47 @@ const SINGLE_RIGHT = new Set(['’', '›']);
 const ASCII_DOUBLE = '"';
 const ASCII_SINGLE = "'";
 
+// English leading-apostrophe-Kontraktionen (Word/Pages/Google-Docs-Heuristik).
+// Wenn `'<wort>` mit `wort` in dieser Liste → Apostroph statt öffnendes
+// Single-Quote. Plus Year-Shorthand `'90s`, `'00`, `'76`.
+const EN_LEADING_CONTRACTIONS = new Set([
+  'tis', 'twas', 'em', 'cause', 'bout', 'n', 'til', 'round', 'nother',
+  'gainst', 'pon', 'lectric', 'allo', 'ave', 'nuff', 'sup',
+]);
+const EN_YEAR_SHORTHAND = /^\d{2,4}s?$/;
+const WORD_CHAR = /[\p{L}\p{N}]/u;
+
+function _isEnglish(style) {
+  return !!(style && style.lang === 'en');
+}
+
+// Sammle bis zu 12 Word-Chars ab Position idx — durch nachfolgende Text-Nodes,
+// falls Word an Node-Grenze überspannt (`'<em>tis</em>`). Bricht beim ersten
+// Nicht-Word-Char ab.
+function _peekWord(s, idx, textNodes, nodeIdx) {
+  let w = '';
+  for (let k = idx; k < s.length && w.length < 12; k++) {
+    if (!WORD_CHAR.test(s[k])) return w;
+    w += s[k];
+  }
+  for (let n = nodeIdx + 1; n < textNodes.length && w.length < 12; n++) {
+    const ns = textNodes[n].nodeValue;
+    if (!ns) continue;
+    for (let k = 0; k < ns.length && w.length < 12; k++) {
+      if (!WORD_CHAR.test(ns[k])) return w;
+      w += ns[k];
+    }
+  }
+  return w;
+}
+
+function _isLeadingContraction(word) {
+  if (!word) return false;
+  if (EN_LEADING_CONTRACTIONS.has(word.toLowerCase())) return true;
+  if (EN_YEAR_SHORTHAND.test(word)) return true;
+  return false;
+}
+
 const SPACES = new Set([' ', ' ']);
 
 function _isLetterDigit(ch) {
@@ -90,12 +134,17 @@ function _classifyDouble(c, prev, prevNonWs, next, style) {
   return style.rdquo;
 }
 
-function _classifySingle(c, prev, prevNonWs, next, style) {
+function _classifySingle(c, prev, prevNonWs, next, style, wordAfter) {
   const prevLD = _isLetterDigit(prev);
   const nextLD = _isLetterDigit(next);
   if (prevLD && nextLD) return style.apostrophe;    // `don't`, `Marie's`
   const prevOpen  = !prev || OPEN_CTX.test(prev);
   const nextClose = !next || CLOSE_CTX.test(next);
+  // Englisch: Leading-Apostroph-Kontraktionen (`'tis`, `'em`, `'90s`,
+  // `rock 'n' roll`) — Default-Heuristik klassifizierte fälschlich als lsquo.
+  if (_isEnglish(style) && prevOpen && nextLD && _isLeadingContraction(wordAfter)) {
+    return style.apostrophe;
+  }
   if (prevOpen && !nextClose) return style.lsquo;
   if (!prevOpen && nextClose) return style.rsquo;
   // Ambig
@@ -179,9 +228,10 @@ function _normalizeBlock(blockEl, style) {
         continue;
       }
       const next = i + 1 < s.length ? s[i + 1] : _peekNext(textNodes, nodeIdx);
+      const wordAfter = (isSingle && _isEnglish(style)) ? _peekWord(s, i + 1, textNodes, nodeIdx) : '';
       const repl = isDouble
         ? _classifyDouble(c, prevChar, prevNonWs, next, style)
-        : _classifySingle(c, prevChar, prevNonWs, next, style);
+        : _classifySingle(c, prevChar, prevNonWs, next, style, wordAfter);
       // Idempotenz: nur sinnvoll, wenn `repl` mit Space (NBSP / reg) startet
       // (FR-Style). Dann darf der bereits in `out` vorhandene Space als erstes
       // Zeichen von `repl` zählen — wir konsumieren nur `repl.slice(1)` aus
@@ -280,9 +330,10 @@ export function normalizeQuotesInRange(range, style) {
         continue;
       }
       const next = i + 1 < s.length ? s[i + 1] : _peekNext(all, nodeIdx);
+      const wordAfter = (isSingle && _isEnglish(style)) ? _peekWord(s, i + 1, all, nodeIdx) : '';
       const repl = isDouble
         ? _classifyDouble(c, prevChar, prevNonWs, next, style)
-        : _classifySingle(c, prevChar, prevNonWs, next, style);
+        : _classifySingle(c, prevChar, prevNonWs, next, style, wordAfter);
       const matchOffset = (SPACES.has(repl[0]) && out.length && out[out.length - 1] === repl[0]) ? 1 : 0;
       const consumeLen = repl.length - matchOffset;
       // Idempotenz nur innerhalb der Range prüfen — Match darf nicht
