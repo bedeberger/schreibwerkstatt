@@ -1,0 +1,54 @@
+<!-- Diary-Calendar-Sidebar. Sichtbar bei isTagebuch() && sidebarMode === 'calendar'.
+     Monats-Grid (Montag-Start) mit Tag-Cells; Tag mit Page = klickbar gefüllt,
+     leerer Tag = grau. Header zeigt Monats-Label + Prev/Next-Stepper +
+     Combobox zum Sprung auf Monat mit Einträgen. -->
+<div class="sidebar-calendar" x-show="isTagebuch() && sidebarMode === 'calendar'" x-cloak>
+  <div class="sidebar-calendar-header">
+    <button type="button" class="graph-tool-btn"
+            @click="diaryCalendarStep(-1)"
+            :data-tip="t('calendar.prevMonth')"
+            :aria-label="t('calendar.prevMonth')">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#chevron-left"/></svg>
+    </button>
+    <span class="sidebar-calendar-month-label" x-text="diaryCalendarMonthLabel()"></span>
+    <button type="button" class="graph-tool-btn"
+            @click="diaryCalendarStep(1)"
+            :data-tip="t('calendar.nextMonth')"
+            :aria-label="t('calendar.nextMonth')">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#chevron-right"/></svg>
+    </button>
+  </div>
+
+  <div class="sidebar-calendar-jumpwrap"
+       x-show="diaryCalendarMonths().length > 1">
+    <div x-data="combobox(t('calendar.jumpPlaceholder'))"
+         x-modelable="value"
+         x-model="_diaryCalendarJumpModel"
+         x-effect="options = diaryCalendarMonths().map(m => ({ value: m.key, label: `${diaryCalendarLabelForMonth(m)} (${m.count})` }))"
+         @combobox-change="diaryCalendarJumpTo($event.detail.value); _diaryCalendarJumpModel = ''"></div>
+  </div>
+
+  <div class="sidebar-calendar-weekdays">
+    <template x-for="(d, di) in diaryCalendarWeekdayLabels()" :key="di">
+      <span class="sidebar-calendar-weekday" x-text="d"></span>
+    </template>
+  </div>
+
+  <div class="sidebar-calendar-grid">
+    <template x-for="(cell, ci) in diaryCalendarMonthGrid()" :key="ci">
+      <button type="button"
+              class="sidebar-calendar-day"
+              :class="{
+                'sidebar-calendar-day--out': !cell.inMonth,
+                'sidebar-calendar-day--has-page': cell.hasPage,
+                'sidebar-calendar-day--today': cell.isToday,
+                'sidebar-calendar-day--active': cell.hasPage && currentPage && cell.page && currentPage.id === cell.page.id,
+              }"
+              :disabled="!cell.hasPage"
+              :data-tip="cell.hasPage ? cell.page.name : ''"
+              @click="selectDiaryCalendarDay(cell)">
+        <span x-text="cell.dayNum"></span>
+      </button>
+    </template>
+  </div>
+</div>

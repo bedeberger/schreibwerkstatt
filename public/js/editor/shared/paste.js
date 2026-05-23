@@ -6,6 +6,25 @@
 
 import { sanitizePasteHtml } from '../../utils.js';
 
+// Heuristik: Plain-Text mit ≥3 Zeilen, die zu ≥60% wie `key: value` /
+// `key = value` aussehen → Konfigurations-/Code-Paste. Wrap in <pre>, damit
+// User die Block-Struktur nicht manuell wiederherstellen muss (sonst wird jede
+// Zeile zu einem <p> mit Erstzeilen-Einzug).
+const _KV_LINE = /^\s*[A-Za-z_][\w.-]*\s*[:=]\s*\S/;
+
+function _looksLikeConfigBlock(text) {
+  if (!text || !text.includes('\n')) return false;
+  const lines = text.split(/\n/);
+  const nonEmpty = lines.filter(l => l.trim().length > 0);
+  if (nonEmpty.length < 3) return false;
+  const kvCount = nonEmpty.filter(l => _KV_LINE.test(l)).length;
+  return kvCount >= 3 && (kvCount / nonEmpty.length) >= 0.6;
+}
+
+function _escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 // Behandelt ein Paste-Event komplett: preventDefault, Sanitize, Insert.
 // Rückgabe: true wenn etwas eingefügt wurde, false bei leerem Clipboard.
 // Caller markiert anschliessend dirty (kann Block-spezifisch sein).
@@ -14,6 +33,12 @@ export function handleEditorPaste(e) {
   if (!cd) return false;
   e.preventDefault();
 
+  const plain = cd.getData('text/plain') || '';
+  if (_looksLikeConfigBlock(plain)) {
+    document.execCommand('insertHTML', false, `<pre>${_escapeHtml(plain)}</pre>`);
+    return true;
+  }
+
   const html = cd.getData('text/html');
   if (html) {
     const cleaned = sanitizePasteHtml(html);
@@ -21,16 +46,15 @@ export function handleEditorPaste(e) {
       document.execCommand('insertHTML', false, cleaned);
       return true;
     }
-    const text = cd.getData('text/plain') || (cleaned || '');
+    const text = plain || (cleaned || '');
     if (text) {
       document.execCommand('insertText', false, text);
       return true;
     }
     return false;
   }
-  const text = cd.getData('text/plain') || '';
-  if (text) {
-    document.execCommand('insertText', false, text);
+  if (plain) {
+    document.execCommand('insertText', false, plain);
     return true;
   }
   return false;

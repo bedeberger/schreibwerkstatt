@@ -16,17 +16,34 @@
     </span>
     <div class="btn-group sidebar-action-group">
       <button type="button" class="graph-tool-btn"
+              x-show="isTagebuch()"
+              :aria-pressed="sidebarMode === 'calendar'"
+              @click="toggleSidebarMode()"
+              :data-tip="sidebarMode === 'calendar' ? t('sidebar.modeToggle.tree') : t('sidebar.modeToggle.calendar')"
+              :aria-label="sidebarMode === 'calendar' ? t('sidebar.modeToggle.tree') : t('sidebar.modeToggle.calendar')">
+        <svg class="icon" aria-hidden="true">
+          <use :href="sidebarMode === 'calendar' ? '/icons.svg?v=636#list' : '/icons.svg?v=636#calendar'"/>
+        </svg>
+      </button>
+      <button type="button" class="graph-tool-btn"
+              x-show="sidebarMode !== 'calendar'"
               @click="setAllChaptersOpen(true)"
               :disabled="!!pageSearch"
               :data-tip="t('sidebar.expandAll')"
               :aria-label="t('sidebar.expandAll')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#chevron-down"/></svg></button>
       <button type="button" class="graph-tool-btn"
+              x-show="sidebarMode !== 'calendar'"
               @click="setAllChaptersOpen(false)"
               :disabled="!!pageSearch"
               :data-tip="t('sidebar.collapseAll')"
               :aria-label="t('sidebar.collapseAll')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#chevron-up"/></svg></button>
     </div>
   </div>
+
+  <!-- Diary-Calendar — eingebettetes Partial. Lädt nested via _loadPartials. -->
+  <div id="partial-sidebar-calendar" x-show="sidebarMode === 'calendar'" x-cloak></div>
+
+  <div x-show="sidebarMode !== 'calendar'" class="display-contents">
   <div x-show="!pageSearch && tokTotals.any" class="tok-totals">
     <span class="tok-badge tok-neutral" x-text="'∑ ' + tokTotals.chars.toLocaleString(_numLocale) + ' ' + t('bookstats.unit.z')"></span>
     <span class="tok-badge tok-neutral" x-text="'∑ ' + tokTotals.normseiten.toLocaleString(_numLocale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' ' + t('bookstats.unit.ns')"></span>
@@ -132,4 +149,5 @@
       <button type="button" @click="createChapter()" x-text="t('bookOrganizer.newChapter')"></button>
     </div>
   </template>
+  </div><!-- /sidebarMode !== 'calendar' -->
 </div>

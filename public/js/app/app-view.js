@@ -1,4 +1,4 @@
-import { htmlToText, fetchJson, escHtml } from '../utils.js';
+import { htmlToText, fetchJson, escHtml, decorateMentions } from '../utils.js';
 import { computeTodayRing } from '../today-ring.js';
 import { EXCLUSIVE_CARDS } from '../cards/feature-registry.js';
 import { contentRepo } from '../repo/content.js';
@@ -117,7 +117,7 @@ export const appViewMethods = {
       }
       const html = pd.html || '';
       this.originalHtml = html;
-      this.renderedPageHtml = html;
+      this.renderedPageHtml = decorateMentions(html);
       this._updatePageViewHeight();
       // Listing-Cache kann stale sein (Page-Save aktualisiert ihn nicht).
       if (pd.updated_at) p.updated_at = pd.updated_at;
@@ -176,7 +176,7 @@ export const appViewMethods = {
       if (this.currentPage?.id !== pageId) return;
       const html = pd.html || '';
       this.originalHtml = html;
-      this.renderedPageHtml = html;
+      this.renderedPageHtml = decorateMentions(html);
       this._updatePageViewHeight();
       if (pd.updated_at) this.currentPage.updated_at = pd.updated_at;
       this.currentPageEmpty = !htmlToText(html).trim();

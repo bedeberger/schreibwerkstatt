@@ -106,7 +106,9 @@ export const bookSettingsMethods = {
         throw new Error(data ? window.__app.tError(data) : `HTTP ${r.status}`);
       }
       this.bookSettingsSaved = true;
-      if (newName !== (currentBook?.name || '')) {
+      const newBuchtyp = this.bookSettingsBuchtyp || null;
+      const buchtypChanged = (currentBook?.buchtyp ?? null) !== newBuchtyp;
+      if (newName !== (currentBook?.name || '') || buchtypChanged) {
         await window.__app.loadBooks?.({ skipPages: true });
       }
       // Header-Donut konsumiert dailyProgressIsFinished + dailyProgressDailyGoalChars

@@ -463,6 +463,57 @@ export function registerPdfExportCard() {
       const arr = this.activeProfile.config.chapter.unnumberedChapterIds || [];
       this.activeProfile.config.chapter.unnumberedChapterIds = arr.filter(v => v !== id);
     },
+
+    // Picker fuer Seitenzaehler-Skip: gleicher Tree-Lookup wie bei
+    // unnumberedChapterPickOptions; Kapitel-Auswahl ohne Numbering-Mode-Gate
+    // (gilt auch wenn Kapitel-Titel-Nummern aus sind).
+    skipPageCounterChapterPickOptions() {
+      return this.unnumberedChapterPickOptions();
+    },
+    skipPageCounterChapterChips() {
+      const ids = this.activeProfile?.config?.chapter?.skipPageCounterChapterIds || [];
+      const opts = this.skipPageCounterChapterPickOptions();
+      return ids.map(id => {
+        const o = opts.find(x => x.value === id);
+        return o ? { id, label: o.label } : { id, label: '#' + id };
+      });
+    },
+    removeSkipPageCounterChapter(id) {
+      if (!this.activeProfile) return;
+      const arr = this.activeProfile.config.chapter.skipPageCounterChapterIds || [];
+      this.activeProfile.config.chapter.skipPageCounterChapterIds = arr.filter(v => v !== id);
+    },
+    // Seiten-Picker: Pages mit Kapitel-Prefix gruppiert (Label "Kapitel — Seite").
+    skipPageCounterPagePickOptions() {
+      const app = window.__app;
+      if (!app || !Array.isArray(app.pages)) return [];
+      const chapterById = new Map();
+      if (Array.isArray(app.tree)) {
+        for (const c of app.tree) {
+          if (c.type === 'chapter') chapterById.set(c.id, c.name);
+        }
+      }
+      return app.pages.map(p => {
+        const chName = p.chapter_id ? chapterById.get(p.chapter_id) : null;
+        return {
+          value: p.id,
+          label: chName ? `${chName} — ${p.name}` : p.name,
+        };
+      });
+    },
+    skipPageCounterPageChips() {
+      const ids = this.activeProfile?.config?.chapter?.skipPageCounterPageIds || [];
+      const opts = this.skipPageCounterPagePickOptions();
+      return ids.map(id => {
+        const o = opts.find(x => x.value === id);
+        return o ? { id, label: o.label } : { id, label: '#' + id };
+      });
+    },
+    removeSkipPageCounterPage(id) {
+      if (!this.activeProfile) return;
+      const arr = this.activeProfile.config.chapter.skipPageCounterPageIds || [];
+      this.activeProfile.config.chapter.skipPageCounterPageIds = arr.filter(v => v !== id);
+    },
     _ensureExportPicked() {
       const app = window.__app;
       const cur = app?.currentPage;

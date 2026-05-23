@@ -384,6 +384,16 @@ export const treeMethods = {
     return this.currentBookRole === 'viewer';
   },
 
+  currentBuchtyp() {
+    const id = String(this.selectedBookId || '');
+    if (!id) return null;
+    const book = (this.books || []).find(b => String(b.id) === id);
+    return book?.buchtyp || null;
+  },
+  isTagebuch() {
+    return this.currentBuchtyp?.() === 'tagebuch';
+  },
+
   async loadPages(opts = {}) {
     const bookId = this.selectedBookId;
     if (!bookId) return;
@@ -539,6 +549,11 @@ export const treeMethods = {
       } catch { /* Cache-Fehler ignorieren, Fallback auf Live-Berechnung */ }
 
       this.showTreeCard = true;
+      // Default-Sidebar-Mode: Tagebuch öffnet Kalender, sonst Tree. User-Auswahl
+      // überlebt Buchwechsel nicht — bewusst, damit Tagebuch-User Kalender
+      // verlässlich beim Aufruf sieht.
+      this.sidebarMode = this.isTagebuch() ? 'calendar' : 'tree';
+      this.diaryCalendarYearMonth = null;
       this.setStatus('');
       // Geöffnete Seite frisch nachziehen (User klickt "Neuladen" → erwartet
       // auch im Editor den aktuellen Server-Stand). Aktive Edits nicht

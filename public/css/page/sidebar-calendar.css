@@ -1,0 +1,101 @@
+@layer components {
+/* Sidebar-Calendar (Tagebuch-Modus). Monats-Grid + Stepper-Header. */
+.sidebar-calendar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-sm) 0;
+}
+
+.sidebar-calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+}
+
+.sidebar-calendar-month-label {
+  flex: 1 1 auto;
+  text-align: center;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  text-transform: capitalize;
+}
+
+.sidebar-calendar-jumpwrap {
+  width: 100%;
+}
+
+.sidebar-calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: var(--space-2, 2px);
+  font-size: var(--font-em-75);
+  font-weight: 600;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sidebar-calendar-weekday {
+  text-align: center;
+  padding: var(--space-1) 0;
+}
+
+.sidebar-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: var(--space-2, 2px);
+}
+
+.sidebar-calendar-day {
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-muted);
+  padding: 0;
+  aspect-ratio: 1 / 1;
+  min-height: 28px;
+  font-size: var(--font-em-85);
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.08s ease, border-color 0.08s ease;
+}
+
+.sidebar-calendar-day--out {
+  opacity: 0.35;
+}
+
+.sidebar-calendar-day--has-page {
+  background: var(--color-accent-soft);
+  color: var(--color-primary);
+  font-weight: 600;
+  cursor: pointer;
+}
+.sidebar-calendar-day--has-page:hover {
+  background: var(--color-history-active-bg);
+  border-color: var(--color-primary);
+}
+
+.sidebar-calendar-day--today {
+  outline: 1px dashed var(--color-primary);
+  outline-offset: -2px;
+}
+
+.sidebar-calendar-day--active {
+  background: var(--color-primary);
+  color: var(--color-on-primary, #fff);
+  border-color: var(--color-primary);
+}
+
+.sidebar-calendar-day:disabled {
+  cursor: default;
+  background: var(--color-bg);
+  color: var(--color-muted);
+}
+}

@@ -68,6 +68,23 @@ test('validateConfig: unnumberedChapterIds dedup + Integer-Cast + Junk-Filter', 
   assert.deepEqual(empty.chapter.unnumberedChapterIds, []);
 });
 
+test('validateConfig: skipPageCounter Listen — Defaults leer, Junk gefiltert, dedup', () => {
+  const def = defaultConfig();
+  assert.deepEqual(def.chapter.skipPageCounterChapterIds, []);
+  assert.deepEqual(def.chapter.skipPageCounterPageIds, []);
+  const c = validateConfig({
+    chapter: {
+      skipPageCounterChapterIds: [10, '11', 11, 'x', 0, -1, 12],
+      skipPageCounterPageIds:    [9, 9, '8', 'nope', 7],
+    },
+  });
+  assert.deepEqual(c.chapter.skipPageCounterChapterIds, [10, 11, 12]);
+  assert.deepEqual(c.chapter.skipPageCounterPageIds,    [9, 8, 7]);
+  const empty = validateConfig({ chapter: { skipPageCounterChapterIds: 'no', skipPageCounterPageIds: null } });
+  assert.deepEqual(empty.chapter.skipPageCounterChapterIds, []);
+  assert.deepEqual(empty.chapter.skipPageCounterPageIds, []);
+});
+
 test('validateConfig: breakBeforeSubchapter Default false, akzeptiert true', () => {
   const def = defaultConfig();
   assert.equal(def.chapter.breakBeforeSubchapter, false);

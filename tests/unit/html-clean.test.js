@@ -5,7 +5,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { cleanPageHtml, wrapOrphanBlocks, collapseEmptyBlocks, stripTrailingEmptyBlocks, stripBlockEdgeNbsp, flattenDivBlocks } = require('../../lib/html-clean');
+const { cleanPageHtml, wrapOrphanBlocks, collapseEmptyBlocks, stripTrailingEmptyBlocks, stripBlockEdgeNbsp, flattenDivBlocks, linkifyBareUrls } = require('../../lib/html-clean');
 
 test('collapseEmptyBlocks: leere <p>-Runs auf einen kollabieren', () => {
   assert.equal(
@@ -244,4 +244,44 @@ test('cleanPageHtml: heilt page-1056-Pattern (div-Absätze → p)', () => {
   assert.ok(!/<div/.test(out), 'darf keine <div> mehr enthalten');
   assert.match(out, /<p id="bkmrk-y">Eins\.<\/p>/);
   assert.match(out, /<p id="bkmrk-y">Zwei\.<\/p>/);
+});
+
+test('linkifyBareUrls: nackte http-URL wird zum <a>', () => {
+  const out = linkifyBareUrls('<p>Siehe https://example.com hier.</p>');
+  assert.match(out, /<a href="https:\/\/example\.com">https:\/\/example\.com<\/a>/);
+});
+
+test('linkifyBareUrls: bestehende <a>-Wraps bleiben unverändert (idempotent)', () => {
+  const input = '<p><a href="https://example.com">https://example.com</a></p>';
+  assert.equal(linkifyBareUrls(input), input);
+});
+
+test('linkifyBareUrls: trailing-Punkt bleibt ausserhalb des Links', () => {
+  const out = linkifyBareUrls('<p>Zitiere https://example.com/page.</p>');
+  assert.match(out, /<a href="https:\/\/example\.com\/page">https:\/\/example\.com\/page<\/a>\./);
+});
+
+test('linkifyBareUrls: mehrere URLs in einem Absatz', () => {
+  const out = linkifyBareUrls('<p>A https://a.example und B https://b.example fertig.</p>');
+  assert.match(out, /<a href="https:\/\/a\.example">https:\/\/a\.example<\/a>/);
+  assert.match(out, /<a href="https:\/\/b\.example">https:\/\/b\.example<\/a>/);
+});
+
+test('linkifyBareUrls: URL im <pre> bleibt unangetastet', () => {
+  const input = '<pre>https://example.com/raw</pre>';
+  assert.equal(linkifyBareUrls(input), input);
+});
+
+test('linkifyBareUrls: URL mit Query-String + Anker', () => {
+  const out = linkifyBareUrls('<p>Link https://example.com/path?x=1&y=2#anchor sehen.</p>');
+  assert.match(out, /<a href="https:\/\/example\.com\/path\?x=1(&amp;|&)y=2#anchor">/);
+});
+
+test('linkifyBareUrls: kein http im Text → no-op', () => {
+  assert.equal(linkifyBareUrls('<p>Kein Link hier.</p>'), '<p>Kein Link hier.</p>');
+});
+
+test('cleanPageHtml: linkifiziert URLs im Save-Pfad', () => {
+  const out = cleanPageHtml('<p>Siehe https://example.com bla.</p>');
+  assert.match(out, /<a href="https:\/\/example\.com">/);
 });

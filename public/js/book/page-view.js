@@ -1,7 +1,7 @@
 // Seitenansicht-Methoden: Formatierte HTML-Ansicht mit Inline-Fehlermarkierung
 // und Figurenkontext-Panel. `this` bezieht sich auf die Alpine-Komponente.
 
-import { escHtml, htmlToText, fetchJson, findInHtml } from '../utils.js';
+import { escHtml, htmlToText, fetchJson, findInHtml, decorateMentions } from '../utils.js';
 import { handleEditorCopy } from '../editor/shared/paste.js';
 import { tRaw } from '../i18n.js';
 import { _sanitizeFigur } from './figuren.js';
@@ -238,9 +238,9 @@ export const pageViewMethods = {
       }
     }
     if (allErrors.length > 0 || chatProposals.length > 0) {
-      this.renderedPageHtml = buildHighlightedHtml(this.originalHtml, allErrors, allSelected, chatProposals);
+      this.renderedPageHtml = decorateMentions(buildHighlightedHtml(this.originalHtml, allErrors, allSelected, chatProposals));
     } else {
-      this.renderedPageHtml = this.originalHtml;
+      this.renderedPageHtml = decorateMentions(this.originalHtml);
     }
     this._updatePageViewHeight();
   },
@@ -266,8 +266,17 @@ export const pageViewMethods = {
     }
   },
 
-  /** Click-Handler für Inline-Marks → togglet Selektion */
+  /** Click-Handler für Inline-Marks → togglet Selektion. Links → neuer Tab. */
   handleMarkClick(e) {
+    const link = e.target.closest('a[href]');
+    if (link && !link.classList.contains('lektorat-mark')) {
+      const href = link.getAttribute('href');
+      if (href && !href.startsWith('#')) {
+        e.preventDefault();
+        window.open(link.href, '_blank', 'noopener,noreferrer');
+        return;
+      }
+    }
     const mark = e.target.closest('.lektorat-mark');
     if (!mark) return;
     const idx = parseInt(mark.dataset.errorIdx);

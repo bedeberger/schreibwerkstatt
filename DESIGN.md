@@ -1538,7 +1538,7 @@ Struktur: 8 thematische Subfolder unter [public/css/](public/css/) + Root-Solit√
 | File | Inhalt |
 |------|--------|
 | [components/card-form.css](public/css/components/card-form.css) | `.card`, `.card-header*`, `.card-actions*`, `.btn-card-close`, `.card-form-*` Grid, Form-Wertspalten, Combobox-Klassen, `cardFadeIn`, `.token-setup-*` First-Run-Modal. |
-| [components/buttons-badges.css](public/css/components/buttons-badges.css) | `<button>` Hierarchie, `.badge-*`, `.avatar-*`, `.btn-bookstack-link`, `.btn-group`, `.btn-compact`. |
+| [components/buttons-badges.css](public/css/components/buttons-badges.css) | `<button>` Hierarchie, `.badge-*`, `.avatar-*`, `.btn-group`, `.btn-compact`. |
 | [components/tabs.css](public/css/components/tabs.css) | `.tabs` / `.tabs-btn` + `--active`/`--scrollable`/`--fullwidth`. |
 | [components/confirm-dialog.css](public/css/components/confirm-dialog.css) | `.confirm-overlay` / `-dialog`, Shortcuts-Overlay. |
 | [components/icons.css](public/css/components/icons.css) | `.icon`-Klasse, SVG-Sprite-Konsumenten. |
@@ -1552,7 +1552,8 @@ Struktur: 8 thematische Subfolder unter [public/css/](public/css/) + Root-Solit√
 | File | Inhalt |
 |------|--------|
 | [page/page-list.css](public/css/page/page-list.css) | Seiten-Liste in Sidebar, `.tok-stats`, `.tok-totals`. |
-| [page/page-view.css](public/css/page/page-view.css) | `.page-content-view` Reading-Frame, Callouts, Marginalia-Stripe. |
+| [page/page-view.css](public/css/page/page-view.css) | `.page-content-view` Reading-Frame, Callouts, Marginalia-Stripe, `.page-sheet-caption` (Tagebuch-Long-Date), Mention-/Channel-Chips. |
+| [page/sidebar-calendar.css](public/css/page/sidebar-calendar.css) | `.sidebar-calendar` ‚Äî Monats-Grid + Stepper f√ºr Tagebuch-Sidebar. |
 | [page/page-revision-viewer.css](public/css/page/page-revision-viewer.css) | Page-Revision-Diff-Viewer. |
 | [page/tree-history.css](public/css/page/tree-history.css) | Sidebar-Tree, `.history-*`, `.history-chevron`. |
 

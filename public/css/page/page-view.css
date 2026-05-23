@@ -19,7 +19,7 @@
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
   margin: var(--space-md) auto;
-  line-height: 1.3;
+  line-height: 1.5;
   font-family: var(--font-serif);
   font-size: var(--font-size-reading);
   color: var(--color-page-view-text);
@@ -269,6 +269,47 @@
    normale Zeilenumbrüche. */
 @media (max-width: 600px) {
   .page-content-view p { margin: 0.8em 0; }
+}
+
+/* Caption: Long-Form-Datum oberhalb des Sheets, nur für Tagebuch-Buchtyp.
+   Lebt ausserhalb des contenteditable — kein DB-Bleed. Serif, kursiv,
+   muted, rechtsbündig, dotted-rule unten als feiner Heft-Splittinghinweis. */
+.page-sheet-caption {
+  max-width: calc(64ch + 2 * clamp(18px, 4vw, 40px));
+  margin: var(--space-md) auto 0;
+  padding: 0 clamp(18px, 4vw, 40px) var(--space-xs);
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--font-em-90);
+  color: var(--color-muted);
+  text-align: right;
+  border-bottom: 1px dotted var(--color-border);
+}
+.page-sheet-caption + .page-content-view {
+  margin-top: var(--space-xs);
+}
+
+/* Display-Chips für @mentions / #channels. Inline, eckig (var(--radius-sm)),
+   subtil getöntem Hintergrund. Render-Pass via `decorateMentions` in
+   public/js/utils.js — nicht persistiert, gilt nur im View-Modus. */
+.page-content-view .mention,
+.page-content-view .channel {
+  display: inline-block;
+  padding: 0 var(--space-4, 4px);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--font-em-90);
+  font-style: normal;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.page-content-view .mention {
+  background: var(--color-accent-soft);
+  color: var(--color-primary);
+}
+.page-content-view .channel {
+  background: var(--color-history-active-bg);
+  color: var(--color-stark, var(--color-primary));
 }
 
 }

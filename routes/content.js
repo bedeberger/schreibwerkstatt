@@ -76,8 +76,15 @@ router.get('/books', async (req, res) => {
   try {
     const all = await contentStore.listBooks(req);
     const meta = new Map(
-      db.prepare('SELECT book_id, owner_email, category_id FROM books').all()
-        .map(r => [r.book_id, { owner_email: r.owner_email, category_id: r.category_id }])
+      db.prepare(`
+        SELECT b.book_id, b.owner_email, b.category_id, s.buchtyp
+        FROM books b
+        LEFT JOIN book_settings s ON s.book_id = b.book_id
+      `).all().map(r => [r.book_id, {
+        owner_email: r.owner_email,
+        category_id: r.category_id,
+        buchtyp: r.buchtyp,
+      }])
     );
     const visible = all
       .filter(b => allowedIds.has(b.id))
@@ -86,6 +93,7 @@ router.get('/books', async (req, res) => {
         role: roleByBook.get(b.id) || null,
         owner_email: meta.get(b.id)?.owner_email || null,
         category_id: meta.get(b.id)?.category_id ?? null,
+        buchtyp: meta.get(b.id)?.buchtyp ?? null,
       }));
     res.json(visible);
   } catch (e) { _fail(res, e, 'GET /content/books'); }

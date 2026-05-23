@@ -479,6 +479,44 @@
               <p class="card-form-field-note" x-text="$app.t('pdfExport.chapter.unnumberedHint')"></p>
             </div>
           </div>
+          <div class="card-form-row card-form-row--top">
+            <label class="card-form-label" x-text="$app.t('pdfExport.chapter.skipPageCounterChapters')"></label>
+            <div class="card-form-field">
+              <div x-data="combobox({ placeholder: $app.t('pdfExport.chapter.skipPageCounterPick'), multiple: true })"
+                   x-modelable="value" x-model="activeProfile.config.chapter.skipPageCounterChapterIds"
+                   x-effect="options = skipPageCounterChapterPickOptions()"></div>
+              <div class="pdfx-chip-row" x-show="skipPageCounterChapterChips().length">
+                <template x-for="chip in skipPageCounterChapterChips()" :key="chip.id">
+                  <span class="pdfx-chip">
+                    <span x-text="chip.label"></span>
+                    <button type="button" class="pdfx-chip-remove"
+                            :aria-label="$app.t('common.remove')"
+                            @click="removeSkipPageCounterChapter(chip.id)">×</button>
+                  </span>
+                </template>
+              </div>
+              <p class="card-form-field-note" x-text="$app.t('pdfExport.chapter.skipPageCounterChaptersHint')"></p>
+            </div>
+          </div>
+          <div class="card-form-row card-form-row--top">
+            <label class="card-form-label" x-text="$app.t('pdfExport.chapter.skipPageCounterPages')"></label>
+            <div class="card-form-field">
+              <div x-data="combobox({ placeholder: $app.t('pdfExport.chapter.skipPageCounterPagePick'), multiple: true })"
+                   x-modelable="value" x-model="activeProfile.config.chapter.skipPageCounterPageIds"
+                   x-effect="options = skipPageCounterPagePickOptions()"></div>
+              <div class="pdfx-chip-row" x-show="skipPageCounterPageChips().length">
+                <template x-for="chip in skipPageCounterPageChips()" :key="chip.id">
+                  <span class="pdfx-chip">
+                    <span x-text="chip.label"></span>
+                    <button type="button" class="pdfx-chip-remove"
+                            :aria-label="$app.t('common.remove')"
+                            @click="removeSkipPageCounterPage(chip.id)">×</button>
+                  </span>
+                </template>
+              </div>
+              <p class="card-form-field-note" x-text="$app.t('pdfExport.chapter.skipPageCounterPagesHint')"></p>
+            </div>
+          </div>
           <div class="card-form-row">
             <label class="card-form-label" x-text="$app.t('pdfExport.chapter.titleStyle')"></label>
             <div class="card-form-field">

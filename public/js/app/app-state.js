@@ -98,6 +98,12 @@ const navigationState = () => ({
   newChapterTitle: '',
   newChapterCreating: false,
   newChapterError: '',
+  // Diary-Calendar (Tagebuch-Bücher): Sidebar-Mode (Tree vs. Kalender) und
+  // aktiver Monat. `sidebarMode` startet 'tree'; auf Buchwechsel setzt
+  // tree.js#loadPages bei buchtyp='tagebuch' auf 'calendar'.
+  sidebarMode: 'tree',
+  diaryCalendarYearMonth: null,
+  _diaryCalendarJumpModel: '',
 });
 
 // Page-Slice: Inhalt der aktuell geöffneten Seite. Mode-agnostisch — Notebook,

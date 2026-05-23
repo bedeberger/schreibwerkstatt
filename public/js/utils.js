@@ -743,6 +743,69 @@ export function replaceInHtml(html, needle, replacement) {
 }
 
 /**
+ * Display-Pass: Markiert Slack-Style `@mentions` (User-Handles) und `#channels`
+ * im View-Modus als Chips. Pure HTML-String-Transform, nicht persistent —
+ * läuft auf `renderedPageHtml`, niemals auf `originalHtml`. Überspringt Text
+ * in `<a>`, `<pre>`, `<code>` und bereits dekorierten Spans (idempotent).
+ *
+ * `@name`: 2+ Wortzeichen, beginnt mit Buchstabe.
+ * `#tag`:  2+ Wortzeichen, beginnt mit Buchstabe oder Ziffer; Bindestrich erlaubt
+ *           (matcht `#1-vbs`, `#dot-sync`).
+ * Boundary: vorheriges Zeichen darf kein Wortzeichen oder `/` sein.
+ */
+const _MENTION_SKIP_ANCESTOR = new Set(['A', 'PRE', 'CODE']);
+const _CHIP_RE = /(^|[^\w/&])([@#])([A-Za-z0-9][\w-]{1,})/g;
+
+export function decorateMentions(html) {
+  if (!html || (!html.includes('@') && !html.includes('#'))) return html;
+  const doc = new DOMParser().parseFromString('<div id="r">' + html + '</div>', 'text/html');
+  const root = doc.getElementById('r');
+  if (!root) return html;
+
+  const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const texts = [];
+  let n = walker.nextNode();
+  while (n) {
+    if (!_mentionAncestorSkip(n) && /[@#]/.test(n.textContent)) texts.push(n);
+    n = walker.nextNode();
+  }
+  for (const textNode of texts) {
+    const text = textNode.textContent;
+    const matches = [...text.matchAll(_CHIP_RE)];
+    if (matches.length === 0) continue;
+    const frag = doc.createDocumentFragment();
+    let last = 0;
+    for (const m of matches) {
+      const pre = m[1];
+      const sigil = m[2];
+      const word = m[3];
+      const start = m.index + pre.length;
+      const end = start + 1 + word.length;
+      if (start > last) frag.appendChild(doc.createTextNode(text.slice(last, start)));
+      const span = doc.createElement('span');
+      span.className = sigil === '@' ? 'mention' : 'channel';
+      span.textContent = sigil + word;
+      frag.appendChild(span);
+      last = end;
+    }
+    if (last < text.length) frag.appendChild(doc.createTextNode(text.slice(last)));
+    textNode.parentNode.replaceChild(frag, textNode);
+  }
+  return root.innerHTML;
+}
+
+function _mentionAncestorSkip(node) {
+  let p = node.parentNode;
+  while (p && p.nodeType === 1) {
+    if (_MENTION_SKIP_ANCESTOR.has(p.tagName)) return true;
+    const cls = p.getAttribute && p.getAttribute('class');
+    if (cls && /\b(mention|channel)\b/.test(cls)) return true;
+    p = p.parentNode;
+  }
+  return false;
+}
+
+/**
  * Einfaches Markdown → HTML für Chat-Antworten.
  * Unterstützt: # Überschriften, **fett**, *kursiv*, `code`, Zeilenumbrüche, Listen (- und 1.).
  */
