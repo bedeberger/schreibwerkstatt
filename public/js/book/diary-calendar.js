@@ -14,32 +14,6 @@ function _ensureCache(app) {
 }
 
 export const diaryCalendarMethods = {
-  // Parser für Diary-Page-Names: erkennt `YYYY-MM-DD` (mit optionalem
-  // Suffix wie `2026-04-27 Notiz`). Rückgabe: Date-Objekt (UTC-Mittag,
-  // vermeidet TZ-Off-by-One), null wenn kein Match.
-  _parseDiaryDate(name) {
-    if (!name || typeof name !== 'string') return null;
-    const m = name.match(/^(\d{4})-(\d{2})-(\d{2})\b/);
-    if (!m) return null;
-    const y = parseInt(m[1], 10);
-    const mo = parseInt(m[2], 10);
-    const d = parseInt(m[3], 10);
-    if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
-    return new Date(Date.UTC(y, mo - 1, d, 12, 0, 0));
-  },
-
-  // Long-Form-Label für Diary-Page-Name. Tagebuch-Only-Caller, schreibt
-  // `Montag, 27. April 2026` (de) bzw. `Monday, 27 April 2026` (en).
-  // Rückgabe '' bei nicht-parsebaren Namen.
-  diaryDateLabel(name) {
-    const dt = this._parseDiaryDate(name);
-    if (!dt) return '';
-    const locale = this.uiLocale === 'en' ? 'en-US' : 'de-CH';
-    return dt.toLocaleDateString(locale, {
-      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-    });
-  },
-
   // Map<'YYYY-MM-DD', page>. Cache invalidiert bei pages-Replacement.
   diaryCalendarPagesMap() {
     const cache = _ensureCache(this);

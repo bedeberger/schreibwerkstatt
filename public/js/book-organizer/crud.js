@@ -2,6 +2,7 @@
 // in root.tree/root.pages. History-Push pro erfolgreichem Schritt.
 import { contentRepo } from '../repo/content.js';
 import { _sortSoloFirst } from '../book/tree.js';
+import { localIsoDate } from '../utils.js';
 
 export const crudMethods = {
   onRenameChapter(id, ev) {
@@ -101,9 +102,11 @@ export const crudMethods = {
 
   async createPage(chapterId) {
     const root = window.__app;
+    const isDiary = typeof root.isTagebuch === 'function' && root.isTagebuch();
     const name = await root.appPrompt({
       message: root.t('bookOrganizer.promptPageName'),
       placeholder: root.t('bookOrganizer.placeholderPageName'),
+      defaultValue: isDiary ? localIsoDate() : '',
       confirmLabel: root.t('bookOrganizer.create'),
     });
     if (!name) return;

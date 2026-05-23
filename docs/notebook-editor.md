@@ -33,7 +33,6 @@ Sub-Karte `editorNotebookCard` ([public/js/cards/editor-notebook-card.js](../pub
 - **Paper-Sheet-Shadow** — `box-shadow: var(--shadow-sm)` auf `.page-content-view` (Blatt-auf-Tisch-Lift in beiden Modi).
 - **Buchsatz-Erstzeilen-Einzug** — `p + p { text-indent: 1.4em; margin-top: 0; }`. Folge-`<p>`-Selector greift automatisch nicht nach Headings, blockquote, poem, hr (Roman-/Tagebuch-Buchsatz). Mobile (<600 px): Margin auf 0.8em angehoben (Zeilen-Boost), Erstzeilen-Indent bleibt.
 - **Vertikaler Atem** — `padding: 36px clamp(18px, 4vw, 40px)`, `line-height: 1.5`, `<p>`-Margin 0.6em (Desktop).
-- **Heft-Caption** — `.page-sheet-caption` als Sibling vor dem Sheet zeigt `currentPage.name` typografisch (Serif, kursiv, muted, dotted-rule unten, rechtsbündig). Doppelung zum Card-Header bewusst — Sheet ist autark lesbar.
 
 **`--editing`-Modifier** ergänzt nur Edit-Spezifika: linkes Rail (5 px primary), Background-Tint, `hyphens: none`, `text-wrap: wrap` (kein pretty/balance gegen Caret-Wackeln), `cursor: text`. Sheet-Shadow, Padding, Line-height, Erstzeilen-Einzug erbt aus dem Base-Selector — **Read und Edit zeigen identische Typografie**.
 

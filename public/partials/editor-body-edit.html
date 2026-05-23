@@ -8,7 +8,6 @@
      Topbar (editor-notebook.html), damit sie an der sticky Topbar haftet
      und permanent sichtbar bleibt — besonders im Vollbild beim Scrollen. -->
 <div x-show="editMode && !focusActive" class="page-editor-wrap normal-editor">
-  <div class="page-sheet-caption" x-show="isTagebuch() && diaryDateLabel(currentPage?.name)" x-text="diaryDateLabel(currentPage?.name)" x-cloak></div>
   <div class="page-content-view page-content-view--editing"
        :class="{ 'page-content-view--fit-width': pageEditorFitWidth }"
        :style="`--editor-zoom: ${pageEditorZoom}`"
