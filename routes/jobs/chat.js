@@ -12,7 +12,7 @@ const {
   getFiguren, getLatestReview, buildChatMessageHistory,
 } = require('./shared');
 const contentStore = require('../../lib/content-store');
-const { executeTool } = require('./book-chat-tools');
+const { executeTool, validateFinalAnswerCitations } = require('./book-chat-tools');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
 const appSettings = require('../../lib/app-settings');
@@ -569,17 +569,41 @@ async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEma
       const finalUse = result.toolUses.find(tu => tu.name === 'final_answer');
       if (finalUse) {
         const antwort = typeof finalUse.input?.antwort === 'string' ? finalUse.input.antwort : '';
+        const zitate  = Array.isArray(finalUse.input?.zitate) ? finalUse.input.zitate : null;
         finalText = JSON.stringify({ antwort });
+        let citationValidation = null;
+        let invalidCount = 0;
+        if (zitate && zitate.length) {
+          try {
+            citationValidation = await validateFinalAnswerCitations(zitate, ctx);
+            invalidCount = citationValidation.filter(v => !v.valid).length;
+            if (invalidCount > 0) {
+              logger.warn(`final_answer: ${invalidCount}/${citationValidation.length} Zitate ungültig (siehe context_info).`);
+            }
+          } catch (e) {
+            if (e.name === 'AbortError') throw e;
+            logger.warn(`final_answer-Zitat-Validierung fehlgeschlagen: ${e.message}`);
+            citationValidation = [{ valid: false, reason: `validator_error: ${e.message}` }];
+            invalidCount = 1;
+          }
+        }
         toolLog.push({
           name: 'final_answer',
-          input: { antwort_chars: antwort.length },
+          input: {
+            antwort_chars: antwort.length,
+            ...(zitate ? { zitate_count: zitate.length } : {}),
+          },
           ok: true,
           durationMs: 0,
           resultBytes: antwort.length,
           truncated: false,
           iter: iter + 1,
+          ...(citationValidation ? {
+            citation_validation: citationValidation,
+            citations_invalid: invalidCount,
+          } : {}),
         });
-        logger.info(`tool=final_answer antwort_chars=${antwort.length} iter=${iter + 1} (terminal)`);
+        logger.info(`tool=final_answer antwort_chars=${antwort.length} zitate=${zitate?.length || 0} invalid=${invalidCount} iter=${iter + 1} (terminal)`);
         break;
       }
 

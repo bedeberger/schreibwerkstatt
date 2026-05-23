@@ -26,7 +26,7 @@ Jede Tool-Funktion: `(input, ctx) → JSON-serialisierbares Objekt` (sync oder a
 
 ## Tools
 
-24 Tools, gruppiert nach Domäne. Alle Read-Only ausser `final_answer` (Pflicht-Endpunkt, kein DB-Read).
+29 Tools, gruppiert nach Domäne. Alle Read-Only ausser `final_answer` (Pflicht-Endpunkt, kein DB-Read).
 
 ### Buch/Kapitel-Überblick
 
@@ -43,8 +43,10 @@ Jede Tool-Funktion: `(input, ctx) → JSON-serialisierbares Objekt` (sync oder a
 | Tool | Input | Zweck | Quelle |
 |------|-------|-------|--------|
 | `get_pages` | `ids: integer[]` (max 20), `max_chars_per_page?` | Volltext bestimmter Seiten + falls vorhanden `latest_check {checked_at, error_count, fazit, stilanalyse}` aus `page_checks`. | Content-Store-Facade `loadPage(id)` (backend-agnostisch) + `page_checks` |
-| `search_passages` | `pattern`, `regex?`, `chapter_id?`, `page_id?`, `max_results?` (default 10, max 30) | Volltext-Suche; liefert Treffer mit Snippet ±120 Zeichen. Mit `chapter_id`/`page_id` auf Kapitel/Seite eingrenzbar. Offsets kompatibel mit `quote_passage`. | `pages.preview_text` → `htmlToText` |
+| `get_chapter_text` | `chapter_id`, `max_pages?` (1-20), `max_chars_per_page?` | Volltext aller Seiten eines Kapitels in einem Call. Spart die Sequenz `list_chapters → get_pages`. Liefert `pages[{page_id,page_name,text,truncated}]` + `total_pages`. | `chapters` + `pages` + Content-Store `loadPage` |
+| `search_passages` | `pattern`, `regex?`, `chapter_id?`, `page_id?`, `max_results?` (default 10, max 30) | Volltext-Suche via FTS5-Index (Literal-Pfad, bm25-sortiert) → exakte Offsets + Snippet ±120 Zeichen. Mit `regex=true` umgeht FTS5 und scannt alle Seiten direkt. Mit `chapter_id`/`page_id` einschränkbar. Offsets kompatibel mit `quote_passage`. | `search_index` (FTS5) → `pages.body_html` → `htmlToPlainText` |
 | `quote_passage` | `page_id`, `offset`, `length` (max 800), `context_chars?` (default 80, max 300) | Zeichen-genaues Zitat aus einer Seite. Liefert `quote`, `before`/`after`, `page_chars`. Pflicht-Werkzeug vor jeder wörtlichen Zitierung in `final_answer` — kein „aus Erinnerung paraphrasieren". | Content-Store `loadPage` → `htmlToPlainText` |
+| `quote_match` | `page_id`, `pattern` (max 800), `occurrence?` (default 1), `context_chars?` | Bequemes Pendant zu `quote_passage`: Server sucht den Pattern (case-insensitive Literal) selbst und gibt `offset`/`length`/`quote`/`before`/`after`/`occurrence`/`total_matches` zurück. Spart `search_passages → quote_passage`. | Content-Store `loadPage` → `htmlToPlainText` |
 | `find_repetitions` | `n?` (2-5, default 3), `scope?` (book/chapter/page), `chapter_id?`/`page_id?`, `min_count?`, `limit?` (default 30, max 100), `ignore_stopwords?` | N-Gramm-Frequenzanalyse mit Stopwort-Filter (DE+EN). Returns `results[{phrase, count, sample_pages}]`. Sprach-Tics/redundante Phrasen. | `pages.body_html` → `htmlToPlainText` |
 | `get_dialogue` | `chapter_id?`, `page_id?`, `figur_id?`/`figur_name?`, `min_length?`, `limit?` (default 30, max 100) | Heuristische Dialog-Extraktion (Anführungszeichen, Speech-Verb+Doppelpunkt, Em-Dash) via `findDialogRanges` aus [lib/page-index.js](../lib/page-index.js). Mit Figur-Filter: ±100-Zeichen-Sprecherheuristik. Offsets kompatibel mit `quote_passage`. | `pages.body_html` → `htmlToPlainText` + `findDialogRanges` |
 
@@ -69,6 +71,7 @@ Jede Tool-Funktion: `(input, ctx) → JSON-serialisierbares Objekt` (sync oder a
 |------|-------|-------|--------|
 | `get_reviews` | `scope?` (`book`/`chapter`, default `chapter`), `chapter_ids?[]`, `sort?`, `limit?` | `scope=book`: letzte Buchbewertung (gesamtnote, Stärken/Schwächen, Fazit, Zusammenfassung). `scope=chapter`: Kapitelbewertungen + `ohne_bewertung[]`. | `book_reviews` / `chapter_reviews` |
 | `get_lektorat_hotspots` | `chapter_id?`, `min_errors?`, `limit?` (default 20, max 100) | Aggregat über `page_checks` (letzter Check pro Seite): pro Kapitel total/avg/max Fehler + Top-N-Seiten mit Fazit-Snippet. | `page_checks` |
+| `get_lektorat_findings` | `page_id?`, `chapter_id?`, `typ?`, `limit?` (default 30, max 100) | Einzelbefunde aus `page_checks.errors_json` (letzter Check pro Seite). Liefert `findings[{page_id,page_name,chapter_id,checked_at,typ,original,korrektur,erklaerung,offset?,length?}]` + `by_typ`-Verteilung + `total_findings`. Filterbar nach Typ (`stil`, `grammatik`, …). | `page_checks.errors_json` |
 
 ### Kontinuität / Zeitstrahl
 
@@ -97,7 +100,7 @@ Jede Tool-Funktion: `(input, ctx) → JSON-serialisierbares Objekt` (sync oder a
 
 | Tool | Input | Zweck | Quelle |
 |------|-------|-------|--------|
-| `final_answer` | `antwort: string` | Pflicht-Endpunkt der Loop: Modell ruft das Tool als letzten Schritt mit der finalen Antwort an den User. `runBookChatJobAgent` fängt es vor `executeTool` ab, setzt `finalText = JSON.stringify({antwort})` und bricht den Loop. Ersetzt freies JSON-Output am Ende — Schema des Tools erzwingt die Struktur. Bei mehreren Tool-Uses in einer Iteration terminiert `final_answer` unabhängig von der Position. | – (kein DB-Read) |
+| `final_answer` | `antwort: string`, `zitate?: [{page_id, offset, length, quote}]` | Pflicht-Endpunkt der Loop: Modell ruft das Tool als letzten Schritt mit der finalen Antwort an den User. `runBookChatJobAgent` fängt es vor `executeTool` ab, setzt `finalText = JSON.stringify({antwort})` und bricht den Loop. Ersetzt freies JSON-Output am Ende — Schema des Tools erzwingt die Struktur. Bei mehreren Tool-Uses in einer Iteration terminiert `final_answer` unabhängig von der Position. **Halluzinationsschutz:** Wenn `zitate` mitgeliefert wird, validiert `validateFinalAnswerCitations` (Content-Store-Reload pro Seite) jeden Eintrag — `text.slice(offset, offset+length) === quote`. Ergebnis landet als `citation_validation` + `citations_invalid` in `toolLog`/`context_info`; ungültige Zitate werden geloggt, aber der Loop bricht NICHT ab (Antwort wird trotzdem ausgeliefert — die Validierung dient als Beweisspur). | – (kein DB-Read; Validierung nutzt Content-Store) |
 
 ## Neues Tool hinzufügen
 

@@ -241,13 +241,12 @@ export function createFormFieldSpellcheck({
       dictBtn.addEventListener('click', async () => {
         dictBtn.disabled = true;
         try {
-          const bookId = getBookId ? getBookId() : null;
           const rawLang = getBookLocale ? getBookLocale() : '*';
           const lang = (!rawLang || rawLang === 'auto') ? '*' : rawLang;
           const resp = await fetch('/dictionary', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ word, bookId, lang }),
+            body: JSON.stringify({ word, bookId: 0, lang }),
             credentials: 'same-origin',
           });
           if (resp.ok) {

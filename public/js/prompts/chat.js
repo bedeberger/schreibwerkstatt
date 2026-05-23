@@ -131,12 +131,15 @@ export function buildBookChatAgentSystemPrompt(bookName, figuren, review, system
     `Buch: «${bookName}»`,
     '',
     'Du hast Zugriff auf Werkzeuge, die Fragen über das gesamte Buch aus einem vorberechneten Index beantworten. Nutze sie, bevor du antwortest, wann immer die Frage gemessen oder aus konkreten Textstellen belegt werden kann:',
-    '- Häufigkeit, Verteilung, Erzählperspektive → count_pronouns, get_chapter_stats',
+    '- Häufigkeit, Verteilung, Erzählperspektive → count_pronouns, get_stil_metrics',
     '- Figurenverteilung, erstes Auftreten → get_figure_mentions, list_chapters',
-    '- Konkrete Textstellen oder Zitate → search_passages, get_pages',
-    '- Kapitel-Qualität, Stärken/Schwächen, beste/schwächste Kapitel → list_chapter_reviews',
+    '- Konkrete Textstellen oder Zitate → search_passages, quote_match, quote_passage',
+    '- Ganze Kapitel lesen → get_chapter_text (statt list_chapters→get_pages)',
+    '- Lektorat: Übersicht → get_lektorat_hotspots, konkrete Findings → get_lektorat_findings',
+    '- Kapitel-Qualität, Stärken/Schwächen → get_reviews',
     '',
     'Rufe Werkzeuge an, bevor du vermutest. Bei interpretatorischen Fragen (Stil, Ton, Wirkung) kannst du direkt antworten oder mit search_passages Belege suchen.',
+    'Wörtliche Zitate: IMMER über quote_match (Pattern → Stelle) oder quote_passage (offset+length) holen, NIE aus Erinnerung paraphrasieren. Beim final_answer-Call jedes wörtliche Zitat in `zitate` mitliefern — Server validiert.',
     `Maximal ${maxToolIter} Werkzeug-Iterationen pro Antwort. Halte Werkzeug-Argumente präzise und kurz.`,
     '',
   ];
@@ -219,12 +222,12 @@ export const BOOK_CHAT_TOOLS = [
   },
   {
     name: 'search_passages',
-    description: 'Durchsucht das Buch nach Textstellen. Liefert Treffer mit Kurzkontext (Snippet). Standard: case-insensitive Literal-Suche; mit regex=true als Regex. Mit chapter_id/page_id auf ein Kapitel oder eine Seite einschränken (sinnvoll bei häufigen Begriffen, sonst spammt das Buch-weite Resultat). Nutze dies, wenn du nicht weisst, wo etwas steht, oder ob es überhaupt vorkommt. Nicht nutzen, wenn du bereits page_ids kennst und den vollen Seitentext brauchst – dafür `get_pages`. Auch nicht für Figuren-Auftritte – dafür `get_figure_mentions`.',
+    description: 'Durchsucht den Buch-Volltext via FTS5 (Literal-Pfad, bm25-sortiert) und liefert exakte Treffer-Offsets + Snippets. Standard: case-insensitive Literal-Suche; mit regex=true als JavaScript-Regex (umgeht FTS5 und scannt alle Seiten direkt). Mit chapter_id/page_id auf ein Kapitel oder eine Seite einschränken. Offsets sind kompatibel mit `quote_passage`. Nutze dies für "wo kommt X vor?"-Fragen über das ganze Buch. Nicht nutzen, wenn du bereits page_ids kennst und den vollen Seitentext brauchst (→ `get_pages` / `get_chapter_text`) oder für Figuren-Auftritte (→ `get_figure_mentions`).',
     input_schema: {
       type: 'object',
       properties: {
-        pattern:     { type: 'string',  description: 'Suchmuster (literal oder Regex).' },
-        regex:       { type: 'boolean', description: 'true = pattern als Regex interpretieren. Default: false.' },
+        pattern:     { type: 'string',  description: 'Suchmuster (literal oder Regex). Mehrere Wörter werden im Literal-Modus als AND über FTS5 vorgefiltert; final wird die exakte Phrase im Seitentext gesucht.' },
+        regex:       { type: 'boolean', description: 'true = pattern als JavaScript-Regex interpretieren, scannt alle Buchseiten ohne FTS5-Vorfilter. Default: false.' },
         chapter_id:  { type: 'integer', description: 'Optional: Suche auf ein Kapitel einschränken.' },
         page_id:     { type: 'integer', description: 'Optional: Suche auf eine einzelne Seite einschränken (überschreibt chapter_id-Wirkung).' },
         max_results: { type: 'integer', description: 'Maximale Anzahl Treffer (default 10, max 30).' },
@@ -234,7 +237,7 @@ export const BOOK_CHAT_TOOLS = [
   },
   {
     name: 'get_pages',
-    description: 'Lädt den vollen Text bestimmter Seiten (bei Bedarf für Zitate oder Detail-Analyse). Bis zu 20 Seiten pro Aufruf – bei kleinen Büchern kannst du in einem Call das ganze Buch laden (Page-IDs vorher via list_chapters holen). Falls für die Seite ein gespeichertes Lektorat existiert, kommt es als latest_check {checked_at, error_count, fazit, stilanalyse} mit. Schwergewichtig (Volltext) – nicht nutzen für blosse Trefferlisten oder „wo kommt X vor?", dafür `search_passages` / `get_figure_mentions`. Nicht zur Massen-Inspektion ganzer Bücher aufrufen, wenn ein Aggregat-Tool (z.B. `get_stil_metrics`, `get_lektorat_hotspots`) die Frage direkt beantwortet.',
+    description: 'Lädt den vollen Text bestimmter Seiten (bei Bedarf für Zitate oder Detail-Analyse). Bis zu 20 Seiten pro Aufruf – bei kleinen Büchern kannst du in einem Call das ganze Buch laden (Page-IDs vorher via list_chapters holen). Falls für die Seite ein gespeichertes Lektorat existiert, kommt es als latest_check {checked_at, error_count, fazit, stilanalyse} mit. Schwergewichtig (Volltext) – nicht nutzen für blosse Trefferlisten oder „wo kommt X vor?", dafür `search_passages` / `get_figure_mentions`. Für ein ganzes Kapitel bequemer: `get_chapter_text`. Nicht zur Massen-Inspektion ganzer Bücher aufrufen, wenn ein Aggregat-Tool (z.B. `get_stil_metrics`, `get_lektorat_hotspots`) die Frage direkt beantwortet.',
     input_schema: {
       type: 'object',
       properties: {
@@ -242,6 +245,19 @@ export const BOOK_CHAT_TOOLS = [
         max_chars_per_page: { type: 'integer', description: 'Harte Kürzung pro Seite. Server clamped automatisch an das Kontextfenster – nur setzen, wenn explizit weniger gewünscht.' },
       },
       required: ['ids'],
+    },
+  },
+  {
+    name: 'get_chapter_text',
+    description: 'Lädt den Volltext aller Seiten eines Kapitels in einem Call (max 20 Seiten, automatische Sortierung nach page_id). Spart die Sequenz list_chapters → get_pages. Liefert pages[{page_id,page_name,text,truncated}] + total_pages. Ideal für "fasse Kapitel X zusammen", "wie endet Kapitel 3?", "welche Szenen sind in Kapitel 2?". Falls das Kapitel >20 Seiten hat, kommt `dropped` zurück — restliche Seiten dann gezielt via `get_pages` nachladen.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        chapter_id:         { type: 'integer', description: 'Kapitel-ID aus list_chapters (Pflicht).' },
+        max_pages:          { type: 'integer', description: 'Anzahl Seiten max. (1-20, Default: alle Seiten des Kapitels bis 20).' },
+        max_chars_per_page: { type: 'integer', description: 'Harte Kürzung pro Seite. Server clamped automatisch ans Kontextfenster.' },
+      },
+      required: ['chapter_id'],
     },
   },
   {
@@ -326,13 +342,27 @@ export const BOOK_CHAT_TOOLS = [
   },
   {
     name: 'get_lektorat_hotspots',
-    description: 'Aggregat über page_checks (letzter Check pro Seite): pro Kapitel total/avg/max Fehleranzahl plus Top-N-Seiten mit den meisten Fehlern (inkl. fazit-Snippet). Beantwortet "wo sind die schwersten Lektorat-Probleme?", "welche Kapitel brauchen am meisten Arbeit?". Schneller Überblick statt vielfacher get_pages-Aufrufe. Nicht nutzen für Stil-/Lesbarkeitsmetriken (Passiv-Anteil, LIX, Dialoganteil) – dafür `get_stil_metrics`. Hotspots zählen Fehler-Findings; Metriken messen Satzstruktur.',
+    description: 'Aggregat über page_checks (letzter Check pro Seite): pro Kapitel total/avg/max Fehleranzahl plus Top-N-Seiten mit den meisten Fehlern (inkl. fazit-Snippet). Beantwortet "wo sind die schwersten Lektorat-Probleme?", "welche Kapitel brauchen am meisten Arbeit?". Schneller Überblick. Nutze danach `get_lektorat_findings` für die konkreten Findings einer Seite/eines Kapitels. Nicht nutzen für Stil-/Lesbarkeitsmetriken (Passiv-Anteil, LIX, Dialoganteil) – dafür `get_stil_metrics`. Hotspots zählen Fehler-Findings; Metriken messen Satzstruktur.',
     input_schema: {
       type: 'object',
       properties: {
         chapter_id: { type: 'integer', description: 'Nur Seiten dieses Kapitels.' },
         min_errors: { type: 'integer', description: 'Mindest-Fehleranzahl pro Seite (default 0).' },
         limit:      { type: 'integer', description: 'Anzahl Top-Seiten (default 20, max 100).' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'get_lektorat_findings',
+    description: 'Konkrete Lektorat-Findings (Einzelbefunde, nicht nur Aggregat). Liefert findings[{page_id,page_name,chapter_id,chapter_name,checked_at,typ,original,korrektur,erklaerung,offset?,length?}] aus dem letzten Check pro Seite. Plus by_typ-Verteilung und total_findings. Filterbar nach page_id, chapter_id und typ (z.B. "stil","grammatik","rechtschreibung","interpunktion","fluss","wortwahl"). Ideal für "welche Stilfehler gibt es im Kapitel?", "zeig mir konkrete Lektorat-Vorschläge zu Seite X", "wo wurden Grammatikfehler gefunden?". Vorlauf: `get_lektorat_hotspots` für Überblick, dann hier ins Detail.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        page_id:    { type: 'integer', description: 'Nur Findings dieser Seite.' },
+        chapter_id: { type: 'integer', description: 'Nur Findings dieses Kapitels (ignoriert wenn page_id gesetzt).' },
+        typ:        { type: 'string',  description: 'Optional: Filter nach Fehler-Typ (case-insensitive, z.B. "stil").' },
+        limit:      { type: 'integer', description: 'Max. Findings im Output (default 30, max 100). Aggregate (by_typ, total_findings) zählen alle Treffer.' },
       },
       required: [],
     },
@@ -481,7 +511,7 @@ export const BOOK_CHAT_TOOLS = [
   },
   {
     name: 'quote_passage',
-    description: 'Liefert ein zeichengenaues Zitat aus einer Seite (offset+length im Plain-Text, kompatibel mit den offsets aus `search_passages` und `get_dialogue`). Liefert page_name, chapter_name, quote (exakte Passage), before/after-Kontext und page_chars. Nutze dies vor JEDEM wörtlichen Zitat in der finalen Antwort – nie aus Erinnerung paraphrasieren oder aus get_pages-Ausschnitten Quotes zusammenkürzen. Max length: 800 Zeichen; max context_chars: 300.',
+    description: 'Liefert ein zeichengenaues Zitat aus einer Seite (offset+length im Plain-Text, kompatibel mit den offsets aus `search_passages` und `get_dialogue`). Liefert page_name, chapter_name, quote (exakte Passage), before/after-Kontext und page_chars. Nutze dies vor JEDEM wörtlichen Zitat in der finalen Antwort – nie aus Erinnerung paraphrasieren oder aus get_pages-Ausschnitten Quotes zusammenkürzen. Wenn du nur Pattern + page_id kennst (kein offset): nimm `quote_match`. Max length: 800 Zeichen; max context_chars: 300.',
     input_schema: {
       type: 'object',
       properties: {
@@ -494,12 +524,40 @@ export const BOOK_CHAT_TOOLS = [
     },
   },
   {
+    name: 'quote_match',
+    description: 'Bequemes Pendant zu `quote_passage`: Server sucht den Pattern (case-insensitive Literal-Substring) selbst auf der Seite und gibt das zeichengenaue Zitat + offset/length zurück. Spart die Sequenz search_passages → quote_passage, wenn du nur ein Pattern und eine page_id hast. Liefert quote, offset, length, before/after, occurrence und total_matches. Bei mehreren Treffern: `occurrence` (1-basiert) wählt den n-ten Treffer; ohne Angabe der erste. Max pattern-Länge: 800. Nicht für Regex – nur Literal. Für Buch-weite Suche ohne bekannte page_id zuerst `search_passages` rufen.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        page_id:       { type: 'integer', description: 'Seiten-ID (Pflicht).' },
+        pattern:       { type: 'string',  description: 'Literaler Substring, der zitiert werden soll (case-insensitive, max 800 Zeichen). Das gefundene Zitat hat die Original-Schreibweise aus dem Seitentext.' },
+        occurrence:    { type: 'integer', description: 'Wenn das Pattern mehrfach vorkommt: welches Vorkommen (1-basiert)? Default: 1.' },
+        context_chars: { type: 'integer', description: 'Vor-/Nach-Kontext (default 80, max 300, 0 = ohne).' },
+      },
+      required: ['page_id', 'pattern'],
+    },
+  },
+  {
     name: 'final_answer',
-    description: 'Liefert die finale Antwort an den User. Rufe dieses Werkzeug als ALLERLETZTEN Aufruf einer Runde — danach folgt keine weitere Iteration und keine weitere Recherche. Pflicht-Endpunkt: jede Antwort an den User MUSS über dieses Werkzeug laufen. Freitext ohne final_answer wird nicht als Antwort akzeptiert. Schreibe die Antwort in der Sprache der Userfrage.',
+    description: 'Liefert die finale Antwort an den User. Rufe dieses Werkzeug als ALLERLETZTEN Aufruf einer Runde — danach folgt keine weitere Iteration und keine weitere Recherche. Pflicht-Endpunkt: jede Antwort an den User MUSS über dieses Werkzeug laufen. Freitext ohne final_answer wird nicht als Antwort akzeptiert. Schreibe die Antwort in der Sprache der Userfrage. Wenn du in der antwort wörtlich zitierst: hänge JEDES Zitat in das Feld `zitate` mit {page_id, offset, length, quote} aus quote_passage/quote_match/search_passages. Der Server validiert post-hoc; ungültige Zitate werden geloggt.',
     input_schema: {
       type: 'object',
       properties: {
         antwort: { type: 'string', description: 'Antwort an den User als Freitext, Markdown erlaubt. Pflichtfeld.' },
+        zitate: {
+          type: 'array',
+          description: 'Optional: alle wörtlichen Zitate, die in der antwort vorkommen, je mit page_id, offset, length und exakt dem zitierten Text. Halluzinationsschutz — der Server prüft, ob text.slice(offset, offset+length) == quote im aktuellen Seitentext.',
+          items: {
+            type: 'object',
+            properties: {
+              page_id: { type: 'integer', description: 'Seiten-ID des Zitats.' },
+              offset:  { type: 'integer', description: 'Start-Offset im Plain-Text (>=0).' },
+              length:  { type: 'integer', description: 'Länge des Zitats in Zeichen (>0).' },
+              quote:   { type: 'string',  description: 'Der exakt zitierte Text (zeichengenau zum Seiteninhalt).' },
+            },
+            required: ['page_id', 'offset', 'length', 'quote'],
+          },
+        },
       },
       required: ['antwort'],
     },

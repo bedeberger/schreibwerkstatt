@@ -2112,6 +2112,300 @@ function tool_list_revisions(input, ctx) {
 
 // ── Dispatch ──────────────────────────────────────────────────────────────────
 
+// ── get_lektorat_findings ────────────────────────────────────────────────────
+
+const FINDINGS_DEFAULT_LIMIT = 30;
+const FINDINGS_MAX_LIMIT     = 100;
+const FINDINGS_FIELD_CAP     = 600; // pro Findung Klemmgrenze für original/korrektur/erklaerung
+
+function _clampField(s) {
+  if (typeof s !== 'string') return null;
+  if (s.length <= FINDINGS_FIELD_CAP) return s;
+  return s.slice(0, FINDINGS_FIELD_CAP) + '…';
+}
+
+function tool_get_lektorat_findings(input, ctx) {
+  const userEmail = ctx.userEmail || null;
+  const pageId    = Number.isInteger(input?.page_id)    ? input.page_id    : null;
+  const chapterId = Number.isInteger(input?.chapter_id) ? input.chapter_id : null;
+  const typFilter = typeof input?.typ === 'string' ? input.typ.toLowerCase().trim() : null;
+  const limit     = Math.min(FINDINGS_MAX_LIMIT, Math.max(1,
+    Number.isInteger(input?.limit) ? input.limit : FINDINGS_DEFAULT_LIMIT));
+
+  // Letzter Check pro Seite (gleiche Subquery wie get_lektorat_hotspots).
+  let sql = `
+    SELECT pc.page_id, pc.checked_at, pc.errors_json, pc.error_count,
+           p.page_name, p.chapter_id, c.chapter_name
+    FROM page_checks pc
+    JOIN pages    p ON p.page_id    = pc.page_id
+    LEFT JOIN chapters c ON c.chapter_id = p.chapter_id AND c.book_id = p.book_id
+    WHERE pc.book_id = ? AND pc.user_email IS ?
+      AND pc.checked_at = (
+        SELECT MAX(pc2.checked_at) FROM page_checks pc2
+        WHERE pc2.page_id = pc.page_id AND pc2.user_email IS ?
+      )
+  `;
+  const params = [ctx.bookId, userEmail, userEmail];
+  if (pageId !== null)         { sql += ' AND pc.page_id = ?';   params.push(pageId); }
+  else if (chapterId !== null) { sql += ' AND p.chapter_id = ?'; params.push(chapterId); }
+  sql += ' ORDER BY p.chapter_id, p.page_id';
+
+  const rows = db.prepare(sql).all(...params);
+  if (!rows.length) {
+    return {
+      findings: [],
+      hint: 'Keine Lektorat-Ergebnisse für diesen Filter. Lektorat-Job ausführen oder Filter weiten.',
+    };
+  }
+
+  const findings = [];
+  let totalAvailable = 0;
+  for (const r of rows) {
+    let errs = [];
+    try { errs = JSON.parse(r.errors_json || '[]'); } catch { errs = []; }
+    if (!Array.isArray(errs)) continue;
+    for (const e of errs) {
+      if (typFilter && (e.typ || '').toLowerCase() !== typFilter) continue;
+      totalAvailable++;
+      if (findings.length >= limit) continue;
+      findings.push({
+        page_id:      r.page_id,
+        page_name:    r.page_name,
+        chapter_id:   r.chapter_id,
+        chapter_name: r.chapter_name || null,
+        checked_at:   r.checked_at,
+        typ:          e.typ || null,
+        original:     _clampField(e.original),
+        korrektur:    _clampField(e.korrektur),
+        erklaerung:   _clampField(e.erklaerung),
+        ...(Number.isInteger(e.offset) ? { offset: e.offset } : {}),
+        ...(Number.isInteger(e.length) ? { length: e.length } : {}),
+      });
+    }
+  }
+
+  // Typ-Verteilung als Aggregat (über alle gefilterten Findings, nicht nur shown).
+  const byTyp = {};
+  for (const r of rows) {
+    let errs = [];
+    try { errs = JSON.parse(r.errors_json || '[]'); } catch { errs = []; }
+    if (!Array.isArray(errs)) continue;
+    for (const e of errs) {
+      if (typFilter && (e.typ || '').toLowerCase() !== typFilter) continue;
+      const key = (e.typ || 'unbekannt').toLowerCase();
+      byTyp[key] = (byTyp[key] || 0) + 1;
+    }
+  }
+
+  return _truncateResult({
+    findings,
+    total_findings:    totalAvailable,
+    pages_with_checks: rows.length,
+    by_typ:            byTyp,
+    ...(totalAvailable > findings.length
+      ? { truncated: true, shown: findings.length, hint: 'Weitere Findings via typ/page_id/chapter_id einschränken.' }
+      : {}),
+  });
+}
+
+// ── quote_match ──────────────────────────────────────────────────────────────
+
+const QUOTE_MATCH_DEFAULT_CONTEXT = 80;
+const QUOTE_MATCH_MAX_PATTERN     = 800;
+
+async function tool_quote_match(input, ctx) {
+  const pageId  = input?.page_id;
+  const pattern = (input?.pattern || '').toString();
+  if (!Number.isInteger(pageId)) return { error: 'page_id fehlt' };
+  if (!pattern)                  return { error: 'pattern fehlt' };
+  if (pattern.length > QUOTE_MATCH_MAX_PATTERN) {
+    return { error: `pattern zu lang (max ${QUOTE_MATCH_MAX_PATTERN}).` };
+  }
+  const occurrence   = Number.isInteger(input?.occurrence) && input.occurrence >= 1 ? input.occurrence : 1;
+  const contextChars = Math.min(QUOTE_MAX_CONTEXT, Math.max(0,
+    Number.isInteger(input?.context_chars) ? input.context_chars : QUOTE_MATCH_DEFAULT_CONTEXT));
+
+  const pageRow = db.prepare(`
+    SELECT p.page_id, p.page_name, p.book_id, c.chapter_id, c.chapter_name
+    FROM pages p
+    LEFT JOIN chapters c ON c.chapter_id = p.chapter_id AND c.book_id = p.book_id
+    WHERE p.page_id = ?
+  `).get(pageId);
+  if (!pageRow || pageRow.book_id !== ctx.bookId) {
+    return { error: 'Seite nicht im aktuellen Buch.' };
+  }
+  if (!ctx.userToken) return { error: 'Kein BookStack-Token in der Session.' };
+
+  if (ctx.jobSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
+  const pd = await contentStore.loadPage(pageId, ctx.userToken);
+  const text = htmlToPlainText(pd.html || '');
+
+  // Literal-Suche, case-insensitive. Alle Treffer sammeln, damit total_matches stimmt.
+  const lcText = text.toLowerCase();
+  const lcPat  = pattern.toLowerCase();
+  const indices = [];
+  for (let pos = 0; pos <= lcText.length - lcPat.length; ) {
+    const found = lcText.indexOf(lcPat, pos);
+    if (found < 0) break;
+    indices.push(found);
+    pos = found + lcPat.length;
+    if (indices.length >= 5000) break; // Schutz gegen pathologische Patterns
+  }
+  if (indices.length === 0) {
+    return {
+      error: 'pattern nicht gefunden.',
+      page_id:    pageId,
+      page_chars: text.length,
+      total_matches: 0,
+    };
+  }
+  if (occurrence > indices.length) {
+    return {
+      error: `Nur ${indices.length} Treffer auf der Seite (occurrence=${occurrence}).`,
+      page_id:    pageId,
+      total_matches: indices.length,
+    };
+  }
+  const idx    = indices[occurrence - 1];
+  const length = pattern.length;
+  const end    = idx + length;
+  const quote  = text.slice(idx, end);
+  const before = contextChars ? text.slice(Math.max(0, idx - contextChars), idx) : '';
+  const after  = contextChars ? text.slice(end, Math.min(text.length, end + contextChars)) : '';
+
+  return {
+    page_id:      pageId,
+    page_name:    pageRow.page_name,
+    chapter_id:   pageRow.chapter_id || null,
+    chapter_name: pageRow.chapter_name || null,
+    offset:       idx,
+    length,
+    page_chars:   text.length,
+    quote,
+    occurrence,
+    total_matches: indices.length,
+    ...(before ? { before } : {}),
+    ...(after  ? { after  } : {}),
+  };
+}
+
+// ── get_chapter_text ─────────────────────────────────────────────────────────
+
+async function tool_get_chapter_text(input, ctx) {
+  const chapterId = input?.chapter_id;
+  if (!Number.isInteger(chapterId)) return { error: 'chapter_id fehlt' };
+  if (!ctx.userToken) return { error: 'Kein BookStack-Token in der Session.' };
+
+  const chapter = db.prepare(
+    'SELECT chapter_id, chapter_name FROM chapters WHERE chapter_id = ? AND book_id = ?'
+  ).get(chapterId, ctx.bookId);
+  if (!chapter) return { error: 'Kapitel nicht im aktuellen Buch.' };
+
+  const pageRows = db.prepare(`
+    SELECT page_id, page_name FROM pages
+    WHERE chapter_id = ? AND book_id = ?
+    ORDER BY page_id
+  `).all(chapterId, ctx.bookId);
+  if (!pageRows.length) {
+    return {
+      chapter_id:   chapter.chapter_id,
+      chapter_name: chapter.chapter_name,
+      pages:        [],
+      total_pages:  0,
+    };
+  }
+
+  const maxPages = Math.min(MAX_PAGES_PER_FETCH,
+    Math.max(1, Number.isInteger(input?.max_pages) ? input.max_pages : pageRows.length));
+  const maxCharsPerPage = Math.min(MAX_CHARS_PER_PAGE,
+    Math.max(500, Number.isInteger(input?.max_chars_per_page) ? input.max_chars_per_page : DEFAULT_CHARS_PER_PAGE));
+  const toFetch = pageRows.slice(0, maxPages);
+  const dropped = pageRows.length - toFetch.length;
+
+  const results = [];
+  const missing = [];
+  for (const row of toFetch) {
+    if (ctx.jobSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
+    try {
+      const pd = await contentStore.loadPage(row.page_id, ctx.userToken);
+      const text = htmlToText(pd.html || '');
+      results.push({
+        page_id:   row.page_id,
+        page_name: row.page_name,
+        text:      text.length > maxCharsPerPage ? text.slice(0, maxCharsPerPage) + '…' : text,
+        truncated: text.length > maxCharsPerPage,
+      });
+    } catch (e) {
+      missing.push({ page_id: row.page_id, error: e.message });
+    }
+  }
+
+  return _truncateResult({
+    chapter_id:   chapter.chapter_id,
+    chapter_name: chapter.chapter_name,
+    pages:        results,
+    total_pages:  pageRows.length,
+    ...(missing.length ? { missing } : {}),
+    ...(dropped > 0 ? { dropped, note: `${dropped} weitere Seiten nicht geladen (max ${maxPages}).` } : {}),
+  });
+}
+
+// ── validateFinalAnswerCitations ─────────────────────────────────────────────
+// Wird vom Loop in chat.js aufgerufen, NICHT als Tool registriert. Validiert
+// die `zitate`-Liste eines final_answer-Calls gegen den aktuellen Seitentext.
+
+async function validateFinalAnswerCitations(zitate, ctx) {
+  if (!Array.isArray(zitate) || !zitate.length) return [];
+  if (!ctx?.userToken) {
+    return zitate.map(z => ({ ...z, valid: false, reason: 'no_user_token' }));
+  }
+  const cache = new Map(); // page_id → plain text
+  const out = [];
+  for (const z of zitate) {
+    const pageId = z?.page_id;
+    const offset = z?.offset;
+    const length = z?.length;
+    const quote  = typeof z?.quote === 'string' ? z.quote : null;
+    if (!Number.isInteger(pageId) || !Number.isInteger(offset) || !Number.isInteger(length)) {
+      out.push({ page_id: pageId ?? null, valid: false, reason: 'bad_shape' });
+      continue;
+    }
+    if (ctx.jobSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
+    const pageRow = db.prepare(
+      'SELECT page_id, book_id FROM pages WHERE page_id = ?'
+    ).get(pageId);
+    if (!pageRow || pageRow.book_id !== ctx.bookId) {
+      out.push({ page_id: pageId, valid: false, reason: 'page_not_in_book' });
+      continue;
+    }
+    let text = cache.get(pageId);
+    if (text == null) {
+      try {
+        const pd = await contentStore.loadPage(pageId, ctx.userToken);
+        text = htmlToPlainText(pd.html || '');
+        cache.set(pageId, text);
+      } catch (e) {
+        out.push({ page_id: pageId, valid: false, reason: `load_failed: ${e.message}` });
+        continue;
+      }
+    }
+    if (offset < 0 || offset + length > text.length) {
+      out.push({ page_id: pageId, offset, length, valid: false, reason: 'out_of_range', page_chars: text.length });
+      continue;
+    }
+    const actual = text.slice(offset, offset + length);
+    const valid  = quote == null ? true : actual === quote;
+    out.push({
+      page_id: pageId,
+      offset,
+      length,
+      valid,
+      ...(valid ? {} : { reason: 'quote_mismatch', expected: quote, actual }),
+    });
+  }
+  return out;
+}
+
 const TOOLS = {
   list_chapters:          tool_list_chapters,
   list_figures:           tool_list_figures,
@@ -2120,6 +2414,7 @@ const TOOLS = {
   get_figure_mentions:    tool_get_figure_mentions,
   search_passages:        tool_search_passages,
   get_pages:              tool_get_pages,
+  get_chapter_text:       tool_get_chapter_text,
   get_reviews:            tool_get_reviews,
   get_figure_relations:   tool_get_figure_relations,
   get_figure_profile:     tool_get_figure_profile,
@@ -2127,6 +2422,7 @@ const TOOLS = {
   get_timeline:           tool_get_timeline,
   list_ideen:             tool_list_ideen,
   get_lektorat_hotspots:  tool_get_lektorat_hotspots,
+  get_lektorat_findings:  tool_get_lektorat_findings,
   get_stil_metrics:       tool_get_stil_metrics,
   list_locations:         tool_list_locations,
   list_scenes:            tool_list_scenes,
@@ -2138,6 +2434,7 @@ const TOOLS = {
   diff_page_revisions:    tool_diff_page_revisions,
   find_first_last_mention: tool_find_first_last_mention,
   quote_passage:          tool_quote_passage,
+  quote_match:            tool_quote_match,
 };
 
 async function executeTool(name, input, ctx) {
@@ -2147,4 +2444,4 @@ async function executeTool(name, input, ctx) {
   return _truncateResult(result);
 }
 
-module.exports = { executeTool, TOOLS };
+module.exports = { executeTool, TOOLS, validateFinalAnswerCitations };
