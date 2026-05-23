@@ -132,14 +132,27 @@ test('page_revisions: invalid source wirft', () => {
   }), /invalid source/);
 });
 
-test('page_revisions: pruneOverLimit haelt jueng­ste N pro Seite', () => {
-  // Voriger Test-State darf nicht reinleaken — prune ist global.
+// Backdating-Helper: schreibt created_at explizit (umgeht den NOW_ISO_SQL-Default).
+function _insertAt(pageId, bookId, bodyHtml, daysAgo) {
+  const created = new Date(Date.now() - daysAgo * 86400_000).toISOString();
+  // Stats analog _statsFromHtml: hier reicht ein Wert >0; pruneTiered liest sie nicht.
+  const { lastInsertRowid } = db.prepare(`
+    INSERT INTO page_revisions
+      (page_id, book_id, body_html, body_markdown, chars, words, tok,
+       source, user_email, summary, created_at)
+    VALUES
+      (?, ?, ?, NULL, ?, ?, ?, 'main', NULL, NULL, ?)
+  `).run(pageId, bookId, bodyHtml, bodyHtml.length, 1, 1, created);
+  return { id: lastInsertRowid, created };
+}
+
+test('page_revisions: pruneTiered haelt Floor (jueng­ste N) pro Seite', () => {
   db.prepare('DELETE FROM page_revisions').run();
   upsertBookByName(903, 'Test-Buch P2 C');
   _seedPage(903, 90301);
   _seedPage(903, 90302);
 
-  // 5 Revisions auf Seite A, 3 auf Seite B.
+  // Alle Revisions <1 Tag → alle im 'raw'-Bucket → keine Loeschung durch Tiering.
   for (let i = 1; i <= 5; i++) {
     pageRevisions.insert({
       pageId: 90301, bookId: 903,
@@ -152,21 +165,129 @@ test('page_revisions: pruneOverLimit haelt jueng­ste N pro Seite', () => {
       bodyHtml: `<p>w${i}</p>`, source: 'main',
     });
   }
+  const removed = pageRevisions.pruneTiered({ floor: 2 });
+  // raw-Bucket schuetzt alle juengsten 24h → nichts geloescht.
+  assert.equal(removed, 0);
   assert.equal(pageRevisions.countForPage(90301), 5);
   assert.equal(pageRevisions.countForPage(90302), 3);
+});
 
-  // Limit 2: A behaelt 2 (entfernt 3), B behaelt 2 (entfernt 1).
-  const removed = pageRevisions.pruneOverLimit(2);
-  assert.equal(removed, 4);
-  assert.equal(pageRevisions.countForPage(90301), 2);
-  assert.equal(pageRevisions.countForPage(90302), 2);
+test('page_revisions: pruneTiered GFS — Tages-Bucket nimmt aelteste pro Tag', () => {
+  db.prepare('DELETE FROM page_revisions').run();
+  upsertBookByName(910, 'Test-Buch GFS Daily');
+  _seedPage(910, 91001);
 
-  // Es ueberleben die jueng­sten zwei Eintraege pro Seite.
-  const a = pageRevisions.listForPage(90301);
-  assert.equal(a.length, 2);
-  // Body der jueng­sten zwei (v5, v4) muss erhalten sein.
-  const aBodies = a.map(r => pageRevisions.get(r.id).body_html).sort();
-  assert.deepEqual(aBodies, ['<p>v4</p>', '<p>v5</p>']);
+  // Tag 2 ago: 3 Revisions (sollten zu 1 zusammenfallen — aelteste)
+  // Tag 3 ago: 2 Revisions (zu 1)
+  // Tag 4 ago: 1 Revision
+  const r_d2_old = _insertAt(91001, 910, '<p>d2_old</p>', 2 + 0.6);
+  _insertAt(91001, 910, '<p>d2_mid</p>', 2 + 0.4);
+  _insertAt(91001, 910, '<p>d2_new</p>', 2 + 0.1);
+  const r_d3_old = _insertAt(91001, 910, '<p>d3_old</p>', 3 + 0.6);
+  _insertAt(91001, 910, '<p>d3_new</p>', 3 + 0.1);
+  const r_d4 = _insertAt(91001, 910, '<p>d4</p>', 4);
+
+  assert.equal(pageRevisions.countForPage(91001), 6);
+
+  // Floor 1 (minimal), damit Floor nicht den Test verfaelscht.
+  pageRevisions.pruneTiered({ floor: 1 });
+
+  const ids = db.prepare('SELECT id FROM page_revisions WHERE page_id = ? ORDER BY id ASC').all(91001).map(r => r.id);
+  // Erwartet: 3 Behalten (aelteste pro Tag) plus Floor-Pick (juengste). Juengste = r_d2_new ist bereits NICHT in keep_buckets (nur aelteste pro Tag).
+  // Buckets: d2 → r_d2_old, d3 → r_d3_old, d4 → r_d4.
+  // Floor 1 → juengste = r_d2_new (Tag 2, neueste). → Total 4 IDs.
+  assert.equal(ids.length, 4, `kept ids: ${ids.join(',')}`);
+  assert.ok(ids.includes(r_d2_old.id), 'aelteste in Tag-2-Bucket fehlt');
+  assert.ok(ids.includes(r_d3_old.id), 'aelteste in Tag-3-Bucket fehlt');
+  assert.ok(ids.includes(r_d4.id), 'Tag-4-Rev fehlt');
+});
+
+test('page_revisions: pruneTiered GFS — Wochen-/Monats-/Jahres-Buckets', () => {
+  db.prepare('DELETE FROM page_revisions').run();
+  upsertBookByName(911, 'Test-Buch GFS Tiers');
+  _seedPage(911, 91101);
+
+  // Wochen-Range (7-60 Tage): 2 Revs in derselben Woche → 1 behalten.
+  const r_w_old = _insertAt(91101, 911, '<p>w_old</p>', 14);
+  _insertAt(91101, 911, '<p>w_new</p>', 13);
+  // Andere Woche im selben Range
+  const r_w2 = _insertAt(91101, 911, '<p>w2</p>', 30);
+
+  // Monats-Range (60-365 Tage): 2 Revs im selben Monat → 1 behalten.
+  const r_m_old = _insertAt(91101, 911, '<p>m_old</p>', 100);
+  _insertAt(91101, 911, '<p>m_new</p>', 95);
+  // Anderer Monat
+  const r_m2 = _insertAt(91101, 911, '<p>m2</p>', 200);
+
+  // Jahres-Range (>365 Tage): 2 Revs im selben Jahr → 1 behalten.
+  const r_y_old = _insertAt(91101, 911, '<p>y_old</p>', 800);
+  _insertAt(91101, 911, '<p>y_new</p>', 600);
+
+  assert.equal(pageRevisions.countForPage(91101), 8);
+
+  pageRevisions.pruneTiered({ floor: 1 });
+
+  const kept = db.prepare('SELECT id, body_html FROM page_revisions WHERE page_id = ? ORDER BY id ASC').all(91101);
+  const keptBodies = kept.map(r => r.body_html);
+
+  // Erwartet behalten: w_old, w2, m_old, m2, y_old + Floor (juengste = w_new bei daysAgo=13).
+  assert.ok(keptBodies.includes('<p>w_old</p>'), 'aelteste in Woche-1 fehlt');
+  assert.ok(keptBodies.includes('<p>w2</p>'), 'aelteste in Woche-2 fehlt');
+  assert.ok(keptBodies.includes('<p>m_old</p>'), 'aelteste in Monat-1 fehlt');
+  assert.ok(keptBodies.includes('<p>m2</p>'), 'aelteste in Monat-2 fehlt');
+  assert.ok(keptBodies.includes('<p>y_old</p>'), 'aelteste in Jahr-Bucket fehlt');
+
+  // Nicht behalten: w_new (selbe Woche wie w_old, aber juenger), m_new, y_new (≠ Floor-juengste).
+  assert.ok(!keptBodies.includes('<p>m_new</p>'), 'm_new sollte weg sein');
+  assert.ok(!keptBodies.includes('<p>y_new</p>'), 'y_new sollte weg sein');
+
+  // Unused-Marker (Lint)
+  void r_w_old; void r_w2; void r_m_old; void r_m2; void r_y_old;
+});
+
+test('page_revisions: pruneTiered — Floor schuetzt zusaetzlich zu Buckets', () => {
+  db.prepare('DELETE FROM page_revisions').run();
+  upsertBookByName(912, 'Test-Buch GFS Floor');
+  _seedPage(912, 91201);
+
+  // 5 Revs im Monat-Bucket (alle ~100d alt, selber Monat).
+  // Ohne Floor wuerde Tiering nur die aelteste behalten.
+  const ids = [];
+  for (let i = 0; i < 5; i++) {
+    ids.push(_insertAt(91201, 912, `<p>m${i}</p>`, 100 - i * 0.1).id);
+  }
+  assert.equal(pageRevisions.countForPage(91201), 5);
+
+  pageRevisions.pruneTiered({ floor: 3 });
+
+  // Behalten: aelteste-im-Bucket (ids[0]) + juengste 3 (ids[2], ids[3], ids[4]).
+  // ids[1] kein Bucket-Pick (nicht aelteste), kein Floor-Pick (nur 3 juengste).
+  const kept = db.prepare('SELECT id FROM page_revisions WHERE page_id = ?').all(91201).map(r => r.id).sort();
+  assert.equal(kept.length, 4, `kept: ${kept.join(',')}`);
+  assert.ok(kept.includes(ids[0]), 'Bucket-aelteste fehlt');
+  assert.ok(kept.includes(ids[2]) && kept.includes(ids[3]) && kept.includes(ids[4]), 'Floor-Trio fehlt');
+  assert.ok(!kept.includes(ids[1]), 'ids[1] sollte weg sein');
+});
+
+test('page_revisions: pruneTiered — now-Override fuer deterministische Tests', () => {
+  db.prepare('DELETE FROM page_revisions').run();
+  upsertBookByName(913, 'Test-Buch GFS NowOverride');
+  _seedPage(913, 91301);
+
+  // Rev von "vor 2 Tagen" relativ zu fixiertem Anker.
+  const anchor = new Date('2026-06-01T12:00:00.000Z');
+  const twoDaysBefore = new Date(anchor.getTime() - 2 * 86400_000).toISOString();
+  db.prepare(`
+    INSERT INTO page_revisions
+      (page_id, book_id, body_html, chars, words, tok, source, created_at)
+    VALUES (?, ?, '<p>x</p>', 1, 1, 1, 'main', ?)
+  `).run(91301, 913, twoDaysBefore);
+
+  // now = anchor → Rev faellt in Tages-Bucket (1-7d), nicht raw, nicht Woche.
+  // Floor 1 → genau die eine Rev bleibt (sowohl als Bucket- als auch Floor-Pick).
+  const removed = pageRevisions.pruneTiered({ floor: 1, now: anchor.toISOString() });
+  assert.equal(removed, 0);
+  assert.equal(pageRevisions.countForPage(91301), 1);
 });
 
 test('page_revisions: FK-CASCADE bei Page-Delete', () => {

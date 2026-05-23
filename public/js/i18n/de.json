@@ -1460,6 +1460,7 @@
   "admin.settings.help.contextWindow":  "Gesamtes Modell-Kontextfenster (Input + Output) in Token. Bei lokalen Modellen auf die native Kontextgrösse setzen (Mistral-Small3.2 / Gemma3 / Llama-3.1: 128 000; ältere: 32 000 / 8 000).",
   "admin.settings.help.maxTokensOut":   "Output-Cap in Token. Muss deutlich kleiner sein als `context_window` (Rest = Input-Budget). Job-spezifische Overrides werden zusätzlich gedeckelt.",
   "admin.settings.help.charsPerToken":  "Skaliert Token-Schätzungen aus Zeichen. Provider-unabhängig. Default 3.0 ist für Deutsch kalibriert.",
+  "admin.settings.help.pageRevisionLimit": "Floor für Page-Revisions-Retention: jüngste N Revisionen pro Seite werden zusätzlich zum GFS-Schema (24h / 1 pro Tag / 1 pro Woche / 1 pro Monat / 1 pro Jahr, jeweils älteste) garantiert behalten. Cleanup läuft täglich.",
   "admin.settings.help.advancedGlobal": "Greifen unabhängig vom Provider.",
   "admin.settings.help.advancedClaude": "Wirksam nur bei `ai.provider = claude`. Steuern Retries, Timeout und Parallelität gegen Anthropic-TPM-Limits.",
   "admin.settings.saved":        "{count} Einstellung(en) gespeichert.",

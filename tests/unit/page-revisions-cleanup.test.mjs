@@ -1,5 +1,6 @@
-// page_revisions Retention via cache-cleanup-Policy
-// `per-page-limit` aus app.page_revision_limit.
+// page_revisions Retention via cache-cleanup-Policy `tiered`.
+// Floor aus app.page_revision_limit (jueng­ste N pro Seite garantiert behalten);
+// Bucket-Schema (Tag/Woche/Monat/Jahr) ist hardcoded in pruneTiered.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -52,7 +53,17 @@ function _seedRevisions(ctx, pageId, bookId, count) {
   }
 }
 
-test('per-page-limit policy: behaelt die N juengsten Revisions pro Page', () => {
+// Backdating fuer Tiered-Tests: schreibt created_at relativ zu jetzt.
+function _seedBackdated(ctx, pageId, bookId, bodyHtml, daysAgo) {
+  const created = new Date(Date.now() - daysAgo * 86400_000).toISOString();
+  return ctx.db.prepare(`
+    INSERT INTO page_revisions
+      (page_id, book_id, body_html, chars, words, tok, source, created_at)
+    VALUES (?, ?, ?, ?, 1, 1, 'main', ?)
+  `).run(pageId, bookId, bodyHtml, bodyHtml.length, created).lastInsertRowid;
+}
+
+test('tiered policy: alle Revs <1 Tag → raw-Bucket, nichts geloescht', () => {
   const ctx = _bootstrap();
   try {
     const { bookId, pageId } = _seedBookAndPage(ctx);
@@ -63,14 +74,42 @@ test('per-page-limit policy: behaelt die N juengsten Revisions pro Page', () => 
     const summary = ctx.cleanup.runCacheCleanup();
     const entry = summary.tables.find(t => t.table === 'page_revisions');
     assert.ok(entry, 'page_revisions in summary');
-    assert.equal(entry.kind, 'per-page-limit');
+    assert.equal(entry.kind, 'tiered');
     assert.equal(entry.setting, 'app.page_revision_limit');
-    assert.equal(entry.removed, 7);
-    assert.equal(ctx.pageRevisions.countForPage(pageId), 3);
+    // raw-Bucket schuetzt alle juengsten 24h.
+    assert.equal(entry.removed, 0);
+    assert.equal(ctx.pageRevisions.countForPage(pageId), 10);
   } finally { ctx.teardown(); }
 });
 
-test('per-page-limit policy: pruning ist pro page_id getrennt', () => {
+test('tiered policy: GFS-Buckets reduzieren backdated Revisions auf 1 pro Bucket', () => {
+  const ctx = _bootstrap();
+  try {
+    const { bookId, pageId } = _seedBookAndPage(ctx);
+    ctx.appSettings.set('app.page_revision_limit', 1, { updatedBy: 'test' });
+
+    // 3 Revs am selben Tag (Tag 2 ago) → 1 behalten (aelteste).
+    _seedBackdated(ctx, pageId, bookId, '<p>d2a</p>', 2.6);
+    _seedBackdated(ctx, pageId, bookId, '<p>d2b</p>', 2.3);
+    _seedBackdated(ctx, pageId, bookId, '<p>d2c</p>', 2.0);
+    // 2 Revs in derselben Woche (Tag 14, 15 ago) → 1 behalten.
+    _seedBackdated(ctx, pageId, bookId, '<p>w14</p>', 15);
+    _seedBackdated(ctx, pageId, bookId, '<p>w15</p>', 14);
+    // 2 Revs im selben Monat (Tag 100, 101) → 1 behalten.
+    _seedBackdated(ctx, pageId, bookId, '<p>m100</p>', 101);
+    _seedBackdated(ctx, pageId, bookId, '<p>m101</p>', 100);
+
+    assert.equal(ctx.pageRevisions.countForPage(pageId), 7);
+
+    ctx.cleanup.runCacheCleanup();
+    // Behalten: 1 Tag + 1 Woche + 1 Monat = 3. Floor 1 → juengste = d2c (Tag-Bucket-Pick ist d2a, also Floor zieht zusaetzlich d2c).
+    // Tag-Bucket: d2a. Woche-Bucket: w14 (aelteste). Monat-Bucket: m100 (aelteste). Floor=1: d2c.
+    // → 4 ueberleben.
+    assert.equal(ctx.pageRevisions.countForPage(pageId), 4);
+  } finally { ctx.teardown(); }
+});
+
+test('tiered policy: pruning ist pro page_id getrennt', () => {
   const ctx = _bootstrap();
   try {
     const { bookId, pageId: p1 } = _seedBookAndPage(ctx);
@@ -80,17 +119,21 @@ test('per-page-limit policy: pruning ist pro page_id getrennt', () => {
       VALUES (?, 'P2', '<p>y</p>', ?, ?)
     `).run(bookId, now, now).lastInsertRowid;
 
-    ctx.appSettings.set('app.page_revision_limit', 2, { updatedBy: 'test' });
-    _seedRevisions(ctx, p1, bookId, 5);
-    _seedRevisions(ctx, p2, bookId, 5);
+    ctx.appSettings.set('app.page_revision_limit', 1, { updatedBy: 'test' });
+    // Beide Seiten: 3 Revs am selben Tag, alle backdated 5d → derselbe Tag-Bucket.
+    for (let i = 0; i < 3; i++) {
+      _seedBackdated(ctx, p1, bookId, `<p>p1_${i}</p>`, 5 + i * 0.1);
+      _seedBackdated(ctx, p2, bookId, `<p>p2_${i}</p>`, 5 + i * 0.1);
+    }
 
     ctx.cleanup.runCacheCleanup();
+    // Pro Seite: 1 Bucket-Pick (aelteste) + Floor 1 (juengste). Aelteste ≠ juengste → 2 pro Seite.
     assert.equal(ctx.pageRevisions.countForPage(p1), 2);
     assert.equal(ctx.pageRevisions.countForPage(p2), 2);
   } finally { ctx.teardown(); }
 });
 
-test('per-page-limit policy: kein Throw bei leerer Tabelle', () => {
+test('tiered policy: kein Throw bei leerer Tabelle', () => {
   const ctx = _bootstrap();
   try {
     ctx.appSettings.set('app.page_revision_limit', 5, { updatedBy: 'test' });
@@ -100,7 +143,7 @@ test('per-page-limit policy: kein Throw bei leerer Tabelle', () => {
   } finally { ctx.teardown(); }
 });
 
-test('per-page-limit policy: invalides Setting → error in summary, kein Crash', () => {
+test('tiered policy: invalides Setting → error in summary, kein Crash', () => {
   const ctx = _bootstrap();
   try {
     const { bookId, pageId } = _seedBookAndPage(ctx);

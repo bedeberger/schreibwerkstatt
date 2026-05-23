@@ -4688,9 +4688,10 @@ function _runMigrationsLocked() {
     // Eigene Page-Revisions.
     // Jeder Save-Pfad ueber die content-store-Facade schreibt eine Revision
     // vor dem Backend-Write. source-Tag unterscheidet Editor/Focus/Chat-Apply
-    // /Lektorat-Apply/Sync/Import/Conflict-Pfade. Retention via
-    // app.page_revision_limit (Default 50, per-page) — Cleanup-Hook in
-    // lib/cache-cleanup.js POLICIES.
+    // /Lektorat-Apply/Sync/Import/Conflict-Pfade. Retention: tiered GFS
+    // (Tag/Woche/Monat/Jahr, aelteste pro Bucket) plus Floor aus
+    // app.page_revision_limit (Default 50 juengste pro Seite) — Cleanup-Hook
+    // in lib/cache-cleanup.js POLICIES → db/page-revisions.js#pruneTiered.
     db.prepare(`
       CREATE TABLE IF NOT EXISTS page_revisions (
         id            INTEGER PRIMARY KEY AUTOINCREMENT,

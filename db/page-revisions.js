@@ -2,7 +2,17 @@
 // CRUD fuer page_revisions.
 // Schreib-Pfad: content-store-Facade ruft `insert()` vor jedem Backend-Save.
 // Lese-Pfad: routes/content.js Revisions-Endpoints.
-// Retention: lib/cache-cleanup.js POLICIES ruft `pruneOverLimit()` taeglich.
+// Retention: lib/cache-cleanup.js POLICIES ruft `pruneTiered()` taeglich.
+// Strategie: Grandfather-Father-Son (GFS).
+//   <=1 Tag:  alle behalten
+//   1-7 Tage:   1 pro Kalendertag  (aelteste)
+//   7-60 Tage:  1 pro ISO-Woche    (aelteste)
+//   60-365 T:   1 pro Kalendermonat (aelteste)
+//   >1 Jahr:    1 pro Jahr         (aelteste)
+// Floor `app.page_revision_limit` haelt zusaetzlich die N jueng­sten Revisions
+// pro Seite (Safety-Net gegen Schema-Bugs + macht Rollback einfach moeglich).
+// Aelteste-pro-Bucket: User-Intuition "Stand vor ~1 Monat" trifft den
+// Bucket-Rand naeher als die juengste Rev des Buckets.
 
 const { db } = require('./connection');
 require('./migrations');
@@ -99,26 +109,55 @@ function countForPage(pageId) {
   return _countStmt.get(pageId)?.n || 0;
 }
 
-// Retention: pro page_id alle Revisions ausserhalb der jueng­sten `limit`
-// purgen. Single-statement, kein Loop in JS. ROW_NUMBER haelt die jueng­sten
-// `limit` (DESC), DELETE killt den Rest.
-function pruneOverLimit(limit) {
-  const n = parseInt(limit, 10);
-  if (!Number.isInteger(n) || n <= 0) throw new Error('pruneOverLimit: limit must be positive int');
+// Tiered Retention (GFS) + Floor. Single-Statement via CTE.
+// `floor`: Mindestanzahl jueng­ste Revisions pro page_id, die zusaetzlich zum
+// Bucket-Schema garantiert behalten werden.
+// `now` (optional): ISO-Timestamp-Override; Default = SQLite 'now'. Nur fuer
+// Tests; Produktion ruft ohne Argument auf.
+function pruneTiered({ floor, now = null } = {}) {
+  const n = parseInt(floor, 10);
+  if (!Number.isInteger(n) || n <= 0) throw new Error('pruneTiered: floor must be positive int');
+  const nowExpr = now ? '@now' : "'now'";
   const sql = `
+    WITH classified AS (
+      SELECT
+        id, page_id, created_at,
+        CASE
+          WHEN julianday(${nowExpr}) - julianday(created_at) <= 1   THEN 'raw'
+          WHEN julianday(${nowExpr}) - julianday(created_at) <= 7   THEN 'd:' || date(created_at)
+          WHEN julianday(${nowExpr}) - julianday(created_at) <= 60  THEN 'w:' || strftime('%Y-%W', created_at)
+          WHEN julianday(${nowExpr}) - julianday(created_at) <= 365 THEN 'm:' || strftime('%Y-%m', created_at)
+          ELSE                                                            'y:' || strftime('%Y', created_at)
+        END AS bucket
+        FROM page_revisions
+    ),
+    keep_buckets AS (
+      SELECT id FROM classified WHERE bucket = 'raw'
+      UNION
+      SELECT id FROM (
+        SELECT id, ROW_NUMBER() OVER (
+                     PARTITION BY page_id, bucket
+                     ORDER BY created_at ASC, id ASC
+                   ) AS rn
+          FROM classified
+         WHERE bucket <> 'raw'
+      ) WHERE rn = 1
+    ),
+    keep_floor AS (
+      SELECT id FROM (
+        SELECT id, ROW_NUMBER() OVER (
+                     PARTITION BY page_id
+                     ORDER BY created_at DESC, id DESC
+                   ) AS rn
+          FROM page_revisions
+      ) WHERE rn <= @floor
+    )
     DELETE FROM page_revisions
-     WHERE id IN (
-       SELECT id FROM (
-         SELECT id, ROW_NUMBER() OVER (
-                      PARTITION BY page_id
-                      ORDER BY created_at DESC, id DESC
-                    ) AS rn
-           FROM page_revisions
-       )
-      WHERE rn > ?
-     )
+     WHERE id NOT IN (SELECT id FROM keep_buckets)
+       AND id NOT IN (SELECT id FROM keep_floor)
   `;
-  return db.prepare(sql).run(n).changes;
+  const params = now ? { floor: n, now } : { floor: n };
+  return db.prepare(sql).run(params).changes;
 }
 
 module.exports = {
@@ -126,6 +165,6 @@ module.exports = {
   listForPage,
   get,
   countForPage,
-  pruneOverLimit,
+  pruneTiered,
   VALID_SOURCES,
 };

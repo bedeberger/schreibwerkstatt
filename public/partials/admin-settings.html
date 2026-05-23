@@ -257,6 +257,10 @@
           <input type="text" x-data="numInput({ step: 0.1, min: 1, max: 10 })" x-modelable="value" x-model="adminSettingsForm['ai.chars_per_token']">
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.charsPerToken')"></small>
         </label>
+        <label>app.page_revision_limit
+          <input type="text" x-data="numInput({ integer: true, min: 1, max: 500 })" x-modelable="value" x-model="adminSettingsForm['app.page_revision_limit']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.pageRevisionLimit')"></small>
+        </label>
       </div>
 
       <div :class="['admin-settings-subsection', adminSettingsForm['ai.provider'] === 'claude' ? 'is-active-provider' : '']">
