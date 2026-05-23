@@ -145,6 +145,10 @@ export const diaryCalendarMethods = {
     this._createDiaryEntry(localIsoDate());
   },
 
+  diaryHasTodayEntry() {
+    return this.diaryCalendarPagesMap().has(localIsoDate());
+  },
+
   // Sichert Jahr-Kapitel `YYYY` (Name = Jahrzahl, position = Jahrzahl).
   // Pattern stammt aus folder-import (routes/jobs/folder-import.js): ein
   // Top-Level-Kapitel pro Jahr. Liefert Chapter-ID.

@@ -20,7 +20,7 @@
   </div>
 
   <button type="button" class="sidebar-calendar-today"
-          x-show="canEdit()"
+          x-show="canEdit() && !diaryHasTodayEntry()"
           @click="createDiaryEntryToday()"
           :data-tip="t('calendar.todayTip')">
     <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#plus"/></svg>

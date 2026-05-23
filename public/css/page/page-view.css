@@ -124,6 +124,9 @@
   margin: 0.15em 0;
 }
 .page-content-view ul.todo > li.todo-item > input[type="checkbox"] {
+  font: inherit;
+  width: 1em;
+  height: 1em;
   margin-top: 0.35em;
   cursor: pointer;
   flex: 0 0 auto;
