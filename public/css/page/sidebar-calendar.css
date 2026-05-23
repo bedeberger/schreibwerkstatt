@@ -23,6 +23,27 @@
   text-transform: capitalize;
 }
 
+.sidebar-calendar-today {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  width: 100%;
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px dashed var(--color-primary);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-primary);
+  font-weight: 600;
+  font-size: var(--font-em-85);
+  cursor: pointer;
+  transition: background-color 0.08s ease;
+}
+.sidebar-calendar-today:hover {
+  background: var(--color-accent-soft);
+}
+
 .sidebar-calendar-jumpwrap {
   width: 100%;
 }

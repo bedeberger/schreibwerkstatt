@@ -5,3 +5,13 @@
      @copy="handleViewCopy($event)"
      @pointermove="handleMarkPointer($event)"
      @pointerleave="handleMarkPointerLeave($event)"></div>
+
+<div class="page-empty-state"
+     x-show="!editMode && currentPage && currentPageEmpty && originalHtml !== null"
+     x-cloak>
+  <span class="page-empty-state__text" x-text="t('editor.emptyPageHint')"></span>
+  <template x-if="canEdit()">
+    <button type="button" class="danger" @click="deleteCurrentPage()"
+            x-text="t('editor.btn.deleteEmptyPage')"></button>
+  </template>
+</div>

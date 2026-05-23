@@ -19,6 +19,14 @@
     </button>
   </div>
 
+  <button type="button" class="sidebar-calendar-today"
+          x-show="canEdit()"
+          @click="createDiaryEntryToday()"
+          :data-tip="t('calendar.todayTip')">
+    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#plus"/></svg>
+    <span x-text="t('calendar.today')"></span>
+  </button>
+
   <div class="sidebar-calendar-jumpwrap"
        x-show="diaryCalendarMonths().length > 1">
     <div x-data="combobox(t('calendar.jumpPlaceholder'))"

@@ -6,6 +6,10 @@
 // in `loadPages`. Bei 2'400 Diary-Pages ist der Build ~3 ms (Regex-Match pro
 // Page), wir wollen aber nicht pro Render rebuilden.
 
+import { contentRepo } from '../repo/content.js';
+import { localIsoDate } from '../utils.js';
+import { _sortSoloFirst } from './tree.js';
+
 const _CACHE_KEY = '_diaryCalendarCache';
 
 function _ensureCache(app) {
@@ -134,6 +138,81 @@ export const diaryCalendarMethods = {
   selectDiaryCalendarDay(cell) {
     if (!cell?.page) return;
     this.selectPage(cell.page);
+  },
+
+  // Heute-Button-Handler. Öffnet bestehenden Eintrag oder legt neuen an.
+  createDiaryEntryToday() {
+    this._createDiaryEntry(localIsoDate());
+  },
+
+  // Sichert Jahr-Kapitel `YYYY` (Name = Jahrzahl, position = Jahrzahl).
+  // Pattern stammt aus folder-import (routes/jobs/folder-import.js): ein
+  // Top-Level-Kapitel pro Jahr. Liefert Chapter-ID.
+  async _ensureDiaryYearChapter(year) {
+    const yearStr = String(year);
+    const existing = this.tree.find(
+      it => it.type === 'chapter' && !it.solo && it.name === yearStr
+    );
+    if (existing) return existing.id;
+    const created = await contentRepo.createChapter({
+      book_id: parseInt(this.selectedBookId, 10),
+      name: yearStr,
+      position: parseInt(yearStr, 10),
+    });
+    if (!created?.id) throw new Error('createChapter returned no id');
+    const chapterItem = {
+      type: 'chapter',
+      id: created.id,
+      name: created.name,
+      priority: created.position ?? parseInt(yearStr, 10),
+      open: true,
+      solo: false,
+      pages: [],
+    };
+    this.tree = [...this.tree, chapterItem].sort(_sortSoloFirst);
+    return created.id;
+  },
+
+  // Erstellt Diary-Page mit Name = dateIso (`YYYY-MM-DD`) im passenden
+  // Jahr-Kapitel und öffnet sie. Existiert bereits eine Page für dieses
+  // Datum, wird sie geöffnet statt dupliziert.
+  // Diary-Cache (pagesRef) wird durch Array-Reassignment invalidiert.
+  async _createDiaryEntry(dateIso) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateIso || '')) return;
+    if (!this.canEdit?.()) return;
+    if (this._diaryCreatingDate === dateIso) return;
+    const existing = this.diaryCalendarPagesMap().get(dateIso);
+    if (existing) { this.selectPage(existing); return; }
+    this._diaryCreatingDate = dateIso;
+    try {
+      const chapterId = await this._ensureDiaryYearChapter(dateIso.slice(0, 4));
+      const created = await contentRepo.createPage({
+        book_id: parseInt(this.selectedBookId, 10),
+        chapter_id: chapterId,
+        name: dateIso,
+        html: '<p></p>',
+      });
+      if (!created?.id) throw new Error('createPage returned no id');
+      this.pages = [...this.pages, created];
+      const treeCh = this.tree.find(
+        it => it.type === 'chapter' && !it.solo && String(it.id) === String(chapterId)
+      );
+      if (treeCh) {
+        treeCh.pages = [...treeCh.pages, created];
+        treeCh.open = true;
+      }
+      this.tokEsts[created.id] = { tok: 0, words: 0, chars: 0 };
+      this.diaryCalendarYearMonth = {
+        year: parseInt(dateIso.slice(0, 4), 10),
+        month: parseInt(dateIso.slice(5, 7), 10),
+      };
+      this.selectPage(created);
+    } catch (e) {
+      console.error('[_createDiaryEntry]', e);
+      this.setStatus(this.t('calendar.createError'));
+    } finally {
+      this._diaryCreatingDate = null;
+    }
   },
 
   // Sortiert Diary-Pages chronologisch (älteste zuerst). Cache wie pagesMap.

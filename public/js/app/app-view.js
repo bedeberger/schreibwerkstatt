@@ -228,6 +228,31 @@ export const appViewMethods = {
     }
   },
 
+  // Löscht die aktuell offene leere Seite. Nur sinnvoll für `currentPageEmpty`;
+  // UI rendert den Button auch nur dann. Race: User triggert Delete, während
+  // selectPage noch lädt → bestätigte ID einfrieren und beim Bestätigen prüfen.
+  async deleteCurrentPage() {
+    const page = this.currentPage;
+    if (!page || !this.canEdit()) return;
+    const ok = await this.appConfirm({
+      message: this.t('bookOrganizer.confirmDeletePage', { name: page.name }),
+      confirmLabel: this.t('common.delete'),
+      cancelLabel: this.t('common.cancel'),
+      danger: true,
+    });
+    if (!ok) return;
+    if (this.currentPage?.id !== page.id) return;
+    try {
+      await contentRepo.deletePage(page.id);
+      try { clearDraft(page.id); } catch {}
+      this.resetPage();
+      await this.loadPages();
+    } catch (e) {
+      console.error('[deleteCurrentPage]', e);
+      this.setStatus(this.t('bookOrganizer.saveFailed', { detail: e.message }));
+    }
+  },
+
   // Draft-Recovery: nach Page-Load prüfen, ob lokaler Entwurf im localStorage
   // vom Server-HTML abweicht (z. B. nach Server-Crash mid-write + Tab-Reopen).
   // Wenn ja: `pendingDraft`-Banner zeigt User Wiederaufnahme-Option an. Im
