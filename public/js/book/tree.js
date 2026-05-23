@@ -402,10 +402,14 @@ export const treeMethods = {
     const loadCtrl = new AbortController();
     this._bookLoadAbort = loadCtrl;
     const signal = loadCtrl.signal;
+    this.treeLoading = true;
     try {
       this.setStatus(this.t('tree.loadingPages'), true);
-      // Wake-Refresh nicht vorab clearen — Tree bliebe sonst bis zum Response leer (Flicker).
-      // Reassignment am Ende ersetzt die Daten in-place.
+      // Tree/Pages werden NICHT vorab geleert — alter Tree bleibt sichtbar
+      // (CSS dimmt + blockiert Klicks via .tree-card--loading), bis der neue
+      // Tree da ist. Bei Fetch-Fail (Session, Timeout) räumt der catch-Block
+      // explizit auf, statt einen Sackgassen-Tree mit Seiten aus dem alten
+      // Buch stehen zu lassen. Wake-Refresh clear't ohnehin nichts.
       if (opts.source !== 'wake') {
         this.pageSearch = '';
         this.pageSearchActiveIndex = 0;
@@ -415,8 +419,6 @@ export const treeMethods = {
         this.pageLastChecked = {};
         this.ideenCounts = {};
         this.chapterIdeenCounts = {};
-        this.tree = [];
-        this.pages = [];
       }
       this._tokenEstGen++;
       // Buchwechsel: SW-CONTENT_CACHE (SWR) kann stale Listen liefern, daher fresh.
@@ -562,11 +564,20 @@ export const treeMethods = {
       window.dispatchEvent(new CustomEvent('pages:loaded', { detail: { bookId } }));
     } catch (e) {
       // AbortError = Buchwechsel hat laufenden Load gekillt — kein User-Fehler.
+      // Nachfolge-Call managed treeLoading + Tree selbst, hier nichts touchen.
       if (e?.name === 'AbortError' || signal.aborted) return;
       console.error('[loadPages]', e);
+      // Endgültiger Fail (Session expired, Timeout, Netz weg): alten Tree
+      // verwerfen. Sonst sieht User Sackgassen-Tree mit Seiten aus dem alten
+      // Buch und kann nicht navigieren (Klick → Page aus fremdem Buch).
+      this.tree = [];
+      this.pages = [];
       this.setStatus(this.t('common.errorColon') + e.message);
     } finally {
-      if (this._bookLoadAbort === loadCtrl) this._bookLoadAbort = null;
+      if (this._bookLoadAbort === loadCtrl) {
+        this._bookLoadAbort = null;
+        this.treeLoading = false;
+      }
     }
   },
 

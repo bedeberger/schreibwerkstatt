@@ -22,6 +22,15 @@
 }
 
 /* === Tree view === */
+/* Während Buchwechsel-Fetch bleibt alter Tree sichtbar (kein leerer Sackgassen-
+   Zustand bei Fetch-Fail), wird aber gedimmt + Klicks blockiert, damit der
+   User nicht versehentlich Seiten aus dem alten Buch öffnet. */
+.tree-card--loading .tree-chapter,
+.tree-card--loading .sidebar-empty-book {
+  opacity: var(--opacity-hint);
+  pointer-events: none;
+}
+
 .tree-chapter { margin-bottom: var(--space-lg); }
 
 /* Sub-Kapitel: visuell unter Eltern-Kapitel eingerueckt via --depth (1..3).

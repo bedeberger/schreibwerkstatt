@@ -44,7 +44,6 @@ export const dndMethods = {
     // und wirft "page is not defined". Nach Drag wieder entfernen.
     const markIgnore = (evt) => evt.item?.setAttribute('x-ignore', '');
     const unmarkIgnore = (evt) => evt.item?.removeAttribute('x-ignore');
-    const scrollOpts = this._autoScrollOpts();
     // Präzisions-Tuning (gegen "Nachbar verrutscht beim Ziehen"-Bug):
     // - forceFallback: konsistenter Klon-Ghost im <body>, umgeht HTML5-DnD-
     //   Browser-Quirks (sprunghafter Cursor, ungenaue dragover-Targets).
@@ -59,7 +58,7 @@ export const dndMethods = {
     // - chosenClass/ghostClass/dragClass: eigene CSS-Klassen für klares
     //   visuelles Feedback (Pickup-Highlight, Ghost-Slot, Hover-Karte).
     const baseOpts = {
-      animation: 150,
+      animation: 0,
       forceFallback: true,
       fallbackOnBody: true,
       fallbackTolerance: 5,
@@ -68,7 +67,7 @@ export const dndMethods = {
       direction: 'vertical',
       revertOnSpill: true,
       emptyInsertThreshold: 8,
-      ...scrollOpts,
+      scroll: false,
       chosenClass: 'organizer-chosen',
       ghostClass: 'organizer-ghost',
       dragClass: 'organizer-drag-active',
@@ -101,16 +100,6 @@ export const dndMethods = {
         onEnd: (evt) => { unmarkIgnore(evt); this._onPageDrop(evt); },
       }));
     }
-  },
-
-  _autoScrollOpts() {
-    const overflow = document.documentElement.scrollHeight - window.innerHeight;
-    return {
-      scroll: overflow > 100,
-      scrollSensitivity: 12,
-      scrollSpeed: 6,
-      bubbleScroll: true,
-    };
   },
 
   // Sortable.onMove: blockt Drops, die max-depth verletzen oder ein Kapitel in
@@ -159,15 +148,17 @@ export const dndMethods = {
     collect(this.workTree);
 
     const topContainer = this.$root.querySelector('.organizer-list[data-organizer="chapter-list"]');
-    const newWorkTree = topContainer ? this._rebuildFromDom(topContainer, 1, null, nodeById) : this.workTree;
+    const newTop = topContainer ? this._rebuildFromDom(topContainer, 1, null, nodeById) : null;
 
-    // Reassignen (statt in-place sort) — Tiefe + parent_id-Felder muessen neu
-    // gesetzt sein. Alpine x-for reagiert; SortableJS-DOM-Stand bleibt im Sync,
-    // weil wir neu rerendern.
-    this.workTree = newWorkTree;
+    // In-place: workTree-Ref + alle subchapters-Refs + alle Chapter-Objekt-Refs
+    // bleiben erhalten. Alpine x-for diff't keyed, ohne DOM-Container zu
+    // ersetzen → kein Re-Mount der Subchapter-Listen, kein sichtbares Flicker.
+    if (newTop) this.workTree.splice(0, this.workTree.length, ...newTop);
     const ok = await this._persistOrder({ fullReload: !sameBucket });
     if (ok) this._recordReorder(before);
-    await this._reattachSortables();
+    // Sortable-Refs bleiben valid: Container (.organizer-list,
+    // .organizer-subchapters) werden nicht ausgetauscht, weil x-for keyed
+    // gleiche Nodes wiederverwendet.
   },
 
   _rebuildFromDom(containerEl, depth, parentId, nodeById) {
@@ -176,20 +167,20 @@ export const dndMethods = {
       if (!chEl.classList.contains('organizer-chapter')) continue;
       const id = parseInt(chEl.dataset.chapterId, 10);
       if (!Number.isFinite(id)) continue;
-      const existing = nodeById.get(id) || { id, name: '', pages: [], subchapters: [] };
+      const node = nodeById.get(id);
+      if (!node) continue;
+      node.depth = depth;
+      node.parent_id = parentId;
       let subList = null;
       for (const desc of chEl.children) {
         if (desc.classList.contains('organizer-subchapters')) { subList = desc; break; }
       }
-      const subs = subList ? this._rebuildFromDom(subList, depth + 1, id, nodeById) : [];
-      out.push({
-        id,
-        name: existing.name,
-        pages: existing.pages || [],
-        depth,
-        parent_id: parentId,
-        subchapters: subs,
-      });
+      const newSubs = subList ? this._rebuildFromDom(subList, depth + 1, id, nodeById) : [];
+      // Subchapters-Array-Ref bewahren — splice statt Reassign, sonst sieht
+      // nested x-for neue Array-Ref und re-rendert die ganze Subchapter-Liste.
+      if (!node.subchapters) node.subchapters = [];
+      node.subchapters.splice(0, node.subchapters.length, ...newSubs);
+      out.push(node);
     }
     return out;
   },

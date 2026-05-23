@@ -81,6 +81,9 @@ const navigationState = () => ({
   bookSharedFlags: {},
   pages: [],
   tree: [],
+  // Tree wird während Buchwechsel-Fetch sichtbar gelassen + via CSS gedimmt +
+  // Klicks blockiert, statt vorab geleert (sonst leerer Tree bei Fetch-Fail).
+  treeLoading: false,
   _applyingHash: false,
   _hashInitialized: false,
   _hashUpdatePending: false,
