@@ -67,6 +67,10 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  /* Inter-Features: kern/liga/calt sind in den meisten Browsern Default,
+     hier explizit fuer Konsistenz. cv11 schaltet Inter auf single-storey g
+     (editorial-Signatur, dezenter als ss-Sets). */
+  font-feature-settings: "kern", "liga", "calt", "cv11";
   min-height: 100vh;
   min-height: 100dvh;
   padding: 1rem 1rem 56px;

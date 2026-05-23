@@ -1,12 +1,22 @@
 @layer components {
-/* === Card === */
+/* === Card ===
+   Top-Border ist Akzentband: 2px in `--card-accent` (SSoT card-accents.css).
+   Fallback `--color-border` macht Karten ohne `card--<key>` neutral statt
+   farblos-inkonsistent. Baseline-Shadow extrem dezent, Hover lifted via
+   --shadow-sm; transition aus motion-Tokens → reduced-motion respektiert. */
 .card {
   background: var(--color-surface);
   border-radius: var(--radius-lg);
   border: 0.5px solid var(--color-border);
+  border-top: 2px solid var(--card-accent, var(--color-border));
   padding: 1.25rem;
   margin-bottom: 1rem;
   animation: cardFadeIn var(--transition-slow) both;
+  box-shadow: 0 1px 0 var(--color-shadow-soft);
+  transition: box-shadow var(--transition-base);
+}
+.card:hover {
+  box-shadow: var(--shadow-sm);
 }
 @keyframes cardFadeIn {
   from { opacity: 0; transform: translateY(5px); }

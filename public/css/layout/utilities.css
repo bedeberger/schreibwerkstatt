@@ -36,6 +36,21 @@
   color:      color-mix(in srgb, var(--badge-hue) var(--figpal-text-mix), var(--color-text));
 }
 
+/* === Tabular-Nums fuer Stats/Counter ===
+   Numerische Werte sollen bei Live-Update nicht wackeln. Sammel-Selektor
+   fuer alle Container, die primaer Zahlen anzeigen. Per-File-Wiederholungen
+   in book-overview/page-list/heatmap bleiben (specificity-lokal), schaden
+   aber nicht — gleiches Result. */
+.tok-stats,
+.form-stats,
+.form-num,
+.batch-status,
+.job-queue-pill-progress,
+.job-queue-pill-status,
+.review-stars {
+  font-variant-numeric: tabular-nums;
+}
+
 /* === Utility-Klassen === */
 .tag--link {
   margin-left: var(--space-6);
