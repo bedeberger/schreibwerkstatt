@@ -361,23 +361,32 @@ export const crudMethods = {
       if (pi >= 0) root.pages.splice(pi, 1);
       for (let i = root.tree.length - 1; i >= 0; i--) {
         const it = root.tree[i];
-        if (it.type === 'chapter') {
-          if (it.solo && it.pages?.[0]?.id === id) {
-            root.tree.splice(i, 1);
-          } else if (!it.solo) {
-            const j = it.pages.findIndex(p => p.id === id);
-            if (j >= 0) it.pages.splice(j, 1);
-          }
+        if (it.type !== 'chapter') continue;
+        if (it.solo && it.pages?.[0]?.id === id) {
+          root.tree.splice(i, 1);
+        } else if (!it.solo) {
+          const j = it.pages.findIndex(p => p.id === id);
+          if (j >= 0) it.pages.splice(j, 1);
         }
       }
-      for (const c of this.workTree) {
-        const j = c.pages.findIndex(p => p.id === id);
-        if (j >= 0) c.pages.splice(j, 1);
+      // Rekursiv durch workTree.subchapters — sonst bleiben Sub-Kapitel-Pages sichtbar.
+      const removeFromTree = (list) => {
+        for (const c of list) {
+          const j = c.pages.findIndex(p => p.id === id);
+          if (j >= 0) { c.pages.splice(j, 1); return true; }
+          if (removeFromTree(c.subchapters || [])) return true;
+        }
+        return false;
+      };
+      if (!removeFromTree(this.workTree)) {
+        const si = this.soloPages.findIndex(p => p.id === id);
+        if (si >= 0) this.soloPages.splice(si, 1);
       }
-      const si = this.soloPages.findIndex(p => p.id === id);
-      if (si >= 0) this.soloPages.splice(si, 1);
       this._rebuildPageOrderMaps();
       if (typeof root._refreshChapterStats === 'function') root._refreshChapterStats();
+      await this.$nextTick();
+      this._destroySortables();
+      this._initSortables();
     }, 'bookOrganizer.deleteFailed');
   },
 };

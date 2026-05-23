@@ -7,14 +7,44 @@
 // Page), wir wollen aber nicht pro Render rebuilden.
 
 import { contentRepo } from '../repo/content.js';
-import { localIsoDate } from '../utils.js';
+import { fetchJson, localIsoDate } from '../utils.js';
 import { _sortSoloFirst } from './tree.js';
 
 const _CACHE_KEY = '_diaryCalendarCache';
 
 function _ensureCache(app) {
-  if (!app[_CACHE_KEY]) app[_CACHE_KEY] = { pagesRef: null, map: null, months: null };
+  if (!app[_CACHE_KEY]) app[_CACHE_KEY] = { pagesRef: null, map: null, months: null, langByBookId: {} };
   return app[_CACHE_KEY];
+}
+
+const MONTH_NAMES_DE = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+const MONTH_NAMES_EN = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+// DE/EN Monatsname → 1-12. Diakritika-tolerant, akzeptiert übliche Abkürzungen.
+// Spiegel zu lib/import-parsers/date-detect.js#parseMonthToken (Server-Side).
+const _MONTH_TOKENS = {
+  januar:1, jan:1, jaenner:1, january:1,
+  februar:2, feb:2, february:2,
+  maerz:3, marz:3, mar:3, mrz:3, march:3,
+  april:4, apr:4,
+  mai:5, may:5,
+  juni:6, jun:6, june:6,
+  juli:7, jul:7, july:7,
+  august:8, aug:8,
+  september:9, sep:9, sept:9,
+  oktober:10, okt:10, oct:10, october:10,
+  november:11, nov:11,
+  dezember:12, dez:12, december:12,
+};
+
+function _parseMonthName(token) {
+  if (!token) return null;
+  const norm = String(token).toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '');
+  for (const part of norm.split(/[\s.,;:_\-/]+/).filter(Boolean)) {
+    if (_MONTH_TOKENS[part]) return _MONTH_TOKENS[part];
+  }
+  return null;
 }
 
 export const diaryCalendarMethods = {
@@ -149,6 +179,68 @@ export const diaryCalendarMethods = {
     return this.diaryCalendarPagesMap().has(localIsoDate());
   },
 
+  // Lädt Buchsprache (de/en) aus /booksettings, gecacht pro Buch. Default 'de'.
+  async _getDiaryBookLanguage() {
+    const cache = _ensureCache(this);
+    const id = String(this.selectedBookId || '');
+    if (!id) return 'de';
+    if (cache.langByBookId[id]) return cache.langByBookId[id];
+    try {
+      const data = await fetchJson(`/booksettings/${id}`);
+      const lang = data?.language === 'en' ? 'en' : 'de';
+      cache.langByBookId[id] = lang;
+      return lang;
+    } catch {
+      return 'de';
+    }
+  },
+
+  // Liefert Chapter-ID, in die ein neuer Diary-Eintrag für `monthNum` im
+  // `year` gehört. Heuristik: Hat das Jahr-Kapitel Sub-Kapitel, die wie Monate
+  // aussehen (Name enthält DE/EN-Monatsname ODER position 1-12)?
+  // - keine Sub-Kapitel überhaupt → Jahr-Kapitel selbst
+  // - Sub-Kapitel existieren, aber keine month-style → Jahr-Kapitel (User
+  //   organisiert nach anderem Schema; nicht überschreiben)
+  // - month-style Sub-Kapitel vorhanden, gesuchter Monat dabei → matching Sub
+  // - month-style Sub-Kapitel vorhanden, Monat fehlt → neu anlegen
+  //   (Name "YYYY <Monatsname>" in Buchsprache, position = monthNum)
+  async _resolveDiaryEntryChapter(yearChapterId, year, monthNum) {
+    const subs = (this.tree || []).filter(it =>
+      it.type === 'chapter'
+        && !it.solo
+        && String(it.parent_id) === String(yearChapterId)
+    );
+    if (!subs.length) return yearChapterId;
+
+    const monthOf = (sub) => {
+      const byName = _parseMonthName(sub.name);
+      if (byName) return byName;
+      const p = Number(sub.priority);
+      if (Number.isFinite(p) && p >= 1 && p <= 12) return p;
+      return null;
+    };
+    const monthSubs = subs.map(s => ({ sub: s, month: monthOf(s) })).filter(x => x.month);
+    if (!monthSubs.length) return yearChapterId;
+
+    const match = monthSubs.find(x => x.month === monthNum);
+    if (match) return match.sub.id;
+
+    const lang = await this._getDiaryBookLanguage();
+    const names = lang === 'en' ? MONTH_NAMES_EN : MONTH_NAMES_DE;
+    const subName = `${year} ${names[monthNum - 1]}`;
+    const created = await contentRepo.createChapter({
+      book_id: parseInt(this.selectedBookId, 10),
+      name: subName,
+      parent_chapter_id: yearChapterId,
+      position: monthNum,
+    });
+    if (!created?.id) throw new Error('createChapter (month) returned no id');
+    // Sub-Kapitel-Mutation: granularer Tree-Mirror deckt das nicht zuverlässig
+    // ab. wake-Reload behält Selektion + State, erneuert nur Tree/Pages.
+    await this.loadPages({ source: 'wake' });
+    return created.id;
+  },
+
   // Sichert Jahr-Kapitel `YYYY` (Name = Jahrzahl, position = Jahrzahl).
   // Pattern stammt aus folder-import (routes/jobs/folder-import.js): ein
   // Top-Level-Kapitel pro Jahr. Liefert Chapter-ID.
@@ -189,7 +281,10 @@ export const diaryCalendarMethods = {
     if (existing) { this.selectPage(existing); return; }
     this._diaryCreatingDate = dateIso;
     try {
-      const chapterId = await this._ensureDiaryYearChapter(dateIso.slice(0, 4));
+      const year = parseInt(dateIso.slice(0, 4), 10);
+      const monthNum = parseInt(dateIso.slice(5, 7), 10);
+      const yearChapterId = await this._ensureDiaryYearChapter(year);
+      const chapterId = await this._resolveDiaryEntryChapter(yearChapterId, year, monthNum);
       const created = await contentRepo.createPage({
         book_id: parseInt(this.selectedBookId, 10),
         chapter_id: chapterId,
@@ -206,10 +301,7 @@ export const diaryCalendarMethods = {
         treeCh.open = true;
       }
       this.tokEsts[created.id] = { tok: 0, words: 0, chars: 0 };
-      this.diaryCalendarYearMonth = {
-        year: parseInt(dateIso.slice(0, 4), 10),
-        month: parseInt(dateIso.slice(5, 7), 10),
-      };
+      this.diaryCalendarYearMonth = { year, month: monthNum };
       this.selectPage(created);
     } catch (e) {
       console.error('[_createDiaryEntry]', e);
