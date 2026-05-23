@@ -607,6 +607,7 @@ export const notebookEditMethods = {
       app._markEditDirty?.();
       editEl.dispatchEvent(new Event('input', { bubbles: true }));
     }
+    window.dispatchEvent(new CustomEvent('languagetool:recheck'));
   },
 
   // Trennlinie (<hr>) am Caret einfügen + Folge-Absatz für Weiterschreiben.

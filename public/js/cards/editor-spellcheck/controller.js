@@ -341,6 +341,17 @@ export function createSpellcheckController({
     if (!id) return;
     ev.preventDefault();
     ev.stopPropagation();
+    try {
+      if (typeof root.focus === 'function') root.focus({ preventScroll: true });
+      const sel = root.ownerDocument.getSelection();
+      if (sel) {
+        const r = root.ownerDocument.createRange();
+        r.setStart(pt.node, pt.offset);
+        r.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(r);
+      }
+    } catch { /* selection not settable, popover öffnet trotzdem */ }
     _openPopover(id);
   }
 

@@ -1269,6 +1269,8 @@
   "editor.btn.check":            "Prüfen",
   "editor.btn.checkTitle":       "Lektorat starten (Strg+Enter)",
   "editor.btn.pageEmpty":        "Seite ist leer",
+  "editor.btn.deleteEmptyPage":  "Leere Seite löschen",
+  "editor.emptyPageHint":        "Diese Seite ist leer.",
   "editor.btn.edit":             "Bearbeiten",
   "editor.btn.editTitle":        "Text manuell bearbeiten",
   "editor.btn.focus":            "Fokus-Editor",

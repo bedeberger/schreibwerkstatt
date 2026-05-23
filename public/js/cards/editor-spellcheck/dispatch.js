@@ -168,6 +168,12 @@ export function setupSpellcheckDispatch(app) {
     requestAnimationFrame(() => requestAnimationFrame(fn));
   }
 
+  // Explizites Recheck-Signal (z.B. nach Quote-Normalisierung): aktiven
+  // Controller debounced neu prüfen lassen, auch wenn der Text identisch ist.
+  window.addEventListener('languagetool:recheck', () => {
+    try { current?.ctl?.refresh?.(); } catch {}
+  });
+
   app.$watch('languagetoolEnabled', () => { _evaluate(); _evalForms(); });
   app.$watch('editMode',            _evaluate);
   app.$watch('focusActive',         _evaluate);

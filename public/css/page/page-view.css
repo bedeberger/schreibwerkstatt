@@ -294,4 +294,22 @@
   color: var(--color-stark, var(--color-primary));
 }
 
+/* Empty-State im View-Modus: leere Seite + Direkt-Löschen. Sitzt anstelle
+   von `.page-content-view` (das per `x-show` verschwindet). Visuell ruhig,
+   keine Papier-Textur — Hinweis, nicht Inhalt. */
+.page-empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  padding: var(--space-lg) var(--space-md);
+  margin: var(--space-md) auto;
+  max-width: calc(64ch + 2 * clamp(18px, 4vw, 40px));
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-muted);
+}
+.page-empty-state__text { font-size: var(--font-em-95); }
+
 }
