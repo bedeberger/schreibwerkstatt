@@ -6,7 +6,7 @@
   background: var(--color-card-bg);
   color: var(--color-text);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lg);
   max-width: 480px;
   width: calc(100% - 2rem);
@@ -74,7 +74,7 @@
   background: var(--color-card-bg);
   color: var(--color-text);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lg);
   width: min(560px, calc(100% - 2rem));
   max-height: 85vh;

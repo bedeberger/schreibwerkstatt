@@ -50,7 +50,16 @@
 
 /* === Base === */
 html {
-  background: var(--color-bg);
+  background-color: var(--color-bg);
+  /* Vignette: dezent abgedunkelte Ecken/Rand, Editorial-Tischfläche-Anmutung.
+     Fixed-attachment: Gradient scrollt nicht mit, bleibt am Viewport. Dark-Theme
+     hat eigene --color-vignette-Intensität. */
+  background-image: radial-gradient(
+    ellipse 90% 70% at 50% 40%,
+    transparent 55%,
+    var(--color-vignette)
+  );
+  background-attachment: fixed;
   scrollbar-gutter: stable;
 }
 

@@ -7,6 +7,7 @@
      Tinten-Schwarz statt Pure-Black. Editorial-Anmutung statt Standard-SaaS. */
   --color-bg: #faf7f2;
   --color-surface: #ffffff;
+  --color-vignette: rgba(0, 0, 0, 0.045);
   --color-text: #1f1c18;
   --color-muted: #6b6258;
   --color-subtle: #9a9085;
@@ -188,7 +189,8 @@
   color-scheme: dark;
 
   --color-bg: #1a1816;
-  --color-surface: #24221e;
+  --color-surface: #2a2722;
+  --color-vignette: rgba(0, 0, 0, 0.35);
   --color-text: #e6e2d9;
   --color-muted: #9a948a;
   --color-subtle: #6e685f;
