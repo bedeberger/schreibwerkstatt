@@ -291,6 +291,50 @@ test('normalizeQuotes: Quote über <em> hinweg → next-Kontext aus folgendem Te
   assert.equal(root.querySelector('p').textContent, 'Er rief «Hallo Welt» laut.');
 });
 
+test('normalizeQuotes: adjazente Mixed-Style Quotes lösen keinen Infinite-Loop aus', () => {
+  // Regression: `„«` adjacent. Erste Iteration emittiert `«` für `„`. Bei der
+  // zweiten Iteration ist out[-1]=`«` und repl=`«` (single-char) — alte Idempotenz-
+  // Heuristik setzte matchOffset=1 → `repl.slice(1)=''` → `startsWith('', i)=true`
+  // → emitted='' → `i += -1` → hang. Fix: matchOffset nur bei space-prefix repls.
+  const root = makeRoot('<p>„Die Wohnung? „«, fragte er.</p>');
+  const style = resolveQuoteStyle('de', 'CH');
+  const count = normalizeQuotes(root, style);
+  // Beide `„` und `«` klassifizieren sich kontextuell als öffnend → 2 Glyphen
+  // werden zu `«` umgeschrieben (das dritte `«` ist bereits style-konform).
+  // Wichtig: kein Hang, alle Glyphen sind Swiss.
+  const text = root.querySelector('p').textContent;
+  assert.ok(!/[„“”‚‘]/.test(text), `non-Swiss quote remained: ${text}`);
+  assert.ok(count > 0);
+});
+
+test('normalizeQuotes: Page-105-Corpus → alle non-Swiss Quotes weg', () => {
+  // Real-World-Mix aus Buch 102 / Seite 105: „… »…« mit gemischten Richtungen.
+  // Erwartet: nach Normalisierung sind ausschliesslich Swiss-Glyphen (« » ‹ › ’)
+  // im Text — keine deutschen „…“ oder englischen "…" Reste.
+  const root = makeRoot(`
+    <p>„Spurensicherung ist dort. Keine Einbruchsspuren.«</p>
+    <p>„Und ihr Handy?«, während er von The Doors »The End« hörte.</p>
+    <p>„Weg. Nicht in der Wohnung.« Markus setzte sich. „Letzter Anruf: tot.»</p>
+    <p>„Natürlich.«</p>
+    <p>„Ich war bei der Kanzlei«, sagte Markus.</p>
+    <p>„Eine Affäre?«</p>
+    <p>„Möglich. Oder etwas Berufliches.«</p>
+    <p>„Mit wem?«</p>
+    <p>Was soll’s.</p>
+  `);
+  const style = resolveQuoteStyle('de', 'CH');
+  normalizeQuotes(root, style);
+  const all = root.textContent;
+  assert.ok(!/[„“”‚‘"']/.test(all), `non-Swiss quotes remained: ${[...all].filter(c => /[„“”‚‘"']/.test(c)).join(' ')}`);
+  // Vereinzelte Erwartungen: dialogische Sätze beginnen mit `«` und enden mit `»`.
+  const ps = root.querySelectorAll('p');
+  assert.equal(ps[0].textContent, '«Spurensicherung ist dort. Keine Einbruchsspuren.»');
+  assert.equal(ps[1].textContent, '«Und ihr Handy?», während er von The Doors «The End» hörte.');
+  assert.equal(ps[3].textContent, '«Natürlich.»');
+  assert.equal(ps[4].textContent, '«Ich war bei der Kanzlei», sagte Markus.');
+  assert.equal(ps[8].textContent, 'Was soll’s.');
+});
+
 test('normalizeQuotesInRange: nur Selection wird transformiert', () => {
   const root = makeRoot('<p>"Eins" und "Zwei"</p>');
   const style = resolveQuoteStyle('de', 'CH');

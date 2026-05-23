@@ -59,6 +59,15 @@ test('validateConfig: numberingMode nested|flat + Default nested', () => {
   assert.equal(bogus.chapter.numberingMode, 'nested');
 });
 
+test('validateConfig: unnumberedChapterIds dedup + Integer-Cast + Junk-Filter', () => {
+  const def = defaultConfig();
+  assert.deepEqual(def.chapter.unnumberedChapterIds, []);
+  const c = validateConfig({ chapter: { unnumberedChapterIds: [1, '2', 2, 'abc', 0, -3, 4] } });
+  assert.deepEqual(c.chapter.unnumberedChapterIds, [1, 2, 4]);
+  const empty = validateConfig({ chapter: { unnumberedChapterIds: 'nope' } });
+  assert.deepEqual(empty.chapter.unnumberedChapterIds, []);
+});
+
 test('validateConfig: breakBeforeSubchapter Default false, akzeptiert true', () => {
   const def = defaultConfig();
   assert.equal(def.chapter.breakBeforeSubchapter, false);

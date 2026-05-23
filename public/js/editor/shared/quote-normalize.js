@@ -182,12 +182,13 @@ function _normalizeBlock(blockEl, style) {
       const repl = isDouble
         ? _classifyDouble(c, prevChar, prevNonWs, next, style)
         : _classifySingle(c, prevChar, prevNonWs, next, style);
-      // Idempotenz: out-Tail + Source enthalten bereits exakt repl an dieser
-      // Stelle. matchOffset = 1, falls out mit demselben Space (NBSP / reg)
-      // wie repl[0] endet — dann konsumieren wir nur repl.slice(1) aus dem
-      // Source. Match nur bei exakt gleichem Space-Typ (NBSP ≠ reg space),
-      // sonst würde reg space → NBSP nicht ersetzt.
-      const matchOffset = (out.length && out[out.length - 1] === repl[0]) ? 1 : 0;
+      // Idempotenz: nur sinnvoll, wenn `repl` mit Space (NBSP / reg) startet
+      // (FR-Style). Dann darf der bereits in `out` vorhandene Space als erstes
+      // Zeichen von `repl` zählen — wir konsumieren nur `repl.slice(1)` aus
+      // Source. Für Non-Space-Prefix-Styles (de-CH/de-DE/en/it) bleibt
+      // matchOffset 0, sonst entstünde ein Empty-Emit-Infinite-Loop bei
+      // adjazenten Glyphen wie `„«` → `«` + matchOffset=1 → emitted=''.
+      const matchOffset = (SPACES.has(repl[0]) && out.length && out[out.length - 1] === repl[0]) ? 1 : 0;
       const emitted = s.startsWith(repl.slice(matchOffset), i) ? repl.slice(matchOffset) : null;
       if (emitted !== null) {
         out += emitted;
@@ -282,7 +283,7 @@ export function normalizeQuotesInRange(range, style) {
       const repl = isDouble
         ? _classifyDouble(c, prevChar, prevNonWs, next, style)
         : _classifySingle(c, prevChar, prevNonWs, next, style);
-      const matchOffset = (out.length && out[out.length - 1] === repl[0]) ? 1 : 0;
+      const matchOffset = (SPACES.has(repl[0]) && out.length && out[out.length - 1] === repl[0]) ? 1 : 0;
       const consumeLen = repl.length - matchOffset;
       // Idempotenz nur innerhalb der Range prüfen — Match darf nicht
       // ausserhalb der User-Selection greifen.
