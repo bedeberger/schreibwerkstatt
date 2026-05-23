@@ -316,19 +316,20 @@ async function runBlogPushJob(jobId, bookId, userEmail, pageIds) {
 
       const wpHtml = appToWpHtml(pageRow.html || pageRow.body_html || '<p></p>');
 
-      // Beim Create: Datum im Titel (Pattern "YYYY-MM-DD: Rest") auf heute
-      // bumpen, damit der frisch veroeffentlichte Post das Push-Datum
-      // traegt — und lokal nachziehen.
+      // Beim Create: Titel auf `YYYY-MM-DD: Rest` normalisieren (oder nur
+      // `YYYY-MM-DD`, falls Rest leer). Bereits vorhandener Datum-Prefix wird
+      // durch heute ersetzt. Lokaler page_name wird synchron gezogen.
       let titleForCreate = pageRow.name || '';
       let renamedLocally = false;
       if (!link) {
-        const m = /^(\d{4}-\d{2}-\d{2})(:\s.*)$/.exec(titleForCreate);
-        if (m) {
-          const today = localIsoDate();
-          if (m[1] !== today) {
-            titleForCreate = `${today}${m[2]}`;
-            renamedLocally = true;
-          }
+        const today = localIsoDate();
+        const raw = String(titleForCreate).trim();
+        const m = /^\d{4}-\d{2}-\d{2}(?:\s*:\s*(.*))?$/.exec(raw);
+        const rest = (m ? (m[1] || '') : raw).trim();
+        const normalized = rest ? `${today}: ${rest}` : today;
+        if (normalized !== titleForCreate) {
+          titleForCreate = normalized;
+          renamedLocally = true;
         }
       }
 

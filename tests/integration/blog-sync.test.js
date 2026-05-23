@@ -270,7 +270,7 @@ test('Push: lokal editierte Seite wird zu WP gepusht (Update)', async () => {
   }
 });
 
-test('Push: legt neue WP-Posts mit Page-Name als Titel an', async () => {
+test('Push (Create): praegt Page-Name mit YYYY-MM-DD-Prefix von heute', async () => {
   const bookId = 9005;
   seedBlogBook(bookId);
   seedConnection(bookId);
@@ -282,6 +282,9 @@ test('Push: legt neue WP-Posts mit Page-Name als Titel an', async () => {
     book_id: bookId, chapter_id: null, name: 'Neuer App-Titel',
     html: '<p>Frischer Eintrag.</p>',
   }, null);
+
+  const { localIsoDate } = require('../../lib/local-date');
+  const expected = `${localIsoDate()}: Neuer App-Titel`;
 
   const wp = makeWpStub({ posts: [] });
   const restore = installFetch(wp);
@@ -298,7 +301,44 @@ test('Push: legt neue WP-Posts mit Page-Name als Titel an', async () => {
 
     const created = wp.posts[0];
     assert.ok(created, 'WP-Post wurde nicht angelegt');
-    assert.equal(created.title.raw, 'Neuer App-Titel');
+    assert.equal(created.title.raw, expected);
+    const reloaded = await contentStore.loadPage(page.id);
+    assert.equal(reloaded.name, expected);
+  } finally {
+    restore();
+  }
+});
+
+test('Push (Create): leerer Titel wird zu YYYY-MM-DD von heute', async () => {
+  const bookId = 9008;
+  seedBlogBook(bookId);
+  seedConnection(bookId);
+  const connId = blogs.getConnection(bookId).id;
+  blogs.markInitialImportDone(connId);
+
+  const page = await contentStore.createPage({
+    book_id: bookId, chapter_id: null, name: '   ',
+    html: '<p>Ohne Titel.</p>',
+  }, null);
+
+  const { localIsoDate } = require('../../lib/local-date');
+  const expected = localIsoDate();
+
+  const wp = makeWpStub({ posts: [] });
+  const restore = installFetch(wp);
+  try {
+    const jobId = `test-push-empty-${Date.now()}`;
+    const { jobs, runningJobs } = ctx.shared;
+    jobs.set(jobId, { id: jobId, type: 'blog-push', bookId, userEmail: null, status: 'running', progress: 0, createdAt: Date.now() });
+    runningJobs.set(jobId, { type: 'blog-push', bookId });
+
+    await blogSync.runBlogPushJob(jobId, bookId, null, [page.id]);
+    const job = jobs.get(jobId);
+    assert.equal(job.status, 'done', JSON.stringify(job.error));
+
+    assert.equal(wp.posts[0].title.raw, expected);
+    const reloaded = await contentStore.loadPage(page.id);
+    assert.equal(reloaded.name, expected);
   } finally {
     restore();
   }
@@ -343,7 +383,7 @@ test('Push (Create): bumpt YYYY-MM-DD im Titel auf heute, lokal + WP synchron', 
   }
 });
 
-test('Push (Create): Titel ohne YYYY-MM-DD bleibt unverändert', async () => {
+test('Push (Create): Titel ohne YYYY-MM-DD bekommt heute als Prefix', async () => {
   const bookId = 9007;
   seedBlogBook(bookId);
   seedConnection(bookId);
@@ -356,6 +396,9 @@ test('Push (Create): Titel ohne YYYY-MM-DD bleibt unverändert', async () => {
     html: '<p>Inhalt.</p>',
   }, null);
 
+  const { localIsoDate } = require('../../lib/local-date');
+  const expected = `${localIsoDate()}: Kein Datum hier`;
+
   const wp = makeWpStub({ posts: [] });
   const restore = installFetch(wp);
   try {
@@ -365,10 +408,10 @@ test('Push (Create): Titel ohne YYYY-MM-DD bleibt unverändert', async () => {
     runningJobs.set(jobId, { type: 'blog-push', bookId });
 
     await blogSync.runBlogPushJob(jobId, bookId, null, [page.id]);
-    assert.equal(wp.posts[0].title.raw, 'Kein Datum hier');
+    assert.equal(wp.posts[0].title.raw, expected);
 
     const reloaded = await contentStore.loadPage(page.id);
-    assert.equal(reloaded.name, 'Kein Datum hier');
+    assert.equal(reloaded.name, expected);
   } finally {
     restore();
   }

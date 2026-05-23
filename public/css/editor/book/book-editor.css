@@ -296,6 +296,9 @@
     color: inherit;
     background: transparent;
     font-family: var(--font-serif);
+    /* Buchsatz-Mikrotypografie: alte Ziffern + Ligaturen wie page-view. */
+    font-feature-settings: "kern", "liga", "dlig", "calt", "onum";
+    text-rendering: optimizeLegibility;
   }
   .book-editor-page-body[contenteditable="false"] { cursor: text; }
   /* Hintergrund-Tönung markiert aktiven Block. */

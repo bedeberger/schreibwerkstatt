@@ -588,25 +588,55 @@ export const appViewMethods = {
   // Nach Sleep/Wake: in-flight Fetches sind tot, Listen können leer hängen
   // (Tab überlebt im Memory, aber TCP-Sockets sind weg). `/config` triggert
   // 401-Check über globalen Wrapper; Editor-Sessions bleiben unberührt.
+  // Bei Netzfehler (DNS noch nicht zurück, TCP timeout) wird via `online`-Event
+  // + setTimeout-Backoff ein Retry geplant — sonst bleibt Tree stale, wenn der
+  // POST direkt vor dem Disconnect schon serverseitig committed war.
   async _refreshAfterWake() {
-    try { await fetch('/config', { credentials: 'same-origin' }); } catch (e) {}
-    if (this.sessionExpired) return;
-    if (this.isAdminOnly) return;
-    if (this.editMode || this.editDirty) return;
-    if (!this.selectedBookId) {
-      // Kein Buch vorher selektiert → loadBooks muss intern loadPages für Books[0] anstossen.
-      try { await this.loadBooks(); } catch (e) {}
-      return;
-    }
-    // Buchliste refreshen, aber internen loadPages-Trigger unterdrücken — wir rufen
-    // loadPages danach mit source='wake' (kein Pre-Clear) explizit auf.
-    try { await this.loadBooks({ source: 'wake' }); } catch (e) {}
-    try { await this.loadPages({ source: 'wake' }); } catch (e) {}
-    for (const c of EXCLUSIVE_CARDS) {
-      if (this[c.flag]) {
-        window.dispatchEvent(new CustomEvent('card:refresh', { detail: { name: c.key } }));
+    if (this._wakeRefreshInflight) return;
+    this._wakeRefreshInflight = true;
+    let needsRetry = false;
+    const isNetErr = (e) => e && (e.name === 'TypeError' || /Failed to fetch|NetworkError|ERR_/.test(String(e?.message || e)));
+    try {
+      try { await fetch('/config', { credentials: 'same-origin' }); }
+      catch (e) { if (isNetErr(e)) needsRetry = true; }
+      if (this.sessionExpired) return;
+      if (this.isAdminOnly) return;
+      if (this.editMode || this.editDirty) return;
+      try {
+        if (!this.selectedBookId) {
+          await this.loadBooks();
+        } else {
+          await this.loadBooks({ source: 'wake' });
+          await this.loadPages({ source: 'wake' });
+        }
+      } catch (e) {
+        if (isNetErr(e)) needsRetry = true;
       }
+      if (!needsRetry) {
+        for (const c of EXCLUSIVE_CARDS) {
+          if (this[c.flag]) {
+            window.dispatchEvent(new CustomEvent('card:refresh', { detail: { name: c.key } }));
+          }
+        }
+      }
+    } finally {
+      this._wakeRefreshInflight = false;
     }
+    if (needsRetry) this._scheduleWakeRetry();
+  },
+
+  _scheduleWakeRetry() {
+    if (this._wakeRetryArmed) return;
+    this._wakeRetryArmed = true;
+    const fire = () => {
+      if (!this._wakeRetryArmed) return;
+      this._wakeRetryArmed = false;
+      window.removeEventListener('online', fire);
+      if (this._wakeRetryTimer) { clearTimeout(this._wakeRetryTimer); this._wakeRetryTimer = null; }
+      this._refreshAfterWake();
+    };
+    window.addEventListener('online', fire, { once: true });
+    this._wakeRetryTimer = setTimeout(fire, 8000);
   },
 
   // Setzt alles zurück: Seiten-Level (via resetPage) + Buch-Level.

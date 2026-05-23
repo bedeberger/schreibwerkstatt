@@ -173,7 +173,7 @@ body.palette-open { overflow: hidden; overscroll-behavior: contain; }
   overscroll-behavior: contain;
   scrollbar-width: none;
   text-rendering: optimizeLegibility;
-  font-feature-settings: "kern", "liga";
+  font-feature-settings: "kern", "liga", "dlig", "calt", "onum";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
