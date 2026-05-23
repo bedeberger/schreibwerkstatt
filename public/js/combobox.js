@@ -16,16 +16,16 @@
 // ARIA-Rollen — Konsumenten brauchen kein `@click.outside`, kein `@keydown`,
 // keine `class`-Attribute.
 
-export function registerCombobox() {
-  if (typeof window === 'undefined' || !window.Alpine) return;
-  const Alpine = window.Alpine;
-
-  Alpine.data('combobox', (placeholderOrCfg = null, emptyLabelArg = null) => {
-    const cfg = (placeholderOrCfg && typeof placeholderOrCfg === 'object')
-      ? placeholderOrCfg
-      : { placeholder: placeholderOrCfg, emptyLabel: emptyLabelArg, compact: true };
-    if (cfg.compact === undefined) cfg.compact = true;
-    return {
+// comboboxData: pure Factory ohne Alpine-Registrierung. Wird von
+// `registerCombobox` UND von Wrapper-Komponenten (z. B. `catalogFilter`)
+// genutzt, damit Spezialisierungen die volle Combobox-Mechanik erben statt
+// sie zu reimplementieren. cfg-Form deckt sich mit der Object-Variante von
+// `combobox(...)` aus den Templates: { placeholder, emptyLabel, compact,
+// multiple, transient, footer }. Sowohl `placeholder` als auch `emptyLabel`
+// duerfen Funktionen sein (fuer reaktive i18n-Aufloesung).
+export function comboboxData(cfg = {}) {
+  if (cfg.compact === undefined) cfg.compact = true;
+  return {
       open: false,
       query: '',
       // Single mode: scalar; Multi mode: Array. x-modelable seeded from parent.
@@ -48,7 +48,9 @@ export function registerCombobox() {
         return p ?? window.__app?.t?.('common.choose') ?? 'Auswählen…';
       },
       get emptyLabel() {
-        return this._emptyLabel;
+        const e = this._emptyLabel;
+        if (typeof e === 'function') return e() ?? null;
+        return e;
       },
       get _allOptions() {
         if (this._multiple) return this.options;
@@ -227,5 +229,14 @@ export function registerCombobox() {
         }
       },
     };
+}
+
+export function registerCombobox() {
+  if (typeof window === 'undefined' || !window.Alpine) return;
+  window.Alpine.data('combobox', (placeholderOrCfg = null, emptyLabelArg = null) => {
+    const cfg = (placeholderOrCfg && typeof placeholderOrCfg === 'object')
+      ? placeholderOrCfg
+      : { placeholder: placeholderOrCfg, emptyLabel: emptyLabelArg, compact: true };
+    return comboboxData(cfg);
   });
 }

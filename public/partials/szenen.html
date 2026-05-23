@@ -108,18 +108,18 @@
           </button>
         </template>
       </div>
-      <div x-data="combobox($app.t('filter.figur'), $app.t('filter.allFiguren'))"
+      <div x-data="catalogFilter('figur')"
            x-modelable="value" x-model="$app.szenenFilters.figurId"
            x-effect="options = $app.figuren.filter(f => $app.szenen.some(s => s.fig_ids.includes(f.id))).map(f => ({value: f.id, label: f.kurzname || f.name}))"
            >
       </div>
-      <div x-data="combobox($app.t('filter.chapter'), $app.t('filter.allChapters'))"
+      <div x-data="catalogFilter('chapter')"
            x-modelable="value" x-model="$app.szenenFilters.kapitel"
            x-effect="options = $app.szenenKapitelListe().map(k => ({value: k, label: k}))"
            >
       </div>
       <div x-show="$app.orte.length > 0"
-           x-data="combobox($app.t('filter.ort'), $app.t('filter.allOrte'))"
+           x-data="catalogFilter('ort')"
            x-modelable="value" x-model="$app.szenenFilters.ortId"
            x-effect="options = $app.orte.filter(o => $app.szenen.some(s => (s.ort_ids||[]).includes(o.id))).map(o => ({value: o.id, label: o.name}))"
            >

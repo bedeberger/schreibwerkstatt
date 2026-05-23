@@ -193,6 +193,22 @@ Wiederkehrende Werte gehen über Tokens. Ad-hoc-Werte (`box-shadow: 0 4px 12px .
 
 **Regel:** Wrapper-Div leer lassen (Helper überschreibt `innerHTML`). Pflicht-Pattern: `x-data="combobox(placeholder, emptyLabel?)" x-modelable="value" x-model="ref" x-effect="options = …"`.
 
+### Catalog-Filter-Spezialisierung
+
+Filter-Comboboxen in Katalog-Karten (Figuren/Orte/Szenen/Ereignisse/Songs/Kontinuität) nutzen den dünnen Wrapper `catalogFilter(kind)` aus [public/js/catalog-filter.js](public/js/catalog-filter.js). Erbt die volle Combobox-Mechanik via `comboboxData`-Factory und reicht nur Placeholder + Empty-Label per Filter-Typ rein. Spart pro Aufruf vier i18n-Lookups und zentralisiert die Label-Konvention.
+
+`kind`-Werte: `figur`, `chapter`, `page`, `ort`, `szene`. Erweiterung (z. B. `tag`, `datum`): `FILTER_KINDS` in `catalog-filter.js` ergänzen + i18n-Keys `filter.<kind>` / `filter.all<Kind>s` in beiden Locales anlegen.
+
+Pflicht-Pattern (gleiche 3 Attribute wie `combobox`, nur `x-data` schrumpft):
+
+```html
+<div x-data="catalogFilter('figur')"
+     x-modelable="value" x-model="$app.szenenFilters.figurId"
+     x-effect="options = $app.figuren.filter(...).map(...)"></div>
+```
+
+`@combobox-change`, `:class="{'combobox-wrap--disabled': _disabled}"` und alle weiteren Combobox-APIs funktionieren unverändert.
+
 ### Dropdown darf nicht geclippt werden
 
 `.combobox-dropdown` ist `position: absolute` innerhalb `.combobox-wrap`. Jeder Vorfahr mit `overflow: hidden`/`clip`/`auto`/`scroll` clipt das geöffnete Dropdown — Liste unsichtbar, Bug unauffällig (Trigger reagiert normal, nur Optionen weg).

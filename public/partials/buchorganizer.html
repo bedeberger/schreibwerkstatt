@@ -79,31 +79,31 @@
                  :disabled="organizerSaving"
                  autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other" data-spellcheck="spelling"
                  :aria-label="$app.t('bookOrganizer.renamePage')">
-          <template x-if="$app.blogStatusFor(page)">
-            <span class="badge" :class="'badge--blog-' + $app.blogStatusFor(page)"
-                  :data-tip="$app.blogStatusLabel($app.blogStatusFor(page))"
-                  x-text="$app.blogStatusLabel($app.blogStatusFor(page))"></span>
+          <template x-if="$blog.statusFor(page)">
+            <span class="badge" :class="'badge--blog-' + $blog.statusFor(page)"
+                  :data-tip="$blog.statusLabel($blog.statusFor(page))"
+                  x-text="$blog.statusLabel($blog.statusFor(page))"></span>
           </template>
-          <template x-if="$app.canBlogPush(page) || $app.blogPushBusy[page.id]">
+          <template x-if="$blog.canPush(page) || $blog.pushBusy[page.id]">
             <button type="button" class="btn-compact organizer-blog-push"
-                    @click="$app.pushPageToBlog(page.id)"
-                    :disabled="!!$app.blogPushBusy[page.id]"
+                    @click="$blog.push(page.id)"
+                    :disabled="!!$blog.pushBusy[page.id]"
                     :data-tip="$app.t('blog.action.push')"
                     :aria-label="$app.t('blog.action.push')">
-              <template x-if="!$app.blogPushBusy[page.id]">
+              <template x-if="!$blog.pushBusy[page.id]">
                 <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#arrow-up"/></svg>
               </template>
-              <template x-if="$app.blogPushBusy[page.id]">
+              <template x-if="$blog.pushBusy[page.id]">
                 <span class="display-contents">
                   <span class="spinner" aria-hidden="true"></span>
-                  <span class="organizer-blog-push-pct" x-text="($app.blogPushProgress[page.id] || 0) + '%'"></span>
+                  <span class="organizer-blog-push-pct" x-text="($blog.pushProgress[page.id] || 0) + '%'"></span>
                 </span>
               </template>
             </button>
           </template>
-          <template x-if="$app.blogStatusFor(page) === 'conflict'">
+          <template x-if="$blog.statusFor(page) === 'conflict'">
             <button type="button" class="btn-compact organizer-blog-conflict"
-                    @click="$app.openBlogConflict(page.id)"
+                    @click="$blog.openConflict(page.id)"
                     :data-tip="$app.t('blog.action.resolveConflict')"
                     x-text="$app.t('blog.action.resolveConflict')"></button>
           </template>
@@ -177,31 +177,31 @@
                      :disabled="organizerSaving"
                      autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other" data-spellcheck="spelling"
                      :aria-label="$app.t('bookOrganizer.renamePage')">
-              <template x-if="$app.blogStatusFor(page)">
-                <span class="badge" :class="'badge--blog-' + $app.blogStatusFor(page)"
-                      :data-tip="$app.blogStatusLabel($app.blogStatusFor(page))"
-                      x-text="$app.blogStatusLabel($app.blogStatusFor(page))"></span>
+              <template x-if="$blog.statusFor(page)">
+                <span class="badge" :class="'badge--blog-' + $blog.statusFor(page)"
+                      :data-tip="$blog.statusLabel($blog.statusFor(page))"
+                      x-text="$blog.statusLabel($blog.statusFor(page))"></span>
               </template>
-              <template x-if="$app.canBlogPush(page) || $app.blogPushBusy[page.id]">
+              <template x-if="$blog.canPush(page) || $blog.pushBusy[page.id]">
                 <button type="button" class="btn-compact organizer-blog-push"
-                        @click="$app.pushPageToBlog(page.id)"
-                        :disabled="!!$app.blogPushBusy[page.id]"
+                        @click="$blog.push(page.id)"
+                        :disabled="!!$blog.pushBusy[page.id]"
                         :data-tip="$app.t('blog.action.push')"
                         :aria-label="$app.t('blog.action.push')">
-                  <template x-if="!$app.blogPushBusy[page.id]">
+                  <template x-if="!$blog.pushBusy[page.id]">
                     <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#arrow-up"/></svg>
                   </template>
-                  <template x-if="$app.blogPushBusy[page.id]">
+                  <template x-if="$blog.pushBusy[page.id]">
                     <span class="display-contents">
                       <span class="spinner" aria-hidden="true"></span>
-                      <span class="organizer-blog-push-pct" x-text="($app.blogPushProgress[page.id] || 0) + '%'"></span>
+                      <span class="organizer-blog-push-pct" x-text="($blog.pushProgress[page.id] || 0) + '%'"></span>
                     </span>
                   </template>
                 </button>
               </template>
-              <template x-if="$app.blogStatusFor(page) === 'conflict'">
+              <template x-if="$blog.statusFor(page) === 'conflict'">
                 <button type="button" class="btn-compact organizer-blog-conflict"
-                        @click="$app.openBlogConflict(page.id)"
+                        @click="$blog.openConflict(page.id)"
                         :data-tip="$app.t('blog.action.resolveConflict')"
                         x-text="$app.t('blog.action.resolveConflict')"></button>
               </template>
@@ -273,31 +273,31 @@
                            :disabled="organizerSaving"
                            autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other" data-spellcheck="spelling"
                            :aria-label="$app.t('bookOrganizer.renamePage')">
-                    <template x-if="$app.blogStatusFor(page)">
-                      <span class="badge" :class="'badge--blog-' + $app.blogStatusFor(page)"
-                            :data-tip="$app.blogStatusLabel($app.blogStatusFor(page))"
-                            x-text="$app.blogStatusLabel($app.blogStatusFor(page))"></span>
+                    <template x-if="$blog.statusFor(page)">
+                      <span class="badge" :class="'badge--blog-' + $blog.statusFor(page)"
+                            :data-tip="$blog.statusLabel($blog.statusFor(page))"
+                            x-text="$blog.statusLabel($blog.statusFor(page))"></span>
                     </template>
-                    <template x-if="$app.canBlogPush(page) || $app.blogPushBusy[page.id]">
+                    <template x-if="$blog.canPush(page) || $blog.pushBusy[page.id]">
                       <button type="button" class="btn-compact organizer-blog-push"
-                              @click="$app.pushPageToBlog(page.id)"
-                              :disabled="!!$app.blogPushBusy[page.id]"
+                              @click="$blog.push(page.id)"
+                              :disabled="!!$blog.pushBusy[page.id]"
                               :data-tip="$app.t('blog.action.push')"
                               :aria-label="$app.t('blog.action.push')">
-                        <template x-if="!$app.blogPushBusy[page.id]">
+                        <template x-if="!$blog.pushBusy[page.id]">
                           <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#arrow-up"/></svg>
                         </template>
-                        <template x-if="$app.blogPushBusy[page.id]">
+                        <template x-if="$blog.pushBusy[page.id]">
                           <span class="display-contents">
                             <span class="spinner" aria-hidden="true"></span>
-                            <span class="organizer-blog-push-pct" x-text="($app.blogPushProgress[page.id] || 0) + '%'"></span>
+                            <span class="organizer-blog-push-pct" x-text="($blog.pushProgress[page.id] || 0) + '%'"></span>
                           </span>
                         </template>
                       </button>
                     </template>
-                    <template x-if="$app.blogStatusFor(page) === 'conflict'">
+                    <template x-if="$blog.statusFor(page) === 'conflict'">
                       <button type="button" class="btn-compact organizer-blog-conflict"
-                              @click="$app.openBlogConflict(page.id)"
+                              @click="$blog.openConflict(page.id)"
                               :data-tip="$app.t('blog.action.resolveConflict')"
                               x-text="$app.t('blog.action.resolveConflict')"></button>
                     </template>
@@ -359,31 +359,31 @@
                                  :disabled="organizerSaving"
                                  autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other" data-spellcheck="spelling"
                                  :aria-label="$app.t('bookOrganizer.renamePage')">
-                          <template x-if="$app.blogStatusFor(page)">
-                            <span class="badge" :class="'badge--blog-' + $app.blogStatusFor(page)"
-                                  :data-tip="$app.blogStatusLabel($app.blogStatusFor(page))"
-                                  x-text="$app.blogStatusLabel($app.blogStatusFor(page))"></span>
+                          <template x-if="$blog.statusFor(page)">
+                            <span class="badge" :class="'badge--blog-' + $blog.statusFor(page)"
+                                  :data-tip="$blog.statusLabel($blog.statusFor(page))"
+                                  x-text="$blog.statusLabel($blog.statusFor(page))"></span>
                           </template>
-                          <template x-if="$app.canBlogPush(page) || $app.blogPushBusy[page.id]">
+                          <template x-if="$blog.canPush(page) || $blog.pushBusy[page.id]">
                             <button type="button" class="btn-compact organizer-blog-push"
-                                    @click="$app.pushPageToBlog(page.id)"
-                                    :disabled="!!$app.blogPushBusy[page.id]"
+                                    @click="$blog.push(page.id)"
+                                    :disabled="!!$blog.pushBusy[page.id]"
                                     :data-tip="$app.t('blog.action.push')"
                                     :aria-label="$app.t('blog.action.push')">
-                              <template x-if="!$app.blogPushBusy[page.id]">
+                              <template x-if="!$blog.pushBusy[page.id]">
                                 <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#arrow-up"/></svg>
                               </template>
-                              <template x-if="$app.blogPushBusy[page.id]">
+                              <template x-if="$blog.pushBusy[page.id]">
                                 <span class="display-contents">
                                   <span class="spinner" aria-hidden="true"></span>
-                                  <span class="organizer-blog-push-pct" x-text="($app.blogPushProgress[page.id] || 0) + '%'"></span>
+                                  <span class="organizer-blog-push-pct" x-text="($blog.pushProgress[page.id] || 0) + '%'"></span>
                                 </span>
                               </template>
                             </button>
                           </template>
-                          <template x-if="$app.blogStatusFor(page) === 'conflict'">
+                          <template x-if="$blog.statusFor(page) === 'conflict'">
                             <button type="button" class="btn-compact organizer-blog-conflict"
-                                    @click="$app.openBlogConflict(page.id)"
+                                    @click="$blog.openConflict(page.id)"
                                     :data-tip="$app.t('blog.action.resolveConflict')"
                                     x-text="$app.t('blog.action.resolveConflict')"></button>
                           </template>
@@ -412,40 +412,40 @@
   </div>
 
   <!-- Konflikt-Diff-Modal: zeigt App-Inhalt vs. WP-Inhalt, User wählt die Quelle. -->
-  <div class="blog-conflict-overlay" x-show="!!$app.blogConflictOpen" x-cloak
-       @keydown.escape.window="$app.closeBlogConflict()">
+  <div class="blog-conflict-overlay" x-show="!!$blog.conflictOpen" x-cloak
+       @keydown.escape.window="$blog.closeConflict()">
     <div class="blog-conflict-modal">
       <div class="blog-conflict-header">
         <span class="card-title" x-text="$app.t('blog.conflict.title')"></span>
-        <button type="button" class="organizer-delete-btn" @click="$app.closeBlogConflict()" aria-label="✕">×</button>
+        <button type="button" class="organizer-delete-btn" @click="$blog.closeConflict()" aria-label="✕">×</button>
       </div>
-      <template x-if="!$app.blogConflictData">
+      <template x-if="!$blog.conflictData">
         <div class="muted-msg" x-text="$app.t('common.loading')"></div>
       </template>
-      <template x-if="$app.blogConflictData">
+      <template x-if="$blog.conflictData">
         <div class="blog-conflict-body">
           <div class="blog-conflict-side">
             <div class="blog-conflict-side-header">
               <h4 x-text="$app.t('blog.conflict.local', { appName: $app.appName })"></h4>
-              <span class="muted" x-text="$app.blogConflictData.local.name"></span>
+              <span class="muted" x-text="$blog.conflictData.local.name"></span>
             </div>
-            <div class="blog-conflict-content" x-html="$app.blogConflictData.local.html"></div>
+            <div class="blog-conflict-content" x-html="$blog.conflictData.local.html"></div>
           </div>
           <div class="blog-conflict-side">
             <div class="blog-conflict-side-header">
               <h4 x-text="$app.t('blog.conflict.remote')"></h4>
-              <span class="muted" x-text="$app.blogConflictData.remote.title"></span>
+              <span class="muted" x-text="$blog.conflictData.remote.title"></span>
             </div>
-            <div class="blog-conflict-content" x-html="$app.blogConflictData.remote.html"></div>
+            <div class="blog-conflict-content" x-html="$blog.conflictData.remote.html"></div>
           </div>
         </div>
       </template>
-      <div class="blog-conflict-actions" x-show="$app.blogConflictData">
-        <button type="button" @click="$app.resolveBlogConflict('app')"
+      <div class="blog-conflict-actions" x-show="$blog.conflictData">
+        <button type="button" @click="$blog.resolveConflict('app')"
                 x-text="$app.t('blog.conflict.keepApp')"></button>
-        <button type="button" @click="$app.resolveBlogConflict('wp')"
+        <button type="button" @click="$blog.resolveConflict('wp')"
                 x-text="$app.t('blog.conflict.takeWp')"></button>
-        <button type="button" class="btn-compact" @click="$app.closeBlogConflict()"
+        <button type="button" class="btn-compact" @click="$blog.closeConflict()"
                 x-text="$app.t('common.cancel')"></button>
       </div>
     </div>

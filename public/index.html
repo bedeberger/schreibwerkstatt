@@ -245,6 +245,9 @@
       @keydown.window="handleShortcutsHotkey($event); handleFocusHotkey($event); handleNavHotkey($event); handleFindingsHotkey($event); handleTreeKeydown($event); handleSynonymHotkey($event)"
       @app-update-available.window="updateAvailable = true">
 
+<!-- Blog-Sync-Card (WordPress): headless State-Anker, via $blog-Magic erreichbar. -->
+<div x-data="blogSyncCard" class="display-contents"></div>
+
 <a class="skip-link" href="#main-content" x-text="t('a11y.skipToMain')"></a>
 
 <div class="session-banner" x-show="sessionExpired" x-cloak>

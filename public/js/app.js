@@ -65,11 +65,12 @@ import { registerLektoratFindingsCard } from './cards/lektorat-findings-card.js'
 import { registerPageHistoryCard } from './cards/page-history-card.js';
 import { registerPageRevisionsCard } from './cards/page-revisions-card.js';
 import { registerPaletteCard } from './cards/palette-card.js';
+import { registerBlogSyncCard } from './cards/blog-sync-card.js';
 import { registerNumInput } from './num-input.js';
 import { registerCombobox } from './combobox.js';
+import { registerCatalogFilter } from './catalog-filter.js';
 import { shortcutsMethods } from './editor/shortcuts.js';
 import { featuresUsageMethods } from './features-usage.js';
-import { blogSyncMethods } from './book/blog-sync.js';
 import { initialLektoratState } from './app/app-state.js';
 import { appUiMethods, applySzenenFilters, applySongsFilters } from './app/app-ui.js';
 import { appChromeMethods } from './app/app-chrome.js';
@@ -215,6 +216,10 @@ document.addEventListener('alpine:init', () => {
   // wird in Root.init() auf window.__app gesetzt (garantiert reactive proxy) —
   // Alpine.$data(document.body) liefert bei manchen Getter-Evaluationen undefined.
   Alpine.magic('app', () => window.__app || Alpine.$data(document.body));
+  // Magic `$blog` — verweist auf den blogSyncCard-Anker (display-contents
+  // <div x-data="blogSyncCard"> in index.html). Setzt sich in Card.init()
+  // selbst auf window.__blogCard.
+  Alpine.magic('blog', () => window.__blogCard);
 
   registerCatalogStore();
   registerStilCard();
@@ -259,8 +264,10 @@ document.addEventListener('alpine:init', () => {
   registerPageHistoryCard();
   registerPageRevisionsCard();
   registerPaletteCard();
+  registerBlogSyncCard();
   registerNumInput();
   registerCombobox();
+  registerCatalogFilter();
 
   Alpine.data('lektorat', () => {
     // Root-Getter (z.B. tokTotals) leben in app/app-root-getters.js als
@@ -513,7 +520,6 @@ document.addEventListener('alpine:init', () => {
       // Tracking-Watcher früh registrieren, damit auch Karten-Öffnungen
       // während der initialen Hash-Anwendung erfasst werden.
       this.setupFeatureUsageWatchers();
-      this.setupBlogSync();
       setupSpellcheckDispatch(this);
       // Plattform-Detect für Tasten-Hints (⌘ vs. Ctrl).
       const ua = navigator.userAgent || '';
@@ -750,7 +756,6 @@ document.addEventListener('alpine:init', () => {
     ...appNavigationMethods,
     ...appHashRouterMethods,
     ...featuresUsageMethods,
-    ...blogSyncMethods,
     ...bookCreateMethods,
     });
     Object.defineProperties(obj, rootGetterDescriptors);

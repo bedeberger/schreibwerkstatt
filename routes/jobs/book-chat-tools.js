@@ -17,6 +17,7 @@ const { htmlToPlainText } = require('../../lib/html-text');
 const pageRevisions = require('../../db/page-revisions');
 const { narrativeLabels } = require('./narrative-labels');
 const { diffWordsWithSpace } = require('diff');
+const searchIndex = require('../../lib/search');
 
 // Obergrenzen schützen das Token-Budget gegen ausufernde Tool-Calls. Skaliert mit
 // MODEL_CONTEXT, damit User mit grösserem Kontextfenster reichere Tool-Antworten
@@ -260,16 +261,45 @@ function _buildSearchRegex(pattern, regex) {
   return new RegExp(pattern, 'gi');
 }
 
+// Maximale Anzahl Kandidaten-Seiten, die aus dem FTS5-Index für die Offset-Validierung
+// gezogen werden. bm25-sortiert; höhere Werte holen mehr Seiten, kosten aber mehr Volltext-
+// Scans. 200 reicht in der Regel für Buch-weite Suchen mit eindeutigen Begriffen.
+const SEARCH_FTS_CANDIDATE_LIMIT = 200;
+
 async function tool_search_passages(input, ctx) {
   const pattern = (input.pattern || '').trim();
   if (!pattern) return { error: 'pattern fehlt' };
+  const isRegex = !!input.regex;
   const maxResults = Math.min(Math.max(1, input.max_results || 10), MAX_SEARCH_RESULTS);
 
   let re;
-  try { re = _buildSearchRegex(pattern, !!input.regex); }
+  try { re = _buildSearchRegex(pattern, isRegex); }
   catch (e) { return { error: `Ungültiges Regex-Muster: ${e.message}` }; }
 
-  const scopeFilters = [];
+  // FTS5 verengt nur den Literal-Pfad auf Kandidaten-Seiten; Regex muss alle Buchseiten
+  // scannen, da das Pattern nicht über die FTS5-MATCH-Grammatik abbildbar ist.
+  let candidatePageIds = null;
+  let ftsUsed = false;
+  if (!isRegex) {
+    const { hits } = searchIndex.query(pattern, {
+      bookId: ctx.bookId,
+      kinds:  ['page'],
+      limit:  SEARCH_FTS_CANDIDATE_LIMIT,
+    });
+    candidatePageIds = hits.map(h => h.entity_id);
+    ftsUsed = true;
+    if (!candidatePageIds.length) {
+      return _truncateResult({
+        pattern,
+        regex: false,
+        fts: true,
+        results: [],
+        note: 'Keine FTS5-Treffer im Buch.',
+      });
+    }
+  }
+
+  const scopeFilters = ['book_id = ?'];
   const scopeParams  = [ctx.bookId];
   if (Number.isInteger(input.chapter_id)) {
     scopeFilters.push('chapter_id = ?');
@@ -279,46 +309,62 @@ async function tool_search_passages(input, ctx) {
     scopeFilters.push('page_id = ?');
     scopeParams.push(input.page_id);
   }
-  const where = ['book_id = ?', 'preview_text IS NOT NULL', ...scopeFilters].join(' AND ');
+  if (candidatePageIds) {
+    scopeFilters.push(`page_id IN (${candidatePageIds.map(() => '?').join(',')})`);
+    scopeParams.push(...candidatePageIds);
+  }
 
-  const pages = db.prepare(
-    `SELECT page_id, page_name, chapter_id, preview_text FROM pages WHERE ${where}`
-  ).all(...scopeParams);
+  // Volltext der Kandidatenseiten holen — body_html ist Quelle der Wahrheit; preview_text
+  // deckte nur ~800 Zeichen ab und verfehlte spätere Treffer.
+  const pages = db.prepare(`
+    SELECT page_id, page_name, chapter_id, body_html
+    FROM pages
+    WHERE ${scopeFilters.join(' AND ')}
+  `).all(...scopeParams);
+
+  // Bei FTS-Pfad: bm25-Reihenfolge erhalten (SQLite IN-Listen sind unsortiert).
+  let orderedPages = pages;
+  if (candidatePageIds) {
+    const rank = new Map(candidatePageIds.map((id, i) => [id, i]));
+    orderedPages = pages.slice().sort((a, b) => (rank.get(a.page_id) ?? Infinity) - (rank.get(b.page_id) ?? Infinity));
+  }
 
   const results = [];
   const deadline = Date.now() + 3000; // Hard-Timeout gegen ReDoS
 
-  outer: for (const p of pages) {
+  outer: for (const p of orderedPages) {
     if (Date.now() > deadline) break;
     if (ctx.jobSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
+    const text = htmlToPlainText(p.body_html || '');
+    if (!text) continue;
     re.lastIndex = 0;
     let m;
-    while ((m = re.exec(p.preview_text)) !== null) {
+    while ((m = re.exec(text)) !== null) {
       const start = Math.max(0, m.index - SEARCH_SNIPPET_CONTEXT);
-      const end   = Math.min(p.preview_text.length, m.index + m[0].length + SEARCH_SNIPPET_CONTEXT);
+      const end   = Math.min(text.length, m.index + m[0].length + SEARCH_SNIPPET_CONTEXT);
       results.push({
         page_id:   p.page_id,
         page_name: p.page_name,
         chapter_id: p.chapter_id,
         offset:    m.index,
         match:     m[0],
-        snippet:   (start > 0 ? '…' : '') + p.preview_text.slice(start, end) + (end < p.preview_text.length ? '…' : ''),
+        snippet:   (start > 0 ? '…' : '') + text.slice(start, end) + (end < text.length ? '…' : ''),
       });
       if (results.length >= maxResults) break outer;
-      // Bei leerem Match (z.B. leerer Regex) Endlosschleife verhindern
       if (m.index === re.lastIndex) re.lastIndex++;
     }
   }
 
   return _truncateResult({
     pattern,
-    regex: !!input.regex,
+    regex: isRegex,
+    ...(ftsUsed ? { fts: true } : {}),
     ...(Number.isInteger(input.chapter_id) ? { chapter_id: input.chapter_id } : {}),
     ...(Number.isInteger(input.page_id)    ? { page_id:    input.page_id    } : {}),
     results,
-    note: pages.length === 0
-      ? 'Kein Seiten-Cache. Sync ausführen.'
-      : 'Suche bisher nur im gecachten Vorschautext (~800 Zeichen pro Seite) – für vollständigen Text get_pages verwenden.',
+    ...(orderedPages.length === 0
+      ? { note: 'Keine indizierten Seiten im Buch — Reindex oder Sync ausführen.' }
+      : {}),
   });
 }
 

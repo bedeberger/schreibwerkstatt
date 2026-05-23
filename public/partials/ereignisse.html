@@ -35,18 +35,18 @@
   <!-- Filter -->
   <div x-show="$app.globalZeitstrahl.length > 0" class="filter-bar">
     <input type="text" x-model="$app.ereignisseFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
-    <div x-data="combobox($app.t('filter.figur'), $app.t('filter.allFiguren'))"
+    <div x-data="catalogFilter('figur')"
          x-modelable="value" x-model="$app.ereignisseFilters.figurId"
          x-effect="options = $app.figuren.filter(f => $app.globalZeitstrahl.some(ev => ev.figuren.some(fr => fr.id === f.id))).map(f => ({value: f.id, label: f.kurzname || f.name}))"
          >
     </div>
-    <div x-data="combobox($app.t('filter.chapter'), $app.t('filter.allChapters'))"
+    <div x-data="catalogFilter('chapter')"
          x-modelable="value" x-model="$app.ereignisseFilters.kapitel"
          x-effect="options = ereignisseKapitelListe().map(k => ({value: k, label: k}))"
          @combobox-change="$app.ereignisseFilters.seite = ''"
          >
     </div>
-    <div x-data="combobox($app.t('filter.page'), $app.t('filter.allPages'))"
+    <div x-data="catalogFilter('page')"
          x-modelable="value" x-model="$app.ereignisseFilters.seite"
          x-effect="_disabled = !$app.ereignisseFilters.kapitel || ereignisseSeitenListe().length === 0; options = ereignisseSeitenListe().map(s => ({value: s, label: s}))"
          :class="{'combobox-wrap--disabled': _disabled}"

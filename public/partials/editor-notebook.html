@@ -53,38 +53,38 @@
           <span class="focus-live-counter--today"
                 x-text="t('editor.focus.counterToday', { wordsDelta: focusCountWordsDelta, charsDelta: focusCountCharsDelta })"></span>
         </span>
-        <span x-show="currentPage && blogStatusFor(currentPage)" class="editor-blog-status">
-          <template x-if="blogStatusFor(currentPage)">
-            <span class="badge" :class="'badge--blog-' + blogStatusFor(currentPage)"
-                  :data-tip="blogStatusLabel(blogStatusFor(currentPage))"
-                  x-text="blogStatusLabel(blogStatusFor(currentPage))"></span>
+        <span x-show="currentPage && $blog?.statusFor(currentPage)" class="editor-blog-status">
+          <template x-if="$blog?.statusFor(currentPage)">
+            <span class="badge" :class="'badge--blog-' + $blog.statusFor(currentPage)"
+                  :data-tip="$blog.statusLabel($blog.statusFor(currentPage))"
+                  x-text="$blog.statusLabel($blog.statusFor(currentPage))"></span>
           </template>
-          <template x-if="canBlogPush(currentPage) || blogPushBusy[currentPage?.id]">
+          <template x-if="$blog?.canPush(currentPage) || $blog?.pushBusy[currentPage?.id]">
             <button type="button" class="btn-compact editor-blog-push"
-                    @click="pushPageToBlog(currentPage.id)"
-                    :disabled="!!blogPushBusy[currentPage.id]"
+                    @click="$blog.push(currentPage.id)"
+                    :disabled="!!$blog.pushBusy[currentPage.id]"
                     :data-tip="t('blog.action.push')"
                     :aria-label="t('blog.action.push')">
-              <template x-if="!blogPushBusy[currentPage?.id]">
+              <template x-if="!$blog.pushBusy[currentPage?.id]">
                 <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#arrow-up"/></svg>
               </template>
-              <template x-if="blogPushBusy[currentPage?.id]">
+              <template x-if="$blog.pushBusy[currentPage?.id]">
                 <span class="display-contents">
                   <span class="spinner" aria-hidden="true"></span>
-                  <span class="editor-blog-push-pct" x-text="(blogPushProgress[currentPage.id] || 0) + '%'"></span>
+                  <span class="editor-blog-push-pct" x-text="($blog.pushProgress[currentPage.id] || 0) + '%'"></span>
                 </span>
               </template>
             </button>
           </template>
-          <template x-if="blogStatusFor(currentPage) === 'conflict'">
+          <template x-if="$blog?.statusFor(currentPage) === 'conflict'">
             <button type="button" class="btn-compact editor-blog-conflict"
-                    @click="openBlogConflict(currentPage.id)"
+                    @click="$blog.openConflict(currentPage.id)"
                     :data-tip="t('blog.action.resolveConflict')"
                     x-text="t('blog.action.resolveConflict')"></button>
           </template>
-          <template x-if="blogViewUrl(currentPage)">
+          <template x-if="$blog?.viewUrl(currentPage)">
             <button type="button" class="btn-compact editor-blog-view"
-                    @click="window.open(blogViewUrl(currentPage), '_blank', 'noopener')"
+                    @click="window.open($blog.viewUrl(currentPage), '_blank', 'noopener')"
                     :data-tip="t('blog.action.view')"
                     :aria-label="t('blog.action.view')">
               <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=637#external-link"/></svg>

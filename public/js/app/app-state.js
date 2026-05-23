@@ -7,7 +7,6 @@
 // rein organisatorisch und machen sichtbar, welche Felder fachlich
 // zusammengehören. Neue Felder kommen in den passenden Slice.
 
-import { blogState } from '../book/blog-sync.js';
 
 const shellState = () => ({
   currentUser: null,
@@ -508,6 +507,5 @@ export function initialLektoratState() {
     ...collabState(),
     ...dailyProgressState(),
     ...jobsState(),
-    ...blogState(),
   };
 }

@@ -35,18 +35,18 @@
   <!-- Filter-Leiste -->
   <div x-show="$app.orte.length > 0" class="filter-bar">
     <input type="text" x-model="$app.orteFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
-    <div x-data="combobox($app.t('filter.figur'), $app.t('filter.allFiguren'))"
+    <div x-data="catalogFilter('figur')"
          x-modelable="value" x-model="$app.orteFilters.figurId"
          x-effect="options = $app.figuren.filter(f => $app.orte.some(o => (o.figuren || []).includes(f.id))).map(f => ({value: f.id, label: f.kurzname || f.name}))"
          >
     </div>
-    <div x-data="combobox($app.t('filter.chapter'), $app.t('filter.allChapters'))"
+    <div x-data="catalogFilter('chapter')"
          x-modelable="value" x-model="$app.orteFilters.kapitel"
          x-effect="options = $app.orteKapitelListe().map(k => ({value: k, label: k}))"
          >
     </div>
     <div x-show="$app.szenen.length > 0"
-         x-data="combobox($app.t('filter.szene'), $app.t('filter.allSzenen'))"
+         x-data="catalogFilter('szene')"
          x-modelable="value" x-model="$app.orteFilters.szeneId"
          x-effect="options = $app.szenen.map(s => ({value: String(s.id), label: s.titel}))"
          >

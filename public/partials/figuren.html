@@ -86,7 +86,7 @@
       <div class="figuren-graph-toolbar">
         <!-- Kapitel-Filter (alle Graph-Modi) -->
         <div x-show="figurenKapitelListe().length > 0" class="figuren-graph-filter">
-          <div x-data="combobox($app.t('filter.chapter'), $app.t('filter.allChapters'))"
+          <div x-data="catalogFilter('chapter')"
                x-modelable="value" x-model="figurenGraphKapitel"
                x-effect="options = figurenKapitelListe().map(k => ({value: k, label: k}))"
                @combobox-change="_figurenGraphSetKapitel($event.detail || null)"
@@ -115,13 +115,13 @@
      <!-- Filter -->
     <div x-show="$app.figuren.length > 0 && figurenKapitelListe().length > 0" class="filter-bar">
       <input type="text" x-model="$app.figurenFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
-      <div x-data="combobox($app.t('filter.chapter'), $app.t('filter.allChapters'))"
+      <div x-data="catalogFilter('chapter')"
           x-modelable="value" x-model="$app.figurenFilters.kapitel"
           x-effect="options = figurenKapitelListe().map(k => ({value: k, label: k}))"
           @combobox-change="$app.figurenFilters.seite = ''; $app.selectedFigurId = null"
           >
       </div>
-      <div x-data="combobox($app.t('filter.page'), $app.t('filter.allPages'))"
+      <div x-data="catalogFilter('page')"
           x-modelable="value" x-model="$app.figurenFilters.seite"
           x-effect="_disabled = !$app.figurenFilters.kapitel || figurenSeitenListe().length === 0; options = figurenSeitenListe().map(s => ({value: s, label: s}))"
           @combobox-change="$app.selectedFigurId = null"
