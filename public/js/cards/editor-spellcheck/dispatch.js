@@ -51,6 +51,10 @@ export function setupSpellcheckDispatch(app) {
     return pid ? Number(pid) : null;
   }
   function _isEnabled() { return !!app.languagetoolEnabled; }
+  function _debounceMs() {
+    const v = Number(app.languagetoolDebounceMs);
+    return Number.isFinite(v) && v > 0 ? v : 1500;
+  }
 
   function _onApply(kind, range, text) {
     if (!range) return;
@@ -134,6 +138,7 @@ export function setupSpellcheckDispatch(app) {
       getBookId: _bookId,
       getPageId: _pageId,
       isEnabled: _isEnabled,
+      getDebounceMs: _debounceMs,
       i18n: (k) => (typeof app.t === 'function' ? app.t(k) : k),
     });
     ctl.attach();

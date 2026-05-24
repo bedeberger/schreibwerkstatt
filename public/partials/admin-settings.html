@@ -239,6 +239,11 @@
         <span x-text="$app.t('admin.settings.languagetool.picky.label')"></span>
         <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.languagetool.picky.help')"></small>
       </label>
+      <label>
+        <span x-text="$app.t('admin.settings.languagetool.debounce.label')"></span>
+        <input type="text" x-data="numInput({ integer: true, min: 200, max: 10000 })" x-modelable="value" x-model="adminSettingsForm['languagetool.debounce_ms']">
+        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.languagetool.debounce.help')"></small>
+      </label>
       <div class="admin-settings-actions">
         <button type="button" @click="adminSettingsTest('languagetool')" x-text="$app.t('admin.settings.test.languagetool')"></button>
       </div>

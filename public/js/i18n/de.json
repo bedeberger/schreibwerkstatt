@@ -1476,6 +1476,8 @@
   "admin.settings.languagetool.url.help":        "Volle URL ohne Pfad, z. B. http://lt.lokal:8010. Server muss /v2/check und /v2/languages liefern.",
   "admin.settings.languagetool.picky.label":     "Picky-Modus (strengere Stilregeln)",
   "admin.settings.languagetool.picky.help":      "Aktiviert level=picky am LT-Server. Mehr Treffer, höhere False-Positive-Rate.",
+  "admin.settings.languagetool.debounce.label":  "Debounce (ms)",
+  "admin.settings.languagetool.debounce.help":   "Wartezeit zwischen letzter Eingabe und LT-Prüfung in den drei Editoren. Niedriger = schnellere Squiggles, mehr Server-Last. Range 200–10’000 ms, Default 1500.",
   "admin.settings.test.languagetool":            "LT-Server prüfen",
   "admin.settings.analytics.enabledLabel": "Plausible-Tracking aktiv",
   "admin.settings.analytics.scriptUrlLabel": "Bootstrap-Script-URL",

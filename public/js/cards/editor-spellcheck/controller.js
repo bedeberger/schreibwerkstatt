@@ -8,7 +8,7 @@
 //   ctl.detach();   // bei Exit / Block-Deactivate
 //
 // Pipeline pro attach:
-//   input/MutationObserver -> debounce 1500ms -> _runCheck() ->
+//   input/MutationObserver -> debounce (getDebounceMs(), Default 1500ms) -> _runCheck() ->
 //   fetch /languagetool/check -> _renderMatches() registriert DOM-Ranges in
 //   CSS.highlights (typo/grammar/style). Browser rendert die wavy-Underline
 //   nativ via ::highlight()-Regeln — keine DOM-Spans pro Match, kein
@@ -30,7 +30,7 @@
 import { escHtml } from '../../utils.js';
 import { buildOffsetTable, rangeFromOffset } from './mapping.js';
 
-const DEBOUNCE_MS = 1500;
+const DEFAULT_DEBOUNCE_MS = 1500;
 const POPOVER_MAX_REPLACEMENTS = 5;
 const EXTENSION_SELECTORS = [
   'lt-div',
@@ -58,6 +58,7 @@ export function createSpellcheckController({
   getBookId,
   getPageId,
   isEnabled = () => true,
+  getDebounceMs = () => DEFAULT_DEBOUNCE_MS,
   i18n = (key) => key,
 }) {
   if (!root) throw new Error('spellcheck: root required');
@@ -225,7 +226,8 @@ export function createSpellcheckController({
   function _scheduleCheck() {
     if (!attached) return;
     if (debounceTimer) clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => _runCheck(), DEBOUNCE_MS);
+    const ms = Number(getDebounceMs?.()) || DEFAULT_DEBOUNCE_MS;
+    debounceTimer = setTimeout(() => _runCheck(), ms);
   }
 
   async function _runCheck() {

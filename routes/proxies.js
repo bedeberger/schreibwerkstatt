@@ -51,6 +51,7 @@ router.get('/config', (req, res) => {
     languagetool: {
       enabled: appSettings.get('languagetool.enabled') === true
         && !!String(appSettings.get('languagetool.url') || '').replace(/\/$/, '').replace(/\/v2$/i, '').trim(),
+      debounceMs: Number(appSettings.get('languagetool.debounce_ms')) || 1500,
     },
   });
 });

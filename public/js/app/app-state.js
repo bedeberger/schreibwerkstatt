@@ -38,6 +38,10 @@ const shellState = () => ({
   // und vom Spellcheck-Controller (cards/editor-spellcheck/controller.js)
   // als Master-Switch konsumiert.
   languagetoolEnabled: false,
+  // Debounce-Zeit (ms) zwischen Eingabe und LT-Check im Editor-Controller.
+  // Aus /config → app_settings `languagetool.debounce_ms`. Form-Felder
+  // (input/textarea) nutzen eigene Defaults und ignorieren diesen Wert.
+  languagetoolDebounceMs: 1500,
   // Plattform-Detect für Tasten-Hint-Anzeige (⌘ vs. Ctrl). Wird in init()
   // gesetzt; default true wäre auf Windows falsch, default false ist sichere
   // Annahme bevor JS gelaufen ist (Hero erscheint mit Ctrl, dann snap auf ⌘ falls Mac).

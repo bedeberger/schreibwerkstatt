@@ -635,6 +635,9 @@ document.addEventListener('alpine:init', () => {
           if (meta) meta.setAttribute('content', cfg.appName);
         }
         this.languagetoolEnabled = !!cfg.languagetool?.enabled;
+        if (Number.isFinite(cfg.languagetool?.debounceMs)) {
+          this.languagetoolDebounceMs = cfg.languagetool.debounceMs;
+        }
 
         // Hash vorab auswerten, damit loadBooks das gewünschte Buch wählt.
         // _applyingHash unterdrückt Watcher/URL-Writes während der Initialisierung.
