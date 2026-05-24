@@ -65,6 +65,7 @@ const STRINGS = {
     loginLabel:     'Anmelden',
     registerLabel:  'Zugang anfordern',
     landingFooter:  'Selbst gehostet vom Betreiber. Fragen zum Datenschutz bitte direkt an den Betreiber.',
+    githubLabel:    'Quellcode auf GitHub',
 
     featuresTitle:  'Kernfunktionen',
     feat1Title:     'Schreiben',
@@ -99,6 +100,7 @@ const STRINGS = {
     loginLabel:     'Sign in',
     registerLabel:  'Request access',
     landingFooter:  'Self-hosted by the operator. For privacy questions please contact the operator directly.',
+    githubLabel:    'Source code on GitHub',
 
     featuresTitle:  'Core features',
     feat1Title:     'Writing',
@@ -146,6 +148,8 @@ function _renderLanding(req, res) {
     loginLabel:    s.loginLabel,
     registerLabel: s.registerLabel,
     footer:        s.landingFooter,
+    githubUrl:     'https://github.com/bedeberger/schreibwerkstatt',
+    githubLabel:   s.githubLabel,
     featuresTitle: s.featuresTitle,
     feat1Title:    s.feat1Title, feat1Desc: s.feat1Desc,
     feat2Title:    s.feat2Title, feat2Desc: s.feat2Desc,
