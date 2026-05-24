@@ -113,6 +113,31 @@ function _bodyLang(req) {
   return accept.startsWith('en') ? 'en' : 'de';
 }
 
+// GET /invite/:token → loggt Click (last_clicked_at, click_count) und leitet
+// auf /login?returnTo=/?invite={token} weiter. Damit kann der Admin im Tab
+// "Eingeladene Benutzer" sehen, ob der User die Mail geoeffnet hat — auch wenn
+// er sich noch nicht eingeloggt hat. Oeffentlicher Endpoint (vor Auth-Guard).
+//
+// Auch fuer abgelaufene/widerrufene/akzeptierte Tokens wird weitergeleitet —
+// der Callback wirft dann den passenden Fehler. Click-Tracking selber laeuft
+// nur fuer 'active'-Status, damit Wiederholungs-Klicks auf alte Mails nicht
+// die Statistik verwaessern.
+router.get('/invite/:token', (req, res) => {
+  const token = String(req.params.token || '');
+  if (token) {
+    try {
+      const inv = appUsers.findInviteByToken(token);
+      if (inv && appUsers.inviteStatus(inv) === 'active') {
+        appUsers.markInviteClicked(inv.id);
+      }
+    } catch (e) {
+      logger.warn(`invite-click: ${e.message}`);
+    }
+  }
+  const returnTo = `/?invite=${encodeURIComponent(token)}`;
+  res.redirect(`/login?returnTo=${encodeURIComponent(returnTo)}`);
+});
+
 // GET /auth/login → redirect zu Google (oder direkt zu / im LOCAL_DEV_MODE)
 router.get('/auth/login', async (req, res) => {
   if (process.env.LOCAL_DEV_MODE === 'true') {
@@ -262,6 +287,13 @@ router.get('/auth/callback', async (req, res) => {
 router.get('/login', (req, res) => {
   if (process.env.LOCAL_DEV_MODE === 'true') return res.redirect('/');
   if (req.session?.user) return res.redirect(req.query.returnTo || '/');
+  // Backcompat: Mails vor Mig 144 trugen /login?invite=TOKEN ohne returnTo.
+  // Auf neue Click-Tracking-Route umlenken, damit Klick mitgezaehlt wird und
+  // Token in den OIDC-Callback-Flow gepackt wird.
+  const legacyInvite = typeof req.query.invite === 'string' ? req.query.invite : null;
+  if (legacyInvite && !req.query.returnTo) {
+    return res.redirect(`/invite/${encodeURIComponent(legacyInvite)}`);
+  }
   const lang = _bodyLang(req);
   const hasGoogle = !!(appSettings.get('auth.google.client_id') && appSettings.get('auth.google.client_secret'));
   const hasAdminPw = !!process.env.ADMIN_PASSWORD;

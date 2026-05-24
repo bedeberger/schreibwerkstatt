@@ -223,6 +223,35 @@ test('addUserActivity summiert seconds pro (user, Tag)', () => {
   assert.equal(row.seconds, 75);
 });
 
+test('markInviteClicked: setzt last_clicked_at + zaehlt click_count', () => {
+  const inv = appUsers.createInvite({ email: 'click1@example.com', invitedBy: 'alice@example.com' });
+  let found = appUsers.findInviteById(inv.id);
+  assert.equal(found.click_count, 0);
+  assert.equal(found.last_clicked_at, null);
+  appUsers.markInviteClicked(inv.id);
+  appUsers.markInviteClicked(inv.id);
+  found = appUsers.findInviteById(inv.id);
+  assert.equal(found.click_count, 2);
+  assert.ok(found.last_clicked_at, 'last_clicked_at fehlt');
+});
+
+test('markInviteReminded: setzt last_reminder_at + zaehlt reminder_count', () => {
+  const inv = appUsers.createInvite({ email: 'remind1@example.com', invitedBy: 'alice@example.com' });
+  appUsers.markInviteReminded(inv.id);
+  const found = appUsers.findInviteById(inv.id);
+  assert.equal(found.reminder_count, 1);
+  assert.ok(found.last_reminder_at);
+});
+
+test('listActiveInvites: gibt Click+Reminder-Felder zurueck', () => {
+  const all = appUsers.listActiveInvites();
+  const sample = all[0];
+  assert.ok(sample);
+  for (const k of ['last_clicked_at', 'click_count', 'last_reminder_at', 'reminder_count']) {
+    assert.ok(k in sample, `${k} fehlt im listActiveInvites-Output`);
+  }
+});
+
 test('foreign_key_check nach Mig 107 leer', () => {
   const errs = db.pragma('foreign_key_check');
   assert.equal(errs.length, 0, `${errs.length} FK-Verstoesse: ${JSON.stringify(errs.slice(0, 5))}`);

@@ -194,3 +194,47 @@ test('GET /me/settings liefert role + can_invite_users mit', async () => {
   assert.equal(r.body.role, 'user');
   assert.equal(r.body.can_invite_users, 1);
 });
+
+test('GET /admin/users/invites liefert offene Einladungen mit Click-Feldern', async () => {
+  // Vorbedingung: newcomer + newadmin Invites aus den frueheren POSTs sind aktiv.
+  const r = await _request('GET', '/admin/users/invites', { user: 'alice@example.com', role: 'admin' });
+  assert.equal(r.status, 200);
+  assert.ok(Array.isArray(r.body.invites));
+  assert.ok(r.body.invites.length > 0);
+  for (const inv of r.body.invites) {
+    assert.ok('last_clicked_at' in inv);
+    assert.ok('click_count' in inv);
+    assert.ok('last_reminder_at' in inv);
+    assert.ok('reminder_count' in inv);
+    assert.ok(inv.invite_url, 'invite_url im Response fehlt');
+  }
+});
+
+test('POST /admin/users/invites/:id/remind: 404 bei unbekannter id', async () => {
+  const r = await _request('POST', '/admin/users/invites/9999999/remind', {
+    user: 'alice@example.com', role: 'admin',
+  });
+  assert.equal(r.status, 404);
+  assert.equal(r.body.error_code, 'INVITE_NOT_FOUND');
+});
+
+test('POST /admin/users/invites/:id/remind: Cooldown nach manueller Markierung', async () => {
+  const inv = appUsers.createInvite({ email: 'cool@example.com', invitedBy: 'alice@example.com' });
+  appUsers.markInviteReminded(inv.id);
+  const r = await _request('POST', `/admin/users/invites/${inv.id}/remind`, {
+    user: 'alice@example.com', role: 'admin',
+  });
+  assert.equal(r.status, 429);
+  assert.equal(r.body.error_code, 'REMINDER_COOLDOWN');
+  assert.ok(r.body.retryAfter > 0);
+});
+
+test('DELETE /admin/users/invites/:id widerruft Invite', async () => {
+  const inv = appUsers.createInvite({ email: 'revoke-me@example.com', invitedBy: 'alice@example.com' });
+  const r = await _request('DELETE', `/admin/users/invites/${inv.id}`, {
+    user: 'alice@example.com', role: 'admin',
+  });
+  assert.equal(r.status, 200);
+  const after = appUsers.findInviteById(inv.id);
+  assert.equal(appUsers.inviteStatus(after), 'revoked');
+});

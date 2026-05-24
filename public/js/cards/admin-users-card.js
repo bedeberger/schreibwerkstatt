@@ -19,13 +19,19 @@ export function registerAdminUsersCard() {
     adminUsersAuditEmail: null,
     adminUsersAuditEvents: [],
     // Registration-Requests-Tab.
-    adminUsersTab: 'users',                  // 'users' | 'requests'
+    adminUsersTab: 'users',                  // 'users' | 'invites' | 'requests'
     adminUsersRequestsList: [],
     adminUsersRequestsStatus: 'pending',     // pending|approved|denied|expired|all
     adminUsersRequestsLoading: false,
     adminUsersRequestsBusy: null,            // id during approve/deny
     adminUsersRequestsResult: null,          // { id, inviteUrl, mail }
     adminUsersRequestsCopiedId: null,
+    // Invites-Tab (offene Einladungen).
+    adminUsersInvitesList: [],
+    adminUsersInvitesLoading: false,
+    adminUsersInvitesBusy: null,             // id during remind/revoke
+    adminUsersInvitesResult: null,           // { id, mail | cooldown, retryAfter }
+    adminUsersInvitesCopiedId: null,
 
     _onViewReset: null,
 
@@ -34,9 +40,11 @@ export function registerAdminUsersCard() {
         if (!visible) return;
         await this.adminUsersLoad();
         if (this.adminUsersTab === 'requests') await this.adminUsersRequestsLoad();
+        if (this.adminUsersTab === 'invites')  await this.adminUsersInvitesLoad();
       });
       this.$watch(() => this.adminUsersTab, async (tab) => {
         if (tab === 'requests') await this.adminUsersRequestsLoad();
+        if (tab === 'invites')  await this.adminUsersInvitesLoad();
       });
       this.$watch(() => this.adminUsersRequestsStatus, async () => {
         if (this.adminUsersTab === 'requests') await this.adminUsersRequestsLoad();
@@ -47,6 +55,7 @@ export function registerAdminUsersCard() {
         this.adminUsersAuditEmail = null;
         this.adminUsersAuditEvents = [];
         this.adminUsersRequestsResult = null;
+        this.adminUsersInvitesResult = null;
       };
       window.addEventListener('view:reset', this._onViewReset);
     },

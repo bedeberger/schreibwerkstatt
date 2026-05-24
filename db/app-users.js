@@ -121,9 +121,32 @@ const _stmtListAudit = db.prepare(`
 
 const _stmtInviteFind = db.prepare(`
   SELECT id, email, global_role, invite_token, invited_by, invited_at,
-         expires_at, accepted_at, revoked_at
+         expires_at, accepted_at, revoked_at,
+         last_clicked_at, click_count, last_reminder_at, reminder_count
     FROM user_invites
    WHERE invite_token = ?
+`);
+
+const _stmtInviteFindById = db.prepare(`
+  SELECT id, email, global_role, invite_token, invited_by, invited_at,
+         expires_at, accepted_at, revoked_at,
+         last_clicked_at, click_count, last_reminder_at, reminder_count
+    FROM user_invites
+   WHERE id = ?
+`);
+
+const _stmtInviteMarkClicked = db.prepare(`
+  UPDATE user_invites
+     SET last_clicked_at = ${NOW_ISO_SQL},
+         click_count     = click_count + 1
+   WHERE id = ?
+`);
+
+const _stmtInviteMarkReminded = db.prepare(`
+  UPDATE user_invites
+     SET last_reminder_at = ${NOW_ISO_SQL},
+         reminder_count   = reminder_count + 1
+   WHERE id = ?
 `);
 
 const _stmtInviteFindActiveByEmail = db.prepare(`
@@ -322,11 +345,27 @@ function revokeInvite(inviteId) {
 
 function listActiveInvites() {
   return db.prepare(`
-    SELECT id, email, global_role, invite_token, invited_by, invited_at, expires_at
+    SELECT id, email, global_role, invite_token, invited_by, invited_at,
+           expires_at, last_clicked_at, click_count,
+           last_reminder_at, reminder_count
       FROM user_invites
      WHERE revoked_at IS NULL AND accepted_at IS NULL
      ORDER BY invited_at DESC
   `).all();
+}
+
+function findInviteById(id) {
+  const n = Number(id);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return _stmtInviteFindById.get(n) || null;
+}
+
+function markInviteClicked(inviteId) {
+  _stmtInviteMarkClicked.run(inviteId);
+}
+
+function markInviteReminded(inviteId) {
+  _stmtInviteMarkReminded.run(inviteId);
 }
 
 // ── Admin-Bootstrap: ENV-getriebener Admin ────────────────────────────────
@@ -363,6 +402,8 @@ module.exports = {
   setStatus, setGlobalRole, setCanInviteUsers, setBudget, softDeleteUser,
   setAiProviderOverride,
   recordAuditEvent, listAuditForUser,
-  createInvite, findInviteByToken, inviteStatus, acceptInvite, revokeInvite, listActiveInvites,
+  createInvite, findInviteByToken, findInviteById, inviteStatus,
+  acceptInvite, revokeInvite, listActiveInvites,
+  markInviteClicked, markInviteReminded,
   ensureAdminFromEnv,
 };

@@ -21,6 +21,7 @@ const appUsers = require('../db/app-users');
 const regRequests = require('../db/registration-requests');
 const mailer = require('../lib/mailer');
 const rateLimit = require('../lib/register-ratelimit');
+const { tServer } = require('../lib/i18n-server');
 
 const router = express.Router();
 
@@ -58,132 +59,55 @@ function _clientIp(req) {
   return req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || null;
 }
 
-const STRINGS = {
-  de: {
-    landingTitle:   '',
-    landingSubtitle:'Schreiben, Lektorat und Buchanalyse mit KI — in einer Umgebung.',
-    loginLabel:     'Anmelden',
-    registerLabel:  'Zugang anfordern',
-    landingFooter:  'Selbst gehostet vom Betreiber. Fragen zum Datenschutz bitte direkt an den Betreiber.',
-    githubLabel:    'Quellcode auf GitHub',
-
-    featuresTitle:  'Kernfunktionen',
-    feat1Title:     'Schreiben',
-    feat1Desc:      'Ablenkungsfreier Fokus-Editor mit Kapitelstruktur, Auto-Save, Versionshistorie und Suche.',
-    feat2Title:     'KI-Lektorat',
-    feat2Desc:      'Findet Stilbrüche, Wiederholungen, schwache Verben, Passivketten und Tempuswechsel — Seite für Seite.',
-    feat3Title:     'Buchanalyse',
-    feat3Desc:      'Extrahiert Figuren, Schauplätze, Szenen, Zeitstrahl und Kontinuitätsprobleme aus dem ganzen Manuskript.',
-    feat4Title:     'Sparrings-Chat',
-    feat4Desc:      'Seiten-Chat für gezielte Textstellen und agentischer Buch-Chat mit Zugriff auf Figuren, Orte, Szenen.',
-    feat5Title:     'Bewertung',
-    feat5Desc:      'Buch- und Kapitel-Review aus Lektor-Perspektive mit Stärken, Schwächen und konkreten Verbesserungen.',
-    feat6Title:     'Export',
-    feat6Desc:      'Druckfertiges PDF/A, EPUB, Markdown und Trainingsdaten für eigene Finetunes.',
-
-    registerTitle:    'Zugang anfordern',
-    registerSub:      'Wir antworten per Mail an die angegebene Adresse, sobald deine Anfrage geprüft wurde.',
-    emailLabel:       'E-Mail',
-    nameLabel:        'Name (optional)',
-    messageLabel:     'Nachricht (optional, max. 500 Zeichen)',
-    submitLabel:      'Anfrage senden',
-    backToLanding:    'Zurück',
-    registerFooter:   'Mit dem Absenden stimmst du der Speicherung deiner Anfrage zu (Löschung nach 30 Tagen, falls nicht freigeschaltet).',
-    success:          'Anfrage eingegangen — du erhältst eine Mail, sobald sie geprüft wurde.',
-    rateLimit:        'Zu viele Anfragen. Bitte später erneut versuchen.',
-    invalid:          'Bitte gültige E-Mail-Adresse angeben.',
-    error:            'Anfrage konnte nicht gesendet werden. Bitte später erneut versuchen.',
-  },
-  en: {
-    landingTitle:   '',
-    landingSubtitle:'Writing, editing and book analysis with AI — in one workspace.',
-    loginLabel:     'Sign in',
-    registerLabel:  'Request access',
-    landingFooter:  'Self-hosted by the operator. For privacy questions please contact the operator directly.',
-    githubLabel:    'Source code on GitHub',
-
-    featuresTitle:  'Core features',
-    feat1Title:     'Writing',
-    feat1Desc:      'Distraction-free focus editor with chapter structure, auto-save, revision history and search.',
-    feat2Title:     'AI editing',
-    feat2Desc:      'Catches style breaks, repetitions, weak verbs, passive chains and tense shifts — page by page.',
-    feat3Title:     'Book analysis',
-    feat3Desc:      'Extracts characters, locations, scenes, timeline and continuity issues across the whole manuscript.',
-    feat4Title:     'Sparring chat',
-    feat4Desc:      'Page chat for specific passages and an agentic book chat with access to characters, places and scenes.',
-    feat5Title:     'Reviews',
-    feat5Desc:      'Book and chapter reviews from an editor’s angle, with strengths, weaknesses and concrete fixes.',
-    feat6Title:     'Export',
-    feat6Desc:      'Print-ready PDF/A, EPUB, Markdown and training data for your own finetunes.',
-
-    registerTitle:    'Request access',
-    registerSub:      'We will reply by email to the address you provide once your request has been reviewed.',
-    emailLabel:       'Email',
-    nameLabel:        'Name (optional)',
-    messageLabel:     'Message (optional, max 500 chars)',
-    submitLabel:      'Send request',
-    backToLanding:    'Back',
-    registerFooter:   'By submitting you agree to your request being stored (deleted after 30 days unless approved).',
-    success:          'Request received — you will get an email once it has been reviewed.',
-    rateLimit:        'Too many requests. Please try again later.',
-    invalid:          'Please provide a valid email address.',
-    error:            'Could not send request. Please try again later.',
-  },
-};
-
-function _strings(lang) {
-  return STRINGS[lang] || STRINGS.de;
-}
-
 function _renderLanding(req, res) {
   const lang = _bodyLang(req);
-  const s = _strings(lang);
+  const t = (key) => tServer(key, lang);
   const appName = appSettings.get('app.name') || 'Schreibwerkstatt';
   res.set('Cache-Control', 'no-store');
   res.type('html').send(_render('landing.html', {
     lang,
     title:         appName,
     appName,
-    subtitle:      s.landingSubtitle,
-    loginLabel:    s.loginLabel,
-    registerLabel: s.registerLabel,
-    footer:        s.landingFooter,
+    subtitle:      t('landing.subtitle'),
+    loginLabel:    t('landing.loginLabel'),
+    registerLabel: t('landing.registerLabel'),
+    footer:        t('landing.footer'),
     githubUrl:     'https://github.com/bedeberger/schreibwerkstatt',
-    githubLabel:   s.githubLabel,
-    featuresTitle: s.featuresTitle,
-    feat1Title:    s.feat1Title, feat1Desc: s.feat1Desc,
-    feat2Title:    s.feat2Title, feat2Desc: s.feat2Desc,
-    feat3Title:    s.feat3Title, feat3Desc: s.feat3Desc,
-    feat4Title:    s.feat4Title, feat4Desc: s.feat4Desc,
-    feat5Title:    s.feat5Title, feat5Desc: s.feat5Desc,
-    feat6Title:    s.feat6Title, feat6Desc: s.feat6Desc,
+    githubLabel:   t('landing.githubLabel'),
+    featuresTitle: t('landing.featuresTitle'),
+    feat1Title:    t('landing.feat1Title'), feat1Desc: t('landing.feat1Desc'),
+    feat2Title:    t('landing.feat2Title'), feat2Desc: t('landing.feat2Desc'),
+    feat3Title:    t('landing.feat3Title'), feat3Desc: t('landing.feat3Desc'),
+    feat4Title:    t('landing.feat4Title'), feat4Desc: t('landing.feat4Desc'),
+    feat5Title:    t('landing.feat5Title'), feat5Desc: t('landing.feat5Desc'),
+    feat6Title:    t('landing.feat6Title'), feat6Desc: t('landing.feat6Desc'),
   }));
 }
 
 function _renderRegister(req, res) {
   const lang = _bodyLang(req);
-  const s = _strings(lang);
+  const t = (key) => tServer(key, lang);
   const captchaSiteKey = appSettings.get('auth.captcha.site_key') || '';
   res.set('Cache-Control', 'no-store');
   const config = {
     captchaSiteKey,
     i18n: {
-      success:   s.success,
-      rateLimit: s.rateLimit,
-      invalid:   s.invalid,
-      error:     s.error,
+      success:   t('register.success'),
+      rateLimit: t('register.rateLimit'),
+      invalid:   t('register.invalid'),
+      error:     t('register.error'),
     },
   };
   res.type('html').send(_render('register.html', {
     lang,
-    title:          s.registerTitle,
-    subtitle:       s.registerSub,
-    emailLabel:     s.emailLabel,
-    nameLabel:      s.nameLabel,
-    messageLabel:   s.messageLabel,
-    submitLabel:    s.submitLabel,
-    backToLanding:  s.backToLanding,
-    footerHint:     s.registerFooter,
+    title:          t('register.title'),
+    subtitle:       t('register.subtitle'),
+    emailLabel:     t('register.emailLabel'),
+    nameLabel:      t('register.nameLabel'),
+    messageLabel:   t('register.messageLabel'),
+    submitLabel:    t('register.submitLabel'),
+    backToLanding:  t('register.backToLanding'),
+    footerHint:     t('register.footer'),
     captchaSiteKey,
     configJson:     JSON.stringify(config).replace(/</g, '\\u003c'),
   }));

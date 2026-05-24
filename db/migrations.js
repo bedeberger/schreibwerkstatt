@@ -6077,6 +6077,30 @@ function _runMigrationsLocked() {
     logger.info(`DB-Migration auf Version 143 abgeschlossen (page_languagetool_cache geleert, ${cleared.changes} Rows).`);
   }
 
+  if (version < 144) {
+    // Invite-Click- und Reminder-Tracking. Admin-Tab "Eingeladene Benutzer"
+    // sieht so, ob der User den Link geoeffnet hat und kann Erinnerungen senden.
+    const uiCols = db.pragma('table_info(user_invites)').map(c => c.name);
+    if (!uiCols.includes('last_clicked_at')) {
+      db.prepare('ALTER TABLE user_invites ADD COLUMN last_clicked_at TEXT').run();
+    }
+    if (!uiCols.includes('click_count')) {
+      db.prepare('ALTER TABLE user_invites ADD COLUMN click_count INTEGER NOT NULL DEFAULT 0').run();
+    }
+    if (!uiCols.includes('last_reminder_at')) {
+      db.prepare('ALTER TABLE user_invites ADD COLUMN last_reminder_at TEXT').run();
+    }
+    if (!uiCols.includes('reminder_count')) {
+      db.prepare('ALTER TABLE user_invites ADD COLUMN reminder_count INTEGER NOT NULL DEFAULT 0').run();
+    }
+    const fkErrors144 = db.pragma('foreign_key_check');
+    if (fkErrors144.length) {
+      throw new Error(`Migration 144: foreign_key_check meldet ${fkErrors144.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 144').run();
+    logger.info('DB-Migration auf Version 144 abgeschlossen (user_invites: Click+Reminder-Tracking).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

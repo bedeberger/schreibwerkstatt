@@ -45,17 +45,102 @@ export const adminUsersMethods = {
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error_code || `HTTP ${r.status}`);
+      const url = j.inviteUrl
+        ? (j.inviteUrl.startsWith('http') ? j.inviteUrl : `${location.origin}${j.inviteUrl}`)
+        : `${location.origin}/invite/${j.invite.invite_token}`;
       this.adminUsersInviteResult = {
         email: j.invite.email,
         token: j.invite.invite_token,
-        url: `${location.origin}/login?returnTo=${encodeURIComponent('/?invite=' + j.invite.invite_token)}`,
+        url,
+        mail: j.mail || null,
       };
       this.adminUsersInviteEmail = '';
+      if (this.adminUsersTab === 'invites') await this.adminUsersInvitesLoad();
     } catch (e) {
       this.adminUsersError = e.message;
     } finally {
       this.adminUsersInviting = false;
     }
+  },
+
+  async adminUsersInvitesLoad() {
+    if (this.adminUsersInvitesLoading) return;
+    this.adminUsersInvitesLoading = true;
+    this.adminUsersError = '';
+    try {
+      const r = await fetch('/admin/users/invites', { credentials: 'same-origin' });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        throw new Error(j.error_code || `HTTP ${r.status}`);
+      }
+      const j = await r.json();
+      this.adminUsersInvitesList = j.invites || [];
+    } catch (e) {
+      this.adminUsersError = e.message;
+    } finally {
+      this.adminUsersInvitesLoading = false;
+    }
+  },
+
+  async adminUsersInviteRemind(inv) {
+    if (!inv || this.adminUsersInvitesBusy) return;
+    this.adminUsersInvitesBusy = inv.id;
+    this.adminUsersError = '';
+    this.adminUsersInvitesResult = null;
+    try {
+      const r = await fetch(`/admin/users/invites/${inv.id}/remind`, {
+        method: 'POST',
+        credentials: 'same-origin',
+      });
+      const j = await r.json();
+      if (!r.ok) {
+        if (j.error_code === 'REMINDER_COOLDOWN') {
+          this.adminUsersInvitesResult = { id: inv.id, cooldown: true, retryAfter: j.retryAfter };
+          return;
+        }
+        throw new Error(j.error_code || `HTTP ${r.status}`);
+      }
+      this.adminUsersInvitesResult = { id: inv.id, mail: j.mail };
+      await this.adminUsersInvitesLoad();
+    } catch (e) {
+      this.adminUsersError = e.message;
+    } finally {
+      this.adminUsersInvitesBusy = null;
+    }
+  },
+
+  async adminUsersInviteRevoke(inv) {
+    if (!inv || this.adminUsersInvitesBusy) return;
+    const confirmMsg = window.__app?.t?.('admin.users.invites.confirmRevoke', { email: inv.email })
+      || `Einladung an ${inv.email} widerrufen?`;
+    if (!confirm(confirmMsg)) return;
+    this.adminUsersInvitesBusy = inv.id;
+    this.adminUsersError = '';
+    try {
+      const r = await fetch(`/admin/users/invites/${inv.id}`, {
+        method: 'DELETE',
+        credentials: 'same-origin',
+      });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        throw new Error(j.error_code || `HTTP ${r.status}`);
+      }
+      await this.adminUsersInvitesLoad();
+    } catch (e) {
+      this.adminUsersError = e.message;
+    } finally {
+      this.adminUsersInvitesBusy = null;
+    }
+  },
+
+  async adminUsersInviteCopyUrl(inv) {
+    if (!inv?.invite_url) return;
+    const url = inv.invite_url.startsWith('http') ? inv.invite_url : `${location.origin}${inv.invite_url}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      this.adminUsersInvitesCopiedId = inv.id;
+      setTimeout(() => { this.adminUsersInvitesCopiedId = null; }, 1500);
+    } catch {}
   },
 
   async adminUsersUpdate(user, patch) {

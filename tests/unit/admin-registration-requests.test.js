@@ -97,7 +97,7 @@ test('POST /:id/approve erzeugt invite + setzt status=approved', async () => {
   assert.equal(r.status, 200);
   assert.equal(r.body.request.status, 'approved');
   assert.ok(r.body.invite.invite_token);
-  assert.match(r.body.inviteUrl, /\/login\?invite=/);
+  assert.match(r.body.inviteUrl, /\/invite\//);
   const updated = regRequests.getRequest(reqAlice.id);
   assert.equal(updated.status, 'approved');
   assert.equal(updated.invite_id, r.body.invite.id);

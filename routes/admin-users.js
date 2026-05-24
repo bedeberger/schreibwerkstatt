@@ -14,9 +14,16 @@ const appSettings = require('../lib/app-settings');
 
 const express = require('express');
 const appUsers = require('../db/app-users');
+const mailer = require('../lib/mailer');
+const { buildInviteUrl } = require('../lib/invite-url');
 const { requireAdmin } = require('../lib/admin-mw');
 const { setContext } = require('../lib/log-context');
 const logger = require('../logger');
+
+// Cooldown zwischen Reminder-Mails. Schuetzt den Empfaenger vor Spam, falls
+// der Admin ungeduldig wird. Klick-Tracking gibt dem Admin sonst keinen
+// Grund mehr fuer schnelle Wiederholung.
+const REMINDER_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 const router = express.Router();
 router.use(requireAdmin);
@@ -37,19 +44,92 @@ router.get('/:email/audit', (req, res) => {
   res.json({ events });
 });
 
-router.post('/invite', express.json(), (req, res) => {
+router.post('/invite', express.json(), async (req, res) => {
   const { email, role = 'user' } = req.body || {};
   if (!email) return res.status(400).json({ error_code: 'EMAIL_REQUIRED' });
   if (role !== 'admin' && role !== 'user') return res.status(400).json({ error_code: 'ROLE_INVALID' });
   const invitedBy = req.session.user.email;
+  let invite;
   try {
-    const invite = appUsers.createInvite({ email, globalRole: role, invitedBy });
+    invite = appUsers.createInvite({ email, globalRole: role, invitedBy });
     logger.info(`Admin-Invite ausgestellt: ${email} (${role})`, { user: invitedBy });
-    res.json({ invite });
   } catch (e) {
     logger.error(`createInvite: ${e.message}`, { user: invitedBy });
-    res.status(500).json({ error_code: 'INVITE_FAILED', detail: e.message });
+    return res.status(500).json({ error_code: 'INVITE_FAILED', detail: e.message });
   }
+  const inviteUrl = buildInviteUrl(invite.invite_token);
+  // Mail synchron probieren, damit das UI sofort sieht, ob die Mail rausging
+  // oder die URL inline kopiert werden muss (Mailer-disabled-Fallback).
+  let mail = { sent: false, reason: 'not-attempted' };
+  try {
+    mail = await mailer.send({
+      to: email,
+      template: 'invite',
+      locale: 'de',
+      ctx: { inviterName: invitedBy, inviteUrl, expiresAt: invite.expires_at, role },
+    });
+  } catch (e) {
+    mail = { sent: false, reason: 'error', error: e.message };
+  }
+  res.json({ invite, inviteUrl, mail });
+});
+
+// Liste aktiver, noch nicht akzeptierter und nicht widerrufener Invites.
+// Frontend rendert daraus den Tab "Eingeladene Benutzer".
+router.get('/invites', (req, res) => {
+  const invites = appUsers.listActiveInvites().map(inv => ({
+    ...inv,
+    invite_url: buildInviteUrl(inv.invite_token),
+    expired: inv.expires_at ? new Date(inv.expires_at).getTime() < Date.now() : false,
+  }));
+  res.json({ invites });
+});
+
+router.post('/invites/:id/remind', express.json(), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error_code: 'ID_INVALID' });
+  const inv = appUsers.findInviteById(id);
+  if (!inv) return res.status(404).json({ error_code: 'INVITE_NOT_FOUND' });
+  const status = appUsers.inviteStatus(inv);
+  if (status !== 'active') {
+    return res.status(409).json({ error_code: 'INVITE_NOT_ACTIVE', status });
+  }
+  if (inv.last_reminder_at) {
+    const last = new Date(inv.last_reminder_at).getTime();
+    if (Number.isFinite(last) && Date.now() - last < REMINDER_COOLDOWN_MS) {
+      const retryAfterSec = Math.ceil((REMINDER_COOLDOWN_MS - (Date.now() - last)) / 1000);
+      res.set('Retry-After', String(retryAfterSec));
+      return res.status(429).json({ error_code: 'REMINDER_COOLDOWN', retryAfter: retryAfterSec });
+    }
+  }
+  const inviteUrl = buildInviteUrl(inv.invite_token);
+  const actor = req.session.user.email;
+  let mail = { sent: false, reason: 'not-attempted' };
+  try {
+    mail = await mailer.send({
+      to: inv.email,
+      template: 'invite-reminder',
+      locale: 'de',
+      ctx: { inviterName: inv.invited_by || actor, inviteUrl, expiresAt: inv.expires_at, role: inv.global_role },
+    });
+  } catch (e) {
+    mail = { sent: false, reason: 'error', error: e.message };
+  }
+  if (mail.sent) {
+    appUsers.markInviteReminded(id);
+    logger.info(`Invite-Reminder gesendet an ${inv.email}`, { user: actor });
+  }
+  res.json({ mail, invite: appUsers.findInviteById(id) });
+});
+
+router.delete('/invites/:id', (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error_code: 'ID_INVALID' });
+  const inv = appUsers.findInviteById(id);
+  if (!inv) return res.status(404).json({ error_code: 'INVITE_NOT_FOUND' });
+  appUsers.revokeInvite(id);
+  logger.info(`Invite widerrufen: ${inv.email} (id=${id})`, { user: req.session.user.email });
+  res.json({ ok: true });
 });
 
 router.put('/:email', express.json(), (req, res) => {

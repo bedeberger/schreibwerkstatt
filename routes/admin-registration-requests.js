@@ -16,6 +16,7 @@ const appUsers = require('../db/app-users');
 const regRequests = require('../db/registration-requests');
 const appSettings = require('../lib/app-settings');
 const mailer = require('../lib/mailer');
+const { buildInviteUrl } = require('../lib/invite-url');
 const { requireAdmin } = require('../lib/admin-mw');
 
 const router = express.Router();
@@ -23,12 +24,6 @@ router.use(requireAdmin);
 
 function _clientIp(req) {
   return req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || null;
-}
-
-function _buildInviteUrl(token) {
-  const base = (appSettings.get('app.public_url') || '').replace(/\/$/, '');
-  if (!base) return `/login?invite=${encodeURIComponent(token)}`;
-  return `${base}/login?invite=${encodeURIComponent(token)}`;
 }
 
 router.get('/', (req, res) => {
@@ -73,7 +68,7 @@ router.post('/:id/approve', express.json(), (req, res) => {
     meta: { from: 'request', request_id: id, role, by: actor },
   });
 
-  const inviteUrl = _buildInviteUrl(invite.invite_token);
+  const inviteUrl = buildInviteUrl(invite.invite_token);
   let mailResult = { sent: false, reason: 'not-attempted' };
   try {
     // Approve-Mail synchron probieren, damit der Admin im UI sofort sieht,
