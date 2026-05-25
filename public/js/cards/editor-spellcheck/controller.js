@@ -336,6 +336,11 @@ export function createSpellcheckController({
   function _onRootMousedown(ev) {
     if (ev.button !== 0) return;
     if (popover && popover.contains(ev.target)) return;
+    // Doppel-/Dreifachklick (ev.detail >= 2): native Wort-/Absatz-Selektion
+    // gewinnt. Sonst würde preventDefault + Selection-Collapse den zweiten
+    // mousedown der dblclick-Sequenz wegfangen → User kann Wort über
+    // Squiggle nicht mehr per Doppelklick selektieren.
+    if (ev.detail >= 2) return;
     if (!squiggles.size) return;
     const pt = _caretFromPoint(ev.clientX, ev.clientY);
     if (!pt) return;
