@@ -152,6 +152,56 @@ test('resolveQuoteStyle: Fallback bei unbekannter Sprache', () => {
   assert.equal(s.ldquo, '«');
 });
 
+test('resolveQuoteStyle: de ohne Region → de-CH (Swiss-Default)', () => {
+  // Swiss-App: ohne explizite Region fällt `de` auf DEFAULT_STYLE = de-CH,
+  // nicht auf de-DE. Buchsprache ohne Region soll nicht stillschweigend
+  // Anführungszeichen ins deutsche Format kippen.
+  const s = resolveQuoteStyle('de', '');
+  assert.equal(s.ldquo, '«');
+  assert.equal(s.rdquo, '»');
+  assert.equal(s.lsquo, '‹');
+  assert.equal(s.rsquo, '›');
+});
+
+test('resolveQuoteStyle: de mit unbekannter Region → de-CH', () => {
+  // Fallback auf DEFAULT_STYLE statt auf de-DE.
+  const s = resolveQuoteStyle('de', 'XX');
+  assert.equal(s.ldquo, '«');
+});
+
+test('normalizeQuotes: blockquote mit nested p — kein State-Leak zwischen p\'s', () => {
+  // Vor dem Fix: outermost-only-Filter behielt nur die blockquote, und
+  // _normalizeBlock lief mit durchgehendem prevChar/quoteStack über beide p's.
+  const root = makeRoot('<blockquote><p>"Eins</p><p>"Zwei"</p></blockquote>');
+  const style = resolveQuoteStyle('de', 'CH');
+  normalizeQuotes(root, style);
+  const ps = root.querySelectorAll('p');
+  assert.equal(ps[0].textContent, '«Eins');
+  assert.equal(ps[1].textContent, '«Zwei»');
+});
+
+test('normalizeQuotes: ul mit nested li — kein State-Leak zwischen li\'s', () => {
+  const root = makeRoot('<ul><li>"Eins</li><li>"Zwei"</li></ul>');
+  const style = resolveQuoteStyle('de', 'CH');
+  normalizeQuotes(root, style);
+  const lis = root.querySelectorAll('li');
+  assert.equal(lis[0].textContent, '«Eins');
+  assert.equal(lis[1].textContent, '«Zwei»');
+});
+
+test('normalizeQuotes: direkter Text in blockquote + nested p werden beide normalisiert', () => {
+  // blockquote enthält direkten Text VOR dem p. Beide müssen normalisiert
+  // werden — ohne Doppel-Processing der p-Inhalte.
+  const root = makeRoot('<blockquote>"Direkt" und <p>"InP"</p></blockquote>');
+  const style = resolveQuoteStyle('de', 'CH');
+  normalizeQuotes(root, style);
+  const bq = root.querySelector('blockquote');
+  // Direkter Text wird via blockquote-Pass normalisiert (p wird übersprungen).
+  assert.ok(bq.textContent.includes('«Direkt»'), `expected «Direkt» in: ${bq.textContent}`);
+  // p-Inhalt wird via p-Pass normalisiert.
+  assert.equal(root.querySelector('p').textContent, '«InP»');
+});
+
 test('normalizeQuotes: gerade Doppelquotes → de-CH Guillemets', () => {
   const root = makeRoot('<p>Er sagte "Hallo" zu mir.</p>');
   const style = resolveQuoteStyle('de', 'CH');

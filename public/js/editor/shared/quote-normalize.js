@@ -43,7 +43,6 @@ export function resolveQuoteStyle(language, region) {
     if (STYLES[tag]) return STYLES[tag];
   }
   if (l && STYLES[l]) return STYLES[l];
-  if (l === 'de') return STYLES['de-DE'];
   if (l === 'it') return STYLES['it-IT'];
   return DEFAULT_STYLE;
 }
@@ -194,8 +193,10 @@ function _isSingleQuote(c) {
 
 // Eigene Walk-Logik statt TreeWalker — linkedom (Unit-Test-Umgebung)
 // ignoriert den acceptNode-Filter und würde Text-Nodes in <pre>/<code>
-// fälschlich mit-transformieren.
-function _collectTextNodes(root, skipSel, out) {
+// fälschlich mit-transformieren. `innerBlockSel` (optional) stoppt die Rekursion
+// an Block-Elementen — die werden separat normalisiert, sonst leakt der
+// prev/next/Stack-State zwischen geschwister-Paragraphen einer Blockquote/Liste.
+function _collectTextNodes(root, skipSel, out, innerBlockSel) {
   for (let n = root.firstChild; n; n = n.nextSibling) {
     if (n.nodeType === 3) {
       const parent = n.parentElement;
@@ -203,9 +204,24 @@ function _collectTextNodes(root, skipSel, out) {
       out.push(n);
     } else if (n.nodeType === 1) {
       if (n.matches && n.matches(skipSel)) continue;
-      _collectTextNodes(n, skipSel, out);
+      if (innerBlockSel && n.matches && n.matches(innerBlockSel)) continue;
+      _collectTextNodes(n, skipSel, out, innerBlockSel);
     }
   }
+}
+
+// Closest BLOCK_SEL-Ancestor eines Text-Nodes innerhalb des common-Walks.
+// Wird nur in der Range-Variante gebraucht, wo wir alle Text-Nodes (über
+// Block-Grenzen hinweg) sammeln müssen, aber den State an Block-Wechseln
+// resetten wollen.
+function _closestBlock(textNode, root) {
+  let n = textNode.parentElement;
+  while (n) {
+    if (n === root) return root;
+    if (n.matches && n.matches(BLOCK_SEL)) return n;
+    n = n.parentElement;
+  }
+  return root;
 }
 
 // Liefert das erste Zeichen, das `nodeIdx+1..end` an Text-Nodes hat. Damit
@@ -233,7 +249,10 @@ function _applyRepl(out, srcNext, repl) {
 
 function _normalizeBlock(blockEl, style) {
   const textNodes = [];
-  _collectTextNodes(blockEl, SKIP_SEL, textNodes);
+  // Inner Blocks (z.B. <p> in <blockquote>, <li> in <ul>) werden NICHT
+  // mitgesammelt — sie laufen als eigene _normalizeBlock-Aufrufe, damit ihr
+  // prev/next/Stack-State nicht vom Geschwister geerbt wird.
+  _collectTextNodes(blockEl, SKIP_SEL, textNodes, BLOCK_SEL);
   if (!textNodes.length) return 0;
 
   let count = 0;
@@ -331,8 +350,10 @@ function _peekWordInString(s, idx) {
 export function normalizeQuotes(rootEl, style) {
   if (!rootEl || !style) return 0;
   let blocks = Array.from(rootEl.querySelectorAll(BLOCK_SEL));
-  blocks = blocks.filter(b => !blocks.some(other => other !== b && other.contains(b)));
   if (!blocks.length) blocks = [rootEl];
+  // Alle matchenden Blocks werden eigenständig normalisiert. Innere Blocks
+  // werden von ihrem Container via `_collectTextNodes(..., BLOCK_SEL)` bewusst
+  // ausgeklammert — kein Doppel-Processing, kein State-Leak.
   let total = 0;
   for (const b of blocks) total += _normalizeBlock(b, style);
   return total;
@@ -355,9 +376,11 @@ export function normalizeQuotesInRange(range, style) {
   let prevChar = '';
   let prevNonWs = '';
   // Range-Scope: Stack tracked auch Out-of-Range-Quotes, damit eine selektierte
-  // Inner-Quote die Depth aus dem umgebenden Outer-Quote erbt. Reset NICHT pro
-  // Node — common-ancestor-Walk simuliert hier denselben Block.
+  // Inner-Quote die Depth aus dem umgebenden Outer-Quote erbt. Reset NUR an
+  // Block-Grenzen (zwei aufeinanderfolgende Text-Nodes in verschiedenen
+  // BLOCK_SEL-Ancestors) — sonst leakt der State zwischen Geschwister-Paragraphen.
   const quoteStack = [];
+  let lastBlock = null;
 
   const _updateNonWs = (str) => {
     for (let k = str.length - 1; k >= 0; k--) {
@@ -369,6 +392,14 @@ export function normalizeQuotesInRange(range, style) {
     const node = all[nodeIdx];
     const s = node.nodeValue;
     if (!s) continue;
+
+    const blk = _closestBlock(node, common);
+    if (blk !== lastBlock) {
+      prevChar = '';
+      prevNonWs = '';
+      quoteStack.length = 0;
+      lastBlock = blk;
+    }
 
     if (!range.intersectsNode(node)) {
       // Ausserhalb der Range: nichts ändern, aber Stack + prev-Kontext aus dem
