@@ -23,7 +23,7 @@
                defaultKey: 'book_id',
                persistKey: 'admin.books.ownerless',
                types: { book_id: 'number', acl_count: 'number', chapter_count: 'number',
-                        page_count: 'number', chars: 'number', bytes: 'number' },
+                        page_count: 'number', chars: 'number', normseiten: 'number', bytes: 'number' },
              })">
         <thead>
           <tr>
@@ -39,7 +39,8 @@
                 @click="sortBy('page_count')" x-text="$app.t('admin.books.col.pages')"></th>
             <th class="admin-pool-num sortable-th" :class="sortClass('chars')" :aria-sort="ariaSort('chars')"
                 @click="sortBy('chars')" x-text="$app.t('admin.books.col.chars')"></th>
-            <th class="admin-pool-num" x-text="$app.t('admin.books.col.normseiten')"></th>
+            <th class="admin-pool-num sortable-th" :class="sortClass('normseiten')" :aria-sort="ariaSort('normseiten')"
+                @click="sortBy('normseiten')" x-text="$app.t('admin.books.col.normseiten')"></th>
             <th class="admin-pool-num sortable-th" :class="sortClass('bytes')" :aria-sort="ariaSort('bytes')"
                 @click="sortBy('bytes')" :data-tip="$app.t('admin.books.col.bytesTip')" x-text="$app.t('admin.books.col.bytes')"></th>
             <th x-text="$app.t('admin.books.col.assign')"></th>
@@ -90,7 +91,7 @@
                defaultKey: 'book_id',
                persistKey: 'admin.books.owned',
                types: { book_id: 'number', acl_count: 'number', chapter_count: 'number',
-                        page_count: 'number', chars: 'number', bytes: 'number' },
+                        page_count: 'number', chars: 'number', normseiten: 'number', bytes: 'number' },
              })">
         <thead>
           <tr>
@@ -108,7 +109,8 @@
                 @click="sortBy('page_count')" x-text="$app.t('admin.books.col.pages')"></th>
             <th class="admin-pool-num sortable-th" :class="sortClass('chars')" :aria-sort="ariaSort('chars')"
                 @click="sortBy('chars')" x-text="$app.t('admin.books.col.chars')"></th>
-            <th class="admin-pool-num" x-text="$app.t('admin.books.col.normseiten')"></th>
+            <th class="admin-pool-num sortable-th" :class="sortClass('normseiten')" :aria-sort="ariaSort('normseiten')"
+                @click="sortBy('normseiten')" x-text="$app.t('admin.books.col.normseiten')"></th>
             <th class="admin-pool-num sortable-th" :class="sortClass('bytes')" :aria-sort="ariaSort('bytes')"
                 @click="sortBy('bytes')" :data-tip="$app.t('admin.books.col.bytesTip')" x-text="$app.t('admin.books.col.bytes')"></th>
           </tr>

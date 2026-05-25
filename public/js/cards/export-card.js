@@ -23,9 +23,27 @@ export function registerExportCard() {
           exportChapterId: null,
           exportPageId: null,
         },
+        extraListeners: [
+          { type: 'export:preset', handler: (e) => this._applyExportPreset(e.detail) },
+        ],
       });
       this.$watch(() => this.exportScope, () => this._ensurePicked());
       this.$watch(() => window.__app?.currentPage?.id, () => this._ensurePicked());
+      const pending = window.__app?.__exportPreset;
+      if (pending) {
+        this._applyExportPreset(pending);
+        window.__app.__exportPreset = null;
+      }
+    },
+
+    _applyExportPreset({ kind, id } = {}) {
+      if (kind === 'page' && id != null) {
+        this.exportPageId = id;
+        this.exportScope = 'page';
+      } else if (kind === 'chapter' && id != null) {
+        this.exportChapterId = id;
+        this.exportScope = 'chapter';
+      }
     },
 
     _ensurePicked() {

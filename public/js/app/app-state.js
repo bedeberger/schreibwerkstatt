@@ -108,6 +108,15 @@ const navigationState = () => ({
   sidebarMode: 'tree',
   diaryCalendarYearMonth: null,
   _diaryCalendarJumpModel: '',
+  // Pagetree-Rechtsklick-Menü. SSoT für Open/Pos/Target; Render in sidebar.html.
+  // Target-Form: { kind: 'page'|'chapter', id, name }. Position viewport-fixed
+  // (sidebar liegt ausserhalb einer transform-Card, daher kein Containing-Block-
+  // Offset nötig).
+  pageTreeMenuOpen: false,
+  pageTreeMenuPos: { left: 0, top: 0 },
+  pageTreeMenuTarget: null,
+  _pageTreeMenuOutsideHandler: null,
+  _pageTreeMenuEscHandler: null,
 });
 
 // Page-Slice: Inhalt der aktuell geöffneten Seite. Mode-agnostisch — Notebook,

@@ -1,0 +1,71 @@
+/* Generic Context-Menu (Rechtsklick-Popover).
+   Konsumenten: .pagetree-context-menu (Sidebar). State + Position vom
+   Konsumenten via Inline-Style (left/top). z-index muss über card-Layer liegen.
+   Pattern-Doku: DESIGN.md → „Context-Menu". */
+
+.context-menu {
+  position: fixed;
+  min-width: 220px;
+  background: var(--color-surface);
+  border: var(--border-thin) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  z-index: var(--z-popover);
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-xs) 0;
+}
+
+.context-menu-header {
+  padding: var(--space-2xs) var(--space-md);
+  margin: calc(-1 * var(--space-xs)) 0 var(--space-2xs);
+  background: var(--color-hover-light);
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  font-weight: 700;
+  border-bottom: var(--border-thin) solid var(--color-border);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.context-menu-item {
+  display: block;
+  width: 100%;
+  padding: var(--space-xs) var(--space-md);
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  text-align: left;
+  font-size: var(--font-size-base);
+  cursor: pointer;
+}
+
+.context-menu-item:hover,
+.context-menu-item:focus-visible {
+  background: var(--color-hover);
+  outline: none;
+}
+
+.context-menu-item:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+
+.context-menu-item--danger {
+  color: var(--color-err-text);
+}
+
+.context-menu-item--danger:hover:not(:disabled),
+.context-menu-item--danger:focus-visible {
+  background: var(--color-err-bg);
+}
+
+.context-menu-sep {
+  height: 1px;
+  background: var(--color-border);
+  margin: var(--space-xs) 0;
+}

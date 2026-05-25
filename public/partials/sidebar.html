@@ -80,7 +80,8 @@
            @keydown.space.prevent="_onChapterHeaderActivate(item)"
            @keydown.arrow-right.prevent="if ((item.pages.length > 0 || item.hasChildren) && !item.open) setChapterOpen(item, true)"
            @keydown.arrow-left.prevent="if ((item.pages.length > 0 || item.hasChildren) && item.open) setChapterOpen(item, false)"
-           @click="_onChapterHeaderActivate(item)">
+           @click="_onChapterHeaderActivate(item)"
+           @contextmenu="_openPagetreeContextMenu($event, { kind: 'chapter', id: item.id, name: item.name })">
         <span class="history-chevron" :class="{ open: item.open }" x-show="item.pages.length > 0 || item.hasChildren"
               @click.stop="if (!pageSearch && (item.pages.length > 0 || item.hasChildren)) toggleChapterOpen(item)"></span>
         <span x-text="item.name"></span>
@@ -105,7 +106,8 @@
                :data-page-id="page.id" role="button" tabindex="0"
                :aria-current="currentPage?.id === page.id ? 'page' : null"
                :data-tip="recentRemoteEdits.has(page.id) ? t('collab.tree.remoteEditTip') : null"
-               @click="selectPage(page); _clearRemoteEditMark(page.id)">
+               @click="selectPage(page); _clearRemoteEditMark(page.id)"
+               @contextmenu="_openPagetreeContextMenu($event, { kind: 'page', id: page.id, name: page.name })">
             <span class="page-name">
               <span class="page-status-dot" :class="'page-status-' + pageStatus(page)"
                 @mouseenter.stop="_showStatusTip($el, page)"
@@ -150,4 +152,38 @@
     </div>
   </template>
   </div><!-- /sidebarMode !== 'calendar' -->
+</div>
+
+<!-- Pagetree-Rechtsklick-Menü. Position:fixed (viewport-koordinaten). MUSS
+     ausserhalb des `.card`-Wrappers stehen: .card hat cardFadeIn-Animation mit
+     transform: translateY(0) als Endzustand — ein transform-Ancestor erzeugt
+     einen Containing-Block fuer position:fixed (Spec), wodurch das Menue an
+     der Karte statt am Viewport ausgerichtet wuerde. State + Handler in
+     tree-context-menu.js + app-state.js#navigationState. -->
+<div class="context-menu pagetree-context-menu"
+     role="menu"
+     x-show="pageTreeMenuOpen"
+     x-cloak
+     :style="{ left: pageTreeMenuPos.left + 'px', top: pageTreeMenuPos.top + 'px' }"
+     @click.stop
+     @contextmenu.prevent>
+  <template x-if="pageTreeMenuTarget">
+    <div>
+      <div class="context-menu-header" x-text="pageTreeMenuTarget.name"></div>
+      <button type="button" role="menuitem" class="context-menu-item"
+              @click="pagetreeCtxOpen()"
+              x-text="t('pagetreeCtx.open')"></button>
+      <button type="button" role="menuitem" class="context-menu-item"
+              x-show="pageTreeMenuTarget.kind === 'page'"
+              @click="pagetreeCtxEdit()"
+              x-text="t('pagetreeCtx.edit')"></button>
+      <div class="context-menu-sep" role="separator"></div>
+      <button type="button" role="menuitem" class="context-menu-item"
+              @click="pagetreeCtxShare()"
+              x-text="t('pagetreeCtx.share')"></button>
+      <button type="button" role="menuitem" class="context-menu-item"
+              @click="pagetreeCtxExport()"
+              x-text="t('pagetreeCtx.export')"></button>
+    </div>
+  </template>
 </div>

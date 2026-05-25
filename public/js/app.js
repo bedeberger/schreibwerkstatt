@@ -4,6 +4,7 @@ import { setFilters } from './local-prefs.js';
 
 import { historyMethods } from './book/history.js';
 import { treeMethods } from './book/tree.js';
+import { treeContextMenuMethods } from './book/tree-context-menu.js';
 import { diaryCalendarMethods } from './book/diary-calendar.js';
 import { lektoratMethods } from './editor/lektorat.js';
 // readNormalSnapshot/clearNormalSnapshot werden in editor-notebook-card.js via
@@ -735,6 +736,7 @@ document.addEventListener('alpine:init', () => {
     // ── Methoden aus Modulen ─────────────────────────────────────────────────
     ...historyMethods,
     ...treeMethods,
+    ...treeContextMenuMethods,
     ...diaryCalendarMethods,
     ...lektoratMethods,
     ...kapitelReviewMethods,

@@ -20,7 +20,10 @@ export const adminBooksMethods = {
         fetchJson('/admin/books'),
         fetchJson('/admin/users'),
       ]);
-      this.books = b.books || [];
+      this.books = (b.books || []).map(book => ({
+        ...book,
+        normseiten: charsToNormseiten(book.chars),
+      }));
       this.users = (u.users || []).filter(usr => usr.status === 'active');
     } catch (e) {
       this.error = e.message;

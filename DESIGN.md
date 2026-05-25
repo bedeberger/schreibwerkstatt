@@ -966,6 +966,50 @@ Nur in Sidebar-Tree verwendet. Bei neuer hierarchischer Liste: erst prüfen, ob 
 
 ---
 
+## Context-Menu (Rechtsklick-Popover)
+
+**Use:** Sekundäre Aktionen pro Element via Rechtsklick (Desktop) bzw. Long-Press (Touch — noch nicht verdrahtet). Erste Konsumentin: Pagetree (`.pagetree-context-menu` für Pages + Chapters).
+
+**CSS** [public/css/components/context-menu.css](public/css/components/context-menu.css):
+- `.context-menu` — `position: fixed`, `z-index: var(--z-popover)`, Border + Shadow.
+- `.context-menu-header` — Target-Name oben, gemuted + ellipsed.
+- `.context-menu-item` — Volle Breite, Hover/Focus = `--color-hover`.
+- `.context-menu-item--danger` — Rot getönt, Hover = `--color-err-bg`.
+- `.context-menu-sep` — 1 px Trenner zwischen Gruppen.
+
+**Markup:**
+```html
+<div class="context-menu pagetree-context-menu"
+     role="menu"
+     x-show="pageTreeMenuOpen"
+     x-cloak
+     :style="{ left: pageTreeMenuPos.left + 'px', top: pageTreeMenuPos.top + 'px' }"
+     @click.stop
+     @contextmenu.prevent>
+  <div class="context-menu-header" x-text="target.name"></div>
+  <button role="menuitem" class="context-menu-item" @click="action()">…</button>
+  <div class="context-menu-sep" role="separator"></div>
+  <button role="menuitem" class="context-menu-item context-menu-item--danger" @click="del()">…</button>
+</div>
+```
+
+**Pflicht-Verhalten** (Konsumenten-Modul):
+- `@contextmenu`-Handler nutzt `ev.preventDefault()` + setzt State (Open/Pos/Target).
+- Position viewport-fixed via `clientX/Y`. Wenn das Menü in einem `transform`-Card-Ancestor lebt: Card-Rect-Offset abziehen (Containing-Block-Falle). Sidebar liegt ausserhalb transform — kein Offset nötig.
+- Outside-Click via `document.addEventListener('mousedown', …, true)` (Capture-Phase) + Escape-Keylistener. Beide bei Hide entfernen.
+- Viewport-Clamp: `Math.min(window.innerWidth - menuW - 8, x)`.
+- `role="menu"`/`menuitem`-Attribute setzen, sonst kein A11y-Signal für Screen-Reader.
+- Container hat `@contextmenu.prevent`, damit Rechtsklick im Menü kein verschachteltes Native-Menü öffnet.
+
+**State-Form** (Beispiel Pagetree):
+- `pageTreeMenuOpen: boolean`
+- `pageTreeMenuPos: { left, top }`
+- `pageTreeMenuTarget: { kind: 'page'|'chapter', id, name }`
+
+**Wann nicht:** für selten genutzte Aktionen ohne klares Trigger-Element — Command-Palette ist dann passender (kein räumlicher Kontext nötig). Auch nicht für Bulk-Operationen — dafür gibt es Selection + Toolbar.
+
+---
+
 ## History-Item-List (Versionierung, Job-Verlauf)
 
 **Use:** Liste vergangener Job-Läufe / Page-Revisions, klappbar mit Detail-Drawer.
