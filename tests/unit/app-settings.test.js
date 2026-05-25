@@ -145,3 +145,63 @@ test('bootstrapFromEnv: ungesetzte ENV → kein Eintrag', () => {
   // Aber DB-Row darf nicht gesetzt sein
   assert.equal(settings.has('jobs.book_chat.token_budget'), false);
 });
+
+test('VALIDATORS: int-Range rejectet negative Werte', () => {
+  assert.throws(
+    () => settings.set('app.page_revision_limit', -1, { updatedBy: 'tester@x' }),
+    err => err.code === 'INVALID_VALUE' && err.key === 'app.page_revision_limit',
+  );
+  // Wert wurde nicht persistiert
+  assert.equal(settings.has('app.page_revision_limit'), false);
+});
+
+test('VALIDATORS: int-Range rejectet Werte ueber max', () => {
+  assert.throws(
+    () => settings.set('jobs.max_concurrent', 999, { updatedBy: 'tester@x' }),
+    err => err.code === 'INVALID_VALUE',
+  );
+});
+
+test('VALIDATORS: int-Range rejectet Floats', () => {
+  assert.throws(
+    () => settings.set('cron.stale_days', 1.5, { updatedBy: 'tester@x' }),
+    err => err.code === 'INVALID_VALUE',
+  );
+});
+
+test('VALIDATORS: number-Range akzeptiert Floats im Bereich', () => {
+  settings.set('ai.claude.api_key', 'sk-keep', { updatedBy: 'tester@x' }); // unrelated state
+  settings.set('ai.chat_temperature', 0.5, { updatedBy: 'tester@x' });
+  assert.equal(settings.get('ai.chat_temperature'), 0.5);
+});
+
+test('VALIDATORS: number-Range rejectet ausserhalb', () => {
+  assert.throws(
+    () => settings.set('ai.chat_temperature', 5, { updatedBy: 'tester@x' }),
+    err => err.code === 'INVALID_VALUE',
+  );
+});
+
+test('VALIDATORS: enum akzeptiert oneOf-Wert', () => {
+  settings.set('ai.provider', 'claude', { updatedBy: 'tester@x' });
+  assert.equal(settings.get('ai.provider'), 'claude');
+});
+
+test('VALIDATORS: enum rejectet fremden Wert', () => {
+  assert.throws(
+    () => settings.set('ai.provider', 'openai', { updatedBy: 'tester@x' }),
+    err => err.code === 'INVALID_VALUE',
+  );
+});
+
+test('VALIDATORS: nicht-validierte Keys passieren ungehindert', () => {
+  settings.set('app.timezone', 'Europe/Berlin', { updatedBy: 'tester@x' });
+  assert.equal(settings.get('app.timezone'), 'Europe/Berlin');
+});
+
+test('VALIDATORS: __unchanged__-Sentinel bei encrypted ueberspringt Validation', () => {
+  settings.set('ai.claude.api_key', 'sk-original', { updatedBy: 'tester@x' });
+  // __unchanged__ ist kein gueltiger Wert irgendeines Validators, muss aber durch
+  settings.set('ai.claude.api_key', '__unchanged__', { updatedBy: 'tester@x' });
+  assert.equal(settings.get('ai.claude.api_key'), 'sk-original');
+});

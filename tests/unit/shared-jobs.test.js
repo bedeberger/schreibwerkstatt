@@ -35,6 +35,14 @@ require.cache[aiPath].exports = {
 
 const shared = require('../../routes/jobs/shared');
 
+// Test-User in app_users seeden, sonst kracht FK-Constraint in insertJobRun
+// (job_runs.user_email REFERENCES app_users(email)).
+const { db } = require('../../db/connection');
+const seedUser = db.prepare(`INSERT OR IGNORE INTO app_users (email) VALUES (?)`);
+for (const email of ['u@x', 'u1@x', 'u2@x', 'u3@x', 'u4@x', 'u5@x', 'alice@x', 'bob@x']) {
+  seedUser.run(email);
+}
+
 test.after(() => {
   // Schreibgeschütztes Locking durch better-sqlite3 → Datei am Ende abräumen.
   try { fs.unlinkSync(tmpDb); } catch {}

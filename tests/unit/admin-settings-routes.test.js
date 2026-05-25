@@ -134,6 +134,28 @@ test('PUT ohne value-Feld → 400', async () => {
   assert.equal(r.status, 400);
 });
 
+test('PUT /admin/settings/:key mit ungueltigem Range → 400 INVALID_VALUE', async () => {
+  const r = await _req('PUT', '/admin/settings/app.page_revision_limit', {
+    user: 'alice@example.com', role: 'admin',
+    body: { value: -1 },
+  });
+  assert.equal(r.status, 400);
+  assert.equal(r.body.error_code, 'INVALID_VALUE');
+  assert.equal(r.body.key, 'app.page_revision_limit');
+  assert.ok(r.body.reason);
+  // DB-Wert blieb auf Default
+  assert.equal(appSettings.has('app.page_revision_limit'), false);
+});
+
+test('PUT /admin/settings/:key mit ungueltigem Enum → 400', async () => {
+  const r = await _req('PUT', '/admin/settings/ai.provider', {
+    user: 'alice@example.com', role: 'admin',
+    body: { value: 'openai' },
+  });
+  assert.equal(r.status, 400);
+  assert.equal(r.body.error_code, 'INVALID_VALUE');
+});
+
 test('GET /admin/settings/:key (encrypted) → maskiert', async () => {
   appSettings.set('ai.claude.api_key', 'sk-ant-secret', { updatedBy: 'test' });
   const r = await _req('GET', '/admin/settings/ai.claude.api_key', {

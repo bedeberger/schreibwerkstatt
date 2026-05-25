@@ -133,8 +133,10 @@ test('page_revisions: invalid source wirft', () => {
 });
 
 // Backdating-Helper: schreibt created_at explizit (umgeht den NOW_ISO_SQL-Default).
-function _insertAt(pageId, bookId, bodyHtml, daysAgo) {
-  const created = new Date(Date.now() - daysAgo * 86400_000).toISOString();
+// `anchorMs` macht die UTC-Date-Buckets (date()/strftime in pruneTiered) deterministisch
+// — sonst wandern Tag-/Wochen-Grenzen je nach CI-Uhrzeit zwischen den daysAgo-Werten.
+function _insertAt(pageId, bookId, bodyHtml, daysAgo, anchorMs = Date.now()) {
+  const created = new Date(anchorMs - daysAgo * 86400_000).toISOString();
   // Stats analog _statsFromHtml: hier reicht ein Wert >0; pruneTiered liest sie nicht.
   const { lastInsertRowid } = db.prepare(`
     INSERT INTO page_revisions
@@ -177,20 +179,25 @@ test('page_revisions: pruneTiered GFS — Tages-Bucket nimmt aelteste pro Tag', 
   upsertBookByName(910, 'Test-Buch GFS Daily');
   _seedPage(910, 91001);
 
+  // Fixer UTC-Anker → date(created_at)-Buckets sind unabhaengig von der CI-Uhrzeit.
+  const anchor = '2026-05-25T12:00:00.000Z';
+  const anchorMs = Date.parse(anchor);
+
   // Tag 2 ago: 3 Revisions (sollten zu 1 zusammenfallen — aelteste)
   // Tag 3 ago: 2 Revisions (zu 1)
   // Tag 4 ago: 1 Revision
-  const r_d2_old = _insertAt(91001, 910, '<p>d2_old</p>', 2 + 0.6);
-  _insertAt(91001, 910, '<p>d2_mid</p>', 2 + 0.4);
-  _insertAt(91001, 910, '<p>d2_new</p>', 2 + 0.1);
-  const r_d3_old = _insertAt(91001, 910, '<p>d3_old</p>', 3 + 0.6);
-  _insertAt(91001, 910, '<p>d3_new</p>', 3 + 0.1);
-  const r_d4 = _insertAt(91001, 910, '<p>d4</p>', 4);
+  // daysAgo-Werte innerhalb 0.5d eines Integer-Tages, damit anchor±xd in einem UTC-Kalendertag landet.
+  const r_d2_old = _insertAt(91001, 910, '<p>d2_old</p>', 2.4, anchorMs);
+  _insertAt(91001, 910, '<p>d2_mid</p>', 2.2, anchorMs);
+  _insertAt(91001, 910, '<p>d2_new</p>', 2.0, anchorMs);
+  const r_d3_old = _insertAt(91001, 910, '<p>d3_old</p>', 3.4, anchorMs);
+  _insertAt(91001, 910, '<p>d3_new</p>', 3.0, anchorMs);
+  const r_d4 = _insertAt(91001, 910, '<p>d4</p>', 4.0, anchorMs);
 
   assert.equal(pageRevisions.countForPage(91001), 6);
 
   // Floor 1 (minimal), damit Floor nicht den Test verfaelscht.
-  pageRevisions.pruneTiered({ floor: 1 });
+  pageRevisions.pruneTiered({ floor: 1, now: anchor });
 
   const ids = db.prepare('SELECT id FROM page_revisions WHERE page_id = ? ORDER BY id ASC').all(91001).map(r => r.id);
   // Erwartet: 3 Behalten (aelteste pro Tag) plus Floor-Pick (juengste). Juengste = r_d2_new ist bereits NICHT in keep_buckets (nur aelteste pro Tag).
@@ -207,25 +214,30 @@ test('page_revisions: pruneTiered GFS — Wochen-/Monats-/Jahres-Buckets', () =>
   upsertBookByName(911, 'Test-Buch GFS Tiers');
   _seedPage(911, 91101);
 
+  // Fixer UTC-Anker (Montag, 12:00) → ISO-Wochen-/Monats-/Jahres-Buckets sind
+  // unabhaengig von der CI-Uhrzeit und vom Wochentag von "jetzt" deterministisch.
+  const anchor = '2026-05-25T12:00:00.000Z';
+  const anchorMs = Date.parse(anchor);
+
   // Wochen-Range (7-60 Tage): 2 Revs in derselben Woche → 1 behalten.
-  const r_w_old = _insertAt(91101, 911, '<p>w_old</p>', 14);
-  _insertAt(91101, 911, '<p>w_new</p>', 13);
+  const r_w_old = _insertAt(91101, 911, '<p>w_old</p>', 14, anchorMs);
+  _insertAt(91101, 911, '<p>w_new</p>', 13, anchorMs);
   // Andere Woche im selben Range
-  const r_w2 = _insertAt(91101, 911, '<p>w2</p>', 30);
+  const r_w2 = _insertAt(91101, 911, '<p>w2</p>', 30, anchorMs);
 
   // Monats-Range (60-365 Tage): 2 Revs im selben Monat → 1 behalten.
-  const r_m_old = _insertAt(91101, 911, '<p>m_old</p>', 100);
-  _insertAt(91101, 911, '<p>m_new</p>', 95);
+  const r_m_old = _insertAt(91101, 911, '<p>m_old</p>', 100, anchorMs);
+  _insertAt(91101, 911, '<p>m_new</p>', 95, anchorMs);
   // Anderer Monat
-  const r_m2 = _insertAt(91101, 911, '<p>m2</p>', 200);
+  const r_m2 = _insertAt(91101, 911, '<p>m2</p>', 200, anchorMs);
 
   // Jahres-Range (>365 Tage): 2 Revs im selben Jahr → 1 behalten.
-  const r_y_old = _insertAt(91101, 911, '<p>y_old</p>', 800);
-  _insertAt(91101, 911, '<p>y_new</p>', 600);
+  const r_y_old = _insertAt(91101, 911, '<p>y_old</p>', 800, anchorMs);
+  _insertAt(91101, 911, '<p>y_new</p>', 600, anchorMs);
 
   assert.equal(pageRevisions.countForPage(91101), 8);
 
-  pageRevisions.pruneTiered({ floor: 1 });
+  pageRevisions.pruneTiered({ floor: 1, now: anchor });
 
   const kept = db.prepare('SELECT id, body_html FROM page_revisions WHERE page_id = ? ORDER BY id ASC').all(91101);
   const keptBodies = kept.map(r => r.body_html);
@@ -250,15 +262,19 @@ test('page_revisions: pruneTiered — Floor schuetzt zusaetzlich zu Buckets', ()
   upsertBookByName(912, 'Test-Buch GFS Floor');
   _seedPage(912, 91201);
 
+  // Fixer Anker mitten im Monat → 100d/99.6d-99.9d landen alle im selben %Y-%m.
+  const anchor = '2026-05-25T12:00:00.000Z';
+  const anchorMs = Date.parse(anchor);
+
   // 5 Revs im Monat-Bucket (alle ~100d alt, selber Monat).
   // Ohne Floor wuerde Tiering nur die aelteste behalten.
   const ids = [];
   for (let i = 0; i < 5; i++) {
-    ids.push(_insertAt(91201, 912, `<p>m${i}</p>`, 100 - i * 0.1).id);
+    ids.push(_insertAt(91201, 912, `<p>m${i}</p>`, 100 - i * 0.1, anchorMs).id);
   }
   assert.equal(pageRevisions.countForPage(91201), 5);
 
-  pageRevisions.pruneTiered({ floor: 3 });
+  pageRevisions.pruneTiered({ floor: 3, now: anchor });
 
   // Behalten: aelteste-im-Bucket (ids[0]) + juengste 3 (ids[2], ids[3], ids[4]).
   // ids[1] kein Bucket-Pick (nicht aelteste), kein Floor-Pick (nur 3 juengste).

@@ -53,9 +53,11 @@ function _seedRevisions(ctx, pageId, bookId, count) {
   }
 }
 
-// Backdating fuer Tiered-Tests: schreibt created_at relativ zu jetzt.
-function _seedBackdated(ctx, pageId, bookId, bodyHtml, daysAgo) {
-  const created = new Date(Date.now() - daysAgo * 86400_000).toISOString();
+// Backdating fuer Tiered-Tests: schreibt created_at relativ zu einem Anker
+// (Default = jetzt). Anker-Override macht UTC-Date-Bucketing deterministisch
+// — sonst wandern Tag-Grenzen je nach CI-Uhrzeit zwischen Test-daysAgo-Werte.
+function _seedBackdated(ctx, pageId, bookId, bodyHtml, daysAgo, anchorMs = Date.now()) {
+  const created = new Date(anchorMs - daysAgo * 86400_000).toISOString();
   return ctx.db.prepare(`
     INSERT INTO page_revisions
       (page_id, book_id, body_html, chars, words, tok, source, created_at)
@@ -88,23 +90,28 @@ test('tiered policy: GFS-Buckets reduzieren backdated Revisions auf 1 pro Bucket
     const { bookId, pageId } = _seedBookAndPage(ctx);
     ctx.appSettings.set('app.page_revision_limit', 1, { updatedBy: 'test' });
 
-    // 3 Revs am selben Tag (Tag 2 ago) → 1 behalten (aelteste).
-    _seedBackdated(ctx, pageId, bookId, '<p>d2a</p>', 2.6);
-    _seedBackdated(ctx, pageId, bookId, '<p>d2b</p>', 2.3);
-    _seedBackdated(ctx, pageId, bookId, '<p>d2c</p>', 2.0);
-    // 2 Revs in derselben Woche (Tag 14, 15 ago) → 1 behalten.
-    _seedBackdated(ctx, pageId, bookId, '<p>w14</p>', 15);
-    _seedBackdated(ctx, pageId, bookId, '<p>w15</p>', 14);
-    // 2 Revs im selben Monat (Tag 100, 101) → 1 behalten.
-    _seedBackdated(ctx, pageId, bookId, '<p>m100</p>', 101);
-    _seedBackdated(ctx, pageId, bookId, '<p>m101</p>', 100);
+    // Anker = fixierter UTC-Mittag, damit Tag-Grenzen unabhaengig von der CI-
+    // Uhrzeit deterministisch zwischen den daysAgo-Werten verlaufen.
+    const anchor = '2026-05-25T12:00:00.000Z';
+    const anchorMs = Date.parse(anchor);
+
+    // 3 Revs alle innerhalb eines UTC-Kalendertags (Tag-2-Bucket) → 1 behalten.
+    _seedBackdated(ctx, pageId, bookId, '<p>d2a</p>', 2.4, anchorMs);
+    _seedBackdated(ctx, pageId, bookId, '<p>d2b</p>', 2.2, anchorMs);
+    _seedBackdated(ctx, pageId, bookId, '<p>d2c</p>', 2.0, anchorMs);
+    // 2 Revs in derselben ISO-Woche → 1 behalten. Anker ist Mo 2026-05-25;
+    // 13d/14d zurueck = Di 05-12 / Mo 05-11 (beide %W=19). 15d zurueck waere So 05-10 (%W=18, Bucket-Split).
+    _seedBackdated(ctx, pageId, bookId, '<p>w14</p>', 14, anchorMs);
+    _seedBackdated(ctx, pageId, bookId, '<p>w13</p>', 13, anchorMs);
+    // 2 Revs im selben Monat → 1 behalten.
+    _seedBackdated(ctx, pageId, bookId, '<p>m100</p>', 101, anchorMs);
+    _seedBackdated(ctx, pageId, bookId, '<p>m101</p>', 100, anchorMs);
 
     assert.equal(ctx.pageRevisions.countForPage(pageId), 7);
 
-    ctx.cleanup.runCacheCleanup();
-    // Behalten: 1 Tag + 1 Woche + 1 Monat = 3. Floor 1 → juengste = d2c (Tag-Bucket-Pick ist d2a, also Floor zieht zusaetzlich d2c).
-    // Tag-Bucket: d2a. Woche-Bucket: w14 (aelteste). Monat-Bucket: m100 (aelteste). Floor=1: d2c.
-    // → 4 ueberleben.
+    ctx.cleanup.runCacheCleanup({ now: anchor });
+    // Buckets: Tag (d2a aelteste), Woche (w14 aelteste), Monat (m100 aelteste) = 3.
+    // Floor 1 → juengste = d2c (kein Bucket-Pick, also +1). Total 4.
     assert.equal(ctx.pageRevisions.countForPage(pageId), 4);
   } finally { ctx.teardown(); }
 });
@@ -120,13 +127,17 @@ test('tiered policy: pruning ist pro page_id getrennt', () => {
     `).run(bookId, now, now).lastInsertRowid;
 
     ctx.appSettings.set('app.page_revision_limit', 1, { updatedBy: 'test' });
+    // Anker fixiert das UTC-Datum des Tag-Buckets — sonst splittet 5.0/5.1/5.2
+    // je nach CI-Uhrzeit auf 2 Tage und verfaelscht die Bucket-Anzahl.
+    const anchor = '2026-05-25T12:00:00.000Z';
+    const anchorMs = Date.parse(anchor);
     // Beide Seiten: 3 Revs am selben Tag, alle backdated 5d → derselbe Tag-Bucket.
     for (let i = 0; i < 3; i++) {
-      _seedBackdated(ctx, p1, bookId, `<p>p1_${i}</p>`, 5 + i * 0.1);
-      _seedBackdated(ctx, p2, bookId, `<p>p2_${i}</p>`, 5 + i * 0.1);
+      _seedBackdated(ctx, p1, bookId, `<p>p1_${i}</p>`, 5 + i * 0.1, anchorMs);
+      _seedBackdated(ctx, p2, bookId, `<p>p2_${i}</p>`, 5 + i * 0.1, anchorMs);
     }
 
-    ctx.cleanup.runCacheCleanup();
+    ctx.cleanup.runCacheCleanup({ now: anchor });
     // Pro Seite: 1 Bucket-Pick (aelteste) + Floor 1 (juengste). Aelteste ≠ juengste → 2 pro Seite.
     assert.equal(ctx.pageRevisions.countForPage(p1), 2);
     assert.equal(ctx.pageRevisions.countForPage(p2), 2);

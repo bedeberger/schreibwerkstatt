@@ -44,6 +44,10 @@ router.put('/:key', express.json(), (req, res) => {
     logger.info(`app-settings: ${key} updated`, { user: updatedBy });
     res.json({ ok: true, key, value: appSettings.isEncryptedKey(key) ? '__masked__' : stored });
   } catch (e) {
+    if (e.code === 'INVALID_VALUE') {
+      logger.warn(`app-settings put ${key} rejected: ${e.reason}`, { user: updatedBy });
+      return res.status(400).json({ error_code: 'INVALID_VALUE', key, reason: e.reason });
+    }
     logger.error(`app-settings put ${key}: ${e.message}`, { user: updatedBy });
     res.status(500).json({ error_code: 'PUT_FAILED', detail: e.message });
   }
