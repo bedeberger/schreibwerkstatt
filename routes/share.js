@@ -19,6 +19,12 @@ const logger = require('../logger');
 
 const router = express.Router();
 const jsonBody = express.json();
+const formBody = express.urlencoded({ extended: false });
+const commentBody = (req, res, next) => {
+  const ct = String(req.headers['content-type'] || '').toLowerCase();
+  if (ct.startsWith('application/x-www-form-urlencoded')) return formBody(req, res, next);
+  return jsonBody(req, res, next);
+};
 
 const TEMPLATE_OK   = fs.readFileSync(path.join(__dirname, '..', 'public', 'share.html'), 'utf8');
 const TEMPLATE_GONE = fs.readFileSync(path.join(__dirname, '..', 'public', 'share.gone.html'), 'utf8');
@@ -133,7 +139,18 @@ router.get('/:token', async (req, res) => {
       </li>`).join('\n')
     : `<li class="share-comments__empty">${escHtml(tServer('share.reader.comments_empty', lang))}</li>`;
 
-  const formBlock = `<form id="share-comment-form" class="share-comments__form" autocomplete="off"
+  const fallback = req.query?.cmt;
+  const fallbackMsg = fallback === 'ok'   ? tServer('share.reader.comment_submitted', lang)
+                    : fallback === 'rate' ? tServer('share.reader.comment_rate_limited', lang)
+                    : fallback === 'empty'? tServer('share.reader.form_empty', lang)
+                    : fallback === 'long' ? tServer('share.reader.form_error', lang)
+                    : fallback === 'err'  ? tServer('share.reader.form_error', lang)
+                    : '';
+  const fallbackBlock = fallbackMsg
+    ? `<div class="share-comments__status share-comments__status--${escHtml(String(fallback))}" role="status">${escHtml(fallbackMsg)}</div>`
+    : '';
+  const formBlock = `${fallbackBlock}<form id="share-comment-form" class="share-comments__form" autocomplete="off"
+      method="POST" action="/share/${escHtml(token)}/comment"
       data-empty-msg="${escHtml(tServer('share.reader.form_empty', lang))}"
       data-rate-msg="${escHtml(tServer('share.reader.comment_rate_limited', lang))}"
       data-error-msg="${escHtml(tServer('share.reader.form_error', lang))}"
@@ -181,25 +198,38 @@ router.get('/:token', async (req, res) => {
 });
 
 // ── Public: Kommentar abgeben ────────────────────────────────────────────────
-router.post('/:token/comment', jsonBody, (req, res) => {
+router.post('/:token/comment', commentBody, (req, res) => {
+  const ct = String(req.headers['content-type'] || '').toLowerCase();
+  const wantsJson = ct.startsWith('application/json');
+  const respond = (status, errorCode, extra) => {
+    if (wantsJson) return res.status(status).json({ error_code: errorCode, ...(extra || {}) });
+    const flag = errorCode === 'BODY_REQUIRED' ? 'empty'
+              : errorCode === 'BODY_TOO_LONG' ? 'long'
+              : errorCode === 'NAME_TOO_LONG' ? 'long'
+              : errorCode === 'RATE_LIMITED'  ? 'rate'
+              : errorCode === 'GONE'          ? 'gone'
+              : errorCode === 'NOT_FOUND'     ? 'gone'
+              : 'err';
+    res.redirect(303, `/share/${encodeURIComponent(token)}?cmt=${flag}`);
+  };
+
   const token = String(req.params.token || '');
-  if (!/^[A-Za-z0-9_-]{16,32}$/.test(token)) return res.status(404).json({ error_code: 'NOT_FOUND' });
+  if (!/^[A-Za-z0-9_-]{16,32}$/.test(token)) return respond(404, 'NOT_FOUND');
   const link = shareLinks.getShareLinkByToken(token);
-  if (!link) return res.status(404).json({ error_code: 'NOT_FOUND' });
+  if (!link) return respond(404, 'NOT_FOUND');
   setContext({ book: link.book_id });
-  if (isExpired(link)) return res.status(410).json({ error_code: 'GONE' });
+  if (isExpired(link)) return respond(410, 'GONE');
 
   const body = String((req.body?.body || '')).trim();
   const readerName = String((req.body?.reader_name || '')).trim();
   const hp = String((req.body?._hp || '')).trim();
   if (hp) {
-    // Honeypot — Bot.
     logger.warn(`[share/comment] honeypot triggered token=${token.slice(0, 8)}`);
-    return res.status(400).json({ error_code: 'INVALID' });
+    return respond(400, 'INVALID');
   }
-  if (!body) return res.status(400).json({ error_code: 'BODY_REQUIRED' });
-  if (body.length > BODY_MAX) return res.status(400).json({ error_code: 'BODY_TOO_LONG' });
-  if (readerName.length > READER_NAME_MAX) return res.status(400).json({ error_code: 'NAME_TOO_LONG' });
+  if (!body) return respond(400, 'BODY_REQUIRED');
+  if (body.length > BODY_MAX) return respond(400, 'BODY_TOO_LONG');
+  if (readerName.length > READER_NAME_MAX) return respond(400, 'NAME_TOO_LONG');
 
   const ip = req.ip || req.connection?.remoteAddress || '';
   const ipHash = rateLimit.hashIp(ip);
@@ -207,7 +237,7 @@ router.post('/:token/comment', jsonBody, (req, res) => {
   if (!rl.allowed) {
     logger.warn(`[share/comment] rate-limit token=${token.slice(0, 8)} ipHash=${ipHash}`);
     res.setHeader('Retry-After', String(rl.retryAfterSec));
-    return res.status(429).json({ error_code: 'RATE_LIMITED', retry_after: rl.retryAfterSec });
+    return respond(429, 'RATE_LIMITED', { retry_after: rl.retryAfterSec });
   }
 
   try {
@@ -218,10 +248,13 @@ router.post('/:token/comment', jsonBody, (req, res) => {
       ipHash,
     });
     logger.info(`[share/comment] new token=${token.slice(0, 8)} book=${link.book_id} bytes=${body.length}`);
-    res.json({ ok: true, id: comment.id, reader_name: comment.reader_name, body: comment.body, created_at: comment.created_at });
+    if (wantsJson) {
+      return res.json({ ok: true, id: comment.id, reader_name: comment.reader_name, body: comment.body, created_at: comment.created_at });
+    }
+    return res.redirect(303, `/share/${encodeURIComponent(token)}?cmt=ok`);
   } catch (e) {
     logger.error('[share/comment] DB-Fehler: ' + e.message);
-    res.status(500).json({ error_code: 'DB_ERROR' });
+    respond(500, 'DB_ERROR');
   }
 });
 

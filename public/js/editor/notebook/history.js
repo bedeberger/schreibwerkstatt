@@ -22,7 +22,7 @@ const HISTORY_MAX = 100;
 
 function captureCaretOffset(root) {
   const sel = root.ownerDocument?.defaultView?.getSelection?.()
-    || (typeof document !== 'undefined' ? document.getSelection() : null);
+    ?? (typeof document !== 'undefined' ? document.getSelection?.() : null);
   if (!sel || sel.rangeCount === 0) return null;
   const range = sel.getRangeAt(0);
   if (!root.contains(range.startContainer)) return null;
@@ -35,33 +35,41 @@ function captureCaretOffset(root) {
 function restoreCaretAtOffset(root, offset) {
   if (offset == null) return;
   const doc = root.ownerDocument;
-  const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  let remaining = offset;
-  let target = null;
-  let targetOffset = 0;
-  let n;
-  while ((n = walker.nextNode())) {
-    const len = n.nodeValue.length;
-    if (remaining <= len) {
-      target = n;
-      targetOffset = remaining;
-      break;
+  if (!doc?.createTreeWalker || !doc?.createRange) return;
+  try {
+    const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let remaining = offset;
+    let target = null;
+    let targetOffset = 0;
+    let n;
+    while ((n = walker.nextNode())) {
+      const len = n.nodeValue.length;
+      if (remaining <= len) {
+        target = n;
+        targetOffset = remaining;
+        break;
+      }
+      remaining -= len;
     }
-    remaining -= len;
-  }
-  const range = doc.createRange();
-  if (target) {
-    range.setStart(target, targetOffset);
-  } else {
-    range.selectNodeContents(root);
-    range.collapse(false);
-  }
-  range.collapse(true);
-  const win = doc.defaultView || (typeof window !== 'undefined' ? window : null);
-  const sel = win?.getSelection?.();
-  if (sel) {
-    sel.removeAllRanges();
-    sel.addRange(range);
+    const range = doc.createRange();
+    if (typeof range.setStart !== 'function') return;
+    if (target) {
+      range.setStart(target, targetOffset);
+    } else {
+      range.selectNodeContents(root);
+      range.collapse(false);
+    }
+    range.collapse(true);
+    const win = doc.defaultView || (typeof window !== 'undefined' ? window : null);
+    const sel = win?.getSelection?.()
+      ?? (typeof document !== 'undefined' ? document.getSelection?.() : null);
+    if (sel?.removeAllRanges && sel?.addRange) {
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+  } catch {
+    // Caret-Restore ist Best-Effort — bei Edge-Cases (Tree-Walker-Limits,
+    // disconnected Nodes) lieber kein Caret als crash.
   }
 }
 
@@ -155,7 +163,7 @@ export const notebookHistoryMethods = {
         this._scheduleDraftSave?.();
         this._scheduleAutosave?.();
       }
-      el.dispatchEvent(new Event('input', { bubbles: true }));
+      try { el.dispatchEvent(new Event('input', { bubbles: true })); } catch {}
     } finally {
       this._undoApplying = false;
     }

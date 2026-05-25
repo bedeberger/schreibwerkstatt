@@ -96,6 +96,24 @@ view  ──startEdit──▶ edit  ──saveEdit──▶ view
 - Volles Teardown: Draft + Snapshot + Autosave + OnlineRetry + Counter + Presence + Lock.
 - Wenn `focusActive` → zusätzlich `exitFocusMode` (Focus folgt Edit aus dem Notebook-Pfad; gilt nur, solange Invariante `focusMode ⇒ editMode` aktiv ist).
 
+## Undo/Redo (Session-scoped, pro Seite)
+
+Eigener Stack in [editor/notebook/history.js](../public/js/editor/notebook/history.js) — Browser-eigener Undo-Stack kollabiert sobald wir `innerHTML` oder `replaceChild` aufrufen (Slash-Menü, HR, Paste-Cleaner), darum eine eigene Snapshot-Kette.
+
+**Lifecycle:**
+- `startEdit` → `_historyReset(initialHtml)` legt Baseline-Snapshot.
+- `_markEditDirty` → `_historyPushSoon` (debounced 500 ms) — Tipp-Serien werden zu einem Schritt zusammengefasst. Dedup gegen Top-of-Stack.
+- Undo/Redo flush'en pending Debounce, dann `idx--/idx++` und `_historyRestore(snap)` setzt `innerHTML` + Caret.
+- `cancelEdit` / `saveEdit` (non-focus) → `_historyClear` — Session-Ende = Stack-Ende.
+
+**State** (Initial-Felder in [cards/editor-notebook-card.js](../public/js/cards/editor-notebook-card.js)): `_undoStack` (Array `{ html, caretOffset }`, Cap 100), `_undoIdx`, `_undoTimer`, `_undoApplying`.
+
+**Caret-Restore**: Text-Offset vom Editor-Root (Tree-Walker, SHOW_TEXT). Robust über strukturelle Mutationen (Slash, HR), bei reinen Text-Edits exakt.
+
+**Restore-Pfad**: setzt `_undoApplying=true`, schreibt `innerHTML`, restored Caret, ruft `_scheduleDraftSave`/`_scheduleAutosave` (Draft + Autosave laufen weiter), dispatcht `input`-Event (LanguageTool re-check). `_markEditDirty` skipt während des Flags den Push — so wird das Restore nicht selbst zum neuen Stack-Eintrag.
+
+**UI**: Buttons in [editor-notebook.html](../public/partials/editor-notebook.html) `.page-editor-toolbar` (icons `#undo`/`#redo`), Disabled via `notebookCanUndo()`/`notebookCanRedo()`. Keybinds in [toolbar.js](../public/js/editor/notebook/toolbar.js) `_onEditKeydown`: Cmd/Ctrl+Z = Undo, Cmd/Ctrl+Shift+Z + Ctrl+Y = Redo. Im Focus-Editor deaktiviert (Gate `!app.focusActive`).
+
 ## Autosave + Draft
 
 | Pfad | Wann | Wohin | Debounce | Cap |
