@@ -155,11 +155,19 @@ test('tiered policy: kein Throw bei leerer Tabelle', () => {
 });
 
 test('tiered policy: invalides Setting → error in summary, kein Crash', () => {
+  // Simuliert korrupten DB-Zustand: -1 lebt in app_settings (z.B. aus Pre-Validator-
+  // Zeit oder direktem DB-Tampering). Cleanup muss defensiv erren, nicht crashen.
+  // Schreibt direkt via SQL, da appSettings.set() jetzt validiert.
   const ctx = _bootstrap();
   try {
     const { bookId, pageId } = _seedBookAndPage(ctx);
     _seedRevisions(ctx, pageId, bookId, 3);
-    ctx.appSettings.set('app.page_revision_limit', -1, { updatedBy: 'test' });
+    ctx.db.prepare(`
+      INSERT INTO app_settings (key, value_json, encrypted, updated_at, updated_by)
+      VALUES ('app.page_revision_limit', '-1', 0, strftime('%Y-%m-%dT%H:%M:%fZ','now'), 'test-tamper')
+      ON CONFLICT(key) DO UPDATE SET value_json = '-1'
+    `).run();
+    ctx.appSettings.clearCache();
     const summary = ctx.cleanup.runCacheCleanup();
     const entry = summary.tables.find(t => t.table === 'page_revisions');
     assert.ok(entry.error, 'error in summary entry');
