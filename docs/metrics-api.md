@@ -84,21 +84,15 @@ scrape_configs:
       credentials: sw_REPLACE_WITH_TOKEN
 ```
 
-### Home Assistant (`configuration.yaml`)
+### Home Assistant
 
-```yaml
-sensor:
-  - platform: rest
-    name: schreibwerkstatt_chars
-    resource: https://app.example.com/metrics
-    method: GET
-    headers:
-      Authorization: Bearer sw_REPLACE_WITH_TOKEN
-    value_template: "{{ value | regex_findall_index('sw_chars (\\d+)', 0) }}"
-    scan_interval: 60
-```
+Vollständige Sensor-Config + Lovelace-Dashboard: [homeassistant/](homeassistant/) (README, `configuration.yaml`, `dashboard.yaml`). Deckt alle 20 Metriken ab inkl. abgeleiteter Werte (Minuten, Normseiten, Cache-Hit-Ratio) und einer fertigen Übersichts-View mit Gauges, Glance-Tiles und History-Graphs. `rest`-Plattform (Top-Level, nicht `sensor: - platform: rest`) gruppiert mehrere Sensoren pro Endpoint — ein Request, alle Werte. `unique_id` pro Sensor ist Pflicht, sonst kein Entity-Registry-Eintrag (kein Umbenennen, keine Energy-Dashboard-Aufnahme).
 
 Die Admin-UI im Tab **API / Metrics** zeigt diese Snippets aufklappbar inkl. Host-Substitution.
+
+### Grafana
+
+Fertiges Dashboard: [grafana/schreibwerkstatt.json](grafana/schreibwerkstatt.json). Import via Grafana → *Dashboards → New → Import → Upload JSON file* → Datasource `${DS_PROMETHEUS}` auswählen. Panels: Übersicht (Build/User/Aktiv), Inhalt (Bücher/Kapitel/Seiten/Zeichen/Wörter + Korpus-Wachstum), Schreib-Aktivität heute, Job-Queue (Running/Queued/Completion-Rate/Fehler/Kumuliert), Tokens + Kosten (Cache-Hit-Ratio, Cost-Rate, Token-Rates, Provider/Model-Tabelle).
 
 ## Pflicht-Invarianten
 

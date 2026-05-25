@@ -234,4 +234,10 @@
   }
   .admin-settings-actions { flex-wrap: wrap; }
   .admin-settings-actions button { flex: 1 0 auto; }
+  .admin-api-snippet {
+    padding: var(--space-sm);
+    font-size: 11px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
 }

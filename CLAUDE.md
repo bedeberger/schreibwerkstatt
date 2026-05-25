@@ -28,6 +28,7 @@ Themen-Spickzettel ausgelagert (Drift-Schutz: CLAUDE.md-Regeln, Details in den S
 - [docs/languagetool.md](docs/languagetool.md) — LanguageTool-Integration (Self-Hosted, regelbasiert, sync Proxy als Ausnahme zur Job-Queue-Regel): Dispatch über 3 Editoren + Form-Felder, CSS-Custom-Highlights für Squiggles, Chunking + Per-Page-Cache, Custom-Dictionary, Extension-Konflikt-Detection, Pflicht-Invarianten.
 - [docs/share-link.md](docs/share-link.md) — Share-Link (Page/Chapter public via opaken Token): SSR-Reader-View ohne Alpine, Mount **vor** Auth-Guard, In-Memory-Rate-Limit + Honeypot, IP-Hash für GDPR, Owner-Karte mit Unread-Tracking via `owner_last_seen_at`.
 - [docs/metrics-api.md](docs/metrics-api.md) — Metrics-API: `GET /metrics` im Prometheus-Text-Format (HA/Grafana/Prometheus), Bearer-Token-Auth mit Scopes, `api_tokens`-Lifecycle, exponierte Kennzahlen-Liste, Pflicht-Invarianten.
+- [docs/homeassistant/](docs/homeassistant/) — Home-Assistant-Integration: `rest`-Sensor-Config + Template-Sensoren + fertiges Lovelace-Dashboard, deckt alle Metriken ab.
 
 ## Feature-Pläne
 

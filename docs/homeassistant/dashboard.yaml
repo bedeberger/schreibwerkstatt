@@ -1,0 +1,117 @@
+# Schreibwerkstatt — Lovelace-Dashboard
+# Settings → Dashboards → Add Dashboard → New dashboard from scratch
+# → drei Punkte oben rechts → Raw configuration editor → Inhalt einfügen.
+
+title: Schreibwerkstatt
+views:
+  - title: Übersicht
+    path: schreibwerkstatt
+    icon: mdi:fountain-pen-tip
+    cards:
+      - type: markdown
+        content: |
+          ## Schreibwerkstatt
+          Version **{{ states('sensor.schreibwerkstatt_version') }}** ·
+          {{ states('sensor.schreibwerkstatt_active_users_24h') }} aktiv 24h ·
+          {{ states('sensor.schreibwerkstatt_active_users_7d') }} aktiv 7d
+
+      - type: horizontal-stack
+        cards:
+          - type: entity
+            entity: sensor.schreibwerkstatt_writing_today_minutes
+            name: Geschrieben heute
+            icon: mdi:pencil
+          - type: entity
+            entity: sensor.schreibwerkstatt_lektorat_today_minutes
+            name: Lektorat heute
+            icon: mdi:book-edit
+
+      - type: glance
+        title: Inhalte
+        columns: 5
+        entities:
+          - entity: sensor.schreibwerkstatt_books
+            name: Bücher
+          - entity: sensor.schreibwerkstatt_chapters
+            name: Kapitel
+          - entity: sensor.schreibwerkstatt_pages
+            name: Seiten
+          - entity: sensor.schreibwerkstatt_chars
+            name: Zeichen
+          - entity: sensor.schreibwerkstatt_normseiten
+            name: Normseiten
+
+      - type: glance
+        title: User
+        columns: 5
+        entities:
+          - entity: sensor.schreibwerkstatt_users_active
+            name: Aktiv
+          - entity: sensor.schreibwerkstatt_users_invited
+            name: Eingeladen
+          - entity: sensor.schreibwerkstatt_users_suspended
+            name: Suspendiert
+          - entity: sensor.schreibwerkstatt_active_users_24h
+            name: 24h
+          - entity: sensor.schreibwerkstatt_active_users_7d
+            name: 7d
+
+      - type: horizontal-stack
+        cards:
+          - type: gauge
+            entity: sensor.schreibwerkstatt_jobs_running
+            name: Jobs laufend
+            min: 0
+            max: 5
+            severity:
+              green: 0
+              yellow: 2
+              red: 4
+          - type: gauge
+            entity: sensor.schreibwerkstatt_jobs_queued
+            name: Jobs in Queue
+            min: 0
+            max: 10
+            severity:
+              green: 0
+              yellow: 3
+              red: 7
+
+      - type: glance
+        title: KI-Kosten & Tokens (kumuliert)
+        columns: 4
+        entities:
+          - entity: sensor.schreibwerkstatt_cost_usd_total
+            name: Kosten USD
+          - entity: sensor.schreibwerkstatt_tokens_in_total
+            name: Input
+          - entity: sensor.schreibwerkstatt_tokens_out_total
+            name: Output
+          - entity: sensor.schreibwerkstatt_cache_hit_ratio
+            name: Cache-Hit
+
+      - type: history-graph
+        title: Zeichen-Wachstum 7d
+        hours_to_show: 168
+        entities:
+          - entity: sensor.schreibwerkstatt_chars
+
+      - type: history-graph
+        title: Job-Queue 24h
+        hours_to_show: 24
+        entities:
+          - entity: sensor.schreibwerkstatt_jobs_running
+          - entity: sensor.schreibwerkstatt_jobs_queued
+
+      - type: history-graph
+        title: Schreib- / Lektorat-Minuten heute
+        hours_to_show: 24
+        entities:
+          - entity: sensor.schreibwerkstatt_writing_today_minutes
+          - entity: sensor.schreibwerkstatt_lektorat_today_minutes
+
+      - type: history-graph
+        title: Kosten USD (kumuliert, 30d)
+        hours_to_show: 720
+        entities:
+          - entity: sensor.schreibwerkstatt_cost_usd_total

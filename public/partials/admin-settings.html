@@ -373,15 +373,32 @@
         </details>
         <details>
           <summary x-text="$app.t('admin.settings.api.snippetHomeAssistant')"></summary>
-<pre class="admin-api-snippet">sensor:
-  - platform: rest
-    name: schreibwerkstatt_chars
-    resource: <span x-text="location.origin"></span>/metrics
+<pre class="admin-api-snippet">rest:
+  - resource: <span x-text="location.origin"></span>/metrics
     method: GET
     headers:
       Authorization: Bearer sw_REPLACE_WITH_TOKEN
-    value_template: &quot;{{ value | regex_findall_index('sw_chars (\\d+)', 0) }}&quot;
-    scan_interval: 60</pre>
+    scan_interval: 300
+    sensor:
+      - name: Schreibwerkstatt Zeichen
+        unique_id: schreibwerkstatt_chars
+        value_template: &quot;{{ value | regex_findall_index('sw_chars (\\d+)', 0) | int(0) }}&quot;
+        unit_of_measurement: chars
+        state_class: measurement
+        icon: mdi:format-letter-case
+      - name: Schreibwerkstatt Wörter
+        unique_id: schreibwerkstatt_words
+        value_template: &quot;{{ value | regex_findall_index('sw_words (\\d+)', 0) | int(0) }}&quot;
+        unit_of_measurement: words
+        state_class: measurement
+        icon: mdi:text
+      - name: Schreibwerkstatt Schreibzeit heute
+        unique_id: schreibwerkstatt_writing_seconds_today
+        value_template: &quot;{{ value | regex_findall_index('sw_writing_seconds_today (\\d+)', 0) | int(0) }}&quot;
+        unit_of_measurement: s
+        device_class: duration
+        state_class: measurement
+        icon: mdi:fountain-pen-tip</pre>
         </details>
       </div>
     </section>
