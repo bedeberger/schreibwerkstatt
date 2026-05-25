@@ -262,6 +262,7 @@ const PUBLIC_ASSETS = new Set([
   '/schreibwerkstatt_icon.ico',
   '/favicon.ico',
   '/js/admin/admin-login.js',
+  '/js/share-reader.js',
 ]);
 // Pre-auth-erlaubte Prefixes: landing.html + register.html ziehen /css/tokens.css
 // + /css/landing.css (+ deren @import-Sub-Tokens) und Variable-Fonts aus /fonts/.
