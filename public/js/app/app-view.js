@@ -741,6 +741,31 @@ export const appViewMethods = {
     this.dailyProgressBookId = null;
   },
 
+  // Share-Link-Karte mit Prefill öffnen. Buttons im Notebook-Editor (page) und
+  // im Sidebar-Kapitel-Header (chapter) rufen das auf, damit das Create-Form
+  // direkt auf das richtige Target vorgesetzt ist. Sub-Komponente liest
+  // `_shareLinksPrefill` in `onShow` und cleared.
+  async openShareLinksForPage(pageId) {
+    if (!pageId) return;
+    this._shareLinksPrefill = { kind: 'page', id: pageId };
+    if (!this.showShareLinksCard) {
+      await this.toggleShareLinksCard();
+    } else {
+      window.dispatchEvent(new CustomEvent('share:prefill', { detail: { kind: 'page', id: pageId } }));
+      this._scrollToCardByKey('shareLinks');
+    }
+  },
+  async openShareLinksForChapter(chapterId) {
+    if (!chapterId) return;
+    this._shareLinksPrefill = { kind: 'chapter', id: chapterId };
+    if (!this.showShareLinksCard) {
+      await this.toggleShareLinksCard();
+    } else {
+      window.dispatchEvent(new CustomEvent('share:prefill', { detail: { kind: 'chapter', id: chapterId } }));
+      this._scrollToCardByKey('shareLinks');
+    }
+  },
+
   // Header-Today-Ring: kleiner Donut (r=14). Shared Math mit Overview-Tile in
   // [public/js/today-ring.js] — beide Donuts driften nie auseinander.
   headerTodayRing() {

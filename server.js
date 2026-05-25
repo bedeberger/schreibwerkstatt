@@ -65,6 +65,7 @@ const pdfExportRouter = require('./routes/pdf-export');
 const usageRouter = require('./routes/usage');
 const { router: draftFiguresRouter } = require('./routes/draft-figures');
 const contentRouter = require('./routes/content');
+const shareRouter = require('./routes/share');
 
 const PORT = process.env.PORT || 3737;
 const app = express();
@@ -216,6 +217,11 @@ app.use(authRouter);
 // liefern dann die SPA-Shell.
 app.use(require('./routes/public'));
 
+// /share/:token Reader-View + POST /share/:token/comment sind oeffentlich.
+// Owner-API-Routen /share/api/* sind hingegen auth-pflichtig — die Auth-
+// Routinen pruefen die Session selbst (requireSession-Mw).
+app.use('/share', shareRouter);
+
 // Plausible-Bootstrap dynamisch rendern: enabled+URL aus app_settings.
 // Disabled oder leere URL → no-op JS (kein Tracking, keine Console-Error).
 // Admin-Toggle ist die einzige Aktivierungs-Bedingung — keine Host-/Env-Filter.
@@ -296,7 +302,7 @@ app.use((req, res, next) => {
 
 // ── Auth-Guard ────────────────────────────────────────────────────────────────
 // API-Pfade → 401 JSON; HTML-Pfade → Redirect zu /auth/login
-const API_PREFIXES = ['/history/', '/figures/', '/locations/', '/songs/', '/jobs/', '/sync/', '/chat/', '/booksettings/', '/content/', '/books/', '/me/', '/admin/', '/local/', '/config'];
+const API_PREFIXES = ['/history/', '/figures/', '/locations/', '/songs/', '/jobs/', '/sync/', '/chat/', '/booksettings/', '/content/', '/books/', '/me/', '/admin/', '/local/', '/config', '/share/api/'];
 
 app.use((req, res, next) => {
   if (req.session?.user) return next();

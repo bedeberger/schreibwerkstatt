@@ -232,6 +232,7 @@ const cardsState = () => ({
   showBookOrganizerCard: false,
   showBookEditorCard: false,
   showSearchCard: false,
+  showShareLinksCard: false,
   showKomplettStatus: false,
   showAvatarMenu: false,
 });

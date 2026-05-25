@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 144, 76 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 145, 78 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -54,6 +54,12 @@ erDiagram
   books ||--o| blog_connections      : "wp-link"
   blog_connections ||--o{ blog_page_links : "has"
   pages ||--o| blog_page_links       : "wp-mirror"
+
+  books ||--o{ share_links           : has
+  pages ||--o{ share_links           : "shared as page"
+  chapters ||--o{ share_links        : "shared as chapter"
+  app_users ||--o{ share_links       : owns
+  share_links ||--o{ share_comments  : has
 
   book_categories ||--o{ book_categories : parent
 
@@ -975,10 +981,37 @@ erDiagram
     TEXT    last_pushed_at
     TEXT    conflict_state "detected|resolved-app|resolved-wp"
   }
+  share_links {
+    TEXT    token              PK "22-Zeichen base64url"
+    TEXT    kind               "page|chapter (CHECK)"
+    INTEGER page_id            FK "FK pages(page_id) — nur bei kind='page'"
+    INTEGER chapter_id         FK "FK chapters(chapter_id) — nur bei kind='chapter'"
+    INTEGER book_id            FK "FK books(book_id) ON DELETE CASCADE"
+    TEXT    owner_email        FK "FK app_users(email) ON DELETE CASCADE"
+    TEXT    intro              "Plaintext-Vorwort fuer Reader"
+    TEXT    expires_at         "ISO-Timestamp oder NULL = nie"
+    TEXT    revoked_at         "Soft-Delete-Marker"
+    INTEGER view_count         "non-blocking Inkrement pro GET"
+    TEXT    owner_last_seen_at "Unread-Tracking"
+    TEXT    created_at         "DEFAULT NOW_ISO_SQL"
+  }
+  share_comments {
+    INTEGER id           PK
+    TEXT    share_token  FK "FK share_links(token) ON DELETE CASCADE"
+    TEXT    reader_name  "max 80 Zeichen, nullable"
+    TEXT    body         "max 4000 Zeichen"
+    TEXT    ip_hash      "SHA-256(ip + Server-Salt) fuer Rate-Limit"
+    TEXT    created_at
+  }
 
   books            ||--o| blog_connections  : "wp-link"
   blog_connections ||--o{ blog_page_links   : has
   pages            ||--o| blog_page_links   : "wp-mirror"
+  books            ||--o{ share_links       : has
+  pages            ||--o{ share_links       : "shared as page"
+  chapters         ||--o{ share_links       : "shared as chapter"
+  app_users        ||--o{ share_links       : owns
+  share_links      ||--o{ share_comments    : has
 
   chat_sessions ||--o{ chat_messages : has
   user_invites  ||--o{ registration_requests : "linked invite"

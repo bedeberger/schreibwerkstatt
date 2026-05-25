@@ -1,0 +1,163 @@
+<!-- Owner-Karte: alle Share-Links des aktuellen Buchs.
+     Alpine.data-Sub-Komponente — siehe public/js/cards/share-links-card.js. -->
+<div class="card card--share" x-data="shareLinksCard" x-show="$app.showShareLinksCard" x-cloak>
+  <div class="card-header">
+    <div class="card-header-titlebar">
+      <span class="card-eyebrow" x-text="$app.selectedBookName"></span>
+      <span class="card-title" x-text="$app.t('share.title')"></span>
+    </div>
+    <div class="card-actions">
+      <span class="card-form-error" x-show="loadError" x-text="loadError"></span>
+      <button type="button" @click="$app.showShareLinksCard = false" x-text="$app.t('common.close')"></button>
+    </div>
+  </div>
+
+  <!-- Create-Form -->
+  <section class="share-create">
+    <h3 class="share-create__title" x-text="$app.t('share.create.title')"></h3>
+    <div class="share-create__row">
+      <label class="share-create__option">
+        <input type="radio" name="share-kind" value="page" x-model="createKind">
+        <span x-text="$app.t('share.create.page')"></span>
+      </label>
+      <label class="share-create__option">
+        <input type="radio" name="share-kind" value="chapter" x-model="createKind">
+        <span x-text="$app.t('share.create.chapter')"></span>
+      </label>
+    </div>
+
+    <template x-if="createKind === 'page'">
+      <div class="share-create__row">
+        <label class="share-create__label" x-text="$app.t('share.create.pickPage')"></label>
+        <div x-data="combobox({ placeholder: $app.t('share.create.pickPage'), compact: false })"
+             x-modelable="value" x-model="createPageId"
+             x-effect="options = pageOptions()"></div>
+      </div>
+    </template>
+
+    <template x-if="createKind === 'chapter'">
+      <div class="share-create__row">
+        <label class="share-create__label" x-text="$app.t('share.create.pickChapter')"></label>
+        <div x-data="combobox({ placeholder: $app.t('share.create.pickChapter'), compact: false })"
+             x-modelable="value" x-model="createChapterId"
+             x-effect="options = chapterOptions()"></div>
+      </div>
+    </template>
+
+    <div class="share-create__row">
+      <label class="share-create__label" x-text="$app.t('share.intro.label')"></label>
+      <textarea x-model="createIntro" rows="3"
+                :placeholder="$app.t('share.intro.placeholder')"
+                maxlength="2000"
+                class="share-create__textarea"></textarea>
+    </div>
+
+    <div class="share-create__row">
+      <label class="share-create__label" x-text="$app.t('share.expires.label')"></label>
+      <input type="datetime-local" x-model="createExpiresAt" class="share-create__input">
+      <span class="share-create__hint" x-text="$app.t('share.expires.never')"></span>
+    </div>
+
+    <div class="share-create__row share-create__row--actions">
+      <span class="card-form-error" x-show="createError" x-text="createError"></span>
+      <button type="button" class="primary" @click="createLink()"
+              :disabled="creating || (createKind === 'page' && !createPageId) || (createKind === 'chapter' && !createChapterId)">
+        <span x-show="creating" class="spinner"></span>
+        <span x-text="$app.t('share.create.submit')"></span>
+      </button>
+    </div>
+  </section>
+
+  <!-- Liste -->
+  <section class="share-list">
+    <h3 class="share-list__title" x-text="$app.t('share.list.title')"></h3>
+    <div x-show="loadingLinks" class="muted-msg" x-text="$app.t('common.loading')"></div>
+    <div x-show="!loadingLinks && links.length === 0" class="muted-msg" x-text="$app.t('share.list.empty')"></div>
+
+    <template x-for="link in links" :key="link.token">
+      <article class="share-row" :class="'share-row--' + linkStatus(link)">
+        <div class="share-row__head">
+          <div class="share-row__meta">
+            <span class="badge" :class="'badge--' + linkStatus(link)"
+                  x-text="$app.t('share.status.' + linkStatus(link))"></span>
+            <span class="share-row__target" x-text="targetLabel(link)"></span>
+            <span class="share-row__kind" x-text="$app.t('share.kind.' + link.kind)"></span>
+          </div>
+          <div class="share-row__counts">
+            <span class="share-row__count" x-text="$app.t('share.views.label', { count: link.view_count || 0 })"></span>
+            <button type="button" class="share-row__comments-btn"
+                    @click="toggleComments(link.token)"
+                    :data-tip="$app.t('share.comments.label')">
+              <span x-text="$app.t('share.comments.countLabel', { count: link.comment_count || 0 })"></span>
+              <span x-show="link.unread_count > 0" class="share-row__unread"
+                    x-text="$app.t('share.unread.badge', { count: link.unread_count })"></span>
+            </button>
+          </div>
+        </div>
+
+        <div class="share-row__url">
+          <input type="text" readonly :value="linkUrl(link.token)" class="share-row__url-input">
+          <button type="button" @click="copyLink(link.token)"
+                  x-text="copiedToken === link.token ? $app.t('share.copied') : $app.t('share.copy')"></button>
+        </div>
+
+        <div class="share-row__details">
+          <template x-if="link.intro && editingToken !== link.token">
+            <div class="share-row__intro" x-text="link.intro"></div>
+          </template>
+          <template x-if="link.expires_at && editingToken !== link.token">
+            <div class="share-row__expires">
+              <span x-text="$app.t('share.expires.at', { date: formatExpires(link.expires_at) })"></span>
+            </div>
+          </template>
+        </div>
+
+        <!-- Edit-Form -->
+        <template x-if="editingToken === link.token">
+          <div class="share-row__edit">
+            <label class="share-create__label" x-text="$app.t('share.intro.label')"></label>
+            <textarea x-model="editIntro" rows="3" maxlength="2000" class="share-create__textarea"></textarea>
+            <label class="share-create__label" x-text="$app.t('share.expires.label')"></label>
+            <input type="datetime-local" x-model="editExpiresAt" class="share-create__input">
+            <div class="share-row__edit-actions">
+              <button type="button" class="primary" @click="saveEdit(link.token)" :disabled="savingEdit">
+                <span x-text="$app.t('common.save')"></span>
+              </button>
+              <button type="button" @click="cancelEdit()" x-text="$app.t('common.cancel')"></button>
+            </div>
+          </div>
+        </template>
+
+        <div class="share-row__actions">
+          <template x-if="editingToken !== link.token && linkStatus(link) === 'active'">
+            <button type="button" @click="startEdit(link)" x-text="$app.t('share.edit')"></button>
+          </template>
+          <template x-if="linkStatus(link) === 'active'">
+            <button type="button" class="danger" @click="revokeLink(link.token)" x-text="$app.t('share.revoke')"></button>
+          </template>
+        </div>
+
+        <!-- Kommentar-Liste -->
+        <template x-if="openCommentsToken === link.token">
+          <div class="share-row__comments">
+            <template x-if="!(commentsByToken[link.token]?.length)">
+              <div class="muted-msg" x-text="$app.t('share.comments.empty')"></div>
+            </template>
+            <template x-for="c in (commentsByToken[link.token] || [])" :key="c.id">
+              <div class="share-comment">
+                <div class="share-comment__meta">
+                  <span x-text="c.reader_name || $app.t('share.reader.anon')"></span>
+                  <span x-text="' · ' + formatExpires(c.created_at)"></span>
+                </div>
+                <div class="share-comment__body" x-text="c.body"></div>
+                <button type="button" class="share-comment__delete"
+                        @click="deleteComment(link.token, c.id)"
+                        x-text="$app.t('common.delete')"></button>
+              </div>
+            </template>
+          </div>
+        </template>
+      </article>
+    </template>
+  </section>
+</div>

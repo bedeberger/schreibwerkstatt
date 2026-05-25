@@ -63,6 +63,7 @@ export const appHashRouterMethods = {
     else if (this.showPdfExportCard) parts.push('pdf');
     else if (this.showBookOrganizerCard) parts.push('organize');
     else if (this.showBookEditorCard) parts.push('bucheditor');
+    else if (this.showShareLinksCard) parts.push('share');
     return '#' + parts.join('/');
   },
 
@@ -356,6 +357,9 @@ export const appHashRouterMethods = {
         case 'bucheditor':
           if (!this.showBookEditorCard) await this.toggleBookEditorCard();
           break;
+        case 'share':
+          if (!this.showShareLinksCard) await this.toggleShareLinksCard();
+          break;
       }
     } finally {
       this._applyingHash = false;
@@ -387,6 +391,7 @@ export const appHashRouterMethods = {
       'showBookOverviewCard',
       'showSearchCard',
       'showFolderImportCard',
+      'showShareLinksCard',
     ];
     this._hashWatcherTeardowns = [];
     for (const prop of watchers) {

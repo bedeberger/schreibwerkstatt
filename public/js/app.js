@@ -48,6 +48,7 @@ import { registerBookOrganizerCard } from './cards/book-organizer-card.js';
 import { registerBookEditorCard } from './cards/book-editor-card.js';
 import { registerSearchCard } from './cards/search-card.js';
 import { registerFolderImportCard } from './cards/folder-import-card.js';
+import { registerShareLinksCard } from './cards/share-links-card.js';
 import { configureI18n, i18nMethods, getSupportedLocales } from './i18n.js';
 import { pageViewMethods } from './book/page-view.js';
 import { notebookTrampoline } from './editor/notebook/trampoline.js';
@@ -242,6 +243,7 @@ document.addEventListener('alpine:init', () => {
   registerBookEditorCard();
   registerSearchCard();
   registerFolderImportCard();
+  registerShareLinksCard();
   registerKontinuitaetCard();
   registerEreignisseCard();
   registerOrteCard();

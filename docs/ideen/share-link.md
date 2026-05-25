@@ -1,6 +1,6 @@
 # Share-Link für Seite/Kapitel
 
-- **Status:** Draft
+- **Status:** Ready
 - **Aufwand:** M (DB-Migration + 1 neuer Public-Route-Cluster + Standalone-Reader-View + Owner-Card + 1 zusätzliche Toolbar/Sidebar-Buttons)
 - **Severity:** Low (additives Feature, kein Eingriff in bestehende Editoren oder Auth)
 
@@ -26,7 +26,8 @@ Lösungs-Idee: pro Seite/Kapitel ein opaker Share-Token. Wer Link kennt, sieht R
   - Neue Karte „Geteilte Links" → Liste aller eigenen Links mit Status (aktiv/expired/revoked), View-Count, Kommentaren (löschbar), Revoke/Update.
 - Lifecycle: optionales `expires_at` (Datepicker, leer = nie) + jederzeit revoke (setzt `revoked_at`).
 - Spam-Schutz Reader-Kommentare: Honeypot-Hidden-Field + Server-Rate-Limit (3 Kommentare/Stunde pro Token+IP-Hash).
-- Mail-Notification an Owner bei neuem Kommentar (synchron via [lib/mailer.js](../../lib/mailer.js)).
+- Reader gibt seinen Namen selbst an (optional, `reader_name` Plaintext, max 80 Zeichen).
+- Owner sieht neue Kommentare beim Öffnen der Karte „Geteilte Links" (Unread-Badge mit Anzahl ungelesener Kommentare pro Link).
 - Mobile-/Desktop-Lesbarkeit: zentrierter Text max 70ch, serif body, light/dark via `prefers-color-scheme`, generöse line-height.
 
 ## Out-of-Scope
@@ -37,14 +38,16 @@ Lösungs-Idee: pro Seite/Kapitel ein opaker Share-Token. Wer Link kennt, sieht R
 - Versionierung / Snapshot-Zeitpunkt einfrieren (live only).
 - Captcha (Honeypot + Rate-Limit reicht für MVP — Self-hosted, Betreiber kann nachrüsten).
 - Markdown-Editor für Intro.
+- **Mail-Notification** bei neuem Kommentar (User teilt Link via WhatsApp und schaut aktiv rein; Mail wäre Spam-Vektor und zusätzliche Komplexität).
 - Owner-Notification via Browser-Push.
 - Statistiken jenseits Roh-View-Count (Geo, Referrer, UA-Breakdown).
+- Share-Button in Focus-Editor oder Bucheditor (nur Notebook-Editor + Sidebar-Kapitel-Header).
 
 ## Done when
 
 - DB-Migration 145 läuft auf Legacy- und Fresh-DB grün durch (`foreign_key_check` leer, Squash regen).
-- Owner kann von Editor + Sidebar einen Link erstellen, kopieren, in Inkognito-Tab öffnen und Inhalt lesen.
-- Reader kann ohne Login Kommentar absenden; Owner sieht ihn in der Karte „Geteilte Links" + per Mail.
+- Owner kann vom Notebook-Editor-Toolbar (Page) und Sidebar-Kapitel-Header (Chapter) einen Link erstellen, kopieren, in Inkognito-Tab öffnen und Inhalt lesen.
+- Reader kann ohne Login Kommentar absenden; Owner sieht ihn in der Karte „Geteilte Links" inkl. Unread-Badge.
 - Expired/Revoked Links zeigen 410-Gone-View statt Inhalt.
 - Mobile (375px viewport) und Desktop (1280px) sehen ansprechend aus; Lighthouse Accessibility ≥95.
 - Unit-Tests für Token-Generator + Rate-Limit + CHECK-Constraint grün. Playwright E2E: Share-Flow End-to-End.
@@ -81,7 +84,7 @@ Pflicht-Check der Hard Rules aus [CLAUDE.md](../../CLAUDE.md):
 
 ## Abhängigkeiten
 
-- Existierende Module: [lib/content-store/](../../lib/content-store/) (Pages/Chapters lesen), [lib/html-clean.js](../../lib/html-clean.js) (Annahme: alle gespeicherten Pages sind sanitisiert), [lib/mailer.js](../../lib/mailer.js) (Notification), [lib/log-context.js](../../lib/log-context.js), [lib/local-date.js](../../lib/local-date.js), [lib/admin-login-ratelimit.js](../../lib/admin-login-ratelimit.js) als Rate-Limit-Pattern-Vorlage, [db/now.js](../../db/now.js).
+- Existierende Module: [lib/content-store/](../../lib/content-store/) (Pages/Chapters lesen), [lib/html-clean.js](../../lib/html-clean.js) (Annahme: alle gespeicherten Pages sind sanitisiert), [lib/log-context.js](../../lib/log-context.js), [lib/local-date.js](../../lib/local-date.js), [lib/admin-login-ratelimit.js](../../lib/admin-login-ratelimit.js) als Rate-Limit-Pattern-Vorlage, [db/now.js](../../db/now.js).
 - Keine neuen npm-Deps. `crypto.randomBytes(16)` aus Node-Stdlib für Token.
 
 ## Backend
@@ -93,7 +96,7 @@ Pflicht-Check der Hard Rules aus [CLAUDE.md](../../CLAUDE.md):
 | Methode | Pfad | Verhalten |
 |---|---|---|
 | GET | `/share/:token` | SSR-HTML. 404 bei unbekanntem Token, 410-Gone bei `revoked_at` oder `expires_at < now`. Bei erfolgreichem Render: View-Count inkrementieren. |
-| POST | `/share/:token/comment` | JSON-Body `{ reader_name?, body, _hp? }`. `_hp` (Honeypot) muss leer sein. Rate-Limit: 3 pro `(token, ip_hash)` pro 60 min. IP-Hash via SHA-256 (ip + Server-Salt) Slice 16 Hex. Owner-Mail nach Insert. |
+| POST | `/share/:token/comment` | JSON-Body `{ reader_name?, body, _hp? }`. `reader_name` max 80 Zeichen, optional. `_hp` (Honeypot) muss leer sein. Rate-Limit: 3 pro `(token, ip_hash)` pro 60 min. IP-Hash via SHA-256 (ip + Server-Salt) Slice 16 Hex. |
 
 **Auth (Standard-Guard):**
 
@@ -125,9 +128,9 @@ Pflicht-Check der Hard Rules aus [CLAUDE.md](../../CLAUDE.md):
 
 In-Memory-Map `${token}:${ip_hash}` → `[timestamps]`, alte > 60min werden beim Check abgeschnitten. Process-Restart resettet (akzeptabel für MVP, kein Cluster-Setup).
 
-### Mailer-Template
+### Unread-Tracking
 
-Ergänze in [lib/mailer-templates.js](../../lib/mailer-templates.js): `shareCommentNotification({ ownerLang, bookName, targetName, readerName, body, ownerLinkToCard })`. DE + EN.
+Owner-Karte-State speichert `last_seen_at` pro Link (separate Tabelle `share_link_seen` oder Spalte `share_links.owner_last_seen_at`). Bei Karten-Öffnung wird Timestamp gesetzt; Unread-Badge zeigt `COUNT(*) FROM share_comments WHERE share_token=? AND created_at > owner_last_seen_at`. Pragmatisch: zusätzliche Spalte `owner_last_seen_at TEXT` in `share_links` (kein Bridge nötig — pro Link nur ein Owner).
 
 ## Frontend
 
@@ -180,9 +183,10 @@ Neue Key-Gruppe `share.*` in beiden Locale-Files:
 - `share.intro.label`, `share.intro.placeholder`
 - `share.expires.label`, `share.expires.never`
 - `share.copy`, `share.copied`, `share.revoke`, `share.revoked`, `share.expired`, `share.active`
+- `share.views.label` (z.B. „{count} Aufrufe")
+- `share.unread.badge` (z.B. „{count} neu")
 - `share.comments.label`, `share.comments.empty`, `share.comments.delete`
-- Reader-Strings: `share.reader.author_intro`, `share.reader.comments_heading`, `share.reader.comment_form_name`, `share.reader.comment_form_body`, `share.reader.comment_form_submit`, `share.reader.comment_submitted`, `share.reader.comment_rate_limited`, `share.reader.expired_heading`, `share.reader.revoked_heading`, `share.reader.expired_body`, `share.reader.revoked_body`
-- Mailer-Strings: `share.mail.subject`, `share.mail.greeting`, `share.mail.body`, `share.mail.cta`
+- Reader-Strings: `share.reader.author_intro`, `share.reader.comments_heading`, `share.reader.comment_form_name`, `share.reader.comment_form_name_placeholder`, `share.reader.comment_form_body`, `share.reader.comment_form_submit`, `share.reader.comment_submitted`, `share.reader.comment_rate_limited`, `share.reader.expired_heading`, `share.reader.revoked_heading`, `share.reader.expired_body`, `share.reader.revoked_body`
 
 ## DB
 
@@ -202,6 +206,7 @@ CREATE TABLE IF NOT EXISTS share_links (
   expires_at TEXT,
   revoked_at TEXT,
   view_count INTEGER NOT NULL DEFAULT 0,
+  owner_last_seen_at TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   CHECK (
     (kind='page' AND page_id IS NOT NULL AND chapter_id IS NULL) OR
@@ -253,8 +258,8 @@ Neu: [db/share-links.js](../../db/share-links.js) — exportiert `createShareLin
 - **CSRF:** POST-Endpoint `/share/:token/comment` ist explizit für anonyme Fremd-Domains gedacht → kein CSRF-Token, kein SameSite-Cookie-Pflicht. Risiko: Site X postet Kommentar von Visitor → akzeptabel weil Body sichtbar im UI, kein State-Change auf Owner-Account.
 - **Open-Redirect:** keine Redirects in Reader-Pipeline.
 - **Owner-ACL:** alle Auth-Routen prüfen `owner_email === req.session.user.email`. ACL aufs Buch (Owner/Editor) wird beim CREATE geprüft via [lib/acl.js](../../lib/acl.js).
-- **Email-Notification:** Owner-Email kommt aus DB, nicht aus User-Input → kein Header-Injection-Risk.
 - **GDPR:** Reader-IP wird gehasht gespeichert (nicht plain), ip_hash dient nur Rate-Limit. Self-hosted → Memory-Regel: Compliance ist Betreiber-Sache; trotzdem keine raw-IPs.
+- **Reader-Name:** Plaintext, max 80 Zeichen Server-Side validiert. Escape Server-Side vor Render.
 
 ## Telemetrie
 
@@ -323,7 +328,6 @@ Neu: [db/share-links.js](../../db/share-links.js) — exportiert `createShareLin
 - [public/js/app.js](../../public/js/app.js) — `registerShareLinksCard()` aufrufen.
 - [public/js/i18n/de.json](../../public/js/i18n/de.json) + [public/js/i18n/en.json](../../public/js/i18n/en.json) — `share.*` Keys.
 - [routes/usage.js](../../routes/usage.js) — `ALLOWED_KEYS` ergänzt um `shareLinks`.
-- [lib/mailer-templates.js](../../lib/mailer-templates.js) — Notification-Template.
 - [DESIGN.md](../../DESIGN.md) — CSS-File-Inventar + ggf. Pattern-Eintrag für Reader-View.
 
 ### Create
@@ -342,8 +346,13 @@ Neu: [db/share-links.js](../../db/share-links.js) — exportiert `createShareLin
 
 ## Offene Fragen
 
-- Soll `view_count` öffentlich für Owner sichtbar sein, oder nur intern für Analytics? (Default: ja, sichtbar.)
-- Sollen Reader-Kommentare an alle Buch-Owner (bei Co-Authoring via `book_access`) gehen oder nur an den Link-Ersteller? (Default: nur Link-Ersteller.)
-- Display-Name des Autors in Reader-View: aus `app_users.display_name`, oder anonymisiert („Der Autor"/"The author")? (Default: `display_name`; Buchorganizer-Setting für anonymen Modus später.)
-- Sollen Findings-/Suche-Highlight-Marken (CSS-Klassen wie `.finding-mark`) server-side aus dem Page-HTML gestrippt werden, oder reicht es, im Reader-CSS deren Styling zu neutralisieren? (Default: CSS neutralisiert visuell — kein Strip nötig.)
-- Soll Share-Button auch in Focus-Editor und Bucheditor erscheinen, oder bleibt MVP auf Notebook + Sidebar beschränkt?
+_keine offen_
+
+## Entscheidungen
+
+- Share-Button **nur** im Notebook-Editor-Toolbar (Page) + Sidebar-Kapitel-Header (Chapter). Focus-Editor + Bucheditor bekommen keinen Button.
+- View-Count ist Owner sichtbar.
+- Keine Mail-Notification. Link wird manuell geteilt (WhatsApp). Owner sieht ungelesene Kommentare via Unread-Badge in der Karte „Geteilte Links" (Tracking via `share_links.owner_last_seen_at`).
+- Reader gibt Namen selbst an (optional, max 80 Zeichen Plaintext, Server-Side escaped).
+- Autor-Display-Name in Reader-View: `app_users.display_name`.
+- Findings-/Highlight-Marken sind Runtime-Overlay (CSS Custom Highlight API laut [docs/languagetool.md](../languagetool.md)), persistieren nicht im Page-HTML → kein Strip nötig.

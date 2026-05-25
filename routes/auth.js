@@ -286,7 +286,11 @@ router.get('/auth/callback', async (req, res) => {
 // die Admin-Form ausgeblendet (Plan-Pfad B deaktiviert).
 router.get('/login', (req, res) => {
   if (process.env.LOCAL_DEV_MODE === 'true') return res.redirect('/');
-  if (req.session?.user) return res.redirect(req.query.returnTo || '/');
+  if (req.session?.user) {
+    const rawReturn = typeof req.query.returnTo === 'string' ? req.query.returnTo : '/';
+    const safeReturn = rawReturn.startsWith('/') && !rawReturn.startsWith('//') ? rawReturn : '/';
+    return res.redirect(safeReturn);
+  }
   // Backcompat: Mails vor Mig 144 trugen /login?invite=TOKEN ohne returnTo.
   // Auf neue Click-Tracking-Route umlenken, damit Klick mitgezaehlt wird und
   // Token in den OIDC-Callback-Flow gepackt wird.

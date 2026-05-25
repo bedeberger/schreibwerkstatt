@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="{{lang}}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex,nofollow">
+  <title>{{title}}</title>
+  <link rel="stylesheet" href="/css/share.css">
+</head>
+<body class="share-page">
+  <a class="share-skip" href="#share-content">{{t_skip}}</a>
+  <header class="share-header">
+    <div class="share-header__inner">
+      <div class="share-header__book">{{book_name}}</div>
+      <h1 class="share-header__title">{{target_name}}</h1>
+      <div class="share-header__author">{{t_by}} {{author_name}}</div>
+    </div>
+  </header>
+
+  <main id="share-content" class="share-main">
+    {{intro_block}}
+    <article class="share-content">{{content_html}}</article>
+  </main>
+
+  <section class="share-comments" aria-label="{{t_comments}}">
+    <h2 class="share-comments__heading">{{t_comments}}</h2>
+    <ol class="share-comments__list">{{comments_html}}</ol>
+    {{form_block}}
+  </section>
+
+  <footer class="share-footer">
+    <span>{{app_name}}</span>
+  </footer>
+
+  <script>
+  (function () {
+    const form = document.getElementById('share-comment-form');
+    if (!form) return;
+    const status = document.getElementById('share-comment-status');
+    const list = document.querySelector('.share-comments__list');
+    const empty = document.querySelector('.share-comments__empty');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      status.textContent = '';
+      const submit = form.querySelector('button[type="submit"]');
+      submit.disabled = true;
+      const body = (form.elements['body'].value || '').trim();
+      const name = (form.elements['reader_name'].value || '').trim();
+      const hp = (form.elements['_hp'].value || '').trim();
+      if (!body) { status.textContent = form.dataset.emptyMsg; submit.disabled = false; return; }
+      try {
+        const res = await fetch(window.location.pathname + '/comment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ body, reader_name: name, _hp: hp }),
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          if (res.status === 429) status.textContent = form.dataset.rateMsg;
+          else status.textContent = form.dataset.errorMsg + (j.error_code ? ' (' + j.error_code + ')' : '');
+          submit.disabled = false;
+          return;
+        }
+        const li = document.createElement('li');
+        li.className = 'share-comments__item';
+        const meta = document.createElement('div');
+        meta.className = 'share-comments__meta';
+        meta.textContent = (j.reader_name || form.dataset.anon) + ' · ' + new Date(j.created_at).toLocaleString();
+        const text = document.createElement('div');
+        text.className = 'share-comments__body';
+        text.textContent = j.body;
+        li.appendChild(meta);
+        li.appendChild(text);
+        if (list) list.insertBefore(li, list.firstChild);
+        if (empty) empty.remove();
+        form.reset();
+        status.textContent = form.dataset.successMsg;
+        submit.disabled = false;
+      } catch {
+        status.textContent = form.dataset.errorMsg;
+        submit.disabled = false;
+      }
+    });
+  })();
+  </script>
+</body>
+</html>

@@ -96,6 +96,13 @@
                 class="ideen-count-badge"
                 x-text="chapterIdeenCounts[item.id]"
                 :data-tip="t('ideen.openCountTitle', { n: chapterIdeenCounts[item.id] })"></span>
+          <button type="button" class="tree-chapter-share-btn"
+                  x-show="!item.solo && canEdit() && (item.pages.length > 0 || item.hasChildren)"
+                  @click.stop="openShareLinksForChapter(item.id)"
+                  :data-tip="t('share.btn.shareChapterTitle')"
+                  :aria-label="t('share.btn.shareChapter')">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#share-2"/></svg>
+          </button>
         </span>
       </div>
       <div x-show="item.solo || item.open" class="tree-chapter-pages">

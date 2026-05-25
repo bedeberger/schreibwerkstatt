@@ -6101,6 +6101,56 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 144 abgeschlossen (user_invites: Click+Reminder-Tracking).');
   }
 
+  if (version < 145) {
+    // Share-Links: opaque Tokens, mit denen Owner einzelne Seiten oder
+    // Kapitel an externe Reader ohne Account verschicken kann. CHECK-Constraint
+    // erzwingt, dass je nach `kind` genau eine der Spalten page_id/chapter_id
+    // gesetzt ist. owner_last_seen_at trackt Unread-Kommentare in der Owner-UI.
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS share_links (
+        token TEXT PRIMARY KEY,
+        kind TEXT NOT NULL CHECK(kind IN ('page','chapter')),
+        page_id INTEGER REFERENCES pages(page_id) ON DELETE CASCADE,
+        chapter_id INTEGER REFERENCES chapters(chapter_id) ON DELETE CASCADE,
+        book_id INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        owner_email TEXT NOT NULL REFERENCES app_users(email) ON DELETE CASCADE,
+        intro TEXT,
+        expires_at TEXT,
+        revoked_at TEXT,
+        view_count INTEGER NOT NULL DEFAULT 0,
+        owner_last_seen_at TEXT,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        CHECK (
+          (kind='page' AND page_id IS NOT NULL AND chapter_id IS NULL) OR
+          (kind='chapter' AND chapter_id IS NOT NULL AND page_id IS NULL)
+        )
+      )
+    `).run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_share_links_book ON share_links(book_id)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_share_links_owner ON share_links(owner_email)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_share_links_page ON share_links(page_id)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_share_links_chapter ON share_links(chapter_id)').run();
+
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS share_comments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        share_token TEXT NOT NULL REFERENCES share_links(token) ON DELETE CASCADE,
+        reader_name TEXT,
+        body TEXT NOT NULL,
+        ip_hash TEXT,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      )
+    `).run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_share_comments_token ON share_comments(share_token)').run();
+
+    const fkErrors145 = db.pragma('foreign_key_check');
+    if (fkErrors145.length) {
+      throw new Error(`Migration 145: foreign_key_check meldet ${fkErrors145.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 145').run();
+    logger.info('DB-Migration auf Version 145 abgeschlossen (share_links, share_comments).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

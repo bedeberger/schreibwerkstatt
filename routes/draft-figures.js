@@ -11,11 +11,14 @@ const {
   getFigureWithDetails, db,
 } = require('../db/schema');
 const { toIntId } = require('../lib/validate');
-const { bookParamHandler } = require('../lib/log-context');
+const { aclParamGuard } = require('../lib/acl');
 const logger = require('../logger');
 
 const router = express.Router();
-router.param('book_id', bookParamHandler);
+// ACL: jede :book_id-Route erfordert mind. viewer-Rolle (drafts user-scoped,
+// aber Anlage auf fremden Büchern sonst möglich → IDOR). Setzt zugleich den
+// ALS-Logging-Context (book) + req.bookId/req.bookRole.
+router.param('book_id', aclParamGuard('viewer'));
 const jsonBody = express.json({ limit: '1mb' });
 
 const MAX_NAME_LEN = 200;

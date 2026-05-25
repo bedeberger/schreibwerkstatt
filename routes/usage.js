@@ -6,6 +6,7 @@
 const express = require('express');
 const { db } = require('../db/schema');
 const { setContext } = require('../lib/log-context');
+const { requireBookAccess, sendACLError } = require('../lib/acl');
 const logger = require('../logger');
 
 const router = express.Router();
@@ -35,6 +36,7 @@ const ALLOWED_KEYS = new Set([
   'bookOrganizer',
   'bookEditor',
   'search',
+  'shareLinks',
 ]);
 
 function userEmailOrNull(req) {
@@ -56,7 +58,11 @@ router.post('/track', jsonBody, (req, res) => {
   const rawSource = (req.body?.source || '').toString();
   const source = KNOWN_SOURCES.has(rawSource) ? rawSource : null;
   const bookId = parseInt(req.body?.book_id, 10);
-  if (bookId) setContext({ book: bookId });
+  if (bookId) {
+    setContext({ book: bookId });
+    try { requireBookAccess(req, bookId, 'viewer'); }
+    catch (e) { const sent = sendACLError(res, e); if (sent) return sent; throw e; }
+  }
   const now = Date.now();
   try {
     db.prepare(`
@@ -102,6 +108,8 @@ router.post('/page/track', jsonBody, (req, res) => {
   const bookId = parseInt(req.body?.book_id, 10);
   if (!pageId || !bookId) return res.status(400).json({ error_code: 'INVALID_IDS' });
   setContext({ book: bookId });
+  try { requireBookAccess(req, bookId, 'viewer'); }
+  catch (e) { const sent = sendACLError(res, e); if (sent) return sent; throw e; }
   const now = Date.now();
   try {
     db.prepare(`
@@ -126,6 +134,8 @@ router.get('/page/recent', (req, res) => {
   const bookId = parseInt(req.query.book_id, 10);
   if (!bookId) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
   setContext({ book: bookId });
+  try { requireBookAccess(req, bookId, 'viewer'); }
+  catch (e) { const sent = sendACLError(res, e); if (sent) return sent; throw e; }
   const limit = Math.max(1, Math.min(20, parseInt(req.query.limit, 10) || 5));
   try {
     const rows = db.prepare(`

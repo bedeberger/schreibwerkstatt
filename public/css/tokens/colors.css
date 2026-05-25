@@ -147,6 +147,7 @@
   --card-accent-songs: #a04a8e;
   --card-accent-folderimport: #5a7a4a;
   --card-accent-blog: #4a7aa0;
+  --card-accent-share: #5a4a8e;
 
   /* Job-Queue-Footer */
   --color-queue-bar-bg: var(--color-surface);
@@ -299,6 +300,7 @@
   --card-accent-songs: #d68ac6;
   --card-accent-folderimport: #9eb878;
   --card-accent-blog: #88aacc;
+  --card-accent-share: #998ac6;
 
   --color-border-contrast: #d8d8d8;
 

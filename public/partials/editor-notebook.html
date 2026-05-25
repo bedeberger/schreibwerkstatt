@@ -156,6 +156,10 @@
               <span x-text="t('ideen.title')"></span>
               <span class="btn-count" x-show="currentPageIdeenOpenCount > 0" x-text="currentPageIdeenOpenCount" :data-tip="t('ideen.openCountTitle', { n: currentPageIdeenOpenCount })"></span>
             </button>
+            <button type="button" x-show="canEdit() && currentPage" @click="openShareLinksForPage(currentPage.id)"
+                    :disabled="currentPageEmpty"
+                    :data-tip="t('share.btn.sharePageTitle')"
+                    x-text="t('share.btn.sharePage')"></button>
           </span>
         </span>
       </template>
