@@ -6,6 +6,7 @@
 .context-menu {
   position: fixed;
   min-width: 220px;
+  max-width: min(320px, calc(100vw - var(--space-md)));
   background: var(--color-surface);
   border: var(--border-thin) solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -26,10 +27,9 @@
   color: var(--color-muted);
   font-weight: 700;
   border-bottom: var(--border-thin) solid var(--color-border);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   max-width: 100%;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
 }
 
 .context-menu-item {
