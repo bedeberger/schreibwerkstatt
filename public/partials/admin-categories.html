@@ -33,16 +33,23 @@
 
       <p class="muted-msg muted-msg--sm" x-show="categories.length === 0" x-text="$app.t('categories.empty')"></p>
       <div class="table-scroll" x-show="categories.length">
-      <table class="admin-pool-table">
+      <table class="admin-pool-table"
+             x-data="sortableTable({
+               rows: () => categories,
+               defaultKey: 'name',
+               persistKey: 'admin.categories',
+             })">
         <thead>
           <tr>
-            <th x-text="$app.t('admin.cat.col.name')"></th>
-            <th x-text="$app.t('admin.cat.col.slug')"></th>
+            <th class="sortable-th" :class="sortClass('name')" :aria-sort="ariaSort('name')"
+                @click="sortBy('name')" x-text="$app.t('admin.cat.col.name')"></th>
+            <th class="sortable-th" :class="sortClass('slug')" :aria-sort="ariaSort('slug')"
+                @click="sortBy('slug')" x-text="$app.t('admin.cat.col.slug')"></th>
             <th></th>
           </tr>
         </thead>
         <tbody>
-          <template x-for="cat in categories" :key="cat.id">
+          <template x-for="cat in sorted" :key="cat.id">
             <tr>
               <td x-text="cat.name"></td>
               <td><code class="muted-msg muted-msg--sm" x-text="cat.slug"></code></td>

@@ -1,0 +1,74 @@
+/* Sortierbare Tabellen-Header.
+   Pattern: <th @click="sortBy('key')" :class="sortClass('key')" :aria-sort="...">
+   `sortableTable`-Komponente (public/js/sortable-table.js) liefert die Klassen.
+
+   Visuelles Signal: Hover und aktive Sort-Spalte zeigen ein Chevron-Paar an
+   (CSS-Triangles, color = currentColor → theme-fähig). Inaktiv: gedimmtes
+   Doppel-Chevron als Hint. Aktiv asc/desc: einzeln, voll. */
+
+.sortable-th {
+  cursor: pointer;
+  position: relative;
+  padding-right: calc(var(--space-md) + 14px); /* Platz fuer Chevron */
+  user-select: none;
+  white-space: nowrap;
+}
+
+.sortable-th:hover {
+  color: var(--color-text);
+}
+
+.sortable-th::before,
+.sortable-th::after {
+  content: "";
+  position: absolute;
+  right: var(--space-sm);
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  opacity: 0.35;
+  transition: opacity 0.12s ease;
+}
+
+.sortable-th::before {
+  /* Pfeil hoch (asc) */
+  top: 50%;
+  margin-top: -7px;
+  border-bottom: 5px solid currentColor;
+}
+
+.sortable-th::after {
+  /* Pfeil runter (desc) */
+  top: 50%;
+  margin-top: 2px;
+  border-top: 5px solid currentColor;
+}
+
+.sortable-th:hover::before,
+.sortable-th:hover::after {
+  opacity: 0.7;
+}
+
+.sortable-th--asc::before {
+  opacity: 1;
+}
+
+.sortable-th--asc::after {
+  opacity: 0.15;
+}
+
+.sortable-th--desc::after {
+  opacity: 1;
+}
+
+.sortable-th--desc::before {
+  opacity: 0.15;
+}
+
+/* Fokus-Ring fuer Tastatur-Nav (Element wird via tabindex=0 + .internal-link
+   tastatur-erreichbar gemacht). */
+.sortable-th:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}

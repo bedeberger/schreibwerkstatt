@@ -44,20 +44,31 @@
   <!-- ── Users-Tab ─────────────────────────────────────────────────────── -->
   <div x-show="adminUsageTab === 'users'" class="admin-usage-pane">
     <div class="table-scroll" x-show="adminUsageUsersList.length">
-    <table class="admin-usage-table">
+    <table class="admin-usage-table"
+           x-data="sortableTable({
+             rows: () => adminUsageUsersList,
+             defaultKey: 'usd',
+             defaultDir: 'desc',
+             persistKey: 'admin.usage.users',
+             types: { usd: 'number', tokensIn: 'number', tokensOut: 'number' },
+           })">
       <thead>
         <tr>
-          <th x-text="$app.t('admin.users.email')"></th>
-          <th x-text="$app.t('admin.usage.column.cost')"></th>
-          <th x-text="$app.t('admin.usage.column.tokensIn')"></th>
-          <th x-text="$app.t('admin.usage.column.tokensOut')"></th>
+          <th class="sortable-th" :class="sortClass('email')" :aria-sort="ariaSort('email')"
+              @click="sortBy('email')" x-text="$app.t('admin.users.email')"></th>
+          <th class="sortable-th" :class="sortClass('usd')" :aria-sort="ariaSort('usd')"
+              @click="sortBy('usd')" x-text="$app.t('admin.usage.column.cost')"></th>
+          <th class="sortable-th" :class="sortClass('tokensIn')" :aria-sort="ariaSort('tokensIn')"
+              @click="sortBy('tokensIn')" x-text="$app.t('admin.usage.column.tokensIn')"></th>
+          <th class="sortable-th" :class="sortClass('tokensOut')" :aria-sort="ariaSort('tokensOut')"
+              @click="sortBy('tokensOut')" x-text="$app.t('admin.usage.column.tokensOut')"></th>
           <th x-text="$app.t('admin.usage.user.budget')"></th>
           <th x-text="$app.t('admin.usage.user.mode')"></th>
           <th></th>
         </tr>
       </thead>
       <tbody>
-        <template x-for="u in adminUsageUsersList" :key="u.email">
+        <template x-for="u in sorted" :key="u.email">
           <tr :class="u.overrun ? 'admin-usage-row--overrun' : ''">
             <td class="admin-usage-cell-email">
               <div x-text="u.displayName || u.email"></div>
@@ -117,23 +128,42 @@
       </template>
     </div>
     <div class="table-scroll" x-show="adminUsageJobsList.length">
-    <table class="admin-usage-table">
+    <table class="admin-usage-table"
+           x-data="sortableTable({
+             rows: () => adminUsageJobsList,
+             defaultKey: 'queuedAt',
+             defaultDir: 'desc',
+             persistKey: 'admin.usage.jobs',
+             types: { tokensIn: 'number', tokensOut: 'number', cacheReadIn: 'number',
+                      cacheCreationIn: 'number', usd: 'number', bookId: 'number',
+                      queuedAt: 'date' },
+           })">
       <thead>
         <tr>
-          <th x-text="$app.t('admin.users.email')"></th>
-          <th x-text="$app.t('admin.usage.job.type')"></th>
-          <th x-text="$app.t('admin.usage.job.model')"></th>
-          <th x-text="$app.t('admin.usage.column.tokensIn')"></th>
-          <th x-text="$app.t('admin.usage.column.tokensOut')"></th>
-          <th x-text="$app.t('admin.usage.column.cacheRead')"></th>
-          <th x-text="$app.t('admin.usage.column.cacheWrite')"></th>
-          <th x-text="$app.t('admin.usage.column.cost')"></th>
-          <th x-text="$app.t('admin.usage.job.book')"></th>
-          <th x-text="$app.t('admin.usage.job.queuedAt')"></th>
+          <th class="sortable-th" :class="sortClass('userEmail')" :aria-sort="ariaSort('userEmail')"
+              @click="sortBy('userEmail')" x-text="$app.t('admin.users.email')"></th>
+          <th class="sortable-th" :class="sortClass('type')" :aria-sort="ariaSort('type')"
+              @click="sortBy('type')" x-text="$app.t('admin.usage.job.type')"></th>
+          <th class="sortable-th" :class="sortClass('model')" :aria-sort="ariaSort('model')"
+              @click="sortBy('model')" x-text="$app.t('admin.usage.job.model')"></th>
+          <th class="sortable-th" :class="sortClass('tokensIn')" :aria-sort="ariaSort('tokensIn')"
+              @click="sortBy('tokensIn')" x-text="$app.t('admin.usage.column.tokensIn')"></th>
+          <th class="sortable-th" :class="sortClass('tokensOut')" :aria-sort="ariaSort('tokensOut')"
+              @click="sortBy('tokensOut')" x-text="$app.t('admin.usage.column.tokensOut')"></th>
+          <th class="sortable-th" :class="sortClass('cacheReadIn')" :aria-sort="ariaSort('cacheReadIn')"
+              @click="sortBy('cacheReadIn')" x-text="$app.t('admin.usage.column.cacheRead')"></th>
+          <th class="sortable-th" :class="sortClass('cacheCreationIn')" :aria-sort="ariaSort('cacheCreationIn')"
+              @click="sortBy('cacheCreationIn')" x-text="$app.t('admin.usage.column.cacheWrite')"></th>
+          <th class="sortable-th" :class="sortClass('usd')" :aria-sort="ariaSort('usd')"
+              @click="sortBy('usd')" x-text="$app.t('admin.usage.column.cost')"></th>
+          <th class="sortable-th" :class="sortClass('bookId')" :aria-sort="ariaSort('bookId')"
+              @click="sortBy('bookId')" x-text="$app.t('admin.usage.job.book')"></th>
+          <th class="sortable-th" :class="sortClass('queuedAt')" :aria-sort="ariaSort('queuedAt')"
+              @click="sortBy('queuedAt')" x-text="$app.t('admin.usage.job.queuedAt')"></th>
         </tr>
       </thead>
       <tbody>
-        <template x-for="r in adminUsageJobsList" :key="r.id">
+        <template x-for="r in sorted" :key="r.id">
           <tr>
             <td x-text="r.userEmail || '—'"></td>
             <td x-text="r.type"></td>
@@ -174,22 +204,39 @@
       </template>
     </div>
     <div class="table-scroll" x-show="adminUsageChatList.length">
-    <table class="admin-usage-table">
+    <table class="admin-usage-table"
+           x-data="sortableTable({
+             rows: () => adminUsageChatList,
+             defaultKey: 'createdAt',
+             defaultDir: 'desc',
+             persistKey: 'admin.usage.chat',
+             types: { tokensIn: 'number', tokensOut: 'number', cacheReadIn: 'number',
+                      usd: 'number', bookId: 'number', createdAt: 'date' },
+           })">
       <thead>
         <tr>
-          <th x-text="$app.t('admin.users.email')"></th>
-          <th x-text="$app.t('admin.usage.chat.kind')"></th>
-          <th x-text="$app.t('admin.usage.job.model')"></th>
-          <th x-text="$app.t('admin.usage.column.tokensIn')"></th>
-          <th x-text="$app.t('admin.usage.column.tokensOut')"></th>
-          <th x-text="$app.t('admin.usage.column.cacheRead')"></th>
-          <th x-text="$app.t('admin.usage.column.cost')"></th>
-          <th x-text="$app.t('admin.usage.job.book')"></th>
-          <th x-text="$app.t('admin.usage.job.queuedAt')"></th>
+          <th class="sortable-th" :class="sortClass('userEmail')" :aria-sort="ariaSort('userEmail')"
+              @click="sortBy('userEmail')" x-text="$app.t('admin.users.email')"></th>
+          <th class="sortable-th" :class="sortClass('sessionKind')" :aria-sort="ariaSort('sessionKind')"
+              @click="sortBy('sessionKind')" x-text="$app.t('admin.usage.chat.kind')"></th>
+          <th class="sortable-th" :class="sortClass('model')" :aria-sort="ariaSort('model')"
+              @click="sortBy('model')" x-text="$app.t('admin.usage.job.model')"></th>
+          <th class="sortable-th" :class="sortClass('tokensIn')" :aria-sort="ariaSort('tokensIn')"
+              @click="sortBy('tokensIn')" x-text="$app.t('admin.usage.column.tokensIn')"></th>
+          <th class="sortable-th" :class="sortClass('tokensOut')" :aria-sort="ariaSort('tokensOut')"
+              @click="sortBy('tokensOut')" x-text="$app.t('admin.usage.column.tokensOut')"></th>
+          <th class="sortable-th" :class="sortClass('cacheReadIn')" :aria-sort="ariaSort('cacheReadIn')"
+              @click="sortBy('cacheReadIn')" x-text="$app.t('admin.usage.column.cacheRead')"></th>
+          <th class="sortable-th" :class="sortClass('usd')" :aria-sort="ariaSort('usd')"
+              @click="sortBy('usd')" x-text="$app.t('admin.usage.column.cost')"></th>
+          <th class="sortable-th" :class="sortClass('bookId')" :aria-sort="ariaSort('bookId')"
+              @click="sortBy('bookId')" x-text="$app.t('admin.usage.job.book')"></th>
+          <th class="sortable-th" :class="sortClass('createdAt')" :aria-sort="ariaSort('createdAt')"
+              @click="sortBy('createdAt')" x-text="$app.t('admin.usage.job.queuedAt')"></th>
         </tr>
       </thead>
       <tbody>
-        <template x-for="r in adminUsageChatList" :key="r.id">
+        <template x-for="r in sorted" :key="r.id">
           <tr>
             <td x-text="r.userEmail || '—'"></td>
             <td x-text="r.sessionKind"></td>
@@ -259,15 +306,24 @@
   <div x-show="adminUsageTab === 'features'" class="admin-usage-pane">
     <h3 x-text="$app.t('admin.usage.feature.totals')"></h3>
     <div class="table-scroll" x-show="adminUsageFeatureTotals.length">
-    <table class="admin-usage-table">
+    <table class="admin-usage-table"
+           x-data="sortableTable({
+             rows: () => adminUsageFeatureTotals,
+             defaultKey: 'count',
+             defaultDir: 'desc',
+             persistKey: 'admin.usage.feature.totals',
+             types: { count: 'number' },
+           })">
       <thead>
         <tr>
-          <th x-text="$app.t('admin.usage.feature.key')"></th>
-          <th x-text="$app.t('admin.usage.feature.count')"></th>
+          <th class="sortable-th" :class="sortClass('featureKey')" :aria-sort="ariaSort('featureKey')"
+              @click="sortBy('featureKey')" x-text="$app.t('admin.usage.feature.key')"></th>
+          <th class="sortable-th" :class="sortClass('count')" :aria-sort="ariaSort('count')"
+              @click="sortBy('count')" x-text="$app.t('admin.usage.feature.count')"></th>
         </tr>
       </thead>
       <tbody>
-        <template x-for="t in adminUsageFeatureTotals" :key="t.featureKey">
+        <template x-for="t in sorted" :key="t.featureKey">
           <tr>
             <td x-text="t.featureKey"></td>
             <td x-text="adminUsageInt(t.count)"></td>
@@ -279,17 +335,28 @@
 
     <h3 class="admin-usage-h3--spaced" x-text="$app.t('admin.usage.feature.byUser')"></h3>
     <div class="table-scroll" x-show="adminUsageFeatureItems.length">
-    <table class="admin-usage-table">
+    <table class="admin-usage-table"
+           x-data="sortableTable({
+             rows: () => adminUsageFeatureItems,
+             defaultKey: 'lastUsed',
+             defaultDir: 'desc',
+             persistKey: 'admin.usage.feature.byUser',
+             types: { count: 'number', lastUsed: 'date' },
+           })">
       <thead>
         <tr>
-          <th x-text="$app.t('admin.users.email')"></th>
-          <th x-text="$app.t('admin.usage.feature.key')"></th>
-          <th x-text="$app.t('admin.usage.feature.count')"></th>
-          <th x-text="$app.t('admin.usage.feature.lastUsed')"></th>
+          <th class="sortable-th" :class="sortClass('email')" :aria-sort="ariaSort('email')"
+              @click="sortBy('email')" x-text="$app.t('admin.users.email')"></th>
+          <th class="sortable-th" :class="sortClass('featureKey')" :aria-sort="ariaSort('featureKey')"
+              @click="sortBy('featureKey')" x-text="$app.t('admin.usage.feature.key')"></th>
+          <th class="sortable-th" :class="sortClass('count')" :aria-sort="ariaSort('count')"
+              @click="sortBy('count')" x-text="$app.t('admin.usage.feature.count')"></th>
+          <th class="sortable-th" :class="sortClass('lastUsed')" :aria-sort="ariaSort('lastUsed')"
+              @click="sortBy('lastUsed')" x-text="$app.t('admin.usage.feature.lastUsed')"></th>
         </tr>
       </thead>
       <tbody>
-        <template x-for="r in adminUsageFeatureItems" :key="r.email + ':' + r.featureKey">
+        <template x-for="r in sorted" :key="r.email + ':' + r.featureKey">
           <tr>
             <td x-text="r.email"></td>
             <td x-text="r.featureKey"></td>
@@ -305,19 +372,32 @@
   <!-- ── Zeit-Tab ──────────────────────────────────────────────────────── -->
   <div x-show="adminUsageTab === 'time'" class="admin-usage-pane">
     <div class="table-scroll" x-show="adminUsageTimeItems.length">
-    <table class="admin-usage-table">
+    <table class="admin-usage-table"
+           x-data="sortableTable({
+             rows: () => adminUsageTimeItems,
+             defaultKey: 'totalSeconds',
+             defaultDir: 'desc',
+             persistKey: 'admin.usage.time',
+             types: { bookId: 'number', writingSeconds: 'number',
+                      lektoratSeconds: 'number', totalSeconds: 'number' },
+           })">
       <thead>
         <tr>
-          <th x-text="$app.t('admin.users.email')"></th>
-          <th x-text="$app.t('admin.usage.time.book')"></th>
-          <th x-text="$app.t('admin.usage.time.writing')"></th>
-          <th x-text="$app.t('admin.usage.time.lektorat')"></th>
-          <th x-text="$app.t('admin.usage.time.total')"></th>
+          <th class="sortable-th" :class="sortClass('email')" :aria-sort="ariaSort('email')"
+              @click="sortBy('email')" x-text="$app.t('admin.users.email')"></th>
+          <th class="sortable-th" :class="sortClass('bookId')" :aria-sort="ariaSort('bookId')"
+              @click="sortBy('bookId')" x-text="$app.t('admin.usage.time.book')"></th>
+          <th class="sortable-th" :class="sortClass('writingSeconds')" :aria-sort="ariaSort('writingSeconds')"
+              @click="sortBy('writingSeconds')" x-text="$app.t('admin.usage.time.writing')"></th>
+          <th class="sortable-th" :class="sortClass('lektoratSeconds')" :aria-sort="ariaSort('lektoratSeconds')"
+              @click="sortBy('lektoratSeconds')" x-text="$app.t('admin.usage.time.lektorat')"></th>
+          <th class="sortable-th" :class="sortClass('totalSeconds')" :aria-sort="ariaSort('totalSeconds')"
+              @click="sortBy('totalSeconds')" x-text="$app.t('admin.usage.time.total')"></th>
           <th></th>
         </tr>
       </thead>
       <tbody>
-        <template x-for="r in adminUsageTimeItems" :key="r.email + ':' + r.bookId">
+        <template x-for="r in sorted" :key="r.email + ':' + r.bookId">
           <tr>
             <td x-text="r.email"></td>
             <td x-text="r.bookId ? ('#' + r.bookId) : '—'"></td>
@@ -336,17 +416,29 @@
 
     <div class="admin-usage-series" x-show="adminUsageTimeSeries.length">
       <div class="table-scroll">
-      <table class="admin-usage-table">
+      <table class="admin-usage-table"
+             x-data="sortableTable({
+               rows: () => adminUsageTimeSeries,
+               defaultKey: 'date',
+               defaultDir: 'desc',
+               persistKey: 'admin.usage.timeSeries',
+               types: { date: 'string', writingSeconds: 'number',
+                        lektoratSeconds: 'number', totalSeconds: 'number' },
+             })">
         <thead>
           <tr>
-            <th x-text="$app.t('admin.usage.time.date')"></th>
-            <th x-text="$app.t('admin.usage.time.writing')"></th>
-            <th x-text="$app.t('admin.usage.time.lektorat')"></th>
-            <th x-text="$app.t('admin.usage.time.total')"></th>
+            <th class="sortable-th" :class="sortClass('date')" :aria-sort="ariaSort('date')"
+                @click="sortBy('date')" x-text="$app.t('admin.usage.time.date')"></th>
+            <th class="sortable-th" :class="sortClass('writingSeconds')" :aria-sort="ariaSort('writingSeconds')"
+                @click="sortBy('writingSeconds')" x-text="$app.t('admin.usage.time.writing')"></th>
+            <th class="sortable-th" :class="sortClass('lektoratSeconds')" :aria-sort="ariaSort('lektoratSeconds')"
+                @click="sortBy('lektoratSeconds')" x-text="$app.t('admin.usage.time.lektorat')"></th>
+            <th class="sortable-th" :class="sortClass('totalSeconds')" :aria-sort="ariaSort('totalSeconds')"
+                @click="sortBy('totalSeconds')" x-text="$app.t('admin.usage.time.total')"></th>
           </tr>
         </thead>
         <tbody>
-          <template x-for="d in adminUsageTimeSeries" :key="d.date">
+          <template x-for="d in sorted" :key="d.date">
             <tr>
               <td x-text="d.date"></td>
               <td x-text="adminUsageHhmm(d.writingSeconds)"></td>

@@ -252,6 +252,12 @@
   text-align: right;
   white-space: nowrap;
 }
+.admin-pool-table th.admin-pool-num,
+.admin-pool-table td.admin-pool-num {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
 @media (max-width: 600px) {
   .admin-pool-create { flex-direction: column; align-items: stretch; }
 }

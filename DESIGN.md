@@ -33,6 +33,7 @@ Token-Referenz (Farben, Radien, Spacing, Schriftgrössen): [public/css/tokens.cs
 - [Skeleton-Loader](#skeleton-loader) — Shimmer beim Laden
 - [Klappbarer Section-Toggle](#klappbarer-section-toggle-accordion) — Accordion via `.collapsible-toggle`
 - [Card-Status](#card-status--loading--empty--error) — Loading/Empty/Error
+- [Sortierbare Tabelle](#sortierbare-tabelle-sortabletable) — Client-Side-Sort via `sortableTable` Alpine-Komponente
 - [Chevron-Konventionen](#chevron-konventionen) — `›` 90°, `▾` 180°
 
 **Layout & Navigation**
@@ -709,6 +710,51 @@ CSS: [public/css/entities/entity-list.css](public/css/entities/entity-list.css).
 ```
 
 CSS: [public/css/layout/utilities.css](public/css/layout/utilities.css). `overflow-x: auto` + `max-width: 100%` am Wrapper; `min-width: 100%` an der Table.
+
+---
+
+## Sortierbare Tabelle (`sortableTable`)
+
+**Pflicht** für jede `<table>` mit >3 Datenzeilen. Kein natives `<table>` ohne `sortableTable`-Wrapper, ausser die Ausnahmebedingung („Wann nicht") greift. Gilt rückwirkend: bestehende Tabellen werden bei Berührung mitgezogen.
+
+**Use:** Reines Client-Side-Sort über eine reaktive Datenquelle. Default-Tabelle für Admin-, Listen-, Verwaltungs-Views.
+
+**Markup:**
+```html
+<table class="admin-users-table"
+       x-data="sortableTable({
+         rows: () => adminUsersList,
+         defaultKey: 'email',
+         defaultDir: 'asc',
+         persistKey: 'admin.users',
+         types: { last_seen_at: 'date' },
+       })">
+  <thead><tr>
+    <th class="sortable-th" :class="sortClass('email')" :aria-sort="ariaSort('email')"
+        @click="sortBy('email')" x-text="$app.t('admin.users.email')"></th>
+    <th class="sortable-th" :class="sortClass('last_seen_at')" :aria-sort="ariaSort('last_seen_at')"
+        @click="sortBy('last_seen_at')" x-text="$app.t('admin.users.lastLogin')"></th>
+  </tr></thead>
+  <tbody>
+    <template x-for="u in sorted" :key="u.email">…</template>
+  </tbody>
+</table>
+```
+
+**Pflicht-Pattern:**
+- `<table>` ist die `x-data`-Wurzel — `sorted`, `sortBy`, `sortClass`, `ariaSort` werden direkt im `<thead>`/`<tbody>` adressiert. Aussere Scope (Karten-State, Methoden) bleibt via Alpine-Scope-Chain erreichbar.
+- `rows` ist eine **Funktion** (Getter), keine Array-Referenz. Reagiert dadurch reaktiv auf Aenderungen der Quelle (z.B. nach `loadAll()`-Refresh oder Filter-Anpassung). Methoden des Karten-Scopes (`ownerlessBooks()`) sind erlaubt.
+- `defaultKey` / `defaultDir` (`asc` | `desc`): Initial-Sort, falls kein persistierter State.
+- `persistKey` (optional): Schluessel unter `localStorage["sortableTable.<persistKey>"]`. Ohne Key wird der Sort-Zustand nicht persistiert.
+- `types` (optional): pro Spalte `number` | `date` | `string`. Ohne Eintrag wird der Typ aus dem ersten Non-Null-Sample-Wert geraten (ISO-Datum, Number, sonst String mit Locale-Compare). `null`/`undefined` sinkt immer ans Ende, unabhaengig von `dir`.
+- `<th>` Pflicht-Attribute: `class="sortable-th"` (Cursor + Chevron-Platz), `:class="sortClass('key')"` (asc/desc-Modifier), `:aria-sort="ariaSort('key')"` (Screen-Reader), `@click="sortBy('key')"` (Toggle asc→desc, oder neuer Key → asc).
+- Spalten ohne Sortier-Sinn (Action-Buttons, ungeordnete Render-Spalten wie „Status mit Badge" wenn Sort darueber nichts bringt): `<th>` ohne `sortable-th` lassen.
+
+**CSS:** [public/css/components/sortable-table.css](public/css/components/sortable-table.css). Chevron-Pfeile via CSS-Triangles (currentColor → theme-faehig). Inaktive Spalte zeigt doppeltes Pfeil-Paar gedimmt, aktive Richtung voll opaque.
+
+**JS:** [public/js/sortable-table.js](public/js/sortable-table.js). Reine Pure-Funktion `sortRows(rows, key, dir, typeHint)` ist exportiert fuer Unit-Tests (siehe [tests/unit/sortable-table.test.mjs](tests/unit/sortable-table.test.mjs)).
+
+**Wann nicht:** Server-Pagination oder Server-Sort noetig (z.B. Admin-Logs mit > 10k Rows) → eigene Route + Cursor-Pagination; `sortableTable` kann den Server-Result-Slice nicht ueber alle Seiten sortieren. Presence-Matrizen ([bookoverview-figpresence.html](public/partials/bookoverview-figpresence.html), [bookoverview-ortpresence.html](public/partials/bookoverview-ortpresence.html)) und Heatmap-Tabellen (`.heatmap-table`) sind ebenfalls ausgenommen — feste Spalten/Zeilen-Semantik, kein Row-Sort sinnvoll.
 
 ---
 
@@ -1545,6 +1591,7 @@ Struktur: 8 thematische Subfolder unter [public/css/](public/css/) + Root-Solit�
 | [components/user-chip.css](public/css/components/user-chip.css) | User-Avatar-Chip. |
 | [components/feature-tiles.css](public/css/components/feature-tiles.css) | Palette (Hero/Overlay/Panel/Item), Quick-Pills. |
 | [components/tooltip.css](public/css/components/tooltip.css) | `.tip-layer` / `.tip-bubble` / `.tip-arrow` für `[data-tip]`. |
+| [components/sortable-table.css](public/css/components/sortable-table.css) | `.sortable-th` + `--asc`/`--desc`-Modifier für die `sortableTable`-Alpine-Komponente. |
 | [components/folder-import.css](public/css/components/folder-import.css) | Folder-Import-Karte (Drop-Zone, Mode-Toggle, Progress, Result). |
 
 ### page/

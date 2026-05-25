@@ -19,12 +19,19 @@ router.use(requireAdmin);
 
 function _normEmail(e) { return (e || '').toString().trim().toLowerCase(); }
 
-// GET /admin/books — Liste aller Buecher mit Owner-Info + ACL-Count.
-// Zeigt explizit auch ownerless Buecher, damit Admin sie zuweisen kann.
+// GET /admin/books — Liste aller Buecher mit Owner-Info + ACL-Count + Umfang +
+// DB-Grosse-Naeherung (pages.body_html/markdown + page_revisions.body_html/markdown).
 router.get('/', (req, res) => {
   const rows = db.prepare(`
     SELECT b.book_id, b.name, b.owner_email,
-           (SELECT COUNT(*) FROM book_access ba WHERE ba.book_id = b.book_id) AS acl_count
+           (SELECT COUNT(*) FROM book_access ba WHERE ba.book_id = b.book_id) AS acl_count,
+           (SELECT COUNT(*) FROM chapters c WHERE c.book_id = b.book_id) AS chapter_count,
+           (SELECT COUNT(*) FROM pages p WHERE p.book_id = b.book_id) AS page_count,
+           COALESCE((SELECT SUM(chars) FROM page_stats ps WHERE ps.book_id = b.book_id), 0) AS chars,
+           (COALESCE((SELECT COALESCE(SUM(LENGTH(body_html)),0) + COALESCE(SUM(LENGTH(body_markdown)),0)
+                        FROM pages p WHERE p.book_id = b.book_id), 0)
+            + COALESCE((SELECT COALESCE(SUM(LENGTH(body_html)),0) + COALESCE(SUM(LENGTH(body_markdown)),0)
+                        FROM page_revisions pr WHERE pr.book_id = b.book_id), 0)) AS bytes
       FROM books b
      ORDER BY b.name COLLATE NOCASE
   `).all();

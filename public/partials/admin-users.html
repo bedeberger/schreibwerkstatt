@@ -68,19 +68,29 @@
 
     <!-- User-Tabelle -->
     <div class="table-scroll" x-show="adminUsersList.length">
-    <table class="admin-users-table">
+    <table class="admin-users-table"
+           x-data="sortableTable({
+             rows: () => adminUsersList,
+             defaultKey: 'email',
+             persistKey: 'admin.users',
+             types: { last_seen_at: 'date' },
+           })">
       <thead>
         <tr>
-          <th x-text="$app.t('admin.users.email')"></th>
-          <th x-text="$app.t('admin.users.role')"></th>
+          <th class="sortable-th" :class="sortClass('email')" :aria-sort="ariaSort('email')"
+              @click="sortBy('email')" x-text="$app.t('admin.users.email')"></th>
+          <th class="sortable-th" :class="sortClass('global_role')" :aria-sort="ariaSort('global_role')"
+              @click="sortBy('global_role')" x-text="$app.t('admin.users.role')"></th>
           <th x-text="$app.t('admin.users.aiProvider')"></th>
-          <th x-text="$app.t('admin.users.status')"></th>
-          <th x-text="$app.t('admin.users.lastLogin')"></th>
+          <th class="sortable-th" :class="sortClass('status')" :aria-sort="ariaSort('status')"
+              @click="sortBy('status')" x-text="$app.t('admin.users.status')"></th>
+          <th class="sortable-th" :class="sortClass('last_seen_at')" :aria-sort="ariaSort('last_seen_at')"
+              @click="sortBy('last_seen_at')" x-text="$app.t('admin.users.lastLogin')"></th>
           <th></th>
         </tr>
       </thead>
       <tbody>
-        <template x-for="u in adminUsersList" :key="u.email">
+        <template x-for="u in sorted" :key="u.email">
           <tr>
             <td>
               <div x-text="u.display_name || u.email"></div>
@@ -167,20 +177,33 @@
     </div>
 
     <div class="table-scroll" x-show="adminUsersInvitesList.length">
-    <table class="admin-users-table">
+    <table class="admin-users-table"
+           x-data="sortableTable({
+             rows: () => adminUsersInvitesList,
+             defaultKey: 'invited_at',
+             defaultDir: 'desc',
+             persistKey: 'admin.users.invites',
+             types: { invited_at: 'date', expires_at: 'date', last_clicked_at: 'date', last_reminder_at: 'date' },
+           })">
       <thead>
         <tr>
-          <th x-text="$app.t('admin.users.email')"></th>
-          <th x-text="$app.t('admin.users.role')"></th>
-          <th x-text="$app.t('admin.users.invites.invitedAt')"></th>
-          <th x-text="$app.t('admin.users.invites.expiresAt')"></th>
-          <th x-text="$app.t('admin.users.invites.clickStatus')"></th>
-          <th x-text="$app.t('admin.users.invites.reminderStatus')"></th>
+          <th class="sortable-th" :class="sortClass('email')" :aria-sort="ariaSort('email')"
+              @click="sortBy('email')" x-text="$app.t('admin.users.email')"></th>
+          <th class="sortable-th" :class="sortClass('global_role')" :aria-sort="ariaSort('global_role')"
+              @click="sortBy('global_role')" x-text="$app.t('admin.users.role')"></th>
+          <th class="sortable-th" :class="sortClass('invited_at')" :aria-sort="ariaSort('invited_at')"
+              @click="sortBy('invited_at')" x-text="$app.t('admin.users.invites.invitedAt')"></th>
+          <th class="sortable-th" :class="sortClass('expires_at')" :aria-sort="ariaSort('expires_at')"
+              @click="sortBy('expires_at')" x-text="$app.t('admin.users.invites.expiresAt')"></th>
+          <th class="sortable-th" :class="sortClass('last_clicked_at')" :aria-sort="ariaSort('last_clicked_at')"
+              @click="sortBy('last_clicked_at')" x-text="$app.t('admin.users.invites.clickStatus')"></th>
+          <th class="sortable-th" :class="sortClass('last_reminder_at')" :aria-sort="ariaSort('last_reminder_at')"
+              @click="sortBy('last_reminder_at')" x-text="$app.t('admin.users.invites.reminderStatus')"></th>
           <th></th>
         </tr>
       </thead>
       <tbody>
-        <template x-for="inv in adminUsersInvitesList" :key="inv.id">
+        <template x-for="inv in sorted" :key="inv.id">
           <tr>
             <td>
               <div x-text="inv.email"></div>
@@ -260,19 +283,30 @@
     </div>
 
     <div class="table-scroll" x-show="adminUsersRequestsList.length">
-    <table class="admin-users-table">
+    <table class="admin-users-table"
+           x-data="sortableTable({
+             rows: () => adminUsersRequestsList,
+             defaultKey: 'created_at',
+             defaultDir: 'desc',
+             persistKey: 'admin.users.requests',
+             types: { created_at: 'date' },
+           })">
       <thead>
         <tr>
-          <th x-text="$app.t('admin.users.requests.email')"></th>
-          <th x-text="$app.t('admin.users.requests.name')"></th>
+          <th class="sortable-th" :class="sortClass('email')" :aria-sort="ariaSort('email')"
+              @click="sortBy('email')" x-text="$app.t('admin.users.requests.email')"></th>
+          <th class="sortable-th" :class="sortClass('display_name')" :aria-sort="ariaSort('display_name')"
+              @click="sortBy('display_name')" x-text="$app.t('admin.users.requests.name')"></th>
           <th x-text="$app.t('admin.users.requests.message')"></th>
-          <th x-text="$app.t('admin.users.requests.createdAt')"></th>
-          <th x-text="$app.t('admin.users.status')"></th>
+          <th class="sortable-th" :class="sortClass('created_at')" :aria-sort="ariaSort('created_at')"
+              @click="sortBy('created_at')" x-text="$app.t('admin.users.requests.createdAt')"></th>
+          <th class="sortable-th" :class="sortClass('status')" :aria-sort="ariaSort('status')"
+              @click="sortBy('status')" x-text="$app.t('admin.users.status')"></th>
           <th></th>
         </tr>
       </thead>
       <tbody>
-        <template x-for="req in adminUsersRequestsList" :key="req.id">
+        <template x-for="req in sorted" :key="req.id">
           <tr>
             <td x-text="req.email"></td>
             <td x-text="req.display_name || '—'"></td>

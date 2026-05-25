@@ -70,6 +70,7 @@ import { registerPaletteCard } from './cards/palette-card.js';
 import { registerBlogSyncCard } from './cards/blog-sync-card.js';
 import { registerNumInput } from './num-input.js';
 import { registerCombobox } from './combobox.js';
+import { registerSortableTable } from './sortable-table.js';
 import { registerCatalogFilter } from './catalog-filter.js';
 import { shortcutsMethods } from './editor/shortcuts.js';
 import { featuresUsageMethods } from './features-usage.js';
@@ -270,6 +271,7 @@ document.addEventListener('alpine:init', () => {
   registerBlogSyncCard();
   registerNumInput();
   registerCombobox();
+  registerSortableTable();
   registerCatalogFilter();
 
   Alpine.data('lektorat', () => {
