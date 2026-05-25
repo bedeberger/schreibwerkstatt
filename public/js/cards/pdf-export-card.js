@@ -54,6 +54,8 @@ export function registerPdfExportCard() {
       dedication: false,
       year: false,
       imprint: false,
+      tocTitle: false,
+      toc: false,
     },
 
     creating: false,
