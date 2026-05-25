@@ -420,6 +420,59 @@ test('normalizeQuotes: Page-105-Corpus → alle non-Swiss Quotes weg', () => {
   assert.equal(ps[8].textContent, 'Was soll’s.');
 });
 
+// Stack-basiertes Depth-Tracking: User tippt durchgehend `"` für Outer und
+// Inner. Klassifizierer-allein würde alle vier als Outer-Double sehen.
+// Block-lokaler Stack erkennt Verschachtelung und demoted die mittleren zwei
+// Double-Quotes zu Inner-Single.
+test('normalizeQuotes: en — verschachtelte ASCII-Doubles → Inner zu Single', () => {
+  const root = makeRoot('<p>He said: "Everything is "great" - but not always"</p>');
+  const style = resolveQuoteStyle('en', '');
+  normalizeQuotes(root, style);
+  assert.equal(
+    root.querySelector('p').textContent,
+    'He said: “Everything is ‘great’ - but not always”',
+  );
+});
+
+test('normalizeQuotes: de-DE — verschachtelte ASCII-Doubles → Inner zu ‚…‘', () => {
+  const root = makeRoot('<p>Er sagte: "Heute ist "schön" wirklich."</p>');
+  const style = resolveQuoteStyle('de', 'DE');
+  normalizeQuotes(root, style);
+  assert.equal(
+    root.querySelector('p').textContent,
+    'Er sagte: „Heute ist ‚schön‘ wirklich.“',
+  );
+});
+
+test('normalizeQuotes: de-CH — verschachtelte ASCII-Doubles → Inner zu ‹…›', () => {
+  const root = makeRoot('<p>Er sagte: "Heute ist "schön" wirklich."</p>');
+  const style = resolveQuoteStyle('de', 'CH');
+  normalizeQuotes(root, style);
+  assert.equal(
+    root.querySelector('p').textContent,
+    'Er sagte: «Heute ist ‹schön› wirklich.»',
+  );
+});
+
+test('normalizeQuotes: en — 3-Level-Nesting (Double-Single-Double)', () => {
+  // depth=0 outer "  depth=1 inner '  depth=2 wieder outer "
+  const root = makeRoot('<p>"Sie sagte \'er rief "ja"\' laut."</p>');
+  const style = resolveQuoteStyle('en', '');
+  normalizeQuotes(root, style);
+  assert.equal(
+    root.querySelector('p').textContent,
+    '“Sie sagte ‘er rief “ja”’ laut.”',
+  );
+});
+
+test('normalizeQuotes: en — Apostroph innerhalb Outer-Dialog unverändert', () => {
+  // Stack push für Outer, dann Apostroph (kein push/pop), dann Outer-Close.
+  const root = makeRoot('<p>"It is foo\'s bar"</p>');
+  const style = resolveQuoteStyle('en', '');
+  normalizeQuotes(root, style);
+  assert.equal(root.querySelector('p').textContent, '“It is foo’s bar”');
+});
+
 test('normalizeQuotesInRange: nur Selection wird transformiert', () => {
   const root = makeRoot('<p>"Eins" und "Zwei"</p>');
   const style = resolveQuoteStyle('de', 'CH');

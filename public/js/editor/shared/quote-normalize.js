@@ -120,41 +120,69 @@ function _isLetterDigit(ch) {
 // → Schliess-Hinweis im Ambig-Fall (prev und next beide whitespace).
 const CLOSE_HINT = /[\p{L}\p{N}.,;:!?»›"”’]/u;
 
+// Klassifizierer geben `{ repl, role }` zurück. `role` steuert den block-lokalen
+// Nesting-Stack (`open` pusht, `close` poppt, `apostrophe` ignoriert). Die
+// finale Glyphe entsteht aus `_depthRepl` — Outer vs. Inner abhängig von der
+// aktuellen Verschachtelungstiefe, sodass `"Er sagte "hallo""` in EN korrekt
+// zu `"Er sagte 'hallo'"` wird, ohne dass der User Single-Glyphen tippen muss.
 function _classifyDouble(c, prev, prevNonWs, next, style) {
   const prevOpen  = !prev || OPEN_CTX.test(prev);
   const nextClose = !next || CLOSE_CTX.test(next);
-  if (prevOpen && !nextClose) return style.ldquo;
-  if (!prevOpen && nextClose) return style.rdquo;
+  if (prevOpen && !nextClose) return { repl: style.ldquo, role: 'open' };
+  if (!prevOpen && nextClose) return { repl: style.rdquo, role: 'close' };
   // Ambig (z.B. FR mit NBSP beidseitig): inhärent gerichtete Glyphen
   // entscheiden, sonst prev-non-ws-Hinweis, sonst Default open.
-  if (DOUBLE_LEFT.has(c))  return style.ldquo;
-  if (DOUBLE_RIGHT.has(c)) return style.rdquo;
-  if (prevNonWs && CLOSE_HINT.test(prevNonWs)) return style.rdquo;
-  if (prevOpen) return style.ldquo;
-  return style.rdquo;
+  if (DOUBLE_LEFT.has(c))  return { repl: style.ldquo, role: 'open' };
+  if (DOUBLE_RIGHT.has(c)) return { repl: style.rdquo, role: 'close' };
+  if (prevNonWs && CLOSE_HINT.test(prevNonWs)) return { repl: style.rdquo, role: 'close' };
+  if (prevOpen) return { repl: style.ldquo, role: 'open' };
+  return { repl: style.rdquo, role: 'close' };
 }
 
 function _classifySingle(c, prev, prevNonWs, next, style, wordAfter) {
   const prevLD = _isLetterDigit(prev);
   const nextLD = _isLetterDigit(next);
-  if (prevLD && nextLD) return style.apostrophe;    // `don't`, `Marie's`
+  if (prevLD && nextLD) return { repl: style.apostrophe, role: 'apostrophe' };
   const prevOpen  = !prev || OPEN_CTX.test(prev);
   const nextClose = !next || CLOSE_CTX.test(next);
   // Englisch: Leading-Apostroph-Kontraktionen (`'tis`, `'em`, `'90s`,
   // `rock 'n' roll`) — Default-Heuristik klassifizierte fälschlich als lsquo.
   if (_isEnglish(style) && prevOpen && nextLD && _isLeadingContraction(wordAfter)) {
-    return style.apostrophe;
+    return { repl: style.apostrophe, role: 'apostrophe' };
   }
-  if (prevOpen && !nextClose) return style.lsquo;
-  if (!prevOpen && nextClose) return style.rsquo;
+  if (prevOpen && !nextClose) return { repl: style.lsquo, role: 'open' };
+  if (!prevOpen && nextClose) return { repl: style.rsquo, role: 'close' };
   // Ambig
-  if (SINGLE_LEFT.has(c))  return style.lsquo;
-  if (c === '›')           return style.rsquo;
-  if (c === '’')           return prevLD ? style.apostrophe : style.rsquo;
-  if (prevLD) return style.apostrophe;
-  if (prevNonWs && CLOSE_HINT.test(prevNonWs)) return style.rsquo;
-  if (prevOpen) return style.lsquo;
-  return style.apostrophe;
+  if (SINGLE_LEFT.has(c))  return { repl: style.lsquo, role: 'open' };
+  if (c === '›')           return { repl: style.rsquo, role: 'close' };
+  if (c === '’') {
+    return prevLD
+      ? { repl: style.apostrophe, role: 'apostrophe' }
+      : { repl: style.rsquo, role: 'close' };
+  }
+  if (prevLD) return { repl: style.apostrophe, role: 'apostrophe' };
+  if (prevNonWs && CLOSE_HINT.test(prevNonWs)) return { repl: style.rsquo, role: 'close' };
+  if (prevOpen) return { repl: style.lsquo, role: 'open' };
+  return { repl: style.apostrophe, role: 'apostrophe' };
+}
+
+// Block-lokaler Stack alterniert Outer/Inner. Glyph-Override gilt NUR für
+// Double-Quote-Inputs (`"`, `"`, `"`, `«`, `»`): wenn User durchgängig
+// dieselbe Glyphe für mehrere Ebenen tippt (`"foo "bar" baz"`), demoten wir
+// die innere zu Inner-Single. Explizit getippte Single-Quotes (`'`, `'`, `'`)
+// behalten die Klassifizierer-Glyphe — sonst würde `He said 'hi'` zu Outer-
+// Double promoviert. Stack-Push/Pop laufen auf beiden Kinds, damit gemischte
+// Eingaben (`"outer 'inner' outer"`) korrekte Depth liefern.
+function _depthRepl(role, depth, style, fallbackRepl, isDouble) {
+  if (!isDouble) return fallbackRepl;
+  if (role === 'open') {
+    return (depth % 2 === 0) ? style.ldquo : style.lsquo;
+  }
+  if (role === 'close') {
+    if (depth === 0) return fallbackRepl;
+    return ((depth - 1) % 2 === 1) ? style.rsquo : style.rdquo;
+  }
+  return fallbackRepl;
 }
 
 function _isDoubleQuote(c) {
@@ -211,6 +239,9 @@ function _normalizeBlock(blockEl, style) {
   let count = 0;
   let prevChar = '';
   let prevNonWs = '';
+  // Quote-Stack pro Block (Reset an Block-Grenze). `length` = Nesting-Depth
+  // beim aktuellen Char. Inhalt ist irrelevant — wir brauchen nur die Tiefe.
+  const quoteStack = [];
 
   for (let nodeIdx = 0; nodeIdx < textNodes.length; nodeIdx++) {
     const node = textNodes[nodeIdx];
@@ -229,9 +260,10 @@ function _normalizeBlock(blockEl, style) {
       }
       const next = i + 1 < s.length ? s[i + 1] : _peekNext(textNodes, nodeIdx);
       const wordAfter = (isSingle && _isEnglish(style)) ? _peekWord(s, i + 1, textNodes, nodeIdx) : '';
-      const repl = isDouble
+      const cls = isDouble
         ? _classifyDouble(c, prevChar, prevNonWs, next, style)
         : _classifySingle(c, prevChar, prevNonWs, next, style, wordAfter);
+      const repl = _depthRepl(cls.role, quoteStack.length, style, cls.repl, isDouble);
       // Idempotenz: nur sinnvoll, wenn `repl` mit Space (NBSP / reg) startet
       // (FR-Style). Dann darf der bereits in `out` vorhandene Space als erstes
       // Zeichen von `repl` zählen — wir konsumieren nur `repl.slice(1)` aus
@@ -254,10 +286,46 @@ function _normalizeBlock(blockEl, style) {
       for (let k = repl.length - 1; k >= 0; k--) {
         if (!SPACES.has(repl[k])) { prevNonWs = repl[k]; break; }
       }
+      if (cls.role === 'open') quoteStack.push(1);
+      else if (cls.role === 'close' && quoteStack.length) quoteStack.pop();
     }
     if (out !== s) node.nodeValue = out;
   }
   return count;
+}
+
+// Scannt einen String nur fürs Stack-Update (keine Mutation). Wird in der
+// Range-Variante für Out-of-Range-Text benutzt, damit ein selektierter Inner-
+// Quote die Depth-Information aus dem umgebenden Outer-Quote erbt.
+function _consumeForStack(s, stack, style, prevCharIn, prevNonWsIn) {
+  let prevChar = prevCharIn;
+  let prevNonWs = prevNonWsIn;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    const isDouble = _isDoubleQuote(c);
+    const isSingle = !isDouble && _isSingleQuote(c);
+    if (isDouble || isSingle) {
+      const next = i + 1 < s.length ? s[i + 1] : '';
+      const wordAfter = (isSingle && _isEnglish(style)) ? _peekWordInString(s, i + 1) : '';
+      const cls = isDouble
+        ? _classifyDouble(c, prevChar, prevNonWs, next, style)
+        : _classifySingle(c, prevChar, prevNonWs, next, style, wordAfter);
+      if (cls.role === 'open') stack.push(1);
+      else if (cls.role === 'close' && stack.length) stack.pop();
+    }
+    prevChar = c;
+    if (!SPACES.has(c)) prevNonWs = c;
+  }
+  return { prevChar, prevNonWs };
+}
+
+function _peekWordInString(s, idx) {
+  let w = '';
+  for (let k = idx; k < s.length && w.length < 12; k++) {
+    if (!WORD_CHAR.test(s[k])) return w;
+    w += s[k];
+  }
+  return w;
 }
 
 export function normalizeQuotes(rootEl, style) {
@@ -286,6 +354,10 @@ export function normalizeQuotesInRange(range, style) {
   let count = 0;
   let prevChar = '';
   let prevNonWs = '';
+  // Range-Scope: Stack tracked auch Out-of-Range-Quotes, damit eine selektierte
+  // Inner-Quote die Depth aus dem umgebenden Outer-Quote erbt. Reset NICHT pro
+  // Node — common-ancestor-Walk simuliert hier denselben Block.
+  const quoteStack = [];
 
   const _updateNonWs = (str) => {
     for (let k = str.length - 1; k >= 0; k--) {
@@ -299,25 +371,31 @@ export function normalizeQuotesInRange(range, style) {
     if (!s) continue;
 
     if (!range.intersectsNode(node)) {
-      // Ausserhalb der Range: nichts ändern, prevChar/prevNonWs fortschreiben
-      // für Kontext der nächsten in-Range-Node.
-      prevChar = s[s.length - 1];
-      _updateNonWs(s);
+      // Ausserhalb der Range: nichts ändern, aber Stack + prev-Kontext aus dem
+      // gesamten Node aktualisieren.
+      const r = _consumeForStack(s, quoteStack, style, prevChar, prevNonWs);
+      prevChar = r.prevChar;
+      prevNonWs = r.prevNonWs;
       continue;
     }
 
     const startOff = node === range.startContainer ? range.startOffset : 0;
     const endOff   = node === range.endContainer   ? range.endOffset   : s.length;
     if (startOff >= endOff) {
-      if (s.length) { prevChar = s[s.length - 1]; _updateNonWs(s); }
+      if (s.length) {
+        const r = _consumeForStack(s, quoteStack, style, prevChar, prevNonWs);
+        prevChar = r.prevChar;
+        prevNonWs = r.prevNonWs;
+      }
       continue;
     }
 
     let out = '';
     if (startOff > 0) {
       out = s.slice(0, startOff);
-      prevChar = out[out.length - 1];
-      _updateNonWs(out);
+      const r = _consumeForStack(out, quoteStack, style, prevChar, prevNonWs);
+      prevChar = r.prevChar;
+      prevNonWs = r.prevNonWs;
     }
     for (let i = startOff; i < endOff; i++) {
       const c = s[i];
@@ -331,9 +409,10 @@ export function normalizeQuotesInRange(range, style) {
       }
       const next = i + 1 < s.length ? s[i + 1] : _peekNext(all, nodeIdx);
       const wordAfter = (isSingle && _isEnglish(style)) ? _peekWord(s, i + 1, all, nodeIdx) : '';
-      const repl = isDouble
+      const cls = isDouble
         ? _classifyDouble(c, prevChar, prevNonWs, next, style)
         : _classifySingle(c, prevChar, prevNonWs, next, style, wordAfter);
+      const repl = _depthRepl(cls.role, quoteStack.length, style, cls.repl, isDouble);
       const matchOffset = (SPACES.has(repl[0]) && out.length && out[out.length - 1] === repl[0]) ? 1 : 0;
       const consumeLen = repl.length - matchOffset;
       // Idempotenz nur innerhalb der Range prüfen — Match darf nicht
@@ -352,11 +431,15 @@ export function normalizeQuotesInRange(range, style) {
       }
       prevChar = repl[repl.length - 1] || c;
       _updateNonWs(repl);
+      if (cls.role === 'open') quoteStack.push(1);
+      else if (cls.role === 'close' && quoteStack.length) quoteStack.pop();
     }
     if (endOff < s.length) {
-      out += s.slice(endOff);
-      prevChar = out[out.length - 1];
-      _updateNonWs(out.slice(endOff));
+      const tail = s.slice(endOff);
+      out += tail;
+      const r = _consumeForStack(tail, quoteStack, style, prevChar, prevNonWs);
+      prevChar = r.prevChar;
+      prevNonWs = r.prevNonWs;
     }
     if (out !== s) node.nodeValue = out;
   }
