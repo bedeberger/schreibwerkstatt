@@ -174,6 +174,7 @@ router.get('/:token', async (req, res) => {
     try { shareLinks.incrementViewCount(token); } catch {}
   });
 
+  res.set('Cache-Control', 'no-store');
   res.status(200).type('html').send(html);
 });
 

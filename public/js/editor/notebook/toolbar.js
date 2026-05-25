@@ -239,6 +239,28 @@ export const toolbarCardMethods = {
       return;
     }
 
+    // Undo/Redo — nur im Notebook (Focus übernimmt unten den early-return).
+    // Cmd/Ctrl+Z → Undo, Cmd/Ctrl+Shift+Z + Ctrl+Y → Redo. Browser-Default
+    // bewusst überschrieben — eigener Stack ist nach Slash/HR-Mutationen
+    // konsistent, der Browser-Stack ist es nicht.
+    if (!app.focusActive && (e.metaKey || e.ctrlKey) && !e.altKey) {
+      if (!e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault();
+        app.notebookUndo?.();
+        return;
+      }
+      if (e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault();
+        app.notebookRedo?.();
+        return;
+      }
+      if (!e.shiftKey && (e.key === 'y' || e.key === 'Y')) {
+        e.preventDefault();
+        app.notebookRedo?.();
+        return;
+      }
+    }
+
     // Im Focus-Mode hört die Toolbar auf — Slash-Menü und sonstige
     // Block-Transforms sind nicht erlaubt. B/I/U laufen weiter via Browser-
     // Default (Cmd/Ctrl+B/I/U).

@@ -24,6 +24,10 @@ export const notebookTrampoline = {
   pageEditorZoomOut() { card()?.pageEditorZoomOut(); },
   pageEditorZoomReset() { card()?.pageEditorZoomReset(); },
   normalizeQuotes() { return card()?.normalizeQuotes(); },
+  notebookUndo() { card()?.notebookUndo(); },
+  notebookRedo() { card()?.notebookRedo(); },
+  notebookCanUndo() { return !!card()?.notebookCanUndo(); },
+  notebookCanRedo() { return !!card()?.notebookCanRedo(); },
 
   // Half-public — von Templates/anderen Modulen (synonyme, find, focus, toolbar,
   // app-view, book-editor-card) erwartet.

@@ -1307,6 +1307,8 @@
   "editor.toolbar.synonymLabel": "Syn",
   "editor.toolbar.hrTitle":      "Trennlinie einfügen (Strg/⌘+Shift+H)",
   "editor.toolbar.quotesTitle":  "Anführungszeichen normalisieren",
+  "editor.toolbar.undoTitle":    "Rückgängig (Strg/⌘+Z)",
+  "editor.toolbar.redoTitle":    "Wiederholen (Strg/⌘+Shift+Z)",
 
   "editor.slash.hint":           "Blocktyp wählen",
   "editor.slash.noMatch":        "Keine Treffer",

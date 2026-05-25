@@ -190,6 +190,19 @@
        beim Scrollen tief in die Seite (Vollbild). -->
   <div class="page-editor-toolbar" x-show="editMode && !focusActive" x-cloak>
     <button type="button" class="graph-tool-btn"
+            :disabled="!notebookCanUndo()"
+            :data-tip="t('editor.toolbar.undoTitle')" :aria-label="t('editor.toolbar.undoTitle')"
+            @click="notebookUndo()">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#undo"/></svg>
+    </button>
+    <button type="button" class="graph-tool-btn"
+            :disabled="!notebookCanRedo()"
+            :data-tip="t('editor.toolbar.redoTitle')" :aria-label="t('editor.toolbar.redoTitle')"
+            @click="notebookRedo()">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#redo"/></svg>
+    </button>
+    <span class="action-sep" aria-hidden="true"></span>
+    <button type="button" class="graph-tool-btn"
             :data-tip="t('graph.zoomOut')" :aria-label="t('graph.zoomOut')"
             @click="pageEditorZoomOut()">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#minus"/></svg>

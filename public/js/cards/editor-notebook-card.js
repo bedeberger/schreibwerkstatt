@@ -9,11 +9,18 @@
 
 import { notebookCardMethods } from '../editor/notebook/card.js';
 import { notebookEditMethods } from '../editor/notebook/edit.js';
+import { notebookHistoryMethods } from '../editor/notebook/history.js';
 
 export function registerEditorNotebookCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
   window.Alpine.data('editorNotebookCard', () => ({
     _notebookRestoreSnapshot: null,
+    // Undo/Redo: Session-scoped Stack (siehe editor/notebook/history.js).
+    // Initial leer; `startEdit` ruft `_historyReset(initialHtml)`.
+    _undoStack: [],
+    _undoIdx: -1,
+    _undoTimer: null,
+    _undoApplying: false,
 
     init() {
       // Globaler Selbst-Ref für die Root-Trampoline. Pendant zu __focusCard /
@@ -29,5 +36,6 @@ export function registerEditorNotebookCard() {
 
     ...notebookCardMethods,
     ...notebookEditMethods,
+    ...notebookHistoryMethods,
   }));
 }

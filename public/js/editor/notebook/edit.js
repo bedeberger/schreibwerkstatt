@@ -181,6 +181,10 @@ export const notebookEditMethods = {
     // beim regulären Exit (cancelEdit/saveEdit) wird er wieder gelöscht.
     writeNormalSnapshot(app.currentPage.id);
 
+    // Undo/Redo: Session-Baseline mit dem initialen Edit-Stand. Stack
+    // wird bei cancel/save (non-focus) wieder geclear't.
+    if (el) this._historyReset?.(el.innerHTML);
+
     // Layout-Prefs (Fullscreen + Seitenbreite) aus localStorage restoren.
     // Fit-Width skaliert die Schrift jetzt per CSS Container-Query (cqi) —
     // kein JS-Pfad, kein Zoom-Vorab-Compute mehr.
@@ -207,6 +211,7 @@ export const notebookEditMethods = {
     app._editCounterCtx?.teardown?.();
     app._stopPresenceHeartbeat?.();
     app._releaseEditLock?.(app.currentPage?.id);
+    this._historyClear?.();
     app.lastDraftSavedAt = null;
     app.editMode = false;
     app.editDirty = false;
@@ -318,6 +323,7 @@ export const notebookEditMethods = {
         app._editCounterCtx?.teardown?.();
         app._stopPresenceHeartbeat?.();
         app._releaseEditLock?.(app.currentPage?.id);
+        this._historyClear?.();
         app.editMode = false;
         app.pageEditorFullscreen = false;
         app.pageEditorFitWidth = false;
@@ -464,6 +470,7 @@ export const notebookEditMethods = {
     app.editDirty = true;
     this._scheduleDraftSave();
     this._scheduleAutosave();
+    this._historyPushSoon?.();
   },
 
   _scheduleDraftSave() {
