@@ -106,6 +106,7 @@ Weitere sinnvolle Trigger:
 
 - **`unavailable` auf allen Sensoren** — Token falsch oder abgelaufen. Check via `curl -H "Authorization: Bearer sw_…" https://app.example.com/metrics`. Status 401 → Token rotieren.
 - **Sensor zeigt `unknown`** — Regex matcht nicht. Metric-Name aus `/metrics`-Output direkt prüfen (Backslash-Escape in `\{` / `\}` ist Pflicht in HA-YAML).
+- **`IndexError: list index out of range`** beim ersten Render — `regex_findall_index` wirft, sobald Pattern nicht matcht (REST-Daten noch nicht da oder Metric fehlt im Output). Lösung ist bereits in [configuration.yaml](configuration.yaml) gepflegt: `((value | regex_findall('…')) + ['0']) | first | int(0)` statt `regex_findall_index`. Wer eigene Sensoren ergänzt, MUSS dasselbe Pattern verwenden.
 - **Wert springt auf 0 nach Server-Restart** — Nur In-Memory-Gauges (`sw_jobs_running`, `sw_jobs_queued`). `*_total`-Counter persistieren in `job_runs`. Erwartetes Verhalten — siehe Pflicht-Invariante "Counter sind kumuliert seit DB-Init" in [metrics-api.md](../metrics-api.md).
 - **History-Graph leer** — `state_class` muss gesetzt sein (in [configuration.yaml](configuration.yaml) bereits gepflegt). Recorder läuft sonst nicht auf den Sensor.
 

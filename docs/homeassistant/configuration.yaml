@@ -2,6 +2,11 @@
 # In bestehende configuration.yaml mergen. Token + URL in secrets.yaml:
 #   schreibwerkstatt_token: "Bearer sw_REPLACE_WITH_TOKEN"
 #   schreibwerkstatt_url:   "https://app.example.com/metrics"
+#
+# Pattern-Hinweis: jeder Single-Match-Sensor nutzt
+#   (regex_findall(...) + [default]) | first
+# statt regex_findall_index — sonst IndexError beim ersten Render
+# (REST-Daten noch nicht geladen) oder bei fehlender Metric.
 
 rest:
   - resource: !secret schreibwerkstatt_url
@@ -15,69 +20,74 @@ rest:
       - name: Schreibwerkstatt Version
         unique_id: sw_version
         value_template: >
-          {{ value | regex_findall_index('sw_build_info\{version="([^"]+)"\} 1', 0) }}
+          {{ (value | regex_findall('sw_build_info\{version="([^"]+)"\} 1') + ['unknown']) | first }}
 
       - name: Schreibwerkstatt Users Active
         unique_id: sw_users_active
         value_template: >
-          {{ value | regex_findall_index('sw_users\{status="active"\} (\d+)', 0) | int(0) }}
+          {{ ((value | regex_findall('sw_users\{status="active"\} (\d+)')) + ['0']) | first | int(0) }}
         state_class: measurement
 
       - name: Schreibwerkstatt Users Invited
         unique_id: sw_users_invited
         value_template: >
-          {{ value | regex_findall_index('sw_users\{status="invited"\} (\d+)', 0) | int(0) }}
+          {{ ((value | regex_findall('sw_users\{status="invited"\} (\d+)')) + ['0']) | first | int(0) }}
         state_class: measurement
 
       - name: Schreibwerkstatt Users Suspended
         unique_id: sw_users_suspended
         value_template: >
-          {{ value | regex_findall_index('sw_users\{status="suspended"\} (\d+)', 0) | int(0) }}
+          {{ ((value | regex_findall('sw_users\{status="suspended"\} (\d+)')) + ['0']) | first | int(0) }}
         state_class: measurement
 
       - name: Schreibwerkstatt Active Users 24h
         unique_id: sw_active_users_24h
         value_template: >
-          {{ value | regex_findall_index('sw_active_users_24h (\d+)', 0) | int(0) }}
+          {{ ((value | regex_findall('sw_active_users_24h (\d+)')) + ['0']) | first | int(0) }}
         state_class: measurement
 
       - name: Schreibwerkstatt Active Users 7d
         unique_id: sw_active_users_7d
         value_template: >
-          {{ value | regex_findall_index('sw_active_users_7d (\d+)', 0) | int(0) }}
+          {{ ((value | regex_findall('sw_active_users_7d (\d+)')) + ['0']) | first | int(0) }}
         state_class: measurement
 
       # ---- Content ----
       - name: Schreibwerkstatt Books
         unique_id: sw_books
         icon: mdi:book-multiple
-        value_template: "{{ value | regex_findall_index('sw_books (\\d+)', 0) | int(0) }}"
+        value_template: >
+          {{ ((value | regex_findall('sw_books (\d+)')) + ['0']) | first | int(0) }}
         state_class: measurement
 
       - name: Schreibwerkstatt Pages
         unique_id: sw_pages
         icon: mdi:file-document-multiple
-        value_template: "{{ value | regex_findall_index('sw_pages (\\d+)', 0) | int(0) }}"
+        value_template: >
+          {{ ((value | regex_findall('sw_pages (\d+)')) + ['0']) | first | int(0) }}
         state_class: measurement
 
       - name: Schreibwerkstatt Chapters
         unique_id: sw_chapters
         icon: mdi:format-list-numbered
-        value_template: "{{ value | regex_findall_index('sw_chapters (\\d+)', 0) | int(0) }}"
+        value_template: >
+          {{ ((value | regex_findall('sw_chapters (\d+)')) + ['0']) | first | int(0) }}
         state_class: measurement
 
       - name: Schreibwerkstatt Chars
         unique_id: sw_chars
         icon: mdi:counter
         unit_of_measurement: Zeichen
-        value_template: "{{ value | regex_findall_index('sw_chars (\\d+)', 0) | int(0) }}"
+        value_template: >
+          {{ ((value | regex_findall('sw_chars (\d+)')) + ['0']) | first | int(0) }}
         state_class: total
 
       - name: Schreibwerkstatt Words
         unique_id: sw_words
         icon: mdi:text
         unit_of_measurement: "Wörter"
-        value_template: "{{ value | regex_findall_index('sw_words (\\d+)', 0) | int(0) }}"
+        value_template: >
+          {{ ((value | regex_findall('sw_words (\d+)')) + ['0']) | first | int(0) }}
         state_class: total
 
       # ---- Writing Activity (heute, app.timezone) ----
@@ -85,27 +95,31 @@ rest:
         unique_id: sw_writing_seconds_today
         unit_of_measurement: s
         device_class: duration
-        value_template: "{{ value | regex_findall_index('sw_writing_seconds_today (\\d+)', 0) | int(0) }}"
+        value_template: >
+          {{ ((value | regex_findall('sw_writing_seconds_today (\d+)')) + ['0']) | first | int(0) }}
         state_class: measurement
 
       - name: Schreibwerkstatt Lektorat Seconds Today
         unique_id: sw_lektorat_seconds_today
         unit_of_measurement: s
         device_class: duration
-        value_template: "{{ value | regex_findall_index('sw_lektorat_seconds_today (\\d+)', 0) | int(0) }}"
+        value_template: >
+          {{ ((value | regex_findall('sw_lektorat_seconds_today (\d+)')) + ['0']) | first | int(0) }}
         state_class: measurement
 
       # ---- Job-Queue (In-Memory, resettet bei Server-Restart) ----
       - name: Schreibwerkstatt Jobs Running
         unique_id: sw_jobs_running
         icon: mdi:cog-sync
-        value_template: "{{ value | regex_findall_index('sw_jobs_running (\\d+)', 0) | int(0) }}"
+        value_template: >
+          {{ ((value | regex_findall('sw_jobs_running (\d+)')) + ['0']) | first | int(0) }}
         state_class: measurement
 
       - name: Schreibwerkstatt Jobs Queued
         unique_id: sw_jobs_queued
         icon: mdi:tray-full
-        value_template: "{{ value | regex_findall_index('sw_jobs_queued (\\d+)', 0) | int(0) }}"
+        value_template: >
+          {{ ((value | regex_findall('sw_jobs_queued (\d+)')) + ['0']) | first | int(0) }}
         state_class: measurement
 
       # ---- Persistente Job-Historie (Sum über alle type/status) ----
