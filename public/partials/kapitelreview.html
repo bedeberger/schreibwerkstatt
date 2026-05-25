@@ -59,6 +59,11 @@
                 :data-tip="$app.t('ideen.openCountTitle', { n: $app.chapterIdeenCounts[$app.kapitelReviewChapterId] })"></span>
         </button>
         <button type="button"
+                x-show="$app.canEdit() && $app.kapitelReviewChapterId"
+                @click="$app.openShareLinksForChapter($app.kapitelReviewChapterId)"
+                :data-tip="$app.t('share.btn.shareChapterTitle')"
+                x-text="$app.t('share.btn.shareChapter')"></button>
+        <button type="button"
                 @click="runKapitelReview()"
                 :disabled="kapitelReviewLoading || !$app.kapitelReviewChapterId">
           <span x-show="kapitelReviewLoading" class="spinner"></span>
