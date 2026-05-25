@@ -555,3 +555,65 @@ test('normalizeQuotesInRange: prev-Kontext aus Text vor Range', () => {
   normalizeQuotesInRange(range, style);
   assert.equal(p.textContent, 'Er sagte «Hallo» laut.');
 });
+
+test('normalizeQuotes: Dot-Run innerhalb Quote → … (de-CH)', () => {
+  const root = makeRoot('<p>Er sagte "Oh.." und ging.</p>');
+  const style = resolveQuoteStyle('de', 'CH');
+  normalizeQuotes(root, style);
+  assert.equal(root.querySelector('p').textContent, 'Er sagte «Oh…» und ging.');
+});
+
+test('normalizeQuotes: drei Punkte in Quote → …', () => {
+  const root = makeRoot('<p>"Ich weiss nicht..."</p>');
+  const style = resolveQuoteStyle('de', 'CH');
+  normalizeQuotes(root, style);
+  assert.equal(root.querySelector('p').textContent, '«Ich weiss nicht…»');
+});
+
+test('normalizeQuotes: einzelner Punkt in Quote bleibt', () => {
+  const root = makeRoot('<p>"Oh."</p>');
+  const style = resolveQuoteStyle('de', 'CH');
+  normalizeQuotes(root, style);
+  assert.equal(root.querySelector('p').textContent, '«Oh.»');
+});
+
+test('normalizeQuotes: Dot-Run ausserhalb Quote bleibt (z.B.)', () => {
+  const root = makeRoot('<p>Das war z.B. wichtig... wirklich.</p>');
+  const style = resolveQuoteStyle('de', 'CH');
+  normalizeQuotes(root, style);
+  assert.equal(root.querySelector('p').textContent, 'Das war z.B. wichtig... wirklich.');
+});
+
+test('normalizeQuotes: Dot-Run in Quote, andere Stelle ausserhalb bleibt', () => {
+  const root = makeRoot('<p>z.B. sagte er "Oh.." und lachte.</p>');
+  const style = resolveQuoteStyle('de', 'CH');
+  normalizeQuotes(root, style);
+  assert.equal(root.querySelector('p').textContent, 'z.B. sagte er «Oh…» und lachte.');
+});
+
+test('normalizeQuotes: Dot-Run in en-US Quote', () => {
+  const root = makeRoot('<p>He said "I dont know...".</p>');
+  const style = resolveQuoteStyle('en', 'US');
+  normalizeQuotes(root, style);
+  assert.equal(root.querySelector('p').textContent, 'He said “I dont know…”.');
+});
+
+test('normalizeQuotes: idempotent — bereits … bleibt …', () => {
+  const root = makeRoot('<p>«Oh…»</p>');
+  const style = resolveQuoteStyle('de', 'CH');
+  normalizeQuotes(root, style);
+  assert.equal(root.querySelector('p').textContent, '«Oh…»');
+});
+
+test('normalizeQuotesInRange: Dot-Run nur innerhalb Range', () => {
+  // Range umschliesst nur den inneren Dot-Run; Quotes bereits gesetzt.
+  const root = makeRoot('<p>«Oh..» z.B. Foo..</p>');
+  const style = resolveQuoteStyle('de', 'CH');
+  const p = root.querySelector('p');
+  const t = p.firstChild;
+  // Offsets: «=0, O=1, h=2, .=3, .=4, »=5
+  const range = makeRange(t, 3, t, 5);
+  normalizeQuotesInRange(range, style);
+  // Inner Dot-Run normalisiert; ausserhalb (`Foo..`) bleibt
+  assert.equal(p.textContent, '«Oh…» z.B. Foo..');
+});

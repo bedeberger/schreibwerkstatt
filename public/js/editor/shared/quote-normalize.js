@@ -14,6 +14,11 @@
 // Zwei Scopes: `normalizeQuotes(rootEl, style)` für Page-weit (Slash-Item
 // Notebook + Focus-Topbar), `normalizeQuotesInRange(range, style)` für eine
 // Selection-Range (Bubble-Toolbar Notebook).
+//
+// Zusätzlich: ASCII-Dot-Runs (`..`, `...`, `....`) innerhalb einer offenen
+// Quote-Klammer → `…` (U+2026). Nur in Quote-Scope, damit Abkürzungen
+// (`z.B.`, `usw.`) ausserhalb von Dialogen unverändert bleiben. Detection
+// via `quoteStack.length > 0` an der Dot-Position.
 
 const STYLES = {
   // Schweiz / Liechtenstein: Guillemets aussen, Single-Guillemets innen
@@ -272,6 +277,16 @@ function _normalizeBlock(blockEl, style) {
       const isDouble = _isDoubleQuote(c);
       const isSingle = !isDouble && _isSingleQuote(c);
       if (!isDouble && !isSingle) {
+        if (c === '.' && quoteStack.length > 0 && i + 1 < s.length && s[i + 1] === '.') {
+          let runLen = 2;
+          while (i + runLen < s.length && s[i + runLen] === '.') runLen++;
+          out += '…';
+          i += runLen - 1;
+          prevChar = '…';
+          prevNonWs = '…';
+          count++;
+          continue;
+        }
         out += c;
         prevChar = c;
         if (!SPACES.has(c)) prevNonWs = c;
@@ -433,6 +448,16 @@ export function normalizeQuotesInRange(range, style) {
       const isDouble = _isDoubleQuote(c);
       const isSingle = !isDouble && _isSingleQuote(c);
       if (!isDouble && !isSingle) {
+        if (c === '.' && quoteStack.length > 0 && (i + 1) < endOff && s[i + 1] === '.') {
+          let runLen = 2;
+          while ((i + runLen) < endOff && s[i + runLen] === '.') runLen++;
+          out += '…';
+          i += runLen - 1;
+          prevChar = '…';
+          prevNonWs = '…';
+          count++;
+          continue;
+        }
         out += c;
         prevChar = c;
         if (!SPACES.has(c)) prevNonWs = c;
