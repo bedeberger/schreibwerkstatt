@@ -39,6 +39,7 @@ Naming-Convention: Prefix `sw_`, Counter mit `_total`-Suffix, Gauges ohne. Label
 
 - `sw_books`, `sw_pages`, `sw_chapters` — Gauge, `COUNT(*)`.
 - `sw_chars`, `sw_words` — Gauge, `SUM(page_stats.chars|words)`.
+- `sw_normseiten` — Gauge, `round(sw_chars / 1800)` (Normseite = 1800 Zeichen).
 
 ### Writing-Activity (heute, app.timezone)
 

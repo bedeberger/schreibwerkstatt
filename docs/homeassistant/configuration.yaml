@@ -19,35 +19,46 @@ rest:
       # ---- Build + User ----
       - name: Schreibwerkstatt Version
         unique_id: sw_version
+        icon: mdi:tag
         value_template: >
           {{ (value | regex_findall('sw_build_info\{version="([^"]+)"\} 1') + ['unknown']) | first }}
 
       - name: Schreibwerkstatt Users Active
         unique_id: sw_users_active
+        icon: mdi:account-check
+        unit_of_measurement: User
         value_template: >
           {{ ((value | regex_findall('sw_users\{status="active"\} (\d+)')) + ['0']) | first | int(0) }}
         state_class: measurement
 
       - name: Schreibwerkstatt Users Invited
         unique_id: sw_users_invited
+        icon: mdi:account-clock
+        unit_of_measurement: User
         value_template: >
           {{ ((value | regex_findall('sw_users\{status="invited"\} (\d+)')) + ['0']) | first | int(0) }}
         state_class: measurement
 
       - name: Schreibwerkstatt Users Suspended
         unique_id: sw_users_suspended
+        icon: mdi:account-cancel
+        unit_of_measurement: User
         value_template: >
           {{ ((value | regex_findall('sw_users\{status="suspended"\} (\d+)')) + ['0']) | first | int(0) }}
         state_class: measurement
 
       - name: Schreibwerkstatt Active Users 24h
         unique_id: sw_active_users_24h
+        icon: mdi:account-multiple
+        unit_of_measurement: User
         value_template: >
           {{ ((value | regex_findall('sw_active_users_24h (\d+)')) + ['0']) | first | int(0) }}
         state_class: measurement
 
       - name: Schreibwerkstatt Active Users 7d
         unique_id: sw_active_users_7d
+        icon: mdi:account-multiple-outline
+        unit_of_measurement: User
         value_template: >
           {{ ((value | regex_findall('sw_active_users_7d (\d+)')) + ['0']) | first | int(0) }}
         state_class: measurement
@@ -56,6 +67,7 @@ rest:
       - name: Schreibwerkstatt Books
         unique_id: sw_books
         icon: mdi:book-multiple
+        unit_of_measurement: "Bücher"
         value_template: >
           {{ ((value | regex_findall('sw_books (\d+)')) + ['0']) | first | int(0) }}
         state_class: measurement
@@ -63,6 +75,7 @@ rest:
       - name: Schreibwerkstatt Pages
         unique_id: sw_pages
         icon: mdi:file-document-multiple
+        unit_of_measurement: Seiten
         value_template: >
           {{ ((value | regex_findall('sw_pages (\d+)')) + ['0']) | first | int(0) }}
         state_class: measurement
@@ -70,6 +83,7 @@ rest:
       - name: Schreibwerkstatt Chapters
         unique_id: sw_chapters
         icon: mdi:format-list-numbered
+        unit_of_measurement: Kapitel
         value_template: >
           {{ ((value | regex_findall('sw_chapters (\d+)')) + ['0']) | first | int(0) }}
         state_class: measurement
@@ -80,7 +94,7 @@ rest:
         unit_of_measurement: Zeichen
         value_template: >
           {{ ((value | regex_findall('sw_chars (\d+)')) + ['0']) | first | int(0) }}
-        state_class: total
+        state_class: measurement
 
       - name: Schreibwerkstatt Words
         unique_id: sw_words
@@ -88,11 +102,20 @@ rest:
         unit_of_measurement: "Wörter"
         value_template: >
           {{ ((value | regex_findall('sw_words (\d+)')) + ['0']) | first | int(0) }}
-        state_class: total
+        state_class: measurement
+
+      - name: Schreibwerkstatt Normseiten
+        unique_id: sw_normseiten
+        icon: mdi:file-document-outline
+        unit_of_measurement: Seiten
+        value_template: >
+          {{ ((value | regex_findall('sw_normseiten (\d+)')) + ['0']) | first | int(0) }}
+        state_class: measurement
 
       # ---- Writing Activity (heute, app.timezone) ----
       - name: Schreibwerkstatt Writing Seconds Today
         unique_id: sw_writing_seconds_today
+        icon: mdi:pencil-outline
         unit_of_measurement: s
         device_class: duration
         value_template: >
@@ -101,6 +124,7 @@ rest:
 
       - name: Schreibwerkstatt Lektorat Seconds Today
         unique_id: sw_lektorat_seconds_today
+        icon: mdi:book-edit-outline
         unit_of_measurement: s
         device_class: duration
         value_template: >
@@ -125,6 +149,8 @@ rest:
       # ---- Persistente Job-Historie (Sum über alle type/status) ----
       - name: Schreibwerkstatt Jobs Finished Total
         unique_id: sw_jobs_finished_total
+        icon: mdi:check-all
+        unit_of_measurement: Jobs
         value_template: >
           {% set vals = value | regex_findall('sw_jobs_finished_total\{[^}]+\}\s+(\d+)') %}
           {{ vals | map('int', 0) | sum }}
@@ -133,8 +159,9 @@ rest:
       # ---- Tokens + Kosten (Sum über alle provider/model) ----
       - name: Schreibwerkstatt Cost USD Total
         unique_id: sw_cost_usd_total
-        unit_of_measurement: USD
         icon: mdi:currency-usd
+        unit_of_measurement: USD
+        device_class: monetary
         value_template: >
           {% set vals = value | regex_findall('sw_cost_usd_total\{[^}]+\}\s+([0-9.eE+-]+)') %}
           {{ (vals | map('float', 0) | sum) | round(4) }}
@@ -142,6 +169,7 @@ rest:
 
       - name: Schreibwerkstatt Tokens In Total
         unique_id: sw_tokens_in_total
+        icon: mdi:arrow-down-bold-box
         unit_of_measurement: tokens
         value_template: >
           {% set vals = value | regex_findall('sw_tokens_in_total\{[^}]+\}\s+(\d+)') %}
@@ -150,6 +178,7 @@ rest:
 
       - name: Schreibwerkstatt Tokens Out Total
         unique_id: sw_tokens_out_total
+        icon: mdi:arrow-up-bold-box
         unit_of_measurement: tokens
         value_template: >
           {% set vals = value | regex_findall('sw_tokens_out_total\{[^}]+\}\s+(\d+)') %}
@@ -158,6 +187,7 @@ rest:
 
       - name: Schreibwerkstatt Cache Read Tokens
         unique_id: sw_cache_read_tokens_total
+        icon: mdi:cached
         unit_of_measurement: tokens
         value_template: >
           {% set vals = value | regex_findall('sw_cache_read_tokens_total\{[^}]+\}\s+(\d+)') %}
@@ -166,6 +196,7 @@ rest:
 
       - name: Schreibwerkstatt Cache Creation Tokens
         unique_id: sw_cache_creation_tokens_total
+        icon: mdi:database-plus
         unit_of_measurement: tokens
         value_template: >
           {% set vals = value | regex_findall('sw_cache_creation_tokens_total\{[^}]+\}\s+(\d+)') %}
@@ -177,28 +208,28 @@ template:
   - sensor:
       - name: Schreibwerkstatt Writing Today Minutes
         unique_id: sw_writing_today_min
+        icon: mdi:pencil
         unit_of_measurement: min
         device_class: duration
+        state_class: measurement
         state: >
           {{ (states('sensor.schreibwerkstatt_writing_seconds_today') | int(0) / 60) | round(1) }}
 
       - name: Schreibwerkstatt Lektorat Today Minutes
         unique_id: sw_lektorat_today_min
+        icon: mdi:book-edit
         unit_of_measurement: min
         device_class: duration
+        state_class: measurement
         state: >
           {{ (states('sensor.schreibwerkstatt_lektorat_seconds_today') | int(0) / 60) | round(1) }}
 
       - name: Schreibwerkstatt Cache Hit Ratio
         unique_id: sw_cache_hit_ratio
+        icon: mdi:percent-outline
         unit_of_measurement: "%"
+        state_class: measurement
         state: >
           {% set r = states('sensor.schreibwerkstatt_cache_read_tokens') | int(0) %}
           {% set i = states('sensor.schreibwerkstatt_tokens_in_total') | int(0) %}
           {{ ((r / i * 100) if i > 0 else 0) | round(1) }}
-
-      - name: Schreibwerkstatt Normseiten
-        unique_id: sw_normseiten
-        unit_of_measurement: Seiten
-        state: >
-          {{ (states('sensor.schreibwerkstatt_chars') | int(0) / 1800) | round(0) }}
