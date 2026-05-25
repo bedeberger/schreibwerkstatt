@@ -14,6 +14,7 @@ const rateLimit = require('../lib/share-ratelimit');
 const { requireBookAccess, sendACLError, ACLError } = require('../lib/acl');
 const { setContext } = require('../lib/log-context');
 const { tServer } = require('../lib/i18n-server');
+const appSettings = require('../lib/app-settings');
 const logger = require('../logger');
 
 const router = express.Router();
@@ -167,6 +168,7 @@ router.get('/:token', async (req, res) => {
     comments_html: commentsHtml,
     form_block: formBlock,
     app_name: 'Schreibwerkstatt',
+    app_url: escHtml((appSettings.get('app.public_url') || '').replace(/\/$/, '') || '/'),
   });
 
   // View-Count non-blocking
