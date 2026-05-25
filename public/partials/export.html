@@ -39,7 +39,7 @@
     <button type="button"
             class="primary"
             :disabled="!$app.selectedBookId"
-            @click="$app.togglePdfExportCard()"
+            @click="_handoffToPdfCustom()"
             x-text="$app.t('book.export.pdfCustom')"></button>
   </div>
 

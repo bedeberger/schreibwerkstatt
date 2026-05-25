@@ -78,6 +78,7 @@ export function registerPdfExportCard() {
     _pollTimer: null,
     _onBookChanged: null,
     _onViewReset: null,
+    _onExportPreset: null,
 
     init() {
       this.$watch(() => window.__app.showPdfExportCard, async (visible) => {
@@ -90,6 +91,14 @@ export function registerPdfExportCard() {
       this.$watch(() => this.exportScope, () => this._ensureExportPicked());
       this.$watch(() => this.exportChapterId, () => { this.exportIncludeSubchapters = false; });
       this.$watch(() => window.__app?.currentPage?.id, () => this._ensureExportPicked());
+
+      this._onExportPreset = (e) => this._applyExportPreset(e.detail);
+      window.addEventListener('export:preset', this._onExportPreset);
+      const pending = window.__app?.__exportPreset;
+      if (pending) {
+        this._applyExportPreset(pending);
+        window.__app.__exportPreset = null;
+      }
 
       // book:changed räumt nur den laufenden Export-State (Buchwechsel = neuer
       // Render-Kontext). Profile-Liste bleibt erhalten.
@@ -122,8 +131,9 @@ export function registerPdfExportCard() {
       this._stopPoll();
       if (this._savedAtTimer)     { clearTimeout(this._savedAtTimer);     this._savedAtTimer = null; }
       if (this._exportStatusTimer) { clearTimeout(this._exportStatusTimer); this._exportStatusTimer = null; }
-      if (this._onBookChanged) window.removeEventListener('book:changed', this._onBookChanged);
-      if (this._onViewReset)   window.removeEventListener('view:reset',   this._onViewReset);
+      if (this._onBookChanged)  window.removeEventListener('book:changed',  this._onBookChanged);
+      if (this._onViewReset)    window.removeEventListener('view:reset',    this._onViewReset);
+      if (this._onExportPreset) window.removeEventListener('export:preset', this._onExportPreset);
     },
 
     // ── Profile-Liste / Auswahl ──────────────────────────────────────────
@@ -513,6 +523,15 @@ export function registerPdfExportCard() {
       if (!this.activeProfile) return;
       const arr = this.activeProfile.config.chapter.skipPageCounterPageIds || [];
       this.activeProfile.config.chapter.skipPageCounterPageIds = arr.filter(v => v !== id);
+    },
+    _applyExportPreset({ kind, id } = {}) {
+      if (kind === 'page' && id != null) {
+        this.exportPageId = id;
+        this.exportScope = 'page';
+      } else if (kind === 'chapter' && id != null) {
+        this.exportChapterId = id;
+        this.exportScope = 'chapter';
+      }
     },
     _ensureExportPicked() {
       const app = window.__app;

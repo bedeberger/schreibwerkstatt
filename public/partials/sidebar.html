@@ -177,6 +177,10 @@
               x-show="pageTreeMenuTarget.kind === 'page'"
               @click="pagetreeCtxEdit()"
               x-text="t('pagetreeCtx.edit')"></button>
+      <button type="button" role="menuitem" class="context-menu-item"
+              x-show="pageTreeMenuTarget.kind === 'page'"
+              @click="pagetreeCtxLektorieren()"
+              x-text="t('pagetreeCtx.lektorieren')"></button>
       <div class="context-menu-sep" role="separator"></div>
       <button type="button" role="menuitem" class="context-menu-item"
               @click="pagetreeCtxShare()"

@@ -6151,6 +6151,35 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 145 abgeschlossen (share_links, share_comments).');
   }
 
+  if (version < 146) {
+    // api_tokens: Bearer-Tokens fuer externe Metrics-Scraper (Prometheus/HA/Grafana).
+    // Plain-Token wird nur einmal beim Create zurueckgegeben; in der DB lebt nur der
+    // SHA-256-Hash. scopes als kommaseparierte Liste (aktuell nur 'metrics:read').
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS api_tokens (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        admin_email   TEXT NOT NULL REFERENCES app_users(email) ON DELETE CASCADE,
+        token_hash    TEXT NOT NULL UNIQUE,
+        display_name  TEXT NOT NULL,
+        scopes        TEXT NOT NULL DEFAULT 'metrics:read',
+        last_used_at  TEXT,
+        last_used_ip  TEXT,
+        expires_at    TEXT,
+        revoked_at    TEXT,
+        created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      )
+    `).run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_api_tokens_admin ON api_tokens(admin_email)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_api_tokens_hash ON api_tokens(token_hash)').run();
+
+    const fkErrors146 = db.pragma('foreign_key_check');
+    if (fkErrors146.length) {
+      throw new Error(`Migration 146: foreign_key_check meldet ${fkErrors146.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 146').run();
+    logger.info('DB-Migration auf Version 146 abgeschlossen (api_tokens fuer Prometheus-Scraper).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

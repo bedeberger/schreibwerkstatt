@@ -17,6 +17,17 @@ export function registerAdminSettingsCard() {
     adminSettingsProviderSubtab: 'claude',
     adminSettingsTestResult: null,
 
+    // ── API-Tokens (Tab `api`) — Prometheus/HA/Grafana-Scraper ──────────────
+    adminApiTokensList: [],
+    adminApiTokensLoading: false,
+    adminApiTokensLoaded: false,
+    adminApiTokensError: '',
+    adminApiTokensCreating: false,
+    adminApiTokensNewName: '',
+    adminApiTokensNewExpiresAt: '',
+    adminApiTokensJustCreated: null,
+    adminApiTokensCopiedAt: 0,
+
     _onViewReset: null,
 
     init() {

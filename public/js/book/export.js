@@ -67,4 +67,19 @@ export const exportMethods = {
     if (!app || !Array.isArray(app.pages)) return [];
     return app.pages.map(p => ({ value: p.id, label: p.name }));
   },
+
+  _handoffToPdfCustom() {
+    const app = window.__app;
+    if (!app) return;
+    let preset = null;
+    if (this.exportScope === 'page' && this.exportPageId)
+      preset = { kind: 'page', id: this.exportPageId };
+    else if (this.exportScope === 'chapter' && this.exportChapterId)
+      preset = { kind: 'chapter', id: this.exportChapterId };
+    if (preset) {
+      app.__exportPreset = preset;
+      window.dispatchEvent(new CustomEvent('export:preset', { detail: preset }));
+    }
+    app.togglePdfExportCard();
+  },
 };

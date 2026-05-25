@@ -301,6 +301,14 @@ app.use((req, res, next) => {
   next();
 });
 
+// ── Prometheus-Endpoint (vor Auth-Guard) ─────────────────────────────────────
+// /metrics nutzt Bearer-Token-Auth (lib/bearer-auth, Scope `metrics:read`).
+// Mount muss VOR dem Session-Guard liegen, sonst redirected der Guard externe
+// Scraper (HA/Prometheus/Grafana) auf /login. Die Route validiert den Token
+// selbst und setzt req.session.user falls gueltig; ungueltige Tokens enden in
+// 401 JSON ohne Redirect.
+app.use('/metrics', require('./routes/metrics'));
+
 // ── Auth-Guard ────────────────────────────────────────────────────────────────
 // API-Pfade → 401 JSON; HTML-Pfade → Redirect zu /auth/login
 const API_PREFIXES = ['/history/', '/figures/', '/locations/', '/songs/', '/jobs/', '/sync/', '/chat/', '/booksettings/', '/content/', '/books/', '/me/', '/admin/', '/local/', '/config', '/share/api/'];
@@ -385,6 +393,7 @@ app.use('/admin/settings', require('./routes/admin-settings'));
 app.use('/admin/usage', require('./routes/admin-usage'));
 app.use('/admin/logs', require('./routes/admin-logs'));
 app.use('/admin/registration-requests', require('./routes/admin-registration-requests'));
+app.use('/admin/api-tokens',            require('./routes/admin-api-tokens'));
 app.use('/local/categories', require('./routes/categories'));
 app.use('/blog', require('./routes/blog'));
 

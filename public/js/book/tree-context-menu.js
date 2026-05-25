@@ -96,6 +96,16 @@ export const treeContextMenuMethods = {
     this.startEdit?.();
   },
 
+  async pagetreeCtxLektorieren() {
+    const target = this.pageTreeMenuTarget;
+    this._hidePagetreeContextMenu();
+    if (!target || target.kind !== 'page') return;
+    const page = this._findTreePage(target.id);
+    if (!page) return;
+    await this.selectPage(page);
+    this.runCheck?.();
+  },
+
   pagetreeCtxShare() {
     const target = this.pageTreeMenuTarget;
     this._hidePagetreeContextMenu();

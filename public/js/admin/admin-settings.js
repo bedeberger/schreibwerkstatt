@@ -120,6 +120,107 @@ export const adminSettingsMethods = {
 
   adminSettingsSwitchTab(tab) {
     this.adminSettingsTab = tab;
+    if (tab === 'api' && !this.adminApiTokensLoaded) {
+      this.adminApiTokensLoad();
+    }
+  },
+
+  // ── API-Tokens (Tab `api`) ──────────────────────────────────────────────
+  // Plain-Token wird vom Server NUR einmal nach POST zurueckgegeben und im
+  // Frontend in `adminApiTokensJustCreated` zwischengespeichert, bis der
+  // User ihn ueber „Verbergen" wegklickt. DB speichert nur den SHA-256-Hash.
+
+  async adminApiTokensLoad() {
+    if (this.adminApiTokensLoading) return;
+    this.adminApiTokensLoading = true;
+    this.adminApiTokensError = '';
+    try {
+      const r = await fetch('/admin/api-tokens', { credentials: 'same-origin' });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data = await r.json();
+      this.adminApiTokensList = Array.isArray(data.tokens) ? data.tokens : [];
+      this.adminApiTokensLoaded = true;
+    } catch (e) {
+      this.adminApiTokensError = e.message;
+    } finally {
+      this.adminApiTokensLoading = false;
+    }
+  },
+
+  async adminApiTokensCreate() {
+    const name = (this.adminApiTokensNewName || '').trim();
+    if (!name) {
+      this.adminApiTokensError = window.__app.t('admin.settings.api.errorNameRequired');
+      return;
+    }
+    this.adminApiTokensCreating = true;
+    this.adminApiTokensError = '';
+    try {
+      const body = { display_name: name };
+      if (this.adminApiTokensNewExpiresAt) body.expires_at = this.adminApiTokensNewExpiresAt;
+      const r = await fetch('/admin/api-tokens', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify(body),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error_code || `HTTP ${r.status}`);
+      this.adminApiTokensJustCreated = j;
+      this.adminApiTokensNewName = '';
+      this.adminApiTokensNewExpiresAt = '';
+      await this.adminApiTokensLoad();
+    } catch (e) {
+      this.adminApiTokensError = e.message;
+    } finally {
+      this.adminApiTokensCreating = false;
+    }
+  },
+
+  async adminApiTokensRevoke(id) {
+    if (!confirm(window.__app.t('admin.settings.api.confirmRevoke'))) return;
+    try {
+      const r = await fetch(`/admin/api-tokens/${id}/revoke`, {
+        method: 'POST', credentials: 'same-origin',
+      });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        throw new Error(j.error_code || `HTTP ${r.status}`);
+      }
+      await this.adminApiTokensLoad();
+    } catch (e) {
+      this.adminApiTokensError = e.message;
+    }
+  },
+
+  async adminApiTokensDelete(id) {
+    if (!confirm(window.__app.t('admin.settings.api.confirmDelete'))) return;
+    try {
+      const r = await fetch(`/admin/api-tokens/${id}`, {
+        method: 'DELETE', credentials: 'same-origin',
+      });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        throw new Error(j.error_code || `HTTP ${r.status}`);
+      }
+      await this.adminApiTokensLoad();
+    } catch (e) {
+      this.adminApiTokensError = e.message;
+    }
+  },
+
+  async adminApiTokensCopyPlain() {
+    const t = this.adminApiTokensJustCreated?.plain_token;
+    if (!t) return;
+    try {
+      await navigator.clipboard.writeText(t);
+      this.adminApiTokensCopiedAt = Date.now();
+      setTimeout(() => { this.adminApiTokensCopiedAt = 0; }, 2000);
+    } catch (_) {}
+  },
+
+  adminApiTokensDismissPlain() {
+    this.adminApiTokensJustCreated = null;
   },
 
   adminSettingsIsDirty(key) {

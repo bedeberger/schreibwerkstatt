@@ -155,6 +155,68 @@
   font-size: var(--font-size-sm);
 }
 
+/* API-Tab: Token-Liste, Plain-Token-Reveal, Scrape-Snippets */
+.admin-api-tokens-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+
+.admin-api-tokens-table th,
+.admin-api-tokens-table td {
+  text-align: left;
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+
+.admin-api-tokens-table tr.is-revoked {
+  opacity: 0.6;
+}
+
+.admin-api-token-reveal {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.admin-api-token-reveal-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.admin-api-token-plain {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono, monospace);
+  font-size: var(--font-size-sm);
+  word-break: break-all;
+  user-select: all;
+}
+
+.admin-api-snippet {
+  margin: var(--space-sm) 0 0;
+  padding: var(--space-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono, monospace);
+  font-size: var(--font-size-xs);
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.admin-settings-refresh-inline {
+  margin-left: auto;
+  font-size: var(--font-size-xs);
+  padding: var(--space-2xs) var(--space-sm);
+}
+
 @media (max-width: 600px) {
   .admin-settings-tabs {
     overflow-x: auto;
