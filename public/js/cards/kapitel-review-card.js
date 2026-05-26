@@ -432,9 +432,8 @@ export function registerKapitelReviewCard() {
       return this.kapitelReviewHistory?.[String(window.__app.kapitelReviewChapterId)] || [];
     },
 
-    // Schnell eine Seite im aktuellen Kapitel anlegen. BookStack hängt neue
-    // Seiten automatisch ans Ende an — Baum + Flat-Liste lokal einhängen, dann
-    // zur neuen Seite springen.
+    // Schnell eine Seite im aktuellen Kapitel anlegen — Baum + Flat-Liste lokal
+    // einhängen, dann zur neuen Seite springen.
     async createKapitelPage() {
       const root = window.__app;
       const chapter = this.kapitelReviewSelectedChapter();
@@ -452,14 +451,18 @@ export function registerKapitelReviewCard() {
         if (!created?.id) return;
         const newPage = {
           ...created,
+          priority: created.position, // legacy Sort-Alias wie decoratePage
           chapterName: chapter.name,
         };
-        root.pages.push(newPage);
+        root.pages = [...root.pages, newPage];
         const chapterItem = root.tree.find(i =>
           i.type === 'chapter' && !i.solo && String(i.id) === String(chapter.id)
         );
         if (chapterItem) {
-          chapterItem.pages.push(newPage);
+          // Reassignment statt push: Property-Set auf `.pages` triggert die
+          // Alpine-Watcher zuverlässig — nested-Array-push tut das nicht immer
+          // (Sidebar-Tree würde die neue Seite sonst erst nach Reload zeigen).
+          chapterItem.pages = [...chapterItem.pages, newPage];
           chapterItem.open = true;
         }
         root.tokEsts[newPage.id] = { tok: 0, words: 0, chars: 0 };

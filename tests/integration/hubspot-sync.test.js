@@ -40,16 +40,17 @@ test('hubspot-import: zwei PUBLISHED-Posts → Pages + Jahres-Kapitel + Link-Ein
   const BOOK_ID = 70;
   seedBlogBook(BOOK_ID);
   hubspot.upsertConnection({ bookId: BOOK_ID, token: 'pat-x', blogId: '555', authorId: '111' });
+  // Newest-first geliefert (HubSpot-Default) — Import muss aufsteigend sortieren.
   mock.state.posts = [
-    {
-      id: '1001', htmlTitle: 'Erster Beitrag', name: 'Erster Beitrag',
-      publishDate: '2024-03-15T10:00:00.000Z', state: 'PUBLISHED',
-      postBody: '<p>Hallo Welt</p><img src="https://x/foo.png">',
-    },
     {
       id: '1002', htmlTitle: 'Zweiter Beitrag', name: 'Zweiter Beitrag',
       publishDate: '2025-01-02T10:00:00.000Z', state: 'PUBLISHED',
       postBody: '<p>Mehr Text</p>',
+    },
+    {
+      id: '1001', htmlTitle: 'Erster Beitrag', name: 'Erster Beitrag',
+      publishDate: '2024-03-15T10:00:00.000Z', state: 'PUBLISHED',
+      postBody: '<p>Hallo Welt</p><img src="https://x/foo.png">',
     },
   ];
 
@@ -71,6 +72,14 @@ test('hubspot-import: zwei PUBLISHED-Posts → Pages + Jahres-Kapitel + Link-Ein
   const chapters = ctx.dbSchema.db.prepare('SELECT chapter_name FROM chapters WHERE book_id = ?').all(BOOK_ID);
   const chNames = chapters.map(c => c.chapter_name).sort();
   assert.deepEqual(chNames, ['2024', '2025']);
+
+  // Reihenfolge: trotz newest-first-Lieferung landen Kapitel + Seiten in
+  // Anlage-(=chronologischer)-Reihenfolge (page_id/chapter_id aufsteigend).
+  const chOrder = ctx.dbSchema.db.prepare('SELECT chapter_name FROM chapters WHERE book_id = ? ORDER BY chapter_id').all(BOOK_ID);
+  assert.deepEqual(chOrder.map(c => c.chapter_name), ['2024', '2025']);
+  const pageOrder = ctx.dbSchema.db.prepare('SELECT page_name FROM pages WHERE book_id = ? ORDER BY page_id').all(BOOK_ID);
+  assert.match(pageOrder[0].page_name, /^2024-03-15:/);
+  assert.match(pageOrder[1].page_name, /^2025-01-02:/);
 
   // Bild im Body wurde gestrippt.
   const body = ctx.dbSchema.db.prepare('SELECT body_html FROM pages WHERE page_id = ?').get(pages[0].page_id);

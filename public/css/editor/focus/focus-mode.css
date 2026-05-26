@@ -179,6 +179,9 @@ body.palette-open { overflow: hidden; overscroll-behavior: contain; }
   -webkit-text-size-adjust: 100%;
   hyphens: none;
   -webkit-hyphens: none;
+  /* Lange Tokens ohne Whitespace brechen im Container statt horizontal zu
+     overflowen. Vererbt an Descendants; `pre`/`code` bleiben via white-space. */
+  overflow-wrap: anywhere;
   caret-color: var(--color-primary);
 }
 
@@ -302,7 +305,6 @@ body.palette-open { overflow: hidden; overscroll-behavior: contain; }
   text-wrap: wrap;
 }
 
-.focus-editor__content a { overflow-wrap: anywhere; }
 
 /* Bold/Italic im Fokus-Modus sichtbar lassen — Ctrl+B/Ctrl+I sind als
    Shortcut explizit dokumentiert. <u> bleibt geplättet, weil Underline mit

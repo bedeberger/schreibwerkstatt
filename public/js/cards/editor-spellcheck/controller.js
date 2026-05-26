@@ -84,6 +84,7 @@ export function createSpellcheckController({
   let attached = false;
 
   let debounceTimer = null;
+  let extCheckTimer = null;
   let abortCtrl = null;
   let seq = 0;
   let lastHtmlSnapshot = '';
@@ -612,6 +613,19 @@ export function createSpellcheckController({
     return false;
   }
 
+  // Throttle: der Extension-Observer haengt an document.body{subtree} und
+  // feuert bei JEDEM Keystroke (Editor-Mutationen). _detectExtension scannt das
+  // ganze Dokument (querySelector) — ungedrosselt waere das Tipp-Latenz pro
+  // Tastendruck auf grossen Seiten. Trailing-Throttle reicht: Extension-Marker
+  // im DOM verschwinden nicht zeitkritisch.
+  function _scheduleExtensionCheck() {
+    if (extCheckTimer) return;
+    extCheckTimer = setTimeout(() => {
+      extCheckTimer = null;
+      _updateExtensionState();
+    }, 300);
+  }
+
   function _updateExtensionState() {
     const present = _detectExtension();
     if (present && !extensionDetected) {
@@ -683,8 +697,13 @@ export function createSpellcheckController({
     }
     scrollEl = scrollContainer || _findScrollParent(root);
 
-    extensionObs = new MutationObserver(() => _updateExtensionState());
-    extensionObs.observe(document.body, { childList: true, subtree: true, attributes: true });
+    extensionObs = new MutationObserver(() => _scheduleExtensionCheck());
+    extensionObs.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class'],
+    });
     _updateExtensionState();
 
     // Sofort-Check beim Attach.
@@ -695,6 +714,7 @@ export function createSpellcheckController({
     if (!attached) return;
     attached = false;
     if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; }
+    if (extCheckTimer) { clearTimeout(extCheckTimer); extCheckTimer = null; }
     if (abortCtrl) { abortCtrl.abort(); abortCtrl = null; }
     if (mutationObs) { mutationObs.disconnect(); mutationObs = null; }
     if (resizeObs) { resizeObs.disconnect(); resizeObs = null; }

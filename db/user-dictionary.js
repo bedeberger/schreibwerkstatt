@@ -7,8 +7,8 @@
 // vorkommt (Scope: betroffenes Buch bzw. alle Buecher mit book_access).
 //
 // Granularitaet:
-//   - book_id = 0     -> User-globaler Eintrag (alle Buecher)
-//   - book_id > 0     -> nur fuer das jeweilige Buch
+//   - book_id = NULL  -> User-globaler Eintrag (alle Buecher)
+//   - book_id > 0     -> nur fuer das jeweilige Buch (FK CASCADE bei Buchloeschung)
 //   - lang = '*'      -> sprachuebergreifend
 //   - lang = 'de-CH'  -> nur fuer diese Locale
 //
@@ -25,7 +25,7 @@ const _stmtList = db.prepare(
 const _stmtListForCheck = db.prepare(
   `SELECT word FROM user_dictionary
    WHERE user_email = ?
-     AND (book_id = 0 OR book_id = ?)
+     AND (book_id IS NULL OR book_id = ?)
      AND (lang = '*' OR lang = ?)`
 );
 const _stmtInsert = db.prepare(
@@ -34,7 +34,7 @@ const _stmtInsert = db.prepare(
 );
 const _stmtDelete = db.prepare(
   `DELETE FROM user_dictionary
-   WHERE user_email = ? AND book_id = ? AND word = ? AND lang = ?`
+   WHERE user_email = ? AND book_id IS ? AND word = ? AND lang = ?`
 );
 // Wort-scoped Purge: nur Pages mit body_html LIKE %word% verlieren ihren Cache.
 // LIKE COLLATE NOCASE deckt ASCII-Case ab; Umlaute bleiben case-sensitive --
@@ -65,7 +65,7 @@ function listForUser(userEmail) {
 
 function getCheckSet(userEmail, bookId, lang) {
   if (!userEmail) return new Set();
-  const rows = _stmtListForCheck.all(userEmail, bookId || 0, lang || 'auto');
+  const rows = _stmtListForCheck.all(userEmail, bookId || null, lang || 'auto');
   const set = new Set();
   for (const r of rows) {
     if (r.word) set.add(r.word.toLowerCase());
@@ -76,14 +76,14 @@ function getCheckSet(userEmail, bookId, lang) {
 function add(userEmail, { word, bookId = 0, lang = '*' }) {
   if (!userEmail || !word || !word.trim()) return false;
   const w = word.trim();
-  _stmtInsert.run(userEmail, bookId || 0, w, lang || '*');
+  _stmtInsert.run(userEmail, bookId || null, w, lang || '*');
   _purgeCacheForWord(userEmail, bookId, w);
   return true;
 }
 
 function remove(userEmail, { word, bookId = 0, lang = '*' }) {
   if (!userEmail || !word) return 0;
-  const r = _stmtDelete.run(userEmail, bookId || 0, word, lang || '*');
+  const r = _stmtDelete.run(userEmail, bookId || null, word, lang || '*');
   if (r.changes > 0) _purgeCacheForWord(userEmail, bookId, word);
   return r.changes;
 }

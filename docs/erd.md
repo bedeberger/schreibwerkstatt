@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 151, 82 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 152, 82 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -92,6 +92,8 @@ erDiagram
   app_users ||--o{ page_presence     : pings
   app_users ||--o{ app_users_devices : "owns devices"
   app_users ||--o{ budget_alerts     : dedupes
+  app_users ||--o{ user_dictionary   : owns
+  books     ||--o{ user_dictionary   : "scoped (NULL=global)"
 
   user_invites ||--o{ registration_requests : "linked invite"
   pages ||--o{ page_presence         : "online viewers"
@@ -763,10 +765,10 @@ erDiagram
     TEXT    created_at
   }
   user_dictionary {
-    TEXT    user_email PK,FK "CASCADE auf app_users"
-    INTEGER book_id    PK    "0 = global, sonst pro Buch"
-    TEXT    word       PK    "User-spezifisches Wort"
-    TEXT    lang       PK    "* = alle Sprachen, sonst Locale-Tag"
+    TEXT    user_email FK "CASCADE auf app_users"
+    INTEGER book_id    FK "NULL = global, sonst pro Buch; CASCADE auf books"
+    TEXT    word          "User-spezifisches Wort"
+    TEXT    lang          "* = alle Sprachen, sonst Locale-Tag"
     TEXT    created_at
   }
 

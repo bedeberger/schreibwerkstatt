@@ -48,15 +48,17 @@ async function _resolveYearChapter(bookId, year, cache) {
   return created.id;
 }
 
+function _postDate(post) {
+  return post.publishDate || post.created || post.updated || '';
+}
+
 function _postYear(post) {
-  const src = post.publishDate || post.created || post.updated || '';
-  const y = String(src).slice(0, 4);
+  const y = String(_postDate(post)).slice(0, 4);
   return /^\d{4}$/.test(y) ? y : 'Undatiert';
 }
 
 function _postPageName(post) {
-  const src = post.publishDate || post.created || post.updated || '';
-  const day = String(src).slice(0, 10);
+  const day = String(_postDate(post)).slice(0, 10);
   const title = (post.htmlTitle || post.name || post.slug || `Post ${post.id}`).trim();
   return /^\d{4}-\d{2}-\d{2}$/.test(day) ? `${day}: ${title}` : title;
 }
@@ -99,11 +101,22 @@ async function runHubspotImportJob(jobId, bookId, userEmail) {
     let dropped = 0;
     const chapterCache = new Map();
 
+    // Alle Posts puffern, dann aufsteigend nach Datum sortieren. HubSpot liefert
+    // ohne `sort`-Param newest-first; ungesteuert laegen Jahres-Kapitel und
+    // Seiten reverse-chronologisch. Sortieren erzwingt aelteste→neueste, sodass
+    // Kapitel-Anlage und book_order chronologisch wachsen.
+    const posts = [];
     for await (const post of client.iteratePosts({
       authorId: conn.authorId,
       blogId: conn.blogId,
       state: 'PUBLISHED',
     })) {
+      if (_abortSignal(jobId)?.aborted) throw new DOMException('Aborted', 'AbortError');
+      posts.push(post);
+    }
+    posts.sort((a, b) => String(_postDate(a)).localeCompare(String(_postDate(b))));
+
+    for (const post of posts) {
       if (_abortSignal(jobId)?.aborted) throw new DOMException('Aborted', 'AbortError');
 
       // Idempotenz: bereits importierter Post (existing link) wird übersprungen.

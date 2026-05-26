@@ -6381,6 +6381,73 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 151 abgeschlossen (pages.book_id FK auf books CASCADE).');
   }
 
+  if (version < 152) {
+    // user_dictionary.book_id wird nullable FK auf books(book_id) ON DELETE
+    // CASCADE. Vorher: lose INTEGER-Spalte mit Sentinel book_id=0 (= user-global)
+    // und keiner Constraint -> geloeschte Buecher hinterliessen orphan-Eintraege.
+    // Neu: NULL = user-global, book_id > 0 cascadet bei Buchloeschung.
+    db.pragma('foreign_keys = OFF');
+
+    // Orphan-Diagnose vor dem Copy: book_id zeigt auf geloeschtes Buch (Sentinel
+    // 0 ausgenommen). Solche Rows werden NICHT mitkopiert -- nicht zu NULL machen,
+    // sonst wuerden sie faelschlich zu user-globalen Woertern. Genau der Muell,
+    // den die FK kuenftig verhindert.
+    const dictOrphans = db.prepare(
+      'SELECT COUNT(*) AS n FROM user_dictionary WHERE book_id != 0 AND book_id NOT IN (SELECT book_id FROM books)'
+    ).get().n;
+    if (dictOrphans > 0) {
+      logger.info(`Migration 152: ${dictOrphans} orphan-Dictionary-Eintraege werden verworfen (book_id ohne books-Row).`);
+    }
+
+    db.prepare('DROP TABLE IF EXISTS user_dictionary_new').run();
+    db.prepare(`
+      CREATE TABLE user_dictionary_new (
+        user_email TEXT NOT NULL REFERENCES app_users(email) ON DELETE CASCADE,
+        book_id    INTEGER REFERENCES books(book_id) ON DELETE CASCADE,
+        word       TEXT NOT NULL,
+        lang       TEXT NOT NULL DEFAULT '*',
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      )
+    `).run();
+    // Sentinel 0 -> NULL waehrend des Copy (alte Spalte ist NOT NULL, NULL erst
+    // in der neuen nullable Spalte moeglich). Orphans (book_id != 0 ohne books-Row)
+    // fallen via WHERE raus.
+    db.prepare(`
+      INSERT INTO user_dictionary_new (user_email, book_id, word, lang, created_at)
+      SELECT user_email,
+             CASE WHEN book_id = 0 THEN NULL ELSE book_id END,
+             word, lang, created_at
+        FROM user_dictionary
+       WHERE book_id = 0 OR book_id IN (SELECT book_id FROM books)
+    `).run();
+    db.prepare('DROP TABLE user_dictionary').run();
+    db.prepare('ALTER TABLE user_dictionary_new RENAME TO user_dictionary').run();
+
+    // Dedup-Constraint via partielle Unique-Indexe statt PK: NULL in einem
+    // PK-Bestandteil gilt in SQLite als distinct -> wuerde doppelte user-globale
+    // Eintraege zulassen. Zwei Teil-Indexe decken global (book_id IS NULL) und
+    // buch-scoped (book_id IS NOT NULL) sauber ab.
+    db.prepare(`
+      CREATE UNIQUE INDEX idx_user_dictionary_global
+        ON user_dictionary(user_email, word, lang) WHERE book_id IS NULL
+    `).run();
+    db.prepare(`
+      CREATE UNIQUE INDEX idx_user_dictionary_scoped
+        ON user_dictionary(user_email, book_id, word, lang) WHERE book_id IS NOT NULL
+    `).run();
+    db.prepare('CREATE INDEX idx_user_dictionary_user ON user_dictionary(user_email)').run();
+    db.prepare('CREATE INDEX idx_user_dictionary_book ON user_dictionary(book_id)').run();
+
+    db.pragma('foreign_keys = ON');
+
+    const fkErrors152 = db.pragma('foreign_key_check');
+    if (fkErrors152.length) {
+      throw new Error(`Migration 152: foreign_key_check meldet ${fkErrors152.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 152').run();
+    logger.info('DB-Migration auf Version 152 abgeschlossen (user_dictionary.book_id nullable FK auf books CASCADE).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

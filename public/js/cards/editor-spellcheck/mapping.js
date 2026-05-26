@@ -80,28 +80,58 @@ export function buildOffsetTable(root) {
   return { text, positions };
 }
 
+// Positions sind nach `start` aufsteigend + nicht-ueberlappend (TreeWalker-
+// Dokumentreihenfolge). Darum Binary-Search statt Linear-Scan — bei grossen
+// Seiten (viele Text-Nodes × viele Matches) waere O(M·P) sonst quadratisch und
+// blockiert beim Render der LT-Antwort den Main-Thread.
+
+// Index der Position, die `target` enthaelt (p.start <= target < p.end), sonst
+// -1. `target` faellt in eine Block-Break-Luecke (\n\n ohne Node) → -1.
+function _findStartIndex(positions, target) {
+  let lo = 0;
+  let hi = positions.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const p = positions[mid];
+    if (target < p.start) hi = mid - 1;
+    else if (target >= p.end) lo = mid + 1;
+    else return mid;
+  }
+  return -1;
+}
+
+// Index der Position mit p.start < end <= p.end (end ist exklusive Grenze, darf
+// auf p.end fallen), sonst -1.
+function _findEndIndex(positions, end) {
+  let lo = 0;
+  let hi = positions.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const p = positions[mid];
+    if (end <= p.start) hi = mid - 1;
+    else if (end > p.end) lo = mid + 1;
+    else return mid;
+  }
+  return -1;
+}
+
 // Lokalisiert Offset-Range in der Positions-Tabelle (pure, testbar ohne Range).
 // Liefert { startNode, startOffset, endNode, endOffset } oder null.
 export function locateOffset(table, offset, length) {
   if (!table || !table.positions || length <= 0) return null;
   const end = offset + length;
-  let startNode = null;
-  let startOffset = 0;
-  let endNode = null;
-  let endOffset = 0;
-  for (const p of table.positions) {
-    if (startNode === null && offset >= p.start && offset < p.end) {
-      startNode = p.node;
-      startOffset = offset - p.start;
-    }
-    if (end > p.start && end <= p.end) {
-      endNode = p.node;
-      endOffset = end - p.start;
-      break;
-    }
-  }
-  if (!startNode || !endNode) return null;
-  return { startNode, startOffset, endNode, endOffset };
+  const si = _findStartIndex(table.positions, offset);
+  if (si < 0) return null;
+  const ei = _findEndIndex(table.positions, end);
+  if (ei < 0) return null;
+  const sp = table.positions[si];
+  const ep = table.positions[ei];
+  return {
+    startNode: sp.node,
+    startOffset: offset - sp.start,
+    endNode: ep.node,
+    endOffset: end - ep.start,
+  };
 }
 
 export function rangeFromOffset(table, offset, length) {
