@@ -68,7 +68,7 @@ body.sidebar-resizing iframe {
   .editor-chat-split,
   .kapitel-ideen-split {
     display: grid;
-    grid-template-columns: 1fr 420px;
+    grid-template-columns: minmax(0, 1fr) 420px;
     gap: 0 1rem;
     align-items: start;
   }
