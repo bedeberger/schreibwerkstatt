@@ -148,16 +148,16 @@
   min-width: 0;
   margin-left: auto;
 }
-.card-subline .editor-blog-status,
+.card-subline .editor-sync-status,
 .card-subline .tok-stats {
   display: inline-flex;
   align-items: center;
   gap: var(--space-xs);
 }
-.editor-blog-push .icon,
-.editor-blog-conflict .icon,
-.editor-blog-view .icon { width: 0.9em; height: 0.9em; }
-.editor-blog-push-pct {
+.editor-sync-push .icon,
+.editor-sync-conflict .icon,
+.editor-sync-view .icon { width: 0.9em; height: 0.9em; }
+.editor-sync-push-pct {
   font-size: 0.85em;
   font-variant-numeric: tabular-nums;
   margin-left: var(--space-2xs);

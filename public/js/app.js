@@ -227,6 +227,17 @@ document.addEventListener('alpine:init', () => {
   Alpine.magic('blog', () => window.__blogCard);
   // Magic `$hubspot` — analog zu $blog, verweist auf den hubspotSyncCard-Anker.
   Alpine.magic('hubspot', () => window.__hubspotCard);
+  // Magic `$syncProviders` — Liste aller verbundenen Sync-Provider, sortiert
+  // nach Registrierungsreihenfolge (blog, hubspot, …). Templates iterieren
+  // hierüber statt copy-paste pro Provider; jeder Eintrag hat `{ key, card }`.
+  // Reaktiv via `.connected`-Lesen am Card-Proxy.
+  Alpine.magic('syncProviders', () => {
+    const candidates = [
+      { key: 'blog', card: window.__blogCard },
+      { key: 'hubspot', card: window.__hubspotCard },
+    ];
+    return candidates.filter(p => p.card && p.card.connected);
+  });
 
   registerCatalogStore();
   registerStilCard();

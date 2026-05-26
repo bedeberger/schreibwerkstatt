@@ -13,6 +13,36 @@
 
 const COLLAB_POLL_MS = 5000;
 
+// Stabile Device-ID pro Browser-Profil. localStorage ueberlebt Reloads,
+// trennt Browser-Profile/Geraete sauber. Beim ersten Aufruf wird eine UUID
+// generiert; spaeter wiederverwendet — selber Browser = selbes Device.
+const DEVICE_ID_KEY = 'sw_device_id';
+let _cachedDeviceId = null;
+function _getDeviceId() {
+  if (_cachedDeviceId) return _cachedDeviceId;
+  try {
+    let id = localStorage.getItem(DEVICE_ID_KEY);
+    if (!id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+      id = (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : _uuidFallback();
+      localStorage.setItem(DEVICE_ID_KEY, id);
+    }
+    _cachedDeviceId = id;
+    return id;
+  } catch {
+    // Safari Private Mode etc. — Ephemeral-UUID pro Session, kein Persist.
+    if (!_cachedDeviceId) _cachedDeviceId = _uuidFallback();
+    return _cachedDeviceId;
+  }
+}
+function _uuidFallback() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+
 export const appCollabMethods = {
   _startCollabPoll(bookId) {
     this._stopCollabPoll();
@@ -82,7 +112,8 @@ export const appCollabMethods = {
   async _collabFetchPresence(bookId) {
     let data;
     try {
-      const r = await fetch('/content/books/' + bookId + '/presence');
+      const url = '/content/books/' + bookId + '/presence?device_id=' + encodeURIComponent(_getDeviceId());
+      const r = await fetch(url);
       if (!r.ok) return;
       data = await r.json();
     } catch { return; }
@@ -95,6 +126,9 @@ export const appCollabMethods = {
       map[key].push({
         user_email: p.user_email,
         user_display_name: p.user_display_name || p.user_email,
+        device_id: p.device_id,
+        device_label: p.device_label || null,
+        is_self: !!p.is_self,
         last_ping_at: p.last_ping_at,
       });
     }
@@ -176,8 +210,9 @@ export const appCollabMethods = {
     this.recentRemoteEdits = new Set(this.recentRemoteEdits);
   },
 
-  // Liefert das Presence-Array fuer eine Seite (nur fremde User; eigene
-  // sind serverseitig schon ausgefiltert). [] wenn niemand.
+  // Liefert das Presence-Array fuer eine Seite. Eigene aktuelle Session ist
+  // serverseitig schon ausgefiltert; eigene andere Geraete bleiben drin mit
+  // `is_self: true`. [] wenn niemand.
   presenceFor(pageId) {
     if (!pageId) return [];
     return this.livePresenceByPage[String(pageId)] || [];
@@ -219,6 +254,7 @@ export const appCollabMethods = {
       fetch('/content/pages/' + pageId + '/presence', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ device_id: _getDeviceId() }),
       }).catch(() => {});
     } catch {}
   },
@@ -226,8 +262,14 @@ export const appCollabMethods = {
   _sendPresenceLeave(pageId) {
     if (!pageId) return;
     try {
-      fetch('/content/pages/' + pageId + '/presence', {
+      // device_id auch als Query-Param: keepalive/sendBeacon koennen Body
+      // verschlucken; Server akzeptiert beide.
+      const did = _getDeviceId();
+      fetch('/content/pages/' + pageId + '/presence?device_id=' + encodeURIComponent(did), {
         method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ device_id: did }),
+        keepalive: true,
       }).catch(() => {});
     } catch {}
   },

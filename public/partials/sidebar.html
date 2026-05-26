@@ -113,10 +113,13 @@
                 @mouseenter.stop="_showStatusTip($el, page)"
                 @mouseleave.stop="_hideStatusTip()"></span>
               <span x-text="page.name"></span>
-              <template x-for="p in presenceFor(page.id)" :key="p.user_email">
+              <template x-for="p in presenceFor(page.id)" :key="p.device_id || p.user_email">
                 <span class="presence-pip"
+                      :class="{ 'presence-pip--self': p.is_self }"
                       :style="`--avatar-hue: ${userAvatarHue(p.user_email)}`"
-                      :data-tip="t('collab.presence.editing', { user: p.user_display_name })"
+                      :data-tip="p.is_self
+                        ? t('presence.self.editing', { device: p.device_label || t('presence.device.unknown') })
+                        : t('collab.presence.editing', { user: p.user_display_name })"
                       x-text="userInitials(p.user_email)"></span>
               </template>
             </span>

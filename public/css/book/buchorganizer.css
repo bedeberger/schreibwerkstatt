@@ -331,25 +331,31 @@
   }
 }
 
-/* Blog-Status-Pills — Subklassen von .badge (components/buttons-badges.css).
-   Eckig (radius-sm = 0), gefüllter Background, Status-spezifische Farben. */
-.badge--blog-synced      { background: var(--color-tag-bg);  color: var(--card-accent-blog); }
-.badge--blog-push-needed { background: var(--color-warn-bg); color: var(--color-warn-text); }
-.badge--blog-conflict    { background: var(--color-err-bg);  color: var(--color-err-text); }
-.badge--blog-new         { background: var(--color-tag-bg);  color: var(--color-muted); }
-.organizer-blog-push,
-.organizer-blog-conflict {
+/* Sync-Status-Pills (WordPress-Blog, HubSpot, künftige Provider) — Subklassen
+   von .badge (components/buttons-badges.css). Eckig (radius-sm = 0), gefüllter
+   Background, Status-spezifische Farben. `--sync-accent` setzt der jeweilige
+   Provider-Wrapper (.sync-provider--blog/--hubspot). */
+.sync-provider--blog    { --sync-accent: var(--card-accent-blog); }
+.sync-provider--hubspot { --sync-accent: var(--card-accent-hubspot); }
+
+.badge--sync-synced,
+.badge--sync-pushed      { background: var(--color-tag-bg);  color: var(--sync-accent); }
+.badge--sync-push-needed { background: var(--color-warn-bg); color: var(--color-warn-text); }
+.badge--sync-conflict    { background: var(--color-err-bg);  color: var(--color-err-text); }
+.badge--sync-new         { background: var(--color-tag-bg);  color: var(--color-muted); }
+.organizer-sync-push,
+.organizer-sync-conflict {
   flex: none;
 }
-.organizer-blog-push .icon { width: 0.9em; height: 0.9em; }
-.organizer-blog-push .spinner,
-.organizer-blog-push .organizer-blog-push-pct {
+.organizer-sync-push .icon { width: 0.9em; height: 0.9em; }
+.organizer-sync-push .spinner,
+.organizer-sync-push .organizer-sync-push-pct {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2xs);
   font-variant-numeric: tabular-nums;
 }
-.organizer-blog-push-pct { font-size: 0.85em; }
+.organizer-sync-push-pct { font-size: 0.85em; }
 
 /* Konflikt-Diff-Modal */
 .blog-conflict-overlay {

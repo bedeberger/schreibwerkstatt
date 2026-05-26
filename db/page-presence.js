@@ -3,6 +3,9 @@
 // Client pingt im Edit-Mode alle 30s; Server filtert Stale-Eintraege (>90s)
 // bei jedem List-Read. Daten sind ephemeral — kein Audit-Wert, daher kein
 // Aufraeum-Cron (Stale-Filter beim Read reicht).
+//
+// PK ist (page_id, user_email, device_id): derselbe User auf zwei Geraeten
+// belegt zwei Rows, damit das eigene andere Geraet im UI sichtbar bleibt.
 
 const { db } = require('./connection');
 const { NOW_ISO_SQL } = require('./now');
@@ -17,33 +20,36 @@ function _staleCutoffIso() {
 }
 
 const _stmtUpsert = db.prepare(`
-  INSERT INTO page_presence (page_id, user_email, book_id, last_ping_at)
-  VALUES (?, ?, ?, ${NOW_ISO_SQL})
-  ON CONFLICT(page_id, user_email)
+  INSERT INTO page_presence (page_id, user_email, device_id, book_id, last_ping_at)
+  VALUES (?, ?, ?, ?, ${NOW_ISO_SQL})
+  ON CONFLICT(page_id, user_email, device_id)
   DO UPDATE SET last_ping_at = ${NOW_ISO_SQL}
 `);
 
-function ping(pageId, userEmail, bookId) {
-  if (!pageId || !userEmail || !bookId) return false;
-  _stmtUpsert.run(pageId, userEmail, bookId);
+function ping(pageId, userEmail, bookId, deviceId) {
+  if (!pageId || !userEmail || !bookId || !deviceId) return false;
+  _stmtUpsert.run(pageId, userEmail, deviceId, bookId);
   return true;
 }
 
 const _stmtRemove = db.prepare(`
-  DELETE FROM page_presence WHERE page_id = ? AND user_email = ?
+  DELETE FROM page_presence
+   WHERE page_id = ? AND user_email = ? AND device_id = ?
 `);
 
-function leave(pageId, userEmail) {
-  if (!pageId || !userEmail) return false;
-  const r = _stmtRemove.run(pageId, userEmail);
+function leave(pageId, userEmail, deviceId) {
+  if (!pageId || !userEmail || !deviceId) return false;
+  const r = _stmtRemove.run(pageId, userEmail, deviceId);
   return r.changes > 0;
 }
 
 const _stmtListForBook = db.prepare(`
-  SELECT p.page_id, p.user_email, p.book_id, p.last_ping_at,
-         u.display_name AS user_display_name
+  SELECT p.page_id, p.user_email, p.device_id, p.book_id, p.last_ping_at,
+         u.display_name AS user_display_name,
+         d.label        AS device_label
     FROM page_presence p
-    LEFT JOIN app_users u ON u.email = p.user_email
+    LEFT JOIN app_users          u ON u.email     = p.user_email
+    LEFT JOIN app_users_devices  d ON d.device_id = p.device_id
    WHERE p.book_id = ?
      AND p.last_ping_at > ?
    ORDER BY p.last_ping_at DESC
@@ -55,10 +61,12 @@ function listForBook(bookId) {
 }
 
 const _stmtListForPage = db.prepare(`
-  SELECT p.page_id, p.user_email, p.book_id, p.last_ping_at,
-         u.display_name AS user_display_name
+  SELECT p.page_id, p.user_email, p.device_id, p.book_id, p.last_ping_at,
+         u.display_name AS user_display_name,
+         d.label        AS device_label
     FROM page_presence p
-    LEFT JOIN app_users u ON u.email = p.user_email
+    LEFT JOIN app_users          u ON u.email     = p.user_email
+    LEFT JOIN app_users_devices  d ON d.device_id = p.device_id
    WHERE p.page_id = ?
      AND p.last_ping_at > ?
    ORDER BY p.last_ping_at DESC

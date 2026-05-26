@@ -6222,6 +6222,56 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 147 abgeschlossen (hubspot_connections + hubspot_page_links).');
   }
 
+  if (version < 148) {
+    // Multi-Device-Presence: jedes Geraet (Browser/localStorage-UUID) bekommt
+    // einen eigenen Heartbeat-Slot. PK auf page_presence wird um device_id
+    // erweitert. Neue Tabelle app_users_devices haelt Label + UA pro Device
+    // (Schema bereit fuer kuenftige Settings-UI).
+    db.pragma('foreign_keys = OFF');
+
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS app_users_devices (
+        device_id     TEXT PRIMARY KEY,
+        user_email    TEXT NOT NULL REFERENCES app_users(email) ON DELETE CASCADE,
+        label         TEXT,
+        user_agent    TEXT,
+        created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        last_seen_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      )
+    `).run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_app_users_devices_user ON app_users_devices(user_email)').run();
+
+    // page_presence: PK auf (page_id, user_email, device_id) erweitern.
+    // Recreate-Pattern. Alte Rows haben keinen device_id — Drop akzeptiert
+    // (90s-Stale-Filter laufen sie eh aus, kein Audit-Wert).
+    db.prepare('DROP TABLE IF EXISTS page_presence_new').run();
+    db.prepare(`
+      CREATE TABLE page_presence_new (
+        page_id      INTEGER NOT NULL REFERENCES pages(page_id)            ON DELETE CASCADE,
+        user_email   TEXT    NOT NULL REFERENCES app_users(email)          ON DELETE CASCADE,
+        device_id    TEXT    NOT NULL REFERENCES app_users_devices(device_id) ON DELETE CASCADE,
+        book_id      INTEGER NOT NULL REFERENCES books(book_id)            ON DELETE CASCADE,
+        last_ping_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        PRIMARY KEY (page_id, user_email, device_id)
+      )
+    `).run();
+    // Alte Rows ohne device_id absichtlich nicht kopieren — neue Pings
+    // legen frische Eintraege binnen 30s wieder an.
+    db.prepare('DROP TABLE page_presence').run();
+    db.prepare('ALTER TABLE page_presence_new RENAME TO page_presence').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_page_presence_book ON page_presence(book_id, last_ping_at DESC)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_page_presence_ping ON page_presence(last_ping_at)').run();
+
+    db.pragma('foreign_keys = ON');
+
+    const fkErrors148 = db.pragma('foreign_key_check');
+    if (fkErrors148.length) {
+      throw new Error(`Migration 148: foreign_key_check meldet ${fkErrors148.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 148').run();
+    logger.info('DB-Migration auf Version 148 abgeschlossen (app_users_devices + page_presence Multi-Device-PK).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

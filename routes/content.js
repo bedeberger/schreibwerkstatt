@@ -10,6 +10,7 @@ const logger = require('../logger');
 const contentStore = require('../lib/content-store');
 const pageRevisions = require('../db/page-revisions');
 const pagePresence = require('../db/page-presence');
+const appUsersDevices = require('../db/app-users-devices');
 const bookOrder = require('../db/book-order');
 const { toIntId } = require('../lib/validate');
 const { setContext, bookParamHandler } = require('../lib/log-context');
@@ -51,6 +52,8 @@ function _guardChapter(req, res, chapterId, minRole) {
 
 const jsonBody = express.json({ limit: '10mb' });
 const NAME_MAX = 255;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function _validDeviceId(s) { return typeof s === 'string' && UUID_RE.test(s); }
 
 function _fail(res, e, opName) {
   const status = e?.status || 500;
@@ -240,47 +243,66 @@ router.put('/pages/:page_id', jsonBody, async (req, res) => {
 // Lese-Rollen koennen auch nur „lesen-da" signalisieren wenn wir das spaeter
 // brauchen. Auf editor-Rolle gaten, falls Datenschutz das verlangt — derzeit
 // keine Anforderung dafuer.
-router.post('/pages/:page_id/presence', async (req, res) => {
+router.post('/pages/:page_id/presence', jsonBody, async (req, res) => {
   const pageId = toIntId(req.params.page_id);
   if (!pageId) return res.status(400).json({ error_code: 'INVALID_PAGE_ID' });
   const bookId = _guardPage(req, res, pageId, 'editor');
   if (bookId == null) return;
   const email = _userEmail(req);
   if (!email) return res.status(401).json({ error_code: 'NOT_LOGGED_IN' });
-  try { pagePresence.ping(pageId, email, bookId); }
-  catch (e) { return _fail(res, e, 'POST /content/pages/:id/presence'); }
+  const deviceId = req.body?.device_id;
+  if (!_validDeviceId(deviceId)) return res.status(400).json({ error_code: 'INVALID_DEVICE_ID' });
+  try {
+    appUsersDevices.upsertDevice(deviceId, email, req.get('user-agent') || '');
+    pagePresence.ping(pageId, email, bookId, deviceId);
+  } catch (e) { return _fail(res, e, 'POST /content/pages/:id/presence'); }
   res.json({ ok: true });
 });
 
 // DELETE /content/pages/:page_id/presence — Eigener Edit-Exit (cancel/blur).
 // Optional — Stale-Filter wuerde den Eintrag eh nach 90s entfernen, aber
 // expliziter Abmelden gibt der UI sofortige Korrektheit.
-router.delete('/pages/:page_id/presence', async (req, res) => {
+router.delete('/pages/:page_id/presence', jsonBody, async (req, res) => {
   const pageId = toIntId(req.params.page_id);
   if (!pageId) return res.status(400).json({ error_code: 'INVALID_PAGE_ID' });
   const bookId = _guardPage(req, res, pageId, 'viewer');
   if (bookId == null) return;
   const email = _userEmail(req);
   if (!email) return res.status(401).json({ error_code: 'NOT_LOGGED_IN' });
-  try { pagePresence.leave(pageId, email); }
+  // Body wird bei sendBeacon/keepalive nicht immer geparst; Query als Fallback.
+  const deviceId = req.body?.device_id || req.query?.device_id;
+  if (!_validDeviceId(deviceId)) return res.status(400).json({ error_code: 'INVALID_DEVICE_ID' });
+  try { pagePresence.leave(pageId, email, deviceId); }
   catch (e) { return _fail(res, e, 'DELETE /content/pages/:id/presence'); }
   res.json({ ok: true });
 });
 
-// GET /content/books/:book_id/presence — Liste aktiver Editor-Sessions am Buch.
-// Filtert eigene Sessions aus (der User selbst soll nicht in der „andere
-// editieren"-Liste auftauchen). Liefert pro page_id ggf. mehrere User.
+// GET /content/books/:book_id/presence?device_id=… — Liste aktiver Sessions am Buch.
+// Filtert die anrufende Session (gleicher User + gleiche device_id) raus. Sessions
+// desselben Users auf anderen Geraeten bleiben sichtbar (`is_self: true`), damit
+// der User sein eigenes Multi-Device sehen kann.
 router.get('/books/:book_id/presence', aclParamGuard('viewer'), (req, res) => {
   const email = _userEmail(req);
+  const selfDevice = (req.query?.device_id || '').toString();
   let rows;
   try { rows = pagePresence.listForBook(req.bookId); }
   catch (e) { return _fail(res, e, 'GET /content/books/:id/presence'); }
+  const selfEmailLc = email ? String(email).toLowerCase() : null;
   const filtered = rows
-    .filter(r => !email || String(r.user_email).toLowerCase() !== String(email).toLowerCase())
+    .filter(r => {
+      if (!selfEmailLc) return true;
+      const sameUser = String(r.user_email).toLowerCase() === selfEmailLc;
+      const sameDevice = selfDevice && r.device_id === selfDevice;
+      // eigene aktuelle Session droppen; eigene andere Geraete behalten.
+      return !(sameUser && sameDevice);
+    })
     .map(r => ({
       page_id: r.page_id,
       user_email: r.user_email,
       user_display_name: r.user_display_name || r.user_email,
+      device_id: r.device_id,
+      device_label: r.device_label || null,
+      is_self: selfEmailLc ? String(r.user_email).toLowerCase() === selfEmailLc : false,
       last_ping_at: r.last_ping_at,
     }));
   res.json({ presence: filtered });

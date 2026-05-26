@@ -54,44 +54,47 @@
           <span class="focus-live-counter--today"
                 x-text="t('editor.focus.counterToday', { wordsDelta: focusCountWordsDelta, charsDelta: focusCountCharsDelta })"></span>
         </span>
-        <span x-show="currentPage && $blog?.statusFor(currentPage)" class="editor-blog-status">
-          <template x-if="$blog?.statusFor(currentPage)">
-            <span class="badge" :class="'badge--blog-' + $blog.statusFor(currentPage)"
-                  :data-tip="$blog.statusLabel($blog.statusFor(currentPage))"
-                  x-text="$blog.statusLabel($blog.statusFor(currentPage))"></span>
-          </template>
-          <template x-if="$blog?.canPush(currentPage) || $blog?.pushBusy[currentPage?.id]">
-            <button type="button" class="btn-compact editor-blog-push"
-                    @click="$blog.push(currentPage.id)"
-                    :disabled="!!$blog.pushBusy[currentPage.id]"
-                    :data-tip="t('blog.action.push')"
-                    :aria-label="t('blog.action.push')">
-              <template x-if="!$blog.pushBusy[currentPage?.id]">
-                <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#arrow-up"/></svg>
-              </template>
-              <template x-if="$blog.pushBusy[currentPage?.id]">
-                <span class="display-contents">
-                  <span class="spinner" aria-hidden="true"></span>
-                  <span class="editor-blog-push-pct" x-text="($blog.pushProgress[currentPage.id] || 0) + '%'"></span>
-                </span>
-              </template>
-            </button>
-          </template>
-          <template x-if="$blog?.statusFor(currentPage) === 'conflict'">
-            <button type="button" class="btn-compact editor-blog-conflict"
-                    @click="$blog.openConflict(currentPage.id)"
-                    :data-tip="t('blog.action.resolveConflict')"
-                    x-text="t('blog.action.resolveConflict')"></button>
-          </template>
-          <template x-if="$blog?.viewUrl(currentPage)">
-            <button type="button" class="btn-compact editor-blog-view"
-                    @click="window.open($blog.viewUrl(currentPage), '_blank', 'noopener')"
-                    :data-tip="t('blog.action.view')"
-                    :aria-label="t('blog.action.view')">
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=637#external-link"/></svg>
-            </button>
-          </template>
-        </span>
+        <template x-for="prov in $syncProviders" :key="prov.key">
+          <span class="editor-sync-status sync-provider" :class="'sync-provider--' + prov.key"
+                x-show="currentPage && prov.card.statusFor(currentPage)">
+            <template x-if="prov.card.statusFor(currentPage)">
+              <span class="badge" :class="'badge--sync-' + prov.card.statusFor(currentPage)"
+                    :data-tip="prov.card.statusLabel(prov.card.statusFor(currentPage))"
+                    x-text="prov.card.statusLabel(prov.card.statusFor(currentPage))"></span>
+            </template>
+            <template x-if="prov.card.canPush(currentPage) || prov.card.pushBusy[currentPage?.id]">
+              <button type="button" class="btn-compact editor-sync-push"
+                      @click="prov.card.push(currentPage.id)"
+                      :disabled="!!prov.card.pushBusy[currentPage.id]"
+                      :data-tip="t(prov.key + '.action.push')"
+                      :aria-label="t(prov.key + '.action.push')">
+                <template x-if="!prov.card.pushBusy[currentPage?.id]">
+                  <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#arrow-up"/></svg>
+                </template>
+                <template x-if="prov.card.pushBusy[currentPage?.id]">
+                  <span class="display-contents">
+                    <span class="spinner" aria-hidden="true"></span>
+                    <span class="editor-sync-push-pct" x-text="(prov.card.pushProgress[currentPage.id] || 0) + '%'"></span>
+                  </span>
+                </template>
+              </button>
+            </template>
+            <template x-if="prov.card.hasConflict && prov.card.statusFor(currentPage) === 'conflict'">
+              <button type="button" class="btn-compact editor-sync-conflict"
+                      @click="prov.card.openConflict(currentPage.id)"
+                      :data-tip="t(prov.key + '.action.resolveConflict')"
+                      x-text="t(prov.key + '.action.resolveConflict')"></button>
+            </template>
+            <template x-if="prov.card.viewUrl(currentPage)">
+              <button type="button" class="btn-compact editor-sync-view"
+                      @click="window.open(prov.card.viewUrl(currentPage), '_blank', 'noopener')"
+                      :data-tip="t(prov.key + '.action.view')"
+                      :aria-label="t(prov.key + '.action.view')">
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=637#external-link"/></svg>
+              </button>
+            </template>
+          </span>
+        </template>
         <span x-show="currentPage && tokEsts[currentPage.id]" class="tok-stats">
           <template x-if="tokEsts[currentPage?.id]?.words > 0">
             <span class="display-contents">
@@ -248,14 +251,25 @@
 
   <!-- Live-Presence-Hinweis: andere User editieren dieselbe Seite gerade.
        Kein Block — nur Hinweis, damit kein Schock beim spaeteren 409.  -->
-  <div class="editor-presence-banner"
-       x-show="currentPage && presenceFor(currentPage.id).length > 0"
-       x-cloak>
-    <span class="editor-presence-banner__text"
-          x-text="presenceFor(currentPage?.id).length === 1
-            ? t('collab.presence.bannerOne', { user: presenceFor(currentPage.id)[0].user_display_name })
-            : t('collab.presence.bannerMany', { count: presenceFor(currentPage?.id).length })"></span>
-  </div>
+  <template x-if="currentPage && presenceFor(currentPage.id).filter(p => !p.is_self).length > 0">
+    <div class="editor-presence-banner" x-cloak>
+      <span class="editor-presence-banner__text"
+            x-text="presenceFor(currentPage.id).filter(p => !p.is_self).length === 1
+              ? t('collab.presence.bannerOne', { user: presenceFor(currentPage.id).filter(p => !p.is_self)[0].user_display_name })
+              : t('collab.presence.bannerMany', { count: presenceFor(currentPage.id).filter(p => !p.is_self).length })"></span>
+    </div>
+  </template>
+
+  <!-- Self-Multi-Device: derselbe User hat dieselbe Seite auf einem anderen
+       Gerät offen. Eigene aktuelle Session ist serverseitig schon ausgefiltert. -->
+  <template x-if="currentPage && presenceFor(currentPage.id).filter(p => p.is_self).length > 0">
+    <div class="editor-presence-banner editor-presence-banner--self" x-cloak>
+      <span class="editor-presence-banner__text"
+            x-text="presenceFor(currentPage.id).filter(p => p.is_self).length === 1
+              ? t('presence.self.bannerOne', { device: presenceFor(currentPage.id).filter(p => p.is_self)[0].device_label || t('presence.device.unknown') })
+              : t('presence.self.bannerMany', { count: presenceFor(currentPage.id).filter(p => p.is_self).length })"></span>
+    </div>
+  </template>
 
   <!-- Soft-Edit-Lock-Hinweis: anderer User hatte Editor zuletzt offen
        (last_heartbeat <30min). Reine Info; kein Save-Block (OCC schuetzt). -->

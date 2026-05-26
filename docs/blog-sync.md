@@ -138,6 +138,10 @@ Aktion-Buttons:
 - **„Pull"** — nur sichtbar wenn Import durch
 - **„Disconnect"** — löscht Connection-Row + Links via FK-CASCADE
 
+### Sync-Core (geteilt mit HubSpot)
+
+`blog-sync-card.js` ist ein Wrapper über [public/js/cards/sync/sync-core.js](../public/js/cards/sync/sync-core.js): Provider-Spec liefert `endpointBase: '/blog'`, `jobTypes: { push: 'blog-push', refresh: ['blog-import','blog-pull'] }`, `computeStatus`, `statusLabels`, `canPushStatuses: ['new','push-needed']`. Konflikt-Diff (`hasConflict: true`, `openConflict`/`resolveConflict`) bleibt provider-spezifisch via `spreadExt`. Templates iterieren über `$syncProviders` ([public/js/app.js](../public/js/app.js)), kein WP-spezifisches Markup mehr in [buchorganizer.html](../public/partials/buchorganizer.html) / [editor-notebook.html](../public/partials/editor-notebook.html) — nur Provider-agnostisches `.sync-provider--blog` / `badge--sync-*` / `organizer-sync-push`. CSS-Accent: `.sync-provider--blog { --sync-accent: var(--card-accent-blog); }`.
+
 ### Buchorganizer
 
 Pro Page ein eckiges Badge (`--card-accent-blog`) mit Status:

@@ -442,9 +442,10 @@ const collabState = () => ({
   recentRemoteEdits: new Set(),
   collabToast: null,
   _collabToastTimer: null,
-  // Presence: Map<pageId, [{ user_email, user_display_name, last_ping_at }]>
-  // — andere User, die gerade Seiten dieses Buchs editieren. Updated im
-  // gleichen Poll-Tick wie /changes; UI rendert via livePresenceByPage.
+  // Presence: Map<pageId, [{ user_email, user_display_name, device_id,
+  // device_label, is_self, last_ping_at }]> — andere User + eigene Sessions
+  // auf anderen Geraeten. Eigene aktuelle Session ist serverseitig gefiltert.
+  // Updated im gleichen Poll-Tick wie /changes.
   livePresenceByPage: {},
   // Eigener Heartbeat: aktiver Edit-Mode pingt den Server alle 30s.
   _presencePingTimer: null,

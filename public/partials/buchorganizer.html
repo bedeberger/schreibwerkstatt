@@ -82,33 +82,37 @@
                  :disabled="organizerSaving"
                  autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other" data-spellcheck="spelling"
                  :aria-label="$app.t('bookOrganizer.renamePage')">
-          <template x-if="$blog.statusFor(page)">
-            <span class="badge" :class="'badge--blog-' + $blog.statusFor(page)"
-                  :data-tip="$blog.statusLabel($blog.statusFor(page))"
-                  x-text="$blog.statusLabel($blog.statusFor(page))"></span>
-          </template>
-          <template x-if="$blog.canPush(page) || $blog.pushBusy[page.id]">
-            <button type="button" class="btn-compact organizer-blog-push"
-                    @click="$blog.push(page.id)"
-                    :disabled="!!$blog.pushBusy[page.id]"
-                    :data-tip="$app.t('blog.action.push')"
-                    :aria-label="$app.t('blog.action.push')">
-              <template x-if="!$blog.pushBusy[page.id]">
-                <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#arrow-up"/></svg>
+          <template x-for="prov in $syncProviders" :key="prov.key">
+            <span class="sync-provider display-contents" :class="'sync-provider--' + prov.key">
+              <template x-if="prov.card.statusFor(page)">
+                <span class="badge" :class="'badge--sync-' + prov.card.statusFor(page)"
+                      :data-tip="prov.card.statusLabel(prov.card.statusFor(page))"
+                      x-text="prov.card.statusLabel(prov.card.statusFor(page))"></span>
               </template>
-              <template x-if="$blog.pushBusy[page.id]">
-                <span class="display-contents">
-                  <span class="spinner" aria-hidden="true"></span>
-                  <span class="organizer-blog-push-pct" x-text="($blog.pushProgress[page.id] || 0) + '%'"></span>
-                </span>
+              <template x-if="prov.card.canPush(page) || prov.card.pushBusy[page.id]">
+                <button type="button" class="btn-compact organizer-sync-push"
+                        @click="prov.card.push(page.id)"
+                        :disabled="!!prov.card.pushBusy[page.id]"
+                        :data-tip="$app.t(prov.key + '.action.push')"
+                        :aria-label="$app.t(prov.key + '.action.push')">
+                  <template x-if="!prov.card.pushBusy[page.id]">
+                    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#arrow-up"/></svg>
+                  </template>
+                  <template x-if="prov.card.pushBusy[page.id]">
+                    <span class="display-contents">
+                      <span class="spinner" aria-hidden="true"></span>
+                      <span class="organizer-sync-push-pct" x-text="(prov.card.pushProgress[page.id] || 0) + '%'"></span>
+                    </span>
+                  </template>
+                </button>
               </template>
-            </button>
-          </template>
-          <template x-if="$blog.statusFor(page) === 'conflict'">
-            <button type="button" class="btn-compact organizer-blog-conflict"
-                    @click="$blog.openConflict(page.id)"
-                    :data-tip="$app.t('blog.action.resolveConflict')"
-                    x-text="$app.t('blog.action.resolveConflict')"></button>
+              <template x-if="prov.card.hasConflict && prov.card.statusFor(page) === 'conflict'">
+                <button type="button" class="btn-compact organizer-sync-conflict"
+                        @click="prov.card.openConflict(page.id)"
+                        :data-tip="$app.t(prov.key + '.action.resolveConflict')"
+                        x-text="$app.t(prov.key + '.action.resolveConflict')"></button>
+              </template>
+            </span>
           </template>
           <div class="organizer-move-combo"
                x-data="combobox({ placeholder: $app.t('bookOrganizer.moveTo'), transient: true })"
@@ -180,33 +184,37 @@
                      :disabled="organizerSaving"
                      autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other" data-spellcheck="spelling"
                      :aria-label="$app.t('bookOrganizer.renamePage')">
-              <template x-if="$blog.statusFor(page)">
-                <span class="badge" :class="'badge--blog-' + $blog.statusFor(page)"
-                      :data-tip="$blog.statusLabel($blog.statusFor(page))"
-                      x-text="$blog.statusLabel($blog.statusFor(page))"></span>
-              </template>
-              <template x-if="$blog.canPush(page) || $blog.pushBusy[page.id]">
-                <button type="button" class="btn-compact organizer-blog-push"
-                        @click="$blog.push(page.id)"
-                        :disabled="!!$blog.pushBusy[page.id]"
-                        :data-tip="$app.t('blog.action.push')"
-                        :aria-label="$app.t('blog.action.push')">
-                  <template x-if="!$blog.pushBusy[page.id]">
-                    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#arrow-up"/></svg>
+              <template x-for="prov in $syncProviders" :key="prov.key">
+                <span class="sync-provider display-contents" :class="'sync-provider--' + prov.key">
+                  <template x-if="prov.card.statusFor(page)">
+                    <span class="badge" :class="'badge--sync-' + prov.card.statusFor(page)"
+                          :data-tip="prov.card.statusLabel(prov.card.statusFor(page))"
+                          x-text="prov.card.statusLabel(prov.card.statusFor(page))"></span>
                   </template>
-                  <template x-if="$blog.pushBusy[page.id]">
-                    <span class="display-contents">
-                      <span class="spinner" aria-hidden="true"></span>
-                      <span class="organizer-blog-push-pct" x-text="($blog.pushProgress[page.id] || 0) + '%'"></span>
-                    </span>
+                  <template x-if="prov.card.canPush(page) || prov.card.pushBusy[page.id]">
+                    <button type="button" class="btn-compact organizer-sync-push"
+                            @click="prov.card.push(page.id)"
+                            :disabled="!!prov.card.pushBusy[page.id]"
+                            :data-tip="$app.t(prov.key + '.action.push')"
+                            :aria-label="$app.t(prov.key + '.action.push')">
+                      <template x-if="!prov.card.pushBusy[page.id]">
+                        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#arrow-up"/></svg>
+                      </template>
+                      <template x-if="prov.card.pushBusy[page.id]">
+                        <span class="display-contents">
+                          <span class="spinner" aria-hidden="true"></span>
+                          <span class="organizer-sync-push-pct" x-text="(prov.card.pushProgress[page.id] || 0) + '%'"></span>
+                        </span>
+                      </template>
+                    </button>
                   </template>
-                </button>
-              </template>
-              <template x-if="$blog.statusFor(page) === 'conflict'">
-                <button type="button" class="btn-compact organizer-blog-conflict"
-                        @click="$blog.openConflict(page.id)"
-                        :data-tip="$app.t('blog.action.resolveConflict')"
-                        x-text="$app.t('blog.action.resolveConflict')"></button>
+                  <template x-if="prov.card.hasConflict && prov.card.statusFor(page) === 'conflict'">
+                    <button type="button" class="btn-compact organizer-sync-conflict"
+                            @click="prov.card.openConflict(page.id)"
+                            :data-tip="$app.t(prov.key + '.action.resolveConflict')"
+                            x-text="$app.t(prov.key + '.action.resolveConflict')"></button>
+                  </template>
+                </span>
               </template>
               <div class="organizer-move-combo"
                    x-data="combobox({ placeholder: $app.t('bookOrganizer.moveTo'), transient: true })"
@@ -276,33 +284,37 @@
                            :disabled="organizerSaving"
                            autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other" data-spellcheck="spelling"
                            :aria-label="$app.t('bookOrganizer.renamePage')">
-                    <template x-if="$blog.statusFor(page)">
-                      <span class="badge" :class="'badge--blog-' + $blog.statusFor(page)"
-                            :data-tip="$blog.statusLabel($blog.statusFor(page))"
-                            x-text="$blog.statusLabel($blog.statusFor(page))"></span>
-                    </template>
-                    <template x-if="$blog.canPush(page) || $blog.pushBusy[page.id]">
-                      <button type="button" class="btn-compact organizer-blog-push"
-                              @click="$blog.push(page.id)"
-                              :disabled="!!$blog.pushBusy[page.id]"
-                              :data-tip="$app.t('blog.action.push')"
-                              :aria-label="$app.t('blog.action.push')">
-                        <template x-if="!$blog.pushBusy[page.id]">
-                          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#arrow-up"/></svg>
+                    <template x-for="prov in $syncProviders" :key="prov.key">
+                      <span class="sync-provider display-contents" :class="'sync-provider--' + prov.key">
+                        <template x-if="prov.card.statusFor(page)">
+                          <span class="badge" :class="'badge--sync-' + prov.card.statusFor(page)"
+                                :data-tip="prov.card.statusLabel(prov.card.statusFor(page))"
+                                x-text="prov.card.statusLabel(prov.card.statusFor(page))"></span>
                         </template>
-                        <template x-if="$blog.pushBusy[page.id]">
-                          <span class="display-contents">
-                            <span class="spinner" aria-hidden="true"></span>
-                            <span class="organizer-blog-push-pct" x-text="($blog.pushProgress[page.id] || 0) + '%'"></span>
-                          </span>
+                        <template x-if="prov.card.canPush(page) || prov.card.pushBusy[page.id]">
+                          <button type="button" class="btn-compact organizer-sync-push"
+                                  @click="prov.card.push(page.id)"
+                                  :disabled="!!prov.card.pushBusy[page.id]"
+                                  :data-tip="$app.t(prov.key + '.action.push')"
+                                  :aria-label="$app.t(prov.key + '.action.push')">
+                            <template x-if="!prov.card.pushBusy[page.id]">
+                              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#arrow-up"/></svg>
+                            </template>
+                            <template x-if="prov.card.pushBusy[page.id]">
+                              <span class="display-contents">
+                                <span class="spinner" aria-hidden="true"></span>
+                                <span class="organizer-sync-push-pct" x-text="(prov.card.pushProgress[page.id] || 0) + '%'"></span>
+                              </span>
+                            </template>
+                          </button>
                         </template>
-                      </button>
-                    </template>
-                    <template x-if="$blog.statusFor(page) === 'conflict'">
-                      <button type="button" class="btn-compact organizer-blog-conflict"
-                              @click="$blog.openConflict(page.id)"
-                              :data-tip="$app.t('blog.action.resolveConflict')"
-                              x-text="$app.t('blog.action.resolveConflict')"></button>
+                        <template x-if="prov.card.hasConflict && prov.card.statusFor(page) === 'conflict'">
+                          <button type="button" class="btn-compact organizer-sync-conflict"
+                                  @click="prov.card.openConflict(page.id)"
+                                  :data-tip="$app.t(prov.key + '.action.resolveConflict')"
+                                  x-text="$app.t(prov.key + '.action.resolveConflict')"></button>
+                        </template>
+                      </span>
                     </template>
                     <div class="organizer-move-combo"
                          x-data="combobox({ placeholder: $app.t('bookOrganizer.moveTo'), transient: true })"
@@ -362,33 +374,37 @@
                                  :disabled="organizerSaving"
                                  autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other" data-spellcheck="spelling"
                                  :aria-label="$app.t('bookOrganizer.renamePage')">
-                          <template x-if="$blog.statusFor(page)">
-                            <span class="badge" :class="'badge--blog-' + $blog.statusFor(page)"
-                                  :data-tip="$blog.statusLabel($blog.statusFor(page))"
-                                  x-text="$blog.statusLabel($blog.statusFor(page))"></span>
-                          </template>
-                          <template x-if="$blog.canPush(page) || $blog.pushBusy[page.id]">
-                            <button type="button" class="btn-compact organizer-blog-push"
-                                    @click="$blog.push(page.id)"
-                                    :disabled="!!$blog.pushBusy[page.id]"
-                                    :data-tip="$app.t('blog.action.push')"
-                                    :aria-label="$app.t('blog.action.push')">
-                              <template x-if="!$blog.pushBusy[page.id]">
-                                <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#arrow-up"/></svg>
+                          <template x-for="prov in $syncProviders" :key="prov.key">
+                            <span class="sync-provider display-contents" :class="'sync-provider--' + prov.key">
+                              <template x-if="prov.card.statusFor(page)">
+                                <span class="badge" :class="'badge--sync-' + prov.card.statusFor(page)"
+                                      :data-tip="prov.card.statusLabel(prov.card.statusFor(page))"
+                                      x-text="prov.card.statusLabel(prov.card.statusFor(page))"></span>
                               </template>
-                              <template x-if="$blog.pushBusy[page.id]">
-                                <span class="display-contents">
-                                  <span class="spinner" aria-hidden="true"></span>
-                                  <span class="organizer-blog-push-pct" x-text="($blog.pushProgress[page.id] || 0) + '%'"></span>
-                                </span>
+                              <template x-if="prov.card.canPush(page) || prov.card.pushBusy[page.id]">
+                                <button type="button" class="btn-compact organizer-sync-push"
+                                        @click="prov.card.push(page.id)"
+                                        :disabled="!!prov.card.pushBusy[page.id]"
+                                        :data-tip="$app.t(prov.key + '.action.push')"
+                                        :aria-label="$app.t(prov.key + '.action.push')">
+                                  <template x-if="!prov.card.pushBusy[page.id]">
+                                    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#arrow-up"/></svg>
+                                  </template>
+                                  <template x-if="prov.card.pushBusy[page.id]">
+                                    <span class="display-contents">
+                                      <span class="spinner" aria-hidden="true"></span>
+                                      <span class="organizer-sync-push-pct" x-text="(prov.card.pushProgress[page.id] || 0) + '%'"></span>
+                                    </span>
+                                  </template>
+                                </button>
                               </template>
-                            </button>
-                          </template>
-                          <template x-if="$blog.statusFor(page) === 'conflict'">
-                            <button type="button" class="btn-compact organizer-blog-conflict"
-                                    @click="$blog.openConflict(page.id)"
-                                    :data-tip="$app.t('blog.action.resolveConflict')"
-                                    x-text="$app.t('blog.action.resolveConflict')"></button>
+                              <template x-if="prov.card.hasConflict && prov.card.statusFor(page) === 'conflict'">
+                                <button type="button" class="btn-compact organizer-sync-conflict"
+                                        @click="prov.card.openConflict(page.id)"
+                                        :data-tip="$app.t(prov.key + '.action.resolveConflict')"
+                                        x-text="$app.t(prov.key + '.action.resolveConflict')"></button>
+                              </template>
+                            </span>
                           </template>
                           <div class="organizer-move-combo"
                                x-data="combobox({ placeholder: $app.t('bookOrganizer.moveTo'), transient: true })"

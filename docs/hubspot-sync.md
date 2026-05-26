@@ -142,20 +142,19 @@ Methoden:
 
 Status-Panel zeigt `initialImportDoneAt` + `lastPushAt` (via `tzOpts`-Format).
 
-### Buchorganizer-Badge + Push
+### Buchorganizer-Badge + Push (sync-core-basiert)
 
-Headless Sub-Komponente [public/js/cards/hubspot-sync-card.js](../public/js/cards/hubspot-sync-card.js) als `<div x-data="hubspotSyncCard" class="display-contents">` in [public/index.html](../public/index.html). Globaler Zugriff via `window.__hubspotCard` + Template-Magic `$hubspot`.
+Headless Sub-Komponente [public/js/cards/hubspot-sync-card.js](../public/js/cards/hubspot-sync-card.js) ist ein dünner Wrapper über [public/js/cards/sync/sync-core.js](../public/js/cards/sync/sync-core.js) — Single Source of Truth für `loadLinks`/`statusFor`/`canPush`/`push`/Polling-Lifecycle. Provider-Spec liefert nur Endpoint-Prefix, Job-Typen, Status-Modell, Labels. Lebt als `<div x-data="hubspotSyncCard" class="display-contents">` in [public/index.html](../public/index.html); globaler Zugriff via `window.__hubspotCard` + Template-Magic `$hubspot`. Templates iterieren über `$syncProviders` (Alpine-Magic in [public/js/app.js](../public/js/app.js)) — gleicher Badge+Push-Button-Block deckt Blog und HubSpot ab, ohne pro Provider neu zu duplizieren. CSS-Accent über `.sync-provider--hubspot { --sync-accent: var(--card-accent-hubspot); }`, Status-Pills `.badge--sync-{new|pushed|…}`.
 
-State: `connected`, `blogId`, `linksMap` (page_id → link), `pushBusy`, `pushProgress`, `_pushTimers`.
+Provider-Spec (in [hubspot-sync-card.js](../public/js/cards/hubspot-sync-card.js)):
+- `key: 'hubspot'`, `endpointBase: '/hubspot'`
+- `jobTypes: { push: 'hubspot-push', refresh: ['hubspot-import'] }`
+- `computeStatus(page, link)` → `link ? 'pushed' : 'new'`
+- `statusLabels: { new: 'hubspot.status.new', pushed: 'hubspot.status.pushed' }`
+- `canPushStatuses: ['new']`
+- `pushErrorCode: 'HUBSPOT_PUSH_FAILED'`
 
-Methoden:
-- `loadLinks` — bei `pages:loaded` und `book:changed` getriggert; lädt `/hubspot/:book_id/links`.
-- `statusFor(page)` → `'new'` | `'pushed'` | `null` (wenn nicht connected).
-- `statusLabel(status)` → i18n-Key `hubspot.status.new` / `hubspot.status.pushed`.
-- `canPush(page)` → `statusFor === 'new'`.
-- `push(pageId)` — `/jobs/hubspot-push` enqueuen, Per-Page-Polling auf `/jobs/:id`, bei Done `loadLinks` (refresh badge).
-
-Re-Push bewusst nicht implementiert — Backend würde `HUBSPOT_ALREADY_PUSHED` antworten, UI verhindert es vorher.
+Re-Push bewusst nicht implementiert — Backend würde `HUBSPOT_ALREADY_PUSHED` antworten, UI verhindert es vorher (Status `pushed` ∉ `canPushStatuses`).
 
 ## i18n
 

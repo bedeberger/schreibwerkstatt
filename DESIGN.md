@@ -1178,6 +1178,31 @@ CSS: [public/css/editor/focus-mode.css](public/css/editor/focus-mode.css). Inlin
 
 ---
 
+## Presence-Pip (Live-Co-Editing-Marker)
+
+**Use:** Initialen-Bubble neben einem Seitennamen (Sidebar) oder im Editor-Header, sobald ein anderer User dieselbe Seite gerade editiert (Heartbeat <90s). Multi-Device: derselbe User auf einem anderen Geräten erscheint mit Modifier `--self` (gestrichelte Border, leicht muted) statt mit fremder Akzentfarbe.
+
+**Klassen** (CSS in [public/css/page/page-list.css](public/css/page/page-list.css)):
+- `.presence-pip` — Basis-Initialen-Bubble. Pro-User-Hue via `--avatar-hue`-Custom-Prop (Setter im Konsumenten-Markup).
+- `.presence-pip--self` — Eigener User, anderes Gerät. Gestrichelte Border + opacity 0.85.
+
+**Markup:**
+```html
+<span class="presence-pip"
+      :class="{ 'presence-pip--self': p.is_self }"
+      :style="`--avatar-hue: ${userAvatarHue(p.user_email)}`"
+      :data-tip="p.is_self
+        ? t('presence.self.editing', { device: p.device_label })
+        : t('collab.presence.editing', { user: p.user_display_name })"
+      x-text="userInitials(p.user_email)"></span>
+```
+
+**Banner-Variante (Editor-Header):** `.editor-presence-banner` mit Modifier `--self` (muted-Hue, in [public/css/editor/shared/editor-chrome.css](public/css/editor/shared/editor-chrome.css)).
+
+**Daten-Quelle:** `presenceFor(pageId)` ([public/js/app/app-collab.js](public/js/app/app-collab.js)). Server-Filter dropt nur die eigene aktuelle Session — eigene andere Geräte bleiben mit `is_self: true` in der Liste.
+
+---
+
 ## Avatar-Menu
 
 **Use:** User-Menü oben rechts (Profil, Logout, Sprache).

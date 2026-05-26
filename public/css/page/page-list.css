@@ -62,6 +62,13 @@
   border-radius: var(--radius-sm);
   line-height: 1;
 }
+/* Self-Multi-Device: derselbe User auf einem anderen Geraet. Gestrichelte
+   Border + leicht muted, damit der Self-Hinweis sich von Fremd-Sessions
+   unterscheidet, ohne neue Akzentfarbe einzufuehren. */
+.presence-pip--self {
+  border-style: dashed;
+  opacity: 0.85;
+}
 @media (prefers-color-scheme: dark) {
   .presence-pip {
     background: hsl(var(--avatar-hue, 220) 40% 22%);
