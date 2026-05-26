@@ -51,6 +51,37 @@ function _formatStamp(kind) {
   return `${date} ${time}`;
 }
 
+// Link-URL normalisieren: leerer/whitespace-only String → ''. Bekannte Schemes
+// (http/https/mailto/tel) durchreichen. Plain `foo@bar.tld` → mailto:. Sonst
+// `https://` voranstellen.
+function _normalizeLinkUrl(raw) {
+  const s = (raw || '').trim();
+  if (!s) return '';
+  if (/^(https?:|mailto:|tel:)/i.test(s)) return s;
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) return 'mailto:' + s;
+  return 'https://' + s;
+}
+
+// Range zu <a href> machen. Bei nicht-collapsed Range: execCommand('createLink')
+// (behält Inline-Formate, splittet Tags sauber). Bei Caret (collapsed): URL als
+// Linktext einfügen. Caller hat Selection bereits auf range gesetzt + Editor
+// fokussiert.
+function _applyLinkAtRange(range, url) {
+  if (range.collapsed) {
+    const a = document.createElement('a');
+    a.href = url;
+    a.textContent = url;
+    range.insertNode(a);
+    const after = document.createRange();
+    after.setStartAfter(a);
+    after.collapse(true);
+    const sel = document.getSelection();
+    if (sel) { sel.removeAllRanges(); sel.addRange(after); }
+  } else {
+    document.execCommand('createLink', false, url);
+  }
+}
+
 const BLOCK_SEL = 'p, h1, h2, h3, h4, h5, h6, blockquote, pre, li, div.poem';
 
 function findBlock(node, root) {
@@ -133,6 +164,71 @@ export const toolbarCardMethods = {
 
   toolbarBold()   { this._applyInline('bold'); },
   toolbarItalic() { this._applyInline('italic'); },
+
+  // ── Link-Bar ─────────────────────────────────────────────────────────
+  // Cmd/Ctrl+Shift+K oder Bubble-Link-Button öffnet teleportierten Input
+  // an Selektion/Caret. Range wird beim Öffnen geclont, weil das Fokussieren
+  // des Inputs die Editor-Selection verliert.
+  openLinkInput() {
+    const app = window.__app;
+    if (!app?.editMode || app.focusActive) return;
+    const editEl = getEditEl();
+    if (!editEl) return;
+    const sel = document.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    if (!editEl.contains(range.commonAncestorContainer) && editEl !== range.commonAncestorContainer) return;
+
+    this._linkRange = range.cloneRange();
+
+    let rect = range.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) {
+      const block = findBlock(range.startContainer, editEl) || editEl;
+      rect = block.getBoundingClientRect();
+    }
+    this.linkX = rect.left + rect.width / 2;
+    this.linkY = rect.top;
+
+    const selText = sel.toString().trim();
+    this.linkUrl = /^(https?:|mailto:)/i.test(selText) ? selText : '';
+    this.bubbleShow = false;
+    this.linkShow = true;
+    this.$nextTick(() => {
+      const inp = this.$refs?.linkInput;
+      if (inp) { inp.focus(); inp.select(); }
+    });
+  },
+
+  _commitLink() {
+    const editEl = getEditEl();
+    const range = this._linkRange;
+    const raw = (this.linkUrl || '').trim();
+    if (!editEl || !range || !raw) { this._closeLink(); return; }
+    const url = _normalizeLinkUrl(raw);
+    if (!url) { this._closeLink(); return; }
+
+    editEl.focus();
+    const sel = document.getSelection();
+    if (sel) {
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+    _applyLinkAtRange(range, url);
+    window.__app?._markEditDirty?.();
+    this._closeLink();
+  },
+
+  _closeLink() {
+    this.linkShow = false;
+    this.linkUrl = '';
+    this._linkRange = null;
+    getEditEl()?.focus();
+  },
+
+  _onLinkKeydown(e) {
+    if (e.key === 'Enter') { e.preventDefault(); this._commitLink(); return; }
+    if (e.key === 'Escape') { e.preventDefault(); this._closeLink(); return; }
+  },
 
   // ── Slash-Menü ────────────────────────────────────────────────────────
   // Reaktive Labels: jedes Mal frisch aus i18n (günstig). Kein Getter –
@@ -236,6 +332,14 @@ export const toolbarCardMethods = {
     if ((e.metaKey || e.ctrlKey) && e.shiftKey && !e.altKey && (e.key === 'h' || e.key === 'H')) {
       e.preventDefault();
       app.insertHorizontalRule?.();
+      return;
+    }
+
+    // Ctrl/Cmd+Shift+K: Link-Input öffnen (Cmd+K alleine belegt mit Palette).
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && !e.altKey && (e.key === 'k' || e.key === 'K')) {
+      if (app.focusActive) return;
+      e.preventDefault();
+      this.openLinkInput();
       return;
     }
 

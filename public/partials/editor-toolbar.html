@@ -20,6 +20,34 @@
               :data-tip="$app.t('editor.toolbar.synonymTitle')"
               :aria-label="$app.t('editor.toolbar.synonymTitle')"
               x-text="$app.t('editor.toolbar.synonymLabel')"></button>
+      <button type="button"
+              class="edit-bubble-btn edit-bubble-btn--link"
+              @click="openLinkInput()"
+              :data-tip="$app.t('editor.toolbar.linkTitle')"
+              :aria-label="$app.t('editor.toolbar.linkTitle')">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#external-link"/></svg>
+      </button>
+    </div>
+  </template>
+
+  <!-- Link-Input -->
+  <template x-teleport="body">
+    <div x-show="linkShow && $app.editMode && !$app.focusActive" x-cloak
+         class="edit-link-bar"
+         :style="{ left: linkX + 'px', top: linkY + 'px' }"
+         @click.outside="_closeLink()"
+         @mousedown.stop>
+      <input type="text" x-ref="linkInput"
+             x-model="linkUrl"
+             @keydown="_onLinkKeydown($event)"
+             :placeholder="$app.t('editor.toolbar.linkPlaceholder')"
+             :aria-label="$app.t('editor.toolbar.linkTitle')"
+             class="edit-link-input">
+      <button type="button" class="edit-link-btn" @click="_commitLink()"
+              :data-tip="$app.t('editor.toolbar.linkApply')"
+              :aria-label="$app.t('editor.toolbar.linkApply')">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#check"/></svg>
+      </button>
     </div>
   </template>
 

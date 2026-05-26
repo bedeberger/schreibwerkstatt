@@ -24,6 +24,11 @@ export function registerEditorToolbarCard() {
     slashIdx: 0,
     slashQuery: '',
     _slashBlock: null,
+    linkShow: false,
+    linkX: 0,
+    linkY: 0,
+    linkUrl: '',
+    _linkRange: null,
     _toolbarAbort: null,
 
     init() {

@@ -29,6 +29,46 @@
 .edit-bubble-btn--bold   { font-weight: 700; }
 .edit-bubble-btn--italic { font-style: italic; }
 .edit-bubble-btn--syn    { font-size: var(--font-size-mini); padding-inline: var(--space-sm); border-left: 1px solid var(--color-border); }
+.edit-bubble-btn--link   { display: inline-flex; align-items: center; padding-inline: var(--space-sm); border-left: 1px solid var(--color-border); }
+.edit-bubble-btn--link .icon { width: 1em; height: 1em; }
+
+.edit-link-bar {
+  position: fixed;
+  z-index: var(--z-toolbar);
+  transform: translate(-50%, calc(-100% - 8px));
+  display: flex;
+  gap: var(--space-2xs);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-3);
+  align-items: center;
+}
+.edit-link-input {
+  flex: 1;
+  min-width: 18em;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--font-size-sm);
+  font-family: inherit;
+  color: var(--color-text);
+}
+.edit-link-input:focus {
+  outline: none;
+  border-color: var(--color-accent, var(--color-text));
+}
+.edit-link-btn {
+  display: inline-flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  padding: var(--space-xs) 10px;
+  cursor: pointer;
+  color: var(--color-text);
+}
+.edit-link-btn:hover { background: var(--color-hover); }
+.edit-link-btn .icon { width: 1em; height: 1em; }
 
 .edit-slash-menu {
   position: fixed;
@@ -80,6 +120,7 @@
    Scope auf `.focus-host` am Editor-Card (gesetzt in focus/card.js#enterFocusMode). */
 #editor-card.focus-host .edit-bubble-toolbar,
 #editor-card.focus-host .edit-slash-menu,
+#editor-card.focus-host .edit-link-bar,
 #editor-card.focus-host .edit-find { display: none !important; }
 
 }
