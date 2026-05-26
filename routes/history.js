@@ -213,10 +213,29 @@ router.get('/page-stats/:book_id', (req, res) => {
   res.json(map);
 });
 
-// Seiten-Stats-Cache: Batch-Upsert (vom Frontend nach Token-Berechnung)
+// Seiten-Stats-Cache: Batch-Upsert (vom Frontend nach Token-Berechnung).
+// Vor dem INSERT prüfen, dass (page_id, book_id) konsistent zu `pages` ist —
+// page_stats hat FK auf pages(page_id) UND books(book_id); ein Mismatch
+// (z.B. stale Frontend-State nach Buchwechsel/Page-Löschung) wuerde sonst die
+// ganze Transaktion abreissen. Skipped Rows werden geloggt, Restliche gehen durch.
 router.post('/page-stats/batch', express.json(), (req, res) => {
   const items = req.body;
   if (!Array.isArray(items) || !items.length) return res.json({ ok: true, count: 0 });
+
+  const pageIds = Array.from(new Set(
+    items.map(s => toIntId(s?.page_id)).filter(Boolean)
+  ));
+  if (!pageIds.length) {
+    logger.warn(`page-stats/batch: ${items.length} Rows ohne gueltige page_id verworfen.`);
+    return res.json({ ok: true, count: 0, skipped: items.length });
+  }
+  const placeholders = pageIds.map(() => '?').join(',');
+  const ownerByPage = new Map(
+    db.prepare(`SELECT page_id, book_id FROM pages WHERE page_id IN (${placeholders})`)
+      .all(...pageIds)
+      .map(r => [r.page_id, r.book_id])
+  );
+
   const stmt = db.prepare(`
     INSERT INTO page_stats (page_id, book_id, tok, words, chars, updated_at, cached_at)
     VALUES (@page_id, @book_id, @tok, @words, @chars, @updated_at, @cached_at)
@@ -225,8 +244,25 @@ router.post('/page-stats/batch', express.json(), (req, res) => {
       updated_at=excluded.updated_at, cached_at=excluded.cached_at
   `);
   const now = new Date().toISOString();
-  db.transaction(() => { for (const s of items) stmt.run({ ...s, cached_at: now }); })();
-  res.json({ ok: true, count: items.length });
+  const skipped = [];
+  let written = 0;
+  db.transaction(() => {
+    for (const s of items) {
+      const pageId = toIntId(s?.page_id);
+      const bookId = toIntId(s?.book_id);
+      const ownerBook = pageId ? ownerByPage.get(pageId) : null;
+      if (!pageId || !bookId || !ownerBook || ownerBook !== bookId) {
+        skipped.push({ page_id: s?.page_id, book_id: s?.book_id, owner_book: ownerBook ?? null });
+        continue;
+      }
+      stmt.run({ ...s, page_id: pageId, book_id: bookId, cached_at: now });
+      written += 1;
+    }
+  })();
+  if (skipped.length) {
+    logger.warn(`page-stats/batch: ${skipped.length} Row(s) verworfen (FK-Mismatch): ${JSON.stringify(skipped)}`);
+  }
+  res.json({ ok: true, count: written, skipped: skipped.length });
 });
 
 // Buchstatistik-Verlauf für Zeitliniendiagramm (geteilter Cache, nicht user-spezifisch)
