@@ -6308,6 +6308,79 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 150 abgeschlossen (hubspot_connections.portal_id).');
   }
 
+  if (version < 151) {
+    // pages.book_id wird FK auf books(book_id) ON DELETE CASCADE. Vorher fehlte
+    // die Constraint komplett — geloeschte Buecher hinterliessen orphan-pages,
+    // deren last_seen_at einfror, weil _syncAllBooksInner ueber `books` iteriert
+    // und sie nie touched. Startup-Stale-Cleanup (pruneStaleByAge) loescht solche
+    // Rows dann massenhaft, sobald 7 Tage abgelaufen sind.
+    db.pragma('foreign_keys = OFF');
+
+    // Pre-Cleanup: orphan-pages entfernen (book_id zeigt auf nicht existierendes
+    // Buch). Sonst kippt foreign_key_check am Ende. page_stats / page_revisions /
+    // figure_events.page_id etc. haengen via FK CASCADE/SET NULL bereits dran.
+    const orphanCount = db.prepare(
+      'SELECT COUNT(*) AS n FROM pages WHERE book_id NOT IN (SELECT book_id FROM books)'
+    ).get().n;
+    if (orphanCount > 0) {
+      db.prepare('DELETE FROM pages WHERE book_id NOT IN (SELECT book_id FROM books)').run();
+      logger.info(`Migration 151: ${orphanCount} orphan-pages vorab entfernt (book_id ohne books-Row).`);
+    }
+
+    db.prepare('DROP TABLE IF EXISTS pages_new').run();
+    db.prepare(`
+      CREATE TABLE pages_new (
+        page_id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id           INTEGER NOT NULL REFERENCES books(book_id)       ON DELETE CASCADE,
+        page_name         TEXT,
+        chapter_id        INTEGER          REFERENCES chapters(chapter_id) ON DELETE SET NULL,
+        updated_at        TEXT,
+        preview_text      TEXT,
+        last_seen_at      TEXT,
+        body_html         TEXT,
+        body_markdown     TEXT,
+        position          INTEGER,
+        priority          INTEGER,
+        slug              TEXT,
+        local_updated_at  TEXT,
+        last_editor_email TEXT
+      )
+    `).run();
+    db.prepare(`
+      INSERT INTO pages_new (page_id, book_id, page_name, chapter_id, updated_at,
+                             preview_text, last_seen_at, body_html, body_markdown,
+                             position, priority, slug, local_updated_at, last_editor_email)
+      SELECT page_id, book_id, page_name, chapter_id, updated_at,
+             preview_text, last_seen_at, body_html, body_markdown,
+             position, priority, slug, local_updated_at, last_editor_email
+        FROM pages
+    `).run();
+    db.prepare('DROP TABLE pages').run();
+    db.prepare('ALTER TABLE pages_new RENAME TO pages').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_pages_book_id    ON pages(book_id)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_pages_chapter_id ON pages(chapter_id)').run();
+
+    // Wasserzeichen wiederherstellen (Phase-0-Garantie aus Mig 122):
+    // AUTOINCREMENT-Counter min. 1_000_000, damit neue localdb-IDs >= 1_000_001 sind.
+    const existing151 = db.prepare("SELECT seq FROM sqlite_sequence WHERE name = 'pages'").get();
+    if (existing151) {
+      if (existing151.seq < 1000000) {
+        db.prepare("UPDATE sqlite_sequence SET seq = 1000000 WHERE name = 'pages'").run();
+      }
+    } else {
+      db.prepare("INSERT INTO sqlite_sequence(name, seq) VALUES ('pages', 1000000)").run();
+    }
+
+    db.pragma('foreign_keys = ON');
+
+    const fkErrors151 = db.pragma('foreign_key_check');
+    if (fkErrors151.length) {
+      throw new Error(`Migration 151: foreign_key_check meldet ${fkErrors151.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 151').run();
+    logger.info('DB-Migration auf Version 151 abgeschlossen (pages.book_id FK auf books CASCADE).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

@@ -109,7 +109,7 @@ export const bookSettingsMethods = {
       const newBuchtyp = this.bookSettingsBuchtyp || null;
       const buchtypChanged = (currentBook?.buchtyp ?? null) !== newBuchtyp;
       if (newName !== (currentBook?.name || '') || buchtypChanged) {
-        await window.__app.loadBooks?.({ skipPages: true });
+        await window.__app.loadBooks?.({ skipPages: true, fresh: true });
       }
       // Header-Donut konsumiert dailyProgressIsFinished + dailyProgressDailyGoalChars
       // am Root — direkt spiegeln, damit Toggle Buch-Abschluss und neues Tagesziel

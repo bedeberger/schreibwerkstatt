@@ -7,7 +7,7 @@ Spec für bidirektionale Synchronisation zwischen einem self-hosted WordPress-Bl
 - **Mapping:** 1 Blog == 1 Buch. 1 WP-Post == 1 Page in der App.
 - **Gating:** Verbindung nur konfigurierbar, wenn `buchtyp === 'blog'` (siehe `prompt-config.json`).
 - **Auth:** Basic-Auth über HTTPS. URL/User/Password pro Buch in den Bucheinstellungen.
-- **Trigger:** manuell. Einmaliger Initial-Import + ad-hoc Pull/Push. Kein Cron.
+- **Trigger:** manuell. Einmaliger Initial-Import + ad-hoc Pull/Push + on-demand Reconcile (Link-Drift-Check). Kein Cron.
 - **Editor:** WordPress Block-Editor (Gutenberg) only. Classic-Editor-Posts werden importiert, beim Push wieder als Block-HTML rausgeschrieben.
 - **Out-of-Scope:** Categories/Tags-Mapping, Medien-Upload (Featured-Image, Inline-Bilder), Auto-Pull, Mehrere Blogs pro Buch.
 
@@ -68,7 +68,7 @@ CREATE INDEX idx_blog_page_links_blog ON blog_page_links(blog_id);
 | `lib/wp-html.js` | `wpToAppHtml(raw)`: strip alle `<!-- wp:* -->`/`<!-- /wp:* -->` Kommentare, dann durch `lib/html-clean.js` (Single Chokepoint). `appToWpHtml(html)`: parse via linkedom, pro Block-Element passenden Gutenberg-Kommentar wrappen (siehe Block-Mapping). `<img>`/`<figure>` werden gestrippt. |
 | `db/blogs.js` | CRUD für `blog_connections` + `blog_page_links`. Passwort beim Read via `lib/crypto.js` entschlüsseln, nie an Client returnen. |
 | `routes/blog.js` | `GET /blog/:book_id/status`, `POST /blog/:book_id/connect`, `DELETE /blog/:book_id/disconnect`. `router.param('book_id', bookParamHandler)` aus `lib/log-context.js`. Connect prüft serverseitig `buchtyp === 'blog'` (sonst 400 `BLOG_REQUIRES_BLOG_TYPE`). |
-| `routes/jobs/blog-sync.js` | Job-Typen `blog-import`, `blog-pull`, `blog-push`. Dedup via `findActiveJobId(type, bookId, userEmail)`. |
+| `routes/jobs/blog-sync.js` | Job-Typen `blog-import`, `blog-pull`, `blog-push`, `blog-reconcile`. Dedup via `findActiveJobId(type, bookId, userEmail)`. |
 
 ## Gutenberg-Block-Mapping (Push)
 
@@ -117,7 +117,17 @@ Voraussetzung: Initial-Import durch. Sonst 400 `IMPORT_FIRST`.
      **Titel-Normalisierung (nur Create):** Titel wird auf `YYYY-MM-DD: Rest` gebracht (Datum = `localIsoDate()`); leerer Rest → nur das Datum. Vorhandener Datum-Prefix (`^\d{4}-\d{2}-\d{2}(?:\s*:\s*…)?$`) wird durch heute ersetzt. Lokaler `page_name` zieht via `contentStore.savePage` synchron nach. Updates rühren den Titel nicht an.
    - Link da, kein Konflikt → `updatePost(id, …)`, `wp_modified_at` aus Response übernehmen
    - `conflict_state='detected'` → skip, Fehler in Job-Result
+   - **WP-Post drüben gelöscht** (`BLOG_HTTP_404` von `updatePost`) → Link wird entfernt, Error-Code `BLOG_REMOTE_GONE` ins Result; Page-Badge flippt auf `new`. Erneuter Push erstellt einen frischen Post.
 2. `last_push_at = NOW_ISO_SQL`
+
+### `runBlogReconcileJob(bookId)` — on demand
+
+Drift-Check zwischen lokalen Links und WP-Realität. Deckt Hard-Delete drüben (kein Trash-Stamp im Pull-Delta sichtbar).
+
+1. `_requireBlogBook` + `_resolveBlogConn`.
+2. `blogs.listLinksForBlog(conn.id)` → pro Link ein `wp.getPost(wp_post_id)`.
+3. Bei `BLOG_HTTP_404` → `blogs.deleteLink(link.page_id)` (Marker weg, Page bleibt). Andere Fehler werden nur geloggt, Link bleibt.
+4. Job-Result: `{ checked, removed }`. Buchorganizer-Badge flippt nach `loadLinks` für betroffene Pages auf `new`; erneuter Push erstellt einen neuen Post.
 
 ## UI
 
@@ -136,11 +146,12 @@ Status-Panel: `initial_import_done_at`, `last_pull_at`, `last_push_at` (alle via
 Aktion-Buttons:
 - **„Initial-Import starten"** — nur sichtbar wenn `!initial_import_done_at`
 - **„Pull"** — nur sichtbar wenn Import durch
+- **„Verbindung prüfen"** — Reconcile-Job; nur sichtbar wenn Import durch. Ruft `GET /posts/{id}` für jeden Link, dropt 404-Orphans. Confirm-Dialog vor Start (kann je nach Link-Anzahl dauern).
 - **„Disconnect"** — löscht Connection-Row + Links via FK-CASCADE
 
 ### Sync-Core (geteilt mit HubSpot)
 
-`blog-sync-card.js` ist ein Wrapper über [public/js/cards/sync/sync-core.js](../public/js/cards/sync/sync-core.js): Provider-Spec liefert `endpointBase: '/blog'`, `jobTypes: { push: 'blog-push', refresh: ['blog-import','blog-pull'] }`, `computeStatus`, `statusLabels`, `canPushStatuses: ['new','push-needed']`. Konflikt-Diff (`hasConflict: true`, `openConflict`/`resolveConflict`) bleibt provider-spezifisch via `spreadExt`. Templates iterieren über `$syncProviders` ([public/js/app.js](../public/js/app.js)), kein WP-spezifisches Markup mehr in [buchorganizer.html](../public/partials/buchorganizer.html) / [editor-notebook.html](../public/partials/editor-notebook.html) — nur Provider-agnostisches `.sync-provider--blog` / `badge--sync-*` / `organizer-sync-push`. CSS-Accent: `.sync-provider--blog { --sync-accent: var(--card-accent-blog); }`.
+`blog-sync-card.js` ist ein Wrapper über [public/js/cards/sync/sync-core.js](../public/js/cards/sync/sync-core.js): Provider-Spec liefert `endpointBase: '/blog'`, `jobTypes: { push: 'blog-push', refresh: ['blog-import','blog-pull'], reconcile: 'blog-reconcile' }`, `computeStatus`, `statusLabels`, `canPushStatuses: ['new','push-needed']`. `reconcile` triggert nach Job-Done ein `loadLinks()` (entfernte Orphans verschwinden aus dem Buchorganizer). Konflikt-Diff (`hasConflict: true`, `openConflict`/`resolveConflict`) bleibt provider-spezifisch via `spreadExt`. Templates iterieren über `$syncProviders` ([public/js/app.js](../public/js/app.js)), kein WP-spezifisches Markup mehr in [buchorganizer.html](../public/partials/buchorganizer.html) / [editor-notebook.html](../public/partials/editor-notebook.html) — nur Provider-agnostisches `.sync-provider--blog` / `badge--sync-*` / `organizer-sync-push`. CSS-Accent: `.sync-provider--blog { --sync-accent: var(--card-accent-blog); }`.
 
 ### Buchorganizer
 
@@ -166,11 +177,13 @@ Neue Keys in `public/js/i18n/de.json` + `public/js/i18n/en.json`:
 ```
 blog.connect.title|url|user|password|defaultStatus|test|save|disconnect
 blog.status.synced|pushNeeded|pullNeeded|conflict|notImported|imported
-blog.action.import|pull|push|resolveConflict
-blog.error.httpOnly|authFailed|notBlogType|conflictDetected|alreadyImported|importFirst
+blog.action.import|pull|push|reconcile|reconcileHint|reconcileConfirm|resolveConflict
+blog.error.httpOnly|authFailed|notBlogType|conflictDetected|alreadyImported|importFirst|BLOG_REMOTE_GONE|BLOG_RECONCILE_FAILED
+job.label.blogReconcile
 job.blog.import.progress
 job.blog.pull.fetch|job.blog.pull.merge
 job.blog.push.upload
+job.blog.reconcile.check
 ```
 
 Persistierte Conflict-Notice in DB: `__i18n:blog.conflict.detected__`.
