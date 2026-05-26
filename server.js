@@ -396,6 +396,7 @@ app.use('/admin/registration-requests', require('./routes/admin-registration-req
 app.use('/admin/api-tokens',            require('./routes/admin-api-tokens'));
 app.use('/local/categories', require('./routes/categories'));
 app.use('/blog', require('./routes/blog'));
+app.use('/hubspot', require('./routes/hubspot'));
 
 // Logout: usage-Tabelle behält Einträge (User-Wiederkehr → Top-3 sofort wieder da).
 // Wenn Datenschutz erforderlich, Cleanup über Job/Cron auf Last-Seen-Basis.

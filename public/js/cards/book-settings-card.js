@@ -44,6 +44,7 @@ export function registerBookSettingsCard() {
     bookDeleteLoading: false,
     bookDeleteError: '',
     // Blog-Sync (WordPress).
+    blogSectionOpen: false,
     blogConnection: null,
     blogForm: { baseUrl: '', username: '', password: '', defaultStatus: 'draft' },
     blogBusy: false,
@@ -52,17 +53,29 @@ export function registerBookSettingsCard() {
     blogError: '',
     blogImportJobId: null,
     blogPullJobId: null,
+    // HubSpot-Sync (Initial-Import + Create-Draft-Push).
+    hubspotSectionOpen: false,
+    hubspotConnection: null,
+    hubspotForm: { token: '', blogId: '', authorId: '' },
+    hubspotBlogs: [],
+    hubspotAuthors: [],
+    hubspotBusy: false,
+    hubspotAction: null,
+    hubspotMessage: '',
+    hubspotError: '',
+    hubspotImportJobId: null,
     _savedAtTimer: null,
     _resetMsgTimer: null,
     _shareInviteMsgTimer: null,
     _lifecycle: null,
     _onBlogJobFinished: null,
+    _onHubspotJobFinished: null,
 
     init() {
       this._lifecycle = setupCardLifecycle(this, {
         showFlag: 'showBookSettingsCard',
-        onShow: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats(), this.loadBookAccess(), this.loadBookCategory(), this.loadBlogStatus()]),
-        load: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats(), this.loadBookAccess(), this.loadBookCategory(), this.loadBlogStatus()]),
+        onShow: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats(), this.loadBookAccess(), this.loadBookCategory(), this.loadBlogStatus(), this.loadHubspotStatus()]),
+        load: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats(), this.loadBookAccess(), this.loadBookCategory(), this.loadBlogStatus(), this.loadHubspotStatus()]),
         resetState: {
           expandedJobType: null,
           bookJobRuns: {},
@@ -75,6 +88,7 @@ export function registerBookSettingsCard() {
           shareRole: 'viewer',
           shareInviteMessage: '',
           bookCategoryId: '',
+          blogSectionOpen: false,
           blogConnection: null,
           blogForm: { baseUrl: '', username: '', password: '', defaultStatus: 'draft' },
           blogBusy: false,
@@ -82,6 +96,15 @@ export function registerBookSettingsCard() {
           blogError: '',
           blogImportJobId: null,
           blogPullJobId: null,
+          hubspotSectionOpen: false,
+          hubspotConnection: null,
+          hubspotForm: { token: '', blogId: '', authorId: '' },
+          hubspotBlogs: [],
+          hubspotAuthors: [],
+          hubspotBusy: false,
+          hubspotMessage: '',
+          hubspotError: '',
+          hubspotImportJobId: null,
         },
         resetStateView: {
           bookSettingsSaved: false,
@@ -93,6 +116,8 @@ export function registerBookSettingsCard() {
           shareInviteMessage: '',
           blogMessage: '',
           blogError: '',
+          hubspotMessage: '',
+          hubspotError: '',
         },
       });
 
@@ -111,6 +136,19 @@ export function registerBookSettingsCard() {
         }
       };
       window.addEventListener('job:finished', this._onBlogJobFinished);
+
+      // HubSpot-Jobs: bei Import-/Push-Done Status nachladen, Sidebar-Tree
+      // refreshen (Import legt Pages/Chapters an).
+      this._onHubspotJobFinished = (ev) => {
+        const t = ev?.detail?.type;
+        if (t !== 'hubspot-import' && t !== 'hubspot-push') return;
+        this.hubspotImportJobId = null;
+        this.loadHubspotStatus();
+        if (t === 'hubspot-import') {
+          window.__app.loadPages?.();
+        }
+      };
+      window.addEventListener('job:finished', this._onHubspotJobFinished);
     },
 
     destroy() {
@@ -120,6 +158,10 @@ export function registerBookSettingsCard() {
       if (this._onBlogJobFinished) {
         window.removeEventListener('job:finished', this._onBlogJobFinished);
         this._onBlogJobFinished = null;
+      }
+      if (this._onHubspotJobFinished) {
+        window.removeEventListener('job:finished', this._onHubspotJobFinished);
+        this._onHubspotJobFinished = null;
       }
       this._lifecycle?.destroy();
     },

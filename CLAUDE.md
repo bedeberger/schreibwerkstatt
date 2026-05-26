@@ -28,6 +28,8 @@ Themen-Spickzettel ausgelagert (Drift-Schutz: CLAUDE.md-Regeln, Details in den S
 - [docs/languagetool.md](docs/languagetool.md) — LanguageTool-Integration (Self-Hosted, regelbasiert, sync Proxy als Ausnahme zur Job-Queue-Regel): Dispatch über 3 Editoren + Form-Felder, CSS-Custom-Highlights für Squiggles, Chunking + Per-Page-Cache, Custom-Dictionary, Extension-Konflikt-Detection, Pflicht-Invarianten.
 - [docs/share-link.md](docs/share-link.md) — Share-Link (Page/Chapter public via opaken Token): SSR-Reader-View ohne Alpine, Mount **vor** Auth-Guard, In-Memory-Rate-Limit + Honeypot, IP-Hash für GDPR, Owner-Karte mit Unread-Tracking via `owner_last_seen_at`.
 - [docs/metrics-api.md](docs/metrics-api.md) — Metrics-API: `GET /metrics` im Prometheus-Text-Format (HA/Grafana/Prometheus), Bearer-Token-Auth mit Scopes, `api_tokens`-Lifecycle, exponierte Kennzahlen-Liste, Pflicht-Invarianten.
+- [docs/blog-sync.md](docs/blog-sync.md) — Blog-Sync (Buch ↔ WordPress, Buchtyp `blog`): Initial-Import + Pull + Push, LWW-Konfliktstrategie, Gutenberg-Block-Mapping, Buchorganizer-Status-Badges.
+- [docs/hubspot-sync.md](docs/hubspot-sync.md) — HubSpot-Sync (Buch ↔ HubSpot-Blog, Buchtyp `blog`): einmaliger Initial-Import + Create-Draft-Push (kein Update, kein Pull-Back), PAT-Auth, Rate-Limit-Bucket.
 - [docs/homeassistant/](docs/homeassistant/) — Home-Assistant-Integration: `rest`-Sensor-Config + Template-Sensoren + fertiges Lovelace-Dashboard, deckt alle Metriken ab.
 
 ## Feature-Pläne
@@ -313,6 +315,10 @@ Browser → NGINX (HTTPS) → Express (Port 3737)
   /categories/*    → Kategorie-Pool (CRUD, Zuordnung pro Buch via ACL)
   /pdf-export/*    → Custom-PDF-Export-Profile (CRUD + Cover-Upload + Font-Liste)
   /jobs/pdf-export → Render-Job (eigene pdfkit-Pipeline mit PDF/A-2B)
+  /blog/*          → WordPress-Blog-Connection (Buchtyp 'blog'): Status, Connect, Links, Konflikt-Resolve
+  /hubspot/*       → HubSpot-Blog-Connection (Buchtyp 'blog'): Status, Connect, Blogs/Authors-Combo, Links
+  /jobs/blog-*     → Blog-Sync-Jobs (initial-import, pull, push)
+  /jobs/hubspot-*  → HubSpot-Sync-Jobs (initial-import, push-as-draft)
   /usage/*         → Feature-Usage-Tracking (Recency für Palette/Quick-Pills)
   /admin/books, /admin/logs, /admin/registration-requests, /admin/settings, /admin/usage, /admin/users
   /public/*        → Unauthentifizierte Endpoints (Health, Marketing)

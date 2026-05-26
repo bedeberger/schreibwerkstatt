@@ -19,10 +19,10 @@ require('dotenv').config();
 
 const readline = require('readline/promises');
 const { stdin: input, stdout: output } = require('process');
-const { parseHTML } = require('linkedom');
 const contentStore = require('../lib/content-store');
 const pageRevisions = require('../db/page-revisions');
 const appUsers = require('../db/app-users');
+const { hubspotToAppHtml } = require('../lib/hubspot-html');
 const logger = require('../logger');
 
 const HUBSPOT_BASE = 'https://api.hubapi.com';
@@ -120,98 +120,9 @@ async function* iterateAuthorPosts(token, authorId, hardLimit) {
   }
 }
 
-// HubSpot postBody → minimal-formatiertes HTML.
-// Whitelist: Inline (strong, em, a[href], u) + Block (p, h2, h3, ul, ol, li,
-// blockquote). h1 → h2, h4-h6 → h3 (Buch-Doku-Konvention). Alles andere wird
-// gedroppt, dabei Textinhalt erhalten (Tag wird unwrappt).
-const STRIP_SEL = [
-  '.hs-cta-wrapper', '.hs-cta-img', '.hs-form',
-  '.hs_cos_wrapper_meta_field', '.hs-embed-wrapper',
-  'script', 'style', 'iframe', 'noscript',
-  'img', 'figure', 'video', 'audio', 'svg', 'object', 'embed', 'canvas',
-];
-
-const INLINE_MAP = {
-  STRONG: 'strong', B: 'strong',
-  EM: 'em', I: 'em',
-  U: 'u',
-  A: 'a',
-  BR: 'br',
-};
-const BLOCK_MAP = {
-  P: 'p',
-  H1: 'h2', H2: 'h2',
-  H3: 'h3', H4: 'h3', H5: 'h3', H6: 'h3',
-  UL: 'ul', OL: 'ol', LI: 'li',
-  BLOCKQUOTE: 'blockquote',
-};
-
-function escapeHtml(s) {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-
-function escapeAttr(s) {
-  return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-// Rekursiver Serializer. node: DOM-Node. inline: true → Element ist in Inline-
-// Kontext (z.B. innerhalb <p>); Block-Tags werden dann unwrappt.
-function serializeNode(node, inline) {
-  if (!node) return '';
-  if (node.nodeType === 3) return escapeHtml(node.textContent || '');
-  if (node.nodeType !== 1) return '';
-  const tag = node.tagName;
-  const out = INLINE_MAP[tag];
-  if (out) {
-    const inner = serializeChildren(node, true);
-    if (!inner.trim() && out !== 'br') return '';
-    if (out === 'br') return '<br>';
-    if (out === 'a') {
-      const href = node.getAttribute('href') || '';
-      if (!/^https?:\/\//i.test(href)) return inner; // unsichere/relative Links unwrappt
-      return `<a href="${escapeAttr(href)}">${inner}</a>`;
-    }
-    return `<${out}>${inner}</${out}>`;
-  }
-  const blockOut = BLOCK_MAP[tag];
-  if (blockOut) {
-    if (inline) return serializeChildren(node, true); // Block in Inline-Kontext → unwrap
-    const innerInline = (blockOut === 'ul' || blockOut === 'ol') ? false : true;
-    const inner = serializeChildren(node, innerInline);
-    if (!inner.trim()) return '';
-    return `<${blockOut}>${inner}</${blockOut}>`;
-  }
-  // Unbekanntes Tag → unwrappen, Kinder behalten.
-  return serializeChildren(node, inline);
-}
-
-function serializeChildren(parent, inline) {
-  let out = '';
-  for (const child of parent.childNodes) out += serializeNode(child, inline);
-  if (inline) return out.replace(/\s+/g, ' ');
-  return out;
-}
-
-function stripJinja(s) {
-  return s.replace(/\{\{[\s\S]*?\}\}/g, '').replace(/\{%[\s\S]*?%\}/g, '').replace(/\{#[\s\S]*?#\}/g, '');
-}
-
-function postBodyToText(rawHtml) {
-  if (typeof rawHtml !== 'string' || !rawHtml.trim()) return '';
-  rawHtml = stripJinja(rawHtml);
-  const { document } = parseHTML(`<!doctype html><html><body>${rawHtml}</body></html>`);
-  for (const sel of STRIP_SEL) {
-    for (const el of Array.from(document.querySelectorAll(sel))) el.remove();
-  }
-  let html = serializeChildren(document.body, false).trim();
-  // Wenn nach Strip nichts Block-artiges uebrig: ganzes Body als ein <p>.
-  if (!/^<(p|h2|h3|ul|ol|blockquote)\b/i.test(html)) {
-    const text = (document.body.textContent || '').replace(/\s+/g, ' ').trim();
-    return text ? `<p>${escapeHtml(text)}</p>` : '';
-  }
-  return html;
-}
+// HubSpot postBody → minimal-formatiertes App-HTML; Mapping liegt zentral in
+// lib/hubspot-html.js (gleicher Whitelist wie der GUI-Initial-Import).
+const postBodyToText = hubspotToAppHtml;
 
 function publishDateOf(post) {
   const raw = post.publishDate || post.created || post.updated;

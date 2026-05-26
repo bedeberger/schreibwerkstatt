@@ -6180,6 +6180,48 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 146 abgeschlossen (api_tokens fuer Prometheus-Scraper).');
   }
 
+  if (version < 147) {
+    // HubSpot-Sync: pro Buch eine Connection (Token verschluesselt via lib/crypto.js,
+    // Blog-ID + Author-ID als Fix-Wahl beim Connect). Pro gepushter Page ein Link auf
+    // den HubSpot-Post. Push erstellt ausschliesslich DRAFTs; Re-Push ist UI- und
+    // Backend-blockiert (Existenz des Links).
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS hubspot_connections (
+        id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id                INTEGER NOT NULL UNIQUE REFERENCES books(book_id) ON DELETE CASCADE,
+        token_enc              BLOB NOT NULL,
+        blog_id                TEXT NOT NULL,
+        author_id              TEXT NOT NULL,
+        initial_import_done_at TEXT,
+        last_import_at         TEXT,
+        last_push_at           TEXT,
+        created_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        updated_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      )
+    `).run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_hubspot_conn_book ON hubspot_connections(book_id)').run();
+
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS hubspot_page_links (
+        page_id            INTEGER PRIMARY KEY REFERENCES pages(page_id) ON DELETE CASCADE,
+        hub_id             INTEGER NOT NULL REFERENCES hubspot_connections(id) ON DELETE CASCADE,
+        hubspot_post_id    TEXT NOT NULL,
+        hubspot_state      TEXT,
+        hubspot_created_at TEXT,
+        last_pushed_at     TEXT,
+        UNIQUE(hub_id, hubspot_post_id)
+      )
+    `).run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_hubspot_links_hub ON hubspot_page_links(hub_id)').run();
+
+    const fkErrors147 = db.pragma('foreign_key_check');
+    if (fkErrors147.length) {
+      throw new Error(`Migration 147: foreign_key_check meldet ${fkErrors147.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 147').run();
+    logger.info('DB-Migration auf Version 147 abgeschlossen (hubspot_connections + hubspot_page_links).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

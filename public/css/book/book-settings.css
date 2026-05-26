@@ -275,3 +275,33 @@
   border-width: 0.5px;
 }
 }
+
+/* HubSpot-Sync (Initial-Import + Create-Draft-Push) — strukturell identisch
+   zum Blog-Panel, eigene Akzent-Variable. */
+.hubspot-status-panel {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: var(--space-3);
+  row-gap: var(--space-1);
+  padding: var(--space-3);
+  border: 0.5px solid var(--color-border);
+  border-left: 3px solid var(--card-accent-hubspot, var(--card-accent-blog));
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  font-size: var(--font-size-sm);
+}
+.hubspot-status-row { display: contents; }
+.hubspot-status-label { color: var(--color-muted); }
+.hubspot-status-value { color: var(--color-text); word-break: break-all; }
+.hubspot-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+.hubspot-actions .book-settings-btn-danger {
+  padding: var(--size-default-padding-y) 16px;
+  font-size: var(--font-size-base);
+  border-radius: var(--radius-md);
+  border-width: 0.5px;
+}

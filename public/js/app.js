@@ -69,6 +69,7 @@ import { registerPageHistoryCard } from './cards/page-history-card.js';
 import { registerPageRevisionsCard } from './cards/page-revisions-card.js';
 import { registerPaletteCard } from './cards/palette-card.js';
 import { registerBlogSyncCard } from './cards/blog-sync-card.js';
+import { registerHubspotSyncCard } from './cards/hubspot-sync-card.js';
 import { registerNumInput } from './num-input.js';
 import { registerCombobox } from './combobox.js';
 import { registerSortableTable } from './sortable-table.js';
@@ -224,6 +225,8 @@ document.addEventListener('alpine:init', () => {
   // <div x-data="blogSyncCard"> in index.html). Setzt sich in Card.init()
   // selbst auf window.__blogCard.
   Alpine.magic('blog', () => window.__blogCard);
+  // Magic `$hubspot` — analog zu $blog, verweist auf den hubspotSyncCard-Anker.
+  Alpine.magic('hubspot', () => window.__hubspotCard);
 
   registerCatalogStore();
   registerStilCard();
@@ -270,6 +273,7 @@ document.addEventListener('alpine:init', () => {
   registerPageRevisionsCard();
   registerPaletteCard();
   registerBlogSyncCard();
+  registerHubspotSyncCard();
   registerNumInput();
   registerCombobox();
   registerSortableTable();

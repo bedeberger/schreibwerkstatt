@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 146, 79 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 147, 81 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -54,6 +54,9 @@ erDiagram
   books ||--o| blog_connections      : "wp-link"
   blog_connections ||--o{ blog_page_links : "has"
   pages ||--o| blog_page_links       : "wp-mirror"
+  books ||--o| hubspot_connections   : "hubspot-link"
+  hubspot_connections ||--o{ hubspot_page_links : "has"
+  pages ||--o| hubspot_page_links    : "hubspot-mirror"
 
   books ||--o{ share_links           : has
   pages ||--o{ share_links           : "shared as page"
@@ -981,6 +984,26 @@ erDiagram
     TEXT    last_pushed_at
     TEXT    conflict_state "detected|resolved-app|resolved-wp"
   }
+  hubspot_connections {
+    INTEGER id                     PK
+    INTEGER book_id                FK "UNIQUE — 1 HubSpot-Blog pro Buch"
+    BLOB    token_enc              "AES-PAT via lib/crypto.js"
+    TEXT    blog_id                "HubSpot contentGroupId"
+    TEXT    author_id              "HubSpot blogAuthorId"
+    TEXT    initial_import_done_at "NULL = noch nie importiert"
+    TEXT    last_import_at
+    TEXT    last_push_at
+    TEXT    created_at
+    TEXT    updated_at
+  }
+  hubspot_page_links {
+    INTEGER page_id            PK "FK pages(page_id) ON DELETE CASCADE"
+    INTEGER hub_id             FK "FK hubspot_connections(id) ON DELETE CASCADE"
+    TEXT    hubspot_post_id    "UNIQUE(hub_id, hubspot_post_id)"
+    TEXT    hubspot_state      "DRAFT|PUBLISHED|…"
+    TEXT    hubspot_created_at
+    TEXT    last_pushed_at
+  }
   share_links {
     TEXT    token              PK "22-Zeichen base64url"
     TEXT    kind               "page|chapter (CHECK)"
@@ -1019,6 +1042,9 @@ erDiagram
   books            ||--o| blog_connections  : "wp-link"
   blog_connections ||--o{ blog_page_links   : has
   pages            ||--o| blog_page_links   : "wp-mirror"
+  books            ||--o| hubspot_connections   : "hubspot-link"
+  hubspot_connections ||--o{ hubspot_page_links : has
+  pages            ||--o| hubspot_page_links    : "hubspot-mirror"
   books            ||--o{ share_links       : has
   pages            ||--o{ share_links       : "shared as page"
   chapters         ||--o{ share_links       : "shared as chapter"
