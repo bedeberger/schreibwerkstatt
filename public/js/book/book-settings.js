@@ -293,16 +293,6 @@ export const bookSettingsMethods = {
     return {};
   },
 
-  async loadShareUserPool() {
-    try {
-      const data = await fetchJson('/me/users-light');
-      this.shareUserPool = Array.isArray(data?.users) ? data.users : [];
-    } catch (e) {
-      // Pool ist optional — Suggestions bleiben leer, Invite-Pfad geht weiter.
-      this.shareUserPool = [];
-    }
-  },
-
   _shareEmailValid(email) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   },
@@ -311,109 +301,49 @@ export const bookSettingsMethods = {
     return !!window.__app.currentUser?.can_invite_users;
   },
 
-  shareSuggestions() {
-    const q = (this.shareEmail || '').trim().toLowerCase();
-    const taken = new Set((this.bookAccessList || []).map(e => (e.user_email || '').toLowerCase()));
-    const pool = (this.shareUserPool || []).filter(u =>
-      !taken.has((u.email || '').toLowerCase()) && u.global_role !== 'admin');
-    let matches = pool;
-    if (q) {
-      matches = pool.filter(u =>
-        u.email.toLowerCase().includes(q) ||
-        (u.display_name || '').toLowerCase().includes(q));
-    }
-    const list = matches.slice(0, 8).map(u => ({
-      kind: 'user',
-      key: 'user:' + u.email,
-      email: u.email,
-      label: u.display_name || u.email,
-      sub: u.display_name ? u.email : '',
-    }));
-    // Invite-Option, wenn Eingabe eine gültige Email ist, kein User matcht und
-    // der aktuelle User Invite-Recht hat. Auch nicht anzeigen, wenn die Email
-    // bereits Zugriff hat.
-    if (q && this._shareEmailValid(q) && !taken.has(q) && this.shareCanInvite()) {
-      const exact = pool.find(u => u.email.toLowerCase() === q);
-      if (!exact) {
-        list.push({
-          kind: 'invite',
-          key: 'invite:' + q,
-          email: q,
-          label: window.__app.t('book.share.inviteOption', { email: q }),
-          sub: '',
-        });
-      }
-    }
-    return list;
-  },
-
-  pickShareSuggestion(s) {
-    if (!s) return;
-    this.shareEmail = s.email;
-    this.shareSuggestOpen = false;
-    if (s.kind === 'invite') {
-      this.submitShareInvite();
-    }
-  },
-
-  shareSubmitLabel() {
-    const q = (this.shareEmail || '').trim().toLowerCase();
-    if (!q) return window.__app.t('book.share.inviteBtn');
-    const taken = new Set((this.bookAccessList || []).map(e => (e.user_email || '').toLowerCase()));
-    if (taken.has(q)) return window.__app.t('book.share.inviteBtn');
-    const known = (this.shareUserPool || []).some(u => u.email.toLowerCase() === q);
-    if (!known && this._shareEmailValid(q) && this.shareCanInvite()) {
-      return window.__app.t('book.share.inviteAndShareBtn');
-    }
-    return window.__app.t('book.share.inviteBtn');
-  },
-
+  // Versucht zuerst zu teilen; existiert der User noch nicht (USER_NOT_FOUND)
+  // und darf der aktuelle User einladen, wird stattdessen eine Einladung
+  // verschickt. Geteilt wird dann erst nach Annahme der Einladung.
   async submitShareInvite() {
-    if (!this.bookAccessIsOwner()) return;
-    const bookId = window.__app.selectedBookId;
-    const email = (this.shareEmail || '').trim().toLowerCase();
-    if (!bookId || !email) return;
-    const known = (this.shareUserPool || []).some(u => u.email.toLowerCase() === email);
-    if (!known && this._shareEmailValid(email) && this.shareCanInvite()) {
-      this.shareBusy = true;
-      this.bookAccessError = '';
-      try {
-        const r = await fetch('/me/invite', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email }),
-        });
-        const data = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(window.__app.tError(data) || `HTTP ${r.status}`);
-        await this.loadShareUserPool();
-      } catch (e) {
-        this.bookAccessError = e.message;
-        this.shareBusy = false;
-        return;
-      }
-    }
-    await this.shareBookAccessAdd();
-  },
-
-  async shareBookAccessAdd() {
     if (!this.bookAccessIsOwner()) return;
     const bookId = window.__app.selectedBookId;
     const email = (this.shareEmail || '').trim().toLowerCase();
     const role = this.shareRole;
     if (!bookId || !email) return;
+    if (!this._shareEmailValid(email)) {
+      this.bookAccessError = window.__app.t('book.share.emailInvalid');
+      return;
+    }
     this.shareBusy = true;
     this.bookAccessError = '';
+    this.shareInviteMessage = '';
+    if (this._shareInviteMsgTimer) { clearTimeout(this._shareInviteMsgTimer); this._shareInviteMsgTimer = null; }
     try {
-      const r = await fetch(`/books/${bookId}/share`, {
+      const shareRes = await fetch(`/books/${bookId}/share`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, role }),
       });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(window.__app.tError(data) || `HTTP ${r.status}`);
-      this.shareEmail = '';
-      this.shareSuggestOpen = false;
-      await this.loadBookAccess();
+      const shareData = await shareRes.json().catch(() => ({}));
+      if (shareRes.ok) {
+        this.shareEmail = '';
+        await this.loadBookAccess();
+        return;
+      }
+      if (shareData?.error_code === 'USER_NOT_FOUND' && this.shareCanInvite()) {
+        const inviteRes = await fetch('/me/invite', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+        const inviteData = await inviteRes.json().catch(() => ({}));
+        if (!inviteRes.ok) throw new Error(window.__app.tError(inviteData) || `HTTP ${inviteRes.status}`);
+        this.shareEmail = '';
+        this.shareInviteMessage = window.__app.t('book.share.inviteSent', { email });
+        this._shareInviteMsgTimer = setTimeout(() => { this.shareInviteMessage = ''; this._shareInviteMsgTimer = null; }, 6000);
+        return;
+      }
+      throw new Error(window.__app.tError(shareData) || `HTTP ${shareRes.status}`);
     } catch (e) {
       this.bookAccessError = e.message;
     } finally {
