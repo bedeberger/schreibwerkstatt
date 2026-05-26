@@ -139,7 +139,10 @@ async function runHubspotImportJob(jobId, bookId, userEmail) {
         hubspotPostId: post.id,
         hubspotState: post.state || 'PUBLISHED',
         hubspotCreatedAt: post.created || post.publishDate || null,
-        lastPushedAt: null,
+        // Sync-Baseline = Anlage-Zeitpunkt der Page. Sonst zaehlt die
+        // Seitenanlage selbst (updated_at = jetzt > hubspot_created_at) als
+        // lokaler Edit und der Import-Status ist faelschlich 'pushed-dirty'.
+        lastPushedAt: created.updated_at || null,
         hubspotUrl: post.url || post.absoluteUrl || null,
       });
       logger.info(`HubSpot-Import: Post ${post.id} -> Page ${created.id} "${pageName}" (Kapitel ${year})`);

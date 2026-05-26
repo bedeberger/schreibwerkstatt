@@ -31,6 +31,9 @@
 //                         vor dem Backend-Call aufgerufen; liefert `false` →
 //                         Push abgebrochen (z.B. wenn ein UI-Dialog erst eine
 //                         Bestätigung einholen muss).
+//   autoReconcileHours — optional > 0. Throttle-Fenster (h) fuer den
+//                         automatischen Drift-Check beim Buch-Open. Nur wirksam,
+//                         wenn jobTypes.reconcile gesetzt ist.
 
 export function createSyncCard(spec) {
   const refreshTypes = new Set([
@@ -114,9 +117,36 @@ export function createSyncCard(spec) {
           const map = {};
           for (const link of (data.links || [])) map[link.page_id] = link;
           this.linksMap = map;
+          this._maybeAutoReconcile(bookId);
         } catch (e) {
           console.error(`[sync:${spec.key}] Links laden fehlgeschlagen:`, e);
         }
+      },
+
+      // Throttled Drift-Check: pruft beim Buch-Open einmal pro
+      // `spec.autoReconcileHours`, ob die verlinkten Remote-Posts noch
+      // existieren (Reconcile-Job → getPost je Link, 404 → Link weg → Badge
+      // 'new'). Deckt drueben geloeschte Blogs/Posts ohne manuellen Klick.
+      // Throttle pro (Provider, Buch) in localStorage, weil Reconcile N
+      // HubSpot-Calls kostet. Job-Dedup serverseitig verhindert Parallel-Laeufe.
+      _maybeAutoReconcile(bookId) {
+        if (!reconcileType || !(spec.autoReconcileHours > 0)) return;
+        if (!this.connected || !Object.keys(this.linksMap).length) return;
+        const key = `sync:${spec.key}:reconcile:${bookId}`;
+        try {
+          const last = parseInt(localStorage.getItem(key) || '0', 10);
+          if (Date.now() - last < spec.autoReconcileHours * 3600_000) return;
+          localStorage.setItem(key, String(Date.now()));
+        } catch { return; }
+        fetch(`/jobs/${reconcileType}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ book_id: bookId }),
+        }).then(r => r.ok ? r.json() : null).then(data => {
+          if (data?.jobId && !data.existing) {
+            window.dispatchEvent(new CustomEvent('job:enqueued', { detail: { type: reconcileType, jobId: data.jobId } }));
+          }
+        }).catch(() => { /* Drift-Check best-effort */ });
       },
 
       statusFor(page) {

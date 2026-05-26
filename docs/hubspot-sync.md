@@ -23,7 +23,7 @@ Drei Zustände pro Page (`computeStatus` in [hubspot-sync-card.js](../public/js/
 | `pushed-dirty` | Link existiert + `page.updated_at > COALESCE(last_pushed_at, hubspot_created_at)` | Push-Button aktiv, öffnet `appConfirm`-Warn-Dialog vor Re-Push |
 | `pushed` | Link existiert + lokal unverändert seit Sync-Punkt | Indikator + externer Link, Push-Button ausgeblendet |
 
-Re-Push ruft den Warn-Dialog (Keys `hubspot.repush.warning`/`hubspot.repush.confirm`) via `confirmPush`-Hook in [sync-core.js](../public/js/cards/sync/sync-core.js) auf. Bestätigt der User, sendet das Backend `PATCH …/draft` an HubSpot. Bricht der User ab, ändert sich nichts. Sync-Baseline `last_pushed_at || hubspot_created_at` deckt auch Import-only-Links ab — fehlt `last_pushed_at`, vergleicht die UI gegen `hubspot_created_at`, und lokale Edits seither werden als `pushed-dirty` erkannt.
+Re-Push ruft den Warn-Dialog (Keys `hubspot.repush.warning`/`hubspot.repush.confirm`) via `confirmPush`-Hook in [sync-core.js](../public/js/cards/sync/sync-core.js) auf. Bestätigt der User, sendet das Backend `PATCH …/draft` an HubSpot. Bricht der User ab, ändert sich nichts. Sync-Baseline ist `last_pushed_at || hubspot_created_at`. Der Initial-Import setzt `last_pushed_at` auf den Anlage-Zeitpunkt der frisch erzeugten Page (`created.updated_at`), damit sie direkt nach dem Import als `pushed` (synchron) gilt — sonst würde die Seitenanlage selbst (`updated_at` = jetzt > `hubspot_created_at`) als lokaler Edit zählen und der Status fälschlich `pushed-dirty` sein. Erst ein echter User-Edit schiebt `updated_at` über die Baseline → `pushed-dirty`.
 
 ## Schema (Migration 147 + 149 + 150)
 
@@ -218,9 +218,10 @@ Server-Fehler-Codes werden 1:1 als i18n-Keys gemappt (`hubspot.error.${code}`). 
 
 - **PAT abgelaufen:** Job-Status `error` mit `HUBSPOT_AUTH_FAILED`; User aktualisiert Token in den Bucheinstellungen.
 - **Page lokal nach Push verändert:** Push-UI blockiert, lokale Edits driften gegenüber HubSpot. Bewusster Trade-off — User hat Workflow-Wechsel zu HubSpot kommuniziert.
-- **HubSpot-Post drüben gelöscht:**
+- **HubSpot-Post/Blog drüben gelöscht:**
   - **Push-Pfad:** Re-Push einer verlinkten Page entdeckt das 404 via `updatePostDraft`, löscht den Link automatisch und erstellt einen neuen Draft (`revived` im Logger). Single Push-Klick reicht.
   - **Drift sichtbar machen:** „Verbindung prüfen"-Button (`runHubspotReconcileJob`) ruft `getPost` für jeden Link und entfernt Orphans. Pages flippen danach auf Badge `new`.
+  - **Auto-Check beim Buch-Open:** `sync-core.js#_maybeAutoReconcile` triggert den Reconcile-Job automatisch beim ersten `loadLinks` pro Buch, throttled auf max. 1×/Stunde pro Buch (localStorage-Key `sync:hubspot:reconcile:<bookId>`, Fenster aus `spec.autoReconcileHours`). Greift nur bei `connected` + vorhandenen Links; Job-Dedup serverseitig verhindert Parallel-Läufe. Deckt drüben gelöschte Blogs (alle `getPost` → 404 → alle Links weg) ohne manuellen Klick.
 - **Link auf Pre-149-Pushes:** `hubspot_url` wurde mit Migration 149 ergänzt; vorher gepushte Pages haben `NULL` → kein „In HubSpot öffnen"-Button für PUBLISHED-Posts. Workaround: Re-Push (Status `pushed-dirty`) füllt das Feld; alternativ Link in DB löschen → Push neu.
 - **Connection vor Migration 150:** `portal_id` fehlt → Editor-URL nicht baubar. `/links` self-healt einmalig via `me()`-Roundtrip beim ersten Aufruf nach dem Update und persistiert die `portalId`. Schlägt der Roundtrip fehl (Auth/Netz), bleibt der Draft-Button für diesen Request leer; nächster Aufruf retried.
 - **HubSpot-Rate-Limit (429):** Client honoriert `Retry-After`, retried bis `MAX_RETRIES`. Bei Final-Fail → `HUBSPOT_RATE_LIMIT` im Job-Errors-Array.

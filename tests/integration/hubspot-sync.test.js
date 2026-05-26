@@ -79,6 +79,14 @@ test('hubspot-import: zwei PUBLISHED-Posts → Pages + Jahres-Kapitel + Link-Ein
   // Link-Eintraege existieren.
   const links = hubspot.listLinksForConnection(conn.id);
   assert.equal(links.length, 2);
+
+  // Import setzt last_pushed_at als Sync-Baseline auf den Anlage-Zeitpunkt der
+  // Page → Status direkt nach Import ist 'pushed', nicht 'pushed-dirty'.
+  for (const link of links) {
+    assert.ok(link.last_pushed_at, 'last_pushed_at muss nach Import gesetzt sein');
+    const page = ctx.dbSchema.db.prepare('SELECT updated_at FROM pages WHERE page_id = ?').get(link.page_id);
+    assert.ok(page.updated_at <= link.last_pushed_at, 'page.updated_at darf nicht ueber der Baseline liegen');
+  }
 });
 
 test('hubspot-import: bereits importiert → HUBSPOT_ALREADY_IMPORTED', async () => {
