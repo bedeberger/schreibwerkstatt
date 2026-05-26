@@ -93,6 +93,29 @@ test('hubspotToAppHtml preserves <pre> incl. whitespace + escapes inner', () => 
   assert.match(out, /<pre>line 1\n  line 2 &lt; &amp; &gt;<\/pre>/);
 });
 
+test('hubspotToAppHtml converts font-weight:bold style to <strong>', () => {
+  const out = hubspotToAppHtml('<p style="font-weight: bold">Fett</p>');
+  assert.match(out, /<p><strong>Fett<\/strong><\/p>/);
+});
+
+test('hubspotToAppHtml converts numeric font-weight >=600 to <strong>', () => {
+  const out = hubspotToAppHtml('<p style="font-weight:700">Sieben</p><p style="font-weight: 500">Fünf</p>');
+  assert.match(out, /<p><strong>Sieben<\/strong><\/p>/);
+  assert.match(out, /<p>Fünf<\/p>/);
+  assert.doesNotMatch(out, /<strong>Fünf/);
+});
+
+test('hubspotToAppHtml converts bold span (unknown tag) to <strong>', () => {
+  const out = hubspotToAppHtml('<p>vor <span style="font-weight:bold">fett</span> nach</p>');
+  assert.match(out, /<p>vor <strong>fett<\/strong> nach<\/p>/);
+});
+
+test('hubspotToAppHtml: bold on <strong> stays single <strong>', () => {
+  const out = hubspotToAppHtml('<p><strong style="font-weight:bold">x</strong></p>');
+  assert.match(out, /<p><strong>x<\/strong><\/p>/);
+  assert.doesNotMatch(out, /<strong><strong>/);
+});
+
 test('appToHubspotHtml round-trips hr + pre from editor', () => {
   const out = appToHubspotHtml('<p>x</p><hr><pre>code\n  indent</pre><p>y</p>');
   assert.match(out, /<p>x<\/p>/);

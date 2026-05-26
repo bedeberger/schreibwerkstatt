@@ -92,10 +92,26 @@ export function createFormFieldSpellcheck({
     let wrap = el.parentNode;
     const wrapped = wrap.classList && wrap.classList.contains('lt-field-wrap');
     if (!wrapped) {
+      // Move steals focus + blurs synchronously. Snapshot focus/selection und
+      // restore — sonst feuert @blur (z.B. onRenamePage im Buchorganizer)
+      // direkt beim ersten Klick und User kann nicht tippen.
+      const wasFocused = document.activeElement === el;
+      let selStart = null, selEnd = null;
+      if (wasFocused) {
+        try { selStart = el.selectionStart; selEnd = el.selectionEnd; } catch {}
+      }
       wrap = document.createElement('span');
       wrap.className = isTextarea ? 'lt-field-wrap lt-field-wrap--textarea' : 'lt-field-wrap';
       el.parentNode.insertBefore(wrap, el);
       wrap.appendChild(el);
+      if (wasFocused) {
+        try {
+          el.focus({ preventScroll: true });
+          if (selStart != null && typeof el.setSelectionRange === 'function') {
+            el.setSelectionRange(selStart, selEnd);
+          }
+        } catch {}
+      }
     }
     if (badge.parentNode !== wrap) wrap.appendChild(badge);
     fieldWrap = wrap;
