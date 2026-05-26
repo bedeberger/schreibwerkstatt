@@ -337,30 +337,62 @@
 }
 
 /* ─── Form-Field-Variante (input/textarea, [data-spellcheck="spelling"]) ──
- * Badge: inline-block neben Feld, kein absolutes Positioning. Popover-Variante
- * mit Match-Liste; jeder Match-Eintrag hat Wort + Vorschlaege + Ignore/Dict. */
+ * Badge sitzt absolut in der oberen/unteren rechten Ecke des Feldes — der
+ * Form-Controller wickelt das Feld dafuer einmalig in .lt-field-wrap ein
+ * (DOM-Mutation beim attach, beim detach unwrap). Dadurch ist die Position
+ * IMMER am Feld, unabhaengig von flex/grid/block-Parents. */
+
+.lt-field-wrap {
+  position: relative;
+  display: block;
+  min-width: 0;
+  /* Greift nur in flex-Parents — sonst no-op. Behaelt das urspruengliche
+   * flex:1-Verhalten von gewrappten Inputs wie .organizer-name oder
+   * .kapitel-new-page-input. */
+  flex: 1;
+}
+
+/* Wrapped field fuellt den Wrap und reserviert rechts Platz fuer den Badge.
+ * Attribute-Selektor + Klassen-Selektor heben die Specificity ueber Klassen-
+ * Padding-Shorthands ([data-spellcheck] = 0,1,0 + .lt-field-wrap > = 0,1,1
+ * + Element = +0,0,1 → 0,2,2). !important nur als Sicherung gegen :focus-
+ * Restyle (z.B. .card-title--input:focus = 0,2,1 setzt padding-Shorthand). */
+.lt-field-wrap > input[data-spellcheck],
+.lt-field-wrap > textarea[data-spellcheck] {
+  width: 100%;
+  box-sizing: border-box;
+  padding-inline-end: 32px !important;
+}
 
 .lt-badge--form {
-  position: static;
-  transform: none;
-  vertical-align: middle;
-  margin-left: 6px;
+  position: absolute;
+  top: 50%;
+  inset-inline-end: 6px;
+  transform: translateY(-50%);
+  margin: 0;
   cursor: pointer;
   appearance: none;
   border-color: var(--color-border);
+  z-index: 1;
+}
+
+/* Textarea: Badge bottom-right damit oben die erste Textzeile frei bleibt. */
+.lt-field-wrap--textarea > .lt-badge--form {
+  top: auto;
+  bottom: 8px;
+  transform: none;
 }
 
 /* Quiet: weniger visuelles Rauschen wenn nichts zu zeigen. Wird vom JS gesetzt
  * fuer idle/clean/disabled. Hover/Fokus aufs Feld macht Badge wieder voll
- * sichtbar (Container-Hover). */
+ * sichtbar (Container-Hover via .lt-field-wrap). */
 .lt-badge--form.lt-badge--quiet {
-  opacity: 0.35;
+  opacity: 0.4;
 }
-.lt-badge--form.lt-badge--quiet:hover,
-.lt-badge--form:focus-visible,
-*:focus-within > .lt-badge--form,
-*:hover > .lt-badge--form {
-  opacity: 0.9;
+.lt-field-wrap:hover > .lt-badge--form,
+.lt-field-wrap:focus-within > .lt-badge--form,
+.lt-badge--form:focus-visible {
+  opacity: 0.95;
 }
 
 /* Form-Popover liegt im body, absolute via JS positioniert. */

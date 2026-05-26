@@ -636,6 +636,22 @@ Pure-CSS-Border ohne `aria-invalid` ist Anti-Pattern — Screen-Reader liest son
 
 `.card-form-textarea` (volle Breite, vertikal resizable) für mehrzeilige Inputs. `.card-form-field` ist Spalten-Stack (Input + Note darunter), `.card-form-field-note` ist 12 px-Erklärtext unter dem Input.
 
+### Spellcheck-Badge auf Form-Feldern (`.lt-field-wrap`)
+
+`<input type="text">` und `<textarea>`, die Prosatext aufnehmen (Titel, Notizen, Einleitungen, Beschreibungen, Ideen), bekommen `data-spellcheck="spelling"`. Der Form-Controller ([public/js/cards/editor-spellcheck/form-controller.js](public/js/cards/editor-spellcheck/form-controller.js)) wickelt das Feld beim Focus einmalig in `<span class="lt-field-wrap">` und hängt dort den Badge absolut positioniert in die obere/untere rechte Ecke. Klick öffnet ein Popover mit Tippfehler-Liste + Vorschlägen.
+
+- **Markup-Pflicht** im Partial: nur das Attribut, sonst nichts. Wrap + Badge erzeugt der Controller, keine Hand-Markup-Anpassung nötig.
+  ```html
+  <input type="text" data-spellcheck="spelling" x-model="…">
+  <textarea data-spellcheck="spelling" x-model="…" rows="4"></textarea>
+  ```
+- **Position:** Input → vertikal mittig rechts. Textarea (Klasse `.lt-field-wrap--textarea` automatisch) → bottom-right (erste Textzeile bleibt frei).
+- **Padding-Reservation:** Der Controller setzt das nicht selbst — CSS macht es: `.lt-field-wrap > input[data-spellcheck], .lt-field-wrap > textarea[data-spellcheck] { padding-inline-end: 32px !important }`. Eigenes Padding-Shorthand am Feld bleibt sonst voll wirksam (top/bottom/left), nur rechts wird reserviert.
+- **Flex/Grid-Parents:** `.lt-field-wrap { flex: 1; min-width: 0; display: block; }` greift transparent — in flex-Parents (`.organizer-page`, `.ideen-input-row`, `.kapitel-new-page`) übernimmt der Wrap die `flex: 1`-Rolle des Inputs; in grid/block bleibt es block-level.
+- **Anti-Pattern:** Badge per Hand-Markup neben den Input setzen (war früher Sibling-Layout, sah unterschiedlich aus je nach Parent — vermeidet das jetzt absichtlich).
+
+**Wann NICHT** `data-spellcheck` setzen: Such-/Filterfelder (`.filter-search-input`, Sidebar-Suche, Palette-Suche), `numInput`-Zahlenfelder, Admin-/technische Settings (Model-IDs, URLs, Tokens), Find/Replace (User sucht ggf. nach Tippfehlern), Readonly-Felder (Share-URLs), Passwortfelder. Im Zweifel: Prosatext → ja, sonst → nein. Hard-Rule-Begründung steht in CLAUDE.md.
+
 ### Mobile (≤ 600 px)
 
 Grid kollabiert auf 1 Spalte (in card-form.css). `.form-inline` reflowed auf 50/50 (`flex 1 1 calc(50% - 16px)`); `.form-num` wird flex-fluid.

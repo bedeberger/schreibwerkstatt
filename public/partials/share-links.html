@@ -49,6 +49,7 @@
       <textarea x-model="createIntro" rows="3"
                 :placeholder="$app.t('share.intro.placeholder')"
                 maxlength="2000"
+                data-spellcheck="spelling"
                 class="share-create__textarea"></textarea>
     </div>
 
@@ -116,7 +117,7 @@
         <template x-if="editingToken === link.token">
           <div class="share-row__edit">
             <label class="share-create__label" x-text="$app.t('share.intro.label')"></label>
-            <textarea x-model="editIntro" rows="3" maxlength="2000" class="share-create__textarea"></textarea>
+            <textarea x-model="editIntro" rows="3" maxlength="2000" data-spellcheck="spelling" class="share-create__textarea"></textarea>
             <label class="share-create__label" x-text="$app.t('share.expires.label')"></label>
             <input type="datetime-local" x-model="editExpiresAt" class="share-create__input">
             <div class="share-row__edit-actions">

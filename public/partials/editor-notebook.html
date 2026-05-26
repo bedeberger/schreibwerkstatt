@@ -35,6 +35,7 @@
                   @keydown.enter.prevent="$event.target.blur()"
                   :disabled="editMode || focusActive"
                   autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other"
+                  data-spellcheck="spelling"
                   :aria-label="t('editor.renamePage')"></textarea>
       </template>
       <template x-if="!currentPage || !canEdit()">
