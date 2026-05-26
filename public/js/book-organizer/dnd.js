@@ -130,59 +130,61 @@ export const dndMethods = {
     return parseInt(raw, 10) || 0;
   },
 
+  // Nimmt Sortables physischen DOM-Move zurück (Node zurück in Quell-Container an
+  // alten Index). Pflicht vor jeder Modell-Mutation: SortableJS und Alpine x-for
+  // besitzen sonst dieselben <li>/<div>-Nodes doppelt — verschiebt Sortable einen
+  // Node über Container-Grenzen, zeigt Alpines key→el-Map einer anderen x-for-
+  // Scope weiterhin auf ihn → Orphan/Duplikat-Nodes, driftender DOM, falsche
+  // Positionen. Nach Revert ist Alpine alleiniger DOM-Besitzer; das Modell (unten
+  // mutiert) ist die Wahrheit, x-for rendert daraus neu.
+  _revertSortable(evt) {
+    const { item, from, oldIndex } = evt;
+    if (!item || !from) return;
+    if (item.parentNode === from
+        && Array.prototype.indexOf.call(from.children, item) === oldIndex) return;
+    const ref = from.children[oldIndex] || null;
+    from.insertBefore(item, ref);
+  },
+
+  _setSubtreeDepth(node, depth) {
+    node.depth = depth;
+    for (const sub of (node.subchapters || [])) this._setSubtreeDepth(sub, depth + 1);
+  },
+
   async _onChapterDrop(evt) {
     if (this.organizerSaving) return;
     const sameBucket = evt.from === evt.to;
     if (sameBucket && evt.oldIndex === evt.newIndex) return;
+    const movedId = parseInt(evt.item?.dataset?.chapterId, 10);
+    if (!Number.isFinite(movedId)) return;
     const before = this._snapshotWorkstate();
 
-    // Existierende Nodes per ID indexieren — Pages + Renames bleiben erhalten,
-    // wenn wir den Tree neu aus DOM-Reihenfolge zusammenbauen.
-    const nodeById = new Map();
-    function collect(list) {
-      for (const c of list) {
-        nodeById.set(c.id, c);
-        collect(c.subchapters || []);
-      }
+    this._revertSortable(evt);
+
+    const toParentId = parseInt(evt.to?.dataset?.parentChapterId, 10) || null;
+    const targetDepth = parseInt(evt.to?.dataset?.organizerDepth, 10) || 1;
+    const newIndex = Number.isFinite(evt.newIndex) ? evt.newIndex : 0;
+
+    const found = this._findChapter(movedId);
+    if (!found) return;
+    const node = found.node;
+    found.parentList.splice(found.index, 1);
+
+    let targetList;
+    if (toParentId == null) {
+      targetList = this.workTree;
+    } else {
+      const parent = this._findChapter(toParentId)?.node;
+      if (!parent) { found.parentList.splice(found.index, 0, node); return; } // Rollback
+      if (!parent.subchapters) parent.subchapters = [];
+      targetList = parent.subchapters;
     }
-    collect(this.workTree);
+    node.parent_id = toParentId;
+    this._setSubtreeDepth(node, targetDepth);
+    targetList.splice(Math.max(0, Math.min(newIndex, targetList.length)), 0, node);
 
-    const topContainer = this.$root.querySelector('.organizer-list[data-organizer="chapter-list"]');
-    const newTop = topContainer ? this._rebuildFromDom(topContainer, 1, null, nodeById) : null;
-
-    // In-place: workTree-Ref + alle subchapters-Refs + alle Chapter-Objekt-Refs
-    // bleiben erhalten. Alpine x-for diff't keyed, ohne DOM-Container zu
-    // ersetzen → kein Re-Mount der Subchapter-Listen, kein sichtbares Flicker.
-    if (newTop) this.workTree.splice(0, this.workTree.length, ...newTop);
     const ok = await this._persistOrder({ fullReload: !sameBucket });
     if (ok) this._recordReorder(before);
-    // Sortable-Refs bleiben valid: Container (.organizer-list,
-    // .organizer-subchapters) werden nicht ausgetauscht, weil x-for keyed
-    // gleiche Nodes wiederverwendet.
-  },
-
-  _rebuildFromDom(containerEl, depth, parentId, nodeById) {
-    const out = [];
-    for (const chEl of containerEl.children) {
-      if (!chEl.classList.contains('organizer-chapter')) continue;
-      const id = parseInt(chEl.dataset.chapterId, 10);
-      if (!Number.isFinite(id)) continue;
-      const node = nodeById.get(id);
-      if (!node) continue;
-      node.depth = depth;
-      node.parent_id = parentId;
-      let subList = null;
-      for (const desc of chEl.children) {
-        if (desc.classList.contains('organizer-subchapters')) { subList = desc; break; }
-      }
-      const newSubs = subList ? this._rebuildFromDom(subList, depth + 1, id, nodeById) : [];
-      // Subchapters-Array-Ref bewahren — splice statt Reassign, sonst sieht
-      // nested x-for neue Array-Ref und re-rendert die ganze Subchapter-Liste.
-      if (!node.subchapters) node.subchapters = [];
-      node.subchapters.splice(0, node.subchapters.length, ...newSubs);
-      out.push(node);
-    }
-    return out;
   },
 
   async _onPageDrop(evt) {
@@ -192,15 +194,18 @@ export const dndMethods = {
     const fromChapId = this._parseChapterIdAttr(evt.from);
     const toChapId = this._parseChapterIdAttr(evt.to);
     const pageId = parseInt(evt.item.dataset.pageId, 10);
+
+    this._revertSortable(evt);
+
     const pageObj = this._removePageFromBucket(fromChapId, pageId);
     if (!pageObj) return;
     pageObj.chapter_id = toChapId;
-    const newOrder = [...evt.to.querySelectorAll(':scope > .organizer-page[data-page-id]')]
-      .map(el => parseInt(el.dataset.pageId, 10));
-    const targetIdx = newOrder.indexOf(pageId);
     const bucket = this._pagesBucket(toChapId);
-    if (!bucket) return;
-    bucket.splice(targetIdx >= 0 ? targetIdx : bucket.length, 0, pageObj);
+    if (!bucket) { this._pagesBucket(fromChapId)?.push(pageObj); return; } // Rollback
+    // Ziel-Index aus Sortable-Event (Position unter .organizer-page), nicht aus
+    // dem DOM lesen — DOM wurde gerade revertet und ist nicht mehr massgeblich.
+    const targetIdx = Number.isFinite(evt.newIndex) ? evt.newIndex : bucket.length;
+    bucket.splice(Math.max(0, Math.min(targetIdx, bucket.length)), 0, pageObj);
     // Subchapter-Pages koennen tief liegen → fullReload, damit root.tree
     // (flach) konsistent bleibt.
     const fullReload = toChapId !== 0 && this._chapterDepth(toChapId) > 1;
