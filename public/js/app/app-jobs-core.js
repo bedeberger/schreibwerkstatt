@@ -269,6 +269,10 @@ export const appJobsCoreMethods = {
       'blog-import':           'toast.job.blogImport',
       'blog-pull':             'toast.job.blogPull',
       'blog-push':             'toast.job.blogPush',
+      'blog-reconcile':        'toast.job.blogReconcile',
+      'hubspot-import':        'toast.job.hubspotImport',
+      'hubspot-push':          'toast.job.hubspotPush',
+      'hubspot-reconcile':     'toast.job.hubspotReconcile',
     };
     const labelKey = labels[detail.type];
     const isError = job.status !== 'done';

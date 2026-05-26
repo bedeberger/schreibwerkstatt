@@ -94,7 +94,7 @@ test('hubspot-import: bereits importiert → HUBSPOT_ALREADY_IMPORTED', async ()
   assert.match(String(job.error || ''), /HUBSPOT_ALREADY_IMPORTED/);
 });
 
-test('hubspot-push: neue Page → Draft + Link; Re-Push → HUBSPOT_ALREADY_PUSHED', async () => {
+test('hubspot-push: Erst-Push erstellt Draft + Link; Re-Push aktualisiert den Buffer (PATCH /draft)', async () => {
   const BOOK_ID = 72;
   seedBlogBook(BOOK_ID);
   hubspot.upsertConnection({ bookId: BOOK_ID, token: 'pat-x', blogId: '555', authorId: '111' });
@@ -114,21 +114,35 @@ test('hubspot-push: neue Page → Draft + Link; Re-Push → HUBSPOT_ALREADY_PUSH
   assert.equal(mock.state.created[0].state, 'DRAFT');
   assert.equal(mock.state.created[0].contentGroupId, '555');
   assert.equal(mock.state.created[0].blogAuthorId, '111');
+  assert.equal(mock.state.created[0].authorName, 'Autor Eins');
 
   const link = hubspot.getLinkByPage(page.id);
   assert.ok(link);
   assert.equal(link.hubspot_state, 'DRAFT');
+  const firstPostId = link.hubspot_post_id;
+  const firstPushedAt = link.last_pushed_at;
+  assert.ok(firstPushedAt);
 
-  // Re-Push derselben Page → Errors-Array enthält HUBSPOT_ALREADY_PUSHED.
+  // Page lokal ändern → Re-Push aktualisiert den Buffer via PATCH …/draft.
+  await new Promise(r => setTimeout(r, 30)); // sicherstellen, dass updated_at > last_pushed_at
+  await contentStore.savePage(page.id, { html: '<p>Geänderter Inhalt</p>' }, null);
+
   const jobId2 = ctx.shared.createJob('hubspot-push', BOOK_ID, 'tester@test.dev', 'job.label.hubspotPushCount', { count: 1 });
   ctx.shared.enqueueJob(jobId2, () => hubspotSync.runHubspotPushJob(jobId2, BOOK_ID, 'tester@test.dev', [page.id]));
   const job2 = await waitForJob(ctx.shared, jobId2, { timeoutMs: 4000 });
-  assert.equal(job2.status, 'done');
-  assert.equal(job2.result.pushed, 0);
-  assert.equal(job2.result.errors.length, 1);
-  assert.equal(job2.result.errors[0].code, 'HUBSPOT_ALREADY_PUSHED');
-  // Mock-Side: kein zweiter create.
+  assert.equal(job2.status, 'done', `got ${job2.status}: ${job2.error || ''}`);
+  assert.equal(job2.result.pushed, 1);
+  assert.equal(job2.result.errors.length, 0);
+  // Kein zweiter create — PATCH statt POST.
   assert.equal(mock.state.created.length, 1);
+  assert.equal(mock.state.updated.length, 1);
+  assert.equal(mock.state.updated[0].id, firstPostId);
+  assert.match(mock.state.updated[0].postBody, /Geänderter/);
+
+  // Link bleibt auf derselben Post-ID, last_pushed_at wurde aktualisiert.
+  const link2 = hubspot.getLinkByPage(page.id);
+  assert.equal(link2.hubspot_post_id, firstPostId);
+  assert.notEqual(link2.last_pushed_at, firstPushedAt);
 });
 
 test('hubspot-push: Buchtyp != blog → HUBSPOT_REQUIRES_BLOG_TYPE', async () => {

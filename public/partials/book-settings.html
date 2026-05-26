@@ -362,6 +362,14 @@
             <span x-show="blogPullJobId" class="spinner"></span>
             <span x-text="$app.t('blog.action.pull')"></span>
           </button>
+          <button type="button"
+                  x-show="blogConnection?.initialImportDoneAt"
+                  @click="startBlogReconcile()"
+                  :disabled="blogBusy || blogReconcileJobId"
+                  :data-tip="$app.t('blog.action.reconcileHint')">
+            <span x-show="blogReconcileJobId" class="spinner"></span>
+            <span x-text="$app.t('blog.action.reconcile')"></span>
+          </button>
           <button type="button" class="book-settings-btn-danger"
                   x-show="blogConnection"
                   @click="disconnectBlog()"
@@ -465,6 +473,14 @@
                   :disabled="hubspotBusy || hubspotImportJobId">
             <span x-show="hubspotImportJobId" class="spinner"></span>
             <span x-text="$app.t('hubspot.action.import')"></span>
+          </button>
+          <button type="button"
+                  x-show="hubspotConnection?.initialImportDoneAt"
+                  @click="startHubspotReconcile()"
+                  :disabled="hubspotBusy || hubspotReconcileJobId"
+                  :data-tip="$app.t('hubspot.action.reconcileHint')">
+            <span x-show="hubspotReconcileJobId" class="spinner"></span>
+            <span x-text="$app.t('hubspot.action.reconcile')"></span>
           </button>
           <button type="button" class="book-settings-btn-danger"
                   x-show="hubspotConnection"

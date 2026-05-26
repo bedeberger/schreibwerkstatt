@@ -457,9 +457,12 @@ export const bookSettingsMethods = {
         return (jobId && (status === 'running' || status === 'queued')) ? jobId : null;
       } catch { return null; }
     };
-    const [importId, pullId] = await Promise.all([probe('blog-import'), probe('blog-pull')]);
+    const [importId, pullId, reconcileId] = await Promise.all([
+      probe('blog-import'), probe('blog-pull'), probe('blog-reconcile'),
+    ]);
     this.blogImportJobId = importId;
     this.blogPullJobId = pullId;
+    this.blogReconcileJobId = reconcileId;
   },
 
   blogStatusOptions() {
@@ -589,6 +592,25 @@ export const bookSettingsMethods = {
     }
   },
 
+  async startBlogReconcile() {
+    const bookId = window.__app.selectedBookId;
+    if (!bookId || this.blogReconcileJobId) return;
+    if (!confirm(window.__app.t('blog.action.reconcileConfirm'))) return;
+    try {
+      const res = await fetch('/jobs/blog-reconcile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ book_id: bookId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error_code || 'BLOG_RECONCILE_FAILED');
+      this.blogReconcileJobId = data.jobId;
+      window.dispatchEvent(new CustomEvent('job:enqueued', { detail: { type: 'blog-reconcile', jobId: data.jobId } }));
+    } catch (e) {
+      this.blogError = window.__app.t('blog.error.' + e.message) || e.message;
+    }
+  },
+
   // ─── HubSpot-Sync ────────────────────────────────────────────────────────
   // Sichtbar nur bei buchtyp === 'blog'. State im Card-Init: hubspotConnection,
   // hubspotForm, hubspotBusy/Action/Message/Error, hubspotBlogs, hubspotAuthors,
@@ -620,7 +642,11 @@ export const bookSettingsMethods = {
         return Array.isArray(list) && list.length ? list[0].jobId : null;
       } catch { return null; }
     };
-    this.hubspotImportJobId = await probe('hubspot-import');
+    const [importId, reconcileId] = await Promise.all([
+      probe('hubspot-import'), probe('hubspot-reconcile'),
+    ]);
+    this.hubspotImportJobId = importId;
+    this.hubspotReconcileJobId = reconcileId;
   },
 
   hubspotFormReady() {
@@ -748,6 +774,25 @@ export const bookSettingsMethods = {
       if (!res.ok) throw new Error(data.error_code || 'HUBSPOT_IMPORT_FAILED');
       this.hubspotImportJobId = data.jobId;
       window.dispatchEvent(new CustomEvent('job:enqueued', { detail: { type: 'hubspot-import', jobId: data.jobId } }));
+    } catch (e) {
+      this.hubspotError = window.__app.t('hubspot.error.' + e.message) || e.message;
+    }
+  },
+
+  async startHubspotReconcile() {
+    const bookId = window.__app.selectedBookId;
+    if (!bookId || this.hubspotReconcileJobId) return;
+    if (!confirm(window.__app.t('hubspot.action.reconcileConfirm'))) return;
+    try {
+      const res = await fetch('/jobs/hubspot-reconcile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ book_id: bookId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error_code || 'HUBSPOT_RECONCILE_FAILED');
+      this.hubspotReconcileJobId = data.jobId;
+      window.dispatchEvent(new CustomEvent('job:enqueued', { detail: { type: 'hubspot-reconcile', jobId: data.jobId } }));
     } catch (e) {
       this.hubspotError = window.__app.t('hubspot.error.' + e.message) || e.message;
     }

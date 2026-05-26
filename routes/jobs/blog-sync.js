@@ -133,6 +133,7 @@ async function runBlogImportJob(jobId, bookId, userEmail) {
           wpSlug: post.slug || null,
           lastPulledAt: new Date().toISOString(),
         });
+        logger.info(`Blog-Import: WP-Post ${post.id} -> Page ${created.id} "${pageName}" (Kapitel ${year})`);
         imported++;
         updateJob(jobId, {
           statusText: 'job.blog.import.progress',
@@ -233,12 +234,14 @@ async function runBlogPullJob(jobId, bookId, userEmail) {
             wpSlug: post.slug || null,
             lastPulledAt: new Date().toISOString(),
           });
+          logger.info(`Blog-Pull: WP-Post ${post.id} -> Page ${createdPage.id} "${pageName}" neu angelegt`);
           created++;
           continue;
         }
 
         const pageRow = await contentStore.loadPage(link.page_id).catch(() => null);
         if (!pageRow) {
+          logger.warn(`Blog-Pull: Page ${link.page_id} (WP-Post ${post.id}) nicht gefunden, uebersprungen`);
           skipped++;
           continue;
         }
@@ -247,6 +250,7 @@ async function runBlogPullJob(jobId, bookId, userEmail) {
 
         if (wpHasNew && appHasLocalEdit) {
           blogs.setConflictState(link.page_id, 'detected');
+          logger.info(`Blog-Pull: Page ${link.page_id} "${pageRow.name}" (WP-Post ${post.id}) Konflikt erkannt`);
           conflicts++;
           continue;
         }
@@ -257,6 +261,7 @@ async function runBlogPullJob(jobId, bookId, userEmail) {
             wpStatus: post.status || null,
             wpSlug: post.slug || null,
           });
+          logger.info(`Blog-Pull: Page ${link.page_id} "${pageName}" aus WP-Post ${post.id} aktualisiert`);
           updated++;
           continue;
         }
@@ -304,11 +309,20 @@ async function runBlogPushJob(jobId, bookId, userEmail, pageIds) {
         progress: Math.round((i / ids.length) * 95) + 2,
       });
       const pageRow = await contentStore.loadPage(pageId).catch(() => null);
-      if (!pageRow) { errors.push({ pageId, code: 'PAGE_NOT_FOUND' }); continue; }
-      if (pageRow.book_id !== bookId) { errors.push({ pageId, code: 'PAGE_WRONG_BOOK' }); continue; }
+      if (!pageRow) {
+        logger.warn(`Blog-Push: Page ${pageId} nicht gefunden`);
+        errors.push({ pageId, code: 'PAGE_NOT_FOUND' });
+        continue;
+      }
+      if (pageRow.book_id !== bookId) {
+        logger.warn(`Blog-Push: Page ${pageId} gehoert nicht zu Buch ${bookId}`);
+        errors.push({ pageId, code: 'PAGE_WRONG_BOOK' });
+        continue;
+      }
 
       const link = blogs.getLinkByPage(pageId);
       if (link && link.conflict_state === 'detected') {
+        logger.info(`Blog-Push: Page ${pageId} "${pageRow.name}" Konflikt offen, skip`);
         conflictSkipped++;
         errors.push({ pageId, code: 'BLOG_CONFLICT' });
         continue;
@@ -353,10 +367,25 @@ async function runBlogPushJob(jobId, bookId, userEmail, pageIds) {
           wpSlug: remote.slug || null,
           lastPushedAt: new Date().toISOString(),
         });
-        if (!link) createdRemote++;
-        else pushed++;
+        if (!link) {
+          logger.info(`Blog-Push: Page ${pageId} "${titleForCreate}" -> WP-Post ${remote.id} neu erstellt`);
+          createdRemote++;
+        } else {
+          logger.info(`Blog-Push: Page ${pageId} "${pageRow.name}" -> WP-Post ${remote.id} aktualisiert`);
+          pushed++;
+        }
       } catch (e) {
-        errors.push({ pageId, code: e.code || 'BLOG_PUSH_FAILED' });
+        // Remote-Post 404: WP-User hat Draft/Post gelöscht. Link weg, Badge
+        // flippt automatisch auf 'new' beim nächsten loadLinks. User kann
+        // erneut pushen → neuer Post wird angelegt.
+        if (link && (e.code === 'BLOG_HTTP_404' || e.status === 404)) {
+          blogs.deleteLink(pageId);
+          logger.info(`Blog-Push: Page ${pageId} "${pageRow.name}" -> WP-Post ${link.wp_post_id} weg (404), Link entfernt`);
+          errors.push({ pageId, code: 'BLOG_REMOTE_GONE' });
+        } else {
+          logger.warn(`Blog-Push: Page ${pageId} "${pageRow.name}" Fehler ${e.code || e.message}`);
+          errors.push({ pageId, code: e.code || 'BLOG_PUSH_FAILED' });
+        }
       }
     }
 
@@ -366,6 +395,60 @@ async function runBlogPushJob(jobId, bookId, userEmail, pageIds) {
       `${pushed + createdRemote} gepusht / ${errors.length} Fehler`);
   } catch (e) {
     if (e.name !== 'AbortError') makeJobLogger(jobId).error(`Blog-Push-Fehler: ${e.message}`);
+    failJob(jobId, e);
+  }
+}
+
+// Reconcile: pruft jeden Link via GET, dropt orphan Links (Remote-Post weg).
+// Deckt Hard-Delete in WP (kein Trash-Stamp). Nach Lauf kennt der Buchorganizer
+// die toten Links nicht mehr; Badges flippen auf 'new'.
+async function runBlogReconcileJob(jobId, bookId, userEmail) {
+  const logger = makeJobLogger(jobId);
+  try {
+    _requireBlogBook(bookId, userEmail);
+    const conn = _resolveBlogConn(bookId);
+    const wp = createWpClient({
+      baseUrl: conn.baseUrl,
+      username: conn.username,
+      password: conn.password,
+      signal: _abortSignal(jobId),
+    });
+
+    const links = blogs.listLinksForBlog(conn.id);
+    let checked = 0;
+    let removed = 0;
+    const total = links.length;
+    updateJob(jobId, {
+      statusText: 'job.blog.reconcile.check',
+      statusParams: { current: 0, total },
+      progress: 1,
+    });
+
+    for (const link of links) {
+      if (_abortSignal(jobId)?.aborted) throw new DOMException('Aborted', 'AbortError');
+      checked++;
+      try {
+        await wp.getPost(link.wp_post_id);
+      } catch (e) {
+        if (e.code === 'BLOG_HTTP_404' || e.status === 404) {
+          blogs.deleteLink(link.page_id);
+          removed++;
+          logger.info(`Blog-Reconcile: Page ${link.page_id} -> WP-Post ${link.wp_post_id} weg, Link entfernt`);
+        } else {
+          logger.warn(`Blog-Reconcile: Page ${link.page_id} -> WP-Post ${link.wp_post_id} Fehler ${e.code || e.message}`);
+        }
+      }
+      updateJob(jobId, {
+        statusText: 'job.blog.reconcile.check',
+        statusParams: { current: checked, total },
+        progress: Math.min(98, 2 + Math.round((checked / Math.max(1, total)) * 95)),
+      });
+    }
+
+    logger.info(`Blog-Reconcile: ${checked} geprüft, ${removed} orphan Links entfernt.`);
+    completeJob(jobId, { checked, removed }, null, `${removed} orphan Links entfernt`);
+  } catch (e) {
+    if (e.name !== 'AbortError') makeJobLogger(jobId).error(`Blog-Reconcile-Fehler: ${e.message}`);
     failJob(jobId, e);
   }
 }
@@ -405,6 +488,21 @@ blogSyncRouter.post('/blog-pull', jsonBody, (req, res) => {
   res.json({ jobId });
 });
 
+blogSyncRouter.post('/blog-reconcile', jsonBody, (req, res) => {
+  const book_id = toIntId(req.body?.book_id);
+  if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
+  setContext({ book: book_id });
+  if (!_aclEditor(req, res, book_id)) return;
+  const userEmail = req.session?.user?.email || null;
+  try { _requireBlogBook(book_id, userEmail); }
+  catch (e) { return res.status(400).json({ error_code: e.code }); }
+  const existing = findActiveJobId('blog-reconcile', book_id, userEmail);
+  if (existing) return res.json({ jobId: existing, existing: true });
+  const jobId = createJob('blog-reconcile', book_id, userEmail, 'job.label.blogReconcile');
+  enqueueJob(jobId, () => runBlogReconcileJob(jobId, book_id, userEmail));
+  res.json({ jobId });
+});
+
 blogSyncRouter.post('/blog-push', jsonBody, (req, res) => {
   const book_id = toIntId(req.body?.book_id);
   if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
@@ -422,4 +520,4 @@ blogSyncRouter.post('/blog-push', jsonBody, (req, res) => {
   res.json({ jobId });
 });
 
-module.exports = { blogSyncRouter, runBlogImportJob, runBlogPullJob, runBlogPushJob };
+module.exports = { blogSyncRouter, runBlogImportJob, runBlogPullJob, runBlogPushJob, runBlogReconcileJob };

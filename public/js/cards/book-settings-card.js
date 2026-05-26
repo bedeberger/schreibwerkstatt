@@ -53,6 +53,7 @@ export function registerBookSettingsCard() {
     blogError: '',
     blogImportJobId: null,
     blogPullJobId: null,
+    blogReconcileJobId: null,
     // HubSpot-Sync (Initial-Import + Create-Draft-Push).
     hubspotSectionOpen: false,
     hubspotConnection: null,
@@ -64,6 +65,7 @@ export function registerBookSettingsCard() {
     hubspotMessage: '',
     hubspotError: '',
     hubspotImportJobId: null,
+    hubspotReconcileJobId: null,
     _savedAtTimer: null,
     _resetMsgTimer: null,
     _shareInviteMsgTimer: null,
@@ -96,6 +98,7 @@ export function registerBookSettingsCard() {
           blogError: '',
           blogImportJobId: null,
           blogPullJobId: null,
+          blogReconcileJobId: null,
           hubspotSectionOpen: false,
           hubspotConnection: null,
           hubspotForm: { token: '', blogId: '', authorId: '' },
@@ -105,6 +108,7 @@ export function registerBookSettingsCard() {
           hubspotMessage: '',
           hubspotError: '',
           hubspotImportJobId: null,
+          hubspotReconcileJobId: null,
         },
         resetStateView: {
           bookSettingsSaved: false,
@@ -127,9 +131,10 @@ export function registerBookSettingsCard() {
       // anlegen und der Sidebar-Tree sonst veraltet ist.
       this._onBlogJobFinished = (ev) => {
         const t = ev?.detail?.type;
-        if (t !== 'blog-import' && t !== 'blog-pull' && t !== 'blog-push') return;
+        if (t !== 'blog-import' && t !== 'blog-pull' && t !== 'blog-push' && t !== 'blog-reconcile') return;
         this.blogImportJobId = null;
         this.blogPullJobId = null;
+        this.blogReconcileJobId = null;
         this.loadBlogStatus();
         if (t === 'blog-import' || t === 'blog-pull') {
           window.__app.loadPages?.();
@@ -141,8 +146,9 @@ export function registerBookSettingsCard() {
       // refreshen (Import legt Pages/Chapters an).
       this._onHubspotJobFinished = (ev) => {
         const t = ev?.detail?.type;
-        if (t !== 'hubspot-import' && t !== 'hubspot-push') return;
+        if (t !== 'hubspot-import' && t !== 'hubspot-push' && t !== 'hubspot-reconcile') return;
         this.hubspotImportJobId = null;
+        this.hubspotReconcileJobId = null;
         this.loadHubspotStatus();
         if (t === 'hubspot-import') {
           window.__app.loadPages?.();

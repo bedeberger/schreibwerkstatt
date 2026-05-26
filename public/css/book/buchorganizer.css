@@ -340,7 +340,8 @@
 
 .badge--sync-synced,
 .badge--sync-pushed      { background: var(--color-tag-bg);  color: var(--sync-accent); }
-.badge--sync-push-needed { background: var(--color-warn-bg); color: var(--color-warn-text); }
+.badge--sync-push-needed,
+.badge--sync-pushed-dirty { background: var(--color-warn-bg); color: var(--color-warn-text); }
 .badge--sync-conflict    { background: var(--color-err-bg);  color: var(--color-err-text); }
 .badge--sync-new         { background: var(--color-tag-bg);  color: var(--color-muted); }
 .organizer-sync-push,

@@ -128,14 +128,16 @@ router.post('/:book_id/connect', aclParamGuard('editor'), jsonBody, async (req, 
   if (!authorId) return res.status(400).json({ error_code: 'HUBSPOT_AUTHOR_REQUIRED' });
   const token = _resolveToken(req, bookId);
   if (!token) return res.status(400).json({ error_code: 'HUBSPOT_TOKEN_REQUIRED' });
+  let portalId = null;
   try {
     const client = createHubspotClient({ token });
-    await client.me();
+    const me = await client.me();
+    if (me && me.portalId != null) portalId = String(me.portalId);
   } catch (e) {
     return _mapHubspotError(res, e);
   }
   const conn = hubspot.upsertConnection({
-    bookId, token, blogId: String(blogId), authorId: String(authorId),
+    bookId, token, blogId: String(blogId), authorId: String(authorId), portalId,
   });
   return res.json({ ok: true, connection: conn });
 });
@@ -145,11 +147,29 @@ router.delete('/:book_id', aclParamGuard('editor'), (req, res) => {
   res.json({ ok });
 });
 
-router.get('/:book_id/links', aclParamGuard('viewer'), (req, res) => {
+router.get('/:book_id/links', aclParamGuard('viewer'), async (req, res) => {
   const conn = hubspot.getConnectionPublic(req.bookId);
   if (!conn) return res.json({ links: [], connected: false });
+  let portalId = conn.portalId || null;
+  // Self-Heal fuer Pre-150-Connections: einmaliger me()-Roundtrip persistiert
+  // portalId, danach kein weiterer Call mehr noetig.
+  if (!portalId) {
+    try {
+      const full = hubspot.getConnection(req.bookId);
+      if (full && full.token) {
+        const client = createHubspotClient({ token: full.token });
+        const me = await client.me();
+        if (me && me.portalId != null) {
+          portalId = String(me.portalId);
+          hubspot.setPortalId(conn.id, portalId);
+        }
+      }
+    } catch (e) {
+      logger.warn(`HubSpot-portalId-Backfill fehlgeschlagen: ${e.code || e.message}`);
+    }
+  }
   const links = hubspot.listLinksForConnection(conn.id);
-  res.json({ links, connected: true, blogId: conn.blogId });
+  res.json({ links, connected: true, blogId: conn.blogId, portalId });
 });
 
 module.exports = router;

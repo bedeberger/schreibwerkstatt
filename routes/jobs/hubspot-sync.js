@@ -1,9 +1,15 @@
 'use strict';
 // HubSpot-Sync-Jobs: einmaliger Initial-Import (alle PUBLISHED-Posts des
 // konfigurierten Authors+Blogs in Jahres-Kapitel), selektiver Push (Page →
-// HubSpot-Draft). Push erstellt ausschliesslich neue Posts; bereits gepushte
-// Pages werden mit HUBSPOT_ALREADY_PUSHED abgelehnt. Mapping 1 Buch == 1 Blog,
-// 1 Post == 1 Page. Job-Dedup pro (type, bookId, user) via findActiveJobId.
+// HubSpot). Erst-Push pro Page erstellt einen neuen DRAFT-Post via
+// `POST /cms/v3/blogs/posts`. Re-Push einer bereits verknüpften Page
+// aktualisiert via `PATCH /cms/v3/blogs/posts/{id}/draft` den Buffer des
+// bestehenden Posts; die Live-Version drüben bleibt unverändert, bis der User
+// den Buffer in HubSpot publiziert. UI hat ihn vorher per appConfirm darauf
+// hingewiesen, dass HubSpot-spezifische Formatierungen (Module/CTAs/Bilder/
+// Forms/Tags) im Buffer durch den App-HTML-Body ersetzt werden.
+// Mapping 1 Buch == 1 Blog, 1 Post == 1 Page. Job-Dedup pro (type, bookId,
+// user) via findActiveJobId.
 
 const express = require('express');
 const {
@@ -102,10 +108,18 @@ async function runHubspotImportJob(jobId, bookId, userEmail) {
 
       // Idempotenz: bereits importierter Post (existing link) wird übersprungen.
       const existingLink = hubspot.getLinkByPost(conn.id, post.id);
-      if (existingLink) { dropped++; continue; }
+      if (existingLink) {
+        logger.info(`HubSpot-Import: Post ${post.id} bereits verlinkt mit Page ${existingLink.page_id}, skip`);
+        dropped++;
+        continue;
+      }
 
       const title = (post.htmlTitle || post.name || '').trim();
-      if (!title) { dropped++; continue; }
+      if (!title) {
+        logger.warn(`HubSpot-Import: Post ${post.id} ohne Titel, skip`);
+        dropped++;
+        continue;
+      }
 
       const rawHtml = post.postBody || '';
       const appHtml = hubspotToAppHtml(rawHtml) || '<p></p>';
@@ -126,7 +140,9 @@ async function runHubspotImportJob(jobId, bookId, userEmail) {
         hubspotState: post.state || 'PUBLISHED',
         hubspotCreatedAt: post.created || post.publishDate || null,
         lastPushedAt: null,
+        hubspotUrl: post.url || post.absoluteUrl || null,
       });
+      logger.info(`HubSpot-Import: Post ${post.id} -> Page ${created.id} "${pageName}" (Kapitel ${year})`);
       imported++;
       updateJob(jobId, {
         statusText: 'job.hubspot.import.progress',
@@ -179,6 +195,17 @@ async function runHubspotPushJob(jobId, bookId, userEmail, pageIds) {
     const ids = (pageIds || []).map(x => parseInt(x, 10)).filter(n => Number.isInteger(n) && n > 0);
     if (!ids.length) throw Object.assign(new Error('HUBSPOT_NO_PAGES'), { code: 'HUBSPOT_NO_PAGES' });
 
+    // Author-Name auflösen: HubSpot CMS v3 setzt den Autor auf neuen Posts nur
+    // zuverlässig, wenn `name` (Autorname) zusätzlich zu `blogAuthorId` mitgeht.
+    let authorName;
+    try {
+      const authors = await client.listAuthors();
+      const row = (authors || []).find(a => String(a.id) === String(conn.authorId));
+      authorName = (row?.fullName || row?.displayName || row?.name || '').trim() || undefined;
+    } catch (e) {
+      logger.warn(`HubSpot-Author-Name nicht auflösbar: ${e.code || e.message}`);
+    }
+
     let pushed = 0;
     const errors = [];
 
@@ -192,42 +219,131 @@ async function runHubspotPushJob(jobId, bookId, userEmail, pageIds) {
       });
 
       const pageRow = await contentStore.loadPage(pageId).catch(() => null);
-      if (!pageRow) { errors.push({ pageId, code: 'PAGE_NOT_FOUND' }); continue; }
-      if (pageRow.book_id !== bookId) { errors.push({ pageId, code: 'PAGE_WRONG_BOOK' }); continue; }
+      if (!pageRow) {
+        logger.warn(`HubSpot-Push: Page ${pageId} nicht gefunden`);
+        errors.push({ pageId, code: 'PAGE_NOT_FOUND' });
+        continue;
+      }
+      if (pageRow.book_id !== bookId) {
+        logger.warn(`HubSpot-Push: Page ${pageId} gehoert nicht zu Buch ${bookId}`);
+        errors.push({ pageId, code: 'PAGE_WRONG_BOOK' });
+        continue;
+      }
 
-      const existing = hubspot.getLinkByPage(pageId);
-      if (existing) { errors.push({ pageId, code: 'HUBSPOT_ALREADY_PUSHED' }); continue; }
-
+      let existing = hubspot.getLinkByPage(pageId);
       const postBody = appToHubspotHtml(pageRow.html || pageRow.body_html || '<p></p>');
       const name = (pageRow.name || `Page ${pageId}`).trim();
+      let revivedThis = false;
+
+      const doCreate = () => client.createPost({
+        name,
+        postBody,
+        contentGroupId: conn.blogId,
+        blogAuthorId: conn.authorId,
+        ...(authorName ? { authorName } : {}),
+        state: 'DRAFT',
+      });
 
       try {
-        const remote = await client.createPost({
-          name,
-          postBody,
-          contentGroupId: conn.blogId,
-          blogAuthorId: conn.authorId,
-          state: 'DRAFT',
-        });
+        let remote;
+        if (existing) {
+          // Re-Push: Buffer/Draft des bestehenden Posts via PATCH aktualisieren.
+          // Live-Version drüben bleibt unverändert, bis der User den Buffer in
+          // HubSpot publiziert. HubSpot-spezifische Formatierungen im Live-Post
+          // werden im Buffer durch den App-HTML-Body überschrieben — UI hat den
+          // User vorab darauf hingewiesen (Warn-Dialog).
+          try {
+            remote = await client.updatePostDraft(existing.hubspot_post_id, { name, postBody });
+          } catch (e) {
+            // Remote-Post weg → Link entfernen, als neuer Push fahren.
+            if (e.code === 'HUBSPOT_HTTP_404' || e.status === 404) {
+              hubspot.deleteLink(pageId);
+              logger.info(`HubSpot-Push: Page ${pageId} -> Post ${existing.hubspot_post_id} weg (404), Link entfernt, lege neu an`);
+              existing = null;
+              revivedThis = true;
+              remote = await doCreate();
+            } else {
+              throw e;
+            }
+          }
+        } else {
+          remote = await doCreate();
+        }
         hubspot.upsertLink({
           pageId,
           hubId: conn.id,
-          hubspotPostId: remote.id,
-          hubspotState: remote.state || 'DRAFT',
-          hubspotCreatedAt: remote.created || remote.publishDate || null,
+          hubspotPostId: (remote && remote.id) || (existing && existing.hubspot_post_id),
+          hubspotState: (remote && remote.state) || (existing && existing.hubspot_state) || 'DRAFT',
+          hubspotCreatedAt: (remote && (remote.created || remote.publishDate)) || (existing && existing.hubspot_created_at) || null,
           lastPushedAt: new Date().toISOString(),
+          hubspotUrl: (remote && (remote.url || remote.absoluteUrl)) || (existing && existing.hubspot_url) || null,
         });
+        if (revivedThis) logger.info(`HubSpot-Push: Page ${pageId} "${name}" -> Post ${remote.id} neu angelegt (vorheriger Post 404)`);
+        else if (existing) logger.info(`HubSpot-Push: Page ${pageId} "${name}" -> Post ${existing.hubspot_post_id} Buffer aktualisiert`);
+        else logger.info(`HubSpot-Push: Page ${pageId} "${name}" -> Post ${remote.id} neu angelegt (DRAFT)`);
         pushed++;
       } catch (e) {
+        logger.warn(`HubSpot-Push: Page ${pageId} "${name}" Fehler ${e.code || e.message}`);
         errors.push({ pageId, code: e.code || 'HUBSPOT_PUSH_FAILED' });
       }
     }
 
     hubspot.touchPush(conn.id);
-    logger.info(`HubSpot-Push: ${pushed} neu, ${errors.length} Fehler.`);
+    logger.info(`HubSpot-Push: ${pushed} gepusht, ${errors.length} Fehler.`);
     completeJob(jobId, { pushed, errors }, null, `${pushed} gepusht / ${errors.length} Fehler`);
   } catch (e) {
     if (e.name !== 'AbortError') makeJobLogger(jobId).error(`HubSpot-Push-Fehler: ${e.code || e.message}`);
+    failJob(jobId, e);
+  }
+}
+
+// Reconcile: pruft jeden HubSpot-Link via GET, dropt orphan Links (Draft/Post
+// weg). Nach Lauf flippt Badge auf 'new', User kann erneut pushen.
+async function runHubspotReconcileJob(jobId, bookId, userEmail) {
+  const logger = makeJobLogger(jobId);
+  try {
+    _requireBlogBook(bookId, userEmail);
+    const conn = _resolveHubConn(bookId);
+    const client = createHubspotClient({
+      token: conn.token,
+      signal: _abortSignal(jobId),
+    });
+
+    const links = hubspot.listLinksForConnection(conn.id);
+    let checked = 0;
+    let removed = 0;
+    const total = links.length;
+    updateJob(jobId, {
+      statusText: 'job.hubspot.reconcile.check',
+      statusParams: { current: 0, total },
+      progress: 1,
+    });
+
+    for (const link of links) {
+      if (_abortSignal(jobId)?.aborted) throw new DOMException('Aborted', 'AbortError');
+      checked++;
+      try {
+        await client.getPost(link.hubspot_post_id);
+      } catch (e) {
+        if (e.code === 'HUBSPOT_HTTP_404' || e.status === 404) {
+          hubspot.deleteLink(link.page_id);
+          removed++;
+          logger.info(`HubSpot-Reconcile: Page ${link.page_id} -> Post ${link.hubspot_post_id} weg, Link entfernt`);
+        } else {
+          logger.warn(`HubSpot-Reconcile: Page ${link.page_id} -> Post ${link.hubspot_post_id} Fehler ${e.code || e.message}`);
+        }
+      }
+      updateJob(jobId, {
+        statusText: 'job.hubspot.reconcile.check',
+        statusParams: { current: checked, total },
+        progress: Math.min(98, 2 + Math.round((checked / Math.max(1, total)) * 95)),
+      });
+    }
+
+    logger.info(`HubSpot-Reconcile: ${checked} geprüft, ${removed} orphan Links entfernt.`);
+    completeJob(jobId, { checked, removed }, null, `${removed} orphan Links entfernt`);
+  } catch (e) {
+    if (e.name !== 'AbortError') makeJobLogger(jobId).error(`HubSpot-Reconcile-Fehler: ${e.message}`);
     failJob(jobId, e);
   }
 }
@@ -252,6 +368,21 @@ hubspotSyncRouter.post('/hubspot-import', jsonBody, (req, res) => {
   res.json({ jobId });
 });
 
+hubspotSyncRouter.post('/hubspot-reconcile', jsonBody, (req, res) => {
+  const book_id = toIntId(req.body?.book_id);
+  if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
+  setContext({ book: book_id });
+  if (!_aclEditor(req, res, book_id)) return;
+  const userEmail = req.session?.user?.email || null;
+  try { _requireBlogBook(book_id, userEmail); }
+  catch (e) { return res.status(400).json({ error_code: e.code }); }
+  const existing = findActiveJobId('hubspot-reconcile', book_id, userEmail);
+  if (existing) return res.json({ jobId: existing, existing: true });
+  const jobId = createJob('hubspot-reconcile', book_id, userEmail, 'job.label.hubspotReconcile');
+  enqueueJob(jobId, () => runHubspotReconcileJob(jobId, book_id, userEmail));
+  res.json({ jobId });
+});
+
 hubspotSyncRouter.post('/hubspot-push', jsonBody, (req, res) => {
   const book_id = toIntId(req.body?.book_id);
   if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
@@ -269,4 +400,4 @@ hubspotSyncRouter.post('/hubspot-push', jsonBody, (req, res) => {
   res.json({ jobId });
 });
 
-module.exports = { hubspotSyncRouter, runHubspotImportJob, runHubspotPushJob };
+module.exports = { hubspotSyncRouter, runHubspotImportJob, runHubspotPushJob, runHubspotReconcileJob };

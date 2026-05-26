@@ -6272,6 +6272,42 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 148 abgeschlossen (app_users_devices + page_presence Multi-Device-PK).');
   }
 
+  if (version < 149) {
+    // HubSpot: absolute Post-URL aus createPost-Response persistieren, damit
+    // der Editor-Header einen "In HubSpot oeffnen"-Link anbieten kann (analog
+    // WordPress-Blog-Sync). Bestehende Links bleiben ohne URL, neuer Push und
+    // Initial-Import fuellen das Feld.
+    const hubLinksCols = db.pragma('table_info(hubspot_page_links)').map(c => c.name);
+    if (!hubLinksCols.includes('hubspot_url')) {
+      db.prepare('ALTER TABLE hubspot_page_links ADD COLUMN hubspot_url TEXT').run();
+    }
+
+    const fkErrors149 = db.pragma('foreign_key_check');
+    if (fkErrors149.length) {
+      throw new Error(`Migration 149: foreign_key_check meldet ${fkErrors149.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 149').run();
+    logger.info('DB-Migration auf Version 149 abgeschlossen (hubspot_page_links.hubspot_url).');
+  }
+
+  if (version < 150) {
+    // HubSpot: portalId aus /account-info/v3/details persistieren. Wird beim
+    // Connect via me() ermittelt; ermoeglicht das Bauen der Editor-URL fuer
+    // Drafts (https://app.hubspot.com/blog/<portalId>/editor/<postId>/content).
+    // Bestehende Connections haben NULL bis zum naechsten Connect/Re-Save.
+    const hubConnCols = db.pragma('table_info(hubspot_connections)').map(c => c.name);
+    if (!hubConnCols.includes('portal_id')) {
+      db.prepare('ALTER TABLE hubspot_connections ADD COLUMN portal_id TEXT').run();
+    }
+
+    const fkErrors150 = db.pragma('foreign_key_check');
+    if (fkErrors150.length) {
+      throw new Error(`Migration 150: foreign_key_check meldet ${fkErrors150.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 150').run();
+    logger.info('DB-Migration auf Version 150 abgeschlossen (hubspot_connections.portal_id).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

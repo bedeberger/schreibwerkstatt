@@ -11,9 +11,10 @@
 // Provider-Spec:
 //   key           — kurzer Identifier ('blog', 'hubspot')
 //   endpointBase  — '/blog' | '/hubspot'
-//   jobTypes      — { push: 'blog-push', refresh: ['blog-import','blog-pull'] }
+//   jobTypes      — { push: 'blog-push', refresh: ['blog-import','blog-pull'],
+//                     reconcile: 'blog-reconcile' }
 //                   (refresh-Liste: nach diesen Jobs `loadPages()` triggern;
-//                   nach push-Jobs reicht `loadLinks()`)
+//                   nach push-/reconcile-Jobs reicht `loadLinks()`)
 //   providerMetaKey — Key aus /links-Response, der provider-spezifische Meta
 //                     trägt (z.B. 'baseUrl', 'blogId'). Wird auf `providerMeta`
 //                     gemappt; legacy Felder bleiben als Top-Level für
@@ -26,12 +27,18 @@
 //                   das Alpine.data gespreaded (z.B. Konflikt-Handling)
 //   onBookChange  — optional, wird in book:changed nach Core-Reset gerufen
 //   pushErrorCode — Fallback-Error-Code-String
+//   confirmPush(pageId) → boolean | Promise<boolean> (optional). Wird in `push()`
+//                         vor dem Backend-Call aufgerufen; liefert `false` →
+//                         Push abgebrochen (z.B. wenn ein UI-Dialog erst eine
+//                         Bestätigung einholen muss).
 
 export function createSyncCard(spec) {
   const refreshTypes = new Set([
     ...(spec.jobTypes?.refresh || []),
   ]);
   const pushType = spec.jobTypes?.push || `${spec.key}-push`;
+  const reconcileType = spec.jobTypes?.reconcile || null;
+  const linkRefreshTypes = new Set([pushType, ...(reconcileType ? [reconcileType] : [])]);
   const globalWindowKey = `__${spec.key}Card`;
   const extRaw = spec.spreadExt || {};
   const extInit = extRaw.init;
@@ -64,7 +71,7 @@ export function createSyncCard(spec) {
         };
         this._onJobFinished = (ev) => {
           const t = ev?.detail?.type;
-          if (t === pushType) this.loadLinks();
+          if (linkRefreshTypes.has(t)) this.loadLinks();
           else if (refreshTypes.has(t)) window.__app?.loadPages?.();
         };
         window.addEventListener('pages:loaded', this._onPagesLoaded);
@@ -137,6 +144,10 @@ export function createSyncCard(spec) {
         const bookId = window.__app?.selectedBookId;
         if (!bookId) return;
         if (this.pushBusy[pageId]) return;
+        if (typeof spec.confirmPush === 'function') {
+          const ok = await spec.confirmPush.call(this, pageId);
+          if (!ok) return;
+        }
         this.pushBusy = { ...this.pushBusy, [pageId]: true };
         this.pushProgress = { ...this.pushProgress, [pageId]: 0 };
         try {

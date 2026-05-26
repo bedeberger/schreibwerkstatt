@@ -11,6 +11,7 @@ const blogSpec = {
   jobTypes: {
     push: 'blog-push',
     refresh: ['blog-import', 'blog-pull'],
+    reconcile: 'blog-reconcile',
   },
   // Badge-Status für eine Page (oder null = kein Badge).
   // 'new'         — kein Link → lokal angelegt, noch nie zu WP gepusht.

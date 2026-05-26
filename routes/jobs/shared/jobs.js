@@ -253,6 +253,10 @@ const JOB_TYPE_LABELS = {
   'blog-import':           'job.label.blogImport',
   'blog-pull':             'job.label.blogPull',
   'blog-push':             'job.label.blogPush',
+  'blog-reconcile':        'job.label.blogReconcile',
+  'hubspot-import':        'job.label.hubspotImport',
+  'hubspot-push':          'job.label.hubspotPush',
+  'hubspot-reconcile':     'job.label.hubspotReconcile',
   'werkstatt-brainstorm':  'job.label.werkstattBrainstorm',
   'werkstatt-consistency': 'job.label.werkstattConsistency',
 };

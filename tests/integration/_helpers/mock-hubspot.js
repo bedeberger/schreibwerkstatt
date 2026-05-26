@@ -19,6 +19,7 @@ function makeMock() {
     ],
     posts: [],          // GET /cms/v3/blogs/posts liefert das hier
     created: [],        // POST /cms/v3/blogs/posts schiebt rein
+    updated: [],        // PATCH /cms/v3/blogs/posts/{id}/draft schiebt rein
     failOnCreate: false,
   };
 
@@ -50,6 +51,23 @@ function makeMock() {
       const created = { id, ...body, created: new Date().toISOString() };
       state.created.push(created);
       return jsonResponse(created);
+    }
+    // PATCH /cms/v3/blogs/posts/{id}/draft → Buffer aktualisieren.
+    const draftMatch = path.match(/^\/cms\/v3\/blogs\/posts\/([^/]+)\/draft$/);
+    if (draftMatch && method === 'PATCH') {
+      const id = decodeURIComponent(draftMatch[1]);
+      const body = JSON.parse(opts.body || '{}');
+      const updated = { id, ...body, updated: new Date().toISOString() };
+      state.updated.push(updated);
+      return jsonResponse(updated);
+    }
+    // GET /cms/v3/blogs/posts/{id}
+    const getMatch = path.match(/^\/cms\/v3\/blogs\/posts\/([^/]+)$/);
+    if (getMatch && method === 'GET') {
+      const id = decodeURIComponent(getMatch[1]);
+      const found = state.created.find(p => p.id === id) || state.posts.find(p => p.id === id);
+      if (found) return jsonResponse(found);
+      return new Response('not found', { status: 404 });
     }
     return new Response('nope', { status: 404 });
   };

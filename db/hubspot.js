@@ -12,7 +12,7 @@ const { encrypt, decrypt } = require('../lib/crypto');
 // ── hubspot_connections ─────────────────────────────────────────────────────
 
 const _stmtGetByBook = db.prepare(`
-  SELECT id, book_id, token_enc, blog_id, author_id,
+  SELECT id, book_id, token_enc, blog_id, author_id, portal_id,
          initial_import_done_at, last_import_at, last_push_at,
          created_at, updated_at
     FROM hubspot_connections
@@ -29,6 +29,7 @@ function _decryptRow(row) {
     token: decrypt(asString),
     blogId: row.blog_id,
     authorId: row.author_id,
+    portalId: row.portal_id,
     initialImportDoneAt: row.initial_import_done_at,
     lastImportAt: row.last_import_at,
     lastPushAt: row.last_push_at,
@@ -44,6 +45,7 @@ function _publicRow(row) {
     bookId: row.book_id,
     blogId: row.blog_id,
     authorId: row.author_id,
+    portalId: row.portal_id,
     initialImportDoneAt: row.initial_import_done_at,
     lastImportAt: row.last_import_at,
     lastPushAt: row.last_push_at,
@@ -61,17 +63,17 @@ function getConnectionPublic(bookId) {
 }
 
 const _stmtInsert = db.prepare(`
-  INSERT INTO hubspot_connections (book_id, token_enc, blog_id, author_id, created_at, updated_at)
-  VALUES (?, ?, ?, ?, ${NOW_ISO_SQL}, ${NOW_ISO_SQL})
+  INSERT INTO hubspot_connections (book_id, token_enc, blog_id, author_id, portal_id, created_at, updated_at)
+  VALUES (?, ?, ?, ?, ?, ${NOW_ISO_SQL}, ${NOW_ISO_SQL})
 `);
 
 const _stmtUpdate = db.prepare(`
   UPDATE hubspot_connections
-     SET token_enc = ?, blog_id = ?, author_id = ?, updated_at = ${NOW_ISO_SQL}
+     SET token_enc = ?, blog_id = ?, author_id = ?, portal_id = COALESCE(?, portal_id), updated_at = ${NOW_ISO_SQL}
    WHERE id = ?
 `);
 
-function upsertConnection({ bookId, token, blogId, authorId }) {
+function upsertConnection({ bookId, token, blogId, authorId, portalId = null }) {
   const bid = parseInt(bookId, 10);
   if (!Number.isInteger(bid) || bid <= 0) throw new Error('hubspot.upsert: invalid bookId');
   if (!token || typeof token !== 'string') throw new Error('hubspot.upsert: token required');
@@ -79,13 +81,22 @@ function upsertConnection({ bookId, token, blogId, authorId }) {
   if (!authorId || typeof authorId !== 'string') throw new Error('hubspot.upsert: authorId required');
 
   const enc = encrypt(token);
+  const pid = portalId == null ? null : String(portalId);
   const existing = _stmtGetByBook.get(bid);
   if (existing) {
-    _stmtUpdate.run(enc, blogId, authorId, existing.id);
+    _stmtUpdate.run(enc, blogId, authorId, pid, existing.id);
   } else {
-    _stmtInsert.run(bid, enc, blogId, authorId);
+    _stmtInsert.run(bid, enc, blogId, authorId, pid);
   }
   return getConnectionPublic(bid);
+}
+
+const _stmtSetPortalId = db.prepare(`
+  UPDATE hubspot_connections SET portal_id = ?, updated_at = ${NOW_ISO_SQL} WHERE id = ?
+`);
+function setPortalId(connId, portalId) {
+  if (portalId == null || portalId === '') return false;
+  return _stmtSetPortalId.run(String(portalId), parseInt(connId, 10)).changes > 0;
 }
 
 const _stmtMarkImported = db.prepare(`
@@ -112,7 +123,7 @@ function deleteConnection(bookId) {
 // ── hubspot_page_links ──────────────────────────────────────────────────────
 
 const _stmtGetLinkByPage = db.prepare(`
-  SELECT page_id, hub_id, hubspot_post_id, hubspot_state, hubspot_created_at, last_pushed_at
+  SELECT page_id, hub_id, hubspot_post_id, hubspot_state, hubspot_created_at, last_pushed_at, hubspot_url
     FROM hubspot_page_links WHERE page_id = ?
 `);
 function getLinkByPage(pageId) {
@@ -120,7 +131,7 @@ function getLinkByPage(pageId) {
 }
 
 const _stmtGetLinkByPost = db.prepare(`
-  SELECT page_id, hub_id, hubspot_post_id, hubspot_state, hubspot_created_at, last_pushed_at
+  SELECT page_id, hub_id, hubspot_post_id, hubspot_state, hubspot_created_at, last_pushed_at, hubspot_url
     FROM hubspot_page_links WHERE hub_id = ? AND hubspot_post_id = ?
 `);
 function getLinkByPost(hubId, hubspotPostId) {
@@ -128,7 +139,7 @@ function getLinkByPost(hubId, hubspotPostId) {
 }
 
 const _stmtListLinksForConn = db.prepare(`
-  SELECT page_id, hub_id, hubspot_post_id, hubspot_state, hubspot_created_at, last_pushed_at
+  SELECT page_id, hub_id, hubspot_post_id, hubspot_state, hubspot_created_at, last_pushed_at, hubspot_url
     FROM hubspot_page_links WHERE hub_id = ?
 `);
 function listLinksForConnection(hubId) {
@@ -137,17 +148,18 @@ function listLinksForConnection(hubId) {
 
 const _stmtUpsertLink = db.prepare(`
   INSERT INTO hubspot_page_links
-    (page_id, hub_id, hubspot_post_id, hubspot_state, hubspot_created_at, last_pushed_at)
-  VALUES (?, ?, ?, ?, ?, ?)
+    (page_id, hub_id, hubspot_post_id, hubspot_state, hubspot_created_at, last_pushed_at, hubspot_url)
+  VALUES (?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT(page_id) DO UPDATE SET
     hub_id            = excluded.hub_id,
     hubspot_post_id   = excluded.hubspot_post_id,
     hubspot_state     = excluded.hubspot_state,
     hubspot_created_at= COALESCE(excluded.hubspot_created_at, hubspot_page_links.hubspot_created_at),
-    last_pushed_at    = COALESCE(excluded.last_pushed_at, hubspot_page_links.last_pushed_at)
+    last_pushed_at    = COALESCE(excluded.last_pushed_at, hubspot_page_links.last_pushed_at),
+    hubspot_url       = COALESCE(excluded.hubspot_url, hubspot_page_links.hubspot_url)
 `);
 
-function upsertLink({ pageId, hubId, hubspotPostId, hubspotState = null, hubspotCreatedAt = null, lastPushedAt = null }) {
+function upsertLink({ pageId, hubId, hubspotPostId, hubspotState = null, hubspotCreatedAt = null, lastPushedAt = null, hubspotUrl = null }) {
   _stmtUpsertLink.run(
     parseInt(pageId, 10),
     parseInt(hubId, 10),
@@ -155,6 +167,7 @@ function upsertLink({ pageId, hubId, hubspotPostId, hubspotState = null, hubspot
     hubspotState,
     hubspotCreatedAt,
     lastPushedAt,
+    hubspotUrl,
   );
   return getLinkByPage(pageId);
 }
@@ -168,6 +181,7 @@ module.exports = {
   getConnection,
   getConnectionPublic,
   upsertConnection,
+  setPortalId,
   markInitialImportDone,
   touchPush,
   deleteConnection,
