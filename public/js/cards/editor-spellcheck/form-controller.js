@@ -3,13 +3,20 @@
 //
 //   - Quelle: `el.value` (kein DOM-Walk noetig).
 //   - Kein Inline-Overlay/Squiggle — Form-Felder rendern Text intern (kein
-//     CSS.highlights-Support). Stattdessen kompaktes Badge neben dem Feld;
-//     Klick oeffnet Popover mit Liste der Tippfehler + Vorschlaegen.
+//     CSS.highlights-Support). Stattdessen kompaktes Badge im Feld (top/bottom
+//     right via .lt-field-wrap); Klick oeffnet Popover mit Vorschlaegen.
 //   - Filter: Spelling-only — Grammar/Style/Punctuation werden in Form-Feldern
 //     bewusst weggelassen (Titel/Notizen kurz, kein Mehrwert).
 //   - Apply: setRangeText + input-Event (Alpine/x-model bekommt mit).
 //
 // Mounting / Lifecycle: siehe dispatch.js (focusin-basiert, WeakMap-cached).
+//
+// Layout: Beim attach wird das Feld einmalig in <span class="lt-field-wrap">
+// eingewickelt; der Badge wird Kind dieses Wraps mit position: absolute.
+// Dadurch sitzt der Badge IMMER in der oberen/unteren rechten Ecke des Feldes
+// — unabhaengig vom Eltern-Layout (flex/grid/block). Beim detach wird das Feld
+// wieder ausgewickelt (DOM bleibt sauber). Alpine-Bindings bleiben intakt,
+// weil das Element-Objekt unveraendert bleibt.
 
 const DEFAULT_DEBOUNCE_INPUT = 500;
 const DEFAULT_DEBOUNCE_TEXTAREA = 1000;
@@ -56,6 +63,7 @@ export function createFormFieldSpellcheck({
   const debounceMs = isTextarea ? DEFAULT_DEBOUNCE_TEXTAREA : DEFAULT_DEBOUNCE_INPUT;
 
   let badge = null;
+  let fieldWrap = null;
   let popover = null;
   let docClick = null;
   let matches = [];           // filtered: spelling only
@@ -80,15 +88,29 @@ export function createFormFieldSpellcheck({
   }
 
   function _insertBadge() {
-    // Bevorzugt direkt nach dem Feld (sibling). Wenn Parent ein Wrap ist, der
-    // schon Hint/Text-Length-Anzeige enthaelt, ans Ende des Wraps.
-    if (el.nextSibling) el.parentNode.insertBefore(badge, el.nextSibling);
-    else el.parentNode.appendChild(badge);
+    if (!el.parentNode) return;
+    let wrap = el.parentNode;
+    const wrapped = wrap.classList && wrap.classList.contains('lt-field-wrap');
+    if (!wrapped) {
+      wrap = document.createElement('span');
+      wrap.className = isTextarea ? 'lt-field-wrap lt-field-wrap--textarea' : 'lt-field-wrap';
+      el.parentNode.insertBefore(wrap, el);
+      wrap.appendChild(el);
+    }
+    if (badge.parentNode !== wrap) wrap.appendChild(badge);
+    fieldWrap = wrap;
   }
 
   function _removeBadge() {
     if (badge && badge.parentNode) badge.parentNode.removeChild(badge);
     badge = null;
+    // Unwrap field — move it back to grandparent at the wrap's position.
+    if (fieldWrap && fieldWrap.parentNode && fieldWrap.classList.contains('lt-field-wrap')) {
+      const parent = fieldWrap.parentNode;
+      while (fieldWrap.firstChild) parent.insertBefore(fieldWrap.firstChild, fieldWrap);
+      parent.removeChild(fieldWrap);
+    }
+    fieldWrap = null;
   }
 
   function _updateBadge(state, opts = {}) {

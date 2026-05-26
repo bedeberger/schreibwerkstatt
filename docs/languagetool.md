@@ -152,7 +152,11 @@ UTF-16 Code Units = JS `String.length` = LT-Offset-Semantik. Keine Konvertierung
 Eine Instanz pro `<input>`/`<textarea>` mit `data-spellcheck="spelling"`. Unterschiede zum contenteditable-Controller:
 
 - Quelle: `el.value`, kein DOM-Walk.
-- **Kein Inline-Squiggle** — Form-Felder rendern Text intern, kein `CSS.highlights`-Support. Stattdessen `.lt-badge.lt-badge--form` neben dem Feld; Klick öffnet Popover mit Liste aller Tippfehler.
+- **Kein Inline-Squiggle** — Form-Felder rendern Text intern, kein `CSS.highlights`-Support. Stattdessen `.lt-badge.lt-badge--form` absolut **im** Feld (top/bottom-right); Klick öffnet Popover mit Liste aller Tippfehler.
+- **Wrap-Pattern:** Beim ersten attach wickelt `_insertBadge` das Feld in `<span class="lt-field-wrap">` (Textarea: zusätzlich `lt-field-wrap--textarea`) und hängt den Badge als zweites Kind ein. Beim detach unwrap (Feld zurück an Grandparent, Wrap entfernt). Alpine-Bindings bleiben intakt — das Element-Objekt wird nur verschoben, nicht ersetzt. Idempotent: wenn Feld bei Re-Attach schon gewrappt ist, wird nicht doppelt gewrappt.
+- **Position:** `position: absolute` auf `.lt-badge--form`, default top:50%/right:6px (vertikal mittig). Textarea-Variante: `bottom: 8px/right: 6px` (Badge sitzt am unteren Rand, blockiert nicht die erste Zeile).
+- **Padding-Reservation:** CSS-Regel `.lt-field-wrap > input[data-spellcheck], .lt-field-wrap > textarea[data-spellcheck] { padding-inline-end: 32px !important }` reserviert rechts Platz. `!important` ist Pflicht, weil Karten wie `.card-title--input:focus` per `padding`-Shorthand alle 4 Seiten neu setzen — sonst überschreibt der Focus-Shorthand das `padding-inline-end` zurück und Text klebt am Badge.
+- **Flex/Grid-Parents:** `.lt-field-wrap { flex: 1; min-width: 0; display: block; }`. In flex-Containern (Buchorganizer-`.organizer-page`, `.ideen-input-row`, `.kapitel-new-page`, `.book-settings-kontext-wrap`) übernimmt der Wrap die `flex:1`-Rolle des Feldes; in grid-Cells (`.card-form-row`) und block-Stacks (`.card-header-titlebar`) bleibt es block-level. Kein JS-Reposition bei Scroll/Resize nötig — alles CSS.
 - **Spelling-only Filter** — Grammar/Style/Punctuation wegfiltern. Titel/Notizen sind kurz, Grammar/Style bringen keinen Mehrwert und nerven.
 - Apply via `el.setRangeText(text, off, off+len, 'end')` + `input`/`change`-Event (Alpine `x-model` bekommt mit, Undo-Stack bleibt intakt).
 - Snapshot-Drift-Check vor Apply: wenn `el.value.substr(off, len).trim() !== lastValueSnapshot`-Word, abbrechen + Re-Check.
@@ -190,6 +194,8 @@ Pro-Editor-Tweaks via `[data-editor="focus"]`/`[data-editor="book"]` auf Popover
 
 ## Pflicht-Invarianten
 
+- **`data-spellcheck="spelling"` auf jedem Prosa-Feld.** Buch-/Seiten-/Kapiteltitel, Notizen, Beschreibungen, Einleitungen, Ideen, Freitext-Kontext — alles bekommt das Attribut (siehe CLAUDE.md „LanguageTool auf Prosatextfeldern Pflicht"). Ausnahmen: Suchfelder, `numInput`, Admin-Settings, Find/Replace, Readonly-Felder. Wer ein neues Prosa-Feld baut, ohne das Attribut zu setzen, bricht die Regel.
+- **Wrap-Pattern via Form-Controller, nicht im Markup.** Der `.lt-field-wrap`-Span entsteht beim attach automatisch, das Partial enthält nur das Attribut. Hand-Markup-Wrap ist Anti-Pattern und führt zu Drift mit dem Controller-Unwrap.
 - **Locale-SSoT Server.** Wenn der Proxy eine `bookId` bekommt, gewinnt `getBookLocale(bookId)` über alles, was das Frontend mitschickt. Frontend liefert Locale nur als Fallback (Form-Felder ohne Buchscope).
 - **`'auto'` ist kein Dictionary-Lang.** Wert `'auto'` wird in `/dictionary` zu `'*'` gemappt, sonst matched `getCheckSet` nie (Migration 142 hat tote Daten gelöscht). Frontend-Add muss das mappen.
 - **Cache-Key enthält `picky` + `lang`.** Sprachwechsel oder Picky-Toggle dürfen alten Cache **nicht** wiederverwenden. PRIMARY KEY `(page_id, content_hash, lang, picky)`.

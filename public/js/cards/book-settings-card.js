@@ -25,9 +25,7 @@ export function registerBookSettingsCard() {
     shareEmail: '',
     shareRole: 'viewer',
     shareBusy: false,
-    // Typeahead-Pool für Sharing-Suggestions (Email → Display-Name aus app_users).
-    shareUserPool: [],
-    shareSuggestOpen: false,
+    shareInviteMessage: '',
     // Kategorie.
     categoryPool: [],
     bookCategoryId: '',
@@ -56,14 +54,15 @@ export function registerBookSettingsCard() {
     blogPullJobId: null,
     _savedAtTimer: null,
     _resetMsgTimer: null,
+    _shareInviteMsgTimer: null,
     _lifecycle: null,
     _onBlogJobFinished: null,
 
     init() {
       this._lifecycle = setupCardLifecycle(this, {
         showFlag: 'showBookSettingsCard',
-        onShow: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats(), this.loadBookAccess(), this.loadBookCategory(), this.loadShareUserPool(), this.loadBlogStatus()]),
-        load: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats(), this.loadBookAccess(), this.loadBookCategory(), this.loadShareUserPool(), this.loadBlogStatus()]),
+        onShow: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats(), this.loadBookAccess(), this.loadBookCategory(), this.loadBlogStatus()]),
+        load: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats(), this.loadBookAccess(), this.loadBookCategory(), this.loadBlogStatus()]),
         resetState: {
           expandedJobType: null,
           bookJobRuns: {},
@@ -74,6 +73,7 @@ export function registerBookSettingsCard() {
           bookAccessError: '',
           shareEmail: '',
           shareRole: 'viewer',
+          shareInviteMessage: '',
           bookCategoryId: '',
           blogConnection: null,
           blogForm: { baseUrl: '', username: '', password: '', defaultStatus: 'draft' },
@@ -90,6 +90,7 @@ export function registerBookSettingsCard() {
           bookHistoryResetError: '',
           bookDeleteError: '',
           bookAccessError: '',
+          shareInviteMessage: '',
           blogMessage: '',
           blogError: '',
         },
@@ -115,6 +116,7 @@ export function registerBookSettingsCard() {
     destroy() {
       if (this._savedAtTimer) { clearTimeout(this._savedAtTimer); this._savedAtTimer = null; }
       if (this._resetMsgTimer) { clearTimeout(this._resetMsgTimer); this._resetMsgTimer = null; }
+      if (this._shareInviteMsgTimer) { clearTimeout(this._shareInviteMsgTimer); this._shareInviteMsgTimer = null; }
       if (this._onBlogJobFinished) {
         window.removeEventListener('job:finished', this._onBlogJobFinished);
         this._onBlogJobFinished = null;

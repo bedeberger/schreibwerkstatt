@@ -21,6 +21,7 @@
       :aria-label="$app.ideenScope === 'chapter' ? $app.t('ideen.placeholderChapter') : $app.t('ideen.placeholder')"
       rows="2"
       :disabled="busy"
+      data-spellcheck="spelling"
       @keydown.enter="if(!$event.isComposing && $event.keyCode !== 229 && !$event.shiftKey && !$event.ctrlKey && !$event.metaKey) { $event.preventDefault(); addIdee(); }"
     ></textarea>
     <button type="button"
@@ -70,6 +71,7 @@
             <template x-if="editingId === idee.id">
               <div class="idee-edit">
                 <textarea class="ideen-input" x-model="editingDraft" rows="3" :disabled="busy"
+                  data-spellcheck="spelling"
                   @keydown.enter="if(!$event.isComposing && $event.keyCode !== 229 && !$event.shiftKey && !$event.ctrlKey && !$event.metaKey) { $event.preventDefault(); saveEditIdee(idee); }"
                   @keydown.escape="cancelEditIdee()"></textarea>
                 <div class="idee-edit-actions">

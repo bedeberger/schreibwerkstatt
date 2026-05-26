@@ -1,4 +1,4 @@
-# schreibwerkstatt
+# schreibwerkstatt.app
 
 Schreiben, Lektorat und Buchanalyse mit KI. Eigenständiger Node.js-Service, Multi-User mit Rollen-ACL pro Buch. Inhalte (Bücher/Kapitel/Seiten) liegen lokal in SQLite — keine externe Storage-Abhängigkeit.
 
