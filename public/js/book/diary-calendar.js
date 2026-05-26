@@ -69,7 +69,12 @@ export const diaryCalendarMethods = {
   // [{ key:'YYYY-MM', year, month, count }] absteigend sortiert.
   diaryCalendarMonths() {
     const cache = _ensureCache(this);
-    if (cache.months) return cache.months;
+    // pagesRef-Check muss hier eigenständig laufen — Template ruft
+    // `diaryCalendarMonths` (via Label/Combobox) vor `diaryCalendarMonthGrid`,
+    // ohne pagesRef-Check würde nach Buchwechsel die alte `cache.months`-Liste
+    // zurückkommen (Label + Sprung-Combobox zeigen sonst altes Buch bis ein
+    // weiterer Reactive-Trigger feuert).
+    if (cache.pagesRef === this.pages && cache.months) return cache.months;
     const map = this.diaryCalendarPagesMap();
     const counts = new Map();
     for (const key of map.keys()) {
