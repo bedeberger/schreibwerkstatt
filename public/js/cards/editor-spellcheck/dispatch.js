@@ -247,14 +247,19 @@ export function setupSpellcheckDispatch(app) {
   function _setupFormObserver() {
     if (formObserver) return;
     formObserver = new MutationObserver((muts) => {
+      // Reparent (z.B. unser eigenes lt-field-wrap wickelt das Input ein) loest
+      // ein removedNode-Event aus, obwohl der Knoten weiterhin im DOM haengt.
+      // Nur echte Removals (isConnected === false) triggern detach.
+      const detachIfGone = (node) => {
+        if (node.nodeType !== 1) return;
+        if (node.isConnected) return;
+        if (node.matches?.(FORM_FIELD_SEL)) _detachFormCtl(node);
+        const inner = node.querySelectorAll?.(FORM_FIELD_SEL);
+        if (inner && inner.length) inner.forEach((el) => { if (!el.isConnected) _detachFormCtl(el); });
+      };
       for (const m of muts) {
         if (m.type !== 'childList') continue;
-        for (const node of m.removedNodes) {
-          if (node.nodeType !== 1) continue;
-          if (node.matches?.(FORM_FIELD_SEL)) _detachFormCtl(node);
-          const inner = node.querySelectorAll?.(FORM_FIELD_SEL);
-          if (inner && inner.length) inner.forEach(_detachFormCtl);
-        }
+        for (const node of m.removedNodes) detachIfGone(node);
       }
     });
     formObserver.observe(document.body, { childList: true, subtree: true });
