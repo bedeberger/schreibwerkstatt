@@ -415,6 +415,14 @@ export const treeMethods = {
     this._bookLoadAbort = loadCtrl;
     const signal = loadCtrl.signal;
     this.treeLoading = true;
+    // Sidebar-Mode SYNCHRON vor dem Page-Fetch setzen: Tagebuch öffnet Kalender,
+    // sonst Tree. Buchtyp ist aus der bereits geladenen `books`-Liste sofort
+    // bekannt (currentBuchtyp), daher kein Warten auf den Fetch nötig — sonst
+    // sieht der User für die Fetch-Dauer den Tree und es springt danach in den
+    // Kalender. User-Auswahl überlebt Buchwechsel/Reload bewusst nicht, damit
+    // Tagebuch-User den Kalender verlässlich beim Aufruf sehen.
+    this.sidebarMode = this.isTagebuch() ? 'calendar' : 'tree';
+    this.diaryCalendarYearMonth = null;
     try {
       this.setStatus(this.t('tree.loadingPages'), true);
       // Tree/Pages werden NICHT vorab geleert — alter Tree bleibt sichtbar
@@ -551,11 +559,9 @@ export const treeMethods = {
       } catch { /* Cache-Fehler ignorieren, Fallback auf Live-Berechnung */ }
 
       this.showTreeCard = true;
-      // Default-Sidebar-Mode: Tagebuch öffnet Kalender, sonst Tree. User-Auswahl
-      // überlebt Buchwechsel nicht — bewusst, damit Tagebuch-User Kalender
-      // verlässlich beim Aufruf sieht.
-      this.sidebarMode = this.isTagebuch() ? 'calendar' : 'tree';
-      this.diaryCalendarYearMonth = null;
+      // sidebarMode + diaryCalendarYearMonth werden bereits synchron vor dem
+      // Fetch gesetzt (siehe oben), damit der Kalender nicht erst nach dem
+      // Page-Load aus dem Tree aufpoppt.
       this.setStatus('');
       // Geöffnete Seite frisch nachziehen (User klickt "Neuladen" → erwartet
       // auch im Editor den aktuellen Server-Stand). Aktive Edits nicht
