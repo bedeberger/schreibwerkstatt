@@ -163,6 +163,17 @@ Sub-Karte `editorToolbarCard` ([cards/editor-toolbar-card.js](../public/js/cards
 - `/` in leerem Block → Slash-Menü öffnen.
 - Slash-Menü offen: `↑/↓` Navigation, `Enter` Apply, `Esc` Schliessen, jedes Zeichen → Menü zu (Zeichen läuft durch).
 
+## Void-/Caret-lose Block-Elemente: Klick-Selektion + Löschen
+
+Manche Block-Elemente nehmen keinen Caret an (`<hr>` ist void; künftig denkbar: Bild-Block, Embed, Divider-Varianten). Im `contenteditable` lassen sie sich daher nicht selektieren und es gibt keinen natürlichen Lösch-Pfad. Muster, um ein solches Element editierbar (löschbar) zu machen — am Beispiel `<hr>`:
+
+1. **Klick-Selektion** ([editor-toolbar-card.js](../public/js/cards/editor-toolbar-card.js), delegierter `click`-Listener im `init()` mit AbortController-`signal`): Klick auf das Element setzt eine transiente Klasse `.<tag>-selected` (z. B. `.hr-selected`). Klick irgendwo sonst im `.page-content-view--editing` hebt die Markierung aller Geschwister wieder auf. SSoT der Selektion ist die DOM-Klasse, kein Alpine-State.
+2. **Visuelle Markierung** ([page-view.css](../public/css/page/page-view.css)): `.page-content-view--editing <tag> { cursor: pointer; }` + `.page-content-view--editing <tag>.<tag>-selected { … outline … }` (Akzent via `var(--color-accent)`). Nur unter `--editing` (Read-Modus bleibt unverändert). Zusätzlich `.page-content-view--editing:has(<tag>.<tag>-selected) { caret-color: transparent; }` — der Caret hat bei selektiertem void-Element keinen sinnvollen Slot und landet sonst quer zwischen Element und Folgeabsatz. Kommt zurück, sobald die Selektion (Klick woanders) die Klasse entfernt.
+3. **Keyboard-Löschen** ([toolbar.js](../public/js/editor/notebook/toolbar.js) `_onEditKeydown`, Backspace/Delete-Branch): Liegt ein `<tag>.<tag>-selected` im Edit-Container, `e.preventDefault()` + `.remove()` + `_markEditDirty()`. Vor der normalen Caret-Nachbar-Logik.
+4. **Transient halten** ([utils.js](../public/js/utils.js) `stripFocusArtefacts`): die `-selected`-Klasse ist reine Laufzeit-Dekoration und MUSS vor Save + Dirty-Compare gestrippt werden (gleicher Mechanismus wie `.focus-paragraph-active`). Sonst landet sie in der Revision und erzeugt Falsch-Dirty. `stripFocusArtefacts` läuft im Save- **und** Compare-Pfad (via `stripLektoratMarks`) — neue transiente Klasse dort in Guard + `querySelectorAll`-Selektor + `classList.remove`-Argumentliste ergänzen.
+
+**Caret-Nachbar-Pfad als Ergänzung** (gleicher Backspace/Delete-Branch): Caret am Block-Anfang + Backspace löscht eine direkt davor liegende `<hr>`, Caret am Block-Ende + Delete eine dahinter. Nachbar-Lookup auf **Top-Level-Child** von `editEl` heben (nicht `block.previousElementSibling`), damit auch `<hr>` neben Listen/`figure`/`table` erreichbar ist (Caret-Block ist dort das tief verschachtelte `<li>`).
+
 ## Paste-Handler
 
 `_onEditPaste` ([edit.js#L429-442](../public/js/editor/notebook/edit.js#L429-L442)) verhindert, dass Computed-Styles inline aus anderen BookStack-Seiten / Websites in die DB wandern (sonst überschreiben sie `.poem` & Co.).

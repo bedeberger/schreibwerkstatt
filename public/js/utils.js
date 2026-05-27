@@ -326,6 +326,7 @@ export function stripFocusArtefacts(html) {
   // obwohl semantisch nichts geändert wurde.
   if (
     !html.includes('focus-paragraph-active') &&
+    !html.includes('hr-selected') &&
     !/font-size|background-color\s*:\s*transparent/i.test(html) &&
     !/\sclass\s*=\s*""/.test(html)
   ) {
@@ -335,8 +336,11 @@ export function stripFocusArtefacts(html) {
   const tmp = document.createElement('div');
   tmp.innerHTML = html;
 
-  tmp.querySelectorAll('.focus-paragraph-active').forEach(el => {
-    el.classList.remove('focus-paragraph-active');
+  // Transiente Editor-UI-Markierungen (Focus-Aktiv-Absatz, per Klick selektierte
+  // <hr>) sind reine Laufzeit-Dekoration — nie persistieren, sonst falsch-dirty
+  // im Vergleich + landen in der Revision.
+  tmp.querySelectorAll('.focus-paragraph-active, .hr-selected').forEach(el => {
+    el.classList.remove('focus-paragraph-active', 'hr-selected');
     if (el.classList.length === 0) el.removeAttribute('class');
   });
 

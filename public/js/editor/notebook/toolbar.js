@@ -432,15 +432,28 @@ export const toolbarCardMethods = {
     // Caret bleibt im aktuellen Block.
     if (e.key === 'Backspace' || e.key === 'Delete') {
       const editEl = getEditEl();
+      // Per Klick markierte <hr> direkt entfernen (siehe editor-toolbar-card.js).
+      const selectedHr = editEl?.querySelector('hr.hr-selected');
+      if (selectedHr) {
+        e.preventDefault();
+        selectedHr.remove();
+        app._markEditDirty?.();
+        return;
+      }
       const sel = editEl ? document.getSelection() : null;
       if (editEl && sel && sel.rangeCount > 0) {
         const range = sel.getRangeAt(0);
         if (range.collapsed && editEl.contains(range.startContainer)) {
           const block = findBlock(range.startContainer, editEl);
           if (block) {
+            // Eine <hr> ist Direktkind von editEl; der Caret-Block kann tiefer
+            // liegen (z.B. <li> in einer Liste). Nachbar daher auf der Ebene
+            // des umschliessenden Top-Level-Childs suchen, nicht am Block selbst.
+            let top = block;
+            while (top.parentNode && top.parentNode !== editEl) top = top.parentNode;
             const neighbour = e.key === 'Backspace'
-              ? (caretAtBlockStart(range, block) ? block.previousElementSibling : null)
-              : (caretAtBlockEnd(range, block) ? block.nextElementSibling : null);
+              ? (caretAtBlockStart(range, block) ? top.previousElementSibling : null)
+              : (caretAtBlockEnd(range, block) ? top.nextElementSibling : null);
             if (neighbour && neighbour.tagName === 'HR') {
               e.preventDefault();
               neighbour.remove();

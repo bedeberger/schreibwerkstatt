@@ -43,7 +43,11 @@
      im Fliesstext überraschend. `onum` wird auf Tabellen unten überschrieben. */
   font-variant-ligatures: common-ligatures contextual;
   font-variant-numeric: oldstyle-nums;
-  text-rendering: optimizeLegibility;
+  /* `auto` statt `optimizeLegibility`: Chromium/Edge erzwingt mit optimizeLegibility
+     einen Kerning-Pfad, der bei fraktionalen (per cqi-Clamp fit-width-skalierten)
+     Schriftgrössen Baseline-Jitter + Glyph-Overlap + weiches Rendering erzeugt.
+     Ligaturen/Mediävalziffern liefern die `font-variant-*`-Props oben unabhängig. */
+  text-rendering: auto;
 }
 .page-content-view h1 { font-size: var(--font-em-150); margin: 0.6em 0 0.3em; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
 .page-content-view h2 { font-size: var(--font-em-130); margin: 0.5em 0 0.3em; font-weight: 700; letter-spacing: -0.005em; text-wrap: balance; }
@@ -103,6 +107,11 @@
 .page-content-view ul, .page-content-view ol { padding-left: 1.5em; margin: 0.4em 0; }
 .page-content-view img { max-width: 100%; height: auto; border-radius: var(--radius-md); }
 .page-content-view hr { border: none; border-top: 1px solid var(--color-border); margin: 1em 0; }
+.page-content-view--editing hr { cursor: pointer; }
+.page-content-view--editing hr.hr-selected { border-top-color: var(--color-accent); border-top-width: 2px; outline: 2px solid var(--color-accent); outline-offset: 4px; }
+/* hr ist void ohne Caret-Slot: bei Selektion landet der Caret quer zwischen
+   Linie und Folgeabsatz. Caret ausblenden, solange eine hr selektiert ist. */
+.page-content-view--editing:has(hr.hr-selected) { caret-color: transparent; }
 .page-content-view pre { background: var(--color-bg); padding: var(--space-10) 12px; border-radius: var(--radius-md); overflow-x: auto; font-size: var(--font-size-sm); }
 .page-content-view code { background: var(--color-bg); padding: var(--space-1) 4px; border-radius: var(--radius-sm); font-size: var(--font-em-90); }
 .page-content-view pre code { background: none; padding: 0; }
@@ -221,6 +230,10 @@
 .page-content-view--editing.page-content-view--fit-width {
   max-width: none;
   font-size: calc(1em * var(--editor-zoom, 1) * clamp(1, 100cqi / 700px, 2.5));
+  /* Eigener GPU-Layer: snappt die fraktional skalierten Glyphen auf
+     Geräte-Pixel (Edge/Chromium Sub-Pixel-Jitter bei nicht-ganzzahligen
+     Schriftgrössen). Gleicher Mechanismus wie im Bucheditor. */
+  transform: translateZ(0);
 }
 
 /* Edit-Wrap: contenteditable. Toolbar (Zoom/FitWidth/Fullscreen/HR) lebt nicht
@@ -262,6 +275,8 @@
 }
 .editor-card--fullscreen .page-content-view--editing {
   max-height: none;
+  /* Wie fit-width: GPU-Layer gegen Sub-Pixel-Jitter der skalierten Glyphen. */
+  transform: translateZ(0);
 }
 /* Im Vollbild scrollt die Karte selbst; Topbar (Header + Save-Progress +
    Lektorat-Status + Save-Bestätigung aus #status) bleibt am oberen Rand

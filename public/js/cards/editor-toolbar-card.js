@@ -65,6 +65,18 @@ export function registerEditorToolbarCard() {
         else t.setAttribute('checked', '');
         window.__app?._markEditDirty?.();
       }, { signal });
+
+      // <hr> ist ein void-Element ohne Caret-Slot — per Klick als
+      // ".hr-selected" markieren, damit Backspace/Delete (in
+      // toolbarCardMethods._onEditKeydown) es entfernen kann. Nur im
+      // Notebook-Edit-Container; Klick irgendwo sonst hebt die Markierung auf.
+      document.addEventListener('click', (e) => {
+        const editEl = e.target?.closest?.('.page-content-view--editing');
+        editEl?.querySelectorAll('hr.hr-selected').forEach((h) => {
+          if (h !== e.target) h.classList.remove('hr-selected');
+        });
+        if (editEl && e.target.tagName === 'HR') e.target.classList.toggle('hr-selected');
+      }, { signal });
     },
 
     destroy() {
