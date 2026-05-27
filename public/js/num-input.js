@@ -96,6 +96,7 @@ export function registerNumInput() {
       grouping: cfg.grouping !== false,
     },
     _focused: false,
+    _pointerFocus: false,
 
     _decimals() { return inferDecimals(this._cfg); },
     _isInteger() { return this._decimals() === 0; },
@@ -119,15 +120,21 @@ export function registerNumInput() {
       el.setAttribute('spellcheck', 'false');
       if (!el.classList.contains('num-input')) el.classList.add('num-input');
 
+      // Pointer-Focus (Klick) merken, damit der Caret an die geklickte Stelle
+      // darf. Bei Maus-Focus weder reformatieren noch Select-All, sonst
+      // verschiebt sich der Text unter dem Cursor / die Auswahl killt den Klick.
+      el.addEventListener('mousedown', () => { this._pointerFocus = true; });
       el.addEventListener('focus', () => {
         this._focused = true;
+        if (this._pointerFocus) return;
         el.value = this._fmtRaw(this.value);
         // Select-All erleichtert direktes Ueberschreiben (Standard-Erwartung
-        // bei numerischen Settings-Feldern).
+        // bei Keyboard-Navigation in numerischen Settings-Feldern).
         setTimeout(() => { try { el.select(); } catch (_) {} }, 0);
       });
       el.addEventListener('blur', () => {
         this._focused = false;
+        this._pointerFocus = false;
         const clamped = clampNum(this.value, this._cfg.min, this._cfg.max);
         if (clamped !== this.value) this.value = clamped;
         el.value = this._fmt(clamped);

@@ -98,7 +98,7 @@
           <input type="text" x-model="adminSettingsForm['ai.ollama.model']">
         </label>
         <label>ai.ollama.temperature
-          <input type="text" x-data="numInput({ step: 0.1, min: 0, max: 2 })" x-modelable="value" x-model="adminSettingsForm['ai.ollama.temperature']">
+          <input type="text" x-data="numInput({ step: 0.01, decimals: 2, min: 0, max: 2 })" x-modelable="value" x-model="adminSettingsForm['ai.ollama.temperature']">
         </label>
         <label>ai.ollama.context_window
           <input type="text" x-data="numInput({ integer: true, min: 2048 })" x-modelable="value" x-model="adminSettingsForm['ai.ollama.context_window']">
@@ -113,7 +113,7 @@
       <div x-show="adminSettingsProviderSubtab === 'llama'" class="admin-settings-subsection">
         <label>ai.llama.host <input type="url" x-model="adminSettingsForm['ai.llama.host']" placeholder="http://localhost:8080"></label>
         <label>ai.llama.model <input type="text" x-model="adminSettingsForm['ai.llama.model']"></label>
-        <label>ai.llama.temperature <input type="text" x-data="numInput({ step: 0.1, min: 0, max: 2 })" x-modelable="value" x-model="adminSettingsForm['ai.llama.temperature']"></label>
+        <label>ai.llama.temperature <input type="text" x-data="numInput({ step: 0.01, decimals: 2, min: 0, max: 2 })" x-modelable="value" x-model="adminSettingsForm['ai.llama.temperature']"></label>
         <label>ai.llama.context_window
           <input type="text" x-data="numInput({ integer: true, min: 2048 })" x-modelable="value" x-model="adminSettingsForm['ai.llama.context_window']">
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.contextWindow')"></small>
@@ -410,7 +410,7 @@
       <div class="admin-settings-subsection">
         <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.section.global')"></span></h4>
         <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.advancedGlobal')"></p>
-        <label>ai.chat_temperature <input type="text" x-data="numInput({ step: 0.1, min: 0, max: 2 })" x-modelable="value" x-model="adminSettingsForm['ai.chat_temperature']"></label>
+        <label>ai.chat_temperature <input type="text" x-data="numInput({ step: 0.01, decimals: 2, min: 0, max: 2 })" x-modelable="value" x-model="adminSettingsForm['ai.chat_temperature']"></label>
         <label>ai.lektorat_batch_concurrency <input type="text" x-data="numInput({ step: 1, min: 1, max: 8 })" x-modelable="value" x-model="adminSettingsForm['ai.lektorat_batch_concurrency']"></label>
         <label>ai.chars_per_token
           <input type="text" x-data="numInput({ step: 0.1, min: 1, max: 10 })" x-modelable="value" x-model="adminSettingsForm['ai.chars_per_token']">
