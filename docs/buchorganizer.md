@@ -90,14 +90,16 @@ Mirror-Helper:
 
 Zwei Sortable-Gruppen:
 
-- **`chapter-list`** (Kapitel reordern): `group: { name: 'chapters', pull: false, put: false }`. `pull:false` + `put:false` verhindern, dass page-list-Sortables (mit `put: ['pages']`) ein Kapitel als Drop-Ziel akzeptieren — sonst landet das Kapitel-DOM in einer page-list.
+- **`chapter-list`** (Kapitel reordern, eine Liste pro Tiefe): `group: { name: 'chapters', pull: true, put: ['chapters'] }`. Erlaubt Kapitel-Wandern zwischen Levels; Ziel-Validierung (max-depth, kein-eigener-Subtree, kein-self) im `onMove`-Hook `_validateChapterMove`.
 - **`page-list`** (eine pro Kapitel + eine für Solo-Seiten): `group: { name: 'pages', pull: true, put: ['pages'] }`. Erlaubt Page-Drops aus jeder anderen page-list.
 
 `onChoose`/`onUnchoose`: setzen `x-ignore` auf das Drag-Item. Sortable klont das Item als Fallback-Ghost (`cloneNode(true)`) in `<body>`. Ohne `x-ignore` würde Alpines MutationObserver `:value="page.name"` ausserhalb des `x-for`-Scopes evaluieren und „page is not defined" werfen.
 
-`_onChapterDrop` rebuildt `workTree` aus dem aktuellen DOM (`_rebuildFromDom` rekursiv ab Top-Level-Chapter-List), weil ein Drop zwischen Levels `depth`/`parent_id` neu setzen muss. Reassignment auf `this.workTree` ist nötig — Alpine-x-for rekonziliert per `key=id` stabil; **danach Pflicht: `_reattachSortables()`**, weil Alpine bei depth-Wechseln Container austauscht und Sortable sonst auf stale DOM-Nodes zeigt → folgende Drops verrücken Items in unsichtbaren alten Listen.
+**Revert-vor-Mutation (Pflicht).** SortableJS und Alpine `x-for` besitzen dieselben `<li>`/`<div>`-Nodes. Drop-Handler rufen darum **als Erstes** `_revertSortable(evt)` — der schiebt den von Sortable physisch verschobenen Node zurück an seinen Ursprungsplatz (Quell-Container, `oldIndex`). Erst danach mutieren sie das Modell (`workTree`/`soloPages`); Alpine rendert die finale Position aus dem Modell. Ohne Revert zeigt nach einem Cross-Container-Move Alpines `key→el`-Map einer anderen `x-for`-Scope weiter auf den verschobenen Node → Orphan/Duplikat-Nodes, driftender DOM, kumulativ falsche Positionen.
 
-`_onPageDrop` liest `fromChapId`/`toChapId` aus `dataset.chapterId` der `<ul>`-Wrapper, entfernt Page aus Source-Bucket, setzt neue `chapter_id`, fügt am Target-Index ein. `affectedChapters: [fromChapId, toChapId]` → Mirror-Pfad spiegelt nur diese beiden Buckets. Bei `fullReload` (Sub-Kapitel-Move via `loadPages`) folgt `_reattachSortables()`; Same-Level-Page-Drops mutieren Buckets in-place und brauchen keinen Reattach.
+`_onChapterDrop`: liest `movedId`/`toParentId`/`targetDepth`/`newIndex` aus dem `evt` (nicht aus dem DOM), revertet, entfernt den Node via `_findChapter` aus seiner Quell-Liste, setzt `parent_id` + rekursiv `depth` (`_setSubtreeDepth`) und splice't ihn an `newIndex` in die Ziel-Liste (`workTree` bei Top-Level, sonst `parent.subchapters`). Cross-Level-Moves persisten mit `fullReload` (root.tree ist flach), Top-Level-Reorder mit Chapter-Order-Mirror.
+
+`_onPageDrop` liest `fromChapId`/`toChapId` aus `dataset.chapterId` der `<ul>`-Wrapper und den Ziel-Index aus `evt.newIndex`, revertet, entfernt Page aus Source-Bucket, setzt neue `chapter_id`, fügt am Ziel-Index ein. `affectedChapters: [fromChapId, toChapId]` → Mirror-Pfad spiegelt nur diese beiden Buckets. Bei `fullReload` (Page in Sub-Kapitel `depth > 1` via `loadPages`) folgt `_reattachSortables()`.
 
 **Sortable-Options (Präzisions-Tuning, in `_initSortables`):** `forceFallback: true` (konsistenter Klon-Ghost via `<body>`, umgeht HTML5-DnD-Quirks), `swapThreshold: 0.65` (Swap erst bei 65% Cursor-im-Ziel — Default 1.0 swappt schon bei minimaler Überlappung → Nachbar-Flackern), `invertSwap: true` (stabile Backward-Drops in nested Listen), `fallbackTolerance: 5` (5px-Move bevor Drag startet), `revertOnSpill: true` (Drop ausserhalb gültiger Liste springt zurück), `direction: 'vertical'`. Drag-Visuals via eigene Klassen `organizer-ghost`/`organizer-chosen`/`organizer-drag-active` (CSS in `book/buchorganizer.css`).
 
@@ -143,7 +145,7 @@ Records (siehe `history.js`):
 
 - **Kein `loadPages()` nach erfolgreicher Mutation.** Nur im Error-Path von `_runMutation`.
 - **Kein `$watch(root.tree)`.** `pages:loaded`-Event ist die einzige zugelassene Re-Snapshot-Quelle.
-- **Chapter-Drop reassignt `workTree`** (Rebuild aus DOM, damit `depth`/`parent_id` für Cross-Level stimmen) und ruft danach Pflicht-`_reattachSortables()`. Page-Drop ohne Level-Wechsel mutiert Buckets in-place.
+- **Drop-Handler revertieren Sortables DOM-Move zuerst** (`_revertSortable(evt)`), dann mutieren sie das Modell. Indizes/Parent/Tiefe kommen aus dem `evt`, nicht aus dem DOM. Alpine bleibt alleiniger DOM-Besitzer.
 - **Snapshots via `JSON.parse(JSON.stringify(…))`**, nicht `structuredClone`.
 - **Delete clear't History.** Create-Undo invalidiert Redo-Stack.
 - **Suche disabled Sortable**, nicht das Suchfeld.

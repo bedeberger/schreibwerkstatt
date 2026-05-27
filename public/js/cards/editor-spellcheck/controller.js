@@ -298,38 +298,20 @@ export function createSpellcheckController({
   }
 
   // ─── Click-Hit-Test ──────────────────────────────────────────────────────
-  // User klickt in Editor-Text. Caret-Position via caretPositionFromPoint
-  // (Standard) bzw. caretRangeFromPoint (Webkit-Fallback). Match-Lookup ueber
-  // gespeicherte Ranges (kein DOM-Element pro Squiggle mehr).
+  // Geometrischer Treffer-Test: der Klickpunkt wird gegen die ClientRects der
+  // gespeicherten Squiggle-Ranges geprueft. Bewusst NICHT ueber
+  // caretPositionFromPoint/caretRangeFromPoint — die liefern in einem
+  // gescrollten overflow-Container (.page-content-view--editing, max-height
+  // 70vh) eine falsche oder leere Caret-Position, sodass der Match beim
+  // Scrollen zunehmend daneben liegt. ClientRects sind scroll- und
+  // engine-unabhaengig korrekt.
 
-  function _caretFromPoint(x, y) {
-    if (typeof document.caretPositionFromPoint === 'function') {
-      const pos = document.caretPositionFromPoint(x, y);
-      if (pos) return { node: pos.offsetNode, offset: pos.offset };
-    }
-    if (typeof document.caretRangeFromPoint === 'function') {
-      const r = document.caretRangeFromPoint(x, y);
-      if (r) return { node: r.startContainer, offset: r.startOffset };
-    }
-    return null;
-  }
-
-  function _findMatchAtCaret(node, offset) {
-    if (!node) return null;
-    const probe = document.createRange();
-    try {
-      probe.setStart(node, offset);
-      probe.collapse(true);
-    } catch { return null; }
+  function _findMatchAtPoint(x, y) {
     for (const [id, entry] of squiggles) {
-      try {
-        // probe innerhalb entry.range?  entry.start <= probe.start < entry.end.
-        // START_TO_START: entry.range.start vs probe.start (<=0 → entry start <= probe).
-        // START_TO_END:   entry.range.end   vs probe.start (>0  → entry end  >  probe).
-        const startCmp = entry.range.compareBoundaryPoints(Range.START_TO_START, probe);
-        const endCmp   = entry.range.compareBoundaryPoints(Range.START_TO_END, probe);
-        if (startCmp <= 0 && endCmp > 0) return id;
-      } catch { /* range invalid */ }
+      const rects = entry.range.getClientRects();
+      for (const rc of rects) {
+        if (x >= rc.left && x <= rc.right && y >= rc.top && y <= rc.bottom) return id;
+      }
     }
     return null;
   }
@@ -343,18 +325,19 @@ export function createSpellcheckController({
     // Squiggle nicht mehr per Doppelklick selektieren.
     if (ev.detail >= 2) return;
     if (!squiggles.size) return;
-    const pt = _caretFromPoint(ev.clientX, ev.clientY);
-    if (!pt) return;
-    const id = _findMatchAtCaret(pt.node, pt.offset);
+    const id = _findMatchAtPoint(ev.clientX, ev.clientY);
     if (!id) return;
     ev.preventDefault();
     ev.stopPropagation();
+    // Caret an den Match-Anfang setzen (aus der Range, nicht aus dem Klickpunkt
+    // — siehe caret-from-point-Unzuverlaessigkeit oben). Best-Effort; die
+    // Ersetzung selbst laeuft ueber entry.range, nicht ueber die Selection.
     try {
       if (typeof root.focus === 'function') root.focus({ preventScroll: true });
       const sel = root.ownerDocument.getSelection();
-      if (sel) {
-        const r = root.ownerDocument.createRange();
-        r.setStart(pt.node, pt.offset);
+      const entry = squiggles.get(id);
+      if (sel && entry?.range) {
+        const r = entry.range.cloneRange();
         r.collapse(true);
         sel.removeAllRanges();
         sel.addRange(r);
