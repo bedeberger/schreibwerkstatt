@@ -97,6 +97,7 @@ function _peekWord(s, idx, textNodes, nodeIdx) {
     w += s[k];
   }
   for (let n = nodeIdx + 1; n < textNodes.length && w.length < 12; n++) {
+    if (_isBr(textNodes[n])) return w;
     const ns = textNodes[n].nodeValue;
     if (!ns) continue;
     for (let k = 0; k < ns.length && w.length < 12; k++) {
@@ -201,6 +202,9 @@ function _isSingleQuote(c) {
 // fälschlich mit-transformieren. `innerBlockSel` (optional) stoppt die Rekursion
 // an Block-Elementen — die werden separat normalisiert, sonst leakt der
 // prev/next/Stack-State zwischen geschwister-Paragraphen einer Blockquote/Liste.
+// `<br>` wird als Marker mitgesammelt — eine weiche Zeilengrenze innerhalb eines
+// Blocks (Dialog je Zeile). Konsumenten resetten dort prev/next/Stack, sonst
+// vergiftet das Satzende der Vorzeile (`.`) das öffnende Quote der Folgezeile.
 function _collectTextNodes(root, skipSel, out, innerBlockSel) {
   for (let n = root.firstChild; n; n = n.nextSibling) {
     if (n.nodeType === 3) {
@@ -208,11 +212,16 @@ function _collectTextNodes(root, skipSel, out, innerBlockSel) {
       if (parent && parent.closest(skipSel)) continue;
       out.push(n);
     } else if (n.nodeType === 1) {
+      if (n.nodeName === 'BR') { out.push(n); continue; }
       if (n.matches && n.matches(skipSel)) continue;
       if (innerBlockSel && n.matches && n.matches(innerBlockSel)) continue;
       _collectTextNodes(n, skipSel, out, innerBlockSel);
     }
   }
+}
+
+function _isBr(node) {
+  return node.nodeType === 1 && node.nodeName === 'BR';
 }
 
 // Closest BLOCK_SEL-Ancestor eines Text-Nodes innerhalb des common-Walks.
@@ -234,6 +243,7 @@ function _closestBlock(textNode, root) {
 // nächsten Geschwister-Text-Node lesen (z.B. `"<strong>foo</strong>"`).
 function _peekNext(textNodes, nodeIdx) {
   for (let k = nodeIdx + 1; k < textNodes.length; k++) {
+    if (_isBr(textNodes[k])) return '';
     const s = textNodes[k].nodeValue;
     if (s && s.length) return s[0];
   }
@@ -269,6 +279,13 @@ function _normalizeBlock(blockEl, style) {
 
   for (let nodeIdx = 0; nodeIdx < textNodes.length; nodeIdx++) {
     const node = textNodes[nodeIdx];
+    if (_isBr(node)) {
+      // Weiche Zeilengrenze: frischer Kontext wie an einer Block-Grenze.
+      prevChar = '';
+      prevNonWs = '';
+      quoteStack.length = 0;
+      continue;
+    }
     const s = node.nodeValue;
     if (!s) continue;
     let out = '';
@@ -405,6 +422,14 @@ export function normalizeQuotesInRange(range, style) {
 
   for (let nodeIdx = 0; nodeIdx < all.length; nodeIdx++) {
     const node = all[nodeIdx];
+    if (_isBr(node)) {
+      // Weiche Zeilengrenze: frischer Kontext, auch innerhalb eines Blocks.
+      prevChar = '';
+      prevNonWs = '';
+      quoteStack.length = 0;
+      lastBlock = _closestBlock(node, common);
+      continue;
+    }
     const s = node.nodeValue;
     if (!s) continue;
 

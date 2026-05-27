@@ -523,6 +523,61 @@ test('normalizeQuotes: en — Apostroph innerhalb Outer-Dialog unverändert', ()
   assert.equal(root.querySelector('p').textContent, '“It is foo’s bar”');
 });
 
+test('normalizeQuotes: <br>-Zeilengrenze resettet Kontext — öffnendes Quote nach Satzende', () => {
+  // Regression: <br>-getrennte Dialogzeilen in EINEM <p>. Ohne Reset erbt das
+  // öffnende `"` der Folgezeile den `.` der Vorzeile als prevChar und wird
+  // fälschlich als schliessend (”) klassifiziert; zugleich bleibt der Dot-Run
+  // unkonvertiert, weil der Quote-Stack auf 0 hängt.
+  const root = makeRoot('<p>I started typing.<br>"Thank you. I...."<br>What did I do?</p>');
+  const style = resolveQuoteStyle('en', 'US');
+  normalizeQuotes(root, style);
+  assert.equal(
+    root.querySelector('p').textContent,
+    'I started typing.“Thank you. I…”What did I do?',
+  );
+});
+
+test('normalizeQuotes: <br>-getrennte Dialogzeilen — jede Zeile öffnet/schliesst korrekt', () => {
+  const lines = [
+    '"Hey, wanna come?"',
+    'I stared at the message.',
+    '"... will check my calendar."',
+    'I didn\'t need to.',
+    '"Next time, I would love to come."',
+  ].join('<br>');
+  const root = makeRoot(`<p>${lines}</p>`);
+  const style = resolveQuoteStyle('en', 'US');
+  normalizeQuotes(root, style);
+  const text = root.querySelector('p').textContent;
+  assert.ok(!/["”]Hey/.test(text), `opening quote misclassified: ${text}`);
+  assert.ok(text.includes('“Hey, wanna come?”'), text);
+  assert.ok(text.includes('“… will check my calendar.”'), text);
+  assert.ok(text.includes('“Next time, I would love to come.”'), text);
+  assert.ok(text.includes('didn’t'), text);
+});
+
+test('normalizeQuotes: <br> innerhalb <strong> wird ebenfalls als Grenze erkannt', () => {
+  const root = makeRoot('<p>Foo bar.<strong>baz.<br>"Quote here"</strong></p>');
+  const style = resolveQuoteStyle('en', 'US');
+  normalizeQuotes(root, style);
+  assert.equal(root.querySelector('p').textContent, 'Foo bar.baz.“Quote here”');
+});
+
+test('normalizeQuotesInRange: <br>-Grenze resettet Kontext auch im Range-Scope', () => {
+  // Range deckt den gesamten <p>-Inhalt ab (über die <br>-Grenze hinweg).
+  const root = makeRoot('<p>typing.<br>"Hi there"</p>');
+  const style = resolveQuoteStyle('en', 'US');
+  const p = root.querySelector('p');
+  // Range vom ersten bis zum letzten Text-Node.
+  const first = p.firstChild;
+  const last = p.lastChild;
+  const range = makeRange(first, 0, last, last.nodeValue.length);
+  // intersectsNode-Shim muss beide Text-Nodes erfassen.
+  range.intersectsNode = () => true;
+  normalizeQuotesInRange(range, style);
+  assert.equal(p.textContent, 'typing.“Hi there”');
+});
+
 test('normalizeQuotesInRange: nur Selection wird transformiert', () => {
   const root = makeRoot('<p>"Eins" und "Zwei"</p>');
   const style = resolveQuoteStyle('de', 'CH');
