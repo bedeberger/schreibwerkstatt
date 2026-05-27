@@ -1,4 +1,21 @@
 @layer components {
+/* ── Tab-Reihe + Panels ───────────────────────────────────────────────────
+   Tab-Leiste vom Karten-Header und vom Tab-Inhalt absetzen; das Panel
+   leicht einrücken, sodass der Inhalt schmaler als die Tab-Reihe darüber
+   sitzt (visuelle Hierarchie: Tabs rahmen den Inhalt). */
+.card--settings .tabs {
+  margin-top: 0.5rem;
+  margin-bottom: 1.75rem;
+}
+.card--settings .card-form-grid {
+  padding-inline: 1.25rem;
+}
+@media (max-width: 600px) {
+  .card--settings .card-form-grid {
+    padding-inline: 0.5rem;
+  }
+}
+
 /* ── Thematische Sub-Sections in der BuchSettings-Card ────────────────────
    Lockert das Formular auf: jede logische Gruppe (Sprache, Erzählweise,
    Kategorisierung, Kontext, Sharing, Job-Stats) sitzt in einer eigenen
@@ -139,11 +156,15 @@
 .book-share-row {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-3);
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-card-bg-subtle, var(--color-card-bg));
+}
+.book-share-row--self {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft, var(--color-card-bg-subtle, var(--color-card-bg)));
 }
 .book-share-avatar {
   display: inline-flex;
@@ -153,14 +174,19 @@
   width: 32px;
   height: 32px;
   border-radius: var(--radius-sm);
-  border: 0.5px solid var(--color-border);
-  background: var(--color-bg);
-  color: var(--color-muted);
+  background: hsl(var(--avatar-hue, 220) 60% 88%);
+  color: hsl(var(--avatar-hue, 220) 60% 28%);
   font-size: var(--font-size-xs);
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   user-select: none;
+}
+@media (prefers-color-scheme: dark) {
+  .book-share-avatar {
+    background: hsl(var(--avatar-hue, 220) 40% 22%);
+    color: hsl(var(--avatar-hue, 220) 70% 78%);
+  }
 }
 .book-share-row-main {
   display: flex;
@@ -170,10 +196,38 @@
   flex: 1;
 }
 .book-share-displayname {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   font-weight: 500;
+  min-width: 0;
+}
+.book-share-displayname > span:first-child {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.book-share-you-tag {
+  flex: 0 0 auto;
+  font-size: var(--font-size-mini);
+  font-weight: 400;
+  color: var(--color-muted);
+}
+.book-share-you-tag::before { content: "· "; }
+.book-share-role-badge {
+  display: inline-block;
+  flex: 0 0 auto;
+  font-size: var(--font-size-mini);
+  font-weight: 500;
+  padding: var(--space-3) 10px;
+  border-radius: var(--radius-sm);
+  background: var(--color-tag-bg);
+  color: var(--color-muted);
+}
+.book-share-role-badge--owner {
+  background: var(--color-accent-soft, var(--color-tag-bg));
+  color: var(--color-accent);
+  font-weight: 600;
 }
 .book-share-email {
   font-size: var(--font-size-xs);

@@ -61,6 +61,7 @@ export function registerPdfExportCard() {
     creating: false,
     newProfileName: '',
     cloneFromId: null,
+    _showCreate: false,
 
     saving: false,
     savedAt: null,
@@ -212,6 +213,7 @@ export function registerPdfExportCard() {
         const profile = await r.json();
         this.newProfileName = '';
         this.cloneFromId = null;
+        this._showCreate = false;
         await this.loadProfiles();
         await this.selectProfile(profile.id);
       } finally {

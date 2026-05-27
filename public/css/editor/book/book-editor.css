@@ -326,6 +326,14 @@
     color: var(--color-muted);
     font-style: italic;
   }
+  /* Aufzählungen/Nummerierungen: Marker innerhalb des Reading-Frames halten.
+     Browser-Default (~40px padding-inline-start) schiebt sie zu weit raus. */
+  .book-editor-page-body ul,
+  .book-editor-page-body ol {
+    padding-inline-start: 1.5em;
+    margin-block: 0.4em;
+  }
+  .book-editor-page-body li { margin-block: 0.15em; }
 
   /* Find-Highlights — gedämpft. */
   ::highlight(book-editor-find-match) {

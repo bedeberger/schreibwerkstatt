@@ -1,3 +1,8 @@
+// Feature-Flag für den Block-Level-Merge bei Stale-Write-Konflikten (Notebook +
+// Focus-Editor). Off → klassischer Überschreiben/Übernehmen-Banner. Client-Konstante
+// (keine Per-User-Differenzierung nötig); bei Bug einfach auf false → alter Pfad.
+export const FEATURE_BLOCK_MERGE = true;
+
 // Initialer State der `lektorat`-Alpine-Komponente.
 // Als Funktion, damit jede Komponenten-Instanz eigene Arrays/Objekte erhält
 // (sonst teilen sich alle Instanzen dieselben Referenzen).
@@ -155,6 +160,13 @@ const notebookState = () => ({
   // bleibt bis zum nächsten erfolgreichen Save oder bis User explizit
   // entscheidet. Form: `{ remoteUserName, remoteUpdatedAt }`.
   editConflict: null,
+  // Block-Level-Merge-Auflösung (Notebook + Focus). Gesetzt, wenn ein
+  // Stale-Write-Konflikt blockweise gemerged wurde und einzelne Blöcke in
+  // beiden Versionen kollidieren — die Auflösungs-UI braucht User-Entscheidung.
+  // Form: `{ pageId, source, merged, conflicts:[{bid,tag,local_html,remote_html}],
+  // remoteUpdatedAt, decisions:{[bid]:'local'|'remote'|'both'} }`. null = kein
+  // offener Konflikt. Auto-gemergte (kollisionsfreie) Edits setzen das nie.
+  conflictResolution: null,
   // Local-Draft-Hinweis für nicht-editMode: localStorage hat ungespeicherten
   // Entwurf für aktuell geöffnete Seite (z. B. nach Server-Crash mid-write,
   // Tab geschlossen + wieder geöffnet). Form `{ savedAt }`. Banner bietet

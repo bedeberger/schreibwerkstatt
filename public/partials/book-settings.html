@@ -21,7 +21,29 @@
 
   <div x-show="bookSettingsLoading" class="muted-msg" x-text="$app.t('common.loading')"></div>
 
-  <div x-show="!bookSettingsLoading" class="card-form-grid">
+  <div x-show="!bookSettingsLoading">
+
+    <div class="tabs tabs--scrollable">
+      <button type="button" class="tabs-btn"
+              :class="{ 'tabs-btn--active': bookSettingsTab === 'book' }"
+              @click="bookSettingsTab = 'book'"
+              x-text="$app.t('book.settings.tab.book')"></button>
+      <button type="button" class="tabs-btn"
+              :class="{ 'tabs-btn--active': bookSettingsTab === 'share' }"
+              @click="bookSettingsTab = 'share'"
+              x-text="$app.t('book.settings.tab.share')"></button>
+      <button type="button" class="tabs-btn"
+              x-show="bookSettingsBuchtyp === 'blog'" x-cloak
+              :class="{ 'tabs-btn--active': bookSettingsTab === 'sync' }"
+              @click="bookSettingsTab = 'sync'"
+              x-text="$app.t('book.settings.tab.sync')"></button>
+      <button type="button" class="tabs-btn"
+              :class="{ 'tabs-btn--active': bookSettingsTab === 'stats' }"
+              @click="bookSettingsTab = 'stats'"
+              x-text="$app.t('book.settings.tab.stats')"></button>
+    </div>
+
+    <div class="card-form-grid" x-show="bookSettingsTab === 'book'" x-cloak>
 
     <section class="book-settings-section">
       <h3 class="book-settings-section-title" x-text="$app.t('book.settings.section.basics')"></h3>
@@ -170,6 +192,50 @@
       </div>
     </section>
 
+    <div class="book-settings-danger-zone">
+      <div class="book-settings-danger-title">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#alert-triangle"/></svg>
+        <span x-text="$app.t('book.settings.dangerZone')"></span>
+      </div>
+
+      <div class="book-settings-danger-section">
+        <div class="book-settings-danger-row">
+          <div class="book-settings-danger-text" x-text="$app.t('book.settings.dangerText')"></div>
+          <div class="book-settings-danger-actions">
+            <button type="button"
+              class="book-settings-btn-danger"
+              @click="resetBookHistory()"
+              :disabled="bookHistoryResetLoading || !$app.selectedBookId">
+              <span x-show="bookHistoryResetLoading" class="spinner"></span>
+              <span x-text="bookHistoryResetLoading ? $app.t('common.deleting') : $app.t('book.settings.dangerButton')"></span>
+            </button>
+          </div>
+        </div>
+        <p class="card-form-saved" x-show="bookHistoryResetMessage" x-cloak x-transition.opacity.duration.250ms x-text="bookHistoryResetMessage"></p>
+        <p class="card-form-error" x-show="bookHistoryResetError" x-text="bookHistoryResetError"></p>
+      </div>
+
+      <div class="book-settings-danger-section">
+        <div class="book-settings-danger-row">
+          <div class="book-settings-danger-text" x-text="$app.t('book.settings.deleteBookText')"></div>
+          <div class="book-settings-danger-actions">
+            <button type="button"
+              class="book-settings-btn-danger"
+              @click="deleteBook()"
+              :disabled="bookDeleteLoading || !$app.selectedBookId">
+              <span x-show="bookDeleteLoading" class="spinner"></span>
+              <span x-text="bookDeleteLoading ? $app.t('common.deleting') : $app.t('book.settings.deleteBookButton')"></span>
+            </button>
+          </div>
+        </div>
+        <p class="card-form-error" x-show="bookDeleteError" x-text="bookDeleteError"></p>
+      </div>
+    </div>
+
+    </div><!-- /tab: book -->
+
+    <div class="card-form-grid" x-show="bookSettingsTab === 'share'" x-cloak>
+
     <!-- Sharing + Buch-Chat-Opt-In für Lektor. Sichtbar für alle
          Buch-Berechtigten (read-only für nicht-Owner). -->
     <section class="book-settings-section">
@@ -195,15 +261,18 @@
         <label class="card-form-label" x-text="$app.t('book.share.membersLabel')"></label>
         <div class="book-share-list">
           <template x-for="entry in bookAccessList" :key="entry.user_email">
-            <div class="book-share-row">
-              <span class="book-share-avatar" x-text="shareInitials(entry)" aria-hidden="true"></span>
+            <div class="book-share-row" :class="{ 'book-share-row--self': entry.user_email === $app.currentUser?.email }">
+              <span class="book-share-avatar" :style="`--avatar-hue: ${$app.userAvatarHue(entry.user_email)}`" x-text="shareInitials(entry)" aria-hidden="true"></span>
               <div class="book-share-row-main">
-                <span class="book-share-displayname" x-text="entry.display_name || entry.user_email"></span>
+                <span class="book-share-displayname">
+                  <span x-text="entry.display_name || entry.user_email"></span>
+                  <span class="book-share-you-tag" x-show="entry.user_email === $app.currentUser?.email" x-text="$app.t('book.share.youTag')"></span>
+                </span>
                 <span class="book-share-email muted" x-show="entry.display_name" x-text="entry.user_email"></span>
               </div>
               <div class="book-share-row-actions">
                 <template x-if="entry.role === 'owner' || !bookAccessIsOwner()">
-                  <span class="badge" x-text="$app.t('book.share.role.' + entry.role)"></span>
+                  <span class="book-share-role-badge" :class="'book-share-role-badge--' + entry.role" x-text="$app.t('book.share.role.' + entry.role)"></span>
                 </template>
                 <template x-if="bookAccessIsOwner() && entry.role !== 'owner'">
                   <div class="book-share-row-controls">
@@ -256,6 +325,10 @@
         </div>
       </div>
     </section>
+
+    </div><!-- /tab: share -->
+
+    <div class="card-form-grid" x-show="bookSettingsTab === 'sync'" x-cloak>
 
     <section class="book-settings-section" x-show="bookSettingsBuchtyp === 'blog'" x-cloak>
       <button type="button"
@@ -497,45 +570,9 @@
       </div>
     </section>
 
-    <div class="book-settings-danger-zone">
-      <div class="book-settings-danger-title">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#alert-triangle"/></svg>
-        <span x-text="$app.t('book.settings.dangerZone')"></span>
-      </div>
+    </div><!-- /tab: sync -->
 
-      <div class="book-settings-danger-section">
-        <div class="book-settings-danger-row">
-          <div class="book-settings-danger-text" x-text="$app.t('book.settings.dangerText')"></div>
-          <div class="book-settings-danger-actions">
-            <button type="button"
-              class="book-settings-btn-danger"
-              @click="resetBookHistory()"
-              :disabled="bookHistoryResetLoading || !$app.selectedBookId">
-              <span x-show="bookHistoryResetLoading" class="spinner"></span>
-              <span x-text="bookHistoryResetLoading ? $app.t('common.deleting') : $app.t('book.settings.dangerButton')"></span>
-            </button>
-          </div>
-        </div>
-        <p class="card-form-saved" x-show="bookHistoryResetMessage" x-cloak x-transition.opacity.duration.250ms x-text="bookHistoryResetMessage"></p>
-        <p class="card-form-error" x-show="bookHistoryResetError" x-text="bookHistoryResetError"></p>
-      </div>
-
-      <div class="book-settings-danger-section">
-        <div class="book-settings-danger-row">
-          <div class="book-settings-danger-text" x-text="$app.t('book.settings.deleteBookText')"></div>
-          <div class="book-settings-danger-actions">
-            <button type="button"
-              class="book-settings-btn-danger"
-              @click="deleteBook()"
-              :disabled="bookDeleteLoading || !$app.selectedBookId">
-              <span x-show="bookDeleteLoading" class="spinner"></span>
-              <span x-text="bookDeleteLoading ? $app.t('common.deleting') : $app.t('book.settings.deleteBookButton')"></span>
-            </button>
-          </div>
-        </div>
-        <p class="card-form-error" x-show="bookDeleteError" x-text="bookDeleteError"></p>
-      </div>
-    </div>
+    <div class="card-form-grid" x-show="bookSettingsTab === 'stats'" x-cloak>
 
     <section class="book-settings-section">
       <h3 class="book-settings-section-title" x-text="$app.t('jobStats.title')"></h3>
@@ -616,5 +653,7 @@
       </table>
       </div>
     </section>
+
+    </div><!-- /tab: stats -->
   </div>
 </div>

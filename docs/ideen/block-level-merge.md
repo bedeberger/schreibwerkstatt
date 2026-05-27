@@ -1,8 +1,14 @@
 # Block-Level-Merge für Notebook + Focus-Editor
 
-- **Status:** Draft
+- **Status:** Umgesetzt (MVP, Flag `FEATURE_BLOCK_MERGE` default on)
 - **Aufwand:** L (3–4 PRs; Block-ID-Pipeline + Merge-Engine + UI + Tests)
 - **Severity:** Feature (verbessert Konflikt-Auflösung, ersetzt Last-Write-Wins durch granularen Merge bei Same-User-Multi-Device)
+
+> **Umsetzungs-Abweichungen vom Plan:**
+> - `ensureBlockIds` läuft **nicht** in `cleanPageHtml`, sondern am Page-Write-Chokepoint [lib/content-store/backends/localdb.js](../../lib/content-store/backends/localdb.js)#`_cleanHtmlSafe`. Grund: `cleanPageHtml` wird auch von Export/WP-Sync genutzt — dort sollen keine `data-bid` leaken. Hält ausserdem die exakten Output-Assertions in [tests/unit/html-clean.test.js](../../tests/unit/html-clean.test.js) intakt.
+> - Merge-Engine liegt unter [public/js/editor/shared/block-merge.js](../../public/js/editor/shared/block-merge.js) (Browser-ESM, client-seitig) statt `lib/block-merge.js` — Merge läuft nur im Client. Pure Kern `mergeBlockLists` ist DOM-frei + Node-testbar.
+> - Konflikt-UI als globales Modal-Partial [public/partials/conflict-resolution.html](../../public/partials/conflict-resolution.html) (Root-Scope), nicht als eigene Karte.
+> - E2E-Test (`tests/e2e/block-merge.spec.js`) noch offen — Unit-Coverage steht.
 
 ## Context
 

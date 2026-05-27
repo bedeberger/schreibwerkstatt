@@ -1694,6 +1694,7 @@ Drei Editoren leben in eigenen Subfoldern (`book/`, `focus/`, `notebook/`); edit
 | File | Inhalt |
 |------|--------|
 | [editor/shared/editor-chrome.css](public/css/editor/shared/editor-chrome.css) | `.save-indicator`, `.editor-conflict-banner`, `.editor-presence-banner`, `.editor-draft-banner` — von Notebook + Focus + Figur-Werkstatt konsumiert. |
+| [editor/shared/conflict-resolution.css](public/css/editor/shared/conflict-resolution.css) | Block-Level-Merge-Konflikt-Modal: `.conflict-overlay`, `.conflict-modal`, `.conflict-block`, Block-Previews. Notebook + Focus. |
 | [editor/book/book-editor.css](public/css/editor/book/book-editor.css) | Bucheditor (`.book-editor-*`): Outline + Manuskript-Stream. |
 | [editor/focus/focus-mode.css](public/css/editor/focus/focus-mode.css) | Fokus-Modus: `.focus-editor`, `.focus-editor__content`, Caret-Pulse, Live-Counter. |
 | [editor/notebook/edit-toolbar.css](public/css/editor/notebook/edit-toolbar.css) | `.edit-bubble-toolbar`, `.edit-slash-menu`. |

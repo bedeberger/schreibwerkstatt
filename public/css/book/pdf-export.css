@@ -41,19 +41,57 @@
   background: var(--color-accent-soft);
 }
 .pdfx-default-marker {
-  font-size: var(--font-size-xs);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
   color: var(--color-muted);
+  font-size: var(--font-size-xs);
   font-weight: 500;
+  letter-spacing: 0.02em;
+}
+.pdfx-profile-pill.is-active .pdfx-default-marker {
+  background: var(--color-surface);
 }
 
-.pdfx-profile-create {
-  display: inline-flex;
+/* "+ Neu"-Trigger: gestrichelter Rand signalisiert Hinzufügen, aktiv = offenes Panel */
+.pdfx-profile-pill--new {
+  margin-left: auto;
+  border-style: dashed;
+  color: var(--color-muted);
+}
+.pdfx-profile-pill--new.is-active {
+  border-style: solid;
+  color: var(--color-text);
+}
+
+/* === Create-Panel (eingeklappt unter der Profil-Leiste) === */
+.pdfx-create-panel {
+  display: flex;
   flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+  padding: 0.75rem;
+  border: 0.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+}
+.pdfx-create-panel .pdfx-name-input { width: auto; flex: 1 1 200px; }
+.pdfx-create-clone {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.pdfx-create-clone-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+.pdfx-create-clone > .combobox-wrap { width: 180px; }
+.pdfx-create-actions {
+  display: inline-flex;
   gap: 0.4rem;
   margin-left: auto;
-  align-items: center;
 }
-.pdfx-profile-create > .combobox-wrap { width: 180px; }
 
 .pdfx-scope-picker {
   display: inline-flex;
@@ -313,7 +351,10 @@
 @media (max-width: 600px) {
   .pdfx-num-grid--3,
   .pdfx-num-grid--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .pdfx-profile-create { margin-left: 0; }
+  .pdfx-profile-pill--new { margin-left: 0; }
+  .pdfx-create-actions { margin-left: 0; }
+  .pdfx-create-clone,
+  .pdfx-create-clone > .combobox-wrap { width: 100%; }
   .pdfx-name-input { max-width: 100%; }
   .pdfx-cover-preview { width: 100%; max-width: 200px; }
   .pdfx-num-input { max-width: 100%; }

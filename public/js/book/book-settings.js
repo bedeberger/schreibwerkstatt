@@ -289,10 +289,6 @@ export const bookSettingsMethods = {
     return local.slice(0, 2).toUpperCase();
   },
 
-  shareAvatarStyle() {
-    return {};
-  },
-
   _shareEmailValid(email) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   },

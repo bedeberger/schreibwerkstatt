@@ -4,6 +4,8 @@ Vollbild-Schreibmodus **für eine Seite** mit Absatz-/Satz-Spotlight, Typewriter
 
 Heilige Kuh: jede Änderung an diesem Modul muss dieses Dokument konsultieren. Drift in den Invarianten = sichtbares „Flattern", verlorene Edits oder Phantom-Revisionen im Storage-Backend.
 
+**Stale-Write-Konflikt:** Der Focus-Editor läuft auf der Notebook-Save-Pipeline (`saveEdit`/`quickSave` mit `source: 'focus'`) und erbt damit den **Block-Level-Merge** — kollisionsfreie Block-Edits zweier Geräte mergen still, echte Block-Kollisionen öffnen das Auflösungs-Modal. Details + Invarianten in [notebook-editor.md → Block-Level-Merge](notebook-editor.md#block-level-merge-bei-stale-write).
+
 Code: [public/js/editor/focus.js](../public/js/editor/focus.js) (Facade) → [public/js/editor/focus/](../public/js/editor/focus/) (Submodule), [public/js/cards/editor-focus-card.js](../public/js/cards/editor-focus-card.js) (Alpine.data-Sub), [public/css/editor/focus/focus-mode.css](../public/css/editor/focus/focus-mode.css). Tests: [tests/e2e/focus-editor.spec.js](../tests/e2e/focus-editor.spec.js), [tests/unit/editor-focus.test.mjs](../tests/unit/editor-focus.test.mjs), [tests/unit/focus-granularity.test.mjs](../tests/unit/focus-granularity.test.mjs).
 
 Trigger: Hotkey `Cmd/Ctrl+Shift+E` (überall im Editor; aus Lesemodus → startet Edit + Fokus in einem). Body-Listener in [public/index.html](../public/index.html#L227) routet via `handleFocusHotkey`.

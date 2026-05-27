@@ -8,6 +8,7 @@ import { setupCardLifecycle } from './card-lifecycle.js';
 export function registerBookSettingsCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
   window.Alpine.data('bookSettingsCard', () => ({
+    bookSettingsTab: 'book',
     bookSettingsName: '',
     bookSettingsLanguage: 'de',
     bookSettingsRegion: 'CH',
@@ -79,6 +80,7 @@ export function registerBookSettingsCard() {
         onShow: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats(), this.loadBookAccess(), this.loadBookCategory(), this.loadBlogStatus(), this.loadHubspotStatus()]),
         load: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats(), this.loadBookAccess(), this.loadBookCategory(), this.loadBlogStatus(), this.loadHubspotStatus()]),
         resetState: {
+          bookSettingsTab: 'book',
           expandedJobType: null,
           bookJobRuns: {},
           bookHistoryResetMessage: '',

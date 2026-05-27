@@ -11,6 +11,10 @@ const assert = require('node:assert/strict');
 
 const { bootstrap } = require('./_helpers/setup');
 
+// Page-Writes bekommen am Chokepoint stabile data-bid (Block-Level-Merge).
+// Für Exact-HTML-Assertions die IDs strippen — sie sind random pro Write.
+const noBid = (h) => String(h ?? '').replace(/ data-bid="[^"]*"/g, '');
+
 let ctx;
 test.before(() => {
   ctx = bootstrap();
@@ -84,7 +88,7 @@ test('localdb: savePage updated body_html + local_updated_at', async () => {
   await ctx.contentStore.savePage(pageId, { html: '<p>Neu</p>' });
   const after = await ctx.contentStore.loadPage(pageId);
 
-  assert.equal(after.html, '<p>Neu</p>');
+  assert.equal(noBid(after.html), '<p>Neu</p>');
   assert.notEqual(after.updated_at, before.updated_at);
 });
 
@@ -93,7 +97,7 @@ test('localdb: createPage vergibt ID >= 1_000_001 (Phase-0-Wasserzeichen)', asyn
   const created = await ctx.contentStore.createPage({ book_id: bookId, name: 'Neue Seite', html: '<p>x</p>' });
   assert.ok(created.id >= 1_000_001, `id ${created.id} muss >= 1_000_001 sein`);
   assert.equal(created.book_id, bookId);
-  assert.equal(created.html, '<p>x</p>');
+  assert.equal(noBid(created.html), '<p>x</p>');
 });
 
 test('localdb: bookTree gruppiert nach Kapitel + Top-Level', async () => {
@@ -149,7 +153,7 @@ test('localdb: savePage mit expected_updated_at = aktueller Stand → ok, setzt 
     { html: '<p>Update durch Alice</p>', expected_updated_at: before.updated_at },
     ctxReq,
   );
-  assert.equal(saved.html, '<p>Update durch Alice</p>');
+  assert.equal(noBid(saved.html), '<p>Update durch Alice</p>');
   assert.equal(saved.last_editor_email, 'alice@example.com');
   assert.notEqual(saved.updated_at, before.updated_at);
 });
@@ -185,7 +189,7 @@ test('localdb: savePage mit stale expected_updated_at → PAGE_CONFLICT', async 
 
   // Bobs Inhalt steht weiterhin in der DB — kein Overwrite durch Alice.
   const final = await ctx.contentStore.loadPage(pageId);
-  assert.equal(final.html, '<p>Bob writes first</p>');
+  assert.equal(noBid(final.html), '<p>Bob writes first</p>');
   assert.equal(final.last_editor_email, 'bob@example.com');
 });
 
@@ -199,7 +203,7 @@ test('localdb: savePage ohne expected_updated_at → kein Conflict-Check (Legacy
     { html: '<p>Cron</p>' },
     null,
   );
-  assert.equal(saved.html, '<p>Cron</p>');
+  assert.equal(noBid(saved.html), '<p>Cron</p>');
   assert.equal(saved.last_editor_email, null);
 });
 

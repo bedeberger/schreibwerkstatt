@@ -9,6 +9,8 @@ import {
 } from '../shared/html-clean.js';
 import { isNoChange } from '../shared/save-pipeline.js';
 import { savePage, isPageConflict, readConflictBody } from '../shared/page-api.js';
+import { mergeBlocks, mergedToHtml, buildResolvedHtml } from '../shared/block-merge.js';
+import { FEATURE_BLOCK_MERGE } from '../../app/app-state.js';
 import { getActiveEditorContainer } from '../shared/active-editor.js';
 import { installEditCounter } from '../shared/edit-counter.js';
 import { writeNormalSnapshot, clearNormalSnapshot, readEditorPrefs, writeEditorPrefs } from './storage.js';
@@ -62,6 +64,159 @@ export const notebookEditMethods = {
       remoteUserName: remote.updated_by_name || null,
       remoteHtml: remote.html || '',
     };
+  },
+
+  // Block-Level-3-Way-Merge gegen den frischen Remote-Stand. base = originalHtml
+  // (zuletzt geladene/gespeicherte Server-Fassung = common ancestor). Liefert
+  // { merged, conflicts } oder null → Aufrufer fällt auf klassischen Banner zurück
+  // (Flag off, leere Base = frische Page → 2-Way-Fallback, oder Merge wirft).
+  _computeBlockMerge(localHtml, remoteHtml) {
+    const app = window.__app;
+    if (!FEATURE_BLOCK_MERGE) return null;
+    const base = app.originalHtml || '';
+    if (!base) return null;
+    try {
+      return mergeBlocks(base, localHtml, remoteHtml);
+    } catch (e) {
+      console.warn('[blockMerge] compute failed, fallback to classic', e);
+      return null;
+    }
+  },
+
+  // Gemergtes HTML in den Live-Editor spiegeln, damit Folge-Edits auf dem
+  // gemergten Stand aufbauen (sonst würde der nächste Save remote-Blöcke
+  // wieder „zurückeditieren"). Quelle ist server-sanitiertes Page-HTML (gleiche
+  // Vertrauensstufe wie startEdit, das ebenfalls direkt setzt). Cursor springt
+  // an den Anfang — akzeptabel, der Pfad läuft nur bei echtem Multi-Device-Konflikt.
+  _applyMergedToEditor(html) {
+    const el = this._getEditEl();
+    if (el && el.innerHTML !== html) el.innerHTML = html;
+  },
+
+  // Konflikt-Banner öffnen: kollidierende Blöcke + Auflösungs-State festhalten.
+  _openConflictResolution({ merged, conflicts, source, remoteUpdatedAt }) {
+    const app = window.__app;
+    const decisions = {};
+    for (const c of conflicts) decisions[c.bid] = 'local';
+    app.conflictResolution = {
+      pageId: app.currentPage?.id,
+      source,
+      merged,
+      conflicts,
+      remoteUpdatedAt,
+      decisions,
+    };
+  },
+
+  // Konflikt-Orchestrierung: versucht Block-Merge gegen den Remote-Stand.
+  // remoteHtml/remoteUpdatedAt können aus _checkPageConflict mitgegeben werden
+  // (spart einen fresh-Load); fehlen sie (409-Race), wird frisch geladen.
+  // Rückgabe:
+  //   { merged:true, saveHtml, expectedAt } — kollisionsfrei, Aufrufer speichert saveHtml.
+  //   { conflict:true } — Auflösungs-Banner geöffnet, Aufrufer bricht ab.
+  //   null — kein Merge (Flag off / leere Base / Read-Fehler) → klassischer Pfad.
+  async _attemptBlockMerge({ localHtml, source, remoteHtml = null, remoteUpdatedAt = null }) {
+    const app = window.__app;
+    if (!FEATURE_BLOCK_MERGE || !app.currentPage) return null;
+    if (remoteHtml === null || remoteUpdatedAt === null) {
+      try {
+        const remote = await contentRepo.loadPage(app.currentPage.id, { fresh: true });
+        remoteHtml = remote?.html || '';
+        remoteUpdatedAt = remote?.updated_at || null;
+      } catch { return null; }
+    }
+    if (!remoteUpdatedAt) return null;
+    const m = this._computeBlockMerge(localHtml, remoteHtml);
+    if (!m) return null;
+    if (m.conflicts.length === 0) {
+      const saveHtml = mergedToHtml(m.merged);
+      this._applyMergedToEditor(saveHtml);
+      return { merged: true, saveHtml, expectedAt: remoteUpdatedAt };
+    }
+    writeDraft(app.currentPage.id, localHtml, app.originalHtml, app.currentPage.updated_at);
+    app.lastDraftSavedAt = Date.now();
+    app.saveOffline = true;
+    this._openConflictResolution({ merged: m.merged, conflicts: m.conflicts, source, remoteUpdatedAt });
+    return { conflict: true };
+  },
+
+  // Auflösungs-Entscheidung pro Block (UI). choice: 'local'|'remote'|'both'.
+  resolveBlock(bid, choice) {
+    const app = window.__app;
+    if (!app.conflictResolution) return;
+    app.conflictResolution.decisions[bid] = choice;
+  },
+
+  // Bulk: alle Konflikte auf eine Seite setzen.
+  resolveAllConflicts(choice) {
+    const app = window.__app;
+    if (!app.conflictResolution) return;
+    for (const c of app.conflictResolution.conflicts) {
+      app.conflictResolution.decisions[c.bid] = choice;
+    }
+  },
+
+  // Auflösung übernehmen: finales HTML aus merged + decisions bauen und mit
+  // expected_updated_at = remoteUpdatedAt speichern.
+  async submitConflictResolution() {
+    const app = window.__app;
+    const cr = app.conflictResolution;
+    if (!cr || app.editSaving) return;
+    const finalHtml = buildResolvedHtml(cr.merged, cr.decisions);
+    app.editSaving = true;
+    app.setStatus(app.t('edit.saving'), true);
+    try {
+      const saved = await savePage(cr.pageId, {
+        html: finalHtml,
+        pageName: app.currentPage?.name,
+        source: cr.source || (app.focusActive ? 'focus' : 'main'),
+        expectedUpdatedAt: cr.remoteUpdatedAt,
+      });
+      if (saved?.updated_at) app.currentPage.updated_at = saved.updated_at;
+      this._applyMergedToEditor(finalHtml);
+      app.originalHtml = finalHtml;
+      app.currentPageEmpty = !htmlToText(finalHtml).trim();
+      this._filterFindingsAfterSave(finalHtml);
+      app._syncPageStatsAfterSave?.(app.currentPage, finalHtml);
+      app.refreshPageAges?.();
+      clearDraft(cr.pageId);
+      app.lastAutosaveAt = Date.now();
+      app.lastDraftSavedAt = null;
+      app.editDirty = false;
+      app.saveOffline = false;
+      app.editConflict = null;
+      app.conflictResolution = null;
+      app.updatePageView?.();
+      app.setStatus('');
+    } catch (e) {
+      console.error('[submitConflictResolution]', e);
+      app.setStatus(app.t('edit.saveFailed', { msg: e.message }), false, 8000);
+    } finally {
+      app.editSaving = false;
+    }
+  },
+
+  // Auflösung abbrechen: Konflikt-State verwerfen, frischen Server-Stand laden.
+  // Lokale Edits bleiben als Page-Revision/Draft erhalten (Last-Resort).
+  async cancelConflictResolution() {
+    const app = window.__app;
+    const cr = app.conflictResolution;
+    app.conflictResolution = null;
+    app.editConflict = null;
+    if (!cr?.pageId) return;
+    try {
+      const remote = await contentRepo.loadPage(cr.pageId, { fresh: true });
+      if (remote?.html != null) {
+        this._applyMergedToEditor(remote.html);
+        app.originalHtml = remote.html;
+        if (remote.updated_at) app.currentPage.updated_at = remote.updated_at;
+        app.editDirty = false;
+        app.saveOffline = false;
+        app.updatePageView?.();
+      }
+    } catch (e) {
+      console.warn('[cancelConflictResolution] reload failed', e);
+    }
   },
 
   // Nach jedem erfolgreichen Save: Findings, deren `original`-Text nicht mehr
@@ -263,26 +418,44 @@ export const notebookEditMethods = {
       if (!okShort) return;
     }
 
+    let saveHtml = newHtml;
+    let expectedAt = app.currentPage.updated_at;
+    const source = app.focusActive ? 'focus' : 'main';
     const conflict = await this._checkPageConflict(app.currentPage.id, app.currentPage.updated_at);
     if (conflict) {
-      app.editConflict = {
-        remoteUserName: conflict.remoteUserName,
-        remoteUpdatedAt: conflict.remoteUpdatedAt,
-      };
-      const okOverwrite = await app.appConfirm({
-        message: app.t('edit.conflict.message', {
-          user: conflict.remoteUserName || app.t('edit.conflict.unknownUser'),
-          time: app.formatDate(conflict.remoteUpdatedAt),
-        }),
-        confirmLabel: app.t('edit.conflict.saveAnyway'),
-        danger: true,
+      const merge = await this._attemptBlockMerge({
+        localHtml: newHtml, source,
+        remoteHtml: conflict.remoteHtml, remoteUpdatedAt: conflict.remoteUpdatedAt,
       });
-      if (!okOverwrite) {
-        writeDraft(app.currentPage.id, newHtml, app.originalHtml, app.currentPage.updated_at);
-        app.lastDraftSavedAt = Date.now();
-        app.saveOffline = true;
-        app.setStatus(app.t('edit.conflict.kept'), false, 6000);
-        return;
+      if (merge?.conflict) return; // Auflösungs-Banner offen
+      if (merge?.merged) {
+        // Stiller Auto-Merge: nicht-kollidierende Block-Edits zusammengeführt.
+        saveHtml = merge.saveHtml;
+        expectedAt = merge.expectedAt;
+        app.editConflict = null;
+        app.setStatus(app.t('edit.conflict.merged.silent'), false, 3000);
+      }
+      if (!merge?.merged) {
+        // Klassischer Fallback (Flag off / leere Base / kein Merge): Überschreiben-Modal.
+        app.editConflict = {
+          remoteUserName: conflict.remoteUserName,
+          remoteUpdatedAt: conflict.remoteUpdatedAt,
+        };
+        const okOverwrite = await app.appConfirm({
+          message: app.t('edit.conflict.message', {
+            user: conflict.remoteUserName || app.t('edit.conflict.unknownUser'),
+            time: app.formatDate(conflict.remoteUpdatedAt),
+          }),
+          confirmLabel: app.t('edit.conflict.saveAnyway'),
+          danger: true,
+        });
+        if (!okOverwrite) {
+          writeDraft(app.currentPage.id, newHtml, app.originalHtml, app.currentPage.updated_at);
+          app.lastDraftSavedAt = Date.now();
+          app.saveOffline = true;
+          app.setStatus(app.t('edit.conflict.kept'), false, 6000);
+          return;
+        }
       }
     }
 
@@ -290,18 +463,18 @@ export const notebookEditMethods = {
     app.setStatus(app.t('edit.saving'), true);
     try {
       const saved = await savePage(app.currentPage.id, {
-        html: newHtml,
+        html: saveHtml,
         pageName: app.currentPage.name,
-        source: app.focusActive ? 'focus' : 'main',
-        expectedUpdatedAt: app.currentPage.updated_at,
+        source,
+        expectedUpdatedAt: expectedAt,
       });
       if (saved?.updated_at) app.currentPage.updated_at = saved.updated_at;
 
-      app.originalHtml = newHtml;
-      app.currentPageEmpty = !htmlToText(newHtml).trim();
+      app.originalHtml = saveHtml;
+      app.currentPageEmpty = !htmlToText(saveHtml).trim();
 
-      this._filterFindingsAfterSave(newHtml);
-      app._syncPageStatsAfterSave?.(app.currentPage, newHtml);
+      this._filterFindingsAfterSave(saveHtml);
+      app._syncPageStatsAfterSave?.(app.currentPage, saveHtml);
       // Sidebar-Lektorat-Status flippt auf 'warn' (updated_at > checkedAt) — Server-Map nachladen.
       app.refreshPageAges?.();
 
@@ -334,13 +507,38 @@ export const notebookEditMethods = {
     } catch (e) {
       if (isPageConflict(e)) {
         // Race: zwischen Pre-Check und PUT hat anderer User geschrieben.
-        // Draft sichern + Conflict-Banner setzen; User muss erneut entscheiden.
+        // Erneuter Block-Merge gegen den jetzt frischen Remote-Stand.
+        app.editSaving = false;
+        const merge = await this._attemptBlockMerge({ localHtml: newHtml, source });
+        if (merge?.conflict) return;
+        if (merge?.merged) {
+          // Kollisionsfrei: gemergten Stand direkt nachspeichern.
+          try {
+            const saved = await savePage(app.currentPage.id, {
+              html: merge.saveHtml, pageName: app.currentPage.name, source,
+              expectedUpdatedAt: merge.expectedAt,
+            });
+            if (saved?.updated_at) app.currentPage.updated_at = saved.updated_at;
+            app.originalHtml = merge.saveHtml;
+            app.currentPageEmpty = !htmlToText(merge.saveHtml).trim();
+            this._filterFindingsAfterSave(merge.saveHtml);
+            app._syncPageStatsAfterSave?.(app.currentPage, merge.saveHtml);
+            app.refreshPageAges?.();
+            clearDraft(app.currentPage.id);
+            app.editDirty = false;
+            app.saveOffline = false;
+            app.editConflict = null;
+            app.updatePageView?.();
+            app.setStatus(app.t('edit.conflict.merged.silent'), false, 3000);
+            return;
+          } catch (e2) { console.warn('[saveEdit] merged re-save failed', e2); }
+        }
+        // Fallback: Draft sichern + klassischer Conflict-Banner.
         writeDraft(app.currentPage.id, newHtml, app.originalHtml, app.currentPage.updated_at);
         app.lastDraftSavedAt = Date.now();
         app.saveOffline = true;
         app.editConflict = readConflictBody(e);
         app.setStatus(app.t('edit.conflict.kept'), false, 8000);
-        app.editSaving = false;
         return;
       }
       console.error('[saveEdit]', e);
@@ -393,41 +591,53 @@ export const notebookEditMethods = {
     // (oder exitFocusMode-quickSave + Auto-Save-Timer) den gleichen PUT zweimal
     // absetzen.
     app.editSaving = true;
+    let saveHtml = newHtml;
+    let expectedAt = app.currentPage.updated_at;
+    const source = app.focusActive ? 'focus' : 'main';
     try {
-      // Silent-Path: Auto-Save / Pre-Send-Refresh dürfen keinen Modal triggern.
-      // Bei Cross-User-Konflikt → Draft bleibt liegen, editConflict-Banner
-      // im Editor-Header zeigt Hinweis (auch im Fokusmodus sichtbar). User
-      // muss explizit Save-Button drücken (saveEdit), dort fragt appConfirm
-      // dann nach Überschreiben.
+      // Silent-Path: Auto-Save darf keinen Modal triggern. Bei Cross-User-Konflikt
+      // versucht der Block-Merge still zusammenzuführen; nur echte Block-Kollisionen
+      // öffnen das Auflösungs-Banner (auch im Fokusmodus sichtbar). Ohne Merge
+      // (Flag off / leere Base) bleibt der editConflict-Hinweis wie gehabt.
       const conflict = await this._checkPageConflict(app.currentPage.id, app.currentPage.updated_at);
       if (conflict) {
-        app.saveOffline = true;
-        app.editConflict = {
-          remoteUserName: conflict.remoteUserName,
-          remoteUpdatedAt: conflict.remoteUpdatedAt,
-        };
-        app.setStatus(app.t('edit.conflict.unsavedHint', {
-          user: conflict.remoteUserName || app.t('edit.conflict.unknownUser'),
-        }), false, 8000);
-        return;
+        const merge = await this._attemptBlockMerge({
+          localHtml: newHtml, source,
+          remoteHtml: conflict.remoteHtml, remoteUpdatedAt: conflict.remoteUpdatedAt,
+        });
+        if (merge?.conflict) return; // Auflösungs-Banner offen
+        if (merge?.merged) {
+          saveHtml = merge.saveHtml;
+          expectedAt = merge.expectedAt;
+        } else {
+          app.saveOffline = true;
+          app.editConflict = {
+            remoteUserName: conflict.remoteUserName,
+            remoteUpdatedAt: conflict.remoteUpdatedAt,
+          };
+          app.setStatus(app.t('edit.conflict.unsavedHint', {
+            user: conflict.remoteUserName || app.t('edit.conflict.unknownUser'),
+          }), false, 8000);
+          return;
+        }
       }
       const saved = await savePage(app.currentPage.id, {
-        html: newHtml,
+        html: saveHtml,
         pageName: app.currentPage.name,
-        source: app.focusActive ? 'focus' : 'main',
-        expectedUpdatedAt: app.currentPage.updated_at,
+        source,
+        expectedUpdatedAt: expectedAt,
       });
       if (saved?.updated_at) app.currentPage.updated_at = saved.updated_at;
-      app.originalHtml = newHtml;
+      app.originalHtml = saveHtml;
       app.editDirty = false;
       app.saveOffline = false;
       app.editConflict = null;
       app.lastAutosaveAt = Date.now();
       app.lastDraftSavedAt = null;
       clearDraft(app.currentPage.id);
-      app.currentPageEmpty = !htmlToText(newHtml).trim();
-      this._filterFindingsAfterSave(newHtml);
-      app._syncPageStatsAfterSave?.(app.currentPage, newHtml);
+      app.currentPageEmpty = !htmlToText(saveHtml).trim();
+      this._filterFindingsAfterSave(saveHtml);
+      app._syncPageStatsAfterSave?.(app.currentPage, saveHtml);
       // Sidebar-Lektorat-Status flippt auf 'warn' (updated_at > checkedAt) — Server-Map nachladen.
       app.refreshPageAges?.();
       app.updatePageView?.();
@@ -437,13 +647,38 @@ export const notebookEditMethods = {
     } catch (e) {
       if (isPageConflict(e)) {
         // Race nach Pre-Check: anderer User war im selben Tick schneller.
-        // Quiet-Pfad: Draft bleibt, Banner setzen, kein Modal.
+        // Block-Merge gegen den frischen Remote-Stand; nur Block-Kollisionen
+        // öffnen das Banner. Quiet-Pfad, kein Modal.
+        app.editSaving = false;
+        const merge = await this._attemptBlockMerge({ localHtml: newHtml, source });
+        if (merge?.conflict) return;
+        if (merge?.merged) {
+          try {
+            const saved = await savePage(app.currentPage.id, {
+              html: merge.saveHtml, pageName: app.currentPage.name, source,
+              expectedUpdatedAt: merge.expectedAt,
+            });
+            if (saved?.updated_at) app.currentPage.updated_at = saved.updated_at;
+            app.originalHtml = merge.saveHtml;
+            app.editDirty = false;
+            app.saveOffline = false;
+            app.editConflict = null;
+            app.lastAutosaveAt = Date.now();
+            app.lastDraftSavedAt = null;
+            clearDraft(app.currentPage.id);
+            app.currentPageEmpty = !htmlToText(merge.saveHtml).trim();
+            this._filterFindingsAfterSave(merge.saveHtml);
+            app._syncPageStatsAfterSave?.(app.currentPage, merge.saveHtml);
+            app.refreshPageAges?.();
+            app.updatePageView?.();
+            return;
+          } catch (e2) { console.warn('[quickSave] merged re-save failed', e2); }
+        }
         app.saveOffline = true;
         app.editConflict = readConflictBody(e);
         app.setStatus(app.t('edit.conflict.unsavedHint', {
           user: e.body?.server_editor_name || app.t('edit.conflict.unknownUser'),
         }), false, 8000);
-        app.editSaving = false;
         return;
       }
       console.error('[quickSave]', e);

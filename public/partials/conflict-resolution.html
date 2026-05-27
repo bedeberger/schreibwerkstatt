@@ -1,0 +1,56 @@
+<!-- Block-Level-Merge: Konflikt-Auflösung (Notebook + Focus-Editor).
+     Geöffnet von editor/notebook/edit.js#_openConflictResolution, wenn beim
+     Stale-Write einzelne Blöcke in beiden Versionen kollidieren. Block-Previews
+     via x-text (escaped) — kein x-html-Sink. Läuft im lektorat-Root-Scope. -->
+<div class="conflict-overlay" x-show="conflictResolution" x-cloak role="alert"
+     aria-modal="true" @keydown.escape.window="conflictResolution && cancelConflictResolution()">
+  <div class="conflict-modal" @click.outside="cancelConflictResolution()">
+    <header class="conflict-modal__head">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#alert-triangle"/></svg>
+      <h2 class="conflict-modal__title"
+          x-text="t('edit.conflict.blocks.count', { count: conflictResolution?.conflicts?.length || 0 })"></h2>
+    </header>
+
+    <div class="conflict-modal__bulk">
+      <button type="button" @click="resolveAllConflicts('local')"
+              x-text="t('edit.conflict.bulk.takeAllLocal')"></button>
+      <button type="button" @click="resolveAllConflicts('remote')"
+              x-text="t('edit.conflict.bulk.takeAllRemote')"></button>
+    </div>
+
+    <ul class="conflict-block-list">
+      <template x-for="c in (conflictResolution?.conflicts || [])" :key="c.bid">
+        <li class="conflict-block">
+          <div class="conflict-block__choices">
+            <button type="button" @click="resolveBlock(c.bid, 'local')"
+                    :class="{ 'is-active': (conflictResolution.decisions[c.bid] || 'local') === 'local' }"
+                    x-text="t('edit.conflict.block.takeLocal')"></button>
+            <button type="button" @click="resolveBlock(c.bid, 'remote')"
+                    :class="{ 'is-active': conflictResolution.decisions[c.bid] === 'remote' }"
+                    x-text="t('edit.conflict.block.takeRemote')"></button>
+            <button type="button" @click="resolveBlock(c.bid, 'both')"
+                    :class="{ 'is-active': conflictResolution.decisions[c.bid] === 'both' }"
+                    x-text="t('edit.conflict.block.takeBoth')"></button>
+          </div>
+          <div class="conflict-block__previews">
+            <div class="conflict-block__preview">
+              <span class="conflict-block__label" x-text="t('edit.conflict.block.takeLocal')"></span>
+              <pre class="conflict-block__code" x-text="c.local_html || '—'"></pre>
+            </div>
+            <div class="conflict-block__preview">
+              <span class="conflict-block__label" x-text="t('edit.conflict.block.takeRemote')"></span>
+              <pre class="conflict-block__code" x-text="c.remote_html || '—'"></pre>
+            </div>
+          </div>
+        </li>
+      </template>
+    </ul>
+
+    <footer class="conflict-modal__actions">
+      <button type="button" @click="cancelConflictResolution()"
+              x-text="t('edit.conflict.cancel')"></button>
+      <button type="button" class="primary" @click="submitConflictResolution()" :disabled="editSaving"
+              x-text="t('edit.conflict.apply')"></button>
+    </footer>
+  </div>
+</div>

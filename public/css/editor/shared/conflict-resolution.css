@@ -1,0 +1,134 @@
+@layer components {
+/* === Block-Level-Merge: Konflikt-Auflösung ===
+   Modal-Overlay (Notebook + Focus). Zeigt pro kollidierendem Block die lokale
+   und die andere Version (read-only, escaped via x-text) plus Auswahl-Buttons.
+   Markup: public/partials/conflict-resolution.html. */
+.conflict-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+  background: var(--color-shadow-strong, rgba(0, 0, 0, 0.4));
+}
+
+.conflict-modal {
+  z-index: var(--z-modal-front);
+  display: flex;
+  flex-direction: column;
+  width: min(820px, 100%);
+  max-height: 88vh;
+  background: var(--color-surface);
+  border: 0.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.conflict-modal__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 0.5px solid var(--color-border);
+  background: var(--color-warn-bg);
+  color: var(--color-warn-text);
+}
+
+.conflict-modal__head .icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+
+.conflict-modal__title {
+  margin: 0;
+  font-size: var(--font-size-base);
+  font-weight: 600;
+}
+
+.conflict-modal__bulk {
+  display: flex;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-lg);
+  border-bottom: 0.5px solid var(--color-border);
+}
+
+.conflict-block-list {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-md) var(--space-lg);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.conflict-block {
+  border: 0.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.conflict-block__choices {
+  display: flex;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  border-bottom: 0.5px solid var(--color-border);
+  background: var(--color-bg);
+}
+
+/* Aktive Auswahl hervorgehoben (eckige Hervorhebung, Projektregel). */
+.conflict-block__choices button.is-active {
+  background: var(--color-accent);
+  color: var(--color-surface);
+  border-color: var(--color-accent);
+}
+
+.conflict-block__previews {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+}
+
+.conflict-block__preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.conflict-block__label {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+}
+
+.conflict-block__code {
+  margin: 0;
+  padding: var(--space-sm);
+  background: var(--color-bg);
+  border: 0.5px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--font-size-sm);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.conflict-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+  border-top: 0.5px solid var(--color-border);
+}
+
+@media (max-width: 700px) {
+  .conflict-block__previews { grid-template-columns: 1fr; }
+}
+}

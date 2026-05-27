@@ -76,20 +76,36 @@
         <span class="pdfx-default-marker" x-show="p.is_default" x-text="$app.t('pdfExport.defaultMark')"></span>
       </button>
     </template>
-    <div class="pdfx-profile-create">
-      <input type="text"
-             class="pdfx-name-input"
-             x-model="newProfileName"
-             :placeholder="$app.t('pdfExport.newPlaceholder')"
-             @keydown.enter="createProfile()">
+    <button type="button"
+            class="pdfx-profile-pill pdfx-profile-pill--new"
+            :class="{ 'is-active': _showCreate }"
+            @click="_showCreate = !_showCreate"
+            x-text="$app.t('pdfExport.newProfile')"></button>
+  </div>
+
+  <!-- Neues Profil anlegen (eingeklappt) -->
+  <div class="pdfx-create-panel" x-show="_showCreate" x-cloak>
+    <input type="text"
+           class="pdfx-name-input"
+           x-model="newProfileName"
+           :placeholder="$app.t('pdfExport.newPlaceholder')"
+           @keydown.enter="createProfile()">
+    <label class="pdfx-create-clone">
+      <span class="pdfx-create-clone-label" x-text="$app.t('pdfExport.cloneLabel')"></span>
       <div x-data="combobox($app.t('pdfExport.cloneNone'))"
            x-modelable="value" x-model="cloneFromId"
            x-effect="options = [{ value: '', label: $app.t('pdfExport.cloneNone') }, ...profiles.map(p => ({ value: p.id, label: p.name }))]"
 ></div>
+    </label>
+    <div class="pdfx-create-actions">
       <button type="button"
+              class="primary"
               :disabled="creating || !newProfileName.trim()"
               @click="createProfile()"
               x-text="$app.t('pdfExport.create')"></button>
+      <button type="button"
+              @click="_showCreate = false; newProfileName = ''; cloneFromId = null"
+              x-text="$app.t('pdfExport.cancel')"></button>
     </div>
   </div>
 

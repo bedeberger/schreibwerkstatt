@@ -82,7 +82,15 @@ view  ──startEdit──▶ edit  ──saveEdit──▶ view
 7. `_filterFindingsAfterSave(newHtml)` — Findings, deren `original` nicht mehr matcht, fliegen raus + selectedFindings + appliedOriginals + correctedHtml resetten.
 8. `_syncPageStatsAfterSave` + `refreshPageAges` (Lektorat-Status flippt auf `warn`).
 9. `clearDraft`, Snapshot weg, Autosave/OnlineRetry/Counter/Presence/Lock-Teardown — **nur wenn nicht im Focus**. Im Focus bleibt `editMode=true`.
-10. Fehlerpfade: 409 `PAGE_CONFLICT` (Race nach Pre-Check) → Draft sichern, Banner, kein Modal. Netzwerkfehler → Draft + `saveOffline=true`, Online-Retry feuert `quickSave`.
+10. Fehlerpfade: 409 `PAGE_CONFLICT` (Race nach Pre-Check) → Block-Merge-Versuch (s.u.); kollisionsfrei = stille Re-Save, sonst Auflösungs-Banner; bei Flag-off/Fehlschlag Draft sichern + klassischer Banner. Netzwerkfehler → Draft + `saveOffline=true`, Online-Retry feuert `quickSave`.
+
+### Block-Level-Merge bei Stale-Write ([shared/block-merge.js](../public/js/editor/shared/block-merge.js))
+Flag `FEATURE_BLOCK_MERGE` ([app-state.js](../public/js/app/app-state.js)). Greift in `saveEdit`/`quickSave` an beiden Konflikt-Punkten (Pre-Check + 409-Race) — Notebook **und** Focus teilen den Pfad.
+- **Block-IDs:** `lib/html-clean.js#ensureBlockIds` vergibt beim Page-Write (`localdb`-Backend, `_cleanHtmlSafe`) stabile `data-bid` auf allen Block-Tags. Nur auf gespeichertem Page-Body, nicht in `cleanPageHtml` (sonst auch Export/WP-Sync). Idempotent, Duplikate werden neu vergeben.
+- **3-Way:** `_attemptBlockMerge` lädt frischen Remote-Stand, `base = originalHtml` (common ancestor), `local = Editor-HTML`. `mergeBlocks(base, local, remote)` mergt nicht-kollidierende Block-Edits still.
+- **Kollisionsfrei** → `saveHtml = mergedToHtml(merged)`, Save mit `expectedUpdatedAt = remote.updated_at`, Editor-DOM auf merged gespiegelt (`_applyMergedToEditor`), Toast `edit.conflict.merged.silent`. Kein Banner.
+- **Echte Block-Kollision** → `conflictResolution`-State + Modal ([partials/conflict-resolution.html](../public/partials/conflict-resolution.html)): pro Block Meine/Andere/Beide + Bulk; `submitConflictResolution` baut finales HTML via `buildResolvedHtml`. Block-Previews via `x-text` (escaped, kein x-html-Sink).
+- **Fallback** auf klassisches Überschreib-Modal: Flag off, leere Base (frische Page → 2-Way) oder Merge wirft.
 
 ### quickSave ([edit.js:331-421](../public/js/editor/notebook/edit.js#L331-L421))
 - Silent-Pfad: kein Modal, kein „bist du sicher". Auslöser: Ctrl+S, Autosave-Timer, Focus-Exit, Online-Retry.
