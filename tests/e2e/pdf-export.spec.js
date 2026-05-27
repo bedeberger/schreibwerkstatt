@@ -20,9 +20,17 @@ test.describe('pdf-export-card', () => {
     await expect(page.locator('.pdf-export-card .card-status')).toBeVisible();
   });
 
+  // Profile-Anlage liegt hinter dem "Neues Profil"-Pill: Klick öffnet das
+  // .pdfx-create-panel (Name-Input + Anlegen). createProfile() schliesst es
+  // wieder (_showCreate = false).
+  async function createProfile(page, name) {
+    await page.locator('.pdfx-profile-pill--new').click();
+    await page.locator('.pdfx-create-panel .pdfx-name-input').fill(name);
+    await page.locator('.pdfx-create-actions button.primary', { hasText: 'Anlegen' }).click();
+  }
+
   test('Profil anlegen → wird Profil-Pill + Editor sichtbar', async ({ page }) => {
-    await page.locator('.pdfx-profile-create .pdfx-name-input').fill('Mein Profil');
-    await page.locator('.pdfx-profile-create button', { hasText: 'Anlegen' }).click();
+    await createProfile(page, 'Mein Profil');
     // Pill erscheint
     await expect(page.locator('.pdfx-profile-pill').filter({ hasText: 'Mein Profil' })).toBeVisible();
     // Editor mit Tabs erscheint (Tabs nutzen das DESIGN.md .tabs-Pattern)
@@ -31,8 +39,7 @@ test.describe('pdf-export-card', () => {
   });
 
   test('Tab-Wechsel zeigt verschiedene Tab-Panels', async ({ page }) => {
-    await page.locator('.pdfx-profile-create .pdfx-name-input').fill('X');
-    await page.locator('.pdfx-profile-create button', { hasText: 'Anlegen' }).click();
+    await createProfile(page, 'X');
     const activeTab = page.locator('.pdfx-tabs .tabs-btn--active');
     await expect(activeTab).toHaveText(/Layout/);
     await page.locator('.pdfx-tabs .tabs-btn').filter({ hasText: 'Cover' }).click();
@@ -43,8 +50,7 @@ test.describe('pdf-export-card', () => {
 
   test('Profil löschen entfernt es aus der Liste', async ({ page }) => {
     page.on('dialog', d => d.accept());
-    await page.locator('.pdfx-profile-create .pdfx-name-input').fill('Wegwerf');
-    await page.locator('.pdfx-profile-create button', { hasText: 'Anlegen' }).click();
+    await createProfile(page, 'Wegwerf');
     await expect(page.locator('.pdfx-profile-pill').filter({ hasText: 'Wegwerf' })).toBeVisible();
     // Profil-Header > .card-actions > button.danger trägt jetzt das standard
     // Button-Pattern (DESIGN.md). Filter über sichtbaren Text "Löschen".
