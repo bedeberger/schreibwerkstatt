@@ -48,6 +48,10 @@ Inhalt von [dashboard.yaml](dashboard.yaml) als neues Dashboard anlegen: Setting
 | `sensor.schreibwerkstatt_cache_read_tokens` / `_creation_tokens` | `sw_cache_*_tokens_total` (Sum) | Counter |
 | `sensor.schreibwerkstatt_cost_usd_total` | `sw_cost_usd_total` (Sum) | Counter |
 | `sensor.schreibwerkstatt_cache_hit_ratio` | Template (cache_read / tokens_in) | Percent |
+| `sensor.schreibwerkstatt_merge_silent_total` | `sw_merge_silent_total` | Counter |
+| `sensor.schreibwerkstatt_merge_conflicts_shown_total` | `sw_merge_conflict_shown_total` | Counter |
+| `sensor.schreibwerkstatt_merge_conflicts_resolved_total` | `sw_merge_conflict_resolved_total` (Sum) | Counter |
+| `sensor.schreibwerkstatt_merge_fallback_overwrite_total` | `sw_merge_fallback_overwrite_total` | Counter |
 
 ## Dashboard-Layout
 
@@ -59,7 +63,8 @@ Eine View **Übersicht** mit folgenden Sektionen:
 4. **User** — Status-Aufschlüsselung + Aktivitäts-Fenster (Glance).
 5. **Job-Queue (Live)** — Zwei Gauges mit Severity-Schwellen (grün / gelb / rot).
 6. **KI-Kosten & Tokens** — Kumulierte USD, Input-/Output-Tokens, Cache-Hit (Glance).
-7. **Trends** — Drei `history-graph`-Karten: Zeichen-Wachstum 7d, Job-Queue 24h, Schreib-Minuten 24h, Kosten 30d.
+7. **Block-Merge** — Auto-Merge / Banner / aufgelöste Blöcke / Overwrite-Fallback (Glance).
+8. **Trends** — Drei `history-graph`-Karten: Zeichen-Wachstum 7d, Job-Queue 24h, Schreib-Minuten 24h, Kosten 30d.
 
 ## Per-Provider-/Model-Aufschlüsselung
 

@@ -203,6 +203,40 @@ rest:
           {{ vals | map('int', 0) | sum }}
         state_class: total_increasing
 
+      # ---- Block-Level-Merge (Stale-Write-Konflikte) ----
+      - name: Schreibwerkstatt Merge Silent Total
+        unique_id: sw_merge_silent_total
+        icon: mdi:merge
+        unit_of_measurement: merges
+        value_template: >
+          {{ ((value | regex_findall('sw_merge_silent_total (\d+)')) + ['0']) | first | int(0) }}
+        state_class: total_increasing
+
+      - name: Schreibwerkstatt Merge Conflicts Shown Total
+        unique_id: sw_merge_conflict_shown_total
+        icon: mdi:alert-decagram
+        unit_of_measurement: conflicts
+        value_template: >
+          {{ ((value | regex_findall('sw_merge_conflict_shown_total (\d+)')) + ['0']) | first | int(0) }}
+        state_class: total_increasing
+
+      - name: Schreibwerkstatt Merge Conflicts Resolved Total
+        unique_id: sw_merge_conflict_resolved_total
+        icon: mdi:check-decagram
+        unit_of_measurement: blocks
+        value_template: >
+          {% set vals = value | regex_findall('sw_merge_conflict_resolved_total\{[^}]+\}\s+(\d+)') %}
+          {{ vals | map('int', 0) | sum }}
+        state_class: total_increasing
+
+      - name: Schreibwerkstatt Merge Fallback Overwrite Total
+        unique_id: sw_merge_fallback_overwrite_total
+        icon: mdi:content-save-alert
+        unit_of_measurement: overwrites
+        value_template: >
+          {{ ((value | regex_findall('sw_merge_fallback_overwrite_total (\d+)')) + ['0']) | first | int(0) }}
+        state_class: total_increasing
+
 # ---- Abgeleitete Sensoren ----
 template:
   - sensor:

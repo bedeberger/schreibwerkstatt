@@ -90,6 +90,19 @@ views:
           - entity: sensor.schreibwerkstatt_cache_hit_ratio
             name: Cache-Hit
 
+      - type: glance
+        title: Block-Merge (Stale-Write-Konflikte)
+        columns: 4
+        entities:
+          - entity: sensor.schreibwerkstatt_merge_silent_total
+            name: Auto-Merge
+          - entity: sensor.schreibwerkstatt_merge_conflicts_shown_total
+            name: Banner
+          - entity: sensor.schreibwerkstatt_merge_conflicts_resolved_total
+            name: Aufgelöst
+          - entity: sensor.schreibwerkstatt_merge_fallback_overwrite_total
+            name: Overwrite
+
       - type: history-graph
         title: Zeichen-Wachstum 7d
         hours_to_show: 168
