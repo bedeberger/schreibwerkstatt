@@ -6467,6 +6467,33 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 153 abgeschlossen (merge_telemetry-Counter-Tabelle).');
   }
 
+  if (version < 154) {
+    // Book-Level-Presence: leichter Heartbeat pro Geraet, sobald ein Buch offen
+    // ist (nicht nur im Edit-Mode wie page_presence). Dient als Bootstrap fuer
+    // die Multi-Device-Erkennung: zeigt book_presence >1 eigenes Geraet, startet
+    // der Client den teuren 5s-Collab-Poll auch fuer Einzel-Owner-Buecher —
+    // sonst sieht der User sein eigenes Zweit-Geraet nie. Ephemeral wie
+    // page_presence (90s-Stale-Filter beim Read, kein Aufraeum-Cron).
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS book_presence (
+        book_id      INTEGER NOT NULL REFERENCES books(book_id)               ON DELETE CASCADE,
+        user_email   TEXT    NOT NULL REFERENCES app_users(email)             ON DELETE CASCADE,
+        device_id    TEXT    NOT NULL REFERENCES app_users_devices(device_id) ON DELETE CASCADE,
+        last_ping_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        PRIMARY KEY (book_id, user_email, device_id)
+      )
+    `).run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_book_presence_book ON book_presence(book_id, last_ping_at DESC)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_book_presence_ping ON book_presence(last_ping_at)').run();
+
+    const fkErrors154 = db.pragma('foreign_key_check');
+    if (fkErrors154.length) {
+      throw new Error(`Migration 154: foreign_key_check meldet ${fkErrors154.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 154').run();
+    logger.info('DB-Migration auf Version 154 abgeschlossen (book_presence fuer Multi-Device-Erkennung).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

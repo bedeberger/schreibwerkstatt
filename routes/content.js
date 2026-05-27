@@ -10,6 +10,7 @@ const logger = require('../logger');
 const contentStore = require('../lib/content-store');
 const pageRevisions = require('../db/page-revisions');
 const pagePresence = require('../db/page-presence');
+const bookPresence = require('../db/book-presence');
 const appUsersDevices = require('../db/app-users-devices');
 const bookOrder = require('../db/book-order');
 const { toIntId } = require('../lib/validate');
@@ -274,6 +275,37 @@ router.delete('/pages/:page_id/presence', jsonBody, async (req, res) => {
   if (!_validDeviceId(deviceId)) return res.status(400).json({ error_code: 'INVALID_DEVICE_ID' });
   try { pagePresence.leave(pageId, email, deviceId); }
   catch (e) { return _fail(res, e, 'DELETE /content/pages/:id/presence'); }
+  res.json({ ok: true });
+});
+
+// POST /content/books/:book_id/device-ping — Buch-Level-Heartbeat (Buch offen,
+// nicht zwingend Edit-Mode). Bootstrap fuer Multi-Device-Erkennung: Antwort
+// enthaelt `self_device_count` (aktive eigene Geraete am Buch inkl. diesem). Der
+// Client startet daraufhin den vollen Collab-Poll, sobald >1 — so wird das
+// eigene Zweit-Geraet auch bei Einzel-Owner-Buechern sichtbar. Min-Role viewer.
+router.post('/books/:book_id/device-ping', aclParamGuard('viewer'), jsonBody, (req, res) => {
+  const email = _userEmail(req);
+  if (!email) return res.status(401).json({ error_code: 'NOT_LOGGED_IN' });
+  const deviceId = req.body?.device_id;
+  if (!_validDeviceId(deviceId)) return res.status(400).json({ error_code: 'INVALID_DEVICE_ID' });
+  try {
+    appUsersDevices.upsertDevice(deviceId, email, req.get('user-agent') || '');
+    bookPresence.ping(req.bookId, email, deviceId);
+    const selfDeviceCount = bookPresence.countSelfDevices(req.bookId, email);
+    res.json({ ok: true, self_device_count: selfDeviceCount });
+  } catch (e) { return _fail(res, e, 'POST /content/books/:id/device-ping'); }
+});
+
+// DELETE /content/books/:book_id/device-ping — Buch geschlossen/gewechselt.
+// Optional (Stale-Filter raeumt eh nach 90s), aber gibt der Erkennung sofortige
+// Korrektheit. device_id auch als Query — keepalive/sendBeacon verschluckt Body.
+router.delete('/books/:book_id/device-ping', aclParamGuard('viewer'), jsonBody, (req, res) => {
+  const email = _userEmail(req);
+  if (!email) return res.status(401).json({ error_code: 'NOT_LOGGED_IN' });
+  const deviceId = req.body?.device_id || req.query?.device_id;
+  if (!_validDeviceId(deviceId)) return res.status(400).json({ error_code: 'INVALID_DEVICE_ID' });
+  try { bookPresence.leave(req.bookId, email, deviceId); }
+  catch (e) { return _fail(res, e, 'DELETE /content/books/:id/device-ping'); }
   res.json({ ok: true });
 });
 

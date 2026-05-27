@@ -572,6 +572,9 @@ document.addEventListener('alpine:init', () => {
           this._beaconReleaseEditLock?.(this.currentPage.id);
           this._sendPresenceLeave?.(this.currentPage.id);
         }
+        // Buch-Level-Geraete-Ping freigeben, damit das eigene Zweit-Geraet nicht
+        // 90s lang einen verwaisten „auch hier offen"-Hinweis sieht.
+        if (this._bookDevicePingBookId) this._sendBookDeviceLeave?.(this._bookDevicePingBookId);
       }, { signal });
       // Kapitel-Stats werden bei jeder tokEsts-Reassignment neu berechnet.
       // Mutationen via Index-Assign (this.tokEsts[id] = …) feuern den Watcher

@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 153, 83 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 154, 84 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -90,6 +90,7 @@ erDiagram
   app_users ||--o{ book_access       : grants
   app_users ||--o{ page_locks        : holds
   app_users ||--o{ page_presence     : pings
+  app_users ||--o{ book_presence     : pings
   app_users ||--o{ app_users_devices : "owns devices"
   app_users ||--o{ budget_alerts     : dedupes
   app_users ||--o{ user_dictionary   : owns
@@ -98,7 +99,9 @@ erDiagram
   user_invites ||--o{ registration_requests : "linked invite"
   pages ||--o{ page_presence         : "online viewers"
   books ||--o{ page_presence         : has
+  books ||--o{ book_presence         : "open on devices"
   app_users_devices ||--o{ page_presence : "pinged from"
+  app_users_devices ||--o{ book_presence : "pinged from"
 
   chapters ||--o{ figure_appearances     : has
   chapters ||--o{ figure_events          : at
@@ -852,6 +855,12 @@ erDiagram
     TEXT    user_email   PK,FK "app_users(email) CASCADE"
     TEXT    device_id    PK,FK "app_users_devices(device_id) CASCADE"
     INTEGER book_id      FK    "books(book_id) CASCADE"
+    TEXT    last_ping_at "Default now"
+  }
+  book_presence {
+    INTEGER book_id      PK,FK "books(book_id) CASCADE"
+    TEXT    user_email   PK,FK "app_users(email) CASCADE"
+    TEXT    device_id    PK,FK "app_users_devices(device_id) CASCADE"
     TEXT    last_ping_at "Default now"
   }
   app_users_devices {

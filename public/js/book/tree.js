@@ -364,7 +364,9 @@ export const treeMethods = {
     this.bookSharedFlags[id] = shared;
     if (String(this.selectedBookId) === id) {
       this.currentBookRole = role;
-      if (shared) this._startCollabPoll?.(id);
+      // Shared-Flag steht jetzt fest → vollen Poll ggf. starten, ohne den schon
+      // laufenden leichten Geraete-Ping (aus _startCollabPoll) abzureissen.
+      this._reconcileFullCollabPoll?.(id);
     }
   },
 

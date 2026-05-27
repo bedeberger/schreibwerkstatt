@@ -13,6 +13,12 @@
 
 const COLLAB_POLL_MS = 5000;
 
+// Buch-Level-Geraete-Ping: leicht (40s) und laeuft IMMER bei offenem Buch — auch
+// fuer Einzel-Owner-Buecher. Dient nur der Multi-Device-Erkennung; der teure
+// 5s-Collab-Poll (changes + presence) startet erst, wenn dieser Ping >1 eigenes
+// Geraet meldet (oder das Buch ohnehin geteilt ist).
+const BOOK_DEVICE_PING_MS = 40000;
+
 // Stabile Device-ID pro Browser-Profil. localStorage ueberlebt Reloads,
 // trennt Browser-Profile/Geraete sauber. Beim ersten Aufruf wird eine UUID
 // generiert; spaeter wiederverwendet — selber Browser = selbes Device.
@@ -47,10 +53,28 @@ export const appCollabMethods = {
   _startCollabPoll(bookId) {
     this._stopCollabPoll();
     if (!bookId) return;
-    // Single-User-Bücher pollen nicht. `_loadBookRole` ruft uns nach erfolgreichem
-    // ACL-Read erneut auf, sobald `bookSharedFlags[id]` true ist.
     const id = String(bookId);
-    if (this.bookSharedFlags[id] !== true) return;
+    // Leichter Buch-Geraete-Ping laeuft IMMER — er bootstrappt die
+    // Multi-Device-Erkennung (eigenes Zweit-Geraet → voller Poll). `_loadBookRole`
+    // ruft uns nach dem ACL-Read erneut auf, sobald `bookSharedFlags` gesetzt ist.
+    this._startBookDevicePing(id);
+    // Geteiltes Buch: voller Poll sofort, ohne auf den Geraete-Ping zu warten.
+    if (this.bookSharedFlags[id] === true) this._ensureFullCollabPoll(id);
+  },
+
+  _stopCollabPoll() {
+    this._stopBookDevicePing();
+    this._stopFullCollabPoll();
+    // Echtes Teardown (Buchwechsel/Access-Lost): auch den Editor-Heartbeat
+    // abraeumen, falls ein Edit offen war.
+    this._stopPresenceHeartbeat();
+  },
+
+  // Voller 5s-Collab-Poll (changes + page-presence). Startet, sobald eine zweite
+  // Partei am Buch ist: anderer ACL-User ODER eigenes Zweit-Geraet. Idempotent.
+  _ensureFullCollabPoll(bookId) {
+    if (this._collabPollTimer) return;
+    if (!bookId || String(bookId) !== String(this.selectedBookId)) return;
     // Erster Tick holt sich den Server-Stempel als Baseline — sonst wuerden
     // historische Edits beim Buchwechsel als „neu" gemeldet.
     this._collabSince = null;
@@ -59,7 +83,12 @@ export const appCollabMethods = {
     this._collabPollTimer = setInterval(tick, COLLAB_POLL_MS);
   },
 
-  _stopCollabPoll() {
+  // Stoppt NUR den Poll + poll-abgeleiteten State. Der Presence-Heartbeat gehoert
+  // dem Editor-Lifecycle (enter/exit), nicht dem Poll — sonst verstummt ein solo
+  // editierender User, sobald sein Zweit-Geraet das Buch wieder schliesst und
+  // koennte ein drittes Geraet nicht mehr erreichen. Echtes Teardown
+  // (`_stopCollabPoll`) raeumt den Heartbeat separat ab.
+  _stopFullCollabPoll() {
     if (this._collabPollTimer) {
       clearInterval(this._collabPollTimer);
       this._collabPollTimer = null;
@@ -69,7 +98,67 @@ export const appCollabMethods = {
     this.livePresenceByPage = {};
     this.foreignEditLock = null;
     this._dismissCollabToast();
-    this._stopPresenceHeartbeat();
+  },
+
+  // ── Buch-Level-Geraete-Ping (Multi-Device-Erkennung) ────────────────────
+  _startBookDevicePing(bookId) {
+    this._stopBookDevicePing();
+    if (!bookId) return;
+    this._bookDevicePingBookId = String(bookId);
+    const tick = () => this._sendBookDevicePing(bookId);
+    tick();
+    this._bookDevicePingTimer = setInterval(tick, BOOK_DEVICE_PING_MS);
+  },
+
+  _stopBookDevicePing() {
+    if (this._bookDevicePingTimer) {
+      clearInterval(this._bookDevicePingTimer);
+      this._bookDevicePingTimer = null;
+    }
+    const bid = this._bookDevicePingBookId;
+    this._bookDevicePingBookId = null;
+    this._selfDeviceCount = 1;
+    if (bid) this._sendBookDeviceLeave(bid);
+  },
+
+  async _sendBookDevicePing(bookId) {
+    if (!bookId || String(bookId) !== String(this.selectedBookId)) return;
+    let data;
+    try {
+      const r = await fetch('/content/books/' + bookId + '/device-ping', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ device_id: _getDeviceId() }),
+      });
+      if (r.status === 403) { this._handleBookAccessLost(bookId); return; }
+      if (!r.ok) return;
+      data = await r.json();
+    } catch { return; }
+    this._selfDeviceCount = Number(data?.self_device_count) || 1;
+    this._reconcileFullCollabPoll(bookId);
+  },
+
+  // Voller Poll an/aus je nach erkannter Zweit-Partei. `bookSharedFlags` deckt
+  // andere ACL-User ab, `_selfDeviceCount` das eigene Multi-Device.
+  _reconcileFullCollabPoll(bookId) {
+    if (!bookId || String(bookId) !== String(this.selectedBookId)) return;
+    const id = String(bookId);
+    const needFull = this.bookSharedFlags[id] === true || this._selfDeviceCount > 1;
+    if (needFull) this._ensureFullCollabPoll(id);
+    else this._stopFullCollabPoll();
+  },
+
+  _sendBookDeviceLeave(bookId) {
+    if (!bookId) return;
+    try {
+      const did = _getDeviceId();
+      fetch('/content/books/' + bookId + '/device-ping?device_id=' + encodeURIComponent(did), {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ device_id: did }),
+        keepalive: true,
+      }).catch(() => {});
+    } catch {}
   },
 
   // Buch waehrend offener Session geloescht oder Zugriff entzogen: der Poller
@@ -246,8 +335,10 @@ export const appCollabMethods = {
   // hardcoded: bei pageId-Wechsel wird der alte Ping abgemeldet.
   _startPresenceHeartbeat(pageId) {
     if (!pageId) return;
-    // Single-User-Buch: niemand sieht "X editiert hier" → keine Pings.
-    if (this.bookSharedFlags[String(this.selectedBookId)] !== true) return;
+    // Laeuft immer im Edit-Mode (billiger 30s-POST, nur waehrend aktivem Edit) —
+    // so liegt die page_presence-Row sofort vor, wenn ein Zweit-Geraet das Buch
+    // oeffnet und seinen vollen Poll startet. Gegated ist nur der teure 5s-Poll,
+    // nicht dieser Heartbeat.
     if (this._presencePingPageId && this._presencePingPageId !== pageId) {
       this._sendPresenceLeave(this._presencePingPageId);
     }
