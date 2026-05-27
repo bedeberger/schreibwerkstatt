@@ -26,7 +26,7 @@
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
   margin: var(--space-md) auto;
-  line-height: 1.5;
+  line-height: var(--lh-relaxed);
   font-family: var(--font-serif);
   font-size: var(--font-size-reading);
   color: var(--color-page-view-text);
@@ -35,8 +35,14 @@
      Daten) brechen im Container statt horizontal zu overflowen. Vererbt an
      alle Descendants; `pre` bleibt via white-space:pre + overflow-x:auto. */
   overflow-wrap: anywhere;
-  /* Buchsatz-Mikrotypografie: Ligaturen + alte Ziffern (OldStyle), feines Hinting. */
-  font-feature-settings: "kern", "liga", "dlig", "calt", "onum";
+  /* Buchsatz-Mikrotypografie: gewöhnliche + kontextuelle Ligaturen, Mediävalziffern
+     (OldStyle) für den Fliesstext. `font-variant-*` statt Low-Level
+     `font-feature-settings` — komponiert sauber und degradiert graceful (alte
+     Browser/fehlende Features fallen auf Defaults zurück, statt alles zu killen).
+     Keine `dlig` (Discretionary Ligatures): die sind Display-/Opt-in-Schmuck und
+     im Fliesstext überraschend. `onum` wird auf Tabellen unten überschrieben. */
+  font-variant-ligatures: common-ligatures contextual;
+  font-variant-numeric: oldstyle-nums;
   text-rendering: optimizeLegibility;
 }
 .page-content-view h1 { font-size: var(--font-em-150); margin: 0.6em 0 0.3em; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
@@ -90,7 +96,9 @@
    schlucken — Original-HTML bleibt unverändert (nur Display-Stripping). */
 .page-content-view blockquote + br { display: none; }
 .page-content-view table { border-collapse: collapse; margin: 0.6em 0; width: 100%; }
-.page-content-view th, .page-content-view td { border: 1px solid var(--color-border); padding: var(--space-6) 10px; text-align: left; }
+/* Tabellenzellen: Versal-/Tabellenziffern statt Mediävalziffern — fluchten
+   spaltenweise und gleichbreit, sonst tanzen Zahlen in Datenspalten. */
+.page-content-view th, .page-content-view td { border: 1px solid var(--color-border); padding: var(--space-6) 10px; text-align: left; font-variant-numeric: lining-nums tabular-nums; }
 .page-content-view th { background: var(--color-bg); font-weight: 700; }
 .page-content-view ul, .page-content-view ol { padding-left: 1.5em; margin: 0.4em 0; }
 .page-content-view img { max-width: 100%; height: auto; border-radius: var(--radius-md); }
@@ -149,7 +157,7 @@
 .page-content-view ul.todo > li.todo-item > .todo-text {
   flex: 1 1 auto;
   min-width: 0;
-  line-height: 1.5;
+  line-height: var(--lh-relaxed);
 }
 .page-content-view ul.todo > li.todo-item > input[type="checkbox"]:checked + .todo-text {
   text-decoration: line-through;
