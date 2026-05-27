@@ -380,6 +380,7 @@ app.use('/sync', syncRouter);
 app.use('/export', exportRouter);
 app.use('/pdf-export', pdfExportRouter);
 app.use('/usage', usageRouter);
+app.use('/telemetry', require('./routes/telemetry'));
 app.use('/draft-figures', draftFiguresRouter);
 app.use('/content', contentRouter);
 app.use('/search', require('./routes/search'));

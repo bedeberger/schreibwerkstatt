@@ -1269,6 +1269,7 @@
   "collab.presence.bannerOne":          "{user} editiert diese Seite gerade ebenfalls.",
   "collab.presence.bannerMany":         "{count} andere editieren diese Seite gerade ebenfalls.",
   "collab.lock.banner":                 "{user} hat diese Seite zum Editieren reserviert (bis {until}).",
+  "collab.bookAccessLost":              "Dieses Buch ist nicht mehr verfügbar (gelöscht oder Zugriff entzogen).",
   "presence.self.editing":              "Du editierst diese Seite gerade auf {device}.",
   "presence.self.bannerOne":            "Du editierst diese Seite gerade auch auf {device}.",
   "presence.self.bannerMany":           "Du editierst diese Seite gerade auf {count} weiteren Geräten.",

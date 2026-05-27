@@ -6448,6 +6448,25 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 152 abgeschlossen (user_dictionary.book_id nullable FK auf books CASCADE).');
   }
 
+  if (version < 153) {
+    // Block-Level-Merge-Telemetrie: globale, kumulierte Counter (lifetime),
+    // gescraped via /metrics. Name-gekeyt, keine Entity-Refs -> kein FK noetig.
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS merge_telemetry (
+        name       TEXT PRIMARY KEY,
+        value      INTEGER NOT NULL DEFAULT 0,
+        updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      )
+    `).run();
+
+    const fkErrors153 = db.pragma('foreign_key_check');
+    if (fkErrors153.length) {
+      throw new Error(`Migration 153: foreign_key_check meldet ${fkErrors153.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 153').run();
+    logger.info('DB-Migration auf Version 153 abgeschlossen (merge_telemetry-Counter-Tabelle).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

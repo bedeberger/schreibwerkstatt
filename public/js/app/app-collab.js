@@ -72,6 +72,25 @@ export const appCollabMethods = {
     this._stopPresenceHeartbeat();
   },
 
+  // Buch waehrend offener Session geloescht oder Zugriff entzogen: der Poller
+  // bekommt 403 NO_BOOK_ACCESS. Ohne Handler tickt der 5s-Poll endlos weiter
+  // und spammt Server-Warnungen. Hier hart abbrechen: Polling + Lock-Heartbeat
+  // stoppen, Buchwahl raeumen, View resetten, Buchliste neu laden (das Buch
+  // verschwindet daraus). Re-Entry-Guard, weil changes+presence parallel feuern.
+  _handleBookAccessLost(bookId) {
+    if (!bookId || String(bookId) !== String(this.selectedBookId)) return;
+    if (this._bookAccessLostFor === String(bookId)) return;
+    this._bookAccessLostFor = String(bookId);
+    this._stopCollabPoll();
+    if (this._lockHeartbeatTimer) { clearInterval(this._lockHeartbeatTimer); this._lockHeartbeatTimer = null; }
+    this._currentEditLock = null;
+    this.selectedBookId = '';
+    this.resetView();
+    this.loadBooks?.();
+    this.setStatus(this.t('collab.bookAccessLost'), false, 6000);
+    this._bookAccessLostFor = null;
+  },
+
   async _collabPollOnce(bookId) {
     if (document.hidden) return;
     if (!bookId || String(bookId) !== String(this.selectedBookId)) return;
@@ -95,6 +114,7 @@ export const appCollabMethods = {
     let data;
     try {
       const r = await fetch(url);
+      if (r.status === 403) { this._handleBookAccessLost(bookId); return; }
       if (!r.ok) return;
       data = await r.json();
     } catch { return; }
@@ -114,6 +134,7 @@ export const appCollabMethods = {
     try {
       const url = '/content/books/' + bookId + '/presence?device_id=' + encodeURIComponent(_getDeviceId());
       const r = await fetch(url);
+      if (r.status === 403) { this._handleBookAccessLost(bookId); return; }
       if (!r.ok) return;
       data = await r.json();
     } catch { return; }

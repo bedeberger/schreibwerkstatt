@@ -69,6 +69,15 @@ Aggregiert pro `(provider, model)` aus `job_runs ∪ chat_messages WHERE role='a
 
 Lokale Provider (`ollama`, `llama`) liefern Cost 0 (siehe `costUsd` — Strom/Compute des Betreibers, nicht App-Sache).
 
+### Block-Level-Merge
+
+Kumuliert aus `merge_telemetry` ([db/merge-telemetry.js](../db/merge-telemetry.js)). Befüllt vom Frontend über `POST /telemetry/merge` ([routes/telemetry.js](../routes/telemetry.js), fire-and-forget) beim Stale-Write-Merge in Notebook-/Focus-Editor.
+
+- `sw_merge_silent_total` — Counter, stille Auto-Merges (kollisionsfrei, keine User-Aktion).
+- `sw_merge_conflict_shown_total` — Counter, Auflösungs-Banner angezeigt.
+- `sw_merge_conflict_resolved_total{choice}` — Counter, aufgelöste Konflikt-Blöcke je gewählter Seite (`local`/`remote`/`both`).
+- `sw_merge_fallback_overwrite_total` — Counter, klassischer Last-Write-Wins-Overwrite trotz aktivem Block-Merge.
+
 ## Beispiele
 
 ### Prometheus (`prometheus.yml`)

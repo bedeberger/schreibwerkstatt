@@ -1268,6 +1268,7 @@
   "collab.presence.bannerOne":          "{user} is also editing this page right now.",
   "collab.presence.bannerMany":         "{count} others are also editing this page right now.",
   "collab.lock.banner":                 "{user} reserved this page for editing (until {until}).",
+  "collab.bookAccessLost":              "This book is no longer available (deleted or access revoked).",
   "presence.self.editing":              "You are editing this page on {device}.",
   "presence.self.bannerOne":            "You are also editing this page on {device}.",
   "presence.self.bannerMany":           "You are editing this page on {count} other devices.",

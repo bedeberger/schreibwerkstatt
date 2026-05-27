@@ -10,6 +10,7 @@ import {
 import { isNoChange } from '../shared/save-pipeline.js';
 import { savePage, isPageConflict, readConflictBody } from '../shared/page-api.js';
 import { mergeBlocks, mergedToHtml, buildResolvedHtml } from '../shared/block-merge.js';
+import { trackMerge } from '../shared/merge-telemetry.js';
 import { FEATURE_BLOCK_MERGE } from '../../app/app-state.js';
 import { getActiveEditorContainer } from '../shared/active-editor.js';
 import { installEditCounter } from '../shared/edit-counter.js';
@@ -106,6 +107,7 @@ export const notebookEditMethods = {
       remoteUpdatedAt,
       decisions,
     };
+    trackMerge('conflict_shown');
   },
 
   // Konflikt-Orchestrierung: versucht Block-Merge gegen den Remote-Stand.
@@ -131,6 +133,7 @@ export const notebookEditMethods = {
     if (m.conflicts.length === 0) {
       const saveHtml = mergedToHtml(m.merged);
       this._applyMergedToEditor(saveHtml);
+      trackMerge('silent_success');
       return { merged: true, saveHtml, expectedAt: remoteUpdatedAt };
     }
     writeDraft(app.currentPage.id, localHtml, app.originalHtml, app.currentPage.updated_at);
@@ -185,6 +188,12 @@ export const notebookEditMethods = {
       app.editDirty = false;
       app.saveOffline = false;
       app.editConflict = null;
+      const mix = { local: 0, remote: 0, both: 0 };
+      for (const c of cr.conflicts) {
+        const choice = cr.decisions[c.bid] || 'local';
+        if (mix[choice] != null) mix[choice]++;
+      }
+      trackMerge('conflict_resolved', { mix });
       app.conflictResolution = null;
       app.updatePageView?.();
       app.setStatus('');
@@ -456,6 +465,7 @@ export const notebookEditMethods = {
           app.setStatus(app.t('edit.conflict.kept'), false, 6000);
           return;
         }
+        if (FEATURE_BLOCK_MERGE) trackMerge('fallback_overwrite');
       }
     }
 
