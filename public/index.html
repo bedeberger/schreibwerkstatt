@@ -17,6 +17,22 @@
   <!-- Theme-Init synchron VOR dem ersten Paint, damit es FOUC verhindert.
        Kein defer/module – muss vor body-Render laufen. -->
   <script src="js/theme-init.js"></script>
+  <!-- Failsafe-Reveal: löst das data-app-loading-Gate notfalls auch ohne
+       erfolgreichen Alpine-Boot. Scheitert ein SW-Reload offline am frisch
+       geleerten Modul-Cache, bricht der ESM-Import von app.js ab, init()
+       entfernt das Attribut nie → Body bliebe unsichtbar (schwarz im
+       Dark-Theme). Script-Load-Fehler (capture) + Timeout-Backstop geben dem
+       User stattdessen die gecachte Shell inkl. Offline-Banner. Klassisches
+       Inline-Script, weil es unabhängig vom ESM-Graphen laufen muss. -->
+  <script>
+    (function () {
+      var reveal = function () { document.documentElement.removeAttribute('data-app-loading'); };
+      setTimeout(reveal, 8000);
+      window.addEventListener('error', function (e) {
+        if (e && e.target && e.target.tagName === 'SCRIPT') reveal();
+      }, true);
+    })();
+  </script>
   <link rel="stylesheet" href="css/tokens.css">
   <link rel="stylesheet" href="css/card-accents.css">
   <!-- layout -->

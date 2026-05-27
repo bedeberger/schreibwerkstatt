@@ -155,6 +155,17 @@ if ('serviceWorker' in navigator) {
             app.updateAvailable = true;
             return;
           }
+          // Offline nicht reloaden: der frisch aktivierte SW hat die alte
+          // SHELL_CACHE-Version (mit allen JS-Modulen) gelöscht, der neue Cache
+          // hält nur die Shell. Ein Reload würde die Module per Netz nachladen —
+          // offline scheitert das, Alpine bootet nicht, der Body bleibt hinter
+          // dem data-app-loading-Gate unsichtbar (schwarz). Stattdessen Banner;
+          // Reload kommt beim nächsten Online-Wechsel.
+          if (!navigator.onLine) {
+            if (app) app.updateAvailable = true;
+            window.addEventListener('online', () => location.reload(), { once: true });
+            return;
+          }
           location.reload();
         });
       } catch {}
