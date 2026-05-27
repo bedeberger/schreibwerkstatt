@@ -93,6 +93,24 @@ function findBlock(node, root) {
   return null;
 }
 
+// Liegt der collapsed Caret am Block-Anfang bzw. -Ende? Genutzt, um eine
+// direkt angrenzende <hr> per Backspace/Delete zu löschen — das void-Element
+// lässt sich nicht selektieren, deshalb gibt es sonst keinen Lösch-Pfad.
+function caretAtBlockStart(range, block) {
+  if (!range.collapsed) return false;
+  const r = document.createRange();
+  r.selectNodeContents(block);
+  r.setEnd(range.startContainer, range.startOffset);
+  return r.toString().length === 0;
+}
+function caretAtBlockEnd(range, block) {
+  if (!range.collapsed) return false;
+  const r = document.createRange();
+  r.selectNodeContents(block);
+  r.setStart(range.startContainer, range.startOffset);
+  return r.toString().length === 0;
+}
+
 // Liefert das umschliessende <li class="todo-item">, falls die Caret-Position
 // in einer Checkbox-Liste liegt. Sonst null.
 function findTodoLi(node, root) {
@@ -406,6 +424,32 @@ export const toolbarCardMethods = {
         return;
       }
       return;
+    }
+
+    // Trennlinie (<hr>) löschen: das void-Element ist nicht selektierbar, also
+    // gibt es sonst keinen Lösch-Pfad. Backspace am Block-Anfang entfernt eine
+    // direkt davor liegende <hr>, Delete am Block-Ende eine direkt dahinter.
+    // Caret bleibt im aktuellen Block.
+    if (e.key === 'Backspace' || e.key === 'Delete') {
+      const editEl = getEditEl();
+      const sel = editEl ? document.getSelection() : null;
+      if (editEl && sel && sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0);
+        if (range.collapsed && editEl.contains(range.startContainer)) {
+          const block = findBlock(range.startContainer, editEl);
+          if (block) {
+            const neighbour = e.key === 'Backspace'
+              ? (caretAtBlockStart(range, block) ? block.previousElementSibling : null)
+              : (caretAtBlockEnd(range, block) ? block.nextElementSibling : null);
+            if (neighbour && neighbour.tagName === 'HR') {
+              e.preventDefault();
+              neighbour.remove();
+              app._markEditDirty?.();
+              return;
+            }
+          }
+        }
+      }
     }
 
     // Slash-Trigger: nur in einem leeren Block

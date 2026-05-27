@@ -8,8 +8,8 @@
 
 <div class="card" id="editor-card"
      x-show="showEditorCard" x-cloak
-     :class="{ 'editor-card--fullscreen': pageEditorFullscreen }"
-     @keydown.escape.window="pageEditorFullscreen && togglePageEditorFullscreen()">
+     :class="{ 'editor-card--fullscreen': pageEditorFullscreen && editMode }"
+     @keydown.escape.window="!focusActive && pageEditorFullscreen && togglePageEditorFullscreen()">
   <!-- Sticky-Region im Vollbild: Header + Save-Progress + Lektorat-Status +
        Save-Bestätigung bleiben oben sichtbar, auch wenn die Karte gescrollt
        wird. Wrapper umschliesst alles, was beim Speichern Feedback liefert. -->

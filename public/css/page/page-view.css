@@ -7,6 +7,13 @@
   max-width: calc(64ch + 2 * clamp(18px, 4vw, 40px));
   max-height: var(--pcv-max-h, 60vh);
   overflow-y: auto;
+  /* Gutter immer reservieren: sonst aendert das Erscheinen/Verschwinden der
+     internen Scrollbar (an der max-height-Schwelle) auf Systemen mit klassischen
+     (platzverbrauchenden) Scrollbars die Inhaltsbreite -> alle Zeilen reflowen
+     beim Tippen, sichtbar v.a. an der Checkbox-Spalte von ul.todo. Auf
+     base-Ebene (nicht nur --editing), damit Read- und Edit-Modus dieselbe
+     Innenbreite haben und der Toggle keinen Layout-Sprung erzeugt. */
+  scrollbar-gutter: stable;
   padding: 36px clamp(18px, 4vw, 40px);
   /* Papier-Textur: feiner Turbulence-Noise als Overlay über Crème-Grund.
      SVG inline (kein Network-Roundtrip), 160px-Tile wiederholt sich,
