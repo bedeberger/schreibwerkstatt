@@ -6494,6 +6494,28 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 154 abgeschlossen (book_presence fuer Multi-Device-Erkennung).');
   }
 
+  if (version < 155) {
+    // Presence page-scoped: jedes Geraet meldet zusaetzlich die aktuell offene
+    // Seite. So startet der teure 5s-Collab-Poll nur, wenn DIESELBE Seite auf
+    // mehreren eigenen Geraeten offen ist — nicht schon bei irgendeinem
+    // Zweit-Geraet am selben Buch (zwei Geraete auf verschiedenen Seiten haben
+    // keinen Seitenkonflikt). page_id nullable (Geraet kann ohne offene Seite am
+    // Buch sein, z.B. Buch-Overview); ON DELETE SET NULL (Geraet bleibt praesent,
+    // nur seine Seite verschwand).
+    const bpCols = db.pragma('table_info(book_presence)').map(c => c.name);
+    if (!bpCols.includes('page_id')) {
+      db.prepare('ALTER TABLE book_presence ADD COLUMN page_id INTEGER REFERENCES pages(page_id) ON DELETE SET NULL').run();
+    }
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_book_presence_page ON book_presence(page_id, user_email, last_ping_at DESC)').run();
+
+    const fkErrors155 = db.pragma('foreign_key_check');
+    if (fkErrors155.length) {
+      throw new Error(`Migration 155: foreign_key_check meldet ${fkErrors155.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 155').run();
+    logger.info('DB-Migration auf Version 155 abgeschlossen (book_presence.page_id, page-scoped Presence).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

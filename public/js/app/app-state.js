@@ -466,12 +466,13 @@ const collabState = () => ({
   // Eigener Heartbeat: aktiver Edit-Mode pingt den Server alle 30s.
   _presencePingTimer: null,
   _presencePingPageId: null,
-  // Buch-Level-Geraete-Ping (Multi-Device-Erkennung): laeuft immer bei offenem
-  // Buch. _selfDeviceCount = Anzahl eigener aktiver Geraete am Buch (inkl. diesem);
-  // >1 schaltet den vollen Collab-Poll auch fuer Einzel-Owner-Buecher frei.
+  // Geraete-Ping (page-scoped Multi-Device-Erkennung): laeuft immer bei offenem
+  // Buch, meldet die aktuell offene Seite. _selfPageDeviceCount = eigene aktive
+  // Geraete auf DERSELBEN Seite (inkl. diesem); >1 schaltet den vollen
+  // Collab-Poll auch fuer Einzel-Owner-Buecher frei.
   _bookDevicePingTimer: null,
   _bookDevicePingBookId: null,
-  _selfDeviceCount: 1,
+  _selfPageDeviceCount: 0,
   // Soft-Lock-State: eigener gehaltener Lock + fremder Lock auf der offenen
   // Seite (Banner-Quelle). _currentEditLock haelt {expires_at, reason}; ein
   // fremder Lock (foreignEditLock) ist {user_email, user_display_name, ...}.

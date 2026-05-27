@@ -34,7 +34,7 @@ Verbindlicher Aufbau des Alpine-State. Vor jeder UI-Änderung die richtige Ebene
 | `chatsState` | `_checkDoneBeforeChat` |
 | `featuresUsageState` | recentFeatureKeys (Top-3 Quick-Pills), recentPageIds (Palette) |
 | `bookCreateState` | bookCreateName/Busy/Error (Buch-Erstellung-Modal aus Combobox-Footer) |
-| `collabState` | `_collabSince`, `_collabPollTimer`, recentRemoteEdits (Set), collabToast/`_collabToastTimer`, livePresenceByPage, Heartbeat-Timer (`_presencePingTimer`/`_presencePingPageId`), Buch-Geraete-Ping (`_bookDevicePingTimer`/`_bookDevicePingBookId`/`_selfDeviceCount` — Multi-Device-Erkennung), Lock-State (`_currentEditLock`, `_lockHeartbeatTimer`, foreignEditLock) |
+| `collabState` | `_collabSince`, `_collabPollTimer`, recentRemoteEdits (Set), collabToast/`_collabToastTimer`, livePresenceByPage, Heartbeat-Timer (`_presencePingTimer`/`_presencePingPageId`), Geraete-Ping (`_bookDevicePingTimer`/`_bookDevicePingBookId`/`_selfPageDeviceCount` — page-scoped Multi-Device-Erkennung), Lock-State (`_currentEditLock`, `_lockHeartbeatTimer`, foreignEditLock) |
 | `dailyProgressState` | dailyProgressBookId/Stats/IsFinished, `_dailyProgressLoadingBookId` (Header-Donut neben Avatar) |
 | `jobsState` | jobQueueItems, jobQueueExpanded, alleAktualisierenLoading/Status/Progress/Tps/Tok\*/PassMode/LastRun, `_jobQueueTimer`, **jobToast** + `_jobToastTimer` (globaler Job-Done-Toast, Severity ok/err) |
 

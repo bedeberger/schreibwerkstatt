@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 154, 84 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 155, 84 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -98,6 +98,7 @@ erDiagram
 
   user_invites ||--o{ registration_requests : "linked invite"
   pages ||--o{ page_presence         : "online viewers"
+  pages ||--o{ book_presence         : "current page"
   books ||--o{ page_presence         : has
   books ||--o{ book_presence         : "open on devices"
   app_users_devices ||--o{ page_presence : "pinged from"
@@ -861,6 +862,7 @@ erDiagram
     INTEGER book_id      PK,FK "books(book_id) CASCADE"
     TEXT    user_email   PK,FK "app_users(email) CASCADE"
     TEXT    device_id    PK,FK "app_users_devices(device_id) CASCADE"
+    INTEGER page_id      FK    "pages(page_id) SET NULL — aktuell offene Seite (page-scoped)"
     TEXT    last_ping_at "Default now"
   }
   app_users_devices {

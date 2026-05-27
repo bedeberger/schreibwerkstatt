@@ -117,7 +117,7 @@ export const appCollabMethods = {
     }
     const bid = this._bookDevicePingBookId;
     this._bookDevicePingBookId = null;
-    this._selfDeviceCount = 1;
+    this._selfPageDeviceCount = 0;
     if (bid) this._sendBookDeviceLeave(bid);
   },
 
@@ -128,22 +128,31 @@ export const appCollabMethods = {
       const r = await fetch('/content/books/' + bookId + '/device-ping', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ device_id: _getDeviceId() }),
+        body: JSON.stringify({ device_id: _getDeviceId(), page_id: this.currentPage?.id || null }),
       });
       if (r.status === 403) { this._handleBookAccessLost(bookId); return; }
       if (!r.ok) return;
       data = await r.json();
     } catch { return; }
-    this._selfDeviceCount = Number(data?.self_device_count) || 1;
+    this._selfPageDeviceCount = Number(data?.self_page_device_count) || 0;
     this._reconcileFullCollabPoll(bookId);
   },
 
-  // Voller Poll an/aus je nach erkannter Zweit-Partei. `bookSharedFlags` deckt
-  // andere ACL-User ab, `_selfDeviceCount` das eigene Multi-Device.
+  // Beim Seitenwechsel sofort neu pingen, damit die page-scoped Erkennung nicht
+  // bis zum naechsten 40s-Tick wartet. Aufrufer: Seitenwechsel + Edit-Eintritt.
+  _pingDevicePresenceNow() {
+    const bid = this._bookDevicePingBookId;
+    if (bid) this._sendBookDevicePing(bid);
+  },
+
+  // Voller Poll an/aus je nach erkannter Zweit-Partei AUF DERSELBEN SEITE.
+  // `bookSharedFlags` deckt andere ACL-User ab (buchweit), `_selfPageDeviceCount`
+  // das eigene Multi-Device auf der aktuell offenen Seite.
   _reconcileFullCollabPoll(bookId) {
     if (!bookId || String(bookId) !== String(this.selectedBookId)) return;
     const id = String(bookId);
-    const needFull = this.bookSharedFlags[id] === true || this._selfDeviceCount > 1;
+    const needFull = this.bookSharedFlags[id] === true
+      || (this.currentPage?.id && this._selfPageDeviceCount > 1);
     if (needFull) this._ensureFullCollabPoll(id);
     else this._stopFullCollabPoll();
   },
@@ -344,6 +353,10 @@ export const appCollabMethods = {
     }
     this._presencePingPageId = pageId;
     this._sendPresencePing(pageId);
+    // Sofort die page-scoped Erkennung anstossen: meldet diese Seite ans
+    // book_presence und holt den aktuellen Geraete-Zaehler — so erscheint das
+    // Self-Banner gleich bei Edit-Eintritt, nicht erst nach dem 40s-Tick.
+    this._pingDevicePresenceNow();
     if (this._presencePingTimer) clearInterval(this._presencePingTimer);
     this._presencePingTimer = setInterval(() => {
       if (this._presencePingPageId) this._sendPresencePing(this._presencePingPageId);

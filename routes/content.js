@@ -278,21 +278,27 @@ router.delete('/pages/:page_id/presence', jsonBody, async (req, res) => {
   res.json({ ok: true });
 });
 
-// POST /content/books/:book_id/device-ping — Buch-Level-Heartbeat (Buch offen,
-// nicht zwingend Edit-Mode). Bootstrap fuer Multi-Device-Erkennung: Antwort
-// enthaelt `self_device_count` (aktive eigene Geraete am Buch inkl. diesem). Der
-// Client startet daraufhin den vollen Collab-Poll, sobald >1 — so wird das
-// eigene Zweit-Geraet auch bei Einzel-Owner-Buechern sichtbar. Min-Role viewer.
+// POST /content/books/:book_id/device-ping — leichter Geraete-Heartbeat (Buch
+// offen, nicht zwingend Edit-Mode). Bootstrap fuer page-scoped
+// Multi-Device-Erkennung: Body traegt die aktuell offene `page_id` (optional),
+// Antwort enthaelt `self_page_device_count` (aktive eigene Geraete auf DERSELBEN
+// Seite inkl. diesem). Der Client startet den vollen Collab-Poll, sobald >1 — so
+// wird das eigene Zweit-Geraet auf derselben Seite auch bei Einzel-Owner-Buechern
+// sichtbar. Min-Role viewer.
 router.post('/books/:book_id/device-ping', aclParamGuard('viewer'), jsonBody, (req, res) => {
   const email = _userEmail(req);
   if (!email) return res.status(401).json({ error_code: 'NOT_LOGGED_IN' });
   const deviceId = req.body?.device_id;
   if (!_validDeviceId(deviceId)) return res.status(400).json({ error_code: 'INVALID_DEVICE_ID' });
+  // page_id optional. Nur akzeptieren, wenn die Seite zu DIESEM Buch gehoert —
+  // sonst null (verhindert fremde page_id im eigenen Praesenz-Zaehler).
+  let pageId = toIntId(req.body?.page_id);
+  if (pageId && _pageBookId(pageId) !== req.bookId) pageId = null;
   try {
     appUsersDevices.upsertDevice(deviceId, email, req.get('user-agent') || '');
-    bookPresence.ping(req.bookId, email, deviceId);
-    const selfDeviceCount = bookPresence.countSelfDevices(req.bookId, email);
-    res.json({ ok: true, self_device_count: selfDeviceCount });
+    bookPresence.ping(req.bookId, email, deviceId, pageId);
+    const selfPageDeviceCount = pageId ? bookPresence.countSelfDevicesOnPage(pageId, email) : 0;
+    res.json({ ok: true, self_page_device_count: selfPageDeviceCount });
   } catch (e) { return _fail(res, e, 'POST /content/books/:id/device-ping'); }
 });
 

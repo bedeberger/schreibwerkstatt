@@ -582,6 +582,9 @@ document.addEventListener('alpine:init', () => {
       // Kein $watch('tree') — refresh mutiert item.stats und würde sich rekursiv
       // selbst triggern (Alpine-Deep-Reactivity → Browser-Freeze).
       this.$watch('tokEsts', () => this._refreshChapterStats());
+      // Seitenwechsel → page-scoped Presence neu melden (welche Seite dieses
+      // Geraet jetzt offen hat). Steuert, ob der teure Collab-Poll laeuft.
+      this.$watch(() => this.currentPage?.id, () => this._pingDevicePresenceNow?.());
       // Sidebar-Suche: bei jedem (debounced) pageSearch-Write Index auf
       // ersten Treffer und kbd-aktive Page-ID neu setzen.
       this.$watch('pageSearch', () => {
