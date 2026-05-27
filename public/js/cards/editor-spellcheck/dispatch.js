@@ -249,6 +249,21 @@ export function setupSpellcheckDispatch(app) {
     _ensureFormCtl(t);
   }
 
+  // Native Browser-Spellcheck auf LT-verwalteten Form-Feldern unterdruecken,
+  // solange LT aktiv ist — sonst konkurrieren zwei Squiggle-Systeme (v.a.
+  // Mobile mit installiertem Woerterbuch unterstreicht jedes Feld nativ, nicht
+  // klickbar als LT-Popover). LT-Indikator ist das Badge. Analog zu den drei
+  // Editoren (`:spellcheck="!languagetoolEnabled"`). LT aus -> native als
+  // Fallback wieder an.
+  function _setNative(el, on) {
+    try { el.spellcheck = on; } catch {}
+    el.setAttribute('spellcheck', on ? 'true' : 'false');
+  }
+  function _sweepNative() {
+    const on = !_isEnabled();
+    document.querySelectorAll(FORM_FIELD_SEL).forEach((el) => _setNative(el, on));
+  }
+
   function _setupFormObserver() {
     if (formObserver) return;
     formObserver = new MutationObserver((muts) => {
@@ -262,9 +277,18 @@ export function setupSpellcheckDispatch(app) {
         const inner = node.querySelectorAll?.(FORM_FIELD_SEL);
         if (inner && inner.length) inner.forEach((el) => { if (!el.isConnected) _detachFormCtl(el); });
       };
+      // Neu eingehaengte Felder (Tab-Wechsel, x-if-Templates) sofort nativ
+      // entschaerfen — sie werden u.U. nie fokussiert, leuchten auf Mobile aber
+      // trotzdem nativ.
+      const suppressIfNew = (node) => {
+        if (node.nodeType !== 1) return;
+        if (node.matches?.(FORM_FIELD_SEL)) _setNative(node, false);
+        node.querySelectorAll?.(FORM_FIELD_SEL).forEach((el) => _setNative(el, false));
+      };
       for (const m of muts) {
         if (m.type !== 'childList') continue;
         for (const node of m.removedNodes) detachIfGone(node);
+        for (const node of m.addedNodes) suppressIfNew(node);
       }
     });
     formObserver.observe(document.body, { childList: true, subtree: true });
@@ -278,6 +302,7 @@ export function setupSpellcheckDispatch(app) {
     if (_isEnabled()) {
       _setupFormObserver();
       document.addEventListener('focusin', _onFocusIn, true);
+      _sweepNative();
       // Schon-fokussiertes Feld einmalig nachziehen.
       const active = document.activeElement;
       if (active && active.matches?.(FORM_FIELD_SEL)) _ensureFormCtl(active);
@@ -285,6 +310,7 @@ export function setupSpellcheckDispatch(app) {
       document.removeEventListener('focusin', _onFocusIn, true);
       _detachAllForms();
       _teardownFormObserver();
+      _sweepNative();
     }
   }
 
