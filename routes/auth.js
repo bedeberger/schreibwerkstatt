@@ -5,6 +5,7 @@ const logger = require('../logger');
 const appUsers = require('../db/app-users');
 const rateLimit = require('../lib/admin-login-ratelimit');
 const appSettings = require('../lib/app-settings');
+const avatarCache = require('../lib/avatar-cache');
 const { tServer } = require('../lib/i18n-server');
 
 const router = express.Router();
@@ -433,6 +434,29 @@ router.get('/auth/logout', (req, res) => {
 </main>`,
     }));
   });
+});
+
+// GET /auth/avatar → Same-Origin-Proxy für das Google-Profilbild des
+// eingeloggten Users. Browser-Tracking-Prevention blockiert den Direktzugriff
+// auf lh3.googleusercontent.com (v.a. in Firmennetzen); der Server holt das
+// Bild selbst und cached es. Liefert 404 ohne Session/Bild → Frontend fällt
+// im `@error`-Handler auf die Initialen-Bubble zurück.
+router.get('/auth/avatar', async (req, res) => {
+  const url = req.session?.user?.picture;
+  if (!url || !avatarCache.isAllowedAvatarUrl(url)) {
+    return res.status(404).end();
+  }
+  try {
+    const { buffer, contentType } = await avatarCache.getAvatar(url);
+    // private: nur Browser-Cache, keine Shared-Caches (Bild ist user-spezifisch).
+    // Der `?v=`-Hash in der /config-URL bricht den Cache, wenn Google rotiert.
+    res.set('Cache-Control', 'private, max-age=86400');
+    res.set('Content-Type', contentType);
+    res.send(buffer);
+  } catch (err) {
+    logger.warn('Avatar-Proxy fehlgeschlagen: ' + err.message, { user: req.session?.user?.email });
+    res.status(404).end();
+  }
 });
 
 module.exports = router;

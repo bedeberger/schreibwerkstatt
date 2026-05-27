@@ -1,5 +1,7 @@
+const crypto = require('crypto');
 const express = require('express');
 const logger = require('../logger');
+const avatarCache = require('../lib/avatar-cache');
 const { MAX_TOKENS_OUT, CHARS_PER_TOKEN } = require('../lib/ai');
 const { getBookLocale } = require('../db/schema');
 const appUsers = require('../db/app-users');
@@ -16,8 +18,18 @@ router.get('/config', (req, res) => {
   let userSettings = null;
   if (sessionUser) {
     const appUser = appUsers.getUser(sessionUser.email);
+    // Google-Profilbild über den Same-Origin-Proxy (/auth/avatar) ausliefern,
+    // damit Browser-Tracking-Prevention den Direktzugriff auf
+    // googleusercontent.com nicht blockt. `?v=` bricht den Browser-Cache, wenn
+    // Google die Avatar-URL rotiert (avatarCache liest die echte URL aus der Session).
+    let picture = sessionUser.picture || null;
+    if (avatarCache.isAllowedAvatarUrl(picture)) {
+      const v = crypto.createHash('sha1').update(picture).digest('hex').slice(0, 8);
+      picture = `/auth/avatar?v=${v}`;
+    }
     user = {
       ...sessionUser,
+      picture,
       role: appUser?.global_role || 'user',
       status: appUser?.status || 'active',
       can_invite_users: appUser?.can_invite_users ? 1 : 0,

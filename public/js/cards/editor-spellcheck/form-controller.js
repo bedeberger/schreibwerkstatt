@@ -430,7 +430,19 @@ export function createFormFieldSpellcheck({
     ignored.clear();
   }
 
-  function refresh() { _scheduleCheck(); }
+  function refresh() {
+    // Externe Wertaenderung (z.B. Seitenwechsel rebindet das Titel-Feld via
+    // :value, ohne input-Event): das Badge zeigt sonst weiter den Match-Count
+    // der vorherigen Seite. Stale-State sofort verwerfen, damit der Indikator
+    // nicht haengen bleibt — danach debounced neu pruefen.
+    if (attached && (el.value || '') !== lastValueSnapshot) {
+      matches = [];
+      ignored.clear();
+      _closePopover();
+      _updateBadge((el.value || '').trim() ? 'loading' : 'idle');
+    }
+    _scheduleCheck();
+  }
 
   return { attach, detach, refresh, isAttached: () => attached, getElement: () => el };
 }

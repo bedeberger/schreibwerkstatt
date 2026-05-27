@@ -247,6 +247,7 @@
       @keydown.ctrl.enter.window="if (showEditorCard && !checkLoading && !focusActive) runCheck()"
       @keydown.ctrl.s.prevent.window="if (editMode) quickSave()"
       @keydown.meta.s.prevent.window="if (editMode) quickSave()"
+      @keydown.capture.window="handleBossKey($event)"
       @keydown.window="handleShortcutsHotkey($event); handleFocusHotkey($event); handleNavHotkey($event); handleFindingsHotkey($event); handleTreeKeydown($event); handleSynonymHotkey($event)"
       @app-update-available.window="updateAvailable = true">
 
@@ -255,6 +256,12 @@
 
 <!-- HubSpot-Sync-Card: headless State-Anker, via $hubspot-Magic erreichbar. -->
 <div x-data="hubspotSyncCard" class="display-contents"></div>
+
+<!-- Chef-Taste (Boss-Key): schwarzer Privacy-Vorhang. F9 im Seiten-Editor blendet ein
+     (handleBossKey), beliebige Taste oder Klick blendet wieder aus. -->
+<div class="boss-screen" x-show="bossScreenActive" x-cloak
+     @click.prevent.stop="bossScreenActive = false"
+     aria-hidden="true"></div>
 
 <a class="skip-link" href="#main-content" x-text="t('a11y.skipToMain')"></a>
 

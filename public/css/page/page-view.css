@@ -130,13 +130,19 @@
   font: inherit;
   width: 1em;
   height: 1em;
-  margin-top: 0.35em;
+  /* Auf die erste Textzeile zentrieren: halbe Differenz zwischen Zeilenhöhe
+     (1lh = line-height × font-size) und Box-Höhe (1em). Skaliert mit der
+     Reading-Font-Size statt Magic-Offset, bleibt über die ganze Seitenbreite
+     bündig — auch bei umbrechendem mehrzeiligem Text. */
+  margin-top: calc((1lh - 1em) / 2);
+  accent-color: var(--color-primary);
   cursor: pointer;
   flex: 0 0 auto;
 }
 .page-content-view ul.todo > li.todo-item > .todo-text {
   flex: 1 1 auto;
   min-width: 0;
+  line-height: 1.5;
 }
 .page-content-view ul.todo > li.todo-item > input[type="checkbox"]:checked + .todo-text {
   text-decoration: line-through;

@@ -236,4 +236,28 @@ export const shortcutsMethods = {
       }
     }
   },
+
+  // ── Chef-Taste (Boss-Key) ──────────────────────────────────────────────
+  // F9 im Seiten-Editor (Notebook-Edit-Modus oder Fokus-Modus) schwärzt sofort
+  // den ganzen Bildschirm. Ist der Vorhang an, blendet jede beliebige Taste
+  // ihn wieder aus — der Tastendruck wird dabei geschluckt (kein Tippen ins
+  // Dokument, kein Auslösen anderer Hotkeys). Läuft als Capture-Listener
+  // (siehe index.html `@keydown.capture.window`), damit es vor der regulären
+  // Hotkey-Kette greift und sie via stopImmediatePropagation abklemmen kann.
+  handleBossKey(event) {
+    if (this.bossScreenActive) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      this.bossScreenActive = false;
+      return;
+    }
+    const plainF9 = event.key === 'F9'
+      && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey;
+    if (!plainF9) return;
+    // Nur im Seiten-Editor: editMode deckt Notebook-Edit ab; im Fokus-Modus ist
+    // editMode ebenfalls true (Focus läuft auf der Notebook-Save-Pipeline).
+    if (!this.editMode) return;
+    event.preventDefault();
+    this.bossScreenActive = true;
+  },
 };

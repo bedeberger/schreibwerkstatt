@@ -1,4 +1,17 @@
 @layer components {
+/* === Chef-Taste (Boss-Key): schwarzer Privacy-Vorhang ===
+   F9 im Seiten-Editor (Notebook/Focus) blendet diesen Vollbild-Vorhang ein;
+   beliebige Taste (handleBossKey) oder Klick blendet ihn wieder aus. Liegt
+   per --z-boss-screen über allem (Toast/Modal/Banner inklusive). Reines
+   Schwarz, kein Inhalt — maximal unauffällig. */
+.boss-screen {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-boss-screen);
+  background: #000;
+  cursor: none;
+}
+
 /* === Layout === */
 .dev-banner {
   display: inline-block;

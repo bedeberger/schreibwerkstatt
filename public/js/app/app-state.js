@@ -25,6 +25,10 @@ const shellState = () => ({
   serverOffline: false,
   isOffline: false,
   updateAvailable: false,
+  // Chef-Taste (Boss-Key): true blendet einen schwarzen Vollbild-Vorhang über
+  // allem ein. F9 im Seiten-Editor (Notebook/Focus) schaltet ein, beliebige
+  // Taste oder Klick wieder aus. Logik in editor/shortcuts.js#handleBossKey.
+  bossScreenActive: false,
   themePref: 'auto',
   focusGranularity: 'paragraph',
   uiLocale: '',

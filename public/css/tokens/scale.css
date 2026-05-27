@@ -11,5 +11,6 @@
   --z-modal:       9500;  /* Confirm-Dialog Overlay */
   --z-banner:      10000; /* Session-Banner, Dev-Banner (oben fixed) */
   --z-modal-front: 11000; /* Confirm-Dialog Panel (über Banner/Palette) */
-  --z-toast:       12000; /* höchster sichtbarer Layer */
+  --z-toast:       12000; /* höchster regulärer Layer */
+  --z-boss-screen: 13000; /* Chef-Taste: schwarzer Privacy-Vorhang über allem */
 }

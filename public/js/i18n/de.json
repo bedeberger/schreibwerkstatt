@@ -1460,6 +1460,7 @@
   "shortcuts.section.mindmap":   "Mindmap (Figuren-Werkstatt)",
   "shortcuts.item.help":         "Diese Übersicht öffnen/schliessen",
   "shortcuts.item.escape":       "Offene Dialoge, Menüs und Picker schliessen",
+  "shortcuts.item.bossScreen":   "Chef-Taste: Bildschirm sofort schwärzen (im Editor); beliebige Taste/Klick blendet wieder ein",
   "shortcuts.item.runCheck":     "Lektorat starten (wenn Editor offen)",
   "shortcuts.item.saveEdit":     "Seite speichern (im Bearbeiten-Modus)",
   "shortcuts.item.bold":         "Fett (im Bearbeiten- und Fokus-Modus)",

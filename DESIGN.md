@@ -51,6 +51,7 @@ Token-Referenz (Farben, Radien, Spacing, Schriftgrössen): [public/css/tokens.cs
 - [Editor](#editor) — Findings, Page-View, Focus, Edit-Bubble, Find-Replace, Lookup
 
 **Overlays**
+- [Chef-Taste / Boss-Key (`.boss-screen`)](#chef-taste--boss-key-boss-screen)
 - [Confirm-Dialog](#confirm-dialog-modal)
 - [Modal-Wrapper](#modal-wrapper-generisches-pattern) — Status: noch nicht konsolidiert
 - [Sofort-Tooltip (`data-tip`)](#sofort-tooltip-data-tip--default-variante)
@@ -120,7 +121,7 @@ Wiederkehrende Werte gehen über Tokens. Ad-hoc-Werte (`box-shadow: 0 4px 12px .
 | **Border-Width** | `--border-thin` (0.5px), `--border` (1px), `--border-thick` (2px) | Trenner / Standard-Rand / Akzentband. |
 | **Radius** | `--radius-sm` (0, hart — Badges/Tags/Pills), `--radius-md` (2px — Cards, Inputs, Buttons), `--radius-lg` (4px — Modal, Drawer, Tooltip, Confirm-Dialog) | Editorial-Eckig bleibt Leitmotiv (Listen-Elemente hart auf 0), grössere Flächen leicht weichgespült. Nicht zu ad-hoc Pixel-Radius greifen. |
 | **Text-Farben** | `--color-text`, `--color-muted`, `--color-subtle`, `--color-faint` | Vier Stufen vom prägnantesten zum dezentesten — Body / sekundär / tertiär / fast unsichtbar. Inverse für dauerhaft dunkle Flächen: `--color-text-inverse`, `--color-text-inverse-muted`. |
-| **Z-Index** | `--z-base` (1), `--z-sticky` (100), `--z-header` (200), `--z-popover` (1000), `--z-toolbar` (1100), `--z-overlay` (2000), `--z-banner` (10000), `--z-modal` (9500), `--z-modal-front` (11000), `--z-toast` (12000) | Stapel-Reihenfolge — siehe Section „Z-Index-Stack" unten. |
+| **Z-Index** | `--z-base` (1), `--z-sticky` (100), `--z-header` (200), `--z-popover` (1000), `--z-toolbar` (1100), `--z-overlay` (2000), `--z-banner` (10000), `--z-modal` (9500), `--z-modal-front` (11000), `--z-toast` (12000), `--z-boss-screen` (13000) | Stapel-Reihenfolge — siehe Section „Z-Index-Stack" unten. |
 
 ---
 
@@ -1459,6 +1460,23 @@ Kein eigenes `@media print {}` pro Karte einführen — der Aufwand für saubere
 
 ---
 
+## Chef-Taste / Boss-Key (`.boss-screen`)
+
+**Use:** Ein-Tasten-Privacy-Vorhang. Im Seiten-Editor (Notebook-Edit-Modus oder Fokus-Modus) blendet `F9` sofort einen reinschwarzen Vollbild-Vorhang über die gesamte App; beliebige Taste oder Klick blendet ihn wieder aus. Reines Schwarz, kein Inhalt, `cursor: none` — maximal unauffällig.
+
+**Markup** (Top-Level in [public/index.html](public/index.html), Geschwister der Session-Banner):
+```html
+<div class="boss-screen" x-show="bossScreenActive" x-cloak
+     @click.prevent.stop="bossScreenActive = false"
+     aria-hidden="true"></div>
+```
+
+**CSS** ([public/css/layout/layout-base.css](public/css/layout/layout-base.css)): `position: fixed; inset: 0; z-index: var(--z-boss-screen)` (13000 — über allem inkl. Toast/Modal/Banner), `background: #000`, `cursor: none`.
+
+**Logik:** State-Flag `bossScreenActive` in `shellState` ([app-state.js](public/js/app/app-state.js)). Trigger + Dismiss in `handleBossKey` ([editor/shortcuts.js](public/js/editor/shortcuts.js)), via Capture-Listener `@keydown.capture.window` am `<body>` — läuft vor der regulären Hotkey-Kette und schluckt bei aktivem Vorhang jeden Tastendruck (`stopImmediatePropagation`), damit nichts ins Dokument getippt wird. Gate: `this.editMode` (Notebook-Edit; Fokus-Modus hat editMode ebenfalls true).
+
+---
+
 ## Z-Index-Stack
 
 **Pflicht-Tokens** ([public/css/tokens.css](public/css/tokens.css)). Hartcoded `z-index: 9999` o.ä. nur, wenn der Layer wirklich neu ist — dann Token ergänzen, nicht ad-hoc setzen.
@@ -1475,6 +1493,7 @@ Kein eigenes `@media print {}` pro Karte einführen — der Aufwand für saubere
 | `--z-modal` | 9500 | Confirm-Dialog Overlay-Backdrop |
 | `--z-modal-front` | 11000 | Confirm-Dialog Panel — über Banner und Palette, weil Dialog aus jedem Kontext getriggert werden kann |
 | `--z-toast` | 12000 | Reserviert für künftige Toasts/Snackbars (siehe Section „Toast/Snackbar") |
+| `--z-boss-screen` | 13000 | Chef-Taste-Privacy-Vorhang (`.boss-screen`) — muss alles inkl. Toast/Modal/Banner verdecken |
 
 **Regeln:**
 - Stapel-Verletzung (Layer X muss über Layer Y liegen, ist aber numerisch darunter) → Token-Tabelle hier korrigieren, nicht lokal patchen.

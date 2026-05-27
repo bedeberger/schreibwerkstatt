@@ -88,6 +88,12 @@ export function createSpellcheckController({
   let abortCtrl = null;
   let seq = 0;
   let lastHtmlSnapshot = '';
+  // Plain-Text-Stream des zuletzt erfolgreich gerenderten Checks. Ein
+  // `input`-Event, das keinen Text-Node aendert (z.B. Todo-Checkbox an/aus),
+  // wuerde sonst einen Re-Check ausloesen, der die Highlights neu registriert
+  // -> sichtbares Flackern. Bei identischem Text wird der Check uebersprungen;
+  // explizite Rechecks (force) umgehen den Vergleich.
+  let lastCheckedText = null;
 
   function _matchId(m) {
     // LT liefert keine stabile ID -> aus offset+length+ruleId zusammenbauen.
@@ -224,24 +230,34 @@ export function createSpellcheckController({
     popoverAnchorRange = null;
   }
 
-  function _scheduleCheck() {
+  function _scheduleCheck(opts) {
     if (!attached) return;
     if (debounceTimer) clearTimeout(debounceTimer);
+    const force = opts === true || !!(opts && opts.force === true);
     const ms = Number(getDebounceMs?.()) || DEFAULT_DEBOUNCE_MS;
-    debounceTimer = setTimeout(() => _runCheck(), ms);
+    debounceTimer = setTimeout(() => _runCheck({ force }), ms);
   }
 
-  async function _runCheck() {
+  async function _runCheck(opts) {
     if (!attached || extensionDetected) return;
     if (!isEnabled()) return;
+
+    const force = opts === true || !!(opts && opts.force === true);
+    const table = buildOffsetTable(root);
+    // Text unveraendert seit letztem gerenderten Check -> kein Netz-Roundtrip,
+    // kein Highlight-Re-Register (Flacker-Quelle). Bestehende Squiggles bleiben
+    // gueltig (keine Text-Node-Mutation). Force-Pfade (Wörterbuch, Quote-Norm,
+    // Extension-cleared, manuelles refresh) pruefen trotzdem.
+    if (!force && lastCheckedText !== null && table.text === lastCheckedText) return;
+
     if (abortCtrl) abortCtrl.abort();
     abortCtrl = new AbortController();
 
     const myReq = ++seq;
-    const table = buildOffsetTable(root);
     if (!table.text.trim()) {
       _renderMatches([]);
       _updateBadge('clean');
+      lastCheckedText = table.text;
       return;
     }
     lastHtmlSnapshot = getHtml ? getHtml() : root.innerHTML;
@@ -271,6 +287,7 @@ export function createSpellcheckController({
       if (currentSnap !== lastHtmlSnapshot) return; // DOM mutated mid-flight
       const matches = Array.isArray(json.matches) ? json.matches : [];
       _renderMatches(matches, table);
+      lastCheckedText = table.text;
       const visibleCount = matches.filter((m) => !ignored.has(_matchId(m))).length;
       _updateBadge(visibleCount ? 'matches' : 'clean', { count: visibleCount });
     } catch (err) {
@@ -344,6 +361,22 @@ export function createSpellcheckController({
       }
     } catch { /* selection not settable, popover öffnet trotzdem */ }
     _openPopover(id);
+  }
+
+  // Native Anker-Navigation (und sonstige Default-Click-Aktion) feuert auf dem
+  // `click`-Event, nicht auf mousedown — `_onRootMousedown`'s preventDefault
+  // verhindert sie also nicht. Sitzt der Squiggle innerhalb eines <a href>,
+  // wuerde der Link beim Klick gefolgt statt das Popover geoeffnet. Darum
+  // unterdruecken wir den Folge-Click geometrisch am selben Punkt.
+  function _onRootClick(ev) {
+    if (ev.button !== 0) return;
+    if (popover && popover.contains(ev.target)) return;
+    if (ev.detail >= 2) return;
+    if (!squiggles.size) return;
+    if (_findMatchAtPoint(ev.clientX, ev.clientY)) {
+      ev.preventDefault();
+      ev.stopPropagation();
+    }
   }
 
   function _openPopover(matchId) {
@@ -448,7 +481,7 @@ export function createSpellcheckController({
                 squiggles.delete(matchId);
               }
               _closePopover();
-              _scheduleCheck();
+              _scheduleCheck({ force: true }); // Text unveraendert, Dictionary aber geaendert
             } else {
               dictBtn.disabled = false;
             }
@@ -531,12 +564,19 @@ export function createSpellcheckController({
     const hostRect = host.getBoundingClientRect();
     const padding = 8;
     const pr = el.getBoundingClientRect();
-    // Vertical: clamp/flip gegen Viewport.
+    // Vertical: clamp/flip gegen den SICHTBAREN Host-Bereich, nicht gegen das
+    // Window. Der Notebook-Scroller hat max-height:70vh + overflow-y:auto; sein
+    // sichtbarer Boden liegt darum meist deutlich oberhalb von innerHeight.
+    // Ein nach unten platziertes Popover an den letzten Zeilen passt zwar ins
+    // Window, ragt aber unter den Scroller-Sichtbereich — overflow:auto clippt
+    // es weg ("verrutscht ganz unten", v.a. Edge). Schnittmenge Host∩Window.
+    const visTop = Math.max(hostRect.top, 0);
+    const visBottom = Math.min(hostRect.bottom, window.innerHeight);
     let viewportTop = anchorRect.bottom + 4;
-    if (viewportTop + pr.height + padding > window.innerHeight) {
+    if (viewportTop + pr.height + padding > visBottom) {
       viewportTop = anchorRect.top - pr.height - 4;
     }
-    if (viewportTop < padding) viewportTop = padding;
+    if (viewportTop < visTop + padding) viewportTop = visTop + padding;
     // Horizontal: clamp gegen Host-Sichtbereich (Popover bleibt im Scroll-Slot).
     let viewportLeft = anchorRect.left;
     const hostRight = hostRect.left + host.clientWidth;
@@ -621,7 +661,9 @@ export function createSpellcheckController({
     } else if (!present && extensionDetected) {
       extensionDetected = false;
       window.dispatchEvent(new CustomEvent('languagetool:extension-cleared'));
-      _scheduleCheck();
+      // Highlights wurden bei Detect geleert -> Re-Check erzwingen, auch wenn
+      // der Text seit dem letzten Render unveraendert ist.
+      _scheduleCheck({ force: true });
     }
   }
 
@@ -667,6 +709,7 @@ export function createSpellcheckController({
     mutationObs.observe(root, { childList: true, subtree: true, characterData: true });
     root.addEventListener('input', _scheduleCheck);
     root.addEventListener('mousedown', _onRootMousedown, true);
+    root.addEventListener('click', _onRootClick, true);
 
     if (typeof ResizeObserver !== 'undefined') {
       // Resize verschiebt Anker — Popover neu positionieren + Badge an Ecke
@@ -689,8 +732,9 @@ export function createSpellcheckController({
     });
     _updateExtensionState();
 
-    // Sofort-Check beim Attach.
-    _runCheck();
+    // Sofort-Check beim Attach (force: lastCheckedText ist noch leer, aber
+    // explizit, falls der Controller je wiederverwendet wuerde).
+    _runCheck({ force: true });
   }
 
   function detach() {
@@ -704,15 +748,17 @@ export function createSpellcheckController({
     if (extensionObs) { extensionObs.disconnect(); extensionObs = null; }
     root.removeEventListener('input', _scheduleCheck);
     root.removeEventListener('mousedown', _onRootMousedown, true);
+    root.removeEventListener('click', _onRootClick, true);
     scrollEl = null;
     _closePopover();
     _clearHighlights();
     squiggles.clear();
+    lastCheckedText = null;
     _removeBadge();
   }
 
   function refresh() {
-    _scheduleCheck();
+    _scheduleCheck({ force: true });
   }
 
   function _findScrollParent(el) {
