@@ -26,10 +26,6 @@ const hubspotSpec = {
     refresh: ['hubspot-import'],
     reconcile: 'hubspot-reconcile',
   },
-  // Auto-Drift-Check beim Buch-Open, max. 1×/Stunde pro Buch (localStorage-
-  // Throttle in sync-core). Faengt drueben geloeschte Blogs/Posts ab — Links
-  // mit 404 fliegen raus, Badge flippt auf 'new'.
-  autoReconcileHours: 1,
   computeStatus(page, link) {
     if (!link) return 'new';
     const baseline = _syncBaseline(link);
