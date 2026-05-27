@@ -17,6 +17,8 @@
 // `stripLektoratMarks` gelaufen ist. Kein externer/user-fremder String
 // landet hier.
 
+import { normalizeEditorBlocks } from '../shared/html-clean.js';
+
 const HISTORY_DEBOUNCE_MS = 500;
 const HISTORY_MAX = 100;
 
@@ -155,6 +157,19 @@ export const notebookHistoryMethods = {
     this._undoApplying = true;
     try {
       el.innerHTML = snap.html || '';
+      // Block-Konsistenz wahren: ein Snapshot kann einen transienten
+      // contenteditable-Zwischenstand eingefangen haben (orphan Text-/Inline-
+      // Runs direkt unter dem Editor-Root, leerer <p> ohne Caret-Slot). Ohne
+      // Re-Normalisierung reproduziert das Restore den Defekt → der <p>-Block
+      // ist nach Undo/Redo korrumpiert. Spiegelt die startEdit-Pipeline:
+      // normalizeEditorBlocks (orphan-Runs in <p> wrappen) + Caret-Slot-<br>.
+      // Text-Offsets bleiben gültig (Wrapping ändert keine Textinhalte, <br>
+      // ist kein Text) → Caret-Restore danach.
+      normalizeEditorBlocks(el);
+      const lastBlock = el.lastElementChild;
+      if (lastBlock && lastBlock.tagName === 'P' && !lastBlock.hasChildNodes()) {
+        lastBlock.appendChild((el.ownerDocument || document).createElement('br'));
+      }
       restoreCaretAtOffset(el, snap.caretOffset);
       el.focus?.();
       const app = window.__app;

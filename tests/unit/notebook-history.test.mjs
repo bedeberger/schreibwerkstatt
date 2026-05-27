@@ -132,6 +132,31 @@ test('Undo no-op bei focusActive (Notebook-only)', () => {
   assert.equal(el.innerHTML, '<p>v2</p>', 'Focus-Modus kapselt Notebook-Undo aus');
 });
 
+test('Undo normalisiert orphan-Text-Snapshot in <p> (Block-Konsistenz)', () => {
+  // Reproduziert den Korruptions-Fall: ein Snapshot fängt einen transienten
+  // contenteditable-Stand ohne <p>-Wrapper ein (z.B. nach Select-all+Tippen).
+  // Restore muss den Block normalisieren statt orphan-Text zu reinstanzieren.
+  const { ctx, el } = makeCtx();
+  ctx._historyReset(el.innerHTML);
+  setHtml(el, 'orphan ohne block');
+  ctx._historyPushNow();
+  setHtml(el, '<p>danach</p>');
+  ctx._historyPushNow();
+  ctx.notebookUndo();
+  assert.equal(el.innerHTML, '<p>orphan ohne block</p>', 'orphan-Text in <p> gewrapt');
+});
+
+test('Restore ergänzt Caret-Slot <br> in leerem trailing <p>', () => {
+  const { ctx, el } = makeCtx();
+  ctx._historyReset(el.innerHTML);
+  setHtml(el, '<p>text</p><p></p>');
+  ctx._historyPushNow();
+  setHtml(el, '<p>weiter</p>');
+  ctx._historyPushNow();
+  ctx.notebookUndo();
+  assert.equal(el.innerHTML, '<p>text</p><p><br></p>', 'leerer trailing <p> bekommt Caret-Slot');
+});
+
 test('_historyClear setzt idx=-1', () => {
   const { ctx, el } = makeCtx();
   ctx._historyReset(el.innerHTML);

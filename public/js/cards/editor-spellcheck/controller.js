@@ -344,22 +344,14 @@ export function createSpellcheckController({
     if (!squiggles.size) return;
     const id = _findMatchAtPoint(ev.clientX, ev.clientY);
     if (!id) return;
-    ev.preventDefault();
+    // KEIN preventDefault: die native Caret-Platzierung an die Klickposition
+    // soll laufen, damit der User gezielt in eine Stelle des Wortes springen
+    // kann (statt zwangsweise an den Wort-Anfang). Die Ersetzung laeuft ohnehin
+    // ueber entry.range, nicht ueber die Selection — die Caret-Position ist rein
+    // kosmetisch. stopPropagation bleibt (Editor-eigene mousedown-Handler sollen
+    // nicht zusaetzlich feuern); das blockiert die Default-Aktion nicht.
+    // Link-Folgen wird separat auf dem `click`-Event (_onRootClick) unterdrueckt.
     ev.stopPropagation();
-    // Caret an den Match-Anfang setzen (aus der Range, nicht aus dem Klickpunkt
-    // — siehe caret-from-point-Unzuverlaessigkeit oben). Best-Effort; die
-    // Ersetzung selbst laeuft ueber entry.range, nicht ueber die Selection.
-    try {
-      if (typeof root.focus === 'function') root.focus({ preventScroll: true });
-      const sel = root.ownerDocument.getSelection();
-      const entry = squiggles.get(id);
-      if (sel && entry?.range) {
-        const r = entry.range.cloneRange();
-        r.collapse(true);
-        sel.removeAllRanges();
-        sel.addRange(r);
-      }
-    } catch { /* selection not settable, popover öffnet trotzdem */ }
     _openPopover(id);
   }
 
