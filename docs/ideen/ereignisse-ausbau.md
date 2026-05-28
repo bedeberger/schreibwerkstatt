@@ -1,50 +1,32 @@
 # Ereignisse-Ausbau
 
-- **Status:** Ready
-- **Aufwand:** XL (Phasen 1–6; einzeln M–L)
-- **Severity:** medium
+- **Status:** In Progress — Phase 1+2 erledigt (Commit b2580922 + Folge-Detail-Commits), Phase 3–6 offen
+- **Aufwand:** L (Phase 3 niedrige Prio; Phase 4–6 je M–L)
+- **Severity:** low (Grundfunktionalität trägt; offene Phasen sind Komfort/Visualisierung)
 
 ## Context
 
-Die Ereignisse-Karte (Zeitstrahl, [public/partials/ereignisse.html](../../public/partials/ereignisse.html), Daten via `zeitstrahl_events` + `figure_events`) zeigt heute eine lineare Liste, sortiert ausschliesslich nach `parseInt(datum)`. Mehrere Schwächen:
+Die Ereignisse-Karte (Zeitstrahl, [public/partials/ereignisse.html](../../public/partials/ereignisse.html), Daten via `zeitstrahl_events` + `figure_events`) hat mit Phase 1+2 strukturierte Datum-Felder (`datum_year/month/day` plus `datum_ende_*`), Sub-Typen mit Farben/Icons, Spannen-Layout, einen „unbekannt"-Bucket für Fuzzy-Daten und Multi-Kapitel-Goto. Backend-Sortierung in [routes/figures.js](../../routes/figures.js#L?) sortiert deterministisch nach `(datum_year, datum_month, datum_day, sort_order)`; KI liefert die strukturierten Felder direkt im Komplettanalyse-Schema. Storylines-Tabelle ist angelegt (`storylines`, FK SET NULL), aber noch ohne UI.
 
-- **Datum-Parsing droppt Events stumm**: alles ohne führende Jahreszahl (`"Mai 1850"`, `"vor der Reise"`, `"Tag 3"`) fällt aus `parseInt(...)` raus und verschwindet aus der Anzeige.
-- **Nur Punkt-Events**: keine Spannen (Krieg, Reise, Schwangerschaft) — Start+Ende lassen sich nicht abbilden.
-- **`sort_order` in DB existiert, wird in der UI nicht verwendet** — bei mehreren Events im selben Jahr ist die Reihenfolge undefiniert.
-- **Kein Handlungsstrang-Konzept**: Events sind nur Figuren zugeordnet, nicht Plot-Strängen (Haupt-/Nebenplot). Filter nach Strang fehlt.
-- **`typ` nur `persoenlich|extern`** — keine Sub-Kategorien (Geburt/Tod/Wendepunkt/…); Färbung/Icon-Mapping nicht möglich.
+Verbleibende Schwächen:
+
+- **Kein Handlungsstrang-UI**: Schema (`storyline_id` FK SET NULL auf `storylines`) liegt vor; Filter/Edit/Visualisierung fehlt.
 - **Visualisierung flach**: Lineare Liste. Eine Swimlane-Sicht (Figur × Zeit) und ein Plot-Chart (Spannungsbogen) sind etablierte Tools für Autor:innen.
-- **Inline-Edit fehlt**: Events sind nur AI-Output, indirekt über Figuren-Werkstatt editierbar; manuelles Hinzufügen einer Welt-Linie ist nicht vorgesehen.
+- **Inline-Edit fehlt**: Events sind reiner KI-Output, manuelles Hinzufügen einer Welt-Linie ist nicht vorgesehen. **Niedrige Priorität** — manuelle Events bleiben Edge-Case im KI-driven Workflow; `manually_edited`-Flag ist im Schema, Phase 3 entscheidet, wie viel Edit-UI sich lohnt.
 - **Konflikt-Marker isoliert**: Kontinuitäts-Check schreibt Issues; auf dem Zeitstrahl tauchen sie nicht auf.
-- **Multi-Kapitel-Goto greift nur das erste Kapitel** (`gotoStelle(kap, null)` mit `kap = ev.kapitel[0]`).
+- **Legacy-toter-Code in [routes/jobs/komplett/remap.js:81+84](../../routes/jobs/komplett/remap.js#L81): `ev.datum` wird gelesen (existiert seit Phase 1 nicht mehr im KI-Output) → Dedup-Key kollabiert auf `ereignis.toLowerCase()`, Sort ist No-Op (`parseInt(undefined)` → 0). Aufräumen.**
 
-Produkt-Bezug: Ereignis-/Zeitstrahl-Werkzeuge sind ein Kerndifferenzierer gegenüber Standard-Schreibsoftware; aktuelle Karte schöpft das Potenzial nicht aus.
+Produkt-Bezug: Ereignis-/Zeitstrahl-Werkzeuge sind ein Kerndifferenzierer gegenüber Standard-Schreibsoftware; mit Phase 1+2 ist die Basis tragfähig, Phase 4 (Swimlane) hebt das nochmal sichtbar.
 
 ## Scope MVP
 
-MVP = Phasen 1+2 (Datenmodell + Sub-Typen/Spannen). Phasen 3–6 als Folge-Iterationen mit eigenen Akzeptanzkriterien innerhalb dieses Plans, aber jeweils separat shipbar.
+MVP (Phase 1+2) ist erledigt. Verbleibend: Phasen 3–6 als separat shipbare Folge-Iterationen. Reihenfolge nach Wert/Aufwand: **4 vor 5 vor 6 vor 3** (Phase 3 ist niedrig priorisiert, weil manuelle Events im KI-driven Workflow Edge-Case bleiben).
 
-**Phase 1 — Datenmodell + Quick Wins**
-- `zeitstrahl_events` erweitern: `datum_year INT`, `datum_month INT`, `datum_day INT`, `datum_ende_year INT`, `datum_ende_month INT`, `datum_ende_day INT`, `datum_label TEXT` (User-/AI-lesbarer Original-String), `story_tag INT` (relative Story-Zeit), `subtyp TEXT` (Whitelist, siehe Phase 2), `storyline_id INT NULL REFERENCES storylines(id) ON DELETE SET NULL`.
-- Neue Tabelle `storylines (id, book_id FK CASCADE, name TEXT, farbe TEXT, sort_order INT, created_at, updated_at)`, UNIQUE(book_id, name).
-- `figure_events` analog erweitern (Symmetrie zur Pre-Konsolidierungs-Quelle).
-- Backend-Sortierung in `routes/figures.js#GET /zeitstrahl/:book_id`: `ORDER BY COALESCE(datum_year, 9999), COALESCE(datum_month, 99), COALESCE(datum_day, 99), sort_order` (Events ohne Jahr ans Ende, „unbekannt"-Bucket).
-- Datum-Parser-Lib (`lib/datum-parse.js`) extrahiert `{year, month, day}` aus Freitext (Regex-Stufen, ohne KI). `prompts/komplett.js`-Schema fordert die strukturierten Felder bereits vom Modell — Parser ist Fallback für Legacy/manuelle Eingaben.
-- Render-Pfad in `_reloadZeitstrahl()` joint Kapitel/Seite via FK (server-side, neue Spalten `chapter_name`/`page_name` aus JOIN — kein Snapshot in DB).
-- `sort_order` als Tiebreaker im Frontend.
-- `gotoStelle`-Bug: bei Multi-Kapitel-Event Dropdown statt erstes Element.
-
-**Phase 2 — Sub-Typen + Spannen**
-- `subtyp`-Whitelist in `prompt-config.json` pro Sprache: `geburt`, `tod`, `hochzeit`, `reise`, `konflikt`, `wendepunkt`, `entdeckung`, `verlust`, `sieg`, `extern_politisch`, `extern_natur`, `extern_kulturell`, `sonstiges`. Default `sonstiges`.
-- Färbung via `--card-accent`-Variante pro Subtyp (Token in `public/css/tokens/colors.css`, Mapping in `public/css/entities/ereignisse-subtyp.css`).
-- Icon-Mapping über Lucide-Sprite (vgl. [Lucide-Sprite](feedback_lucide_icons.md)).
-- Spannen-Render: `<span class="gz-marker">` wird zu `<div class="gz-span">` mit `min-height` proportional zu Jahr-Differenz (CSS-Custom-Prop `--span-years`).
-- Externe Welt-Events: eigener Layer/Lane oberhalb der Figur-Events (CSS-Grid-Row).
-
-**Phase 3 — Inline-Edit + manueller Anlegen**
+**Phase 3 — Inline-Edit + manueller Anlegen** (niedrige Priorität, evtl. komplett verworfen)
 - Event-CRUD-Modal als `eventEditCard`-Komponente. CRUD-Endpoints: `POST/PUT/DELETE /figures/zeitstrahl/:book_id/events/:id?`.
-- Storyline-CRUD: inline neben Filter-Bar (Combobox + „+ Strang"-Button öffnet Mini-Modal).
+- Storyline-CRUD: inline neben Filter-Bar (Combobox + „+ Strang"-Button öffnet Mini-Modal). Auch ohne Phase 3 vorerst möglich, weil Storyline-Tabelle existiert — KI könnte Strang-Zuordnung selbst übernehmen (siehe Out-of-Scope).
 - Drag-to-reorder bei gleichem Jahr (mutiert `sort_order`). Lib: **SortableJS via `loadSortable()` aus `lazy-libs.js`** — dieselbe Lib wie Buchorganizer ([public/js/book-organizer/dnd.js](../../public/js/book-organizer/dnd.js)). Keine neue Dep.
+- **Entscheidungsfrage** (siehe Offene Fragen): Wie viel Edit-UI lohnt sich, wenn Re-Run der Komplettanalyse die Quelle der Wahrheit bleibt? `manually_edited=1` schützt vor Overwrite, aber der User muss dann zwei Welten pflegen.
 
 **Phase 4 — Swimlane-Visualisierung**
 - Toggle `viewMode: 'liste' | 'swimlane' | 'storyline'` (Tab-Strip in Karten-Header, persisted via `view_prefs`).
@@ -63,112 +45,82 @@ MVP = Phasen 1+2 (Datenmodell + Sub-Typen/Spannen). Phasen 3–6 als Folge-Itera
 
 ## Out-of-Scope
 
-- KI-getriebene automatische Plot-Strang-Erkennung (Phase 3 fordert manuelles Anlegen). Auto-Vorschlag ist eigener Plan.
+- KI-getriebene automatische Plot-Strang-Erkennung (Storyline-Zuordnung im KI-Output). Sobald Phase 4 Swimlane braucht, müsste das eigentlich rein — aktuell aber bewusst raus, weil unklar ist, ob die KI Stränge zuverlässig identifizieren kann. Eigener Plan, falls Phase 4 darauf angewiesen ist.
 - Drei-Achs-Visualisierungen (Zeit × Ort × Figur). Phase 4 bleibt auf zwei Achsen.
 - Cross-Book-Timelines (Saga-übergreifend).
 - Versionierung von Events (Undo-History pro Event).
 
 ## Done when
 
-**MVP (Phase 1+2):**
-- DB-Migration N angewendet, `foreign_key_check` clean, squashed-Schema regeneriert.
-- Events mit Monat/Tag werden korrekt einsortiert; Events ohne Jahr landen sichtbar im „unbekannt"-Bucket statt zu verschwinden.
-- Sub-Typen-Farben sichtbar; Spannen-Events haben sichtbare Höhe proportional zur Dauer.
-- Unit-Test für `lib/datum-parse.js` deckt Legacy-Formate ab.
-- E2E: Ereignisse-Karte rendert ohne Fehler bei Mix aus Punkten/Spannen/unbekannt-Bucket.
-- `gotoStelle`-Multi-Kapitel-Bug behoben (Dropdown statt erstes Element).
-
-**Phase 3:** Event/Storyline-CRUD aus UI nutzbar; manuelle Edits überleben Komplettanalyse-Re-Run (Schutz vor Merge-Overwrite via `manually_edited`-Flag).
+**Phase 3** (optional): Event/Storyline-CRUD aus UI nutzbar; manuelle Edits überleben Komplettanalyse-Re-Run (`manually_edited=1` ist schon im Schema, Code-Pfad in `updateFigurenEvents` schützt bereits per `DELETE … WHERE manually_edited = 0`).
 
 **Phase 4:** Liste/Swimlane/Storyline-Toggle persistiert; > 500 Events ohne UI-Block (Lazy-Render oder Virtualisierung).
 
 **Phase 5:** Konflikt-Badge am Event sichtbar; Klick scrollt zur Kontinuitäts-Karte auf den Issue.
 
-**Phase 6:** Plot-Chart-Tab zeigt Spannungsbogen; manuelle `tension`-Werte überschreiben AI-Default.
+**Phase 6:** Plot-Chart-Tab zeigt Spannungsbogen; manuelle `tension`-Werte überschreiben AI-Default (oder bleibt rein KI-getrieben, siehe Offene Fragen).
+
+**Cleanup** (Mini-Aufgabe, jederzeit): toter `parseInt(ev.datum)`-Sort + `ev.datum`-Dedup-Key in [routes/jobs/komplett/remap.js:81+84](../../routes/jobs/komplett/remap.js#L81) entfernen — `ev.datum` existiert seit Phase 1 nicht mehr im KI-Output, Dedup-Key auf `(year, month, day, ereignis.toLowerCase())` umstellen.
 
 ## Hard-Rule-Audit
 
-- **Editor-Spezifikation**: nicht betroffen (kein Editor).
-- **UI-Patterns aus DESIGN.md**: betroffen (neue Subtyp-Badges, Tab-Strip, Spannen-Balken). Vor Bau: Pattern in DESIGN.md eintragen. Subtyp-Badge nutzt bestehendes Badge-Pattern (eckig, `var(--radius-sm)`). Tab-Strip in DESIGN.md prüfen (existiert für Graph 3 Modi).
-- **Prompts unter `public/js/prompts/`**: betroffen. `prompts/komplett.js` ergänzt strukturierte Datum-Felder + Subtyp-Whitelist im Extraktions-Schema. **`PROMPTS_VERSION` bumpen** (invalidiert chapter/book-extract-cache).
-- **KI-Calls nur via Job-Queue**: Phase 1 hat keinen neuen Job. Phase 3-Anlegen ist sync (CRUD ohne KI). Falls Phase 6 KI-gestützte Tension-Schätzung bekommt, neuer Job-Typ.
-- **`callAI` gibt nur JSON**: betroffen (Komplett-Schema ändert). Schema-Validierung in `phases.js` ergänzen.
-- **Styles nur in `public/css/`**: neue Datei `public/css/entities/ereignisse-subtyp.css`. In `public/index.html` `<link>` ergänzen. `SHELL_CACHE` bumpen.
-- **UI-Strings nur in `i18n/{de,en}.json`**: alle Subtyp-Labels, Tab-Namen, Modal-Texte als Keys.
-- **Content-Store-Facade**: nicht betroffen (Ereignisse sind nicht Page-Content).
-- **Block-IDs**: nicht betroffen.
-- **Page-Stats-Normalisierung**: nicht betroffen.
-- **Job-Ergebnisse mit `updatedAt`**: nicht betroffen (kein positions-basierter Snapshot).
-- **401-Handling**: zentral, nicht betroffen.
-- **Logging-Context `book`**: betroffen — neue CRUD-Routen via `router.param('book_id', bookParamHandler)`.
-- **`x-html` nur mit Escape**: keine neuen `x-html`-Sinks geplant; Subtyp-Label sind statische i18n-Keys.
-- **A11y**: neue klickbare Spans bekommen `.internal-link`-Klasse.
-- **Progress-Bars**: nicht betroffen.
-- **Card-Animationen**: nicht betroffen (bestehende Karte).
-- **`SHELL_CACHE`**: bumpen bei JS/CSS-Änderungen.
-- **`sortableTable`**: Event-Liste in Modal (Phase 3) ggf. via `sortableTable`. Reine Timeline-Karte ist kein Tabellen-Layout.
-- **Combobox statt `<select>`**: Storyline-Filter + Subtyp-Filter via `combobox`. Storyline-CRUD-Modal mit Color-Picker (eigenes Mini-Pattern, dann DESIGN.md).
-- **`numInput` statt `type=number`**: Jahr-/Tension-Felder im Edit-Modal via `numInput` mit `integer: true, grouping: false` (Jahre).
-- **LanguageTool auf Prosa-Feldern**: `ereignis`, `bedeutung`, Storyline-`name` bekommen `data-spellcheck="spelling"`.
-- **File-Limits**: `ereignisse.js` (77 LOC) bleibt klein. Neue Datei `lib/datum-parse.js` < 200 LOC, `public/js/cards/event-edit-card.js` ggf. ab Phase 3.
-- **Memo-Pattern**: `filteredEreignisse()` wird im Template mehrfach evaluiert. Aktuell Helper-Funktion; bei wachsender Komplexität (Subtyp-Filter, Storyline-Filter) auf `_memo`-Pattern umstellen.
-- **State explizit deklariert**: neue Felder (`viewMode`, `selectedStorylineId`, Edit-Modal-State) als Initial-Felder in `ereignisseCard`.
-- **Ein Attribut, eine Deklaration**: einhalten.
-- **CSS: Selektor unique**: einhalten.
-- **Mobile-Strategie**: Swimlane Phase 4 braucht Mobile-Plan (horizontaler Scroll? Kompakt-Modus?).
-- **DB-Timestamps: ISO+Z**: alle neuen `*_at`-Defaults via `(strftime('%Y-%m-%dT%H:%M:%fZ','now'))`; alle INSERT/UPDATE via `${NOW_ISO_SQL}`.
-- **Frontend-Datums-Display: `tzOpts()`**: betroffen, wo Events-Karte `updated_at` zeigt.
+Phase 1+2 wurden gegen die Hard-Rules implementiert; verbleibend für Phasen 3–6:
+
+- **Editor-Spezifikation**: nicht betroffen.
+- **UI-Patterns aus DESIGN.md**: Tab-Strip (Phase 4) prüfen — existiert für Graph 3 Modi. Storyline-Color-Picker als neues Mini-Pattern dokumentieren (Phase 3).
+- **Prompts**: Phase 6 (Tension-Schätzung) ergänzt eigenes Schema — `PROMPTS_VERSION` bumpen. Phase 4 ohne Prompt-Change, ausser Storyline-Auto-Erkennung kommt rein (siehe Out-of-Scope).
+- **KI-Calls nur via Job-Queue**: Phase 3-CRUD ist sync. Phase 6 (Tension) braucht neuen Job-Typ `tension-estimate`.
+- **`callAI` gibt nur JSON**: Phase 6 ergänzt Schema-Validierung.
+- **Styles nur in `public/css/`**: neue Dateien für Swimlane (P4) + Plot-Chart (P6). `SHELL_CACHE` bumpen.
+- **UI-Strings nur in `i18n`**: alle neuen Keys (Tab-Namen, Modal-Texte, Plot-Achsen) in beiden Locales.
+- **Logging-Context `book`**: neue Phase-3-CRUD-Routen via `router.param('book_id', bookParamHandler)`.
+- **A11y**: neue klickbare Spans (Konflikt-Badge P5) bekommen `.internal-link`.
+- **`sortableTable`**: Event-Liste in P3-Modal ggf. via `sortableTable`. Timeline selbst ist kein Tabellen-Layout.
+- **Combobox statt `<select>`**: Storyline-Filter (P3+P4) via `combobox`.
+- **`numInput` statt `type=number`**: Jahr-/Tension-Felder im P3-Edit-Modal mit `integer: true, grouping: false`.
+- **LanguageTool**: `ereignis`, `bedeutung`, Storyline-`name` (P3) bekommen `data-spellcheck="spelling"`.
+- **Memo-Pattern**: `filteredEreignisse()` läuft schon über `_memoFiltered`. Bei weiteren Filtern (Storyline P3) Deps erweitern.
+- **State explizit deklariert**: neue Felder (`viewMode` P4, `selectedStorylineId`, Edit-Modal-State P3) als Initial-Felder in `ereignisseCard`.
+- **Mobile-Strategie**: Swimlane P4 braucht Mobile-Plan (horizontaler Scroll? Kompakt-Modus?).
+- **DB-Timestamps: ISO+Z**: für P5/P6-Migrationen via `(strftime('%Y-%m-%dT%H:%M:%fZ','now'))`.
 
 ## Abhängigkeiten
 
-- **Komplettanalyse-Pipeline**: Phase-1-DB-Schema erfordert Anpassung von `prompts/komplett.js` (Extraktions-Schema) und `routes/jobs/komplett/phases.js` (save-Pfad). `PROMPTS_VERSION` bumpen.
-- **Kontinuitäts-Check** (Phase 5): braucht `continuity_issue_zeitstrahl_event_id`-Spalte + Verknüpfungs-Logik im Job.
-- **Figuren-Werkstatt**: Lebensereignisse-Editor dort muss neue strukturierte Felder annehmen.
+- **Kontinuitäts-Check** (Phase 5): braucht `continuity_issues.zeitstrahl_event_id`-Spalte + Verknüpfungs-Logik im Job.
+- **Figuren-Werkstatt**: Lebensereignisse-Editor dort konsumiert die strukturierten Felder bereits (Phase 1 hat das angepasst); P3-Inline-Edit muss dieselbe Schreib-Pfad-Invariante einhalten (`manually_edited=1` setzen).
 - **Hash-Router**: bei Tab-Wechsel (Phase 4) ggf. URL-Sub-State `#ereignisse/swimlane`.
-- **Cache-Invalidierung**: bei DB-Schema-Change Migration löscht/migriert bestehende `zeitstrahl_events.datum`-Werte via Parser.
+- **Storyline-KI-Zuordnung** (Out-of-Scope-Frage): falls Phase 4 ohne Storylines wertlos wirkt, muss vorher entschieden werden, ob die Strang-Zuordnung in `prompts/komplett.js` ergänzt wird → `PROMPTS_VERSION` bumpen.
 
 ## Backend
 
-**Phase 1**
-- Anpassung `GET /figures/zeitstrahl/:book_id` ([routes/figures.js](../../routes/figures.js)): SELECT um neue Spalten erweitert; JOIN auf `chapters`/`pages` für Live-Namen; ORDER BY neu.
-- `lib/datum-parse.js` (neu): `parseDatum(input: string): { year, month, day, label }` — Regex-Stufen für DE/EN-Monatsnamen, ISO-Form, Nur-Jahr, Story-Tag.
-- Migration N: ALTER `zeitstrahl_events` ADD COLUMN je Feld; ALTER `figure_events` analog; CREATE TABLE `storylines`; CREATE INDEX `idx_zs_storyline ON zeitstrahl_events(storyline_id)`. Pre-Cleanup: aktuelle `datum`-Werte einmalig durch `parseDatum` schleusen + strukturierte Felder befüllen.
-
-**Phase 2** — kein Backend-Change ausser Schema-Whitelist-Validation in `phases.js` (Subtyp-Default bei Unbekannt).
+**Cleanup (jederzeit, klein):** [routes/jobs/komplett/remap.js:81+84](../../routes/jobs/komplett/remap.js#L81) — `ev.datum`-basierter Dedup-Key + `parseInt(ev.datum)`-Sort streichen. `ev.datum` ist seit Phase 1 nicht mehr im KI-Output, beide Stellen sind tot. Dedup-Key auf `(ev.datum_year, ev.datum_month, ev.datum_day, ev.ereignis.toLowerCase())` umstellen. Sortierung dort komplett raus — `updateFigurenEvents` schreibt `sort_order = j` (Schleifen-Index = KI-Reihenfolge), DB-Lesepfad sortiert per ORDER BY auf strukturierten Feldern.
 
 **Phase 3**
-- `POST /figures/zeitstrahl/:book_id/events` — Anlegen.
-- `PUT /figures/zeitstrahl/:book_id/events/:id` — Update; setzt `manually_edited=1`.
+- `POST /figures/zeitstrahl/:book_id/events` — Anlegen, setzt `manually_edited=1`.
+- `PUT /figures/zeitstrahl/:book_id/events/:id` — Update, setzt `manually_edited=1`.
 - `DELETE /figures/zeitstrahl/:book_id/events/:id` — Löschen.
 - `POST /figures/zeitstrahl/:book_id/events/:id/figuren` + `DELETE …/figuren/:figure_id` — M:N-Pflege.
 - Storylines: `GET/POST/PUT/DELETE /books/:book_id/storylines/:id?`.
-- Komplettanalyse-Merge respektiert `manually_edited=1` (überschreibt nicht).
+- Komplettanalyse-Merge respektiert `manually_edited=1` bereits in [db/figures.js](../../db/figures.js#L155) (DELETE-Pfad in `updateFigurenEvents`) und [db/schema.js](../../db/schema.js#L120) (zeitstrahl-events).
 
-**Phase 4** — kein Backend.
+**Phase 4** — kein Backend, ausser KI-Storyline-Zuordnung wird beschlossen (dann Schema-Erweiterung in `prompts/komplett.js`).
 
 **Phase 5**
 - Migration: `continuity_issues` ADD `zeitstrahl_event_id INT REFERENCES zeitstrahl_events(id) ON DELETE SET NULL`.
 - Kontinuitäts-Job: Mapping Issue → Event-ID via Datum+Ereignis-Lookup oder ID-Pass-Through aus Phase 1.
 
-**Phase 6** — Hybrid (AI-Vorschlag + manueller Override):
-- ALTER `zeitstrahl_events` ADD `tension INTEGER NULL`, ADD `tension_ai INTEGER NULL`, ADD `tension_manual INTEGER NULL`. Render-Pfad: `tension = COALESCE(tension_manual, tension_ai)`. Override-Erkennung via `tension_manual IS NOT NULL`.
-- Neuer Job-Typ `tension-estimate` in `routes/jobs/tension-estimate.js`: extrahiert pro Event den Story-Kontext (Page-Texte aus den verknüpften `zeitstrahl_event_pages`) und ruft `callAI` mit Tension-Schema (0–10 INT + Begründung). Speichert in `tension_ai`. `manually_edited`-Flag bleibt unberührt.
-- User-Edit setzt `tension_manual`; UI zeigt Indikator („AI-Vorschlag überschrieben"), Reset-Knopf nullt `tension_manual`.
+**Phase 6** — gemäss „KI-driven, manuell = Edge-Case" eher rein-KI:
+- ALTER `zeitstrahl_events` ADD `tension INTEGER NULL`. Render-Pfad: `tension` direkt aus DB.
+- Neuer Job-Typ `tension-estimate` in `routes/jobs/tension-estimate.js`: extrahiert pro Event den Story-Kontext (Page-Texte aus den verknüpften Kapiteln/Seiten) und ruft `callAI` mit Tension-Schema (0–10 INT + Begründung).
+- Re-Run der Komplettanalyse überschreibt `tension` standardmässig (KI-driven). Wenn manueller Override gebraucht wird, dann analog zu `manually_edited` Pattern (`tension_manual` separat).
+- Manuelles Override-UI ist optional und folgt der Phase-3-Edge-Case-Logik.
 
 ## Frontend
-
-**Phase 1**
-- `public/js/book/ereignisse.js`: `_buildGlobalZeitstrahl()` nutzt strukturierte Felder statt `parseInt`. „Unbekannt"-Bucket sichtbar am Listen-Ende.
-- `public/js/cards/ereignisse-card.js`: `filteredEreignisse()` zusätzlich nach Subtyp/Storyline filterbar. Tiebreaker via `sort_order`. Multi-Kapitel-Goto-Dropdown.
-
-**Phase 2**
-- Neue Subtyp-Combobox in der Filter-Bar.
-- Render-Logik: Spannen-CSS-Klasse + Subtyp-Klasse am `gz-item`.
 
 **Phase 3**
 - Neue Sub-Komponente `eventEditCard` (Modal).
 - Storyline-Mini-Modal (`storylineEditCard`) — Color-Picker + Name.
-- Drag-to-reorder via SortableJS (bereits Dep? sonst lazy).
+- Drag-to-reorder via SortableJS (bereits Dep — siehe `lazy-libs.js#loadSortable()`).
 
 **Phase 4**
 - Tab-Strip in `card-header`; `viewMode` persistiert in LocalStorage (Key `ereignisse.viewMode`), konsistent mit `sortableTable`-Persistenz. Kein DB-Sync.
@@ -183,48 +135,33 @@ MVP = Phasen 1+2 (Datenmodell + Sub-Typen/Spannen). Phasen 3–6 als Folge-Itera
 
 ## CSS
 
-Neue Dateien:
-- `public/css/entities/ereignisse-subtyp.css` — Subtyp-Badge-Farben + Icon-Mapping.
-- `public/css/entities/ereignisse-span.css` — Spannen-Balken-Layout.
-- `public/css/entities/ereignisse-swimlane.css` (Phase 4).
-- `public/css/entities/ereignisse-storyline.css` (Phase 4).
+Verbleibend für Phase 4:
+- `public/css/entities/ereignisse-swimlane.css`.
+- `public/css/entities/ereignisse-storyline.css`.
 
-Token-Erweiterung in `public/css/tokens/colors.css`: pro Subtyp `--card-accent-event-<subtyp>`. Mapping in `public/css/card-accents.css` über Variant-Klasse.
+`SHELL_CACHE` in [public/sw.js](../../public/sw.js) bei jeder JS/CSS-Änderung bumpen.
 
-Mobile-Breakpoints im selben Commit pro Datei (vgl. [Mobile-Breakpoints-Memory](../../public/js/cards/...) — Container-Query bevorzugt).
-
-`SHELL_CACHE` in [public/sw.js](../../public/sw.js) bumpen.
-
-DESIGN.md ergänzen: Subtyp-Badge-Pattern, Tab-Strip-Pattern (falls noch nicht vorhanden), Storyline-Color-Picker.
+DESIGN.md ergänzen (Phase 3+4): Storyline-Color-Picker-Pattern, Tab-Strip-Pattern (prüfen, ob Graph-3-Modi-Pattern wiederverwendbar ist).
 
 ## i18n
 
-Neue Key-Bereiche in beiden Locales (`public/js/i18n/{de,en}.json`):
-- `events.subtyp.<key>` für alle Subtyp-Labels.
-- `events.storyline.title`, `events.storyline.add`, `events.storyline.edit`, `events.storyline.delete`.
-- `events.viewMode.liste`, `events.viewMode.swimlane`, `events.viewMode.storyline`, `events.viewMode.plot`.
-- `events.unknownDate` für „unbekannt"-Bucket.
-- `events.edit.title`, `events.edit.span`, `events.edit.tension`, `events.edit.save`, `events.edit.delete`, etc.
-- `events.conflict.badge`, `events.conflict.openIssue`.
+Phase 1+2-Keys (`events.subtyp.*`, `events.unknownDate`) sind drin. Verbleibend in beiden Locales (`public/js/i18n/{de,en}.json`):
 
-Server-seitig: neue Job-Status-Keys (`job.phase.tensionEstimate` Phase 6).
+- `events.storyline.title`, `events.storyline.add`, `events.storyline.edit`, `events.storyline.delete` (Phase 3).
+- `events.viewMode.liste`, `events.viewMode.swimlane`, `events.viewMode.storyline`, `events.viewMode.plot` (Phase 4).
+- `events.edit.title`, `events.edit.span`, `events.edit.tension`, `events.edit.save`, `events.edit.delete`, … (Phase 3).
+- `events.conflict.badge`, `events.conflict.openIssue` (Phase 5).
+
+Server-seitig: neuer Job-Status-Key `job.phase.tensionEstimate` (Phase 6).
 
 ## DB
 
-Migration N (Phase 1) — Recreate-Pattern für FK-Integrität:
+Migration 156 (Phase 1) ist appliziert: `zeitstrahl_events` + `figure_events` mit `datum_year/month/day`, `datum_ende_*`, `datum_label`, `story_tag`, `subtyp`, `storyline_id` FK SET NULL, `manually_edited`. `storylines`-Tabelle existiert. Indexe gesetzt.
 
-1. `zeitstrahl_events` erweitern via Recreate (neue Spalten + neue FK auf `storylines`):
-   - Spalten: `datum_year, datum_month, datum_day, datum_ende_year, datum_ende_month, datum_ende_day INTEGER NULL`; `datum_label TEXT`; `story_tag INTEGER NULL`; `subtyp TEXT DEFAULT 'sonstiges'`; `storyline_id INTEGER NULL REFERENCES storylines(id) ON DELETE SET NULL`; `manually_edited INTEGER NOT NULL DEFAULT 0`.
-2. `figure_events` analog.
-3. `storylines (id, book_id FK CASCADE, name UNIQUE per book, farbe, sort_order, created_at, updated_at)`.
-4. Daten-Migration: aktuelle `datum`-TEXT-Werte einmalig durch `parseDatum` → strukturierte Felder befüllen. Original-String in `datum_label` mitlaufen. **Zusätzlich Lazy-Fallback** in `routes/figures.js#GET /zeitstrahl/:book_id`: liefert SELECT ein Event mit `datum_label IS NOT NULL AND datum_year IS NULL AND datum_month IS NULL AND datum_day IS NULL AND story_tag IS NULL` (Parser hat in der Migration nichts erkannt), läuft `parseDatum` erneut beim Read — fängt nachträglich verbesserte Parser-Regeln und manuell eingegebene Legacy-Strings (Phase 3 erlaubt Freitext-`datum_label` ohne strukturierte Felder).
-5. Index `idx_zs_storyline ON zeitstrahl_events(storyline_id)`, `idx_zs_year ON zeitstrahl_events(datum_year)`, `idx_fe_storyline ON figure_events(storyline_id)`.
-6. `foreign_key_check` Pflicht-Assert.
-7. `schema_version` hochzählen.
+Verbleibende Migrationen:
 
-Migration N+1 (Phase 5): `continuity_issues` ADD `zeitstrahl_event_id`.
-
-Migration N+2 (Phase 6): `zeitstrahl_events` ADD `tension INTEGER`.
+- **Phase 5:** `continuity_issues` ADD `zeitstrahl_event_id INTEGER REFERENCES zeitstrahl_events(id) ON DELETE SET NULL`.
+- **Phase 6:** `zeitstrahl_events` ADD `tension INTEGER NULL` (optional `tension_manual` für Override-Pattern, siehe Backend Phase 6).
 
 **Pflicht nach Migration**: `npm run squash:regen` + ERD ([docs/erd.md](../erd.md)) aktualisieren (Stand-Zeile, Blocks, FK-Kanten).
 
@@ -253,17 +190,18 @@ Counter (exponiert über `/metrics`):
 
 ## Tests
 
-**Unit**
-- `tests/unit/datum-parse.test.mjs` — Parser-Stufen für DE/EN-Monate, ISO, nur Jahr, Story-Tag, „unbekannt".
+Bereits vorhanden:
+- `tests/unit/datum-parse.test.mjs` — Parser-Stufen.
 - `tests/unit/event-sort.test.mjs` — Sortierung mit strukturierten Feldern, Tiebreaker `sort_order`, „unbekannt"-Bucket ans Ende.
-- `tests/unit/ereignisse-card-filter.test.mjs` — Subtyp-, Storyline-, Figur-, Kapitel-, Seiten-Filter kombiniert.
+- `tests/unit/ereignisse-card-filter.test.mjs` — Subtyp-/Storyline-/Figur-/Kapitel-/Seiten-Filter kombiniert (uncommitted, gemäss git status).
+- `tests/integration/komplett-events-schema.test.js` — Komplettanalyse-Pipeline schreibt strukturierte Felder + Subtyp + Storyline-NULL (uncommitted).
+- `tests/e2e/ereignisse.spec.js` — Karte rendert mit Mix aus Punkt/Span/unbekannt; Filter-Combobox (uncommitted).
 
-**Integration**
-- `tests/integration/komplett-events-schema.test.js` — Komplettanalyse-Pipeline schreibt strukturierte Felder + Subtyp + Storyline-NULL.
-- `tests/integration/event-crud.test.js` (Phase 3) — POST/PUT/DELETE, ACL.
-
-**E2E**
-- `tests/e2e/ereignisse.spec.js` — Karte rendert mit Mix aus Punkt/Span/unbekannt; Filter-Combobox; Modal-Edit (Phase 3); Tab-Wechsel (Phase 4).
+Verbleibend pro Phase:
+- **Phase 3:** `tests/integration/event-crud.test.js` — POST/PUT/DELETE, ACL.
+- **Phase 4:** E2E-Erweiterung um Tab-Wechsel + Swimlane-Render.
+- **Phase 5:** Integration: Kontinuitäts-Job verlinkt korrekt auf `zeitstrahl_event_id`.
+- **Phase 6:** Integration: `tension-estimate`-Job schreibt 0–10-INT.
 
 ## Edge-Cases
 
@@ -278,41 +216,41 @@ Counter (exponiert über `/metrics`):
 
 ## Kritische Dateien
 
+Verbleibend für Phasen 3–6.
+
 **Modify:**
-- [db/migrations.js](../../db/migrations.js)
-- [db/squashed-schema.js](../../db/squashed-schema.js) (via `npm run squash:regen`)
-- [docs/erd.md](../erd.md)
-- [routes/figures.js](../../routes/figures.js)
-- [routes/jobs/komplett/phases.js](../../routes/jobs/komplett/phases.js)
-- [public/js/prompts/komplett.js](../../public/js/prompts/komplett.js) (Schema-Erweiterung + `PROMPTS_VERSION`-Bump in [public/js/prompts/core.js](../../public/js/prompts/core.js))
-- [public/js/book/ereignisse.js](../../public/js/book/ereignisse.js)
-- [public/js/cards/ereignisse-card.js](../../public/js/cards/ereignisse-card.js)
-- [public/partials/ereignisse.html](../../public/partials/ereignisse.html)
-- [public/css/tokens/colors.css](../../public/css/tokens/colors.css)
-- [public/css/card-accents.css](../../public/css/card-accents.css)
-- [public/index.html](../../public/index.html) (neue `<link>`-Tags)
-- [public/sw.js](../../public/sw.js) (SHELL_CACHE)
+- [routes/jobs/komplett/remap.js](../../routes/jobs/komplett/remap.js) (Cleanup tote `datum`-Pfade, jederzeit machbar)
+- [db/migrations.js](../../db/migrations.js) (Phase 5 + 6)
+- [db/squashed-schema.js](../../db/squashed-schema.js) (via `npm run squash:regen` nach jeder neuen Migration)
+- [docs/erd.md](../erd.md) (nach jeder Migration)
+- [routes/figures.js](../../routes/figures.js) (Phase 3 CRUD-Routen)
+- [routes/jobs/komplett/phases.js](../../routes/jobs/komplett/phases.js) (Phase 5: Konflikt-Mapping)
+- [public/js/cards/ereignisse-card.js](../../public/js/cards/ereignisse-card.js) (Phase 4 ViewMode, Phase 5 Konflikt-Badge)
+- [public/partials/ereignisse.html](../../public/partials/ereignisse.html) (Phase 4 Tab-Strip)
+- [public/sw.js](../../public/sw.js) (SHELL_CACHE bei jeder Phase)
 - [public/js/i18n/de.json](../../public/js/i18n/de.json), [public/js/i18n/en.json](../../public/js/i18n/en.json)
-- [DESIGN.md](../../DESIGN.md)
+- [DESIGN.md](../../DESIGN.md) (Tab-Strip + Color-Picker-Pattern, wenn Phase 3/4 startet)
 
 **Create:**
-- `lib/datum-parse.js`
-- `db/storylines.js`
-- `public/css/entities/ereignisse-subtyp.css`
-- `public/css/entities/ereignisse-span.css`
 - `public/css/entities/ereignisse-swimlane.css` (Phase 4)
 - `public/css/entities/ereignisse-storyline.css` (Phase 4)
 - `public/js/cards/event-edit-card.js` (Phase 3)
 - `public/js/cards/storyline-edit-card.js` (Phase 3)
 - `public/js/cards/ereignisse-swimlane.js` (Phase 4)
 - `public/js/cards/ereignisse-plot-chart.js` (Phase 6)
-- `tests/unit/datum-parse.test.mjs`
-- `tests/unit/event-sort.test.mjs`
-- `tests/unit/ereignisse-card-filter.test.mjs`
-- `tests/integration/komplett-events-schema.test.js`
+- `routes/jobs/tension-estimate.js` (Phase 6)
 - `tests/integration/event-crud.test.js` (Phase 3)
-- `tests/e2e/ereignisse.spec.js`
 
 ## Offene Fragen
 
-Keine.
+1. **Sortier-Strategie für Fuzzy-Daten und Ties.** Aktuell sortiert [routes/figures.js](../../routes/figures.js) `ORDER BY datum_year, datum_month, datum_day, sort_order`. Bei NULL-Feldern (`"Frühling 1985"` → year=1985, month=NULL) oder identischen strukturierten Werten greift `sort_order`, gesetzt als Schleifen-Index in `updateFigurenEvents` ([db/figures.js:191](../../db/figures.js#L191)) = KI-Output-Reihenfolge. Optionen:
+   - **Status quo:** Lassen wie es ist; KI-Reihenfolge entscheidet bei Ties. Genug, wenn die KI Events ohnehin grob narrativ/chronologisch ausgibt.
+   - **KI sortiert explizit:** Prompt-Anweisung in [public/js/prompts/komplett.js](../../public/js/prompts/komplett.js) ergänzen: „`lebensereignisse` chronologisch sortieren (frühestes zuerst); bei unscharfen Daten (`Frühling 1985`, `nach dem Krieg`) Position so wählen, wie es im Lebenslauf der Figur stimmig ist." `sort_order` (= Schleifen-Index) reflektiert dann die KI-Chronologie. **Empfehlung**, weil günstig (keine Schema-/Code-Änderung ausser Prompt + `PROMPTS_VERSION`-Bump) und konsistent mit dem „KI-driven, manuell = Edge-Case"-Leitbild.
+   - **Server-Parser für Fuzzy-Monate:** `lib/datum-parse.js` um Heuristik erweitern (`Frühling → month=4`, `Sommer → month=7`, …). Riskant bei Genre-/Sprach-Drift; ergänzt sich aber mit Option B.
+   - **Separates Schema-Feld (`datum_sort_iso`):** Über-Engineering, wenn manuelle Edits selten sind.
+
+2. **Phase 3 ganz verwerfen?** Im KI-driven Workflow ist die zentrale Frage: Welche Mehrwerte hat ein Inline-Edit über der nächsten Komplettanalyse? Vorschlag — Phase 3 zurückstellen bis ein konkreter User-Pain-Point auftaucht („KI bekommt Event X partout nicht richtig hin"). Wenn Phase 3 nur Storyline-Pflege braucht, reicht ein minimales Storyline-CRUD ohne Event-Edit.
+
+3. **Storyline-Quelle.** Phase 4 (Swimlane/Storyline-View) ist ohne befüllte Storylines wertlos. Entweder Phase 3 priorisieren (manuelle Anlage) **oder** die KI in Phase 1+2 erweitern, sodass sie Stränge selbst identifiziert + zuordnet (Out-of-Scope-Punkt aufheben). Letzteres passt zum KI-driven Leitbild, ist aber unsicher in der Trefferquote.
+
+4. **Tension-Override-Pattern in Phase 6.** Falls Phase 6 kommt: rein KI-getrieben (`tension` direkt) oder Hybrid (`tension_ai` + `tension_manual` mit `COALESCE`)? Gemäss Leitbild eher KI-only; Hybrid nur, wenn Phase 3 ohnehin Edit-UI bekommt.
