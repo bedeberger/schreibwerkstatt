@@ -181,7 +181,7 @@
   "chat.changeSaved":            "Änderung gespeichert.",
   "chat.saveFailedPrefix":       "Fehler beim Speichern: ",
   "common.asOf":                 "Stand: {date}",
-  "common.noDataYet":            "Noch keine Daten vorhanden. Bitte auf «Alle aktualisieren» klicken.",
+  "common.noDataYet":            "Noch keine Daten vorhanden. Bitte auf «Buch analysieren» klicken.",
 
   "filter.figur":                "Figur…",
   "filter.allFiguren":           "Alle Figuren",
@@ -1107,7 +1107,7 @@
   "graph.fullscreenClose":       "Vollbild schliessen",
   "graph.empty.figuren":         "Noch keine Figuren – «Figuren ermitteln» starten.",
   "graph.empty.visLoading":      "vis-network wird geladen…",
-  "graph.empty.sozialschicht":   "Noch keine Sozialschichten analysiert.<br>Bitte auf «Alle aktualisieren» klicken, um Schichtzugehörigkeit und Machtstrukturen zu ermitteln.",
+  "graph.empty.sozialschicht":   "Noch keine Sozialschichten analysiert.<br>Bitte auf «Buch analysieren» klicken, um Schichtzugehörigkeit und Machtstrukturen zu ermitteln.",
   "graph.empty.familie":         "Keine Familienbeziehungen gefunden.",
 
   "szenen.title":                "Szenen",
@@ -1476,7 +1476,7 @@
   "header.profileTitle":         "Profil & Einstellungen",
   "header.times":                "Zeiten",
   "header.timesTitle":           "Job-Zeiten & Token-Verbrauch",
-  "header.updateAll":            "Alle aktualisieren",
+  "header.updateAll":            "Buch analysieren",
   "header.updateAllTitle":       "Figuren, Soziogramm, Schauplätze, Szenenanalyse, Ereignisse und Zeitstrahl neu ermitteln",
   "header.clearCache":           "Cache leeren",
   "header.clearCacheTitle":      "Delta-Cache für dieses Buch leeren – nächste Analyse extrahiert alle Kapitel neu",

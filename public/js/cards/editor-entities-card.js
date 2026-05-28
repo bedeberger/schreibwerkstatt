@@ -50,8 +50,13 @@ export function registerEditorEntitiesCard() {
           clearHighlights();
           this.closePopover();
         } else {
+          this._ensureSzenenLoaded();
           recompute();
         }
+      });
+      // Buch-Wechsel: Szenen ggf. fuer neues Buch nachladen, wenn Toggle bereits an.
+      this.$watch(() => window.__app?.selectedBookId, () => {
+        if (window.__app?.entitiesEnabledForCurrentBook) this._ensureSzenenLoaded();
       });
       this.$watch(() => window.__app?.currentPage?.id, () => {
         clearHighlights();
@@ -94,7 +99,27 @@ export function registerEditorEntitiesCard() {
       }, { signal });
 
       // Initial-Trigger nach Mount.
-      this.$nextTick(() => recompute());
+      this.$nextTick(() => {
+        if (window.__app?.entitiesEnabledForCurrentBook) this._ensureSzenenLoaded();
+        recompute();
+      });
+    },
+
+    // Stellt sicher, dass `app.szenen` fuer das aktuelle Buch geladen ist.
+    // Andere Trigger (Szenen-/Orte-Karte, Komplettanalyse, Palette) laden
+    // bei Bedarf; das Entity-Panel ist eigener Konsument und muss selber dafuer
+    // sorgen, sonst bleibt die Szenen-Sektion permanent leer.
+    _ensureSzenenLoaded() {
+      const app = window.__app;
+      const bookId = app?.selectedBookId;
+      if (!bookId) return;
+      if (Array.isArray(app.szenen) && app.szenen.length > 0) return;
+      const tag = bookId + ':' + (app?.session?.email || '');
+      if (this._szenenLoadTag === tag) return;
+      this._szenenLoadTag = tag;
+      Promise.resolve(app.loadSzenen?.(bookId)).catch(() => {
+        this._szenenLoadTag = null;
+      });
     },
 
     destroy() {

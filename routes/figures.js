@@ -214,6 +214,7 @@ router.get('/:book_id', (req, res) => {
     WHERE f.book_id = ? AND f.user_email = ?`).all(bookId, userEmail);
   const evts = db.prepare(`
     SELECT fe.figure_id, fe.datum, fe.ereignis, fe.bedeutung, fe.typ,
+           fe.chapter_id, fe.page_id,
            c.chapter_name AS kapitel, p.page_name AS seite
     FROM figure_events fe
     JOIN figures f ON f.id = fe.figure_id
@@ -235,7 +236,12 @@ router.get('/:book_id', (req, res) => {
   const appMap = {};
   for (const a of apps) (appMap[a.figure_id] ??= []).push({ chapter_id: a.chapter_id ?? null, name: a.chapter_name, haeufigkeit: a.haeufigkeit });
   const evtMap = {};
-  for (const e of evts) (evtMap[e.figure_id] ??= []).push({ datum: e.datum, ereignis: e.ereignis, bedeutung: e.bedeutung, typ: e.typ || 'persoenlich', kapitel: e.kapitel || null, seite: e.seite || null });
+  for (const e of evts) (evtMap[e.figure_id] ??= []).push({
+    datum: e.datum, ereignis: e.ereignis, bedeutung: e.bedeutung,
+    typ: e.typ || 'persoenlich',
+    chapter_id: e.chapter_id ?? null, page_id: e.page_id ?? null,
+    kapitel: e.kapitel || null, seite: e.seite || null,
+  });
   const relMap = {};
   for (const r of rels) {
     let belege = [];

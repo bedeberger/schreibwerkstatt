@@ -365,6 +365,7 @@ document.addEventListener('alpine:init', () => {
     get szenenNachKapitel() {
       const map = new Map();
       for (const s of this.szenen) {
+        if (!s.kapitel) continue;
         if (!map.has(s.kapitel)) map.set(s.kapitel, { total: 0, stark: 0, mittel: 0, schwach: 0 });
         const e = map.get(s.kapitel);
         e.total++;

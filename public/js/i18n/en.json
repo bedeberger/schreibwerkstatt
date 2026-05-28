@@ -181,7 +181,7 @@
   "chat.changeSaved":            "Change saved.",
   "chat.saveFailedPrefix":       "Save failed: ",
   "common.asOf":                 "As of: {date}",
-  "common.noDataYet":            "No data yet. Please click \"Update all\".",
+  "common.noDataYet":            "No data yet. Please click \"Analyze book\".",
 
   "filter.figur":                "Character…",
   "filter.allFiguren":           "All characters",
@@ -1106,7 +1106,7 @@
   "graph.fullscreenClose":       "Close fullscreen",
   "graph.empty.figuren":         "No characters yet – run \"Extract characters\".",
   "graph.empty.visLoading":      "Loading vis-network…",
-  "graph.empty.sozialschicht":   "No social classes analysed yet.<br>Please click \"Update all\" to determine class membership and power structures.",
+  "graph.empty.sozialschicht":   "No social classes analysed yet.<br>Please click \"Analyze book\" to determine class membership and power structures.",
   "graph.empty.familie":         "No family relationships found.",
 
   "szenen.title":                "Scenes",
@@ -1475,7 +1475,7 @@
   "header.profileTitle":         "Profile & settings",
   "header.times":                "Times",
   "header.timesTitle":           "Job durations & token usage",
-  "header.updateAll":            "Update all",
+  "header.updateAll":            "Analyze book",
   "header.updateAllTitle":       "Re-run figures, sociogram, locations, scene analysis, events and timeline",
   "header.clearCache":           "Clear cache",
   "header.clearCacheTitle":      "Clear delta cache for this book – next analysis re-extracts all chapters",
