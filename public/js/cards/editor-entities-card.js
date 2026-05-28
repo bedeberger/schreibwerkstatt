@@ -38,6 +38,10 @@ export function registerEditorEntitiesCard() {
     // Range-Objekte mag Alpines Proxy nicht). Wird beim Scroll/Resize neu
     // vermessen, damit der Popover mit dem Highlight mitwandert.
     _popoverRange: null,
+    // Anker-Element fuer Chip-Popovers (Kontext-Leiste). Wenn die Page
+    // scrollt, hat das Chip keinen Range — wir messen direkt am DOM-Element
+    // neu, damit der Popover am Chip kleben bleibt.
+    _popoverAnchor: null,
     _repositionRaf: 0,
     _recomputeTimer: null,
     _abort: null,
@@ -104,9 +108,14 @@ export function registerEditorEntitiesCard() {
       // nicht — Entity-Popover bleibt offen und ueberdeckt das LT-Popover.
       // Mousedown auf document/capture laeuft vor jedem Root-Listener, schliesst
       // sauber bevor LT sein Popover oeffnet.
+      // Ausnahme: Chip-zu-Chip-Wechsel. Mousedown auf einem anderen Chip wuerde
+      // den Popover schliessen und der nachfolgende Click ihn neu oeffnen —
+      // sichtbares Flackern. Wir lassen Chip-Targets durch, der Chip-Click
+      // ueberschreibt den State ohnehin.
       document.addEventListener('mousedown', (e) => {
         if (!this.entityPopover) return;
         if (e.target?.closest?.('.entity-popover')) return;
+        if (e.target?.closest?.('.figure-context-chip')) return;
         this.closePopover();
       }, { capture: true, signal });
 
@@ -152,6 +161,7 @@ export function registerEditorEntitiesCard() {
       if (this._recomputeTimer) { clearTimeout(this._recomputeTimer); this._recomputeTimer = null; }
       if (this._repositionRaf) { cancelAnimationFrame(this._repositionRaf); this._repositionRaf = 0; }
       this._popoverRange = null;
+      this._popoverAnchor = null;
       this._abort?.abort();
       clearHighlights();
     },
@@ -239,6 +249,7 @@ export function registerEditorEntitiesCard() {
       const rect = ev.currentTarget.getBoundingClientRect();
       const { x, y } = this._computePopoverXY(rect);
       this._popoverRange = null;
+      this._popoverAnchor = ev.currentTarget;
       this.entityPopover = {
         kind,
         id: data.id ?? data.figure_id ?? null,
@@ -289,6 +300,7 @@ export function registerEditorEntitiesCard() {
         : (app.orte    || []).find(o => o.id === hit.id);
       const { x, y } = this._computePopoverXY(rect);
       this._popoverRange = hit.range || null;
+      this._popoverAnchor = null;
       this.entityPopover = {
         kind: hit.kind,
         id: hit.id,
@@ -312,7 +324,8 @@ export function registerEditorEntitiesCard() {
     },
 
     _schedulePopoverReposition() {
-      if (!this.entityPopover || !this._popoverRange) return;
+      if (!this.entityPopover) return;
+      if (!this._popoverRange && !this._popoverAnchor) return;
       if (this._repositionRaf) return;
       this._repositionRaf = requestAnimationFrame(() => {
         this._repositionRaf = 0;
@@ -320,17 +333,39 @@ export function registerEditorEntitiesCard() {
       });
     },
 
+    // Anker-Rect ermitteln: Range hat Prioritaet (Inline-Highlight), sonst
+    // das DOM-Element (Chip in der Kontext-Leiste). Beides liefert ein
+    // viewport-relatives Rect, das `_computePopoverXY` direkt verwertet.
+    _currentAnchorRect() {
+      if (this._popoverRange) {
+        const rects = this._popoverRange.getClientRects?.();
+        if (rects && rects.length > 0) return rects[0];
+      }
+      if (this._popoverAnchor?.isConnected) {
+        return this._popoverAnchor.getBoundingClientRect();
+      }
+      return null;
+    },
+
     _repositionPopover() {
-      if (!this.entityPopover || !this._popoverRange) return;
-      const rects = this._popoverRange.getClientRects?.();
-      if (!rects || rects.length === 0) return;
-      const { x, y } = this._computePopoverXY(rects[0]);
+      if (!this.entityPopover) return;
+      const rect = this._currentAnchorRect();
+      if (!rect) return;
+      // Anker vollstaendig ausserhalb des Viewports → Popover hat keinen
+      // sichtbaren Bezugspunkt mehr. Schliessen statt am Rand kleben lassen.
+      if (rect.bottom < 0 || rect.top > window.innerHeight
+          || rect.right < 0 || rect.left > window.innerWidth) {
+        this.closePopover();
+        return;
+      }
+      const { x, y } = this._computePopoverXY(rect);
       if (x === this.entityPopover.x && y === this.entityPopover.y) return;
       this.entityPopover = { ...this.entityPopover, x, y };
     },
 
     closePopover() {
       this._popoverRange = null;
+      this._popoverAnchor = null;
       if (this._repositionRaf) { cancelAnimationFrame(this._repositionRaf); this._repositionRaf = 0; }
       this.entityPopover = null;
     },
