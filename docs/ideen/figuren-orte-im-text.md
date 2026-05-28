@@ -1,117 +1,172 @@
-# Codex-Auto-Linking (Entitäten-Erwähnungen im Text live verknüpfen)
+# Figuren & Orte im Text (extrahierte Entitäten im Notebook-Editor sichtbar machen)
 
-- **Status:** Draft
+- **Status:** Ready
 - **Aufwand:** M
 - **Severity:** medium
 
 ## Context
 
-Figuren und Orte werden bereits aus dem fertigen Text **extrahiert** (Komplettanalyse → `figures`, `locations`, `page_figure_mentions`). Diese extrahierten Entitäten sind aber tote Listen in eigenen Karten — beim Lesen/Editieren einer Seite sieht der Autor nicht, **wo** welche Figur/welcher Ort vorkommt, und kommt nicht mit einem Klick zur Stammkarte.
+Komplettanalyse extrahiert vier Entitäts-Typen aus dem fertigen Text:
 
-Novelcrafters „Codex" verlinkt jede Erwähnung im Text live zur Entitäts-Karte (Hover-Vorschau, Klick → Detail). Wir bauen dasselbe, aber **strikt rückwärtsgerichtet**: kein Generieren neuer Inhalte, nur Sichtbarmachen dessen, was die Analyse aus dem Text bereits abgeleitet hat. Reines Read-Overlay über bestehenden Extraktions-Daten.
+- **Figuren** (`figures`) — benannte Personen, Inline-Erwähnungen via `page_figure_mentions`.
+- **Orte** (`locations`) — benannte Schauplätze.
+- **Szenen** (`figure_scenes`) — gegliederte Erzähleinheiten, gebunden an `page_id`/`chapter_id`.
+- **Ereignisse** (`figure_events`) — figurgebundene Vorgänge, gebunden an `page_id`/`chapter_id`.
 
-**Prinzip-Treue:** Die KI generiert hier nichts. Highlighting + Hover-Karte sind deterministische Text-Matches gegen bereits extrahierte Entitätsnamen. Reverse-Engineering bleibt Reverse-Engineering.
+Diese Daten leben in eigenen Karten — beim Editieren einer Seite sieht der Autor nicht, **wer/was/welche Szene/welches Ereignis** auf dieser Seite vorkommt und kommt nicht mit einem Klick zur Stammkarte.
+
+Novelcrafters „Codex" verknüpft Entitäten live mit dem Text. Wir bauen das **strikt rückwärtsgerichtet**: KI generiert nichts, Codex macht nur sichtbar, was die Analyse bereits aus dem Text abgeleitet hat. Reverse-Engineering bleibt Reverse-Engineering.
+
+Zwei Verknüpfungsmodi je nach Entitäts-Charakter:
+
+| Typ | Bezug zum Text | Codex-Darstellung |
+|---|---|---|
+| Figur, Ort | benannt, mehrfach im Body | **Inline-Highlight** auf Namens-Vorkommen (CSS Custom Highlight) |
+| Szene, Ereignis | an `page_id` gehängt, kein eigener Name im Body | **Seiten-Panel** „Auf dieser Seite" (Liste, kein Inline-Markup) |
 
 ## Scope MVP
 
-- Im **Notebook-Editor** (Einzelseiten-Edit-Modus, `.page-content-view`) werden Erwähnungen extrahierter Figuren + Orte der aktuellen Seite via CSS Custom Highlight markiert (zwei Highlight-Register: `codex-figure`, `codex-location`).
-- Match client-seitig: kanonischer `figures.name` / `locations.name` gegen den gerenderten Seitentext (case-insensitiv, Wortgrenzen). Quelle der relevanten Entitäten pro Seite: `page_figure_mentions` (Figuren) bzw. Orte über bestehende Orte-Liste des Buchs.
-- Hover/Klick auf ein Highlight → Popover mit Stammdaten der Entität (Name, Typ, Kurzbeschreibung, bei Figuren Soziogramm-Rolle; „Zur Karte springen"-Link).
-- Toggle in der Notebook-Toolbar: Codex-Highlights an/aus (Default aus — kein erzwungenes visuelles Rauschen beim Schreiben).
-- Read-only: kein Markup im gespeicherten HTML, keine `data-bid`-Berührung, keine Persistenz im Page-Body. Highlights sind reine Range-Overlays.
+- **Editor:** ausschließlich **Notebook-Editor** (Einzelseiten-Edit-Modus, `.page-content-view`). Focus-Editor und Bucheditor explizit out-of-scope (kein gemeinsamer Code-Pfad).
+- **Inline-Highlights** (Figuren, Orte):
+  - Match-Engine **Hybrid** — MVP-Default: **client-seitig** auf kanonischem `figures.name` / `locations.name` (case-insensitiv, ganze Wörter, Unicode-aware `\p{L}\p{M}`-Wortgrenzen). Phase-2-Option: pro Buch aktivierbare Offset-Persistenz (siehe DB-Sektion).
+  - **Nur kanonischer Name**, keine Alias-/Spitznamen-/Vorname-Nachname-Splits. Aliase = Phase 2.
+  - **Kollisionsregel Figur ↔ Ort:** Figur gewinnt. Bei gleichem Namen wird nur das `codex-figure`-Highlight gesetzt, das `codex-location`-Highlight übersprungen. Begründung: Figuren im Erzähltext häufiger gemeint, weniger visuelles Rauschen.
+  - Zwei Highlight-Register: `codex-figure`, `codex-location`.
+  - Hover/Klick auf Highlight → Popover mit Stammdaten (Name, Typ, Kurzbeschreibung, bei Figuren Soziogramm-Rolle; „Zur Karte"-Link).
+- **Seiten-Panel** (Szenen, Ereignisse) — als **Klappschiene am rechten Editor-Rand** (`collapsible-toggle` + `history-chevron`-Pattern). Permanent sichtbar bei aktivem Toggle, nimmt Spaltenbreite weg. Mobile (Container-Query): nach unten ausgeklappt unter den Editor-Body. Zwei Listen mit je zwei Sektionen:
+  - **Szenen**
+    - Sektion „Auf dieser Seite": `figure_scenes` mit `page_id = aktuelle Seite`.
+    - Sektion „Im Kapitel (ohne Seitenbezug)": `figure_scenes` mit `chapter_id = aktuelles Kapitel` **und** `page_id IS NULL` — sichtbar abgesetzt (gedimmter Stil, eigener Sektions-Header). Nur sichtbar wenn Inhalt vorhanden.
+    - Karten-Inhalt: `titel`, optional `wertung`-Badge.
+  - **Ereignisse**
+    - Sektion „Auf dieser Seite": `figure_events` mit `page_id = aktuelle Seite`.
+    - Sektion „Im Kapitel (ohne Seitenbezug)": `figure_events` mit `chapter_id = aktuelles Kapitel` **und** `page_id IS NULL`, identisch gestylt.
+    - Karten-Inhalt: `ereignis`, `datum`, zugehörige Figur (Name via JOIN).
+  - Klick auf Eintrag → öffnet jeweilige Karte (Szenen / Ereignisse) und scrollt zum Eintrag (bestehendes `gotoStelle`-/Card-Open-Muster).
+- **Pro-Buch-Toggle, zwei Eintrittspunkte** (gemeinsamer State, kein localStorage):
+  - **BookSettings-Karte**: Checkbox „Codex-Highlights (Figuren/Orte + Szenen/Ereignisse-Panel)". Default aus.
+  - **Notebook-Toolbar**: identischer Toggle als Quick-Access beim Schreiben. Klick persistiert sofort am Buch (PUT `/booksettings/:book_id`), beide Stellen bleiben synchron via `book:settings:updated`-Event.
+  - Schaltet Highlights + Panel gemeinsam. Beim Buchwechsel wird der jeweilige Buch-Status geladen, kein User-Default über mehrere Bücher hinweg.
+- Read-only: kein Markup im gespeicherten HTML, keine `data-bid`-Berührung, keine Persistenz im Page-Body. Highlights sind reine Range-Overlays, Panel ist Read-View über Stammdaten.
 
 ## Out-of-Scope
 
-- **Kein** Vorwärts-Generieren: keine „neue Figur anlegen aus Markierung", kein AI-Vorschlag für fehlende Entitäten. (Erkennen, dass ein Name noch nicht extrahiert ist, wäre Phase 2 und müsste über die bestehende Extraktions-Pipeline laufen, nicht über Inline-Generierung.)
-- **Focus-Editor** und **Bucheditor**: Phase 2. MVP nur Notebook-Editor (siehe Offene Fragen).
-- Alias-/Spitznamen-Auflösung (z. B. „der Hauptmann" → Figur X). MVP matcht nur den kanonischen Namen + triviale Varianten. Echte Koreferenz ist Analyse-Aufgabe, kein Client-Match.
-- Manuelles Editieren der Verknüpfungen.
+- **Kein** Vorwärts-Generieren: keine „neue Figur/Szene/Ereignis aus Markierung anlegen", kein AI-Vorschlag für fehlende Entitäten. Erkennen, dass ein Name nicht extrahiert ist → muss über bestehende Extraktions-Pipeline laufen, nicht über Inline-Generierung.
+- **Focus-Editor** und **Bucheditor**: nicht im MVP, kein gemeinsamer Code mit Notebook-Pfad gebaut.
+- **Alias-/Spitznamen-/Vorname-Nachname-Matching** (z. B. „der Hauptmann" → Figur X, „Anna" als Kurzform für „Anna Schmidt"). MVP matcht ausschließlich den kanonischen `figures.name`/`locations.name`. Aliase = Phase 2 (eigene Spalte `figures.aliases` + Prompt-Erweiterung).
+- **DB-Offsets in der Default-Konfiguration.** Hybrid-Modell: Offset-Persistenz ist eine **Opt-in-Phase-2-Option pro Buch**, nicht MVP-Pflicht.
+- **Editieren** der Entitäts-Stammdaten aus Popover/Panel — bleibt in den jeweiligen Karten.
+- **Ereignisse/Szenen als Inline-Marker** (z. B. Block-Anker im Text). Sie haben keinen eigenen Textanker → bewusst kein erfundenes Inline-Markup. Panel-Liste reicht.
 
 ## Done when
 
-- Bei offener Seite mit aktiviertem Toggle sind alle Vorkommen extrahierter Figuren-/Orte-Namen sichtbar markiert (zwei unterscheidbare Highlight-Stile).
-- Hover zeigt Popover mit korrekten Stammdaten; Klick auf „Zur Karte" öffnet die jeweilige Karte (Figuren/Orte) und schließt den Editor regelkonform via `_closeOtherMainCards`.
-- Toggle aus → keine Highlights, keine Reste in `CSS.highlights`.
+- Bei offener Seite mit aktiviertem Toggle:
+  - alle Vorkommen extrahierter Figuren-/Orte-Namen sichtbar markiert (zwei unterscheidbare Highlight-Stile);
+  - Panel listet Szenen + Ereignisse der aktuellen Seite korrekt;
+  - Panel zeigt zusätzlich Sektion „Im Kapitel (ohne Seitenbezug)" für Szenen + Ereignisse mit `page_id IS NULL` aber passender `chapter_id` (Sektion blendet sich aus, wenn leer).
+- Hover auf Highlight → Popover mit Stammdaten; Klick → Karte öffnet via `_closeOtherMainCards` regelkonform.
+- Klick auf Panel-Eintrag → Szenen-/Ereignisse-Karte öffnet + scrollt zum Eintrag.
+- Toggle aus → keine Highlights, kein Panel, keine Reste in `CSS.highlights`.
 - Seitenwechsel/Edit räumt Highlight-Ranges auf (keine Stale-Ranges auf altem DOM).
 - Gespeichertes Seiten-HTML enthält keinerlei Codex-Markup (Diff vor/nach Save identisch).
+- Leere Extraktion (keine Figuren/Orte/Szenen/Ereignisse) → Toggle deaktiviert + Empty-State im Panel mit Hinweis auf Komplettanalyse.
 
 ## Hard-Rule-Audit
 
-- **Editor-Spezifikation:** Betrifft MVP **nur Notebook-Editor**. Explizit so im Scope; Focus/Bucheditor out-of-scope. Pflicht-Invarianten der Notebook-Doku prüfen (kein Eingriff in Save-Pipeline/Draft).
-- **Styles nur in `public/css/`:** Highlight-Stile via `::highlight(codex-figure)` / `::highlight(codex-location)` in neuer CSS-Datei unter `editor/`. Akzentfarbe über bestehende Tokens, keine Inline-Styles.
-- **i18n:** Toggle-Label, Popover-Strings („Zur Karte", Typ-Labels) in beide Locale-Dateien.
+- **Editor-Spezifikation:** Betrifft **nur Notebook-Editor**. Focus + Bucheditor explizit out-of-scope. Notebook-Pflicht-Invarianten ([docs/notebook-editor.md](../notebook-editor.md)) prüfen: kein Eingriff in Save-Pipeline, Draft, Stale-Write-Schutz, Findings-Mark-Watcher.
+- **Styles nur in `public/css/`:** Highlight-Stile via `::highlight(codex-figure)` / `::highlight(codex-location)` in neuer CSS-Datei unter `editor/`. Panel-Styles in derselben Datei oder eigener `components/`-Datei. Akzentfarbe über bestehende Tokens, keine Inline-Styles.
+- **i18n:** Toggle-Label, Popover-Strings, Panel-Überschriften, Empty-State in beide Locale-Dateien.
 - **Content-Store-Facade:** nur lesend; keine neuen Schreibpfade auf `pages`.
-- **x-html-Escape:** Popover rendert Entitäts-Felder (KI-/User-Herkunft) → `escHtml()` vor jeder Interpolation.
-- **A11y:** Popover-Trigger tastatur-erreichbar; klickbare Spans via `.internal-link`-Konvention.
+- **x-html-Escape:** Popover + Panel rendern Entitäts-Felder (KI-/User-Herkunft) → `escHtml()` vor jeder Interpolation.
+- **A11y:** Popover-Trigger + Panel-Einträge tastatur-erreichbar; klickbare Spans via `.internal-link`-Konvention.
 - **DB-Integrität:** MVP ohne Schema-Änderung.
 - **SHELL_CACHE bumpen** (neue JS/CSS).
 - **CSS Custom Highlight** bereits etabliert (find.js, LanguageTool) — Muster wiederverwenden, kein neues Highlight-Framework.
 
 ## Abhängigkeiten
 
-- Komplettanalyse muss gelaufen sein (sonst keine `figures`/`locations`/`page_figure_mentions`). Bei leerer Extraktion: Toggle deaktiviert + Hinweis.
+- Komplettanalyse muss gelaufen sein. Bei leerer Extraktion: Toggle deaktiviert + Hinweis.
+- Stammdaten-Loader: `figures` (`loadFiguren`), `locations`, `figure_scenes` (`GET /scenes/:book_id`), `figure_events` (bestehende Ereignisse-Pipeline). Alle bereits im Frontend verfügbar — Codex konsumiert vorhandenen State, keine neuen Lade-Pfade nötig.
 - CSS-Custom-Highlight-Infrastruktur aus [public/js/editor/find.js](../../public/js/editor/find.js) als Referenz-Pattern.
-- Notebook-Toolbar (`editor-toolbar`) für den Toggle.
+- Notebook-Toolbar (`editor-toolbar`) für den Toggle + Panel-Anker.
 
 ## Backend
 
-- MVP: **keine neuen Endpoints**. Figuren-/Orte-Stammdaten + `page_figure_mentions` werden über bestehende Lade-Pfade (`loadFiguren`, Orte-Liste, Seiten-Mentions) bereitgestellt.
-- Phase-2-Option (genauere Mehrfach-Offsets statt Client-Match): Erwägung, `page_figure_mentions` um eine Offset-Liste zu erweitern oder eine analoge `page_location_mentions`-Tabelle anzulegen — nur falls Client-Match qualitativ nicht reicht (siehe Offene Fragen).
+- MVP: **keine neuen Endpoints**. Sämtliche Daten kommen über bestehende Lade-Pfade (Figuren, Orte, Szenen, Ereignisse, Mentions).
+- `PUT /booksettings/:book_id` erweitern um Feld `codex_enabled` (Bool → 0/1). `saveBookSettings` in [db/schema.js](../../db/schema.js) bekommt neuen Parameter; `GET /booksettings/:book_id` und `getBookSettings` liefern das Feld mit. Validate-Schema in [routes/booksettings.js](../../routes/booksettings.js) ergänzen.
+- Phase-2-Option (genauere Mehrfach-Offsets statt Client-Match): Erwägung, `page_figure_mentions` um Offset-Liste zu erweitern oder analoge `page_location_mentions`-Tabelle anzulegen — nur falls Client-Match qualitativ nicht reicht (siehe Offene Fragen).
 
 ## Frontend
 
-- Neue Editor-Sub-Komponente bzw. Erweiterung in [public/js/editor/](../../public/js/editor/): `codex-highlight.js` — pure Funktionen `buildRanges(text, entities)` + `applyHighlights()` / `clearHighlights()`.
-- Toggle-State im Notebook-Toolbar-Slice; Default aus.
+- Neues Sub-Modul [public/js/editor/notebook/codex.js](../../public/js/editor/notebook/codex.js) (Notebook-spezifisch, Focus-shared-Layer **nicht** berührt):
+  - pure Funktion `buildRanges(text, entities)` für Name-Match → Range-Deskriptoren;
+  - `applyHighlights()` / `clearHighlights()` über `CSS.highlights`;
+  - Selektor-Helper für „Szenen/Ereignisse mit `page_id = currentPageId`".
+- Toggle-State kommt aus `currentBook.codex_enabled` (kein localStorage). Toolbar-Toggle ruft `PUT /booksettings/:book_id` mit aktuellem Wert + erwartet `{ codex_enabled }`-Response; dispatcht `book:settings:updated` → BookSettings-Karte + Codex-Sub aktualisieren ihren State.
 - Popover über bestehendes Tooltip-/Popover-Muster (kein neues Overlay-System).
-- Match-Engine pure + testbar (Name-Liste + Text rein, Range-Deskriptoren raus).
+- Panel als Klappschiene neben Toolbar (collapsible-toggle + history-chevron-Pattern aus DESIGN.md).
+- Match-Engine pure + testbar (Name-Liste + Text rein, Range-Deskriptoren raus; ohne DOM).
 
 ## CSS
 
-- Neue Datei [public/css/editor/codex-highlight.css](../../public/css/editor/codex-highlight.css): `::highlight(codex-figure)` / `::highlight(codex-location)` (dezente Unterstreichung/Tönung, zwei Akzente). Link in `index.html`, `SHELL_CACHE` bumpen, DESIGN.md-Inventar ergänzen.
+- Neue Datei [public/css/editor/codex.css](../../public/css/editor/codex.css):
+  - `::highlight(codex-figure)` / `::highlight(codex-location)` (zwei dezente Akzente, Tönung/Unterstreichung);
+  - Panel-Layout (Klappschiene, eckige Badges, Mobile-Container-Query).
+- Link in `index.html`, `SHELL_CACHE` bumpen, DESIGN.md-Inventar ergänzen.
 
 ## i18n
 
-- `codex.toggle`, `codex.gotoCard`, `codex.figure`, `codex.location`, `codex.empty` (de + en).
+- `codex.toggle`, `codex.toggle.hint`, `codex.gotoCard`, `codex.figure`, `codex.location`, `codex.scene`, `codex.event`,
+- `codex.panel.title`, `codex.panel.scenes`, `codex.panel.events`,
+- `codex.panel.onPage`, `codex.panel.inChapter`, `codex.panel.empty`,
+- `codex.empty.runAnalysis`,
+- `booksettings.codex.label`, `booksettings.codex.hint` — in de + en.
 
 ## DB
 
-- MVP: `n/a`.
-- Phase 2 (optional): Offset-Tabelle für Orte / Offset-Liste für Figuren — eigene Migration mit FK + Index, ERD-Update, `squash:regen`.
+- **MVP:** neue Migration → `ALTER TABLE books ADD COLUMN codex_enabled INTEGER NOT NULL DEFAULT 0`. Eintrag in [docs/erd.md](../erd.md) Book-Block ergänzen, `npm run squash:regen`, Drift-Tests gegen.
+- **Phase 2 (Hybrid-Opt-in pro Buch):**
+  - Erweiterung von `page_figure_mentions` um `offsets TEXT` (JSON-Array Int-Offsets, NULL bei nicht-persistierten Büchern), bzw. neue analoge Tabelle `page_location_mentions` mit `(page_id, location_id, count, offsets)` + FK auf `locations(id)` ON DELETE CASCADE + Index auf `page_id`.
+  - Neue Spalte `books.codex_offsets_enabled INTEGER NOT NULL DEFAULT 0` als zweites Buch-Opt-in (unabhängig von `codex_enabled`, das nur das Feature aktiviert).
+  - Backfill: Re-Extraktion oder dedizierter Offset-Backfill-Job auf vorhandenem Text — kein KI-Call, reines Index-Aufbauen.
+  - Eigene Migration, ERD-Update, `npm run squash:regen` Pflicht.
 
 ## Security
 
-- Read-only, buch-scoped über bestehende ACL. Popover-Felder escaped. Kein neuer Angriffspfad.
+- Read-only, buch-scoped über bestehende ACL. Popover- und Panel-Felder escaped. Kein neuer Angriffspfad.
 
 ## Telemetrie
 
-- Optional: Counter „Codex-Toggle aktiviert" (Usage), niedrige Prio. `n/a` für MVP.
+- Optional: Counter „Codex-Toggle aktiviert", niedrige Prio. `n/a` für MVP.
 
 ## Reversibilität
 
-- Feature-Flag (`FEATURE_CODEX_LINKING` in app-state) → Toggle versteckt, Highlight-Code no-op. Kein Daten-Rückbau nötig (nichts persistiert).
+- Feature-Flag (`FEATURE_CODEX_LINKING` in app-state) → Toggle versteckt, Highlight + Panel no-op. Kein Daten-Rückbau nötig (nichts persistiert).
 
 ## Tests
 
-- **Unit:** `buildRanges` — Wortgrenzen, Case-Insensitivität, Überlappungen (Figur „Anna" vs. „Annabelle"), leere Entitätsliste.
-- **Unit:** kein Codex-Markup im Save-Output (Invariante).
-- **E2E (Notebook):** Toggle an → Highlights sichtbar; Hover → Popover; Klick → Karte; Toggle aus → sauber; Seitenwechsel → keine Stale-Ranges.
+- **Unit:** `buildRanges` — Wortgrenzen, Case-Insensitivität, Überlappungen (Figur „Anna" vs. „Annabelle"), Kollision Figur/Ort, leere Entitätsliste.
+- **Unit:** Panel-Selektoren (Szenen/Ereignisse-Filter nach `page_id`).
+- **Unit:** Save-Output enthält kein Codex-Markup (Invariante).
+- **E2E (Notebook):** Toggle an → Highlights + Panel sichtbar; Hover → Popover; Klick → Karte öffnet; Panel-Klick → Szenen-/Ereignisse-Karte mit Scroll; Toggle aus → sauber; Seitenwechsel → keine Stale-Ranges.
 
 ## Edge-Cases
 
-- Gleicher Name als Figur **und** Ort → Priorität definieren (Offene Fragen).
+- Gleicher Name als Figur **und** Ort → Figur gewinnt, Orte-Highlight unterdrückt. Popover zeigt nur Figuren-Karte.
 - Teilstring-Kollisionen („Anna" in „Annabelle") → nur ganze Wörter matchen.
 - Sehr häufige Kurznamen → Performance: Range-Bau auf sichtbaren Block beschränken / debounce.
-- Name mit Sonderzeichen/Bindestrich → robuste Wortgrenzen-Definition.
+- Name mit Sonderzeichen/Bindestrich/Apostroph → robuste Wortgrenzen-Definition (`\p{L}\p{M}`-aware, nicht nur ASCII).
 - Während aktivem Edit (Cursor im Text) → Highlights bei Eingabe neu berechnen oder bis Idle pausieren (kein Konflikt mit Caret).
+- Szene/Ereignis ohne `page_id` (nur `chapter_id`) → eigene Sektion „Im Kapitel (ohne Seitenbezug)" pro Liste, gedimmt abgesetzt.
+- Szene/Ereignis ohne `page_id` **und** ohne `chapter_id` → nicht im Panel (keine Bindung zur aktuellen Sicht).
+- Mehrere Szenen/Ereignisse pro Seite → Liste sortiert nach `sort_order` (Szenen) bzw. `datum` (Ereignisse).
+- Re-Extraktion während offener Notebook-View → Codex-State neu laden auf Daten-Event (`book:changed`, `figuren:updated`, `szenen:updated`).
 
 ## Kritische Dateien
 
-- **Modify:** [public/js/editor/toolbar.js](../../public/js/editor/toolbar.js) (Toggle), [public/css/editor/](../../public/css/editor/) + `index.html` (Link), [public/sw.js](../../public/sw.js) (`SHELL_CACHE`), [public/js/i18n/de.json](../../public/js/i18n/de.json) + [en.json](../../public/js/i18n/en.json), [DESIGN.md](../../DESIGN.md).
-- **Create:** `public/js/editor/codex-highlight.js`, `public/css/editor/codex-highlight.css`, `tests/unit/codex-highlight.test.mjs`.
+- **Modify:** [public/js/editor/toolbar.js](../../public/js/editor/toolbar.js) (Toggle + Panel-Mount im Notebook-Pfad), [public/index.html](../../public/index.html) (CSS-Link), [public/sw.js](../../public/sw.js) (`SHELL_CACHE`), [public/js/i18n/de.json](../../public/js/i18n/de.json) + [en.json](../../public/js/i18n/en.json), [DESIGN.md](../../DESIGN.md), [db/migrations.js](../../db/migrations.js) (neue Migration), [db/schema.js](../../db/schema.js) (`saveBookSettings`, `getBookSettings`), [db/squashed-schema.js](../../db/squashed-schema.js) (Regen), [routes/booksettings.js](../../routes/booksettings.js) (Validate + Payload), [public/partials/book-settings.html](../../public/partials/book-settings.html) + [public/js/cards/book-settings-card.js](../../public/js/cards/book-settings-card.js) (Checkbox), [docs/erd.md](../erd.md) (Stand + Books-Block).
+- **Create:** `public/js/editor/notebook/codex.js`, `public/css/editor/codex.css`, `tests/unit/codex-highlight.test.mjs`, `tests/unit/codex-panel-filter.test.mjs`.
 
 ## Offene Fragen
 
-- MVP wirklich nur Notebook-Editor, oder gleich Focus mitnehmen (teilen `editor/shared/`)?
-- Client-seitiger Name-Match ausreichend, oder Offset-Persistenz (Phase-2-DB) für Genauigkeit bei häufigen/mehrdeutigen Namen nötig?
-- Namens-Kollision Figur ↔ Ort: welche Priorität / beide markieren?
-- Alias-Matching ganz raus, oder minimaler Varianten-Satz (Vor-/Nachname separat)?
+_Leer — alle Entscheidungen getroffen. Status kann auf `Ready` gesetzt werden._
