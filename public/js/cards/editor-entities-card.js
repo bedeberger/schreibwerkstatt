@@ -97,6 +97,19 @@ export function registerEditorEntitiesCard() {
         this._maybeOpenPopoverFromClick(e);
       }, { signal });
 
+      // Outside-Close auf mousedown statt click. Why: der LT-Spellcheck-
+      // Controller stoppt das click-Event in der capture-Phase auf .page-content-
+      // view--editing, damit Links unter Squiggles nicht gefolgt werden. Dadurch
+      // erreicht der Click document nie und Alpine's `@click.outside` feuert
+      // nicht — Entity-Popover bleibt offen und ueberdeckt das LT-Popover.
+      // Mousedown auf document/capture laeuft vor jedem Root-Listener, schliesst
+      // sauber bevor LT sein Popover oeffnet.
+      document.addEventListener('mousedown', (e) => {
+        if (!this.entityPopover) return;
+        if (e.target?.closest?.('.entity-popover')) return;
+        this.closePopover();
+      }, { capture: true, signal });
+
       // Edit-Input → debounced Recompute (Texte aendern Highlights).
       document.addEventListener('input', (e) => {
         if (!e.target?.closest?.(EDIT_SELECTOR)) return;
