@@ -235,44 +235,6 @@ export function findHighlightAtPoint(highlights, x, y) {
   return null;
 }
 
-/** Prueft ob ein Token-String als ganzes Wort im (lowercased) Text vorkommt.
- *  Liefert true beim ersten Treffer. */
-function textHasWord(lowText, originalText, token) {
-  const low = token.toLowerCase();
-  if (!low) return false;
-  let from = 0;
-  while (from <= lowText.length - low.length) {
-    const idx = lowText.indexOf(low, from);
-    if (idx < 0) return false;
-    const before = idx > 0 ? originalText[idx - 1] : '';
-    const after  = originalText[idx + token.length] || '';
-    if (!isWordChar(before) && !isWordChar(after)) return true;
-    from = idx + Math.max(1, low.length);
-  }
-  return false;
-}
-
-/** Filtert Figuren fuer das Seiten-Panel: liefert alle Figuren, deren
- *  Name ODER Alias (kurzname/Vor-/Nachname-Token) im aktuellen Seiten-Text
- *  als ganzes Wort vorkommt. Pendant zu `selectScenesForView` aber textbasiert
- *  statt page_id-basiert (Figuren-Mentions stehen im Body, nicht in einer
- *  Bridge). Sortierung deterministisch nach `name` (locale-Compare). */
-export function selectFigurenForPage(figuren, pageText) {
-  if (!Array.isArray(figuren) || !pageText) return [];
-  const lowText = pageText.toLowerCase();
-  const hit = new Set();
-  for (const f of figuren) {
-    if (!f || f.id == null) continue;
-    const aliases = buildFigureAliases(f);
-    for (const a of aliases) {
-      if (textHasWord(lowText, pageText, a)) { hit.add(f.id); break; }
-    }
-  }
-  return figuren
-    .filter(f => hit.has(f.id))
-    .sort((a, b) => String(a?.name || '').localeCompare(String(b?.name || '')));
-}
-
 // Mindestlaenge fuer Alias-Match, damit kurze Vornamen wie "Im"/"Es"/"An"
 // nicht zu false-positives fuehren. 3 Zeichen deckt "Tom", "Ada", "Leo" ab —
 // Risiko bleibt minimal.

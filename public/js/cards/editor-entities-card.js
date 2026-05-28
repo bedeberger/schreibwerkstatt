@@ -19,11 +19,11 @@
 
 import {
   applyHighlights, clearHighlights, findHighlightAtPoint,
-  selectScenesForView, selectEventsForView, selectFigurenForPage,
+  selectScenesForView, selectEventsForView,
   toEntitiesList,
 } from '../editor/notebook/entities.js';
 
-const RECOMPUTE_DEBOUNCE_MS = 250;
+const RECOMPUTE_DEBOUNCE_MS = 400;
 const EDIT_SELECTOR = '#editor-card .page-content-view--editing';
 
 export function registerEditorEntitiesCard() {
@@ -46,6 +46,13 @@ export function registerEditorEntitiesCard() {
     _recomputeTimer: null,
     _abort: null,
     _onSettingsUpdated: null,
+    // Memo-Cache fuer panelScenes/panelEvents. Alpine ruft die Getter mehrfach
+    // pro Render auf; ohne Cache laeuft filter+sort jedes Mal neu. Key =
+    // pageId|chapterId|sourceLen — Quellen-Wechsel invalidiert implizit.
+    _scenesKey: null,
+    _scenesVal: { onPage: [], inChapter: [] },
+    _eventsKey: null,
+    _eventsVal: { onPage: [], inChapter: [] },
 
     init() {
       const abort = new AbortController();
@@ -120,7 +127,10 @@ export function registerEditorEntitiesCard() {
       }, { capture: true, signal });
 
       // Edit-Input → debounced Recompute (Texte aendern Highlights).
+      // Early-Out: bei deaktiviertem Buch keinen Timer schedulen — spart bei
+      // 20k-Zeichen-Seiten jeden Tipp-Tick einen setTimeout.
       document.addEventListener('input', (e) => {
+        if (!window.__app?.entitiesEnabledForCurrentBook) return;
         if (!e.target?.closest?.(EDIT_SELECTOR)) return;
         this._scheduleRecompute();
       }, { signal });
@@ -189,33 +199,37 @@ export function registerEditorEntitiesCard() {
     },
 
     // ── Panel-Daten ─────────────────────────────────────────────────────────
+    //
+    // Alpine ruft Getter im Panel-Template mehrfach pro Render (x-show, x-if,
+    // x-for je 1×) — bei 20k-Zeichen-Seiten + viel Buchmaterial summiert sich
+    // das. Memoization auf (page, szenen/figuren-laenge) eliminiert die
+    // wiederholten filter+sort-Sweeps; gecacht wird das Resultat-Objekt, das
+    // x-for direkt iteriert. Reset implizit beim Wechsel der Quellen.
 
     panelScenes() {
       const app = window.__app;
       const pid = app?.currentPage?.id;
       const cid = app?.currentPage?.chapter_id;
-      return selectScenesForView(app?.szenen || [], pid, cid);
+      const len = (app?.szenen || []).length;
+      const key = pid + '|' + cid + '|' + len;
+      if (this._scenesKey !== key) {
+        this._scenesKey = key;
+        this._scenesVal = selectScenesForView(app?.szenen || [], pid, cid);
+      }
+      return this._scenesVal;
     },
 
     panelEvents() {
       const app = window.__app;
       const pid = app?.currentPage?.id;
       const cid = app?.currentPage?.chapter_id;
-      return selectEventsForView(app?.figuren || [], pid, cid);
-    },
-
-    // Figuren, deren Name auf der aktuellen Seite vorkommt. Aus dem aktuellen
-    // Editor-Text bzw. dem zuletzt gerenderten Page-HTML extrahiert (gleiche
-    // Match-Logik wie Highlights), damit die Liste auch ohne CSS-Highlight-API
-    // korrekt ist. selectFigurenForPage ist die SSoT (pure, unit-getestet).
-    panelFigures() {
-      const app = window.__app;
-      const figs = app?.figuren || [];
-      if (!figs.length) return [];
-      const root = document.querySelector(EDIT_SELECTOR)
-                || document.querySelector('#editor-card .page-content-view');
-      const text = root?.textContent || '';
-      return selectFigurenForPage(figs, text);
+      const len = (app?.figuren || []).length;
+      const key = pid + '|' + cid + '|' + len;
+      if (this._eventsKey !== key) {
+        this._eventsKey = key;
+        this._eventsVal = selectEventsForView(app?.figuren || [], pid, cid);
+      }
+      return this._eventsVal;
     },
 
     panelEmpty() {
