@@ -338,8 +338,9 @@ export const treeMethods = {
   },
 
   // Entity-Linking-Toggle pro Buch laden — Spiegel von
-  // book_settings.entities_enabled. Wird beim Buchwechsel + nach Save in der
-  // BookSettings-Karte aktualisiert. Failsafe: bei Netz/Permission-Fehler aus.
+  // book_settings.entities_enabled. Wird beim Buchwechsel gesetzt; der
+  // Toolbar-Toggle pflegt die Flag danach selbst (optimistisch + PUT).
+  // Failsafe: bei Netz/Permission-Fehler aus.
   async _loadEntitiesEnabledForBook(bookId) {
     const id = bookId ? String(bookId) : '';
     if (!id) { this.entitiesEnabledForCurrentBook = false; return; }
@@ -358,8 +359,7 @@ export const treeMethods = {
   },
 
   // Toolbar-Toggle aus dem Notebook-Editor — PUTtet nur entities_enabled,
-  // dispatcht book:settings:updated damit BookSettings-Card + Entities-Sub
-  // sich synchron halten.
+  // dispatcht book:settings:updated damit die Entities-Sub neu rechnet.
   async toggleEntitiesEnabledForCurrentBook() {
     const id = this.selectedBookId;
     if (!id) return;

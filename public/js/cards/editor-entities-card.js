@@ -50,13 +50,13 @@ export function registerEditorEntitiesCard() {
           clearHighlights();
           this.closePopover();
         } else {
-          this._ensureSzenenLoaded();
           recompute();
         }
       });
-      // Buch-Wechsel: Szenen ggf. fuer neues Buch nachladen, wenn Toggle bereits an.
+      // Buch-Wechsel: Szenen fuer neues Buch nachladen (Kontext-Panel zeigt
+      // Szenen/Ereignisse unabhaengig vom Entity-Toggle, also auch hier laden).
       this.$watch(() => window.__app?.selectedBookId, () => {
-        if (window.__app?.entitiesEnabledForCurrentBook) this._ensureSzenenLoaded();
+        this._ensureSzenenLoaded();
       });
       this.$watch(() => window.__app?.currentPage?.id, () => {
         clearHighlights();
@@ -98,9 +98,10 @@ export function registerEditorEntitiesCard() {
         this._scheduleRecompute();
       }, { signal });
 
-      // Initial-Trigger nach Mount.
+      // Initial-Trigger nach Mount. Szenen werden immer geladen — das Kontext-
+      // Panel zeigt sie unabhaengig vom Entity-Toggle.
       this.$nextTick(() => {
-        if (window.__app?.entitiesEnabledForCurrentBook) this._ensureSzenenLoaded();
+        this._ensureSzenenLoaded();
         recompute();
       });
     },

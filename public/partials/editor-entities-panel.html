@@ -8,10 +8,8 @@
 
   <div class="figure-context-panel"
        x-show="$app.chapterFigures.length > 0
-               || ($app.entitiesEnabledForCurrentBook && (
-                     panelScenes().onPage.length + panelScenes().inChapter.length > 0
-                     || panelEvents().onPage.length + panelEvents().inChapter.length > 0
-                   ))"
+               || panelScenes().onPage.length + panelScenes().inChapter.length > 0
+               || panelEvents().onPage.length + panelEvents().inChapter.length > 0"
        x-cloak>
     <div class="figure-context-header internal-link"
          @click="$app.entityPanelOpen = !$app.entityPanelOpen"
@@ -61,8 +59,7 @@
       </template>
 
       <!-- Szenen (Seite + Kapitel-ohne-Seitenbezug, gedimmt) -->
-      <template x-if="$app.entitiesEnabledForCurrentBook
-                      && panelScenes().onPage.length + panelScenes().inChapter.length > 0">
+      <template x-if="panelScenes().onPage.length + panelScenes().inChapter.length > 0">
         <div class="figure-context-section">
           <span class="figure-context-section-label" x-text="$app.t('entities.panel.scenes')"></span>
           <div class="figure-context-chips">
@@ -109,8 +106,7 @@
       </template>
 
       <!-- Ereignisse (Seite + Kapitel-ohne-Seitenbezug) -->
-      <template x-if="$app.entitiesEnabledForCurrentBook
-                      && panelEvents().onPage.length + panelEvents().inChapter.length > 0">
+      <template x-if="panelEvents().onPage.length + panelEvents().inChapter.length > 0">
         <div class="figure-context-section">
           <span class="figure-context-section-label" x-text="$app.t('entities.panel.events')"></span>
           <div class="figure-context-chips">

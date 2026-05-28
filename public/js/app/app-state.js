@@ -505,7 +505,8 @@ const dailyProgressState = () => ({
 
 // Entity-Linking pro Buch (Figuren-/Orte-Highlights + Szenen-/Ereignisse-Panel
 // im Notebook-Editor). Source-of-Truth ist book_settings.entities_enabled —
-// hier nur Spiegel, gesetzt von loadBookSettings + book:settings:updated-Event.
+// hier nur Spiegel, gesetzt von _loadEntitiesEnabledForBook (beim Buchwechsel)
+// und vom Toolbar-Toggle (toggleEntitiesEnabledForCurrentBook).
 // entityPanelOpen kontrolliert die Klappschiene neben dem Editor-Body; default
 // = true, sobald entitiesEnabled angeht (User kann manuell zuklappen).
 const entitiesState = () => ({

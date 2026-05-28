@@ -19,7 +19,6 @@ export function registerBookSettingsCard() {
     bookSettingsIsFinished: false,
     bookSettingsAllowLektorBookChat: false,
     bookSettingsDailyGoalChars: 1500,
-    bookSettingsEntitiesEnabled: false,
     // Sharing: Access-Liste + Invite-Form.
     bookAccessList: [],
     bookAccessLoading: false,

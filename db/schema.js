@@ -660,8 +660,8 @@ function deleteFinetuneAiCache(bookId, userEmail) {
 
 const _getBookSettings = db.prepare('SELECT language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, entities_enabled FROM book_settings WHERE book_id = ?');
 const _upsertBookSettings = db.prepare(`
-  INSERT INTO book_settings (book_id, language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, entities_enabled, updated_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  INSERT INTO book_settings (book_id, language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, updated_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT(book_id) DO UPDATE SET
     language=excluded.language, region=excluded.region,
     buchtyp=excluded.buchtyp, buch_kontext=excluded.buch_kontext,
@@ -669,7 +669,6 @@ const _upsertBookSettings = db.prepare(`
     is_finished=excluded.is_finished,
     allow_lektor_book_chat=excluded.allow_lektor_book_chat,
     daily_goal_chars=excluded.daily_goal_chars,
-    entities_enabled=excluded.entities_enabled,
     updated_at=excluded.updated_at
 `);
 const _updateBookSettingsEntitiesEnabled = db.prepare(`
@@ -709,8 +708,9 @@ function getBookLocale(bookId, userEmail = null) {
   return `${language}-${region}`;
 }
 
-/** Speichert/aktualisiert Sprache, Region, Buchtyp, Buchkontext, Erzählperspektive, Erzählzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, entities_enabled. */
-function saveBookSettings(bookId, language, region, buchtyp, buchKontext, erzaehlperspektive = null, erzaehlzeit = null, isFinished = 0, allowLektorBookChat = 0, dailyGoalChars = null, entitiesEnabled = 0) {
+/** Speichert/aktualisiert Sprache, Region, Buchtyp, Buchkontext, Erzählperspektive, Erzählzeit, is_finished, allow_lektor_book_chat, daily_goal_chars.
+ *  `entities_enabled` wird hier nicht angefasst — Quick-Toggle aus der Notebook-Toolbar laeuft ueber setBookEntitiesEnabled. */
+function saveBookSettings(bookId, language, region, buchtyp, buchKontext, erzaehlperspektive = null, erzaehlzeit = null, isFinished = 0, allowLektorBookChat = 0, dailyGoalChars = null) {
   _upsertBookSettings.run(
     parseInt(bookId), language, region,
     buchtyp || null, buchKontext || null,
@@ -718,7 +718,6 @@ function saveBookSettings(bookId, language, region, buchtyp, buchKontext, erzaeh
     isFinished ? 1 : 0,
     allowLektorBookChat ? 1 : 0,
     dailyGoalChars == null ? null : Math.round(Number(dailyGoalChars)),
-    entitiesEnabled ? 1 : 0,
     new Date().toISOString()
   );
 }

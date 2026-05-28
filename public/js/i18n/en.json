@@ -261,8 +261,6 @@
   "book.settings.finished.desc": "Hides the daily writing tiles in the book overview (trend, 7-day bars, today ring, streak heatmap).",
   "book.settings.dailyGoalChars":     "Daily goal (characters)",
   "book.settings.dailyGoalCharsHint": "Target value for the Today ring in the header and on the book overview. 1500 characters ≈ 1 standard page.",
-  "booksettings.entities.label":  "Highlight entities in text",
-  "booksettings.entities.hint":   "Marks character and location names in the notebook editor and shows scenes/events for the current page in a side panel. Strictly reverse-engineered — uses only data from the full analysis.",
   "entities.toggle.on":           "Highlight entities",
   "entities.toggle.off":          "Turn off entity highlighting",
   "entities.toggle.hint":         "Mark characters/locations in text, show scenes/events per page",

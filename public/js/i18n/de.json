@@ -261,8 +261,6 @@
   "book.settings.finished.desc": "Blendet die Schreib-pro-Tag-Kacheln in der Buch-Übersicht aus (Trend, 7-Tage-Balken, Heute-Ring, Streak-Heatmap).",
   "book.settings.dailyGoalChars":     "Tagesziel (Zeichen)",
   "book.settings.dailyGoalCharsHint": "Zielwert für den Heute-Ring im Header und in der Buch-Übersicht. 1500 Zeichen ≈ 1 Normseite.",
-  "booksettings.entities.label":  "Entitäten im Text hervorheben",
-  "booksettings.entities.hint":   "Hebt Figuren- und Orte-Namen im Notebook-Editor hervor und zeigt Szenen/Ereignisse der aktuellen Seite in einer Klappschiene. Strikt rückwärtsgerichtet — nutzt nur Daten aus der Komplettanalyse.",
   "entities.toggle.on":           "Entitäten hervorheben",
   "entities.toggle.off":          "Entitäten-Hervorhebung aus",
   "entities.toggle.hint":         "Figuren/Orte im Text markieren, Szenen/Ereignisse seitenweise anzeigen",
