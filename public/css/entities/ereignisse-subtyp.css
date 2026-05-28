@@ -1,0 +1,72 @@
+@layer components {
+/* === Event-Subtyp-Badges + Marker-Color === */
+/* SSoT der Subtyp-Hues: `--card-accent-event-<subtyp>` in
+   public/css/tokens/colors.css (Light + Dark). Hier nur das Mapping
+   per Variant-Klasse auf die gemeinsame `--gz-subtyp-color`-Prop, die
+   sowohl der Marker (.gz-marker) als auch das Badge konsumiert. */
+.gz-item--subtyp-geburt           { --gz-subtyp-color: var(--card-accent-event-geburt); }
+.gz-item--subtyp-tod              { --gz-subtyp-color: var(--card-accent-event-tod); }
+.gz-item--subtyp-hochzeit         { --gz-subtyp-color: var(--card-accent-event-hochzeit); }
+.gz-item--subtyp-reise            { --gz-subtyp-color: var(--card-accent-event-reise); }
+.gz-item--subtyp-konflikt         { --gz-subtyp-color: var(--card-accent-event-konflikt); }
+.gz-item--subtyp-wendepunkt       { --gz-subtyp-color: var(--card-accent-event-wendepunkt); }
+.gz-item--subtyp-entdeckung       { --gz-subtyp-color: var(--card-accent-event-entdeckung); }
+.gz-item--subtyp-verlust          { --gz-subtyp-color: var(--card-accent-event-verlust); }
+.gz-item--subtyp-sieg             { --gz-subtyp-color: var(--card-accent-event-sieg); }
+.gz-item--subtyp-extern_politisch { --gz-subtyp-color: var(--card-accent-event-extern_politisch); }
+.gz-item--subtyp-extern_natur     { --gz-subtyp-color: var(--card-accent-event-extern_natur); }
+.gz-item--subtyp-extern_kulturell { --gz-subtyp-color: var(--card-accent-event-extern_kulturell); }
+.gz-item--subtyp-sonstiges        { --gz-subtyp-color: var(--card-accent-event-sonstiges); }
+
+/* Marker übernimmt Subtyp-Farbe (bestehende externe-Marker-Variante bleibt
+   für gz-marker--extern erhalten und schlägt die Subtyp-Farbe). */
+.gz-item:not(.gz-item--extern) .gz-marker {
+  background: var(--gz-subtyp-color, var(--color-primary));
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--gz-subtyp-color, var(--color-primary)) 60%, var(--color-border));
+}
+
+/* Subtyp-Badge: eckig (Pattern „Eckige Badges"), kompakt. */
+.gz-subtyp-badge {
+  font-size: var(--font-size-micro);
+  font-weight: 400;
+  padding: var(--space-1) 6px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--gz-subtyp-color, var(--color-accent)) 18%, var(--color-surface));
+  color:      color-mix(in srgb, var(--gz-subtyp-color, var(--color-accent)) 75%, var(--color-text));
+  border: 0.5px solid color-mix(in srgb, var(--gz-subtyp-color, var(--color-accent)) 50%, var(--color-border));
+  white-space: nowrap;
+}
+
+/* 'sonstiges' visuell zurückhaltend — Default-Subtyp soll nicht laut werden. */
+.gz-subtyp-badge--sonstiges {
+  background: var(--color-tag-bg);
+  color: var(--color-muted);
+  border-color: var(--color-border);
+}
+
+/* Manuell bearbeitet — leichter Hinweis, keine starke Färbung. */
+.gz-manual-badge {
+  font-size: var(--font-size-micro);
+  font-weight: 400;
+  padding: var(--space-1) 6px;
+  border-radius: var(--radius-sm);
+  background: var(--color-tag-bg);
+  color: var(--color-muted);
+  border: 0.5px dashed var(--color-border-input);
+}
+
+/* "Unbekannt"-Bucket: Marker dezent, Datum-Anzeige in Muted. */
+.gz-item--unknown .gz-marker {
+  background: var(--color-tag-bg);
+  box-shadow: 0 0 0 1.5px var(--color-border);
+}
+.gz-item--unknown .gz-datum {
+  font-style: italic;
+  color: var(--color-subtle);
+}
+
+/* Mobile: Subtyp-Badge in eigene Zeile umbrechen lassen statt zu schrumpfen. */
+@container (max-width: 480px) {
+  .gz-datum-row { flex-wrap: wrap; }
+}
+}

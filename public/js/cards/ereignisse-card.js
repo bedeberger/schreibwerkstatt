@@ -9,13 +9,14 @@
 import { setupCardLifecycle } from './card-lifecycle.js';
 import { memoizeByIdentity } from '../utils.js';
 
-const _memoEreignisse = () => memoizeByIdentity(([events, suche, figurId, kapitel, seite]) => {
+const _memoEreignisse = () => memoizeByIdentity(([events, suche, figurId, kapitel, seite, subtyp]) => {
   let result = events;
   if (suche) {
     const q = suche.toLowerCase();
     result = result.filter(ev => (ev.ereignis || '').toLowerCase().includes(q));
   }
   if (figurId) result = result.filter(ev => ev.figuren.some(f => f.id === figurId));
+  if (subtyp) result = result.filter(ev => (ev.subtyp || 'sonstiges') === subtyp);
   if (kapitel) {
     result = result.filter(ev => {
       const kap = Array.isArray(ev.kapitel) ? ev.kapitel : (ev.kapitel ? [ev.kapitel] : []);
@@ -30,6 +31,27 @@ const _memoEreignisse = () => memoizeByIdentity(([events, suche, figurId, kapite
   }
   return result;
 });
+
+// Formatiert das Anzeige-Datum aus den strukturierten Feldern. Punkt-Events
+// und Spannen werden unterschiedlich gerendert. Fallback auf datum_label
+// (Original-String) oder die i18n-Variante für "unbekannt".
+function _formatEventDate(ev, t) {
+  const yPart = (y, m, d) => {
+    if (y == null && m == null && d == null) return null;
+    const parts = [];
+    if (d != null) parts.push(String(d).padStart(2, '0') + '.');
+    if (m != null) parts.push(String(m).padStart(2, '0') + '.');
+    if (y != null) parts.push(String(y));
+    return parts.join(d != null && m != null ? '' : ' ').trim();
+  };
+  const start = yPart(ev.datum_year, ev.datum_month, ev.datum_day);
+  const ende  = yPart(ev.datum_ende_year, ev.datum_ende_month, ev.datum_ende_day);
+  if (ende && start) return t('events.span', { start, ende });
+  if (start) return start;
+  if (ev.story_tag != null) return String(ev.story_tag);
+  if (ev.datum_label) return ev.datum_label;
+  return t('events.unknownDate');
+}
 
 export function registerEreignisseCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -81,15 +103,44 @@ export function registerEreignisseCard() {
       );
     },
 
+    // Liste sichtbarer Subtypen im aktuellen Buch — Filter zeigt nur was vorkommt.
+    ereignisseSubtypListe() {
+      const seen = new Set();
+      for (const ev of (window.__app.globalZeitstrahl || [])) {
+        seen.add(ev.subtyp || 'sonstiges');
+      }
+      return [...seen].sort();
+    },
+
+    // Klick-Helper: bei mehreren Kapiteln wäre `gotoStelle(kap[0], …)` falsch.
+    // Wir geben dem Template-Loop einen direkten Helper, damit die Multi-Kapitel-
+    // Liste pro Kapitel-Span einzeln öffnet.
+    gotoEventKapitel(ev, kapitelName, seite = null) {
+      window.__app.gotoStelle(kapitelName, seite);
+    },
+
+    formatEventDate(ev) {
+      return _formatEventDate(ev, (k, p) => window.__app.t(k, p));
+    },
+
+    // Span-Höhe (Spannen-Events): proportional zur Jahr-Differenz, geclampt.
+    // Wird per CSS-Custom-Prop --span-years konsumiert. 0 für Punkt-Events.
+    eventSpanYears(ev) {
+      if (ev.datum_year == null || ev.datum_ende_year == null) return 0;
+      const diff = ev.datum_ende_year - ev.datum_year;
+      return diff > 0 ? Math.min(diff, 50) : 0;
+    },
+
     filteredEreignisse() {
       const root = window.__app;
       const f = root.ereignisseFilters;
       return this._memoFiltered([
         root.globalZeitstrahl,
-        f.suche ?? '',
+        f.suche  ?? '',
         f.figurId ?? '',
         f.kapitel ?? '',
-        f.seite ?? '',
+        f.seite   ?? '',
+        f.subtyp  ?? '',
       ]);
     },
   }));

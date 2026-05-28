@@ -1,0 +1,42 @@
+@layer components {
+/* === Spannen-Events (Phase 2) ===
+   Events mit Start- und Ende-Datum bekommen eine vertikale Verlängerung des
+   Markers, proportional zur Jahr-Differenz (CSS-Custom-Prop --span-years,
+   gesetzt vom Template). Reine Punkt-Events bleiben unverändert. */
+.gz-item--span {
+  /* Reserviert Platz unterhalb, damit der nächste Event-Marker nicht in
+     den Spannen-Balken hineinläuft. */
+  padding-bottom: calc(var(--space-18) + var(--gz-span-extra, 0px));
+  --gz-span-extra: clamp(8px, calc(var(--span-years, 0) * 6px), 240px);
+}
+
+.gz-item--span .gz-marker::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 2px);
+  transform: translateX(-50%);
+  width: 3px;
+  height: var(--gz-span-extra, 0px);
+  background: linear-gradient(
+    to bottom,
+    var(--gz-subtyp-color, var(--color-primary)),
+    color-mix(in srgb, var(--gz-subtyp-color, var(--color-primary)) 35%, transparent)
+  );
+  border-radius: var(--radius-sm);
+}
+
+/* Span-Bar nimmt Platz auch in der globalen Border-Linie ein — leichtes Glow,
+   damit Range optisch lesbar bleibt ohne Layout-Sprung. */
+.gz-item--span .gz-content {
+  /* Spannen-Items lesen sich besser mit etwas mehr Atemraum. */
+  padding-bottom: var(--space-xs);
+}
+
+/* Mobile: Span-Bar gedämpft (Verkürzung statt komplettem Abschneiden). */
+@container (max-width: 480px) {
+  .gz-item--span {
+    --gz-span-extra: clamp(6px, calc(var(--span-years, 0) * 3px), 80px);
+  }
+}
+}

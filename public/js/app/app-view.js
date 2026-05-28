@@ -534,6 +534,7 @@ export const appViewMethods = {
     this.newPageCreating = false;
     this.newPageError = '';
     this.chapterFigures = [];
+    this.entitiesEnabledForCurrentBook = false;
     this.pageHistory = [];
     this.activeHistoryEntryId = null;
     this.tokEsts = {};

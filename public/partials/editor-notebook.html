@@ -246,6 +246,17 @@
             @click="togglePageEditorFullscreen()">
       <svg class="icon" aria-hidden="true"><use :href="pageEditorFullscreen ? '/icons.svg?v=636#minimize-2' : '/icons.svg?v=636#maximize-2'"/></svg>
     </button>
+    <span class="action-sep" aria-hidden="true"></span>
+    <!-- Entity-Linking-Toggle (Figuren/Orte-Highlights + Szenen/Ereignisse-Panel).
+         Aktivieren oeffnet automatisch die Klappschiene; Deaktivieren raeumt sie auf.
+         Pure Buch-Setting — synchron zu BookSettings-Checkbox via book:settings:updated. -->
+    <button type="button" class="graph-tool-btn"
+            :aria-pressed="entitiesEnabledForCurrentBook"
+            :data-tip="entitiesEnabledForCurrentBook ? t('entities.toggle.off') : t('entities.toggle.on')"
+            :aria-label="entitiesEnabledForCurrentBook ? t('entities.toggle.off') : t('entities.toggle.on')"
+            @click="toggleEntitiesEnabledForCurrentBook(); entityPanelOpen = !entitiesEnabledForCurrentBook ? entityPanelOpen : true">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#radio"/></svg>
+    </button>
   </div>
   </div><!-- /editor-card__topbar -->
 
@@ -343,12 +354,14 @@
 
   <!-- Preview + optional Befunde: Layout wird zum Split, sobald geprüft wurde.
        editMode zeigt contenteditable statt Preview (Findings bleiben rechts sichtbar). -->
-  <div class="editor-body-wrap" :class="checkDone ? 'lektorat-split' : ''">
+  <div class="editor-body-wrap"
+       :class="{ 'lektorat-split': checkDone, 'editor-body-wrap--entities': entitiesEnabledForCurrentBook && entityPanelOpen && editMode && !focusActive }">
     <div class="editor-preview-wrap" :class="checkDone ? 'lektorat-split-preview' : ''">
       <div id="partial-editor-body-edit"></div>
       <div id="partial-editor-body-view"></div>
     </div>
     <div id="partial-editor-findings" class="display-contents"></div>
+    <div id="partial-editor-entities-panel" class="display-contents"></div>
   </div>
 
   <!-- Verlauf dieser Seite (Partial → pageHistoryCard) -->

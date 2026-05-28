@@ -563,14 +563,23 @@ async function runZeitstrahl(ctx, opts = {}) {
   if (!silent) updateJob(jobId, { progress: 78, statusText: 'job.phase.consolidatingTimeline' });
   const rawEvtRows = db.prepare(`
     SELECT f.fig_id, f.name AS fig_name, f.typ AS fig_typ,
-           fe.datum, fe.ereignis, fe.typ AS evt_typ, fe.bedeutung,
+           fe.datum, fe.datum_label,
+           fe.datum_year, fe.datum_month, fe.datum_day,
+           fe.datum_ende_year, fe.datum_ende_month, fe.datum_ende_day,
+           fe.story_tag, fe.subtyp,
+           fe.ereignis, fe.typ AS evt_typ, fe.bedeutung,
            c.chapter_name AS kapitel, p.page_name AS seite
     FROM figure_events fe
     JOIN figures f ON f.id = fe.figure_id
     LEFT JOIN chapters c ON c.chapter_id = fe.chapter_id
     LEFT JOIN pages    p ON p.page_id    = fe.page_id
     WHERE f.book_id = ? AND f.user_email IS ?
-    ORDER BY fe.datum, f.sort_order
+    ORDER BY
+      COALESCE(fe.datum_year,  9999),
+      COALESCE(fe.datum_month, 99),
+      COALESCE(fe.datum_day,   99),
+      COALESCE(fe.story_tag,   99999),
+      f.sort_order
   `).all(bookIdInt, email);
   if (!rawEvtRows.length) return;
 
@@ -579,7 +588,17 @@ async function runZeitstrahl(ctx, opts = {}) {
     const key = `${row.datum}||${(row.ereignis || '').trim().toLowerCase()}`;
     if (!evtGroupMap.has(key)) {
       evtGroupMap.set(key, {
-        datum: row.datum, ereignis: row.ereignis, typ: row.evt_typ,
+        datum: row.datum,
+        datum_label:      row.datum_label,
+        datum_year:       row.datum_year,
+        datum_month:      row.datum_month,
+        datum_day:        row.datum_day,
+        datum_ende_year:  row.datum_ende_year,
+        datum_ende_month: row.datum_ende_month,
+        datum_ende_day:   row.datum_ende_day,
+        story_tag:        row.story_tag,
+        subtyp:           row.subtyp || 'sonstiges',
+        ereignis: row.ereignis, typ: row.evt_typ,
         bedeutung: row.bedeutung || '',
         kapitel: row.kapitel ? [row.kapitel] : [],
         seiten:  row.seite   ? [row.seite]   : [],
@@ -593,7 +612,18 @@ async function runZeitstrahl(ctx, opts = {}) {
     if (row.seite   && !ev.seiten.includes(row.seite))   ev.seiten.push(row.seite);
   }
 
-  const zeitstrahlEvents = [...evtGroupMap.values()].sort((a, b) => parseInt(a.datum) - parseInt(b.datum));
+  // Strukturierte Sortierung — Events ohne Jahr ans Ende.
+  const _sortKey = ev => [
+    ev.datum_year  ?? 9999,
+    ev.datum_month ?? 99,
+    ev.datum_day   ?? 99,
+    ev.story_tag   ?? 99999,
+  ];
+  const zeitstrahlEvents = [...evtGroupMap.values()].sort((a, b) => {
+    const ka = _sortKey(a), kb = _sortKey(b);
+    for (let i = 0; i < ka.length; i++) if (ka[i] !== kb[i]) return ka[i] - kb[i];
+    return 0;
+  });
 
   // Bei wenigen pre-gegroupeten Events bringt die KI-Konsolidierung fast nichts
   // (Dedup-Chance klein, kanonische Formulierung marginal) – direkt speichern spart

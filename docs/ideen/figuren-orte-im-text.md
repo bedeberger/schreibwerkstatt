@@ -1,6 +1,6 @@
 # Figuren & Orte im Text (extrahierte Entitäten im Notebook-Editor sichtbar machen)
 
-- **Status:** Ready
+- **Status:** Implemented
 - **Aufwand:** M
 - **Severity:** medium
 

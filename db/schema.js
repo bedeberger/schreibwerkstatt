@@ -13,6 +13,34 @@ const fonts = require('./fonts');
 const books = require('./books');
 const tokenUsage = require('./token-usage');
 const draftFigures = require('./draft-figures');
+const { parseDatum } = require('../lib/datum-parse');
+
+// Whitelist für Event-Subtypen (Phase 2). Unbekannte Werte fallen auf
+// 'sonstiges' zurück. Persoenlich/extern bleibt in `typ` getrennt.
+const SUBTYP_WL = new Set([
+  'geburt', 'tod', 'hochzeit', 'reise', 'konflikt', 'wendepunkt',
+  'entdeckung', 'verlust', 'sieg',
+  'extern_politisch', 'extern_natur', 'extern_kulturell', 'sonstiges',
+]);
+
+// Strukturierte Datums-Felder aus AI-Output extrahieren; fehlt etwas, parseDatum
+// als Fallback. Liefert Felder, die direkt in zeitstrahl_events/figure_events
+// eingefügt werden können.
+function _structuredDatum(ev) {
+  const labelSrc = ev.datum_label || ev.datum || '';
+  const p = parseDatum(labelSrc);
+  return {
+    datum_label:       (ev.datum_label || ev.datum || p.label || '').toString(),
+    datum_year:        ev.datum_year        ?? p.year      ?? null,
+    datum_month:       ev.datum_month       ?? p.month     ?? null,
+    datum_day:         ev.datum_day         ?? p.day       ?? null,
+    datum_ende_year:   ev.datum_ende_year   ?? null,
+    datum_ende_month:  ev.datum_ende_month  ?? null,
+    datum_ende_day:    ev.datum_ende_day    ?? null,
+    story_tag:         ev.story_tag         ?? p.story_tag ?? null,
+    subtyp:            SUBTYP_WL.has(ev.subtyp) ? ev.subtyp : 'sonstiges',
+  };
+}
 
 // ── Job-Laufzeiten ────────────────────────────────────────────────────────────
 const _stmtInsJobRun = db.prepare(
@@ -85,10 +113,18 @@ function _toRefString(v) {
 function saveZeitstrahlEvents(bookId, userEmail, ereignisse, chNameToId = {}, pageNameToIdByChapter = null) {
   const now = new Date().toISOString();
   db.transaction(() => {
-    db.prepare('DELETE FROM zeitstrahl_events WHERE book_id = ? AND user_email = ?').run(bookId, userEmail || '');
+    // Nur AI-generierte Rows (manually_edited=0) ersetzen — user-kuratierte
+    // Events bleiben über Re-Runs hinweg erhalten. CASCADE löscht ihre Child-
+    // Rows (chapters/pages/figures) mit; AI-Re-Run baut sie neu auf.
+    db.prepare(
+      'DELETE FROM zeitstrahl_events WHERE book_id = ? AND user_email = ? AND manually_edited = 0'
+    ).run(bookId, userEmail || '');
     const ins = db.prepare(`INSERT INTO zeitstrahl_events
-      (book_id, user_email, datum, ereignis, typ, bedeutung, sort_order, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
+      (book_id, user_email, datum, datum_label,
+       datum_year, datum_month, datum_day,
+       datum_ende_year, datum_ende_month, datum_ende_day,
+       story_tag, ereignis, typ, subtyp, bedeutung, sort_order, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     const insZec = db.prepare('INSERT INTO zeitstrahl_event_chapters (event_id, chapter_id, sort_order) VALUES (?, ?, ?)');
     const insZep = db.prepare('INSERT INTO zeitstrahl_event_pages    (event_id, page_id, sort_order)    VALUES (?, ?, ?)');
     const insZef = db.prepare('INSERT INTO zeitstrahl_event_figures  (event_id, figure_id, figur_name, sort_order) VALUES (?, ?, ?, ?)');
@@ -105,9 +141,14 @@ function saveZeitstrahlEvents(bookId, userEmail, ereignisse, chNameToId = {}, pa
     }
     for (let i = 0; i < ereignisse.length; i++) {
       const ev = ereignisse[i];
+      const sd = _structuredDatum(ev);
       const { lastInsertRowid: eventId } = ins.run(
         bookId, userEmail || '',
-        ev.datum || '', ev.ereignis || '', ev.typ || 'persoenlich', ev.bedeutung || null,
+        ev.datum || sd.datum_label || '', sd.datum_label,
+        sd.datum_year, sd.datum_month, sd.datum_day,
+        sd.datum_ende_year, sd.datum_ende_month, sd.datum_ende_day,
+        sd.story_tag,
+        ev.ereignis || '', ev.typ || 'persoenlich', sd.subtyp, ev.bedeutung || null,
         i, now
       );
 
@@ -617,10 +658,10 @@ function deleteFinetuneAiCache(bookId, userEmail) {
 
 // ── Buch-Einstellungen (Sprache + Region) ─────────────────────────────────────
 
-const _getBookSettings = db.prepare('SELECT language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars FROM book_settings WHERE book_id = ?');
+const _getBookSettings = db.prepare('SELECT language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, entities_enabled FROM book_settings WHERE book_id = ?');
 const _upsertBookSettings = db.prepare(`
-  INSERT INTO book_settings (book_id, language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, updated_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  INSERT INTO book_settings (book_id, language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, entities_enabled, updated_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT(book_id) DO UPDATE SET
     language=excluded.language, region=excluded.region,
     buchtyp=excluded.buchtyp, buch_kontext=excluded.buch_kontext,
@@ -628,10 +669,18 @@ const _upsertBookSettings = db.prepare(`
     is_finished=excluded.is_finished,
     allow_lektor_book_chat=excluded.allow_lektor_book_chat,
     daily_goal_chars=excluded.daily_goal_chars,
+    entities_enabled=excluded.entities_enabled,
+    updated_at=excluded.updated_at
+`);
+const _updateBookSettingsEntitiesEnabled = db.prepare(`
+  INSERT INTO book_settings (book_id, entities_enabled, updated_at)
+  VALUES (?, ?, ?)
+  ON CONFLICT(book_id) DO UPDATE SET
+    entities_enabled=excluded.entities_enabled,
     updated_at=excluded.updated_at
 `);
 
-/** Gibt {language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars} für ein Buch zurück.
+/** Gibt {language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, entities_enabled} für ein Buch zurück.
  *  Fehlt die book_settings-Zeile, werden – wenn vorhanden – die User-Defaults
  *  (default_language/region/buchtyp) als Fallback verwendet. `daily_goal_chars`
  *  bleibt NULL, wenn nichts gesetzt — Frontend mappt auf 1500-Default. */
@@ -641,16 +690,17 @@ function getBookSettings(bookId, userEmail = null) {
     ...row,
     is_finished: row.is_finished ? 1 : 0,
     allow_lektor_book_chat: row.allow_lektor_book_chat ? 1 : 0,
+    entities_enabled: row.entities_enabled ? 1 : 0,
   };
   if (userEmail) {
     const u = require('./app-users').getUser(userEmail);
     if (u && (u.default_language || u.default_buchtyp)) {
       const language = u.default_language || 'de';
       const region   = u.default_region   || (language === 'en' ? 'US' : 'CH');
-      return { language, region, buchtyp: u.default_buchtyp || null, buch_kontext: null, erzaehlperspektive: null, erzaehlzeit: null, is_finished: 0, allow_lektor_book_chat: 0, daily_goal_chars: null };
+      return { language, region, buchtyp: u.default_buchtyp || null, buch_kontext: null, erzaehlperspektive: null, erzaehlzeit: null, is_finished: 0, allow_lektor_book_chat: 0, daily_goal_chars: null, entities_enabled: 0 };
     }
   }
-  return { language: 'de', region: 'CH', buchtyp: null, buch_kontext: null, erzaehlperspektive: null, erzaehlzeit: null, is_finished: 0, allow_lektor_book_chat: 0, daily_goal_chars: null };
+  return { language: 'de', region: 'CH', buchtyp: null, buch_kontext: null, erzaehlperspektive: null, erzaehlzeit: null, is_finished: 0, allow_lektor_book_chat: 0, daily_goal_chars: null, entities_enabled: 0 };
 }
 
 /** Locale-Key für ein Buch: z.B. "de-CH", "en-US". */
@@ -659,8 +709,8 @@ function getBookLocale(bookId, userEmail = null) {
   return `${language}-${region}`;
 }
 
-/** Speichert/aktualisiert Sprache, Region, Buchtyp, Buchkontext, Erzählperspektive, Erzählzeit, is_finished, allow_lektor_book_chat, daily_goal_chars. */
-function saveBookSettings(bookId, language, region, buchtyp, buchKontext, erzaehlperspektive = null, erzaehlzeit = null, isFinished = 0, allowLektorBookChat = 0, dailyGoalChars = null) {
+/** Speichert/aktualisiert Sprache, Region, Buchtyp, Buchkontext, Erzählperspektive, Erzählzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, entities_enabled. */
+function saveBookSettings(bookId, language, region, buchtyp, buchKontext, erzaehlperspektive = null, erzaehlzeit = null, isFinished = 0, allowLektorBookChat = 0, dailyGoalChars = null, entitiesEnabled = 0) {
   _upsertBookSettings.run(
     parseInt(bookId), language, region,
     buchtyp || null, buchKontext || null,
@@ -668,6 +718,17 @@ function saveBookSettings(bookId, language, region, buchtyp, buchKontext, erzaeh
     isFinished ? 1 : 0,
     allowLektorBookChat ? 1 : 0,
     dailyGoalChars == null ? null : Math.round(Number(dailyGoalChars)),
+    entitiesEnabled ? 1 : 0,
+    new Date().toISOString()
+  );
+}
+
+/** Toggle aus Notebook-Toolbar — Quick-Update nur fuer entities_enabled,
+ *  ohne andere Settings anzufassen (Toolbar-Toggle laedt Form nicht). */
+function setBookEntitiesEnabled(bookId, enabled) {
+  _updateBookSettingsEntitiesEnabled.run(
+    parseInt(bookId),
+    enabled ? 1 : 0,
     new Date().toISOString()
   );
 }
@@ -976,7 +1037,7 @@ module.exports = {
   insertJobRun, startJobRun, endJobRun, cleanupStuckJobRuns,
   getDailyTokenUsage:    tokenUsage.getDailyTokenUsage,
   getDailyTotalsByUser:  tokenUsage.getDailyTotalsByUser,
-  getBookSettings, getBookLocale, saveBookSettings,
+  getBookSettings, getBookLocale, saveBookSettings, setBookEntitiesEnabled,
   loadChapterExtractCache, saveChapterExtractCache, deleteChapterExtractCache,
   loadChapterReviewCache, saveChapterReviewCache,
   loadBookReviewCache, saveBookReviewCache, deleteReviewCache,

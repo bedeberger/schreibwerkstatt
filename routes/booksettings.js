@@ -1,6 +1,6 @@
 'use strict';
 const express = require('express');
-const { getBookSettings, saveBookSettings } = require('../db/schema');
+const { getBookSettings, saveBookSettings, setBookEntitiesEnabled } = require('../db/schema');
 const { aclParamGuard } = require('../lib/acl');
 
 const router = express.Router();
@@ -28,7 +28,7 @@ router.get('/:book_id', aclParamGuard('viewer'), (req, res) => {
 router.put('/:book_id', aclParamGuard('editor'), jsonBody, (req, res) => {
   const bookId = req.bookId;
 
-  const { language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars } = req.body || {};
+  const { language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, entities_enabled } = req.body || {};
   if (!language || !region) {
     return res.status(400).json({ error_code: 'LANGUAGE_REGION_REQUIRED' });
   }
@@ -61,7 +61,8 @@ router.put('/:book_id', aclParamGuard('editor'), jsonBody, (req, res) => {
 
   const finished = is_finished ? 1 : 0;
   const lektorBookChat = allow_lektor_book_chat ? 1 : 0;
-  saveBookSettings(bookId, language, region, buchtyp || null, buch_kontext || null, erzaehlperspektive || null, erzaehlzeit || null, finished, lektorBookChat, dailyGoal);
+  const entitiesEnabled = entities_enabled ? 1 : 0;
+  saveBookSettings(bookId, language, region, buchtyp || null, buch_kontext || null, erzaehlperspektive || null, erzaehlzeit || null, finished, lektorBookChat, dailyGoal, entitiesEnabled);
   res.json({
     ok: true, language, region,
     buchtyp: buchtyp || null, buch_kontext: buch_kontext || null,
@@ -70,8 +71,18 @@ router.put('/:book_id', aclParamGuard('editor'), jsonBody, (req, res) => {
     is_finished: finished,
     allow_lektor_book_chat: lektorBookChat,
     daily_goal_chars: dailyGoal,
+    entities_enabled: entitiesEnabled,
     locale: `${language}-${region}`,
   });
+});
+
+/** Quick-Toggle aus Notebook-Toolbar — patcht nur entities_enabled,
+ *  ohne dass der ganze Settings-Body uebertragen werden muss. */
+router.put('/:book_id/entities-enabled', aclParamGuard('editor'), jsonBody, (req, res) => {
+  const bookId = req.bookId;
+  const enabled = req.body?.enabled ? 1 : 0;
+  setBookEntitiesEnabled(bookId, enabled);
+  res.json({ ok: true, entities_enabled: enabled });
 });
 
 module.exports = router;

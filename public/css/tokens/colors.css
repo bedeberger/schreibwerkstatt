@@ -150,6 +150,22 @@
   --card-accent-hubspot: #c45a3a;
   --card-accent-share: #5a4a8e;
 
+  /* Event-Subtyp-Akzente (Phase 2): Mapping in card-accents.css.
+     Light-Theme: kräftige Hues für Badge-Background. */
+  --card-accent-event-geburt:           #4c8a4c;
+  --card-accent-event-tod:              #555c66;
+  --card-accent-event-hochzeit:         #b86fa0;
+  --card-accent-event-reise:            #4a86b8;
+  --card-accent-event-konflikt:         #b85a48;
+  --card-accent-event-wendepunkt:       #8e5fbd;
+  --card-accent-event-entdeckung:       #d18a3a;
+  --card-accent-event-verlust:          #7a6478;
+  --card-accent-event-sieg:             #c8a23a;
+  --card-accent-event-extern_politisch: #4a6a8e;
+  --card-accent-event-extern_natur:     #4e8a72;
+  --card-accent-event-extern_kulturell: #a05a7a;
+  --card-accent-event-sonstiges:        #8a8278;
+
   /* Job-Queue-Footer */
   --color-queue-bar-bg: var(--color-surface);
   --color-queue-border-subtle: var(--color-border);
@@ -303,6 +319,21 @@
   --card-accent-blog: #88aacc;
   --card-accent-hubspot: #e08a72;
   --card-accent-share: #998ac6;
+
+  /* Event-Subtyp-Akzente (Dark) — heller, geringer gesättigt. */
+  --card-accent-event-geburt:           #88c488;
+  --card-accent-event-tod:              #98a0aa;
+  --card-accent-event-hochzeit:         #e0a4cc;
+  --card-accent-event-reise:            #8ab8d4;
+  --card-accent-event-konflikt:         #e0907e;
+  --card-accent-event-wendepunkt:       #c4a4e4;
+  --card-accent-event-entdeckung:       #efb678;
+  --card-accent-event-verlust:          #b8a4b4;
+  --card-accent-event-sieg:             #e8cc78;
+  --card-accent-event-extern_politisch: #8aaadc;
+  --card-accent-event-extern_natur:     #8ec4a8;
+  --card-accent-event-extern_kulturell: #d098b0;
+  --card-accent-event-sonstiges:        #b8b0a6;
 
   --color-border-contrast: #d8d8d8;
 

@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 155, 84 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 157, 85 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -50,6 +50,9 @@ erDiagram
   books ||--o{ finetune_ai_cache     : has
   books ||--o{ draft_figures         : has
   books ||--o{ werkstatt_runs        : has
+  books ||--o{ storylines            : has
+  storylines ||--o{ zeitstrahl_events : groups
+  storylines ||--o{ figure_events     : groups
   books }o--o| book_categories       : "category_id"
   books ||--o| blog_connections      : "wp-link"
   blog_connections ||--o{ blog_page_links : "has"
@@ -296,6 +299,7 @@ erDiagram
     INTEGER is_finished              "0|1, blendet Schreib-Tracking aus"
     INTEGER allow_lektor_book_chat   "Lektor darf Buch-Chat (Default 0)"
     INTEGER daily_goal_chars         "Tagesziel Zeichen (NULL = Default 1500)"
+    INTEGER entities_enabled         "0|1, Figuren/Orte-Highlights + Szenen/Ereignisse-Panel im Notebook-Editor"
     TEXT    updated_at
   }
 
@@ -367,14 +371,25 @@ erDiagram
     INTEGER haeufigkeit
   }
   figure_events {
-    INTEGER id         PK
-    INTEGER figure_id  FK
-    INTEGER chapter_id FK "SET NULL"
-    INTEGER page_id    FK "SET NULL"
-    TEXT    datum
+    INTEGER id              PK
+    INTEGER figure_id       FK
+    INTEGER chapter_id      FK "SET NULL"
+    INTEGER page_id         FK "SET NULL"
+    INTEGER storyline_id    FK "SET NULL"
+    TEXT    datum           "Original-Notation"
+    TEXT    datum_label     "User-lesbar"
+    INTEGER datum_year
+    INTEGER datum_month
+    INTEGER datum_day
+    INTEGER datum_ende_year
+    INTEGER datum_ende_month
+    INTEGER datum_ende_day
+    INTEGER story_tag       "relative Story-Zeit"
     TEXT    ereignis
     TEXT    bedeutung
     TEXT    typ
+    TEXT    subtyp          "geburt|tod|reise|… Whitelist"
+    INTEGER manually_edited "Schutz vor Re-Run-Overwrite"
     INTEGER sort_order
   }
   page_figure_mentions {
@@ -556,14 +571,34 @@ erDiagram
     INTEGER sort_order
   }
 
+  storylines {
+    INTEGER id          PK
+    INTEGER book_id     FK
+    TEXT    name        "UNIQUE(book_id, name)"
+    TEXT    farbe       "Hex #RRGGBB (Phase 3)"
+    INTEGER sort_order
+    TEXT    created_at
+    TEXT    updated_at
+  }
   zeitstrahl_events {
-    INTEGER id         PK
-    INTEGER book_id    FK
+    INTEGER id              PK
+    INTEGER book_id         FK
+    INTEGER storyline_id    FK "SET NULL"
     TEXT    user_email
-    TEXT    datum
+    TEXT    datum           "Original-Notation"
+    TEXT    datum_label     "User-lesbar"
+    INTEGER datum_year
+    INTEGER datum_month
+    INTEGER datum_day
+    INTEGER datum_ende_year
+    INTEGER datum_ende_month
+    INTEGER datum_ende_day
+    INTEGER story_tag       "relative Story-Zeit"
     TEXT    ereignis
     TEXT    typ
+    TEXT    subtyp          "geburt|tod|reise|… Whitelist"
     TEXT    bedeutung
+    INTEGER manually_edited "Schutz vor Re-Run-Overwrite"
     INTEGER sort_order
     TEXT    updated_at
   }
@@ -593,6 +628,7 @@ erDiagram
   zeitstrahl_events ||--o{ zeitstrahl_event_chapters  : refs
   zeitstrahl_events ||--o{ zeitstrahl_event_pages     : refs
   zeitstrahl_events ||--o{ zeitstrahl_event_figures   : refs
+  storylines        ||--o{ zeitstrahl_events          : groups
 ```
 
 ---

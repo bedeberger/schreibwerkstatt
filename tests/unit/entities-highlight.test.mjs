@@ -1,0 +1,118 @@
+// Unit-Tests fuer Entity-Linking-Match-Engine.
+//
+// Pure-Funktion buildRanges(text, entities): findet Vorkommen von
+// Figuren-/Orte-Namen im Text, respektiert Unicode-Wortgrenzen, behandelt
+// Kollisionen (Figur > Ort) und Overlaps deterministisch.
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+const { buildRanges, toEntitiesList } = await import('../../public/js/editor/notebook/entities.js');
+
+const F = (id, name) => ({ id, name, kind: 'figure' });
+const L = (id, name) => ({ id, name, kind: 'location' });
+
+test('buildRanges: leere Eingaben → leeres Ergebnis', () => {
+  assert.deepEqual(buildRanges('', [F(1, 'Anna')]), []);
+  assert.deepEqual(buildRanges('Hallo', []), []);
+  assert.deepEqual(buildRanges('Hallo', null), []);
+});
+
+test('buildRanges: einfacher Treffer am Wortanfang', () => {
+  const out = buildRanges('Anna ging fort.', [F(1, 'Anna')]);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].start, 0);
+  assert.equal(out[0].end, 4);
+  assert.equal(out[0].kind, 'figure');
+  assert.equal(out[0].id, 1);
+});
+
+test('buildRanges: case-insensitiv', () => {
+  const out = buildRanges('Heute traf ich ANNA wieder.', [F(1, 'Anna')]);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].start, 15);
+  assert.equal(out[0].end, 19);
+});
+
+test('buildRanges: Teilstring-Schutz — "Anna" matcht nicht in "Annabelle"', () => {
+  const out = buildRanges('Annabelle stand am Fenster.', [F(1, 'Anna')]);
+  assert.deepEqual(out, []);
+});
+
+test('buildRanges: aber "Annabelle" matcht "Annabelle"', () => {
+  const out = buildRanges('Annabelle stand am Fenster.', [F(1, 'Annabelle')]);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].name, 'Annabelle');
+});
+
+test('buildRanges: mehrere Vorkommen desselben Namens', () => {
+  const out = buildRanges('Anna sah Anna. Anna lachte.', [F(1, 'Anna')]);
+  assert.equal(out.length, 3);
+  assert.deepEqual(out.map(r => r.start), [0, 9, 15]);
+});
+
+test('buildRanges: Unicode-Wortgrenzen — "Anna-Lena" gilt als ein Wort', () => {
+  // "Anna" in "Anna-Lena" sollte NICHT matchen, weil "-" Wort-Zeichen ist.
+  const out = buildRanges('Anna-Lena rief um Hilfe.', [F(1, 'Anna')]);
+  assert.deepEqual(out, []);
+});
+
+test('buildRanges: Apostroph in Namen erlaubt — O\'Brien als Einheit', () => {
+  // "Brien" alleine sollte NICHT matchen in "O'Brien".
+  const out = buildRanges('Mister O\'Brien kam.', [F(1, 'Brien')]);
+  assert.deepEqual(out, []);
+});
+
+test('buildRanges: vollstaendiger Name mit Apostroph matcht', () => {
+  const out = buildRanges('Mister O\'Brien kam.', [F(1, 'O\'Brien')]);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].name, 'O\'Brien');
+});
+
+test('buildRanges: Kollision Figur ↔ Ort am gleichen Offset → Figur gewinnt', () => {
+  // "Wald" existiert als Figur UND als Ort.
+  const out = buildRanges('Wald sah den Wald an.', [F(1, 'Wald'), L(2, 'Wald')]);
+  assert.equal(out.length, 2);
+  // Beide Treffer als Figur (Ort wurde durch Kollision verworfen).
+  assert.ok(out.every(r => r.kind === 'figure'));
+});
+
+test('buildRanges: Overlapping-Schutz — laengster Match zuerst, andere fallen weg', () => {
+  // "Anna" als Figur + "Anna Schmidt" als andere Figur. Wenn beide am
+  // gleichen Offset starten, gewinnt der laengere — andere wird verworfen.
+  const out = buildRanges('Anna Schmidt klopfte.', [F(1, 'Anna'), F(2, 'Anna Schmidt')]);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].name, 'Anna Schmidt');
+});
+
+test('buildRanges: Sortierung nach Start-Offset', () => {
+  const out = buildRanges('Bob traf Anna in Berlin.', [
+    F(1, 'Anna'),
+    L(2, 'Berlin'),
+    F(3, 'Bob'),
+  ]);
+  assert.equal(out.length, 3);
+  assert.deepEqual(out.map(r => r.name), ['Bob', 'Anna', 'Berlin']);
+});
+
+test('buildRanges: leerer Name wird ignoriert', () => {
+  const out = buildRanges('Anna kam.', [F(1, ''), F(2, '  '), F(3, 'Anna')]);
+  assert.equal(out.length, 1);
+});
+
+test('buildRanges: Mark-Zeichen (Diakritika) als Wort-Zeichen', () => {
+  // "Müller" matcht "Müller" trotz Umlaut; nicht aber "Müllerin".
+  const out = buildRanges('Frau Müllerin und Herr Müller.', [F(1, 'Müller')]);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].start, 23);
+});
+
+test('toEntitiesList: vereint Figuren und Orte mit kind-Annotation, leere Namen raus', () => {
+  const figuren = [{ id: 1, name: 'Anna' }, { id: 2, name: '' }, { id: 3, name: null }];
+  const orte    = [{ id: 10, name: 'Berlin' }, { id: 11, name: '' }];
+  const list = toEntitiesList(figuren, orte);
+  assert.deepEqual(list, [
+    { id: 1, name: 'Anna', kind: 'figure' },
+    { id: 10, name: 'Berlin', kind: 'location' },
+  ]);
+});

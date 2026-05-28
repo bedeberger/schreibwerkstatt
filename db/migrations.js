@@ -6516,6 +6516,188 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 155 abgeschlossen (book_presence.page_id, page-scoped Presence).');
   }
 
+  if (version < 156) {
+    // Ereignisse-Ausbau Phase 1: strukturierte Datum-Felder + Subtyp + Storylines.
+    //   - Neue Tabelle `storylines` (Plot-Stränge) — UNIQUE(book_id, name).
+    //   - `zeitstrahl_events` + `figure_events` bekommen:
+    //       * datum_year/month/day  (Punkt-Datum strukturiert)
+    //       * datum_ende_year/month/day  (Spannen-Ende)
+    //       * datum_label TEXT  (Original-String, user-/AI-lesbar)
+    //       * story_tag INT  (relative Story-Zeit, falls kein realer Kalender)
+    //       * subtyp TEXT DEFAULT 'sonstiges'  (geburt|tod|reise|… Whitelist)
+    //       * storyline_id INT NULL REFERENCES storylines(id) ON DELETE SET NULL
+    //       * manually_edited INT NOT NULL DEFAULT 0  (Schutz vor Re-Run-Overwrite)
+    //   - Datums-Parser läuft einmalig über alle Bestands-`datum`-Werte und füllt
+    //     die strukturierten Felder. Original-String wandert nach `datum_label`.
+    //   - storyline_id FK braucht Recreate (SQLite kann ALTER ADD CONSTRAINT nicht).
+    const { parseDatum } = require('../lib/datum-parse');
+
+    db.pragma('foreign_keys = OFF');
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS storylines (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id     INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        name        TEXT NOT NULL,
+        farbe       TEXT,
+        sort_order  INTEGER DEFAULT 0,
+        created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        UNIQUE(book_id, name)
+      );
+      CREATE INDEX IF NOT EXISTS idx_storylines_book ON storylines(book_id, sort_order);
+    `);
+
+    db.exec(`
+      DROP TABLE IF EXISTS zeitstrahl_events_new;
+      CREATE TABLE zeitstrahl_events_new (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id         INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        user_email      TEXT NOT NULL DEFAULT '' REFERENCES app_users(email) ON DELETE CASCADE,
+        datum           TEXT NOT NULL,
+        datum_label     TEXT,
+        datum_year      INTEGER,
+        datum_month     INTEGER,
+        datum_day       INTEGER,
+        datum_ende_year INTEGER,
+        datum_ende_month INTEGER,
+        datum_ende_day  INTEGER,
+        story_tag       INTEGER,
+        ereignis        TEXT NOT NULL,
+        typ             TEXT DEFAULT 'persoenlich',
+        subtyp          TEXT DEFAULT 'sonstiges',
+        bedeutung       TEXT,
+        storyline_id    INTEGER REFERENCES storylines(id) ON DELETE SET NULL,
+        manually_edited INTEGER NOT NULL DEFAULT 0,
+        sort_order      INTEGER DEFAULT 0,
+        updated_at      TEXT
+      );
+    `);
+
+    // Daten kopieren + parsen
+    const zeRows = db.prepare(
+      'SELECT id, book_id, user_email, datum, ereignis, typ, bedeutung, sort_order, updated_at FROM zeitstrahl_events'
+    ).all();
+    const insZe = db.prepare(`
+      INSERT INTO zeitstrahl_events_new
+        (id, book_id, user_email, datum, datum_label,
+         datum_year, datum_month, datum_day,
+         story_tag, ereignis, typ, subtyp, bedeutung, sort_order, updated_at)
+      VALUES (@id, @book_id, @user_email, @datum, @datum_label,
+              @datum_year, @datum_month, @datum_day,
+              @story_tag, @ereignis, @typ, @subtyp, @bedeutung, @sort_order, @updated_at)
+    `);
+    for (const r of zeRows) {
+      const p = parseDatum(r.datum);
+      insZe.run({
+        id: r.id, book_id: r.book_id, user_email: r.user_email,
+        datum: r.datum, datum_label: p.label || r.datum,
+        datum_year:  p.year  ?? null,
+        datum_month: p.month ?? null,
+        datum_day:   p.day   ?? null,
+        story_tag:   p.story_tag ?? null,
+        ereignis: r.ereignis, typ: r.typ || 'persoenlich', subtyp: 'sonstiges',
+        bedeutung: r.bedeutung, sort_order: r.sort_order ?? 0, updated_at: r.updated_at,
+      });
+    }
+
+    db.exec(`
+      DROP TABLE zeitstrahl_events;
+      ALTER TABLE zeitstrahl_events_new RENAME TO zeitstrahl_events;
+      CREATE INDEX idx_ze_book_id              ON zeitstrahl_events(book_id, user_email);
+      CREATE INDEX idx_zeitstrahl_events_user_email ON zeitstrahl_events(user_email);
+      CREATE INDEX idx_ze_storyline            ON zeitstrahl_events(storyline_id);
+      CREATE INDEX idx_ze_year                 ON zeitstrahl_events(datum_year);
+    `);
+
+    db.exec(`
+      DROP TABLE IF EXISTS figure_events_new;
+      CREATE TABLE figure_events_new (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        figure_id       INTEGER NOT NULL REFERENCES figures(id) ON DELETE CASCADE,
+        datum           TEXT NOT NULL,
+        datum_label     TEXT,
+        datum_year      INTEGER,
+        datum_month     INTEGER,
+        datum_day       INTEGER,
+        datum_ende_year INTEGER,
+        datum_ende_month INTEGER,
+        datum_ende_day  INTEGER,
+        story_tag       INTEGER,
+        ereignis        TEXT NOT NULL,
+        bedeutung       TEXT,
+        typ             TEXT DEFAULT 'persoenlich',
+        subtyp          TEXT DEFAULT 'sonstiges',
+        storyline_id    INTEGER REFERENCES storylines(id) ON DELETE SET NULL,
+        manually_edited INTEGER NOT NULL DEFAULT 0,
+        sort_order      INTEGER DEFAULT 0,
+        chapter_id      INTEGER REFERENCES chapters(chapter_id) ON DELETE SET NULL,
+        page_id         INTEGER REFERENCES pages(page_id)       ON DELETE SET NULL
+      );
+    `);
+
+    const feRows = db.prepare(
+      'SELECT rowid AS rid, figure_id, datum, ereignis, bedeutung, typ, sort_order, chapter_id, page_id FROM figure_events'
+    ).all();
+    const insFe = db.prepare(`
+      INSERT INTO figure_events_new
+        (figure_id, datum, datum_label,
+         datum_year, datum_month, datum_day,
+         story_tag, ereignis, bedeutung, typ, subtyp, sort_order, chapter_id, page_id)
+      VALUES (@figure_id, @datum, @datum_label,
+              @datum_year, @datum_month, @datum_day,
+              @story_tag, @ereignis, @bedeutung, @typ, @subtyp, @sort_order, @chapter_id, @page_id)
+    `);
+    for (const r of feRows) {
+      const p = parseDatum(r.datum);
+      insFe.run({
+        figure_id: r.figure_id, datum: r.datum, datum_label: p.label || r.datum,
+        datum_year:  p.year  ?? null,
+        datum_month: p.month ?? null,
+        datum_day:   p.day   ?? null,
+        story_tag:   p.story_tag ?? null,
+        ereignis: r.ereignis, bedeutung: r.bedeutung, typ: r.typ || 'persoenlich',
+        subtyp: 'sonstiges', sort_order: r.sort_order ?? 0,
+        chapter_id: r.chapter_id, page_id: r.page_id,
+      });
+    }
+
+    db.exec(`
+      DROP TABLE figure_events;
+      ALTER TABLE figure_events_new RENAME TO figure_events;
+      CREATE INDEX idx_fe_chapter   ON figure_events(chapter_id);
+      CREATE INDEX idx_fe_page      ON figure_events(page_id);
+      CREATE INDEX idx_fe_storyline ON figure_events(storyline_id);
+    `);
+
+    db.pragma('foreign_keys = ON');
+    const fkErrors156 = db.pragma('foreign_key_check');
+    if (fkErrors156.length) {
+      throw new Error(`Migration 156: foreign_key_check meldet ${fkErrors156.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 156').run();
+    logger.info(`DB-Migration auf Version 156 abgeschlossen (storylines + strukturierte Datum-Felder; ${zeRows.length} zeitstrahl_events / ${feRows.length} figure_events migriert).`);
+  }
+
+  if (version < 157) {
+    // Entity-Linking-Feature pro Buch ein-/ausschaltbar (siehe
+    // docs/ideen/figuren-orte-im-text.md). Default aus. Schaltet im
+    // Notebook-Editor Inline-Highlights fuer Figuren/Orte + Seiten-Panel
+    // fuer Szenen/Ereignisse. Liegt in book_settings (konsistent mit
+    // is_finished / allow_lektor_book_chat / daily_goal_chars).
+    const bsCols = db.pragma('table_info(book_settings)').map(c => c.name);
+    if (!bsCols.includes('entities_enabled')) {
+      db.prepare('ALTER TABLE book_settings ADD COLUMN entities_enabled INTEGER NOT NULL DEFAULT 0').run();
+    }
+
+    const fkErrors157 = db.pragma('foreign_key_check');
+    if (fkErrors157.length) {
+      throw new Error(`Migration 157: foreign_key_check meldet ${fkErrors157.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 157').run();
+    logger.info('DB-Migration auf Version 157 abgeschlossen (book_settings.entities_enabled).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

@@ -135,7 +135,16 @@ function saveFigurenToDb(bookId, figuren, userEmail, idMaps) {
 
 // Ersetzt alle Lebensereignisse für ein Buch/User anhand von fig_id-basierten Assignments.
 // assignments: [{ fig_id: "fig_1", lebensereignisse: [...] }]
+// Strukturierte Datumsfelder (datum_year/month/day/ende/story_tag/datum_label/subtyp)
+// werden vom AI-Pass mitgeliefert; parseDatum dient als Fallback. manually_edited=1
+// schützt vor Re-Run-Overwrite.
 function updateFigurenEvents(bookId, assignments, userEmail, idMaps) {
+  const { parseDatum } = require('../lib/datum-parse');
+  const SUBTYP_WL = new Set([
+    'geburt', 'tod', 'hochzeit', 'reise', 'konflikt', 'wendepunkt',
+    'entdeckung', 'verlust', 'sieg',
+    'extern_politisch', 'extern_natur', 'extern_kulturell', 'sonstiges',
+  ]);
   db.transaction(() => {
     const figRows = db.prepare(
       'SELECT id, fig_id FROM figures WHERE book_id = ? AND user_email = ?'
@@ -143,10 +152,15 @@ function updateFigurenEvents(bookId, assignments, userEmail, idMaps) {
     if (!figRows.length) return;
 
     const figIdToRowId = Object.fromEntries(figRows.map(r => [r.fig_id, r.id]));
-    const delEvt = db.prepare('DELETE FROM figure_events WHERE figure_id = ?');
+    const delEvt = db.prepare('DELETE FROM figure_events WHERE figure_id = ? AND manually_edited = 0');
     for (const row of figRows) delEvt.run(row.id);
 
-    const insEvt = db.prepare('INSERT INTO figure_events (figure_id, datum, ereignis, bedeutung, typ, chapter_id, page_id, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+    const insEvt = db.prepare(`INSERT INTO figure_events
+      (figure_id, datum, datum_label,
+       datum_year, datum_month, datum_day,
+       datum_ende_year, datum_ende_month, datum_ende_day,
+       story_tag, ereignis, bedeutung, typ, subtyp, chapter_id, page_id, sort_order)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     for (const assignment of assignments) {
       const rowId = figIdToRowId[assignment.fig_id];
       if (!rowId) continue;
@@ -157,12 +171,25 @@ function updateFigurenEvents(bookId, assignments, userEmail, idMaps) {
         // oder chMap-Fallback «Sonstige Seiten» → seite nullen.
         const effSeite = (ev.seite && ev.seite !== ev.kapitel && ev.seite !== 'Sonstige Seiten')
           ? ev.seite : null;
-        // Kapitel-scoped page-id Lookup gegen Namenskollisionen zwischen Kapiteln.
         const pageId = effSeite
           ? (idMaps?.pageNameToIdByChapter?.[chId ?? 0]?.[effSeite] ?? null)
           : null;
-        insEvt.run(rowId, ev.datum || '', ev.ereignis || '', ev.bedeutung || null,
-          ev.typ || 'persoenlich', chId, pageId, j);
+        const labelSrc = ev.datum_label || ev.datum || '';
+        const p = parseDatum(labelSrc);
+        const subtyp = SUBTYP_WL.has(ev.subtyp) ? ev.subtyp : 'sonstiges';
+        insEvt.run(
+          rowId, ev.datum || labelSrc || '',
+          ev.datum_label || labelSrc || p.label || '',
+          ev.datum_year       ?? p.year       ?? null,
+          ev.datum_month      ?? p.month      ?? null,
+          ev.datum_day        ?? p.day        ?? null,
+          ev.datum_ende_year  ?? null,
+          ev.datum_ende_month ?? null,
+          ev.datum_ende_day   ?? null,
+          ev.story_tag        ?? p.story_tag  ?? null,
+          ev.ereignis || '', ev.bedeutung || null,
+          ev.typ || 'persoenlich', subtyp, chId, pageId, j,
+        );
       }
     }
   })();

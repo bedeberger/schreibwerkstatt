@@ -62,6 +62,7 @@ import { registerEditorFigurLookupCard } from './cards/editor-figur-lookup-card.
 import { registerEditorToolbarCard } from './cards/editor-toolbar-card.js';
 import { registerEditorFocusCard } from './cards/editor-focus-card.js';
 import { registerEditorNotebookCard } from './cards/editor-notebook-card.js';
+import { registerEditorEntitiesCard } from './cards/editor-entities-card.js';
 import { registerEditorSpellcheckCard } from './cards/editor-spellcheck-card.js';
 import { setupSpellcheckDispatch } from './cards/editor-spellcheck/dispatch.js';
 import { registerLektoratFindingsCard } from './cards/lektorat-findings-card.js';
@@ -289,6 +290,7 @@ document.addEventListener('alpine:init', () => {
   registerEditorToolbarCard();
   registerEditorFocusCard();
   registerEditorNotebookCard();
+  registerEditorEntitiesCard();
   registerEditorSpellcheckCard();
   registerLektoratFindingsCard();
   registerPageHistoryCard();
@@ -700,6 +702,7 @@ document.addEventListener('alpine:init', () => {
         }
         await this._applyHash();
         if (!this.isAdminOnly && this.selectedBookId) this._loadBookRole(this.selectedBookId);
+        if (!this.isAdminOnly && this.selectedBookId) this._loadEntitiesEnabledForBook(this.selectedBookId);
         if (!this.isAdminOnly) await this._maybeOpenBookOverview();
         this._syncUrlNow();
         this._applyingHash = false;
@@ -745,6 +748,7 @@ document.addEventListener('alpine:init', () => {
           } catch (_) {}
           this._resetBookScopedState();
           this._loadBookRole(newVal);
+          this._loadEntitiesEnabledForBook(newVal);
           await this.loadPages({ source: 'bookSwitch' });
           await this._reloadVisibleBookCards();
           this._maybeOpenBookOverview();

@@ -337,6 +337,57 @@ export const treeMethods = {
     this.bookFilterCategoryId = '';
   },
 
+  // Entity-Linking-Toggle pro Buch laden — Spiegel von
+  // book_settings.entities_enabled. Wird beim Buchwechsel + nach Save in der
+  // BookSettings-Karte aktualisiert. Failsafe: bei Netz/Permission-Fehler aus.
+  async _loadEntitiesEnabledForBook(bookId) {
+    const id = bookId ? String(bookId) : '';
+    if (!id) { this.entitiesEnabledForCurrentBook = false; return; }
+    try {
+      const res = await fetch('/booksettings/' + encodeURIComponent(id), {
+        headers: { Accept: 'application/json' },
+      });
+      if (!res.ok) { this.entitiesEnabledForCurrentBook = false; return; }
+      const data = await res.json();
+      if (String(this.selectedBookId) === id) {
+        this.entitiesEnabledForCurrentBook = !!data.entities_enabled;
+      }
+    } catch (_) {
+      this.entitiesEnabledForCurrentBook = false;
+    }
+  },
+
+  // Toolbar-Toggle aus dem Notebook-Editor — PUTtet nur entities_enabled,
+  // dispatcht book:settings:updated damit BookSettings-Card + Entities-Sub
+  // sich synchron halten.
+  async toggleEntitiesEnabledForCurrentBook() {
+    const id = this.selectedBookId;
+    if (!id) return;
+    if (this._entitiesBusy) return;
+    this._entitiesBusy = true;
+    const next = !this.entitiesEnabledForCurrentBook;
+    this.entitiesEnabledForCurrentBook = next;
+    try {
+      const res = await fetch('/booksettings/' + encodeURIComponent(id) + '/entities-enabled', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: next ? 1 : 0 }),
+      });
+      if (!res.ok) {
+        this.entitiesEnabledForCurrentBook = !next;
+        throw new Error('HTTP ' + res.status);
+      }
+      window.dispatchEvent(new CustomEvent('book:settings:updated', { detail: {
+        bookId: id, entities_enabled: next ? 1 : 0,
+      }}));
+    } catch (e) {
+      this.entitiesEnabledForCurrentBook = !next;
+      console.error('[entities] Toggle fehlgeschlagen:', e);
+    } finally {
+      this._entitiesBusy = false;
+    }
+  },
+
   // ACL-Rolle aus /books/:id/access laden + cachen. Getter
   // `canEdit`/`canReview`/`isViewer` lesen ausschliesslich `currentBookRole`.
   async _loadBookRole(bookId) {

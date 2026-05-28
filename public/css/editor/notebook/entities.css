@@ -1,0 +1,284 @@
+/* Entity-Linking (Notebook-Editor): Inline-Highlights fuer Figuren/Orte +
+   Klappschiene mit Szenen/Ereignissen + Popover. CSS Custom Highlight API
+   wird vom selben Browser-Pool angewendet — wir registrieren nur Pseudo-Stile. */
+
+@layer components {
+
+  /* ── Inline-Highlights ─────────────────────────────────────────────────── */
+
+  ::highlight(entity-figure) {
+    background-color: color-mix(in srgb, var(--color-accent-figure, #6c8bd7) 22%, transparent);
+    text-decoration: underline dotted color-mix(in srgb, var(--color-accent-figure, #6c8bd7) 70%, transparent);
+    text-underline-offset: 3px;
+  }
+
+  ::highlight(entity-location) {
+    background-color: color-mix(in srgb, var(--color-accent-location, #c08a4a) 18%, transparent);
+    text-decoration: underline dotted color-mix(in srgb, var(--color-accent-location, #c08a4a) 70%, transparent);
+    text-underline-offset: 3px;
+  }
+
+  /* ── Klappschiene neben Editor-Body ────────────────────────────────────── */
+
+  .entity-panel {
+    container-type: inline-size;
+    flex: 0 0 280px;
+    max-width: 320px;
+    min-width: 220px;
+    border-left: 1px solid var(--color-border, #e3e3e3);
+    background: var(--color-bg-subtle, #fafafa);
+    padding: var(--space-3, 12px);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3, 12px);
+    overflow-y: auto;
+    align-self: stretch;
+  }
+
+  .entity-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2, 8px);
+    padding-bottom: var(--space-2, 8px);
+    border-bottom: 1px solid var(--color-border, #e3e3e3);
+  }
+
+  .entity-panel-title {
+    font-size: var(--text-sm, 0.85em);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-fg-muted, #666);
+  }
+
+  .entity-panel-close {
+    padding: 2px;
+    line-height: 1;
+  }
+
+  .entity-panel-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4, 16px);
+  }
+
+  .entity-panel-section-title {
+    font-size: var(--text-sm, 0.85em);
+    margin: 0 0 var(--space-2, 6px);
+    color: var(--color-fg-strong, #222);
+  }
+
+  .entity-panel-subsection {
+    margin-bottom: var(--space-2, 8px);
+  }
+
+  .entity-panel-subsection--chapter {
+    opacity: 0.78;
+  }
+
+  .entity-panel-subtitle {
+    margin: 0 0 4px;
+    font-size: 0.72em;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-fg-muted, #666);
+  }
+
+  .entity-panel-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .entity-panel-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 8px;
+    border-radius: var(--radius-sm, 4px);
+    background: var(--color-bg, #fff);
+    border: 1px solid var(--color-border, #e3e3e3);
+    cursor: pointer;
+    transition: background 0.12s ease, border-color 0.12s ease;
+  }
+
+  .entity-panel-item:hover {
+    background: color-mix(in srgb, var(--color-accent, #4a90e2) 6%, var(--color-bg, #fff));
+    border-color: color-mix(in srgb, var(--color-accent, #4a90e2) 35%, var(--color-border, #e3e3e3));
+  }
+
+  .entity-panel-item:focus-visible {
+    outline: 2px solid var(--color-accent, #4a90e2);
+    outline-offset: 1px;
+  }
+
+  .entity-panel-item-title {
+    font-size: var(--text-sm, 0.9em);
+    font-weight: 500;
+    color: var(--color-fg, #222);
+  }
+
+  .entity-panel-item-meta {
+    display: flex;
+    gap: var(--space-2, 6px);
+    flex-wrap: wrap;
+    font-size: 0.78em;
+    color: var(--color-fg-muted, #666);
+  }
+
+  .entity-panel-item-date {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .entity-panel-item-figure {
+    font-style: italic;
+  }
+
+  .entity-panel-section-empty,
+  .entity-panel-empty {
+    font-size: 0.85em;
+    margin: 0;
+  }
+
+  /* Container-Query: bei schmalem Editor-Body (Mobile, geteilte Ansicht)
+     statt rechtem Sidebar unter den Body fallen. */
+  @container (max-width: 240px) {
+    .entity-panel {
+      max-width: none;
+      min-width: 0;
+    }
+  }
+
+  /* Editor-Body responsiv: bei < 760px Viewport Schiene komplett unten.
+     Mediaquery hier, weil Layout vom .editor-body-wrap-Parent abhaengt. */
+  @media (max-width: 760px) {
+    .editor-body-wrap .entity-panel {
+      flex-basis: auto;
+      max-width: none;
+      border-left: none;
+      border-top: 1px solid var(--color-border, #e3e3e3);
+    }
+  }
+
+  /* ── Popover (teleport in body) ────────────────────────────────────────── */
+
+  .entity-popover {
+    position: fixed;
+    z-index: 2000;
+    min-width: 240px;
+    max-width: 340px;
+    background: var(--color-bg, #fff);
+    border: 1px solid var(--color-border, #e3e3e3);
+    border-radius: var(--radius-md, 6px);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+    padding: var(--space-3, 12px);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2, 8px);
+  }
+
+  .entity-popover-header {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2, 8px);
+  }
+
+  .entity-popover-kind {
+    font-size: 0.7em;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm, 4px);
+    background: var(--color-bg-subtle, #f3f3f3);
+    color: var(--color-fg-muted, #666);
+  }
+
+  .entity-popover-kind--figure {
+    background: color-mix(in srgb, var(--color-accent-figure, #6c8bd7) 18%, transparent);
+    color: var(--color-accent-figure-fg, #2c3e7d);
+  }
+
+  .entity-popover-kind--location {
+    background: color-mix(in srgb, var(--color-accent-location, #c08a4a) 18%, transparent);
+    color: var(--color-accent-location-fg, #6e4a1f);
+  }
+
+  .entity-popover-name {
+    font-weight: 600;
+    font-size: 1.02em;
+    flex: 1;
+    word-break: break-word;
+  }
+
+  .entity-popover-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.2em;
+    line-height: 1;
+    padding: 2px 6px;
+    color: var(--color-fg-muted, #666);
+    border-radius: var(--radius-sm, 4px);
+  }
+
+  .entity-popover-close:hover {
+    background: var(--color-bg-subtle, #f3f3f3);
+  }
+
+  .entity-popover-body {
+    font-size: 0.9em;
+    color: var(--color-fg, #222);
+  }
+
+  .entity-popover-desc {
+    margin: 0;
+  }
+
+  .entity-popover-meta {
+    margin: 4px 0 0;
+    color: var(--color-fg-muted, #666);
+    font-size: 0.85em;
+    font-style: italic;
+  }
+
+  .entity-popover-footer {
+    display: flex;
+    justify-content: flex-end;
+    border-top: 1px solid var(--color-border, #e3e3e3);
+    padding-top: var(--space-2, 8px);
+  }
+
+  .entity-popover-link {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.88em;
+    color: var(--color-accent, #4a90e2);
+    padding: 4px 8px;
+    border-radius: var(--radius-sm, 4px);
+  }
+
+  .entity-popover-link:hover {
+    background: color-mix(in srgb, var(--color-accent, #4a90e2) 10%, transparent);
+  }
+}
+
+/* Tokens: Accents pro Entity-Typ. Werden in tokens/colors.css ueberschrieben,
+   falls dort definiert; Fallbacks hier sichern Standalone-Rendering ab. */
+:root {
+  --color-accent-figure: #6c8bd7;
+  --color-accent-figure-fg: #2c3e7d;
+  --color-accent-location: #c08a4a;
+  --color-accent-location-fg: #6e4a1f;
+}
+
+[data-theme="dark"], .theme-dark {
+  --color-accent-figure: #8aa5e6;
+  --color-accent-figure-fg: #b3c6f0;
+  --color-accent-location: #d4a474;
+  --color-accent-location-fg: #e6c294;
+}

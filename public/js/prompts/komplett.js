@@ -316,7 +316,16 @@ Antworte mit diesem JSON-Schema:
       "figur_name": "Figurenname exakt wie im Text",
       "lebensereignisse": [
         {
-          "datum": "JJJJ (nur Jahreszahl; aus Kontext errechnen wenn nötig; leer wenn nicht errechenbar)",
+          "datum": "Original-Datum-Notation (JJJJ, JJJJ-MM, JJJJ-MM-TT, «Mai 1850», «Tag 3», «vor der Reise», …)",
+          "datum_label": "User-lesbarer Original-String – identisch oder lesbarer als datum.",
+          "datum_year":  1850,        // Jahreszahl als INT (negativ für v.Chr.); null wenn unbekannt
+          "datum_month": 5,           // 1–12; null wenn unbekannt
+          "datum_day":   12,          // 1–31; null wenn unbekannt
+          "datum_ende_year":  null,   // Spanne (Krieg, Reise, Schwangerschaft, Studium): Ende-Jahr
+          "datum_ende_month": null,
+          "datum_ende_day":   null,
+          "story_tag":   null,        // Relative Story-Zeit (Tag 3, Day 12) wenn kein realer Kalender
+          "subtyp":      "wendepunkt", // geburt|tod|hochzeit|reise|konflikt|wendepunkt|entdeckung|verlust|sieg|extern_politisch|extern_natur|extern_kulturell|sonstiges (Default 'sonstiges')
           "ereignis": "Was passierte – neutral und kanonisch formuliert, NICHT aus der Figurenperspektive. Ereignisse die mehrere Figuren betreffen MÜSSEN bei allen beteiligten Figuren identisch formuliert sein (z.B. 'Geburt von Maria' für Vater, Mutter und Kind – nicht 'Geburt seiner Tochter' oder 'Eigene Geburt').",
           "typ": "persoenlich|extern",
           "bedeutung": "Bedeutung für diese Figur (1 Satz, leer wenn nicht klar)",
@@ -338,7 +347,7 @@ Kernregeln:
 - kapitel[].name: immer der Kapitelname (aus dem ## Header oder dem Prompt-Kontext), niemals Seitentitel.
 - figuren_namen / orte_namen / figur_name: Klarnamen exakt wie im Text.
 - Songs: nur mit konkretem Titel oder Interpret aufnehmen; kontext_typ Pflicht.
-- Ereignisse: datum als JJJJ; ohne errechenbares Jahr weglassen. Gleiches Ereignis bei allen beteiligten Figuren identisch formulieren.
+- Ereignisse: datum_label = Original-String, datum_year/month/day strukturiert (jeweils null wenn unbekannt). subtyp aus Whitelist; im Zweifel 'sonstiges'. Gleiches Ereignis bei allen beteiligten Figuren identisch formulieren.
 - Leere Arrays wenn nichts gefunden.`;
   }
 
@@ -368,7 +377,11 @@ Szenen-Regeln:
 Ereignis-Regeln:
 - typ='persoenlich': echte biografische Wendepunkte (Geburt, Tod, Trauma, neue/beendete Beziehung, Jobwechsel, Umzug, wichtige Entscheidung) – nur wenn tatsächlich im Text belegt
 - typ='extern': gesellschaftliche/historische Ereignisse – SEHR GROSSZÜGIG erfassen: Kriege, politische Umbrüche, Sport- und Kulturereignisse, Wirtschaftskrisen, Seuchen, Naturkatastrophen; auch wenn nur kurz erwähnt; jedes externe Ereignis ALLEN betroffenen Figuren zuweisen
-- datum: immer als vierstellige Jahreszahl (JJJJ) – aus Kontext errechnen wenn nötig; Events ohne errechenbare Jahreszahl weglassen
+- subtyp: feiner Subtyp (Whitelist) – geburt, tod, hochzeit, reise, konflikt, wendepunkt, entdeckung, verlust, sieg (für typ=persoenlich) bzw. extern_politisch, extern_natur, extern_kulturell (für typ=extern). Wenn nichts klar passt: 'sonstiges'.
+- datum: Original-String wie im Text vorhanden (z.B. «Mai 1850», «12. März 1850», «1850», «Tag 3», «vor der Reise»). datum_label spiegelt das in einer user-lesbaren Form.
+- datum_year/datum_month/datum_day PFLICHT zerlegen falls aus Text/Kontext berechenbar; Felder ohne Information null lassen. Events OHNE jegliche Datums-Information (auch keine relative Story-Zeit) trotzdem aufnehmen – Felder dann null, das Event landet im «unbekannt»-Bucket.
+- Spannen-Events (Krieg, Reise, Studium, Schwangerschaft): Start in datum_year/month/day, Ende in datum_ende_year/month/day. Ein-Punkt-Events lassen datum_ende_* null.
+- story_tag: Wenn der Text relative Zeit nutzt («Tag 3», «am dritten Tag der Reise») statt eines Kalenders, hier den INT-Wert eintragen.
 - figur_name: exakt wie in figuren[].name dieser Antwort (kanonischen Namen aus der Figurenliste verwenden, KEINE Textvariante, kein Titel, kein Spitzname der dort nicht steht)
 - Nur Figuren ausgeben die mindestens ein Ereignis haben; leeres assignments-Array wenn keine Ereignisse gefunden`;
 }
@@ -387,7 +400,16 @@ function buildKomplettSchemaFigurenOnly(kontext = '') {
       "figur_name": "Figurenname exakt wie im Text",
       "lebensereignisse": [
         {
-          "datum": "JJJJ (nur Jahreszahl; aus Kontext errechnen wenn nötig; leer wenn nicht errechenbar)",
+          "datum": "Original-Datum-Notation (JJJJ, JJJJ-MM, JJJJ-MM-TT, «Mai 1850», «Tag 3», «vor der Reise», …)",
+          "datum_label": "User-lesbarer Original-String.",
+          "datum_year":  1850,         // null wenn unbekannt
+          "datum_month": null,
+          "datum_day":   null,
+          "datum_ende_year":  null,    // Spanne: Ende-Jahr
+          "datum_ende_month": null,
+          "datum_ende_day":   null,
+          "story_tag":   null,         // Relative Story-Zeit
+          "subtyp":      "sonstiges",  // geburt|tod|hochzeit|reise|konflikt|wendepunkt|entdeckung|verlust|sieg|extern_politisch|extern_natur|extern_kulturell|sonstiges
           "ereignis": "Was passierte – neutral formuliert. Gleiches Ereignis bei allen beteiligten Figuren identisch.",
           "typ": "persoenlich|extern",
           "bedeutung": "Bedeutung für diese Figur (1 Satz, leer wenn nicht klar)",
@@ -408,7 +430,7 @@ Kernregeln:
 - Keine historischen/realen Personen die nur erwähnt werden.
 - kapitel[].name: aus ## Header oder Prompt-Kontext. Nie Seitentitel.
 - figur_name: Klarname exakt wie im Text.
-- Ereignisse: datum JJJJ; ohne errechenbares Jahr weglassen.
+- Ereignisse: datum_label = Original-String, datum_year/month/day strukturiert (null wenn unbekannt). subtyp aus Whitelist; im Zweifel 'sonstiges'.
 - Leere Arrays wenn nichts gefunden.`;
   }
   return `${schemaPart}
@@ -418,6 +440,9 @@ ${figurenBasisRules(kontext)}
 
 Ereignis-Regeln:
 - typ='persoenlich' / typ='extern' wie oben dokumentiert.
+- datum_label = Original-String; datum_year/month/day strukturiert zerlegen (null wenn unbekannt). Events ohne Datums-Information trotzdem aufnehmen (alles null).
+- Spannen (Krieg, Reise, Studium): Start in datum_*, Ende in datum_ende_*.
+- subtyp aus Whitelist; persoenlich → geburt|tod|hochzeit|reise|konflikt|wendepunkt|entdeckung|verlust|sieg|sonstiges; extern → extern_politisch|extern_natur|extern_kulturell|sonstiges.
 - Nur Figuren ausgeben die mindestens ein Ereignis haben.`;
 }
 
@@ -552,7 +577,16 @@ Antworte mit diesem JSON-Schema:
 {
   "ereignisse": [
     {
-      "datum": "JJJJ",
+      "datum": "Original-Datum (JJJJ oder Freitext)",
+      "datum_label": "User-lesbarer Original-String, z.B. «Mai 1850», «12. März 1850», «1850», «vor der Reise»",
+      "datum_year":  1850,          // Jahr als INT (negativ für v.Chr.); null wenn unbekannt
+      "datum_month": 5,             // 1–12; null wenn unbekannt
+      "datum_day":   12,            // 1–31; null wenn unbekannt
+      "datum_ende_year":  null,     // Falls Spanne (Krieg, Reise, Schwangerschaft): Ende-Jahr
+      "datum_ende_month": null,
+      "datum_ende_day":   null,
+      "story_tag": null,            // Relative Story-Zeit (Tag 3, Day 12) wenn kein Kalender
+      "subtyp": "wendepunkt",       // geburt|tod|hochzeit|reise|konflikt|wendepunkt|entdeckung|verlust|sieg|extern_politisch|extern_natur|extern_kulturell|sonstiges
       "ereignis": "kanonische Formulierung",
       "typ": "persoenlich|extern",
       "bedeutung": "zusammengeführte Bedeutung oder leer",
@@ -564,7 +598,10 @@ Antworte mit diesem JSON-Schema:
 }
 
 Regeln:
-- Behalte die chronologische Reihenfolge (aufsteigend nach Jahreszahl)
+- Strukturierte Datums-Felder PFLICHT: datum_year/month/day aus jedem datum_label extrahieren. Nur ein Teil bekannt? Restliche Felder null.
+- Spannen (z.B. «Krieg 1914–1918», «Reise Mai–August 1850»): datum_*_year/month/day = Start, datum_ende_*_year/month/day = Ende.
+- Behalte die chronologische Reihenfolge (aufsteigend nach datum_year, dann _month, _day)
+- subtyp: Eines aus der Whitelist. Default 'sonstiges'. Bei externen Welt-Events: extern_politisch|extern_natur|extern_kulturell.
 - Dedupliziere figuren (gleiche id nur einmal pro Ereignis)
 - kapitel: Alle Kapitel der zusammengeführten Ereignisse beibehalten (Union der Arrays, Duplikate entfernen)
 - seiten: Alle Seiten der zusammengeführten Ereignisse beibehalten (Union der Arrays, Duplikate entfernen)
@@ -831,6 +868,14 @@ function _szenenField() {
   };
 }
 
+// Whitelist für Event-Subtypen (Phase 2). KI darf nur diese Werte liefern;
+// Server-Save fällt sonst auf 'sonstiges' zurück.
+const EVENT_SUBTYP_ENUM = [
+  'geburt', 'tod', 'hochzeit', 'reise', 'konflikt', 'wendepunkt',
+  'entdeckung', 'verlust', 'sieg',
+  'extern_politisch', 'extern_natur', 'extern_kulturell', 'sonstiges',
+];
+
 function _assignmentsField() {
   return {
     type: 'array',
@@ -840,6 +885,15 @@ function _assignmentsField() {
         type: 'array',
         items: _obj({
           datum: _str,
+          datum_label: _str,
+          datum_year:  _num,
+          datum_month: _num,
+          datum_day:   _num,
+          datum_ende_year:  _num,
+          datum_ende_month: _num,
+          datum_ende_day:   _num,
+          story_tag:   _num,
+          subtyp: { type: 'string', enum: EVENT_SUBTYP_ENUM },
           ereignis: _str,
           typ: { type: 'string', enum: ['persoenlich', 'extern'] },
           bedeutung: _str,
@@ -913,6 +967,15 @@ export const SCHEMA_ZEITSTRAHL = _obj({
     type: 'array',
     items: _obj({
       datum: _str,
+      datum_label: _str,
+      datum_year:  _num,
+      datum_month: _num,
+      datum_day:   _num,
+      datum_ende_year:  _num,
+      datum_ende_month: _num,
+      datum_ende_day:   _num,
+      story_tag:   _num,
+      subtyp: { type: 'string', enum: EVENT_SUBTYP_ENUM },
       ereignis: _str,
       typ: { type: 'string', enum: ['persoenlich', 'extern'] },
       bedeutung: _str,

@@ -1,0 +1,165 @@
+<!-- Entity-Linking-Panel + Popover (Notebook-Editor).
+     Klappschiene rechts neben dem Editor-Body (Container-Query mobile);
+     Popover teleported in body fuer Klick auf Highlight-Wort.
+     x-data: editorEntitiesCard (cards/editor-entities-card.js). -->
+<div x-data="editorEntitiesCard" class="display-contents">
+
+  <!-- Klappschiene: lebt im editor-body-wrap als Sibling von .editor-preview-wrap.
+       Sichtbar wenn entitiesEnabled aktiv UND nicht alle Listen leer (sonst nur
+       der Empty-State-Hinweis auf die Komplettanalyse). -->
+  <aside class="entity-panel"
+         x-show="$app.entitiesEnabledForCurrentBook && $app.entityPanelOpen && $app.editMode && !$app.focusActive"
+         x-cloak>
+    <div class="entity-panel-header">
+      <span class="entity-panel-title" x-text="$app.t('entities.panel.title')"></span>
+      <button type="button" class="graph-tool-btn entity-panel-close"
+              @click="$app.entityPanelOpen = false"
+              :data-tip="$app.t('common.close')"
+              :aria-label="$app.t('common.close')">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#x"/></svg>
+      </button>
+    </div>
+
+    <div class="entity-panel-body">
+      <!-- Empty-State: keine Extraktion vorhanden -->
+      <div class="entity-panel-empty" x-show="extractionEmpty()" x-cloak>
+        <p class="muted-msg" x-text="$app.t('entities.empty.runAnalysis')"></p>
+      </div>
+
+      <!-- Szenen -->
+      <template x-if="!extractionEmpty()">
+        <div class="entity-panel-section">
+          <h4 class="entity-panel-section-title" x-text="$app.t('entities.panel.scenes')"></h4>
+
+          <template x-if="panelScenes().onPage.length > 0">
+            <div class="entity-panel-subsection">
+              <p class="entity-panel-subtitle" x-text="$app.t('entities.panel.onPage')"></p>
+              <ul class="entity-panel-list">
+                <template x-for="s in panelScenes().onPage" :key="'sp-' + s.id">
+                  <li class="entity-panel-item internal-link" @click="openScene(s.id)">
+                    <span class="entity-panel-item-title" x-text="s.titel || $app.t('entities.scene')"></span>
+                    <span x-show="s.wertung" class="badge"
+                          :class="'badge--wertung-' + s.wertung"
+                          x-text="s.wertung"></span>
+                  </li>
+                </template>
+              </ul>
+            </div>
+          </template>
+
+          <template x-if="panelScenes().inChapter.length > 0">
+            <div class="entity-panel-subsection entity-panel-subsection--chapter">
+              <p class="entity-panel-subtitle" x-text="$app.t('entities.panel.inChapter')"></p>
+              <ul class="entity-panel-list">
+                <template x-for="s in panelScenes().inChapter" :key="'sc-' + s.id">
+                  <li class="entity-panel-item internal-link" @click="openScene(s.id)">
+                    <span class="entity-panel-item-title" x-text="s.titel || $app.t('entities.scene')"></span>
+                    <span x-show="s.wertung" class="badge"
+                          :class="'badge--wertung-' + s.wertung"
+                          x-text="s.wertung"></span>
+                  </li>
+                </template>
+              </ul>
+            </div>
+          </template>
+
+          <p x-show="panelScenes().onPage.length === 0 && panelScenes().inChapter.length === 0"
+             class="entity-panel-section-empty muted-msg"
+             x-text="$app.t('entities.panel.empty')"></p>
+        </div>
+      </template>
+
+      <!-- Ereignisse -->
+      <template x-if="!extractionEmpty()">
+        <div class="entity-panel-section">
+          <h4 class="entity-panel-section-title" x-text="$app.t('entities.panel.events')"></h4>
+
+          <template x-if="panelEvents().onPage.length > 0">
+            <div class="entity-panel-subsection">
+              <p class="entity-panel-subtitle" x-text="$app.t('entities.panel.onPage')"></p>
+              <ul class="entity-panel-list">
+                <template x-for="(e, ei) in panelEvents().onPage" :key="'ep-' + ei + '-' + e.figure_id">
+                  <li class="entity-panel-item internal-link" @click="openEvent(e.figure_id)">
+                    <span class="entity-panel-item-title" x-text="e.ereignis"></span>
+                    <span class="entity-panel-item-meta">
+                      <span x-show="e.datum" class="entity-panel-item-date" x-text="e.datum_label || e.datum"></span>
+                      <span x-show="e.figure_kurzname || e.figure_name"
+                            class="entity-panel-item-figure"
+                            x-text="e.figure_kurzname || e.figure_name"></span>
+                    </span>
+                  </li>
+                </template>
+              </ul>
+            </div>
+          </template>
+
+          <template x-if="panelEvents().inChapter.length > 0">
+            <div class="entity-panel-subsection entity-panel-subsection--chapter">
+              <p class="entity-panel-subtitle" x-text="$app.t('entities.panel.inChapter')"></p>
+              <ul class="entity-panel-list">
+                <template x-for="(e, ei) in panelEvents().inChapter" :key="'ec-' + ei + '-' + e.figure_id">
+                  <li class="entity-panel-item internal-link" @click="openEvent(e.figure_id)">
+                    <span class="entity-panel-item-title" x-text="e.ereignis"></span>
+                    <span class="entity-panel-item-meta">
+                      <span x-show="e.datum" class="entity-panel-item-date" x-text="e.datum_label || e.datum"></span>
+                      <span x-show="e.figure_kurzname || e.figure_name"
+                            class="entity-panel-item-figure"
+                            x-text="e.figure_kurzname || e.figure_name"></span>
+                    </span>
+                  </li>
+                </template>
+              </ul>
+            </div>
+          </template>
+
+          <p x-show="panelEvents().onPage.length === 0 && panelEvents().inChapter.length === 0"
+             class="entity-panel-section-empty muted-msg"
+             x-text="$app.t('entities.panel.empty')"></p>
+        </div>
+      </template>
+    </div>
+  </aside>
+
+  <!-- Popover (teleport): Klick auf Highlight-Wort im Editor.
+       Pendant zum figur-lookup-Popover; eigene Klasse fuer Styling.  -->
+  <template x-teleport="body">
+    <div x-show="entityPopover" x-cloak class="entity-popover"
+         :style="{ left: (entityPopover?.x || 0) + 'px', top: (entityPopover?.y || 0) + 'px' }"
+         @click.outside="closePopover()"
+         @keydown.escape.window="closePopover()">
+      <template x-if="entityPopover">
+        <div>
+          <div class="entity-popover-header">
+            <span class="entity-popover-kind"
+                  :class="'entity-popover-kind--' + entityPopover.kind"
+                  x-text="entityPopover.kind === 'figure' ? $app.t('entities.figure') : $app.t('entities.location')"></span>
+            <span class="entity-popover-name" x-text="entityPopover.name"></span>
+            <button type="button" class="entity-popover-close" @click="closePopover()"
+                    :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')">×</button>
+          </div>
+          <div class="entity-popover-body">
+            <p x-show="entityPopover.data?.kurzbeschreibung || entityPopover.data?.beschreibung"
+               class="entity-popover-desc"
+               x-text="entityPopover.data?.kurzbeschreibung || entityPopover.data?.beschreibung"></p>
+            <p x-show="entityPopover.kind === 'figure' && entityPopover.data?.rolle"
+               class="entity-popover-meta"
+               x-text="entityPopover.data?.rolle"></p>
+            <p x-show="entityPopover.kind === 'location' && entityPopover.data?.typ"
+               class="entity-popover-meta"
+               x-text="entityPopover.data?.typ"></p>
+          </div>
+          <div class="entity-popover-footer">
+            <button type="button" class="entity-popover-link"
+                    x-show="entityPopover.kind === 'figure'"
+                    @click="openFigure(entityPopover.id)"
+                    x-text="$app.t('entities.gotoCard')"></button>
+            <button type="button" class="entity-popover-link"
+                    x-show="entityPopover.kind === 'location'"
+                    @click="openLocation(entityPopover.id)"
+                    x-text="$app.t('entities.gotoCard')"></button>
+          </div>
+        </div>
+      </template>
+    </div>
+  </template>
+</div>

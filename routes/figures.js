@@ -3,6 +3,7 @@ const { db, saveFigurenToDb, saveZeitstrahlEvents, getChapterFigures } = require
 const { recomputeBookFigureMentions } = require('../lib/page-index');
 const { toIntId, inClause } = require('../lib/validate');
 const { aclParamGuard } = require('../lib/acl');
+const { parseDatum } = require('../lib/datum-parse');
 const searchIndex = require('../lib/search');
 const logger = require('../logger');
 
@@ -17,10 +18,38 @@ router.get('/zeitstrahl/:book_id', (req, res) => {
   const bookId = toIntId(req.params.book_id);
   if (!bookId) return res.status(400).json({ error_code: 'INVALID_ID' });
   const userEmail = req.session?.user?.email || null;
-  const rows = db.prepare(
-    'SELECT id, datum, ereignis, typ, bedeutung FROM zeitstrahl_events WHERE book_id = ? AND user_email = ? ORDER BY sort_order'
-  ).all(bookId, userEmail || '');
+  // ORDER BY: strukturierte Datums-Felder zuerst (Year/Month/Day), Events ohne
+  // Jahr ans Ende ("unbekannt"-Bucket via COALESCE-Sentinel 9999/99). sort_order
+  // dient nur noch als Tiebreaker bei Datums-Gleichstand.
+  const rows = db.prepare(`
+    SELECT id, datum, datum_label, datum_year, datum_month, datum_day,
+           datum_ende_year, datum_ende_month, datum_ende_day,
+           story_tag, ereignis, typ, subtyp, bedeutung,
+           storyline_id, manually_edited, sort_order
+    FROM zeitstrahl_events
+    WHERE book_id = ? AND user_email = ?
+    ORDER BY
+      COALESCE(datum_year,  9999),
+      COALESCE(datum_month, 99),
+      COALESCE(datum_day,   99),
+      COALESCE(story_tag,   99999),
+      sort_order, id
+  `).all(bookId, userEmail || '');
   if (!rows.length) return res.json({ ereignisse: null });
+
+  // Lazy-Parser-Fallback: Events mit Label aber ohne strukturierte Felder
+  // (z.B. nachträglich verbesserter Parser oder manuelle Legacy-Strings)
+  // beim Read erneut durchschleusen — füllt nur In-Memory, kein DB-Write.
+  for (const r of rows) {
+    if (r.datum_label && r.datum_year == null && r.datum_month == null
+        && r.datum_day == null && r.story_tag == null) {
+      const p = parseDatum(r.datum_label);
+      if (p.year  != null) r.datum_year  = p.year;
+      if (p.month != null) r.datum_month = p.month;
+      if (p.day   != null) r.datum_day   = p.day;
+      if (p.story_tag != null) r.story_tag = p.story_tag;
+    }
+  }
 
   const eventIds = rows.map(r => r.id);
   const { sql: idSql, values: idVals } = inClause(eventIds);
@@ -72,15 +101,28 @@ router.get('/zeitstrahl/:book_id', (req, res) => {
   }
 
   const ereignisse = rows.map(r => ({
-    datum:       r.datum,
-    ereignis:    r.ereignis,
-    typ:         r.typ || 'persoenlich',
-    bedeutung:   r.bedeutung || '',
-    kapitel:     chByEvt.get(r.id)?.kapitel     || [],
-    chapter_ids: chByEvt.get(r.id)?.chapter_ids || [],
-    seiten:      pgByEvt.get(r.id)?.seiten      || [],
-    page_ids:    pgByEvt.get(r.id)?.page_ids    || [],
-    figuren:     fgByEvt.get(r.id) || [],
+    id:               r.id,
+    datum:            r.datum,
+    datum_label:      r.datum_label || r.datum || '',
+    datum_year:       r.datum_year,
+    datum_month:      r.datum_month,
+    datum_day:        r.datum_day,
+    datum_ende_year:  r.datum_ende_year,
+    datum_ende_month: r.datum_ende_month,
+    datum_ende_day:   r.datum_ende_day,
+    story_tag:        r.story_tag,
+    ereignis:         r.ereignis,
+    typ:              r.typ || 'persoenlich',
+    subtyp:           r.subtyp || 'sonstiges',
+    bedeutung:        r.bedeutung || '',
+    storyline_id:     r.storyline_id,
+    manually_edited:  !!r.manually_edited,
+    sort_order:       r.sort_order ?? 0,
+    kapitel:          chByEvt.get(r.id)?.kapitel     || [],
+    chapter_ids:      chByEvt.get(r.id)?.chapter_ids || [],
+    seiten:           pgByEvt.get(r.id)?.seiten      || [],
+    page_ids:         pgByEvt.get(r.id)?.page_ids    || [],
+    figuren:          fgByEvt.get(r.id) || [],
   }));
   res.json({ ereignisse });
 });

@@ -3,47 +3,78 @@
 
 import { fetchJson } from '../utils.js';
 
+// Sortier-Schlüssel mit strukturierten Datums-Feldern. Events ohne Jahr landen
+// am Ende ("unbekannt"-Bucket). story_tag fängt relative Story-Zeit ohne Kalender.
+function _sortKey(ev) {
+  return [
+    ev.datum_year  ?? 9999,
+    ev.datum_month ?? 99,
+    ev.datum_day   ?? 99,
+    ev.story_tag   ?? 99999,
+    ev.sort_order  ?? 0,
+  ];
+}
+function _cmp(a, b) {
+  const ka = _sortKey(a), kb = _sortKey(b);
+  for (let i = 0; i < ka.length; i++) if (ka[i] !== kb[i]) return ka[i] - kb[i];
+  return 0;
+}
+
 export const ereignisseMethods = {
   _buildGlobalZeitstrahl() {
+    // Fallback-Pfad: konstruiert globalen Zeitstrahl aus figuren[].lebensereignisse
+    // wenn der konsolidierte Server-Endpunkt nichts liefert. Strukturierte
+    // Datums-Felder werden aus den figure_events-Feldern übernommen (kommen
+    // dort an, sobald saveFigurenToDb das KI-Output mit datum_year/month/day
+    // persistiert hat).
     const allEvents = [];
     for (const f of (this.figuren || [])) {
       for (const ev of (f.lebensereignisse || [])) {
-        const year = parseInt(ev.datum);
-        if (!year) continue; // Events ohne errechenbare Jahreszahl ignorieren
         allEvents.push({
-          datum: String(year),
+          datum:        ev.datum || '',
+          datum_label:  ev.datum_label || ev.datum || '',
+          datum_year:   ev.datum_year   ?? null,
+          datum_month:  ev.datum_month  ?? null,
+          datum_day:    ev.datum_day    ?? null,
+          datum_ende_year:  ev.datum_ende_year  ?? null,
+          datum_ende_month: ev.datum_ende_month ?? null,
+          datum_ende_day:   ev.datum_ende_day   ?? null,
+          story_tag:    ev.story_tag    ?? null,
           ereignis: ev.ereignis || '',
-          typ: ev.typ || 'persoenlich',
+          typ:      ev.typ || 'persoenlich',
+          subtyp:   ev.subtyp || 'sonstiges',
           bedeutung: ev.bedeutung || '',
+          sort_order: 0,
           kapitel: ev.kapitel || '',
-          seite: ev.seite || '',
-          figur: { id: f.id, name: f.kurzname || f.name, typ: f.typ },
+          seite:   ev.seite || '',
+          figur:   { id: f.id, name: f.kurzname || f.name, typ: f.typ },
         });
       }
     }
 
-    // Events mit identischem datum+ereignis zusammenführen (alle Typen)
+    // Events mit identischem datum+ereignis zusammenführen.
     const groups = [];
     const used = new Set();
     for (let i = 0; i < allEvents.length; i++) {
       if (used.has(i)) continue;
       const ev = allEvents[i];
       const group = {
-        datum: ev.datum,
-        ereignis: ev.ereignis,
-        typ: ev.typ,
-        bedeutung: ev.bedeutung,
-        kapitel: ev.kapitel ? [ev.kapitel] : [],
-        seiten: ev.seite ? [ev.seite] : [],
-        figuren: [ev.figur],
+        ...ev,
+        kapitel:     ev.kapitel ? [ev.kapitel] : [],
+        chapter_ids: [],
+        seiten:      ev.seite   ? [ev.seite]   : [],
+        page_ids:    [],
+        figuren:     [ev.figur],
       };
+      delete group.figur;
+      delete group.seite;
       for (let j = i + 1; j < allEvents.length; j++) {
         if (used.has(j)) continue;
         const ev2 = allEvents[j];
         if (ev2.datum === ev.datum && ev2.ereignis === ev.ereignis) {
           group.figuren.push(ev2.figur);
           if (ev2.kapitel && !group.kapitel.includes(ev2.kapitel)) group.kapitel.push(ev2.kapitel);
-          if (ev2.seite && !group.seiten.includes(ev2.seite)) group.seiten.push(ev2.seite);
+          if (ev2.seite   && !group.seiten.includes(ev2.seite))   group.seiten.push(ev2.seite);
           used.add(j);
         }
       }
@@ -51,21 +82,17 @@ export const ereignisseMethods = {
       groups.push(group);
     }
 
-    // Chronologisch sortieren
-    groups.sort((a, b) => parseInt(a.datum) - parseInt(b.datum));
-
+    groups.sort(_cmp);
     this.globalZeitstrahl = groups;
   },
 
   async _reloadZeitstrahl() {
-    // Guard: wenn Konsolidierung läuft, ist der Status nur in der ereignisseCard
-    // verfügbar. Von dort wird `this._reloadZeitstrahl()` nur gecallt, wenn
-    // ohnehin nicht konsolidiert. Für Root-Aufrufer (komplett) existiert der
-    // Zustand nicht separat; wir überspringen hier keine Calls.
     try {
       const { ereignisse } = await fetchJson(`/figures/zeitstrahl/${this.selectedBookId}`);
       if (ereignisse) {
-        this.globalZeitstrahl = ereignisse;
+        // Server liefert bereits strukturierte Felder sortiert; Client-Sortierung
+        // ist defensiv (gegen abweichende Tiebreaker bei Auto-Reorder).
+        this.globalZeitstrahl = [...ereignisse].sort(_cmp);
       } else if (!this.globalZeitstrahl.length) {
         this._buildGlobalZeitstrahl();
       }

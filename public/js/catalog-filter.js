@@ -23,6 +23,7 @@ const FILTER_KINDS = {
   page:    { placeholder: 'filter.page',    empty: 'filter.allPages' },
   ort:     { placeholder: 'filter.ort',     empty: 'filter.allOrte' },
   szene:   { placeholder: 'filter.szene',   empty: 'filter.allSzenen' },
+  subtyp:  { placeholder: 'events.filter.subtyp', empty: 'events.filter.allSubtypes' },
 };
 
 export function registerCatalogFilter() {

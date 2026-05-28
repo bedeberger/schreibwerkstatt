@@ -22,6 +22,7 @@ export const bookSettingsMethods = {
       this.bookSettingsIsFinished         = !!data.is_finished;
       this.bookSettingsAllowLektorBookChat = !!data.allow_lektor_book_chat;
       this.bookSettingsDailyGoalChars     = data.daily_goal_chars != null ? Number(data.daily_goal_chars) : 1500;
+      this.bookSettingsEntitiesEnabled    = !!data.entities_enabled;
     } catch (e) {
       console.error('[book-settings] Laden fehlgeschlagen:', e);
     } finally {
@@ -98,6 +99,7 @@ export const bookSettingsMethods = {
           is_finished:       this.bookSettingsIsFinished ? 1 : 0,
           allow_lektor_book_chat: this.bookSettingsAllowLektorBookChat ? 1 : 0,
           daily_goal_chars:  Number.isFinite(Number(this.bookSettingsDailyGoalChars)) ? Number(this.bookSettingsDailyGoalChars) : null,
+          entities_enabled:  this.bookSettingsEntitiesEnabled ? 1 : 0,
         }),
       });
       if (!r.ok) {
@@ -119,6 +121,10 @@ export const bookSettingsMethods = {
         window.__app.dailyProgressDailyGoalChars = Number.isFinite(Number(this.bookSettingsDailyGoalChars))
           ? Number(this.bookSettingsDailyGoalChars) : null;
       }
+      window.dispatchEvent(new CustomEvent('book:settings:updated', { detail: {
+        bookId,
+        entities_enabled: this.bookSettingsEntitiesEnabled ? 1 : 0,
+      }}));
       if (this._savedAtTimer) clearTimeout(this._savedAtTimer);
       this._savedAtTimer = setTimeout(() => { this.bookSettingsSaved = false; this._savedAtTimer = null; }, 2500);
     } catch (e) {
