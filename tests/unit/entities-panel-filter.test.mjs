@@ -152,3 +152,21 @@ test('selectFigurenForPage: Figur ohne id wird uebersprungen', () => {
   const out = selectFigurenForPage(figuren, 'NoId und Anna kommen.');
   assert.deepEqual(out.map(f => f.id), [1]);
 });
+
+test('selectFigurenForPage: Alias-Match — nur Nachname im Text', () => {
+  const figuren = [{ id: 1, name: 'Lea Brunner', kurzname: 'Lea' }];
+  const out = selectFigurenForPage(figuren, '"Brunner", sagte ich in den Hörer.');
+  assert.deepEqual(out.map(f => f.id), [1]);
+});
+
+test('selectFigurenForPage: Alias-Match — nur Vorname im Text', () => {
+  const figuren = [{ id: 1, name: 'Lea Brunner', kurzname: 'Lea' }];
+  const out = selectFigurenForPage(figuren, 'Lea ging fort.');
+  assert.deepEqual(out.map(f => f.id), [1]);
+});
+
+test('selectFigurenForPage: Dedupliziert per id (mehrere Aliase derselben Figur)', () => {
+  const figuren = [{ id: 1, name: 'Lea Brunner', kurzname: 'Lea' }];
+  const out = selectFigurenForPage(figuren, 'Lea sah Brunner und Lea Brunner lachte.');
+  assert.equal(out.length, 1);
+});

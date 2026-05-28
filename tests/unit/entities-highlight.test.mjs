@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { buildRanges, toEntitiesList } = await import('../../public/js/editor/notebook/entities.js');
+const { buildRanges, toEntitiesList, buildFigureAliases } = await import('../../public/js/editor/notebook/entities.js');
 
 const F = (id, name) => ({ id, name, kind: 'figure' });
 const L = (id, name) => ({ id, name, kind: 'location' });
@@ -115,4 +115,63 @@ test('toEntitiesList: vereint Figuren und Orte mit kind-Annotation, leere Namen 
     { id: 1, name: 'Anna', kind: 'figure' },
     { id: 10, name: 'Berlin', kind: 'location' },
   ]);
+});
+
+// ── Alias-Generierung ─────────────────────────────────────────────────────
+
+test('buildFigureAliases: Vollname + Vorname + Nachname', () => {
+  const aliases = buildFigureAliases({ id: 1, name: 'Lea Brunner', kurzname: 'Lea' });
+  assert.deepEqual(aliases.sort(), ['Brunner', 'Lea', 'Lea Brunner'].sort());
+});
+
+test('buildFigureAliases: Single-Token-Name → nur Vollname', () => {
+  assert.deepEqual(buildFigureAliases({ id: 1, name: 'Mephisto' }), ['Mephisto']);
+});
+
+test('buildFigureAliases: Drei-Teile-Name → Vorname-Prefix + Nachname-Suffix + erstes Token', () => {
+  const aliases = buildFigureAliases({ id: 1, name: 'Anna Maria Schmidt', kurzname: 'Anna' });
+  assert.ok(aliases.includes('Anna Maria Schmidt'));
+  assert.ok(aliases.includes('Schmidt'));
+  assert.ok(aliases.includes('Anna Maria'));
+  assert.ok(aliases.includes('Anna'));
+});
+
+test('buildFigureAliases: kurzname kann Nachname sein (z.B. Daniel Moser / Moser)', () => {
+  const aliases = buildFigureAliases({ id: 1, name: 'Daniel Moser', kurzname: 'Moser' });
+  assert.ok(aliases.includes('Daniel Moser'));
+  assert.ok(aliases.includes('Daniel'));
+  assert.ok(aliases.includes('Moser'));
+});
+
+test('buildFigureAliases: zu kurze Aliase werden gefiltert (< 3 Zeichen)', () => {
+  const aliases = buildFigureAliases({ id: 1, name: 'Bo Tan', kurzname: 'Bo' });
+  // "Bo" < 3 → raus. "Tan" 3 Buchstaben → drin. Vollname drin.
+  assert.ok(!aliases.includes('Bo'));
+  assert.ok(aliases.includes('Bo Tan'));
+});
+
+test('buildFigureAliases: Stopwords werden gefiltert (z.B. der/die)', () => {
+  const aliases = buildFigureAliases({ id: 1, name: 'Die Frau', kurzname: 'Die' });
+  assert.ok(!aliases.includes('Die'));
+  assert.ok(!aliases.includes('die'));
+});
+
+test('toEntitiesList: erzeugt mehrere Entries pro Figur mit gleicher id', () => {
+  const list = toEntitiesList([{ id: 1, name: 'Lea Brunner', kurzname: 'Lea' }], []);
+  const ids = list.map(e => e.id);
+  assert.ok(ids.every(i => i === 1));
+  const names = list.map(e => e.name);
+  assert.ok(names.includes('Lea Brunner'));
+  assert.ok(names.includes('Lea'));
+  assert.ok(names.includes('Brunner'));
+});
+
+test('buildRanges: Aliase via toEntitiesList → Vorname/Nachname matchen', () => {
+  const entities = toEntitiesList([{ id: 1, name: 'Lea Brunner', kurzname: 'Lea' }], []);
+  const text = 'Brunner sagte, dass Lea nicht da war.';
+  const out = buildRanges(text, entities);
+  // Beide Erwaehnungen sollen matchen, beide → id=1.
+  assert.equal(out.length, 2);
+  assert.ok(out.every(r => r.id === 1));
+  assert.deepEqual(out.map(r => r.name).sort(), ['Brunner', 'Lea']);
 });

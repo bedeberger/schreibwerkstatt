@@ -323,38 +323,10 @@
             x-text="t('edit.conflict.resolveBtn')"></button>
   </div>
 
-  <!-- Figurenkontext-Panel (collapsible) -->
-  <template x-if="chapterFigures.length > 0">
-    <div class="figure-context-panel">
-      <div class="figure-context-header" @click="showChapterFigures = !showChapterFigures">
-        <span class="figure-context-title">
-          <span class="figure-context-icon">F</span>
-          <span x-text="t('editor.figuresInChapter', { n: chapterFigures.length })"></span>
-        </span>
-        <span class="history-chevron" :class="{ open: showChapterFigures }">›</span>
-      </div>
-      <div x-show="showChapterFigures" x-cloak class="figure-context-body">
-        <template x-for="(fig, fi) in chapterFigures" :key="fi">
-          <span class="figure-context-chip" x-data="{ show: false }" @mouseenter="show = true" @mouseleave="show = false">
-            <span x-text="fig.kurzname || fig.name"></span>
-            <span x-show="fig.typ" class="tag" x-text="t('figuren.type.' + fig.typ)"></span>
-            <span x-show="fig.geburtstag" class="tag" x-text="'* ' + fig.geburtstag"></span>
-            <div x-show="show" x-cloak class="figure-context-tooltip">
-              <div class="figure-context-tooltip-name" x-text="fig.name"></div>
-              <div x-show="fig.geburtstag" class="figure-context-tooltip-row"><span class="figure-context-label" x-text="t('figurLookup.geburt')"></span> <span x-text="fig.geburtstag"></span></div>
-              <div x-show="fig.beruf" class="figure-context-tooltip-row"><span class="figure-context-label" x-text="t('figuren.field.beruf')"></span> <span x-text="fig.beruf"></span></div>
-              <div x-show="fig.geschlecht" class="figure-context-tooltip-row"><span class="figure-context-label" x-text="t('editor.field.geschlecht')"></span> <span x-text="fig.geschlecht"></span></div>
-              <div x-show="fig.beschreibung" class="figure-context-tooltip-desc" x-text="fig.beschreibung"></div>
-            </div>
-          </span>
-        </template>
-      </div>
-    </div>
-  </template>
-
-  <!-- "Auf dieser Seite"-Panel (Entity-Linking): Collapsible mit drei Reihen
-       (Figuren/Szenen/Ereignisse), Pattern wie .figure-context-panel. Lebt
-       oberhalb des Editor-Bodys, damit Inhalte nicht uebersehen werden. -->
+  <!-- „Auf dieser Seite"-Panel (Entity-Linking + Kapitel-Figuren konsolidiert).
+       Eine Collapsible mit drei Sektionen: Figuren (Kapitel-Scope), Szenen,
+       Ereignisse. Stil + Hover-Tooltips wie .figure-context-panel. Lebt im
+       Partial editor-entities-panel.html. -->
   <div id="partial-editor-entities-panel" class="display-contents"></div>
 
   <!-- Preview + optional Befunde: Layout wird zum Split, sobald geprüft wurde.

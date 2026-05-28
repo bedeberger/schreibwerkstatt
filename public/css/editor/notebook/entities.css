@@ -7,60 +7,36 @@
   /* ── Inline-Highlights ─────────────────────────────────────────────────── */
 
   ::highlight(entity-figure) {
-    background-color: color-mix(in srgb, var(--color-accent-figure, #6c8bd7) 22%, transparent);
-    text-decoration: underline dotted color-mix(in srgb, var(--color-accent-figure, #6c8bd7) 70%, transparent);
+    background-color: color-mix(in srgb, var(--color-accent-figure, #6c8bd7) 35%, transparent);
+    text-decoration: underline 1.5px solid color-mix(in srgb, var(--color-accent-figure, #6c8bd7) 85%, transparent);
     text-underline-offset: 3px;
   }
 
   ::highlight(entity-location) {
-    background-color: color-mix(in srgb, var(--color-accent-location, #c08a4a) 18%, transparent);
-    text-decoration: underline dotted color-mix(in srgb, var(--color-accent-location, #c08a4a) 70%, transparent);
+    background-color: color-mix(in srgb, var(--color-accent-location, #c08a4a) 30%, transparent);
+    text-decoration: underline 1.5px solid color-mix(in srgb, var(--color-accent-location, #c08a4a) 85%, transparent);
     text-underline-offset: 3px;
   }
 
-  /* ── „Auf dieser Seite"-Collapsible ueber dem Editor-Body ──────────────── */
-  /* Pattern wie .figure-context-panel (Header + Chevron + Chip-Body). Drei
-     parallele Reihen (Figuren/Szenen/Ereignisse) untereinander. Reihen ohne
-     Inhalte werden vom Template ausgeblendet — kein leerer Spacer im DOM. */
+  /* ── „Auf dieser Seite"-Panel: erweitert .figure-context-panel um mehrere
+       Sektionen (Figuren/Szenen/Ereignisse). Grundstile leben in
+       editor/notebook/lektorat.css (gemeinsam mit Lektorat-Markup).
+       Hier nur Multi-Section-Layout + Chapter-Dimming. */
 
-  .on-this-page-panel {
-    margin: var(--space-md) 0;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    background: var(--color-bg);
-  }
-
-  .on-this-page-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: var(--space-sm) 12px;
-    cursor: pointer;
-    user-select: none;
-  }
-
-  .on-this-page-header:hover { background: var(--color-hover-light); }
-
-  .on-this-page-title {
-    font-size: var(--font-size-sm);
-    font-weight: 400;
-  }
-
-  .on-this-page-body {
-    padding: var(--space-xs) 12px 10px;
+  .figure-context-body--rows {
     display: flex;
     flex-direction: column;
     gap: var(--space-sm);
   }
 
-  .on-this-page-row {
+  .figure-context-section {
     display: flex;
     align-items: flex-start;
     gap: var(--space-6);
     flex-wrap: wrap;
   }
 
-  .on-this-page-row-label {
+  .figure-context-section-label {
     flex: 0 0 auto;
     min-width: 90px;
     padding-top: 3px;
@@ -70,7 +46,7 @@
     color: var(--color-subtle);
   }
 
-  .on-this-page-chips {
+  .figure-context-chips {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-6);
@@ -78,158 +54,223 @@
     min-width: 0;
   }
 
-  .on-this-page-chip {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-xs);
-    padding: var(--space-3) 8px;
-    font-size: var(--font-size-sm);
-    background: var(--color-tooltip-bg);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-  }
-
-  .on-this-page-chip:hover { border-color: var(--color-accent); }
-
-  .on-this-page-chip--figure {
-    background: color-mix(in srgb, var(--color-accent-figure) 14%, var(--color-tooltip-bg));
-    border-color: color-mix(in srgb, var(--color-accent-figure) 45%, var(--color-border));
-  }
-
-  .on-this-page-chip--chapter {
+  /* Chips, die im Kapitel-Kontext gemeint sind (Szene/Ereignis ohne
+     Seitenbezug), aber im Panel der aktuellen Seite mitgezeigt werden. */
+  .figure-context-chip--chapter {
     opacity: 0.65;
   }
 
-  .on-this-page-chip-title { font-weight: 500; }
-
-  .on-this-page-chip-meta {
-    font-size: var(--font-size-micro);
-    color: var(--color-subtle);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .on-this-page-chip-meta--figure {
-    font-style: italic;
-    font-variant-numeric: normal;
-  }
-
-  .on-this-page-chip .tag {
-    font-size: var(--font-size-micro);
-    padding: 0 4px;
-  }
-
-  .on-this-page-empty {
-    font-size: var(--font-size-sm);
-    margin: 0;
+  /* `.internal-link:hover` setzt global `opacity: 0.65` + Underline — gut fuer
+     Inline-Text-Links, aber ungeeignet fuer Chip-Container: vererbt auf den
+     absolut positionierten Tooltip im Chip und macht ihn transluzent
+     (Editor-Text leuchtet durch). Chip-Variante deaktiviert beide Effekte;
+     Hover-Signal liegt bereits auf `border-color` (.figure-context-chip:hover). */
+  .figure-context-chip.internal-link:hover {
+    opacity: 1;
+    text-decoration: none;
   }
 
   @media (max-width: 760px) {
-    .on-this-page-row { flex-direction: column; gap: 4px; }
-    .on-this-page-row-label { min-width: 0; padding-top: 0; }
+    .figure-context-section { flex-direction: column; gap: 4px; }
+    .figure-context-section-label { min-width: 0; padding-top: 0; }
   }
 
-  /* ── Popover (teleport in body) ────────────────────────────────────────── */
+  /* ── Popover (teleport in body) ─────────────────────────────────────────
+       Initial-Bubble links, Name + Badge-Reihe rechts, Body mit Description
+       + Meta-Grid, Footer mit „Zur Karte"-Action. Accent-Bar links signalisiert
+       Kind (Figur=blau, Ort=ocker). Eckige Radien (DESIGN.md). */
 
   .entity-popover {
     position: fixed;
     z-index: 2000;
-    min-width: 240px;
-    max-width: 340px;
-    background: var(--color-bg, #fff);
-    border: 1px solid var(--color-border, #e3e3e3);
-    border-radius: var(--radius-md, 6px);
-    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
-    padding: var(--space-3, 12px);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2, 8px);
+    min-width: 280px;
+    max-width: 360px;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 10px 32px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+    isolation: isolate;
   }
 
-  .entity-popover-header {
+  .entity-popover::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: var(--color-accent-figure);
+  }
+
+  .entity-popover--location::before { background: var(--color-accent-location); }
+
+  .entity-popover-card {
     display: flex;
-    align-items: baseline;
-    gap: var(--space-2, 8px);
+    flex-direction: column;
+  }
+
+  .entity-popover-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 12px 10px 16px;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .entity-popover-avatar {
+    flex: 0 0 auto;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--color-accent-figure) 22%, var(--color-bg-subtle));
+    color: var(--color-accent-figure-fg);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 1.05em;
+    text-transform: uppercase;
+  }
+
+  .entity-popover--location .entity-popover-avatar {
+    background: color-mix(in srgb, var(--color-accent-location) 22%, var(--color-bg-subtle));
+    color: var(--color-accent-location-fg);
+  }
+
+  .entity-popover-headtext {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .entity-popover-name {
+    font-weight: 600;
+    font-size: 1.0em;
+    color: var(--color-fg);
+    line-height: 1.25;
+    word-break: break-word;
+  }
+
+  .entity-popover-badges {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 6px;
   }
 
   .entity-popover-kind {
     font-size: 0.7em;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    padding: 2px 6px;
-    border-radius: var(--radius-sm, 4px);
-    background: var(--color-bg-subtle, #f3f3f3);
-    color: var(--color-fg-muted, #666);
-  }
-
-  .entity-popover-kind--figure {
-    background: color-mix(in srgb, var(--color-accent-figure, #6c8bd7) 18%, transparent);
-    color: var(--color-accent-figure-fg, #2c3e7d);
-  }
-
-  .entity-popover-kind--location {
-    background: color-mix(in srgb, var(--color-accent-location, #c08a4a) 18%, transparent);
-    color: var(--color-accent-location-fg, #6e4a1f);
-  }
-
-  .entity-popover-name {
+    padding: 1px 6px;
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--color-accent-figure) 18%, transparent);
+    color: var(--color-accent-figure-fg);
     font-weight: 600;
-    font-size: 1.02em;
-    flex: 1;
-    word-break: break-word;
+  }
+
+  .entity-popover--location .entity-popover-kind {
+    background: color-mix(in srgb, var(--color-accent-location) 18%, transparent);
+    color: var(--color-accent-location-fg);
+  }
+
+  .entity-popover-tag {
+    font-size: 0.7em;
+    padding: 1px 6px;
+    border-radius: var(--radius-sm);
+    background: var(--color-bg-subtle);
+    color: var(--color-subtle);
+    text-transform: lowercase;
   }
 
   .entity-popover-close {
+    flex: 0 0 auto;
     background: none;
     border: none;
     cursor: pointer;
-    font-size: 1.2em;
+    font-size: 1.3em;
     line-height: 1;
-    padding: 2px 6px;
-    color: var(--color-fg-muted, #666);
-    border-radius: var(--radius-sm, 4px);
+    padding: 0 4px;
+    color: var(--color-subtle);
+    border-radius: var(--radius-sm);
   }
 
   .entity-popover-close:hover {
-    background: var(--color-bg-subtle, #f3f3f3);
+    background: var(--color-bg-subtle);
+    color: var(--color-fg);
   }
 
   .entity-popover-body {
+    padding: 10px 12px 12px 16px;
     font-size: 0.9em;
-    color: var(--color-fg, #222);
+    color: var(--color-fg);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
   }
 
   .entity-popover-desc {
     margin: 0;
+    line-height: 1.45;
+    color: var(--color-fg);
   }
 
-  .entity-popover-meta {
-    margin: 4px 0 0;
-    color: var(--color-fg-muted, #666);
+  .entity-popover-meta-grid {
+    margin: 0;
+    display: grid;
+    grid-template-columns: minmax(70px, max-content) 1fr;
+    column-gap: 12px;
+    row-gap: 4px;
+    font-size: 0.82em;
+  }
+
+  .entity-popover-meta-row {
+    display: contents;
+  }
+
+  .entity-popover-meta-row dt {
+    color: var(--color-subtle);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
     font-size: 0.85em;
-    font-style: italic;
+    padding-top: 2px;
+  }
+
+  .entity-popover-meta-row dd {
+    margin: 0;
+    color: var(--color-fg);
+    word-break: break-word;
   }
 
   .entity-popover-footer {
     display: flex;
     justify-content: flex-end;
-    border-top: 1px solid var(--color-border, #e3e3e3);
-    padding-top: var(--space-2, 8px);
+    padding: 8px 12px 10px;
+    border-top: 1px solid var(--color-border);
+    background: var(--color-bg-subtle);
   }
 
   .entity-popover-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     background: none;
     border: none;
     cursor: pointer;
-    font-size: 0.88em;
-    color: var(--color-accent, #4a90e2);
-    padding: 4px 8px;
-    border-radius: var(--radius-sm, 4px);
+    font-size: 0.86em;
+    color: var(--color-accent);
+    padding: 4px 6px;
+    border-radius: var(--radius-sm);
+    font-weight: 500;
+  }
+
+  .entity-popover-link .icon {
+    width: 14px;
+    height: 14px;
   }
 
   .entity-popover-link:hover {
-    background: color-mix(in srgb, var(--color-accent, #4a90e2) 10%, transparent);
+    background: color-mix(in srgb, var(--color-accent) 12%, transparent);
   }
 }
 

@@ -9,6 +9,8 @@
 // DOM-Bindings (applyHighlights/clearHighlights) leben darunter und nutzen die
 // CSS-Custom-Highlight-API analog zu editor/find.js — keine DOM-Mutation.
 
+import { STOPWORDS_DE_BASE } from '../../shared/stopwords-de.js';
+
 // Wortzeichen: Unicode-Buchstaben (\p{L}) + Marks (\p{M}) + Ziffern (\p{N})
 // + Apostroph/Bindestrich, damit Namen wie "O'Brien" / "Anna-Lena" als
 // Einheit zaehlen. Wortgrenzen-Pruefung ist symmetrisch (vorher + nachher).
@@ -227,27 +229,37 @@ export function findHighlightAtPoint(highlights, x, y) {
   return null;
 }
 
+/** Prueft ob ein Token-String als ganzes Wort im (lowercased) Text vorkommt.
+ *  Liefert true beim ersten Treffer. */
+function textHasWord(lowText, originalText, token) {
+  const low = token.toLowerCase();
+  if (!low) return false;
+  let from = 0;
+  while (from <= lowText.length - low.length) {
+    const idx = lowText.indexOf(low, from);
+    if (idx < 0) return false;
+    const before = idx > 0 ? originalText[idx - 1] : '';
+    const after  = originalText[idx + token.length] || '';
+    if (!isWordChar(before) && !isWordChar(after)) return true;
+    from = idx + Math.max(1, low.length);
+  }
+  return false;
+}
+
 /** Filtert Figuren fuer das Seiten-Panel: liefert alle Figuren, deren
- *  kanonischer Name (case-insensitiv, ganze Woerter) im aktuellen Seiten-Text
- *  vorkommt. Pendant zu `selectScenesForView` aber textbasiert statt
- *  page_id-basiert (Figuren-Mentions stehen im Body, nicht in einer Bridge).
- *  Sortierung deterministisch nach `name` (locale-Compare). */
+ *  Name ODER Alias (kurzname/Vor-/Nachname-Token) im aktuellen Seiten-Text
+ *  als ganzes Wort vorkommt. Pendant zu `selectScenesForView` aber textbasiert
+ *  statt page_id-basiert (Figuren-Mentions stehen im Body, nicht in einer
+ *  Bridge). Sortierung deterministisch nach `name` (locale-Compare). */
 export function selectFigurenForPage(figuren, pageText) {
   if (!Array.isArray(figuren) || !pageText) return [];
   const lowText = pageText.toLowerCase();
   const hit = new Set();
   for (const f of figuren) {
-    const name = (f?.name || '').trim();
-    if (!name || f.id == null) continue;
-    const lowName = name.toLowerCase();
-    let from = 0;
-    while (from <= lowText.length - lowName.length) {
-      const idx = lowText.indexOf(lowName, from);
-      if (idx < 0) break;
-      const before = idx > 0 ? pageText[idx - 1] : '';
-      const after  = pageText[idx + name.length] || '';
-      if (!isWordChar(before) && !isWordChar(after)) { hit.add(f.id); break; }
-      from = idx + Math.max(1, name.length);
+    if (!f || f.id == null) continue;
+    const aliases = buildFigureAliases(f);
+    for (const a of aliases) {
+      if (textHasWord(lowText, pageText, a)) { hit.add(f.id); break; }
     }
   }
   return figuren
@@ -255,13 +267,66 @@ export function selectFigurenForPage(figuren, pageText) {
     .sort((a, b) => String(a?.name || '').localeCompare(String(b?.name || '')));
 }
 
+// Mindestlaenge fuer Alias-Match, damit kurze Vornamen wie "Im"/"Es"/"An"
+// nicht zu false-positives fuehren. 3 Zeichen deckt "Tom", "Ada", "Leo" ab —
+// Risiko bleibt minimal.
+const ALIAS_MIN_LEN = 3;
+
+// Stop-Liste fuer haeufige Kurz-Vornamen, die als deutsche Konjunktion/
+// Pronomen auch im Erzaehltext stehen koennen. Pure Heuristik — Vollnamen
+// matchen weiter ungehindert. DE-Basis aus shared/stopwords-de.js (SSoT),
+// EN-Liste + 'man' lokal (figurspezifisch, im Server-Wiederholungs-Filter
+// nicht relevant).
+const ALIAS_STOPWORDS_EXTRA = [
+  'man',
+  'the', 'and', 'her', 'his', 'him', 'she', 'you', 'they', 'who', 'has',
+];
+const ALIAS_STOPWORDS = new Set([...STOPWORDS_DE_BASE, ...ALIAS_STOPWORDS_EXTRA]);
+
+/** Baut die Alias-Liste fuer eine einzelne Figur:
+ *   - Vollname (`name`)
+ *   - Kurzname (`kurzname`), falls != Vollname und != reines Vornamen-Token
+ *   - Nachname-Suffix (letztes Token vom Vollnamen)
+ *   - Vorname-Prefix (alles vor dem letzten Token)
+ *  Dedupliziert, leere/zu kurze Aliase + Stopwords gefiltert. Pure. */
+export function buildFigureAliases(figure) {
+  const out = [];
+  const seen = new Set();
+  const push = (s) => {
+    const v = (s || '').trim();
+    if (v.length < ALIAS_MIN_LEN) return;
+    if (ALIAS_STOPWORDS.has(v.toLowerCase())) return;
+    const key = v.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(v);
+  };
+  if (!figure || !figure.name) return out;
+  push(figure.name);
+  push(figure.kurzname);
+  // Multi-Token-Vollname: "Lea Brunner" → ["Lea", "Brunner"]; "Anna Maria Schmidt"
+  // → vorname-prefix "Anna Maria", nachname-suffix "Schmidt".
+  const parts = figure.name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    push(parts[parts.length - 1]);                 // Nachname (letztes Token)
+    push(parts.slice(0, -1).join(' '));            // Vorname(n)-Prefix
+    if (parts.length >= 2) push(parts[0]);         // Vorname (erstes Token)
+  }
+  return out;
+}
+
 /** Vereint Figuren + Orte zur Entitaeten-Liste, die `buildRanges`
  *  konsumiert. Kollisions-Vorrang via Reihenfolge: Figuren zuerst.
- *  Eingabe: Roh-Arrays aus dem Catalog-Store. */
+ *  Eingabe: Roh-Arrays aus dem Catalog-Store. Pro Figur werden mehrere
+ *  Alias-Eintraege erzeugt — alle mit derselben `id`, damit Click/Hit-Test
+ *  immer zur gleichen Stammkarte fuehrt. */
 export function toEntitiesList(figuren, orte) {
   const out = [];
   for (const f of (figuren || [])) {
-    if (f?.name) out.push({ id: f.id, name: f.name, kind: 'figure' });
+    if (!f?.name) continue;
+    for (const alias of buildFigureAliases(f)) {
+      out.push({ id: f.id, name: alias, kind: 'figure' });
+    }
   }
   for (const o of (orte || [])) {
     if (o?.name) out.push({ id: o.id, name: o.name, kind: 'location' });
