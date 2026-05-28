@@ -736,6 +736,9 @@ document.addEventListener('alpine:init', () => {
             else localStorage.removeItem(key);
           } catch (_) {}
         });
+        this.$watch('entityPanelOpen', (val) => {
+          try { localStorage.setItem('sw:entityPanelOpen', val ? '1' : '0'); } catch (_) {}
+        });
         this.$watch('selectedBookId', async (newVal, oldVal) => {
           if (this._applyingHash) return;
           if (!newVal) return;

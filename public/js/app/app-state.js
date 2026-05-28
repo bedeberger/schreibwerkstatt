@@ -507,14 +507,19 @@ const dailyProgressState = () => ({
 // im Notebook-Editor). Source-of-Truth ist book_settings.entities_enabled —
 // hier nur Spiegel, gesetzt von _loadEntitiesEnabledForBook (beim Buchwechsel)
 // und vom Toolbar-Toggle (toggleEntitiesEnabledForCurrentBook).
-// entityPanelOpen kontrolliert die Klappschiene neben dem Editor-Body; default
-// = false (zugeklappt), User kann manuell aufklappen. Toolbar-Toggle "Entities
-// aktivieren" oeffnet sie einmalig (siehe editor-notebook.html).
-const entitiesState = () => ({
-  entitiesEnabledForCurrentBook: false,
-  entityPanelOpen: false,
-  _entitiesBusy: false,
-});
+// entityPanelOpen kontrolliert die Klappschiene neben dem Editor-Body. Initial
+// aus localStorage (`sw:entityPanelOpen`); Persistenz via $watch in app.js#init.
+// Toolbar-Toggle "Entities aktivieren" oeffnet die Leiste einmalig beim
+// Aktivieren (siehe editor-notebook.html).
+const entitiesState = () => {
+  let entityPanelOpen = false;
+  try { entityPanelOpen = localStorage.getItem('sw:entityPanelOpen') === '1'; } catch (_) {}
+  return {
+    entitiesEnabledForCurrentBook: false,
+    entityPanelOpen,
+    _entitiesBusy: false,
+  };
+};
 
 const jobsState = () => ({
   jobQueueItems: [],

@@ -250,13 +250,29 @@
 .page-editor-toolbar {
   display: flex;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: var(--space-xs);
   margin-top: var(--space-xs);
+}
+/* Icon-only Buttons: quadratisch + Icon zentriert. Base-`.graph-tool-btn`
+   nutzt asymmetrisches Padding (3px/9px) ohne `justify-content`, was bei
+   schmaleren Icons (z.B. radio/scan/quote) optisch rechtslastig wirkt. */
+.page-editor-toolbar .graph-tool-btn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 0;
 }
 .page-editor-toolbar .graph-tool-btn[aria-pressed="true"] {
   background: var(--color-history-active-bg);
   border-color: var(--color-primary);
   color: var(--color-primary);
+}
+@media (max-width: 600px) {
+  .page-editor-toolbar { justify-content: flex-start; }
 }
 
 /* Vollbild: Karte als Overlay, Header (Save/Cancel/Status) bleibt sichtbar.

@@ -307,6 +307,19 @@
   .entity-popover-link:hover {
     background: color-mix(in srgb, var(--color-accent) 12%, transparent);
   }
+
+  /* Mobile: Popover spannt sich auf die volle nutzbare Breite. JS setzt
+     left: 12px inline (siehe `_computePopoverXY`); right: 12px hier liefert
+     die Browser-Breitenberechnung. max-width entkoppeln, sonst bleibt der
+     Container schmal und der Aufruf wirkt verlegen am Rand. min-width auf 0,
+     damit die 280px-Untergrenze auf 360px-Phones nicht zu Overflow fuehrt. */
+  @media (max-width: 480px) {
+    .entity-popover {
+      right: 12px;
+      max-width: none;
+      min-width: 0;
+    }
+  }
 }
 
 /* Tokens: Accents pro Entity-Typ. Werden in tokens/colors.css ueberschrieben,

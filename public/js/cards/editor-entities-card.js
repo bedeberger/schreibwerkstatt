@@ -311,13 +311,22 @@ export function registerEditorEntitiesCard() {
     },
 
     // Popover an der Highlight-Box ausrichten — unter dem Wort, links mit
-    // etwas Inset, Viewport-Clamping. Shared zwischen Open- und Reposition-
-    // Pfad, damit Initial- und Scroll-Position identisch berechnet werden.
+    // etwas Inset, Viewport-Clamping. Shared zwischen Open- und Scroll-
+    // Reposition-Pfad, damit Initial- und Scroll-Position identisch sind.
+    // Mobile (<= 480px): Popover spannt sich via CSS auf volle Breite (left+
+    // right: 12px) — JS setzt nur x = 12, damit Inline-`left` mit dem CSS-
+    // `right` zusammen die Breite berechnen kann. Aeusserer Math.max(12, …)
+    // verhindert ausserdem x < 0 auf sehr schmalen Viewports zwischen 481px
+    // und ca. 350px, wo windowInnerWidth - POPOVER_W - 12 negativ werden kann.
     _computePopoverXY(rect) {
       const POPOVER_W = 320;
       const POPOVER_H_EST = 180;
-      const x = Math.min(window.innerWidth - POPOVER_W - 12, Math.max(12, rect.left));
-      const y = rect.bottom + POPOVER_H_EST > window.innerHeight
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const x = vw <= 480
+        ? 12
+        : Math.max(12, Math.min(vw - POPOVER_W - 12, Math.max(12, rect.left)));
+      const y = rect.bottom + POPOVER_H_EST > vh
         ? Math.max(12, rect.top - POPOVER_H_EST - 6)
         : rect.bottom + 6;
       return { x, y };
