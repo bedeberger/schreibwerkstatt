@@ -15,7 +15,6 @@
          @click="$app.entityPanelOpen = !$app.entityPanelOpen"
          :aria-expanded="$app.entityPanelOpen ? 'true' : 'false'">
       <span class="figure-context-title">
-        <span class="figure-context-icon" aria-hidden="true">›</span>
         <span x-text="$app.t('entities.panel.title')"></span>
       </span>
       <span class="history-chevron" :class="{ open: $app.entityPanelOpen }" aria-hidden="true">›</span>

@@ -508,10 +508,11 @@ const dailyProgressState = () => ({
 // hier nur Spiegel, gesetzt von _loadEntitiesEnabledForBook (beim Buchwechsel)
 // und vom Toolbar-Toggle (toggleEntitiesEnabledForCurrentBook).
 // entityPanelOpen kontrolliert die Klappschiene neben dem Editor-Body; default
-// = true, sobald entitiesEnabled angeht (User kann manuell zuklappen).
+// = false (zugeklappt), User kann manuell aufklappen. Toolbar-Toggle "Entities
+// aktivieren" oeffnet sie einmalig (siehe editor-notebook.html).
 const entitiesState = () => ({
   entitiesEnabledForCurrentBook: false,
-  entityPanelOpen: true,
+  entityPanelOpen: false,
   _entitiesBusy: false,
 });
 
