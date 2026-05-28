@@ -102,6 +102,8 @@
   }
 
   .entity-popover--location::before { background: var(--color-accent-location); }
+  .entity-popover--scene::before    { background: var(--card-accent-szenen); }
+  .entity-popover--event::before    { background: var(--card-accent-ereignisse); }
 
   .entity-popover-card {
     display: flex;
@@ -134,6 +136,16 @@
   .entity-popover--location .entity-popover-avatar {
     background: color-mix(in srgb, var(--color-accent-location) 22%, var(--color-bg-subtle));
     color: var(--color-accent-location-fg);
+  }
+
+  .entity-popover--scene .entity-popover-avatar {
+    background: color-mix(in srgb, var(--card-accent-szenen) 22%, var(--color-bg-subtle));
+    color: var(--card-accent-szenen);
+  }
+
+  .entity-popover--event .entity-popover-avatar {
+    background: color-mix(in srgb, var(--card-accent-ereignisse) 22%, var(--color-bg-subtle));
+    color: var(--card-accent-ereignisse);
   }
 
   .entity-popover-headtext {
@@ -172,6 +184,16 @@
   .entity-popover--location .entity-popover-kind {
     background: color-mix(in srgb, var(--color-accent-location) 18%, transparent);
     color: var(--color-accent-location-fg);
+  }
+
+  .entity-popover--scene .entity-popover-kind {
+    background: color-mix(in srgb, var(--card-accent-szenen) 18%, transparent);
+    color: var(--card-accent-szenen);
+  }
+
+  .entity-popover--event .entity-popover-kind {
+    background: color-mix(in srgb, var(--card-accent-ereignisse) 18%, transparent);
+    color: var(--card-accent-ereignisse);
   }
 
   .entity-popover-tag {

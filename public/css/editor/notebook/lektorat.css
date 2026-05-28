@@ -176,29 +176,5 @@
 }
 .figure-context-chip:hover { border-color: var(--color-accent); }
 .figure-context-chip .tag { font-size: var(--font-size-micro); padding: 0 4px; }
-.figure-context-tooltip {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: var(--z-popover);
-  min-width: 220px;
-  max-width: 320px;
-  padding: var(--space-10) 12px;
-  background: var(--color-tooltip-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-md);
-  font-size: var(--font-size-sm);
-  line-height: 1.5;
-  color: var(--color-muted);
-}
-.figure-context-tooltip-name { font-weight: 700; margin-bottom: var(--space-xs); }
-.figure-context-tooltip-row { margin-bottom: var(--space-2xs); }
-.figure-context-label { font-weight: 400; color: var(--color-subtle); }
-.figure-context-tooltip-desc {
-  margin-top: var(--space-xs);
-  color: var(--color-subtle);
-  line-height: 1.5;
-}
 
 }

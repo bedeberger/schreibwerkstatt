@@ -200,6 +200,33 @@ Manche Block-Elemente nehmen keinen Caret an (`<hr>` ist void; künftig denkbar:
 12. **Edit + Prüfmodus forbidden.** `startEdit` bricht bei `checkDone === true` ab; Edit/Fokus-Buttons sind im Prüfmodus per `x-show="!checkDone"` ausgeblendet. Findings landen damit nie im contenteditable — Korrekturen werden ausschliesslich via `saveCorrections` aus dem Prüfmodus-Header angewandt.
 13. **Findings-Filter nach jedem Save** (`_filterFindingsAfterSave`): Defensive Restbereinigung, falls Findings doch existieren — `original`-Text nicht mehr im neuen HTML → raus. Mit Invariante #12 üblicherweise No-Op.
 
+## Entity-Linking (Figuren/Orte-Highlights + Kontext-Panel)
+
+Opt-in pro Buch (`book_settings.entities_enabled`, Migration 157). Toggle in der Notebook-Toolbar + Checkbox in den BookSettings. Rückwärtsgerichtet — keine KI, nur sichtbar machen, was die Komplettanalyse in `figures` / `locations` / `figure_scenes` / `figuren[].lebensereignisse` abgelegt hat.
+
+Code: pure Helpers + CSS-Highlight-API in [public/js/editor/notebook/entities.js](../public/js/editor/notebook/entities.js); Sub-Karte [public/js/cards/editor-entities-card.js](../public/js/cards/editor-entities-card.js); Partial [public/partials/editor-entities-panel.html](../public/partials/editor-entities-panel.html) (mounted in [editor-notebook.html](../public/partials/editor-notebook.html) via `partial-editor-entities-panel`-Placeholder); CSS [public/css/editor/notebook/entities.css](../public/css/editor/notebook/entities.css).
+
+| Typ | Darstellung | Daten |
+|---|---|---|
+| Figur, Ort | Inline-Highlight via `CSS.highlights` (Register `entity-figure` / `entity-location`) | Name-Match auf `figures.name` / `locations.name` |
+| Szene, Ereignis | Collapsible „Auf dieser Seite"-Panel (zwei Sektionen: page_id + chapter_id mit page_id IS NULL) | `figure_scenes`, `figuren[].lebensereignisse` |
+
+**Match-Engine** (`buildRanges`, pure): case-insensitiv, ganze Wörter, Unicode-aware (`\p{L}\p{M}\p{N}` + Apostroph/Bindestrich). Kollisionsregel bei gleichem Namen: Figur > Ort. Overlap-Filter (längste Treffer-Region gewinnt am selben Start-Offset).
+
+**Highlight-Priority `-10`** — bleibt unter LanguageTool-Squiggles (Default 0), damit Spellcheck sichtbar bleibt. `CSS.highlights` stapelt `text-decoration` nicht, höhere Priority überschreibt.
+
+**Toggle-Sync:** Toolbar-Klick PUTtet `/booksettings/:id/entities-enabled` (Quick-Update-Endpoint, separat von `PUT /booksettings/:id` für die Volledit-Karte), dispatcht `book:settings:updated`; Root-Flag ist `entitiesEnabledForCurrentBook` (in [tree.js](../public/js/book/tree.js)).
+
+**Pflicht-Invarianten:**
+1. **Nur Notebook.** Focus-Editor und Bucheditor sind explizit out-of-scope — kein gemeinsamer Code mit `shared/`. Sub-Karte mountet sich gegen `#editor-card .page-content-view--editing`.
+2. **Read-only.** Kein Markup im gespeicherten HTML, keine `data-bid`-Berührung. Highlights sind reine Range-Overlays. Save-Invariante getestet in [tests/unit/entities-save-invariant.test.mjs](../tests/unit/entities-save-invariant.test.mjs).
+3. **Toggle lebt am Buch.** `book_settings.entities_enabled`, kein localStorage, kein User-Default über Bücher hinweg. Beim Buchwechsel wird der Buch-Status frisch geladen.
+4. **Nur kanonischer Name.** Keine Alias-/Spitznamen-/Vorname-Nachname-Splits — wer mehr will, reichert die Extraktion an, nicht das Linking.
+5. **Cleanup-Trigger:** Toggle-Off, Edit-Exit, Page-Exit, Buchwechsel → `clearHighlights()` leert beide Register. Sonst leaken Stale-Ranges auf altes DOM.
+6. **Recompute debounced** (250 ms) nach Edit-Input — sonst rebuilded jeder Tastendruck die Ranges.
+
+**Tests:** [entities-highlight.test.mjs](../tests/unit/entities-highlight.test.mjs) (`buildRanges`: Wortgrenzen, Case, Overlap, Figur/Ort-Kollision), [entities-panel-filter.test.mjs](../tests/unit/entities-panel-filter.test.mjs) (`selectScenesForView` / `selectEventsForView`), [entities-save-invariant.test.mjs](../tests/unit/entities-save-invariant.test.mjs) (kein Highlight-Markup im Save-Output).
+
 ## Shared-Lib `public/js/editor/shared/`
 
 Beide Editoren (Notebook + Focus) konsumieren ausschliesslich aus `shared/`:

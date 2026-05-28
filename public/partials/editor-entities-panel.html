@@ -1,8 +1,12 @@
 <!-- Entity-Linking-Panel "Auf dieser Seite" (Notebook-Editor).
      Wiederverwendung des `.figure-context-panel`-Patterns: Header + Chevron +
-     Chip-Body mit Hover-Tooltips. Drei Sektionen — Figuren (Kapitel-Scope),
-     Szenen (Seite + Kapitel-ohne-Seitenbezug), Ereignisse (analog). Sektion
-     ohne Inhalte wird ausgeblendet. Popover-Teleport siehe unten.
+     Chip-Body. Drei Sektionen — Figuren (Kapitel-Scope), Szenen (Seite +
+     Kapitel-ohne-Seitenbezug), Ereignisse (analog). Sektion ohne Inhalte
+     wird ausgeblendet.
+
+     Chip-Klick oeffnet das gemeinsame `.entity-popover` (Teleport in body) —
+     identisches Markup/CSS/State wie das Editor-Highlight-Popover. Footer-
+     Button im Popover navigiert dann zur jeweiligen Karte.
      x-data: editorEntitiesCard (cards/editor-entities-card.js). -->
 <div x-data="editorEntitiesCard" class="display-contents">
 
@@ -29,28 +33,10 @@
           <div class="figure-context-chips">
             <template x-for="(fig, fi) in $app.chapterFigures" :key="'cf-' + (fig.id ?? fi)">
               <span class="figure-context-chip internal-link"
-                    x-data="{ show: false }"
-                    @mouseenter="show = true" @mouseleave="show = false"
-                    @click="openFigure(fig.id)">
+                    @click="openPopoverForChip('figure', fig, fig.name, $event)">
                 <span x-text="fig.kurzname || fig.name"></span>
                 <span x-show="fig.typ" class="tag" x-text="$app.t('figuren.type.' + fig.typ)"></span>
                 <span x-show="fig.geburtstag" class="tag" x-text="'* ' + fig.geburtstag"></span>
-                <div x-show="show" x-cloak class="figure-context-tooltip">
-                  <div class="figure-context-tooltip-name" x-text="fig.name"></div>
-                  <div x-show="fig.geburtstag" class="figure-context-tooltip-row">
-                    <span class="figure-context-label" x-text="$app.t('figurLookup.geburt')"></span>
-                    <span x-text="fig.geburtstag"></span>
-                  </div>
-                  <div x-show="fig.beruf" class="figure-context-tooltip-row">
-                    <span class="figure-context-label" x-text="$app.t('figuren.field.beruf')"></span>
-                    <span x-text="fig.beruf"></span>
-                  </div>
-                  <div x-show="fig.geschlecht" class="figure-context-tooltip-row">
-                    <span class="figure-context-label" x-text="$app.t('editor.field.geschlecht')"></span>
-                    <span x-text="fig.geschlecht"></span>
-                  </div>
-                  <div x-show="fig.beschreibung" class="figure-context-tooltip-desc" x-text="fig.beschreibung"></div>
-                </div>
               </span>
             </template>
           </div>
@@ -64,40 +50,21 @@
           <div class="figure-context-chips">
             <template x-for="s in panelScenes().onPage" :key="'sp-' + s.id">
               <span class="figure-context-chip internal-link"
-                    x-data="{ show: false }"
-                    @mouseenter="show = true" @mouseleave="show = false"
-                    @click="openScene(s.id)">
+                    @click="openPopoverForChip('scene', s, s.titel || $app.t('entities.scene'), $event)">
                 <span x-text="s.titel || $app.t('entities.scene')"></span>
                 <span x-show="s.wertung" class="tag"
                       :class="'badge--wertung-' + s.wertung"
                       x-text="s.wertung"></span>
-                <div x-show="show" x-cloak class="figure-context-tooltip">
-                  <div class="figure-context-tooltip-name" x-text="s.titel || $app.t('entities.scene')"></div>
-                  <div x-show="s.wertung" class="figure-context-tooltip-row">
-                    <span class="figure-context-label" x-text="$app.t('entities.panel.scenes')"></span>
-                    <span x-text="s.wertung"></span>
-                  </div>
-                  <div x-show="s.beschreibung" class="figure-context-tooltip-desc" x-text="s.beschreibung"></div>
-                </div>
               </span>
             </template>
             <template x-for="s in panelScenes().inChapter" :key="'sc-' + s.id">
               <span class="figure-context-chip figure-context-chip--chapter internal-link"
-                    x-data="{ show: false }"
-                    @mouseenter="show = true" @mouseleave="show = false"
-                    @click="openScene(s.id)"
+                    @click="openPopoverForChip('scene', s, s.titel || $app.t('entities.scene'), $event)"
                     :data-tip="$app.t('entities.panel.inChapter')">
                 <span x-text="s.titel || $app.t('entities.scene')"></span>
                 <span x-show="s.wertung" class="tag"
                       :class="'badge--wertung-' + s.wertung"
                       x-text="s.wertung"></span>
-                <div x-show="show" x-cloak class="figure-context-tooltip">
-                  <div class="figure-context-tooltip-name" x-text="s.titel || $app.t('entities.scene')"></div>
-                  <div class="figure-context-tooltip-row">
-                    <span class="figure-context-label" x-text="$app.t('entities.panel.inChapter')"></span>
-                  </div>
-                  <div x-show="s.beschreibung" class="figure-context-tooltip-desc" x-text="s.beschreibung"></div>
-                </div>
               </span>
             </template>
           </div>
@@ -111,46 +78,17 @@
           <div class="figure-context-chips">
             <template x-for="(e, ei) in panelEvents().onPage" :key="'ep-' + ei + '-' + e.figure_id">
               <span class="figure-context-chip internal-link"
-                    x-data="{ show: false }"
-                    @mouseenter="show = true" @mouseleave="show = false"
-                    @click="openEvent(e.figure_id)">
+                    @click="openPopoverForChip('event', e, e.ereignis, $event)">
                 <span x-text="e.ereignis"></span>
                 <span x-show="e.datum" class="tag" x-text="e.datum_label || e.datum"></span>
-                <div x-show="show" x-cloak class="figure-context-tooltip">
-                  <div class="figure-context-tooltip-name" x-text="e.ereignis"></div>
-                  <div x-show="e.datum" class="figure-context-tooltip-row">
-                    <span class="figure-context-label" x-text="$app.t('figurLookup.geburt')"></span>
-                    <span x-text="e.datum_label || e.datum"></span>
-                  </div>
-                  <div x-show="e.figure_kurzname || e.figure_name" class="figure-context-tooltip-row">
-                    <span class="figure-context-label" x-text="$app.t('entities.figure')"></span>
-                    <span x-text="e.figure_kurzname || e.figure_name"></span>
-                  </div>
-                </div>
               </span>
             </template>
             <template x-for="(e, ei) in panelEvents().inChapter" :key="'ec-' + ei + '-' + e.figure_id">
               <span class="figure-context-chip figure-context-chip--chapter internal-link"
-                    x-data="{ show: false }"
-                    @mouseenter="show = true" @mouseleave="show = false"
-                    @click="openEvent(e.figure_id)"
+                    @click="openPopoverForChip('event', e, e.ereignis, $event)"
                     :data-tip="$app.t('entities.panel.inChapter')">
                 <span x-text="e.ereignis"></span>
                 <span x-show="e.datum" class="tag" x-text="e.datum_label || e.datum"></span>
-                <div x-show="show" x-cloak class="figure-context-tooltip">
-                  <div class="figure-context-tooltip-name" x-text="e.ereignis"></div>
-                  <div class="figure-context-tooltip-row">
-                    <span class="figure-context-label" x-text="$app.t('entities.panel.inChapter')"></span>
-                  </div>
-                  <div x-show="e.datum" class="figure-context-tooltip-row">
-                    <span class="figure-context-label" x-text="$app.t('figurLookup.geburt')"></span>
-                    <span x-text="e.datum_label || e.datum"></span>
-                  </div>
-                  <div x-show="e.figure_kurzname || e.figure_name" class="figure-context-tooltip-row">
-                    <span class="figure-context-label" x-text="$app.t('entities.figure')"></span>
-                    <span x-text="e.figure_kurzname || e.figure_name"></span>
-                  </div>
-                </div>
               </span>
             </template>
           </div>
@@ -160,8 +98,10 @@
     </div>
   </div>
 
-  <!-- Popover (teleport): Klick auf Highlight im Editor.
-       Initial-Bubble + Kind/Typ-Badge-Reihe + Meta-Grid + 1-Klick-Zur-Karte. -->
+  <!-- Popover (teleport): wird von Highlight-Klicks im Editor UND von Chip-
+       Klicks in der Kontext-Leiste befuellt. Vier `kind`-Varianten: figure,
+       location, scene, event — Accent-Bar und Avatar-Toenung pro kind in
+       entities.css. -->
   <template x-teleport="body">
     <div x-show="entityPopover" x-cloak class="entity-popover"
          :class="entityPopover ? 'entity-popover--' + entityPopover.kind : ''"
@@ -172,17 +112,30 @@
         <div class="entity-popover-card">
           <div class="entity-popover-head">
             <span class="entity-popover-avatar" aria-hidden="true"
-                  x-text="(entityPopover.data?.kurzname || entityPopover.data?.name || entityPopover.name || '?').trim().charAt(0).toUpperCase()"></span>
+                  x-text="(entityPopover.name || entityPopover.data?.kurzname || entityPopover.data?.name || entityPopover.data?.titel || entityPopover.data?.ereignis || '?').trim().charAt(0).toUpperCase()"></span>
             <div class="entity-popover-headtext">
-              <span class="entity-popover-name" x-text="entityPopover.data?.name || entityPopover.name"></span>
+              <span class="entity-popover-name"
+                    x-text="entityPopover.kind === 'figure' ? (entityPopover.data?.name || entityPopover.name)
+                          : entityPopover.kind === 'location' ? (entityPopover.data?.name || entityPopover.name)
+                          : entityPopover.kind === 'scene' ? (entityPopover.data?.titel || entityPopover.name || $app.t('entities.scene'))
+                          : (entityPopover.data?.ereignis || entityPopover.name)"></span>
               <span class="entity-popover-badges">
                 <span class="entity-popover-kind"
-                      x-text="entityPopover.kind === 'figure' ? $app.t('entities.figure') : $app.t('entities.location')"></span>
-                <template x-if="entityPopover.kind === 'figure' && entityPopover.data?.typ">
+                      x-text="entityPopover.kind === 'figure' ? $app.t('entities.figure')
+                            : entityPopover.kind === 'location' ? $app.t('entities.location')
+                            : entityPopover.kind === 'scene' ? $app.t('entities.scene')
+                            : $app.t('entities.event')"></span>
+                <template x-if="(entityPopover.kind === 'figure' || entityPopover.kind === 'location') && entityPopover.data?.typ">
                   <span class="entity-popover-tag" x-text="entityPopover.data.typ"></span>
                 </template>
-                <template x-if="entityPopover.kind === 'location' && entityPopover.data?.typ">
-                  <span class="entity-popover-tag" x-text="entityPopover.data.typ"></span>
+                <template x-if="entityPopover.kind === 'scene' && entityPopover.data?.wertung">
+                  <span class="entity-popover-tag"
+                        :class="'badge--wertung-' + entityPopover.data.wertung"
+                        x-text="entityPopover.data.wertung"></span>
+                </template>
+                <template x-if="entityPopover.kind === 'event' && (entityPopover.data?.datum_label || entityPopover.data?.datum)">
+                  <span class="entity-popover-tag"
+                        x-text="entityPopover.data.datum_label || entityPopover.data.datum"></span>
                 </template>
               </span>
             </div>
@@ -217,6 +170,23 @@
                 </template>
               </dl>
             </template>
+
+            <template x-if="entityPopover.kind === 'event'">
+              <dl class="entity-popover-meta-grid">
+                <template x-if="entityPopover.data?.datum_label || entityPopover.data?.datum">
+                  <div class="entity-popover-meta-row">
+                    <dt x-text="$app.t('figurLookup.geburt')"></dt>
+                    <dd x-text="entityPopover.data.datum_label || entityPopover.data.datum"></dd>
+                  </div>
+                </template>
+                <template x-if="entityPopover.data?.figure_kurzname || entityPopover.data?.figure_name">
+                  <div class="entity-popover-meta-row">
+                    <dt x-text="$app.t('entities.figure')"></dt>
+                    <dd x-text="entityPopover.data.figure_kurzname || entityPopover.data.figure_name"></dd>
+                  </div>
+                </template>
+              </dl>
+            </template>
           </div>
 
           <div class="entity-popover-footer">
@@ -229,6 +199,18 @@
             <button type="button" class="entity-popover-link"
                     x-show="entityPopover.kind === 'location'"
                     @click="openLocation(entityPopover.id)">
+              <span x-text="$app.t('entities.gotoCard')"></span>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#arrow-right"/></svg>
+            </button>
+            <button type="button" class="entity-popover-link"
+                    x-show="entityPopover.kind === 'scene'"
+                    @click="openScene(entityPopover.id); closePopover()">
+              <span x-text="$app.t('entities.gotoCard')"></span>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#arrow-right"/></svg>
+            </button>
+            <button type="button" class="entity-popover-link"
+                    x-show="entityPopover.kind === 'event'"
+                    @click="openEvent(entityPopover.data?.figure_id); closePopover()">
               <span x-text="$app.t('entities.gotoCard')"></span>
               <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#arrow-right"/></svg>
             </button>

@@ -34,6 +34,11 @@ export function registerEditorEntitiesCard() {
     // Letzte berechnete Highlight-Ranges (kind, id, name, range) — Hit-Test-
     // Quelle fuer Klicks. Wird in `_recompute` neu gesetzt.
     _highlights: [],
+    // Aktuelle Anchor-Range fuer den offenen Popover (nicht reaktiv —
+    // Range-Objekte mag Alpines Proxy nicht). Wird beim Scroll/Resize neu
+    // vermessen, damit der Popover mit dem Highlight mitwandert.
+    _popoverRange: null,
+    _repositionRaf: 0,
     _recomputeTimer: null,
     _abort: null,
     _onSettingsUpdated: null,
@@ -98,6 +103,13 @@ export function registerEditorEntitiesCard() {
         this._scheduleRecompute();
       }, { signal });
 
+      // Popover anker-treu halten: capture-Phase faengt Scrolls auf jedem
+      // Vorfahren (Window, Editor-Container, Card-Body) — egal wo das Layout
+      // wirklich scrollt, wir richten am Live-Range-Rect neu aus.
+      const onScroll = () => this._schedulePopoverReposition();
+      window.addEventListener('scroll', onScroll, { capture: true, passive: true, signal });
+      window.addEventListener('resize', onScroll, { signal });
+
       // Initial-Trigger nach Mount. Szenen werden immer geladen — das Kontext-
       // Panel zeigt sie unabhaengig vom Entity-Toggle.
       this.$nextTick(() => {
@@ -125,6 +137,8 @@ export function registerEditorEntitiesCard() {
 
     destroy() {
       if (this._recomputeTimer) { clearTimeout(this._recomputeTimer); this._recomputeTimer = null; }
+      if (this._repositionRaf) { cancelAnimationFrame(this._repositionRaf); this._repositionRaf = 0; }
+      this._popoverRange = null;
       this._abort?.abort();
       clearHighlights();
     },
@@ -199,6 +213,28 @@ export function registerEditorEntitiesCard() {
 
     // ── Navigation ──────────────────────────────────────────────────────────
 
+    // Oeffnet das gemeinsame Entity-Popover fuer einen Chip in der Kontext-
+    // Leiste. Identischer State-Sink (`entityPopover`) wie der Klick auf ein
+    // Highlight im Editor — eine Popover-Implementierung fuer beide Trigger.
+    // `kind` ∈ {'figure','location','scene','event'}, `data` das Quell-Objekt,
+    // `displayName` der sichtbare Name, `ev` das urspruengliche Click-Event
+    // (currentTarget = Chip-Element zum Positionieren via getBoundingClientRect).
+    openPopoverForChip(kind, data, displayName, ev) {
+      if (!data || !ev?.currentTarget) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      const rect = ev.currentTarget.getBoundingClientRect();
+      const { x, y } = this._computePopoverXY(rect);
+      this._popoverRange = null;
+      this.entityPopover = {
+        kind,
+        id: data.id ?? data.figure_id ?? null,
+        name: displayName || data.name || data.titel || data.ereignis || '',
+        data,
+        x, y,
+      };
+    },
+
     openFigure(id) {
       const app = window.__app;
       this.closePopover();
@@ -238,14 +274,8 @@ export function registerEditorEntitiesCard() {
       const data = hit.kind === 'figure'
         ? (app.figuren || []).find(f => f.id === hit.id)
         : (app.orte    || []).find(o => o.id === hit.id);
-      // Popover an der Highlight-Box ausrichten — unter dem Wort, links
-      // mit ein bisschen Inset, Viewport-Clamping.
-      const POPOVER_W = 320;
-      const POPOVER_H_EST = 180;
-      const x = Math.min(window.innerWidth - POPOVER_W - 12, Math.max(12, rect.left));
-      const y = rect.bottom + POPOVER_H_EST > window.innerHeight
-        ? Math.max(12, rect.top - POPOVER_H_EST - 6)
-        : rect.bottom + 6;
+      const { x, y } = this._computePopoverXY(rect);
+      this._popoverRange = hit.range || null;
       this.entityPopover = {
         kind: hit.kind,
         id: hit.id,
@@ -255,7 +285,40 @@ export function registerEditorEntitiesCard() {
       };
     },
 
+    // Popover an der Highlight-Box ausrichten — unter dem Wort, links mit
+    // etwas Inset, Viewport-Clamping. Shared zwischen Open- und Reposition-
+    // Pfad, damit Initial- und Scroll-Position identisch berechnet werden.
+    _computePopoverXY(rect) {
+      const POPOVER_W = 320;
+      const POPOVER_H_EST = 180;
+      const x = Math.min(window.innerWidth - POPOVER_W - 12, Math.max(12, rect.left));
+      const y = rect.bottom + POPOVER_H_EST > window.innerHeight
+        ? Math.max(12, rect.top - POPOVER_H_EST - 6)
+        : rect.bottom + 6;
+      return { x, y };
+    },
+
+    _schedulePopoverReposition() {
+      if (!this.entityPopover || !this._popoverRange) return;
+      if (this._repositionRaf) return;
+      this._repositionRaf = requestAnimationFrame(() => {
+        this._repositionRaf = 0;
+        this._repositionPopover();
+      });
+    },
+
+    _repositionPopover() {
+      if (!this.entityPopover || !this._popoverRange) return;
+      const rects = this._popoverRange.getClientRects?.();
+      if (!rects || rects.length === 0) return;
+      const { x, y } = this._computePopoverXY(rects[0]);
+      if (x === this.entityPopover.x && y === this.entityPopover.y) return;
+      this.entityPopover = { ...this.entityPopover, x, y };
+    },
+
     closePopover() {
+      this._popoverRange = null;
+      if (this._repositionRaf) { cancelAnimationFrame(this._repositionRaf); this._repositionRaf = 0; }
       this.entityPopover = null;
     },
   }));
