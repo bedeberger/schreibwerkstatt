@@ -272,6 +272,7 @@
   "entities.scene":               "Scene",
   "entities.event":               "Event",
   "entities.panel.title":         "On this page",
+  "entities.panel.figures":       "Characters",
   "entities.panel.scenes":        "Scenes",
   "entities.panel.events":        "Events",
   "entities.panel.onPage":        "On this page",

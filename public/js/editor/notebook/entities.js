@@ -189,20 +189,70 @@ function rangeFromOffsets(nodes, starts, start, end) {
 }
 
 /** Berechnet Ranges aus dem aktuellen DOM-Stand des Editor-Containers
- *  und schiebt sie in die zwei Highlight-Register. Kein DOM-Eingriff. */
+ *  und schiebt sie in die zwei Highlight-Register. Kein DOM-Eingriff.
+ *  Liefert die DOM-Ranges + Entity-Metadata zurueck, damit Click-Hit-Tests
+ *  direkt gegen die Ranges fahren koennen (kein Wort-Extrakt mehr noetig). */
 export function applyHighlights(rootEl, entities) {
-  if (!ensureHighlights()) return;
+  if (!ensureHighlights()) return [];
   clearHighlights();
-  if (!rootEl) return;
+  if (!rootEl) return [];
   const { nodes, full, starts } = collectTextNodes(rootEl);
-  if (!full) return;
+  if (!full) return [];
   const ranges = buildRanges(full, entities);
+  const out = [];
   for (const r of ranges) {
     const range = rangeFromOffsets(nodes, starts, r.start, r.end);
     if (!range) continue;
     if (r.kind === 'figure') _hlFigure.add(range);
     else if (r.kind === 'location') _hlLocation.add(range);
+    out.push({ kind: r.kind, id: r.id, name: r.name, range });
   }
+  return out;
+}
+
+/** Findet den ersten Highlight-Match, dessen Bounding-Rect den Punkt
+ *  enthaelt. Iteriert getClientRects() (Highlight kann ueber Zeilen-Umbrueche
+ *  mehrere Rects haben). */
+export function findHighlightAtPoint(highlights, x, y) {
+  if (!Array.isArray(highlights)) return null;
+  for (const h of highlights) {
+    const rects = h.range?.getClientRects?.();
+    if (!rects) continue;
+    for (const r of rects) {
+      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
+        return { hit: h, rect: r };
+      }
+    }
+  }
+  return null;
+}
+
+/** Filtert Figuren fuer das Seiten-Panel: liefert alle Figuren, deren
+ *  kanonischer Name (case-insensitiv, ganze Woerter) im aktuellen Seiten-Text
+ *  vorkommt. Pendant zu `selectScenesForView` aber textbasiert statt
+ *  page_id-basiert (Figuren-Mentions stehen im Body, nicht in einer Bridge).
+ *  Sortierung deterministisch nach `name` (locale-Compare). */
+export function selectFigurenForPage(figuren, pageText) {
+  if (!Array.isArray(figuren) || !pageText) return [];
+  const lowText = pageText.toLowerCase();
+  const hit = new Set();
+  for (const f of figuren) {
+    const name = (f?.name || '').trim();
+    if (!name || f.id == null) continue;
+    const lowName = name.toLowerCase();
+    let from = 0;
+    while (from <= lowText.length - lowName.length) {
+      const idx = lowText.indexOf(lowName, from);
+      if (idx < 0) break;
+      const before = idx > 0 ? pageText[idx - 1] : '';
+      const after  = pageText[idx + name.length] || '';
+      if (!isWordChar(before) && !isWordChar(after)) { hit.add(f.id); break; }
+      from = idx + Math.max(1, name.length);
+    }
+  }
+  return figuren
+    .filter(f => hit.has(f.id))
+    .sort((a, b) => String(a?.name || '').localeCompare(String(b?.name || '')));
 }
 
 /** Vereint Figuren + Orte zur Entitaeten-Liste, die `buildRanges`

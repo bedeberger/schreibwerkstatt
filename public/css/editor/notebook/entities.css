@@ -18,150 +18,116 @@
     text-underline-offset: 3px;
   }
 
-  /* ── Klappschiene neben Editor-Body ────────────────────────────────────── */
+  /* ── „Auf dieser Seite"-Collapsible ueber dem Editor-Body ──────────────── */
+  /* Pattern wie .figure-context-panel (Header + Chevron + Chip-Body). Drei
+     parallele Reihen (Figuren/Szenen/Ereignisse) untereinander. Reihen ohne
+     Inhalte werden vom Template ausgeblendet — kein leerer Spacer im DOM. */
 
-  .entity-panel {
-    container-type: inline-size;
-    flex: 0 0 280px;
-    max-width: 320px;
-    min-width: 220px;
-    border-left: 1px solid var(--color-border, #e3e3e3);
-    background: var(--color-bg-subtle, #fafafa);
-    padding: var(--space-3, 12px);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3, 12px);
-    overflow-y: auto;
-    align-self: stretch;
+  .on-this-page-panel {
+    margin: var(--space-md) 0;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-bg);
   }
 
-  .entity-panel-header {
+  .on-this-page-header {
     display: flex;
-    align-items: center;
     justify-content: space-between;
-    gap: var(--space-2, 8px);
-    padding-bottom: var(--space-2, 8px);
-    border-bottom: 1px solid var(--color-border, #e3e3e3);
+    align-items: center;
+    padding: var(--space-sm) 12px;
+    cursor: pointer;
+    user-select: none;
   }
 
-  .entity-panel-title {
-    font-size: var(--text-sm, 0.85em);
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--color-fg-muted, #666);
+  .on-this-page-header:hover { background: var(--color-hover-light); }
+
+  .on-this-page-title {
+    font-size: var(--font-size-sm);
+    font-weight: 400;
   }
 
-  .entity-panel-close {
-    padding: 2px;
-    line-height: 1;
-  }
-
-  .entity-panel-body {
+  .on-this-page-body {
+    padding: var(--space-xs) 12px 10px;
     display: flex;
     flex-direction: column;
-    gap: var(--space-4, 16px);
+    gap: var(--space-sm);
   }
 
-  .entity-panel-section-title {
-    font-size: var(--text-sm, 0.85em);
-    margin: 0 0 var(--space-2, 6px);
-    color: var(--color-fg-strong, #222);
+  .on-this-page-row {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-6);
+    flex-wrap: wrap;
   }
 
-  .entity-panel-subsection {
-    margin-bottom: var(--space-2, 8px);
-  }
-
-  .entity-panel-subsection--chapter {
-    opacity: 0.78;
-  }
-
-  .entity-panel-subtitle {
-    margin: 0 0 4px;
-    font-size: 0.72em;
+  .on-this-page-row-label {
+    flex: 0 0 auto;
+    min-width: 90px;
+    padding-top: 3px;
+    font-size: var(--font-size-xs);
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: var(--color-fg-muted, #666);
+    color: var(--color-subtle);
   }
 
-  .entity-panel-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
+  .on-this-page-chips {
     display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .entity-panel-item {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: 6px 8px;
-    border-radius: var(--radius-sm, 4px);
-    background: var(--color-bg, #fff);
-    border: 1px solid var(--color-border, #e3e3e3);
-    cursor: pointer;
-    transition: background 0.12s ease, border-color 0.12s ease;
-  }
-
-  .entity-panel-item:hover {
-    background: color-mix(in srgb, var(--color-accent, #4a90e2) 6%, var(--color-bg, #fff));
-    border-color: color-mix(in srgb, var(--color-accent, #4a90e2) 35%, var(--color-border, #e3e3e3));
-  }
-
-  .entity-panel-item:focus-visible {
-    outline: 2px solid var(--color-accent, #4a90e2);
-    outline-offset: 1px;
-  }
-
-  .entity-panel-item-title {
-    font-size: var(--text-sm, 0.9em);
-    font-weight: 500;
-    color: var(--color-fg, #222);
-  }
-
-  .entity-panel-item-meta {
-    display: flex;
-    gap: var(--space-2, 6px);
     flex-wrap: wrap;
-    font-size: 0.78em;
-    color: var(--color-fg-muted, #666);
+    gap: var(--space-6);
+    flex: 1 1 auto;
+    min-width: 0;
   }
 
-  .entity-panel-item-date {
+  .on-this-page-chip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-3) 8px;
+    font-size: var(--font-size-sm);
+    background: var(--color-tooltip-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+  }
+
+  .on-this-page-chip:hover { border-color: var(--color-accent); }
+
+  .on-this-page-chip--figure {
+    background: color-mix(in srgb, var(--color-accent-figure) 14%, var(--color-tooltip-bg));
+    border-color: color-mix(in srgb, var(--color-accent-figure) 45%, var(--color-border));
+  }
+
+  .on-this-page-chip--chapter {
+    opacity: 0.65;
+  }
+
+  .on-this-page-chip-title { font-weight: 500; }
+
+  .on-this-page-chip-meta {
+    font-size: var(--font-size-micro);
+    color: var(--color-subtle);
     font-variant-numeric: tabular-nums;
   }
 
-  .entity-panel-item-figure {
+  .on-this-page-chip-meta--figure {
     font-style: italic;
+    font-variant-numeric: normal;
   }
 
-  .entity-panel-section-empty,
-  .entity-panel-empty {
-    font-size: 0.85em;
+  .on-this-page-chip .tag {
+    font-size: var(--font-size-micro);
+    padding: 0 4px;
+  }
+
+  .on-this-page-empty {
+    font-size: var(--font-size-sm);
     margin: 0;
   }
 
-  /* Container-Query: bei schmalem Editor-Body (Mobile, geteilte Ansicht)
-     statt rechtem Sidebar unter den Body fallen. */
-  @container (max-width: 240px) {
-    .entity-panel {
-      max-width: none;
-      min-width: 0;
-    }
-  }
-
-  /* Editor-Body responsiv: bei < 760px Viewport Schiene komplett unten.
-     Mediaquery hier, weil Layout vom .editor-body-wrap-Parent abhaengt. */
   @media (max-width: 760px) {
-    .editor-body-wrap .entity-panel {
-      flex-basis: auto;
-      max-width: none;
-      border-left: none;
-      border-top: 1px solid var(--color-border, #e3e3e3);
-    }
+    .on-this-page-row { flex-direction: column; gap: 4px; }
+    .on-this-page-row-label { min-width: 0; padding-top: 0; }
   }
 
   /* ── Popover (teleport in body) ────────────────────────────────────────── */

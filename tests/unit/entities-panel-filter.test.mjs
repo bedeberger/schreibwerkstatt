@@ -8,7 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { selectScenesForView, selectEventsForView } = await import('../../public/js/editor/notebook/entities.js');
+const { selectScenesForView, selectEventsForView, selectFigurenForPage } = await import('../../public/js/editor/notebook/entities.js');
 
 // ── Szenen ─────────────────────────────────────────────────────────────────
 
@@ -107,4 +107,48 @@ test('selectEventsForView: Fallback-Sort lexikographisch ueber datum-String wenn
   ];
   const out = selectEventsForView(figuren, 1, 1);
   assert.deepEqual(out.onPage.map(e => e.ereignis), ['A', 'B']);
+});
+
+// ── Figuren auf Seite ──────────────────────────────────────────────────────
+
+test('selectFigurenForPage: matched Figuren nach Name (case-insensitiv, ganze Woerter)', () => {
+  const figuren = [
+    { id: 1, name: 'Anna' },
+    { id: 2, name: 'Bob' },
+    { id: 3, name: 'Carol' },
+  ];
+  const text = 'Heute trafen anna und Bob den Hund.';
+  const out = selectFigurenForPage(figuren, text);
+  assert.deepEqual(out.map(f => f.id), [1, 2]);
+});
+
+test('selectFigurenForPage: kein Teilstring-Match (Anna ≠ Annabelle)', () => {
+  const figuren = [{ id: 1, name: 'Anna' }];
+  const out = selectFigurenForPage(figuren, 'Annabelle ging spazieren.');
+  assert.equal(out.length, 0);
+});
+
+test('selectFigurenForPage: leere Inputs', () => {
+  assert.deepEqual(selectFigurenForPage([], 'Hallo'), []);
+  assert.deepEqual(selectFigurenForPage([{ id: 1, name: 'A' }], ''), []);
+  assert.deepEqual(selectFigurenForPage(null, 'Hallo'), []);
+});
+
+test('selectFigurenForPage: deterministisch nach name sortiert', () => {
+  const figuren = [
+    { id: 3, name: 'Zoe' },
+    { id: 1, name: 'Anna' },
+    { id: 2, name: 'Mike' },
+  ];
+  const out = selectFigurenForPage(figuren, 'Zoe, Anna und Mike sind hier.');
+  assert.deepEqual(out.map(f => f.name), ['Anna', 'Mike', 'Zoe']);
+});
+
+test('selectFigurenForPage: Figur ohne id wird uebersprungen', () => {
+  const figuren = [
+    { id: null, name: 'NoId' },
+    { id: 1, name: 'Anna' },
+  ];
+  const out = selectFigurenForPage(figuren, 'NoId und Anna kommen.');
+  assert.deepEqual(out.map(f => f.id), [1]);
 });

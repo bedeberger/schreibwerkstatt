@@ -1,7 +1,7 @@
 // editorEntitiesCard — Entity-Linking-Sub-Komponente (Notebook-Editor):
 //   - Inline-Highlights (Figuren, Orte) im contenteditable.
-//   - Klappschiene rechts neben dem Editor-Body mit Szenen + Ereignissen
-//     der aktuellen Seite (plus „Im Kapitel"-Sektion fuer ungebundene Eintraege).
+//   - „Auf dieser Seite"-Collapsible ueber dem Editor-Body mit drei Reihen
+//     (Figuren / Szenen / Ereignisse). Pattern wie .figure-context-panel.
 //   - Popover (teleport) bei Klick auf ein Highlight.
 //
 // Lifecycle:
@@ -18,8 +18,9 @@
 // Ereignisse aus `figuren[].lebensereignisse` (siehe entities.js#selectEventsForView).
 
 import {
-  applyHighlights, clearHighlights,
-  selectScenesForView, selectEventsForView, toEntitiesList,
+  applyHighlights, clearHighlights, findHighlightAtPoint,
+  selectScenesForView, selectEventsForView, selectFigurenForPage,
+  toEntitiesList,
 } from '../editor/notebook/entities.js';
 
 const RECOMPUTE_DEBOUNCE_MS = 250;
@@ -30,6 +31,9 @@ export function registerEditorEntitiesCard() {
   window.Alpine.data('editorEntitiesCard', () => ({
     // Popover-State (teleport): null = zu; sonst { entity, kind, x, y, name }.
     entityPopover: null,
+    // Letzte berechnete Highlight-Ranges (kind, id, name, range) — Hit-Test-
+    // Quelle fuer Klicks. Wird in `_recompute` neu gesetzt.
+    _highlights: [],
     _recomputeTimer: null,
     _abort: null,
     _onSettingsUpdated: null,
@@ -109,12 +113,16 @@ export function registerEditorEntitiesCard() {
 
     _recompute() {
       const app = window.__app;
-      if (!app?.entitiesEnabledForCurrentBook) { clearHighlights(); return; }
+      if (!app?.entitiesEnabledForCurrentBook) {
+        clearHighlights();
+        this._highlights = [];
+        return;
+      }
       const root = document.querySelector(EDIT_SELECTOR)
                 || document.querySelector('#editor-card .page-content-view');
-      if (!root) { clearHighlights(); return; }
+      if (!root) { clearHighlights(); this._highlights = []; return; }
       const entities = toEntitiesList(app.figuren, app.orte);
-      applyHighlights(root, entities);
+      this._highlights = applyHighlights(root, entities);
     },
 
     // ── Panel-Daten ─────────────────────────────────────────────────────────
@@ -131,6 +139,20 @@ export function registerEditorEntitiesCard() {
       const pid = app?.currentPage?.id;
       const cid = app?.currentPage?.chapter_id;
       return selectEventsForView(app?.figuren || [], pid, cid);
+    },
+
+    // Figuren, deren Name auf der aktuellen Seite vorkommt. Aus dem aktuellen
+    // Editor-Text bzw. dem zuletzt gerenderten Page-HTML extrahiert (gleiche
+    // Match-Logik wie Highlights), damit die Liste auch ohne CSS-Highlight-API
+    // korrekt ist. selectFigurenForPage ist die SSoT (pure, unit-getestet).
+    panelFigures() {
+      const app = window.__app;
+      const figs = app?.figuren || [];
+      if (!figs.length) return [];
+      const root = document.querySelector(EDIT_SELECTOR)
+                || document.querySelector('#editor-card .page-content-view');
+      const text = root?.textContent || '';
+      return selectFigurenForPage(figs, text);
     },
 
     panelEmpty() {
@@ -177,59 +199,34 @@ export function registerEditorEntitiesCard() {
 
     // ── Popover ─────────────────────────────────────────────────────────────
 
+    // Hit-Test ueber die DOM-Ranges, die `applyHighlights` zurueckgeliefert hat.
+    // CSS Custom Highlights selbst sind nicht pointer-event-faehig — wir
+    // iterieren die gespeicherten Ranges und matchen gegen die Klick-Koordinate.
     _maybeOpenPopoverFromClick(ev) {
       const app = window.__app;
-      const entities = toEntitiesList(app?.figuren, app?.orte);
-      if (entities.length === 0) return;
-      const range = this._rangeAtPoint(ev.clientX, ev.clientY);
-      if (!range) return;
-      // Wort um den Klick herum extrahieren.
-      const word = this._wordAtRange(range);
-      if (!word) return;
-      const lowWord = word.toLowerCase();
-      // Erstes Match (Figur > Ort durch Listen-Reihenfolge).
-      const hit = entities.find(e => e.name.toLowerCase() === lowWord);
-      if (!hit) return;
+      if (!this._highlights?.length) return;
+      const found = findHighlightAtPoint(this._highlights, ev.clientX, ev.clientY);
+      if (!found) return;
+      const { hit, rect } = found;
       ev.preventDefault();
-      const rect = range.getBoundingClientRect();
       const data = hit.kind === 'figure'
         ? (app.figuren || []).find(f => f.id === hit.id)
         : (app.orte    || []).find(o => o.id === hit.id);
+      // Popover an der Highlight-Box ausrichten — unter dem Wort, links
+      // mit ein bisschen Inset, Viewport-Clamping.
+      const POPOVER_W = 320;
+      const POPOVER_H_EST = 180;
+      const x = Math.min(window.innerWidth - POPOVER_W - 12, Math.max(12, rect.left));
+      const y = rect.bottom + POPOVER_H_EST > window.innerHeight
+        ? Math.max(12, rect.top - POPOVER_H_EST - 6)
+        : rect.bottom + 6;
       this.entityPopover = {
         kind: hit.kind,
         id: hit.id,
         name: hit.name,
         data: data || null,
-        x: Math.min(window.innerWidth - 340, Math.max(12, rect.left)),
-        y: Math.min(window.innerHeight - 200, rect.bottom + 6),
+        x, y,
       };
-    },
-
-    _rangeAtPoint(x, y) {
-      if (document.caretPositionFromPoint) {
-        const pos = document.caretPositionFromPoint(x, y);
-        if (!pos || !pos.offsetNode) return null;
-        const r = document.createRange();
-        r.setStart(pos.offsetNode, pos.offset);
-        r.setEnd(pos.offsetNode, pos.offset);
-        return r;
-      }
-      if (document.caretRangeFromPoint) {
-        return document.caretRangeFromPoint(x, y);
-      }
-      return null;
-    },
-
-    _wordAtRange(range) {
-      const node = range.startContainer;
-      if (!node || node.nodeType !== Node.TEXT_NODE) return '';
-      const text = node.nodeValue || '';
-      const idx = range.startOffset;
-      const isWord = (ch) => /[\p{L}\p{M}\p{N}'’\-]/u.test(ch || '');
-      let s = idx, e = idx;
-      while (s > 0 && isWord(text[s - 1])) s--;
-      while (e < text.length && isWord(text[e])) e++;
-      return text.slice(s, e);
     },
 
     closePopover() {
