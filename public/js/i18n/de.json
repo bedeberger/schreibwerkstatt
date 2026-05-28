@@ -271,7 +271,7 @@
   "entities.location":            "Ort",
   "entities.scene":               "Szene",
   "entities.event":               "Ereignis",
-  "entities.panel.title":         "Auf dieser Seite",
+  "entities.panel.title":         "Kontext",
   "entities.panel.figures":       "Figuren",
   "entities.panel.scenes":        "Szenen",
   "entities.panel.events":        "Ereignisse",

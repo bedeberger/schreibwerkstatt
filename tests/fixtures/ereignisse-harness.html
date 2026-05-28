@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="de-CH">
+<head>
+  <meta charset="UTF-8">
+  <title>Ereignisse Test Harness</title>
+  <!-- Minimal-CSS: nur was die Ereignisse-Karte konsumiert. Vollständig zu
+       laden waere overkill und erhoeht den Pflegeaufwand. -->
+  <link rel="stylesheet" href="/public/css/tokens.css">
+  <link rel="stylesheet" href="/public/css/components/icons.css">
+  <link rel="stylesheet" href="/public/css/entities/ereignisse-subtyp.css">
+  <link rel="stylesheet" href="/public/css/entities/ereignisse-span.css">
+  <style>
+    body { margin: 0; padding: 24px; font: 16px/1.5 system-ui, sans-serif; }
+  </style>
+</head>
+<body>
+  <!-- Slim-Variante des Partials. Genug DOM, um zu testen: Subtyp-Icon-
+       Rendering, Spannen-Klasse, Unbekannt-Bucket, Subtyp-Filter. Filter-Bar
+       reduziert auf einfaches <select> (das Test-Harness umgeht absichtlich
+       die catalogFilter-Combobox, weil deren Live-Bindings hier nicht
+       relevant sind). -->
+  <div id="root" x-data="ereignisseCard" x-show="$app.showEreignisseCard">
+    <div class="filter-bar">
+      <label>Subtyp:
+        <select data-test="subtyp-filter" x-model="$app.ereignisseFilters.subtyp">
+          <option value="">(alle)</option>
+          <template x-for="s in ereignisseSubtypListe()" :key="s">
+            <option :value="s" x-text="s"></option>
+          </template>
+        </select>
+      </label>
+      <span data-test="filter-count" x-text="filteredEreignisse().length + ' / ' + $app.globalZeitstrahl.length"></span>
+    </div>
+
+    <div class="global-zeitstrahl-body">
+      <template x-for="(ev, i) in filteredEreignisse()" :key="ev.id ?? i">
+        <div class="gz-item"
+             :data-test="'event-' + ev.id"
+             :data-subtyp="ev.subtyp || 'sonstiges'"
+             :class="[
+               ev.typ === 'extern' ? 'gz-item--extern' : '',
+               'gz-item--subtyp-' + (ev.subtyp || 'sonstiges'),
+               eventSpanYears(ev) > 0 ? 'gz-item--span' : '',
+               ev.datum_year == null && ev.story_tag == null ? 'gz-item--unknown' : '',
+             ]"
+             :style="eventSpanYears(ev) > 0 ? ('--span-years:' + eventSpanYears(ev)) : null">
+          <div class="gz-content">
+            <div class="gz-datum-row">
+              <span class="gz-datum" x-text="formatEventDate(ev)"></span>
+              <span class="gz-subtyp-badge"
+                    :class="'gz-subtyp-badge--' + (ev.subtyp || 'sonstiges')">
+                <svg class="icon gz-subtyp-icon" :data-test-icon="subtypIcon(ev.subtyp || 'sonstiges')" aria-hidden="true">
+                  <use :href="'/public/icons.svg#' + subtypIcon(ev.subtyp || 'sonstiges')"/>
+                </svg>
+                <span x-text="ev.subtyp || 'sonstiges'"></span>
+              </span>
+            </div>
+            <div class="gz-ereignis" x-text="ev.ereignis"></div>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <script type="module">
+    // Reihenfolge ist heikel:
+    //  1) Mock-Daten + window.__app aufbauen (synchron).
+    //  2) `alpine:init`-Listener registrieren — Alpine ruft ihn auf, BEVOR es
+    //     den DOM scannt. Dort dann magic('app'), store('catalog'), und das
+    //     Card-Komponenten-Register.
+    //  3) Alpine-Script erst danach dynamisch laden — sonst feuert init,
+    //     bevor unser Listener da ist.
+    const { registerEreignisseCard } = await import('/public/js/cards/ereignisse-card.js');
+
+    const MOCK_EVENTS = [
+      {
+        id: 1, ereignis: 'Hochzeit in Bern', subtyp: 'hochzeit', typ: 'persoenlich',
+        datum_year: 1850, datum_month: 5, datum_day: 12,
+        datum_ende_year: null, datum_ende_month: null, datum_ende_day: null,
+        story_tag: null, datum_label: '12. Mai 1850',
+        figuren: [], kapitel: ['Kapitel Eins'], seiten: ['Seite 1'],
+      },
+      {
+        id: 2, ereignis: 'Reise durch Europa', subtyp: 'reise', typ: 'persoenlich',
+        datum_year: 1851, datum_month: null, datum_day: null,
+        datum_ende_year: 1853, datum_ende_month: null, datum_ende_day: null,
+        story_tag: null, datum_label: '1851–1853',
+        figuren: [], kapitel: ['Kapitel Eins'], seiten: [],
+      },
+      {
+        id: 3, ereignis: 'Tod der Mutter', subtyp: 'tod', typ: 'persoenlich',
+        datum_year: 1860, datum_month: null, datum_day: null,
+        datum_ende_year: null, datum_ende_month: null, datum_ende_day: null,
+        story_tag: null, datum_label: '1860',
+        figuren: [], kapitel: ['Kapitel Eins'], seiten: [],
+      },
+      {
+        id: 4, ereignis: 'Unbekannter Vorfall', subtyp: 'sonstiges', typ: 'persoenlich',
+        datum_year: null, datum_month: null, datum_day: null,
+        datum_ende_year: null, datum_ende_month: null, datum_ende_day: null,
+        story_tag: null, datum_label: 'vor der Reise',
+        figuren: [], kapitel: ['Kapitel Eins'], seiten: [],
+      },
+      {
+        id: 5, ereignis: 'Politisches Beben', subtyp: 'extern_politisch', typ: 'extern',
+        datum_year: 1848, datum_month: 3, datum_day: null,
+        datum_ende_year: null, datum_ende_month: null, datum_ende_day: null,
+        story_tag: null, datum_label: 'März 1848',
+        figuren: [], kapitel: ['Kapitel Eins'], seiten: [],
+      },
+    ];
+
+    document.addEventListener('alpine:init', () => {
+      // $app im real-App ist der Alpine-Root-Proxy → reaktiv. Hier mit
+      // Alpine.reactive nachbauen, sonst sieht x-model-Bindings auf
+      // $app.ereignisseFilters.subtyp die Mutationen nicht.
+      window.__app = window.Alpine.reactive({
+        selectedBookId: 1,
+        selectedBookName: 'Testbuch',
+        showEreignisseCard: true,
+        figuren: [],
+        globalZeitstrahl: MOCK_EVENTS,
+        ereignisseFilters: { suche: '', figurId: '', kapitel: '', seite: '', subtyp: '' },
+        alleAktualisierenLastRun: null,
+        t: (k, params) => params ? `${k} ${JSON.stringify(params)}` : k,
+        _deriveKapitel: () => [],
+        _deriveSeiten: () => [],
+        _reloadZeitstrahl: () => {},
+        gotoStelle: () => {},
+        openFigurById: () => {},
+      });
+      window.Alpine.magic('app', () => window.__app);
+      window.Alpine.store('catalog', {
+        figuren: [], orte: [], szenen: [], globalZeitstrahl: MOCK_EVENTS,
+      });
+      registerEreignisseCard();
+    });
+
+    document.addEventListener('alpine:initialized', () => {
+      // x-for-Rendering läuft im selben Tick — Mikrotask reicht.
+      queueMicrotask(() => { window.__harnessReady = true; });
+    });
+
+    // Alpine erst jetzt laden — der init-Listener oben muss vorher hängen.
+    const s = document.createElement('script');
+    s.src = '/public/vendor/alpine-3.14.9.min.js';
+    document.head.appendChild(s);
+  </script>
+</body>
+</html>

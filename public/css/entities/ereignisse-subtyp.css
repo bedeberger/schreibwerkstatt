@@ -25,8 +25,12 @@
   box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--gz-subtyp-color, var(--color-primary)) 60%, var(--color-border));
 }
 
-/* Subtyp-Badge: eckig (Pattern „Eckige Badges"), kompakt. */
+/* Subtyp-Badge: eckig (Pattern „Eckige Badges"), kompakt.
+   Inline-Flex, weil das Lucide-Icon vor dem Label sitzt. */
 .gz-subtyp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: var(--font-size-micro);
   font-weight: 400;
   padding: var(--space-1) 6px;
@@ -35,6 +39,12 @@
   color:      color-mix(in srgb, var(--gz-subtyp-color, var(--color-accent)) 75%, var(--color-text));
   border: 0.5px solid color-mix(in srgb, var(--gz-subtyp-color, var(--color-accent)) 50%, var(--color-border));
   white-space: nowrap;
+}
+.gz-subtyp-icon {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  color: color-mix(in srgb, var(--gz-subtyp-color, var(--color-accent)) 85%, var(--color-text));
 }
 
 /* 'sonstiges' visuell zurückhaltend — Default-Subtyp soll nicht laut werden. */

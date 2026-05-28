@@ -9,13 +9,15 @@
 import { setupCardLifecycle } from './card-lifecycle.js';
 import { memoizeByIdentity } from '../utils.js';
 
-const _memoEreignisse = () => memoizeByIdentity(([events, suche, figurId, kapitel, seite, subtyp]) => {
-  let result = events;
+// Pure Filter-Logik. Aus dem memoized Wrapper extrahiert, damit sie ohne
+// Alpine-Root testbar ist (siehe tests/unit/ereignisse-card-filter.test.mjs).
+export function applyEreignisseFilters(events, { suche = '', figurId = '', subtyp = '', kapitel = '', seite = '' } = {}) {
+  let result = events || [];
   if (suche) {
     const q = suche.toLowerCase();
     result = result.filter(ev => (ev.ereignis || '').toLowerCase().includes(q));
   }
-  if (figurId) result = result.filter(ev => ev.figuren.some(f => f.id === figurId));
+  if (figurId) result = result.filter(ev => (ev.figuren || []).some(f => f.id === figurId));
   if (subtyp) result = result.filter(ev => (ev.subtyp || 'sonstiges') === subtyp);
   if (kapitel) {
     result = result.filter(ev => {
@@ -30,7 +32,33 @@ const _memoEreignisse = () => memoizeByIdentity(([events, suche, figurId, kapite
     });
   }
   return result;
-});
+}
+
+const _memoEreignisse = () => memoizeByIdentity(([events, suche, figurId, kapitel, seite, subtyp]) =>
+  applyEreignisseFilters(events, { suche, figurId, kapitel, seite, subtyp })
+);
+
+// Mapping Subtyp → Lucide-Sprite-Icon-ID. Whitelist deckungsgleich mit
+// prompts/komplett.js + i18n events.subtyp.*. Unbekannte/ungültige Subtypen
+// fallen auf 'sonstiges' → more-horizontal.
+const SUBTYP_ICON = {
+  geburt:            'baby',
+  tod:               'skull',
+  hochzeit:          'heart',
+  reise:             'plane',
+  konflikt:          'swords',
+  wendepunkt:        'git-fork',
+  entdeckung:        'compass',
+  verlust:           'heart-crack',
+  sieg:              'trophy',
+  extern_politisch:  'landmark',
+  extern_natur:      'mountain',
+  extern_kulturell:  'book-open',
+  sonstiges:         'more-horizontal',
+};
+export function subtypIcon(subtyp) {
+  return SUBTYP_ICON[subtyp] || SUBTYP_ICON.sonstiges;
+}
 
 // Formatiert das Anzeige-Datum aus den strukturierten Feldern. Punkt-Events
 // und Spannen werden unterschiedlich gerendert. Fallback auf datum_label
@@ -121,6 +149,10 @@ export function registerEreignisseCard() {
 
     formatEventDate(ev) {
       return _formatEventDate(ev, (k, p) => window.__app.t(k, p));
+    },
+
+    subtypIcon(subtyp) {
+      return subtypIcon(subtyp);
     },
 
     // Span-Höhe (Spannen-Events): proportional zur Jahr-Differenz, geclampt.

@@ -128,12 +128,18 @@ let _hlLocation = null;
 
 function ensureHighlights() {
   if (typeof CSS === 'undefined' || !CSS.highlights || typeof Highlight === 'undefined') return false;
+  // Niedrigere Priority als LanguageTool-Highlights (Default 0): bei Overlap
+  // setzt der zuletzt registrierte / hoechst priorisierte Highlight die
+  // `text-decoration` (stapelt nicht). Entities sind sekundaeres Signal —
+  // die wavy Squiggle vom LT-Spellcheck muss sichtbar bleiben.
   if (!_hlFigure) {
     _hlFigure = new Highlight();
+    _hlFigure.priority = -10;
     CSS.highlights.set(HL_FIGURE, _hlFigure);
   }
   if (!_hlLocation) {
     _hlLocation = new Highlight();
+    _hlLocation.priority = -10;
     CSS.highlights.set(HL_LOCATION, _hlLocation);
   }
   return true;
