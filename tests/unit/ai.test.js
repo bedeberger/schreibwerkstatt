@@ -55,6 +55,22 @@ test('parseJSON: escapete Quotes in Strings', () => {
   );
 });
 
+test('parseJSON: unescaptes Dialog-Quote vor Prosa-Komma (DE „Ada", bis …)', () => {
+  // Modell schreibt Dialog mit ASCII-`"` mitten in Prosa-Wert; das `"` steht
+  // direkt vor einem Prosa-Komma. Heuristik darf das NICHT als String-Terminator
+  // werten (nach echtem `",` folgt immer `"`/`}`/`]`/EOF, nie ein Wort).
+  const input = '{"beschreibung":"Sie besteht auf „Ada", bis sie merkt, dass die Frau „Ida" heisst.","ok":true}';
+  assert.deepEqual(parseJSON(input), {
+    beschreibung: 'Sie besteht auf „Ada", bis sie merkt, dass die Frau „Ida" heisst.',
+    ok: true,
+  });
+});
+
+test('parseJSON: unescaptes Quote vor Wort (kein Komma) wird escaped', () => {
+  const input = '{"a":"er sagte "hallo" laut","b":2}';
+  assert.deepEqual(parseJSON(input), { a: 'er sagte "hallo" laut', b: 2 });
+});
+
 test('parseJSON: Typ-Mismatch `{"a":[}` wird nicht fälschlich aus Trailing-Mülltext erweitert', () => {
   // Früher zählte die Extraktion `{` und `[` in denselben depth-Counter; ein defekter
   // Input wie `{"a":[}` wurde "balanciert" erkannt und dann durch jsonrepair geflickt
