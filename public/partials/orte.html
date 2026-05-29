@@ -33,6 +33,18 @@
     </template>
   </div>
 
+  <!-- Ansicht-Umschalter (Liste / Grid) -->
+  <div x-show="$app.orte.length > 0" class="tabs entity-view-toggle" role="tablist" :aria-label="$app.t('orte.viewLabel')">
+    <template x-for="m in ['list','grid']" :key="m">
+      <button type="button" role="tab"
+              class="tabs-btn"
+              :class="{ 'tabs-btn--active': viewMode === m }"
+              :aria-selected="viewMode === m"
+              @click="viewMode = m"
+              x-text="$app.t('orte.view.' + m)"></button>
+    </template>
+  </div>
+
   <!-- Filter-Leiste -->
   <div x-show="$app.orte.length > 0" class="filter-bar">
     <input type="text" x-model="$app.orteFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
@@ -56,7 +68,7 @@
   </div>
 
   <!-- Ortsliste -->
-  <div x-show="$app.orte.length > 0" class="entity-list entity-list--accented ort-list">
+  <div x-show="$app.orte.length > 0 && viewMode === 'list'" class="entity-list entity-list--accented ort-list">
     <template x-for="o in $app.orteFiltered" :key="o.id">
       <div>
         <div class="entity-row" :data-ortid="o.id" @click="$app.selectedOrtId = $app.selectedOrtId === o.id ? null : o.id">
@@ -105,5 +117,69 @@
         </div>
       </div>
     </template>
+  </div>
+
+  <!-- Grid (Matrix): sortierbare Tabelle aller gefilterten Schauplätze -->
+  <div x-show="$app.orte.length > 0 && viewMode === 'grid'" class="table-scroll" x-cloak>
+    <table class="entity-grid-table"
+           x-data="sortableTable({
+             rows: () => window.__app.orteFiltered,
+             defaultKey: 'name',
+             types: { typ: 'string', name: 'string', stimmung: 'string' },
+             persistKey: 'orte.grid',
+           })">
+      <thead>
+        <tr>
+          <th class="sortable-th" :class="sortClass('typ')" :aria-sort="ariaSort('typ')"
+              @click="sortBy('typ')" x-text="$app.t('orte.col.typ')"></th>
+          <th class="sortable-th" :class="sortClass('name')" :aria-sort="ariaSort('name')"
+              @click="sortBy('name')" x-text="$app.t('orte.col.name')"></th>
+          <th class="sortable-th" :class="sortClass('stimmung')" :aria-sort="ariaSort('stimmung')"
+              @click="sortBy('stimmung')" x-text="$app.t('orte.col.stimmung')"></th>
+          <th x-text="$app.t('orte.col.kapitel')"></th>
+          <th x-text="$app.t('orte.col.erste')"></th>
+          <th x-text="$app.t('orte.col.figuren')"></th>
+          <th x-text="$app.t('orte.col.beschreibung')"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-for="o in sorted" :key="o.id">
+          <tr>
+            <td><span class="tag entity-typ-tag" x-text="o.typ || $app.t('orte.typAndere')"></span></td>
+            <td class="entity-grid-cell-title" x-text="o.name"></td>
+            <td x-text="o.stimmung"></td>
+            <td>
+              <span class="entity-grid-tags">
+                <template x-for="k in (o.kapitel || [])" :key="k.name">
+                  <span class="kapitel-badge kapitel-badge--primary internal-link"
+                        @click="$app.openKapitelByName(k.name)"
+                        x-text="k.name"></span>
+                </template>
+              </span>
+            </td>
+            <td>
+              <template x-if="o.erste_erwaehnung && o.erste_erwaehnung_page_id">
+                <span class="kapitel-badge kapitel-badge--secondary internal-link"
+                      @click="$app.gotoPageById(o.erste_erwaehnung_page_id)"
+                      x-text="o.erste_erwaehnung"></span>
+              </template>
+              <template x-if="o.erste_erwaehnung && !o.erste_erwaehnung_page_id">
+                <span x-text="o.erste_erwaehnung"></span>
+              </template>
+            </td>
+            <td>
+              <span class="entity-grid-tags">
+                <template x-for="figId in (o.figuren || [])" :key="figId">
+                  <span class="tag internal-link"
+                        @click="$app.openFigurById(figId)"
+                        x-text="$app.figurenById.get(figId)?.kurzname || $app.figurenById.get(figId)?.name || figId"></span>
+                </template>
+              </span>
+            </td>
+            <td class="entity-grid-cell-text" x-text="o.beschreibung"></td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
   </div>
 </div>

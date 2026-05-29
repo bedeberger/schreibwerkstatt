@@ -15,10 +15,12 @@ export function registerOrteCard() {
     orteLoading: false,
     orteProgress: 0,
     orteStatus: '',
+    viewMode: localStorage.getItem('orte.viewMode') === 'grid' ? 'grid' : 'list', // 'list' | 'grid'
     _ortePollTimer: null,
     _lifecycle: null,
 
     init() {
+      this.$watch('viewMode', (v) => localStorage.setItem('orte.viewMode', v));
       this._lifecycle = setupCardLifecycle(this, {
         name: 'orte',
         showFlag: 'showOrteCard',

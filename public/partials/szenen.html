@@ -90,7 +90,7 @@
   <!-- Alle Szenen -->
   <div x-show="$app.szenen.length > 0" class="szenen-liste-section">
     <!-- Ansicht-Umschalter (Liste / Grid) -->
-    <div class="tabs szenen-view-toggle" role="tablist" :aria-label="$app.t('szenen.viewLabel')">
+    <div class="tabs entity-view-toggle" role="tablist" :aria-label="$app.t('szenen.viewLabel')">
       <template x-for="m in ['list','grid']" :key="m">
         <button type="button" role="tab"
                 class="tabs-btn"
@@ -188,7 +188,7 @@
 
     <!-- Grid (Matrix): sortierbare Tabelle aller gefilterten Szenen -->
     <div x-show="viewMode === 'grid'" class="table-scroll" x-cloak>
-      <table class="szenen-grid-table"
+      <table class="entity-grid-table"
              x-data="sortableTable({
                rows: () => window.__app.szenenFiltered,
                defaultKey: 'kapitel',
@@ -218,7 +218,7 @@
                       :class="'severity-tag--' + (s.wertung || 'mittel')"
                       x-text="$app.t('szenen.rating.' + (s.wertung || 'mittel'))"></span>
               </td>
-              <td class="szenen-grid-cell-titel" x-text="s.titel"></td>
+              <td class="entity-grid-cell-title" x-text="s.titel"></td>
               <td>
                 <span class="kapitel-badge kapitel-badge--primary internal-link"
                       @click="$app.openKapitelByName(s.kapitel)"
@@ -232,7 +232,7 @@
                 </template>
               </td>
               <td>
-                <span class="szenen-grid-tags">
+                <span class="entity-grid-tags">
                   <template x-for="figId in (s.fig_ids || [])" :key="figId">
                     <span class="tag internal-link"
                           @click="$app.openFigurById(figId)"
@@ -241,7 +241,7 @@
                 </span>
               </td>
               <td>
-                <span class="szenen-grid-tags">
+                <span class="entity-grid-tags">
                   <template x-for="ortId in (s.ort_ids || [])" :key="'o'+ortId">
                     <span class="tag internal-link"
                           @click="$app.openOrtById(ortId)"
@@ -249,7 +249,7 @@
                   </template>
                 </span>
               </td>
-              <td class="szenen-grid-cell-kommentar" x-text="s.kommentar"></td>
+              <td class="entity-grid-cell-text" x-text="s.kommentar"></td>
             </tr>
           </template>
         </tbody>
