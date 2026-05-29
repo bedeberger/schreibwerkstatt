@@ -89,6 +89,17 @@
 
   <!-- Alle Szenen -->
   <div x-show="$app.szenen.length > 0" class="szenen-liste-section">
+    <!-- Ansicht-Umschalter (Liste / Grid) -->
+    <div class="tabs szenen-view-toggle" role="tablist" :aria-label="$app.t('szenen.viewLabel')">
+      <template x-for="m in ['list','grid']" :key="m">
+        <button type="button" role="tab"
+                class="tabs-btn"
+                :class="{ 'tabs-btn--active': viewMode === m }"
+                :aria-selected="viewMode === m"
+                @click="viewMode = m"
+                x-text="$app.t('szenen.view.' + m)"></button>
+      </template>
+    </div>
     <!-- Filter-Leiste -->
     <div class="filter-bar">
       <input type="text" x-model="$app.szenenFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
@@ -129,7 +140,7 @@
     </div>
 
     <!-- Kompakte Szenen-Liste -->
-    <div class="entity-list entity-list--accented">
+    <div x-show="viewMode === 'list'" class="entity-list entity-list--accented">
       <template x-for="(s, i) in $app.szenenFiltered" :key="s.id || i">
         <div>
           <div class="entity-row"
@@ -173,6 +184,76 @@
           </div>
         </div>
       </template>
+    </div>
+
+    <!-- Grid (Matrix): sortierbare Tabelle aller gefilterten Szenen -->
+    <div x-show="viewMode === 'grid'" class="table-scroll" x-cloak>
+      <table class="szenen-grid-table"
+             x-data="sortableTable({
+               rows: () => window.__app.szenenFiltered,
+               defaultKey: 'kapitel',
+               types: { wertung: 'string', titel: 'string', kapitel: 'string', seite: 'string' },
+               persistKey: 'szenen.grid',
+             })">
+        <thead>
+          <tr>
+            <th class="sortable-th" :class="sortClass('wertung')" :aria-sort="ariaSort('wertung')"
+                @click="sortBy('wertung')" x-text="$app.t('szenen.col.wertung')"></th>
+            <th class="sortable-th" :class="sortClass('titel')" :aria-sort="ariaSort('titel')"
+                @click="sortBy('titel')" x-text="$app.t('szenen.col.titel')"></th>
+            <th class="sortable-th" :class="sortClass('kapitel')" :aria-sort="ariaSort('kapitel')"
+                @click="sortBy('kapitel')" x-text="$app.t('szenen.col.kapitel')"></th>
+            <th class="sortable-th" :class="sortClass('seite')" :aria-sort="ariaSort('seite')"
+                @click="sortBy('seite')" x-text="$app.t('szenen.col.seite')"></th>
+            <th x-text="$app.t('szenen.col.pov')"></th>
+            <th x-text="$app.t('szenen.col.orte')"></th>
+            <th x-text="$app.t('szenen.col.kommentar')"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="s in sorted" :key="s.id">
+            <tr>
+              <td>
+                <span class="severity-tag"
+                      :class="'severity-tag--' + (s.wertung || 'mittel')"
+                      x-text="$app.t('szenen.rating.' + (s.wertung || 'mittel'))"></span>
+              </td>
+              <td class="szenen-grid-cell-titel" x-text="s.titel"></td>
+              <td>
+                <span class="kapitel-badge kapitel-badge--primary internal-link"
+                      @click="$app.openKapitelByName(s.kapitel)"
+                      x-text="s.kapitel"></span>
+              </td>
+              <td>
+                <template x-if="s.seite">
+                  <span class="kapitel-badge kapitel-badge--secondary internal-link"
+                        @click="s.page_id ? $app.gotoPageById(s.page_id) : $app.gotoStelle(s.kapitel, s.seite)"
+                        x-text="s.seite"></span>
+                </template>
+              </td>
+              <td>
+                <span class="szenen-grid-tags">
+                  <template x-for="figId in (s.fig_ids || [])" :key="figId">
+                    <span class="tag internal-link"
+                          @click="$app.openFigurById(figId)"
+                          x-text="$app.figurenById.get(figId)?.kurzname || $app.figurenById.get(figId)?.name || figId"></span>
+                  </template>
+                </span>
+              </td>
+              <td>
+                <span class="szenen-grid-tags">
+                  <template x-for="ortId in (s.ort_ids || [])" :key="'o'+ortId">
+                    <span class="tag internal-link"
+                          @click="$app.openOrtById(ortId)"
+                          x-text="$app.orteById.get(ortId)?.name || ortId"></span>
+                  </template>
+                </span>
+              </td>
+              <td class="szenen-grid-cell-kommentar" x-text="s.kommentar"></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
     </div>
   </div>
 </div>

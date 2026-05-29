@@ -1731,6 +1731,7 @@ Drei Editoren leben in eigenen Subfoldern (`book/`, `focus/`, `notebook/`); edit
 | [entities/figuren.css](public/css/entities/figuren.css) | Figuren-Karte (Graph, Familie, Soziogramm). |
 | [entities/figur-werkstatt.css](public/css/entities/figur-werkstatt.css) | Figuren-Werkstatt (Mindmap, Drafts-Sidebar, Read-only-Tree). |
 | [entities/szenen.css](public/css/entities/szenen.css) | Szenen-Karte. |
+| [entities/szenen-grid.css](public/css/entities/szenen-grid.css) | Szenen-Grid (Matrix-Ansicht): sortierbare Tabelle, View-Toggle. |
 | [entities/ideen.css](public/css/entities/ideen.css) | Ideen-Karte. |
 | [entities/entity-list.css](public/css/entities/entity-list.css) | `.entity-list` / `-row`, `.severity-tag*`, `.collapsible-*`, Skeleton, `.ort-*` Schauplätze. |
 

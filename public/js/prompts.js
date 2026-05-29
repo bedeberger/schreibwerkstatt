@@ -9,7 +9,39 @@
 import { _setIsLocal } from './prompts/state.js';
 import { _rebuildLektoratSchema } from './prompts/lektorat.js';
 import { _rebuildKomplettSchemas } from './prompts/komplett.js';
-import { configureLocales } from './prompts/core.js';
+import { configureLocales, _setPromptsContentHash, _allLocalePromptsSnapshot } from './prompts/core.js';
+import * as lektoratNs from './prompts/lektorat.js';
+import * as reviewNs from './prompts/review.js';
+import * as komplettNs from './prompts/komplett.js';
+import * as synonymNs from './prompts/synonym.js';
+
+// FNV-1a 32-bit über einen String → base36. Deterministisch, dependency-frei,
+// in Browser + Node identisch. Zweck ist Cache-Busting, nicht Kryptografie:
+// eine seltene Kollision verpasst nur eine Invalidierung (gleiche Risikoklasse
+// wie der frühere manuelle Bump), während jede reale Änderung den Hash bewegt.
+function _hashContent(str) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return ((h >>> 0).toString(36) + str.length.toString(36));
+}
+
+// Kanonischer Inhalt für den Versions-Hash: alle Locale-Prompts (alle Sprachen,
+// SYSTEM_*-Cores inkl. eingebettetem Komplett-Schema) + die cache-gateten Schemas,
+// die NICHT im Prompt-Text eingebettet sind (Lektorat/Review/Synonym).
+function _promptsContentHash() {
+  const schemaPart = JSON.stringify([
+    lektoratNs.SCHEMA_LEKTORAT,
+    reviewNs.SCHEMA_REVIEW, reviewNs.SCHEMA_CHAPTER_ANALYSIS, reviewNs.SCHEMA_CHAPTER_REVIEW,
+    komplettNs.SCHEMA_KOMPLETT_EXTRAKTION, komplettNs.SCHEMA_KOMPLETT_FIGUREN_STAMM,
+    komplettNs.SCHEMA_KOMPLETT_ORTE_PASS, komplettNs.SCHEMA_BEZIEHUNGEN,
+    komplettNs.SCHEMA_FIGUREN_KONSOL, komplettNs.SCHEMA_KONTINUITAET_PROBLEME,
+    synonymNs.SCHEMA_SYNONYM,
+  ]);
+  return _hashContent(_allLocalePromptsSnapshot() + schemaPart);
+}
 
 /**
  * Pflichtaufruf beim App-Start. Wirft bei fehlender Config.
@@ -23,6 +55,9 @@ export function configurePrompts(cfg, provider = 'claude') {
   _rebuildLektoratSchema();
   _rebuildKomplettSchemas();
   configureLocales(cfg);
+  // Nach dem Bau aller Prompts + Schemas: PROMPTS_VERSION mit Content-Hash versehen,
+  // damit Wortlaut-/Schema-/Config-Drift den persistenten Cache automatisch invalidiert.
+  _setPromptsContentHash(_promptsContentHash());
 }
 
 export {

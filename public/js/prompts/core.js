@@ -16,9 +16,25 @@ import {
 } from './komplett.js';
 
 // Versionsmarker für persistente Caches (z.B. chapter_extract_cache, Phase-1
-// Single-Pass-Cache). Bei jeder schemarelevanten Änderung erhöhen, damit alte
-// Cache-Einträge nicht mehr matchen und frisch extrahiert wird.
-export const PROMPTS_VERSION = '19';
+// Single-Pass-Cache). Der manuelle Prefix erlaubt einen erzwungenen Bump; der
+// Suffix `-<hash>` wird von configurePrompts() automatisch aus dem tatsächlich
+// gebauten Prompt-/Schema-Inhalt abgeleitet (_setPromptsContentHash). Dadurch
+// invalidiert jede Wortlaut- oder Schema-Änderung den Cache von selbst – kein
+// manueller Bump bei reinen Text-Edits mehr nötig.
+const PROMPTS_VERSION_BASE = '19';
+export let PROMPTS_VERSION = PROMPTS_VERSION_BASE;
+
+/** Setzt den Content-Hash-Suffix an PROMPTS_VERSION (von der Facade aufgerufen,
+ *  nachdem alle SYSTEM_*-Prompts und Schemas gebaut sind). */
+export function _setPromptsContentHash(hash) {
+  PROMPTS_VERSION = hash ? `${PROMPTS_VERSION_BASE}-${hash}` : PROMPTS_VERSION_BASE;
+}
+
+/** Serialisierbarer Snapshot aller gebauten Locale-Prompts (alle Locales, alle
+ *  SYSTEM_*-Cores inkl. eingebettetem Komplett-Schema) – Basis für den Content-Hash. */
+export function _allLocalePromptsSnapshot() {
+  return JSON.stringify([..._localeMap.entries()]);
+}
 
 // Kompakte Ersatzregeln für commonRules[langCode] im Lokal-Modus.
 // Behält nur die Kernregel – WAS GEMELDET WERDEN SOLL ist redundant mit den typ-spezifischen

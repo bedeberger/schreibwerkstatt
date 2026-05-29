@@ -1,0 +1,46 @@
+/* Szenen-Grid (Matrix-Ansicht der Szenen-Karte).
+   Sortierbare Tabelle aller gefilterten Szenen — Header via .sortable-th
+   (public/css/components/sortable-table.css). Tabelle scrollt horizontal
+   im umschliessenden .table-scroll. */
+
+.szenen-view-toggle {
+  margin-bottom: var(--space-md);
+}
+
+.szenen-grid-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+
+.szenen-grid-table th,
+.szenen-grid-table td {
+  text-align: left;
+  padding: var(--space-sm);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+
+.szenen-grid-table th {
+  font-weight: 600;
+  color: var(--color-muted);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.szenen-grid-cell-titel {
+  font-weight: 500;
+  min-width: 12rem;
+}
+
+.szenen-grid-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs);
+}
+
+.szenen-grid-cell-kommentar {
+  max-width: 24rem;
+  color: var(--color-muted);
+}

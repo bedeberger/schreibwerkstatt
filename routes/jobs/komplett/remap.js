@@ -78,10 +78,9 @@ function remapAssignments(chAssignments, figNameToId, figNameToIdLower, chNameTo
     const seen = new Set();
     const deduped = [];
     for (const ev of events) {
-      const key = (ev.datum || '') + '||' + (ev.ereignis || '').trim().toLowerCase();
+      const key = [ev.datum_year, ev.datum_month, ev.datum_day, (ev.ereignis || '').trim().toLowerCase()].join('||');
       if (!seen.has(key)) { seen.add(key); deduped.push(ev); }
     }
-    deduped.sort((a, b) => (parseInt(a.datum) || 0) - (parseInt(b.datum) || 0));
     allAssignments.push({ fig_id, lebensereignisse: deduped });
   }
   return allAssignments;

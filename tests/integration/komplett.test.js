@@ -480,3 +480,215 @@ test('Komplettanalyse: Cache-Hit Phase 1 → nur P8 ruft AI', async () => {
   const run2Calls = ctx.mockAi.log.length - callsBeforeRun2;
   assert.equal(run2Calls, 1, `cache-hit run: expected 1 AI call (P8 only), got ${run2Calls}`);
 });
+
+// ── Konsolidierungs-Phasen (Multi-Pass): P2 Soziogramm, P3 Orte, P6 Zeitstrahl ──
+// Diese Phasen liefen in den Pass-Mode-Tests oben nur mit, ohne Assertion auf ihren
+// spezifischen Output. Hier wird gezielt der jeweilige Konsolidierungs-Call ausgelöst
+// und geprüft, dass dessen Resultat (nicht der rohe P1-Extrakt) persistiert wird.
+
+// Matcher-Helpers (schemaKeys aus dem jeweiligen Konsolidierungs-Schema).
+const isP1Extract  = (e) => e.schemaKeys.includes('figuren') && e.schemaKeys.includes('orte') && e.schemaKeys.includes('assignments');
+const isFigKonsol  = (e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('figuren');
+const isSoziogramm = (e) => e.schemaKeys.includes('figuren') && e.schemaKeys.includes('beziehungen');
+const isOrteKonsol = (e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('orte');
+const isBeziehung  = (e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('beziehungen');
+const isZeitstrahl = (e) => e.schemaKeys.includes('ereignisse');
+const isKontinuitaet = (e) => e.schemaKeys.includes('zusammenfassung') && e.schemaKeys.includes('probleme');
+
+function figKonsolResponse(figuren) {
+  return { figuren };
+}
+
+test('Komplettanalyse Phase 2 Soziogramm: >=4 Figuren → Refine-Call überschreibt sozialschicht + machtverhaltnis', async () => {
+  const BOOK_ID = 70;
+  seedMultiChapterBook(BOOK_ID, 3); // 3 Chunks → Multi-Pass → Soziogramm-Refine aktiv
+
+  ctx.mockAi.on(isP1Extract, ({ prompt }) => {
+    const m = prompt.match(/Kapitel \d+/);
+    return extraktionResponseFor(m ? m[0] : 'Kapitel');
+  });
+
+  // Phase 2 Konsolidierung: 4 Figuren (>=4 triggert Soziogramm-Block).
+  // fig_1 → fig_2 mit preliminary machtverhaltnis=1 (truthy → in prelimPairs).
+  ctx.mockAi.on(isSoziogramm, {
+    // Refine: sozialschicht-Override für fig_1 + verfeinerte Machtbeziehung fig_1→fig_2.
+    figuren: [{ id: 'fig_1', sozialschicht: 'oben' }],
+    beziehungen: [{ from_fig_id: 'fig_1', to_fig_id: 'fig_2', machtverhaltnis: 5 }],
+  });
+  ctx.mockAi.on(isFigKonsol, figKonsolResponse([
+    {
+      id: 'fig_1', name: 'Anna', kurzname: 'Anna', typ: 'protagonist', praesenz: 'zentral',
+      sozialschicht: 'mitte', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 1 }],
+      beziehungen: [{ figur_id: 'fig_2', typ: 'freund', machtverhaltnis: 1, beschreibung: 'reisen', belege: [] }],
+    },
+    { id: 'fig_2', name: 'Bert', kurzname: 'Bert', typ: 'nebenfigur', praesenz: 'regelmaessig', sozialschicht: 'mitte', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 1 }], beziehungen: [] },
+    { id: 'fig_3', name: 'Cara', kurzname: 'Cara', typ: 'nebenfigur', praesenz: 'punktuell', sozialschicht: 'unten', kapitel: [{ name: 'Kapitel 2', haeufigkeit: 1 }], beziehungen: [] },
+    { id: 'fig_4', name: 'Dora', kurzname: 'Dora', typ: 'nebenfigur', praesenz: 'punktuell', sozialschicht: 'unten', kapitel: [{ name: 'Kapitel 3', haeufigkeit: 1 }], beziehungen: [] },
+  ]));
+  ctx.mockAi.on(isOrteKonsol, { orte: [{ id: 'ort_land', name: 'Land', typ: 'natur', beschreibung: 'weit', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 3 }], figuren: ['fig_1'] }] });
+  ctx.mockAi.on(isBeziehung, { beziehungen: [] }); // Phase 3b: keine kapitelübergreifenden
+  ctx.mockAi.on(isKontinuitaet, kontinuitaetResponse());
+
+  const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
+  ctx.shared.enqueueJob(jobId, () =>
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+  );
+  const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 10000 });
+  assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
+  assert.equal(job.passMode, 'multi');
+  assert.equal(job.result.figCount, 4);
+
+  // Soziogramm-Refine-Call ist gelaufen.
+  assert.equal(ctx.mockAi.log.filter(isSoziogramm).length, 1, 'expected exactly 1 Soziogramm-Refine call');
+
+  // sozialschicht von fig_1 stammt aus dem Refine-Call ('oben'), nicht aus P2 ('mitte').
+  const f1 = ctx.dbSchema.db.prepare(
+    `SELECT sozialschicht FROM figures WHERE book_id = ? AND fig_id = 'fig_1' AND user_email = ?`
+  ).get(BOOK_ID, 'tester@test.dev');
+  assert.equal(f1.sozialschicht, 'oben', 'fig_1 sozialschicht should be refined value');
+
+  // machtverhaltnis der Beziehung fig_1→fig_2 stammt aus dem Refine-Call (5), nicht aus P2 (1).
+  const rel = ctx.dbSchema.db.prepare(
+    `SELECT r.machtverhaltnis FROM figure_relations r
+       JOIN figures ff ON ff.id = r.from_fig_id
+       JOIN figures ft ON ft.id = r.to_fig_id
+      WHERE r.book_id = ? AND ff.fig_id = 'fig_1' AND ft.fig_id = 'fig_2'`
+  ).get(BOOK_ID);
+  assert.ok(rel, 'relation fig_1→fig_2 should exist');
+  assert.equal(rel.machtverhaltnis, 5, 'machtverhaltnis should be refined value');
+});
+
+test('Komplettanalyse Phase 3 Orte-Konsolidierung: Konsol-Output dedupliziert die Kapitel-Orte', async () => {
+  const BOOK_ID = 71;
+  seedMultiChapterBook(BOOK_ID, 3); // Multi-Pass → echter Orte-Konsol-Call
+
+  // P1 liefert pro Chunk denselben Ort-Namen «Land» + zusätzlich «Berg» – also
+  // chapterübergreifende Duplikate, die die Konsolidierung zusammenführen muss.
+  ctx.mockAi.on(isP1Extract, ({ prompt }) => {
+    const m = prompt.match(/Kapitel \d+/);
+    const chap = m ? m[0] : 'Kapitel';
+    return {
+      figuren: [{ id: 'fig_anna', name: 'Anna', kurzname: 'Anna', typ: 'protagonist', praesenz: 'zentral', sozialschicht: 'mitte', kapitel: [{ name: chap, haeufigkeit: 1 }], beziehungen: [] }],
+      orte: [
+        { id: 'ort_land', name: 'Land', typ: 'natur', beschreibung: 'weit', kapitel: [{ name: chap, haeufigkeit: 1 }], figuren: ['fig_anna'] },
+        { id: 'ort_berg', name: 'Berg', typ: 'natur', beschreibung: 'hoch', kapitel: [{ name: chap, haeufigkeit: 1 }], figuren: [] },
+      ],
+      fakten: [], songs: [],
+      szenen: [{ seite: 'Seite', kapitel: chap, titel: 'Anna unterwegs', wertung: 'mittel', kommentar: 'k', figuren_namen: ['Anna'], orte_namen: ['Land'] }],
+      assignments: [{ figur_name: 'Anna', lebensereignisse: [] }],
+    };
+  });
+  ctx.mockAi.on(isFigKonsol, figKonsolResponse([
+    { id: 'fig_anna', name: 'Anna', kurzname: 'Anna', typ: 'protagonist', praesenz: 'zentral', sozialschicht: 'mitte', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 1 }], beziehungen: [] },
+  ]));
+  // Konsolidierung führt die 6 Kapitel-Vorkommen (3×Land + 3×Berg) auf 2 Orte zusammen.
+  ctx.mockAi.on(isOrteKonsol, {
+    orte: [
+      { id: 'ort_land', name: 'Land', typ: 'natur', beschreibung: 'weit', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 3 }], figuren: ['fig_anna'] },
+      { id: 'ort_berg', name: 'Berg', typ: 'natur', beschreibung: 'hoch', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 3 }], figuren: ['fig_anna'] },
+    ],
+  });
+  ctx.mockAi.on(isBeziehung, { beziehungen: [] });
+  ctx.mockAi.on(isKontinuitaet, kontinuitaetResponse());
+
+  const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
+  ctx.shared.enqueueJob(jobId, () =>
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+  );
+  const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 10000 });
+  assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
+
+  // Genau 1 Orte-Konsol-Call.
+  assert.equal(ctx.mockAi.log.filter(isOrteKonsol).length, 1, 'expected exactly 1 Orte-Konsol call');
+
+  // DB hält die konsolidierten 2 Orte (Konsol-Output), nicht die 6 rohen Kapitel-Vorkommen.
+  const orte = ctx.dbSchema.db.prepare(
+    'SELECT name FROM locations WHERE book_id = ? AND user_email = ? ORDER BY name'
+  ).all(BOOK_ID, 'tester@test.dev');
+  assert.deepEqual(orte.map(o => o.name), ['Berg', 'Land']);
+  assert.equal(job.result.orteCount, 2);
+});
+
+// Baut N Lebensereignisse für eine Figur (distinct datum+ereignis → N Gruppen in P6).
+function lebensereignisse(n) {
+  return Array.from({ length: n }, (_, i) => ({
+    datum: String(2020 + i), datum_label: String(2020 + i), datum_year: 2020 + i,
+    subtyp: 'wendepunkt', ereignis: `Ereignis ${i + 1}`, typ: 'persoenlich',
+    bedeutung: 'wichtig', kapitel: 'Kapitel 1', seite: 'Seite 1',
+  }));
+}
+
+function zeitstrahlSeedHandlers(eventCount) {
+  // Nur Chunk «Kapitel 1» liefert Events; übrige Chunks leer → keine Doppelung.
+  ctx.mockAi.on(isP1Extract, ({ prompt }) => {
+    const m = prompt.match(/Kapitel \d+/);
+    const chap = m ? m[0] : 'Kapitel';
+    return {
+      figuren: [{ id: 'fig_anna', name: 'Anna', kurzname: 'Anna', typ: 'protagonist', praesenz: 'zentral', sozialschicht: 'mitte', kapitel: [{ name: chap, haeufigkeit: 1 }], beziehungen: [] }],
+      orte: [{ id: 'ort_land', name: 'Land', typ: 'natur', beschreibung: 'weit', kapitel: [{ name: chap, haeufigkeit: 1 }], figuren: ['fig_anna'] }],
+      fakten: [], songs: [],
+      szenen: [{ seite: 'Seite', kapitel: chap, titel: 'Anna unterwegs', wertung: 'mittel', kommentar: 'k', figuren_namen: ['Anna'], orte_namen: ['Land'] }],
+      assignments: [{ figur_name: 'Anna', lebensereignisse: chap === 'Kapitel 1' ? lebensereignisse(eventCount) : [] }],
+    };
+  });
+  ctx.mockAi.on(isFigKonsol, figKonsolResponse([
+    { id: 'fig_anna', name: 'Anna', kurzname: 'Anna', typ: 'protagonist', praesenz: 'zentral', sozialschicht: 'mitte', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 1 }], beziehungen: [] },
+  ]));
+  ctx.mockAi.on(isOrteKonsol, { orte: [{ id: 'ort_land', name: 'Land', typ: 'natur', beschreibung: 'weit', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 3 }], figuren: ['fig_anna'] }] });
+  ctx.mockAi.on(isBeziehung, { beziehungen: [] });
+  ctx.mockAi.on(isKontinuitaet, kontinuitaetResponse());
+}
+
+test('Komplettanalyse Phase 6 Zeitstrahl >=5 Events: Konsol-Call läuft, persistiert dessen Output', async () => {
+  const BOOK_ID = 72;
+  seedMultiChapterBook(BOOK_ID, 3);
+  zeitstrahlSeedHandlers(6); // 6 distinct Events → >=5 → KI-Konsolidierung
+
+  // Konsolidierung fasst die 6 Events auf 3 kanonische zusammen.
+  ctx.mockAi.on(isZeitstrahl, {
+    ereignisse: [
+      { datum: '2020', datum_label: '2020', datum_year: 2020, subtyp: 'wendepunkt', ereignis: 'A', typ: 'persoenlich', bedeutung: '', kapitel: ['Kapitel 1'], seiten: [], figuren: [{ id: 'fig_anna', name: 'Anna', typ: 'protagonist' }] },
+      { datum: '2022', datum_label: '2022', datum_year: 2022, subtyp: 'wendepunkt', ereignis: 'B', typ: 'persoenlich', bedeutung: '', kapitel: ['Kapitel 1'], seiten: [], figuren: [{ id: 'fig_anna', name: 'Anna', typ: 'protagonist' }] },
+      { datum: '2024', datum_label: '2024', datum_year: 2024, subtyp: 'wendepunkt', ereignis: 'C', typ: 'persoenlich', bedeutung: '', kapitel: ['Kapitel 1'], seiten: [], figuren: [{ id: 'fig_anna', name: 'Anna', typ: 'protagonist' }] },
+    ],
+  });
+
+  const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
+  ctx.shared.enqueueJob(jobId, () =>
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+  );
+  const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 10000 });
+  assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
+
+  // Zeitstrahl-Konsolidierung lief (>=5 Events).
+  assert.equal(ctx.mockAi.log.filter(isZeitstrahl).length, 1, 'expected exactly 1 Zeitstrahl-Konsol call');
+
+  // DB hält die 3 konsolidierten Events (Konsol-Output), nicht die 6 rohen.
+  const rows = ctx.dbSchema.db.prepare(
+    'SELECT COUNT(*) AS n FROM zeitstrahl_events WHERE book_id = ? AND user_email = ?'
+  ).get(BOOK_ID, 'tester@test.dev');
+  assert.equal(rows.n, 3, 'expected 3 consolidated timeline events');
+});
+
+test('Komplettanalyse Phase 6 Zeitstrahl <5 Events: Direkt-Speichern ohne KI-Call', async () => {
+  const BOOK_ID = 73;
+  seedMultiChapterBook(BOOK_ID, 3);
+  zeitstrahlSeedHandlers(3); // 3 Events → unter Schwelle → kein Konsol-Call
+
+  // Bewusst KEIN isZeitstrahl-Handler: ein Call würde mit "no handler matched" werfen.
+  const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
+  ctx.shared.enqueueJob(jobId, () =>
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+  );
+  const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 10000 });
+  assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
+
+  // Kein Zeitstrahl-Konsol-Call.
+  assert.equal(ctx.mockAi.log.filter(isZeitstrahl).length, 0, 'expected no Zeitstrahl-Konsol call under threshold');
+
+  // Die 3 Events wurden direkt (aus figure_events gegroupt) gespeichert.
+  const rows = ctx.dbSchema.db.prepare(
+    'SELECT COUNT(*) AS n FROM zeitstrahl_events WHERE book_id = ? AND user_email = ?'
+  ).get(BOOK_ID, 'tester@test.dev');
+  assert.equal(rows.n, 3, 'expected 3 directly-saved timeline events');
+});

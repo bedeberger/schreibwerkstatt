@@ -15,10 +15,12 @@ export function registerSzenenCard() {
     szenenProgress: 0,
     szenenStatus: '',
     szenenUebersichtOpen: false,
+    viewMode: localStorage.getItem('szenen.viewMode') === 'grid' ? 'grid' : 'list', // 'list' | 'grid'
     _szenenPollTimer: null,
     _lifecycle: null,
 
     init() {
+      this.$watch('viewMode', (v) => localStorage.setItem('szenen.viewMode', v));
       this._lifecycle = setupCardLifecycle(this, {
         name: 'szenen',
         showFlag: 'showSzenenCard',
