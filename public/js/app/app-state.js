@@ -75,6 +75,9 @@ const aiProviderState = () => ({
 
 const navigationState = () => ({
   books: [],
+  // Erst nach dem ersten loadBooks() true. Gate fuer den Welcome-Empty-State
+  // (books.length === 0), damit der nicht waehrend des initialen Ladens blitzt.
+  booksLoaded: false,
   // Buchliste-Filter (UI-only, persistiert nicht; reines Frontend-Filter
   // ueber das per /content/books gelieferte category_id-Feld).
   bookFilterCategoryId: '',

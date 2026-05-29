@@ -309,6 +309,7 @@ export const treeMethods = {
         this.selectedBookId = restored || filteredFallback || String(this.books[0]?.id || '');
       }
       this.showBookCard = true;
+      this.booksLoaded = true;
       this.setStatus(this.t('tree.booksFound', { n: this.books.length }), false, 4000);
       if (this.selectedBookId) this._loadBookRole(this.selectedBookId);
       if (!skipLoadPages) await this.loadPages();

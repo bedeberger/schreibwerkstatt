@@ -346,8 +346,18 @@
 </div>
 <div class="dev-banner" x-show="devMode" x-cloak x-text="t('dev.banner')"></div>
 
+<!-- Welcome-Empty-State: neuer User ohne Buch. Ersetzt die Buch-Auswahl, solange
+     kein einziges Buch existiert. Einziger sichtbarer CTA → Buch anlegen. -->
+<div class="card card--welcome" x-show="currentUser && !isAdminOnly && booksLoaded && books.length === 0" x-cloak>
+  <div class="card-empty">
+    <p class="card-empty-text" x-text="t('welcome.title')"></p>
+    <p class="card-empty-hint" x-text="t('welcome.hint')"></p>
+    <button class="primary" @click="openCreateBook()" x-text="t('welcome.cta')"></button>
+  </div>
+</div>
+
 <!-- Bücherliste & Seitenauswahl -->
-<div class="card card--book-selector" x-show="currentUser && showBookCard && !isAdminOnly" x-cloak>
+<div class="card card--book-selector" x-show="currentUser && showBookCard && !isAdminOnly && books.length > 0" x-cloak>
   <label x-text="t('book.label')"></label>
   <div class="row book-selector-row">
     <div x-data="combobox({ placeholder: () => t('book.chooseBook'), compact: false, footer: { label: () => t('book.create.action'), action: () => openCreateBook() } })"

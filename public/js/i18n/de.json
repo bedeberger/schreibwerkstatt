@@ -216,6 +216,10 @@
   "book.search.noResults":       "Keine Treffer.",
   "book.search.error":           "Suche fehlgeschlagen.",
 
+  "welcome.title":               "Willkommen in der Schreibwerkstatt",
+  "welcome.hint":                "Leg dein erstes Buch an, um zu starten. Danach kannst du Kapitel und Seiten hinzufügen, schreiben und deinen Text analysieren lassen.",
+  "welcome.cta":                 "Erstes Buch anlegen",
+
   "book.create.action":          "+ Neues Buch…",
   "book.create.title":           "Neues Buch erstellen",
   "book.create.nameLabel":       "Buchtitel",

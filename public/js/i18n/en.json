@@ -216,6 +216,10 @@
   "book.search.noResults":       "No results.",
   "book.search.error":           "Search failed.",
 
+  "welcome.title":               "Welcome to Schreibwerkstatt",
+  "welcome.hint":                "Create your first book to get started. Then you can add chapters and pages, write, and have your text analysed.",
+  "welcome.cta":                 "Create first book",
+
   "book.create.action":          "+ New book…",
   "book.create.title":           "Create new book",
   "book.create.nameLabel":       "Book title",
