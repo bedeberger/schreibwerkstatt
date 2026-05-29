@@ -364,6 +364,10 @@ Jobs in `routes/jobs/` verwenden ein Single-Pass/Multi-Pass-Muster. Limits und B
 ```
 Phase 1 – Vollextraktion (parallel pro Kapitel oder Single-Pass)
           → figuren, orte, fakten, szenen(Namen), assignments(Namen)
+          → Claude-Single-Pass: 3 Calls (A1 Figuren-Stammdaten + B Orte/Szenen parallel,
+            danach A2 Beziehungen aus den A1-IDs), alle teilen den 1h-gecachten Buchtext-Block;
+            Beziehungen via mergeBeziehungenIntoFiguren zurück in figuren[].beziehungen gefaltet.
+            Lokale Provider + Multi-Pass: kombinierter Call (SCHEMA_KOMPLETT_EXTRAKTION).
           → Checkpoint 'p1_full_done'
                     ↓
 Phase 2 – Figuren konsolidieren + Soziogramm (aus P2-Output, kein Extra-Call)
@@ -379,7 +383,7 @@ Block 2 [parallel]:
 **Standalone-Kontinuitätscheck:** `POST /jobs/kontinuitaet` — läuft Phase 8 einzeln, ohne die volle Pipeline. Exportiert `runKontinuitaetJob` aus `routes/jobs/komplett/job.js`.
 
 **Wichtige Mechanismen:**
-- **Delta-Cache:** Phase 1 (Multi-Pass) prüft `chapter_extract_cache` in der DB. Cache-Key enthält `pages_sig` (sortierte `page_id:updated_at`-Paare). Ändert sich eine Seite → Cache-Miss → Neu-Extraktion. Single-Pass wird nicht gecacht.
+- **Delta-Cache:** Phase 1 prüft `chapter_extract_cache` in der DB. Cache-Key enthält `pages_sig` (sortierte `page_id:updated_at`-Paare). Ändert sich eine Seite → Cache-Miss → Neu-Extraktion. Single-Pass cached unter `chapter_key='__singlepass__'` (Gesamt-Seitensignatur); der gecachte Eintrag enthält die fertig gefalteten Figuren inkl. Beziehungen.
 - **Prompt-Caching:** System-Prompt mit eingebettetem Schema wird bei parallelen Kapitel-Calls gecacht (~10% des Input-Preises für Folge-Calls).
 - **Checkpoint-Wiederaufnahme:** `p1_full_done` speichert alle 5 Arrays.
 

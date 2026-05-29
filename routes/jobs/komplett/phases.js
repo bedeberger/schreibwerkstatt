@@ -19,6 +19,7 @@ const {
 const {
   preMergeChapterFiguren, applySozialschichtModeVote,
   mergeDuplicateFiguren, validateBeziehungenDescriptions,
+  mergeBeziehungenIntoFiguren,
 } = require('./figuren-merge');
 const appSettings = require('../../../lib/app-settings');
 
@@ -63,25 +64,62 @@ async function runPhase1(ctx) {
       updateJob(jobId, { progress: 28, statusText: 'job.phase.checkpointLoaded' });
     } else {
       updateJob(jobId, { progress: 12, statusText: 'job.phase.extracting' });
-      // Ein kombinierter Call (Figuren+Orte+Fakten+Szenen+Assignments). Claude erhält den
-      // Buchtext zusätzlich als eigenen cache_control-Block mit 1h-TTL, sodass Phase 8
-      // Kontinuität denselben Prefix trifft und cache_read statt cache_write zahlt.
-      let r;
+      let passA, passB;
       if (effectiveProvider === 'claude') {
+        // Claude-Split: Figuren-Stammdaten (A1) + Orte/Szenen (B) parallel, danach
+        // Beziehungen (A2) aus den A1-IDs. Alle drei Calls teilen denselben Buchtext-
+        // Block (cache_control 1h) → Folge-Calls zahlen cache_read; Phase 8 trifft
+        // denselben Prefix. Kleinere Schemas pro Call senken das Truncation-Risiko des
+        // ehemals einen 6-Array-Mega-Calls.
         const bookSystemBlock = { text: buildBookSystemBlockText(bookName, pageContents.length, fullBookText), ttl: '1h' };
-        r = await call(jobId, tok,
-          prompts.buildExtraktionKomplettChapterPrompt('Gesamtbuch', bookName, pageContents.length, null),
-          [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KOMPLETT_EXTRAKTION_BLOCKS, '1h')],
-          12, 28, 22000, 0.2, null, prompts.SCHEMA_KOMPLETT_EXTRAKTION,
-        );
+        const [stammRes, orteRes] = await settledAll([
+          () => call(jobId, tok,
+            prompts.buildExtraktionFigurenStammPrompt('Gesamtbuch', bookName, pageContents.length, null),
+            [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KOMPLETT_FIGUREN_STAMM_BLOCKS, '1h')],
+            12, 20, 14000, 0.2, null, prompts.SCHEMA_KOMPLETT_FIGUREN_STAMM,
+          ),
+          () => call(jobId, tok,
+            prompts.buildExtraktionOrtePassPrompt('Gesamtbuch', bookName, pageContents.length, null),
+            [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KOMPLETT_ORTE_PASS_BLOCKS, '1h')],
+            12, 20, 8000, 0.2, null, prompts.SCHEMA_KOMPLETT_ORTE_PASS,
+          ),
+        ]);
+        if (stammRes.status === 'rejected') throw stammRes.reason;
+        const stamm = stammRes.value || {};
+        if (orteRes.status === 'rejected') {
+          log.warn(`Single-Pass Orte/Szenen-Pass fehlgeschlagen, ohne Orte/Szenen: ${orteRes.reason?.message}`);
+          passB = {};
+        } else {
+          passB = orteRes.value || {};
+        }
+
+        // A2: Beziehungen separat – braucht die stabilen IDs aus A1.
+        let stammFiguren = stamm.figuren || [];
+        if (stammFiguren.length >= 2) {
+          updateJob(jobId, { progress: 20, statusText: 'job.phase.extractingRelations' });
+          try {
+            const bzRes = await call(jobId, tok,
+              prompts.buildFigurenBeziehungenExtraktionPrompt(bookName, stammFiguren, null),
+              [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_FIGUREN_BLOCKS, '1h')],
+              20, 28, 8000, 0.2, null, prompts.SCHEMA_BEZIEHUNGEN,
+            );
+            const flatBz = Array.isArray(bzRes?.beziehungen) ? bzRes.beziehungen : [];
+            stammFiguren = mergeBeziehungenIntoFiguren(stammFiguren, flatBz);
+            log.info(`Single-Pass Beziehungs-Pass (A2) – ${flatBz.length} Beziehungen extrahiert.`);
+          } catch (e) {
+            log.warn(`Single-Pass Beziehungs-Pass (A2) fehlgeschlagen, Figuren ohne Beziehungen: ${e.message}`);
+          }
+        }
+        passA = { figuren: stammFiguren, assignments: stamm.assignments };
       } else {
-        r = await call(jobId, tok,
+        // Lokale Provider: kombinierter Call (kein 1h-Cache → Split wäre 3× voller Input).
+        const r = await call(jobId, tok,
           prompts.buildExtraktionKomplettChapterPrompt('Gesamtbuch', bookName, pageContents.length, fullBookText),
           sys.SYSTEM_KOMPLETT_EXTRAKTION_BLOCKS, 12, 28, 16000, 0.2, null, prompts.SCHEMA_KOMPLETT_EXTRAKTION,
         );
+        passA = { figuren: r?.figuren, assignments: r?.assignments };
+        passB = { orte: r?.orte, songs: r?.songs, fakten: r?.fakten, szenen: r?.szenen };
       }
-      const passA = { figuren: r?.figuren, assignments: r?.assignments };
-      const passB = { orte: r?.orte, songs: r?.songs, fakten: r?.fakten, szenen: r?.szenen };
       chapterFiguren     = [{ kapitel: 'Gesamtbuch', figuren:     passA.figuren     || [] }];
       chapterOrte        = [{ kapitel: 'Gesamtbuch', orte:        passB.orte        || [] }];
       chapterSongs       = [{ kapitel: 'Gesamtbuch', songs:       passB.songs       || [] }];

@@ -1987,6 +1987,7 @@
   "job.phase.selectingPages":        "Relevante Seiten auswählen…",
   "job.phase.checkpointLoaded":      "Phase 1 aus Checkpoint geladen…",
   "job.phase.extracting":            "KI extrahiert Figuren, Schauplätze, Fakten, Szenen…",
+  "job.phase.extractingRelations":   "KI extrahiert Figuren-Beziehungen…",
   "job.phase.extractingChunks":      "Vollextraktion in {n} Chunks…",
   "job.phase.consolidatingFiguren":  "KI konsolidiert Figuren…",
   "job.phase.refiningSoziogramm":    "KI verfeinert Soziogramm…",

@@ -286,7 +286,42 @@ function validateBeziehungenDescriptions(figuren) {
   return { cleared, moved };
 }
 
+/** Faltet flache Beziehungen aus dem Claude-A2-Pass ({von,zu,typ,machtverhaltnis,
+ *  beschreibung,belege}) zurück in figuren[].beziehungen ({figur_id,...} aus Sicht der
+ *  «von»-Figur), sodass der Downstream (Soziogramm-Preliminary, saveFigurenToDb) dieselbe
+ *  Datenform wie beim kombinierten Extraktions-Call sieht. Filtert ungültige/Selbst-IDs,
+ *  dedupliziert pro ungeordnetem Paar, respektiert bereits vorhandene Beziehungen.
+ *  Mutiert die Eingabe nicht – gibt eine neue Figurenliste in Originalreihenfolge zurück. */
+function mergeBeziehungenIntoFiguren(figuren, flatBz) {
+  const byId = new Map(figuren.map(f => [f.id, { ...f, beziehungen: [...(f.beziehungen || [])] }]));
+  const seenPair = new Set();
+  for (const f of byId.values()) {
+    for (const b of f.beziehungen) {
+      const [a, c] = f.id < b.figur_id ? [f.id, b.figur_id] : [b.figur_id, f.id];
+      seenPair.add(`${a}|${c}`);
+    }
+  }
+  for (const bz of (flatBz || [])) {
+    const von = bz?.von, zu = bz?.zu;
+    if (!von || !zu || von === zu) continue;
+    if (!byId.has(von) || !byId.has(zu)) continue;
+    const [a, c] = von < zu ? [von, zu] : [zu, von];
+    const key = `${a}|${c}`;
+    if (seenPair.has(key)) continue;
+    seenPair.add(key);
+    byId.get(von).beziehungen.push({
+      figur_id: zu,
+      typ: bz.typ || 'andere',
+      ...(Number.isFinite(bz.machtverhaltnis) ? { machtverhaltnis: bz.machtverhaltnis } : {}),
+      ...(bz.beschreibung ? { beschreibung: bz.beschreibung } : {}),
+      ...(Array.isArray(bz.belege) && bz.belege.length ? { belege: bz.belege } : {}),
+    });
+  }
+  return figuren.map(f => byId.get(f.id));
+}
+
 module.exports = {
   preMergeChapterFiguren, applySozialschichtModeVote,
   mergeDuplicateFiguren, validateBeziehungenDescriptions,
+  mergeBeziehungenIntoFiguren,
 };

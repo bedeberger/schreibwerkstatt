@@ -11,13 +11,14 @@ import { _isLocal, _jsonOnly } from './state.js';
 import {
   buildSystemKomplett,
   buildSystemKomplettFiguren,
+  buildSystemKomplettFigurenStamm,
   buildSystemKomplettOrteSzenen,
 } from './komplett.js';
 
 // Versionsmarker für persistente Caches (z.B. chapter_extract_cache, Phase-1
 // Single-Pass-Cache). Bei jeder schemarelevanten Änderung erhöhen, damit alte
 // Cache-Einträge nicht mehr matchen und frisch extrahiert wird.
-export const PROMPTS_VERSION = '18';
+export const PROMPTS_VERSION = '19';
 
 // Kompakte Ersatzregeln für commonRules[langCode] im Lokal-Modus.
 // Behält nur die Kernregel – WAS GEMELDET WERDEN SOLL ist redundant mit den typ-spezifischen
@@ -111,8 +112,9 @@ function _buildLocalePrompts(localeConfig, globalErklaerungRule, buchKontext = '
   // bleibt aber für die _toCacheBlocks-Split-Logik separat sichtbar — der Core ist
   // bewusst der Builder-Output OHNE bookContextStr-Section (siehe getLocalePromptsForBook).
   const SYS_KOMPLETT_EXTRAKTION_CORE   = buildSystemKomplett(sp.figuren   || '', rules, buchKontext);
-  const SYS_KOMPLETT_FIGUREN_PASS_CORE = buildSystemKomplettFiguren(sp.figuren || '', rules, buchKontext);
-  const SYS_KOMPLETT_ORTE_PASS_CORE    = buildSystemKomplettOrteSzenen(sp.orte || sp.figuren || '', rules, buchKontext);
+  const SYS_KOMPLETT_FIGUREN_PASS_CORE  = buildSystemKomplettFiguren(sp.figuren || '', rules, buchKontext);
+  const SYS_KOMPLETT_FIGUREN_STAMM_CORE = buildSystemKomplettFigurenStamm(sp.figuren || '', rules, buchKontext);
+  const SYS_KOMPLETT_ORTE_PASS_CORE     = buildSystemKomplettOrteSzenen(sp.orte || sp.figuren || '', rules, buchKontext);
 
   // Augmented Strings (Backward-Compat): Core + Book-Context als Single-String.
   // Konsumenten ohne Multi-Block-Support (chat-builder, proxies.js) bleiben funktionsfähig.
@@ -158,6 +160,9 @@ function _buildLocalePrompts(localeConfig, globalErklaerungRule, buchKontext = '
     // Claude nutzt weiterhin SYSTEM_KOMPLETT_EXTRAKTION (kombinierter Single-Call).
     SYSTEM_KOMPLETT_FIGUREN_PASS:        _aug(SYS_KOMPLETT_FIGUREN_PASS_CORE),
     SYSTEM_KOMPLETT_FIGUREN_PASS_BLOCKS: _toCacheBlocks(SYS_KOMPLETT_FIGUREN_PASS_CORE, bookContextStr),
+    // Claude-Single-Pass A1: Figuren-Stammdaten ohne Beziehungen (A2 separat).
+    SYSTEM_KOMPLETT_FIGUREN_STAMM:        _aug(SYS_KOMPLETT_FIGUREN_STAMM_CORE),
+    SYSTEM_KOMPLETT_FIGUREN_STAMM_BLOCKS: _toCacheBlocks(SYS_KOMPLETT_FIGUREN_STAMM_CORE, bookContextStr),
     SYSTEM_KOMPLETT_ORTE_PASS:           _aug(SYS_KOMPLETT_ORTE_PASS_CORE),
     SYSTEM_KOMPLETT_ORTE_PASS_BLOCKS:    _toCacheBlocks(SYS_KOMPLETT_ORTE_PASS_CORE, bookContextStr),
   };
@@ -180,9 +185,10 @@ export let SYSTEM_BOOK_CHAT             = null;
 export let SYSTEM_ORTE                  = null;
 export let SYSTEM_KONTINUITAET          = null;
 export let SYSTEM_ZEITSTRAHL            = null;
-export let SYSTEM_KOMPLETT_EXTRAKTION   = null;
-export let SYSTEM_KOMPLETT_FIGUREN_PASS = null;
-export let SYSTEM_KOMPLETT_ORTE_PASS    = null;
+export let SYSTEM_KOMPLETT_EXTRAKTION    = null;
+export let SYSTEM_KOMPLETT_FIGUREN_PASS  = null;
+export let SYSTEM_KOMPLETT_FIGUREN_STAMM = null;
+export let SYSTEM_KOMPLETT_ORTE_PASS     = null;
 
 /**
  * Setzt alle System-Prompts aus dem promptConfig-Objekt (geladen aus prompt-config.json).
@@ -265,9 +271,10 @@ export function configureLocales(cfg) {
   SYSTEM_ORTE                  = def.SYSTEM_ORTE                  ?? null;
   SYSTEM_KONTINUITAET          = def.SYSTEM_KONTINUITAET          ?? null;
   SYSTEM_ZEITSTRAHL            = def.SYSTEM_ZEITSTRAHL            ?? null;
-  SYSTEM_KOMPLETT_EXTRAKTION   = def.SYSTEM_KOMPLETT_EXTRAKTION   ?? null;
-  SYSTEM_KOMPLETT_FIGUREN_PASS = def.SYSTEM_KOMPLETT_FIGUREN_PASS ?? null;
-  SYSTEM_KOMPLETT_ORTE_PASS    = def.SYSTEM_KOMPLETT_ORTE_PASS    ?? null;
+  SYSTEM_KOMPLETT_EXTRAKTION    = def.SYSTEM_KOMPLETT_EXTRAKTION    ?? null;
+  SYSTEM_KOMPLETT_FIGUREN_PASS  = def.SYSTEM_KOMPLETT_FIGUREN_PASS  ?? null;
+  SYSTEM_KOMPLETT_FIGUREN_STAMM = def.SYSTEM_KOMPLETT_FIGUREN_STAMM ?? null;
+  SYSTEM_KOMPLETT_ORTE_PASS     = def.SYSTEM_KOMPLETT_ORTE_PASS     ?? null;
 }
 
 /**

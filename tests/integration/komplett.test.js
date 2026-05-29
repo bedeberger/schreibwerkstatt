@@ -1,8 +1,9 @@
 'use strict';
 // Integration test: runKomplettAnalyseJob single-pass.
-// Pipeline: Phase 1 (extraction) → Phase 2/3 skipped (single-pass)
-// → Phase 6 Zeitstrahl skipped (< 5 events) → Phase 8 Kontinuität.
-// Expected: 2 AI calls (P1 + P8).
+// Pipeline (Claude): Phase 1 split → A1 (Figuren-Stammdaten) + B (Orte/Szenen) +
+// A2 (Beziehungen) → Phase 2/3 skipped (single-pass) → Phase 6 Zeitstrahl skipped
+// (< 5 events) → Phase 8 Kontinuität.
+// Expected: 4 AI calls (A1 + B + A2 + P8).
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -27,25 +28,51 @@ function seedTinyBook(bookId) {
   });
 }
 
-function extraktionResponse() {
+// Claude-Single-Pass A1: Figuren-Stammdaten (OHNE Beziehungen) + Lebensereignisse.
+// Zwei Figuren, damit der A2-Beziehungs-Pass (>= 2 Figuren) ausgelöst wird.
+function figurenStammResponse() {
   return {
-    figuren: [{
-      id: 'fig_1', name: 'Anna', kurzname: 'Anna', typ: 'protagonist',
-      beschreibung: 'Hauptfigur', sozialschicht: 'mitte', praesenz: 'zentral',
-      kapitel: [{ name: 'Kapitel Eins', haeufigkeit: 1 }],
-      beziehungen: [], eigenschaften: [], schluesselzitate: [],
-    }],
+    figuren: [
+      {
+        id: 'fig_1', name: 'Anna', kurzname: 'Anna', typ: 'protagonist',
+        beschreibung: 'Hauptfigur', sozialschicht: 'mitte', praesenz: 'zentral',
+        kapitel: [{ name: 'Kapitel Eins', haeufigkeit: 1 }],
+        eigenschaften: [], schluesselzitate: [],
+      },
+      {
+        id: 'fig_2', name: 'Bert', kurzname: 'Bert', typ: 'nebenfigur',
+        beschreibung: 'Begleiter', sozialschicht: 'mitte', praesenz: 'punktuell',
+        kapitel: [{ name: 'Kapitel Eins', haeufigkeit: 1 }],
+        eigenschaften: [], schluesselzitate: [],
+      },
+    ],
+    assignments: [{ figur_name: 'Anna', lebensereignisse: [] }],
+  };
+}
+
+// Claude-Single-Pass B: Orte + Songs + Fakten + Szenen.
+function ortePassResponse() {
+  return {
     orte: [{
       id: 'ort_1', name: 'Wald', typ: 'natur', beschreibung: 'kalt',
       kapitel: [{ name: 'Kapitel Eins', haeufigkeit: 1 }], figuren: ['fig_1'],
     }],
+    songs: [],
     fakten: [{ kategorie: 'wetter', subjekt: 'Wald', fakt: 'kalt', seite: 'Seite Eins' }],
     szenen: [{
       seite: 'Seite Eins', kapitel: 'Kapitel Eins', titel: 'Anna im Wald',
       wertung: 'mittel', kommentar: 'kurze Szene',
       figuren_namen: ['Anna'], orte_namen: ['Wald'],
     }],
-    assignments: [{ figur_name: 'Anna', lebensereignisse: [] }],
+  };
+}
+
+// Claude-Single-Pass A2: flache Beziehungen (von/zu).
+function beziehungenResponse() {
+  return {
+    beziehungen: [
+      { von: 'fig_1', zu: 'fig_2', typ: 'freund', machtverhaltnis: 0, beschreibung: 'reisen zusammen', belege: [] },
+    ],
   };
 }
 
@@ -60,9 +87,20 @@ test('Komplettanalyse Single-Pass: 1 Kapitel, P1 + P8 → done', async () => {
   const BOOK_ID = 50;
   seedTinyBook(BOOK_ID);
 
+  // A1: Figuren-Stammdaten (figuren + assignments, KEIN orte).
   ctx.mockAi.on(
-    (e) => e.schemaKeys.includes('figuren') && e.schemaKeys.includes('orte') && e.schemaKeys.includes('assignments'),
-    extraktionResponse(),
+    (e) => e.schemaKeys.includes('figuren') && e.schemaKeys.includes('assignments') && !e.schemaKeys.includes('orte'),
+    figurenStammResponse(),
+  );
+  // B: Orte/Szenen (orte + szenen, KEINE figuren).
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.includes('orte') && e.schemaKeys.includes('szenen') && !e.schemaKeys.includes('figuren'),
+    ortePassResponse(),
+  );
+  // A2: Beziehungen.
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('beziehungen'),
+    beziehungenResponse(),
   );
   ctx.mockAi.on(
     (e) => e.schemaKeys.includes('zusammenfassung') && e.schemaKeys.includes('probleme'),
@@ -76,20 +114,26 @@ test('Komplettanalyse Single-Pass: 1 Kapitel, P1 + P8 → done', async () => {
 
   const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 8000 });
   assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
-  assert.equal(job.result.figCount, 1);
+  assert.equal(job.result.figCount, 2);
   assert.equal(job.result.orteCount, 1);
   assert.equal(job.result.szenenCount, 1);
   assert.equal(job.passMode, 'single');
 
-  // Exactly 2 AI calls: P1 + P8.
-  assert.equal(ctx.mockAi.log.length, 2, `expected 2 AI calls, got ${ctx.mockAi.log.length}`);
+  // Exactly 4 AI calls: A1 + B + A2 + P8.
+  assert.equal(ctx.mockAi.log.length, 4, `expected 4 AI calls, got ${ctx.mockAi.log.length}`);
 
-  // Figures saved.
+  // Figures saved (Anna + Bert).
   const figRows = ctx.dbSchema.db.prepare(
-    'SELECT name, typ FROM figures WHERE book_id = ? AND user_email = ?'
+    'SELECT name, typ FROM figures WHERE book_id = ? AND user_email = ? ORDER BY name'
   ).all(BOOK_ID, 'tester@test.dev');
-  assert.equal(figRows.length, 1);
+  assert.equal(figRows.length, 2);
   assert.equal(figRows[0].name, 'Anna');
+
+  // Relationship from A2 pass persisted (Anna → Bert).
+  const relRows = ctx.dbSchema.db.prepare(
+    'SELECT COUNT(*) AS n FROM figure_relations WHERE book_id = ?'
+  ).get(BOOK_ID);
+  assert.equal(relRows.n, 1, `expected 1 relation from A2 pass, got ${relRows.n}`);
 
   // Locations saved.
   const ortRows = ctx.dbSchema.db.prepare(
@@ -401,21 +445,29 @@ test('Komplettanalyse: Cache-Hit Phase 1 → nur P8 ruft AI', async () => {
   seedTinyBook(BOOK_ID);
 
   ctx.mockAi.on(
-    (e) => e.schemaKeys.includes('figuren') && e.schemaKeys.includes('orte') && e.schemaKeys.includes('assignments'),
-    extraktionResponse(),
+    (e) => e.schemaKeys.includes('figuren') && e.schemaKeys.includes('assignments') && !e.schemaKeys.includes('orte'),
+    figurenStammResponse(),
+  );
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.includes('orte') && e.schemaKeys.includes('szenen') && !e.schemaKeys.includes('figuren'),
+    ortePassResponse(),
+  );
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('beziehungen'),
+    beziehungenResponse(),
   );
   ctx.mockAi.on(
     (e) => e.schemaKeys.includes('zusammenfassung') && e.schemaKeys.includes('probleme'),
     kontinuitaetResponse(),
   );
 
-  // Run 1: populates cache.
+  // Run 1: populates cache (A1 + B + A2 + P8 = 4 calls).
   const jobId1 = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
   ctx.shared.enqueueJob(jobId1, () =>
     ctx.komplett.runKomplettAnalyseJob(jobId1, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
   );
   await waitForJob(ctx.shared, jobId1, { timeoutMs: 8000 });
-  assert.equal(ctx.mockAi.log.length, 2, 'run 1: 2 AI calls');
+  assert.equal(ctx.mockAi.log.length, 4, 'run 1: 4 AI calls (A1+B+A2+P8)');
 
   // Run 2: same book, cache should hit Phase 1 → only P8 calls AI.
   const callsBeforeRun2 = ctx.mockAi.log.length;

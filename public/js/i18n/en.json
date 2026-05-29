@@ -1986,6 +1986,7 @@
   "job.phase.selectingPages":        "Selecting relevant pages…",
   "job.phase.checkpointLoaded":     "Phase 1 loaded from checkpoint…",
   "job.phase.extracting":            "AI extracting characters, locations, facts, scenes…",
+  "job.phase.extractingRelations":   "AI extracting character relationships…",
   "job.phase.extractingChunks":      "Full extraction in {n} chunks…",
   "job.phase.consolidatingFiguren":  "AI consolidating characters…",
   "job.phase.refiningSoziogramm":    "AI refining sociogram…",
