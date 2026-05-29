@@ -32,21 +32,15 @@ function seedBook(bookId) {
 }
 
 // AI-Output mit Mix aus strukturierten, Spannen-, Label-only-, Unknown- und
-// invalid-subtyp-Events. Phase 1 (single-pass) liefert alles auf einmal.
-function extraktionResponseWithEvents() {
+// invalid-subtyp-Events. Claude-Single-Pass A1 (Figuren-Stammdaten +
+// assignments) trägt die Lebensereignisse; B (Orte/Szenen) separat.
+function figurenStammWithEvents() {
   return {
     figuren: [{
       id: 'fig_anna', name: 'Anna', kurzname: 'Anna', typ: 'protagonist',
       beschreibung: 'Hauptfigur', sozialschicht: 'mitte', praesenz: 'zentral',
       kapitel: [{ name: 'Kapitel Eins', haeufigkeit: 1 }],
-      beziehungen: [], eigenschaften: [], schluesselzitate: [],
-    }],
-    orte: [],
-    fakten: [],
-    szenen: [{
-      seite: 'Seite Eins', kapitel: 'Kapitel Eins', titel: 'Annas Hochzeit',
-      wertung: 'stark', kommentar: '',
-      figuren_namen: ['Anna'], orte_namen: [],
+      eigenschaften: [], schluesselzitate: [],
     }],
     assignments: [{
       figur_name: 'Anna',
@@ -104,6 +98,21 @@ function extraktionResponseWithEvents() {
   };
 }
 
+// Claude-Single-Pass B: Orte/Szenen (KEINE figuren). Für die Event-Tests
+// irrelevant, aber die Pipeline ruft den Pass trotzdem auf.
+function ortePassResponse() {
+  return {
+    orte: [],
+    songs: [],
+    fakten: [],
+    szenen: [{
+      seite: 'Seite Eins', kapitel: 'Kapitel Eins', titel: 'Annas Hochzeit',
+      wertung: 'stark', kommentar: '',
+      figuren_namen: ['Anna'], orte_namen: [],
+    }],
+  };
+}
+
 function kontinuitaetResponse() {
   return { zusammenfassung: 'Stimmig.', probleme: [] };
 }
@@ -124,9 +133,15 @@ test('Komplettanalyse: AI-Events landen mit strukturierten Feldern + Subtyp in f
   const BOOK_ID = 70;
   seedBook(BOOK_ID);
 
+  // A1: Figuren-Stammdaten + assignments (Events), KEIN orte.
   ctx.mockAi.on(
-    (e) => e.schemaKeys.includes('figuren') && e.schemaKeys.includes('orte') && e.schemaKeys.includes('assignments'),
-    extraktionResponseWithEvents(),
+    (e) => e.schemaKeys.includes('figuren') && e.schemaKeys.includes('assignments') && !e.schemaKeys.includes('orte'),
+    figurenStammWithEvents(),
+  );
+  // B: Orte/Szenen, KEINE figuren.
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.includes('orte') && e.schemaKeys.includes('szenen') && !e.schemaKeys.includes('figuren'),
+    ortePassResponse(),
   );
   ctx.mockAi.on(
     (e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('ereignisse'),
@@ -206,9 +221,15 @@ test('Komplettanalyse: figure_events ORDER BY platziert Unknown-Bucket ans Ende'
   const BOOK_ID = 71;
   seedBook(BOOK_ID);
 
+  // A1: Figuren-Stammdaten + assignments (Events), KEIN orte.
   ctx.mockAi.on(
-    (e) => e.schemaKeys.includes('figuren') && e.schemaKeys.includes('orte') && e.schemaKeys.includes('assignments'),
-    extraktionResponseWithEvents(),
+    (e) => e.schemaKeys.includes('figuren') && e.schemaKeys.includes('assignments') && !e.schemaKeys.includes('orte'),
+    figurenStammWithEvents(),
+  );
+  // B: Orte/Szenen, KEINE figuren.
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.includes('orte') && e.schemaKeys.includes('szenen') && !e.schemaKeys.includes('figuren'),
+    ortePassResponse(),
   );
   ctx.mockAi.on(
     (e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('ereignisse'),

@@ -106,6 +106,7 @@ const DUMMY_ORTE = Object.freeze([
   { id: 'ort_bahnhof', name: 'Bahnhof Luzern', typ: 'gebaeude', beschreibung: 'Treff mit Ronnie' },
 ]);
 
+// Kombinierter Extraktions-Output (lokale Provider / Multi-Pass-Kombi-Schema).
 function _extraktionResponse(chapterName) {
   return {
     figuren: DUMMY_FIGUREN.map(f => ({
@@ -130,13 +131,57 @@ function _extraktionResponse(chapterName) {
   };
 }
 
+// Claude-Single-Pass A1: Figuren-Stammdaten (figuren + assignments, KEIN orte).
+function _figurenStammResponse(chapterName) {
+  return {
+    figuren: DUMMY_FIGUREN.map(f => ({
+      ...f,
+      kapitel: [{ name: chapterName, haeufigkeit: 1 }],
+      eigenschaften: [], schluesselzitate: [],
+    })),
+    assignments: [{ figur_name: 'Lea Brunner', lebensereignisse: [] }],
+  };
+}
+
+// Claude-Single-Pass B: Orte + Songs + Fakten + Szenen (KEINE figuren).
+function _ortePassResponse(chapterName) {
+  return {
+    orte: DUMMY_ORTE.map(o => ({
+      ...o,
+      kapitel: [{ name: chapterName, haeufigkeit: 1 }],
+      figuren: ['fig_lea'],
+    })),
+    songs: [],
+    fakten: [
+      { kategorie: 'opfer', subjekt: 'Sibylle Amrein', fakt: 'tot am Seeufer', seite: 'Seite 1.1' },
+    ],
+    szenen: [{
+      seite: 'Seite', kapitel: chapterName, titel: 'Szene',
+      wertung: 'mittel', kommentar: '',
+      figuren_namen: ['Lea Brunner'], orte_namen: ['Seeufer Weggis'],
+    }],
+  };
+}
+
 function registerKomplettAiMocks(mockAi) {
+  const chapterFromPrompt = (prompt) => {
+    const m = prompt.match(/Kapitel \d+[^\n]*/);
+    return m ? m[0].trim() : 'Kapitel';
+  };
+  // A1: Figuren-Stammdaten (figuren + assignments, KEIN orte).
+  mockAi.on(
+    (e) => e.schemaKeys.includes('figuren') && e.schemaKeys.includes('assignments') && !e.schemaKeys.includes('orte'),
+    ({ prompt }) => _figurenStammResponse(chapterFromPrompt(prompt)),
+  );
+  // B: Orte/Szenen (orte + szenen, KEINE figuren).
+  mockAi.on(
+    (e) => e.schemaKeys.includes('orte') && e.schemaKeys.includes('szenen') && !e.schemaKeys.includes('figuren'),
+    ({ prompt }) => _ortePassResponse(chapterFromPrompt(prompt)),
+  );
+  // Kombiniertes Extraktions-Schema (lokale Provider / Multi-Pass-Kombi).
   mockAi.on(
     (e) => e.schemaKeys.includes('figuren') && e.schemaKeys.includes('orte') && e.schemaKeys.includes('assignments'),
-    ({ prompt }) => {
-      const m = prompt.match(/Kapitel \d+[^\n]*/);
-      return _extraktionResponse(m ? m[0].trim() : 'Kapitel');
-    },
+    ({ prompt }) => _extraktionResponse(chapterFromPrompt(prompt)),
   );
   // Konsolidierung Figuren (Multi-Pass).
   mockAi.on(
