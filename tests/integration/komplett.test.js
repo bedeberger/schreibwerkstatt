@@ -8,6 +8,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { bootstrap, waitForJob } = require('./_helpers/setup');
+const { buildBookPagesSig } = require('../../routes/jobs/komplett/utils');
 
 let ctx;
 test.before(() => { ctx = bootstrap(); });
@@ -286,8 +287,19 @@ test('Komplettanalyse Checkpoint-Recovery: p1_full_done → überspringt Phase 1
   seedMultiChapterBook(BOOK_ID, 3);
 
   // Pre-seed checkpoint as if Phase 1 ran successfully but job died before P2.
+  // bookPagesSig MUSS dem entsprechen, was der Job aus dem aktuellen Seitenstand
+  // berechnet — sonst verwirft die Staleness-Gate den Checkpoint und P1 läuft neu.
+  const prompts = await ctx.shared.getPrompts();
+  const cacheVersion = `${ctx.shared._modelName('claude')}:${prompts.PROMPTS_VERSION || ''}`;
+  const pageMeta = [
+    { id: 3000, updated_at: '2026-01-01', chapter_id: 2000, chapter: 'Kapitel 1' },
+    { id: 3001, updated_at: '2026-01-01', chapter_id: 2001, chapter: 'Kapitel 2' },
+    { id: 3002, updated_at: '2026-01-01', chapter_id: 2002, chapter: 'Kapitel 3' },
+  ];
+  const bookPagesSig = buildBookPagesSig(pageMeta, ctx.dbSchema.getBookSettings(BOOK_ID, 'tester@test.dev'), cacheVersion);
   ctx.dbSchema.saveCheckpoint('komplett-analyse', BOOK_ID, 'tester@test.dev', {
     phase: 'p1_full_done',
+    bookPagesSig,
     chapterFiguren: [
       { kapitel: 'Kapitel 1', figuren: [{ id: 'fig_anna', name: 'Anna', kurzname: 'Anna', typ: 'protagonist', praesenz: 'zentral', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 1 }], beziehungen: [] }] },
       { kapitel: 'Kapitel 2', figuren: [{ id: 'fig_anna', name: 'Anna', kurzname: 'Anna', typ: 'protagonist', praesenz: 'zentral', kapitel: [{ name: 'Kapitel 2', haeufigkeit: 1 }], beziehungen: [] }] },

@@ -1,0 +1,48 @@
+<!-- Admin: KI-Parse-Fehler -->
+<!--
+  Alpine.data-Sub-Komponente — siehe public/js/cards/admin-parse-fails-card.js.
+  `showAdminParseFailsCard` + `toggleAdminParseFailsCard` im Root. Nur sichtbar
+  bei $app.currentUser.role === 'admin'. Listet die Rohtext-Dumps aus
+  ai_parse_fails/ (lib/ai.js#_dumpParseFail).
+-->
+<div class="card card--admin-parse-fails" x-data="adminParseFailsCard" x-show="$app.showAdminParseFailsCard" x-cloak>
+  <div class="card-header">
+    <span class="card-title" x-text="$app.t('admin.parseFails.title')"></span>
+    <div class="card-actions">
+      <button type="button" @click="parseFailsRefresh()" :disabled="parseFailsLoading" x-text="$app.t('common.refresh')"></button>
+      <button type="button" class="danger" @click="parseFailsClearAll()"
+              :disabled="parseFailsLoading || !parseFailsFiles.length"
+              x-text="$app.t('admin.parseFails.clearAll')"></button>
+    </div>
+  </div>
+
+  <p class="muted-msg" x-text="$app.t('admin.parseFails.intro')"></p>
+
+  <div x-show="parseFailsError" class="error-msg" x-text="parseFailsError"></div>
+
+  <div class="parse-fails-list" x-show="parseFailsFiles.length">
+    <template x-for="f in parseFailsFiles" :key="f.name">
+      <div class="parse-fails-row">
+        <div class="parse-fails-row-head">
+          <span class="parse-fails-ts" x-text="parseFailsFmtTs(f.mtime)"></span>
+          <span class="parse-fails-size" x-text="parseFailsFmtSize(f.size)"></span>
+          <span class="parse-fails-name" x-text="f.name"></span>
+          <button type="button" class="parse-fails-view"
+                  @click="parseFailsToggle(f.name)"
+                  :aria-expanded="parseFailsExpanded[f.name] ? 'true' : 'false'">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#chevron-down"></use></svg>
+            <span x-text="parseFailsExpanded[f.name] ? $app.t('admin.parseFails.hide') : $app.t('admin.parseFails.view')"></span>
+          </button>
+          <button type="button" class="parse-fails-delete"
+                  @click="parseFailsDelete(f.name)"
+                  :aria-label="$app.t('common.delete')">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"></use></svg>
+          </button>
+        </div>
+        <pre class="parse-fails-content" x-show="parseFailsExpanded[f.name]" x-text="parseFailsContent[f.name] || ''"></pre>
+      </div>
+    </template>
+  </div>
+
+  <div x-show="!parseFailsFiles.length && !parseFailsLoading" class="muted-msg" x-text="$app.t('admin.parseFails.empty')"></div>
+</div>

@@ -1751,6 +1751,8 @@ Drei Editoren leben in eigenen Subfoldern (`book/`, `focus/`, `notebook/`); edit
 | [admin/admin-settings.css](public/css/admin/admin-settings.css) | Admin-Settings-Form. |
 | [admin/admin-usage.css](public/css/admin/admin-usage.css) | Admin-Usage-Dashboard. |
 | [admin/admin-users.css](public/css/admin/admin-users.css) | Admin-Users-Tabelle. |
+| [admin/logs.css](public/css/admin/logs.css) | Admin-Logs: Filter-Toolbar, Log-Liste, Stack-Trace-Toggle. |
+| [admin/parse-fails.css](public/css/admin/parse-fails.css) | Admin-KI-Parse-Fehler: Dump-Liste mit aufklappbarem Rohtext. |
 
 ### book/
 | File | Inhalt |

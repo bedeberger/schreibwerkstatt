@@ -1,0 +1,87 @@
+/* Admin: KI-Parse-Fehler — Dump-Liste mit aufklappbarem Rohtext.
+   Mobile via Container-Query (Karte lebt im Admin-Slot). */
+
+@layer components {
+  .card--admin-parse-fails {
+    --card-accent: var(--card-accent-admin-parse-fails, var(--color-err-border));
+    container-type: inline-size;
+  }
+
+  .card--admin-parse-fails .danger { color: var(--color-err-text); }
+
+  .parse-fails-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    margin-top: var(--space-3);
+  }
+
+  .parse-fails-row {
+    border: 0.5px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg);
+  }
+
+  .parse-fails-row-head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2);
+    min-width: 0;
+  }
+
+  .parse-fails-ts {
+    font-size: var(--font-sm);
+    color: var(--color-text);
+    white-space: nowrap;
+  }
+
+  .parse-fails-size {
+    font-size: var(--font-xs);
+    color: var(--color-muted);
+    white-space: nowrap;
+  }
+
+  .parse-fails-name {
+    font-size: var(--font-xs);
+    color: var(--color-muted);
+    font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .parse-fails-view {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    white-space: nowrap;
+  }
+
+  .parse-fails-delete {
+    display: inline-flex;
+    align-items: center;
+    color: var(--color-err-text);
+  }
+
+  .parse-fails-content {
+    margin: 0;
+    padding: var(--space-2);
+    border-top: 0.5px solid var(--color-border);
+    background: var(--color-hover);
+    font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+    font-size: var(--font-xs);
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--color-text);
+    max-height: 28rem;
+    overflow: auto;
+  }
+
+  @container (max-width: 640px) {
+    .parse-fails-row-head { flex-wrap: wrap; }
+    .parse-fails-name { flex-basis: 100%; order: 3; }
+  }
+}

@@ -19,7 +19,7 @@ const {
 } = require('../shared');
 const contentStore = require('../../../lib/content-store');
 const appSettings = require('../../../lib/app-settings');
-const { runNonCritical, buildBookSystemBlockText } = require('./utils');
+const { runNonCritical, buildBookSystemBlockText, buildBookPagesSig } = require('./utils');
 const { invalidateRenamedChapterCaches, loadAndValidateCheckpoint, restorePhase1FromCheckpoint } = require('./checkpoint');
 const { remapSzenen, remapAssignments, saveSzenenAndEvents, saveKontinuitaetResult } = require('./remap');
 const {
@@ -114,15 +114,27 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
     // werden alle persistierten Phase-1-Caches automatisch verworfen (Hit-Test
     // matcht den vollen Sig-String inkl. dieser Version).
     const cacheVersion = `${_modelName(effectiveProvider)}:${prompts.PROMPTS_VERSION || ''}`;
+    // Buch-weite Signatur (Seitenstand + Settings + Modell/Prompt-Version) – dieselbe
+    // Gate wie der chapter_extract_cache. Validiert den Checkpoint-Resume.
+    const bookPagesSig = buildBookPagesSig(pageContents, getBookSettings(bookIdInt, email), cacheVersion);
 
     const ctx = {
       jobId, bookIdInt, bookName, email, call, tok, log,
-      effectiveProvider, singlePassLimit, perChunkLimit, cacheVersion, prompts, sys,
+      effectiveProvider, singlePassLimit, perChunkLimit, cacheVersion, bookPagesSig, prompts, sys,
       idMaps, pageContents, groups, groupOrder, totalChars, fullBookText,
     };
 
     // ── Phase 1: Vollextraktion ───────────────────────────────────────────────
-    const p1 = cp?.phase === 'p1_full_done'
+    // Checkpoint nur resumen, wenn Seitenstand + Modell/Prompt-Version unverändert.
+    // Sonst liefert restorePhase1FromCheckpoint stale Extraktion (Edit nach Crash,
+    // PROMPTS_VERSION-Bump) – der chapter_extract_cache wäre hier sig-invalidiert,
+    // der Checkpoint umging das bisher komplett.
+    const cpUsable = cp?.phase === 'p1_full_done' && cp.bookPagesSig === bookPagesSig;
+    if (cp && !cpUsable) {
+      log.info('Checkpoint verworfen (Seiten oder Modell/Prompt-Version geändert) – Phase 1 neu.');
+      deleteCheckpoint('komplett-analyse', bookIdInt, email);
+    }
+    const p1 = cpUsable
       ? restorePhase1FromCheckpoint(cp, tok, log, jobId)
       : await runPhase1(ctx);
     const { chapterFiguren, chapterOrte, chapterSongs, chapterFakten, chapterSzenen, chapterAssignments } = p1;

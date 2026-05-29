@@ -49,7 +49,10 @@ async function runPhase1(ctx) {
     // (der Anthropic-Prompt-Cache deckt nur eine 1h-Fensterspanne ab).
     const bookPagesSig = buildBookPagesSig(pageContents, getBookSettings(bookIdInt, email), cacheVersion);
     const cached = loadChapterExtractCache(bookIdInt, email, '__singlepass__', bookPagesSig, effectiveProvider);
-    if (cached && Array.isArray(cached.chapterFiguren) && cached.chapterFiguren[0]?.figuren?.length > 0) {
+    // HIT auf Cache-Präsenz gaten, nicht auf Figuren-Count: Bücher ohne Figuren
+    // (Sachbuch, Lyrik) sind legitim – sonst Cache-MISS bei jedem Run trotz
+    // identischem Seitenstand.
+    if (cached && Array.isArray(cached.chapterFiguren) && cached.chapterFiguren.length > 0) {
       chapterFiguren     = cached.chapterFiguren;
       chapterOrte        = cached.chapterOrte        || [{ kapitel: 'Gesamtbuch', orte: [] }];
       chapterSongs       = cached.chapterSongs       || [{ kapitel: 'Gesamtbuch', songs: [] }];
@@ -231,6 +234,7 @@ async function runPhase1(ctx) {
 
   saveCheckpoint('komplett-analyse', bookIdInt, email, {
     phase: 'p1_full_done',
+    bookPagesSig: ctx.bookPagesSig,
     chapterFiguren, chapterOrte, chapterSongs, chapterFakten, chapterSzenen, chapterAssignments,
     tokIn: tok.in, tokOut: tok.out, tokMs: tok.ms,
   });

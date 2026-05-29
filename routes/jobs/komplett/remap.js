@@ -150,7 +150,7 @@ function saveSzenenAndEvents(bookIdInt, email, szenen, assignments, locIdToDbId,
 // signalisiert. Synchron mit Prompt-Selbstcheck in
 // public/js/prompts/komplett.js (PROBLEME_RULES). KI hält die Selbstcheck-Regel
 // nicht zuverlässig ein → Server filtert defensiv nach.
-const SELF_CANCEL_PATTERN = /\b(kein(en)?\s+(echten?\s+)?widerspruch|kein\s+problem|das\s+ist\s+korrekt|konsistent|pass(t|en)\s+zusammen|stimmig|unproblematisch|entwarnung|wird\s+nicht\s+gemeldet|eintrag\s+entfernen)\b/i;
+const SELF_CANCEL_PATTERN = /\b(kein(en)?\s+(echten?\s+)?widerspruch|kein\s+problem|das\s+ist\s+korrekt|konsistent|pass(t|en)\s+zusammen|stimmig|unproblematisch|entwarnung|wird\s+nicht\s+gemeldet|l(ä|ae)sst\s+sich\s+erkl(ä|ae)ren|eintrag\s+entfernen)\b/i;
 
 function _isSelfCancelled(p) {
   return SELF_CANCEL_PATTERN.test(p.beschreibung || '') || SELF_CANCEL_PATTERN.test(p.empfehlung || '');

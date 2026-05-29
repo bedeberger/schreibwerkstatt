@@ -10,6 +10,7 @@
              && !showAdminCategoriesCard
              && !showAdminBooksCard
              && !showAdminLogsCard
+             && !showAdminParseFailsCard
              && !showUserSettingsCard"
      x-cloak>
   <div class="card-header">
@@ -57,6 +58,13 @@
       <div class="overview-tile-label" x-text="t('admin.home.logsLabel')"></div>
       <div class="overview-tile-value" x-text="t('admin.logs.title')"></div>
       <div class="overview-tile-desc" x-text="t('tile.adminLogs.desc')"></div>
+    </button>
+    <button type="button"
+            class="overview-tile internal-link card--admin-parse-fails"
+            @click="toggleAdminParseFailsCard()">
+      <div class="overview-tile-label" x-text="t('admin.home.parseFailsLabel')"></div>
+      <div class="overview-tile-value" x-text="t('admin.parseFails.title')"></div>
+      <div class="overview-tile-desc" x-text="t('tile.adminParseFails.desc')"></div>
     </button>
   </div>
 </div>
