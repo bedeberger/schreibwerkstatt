@@ -63,13 +63,13 @@ router.get('/files', async (_req, res) => {
 router.get('/file', async (req, res) => {
   const fp = _safePath(req.query.name);
   if (!fp) return res.status(400).json({ error_code: 'BAD_NAME' });
-  let stat;
+  let stat, content;
   try {
     stat = await fsp.stat(fp);
+    content = await fsp.readFile(fp, { encoding: 'utf8' });
   } catch {
     return res.status(404).json({ error_code: 'FILE_NOT_FOUND' });
   }
-  const content = await fsp.readFile(fp, { encoding: 'utf8' });
   res.json({
     name: path.basename(fp),
     size: stat.size,

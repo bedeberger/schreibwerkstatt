@@ -26,10 +26,13 @@ function loadAndValidateCheckpoint(bookIdInt, email, log, jobId) {
     deleteCheckpoint('komplett-analyse', bookIdInt, email);
     return null;
   }
-  const hasFiguren = Array.isArray(cp.chapterFiguren) && cp.chapterFiguren.length > 0
-    && cp.chapterFiguren.some(c => Array.isArray(c.figuren) && c.figuren.length > 0);
-  if (!hasFiguren) {
-    log.warn(`Checkpoint ohne Figuren-Daten – Neustart.`);
+  // Auf Kapitel-Präsenz gaten, nicht auf Figuren-Count: Bücher ohne Figuren
+  // (Sachbuch, Lyrik) sind legitim – sonst verwirft Resume jeden figurenlosen
+  // Checkpoint und re-extrahiert die ganze Phase 1 (gleiche Semantik wie der
+  // Single-Pass-Cache-Gate in phases.js).
+  const hasPhase1 = Array.isArray(cp.chapterFiguren) && cp.chapterFiguren.length > 0;
+  if (!hasPhase1) {
+    log.warn(`Checkpoint ohne Phase-1-Daten – Neustart.`);
     deleteCheckpoint('komplett-analyse', bookIdInt, email);
     return null;
   }
