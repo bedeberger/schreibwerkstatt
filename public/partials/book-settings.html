@@ -29,6 +29,10 @@
               @click="bookSettingsTab = 'book'"
               x-text="$app.t('book.settings.tab.book')"></button>
       <button type="button" class="tabs-btn"
+              :class="{ 'tabs-btn--active': bookSettingsTab === 'context' }"
+              @click="bookSettingsTab = 'context'"
+              x-text="$app.t('book.settings.tab.context')"></button>
+      <button type="button" class="tabs-btn"
               :class="{ 'tabs-btn--active': bookSettingsTab === 'share' }"
               @click="bookSettingsTab = 'share'"
               x-text="$app.t('book.settings.tab.share')"></button>
@@ -45,6 +49,10 @@
               :class="{ 'tabs-btn--active': bookSettingsTab === 'stats' }"
               @click="bookSettingsTab = 'stats'"
               x-text="$app.t('book.settings.tab.stats')"></button>
+      <button type="button" class="tabs-btn"
+              :class="{ 'tabs-btn--active': bookSettingsTab === 'danger' }"
+              @click="bookSettingsTab = 'danger'"
+              x-text="$app.t('book.settings.tab.danger')"></button>
     </div>
 
     <div class="card-form-grid" x-show="bookSettingsTab === 'book'" x-cloak>
@@ -153,6 +161,10 @@
 
     </section>
 
+    </div><!-- /tab: book -->
+
+    <div class="card-form-grid" x-show="bookSettingsTab === 'context'" x-cloak>
+
     <section class="book-settings-section">
       <h3 class="book-settings-section-title" x-text="$app.t('book.settings.section.context')"></h3>
 
@@ -219,6 +231,10 @@
       </div>
     </section>
 
+    </div><!-- /tab: context -->
+
+    <div class="card-form-grid" x-show="bookSettingsTab === 'danger'" x-cloak>
+
     <div class="book-settings-danger-zone">
       <div class="book-settings-danger-title">
         <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#alert-triangle"/></svg>
@@ -259,7 +275,7 @@
       </div>
     </div>
 
-    </div><!-- /tab: book -->
+    </div><!-- /tab: danger -->
 
     <!-- Publikation: buch-weite Metadaten (Cover, Titelei, Bio) — geteilt von
          PDF- und EPUB-Export. Plus EPUB-Export-Trigger. -->

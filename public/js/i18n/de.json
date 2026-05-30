@@ -228,10 +228,12 @@
 
   "book.settings.title":         "Einstellungen",
   "book.settings.tab.book":      "Buch",
+  "book.settings.tab.context":   "Kontext",
   "book.settings.tab.share":     "Teilen",
   "book.settings.tab.publication": "Publikation",
   "book.settings.tab.sync":      "Sync",
   "book.settings.tab.stats":     "Statistik",
+  "book.settings.tab.danger":    "Gefahrenzone",
   "publication.section.images":   "Cover & Autorfoto",
   "publication.section.metadata": "Titelei",
   "publication.section.epub":     "EPUB-Optionen",

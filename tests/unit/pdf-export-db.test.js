@@ -44,16 +44,17 @@ test('CRUD-Cycle für pdf_export_profile', () => {
   assert.equal(defs.length, 1);
   assert.equal(defs[0].id, p2.id);
 
-  // Cover setzen + lesen + löschen
+  // Umschlag-Rückseitenbild setzen + lesen + löschen (profil-gebunden, Phase-4-Cover-PDF).
+  // Front-Cover + Autorfoto leben buch-weit in book_publication, nicht mehr am Profil.
   const buf = Buffer.from('FAKEJPEG');
-  schema.setPdfExportProfileCover(p1.id, buf, 'image/jpeg');
-  const cover = schema.getPdfExportProfileCover(p1.id);
-  assert.ok(cover);
-  assert.equal(cover.mime, 'image/jpeg');
-  assert.equal(cover.image.toString(), 'FAKEJPEG');
+  schema.setPdfExportProfileBackCover(p1.id, buf, 'image/jpeg');
+  const back = schema.getPdfExportProfileBackCover(p1.id);
+  assert.ok(back);
+  assert.equal(back.mime, 'image/jpeg');
+  assert.equal(back.image.toString(), 'FAKEJPEG');
 
-  schema.clearPdfExportProfileCover(p1.id);
-  assert.equal(schema.getPdfExportProfileCover(p1.id), null);
+  schema.clearPdfExportProfileBackCover(p1.id);
+  assert.equal(schema.getPdfExportProfileBackCover(p1.id), null);
 
   // Update + Delete
   schema.updatePdfExportProfile(p1.id, 'A4 Final', { layout: { pageSize: 'A4', columns: 2 } });
