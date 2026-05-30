@@ -538,6 +538,9 @@ const jobsState = () => ({
   alleAktualisierenTokOut: 0,
   alleAktualisierenTps: null,
   alleAktualisierenPassMode: null,
+  // Non-critical-Degradierungen aus dem letzten Komplettlauf (Job-Result.warnings):
+  // [{ key }] – im Status-Panel als Hinweiszeilen gerendert.
+  alleAktualisierenWarnings: [],
   // Globaler Job-Done-Toast. Wird von `_onJobFinished` für relevante
   // langlaufende Job-Typen gesetzt (komplett-analyse, review, kapitel-review,
   // figuren, kontinuitaet, book-chat, finetune-export, pdf-export, batch-check,

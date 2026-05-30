@@ -3,12 +3,16 @@ const {
   db, saveZeitstrahlEvents, updateFigurenEvents, saveContinuityCheck,
 } = require('../../../db/schema');
 const { _modelName } = require('../shared');
-const { _refToString } = require('./utils');
+const { _refToString, _stelleQuote } = require('./utils');
 const searchIndex = require('../../../lib/search');
 
-/** Mappt Szenen-Klarnamen (aus Phase 1) auf konsolidierte Figuren-/Ort-IDs. */
-function remapSzenen(chSzenen, figNameToId, figNameToIdLower, ortNameToId, ortNameToIdLower, chNameToId) {
+/** Mappt Szenen-Klarnamen (aus Phase 1) auf konsolidierte Figuren-/Ort-IDs.
+ *  Nicht auflösbare Namen (KI-Halluzination, Tippfehler, in Phase 2/3 wegkonsolidiert)
+ *  werden gedroppt und – wenn `log` übergeben – aggregiert geloggt (sonst still). */
+function remapSzenen(chSzenen, figNameToId, figNameToIdLower, ortNameToId, ortNameToIdLower, chNameToId, log = null) {
   const szenen = [];
+  const droppedFig = new Set();
+  const droppedOrt = new Set();
   for (const { kapitel, szenen: chSz } of (chSzenen || [])) {
     for (const s of (chSz || [])) {
       // Wie bei `seite` kann die KI auch beim Kapitel den ##-Präfix mitliefern.
@@ -32,15 +36,26 @@ function remapSzenen(chSzenen, figNameToId, figNameToIdLower, ortNameToId, ortNa
         kommentar: s.kommentar || null,
         fig_ids: (s.figuren_namen || []).map(n => {
           const name = _refToString(n);
-          return name ? (figNameToId[name] || figNameToIdLower[name.toLowerCase()] || null) : null;
+          if (!name) return null;
+          const id = figNameToId[name] || figNameToIdLower[name.toLowerCase()] || null;
+          if (!id) droppedFig.add(name);
+          return id;
         }).filter(Boolean),
         ort_ids: (s.orte_namen || []).map(n => {
           const name = _refToString(n);
-          return name ? (ortNameToId[name] || ortNameToIdLower[name.toLowerCase()] || null) : null;
+          if (!name) return null;
+          const id = ortNameToId[name] || ortNameToIdLower[name.toLowerCase()] || null;
+          if (!id) droppedOrt.add(name);
+          return id;
         }).filter(Boolean),
         sort_order: szenen.length,
       });
     }
+  }
+  if (log) {
+    const sample = (set) => [...set].slice(0, 8).join(', ') + (set.size > 8 ? ' …' : '');
+    if (droppedFig.size) log.warn(`Szenen-Remap: ${droppedFig.size} Figuren-Name(n) ohne ID ignoriert: ${sample(droppedFig)}`);
+    if (droppedOrt.size) log.warn(`Szenen-Remap: ${droppedOrt.size} Ort-Name(n) ohne ID ignoriert: ${sample(droppedOrt)}`);
   }
   return szenen;
 }
@@ -158,12 +173,37 @@ function _isSelfCancelled(p) {
 /** Speichert Kontinuitätsprüfung in die DB (eine Zeile pro Issue + Bridge-Tabellen
  *  für Figuren-/Kapitel-Referenzen). Gibt normalizedIssues zurück, oder null bei
  *  ungültiger Antwort. */
-function saveKontinuitaetResult(bookIdInt, email, kontResult, figNameToId, chNameToId, effectiveProvider, log, jobId) {
+function saveKontinuitaetResult(bookIdInt, email, kontResult, figNameToId, chNameToId, effectiveProvider, log, opts = {}) {
+  const { fullBookText = null, requireQuoteEvidence = false } = opts;
   if (typeof kontResult?.zusammenfassung === 'undefined') return null;
   const rawProbleme = kontResult.probleme || [];
-  const filtered = rawProbleme.filter(p => !_isSelfCancelled(p));
+  let filtered = rawProbleme.filter(p => !_isSelfCancelled(p));
   const dropped = rawProbleme.length - filtered.length;
   if (dropped > 0) log.warn(`Kontinuität: ${dropped} Selbst-Entwarnungen verworfen.`);
+
+  // Beleg-Prüfung NUR für Single-Pass-Pfade (voller Buchtext im Prompt, Zitat-Pflicht
+  // ist wörtlich). Der Multi-Pass-Fakten-Pfad zitiert paraphrasierte Fakt-Aussagen,
+  // nicht den Buchtext → dort würde ein indexOf gegen den Volltext echte Befunde als
+  // False-Negative verwerfen. Der Multi-Pass-Claude-Pfad hat ohnehin die separate
+  // verifyKontinuitaetProbleme-Stufe; Single-Pass + lokale Provider hatten bisher
+  // keine Beleg-Kontrolle → halluzinierte Zitate erreichten die UI.
+  if (requireQuoteEvidence && fullBookText) {
+    const haystack = fullBookText.replace(/\s+/g, ' ');
+    const inText = (q) => haystack.includes(q.replace(/\s+/g, ' ').slice(0, 40));
+    // Konservativ wie die verify-Stufe: nur als Halluzination verwerfen, wenn ein
+    // Problem ein wörtliches Zitat LIEFERT, das aber im Buchtext NICHT auffindbar ist.
+    // Hat es keine «»-Zitate (nur Kapitel-/Seiten-Hinweis), bleibt es erhalten – das
+    // ist eine Zitat-Format-Verletzung, keine erfundene Stelle (kein False-Negative).
+    const isFabricated = (p) => {
+      const quotes = [p.stelle_a, p.stelle_b].map(_stelleQuote).filter(Boolean);
+      return quotes.length > 0 && !quotes.some(inText);
+    };
+    const before = filtered.length;
+    filtered = filtered.filter(p => !isFabricated(p));
+    const evDropped = before - filtered.length;
+    if (evDropped > 0) log.warn(`Kontinuität: ${evDropped} Problem(e) mit erfundenem Beleg-Zitat (nicht im Buchtext) verworfen.`);
+  }
+
   const issues = filtered.map(p => ({
     schwere: p.schwere, typ: p.typ, beschreibung: p.beschreibung,
     stelle_a: p.stelle_a, stelle_b: p.stelle_b, empfehlung: p.empfehlung,

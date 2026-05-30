@@ -33,6 +33,18 @@ function buildBookSystemBlockText(bookName, pageCount, fullBookText) {
 }
 
 /**
+ * Settings-Anteil der Cache-Signatur (language/region/buchtyp/buch_kontext).
+ * SSoT für Single-Pass (buildBookPagesSig) UND Multi-Pass-Chunk-Keys: beide müssen
+ * bei Buchtyp-/Kontext-Wechsel invalidieren, weil diese Settings via
+ * getLocalePromptsForBook (Block «VORRANGIGE ANGABEN DES AUTORS») in den
+ * Extraktions-Prompt fliessen und das Ergebnis verändern.
+ */
+function bookSettingsSigPart(bookSettings) {
+  const s = bookSettings || {};
+  return `${s.language || ''}:${s.region || ''}:${s.buchtyp || ''}:${s.buch_kontext || ''}`;
+}
+
+/**
  * Signatur aller Seiten eines Buchs für den Single-Pass-Cache der Phase 1.
  * Berücksichtigt page_id, page-updated_at, chapter_id, chapter-Name sowie
  * buchtyp/buch_kontext/language – ändert sich eins davon, wird der Cache
@@ -45,17 +57,47 @@ function buildBookPagesSig(pageContents, bookSettings, cacheVersion) {
     .map(p => `${p.id}:${p.updated_at || ''}|${p.chapter_id ?? ''}:${p.chapter ?? ''}`)
     .sort()
     .join('|');
-  const s = bookSettings || {};
-  const settingsPart = `${s.language || ''}:${s.region || ''}:${s.buchtyp || ''}:${s.buch_kontext || ''}`;
-  return `${pagesPart}||${settingsPart}||${cacheVersion || ''}`;
+  return `${pagesPart}||${bookSettingsSigPart(bookSettings)}||${cacheVersion || ''}`;
 }
 
-/** Führt eine nicht-kritische Phase aus – Fehler werden geloggt, nicht geworfen. */
-async function runNonCritical(label, fn, log, jobId) {
+/** Extrahiert das wörtliche Zitat aus einem stelle_a/stelle_b-String (in «»/""/„").
+ *  Leer, wenn kein Zitat vorhanden. Geteilt von der Verify-Stufe (job.js) und der
+ *  Beleg-Prüfung im Single-Pass-Save (remap.js). */
+function _stelleQuote(stelle) {
+  const m = String(stelle || '').match(/[«„"“]([^»"”]{3,})[»"”]/);
+  return m ? m[1].trim() : '';
+}
+
+/** Misst Wall-Clock pro Pipeline-Segment. `mark(label)` loggt die Dauer seit dem
+ *  letzten Mark sofort (Live-Fortschritt + Lokalisierung, falls ein Job in einer
+ *  Phase hängt) und sammelt sie für `summary()` (eine konsolidierte Zeile am
+ *  Job-Ende). Date.now() konsistent mit _jobDurationFmt; Sekunden-Auflösung reicht
+ *  für die mehrsekündigen Phasen. Parallel laufende Phasen (P2+P3, P6+P8) erscheinen
+ *  als ein Segment mit ihrer gemeinsamen Wall-Clock-Dauer. */
+function makePhaseTimer(log) {
+  const segments = [];
+  let last = Date.now();
+  return {
+    mark(label) {
+      const now = Date.now();
+      const secs = (now - last) / 1000;
+      last = now;
+      segments.push(`${label}=${secs.toFixed(1)}s`);
+      log.info(`Phase «${label}» – ${secs.toFixed(1)}s`);
+    },
+    summary() { return segments.join(' '); },
+  };
+}
+
+/** Führt eine nicht-kritische Phase aus – Fehler werden geloggt, nicht geworfen.
+ *  Optionaler `warnings`-Sink + `warnKey`: bei Fehlschlag wird `{ key: warnKey }`
+ *  gesammelt, damit die Degradierung im Job-Result user-sichtbar wird. */
+async function runNonCritical(label, fn, log, { warnings = null, warnKey = null } = {}) {
   try {
     return await fn();
   } catch (e) {
     log.warn(`${label} fehlgeschlagen (ignoriert): ${e.message}`);
+    if (warnings && warnKey) warnings.push({ key: warnKey });
     return null;
   }
 }
@@ -106,6 +148,8 @@ function buildFigNameLookup(figuren, chapterFiguren, chapterAssignments, log, jo
 
 module.exports = {
   _refToString, extractField,
-  buildBookSystemBlockText, buildBookPagesSig,
+  buildBookSystemBlockText, buildBookPagesSig, bookSettingsSigPart,
+  _stelleQuote,
+  makePhaseTimer,
   runNonCritical, buildFigNameLookup,
 };

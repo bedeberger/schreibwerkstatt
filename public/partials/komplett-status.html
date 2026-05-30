@@ -1,5 +1,5 @@
 <!-- Komplettanalyse: Primärbutton mit eingebettetem Fortschrittsring + Cache-Clear + Status-Panel -->
-<div class="komplett-status-wrap" @click.outside="showKomplettStatus = false" @mouseenter="if (alleAktualisierenLoading) showKomplettStatus = true" :data-lastrun="(!alleAktualisierenLoading && alleAktualisierenLastRun) ? t('common.asOf', { date: alleAktualisierenLastRun }) : null">
+<div class="komplett-status-wrap" @click.outside="showKomplettStatus = false" @mouseenter="if (alleAktualisierenLoading) showKomplettStatus = true">
   <button type="button"
           class="update-all-btn"
           :class="{ 'update-all-btn--running': alleAktualisierenLoading }"
@@ -21,8 +21,14 @@
           :aria-label="t('header.clearCache')">
     <span aria-hidden="true">⌫</span>
   </button>
+  <span class="komplett-last-run"
+        x-show="!alleAktualisierenLoading && alleAktualisierenLastRun"
+        x-cloak
+        x-text="t('common.asOf', { date: alleAktualisierenLastRun })"></span>
   <div class="komplett-status-panel" x-show="showKomplettStatus" x-cloak>
     <div class="komplett-status-title" x-text="t('komplett.title')"></div>
+    <div class="komplett-status-laststamp" x-show="alleAktualisierenLastRun" x-cloak
+         x-text="t('common.asOf', { date: alleAktualisierenLastRun })"></div>
     <div class="progress-bar-wrap komplett-progress-bar-wrap">
       <div class="progress-bar" :style="{ '--progress': alleAktualisierenProgress + '%' }"></div>
     </div>
@@ -42,6 +48,11 @@
           </span>
           <span x-text="phase.label"></span>
         </li>
+      </template>
+    </ul>
+    <ul class="komplett-warnings" x-show="!alleAktualisierenLoading && alleAktualisierenWarnings.length" x-cloak>
+      <template x-for="w in alleAktualisierenWarnings" :key="w.key">
+        <li class="komplett-warning-item" x-text="t(w.key)"></li>
       </template>
     </ul>
   </div>

@@ -14,6 +14,7 @@ const books = require('./books');
 const tokenUsage = require('./token-usage');
 const draftFigures = require('./draft-figures');
 const { parseDatum } = require('../lib/datum-parse');
+const logger = require('../logger');
 
 // Whitelist für Event-Subtypen (Phase 2). Unbekannte Werte fallen auf
 // 'sonstiges' zurück. Persoenlich/extern bleibt in `typ` getrennt.
@@ -259,6 +260,7 @@ function saveOrteToDb(bookId, orte, userEmail, chNameToId = null, pageNameToIdBy
   const now = new Date().toISOString();
   const emailCond = userEmail ? 'user_email = ?' : 'user_email IS NULL';
   const emailVal  = userEmail ? [userEmail] : [];
+  let droppedFigRefs = 0;
 
   db.transaction(() => {
     const existing = db.prepare(
@@ -316,6 +318,7 @@ function saveOrteToDb(bookId, orte, userEmail, chNameToId = null, pageNameToIdBy
         const ref = _toRefString(fid);
         const rowId = ref ? figIdToRowId[ref] : null;
         if (rowId != null) insLf.run(locDbId, rowId);
+        else if (ref) droppedFigRefs++;
       }
       for (const k of (o.kapitel || [])) {
         const chName = _toRefString(typeof k === 'object' && k ? (k.name ?? k) : k);
@@ -326,6 +329,9 @@ function saveOrteToDb(bookId, orte, userEmail, chNameToId = null, pageNameToIdBy
       }
     }
   })();
+  if (droppedFigRefs > 0) {
+    logger.warn(`saveOrteToDb: ${droppedFigRefs} Ort→Figur-Referenzen verworfen (Figur nicht in figures-Tabelle).`);
+  }
 }
 
 // Backfill für location_chapters: ergänzt fehlende Kapitel-Zuordnungen aus

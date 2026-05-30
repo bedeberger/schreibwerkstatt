@@ -24,6 +24,7 @@ export const appKomplettMethods = {
     this.alleAktualisierenTokOut = 0;
     this.alleAktualisierenTps = null;
     this.alleAktualisierenPassMode = null;
+    this.alleAktualisierenWarnings = [];
     this.showKomplettStatus = true;
     const bookId = this.selectedBookId;
     const bookName = this.selectedBookName;
@@ -63,7 +64,10 @@ export const appKomplettMethods = {
         this.alleAktualisierenLoading = false;
         this.alleAktualisierenStatus = `${this.t('common.errorColon')}${job.error ? this.t(job.error, job.errorParams) : this.t('app.jobFailed')}`;
       },
-      onDone: async () => {
+      onDone: async (job) => {
+        // Non-critical-Degradierungen (Soziogramm/P3b/Kontinuität) persistent im
+        // Status-Panel zeigen – sonst ununterscheidbar von „alles ok".
+        this.alleAktualisierenWarnings = Array.isArray(job?.result?.warnings) ? job.result.warnings : [];
         try {
           // _loadKontinuitaetHistory lebt auf kontinuitaetCard (nicht im Root) —
           // Card per card:refresh-Event reloaden lassen (Lifecycle hört darauf).

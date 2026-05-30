@@ -2019,6 +2019,10 @@
   "job.error.synonymeArrayMissing":  "KI-Antwort ungültig: synonyme-Array fehlt.",
   "job.error.gesamtnoteMissing":     "KI-Antwort ungültig: Gesamtnote fehlt.",
 
+  "job.warn.soziogrammDegraded":     "Soziogramm-Verfeinerung übersprungen – vorläufige Werte verwendet.",
+  "job.warn.crossChapterFailed":     "Kapitelübergreifende Beziehungen konnten nicht ermittelt werden.",
+  "job.warn.continuityFailed":       "Kontinuitätsprüfung übersprungen – übriger Katalog wurde aktualisiert.",
+
   "job.phase.preparing":             "Vorbereitung…",
   "job.phase.aiReply":               "KI antwortet…",
   "job.phase.agentTools":            "Werkzeuge {current}/{total}…",

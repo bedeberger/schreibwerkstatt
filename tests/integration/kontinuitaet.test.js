@@ -65,6 +65,40 @@ test('Kontinuität single-pass: 1 Kapitel, 1 Seite, AI liefert 1 Problem', async
   assert.equal(ctx.mockAi.log.length, 1, 'expected exactly 1 AI call for single-pass');
 });
 
+test('Kontinuität single-pass: erfundenes Beleg-Zitat wird verworfen, echtes bleibt', async () => {
+  const BOOK_ID = 45;
+  ctx.dbSeed.setBook({
+    chapters: [{ id: 120, book_id: BOOK_ID, name: 'Kapitel Eins' }],
+    pages: [{ id: 220, book_id: BOOK_ID, chapter_id: 120, name: 'Seite Eins', updated_at: '2026-01-01' }],
+    pageBodies: { 220: '<p>' + 'Wald und Sonne. '.repeat(50) + '</p>' },
+  });
+
+  ctx.mockAi.on(
+    (entry) => entry.schemaKeys.includes('zusammenfassung') && entry.schemaKeys.includes('probleme'),
+    {
+      zusammenfassung: 'Ein echter, ein erfundener Widerspruch.',
+      probleme: [
+        { schwere: 'mittel', typ: 'detail', beschreibung: 'echter Widerspruch',
+          stelle_a: 'Kapitel Eins: «Wald und Sonne»', stelle_b: 'Kapitel Eins: «Wald und Sonne»',
+          empfehlung: 'x', figuren: [], kapitel: ['Kapitel Eins'] },
+        { schwere: 'kritisch', typ: 'figur', beschreibung: 'halluziniert',
+          stelle_a: 'Kapitel Eins: «Drachen und Raumschiffe»', stelle_b: 'Kapitel Eins: «niemals im Text»',
+          empfehlung: 'x', figuren: [], kapitel: ['Kapitel Eins'] },
+      ],
+    },
+  );
+
+  const jobId = ctx.shared.createJob('kontinuitaet', BOOK_ID, 'tester@test.dev', 'job.label.kontinuitaet');
+  ctx.shared.enqueueJob(jobId, () =>
+    ctx.komplett.runKontinuitaetJob(jobId, BOOK_ID, 'Testbuch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+  );
+
+  const job = await waitForJob(ctx.shared, jobId);
+  assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
+  assert.equal(job.result.count, 1, 'erfundenes Zitat muss verworfen werden, echtes bleibt');
+  assert.equal(job.result.issues[0].beschreibung, 'echter Widerspruch');
+});
+
 test('Kontinuität: leeres Buch → result.empty', async () => {
   const BOOK_ID = 43;
   ctx.dbSeed.setBook({ chapters: [], pages: [], pageBodies: {}, books: [{ id: BOOK_ID, name: 'Leer' }] });

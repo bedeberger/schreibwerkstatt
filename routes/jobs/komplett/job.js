@@ -20,7 +20,7 @@ const {
 } = require('../shared');
 const contentStore = require('../../../lib/content-store');
 const appSettings = require('../../../lib/app-settings');
-const { runNonCritical, buildBookSystemBlockText, buildBookPagesSig } = require('./utils');
+const { runNonCritical, buildBookSystemBlockText, buildBookPagesSig, _stelleQuote, makePhaseTimer } = require('./utils');
 const { invalidateRenamedChapterCaches, loadAndValidateCheckpoint, restorePhase1FromCheckpoint } = require('./checkpoint');
 const { remapSzenen, remapAssignments, saveSzenenAndEvents, saveKontinuitaetResult } = require('./remap');
 const {
@@ -36,11 +36,6 @@ const {
 // mit echtem Kontext bestätigen oder verwerfen. Single-Pass braucht das nicht
 // (hat den Volltext bereits beim Check).
 const _VERIFY_RADIUS = 1500;
-
-function _stelleQuote(stelle) {
-  const m = String(stelle || '').match(/[«„"“]([^»"”]{3,})[»"”]/);
-  return m ? m[1].trim() : '';
-}
 
 // Textfenster rund um das Zitat aus den im Problem referenzierten Kapiteln.
 // Whitespace-normalisiert (matcht den Single-Pass-/Fakten-Textfluss); findet das
@@ -108,6 +103,7 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
   const bookIdInt = parseInt(bookId);
   const email = userEmail || null;
   const log = makeJobLogger(jobId);
+  const pt = makePhaseTimer(log);
   // call akzeptiert optional ein JSON-Schema als letztes Argument (11. Position in aiCall).
   // Schemas werden nur von lokalen Providern (ollama/llama) verwendet – Claude ignoriert sie.
   const call = (jobId_, tok_, prompt_, system_, fromPct, toPct, expectedChars, outputRatio, maxTokens, schema) =>
@@ -185,11 +181,16 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
     // Gate wie der chapter_extract_cache. Validiert den Checkpoint-Resume.
     const bookPagesSig = buildBookPagesSig(pageContents, getBookSettings(bookIdInt, email), cacheVersion);
 
+    // Sammelt non-critical-Degradierungen (Soziogramm, P3b, Kontinuität), die
+    // sonst nur in schreibwerkstatt.log landen → ins Job-Result, damit der User
+    // „erfolgreich, aber Teilphase übersprungen" von „alles ok" unterscheiden kann.
+    const warnings = [];
     const ctx = {
       jobId, bookIdInt, bookName, email, call, tok, log,
       effectiveProvider, singlePassLimit, perChunkLimit, cacheVersion, bookPagesSig, prompts, sys,
-      idMaps, pageContents, groups, groupOrder, totalChars, fullBookText,
+      idMaps, pageContents, groups, groupOrder, totalChars, fullBookText, warnings,
     };
+    pt.mark('Laden');
 
     // ── Phase 1: Vollextraktion ───────────────────────────────────────────────
     // Checkpoint nur resumen, wenn Seitenstand + Modell/Prompt-Version unverändert.
@@ -205,6 +206,7 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
       ? restorePhase1FromCheckpoint(cp, tok, log, jobId)
       : await runPhase1(ctx);
     const { chapterFiguren, chapterOrte, chapterSongs, chapterFakten, chapterSzenen, chapterAssignments } = p1;
+    pt.mark('P1 Extraktion');
 
     // ── Phase 2 + 3: Figuren + Orte konsolidieren ────────────────────────────
     // Multi-Pass Claude: P2 (Figuren-AI) und P3 (Orte-AI) sind unabhängig und
@@ -231,6 +233,7 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
       ({ orte, ortNameToId, ortNameToIdLower } =
         await runPhase3(ctx, chapterOrte, figurenKompakt, isSinglePass, idRemap));
     }
+    pt.mark('P2+P3 Konsolidierung');
 
     // ── Phase 3 Songs: Musikbibliothek konsolidieren ─────────────────────────
     const { songs } = await runPhase3Songs(ctx, chapterSongs || [], figurenKompakt, isSinglePass, idRemap);
@@ -238,8 +241,10 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
     // ── Phase 3b: Kapitelübergreifende Beziehungen (non-critical, nur Multi-Pass) ──
     if (chapterFiguren.length > 1 && figuren.length >= 2) {
       await runNonCritical('Phase 3b kapitelübergreifende Beziehungen',
-        () => runPhase3b(ctx, figuren), log, jobId);
+        () => runPhase3b(ctx, figuren), log,
+        { warnings, warnKey: 'job.warn.crossChapterFailed' });
     }
+    pt.mark('Songs+P3b');
 
     // ── Block 2: Szenen remappen → Zeitstrahl + Kontinuitätsprüfung ──────────
     // Claude: P6 (Zeitstrahl) und P8 (Kontinuität) sind unabhängig und laufen
@@ -251,11 +256,12 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
       'SELECT id, loc_id FROM locations WHERE book_id = ? AND user_email = ? ORDER BY sort_order'
     ).all(bookIdInt, email);
     const locIdToDbId = Object.fromEntries(locRows.map(r => [r.loc_id, r.id]));
-    const szenen = remapSzenen(chapterSzenen, figNameToId, figNameToIdLower, ortNameToId, ortNameToIdLower, idMaps.chNameToId);
+    const szenen = remapSzenen(chapterSzenen, figNameToId, figNameToIdLower, ortNameToId, ortNameToIdLower, idMaps.chNameToId, log);
     const assignments = remapAssignments(chapterAssignments, figNameToId, figNameToIdLower, idMaps.chNameToId, log, jobId);
     updateJob(jobId, { progress: 76, statusText: 'job.phase.savingScenes' });
     const szenenResult = saveSzenenAndEvents(bookIdInt, email, szenen, assignments, locIdToDbId, idMaps, log, jobId);
     backfillLocationChaptersFromScenes(bookIdInt, email);
+    pt.mark('P5 Szenen');
 
     const figKompakt = figuren.map(f => ({ name: f.name, typ: f.typ || 'andere', beschreibung: f.beschreibung || '' }));
     const ortRows = db.prepare(
@@ -267,20 +273,31 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
     const kontMultiPass = !(totalChars <= singlePassLimit && effectiveProvider === 'claude');
     // P8-Call als Closure – wird je nach Provider parallel oder sequentiell ausgeführt.
     const runP8 = async () => {
-      if (!kontMultiPass) {
-        log.info(`Kontinuität Single-Pass: ${fullBookText.length} Zeichen, ${figKompakt.length} Figuren, ${orteKompakt.length} Orte`);
-        const bookSystemBlock = { text: buildBookSystemBlockText(bookName, pageContents.length, fullBookText), ttl: '1h' };
-        return retryOnTransientAi(() => call(jobId, tok,
-          prompts.buildKontinuitaetSinglePassPrompt(bookName, null, figKompakt, orteKompakt, narrativeLabels(getBookSettings(bookIdInt, email))),
-          [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KONTINUITAET_BLOCKS, '1h')],
-          82, 97, 5000, 0.2, null, prompts.SCHEMA_KONTINUITAET_PROBLEME,
-        ), { log, label: 'Kontinuität Single-Pass (P8)' });
+      try {
+        if (!kontMultiPass) {
+          log.info(`Kontinuität Single-Pass: ${fullBookText.length} Zeichen, ${figKompakt.length} Figuren, ${orteKompakt.length} Orte`);
+          const bookSystemBlock = { text: buildBookSystemBlockText(bookName, pageContents.length, fullBookText), ttl: '1h' };
+          return await retryOnTransientAi(() => call(jobId, tok,
+            prompts.buildKontinuitaetSinglePassPrompt(bookName, null, figKompakt, orteKompakt, narrativeLabels(getBookSettings(bookIdInt, email))),
+            [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KONTINUITAET_BLOCKS, '1h')],
+            82, 97, 5000, 0.2, null, prompts.SCHEMA_KONTINUITAET_PROBLEME,
+          ), { log, label: 'Kontinuität Single-Pass (P8)' });
+        }
+        log.info(`Kontinuität facts-basiert: ${chapterFakten.length} Kapitel, ${figKompakt.length} Figuren`);
+        return await retryOnTransientAi(() => call(jobId, tok,
+          prompts.buildKontinuitaetCheckPrompt(bookName, chapterFakten, figKompakt, orteKompakt),
+          sys.SYSTEM_KONTINUITAET_BLOCKS, 82, 97, effectiveProvider === 'claude' ? 5000 : 2500, 0.2, null, prompts.SCHEMA_KONTINUITAET_PROBLEME,
+        ), { log, label: 'Kontinuität facts-basiert (P8)' });
+      } catch (e) {
+        if (e.name === 'AbortError') throw e;
+        // P8 ist die letzte, read-only Phase: Figuren/Orte/Szenen sind bereits gültig
+        // gespeichert. Ein Fehler hier (Trunkierung bei zu vielen Befunden, Parse-Fehler,
+        // erschöpfter Retry) darf den Katalog NICHT als „fehlgeschlagen" verwerfen.
+        // Kontinuität überspringen (vorheriges Ergebnis bleibt), Warnung sammeln, Job ok.
+        log.warn(`Kontinuitätsprüfung fehlgeschlagen (Katalog bleibt erhalten): ${e.message}`);
+        warnings.push({ key: 'job.warn.continuityFailed' });
+        return null;
       }
-      log.info(`Kontinuität facts-basiert: ${chapterFakten.length} Kapitel, ${figKompakt.length} Figuren`);
-      return retryOnTransientAi(() => call(jobId, tok,
-        prompts.buildKontinuitaetCheckPrompt(bookName, chapterFakten, figKompakt, orteKompakt),
-        sys.SYSTEM_KONTINUITAET_BLOCKS, 82, 97, effectiveProvider === 'claude' ? 5000 : 2500, 0.2, null, prompts.SCHEMA_KONTINUITAET_PROBLEME,
-      ), { log, label: 'Kontinuität facts-basiert (P8)' });
     };
 
     let kontResult;
@@ -297,20 +314,30 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
       updateJob(jobId, { progress: 82, statusText: 'job.phase.checkContinuity' });
       kontResult = await runP8();
     }
-    // Multi-Pass-Befunde gegen den Originaltext verifizieren (False-Positive-Filter).
-    if (kontMultiPass && effectiveProvider === 'claude') {
-      kontResult = await verifyKontinuitaetProbleme(ctx, kontResult, 96, 97);
+    if (kontResult) {
+      // Multi-Pass-Befunde gegen den Originaltext verifizieren (False-Positive-Filter).
+      if (kontMultiPass && effectiveProvider === 'claude') {
+        kontResult = await verifyKontinuitaetProbleme(ctx, kontResult, 96, 97);
+      }
+      // Single-Pass (Claude, voller Buchtext im Prompt): Beleg-Zitate gegen den Text
+      // prüfen. Multi-Pass-Claude hat die separate verify-Stufe; der Fakten-Pfad zitiert
+      // paraphrasiert → requireQuoteEvidence dort aus (false negatives sonst).
+      saveKontinuitaetResult(bookIdInt, email, kontResult, figNameToId, idMaps.chNameToId, effectiveProvider, log,
+        { fullBookText, requireQuoteEvidence: !kontMultiPass });
     }
-    saveKontinuitaetResult(bookIdInt, email, kontResult, figNameToId, idMaps.chNameToId, effectiveProvider, log, jobId);
+
+    pt.mark('Block 2 (Zeitstrahl+Kontinuität)');
 
     deleteCheckpoint('komplett-analyse', bookIdInt, email);
+    log.info(`Phasen-Timing: ${pt.summary()}`);
     completeJob(jobId, {
       figCount:    figuren.length,
       orteCount:   orte.length,
       songsCount:  songs.length,
       szenenCount: szenenResult.szenenCount,
+      warnings,
       tokensIn: tok.in, tokensOut: tok.out,
-    }, tps(tok), `fig=${figuren.length} orte=${orte.length} songs=${songs.length} szenen=${szenenResult.szenenCount}`);
+    }, tps(tok), `fig=${figuren.length} orte=${orte.length} songs=${songs.length} szenen=${szenenResult.szenenCount}${warnings.length ? ` warn=${warnings.length}` : ''}`);
   } catch (e) {
     if (e.name !== 'AbortError') {
       const cause = e.cause?.message || e.cause?.code || '';
@@ -325,6 +352,7 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
   const bookIdInt = parseInt(bookId);
   const email = userEmail || null;
   const log = makeJobLogger(jobId);
+  const pt = makePhaseTimer(log);
   const call = (jobId_, tok_, prompt_, system_, fromPct, toPct, expectedChars, outputRatio, maxTokens, schema) =>
     aiCall(jobId_, tok_, prompt_, system_, fromPct, toPct, expectedChars, outputRatio, maxTokens, provider, schema);
   const effectiveProvider = provider || appSettings.get('ai.provider') || 'claude';
@@ -378,14 +406,20 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
     const totalChars = pageContents.reduce((s, p) => s + p.text.length, 0);
     const { groupOrder, groups } = groupByChapter(pageContents);
     let result;
+    // Single-Pass-Buchtext für die Beleg-Prüfung in saveKontinuitaetResult (gilt für
+    // ALLE Provider hier – auch lokale, die im Single-Pass den Volltext sehen).
+    let kontFullText = null;
+    pt.mark('Laden');
 
     if (totalChars <= singlePassLimit) {
       updateJob(jobId, { progress: 60, statusText: 'job.phase.checkContinuity' });
       const bookText = buildSinglePassBookText(groups, groupOrder);
+      kontFullText = bookText;
       result = await retryOnTransientAi(() => call(jobId, tok,
         prompts.buildKontinuitaetSinglePassPrompt(bookName, bookText, figurenKompakt, orteKompakt, narrativeLabels(getBookSettings(bookIdInt, email))),
         sys.SYSTEM_KONTINUITAET_BLOCKS, 60, 97, 5000, 0.2, null, prompts.SCHEMA_KONTINUITAET_PROBLEME,
       ), { log, label: 'Kontinuität Single-Pass' });
+      pt.mark('Single-Pass Check');
     } else {
       // Multi-Pass: Fakten pro Kapitel extrahieren – ggf. aus Checkpoint fortsetzen
       let chapterFacts = cp?.chapterFacts ?? [];
@@ -418,6 +452,7 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
         }
         saveCheckpoint('kontinuitaet', bookIdInt, email, { chapterFacts, nextGi: gi + 1 });
       }
+      pt.mark('Fakten-Extraktion');
 
       updateJob(jobId, { progress: 88, statusText: 'job.phase.checkContradictions' });
       result = await retryOnTransientAi(() => call(jobId, tok,
@@ -429,11 +464,14 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
         result = await verifyKontinuitaetProbleme(
           { call, prompts, sys, jobId, tok, bookName, groups, groupOrder, log }, result, 95, 97);
       }
+      pt.mark('Check+Verify');
     }
 
     if (typeof result?.zusammenfassung === 'undefined') throw i18nError('job.error.zusammenfassungMissing');
-    const normalizedProbleme = saveKontinuitaetResult(bookIdInt, email, result, figNameToId, chNameToId, effectiveProvider, log, jobId);
+    const normalizedProbleme = saveKontinuitaetResult(bookIdInt, email, result, figNameToId, chNameToId, effectiveProvider, log,
+      { fullBookText: kontFullText, requireQuoteEvidence: kontFullText != null });
     deleteCheckpoint('kontinuitaet', bookIdInt, email);
+    log.info(`Phasen-Timing: ${pt.summary()}`);
     completeJob(jobId, {
       count: normalizedProbleme.length,
       issues: normalizedProbleme,

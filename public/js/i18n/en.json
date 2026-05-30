@@ -2018,6 +2018,10 @@
   "job.error.synonymeArrayMissing":  "AI response invalid: synonyme array missing.",
   "job.error.gesamtnoteMissing":     "AI response invalid: overall grade missing.",
 
+  "job.warn.soziogrammDegraded":     "Sociogram refinement skipped – preliminary values used.",
+  "job.warn.crossChapterFailed":     "Cross-chapter relationships could not be determined.",
+  "job.warn.continuityFailed":       "Continuity check skipped – the rest of the catalog was updated.",
+
   "job.phase.preparing":             "Preparing…",
   "job.phase.aiReply":               "AI replying…",
   "job.phase.agentTools":            "Tools {current}/{total}…",

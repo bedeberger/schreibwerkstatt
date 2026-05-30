@@ -13,7 +13,7 @@ const {
   toSystemBlocks,
 } = require('../shared');
 const {
-  buildBookSystemBlockText, buildBookPagesSig,
+  buildBookSystemBlockText, buildBookPagesSig, bookSettingsSigPart,
   extractField, buildFigNameLookup,
 } = require('./utils');
 const {
@@ -139,11 +139,16 @@ async function runPhase1(ctx) {
     // aufgeteilt. Jeder Chunk bekommt einen eigenen KI-Call mit eigenem Delta-Cache-Eintrag.
     // Claude nutzt singlePassLimit (250K) als Chunk-Grenze → kein Splitting in der Praxis.
     updateJob(jobId, { progress: 12, statusText: 'job.phase.extractingChunks', statusParams: { n: chunkOrder.length } });
+    // Settings-Anteil identisch zum Single-Pass-Key (buildBookPagesSig): Buchtyp/
+    // Kontext fliessen in den Extraktions-Prompt, also muss ihr Wechsel auch die
+    // Per-Chunk-Caches invalidieren – sonst liefert der Multi-Pass-Cache stale
+    // Extraktion mit den alten Autoren-Vorgaben.
+    const settingsSig = bookSettingsSigPart(getBookSettings(bookIdInt, email));
     const chunkTexts = chunkOrder.map(chunkKey => {
       const chunk = chunks.get(chunkKey);
       return {
         chunk, key: chunkKey,
-        pagesSig: chunk.pages.map(p => `${p.id}:${p.updated_at}`).sort().join('|') + `||${cacheVersion || ''}`,
+        pagesSig: chunk.pages.map(p => `${p.id}:${p.updated_at}`).sort().join('|') + `||${settingsSig}||${cacheVersion || ''}`,
         chText: chunk.pages.map(p => `### ${p.title}\n${p.text}`).join('\n\n---\n\n'),
       };
     });
@@ -261,7 +266,8 @@ async function runPhase1(ctx) {
     chapterAssignments = extractField(settled, chunkTexts, 'assignments');
 
     const failedChunks = settled.filter(r => r.status === 'rejected');
-    log.info(`Phase 1 Multi-Pass – ${settled.length - failedChunks.length}/${settled.length} OK (${cacheHits} Cache-Hits), fig=${chapterFiguren.reduce((s, c) => s + c.figuren.length, 0)} orte=${chapterOrte.reduce((s, c) => s + c.orte.length, 0)} songs=${chapterSongs.reduce((s, c) => s + (c.songs?.length || 0), 0)} sz=${chapterSzenen.reduce((s, c) => s + c.szenen.length, 0)}`);
+    const cacheLookups = chunkTexts.length * (isSplit ? 2 : 1);
+    log.info(`Phase 1 Multi-Pass – ${settled.length - failedChunks.length}/${settled.length} OK (${cacheHits}/${cacheLookups} Cache-Hits), fig=${chapterFiguren.reduce((s, c) => s + c.figuren.length, 0)} orte=${chapterOrte.reduce((s, c) => s + c.orte.length, 0)} songs=${chapterSongs.reduce((s, c) => s + (c.songs?.length || 0), 0)} sz=${chapterSzenen.reduce((s, c) => s + c.szenen.length, 0)}`);
     if (failedChunks.length > 0) {
       const failedDetails = chunkTexts
         .map((ct, i) => ({ ct, r: settled[i] }))
@@ -369,6 +375,7 @@ async function runPhase2(ctx, chapterFiguren, chapterAssignments) {
         log.info(`Soziogramm-Konsolidierung: ${changedSchichten} Schicht-Korrekturen, ${refinedBz.length}/${prelimPairs.size} Machtbeziehungen verfeinert.`);
       } catch (e) {
         log.warn(`Soziogramm-Konsolidierung fehlgeschlagen, nutze preliminary-Werte: ${e.message}`);
+        ctx.warnings?.push({ key: 'job.warn.soziogrammDegraded' });
         updateJob(jobId, { progress: 43 });
       }
     }
