@@ -65,11 +65,28 @@ router.post('/check', express.json({ limit: '600kb' }), async (req, res) => {
   // Cache-Lookup: nur wenn pageId gesetzt. Bucheditor (Block-Scope) sendet
   // pageId weiterhin, aber Hash basiert auf dem Block-Text -- d.h. Notebook-
   // und Bucheditor-Caches kollidieren nicht (unterschiedliche Hashes).
+  //
+  // Dict-Re-Filter auf Cache-Hits: der body_html-basierte Purge in
+  // user-dictionary.js#_purgeCacheForWord erwischt Faelle nicht, in denen
+  // das Wort beim Add noch nicht in der gespeicherten body_html stand
+  // (ungespeicherte Edits im Notebook-Editor: User tippt "Kantifest", LT
+  // cached den Match unfilterted, User fuegt Wort zum Dict hinzu BEVOR
+  // Autosave gelaufen ist -> Purge findet die Seite nicht -> Cache-Eintrag
+  // mit unfiltered Match bleibt fuer immer auf diesem content_hash). Re-Filter
+  // ist idempotent: gecached sind bereits gefilterte Matches, ein zweiter Lauf
+  // entfernt nur, was seit dem Cache-Write ins Dict gewandert ist.
   const contentHash = pageId ? ltCache.hashText(text) : null;
   if (pageId && contentHash) {
     const cached = ltCache.getCached({ pageId, contentHash, lang: language, picky });
     if (cached) {
-      return res.json({ matches: cached, language: null, chunks: 0, cached: true });
+      let result = cached;
+      if (userEmail) {
+        try {
+          const dictSet = dict.getCheckSet(userEmail, bookId, language);
+          if (dictSet.size) result = dict.filterMatches(cached, dictSet);
+        } catch (e) { log.warn(`dict filter on cache hit failed: ${e.message}`); }
+      }
+      return res.json({ matches: result, language: null, chunks: 0, cached: true });
     }
   }
 

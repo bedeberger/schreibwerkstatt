@@ -260,6 +260,74 @@ test('per-page-cache: hit serves without upstream call', async () => {
   db.prepare('DELETE FROM books WHERE book_id = ?').run(900001);
 });
 
+test('cache-hit re-applies dict filter (post-cache Dict-Add greift sofort)', async () => {
+  setLT({ enabled: true, url: 'http://lt.lan:8010' });
+  const { db } = require('../../db/connection');
+  const now = "strftime('%Y-%m-%dT%H:%M:%fZ','now')";
+  // app_users-Row, damit user_dictionary-FK aufgeht.
+  db.prepare(`INSERT OR IGNORE INTO app_users (email, display_name, global_role, status, created_at) VALUES (?, ?, 'user', 'active', ${now})`)
+    .run('tester@test.dev', 'Tester');
+  db.prepare(`INSERT INTO books (book_id, name, created_at, updated_at) VALUES (?, ?, ${now}, ${now})`).run(900002, 'lt-dict-rerun-book');
+  // body_html absichtlich OHNE "Kantifest" -- simuliert ungespeicherten Edit:
+  // der LT-Check laeuft auf dem Live-Text mit Kantifest drin, der Purge beim
+  // Dict-Add findet die Seite aber nicht und laesst den Cache-Eintrag stehen.
+  db.prepare(`INSERT INTO pages (page_id, book_id, page_name, body_html, updated_at) VALUES (?, ?, ?, ?, ${now})`)
+    .run(900002, 900002, 'p', '<p>kein treffer hier</p>');
+
+  let calls = 0;
+  // LT-Upstream gibt einen Match fuer "Kantifest" zurueck, inkl. korrektem
+  // context (offset/length zeigen aufs Wort). Genau das Format, das filterMatches
+  // erwartet.
+  fetchHandler = async () => {
+    calls++;
+    return new Response(JSON.stringify({
+      matches: [{
+        message: 'Moeglicher Tippfehler',
+        offset: 11,
+        length: 9,
+        rule: { id: 'GERMAN_SPELLER_RULE', category: { id: 'TYPOS', name: 'Rechtschreibung' } },
+        context: { text: 'Wir feiern Kantifest am Wochenende', offset: 11, length: 9 },
+        replacements: [{ value: 'Festival' }],
+      }],
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  const liveText = 'Wir feiern Kantifest am Wochenende';
+  const body = { text: liveText, language: 'de-CH', pageId: 900002, bookId: 900002 };
+
+  // Erster Call: Upstream wird befragt, Cache wird geschrieben (mit Kantifest-Match,
+  // weil Dict noch leer).
+  const r1 = await originalFetch(`${baseUrl}/languagetool/check`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const j1 = await r1.json();
+  assert.equal(j1.matches.length, 1, 'erster Call liefert Kantifest-Match');
+  assert.equal(calls, 1);
+
+  // User fuegt "Kantifest" zum Dict hinzu. Purge sucht in body_html LIKE %Kantifest%
+  // -- findet die Seite NICHT (body_html ist noch der alte gespeicherte Stand).
+  // Der Cache-Eintrag fuer (page, content_hash, lang, picky) bleibt also stehen.
+  const dict = require('../../db/user-dictionary');
+  dict.add('tester@test.dev', { word: 'Kantifest', bookId: 0, lang: '*' });
+
+  // Zweiter Call mit identischem Live-Text -> Cache-Hit. Vor dem Fix wuerde der
+  // Server den stale Match zurueckgeben. Mit dem Fix laeuft der Dict-Filter
+  // erneut und Kantifest faellt raus.
+  const r2 = await originalFetch(`${baseUrl}/languagetool/check`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const j2 = await r2.json();
+  assert.equal(j2.cached, true, 'Cache-Hit (Upstream wurde nicht erneut befragt)');
+  assert.equal(calls, 1, 'kein zweiter Upstream-Call');
+  assert.equal(j2.matches.length, 0, 'Kantifest wird via Re-Filter auf Cache-Hit entfernt');
+
+  // Cleanup
+  db.prepare('DELETE FROM user_dictionary WHERE user_email = ?').run('tester@test.dev');
+  db.prepare('DELETE FROM pages WHERE page_id = ?').run(900002);
+  db.prepare('DELETE FROM books WHERE book_id = ?').run(900002);
+});
+
 test('text >TEXT_MAX (500KB) -> 413', async () => {
   setLT({ enabled: true, url: 'http://lt.lan:8010' });
   fetchHandler = async () => new Response('{}', { status: 200 });

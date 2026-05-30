@@ -51,7 +51,7 @@ Admin-UI: [public/partials/admin-settings.html](../public/partials/admin-setting
 - **Disabled-Fall:** `!enabled || !url` → `404 { error: 'languagetool_disabled' }`. Frontend behandelt als „Feature aus", kein Retry.
 - **Locale-SSoT:** wenn `bookId` mitgesendet → `getBookLocale(bookId)` aus [db/schema.js](../db/schema.js) gewinnt. `body.language` nur Fallback (Aufrufe ohne Buchscope).
 - **Body-Cap:** `TEXT_MAX = 500_000` Zeichen, JSON-Body 600 KB. Übergross → `413 { error: 'text_too_large' }`.
-- **Cache-Lookup:** Wenn `pageId` gesetzt, `ltCache.getCached({ pageId, contentHash, lang, picky })` — Hit liefert `{ matches, cached: true }`.
+- **Cache-Lookup:** Wenn `pageId` gesetzt, `ltCache.getCached({ pageId, contentHash, lang, picky })` — Hit liefert `{ matches, cached: true }`. Vor der Antwort läuft `dict.filterMatches` erneut über das gecachte Array (idempotent — Cached sind bereits gefilterte Matches, ein zweiter Lauf entfernt nur, was seit dem Cache-Write ins Dict gewandert ist; deckt den Edge-Case ab, dass `_purgeCacheForWord` die Seite verfehlt, weil `body_html` beim Add noch den ungespeicherten Stand hatte).
 - **Chunking:** `chunkText(text, CHUNK_MAX=50_000)` aus [lib/languagetool-chunk.js](../lib/languagetool-chunk.js). Splittet primär an Paragraph (`\n{2,}`), Fallback Satz (`[.!?\n]+`), Worst-Case Hard-Split bei Wortgrenze.
 - **Pool:** `PARALLEL = 4` Worker konsumieren Chunks; `adjustMatches(c.offset, …)` schiebt Match-Offsets auf absolute Position.
 - **Filter:** `dict.getCheckSet(userEmail, bookId, language)` lädt User-Wörterbuch; `dict.filterMatches(all, dictSet)` entfernt User-Wörter.
@@ -200,6 +200,7 @@ Pro-Editor-Tweaks via `[data-editor="focus"]`/`[data-editor="book"]` auf Popover
 - **`'auto'` ist kein Dictionary-Lang.** Wert `'auto'` wird in `/dictionary` zu `'*'` gemappt, sonst matched `getCheckSet` nie (Migration 142 hat tote Daten gelöscht). Frontend-Add muss das mappen.
 - **Cache-Key enthält `picky` + `lang`.** Sprachwechsel oder Picky-Toggle dürfen alten Cache **nicht** wiederverwenden. PRIMARY KEY `(page_id, content_hash, lang, picky)`.
 - **Dictionary-Add purgt nur betroffene Pages.** `body_html LIKE %word%` — kein Pauschal-Wipe. Beim Edit von `user-dictionary.js`-Lookup-Queries: Granularität pro `book_id`/`lang` muss zur Cache-Purge-Query passen.
+- **Dict-Filter läuft auch auf Cache-Hits.** Der `body_html`-basierte Purge ist eine Best-Effort-Optimierung; der eigentliche Wahrheits-Anker ist der Re-Filter im Proxy beim Cache-Lookup. Wer den Cache-Hit-Pfad anfasst, darf das `dict.filterMatches` davor nicht entfernen — sonst überleben Dict-Wörter, deren `body_html` beim Add ungespeichert war.
 - **Popover ist `contenteditable="false"`.** MutationObserver filtert Popover-Mutationen (`_isPopoverOnlyMutation`), sonst verschwinden Squiggles vor dem Klick. Gilt für jede neue UI, die der Controller in den Editor-Subtree einhängt.
 - **`seq` + `htmlSnapshot` doppelte Staleness.** Both checks sind Pflicht: Race „User tippt während Fetch" + Race „mehrere Checks parallel". AbortController allein reicht nicht (Response kann durch sein, bevor abort durchläuft).
 - **Apply geht über `input`-Event, nicht direkt an Editor-State.** Save-Pipeline muss triggern (Notebook-Autosave/Focus-Save/Bucheditor-`_markDirty`). Direkter State-Write umgeht Stale-Write-Schutz und Draft-Storage.
