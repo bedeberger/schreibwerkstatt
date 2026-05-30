@@ -98,7 +98,10 @@ async function runPhase1(ctx) {
             [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KOMPLETT_ORTE_PASS_BLOCKS, '1h')],
             12, 20, 8000, 0.2, null, prompts.SCHEMA_KOMPLETT_ORTE_PASS,
           ), { log, label: 'Single-Pass Orte/Szenen (B)' }),
-        ]);
+        // warmup: A1 läuft seriell zuerst und schreibt den 1h-bookSystemBlock-Cache;
+        // B (und das nachgelagerte A2/P8) lesen ihn dann statt ihn ein zweites Mal
+        // teuer neu zu erstellen. Spart ~1× cache_creation auf dem ~grössten Block.
+        ], { warmup: true });
         if (stammRes.status === 'rejected') throw stammRes.reason;
         const stamm = stammRes.value || {};
         // Orte/Szenen-Pass nicht still degradieren: ein durch Call-Fehler leerer
@@ -341,9 +344,13 @@ async function runPhase2(ctx, chapterFiguren, chapterAssignments, chapterSzenen)
   const { figuren: mergedFiguren, mergedCount, stage1Saved, stage2Saved, idRemap } = mergeDuplicateFiguren(figuren);
   if (mergedCount > 0) log.info(`${mergedCount} Figuren-Duplikate zusammengeführt (exakt: ${stage1Saved}, Teilname+Indizien: ${stage2Saved}).`);
   figuren = mergedFiguren;
+  // Beziehungs-Beschreibungs-Rescue ist pure + billig und hilft jedem Provider:
+  // auch Claude attribuiert gelegentlich eine Beschreibung der falschen Figur zu.
+  const { cleared, moved } = validateBeziehungenDescriptions(figuren);
+  if (cleared > 0 || moved > 0) log.info(`Beziehungs-Beschreibungen bereinigt – ${moved} verschoben, ${cleared} geleert.`);
+  // Sozialschicht-Mehrheitsvotum nur für lokale Modelle: Claude läuft durch den
+  // holistischen Soziogramm-Refine-Call und braucht das nicht.
   if (effectiveProvider && effectiveProvider !== 'claude') {
-    const { cleared, moved } = validateBeziehungenDescriptions(figuren);
-    if (cleared > 0 || moved > 0) log.info(`Beziehungs-Beschreibungen bereinigt – ${moved} verschoben, ${cleared} geleert.`);
     const schichtChanges = applySozialschichtModeVote(chapterFiguren, figuren);
     if (schichtChanges > 0) log.info(`Sozialschicht per Mehrheitsvotum korrigiert (${schichtChanges} Figuren).`);
   }

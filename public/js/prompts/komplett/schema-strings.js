@@ -202,7 +202,7 @@ export function _schemaBody(schemaStr) {
 // Geteilter Lebensereignis-Schema-Block (Pass A lokal + Claude-A1-Stammpass).
 export const _ASSIGNMENTS_SCHEMA_BLOCK = `"assignments": [
     {
-      "figur_name": "Figurenname exakt wie im Text",
+      "figur_name": "Exakt der kanonische figuren[].name aus DIESER Antwort (kein Spitzname/Titel/Textvariante, die dort nicht steht) – sonst wird das Ereignis beim ID-Mapping verworfen",
       "lebensereignisse": [
         {
           "datum": "Original-Datum-Notation (JJJJ, JJJJ-MM, JJJJ-MM-TT, «Mai 1850», «Tag 3», «vor der Reise», …)",
