@@ -27,6 +27,8 @@ const SLASH_ITEMS = [
   { key: 'list',       tag: 'ul', list: true },
   { key: 'todo',       tag: 'ul', className: 'todo', todoList: true },
   { key: 'hr',         tag: 'hr' },
+  { key: 'pagebreak',  tag: 'hr', className: 'pagebreak' },
+  { key: 'blankpage',  tag: 'hr', className: 'blankpage' },
   { key: 'heute',      insertText: 'date' },
   { key: 'jetzt',      insertText: 'datetime' },
   { key: 'zeit',       insertText: 'time' },
@@ -543,6 +545,7 @@ export const toolbarCardMethods = {
 
     if (item.tag === 'hr') {
       replacement = document.createElement('hr');
+      if (item.className) replacement.className = item.className;
       block.parentNode.replaceChild(replacement, block);
       const next = document.createElement('p');
       next.appendChild(document.createElement('br'));

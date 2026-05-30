@@ -107,6 +107,12 @@
 .page-content-view ul, .page-content-view ol { padding-left: 1.5em; margin: 0.4em 0; }
 .page-content-view img { max-width: 100%; height: auto; border-radius: var(--radius-md); }
 .page-content-view hr { border: none; border-top: 1px solid var(--color-border); margin: 1em 0; }
+/* Seitenumbruch-Marker: nur im Editor sichtbar, im PDF-Export erzeugt er addPage().
+   Dashed + Akzentfarbe grenzt ihn klar von der soliden Trennlinie ab. */
+.page-content-view hr.pagebreak { border-top: 2px dashed var(--color-accent); margin: 1.6em 0; }
+/* Leere-Seite-Marker: erzeugt im PDF eine leere Seite + Umbruch. Doppellinie
+   grenzt ihn vom einfachen Seitenumbruch ab. */
+.page-content-view hr.blankpage { border-top: 3px double var(--color-accent); margin: 1.6em 0; }
 .page-content-view--editing hr { cursor: pointer; }
 .page-content-view--editing hr.hr-selected { border-top-color: var(--color-accent); border-top-width: 2px; outline: 2px solid var(--color-accent); outline-offset: 4px; }
 /* hr ist void ohne Caret-Slot: bei Selektion landet der Caret quer zwischen

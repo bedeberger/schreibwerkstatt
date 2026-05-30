@@ -1,8 +1,24 @@
 # Druckfertiger PDF-Export (klassische Druckerei)
 
-- **Status:** Draft <!-- Draft → Ready erst wenn „Offene Fragen" leer -->
-- **Aufwand:** XL <!-- 4 Phasen; MVP (Phase 1+2) = L -->
+- **Status:** Ready <!-- Phase 1+2 umgesetzt; Phase 3+4 auf branchenüblichen Default-Annahmen statt konkreter Druckerei-Spec (siehe Annahmen unten) -->
+- **Aufwand:** XL <!-- 4 Phasen; Phase 1+2 = L (erledigt), Phase 3+4 = M offen -->
 - **Severity:** high <!-- Self-Publishing ist erklärtes Produkt-Ziel des Owners -->
+
+> **Umsetzungsstand:** Phase 1 (Content/Frontmatter) + Phase 2 (Innenteil druckfertig: Bleed/Crop/TrimBox/BleedBox/dpi-Warnung) sind **umgesetzt** (Backend + Card-UI). Offen: Phase 3 (PDF/X) + Phase 4 (Umschlag). Diese basieren auf branchenüblichen Default-Annahmen (unten), nicht auf einer konkreten Druckerei-Spec — eine reale Spec kann einzelne Werte noch verschieben, blockiert den Bau aber nicht mehr.
+
+## Branchenübliche Default-Annahmen (statt Druckerei-Spec)
+
+Klassischer DE/CH-Buchdruck, Roman/Werkdruck. Bewusst gewählte Defaults, von einer konkreten Druckerei überschreibbar:
+
+- **Beschnitt:** 3 mm umlaufend (`print.bleedMm: 3`).
+- **Schnittmarken:** an (`print.cropMarks: true`) — Druckerei ignoriert sie sonst, stören nie.
+- **Druckstandard:** **PDF/X-3** (nicht X-1a). X-3 erlaubt **RGB + Output-Intent-ICC** → Druckerei separiert selbst gegen ihr Profil. Robuster, eine Fehlerquelle weniger.
+- **Output-Intent:** **PSO Uncoated v3 (FOGRA52)** als Default (Roman = Werkdruckpapier, ungestrichen); PSO Coated v3 (FOGRA51) als Alternative für gestrichenes Papier. ECI-Profile sind **frei redistribuierbar** → ins Repo bündelbar, kein ENV-Pfad-Zwang.
+- **Body-Text:** K-only an (`print.blackTextKOnly: true`) — kein 4C-Passerproblem im Fliesstext.
+- **CMYK-Bildkonvertierung:** **OUT.** X-3 trägt RGB + ICC; die Druckerei separiert. Spart die gesamte sharp-CMYK-Pipeline → Phase 3 schrumpft auf reinen GS-Stempel-Schritt (PDF/X-Marker + OutputIntent-ICC einbetten).
+- **ISBN-Prüfziffer:** ISBN-13-Checksum validieren, aber **non-blocking** (Warnung, kein Render-Abbruch).
+- **Autorfoto Druck:** Default **Graustufen** (Roman-Innenteil meist s/w), Toggle für Farbe.
+- **Rückenbreite (Phase 4):** Papiervolumen ist echt druckerei-spezifisch (1.8–2.2 typisch) → **kein** Default, bleibt Pflichtfeld pro Render.
 
 ## Context
 
@@ -24,7 +40,7 @@ Zusätzlich fehlen für ein publikationsreifes Buch Standard-Bestandteile, die d
 
 ## Scope MVP
 
-MVP = **Phase 1 (Content) + Phase 2 (Innenteil druckfertig)**. Beide liefern eigenständigen Wert, sind route-/druckerei-unabhängig und nicht durch die offene Druckerei-Spec blockiert. Phase 3 (Farbe/Norm) und Phase 4 (Umschlag) sind im Plan vollständig ausgearbeitet, aber Spec-gegated (siehe Offene Fragen) und werden erst nach Vorliegen der Druckerei-Vorgaben umgesetzt.
+MVP = **Phase 1 (Content) + Phase 2 (Innenteil druckfertig)** — **umgesetzt** (Backend + Card-UI). Beide liefern eigenständigen Wert, sind route-/druckerei-unabhängig. Phase 3 (PDF/X-Norm) und Phase 4 (Umschlag) sind im Plan vollständig ausgearbeitet und auf den Default-Annahmen oben baubar; sie warten nicht mehr auf eine Druckerei-Spec (eine reale Spec verschiebt höchstens Einzelwerte).
 
 **Phase 1 — Content & Frontmatter** (alle als Felder in `config.extras`, kein neuer Renderpfad-Umbau):
 
@@ -44,13 +60,14 @@ MVP = **Phase 1 (Content) + Phase 2 (Innenteil druckfertig)**. Beide liefern eig
 
 ## Out-of-Scope
 
-**Phase 3 — Farbe & Norm** (im Plan ausgearbeitet, Umsetzung Spec-gegated):
+**Phase 3 — PDF/X-Norm** (offen, auf Default-Annahmen baubar):
 
-- **PDF/X-Export** via Ghostscript-Post-Step (`gs -dPDFX` + PDFX-def + ICC), neuer `lib/pdfx-convert.js` nach dem Muster von [lib/pdfa-validate.js](../../lib/pdfa-validate.js) (externes CLI, env-gated, non-fatal).
-- **CMYK-Konvertierung** mit gebündeltem Output-Intent-ICC (Profil-Wahl Spec-abhängig).
+- **PDF/X-3-Export** via Ghostscript-Post-Step (`gs -dPDFX` + PDFX-def + OutputIntent-ICC), neuer `lib/pdfx-convert.js` nach dem Muster von [lib/pdfa-validate.js](../../lib/pdfa-validate.js) (externes CLI, env-gated, non-fatal).
+- **RGB bleibt, keine CMYK-Bild-Separation** — X-3 trägt RGB + Output-Intent; die Druckerei separiert. (Spart die sharp-CMYK-Pipeline; bei Bedarf später als opt-in nachrüstbar.)
+- **Gebündeltes Output-Intent-ICC** (PSO Uncoated v3 / FOGRA52 Default; PSO Coated v3 wählbar). ECI-Lizenz erlaubt Redistribution → Profile im Repo.
 - **Norm-Toggle** im bisherigen PDF/A-Tab: `pdfa.standard: 'pdfa' | 'pdfx' | 'none'`.
 
-**Phase 4 — Umschlag-PDF** (im Plan ausgearbeitet, Umsetzung Spec-gegated):
+**Phase 4 — Umschlag-PDF** (offen; einziger echter Spec-Input: Papiervolumen für Rückenbreite):
 
 - Separates Cover-PDF (Rückseite + Rücken + Vorderseite als ein Bogen), Rückenbreite = Seitenzahl × Papiervolumen, Beschnitt + Schnittmarken, Klappentext/Barcode-Platz.
 - Eigener Job-Target (`target: 'cover'`).
@@ -79,7 +96,7 @@ MVP = **Phase 1 (Content) + Phase 2 (Innenteil druckfertig)**. Beide liefern eig
 
 **Phase 3 (separat abnehmbar):**
 
-- PDF/X-3-Export erzeugt validierbare Datei (CMYK + Output-Intent); fehlt Ghostscript → Fallback auf PDF/A oder unmarkiertes PDF + Warnung (non-fatal).
+- PDF/X-3-Export erzeugt validierbare Datei (RGB + gebündeltes Output-Intent-ICC, keine CMYK-Separation); fehlt Ghostscript → Fallback auf PDF/A oder unmarkiertes PDF + Warnung (non-fatal).
 
 **Phase 4 (separat abnehmbar):**
 
@@ -107,7 +124,7 @@ MVP = **Phase 1 (Content) + Phase 2 (Innenteil druckfertig)**. Beide liefern eig
 
 - Bestehender PDF-Export: [lib/pdf-render.js](../../lib/pdf-render.js) + [lib/pdf-render/](../../lib/pdf-render/) (index/pages/chrome/layout/blocks/images), [lib/pdf-export-defaults.js](../../lib/pdf-export-defaults.js), [routes/jobs/pdf-export.js](../../routes/jobs/pdf-export.js), [routes/pdf-export.js](../../routes/pdf-export.js), [db/pdf-export.js](../../db/pdf-export.js), [public/js/cards/pdf-export-card.js](../../public/js/cards/pdf-export-card.js).
 - `sharp` (Bild-Normalisierung; Autorfoto + CMYK-Bildkonvertierung) — bereits Pflicht-Dep, siehe [lib/cover-prepare.js](../../lib/cover-prepare.js).
-- **Phase 3:** Ghostscript als neue Ops-Dependency (CLI, env-gated wie veraPDF). CMYK-Output-Intent-ICC (Lizenz/Profil siehe Offene Fragen).
+- **Phase 3:** Ghostscript als neue Ops-Dependency (CLI, env-gated wie veraPDF). Gebündeltes Output-Intent-ICC (PSO Uncoated v3 / FOGRA52 Default; ECI-Lizenz erlaubt Redistribution).
 - `Alpine.data('combobox')` / `Alpine.data('numInput')` — bestehend.
 - LanguageTool-Dispatcher ([public/js/cards/editor-spellcheck/dispatch.js](../../public/js/cards/editor-spellcheck/dispatch.js)).
 
@@ -129,9 +146,9 @@ MVP = **Phase 1 (Content) + Phase 2 (Innenteil druckfertig)**. Beide liefern eig
 - [lib/pdf-render/index.js](../../lib/pdf-render/index.js): nach `addPage` `TrimBox`/`BleedBox` ins `doc.page.dictionary` schreiben; Crop-Marks-Pass im Anschnitt (eigener `_drawCropMarks`); Body-Origin um Bleed-Offset verschieben.
 - [lib/pdf-render/images.js](../../lib/pdf-render/images.js): effektive dpi je Bild aus sharp-Metadaten + Render-Breite berechnen; Unterschreitungen in `renderCtx.dpiWarnings[]` sammeln. Job-Result um `dpiWarnings` ergänzen.
 
-**Phase 3 — PDF/X + CMYK** (neu, Spec-gegated)
+**Phase 3 — PDF/X-3** (neu, auf Default-Annahmen baubar)
 
-- `lib/pdfx-convert.js`: `convertToPdfX(buffer, { iccPath, flavour })` → ruft Ghostscript via `execFile` (kein Shell), Temp-Datei mit `.pdf`-Ext, PDFX-def-Datei, CMYK-Device, OutputIntent-ICC. env `GS_BIN`, `GS_DISABLED`. Bei fehlendem Binary `{ available:false }`, Job liefert PDF/A-Fallback + Warnung (non-fatal — exakt das Muster von [lib/pdfa-validate.js](../../lib/pdfa-validate.js)).
+- `lib/pdfx-convert.js`: `convertToPdfX(buffer, { iccPath, flavour })` → ruft Ghostscript via `execFile` (kein Shell), Temp-Datei mit `.pdf`-Ext, PDFX-def-Datei, OutputIntent-ICC. **Kein CMYK-Device** — RGB bleibt erhalten (X-3), Druckerei separiert. env `GS_BIN`, `GS_DISABLED`. Bei fehlendem Binary `{ available:false }`, Job liefert PDF/A-Fallback + Warnung (non-fatal — exakt das Muster von [lib/pdfa-validate.js](../../lib/pdfa-validate.js)).
 - [routes/jobs/pdf-export.js](../../routes/jobs/pdf-export.js): nach `renderPdfBuffer`, wenn `pdfa.standard==='pdfx'`, Post-Step `convertToPdfX`; Result-Metadaten um `pdfx`-Status.
 
 **Phase 4 — Umschlag** (neu, Spec-gegated)
@@ -242,17 +259,23 @@ Optional, Phase 2+: leichter Counter `print_export_total{standard,bleed}` und (P
 - **Create:**
   - `lib/pdfx-convert.js` (Phase 3)
   - `lib/pdf-cover-render.js` (Phase 4)
-  - Bundle: CMYK-Output-Intent-ICC + PDFX-def-Vorlage (Phase 3)
+  - Bundle: Output-Intent-ICC (PSO Uncoated v3 / FOGRA52) + PDFX-def-Vorlage (Phase 3)
   - ggf. eigene CSS-Datei für Print-Tab (bei Überschreitung File-Limit)
 
 ## Offene Fragen
 
-> Muss vor Status `Ready` leer sein. **Blocker für Phase 2–4 ist primär die Druckerei-Spec.**
+> Leer für Status `Ready`. Die ursprünglichen Spec-Fragen sind über die **Default-Annahmen** oben aufgelöst — alle baubar ohne konkrete Druckerei. Eine reale Spec kann Einzelwerte überschreiben, ist aber kein Blocker mehr.
 
-1. **Druckerei-Spec einholen** (entscheidet Phase 2–4 direkt): Endformat + Beschnitt-mm (3 vs 5)? PDF/X-Version (X-1a CMYK-only vs X-3 RGB+ICC erlaubt)? Welches Output-Intent-Profil (ISO Coated v2 / PSO Coated v3 / FOGRA-Nr.)? Schnittmarken erwünscht oder störend? Umschlag separat oder als Spread? Wird das Papiervolumen für die Rückenbreite von der Druckerei vorgegeben?
-2. **CMYK zwingend?** Falls die Druckerei PDF/X-3 mit RGB+Profil akzeptiert und selbst separiert, entfällt der CMYK-Konvertierungsteil von Phase 3 (deutlich kleiner). Klären.
-3. **ICC-Lizenz:** Darf das gewählte Output-Intent-Profil mit der self-hosted-OSS-App gebündelt/redistribuiert werden? Falls nein → Profil per ENV/Pfad konfigurierbar, nicht im Repo.
-4. **Ghostscript als Ops-Dependency** akzeptabel (Container-Grösse, Wartung)? Alternative: nur PDF/A liefern + Hinweis „Konvertierung extern".
-5. **ISBN-Prüfziffer** validieren (ISBN-13-Checksum) oder Freitext belassen?
-6. **Autorfoto für Druck** automatisch in Graustufen/CMYK wandeln, oder dem User überlassen?
-7. **MVP-Schnitt bestätigen:** Phase 1+2 zuerst bauen (route-unabhängig), Phase 3+4 nach Spec — oder direkt auf eine konkrete Druckerei hin alles in einem Zug?
+**Aufgelöst per Annahme:**
+
+- **Beschnitt** → 3 mm. **Schnittmarken** → an.
+- **PDF/X-Version** → X-3 (RGB + ICC erlaubt). **CMYK-Separation** → entfällt (Druckerei separiert); X-3 schrumpft auf GS-Stempel-Schritt.
+- **Output-Intent** → PSO Uncoated v3 (FOGRA52) Default, Coated v3 wählbar. **ICC-Lizenz** → ECI redistribuierbar, ins Repo.
+- **Ghostscript** → akzeptiert als env-gated Ops-Dep (Muster veraPDF: fehlt Binary → non-fatal Fallback).
+- **ISBN-Prüfziffer** → validieren, non-blocking.
+- **Autorfoto Druck** → Graustufen-Default + Farb-Toggle.
+- **Rückenbreite (Phase 4)** → Papiervolumen bleibt Pflicht-Eingabe pro Render (kein sinnvoller Default).
+
+**Noch offen (nicht-blockierend):**
+
+1. Falls eine konkrete Druckerei vorliegt: deren Output-Intent-Profil + Endformat gegen die Defaults gegenprüfen und ggf. überschreiben.

@@ -49,3 +49,10 @@ test('hr und img werden als eigene Block-Typen erkannt', () => {
   assert.equal(blocks[1].kind, 'image');
   assert.equal(blocks[1].src, '/foo.png');
 });
+
+test('hr.pagebreak/blankpage werden erkannt (sonst hr)', () => {
+  const blocks = parseHtmlToBlocks('<hr class="pagebreak"><hr class="blankpage"><hr>');
+  assert.equal(blocks[0].kind, 'pagebreak');
+  assert.equal(blocks[1].kind, 'blankpage');
+  assert.equal(blocks[2].kind, 'hr');
+});

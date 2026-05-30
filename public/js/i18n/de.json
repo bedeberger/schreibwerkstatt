@@ -1513,6 +1513,8 @@
   "editor.slash.list":           "Aufzählung",
   "editor.slash.todo":           "Checkliste",
   "editor.slash.hr":             "Trennlinie",
+  "editor.slash.pagebreak":      "Seitenumbruch",
+  "editor.slash.blankpage":      "Leere Seite",
   "editor.slash.heute":          "Datum einfügen",
   "editor.slash.jetzt":          "Datum + Zeit einfügen",
   "editor.slash.zeit":           "Uhrzeit einfügen",
