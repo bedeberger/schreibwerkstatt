@@ -629,7 +629,10 @@ try {
     runWithContext({ job: 'cron', user: 'system' }, () => {
       logger.info('Cron: Starte Orte-Auto-Verortung…');
       const { geocodeAllBooks } = require('./lib/geocode');
-      geocodeAllBooks().catch(e => logger.error('Cron-Geocode Fehler: ' + e.message));
+      // KI-Fallback (aiResolveLocation) via DI — Heuristik leer → Label auf realen
+      // Toponym normalisieren. Resolver lebt im Job-Modul (callAI), lib bleibt frei.
+      const { aiResolveLocation } = require('./routes/jobs/geocode');
+      geocodeAllBooks({ aiResolve: aiResolveLocation }).catch(e => logger.error('Cron-Geocode Fehler: ' + e.message));
     });
   }, { timezone: cronTz });
   logger.info(`Cron-Job registriert: Orte-Auto-Verortung täglich 03:30 (${cronTz})`);

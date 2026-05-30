@@ -221,5 +221,11 @@
         </div>
       </template>
     </div>
+    <div class="ort-map-footer" x-show="$app.orte.some(o => o.lat != null && o.lng != null)">
+      <button type="button" class="btn-compact danger"
+              :disabled="geocodingAll || geocodingId != null"
+              @click="clearAllGeorefs()"
+              x-text="$app.t('orte.map.clearAll')"></button>
+    </div>
   </div>
 </div>

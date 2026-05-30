@@ -29,6 +29,7 @@ export function registerOrteCard() {
     _markers: null,           // Leaflet-LayerGroup
     _markerById: {},          // ort-id → Leaflet-Marker (Cross-Highlight-Lookup)
     _ortePollTimer: null,
+    _geocodeJobTimer: null,   // transienter Poll-Timer fuer den KI-Geocode-Fallback-Job
     _lifecycle: null,
 
     init() {
@@ -40,7 +41,7 @@ export function registerOrteCard() {
       this._lifecycle = setupCardLifecycle(this, {
         name: 'orte',
         showFlag: 'showOrteCard',
-        timerKeys: ['_ortePollTimer'],
+        timerKeys: ['_ortePollTimer', '_geocodeJobTimer'],
         resetState: { orteLoading: false, orteProgress: 0, orteStatus: '', orteRealEnabled: false, geocodingId: null, geocodingAll: false, highlightOrtId: null, orteMapStatus: '' },
         load: (root) => root.loadOrte(root.selectedBookId),
         onShow: async (root) => {

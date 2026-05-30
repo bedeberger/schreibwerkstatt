@@ -164,6 +164,12 @@ export {
 } from './prompts/import.js';
 
 export {
+  buildSystemGeocodeResolve,
+  buildGeocodeResolvePrompt,
+  SCHEMA_GEOCODE_RESOLVE,
+} from './prompts/geocode.js';
+
+export {
   buildFinetuneAugmentSystem,
   buildFinetuneReversePromptsPrompt,
   buildFinetuneFactQAPrompt,

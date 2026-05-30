@@ -9,6 +9,7 @@
 import { fetchJson, escHtml } from '../utils.js';
 import { loadLeaflet } from '../lazy-libs.js';
 import { countryLabel } from '../country-codes.js';
+import { startPoll } from '../cards/job-helpers.js';
 
 const OSM_TILES = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 
@@ -69,23 +70,46 @@ export const orteMapMethods = {
     this._markerById = {};
     const pts = [];
     for (const o of this.orteMapped()) {
-      const marker = L.marker([o.lat, o.lng], { draggable: true });
-      marker.bindPopup(this._buildPopupHtml(o), { minWidth: 160, maxWidth: 240, maxHeight: 300 });
-      // Popup-Inhalt lebt als statisches HTML in Leaflet; interne Links erst beim
-      // Öffnen an die App-Navigation binden (Alpine-Bindings greifen hier nicht).
-      marker.on('popupopen', (e) => this._bindPopupLinks(e.popup.getElement(), o));
-      // Marker-Klick spiegelt die Selektion in die Locate-Liste (Cross-Highlight).
-      marker.on('click', () => this._selectFromMap(o.id));
-      marker.on('dragend', async () => {
-        const ll = marker.getLatLng();
-        const target = window.__app.orte.find(x => x.id === o.id);
-        if (target) { target.lat = ll.lat; target.lng = ll.lng; await window.__app.saveOrte(); }
-      });
-      marker.addTo(this._markers);
-      this._markerById[o.id] = marker;
+      this._addOrtMarker(L, o, [o.lat, o.lng], false);
       pts.push([o.lat, o.lng]);
     }
+    // Verortete Marker zuerst einpassen → getCenter() liefert danach die
+    // sichtbare Kartenmitte, auf die wir die Orte ohne Georeferenz legen.
     if (pts.length) this._map.fitBounds(pts, { padding: [30, 30], maxZoom: 13 });
+    const center = this._map.getCenter();
+    for (const o of this.unlocatedOrte()) {
+      this._addOrtMarker(L, o, [center.lat, center.lng], true);
+    }
+  },
+
+  // Einen Marker bauen + verdrahten. `unlocated` → roter Pin in der Kartenmitte
+  // (kein lat/lng am Ort); Dragend setzt echte Koordinaten → wird blau.
+  _addOrtMarker(L, o, latlng, unlocated) {
+    const opts = { draggable: true };
+    if (unlocated) {
+      opts.icon = L.divIcon({ className: 'ort-marker-pin ort-marker-pin--unlocated', iconSize: [18, 18] });
+    }
+    const marker = L.marker(latlng, opts);
+    marker.bindPopup(this._buildPopupHtml(o), { minWidth: 160, maxWidth: 240, maxHeight: 300 });
+    // Popup-Inhalt lebt als statisches HTML in Leaflet; interne Links erst beim
+    // Öffnen an die App-Navigation binden (Alpine-Bindings greifen hier nicht).
+    marker.on('popupopen', (e) => this._bindPopupLinks(e.popup.getElement(), o));
+    // Marker-Klick spiegelt die Selektion in die Locate-Liste (Cross-Highlight).
+    marker.on('click', () => this._selectFromMap(o.id));
+    marker.on('dragend', async () => {
+      const ll = marker.getLatLng();
+      const target = window.__app.orte.find(x => x.id === o.id);
+      if (target) {
+        target.lat = ll.lat;
+        target.lng = ll.lng;
+        await window.__app.saveOrte();
+        // War der Pin „unlocated" (rot), wird er durch das Speichern verortet →
+        // neu rendern, damit er als regulärer (blauer) Marker erscheint.
+        if (unlocated) this._renderOrteMarkers(L);
+      }
+    });
+    marker.addTo(this._markers);
+    this._markerById[o.id] = marker;
   },
 
   // Reicher Marker-Popup: Stammdaten + klickbare Querverweise (Seite/Figuren/
@@ -152,8 +176,9 @@ export const orteMapMethods = {
     return window.__app.orteFiltered.filter(o => o.lat == null || o.lng == null);
   },
 
-  // Nominatim-Lookup für EINEN Ort. Setzt lat/lng (Treffer) oder droppt einen
-  // Pin in die Kartenmitte (kein Treffer). Gibt true zurück bei echtem Treffer.
+  // Nominatim-Lookup für EINEN Ort. Setzt lat/lng (Treffer) oder lässt sie null
+  // (kein Treffer) → der Ort bleibt „unlocated" und erscheint als roter Pin in
+  // der Kartenmitte. Gibt true zurück bei echtem Treffer.
   // Kein Single-Flight-Guard hier — der lebt in den Aufrufern (geocodeOrt/Batch).
   async _geocodeOne(o) {
     const app = window.__app;
@@ -167,32 +192,83 @@ export const orteMapMethods = {
     const data = await fetchJson(`/geocode?q=${q}&lang=${this._geoLang || 'de'}${regionQ}`);
     const c = data?.candidates?.[0];
     const target = app.orte.find(x => x.id === o.id);
-    if (!c) {
-      // Kein Treffer → Pin in Karten-Mitte droppen. User schiebt ihn zurecht,
-      // dragend speichert. Ohne Map (Liste) Buch-Center bzw. globaler Default.
-      const center = this._map ? this._map.getCenter() : { lat: 20, lng: 0 };
-      if (target) { target.lat = center.lat; target.lng = center.lng; await app.saveOrte(); }
-      return false;
-    }
+    // Kein Treffer → lat/lng bleiben null. Der rote Mitte-Pin (Render-Pfad)
+    // markiert den Ort als „ohne Georeferenz"; User zieht ihn zurecht.
+    if (!c) return false;
     if (target) { target.lat = c.lat; target.lng = c.lng; await app.saveOrte(); }
     return true;
   },
 
-  // Nominatim-Vorschlag fuer einen Ort holen + ersten Treffer uebernehmen.
-  // User korrigiert danach per Marker-Drag.
+  // Koordinaten auf einen Ort im Speicher schreiben + persistieren. Gibt true,
+  // wenn der Ort noch existiert (sonst no-op → false).
+  async _applyCoords(id, lat, lng) {
+    const target = window.__app.orte.find(x => x.id === id);
+    if (!target) return false;
+    target.lat = lat;
+    target.lng = lng;
+    await window.__app.saveOrte();
+    return true;
+  },
+
+  // KI-Fallback-Job für eine Liste unverorteter Orte. Normalisiert die Labels
+  // serverseitig auf reale Toponyme (z.B. „Bar in Olten" → „Olten") + geocodet
+  // sie. Resolved → Set der ids mit KI-Treffer (Koordinaten bereits gesetzt +
+  // gespeichert). Misses bleiben unverortet (roter Pin, User schiebt zurecht).
+  async _geocodeViaAI(items) {
+    const app = window.__app;
+    const hitIds = new Set();
+    if (!items.length || !app.selectedBookId) return hitIds;
+    let resp;
+    try {
+      resp = await fetchJson('/jobs/geocode-resolve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          book_id: app.selectedBookId,
+          items: items.map(o => ({ id: o.id, name: (o.name || '').trim() })),
+        }),
+      });
+    } catch (e) { console.error('[geocodeViaAI]', e); return hitIds; }
+    if (!resp?.jobId) return hitIds;
+
+    const results = await new Promise((resolve) => {
+      startPoll(this, {
+        timerProp: '_geocodeJobTimer',
+        jobId: resp.jobId,
+        onDone: (job) => resolve(Array.isArray(job?.result?.results) ? job.result.results : []),
+        onError: () => resolve([]),
+        onNotFound: () => resolve([]),
+      });
+    });
+
+    for (const r of results) {
+      if (r && r.lat != null && r.lng != null && await this._applyCoords(r.id, r.lat, r.lng)) hitIds.add(r.id);
+    }
+    return hitIds;
+  },
+
+  // Einen Ort verorten: erst regelbasierte Heuristik, bei Miss automatisch der
+  // KI-Fallback. Bleibt der Ort danach unverortet, zeigt der Render-Pfad einen
+  // roten Pin in der Kartenmitte (User korrigiert per Drag).
   async geocodeOrt(o) {
     if (this.geocodingId || this.geocodingAll) return;
     const app = window.__app;
     this.geocodingId = o.id;
     this.orteMapStatus = '';
     try {
-      const hit = await this._geocodeOne(o);
-      if (!hit) this.orteMapStatus = app.t('orte.map.pinDropped', { name: o.name });
+      let hit = await this._geocodeOne(o);
+      if (!hit) {
+        this.orteMapStatus = app.t('orte.map.aiResolving', { name: o.name });
+        hit = (await this._geocodeViaAI([o])).has(o.id);
+      }
+      this.orteMapStatus = app.t(hit ? 'orte.map.geocoded' : 'orte.map.unresolved', { name: o.name });
       if (this.viewMode === 'map') {
         const L = await loadLeaflet();
         this._renderOrteMarkers(L);
+        // Treffer → auf die neue Position zoomen. Kein Treffer → der rote
+        // Mitte-Pin liegt bereits sichtbar in der Kartenmitte, kein setView.
         const target = app.orte.find(x => x.id === o.id);
-        if (!hit && target) this._map?.setView([target.lat, target.lng], Math.max(this._map.getZoom(), 6));
+        if (hit && target) this._map?.setView([target.lat, target.lng], Math.max(this._map.getZoom(), 6));
       }
     } catch (e) {
       console.error('[geocodeOrt]', e);
@@ -201,8 +277,9 @@ export const orteMapMethods = {
     }
   },
 
-  // Batch: alle gefilterten Orte ohne Koordinaten nacheinander geocodieren.
-  // Sequenziell mit Pause — Nominatim-Usage-Policy erlaubt ~1 Request/Sekunde.
+  // Batch: alle gefilterten Orte ohne Koordinaten verorten. Phase 1 regelbasiert,
+  // sequenziell mit Pause (Nominatim-Policy ~1 Request/Sekunde). Phase 2: alle
+  // Heuristik-Misses gehen in EINEN KI-Fallback-Job. Rest bleibt unverortet.
   async geocodeAllUnlocated() {
     if (this.geocodingId || this.geocodingAll) return;
     const app = window.__app;
@@ -210,6 +287,7 @@ export const orteMapMethods = {
     if (!todo.length) return;
     this.geocodingAll = true;
     let done = 0, hits = 0;
+    const misses = [];
     // Map-Handle einmal vorab holen, dann nach jedem Treffer sofort neu rendern —
     // jede gefundene Georeferenz erscheint direkt, nicht erst am Schleifenende.
     const L = this.viewMode === 'map' ? await loadLeaflet() : null;
@@ -217,9 +295,15 @@ export const orteMapMethods = {
       for (const o of todo) {
         done++;
         this.orteMapStatus = app.t('orte.map.batchProgress', { done, total: todo.length, name: o.name });
-        try { if (await this._geocodeOne(o)) hits++; } catch (e) { console.error('[geocodeAll]', e); }
+        try { if (await this._geocodeOne(o)) hits++; else misses.push(o); }
+        catch (e) { console.error('[geocodeAll]', e); misses.push(o); }
         if (L) this._renderOrteMarkers(L);
         if (done < todo.length) await new Promise(r => setTimeout(r, 1100));
+      }
+      if (misses.length) {
+        this.orteMapStatus = app.t('orte.map.batchAi', { n: misses.length });
+        hits += (await this._geocodeViaAI(misses)).size;
+        if (L) this._renderOrteMarkers(L);
       }
       this.orteMapStatus = app.t('orte.map.batchDone', { hits, total: todo.length });
     } finally {
@@ -237,6 +321,24 @@ export const orteMapMethods = {
     target.lng = null;
     await app.saveOrte();
     this.orteMapStatus = app.t('orte.map.georefCleared', { name: o.name });
+    if (this.viewMode === 'map') {
+      const L = await loadLeaflet();
+      this._renderOrteMarkers(L);
+    }
+  },
+
+  // Alle Georeferenzen des Buchs auf einmal entfernen (lat/lng raus, Schauplätze
+  // bleiben). Operiert auf allen Orten, nicht nur dem aktuellen Filter. Marker
+  // verschwinden, alles wird wieder geocodierbar. Destruktiv → Bestätigung.
+  async clearAllGeorefs() {
+    if (this.geocodingId || this.geocodingAll) return;
+    const app = window.__app;
+    const located = app.orte.filter(o => o.lat != null || o.lng != null);
+    if (!located.length) return;
+    if (!confirm(app.t('orte.map.clearAllConfirm', { n: located.length }))) return;
+    for (const o of located) { o.lat = null; o.lng = null; }
+    await app.saveOrte();
+    this.orteMapStatus = app.t('orte.map.allGeorefsCleared', { n: located.length });
     if (this.viewMode === 'map') {
       const L = await loadLeaflet();
       this._renderOrteMarkers(L);

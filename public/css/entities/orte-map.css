@@ -41,6 +41,14 @@
   gap: var(--space-2xs);
 }
 
+.ort-map-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--color-border);
+}
+
 .ort-map-locate-row {
   display: flex;
   align-items: center;
@@ -53,6 +61,18 @@
 
 .ort-map-locate-row--active {
   background: color-mix(in srgb, var(--card-accent) 12%, transparent);
+}
+
+/* Marker für Orte ohne Georeferenz: roter Punkt in der Kartenmitte. Signalisiert
+   „noch nicht verortet" — User zieht ihn an die richtige Stelle (dragend speichert). */
+.ort-marker-pin--unlocated {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--palette-red);
+  border: 2px solid var(--color-surface);
+  box-shadow: var(--shadow-md);
+  cursor: grab;
 }
 
 /* Marker-Popup (Leaflet). Inhalt als x-html-Sink — Felder serverseitig escaped. */
