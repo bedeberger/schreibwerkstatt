@@ -186,7 +186,7 @@ MVP optional: `world_facts_total{book_id}` (Gauge) bei Komplettanalyse-Write. To
 
 ## Offene Fragen
 
-> Alle Entscheidungen getroffen + umgesetzt: **1 = Full-Replace**, **2 = nur `list_world_facts`**, **3 = Standalone-Kontinuitätscheck nutzt persistierte Welt-Fakten** (`loadWorldFactsGrouped`, überspringt die Kapitel-Extraktion → N KI-Calls gespart; Pipeline-Phase-8 behält den frischen In-Memory-Stand), **4 = Browse-Karte umgesetzt** (`worldFactsCard`). Keine offenen Punkte mehr.
+> Entscheidungen: **1 = Full-Replace**, **2 = nur `list_world_facts`**, **3 = verworfen** — der Standalone-Kontinuitätscheck (Kontinuität-Karte) hatte keinen UI-Trigger (`runKontinuitaetCheck` ohne Aufrufer → toter Code, entfernt). Die DB-Reuse-Optimierung lief damit auf einem unerreichbaren Pfad und wurde zurückgenommen; der Check läuft real nur als Komplettanalyse-Phase-8 (frische In-Memory-Fakten). **4 = Browse-Karte umgesetzt** (`worldFactsCard`).
 
 1. **Full-Replace vs. Delta-Persistenz.** Fakten haben keine stabile AI-ID (anders als `loc_id` bei Orten) → MVP macht Full-Replace pro `(book, user)`. Sauber, solange kein manuelles Edit existiert. Sobald manuelle Fakten kommen (Out-of-Scope), bräuchte es `manually_edited`-Schutz + Hash-Key für Dedup. **Empfehlung:** Full-Replace beibehalten, manuelle Edits bleiben Edge-Case (konsistent mit Ereignisse-Leitbild). → entscheidbar, neige zu Full-Replace.
 

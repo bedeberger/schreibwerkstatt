@@ -15,7 +15,9 @@ const BOOK_REVIEW_FAZIT_CHARS = 600;
 function _getBookReview(ctx) {
   const userEmail = ctx.userEmail || null;
   const row = db.prepare(`
-    SELECT br.reviewed_at, br.review_json, br.model, b.name AS book_name
+    SELECT br.reviewed_at, br.review_json, br.model, b.name AS book_name,
+           (SELECT MAX(datetime(p.updated_at)) FROM pages p WHERE p.book_id = br.book_id)
+             > datetime(br.reviewed_at) AS stale
     FROM book_reviews br
     LEFT JOIN books b ON b.book_id = br.book_id
     WHERE br.book_id = ? AND br.user_email IS ?
@@ -35,6 +37,7 @@ function _getBookReview(ctx) {
     scope: 'book',
     book_name: row.book_name || null,
     reviewed_at: row.reviewed_at,
+    ...(row.stale === 1 ? { stale: true, stale_hint: 'Buch wurde nach der Bewertung editiert — Review-Inhalt ggf. veraltet.' } : {}),
     gesamtnote: typeof parsed.gesamtnote === 'number' ? parsed.gesamtnote : null,
     zusammenfassung: parsed.zusammenfassung || null,
     fazit: fazit && fazit.length > BOOK_REVIEW_FAZIT_CHARS
@@ -59,7 +62,10 @@ function tool_get_reviews(input, ctx) {
   const limit = Math.min(100, Math.max(1, Number.isInteger(input?.limit) ? input.limit : CHAPTER_REVIEW_DEFAULT_LIMIT));
 
   let sql = `
-    SELECT cr.chapter_id, c.chapter_name, c.position AS chapter_position, cr.reviewed_at, cr.review_json, cr.model
+    SELECT cr.chapter_id, c.chapter_name, c.position AS chapter_position, cr.reviewed_at, cr.review_json, cr.model,
+           (SELECT MAX(datetime(p.updated_at)) FROM pages p
+              WHERE p.chapter_id = cr.chapter_id AND p.book_id = cr.book_id)
+             > datetime(cr.reviewed_at) AS stale
     FROM chapter_reviews cr
     JOIN chapters c ON c.chapter_id = cr.chapter_id AND c.book_id = cr.book_id
     WHERE cr.book_id = ? AND cr.user_email IS ?
@@ -96,6 +102,7 @@ function tool_get_reviews(input, ctx) {
       staerken:     Array.isArray(parsed.staerken)   ? parsed.staerken   : [],
       schwaechen:   Array.isArray(parsed.schwaechen) ? parsed.schwaechen : [],
       model:        r.model || null,
+      ...(r.stale === 1 ? { stale: true } : {}),
     });
   }
 
@@ -105,6 +112,7 @@ function tool_get_reviews(input, ctx) {
 
   const total = items.length;
   const limited = items.slice(0, limit).map(({ chapter_position, ...rest }) => rest);
+  const anyStale = limited.some(i => i.stale);
 
   const allChapters = db.prepare(
     'SELECT chapter_id, chapter_name FROM chapters WHERE book_id = ? ORDER BY position'
@@ -119,6 +127,7 @@ function tool_get_reviews(input, ctx) {
     reviews: limited,
     total,
     sort,
+    ...(anyStale ? { stale_hint: 'Mit stale:true markierte Kapitel wurden nach der Bewertung editiert — Review-Inhalt ggf. veraltet.' } : {}),
     ...(limited.length < total ? { truncated: true, shown: limited.length } : {}),
     ...(missingReview.length ? {
       ohne_bewertung: missingReview,

@@ -345,30 +345,6 @@ function saveOrteToDb(bookId, orte, userEmail, chNameToId = null, pageNameToIdBy
   }
 }
 
-// Persistierte Welt-Fakten gruppiert nach Kapitel laden — Shape kompatibel mit
-// chapterFakten aus der Komplettanalyse ([{ kapitel, fakten: [{ kategorie,
-// subjekt, fakt, seite }] }]). Für die Token-sparende Wiederverwendung im
-// Standalone-Kontinuitätscheck (statt Neu-Extraktion pro Kapitel). Book-level
-// Fakten ohne Kapitel-Bridge landen unter `bookLabel`. Ein Fakt mit mehreren
-// Kapiteln erscheint pro Kapitel (für den Check unkritisch).
-function loadWorldFactsGrouped(bookId, userEmail, bookLabel = 'Gesamtbuch') {
-  const rows = db.prepare(`
-    SELECT wf.id, wf.kategorie, wf.subjekt, wf.fakt, wf.seite_label, c.chapter_name
-    FROM world_facts wf
-    LEFT JOIN world_fact_chapters wfc ON wfc.fact_id = wf.id
-    LEFT JOIN chapters c ON c.chapter_id = wfc.chapter_id
-    WHERE wf.book_id = ? AND wf.user_email IS ?
-    ORDER BY wf.sort_order, wf.id
-  `).all(bookId, userEmail || null);
-  const groups = new Map();
-  for (const r of rows) {
-    const kap = r.chapter_name || bookLabel;
-    if (!groups.has(kap)) groups.set(kap, []);
-    groups.get(kap).push({ kategorie: r.kategorie, subjekt: r.subjekt, fakt: r.fakt, seite: r.seite_label });
-  }
-  return [...groups.entries()].map(([kapitel, fakten]) => ({ kapitel, fakten }));
-}
-
 // ── Welt-Fakten ─────────────────────────────────────────────────────────────
 // Deklaratives Buch-Wissen aus der Komplettanalyse (Phase 1). Anders als Orte
 // haben Fakten keine stabile KI-ID → Full-Replace pro (book, user) statt Upsert
@@ -1137,7 +1113,6 @@ module.exports = {
   saveZeitstrahlEvents,
   saveOrteToDb,
   saveFaktenToDb,
-  loadWorldFactsGrouped,
   saveSongsToDb,
   backfillLocationChaptersFromScenes,
   saveContinuityCheck,

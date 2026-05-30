@@ -1,9 +1,8 @@
 // Kontinuitätsprüfer-Methoden (werden in Alpine.data('kontinuitaetCard')
-// gespreadet). Job-Flow (runKontinuitaetCheck + startKontinuitaetPoll) nutzt
-// shared `startPoll`-Helper; eigene Toggle-Logik bleibt (kein createCardJobFeature).
+// gespreadet). Ergebnisse stammen aus der Komplettanalyse (Phase 8) und werden
+// via _loadKontinuitaetHistory (GET) angezeigt; Anzeige + Filter + Resolve-Toggle.
 
-import { fetchJson, escHtml } from '../utils.js';
-import { startPoll } from '../cards/job-helpers.js';
+import { fetchJson } from '../utils.js';
 
 export const kontinuitaetMethods = {
   async _loadKontinuitaetHistory() {
@@ -13,82 +12,6 @@ export const kontinuitaetMethods = {
     } catch (e) {
       console.error('[_loadKontinuitaetHistory]', e);
     }
-  },
-
-  _kontinuitaetWriteStatus(msg, spinner) {
-    const safe = escHtml(msg);
-    this.kontinuitaetStatus = spinner ? `<span class="spinner"></span>${safe}` : safe;
-  },
-
-  async runKontinuitaetCheck() {
-    const root = window.__app;
-    const bookId = root.selectedBookId;
-    this.kontinuitaetLoading = true;
-    this.kontinuitaetProgress = 0;
-    root.showKontinuitaetCard = true;
-    this.kontinuitaetResult = null;
-    this._kontinuitaetWriteStatus(root.t('kontinuitaet.starting'), true);
-
-    try {
-      const { jobId } = await fetchJson('/jobs/kontinuitaet', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          book_id: parseInt(bookId),
-          book_name: root.selectedBookName,
-        }),
-      });
-      localStorage.setItem(`lektorat_kontinuitaet_job_${bookId}`, jobId);
-      this.startKontinuitaetPoll(jobId);
-    } catch (e) {
-      console.error('[runKontinuitaetCheck]', e);
-      this.kontinuitaetStatus = `<span class="error-msg">${root.t('common.errorColon')}${escHtml(e.message)}</span>`;
-      this.kontinuitaetLoading = false;
-      this.kontinuitaetProgress = 0;
-    }
-  },
-
-  startKontinuitaetPoll(jobId) {
-    const root = window.__app;
-    const bookId = root.selectedBookId;
-    startPoll(this, {
-      timerProp: '_kontinuitaetPollTimer',
-      jobId,
-      lsKey: `lektorat_kontinuitaet_job_${bookId}`,
-      progressProp: 'kontinuitaetProgress',
-      onProgress: (job) => {
-        this.kontinuitaetStatus = root._runningJobStatus(
-          job.statusText, job.tokensIn, job.tokensOut, job.maxTokensOut,
-          job.progress, job.tokensPerSec, job.statusParams,
-        );
-      },
-      onNotFound: () => {
-        this.kontinuitaetLoading = false;
-        this.kontinuitaetProgress = 0;
-        this._kontinuitaetWriteStatus(root.t('kontinuitaet.interrupted'), false);
-      },
-      onError: (job) => {
-        this.kontinuitaetLoading = false;
-        this.kontinuitaetProgress = 0;
-        this.kontinuitaetStatus = `<span class="error-msg">${root.t('common.errorColon')}${escHtml(root.t(job.error || '', job.errorParams))}</span>`;
-      },
-      onDone: async (job) => {
-        this.kontinuitaetLoading = false;
-        this.kontinuitaetProgress = 0;
-        if (job.result?.empty) {
-          this._kontinuitaetWriteStatus(root.t('kontinuitaet.noPages'), false);
-          return;
-        }
-        await this._loadKontinuitaetHistory();
-        const count = job.result?.count || 0;
-        this._kontinuitaetWriteStatus(
-          count === 0
-            ? root.t('kontinuitaet.noIssues')
-            : root.t(count === 1 ? 'kontinuitaet.issuesOne' : 'kontinuitaet.issuesMany', { count }),
-          false,
-        );
-      },
-    });
   },
 
   // Issues gefiltert nach UI-Filtern (figurId, kapitel). Reads figuren+tree

@@ -119,12 +119,6 @@
   "phase.timeline":              "Timeline",
   "phase.continuity":            "Continuity",
 
-  "kontinuitaet.alreadyRunning": "Check already running…",
-  "kontinuitaet.starting":       "Starting check…",
-  "kontinuitaet.interrupted":    "Check interrupted (server restart). Please restart.",
-  "kontinuitaet.noPages":        "No pages found.",
-  "kontinuitaet.issuesOne":      "{count} issue found.",
-  "kontinuitaet.issuesMany":     "{count} issues found.",
 
   "userSettings.resetConfirm":   "Delete all your editing results, book reviews and chats for \"{name}\"?\n\nOther users are not affected. This cannot be undone.",
   "userSettings.resetSummary":   "Deleted: {lektorate} edits, {reviews} reviews, {chats} chats.",
@@ -2108,7 +2102,6 @@
   "job.phase.savingScenes":          "Saving scenes…",
   "job.phase.checkContinuity":       "AI checking continuity…",
   "job.phase.resumeFacts":           "Resuming fact extraction ({current}/{total})…",
-  "job.phase.factsFromDb":           "Reusing {count} world facts from last full analysis…",
   "job.phase.factsInGroup":          "Facts in \"{name}\" ({current}/{total})…",
   "job.phase.checkContradictions":   "AI checking contradictions…",
   "job.phase.verifyContradictions":  "AI verifying contradictions against the source text…",

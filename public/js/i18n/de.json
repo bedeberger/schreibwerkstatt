@@ -119,12 +119,6 @@
   "phase.timeline":              "Zeitstrahl",
   "phase.continuity":            "Kontinuität",
 
-  "kontinuitaet.alreadyRunning": "Prüfung läuft bereits…",
-  "kontinuitaet.starting":       "Starte Prüfung…",
-  "kontinuitaet.interrupted":    "Prüfung unterbrochen (Server-Neustart). Bitte neu starten.",
-  "kontinuitaet.noPages":        "Keine Seiten gefunden.",
-  "kontinuitaet.issuesOne":      "{count} Problem gefunden.",
-  "kontinuitaet.issuesMany":     "{count} Probleme gefunden.",
 
   "userSettings.resetConfirm":   "Alle deine Lektorate, Buchbewertungen und Chats zu «{name}» löschen?\n\nAndere Nutzer sind nicht betroffen. Diese Aktion ist nicht rückgängig zu machen.",
   "userSettings.resetSummary":   "Gelöscht: {lektorate} Lektorate, {reviews} Bewertungen, {chats} Chats.",
@@ -2109,7 +2103,6 @@
   "job.phase.savingScenes":          "Szenen speichern…",
   "job.phase.checkContinuity":       "KI prüft Kontinuität…",
   "job.phase.resumeFacts":           "Setze Fakten-Extraktion fort ({current}/{total})…",
-  "job.phase.factsFromDb":           "{count} Welt-Fakten aus letzter Komplettanalyse übernommen…",
   "job.phase.factsInGroup":          "Fakten in «{name}» ({current}/{total})…",
   "job.phase.checkContradictions":   "KI prüft Widersprüche…",
   "job.phase.verifyContradictions":  "KI verifiziert Widersprüche am Originaltext…",

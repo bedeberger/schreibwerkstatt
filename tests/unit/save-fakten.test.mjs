@@ -67,29 +67,3 @@ test('saveFaktenToDb: leeres chapterFakten → 0 Rows', () => {
   schema.saveFaktenToDb(BOOK, [], USER, {});
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM world_facts WHERE book_id=? AND user_email=?').get(BOOK, USER).n, 0);
 });
-
-test('loadWorldFactsGrouped: gruppiert nach Kapitel, book-level unter bookLabel', () => {
-  setup();
-  schema.saveFaktenToDb(BOOK, [
-    { kapitel: 'Kapitel 1', fakten: [
-      { kategorie: 'Magie', subjekt: 'Stab', fakt: 'leuchtet', seite: 'S1' },
-      { kategorie: 'Geo', subjekt: 'Wald', fakt: 'im Norden' },
-    ] },
-    { kapitel: 'Gesamtbuch', fakten: [{ fakt: 'globaler Fakt' }] },
-  ], USER, { 'Kapitel 1': 7001 });
-
-  const grouped = schema.loadWorldFactsGrouped(BOOK, USER, 'GANZESBUCH');
-  const byKap = Object.fromEntries(grouped.map(g => [g.kapitel, g.fakten]));
-  assert.equal(byKap['Kapitel 1'].length, 2);
-  assert.equal(byKap['Kapitel 1'][0].fakt, 'leuchtet');
-  assert.equal(byKap['Kapitel 1'][0].seite, 'S1');
-  // Gesamtbuch-Fakt hat keinen Bridge → landet unter bookLabel.
-  assert.equal(byKap['GANZESBUCH'].length, 1);
-  assert.equal(byKap['GANZESBUCH'][0].fakt, 'globaler Fakt');
-});
-
-test('loadWorldFactsGrouped: leer → []', () => {
-  setup();
-  schema.saveFaktenToDb(BOOK, [], USER, {}); // Full-Replace leert (Shared-DB)
-  assert.deepEqual(schema.loadWorldFactsGrouped(BOOK, USER), []);
-});
