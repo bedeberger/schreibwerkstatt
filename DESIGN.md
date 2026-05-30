@@ -1647,6 +1647,19 @@ Siehe Section „Reduced-Motion" oben.
 
 Inhalte in einer Locale, die vom `<html lang="...">`-Default abweicht, bekommen `lang="de"` / `lang="en"` am Container. Relevant für Chat-Antworten und Seiten-HTML (User-Sprache pro Buch).
 
+### Geo-Karte (Leaflet)
+
+Geografische Karte mit Markern (aktuell: Orte-Karte View-Mode `map`, nur bei `book_settings.orte_real`). Leaflet lädt lazy via `loadLeaflet()` aus [public/js/lazy-libs.js](public/js/lazy-libs.js) (vendored `public/vendor/leaflet-1.9.4/`, CSS wird per `<link>` injiziert). Karten-Logik als Methods-Modul (z.B. [public/js/book/orte-map.js](public/js/book/orte-map.js)) in die Card gespreadet; Map-Instanz als transienter Runtime-Handle (`_map`/`_markers`), Teardown via `map.remove()` in `destroy` + auf `book:changed`/`view:reset`.
+
+```html
+<div x-ref="orteMapEl" class="ort-map" role="application" :aria-label="$app.t('orte.map.tab')"></div>
+```
+
+- Container nutzt `x-show` (nicht `x-if`) → `$refs` bleibt verfügbar; nach Sichtbarwerden `map.invalidateSize()` (Container hatte 0px in `display:none`).
+- Tiles: OSM Public (`tile.openstreetmap.org`) — Browser-Requests, Betreiber-Sache. Attribution via `tileLayer`-Option Pflicht.
+- Marker-Popup-HTML mit `escHtml()` escapen (KI-/User-Felder).
+- CSS: [public/css/entities/orte-map.css](public/css/entities/orte-map.css).
+
 ---
 
 ## CSS-File-Inventar
@@ -1731,9 +1744,11 @@ Drei Editoren leben in eigenen Subfoldern (`book/`, `focus/`, `notebook/`); edit
 | [entities/figuren.css](public/css/entities/figuren.css) | Figuren-Karte (Graph, Familie, Soziogramm). |
 | [entities/figur-werkstatt.css](public/css/entities/figur-werkstatt.css) | Figuren-Werkstatt (Mindmap, Drafts-Sidebar, Read-only-Tree). |
 | [entities/szenen.css](public/css/entities/szenen.css) | Szenen-Karte. |
+| [entities/world-facts.css](public/css/entities/world-facts.css) | Welt-Fakten-Karte (read-only): Kategorie-Gruppierung (`.weltfakten-*`), Fakt-Zeile mit Akzent-Leiste. |
 | [entities/entity-grid.css](public/css/entities/entity-grid.css) | Entity-Grid (Matrix-Ansicht für Szenen + Schauplätze): sortierbare Tabelle, View-Toggle (`.entity-view-toggle`, `.entity-grid-*`). |
 | [entities/ideen.css](public/css/entities/ideen.css) | Ideen-Karte. |
 | [entities/entity-list.css](public/css/entities/entity-list.css) | `.entity-list` / `-row`, `.severity-tag*`, `.collapsible-*`, Skeleton, `.ort-*` Schauplätze. |
+| [entities/orte-map.css](public/css/entities/orte-map.css) | Orte-Karte View-Mode `map` (Geo-Karte via Leaflet): `.ort-map*` Container + Geocode-Liste. Nur bei `book_settings.orte_real`. |
 
 ### analysis/
 | File | Inhalt |

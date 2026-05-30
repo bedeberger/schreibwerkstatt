@@ -1,6 +1,6 @@
 # Welt-Fakten / Weltregeln
 
-- **Status:** MVP umgesetzt — Persistenz + Chat-Tool live (Migration 161). Phase 2 (Browse-Karte) offen.
+- **Status:** Umgesetzt — Persistenz + Chat-Tool (Migration 161) **+ Browse-Karte** (`worldFactsCard`, read-only, Gruppierung nach Kategorie, Filter Suche/Kategorie).
 - **Aufwand:** M
 - **Severity:** high <!-- grösste inhaltliche Lücke im „Buch-Wissen", das die App abfragbar machen will -->
 
@@ -186,7 +186,7 @@ MVP optional: `world_facts_total{book_id}` (Gauge) bei Komplettanalyse-Write. To
 
 ## Offene Fragen
 
-> MVP-Entscheidungen getroffen: **1 = Full-Replace**, **2 = nur `list_world_facts`**, **3 = Checkpoint bleibt (kein DB-Read im Kontinuitätscheck)**, **4 = Browse-Karte zurückgestellt (Phase 2)**. Verbleibt als offen nur 3 + 4 als Folge-Iterationen.
+> Alle Entscheidungen getroffen + umgesetzt: **1 = Full-Replace**, **2 = nur `list_world_facts`**, **3 = Standalone-Kontinuitätscheck nutzt persistierte Welt-Fakten** (`loadWorldFactsGrouped`, überspringt die Kapitel-Extraktion → N KI-Calls gespart; Pipeline-Phase-8 behält den frischen In-Memory-Stand), **4 = Browse-Karte umgesetzt** (`worldFactsCard`). Keine offenen Punkte mehr.
 
 1. **Full-Replace vs. Delta-Persistenz.** Fakten haben keine stabile AI-ID (anders als `loc_id` bei Orten) → MVP macht Full-Replace pro `(book, user)`. Sauber, solange kein manuelles Edit existiert. Sobald manuelle Fakten kommen (Out-of-Scope), bräuchte es `manually_edited`-Schutz + Hash-Key für Dedup. **Empfehlung:** Full-Replace beibehalten, manuelle Edits bleiben Edge-Case (konsistent mit Ereignisse-Leitbild). → entscheidbar, neige zu Full-Replace.
 

@@ -79,7 +79,7 @@ function tool_get_figure_mentions(input, ctx) {
     JOIN pages p      ON p.page_id = pfm.page_id
     LEFT JOIN chapters c ON c.chapter_id = p.chapter_id AND c.book_id = p.book_id
     WHERE pfm.figure_id = ? AND p.book_id = ?
-    ORDER BY p.chapter_id, p.page_id
+    ORDER BY c.position, p.position, p.page_id
   `).all(figRow.id, ctx.bookId);
 
   if (!mentions.length) {
@@ -204,7 +204,7 @@ function tool_get_figure_profile(input, ctx) {
     FROM figure_appearances fa
     LEFT JOIN chapters c ON c.chapter_id = fa.chapter_id
     WHERE fa.figure_id = ?
-    ORDER BY fa.chapter_id
+    ORDER BY c.position
   `).all(figRow.id);
 
   const events = db.prepare(`

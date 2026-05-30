@@ -151,6 +151,35 @@ test('imprintPosition back: Impressum am Buchende, eine Seite', async () => {
   assert.equal(pageCount(withBack) - pageCount(baseline), 1);
 });
 
+test('Beschnitt: Seite wird um 2×Bleed grösser, TrimBox vorhanden', async () => {
+  const base = defaultConfig(); base.cover.enabled = false;
+  const bufNo = await renderPdfBuffer({
+    book: baseBook, groups: baseGroups, profile: { config: base }, coverBuf: null, token: null,
+  });
+  const cfg = defaultConfig(); cfg.cover.enabled = false; cfg.print.bleedMm = 3;
+  const bufBleed = await renderPdfBuffer({
+    book: baseBook, groups: baseGroups, profile: { config: cfg }, coverBuf: null, token: null,
+  });
+  assert.ok(bufBleed.toString('binary').includes('/TrimBox'), 'TrimBox fehlt im Bleed-PDF');
+  assert.ok(!bufNo.toString('binary').includes('/TrimBox'), 'TrimBox darf ohne Bleed fehlen');
+  const mb = (b) => { const m = b.toString('binary').match(/\/MediaBox \[0 0 ([\d.]+) ([\d.]+)\]/); return m ? [parseFloat(m[1]), parseFloat(m[2])] : null; };
+  const a = mb(bufNo), c = mb(bufBleed);
+  assert.ok(a && c, 'MediaBox nicht gefunden');
+  assert.ok(Math.abs((c[0] - a[0]) - 6 * 72 / 25.4) < 1, `Breiten-Delta ~17pt erwartet, war ${(c[0] - a[0]).toFixed(2)}`);
+});
+
+test('Schnittmarken: Render mit Bleed + cropMarks läuft, gleiche Page-Anzahl', async () => {
+  const cfg = defaultConfig(); cfg.cover.enabled = false; cfg.print.bleedMm = 3;
+  const noMarks = await renderPdfBuffer({
+    book: baseBook, groups: baseGroups, profile: { config: cfg }, coverBuf: null, token: null,
+  });
+  const cfg2 = defaultConfig(); cfg2.cover.enabled = false; cfg2.print.bleedMm = 3; cfg2.print.cropMarks = true;
+  const marks = await renderPdfBuffer({
+    book: baseBook, groups: baseGroups, profile: { config: cfg2 }, coverBuf: null, token: null,
+  });
+  assert.equal(pageCount(marks), pageCount(noMarks), 'cropMarks dürfen keine Extra-Pages erzeugen');
+});
+
 test('Lose Seite vor erstem Kapitel: Kapitel-Heading bricht auf eigene Page (Regression)', async () => {
   // Bug: spaceBeforeMm-Reset (doc.y = margin.top + 60mm) lief auch für
   // Kapitel 1 unbedingt, sodass auf einer mit losen Seiten befüllten Body-

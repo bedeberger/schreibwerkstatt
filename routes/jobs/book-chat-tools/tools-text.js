@@ -212,7 +212,7 @@ async function tool_get_chapter_text(input, ctx) {
   const pageRows = db.prepare(`
     SELECT page_id, page_name FROM pages
     WHERE chapter_id = ? AND book_id = ?
-    ORDER BY page_id
+    ORDER BY position, page_id
   `).all(chapterId, ctx.bookId);
   if (!pageRows.length) {
     return {
@@ -418,11 +418,14 @@ function tool_get_dialogue(input, ctx) {
     figNames = _figureNamePatterns(figRow).map(n => n.toLowerCase());
   }
 
-  let sql = 'SELECT page_id, page_name, chapter_id, body_html FROM pages WHERE book_id = ? AND body_html IS NOT NULL';
+  let sql = `SELECT p.page_id, p.page_name, p.chapter_id, p.body_html
+    FROM pages p
+    LEFT JOIN chapters c ON c.chapter_id = p.chapter_id AND c.book_id = p.book_id
+    WHERE p.book_id = ? AND p.body_html IS NOT NULL`;
   const params = [ctx.bookId];
-  if (Number.isInteger(input?.chapter_id)) { sql += ' AND chapter_id = ?'; params.push(input.chapter_id); }
-  if (Number.isInteger(input?.page_id))    { sql += ' AND page_id    = ?'; params.push(input.page_id); }
-  sql += ' ORDER BY chapter_id, page_id';
+  if (Number.isInteger(input?.chapter_id)) { sql += ' AND p.chapter_id = ?'; params.push(input.chapter_id); }
+  if (Number.isInteger(input?.page_id))    { sql += ' AND p.page_id    = ?'; params.push(input.page_id); }
+  sql += ' ORDER BY c.position, p.position, p.page_id';
   const pages = db.prepare(sql).all(...params);
   if (!pages.length) return { results: [], hint: 'Keine Seiten im Scope.' };
 
@@ -490,7 +493,7 @@ function tool_find_first_last_mention(input, ctx) {
       JOIN pages p      ON p.page_id = pfm.page_id
       LEFT JOIN chapters c ON c.chapter_id = p.chapter_id AND c.book_id = p.book_id
       WHERE pfm.figure_id = ? AND p.book_id = ?
-      ORDER BY p.chapter_id, p.page_id
+      ORDER BY c.position, p.position, p.page_id
     `).all(figRow.id, ctx.bookId);
     if (!mentions.length) {
       return {
@@ -536,7 +539,7 @@ function tool_find_first_last_mention(input, ctx) {
     FROM location_chapters lc
     LEFT JOIN chapters c ON c.chapter_id = lc.chapter_id
     WHERE lc.location_id = ?
-    ORDER BY lc.chapter_id
+    ORDER BY c.position
   `).all(locRow.id);
   if (!chRows.length) {
     return {

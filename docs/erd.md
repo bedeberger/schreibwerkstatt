@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 161, 88 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 162, 88 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -302,6 +302,7 @@ erDiagram
     INTEGER allow_lektor_book_chat   "Lektor darf Buch-Chat (Default 0)"
     INTEGER daily_goal_chars         "Tagesziel Zeichen (NULL = Default 1500)"
     INTEGER entities_enabled         "0|1, Figuren/Orte-Highlights + Szenen/Ereignisse-Panel im Notebook-Editor"
+    INTEGER orte_real                "0|1, Orte sind reale Schauplätze → Geo-Karte in der Orte-Karte"
     TEXT    updated_at
   }
 
@@ -430,6 +431,8 @@ erDiagram
     TEXT    erste_erwaehnung
     INTEGER erste_erwaehnung_page_id FK "SET NULL"
     TEXT    stimmung
+    REAL    lat          "Geo-Breite (nur bei orte_real, nullbar)"
+    REAL    lng          "Geo-Länge (nur bei orte_real, nullbar)"
     INTEGER sort_order
     TEXT    user_email
     TEXT    updated_at

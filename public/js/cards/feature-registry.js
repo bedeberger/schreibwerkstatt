@@ -42,6 +42,8 @@ export const FEATURES = [
     aliases: ['musik','music','songs','musikstuecke','musikstücke','playlist','soundtrack','band','interpret','tracks'] },
   { key: 'ereignisse',     kind: 'toggle', group: 'world',  labelKey: 'tile.events',         descKey: 'tile.events.desc',         flag: 'showEreignisseCard',     toggle: 'toggleEreignisseCard',     requiresBook: true, minRole: 'editor',
     aliases: ['events','timeline','zeitstrahl','plot','chronologie'] },
+  { key: 'weltfakten',     kind: 'toggle', group: 'world',  labelKey: 'tile.weltfakten',     descKey: 'tile.weltfakten.desc',     flag: 'showWorldFactsCard',     toggle: 'toggleWorldFactsCard',     requiresBook: true, minRole: 'editor',
+    aliases: ['facts','fakten','weltregeln','worldbuilding','lore','magiesystem','rules','kanon','canon','regeln'] },
   // Werkzeug
   { key: 'bookchat',       kind: 'toggle', group: 'tools',  labelKey: 'tile.bookchat',       descKey: 'tile.bookchat.desc',       flag: 'showBookChatCard',       toggle: 'toggleBookChatCard',       requiresPages: true, minRole: 'editor',
     aliases: ['ai','frage','question','rag','assistant'] },
@@ -157,6 +159,7 @@ export const EXCLUSIVE_CARDS = [
     loadDeps: [{ method: 'loadFiguren', skipIfNonEmpty: 'figuren' }, { method: 'loadOrte', skipIfNonEmpty: 'orte' }] },
   { key: 'ereignisse',     flag: 'showEreignisseCard',     toggle: 'toggleEreignisseCard',     onReclick: 'refresh', partial: 'ereignisse',
     loadDeps: [{ method: 'loadFiguren', skipIfNonEmpty: 'figuren' }] },
+  { key: 'weltfakten',     flag: 'showWorldFactsCard',     toggle: 'toggleWorldFactsCard',     onReclick: 'refresh', partial: 'world-facts' },
   { key: 'bookStats',      flag: 'showBookStatsCard',      toggle: 'toggleBookStatsCard',      onReclick: 'close', partial: 'bookstats' },
   { key: 'stil',           flag: 'showStilCard',           toggle: 'toggleStilCard',           onReclick: 'close', partial: 'stil-heatmap' },
   { key: 'fehlerHeatmap',  flag: 'showFehlerHeatmapCard',  toggle: 'toggleFehlerHeatmapCard',  onReclick: 'close', partial: 'fehler-heatmap' },

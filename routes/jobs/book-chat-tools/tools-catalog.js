@@ -22,7 +22,7 @@ function tool_list_chapters(_input, ctx) {
     LEFT JOIN page_stats ps ON ps.page_id = p.page_id
     WHERE c.book_id = ?
     GROUP BY c.chapter_id, c.chapter_name
-    ORDER BY c.chapter_id
+    ORDER BY c.position
   `).all(ctx.bookId);
 
   // Seiten mit ihren Kapitelzuordnungen laden – inkl. Seiten ohne Kapitel (chapter_id IS NULL)
@@ -31,7 +31,7 @@ function tool_list_chapters(_input, ctx) {
     FROM pages p
     LEFT JOIN page_stats ps ON ps.page_id = p.page_id
     WHERE p.book_id = ?
-    ORDER BY p.chapter_id, p.page_id
+    ORDER BY p.position, p.page_id
   `).all(ctx.bookId);
 
   const pagesByChapter = new Map();
@@ -173,7 +173,7 @@ function tool_list_locations(input, ctx) {
     FROM location_chapters lc
     LEFT JOIN chapters c ON c.chapter_id = lc.chapter_id
     WHERE lc.location_id IN ${idSql}
-    ORDER BY lc.location_id, lc.chapter_id
+    ORDER BY lc.location_id, c.position
   `).all(...idVals);
   const fgRows = db.prepare(`
     SELECT lf.location_id, f.fig_id, f.name
@@ -268,7 +268,7 @@ function tool_list_songs(input, ctx) {
     FROM song_chapters sc
     LEFT JOIN chapters c ON c.chapter_id = sc.chapter_id
     WHERE sc.song_id IN ${idSql}
-    ORDER BY sc.haeufigkeit DESC, sc.chapter_id
+    ORDER BY sc.haeufigkeit DESC, c.position
   `).all(...idVals);
   const fgRows = db.prepare(`
     SELECT sf.song_id, f.fig_id, f.name, sf.kontext_typ
@@ -356,7 +356,7 @@ function tool_get_location_profile(input, ctx) {
     FROM location_chapters lc
     LEFT JOIN chapters c ON c.chapter_id = lc.chapter_id
     WHERE lc.location_id = ?
-    ORDER BY lc.chapter_id
+    ORDER BY c.position
   `).all(locRow.id).map(r => ({ chapter_id: r.chapter_id, chapter_name: r.chapter_name || null, haeufigkeit: r.haeufigkeit }));
 
   const figuren = db.prepare(`
@@ -662,7 +662,7 @@ function tool_list_world_facts(input, ctx) {
     FROM world_fact_chapters wfc
     LEFT JOIN chapters c ON c.chapter_id = wfc.chapter_id
     WHERE wfc.fact_id IN ${idSql}
-    ORDER BY wfc.fact_id, wfc.chapter_id
+    ORDER BY wfc.fact_id, c.position
   `).all(...idVals);
   const chByFact = new Map();
   for (const r of chRows) {

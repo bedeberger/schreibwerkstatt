@@ -22,6 +22,7 @@ export const bookSettingsMethods = {
       this.bookSettingsIsFinished         = !!data.is_finished;
       this.bookSettingsAllowLektorBookChat = !!data.allow_lektor_book_chat;
       this.bookSettingsDailyGoalChars     = data.daily_goal_chars != null ? Number(data.daily_goal_chars) : 1500;
+      this.bookSettingsOrteReal           = !!data.orte_real;
     } catch (e) {
       console.error('[book-settings] Laden fehlgeschlagen:', e);
     } finally {
@@ -98,6 +99,7 @@ export const bookSettingsMethods = {
           is_finished:       this.bookSettingsIsFinished ? 1 : 0,
           allow_lektor_book_chat: this.bookSettingsAllowLektorBookChat ? 1 : 0,
           daily_goal_chars:  Number.isFinite(Number(this.bookSettingsDailyGoalChars)) ? Number(this.bookSettingsDailyGoalChars) : null,
+          orte_real:         this.bookSettingsOrteReal ? 1 : 0,
         }),
       });
       if (!r.ok) {

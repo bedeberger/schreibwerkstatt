@@ -51,6 +51,7 @@ export const appHashRouterMethods = {
     else if (this.showSongsCard) parts.push('songs');
     else if (this.showSzenenCard) parts.push('szenen');
     else if (this.showEreignisseCard) parts.push('ereignisse');
+    else if (this.showWorldFactsCard) parts.push('fakten');
     else if (this.showKontinuitaetCard) parts.push('kontinuitaet');
     else if (this.showBookReviewCard) parts.push('bewertung');
     else if (this.showKapitelReviewCard) parts.push('kapitel');
@@ -316,6 +317,10 @@ export const appHashRouterMethods = {
         case 'ereignisse':
           if (!this.showEreignisseCard) await this.toggleEreignisseCard();
           break;
+        case 'fakten':
+          if (!this.showWorldFactsCard) await this.toggleWorldFactsCard();
+          else { this._closeOtherMainCards('weltfakten'); this._scrollToCardByKey('weltfakten'); }
+          break;
         case 'kontinuitaet':
           if (!this.showKontinuitaetCard) await this.toggleKontinuitaetCard();
           break;
@@ -381,7 +386,7 @@ export const appHashRouterMethods = {
     const watchers = [
       'selectedBookId', 'currentPage', 'showEditorCard',
       'selectedFigurId', 'selectedOrtId', 'selectedSongId', 'selectedSzeneId',
-      'showFiguresCard', 'showFigurWerkstattCard', 'showOrteCard', 'showSongsCard', 'showSzenenCard', 'showEreignisseCard',
+      'showFiguresCard', 'showFigurWerkstattCard', 'showOrteCard', 'showSongsCard', 'showSzenenCard', 'showEreignisseCard', 'showWorldFactsCard',
       'showKontinuitaetCard', 'showBookReviewCard', 'showBookChatCard',
       'showKapitelReviewCard', 'kapitelReviewChapterId',
       'werkstattDraftId',

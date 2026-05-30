@@ -13,7 +13,16 @@
 
 import { startPoll } from './job-helpers.js';
 
-const TABS = ['layout', 'font', 'chapter', 'cover', 'toc', 'extras', 'author', 'pdfa'];
+const TABS = ['layout', 'font', 'chapter', 'cover', 'toc', 'extras', 'author', 'print', 'pdfa'];
+
+// Druckerei-Trim-Presets (mm). Setzen pageSize='custom' + Masse. Decken die
+// gängigen Buchformate ab, die A4/A5/A6/Letter nicht abbilden.
+const TRIM_PRESETS = [
+  { value: '125x200', w: 125, h: 200 },
+  { value: '135x215', w: 135, h: 215 },
+  { value: '155x230', w: 155, h: 230 },
+  { value: '170x240', w: 170, h: 240 },
+];
 
 export function registerPdfExportCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -74,7 +83,9 @@ export function registerPdfExportCard() {
     exportProgress: 0,
     exportStatus: '',
     exportError: '',
+    exportLowRes: 0,
     currentJobId: null,
+    trimPresetSel: '',
 
     coverUploading: false,
     coverError: '',
@@ -338,6 +349,22 @@ export function registerPdfExportCard() {
       return `/pdf-export/profiles/${this.activeProfile.id}/author-image?v=${this.coverPreviewVersion}`;
     },
 
+    // ── Druck-Tab: Trim-Preset anwenden ──────────────────────────────────
+    // cm-Label mit '.'-Dezimal (Swiss-konform, locale-unabhängig).
+    trimPresetOptions() {
+      return TRIM_PRESETS.map(p => ({
+        value: p.value,
+        label: `${p.w / 10} × ${p.h / 10} cm`,
+      }));
+    },
+    applyTrimPreset(value) {
+      const p = TRIM_PRESETS.find(x => x.value === value);
+      if (!p || !this.activeProfile) return;
+      this.activeProfile.config.layout.pageSize = 'custom';
+      this.activeProfile.config.layout.customWidthMm = p.w;
+      this.activeProfile.config.layout.customHeightMm = p.h;
+    },
+
     // ── Font-Preview ──────────────────────────────────────────────────────
     loadFontPreview(family, weight) {
       const key = `${family}:${weight}`;
@@ -381,6 +408,7 @@ export function registerPdfExportCard() {
       this.exportProgress = 0;
       this.exportStatus = window.__app.t('pdfExport.starting');
       this.exportError = '';
+      this.exportLowRes = 0;
       try {
         const ref = this._exportEntity();
         if (!ref) { this.exportError = window.__app.t('pdfExport.error.startFailed'); this.exporting = false; return; }
@@ -431,6 +459,7 @@ export function registerPdfExportCard() {
           this.exporting = false;
           this.exportProgress = 100;
           const result = job.result || {};
+          this.exportLowRes = result.lowResImages || 0;
           const isWarning = result.pdfa?.requested && result.pdfa.validatorAvailable && !result.pdfa.passed;
           this.exportStatus = window.__app.t(isWarning ? 'pdfExport.pdfaWarning' : 'pdfExport.done');
           this._triggerDownload(jobId, result.filename);

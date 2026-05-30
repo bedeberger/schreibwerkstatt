@@ -105,6 +105,15 @@ function _toRefString(v) {
   return null;
 }
 
+// Geo-Koordinate als Number normalisieren + auf gueltigen Bereich clampen.
+// Fremd-Input (Nominatim / Marker-Drag) → null bei NaN/leer, sonst geklemmt.
+function _clampCoord(v, max) {
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  if (!Number.isFinite(n)) return null;
+  return Math.max(-max, Math.min(max, n));
+}
+
 // ── Konsolidierter Zeitstrahl ─────────────────────────────────────────────────
 // Ersetzt den gesamten Bestand für book/user.
 // ereignisse: Array aus KI-Antwort [{datum, ereignis, typ, bedeutung, kapitel[], seiten[], figuren[]}]
@@ -279,12 +288,12 @@ function saveOrteToDb(bookId, orte, userEmail, chNameToId = null, pageNameToIdBy
 
     const upd = db.prepare(`
       UPDATE locations SET name=?, typ=?, beschreibung=?, erste_erwaehnung=?, erste_erwaehnung_page_id=?, stimmung=?,
-        sort_order=?, updated_at=?
+        lat=?, lng=?, sort_order=?, updated_at=?
       WHERE id=?`);
     const ins = db.prepare(`
       INSERT INTO locations (book_id, loc_id, name, typ, beschreibung, erste_erwaehnung, erste_erwaehnung_page_id, stimmung,
-        sort_order, user_email, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        lat, lng, sort_order, user_email, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     const delLf = db.prepare('DELETE FROM location_figures WHERE location_id = ?');
     const delLc = db.prepare('DELETE FROM location_chapters WHERE location_id = ?');
     // location_figures.figure_id ist INTEGER (figures.id) seit Mig 73 — Lookup TEXT → INT.
@@ -298,19 +307,21 @@ function saveOrteToDb(bookId, orte, userEmail, chNameToId = null, pageNameToIdBy
     for (let i = 0; i < orte.length; i++) {
       const o = orte[i];
       const erstPageId = resolveErstePageIdForOrt(o.erste_erwaehnung, o.kapitel);
+      const lat = _clampCoord(o.lat, 90);
+      const lng = _clampCoord(o.lng, 180);
       let locDbId = existingMap[o.id];
       if (locDbId !== undefined) {
         // integer id (und scene_locations) bleibt erhalten
         upd.run(o.name, o.typ || null, o.beschreibung || null,
           o.erste_erwaehnung || null, erstPageId, o.stimmung || null,
-          i, now, locDbId);
+          lat, lng, i, now, locDbId);
         delLf.run(locDbId);
         delLc.run(locDbId);
       } else {
         const { lastInsertRowid } = ins.run(
           bookId, o.id, o.name, o.typ || null, o.beschreibung || null,
           o.erste_erwaehnung || null, erstPageId, o.stimmung || null,
-          i, userEmail || null, now
+          lat, lng, i, userEmail || null, now
         );
         locDbId = lastInsertRowid;
       }
@@ -332,6 +343,30 @@ function saveOrteToDb(bookId, orte, userEmail, chNameToId = null, pageNameToIdBy
   if (droppedFigRefs > 0) {
     logger.warn(`saveOrteToDb: ${droppedFigRefs} Ort→Figur-Referenzen verworfen (Figur nicht in figures-Tabelle).`);
   }
+}
+
+// Persistierte Welt-Fakten gruppiert nach Kapitel laden — Shape kompatibel mit
+// chapterFakten aus der Komplettanalyse ([{ kapitel, fakten: [{ kategorie,
+// subjekt, fakt, seite }] }]). Für die Token-sparende Wiederverwendung im
+// Standalone-Kontinuitätscheck (statt Neu-Extraktion pro Kapitel). Book-level
+// Fakten ohne Kapitel-Bridge landen unter `bookLabel`. Ein Fakt mit mehreren
+// Kapiteln erscheint pro Kapitel (für den Check unkritisch).
+function loadWorldFactsGrouped(bookId, userEmail, bookLabel = 'Gesamtbuch') {
+  const rows = db.prepare(`
+    SELECT wf.id, wf.kategorie, wf.subjekt, wf.fakt, wf.seite_label, c.chapter_name
+    FROM world_facts wf
+    LEFT JOIN world_fact_chapters wfc ON wfc.fact_id = wf.id
+    LEFT JOIN chapters c ON c.chapter_id = wfc.chapter_id
+    WHERE wf.book_id = ? AND wf.user_email IS ?
+    ORDER BY wf.sort_order, wf.id
+  `).all(bookId, userEmail || null);
+  const groups = new Map();
+  for (const r of rows) {
+    const kap = r.chapter_name || bookLabel;
+    if (!groups.has(kap)) groups.set(kap, []);
+    groups.get(kap).push({ kategorie: r.kategorie, subjekt: r.subjekt, fakt: r.fakt, seite: r.seite_label });
+  }
+  return [...groups.entries()].map(([kapitel, fakten]) => ({ kapitel, fakten }));
 }
 
 // ── Welt-Fakten ─────────────────────────────────────────────────────────────
@@ -706,10 +741,10 @@ function deleteFinetuneAiCache(bookId, userEmail) {
 
 // ── Buch-Einstellungen (Sprache + Region) ─────────────────────────────────────
 
-const _getBookSettings = db.prepare('SELECT language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, entities_enabled FROM book_settings WHERE book_id = ?');
+const _getBookSettings = db.prepare('SELECT language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, entities_enabled, orte_real FROM book_settings WHERE book_id = ?');
 const _upsertBookSettings = db.prepare(`
-  INSERT INTO book_settings (book_id, language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, updated_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  INSERT INTO book_settings (book_id, language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, orte_real, updated_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT(book_id) DO UPDATE SET
     language=excluded.language, region=excluded.region,
     buchtyp=excluded.buchtyp, buch_kontext=excluded.buch_kontext,
@@ -717,6 +752,7 @@ const _upsertBookSettings = db.prepare(`
     is_finished=excluded.is_finished,
     allow_lektor_book_chat=excluded.allow_lektor_book_chat,
     daily_goal_chars=excluded.daily_goal_chars,
+    orte_real=excluded.orte_real,
     updated_at=excluded.updated_at
 `);
 const _updateBookSettingsEntitiesEnabled = db.prepare(`
@@ -738,16 +774,17 @@ function getBookSettings(bookId, userEmail = null) {
     is_finished: row.is_finished ? 1 : 0,
     allow_lektor_book_chat: row.allow_lektor_book_chat ? 1 : 0,
     entities_enabled: row.entities_enabled ? 1 : 0,
+    orte_real: row.orte_real ? 1 : 0,
   };
   if (userEmail) {
     const u = require('./app-users').getUser(userEmail);
     if (u && (u.default_language || u.default_buchtyp)) {
       const language = u.default_language || 'de';
       const region   = u.default_region   || (language === 'en' ? 'US' : 'CH');
-      return { language, region, buchtyp: u.default_buchtyp || null, buch_kontext: null, erzaehlperspektive: null, erzaehlzeit: null, is_finished: 0, allow_lektor_book_chat: 0, daily_goal_chars: null, entities_enabled: 0 };
+      return { language, region, buchtyp: u.default_buchtyp || null, buch_kontext: null, erzaehlperspektive: null, erzaehlzeit: null, is_finished: 0, allow_lektor_book_chat: 0, daily_goal_chars: null, entities_enabled: 0, orte_real: 0 };
     }
   }
-  return { language: 'de', region: 'CH', buchtyp: null, buch_kontext: null, erzaehlperspektive: null, erzaehlzeit: null, is_finished: 0, allow_lektor_book_chat: 0, daily_goal_chars: null, entities_enabled: 0 };
+  return { language: 'de', region: 'CH', buchtyp: null, buch_kontext: null, erzaehlperspektive: null, erzaehlzeit: null, is_finished: 0, allow_lektor_book_chat: 0, daily_goal_chars: null, entities_enabled: 0, orte_real: 0 };
 }
 
 /** Locale-Key für ein Buch: z.B. "de-CH", "en-US". */
@@ -758,7 +795,7 @@ function getBookLocale(bookId, userEmail = null) {
 
 /** Speichert/aktualisiert Sprache, Region, Buchtyp, Buchkontext, Erzählperspektive, Erzählzeit, is_finished, allow_lektor_book_chat, daily_goal_chars.
  *  `entities_enabled` wird hier nicht angefasst — Quick-Toggle aus der Notebook-Toolbar laeuft ueber setBookEntitiesEnabled. */
-function saveBookSettings(bookId, language, region, buchtyp, buchKontext, erzaehlperspektive = null, erzaehlzeit = null, isFinished = 0, allowLektorBookChat = 0, dailyGoalChars = null) {
+function saveBookSettings(bookId, language, region, buchtyp, buchKontext, erzaehlperspektive = null, erzaehlzeit = null, isFinished = 0, allowLektorBookChat = 0, dailyGoalChars = null, orteReal = 0) {
   _upsertBookSettings.run(
     parseInt(bookId), language, region,
     buchtyp || null, buchKontext || null,
@@ -766,6 +803,7 @@ function saveBookSettings(bookId, language, region, buchtyp, buchKontext, erzaeh
     isFinished ? 1 : 0,
     allowLektorBookChat ? 1 : 0,
     dailyGoalChars == null ? null : Math.round(Number(dailyGoalChars)),
+    orteReal ? 1 : 0,
     new Date().toISOString()
   );
 }
@@ -1099,6 +1137,7 @@ module.exports = {
   saveZeitstrahlEvents,
   saveOrteToDb,
   saveFaktenToDb,
+  loadWorldFactsGrouped,
   saveSongsToDb,
   backfillLocationChaptersFromScenes,
   saveContinuityCheck,

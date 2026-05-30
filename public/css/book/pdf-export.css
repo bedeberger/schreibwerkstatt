@@ -292,6 +292,8 @@
   height: 190px;
 }
 .pdfx-author-preview img { object-fit: cover; }
+/* Niedrig-Auflösungs-Warnung nach Export (Druck-Tab / 300-dpi-Check). */
+.pdfx-lowres-warn { color: var(--color-warn-text); }
 .pdfx-cover-actions {
   display: flex;
   gap: 0.5rem;

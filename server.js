@@ -78,7 +78,8 @@ app.set('trust proxy', 1);
 // 'unsafe-inline' bei style-src ist nötig, weil Alpine `:style` zur Laufzeit
 // inline-style-Attribute setzt (z.B. progress-bar via --progress).
 // img-src deckt data:/blob: für Generated Charts/Graphs plus
-// *.googleusercontent.com für Google-Profilbilder im Avatar-Menü.
+// *.googleusercontent.com für Google-Profilbilder im Avatar-Menü plus
+// *.tile.openstreetmap.org für die Leaflet-Karte der Schauplätze.
 // connect-src 'self' deckt alle XHR/SSE-Endpunkte (Server proxy'd Anthropic +
 // Ollama; Storage geht ueber /content/*); Plausible-Origin wird zur Laufzeit
 // aus app_settings ergänzt, falls Analytics aktiv ist.
@@ -96,7 +97,7 @@ function buildCspHeader() {
   const plausible = plausibleOriginFromSettings();
   const scriptSrc  = ["'self'", "'unsafe-eval'", ...(plausible ? [plausible] : []), ...HCAPTCHA_ORIGINS];
   const styleSrc   = ["'self'", "'unsafe-inline'", ...HCAPTCHA_ORIGINS];
-  const imgSrc     = ["'self'", 'data:', 'blob:', 'https://*.googleusercontent.com'];
+  const imgSrc     = ["'self'", 'data:', 'blob:', 'https://*.googleusercontent.com', 'https://*.tile.openstreetmap.org'];
   const fontSrc    = ["'self'"];
   const connectSrc = ["'self'", ...(plausible ? [plausible] : []), ...HCAPTCHA_ORIGINS];
   const frameSrc   = ["'self'", ...HCAPTCHA_ORIGINS];
@@ -311,7 +312,7 @@ app.use('/metrics', require('./routes/metrics'));
 
 // ── Auth-Guard ────────────────────────────────────────────────────────────────
 // API-Pfade → 401 JSON; HTML-Pfade → Redirect zu /auth/login
-const API_PREFIXES = ['/history/', '/figures/', '/locations/', '/songs/', '/jobs/', '/sync/', '/chat/', '/booksettings/', '/content/', '/books/', '/me/', '/admin/', '/local/', '/config', '/share/api/'];
+const API_PREFIXES = ['/history/', '/figures/', '/locations/', '/world-facts/', '/songs/', '/jobs/', '/sync/', '/chat/', '/booksettings/', '/content/', '/books/', '/me/', '/admin/', '/local/', '/config', '/share/api/'];
 
 app.use((req, res, next) => {
   if (req.session?.user) return next();
@@ -370,6 +371,8 @@ app.use(proxiesRouter);
 app.use('/history', historyRouter);
 app.use('/figures', figuresRouter);
 app.use('/locations', locationsRouter);
+app.use('/world-facts', require('./routes/world-facts'));
+app.use('/geocode', require('./routes/geocode'));
 app.use('/songs', songsRouter);
 app.use('/jobs', jobsRouter);
 app.use('/chat', chatRouter);

@@ -29,6 +29,7 @@
   .card--folderimport     { --card-accent: var(--card-accent-folderimport); }
   .card--kontinuitaet     { --card-accent: var(--card-accent-kontinuitaet); }
   .card--szenen           { --card-accent: var(--card-accent-szenen); }
+  .card--weltfakten       { --card-accent: var(--card-accent-weltfakten); }
   .card--organizer        { --card-accent: var(--card-accent-organize); }
   .card--werkstatt        { --card-accent: var(--card-accent-werkstatt); }
   .card--admin-usage      { --card-accent: var(--card-accent-admin-usage, var(--color-accent)); }

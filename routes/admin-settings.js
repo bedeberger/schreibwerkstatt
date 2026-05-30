@@ -139,6 +139,41 @@ router.post('/test-languagetool', async (req, res) => {
   }
 });
 
+// POST /admin/settings/test-geocode — Health-Probe der konfigurierten
+// Geocoding-Quelle. Fragt eine bekannte Stadt ab; ok wenn >=1 Treffer.
+router.post('/test-geocode', async (req, res) => {
+  const provider = appSettings.get('geocode.provider') === 'photon' ? 'photon' : 'nominatim';
+  const t0 = Date.now();
+  try {
+    let url;
+    if (provider === 'photon') {
+      const base = String(appSettings.get('geocode.photon.url') || '')
+        .replace(/\/+$/, '')
+        .replace(/\/api$/i, '');
+      if (!base) return res.json({ ok: false, error: 'NO_URL', provider });
+      url = `${base}/api?q=Z%C3%BCrich&limit=1&lang=de`;
+    } else {
+      const base = String(appSettings.get('geocode.nominatim.url') || 'https://nominatim.openstreetmap.org/search');
+      url = `${base}?q=Z%C3%BCrich&format=jsonv2&limit=1`;
+    }
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 5000);
+    const r = await fetch(url, {
+      headers: { 'User-Agent': 'Schreibwerkstatt/1.0 (self-hosted book tool)', 'Accept': 'application/json' },
+      signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+    if (!r.ok) return res.json({ ok: false, status: r.status, provider, latency_ms: Date.now() - t0 });
+    const j = await r.json().catch(() => null);
+    const count = provider === 'photon'
+      ? (Array.isArray(j?.features) ? j.features.length : 0)
+      : (Array.isArray(j) ? j.length : 0);
+    return res.json({ ok: count > 0, status: r.status, provider, result_count: count, latency_ms: Date.now() - t0 });
+  } catch (e) {
+    return res.json({ ok: false, error: e.name === 'AbortError' ? 'TIMEOUT' : e.message, provider, latency_ms: Date.now() - t0 });
+  }
+});
+
 // POST /admin/settings/smtp/test-send { to? } — sendet ein 'test'-Template
 // an `to` (Default: Gmail-User des Mailers). Liefert { ok, latencyMs, error? }.
 router.post('/smtp/test-send', express.json(), async (req, res) => {

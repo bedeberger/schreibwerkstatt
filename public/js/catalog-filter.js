@@ -24,6 +24,7 @@ const FILTER_KINDS = {
   ort:     { placeholder: 'filter.ort',     empty: 'filter.allOrte' },
   szene:   { placeholder: 'filter.szene',   empty: 'filter.allSzenen' },
   subtyp:  { placeholder: 'events.filter.subtyp', empty: 'events.filter.allSubtypes' },
+  kategorie: { placeholder: 'filter.kategorie', empty: 'filter.allKategorien' },
 };
 
 export function registerCatalogFilter() {

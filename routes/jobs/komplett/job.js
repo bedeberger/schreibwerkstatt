@@ -5,6 +5,7 @@ const {
   saveCheckpoint, loadCheckpoint, deleteCheckpoint,
   backfillLocationChaptersFromScenes,
   saveFaktenToDb,
+  loadWorldFactsGrouped,
   getBookSettings,
 } = require('../../../db/schema');
 const appUsers = require('../../../db/app-users');
@@ -428,8 +429,24 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
     } else {
       // Multi-Pass: Fakten pro Kapitel extrahieren – ggf. aus Checkpoint fortsetzen
       let chapterFacts = cp?.chapterFacts ?? [];
-      const startGi = cp?.nextGi ?? 0;
-      if (startGi > 0) {
+      let startGi = cp?.nextGi ?? 0;
+
+      // Token-Optimierung: persistierte Welt-Fakten aus der letzten Komplett-
+      // analyse wiederverwenden, statt pro Kapitel neu zu extrahieren (spart N
+      // KI-Calls). Nur ohne laufenden Extraktions-Checkpoint. Trade-off: die
+      // Fakten spiegeln den Buchstand der letzten Komplettanalyse — bei seither
+      // geänderten Seiten ggf. leicht veraltet; für grobe Weltregeln vertretbar.
+      if (startGi === 0 && chapterFacts.length === 0) {
+        const persisted = loadWorldFactsGrouped(bookIdInt, email, bookName);
+        const persistedCount = persisted.reduce((s, c) => s + c.fakten.length, 0);
+        if (persistedCount > 0) {
+          chapterFacts = persisted;
+          startGi = groupOrder.length; // Extraktions-Schleife überspringen
+          updateJob(jobId, { progress: 88, statusText: 'job.phase.factsFromDb', statusParams: { count: persistedCount } });
+          log.info(`${persistedCount} Welt-Fakten aus DB übernommen (letzte Komplettanalyse) – Kapitel-Extraktion übersprungen.`);
+        }
+      }
+      if (startGi > 0 && startGi < groupOrder.length) {
         updateJob(jobId, {
           progress: 50 + Math.round((startGi / groupOrder.length) * 35),
           statusText: 'job.phase.resumeFacts',

@@ -127,6 +127,7 @@
      liegen pro Karte in der jeweiligen CSS-Datei. Hier Basis-Hues: */
   --card-accent-orte: #4f7a3a;
   --card-accent-szenen: #6e4f9a;
+  --card-accent-weltfakten: #5a6e8e;
   --card-accent-kontinuitaet: #b86537;
   --card-accent-werkstatt: #2f6e7a;
   --card-accent-organize: #3a5a8a;
@@ -297,6 +298,7 @@
 
   --card-accent-orte: #8aaa6a;
   --card-accent-szenen: #b39ad9;
+  --card-accent-weltfakten: #9fb0d4;
   --card-accent-kontinuitaet: #e0905a;
   --card-accent-werkstatt: #6ab0bc;
   --card-accent-organize: #7896c6;

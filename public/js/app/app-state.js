@@ -237,6 +237,7 @@ const cardsState = () => ({
   showSzenenCard: false,
   showOrteCard: false,
   showSongsCard: false,
+  showWorldFactsCard: false,
   showKontinuitaetCard: false,
   showBookStatsCard: false,
   showStilCard: false,

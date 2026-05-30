@@ -76,11 +76,14 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
     const { language: bookLang } = getBookSettings(book.id, userEmail);
 
     updateJob(jobId, { progress: 40, statusText: 'job.phase.renderPdf' });
+    const meta = {};
     const buffer = await renderPdfBuffer({
       book, groups, profile,
       coverBuf, authorImageBuf, token: userToken, lang: bookLang,
-      scope, chapter, page,
+      scope, chapter, page, meta,
     });
+    const lowResImages = Array.isArray(meta.dpiWarnings) ? meta.dpiWarnings.length : 0;
+    if (lowResImages) log.warn(`${lowResImages} Bild(er) unter ${profile.config.print?.dpiWarnThreshold || 300} dpi (scope=${scope})`);
 
     if (ctrl?.signal.aborted) throw new Error('job.cancelled');
 
@@ -116,6 +119,8 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
       filename,
       profileName: profile.name,
       scope,
+      lowResImages,
+      dpiThreshold: profile.config.print?.dpiWarnThreshold || 0,
       pdfa: {
         requested: !!profile.config.pdfa.enabled,
         validatorAvailable: !!validation.available,

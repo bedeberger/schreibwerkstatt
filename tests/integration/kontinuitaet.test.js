@@ -99,6 +99,44 @@ test('Kontinuität single-pass: erfundenes Beleg-Zitat wird verworfen, echtes bl
   assert.equal(job.result.issues[0].beschreibung, 'echter Widerspruch');
 });
 
+test('Kontinuität multi-pass: persistierte Welt-Fakten überspringen die Extraktion', async () => {
+  const BOOK_ID = 46;
+  const CH_ID = 130;
+  // Body > singlePassLimit erzwingt Multi-Pass (sonst keine Fakten-Phase).
+  ctx.dbSeed.setBook({
+    chapters: [{ id: CH_ID, book_id: BOOK_ID, name: 'Kapitel Eins' }],
+    pages: [{ id: 230, book_id: BOOK_ID, chapter_id: CH_ID, name: 'Seite Eins', updated_at: '2026-01-01' }],
+    pageBodies: { 230: '<p>' + 'Wald und Sonne. '.repeat(25000) + '</p>' },
+  });
+
+  // Welt-Fakten aus "letzter Komplettanalyse" persistieren.
+  ctx.dbSchema.saveFaktenToDb(BOOK_ID, [
+    { kapitel: 'Kapitel Eins', fakten: [{ kategorie: 'Wetter', subjekt: 'Wald', fakt: 'immer sonnig', seite: 'Seite Eins' }] },
+  ], 'tester@test.dev', { 'Kapitel Eins': CH_ID });
+
+  // Nur die Widerspruchs-Prüfung antwortet; eine Fakten-Extraktion darf nicht passieren.
+  ctx.mockAi.on(
+    (entry) => entry.schemaKeys.includes('zusammenfassung') && entry.schemaKeys.includes('probleme'),
+    { zusammenfassung: 'Konsistent.', probleme: [] },
+  );
+
+  // Provider 'ollama' → kein Claude-Verify-Pass (hält den Mock einfach).
+  const jobId = ctx.shared.createJob('kontinuitaet', BOOK_ID, 'tester@test.dev', 'job.label.kontinuitaet');
+  ctx.shared.enqueueJob(jobId, () =>
+    ctx.komplett.runKontinuitaetJob(jobId, BOOK_ID, 'Testbuch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'ollama'),
+  );
+
+  const job = await waitForJob(ctx.shared, jobId);
+  assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
+  assert.equal(job.result.zusammenfassung, 'Konsistent.');
+
+  // Keine Kapitel-Fakten-Extraktion: kein AI-Call mit dem Fakten-Schema.
+  const faktenCalls = ctx.mockAi.log.filter(e => e.schemaKeys.includes('fakten'));
+  assert.equal(faktenCalls.length, 0, 'persistierte Fakten müssen die Extraktion ersetzen');
+  // Genau ein Call: die Widerspruchs-Prüfung.
+  assert.equal(ctx.mockAi.log.length, 1, `expected 1 AI call (nur Check), got ${ctx.mockAi.log.length}`);
+});
+
 test('Kontinuität: leeres Buch → result.empty', async () => {
   const BOOK_ID = 43;
   ctx.dbSeed.setBook({ chapters: [], pages: [], pageBodies: {}, books: [{ id: BOOK_ID, name: 'Leer' }] });

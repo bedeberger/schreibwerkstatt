@@ -1,0 +1,66 @@
+<!-- Welt-Fakten / Weltregeln (read-only) -->
+<!--
+  Alpine.data-Sub-Komponente — siehe public/js/cards/world-facts-card.js.
+  Daten stammen aus der Komplettanalyse; kein Edit-Pfad. Gruppiert nach Kategorie.
+-->
+<div class="card card--weltfakten" x-data="worldFactsCard" x-show="$app.showWorldFactsCard" x-cloak>
+  <div class="card-header card-header--subline">
+    <div class="card-header-titlebar">
+      <span class="card-eyebrow" x-text="$app.selectedBookName"></span>
+      <span class="card-title" x-text="$app.t('weltfakten.title')"></span>
+      <div class="card-subline" x-show="$app.alleAktualisierenLastRun && !wfLoading">
+        <span class="card-timestamp" x-text="$app.t('common.asOf', { date: $app.alleAktualisierenLastRun })"></span>
+      </div>
+    </div>
+  </div>
+
+  <div x-show="fakten.length === 0 && !wfLoading" class="card-status" x-text="$app.t('weltfakten.empty')"></div>
+
+  <!-- Skeleton während Loading vor erstem Datensatz -->
+  <div x-show="wfLoading && fakten.length === 0" class="entity-skeleton entity-list--accented" x-cloak>
+    <template x-for="i in 6" :key="i">
+      <div class="entity-skeleton-row">
+        <span class="entity-skeleton-cell entity-skeleton-cell--anchor"></span>
+        <span class="entity-skeleton-cell entity-skeleton-cell--title"></span>
+        <span class="entity-skeleton-cell entity-skeleton-cell--meta"></span>
+      </div>
+    </template>
+  </div>
+
+  <!-- Filter-Leiste -->
+  <div x-show="fakten.length > 0" class="filter-bar">
+    <input type="text" x-model="wfFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
+    <div x-data="catalogFilter('kategorie')"
+         x-modelable="value" x-model="wfFilters.kategorie"
+         x-effect="options = wfKategorieListe.map(k => ({ value: k, label: k }))"></div>
+    <span class="filter-count" x-text="wfFiltered.length + ' / ' + fakten.length"></span>
+  </div>
+
+  <!-- Fakten nach Kategorie gruppiert -->
+  <div x-show="fakten.length > 0" class="weltfakten-groups">
+    <template x-for="g in wfGrouped" :key="g.kategorie">
+      <div class="weltfakten-group">
+        <div class="weltfakten-group-head">
+          <span class="tag entity-typ-tag" x-text="g.kategorie"></span>
+          <span class="weltfakten-group-count" x-text="g.fakten.length"></span>
+        </div>
+        <div class="entity-list entity-list--accented">
+          <template x-for="f in g.fakten" :key="f.id">
+            <div class="weltfakten-row">
+              <div class="weltfakten-row-main">
+                <span x-show="f.subjekt" class="weltfakten-subjekt" x-text="f.subjekt"></span>
+                <span class="weltfakten-fakt" x-text="f.fakt"></span>
+              </div>
+              <div class="weltfakten-row-meta" x-show="f.kapitel?.length || f.seite">
+                <template x-for="k in (f.kapitel || [])" :key="k">
+                  <span class="kapitel-badge kapitel-badge--primary internal-link" @click="$app.openKapitelByName(k)" x-text="k"></span>
+                </template>
+                <span x-show="f.seite" class="weltfakten-seite" x-text="f.seite"></span>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </template>
+  </div>
+</div>

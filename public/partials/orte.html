@@ -33,9 +33,9 @@
     </template>
   </div>
 
-  <!-- Ansicht-Umschalter (Liste / Grid) -->
+  <!-- Ansicht-Umschalter (Liste / Grid / Karte) — Karte nur bei realen Orten -->
   <div x-show="$app.orte.length > 0" class="tabs entity-view-toggle" role="tablist" :aria-label="$app.t('orte.viewLabel')">
-    <template x-for="m in ['list','grid']" :key="m">
+    <template x-for="m in (orteRealEnabled ? ['list','grid','map'] : ['list','grid'])" :key="m">
       <button type="button" role="tab"
               class="tabs-btn"
               :class="{ 'tabs-btn--active': viewMode === m }"
@@ -181,5 +181,25 @@
         </template>
       </tbody>
     </table>
+  </div>
+
+  <!-- Geo-Karte: Marker je verorteter Schauplatz + Geocode-Liste -->
+  <div x-show="$app.orte.length > 0 && viewMode === 'map'" class="ort-map-view" x-cloak>
+    <div x-ref="orteMapEl" class="ort-map" role="application" :aria-label="$app.t('orte.map.tab')"></div>
+    <p class="ort-map-hint" x-text="$app.t('orte.map.dragHint')"></p>
+    <div x-show="orteMapStatus" class="card-status" x-text="orteMapStatus"></div>
+    <div class="ort-map-locate-list">
+      <template x-for="o in $app.orteFiltered" :key="o.id">
+        <div class="ort-map-locate-row">
+          <span class="tag entity-typ-tag" x-text="o.typ || $app.t('orte.typAndere')"></span>
+          <span class="ort-map-locate-name" x-text="o.name"></span>
+          <span x-show="o.lat != null && o.lng != null" class="ort-map-located" x-text="$app.t('orte.map.located')"></span>
+          <button type="button" class="btn-compact"
+                  :disabled="geocodingId === o.id"
+                  @click="geocodeOrt(o)"
+                  x-text="geocodingId === o.id ? $app.t('orte.map.geocoding') : $app.t('orte.map.geocode')"></button>
+        </div>
+      </template>
+    </div>
   </div>
 </div>

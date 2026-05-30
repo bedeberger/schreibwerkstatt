@@ -12,6 +12,7 @@ let _chartPromise = null;
 let _jsMindPromise = null;
 let _sortablePromise = null;
 let _diffPromise = null;
+let _leafletPromise = null;
 
 function _loadScript(src) {
   return new Promise((resolve, reject) => {
@@ -22,6 +23,14 @@ function _loadScript(src) {
     s.onerror = () => reject(new Error('Script konnte nicht geladen werden: ' + src));
     document.head.appendChild(s);
   });
+}
+
+function _ensureCss(href) {
+  if (document.querySelector(`link[href="${href}"]`)) return;
+  const l = document.createElement('link');
+  l.rel = 'stylesheet';
+  l.href = href;
+  document.head.appendChild(l);
 }
 
 export function loadVis() {
@@ -72,4 +81,20 @@ export function loadDiff() {
       .catch(err => { _diffPromise = null; throw err; });
   }
   return _diffPromise;
+}
+
+export function loadLeaflet() {
+  // CSS muss vor dem Skript da sein (Marker-Image-Pfade relativ zur leaflet.css).
+  _ensureCss('vendor/leaflet-1.9.4/leaflet.css');
+  if (typeof window.L !== 'undefined') return Promise.resolve(window.L);
+  if (!_leafletPromise) {
+    _leafletPromise = _loadScript('vendor/leaflet-1.9.4/leaflet.js')
+      .then(() => {
+        // Auto-Detect der Image-Pfade scheitert bei manchen Setups → explizit setzen.
+        if (window.L?.Icon?.Default) window.L.Icon.Default.imagePath = 'vendor/leaflet-1.9.4/images/';
+        return window.L;
+      })
+      .catch(err => { _leafletPromise = null; throw err; });
+  }
+  return _leafletPromise;
 }

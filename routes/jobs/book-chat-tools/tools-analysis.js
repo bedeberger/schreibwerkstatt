@@ -59,7 +59,7 @@ function tool_get_reviews(input, ctx) {
   const limit = Math.min(100, Math.max(1, Number.isInteger(input?.limit) ? input.limit : CHAPTER_REVIEW_DEFAULT_LIMIT));
 
   let sql = `
-    SELECT cr.chapter_id, c.chapter_name, cr.reviewed_at, cr.review_json, cr.model
+    SELECT cr.chapter_id, c.chapter_name, c.position AS chapter_position, cr.reviewed_at, cr.review_json, cr.model
     FROM chapter_reviews cr
     JOIN chapters c ON c.chapter_id = cr.chapter_id AND c.book_id = cr.book_id
     WHERE cr.book_id = ? AND cr.user_email IS ?
@@ -85,6 +85,7 @@ function tool_get_reviews(input, ctx) {
     const fazit = parsed.fazit || null;
     items.push({
       chapter_id:   r.chapter_id,
+      chapter_position: r.chapter_position,
       chapter_name: r.chapter_name,
       reviewed_at:  r.reviewed_at,
       gesamtnote:   typeof parsed.gesamtnote === 'number' ? parsed.gesamtnote : null,
@@ -100,13 +101,13 @@ function tool_get_reviews(input, ctx) {
 
   if (sort === 'note_desc')      items.sort((a, b) => (b.gesamtnote ?? -1) - (a.gesamtnote ?? -1));
   else if (sort === 'note_asc')  items.sort((a, b) => (a.gesamtnote ?? 99) - (b.gesamtnote ?? 99));
-  else                            items.sort((a, b) => a.chapter_id - b.chapter_id);
+  else                            items.sort((a, b) => (a.chapter_position ?? a.chapter_id) - (b.chapter_position ?? b.chapter_id));
 
   const total = items.length;
-  const limited = items.slice(0, limit);
+  const limited = items.slice(0, limit).map(({ chapter_position, ...rest }) => rest);
 
   const allChapters = db.prepare(
-    'SELECT chapter_id, chapter_name FROM chapters WHERE book_id = ? ORDER BY chapter_id'
+    'SELECT chapter_id, chapter_name FROM chapters WHERE book_id = ? ORDER BY position'
   ).all(ctx.bookId);
   const reviewedIds = new Set(items.map(i => i.chapter_id));
   const missingReview = allChapters
@@ -239,7 +240,7 @@ function tool_get_lektorat_findings(input, ctx) {
   const params = [ctx.bookId, userEmail, userEmail];
   if (pageId !== null)         { sql += ' AND pc.page_id = ?';   params.push(pageId); }
   else if (chapterId !== null) { sql += ' AND p.chapter_id = ?'; params.push(chapterId); }
-  sql += ' ORDER BY p.chapter_id, p.page_id';
+  sql += ' ORDER BY c.position, p.position, p.page_id';
 
   const rows = db.prepare(sql).all(...params);
   if (!rows.length) {
@@ -361,7 +362,7 @@ function tool_get_stil_metrics(input, ctx) {
     `;
     const params = [ctx.bookId];
     if (chapterFilter !== null) { sql += ' AND p.chapter_id = ?'; params.push(chapterFilter); }
-    sql += ' GROUP BY p.chapter_id, c.chapter_name ORDER BY p.chapter_id';
+    sql += ' GROUP BY p.chapter_id, c.chapter_name, c.position ORDER BY c.position';
     const rows = db.prepare(sql).all(...params);
     if (!rows.length) return { hint: 'Keine Stil-Metriken vorhanden.' };
 

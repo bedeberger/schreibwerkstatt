@@ -101,6 +101,7 @@ export const adminSettingsMethods = {
                : kind === 'oauth'        ? '/admin/settings/test-oauth'
                : kind === 'smtp'         ? '/admin/settings/smtp/test-send'
                : kind === 'languagetool' ? '/admin/settings/test-languagetool'
+               : kind === 'geocode'      ? '/admin/settings/test-geocode'
                : null;
     if (!path) return;
     this.adminSettingsTestResult = { kind, running: true };

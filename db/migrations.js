@@ -6804,6 +6804,26 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 161 abgeschlossen (world_facts + world_fact_chapters).');
   }
 
+  if (version < 162) {
+    // Orte-Karte: pro Buch konfigurierbar, ob Schauplaetze reale (geocodierbare)
+    // Orte sind. Nur dann blendet die Orte-Karte den Geo-Karten-Tab ein.
+    // lat/lng nullbar pro Ort — User-kuratiert (Nominatim-Vorschlag + Pin-Drag).
+    const bsCols162 = db.pragma('table_info(book_settings)').map(c => c.name);
+    if (!bsCols162.includes('orte_real')) {
+      db.exec('ALTER TABLE book_settings ADD COLUMN orte_real INTEGER NOT NULL DEFAULT 0');
+    }
+    const locCols162 = db.pragma('table_info(locations)').map(c => c.name);
+    if (!locCols162.includes('lat')) db.exec('ALTER TABLE locations ADD COLUMN lat REAL');
+    if (!locCols162.includes('lng')) db.exec('ALTER TABLE locations ADD COLUMN lng REAL');
+
+    const fkErrors162 = db.pragma('foreign_key_check');
+    if (fkErrors162.length) {
+      throw new Error(`Migration 162: foreign_key_check meldet ${fkErrors162.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 162').run();
+    logger.info('DB-Migration auf Version 162 abgeschlossen (book_settings.orte_real + locations.lat/lng).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {
