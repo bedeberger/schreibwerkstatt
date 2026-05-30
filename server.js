@@ -622,21 +622,6 @@ try {
   }, { timezone: cronTz });
   logger.info(`Cron-Job registriert: registration_requests-Expire täglich 02:30 (${cronTz})`);
 
-  // 03:30 – Orte-Auto-Verortung. Geocodet noch nicht verortete Orte (lat/lng
-  // NULL) aller Bücher mit `orte_real`. Manuell gepinnte Coords bleiben. Läuft
-  // nach reg-expire (02:30), vor Stale-Cleanup (04:00).
-  cron.schedule('30 3 * * *', () => {
-    runWithContext({ job: 'cron', user: 'system' }, () => {
-      logger.info('Cron: Starte Orte-Auto-Verortung…');
-      const { geocodeAllBooks } = require('./lib/geocode');
-      // KI-Fallback (aiResolveLocation) via DI — Heuristik leer → Label auf realen
-      // Toponym normalisieren. Resolver lebt im Job-Modul (callAI), lib bleibt frei.
-      const { aiResolveLocation } = require('./routes/jobs/geocode');
-      geocodeAllBooks({ aiResolve: aiResolveLocation }).catch(e => logger.error('Cron-Geocode Fehler: ' + e.message));
-    });
-  }, { timezone: cronTz });
-  logger.info(`Cron-Job registriert: Orte-Auto-Verortung täglich 03:30 (${cronTz})`);
-
   // 03:00 – Nacht-Komplettanalyse für alle Bücher × alle User (deaktiviert)
   // cron.schedule('0 3 * * *', () => {
   //   logger.info('Cron: Starte nächtliche Komplettanalyse…');

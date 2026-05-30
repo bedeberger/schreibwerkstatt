@@ -176,29 +176,6 @@ export const orteMapMethods = {
     return window.__app.orteFiltered.filter(o => o.lat == null || o.lng == null);
   },
 
-  // Nominatim-Lookup für EINEN Ort. Setzt lat/lng (Treffer) oder lässt sie null
-  // (kein Treffer) → der Ort bleibt „unlocated" und erscheint als roter Pin in
-  // der Kartenmitte. Gibt true zurück bei echtem Treffer.
-  // Kein Single-Flight-Guard hier — der lebt in den Aufrufern (geocodeOrt/Batch).
-  async _geocodeOne(o) {
-    const app = window.__app;
-    const q = encodeURIComponent((o.name || '').trim());
-    if (!q) return false;
-    // Länder-Bias: pro-Ort-Land schlägt Buch-Hauptland; biast Nominatim auf
-    // das richtige Land (verhindert „Bern → USA"-Fehltreffer bei mehrdeutigen
-    // Ortsnamen). Ohne Land → kein Bias (globale Suche wie bisher).
-    const land = o.land || this._bookLand || '';
-    const regionQ = /^[A-Za-z]{2}$/.test(land) ? `&region=${land.toLowerCase()}` : '';
-    const data = await fetchJson(`/geocode?q=${q}&lang=${this._geoLang || 'de'}${regionQ}`);
-    const c = data?.candidates?.[0];
-    const target = app.orte.find(x => x.id === o.id);
-    // Kein Treffer → lat/lng bleiben null. Der rote Mitte-Pin (Render-Pfad)
-    // markiert den Ort als „ohne Georeferenz"; User zieht ihn zurecht.
-    if (!c) return false;
-    if (target) { target.lat = c.lat; target.lng = c.lng; await app.saveOrte(); }
-    return true;
-  },
-
   // Koordinaten auf einen Ort im Speicher schreiben + persistieren. Gibt true,
   // wenn der Ort noch existiert (sonst no-op → false).
   async _applyCoords(id, lat, lng) {
@@ -210,10 +187,12 @@ export const orteMapMethods = {
     return true;
   },
 
-  // KI-Fallback-Job für eine Liste unverorteter Orte. Normalisiert die Labels
-  // serverseitig auf reale Toponyme (z.B. „Bar in Olten" → „Olten") + geocodet
-  // sie. Resolved → Set der ids mit KI-Treffer (Koordinaten bereits gesetzt +
-  // gespeichert). Misses bleiben unverortet (roter Pin, User schiebt zurecht).
+  // KI-first-Verortung für eine Liste von Orten. Der Server normalisiert jedes
+  // Label zuerst auf eine präzise reale Anfrage („Badi Olten" → „Olten") und
+  // geocodet sie dann — verhindert, dass der tolerante Geocoder das rohe Label
+  // auf einen falschen Treffer (z.B. in DE) zieht. Resolved → Set der ids mit
+  // Treffer (Koordinaten bereits gesetzt + gespeichert). Misses bleiben
+  // unverortet (roter Pin, User schiebt zurecht).
   async _geocodeViaAI(items) {
     const app = window.__app;
     const hitIds = new Set();
@@ -247,20 +226,17 @@ export const orteMapMethods = {
     return hitIds;
   },
 
-  // Einen Ort verorten: erst regelbasierte Heuristik, bei Miss automatisch der
-  // KI-Fallback. Bleibt der Ort danach unverortet, zeigt der Render-Pfad einen
-  // roten Pin in der Kartenmitte (User korrigiert per Drag).
+  // Einen Ort verorten (KI-first): das Label wird serverseitig auf eine präzise
+  // reale Anfrage normalisiert und dann geocodet. Bleibt der Ort danach
+  // unverortet (rein fiktiv / kein Treffer), zeigt der Render-Pfad einen roten
+  // Pin in der Kartenmitte (User korrigiert per Drag).
   async geocodeOrt(o) {
     if (this.geocodingId || this.geocodingAll) return;
     const app = window.__app;
     this.geocodingId = o.id;
-    this.orteMapStatus = '';
+    this.orteMapStatus = app.t('orte.map.aiResolving', { name: o.name });
     try {
-      let hit = await this._geocodeOne(o);
-      if (!hit) {
-        this.orteMapStatus = app.t('orte.map.aiResolving', { name: o.name });
-        hit = (await this._geocodeViaAI([o])).has(o.id);
-      }
+      const hit = (await this._geocodeViaAI([o])).has(o.id);
       this.orteMapStatus = app.t(hit ? 'orte.map.geocoded' : 'orte.map.unresolved', { name: o.name });
       if (this.viewMode === 'map') {
         const L = await loadLeaflet();
@@ -277,33 +253,20 @@ export const orteMapMethods = {
     }
   },
 
-  // Batch: alle gefilterten Orte ohne Koordinaten verorten. Phase 1 regelbasiert,
-  // sequenziell mit Pause (Nominatim-Policy ~1 Request/Sekunde). Phase 2: alle
-  // Heuristik-Misses gehen in EINEN KI-Fallback-Job. Rest bleibt unverortet.
+  // Batch (KI-first): alle gefilterten Orte ohne Koordinaten gehen in EINEN
+  // KI-Job, der jedes Label normalisiert + geocodet. Rest bleibt unverortet.
   async geocodeAllUnlocated() {
     if (this.geocodingId || this.geocodingAll) return;
     const app = window.__app;
     const todo = this.unlocatedOrte();
     if (!todo.length) return;
     this.geocodingAll = true;
-    let done = 0, hits = 0;
-    const misses = [];
-    // Map-Handle einmal vorab holen, dann nach jedem Treffer sofort neu rendern —
-    // jede gefundene Georeferenz erscheint direkt, nicht erst am Schleifenende.
-    const L = this.viewMode === 'map' ? await loadLeaflet() : null;
+    this.orteMapStatus = app.t('orte.map.batchAi', { n: todo.length });
     try {
-      for (const o of todo) {
-        done++;
-        this.orteMapStatus = app.t('orte.map.batchProgress', { done, total: todo.length, name: o.name });
-        try { if (await this._geocodeOne(o)) hits++; else misses.push(o); }
-        catch (e) { console.error('[geocodeAll]', e); misses.push(o); }
-        if (L) this._renderOrteMarkers(L);
-        if (done < todo.length) await new Promise(r => setTimeout(r, 1100));
-      }
-      if (misses.length) {
-        this.orteMapStatus = app.t('orte.map.batchAi', { n: misses.length });
-        hits += (await this._geocodeViaAI(misses)).size;
-        if (L) this._renderOrteMarkers(L);
+      const hits = (await this._geocodeViaAI(todo)).size;
+      if (this.viewMode === 'map') {
+        const L = await loadLeaflet();
+        this._renderOrteMarkers(L);
       }
       this.orteMapStatus = app.t('orte.map.batchDone', { hits, total: todo.length });
     } finally {
@@ -335,7 +298,12 @@ export const orteMapMethods = {
     const app = window.__app;
     const located = app.orte.filter(o => o.lat != null || o.lng != null);
     if (!located.length) return;
-    if (!confirm(app.t('orte.map.clearAllConfirm', { n: located.length }))) return;
+    const ok = await app.appConfirm({
+      message: app.t('orte.map.clearAllConfirm', { n: located.length }),
+      confirmLabel: app.t('orte.map.clearAll'),
+      danger: true,
+    });
+    if (!ok) return;
     for (const o of located) { o.lat = null; o.lng = null; }
     await app.saveOrte();
     this.orteMapStatus = app.t('orte.map.allGeorefsCleared', { n: located.length });
