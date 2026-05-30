@@ -8,6 +8,7 @@ Buch-weite Publikations-Metadaten (Cover, Titelei, Autor-Bio) leben in **`book_p
 
 - **BLOBs:** `cover_image`/`cover_mime`, `author_image`/`author_image_mime` (sharp-gehärtet via [lib/cover-prepare.js](../lib/cover-prepare.js)).
 - **Titelei (Text):** `isbn`, `subtitle`, `year`, `dedication`, `imprint`, `copyright`, `frontmatter`, `author_bio`.
+- **Buchhandels-Metadaten (Text, Migration 167, fliessen in EPUB-OPF):** `description` (Klappentext), `publisher`, `series` + `series_index`, `keywords` (kommagetrennt). `description` faellt im EPUB-Builder auf `books.description` zurueck, wenn leer.
 - **EPUB-Reflow-Toggles:** `epub_css_style` (`serif`|`sans`), `epub_justify` (0/1), `epub_toc_title` (Override; leer → Sprach-Default).
 
 Validator + Defaults: [lib/publication-meta.js](../lib/publication-meta.js) (`defaultMeta`/`validateMeta`, strict; `isValidIsbn13` non-blocking). CRUD: [db/book-publication.js](../db/book-publication.js) (`getMeta`/`upsertMeta`/`set|clear|getCover`/`…AuthorImage`).
@@ -29,6 +30,8 @@ Builder [lib/export-builders/epub.js](../lib/export-builders/epub.js) `buildEpub
 
 - **Cover** via `new File([buf], …)` an epub-gen-memory (`cover` akzeptiert `string|File`).
 - **Frontmatter** (Titelseite/Impressum/Widmung/Motto) als XHTML-Entries `beforeToc: true`, **Autor-Bio** als Backmatter (+ Foto als data-URI). Aus dem custom-NCX/Nav-TOC ausgeschlossen via `__toc: false` (beide TOC-Builder filtern darauf).
+- **OPF-Metadaten** aus `book_publication`: `description` (Fallback `books.description`) + `publisher` + `date` (aus `year`) als native epub-gen-memory-Optionen; `keywords` → `<dc:subject>` (eins pro kommagetrenntem Term) und `series`/`series_index` → EPUB3-`belongs-to-collection` + calibre-Legacy-Meta via **Custom-`contentOPF`** (`_buildContentOPF` injiziert Extra-Zeilen vor `</metadata>` ins zur Laufzeit gezogene Lib-Template — driftfest, kein Copy). `date` nur setzen wenn vorhanden (Lib wirft sonst bei `new Date(undefined)`).
+- **Schriftstil:** `epub_css_style` (`serif`|`sans`) setzt `body { font-family: … }`; `epub_justify` schaltet Blocksatz.
 - `lang`/Autor: Sync-Route resolvt aus `book_settings` + Buch-Owner-Anzeigename; das Domain-Shape (`mapBook`) führt Autor nicht.
 - Inline-`<img>`: nur Remote-`http(s)`-URLs (wie PDF); nicht-fetchbare werden geloggt, nicht still verworfen (`_countUnfetchableImages`).
 

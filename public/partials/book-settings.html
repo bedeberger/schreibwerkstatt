@@ -10,11 +10,11 @@
       <span class="card-title" x-text="$app.t('book.settings.title')"></span>
     </div>
     <div class="card-actions">
-      <span class="card-form-saved" x-show="bookSettingsSaved" x-cloak x-transition.opacity.duration.250ms x-text="$app.t('common.settingsSaved')"></span>
-      <span class="card-form-error" x-show="bookSettingsError" x-text="bookSettingsError"></span>
-      <button type="button" @click="saveBookSettings()" :disabled="bookSettingsSaving || bookSettingsLoading">
-        <span x-show="bookSettingsSaving" class="spinner"></span>
-        <span x-text="bookSettingsSaving ? $app.t('common.saving') : $app.t('common.save')"></span>
+      <span class="card-form-saved" x-show="headerSaved()" x-cloak x-transition.opacity.duration.250ms x-text="$app.t('common.settingsSaved')"></span>
+      <span class="card-form-error" x-show="headerError()" x-text="headerError()"></span>
+      <button type="button" @click="saveActiveTab()" :disabled="headerDisabled()">
+        <span x-show="headerSaving()" class="spinner"></span>
+        <span x-text="headerSaving() ? $app.t('common.saving') : $app.t('common.save')"></span>
       </button>
     </div>
   </div>
@@ -392,15 +392,6 @@
           <span class="card-form-hint" x-text="$app.t('publication.keywordsHint')"></span>
         </div>
       </section>
-
-      <div class="card-actions">
-        <span class="card-form-error" x-show="pubError" x-text="pubError"></span>
-        <span class="card-form-saved" x-show="pubSaved" x-cloak x-transition.opacity.duration.250ms x-text="$app.t('common.settingsSaved')"></span>
-        <button type="button" @click="savePublication()" :disabled="pubSaving">
-          <span x-show="pubSaving" class="spinner"></span>
-          <span x-text="pubSaving ? $app.t('common.saving') : $app.t('common.save')"></span>
-        </button>
-      </div>
 
       <section class="book-settings-section">
         <h3 class="book-settings-section-title" x-text="$app.t('publication.section.export')"></h3>

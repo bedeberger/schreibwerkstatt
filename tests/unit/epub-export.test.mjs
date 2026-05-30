@@ -124,39 +124,40 @@ test('_buildContentOPF: undefined ohne Extra-Meta, sonst injiziert vor </metadat
   assert.ok(opf.includes('<%= title %>'), 'ejs-Platzhalter der Lib bleiben erhalten');
 });
 
+// content.opf + style.css liegen DEFLATE-komprimiert im Zip — Buffer-Grep findet
+// sie nicht. Entpacken via jszip.
+async function _unzip(buf) {
+  const JSZip = (await import('jszip')).default;
+  return JSZip.loadAsync(buf);
+}
+const _oneGroup = () => ([{ chapterId: null, chapter: null, pages: [{ p: { name: 'S1' }, pd: { html: '<p>x</p>' } }] }]);
+
 test('buildEpub: description-Fallback book→meta, publisher/series in OPF', async () => {
-  const bundle = {
-    scope: 'book',
-    book: { id: 1, name: 'Mein Buch', description: 'Buch-Beschreibung' },
-    groups: [{ chapterId: null, chapter: null, pages: [{ p: { name: 'S1' }, pd: { html: '<p>x</p>' } }] }],
-  };
+  const bundle = { scope: 'book', book: { id: 1, name: 'Mein Buch', description: 'Buch-Beschreibung' }, groups: _oneGroup() };
   const buf = await buildEpub(bundle, {
     lang: 'de', author: 'A',
     meta: { description: 'Klappentext', publisher: 'Mein Verlag', series: 'Saga', keywords: 'Krimi' },
   });
-  const s = buf.toString('latin1');
-  assert.ok(s.includes('Klappentext'), 'meta.description gewinnt vor book.description');
-  assert.ok(s.includes('Mein Verlag'), 'publisher fehlt');
-  assert.ok(s.includes('belongs-to-collection'), 'series collection fehlt');
-  assert.ok(s.includes('<dc:subject>Krimi</dc:subject>'), 'keyword fehlt');
+  const zip = await _unzip(buf);
+  const opf = await zip.file('OEBPS/content.opf').async('string');
+  assert.ok(opf.includes('<dc:description>Klappentext</dc:description>'), 'meta.description gewinnt vor book.description');
+  assert.ok(opf.includes('<dc:publisher>Mein Verlag</dc:publisher>'), 'publisher fehlt');
+  assert.ok(opf.includes('belongs-to-collection'), 'series collection fehlt');
+  assert.ok(opf.includes('<dc:subject>Krimi</dc:subject>'), 'keyword fehlt');
 });
 
 test('buildEpub: ohne meta.description faellt auf book.description', async () => {
-  const bundle = {
-    scope: 'book',
-    book: { id: 1, name: 'B', description: 'NurBuchDesc' },
-    groups: [{ chapterId: null, chapter: null, pages: [{ p: { name: 'S1' }, pd: { html: '<p>x</p>' } }] }],
-  };
+  const bundle = { scope: 'book', book: { id: 1, name: 'B', description: 'NurBuchDesc' }, groups: _oneGroup() };
   const buf = await buildEpub(bundle, { lang: 'de', author: 'A', meta: {} });
-  assert.ok(buf.toString('latin1').includes('NurBuchDesc'));
+  const zip = await _unzip(buf);
+  const opf = await zip.file('OEBPS/content.opf').async('string');
+  assert.ok(opf.includes('<dc:description>NurBuchDesc</dc:description>'));
 });
 
 test('buildEpub: epub_css_style sans → sans-serif body font', async () => {
-  const bundle = {
-    scope: 'book',
-    book: { id: 1, name: 'B' },
-    groups: [{ chapterId: null, chapter: null, pages: [{ p: { name: 'S1' }, pd: { html: '<p>x</p>' } }] }],
-  };
+  const bundle = { scope: 'book', book: { id: 1, name: 'B' }, groups: _oneGroup() };
   const buf = await buildEpub(bundle, { lang: 'de', author: 'A', meta: { epub_css_style: 'sans' } });
-  assert.ok(buf.toString('latin1').includes('font-family: sans-serif'));
+  const zip = await _unzip(buf);
+  const css = await zip.file('OEBPS/style.css').async('string');
+  assert.ok(css.includes('font-family: sans-serif'));
 });

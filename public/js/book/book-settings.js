@@ -75,6 +75,16 @@ export const bookSettingsMethods = {
     }
   },
 
+  // Header-Save dispatcht je Tab: Publikation schreibt /publication/, sonst
+  // /booksettings/. Methoden (keine Getter) — bookSettingsMethods wird gespreadet,
+  // Getter würden beim Spread eval't statt durchgereicht.
+  _isPublicationTab() { return this.bookSettingsTab === 'publication'; },
+  saveActiveTab() { return this._isPublicationTab() ? this.savePublication() : this.saveBookSettings(); },
+  headerSaving() { return this._isPublicationTab() ? this.pubSaving : this.bookSettingsSaving; },
+  headerSaved() { return this._isPublicationTab() ? this.pubSaved : this.bookSettingsSaved; },
+  headerError() { return this._isPublicationTab() ? this.pubError : this.bookSettingsError; },
+  headerDisabled() { return this._isPublicationTab() ? this.pubSaving : (this.bookSettingsSaving || this.bookSettingsLoading); },
+
   async saveBookSettings() {
     if (!window.__app.selectedBookId) return;
     this.bookSettingsSaving = true;
