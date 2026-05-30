@@ -237,7 +237,7 @@
   "publication.section.images":   "Cover & author photo",
   "publication.section.metadata": "Front matter",
   "publication.section.epub":     "EPUB options",
-  "publication.section.export":   "Export EPUB",
+  "publication.section.export":   "Export",
   "publication.cover":            "Cover",
   "publication.authorImage":      "Author photo",
   "publication.noImage":          "No image",

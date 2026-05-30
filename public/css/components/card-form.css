@@ -507,6 +507,10 @@ select[aria-invalid="true"],
   text-align: right;
   margin: 0;
 }
+.card-form-row > .card-form-hint {
+  grid-column: 2;
+  text-align: left;
+}
 
 .form-lead {
   margin: var(--space-xs) 0 14px;

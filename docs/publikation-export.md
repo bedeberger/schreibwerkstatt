@@ -54,7 +54,7 @@ Der PDF-Job ([routes/jobs/pdf-export.js](../routes/jobs/pdf-export.js)) spiegelt
 
 **Aufteilung (drift-kritisch):**
 
-- **Buch-weit (`book_publication`):** Cover, Autorfoto, ISBN, Subtitle, Jahr, Widmung, Impressum, Copyright, Frontmatter, Bio.
+- **Buch-weit (`book_publication`):** Cover, Autorfoto, ISBN, Subtitle, Jahr, Widmung, Impressum, Copyright, Frontmatter, Bio + Buchhandels-Metadaten (Description/Publisher/Series/Keywords — **nur** vom EPUB-OPF gelesen, PDF ignoriert sie).
 - **Profil-spezifisch (`pdf_export_profile.config`):** Layout/Print/Fonts/TOC + Render-Toggles `barcode`, `imprintPosition` + **Rückseiten-Bild** (`back_cover_image`, Umschlag-PDF).
 
 Die PDF-Export-Card editiert die Titelei-/Cover-Felder **nicht** mehr (Hinweis auf den Publikation-Tab).
