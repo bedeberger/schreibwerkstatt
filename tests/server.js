@@ -34,6 +34,12 @@ let lastHistoryPatch = null;
 let pdfProfiles = [];
 let pdfProfileSeq = 0;
 
+// Publication-Tab + EPUB-Export-Mock-State.
+let publication = {};       // bookId -> { …meta, has_cover, has_author_image }
+let epubJobSeq = 0;
+let lastPubPut = null;
+const PNG_1x1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+
 const ORIGINAL_HTML = '<p>Der Jungen ging in den Walld. Die Sonne scheinet hell.</p>';
 
 const SCENARIOS = {
@@ -224,10 +230,64 @@ async function handleMockRoute(req, res, urlPath) {
     return true;
   }
 
+  // ── Publication-Tab + EPUB-Export-Mocks ─────────────────────────────────
+  if (urlPath === '/__mock/publication-reset' && req.method === 'POST') {
+    publication = {}; epubJobSeq = 0; lastPubPut = null;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end('{}');
+    return true;
+  }
+  const pubMatch = urlPath.match(/^\/publication\/(\d+)$/);
+  if (pubMatch) {
+    const id = pubMatch[1];
+    const base = { book_id: Number(id), isbn: '', subtitle: '', year: '', dedication: '', imprint: '', copyright: '', frontmatter: '', author_bio: '', epub_css_style: 'serif', epub_justify: true, epub_toc_title: '', has_cover: false, has_author_image: false };
+    if (req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ...base, ...(publication[id] || {}) }));
+      return true;
+    }
+    if (req.method === 'PUT') {
+      const body = await readBody(req);
+      try { lastPubPut = JSON.parse(body); } catch { lastPubPut = null; }
+      publication[id] = { ...(publication[id] || {}), ...(lastPubPut || {}), epub_justify: !!(lastPubPut?.epub_justify === 1 || lastPubPut?.epub_justify === true) };
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ...base, ...publication[id] }));
+      return true;
+    }
+  }
+  const pubImgMatch = urlPath.match(/^\/publication\/(\d+)\/(cover|author-image)$/);
+  if (pubImgMatch) {
+    const id = pubImgMatch[1];
+    const key = pubImgMatch[2] === 'cover' ? 'has_cover' : 'has_author_image';
+    publication[id] = publication[id] || {};
+    if (req.method === 'POST')   { publication[id][key] = true;  res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: true, mime: 'image/jpeg' })); return true; }
+    if (req.method === 'DELETE') { publication[id][key] = false; res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{"ok":true}'); return true; }
+    if (req.method === 'GET') {
+      if (!publication[id][key]) { res.writeHead(404); return res.end('{}'); }
+      res.writeHead(200, { 'Content-Type': 'image/png' }); res.end(PNG_1x1); return true;
+    }
+  }
+  if (urlPath === '/jobs/epub-export' && req.method === 'POST') {
+    const jobId = 'epub-' + (++epubJobSeq);
+    res.writeHead(202, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ jobId }));
+    return true;
+  }
+  if (urlPath.match(/^\/jobs\/epub-\d+$/) && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'done', progress: 100, result: { ready: true, filename: 'book.epub', mime: 'application/epub+zip' } }));
+    return true;
+  }
+  if (urlPath.match(/^\/jobs\/epub-\d+\/file$/) && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/epub+zip', 'Content-Disposition': 'attachment; filename="book.epub"' });
+    res.end(Buffer.from('PKepub-mock-bytes'));
+    return true;
+  }
+
   // Inspect-Endpoint für die Tests: aktuelle Mock-State-Werte.
   if (urlPath === '/__mock/state' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ lastBsPut, lastHistoryPatch }));
+    res.end(JSON.stringify({ lastBsPut, lastHistoryPatch, lastPubPut }));
     return true;
   }
 

@@ -7,12 +7,18 @@ module.exports = {
   testDir: './tests/e2e',
   testMatch: '**/*.spec.js',
   fullyParallel: false,
-  workers: process.env.CI ? 4 : undefined,
-  retries: process.env.CI ? 2 : 0,
-  timeout: 60000,
+  // CI läuft auf lokalem Runner über Ceph-RBD-Storage; IO-Stalls bremsen
+  // Chromium → reine Setup/Navigations-Timeouts. Sequenziell (worker=1)
+  // hält die IO-Last niedrig, höhere Timeouts + 3 Retries fangen Spikes.
+  workers: process.env.CI ? 1 : undefined,
+  retries: process.env.CI ? 3 : 0,
+  timeout: 90000,
+  expect: { timeout: 10000 },
   use: {
     baseURL: 'http://localhost:8765',
     viewport: { width: 1024, height: 768 },
+    navigationTimeout: 45000,
+    actionTimeout: 30000,
   },
   projects: [
     { name: 'chromium', use: { browserName: 'chromium' } },
@@ -20,7 +26,7 @@ module.exports = {
   webServer: {
     command: 'node tests/server.js',
     url: 'http://localhost:8765/tests/fixtures/focus-harness.html',
-    timeout: 10000,
+    timeout: process.env.CI ? 30000 : 10000,
     reuseExistingServer: !process.env.CI,
   },
 };

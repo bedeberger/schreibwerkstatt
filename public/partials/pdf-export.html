@@ -637,24 +637,6 @@
 ></div>
                     </div>
                   </div>
-                  <div class="card-form-row">
-                    <label class="card-form-label">&nbsp;</label>
-                    <div class="card-form-field">
-                      <label class="pdfx-check">
-                        <input type="checkbox" x-model="activeProfile.config.cover.showTitleOverlay">
-                        <span x-text="$app.t('pdfExport.cover.overlay')"></span>
-                      </label>
-                    </div>
-                  </div>
-                  <div class="card-form-row" x-show="activeProfile.config.cover.showTitleOverlay">
-                    <label class="card-form-label" x-text="$app.t('pdfExport.cover.overlayPosition')"></label>
-                    <div class="card-form-field">
-                      <div x-data="combobox($app.t('pdfExport.cover.overlayPosition'))"
-                           x-modelable="value" x-model="activeProfile.config.cover.overlayPosition"
-                           x-effect="options = [{ value: 'top', label: $app.t('pdfExport.cover.posTop') }, { value: 'center', label: $app.t('pdfExport.cover.posCenter') }, { value: 'bottom', label: $app.t('pdfExport.cover.posBottom') }]"
-></div>
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>

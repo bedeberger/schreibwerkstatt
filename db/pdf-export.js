@@ -35,12 +35,6 @@ const _stmtListUserDefault = db.prepare(
     ORDER BY is_default DESC, name COLLATE NOCASE ASC`
 );
 const _stmtGet = db.prepare(`SELECT ${_SELECT_COLS} FROM pdf_export_profile WHERE id = ?`);
-const _stmtGetCover = db.prepare(
-  `SELECT cover_image AS image, cover_mime AS mime FROM pdf_export_profile WHERE id = ?`
-);
-const _stmtGetAuthorImage = db.prepare(
-  `SELECT author_image AS image, author_image_mime AS mime FROM pdf_export_profile WHERE id = ?`
-);
 const _stmtGetBackCover = db.prepare(
   `SELECT back_cover_image AS image, back_cover_image_mime AS mime FROM pdf_export_profile WHERE id = ?`
 );
@@ -52,18 +46,6 @@ const _stmtUpdate = db.prepare(
   `UPDATE pdf_export_profile SET name = ?, config_json = ?, updated_at = ? WHERE id = ?`
 );
 const _stmtDelete = db.prepare(`DELETE FROM pdf_export_profile WHERE id = ?`);
-const _stmtSetCover = db.prepare(
-  `UPDATE pdf_export_profile SET cover_image = ?, cover_mime = ?, updated_at = ? WHERE id = ?`
-);
-const _stmtClearCover = db.prepare(
-  `UPDATE pdf_export_profile SET cover_image = NULL, cover_mime = NULL, updated_at = ? WHERE id = ?`
-);
-const _stmtSetAuthorImage = db.prepare(
-  `UPDATE pdf_export_profile SET author_image = ?, author_image_mime = ?, updated_at = ? WHERE id = ?`
-);
-const _stmtClearAuthorImage = db.prepare(
-  `UPDATE pdf_export_profile SET author_image = NULL, author_image_mime = NULL, updated_at = ? WHERE id = ?`
-);
 const _stmtSetBackCover = db.prepare(
   `UPDATE pdf_export_profile SET back_cover_image = ?, back_cover_image_mime = ?, updated_at = ? WHERE id = ?`
 );
@@ -131,34 +113,6 @@ function deleteProfile(id) {
   _stmtDelete.run(parseInt(id));
 }
 
-function setCover(id, buffer, mime) {
-  _stmtSetCover.run(buffer, mime, Date.now(), parseInt(id));
-}
-
-function clearCover(id) {
-  _stmtClearCover.run(Date.now(), parseInt(id));
-}
-
-function getCover(id) {
-  const r = _stmtGetCover.get(parseInt(id));
-  if (!r || !r.image) return null;
-  return { image: r.image, mime: r.mime };
-}
-
-function setAuthorImage(id, buffer, mime) {
-  _stmtSetAuthorImage.run(buffer, mime, Date.now(), parseInt(id));
-}
-
-function clearAuthorImage(id) {
-  _stmtClearAuthorImage.run(Date.now(), parseInt(id));
-}
-
-function getAuthorImage(id) {
-  const r = _stmtGetAuthorImage.get(parseInt(id));
-  if (!r || !r.image) return null;
-  return { image: r.image, mime: r.mime };
-}
-
 function setBackCover(id, buffer, mime) {
   _stmtSetBackCover.run(buffer, mime, Date.now(), parseInt(id));
 }
@@ -187,8 +141,6 @@ function setDefault(bookId, userEmail, id) {
 
 module.exports = {
   listProfiles, getProfile, createProfile, updateProfile, deleteProfile,
-  setCover, clearCover, getCover,
-  setAuthorImage, clearAuthorImage, getAuthorImage,
   setBackCover, clearBackCover, getBackCover,
   setDefault,
 };
