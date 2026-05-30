@@ -6988,6 +6988,56 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 167 abgeschlossen (book_publication: Buchhandels-Metadaten).');
   }
 
+  if (version < 168) {
+    // Erweiterte EPUB-Export-Optionen (book_publication): Typografie (Schriftgrad,
+    // Zeilenhoehe, Absatzstil, Einzug, Silbentrennung), Struktur (Kapitelumbruch,
+    // Initiale, Szenentrenner, TOC-Seitenverschachtelung, Titelseiten-Modus) und
+    // OPF-Metadaten (Rechte, Erscheinungsdatum, Mitwirkende, UUID). Additiv.
+    const pubCols = db.pragma('table_info(book_publication)').map(c => c.name);
+    const addPubCol = (name, ddl) => {
+      if (!pubCols.includes(name)) db.exec(`ALTER TABLE book_publication ADD COLUMN ${ddl}`);
+    };
+    addPubCol('epub_font_size',       "epub_font_size TEXT DEFAULT 'normal'");
+    addPubCol('epub_line_height',     "epub_line_height TEXT DEFAULT 'normal'");
+    addPubCol('epub_paragraph_style', "epub_paragraph_style TEXT DEFAULT 'indent'");
+    addPubCol('epub_indent_size',     "epub_indent_size TEXT DEFAULT 'medium'");
+    addPubCol('epub_hyphenation',     'epub_hyphenation INTEGER DEFAULT 0');
+    addPubCol('epub_chapter_pagebreak', 'epub_chapter_pagebreak INTEGER DEFAULT 1');
+    addPubCol('epub_drop_caps',       'epub_drop_caps INTEGER DEFAULT 0');
+    addPubCol('epub_nest_pages_in_toc', 'epub_nest_pages_in_toc INTEGER DEFAULT 1');
+    addPubCol('epub_scene_separator', "epub_scene_separator TEXT DEFAULT 'line'");
+    addPubCol('epub_titlepage_mode',  "epub_titlepage_mode TEXT DEFAULT 'generated'");
+    addPubCol('epub_rights',          'epub_rights TEXT');
+    addPubCol('epub_pubdate',         'epub_pubdate TEXT');
+    addPubCol('epub_translator',      'epub_translator TEXT');
+    addPubCol('epub_illustrator',     'epub_illustrator TEXT');
+    addPubCol('epub_editor_name',     'epub_editor_name TEXT');
+    addPubCol('epub_uuid',            'epub_uuid TEXT');
+
+    const fkErrors168 = db.pragma('foreign_key_check');
+    if (fkErrors168.length) {
+      throw new Error(`Migration 168: foreign_key_check meldet ${fkErrors168.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 168').run();
+    logger.info('DB-Migration auf Version 168 abgeschlossen (book_publication: erweiterte EPUB-Optionen).');
+  }
+
+  if (version < 169) {
+    // Autor-Anzeigename (book_publication): Pseudonym/Publikationsname, der den
+    // Account-Namen (books.created_by) als Author in PDF/EPUB uebersteuert.
+    const pubCols = db.pragma('table_info(book_publication)').map(c => c.name);
+    if (!pubCols.includes('author_name')) {
+      db.exec('ALTER TABLE book_publication ADD COLUMN author_name TEXT');
+    }
+
+    const fkErrors169 = db.pragma('foreign_key_check');
+    if (fkErrors169.length) {
+      throw new Error(`Migration 169: foreign_key_check meldet ${fkErrors169.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 169').run();
+    logger.info('DB-Migration auf Version 169 abgeschlossen (book_publication.author_name).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

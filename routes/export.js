@@ -73,6 +73,8 @@ router.get('/:scope/:id/:fmt', async (req, res) => {
       const bp = require('../db/book-publication');
       const meta = bp.getMeta(bundle.book.id);
       buildOpts.meta = meta;
+      // Publikationsname (book_publication.author_name) uebersteuert den Account-Namen.
+      if ((meta.author_name || '').trim()) buildOpts.author = meta.author_name.trim();
       buildOpts.tocTitle = meta.epub_toc_title || undefined;
       if (meta.has_cover) buildOpts.cover = bp.getCover(bundle.book.id);
       if (meta.has_author_image) buildOpts.authorImage = bp.getAuthorImage(bundle.book.id);

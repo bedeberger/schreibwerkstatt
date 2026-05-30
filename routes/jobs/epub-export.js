@@ -55,11 +55,12 @@ async function runEpubExportJob(jobId, { scope, entityId, includeSubchapters, us
 
     updateJob(jobId, { progress: 40, statusText: 'job.phase.renderEpub' });
     const lang = (book?.id ? getBookSettings(book.id)?.language : null) || 'de';
-    const author = book?.id ? _resolveAuthor(book.id) : '';
-    const opts = { lang, author };
+    const opts = { lang };
     if (book?.id) {
       const meta = bp.getMeta(book.id);
       opts.meta = meta;
+      // Publikationsname (book_publication.author_name) uebersteuert den Account-Namen.
+      opts.author = (meta.author_name || '').trim() || _resolveAuthor(book.id);
       opts.tocTitle = meta.epub_toc_title || undefined;
       if (meta.has_cover) opts.cover = bp.getCover(book.id);
       if (meta.has_author_image) opts.authorImage = bp.getAuthorImage(book.id);

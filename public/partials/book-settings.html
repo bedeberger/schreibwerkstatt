@@ -333,6 +333,11 @@
         <h3 class="book-settings-section-title" x-text="$app.t('publication.section.metadata')"></h3>
 
         <div class="card-form-row">
+          <label class="card-form-label" for="pub-author-name" x-text="$app.t('publication.authorName')"></label>
+          <input type="text" id="pub-author-name" class="card-form-input" x-model="bookPublication.author_name" maxlength="200" :placeholder="$app.t('publication.authorNamePlaceholder')" data-spellcheck="spelling">
+          <p class="card-form-hint" x-text="$app.t('publication.authorNameHint')"></p>
+        </div>
+        <div class="card-form-row">
           <label class="card-form-label" for="pub-subtitle" x-text="$app.t('publication.subtitle')"></label>
           <input type="text" id="pub-subtitle" class="card-form-input" x-model="bookPublication.subtitle" maxlength="300" data-spellcheck="spelling">
         </div>

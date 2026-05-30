@@ -9,9 +9,20 @@ const { NOW_ISO_SQL } = require('./now');
 const { defaultMeta, validateMeta } = require('../lib/publication-meta');
 
 const _META_COLS = [
+  'author_name',
   'isbn', 'subtitle', 'year', 'dedication', 'imprint', 'copyright',
   'frontmatter', 'author_bio', 'epub_css_style', 'epub_justify', 'epub_toc_title',
   'description', 'publisher', 'series', 'series_index', 'keywords',
+  'epub_font_size', 'epub_line_height', 'epub_paragraph_style', 'epub_indent_size',
+  'epub_hyphenation', 'epub_chapter_pagebreak', 'epub_drop_caps', 'epub_nest_pages_in_toc',
+  'epub_scene_separator', 'epub_titlepage_mode',
+  'epub_rights', 'epub_pubdate', 'epub_translator', 'epub_illustrator', 'epub_editor_name', 'epub_uuid',
+];
+
+// 0/1-Spalten — beim Upsert aus bool zu Integer wandeln, beim Lesen via
+// validateMeta wieder zu bool (validateMeta akzeptiert 0/1/'1').
+const _BOOL_COLS = [
+  'epub_justify', 'epub_hyphenation', 'epub_chapter_pagebreak', 'epub_drop_caps', 'epub_nest_pages_in_toc',
 ];
 
 const _stmtGet = db.prepare(`
@@ -26,22 +37,14 @@ const _stmtGetCover = db.prepare('SELECT cover_image AS image, cover_mime AS mim
 const _stmtGetAuthorImage = db.prepare('SELECT author_image AS image, author_image_mime AS mime FROM book_publication WHERE book_id = ?');
 
 // Upsert nur der Metadaten-Spalten (BLOBs separat). updated_at immer mit.
+// Column-Liste aus _META_COLS abgeleitet — kein Hand-Pflege-Drift bei neuen Feldern.
 const _stmtUpsertMeta = db.prepare(`
   INSERT INTO book_publication
-    (book_id, isbn, subtitle, year, dedication, imprint, copyright, frontmatter,
-     author_bio, epub_css_style, epub_justify, epub_toc_title,
-     description, publisher, series, series_index, keywords, created_at, updated_at)
+    (book_id, ${_META_COLS.join(', ')}, created_at, updated_at)
   VALUES
-    (@book_id, @isbn, @subtitle, @year, @dedication, @imprint, @copyright, @frontmatter,
-     @author_bio, @epub_css_style, @epub_justify, @epub_toc_title,
-     @description, @publisher, @series, @series_index, @keywords, ${NOW_ISO_SQL}, ${NOW_ISO_SQL})
+    (@book_id, ${_META_COLS.map(c => `@${c}`).join(', ')}, ${NOW_ISO_SQL}, ${NOW_ISO_SQL})
   ON CONFLICT(book_id) DO UPDATE SET
-    isbn = @isbn, subtitle = @subtitle, year = @year, dedication = @dedication,
-    imprint = @imprint, copyright = @copyright, frontmatter = @frontmatter,
-    author_bio = @author_bio, epub_css_style = @epub_css_style,
-    epub_justify = @epub_justify, epub_toc_title = @epub_toc_title,
-    description = @description, publisher = @publisher, series = @series,
-    series_index = @series_index, keywords = @keywords,
+    ${_META_COLS.map(c => `${c} = @${c}`).join(', ')},
     updated_at = ${NOW_ISO_SQL}
 `);
 
@@ -78,11 +81,8 @@ function getMeta(bookId) {
 
 function upsertMeta(bookId, meta) {
   const v = validateMeta(meta);
-  _stmtUpsertMeta.run({
-    book_id: parseInt(bookId),
-    ...v,
-    epub_justify: v.epub_justify ? 1 : 0,
-  });
+  for (const col of _BOOL_COLS) v[col] = v[col] ? 1 : 0;
+  _stmtUpsertMeta.run({ book_id: parseInt(bookId), ...v });
   return getMeta(bookId);
 }
 

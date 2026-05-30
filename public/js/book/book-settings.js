@@ -164,6 +164,7 @@ export const bookSettingsMethods = {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          author_name: p.author_name || '',
           isbn: p.isbn || '', subtitle: p.subtitle || '', year: p.year || '',
           dedication: p.dedication || '', imprint: p.imprint || '', copyright: p.copyright || '',
           frontmatter: p.frontmatter || '', author_bio: p.author_bio || '',

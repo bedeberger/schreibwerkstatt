@@ -56,26 +56,132 @@
   <p class="card-form-hint" x-text="$app.t('epubExport.hint')"></p>
 
   <div class="card-form-grid">
+    <!-- Typografie -->
     <section class="book-settings-section">
-      <h3 class="book-settings-section-title" x-text="$app.t('publication.section.epub')"></h3>
+      <h3 class="book-settings-section-title" x-text="$app.t('epubExport.section.typography')"></h3>
 
       <div class="card-form-row">
-        <label class="card-form-label" x-text="$app.t('publication.cssStyle')"></label>
-        <div x-data="combobox($app.t('publication.cssStyle'))"
+        <label class="card-form-label" x-text="$app.t('epubExport.cssStyle')"></label>
+        <div x-data="combobox($app.t('epubExport.cssStyle'))"
              x-modelable="value" x-model="pub.epub_css_style"
              x-effect="options = publicationCssOptions()"></div>
       </div>
       <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('epubExport.field.fontSize')"></label>
+        <div x-data="combobox($app.t('epubExport.field.fontSize'))"
+             x-modelable="value" x-model="pub.epub_font_size"
+             x-effect="options = fontSizeOptions()"></div>
+      </div>
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('epubExport.field.lineHeight')"></label>
+        <div x-data="combobox($app.t('epubExport.field.lineHeight'))"
+             x-modelable="value" x-model="pub.epub_line_height"
+             x-effect="options = lineHeightOptions()"></div>
+      </div>
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('epubExport.field.paragraphStyle')"></label>
+        <div x-data="combobox($app.t('epubExport.field.paragraphStyle'))"
+             x-modelable="value" x-model="pub.epub_paragraph_style"
+             x-effect="options = paragraphStyleOptions()"></div>
+      </div>
+      <div class="card-form-row" x-show="pub.epub_paragraph_style !== 'spaced'">
+        <label class="card-form-label" x-text="$app.t('epubExport.field.indentSize')"></label>
+        <div x-data="combobox($app.t('epubExport.field.indentSize'))"
+             x-modelable="value" x-model="pub.epub_indent_size"
+             x-effect="options = indentSizeOptions()"></div>
+      </div>
+      <div class="card-form-row">
         <label class="book-settings-option">
           <input type="checkbox" x-model="pub.epub_justify" :disabled="!canEditPublication()">
-          <span x-text="$app.t('publication.justify')"></span>
+          <span x-text="$app.t('epubExport.justify')"></span>
         </label>
       </div>
       <div class="card-form-row">
-        <label class="card-form-label" for="epubx-toc" x-text="$app.t('publication.tocTitle')"></label>
+        <label class="book-settings-option">
+          <input type="checkbox" x-model="pub.epub_hyphenation" :disabled="!canEditPublication()">
+          <span x-text="$app.t('epubExport.field.hyphenation')"></span>
+        </label>
+      </div>
+      <div class="card-form-row">
+        <label class="book-settings-option">
+          <input type="checkbox" x-model="pub.epub_drop_caps" :disabled="!canEditPublication()">
+          <span x-text="$app.t('epubExport.field.dropCaps')"></span>
+        </label>
+      </div>
+    </section>
+
+    <!-- Struktur -->
+    <section class="book-settings-section">
+      <h3 class="book-settings-section-title" x-text="$app.t('epubExport.section.structure')"></h3>
+
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('epubExport.field.titlepageMode')"></label>
+        <div x-data="combobox($app.t('epubExport.field.titlepageMode'))"
+             x-modelable="value" x-model="pub.epub_titlepage_mode"
+             x-effect="options = titlepageModeOptions()"></div>
+      </div>
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('epubExport.field.sceneSep')"></label>
+        <div x-data="combobox($app.t('epubExport.field.sceneSep'))"
+             x-modelable="value" x-model="pub.epub_scene_separator"
+             x-effect="options = sceneSeparatorOptions()"></div>
+      </div>
+      <div class="card-form-row">
+        <label class="book-settings-option">
+          <input type="checkbox" x-model="pub.epub_chapter_pagebreak" :disabled="!canEditPublication()">
+          <span x-text="$app.t('epubExport.field.chapterPagebreak')"></span>
+        </label>
+      </div>
+      <div class="card-form-row">
+        <label class="book-settings-option">
+          <input type="checkbox" x-model="pub.epub_nest_pages_in_toc" :disabled="!canEditPublication()">
+          <span x-text="$app.t('epubExport.field.nestPagesInToc')"></span>
+        </label>
+      </div>
+      <div class="card-form-row">
+        <label class="card-form-label" for="epubx-toc" x-text="$app.t('epubExport.tocTitle')"></label>
         <input type="text" id="epubx-toc" class="card-form-input" x-model="pub.epub_toc_title"
-               maxlength="100" :placeholder="$app.t('publication.tocTitlePlaceholder')"
+               maxlength="100" :placeholder="$app.t('epubExport.tocTitlePlaceholder')"
                :disabled="!canEditPublication()" data-spellcheck="spelling">
+      </div>
+    </section>
+
+    <!-- Metadaten (OPF) -->
+    <section class="book-settings-section">
+      <h3 class="book-settings-section-title" x-text="$app.t('epubExport.section.metadata')"></h3>
+      <p class="card-form-field-note" x-text="$app.t('epubExport.metadataHint')"></p>
+
+      <div class="card-form-row">
+        <label class="card-form-label" for="epubx-rights" x-text="$app.t('epubExport.field.rights')"></label>
+        <input type="text" id="epubx-rights" class="card-form-input" x-model="pub.epub_rights"
+               maxlength="500" :disabled="!canEditPublication()" data-spellcheck="spelling">
+      </div>
+      <div class="card-form-row">
+        <label class="card-form-label" for="epubx-pubdate" x-text="$app.t('epubExport.field.pubdate')"></label>
+        <input type="text" id="epubx-pubdate" class="card-form-input" x-model="pub.epub_pubdate"
+               maxlength="10" :placeholder="$app.t('epubExport.field.pubdatePlaceholder')"
+               :disabled="!canEditPublication()">
+      </div>
+      <div class="card-form-row">
+        <label class="card-form-label" for="epubx-translator" x-text="$app.t('epubExport.field.translator')"></label>
+        <input type="text" id="epubx-translator" class="card-form-input" x-model="pub.epub_translator"
+               maxlength="200" :disabled="!canEditPublication()">
+      </div>
+      <div class="card-form-row">
+        <label class="card-form-label" for="epubx-illustrator" x-text="$app.t('epubExport.field.illustrator')"></label>
+        <input type="text" id="epubx-illustrator" class="card-form-input" x-model="pub.epub_illustrator"
+               maxlength="200" :disabled="!canEditPublication()">
+      </div>
+      <div class="card-form-row">
+        <label class="card-form-label" for="epubx-editor" x-text="$app.t('epubExport.field.editorName')"></label>
+        <input type="text" id="epubx-editor" class="card-form-input" x-model="pub.epub_editor_name"
+               maxlength="200" :disabled="!canEditPublication()">
+      </div>
+      <div class="card-form-row">
+        <label class="card-form-label" for="epubx-uuid" x-text="$app.t('epubExport.field.uuid')"></label>
+        <input type="text" id="epubx-uuid" class="card-form-input" x-model="pub.epub_uuid"
+               maxlength="100" :placeholder="$app.t('epubExport.field.uuidPlaceholder')"
+               :disabled="!canEditPublication()">
       </div>
 
       <div class="card-actions" x-show="canEditPublication()">

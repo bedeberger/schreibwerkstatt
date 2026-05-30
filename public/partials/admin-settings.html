@@ -383,8 +383,15 @@
       <div class="admin-settings-subsection">
         <h4 class="admin-settings-subheading" x-text="$app.t('admin.settings.api.snippetsTitle')"></h4>
         <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.api.snippetsHint')"></p>
-        <details>
-          <summary x-text="$app.t('admin.settings.api.snippetPrometheus')"></summary>
+        <div class="collapsible-wrap">
+        <button type="button"
+                class="collapsible-toggle"
+                @click="adminSnippetPrometheusOpen = !adminSnippetPrometheusOpen"
+                :aria-expanded="adminSnippetPrometheusOpen">
+          <span class="history-chevron" :class="{ open: adminSnippetPrometheusOpen }">›</span>
+          <span x-text="$app.t('admin.settings.api.snippetPrometheus')"></span>
+        </button>
+        <div x-show="adminSnippetPrometheusOpen" x-cloak class="collapsible-section">
 <pre class="admin-api-snippet">scrape_configs:
   - job_name: schreibwerkstatt
     scheme: https
@@ -394,9 +401,17 @@
     authorization:
       type: Bearer
       credentials: sw_REPLACE_WITH_TOKEN</pre>
-        </details>
-        <details>
-          <summary x-text="$app.t('admin.settings.api.snippetHomeAssistant')"></summary>
+        </div>
+        </div>
+        <div class="collapsible-wrap">
+        <button type="button"
+                class="collapsible-toggle"
+                @click="adminSnippetHomeAssistantOpen = !adminSnippetHomeAssistantOpen"
+                :aria-expanded="adminSnippetHomeAssistantOpen">
+          <span class="history-chevron" :class="{ open: adminSnippetHomeAssistantOpen }">›</span>
+          <span x-text="$app.t('admin.settings.api.snippetHomeAssistant')"></span>
+        </button>
+        <div x-show="adminSnippetHomeAssistantOpen" x-cloak class="collapsible-section">
 <pre class="admin-api-snippet">rest:
   - resource: <span x-text="location.origin"></span>/metrics
     method: GET
@@ -423,7 +438,8 @@
         device_class: duration
         state_class: measurement
         icon: mdi:fountain-pen-tip</pre>
-        </details>
+        </div>
+        </div>
       </div>
     </section>
 

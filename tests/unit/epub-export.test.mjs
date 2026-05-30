@@ -2,7 +2,24 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import epub from '../../lib/export-builders/epub.js';
 
-const { _resolveEpubMeta, _countUnfetchableImages, _buildFrontmatter, _buildBackmatter, _proseToXhtml, buildEpub, _buildOpfExtraMeta, _buildContentOPF } = epub;
+const { _resolveEpubMeta, _countUnfetchableImages, _buildFrontmatter, _buildBackmatter, _proseToXhtml, buildEpub, _buildOpfExtraMeta, _buildContentOPF, _applyBreaks } = epub;
+
+test('_applyBreaks: Editor-hr nach Klasse → pagebreak/blankpage/Szenentrenner', () => {
+  const html = '<hr class="pagebreak" data-bid="a1">x'
+    + '<hr class="blankpage" data-bid="b2">y'
+    + '<hr data-bid="c3">z';
+  const out = _applyBreaks(html, 'stars');
+  assert.equal(out.match(/<hr class="pagebreak" \/>/g).length, 1);
+  // Blankpage-Div traegt ein U+00A0, damit Reader die leere Seite nicht kollabieren.
+  assert.equal(out.match(/<div class="blankpage">[^<]*<\/div>/g).length, 1);
+  // Plain-hr (kein Break-Marker) → konfigurierter Szenentrenner.
+  assert.ok(out.includes('<p class="scene-sep">* * *</p>'));
+});
+
+test('_applyBreaks: unbekannter sceneSep → line-Default, leeres html durchgereicht', () => {
+  assert.equal(_applyBreaks('', 'stars'), '');
+  assert.ok(_applyBreaks('<hr data-bid="x">', 'bogus').includes('<hr class="scene-line" />'));
+});
 
 test('_resolveEpubMeta: opts.author/lang gewinnen vor Domain-Shape', () => {
   const m = _resolveEpubMeta({ created_by: { name: 'Alt' } }, { author: 'Owner Name', lang: 'en' });

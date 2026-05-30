@@ -83,6 +83,7 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
     if (scope === 'book') {
       const pub = getBookPublication(book.id);
       const ex = profile.config.extras;
+      ex.authorName  = pub.author_name || '';
       ex.isbn        = pub.isbn || '';
       ex.subtitle    = pub.subtitle || '';
       ex.year        = pub.year || '';

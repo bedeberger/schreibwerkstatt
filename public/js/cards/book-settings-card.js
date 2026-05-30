@@ -70,7 +70,7 @@ export function registerBookSettingsCard() {
     hubspotImportJobId: null,
     hubspotReconcileJobId: null,
     // Publikation (book_publication: Cover/Titelei/Bio, geteilt mit PDF+EPUB).
-    bookPublication: { isbn: '', subtitle: '', year: '', dedication: '', imprint: '', copyright: '', frontmatter: '', author_bio: '', epub_css_style: 'serif', epub_justify: true, epub_toc_title: '', description: '', publisher: '', series: '', series_index: '', keywords: '', has_cover: false, has_author_image: false },
+    bookPublication: { author_name: '', isbn: '', subtitle: '', year: '', dedication: '', imprint: '', copyright: '', frontmatter: '', author_bio: '', epub_css_style: 'serif', epub_justify: true, epub_toc_title: '', description: '', publisher: '', series: '', series_index: '', keywords: '', has_cover: false, has_author_image: false },
     pubSaving: false,
     pubSaved: false,
     pubError: '',
@@ -124,7 +124,7 @@ export function registerBookSettingsCard() {
           hubspotError: '',
           hubspotImportJobId: null,
           hubspotReconcileJobId: null,
-          bookPublication: { isbn: '', subtitle: '', year: '', dedication: '', imprint: '', copyright: '', frontmatter: '', author_bio: '', epub_css_style: 'serif', epub_justify: true, epub_toc_title: '', description: '', publisher: '', series: '', series_index: '', keywords: '', has_cover: false, has_author_image: false },
+          bookPublication: { author_name: '', isbn: '', subtitle: '', year: '', dedication: '', imprint: '', copyright: '', frontmatter: '', author_bio: '', epub_css_style: 'serif', epub_justify: true, epub_toc_title: '', description: '', publisher: '', series: '', series_index: '', keywords: '', has_cover: false, has_author_image: false },
           pubError: '',
           pubCoverError: '',
           pubAuthorError: '',

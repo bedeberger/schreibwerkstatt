@@ -20,6 +20,12 @@ const _EMPTY_META = () => ({
   frontmatter: '', author_bio: '', epub_css_style: 'serif', epub_justify: true,
   epub_toc_title: '', description: '', publisher: '', series: '', series_index: '',
   keywords: '', has_cover: false, has_author_image: false,
+  // Erweiterte EPUB-Optionen.
+  epub_font_size: 'normal', epub_line_height: 'normal', epub_paragraph_style: 'indent',
+  epub_indent_size: 'medium', epub_hyphenation: false, epub_chapter_pagebreak: true,
+  epub_drop_caps: false, epub_nest_pages_in_toc: true, epub_scene_separator: 'line',
+  epub_titlepage_mode: 'generated', epub_rights: '', epub_pubdate: '',
+  epub_translator: '', epub_illustrator: '', epub_editor_name: '', epub_uuid: '',
 });
 
 export function registerEpubExportCard() {
@@ -140,6 +146,20 @@ export function registerEpubExportCard() {
             description: p.description || '', publisher: p.publisher || '',
             series: p.series || '', series_index: p.series_index != null ? String(p.series_index) : '',
             keywords: p.keywords || '',
+            // Erweiterte EPUB-Optionen.
+            epub_font_size: p.epub_font_size || 'normal',
+            epub_line_height: p.epub_line_height || 'normal',
+            epub_paragraph_style: p.epub_paragraph_style || 'indent',
+            epub_indent_size: p.epub_indent_size || 'medium',
+            epub_scene_separator: p.epub_scene_separator || 'line',
+            epub_titlepage_mode: p.epub_titlepage_mode || 'generated',
+            epub_hyphenation: p.epub_hyphenation ? 1 : 0,
+            epub_chapter_pagebreak: p.epub_chapter_pagebreak ? 1 : 0,
+            epub_drop_caps: p.epub_drop_caps ? 1 : 0,
+            epub_nest_pages_in_toc: p.epub_nest_pages_in_toc ? 1 : 0,
+            epub_rights: p.epub_rights || '', epub_pubdate: p.epub_pubdate || '',
+            epub_translator: p.epub_translator || '', epub_illustrator: p.epub_illustrator || '',
+            epub_editor_name: p.epub_editor_name || '', epub_uuid: p.epub_uuid || '',
           }),
         });
         if (!r.ok) {
@@ -163,12 +183,22 @@ export function registerEpubExportCard() {
       return role === 'editor' || role === 'owner';
     },
 
-    publicationCssOptions() {
-      return [
-        { value: 'serif', label: window.__app.t('publication.cssSerif') },
-        { value: 'sans',  label: window.__app.t('publication.cssSans') },
-      ];
+    // Generischer Enum→Combobox-Options-Helper: Werte + i18n-Key-Prefix.
+    _enumOptions(values, prefix) {
+      return values.map(v => ({ value: v, label: window.__app.t(`${prefix}.${v}`) }));
     },
+    publicationCssOptions() {
+      return this._enumOptions(
+        ['serif', 'sans', 'georgia', 'palatino', 'garamond', 'times', 'baskerville', 'helvetica', 'verdana'],
+        'epubExport.font',
+      );
+    },
+    fontSizeOptions()       { return this._enumOptions(['small', 'normal', 'large'], 'epubExport.fontSize'); },
+    lineHeightOptions()     { return this._enumOptions(['tight', 'normal', 'relaxed'], 'epubExport.lineHeight'); },
+    paragraphStyleOptions() { return this._enumOptions(['indent', 'spaced'], 'epubExport.paragraphStyle'); },
+    indentSizeOptions()     { return this._enumOptions(['small', 'medium', 'large'], 'epubExport.indentSize'); },
+    sceneSeparatorOptions() { return this._enumOptions(['line', 'asterism', 'stars', 'blank', 'fleuron'], 'epubExport.sceneSep'); },
+    titlepageModeOptions()  { return this._enumOptions(['generated', 'cover', 'none'], 'epubExport.titlepageMode'); },
 
     openBookSettings() {
       window.__app?.toggleBookSettingsCard?.();
