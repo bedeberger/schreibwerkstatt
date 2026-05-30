@@ -69,6 +69,23 @@ export function registerBookSettingsCard() {
     hubspotError: '',
     hubspotImportJobId: null,
     hubspotReconcileJobId: null,
+    // Publikation (book_publication: Cover/Titelei/Bio, geteilt mit PDF+EPUB).
+    bookPublication: { isbn: '', subtitle: '', year: '', dedication: '', imprint: '', copyright: '', frontmatter: '', author_bio: '', epub_css_style: 'serif', epub_justify: true, epub_toc_title: '', has_cover: false, has_author_image: false },
+    pubSaving: false,
+    pubSaved: false,
+    pubError: '',
+    pubCoverUploading: false,
+    pubCoverError: '',
+    pubAuthorUploading: false,
+    pubAuthorError: '',
+    pubPreviewVersion: 0,
+    epubExporting: false,
+    epubProgress: 0,
+    epubStatus: '',
+    epubError: '',
+    _pubSavedTimer: null,
+    _epubPollTimer: null,
+    _epubStatusTimer: null,
     _savedAtTimer: null,
     _resetMsgTimer: null,
     _shareInviteMsgTimer: null,
@@ -79,8 +96,8 @@ export function registerBookSettingsCard() {
     init() {
       this._lifecycle = setupCardLifecycle(this, {
         showFlag: 'showBookSettingsCard',
-        onShow: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats(), this.loadBookAccess(), this.loadBookCategory(), this.loadBlogStatus(), this.loadHubspotStatus()]),
-        load: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats(), this.loadBookAccess(), this.loadBookCategory(), this.loadBlogStatus(), this.loadHubspotStatus()]),
+        onShow: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats(), this.loadBookAccess(), this.loadBookCategory(), this.loadBlogStatus(), this.loadHubspotStatus(), this.loadPublication()]),
+        load: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats(), this.loadBookAccess(), this.loadBookCategory(), this.loadBlogStatus(), this.loadHubspotStatus(), this.loadPublication()]),
         resetState: {
           bookSettingsTab: 'book',
           expandedJobType: null,
@@ -113,6 +130,12 @@ export function registerBookSettingsCard() {
           hubspotError: '',
           hubspotImportJobId: null,
           hubspotReconcileJobId: null,
+          bookPublication: { isbn: '', subtitle: '', year: '', dedication: '', imprint: '', copyright: '', frontmatter: '', author_bio: '', epub_css_style: 'serif', epub_justify: true, epub_toc_title: '', has_cover: false, has_author_image: false },
+          pubError: '',
+          pubCoverError: '',
+          pubAuthorError: '',
+          epubError: '',
+          epubStatus: '',
         },
         resetStateView: {
           bookSettingsSaved: false,
@@ -165,6 +188,9 @@ export function registerBookSettingsCard() {
       if (this._savedAtTimer) { clearTimeout(this._savedAtTimer); this._savedAtTimer = null; }
       if (this._resetMsgTimer) { clearTimeout(this._resetMsgTimer); this._resetMsgTimer = null; }
       if (this._shareInviteMsgTimer) { clearTimeout(this._shareInviteMsgTimer); this._shareInviteMsgTimer = null; }
+      if (this._pubSavedTimer) { clearTimeout(this._pubSavedTimer); this._pubSavedTimer = null; }
+      if (this._epubStatusTimer) { clearTimeout(this._epubStatusTimer); this._epubStatusTimer = null; }
+      if (this._epubPollTimer) { clearInterval(this._epubPollTimer); this._epubPollTimer = null; }
       if (this._onBlogJobFinished) {
         window.removeEventListener('job:finished', this._onBlogJobFinished);
         this._onBlogJobFinished = null;

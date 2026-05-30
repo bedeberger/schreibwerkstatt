@@ -313,7 +313,7 @@ app.use('/metrics', require('./routes/metrics'));
 
 // ── Auth-Guard ────────────────────────────────────────────────────────────────
 // API-Pfade → 401 JSON; HTML-Pfade → Redirect zu /auth/login
-const API_PREFIXES = ['/history/', '/figures/', '/locations/', '/world-facts/', '/songs/', '/jobs/', '/sync/', '/chat/', '/booksettings/', '/content/', '/books/', '/me/', '/admin/', '/local/', '/config', '/share/api/'];
+const API_PREFIXES = ['/history/', '/figures/', '/locations/', '/world-facts/', '/songs/', '/jobs/', '/sync/', '/chat/', '/booksettings/', '/publication/', '/content/', '/books/', '/me/', '/admin/', '/local/', '/config', '/share/api/'];
 
 app.use((req, res, next) => {
   if (req.session?.user) return next();
@@ -384,6 +384,7 @@ app.use('/sync', syncRouter);
 app.use('/export', exportRouter);
 app.use('/book-migration', bookMigrationRouter);
 app.use('/pdf-export', pdfExportRouter);
+app.use('/publication', require('./routes/publication'));
 app.use('/usage', usageRouter);
 app.use('/telemetry', require('./routes/telemetry'));
 app.use('/draft-figures', draftFiguresRouter);

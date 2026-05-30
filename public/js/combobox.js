@@ -74,8 +74,8 @@ export function comboboxData(cfg = {}) {
         if (this._multiple) {
           const arr = Array.isArray(this.value) ? this.value : [];
           if (!arr.length) return '';
-          const t = window.__app?.t;
-          return t ? t('common.multiSelected', { n: arr.length }) : `${arr.length}`;
+          const app = window.__app;
+          return app?.t ? app.t('common.multiSelected', { n: arr.length }) : `${arr.length}`;
         }
         const v = this.value ?? '';
         const opt = this._allOptions.find(o => String(o.value) === String(v));

@@ -33,6 +33,10 @@
               @click="bookSettingsTab = 'share'"
               x-text="$app.t('book.settings.tab.share')"></button>
       <button type="button" class="tabs-btn"
+              :class="{ 'tabs-btn--active': bookSettingsTab === 'publication' }"
+              @click="bookSettingsTab = 'publication'"
+              x-text="$app.t('book.settings.tab.publication')"></button>
+      <button type="button" class="tabs-btn"
               x-show="bookSettingsBuchtyp === 'blog'" x-cloak
               :class="{ 'tabs-btn--active': bookSettingsTab === 'sync' }"
               @click="bookSettingsTab = 'sync'"
@@ -256,6 +260,140 @@
     </div>
 
     </div><!-- /tab: book -->
+
+    <!-- Publikation: buch-weite Metadaten (Cover, Titelei, Bio) — geteilt von
+         PDF- und EPUB-Export. Plus EPUB-Export-Trigger. -->
+    <div class="card-form-grid" x-show="bookSettingsTab === 'publication'" x-cloak>
+
+      <section class="book-settings-section">
+        <h3 class="book-settings-section-title" x-text="$app.t('publication.section.images')"></h3>
+
+        <div class="card-form-row">
+          <label class="card-form-label" x-text="$app.t('publication.cover')"></label>
+          <div class="pub-image-block">
+            <div class="pub-image-preview">
+              <template x-if="bookPublication.has_cover">
+                <img :src="publicationCoverUrl()" alt="">
+              </template>
+              <template x-if="!bookPublication.has_cover">
+                <span x-text="$app.t('publication.noImage')"></span>
+              </template>
+            </div>
+            <div class="pub-image-actions">
+              <label class="pub-upload-btn">
+                <input type="file" accept="image/jpeg,image/png,image/webp" hidden @change="uploadPublicationCover($event)">
+                <span x-text="pubCoverUploading ? $app.t('publication.uploading') : (bookPublication.has_cover ? $app.t('publication.replace') : $app.t('publication.upload'))"></span>
+              </label>
+              <button type="button" x-show="bookPublication.has_cover" @click="removePublicationCover()" x-text="$app.t('publication.remove')"></button>
+            </div>
+          </div>
+          <p class="card-form-error" x-show="pubCoverError" x-text="pubCoverError"></p>
+        </div>
+
+        <div class="card-form-row">
+          <label class="card-form-label" x-text="$app.t('publication.authorImage')"></label>
+          <div class="pub-image-block">
+            <div class="pub-image-preview">
+              <template x-if="bookPublication.has_author_image">
+                <img :src="publicationAuthorImageUrl()" alt="">
+              </template>
+              <template x-if="!bookPublication.has_author_image">
+                <span x-text="$app.t('publication.noImage')"></span>
+              </template>
+            </div>
+            <div class="pub-image-actions">
+              <label class="pub-upload-btn">
+                <input type="file" accept="image/jpeg,image/png,image/webp" hidden @change="uploadPublicationAuthorImage($event)">
+                <span x-text="pubAuthorUploading ? $app.t('publication.uploading') : (bookPublication.has_author_image ? $app.t('publication.replace') : $app.t('publication.upload'))"></span>
+              </label>
+              <button type="button" x-show="bookPublication.has_author_image" @click="removePublicationAuthorImage()" x-text="$app.t('publication.remove')"></button>
+            </div>
+          </div>
+          <p class="card-form-error" x-show="pubAuthorError" x-text="pubAuthorError"></p>
+        </div>
+      </section>
+
+      <section class="book-settings-section">
+        <h3 class="book-settings-section-title" x-text="$app.t('publication.section.metadata')"></h3>
+
+        <div class="card-form-row">
+          <label class="card-form-label" for="pub-subtitle" x-text="$app.t('publication.subtitle')"></label>
+          <input type="text" id="pub-subtitle" class="card-form-input" x-model="bookPublication.subtitle" maxlength="300" data-spellcheck="spelling">
+        </div>
+        <div class="card-form-row">
+          <label class="card-form-label" for="pub-isbn" x-text="$app.t('publication.isbn')"></label>
+          <input type="text" id="pub-isbn" class="card-form-input" x-model="bookPublication.isbn" maxlength="20">
+        </div>
+        <div class="card-form-row">
+          <label class="card-form-label" for="pub-year" x-text="$app.t('publication.year')"></label>
+          <input type="text" id="pub-year" class="card-form-input" x-model="bookPublication.year" maxlength="10">
+        </div>
+        <div class="card-form-row">
+          <label class="card-form-label" for="pub-dedication" x-text="$app.t('publication.dedication')"></label>
+          <textarea id="pub-dedication" class="card-form-textarea" rows="2" x-model="bookPublication.dedication" maxlength="2000" data-spellcheck="spelling"></textarea>
+        </div>
+        <div class="card-form-row">
+          <label class="card-form-label" for="pub-frontmatter" x-text="$app.t('publication.frontmatter')"></label>
+          <textarea id="pub-frontmatter" class="card-form-textarea" rows="3" x-model="bookPublication.frontmatter" maxlength="8000" data-spellcheck="spelling"></textarea>
+        </div>
+        <div class="card-form-row">
+          <label class="card-form-label" for="pub-imprint" x-text="$app.t('publication.imprint')"></label>
+          <textarea id="pub-imprint" class="card-form-textarea" rows="3" x-model="bookPublication.imprint" maxlength="8000" data-spellcheck="spelling"></textarea>
+        </div>
+        <div class="card-form-row">
+          <label class="card-form-label" for="pub-copyright" x-text="$app.t('publication.copyright')"></label>
+          <textarea id="pub-copyright" class="card-form-textarea" rows="2" x-model="bookPublication.copyright" maxlength="500" data-spellcheck="spelling"></textarea>
+        </div>
+        <div class="card-form-row">
+          <label class="card-form-label" for="pub-bio" x-text="$app.t('publication.authorBio')"></label>
+          <textarea id="pub-bio" class="card-form-textarea" rows="4" x-model="bookPublication.author_bio" maxlength="4000" data-spellcheck="spelling"></textarea>
+        </div>
+      </section>
+
+      <section class="book-settings-section">
+        <h3 class="book-settings-section-title" x-text="$app.t('publication.section.epub')"></h3>
+
+        <div class="card-form-row">
+          <label class="card-form-label" x-text="$app.t('publication.cssStyle')"></label>
+          <div x-data="combobox($app.t('publication.cssStyle'))"
+               x-modelable="value" x-model="bookPublication.epub_css_style"
+               x-effect="options = publicationCssOptions()"></div>
+        </div>
+        <div class="card-form-row">
+          <label class="book-settings-option">
+            <input type="checkbox" x-model="bookPublication.epub_justify">
+            <span x-text="$app.t('publication.justify')"></span>
+          </label>
+        </div>
+        <div class="card-form-row">
+          <label class="card-form-label" for="pub-toc" x-text="$app.t('publication.tocTitle')"></label>
+          <input type="text" id="pub-toc" class="card-form-input" x-model="bookPublication.epub_toc_title" maxlength="100" :placeholder="$app.t('publication.tocTitlePlaceholder')">
+        </div>
+      </section>
+
+      <div class="card-actions">
+        <span class="card-form-error" x-show="pubError" x-text="pubError"></span>
+        <span class="card-form-saved" x-show="pubSaved" x-cloak x-transition.opacity.duration.250ms x-text="$app.t('common.settingsSaved')"></span>
+        <button type="button" @click="savePublication()" :disabled="pubSaving">
+          <span x-show="pubSaving" class="spinner"></span>
+          <span x-text="pubSaving ? $app.t('common.saving') : $app.t('common.save')"></span>
+        </button>
+      </div>
+
+      <section class="book-settings-section">
+        <h3 class="book-settings-section-title" x-text="$app.t('publication.section.export')"></h3>
+        <p class="card-form-hint" x-text="$app.t('publication.exportHint')"></p>
+        <div class="card-actions">
+          <span class="card-form-error" x-show="epubError" x-text="epubError"></span>
+          <span x-show="epubStatus" x-text="epubStatus"></span>
+          <button type="button" @click="exportEpub()" :disabled="epubExporting">
+            <span x-show="epubExporting" class="spinner"></span>
+            <span x-text="$app.t('publication.exportEpub')"></span>
+          </button>
+        </div>
+      </section>
+
+    </div><!-- /tab: publication -->
 
     <div class="card-form-grid" x-show="bookSettingsTab === 'share'" x-cloak>
 

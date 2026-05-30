@@ -16,7 +16,14 @@ const {
   i18nError,
   jsonBody,
 } = require('./shared');
-const { getPdfExportProfile, getPdfExportProfileCover, getPdfExportProfileAuthorImage, getPdfExportProfileBackCover, getBookSettings } = require('../../db/schema');
+const { getPdfExportProfile, getPdfExportProfileBackCover, getBookSettings } = require('../../db/schema');
+// Cover/Autorfoto + Titelei sind buch-weit (book_publication), geteilt mit dem
+// EPUB-Export. Der PDF-Render liest sie von hier, nicht mehr vom Profil.
+const {
+  getMeta: getBookPublication,
+  getCover: getBookPublicationCover,
+  getAuthorImage: getBookPublicationAuthorImage,
+} = require('../../db/book-publication');
 const { loadContents } = require('../../lib/load-contents');
 const { renderPdfBuffer } = require('../../lib/pdf-render');
 const { renderCoverBuffer, computeSpineMm } = require('../../lib/pdf-cover-render');
@@ -67,21 +74,39 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
     const { language: bookLang } = getBookSettings(book.id, userEmail);
     const standard = profile.config.pdfa?.standard || (profile.config.pdfa?.enabled ? 'pdfa' : 'none');
 
+    // Buch-weite Publikations-Metadaten in config.extras spiegeln, damit die
+    // Render-Funktionen (pages.js, cover-render) unveraendert config.extras
+    // lesen. Render-Toggles (barcode, imprintPosition) bleiben Profil-Sache.
+    // Cover/Autorfoto kommen ebenfalls buch-weit (geteilt mit EPUB).
+    let pubCoverBuf = null;
+    let pubAuthorBuf = null;
+    if (scope === 'book') {
+      const pub = getBookPublication(book.id);
+      const ex = profile.config.extras;
+      ex.isbn        = pub.isbn || '';
+      ex.subtitle    = pub.subtitle || '';
+      ex.year        = pub.year || '';
+      ex.dedication  = pub.dedication || '';
+      ex.imprint     = pub.imprint || '';
+      ex.copyright   = pub.copyright || '';
+      ex.frontMatter = pub.frontmatter || '';
+      ex.authorBio   = pub.author_bio || '';
+      if (pub.has_cover) { const c = getBookPublicationCover(book.id); if (c) pubCoverBuf = c.image; }
+      if (pub.has_author_image) { const a = getBookPublicationAuthorImage(book.id); if (a) pubAuthorBuf = a.image; }
+    }
+
     let buffer;
     let lowResImages = 0;
     let coverInInterior = false;
 
     if (target === 'cover') {
-      // Separates Umschlag-PDF: nur fuer das ganze Buch sinnvoll.
+      // Separates Umschlag-PDF: nur fuer das ganze Buch sinnvoll. Front =
+      // buch-weites Cover (book_publication), Rueckseite render-spezifisch (Profil).
       const cs = profile.config.coverSpec || {};
       if (!(cs.pageCount > 0) || !(cs.paperBulkMmPer1000 > 0)) {
         throw i18nError('job.error.coverSpecRequired');
       }
-      let frontImageBuf = null;
-      if (profile.has_cover) {
-        const cover = getPdfExportProfileCover(profileId);
-        if (cover) frontImageBuf = cover.image;
-      }
+      const frontImageBuf = pubCoverBuf;
       let backImageBuf = null;
       if (profile.has_back_cover) {
         const back = getPdfExportProfileBackCover(profileId);
@@ -91,17 +116,8 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
       buffer = await renderCoverBuffer({ book, profile, frontImageBuf, backImageBuf, lang: bookLang });
       log.info(`Umschlag-PDF gerendert (Ruecken=${computeSpineMm(cs).toFixed(1)} mm, ${cs.pageCount} Seiten, profile=${profile.name})`);
     } else {
-      let coverBuf = null;
-      if (scope === 'book' && profile.config.cover.enabled && profile.has_cover) {
-        const cover = getPdfExportProfileCover(profileId);
-        if (cover) coverBuf = cover.image;
-      }
-
-      let authorImageBuf = null;
-      if (scope === 'book' && profile.has_author_image) {
-        const ai = getPdfExportProfileAuthorImage(profileId);
-        if (ai) authorImageBuf = ai.image;
-      }
+      const coverBuf = (scope === 'book' && profile.config.cover.enabled) ? pubCoverBuf : null;
+      const authorImageBuf = (scope === 'book') ? pubAuthorBuf : null;
 
       updateJob(jobId, { progress: 40, statusText: 'job.phase.renderPdf' });
       const meta = {};

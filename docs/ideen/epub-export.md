@@ -8,7 +8,9 @@
 > - **Block B (EPUB-Bugfixes) — umgesetzt + getestet.** Autor (Owner-Anzeigename), `lang` (book_settings.language), lokalisierter TOC-Titel, Bild-Warnliste statt Silent-Drop. DOCX-Autor-Fix mit. Tests: [tests/unit/epub-export.test.mjs](../../tests/unit/epub-export.test.mjs).
 > - **Block A Foundation — umgesetzt + getestet.** Migration 166: Tabelle `book_publication` (1:1, FK CASCADE) + Seed aus dem Gewinner-PDF-Profil je Buch. Validator [lib/publication-meta.js](../../lib/publication-meta.js), CRUD [db/book-publication.js](../../db/book-publication.js). squash:regen + ERD aktualisiert, Drift-Tests grün. Tests: [tests/unit/publication-meta.test.mjs](../../tests/unit/publication-meta.test.mjs).
 > - **EPUB-Consume — umgesetzt + getestet.** `buildEpub` bettet Cover (Buffer→`File`) ein, baut Titelseite/Impressum/Widmung/Motto (beforeToc, aus custom-TOC ausgeschlossen) + Autor-Bio-Backmatter (+Foto-data-URI), Blocksatz-Toggle, TOC-Titel-Override. Sync-Route [routes/export.js](../../routes/export.js) lädt `meta`/Cover/Foto lazy für `epub`. Smoke-Test gegen echtes `genEpub`.
-> - **Offen:** [routes/publication.js](../../routes/publication.js) (Meta-/Cover-/Foto-CRUD-Endpunkte), [routes/jobs/epub-export.js](../../routes/jobs/epub-export.js) (Job-Pfad), `publicationCard` + Partial + i18n + CSS + Registry/Hash-Router (Block C), PDF-Render-Lesepfad auf `book_publication` umziehen (nach Commit der laufenden pdf-print-ready-Arbeit, sonst Konflikt mit uncommitted Working Tree).
+> - **Backend-Route + Job — umgesetzt + verifiziert.** [routes/publication.js](../../routes/publication.js) (GET/PUT Meta + Cover/Autorfoto-Upload, ACL viewer/editor), [routes/jobs/epub-export.js](../../routes/jobs/epub-export.js) (Job `epub-export` + `/file`-Stream), gemountet in server.js/jobs.js + API-Prefix. CRUD end-to-end gegen Dev-DB getestet.
+> - **Publikation-Tab — umgesetzt.** Neuer Tab in der BookSettings-Karte ([book-settings.html](../../public/partials/book-settings.html) + [book-settings-card.js](../../public/js/cards/book-settings-card.js) + [book-settings.js](../../public/js/book/book-settings.js)): Cover-/Autorfoto-Upload, Titelei-Felder, EPUB-Optionen, EPUB-Export-Button (Job-Poll + Download). i18n de+en (30 Keys, Parität), CSS, SHELL_CACHE-Bump, DESIGN.md-Pattern „Bild-Upload mit Vorschau". 1381 Unit-Tests grün.
+> - **Offen:** PDF-Render-Lesepfad auf `book_publication` umziehen (nach Commit der laufenden pdf-print-ready-Arbeit, sonst Konflikt mit uncommitted Working Tree) — bis dahin liest PDF weiter aus `pdf_export_profile.config.extras`, EPUB aus `book_publication` (Seed hält sie initial konsistent).
 
 ## Context
 
@@ -100,18 +102,14 @@ Parallel hat der Custom-PDF-Export ([lib/pdf-render.js](../../lib/pdf-render.js)
 
 ## Frontend
 
-`publicationCard` ([public/js/cards/publication-card.js](../../public/js/cards/publication-card.js)) — neue Buchkarte nach Card-Recipe:
+**Publikation-Tab in der bestehenden BookSettings-Karte** — keine neue Karte (spart Registry/Hash-Router/Exklusivität). [public/js/cards/book-settings-card.js](../../public/js/cards/book-settings-card.js) hat bereits `bookSettingsTab` (book/share/sync/stats):
 
-1. Fachmodul `publicationMethods` (Metadaten laden/speichern, Cover-/Foto-Upload, EPUB-Export via `POST /jobs/epub-export` + Job-Poll + Download-Stream — `createCardJobFeature`/`startPoll` aus [job-helpers.js](../../public/js/cards/job-helpers.js)).
-2. `Alpine.data('publicationCard', …)`, `registerPublicationCard()` in `app.js`.
-3. Partial [public/partials/publication.html](../../public/partials/publication.html), `x-data="publicationCard"`.
-4. `togglePublicationCard()` in app-view.js.
-5. `showPublicationCard`-Flag in `app-state.js` cardsState.
-6. `EXCLUSIVE_CARDS`-Eintrag in [feature-registry.js](../../public/js/cards/feature-registry.js).
-7. `FEATURES`-Eintrag + Key in `ALLOWED_KEYS` ([routes/usage.js](../../routes/usage.js)).
-8. Hash-Router-Branch in [app-hash-router.js](../../public/js/app/app-hash-router.js).
+1. Neuer Tab-Button `bookSettingsTab === 'publication'` + Tab-Content-Section in [public/partials/book-settings.html](../../public/partials/book-settings.html).
+2. State-Felder (`bookPublication`-Objekt + Upload-/Save-Status) im Card-Init; Lade-/Speicher-/Upload-Methoden in [public/js/book/book-settings.js](../../public/js/book/book-settings.js).
+3. Felder: Cover-Upload/Vorschau/Entfernen (reused vom PDF-Cover-Flow), Autorfoto dito, ISBN, Subtitle, Jahr (Text), Widmung, Impressum, Copyright, Frontmatter, Bio + EPUB-Toggles (Stil/Blocksatz/TOC-Titel) + EPUB-Export-Button (`POST /jobs/epub-export` + Poll + Download).
+4. Prosa-Textareas mit `data-spellcheck="spelling"`; Jahr/ISBN als Text; Stil via `combobox`.
 
-PDF-Export-Card: Metadaten-/Cover-/Autor-Tabs entfernen, Hinweis-Link auf Publikation-Karte. Layout/Schrift/Kapitel/TOC/Druck/Norm bleiben.
+PDF-Export-Card: Metadaten-/Cover-/Autor-Tabs entfernen, Hinweis-Link auf den Publikation-Tab. Layout/Schrift/Kapitel/TOC/Druck/Norm bleiben.
 
 ## CSS
 

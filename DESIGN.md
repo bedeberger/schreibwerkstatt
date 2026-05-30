@@ -1894,6 +1894,32 @@ Wenn die Karte zusätzlich Inline-Inputs braucht (z.B. „Neue Figur — Name ei
 
 ---
 
+## Bild-Upload mit Vorschau + Entfernen
+
+**Status:** Etabliert. Zwei Konsumenten: PDF-Export-Karte (Cover/Autorfoto/Rückseite) und BookSettings-Publikation-Tab (Cover/Autorfoto). Jeweils eigene Klassen mit gleichem Aufbau (kein geteiltes Basis-CSS — die Implementierungen sind bewusst entkoppelt, da unterschiedliche Token-Sets/Layout-Slots).
+
+**Pattern:** Vorschau-Box (zeigt Bild oder Leer-Hinweis) + Aktionsreihe mit `<label>`-File-Picker (im Button-Look) + `<button>` „Entfernen" (nur bei vorhandenem Bild).
+```html
+<div class="pub-image-block">
+  <div class="pub-image-preview">
+    <template x-if="bookPublication.has_cover"><img :src="publicationCoverUrl()" alt=""></template>
+    <template x-if="!bookPublication.has_cover"><span x-text="$app.t('publication.noImage')"></span></template>
+  </div>
+  <div class="pub-image-actions">
+    <label class="pub-upload-btn">
+      <input type="file" accept="image/jpeg,image/png,image/webp" hidden @change="uploadPublicationCover($event)">
+      <span x-text="…uploading ? t('uploading') : (has_cover ? t('replace') : t('upload'))"></span>
+    </label>
+    <button type="button" x-show="bookPublication.has_cover" @click="removePublicationCover()" x-text="t('remove')"></button>
+  </div>
+</div>
+```
+- Vorschau-URL trägt `?v=${previewVersion}`-Counter → Cache-Bust nach Upload/Remove (kein veraltetes Bild).
+- Upload via `fetch(POST, body: file)` mit `Content-Type: file.type`; Server härtet durch `prepareCover` (sharp, Magic-Bytes, sRGB-JPEG).
+- CSS: PDF-Export `.pdfx-cover-preview`/`.pdfx-file-btn` ([public/css/book/pdf-export.css](public/css/book/pdf-export.css)), BookSettings `.pub-image-preview`/`.pub-upload-btn` ([public/css/book/book-settings.css](public/css/book/book-settings.css)).
+
+---
+
 ## Keyboard-Shortcut-Anzeige (`<kbd>`)
 
 **Use:** Tasten anzeigen (Hotkeys, Help-Overlay, Palette-Hero).

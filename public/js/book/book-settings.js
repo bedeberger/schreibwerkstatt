@@ -5,6 +5,7 @@
 import { fetchJson } from '../utils.js';
 import { contentRepo } from '../repo/content.js';
 import { countryOptions } from '../country-codes.js';
+import { startPoll } from '../cards/job-helpers.js';
 
 export const bookSettingsMethods = {
   async loadBookSettings() {
@@ -131,6 +132,161 @@ export const bookSettingsMethods = {
     } finally {
       this.bookSettingsSaving = false;
     }
+  },
+
+  // ── Publikation (book_publication: Cover/Titelei/Bio, geteilt mit PDF+EPUB) ──
+  async loadPublication() {
+    const bookId = window.__app.selectedBookId;
+    if (!bookId) return;
+    try {
+      this.bookPublication = await fetchJson(`/publication/${bookId}`);
+    } catch (e) {
+      console.error('[book-settings] Publikation laden fehlgeschlagen:', e);
+    }
+  },
+
+  async savePublication() {
+    const bookId = window.__app.selectedBookId;
+    if (!bookId) return;
+    this.pubSaving = true; this.pubSaved = false; this.pubError = '';
+    try {
+      const p = this.bookPublication || {};
+      const r = await fetch(`/publication/${bookId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          isbn: p.isbn || '', subtitle: p.subtitle || '', year: p.year || '',
+          dedication: p.dedication || '', imprint: p.imprint || '', copyright: p.copyright || '',
+          frontmatter: p.frontmatter || '', author_bio: p.author_bio || '',
+          epub_css_style: p.epub_css_style || 'serif', epub_justify: p.epub_justify ? 1 : 0,
+          epub_toc_title: p.epub_toc_title || '',
+        }),
+      });
+      if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(window.__app.tError(d) || `HTTP ${r.status}`); }
+      this.bookPublication = await r.json();
+      this.pubSaved = true;
+      if (this._pubSavedTimer) clearTimeout(this._pubSavedTimer);
+      this._pubSavedTimer = setTimeout(() => { this.pubSaved = false; this._pubSavedTimer = null; }, 2500);
+    } catch (e) {
+      this.pubError = e.message;
+    } finally {
+      this.pubSaving = false;
+    }
+  },
+
+  async uploadPublicationCover(ev) {
+    const file = ev?.target?.files?.[0];
+    const bookId = window.__app.selectedBookId;
+    if (!file || !bookId) return;
+    this.pubCoverUploading = true; this.pubCoverError = '';
+    try {
+      const r = await fetch(`/publication/${bookId}/cover`, { method: 'POST', headers: { 'Content-Type': file.type || 'application/octet-stream' }, body: file });
+      if (!r.ok) { const d = await r.json().catch(() => ({})); this.pubCoverError = window.__app.tError(d) || window.__app.t('publication.imageInvalid'); return; }
+      this.pubPreviewVersion++;
+      await this.loadPublication();
+    } finally {
+      this.pubCoverUploading = false;
+      ev.target.value = '';
+    }
+  },
+
+  async removePublicationCover() {
+    const bookId = window.__app.selectedBookId;
+    if (!bookId) return;
+    const r = await fetch(`/publication/${bookId}/cover`, { method: 'DELETE' });
+    if (!r.ok) return;
+    this.pubPreviewVersion++;
+    await this.loadPublication();
+  },
+
+  publicationCoverUrl() {
+    const bookId = window.__app.selectedBookId;
+    if (!this.bookPublication?.has_cover || !bookId) return '';
+    return `/publication/${bookId}/cover?v=${this.pubPreviewVersion}`;
+  },
+
+  async uploadPublicationAuthorImage(ev) {
+    const file = ev?.target?.files?.[0];
+    const bookId = window.__app.selectedBookId;
+    if (!file || !bookId) return;
+    this.pubAuthorUploading = true; this.pubAuthorError = '';
+    try {
+      const r = await fetch(`/publication/${bookId}/author-image`, { method: 'POST', headers: { 'Content-Type': file.type || 'application/octet-stream' }, body: file });
+      if (!r.ok) { const d = await r.json().catch(() => ({})); this.pubAuthorError = window.__app.tError(d) || window.__app.t('publication.imageInvalid'); return; }
+      this.pubPreviewVersion++;
+      await this.loadPublication();
+    } finally {
+      this.pubAuthorUploading = false;
+      ev.target.value = '';
+    }
+  },
+
+  async removePublicationAuthorImage() {
+    const bookId = window.__app.selectedBookId;
+    if (!bookId) return;
+    const r = await fetch(`/publication/${bookId}/author-image`, { method: 'DELETE' });
+    if (!r.ok) return;
+    this.pubPreviewVersion++;
+    await this.loadPublication();
+  },
+
+  publicationAuthorImageUrl() {
+    const bookId = window.__app.selectedBookId;
+    if (!this.bookPublication?.has_author_image || !bookId) return '';
+    return `/publication/${bookId}/author-image?v=${this.pubPreviewVersion}`;
+  },
+
+  publicationCssOptions() {
+    return [
+      { value: 'serif', label: window.__app.t('publication.cssSerif') },
+      { value: 'sans',  label: window.__app.t('publication.cssSans') },
+    ];
+  },
+
+  async exportEpub() {
+    const bookId = window.__app.selectedBookId;
+    if (!bookId) return;
+    this.epubExporting = true; this.epubError = ''; this.epubStatus = ''; this.epubProgress = 0;
+    try {
+      const r = await fetch('/jobs/epub-export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scope: 'book', entityId: Number(bookId) }),
+      });
+      if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(window.__app.tError(d) || `HTTP ${r.status}`); }
+      const { jobId } = await r.json();
+      this._epubStartPoll(jobId);
+    } catch (e) {
+      this.epubExporting = false;
+      this.epubError = e.message;
+    }
+  },
+
+  _epubStartPoll(jobId) {
+    if (this._epubPollTimer) { clearInterval(this._epubPollTimer); this._epubPollTimer = null; }
+    startPoll(this, {
+      timerProp: '_epubPollTimer',
+      jobId,
+      progressProp: 'epubProgress',
+      intervalMs: 1000,
+      onProgress: (job) => { this.epubStatus = job.statusText ? window.__app.t(job.statusText, job.statusParams) : ''; },
+      onError: (job) => {
+        this.epubExporting = false;
+        this.epubError = job.error ? window.__app.t(job.error, job.errorParams) : window.__app.t('publication.exportError');
+      },
+      onDone: (job) => {
+        this.epubExporting = false;
+        this.epubProgress = 100;
+        this.epubStatus = window.__app.t('publication.exportDone');
+        const result = job.result || {};
+        const a = document.createElement('a');
+        a.href = `/jobs/epub-export/${jobId}/file`;
+        a.download = result.filename || 'book.epub';
+        document.body.appendChild(a); a.click(); a.remove();
+        if (this._epubStatusTimer) clearTimeout(this._epubStatusTimer);
+        this._epubStatusTimer = setTimeout(() => { this.epubStatus = ''; this.epubProgress = 0; this._epubStatusTimer = null; }, 3500);
+      },
+    });
   },
 
   bookSettingsLocaleDisplay() {

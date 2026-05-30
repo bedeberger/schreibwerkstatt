@@ -352,6 +352,15 @@
   flex: 1;
 }
 
+/* Badge-Platz schon vor dem Lazy-Wrap reservieren: der Form-Controller wickelt
+ * das Feld erst beim ersten focusin ein und setzt dabei padding-inline-end —
+ * ohne Vorab-Reservierung springt das Padding einmalig und das Feld wackelt.
+ * card-title--input ausgenommen (span-artige Optik mit padding:0). */
+input[data-spellcheck="spelling"]:not(.card-title--input),
+textarea[data-spellcheck="spelling"]:not(.card-title--input) {
+  padding-inline-end: var(--space-2xl);
+}
+
 /* Wrapped field fuellt den Wrap und reserviert rechts Platz fuer den Badge.
  * Attribute-Selektor + Klassen-Selektor heben die Specificity ueber Klassen-
  * Padding-Shorthands ([data-spellcheck] = 0,1,0 + .lt-field-wrap > = 0,1,1
