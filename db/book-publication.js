@@ -11,6 +11,7 @@ const { defaultMeta, validateMeta } = require('../lib/publication-meta');
 const _META_COLS = [
   'isbn', 'subtitle', 'year', 'dedication', 'imprint', 'copyright',
   'frontmatter', 'author_bio', 'epub_css_style', 'epub_justify', 'epub_toc_title',
+  'description', 'publisher', 'series', 'series_index', 'keywords',
 ];
 
 const _stmtGet = db.prepare(`
@@ -28,15 +29,19 @@ const _stmtGetAuthorImage = db.prepare('SELECT author_image AS image, author_ima
 const _stmtUpsertMeta = db.prepare(`
   INSERT INTO book_publication
     (book_id, isbn, subtitle, year, dedication, imprint, copyright, frontmatter,
-     author_bio, epub_css_style, epub_justify, epub_toc_title, created_at, updated_at)
+     author_bio, epub_css_style, epub_justify, epub_toc_title,
+     description, publisher, series, series_index, keywords, created_at, updated_at)
   VALUES
     (@book_id, @isbn, @subtitle, @year, @dedication, @imprint, @copyright, @frontmatter,
-     @author_bio, @epub_css_style, @epub_justify, @epub_toc_title, ${NOW_ISO_SQL}, ${NOW_ISO_SQL})
+     @author_bio, @epub_css_style, @epub_justify, @epub_toc_title,
+     @description, @publisher, @series, @series_index, @keywords, ${NOW_ISO_SQL}, ${NOW_ISO_SQL})
   ON CONFLICT(book_id) DO UPDATE SET
     isbn = @isbn, subtitle = @subtitle, year = @year, dedication = @dedication,
     imprint = @imprint, copyright = @copyright, frontmatter = @frontmatter,
     author_bio = @author_bio, epub_css_style = @epub_css_style,
     epub_justify = @epub_justify, epub_toc_title = @epub_toc_title,
+    description = @description, publisher = @publisher, series = @series,
+    series_index = @series_index, keywords = @keywords,
     updated_at = ${NOW_ISO_SQL}
 `);
 

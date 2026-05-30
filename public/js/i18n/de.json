@@ -363,6 +363,7 @@
   "book.export.md":              "Markdown",
   "book.export.pdfCustom":       "PDF (anpassbar) …",
   "book.export.epubCustom":      "EPUB (anpassbar) …",
+  "publication.exportToolsHint": "Layout, Schrift, Cover und Reflow-Einstellungen werden in den anpassbaren Export-Karten gepflegt.",
   "book.export.migrationTitle":  "Buch zügeln",
   "book.export.migrationHint":   "Ganzes Buch als .swbook-Datei exportieren und auf einer anderen Instanz unter «Importieren» wieder einlesen. Enthält Seiten, Kapitelstruktur und Bucheinstellungen (keine Analysen).",
   "book.export.swbook":          "Migrations-Export (.swbook)",

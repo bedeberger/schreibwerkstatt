@@ -235,13 +235,6 @@ export const bookSettingsMethods = {
     return `/publication/${bookId}/author-image?v=${this.pubPreviewVersion}`;
   },
 
-  publicationCssOptions() {
-    return [
-      { value: 'serif', label: window.__app.t('publication.cssSerif') },
-      { value: 'sans',  label: window.__app.t('publication.cssSans') },
-    ];
-  },
-
   bookSettingsLocaleDisplay() {
     const map = {
       'de-CH': 'Deutsch (Schweiz)',

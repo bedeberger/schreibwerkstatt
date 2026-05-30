@@ -6965,6 +6965,29 @@ function _runMigrationsLocked() {
     logger.info(`DB-Migration auf Version 166 abgeschlossen (book_publication, ${seeded} Buch/Buecher geseedet).`);
   }
 
+  if (version < 167) {
+    // Buchhandels-Metadaten fuer den EPUB-Export (OPF): eigene Klappentext-
+    // Beschreibung, Verlag, Reihe + Reihen-Position, Schlagwoerter (dc:subject).
+    // Additiv — keine FK-Aenderung. description ist eigene Quelle, faellt im
+    // Builder auf books.description zurueck wenn leer.
+    const pubCols = db.pragma('table_info(book_publication)').map(c => c.name);
+    const addPubCol = (name, ddl) => {
+      if (!pubCols.includes(name)) db.exec(`ALTER TABLE book_publication ADD COLUMN ${ddl}`);
+    };
+    addPubCol('description', 'description TEXT');
+    addPubCol('publisher', 'publisher TEXT');
+    addPubCol('series', 'series TEXT');
+    addPubCol('series_index', 'series_index TEXT');
+    addPubCol('keywords', 'keywords TEXT');
+
+    const fkErrors167 = db.pragma('foreign_key_check');
+    if (fkErrors167.length) {
+      throw new Error(`Migration 167: foreign_key_check meldet ${fkErrors167.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 167').run();
+    logger.info('DB-Migration auf Version 167 abgeschlossen (book_publication: Buchhandels-Metadaten).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

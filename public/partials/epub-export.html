@@ -67,17 +67,18 @@
       </div>
       <div class="card-form-row">
         <label class="book-settings-option">
-          <input type="checkbox" x-model="pub.epub_justify">
+          <input type="checkbox" x-model="pub.epub_justify" :disabled="!canEditPublication()">
           <span x-text="$app.t('publication.justify')"></span>
         </label>
       </div>
       <div class="card-form-row">
         <label class="card-form-label" for="epubx-toc" x-text="$app.t('publication.tocTitle')"></label>
         <input type="text" id="epubx-toc" class="card-form-input" x-model="pub.epub_toc_title"
-               maxlength="100" :placeholder="$app.t('publication.tocTitlePlaceholder')" data-spellcheck="spelling">
+               maxlength="100" :placeholder="$app.t('publication.tocTitlePlaceholder')"
+               :disabled="!canEditPublication()" data-spellcheck="spelling">
       </div>
 
-      <div class="card-actions">
+      <div class="card-actions" x-show="canEditPublication()">
         <span class="card-form-saved" x-show="savedAt" x-cloak x-transition.opacity.duration.250ms x-text="$app.t('epubExport.saved')"></span>
         <button type="button" :disabled="saving" @click="savePublication()">
           <span x-show="saving" class="spinner"></span>

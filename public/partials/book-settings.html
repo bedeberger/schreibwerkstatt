@@ -366,27 +366,6 @@
         </div>
       </section>
 
-      <section class="book-settings-section">
-        <h3 class="book-settings-section-title" x-text="$app.t('publication.section.epub')"></h3>
-
-        <div class="card-form-row">
-          <label class="card-form-label" x-text="$app.t('publication.cssStyle')"></label>
-          <div x-data="combobox($app.t('publication.cssStyle'))"
-               x-modelable="value" x-model="bookPublication.epub_css_style"
-               x-effect="options = publicationCssOptions()"></div>
-        </div>
-        <div class="card-form-row">
-          <label class="book-settings-option">
-            <input type="checkbox" x-model="bookPublication.epub_justify">
-            <span x-text="$app.t('publication.justify')"></span>
-          </label>
-        </div>
-        <div class="card-form-row">
-          <label class="card-form-label" for="pub-toc" x-text="$app.t('publication.tocTitle')"></label>
-          <input type="text" id="pub-toc" class="card-form-input" x-model="bookPublication.epub_toc_title" maxlength="100" :placeholder="$app.t('publication.tocTitlePlaceholder')">
-        </div>
-      </section>
-
       <div class="card-actions">
         <span class="card-form-error" x-show="pubError" x-text="pubError"></span>
         <span class="card-form-saved" x-show="pubSaved" x-cloak x-transition.opacity.duration.250ms x-text="$app.t('common.settingsSaved')"></span>
@@ -395,6 +374,17 @@
           <span x-text="pubSaving ? $app.t('common.saving') : $app.t('common.save')"></span>
         </button>
       </div>
+
+      <section class="book-settings-section">
+        <h3 class="book-settings-section-title" x-text="$app.t('publication.section.export')"></h3>
+        <p class="card-form-hint" x-text="$app.t('publication.exportToolsHint')"></p>
+        <div class="card-actions">
+          <button type="button" class="primary" :disabled="!$app.selectedBookId"
+                  @click="$app.togglePdfExportCard()" x-text="$app.t('book.export.pdfCustom')"></button>
+          <button type="button" class="primary" :disabled="!$app.selectedBookId"
+                  @click="$app.toggleEpubExportCard()" x-text="$app.t('book.export.epubCustom')"></button>
+        </div>
+      </section>
 
     </div><!-- /tab: publication -->
 

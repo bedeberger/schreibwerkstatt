@@ -152,6 +152,13 @@ export function registerEpubExportCard() {
       }
     },
 
+    // Reflow-Settings schreiben book_publication → braucht editor+. Viewer
+    // dürfen trotzdem exportieren (Export = viewer), nur nicht die Settings ändern.
+    canEditPublication() {
+      const role = window.__app?.currentBookRole;
+      return role === 'editor' || role === 'owner';
+    },
+
     publicationCssOptions() {
       return [
         { value: 'serif', label: window.__app.t('publication.cssSerif') },
@@ -166,9 +173,12 @@ export function registerEpubExportCard() {
     // ── Export-Trigger ────────────────────────────────────────────────────
     async exportEpub() {
       // Settings sind buch-weit und werden serverseitig aus der DB gelesen —
-      // vor Export speichern, damit ungespeicherte Änderungen greifen.
-      await this.savePublication();
-      if (this.exportError) return;
+      // vor Export speichern, damit ungespeicherte Änderungen greifen. Nur
+      // editor+ darf book_publication schreiben; Viewer exportiert mit DB-Stand.
+      if (this.canEditPublication()) {
+        await this.savePublication();
+        if (this.exportError) return;
+      }
       if (this._exportStatusTimer) { clearTimeout(this._exportStatusTimer); this._exportStatusTimer = null; }
       const ref = this._exportEntity();
       if (!ref) { this.exportError = window.__app.t('epubExport.error.startFailed'); return; }
