@@ -73,6 +73,7 @@ export function buildLocationsConsolidationPrompt(bookName, chapterOrte, figuren
   const synthInput = chapterOrte.map(co =>
     `## Kapitel: ${co.kapitel}\n` + co.orte.map(o =>
       `- ${o.name} (${o.typ || 'andere'}): ${o.beschreibung || ''}` +
+      (o.land ? ` | Land: ${o.land}` : '') +
       (o.stimmung ? ` | Stimmung: ${o.stimmung}` : '') +
       (o.kapitel?.length ? ` | Kapitel: ` + o.kapitel.map(k => (typeof k === 'string' ? k : k.name)).join(', ') : '')
     ).join('\n')

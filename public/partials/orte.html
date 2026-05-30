@@ -74,6 +74,7 @@
         <div class="entity-row" :data-ortid="o.id" @click="$app.selectedOrtId = $app.selectedOrtId === o.id ? null : o.id">
           <span class="tag entity-typ-tag" x-text="o.typ || $app.t('orte.typAndere')"></span>
           <span class="entity-row-title" x-text="o.name"></span>
+          <span x-show="o.land" class="tag ort-land-tag" x-text="landLabel(o.land)"></span>
           <span x-show="o.stimmung" class="ort-stimmung" x-text="o.stimmung"></span>
           <template x-if="o.kapitel?.length">
             <span class="kapitel-badges">
@@ -125,7 +126,7 @@
            x-data="sortableTable({
              rows: () => window.__app.orteFiltered,
              defaultKey: 'name',
-             types: { typ: 'string', name: 'string', stimmung: 'string' },
+             types: { typ: 'string', name: 'string', land: 'string', stimmung: 'string' },
              persistKey: 'orte.grid',
            })">
       <thead>
@@ -134,6 +135,8 @@
               @click="sortBy('typ')" x-text="$app.t('orte.col.typ')"></th>
           <th class="sortable-th" :class="sortClass('name')" :aria-sort="ariaSort('name')"
               @click="sortBy('name')" x-text="$app.t('orte.col.name')"></th>
+          <th class="sortable-th" :class="sortClass('land')" :aria-sort="ariaSort('land')"
+              @click="sortBy('land')" x-text="$app.t('orte.col.land')"></th>
           <th class="sortable-th" :class="sortClass('stimmung')" :aria-sort="ariaSort('stimmung')"
               @click="sortBy('stimmung')" x-text="$app.t('orte.col.stimmung')"></th>
           <th x-text="$app.t('orte.col.kapitel')"></th>
@@ -147,6 +150,7 @@
           <tr>
             <td><span class="tag entity-typ-tag" x-text="o.typ || $app.t('orte.typAndere')"></span></td>
             <td class="entity-grid-cell-title" x-text="o.name"></td>
+            <td><span x-show="o.land" class="tag ort-land-tag" x-text="landLabel(o.land)"></span></td>
             <td x-text="o.stimmung"></td>
             <td>
               <span class="entity-grid-tags">
@@ -195,7 +199,7 @@
           <span class="ort-map-locate-name" x-text="o.name"></span>
           <span x-show="o.lat != null && o.lng != null" class="ort-map-located" x-text="$app.t('orte.map.located')"></span>
           <button type="button" class="btn-compact"
-                  :disabled="geocodingId === o.id"
+                  :disabled="geocodingId === o.id || (o.lat != null && o.lng != null)"
                   @click="geocodeOrt(o)"
                   x-text="geocodingId === o.id ? $app.t('orte.map.geocoding') : $app.t('orte.map.geocode')"></button>
         </div>

@@ -303,7 +303,7 @@ export function configureLocales(cfg) {
  * @param {boolean}     isFinished  Buch wurde vom Autor als abgeschlossen markiert
  * @returns {{ SYSTEM_LEKTORAT, ..., BUCH_KONTEXT }}
  */
-export function getLocalePromptsForBook(localeKey, buchtyp, buchKontext, isFinished = false) {
+export function getLocalePromptsForBook(localeKey, buchtyp, buchKontext, isFinished = false, hauptland = null) {
   const rawLocale = _rawLocales.get(localeKey) || _rawLocales.get(_defaultLocale) || {};
   const kontext   = (buchKontext || '').trim();
 
@@ -319,6 +319,12 @@ export function getLocalePromptsForBook(localeKey, buchtyp, buchKontext, isFinis
   }
   if (kontext) {
     bookCtxParts.push(`VORRANGIGE ANGABEN DES AUTORS (übersteuern bei Konflikt alle obigen Regeln – insbesondere Stil-, Ton- und Formatvorgaben):\n${kontext}`);
+  }
+  const landCode = /^[A-Za-z]{2}$/.test(String(hauptland || '').trim()) ? String(hauptland).trim().toLowerCase() : null;
+  if (landCode) {
+    let landName = landCode.toUpperCase();
+    try { landName = new Intl.DisplayNames([langCode], { type: 'region' }).of(landCode.toUpperCase()) || landName; } catch { /* Intl-Fallback: Code */ }
+    bookCtxParts.push(`HAUPT-SCHAUPLATZLAND: ${landName} (${landCode}). Sofern der Text keinen anderen Schauplatz-Ort belegt, sind Schauplätze in diesem Land verortet; nutze diesen Code als Default für das «land»-Feld von Orten.`);
   }
   if (isFinished) {
     const fertigRule = _werkAbgeschlossenByLang?.[langCode];

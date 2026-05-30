@@ -10,6 +10,7 @@
 // Pro Scope max. ein Profil mit is_default=1.
 
 const { db } = require('./connection');
+const { validateConfig } = require('../lib/pdf-export-defaults');
 
 function _scope(bookId) {
   const id = parseInt(bookId);
@@ -79,7 +80,7 @@ function _row(r) {
     kind: r.kind,
     user_email: r.user_email,
     name: r.name,
-    config: JSON.parse(r.config_json),
+    config: validateConfig(JSON.parse(r.config_json)),
     is_default: !!r.is_default,
     has_cover: !!r.has_cover,
     cover_mime: r.cover_mime || null,

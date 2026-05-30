@@ -30,9 +30,26 @@
   <!-- Filter-Leiste -->
   <div x-show="fakten.length > 0" class="filter-bar">
     <input type="text" x-model="wfFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
-    <div x-data="catalogFilter('kategorie')"
-         x-modelable="value" x-model="wfFilters.kategorie"
-         x-effect="options = wfKategorieListe.map(k => ({ value: k, label: k }))"></div>
+    <div x-show="wfSeiteListe.length > 0"
+         x-data="combobox($app.t('weltfakten.filterKapitel'), $app.t('common.all'))"
+         x-modelable="value" x-model="wfFilters.seite"
+         x-effect="options = wfSeiteListe.map(s => ({ value: s, label: s }))"></div>
+    <div class="tabs tabs--scrollable" role="tablist" :aria-label="$app.t('weltfakten.title')">
+      <button type="button" class="tabs-btn"
+              :class="{ 'tabs-btn--active': wfFilters.kategorie === '' }"
+              @click="wfFilters.kategorie = ''">
+        <span x-text="$app.t('common.all')"></span>
+        <span class="tabs-btn-count" x-text="fakten.length"></span>
+      </button>
+      <template x-for="k in wfKategorieListe" :key="k">
+        <button type="button" class="tabs-btn"
+                :class="{ 'tabs-btn--active': wfFilters.kategorie === k }"
+                @click="wfFilters.kategorie = wfFilters.kategorie === k ? '' : k">
+          <span x-text="k"></span>
+          <span class="tabs-btn-count" x-text="fakten.filter(f => f.kategorie === k).length"></span>
+        </button>
+      </template>
+    </div>
     <span class="filter-count" x-text="wfFiltered.length + ' / ' + fakten.length"></span>
   </div>
 
@@ -40,7 +57,7 @@
   <div x-show="fakten.length > 0" class="weltfakten-groups">
     <template x-for="g in wfGrouped" :key="g.kategorie">
       <div class="weltfakten-group">
-        <div class="weltfakten-group-head">
+        <div class="weltfakten-group-head" x-show="!wfFilters.kategorie">
           <span class="tag entity-typ-tag" x-text="g.kategorie"></span>
           <span class="weltfakten-group-count" x-text="g.fakten.length"></span>
         </div>

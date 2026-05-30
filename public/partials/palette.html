@@ -53,7 +53,10 @@
                         role="option"
                         :aria-selected="paletteIsActive(section.key, item.key)"
                         :aria-disabled="!item.available">
-                  <span class="palette-item-label" x-html="renderLabelHtml(item)"></span>
+                  <span class="palette-item-headrow">
+                    <span class="palette-item-label" x-html="renderLabelHtml(item)"></span>
+                    <span class="palette-item-badge" x-show="item.dependsOnKomplett" x-text="$app.t('palette.komplettDep')"></span>
+                  </span>
                   <span class="palette-item-desc" x-text="renderSubText(item)"></span>
                   <span class="palette-item-preview" x-show="item.snippet" x-html="item.snippet"></span>
                 </button>

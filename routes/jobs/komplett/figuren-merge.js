@@ -1,5 +1,7 @@
 'use strict';
 
+const { _refToString } = require('./utils');
+
 /** Mergt duplizierte Figuren anhand des normalisierten Namens (case-insensitive).
  *  Fängt Fälle ab, in denen kleine Modelle (Ollama/llama) die Dedup-Regel in
  *  Phase 2 nicht befolgen. Verschmilzt Kapitel, Eigenschaften und Beziehungen.
@@ -320,8 +322,76 @@ function mergeBeziehungenIntoFiguren(figuren, flatBz) {
   return figuren.map(f => byId.get(f.id));
 }
 
+/** Backfill: Namen, die in Szenen/Events referenziert werden, aber in keiner
+ *  konsolidierten Figur auftauchen, werden als Minimal-Figuren angelegt.
+ *  Phase-1-Figurenextraktion hat unvollständigen Recall (v.a. Nebenfiguren);
+ *  ohne Backfill droppen remapSzenen/remapAssignments diese Namen und der
+ *  Charakter existiert gar nicht – obwohl er in Szenen/Orten/Events vorkommt.
+ *  Schwelle: ≥2 Vorkommen (mehrere Szenen ODER zusätzlich als Assignment), um
+ *  Einmal-Halluzinationen zu filtern. Token-Subset zu einer bestehenden Figur
+ *  («Gerold» bei vorhandenem «Gerold Brunner») → kein Backfill, der
+ *  Token-Fallback in buildFigNameLookup löst das auf. Mutiert `figuren`
+ *  (append) und gibt die Anzahl neu angelegter Figuren zurück. */
+const NAME_HAS_LETTER_RE = /\p{L}/u;
+function backfillFiguren(figuren, chapterSzenen, chapterAssignments, log) {
+  const resolved = new Set();
+  const figTokens = [];
+  for (const f of figuren) {
+    resolved.add(_normalizeName(f.name));
+    if (f.kurzname) resolved.add(_normalizeName(f.kurzname));
+    const t = _nameTokens(f.name);
+    if (t.length) figTokens.push(t);
+  }
+
+  const refs = new Map(); // normKey → { display, count }
+  const bump = (raw) => {
+    const name = _refToString(raw);
+    if (!name) return;
+    const key = _normalizeName(name);
+    if (!key) return;
+    const e = refs.get(key) || { display: name, count: 0 };
+    e.count++;
+    refs.set(key, e);
+  };
+  for (const { szenen: chSz } of (chapterSzenen || []))
+    for (const s of (chSz || []))
+      for (const n of (s?.figuren_namen || [])) bump(n);
+  for (const { assignments: chAss } of (chapterAssignments || []))
+    for (const a of (chAss || [])) bump(a?.figur_name);
+
+  let maxIdx = 0;
+  for (const f of figuren) {
+    const m = /^fig_(\d+)$/.exec(f.id || '');
+    if (m) maxIdx = Math.max(maxIdx, parseInt(m[1], 10));
+  }
+
+  let created = 0;
+  for (const { display, count } of refs.values()) {
+    if (count < 2) continue;
+    const key = _normalizeName(display);
+    if (resolved.has(key)) continue;
+    if (display.length < 2 || !NAME_HAS_LETTER_RE.test(display)) continue;
+    const tk = _nameTokens(display);
+    if (tk.length && figTokens.some(ft =>
+      tk.every(t => ft.includes(t)) || ft.every(t => tk.includes(t)))) continue;
+    maxIdx++;
+    figuren.push({
+      id: 'fig_' + maxIdx,
+      name: display,
+      typ: 'andere',
+      beziehungen: [],
+      kapitel: [],
+      eigenschaften: [],
+    });
+    resolved.add(key);
+    created++;
+    log.info(`Backfill-Figur «${display}» aus Szenen/Events (${count} Vorkommen) – Phase-1 hatte sie ausgelassen.`);
+  }
+  return created;
+}
+
 module.exports = {
   preMergeChapterFiguren, applySozialschichtModeVote,
   mergeDuplicateFiguren, validateBeziehungenDescriptions,
-  mergeBeziehungenIntoFiguren,
+  mergeBeziehungenIntoFiguren, backfillFiguren,
 };

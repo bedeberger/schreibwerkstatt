@@ -20,6 +20,7 @@ export function registerBookSettingsCard() {
     bookSettingsAllowLektorBookChat: false,
     bookSettingsDailyGoalChars: 1500,
     bookSettingsOrteReal: false,
+    bookSettingsSchauplatzLand: '',
     // Sharing: Access-Liste + Invite-Form.
     bookAccessList: [],
     bookAccessLoading: false,

@@ -23,6 +23,18 @@ function dedupRelations(relations, validIds) {
   return result;
 }
 
+// KI liefert Kapitel-/Seitennamen gelegentlich mit Markdown-Header-Präfix
+// (##/###, wörtlich aus dem Prompt-Text kopiert) oder als Schema-Platzhalter-Echo
+// («## Kapitel-Header», «### Seiten-Header»). Beides strippen/nullen, damit der
+// Namens-Lookup auf chNameToId/pageNameToIdByChapter trifft und die UI keinen
+// rohen Header anzeigt. Synchron mit dem ^#{1,6}-Strip in komplett/remap.js.
+function _cleanRefName(v) {
+  if (v == null) return null;
+  const s = String(v).replace(/^#{1,6}\s+/, '').trim();
+  if (!s || /Kapitel-Header|Seiten-Header/i.test(s)) return null;
+  return s;
+}
+
 // Auflösung der ersten Erwähnung einer Figur auf eine konkrete page_id:
 // 1. Versuche die Pages innerhalb der figure_appearances-Kapitel
 //    (kapitel-scoped, gegen Namenskollisionen gleichnamiger Seiten).
@@ -31,7 +43,7 @@ function dedupRelations(relations, validIds) {
 function resolveErstePageId(ersteErwaehnung, appearances, idMaps) {
   if (!ersteErwaehnung || !idMaps?.pageNameToIdByChapter) return null;
   for (const app of (appearances || [])) {
-    const chapId = idMaps.chNameToId?.[app.name];
+    const chapId = idMaps.chNameToId?.[_cleanRefName(app.name)];
     if (chapId != null) {
       const pid = idMaps.pageNameToIdByChapter[chapId]?.[ersteErwaehnung];
       if (pid) return pid;
@@ -48,14 +60,28 @@ function resolveErstePageId(ersteErwaehnung, appearances, idMaps) {
 // damit das Frontend Klick-Links ohne erneuten Namens-Match bauen kann.
 // LLM-Halluzination (seite === kapitel) wird wie bei Szenen genullt.
 function enrichBelegWithIds(beleg, idMaps) {
-  const chId = idMaps?.chNameToId?.[beleg.kapitel] ?? null;
-  const effSeite = (beleg.seite && beleg.seite !== beleg.kapitel && beleg.seite !== 'Sonstige Seiten')
-    ? beleg.seite : null;
+  const chMap = idMaps?.chNameToId || {};
+  const a = _cleanRefName(beleg.kapitel);
+  const b = _cleanRefName(beleg.seite);
+  // Kapitel bestimmen: bevorzugt das kapitel-Feld; sonst das seite-Feld, falls
+  // die KI dort einen echten Kapitelnamen abgelegt hat (häufige Feld-Verwechslung
+  // im A2-Beziehungs-Call). So bleibt der Beleg klickbar statt als toter Name zu enden.
+  let kapitel = (a && chMap[a] != null) ? a : null;
+  let seite = b;
+  if (!kapitel && b && chMap[b] != null) {
+    kapitel = b;   // «seite» war in Wahrheit der Kapitelname
+    seite = null;
+  } else if (!kapitel) {
+    kapitel = a;   // unauflösbar – bereinigter Rohname dient nur der Anzeige
+  }
+  const chId = (kapitel && chMap[kapitel]) ?? null;
+  const effSeite = (seite && seite !== kapitel && seite !== 'Sonstige Seiten')
+    ? seite : null;
   const pId = effSeite
     ? (idMaps?.pageNameToIdByChapter?.[chId ?? 0]?.[effSeite] ?? null)
     : null;
   return {
-    kapitel: beleg.kapitel || null,
+    kapitel: kapitel || null,
     seite: effSeite,
     chapter_id: chId,
     page_id: pId,
@@ -95,19 +121,20 @@ function saveFigurenToDb(bookId, figuren, userEmail, idMaps) {
       // erste_erwaehnung ist Freitext (kann Kapitel- ODER Seitenname sein).
       // Auflösen: zuerst in den Kapiteln der Figur (figure_appearances) suchen,
       // dann globaler Unambiguous-Match. Kein Name → null.
-      const erstPageId = resolveErstePageId(f.erste_erwaehnung, f.kapitel, idMaps);
+      const ersteErwaehnung = _cleanRefName(f.erste_erwaehnung);
+      const erstPageId = resolveErstePageId(ersteErwaehnung, f.kapitel, idMaps);
       const { lastInsertRowid: fid } = insFig.run(
         bookId, f.id, f.name, f.kurzname || null, f.typ || null,
         f.geburtstag || null, f.geschlecht || null, f.beruf || null,
         f.wohnadresse || null, f.beschreibung || null, f.sozialschicht || null,
         f.praesenz || null, f.rolle || null, f.motivation || null, f.konflikt || null,
-        f.entwicklung || null, f.erste_erwaehnung || null, erstPageId, zitate,
+        f.entwicklung || null, ersteErwaehnung, erstPageId, zitate,
         i, userEmail || null, now
       );
       figIdToRowId[f.id] = fid;
       for (const tag of (f.eigenschaften || [])) insTag.run(fid, tag);
       for (const app of (f.kapitel || [])) {
-        const chapId = idMaps?.chNameToId?.[app.name] ?? null;
+        const chapId = idMaps?.chNameToId?.[_cleanRefName(app.name)] ?? null;
         if (chapId != null) insApp.run(fid, chapId, app.haeufigkeit || 1);
       }
       for (const bz of (f.beziehungen || [])) {
@@ -115,6 +142,7 @@ function saveFigurenToDb(bookId, figuren, userEmail, idMaps) {
           ? bz.belege.filter(b => b && (b.kapitel || b.seite))
               .slice(0, 5)
               .map(b => enrichBelegWithIds(b, idMaps))
+              .filter(b => b.kapitel || b.seite)
           : [];
         allRelations.push({
           from: f.id, to: bz.figur_id, typ: bz.typ,
@@ -166,11 +194,13 @@ function updateFigurenEvents(bookId, assignments, userEmail, idMaps) {
       if (!rowId) continue;
       for (let j = 0; j < (assignment.lebensereignisse || []).length; j++) {
         const ev = assignment.lebensereignisse[j];
-        const chId = idMaps?.chNameToId?.[ev.kapitel] ?? null;
+        const evKapitel = _cleanRefName(ev.kapitel);
+        const evSeite = _cleanRefName(ev.seite);
+        const chId = (evKapitel && idMaps?.chNameToId?.[evKapitel]) ?? null;
         // LLM-Halluzination: seite === kapitel (Kapitelname statt Seitentitel)
         // oder chMap-Fallback «Sonstige Seiten» → seite nullen.
-        const effSeite = (ev.seite && ev.seite !== ev.kapitel && ev.seite !== 'Sonstige Seiten')
-          ? ev.seite : null;
+        const effSeite = (evSeite && evSeite !== evKapitel && evSeite !== 'Sonstige Seiten')
+          ? evSeite : null;
         const pageId = effSeite
           ? (idMaps?.pageNameToIdByChapter?.[chId ?? 0]?.[effSeite] ?? null)
           : null;

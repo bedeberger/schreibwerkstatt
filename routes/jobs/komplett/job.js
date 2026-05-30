@@ -226,7 +226,7 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
     if (isMultiPassClaude) {
       const prelimFigKompakt = buildPrelimFigurenKompakt(chapterFiguren);
       const [p2Result, orteRaw] = await Promise.all([
-        runPhase2(ctx, chapterFiguren, chapterAssignments),
+        runPhase2(ctx, chapterFiguren, chapterAssignments, chapterSzenen),
         runPhase3OrteCall(ctx, chapterOrte, prelimFigKompakt),
       ]);
       ({ figuren, figNameToId, figNameToIdLower, figurenKompakt, idRemap, isSinglePass } = p2Result);
@@ -234,7 +234,7 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
         await runPhase3(ctx, chapterOrte, figurenKompakt, isSinglePass, idRemap, { prefetchedOrteRaw: orteRaw }));
     } else {
       ({ figuren, figNameToId, figNameToIdLower, figurenKompakt, idRemap, isSinglePass } =
-        await runPhase2(ctx, chapterFiguren, chapterAssignments));
+        await runPhase2(ctx, chapterFiguren, chapterAssignments, chapterSzenen));
       ({ orte, ortNameToId, ortNameToIdLower } =
         await runPhase3(ctx, chapterOrte, figurenKompakt, isSinglePass, idRemap));
     }

@@ -10,6 +10,9 @@
 //   `requiresBook`  – disabled, wenn kein Buch gewählt.
 //   `minRole`       – Buch-Rolle, ab der die Karte sichtbar ist.
 //                     Hierarchie: viewer < lektor < editor < owner. Pflichtfeld.
+//   `dependsOnKomplett` – true: Karte konsumiert Komplettanalyse-Output
+//                     (Figuren/Orte/Szenen/Ereignisse/Fakten/Soziogramm/Kontinuität).
+//                     Palette zeigt dafür ein Hinweis-Badge.
 //
 // Aktionen (`kind: 'action'`): einmalige Befehle (Theme wechseln, Logout …).
 //   `run(root)` – wird mit Root als Argument aufgerufen.
@@ -27,22 +30,22 @@ export const FEATURES = [
     aliases: ['style','heatmap','passiv','fuellwoerter','filler','readability','lesbarkeit','metrik'] },
   { key: 'fehlerHeatmap',  kind: 'toggle', group: 'review', labelKey: 'tile.fehlerHeatmap',  descKey: 'tile.fehlerHeatmap.desc',  flag: 'showFehlerHeatmapCard',  toggle: 'toggleFehlerHeatmapCard',  requiresBook: true, minRole: 'editor',
     aliases: ['errors','heatmap','findings','lektorat','typo','tippfehler'] },
-  { key: 'kontinuitaet',   kind: 'toggle', group: 'review', labelKey: 'tile.kontinuitaet',   descKey: 'tile.kontinuitaet.desc',   flag: 'showKontinuitaetCard',   toggle: 'toggleKontinuitaetCard',   requiresBook: true, minRole: 'editor',
+  { key: 'kontinuitaet',   kind: 'toggle', group: 'review', labelKey: 'tile.kontinuitaet',   descKey: 'tile.kontinuitaet.desc',   flag: 'showKontinuitaetCard',   toggle: 'toggleKontinuitaetCard',   requiresBook: true, minRole: 'editor', dependsOnKomplett: true,
     aliases: ['continuity','widerspruch','plot-hole','contradiction','consistency'] },
   // Welt & Plot — World-Cards: editor+ (für Viewer/Lektor nicht relevant).
-  { key: 'figuren',        kind: 'toggle', group: 'world',  labelKey: 'tile.figuren',        descKey: 'tile.figuren.desc',        flag: 'showFiguresCard',        toggle: 'toggleFiguresCard',        requiresBook: true, minRole: 'editor',
+  { key: 'figuren',        kind: 'toggle', group: 'world',  labelKey: 'tile.figuren',        descKey: 'tile.figuren.desc',        flag: 'showFiguresCard',        toggle: 'toggleFiguresCard',        requiresBook: true, minRole: 'editor', dependsOnKomplett: true,
     aliases: ['characters','personen','cast','protagonist','antagonist','soziogramm','graph'] },
-  { key: 'werkstatt',      kind: 'toggle', group: 'world',  labelKey: 'tile.werkstatt',      descKey: 'tile.werkstatt.desc',      flag: 'showFigurWerkstattCard', toggle: 'toggleFigurWerkstattCard', requiresBook: true, minRole: 'editor',
+  { key: 'werkstatt',      kind: 'toggle', group: 'world',  labelKey: 'tile.werkstatt',      descKey: 'tile.werkstatt.desc',      flag: 'showFigurWerkstattCard', toggle: 'toggleFigurWerkstattCard', requiresBook: true, minRole: 'editor', dependsOnKomplett: true,
     aliases: ['workshop','mindmap','draft','entwurf','brainstorm','character','figur','vorwaerts'] },
-  { key: 'szenen',         kind: 'toggle', group: 'world',  labelKey: 'tile.szenen',         descKey: 'tile.szenen.desc',         flag: 'showSzenenCard',         toggle: 'toggleSzenenCard',         requiresBook: true, minRole: 'editor',
+  { key: 'szenen',         kind: 'toggle', group: 'world',  labelKey: 'tile.szenen',         descKey: 'tile.szenen.desc',         flag: 'showSzenenCard',         toggle: 'toggleSzenenCard',         requiresBook: true, minRole: 'editor', dependsOnKomplett: true,
     aliases: ['scenes','beats','sequences','akt'] },
-  { key: 'orte',           kind: 'toggle', group: 'world',  labelKey: 'tile.orte',           descKey: 'tile.orte.desc',           flag: 'showOrteCard',           toggle: 'toggleOrteCard',           requiresBook: true, minRole: 'editor',
+  { key: 'orte',           kind: 'toggle', group: 'world',  labelKey: 'tile.orte',           descKey: 'tile.orte.desc',           flag: 'showOrteCard',           toggle: 'toggleOrteCard',           requiresBook: true, minRole: 'editor', dependsOnKomplett: true,
     aliases: ['locations','schauplaetze','places','setting','welt','world'] },
   { key: 'songs',          kind: 'toggle', group: 'world',  labelKey: 'tile.songs',          descKey: 'tile.songs.desc',          flag: 'showSongsCard',          toggle: 'toggleSongsCard',          requiresBook: true, minRole: 'editor',
     aliases: ['musik','music','songs','musikstuecke','musikstücke','playlist','soundtrack','band','interpret','tracks'] },
-  { key: 'ereignisse',     kind: 'toggle', group: 'world',  labelKey: 'tile.events',         descKey: 'tile.events.desc',         flag: 'showEreignisseCard',     toggle: 'toggleEreignisseCard',     requiresBook: true, minRole: 'editor',
+  { key: 'ereignisse',     kind: 'toggle', group: 'world',  labelKey: 'tile.events',         descKey: 'tile.events.desc',         flag: 'showEreignisseCard',     toggle: 'toggleEreignisseCard',     requiresBook: true, minRole: 'editor', dependsOnKomplett: true,
     aliases: ['events','timeline','zeitstrahl','plot','chronologie'] },
-  { key: 'weltfakten',     kind: 'toggle', group: 'world',  labelKey: 'tile.weltfakten',     descKey: 'tile.weltfakten.desc',     flag: 'showWorldFactsCard',     toggle: 'toggleWorldFactsCard',     requiresBook: true, minRole: 'editor',
+  { key: 'weltfakten',     kind: 'toggle', group: 'world',  labelKey: 'tile.weltfakten',     descKey: 'tile.weltfakten.desc',     flag: 'showWorldFactsCard',     toggle: 'toggleWorldFactsCard',     requiresBook: true, minRole: 'editor', dependsOnKomplett: true,
     aliases: ['facts','fakten','weltregeln','worldbuilding','lore','magiesystem','rules','kanon','canon','regeln'] },
   // Werkzeug
   { key: 'bookchat',       kind: 'toggle', group: 'tools',  labelKey: 'tile.bookchat',       descKey: 'tile.bookchat.desc',       flag: 'showBookChatCard',       toggle: 'toggleBookChatCard',       requiresPages: true, minRole: 'editor',

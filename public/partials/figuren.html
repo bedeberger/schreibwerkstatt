@@ -248,7 +248,7 @@
                   <template x-if="bz.belege?.length">
                     <span class="figur-bz-belege">
                       <template x-for="(bg, bi) in (bz.belege || [])" :key="bi">
-                        <span class="figur-bz-beleg internal-link" @click.stop="$app.gotoStelle(bg.kapitel, bg.seite)" x-text="bg.seite || bg.kapitel" :data-tip="(bg.kapitel || '') + (bg.seite ? ' · ' + bg.seite : '')"></span>
+                        <span class="figur-bz-beleg internal-link" @click.stop="bg.page_id ? $app.gotoPageById(bg.page_id) : (bg.chapter_id ? $app.gotoChapterById(bg.chapter_id) : $app.gotoStelle(bg.kapitel, bg.seite))" x-text="bg.seite || bg.kapitel" :data-tip="(bg.kapitel || '') + (bg.seite ? ' · ' + bg.seite : '')"></span>
                       </template>
                     </span>
                   </template>

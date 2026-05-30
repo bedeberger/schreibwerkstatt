@@ -527,6 +527,35 @@ export function normalizeQuotesInRange(range, style) {
   return count;
 }
 
+// String-Variante: normalisiert die Quotes in einem HTML-String off-DOM.
+// Genutzt für KI-Vorschläge (Lektorat-Korrekturen, Seitenchat-Ersatz), bevor
+// sie gespeichert werden — die KI liefert oft gerade `"`/`'`, die nicht zum
+// Buch-Style passen. Round-Trip über ein detached `<div>`; `data-bid` bleibt
+// erhalten (Browser-innerHTML bewahrt Attribute, ensureBlockIds ist idempotent).
+export function normalizeQuotesInHtml(html, style) {
+  if (!html || !style) return html;
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  normalizeQuotes(div, style);
+  return div.innerHTML;
+}
+
+// Lädt Buch-Locale für die String-Variante. Eigene Funktion (kein Re-Use von
+// runQuoteNormalize), weil hier ein String statt DOM/Range normalisiert wird.
+export async function runQuoteNormalizeHtml({ bookId, html }) {
+  if (!bookId || !html) return { ok: false, html };
+  try {
+    const r = await fetch(`/booksettings/${bookId}`, { credentials: 'same-origin' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    const style = resolveQuoteStyle(data.language, data.region);
+    return { ok: true, html: normalizeQuotesInHtml(html, style) };
+  } catch (e) {
+    console.error('[quote-normalize] booksettings fetch failed', e);
+    return { ok: false, html };
+  }
+}
+
 // Lädt Buch-Locale + ruft die passende Normalize-Variante auf. Gemeinsamer
 // Aufrufer für Notebook-Slash, Bubble-Selection und Focus-Topbar.
 export async function runQuoteNormalize({ bookId, rootEl, range = null }) {

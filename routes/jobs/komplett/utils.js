@@ -109,7 +109,7 @@ async function runNonCritical(label, fn, log, { warnings = null, warnKey = null 
  * (z.B. nur Nachname, Titel+Name), wird per Token-Matching die eindeutig
  * passende Phase-2-Figur gesucht. Nur bei eindeutigem Match.
  */
-function buildFigNameLookup(figuren, chapterFiguren, chapterAssignments, log, jobId) {
+function buildFigNameLookup(figuren, chapterFiguren, chapterAssignments, chapterSzenen, log, jobId) {
   const nameToId = {};
   for (const f of figuren) {
     nameToId[f.name] = f.id;
@@ -142,6 +142,11 @@ function buildFigNameLookup(figuren, chapterFiguren, chapterAssignments, log, jo
     for (const f1 of (chFigs || [])) tryTokenFallback(f1.name);
   for (const { assignments: chAss } of (chapterAssignments || []))
     for (const a of (chAss || [])) tryTokenFallback(a?.figur_name);
+  // Szenen-Namen ebenfalls einbeziehen: eine Szenenfigur «Gerold», die nur als
+  // Teilname zu «Gerold Brunner» existiert, soll im Remap auflösen statt droppen.
+  for (const { szenen: chSz } of (chapterSzenen || []))
+    for (const s of (chSz || []))
+      for (const n of (s?.figuren_namen || [])) tryTokenFallback(_refToString(n));
 
   return { figNameToId: nameToId, figNameToIdLower: nameToIdLower };
 }

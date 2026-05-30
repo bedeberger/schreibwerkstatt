@@ -58,6 +58,7 @@ const _ortSchema = _obj({
   name: _str,
   typ: _str,
   beschreibung: _str,
+  land: _str,
   erste_erwaehnung: _str,
   stimmung: _str,
   kapitel: { type: 'array', items: _obj({ name: _str, haeufigkeit: _num }) },

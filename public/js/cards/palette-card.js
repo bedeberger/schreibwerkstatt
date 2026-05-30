@@ -366,6 +366,7 @@ export function registerPaletteCard() {
         labelKey: feature.labelKey,
         descKey: feature.descKey,
         available,
+        dependsOnKomplett: !!feature.dependsOnKomplett,
         reasonKey: available ? null : unavailabilityReasonKey(feature, ctx),
         score: 0,
         indices: [],

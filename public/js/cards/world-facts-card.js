@@ -12,14 +12,14 @@ export function registerWorldFactsCard() {
     fakten: [],
     wfUpdatedAt: null,
     wfLoading: false,
-    wfFilters: { suche: '', kategorie: '' },
+    wfFilters: { suche: '', kategorie: '', seite: '' },
     _lifecycle: null,
 
     init() {
       this._lifecycle = setupCardLifecycle(this, {
         name: 'weltfakten',
         showFlag: 'showWorldFactsCard',
-        resetState: { fakten: [], wfUpdatedAt: null, wfLoading: false },
+        resetState: { fakten: [], wfUpdatedAt: null, wfLoading: false, wfFilters: { suche: '', kategorie: '', seite: '' } },
         load: () => this.loadWorldFacts(),
       });
     },
@@ -47,11 +47,20 @@ export function registerWorldFactsCard() {
       return [...new Set(this.fakten.map(f => f.kategorie).filter(Boolean))].sort();
     },
 
+    // Alle in Fakten referenzierten Kapitel-/Seitennamen (aus seite_label).
+    // Fallback auf f.kapitel, falls die Junction-Tabelle befüllt ist.
+    get wfSeiteListe() {
+      const refs = this.fakten.flatMap(f => f.seite ? [f.seite] : (f.kapitel || []));
+      return [...new Set(refs)].sort((a, b) => a.localeCompare(b));
+    },
+
     get wfFiltered() {
       const q = this.wfFilters.suche.trim().toLowerCase();
       const kat = this.wfFilters.kategorie;
+      const seite = this.wfFilters.seite;
       return this.fakten.filter(f => {
         if (kat && f.kategorie !== kat) return false;
+        if (seite && f.seite !== seite && !(f.kapitel || []).includes(seite)) return false;
         if (!q) return true;
         return (f.fakt || '').toLowerCase().includes(q)
           || (f.subjekt || '').toLowerCase().includes(q)

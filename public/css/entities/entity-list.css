@@ -278,6 +278,17 @@
   max-width: 30%;
 }
 
+/* Land-Badge (Schauplatz-Verortung): dezenter eckiger Chip mit Karten-Akzent. */
+.ort-land-tag {
+  background: color-mix(in srgb, var(--card-accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--card-accent) 30%, transparent);
+  border-radius: var(--radius-sm);
+  color: var(--card-accent);
+  font-size: var(--font-size-micro);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 /* Typ-Tag als Anker — kein Hintergrund, nur Akzent-Text mono-uppercase.
    "Innen/Aussen/Reise/…" wird so zur ersten Information beim Scannen. */
 .card--orte .entity-typ-tag {

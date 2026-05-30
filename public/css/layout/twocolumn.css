@@ -46,6 +46,46 @@
 .layout-sidebar {
   position: relative;
 }
+
+/* Sticky-Sidebar mit eigenem Scroll: bei vielen Kapiteln wächst der Tree sonst
+   ins Endlose und schiebt den Main-Content weg. Scroll liegt auf dem inneren
+   `#partial-sidebar` (Tree), nicht auf `.layout-sidebar` selbst — so bleibt die
+   Sidebar Positions-Kontext für das absolut gesetzte `.sidebar-resize-handle`,
+   das dadurch nicht mit dem Tree wegscrollt. Nur Desktop: mobil stapelt die
+   Sidebar über den Karten und darf nicht in der Höhe begrenzt werden. */
+@media (min-width: 960px) {
+  .layout-sidebar {
+    position: sticky;
+    top: 1.5rem;
+    max-height: calc(100dvh - 3rem);
+    display: flex;
+    flex-direction: column;
+  }
+  .layout-sidebar > #partial-sidebar {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    /* Scrollbar initial unsichtbar (Thumb transparent), erscheint erst während
+       des Scrollens (`.is-scrolling`, von app-chrome.js gesetzt, mit Idle-Fade).
+       Gutter bleibt reserviert → kein Layout-Shift beim Ein-/Ausblenden. */
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+  .layout-sidebar > #partial-sidebar.is-scrolling {
+    scrollbar-color: var(--color-muted) transparent;
+  }
+  .layout-sidebar > #partial-sidebar::-webkit-scrollbar {
+    width: 8px;
+  }
+  .layout-sidebar > #partial-sidebar::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: var(--radius-sm);
+    transition: background var(--transition-slow);
+  }
+  .layout-sidebar > #partial-sidebar.is-scrolling::-webkit-scrollbar-thumb {
+    background: var(--color-muted);
+  }
+}
 .sidebar-resize-handle {
   position: absolute;
   top: 0;

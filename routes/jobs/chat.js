@@ -558,8 +558,15 @@ async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEma
       }
 
       if (result.stopReason !== 'tool_use') {
-        // Finale Antwort
-        finalText = result.text;
+        // Modell beendet mit Prosa statt final_answer-Tool (Sonnet-Drift).
+        // Prosa IST die finale Antwort — direkt als antwort-Envelope verpacken,
+        // statt sie durch _parseChatResponse/parseJSON zu schicken (sonst
+        // JSON-Parse-Fehler-ERROR + ai_parse_fails-Dump auf validem Klartext).
+        // Ausnahme: Modell lieferte bereits {antwort:…}-JSON — dann unverändert.
+        const raw = (result.text || '').trim();
+        finalText = raw.startsWith('{')
+          ? raw
+          : JSON.stringify({ antwort: _stripTrailingEmptyJson(raw) || raw });
         break;
       }
 

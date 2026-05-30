@@ -56,7 +56,7 @@ ${bookText}
 Antworte mit diesem JSON-Schema:
 {
   "beziehungen": [
-    { "von": "fig_1", "zu": "fig_2", "typ": "elternteil|geschwister|kind|freund|feind|kollege|bekannt|liebesbeziehung|rivale|mentor|schuetzling|patronage|geschaeft|andere", "machtverhaltnis": 0, "beschreibung": "1 Satz", "belege": [{ "kapitel": "## Kapitel-Header", "seite": "### Seiten-Header; leer wenn = Kapitelname oder unklar" }] }
+    { "von": "fig_1", "zu": "fig_2", "typ": "elternteil|geschwister|kind|freund|feind|kollege|bekannt|liebesbeziehung|rivale|mentor|schuetzling|patronage|geschaeft|andere", "machtverhaltnis": 0, "beschreibung": "1 Satz", "belege": [{ "kapitel": "Kapitelname (ohne ##-Präfix)", "seite": "Seitentitel (ohne ###-Präfix); leer wenn = Kapitel oder unklar" }] }
   ]
 }
 
@@ -100,7 +100,7 @@ ${textBlock}
 Antworte mit diesem JSON-Schema:
 {
   "beziehungen": [
-    { "von": "fig_1", "zu": "fig_2", "typ": "elternteil|geschwister|kind|freund|feind|kollege|bekannt|liebesbeziehung|rivale|mentor|schuetzling|patronage|geschaeft|andere",${machtField} "beschreibung": "1 Satz", "belege": [{ "kapitel": "## Kapitel-Header", "seite": "### Seiten-Header; leer wenn = Kapitelname oder unklar" }] }
+    { "von": "fig_1", "zu": "fig_2", "typ": "elternteil|geschwister|kind|freund|feind|kollege|bekannt|liebesbeziehung|rivale|mentor|schuetzling|patronage|geschaeft|andere",${machtField} "beschreibung": "1 Satz", "belege": [{ "kapitel": "Kapitelname (ohne ##-Präfix)", "seite": "Seitentitel (ohne ###-Präfix); leer wenn = Kapitel oder unklar" }] }
   ]
 }
 

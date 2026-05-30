@@ -288,12 +288,12 @@ function saveOrteToDb(bookId, orte, userEmail, chNameToId = null, pageNameToIdBy
 
     const upd = db.prepare(`
       UPDATE locations SET name=?, typ=?, beschreibung=?, erste_erwaehnung=?, erste_erwaehnung_page_id=?, stimmung=?,
-        lat=?, lng=?, sort_order=?, updated_at=?
+        land=?, lat=?, lng=?, sort_order=?, updated_at=?
       WHERE id=?`);
     const ins = db.prepare(`
       INSERT INTO locations (book_id, loc_id, name, typ, beschreibung, erste_erwaehnung, erste_erwaehnung_page_id, stimmung,
-        lat, lng, sort_order, user_email, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        land, lat, lng, sort_order, user_email, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     const delLf = db.prepare('DELETE FROM location_figures WHERE location_id = ?');
     const delLc = db.prepare('DELETE FROM location_chapters WHERE location_id = ?');
     // location_figures.figure_id ist INTEGER (figures.id) seit Mig 73 — Lookup TEXT → INT.
@@ -309,19 +309,21 @@ function saveOrteToDb(bookId, orte, userEmail, chNameToId = null, pageNameToIdBy
       const erstPageId = resolveErstePageIdForOrt(o.erste_erwaehnung, o.kapitel);
       const lat = _clampCoord(o.lat, 90);
       const lng = _clampCoord(o.lng, 180);
+      // land normalisiert auf ISO-3166-1-alpha-2 lowercase; alles andere → NULL.
+      const land = /^[A-Za-z]{2}$/.test(String(o.land || '').trim()) ? String(o.land).trim().toLowerCase() : null;
       let locDbId = existingMap[o.id];
       if (locDbId !== undefined) {
         // integer id (und scene_locations) bleibt erhalten
         upd.run(o.name, o.typ || null, o.beschreibung || null,
           o.erste_erwaehnung || null, erstPageId, o.stimmung || null,
-          lat, lng, i, now, locDbId);
+          land, lat, lng, i, now, locDbId);
         delLf.run(locDbId);
         delLc.run(locDbId);
       } else {
         const { lastInsertRowid } = ins.run(
           bookId, o.id, o.name, o.typ || null, o.beschreibung || null,
           o.erste_erwaehnung || null, erstPageId, o.stimmung || null,
-          lat, lng, i, userEmail || null, now
+          land, lat, lng, i, userEmail || null, now
         );
         locDbId = lastInsertRowid;
       }
@@ -717,10 +719,10 @@ function deleteFinetuneAiCache(bookId, userEmail) {
 
 // ── Buch-Einstellungen (Sprache + Region) ─────────────────────────────────────
 
-const _getBookSettings = db.prepare('SELECT language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, entities_enabled, orte_real FROM book_settings WHERE book_id = ?');
+const _getBookSettings = db.prepare('SELECT language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, entities_enabled, orte_real, schauplatz_land FROM book_settings WHERE book_id = ?');
 const _upsertBookSettings = db.prepare(`
-  INSERT INTO book_settings (book_id, language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, orte_real, updated_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  INSERT INTO book_settings (book_id, language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, orte_real, schauplatz_land, updated_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT(book_id) DO UPDATE SET
     language=excluded.language, region=excluded.region,
     buchtyp=excluded.buchtyp, buch_kontext=excluded.buch_kontext,
@@ -729,6 +731,7 @@ const _upsertBookSettings = db.prepare(`
     allow_lektor_book_chat=excluded.allow_lektor_book_chat,
     daily_goal_chars=excluded.daily_goal_chars,
     orte_real=excluded.orte_real,
+    schauplatz_land=excluded.schauplatz_land,
     updated_at=excluded.updated_at
 `);
 const _updateBookSettingsEntitiesEnabled = db.prepare(`
@@ -757,10 +760,10 @@ function getBookSettings(bookId, userEmail = null) {
     if (u && (u.default_language || u.default_buchtyp)) {
       const language = u.default_language || 'de';
       const region   = u.default_region   || (language === 'en' ? 'US' : 'CH');
-      return { language, region, buchtyp: u.default_buchtyp || null, buch_kontext: null, erzaehlperspektive: null, erzaehlzeit: null, is_finished: 0, allow_lektor_book_chat: 0, daily_goal_chars: null, entities_enabled: 0, orte_real: 0 };
+      return { language, region, buchtyp: u.default_buchtyp || null, buch_kontext: null, erzaehlperspektive: null, erzaehlzeit: null, is_finished: 0, allow_lektor_book_chat: 0, daily_goal_chars: null, entities_enabled: 0, orte_real: 0, schauplatz_land: null };
     }
   }
-  return { language: 'de', region: 'CH', buchtyp: null, buch_kontext: null, erzaehlperspektive: null, erzaehlzeit: null, is_finished: 0, allow_lektor_book_chat: 0, daily_goal_chars: null, entities_enabled: 0, orte_real: 0 };
+  return { language: 'de', region: 'CH', buchtyp: null, buch_kontext: null, erzaehlperspektive: null, erzaehlzeit: null, is_finished: 0, allow_lektor_book_chat: 0, daily_goal_chars: null, entities_enabled: 0, orte_real: 0, schauplatz_land: null };
 }
 
 /** Locale-Key für ein Buch: z.B. "de-CH", "en-US". */
@@ -771,7 +774,7 @@ function getBookLocale(bookId, userEmail = null) {
 
 /** Speichert/aktualisiert Sprache, Region, Buchtyp, Buchkontext, Erzählperspektive, Erzählzeit, is_finished, allow_lektor_book_chat, daily_goal_chars.
  *  `entities_enabled` wird hier nicht angefasst — Quick-Toggle aus der Notebook-Toolbar laeuft ueber setBookEntitiesEnabled. */
-function saveBookSettings(bookId, language, region, buchtyp, buchKontext, erzaehlperspektive = null, erzaehlzeit = null, isFinished = 0, allowLektorBookChat = 0, dailyGoalChars = null, orteReal = 0) {
+function saveBookSettings(bookId, language, region, buchtyp, buchKontext, erzaehlperspektive = null, erzaehlzeit = null, isFinished = 0, allowLektorBookChat = 0, dailyGoalChars = null, orteReal = 0, schauplatzLand = null) {
   _upsertBookSettings.run(
     parseInt(bookId), language, region,
     buchtyp || null, buchKontext || null,
@@ -780,6 +783,7 @@ function saveBookSettings(bookId, language, region, buchtyp, buchKontext, erzaeh
     allowLektorBookChat ? 1 : 0,
     dailyGoalChars == null ? null : Math.round(Number(dailyGoalChars)),
     orteReal ? 1 : 0,
+    schauplatzLand || null,
     new Date().toISOString()
   );
 }

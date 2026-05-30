@@ -28,7 +28,7 @@ router.get('/:book_id', aclParamGuard('viewer'), (req, res) => {
 router.put('/:book_id', aclParamGuard('editor'), jsonBody, (req, res) => {
   const bookId = req.bookId;
 
-  const { language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, orte_real } = req.body || {};
+  const { language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, orte_real, schauplatz_land } = req.body || {};
   if (!language || !region) {
     return res.status(400).json({ error_code: 'LANGUAGE_REGION_REQUIRED' });
   }
@@ -59,10 +59,18 @@ router.put('/:book_id', aclParamGuard('editor'), jsonBody, (req, res) => {
     dailyGoal = n;
   }
 
+  let schauplatzLand = null;
+  if (schauplatz_land !== undefined && schauplatz_land !== null && schauplatz_land !== '') {
+    if (!/^[A-Za-z]{2}$/.test(String(schauplatz_land))) {
+      return res.status(400).json({ error_code: 'INVALID_VALUE', params: { field: 'schauplatz_land', allowed: 'ISO-3166-1-alpha-2' } });
+    }
+    schauplatzLand = String(schauplatz_land).toLowerCase();
+  }
+
   const finished = is_finished ? 1 : 0;
   const lektorBookChat = allow_lektor_book_chat ? 1 : 0;
   const orteReal = orte_real ? 1 : 0;
-  saveBookSettings(bookId, language, region, buchtyp || null, buch_kontext || null, erzaehlperspektive || null, erzaehlzeit || null, finished, lektorBookChat, dailyGoal, orteReal);
+  saveBookSettings(bookId, language, region, buchtyp || null, buch_kontext || null, erzaehlperspektive || null, erzaehlzeit || null, finished, lektorBookChat, dailyGoal, orteReal, schauplatzLand);
   res.json({
     ok: true, language, region,
     buchtyp: buchtyp || null, buch_kontext: buch_kontext || null,
@@ -72,6 +80,7 @@ router.put('/:book_id', aclParamGuard('editor'), jsonBody, (req, res) => {
     allow_lektor_book_chat: lektorBookChat,
     daily_goal_chars: dailyGoal,
     orte_real: orteReal,
+    schauplatz_land: schauplatzLand,
     locale: `${language}-${region}`,
   });
 });

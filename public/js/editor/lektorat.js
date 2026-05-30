@@ -2,6 +2,7 @@ import { escHtml, fetchJson, SAFETY_HTML_RATIO, replaceInHtml, stripFocusArtefac
 import { sortByPosition, SOFT_TYPEN } from '../book/page-view.js';
 import { contentRepo } from '../repo/content.js';
 import { savePage } from './shared/page-api.js';
+import { runQuoteNormalizeHtml } from './shared/quote-normalize.js';
 
 // Lektorat-Workflow-Methoden (werden in die Alpine-Komponente gespreadet)
 // `this` bezieht sich auf die Alpine-Komponente.
@@ -26,9 +27,17 @@ export const lektoratMethods = {
     const page = await contentRepo.loadPage(this.currentPage.id, { fresh: true });
     page.html = stripFocusArtefacts(page.html || '');
 
-    const finalHtml = selectedErrors.length > 0
+    let finalHtml = selectedErrors.length > 0
       ? this._applyCorrections(page.html, selectedErrors)
       : page.html;
+
+    // KI-Korrekturen/Vorschläge liefern oft gerade `"`/`'` — auf Buch-Style
+    // ziehen (de-CH «», de-DE „" …), bevor sie persistiert werden. Ganze Seite,
+    // damit Quotes vollen Open/Close-Kontext haben. Idempotent, fehlertolerant.
+    if (selectedErrors.length > 0 && this.selectedBookId) {
+      const { html } = await runQuoteNormalizeHtml({ bookId: this.selectedBookId, html: finalHtml });
+      finalHtml = html;
+    }
 
     if (finalHtml.length < page.html.length * SAFETY_HTML_RATIO) {
       throw new Error(this.t('lektorat.unsafeHtml'));

@@ -4,6 +4,7 @@
 
 import { fetchJson } from '../utils.js';
 import { contentRepo } from '../repo/content.js';
+import { countryOptions } from '../country-codes.js';
 
 export const bookSettingsMethods = {
   async loadBookSettings() {
@@ -23,6 +24,7 @@ export const bookSettingsMethods = {
       this.bookSettingsAllowLektorBookChat = !!data.allow_lektor_book_chat;
       this.bookSettingsDailyGoalChars     = data.daily_goal_chars != null ? Number(data.daily_goal_chars) : 1500;
       this.bookSettingsOrteReal           = !!data.orte_real;
+      this.bookSettingsSchauplatzLand     = data.schauplatz_land || '';
     } catch (e) {
       console.error('[book-settings] Laden fehlgeschlagen:', e);
     } finally {
@@ -100,6 +102,7 @@ export const bookSettingsMethods = {
           allow_lektor_book_chat: this.bookSettingsAllowLektorBookChat ? 1 : 0,
           daily_goal_chars:  Number.isFinite(Number(this.bookSettingsDailyGoalChars)) ? Number(this.bookSettingsDailyGoalChars) : null,
           orte_real:         this.bookSettingsOrteReal ? 1 : 0,
+          schauplatz_land:   this.bookSettingsSchauplatzLand || null,
         }),
       });
       if (!r.ok) {
@@ -161,6 +164,13 @@ export const bookSettingsMethods = {
       { value: 'wir',                label: app.t('book.settings.pov.wir') },
       { value: 'gemischt',           label: app.t('book.settings.pov.gemischt') },
     ];
+  },
+
+  // Haupt-Schauplatzland: ISO-3166-1-alpha-2-Liste, lokalisierte Labels.
+  // emptyLabel-Option ('') = „nicht festgelegt", via Combobox-emptyLabel ergänzt.
+  bookSettingsLandOptions() {
+    const lang = this.bookSettingsLanguage || 'de';
+    return countryOptions(lang);
   },
 
   bookSettingsTempusOptions() {

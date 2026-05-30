@@ -6,6 +6,17 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const { parseNominatimResults, parsePhotonResults } = require('../../routes/geocode.js');
+const { geocode } = require('../../lib/geocode.js');
+
+test('geocode: leere Query → leeres Array (kein Netzwerk-Call)', async () => {
+  assert.deepEqual(await geocode(''), []);
+  assert.deepEqual(await geocode('   '), []);
+  assert.deepEqual(await geocode(null), []);
+});
+
+test('geocode: zu lange Query → leeres Array (kein Netzwerk-Call)', async () => {
+  assert.deepEqual(await geocode('x'.repeat(201)), []);
+});
 
 test('parseNominatimResults: mappt lat/lon-Strings zu Number + displayName', () => {
   const out = parseNominatimResults([

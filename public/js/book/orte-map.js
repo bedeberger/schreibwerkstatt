@@ -8,6 +8,7 @@
 
 import { fetchJson, escHtml } from '../utils.js';
 import { loadLeaflet } from '../lazy-libs.js';
+import { countryLabel } from '../country-codes.js';
 
 const OSM_TILES = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 
@@ -21,10 +22,16 @@ export const orteMapMethods = {
       const s = await fetchJson('/booksettings/' + id);
       this.orteRealEnabled = !!s?.orte_real;
       this._geoLang = s?.language || 'de';
+      this._bookLand = s?.schauplatz_land || null;
     } catch {
       this.orteRealEnabled = false;
     }
     if (!this.orteRealEnabled && this.viewMode === 'map') this.viewMode = 'list';
+  },
+
+  // Lokalisiertes Land-Label für einen ISO-2-Code (Badge in Liste/Grid).
+  landLabel(code) {
+    return countryLabel(code, this._geoLang || 'de');
   },
 
   // Gefilterte Orte mit gesetzten Koordinaten (Marker-Quelle).
@@ -81,7 +88,12 @@ export const orteMapMethods = {
     try {
       const q = encodeURIComponent((o.name || '').trim());
       if (!q) return;
-      const data = await fetchJson(`/geocode?q=${q}&lang=${this._geoLang || 'de'}`);
+      // Länder-Bias: pro-Ort-Land schlägt Buch-Hauptland; biast Nominatim auf
+      // das richtige Land (verhindert „Bern → USA"-Fehltreffer bei mehrdeutigen
+      // Ortsnamen). Ohne Land → kein Bias (globale Suche wie bisher).
+      const land = o.land || this._bookLand || '';
+      const regionQ = /^[A-Za-z]{2}$/.test(land) ? `&region=${land.toLowerCase()}` : '';
+      const data = await fetchJson(`/geocode?q=${q}&lang=${this._geoLang || 'de'}${regionQ}`);
       const c = data?.candidates?.[0];
       if (!c) { this.orteMapStatus = app.t('orte.map.noResult', { name: o.name }); return; }
       const target = app.orte.find(x => x.id === o.id);

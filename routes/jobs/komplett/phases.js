@@ -19,7 +19,7 @@ const {
 const {
   preMergeChapterFiguren, applySozialschichtModeVote,
   mergeDuplicateFiguren, validateBeziehungenDescriptions,
-  mergeBeziehungenIntoFiguren,
+  mergeBeziehungenIntoFiguren, backfillFiguren,
 } = require('./figuren-merge');
 const appSettings = require('../../../lib/app-settings');
 
@@ -291,7 +291,7 @@ async function runPhase1(ctx) {
  *  namens Gesamtbuch), sind die Figuren bereits holistisch extrahiert – eine
  *  weitere KI-Konsolidierung fügt nichts hinzu und kostet ~8K Tokens extra.
  *  Stattdessen übernehmen wir die P1-Figuren direkt (IDs werden normalisiert). */
-async function runPhase2(ctx, chapterFiguren, chapterAssignments) {
+async function runPhase2(ctx, chapterFiguren, chapterAssignments, chapterSzenen) {
   const { jobId, bookIdInt, bookName, email, call, tok, log, prompts, sys, idMaps, effectiveProvider } = ctx;
 
   const isSinglePass = chapterFiguren.length === 1 && chapterFiguren[0].kapitel === 'Gesamtbuch';
@@ -326,6 +326,8 @@ async function runPhase2(ctx, chapterFiguren, chapterAssignments) {
     const schichtChanges = applySozialschichtModeVote(chapterFiguren, figuren);
     if (schichtChanges > 0) log.info(`Sozialschicht per Mehrheitsvotum korrigiert (${schichtChanges} Figuren).`);
   }
+  const backfilled = backfillFiguren(figuren, chapterSzenen, chapterAssignments, log);
+  if (backfilled > 0) log.info(`${backfilled} Figur(en) aus Szenen/Events nachgetragen (Phase-1-Recall-Lücke).`);
   saveFigurenToDb(bookIdInt, figuren, email, idMaps);
   log.info(`${figuren.length} Figuren gespeichert.`);
   try {
@@ -385,7 +387,7 @@ async function runPhase2(ctx, chapterFiguren, chapterAssignments) {
   }
 
   const figurenKompakt = figuren.map(f => ({ id: f.id, name: f.name, typ: f.typ || 'andere' }));
-  const { figNameToId, figNameToIdLower } = buildFigNameLookup(figuren, chapterFiguren, chapterAssignments, log, jobId);
+  const { figNameToId, figNameToIdLower } = buildFigNameLookup(figuren, chapterFiguren, chapterAssignments, chapterSzenen, log, jobId);
 
   return { figuren, figNameToId, figNameToIdLower, figurenKompakt, idRemap, isSinglePass };
 }

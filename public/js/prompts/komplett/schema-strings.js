@@ -26,7 +26,7 @@ export const FIGUREN_BASIS_SCHEMA = `{
       "erste_erwaehnung": "Kapitelname oder Seitenname der ersten Erwähnung (leer wenn unklar)",
       "schluesselzitate": ["Bis zu 3 charakterisierende Zitate, wörtlich aus dem Text"],
       "kapitel": [{ "name": "Kapitelname" }],
-      "beziehungen": [{ "figur_id": "fig_2", "typ": "elternteil|geschwister|kind|freund|feind|kollege|bekannt|liebesbeziehung|rivale|mentor|schuetzling|patronage|geschaeft|andere", "machtverhaltnis": 0, "beschreibung": "1 Satz", "belege": [{ "kapitel": "## Kapitel-Header", "seite": "### Seiten-Header; leer wenn = Kapitelname oder unklar" }] }]
+      "beziehungen": [{ "figur_id": "fig_2", "typ": "elternteil|geschwister|kind|freund|feind|kollege|bekannt|liebesbeziehung|rivale|mentor|schuetzling|patronage|geschaeft|andere", "machtverhaltnis": 0, "beschreibung": "1 Satz", "belege": [{ "kapitel": "Kapitelname (ohne ##-Präfix)", "seite": "Seitentitel (ohne ###-Präfix); leer wenn = Kapitel oder unklar" }] }]
     }
   ]
 }`;
@@ -72,6 +72,7 @@ export const ORTE_SCHEMA = `{
       "name": "Name des Schauplatz",
       "typ": "stadt|gebaeude|raum|landschaft|region|andere",
       "beschreibung": "2-3 Sätze zu Erscheinungsbild, Atmosphäre, Bedeutung für die Handlung",
+      "land": "ISO-3166-1-alpha-2-Ländercode des Schauplatzes in Kleinbuchstaben (z.B. ch, de, fr, us); leer wenn nicht bestimmbar",
       "erste_erwaehnung": "Kapitelname oder Seitenname der ersten Erwähnung (leer wenn unklar)",
       "stimmung": "Grundatmosphäre in 2-3 Worten (z.B. bedrohlich, heimelig, verlassen, belebt)",
       "kapitel": ["Kapitelname"],
@@ -85,6 +86,7 @@ export const ORTE_RULES = `Regeln:
 - SEHR GROSSZÜGIG erfassen: alle Schauplätze inklusive Nebenschauplätze und einmaliger Erwähnungen; lieber inkludieren als weglassen. haeufigkeit=1 ist gültig.
 - figuren: nur IDs aus der gelieferten Figurenliste (leer lassen wenn keine Figuren bekannt)
 - kapitel: flaches Array der Kapitelnamen (Strings), in denen der Ort aktiv vorkommt – jeder Kapitelname höchstens einmal
+- land: ISO-3166-1-alpha-2 in Kleinbuchstaben. Belege das Land aus dem Text (genannte Stadt/Region/Land). Ist im Text kein anderes Land erkennbar, ordne den Ort dem HAUPT-SCHAUPLATZLAND des Buchs zu (falls im Kontext angegeben). Reine Innenräume/Gebäude ohne geografischen Hinweis erben das Land der umgebenden Stadt/Region. Nur leer lassen, wenn weder Text noch Hauptland eine Zuordnung erlauben.
 - Kein Cap auf Anzahl Orte – vollständige Erfassung wichtiger als Kürze`;
 
 // ── Musik-Schema (Songs/Musikstücke) ────────────────────────────────────────

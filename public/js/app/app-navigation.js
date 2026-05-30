@@ -174,6 +174,13 @@ export const appNavigationMethods = {
     if (page) this.selectPage(page);
   },
 
+  gotoChapterById(chapterId) {
+    if (!chapterId) return;
+    const chapter = (this.tree || []).find(t => t.type === 'chapter' && String(t.id) === String(chapterId));
+    const first = chapter?.pages?.[0];
+    if (first) this.selectPage(first);
+  },
+
   // Zusammengesetzte Navigationen (z.B. openFigurById → toggleFiguresCard
   // → loadFiguren) erzeugen sonst mehrere History-Einträge. Mit diesem
   // Wrapper werden Zwischen-States unterdrückt, am Ende genau einmal gepusht.

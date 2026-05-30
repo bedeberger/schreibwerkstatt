@@ -17,7 +17,7 @@ router.get('/:book_id', (req, res) => {
 
   const rows = db.prepare(`
     SELECT id, loc_id, name, typ, beschreibung, erste_erwaehnung, erste_erwaehnung_page_id, stimmung,
-           lat, lng, updated_at
+           land, lat, lng, updated_at
     FROM locations
     WHERE book_id = ? AND user_email = ?
     ORDER BY sort_order, id
@@ -55,6 +55,7 @@ router.get('/:book_id', (req, res) => {
     erste_erwaehnung:         r.erste_erwaehnung,
     erste_erwaehnung_page_id: r.erste_erwaehnung_page_id || null,
     stimmung:                 r.stimmung,
+    land:                     r.land || null,
     lat:                      r.lat != null ? r.lat : null,
     lng:                      r.lng != null ? r.lng : null,
     figuren:                  figMap[r.id] || [],

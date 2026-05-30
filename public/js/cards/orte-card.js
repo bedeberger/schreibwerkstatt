@@ -22,6 +22,7 @@ export function registerOrteCard() {
     geocodingId: null,        // loc-id, fuer die gerade ein Geocode laeuft
     orteMapStatus: '',
     _geoLang: 'de',
+    _bookLand: null,          // book_settings.schauplatz_land → Geocode-Länder-Bias
     _map: null,               // Leaflet-Instanz (transienter Runtime-Handle)
     _markers: null,           // Leaflet-LayerGroup
     _ortePollTimer: null,

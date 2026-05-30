@@ -6824,6 +6824,26 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 162 abgeschlossen (book_settings.orte_real + locations.lat/lng).');
   }
 
+  if (version < 163) {
+    // Schauplatz-Verortung kontextbewusst: Haupt-Schauplatzland pro Buch
+    // (ISO-3166-1-alpha-2, z.B. 'ch') biast Geocoding + dient als Land-Fallback
+    // bei der Extraktion. Pro Ort optionales `land` (gleiche ISO-2-Notation),
+    // von der KI extrahiert bzw. vom User per Karte gepflegt.
+    const bsCols163 = db.pragma('table_info(book_settings)').map(c => c.name);
+    if (!bsCols163.includes('schauplatz_land')) {
+      db.exec('ALTER TABLE book_settings ADD COLUMN schauplatz_land TEXT');
+    }
+    const locCols163 = db.pragma('table_info(locations)').map(c => c.name);
+    if (!locCols163.includes('land')) db.exec('ALTER TABLE locations ADD COLUMN land TEXT');
+
+    const fkErrors163 = db.pragma('foreign_key_check');
+    if (fkErrors163.length) {
+      throw new Error(`Migration 163: foreign_key_check meldet ${fkErrors163.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 163').run();
+    logger.info('DB-Migration auf Version 163 abgeschlossen (book_settings.schauplatz_land + locations.land).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

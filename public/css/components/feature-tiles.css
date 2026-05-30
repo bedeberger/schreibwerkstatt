@@ -115,9 +115,24 @@
   color: var(--color-text);
   border-left: 2px solid transparent;
 }
+.palette-item-headrow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+}
 .palette-item-label {
   font-size: var(--font-size-sm);
   font-weight: 500;
+}
+.palette-item-badge {
+  font-size: var(--font-size-mini);
+  font-weight: 500;
+  padding: 1px var(--space-2xs);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  white-space: nowrap;
 }
 .palette-item-desc {
   font-size: var(--font-size-xs);
