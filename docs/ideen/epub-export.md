@@ -1,8 +1,14 @@
 # Konfigurierbarer EPUB-Export + geteilte Publikations-Metadaten
 
-- **Status:** Ready
+- **Status:** Ready (teilweise umgesetzt — siehe Umsetzungsstand)
 - **Aufwand:** L
 - **Severity:** medium <!-- Self-Publishing ist erklärtes Produkt-Ziel; EPUB ist der eBook-Standard neben PDF -->
+
+> **Umsetzungsstand:**
+> - **Block B (EPUB-Bugfixes) — umgesetzt + getestet.** Autor (Owner-Anzeigename), `lang` (book_settings.language), lokalisierter TOC-Titel, Bild-Warnliste statt Silent-Drop. DOCX-Autor-Fix mit. Tests: [tests/unit/epub-export.test.mjs](../../tests/unit/epub-export.test.mjs).
+> - **Block A Foundation — umgesetzt + getestet.** Migration 166: Tabelle `book_publication` (1:1, FK CASCADE) + Seed aus dem Gewinner-PDF-Profil je Buch. Validator [lib/publication-meta.js](../../lib/publication-meta.js), CRUD [db/book-publication.js](../../db/book-publication.js). squash:regen + ERD aktualisiert, Drift-Tests grün. Tests: [tests/unit/publication-meta.test.mjs](../../tests/unit/publication-meta.test.mjs).
+> - **EPUB-Consume — umgesetzt + getestet.** `buildEpub` bettet Cover (Buffer→`File`) ein, baut Titelseite/Impressum/Widmung/Motto (beforeToc, aus custom-TOC ausgeschlossen) + Autor-Bio-Backmatter (+Foto-data-URI), Blocksatz-Toggle, TOC-Titel-Override. Sync-Route [routes/export.js](../../routes/export.js) lädt `meta`/Cover/Foto lazy für `epub`. Smoke-Test gegen echtes `genEpub`.
+> - **Offen:** [routes/publication.js](../../routes/publication.js) (Meta-/Cover-/Foto-CRUD-Endpunkte), [routes/jobs/epub-export.js](../../routes/jobs/epub-export.js) (Job-Pfad), `publicationCard` + Partial + i18n + CSS + Registry/Hash-Router (Block C), PDF-Render-Lesepfad auf `book_publication` umziehen (nach Commit der laufenden pdf-print-ready-Arbeit, sonst Konflikt mit uncommitted Working Tree).
 
 ## Context
 

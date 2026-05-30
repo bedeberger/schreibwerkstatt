@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import epub from '../../lib/export-builders/epub.js';
 
-const { _resolveEpubMeta, _countUnfetchableImages } = epub;
+const { _resolveEpubMeta, _countUnfetchableImages, _buildFrontmatter, _buildBackmatter, _proseToXhtml, buildEpub } = epub;
 
 test('_resolveEpubMeta: opts.author/lang gewinnen vor Domain-Shape', () => {
   const m = _resolveEpubMeta({ created_by: { name: 'Alt' } }, { author: 'Owner Name', lang: 'en' });
@@ -45,4 +45,59 @@ test('_countUnfetchableImages: zaehlt nur non-http/non-data src', () => {
 
 test('_countUnfetchableImages: leere/keine Bilder -> 0', () => {
   assert.equal(_countUnfetchableImages([{ content: '<p>kein Bild</p>' }, { content: '' }, {}]), 0);
+});
+
+test('_proseToXhtml: escaped, Doppel-Umbruch=Absatz, Einzel=<br/>', () => {
+  assert.equal(_proseToXhtml('a\n\nb'), '<p>a</p>\n<p>b</p>');
+  assert.equal(_proseToXhtml('a\nb'), '<p>a<br/>b</p>');
+  assert.equal(_proseToXhtml('<b>&'), '<p>&lt;b&gt;&amp;</p>');
+  assert.equal(_proseToXhtml('   '), '');
+});
+
+test('_buildFrontmatter: Titelseite immer, Rest konditional, alle __toc:false + beforeToc', () => {
+  const f = _buildFrontmatter({ subtitle: 'Sub', year: '2026', dedication: 'Fuer X', imprint: 'Verlag', isbn: '123', copyright: '© 2026' }, { title: 'Buch', author: 'Autor', lang: 'de' });
+  assert.ok(f.every(e => e.__toc === false && e.beforeToc === true));
+  assert.equal(f[0].filename, 'front_title.xhtml');
+  assert.ok(f[0].content.includes('Buch') && f[0].content.includes('Sub') && f[0].content.includes('Autor') && f[0].content.includes('2026'));
+  const files = f.map(e => e.filename);
+  assert.ok(files.includes('front_imprint.xhtml') && files.includes('front_dedication.xhtml'));
+  assert.ok(f.find(e => e.filename === 'front_imprint.xhtml').content.includes('ISBN: 123'));
+});
+
+test('_buildFrontmatter: nur Titelseite wenn keine Meta', () => {
+  const f = _buildFrontmatter(null, { title: 'B', author: '', lang: 'en' });
+  assert.equal(f.length, 1);
+  assert.equal(f[0].title, 'Title');
+});
+
+test('_buildBackmatter: leere Bio -> [], mit Bio -> Eintrag (+Foto data-uri)', () => {
+  assert.deepEqual(_buildBackmatter({ author_bio: '' }, { lang: 'de' }), []);
+  const withImg = _buildBackmatter({ author_bio: 'Bio Text' }, { lang: 'de' }, { image: Buffer.from('x'), mime: 'image/jpeg' });
+  assert.equal(withImg.length, 1);
+  assert.equal(withImg[0].__toc, false);
+  assert.ok(withImg[0].content.includes('Über den Autor'));
+  assert.ok(withImg[0].content.includes('data:image/jpeg;base64,'));
+});
+
+// 1x1 PNG
+const PNG_1x1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+
+test('buildEpub: erzeugt Buffer mit Frontmatter/Backmatter-Dateien + Cover', async () => {
+  const bundle = {
+    scope: 'book',
+    book: { id: 1, name: 'Mein Buch', description: 'Desc' },
+    groups: [{ chapterId: null, chapter: null, pages: [{ p: { name: 'Seite 1' }, pd: { html: '<p>Inhalt</p>' } }] }],
+  };
+  const buf = await buildEpub(bundle, {
+    lang: 'de',
+    author: 'Test Autor',
+    meta: { dedication: 'Fuer dich', author_bio: 'Der Autor lebt.', epub_justify: true, subtitle: 'Untertitel', year: '2026' },
+    cover: { image: PNG_1x1, mime: 'image/png' },
+  });
+  assert.ok(Buffer.isBuffer(buf) && buf.length > 0);
+  // Zip-Local-Header-Dateinamen liegen unkomprimiert im Buffer.
+  const s = buf.toString('latin1');
+  assert.ok(s.includes('front_title.xhtml'), 'Titelseite fehlt');
+  assert.ok(s.includes('front_dedication.xhtml'), 'Widmung fehlt');
+  assert.ok(s.includes('back_author.xhtml'), 'Autor-Seite fehlt');
 });

@@ -65,9 +65,25 @@ router.get('/:scope/:id/:fmt', async (req, res) => {
     catch (e) { if (sendACLError(res, e)) return; throw e; }
   }
 
+  const buildOpts = _exportMeta(bundle.book?.id);
+  // EPUB konsumiert zusaetzlich die buch-weiten Publikations-Metadaten
+  // (Cover/Titelei/Bio). Lazy geladen — nur fuer epub, nur die BLOBs bei Bedarf.
+  if (fmt === 'epub' && bundle.book?.id) {
+    try {
+      const bp = require('../db/book-publication');
+      const meta = bp.getMeta(bundle.book.id);
+      buildOpts.meta = meta;
+      buildOpts.tocTitle = meta.epub_toc_title || undefined;
+      if (meta.has_cover) buildOpts.cover = bp.getCover(bundle.book.id);
+      if (meta.has_author_image) buildOpts.authorImage = bp.getAuthorImage(bundle.book.id);
+    } catch (e) {
+      logger.warn(`Publikations-Metadaten fuer EPUB nicht ladbar (book=${bundle.book.id}): ${e.message}`);
+    }
+  }
+
   let buf;
   try {
-    buf = await spec.build(bundle, _exportMeta(bundle.book?.id));
+    buf = await spec.build(bundle, buildOpts);
   } catch (e) {
     logger.error(`Export-Build fehlgeschlagen (scope=${scope}, id=${id}, fmt=${fmt}): ${e.message}`);
     return res.status(502).json({ error_code: 'EXPORT_FAILED' });
