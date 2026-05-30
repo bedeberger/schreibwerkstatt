@@ -73,12 +73,25 @@ export const orteMapMethods = {
       this._addOrtMarker(L, o, [o.lat, o.lng], false);
       pts.push([o.lat, o.lng]);
     }
-    // Verortete Marker zuerst einpassen → getCenter() liefert danach die
-    // sichtbare Kartenmitte, auf die wir die Orte ohne Georeferenz legen.
+    // Verortete Marker zuerst einpassen → die Pixel-Mitte liefert danach den
+    // Ankerpunkt für die Orte ohne Georeferenz.
     if (pts.length) this._map.fitBounds(pts, { padding: [30, 30], maxZoom: 13 });
-    const center = this._map.getCenter();
-    for (const o of this.unlocatedOrte()) {
-      this._addOrtMarker(L, o, [center.lat, center.lng], true);
+    // Unverortete Orte als Raster UNTER der Kartenmitte verteilen (Pixel-Offsets,
+    // zoom-unabhängig). Niemals alle auf denselben Punkt stapeln: gestapelte
+    // draggable-Marker fangen den mousedown ab und blockieren das Map-Panning
+    // (die Kartenmitte ist genau der natürliche Greifpunkt zum Verschieben).
+    const unlocated = this.unlocatedOrte();
+    if (unlocated.length) {
+      const size = this._map.getSize();
+      const gap = 26;
+      const cols = Math.max(1, Math.min(6, Math.ceil(Math.sqrt(unlocated.length))));
+      unlocated.forEach((o, i) => {
+        const col = i % cols, row = Math.floor(i / cols);
+        const px = size.x / 2 + (col - (cols - 1) / 2) * gap;
+        const py = size.y / 2 + 48 + row * gap;
+        const ll = this._map.containerPointToLatLng([px, py]);
+        this._addOrtMarker(L, o, [ll.lat, ll.lng], true);
+      });
     }
   },
 
