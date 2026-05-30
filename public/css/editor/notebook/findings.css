@@ -56,6 +56,51 @@
   overflow-wrap: break-word;
 }
 
+/* Eigener Korrekturvorschlag: inline-Edit + Abgrenzung zum KI-Vorschlag.
+   KI-Korrektur = grüner Tint, eigener Vorschlag = Akzent (Gold) + Inset-Kante. */
+.finding-korrektur-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-6);
+  margin-top: var(--space-3);
+}
+.finding-korrektur-row .finding-korrektur { margin-top: 0; }
+.finding-korrektur--user {
+  background: var(--color-accent-bg);
+  box-shadow: inset 2px 0 0 var(--color-accent);
+}
+.finding-korrektur-actions { display: inline-flex; align-items: center; gap: var(--space-6); }
+.finding-edit-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.finding-edit-btn:hover { color: var(--color-text); }
+.finding-korrektur-edit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+  margin-top: var(--space-3);
+  width: 100%;
+}
+.finding-korrektur-input {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--font-size-base);
+  padding: var(--space-2xs) 6px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+.finding-korrektur-input:focus { outline: none; border-color: var(--color-accent); }
+.finding-korrektur-edit-actions { display: inline-flex; gap: var(--space-6); }
+
 del {
   background: var(--color-err-bg);
   color: var(--color-err-text);

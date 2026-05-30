@@ -133,13 +133,9 @@ export const orteMapMethods = {
       b.addEventListener('click', () => app.openKapitelByName(b.dataset.kap)));
   },
 
-  // Marker-Klick → Locate-Row markieren + in den Viewport scrollen.
+  // Marker-Klick → Locate-Row markieren (kein Scroll).
   _selectFromMap(id) {
     this.highlightOrtId = id;
-    this.$nextTick(() => {
-      document.querySelector(`.ort-map-locate-row[data-ortid="${id}"]`)
-        ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    });
   },
 
   // Locate-Row-Hover → Marker zentrieren + Popup öffnen (Gegenrichtung).
@@ -214,18 +210,18 @@ export const orteMapMethods = {
     if (!todo.length) return;
     this.geocodingAll = true;
     let done = 0, hits = 0;
+    // Map-Handle einmal vorab holen, dann nach jedem Treffer sofort neu rendern —
+    // jede gefundene Georeferenz erscheint direkt, nicht erst am Schleifenende.
+    const L = this.viewMode === 'map' ? await loadLeaflet() : null;
     try {
       for (const o of todo) {
         done++;
         this.orteMapStatus = app.t('orte.map.batchProgress', { done, total: todo.length, name: o.name });
         try { if (await this._geocodeOne(o)) hits++; } catch (e) { console.error('[geocodeAll]', e); }
+        if (L) this._renderOrteMarkers(L);
         if (done < todo.length) await new Promise(r => setTimeout(r, 1100));
       }
       this.orteMapStatus = app.t('orte.map.batchDone', { hits, total: todo.length });
-      if (this.viewMode === 'map') {
-        const L = await loadLeaflet();
-        this._renderOrteMarkers(L);
-      }
     } finally {
       this.geocodingAll = false;
     }

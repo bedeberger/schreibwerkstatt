@@ -1672,6 +1672,12 @@
   "editor.findings.selectNone":  "None",
   "editor.findings.applied":     "✓ applied",
   "editor.findings.appliedHistoryTitle": "Applied corrections ({n})",
+  "editor.findings.editKorrektur":       "edit",
+  "editor.findings.addKorrektur":        "Your suggestion",
+  "editor.findings.yourSuggestion":      "your suggestion",
+  "editor.findings.resetToAi":           "reset",
+  "editor.findings.korrekturPlaceholder": "Your correction …",
+  "editor.findings.korrekturConfirm":    "OK",
 
   "finding.rechtschreibung":     "Spell.",
   "finding.grammatik":           "Grammar",

@@ -126,7 +126,10 @@ function validateLektoratFehler(fehler, locale) {
     // damit alte Cache-Rows und vereinzelte AI-Antworten kein totes Feld mitschleppen.
     .map(f => { const { kontext, ...rest } = f; return { ...rest, typ: rest.typ?.toLowerCase?.() }; })
     .filter(f => VALID_TYPEN.has(f.typ))
-    .filter(f => f.typ !== 'stil' || (f.korrektur?.trim() && f.korrektur.trim() !== f.original?.trim()))
+    // Vorschlag == Original (1:1, nach trim) ist kein Fehler – für alle Typen skippen
+    .filter(f => !f.korrektur || f.korrektur.trim() !== f.original?.trim())
+    // stil braucht zusätzlich eine nicht-leere Korrektur
+    .filter(f => f.typ !== 'stil' || !!f.korrektur?.trim())
     // Einträge deren Erklärung verrät, dass es kein echter Fehler ist
     .filter(f => !NON_ERROR_RE.test(f.erklaerung || ''))
     // de-CH: Einträge filtern, deren einziger Unterschied ss↔ß ist
@@ -215,10 +218,11 @@ async function runCheckJob(jobId, pageId, bookId, userEmail, userToken) {
       logger.info(`Cache-HIT (page=${pageId}) – spart Lektorat-Call.`);
       updateJob(jobId, { progress: 97 });
       result = cached;
-      // Dedup + Legacy-`kontext`-Feld-Strip auf Cached-Path: ältere Cache-Rows
-      // können Duplikate und/oder das tote `kontext`-Feld enthalten.
+      // Re-Validate + Dedup auf Cached-Path: ältere Cache-Rows können Duplikate,
+      // das tote `kontext`-Feld oder 1:1-Vorschläge (== Original) enthalten.
+      // validateLektoratFehler strippt `kontext` und filtert 1:1 mit.
       if (Array.isArray(result?.fehler)) {
-        result.fehler = dedupFehler(result.fehler.map(f => { const { kontext, ...rest } = f; return rest; }));
+        result.fehler = dedupFehler(validateLektoratFehler(result.fehler, locale));
       }
     } else {
       result = await aiCall(jobId, tok,
@@ -363,8 +367,9 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
         if (cached) {
           logger.info(`[${i + 1}/${pages.length}] «${pd.name}» page=${p.id} – Cache-HIT`);
           result = cached;
+          // Re-Validate (strippt `kontext`, filtert 1:1) + Dedup auf Cached-Path.
           if (Array.isArray(result?.fehler)) {
-            result.fehler = dedupFehler(result.fehler.map(f => { const { kontext, ...rest } = f; return rest; }));
+            result.fehler = dedupFehler(validateLektoratFehler(result.fehler, locale));
           }
         } else {
           // Bei Pool>1 sind feinere Pct-Ranges pro Item nicht sinnvoll

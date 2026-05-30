@@ -1061,10 +1061,11 @@ Editor-spezifische Patterns. Greifen nur in der Editor-Card und im Fokus-Modus; 
 
 **Use:** Einzelne Lektorats-/Review-Findings mit Original/Korrektur und Apply-Action.
 
-**Klassen** (CSS in [public/css/editor/findings.css](public/css/editor/findings.css), Render-Logik im Frontend):
+**Klassen** (CSS in [public/css/editor/notebook/findings.css](public/css/editor/notebook/findings.css), Render-Logik im Frontend):
 - `.finding` / `.finding--flash` (Highlight-Animation) / `.finding--applied` (nach Übernahme)
 - Severity-Variante: `.finding.error` / `.ok` / `.style` (siehe Section „Severity-Vokabular" für Mapping)
 - Children: `.finding-header`, `.finding-checkbox`, `.finding-content`, `.finding-original`, `.finding-korrektur`, `.finding-explanation`, `.finding-toggle-group`
+- **Eigener Korrekturvorschlag (inline-Edit):** jeder Befund kann den KI-Vorschlag überschreiben oder — bei reinem Stil-Befund ohne `korrektur` — einen eigenen ergänzen. Affordance `.finding-edit-btn` (Textlink „anpassen"/„Eigener Vorschlag") → Inline-Editor `.finding-korrektur-edit` mit `.finding-korrektur-input` (`data-spellcheck="spelling"`, Enter=übernehmen, Esc=abbrechen). Eigener Vorschlag: `.finding-korrektur.finding-korrektur--user` (Akzent-Tint statt KI-Grün) + `.tag` „dein Vorschlag" + Reset-Link. Apply-Pipeline unverändert — sie liest `f.korrektur`. Edit-Controls in der `<label>` brauchen `@click.stop`/`@pointerdown.stop`, sonst togglet der Klick die Checkbox.
 
 **Stilbox** (`.stilbox`, `.stilbox--review-summary`, `.stilbox--spaced`) — bordered Container für Analyse-Sektionen, in Reviews und Findings wiederverwendet.
 

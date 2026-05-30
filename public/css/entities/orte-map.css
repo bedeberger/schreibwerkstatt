@@ -58,6 +58,22 @@
 /* Marker-Popup (Leaflet). Inhalt als x-html-Sink — Felder serverseitig escaped. */
 .ort-map .leaflet-popup-content-wrapper {
   border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+}
+
+.ort-map .leaflet-popup-tip {
+  background: var(--color-surface);
+}
+
+.ort-map .leaflet-popup-close-button {
+  color: var(--color-muted);
+}
+
+.ort-map .leaflet-popup-close-button:hover {
+  color: var(--color-primary);
 }
 
 .ort-map .leaflet-popup-content {

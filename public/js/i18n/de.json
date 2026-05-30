@@ -1673,6 +1673,12 @@
   "editor.findings.selectNone":  "Keine",
   "editor.findings.applied":     "✓ übernommen",
   "editor.findings.appliedHistoryTitle": "Eingearbeitete Korrekturen ({n})",
+  "editor.findings.editKorrektur":       "anpassen",
+  "editor.findings.addKorrektur":        "Eigener Vorschlag",
+  "editor.findings.yourSuggestion":      "dein Vorschlag",
+  "editor.findings.resetToAi":           "zurücksetzen",
+  "editor.findings.korrekturPlaceholder": "Eigener Korrekturvorschlag …",
+  "editor.findings.korrekturConfirm":    "OK",
 
   "finding.rechtschreibung":     "Rechtschr.",
   "finding.grammatik":           "Grammatik",

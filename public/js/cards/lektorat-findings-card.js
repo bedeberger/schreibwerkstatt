@@ -23,7 +23,60 @@ function flashEl(el) {
 export function registerLektoratFindingsCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
   window.Alpine.data('lektoratFindingsCard', () => ({
+    // Inline-Edit eines Korrekturvorschlags: -1 = keine Zeile im Edit.
+    // editDraft puffert den Input-Text bis Commit/Cancel.
+    editingIdx: -1,
+    editDraft: '',
+
+    init() {
+      // Neuer Prüflauf ersetzt das Findings-Array (neue Referenz) → offenen
+      // Inline-Editor schliessen, sonst zeigt eine alte Index-Position Edit-UI.
+      this.$watch(() => window.__app?.lektoratFindings, () => {
+        this.editingIdx = -1;
+        this.editDraft = '';
+      });
+    },
+
     _isHardFinding(typ) { return isHardFinding(typ); },
+
+    startEditKorrektur(idx) {
+      const f = window.__app?.lektoratFindings?.[idx];
+      if (!f) return;
+      this.editDraft = f.korrektur || '';
+      this.editingIdx = idx;
+    },
+
+    cancelEditKorrektur() {
+      this.editingIdx = -1;
+      this.editDraft = '';
+    },
+
+    // Übernimmt den Draft als f.korrektur. KI-Original wird beim ersten Edit in
+    // f.korrekturKi gesnapshottet (für Reset). Anwendbarer Vorschlag → Befund
+    // automatisch selektieren, damit er in Preview/Save landet. Apply-Pipeline
+    // (_applyCorrections) liest f.korrektur unverändert weiter.
+    commitEditKorrektur(idx) {
+      const app = window.__app;
+      const f = app?.lektoratFindings?.[idx];
+      if (!f) return;
+      const val = (this.editDraft || '').trim();
+      if (f.korrekturKi === undefined) f.korrekturKi = f.korrektur || '';
+      f.korrektur = val;
+      f.userEdited = val !== (f.korrekturKi || '');
+      if (val && val !== f.original) app.selectedFindings[idx] = true;
+      this.editingIdx = -1;
+      this.editDraft = '';
+      app._recomputeCorrectedHtml();
+    },
+
+    resetKorrektur(idx) {
+      const app = window.__app;
+      const f = app?.lektoratFindings?.[idx];
+      if (!f || f.korrekturKi === undefined) return;
+      f.korrektur = f.korrekturKi;
+      f.userEdited = false;
+      app._recomputeCorrectedHtml();
+    },
 
     // Hover auf Finding → Preview-Panel zur entsprechenden Markierung scrollen
     // (nur im Split-Modus, sonst zeigt page-view einen Tooltip).
