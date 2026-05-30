@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 166, 89 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 167, 89 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -1048,6 +1048,11 @@ erDiagram
     TEXT    epub_css_style "serif|sans"
     INTEGER epub_justify   "0|1"
     TEXT    epub_toc_title
+    TEXT    description "EPUB-OPF Klappentext"
+    TEXT    publisher
+    TEXT    series
+    TEXT    series_index
+    TEXT    keywords "dc:subject, kommagetrennt"
     TEXT    created_at
     TEXT    updated_at
   }

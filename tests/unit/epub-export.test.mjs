@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import epub from '../../lib/export-builders/epub.js';
 
-const { _resolveEpubMeta, _countUnfetchableImages, _buildFrontmatter, _buildBackmatter, _proseToXhtml, buildEpub } = epub;
+const { _resolveEpubMeta, _countUnfetchableImages, _buildFrontmatter, _buildBackmatter, _proseToXhtml, buildEpub, _buildOpfExtraMeta, _buildContentOPF } = epub;
 
 test('_resolveEpubMeta: opts.author/lang gewinnen vor Domain-Shape', () => {
   const m = _resolveEpubMeta({ created_by: { name: 'Alt' } }, { author: 'Owner Name', lang: 'en' });
@@ -100,4 +100,63 @@ test('buildEpub: erzeugt Buffer mit Frontmatter/Backmatter-Dateien + Cover', asy
   assert.ok(s.includes('front_title.xhtml'), 'Titelseite fehlt');
   assert.ok(s.includes('front_dedication.xhtml'), 'Widmung fehlt');
   assert.ok(s.includes('back_author.xhtml'), 'Autor-Seite fehlt');
+});
+
+test('_buildOpfExtraMeta: leer ohne keywords/series', () => {
+  assert.equal(_buildOpfExtraMeta({}), '');
+  assert.equal(_buildOpfExtraMeta({ keywords: '  ,  ' }), '');
+});
+
+test('_buildOpfExtraMeta: keywords → dc:subject je Term (escaped), series → collection + calibre', () => {
+  const out = _buildOpfExtraMeta({ keywords: 'Fantasy, Abenteuer & Co', series: 'Die <Reihe>', series_index: '2' });
+  assert.ok(out.includes('<dc:subject>Fantasy</dc:subject>'));
+  assert.ok(out.includes('<dc:subject>Abenteuer &amp; Co</dc:subject>'));
+  assert.ok(out.includes('belongs-to-collection') && out.includes('Die &lt;Reihe&gt;'));
+  assert.ok(out.includes('group-position">2<'));
+  assert.ok(out.includes('calibre:series') && out.includes('calibre:series_index'));
+});
+
+test('_buildContentOPF: undefined ohne Extra-Meta, sonst injiziert vor </metadata>', () => {
+  assert.equal(_buildContentOPF({}), undefined);
+  const opf = _buildContentOPF({ keywords: 'X' });
+  assert.ok(opf.includes('<dc:subject>X</dc:subject>'));
+  assert.ok(opf.indexOf('<dc:subject>X</dc:subject>') < opf.indexOf('</metadata>'), 'Extra-Meta muss vor </metadata> stehen');
+  assert.ok(opf.includes('<%= title %>'), 'ejs-Platzhalter der Lib bleiben erhalten');
+});
+
+test('buildEpub: description-Fallback book→meta, publisher/series in OPF', async () => {
+  const bundle = {
+    scope: 'book',
+    book: { id: 1, name: 'Mein Buch', description: 'Buch-Beschreibung' },
+    groups: [{ chapterId: null, chapter: null, pages: [{ p: { name: 'S1' }, pd: { html: '<p>x</p>' } }] }],
+  };
+  const buf = await buildEpub(bundle, {
+    lang: 'de', author: 'A',
+    meta: { description: 'Klappentext', publisher: 'Mein Verlag', series: 'Saga', keywords: 'Krimi' },
+  });
+  const s = buf.toString('latin1');
+  assert.ok(s.includes('Klappentext'), 'meta.description gewinnt vor book.description');
+  assert.ok(s.includes('Mein Verlag'), 'publisher fehlt');
+  assert.ok(s.includes('belongs-to-collection'), 'series collection fehlt');
+  assert.ok(s.includes('<dc:subject>Krimi</dc:subject>'), 'keyword fehlt');
+});
+
+test('buildEpub: ohne meta.description faellt auf book.description', async () => {
+  const bundle = {
+    scope: 'book',
+    book: { id: 1, name: 'B', description: 'NurBuchDesc' },
+    groups: [{ chapterId: null, chapter: null, pages: [{ p: { name: 'S1' }, pd: { html: '<p>x</p>' } }] }],
+  };
+  const buf = await buildEpub(bundle, { lang: 'de', author: 'A', meta: {} });
+  assert.ok(buf.toString('latin1').includes('NurBuchDesc'));
+});
+
+test('buildEpub: epub_css_style sans → sans-serif body font', async () => {
+  const bundle = {
+    scope: 'book',
+    book: { id: 1, name: 'B' },
+    groups: [{ chapterId: null, chapter: null, pages: [{ p: { name: 'S1' }, pd: { html: '<p>x</p>' } }] }],
+  };
+  const buf = await buildEpub(bundle, { lang: 'de', author: 'A', meta: { epub_css_style: 'sans' } });
+  assert.ok(buf.toString('latin1').includes('font-family: sans-serif'));
 });

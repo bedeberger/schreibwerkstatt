@@ -159,6 +159,9 @@ export const bookSettingsMethods = {
           frontmatter: p.frontmatter || '', author_bio: p.author_bio || '',
           epub_css_style: p.epub_css_style || 'serif', epub_justify: p.epub_justify ? 1 : 0,
           epub_toc_title: p.epub_toc_title || '',
+          description: p.description || '', publisher: p.publisher || '',
+          series: p.series || '', series_index: p.series_index != null ? String(p.series_index) : '',
+          keywords: p.keywords || '',
         }),
       });
       if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(window.__app.tError(d) || `HTTP ${r.status}`); }

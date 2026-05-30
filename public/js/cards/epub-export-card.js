@@ -18,7 +18,8 @@ import { startPoll } from './job-helpers.js';
 const _EMPTY_META = () => ({
   isbn: '', subtitle: '', year: '', dedication: '', imprint: '', copyright: '',
   frontmatter: '', author_bio: '', epub_css_style: 'serif', epub_justify: true,
-  epub_toc_title: '', has_cover: false, has_author_image: false,
+  epub_toc_title: '', description: '', publisher: '', series: '', series_index: '',
+  keywords: '', has_cover: false, has_author_image: false,
 });
 
 export function registerEpubExportCard() {
@@ -136,6 +137,9 @@ export function registerEpubExportCard() {
             frontmatter: p.frontmatter || '', author_bio: p.author_bio || '',
             epub_css_style: p.epub_css_style || 'serif', epub_justify: p.epub_justify ? 1 : 0,
             epub_toc_title: p.epub_toc_title || '',
+            description: p.description || '', publisher: p.publisher || '',
+            series: p.series || '', series_index: p.series_index != null ? String(p.series_index) : '',
+            keywords: p.keywords || '',
           }),
         });
         if (!r.ok) {
