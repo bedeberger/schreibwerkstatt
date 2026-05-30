@@ -110,4 +110,19 @@ export const exportMethods = {
     }
     app.togglePdfExportCard();
   },
+
+  _handoffToEpubCustom() {
+    const app = window.__app;
+    if (!app) return;
+    let preset = null;
+    if (this.exportScope === 'page' && this.exportPageId)
+      preset = { kind: 'page', id: this.exportPageId };
+    else if (this.exportScope === 'chapter' && this.exportChapterId)
+      preset = { kind: 'chapter', id: this.exportChapterId };
+    if (preset) {
+      app.__epubExportPreset = preset;
+      window.dispatchEvent(new CustomEvent('export:epub:preset', { detail: preset }));
+    }
+    app.toggleEpubExportCard();
+  },
 };

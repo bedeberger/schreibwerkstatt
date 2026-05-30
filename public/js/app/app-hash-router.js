@@ -64,6 +64,7 @@ export const appHashRouterMethods = {
     else if (this.showFinetuneExportCard) parts.push('finetune');
     else if (this.showExportCard) parts.push('export');
     else if (this.showPdfExportCard) parts.push('pdf');
+    else if (this.showEpubExportCard) parts.push('epub');
     else if (this.showBookOrganizerCard) parts.push('organize');
     else if (this.showBookEditorCard) parts.push('bucheditor');
     else if (this.showShareLinksCard) parts.push('share');
@@ -362,6 +363,9 @@ export const appHashRouterMethods = {
         case 'pdf':
           if (!this.showPdfExportCard) await this.togglePdfExportCard();
           break;
+        case 'epub':
+          if (!this.showEpubExportCard) await this.toggleEpubExportCard();
+          break;
         case 'organize':
           if (!this.showBookOrganizerCard) await this.toggleBookOrganizerCard();
           break;
@@ -398,6 +402,7 @@ export const appHashRouterMethods = {
       'showFinetuneExportCard',
       'showExportCard',
       'showPdfExportCard',
+      'showEpubExportCard',
       'showBookOrganizerCard',
       'showBookEditorCard',
       'showBookOverviewCard',

@@ -142,6 +142,7 @@
   --card-accent-ideen: #b8862a;
   --card-accent-finetune: #5a5a5a;
   --card-accent-pdfexport: #6a4a3a;
+  --card-accent-epubexport: #3a5a52;
   --card-accent-settings: #5a5a5a;
   --card-accent-bookeditor: #7a5a3a;
   --card-accent-search: #3a6a7a;
@@ -313,6 +314,7 @@
   --card-accent-ideen: #d6b260;
   --card-accent-finetune: #989286;
   --card-accent-pdfexport: #a8806a;
+  --card-accent-epubexport: #7aa89c;
   --card-accent-settings: #989286;
   --card-accent-bookeditor: #c69a78;
   --card-accent-search: #7ec2d0;

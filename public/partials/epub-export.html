@@ -1,0 +1,103 @@
+<!-- EPUB-Export — Scope + EPUB-Settings + Trigger -->
+<!--
+  Alpine.data-Sub-Komponente — public/js/cards/epub-export-card.js.
+  Cover/Titelei/Autor-Bio leben buch-weit in BookSettings → Publikation-Tab;
+  diese Karte spiegelt nur die EPUB-Reflow-Toggles + den Export.
+  Pattern-Konformität (DESIGN.md): Combobox statt <select>, .card-form-row,
+  .card-header > .card-actions, .card-status / .card-form-saved / .card-form-error.
+-->
+<div class="card card--epubexport epub-export-card" x-data="epubExportCard" x-show="$app.showEpubExportCard" x-cloak>
+  <div class="card-header">
+    <span class="card-title" x-text="$app.t('epubExport.title')"></span>
+    <div class="card-actions">
+      <div class="epubx-scope-picker" x-show="!exporting">
+        <div x-data="combobox({ placeholder: $app.t('export.scope.label'), compact: false })"
+             x-modelable="value" x-model="exportScope"
+             x-effect="options = exportScopeOptions()"></div>
+        <div x-show="exportScope === 'chapter'"
+             x-data="combobox({ placeholder: $app.t('export.scope.pickChapter'), compact: false })"
+             x-modelable="value" x-model="exportChapterId"
+             x-effect="options = exportChapterOptions()"></div>
+        <button type="button"
+                class="kapitel-include-subs-btn"
+                x-show="exportScope === 'chapter' && selectedChapterHasSubs()"
+                @click="exportIncludeSubchapters = !exportIncludeSubchapters"
+                :class="{ primary: exportIncludeSubchapters }"
+                :aria-pressed="exportIncludeSubchapters"
+                :data-tip="$app.t('epubExport.includeSubchaptersTip')">
+          <svg class="icon" aria-hidden="true">
+            <use :href="exportIncludeSubchapters ? '/icons.svg?v=687#check' : '/icons.svg?v=687#chevron-down'"/>
+          </svg>
+          <span x-text="$app.t('epubExport.includeSubchapters')"></span>
+        </button>
+        <div x-show="exportScope === 'page'"
+             x-data="combobox({ placeholder: $app.t('export.scope.pickPage'), compact: false })"
+             x-modelable="value" x-model="exportPageId"
+             x-effect="options = exportPageOptions()"></div>
+      </div>
+      <button type="button"
+              class="primary"
+              x-show="!exporting"
+              :disabled="!$app.selectedBookId"
+              :data-tip="!$app.selectedBookId ? $app.t('epubExport.export.noBookHint') : ''"
+              @click="exportEpub()">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#download"/></svg>
+        <span x-text="$app.t('epubExport.export')"></span>
+      </button>
+      <button type="button"
+              x-show="exporting"
+              @click="cancelExport()">
+        <span class="spinner"></span>
+        <span x-text="$app.t('epubExport.cancel')"></span>
+      </button>
+    </div>
+  </div>
+
+  <p class="card-form-hint" x-text="$app.t('epubExport.hint')"></p>
+
+  <div class="card-form-grid">
+    <section class="book-settings-section">
+      <h3 class="book-settings-section-title" x-text="$app.t('publication.section.epub')"></h3>
+
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('publication.cssStyle')"></label>
+        <div x-data="combobox($app.t('publication.cssStyle'))"
+             x-modelable="value" x-model="pub.epub_css_style"
+             x-effect="options = publicationCssOptions()"></div>
+      </div>
+      <div class="card-form-row">
+        <label class="book-settings-option">
+          <input type="checkbox" x-model="pub.epub_justify">
+          <span x-text="$app.t('publication.justify')"></span>
+        </label>
+      </div>
+      <div class="card-form-row">
+        <label class="card-form-label" for="epubx-toc" x-text="$app.t('publication.tocTitle')"></label>
+        <input type="text" id="epubx-toc" class="card-form-input" x-model="pub.epub_toc_title"
+               maxlength="100" :placeholder="$app.t('publication.tocTitlePlaceholder')" data-spellcheck="spelling">
+      </div>
+
+      <div class="card-actions">
+        <span class="card-form-saved" x-show="savedAt" x-cloak x-transition.opacity.duration.250ms x-text="$app.t('epubExport.saved')"></span>
+        <button type="button" :disabled="saving" @click="savePublication()">
+          <span x-show="saving" class="spinner"></span>
+          <span x-text="saving ? $app.t('common.saving') : $app.t('common.save')"></span>
+        </button>
+      </div>
+    </section>
+
+    <p class="card-form-hint">
+      <span x-text="$app.t('epubExport.metaHint')"></span>
+      <span class="internal-link" @click="openBookSettings()" x-text="$app.t('epubExport.metaLink')"></span>
+    </p>
+
+    <!-- Progress / Errors -->
+    <div class="epubx-progress" x-show="exporting || (exportProgress > 0 && !exportError)">
+      <div class="progress-bar-wrap">
+        <div class="progress-bar" :style="{ '--progress': exportProgress + '%' }"></div>
+      </div>
+      <p class="card-form-field-note" x-text="exportStatus"></p>
+    </div>
+    <p class="card-form-error" x-show="exportError" x-text="exportError"></p>
+  </div>
+</div>

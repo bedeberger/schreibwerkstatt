@@ -48,6 +48,7 @@ import { registerAdminJsErrorsCard } from './cards/admin-js-errors-card.js';
 import { registerFinetuneExportCard } from './cards/finetune-export-card.js';
 import { registerExportCard } from './cards/export-card.js';
 import { registerPdfExportCard } from './cards/pdf-export-card.js';
+import { registerEpubExportCard } from './cards/epub-export-card.js';
 import { registerBookOrganizerCard } from './cards/book-organizer-card.js';
 import { registerBookEditorCard } from './cards/book-editor-card.js';
 import { registerSearchCard } from './cards/search-card.js';
@@ -272,6 +273,7 @@ document.addEventListener('alpine:init', () => {
   registerFinetuneExportCard();
   registerExportCard();
   registerPdfExportCard();
+  registerEpubExportCard();
   registerBookOrganizerCard();
   registerBookEditorCard();
   registerSearchCard();

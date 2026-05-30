@@ -1,0 +1,25 @@
+/* EPUB-Export-Karte. Reuse: .card-form-* (card-form.css), .book-settings-*
+   (book-settings.css), .progress-bar (components). Hier nur Karten-Spezifika. */
+
+.epubx-scope-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+.epubx-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
+}
+
+@media (max-width: 640px) {
+  .epub-export-card .card-actions {
+    flex-wrap: wrap;
+  }
+  .epubx-scope-picker {
+    width: 100%;
+  }
+}

@@ -95,6 +95,7 @@
   <link rel="stylesheet" href="css/book/buchorganizer.css">
   <link rel="stylesheet" href="css/book/export.css">
   <link rel="stylesheet" href="css/book/pdf-export.css">
+  <link rel="stylesheet" href="css/book/epub-export.css">
   <!-- book-overview -->
   <link rel="stylesheet" href="css/book-overview/base.css">
   <link rel="stylesheet" href="css/book-overview/stats.css">
@@ -416,7 +417,7 @@
 <div id="partial-admin-home"></div>
 <div id="partial-bookoverview"></div>
 <div id="partial-buchreview"></div>
-<div class="kapitel-ideen-wrap" :class="{ 'kapitel-ideen-split': showKapitelReviewCard && showIdeenCard && ideenScope === 'chapter' }">
+<div class="kapitel-ideen-wrap" :class="{ 'kapitel-ideen-split': $app.showKapitelReviewCard && $app.showIdeenCard && $app.ideenScope === 'chapter' }">
   <div id="partial-kapitelreview" class="display-contents"></div>
   <div id="kapitel-ideen-slot" class="display-contents"></div>
 </div>
@@ -431,7 +432,7 @@
 <div id="partial-bookstats"></div>
 <div id="partial-stil-heatmap"></div>
 <div id="partial-fehler-heatmap"></div>
-<div class="editor-chat-wrap" :class="{ 'editor-chat-split': showEditorCard && (showChatCard || showIdeenCard) }">
+<div class="editor-chat-wrap" :class="{ 'editor-chat-split': $app.showEditorCard && ($app.showChatCard || $app.showIdeenCard) }">
   <div id="partial-editor-notebook" class="display-contents"></div>
   <div id="partial-chat" class="display-contents"></div>
   <div id="partial-ideen" class="display-contents"></div>
@@ -440,6 +441,7 @@
 <div id="partial-finetune-export"></div>
 <div id="partial-export"></div>
 <div id="partial-pdf-export"></div>
+<div id="partial-epub-export"></div>
 <div id="partial-buchorganizer"></div>
 <div id="partial-book-editor"></div><div id="partial-search"></div>
 <div id="partial-folder-import"></div>

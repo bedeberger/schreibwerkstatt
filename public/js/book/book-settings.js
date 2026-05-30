@@ -5,7 +5,6 @@
 import { fetchJson } from '../utils.js';
 import { contentRepo } from '../repo/content.js';
 import { countryOptions } from '../country-codes.js';
-import { startPoll } from '../cards/job-helpers.js';
 
 export const bookSettingsMethods = {
   async loadBookSettings() {
@@ -241,52 +240,6 @@ export const bookSettingsMethods = {
       { value: 'serif', label: window.__app.t('publication.cssSerif') },
       { value: 'sans',  label: window.__app.t('publication.cssSans') },
     ];
-  },
-
-  async exportEpub() {
-    const bookId = window.__app.selectedBookId;
-    if (!bookId) return;
-    this.epubExporting = true; this.epubError = ''; this.epubStatus = ''; this.epubProgress = 0;
-    try {
-      const r = await fetch('/jobs/epub-export', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scope: 'book', entityId: Number(bookId) }),
-      });
-      if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(window.__app.tError(d) || `HTTP ${r.status}`); }
-      const { jobId } = await r.json();
-      this._epubStartPoll(jobId);
-    } catch (e) {
-      this.epubExporting = false;
-      this.epubError = e.message;
-    }
-  },
-
-  _epubStartPoll(jobId) {
-    if (this._epubPollTimer) { clearInterval(this._epubPollTimer); this._epubPollTimer = null; }
-    startPoll(this, {
-      timerProp: '_epubPollTimer',
-      jobId,
-      progressProp: 'epubProgress',
-      intervalMs: 1000,
-      onProgress: (job) => { this.epubStatus = job.statusText ? window.__app.t(job.statusText, job.statusParams) : ''; },
-      onError: (job) => {
-        this.epubExporting = false;
-        this.epubError = job.error ? window.__app.t(job.error, job.errorParams) : window.__app.t('publication.exportError');
-      },
-      onDone: (job) => {
-        this.epubExporting = false;
-        this.epubProgress = 100;
-        this.epubStatus = window.__app.t('publication.exportDone');
-        const result = job.result || {};
-        const a = document.createElement('a');
-        a.href = `/jobs/epub-export/${jobId}/file`;
-        a.download = result.filename || 'book.epub';
-        document.body.appendChild(a); a.click(); a.remove();
-        if (this._epubStatusTimer) clearTimeout(this._epubStatusTimer);
-        this._epubStatusTimer = setTimeout(() => { this.epubStatus = ''; this.epubProgress = 0; this._epubStatusTimer = null; }, 3500);
-      },
-    });
   },
 
   bookSettingsLocaleDisplay() {

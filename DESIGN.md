@@ -1779,6 +1779,7 @@ Drei Editoren leben in eigenen Subfoldern (`book/`, `focus/`, `notebook/`); edit
 | [book/buchorganizer.css](public/css/book/buchorganizer.css) | Buch-Organisations-Karte. |
 | [book/export.css](public/css/book/export.css) | Buch-Export. |
 | [book/pdf-export.css](public/css/book/pdf-export.css) | PDF-Export-Profile + Tabs. |
+| [book/epub-export.css](public/css/book/epub-export.css) | EPUB-Export-Karte (Scope-Picker + Reflow-Settings). |
 
 ### book-overview/ (dichtes Tile-Grid)
 [coverage.css](public/css/book-overview/coverage.css), [domain.css](public/css/book-overview/domain.css), [kapitel.css](public/css/book-overview/kapitel.css), [presence.css](public/css/book-overview/presence.css), [recent-actions.css](public/css/book-overview/recent-actions.css), [stats.css](public/css/book-overview/stats.css), [base.css](public/css/book-overview/base.css), [review.css](public/css/book-overview/review.css) — pro Tile-Familie ein File.

@@ -401,7 +401,8 @@ Ziel: Buch im Modell **internalisieren** (Stil, Welt, Figuren, Fakten, Plot). Da
 
 **Pipeline:**
 ```
-/jobs/pdf-export (POST, Job-Queue) → loadBookContents → render (pdfkit, subset='PDF/A-2b') → optional veraPDF-Validate
+/jobs/pdf-export (POST, Job-Queue) → loadBookContents → render (pdfkit, subset='PDF/A-2b')
+   → Norm-Branch (config.pdfa.standard): 'pdfa' → optional veraPDF-Validate │ 'pdfx' → Ghostscript-Post-Step (PDF/X-3) │ 'none' → durchreichen
                                                           ↓
                                           /jobs/pdf-export/:id/file (Stream)
 ```
@@ -414,11 +415,12 @@ Ziel: Buch im Modell **internalisieren** (Stil, Welt, Figuren, Fakten, Plot). Da
 - `lib/pdf-export-defaults.js` — `defaultConfig()` + `validateConfig(src)`. Strict: unbekannte Keys werden verworfen, Numerik geclampt, Enums whitelisted.
 - PDF/A-2B-Subset macht pdfkit nativ via `subset: 'PDF/A-2b'` im PDFDocument-Constructor: hängt `pdfaid:part`/`conformance` ans XMP, schreibt OutputIntent mit eingebettetem sRGB-ICC-Profil aus pdfkit's eigenem Bundle (`node_modules/pdfkit/js/data/sRGB_IEC61966_2_1.icc`). **Nicht** manuell via `doc._root.data.Metadata = …` patchen — pdfkit's `endMetadata()` läuft danach und überschreibt die Referenz.
 - `lib/pdfa-validate.js` — veraPDF-CLI-Wrapper. Schreibt Buffer in Tempdatei mit `.pdf`-Extension (CLI liest nicht von stdin), validiert, löscht. Wenn Binary fehlt → `{ available: false }`, Job liefert PDF mit Warnung. ENV `VERAPDF_BIN`, `VERAPDF_FLAVOUR`, `VERAPDF_DISABLED`.
+- `lib/pdfx-convert.js` — Ghostscript-Post-Step für PDF/X-3 (Druckvorstufe), greift bei `config.pdfa.standard === 'pdfx'`. `convertToPdfX(buffer, …)` stempelt PDFX-Marker + bettet Output-Intent-ICC ein (Default `assets/icc/PSOuncoated_v3_FOGRA52.icc`); **RGB bleibt** — keine CMYK-Separation, die Druckerei separiert selbst. `execFile` ohne Shell, Buffer in Temp-Datei. ENV `GS_BIN`, `GS_DISABLED`, `PDFX_ICC_PATH`. Fehlt gs-Binary oder ICC → `{ available: false }`, Job liefert das unkonvertierte PDF + Warnung (**non-fatal**, Muster wie veraPDF).
 - `lib/font-fetch.js` — Google-Fonts-Loader. Hardcoded Whitelist (~24 Familien). UA-Trick (`Wget/1.13.4`) zwingt Google-CSS-API zu TTF. 30-Tage-TTL via `font_cache`-Tabelle (Stale-while-revalidate: bei Network-Fail wird stale-Cache geliefert).
 - `lib/cover-prepare.js` — sharp: Magic-Bytes-Check → JPEG, sRGB, kein Alpha, max. 2400 px Längsseite. PDF/A-tauglich.
 - `db/pdf-export.js` + `db/fonts.js` — Profile-CRUD + Font-Cache. **Multiple Profile pro (book, user)** via `(book_id, user_email, name)`-UNIQUE; `book_id=0` für User-Default-Vorlagen. Cover-Bild als BLOB in `pdf_export_profile.cover_image`.
 
-**Frontend:** `pdfExportCard` ([public/js/cards/pdf-export-card.js](public/js/cards/pdf-export-card.js)) mit Tabs Layout/Schrift/Kapitel/Cover/TOC/Extras/PDF/A. Live-Font-Preview lädt Google-Fonts-CSS lazy in den Browser. Profile-Operationen (CRUD, Default, Cover-Upload) gehen an `/pdf-export/...`. Render-Trigger an `/jobs/pdf-export`, Download-Stream `/jobs/pdf-export/:id/file`.
+**Frontend:** `pdfExportCard` ([public/js/cards/pdf-export-card.js](public/js/cards/pdf-export-card.js)) mit Tabs Layout/Schrift/Kapitel/Cover/TOC/Extras/Druck/Norm (`pdfa`-Tab = Norm-Combobox PDF/A · PDF/X · kein, SSoT `config.pdfa.standard`). Live-Font-Preview lädt Google-Fonts-CSS lazy in den Browser. Profile-Operationen (CRUD, Default, Cover-Upload) gehen an `/pdf-export/...`. Render-Trigger an `/jobs/pdf-export`, Download-Stream `/jobs/pdf-export/:id/file`.
 
 **Wichtige Invarianten:**
 - `font.body` braucht `family` aus der Whitelist (lib/font-fetch.js#FONT_LIST). PUT validiert; bad font → 400 `FONT_NOT_ALLOWED`.
@@ -426,6 +428,7 @@ Ziel: Buch im Modell **internalisieren** (Stil, Welt, Figuren, Fakten, Plot). Da
 - `pageStructure: 'flatten'` (Default) verkettet alle Seiten eines Kapitels ohne Per-Page-Heading; `'nested'` rendert pro Page einen h2-Sub-Heading.
 - Job-Result-JSON enthält Metadaten (Größe, MIME, PDF/A-Status), **nicht** den Buffer — der lebt in `routes/jobs/pdf-export.js#pdfResults` und wird über `/jobs/pdf-export/:id/file` gestreamt.
 - veraPDF-Failure ist **non-fatal**: Datei wird trotzdem geliefert, Frontend zeigt Warnung.
+- `config.pdfa.standard` ist SSoT (`pdfa`/`pdfx`/`none`); Legacy-`pdfa.enabled` leitet sich daraus ab (true nur bei `'pdfa'`). PDF/X-Konvertierung (`'pdfx'`) ist **non-fatal**: fehlt Ghostscript/ICC → unkonvertiertes PDF + Warnung.
 
 **Ops:**
 - veraPDF (Java-CLI, ~80 MB inkl. JRE) optional im Container. Fehlt es → Validation skipped, kein Crash.

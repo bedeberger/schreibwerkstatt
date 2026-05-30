@@ -34,8 +34,16 @@ Builder [lib/export-builders/epub.js](../lib/export-builders/epub.js) `buildEpub
 
 Zwei Pfade, beide lesen `book_publication`:
 
-- **Job** [routes/jobs/epub-export.js](../routes/jobs/epub-export.js) — `POST /jobs/epub-export` (Dedup, ACL viewer) + `GET /jobs/epub-export/:id/file` (Stream, TTL-Map). Vom Publikation-Tab getriggert (Poll + Download). Kein KI-Call.
-- **Sync** [routes/export.js](../routes/export.js) `GET /export/:scope/:id/epub` — Schnellpfad, lädt `meta`/Cover/Foto lazy nur für `epub`.
+- **Job** [routes/jobs/epub-export.js](../routes/jobs/epub-export.js) — `POST /jobs/epub-export` (Dedup, ACL viewer, `scope` book/chapter/page + `include_subchapters`) + `GET /jobs/epub-export/:id/file` (Stream, TTL-Map). Von der **EPUB-Export-Card** getriggert (Poll + Download). Kein KI-Call.
+- **Sync** [routes/export.js](../routes/export.js) `GET /export/:scope/:id/epub` — Schnellpfad, lädt `meta`/Cover/Foto lazy nur für `epub`. (Nicht mehr aus dem generischen Export-Dialog verlinkt — der reicht via `_handoffToEpubCustom()` an die Card durch.)
+
+### EPUB-Export-Card
+
+Eigene Karte analog Custom-PDF: [public/js/cards/epub-export-card.js](../public/js/cards/epub-export-card.js) (`Alpine.data('epubExportCard')`, registriert via `registerEpubExportCard`), Partial [public/partials/epub-export.html](../public/partials/epub-export.html), CSS [public/css/book/epub-export.css](../public/css/book/epub-export.css), Akzent `--card-accent-epubexport`. Registry-Eintrag `epubExport` in [feature-registry.js](../public/js/cards/feature-registry.js) (FEATURES + EXCLUSIVE_CARDS), Hash-View `epub`, Usage-Key `epubExport` in [routes/usage.js](../routes/usage.js).
+
+Inhalt: Scope-Picker (Buch/Kapitel/Seite, inkl. Subkapitel-Toggle) + die **EPUB-Reflow-Toggles** (`epub_css_style`/`epub_justify`/`epub_toc_title`) live editierbar über denselben `PUT /publication/:book_id` wie der Publikation-Tab — daher wird die volle Meta geladen und vollständig zurückgeschrieben (sonst setzt der strikte Upsert isbn/subtitle/… auf Defaults). Cover/Titelei/Autor-Bio bleiben buch-weit im Publikation-Tab (Karte verlinkt dorthin). Der frühere EPUB-Export-Button im Publikation-Tab entfällt — EPUB läuft nur noch über die Card.
+
+Handoff aus dem generischen Export-Dialog ([public/js/book/export.js](../public/js/book/export.js)#`_handoffToEpubCustom`): Event `export:epub:preset` (+ `window.__app.__epubExportPreset` als Cold-Open-Fallback) trägt den gewählten Scope rüber.
 
 ## PDF-Export liest dieselbe Quelle
 

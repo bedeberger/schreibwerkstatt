@@ -19,6 +19,7 @@
   .card--ideen            { --card-accent: var(--card-accent-ideen); }
   .card--finetune         { --card-accent: var(--card-accent-finetune); }
   .card--pdfexport        { --card-accent: var(--card-accent-pdfexport); }
+  .card--epubexport       { --card-accent: var(--card-accent-epubexport); }
   .card--settings         { --card-accent: var(--card-accent-settings); }
   .card--stil             { --card-accent: var(--card-accent-stil); }
   .card--export           { --card-accent: var(--card-accent-settings); }

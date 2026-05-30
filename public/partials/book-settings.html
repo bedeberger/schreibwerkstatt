@@ -396,19 +396,6 @@
         </button>
       </div>
 
-      <section class="book-settings-section">
-        <h3 class="book-settings-section-title" x-text="$app.t('publication.section.export')"></h3>
-        <p class="card-form-hint" x-text="$app.t('publication.exportHint')"></p>
-        <div class="card-actions">
-          <span class="card-form-error" x-show="epubError" x-text="epubError"></span>
-          <span x-show="epubStatus" x-text="epubStatus"></span>
-          <button type="button" @click="exportEpub()" :disabled="epubExporting">
-            <span x-show="epubExporting" class="spinner"></span>
-            <span x-text="$app.t('publication.exportEpub')"></span>
-          </button>
-        </div>
-      </section>
-
     </div><!-- /tab: publication -->
 
     <div class="card-form-grid" x-show="bookSettingsTab === 'share'" x-cloak>

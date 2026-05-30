@@ -79,13 +79,7 @@ export function registerBookSettingsCard() {
     pubAuthorUploading: false,
     pubAuthorError: '',
     pubPreviewVersion: 0,
-    epubExporting: false,
-    epubProgress: 0,
-    epubStatus: '',
-    epubError: '',
     _pubSavedTimer: null,
-    _epubPollTimer: null,
-    _epubStatusTimer: null,
     _savedAtTimer: null,
     _resetMsgTimer: null,
     _shareInviteMsgTimer: null,
@@ -134,8 +128,6 @@ export function registerBookSettingsCard() {
           pubError: '',
           pubCoverError: '',
           pubAuthorError: '',
-          epubError: '',
-          epubStatus: '',
         },
         resetStateView: {
           bookSettingsSaved: false,
@@ -189,8 +181,6 @@ export function registerBookSettingsCard() {
       if (this._resetMsgTimer) { clearTimeout(this._resetMsgTimer); this._resetMsgTimer = null; }
       if (this._shareInviteMsgTimer) { clearTimeout(this._shareInviteMsgTimer); this._shareInviteMsgTimer = null; }
       if (this._pubSavedTimer) { clearTimeout(this._pubSavedTimer); this._pubSavedTimer = null; }
-      if (this._epubStatusTimer) { clearTimeout(this._epubStatusTimer); this._epubStatusTimer = null; }
-      if (this._epubPollTimer) { clearInterval(this._epubPollTimer); this._epubPollTimer = null; }
       if (this._onBlogJobFinished) {
         window.removeEventListener('job:finished', this._onBlogJobFinished);
         this._onBlogJobFinished = null;
