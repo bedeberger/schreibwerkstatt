@@ -14,7 +14,7 @@ Themen-Spickzettel ausgelagert (Drift-Schutz: CLAUDE.md-Regeln, Details in den S
 - [docs/testing.md](docs/testing.md) — Wann Unit/Integration/E2E, Mock-AI-Setup, Harness-Konventionen, häufige Fallen.
 - [docs/erd.md](docs/erd.md) — Schema-ERD (Mermaid) + offene Schema-Verbesserungen.
 - [docs/figur-werkstatt.md](docs/figur-werkstatt.md) — Figuren-Werkstatt: jsMind-Mindmap, Import aus `figures`, Brainstorm-/Consistency-Jobs, Run-Historie, Hash-Permalinks.
-- [docs/buchchat-tools.md](docs/buchchat-tools.md) — Agentic Buch-Chat: Tool-Inventar (20 Stück inkl. `final_answer`-Endpunkt), `ctx`-Vertrag, Truncation, Loop-Constraints, neues Tool anlegen.
+- [docs/buchchat-tools.md](docs/buchchat-tools.md) — Agentic Buch-Chat: Tool-Inventar (31 Stück inkl. `final_answer`-Endpunkt), `ctx`-Vertrag, Truncation, Loop-Constraints, neues Tool anlegen.
 - **Drei unabhängige Editoren — bei Änderungen MUSS der User nennen, welcher gemeint ist** (siehe Harte Regel „Editor-Spezifikation" weiter unten):
   - [docs/notebook-editor.md](docs/notebook-editor.md) — Notebook-Editor (Einzelseiten-Edit-Modus): `notebookEditMethods` am Root, Toolbar/Bubble/Slash-Card, Autosave (Idle 60 s / Max 120 s), Draft-Pipeline, Stale-Write-Schutz, Findings-Mark-Watcher, Snapshot, Pflicht-Invarianten.
   - [docs/focus-editor.md](docs/focus-editor.md) — Focus-Editor (Vollbild-Schreibmodus auf einer Seite): State-Machine, Submodule (`focus/`), Trampoline-Pattern, Granularitäten, Recenter-Pipeline, Auto-`<p>`-Slot, Snapshot, Pflicht-Invarianten.
@@ -24,6 +24,7 @@ Themen-Spickzettel ausgelagert (Drift-Schutz: CLAUDE.md-Regeln, Details in den S
 - [docs/graph.md](docs/graph.md) — Figuren-Graph: 3 Modi (Swimlane/Familie/Soziogramm), vis-network-Internals, deterministisches Layout, neuen Beziehungstyp einbinden.
 - [docs/finetuning.md](docs/finetuning.md) — Finetune-Export.
 - [docs/folder-import.md](docs/folder-import.md) — Folder-Import: ZIP mit YYYY/Monat/Tag-Struktur, Kapitel pro Jahr, Date-Detect mit AI-Fallback.
+- [docs/geocode.md](docs/geocode.md) — Geocoding & Orte-Karte: `book_settings.orte_real`/`schauplatz_land`, `locations.lat`/`lng`/`land`, Dual-Provider (Nominatim/Photon) in `lib/geocode.js`, `GET /geocode`-Proxy, nächtliche Auto-Verortung (Cron 03:30), Leaflet-View-Mode `map`.
 - [docs/chapter-hierarchy.md](docs/chapter-hierarchy.md) — Kapitel-Hierarchie (max 3 Ebenen): Schema (`parent_chapter_id`), SSoT-Tree, Organizer-DnD/Tab-Indent, Sidebar-Indent, Kapitel-Review inkl. Sub-Kapitel, PDF/Export-Builder Depth-Mapping, Pflicht-Invarianten.
 - [docs/languagetool.md](docs/languagetool.md) — LanguageTool-Integration (Self-Hosted, regelbasiert, sync Proxy als Ausnahme zur Job-Queue-Regel): Dispatch über 3 Editoren + Form-Felder, CSS-Custom-Highlights für Squiggles, Chunking + Per-Page-Cache, Custom-Dictionary, Extension-Konflikt-Detection, Pflicht-Invarianten.
 - [docs/share-link.md](docs/share-link.md) — Share-Link (Page/Chapter public via opaken Token): SSR-Reader-View ohne Alpine, Mount **vor** Auth-Guard, In-Memory-Rate-Limit + Honeypot, IP-Hash für GDPR, Owner-Karte mit Unread-Tracking via `owner_last_seen_at`.
@@ -305,7 +306,8 @@ Browser → NGINX (HTTPS) → Express (Port 3737)
   /history/*       → Job-Verlauf (SQLite)
   /figures/*       → Figuren-CRUD (SQLite)
   /draft-figures/* → Figuren-Drafts (Brainstorming vor Übernahme)
-  /locations/*     → Orte-CRUD (SQLite)
+  /locations/*     → Orte-CRUD (SQLite, inkl. lat/lng/land für Geo-Karte)
+  /geocode         → Geocoding-Proxy (Nominatim/Photon) für die Orte-Karte, kein KI-Call
   /ideen/*         → Ideen-CRUD (SQLite)
   /songs/*         → Songs-Feature (Buch-Soundtrack)
   /booksettings/*  → Per-Buch-Settings (Buchtyp, Freitext)
