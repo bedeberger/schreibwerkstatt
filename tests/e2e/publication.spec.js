@@ -1,6 +1,7 @@
 // E2E-Smoke-Test für den Publikation-Tab der bookSettingsCard. Lädt das
-// Harness, mockt /publication/* + /jobs/epub-export in tests/server.js, prüft
-// Tab-Wechsel, Speichern (PUT), Cover-Upload (Vorschau) und EPUB-Export (Download).
+// Harness, mockt /publication/* in tests/server.js, prüft Tab-Wechsel,
+// Speichern (PUT) und Cover-Upload (Vorschau). Der EPUB-Export hat eine eigene
+// Karte (epubExportCard) — Download-Test in tests/e2e/epub-export.spec.js.
 
 const { test, expect } = require('@playwright/test');
 
@@ -57,13 +58,4 @@ test.describe('publication-tab', () => {
     await expect(coverBlock.locator('img')).toBeVisible({ timeout: 5000 });
   });
 
-  test('EPUB-Export löst Download aus', async ({ page }) => {
-    await openTab(page);
-    const exportBtn = panel(page).locator('button', { hasText: 'EPUB herunterladen' });
-    const [download] = await Promise.all([
-      page.waitForEvent('download', { timeout: 15000 }),
-      exportBtn.click(),
-    ]);
-    expect(download.suggestedFilename()).toBe('book.epub');
-  });
 });

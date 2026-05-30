@@ -159,21 +159,15 @@ export const bookSettingsMethods = {
     if (!bookId) return;
     this.pubSaving = true; this.pubSaved = false; this.pubError = '';
     try {
+      // Volle geladene Meta zurueckschreiben — der strikte Upsert setzt jedes
+      // NICHT gesendete Feld auf Default. Spread statt Hand-Liste: validateMeta
+      // whitelistet serverseitig (Extra-Keys wie has_cover ignoriert), so dass
+      // auch die EPUB-Card-eigenen Felder (Typografie/OPF) erhalten bleiben.
       const p = this.bookPublication || {};
       const r = await fetch(`/publication/${bookId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          author_name: p.author_name || '',
-          isbn: p.isbn || '', subtitle: p.subtitle || '', year: p.year || '',
-          dedication: p.dedication || '', imprint: p.imprint || '', copyright: p.copyright || '',
-          frontmatter: p.frontmatter || '', author_bio: p.author_bio || '',
-          epub_css_style: p.epub_css_style || 'serif', epub_justify: p.epub_justify ? 1 : 0,
-          epub_toc_title: p.epub_toc_title || '',
-          description: p.description || '', publisher: p.publisher || '',
-          series: p.series || '', series_index: p.series_index != null ? String(p.series_index) : '',
-          keywords: p.keywords || '',
-        }),
+        body: JSON.stringify({ ...p }),
       });
       if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(window.__app.tError(d) || `HTTP ${r.status}`); }
       this.bookPublication = await r.json();

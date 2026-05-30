@@ -16,6 +16,7 @@
 import { startPoll } from './job-helpers.js';
 
 const _EMPTY_META = () => ({
+  author_name: '',
   isbn: '', subtitle: '', year: '', dedication: '', imprint: '', copyright: '',
   frontmatter: '', author_bio: '', epub_css_style: 'serif', epub_justify: true,
   epub_toc_title: '', description: '', publisher: '', series: '', series_index: '',
@@ -133,34 +134,15 @@ export function registerEpubExportCard() {
       this.savedAt = null;
       this.exportError = '';
       try {
+        // Volle geladene Meta zurueckschreiben — der strikte Upsert setzt jedes
+        // NICHT gesendete Feld auf Default. Spread statt Hand-Liste: validateMeta
+        // whitelistet serverseitig (Extra-Keys wie has_cover ignoriert), so dass
+        // buch-weite Titelei-Felder (z.B. author_name) erhalten bleiben.
         const p = this.pub || {};
         const r = await fetch(`/publication/${bookId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            isbn: p.isbn || '', subtitle: p.subtitle || '', year: p.year || '',
-            dedication: p.dedication || '', imprint: p.imprint || '', copyright: p.copyright || '',
-            frontmatter: p.frontmatter || '', author_bio: p.author_bio || '',
-            epub_css_style: p.epub_css_style || 'serif', epub_justify: p.epub_justify ? 1 : 0,
-            epub_toc_title: p.epub_toc_title || '',
-            description: p.description || '', publisher: p.publisher || '',
-            series: p.series || '', series_index: p.series_index != null ? String(p.series_index) : '',
-            keywords: p.keywords || '',
-            // Erweiterte EPUB-Optionen.
-            epub_font_size: p.epub_font_size || 'normal',
-            epub_line_height: p.epub_line_height || 'normal',
-            epub_paragraph_style: p.epub_paragraph_style || 'indent',
-            epub_indent_size: p.epub_indent_size || 'medium',
-            epub_scene_separator: p.epub_scene_separator || 'line',
-            epub_titlepage_mode: p.epub_titlepage_mode || 'generated',
-            epub_hyphenation: p.epub_hyphenation ? 1 : 0,
-            epub_chapter_pagebreak: p.epub_chapter_pagebreak ? 1 : 0,
-            epub_drop_caps: p.epub_drop_caps ? 1 : 0,
-            epub_nest_pages_in_toc: p.epub_nest_pages_in_toc ? 1 : 0,
-            epub_rights: p.epub_rights || '', epub_pubdate: p.epub_pubdate || '',
-            epub_translator: p.epub_translator || '', epub_illustrator: p.epub_illustrator || '',
-            epub_editor_name: p.epub_editor_name || '', epub_uuid: p.epub_uuid || '',
-          }),
+          body: JSON.stringify({ ...p }),
         });
         if (!r.ok) {
           const d = await r.json().catch(() => ({}));

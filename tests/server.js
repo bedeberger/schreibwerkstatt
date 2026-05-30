@@ -278,7 +278,7 @@ async function handleMockRoute(req, res, urlPath) {
     res.end(JSON.stringify({ status: 'done', progress: 100, result: { ready: true, filename: 'book.epub', mime: 'application/epub+zip' } }));
     return true;
   }
-  if (urlPath.match(/^\/jobs\/epub-\d+\/file$/) && req.method === 'GET') {
+  if (urlPath.match(/^\/jobs\/epub-export\/epub-\d+\/file$/) && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/epub+zip', 'Content-Disposition': 'attachment; filename="book.epub"' });
     res.end(Buffer.from('PKepub-mock-bytes'));
     return true;

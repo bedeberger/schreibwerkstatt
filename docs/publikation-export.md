@@ -7,9 +7,12 @@ Buch-weite Publikations-Metadaten (Cover, Titelei, Autor-Bio) leben in **`book_p
 `book_publication` (PK = `book_id`, FK → `books` ON DELETE CASCADE, Migration 166):
 
 - **BLOBs:** `cover_image`/`cover_mime`, `author_image`/`author_image_mime` (sharp-gehärtet via [lib/cover-prepare.js](../lib/cover-prepare.js)).
-- **Titelei (Text):** `isbn`, `subtitle`, `year`, `dedication`, `imprint`, `copyright`, `frontmatter`, `author_bio`.
+- **Titelei (Text):** `author_name` (Publikations-/Autorname, Pseudonym — Migration 169; übersteuert in **beiden** Exporten den Account-/Owner-Anzeigenamen), `isbn`, `subtitle`, `year`, `dedication`, `imprint`, `copyright`, `frontmatter`, `author_bio`.
 - **Buchhandels-Metadaten (Text, Migration 167, fliessen in EPUB-OPF):** `description` (Klappentext), `publisher`, `series` + `series_index`, `keywords` (kommagetrennt). `description` faellt im EPUB-Builder auf `books.description` zurueck, wenn leer.
-- **EPUB-Reflow-Toggles:** `epub_css_style` (`serif`|`sans`), `epub_justify` (0/1), `epub_toc_title` (Override; leer → Sprach-Default).
+- **EPUB-Reflow-Toggles:** `epub_css_style` (Schriftfamilie: `serif`|`sans`|`georgia`|`palatino`|`garamond`|`times`|`baskerville`|`helvetica`|`verdana` — CSS-Stack, kein Embedding), `epub_justify` (0/1), `epub_toc_title` (Override; leer → Sprach-Default).
+- **EPUB-Typografie (Migration 168):** `epub_font_size` (`small`|`normal`|`large`), `epub_line_height` (`tight`|`normal`|`relaxed`), `epub_paragraph_style` (`indent` Belletristik | `spaced` Sachbuch), `epub_indent_size` (`small`|`medium`|`large`, nur bei `indent`), `epub_hyphenation` (0/1), `epub_drop_caps` (0/1, Initiale am Kapitelanfang).
+- **EPUB-Struktur (Migration 168):** `epub_chapter_pagebreak` (0/1, `.epub-chapter-head` → `page-break-before`), `epub_nest_pages_in_toc` (0/1, Seiten eines Mehrseiten-Kapitels im TOC/NavMap), `epub_scene_separator` (`line`|`asterism`|`stars`|`blank`|`fleuron` — klassenlose `<hr>` werden in `_applyBreaks` ersetzt), `epub_titlepage_mode` (`generated`|`cover`|`none`).
+- **EPUB-OPF-Metadaten (nur EPUB, Migration 168):** `epub_rights` (`dc:rights`), `epub_pubdate` (`dc:date`, übersteuert das Freitext-`year`), `epub_translator`/`epub_illustrator`/`epub_editor_name` (`dc:contributor` + MARC-Relator `trl`/`ill`/`edt`), `epub_uuid` (OPF-`id`/Identifier; leer → Lib-Auto-UUID). Aufgebaut in `_buildOpfExtraMeta`.
 
 Validator + Defaults: [lib/publication-meta.js](../lib/publication-meta.js) (`defaultMeta`/`validateMeta`, strict; `isValidIsbn13` non-blocking). CRUD: [db/book-publication.js](../db/book-publication.js) (`getMeta`/`upsertMeta`/`set|clear|getCover`/`…AuthorImage`).
 
@@ -24,6 +27,8 @@ Tab **Publikation** in der BookSettings-Karte ([public/partials/book-settings.ht
 - `GET/PUT /publication/:book_id` — Metadaten.
 - `POST/DELETE/GET /publication/:book_id/cover` + `…/author-image` — BLOBs (raw body, `prepareCover`).
 
+**Invariante (drift-kritisch): PUT ist ein Voll-Replace, kein Merge.** `upsertMeta` → `validateMeta` startet bei `defaultMeta()` und überlagert nur gesendete Keys — jedes **fehlende** Feld fällt auf seinen Default zurück. Beide schreibenden Frontends (BookSettings-Publikation-Tab **und** EPUB-Export-Card) editieren nur einen Ausschnitt der Felder, müssen aber die **volle geladene Meta** zurückschicken, sonst löscht ein Tab die Felder des anderen (Tab editiert Titelei → würde `epub_*` killen; Card editiert Reflow → würde `author_name` killen). Mechanismus: beide spreaden die GET-Antwort (`body: { ...p }`); `validateMeta` whitelistet serverseitig, Extra-Keys (`has_cover`, `created_at`, …) werden ignoriert. Kein Hand-Listen einzelner Felder im Body — driftet bei jeder neuen Spalte.
+
 ## EPUB-Export
 
 Builder [lib/export-builders/epub.js](../lib/export-builders/epub.js) `buildEpub(bundle, opts)` mit `opts = { lang, author, meta, cover, authorImage, tocTitle }`:
@@ -31,9 +36,9 @@ Builder [lib/export-builders/epub.js](../lib/export-builders/epub.js) `buildEpub
 - **Cover** via `new File([buf], …)` an epub-gen-memory (`cover` akzeptiert `string|File`).
 - **Frontmatter** (Titelseite/Impressum/Widmung/Motto) als XHTML-Entries `beforeToc: true`, **Autor-Bio** als Backmatter (+ Foto als data-URI). Aus dem custom-NCX/Nav-TOC ausgeschlossen via `__toc: false` (beide TOC-Builder filtern darauf).
 - **OPF-Metadaten** aus `book_publication`: `description` (Fallback `books.description`) + `publisher` + `date` (aus `year`) als native epub-gen-memory-Optionen; `keywords` → `<dc:subject>` (eins pro kommagetrenntem Term) und `series`/`series_index` → EPUB3-`belongs-to-collection` + calibre-Legacy-Meta via **Custom-`contentOPF`** (`_buildContentOPF` injiziert Extra-Zeilen vor `</metadata>` ins zur Laufzeit gezogene Lib-Template — driftfest, kein Copy). `date` nur setzen wenn vorhanden (Lib wirft sonst bei `new Date(undefined)`).
-- **Schriftstil:** `epub_css_style` (`serif`|`sans`) setzt `body { font-family: … }`; `epub_justify` schaltet Blocksatz.
-- `lang`/Autor: Sync-Route resolvt aus `book_settings` + Buch-Owner-Anzeigename; das Domain-Shape (`mapBook`) führt Autor nicht.
-- Inline-`<img>`: nur Remote-`http(s)`-URLs (wie PDF); nicht-fetchbare werden geloggt, nicht still verworfen (`_countUnfetchableImages`).
+- **Stylesheet:** `_buildCss(meta)` baut das komplette `css`-Feld aus `EPUB_CSS_BASE` + den Reflow-/Typografie-Optionen (Schriftfamilie via `FONT_STACKS`, `font-size`/`line-height`, Einzug- vs. Absatzstil, Blocksatz, Silbentrennung, Drop-Caps, `.epub-chapter-head`-Umbruch). Ein eigenes `css`-Feld ersetzt das Lib-Default-Stylesheet komplett — darum die Lib-Defaults (Author/TOC/hr) in `EPUB_CSS_BASE` mitgeführt.
+- `lang`/Autor: Autor = `book_publication.author_name` (wenn gesetzt), sonst Buch-Owner-Anzeigename — beide Pfade (Job `_resolveAuthor`, Sync). `lang` aus `book_settings.language`. Das Domain-Shape (`mapBook`) führt Autor nicht; `_resolveEpubMeta` faellt zusaetzlich auf `book.created_by`/`owned_by` zurueck.
+- Inline-`<img>`: einbettbar sind `http(s)`-URLs **und** `data:`-URIs (Letzteres trägt das Autorfoto-Backmatter); alles andere wird geloggt, nicht still verworfen (`_countUnfetchableImages`).
 
 Zwei Pfade, beide lesen `book_publication`:
 
@@ -54,7 +59,7 @@ Der PDF-Job ([routes/jobs/pdf-export.js](../routes/jobs/pdf-export.js)) spiegelt
 
 **Aufteilung (drift-kritisch):**
 
-- **Buch-weit (`book_publication`):** Cover, Autorfoto, ISBN, Subtitle, Jahr, Widmung, Impressum, Copyright, Frontmatter, Bio + Buchhandels-Metadaten (Description/Publisher/Series/Keywords — **nur** vom EPUB-OPF gelesen, PDF ignoriert sie).
+- **Buch-weit (`book_publication`):** Cover, Autorfoto, Autorname (`author_name` → PDF spiegelt ihn als `extras.authorName`, EPUB nutzt ihn als Autor — von **beiden** gelesen), ISBN, Subtitle, Jahr, Widmung, Impressum, Copyright, Frontmatter, Bio + Buchhandels-Metadaten (Description/Publisher/Series/Keywords) + **alle `epub_*`-Optionen** (Typografie/Struktur/OPF-Metadaten). **Sämtliche `epub_*`-Felder sowie Description/Publisher/Series/Keywords liest ausschliesslich der EPUB-Builder — PDF ignoriert sie bewusst** (EPUB ist reflowbar, PDF hat sein eigenes Profil-Layout in `pdf_export_profile.config`).
 - **Profil-spezifisch (`pdf_export_profile.config`):** Layout/Print/Fonts/TOC + Render-Toggles `barcode`, `imprintPosition` + **Rückseiten-Bild** (`back_cover_image`, Umschlag-PDF).
 
 Die PDF-Export-Card editiert die Titelei-/Cover-Felder **nicht** mehr (Hinweis auf den Publikation-Tab).

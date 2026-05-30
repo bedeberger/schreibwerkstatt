@@ -1,0 +1,73 @@
+<!doctype html>
+<!-- Mini-Harness für Playwright-Tests gegen die epubExportCard (eigene Karte,
+     nicht mehr im Publikation-Tab). Alpine als klassisches Script, Card-Modul
+     via ESM. Backend-Mocks für /jobs/epub-export* in tests/server.js. -->
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>EPUB-Export Harness</title>
+  <link rel="stylesheet" href="/public/css/tokens.css">
+  <link rel="stylesheet" href="/public/css/layout/base.css">
+  <link rel="stylesheet" href="/public/css/components/buttons-badges.css">
+  <link rel="stylesheet" href="/public/css/components/card-form.css">
+  <link rel="stylesheet" href="/public/css/layout/utilities.css">
+  <link rel="stylesheet" href="/public/css/book/book-settings.css">
+  <link rel="stylesheet" href="/public/css/book/epub-export.css">
+  <style>body { padding: 1rem; max-width: 1200px; margin: 0 auto; } [x-cloak] { display: none !important; }</style>
+
+  <script src="/public/vendor/alpine-3.14.9.min.js" defer></script>
+</head>
+<body>
+
+<div id="root">
+  <div id="partial-epub-export"></div>
+</div>
+
+<script type="module">
+  function whenAlpineReady(fn) {
+    if (window.Alpine && typeof window.Alpine.data === 'function') return fn();
+    document.addEventListener('alpine:init', fn, { once: true });
+  }
+
+  whenAlpineReady(async () => {
+    const dict = await fetch('/public/js/i18n/de.json').then(r => r.json());
+    function tStub(key, params = {}) {
+      let s = dict[key] || key;
+      for (const [k, v] of Object.entries(params || {})) s = s.replaceAll('{' + k + '}', v);
+      return s;
+    }
+
+    window.__app = {
+      selectedBookId: 102,
+      selectedBookName: 'Test-Buch',
+      showEpubExportCard: true,
+      currentBookRole: 'reader',
+      tree: [],
+      pages: [],
+      appTimezone: 'Europe/Zurich',
+      t: tStub,
+      tError: (d) => (d && (d.error_code || d.error)) || 'error',
+    };
+    window.Alpine.magic('app', () => window.__app);
+
+    // Combobox-Stub (echte Impl lebt mid-file in app.js). Tests interagieren
+    // nicht mit Comboboxes; Stub verhindert nur Expression-Errors.
+    window.Alpine.data('combobox', () => ({
+      open: false, value: null, options: [], close() {}, onKeydown() {}, init() {},
+    }));
+
+    const { registerEpubExportCard } = await import('/public/js/cards/epub-export-card.js');
+    registerEpubExportCard();
+
+    const html = await fetch('/public/partials/epub-export.html').then(r => r.text());
+    const tpl = document.createElement('template');
+    tpl.innerHTML = html;
+    const slot = document.getElementById('partial-epub-export');
+    slot.appendChild(tpl.content);
+    window.Alpine.initTree(slot);
+    window.__harnessReady = true;
+  });
+</script>
+
+</body>
+</html>
