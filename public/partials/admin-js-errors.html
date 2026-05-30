@@ -1,0 +1,57 @@
+<!-- Admin: Client-JS-Fehler -->
+<!--
+  Alpine.data-Sub-Komponente — siehe public/js/cards/admin-js-errors-card.js.
+  `showAdminJsErrorsCard` + `toggleAdminJsErrorsCard` im Root. Nur sichtbar bei
+  $app.currentUser.role === 'admin'. Listet die vom Browser gemeldeten Fehler
+  aus js_errors (public/js/client-error.js → /telemetry/js-error).
+-->
+<div class="card card--admin-js-errors" x-data="adminJsErrorsCard" x-show="$app.showAdminJsErrorsCard" x-cloak>
+  <div class="card-header">
+    <span class="card-title" x-text="$app.t('admin.jsErrors.title')"></span>
+    <div class="card-actions">
+      <button type="button" @click="jsErrorsRefresh()" :disabled="jsErrorsLoading" x-text="$app.t('common.refresh')"></button>
+      <button type="button" class="danger" @click="jsErrorsClearAll()"
+              :disabled="jsErrorsLoading || !jsErrorsList.length"
+              x-text="$app.t('admin.jsErrors.clearAll')"></button>
+    </div>
+  </div>
+
+  <p class="muted-msg" x-text="$app.t('admin.jsErrors.intro')"></p>
+
+  <div x-show="jsErrorsError" class="error-msg" x-text="jsErrorsError"></div>
+
+  <div class="js-errors-list" x-show="jsErrorsList.length">
+    <template x-for="e in jsErrorsList" :key="e.id">
+      <div class="js-errors-row">
+        <div class="js-errors-row-head">
+          <span class="js-errors-ts" x-text="jsErrorsFmtTs(e.created_at)"></span>
+          <span class="js-errors-kind" :class="'js-errors-kind--' + e.kind" x-text="e.kind"></span>
+          <span class="js-errors-msg" x-text="e.message"></span>
+          <span class="js-errors-loc" x-text="jsErrorsLoc(e)"></span>
+          <button type="button" class="js-errors-view"
+                  @click="jsErrorsToggle(e.id)"
+                  :aria-expanded="jsErrorsExpanded[e.id] ? 'true' : 'false'">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#chevron-down"></use></svg>
+            <span x-text="jsErrorsExpanded[e.id] ? $app.t('admin.jsErrors.hide') : $app.t('admin.jsErrors.view')"></span>
+          </button>
+          <button type="button" class="js-errors-delete"
+                  @click="jsErrorsDelete(e.id)"
+                  :aria-label="$app.t('common.delete')">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"></use></svg>
+          </button>
+        </div>
+        <div class="js-errors-detail" x-show="jsErrorsExpanded[e.id]">
+          <dl class="js-errors-meta">
+            <div x-show="e.user_email"><dt x-text="$app.t('admin.jsErrors.user')"></dt><dd x-text="e.user_email"></dd></div>
+            <div x-show="e.page_url"><dt x-text="$app.t('admin.jsErrors.pageUrl')"></dt><dd x-text="e.page_url"></dd></div>
+            <div x-show="e.source"><dt x-text="$app.t('admin.jsErrors.source')"></dt><dd x-text="e.source + (e.line ? ':' + e.line + (e.col ? ':' + e.col : '') : '')"></dd></div>
+            <div x-show="e.user_agent"><dt x-text="$app.t('admin.jsErrors.userAgent')"></dt><dd x-text="e.user_agent"></dd></div>
+          </dl>
+          <pre class="js-errors-stack" x-show="e.stack" x-text="e.stack || ''"></pre>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <div x-show="!jsErrorsList.length && !jsErrorsLoading" class="muted-msg" x-text="$app.t('admin.jsErrors.empty')"></div>
+</div>

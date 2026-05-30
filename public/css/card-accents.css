@@ -37,5 +37,6 @@
   .card--admin-categories { --card-accent: var(--card-accent-admin-users, var(--color-primary)); }
   .card--admin-logs       { --card-accent: var(--card-accent-admin-logs, var(--color-running)); }
   .card--admin-parse-fails { --card-accent: var(--card-accent-admin-parse-fails, var(--color-err-border)); }
+  .card--admin-js-errors  { --card-accent: var(--card-accent-admin-js-errors, var(--color-err-border)); }
   .card--share            { --card-accent: var(--card-accent-share); }
 }

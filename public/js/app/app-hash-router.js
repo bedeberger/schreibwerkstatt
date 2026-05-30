@@ -28,6 +28,7 @@ export const appHashRouterMethods = {
     if (this.showAdminBooksCard) return '#admin/books';
     if (this.showAdminLogsCard) return '#admin/logs';
     if (this.showAdminParseFailsCard) return '#admin/parse-fails';
+    if (this.showAdminJsErrorsCard) return '#admin/js-errors';
     if (!this.selectedBookId) return '';
     const parts = ['book', this.selectedBookId];
     if (this.showEditorCard && this.currentPage?.id) {
@@ -195,6 +196,8 @@ export const appHashRouterMethods = {
           if (!this.showAdminLogsCard) await this.toggleAdminLogsCard();
         } else if (sub === 'parse-fails') {
           if (!this.showAdminParseFailsCard) await this.toggleAdminParseFailsCard();
+        } else if (sub === 'js-errors') {
+          if (!this.showAdminJsErrorsCard) await this.toggleAdminJsErrorsCard();
         }
       } finally {
         this._applyingHash = false;
@@ -386,6 +389,7 @@ export const appHashRouterMethods = {
       'showBookSettingsCard', 'showUserSettingsCard',
       'showAdminUsersCard', 'showAdminSettingsCard', 'showAdminUsageCard', 'adminUsageTab',
       'showAdminCategoriesCard', 'showAdminBooksCard', 'showAdminLogsCard', 'showAdminParseFailsCard',
+      'showAdminJsErrorsCard',
       'showFinetuneExportCard',
       'showExportCard',
       'showPdfExportCard',

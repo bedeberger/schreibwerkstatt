@@ -394,6 +394,7 @@ app.use('/admin/settings', require('./routes/admin-settings'));
 app.use('/admin/usage', require('./routes/admin-usage'));
 app.use('/admin/logs', require('./routes/admin-logs'));
 app.use('/admin/parse-fails', require('./routes/admin-parse-fails'));
+app.use('/admin/js-errors', require('./routes/admin-js-errors'));
 app.use('/admin/registration-requests', require('./routes/admin-registration-requests'));
 app.use('/admin/api-tokens',            require('./routes/admin-api-tokens'));
 app.use('/local/categories', require('./routes/categories'));

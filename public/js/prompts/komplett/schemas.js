@@ -238,7 +238,12 @@ export const SCHEMA_KONTINUITAET_VERIFY = _obj({
   grund: _str,
 });
 
+// _reasoning MUSS das erste Property bleiben: PROBLEME_RULES (schema-strings.js)
+// erzwingt Reasoning-First als zentrale False-Positive-Abwehr. _obj() macht alle
+// Properties required + additionalProperties:false – ohne dieses Feld verbietet die
+// Grammar lokaler Provider (ollama/llama) genau das vom Prompt geforderte Reasoning.
 export const SCHEMA_KONTINUITAET_PROBLEME = _obj({
+  _reasoning: _str,
   probleme: {
     type: 'array',
     items: _obj({

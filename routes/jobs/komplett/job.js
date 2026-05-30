@@ -16,6 +16,7 @@ const {
   chunkLimitsFor, BATCH_SIZE, jobAbortControllers,
   _modelName, fmtTok, tps,
   createJob, enqueueJob, findActiveJobId,
+  retryOnTransientAi,
 } = require('../shared');
 const contentStore = require('../../../lib/content-store');
 const appSettings = require('../../../lib/app-settings');
@@ -269,17 +270,17 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
       if (!kontMultiPass) {
         log.info(`Kontinuität Single-Pass: ${fullBookText.length} Zeichen, ${figKompakt.length} Figuren, ${orteKompakt.length} Orte`);
         const bookSystemBlock = { text: buildBookSystemBlockText(bookName, pageContents.length, fullBookText), ttl: '1h' };
-        return call(jobId, tok,
+        return retryOnTransientAi(() => call(jobId, tok,
           prompts.buildKontinuitaetSinglePassPrompt(bookName, null, figKompakt, orteKompakt, narrativeLabels(getBookSettings(bookIdInt, email))),
           [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KONTINUITAET_BLOCKS, '1h')],
           82, 97, 5000, 0.2, null, prompts.SCHEMA_KONTINUITAET_PROBLEME,
-        );
+        ), { log, label: 'Kontinuität Single-Pass (P8)' });
       }
       log.info(`Kontinuität facts-basiert: ${chapterFakten.length} Kapitel, ${figKompakt.length} Figuren`);
-      return call(jobId, tok,
+      return retryOnTransientAi(() => call(jobId, tok,
         prompts.buildKontinuitaetCheckPrompt(bookName, chapterFakten, figKompakt, orteKompakt),
         sys.SYSTEM_KONTINUITAET_BLOCKS, 82, 97, effectiveProvider === 'claude' ? 5000 : 2500, 0.2, null, prompts.SCHEMA_KONTINUITAET_PROBLEME,
-      );
+      ), { log, label: 'Kontinuität facts-basiert (P8)' });
     };
 
     let kontResult;
@@ -381,10 +382,10 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
     if (totalChars <= singlePassLimit) {
       updateJob(jobId, { progress: 60, statusText: 'job.phase.checkContinuity' });
       const bookText = buildSinglePassBookText(groups, groupOrder);
-      result = await call(jobId, tok,
+      result = await retryOnTransientAi(() => call(jobId, tok,
         prompts.buildKontinuitaetSinglePassPrompt(bookName, bookText, figurenKompakt, orteKompakt, narrativeLabels(getBookSettings(bookIdInt, email))),
         sys.SYSTEM_KONTINUITAET_BLOCKS, 60, 97, 5000, 0.2, null, prompts.SCHEMA_KONTINUITAET_PROBLEME,
-      );
+      ), { log, label: 'Kontinuität Single-Pass' });
     } else {
       // Multi-Pass: Fakten pro Kapitel extrahieren – ggf. aus Checkpoint fortsetzen
       let chapterFacts = cp?.chapterFacts ?? [];
@@ -403,10 +404,13 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
         updateJob(jobId, { progress: fromPct, statusText: 'job.phase.factsInGroup', statusParams: { name: group.name, current: gi + 1, total: groupOrder.length } });
         const chText = group.pages.map(p => `### ${p.title}\n${p.text}`).join('\n\n---\n\n');
         try {
-          const chResult = await call(jobId, tok,
+          // Retry vor dem graceful-skip: der Checkpoint rückt nach gi+1 vor, ein
+          // übersprungenes Kapitel wird auch beim Resume NIE nachgeholt – ein
+          // transienter Blip würde sonst dauerhaft Fakten verlieren.
+          const chResult = await retryOnTransientAi(() => call(jobId, tok,
             prompts.buildKontinuitaetChapterFactsPrompt(group.name, chText),
             sys.SYSTEM_KONTINUITAET_BLOCKS, fromPct, toPct, 1500, 0.2, null, prompts.SCHEMA_KONTINUITAET_FAKTEN,
-          );
+          ), { log, label: `Fakten «${group.name}»` });
           chapterFacts.push({ kapitel: group.name, fakten: chResult.fakten || [] });
         } catch (e) {
           if (e.name === 'AbortError') throw e;
@@ -416,10 +420,10 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
       }
 
       updateJob(jobId, { progress: 88, statusText: 'job.phase.checkContradictions' });
-      result = await call(jobId, tok,
+      result = await retryOnTransientAi(() => call(jobId, tok,
         prompts.buildKontinuitaetCheckPrompt(bookName, chapterFacts, figurenKompakt, orteKompakt),
         sys.SYSTEM_KONTINUITAET_BLOCKS, 88, 95, 5000, 0.2, null, prompts.SCHEMA_KONTINUITAET_PROBLEME,
-      );
+      ), { log, label: 'Kontinuität Check (Multi-Pass)' });
       // Fakten-basierte Befunde gegen den Originaltext verifizieren (False-Positive-Filter).
       if (effectiveProvider === 'claude') {
         result = await verifyKontinuitaetProbleme(

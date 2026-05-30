@@ -6719,6 +6719,36 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 158 abgeschlossen (continuity_issues.resolved).');
   }
 
+  if (version < 159) {
+    // Client-seitige JS-Fehler. Vom Browser via /telemetry/js-error gemeldet,
+    // im Admin durchsuchbar. Diagnostik — user_email SET NULL, damit die Fehler-
+    // Historie eine User-Loeschung ueberlebt. Zeilen-Cap in db/js-errors.js.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS js_errors (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        user_email  TEXT REFERENCES app_users(email) ON DELETE SET NULL,
+        kind        TEXT NOT NULL DEFAULT 'error',
+        message     TEXT NOT NULL,
+        stack       TEXT,
+        source      TEXT,
+        line        INTEGER,
+        col         INTEGER,
+        page_url    TEXT,
+        user_agent  TEXT
+      )
+    `);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_js_errors_created_at ON js_errors(created_at)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_js_errors_user_email ON js_errors(user_email)');
+
+    const fkErrors159 = db.pragma('foreign_key_check');
+    if (fkErrors159.length) {
+      throw new Error(`Migration 159: foreign_key_check meldet ${fkErrors159.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 159').run();
+    logger.info('DB-Migration auf Version 159 abgeschlossen (js_errors).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

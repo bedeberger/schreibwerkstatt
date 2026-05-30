@@ -73,36 +73,37 @@ async function runPhase1(ctx) {
         // ehemals einen 6-Array-Mega-Calls.
         const bookSystemBlock = { text: buildBookSystemBlockText(bookName, pageContents.length, fullBookText), ttl: '1h' };
         const [stammRes, orteRes] = await settledAll([
-          () => call(jobId, tok,
+          () => retryOnTransientAi(() => call(jobId, tok,
             prompts.buildExtraktionFigurenStammPrompt('Gesamtbuch', bookName, pageContents.length, null),
             [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KOMPLETT_FIGUREN_STAMM_BLOCKS, '1h')],
             12, 20, 14000, 0.2, null, prompts.SCHEMA_KOMPLETT_FIGUREN_STAMM,
-          ),
-          () => call(jobId, tok,
+          ), { log, label: 'Single-Pass Figuren-Stamm (A1)' }),
+          () => retryOnTransientAi(() => call(jobId, tok,
             prompts.buildExtraktionOrtePassPrompt('Gesamtbuch', bookName, pageContents.length, null),
             [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KOMPLETT_ORTE_PASS_BLOCKS, '1h')],
             12, 20, 8000, 0.2, null, prompts.SCHEMA_KOMPLETT_ORTE_PASS,
-          ),
+          ), { log, label: 'Single-Pass Orte/Szenen (B)' }),
         ]);
         if (stammRes.status === 'rejected') throw stammRes.reason;
         const stamm = stammRes.value || {};
-        if (orteRes.status === 'rejected') {
-          log.warn(`Single-Pass Orte/Szenen-Pass fehlgeschlagen, ohne Orte/Szenen: ${orteRes.reason?.message}`);
-          passB = {};
-        } else {
-          passB = orteRes.value || {};
-        }
+        // Orte/Szenen-Pass nicht still degradieren: ein durch Call-Fehler leerer
+        // Katalog würde unter '__singlepass__' gecacht und bei jedem Folgelauf als
+        // HIT geliefert (Phantom-Erfolg), bis eine Seitenedition die Signatur ändert.
+        // Wie A1 hart werfen – transiente Fehler sind oben bereits geretryt. Ein
+        // legitim ortloses Buch liefert fulfilled mit leerem Array und cached korrekt.
+        if (orteRes.status === 'rejected') throw orteRes.reason;
+        passB = orteRes.value || {};
 
         // A2: Beziehungen separat – braucht die stabilen IDs aus A1.
         let stammFiguren = stamm.figuren || [];
         if (stammFiguren.length >= 2) {
           updateJob(jobId, { progress: 20, statusText: 'job.phase.extractingRelations' });
           try {
-            const bzRes = await call(jobId, tok,
+            const bzRes = await retryOnTransientAi(() => call(jobId, tok,
               prompts.buildFigurenBeziehungenExtraktionPrompt(bookName, stammFiguren, null),
               [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_FIGUREN_BLOCKS, '1h')],
               20, 28, 8000, 0.2, null, prompts.SCHEMA_BEZIEHUNGEN,
-            );
+            ), { log, label: 'Single-Pass Beziehungen (A2)' });
             const flatBz = Array.isArray(bzRes?.beziehungen) ? bzRes.beziehungen : [];
             stammFiguren = mergeBeziehungenIntoFiguren(stammFiguren, flatBz);
             log.info(`Single-Pass Beziehungs-Pass (A2) – ${flatBz.length} Beziehungen extrahiert.`);
@@ -113,10 +114,10 @@ async function runPhase1(ctx) {
         passA = { figuren: stammFiguren, assignments: stamm.assignments };
       } else {
         // Lokale Provider: kombinierter Call (kein 1h-Cache → Split wäre 3× voller Input).
-        const r = await call(jobId, tok,
+        const r = await retryOnTransientAi(() => call(jobId, tok,
           prompts.buildExtraktionKomplettChapterPrompt('Gesamtbuch', bookName, pageContents.length, fullBookText),
           sys.SYSTEM_KOMPLETT_EXTRAKTION_BLOCKS, 12, 28, 16000, 0.2, null, prompts.SCHEMA_KOMPLETT_EXTRAKTION,
-        );
+        ), { log, label: 'Single-Pass Extraktion (lokal)' });
         passA = { figuren: r?.figuren, assignments: r?.assignments };
         passB = { orte: r?.orte, songs: r?.songs, fakten: r?.fakten, szenen: r?.szenen };
       }

@@ -5,10 +5,13 @@
 
 const express = require('express');
 const { bumpMergeCounter } = require('../db/merge-telemetry');
+const { insertJsError } = require('../db/js-errors');
 const logger = require('../logger');
 
 const router = express.Router();
 const jsonBody = express.json();
+const JS_ERROR_KINDS = new Set(['error', 'unhandledrejection']);
+function _toInt(v) { const n = parseInt(v, 10); return Number.isInteger(n) ? n : null; }
 
 // Erlaubte Basis-Events. 'conflict_resolved' fuehrt zusaetzlich einen
 // Auflösungs-Mix (local/remote/both) als getrennte Counter.
@@ -39,6 +42,34 @@ router.post('/merge', jsonBody, (req, res) => {
     res.json({ ok: true });
   } catch (e) {
     logger.error('[telemetry/merge] DB-Fehler: ' + e.message);
+    res.status(500).json({ error_code: 'DB_ERROR' });
+  }
+});
+
+// ── POST /telemetry/js-error ──────────────────────────────────────────────────
+// Fire-and-forget Meldung eines client-seitigen JS-Fehlers. Session-authed
+// (Mount nach Auth-Guard). Felder werden in db/js-errors.js gekappt; hier nur
+// Pflichtfeld + Enum pruefen. Best-effort: DB-Fehler werden geschluckt.
+router.post('/js-error', jsonBody, (req, res) => {
+  if (!req.session?.user?.email) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  const message = (req.body?.message || '').toString().trim();
+  if (!message) return res.status(400).json({ error_code: 'NO_MESSAGE' });
+  const kind = JS_ERROR_KINDS.has(req.body?.kind) ? req.body.kind : 'error';
+  try {
+    insertJsError({
+      user_email: req.session.user.email,
+      kind,
+      message,
+      stack: req.body?.stack ?? null,
+      source: req.body?.source ?? null,
+      line: _toInt(req.body?.line),
+      col: _toInt(req.body?.col),
+      page_url: req.body?.pageUrl ?? null,
+      user_agent: req.headers['user-agent'] || null,
+    });
+    res.json({ ok: true });
+  } catch (e) {
+    logger.error('[telemetry/js-error] DB-Fehler: ' + e.message);
     res.status(500).json({ error_code: 'DB_ERROR' });
   }
 });

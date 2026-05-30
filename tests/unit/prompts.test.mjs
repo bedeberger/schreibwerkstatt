@@ -288,3 +288,18 @@ test('SCHEMA_LEKTORAT (ollama): enum bleibt auf 6 Local-Typen beschränkt', asyn
     assert.ok(!e.includes(t), `Local-Schema darf «${t}» nicht enthalten`);
   }
 });
+
+// Grammar-Constrained-Decoding (lokale Provider) verbietet jedes Property, das nicht
+// im Schema steht (additionalProperties:false). PROBLEME_RULES erzwingt Reasoning-First
+// als zentrale False-Positive-Abwehr – fehlt _reasoning im Schema, kann das lokale
+// Modell es physisch nicht emittieren und die CoT ist still tot. Regression-Lock.
+for (const provider of ['ollama', 'claude']) {
+  test(`SCHEMA_KONTINUITAET_PROBLEME (${provider}): _reasoning ist erstes, required Property`, async () => {
+    const m = await freshPrompts(provider);
+    const s = m.SCHEMA_KONTINUITAET_PROBLEME;
+    assert.ok(s?.properties?._reasoning, '_reasoning-Property fehlt im Schema');
+    assert.equal(Object.keys(s.properties)[0], '_reasoning', '_reasoning muss erstes Property sein');
+    assert.ok(s.required.includes('_reasoning'), '_reasoning muss required sein');
+    assert.equal(s.additionalProperties, false);
+  });
+}
