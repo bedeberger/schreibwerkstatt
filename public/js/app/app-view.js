@@ -700,7 +700,7 @@ export const appViewMethods = {
     if (this._komplettPollTimer) { clearInterval(this._komplettPollTimer); this._komplettPollTimer = null; }
     // Last-Run-Stempel gehört zum Buch, nicht zur View — Buch bleibt bei
     // Home-Klick gewählt, also für das aktuelle Buch neu laden statt nullen.
-    if (this.selectedBookId) this.loadLastKomplettRun(this.selectedBookId);
+    if (this.selectedBookId && typeof this.loadLastKomplettRun === 'function') this.loadLastKomplettRun(this.selectedBookId);
     else this.alleAktualisierenLastRun = null;
     this.alleAktualisierenProgress = 0;
     this.alleAktualisierenTokIn = 0;
