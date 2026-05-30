@@ -36,7 +36,8 @@ test.describe('publication-tab', () => {
     await page.locator('#pub-isbn').fill('978-3-16-148410-0');
     await page.locator('#pub-subtitle').fill('Ein Untertitel');
     await page.locator('#pub-dedication').fill('Für alle Leser');
-    await panel(page).locator('button', { hasText: 'Speichern' }).click();
+    // Speichern liegt im Karten-Header (saveActiveTab dispatcht je Tab), nicht im Panel.
+    await page.locator('.card-actions button', { hasText: 'Speichern' }).click();
 
     await expect(async () => {
       const state = await page.request.get('http://localhost:8765/__mock/state').then(r => r.json());
