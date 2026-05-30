@@ -6749,6 +6749,61 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 159 abgeschlossen (js_errors).');
   }
 
+  if (version < 160) {
+    // Autorfoto fuer die "Ueber den Autor"-Seite im PDF-Export. BLOB direkt im
+    // Profil (analog cover_image). Additive Spalten, kein FK noetig.
+    const pepCols160 = db.pragma('table_info(pdf_export_profile)').map(c => c.name);
+    if (!pepCols160.includes('author_image')) {
+      db.prepare('ALTER TABLE pdf_export_profile ADD COLUMN author_image BLOB').run();
+    }
+    if (!pepCols160.includes('author_image_mime')) {
+      db.prepare('ALTER TABLE pdf_export_profile ADD COLUMN author_image_mime TEXT').run();
+    }
+
+    const fkErrors160 = db.pragma('foreign_key_check');
+    if (fkErrors160.length) {
+      throw new Error(`Migration 160: foreign_key_check meldet ${fkErrors160.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 160').run();
+    logger.info('DB-Migration auf Version 160 abgeschlossen (pdf_export_profile.author_image).');
+  }
+
+  if (version < 161) {
+    // Welt-Fakten: deklaratives Buch-Wissen (Magiesystem-Regeln, Geografie, Daten,
+    // etablierte Aussagen), bisher nur transient fuer den Kontinuitaets-Check gebaut
+    // und danach verworfen. Persistiert macht es der Buch-Chat ueber list_world_facts
+    // abfragbar. Regenerierter KI-Cache (kein manuelles Edit) → ON DELETE CASCADE.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS world_facts (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id     INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        kategorie   TEXT,
+        subjekt     TEXT,
+        fakt        TEXT NOT NULL,
+        seite_label TEXT,
+        sort_order  INTEGER DEFAULT 0,
+        user_email  TEXT,
+        updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      )
+    `);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_world_facts_book ON world_facts(book_id)');
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS world_fact_chapters (
+        fact_id    INTEGER NOT NULL REFERENCES world_facts(id) ON DELETE CASCADE,
+        chapter_id INTEGER NOT NULL REFERENCES chapters(chapter_id) ON DELETE CASCADE,
+        PRIMARY KEY (fact_id, chapter_id)
+      )
+    `);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_wfc_chapter ON world_fact_chapters(chapter_id)');
+
+    const fkErrors161 = db.pragma('foreign_key_check');
+    if (fkErrors161.length) {
+      throw new Error(`Migration 161: foreign_key_check meldet ${fkErrors161.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 161').run();
+    logger.info('DB-Migration auf Version 161 abgeschlossen (world_facts + world_fact_chapters).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

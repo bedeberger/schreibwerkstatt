@@ -16,7 +16,7 @@ const {
   i18nError,
   jsonBody,
 } = require('./shared');
-const { getPdfExportProfile, getPdfExportProfileCover, getBookSettings } = require('../../db/schema');
+const { getPdfExportProfile, getPdfExportProfileCover, getPdfExportProfileAuthorImage, getBookSettings } = require('../../db/schema');
 const { loadContents } = require('../../lib/load-contents');
 const { renderPdfBuffer } = require('../../lib/pdf-render');
 const { validatePdfa } = require('../../lib/pdfa-validate');
@@ -67,12 +67,18 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
       if (cover) coverBuf = cover.image;
     }
 
+    let authorImageBuf = null;
+    if (scope === 'book' && profile.has_author_image) {
+      const ai = getPdfExportProfileAuthorImage(profileId);
+      if (ai) authorImageBuf = ai.image;
+    }
+
     const { language: bookLang } = getBookSettings(book.id, userEmail);
 
     updateJob(jobId, { progress: 40, statusText: 'job.phase.renderPdf' });
     const buffer = await renderPdfBuffer({
       book, groups, profile,
-      coverBuf, token: userToken, lang: bookLang,
+      coverBuf, authorImageBuf, token: userToken, lang: bookLang,
       scope, chapter, page,
     });
 

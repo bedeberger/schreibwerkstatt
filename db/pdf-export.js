@@ -18,7 +18,9 @@ function _scope(bookId) {
 }
 
 const _SELECT_COLS = `id, book_id, kind, user_email, name, config_json, is_default,
-       (cover_image IS NOT NULL) AS has_cover, cover_mime, created_at, updated_at`;
+       (cover_image IS NOT NULL) AS has_cover, cover_mime,
+       (author_image IS NOT NULL) AS has_author_image, author_image_mime,
+       created_at, updated_at`;
 
 const _stmtListBook = db.prepare(
   `SELECT ${_SELECT_COLS} FROM pdf_export_profile
@@ -34,6 +36,9 @@ const _stmtGet = db.prepare(`SELECT ${_SELECT_COLS} FROM pdf_export_profile WHER
 const _stmtGetCover = db.prepare(
   `SELECT cover_image AS image, cover_mime AS mime FROM pdf_export_profile WHERE id = ?`
 );
+const _stmtGetAuthorImage = db.prepare(
+  `SELECT author_image AS image, author_image_mime AS mime FROM pdf_export_profile WHERE id = ?`
+);
 const _stmtInsert = db.prepare(
   `INSERT INTO pdf_export_profile (book_id, kind, user_email, name, config_json, is_default, created_at, updated_at)
    VALUES (?, ?, ?, ?, ?, 0, ?, ?)`
@@ -47,6 +52,12 @@ const _stmtSetCover = db.prepare(
 );
 const _stmtClearCover = db.prepare(
   `UPDATE pdf_export_profile SET cover_image = NULL, cover_mime = NULL, updated_at = ? WHERE id = ?`
+);
+const _stmtSetAuthorImage = db.prepare(
+  `UPDATE pdf_export_profile SET author_image = ?, author_image_mime = ?, updated_at = ? WHERE id = ?`
+);
+const _stmtClearAuthorImage = db.prepare(
+  `UPDATE pdf_export_profile SET author_image = NULL, author_image_mime = NULL, updated_at = ? WHERE id = ?`
 );
 const _stmtClearDefaultsBook = db.prepare(
   `UPDATE pdf_export_profile SET is_default = 0
@@ -72,6 +83,8 @@ function _row(r) {
     is_default: !!r.is_default,
     has_cover: !!r.has_cover,
     cover_mime: r.cover_mime || null,
+    has_author_image: !!r.has_author_image,
+    author_image_mime: r.author_image_mime || null,
     created_at: r.created_at,
     updated_at: r.updated_at,
   };
@@ -119,6 +132,20 @@ function getCover(id) {
   return { image: r.image, mime: r.mime };
 }
 
+function setAuthorImage(id, buffer, mime) {
+  _stmtSetAuthorImage.run(buffer, mime, Date.now(), parseInt(id));
+}
+
+function clearAuthorImage(id) {
+  _stmtClearAuthorImage.run(Date.now(), parseInt(id));
+}
+
+function getAuthorImage(id) {
+  const r = _stmtGetAuthorImage.get(parseInt(id));
+  if (!r || !r.image) return null;
+  return { image: r.image, mime: r.mime };
+}
+
 const _setDefaultTx = db.transaction((bookId, userEmail, id) => {
   const s = _scope(bookId);
   if (s.kind === 'book') _stmtClearDefaultsBook.run(s.bookId, userEmail);
@@ -133,5 +160,7 @@ function setDefault(bookId, userEmail, id) {
 
 module.exports = {
   listProfiles, getProfile, createProfile, updateProfile, deleteProfile,
-  setCover, clearCover, getCover, setDefault,
+  setCover, clearCover, getCover,
+  setAuthorImage, clearAuthorImage, getAuthorImage,
+  setDefault,
 };

@@ -334,6 +334,48 @@ function saveOrteToDb(bookId, orte, userEmail, chNameToId = null, pageNameToIdBy
   }
 }
 
+// ── Welt-Fakten ─────────────────────────────────────────────────────────────
+// Deklaratives Buch-Wissen aus der Komplettanalyse (Phase 1). Anders als Orte
+// haben Fakten keine stabile KI-ID → Full-Replace pro (book, user) statt Upsert
+// (regenerierter Cache, kein manuelles Edit). Bridge auf chapters via Kapitelname
+// (chNameToId). Single-Pass ('Gesamtbuch') matcht kein Kapitel → book-level Fakt
+// ohne Bridge-Eintrag (kein Sentinel).
+// chapterFakten: [{ kapitel, fakten: [{ kategorie, subjekt, fakt, seite }] }]
+function saveFaktenToDb(bookId, chapterFakten, userEmail, chNameToId = null) {
+  if (chNameToId == null) {
+    const rows = db.prepare('SELECT chapter_id, chapter_name FROM chapters WHERE book_id = ?').all(bookId);
+    chNameToId = Object.fromEntries(rows.map(r => [r.chapter_name, r.chapter_id]));
+  }
+  const now = new Date().toISOString();
+  const emailCond = userEmail ? 'user_email = ?' : 'user_email IS NULL';
+  const emailVal  = userEmail ? [userEmail] : [];
+
+  db.transaction(() => {
+    // Full-Replace: alte Fakten weg (CASCADE räumt world_fact_chapters).
+    db.prepare(`DELETE FROM world_facts WHERE book_id = ? AND ${emailCond}`).run(bookId, ...emailVal);
+
+    const ins = db.prepare(`
+      INSERT INTO world_facts (book_id, kategorie, subjekt, fakt, seite_label, sort_order, user_email, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
+    const insWfc = db.prepare('INSERT OR IGNORE INTO world_fact_chapters (fact_id, chapter_id) VALUES (?, ?)');
+
+    let order = 0;
+    for (const cf of (chapterFakten || [])) {
+      const chName = _toRefString(cf?.kapitel);
+      const chapId = chName ? (chNameToId?.[chName] ?? null) : null;
+      for (const f of (cf?.fakten || [])) {
+        const fakt = _toRefString(f?.fakt);
+        if (!fakt) continue;
+        const { lastInsertRowid } = ins.run(
+          bookId, _toRefString(f?.kategorie) || null, _toRefString(f?.subjekt) || null,
+          fakt, _toRefString(f?.seite) || null, order++, userEmail || null, now
+        );
+        if (chapId != null) insWfc.run(lastInsertRowid, chapId);
+      }
+    }
+  })();
+}
+
 // Backfill für location_chapters: ergänzt fehlende Kapitel-Zuordnungen aus
 // scene_locations → figure_scenes.chapter_id. Nutzt INSERT OR IGNORE — bestehende
 // Einträge (Primary-Key location_id+chapter_id) bleiben unverändert (haeufigkeit
@@ -1056,6 +1098,7 @@ module.exports = {
   // local
   saveZeitstrahlEvents,
   saveOrteToDb,
+  saveFaktenToDb,
   saveSongsToDb,
   backfillLocationChaptersFromScenes,
   saveContinuityCheck,
@@ -1083,6 +1126,9 @@ module.exports = {
   setPdfExportProfileCover:   pdfExport.setCover,
   clearPdfExportProfileCover: pdfExport.clearCover,
   getPdfExportProfileCover:   pdfExport.getCover,
+  setPdfExportProfileAuthorImage:   pdfExport.setAuthorImage,
+  clearPdfExportProfileAuthorImage: pdfExport.clearAuthorImage,
+  getPdfExportProfileAuthorImage:   pdfExport.getAuthorImage,
   setPdfExportProfileDefault: pdfExport.setDefault,
   // fonts
   getCachedFont: fonts.getCachedFont,

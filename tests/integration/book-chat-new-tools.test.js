@@ -200,3 +200,150 @@ test('find_first_last_mention: figur ohne Index → freundlicher Fehler', () => 
   assert.equal(result.fig_id, 'fig_1');
   assert.match(result.error, /Index|Erwähnung/);
 });
+
+// ── list_songs ──────────────────────────────────────────────────────────────
+
+test('list_songs: liefert Soundtrack mit Kapitel-/Figur-/Szenen-Verknüpfung + filtert', () => {
+  const BOOK_ID = 8050;
+  const CH1 = 80500, CH2 = 80501;
+  ctx.dbSeed.setBook({
+    books: [{ id: BOOK_ID, name: 'Mixtape' }],
+    chapters: [{ id: CH1, book_id: BOOK_ID, name: 'K1' }, { id: CH2, book_id: BOOK_ID, name: 'K2' }],
+    pages: [],
+  });
+  const { db } = require('../../db/connection');
+  const now = new Date().toISOString();
+
+  const fig = db.prepare(`
+    INSERT INTO figures (book_id, user_email, fig_id, name, kurzname, updated_at)
+    VALUES (?, ?, 'fig_h', 'Held', 'Held', ?)
+  `).run(BOOK_ID, 'alice@example.com', now);
+  const figId = fig.lastInsertRowid;
+
+  const scene = db.prepare(`
+    INSERT INTO figure_scenes (book_id, user_email, titel, chapter_id, updated_at)
+    VALUES (?, ?, 'Showdown', ?, ?)
+  `).run(BOOK_ID, 'alice@example.com', CH1, now);
+  const sceneId = scene.lastInsertRowid;
+
+  const s1 = db.prepare(`
+    INSERT INTO songs (book_id, song_uid, titel, interpret, genre, stimmung, user_email, sort_order, updated_at)
+    VALUES (?, 'song_a', 'Heldenlied', 'Band X', 'Rock', 'episch', ?, 0, ?)
+  `).run(BOOK_ID, 'alice@example.com', now);
+  const s1Id = s1.lastInsertRowid;
+  db.prepare(`
+    INSERT INTO songs (book_id, song_uid, titel, user_email, sort_order, updated_at)
+    VALUES (?, 'song_b', 'Outro', ?, 1, ?)
+  `).run(BOOK_ID, 'alice@example.com', now);
+
+  db.prepare('INSERT INTO song_chapters (song_id, chapter_id, haeufigkeit) VALUES (?, ?, 3)').run(s1Id, CH1);
+  db.prepare('INSERT INTO song_figures (song_id, figure_id, kontext_typ) VALUES (?, ?, ?)').run(s1Id, figId, 'leitmotiv');
+  db.prepare('INSERT INTO song_scenes (song_id, scene_id) VALUES (?, ?)').run(s1Id, sceneId);
+
+  const all = bookChatTools.TOOLS.list_songs({}, { bookId: BOOK_ID, userEmail: 'alice@example.com' });
+  assert.equal(all.total, 2);
+  const lied = all.songs.find(s => s.song_id === 'song_a');
+  assert.equal(lied.titel, 'Heldenlied');
+  assert.equal(lied.interpret, 'Band X');
+  assert.equal(lied.kapitel[0].chapter_id, CH1);
+  assert.equal(lied.kapitel[0].haeufigkeit, 3);
+  assert.equal(lied.figuren[0].fig_id, 'fig_h');
+  assert.equal(lied.szenen[0].scene_id, sceneId);
+
+  const byChapter = bookChatTools.TOOLS.list_songs({ chapter_id: CH1 }, { bookId: BOOK_ID, userEmail: 'alice@example.com' });
+  assert.equal(byChapter.total, 1);
+  assert.equal(byChapter.songs[0].song_id, 'song_a');
+
+  const byFig = bookChatTools.TOOLS.list_songs({ figur_name: 'Held' }, { bookId: BOOK_ID, userEmail: 'alice@example.com' });
+  assert.equal(byFig.total, 1);
+  assert.equal(byFig.songs[0].song_id, 'song_a');
+
+  const byScene = bookChatTools.TOOLS.list_songs({ scene_id: sceneId }, { bookId: BOOK_ID, userEmail: 'alice@example.com' });
+  assert.equal(byScene.total, 1);
+});
+
+test('list_songs: leeres Resultat liefert hint', () => {
+  const BOOK_ID = 8051;
+  ctx.dbSeed.setBook({ books: [{ id: BOOK_ID, name: 'Stumm' }], chapters: [], pages: [] });
+  const result = bookChatTools.TOOLS.list_songs({}, { bookId: BOOK_ID, userEmail: 'alice@example.com' });
+  assert.equal(result.total, 0);
+  assert.match(result.hint, /Songs/);
+});
+
+// ── get_location_profile ────────────────────────────────────────────────────
+
+test('get_location_profile: tiefes Profil per loc_id + Name-Fallback', () => {
+  const BOOK_ID = 8060;
+  const CH1 = 80600;
+  ctx.dbSeed.setBook({
+    books: [{ id: BOOK_ID, name: 'Welt' }],
+    chapters: [{ id: CH1, book_id: BOOK_ID, name: 'K1' }],
+    pages: [],
+  });
+  const { db } = require('../../db/connection');
+  const now = new Date().toISOString();
+
+  const loc = db.prepare(`
+    INSERT INTO locations (book_id, loc_id, name, typ, beschreibung, stimmung, user_email, sort_order, updated_at)
+    VALUES (?, 'loc_wald', 'Dunkler Wald', 'natur', 'Dicht und nass.', 'bedrohlich', ?, 0, ?)
+  `).run(BOOK_ID, 'alice@example.com', now);
+  const locId = loc.lastInsertRowid;
+
+  const figJ = db.prepare(`
+    INSERT INTO figures (book_id, user_email, fig_id, name, kurzname, updated_at)
+    VALUES (?, ?, 'fig_j', 'Jäger', 'Jäger', ?)
+  `).run(BOOK_ID, 'alice@example.com', now);
+  const scene = db.prepare(`
+    INSERT INTO figure_scenes (book_id, user_email, titel, wertung, chapter_id, updated_at)
+    VALUES (?, ?, 'Verfolgung', 'spannend', ?, ?)
+  `).run(BOOK_ID, 'alice@example.com', CH1, now);
+
+  db.prepare('INSERT INTO location_chapters (location_id, chapter_id, haeufigkeit) VALUES (?, ?, 2)').run(locId, CH1);
+  db.prepare('INSERT INTO location_figures (location_id, figure_id) VALUES (?, ?)').run(locId, figJ.lastInsertRowid);
+  db.prepare('INSERT INTO scene_locations (scene_id, location_id) VALUES (?, ?)').run(scene.lastInsertRowid, locId);
+
+  const byId = bookChatTools.TOOLS.get_location_profile({ loc_id: 'loc_wald' }, { bookId: BOOK_ID, userEmail: 'alice@example.com' });
+  assert.equal(byId.name, 'Dunkler Wald');
+  assert.equal(byId.typ, 'natur');
+  assert.equal(byId.stimmung, 'bedrohlich');
+  assert.equal(byId.total_kapitel, 1);
+  assert.equal(byId.kapitel[0].chapter_id, CH1);
+  assert.equal(byId.last_chapter.chapter_id, CH1);
+  assert.equal(byId.figuren[0].fig_id, 'fig_j');
+  assert.equal(byId.total_szenen, 1);
+  assert.equal(byId.szenen[0].titel, 'Verfolgung');
+  assert.equal(byId.szenen[0].chapter_id, CH1);
+
+  const byName = bookChatTools.TOOLS.get_location_profile({ name: 'dunkler' }, { bookId: BOOK_ID, userEmail: 'alice@example.com' });
+  assert.equal(byName.loc_id, 'loc_wald');
+});
+
+test('list_locations: Orte mit assoziierten Figuren (figure_id-Join)', () => {
+  const BOOK_ID = 8061;
+  ctx.dbSeed.setBook({ books: [{ id: BOOK_ID, name: 'Karte' }], chapters: [], pages: [] });
+  const { db } = require('../../db/connection');
+  const now = new Date().toISOString();
+  const loc = db.prepare(`
+    INSERT INTO locations (book_id, loc_id, name, user_email, sort_order, updated_at)
+    VALUES (?, 'loc_burg', 'Burg', ?, 0, ?)
+  `).run(BOOK_ID, 'alice@example.com', now);
+  const fig = db.prepare(`
+    INSERT INTO figures (book_id, user_email, fig_id, name, updated_at)
+    VALUES (?, ?, 'fig_k', 'König', ?)
+  `).run(BOOK_ID, 'alice@example.com', now);
+  db.prepare('INSERT INTO location_figures (location_id, figure_id) VALUES (?, ?)')
+    .run(loc.lastInsertRowid, fig.lastInsertRowid);
+
+  const result = bookChatTools.TOOLS.list_locations({}, { bookId: BOOK_ID, userEmail: 'alice@example.com' });
+  assert.equal(result.total, 1);
+  assert.equal(result.locations[0].figuren[0].fig_id, 'fig_k');
+  assert.equal(result.locations[0].figuren[0].name, 'König');
+});
+
+test('get_location_profile: unbekannter Ort → Fehler', () => {
+  const result = bookChatTools.TOOLS.get_location_profile(
+    { loc_id: 'nope' },
+    { bookId: 8060, userEmail: 'alice@example.com' }
+  );
+  assert.match(result.error, /nicht gefunden/);
+});

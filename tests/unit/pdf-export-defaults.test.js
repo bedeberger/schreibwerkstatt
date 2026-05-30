@@ -165,3 +165,32 @@ test('validateConfig: Bad Hex fällt auf Default zurück', () => {
   assert.equal(c.font.title.color,   d.font.title.color);
   assert.equal(c.font.byline.color,  d.font.byline.color);
 });
+
+test('defaultConfig: neue Extras + Font-Rollen für Frontmatter/Autor', () => {
+  const d = defaultConfig();
+  assert.equal(d.extras.isbn, '');
+  assert.equal(d.extras.copyright, '');
+  assert.equal(d.extras.frontMatter, '');
+  assert.equal(d.extras.authorBio, '');
+  assert.equal(d.extras.imprintPosition, 'front');
+  assert.ok(d.font.frontMatter && d.font.authorBio, 'Font-Rollen frontMatter/authorBio fehlen');
+});
+
+test('validateConfig: neue Extras + imprintPosition-Enum', () => {
+  const c = validateConfig({ extras: {
+    isbn: '978-3-16-148410-0',
+    copyright: '© 2026 X',
+    frontMatter: 'Motto',
+    authorBio: 'Bio',
+    imprintPosition: 'back',
+  }});
+  assert.equal(c.extras.isbn, '978-3-16-148410-0');
+  assert.equal(c.extras.copyright, '© 2026 X');
+  assert.equal(c.extras.frontMatter, 'Motto');
+  assert.equal(c.extras.authorBio, 'Bio');
+  assert.equal(c.extras.imprintPosition, 'back');
+  // Junk-Position fällt auf Default 'front' zurück.
+  assert.equal(validateConfig({ extras: { imprintPosition: 'sideways' } }).extras.imprintPosition, 'front');
+  // ISBN über 20 Zeichen wird getrimmt.
+  assert.ok(validateConfig({ extras: { isbn: 'x'.repeat(50) } }).extras.isbn.length <= 20);
+});

@@ -130,7 +130,7 @@
 
       <!-- Tabs (DESIGN.md .tabs) -->
       <div class="tabs tabs--scrollable pdfx-tabs">
-        <template x-for="tab in ['layout','font','chapter','cover','toc','extras','pdfa']" :key="tab">
+        <template x-for="tab in ['layout','font','chapter','cover','toc','extras','author','pdfa']" :key="tab">
           <button type="button"
                   class="tabs-btn"
                   :class="{ 'tabs-btn--active': isTab(tab) }"
@@ -321,7 +321,8 @@
       <div class="pdfx-tab-panel" x-show="isTab('font')">
         <template x-for="group in [
             { key: 'body',       roles: ['body','heading'] },
-            { key: 'titlePages', roles: ['title','subtitle','byline','dedication','year'] },
+            { key: 'titlePages', roles: ['title','subtitle','byline','dedication','frontMatter','year'] },
+            { key: 'backmatter', roles: ['authorBio'] },
             { key: 'imprint',    roles: ['imprint'] }
           ]" :key="group.key">
           <div class="pdfx-font-group">
@@ -423,7 +424,7 @@
                     </div>
                   </div>
 
-                  <template x-if="['dedication','imprint','year'].includes(role)">
+                  <template x-if="['dedication','frontMatter','authorBio','imprint','year'].includes(role)">
                     <div class="card-form-row">
                       <label class="card-form-label">&nbsp;</label>
                       <div class="card-form-field">
@@ -824,7 +825,7 @@
           <div class="card-form-row">
             <label class="card-form-label" x-text="$app.t('pdfExport.extras.subtitle')"></label>
             <div class="card-form-field">
-              <input x-model="activeProfile.config.extras.subtitle" class="pdfx-text-input">
+              <input x-model="activeProfile.config.extras.subtitle" class="pdfx-text-input" data-spellcheck="spelling">
             </div>
           </div>
           <div class="card-form-row">
@@ -833,16 +834,77 @@
               <input x-model="activeProfile.config.extras.year" class="pdfx-text-input" placeholder="2026">
             </div>
           </div>
+          <div class="card-form-row">
+            <label class="card-form-label" x-text="$app.t('pdfExport.extras.isbn')"></label>
+            <div class="card-form-field">
+              <input x-model="activeProfile.config.extras.isbn" class="pdfx-text-input" placeholder="978-3-16-148410-0">
+            </div>
+          </div>
+          <div class="card-form-row card-form-row--top">
+            <label class="card-form-label" x-text="$app.t('pdfExport.extras.copyright')"></label>
+            <div class="card-form-field">
+              <textarea x-model="activeProfile.config.extras.copyright" class="card-form-textarea" rows="2" data-spellcheck="spelling" :placeholder="$app.t('pdfExport.extras.copyrightPlaceholder')"></textarea>
+            </div>
+          </div>
+          <div class="card-form-row">
+            <label class="card-form-label" x-text="$app.t('pdfExport.extras.imprintPosition')"></label>
+            <div class="card-form-field">
+              <div x-data="combobox($app.t('pdfExport.extras.imprintPosition'))"
+                   x-modelable="value" x-model="activeProfile.config.extras.imprintPosition"
+                   x-effect="options = [{ value: 'front', label: $app.t('pdfExport.extras.imprintFront') }, { value: 'back', label: $app.t('pdfExport.extras.imprintBack') }]"
+></div>
+            </div>
+          </div>
           <div class="card-form-row card-form-row--top">
             <label class="card-form-label" x-text="$app.t('pdfExport.extras.dedication')"></label>
             <div class="card-form-field">
-              <textarea x-model="activeProfile.config.extras.dedication" class="card-form-textarea" rows="3"></textarea>
+              <textarea x-model="activeProfile.config.extras.dedication" class="card-form-textarea" rows="3" data-spellcheck="spelling"></textarea>
+            </div>
+          </div>
+          <div class="card-form-row card-form-row--top">
+            <label class="card-form-label" x-text="$app.t('pdfExport.extras.frontMatter')"></label>
+            <div class="card-form-field">
+              <textarea x-model="activeProfile.config.extras.frontMatter" class="card-form-textarea" rows="4" data-spellcheck="spelling"></textarea>
+              <p class="card-form-field-note" x-text="$app.t('pdfExport.extras.frontMatterHint')"></p>
             </div>
           </div>
           <div class="card-form-row card-form-row--top">
             <label class="card-form-label" x-text="$app.t('pdfExport.extras.imprint')"></label>
             <div class="card-form-field">
-              <textarea x-model="activeProfile.config.extras.imprint" class="card-form-textarea" rows="6"></textarea>
+              <textarea x-model="activeProfile.config.extras.imprint" class="card-form-textarea" rows="6" data-spellcheck="spelling"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Autor-Tab ("Über den Autor"-Seite) -->
+      <div class="pdfx-tab-panel" x-show="isTab('author')">
+        <p class="card-form-field-note" x-text="$app.t('pdfExport.author.hint')"></p>
+        <div class="pdfx-cover-preview pdfx-author-preview">
+          <template x-if="activeProfile.has_author_image">
+            <img :src="authorImageUrl()" alt="">
+          </template>
+          <template x-if="!activeProfile.has_author_image">
+            <span x-text="$app.t('pdfExport.author.noPhoto')"></span>
+          </template>
+        </div>
+        <div class="pdfx-cover-actions">
+          <label class="pdfx-file-btn">
+            <input type="file" accept="image/jpeg,image/png,image/webp" hidden @change="uploadAuthorImage($event)">
+            <span x-text="authorImageUploading ? $app.t('pdfExport.author.uploading') : (activeProfile.has_author_image ? $app.t('pdfExport.author.replacePhoto') : $app.t('pdfExport.author.uploadPhoto'))"></span>
+          </label>
+          <button type="button"
+                  x-show="activeProfile.has_author_image"
+                  @click="removeAuthorImage()"
+                  x-text="$app.t('pdfExport.author.removePhoto')"></button>
+        </div>
+        <p class="card-form-error" x-show="authorImageError" x-text="authorImageError"></p>
+
+        <div class="card-form-grid">
+          <div class="card-form-row card-form-row--top">
+            <label class="card-form-label" x-text="$app.t('pdfExport.author.bio')"></label>
+            <div class="card-form-field">
+              <textarea x-model="activeProfile.config.extras.authorBio" class="card-form-textarea" rows="8" data-spellcheck="spelling"></textarea>
             </div>
           </div>
         </div>

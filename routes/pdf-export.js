@@ -8,6 +8,7 @@ const {
   listPdfExportProfiles, getPdfExportProfile, createPdfExportProfile,
   updatePdfExportProfile, deletePdfExportProfile,
   setPdfExportProfileCover, clearPdfExportProfileCover, getPdfExportProfileCover,
+  setPdfExportProfileAuthorImage, clearPdfExportProfileAuthorImage, getPdfExportProfileAuthorImage,
   setPdfExportProfileDefault,
 } = require('../db/schema');
 const { defaultConfig, validateConfig } = require('../lib/pdf-export-defaults');
@@ -189,6 +190,56 @@ router.get('/profiles/:id/cover', (req, res) => {
   res.setHeader('Content-Type', cover.mime);
   res.setHeader('Cache-Control', 'private, no-store');
   res.end(cover.image);
+});
+
+// ── Autorfoto ("Über den Autor"-Seite) ──────────────────────────────────────
+// Identische sharp-Härtung wie Cover (prepareCover: Magic-Bytes, sRGB-JPEG,
+// kein Alpha, max. 2400 px).
+router.post('/profiles/:id/author-image', rawCoverBody, async (req, res) => {
+  const userEmail = _user(req);
+  const id = toIntId(req.params.id);
+  if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
+  const profile = getPdfExportProfile(id);
+  const err = _ownedOr404(profile, userEmail);
+  if (err) return res.status(err.status).json({ error_code: err.error_code });
+
+  if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+    return res.status(400).json({ error_code: 'AUTHOR_IMAGE_EMPTY' });
+  }
+
+  let prepared;
+  try {
+    prepared = await prepareCover(req.body);
+  } catch (e) {
+    return res.status(400).json({ error_code: 'AUTHOR_IMAGE_INVALID', params: { reason: e.message } });
+  }
+  setPdfExportProfileAuthorImage(id, prepared.buffer, prepared.mime);
+  res.json({ ok: true, mime: prepared.mime, width: prepared.width, height: prepared.height, bytes: prepared.buffer.length });
+});
+
+router.delete('/profiles/:id/author-image', (req, res) => {
+  const userEmail = _user(req);
+  const id = toIntId(req.params.id);
+  if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
+  const profile = getPdfExportProfile(id);
+  const err = _ownedOr404(profile, userEmail);
+  if (err) return res.status(err.status).json({ error_code: err.error_code });
+  clearPdfExportProfileAuthorImage(id);
+  res.json({ ok: true });
+});
+
+router.get('/profiles/:id/author-image', (req, res) => {
+  const userEmail = _user(req);
+  const id = toIntId(req.params.id);
+  if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
+  const profile = getPdfExportProfile(id);
+  const err = _ownedOr404(profile, userEmail);
+  if (err) return res.status(err.status).json({ error_code: err.error_code });
+  const img = getPdfExportProfileAuthorImage(id);
+  if (!img) return res.status(404).json({ error_code: 'NO_AUTHOR_IMAGE' });
+  res.setHeader('Content-Type', img.mime);
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.end(img.image);
 });
 
 // ── Font-Liste (für Picker) ─────────────────────────────────────────────────

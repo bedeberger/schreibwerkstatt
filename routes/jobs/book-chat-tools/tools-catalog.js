@@ -176,9 +176,9 @@ function tool_list_locations(input, ctx) {
     ORDER BY lc.location_id, lc.chapter_id
   `).all(...idVals);
   const fgRows = db.prepare(`
-    SELECT lf.location_id, lf.fig_id, f.name
+    SELECT lf.location_id, f.fig_id, f.name
     FROM location_figures lf
-    LEFT JOIN figures f ON f.fig_id = lf.fig_id AND f.book_id = ? AND f.user_email IS ?
+    JOIN figures f ON f.id = lf.figure_id AND f.book_id = ? AND f.user_email IS ?
     WHERE lf.location_id IN ${idSql}
   `).all(ctx.bookId, userEmail, ...idVals);
 
@@ -211,6 +211,192 @@ function tool_list_locations(input, ctx) {
       };
     }),
     total: rows.length,
+  });
+}
+
+// ── list_songs ──────────────────────────────────────────────────────────────
+
+const SONGS_DEFAULT_LIMIT = 50;
+const SONGS_MAX_LIMIT     = 200;
+
+function tool_list_songs(input, ctx) {
+  const userEmail = ctx.userEmail || null;
+  const chapterFilter = Number.isInteger(input?.chapter_id) ? input.chapter_id : null;
+  const sceneFilter   = Number.isInteger(input?.scene_id)   ? input.scene_id   : null;
+  const limit = Math.min(SONGS_MAX_LIMIT, Math.max(1, Number.isInteger(input?.limit) ? input.limit : SONGS_DEFAULT_LIMIT));
+
+  let figFilterId = null;
+  if (input?.figur_id || input?.figur_name) {
+    const figRow = _findFigure(input, ctx);
+    if (!figRow) return { error: 'Figur nicht gefunden' };
+    figFilterId = figRow.id;
+  }
+
+  let sql = `
+    SELECT s.id, s.song_uid, s.titel, s.interpret, s.genre, s.kontext_typ,
+           s.beschreibung, s.stimmung, s.erste_erwaehnung,
+           s.erste_erwaehnung_page_id, p.page_name AS erste_erwaehnung_page_name
+    FROM songs s
+    LEFT JOIN pages p ON p.page_id = s.erste_erwaehnung_page_id
+    WHERE s.book_id = ? AND s.user_email = ?
+  `;
+  const params = [ctx.bookId, userEmail];
+  if (chapterFilter !== null) {
+    sql += ' AND s.id IN (SELECT song_id FROM song_chapters WHERE chapter_id = ?)';
+    params.push(chapterFilter);
+  }
+  if (figFilterId !== null) {
+    sql += ' AND s.id IN (SELECT song_id FROM song_figures WHERE figure_id = ?)';
+    params.push(figFilterId);
+  }
+  if (sceneFilter !== null) {
+    sql += ' AND s.id IN (SELECT song_id FROM song_scenes WHERE scene_id = ?)';
+    params.push(sceneFilter);
+  }
+  sql += ' ORDER BY s.sort_order, s.id';
+
+  const rows = db.prepare(sql).all(...params);
+  if (!rows.length) {
+    return { songs: [], total: 0, hint: 'Keine Songs für diesen Filter. Songs werden in der Musikbibliothek bzw. via Komplettanalyse erfasst.' };
+  }
+
+  const songIds = rows.map(r => r.id);
+  const { sql: idSql, values: idVals } = inClause(songIds);
+
+  const chRows = db.prepare(`
+    SELECT sc.song_id, sc.chapter_id, c.chapter_name, sc.haeufigkeit
+    FROM song_chapters sc
+    LEFT JOIN chapters c ON c.chapter_id = sc.chapter_id
+    WHERE sc.song_id IN ${idSql}
+    ORDER BY sc.haeufigkeit DESC, sc.chapter_id
+  `).all(...idVals);
+  const fgRows = db.prepare(`
+    SELECT sf.song_id, f.fig_id, f.name, sf.kontext_typ
+    FROM song_figures sf
+    JOIN figures f ON f.id = sf.figure_id
+    WHERE sf.song_id IN ${idSql}
+  `).all(...idVals);
+  const scRows = db.prepare(`
+    SELECT ss.song_id, fs.id AS scene_id, fs.titel
+    FROM song_scenes ss
+    JOIN figure_scenes fs ON fs.id = ss.scene_id
+    WHERE ss.song_id IN ${idSql}
+  `).all(...idVals);
+
+  const chBy = new Map();
+  for (const r of chRows) {
+    if (!chBy.has(r.song_id)) chBy.set(r.song_id, []);
+    chBy.get(r.song_id).push({ chapter_id: r.chapter_id, chapter_name: r.chapter_name || null, haeufigkeit: r.haeufigkeit });
+  }
+  const fgBy = new Map();
+  for (const r of fgRows) {
+    if (!fgBy.has(r.song_id)) fgBy.set(r.song_id, []);
+    fgBy.get(r.song_id).push({ fig_id: r.fig_id, name: r.name || null, kontext_typ: r.kontext_typ || null });
+  }
+  const scBy = new Map();
+  for (const r of scRows) {
+    if (!scBy.has(r.song_id)) scBy.set(r.song_id, []);
+    scBy.get(r.song_id).push({ scene_id: r.scene_id, titel: r.titel || null });
+  }
+
+  const total = rows.length;
+  const limited = rows.slice(0, limit).map(r => ({
+    song_id:                    r.song_uid,
+    titel:                      r.titel,
+    interpret:                  r.interpret || null,
+    genre:                      r.genre || null,
+    kontext_typ:                r.kontext_typ || null,
+    beschreibung:               r.beschreibung || null,
+    stimmung:                   r.stimmung || null,
+    erste_erwaehnung:           r.erste_erwaehnung || null,
+    erste_erwaehnung_page_id:   r.erste_erwaehnung_page_id || null,
+    erste_erwaehnung_page_name: r.erste_erwaehnung_page_name || null,
+    kapitel:                    chBy.get(r.id) || [],
+    figuren:                    fgBy.get(r.id) || [],
+    szenen:                     scBy.get(r.id) || [],
+  }));
+
+  return _truncateResult({
+    songs: limited,
+    total,
+    ...(limited.length < total ? { truncated: true, shown: limited.length } : {}),
+  });
+}
+
+// ── get_location_profile ──────────────────────────────────────────────────────
+
+function tool_get_location_profile(input, ctx) {
+  const userEmail = ctx.userEmail || null;
+  let locRow = null;
+  if (input?.loc_id) {
+    locRow = db.prepare(`
+      SELECT l.id, l.loc_id, l.name, l.typ, l.beschreibung, l.stimmung,
+             l.erste_erwaehnung, l.erste_erwaehnung_page_id, p.page_name AS erste_erwaehnung_page_name
+      FROM locations l
+      LEFT JOIN pages p ON p.page_id = l.erste_erwaehnung_page_id
+      WHERE l.book_id = ? AND l.loc_id = ? AND l.user_email IS ?
+    `).get(ctx.bookId, input.loc_id, userEmail);
+  }
+  if (!locRow && input?.name) {
+    const q = `%${input.name}%`;
+    locRow = db.prepare(`
+      SELECT l.id, l.loc_id, l.name, l.typ, l.beschreibung, l.stimmung,
+             l.erste_erwaehnung, l.erste_erwaehnung_page_id, p.page_name AS erste_erwaehnung_page_name
+      FROM locations l
+      LEFT JOIN pages p ON p.page_id = l.erste_erwaehnung_page_id
+      WHERE l.book_id = ? AND l.user_email IS ? AND l.name LIKE ?
+      ORDER BY CASE WHEN l.name = ? THEN 0 ELSE 1 END, l.sort_order, l.id
+      LIMIT 1
+    `).get(ctx.bookId, userEmail, q, input.name);
+  }
+  if (!locRow) return { error: 'Ort nicht gefunden. Erst list_locations rufen, um loc_id/Name zu ermitteln.' };
+
+  const kapitel = db.prepare(`
+    SELECT lc.chapter_id, c.chapter_name, lc.haeufigkeit
+    FROM location_chapters lc
+    LEFT JOIN chapters c ON c.chapter_id = lc.chapter_id
+    WHERE lc.location_id = ?
+    ORDER BY lc.chapter_id
+  `).all(locRow.id).map(r => ({ chapter_id: r.chapter_id, chapter_name: r.chapter_name || null, haeufigkeit: r.haeufigkeit }));
+
+  const figuren = db.prepare(`
+    SELECT f.fig_id, f.name
+    FROM location_figures lf
+    JOIN figures f ON f.id = lf.figure_id AND f.book_id = ? AND f.user_email IS ?
+    WHERE lf.location_id = ?
+  `).all(ctx.bookId, userEmail, locRow.id).map(r => ({ fig_id: r.fig_id, name: r.name || null }));
+
+  const szenen = db.prepare(`
+    SELECT fs.id AS scene_id, fs.titel, fs.wertung,
+           fs.chapter_id, c.chapter_name, fs.page_id, p.page_name
+    FROM scene_locations sl
+    JOIN figure_scenes fs ON fs.id = sl.scene_id
+    LEFT JOIN chapters c ON c.chapter_id = fs.chapter_id
+    LEFT JOIN pages    p ON p.page_id    = fs.page_id
+    WHERE sl.location_id = ? AND fs.book_id = ? AND fs.user_email IS ?
+    ORDER BY fs.sort_order, fs.id
+  `).all(locRow.id, ctx.bookId, userEmail).map(r => ({
+    scene_id: r.scene_id, titel: r.titel, wertung: r.wertung || null,
+    chapter_id: r.chapter_id, chapter_name: r.chapter_name || null,
+    page_id: r.page_id, page_name: r.page_name || null,
+  }));
+
+  return _truncateResult({
+    loc_id:                     locRow.loc_id,
+    name:                       locRow.name,
+    typ:                        locRow.typ || null,
+    beschreibung:               locRow.beschreibung || null,
+    stimmung:                   locRow.stimmung || null,
+    erste_erwaehnung:           locRow.erste_erwaehnung || null,
+    erste_erwaehnung_page_id:   locRow.erste_erwaehnung_page_id || null,
+    erste_erwaehnung_page_name: locRow.erste_erwaehnung_page_name || null,
+    kapitel,
+    last_chapter: kapitel.length ? kapitel[kapitel.length - 1] : null,
+    figuren,
+    szenen,
+    total_kapitel: kapitel.length,
+    total_figuren: figuren.length,
+    total_szenen: szenen.length,
   });
 }
 
@@ -446,12 +632,65 @@ function tool_list_revisions(input, ctx) {
   });
 }
 
+// ── list_world_facts ────────────────────────────────────────────────────────
+// Deklaratives Buch-Wissen (Weltregeln/Fakten) aus der Komplettanalyse.
+// Optionale Filter: kategorie (exakt), subjekt (Teilstring). Kapitelname per JOIN
+// zur Lesezeit (kein Snapshot).
+function tool_list_world_facts(input, ctx) {
+  const userEmail = ctx.userEmail || null;
+  const kategorie = typeof input?.kategorie === 'string' && input.kategorie.trim() ? input.kategorie.trim() : null;
+  const subjekt   = typeof input?.subjekt === 'string' && input.subjekt.trim() ? input.subjekt.trim() : null;
+
+  let sql = `
+    SELECT wf.id, wf.kategorie, wf.subjekt, wf.fakt, wf.seite_label
+    FROM world_facts wf
+    WHERE wf.book_id = ? AND wf.user_email IS ?`;
+  const params = [ctx.bookId, userEmail];
+  if (kategorie !== null) { sql += ' AND wf.kategorie = ?'; params.push(kategorie); }
+  if (subjekt !== null)   { sql += ' AND wf.subjekt LIKE ?'; params.push(`%${subjekt}%`); }
+  sql += ' ORDER BY wf.sort_order, wf.id';
+
+  const rows = db.prepare(sql).all(...params);
+  if (!rows.length) {
+    return { fakten: [], hint: 'Keine Welt-Fakten vorhanden. Komplettanalyse ausführen.' };
+  }
+
+  const factIds = rows.map(r => r.id);
+  const { sql: idSql, values: idVals } = inClause(factIds);
+  const chRows = db.prepare(`
+    SELECT wfc.fact_id, c.chapter_name
+    FROM world_fact_chapters wfc
+    LEFT JOIN chapters c ON c.chapter_id = wfc.chapter_id
+    WHERE wfc.fact_id IN ${idSql}
+    ORDER BY wfc.fact_id, wfc.chapter_id
+  `).all(...idVals);
+  const chByFact = new Map();
+  for (const r of chRows) {
+    if (!chByFact.has(r.fact_id)) chByFact.set(r.fact_id, []);
+    if (r.chapter_name) chByFact.get(r.fact_id).push(r.chapter_name);
+  }
+
+  return _truncateResult({
+    fakten: rows.map(r => ({
+      kategorie:    r.kategorie || null,
+      subjekt:      r.subjekt || null,
+      fakt:         r.fakt,
+      seite:        r.seite_label || null,
+      kapitel:      chByFact.get(r.id) || [],
+    })),
+    total: rows.length,
+  });
+}
+
 module.exports = {
   tool_list_chapters,
   tool_list_ideen,
   tool_list_locations,
+  tool_get_location_profile,
   tool_list_scenes,
+  tool_list_songs,
   tool_get_book_settings,
   tool_list_figures,
   tool_list_revisions,
+  tool_list_world_facts,
 };

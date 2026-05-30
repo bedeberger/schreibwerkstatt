@@ -4,6 +4,7 @@ const {
   db,
   saveCheckpoint, loadCheckpoint, deleteCheckpoint,
   backfillLocationChaptersFromScenes,
+  saveFaktenToDb,
   getBookSettings,
 } = require('../../../db/schema');
 const appUsers = require('../../../db/app-users');
@@ -207,6 +208,10 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
       : await runPhase1(ctx);
     const { chapterFiguren, chapterOrte, chapterSongs, chapterFakten, chapterSzenen, chapterAssignments } = p1;
     pt.mark('P1 Extraktion');
+
+    // Welt-Fakten persistieren (Full-Replace) — abfragbar im Buch-Chat via list_world_facts.
+    saveFaktenToDb(bookIdInt, chapterFakten, email, idMaps.chNameToId);
+    log.info(`${chapterFakten.reduce((s, c) => s + (c.fakten?.length || 0), 0)} Welt-Fakten gespeichert.`);
 
     // ── Phase 2 + 3: Figuren + Orte konsolidieren ────────────────────────────
     // Multi-Pass Claude: P2 (Figuren-AI) und P3 (Orte-AI) sind unabhängig und

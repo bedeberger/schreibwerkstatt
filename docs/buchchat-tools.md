@@ -26,7 +26,7 @@ Jede Tool-Funktion: `(input, ctx) → JSON-serialisierbares Objekt` (sync oder a
 
 ## Tools
 
-29 Tools, gruppiert nach Domäne. Alle Read-Only ausser `final_answer` (Pflicht-Endpunkt, kein DB-Read).
+31 Tools, gruppiert nach Domäne. Alle Read-Only ausser `final_answer` (Pflicht-Endpunkt, kein DB-Read).
 
 ### Buch/Kapitel-Überblick
 
@@ -63,7 +63,15 @@ Jede Tool-Funktion: `(input, ctx) → JSON-serialisierbares Objekt` (sync oder a
 | Tool | Input | Zweck | Quelle |
 |------|-------|-------|--------|
 | `list_locations` | `chapter_id?` | Alle Schauplätze + Typ, Beschreibung, Stimmung, erste Erwähnung, betroffene Kapitel (mit Häufigkeit), `last_chapter` (Arc-Ende kapitel-genau), assoziierte Figuren. | `locations` + `location_chapters` + `location_figures` |
+| `get_location_profile` | `loc_id?` ∨ `name?` | Tiefes Einzel-Ort-Profil (Pendant zu `get_figure_profile`): Stammdaten + alle Kapitel (mit Häufigkeit) + `last_chapter` + assoziierte Figuren + alle Szenen am Ort (Titel, Wertung, Kapitel/Seite) + Counts. | `locations` + `location_chapters` + `location_figures` + `scene_locations` + `figure_scenes` |
 | `list_scenes` | `chapter_id?`, `page_id?`, `figur_id?` ∨ `figur_name?`, `loc_id?`, `limit?` (default 50, max 200) | Szenenkatalog mit Titel, Wertung, Kommentar, Kontext, beteiligte Figuren/Orte. | `figure_scenes` + Bridges |
+| `list_world_facts` | `kategorie?` (exakt), `subjekt?` (Teilstring) | Etablierte Welt-Fakten/Weltregeln (deklaratives Buch-Wissen aus der Komplettanalyse): Magiesystem-Regeln, Geografie, Daten. Pro Fakt kategorie, subjekt, fakt-Text, betroffene Kapitel. | `world_facts` + `world_fact_chapters` |
+
+### Songs / Soundtrack
+
+| Tool | Input | Zweck | Quelle |
+|------|-------|-------|--------|
+| `list_songs` | `chapter_id?`, `figur_id?` ∨ `figur_name?`, `scene_id?`, `limit?` (default 50, max 200) | Soundtrack/Musikbibliothek: Titel, Interpret, Genre, Kontext-Typ, Beschreibung, Stimmung, erste Erwähnung + verknüpfte Kapitel (mit Häufigkeit), Figuren, Szenen. Filterbar nach Kapitel/Figur/Szene. | `songs` + `song_chapters` + `song_figures` + `song_scenes` |
 
 ### Reviews / Lektorat
 

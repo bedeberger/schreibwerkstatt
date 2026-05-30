@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 159, 86 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 161, 88 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -21,6 +21,7 @@ erDiagram
   books ||--o{ locations             : has
   books ||--o{ figure_scenes         : has
   books ||--o{ songs                 : has
+  books ||--o{ world_facts           : has
   books ||--o{ figure_relations      : has
   books ||--o{ zeitstrahl_events     : has
   books ||--o{ continuity_checks     : has
@@ -472,6 +473,21 @@ erDiagram
     INTEGER scene_id PK,FK
     INTEGER song_id  PK,FK
   }
+  world_facts {
+    INTEGER id          PK
+    INTEGER book_id     FK "ON DELETE CASCADE"
+    TEXT    kategorie
+    TEXT    subjekt
+    TEXT    fakt
+    TEXT    seite_label "unscharfer KI-Seiten-String, keine FK"
+    INTEGER sort_order
+    TEXT    user_email
+    TEXT    updated_at
+  }
+  world_fact_chapters {
+    INTEGER fact_id    PK,FK "ON DELETE CASCADE"
+    INTEGER chapter_id PK,FK "ON DELETE CASCADE"
+  }
 
   figures   ||--o{ figure_tags        : tagged
   figures   ||--o{ figure_relations   : from
@@ -492,6 +508,9 @@ erDiagram
   songs     ||--o{ song_chapters      : at
   songs     ||--o{ song_scenes        : in
   chapters  ||--o{ song_chapters      : has
+  books     ||--o{ world_facts        : has
+  world_facts ||--o{ world_fact_chapters : in
+  chapters  ||--o{ world_fact_chapters : tagged
 ```
 
 ### 3a · Figuren-Werkstatt (isoliert, kein Promotion-Pfad zu `figures`)
@@ -994,6 +1013,8 @@ erDiagram
     TEXT    config_json
     BLOB    cover_image
     TEXT    cover_mime
+    BLOB    author_image
+    TEXT    author_image_mime
     INTEGER is_default
     INTEGER created_at
     INTEGER updated_at

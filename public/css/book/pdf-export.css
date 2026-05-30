@@ -286,6 +286,12 @@
   height: 100%;
   object-fit: contain;
 }
+/* Autorfoto-Variante: kleiner als das Cover (Portrait-Headshot, randfüllend). */
+.pdfx-author-preview {
+  width: 150px;
+  height: 190px;
+}
+.pdfx-author-preview img { object-fit: cover; }
 .pdfx-cover-actions {
   display: flex;
   gap: 0.5rem;

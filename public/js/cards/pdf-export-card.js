@@ -13,7 +13,7 @@
 
 import { startPoll } from './job-helpers.js';
 
-const TABS = ['layout', 'font', 'chapter', 'cover', 'toc', 'extras', 'pdfa'];
+const TABS = ['layout', 'font', 'chapter', 'cover', 'toc', 'extras', 'author', 'pdfa'];
 
 export function registerPdfExportCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -52,6 +52,8 @@ export function registerPdfExportCard() {
       subtitle: false,
       byline: false,
       dedication: false,
+      frontMatter: false,
+      authorBio: false,
       year: false,
       imprint: false,
       tocTitle: false,
@@ -77,6 +79,9 @@ export function registerPdfExportCard() {
     coverUploading: false,
     coverError: '',
     coverPreviewVersion: 0,
+
+    authorImageUploading: false,
+    authorImageError: '',
 
     _pollTimer: null,
     _onBookChanged: null,
@@ -295,6 +300,42 @@ export function registerPdfExportCard() {
     coverUrl() {
       if (!this.activeProfile?.has_cover) return '';
       return `/pdf-export/profiles/${this.activeProfile.id}/cover?v=${this.coverPreviewVersion}`;
+    },
+
+    // ── Autorfoto ("Über den Autor"-Seite) ───────────────────────────────
+    async uploadAuthorImage(ev) {
+      const file = ev?.target?.files?.[0];
+      if (!file || !this.activeProfile) return;
+      this.authorImageUploading = true;
+      this.authorImageError = '';
+      try {
+        const r = await fetch(`/pdf-export/profiles/${this.activeProfile.id}/author-image`, {
+          method: 'POST',
+          headers: { 'Content-Type': file.type || 'application/octet-stream' },
+          body: file,
+        });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          this.authorImageError = window.__app.t('pdfExport.error.authorImageInvalid', d.params);
+          return;
+        }
+        await this.selectProfile(this.activeProfile.id);
+      } finally {
+        this.authorImageUploading = false;
+        ev.target.value = '';
+      }
+    },
+
+    async removeAuthorImage() {
+      if (!this.activeProfile) return;
+      const r = await fetch(`/pdf-export/profiles/${this.activeProfile.id}/author-image`, { method: 'DELETE' });
+      if (!r.ok) return;
+      await this.selectProfile(this.activeProfile.id);
+    },
+
+    authorImageUrl() {
+      if (!this.activeProfile?.has_author_image) return '';
+      return `/pdf-export/profiles/${this.activeProfile.id}/author-image?v=${this.coverPreviewVersion}`;
     },
 
     // ── Font-Preview ──────────────────────────────────────────────────────

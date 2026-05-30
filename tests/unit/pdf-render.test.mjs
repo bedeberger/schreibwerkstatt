@@ -96,6 +96,61 @@ test('Widmung + Impressum erzeugen je eine zusätzliche Seite', async () => {
   assert.equal(pageCount(withExtras) - pageCount(baseline), 2);
 });
 
+test('Motto/Frontmatter-Seite erzeugt zusätzliche Seite', async () => {
+  const cfg = defaultConfig();
+  cfg.cover.enabled = false;
+  const baseline = await renderPdfBuffer({
+    book: baseBook, groups: baseGroups, profile: { config: cfg }, coverBuf: null, token: null,
+  });
+  cfg.extras.frontMatter = 'Wer kämpft, kann verlieren. Wer nicht kämpft, hat schon verloren.';
+  const withFm = await renderPdfBuffer({
+    book: baseBook, groups: baseGroups, profile: { config: cfg }, coverBuf: null, token: null,
+  });
+  assert.equal(pageCount(withFm) - pageCount(baseline), 1);
+});
+
+test('Autor-Seite (Bio-Text) erzeugt zusätzliche Seite', async () => {
+  const cfg = defaultConfig();
+  cfg.cover.enabled = false;
+  const baseline = await renderPdfBuffer({
+    book: baseBook, groups: baseGroups, profile: { config: cfg }, coverBuf: null, token: null,
+  });
+  cfg.extras.authorBio = 'Der Autor lebt und schreibt in der Schweiz.';
+  const withBio = await renderPdfBuffer({
+    book: baseBook, groups: baseGroups, profile: { config: cfg }, coverBuf: null, token: null,
+  });
+  assert.equal(pageCount(withBio) - pageCount(baseline), 1);
+});
+
+test('ISBN/Copyright ohne Impressum-Freitext erzeugt trotzdem Impressum-Seite', async () => {
+  const cfg = defaultConfig();
+  cfg.cover.enabled = false;
+  const baseline = await renderPdfBuffer({
+    book: baseBook, groups: baseGroups, profile: { config: cfg }, coverBuf: null, token: null,
+  });
+  cfg.extras.isbn = '978-3-16-148410-0';
+  cfg.extras.copyright = '© 2026 Max Mustermann';
+  const withIsbn = await renderPdfBuffer({
+    book: baseBook, groups: baseGroups, profile: { config: cfg }, coverBuf: null, token: null,
+  });
+  assert.equal(pageCount(withIsbn) - pageCount(baseline), 1);
+});
+
+test('imprintPosition back: Impressum am Buchende, eine Seite', async () => {
+  const front = defaultConfig(); front.cover.enabled = false;
+  const baseline = await renderPdfBuffer({
+    book: baseBook, groups: baseGroups, profile: { config: front }, coverBuf: null, token: null,
+  });
+  const cfg = defaultConfig();
+  cfg.cover.enabled = false;
+  cfg.extras.imprint = '© 2026';
+  cfg.extras.imprintPosition = 'back';
+  const withBack = await renderPdfBuffer({
+    book: baseBook, groups: baseGroups, profile: { config: cfg }, coverBuf: null, token: null,
+  });
+  assert.equal(pageCount(withBack) - pageCount(baseline), 1);
+});
+
 test('Lose Seite vor erstem Kapitel: Kapitel-Heading bricht auf eigene Page (Regression)', async () => {
   // Bug: spaceBeforeMm-Reset (doc.y = margin.top + 60mm) lief auch für
   // Kapitel 1 unbedingt, sodass auf einer mit losen Seiten befüllten Body-

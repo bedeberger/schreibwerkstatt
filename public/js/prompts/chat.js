@@ -399,6 +399,45 @@ export const BOOK_CHAT_TOOLS = [
     },
   },
   {
+    name: 'get_location_profile',
+    description: 'Tiefes Einzel-Ort-Profil (Pendant zu get_figure_profile): Stammdaten (Typ, Beschreibung, Stimmung, erste Erwähnung) + alle Kapitel mit Häufigkeit + `last_chapter` (Arc-Ende) + alle assoziierten Figuren + alle Szenen, die an diesem Ort spielen (mit Titel, Wertung, Kapitel/Seite). Für "erzähl mir alles über den Wald", "welche Szenen spielen im Schloss?", "wer war je am Hafen?". Auswahl per `loc_id` (aus list_locations) oder `name` (exakt oder Substring).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        loc_id: { type: 'string', description: 'loc_id des Orts (aus list_locations).' },
+        name:   { type: 'string', description: 'Alternative: Ortsname (exakt oder Substring, case-insensitive).' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'list_world_facts',
+    description: 'Liefert die etablierten Welt-Fakten/Weltregeln des Buchs (deklaratives Buch-Wissen aus der Komplettanalyse): Magiesystem-Regeln, Geografie, Daten, etablierte Aussagen. Pro Fakt: kategorie, subjekt, fakt-Text, betroffene Kapitel. Beantwortet "welche Weltregeln gelten?", "wie funktioniert die Magie?", "welche Fakten über Ort/Figur X sind etabliert?". Filterbar nach kategorie (exakt) und subjekt (Teilstring).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        kategorie: { type: 'string', description: 'Nur Fakten dieser Kategorie (exakt, z.B. "Magiesystem", "Geografie").' },
+        subjekt:   { type: 'string', description: 'Nur Fakten zu diesem Subjekt (Teilstring, case-insensitive).' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'list_songs',
+    description: 'Listet die Songs/den Soundtrack des Buchs (Musikbibliothek): Titel, Interpret, Genre, Kontext-Typ, Beschreibung, Stimmung, erste Erwähnung + verknüpfte Kapitel (mit Häufigkeit), Figuren und Szenen. Beantwortet "welche Musik/Songs gehören zum Buch?", "welcher Song zu Figur X?", "Soundtrack von Kapitel 3?". Filterbar nach chapter_id, figur_id/figur_name, scene_id.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        chapter_id: { type: 'integer', description: 'Nur Songs, die in diesem Kapitel verknüpft sind.' },
+        figur_id:   { type: 'string',  description: 'Nur Songs zu dieser Figur (fig_id).' },
+        figur_name: { type: 'string',  description: 'Alternative: Name/Kurzname der Figur.' },
+        scene_id:   { type: 'integer', description: 'Nur Songs zu dieser Szene (scene_id aus list_scenes).' },
+        limit:      { type: 'integer', description: 'Maximale Anzahl (default 50, max 200).' },
+      },
+      required: [],
+    },
+  },
+  {
     name: 'list_scenes',
     description: 'Listet Szenen aus dem Szenenkatalog (figure_scenes) mit Titel, Wertung, Kommentar, Kapitel/Seite, beteiligten Figuren und Orten. Filterbar nach chapter_id, page_id, figur_id/figur_name (Figur ist in der Szene), loc_id (Ort der Szene). Ideal für "welche Szenen spielt X?", "Szenen in Kapitel 3", "Szenen im Wald".',
     input_schema: {

@@ -20,7 +20,10 @@ const TOOLS = {
   list_revisions:         catalog.tool_list_revisions,
   list_ideen:             catalog.tool_list_ideen,
   list_locations:         catalog.tool_list_locations,
+  get_location_profile:   catalog.tool_get_location_profile,
   list_scenes:            catalog.tool_list_scenes,
+  list_songs:             catalog.tool_list_songs,
+  list_world_facts:       catalog.tool_list_world_facts,
   get_book_settings:      catalog.tool_get_book_settings,
 
   list_continuity_issues: timeline.tool_list_continuity_issues,
