@@ -11,7 +11,7 @@ function buildFigurePassageSamples(ctx) {
   // Für jede Figur suchen wir ein paar konkrete Textausschnitte, in denen
   // der Name vorkommt. Prompt: „Zeig mir eine Passage mit X" → Absatz aus
   // dem Buch. Groundet Figurwissen direkt im Quelltext.
-  const PASSAGE_MAX_PER_FIG = 5;
+  const PASSAGE_MAX_PER_FIG = 5 * (opts.biasBoost || 1);
   for (const f of figRows) {
     const names = [f.name, f.kurzname].filter(n => n && String(n).trim().length >= 2);
     if (!names.length) continue;

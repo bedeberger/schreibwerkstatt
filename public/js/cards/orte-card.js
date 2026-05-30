@@ -20,11 +20,14 @@ export function registerOrteCard() {
     // Geo-Karte (View-Mode 'map') — siehe book/orte-map.js.
     orteRealEnabled: false,   // book_settings.orte_real → blendet Karten-Tab ein
     geocodingId: null,        // loc-id, fuer die gerade ein Geocode laeuft
+    geocodingAll: false,      // Batch-Geocode laeuft (sperrt Einzel-Buttons)
+    highlightOrtId: null,     // Cross-Highlight Marker ↔ Locate-Liste
     orteMapStatus: '',
     _geoLang: 'de',
     _bookLand: null,          // book_settings.schauplatz_land → Geocode-Länder-Bias
     _map: null,               // Leaflet-Instanz (transienter Runtime-Handle)
     _markers: null,           // Leaflet-LayerGroup
+    _markerById: {},          // ort-id → Leaflet-Marker (Cross-Highlight-Lookup)
     _ortePollTimer: null,
     _lifecycle: null,
 
@@ -38,7 +41,7 @@ export function registerOrteCard() {
         name: 'orte',
         showFlag: 'showOrteCard',
         timerKeys: ['_ortePollTimer'],
-        resetState: { orteLoading: false, orteProgress: 0, orteStatus: '', orteRealEnabled: false, geocodingId: null, orteMapStatus: '' },
+        resetState: { orteLoading: false, orteProgress: 0, orteStatus: '', orteRealEnabled: false, geocodingId: null, geocodingAll: false, highlightOrtId: null, orteMapStatus: '' },
         load: (root) => root.loadOrte(root.selectedBookId),
         onShow: async (root) => {
           const tasks = [root.loadOrte(root.selectedBookId), this.loadOrteReal()];

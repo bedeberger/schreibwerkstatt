@@ -23,11 +23,13 @@ export function registerFinetuneExportCard() {
   window.Alpine.data('finetuneExportCard', () => ({
     finetuneTypeStyle:      true,
     finetuneTypeScene:      true,
+    finetuneTypeVerbatim:   true,
     finetuneTypeDialog:     true,
     finetuneTypeAuthorChat: true,
     finetuneTypeCorrection: true,
     finetuneMinChars:     200,
     finetuneMaxChars:     4000,
+    finetuneBiasBoost:    1,
     finetuneValSplit:     0.1,
     finetuneValSeed:      0,
     finetuneMaxSeqTokens: 4096,   // Sweet-Spot Mistral-Small-3.2-24B-QLoRA @ 20 GB VRAM
@@ -112,12 +114,14 @@ export function registerFinetuneExportCard() {
           types: {
             style:      !!this.finetuneTypeStyle,
             scene:      !!this.finetuneTypeScene,
+            verbatim:   !!this.finetuneTypeVerbatim,
             dialog:     !!this.finetuneTypeDialog,
             authorChat: !!this.finetuneTypeAuthorChat,
             correction: !!this.finetuneTypeCorrection,
           },
           min_chars:      Number(this.finetuneMinChars) || 200,
           max_chars:      Number(this.finetuneMaxChars) || 4000,
+          bias_boost:     Number(this.finetuneBiasBoost) || 1,
           val_split:      Number(this.finetuneValSplit) || 0,
           val_seed:       Number(this.finetuneValSeed)  || 0,
           max_seq_tokens: Number(this.finetuneMaxSeqTokens) || 0,

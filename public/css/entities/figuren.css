@@ -120,6 +120,18 @@
 .figur-kerninfo-row { font-size: var(--font-size-sm); line-height: 1.5; margin-bottom: var(--space-2xs); }
 .figur-kerninfo-row:last-child { margin-bottom: 0; }
 
+/* === Figuren: Entwicklungsbogen === */
+.figur-arc { margin-bottom: var(--space-10); }
+.figur-arc-body { margin-top: var(--space-2xs); }
+.figur-arc-stations {
+  margin: var(--space-2xs) 0;
+  padding-left: var(--space-lg);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+.figur-arc-stations li { margin-bottom: var(--space-2xs); }
+.figur-arc-stations li:last-child { margin-bottom: 0; }
+
 /* === Figuren: Schlüsselzitate === */
 .figur-zitate-list { margin-bottom: var(--space-10); }
 .figur-zitat {

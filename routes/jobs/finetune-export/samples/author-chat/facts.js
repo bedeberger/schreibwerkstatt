@@ -51,13 +51,13 @@ function buildFactSamples(ctx) {
 
 // Block 23: Reverse-Lookups (Satz → Seite/Kapitel)
 function buildReverseLookupSamples(ctx) {
-  const { langIsEn, pageContents, pushQA } = ctx;
+  const { langIsEn, opts, pageContents, pushQA } = ctx;
 
   // Distinktive Sätze (mittellang, mindestens ein Grossbuchstabe
   // mittelstellig als Indikator für Eigennamen) pro Seite sammeln und
   // als Reverse-Samples emittieren: „Auf welcher Seite steht …?" und
   // „Welches Kapitel enthält …?". Cap pro Seite, damit Gleichgewicht.
-  const REV_PER_PAGE = 3;
+  const REV_PER_PAGE = 3 * (opts.biasBoost || 1);
   const looksDistinctive = (sent) => {
     if (sent.length < 80 || sent.length > 260) return false;
     // Enthält mindestens einen Grossbuchstaben nach dem ersten Wort

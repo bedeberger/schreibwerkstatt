@@ -15,7 +15,7 @@ export const finetuneExportMethods = {
   },
 
   finetuneAnyTypeSelected() {
-    return !!(this.finetuneTypeStyle || this.finetuneTypeScene || this.finetuneTypeDialog || this.finetuneTypeAuthorChat || this.finetuneTypeCorrection);
+    return !!(this.finetuneTypeStyle || this.finetuneTypeScene || this.finetuneTypeVerbatim || this.finetuneTypeDialog || this.finetuneTypeAuthorChat || this.finetuneTypeCorrection);
   },
 
   finetuneFormatBytes(n) {

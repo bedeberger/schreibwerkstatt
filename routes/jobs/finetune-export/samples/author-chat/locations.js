@@ -249,7 +249,7 @@ function buildLocationSamples(ctx) {
 function buildLocationPassageSamples(ctx) {
   const { langIsEn, opts, locRows, pageContents, pushQA } = ctx;
   const { maxChars } = opts;
-  const PASSAGE_MAX_PER_LOC = 4;
+  const PASSAGE_MAX_PER_LOC = 4 * (opts.biasBoost || 1);
   for (const l of locRows) {
     if (!l.name || l.name.length < 3) continue;
     const nameRe = new RegExp('\\b' + escapeRe(l.name) + '\\b', 'i');

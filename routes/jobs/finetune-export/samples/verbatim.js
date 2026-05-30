@@ -1,6 +1,6 @@
 'use strict';
 
-const { splitAtSentence } = require('./lib/text');
+const { splitAtSentence } = require('../lib/text');
 
 // Wörtliche Rekonstruktion (Verbatim-Recall) — der stärkste Memorisierungs-
 // Sample-Typ. Anders als `scene` (das Seitentext auf `maxChars` kürzt und im

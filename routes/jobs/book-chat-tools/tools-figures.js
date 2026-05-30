@@ -243,6 +243,8 @@ function tool_get_figure_profile(input, ctx) {
 
   let zitate = [];
   if (f.schluesselzitate) { try { zitate = JSON.parse(f.schluesselzitate) || []; } catch { zitate = []; } }
+  let arc = null;
+  if (f.arc) { try { arc = JSON.parse(f.arc); } catch { arc = null; } }
 
   return _truncateResult({
     fig_id: f.fig_id,
@@ -253,6 +255,9 @@ function tool_get_figure_profile(input, ctx) {
     geschlecht: f.geschlecht || null,
     beruf: f.beruf || null,
     wohnadresse: f.wohnadresse || null,
+    aeusseres: f.aeusseres || null,
+    stimme: f.stimme || null,
+    hintergrund: f.hintergrund || null,
     beschreibung: f.beschreibung || null,
     sozialschicht: f.sozialschicht || null,
     praesenz: f.praesenz || null,
@@ -260,6 +265,7 @@ function tool_get_figure_profile(input, ctx) {
     motivation: f.motivation || null,
     konflikt: f.konflikt || null,
     entwicklung: f.entwicklung || null,
+    arc: (arc && typeof arc === 'object') ? arc : null,
     erste_erwaehnung: f.erste_erwaehnung || null,
     erste_erwaehnung_page_id: f.erste_erwaehnung_page_id || null,
     eigenschaften: tags,

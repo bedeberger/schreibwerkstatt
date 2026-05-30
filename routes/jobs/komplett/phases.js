@@ -65,6 +65,10 @@ async function runPhase1(ctx) {
     } else {
       updateJob(jobId, { progress: 12, statusText: 'job.phase.extracting' });
       let passA, passB;
+      // A2 (Beziehungen) kann scheitern, nachdem A1 Figuren erfolgreich lieferte. Dann
+      // dürfen die beziehungslosen Figuren NICHT als '__singlepass__'-Cache eingefroren
+      // werden (sonst Phantom-Erfolg bei jedem Folgelauf bis zur Seitenedition).
+      let relationsFailed = false;
       if (effectiveProvider === 'claude') {
         // Claude-Split: Figuren-Stammdaten (A1) + Orte/Szenen (B) parallel, danach
         // Beziehungen (A2) aus den A1-IDs. Alle drei Calls teilen denselben Buchtext-
@@ -72,12 +76,23 @@ async function runPhase1(ctx) {
         // denselben Prefix. Kleinere Schemas pro Call senken das Truncation-Risiko des
         // ehemals einen 6-Array-Mega-Calls.
         const bookSystemBlock = { text: buildBookSystemBlockText(bookName, pageContents.length, fullBookText), ttl: '1h' };
+        // A1 trägt jetzt mehr Tiefe-Felder pro Figur (aeusseres/stimme/hintergrund/arc) →
+        // höheres Truncation-Risiko bei figurendichten Büchern. Bei Truncation einmal mit
+        // höherem Cap nachfassen (aiCall deckelt selbst auf MAX_TOKENS_OUT) statt den Job
+        // hart zu killen.
+        const callFigurenStamm = (maxTok) => retryOnTransientAi(() => call(jobId, tok,
+          prompts.buildExtraktionFigurenStammPrompt('Gesamtbuch', bookName, pageContents.length, null),
+          [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KOMPLETT_FIGUREN_STAMM_BLOCKS, '1h')],
+          12, 20, maxTok, 0.2, null, prompts.SCHEMA_KOMPLETT_FIGUREN_STAMM,
+        ), { log, label: 'Single-Pass Figuren-Stamm (A1)' });
         const [stammRes, orteRes] = await settledAll([
-          () => retryOnTransientAi(() => call(jobId, tok,
-            prompts.buildExtraktionFigurenStammPrompt('Gesamtbuch', bookName, pageContents.length, null),
-            [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KOMPLETT_FIGUREN_STAMM_BLOCKS, '1h')],
-            12, 20, 14000, 0.2, null, prompts.SCHEMA_KOMPLETT_FIGUREN_STAMM,
-          ), { log, label: 'Single-Pass Figuren-Stamm (A1)' }),
+          () => callFigurenStamm(14000).catch(e => {
+            if (e?.message === 'job.error.aiTruncated') {
+              log.warn('A1 Figuren-Stamm bei 14000 Tokens trunkiert – Retry mit höherem Cap (24000).');
+              return callFigurenStamm(24000);
+            }
+            throw e;
+          }),
           () => retryOnTransientAi(() => call(jobId, tok,
             prompts.buildExtraktionOrtePassPrompt('Gesamtbuch', bookName, pageContents.length, null),
             [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KOMPLETT_ORTE_PASS_BLOCKS, '1h')],
@@ -108,7 +123,9 @@ async function runPhase1(ctx) {
             stammFiguren = mergeBeziehungenIntoFiguren(stammFiguren, flatBz);
             log.info(`Single-Pass Beziehungs-Pass (A2) – ${flatBz.length} Beziehungen extrahiert.`);
           } catch (e) {
+            relationsFailed = true;
             log.warn(`Single-Pass Beziehungs-Pass (A2) fehlgeschlagen, Figuren ohne Beziehungen: ${e.message}`);
+            ctx.warnings?.push({ key: 'job.warn.relationsFailed' });
           }
         }
         passA = { figuren: stammFiguren, assignments: stamm.assignments };
@@ -129,9 +146,13 @@ async function runPhase1(ctx) {
       chapterAssignments = [{ kapitel: 'Gesamtbuch', assignments: passA.assignments || [] }];
       const totalEvents = (passA.assignments || []).reduce((s, a) => s + (a.lebensereignisse?.length || 0), 0);
       log.info(`Single-Pass OK – fig=${chapterFiguren[0].figuren.length} orte=${chapterOrte[0].orte.length} songs=${chapterSongs[0].songs.length} sz=${chapterSzenen[0].szenen.length} (${totalEvents} Ereignisse)`);
-      saveChapterExtractCache(bookIdInt, email, '__singlepass__', bookPagesSig, {
-        chapterFiguren, chapterOrte, chapterSongs, chapterFakten, chapterSzenen, chapterAssignments,
-      }, effectiveProvider);
+      if (relationsFailed) {
+        log.warn('Single-Pass Cache übersprungen – A2 (Beziehungen) gescheitert, beziehungsloser Stand wird nicht eingefroren.');
+      } else {
+        saveChapterExtractCache(bookIdInt, email, '__singlepass__', bookPagesSig, {
+          chapterFiguren, chapterOrte, chapterSongs, chapterFakten, chapterSzenen, chapterAssignments,
+        }, effectiveProvider);
+      }
     }
   } else {
     // ── Multi-Pass mit Delta-Cache ──

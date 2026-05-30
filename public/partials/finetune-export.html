@@ -46,6 +46,13 @@
           </span>
         </label>
         <label class="form-check">
+          <input type="checkbox" id="ft-type-verbatim" name="ft-type-verbatim" x-model="finetuneTypeVerbatim">
+          <span>
+            <span class="form-check-title" x-text="$app.t('finetune.type.verbatim')"></span>
+            <span class="form-check-desc" x-text="$app.t('finetune.type.verbatim.desc')"></span>
+          </span>
+        </label>
+        <label class="form-check">
           <input type="checkbox" id="ft-type-dialog" name="ft-type-dialog" x-model="finetuneTypeDialog">
           <span>
             <span class="form-check-title" x-text="$app.t('finetune.type.dialog')"></span>
@@ -80,6 +87,19 @@
           <span x-text="$app.t('finetune.length.max')"></span>
           <input type="text" id="ft-max-chars" name="ft-max-chars" x-data="numInput({ step: 100, min: 200, max: 16000 })" x-modelable="value" x-model="finetuneMaxChars" class="form-num">
         </label>
+      </div>
+    </div>
+
+    <div class="card-form-row">
+      <label class="card-form-label" x-text="$app.t('finetune.bias')"></label>
+      <div class="form-stack">
+        <div class="form-inline">
+          <label class="form-inline-field">
+            <span x-text="$app.t('finetune.bias.boost')"></span>
+            <input type="text" id="ft-bias-boost" name="ft-bias-boost" x-data="numInput({ step: 1, min: 1, max: 5, integer: true })" x-modelable="value" x-model="finetuneBiasBoost" class="form-num">
+          </label>
+        </div>
+        <p class="form-check-desc" x-text="$app.t('finetune.bias.desc')"></p>
       </div>
     </div>
 
@@ -177,6 +197,7 @@
         <span class="tok-badge tok-neutral" x-show="finetuneStats.val > 0" x-text="$app.t('finetune.stats.val', { n: finetuneStats.val })"></span>
         <span class="tok-badge tok-neutral" x-show="finetuneStats.styleCount > 0" x-text="$app.t('finetune.stats.style', { n: finetuneStats.styleCount })"></span>
         <span class="tok-badge tok-neutral" x-show="finetuneStats.sceneCount > 0" x-text="$app.t('finetune.stats.scene', { n: finetuneStats.sceneCount })"></span>
+        <span class="tok-badge tok-neutral" x-show="finetuneStats.verbatimCount > 0" x-text="$app.t('finetune.stats.verbatim', { n: finetuneStats.verbatimCount })"></span>
         <span class="tok-badge tok-neutral" x-show="finetuneStats.dialogCount > 0" x-text="$app.t('finetune.stats.dialog', { n: finetuneStats.dialogCount })"></span>
         <span class="tok-badge tok-neutral" x-show="finetuneStats.authorChatCount > 0" x-text="$app.t('finetune.stats.authorChat', { n: finetuneStats.authorChatCount })"></span>
         <span class="tok-badge tok-neutral" x-show="finetuneStats.correctionCount > 0" x-text="$app.t('finetune.stats.correction', { n: finetuneStats.correctionCount })"></span>
