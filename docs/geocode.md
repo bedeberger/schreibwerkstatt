@@ -1,6 +1,6 @@
 # Geocoding & Orte-Karte (Geo-Map realer Schauplätze)
 
-Reale Schauplätze auf einer Leaflet-Karte verorten. Pro Buch via `book_settings.orte_real` aktiviert (Default aus). Geocoding ist reiner Lookup (kein KI-Call) → normale Route, keine Job-Queue. Passt zur Produkt-Philosophie „KI rückwärtsgewandt": reine Kuration/Visualisierung bestehender Orte.
+Reale Schauplätze auf einer Leaflet-Karte verorten. Pro Buch via `book_settings.orte_real` aktiviert (Default aus). Zweistufig: **(1) regelbasierte Heuristik** (`GET /geocode`, reiner Lookup, normale Route) und **(2) KI-Fallback** (`POST /jobs/geocode-resolve`, Job-Queue) nur wenn die Heuristik leer bleibt. Der KI-Schritt liest bestehende Schauplatz-Labels und normalisiert sie auf einen realen Toponym — rein rückwärtsgewandt (keine Buchtext-Generierung), passt zur Produkt-Philosophie „KI rückwärtsgewandt".
 
 ## Datenmodell
 
@@ -21,6 +21,8 @@ Geteilter Kern für die On-Demand-Route **und** den nächtlichen Cron.
 
 Antwort-Normalisierung: `parseNominatimResults` / `parsePhotonResults` → `[{ lat, lng, displayName }]`. Fehler/Timeout → `[]` (non-fatal, nie throw in Request-Pfad).
 
+**Heuristik-Zwei-Pass:** `geocode()` fragt erst das rohe Label ab; bleibt es leer, schneidet `parseToponym()` einen führenden Beschreibungsteil vor einem lokativen Bindewort ab («Bar in Olten» → «Olten», Bindewörter: in/im/bei/am/an/auf/vor/zu/zur/zum/near/at/on) und fragt den Toponym erneut ab. Pure → unit-getestet. Greift kein Bindewort (z.B. «Marktplatz von Bern»), bleibt die KI-Stufe.
+
 **App-Settings** (`lib/app-settings.js`, ENV-Override in Klammern):
 - `geocode.provider` (`GEOCODE_PROVIDER`) — `nominatim` | `photon`
 - `geocode.nominatim.url` (`NOMINATIM_URL`)
@@ -32,9 +34,17 @@ Antwort-Normalisierung: `parseNominatimResults` / `parsePhotonResults` → `[{ l
 
 Auth-geschützt (globaler Guard). Params: `q` (Pflicht, ≤200 Zeichen, sonst 400), `lang` (`de`|`en`, Default `de`), `region` (2-Letter-CC). Antwort `{ candidates: [...] }`. Kein Server-Proxy für Tiles — die holt der Browser direkt von OSM (Betreiber-Sache, self-hosted OSS); App liefert nur Voreinstellung + Pflicht-Attribution.
 
+## KI-Fallback-Job: `POST /jobs/geocode-resolve` (`routes/jobs/geocode.js`)
+
+Greift, wenn die Heuristik 0 Treffer liefert. Input: `{ book_id, items: [{ id, name }] }` (Batch, max 200). `runGeocodeResolveJob` schickt alle Labels in **einem** `callAI`-Call (Prompt/Schema in [public/js/prompts/geocode.js](../public/js/prompts/geocode.js): `buildSystemGeocodeResolve` + `buildGeocodeResolvePrompt` + `SCHEMA_GEOCODE_RESOLVE`), bekommt pro Label `{ ort, land }` (realer Toponym + ISO-2-Code; leer = rein fiktiv, kein Anker), geocodet jeden via `geocode(ort, { region: land })` und liefert `{ results: [{ id, lat, lng }|null] }`. Kein Cache (kein `geocode_*_cache`), daher **nicht** in `_promptsContentHash`.
+
+`aiResolveLocation(name, { language, region })` ist die Einzel-Label-Variante (nutzt `callAI` direkt, kein Job-Kontext) — exportiert für die Cron-DI.
+
+**Frontend** ([public/js/book/orte-map.js](../public/js/book/orte-map.js)): `geocodeOrt`/`geocodeAllUnlocated` rufen erst die Heuristik (`_geocodeOne`), sammeln Misses und schicken sie automatisch in `_geocodeViaAI` → `POST /jobs/geocode-resolve` + `startPoll`. Bleibt ein Ort auch danach unverortet, zeigt der Render-Pfad einen roten Pin in der Kartenmitte (User schiebt zurecht).
+
 ## Cron: Auto-Verortung (`geocodeAllBooks`, server.js 03:30)
 
-Iteriert alle Bücher mit `orte_real=1`, sucht `locations` ohne Koordinaten (`lat IS NULL OR lng IS NULL`), geocodet sequenziell mit `lang = settings.language`, `region = settings.schauplatz_land`, schreibt ersten Treffer direkt in `locations`. Respektiert `max_per_run`-Cap. User korrigiert danach per Marker-Drag.
+Iteriert alle Bücher mit `orte_real=1`, sucht `locations` ohne Koordinaten (`lat IS NULL OR lng IS NULL`), geocodet sequenziell mit `lang = settings.language`, `region = settings.schauplatz_land`, schreibt ersten Treffer direkt in `locations`. Respektiert `max_per_run`-Cap. User korrigiert danach per Marker-Drag. **KI-Fallback:** server.js reicht `aiResolveLocation` via DI (`geocodeAllBooks({ aiResolve })`) — lib bleibt frei von `routes/jobs`-Imports; bei leerer Heuristik normalisiert der Resolver das Label und geocodet erneut.
 
 ## Frontend
 
@@ -44,5 +54,5 @@ Iteriert alle Bücher mit `orte_real=1`, sucht `locations` ohne Koordinaten (`la
 
 ## Tests
 
-- [tests/unit/geocode.test.mjs](../tests/unit/geocode.test.mjs) — Response-Parsing (beide Provider) + Range-Clamp.
+- [tests/unit/geocode.test.mjs](../tests/unit/geocode.test.mjs) — Response-Parsing (beide Provider) + Range-Clamp + `parseToponym`-Heuristik.
 - Migrationen via `squash-drift` + `erd-drift` gegated.

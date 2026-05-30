@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const { parseNominatimResults, parsePhotonResults } = require('../../routes/geocode.js');
-const { geocode } = require('../../lib/geocode.js');
+const { geocode, parseToponym } = require('../../lib/geocode.js');
 
 test('geocode: leere Query → leeres Array (kein Netzwerk-Call)', async () => {
   assert.deepEqual(await geocode(''), []);
@@ -16,6 +16,25 @@ test('geocode: leere Query → leeres Array (kein Netzwerk-Call)', async () => {
 
 test('geocode: zu lange Query → leeres Array (kein Netzwerk-Call)', async () => {
   assert.deepEqual(await geocode('x'.repeat(201)), []);
+});
+
+test('parseToponym: schneidet Beschreibungsteil vor lokativem Bindewort ab', () => {
+  assert.equal(parseToponym('Bar in Olten'), 'Olten');
+  assert.equal(parseToponym('Kleines Café am Bahnhof Bern'), 'Bahnhof Bern');
+  assert.equal(parseToponym('Hotel zur Post Luzern'), 'Post Luzern');
+  assert.equal(parseToponym('Pub on Baker Street'), 'Baker Street');
+});
+
+test('parseToponym: letztes Bindewort gewinnt (mehrere)', () => {
+  assert.equal(parseToponym('Wohnung in der Altstadt in Zürich'), 'Zürich');
+});
+
+test('parseToponym: kein Bindewort oder leerer Rest → null', () => {
+  assert.equal(parseToponym('Olten'), null);
+  assert.equal(parseToponym('Marktplatz von Bern'), null); // «von» nicht in der Liste → KI-Fallback
+  assert.equal(parseToponym('Bar in '), null);
+  assert.equal(parseToponym(''), null);
+  assert.equal(parseToponym(null), null);
 });
 
 test('parseNominatimResults: mappt lat/lon-Strings zu Number + displayName', () => {
