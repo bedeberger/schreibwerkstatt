@@ -209,3 +209,34 @@ test('validateConfig: neue Extras + imprintPosition-Enum', () => {
   // ISBN über 20 Zeichen wird getrimmt.
   assert.ok(validateConfig({ extras: { isbn: 'x'.repeat(50) } }).extras.isbn.length <= 20);
 });
+
+test('defaultConfig: coverSpec-Block (Umschlag-PDF) vorhanden + leer', () => {
+  const d = defaultConfig();
+  assert.ok(d.coverSpec, 'coverSpec fehlt');
+  assert.equal(d.coverSpec.pageCount, 0);
+  assert.equal(d.coverSpec.paperBulkMmPer1000, 0);
+  assert.equal(d.coverSpec.blurb, '');
+  assert.equal(d.coverSpec.spineText, '');
+  assert.equal(d.coverSpec.backgroundColor, '#ffffff');
+});
+
+test('validateConfig: coverSpec — Clamps, Integer-pageCount, Hex-Default', () => {
+  const c = validateConfig({ coverSpec: {
+    pageCount: 312.7,
+    paperBulkMmPer1000: 72.5,
+    blurb: 'Klappentext',
+    spineText: 'Titel',
+    backgroundColor: '#102030',
+  }});
+  assert.equal(c.coverSpec.pageCount, 313);          // gerundet
+  assert.equal(c.coverSpec.paperBulkMmPer1000, 72.5);
+  assert.equal(c.coverSpec.blurb, 'Klappentext');
+  assert.equal(c.coverSpec.spineText, 'Titel');
+  assert.equal(c.coverSpec.backgroundColor, '#102030');
+  // Clamps + Junk-Hex.
+  assert.equal(validateConfig({ coverSpec: { pageCount: -5 } }).coverSpec.pageCount, 0);
+  assert.equal(validateConfig({ coverSpec: { paperBulkMmPer1000: 9999 } }).coverSpec.paperBulkMmPer1000, 300);
+  assert.equal(validateConfig({ coverSpec: { backgroundColor: 'nope' } }).coverSpec.backgroundColor, '#ffffff');
+  // Unbekannte Keys verworfen.
+  assert.equal(validateConfig({ coverSpec: { evil: 1 } }).coverSpec.evil, undefined);
+});

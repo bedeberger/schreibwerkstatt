@@ -1,10 +1,10 @@
 # Druckfertiger PDF-Export (klassische Druckerei)
 
-- **Status:** Ready <!-- Phase 1+2 umgesetzt; Phase 3+4 auf branchenüblichen Default-Annahmen statt konkreter Druckerei-Spec (siehe Annahmen unten) -->
-- **Aufwand:** XL <!-- 4 Phasen; Phase 1+2 = L (erledigt), Phase 3+4 = M offen -->
+- **Status:** Done <!-- Alle 4 Phasen umgesetzt; Phase 3+4 auf branchenüblichen Default-Annahmen statt konkreter Druckerei-Spec (siehe Annahmen unten) -->
+- **Aufwand:** XL <!-- 4 Phasen, alle erledigt -->
 - **Severity:** high <!-- Self-Publishing ist erklärtes Produkt-Ziel des Owners -->
 
-> **Umsetzungsstand:** Phase 1 (Content/Frontmatter) + Phase 2 (Innenteil druckfertig: Bleed/Crop/TrimBox/BleedBox/dpi-Warnung) + Phase 3 (PDF/X-3: Norm-Toggle `pdfa.standard`, Ghostscript-Post-Step [lib/pdfx-convert.js](../../lib/pdfx-convert.js), RGB + Output-Intent-ICC) sind **umgesetzt** (Backend + Card-UI). Offen: Phase 4 (Umschlag). Ops-Rest für Phase 3: gs-Binary im Container + ECI-ICC nach `assets/icc/` legen (siehe [assets/icc/README.md](../../assets/icc/README.md)) — fehlt beides, liefert der Export non-fatal das unkonvertierte PDF.
+> **Umsetzungsstand:** Alle 4 Phasen **umgesetzt** (Backend + Card-UI): Phase 1 (Content/Frontmatter), Phase 2 (Innenteil druckfertig: Bleed/Crop/TrimBox/BleedBox/dpi-Warnung), Phase 3 (PDF/X-3: Norm-Toggle `pdfa.standard`, Ghostscript-Post-Step [lib/pdfx-convert.js](../../lib/pdfx-convert.js), RGB + Output-Intent-ICC), Phase 4 (separates Umschlag-PDF: [lib/pdf-cover-render.js](../../lib/pdf-cover-render.js), Render-Target `target='cover'` in [routes/jobs/pdf-export.js](../../routes/jobs/pdf-export.js), `config.coverSpec`, Rückseiten-Bild-BLOB via Mig 165, Cover-Tab-Sektion). Ops-Rest für Phase 3: gs-Binary im Container + ECI-ICC nach `assets/icc/` legen (siehe [assets/icc/README.md](../../assets/icc/README.md)) — fehlt beides, liefert der Export non-fatal das unkonvertierte PDF.
 
 ## Branchenübliche Default-Annahmen (statt Druckerei-Spec)
 

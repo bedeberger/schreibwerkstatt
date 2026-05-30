@@ -6866,6 +6866,26 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 164 abgeschlossen (figures.aeusseres/stimme/hintergrund/arc).');
   }
 
+  if (version < 165) {
+    // Rückseiten-Bild fuer das separate Umschlag-PDF (Phase 4 druckfertiger
+    // PDF-Export). BLOB direkt im Profil, analog cover_image/author_image.
+    // Additive Spalten, kein FK noetig.
+    const pepCols165 = db.pragma('table_info(pdf_export_profile)').map(c => c.name);
+    if (!pepCols165.includes('back_cover_image')) {
+      db.prepare('ALTER TABLE pdf_export_profile ADD COLUMN back_cover_image BLOB').run();
+    }
+    if (!pepCols165.includes('back_cover_image_mime')) {
+      db.prepare('ALTER TABLE pdf_export_profile ADD COLUMN back_cover_image_mime TEXT').run();
+    }
+
+    const fkErrors165 = db.pragma('foreign_key_check');
+    if (fkErrors165.length) {
+      throw new Error(`Migration 165: foreign_key_check meldet ${fkErrors165.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 165').run();
+    logger.info('DB-Migration auf Version 165 abgeschlossen (pdf_export_profile.back_cover_image).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

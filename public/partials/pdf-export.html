@@ -678,6 +678,93 @@
             </div>
           </div>
         </template>
+
+        <!-- Separates Umschlag-PDF (Druck): Rückseite + Buchrücken + Vorderseite -->
+        <div class="collapsible-wrap pdfx-cover-spine">
+          <button type="button"
+                  class="collapsible-toggle"
+                  @click="secOpen.coverSpine = !secOpen.coverSpine"
+                  :aria-expanded="secOpen.coverSpine">
+            <span class="history-chevron" :class="{ open: secOpen.coverSpine }">›</span>
+            <span x-text="$app.t('pdfExport.cover.spineLegend')"></span>
+          </button>
+          <div x-show="secOpen.coverSpine" x-cloak class="collapsible-section">
+            <p class="card-form-field-note" x-text="$app.t('pdfExport.cover.spineHint')"></p>
+            <div class="card-form-grid">
+              <div class="card-form-row">
+                <label class="card-form-label" x-text="$app.t('pdfExport.cover.pageCount')"></label>
+                <div class="card-form-field">
+                  <input type="text" x-data="numInput({ step: 1, min: 0, max: 5000, integer: true })" x-modelable="value" x-model="activeProfile.config.coverSpec.pageCount" class="pdfx-num-input">
+                </div>
+              </div>
+              <div class="card-form-row">
+                <label class="card-form-label" x-text="$app.t('pdfExport.cover.paperBulk')"></label>
+                <div class="card-form-field">
+                  <input type="text" x-data="numInput({ step: 0.5, min: 0, max: 300 })" x-modelable="value" x-model="activeProfile.config.coverSpec.paperBulkMmPer1000" class="pdfx-num-input">
+                  <p class="card-form-field-note" x-text="$app.t('pdfExport.cover.paperBulkHint')"></p>
+                </div>
+              </div>
+              <div class="card-form-row">
+                <label class="card-form-label" x-text="$app.t('pdfExport.cover.spineWidth')"></label>
+                <div class="card-form-field">
+                  <span class="pdfx-spine-width" x-text="coverSpineMm().toFixed(1) + ' mm'"></span>
+                </div>
+              </div>
+              <div class="card-form-row">
+                <label class="card-form-label" x-text="$app.t('pdfExport.cover.spineText')"></label>
+                <div class="card-form-field">
+                  <input x-model="activeProfile.config.coverSpec.spineText" class="pdfx-text-input" data-spellcheck="spelling" :placeholder="$app.t('pdfExport.cover.spineTextPlaceholder')">
+                </div>
+              </div>
+              <div class="card-form-row">
+                <label class="card-form-label" x-text="$app.t('pdfExport.cover.bgColor')"></label>
+                <div class="card-form-field pdfx-color-field">
+                  <input type="color" class="pdfx-color-picker" x-model="activeProfile.config.coverSpec.backgroundColor">
+                  <span class="pdfx-color-text" x-text="activeProfile.config.coverSpec.backgroundColor"></span>
+                </div>
+              </div>
+              <div class="card-form-row card-form-row--top">
+                <label class="card-form-label" x-text="$app.t('pdfExport.cover.blurb')"></label>
+                <div class="card-form-field">
+                  <textarea x-model="activeProfile.config.coverSpec.blurb" class="card-form-textarea" rows="5" data-spellcheck="spelling"></textarea>
+                </div>
+              </div>
+            </div>
+
+            <h4 class="pdfx-font-group-title" x-text="$app.t('pdfExport.cover.backImage')"></h4>
+            <div class="pdfx-cover-preview">
+              <template x-if="activeProfile.has_back_cover">
+                <img :src="backCoverUrl()" alt="">
+              </template>
+              <template x-if="!activeProfile.has_back_cover">
+                <span x-text="$app.t('pdfExport.cover.backNoFile')"></span>
+              </template>
+            </div>
+            <div class="pdfx-cover-actions">
+              <label class="pdfx-file-btn">
+                <input type="file" accept="image/jpeg,image/png,image/webp" hidden @change="uploadBackCover($event)">
+                <span x-text="backCoverUploading ? $app.t('pdfExport.cover.backUploading') : (activeProfile.has_back_cover ? $app.t('pdfExport.cover.backReplace') : $app.t('pdfExport.cover.backUpload'))"></span>
+              </label>
+              <button type="button"
+                      x-show="activeProfile.has_back_cover"
+                      @click="removeBackCover()"
+                      x-text="$app.t('pdfExport.cover.backRemove')"></button>
+            </div>
+            <p class="card-form-error" x-show="backCoverError" x-text="backCoverError"></p>
+
+            <div class="pdfx-cover-spine-actions">
+              <button type="button"
+                      class="primary"
+                      x-show="!exporting"
+                      :disabled="!coverSpecReady() || !$app.selectedBookId"
+                      :data-tip="!coverSpecReady() ? $app.t('pdfExport.cover.spineNeedsValues') : ''"
+                      @click="exportPdf('cover')">
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#download"/></svg>
+                <span x-text="$app.t('pdfExport.cover.renderCover')"></span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- TOC-Tab -->

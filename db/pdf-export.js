@@ -21,6 +21,7 @@ function _scope(bookId) {
 const _SELECT_COLS = `id, book_id, kind, user_email, name, config_json, is_default,
        (cover_image IS NOT NULL) AS has_cover, cover_mime,
        (author_image IS NOT NULL) AS has_author_image, author_image_mime,
+       (back_cover_image IS NOT NULL) AS has_back_cover, back_cover_image_mime,
        created_at, updated_at`;
 
 const _stmtListBook = db.prepare(
@@ -39,6 +40,9 @@ const _stmtGetCover = db.prepare(
 );
 const _stmtGetAuthorImage = db.prepare(
   `SELECT author_image AS image, author_image_mime AS mime FROM pdf_export_profile WHERE id = ?`
+);
+const _stmtGetBackCover = db.prepare(
+  `SELECT back_cover_image AS image, back_cover_image_mime AS mime FROM pdf_export_profile WHERE id = ?`
 );
 const _stmtInsert = db.prepare(
   `INSERT INTO pdf_export_profile (book_id, kind, user_email, name, config_json, is_default, created_at, updated_at)
@@ -59,6 +63,12 @@ const _stmtSetAuthorImage = db.prepare(
 );
 const _stmtClearAuthorImage = db.prepare(
   `UPDATE pdf_export_profile SET author_image = NULL, author_image_mime = NULL, updated_at = ? WHERE id = ?`
+);
+const _stmtSetBackCover = db.prepare(
+  `UPDATE pdf_export_profile SET back_cover_image = ?, back_cover_image_mime = ?, updated_at = ? WHERE id = ?`
+);
+const _stmtClearBackCover = db.prepare(
+  `UPDATE pdf_export_profile SET back_cover_image = NULL, back_cover_image_mime = NULL, updated_at = ? WHERE id = ?`
 );
 const _stmtClearDefaultsBook = db.prepare(
   `UPDATE pdf_export_profile SET is_default = 0
@@ -86,6 +96,8 @@ function _row(r) {
     cover_mime: r.cover_mime || null,
     has_author_image: !!r.has_author_image,
     author_image_mime: r.author_image_mime || null,
+    has_back_cover: !!r.has_back_cover,
+    back_cover_mime: r.back_cover_image_mime || null,
     created_at: r.created_at,
     updated_at: r.updated_at,
   };
@@ -147,6 +159,20 @@ function getAuthorImage(id) {
   return { image: r.image, mime: r.mime };
 }
 
+function setBackCover(id, buffer, mime) {
+  _stmtSetBackCover.run(buffer, mime, Date.now(), parseInt(id));
+}
+
+function clearBackCover(id) {
+  _stmtClearBackCover.run(Date.now(), parseInt(id));
+}
+
+function getBackCover(id) {
+  const r = _stmtGetBackCover.get(parseInt(id));
+  if (!r || !r.image) return null;
+  return { image: r.image, mime: r.mime };
+}
+
 const _setDefaultTx = db.transaction((bookId, userEmail, id) => {
   const s = _scope(bookId);
   if (s.kind === 'book') _stmtClearDefaultsBook.run(s.bookId, userEmail);
@@ -163,5 +189,6 @@ module.exports = {
   listProfiles, getProfile, createProfile, updateProfile, deleteProfile,
   setCover, clearCover, getCover,
   setAuthorImage, clearAuthorImage, getAuthorImage,
+  setBackCover, clearBackCover, getBackCover,
   setDefault,
 };

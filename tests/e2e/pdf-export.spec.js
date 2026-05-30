@@ -44,8 +44,8 @@ test.describe('pdf-export-card', () => {
     await expect(activeTab).toHaveText(/Layout/);
     await page.locator('.pdfx-tabs .tabs-btn').filter({ hasText: 'Cover' }).click();
     await expect(activeTab).toHaveText(/Cover/);
-    await page.locator('.pdfx-tabs .tabs-btn').filter({ hasText: 'PDF/A' }).click();
-    await expect(activeTab).toHaveText(/PDF\/A/);
+    await page.locator('.pdfx-tabs .tabs-btn').filter({ hasText: 'Norm' }).click();
+    await expect(activeTab).toHaveText(/Norm/);
   });
 
   test('Profil löschen entfernt es aus der Liste', async ({ page }) => {

@@ -14,8 +14,25 @@ const { FORMATS } = require('../lib/export-builders');
 const { buildExportFilename } = require('../lib/filenames');
 const { toIntId } = require('../lib/validate');
 const { setContext } = require('../lib/log-context');
+const { getBookSettings } = require('../db/schema');
+const { getOwnerEmail } = require('../db/book-access');
+const { getUser } = require('../db/app-users');
 
 const router = express.Router();
+
+// Buch-Sprache (book_settings) + Autor (Owner-Anzeigename) fuer die Builder.
+// EPUB/DOCX schreiben dc:language / dc:creator daraus; das Domain-Shape von
+// loadContents fuehrt beides (noch) nicht.
+function _exportMeta(bookId) {
+  if (!bookId) return { lang: 'de', author: '' };
+  const lang = getBookSettings(bookId)?.language || 'de';
+  let author = '';
+  try {
+    const ownerEmail = getOwnerEmail(bookId);
+    if (ownerEmail) author = getUser(ownerEmail)?.display_name || '';
+  } catch { /* Owner/User nicht aufloesbar -> Autor leer */ }
+  return { lang, author };
+}
 
 const VALID_SCOPES = new Set(['book', 'chapter', 'page']);
 
@@ -50,7 +67,7 @@ router.get('/:scope/:id/:fmt', async (req, res) => {
 
   let buf;
   try {
-    buf = await spec.build(bundle, { lang: 'de' });
+    buf = await spec.build(bundle, _exportMeta(bundle.book?.id));
   } catch (e) {
     logger.error(`Export-Build fehlgeschlagen (scope=${scope}, id=${id}, fmt=${fmt}): ${e.message}`);
     return res.status(502).json({ error_code: 'EXPORT_FAILED' });

@@ -51,6 +51,7 @@ export function registerPdfExportCard() {
       headerFooter: false,
       pageStructure: false,
       coverOptions: false,
+      coverSpine: false,
     },
 
     // Pro-Rolle-Akkordeon im Schrift-Tab. `body` default offen, Rest zu.
@@ -93,6 +94,9 @@ export function registerPdfExportCard() {
 
     authorImageUploading: false,
     authorImageError: '',
+
+    backCoverUploading: false,
+    backCoverError: '',
 
     _pollTimer: null,
     _onBookChanged: null,
@@ -230,8 +234,12 @@ export function registerPdfExportCard() {
         this.newProfileName = '';
         this.cloneFromId = null;
         this._showCreate = false;
+        // Neues Profil als aktiv markieren, BEVOR loadProfiles läuft — dann wählt
+        // loadProfiles es direkt aus (ein einziger Form-Mount-Zyklus). Ein
+        // zusätzliches selectProfile danach würde die x-if-Form ein zweites Mal
+        // unmounten/remounten und mit laufenden Klicks racen.
+        this.activeProfileId = profile.id;
         await this.loadProfiles();
-        await this.selectProfile(profile.id);
       } finally {
         this.creating = false;
       }
@@ -349,6 +357,53 @@ export function registerPdfExportCard() {
       return `/pdf-export/profiles/${this.activeProfile.id}/author-image?v=${this.coverPreviewVersion}`;
     },
 
+    // ── Umschlag-Rückseitenbild (separates Cover-PDF) ─────────────────────
+    async uploadBackCover(ev) {
+      const file = ev?.target?.files?.[0];
+      if (!file || !this.activeProfile) return;
+      this.backCoverUploading = true;
+      this.backCoverError = '';
+      try {
+        const r = await fetch(`/pdf-export/profiles/${this.activeProfile.id}/back-cover`, {
+          method: 'POST',
+          headers: { 'Content-Type': file.type || 'application/octet-stream' },
+          body: file,
+        });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          this.backCoverError = window.__app.t('pdfExport.error.backCoverInvalid', d.params);
+          return;
+        }
+        await this.selectProfile(this.activeProfile.id);
+      } finally {
+        this.backCoverUploading = false;
+        ev.target.value = '';
+      }
+    },
+
+    async removeBackCover() {
+      if (!this.activeProfile) return;
+      const r = await fetch(`/pdf-export/profiles/${this.activeProfile.id}/back-cover`, { method: 'DELETE' });
+      if (!r.ok) return;
+      await this.selectProfile(this.activeProfile.id);
+    },
+
+    backCoverUrl() {
+      if (!this.activeProfile?.has_back_cover) return '';
+      return `/pdf-export/profiles/${this.activeProfile.id}/back-cover?v=${this.coverPreviewVersion}`;
+    },
+
+    // Live-Rückenbreite (mm) = Papiervolumen je 1000 Seiten × Seitenzahl / 1000.
+    coverSpineMm() {
+      const cs = this.activeProfile?.config?.coverSpec;
+      if (!cs) return 0;
+      return (Math.max(0, cs.pageCount || 0) * Math.max(0, cs.paperBulkMmPer1000 || 0)) / 1000;
+    },
+    coverSpecReady() {
+      const cs = this.activeProfile?.config?.coverSpec;
+      return !!(cs && cs.pageCount > 0 && cs.paperBulkMmPer1000 > 0);
+    },
+
     // ── Druck-Tab: Trim-Preset anwenden ──────────────────────────────────
     // cm-Label mit '.'-Dezimal (Swiss-konform, locale-unabhängig).
     trimPresetOptions() {
@@ -398,7 +453,8 @@ export function registerPdfExportCard() {
     },
 
     // ── Export-Trigger ────────────────────────────────────────────────────
-    async exportPdf() {
+    // target: 'interior' (Standard) oder 'cover' (separates Umschlag-PDF).
+    async exportPdf(target = 'interior') {
       if (!this.activeProfile) return;
       // Vor Export speichern (Config könnte ungespeichert sein).
       await this.saveActiveProfile();
@@ -410,7 +466,10 @@ export function registerPdfExportCard() {
       this.exportError = '';
       this.exportLowRes = 0;
       try {
-        const ref = this._exportEntity();
+        // Umschlag-PDF immer Buch-scoped; sonst der gewählte Scope.
+        const ref = target === 'cover'
+          ? (window.__app?.selectedBookId ? { scope: 'book', id: parseInt(window.__app.selectedBookId) } : null)
+          : this._exportEntity();
         if (!ref) { this.exportError = window.__app.t('pdfExport.error.startFailed'); this.exporting = false; return; }
         const r = await fetch('/jobs/pdf-export', {
           method: 'POST',
@@ -419,7 +478,8 @@ export function registerPdfExportCard() {
             scope: ref.scope,
             entityId: ref.id,
             profile_id: this.activeProfile.id,
-            ...(ref.scope === 'chapter' ? { include_subchapters: !!this.exportIncludeSubchapters } : {}),
+            target,
+            ...(target === 'interior' && ref.scope === 'chapter' ? { include_subchapters: !!this.exportIncludeSubchapters } : {}),
           }),
         });
         if (!r.ok) {

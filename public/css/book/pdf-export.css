@@ -294,6 +294,16 @@
 .pdfx-author-preview img { object-fit: cover; }
 /* Niedrig-Auflösungs-Warnung nach Export (Druck-Tab / 300-dpi-Check). */
 .pdfx-lowres-warn { color: var(--color-warn-text); }
+/* Separates Umschlag-PDF (Cover-Tab): Live-Rückenbreite + Render-Aktion. */
+.pdfx-spine-width {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.pdfx-cover-spine-actions {
+  margin-top: 0.6rem;
+  display: flex;
+  justify-content: flex-end;
+}
 .pdfx-cover-actions {
   display: flex;
   gap: 0.5rem;

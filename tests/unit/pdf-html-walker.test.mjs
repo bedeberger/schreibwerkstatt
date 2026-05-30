@@ -23,6 +23,26 @@ test('div.poem wird als poem-Block erkannt mit pro-Absatz-Linie', () => {
   assert.equal(blocks[0].lines[0][0].italic, true);
 });
 
+test('div.poem behält Strophen-Trenner (leere Absätze) als leere Zeilen', () => {
+  const blocks = parseHtmlToBlocks(
+    '<div class="poem"><p>Strophe eins A</p><p>Strophe eins B</p><p><br></p><p>Strophe zwei A</p><p>Strophe zwei B</p></div>'
+  );
+  assert.equal(blocks[0].kind, 'poem');
+  assert.equal(blocks[0].lines.length, 5);
+  assert.equal(blocks[0].lines[2].length, 0);
+  assert.equal(blocks[0].lines[3][0].text, 'Strophe zwei A');
+});
+
+test('div.poem kollabiert führende/doppelte/schliessende Leerzeilen', () => {
+  const blocks = parseHtmlToBlocks(
+    '<div class="poem"><p><br></p><p>A</p><p><br></p><p><br></p><p>B</p><p><br></p></div>'
+  );
+  assert.equal(blocks[0].lines.length, 3);
+  assert.equal(blocks[0].lines[0][0].text, 'A');
+  assert.equal(blocks[0].lines[1].length, 0);
+  assert.equal(blocks[0].lines[2][0].text, 'B');
+});
+
 test('Listen mit ordered/unordered + verschachtelte Inline-Styles', () => {
   const blocks = parseHtmlToBlocks('<ol><li>Eins</li><li>Zwei mit <em>kursiv</em></li></ol>');
   assert.equal(blocks[0].kind, 'list');

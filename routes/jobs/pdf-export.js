@@ -16,9 +16,10 @@ const {
   i18nError,
   jsonBody,
 } = require('./shared');
-const { getPdfExportProfile, getPdfExportProfileCover, getPdfExportProfileAuthorImage, getBookSettings } = require('../../db/schema');
+const { getPdfExportProfile, getPdfExportProfileCover, getPdfExportProfileAuthorImage, getPdfExportProfileBackCover, getBookSettings } = require('../../db/schema');
 const { loadContents } = require('../../lib/load-contents');
 const { renderPdfBuffer } = require('../../lib/pdf-render');
+const { renderCoverBuffer, computeSpineMm } = require('../../lib/pdf-cover-render');
 const { validatePdfa } = require('../../lib/pdfa-validate');
 const { convertToPdfX } = require('../../lib/pdfx-convert');
 const { buildExportFilename } = require('../../lib/filenames');
@@ -30,6 +31,7 @@ const logger = require('../../logger');
 const router = express.Router();
 
 const VALID_SCOPES = new Set(['book', 'chapter', 'page']);
+const VALID_TARGETS = new Set(['interior', 'cover']);
 
 // jobId → { buffer, mime, filename }
 const pdfResults = new Map();
@@ -40,7 +42,7 @@ function _scheduleResultCleanup(jobId) {
   t.unref?.();
 }
 
-async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubchapters, userEmail, userToken }) {
+async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubchapters, target = 'interior', userEmail, userToken }) {
   const log = makeJobLogger(jobId);
   const ctrl = jobAbortControllers.get(jobId);
 
@@ -62,31 +64,58 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
 
     if (ctrl?.signal.aborted) throw new Error('job.cancelled');
 
-    let coverBuf = null;
-    if (scope === 'book' && profile.config.cover.enabled && profile.has_cover) {
-      const cover = getPdfExportProfileCover(profileId);
-      if (cover) coverBuf = cover.image;
-    }
-
-    let authorImageBuf = null;
-    if (scope === 'book' && profile.has_author_image) {
-      const ai = getPdfExportProfileAuthorImage(profileId);
-      if (ai) authorImageBuf = ai.image;
-    }
-
     const { language: bookLang } = getBookSettings(book.id, userEmail);
-
     const standard = profile.config.pdfa?.standard || (profile.config.pdfa?.enabled ? 'pdfa' : 'none');
 
-    updateJob(jobId, { progress: 40, statusText: 'job.phase.renderPdf' });
-    const meta = {};
-    let buffer = await renderPdfBuffer({
-      book, groups, profile,
-      coverBuf, authorImageBuf, token: userToken, lang: bookLang,
-      scope, chapter, page, meta,
-    });
-    const lowResImages = Array.isArray(meta.dpiWarnings) ? meta.dpiWarnings.length : 0;
-    if (lowResImages) log.warn(`${lowResImages} Bild(er) unter ${profile.config.print?.dpiWarnThreshold || 300} dpi (scope=${scope})`);
+    let buffer;
+    let lowResImages = 0;
+    let coverInInterior = false;
+
+    if (target === 'cover') {
+      // Separates Umschlag-PDF: nur fuer das ganze Buch sinnvoll.
+      const cs = profile.config.coverSpec || {};
+      if (!(cs.pageCount > 0) || !(cs.paperBulkMmPer1000 > 0)) {
+        throw i18nError('job.error.coverSpecRequired');
+      }
+      let frontImageBuf = null;
+      if (profile.has_cover) {
+        const cover = getPdfExportProfileCover(profileId);
+        if (cover) frontImageBuf = cover.image;
+      }
+      let backImageBuf = null;
+      if (profile.has_back_cover) {
+        const back = getPdfExportProfileBackCover(profileId);
+        if (back) backImageBuf = back.image;
+      }
+      updateJob(jobId, { progress: 40, statusText: 'job.phase.renderCover' });
+      buffer = await renderCoverBuffer({ book, profile, frontImageBuf, backImageBuf, lang: bookLang });
+      log.info(`Umschlag-PDF gerendert (Ruecken=${computeSpineMm(cs).toFixed(1)} mm, ${cs.pageCount} Seiten, profile=${profile.name})`);
+    } else {
+      let coverBuf = null;
+      if (scope === 'book' && profile.config.cover.enabled && profile.has_cover) {
+        const cover = getPdfExportProfileCover(profileId);
+        if (cover) coverBuf = cover.image;
+      }
+
+      let authorImageBuf = null;
+      if (scope === 'book' && profile.has_author_image) {
+        const ai = getPdfExportProfileAuthorImage(profileId);
+        if (ai) authorImageBuf = ai.image;
+      }
+
+      updateJob(jobId, { progress: 40, statusText: 'job.phase.renderPdf' });
+      const meta = {};
+      buffer = await renderPdfBuffer({
+        book, groups, profile,
+        coverBuf, authorImageBuf, token: userToken, lang: bookLang,
+        scope, chapter, page, meta,
+      });
+      lowResImages = Array.isArray(meta.dpiWarnings) ? meta.dpiWarnings.length : 0;
+      if (lowResImages) log.warn(`${lowResImages} Bild(er) unter ${profile.config.print?.dpiWarnThreshold || 300} dpi (scope=${scope})`);
+      // Druckfertiger Innenteil sollte kein Innen-Cover tragen — Hinweis (non-fatal).
+      coverInInterior = !!(scope === 'book' && coverBuf && (profile.config.print?.bleedMm > 0));
+      if (coverInInterior) log.warn(`Innenteil enthaelt Cover trotz Beschnitt — separates Umschlag-PDF empfohlen (job=${jobId})`);
+    }
 
     if (ctrl?.signal.aborted) throw new Error('job.cancelled');
 
@@ -127,7 +156,7 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
 
     const slug = resolveSlug(bundle);
     const filename = buildExportFilename({
-      prefix: scope, slug, ext: 'pdf', date: new Date(),
+      prefix: target === 'cover' ? 'umschlag' : scope, slug, ext: 'pdf', date: new Date(),
     });
 
     pdfResults.set(jobId, { buffer, mime: 'application/pdf', filename });
@@ -146,6 +175,8 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
       filename,
       profileName: profile.name,
       scope,
+      target,
+      coverInInterior,
       lowResImages,
       dpiThreshold: profile.config.print?.dpiWarnThreshold || 0,
       standard,
@@ -179,7 +210,12 @@ router.post('/pdf-export', jsonBody, async (req, res) => {
   const userEmail = req.session?.user?.email || null;
   const userToken = null;
 
-  const rawScope = String(req.body?.scope || 'book').toLowerCase();
+  const rawTarget = String(req.body?.target || 'interior').toLowerCase();
+  const target = VALID_TARGETS.has(rawTarget) ? rawTarget : null;
+  if (!target) return res.status(400).json({ error_code: 'BAD_TARGET' });
+
+  // Umschlag-PDF gibt es nur fuer das ganze Buch.
+  const rawScope = target === 'cover' ? 'book' : String(req.body?.scope || 'book').toLowerCase();
   const scope = VALID_SCOPES.has(rawScope) ? rawScope : null;
   if (!scope) return res.status(400).json({ error_code: 'BAD_SCOPE' });
 
@@ -219,12 +255,12 @@ router.post('/pdf-export', jsonBody, async (req, res) => {
     catch (e) { if (sendACLError(res, e)) return; throw e; }
   }
 
-  const dedupId = `${scope}:${entityId}:${profileId}${includeSubchapters ? ':sub' : ''}`;
+  const dedupId = `${target}:${scope}:${entityId}:${profileId}${includeSubchapters ? ':sub' : ''}`;
   const existing = findActiveJobId('pdf-export', dedupId, userEmail);
   if (existing) return res.json({ jobId: existing, deduplicated: true });
 
   const jobId = createJob('pdf-export', bookId, userEmail, 'job.label.pdfExportProfile', { profile: profile.name }, dedupId);
-  enqueueJob(jobId, () => runPdfExportJob(jobId, { scope, entityId, profileId, includeSubchapters, userEmail, userToken }));
+  enqueueJob(jobId, () => runPdfExportJob(jobId, { scope, entityId, profileId, includeSubchapters, target, userEmail, userToken }));
   res.status(202).json({ jobId });
 });
 
