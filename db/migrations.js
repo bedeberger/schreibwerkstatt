@@ -6886,6 +6886,85 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 165 abgeschlossen (pdf_export_profile.back_cover_image).');
   }
 
+  if (version < 166) {
+    // Buch-weite Publikations-Metadaten (1:1 zu books). Cover/Autorfoto +
+    // Titelei (ISBN/Subtitle/Jahr/Widmung/Impressum/Copyright/Frontmatter/Bio)
+    // werden hier geteilt erfasst und von PDF- UND EPUB-Export gelesen — statt
+    // render-profil-gebunden. Sprache bleibt SSoT in book_settings.language.
+    // EPUB-spezifische Reflow-Toggles (css-Stil, Blocksatz, TOC-Titel) hier mit.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS book_publication (
+        book_id            INTEGER PRIMARY KEY REFERENCES books(book_id) ON DELETE CASCADE,
+        cover_image        BLOB,
+        cover_mime         TEXT,
+        author_image       BLOB,
+        author_image_mime  TEXT,
+        isbn               TEXT,
+        subtitle           TEXT,
+        year               TEXT,
+        dedication         TEXT,
+        imprint            TEXT,
+        copyright          TEXT,
+        frontmatter        TEXT,
+        author_bio         TEXT,
+        epub_css_style     TEXT NOT NULL DEFAULT 'serif',
+        epub_justify       INTEGER NOT NULL DEFAULT 1,
+        epub_toc_title     TEXT,
+        created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      )
+    `);
+
+    // Seed: pro Buch das Gewinner-PDF-Profil (is_default, sonst zuletzt
+    // aktualisiert) → book_publication. Metadaten aus config_json.extras,
+    // Cover/Autorfoto-BLOBs direkt. Verhindert Daten-Doppel beim spaeteren
+    // Umzug des PDF-Render-Lesepfads.
+    const profRows = db.prepare(`
+      SELECT book_id, config_json, cover_image, cover_mime, author_image, author_image_mime,
+             is_default, updated_at
+        FROM pdf_export_profile
+       WHERE book_id IS NOT NULL
+    `).all();
+    const winnerByBook = new Map();
+    for (const r of profRows) {
+      const cur = winnerByBook.get(r.book_id);
+      const better = !cur
+        || (r.is_default && !cur.is_default)
+        || (!!r.is_default === !!cur.is_default && (r.updated_at || 0) > (cur.updated_at || 0));
+      if (better) winnerByBook.set(r.book_id, r);
+    }
+    const insPub = db.prepare(`
+      INSERT INTO book_publication
+        (book_id, cover_image, cover_mime, author_image, author_image_mime,
+         isbn, subtitle, year, dedication, imprint, copyright, frontmatter, author_bio,
+         created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+              strftime('%Y-%m-%dT%H:%M:%fZ','now'), strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      ON CONFLICT(book_id) DO NOTHING
+    `);
+    let seeded = 0;
+    for (const [bookId, r] of winnerByBook) {
+      let ex = {};
+      try { ex = (JSON.parse(r.config_json || '{}').extras) || {}; } catch { ex = {}; }
+      const nn = v => (v && String(v).trim()) ? String(v) : null;
+      insPub.run(
+        bookId,
+        r.cover_image || null, r.cover_mime || null,
+        r.author_image || null, r.author_image_mime || null,
+        nn(ex.isbn), nn(ex.subtitle), nn(ex.year), nn(ex.dedication),
+        nn(ex.imprint), nn(ex.copyright), nn(ex.frontMatter), nn(ex.authorBio),
+      );
+      seeded += 1;
+    }
+
+    const fkErrors166 = db.pragma('foreign_key_check');
+    if (fkErrors166.length) {
+      throw new Error(`Migration 166: foreign_key_check meldet ${fkErrors166.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 166').run();
+    logger.info(`DB-Migration auf Version 166 abgeschlossen (book_publication, ${seeded} Buch/Buecher geseedet).`);
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

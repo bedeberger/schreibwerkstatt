@@ -164,8 +164,8 @@ async function handleMockRoute(req, res, urlPath) {
     const id = ++pdfProfileSeq;
     const profile = {
       id, book_id: payload.book_id || 0, user_email: 'test@x',
-      name: payload.name || 'Profil', config: { layout: { pageSize: 'A4' }, font: {}, chapter: {}, cover: {}, toc: {}, extras: {}, pdfa: {} },
-      is_default: false, has_cover: false,
+      name: payload.name || 'Profil', config: { layout: { pageSize: 'A4' }, font: {}, chapter: {}, cover: {}, toc: {}, extras: {}, print: {}, coverSpec: {}, pdfa: {} },
+      is_default: false, has_cover: false, has_back_cover: false,
     };
     pdfProfiles.push(profile);
     res.writeHead(201, { 'Content-Type': 'application/json' });
@@ -255,13 +255,14 @@ function serveStatic(req, res, urlPath) {
   });
 }
 
-// Connection: close auf jeder Antwort. Verhindert ECONNRESET ("socket hang up"),
-// wenn Playwright's apiRequestContext eine keep-alive Connection wiederverwendet,
-// die der Server nach `keepAliveTimeout` (default 5s) gerade geschlossen hat —
-// passiert reproduzierbar in CI nach längeren Test-Retries.
+// Keep-Alive bleibt aktiv: jede Harness lädt Dutzende ESM-Module, und mit
+// `Connection: close` käme pro Datei ein neuer TCP-Handshake — unter 4 parallelen
+// CI-Workern ein Connection-Storm, der einzelne Requests stallt und `page.goto`
+// (waitUntil 'load' wartet auf alle Subresources) bis zum 60s-Timeout hängt.
+// ECONNRESET ("socket hang up") wird stattdessen über grosszügige Keep-Alive-/
+// Headers-Timeouts vermieden (unten), die länger leben als Playwrights Socket-Reuse.
 const server = http.createServer(async (req, res) => {
   const urlPath = decodeURIComponent(req.url.split('?')[0]);
-  res.setHeader('Connection', 'close');
   try {
     const handled = await handleMockRoute(req, res, urlPath);
     if (!handled) serveStatic(req, res, urlPath);

@@ -522,9 +522,13 @@ export function registerPdfExportCard() {
           this.exportLowRes = result.lowResImages || 0;
           const pdfaWarn = result.pdfa?.requested && result.pdfa.validatorAvailable && !result.pdfa.passed;
           const pdfxWarn = result.pdfx?.requested && !result.pdfx.applied;
-          const isWarning = pdfaWarn || pdfxWarn;
+          const coverWarn = !!result.coverInInterior;
+          const isWarning = pdfaWarn || pdfxWarn || coverWarn;
           this.exportStatus = window.__app.t(
-            pdfxWarn ? 'pdfExport.pdfxWarning' : pdfaWarn ? 'pdfExport.pdfaWarning' : 'pdfExport.done');
+            pdfxWarn ? 'pdfExport.pdfxWarning'
+              : pdfaWarn ? 'pdfExport.pdfaWarning'
+              : coverWarn ? 'pdfExport.coverInInteriorWarning'
+              : 'pdfExport.done');
           this._triggerDownload(jobId, result.filename);
           if (this._exportStatusTimer) clearTimeout(this._exportStatusTimer);
           const ttl = isWarning ? 8000 : 3500;

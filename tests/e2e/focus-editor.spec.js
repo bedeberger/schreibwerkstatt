@@ -31,7 +31,7 @@ async function scrollTop(page) {
 }
 
 test.beforeEach(async ({ page }) => {
-  await page.goto(HARNESS);
+  await page.goto(HARNESS, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.harnessReady === true);
 });
 

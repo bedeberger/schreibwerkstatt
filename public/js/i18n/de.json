@@ -367,6 +367,7 @@
   "pdfExport.done":                        "PDF erstellt – Download startet.",
   "pdfExport.pdfaWarning":                 "PDF erstellt, aber PDF/A-Validator meldet Abweichungen. Datei wurde trotzdem geliefert.",
   "pdfExport.pdfxWarning":                 "PDF erstellt, aber PDF/X-Konvertierung nicht verfügbar (Ghostscript/ICC fehlt). Unkonvertiertes PDF wurde geliefert.",
+  "pdfExport.coverInInteriorWarning":      "PDF erstellt. Hinweis: Der druckfertige Innenteil enthält ein Innen-Cover — für den Druck besser das separate Umschlag-PDF nutzen.",
 
   "pdfExport.tab.layout":                  "Layout",
   "pdfExport.tab.font":                    "Schrift",

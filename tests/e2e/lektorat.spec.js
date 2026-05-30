@@ -5,7 +5,7 @@ const HARNESS = '/tests/fixtures/lektorat-harness.html';
 async function loadHarness(page, scenario) {
   const url = scenario ? `${HARNESS}?scenario=${scenario}` : HARNESS;
   await page.request.post('http://localhost:8765/__mock/reset');
-  await page.goto(url);
+  await page.goto(url, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.harnessReady === true);
 }
 

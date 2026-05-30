@@ -44,7 +44,7 @@ async function clickFirstSquiggle(page) {
 }
 
 test('notebook: squiggle erscheint nach Debounce', async ({ page }) => {
-  await page.goto(HARNESS);
+  await page.goto(HARNESS, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.__harnessReady === true);
   await waitForSquiggles(page);
   const count = await squiggleCount(page);
@@ -52,7 +52,7 @@ test('notebook: squiggle erscheint nach Debounce', async ({ page }) => {
 });
 
 test('notebook: status-badge zeigt match-count', async ({ page }) => {
-  await page.goto(HARNESS);
+  await page.goto(HARNESS, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.__harnessReady === true);
   await page.waitForSelector('.lt-badge[data-state="matches"]', { timeout: 5000 });
   const label = await page.locator('.lt-badge__label').textContent();
@@ -60,7 +60,7 @@ test('notebook: status-badge zeigt match-count', async ({ page }) => {
 });
 
 test('notebook: klick auf squiggle oeffnet popover', async ({ page }) => {
-  await page.goto(HARNESS);
+  await page.goto(HARNESS, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.__harnessReady === true);
   await waitForSquiggles(page);
   await clickFirstSquiggle(page);
@@ -70,7 +70,7 @@ test('notebook: klick auf squiggle oeffnet popover', async ({ page }) => {
 });
 
 test('notebook: replacement-klick ersetzt text', async ({ page }) => {
-  await page.goto(HARNESS);
+  await page.goto(HARNESS, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.__harnessReady === true);
   await waitForSquiggles(page);
   await clickFirstSquiggle(page);

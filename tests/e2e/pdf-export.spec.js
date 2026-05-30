@@ -11,7 +11,7 @@ test.describe.configure({ mode: 'serial' });
 test.describe('pdf-export-card', () => {
   test.beforeEach(async ({ page }) => {
     await page.request.post('http://localhost:8765/__mock/pdf-reset');
-    await page.goto('http://localhost:8765/tests/fixtures/pdf-export-harness.html');
+    await page.goto('http://localhost:8765/tests/fixtures/pdf-export-harness.html', { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => window.__harnessReady === true);
   });
 
@@ -46,6 +46,24 @@ test.describe('pdf-export-card', () => {
     await expect(activeTab).toHaveText(/Cover/);
     await page.locator('.pdfx-tabs .tabs-btn').filter({ hasText: 'Norm' }).click();
     await expect(activeTab).toHaveText(/Norm/);
+  });
+
+  test('Cover-Tab: Umschlag-Sektion berechnet Live-Rückenbreite', async ({ page }) => {
+    await createProfile(page, 'Umschlag');
+    await page.locator('.pdfx-tabs .tabs-btn').filter({ hasText: 'Cover' }).click();
+    // Collapsible "Separates Umschlag-PDF" öffnen.
+    const spine = page.locator('.pdfx-cover-spine');
+    await spine.locator('.collapsible-toggle').click();
+    await expect(spine.locator('.collapsible-section')).toBeVisible();
+    // pageCount + Papiervolumen setzen → Rückenbreite = 200 × 80 / 1000 = 16.0 mm.
+    const nums = spine.locator('.pdfx-num-input');
+    await nums.nth(0).fill('200');
+    await nums.nth(0).press('Tab');
+    await nums.nth(1).fill('80');
+    await nums.nth(1).press('Tab');
+    await expect(spine.locator('.pdfx-spine-width')).toHaveText('16.0 mm');
+    // Render-Button ist erst mit beiden Werten aktiv.
+    await expect(spine.locator('.pdfx-cover-spine-actions button.primary')).toBeEnabled();
   });
 
   test('Profil löschen entfernt es aus der Liste', async ({ page }) => {

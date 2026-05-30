@@ -408,6 +408,7 @@ Ziel: Buch im Modell **internalisieren** (Stil, Welt, Figuren, Fakten, Plot). Da
 **Module:**
 - `routes/jobs/pdf-export.js` — Job-Wrapper, hält PDF-Buffers in `pdfResults`-Map (TTL 2h).
 - `lib/pdf-render.js` — pdfkit-Doc-Lifecycle, Cover, Title-Page, TOC, Kapitel-Loop, Header/Footer-Pass.
+- `lib/pdf-cover-render.js` — separates Umschlag-PDF (Render-Target `target='cover'` in `routes/jobs/pdf-export.js`): ein Bogen Rückseite|Rücken|Vorderseite, Rückenbreite aus `config.coverSpec` (`paperBulkMmPer1000 × pageCount / 1000`), Front=cover_image, Rückseite optional als `back_cover_image`-BLOB + Klappentext + EAN-13, Bleed/Crop/Falzmarken aus dem `print`-Block.
 - `lib/pdf-render/html-walker.js` — linkedom-basiert. Whitelist: h1-h3, p, ul/ol/li, blockquote, pre, hr, img + inline strong/em/u/a. `<div class="poem">` → eigener `poem`-Block. Tabellen werden als Plain-Text-Fallback durchgereicht (kein Layout). Standard-Editor-Markup wird unterstützt.
 - `lib/pdf-export-defaults.js` — `defaultConfig()` + `validateConfig(src)`. Strict: unbekannte Keys werden verworfen, Numerik geclampt, Enums whitelisted.
 - PDF/A-2B-Subset macht pdfkit nativ via `subset: 'PDF/A-2b'` im PDFDocument-Constructor: hängt `pdfaid:part`/`conformance` ans XMP, schreibt OutputIntent mit eingebettetem sRGB-ICC-Profil aus pdfkit's eigenem Bundle (`node_modules/pdfkit/js/data/sRGB_IEC61966_2_1.icc`). **Nicht** manuell via `doc._root.data.Metadata = …` patchen — pdfkit's `endMetadata()` läuft danach und überschreibt die Referenz.

@@ -367,6 +367,7 @@
   "pdfExport.done":                        "PDF ready – download starting.",
   "pdfExport.pdfaWarning":                 "PDF generated, but PDF/A validator reported issues. File was delivered anyway.",
   "pdfExport.pdfxWarning":                 "PDF generated, but PDF/X conversion was unavailable (Ghostscript/ICC missing). Unconverted PDF was delivered.",
+  "pdfExport.coverInInteriorWarning":      "PDF generated. Note: the print-ready interior contains an inner cover — for printing, use the separate cover PDF instead.",
 
   "pdfExport.tab.layout":                  "Layout",
   "pdfExport.tab.font":                    "Fonts",

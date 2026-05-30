@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 165, 88 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 166, 89 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -36,6 +36,7 @@ erDiagram
   books ||--o{ chat_sessions         : has
   books ||--o{ ideen                 : has
   books ||--o{ pdf_export_profile    : has
+  books ||--|| book_publication      : has
   books ||--o{ user_page_usage       : has
   books ||--o{ book_access           : has
   books ||--o{ book_share_invites    : has
@@ -1029,6 +1030,26 @@ erDiagram
     INTEGER is_default
     INTEGER created_at
     INTEGER updated_at
+  }
+  book_publication {
+    INTEGER book_id           PK,FK "1:1 books"
+    BLOB    cover_image
+    TEXT    cover_mime
+    BLOB    author_image
+    TEXT    author_image_mime
+    TEXT    isbn
+    TEXT    subtitle
+    TEXT    year
+    TEXT    dedication
+    TEXT    imprint
+    TEXT    copyright
+    TEXT    frontmatter
+    TEXT    author_bio
+    TEXT    epub_css_style "serif|sans"
+    INTEGER epub_justify   "0|1"
+    TEXT    epub_toc_title
+    TEXT    created_at
+    TEXT    updated_at
   }
   font_cache {
     TEXT    family    PK

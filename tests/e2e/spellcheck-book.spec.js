@@ -23,20 +23,20 @@ async function waitForSquiggles(page, timeout = 5000) {
 }
 
 test('book: badge traegt data-editor=book', async ({ page }) => {
-  await page.goto(HARNESS);
+  await page.goto(HARNESS, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.__harnessReady === true);
   await page.waitForSelector('.lt-badge[data-editor="book"]');
 });
 
 test('book: matches sichtbar nach Initial-Check', async ({ page }) => {
-  await page.goto(HARNESS);
+  await page.goto(HARNESS, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.__harnessReady === true);
   await waitForSquiggles(page);
   expect(await squiggleCount(page)).toBeGreaterThan(0);
 });
 
 test('book: status-badge erscheint', async ({ page }) => {
-  await page.goto(HARNESS);
+  await page.goto(HARNESS, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.__harnessReady === true);
   await page.waitForSelector('.lt-badge[data-editor="book"]');
   const state = await page.locator('.lt-badge').first().getAttribute('data-state');

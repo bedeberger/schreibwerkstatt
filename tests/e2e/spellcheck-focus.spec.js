@@ -38,14 +38,14 @@ async function clickFirstSquiggle(page) {
 }
 
 test('focus: squiggle erscheint, badge sichtbar', async ({ page }) => {
-  await page.goto(HARNESS);
+  await page.goto(HARNESS, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.__harnessReady === true);
   await waitForSquiggles(page);
   await page.waitForSelector('.lt-badge[data-editor="focus"]');
 });
 
 test('focus: ignore entfernt squiggle bis zur naechsten Pruefung', async ({ page }) => {
-  await page.goto(HARNESS);
+  await page.goto(HARNESS, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.__harnessReady === true);
   await waitForSquiggles(page);
   const initial = await squiggleCount(page);
@@ -56,7 +56,7 @@ test('focus: ignore entfernt squiggle bis zur naechsten Pruefung', async ({ page
 });
 
 test('focus: detach raeumt highlights + badge', async ({ page }) => {
-  await page.goto(HARNESS);
+  await page.goto(HARNESS, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.__harnessReady === true);
   await waitForSquiggles(page);
   await page.evaluate(() => window.__spellcheckCtl.detach());

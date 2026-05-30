@@ -12,7 +12,7 @@ const HARNESS = '/tests/fixtures/block-merge-harness.html';
 const BASE = '<p data-bid="aaaaaaaa">Absatz eins.</p><p data-bid="bbbbbbbb">Absatz zwei.</p><p data-bid="cccccccc">Absatz drei.</p>';
 
 test.beforeEach(async ({ page }) => {
-  await page.goto(HARNESS);
+  await page.goto(HARNESS, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.harnessReady === true);
 });
 
