@@ -8,6 +8,21 @@
   <div class="folder-import-body" x-show="!jobId">
     <div class="folder-import-mode">
       <label class="folder-import-radio">
+        <input type="radio" value="diary" x-model="importKind">
+        <span x-text="$app.t('folderImport.kind.diary')"></span>
+      </label>
+      <label class="folder-import-radio">
+        <input type="radio" value="swbook" x-model="importKind">
+        <span x-text="$app.t('folderImport.kind.swbook')"></span>
+      </label>
+    </div>
+
+    <div class="folder-import-field" x-show="importKind === 'swbook'">
+      <div class="folder-import-merge-info" x-text="$app.t('folderImport.swbookHint')"></div>
+    </div>
+
+    <div class="folder-import-mode" x-show="importKind === 'diary'">
+      <label class="folder-import-radio">
         <input type="radio" value="new-book" x-model="mode">
         <span x-text="$app.t('folderImport.mode.newBook')"></span>
       </label>
@@ -17,13 +32,13 @@
       </label>
     </div>
 
-    <div class="folder-import-field" x-show="mode === 'new-book'">
+    <div class="folder-import-field" x-show="importKind === 'diary' && mode === 'new-book'">
       <label class="folder-import-label" x-text="$app.t('folderImport.bookName')"></label>
       <input type="text" class="folder-import-input" x-model="bookName"
              :placeholder="$app.t('folderImport.bookNamePlaceholder')">
     </div>
 
-    <div class="folder-import-field" x-show="mode === 'merge'">
+    <div class="folder-import-field" x-show="importKind === 'diary' && mode === 'merge'">
       <div class="folder-import-merge-info" x-text="$app.t('folderImport.mergeInto', { name: $app.selectedBookName || '' })"></div>
     </div>
 
@@ -32,7 +47,7 @@
          @dragover.prevent="dragOver = true"
          @dragleave.prevent="dragOver = false"
          @drop="onDrop($event)">
-      <input type="file" accept=".zip,application/zip" id="folder-import-file"
+      <input type="file" :accept="importKind === 'swbook' ? '.swbook,.zip,application/zip' : '.zip,application/zip'" id="folder-import-file"
              class="folder-import-file-input" @change="onFilePick($event)">
       <label for="folder-import-file" class="folder-import-drop-label">
         <div class="folder-import-drop-text" x-show="!file" x-text="$app.t('folderImport.dropZone')"></div>
@@ -51,7 +66,7 @@
 
     <div class="folder-import-error" x-show="errorMessage" x-text="errorMessage"></div>
 
-    <div class="folder-import-help">
+    <div class="folder-import-help" x-show="importKind === 'diary'">
       <p x-text="$app.t('folderImport.help.line1')"></p>
       <ul>
         <li x-text="$app.t('folderImport.help.struct')"></li>

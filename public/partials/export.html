@@ -43,6 +43,19 @@
             x-text="$app.t('book.export.pdfCustom')"></button>
   </div>
 
+  <div class="book-export-migration">
+    <label class="book-export-scope-label" x-text="$app.t('book.export.migrationTitle')"></label>
+    <p class="book-export-hint" x-text="$app.t('book.export.migrationHint')"></p>
+    <button type="button"
+            :class="{ 'is-running': bookExportLoading === 'swbook' }"
+            :disabled="!!bookExportLoading || !$app.selectedBookId"
+            @click="migrateExport()">
+      <span x-show="bookExportLoading === 'swbook'" class="spinner"></span>
+      <svg x-show="bookExportLoading !== 'swbook'" class="icon" aria-hidden="true"><use href="/icons.svg?v=636#download"/></svg>
+      <span x-text="$app.t('book.export.swbook')"></span>
+    </button>
+  </div>
+
   <div class="card-status"
        x-show="bookExportLoading"
        x-text="$app.t('book.export.running', { fmt: (bookExportLoading || '').toUpperCase() })"></div>

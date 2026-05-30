@@ -9,6 +9,7 @@ import { tzOpts, localeTag } from '../utils.js';
 export function registerFolderImportCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
   window.Alpine.data('folderImportCard', () => ({
+    importKind: 'diary', // 'diary' = Tagebuch-ZIP (YYYY/Monat), 'swbook' = Buch-Migration
     mode: 'new-book',
     bookName: '',
     file: null,
@@ -76,7 +77,9 @@ export function registerFolderImportCard() {
     },
 
     setFile(f) {
-      const ok = /\.zip$/i.test(f.name) || f.type === 'application/zip' || f.type === 'application/x-zip-compressed';
+      const isZip = /\.zip$/i.test(f.name) || f.type === 'application/zip' || f.type === 'application/x-zip-compressed';
+      const isSwbook = /\.swbook$/i.test(f.name);
+      const ok = this.importKind === 'swbook' ? (isSwbook || isZip) : isZip;
       if (!ok) {
         this.errorMessage = window.__app.t('folderImport.error.notZip');
         return;
@@ -89,6 +92,7 @@ export function registerFolderImportCard() {
 
     get canSubmit() {
       if (!this.file || this.busy) return false;
+      if (this.importKind === 'swbook') return true; // Buch-Name + Owner kommen aus dem Bundle
       if (this.mode === 'new-book' && !this.bookName.trim()) return false;
       if (this.mode === 'merge' && !window.__app.selectedBookId) return false;
       return true;
@@ -115,13 +119,19 @@ export function registerFolderImportCard() {
       this.busy = true;
       this.errorMessage = '';
       this.result = null;
-      const params = new URLSearchParams();
-      params.set('mode', this.mode);
-      if (this.mode === 'new-book') params.set('book_name', this.bookName.trim());
-      else params.set('book_id', String(window.__app.selectedBookId));
+      let url;
+      if (this.importKind === 'swbook') {
+        url = '/jobs/book-import';
+      } else {
+        const params = new URLSearchParams();
+        params.set('mode', this.mode);
+        if (this.mode === 'new-book') params.set('book_name', this.bookName.trim());
+        else params.set('book_id', String(window.__app.selectedBookId));
+        url = '/jobs/folder-import?' + params.toString();
+      }
       try {
         const buf = await this.file.arrayBuffer();
-        const resp = await fetch('/jobs/folder-import?' + params.toString(), {
+        const resp = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/zip' },
           body: buf,

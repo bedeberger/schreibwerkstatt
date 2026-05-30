@@ -15,24 +15,52 @@ export const exportMethods = {
         try { data = await r.json(); } catch (_) {}
         throw new Error(data ? window.__app.tError(data) : `HTTP ${r.status}`);
       }
-      const cd = r.headers.get('content-disposition') || '';
-      const m = /filename="?([^";]+)"?/i.exec(cd);
-      const filename = m ? m[1] : `${ref.scope}.${fmt}`;
-      const blob = await r.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = filename;
-      a.rel = 'noopener';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
+      await this._downloadResponse(r, `${ref.scope}.${fmt}`);
     } catch (e) {
       this.bookExportError = e.message || String(e);
     } finally {
       this.bookExportLoading = null;
     }
+  },
+
+  // Buch-Migration: ganzes Buch als `.swbook`-Bundle (ZIP) fuer Umzug auf eine
+  // andere Instanz. Reiner book-scope (kein Kapitel/Seite). Re-Import via
+  // folder-import-Card (Modus „Schreibwerkstatt-Buch").
+  async migrateExport() {
+    const app = window.__app;
+    const bid = app?.selectedBookId;
+    if (!bid || this.bookExportLoading) return;
+    this.bookExportLoading = 'swbook';
+    this.bookExportError = '';
+    try {
+      const r = await fetch(`/book-migration/${encodeURIComponent(bid)}`);
+      if (!r.ok) {
+        let data = null;
+        try { data = await r.json(); } catch (_) {}
+        throw new Error(data ? app.tError(data) : `HTTP ${r.status}`);
+      }
+      await this._downloadResponse(r, `book-${bid}.swbook`);
+    } catch (e) {
+      this.bookExportError = e.message || String(e);
+    } finally {
+      this.bookExportLoading = null;
+    }
+  },
+
+  async _downloadResponse(r, fallbackName) {
+    const cd = r.headers.get('content-disposition') || '';
+    const m = /filename="?([^";]+)"?/i.exec(cd);
+    const filename = m ? m[1] : fallbackName;
+    const blob = await r.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = filename;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
   },
 
   _exportEntity() {

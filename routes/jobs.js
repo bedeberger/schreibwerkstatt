@@ -14,6 +14,7 @@ const { finetuneExportRouter } = require('./jobs/finetune-export');
 const { pdfExportRouter } = require('./jobs/pdf-export');
 const { figurWerkstattRouter } = require('./jobs/figur-werkstatt');
 const { folderImportRouter } = require('./jobs/folder-import');
+const { bookImportRouter } = require('./jobs/book-import');
 const { blogSyncRouter } = require('./jobs/blog-sync');
 const { hubspotSyncRouter } = require('./jobs/hubspot-sync');
 
@@ -38,6 +39,7 @@ router.use('/', finetuneExportRouter);
 router.use('/', pdfExportRouter);
 router.use('/', figurWerkstattRouter);
 router.use('/', folderImportRouter);
+router.use('/', bookImportRouter);
 router.use('/', blogSyncRouter);
 router.use('/', hubspotSyncRouter);
 router.use('/', sharedRouter);
