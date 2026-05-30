@@ -108,7 +108,7 @@ export const orteMapMethods = {
         return `<button type="button" class="ort-popup__chip" data-fig="${esc(id)}">${esc(label)}</button>`;
       }).join('') + `</div>`;
     }
-    const kapNames = [...new Set((o.kapitel || []).map((k) => k.name).filter(Boolean))];
+    const kapNames = [...new Set((o.kapitel || []).map((k) => (k.name || '').trim()).filter(Boolean))];
     if (kapNames.length) {
       h += `<div class="ort-popup__row">` + kapNames.map((name) =>
         `<button type="button" class="ort-popup__chip" data-kap="${esc(name)}">${esc(name)}</button>`
