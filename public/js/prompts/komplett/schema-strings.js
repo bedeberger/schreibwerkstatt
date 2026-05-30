@@ -146,8 +146,8 @@ export const PROBLEME_SCHEMA = `{
       "schwere": "kritisch|mittel|niedrig",
       "typ": "figur|zeitlinie|ort|objekt|verhalten|soziolekt|sonstiges",
       "beschreibung": "Was genau widerspricht sich (1-2 Sätze)",
-      "stelle_a": "Erste Textstelle (Kapitel: Seite oder Abschnitt)",
-      "stelle_b": "Zweite Textstelle (Kapitel: Seite oder Abschnitt)",
+      "stelle_a": "Kapitel + wörtliches Zitat (5-15 Wörter) der widersprechenden Aussage",
+      "stelle_b": "Kapitel + wörtliches Zitat (5-15 Wörter) der Gegen-Aussage",
       "figuren": ["Name der direkt betroffenen Figur"],
       "kapitel": ["Exakter Kapitelname A", "Exakter Kapitelname B"],
       "empfehlung": "Wie könnte das aufgelöst werden (1 Satz)"
@@ -156,7 +156,20 @@ export const PROBLEME_SCHEMA = `{
   "zusammenfassung": "Gesamteinschätzung der Konsistenz des Buchs in 2-3 Sätzen"
 }`;
 
-export const PROBLEME_RULES = `Regeln:
+export const PROBLEME_RULES = `Beispiel eines korrekten Eintrags:
+{
+  "schwere": "kritisch",
+  "typ": "figur",
+  "beschreibung": "Marek stirbt im Bombenangriff, taucht zwei Kapitel später lebend auf.",
+  "stelle_a": "Kapitel 3: «Marek lag reglos unter den Trümmern»",
+  "stelle_b": "Kapitel 5: «Marek öffnete die Tür und lachte»",
+  "figuren": ["Marek"],
+  "kapitel": ["Kapitel 3", "Kapitel 5"],
+  "empfehlung": "Tod in Kapitel 3 abschwächen oder Rückkehr im Text erklären."
+}
+
+Regeln:
+- Zitat-Pflicht: «stelle_a» UND «stelle_b» MÜSSEN je die konkrete widersprechende Aussage belegen (5-15 Wörter, in «»). Liegt dir der Buchtext vor, zitiere wörtlich aus dem Text; liegen dir nur extrahierte Fakten vor, zitiere die betreffende Fakt-Aussage. Kannst du für eine der beiden Stellen keinen solchen Beleg angeben, melde den Widerspruch NICHT. Keine erfundenen Stellen.
 - Reasoning-First: «_reasoning» MUSS das erste Feld im JSON-Output sein. Denke dort schrittweise nach, BEVOR du «probleme» befüllst. Reihenfolge der Schritte: (1) Fakten, (2) paarweise Vergleiche, (3) verworfene Kandidaten mit Grund, (4) bestätigte Widersprüche. Knapp halten, Stichpunkte reichen.
 - «probleme» enthält NUR die im _reasoning unter (4) bestätigten Widersprüche – jeden verworfenen Kandidaten lässt du weg, NIE als Eintrag mit «Eintrag entfernen»-Empfehlung.
 - Nur echte Widersprüche – keine stilistischen oder inhaltlichen Anmerkungen

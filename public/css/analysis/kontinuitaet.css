@@ -71,6 +71,54 @@
   color: var(--color-text);
 }
 
+/* ── Erledigt-Status ─────────────────────────────────────────────────────────
+   Gültig bis zur nächsten Komplettanalyse. Erledigte Zeilen gedimmt + ans Ende
+   sortiert (Sortierung in kontinuitaet.js). */
+.entity-row--resolved {
+  opacity: var(--opacity-disabled);
+}
+.entity-row--resolved .kontinuitaet-row-stellen,
+.entity-row--resolved .entity-typ-tag {
+  text-decoration: line-through;
+}
+.kontinuitaet-resolved-badge {
+  flex-shrink: 0;
+  padding: var(--pad-badge);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  background: var(--color-ok-bg);
+  color: var(--color-ok-text);
+  border: 1px solid var(--color-ok-border);
+  white-space: nowrap;
+}
+.kontinuitaet-detail-actions {
+  margin-top: 0.6rem;
+  display: flex;
+  gap: var(--space-sm);
+}
+.kontinuitaet-resolve-btn {
+  padding: var(--space-6) 12px;
+  font-size: var(--font-size-mini);
+  font-weight: 500;
+  border: 1px solid var(--color-ok-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-ok-text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.kontinuitaet-resolve-btn:hover {
+  background: var(--color-ok-bg);
+}
+.kontinuitaet-resolve-btn--done {
+  border-color: var(--color-border);
+  color: var(--color-muted);
+}
+.kontinuitaet-resolve-btn--done:hover {
+  background: var(--color-hover);
+}
+
 /* ── Buch-Einstellungen (spezifische Klassen) ───────────────────────────────────
    Generische Form-Klassen .card-form-grid / -row / -label / -field / -hint /
    -section-divider / -saved / -error / -textarea leben in card-form.css. */

@@ -93,7 +93,7 @@
         <template x-for="(issue, i) in kontinuitaetIssuesSorted()" :key="kontinuitaetIssueKey(issue, i)">
           <div>
             <div class="entity-row"
-                 :class="{ 'entity-row--selected': selectedKontinuitaetIssueKey === kontinuitaetIssueKey(issue, i) }"
+                 :class="{ 'entity-row--selected': selectedKontinuitaetIssueKey === kontinuitaetIssueKey(issue, i), 'entity-row--resolved': issue.resolved }"
                  @click="selectedKontinuitaetIssueKey = selectedKontinuitaetIssueKey === kontinuitaetIssueKey(issue, i) ? null : kontinuitaetIssueKey(issue, i)">
               <span class="severity-tag"
                     :class="'severity-tag--' + (issue.schwere || 'niedrig')"
@@ -118,6 +118,7 @@
                   <span class="kapitel-badge kapitel-badge--secondary" x-text="issue.stelle_b"></span>
                 </template>
               </span>
+              <span x-show="issue.resolved" class="kontinuitaet-resolved-badge" x-text="$app.t('kontinuitaet.resolved')"></span>
               <span class="history-chevron" :class="{ open: selectedKontinuitaetIssueKey === kontinuitaetIssueKey(issue, i) }">›</span>
             </div>
             <div x-show="selectedKontinuitaetIssueKey === kontinuitaetIssueKey(issue, i)" class="entity-detail" x-cloak>
@@ -125,6 +126,12 @@
               <div x-show="issue.empfehlung" class="entity-meta-row kontinuitaet-empfehlung">
                 <span class="entity-meta-label kontinuitaet-empfehlung-label" x-text="$app.t('kontinuitaet.empfehlung')"></span>
                 <span class="entity-meta-value kontinuitaet-empfehlung-value" x-text="issue.empfehlung"></span>
+              </div>
+              <div class="kontinuitaet-detail-actions">
+                <button type="button" class="kontinuitaet-resolve-btn"
+                        :class="{ 'kontinuitaet-resolve-btn--done': issue.resolved }"
+                        @click.stop="kontinuitaetToggleResolved(issue)"
+                        x-text="issue.resolved ? $app.t('kontinuitaet.markOpen') : $app.t('kontinuitaet.markResolved')"></button>
               </div>
             </div>
           </div>

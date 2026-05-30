@@ -95,6 +95,34 @@ ${PROBLEME_SCHEMA}
 ${PROBLEME_RULES}`;
 }
 
+// Verify-Stufe für den Multi-Pass-Check: Der Fakten-basierte Check (buildKontinuitaetCheckPrompt)
+// sieht nur extrahierte Fakten, nicht den Volltext – auflösender Kontext (Rückblende, Ironie,
+// Konjunktiv, indirekte Rede) ist dort bereits weg und erzeugt systematisch False-Positives.
+// Diese Stufe lädt pro gemeldetem Problem die Original-Textstellen nach und lässt das Modell
+// den Widerspruch mit echtem Kontext bestätigen oder verwerfen. Single-Pass braucht das nicht
+// (hat den Volltext bereits beim Check).
+export function buildKontinuitaetVerifyPrompt(bookName, problem, excerptA, excerptB) {
+  return `Im Buch «${bookName}» wurde ein möglicher Kontinuitätsfehler gemeldet – auf Basis extrahierter Fakten, OHNE Originaltext. Prüfe anhand der echten Textstellen, ob der Widerspruch WIRKLICH besteht.
+
+Gemeldeter Widerspruch (${problem.typ || 'sonstiges'}): ${problem.beschreibung || ''}
+Stelle A: ${problem.stelle_a || ''}
+Stelle B: ${problem.stelle_b || ''}
+
+## Originaltext rund um Stelle A
+${excerptA || '(im Text nicht gefunden)'}
+
+## Originaltext rund um Stelle B
+${excerptB || '(im Text nicht gefunden)'}
+
+Berücksichtige auflösenden Kontext, der in reinen Fakten verloren geht: Rückblende/Vorausblende, Traum/Vorstellung/Wunsch, Ironie/Sarkasmus, Konjunktiv/Hypothese («hätte», «wäre»), indirekte oder zitierte Rede, unzuverlässiger Erzähler, zwei verschiedene Figuren mit ähnlichem Namen, bewusste erzählerische Wiederholung. Löst der Kontext den scheinbaren Widerspruch auf, ist es KEIN echter Fehler (bestaetigt=false). Im Zweifel – wenn der Kontext den Widerspruch nicht klar auflöst – bestaetigt=true.
+
+Antworte mit diesem JSON-Schema:
+{
+  "bestaetigt": true,
+  "grund": "1 Satz: warum der Widerspruch echt ist bzw. durch welchen Kontext er sich auflöst"
+}`;
+}
+
 export function buildKontinuitaetSinglePassPrompt(bookName, bookText, figurenKompakt, orteKompakt, { erzaehlperspektive = null, erzaehlzeit = null, buchtyp = null } = {}) {
   const figurenStr = figurenKompakt && figurenKompakt.length
     ? '\n\n## Bekannte Figuren\n' + figurenKompakt.map(f => `${f.name} (${f.typ || ''}): ${f.beschreibung || ''}`).join('\n')

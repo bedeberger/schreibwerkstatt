@@ -37,6 +37,7 @@ export {
 export {
   buildKontinuitaetChapterFactsPrompt,
   buildKontinuitaetCheckPrompt,
+  buildKontinuitaetVerifyPrompt,
   buildKontinuitaetSinglePassPrompt,
 } from './komplett/kontinuitaet.js';
 
@@ -54,4 +55,5 @@ export {
   SCHEMA_ZEITSTRAHL,
   SCHEMA_KONTINUITAET_FAKTEN,
   SCHEMA_KONTINUITAET_PROBLEME,
+  SCHEMA_KONTINUITAET_VERIFY,
 } from './komplett/schemas.js';

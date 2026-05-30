@@ -136,6 +136,10 @@ export const kontinuitaetMethods = {
     const order = { kritisch: 0, mittel: 1, niedrig: 2 };
     const list = this.kontinuitaetIssuesFiltered().slice();
     list.sort((a, b) => {
+      // Erledigte ans Ende, danach nach Schwere.
+      const ra = a.resolved ? 1 : 0;
+      const rb = b.resolved ? 1 : 0;
+      if (ra !== rb) return ra - rb;
       const sa = order[a.schwere || 'niedrig'] ?? 2;
       const sb = order[b.schwere || 'niedrig'] ?? 2;
       return sa - sb;
@@ -143,9 +147,34 @@ export const kontinuitaetMethods = {
     return list;
   },
 
-  // Stable-ish key für Selektion (issues haben keine ID).
+  // Selektions-/Render-Key: bevorzugt die DB-Issue-ID (stabil bis zum nächsten
+  // Komplettanalyse-Lauf), Fallback auf Komposit für Alt-Antworten ohne ID.
   kontinuitaetIssueKey(issue, i) {
+    if (issue?.id != null) return 'id:' + issue.id;
     return (issue.typ || '') + '|' + (issue.stelle_a || '') + '|' + (issue.stelle_b || '') + '|' + i;
+  },
+
+  // Erledigt-Status umschalten. Optimistisch + Rollback bei Fehler. Gültig bis
+  // zur nächsten Komplettanalyse (frische Issue-Zeilen, resolved=0).
+  async kontinuitaetToggleResolved(issue) {
+    if (!issue || issue.id == null) return;
+    const next = !issue.resolved;
+    issue.resolved = next;
+    try {
+      await fetchJson('/jobs/kontinuitaet/issue/' + issue.id + '/resolved', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resolved: next }),
+      });
+    } catch (e) {
+      issue.resolved = !next;
+      console.error('[kontinuitaetToggleResolved]', e);
+    }
+  },
+
+  // Anzahl noch offener (nicht erledigter) Issues im aktuellen Check.
+  kontinuitaetOpenCount() {
+    return (this.kontinuitaetResult?.issues || []).filter(i => !i.resolved).length;
   },
 
   kontinuitaetIssuesBySchwere() {

@@ -1196,6 +1196,9 @@
   "kontinuitaet.severity.niedrig":  "Niedrig",
   "kontinuitaet.summary":           "Zusammenfassung",
   "kontinuitaet.empfehlung":        "Empfehlung:",
+  "kontinuitaet.resolved":          "Erledigt",
+  "kontinuitaet.markResolved":      "Als erledigt markieren",
+  "kontinuitaet.markOpen":          "Wieder öffnen",
 
   "bookstats.title":             "Buchentwicklung",
   "bookstats.lastSnapshot":      "Letzter Snapshot: {date}",
@@ -2027,6 +2030,7 @@
   "job.phase.resumeFacts":           "Setze Fakten-Extraktion fort ({current}/{total})…",
   "job.phase.factsInGroup":          "Fakten in «{name}» ({current}/{total})…",
   "job.phase.checkContradictions":   "KI prüft Widersprüche…",
+  "job.phase.verifyContradictions":  "KI verifiziert Widersprüche am Originaltext…",
   "job.phase.loadingPageContent":    "Lade Seiteninhalt…",
   "job.phase.aiAnalyzing":           "KI analysiert…",
   "job.phase.pageProgress":          "{current}/{total}: {name}…",

@@ -833,7 +833,7 @@ function getLatestContinuityCheck(bookId, userEmail) {
   `).get(bookIdInt, email);
   if (!row) return null;
   const issueRows = db.prepare(`
-    SELECT id, schwere, typ, beschreibung, stelle_a, stelle_b, empfehlung
+    SELECT id, schwere, typ, beschreibung, stelle_a, stelle_b, empfehlung, resolved
     FROM continuity_issues
     WHERE check_id = ?
     ORDER BY sort_order, id
@@ -867,6 +867,8 @@ function getLatestContinuityCheck(bookId, userEmail) {
     if (r.chapter_id != null) bucket.chapter_ids.push(r.chapter_id);
   }
   const issues = issueRows.map(r => ({
+    id: r.id,
+    resolved: !!r.resolved,
     schwere: r.schwere, typ: r.typ, beschreibung: r.beschreibung,
     stelle_a: r.stelle_a, stelle_b: r.stelle_b, empfehlung: r.empfehlung,
     figuren: figByIssue.get(r.id)?.figuren || [],
@@ -875,6 +877,26 @@ function getLatestContinuityCheck(bookId, userEmail) {
     chapter_ids: chByIssue.get(r.id)?.chapter_ids || [],
   }));
   return { id: row.id, checked_at: row.checked_at, issues, summary: row.summary, model: row.model };
+}
+
+/** book_id eines Issues (fuer ACL/Log-Context vor der Mutation). null wenn unbekannt. */
+function getContinuityIssueBookId(issueId) {
+  const id = parseInt(issueId);
+  if (!id) return null;
+  const row = db.prepare('SELECT book_id FROM continuity_issues WHERE id = ?').get(id);
+  return row ? row.book_id : null;
+}
+
+/** Setzt das resolved-Flag eines Kontinuitaets-Issues. resolved_at = jetzt bzw.
+ *  null beim Wiederoeffnen. Gibt true zurueck, wenn eine Zeile betroffen war. */
+function setContinuityIssueResolved(issueId, resolved) {
+  const id = parseInt(issueId);
+  if (!id) return false;
+  const now = resolved ? new Date().toISOString() : null;
+  const info = db.prepare(
+    'UPDATE continuity_issues SET resolved = ?, resolved_at = ? WHERE id = ?'
+  ).run(resolved ? 1 : 0, now, id);
+  return info.changes > 0;
 }
 
 // ── Musik (Songs) ────────────────────────────────────────────────────────────
@@ -1032,6 +1054,8 @@ module.exports = {
   backfillLocationChaptersFromScenes,
   saveContinuityCheck,
   getLatestContinuityCheck,
+  getContinuityIssueBookId,
+  setContinuityIssueResolved,
   saveCheckpoint, loadCheckpoint, deleteCheckpoint,
   insertJobRun, startJobRun, endJobRun, cleanupStuckJobRuns,
   getDailyTokenUsage:    tokenUsage.getDailyTokenUsage,

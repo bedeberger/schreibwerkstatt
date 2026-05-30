@@ -6698,6 +6698,27 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 157 abgeschlossen (book_settings.entities_enabled).');
   }
 
+  if (version < 158) {
+    // Kontinuitaets-Issues als "erledigt" markierbar. Gueltig bis zur naechsten
+    // Komplettanalyse: jeder Lauf legt frische continuity_issues-Zeilen mit
+    // resolved=0 an und nur der juengste Check wird angezeigt -> Status resettet
+    // automatisch, ohne Issue-Matching ueber Laeufe hinweg.
+    const ciCols158 = db.pragma('table_info(continuity_issues)').map(c => c.name);
+    if (!ciCols158.includes('resolved')) {
+      db.prepare('ALTER TABLE continuity_issues ADD COLUMN resolved INTEGER NOT NULL DEFAULT 0').run();
+    }
+    if (!ciCols158.includes('resolved_at')) {
+      db.prepare('ALTER TABLE continuity_issues ADD COLUMN resolved_at TEXT').run();
+    }
+
+    const fkErrors158 = db.pragma('foreign_key_check');
+    if (fkErrors158.length) {
+      throw new Error(`Migration 158: foreign_key_check meldet ${fkErrors158.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 158').run();
+    logger.info('DB-Migration auf Version 158 abgeschlossen (continuity_issues.resolved).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

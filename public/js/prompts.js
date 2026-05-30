@@ -119,6 +119,7 @@ export {
   buildSongsConsolidationPrompt,
   buildKontinuitaetChapterFactsPrompt,
   buildKontinuitaetCheckPrompt,
+  buildKontinuitaetVerifyPrompt,
   buildKontinuitaetSinglePassPrompt,
   SCHEMA_KOMPLETT_EXTRAKTION,
   SCHEMA_KOMPLETT_FIGUREN_PASS,
@@ -132,6 +133,7 @@ export {
   SCHEMA_ZEITSTRAHL,
   SCHEMA_KONTINUITAET_FAKTEN,
   SCHEMA_KONTINUITAET_PROBLEME,
+  SCHEMA_KONTINUITAET_VERIFY,
 } from './prompts/komplett.js';
 
 export {

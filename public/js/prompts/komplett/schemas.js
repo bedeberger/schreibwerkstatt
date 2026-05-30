@@ -232,6 +232,12 @@ export const SCHEMA_KONTINUITAET_FAKTEN = _obj({
   fakten: { type: 'array', items: _faktSchema },
 });
 
+// Verify-Stufe: pro gemeldetem Multi-Pass-Problem die Bestätigung mit Originaltext.
+export const SCHEMA_KONTINUITAET_VERIFY = _obj({
+  bestaetigt: { type: 'boolean' },
+  grund: _str,
+});
+
 export const SCHEMA_KONTINUITAET_PROBLEME = _obj({
   probleme: {
     type: 'array',

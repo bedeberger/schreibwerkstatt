@@ -27,6 +27,72 @@ const {
   buildPrelimFigurenKompakt, runPhase3OrteCall,
 } = require('./phases');
 
+// ── Verify-Stufe für den Multi-Pass-Kontinuitätscheck ────────────────────────
+// Der Fakten-basierte Check sieht nur extrahierte Fakten, nicht den Volltext –
+// auflösender Kontext (Rückblende, Ironie, Konjunktiv, indirekte Rede) ist dort
+// schon weg und erzeugt systematisch False-Positives. Pro gemeldetem Problem
+// laden wir die Original-Textstellen nach und lassen das Modell den Widerspruch
+// mit echtem Kontext bestätigen oder verwerfen. Single-Pass braucht das nicht
+// (hat den Volltext bereits beim Check).
+const _VERIFY_RADIUS = 1500;
+
+function _stelleQuote(stelle) {
+  const m = String(stelle || '').match(/[«„"“]([^»"”]{3,})[»"”]/);
+  return m ? m[1].trim() : '';
+}
+
+// Textfenster rund um das Zitat aus den im Problem referenzierten Kapiteln.
+// Whitespace-normalisiert (matcht den Single-Pass-/Fakten-Textfluss); findet das
+// Zitat und schneidet ±_VERIFY_RADIUS Zeichen aus. Fallback: Kapitel-Anfang.
+function _verifyExcerpt(groups, groupOrder, kapitelNames, quote) {
+  const texts = [];
+  for (const key of groupOrder) {
+    const g = groups.get(key);
+    if (kapitelNames.includes(g.name)) texts.push(g.pages.map(p => p.text).join('\n'));
+  }
+  if (!texts.length) return '';
+  const full = texts.join('\n\n').replace(/\s+/g, ' ');
+  if (quote) {
+    const needle = quote.replace(/\s+/g, ' ').slice(0, 40);
+    const idx = full.indexOf(needle);
+    if (idx >= 0) return full.slice(Math.max(0, idx - _VERIFY_RADIUS), Math.min(full.length, idx + needle.length + _VERIFY_RADIUS));
+  }
+  return full.slice(0, _VERIFY_RADIUS * 2);
+}
+
+// Filtert die Probleme des Fakten-Checks: verwirft nur explizit als unecht
+// eingestufte (bestaetigt=false); nicht lokalisierbare/fehlgeschlagene bleiben
+// konservativ erhalten. Nur Claude (lokale Provider: zu kleines Kontextfenster
+// für zuverlässige Verify-Urteile, Mutex serialisiert zudem jeden Call).
+async function verifyKontinuitaetProbleme(ctx, result, fromPct, toPct) {
+  const { call, prompts, sys, jobId, tok, bookName, groups, groupOrder, log } = ctx;
+  const probleme = Array.isArray(result?.probleme) ? result.probleme : [];
+  if (!probleme.length) return result;
+  updateJob(jobId, { progress: fromPct, statusText: 'job.phase.verifyContradictions' });
+  const verdicts = await Promise.all(probleme.map(async (p) => {
+    const kap = Array.isArray(p.kapitel) ? p.kapitel : [];
+    if (!kap.length) return { p, keep: true };
+    const exA = _verifyExcerpt(groups, groupOrder, kap, _stelleQuote(p.stelle_a));
+    const exB = _verifyExcerpt(groups, groupOrder, kap, _stelleQuote(p.stelle_b));
+    if (!exA && !exB) return { p, keep: true };
+    try {
+      const v = await call(jobId, tok,
+        prompts.buildKontinuitaetVerifyPrompt(bookName, p, exA, exB),
+        sys.SYSTEM_KONTINUITAET_BLOCKS, null, null, 400, 0.3, 600, prompts.SCHEMA_KONTINUITAET_VERIFY);
+      return { p, keep: v?.bestaetigt !== false };
+    } catch (e) {
+      if (e.name === 'AbortError') throw e;
+      log.warn(`Kontinuität Verify übersprungen: ${e.message}`);
+      return { p, keep: true };
+    }
+  }));
+  const kept = verdicts.filter(v => v.keep).map(v => v.p);
+  const dropped = probleme.length - kept.length;
+  if (dropped > 0) log.info(`Kontinuität Verify: ${dropped}/${probleme.length} False-Positive(s) verworfen.`);
+  updateJob(jobId, { progress: toPct });
+  return { ...result, probleme: kept };
+}
+
 // ── Job: Komplettanalyse ─────────────────────────────────────────────────────
 // Pipeline (token-optimiert):
 //   P1 (Vollextraktion: Figuren+Orte+Fakten+Szenen+Events, parallel/Kapitel, SYSTEM_KOMPLETT_EXTRAKTION)
@@ -196,9 +262,11 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
     ).all(bookIdInt, email);
     const orteKompakt = ortRows.map(o => ({ name: o.name, typ: o.typ, beschreibung: o.beschreibung || '' }));
 
+    // Single-Pass nur bei Claude (voller Buchtext im 1h-Cache); sonst Fakten-Multi-Pass.
+    const kontMultiPass = !(totalChars <= singlePassLimit && effectiveProvider === 'claude');
     // P8-Call als Closure – wird je nach Provider parallel oder sequentiell ausgeführt.
     const runP8 = async () => {
-      if (totalChars <= singlePassLimit && effectiveProvider === 'claude') {
+      if (!kontMultiPass) {
         log.info(`Kontinuität Single-Pass: ${fullBookText.length} Zeichen, ${figKompakt.length} Figuren, ${orteKompakt.length} Orte`);
         const bookSystemBlock = { text: buildBookSystemBlockText(bookName, pageContents.length, fullBookText), ttl: '1h' };
         return call(jobId, tok,
@@ -227,6 +295,10 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
       await runZeitstrahl(ctx);
       updateJob(jobId, { progress: 82, statusText: 'job.phase.checkContinuity' });
       kontResult = await runP8();
+    }
+    // Multi-Pass-Befunde gegen den Originaltext verifizieren (False-Positive-Filter).
+    if (kontMultiPass && effectiveProvider === 'claude') {
+      kontResult = await verifyKontinuitaetProbleme(ctx, kontResult, 96, 97);
     }
     saveKontinuitaetResult(bookIdInt, email, kontResult, figNameToId, idMaps.chNameToId, effectiveProvider, log, jobId);
 
@@ -346,8 +418,13 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
       updateJob(jobId, { progress: 88, statusText: 'job.phase.checkContradictions' });
       result = await call(jobId, tok,
         prompts.buildKontinuitaetCheckPrompt(bookName, chapterFacts, figurenKompakt, orteKompakt),
-        sys.SYSTEM_KONTINUITAET_BLOCKS, 88, 97, 5000, 0.2, null, prompts.SCHEMA_KONTINUITAET_PROBLEME,
+        sys.SYSTEM_KONTINUITAET_BLOCKS, 88, 95, 5000, 0.2, null, prompts.SCHEMA_KONTINUITAET_PROBLEME,
       );
+      // Fakten-basierte Befunde gegen den Originaltext verifizieren (False-Positive-Filter).
+      if (effectiveProvider === 'claude') {
+        result = await verifyKontinuitaetProbleme(
+          { call, prompts, sys, jobId, tok, bookName, groups, groupOrder, log }, result, 95, 97);
+      }
     }
 
     if (typeof result?.zusammenfassung === 'undefined') throw i18nError('job.error.zusammenfassungMissing');

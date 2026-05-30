@@ -1195,6 +1195,9 @@
   "kontinuitaet.severity.niedrig":  "Low",
   "kontinuitaet.summary":           "Summary",
   "kontinuitaet.empfehlung":        "Recommendation:",
+  "kontinuitaet.resolved":          "Done",
+  "kontinuitaet.markResolved":      "Mark as done",
+  "kontinuitaet.markOpen":          "Reopen",
 
   "bookstats.title":             "Book progress",
   "bookstats.lastSnapshot":      "Last snapshot: {date}",
@@ -2026,6 +2029,7 @@
   "job.phase.resumeFacts":           "Resuming fact extraction ({current}/{total})…",
   "job.phase.factsInGroup":          "Facts in \"{name}\" ({current}/{total})…",
   "job.phase.checkContradictions":   "AI checking contradictions…",
+  "job.phase.verifyContradictions":  "AI verifying contradictions against the source text…",
   "job.phase.loadingPageContent":    "Loading page content…",
   "job.phase.aiAnalyzing":           "AI analysing…",
   "job.phase.pageProgress":          "{current}/{total}: {name}…",

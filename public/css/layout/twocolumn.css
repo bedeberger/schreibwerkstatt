@@ -25,6 +25,19 @@
   min-width: 0;
 }
 
+/* Mobile (einspaltig): Sidebar/Tree stapelt sich ueber den Karten. Beim Oeffnen
+   einer Karte scrollt `_scrollToCardEl` die Karte per `scrollIntoView` an den
+   Viewport-Rand — das gelingt aber nur, wenn unter der Karte genug Scroll-Raum
+   ist. Kurze Karten (wenig Inhalt, z.B. duenne Entwicklungs-/Export-/Review-
+   Karte) liessen das Dokument sonst zu frueh enden, der Browser clampt den
+   Scroll und die Karte bleibt mitten im Viewport unter dem Tree haengen. Ein
+   Viewport-Hoehen-Floor garantiert die Scroll-Distanz fuer jede Karte. */
+@media (max-width: 959.98px) {
+  .layout-main {
+    min-height: 100dvh;
+  }
+}
+
 /* Resize-Handle: sitzt am rechten Rand der Sidebar, ragt halb in den
    Grid-Gap. JS injiziert das Element in `.layout-sidebar` und schreibt
    `--sidebar-w` auf `.layout`. Persistenz in localStorage('sidebar-width').

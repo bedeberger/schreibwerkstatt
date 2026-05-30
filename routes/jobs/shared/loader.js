@@ -15,7 +15,13 @@ const { htmlToText } = require('./ai');
 // Untergrenzen (20K/10K Zeichen) verhindern zu kleine Pässe bei Misconfig.
 // Boot-Konstanten lesen Claude-Defaults; per-Job-Pfade nutzen `chunkLimitsFor(provider)`,
 // damit Ollama/Llama mit eigenen Kontextfenstern korrekt skaliert werden.
-const SINGLE_PASS_LIMIT = Math.max(20000, Math.min(600000, Math.floor(INPUT_BUDGET_CHARS * 0.70)));
+// SINGLE_PASS_CHAR_CEILING: Obergrenze hoch genug, dass Claudes 1M-Kontextfenster
+//   (≈1.96M Zeichen Input-Budget) voll für Single-Pass genutzt wird – dann fährt
+//   selbst ein dicker Gesellschaftsroman in einem Pass (voller auflösender Kontext,
+//   keine Fakten-basierten False-Positives). Bei 200K-Kontext greift die 0.70-Formel
+//   ohnehin lange vorher. Schützt nur gegen absurde Misconfig.
+const SINGLE_PASS_CHAR_CEILING = 2000000;
+const SINGLE_PASS_LIMIT = Math.max(20000, Math.min(SINGLE_PASS_CHAR_CEILING, Math.floor(INPUT_BUDGET_CHARS * 0.70)));
 const PER_CHUNK_LIMIT   = Math.max(10000, Math.min(200000, Math.floor(INPUT_BUDGET_CHARS * 0.35)));
 const BATCH_SIZE = 15;
 
@@ -23,7 +29,7 @@ function chunkLimitsFor(provider) {
   const cfg = getContextConfigFor(provider);
   const budget = cfg.inputBudgetChars;
   return {
-    singlePass: Math.max(20000, Math.min(600000, Math.floor(budget * 0.70))),
+    singlePass: Math.max(20000, Math.min(SINGLE_PASS_CHAR_CEILING, Math.floor(budget * 0.70))),
     perChunk:   Math.max(10000, Math.min(200000, Math.floor(budget * 0.35))),
   };
 }

@@ -664,6 +664,16 @@ select[aria-invalid="true"],
   .card-actions { width: 100%; }
   .card-actions button { flex: 1 1 auto; min-width: 0; }
   .card-actions--grouped .action-sep { display: none; }
+  /* Icon-only Buttons (z.B. Tagebuch Vor/Zurueck) sind via `.graph-tool-btn`
+     nur ~22px hoch — unter dem 44px-Touch-Target, Finger verfehlen sie. Auf
+     Touch volle Zeilenhoehe + 44px-Minimum, Icon zentriert. */
+  .card-actions .graph-tool-btn {
+    align-self: stretch;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
 }
 
 @media (max-width: 480px) {

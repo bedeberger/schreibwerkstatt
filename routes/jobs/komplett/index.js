@@ -3,6 +3,8 @@ const express = require('express');
 const {
   deleteChapterExtractCache,
   getLatestContinuityCheck,
+  getContinuityIssueBookId,
+  setContinuityIssueResolved,
   } = require('../../../db/schema');
 const { toIntId } = require('../../../lib/validate');
 const { setContext } = require('../../../lib/log-context');
@@ -57,6 +59,21 @@ komplettRouter.get('/kontinuitaet/:book_id', (req, res) => {
   const userEmail = req.session?.user?.email || null;
   const result = getLatestContinuityCheck(bookId, userEmail);
   res.json(result);
+});
+
+// Issue als erledigt/offen markieren (editor+). book_id wird aus dem Issue
+// aufgeloest, da kein :book_id-Param vorliegt -> manuelle ACL statt aclParamGuard.
+komplettRouter.post('/kontinuitaet/issue/:issue_id/resolved', jsonBody, (req, res) => {
+  const issueId = toIntId(req.params.issue_id);
+  if (!issueId) return res.status(400).json({ error_code: 'INVALID_ISSUE_ID' });
+  const bookId = getContinuityIssueBookId(issueId);
+  if (!bookId) return res.status(404).json({ error_code: 'ISSUE_NOT_FOUND' });
+  setContext({ book: bookId });
+  try { requireBookAccess(req, bookId, 'editor'); }
+  catch (e) { if (sendACLError(res, e)) return; throw e; }
+  const resolved = !!req.body?.resolved;
+  setContinuityIssueResolved(issueId, resolved);
+  res.json({ ok: true, resolved });
 });
 
 komplettRouter.delete('/chapter-cache/:book_id', (req, res) => {
