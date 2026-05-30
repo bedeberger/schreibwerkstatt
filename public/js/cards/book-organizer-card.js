@@ -39,6 +39,7 @@ export function registerBookOrganizerCard() {
     _redoStack: [],
     _inHistoryFlight: false,
     _onHistoryKeydown: null,
+    _memos: {},        // Cache für chapterLengthDist (siehe view.js#_memo)
 
     init() {
       this._lifecycle = setupCardLifecycle(this, {
@@ -48,7 +49,7 @@ export function registerBookOrganizerCard() {
           workTree: [], soloPages: [],
           chapterOpen: {}, organizerSearch: '', jumpToChapterId: '',
           organizerStatus: '', organizerProgress: 0, organizerSaving: false,
-          _undoStack: [], _redoStack: [], _inHistoryFlight: false,
+          _undoStack: [], _redoStack: [], _inHistoryFlight: false, _memos: {},
         },
         onShow: async () => {
           await loadSortable();
@@ -62,7 +63,7 @@ export function registerBookOrganizerCard() {
             workTree: [], soloPages: [],
             chapterOpen: {}, organizerSearch: '', jumpToChapterId: '',
             organizerStatus: '', organizerProgress: 0, organizerSaving: false,
-            _undoStack: [], _redoStack: [], _inHistoryFlight: false,
+            _undoStack: [], _redoStack: [], _inHistoryFlight: false, _memos: {},
           });
         },
         // Re-Klick auf offene Karte: lokaler Snapshot reicht — Drag/Rename/CRUD
@@ -76,7 +77,7 @@ export function registerBookOrganizerCard() {
           Object.assign(ctx, {
             workTree: [], soloPages: [],
             chapterOpen: {}, organizerSearch: '', jumpToChapterId: '',
-            _undoStack: [], _redoStack: [], _inHistoryFlight: false,
+            _undoStack: [], _redoStack: [], _inHistoryFlight: false, _memos: {},
           });
         },
         extraListeners: [

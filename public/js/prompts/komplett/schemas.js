@@ -17,6 +17,9 @@ const _bzItem = () => _obj(_isLocal
   : { figur_id: _str, typ: _str, machtverhaltnis: _num, beschreibung: _str, belege: { type: 'array', items: _bzBeleg } }
 );
 
+// Tiefe-Felder (aeusseres/stimme/hintergrund/arc) nur für Claude: lokale Grammar
+// (_obj → alle Properties required) würde kleine Modelle zwingen, sie zu füllen →
+// Halluzination/Bloat. Analog zum machtverhaltnis-Gating in _bzItem.
 const _figurSchemaProps = () => ({
   id: _str,
   name: _str,
@@ -26,13 +29,20 @@ const _figurSchemaProps = () => ({
   geschlecht: _str,
   beruf: _str,
   wohnadresse: _str,
+  ...(_isLocal ? {} : {
+    aeusseres: _str,
+    stimme: _str,
+    hintergrund: _str,
+  }),
   rolle: _str,
   motivation: _str,
   konflikt: _str,
   beschreibung: _str,
   sozialschicht: _str,
   praesenz: { type: 'string', enum: ['zentral', 'regelmaessig', 'punktuell', 'randfigur'] },
-  entwicklung: _str,
+  ...(_isLocal
+    ? { entwicklung: _str }
+    : { arc: _obj({ typ: _str, anfang: _str, wendepunkte: { type: 'array', items: _str }, ende: _str }) }),
   erste_erwaehnung: _str,
   schluesselzitate: { type: 'array', items: _str },
   eigenschaften: { type: 'array', items: _str },

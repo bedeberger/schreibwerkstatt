@@ -81,7 +81,7 @@ function buildStyleSamples(ctx) {
     // Feinstes Kontinuitäts-Signal: pro Satz Kontext (1–2 vorherige Sätze)
     // → nächster Satz. Limit pro Seite, damit einzelne lange Seiten nicht
     // den Trainings-Pool dominieren. Nur Sätze 40–300 Zeichen (Rauschen raus).
-    const SENT_CAP_PER_PAGE = 40;
+    const SENT_CAP_PER_PAGE = 40 * (opts.biasBoost || 1);
     const sentPrefix = langIsEn ? 'Next sentence after:\n\n' : 'Nächster Satz nach:\n\n';
     const pageSentences = paragraphs.flatMap(splitSentences);
     let sentEmit = 0;

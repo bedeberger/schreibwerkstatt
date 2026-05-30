@@ -3,7 +3,7 @@ require('./migrations');
 
 // Gerichtete Beziehungstypen und ihre Inverse. A→B elternteil ≡ B→A kind,
 // A→B mentor ≡ B→A schuetzling. Für Dedup-Zwecke als identisch betrachtet.
-const RELATION_INVERSES = { elternteil: 'kind', kind: 'elternteil', mentor: 'schuetzling', schuetzling: 'mentor' };
+const RELATION_INVERSES = { elternteil: 'kind', kind: 'elternteil', mentor: 'schuetzling', schuetzling: 'mentor', vorgesetzter: 'untergebener', untergebener: 'vorgesetzter' };
 
 /** Dedupliziert Relations pro ungeordnetem Paar (A,B). Erste gewinnt.
  *  Eliminiert damit auch widersprüchliche typs (z.B. elternteil + kind auf dem
@@ -88,6 +88,16 @@ function enrichBelegWithIds(beleg, idMaps) {
   };
 }
 
+// Flacht den strukturierten Arc ({typ, anfang, wendepunkte[], ende}) zu einem
+// Anzeige-String – Fallback für Leser, die nur das alte `entwicklung`-Feld kennen
+// (Figur-Werkstatt-bogen, Buch-Chat-Tool, Alt-Daten ohne arc-Spalte).
+function _arcToFlat(arc) {
+  if (!arc || typeof arc !== 'object') return null;
+  const parts = [arc.anfang, ...(Array.isArray(arc.wendepunkte) ? arc.wendepunkte : []), arc.ende].filter(Boolean);
+  if (!parts.length) return arc.typ || null;
+  return parts.join(' → ');
+}
+
 function saveFigurenToDb(bookId, figuren, userEmail, idMaps) {
   const now = new Date().toISOString();
   db.transaction(() => {
@@ -101,10 +111,10 @@ function saveFigurenToDb(bookId, figuren, userEmail, idMaps) {
 
     const insFig = db.prepare(`
       INSERT INTO figures
-        (book_id, fig_id, name, kurzname, typ, geburtstag, geschlecht, beruf, wohnadresse, beschreibung, sozialschicht,
-         praesenz, rolle, motivation, konflikt, entwicklung, erste_erwaehnung, erste_erwaehnung_page_id, schluesselzitate,
-         sort_order, user_email, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        (book_id, fig_id, name, kurzname, typ, geburtstag, geschlecht, beruf, wohnadresse, aeusseres, stimme, hintergrund,
+         beschreibung, sozialschicht, praesenz, rolle, motivation, konflikt, entwicklung, arc,
+         erste_erwaehnung, erste_erwaehnung_page_id, schluesselzitate, sort_order, user_email, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     const insTag = db.prepare('INSERT OR IGNORE INTO figure_tags (figure_id, tag) VALUES (?, ?)');
     const insApp = db.prepare('INSERT OR IGNORE INTO figure_appearances (figure_id, chapter_id, haeufigkeit) VALUES (?, ?, ?)');
     const insRel = db.prepare('INSERT INTO figure_relations (book_id, from_fig_id, to_fig_id, typ, beschreibung, machtverhaltnis, belege, user_email) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
@@ -116,19 +126,23 @@ function saveFigurenToDb(bookId, figuren, userEmail, idMaps) {
     for (let i = 0; i < figuren.length; i++) {
       const f = figuren[i];
       const zitate = Array.isArray(f.schluesselzitate) && f.schluesselzitate.length
-        ? JSON.stringify(f.schluesselzitate.filter(Boolean).slice(0, 3))
+        ? JSON.stringify(f.schluesselzitate.filter(Boolean).slice(0, 5))
         : null;
       // erste_erwaehnung ist Freitext (kann Kapitel- ODER Seitenname sein).
       // Auflösen: zuerst in den Kapiteln der Figur (figure_appearances) suchen,
       // dann globaler Unambiguous-Match. Kein Name → null.
       const ersteErwaehnung = _cleanRefName(f.erste_erwaehnung);
       const erstPageId = resolveErstePageId(ersteErwaehnung, f.kapitel, idMaps);
+      const arcJson = (f.arc && typeof f.arc === 'object') ? JSON.stringify(f.arc)
+        : (typeof f.arc === 'string' && f.arc ? f.arc : null);
+      const entwicklungFlat = f.entwicklung || _arcToFlat(f.arc) || null;
       const { lastInsertRowid: fid } = insFig.run(
         bookId, f.id, f.name, f.kurzname || null, f.typ || null,
         f.geburtstag || null, f.geschlecht || null, f.beruf || null,
-        f.wohnadresse || null, f.beschreibung || null, f.sozialschicht || null,
+        f.wohnadresse || null, f.aeusseres || null, f.stimme || null, f.hintergrund || null,
+        f.beschreibung || null, f.sozialschicht || null,
         f.praesenz || null, f.rolle || null, f.motivation || null, f.konflikt || null,
-        f.entwicklung || null, ersteErwaehnung, erstPageId, zitate,
+        entwicklungFlat, arcJson, ersteErwaehnung, erstPageId, zitate,
         i, userEmail || null, now
       );
       figIdToRowId[f.id] = fid;
@@ -555,8 +569,8 @@ function getChapterFigureRelations(bookId, chapterId, userEmail) {
 function getFigureWithDetails(figureId) {
   const fig = db.prepare(`
     SELECT id, book_id, fig_id, user_email, name, kurzname, typ, geburtstag, geschlecht,
-           beruf, wohnadresse, beschreibung, sozialschicht, praesenz, rolle, motivation,
-           konflikt, entwicklung
+           beruf, wohnadresse, aeusseres, stimme, hintergrund, beschreibung, sozialschicht,
+           praesenz, rolle, motivation, konflikt, entwicklung, arc
       FROM figures WHERE id = ?
   `).get(parseInt(figureId));
   if (!fig) return null;

@@ -6,11 +6,24 @@ import { FIGUREN_BASIS_SCHEMA, figurenBasisRules } from './schema-strings.js';
 export function buildFiguresBasisConsolidationPrompt(bookName, chapterFiguren, buchKontext = '') {
   const synthInput = chapterFiguren.map(cf => {
     const nameById = Object.fromEntries((cf.figuren || []).map(f => [f.id, f.name]));
+    const arcStr = (a) => {
+      if (!a || typeof a !== 'object') return '';
+      const parts = [a.anfang, ...(Array.isArray(a.wendepunkte) ? a.wendepunkte : []), a.ende].filter(Boolean);
+      return parts.length ? `${a.typ ? a.typ + ': ' : ''}${parts.join(' → ')}` : (a.typ || '');
+    };
     return `## Kapitel: ${cf.kapitel}\n` + (cf.figuren || []).map(f => {
       const meta = [f.typ, f.beruf, f.geburtstag ? `*${f.geburtstag}` : '', f.geschlecht].filter(Boolean).join(', ');
       return `- ${f.name}${f.kurzname && f.kurzname !== f.name ? ` («${f.kurzname}»)` : ''} (${meta}): ${f.beschreibung || ''}` +
+        (f.rolle ? '\n  Rolle: ' + f.rolle : '') +
+        (f.motivation ? '\n  Motivation: ' + f.motivation : '') +
+        (f.konflikt ? '\n  Konflikt: ' + f.konflikt : '') +
+        (f.aeusseres ? '\n  Äusseres: ' + f.aeusseres : '') +
+        (f.stimme ? '\n  Stimme: ' + f.stimme : '') +
+        (f.hintergrund ? '\n  Hintergrund: ' + f.hintergrund : '') +
+        (arcStr(f.arc) ? '\n  Arc: ' + arcStr(f.arc) : (f.entwicklung ? '\n  Entwicklung: ' + f.entwicklung : '')) +
         (f.wohnadresse ? '\n  Wohnadresse: ' + f.wohnadresse : '') +
         (f.eigenschaften?.length ? '\n  Eigenschaften: ' + f.eigenschaften.join(', ') : '') +
+        (f.schluesselzitate?.length ? '\n  Zitate: ' + f.schluesselzitate.map(z => `«${z}»`).join(' ') : '') +
         (f.kapitel?.length ? '\n  Kapitel: ' + f.kapitel.map(k => k.name + (k.haeufigkeit > 1 ? ' ×' + k.haeufigkeit : '')).join(', ') : '') +
         (f.beziehungen?.length ? '\n  Beziehungen: ' + f.beziehungen.map(b => {
           const relName = nameById[b.figur_id] || b.name || b.figur_id;
@@ -19,6 +32,8 @@ export function buildFiguresBasisConsolidationPrompt(bookName, chapterFiguren, b
     }).join('\n');
   }).join('\n\n');
   return `Konsolidiere die folgenden Figurenanalysen aller Kapitel des Buchs «${bookName}» zu einer einheitlichen Gesamtliste. Dedupliziere Figuren, führe Informationen zusammen und vergib stabile IDs.
+
+Wähle pro Feld die textnächste, reichhaltigste Variante; ergänzende Angaben aus verschiedenen Kapiteln zusammenführen statt verkürzen. Die Tiefe-Felder (motivation, konflikt, aeusseres, stimme, hintergrund, arc) NICHT einkürzen.
 
 Kapitelanalysen:
 
@@ -56,7 +71,7 @@ ${bookText}
 Antworte mit diesem JSON-Schema:
 {
   "beziehungen": [
-    { "von": "fig_1", "zu": "fig_2", "typ": "elternteil|geschwister|kind|freund|feind|kollege|bekannt|liebesbeziehung|rivale|mentor|schuetzling|patronage|geschaeft|andere", "machtverhaltnis": 0, "beschreibung": "1 Satz", "belege": [{ "kapitel": "Kapitelname (ohne ##-Präfix)", "seite": "Seitentitel (ohne ###-Präfix); leer wenn = Kapitel oder unklar" }] }
+    { "von": "fig_1", "zu": "fig_2", "typ": "elternteil|geschwister|kind|freund|feind|kollege|bekannt|liebesbeziehung|ehepartner|ex_partner|rivale|mentor|schuetzling|patronage|geschaeft|verbuendete|komplize|vorgesetzter|untergebener|andere", "machtverhaltnis": 0, "beschreibung": "1 Satz", "belege": [{ "kapitel": "Kapitelname (ohne ##-Präfix)", "seite": "Seitentitel (ohne ###-Präfix); leer wenn = Kapitel oder unklar" }] }
   ]
 }
 
@@ -100,13 +115,13 @@ ${textBlock}
 Antworte mit diesem JSON-Schema:
 {
   "beziehungen": [
-    { "von": "fig_1", "zu": "fig_2", "typ": "elternteil|geschwister|kind|freund|feind|kollege|bekannt|liebesbeziehung|rivale|mentor|schuetzling|patronage|geschaeft|andere",${machtField} "beschreibung": "1 Satz", "belege": [{ "kapitel": "Kapitelname (ohne ##-Präfix)", "seite": "Seitentitel (ohne ###-Präfix); leer wenn = Kapitel oder unklar" }] }
+    { "von": "fig_1", "zu": "fig_2", "typ": "elternteil|geschwister|kind|freund|feind|kollege|bekannt|liebesbeziehung|ehepartner|ex_partner|rivale|mentor|schuetzling|patronage|geschaeft|verbuendete|komplize|vorgesetzter|untergebener|andere",${machtField} "beschreibung": "1 Satz", "belege": [{ "kapitel": "Kapitelname (ohne ##-Präfix)", "seite": "Seitentitel (ohne ###-Präfix); leer wenn = Kapitel oder unklar" }] }
   ]
 }
 
 Regeln:
 - von/zu: nur IDs aus der obigen Figurenliste
-- typ beschreibt die ROLLE von «zu» (NICHT von «von»). Beispiel: Robert hat Mutter Sandra → { von: «<Roberts id>», zu: «<Sandras id>», typ: elternteil } (Sandra IST der Elternteil von Robert). patronage=Schutzherrschaft (zu = Patron), geschaeft=wirtschaftliche Beziehung, geschwister=ungerichtet, übrige selbsterklärend.
+- typ beschreibt die ROLLE von «zu» (NICHT von «von»). Beispiel: Robert hat Mutter Sandra → { von: «<Roberts id>», zu: «<Sandras id>», typ: elternteil } (Sandra IST der Elternteil von Robert). patronage=Schutzherrschaft (zu = Patron), geschaeft=wirtschaftliche Beziehung, geschwister/ehepartner/ex_partner/verbuendete/komplize=ungerichtet, vorgesetzter=«zu» ist Vorgesetzte(r) von «von», untergebener=«zu» ist «von» unterstellt, liebesbeziehung nur für nicht-eheliche romantische Bindung, übrige selbsterklärend.
 - Pro Figurenpaar höchstens EINE Beziehung – nicht von→zu UND zu→von für dasselbe Paar. Keine widersprüchlichen Angaben.${machtRule}
 - belege: HÖCHSTENS 1 Stelle (Kapitelname + Seitentitel) an der die Beziehung klar wird. seite leer lassen wenn identisch mit dem Kapitelnamen oder unklar. Seitennamen aus ### Überschriften, Kapitel aus ## Überschriften.
 - KONSERVATIV: Nur Beziehungen die im Text eindeutig belegt sind – lieber weglassen als spekulieren.

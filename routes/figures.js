@@ -278,6 +278,12 @@ router.get('/:book_id', (req, res) => {
     if (f.schluesselzitate) {
       try { zitate = JSON.parse(f.schluesselzitate) || []; } catch { zitate = []; }
     }
+    let arc = null;
+    if (f.arc) {
+      try { arc = JSON.parse(f.arc); } catch { arc = null; }
+      // Alt-Daten / Fehlparse: arc-Spalte hielt einen Flachstring statt JSON.
+      if (arc === null && typeof f.arc === 'string') arc = { typ: '', anfang: '', wendepunkte: [], ende: f.arc };
+    }
     return {
       id: f.fig_id,
       name: f.name,
@@ -287,6 +293,9 @@ router.get('/:book_id', (req, res) => {
       geschlecht: f.geschlecht,
       beruf: f.beruf,
       wohnadresse: f.wohnadresse || null,
+      aeusseres: f.aeusseres || null,
+      stimme: f.stimme || null,
+      hintergrund: f.hintergrund || null,
       beschreibung: f.beschreibung,
       sozialschicht: f.sozialschicht || null,
       praesenz: f.praesenz || null,
@@ -294,6 +303,7 @@ router.get('/:book_id', (req, res) => {
       motivation: f.motivation || null,
       konflikt: f.konflikt || null,
       entwicklung: f.entwicklung || null,
+      arc: (arc && (arc.anfang || arc.ende || (Array.isArray(arc.wendepunkte) && arc.wendepunkte.length) || arc.typ)) ? arc : null,
       erste_erwaehnung: f.erste_erwaehnung || null,
       erste_erwaehnung_page_id: f.erste_erwaehnung_page_id || null,
       schluesselzitate: Array.isArray(zitate) ? zitate : [],

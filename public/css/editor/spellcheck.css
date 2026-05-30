@@ -50,7 +50,7 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   box-shadow: 0 4px 16px var(--color-shadow-med);
-  padding: 8px;
+  padding: var(--space-sm);
   max-width: 280px;
   min-width: 180px;
   /* UI-Popup; nicht erben vom Reading-Frame-Mount (Notebook/Focus scrollContainer). */
@@ -58,19 +58,19 @@
   font-size: var(--font-size-sm);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-6);
 }
 
 .lt-popover__header {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
   flex-wrap: wrap;
 }
 
 .lt-popover__badge {
   display: inline-block;
-  padding: 1px 5px;
+  padding: var(--space-1) var(--space-5);
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--lt-color) 18%, transparent);
   color: var(--lt-color);
@@ -100,7 +100,7 @@
 .lt-popover__replacements {
   display: flex;
   flex-wrap: wrap;
-  gap: 3px;
+  gap: var(--space-3);
 }
 
 .lt-popover__replacement {
@@ -109,7 +109,7 @@
   background: var(--color-hover);
   color: var(--color-text);
   border-radius: var(--radius-sm);
-  padding: 2px 6px;
+  padding: var(--space-2xs) var(--space-6);
   font-size: var(--font-size-sm);
   cursor: pointer;
   line-height: var(--lh-tight);
@@ -126,9 +126,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
+  gap: var(--space-6);
   border-top: 1px solid var(--color-border);
-  padding-top: 6px;
+  padding-top: var(--space-6);
 }
 
 .lt-popover__ignore,
@@ -140,7 +140,7 @@
   color: var(--color-muted);
   cursor: pointer;
   font-size: var(--font-size-mini);
-  padding: 1px 3px;
+  padding: var(--space-1) var(--space-3);
   text-decoration: none;
 }
 
@@ -164,8 +164,8 @@
   transform: translateX(-100%);
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 6px;
+  gap: var(--space-xs);
+  padding: var(--space-3) var(--space-6);
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
   background: var(--color-surface);
@@ -229,7 +229,7 @@
 .lt-dict-count {
   display: inline-block;
   min-width: 1.5em;
-  padding: 0 6px;
+  padding: 0 var(--space-6);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-tag-bg);
@@ -243,13 +243,13 @@
 .lt-dict-body {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-top: 6px;
+  gap: var(--space-6);
+  margin-top: var(--space-6);
 }
 
 .lt-dict-search input {
   width: 100%;
-  padding: 4px 8px;
+  padding: var(--pad-badge);
   border: 1px solid var(--color-border-input);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
@@ -260,7 +260,7 @@
 .lt-dict-list {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: var(--space-3);
   max-height: 280px;
   overflow-y: auto;
 }
@@ -269,8 +269,8 @@
   display: grid;
   grid-template-columns: 1fr auto auto;
   align-items: center;
-  gap: 8px;
-  padding: 3px 6px;
+  gap: var(--space-sm);
+  padding: var(--space-3) var(--space-6);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   font-size: var(--font-size-sm);
@@ -288,7 +288,7 @@
   color: var(--color-muted);
   cursor: pointer;
   font-size: var(--font-size-mini);
-  padding: 1px 6px;
+  padding: var(--space-1) var(--space-6);
 }
 
 .lt-dict-remove:hover {
@@ -302,9 +302,9 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
-  margin-bottom: 8px;
+  gap: var(--space-md);
+  padding: var(--space-10) var(--space-md);
+  margin-bottom: var(--space-sm);
   background: var(--color-warn-bg);
   border: 1px solid var(--color-style-border);
   border-radius: var(--radius-sm);
@@ -313,7 +313,7 @@
 }
 
 .lt-extension-banner__text { line-height: 1.35; }
-.lt-extension-banner__title { font-weight: var(--fw-semibold); margin-bottom: 2px; }
+.lt-extension-banner__title { font-weight: var(--fw-semibold); margin-bottom: var(--space-2xs); }
 
 .lt-extension-banner__dismiss {
   appearance: none;
@@ -322,7 +322,7 @@
   cursor: pointer;
   font-size: var(--font-size-sm);
   color: var(--color-muted);
-  padding: 2px 6px;
+  padding: var(--space-2xs) var(--space-6);
 }
 
 .lt-extension-banner__dismiss:hover { color: var(--color-text); }
@@ -361,7 +361,7 @@
 .lt-field-wrap > textarea[data-spellcheck] {
   width: 100%;
   box-sizing: border-box;
-  padding-inline-end: 32px !important;
+  padding-inline-end: var(--space-2xl) !important;
 }
 
 .lt-badge--form {
@@ -404,8 +404,8 @@
 .lt-popover__match {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 6px 0;
+  gap: var(--space-xs);
+  padding: var(--space-6) 0;
   border-bottom: 1px solid var(--color-border);
 }
 .lt-popover__match:last-child { border-bottom: none; padding-bottom: 0; }
@@ -415,7 +415,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 6px;
+  gap: var(--space-6);
 }
 
 .lt-popover__match-word {
@@ -432,6 +432,6 @@
 
 .lt-popover__row-actions {
   display: flex;
-  gap: 6px;
+  gap: var(--space-6);
 }
 

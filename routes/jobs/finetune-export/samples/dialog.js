@@ -49,7 +49,7 @@ function buildDialogSamples(ctx) {
   // Figur cap bei 12 Zitaten, damit stark sprechende Figuren nicht das
   // Training dominieren.
   if (opts.types.dialog) {
-    const REV_CAP_PER_FIG = 30;
+    const REV_CAP_PER_FIG = 30 * (opts.biasBoost || 1);
     for (const f of figRows) {
       const entries = dialogsByFigure.get(f.name.toLowerCase()) || [];
       const altEntries = (f.kurzname && f.kurzname !== f.name)

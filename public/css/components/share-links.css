@@ -8,13 +8,13 @@
 .share-create {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 16px 0;
+  gap: var(--space-md);
+  padding: var(--space-lg) 0;
   border-bottom: 1px solid var(--color-border);
-  margin-bottom: 18px;
+  margin-bottom: var(--space-18);
 }
 .share-create__title {
-  margin: 0 0 4px;
+  margin: 0 0 var(--space-xs);
   font-size: 14px;
   font-weight: 600;
   color: var(--color-muted);
@@ -24,19 +24,19 @@
 .share-create__row {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-6);
 }
 .share-create__row--actions {
   flex-direction: row;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-md);
   justify-content: flex-end;
 }
 .share-create__option {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  margin-right: 16px;
+  gap: var(--space-6);
+  margin-right: var(--space-lg);
   font-size: 14px;
   cursor: pointer;
 }
@@ -46,7 +46,7 @@
 }
 .share-create__input,
 .share-create__textarea {
-  padding: 7px 10px;
+  padding: var(--pad-btn-compact);
   border: 1px solid var(--color-border-input);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
@@ -61,11 +61,11 @@
 .share-create__hint {
   font-size: 12px;
   color: var(--color-faint);
-  margin-top: 2px;
+  margin-top: var(--space-2xs);
 }
 
 .share-list__title {
-  margin: 0 0 12px;
+  margin: 0 0 var(--space-md);
   font-size: 14px;
   font-weight: 600;
   color: var(--color-muted);
@@ -76,8 +76,8 @@
 .share-row {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  padding: 12px 14px;
-  margin-bottom: 10px;
+  padding: var(--space-md) var(--space-14);
+  margin-bottom: var(--space-10);
   background: var(--color-surface);
   border-left: 3px solid var(--card-accent);
 }
@@ -90,21 +90,21 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
 }
 .share-row__meta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 .share-row__target {
   font-weight: 500;
 }
 .share-row__kind {
   font-size: 12px;
-  padding: 2px 6px;
+  padding: var(--space-2xs) var(--space-6);
   background: var(--color-tag-bg);
   border-radius: var(--radius-sm);
   color: var(--color-muted);
@@ -112,15 +112,15 @@
 .share-row__counts {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-10);
   font-size: 13px;
   color: var(--color-muted);
 }
 .share-row__comments-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
+  gap: var(--space-6);
+  padding: var(--pad-badge);
   background: transparent;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -132,7 +132,7 @@
 .share-row__comments-btn:hover { background: var(--color-hover); }
 .share-row__unread {
   display: inline-block;
-  padding: 1px 6px;
+  padding: var(--space-1) var(--space-6);
   background: var(--card-accent);
   color: #fff;
   border-radius: var(--radius-sm);
@@ -143,12 +143,12 @@
 .share-row__url {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
 }
 .share-row__url-input {
   flex: 1;
-  padding: 6px 10px;
+  padding: var(--space-6) var(--space-10);
   border: 1px solid var(--color-border-input);
   border-radius: var(--radius-sm);
   background: var(--color-bg);
@@ -163,9 +163,9 @@
 }
 .share-row__intro {
   background: var(--color-hover);
-  padding: 8px 12px;
+  padding: var(--space-sm) var(--space-md);
   border-radius: var(--radius-sm);
-  margin: 6px 0;
+  margin: var(--space-6) 0;
   font-style: italic;
   color: var(--color-muted);
   white-space: pre-wrap;
@@ -173,40 +173,40 @@
 .share-row__expires {
   font-size: 13px;
   color: var(--color-muted);
-  margin-top: 4px;
+  margin-top: var(--space-xs);
 }
 
 .share-row__edit {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 10px 0;
+  gap: var(--space-6);
+  padding: var(--space-10) 0;
 }
 .share-row__edit-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--space-sm);
   justify-content: flex-end;
-  margin-top: 6px;
+  margin-top: var(--space-6);
 }
 
 .share-row__actions {
   display: flex;
-  gap: 8px;
-  margin-top: 8px;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
 }
 
 .share-row__comments {
-  margin-top: 12px;
-  padding-top: 10px;
+  margin-top: var(--space-md);
+  padding-top: var(--space-10);
   border-top: 1px dashed var(--color-border);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .share-comment {
   position: relative;
-  padding: 8px 10px;
+  padding: var(--space-sm) var(--space-10);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -214,7 +214,7 @@
 .share-comment__meta {
   font-size: 12px;
   color: var(--color-muted);
-  margin-bottom: 4px;
+  margin-bottom: var(--space-xs);
 }
 .share-comment__body {
   white-space: pre-wrap;
@@ -224,7 +224,7 @@
   position: absolute;
   top: 6px;
   right: 6px;
-  padding: 2px 8px;
+  padding: var(--space-2xs) var(--space-sm);
   font-size: 12px;
   background: transparent;
   border: 1px solid var(--color-border);

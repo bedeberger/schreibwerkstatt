@@ -105,6 +105,7 @@ function finalizeFinetuneSamples(jobId, ctx) {
     val: valArr.length,
     styleCount: counts.style,
     sceneCount: counts.scene,
+    verbatimCount: counts.verbatim || 0,
     dialogCount: counts.dialog,
     authorChatCount: counts.authorChat,
     correctionCount: counts.correction,

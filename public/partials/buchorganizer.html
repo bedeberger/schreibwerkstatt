@@ -430,6 +430,49 @@
     <div class="muted-msg muted-msg--sm" x-show="organizerSearch && filteredWorkTree().length === 0 && filteredSoloPages().length === 0" x-text="$app.t('sidebar.noPagesFound')"></div>
   </div>
 
+  <!-- Kapitellängen-Verteilung (Zeichen): Collapse am Fuss, default zu. Diverging-
+       Bar um Median — gleicher Pattern wie Buch-Übersicht (overview-chapter-*).
+       Quelle: chapterLengthDist() aus root.tree-Stats. Klick auf Zeile springt
+       zum Kapitel. Erst ab >1 Kapitel sinnvoll (Median/Verteilung). -->
+  <div class="organizer-lengthdist" x-data="{ open: false }"
+       x-show="chapterLengthDist().length > 1" x-cloak>
+    <button type="button" class="collapsible-toggle" @click="open = !open" :aria-expanded="open">
+      <svg class="icon history-chevron" :class="{ 'is-open': open }" aria-hidden="true"><use href="/icons.svg#chevron-right"/></svg>
+      <span x-text="$app.t('bookOrganizer.lengthDist')"></span>
+      <span class="overview-tile-median"
+            x-show="open && chapterLengthDist()[0]?.median > 0"
+            x-text="$app.t('overview.medianTick') + ': ' + _fmtNum(Math.round(chapterLengthDist()[0]?.median)) + ' ' + $app.t('bookstats.unit.z')"></span>
+    </button>
+    <ul class="overview-chapter-list" x-show="open" x-cloak>
+      <template x-for="ch in chapterLengthDist()" :key="ch.id">
+        <li class="overview-chapter-row internal-link"
+            :class="{ 'overview-chapter-row--max': ch.isMax, 'overview-chapter-row--min': ch.isMin }"
+            @click="jumpToChapter(ch.id)"
+            :data-tip="ch.name">
+          <span class="overview-chapter-name" :data-tip="ch.name" x-text="ch.name"></span>
+          <div class="overview-chapter-bar-track overview-chapter-bar-track--diverge">
+            <div class="overview-chapter-bar-fill"
+                 :class="ch.isPositive ? 'overview-chapter-bar-fill--pos' : 'overview-chapter-bar-fill--neg'"
+                 :style="{ left: ch.barLeftPct + '%', width: ch.barWidthPct + '%' }"></div>
+            <div class="overview-chapter-median-tick"
+                 :data-tip="$app.t('overview.medianTick') + ': ' + _fmtNum(ch.median) + ' ' + $app.t('bookstats.unit.z')"></div>
+          </div>
+          <span class="overview-chapter-meta">
+            <span class="overview-chapter-delta"
+                  :class="ch.deltaPct > 0 ? 'overview-trend-pct--up' : ch.deltaPct < 0 ? 'overview-trend-pct--down' : ''"
+                  x-text="(ch.deltaPct >= 0 ? '+' : '') + ch.deltaPct + '%'"></span>
+            <span class="overview-chapter-chars" x-text="_fmtNum(ch.chars) + ' ' + $app.t('bookstats.unit.z')"></span>
+            <span class="overview-chapter-ns"
+                  :data-tip="$app.t('bookstats.metric.normseiten')"
+                  x-text="ch.normseiten.toLocaleString($app.uiLocale === 'en' ? 'en-US' : 'de-CH', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' ' + $app.t('bookstats.unit.ns')"></span>
+            <span class="overview-chapter-words" x-text="_fmtNum(ch.words) + ' ' + $app.t('bookstats.unit.w')"></span>
+            <span class="overview-chapter-pages" x-text="ch.pages + ' ' + $app.t('bookstats.unit.s')"></span>
+          </span>
+        </li>
+      </template>
+    </ul>
+  </div>
+
   <!-- Konflikt-Diff-Modal: zeigt App-Inhalt vs. WP-Inhalt, User wählt die Quelle. -->
   <div class="blog-conflict-overlay" x-show="!!$blog.conflictOpen" x-cloak
        @keydown.escape.window="$blog.closeConflict()">

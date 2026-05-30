@@ -41,11 +41,17 @@ export const BZ = {
   kollege:         { color: '#c4a55a', highlight: '#8a6a20', arrows: '',     dashes: [4,3] },
   bekannt:         { color: '#999',    highlight: '#555',    arrows: '',     dashes: [4,3] },
   liebesbeziehung: { color: '#D46EA0', highlight: '#A0446E', arrows: '',     dashes: [4,3] },
+  ehepartner:      { color: '#D46EA0', highlight: '#A0446E', arrows: '',     dashes: false },
+  ex_partner:      { color: '#C98AB0', highlight: '#A0446E', arrows: '',     dashes: [2,3] },
   rivale:          { color: '#9B4B00', highlight: '#6B3000', arrows: '',     dashes: [4,3] },
   mentor:          { color: '#2d6a9f', highlight: '#1d4b73', arrows: 'to',   dashes: [4,3] },
   schuetzling:     { color: '#2d6a9f', highlight: '#1d4b73', arrows: 'from', dashes: [4,3] },
   patronage:       { color: '#7B3FA0', highlight: '#5A1F80', arrows: 'to',   dashes: false },
+  vorgesetzter:    { color: '#7B3FA0', highlight: '#5A1F80', arrows: 'to',   dashes: [4,3] },
+  untergebener:    { color: '#7B3FA0', highlight: '#5A1F80', arrows: 'from', dashes: [4,3] },
   geschaeft:       { color: '#B8860B', highlight: '#7A5A00', arrows: '',     dashes: [6,3] },
+  komplize:        { color: '#B8860B', highlight: '#7A5A00', arrows: '',     dashes: [2,2] },
+  verbuendete:     { color: '#639922', highlight: '#3B6D11', arrows: '',     dashes: [6,3] },
   andere:          { color: '#bbb',    highlight: '#888',    arrows: '',     dashes: [4,3] },
 };
 
@@ -60,12 +66,12 @@ export const BZ_SOZIO_COLOR = {
 };
 export const BZ_SOZIO_CAT = {
   elternteil: 'familie', kind: 'familie', geschwister: 'familie',
-  patronage: 'macht',  mentor: 'macht', schuetzling: 'macht',
+  patronage: 'macht',  mentor: 'macht', schuetzling: 'macht', vorgesetzter: 'macht', untergebener: 'macht',
   feind: 'konflikt', rivale: 'konflikt',
-  geschaeft: 'geschaeft', kollege: 'geschaeft',
-  liebesbeziehung: 'liebe',
-  freund: 'sozial', bekannt: 'sozial', andere: 'sozial',
+  geschaeft: 'geschaeft', kollege: 'geschaeft', komplize: 'geschaeft',
+  liebesbeziehung: 'liebe', ehepartner: 'liebe', ex_partner: 'liebe',
+  freund: 'sozial', bekannt: 'sozial', verbuendete: 'sozial', andere: 'sozial',
 };
 
 // Typen mit fester Pfeilrichtung im Standardgraph
-export const DIRECTED_TYPES = ['elternteil', 'kind', 'mentor', 'schuetzling', 'patronage'];
+export const DIRECTED_TYPES = ['elternteil', 'kind', 'mentor', 'schuetzling', 'patronage', 'vorgesetzter', 'untergebener'];

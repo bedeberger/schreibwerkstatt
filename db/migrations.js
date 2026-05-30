@@ -6844,6 +6844,28 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 163 abgeschlossen (book_settings.schauplatz_land + locations.land).');
   }
 
+  if (version < 164) {
+    // Figuren-Tiefe (Claude-Komplettanalyse): körperliche Erscheinung, Sprechweise,
+    // Vorgeschichte + strukturierter Entwicklungsbogen. `arc` als JSON-TEXT
+    // ({typ, anfang, wendepunkte[], ende}), analog zur schluesselzitate-Konvention.
+    // Der flache `entwicklung`-String bleibt als Anzeige-Fallback (aus arc abgeleitet).
+    const figCols164 = db.pragma('table_info(figures)').map(c => c.name);
+    const addCol164 = (name, def) => {
+      if (!figCols164.includes(name)) db.exec(`ALTER TABLE figures ADD COLUMN ${name} ${def}`);
+    };
+    addCol164('aeusseres',   'TEXT');
+    addCol164('stimme',      'TEXT');
+    addCol164('hintergrund', 'TEXT');
+    addCol164('arc',         'TEXT');
+
+    const fkErrors164 = db.pragma('foreign_key_check');
+    if (fkErrors164.length) {
+      throw new Error(`Migration 164: foreign_key_check meldet ${fkErrors164.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 164').run();
+    logger.info('DB-Migration auf Version 164 abgeschlossen (figures.aeusseres/stimme/hintergrund/arc).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

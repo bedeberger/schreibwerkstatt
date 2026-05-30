@@ -167,7 +167,7 @@ export const treeMethods = {
       const { words, chars, tok, count } = subtree(item);
       item.stats = count
         ? {
-            words, chars, tok,
+            words, chars, tok, count,
             normseiten: Math.round((chars / 1500) * 10) / 10,
             badge: chars >= 1000 ? '~' + Math.round(chars / 1000) + 'k Z' : chars + ' Z',
           }

@@ -437,7 +437,7 @@ async function runPhase3(ctx, chapterOrte, figurenKompakt, isSinglePass, idRemap
       orte = orteResultRaw.orte.map((o, i) => ({ ...o, id: o.id || ('ort_' + (i + 1)) }));
     }
   }
-  saveOrteToDb(bookIdInt, orte, email, idMaps.chNameToId, idMaps.pageNameToIdByChapter);
+  saveOrteToDb(bookIdInt, orte, email, idMaps.chNameToId, idMaps.pageNameToIdByChapter, { preserveExistingCoords: true });
   log.info(`${orte.length} Schauplätze gespeichert.`);
 
   const ortNameToId = {}, ortNameToIdLower = {};

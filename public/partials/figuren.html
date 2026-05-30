@@ -152,8 +152,8 @@
         </div>
         <div x-show="$app.selectedFigurId === f.id" class="figur-detail">
           <p x-show="f.beschreibung" x-text="f.beschreibung" class="figur-beschreibung"></p>
-          <!-- Rolle / Motivation / Konflikt / Entwicklung -->
-          <div x-show="f.rolle || f.motivation || f.konflikt || f.entwicklung" class="figur-kerninfo">
+          <!-- Rolle / Motivation / Konflikt / Äusseres / Stimme / Hintergrund -->
+          <div x-show="f.rolle || f.motivation || f.konflikt || f.aeusseres || f.stimme || f.hintergrund" class="figur-kerninfo">
             <div x-show="f.rolle" class="figur-kerninfo-row">
               <span class="bewertung-section-title bewertung-section-title--inline" x-text="$app.t('figuren.field.rolle') + ' '"></span>
               <span class="figur-detail-value" x-text="f.rolle"></span>
@@ -166,10 +166,42 @@
               <span class="bewertung-section-title bewertung-section-title--inline" x-text="$app.t('figuren.field.konflikt') + ' '"></span>
               <span class="figur-detail-value" x-text="f.konflikt"></span>
             </div>
-            <div x-show="f.entwicklung" class="figur-kerninfo-row">
-              <span class="bewertung-section-title bewertung-section-title--inline" x-text="$app.t('figuren.field.entwicklung') + ' '"></span>
-              <span class="figur-detail-value" x-text="f.entwicklung"></span>
+            <div x-show="f.aeusseres" class="figur-kerninfo-row">
+              <span class="bewertung-section-title bewertung-section-title--inline" x-text="$app.t('figuren.field.aeusseres') + ' '"></span>
+              <span class="figur-detail-value" x-text="f.aeusseres"></span>
             </div>
+            <div x-show="f.stimme" class="figur-kerninfo-row">
+              <span class="bewertung-section-title bewertung-section-title--inline" x-text="$app.t('figuren.field.stimme') + ' '"></span>
+              <span class="figur-detail-value" x-text="f.stimme"></span>
+            </div>
+            <div x-show="f.hintergrund" class="figur-kerninfo-row">
+              <span class="bewertung-section-title bewertung-section-title--inline" x-text="$app.t('figuren.field.hintergrund') + ' '"></span>
+              <span class="figur-detail-value" x-text="f.hintergrund"></span>
+            </div>
+          </div>
+          <!-- Entwicklungsbogen (strukturiert); Fallback flacher entwicklung-String -->
+          <div x-show="(f.arc && (f.arc.anfang || f.arc.ende || f.arc.wendepunkte?.length)) || (!f.arc && f.entwicklung)" class="figur-arc">
+            <div class="bewertung-section-title" x-text="$app.t('figuren.field.arc')"></div>
+            <template x-if="f.arc && (f.arc.anfang || f.arc.ende || f.arc.wendepunkte?.length)">
+              <div class="figur-arc-body">
+                <div x-show="f.arc.anfang" class="figur-kerninfo-row">
+                  <span class="bewertung-section-title bewertung-section-title--inline" x-text="$app.t('figuren.field.arcAnfang') + ' '"></span>
+                  <span class="figur-detail-value" x-text="f.arc.anfang"></span>
+                </div>
+                <ol x-show="f.arc.wendepunkte?.length" class="figur-arc-stations">
+                  <template x-for="(w, wi) in (f.arc.wendepunkte || [])" :key="wi">
+                    <li x-text="w"></li>
+                  </template>
+                </ol>
+                <div x-show="f.arc.ende" class="figur-kerninfo-row">
+                  <span class="bewertung-section-title bewertung-section-title--inline" x-text="$app.t('figuren.field.arcEnde') + ' '"></span>
+                  <span class="figur-detail-value" x-text="f.arc.ende"></span>
+                </div>
+              </div>
+            </template>
+            <template x-if="!f.arc && f.entwicklung">
+              <span class="figur-detail-value" x-text="f.entwicklung"></span>
+            </template>
           </div>
           <!-- Beruf + Sozialschicht + Präsenz -->
           <div x-show="f.beruf || (f.sozialschicht && f.sozialschicht !== 'andere') || f.praesenz" class="figur-detail-row">

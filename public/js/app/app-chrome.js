@@ -134,6 +134,21 @@ export const appChromeMethods = {
     });
   },
 
+  // Scrollbar im Sidebar-Tree initial unsichtbar, erscheint nur während des
+  // Scrollens und fadet nach kurzer Idle-Zeit wieder aus. CSS reserviert den
+  // Gutter dauerhaft (kein Layout-Shift), JS toggelt nur `.is-scrolling`.
+  _initSidebarScrollFade() {
+    const tree = document.querySelector('.layout-sidebar > #partial-sidebar');
+    if (!tree || tree._scrollFadeBound) return;
+    tree._scrollFadeBound = true;
+    let idleTimer = null;
+    tree.addEventListener('scroll', () => {
+      tree.classList.add('is-scrolling');
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => tree.classList.remove('is-scrolling'), 800);
+    }, { passive: true });
+  },
+
   _avatarInitials() {
     const src = (this.currentUser && (this.currentUser.name || this.currentUser.email)) || '';
     if (!src) return '·';

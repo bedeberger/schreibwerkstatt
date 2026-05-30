@@ -208,6 +208,75 @@ export const viewMethods = {
     return (newDepth + movingSubtreeDepth - 1) <= MAX_CHAPTER_DEPTH;
   },
 
+  // Kapitel-Längenverteilung (Zeichen) für die Collapse-Tile am Organizer-Fuss.
+  // Quelle: root.tree Top-Level-Kapitel mit .stats (von _refreshChapterStats
+  // gefüllt, Sub-Kapitel-Zeichen sind bereits aufaggregiert). Diverging-Bar um
+  // Median analog overviewChapterDistribution. Reihenfolge = Lese-Reihenfolge.
+  chapterLengthDist() {
+    const tree = window.__app?.tree || [];
+    const roots = tree.filter(it => it.type === 'chapter' && !it.solo && it.parent_id == null);
+    // Signatur statt tree-Ref: stats wird in-place mutiert (kein neuer Ref),
+    // sonst bliebe das Memo nach DnD/Stats-Refresh stale.
+    const sig = roots.map(c => c.id + ':' + (c.stats?.chars || 0)).join('|');
+    return this._memo('chapterLenDist', [sig], () => {
+      const out = roots
+        .map(c => ({
+          id: c.id,
+          name: c.name,
+          chars: c.stats?.chars || 0,
+          words: c.stats?.words || 0,
+          pages: c.stats?.count || 0,
+          normseiten: c.stats?.normseiten || 0,
+        }))
+        .filter(c => c.chars > 0);
+      if (out.length === 0) return [];
+      const maxChars = Math.max(1, ...out.map(c => c.chars));
+      const minChars = Math.min(...out.map(c => c.chars));
+      const sorted = out.map(c => c.chars).sort((a, b) => a - b);
+      const mid = Math.floor(sorted.length / 2);
+      const median = sorted.length % 2 === 0
+        ? (sorted[mid - 1] + sorted[mid]) / 2
+        : sorted[mid];
+      const withDelta = out.map(c => ({
+        ...c,
+        deltaPct: median > 0 ? Math.round(((c.chars - median) / median) * 100) : 0,
+        isMax: c.chars === maxChars && maxChars > 0,
+        isMin: c.chars === minChars && maxChars !== minChars,
+      }));
+      const maxAbsDelta = Math.max(1, ...withDelta.map(c => Math.abs(c.deltaPct)));
+      const HALF = 48; // % of full track (cap, damit Bars nicht an Rand stossen)
+      return withDelta.map(c => {
+        const halfPct = (Math.abs(c.deltaPct) / maxAbsDelta) * HALF;
+        return {
+          ...c,
+          median,
+          barWidthPct: halfPct,
+          barLeftPct: c.deltaPct >= 0 ? 50 : 50 - halfPct,
+          isPositive: c.deltaPct >= 0,
+        };
+      });
+    });
+  },
+
+  _fmtNum(n) {
+    const tag = window.__app?.uiLocale === 'en' ? 'en-US' : 'de-CH';
+    return Number(n || 0).toLocaleString(tag);
+  },
+
+  // Cache hit nur wenn alle deps identisch zur letzten Compute. Genau ein
+  // _memo-Helper pro Karte (CLAUDE.md), gemeinsamer this._memos-Speicher.
+  _memo(key, deps, compute) {
+    const memos = (this._memos ||= {});
+    const hit = memos[key];
+    if (hit && hit.deps.length === deps.length
+        && hit.deps.every((d, i) => d === deps[i])) {
+      return hit.value;
+    }
+    const value = compute();
+    memos[key] = { deps: [...deps], value };
+    return value;
+  },
+
   // Tab / Shift+Tab im Kapitel-Input: bei moeglicher Aktion preventDefault +
   // promote/demote; sonst native Tab durchlassen (Fokus-Move).
   onChapterTab(ev, id) {

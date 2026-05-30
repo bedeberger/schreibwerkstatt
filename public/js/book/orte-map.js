@@ -47,7 +47,11 @@ export const orteMapMethods = {
     const el = this.$refs.orteMapEl;
     if (!el) return;
     if (!this._map) {
-      this._map = L.map(el, { scrollWheelZoom: true }).setView([20, 0], 2);
+      // zoomAnimation aus: der Karten-Tab lebt in einem x-show-Container, der
+      // beim Tab-/Buchwechsel auf display:none geht. Eine laufende Zoom-Anim
+      // feuert dann ihr zoomanim-rAF auf Marker, deren Map-Panes schon weg sind
+      // (_animateZoom liest null) → Crash. Instant-Zoom umgeht den Pfad ganz.
+      this._map = L.map(el, { scrollWheelZoom: true, zoomAnimation: false }).setView([20, 0], 2);
       L.tileLayer(OSM_TILES, {
         maxZoom: 19,
         attribution: window.__app.t('orte.map.attribution'),
@@ -95,12 +99,20 @@ export const orteMapMethods = {
       const regionQ = /^[A-Za-z]{2}$/.test(land) ? `&region=${land.toLowerCase()}` : '';
       const data = await fetchJson(`/geocode?q=${q}&lang=${this._geoLang || 'de'}${regionQ}`);
       const c = data?.candidates?.[0];
-      if (!c) { this.orteMapStatus = app.t('orte.map.noResult', { name: o.name }); return; }
       const target = app.orte.find(x => x.id === o.id);
-      if (target) { target.lat = c.lat; target.lng = c.lng; await app.saveOrte(); }
+      if (!c) {
+        // Kein Treffer → Pin in Karten-Mitte droppen. User schiebt ihn zurecht,
+        // dragend speichert. Ohne Map (Liste) Buch-Center bzw. globaler Default.
+        const center = this._map ? this._map.getCenter() : { lat: 20, lng: 0 };
+        if (target) { target.lat = center.lat; target.lng = center.lng; await app.saveOrte(); }
+        this.orteMapStatus = app.t('orte.map.pinDropped', { name: o.name });
+      } else {
+        if (target) { target.lat = c.lat; target.lng = c.lng; await app.saveOrte(); }
+      }
       if (this.viewMode === 'map') {
         const L = await loadLeaflet();
         this._renderOrteMarkers(L);
+        if (!c && target) this._map?.setView([target.lat, target.lng], Math.max(this._map.getZoom(), 6));
       }
     } catch (e) {
       console.error('[geocodeOrt]', e);
@@ -109,8 +121,28 @@ export const orteMapMethods = {
     }
   },
 
+  // Falsch gesetzte Georeferenz löschen — Schauplatz bleibt, nur lat/lng raus.
+  // Marker verschwindet, Ort wird wieder geocodierbar.
+  async clearGeoref(o) {
+    const app = window.__app;
+    const target = app.orte.find(x => x.id === o.id);
+    if (!target || (target.lat == null && target.lng == null)) return;
+    target.lat = null;
+    target.lng = null;
+    await app.saveOrte();
+    this.orteMapStatus = app.t('orte.map.georefCleared', { name: o.name });
+    if (this.viewMode === 'map') {
+      const L = await loadLeaflet();
+      this._renderOrteMarkers(L);
+    }
+  },
+
   _teardownMap() {
     if (this._map) {
+      // Laufende Pan/Zoom-Anim hart stoppen + Marker abräumen, bevor remove()
+      // die Panes nullt — sonst feuert ein queued Anim-Callback ins Leere.
+      this._map.stop();
+      this._markers?.clearLayers();
       this._map.remove();
       this._map = null;
       this._markers = null;

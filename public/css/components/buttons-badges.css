@@ -29,6 +29,12 @@ button.success {
 }
 button.success:hover { background: var(--color-success-hover); }
 
+button.danger {
+  color: var(--color-err-text);
+  border-color: var(--color-err-border);
+}
+button.danger:hover { background: var(--color-err-bg); }
+
 /* Count-Badge in Action-Buttons (Ideen, Chat). Eckig (Projektregel). */
 .btn-count {
   display: inline-block;

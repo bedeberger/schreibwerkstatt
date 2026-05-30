@@ -416,4 +416,14 @@
 @media (max-width: 720px) {
   .blog-conflict-body { grid-template-columns: 1fr; }
 }
+
+/* Kapitellängen-Collapse am Organizer-Fuss: optisch vom Tree absetzen.
+   Bar-/Listen-Styling kommt aus book-overview/kapitel.css (geteiltes
+   overview-chapter-*-Pattern). */
+.organizer-lengthdist {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-4);
+  border-top: 0.5px solid var(--color-border);
+}
+.organizer-lengthdist .overview-chapter-list { margin-top: var(--space-2); }
 }

@@ -235,7 +235,7 @@ function saveZeitstrahlEvents(bookId, userEmail, ereignisse, chNameToId = {}, pa
 // wird er aus der chapters-Tabelle aufgebaut (für UI-Endpunkt ohne Job-Kontext).
 // pageNameToIdByChapter: optional. Fehlt er, wird er aus der pages-Tabelle
 // aufgebaut — kapitel-scoped gegen Namenskollisionen zwischen Kapiteln.
-function saveOrteToDb(bookId, orte, userEmail, chNameToId = null, pageNameToIdByChapter = null) {
+function saveOrteToDb(bookId, orte, userEmail, chNameToId = null, pageNameToIdByChapter = null, opts = {}) {
   if (chNameToId == null) {
     const rows = db.prepare('SELECT chapter_id, chapter_name FROM chapters WHERE book_id = ?').all(bookId);
     chNameToId = Object.fromEntries(rows.map(r => [r.chapter_name, r.chapter_id]));
@@ -277,6 +277,24 @@ function saveOrteToDb(bookId, orte, userEmail, chNameToId = null, pageNameToIdBy
     ).all(bookId, ...emailVal);
     const existingMap = Object.fromEntries(existing.map(r => [r.loc_id, r.id]));
 
+    // Komplettanalyse liefert keine Geo-Daten (AI extrahiert kein lat/lng) und
+    // wuerde manuell gepinnte/gegeocodete Koordinaten beim Full-Replace mit NULL
+    // ueberschreiben. Bei `preserveExistingCoords` Bestandskoordinaten per
+    // normalisiertem Namen reattachen — loc_id taugt nicht (AI regeneriert ids).
+    // Manuell-Pfad (routes/locations.js) setzt das Flag NICHT → Coords bleiben
+    // dort leerbar.
+    let coordByName = null;
+    if (opts.preserveExistingCoords) {
+      coordByName = new Map();
+      const cr = db.prepare(
+        `SELECT name, lat, lng, land FROM locations WHERE book_id = ? AND ${emailCond} AND lat IS NOT NULL AND lng IS NOT NULL`
+      ).all(bookId, ...emailVal);
+      for (const r of cr) {
+        const key = String(r.name || '').trim().toLowerCase();
+        if (key && !coordByName.has(key)) coordByName.set(key, r);
+      }
+    }
+
     const newLocIds = new Set(orte.map(o => o.id));
 
     // Entfernte Orte löschen (CASCADE entfernt location_figures, location_chapters, scene_locations)
@@ -307,6 +325,10 @@ function saveOrteToDb(bookId, orte, userEmail, chNameToId = null, pageNameToIdBy
     for (let i = 0; i < orte.length; i++) {
       const o = orte[i];
       const erstPageId = resolveErstePageIdForOrt(o.erste_erwaehnung, o.kapitel);
+      if (coordByName && (o.lat == null || o.lng == null)) {
+        const m = coordByName.get(String(o.name || '').trim().toLowerCase());
+        if (m) { o.lat = m.lat; o.lng = m.lng; if (o.land == null && m.land) o.land = m.land; }
+      }
       const lat = _clampCoord(o.lat, 90);
       const lng = _clampCoord(o.lng, 180);
       // land normalisiert auf ISO-3166-1-alpha-2 lowercase; alles andere → NULL.

@@ -13,6 +13,17 @@ export function _cleanStr(v) {
   return s;
 }
 
+// Strukturierter Entwicklungsbogen: leere Felder bereinigen; null wenn nichts übrig.
+function _sanitizeArc(arc) {
+  if (!arc || typeof arc !== 'object') return null;
+  const anfang = _cleanStr(arc.anfang);
+  const ende = _cleanStr(arc.ende);
+  const wendepunkte = (Array.isArray(arc.wendepunkte) ? arc.wendepunkte : []).map(_cleanStr).filter(Boolean);
+  const typ = _cleanStr(arc.typ);
+  if (!anfang && !ende && !wendepunkte.length && !typ) return null;
+  return { typ: typ || '', anfang: anfang || '', wendepunkte, ende: ende || '' };
+}
+
 export function _sanitizeFigur(f) {
   return {
     ...f,
@@ -28,9 +39,13 @@ export function _sanitizeFigur(f) {
     rolle: _cleanStr(f.rolle),
     motivation: _cleanStr(f.motivation),
     konflikt: _cleanStr(f.konflikt),
+    aeusseres: _cleanStr(f.aeusseres),
+    stimme: _cleanStr(f.stimme),
+    hintergrund: _cleanStr(f.hintergrund),
     entwicklung: _cleanStr(f.entwicklung),
+    arc: _sanitizeArc(f.arc),
     erste_erwaehnung: _cleanStr(f.erste_erwaehnung),
-    schluesselzitate: (f.schluesselzitate || []).map(_cleanStr).filter(Boolean).slice(0, 3),
+    schluesselzitate: (f.schluesselzitate || []).map(_cleanStr).filter(Boolean).slice(0, 5),
     eigenschaften: (f.eigenschaften || []).map(_cleanStr).filter(Boolean),
     lebensereignisse: (f.lebensereignisse || []).map(ev => ({
       ...ev,

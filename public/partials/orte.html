@@ -202,6 +202,10 @@
                   :disabled="geocodingId === o.id || (o.lat != null && o.lng != null)"
                   @click="geocodeOrt(o)"
                   x-text="geocodingId === o.id ? $app.t('orte.map.geocoding') : $app.t('orte.map.geocode')"></button>
+          <button type="button" class="btn-compact danger"
+                  x-show="o.lat != null && o.lng != null"
+                  @click="clearGeoref(o)"
+                  x-text="$app.t('orte.map.clearGeoref')"></button>
         </div>
       </template>
     </div>

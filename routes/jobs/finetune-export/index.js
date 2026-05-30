@@ -17,6 +17,7 @@ const { finetuneResultStore } = require('./lib/store');
 
 const { buildStyleSamples } = require('./samples/style');
 const { buildSceneSamples } = require('./samples/scene');
+const { buildVerbatimSamples } = require('./samples/verbatim');
 const { buildDialogSamples } = require('./samples/dialog');
 const { buildCorrectionSamples } = require('./samples/correction');
 const { buildAuthorChatSamples } = require('./samples/author-chat');
@@ -76,6 +77,11 @@ async function runFinetuneExportJob(jobId, bookId, bookName, userEmail, userToke
     // Drop. Bewahrt grosse Samples für kleinere seqlen-Trainings, riskiert dafür
     // Mid-Sentence-Cuts. Default false → bestehendes Verhalten (Drop).
     const truncateLong = !!opts.truncateLong;
+    // `biasBoost`: Multiplikator für die Per-Entity/Per-Page-Caps der
+    // deterministischen Sampler (Dialog-Reverse, Satz-Continuation, Fakten-,
+    // Passagen-Caps). 1 = bisheriges Verhalten, >1 = mehr redundante Samples
+    // pro Quelle → stärkeres Memorisierungs-Bias. Geclamped auf 1..5.
+    const biasBoost = Math.max(1, Math.min(5, Number(opts.biasBoost) || 1));
 
     // Einheitliche Identität über alle Sample-Typen: Modell soll *eine* Stimme
     // lernen — die des Buchs — statt mehrerer Personae (Lektor, Dialogschreiber,
@@ -87,11 +93,11 @@ async function runFinetuneExportJob(jobId, bookId, bookName, userEmail, userToke
       : `Du bist die Stimme von «${displayName}». Schreibe, setze fort und antworte im Stil des Autors und aus der Welt dieses Buchs heraus.`;
 
     const samples = [];
-    const counts = { style: 0, scene: 0, dialog: 0, authorChat: 0, correction: 0, aiAugment: 0 };
+    const counts = { style: 0, scene: 0, verbatim: 0, dialog: 0, authorChat: 0, correction: 0, aiAugment: 0 };
 
     // Normalised opts mit übernommenen Defaults — wird in alle Sub-Module gereicht.
     const optsNorm = { ...opts, minChars, maxChars, valSplit, valSeed: seed, maxSeqTokens, emitText,
-                       fulltext, maxFullChars, truncateLong };
+                       fulltext, maxFullChars, truncateLong, biasBoost };
 
     const ctx = {
       jobId, logger,
@@ -115,6 +121,12 @@ async function runFinetuneExportJob(jobId, bookId, bookName, userEmail, userToke
       updateJob(jobId, { progress: 70, statusText: 'finetune.phase.scene' });
       buildSceneSamples(ctx);
       logger.info(`Sampler «scene» fertig: ${counts.scene} Samples.`);
+    }
+
+    if (opts.types.verbatim) {
+      updateJob(jobId, { progress: 72, statusText: 'finetune.phase.verbatim' });
+      buildVerbatimSamples(ctx);
+      logger.info(`Sampler «verbatim» fertig: ${counts.verbatim} Samples.`);
     }
 
     // Dialog-Sammlung läuft immer, wenn Figuren bekannt sind — `dialogsByFigure`
@@ -149,7 +161,7 @@ async function runFinetuneExportJob(jobId, bookId, bookName, userEmail, userToke
     updateJob(jobId, { progress: 95, statusText: 'finetune.phase.building' });
 
     const stats = finalizeFinetuneSamples(jobId, ctx);
-    const sampleBreakdown = `${counts.style}/${counts.scene}/${counts.dialog}/${counts.authorChat}/${counts.correction}/${counts.aiAugment} (sty/scn/dlg/ac/cor/aug)`;
+    const sampleBreakdown = `${counts.style}/${counts.scene}/${counts.verbatim}/${counts.dialog}/${counts.authorChat}/${counts.correction}/${counts.aiAugment} (sty/scn/vrb/dlg/ac/cor/aug)`;
     completeJob(jobId, { stats }, null,
       `${stats.total} Samples [${sampleBreakdown}], ${stats.train} train + ${stats.val} val, dropped=${stats.dropped}, p95=${stats.tokensP95} tok, max=${stats.tokensMax} tok, recSeq=${stats.recommendedSeqLen}`);
   } catch (e) {
@@ -160,7 +172,7 @@ async function runFinetuneExportJob(jobId, bookId, bookName, userEmail, userToke
 
 finetuneExportRouter.post('/finetune-export', jsonBody, (req, res) => {
   const { book_id, book_name, types, min_chars, max_chars, val_split, val_seed,
-          max_seq_tokens, emit_text, fulltext, max_full_chars, truncate_long, ai } = req.body || {};
+          max_seq_tokens, emit_text, fulltext, max_full_chars, truncate_long, bias_boost, ai } = req.body || {};
   if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
   setContext({ book: book_id });
   const { requireBookAccess, sendACLError } = require('../../../lib/acl');
@@ -178,6 +190,7 @@ finetuneExportRouter.post('/finetune-export', jsonBody, (req, res) => {
     types: {
       style:      !!(types && types.style),
       scene:      !!(types && types.scene),
+      verbatim:   !!(types && types.verbatim),
       dialog:     !!(types && types.dialog),
       authorChat: !!(types && types.authorChat),
       correction: !!(types && types.correction),
@@ -192,6 +205,7 @@ finetuneExportRouter.post('/finetune-export', jsonBody, (req, res) => {
     fulltext: fulltext !== false,
     maxFullChars: Number(max_full_chars) || 60000,
     truncateLong: !!truncate_long,
+    biasBoost: Number(bias_boost) || 1,
     ai: aiOpts,
   };
   if (!Object.values(opts.types).some(v => v)) {

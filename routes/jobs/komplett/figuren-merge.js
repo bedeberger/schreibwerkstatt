@@ -29,14 +29,22 @@ function _nameTokens(name) {
 
 /** Fasst zwei Figuren zu einer kanonischen Figur zusammen. `canon` wird mutiert.
  *  Gibt nichts zurück – Caller kümmert sich um idRemap. */
+function _arcWeight(a) {
+  if (!a || typeof a !== 'object') return 0;
+  return (a.anfang ? 1 : 0) + (a.ende ? 1 : 0) + (Array.isArray(a.wendepunkte) ? a.wendepunkte.length : 0);
+}
+
 function _mergeFigurInto(canon, other) {
   for (const field of ['kurzname', 'typ', 'geburtstag', 'geschlecht', 'beruf', 'wohnadresse', 'sozialschicht',
+                       'aeusseres', 'stimme', 'hintergrund',
                        'rolle', 'motivation', 'konflikt', 'entwicklung', 'erste_erwaehnung', 'praesenz']) {
     if (!canon[field] && other[field]) canon[field] = other[field];
   }
+  // Arc: reichere Variante (mehr belegte Stationen) gewinnt.
+  if (_arcWeight(other.arc) > _arcWeight(canon.arc)) canon.arc = other.arc;
   if (!canon.beschreibung && other.beschreibung) canon.beschreibung = other.beschreibung;
   const zit = new Set([...(canon.schluesselzitate || []), ...(other.schluesselzitate || [])]);
-  canon.schluesselzitate = [...zit].slice(0, 3);
+  canon.schluesselzitate = [...zit].slice(0, 5);
   const kapByName = new Map();
   for (const k of (canon.kapitel || [])) kapByName.set(k.name, k.haeufigkeit || 1);
   for (const k of (other.kapitel || [])) {
@@ -134,12 +142,14 @@ function preMergeChapterFiguren(chapterFiguren) {
 
       if (canon) {
         for (const field of ['kurzname', 'typ', 'geburtstag', 'geschlecht', 'beruf', 'wohnadresse', 'sozialschicht',
+                             'aeusseres', 'stimme', 'hintergrund',
                              'rolle', 'motivation', 'konflikt', 'entwicklung', 'erste_erwaehnung', 'praesenz',
                              'beschreibung']) {
           if (!canon[field] && f[field]) canon[field] = f[field];
         }
+        if (_arcWeight(f.arc) > _arcWeight(canon.arc)) canon.arc = f.arc;
         const zit = new Set([...(canon.schluesselzitate || []), ...(f.schluesselzitate || [])]);
-        canon.schluesselzitate = [...zit].slice(0, 3);
+        canon.schluesselzitate = [...zit].slice(0, 5);
         const eig = new Set([...(canon.eigenschaften || []), ...(f.eigenschaften || [])]);
         canon.eigenschaften = [...eig];
         const kapByName = new Map();
