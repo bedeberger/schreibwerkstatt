@@ -65,24 +65,33 @@
       // funktioniert identisch (clearInterval + Timer-Prop nullen).
       _startPoll(config) {
         if (this[config.timerProp]) clearInterval(this[config.timerProp]);
+        let busy = false;
+        let done = false;
+        const stop = () => {
+          clearInterval(this[config.timerProp]);
+          this[config.timerProp] = null;
+        };
         this[config.timerProp] = setInterval(async () => {
+          if (busy || done) return;
+          busy = true;
           try {
             const resp = await fetch('/jobs/' + config.jobId);
+            if (done) return;
             if (resp.status === 404) {
-              clearInterval(this[config.timerProp]);
-              this[config.timerProp] = null;
+              done = true; stop();
               config.onNotFound?.();
               return;
             }
             if (!resp.ok) return;
             const job = await resp.json();
+            if (done) return;
             if (config.progressProp) this[config.progressProp] = job.progress || 0;
             if (job.status === 'running' || job.status === 'queued') { config.onProgress?.(job); return; }
-            clearInterval(this[config.timerProp]);
-            this[config.timerProp] = null;
+            done = true; stop();
             if (job.status === 'cancelled' || job.status === 'error') await config.onError?.(job);
             else await config.onDone?.(job);
           } catch (e) { console.error('[poll]', e); }
+          finally { busy = false; }
         }, 50);
       },
     };

@@ -34,7 +34,7 @@ export const fehlerHeatmapMethods = {
     this.fehlerHeatmapLoading = true;
     this.fehlerHeatmapStatus = '';
     try {
-      const mode = MODES.includes(this.fehlerHeatmapMode) ? this.fehlerHeatmapMode : 'all';
+      const mode = MODES.includes(this.fehlerHeatmapMode) ? this.fehlerHeatmapMode : 'open';
       const data = await fetchJson(`/history/fehler-heatmap/${window.__app.selectedBookId}?mode=${mode}`);
       this.fehlerHeatmapData = data;
     } catch (e) {

@@ -9,7 +9,7 @@ export function registerFehlerHeatmapCard() {
     fehlerHeatmapData: null,
     fehlerHeatmapLoading: false,
     fehlerHeatmapStatus: '',
-    fehlerHeatmapMode: 'all',
+    fehlerHeatmapMode: 'open',
     activeFehlerDetailKey: null,
     _lifecycle: null,
 

@@ -13,7 +13,7 @@
 
 import { startPoll } from './job-helpers.js';
 
-const TABS = ['layout', 'font', 'chapter', 'cover', 'toc', 'extras', 'author', 'print', 'pdfa'];
+const TABS = ['layout', 'font', 'chapter', 'cover', 'toc', 'extras', 'print', 'pdfa'];
 
 // Druckerei-Trim-Presets (mm). Setzen pageSize='custom' + Masse. Decken die
 // gängigen Buchformate ab, die A4/A5/A6/Letter nicht abbilden.
@@ -88,12 +88,10 @@ export function registerPdfExportCard() {
     currentJobId: null,
     trimPresetSel: '',
 
-    coverUploading: false,
-    coverError: '',
+    // coverPreviewVersion bustet den Cache der Rückseiten-Bild-Vorschau
+    // (Umschlag). Front-Cover + Autorfoto leben buch-weit in book_publication
+    // und werden im BookSettings → Publikation-Tab gepflegt.
     coverPreviewVersion: 0,
-
-    authorImageUploading: false,
-    authorImageError: '',
 
     backCoverUploading: false,
     backCoverError: '',
@@ -283,78 +281,6 @@ export function registerPdfExportCard() {
       } finally {
         this.saving = false;
       }
-    },
-
-    // ── Cover-Upload ──────────────────────────────────────────────────────
-    async uploadCover(ev) {
-      const file = ev?.target?.files?.[0];
-      if (!file || !this.activeProfile) return;
-      this.coverUploading = true;
-      this.coverError = '';
-      try {
-        const r = await fetch(`/pdf-export/profiles/${this.activeProfile.id}/cover`, {
-          method: 'POST',
-          headers: { 'Content-Type': file.type || 'application/octet-stream' },
-          body: file,
-        });
-        if (!r.ok) {
-          const d = await r.json().catch(() => ({}));
-          this.coverError = window.__app.t('pdfExport.error.coverInvalid', d.params);
-          return;
-        }
-        await this.selectProfile(this.activeProfile.id);
-      } finally {
-        this.coverUploading = false;
-        ev.target.value = '';
-      }
-    },
-
-    async removeCover() {
-      if (!this.activeProfile) return;
-      const r = await fetch(`/pdf-export/profiles/${this.activeProfile.id}/cover`, { method: 'DELETE' });
-      if (!r.ok) return;
-      await this.selectProfile(this.activeProfile.id);
-    },
-
-    coverUrl() {
-      if (!this.activeProfile?.has_cover) return '';
-      return `/pdf-export/profiles/${this.activeProfile.id}/cover?v=${this.coverPreviewVersion}`;
-    },
-
-    // ── Autorfoto ("Über den Autor"-Seite) ───────────────────────────────
-    async uploadAuthorImage(ev) {
-      const file = ev?.target?.files?.[0];
-      if (!file || !this.activeProfile) return;
-      this.authorImageUploading = true;
-      this.authorImageError = '';
-      try {
-        const r = await fetch(`/pdf-export/profiles/${this.activeProfile.id}/author-image`, {
-          method: 'POST',
-          headers: { 'Content-Type': file.type || 'application/octet-stream' },
-          body: file,
-        });
-        if (!r.ok) {
-          const d = await r.json().catch(() => ({}));
-          this.authorImageError = window.__app.t('pdfExport.error.authorImageInvalid', d.params);
-          return;
-        }
-        await this.selectProfile(this.activeProfile.id);
-      } finally {
-        this.authorImageUploading = false;
-        ev.target.value = '';
-      }
-    },
-
-    async removeAuthorImage() {
-      if (!this.activeProfile) return;
-      const r = await fetch(`/pdf-export/profiles/${this.activeProfile.id}/author-image`, { method: 'DELETE' });
-      if (!r.ok) return;
-      await this.selectProfile(this.activeProfile.id);
-    },
-
-    authorImageUrl() {
-      if (!this.activeProfile?.has_author_image) return '';
-      return `/pdf-export/profiles/${this.activeProfile.id}/author-image?v=${this.coverPreviewVersion}`;
     },
 
     // ── Umschlag-Rückseitenbild (separates Cover-PDF) ─────────────────────

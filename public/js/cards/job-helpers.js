@@ -11,27 +11,40 @@ import { escHtml, fmtTok } from '../utils.js';
 // intervalMs: Default 2000. PDF-Export fährt 1000 für schnelleres UI-Feedback.
 export function startPoll(ctx, config) {
   if (ctx[config.timerProp]) clearInterval(ctx[config.timerProp]);
+  // `setInterval` wartet nicht auf den async-Body. Bei langsamem Storage/Netz
+  // (z.B. Ceph-RBD-Stall) liegen mehrere Ticks gleichzeitig in-flight, ihre
+  // fetches wurden vor dem `clearInterval` dispatcht → `onDone`/`onError`
+  // feuern mehrfach (klärt State, der danach erneut befüllt wird). `busy`
+  // überspringt überlappende Ticks, `done` macht den Terminal-Handler einmalig.
+  let busy = false;
+  let done = false;
+  const stop = () => {
+    clearInterval(ctx[config.timerProp]);
+    ctx[config.timerProp] = null;
+    if (config.lsKey) localStorage.removeItem(config.lsKey);
+  };
   ctx[config.timerProp] = setInterval(async () => {
+    if (busy || done) return;
+    busy = true;
     try {
       const resp = await fetch('/jobs/' + config.jobId);
+      if (done) return;
       if (resp.status === 404) {
-        clearInterval(ctx[config.timerProp]);
-        ctx[config.timerProp] = null;
-        if (config.lsKey) localStorage.removeItem(config.lsKey);
+        done = true; stop();
         config.onNotFound?.();
         return;
       }
       if (!resp.ok) return;
       const job = await resp.json();
+      if (done) return;
       if (config.progressProp) ctx[config.progressProp] = job.progress || 0;
       if (job.status === 'running' || job.status === 'queued') { config.onProgress?.(job); return; }
-      clearInterval(ctx[config.timerProp]);
-      ctx[config.timerProp] = null;
-      if (config.lsKey) localStorage.removeItem(config.lsKey);
+      done = true; stop();
       if (job.status === 'cancelled') { await config.onError?.(job); return; }
       if (job.status === 'error') await config.onError?.(job);
       else await config.onDone?.(job);
     } catch (e) { console.error('[poll ' + config.timerProp + ']', e); }
+    finally { busy = false; }
   }, config.intervalMs || 2000);
 }
 

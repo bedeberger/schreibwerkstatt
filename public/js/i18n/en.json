@@ -531,7 +531,8 @@
   "pdfExport.cover.posBottom":             "Bottom",
   "pdfExport.cover.optionsLegend":         "Display",
   "pdfExport.cover.spineLegend":           "Separate cover PDF (print)",
-  "pdfExport.cover.spineHint":             "Produces a print-ready cover sheet: back + spine + front. Front = the title image uploaded above. Bleed and crop marks are taken from the Print tab.",
+  "pdfExport.cover.spineHint":             "Produces a print-ready cover sheet: back + spine + front. Front = the title image from Book settings → Publication. Bleed and crop marks are taken from the Print tab.",
+  "pdfExport.cover.imageFromPublication":  "The title image is maintained book-wide under Book settings → Publication (shared with the EPUB export).",
   "pdfExport.cover.pageCount":             "Interior page count",
   "pdfExport.cover.paperBulk":             "Paper bulk (mm / 1000 pages)",
   "pdfExport.cover.paperBulkHint":         "Spine thickness per 1000 interior pages in mm — from the printer / paper datasheet. Typically 60–90.",
@@ -570,7 +571,7 @@
   "pdfExport.toc.font.tocTitle":           "Heading",
   "pdfExport.toc.font.toc":                "Entries",
 
-  "pdfExport.extras.hint":                 "All extras are optional. Empty fields are not rendered into the PDF.",
+  "pdfExport.extras.hint":                 "Render placement. Title-page content (ISBN, subtitle, year, dedication, imprint, copyright, frontmatter, bio) + cover/author photo live under Book settings → Publication.",
   "pdfExport.extras.subtitle":             "Subtitle (optional)",
   "pdfExport.extras.year":                 "Year (optional)",
   "pdfExport.extras.isbn":                 "ISBN (optional)",

@@ -531,7 +531,8 @@
   "pdfExport.cover.posBottom":             "Unten",
   "pdfExport.cover.optionsLegend":         "Darstellung",
   "pdfExport.cover.spineLegend":           "Separates Umschlag-PDF (Druck)",
-  "pdfExport.cover.spineHint":             "Erzeugt einen druckfertigen Umschlagbogen: Rückseite + Buchrücken + Vorderseite. Vorderseite = das oben hochgeladene Titelbild. Beschnitt + Schnittmarken werden aus dem Druck-Tab übernommen.",
+  "pdfExport.cover.spineHint":             "Erzeugt einen druckfertigen Umschlagbogen: Rückseite + Buchrücken + Vorderseite. Vorderseite = das Titelbild aus Buch-Einstellungen → Publikation. Beschnitt + Schnittmarken werden aus dem Druck-Tab übernommen.",
+  "pdfExport.cover.imageFromPublication":  "Das Titelbild wird buchweit unter Buch-Einstellungen → Publikation gepflegt (geteilt mit dem EPUB-Export).",
   "pdfExport.cover.pageCount":             "Innenteil-Seitenzahl",
   "pdfExport.cover.paperBulk":             "Papiervolumen (mm / 1000 Seiten)",
   "pdfExport.cover.paperBulkHint":         "Rückenstärke je 1000 Innenseiten in mm — von der Druckerei / dem Papierdatenblatt. Typisch 60–90.",
@@ -570,7 +571,7 @@
   "pdfExport.toc.font.tocTitle":           "Überschrift",
   "pdfExport.toc.font.toc":                "Einträge",
 
-  "pdfExport.extras.hint":                 "Alle Extras sind optional. Leere Felder werden nicht ins PDF gerendert.",
+  "pdfExport.extras.hint":                 "Render-Platzierung. Inhaltliche Titelei (ISBN, Untertitel, Jahr, Widmung, Impressum, Copyright, Frontmatter, Bio) + Cover/Autorfoto unter Buch-Einstellungen → Publikation.",
   "pdfExport.extras.subtitle":             "Untertitel (optional)",
   "pdfExport.extras.year":                 "Jahr (optional)",
   "pdfExport.extras.isbn":                 "ISBN (optional)",

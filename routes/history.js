@@ -380,16 +380,26 @@ router.get('/fehler-heatmap/:book_id', (req, res) => {
     WHERE p.book_id = ?
   `).all(bookId);
 
+  // errors_json kommt aus dem jüngsten Check pro Seite (aktueller Findings-Stand).
   const checks = db.prepare(`
     WITH latest AS (
-      SELECT page_id, errors_json, applied_errors_json,
+      SELECT page_id, errors_json,
              ROW_NUMBER() OVER (PARTITION BY page_id ORDER BY checked_at DESC) AS rn
       FROM page_checks
       WHERE book_id = ? AND user_email = ?
     )
-    SELECT page_id, errors_json, applied_errors_json
+    SELECT page_id, errors_json
     FROM latest
     WHERE rn = 1
+  `).all(bookId, user_email);
+
+  // applied_errors_json wird über ALLE Checks der Seite akkumuliert (Union per
+  // `original`) — angenommene Korrekturen sind kumulativ und dürfen nicht
+  // verschwinden, sobald die Seite erneut lektoriert wird (neuer Check ohne applied).
+  const appliedRows = db.prepare(`
+    SELECT page_id, applied_errors_json
+    FROM page_checks
+    WHERE book_id = ? AND user_email = ? AND applied_errors_json IS NOT NULL
   `).all(bookId, user_email);
 
   const checkByPage = new Map();
@@ -399,6 +409,16 @@ router.get('/fehler-heatmap/:book_id', (req, res) => {
     if (!s) return [];
     try { const v = JSON.parse(s); return Array.isArray(v) ? v : []; } catch { return []; }
   };
+
+  // page_id → Map<original, finding> (dedupliziert die Union über alle Checks).
+  const appliedByPage = new Map();
+  for (const row of appliedRows) {
+    let m = appliedByPage.get(row.page_id);
+    if (!m) { m = new Map(); appliedByPage.set(row.page_id, m); }
+    for (const e of parseArr(row.applied_errors_json)) {
+      if (e?.original && !m.has(e.original)) m.set(e.original, e);
+    }
+  }
 
   // Gruppiere nach Kapitel. chapter_id kann null sein → '__uncat__'.
   const chapters = new Map();
@@ -423,8 +443,9 @@ router.get('/fehler-heatmap/:book_id', (req, res) => {
     ch.pages_checked++;
 
     const errs = parseArr(check.errors_json);
-    const applied = parseArr(check.applied_errors_json);
-    const appliedSet = new Set(applied.map(e => e?.original).filter(Boolean));
+    const appliedMap = appliedByPage.get(p.page_id) || new Map();
+    const applied = [...appliedMap.values()];
+    const appliedSet = new Set(appliedMap.keys());
 
     let effective;
     if (mode === 'applied') effective = applied;

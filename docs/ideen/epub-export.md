@@ -1,6 +1,6 @@
 # Konfigurierbarer EPUB-Export + geteilte Publikations-Metadaten
 
-- **Status:** Ready (teilweise umgesetzt — siehe Umsetzungsstand)
+- **Status:** Umgesetzt — siehe Umsetzungsstand
 - **Aufwand:** L
 - **Severity:** medium <!-- Self-Publishing ist erklärtes Produkt-Ziel; EPUB ist der eBook-Standard neben PDF -->
 
@@ -10,7 +10,8 @@
 > - **EPUB-Consume — umgesetzt + getestet.** `buildEpub` bettet Cover (Buffer→`File`) ein, baut Titelseite/Impressum/Widmung/Motto (beforeToc, aus custom-TOC ausgeschlossen) + Autor-Bio-Backmatter (+Foto-data-URI), Blocksatz-Toggle, TOC-Titel-Override. Sync-Route [routes/export.js](../../routes/export.js) lädt `meta`/Cover/Foto lazy für `epub`. Smoke-Test gegen echtes `genEpub`.
 > - **Backend-Route + Job — umgesetzt + verifiziert.** [routes/publication.js](../../routes/publication.js) (GET/PUT Meta + Cover/Autorfoto-Upload, ACL viewer/editor), [routes/jobs/epub-export.js](../../routes/jobs/epub-export.js) (Job `epub-export` + `/file`-Stream), gemountet in server.js/jobs.js + API-Prefix. CRUD end-to-end gegen Dev-DB getestet.
 > - **Publikation-Tab — umgesetzt.** Neuer Tab in der BookSettings-Karte ([book-settings.html](../../public/partials/book-settings.html) + [book-settings-card.js](../../public/js/cards/book-settings-card.js) + [book-settings.js](../../public/js/book/book-settings.js)): Cover-/Autorfoto-Upload, Titelei-Felder, EPUB-Optionen, EPUB-Export-Button (Job-Poll + Download). i18n de+en (30 Keys, Parität), CSS, SHELL_CACHE-Bump, DESIGN.md-Pattern „Bild-Upload mit Vorschau". 1381 Unit-Tests grün.
-> - **Offen:** PDF-Render-Lesepfad auf `book_publication` umziehen (nach Commit der laufenden pdf-print-ready-Arbeit, sonst Konflikt mit uncommitted Working Tree) — bis dahin liest PDF weiter aus `pdf_export_profile.config.extras`, EPUB aus `book_publication` (Seed hält sie initial konsistent).
+> - **PDF-Merge — umgesetzt.** Der PDF-Export-Job spiegelt buch-weite Metadaten (Cover/Autorfoto/Titelei) aus `book_publication` in `config.extras` vor dem Render ([routes/jobs/pdf-export.js](../../routes/jobs/pdf-export.js): `getBookPublication`/`getBookPublicationCover`/`getBookPublicationAuthorImage` aus [db/book-publication.js](../../db/book-publication.js)). Render-Toggles (`barcode`, `imprintPosition`) + Rückseiten-Bild bleiben Profil-Sache. PDF-Export-Card-Metadaten-/Cover-/Autor-Inputs entfernt, Hinweis auf den Publikation-Tab. → **Single Source of Truth: PDF und EPUB lesen beide `book_publication`.**
+> - **Status: vollständig umgesetzt.** 1381 Unit + 161 Integration grün.
 
 ## Context
 
