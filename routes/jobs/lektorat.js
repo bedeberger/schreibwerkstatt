@@ -89,9 +89,12 @@ const VALID_TYPEN = new Set([
 ]);
 
 // Erklärungs-Phrasen die darauf hindeuten, dass der Eintrag kein echter Fehler ist.
-// Lokale Modelle (Ollama/Llama) ignorieren die FILTER-PFLICHT im Prompt häufig
-// und liefern Einträge mit «Korrektur entfällt – Satz ist korrekt» o.Ä. als Erklärung.
-const NON_ERROR_RE = /korrektur entfällt|kein fehler|kein mangel|ist korrekt\b|nicht falsch|eintrag entfällt|im schweizer kontext|vertretbar|akzeptabel|möglicherweise/i;
+// Sprach-agnostisches letztes Sicherheitsnetz: Lokale Modelle (Ollama/Llama)
+// ignorieren die FILTER-PFLICHT im Prompt häufig, und bei englischsprachigen
+// Büchern formuliert auch Claude die Selbst-Widerrufung auf Englisch («is in fact
+// correct», «this entry is withdrawn») – die rein deutschen Prompt-Filter greifen
+// dann nicht. Beide Sprachräume hier abgedeckt.
+const NON_ERROR_RE = /korrektur entfällt|kein fehler|kein mangel|ist korrekt\b|nicht falsch|eintrag entfällt|im schweizer kontext|vertretbar|akzeptabel|möglicherweise|\bwithdrawn\b|withdraw this entry|\bnot an error\b|\bno error\b|\bnot a mistake\b|\bnot wrong\b|is (?:in fact |actually |indeed |grammatically )?correct here|is (?:in fact|actually|indeed|grammatically) correct\b|correct as (?:written|is|it stands)|no correction (?:needed|necessary|required)|no change (?:needed|necessary|required)|leave (?:it |this )?as[- ]is|perfectly (?:fine|correct|acceptable|valid)/i;
 
 // Identische Findings (gleicher typ + original + korrektur) entfernen.
 // AI-Output enthält gelegentlich byte-gleiche Duplikate (insb. bei mehrfachem

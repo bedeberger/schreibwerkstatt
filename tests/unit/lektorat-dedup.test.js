@@ -67,6 +67,24 @@ test('validateLektoratFehler strippt Legacy-Feld `kontext` (PROMPTS_VERSION 16: 
   assert.equal(out[0].korrektur, 'bar');
 });
 
+test('validateLektoratFehler verwirft Selbst-Widerruf-Einträge (DE + EN)', () => {
+  const input = [
+    // Echter Fehler – bleibt.
+    { typ: 'grammatik', original: 'wegen dem Regen', korrektur: 'wegen des Regens', erklaerung: '«wegen» verlangt den Genitiv.' },
+    // DE-Selbstwiderruf.
+    { typ: 'grammatik', original: 'sassen', korrektur: 'saßen', erklaerung: 'Im Schweizer Kontext akzeptabel, kein Fehler.' },
+    // EN-Selbstwiderruf (genau der gemeldete Fall): Modell zieht den Eintrag selbst zurück.
+    { typ: 'grammatik', original: 'I laid my phone down', korrektur: 'I lay my phone down',
+      erklaerung: '«laid» is in fact correct for transitive use, so this entry is withdrawn.' },
+    // Weitere EN-Varianten.
+    { typ: 'grammatik', original: 'it buzzed', korrektur: 'it buzzed', erklaerung: 'This is not an error; leave as is.' },
+    { typ: 'stil', original: 'she ran fast', korrektur: 'she sprinted', erklaerung: 'No correction needed, the sentence is fine.' },
+  ];
+  const out = validateLektoratFehler(input, 'en-US');
+  assert.equal(out.length, 1, 'nur der echte Genitiv-Fehler bleibt');
+  assert.equal(out[0].original, 'wegen dem Regen');
+});
+
 test('dedupFehler behaelt Reihenfolge des ersten Vorkommens', () => {
   const input = [
     { typ: 'stil', original: 'B' },
