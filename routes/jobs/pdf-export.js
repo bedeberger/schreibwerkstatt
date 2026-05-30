@@ -20,6 +20,7 @@ const { getPdfExportProfile, getPdfExportProfileCover, getPdfExportProfileAuthor
 const { loadContents } = require('../../lib/load-contents');
 const { renderPdfBuffer } = require('../../lib/pdf-render');
 const { validatePdfa } = require('../../lib/pdfa-validate');
+const { convertToPdfX } = require('../../lib/pdfx-convert');
 const { buildExportFilename } = require('../../lib/filenames');
 const { resolveSlug } = require('../../lib/export-builders/shared');
 const { toIntId } = require('../../lib/validate');
@@ -75,9 +76,11 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
 
     const { language: bookLang } = getBookSettings(book.id, userEmail);
 
+    const standard = profile.config.pdfa?.standard || (profile.config.pdfa?.enabled ? 'pdfa' : 'none');
+
     updateJob(jobId, { progress: 40, statusText: 'job.phase.renderPdf' });
     const meta = {};
-    const buffer = await renderPdfBuffer({
+    let buffer = await renderPdfBuffer({
       book, groups, profile,
       coverBuf, authorImageBuf, token: userToken, lang: bookLang,
       scope, chapter, page, meta,
@@ -88,7 +91,7 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
     if (ctrl?.signal.aborted) throw new Error('job.cancelled');
 
     let validation = { available: false };
-    if (profile.config.pdfa.enabled) {
+    if (standard === 'pdfa') {
       updateJob(jobId, { progress: 85, statusText: 'job.phase.validatePdfa' });
       try {
         validation = await validatePdfa(buffer);
@@ -101,6 +104,27 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
       }
     }
 
+    // PDF/X-3-Post-Step (Druckvorstufe): Ghostscript stempelt OutputIntent + ICC.
+    // RGB bleibt, keine CMYK-Separation. Non-fatal — fehlt gs/ICC, bleibt das
+    // unkonvertierte PDF mit Warnung im Result.
+    let pdfx = null;
+    if (standard === 'pdfx') {
+      updateJob(jobId, { progress: 85, statusText: 'job.phase.convertPdfx' });
+      let conv = { available: false, reason: 'convert-error' };
+      try {
+        conv = await convertToPdfX(buffer, { title: book.name || 'Document' });
+      } catch (e) {
+        log.warn(`PDF/X conversion threw (${e.message}); ignoring`);
+      }
+      if (conv.available && conv.buffer) {
+        buffer = conv.buffer;
+        log.info(`PDF/X-3 erzeugt (OutputIntent=${conv.identifier}, job=${jobId})`);
+      } else {
+        log.warn(`PDF/X conversion unavailable (${conv.reason}); liefere unkonvertiertes PDF (job=${jobId})`);
+      }
+      pdfx = { applied: !!conv.available, reason: conv.reason || null, identifier: conv.identifier || null };
+    }
+
     const slug = resolveSlug(bundle);
     const filename = buildExportFilename({
       prefix: scope, slug, ext: 'pdf', date: new Date(),
@@ -110,7 +134,10 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
     _scheduleResultCleanup(jobId);
 
     const sizeKb = Math.round(buffer.length / 1024);
-    log.info(`PDF generiert «${filename}» (${sizeKb} KB, scope=${scope}${scopeDetail}, profile=${profile.name}, pdfa=${validation.available ? (validation.passed ? 'pass' : 'fail') : 'skipped'})`);
+    const normLog = standard === 'pdfx'
+      ? `pdfx=${pdfx?.applied ? 'ok' : `fallback(${pdfx?.reason})`}`
+      : `pdfa=${validation.available ? (validation.passed ? 'pass' : 'fail') : 'skipped'}`;
+    log.info(`PDF generiert «${filename}» (${sizeKb} KB, scope=${scope}${scopeDetail}, profile=${profile.name}, ${normLog})`);
 
     completeJob(jobId, {
       ready: true,
@@ -121,12 +148,19 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
       scope,
       lowResImages,
       dpiThreshold: profile.config.print?.dpiWarnThreshold || 0,
+      standard,
       pdfa: {
-        requested: !!profile.config.pdfa.enabled,
+        requested: standard === 'pdfa',
         validatorAvailable: !!validation.available,
         passed: validation.available ? !!validation.passed : null,
         reason: validation.reason || null,
       },
+      pdfx: pdfx ? {
+        requested: true,
+        applied: !!pdfx.applied,
+        reason: pdfx.reason,
+        identifier: pdfx.identifier,
+      } : { requested: false, applied: false, reason: null, identifier: null },
     });
   } catch (e) {
     if (e?.name === 'AbortError' || e?.message === 'job.cancelled') {

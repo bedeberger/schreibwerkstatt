@@ -136,6 +136,36 @@ test('ISBN/Copyright ohne Impressum-Freitext erzeugt trotzdem Impressum-Seite', 
   assert.equal(pageCount(withIsbn) - pageCount(baseline), 1);
 });
 
+test('EAN-13-Barcode auf der Impressum-Seite erzeugt keine Extra-Seite', async () => {
+  const noBc = defaultConfig();
+  noBc.cover.enabled = false;
+  noBc.extras.isbn = '978-3-16-148410-0';
+  noBc.extras.barcode = false;
+  const without = await renderPdfBuffer({
+    book: baseBook, groups: baseGroups, profile: { config: noBc }, coverBuf: null, token: null,
+  });
+  const withBc = defaultConfig();
+  withBc.cover.enabled = false;
+  withBc.extras.isbn = '978-3-16-148410-0';
+  withBc.extras.barcode = true;
+  const withBuf = await renderPdfBuffer({
+    book: baseBook, groups: baseGroups, profile: { config: withBc }, coverBuf: null, token: null,
+  });
+  assert.equal(pageCount(withBuf), pageCount(without));
+});
+
+test('Ungültige ISBN unterdrückt den Barcode ohne Crash', async () => {
+  const cfg = defaultConfig();
+  cfg.cover.enabled = false;
+  cfg.extras.isbn = 'keine-zahl';
+  cfg.extras.barcode = true;
+  cfg.extras.copyright = '© 2026';
+  const buf = await renderPdfBuffer({
+    book: baseBook, groups: baseGroups, profile: { config: cfg }, coverBuf: null, token: null,
+  });
+  assert.ok(buf.length > 0);
+});
+
 test('imprintPosition back: Impressum am Buchende, eine Seite', async () => {
   const front = defaultConfig(); front.cover.enabled = false;
   const baseline = await renderPdfBuffer({

@@ -11,6 +11,21 @@ test('defaultConfig liefert vollständigen Schema-Baum', () => {
   assert.equal(c.cover.enabled, false);
   assert.equal(c.toc.enabled, true);
   assert.equal(c.pdfa.enabled, true);
+  assert.equal(c.pdfa.standard, 'pdfa');
+});
+
+test('pdfa.standard: enum-Whitelist + enabled leitet ab', () => {
+  assert.equal(validateConfig({ pdfa: { standard: 'pdfx' } }).pdfa.standard, 'pdfx');
+  assert.equal(validateConfig({ pdfa: { standard: 'pdfx' } }).pdfa.enabled, false);
+  assert.equal(validateConfig({ pdfa: { standard: 'none' } }).pdfa.enabled, false);
+  assert.equal(validateConfig({ pdfa: { standard: 'pdfa' } }).pdfa.enabled, true);
+  // Bogus-Standard faellt auf enabled-Ableitung zurueck.
+  assert.equal(validateConfig({ pdfa: { standard: 'bogus' } }).pdfa.standard, 'pdfa');
+});
+
+test('pdfa: Legacy-Profil ohne standard leitet aus enabled ab', () => {
+  assert.equal(validateConfig({ pdfa: { enabled: true } }).pdfa.standard, 'pdfa');
+  assert.equal(validateConfig({ pdfa: { enabled: false } }).pdfa.standard, 'none');
 });
 
 test('validateConfig clamped Margins auf erlaubten Bereich', () => {

@@ -460,8 +460,11 @@ export function registerPdfExportCard() {
           this.exportProgress = 100;
           const result = job.result || {};
           this.exportLowRes = result.lowResImages || 0;
-          const isWarning = result.pdfa?.requested && result.pdfa.validatorAvailable && !result.pdfa.passed;
-          this.exportStatus = window.__app.t(isWarning ? 'pdfExport.pdfaWarning' : 'pdfExport.done');
+          const pdfaWarn = result.pdfa?.requested && result.pdfa.validatorAvailable && !result.pdfa.passed;
+          const pdfxWarn = result.pdfx?.requested && !result.pdfx.applied;
+          const isWarning = pdfaWarn || pdfxWarn;
+          this.exportStatus = window.__app.t(
+            pdfxWarn ? 'pdfExport.pdfxWarning' : pdfaWarn ? 'pdfExport.pdfaWarning' : 'pdfExport.done');
           this._triggerDownload(jobId, result.filename);
           if (this._exportStatusTimer) clearTimeout(this._exportStatusTimer);
           const ttl = isWarning ? 8000 : 3500;

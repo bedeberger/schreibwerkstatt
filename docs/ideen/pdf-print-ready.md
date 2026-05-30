@@ -4,7 +4,7 @@
 - **Aufwand:** XL <!-- 4 Phasen; Phase 1+2 = L (erledigt), Phase 3+4 = M offen -->
 - **Severity:** high <!-- Self-Publishing ist erklärtes Produkt-Ziel des Owners -->
 
-> **Umsetzungsstand:** Phase 1 (Content/Frontmatter) + Phase 2 (Innenteil druckfertig: Bleed/Crop/TrimBox/BleedBox/dpi-Warnung) sind **umgesetzt** (Backend + Card-UI). Offen: Phase 3 (PDF/X) + Phase 4 (Umschlag). Diese basieren auf branchenüblichen Default-Annahmen (unten), nicht auf einer konkreten Druckerei-Spec — eine reale Spec kann einzelne Werte noch verschieben, blockiert den Bau aber nicht mehr.
+> **Umsetzungsstand:** Phase 1 (Content/Frontmatter) + Phase 2 (Innenteil druckfertig: Bleed/Crop/TrimBox/BleedBox/dpi-Warnung) + Phase 3 (PDF/X-3: Norm-Toggle `pdfa.standard`, Ghostscript-Post-Step [lib/pdfx-convert.js](../../lib/pdfx-convert.js), RGB + Output-Intent-ICC) sind **umgesetzt** (Backend + Card-UI). Offen: Phase 4 (Umschlag). Ops-Rest für Phase 3: gs-Binary im Container + ECI-ICC nach `assets/icc/` legen (siehe [assets/icc/README.md](../../assets/icc/README.md)) — fehlt beides, liefert der Export non-fatal das unkonvertierte PDF.
 
 ## Branchenübliche Default-Annahmen (statt Druckerei-Spec)
 
@@ -45,6 +45,7 @@ MVP = **Phase 1 (Content) + Phase 2 (Innenteil druckfertig)** — **umgesetzt** 
 **Phase 1 — Content & Frontmatter** (alle als Felder in `config.extras`, kein neuer Renderpfad-Umbau):
 
 - **ISBN-Feld** (`extras.isbn`): rendert auf der Impressum-Seite; optional zusätzlich als Zeile auf der Titelseiten-Rückseite.
+- **EAN-13-Barcode** (`extras.barcode`, Default an): App generiert den Strichcode selbst aus der ISBN (ISBN-13 ist bereits eine gültige EAN-13). Pure Vektor-Render via [lib/pdf-barcode.js](../../lib/pdf-barcode.js) (Rechtecke, PDF/A-tauglich, kein npm-Dep), Modulbreite X = 0.33 mm @ 100 %/SC2, Quiet Zones 11X/7X, menschenlesbare Ziffern in Impressum-Schrift. Rendert unten links auf der Impressum-Seite; `drawEan13` ist wiederverwendbar für die Cover-Rückseite (Phase 4). Kein EAN-5-Preis-Add-on.
 - **„Über den Autor"-Seite** (`extras.authorBio` Text + optionales **Autorfoto** als BLOB analog Cover): eigene Backmatter-Seite, Foto links/oben, Bio-Text darunter. Autorname kommt weiterhin aus `book.created_by.name`.
 - **Frontmatter-/Motto-Seite** (`extras.frontMatter`): freie Prosa-Seite (Motto, Epigraph, kurzes Vorwort) — gerendert **nach** Titelseite, **vor** Widmung/TOC.
 - **Impressum-Position** (`extras.imprintPosition: 'front' | 'back'`, Default `front`): Frontmatter (Rückseite Titelseite) statt nur Buchende. Default-Wechsel auf `front` = deutsche Buchkonvention.
@@ -69,7 +70,7 @@ MVP = **Phase 1 (Content) + Phase 2 (Innenteil druckfertig)** — **umgesetzt** 
 
 **Phase 4 — Umschlag-PDF** (offen; einziger echter Spec-Input: Papiervolumen für Rückenbreite):
 
-- Separates Cover-PDF (Rückseite + Rücken + Vorderseite als ein Bogen), Rückenbreite = Seitenzahl × Papiervolumen, Beschnitt + Schnittmarken, Klappentext/Barcode-Platz.
+- Separates Cover-PDF (Rückseite + Rücken + Vorderseite als ein Bogen), Rückenbreite = Seitenzahl × Papiervolumen, Beschnitt + Schnittmarken, Klappentext + EAN-13-Barcode (via `drawEan13` aus [lib/pdf-barcode.js](../../lib/pdf-barcode.js)) auf der Rückseite.
 - Eigener Job-Target (`target: 'cover'`).
 
 **Dauerhaft ausgeschlossen:**
@@ -77,7 +78,7 @@ MVP = **Phase 1 (Content) + Phase 2 (Innenteil druckfertig)** — **umgesetzt** 
 - Vollwertiges Color-Management mehrerer ICC-Profile / Soft-Proofing — genau **ein** Druckerei-Profil wird gebündelt/konfiguriert.
 - Ausschießen/Imposition (Bogenmontage) — macht die Druckerei.
 - Hardcover-Schutzumschlag mit Klappen, Prägung, Sonderfarben (Pantone/HKS), Lack.
-- EAN-13-Barcode-**Generierung** (Druckerei/ISBN-Agentur liefert die Barcode-Grafik; im Cover-PDF wird nur Platz reserviert).
+- EAN-5-Preis-Add-on (5-stelliger Zusatzcode neben dem EAN-13).
 - Automatische ISBN-Vergabe/-Registrierung.
 
 ## Done when
