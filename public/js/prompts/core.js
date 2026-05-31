@@ -13,6 +13,7 @@ import {
   buildSystemKomplettFiguren,
   buildSystemKomplettFigurenStamm,
   buildSystemKomplettOrteSzenen,
+  buildSystemKomplettFakten,
 } from './komplett.js';
 
 // Versionsmarker für persistente Caches (z.B. chapter_extract_cache, Phase-1
@@ -131,6 +132,7 @@ function _buildLocalePrompts(localeConfig, globalErklaerungRule, buchKontext = '
   const SYS_KOMPLETT_FIGUREN_PASS_CORE  = buildSystemKomplettFiguren(sp.figuren || '', rules, buchKontext);
   const SYS_KOMPLETT_FIGUREN_STAMM_CORE = buildSystemKomplettFigurenStamm(sp.figuren || '', rules, buchKontext);
   const SYS_KOMPLETT_ORTE_PASS_CORE     = buildSystemKomplettOrteSzenen(sp.orte || sp.figuren || '', rules, buchKontext);
+  const SYS_KOMPLETT_FAKTEN_PASS_CORE   = buildSystemKomplettFakten(sp.figuren || '', rules, buchKontext);
 
   // Augmented Strings (Backward-Compat): Core + Book-Context als Single-String.
   // Konsumenten ohne Multi-Block-Support (chat-builder, proxies.js) bleiben funktionsfähig.
@@ -181,6 +183,9 @@ function _buildLocalePrompts(localeConfig, globalErklaerungRule, buchKontext = '
     SYSTEM_KOMPLETT_FIGUREN_STAMM_BLOCKS: _toCacheBlocks(SYS_KOMPLETT_FIGUREN_STAMM_CORE, bookContextStr),
     SYSTEM_KOMPLETT_ORTE_PASS:           _aug(SYS_KOMPLETT_ORTE_PASS_CORE),
     SYSTEM_KOMPLETT_ORTE_PASS_BLOCKS:    _toCacheBlocks(SYS_KOMPLETT_ORTE_PASS_CORE, bookContextStr),
+    // Claude-Single-Pass C: eigener Fakten-Pass parallel zu A1/B (lokal: Fakten in Pass B).
+    SYSTEM_KOMPLETT_FAKTEN_PASS:         _aug(SYS_KOMPLETT_FAKTEN_PASS_CORE),
+    SYSTEM_KOMPLETT_FAKTEN_PASS_BLOCKS:  _toCacheBlocks(SYS_KOMPLETT_FAKTEN_PASS_CORE, bookContextStr),
   };
 }
 
@@ -205,6 +210,7 @@ export let SYSTEM_KOMPLETT_EXTRAKTION    = null;
 export let SYSTEM_KOMPLETT_FIGUREN_PASS  = null;
 export let SYSTEM_KOMPLETT_FIGUREN_STAMM = null;
 export let SYSTEM_KOMPLETT_ORTE_PASS     = null;
+export let SYSTEM_KOMPLETT_FAKTEN_PASS   = null;
 
 /**
  * Setzt alle System-Prompts aus dem promptConfig-Objekt (geladen aus prompt-config.json).
@@ -291,6 +297,7 @@ export function configureLocales(cfg) {
   SYSTEM_KOMPLETT_FIGUREN_PASS  = def.SYSTEM_KOMPLETT_FIGUREN_PASS  ?? null;
   SYSTEM_KOMPLETT_FIGUREN_STAMM = def.SYSTEM_KOMPLETT_FIGUREN_STAMM ?? null;
   SYSTEM_KOMPLETT_ORTE_PASS     = def.SYSTEM_KOMPLETT_ORTE_PASS     ?? null;
+  SYSTEM_KOMPLETT_FAKTEN_PASS   = def.SYSTEM_KOMPLETT_FAKTEN_PASS   ?? null;
 }
 
 /**

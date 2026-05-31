@@ -143,7 +143,7 @@ function _figurenStammResponse(chapterName) {
   };
 }
 
-// Claude-Single-Pass B: Orte + Songs + Fakten + Szenen (KEINE figuren).
+// Claude-Single-Pass B: Orte + Songs + Szenen (KEINE figuren; Fakten laufen über Call C).
 function _ortePassResponse(chapterName) {
   return {
     orte: DUMMY_ORTE.map(o => ({
@@ -152,14 +152,20 @@ function _ortePassResponse(chapterName) {
       figuren: ['fig_lea'],
     })),
     songs: [],
-    fakten: [
-      { kategorie: 'opfer', subjekt: 'Sibylle Amrein', fakt: 'tot am Seeufer', seite: 'Seite 1.1' },
-    ],
     szenen: [{
       seite: 'Seite', kapitel: chapterName, titel: 'Szene',
       wertung: 'mittel', kommentar: '',
       figuren_namen: ['Lea Brunner'], orte_namen: ['Seeufer Weggis'],
     }],
+  };
+}
+
+// Claude-Single-Pass C: nur Fakten (eigener Call).
+function _faktenPassResponse() {
+  return {
+    fakten: [
+      { kategorie: 'opfer', subjekt: 'Sibylle Amrein', fakt: 'tot am Seeufer', seite: 'Seite 1.1' },
+    ],
   };
 }
 
@@ -177,6 +183,11 @@ function registerKomplettAiMocks(mockAi) {
   mockAi.on(
     (e) => e.schemaKeys.includes('orte') && e.schemaKeys.includes('szenen') && !e.schemaKeys.includes('figuren'),
     ({ prompt }) => _ortePassResponse(chapterFromPrompt(prompt)),
+  );
+  // C: Fakten (nur fakten).
+  mockAi.on(
+    (e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('fakten'),
+    _faktenPassResponse(),
   );
   // Kombiniertes Extraktions-Schema (lokale Provider / Multi-Pass-Kombi).
   mockAi.on(

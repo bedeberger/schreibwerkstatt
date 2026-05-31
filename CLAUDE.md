@@ -368,10 +368,14 @@ Jobs in `routes/jobs/` verwenden ein Single-Pass/Multi-Pass-Muster. Limits und B
 ```
 Phase 1 – Vollextraktion (parallel pro Kapitel oder Single-Pass)
           → figuren, orte, fakten, szenen(Namen), assignments(Namen)
-          → Claude-Single-Pass: 3 Calls (A1 Figuren-Stammdaten + B Orte/Szenen parallel,
-            danach A2 Beziehungen aus den A1-IDs), alle teilen den 1h-gecachten Buchtext-Block;
-            Beziehungen via mergeBeziehungenIntoFiguren zurück in figuren[].beziehungen gefaltet.
-            Lokale Provider + Multi-Pass: kombinierter Call (SCHEMA_KOMPLETT_EXTRAKTION).
+          → Claude-Single-Pass: 4 Calls (A1 Figuren-Stammdaten + B Orte/Szenen + C Fakten
+            parallel, danach A2 Beziehungen aus den A1-IDs), alle teilen den 1h-gecachten
+            Buchtext-Block; Beziehungen via mergeBeziehungenIntoFiguren zurück in
+            figuren[].beziehungen gefaltet. C (Fakten) ist non-fatal: scheitert er, leere
+            Fakten + Warnung (job.warn.faktenFailed) + Cache-Skip (kein Phantom-Freeze).
+            Fakten als eigener Call = volle Modell-Aufmerksamkeit auf dichte Faktenerfassung.
+            Lokale Provider + Multi-Pass: kombinierter Call (SCHEMA_KOMPLETT_EXTRAKTION) bzw.
+            Split Pass A (Figuren) + Pass B (Orte/Songs/Fakten/Szenen) — dort bleiben Fakten in B.
           → Checkpoint 'p1_full_done'
                     ↓
 Phase 2 – Figuren konsolidieren + Soziogramm (aus P2-Output, kein Extra-Call)

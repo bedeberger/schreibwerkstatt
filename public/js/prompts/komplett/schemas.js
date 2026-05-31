@@ -94,6 +94,7 @@ export let SCHEMA_KOMPLETT_EXTRAKTION = null;
 export let SCHEMA_KOMPLETT_FIGUREN_PASS = null;
 export let SCHEMA_KOMPLETT_FIGUREN_STAMM = null;
 export let SCHEMA_KOMPLETT_ORTE_PASS = null;
+export let SCHEMA_KOMPLETT_FAKTEN_PASS = null;
 export let SCHEMA_FIGUREN_KONSOL = null;
 export let SCHEMA_BEZIEHUNGEN = null;
 
@@ -174,13 +175,20 @@ function _buildFigurenStammSchema() {
   });
 }
 
+// Claude zieht Fakten in einen eigenen Pass (SCHEMA_KOMPLETT_FAKTEN_PASS); nur lokale
+// Provider behalten fakten im kombinierten Pass-B-Schema. Schema-Gating muss zur
+// _isLocal-Gating in buildKomplettSchemaOrteSzenen (extraktion.js) passen.
 function _buildOrtePassSchema() {
   return _obj({
     orte: { type: 'array', items: _ortSchema },
     songs: { type: 'array', items: _songSchema },
-    fakten: { type: 'array', items: _faktSchema },
+    ...(_isLocal ? { fakten: { type: 'array', items: _faktSchema } } : {}),
     szenen: _szenenField(),
   });
+}
+
+function _buildFaktenPassSchema() {
+  return _obj({ fakten: { type: 'array', items: _faktSchema } });
 }
 
 function _buildBeziehungenSchema() {
@@ -198,6 +206,7 @@ export function _rebuildKomplettSchemas() {
   SCHEMA_KOMPLETT_FIGUREN_PASS = _buildFigurenPassSchema();
   SCHEMA_KOMPLETT_FIGUREN_STAMM = _buildFigurenStammSchema();
   SCHEMA_KOMPLETT_ORTE_PASS = _buildOrtePassSchema();
+  SCHEMA_KOMPLETT_FAKTEN_PASS = _buildFaktenPassSchema();
   SCHEMA_FIGUREN_KONSOL = _obj({ figuren: { type: 'array', items: _figurSchema } });
   SCHEMA_BEZIEHUNGEN = _buildBeziehungenSchema();
 }

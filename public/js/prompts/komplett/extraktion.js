@@ -21,7 +21,7 @@ import {
 // figuren_namen / orte_namen / figur_name: Klarnamen statt IDs, da konsolidierte IDs
 // erst nach P2/P3 bekannt sind. Remapping nach der Konsolidierung in jobs.js.
 function buildKomplettSchemaStatic(kontext = '') {
-  const schemaPart = `Priorität: Figuren und deren Beziehungen sind am wichtigsten. Im Zweifel lieber weniger Fakten und dafür korrekte Figurenanalyse. Szenen vollständig erfassen.
+  const schemaPart = `Priorität: Figuren und deren Beziehungen korrekt erfassen. Fakten und Szenen vollständig erfassen.
 
 Antworte mit diesem JSON-Schema:
 {
@@ -180,13 +180,15 @@ ${figurenBasisRules(kontext)}
 ${_EREIGNIS_RULES}`;
 }
 
-/** Schema-Block nur für Orte + Songs + Fakten + Szenen (Pass B, Lokalmodus). */
+/** Schema-Block für Orte + Songs + (Fakten nur lokal) + Szenen (Pass B).
+ *  Claude zieht Fakten in einen eigenen Pass (buildKomplettSchemaFakten) → hier ausgespart;
+ *  lokale Provider behalten Fakten im kombinierten Pass B (kein 1h-Cache für einen Extra-Call). */
 function buildKomplettSchemaOrteSzenen(_kontext = '') {
-  const schemaPart = `Antworte mit diesem JSON-Schema (nur Schauplätze, Musikstücke, Fakten, Szenen):
+  const faktenSchemaLine = _isLocal ? `\n  ${FAKTEN_SCHEMA},` : '';
+  const schemaPart = `Antworte mit diesem JSON-Schema (nur Schauplätze, Musikstücke${_isLocal ? ', Fakten' : ''}, Szenen):
 {
   ${_schemaBody(ORTE_SCHEMA)},
-  ${_schemaBody(SONGS_SCHEMA)},
-  ${FAKTEN_SCHEMA},
+  ${_schemaBody(SONGS_SCHEMA)},${faktenSchemaLine}
   "szenen": [
     {
       "seite": "NUR der reine Seitentitel aus einem ### Header – OHNE ###-Markierung (Beispiel: aus «### Was macht Adrian?» wird «Was macht Adrian?»). NIE der Kapitelname. Leer wenn unklar.",
@@ -210,6 +212,7 @@ Kernregeln:
 - Songs: nur mit konkretem Titel oder Interpret aufnehmen; kontext_typ Pflicht.
 - Leere Arrays wenn nichts gefunden.`;
   }
+  // Claude: Fakten laufen über buildKomplettSchemaFakten – hier keine FAKTEN_RULES.
   return `${schemaPart}
 
 Schauplatz-Regeln:
@@ -218,12 +221,23 @@ ${ORTE_RULES}
 Musik-Regeln:
 ${SONGS_RULES}
 
-${FAKTEN_RULES}
-
 Szenen-Regeln:
 - seite: NUR der reine Titel eines ### Headers im aktuellen ## Kapitel, OHNE «### »-Markierung. NIEMALS den Kapitelnamen. Bei Unklarheit: leer.
 - figuren_namen: Klarnamen exakt wie im Text; leeres Array wenn keine Figur beteiligt.
 - orte_namen: exakter Name wie im Text; leeres Array wenn kein konkreter Ort.`;
+}
+
+/** Schema-Block nur für Fakten (Claude-Single-Pass C, parallel zu A1/B).
+ *  Eigener Call → volle Modell-Aufmerksamkeit auf dichte, vollständige Faktenerfassung,
+ *  ohne mit Figuren/Orten/Szenen um das Attention-Budget eines JSON-Outputs zu konkurrieren. */
+function buildKomplettSchemaFakten(_kontext = '') {
+  const schemaPart = `Antworte mit diesem JSON-Schema (nur Fakten):
+{
+  ${FAKTEN_SCHEMA}
+}`;
+  return `${schemaPart}
+
+${FAKTEN_RULES}`;
 }
 
 // System-Prompt-Builder mit eingebettetem Schema+Regeln-Block (für Caching der parallelen
@@ -240,6 +254,9 @@ export function buildSystemKomplettFigurenStamm(prefix, rules, kontext) {
 }
 export function buildSystemKomplettOrteSzenen(prefix, rules, kontext) {
   return `${prefix}\n\n${rules}\n\n${buildKomplettSchemaOrteSzenen(kontext)}${_jsonOnly()}`;
+}
+export function buildSystemKomplettFakten(prefix, rules, kontext) {
+  return `${prefix}\n\n${rules}\n\n${buildKomplettSchemaFakten(kontext)}${_jsonOnly()}`;
 }
 
 /**
@@ -315,11 +332,29 @@ export function buildExtraktionOrtePassPrompt(chapterName, bookName, pageCount, 
   const textBlock = chText == null
     ? '<text>Der Buchtext steht im System-Prompt oben.</text>'
     : `<${isSinglePass ? 'buchtext' : 'kapiteltext'} seiten="${pageCount}">\n${chText}\n</${isSinglePass ? 'buchtext' : 'kapiteltext'}>`;
+  const faktenPart = _isLocal ? ', alle kontinuitätsrelevanten Fakten' : '';
   return `<aufgabe>
-Extrahiere aus ${scope} AUSSCHLIESSLICH: alle Schauplätze, alle Musikstücke/Songs, alle kontinuitätsrelevanten Fakten und alle Szenen. Figuren-Stammdaten nicht – die sind separat erfasst. In Szenen und Songs nur Figurennamen/IDs als Referenz nennen.
+Extrahiere aus ${scope} AUSSCHLIESSLICH: alle Schauplätze, alle Musikstücke/Songs${faktenPart} und alle Szenen. Figuren-Stammdaten nicht – die sind separat erfasst. In Szenen und Songs nur Figurennamen/IDs als Referenz nennen.
 </aufgabe>
 
 ${kapitelNote}
+
+${textBlock}`;
+}
+
+/** Claude-Single-Pass C: nur Fakten – eigener Call gegen den gecachten Buchtext-Block. */
+export function buildExtraktionFaktenPassPrompt(chapterName, bookName, pageCount, chText) {
+  const isSinglePass = chapterName === 'Gesamtbuch';
+  const scope = isSinglePass ? `dem Buch «${bookName}»` : `dem Kapitel «${chapterName}» des Buchs «${bookName}»`;
+  const seiteNote = 'Im «seite»-Feld jedes Faktums den reinen Seitentitel aus dem zugehörigen ### Header eintragen (OHNE «### »-Markierung); leer lassen wenn nicht eindeutig zuordenbar.';
+  const textBlock = chText == null
+    ? '<text>Der Buchtext steht im System-Prompt oben.</text>'
+    : `<${isSinglePass ? 'buchtext' : 'kapiteltext'} seiten="${pageCount}">\n${chText}\n</${isSinglePass ? 'buchtext' : 'kapiteltext'}>`;
+  return `<aufgabe>
+Extrahiere aus ${scope} AUSSCHLIESSLICH alle Welt- und Kontinuitätsfakten – so vollständig wie möglich. Keine Figuren, Orte, Songs oder Szenen – die werden separat erfasst.
+</aufgabe>
+
+${seiteNote}
 
 ${textBlock}`;
 }

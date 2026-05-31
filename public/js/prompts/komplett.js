@@ -22,10 +22,12 @@ export {
   buildSystemKomplettFiguren,
   buildSystemKomplettFigurenStamm,
   buildSystemKomplettOrteSzenen,
+  buildSystemKomplettFakten,
   buildExtraktionKomplettChapterPrompt,
   buildExtraktionFigurenPassPrompt,
   buildExtraktionFigurenStammPrompt,
   buildExtraktionOrtePassPrompt,
+  buildExtraktionFaktenPassPrompt,
 } from './komplett/extraktion.js';
 
 export {
@@ -47,6 +49,7 @@ export {
   SCHEMA_KOMPLETT_FIGUREN_PASS,
   SCHEMA_KOMPLETT_FIGUREN_STAMM,
   SCHEMA_KOMPLETT_ORTE_PASS,
+  SCHEMA_KOMPLETT_FAKTEN_PASS,
   SCHEMA_FIGUREN_KONSOL,
   SCHEMA_BEZIEHUNGEN,
   SCHEMA_ORTE_KONSOL,

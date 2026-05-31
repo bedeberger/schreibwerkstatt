@@ -2303,6 +2303,7 @@
 
   "job.warn.soziogrammDegraded":     "Sociogram refinement skipped – preliminary values used.",
   "job.warn.relationsFailed":        "Relationship analysis failed – characters saved without relationships.",
+  "job.warn.faktenFailed":           "Fact extraction failed – the rest of the catalog was updated.",
   "job.warn.crossChapterFailed":     "Cross-chapter relationships could not be determined.",
   "job.warn.continuityFailed":       "Continuity check skipped – the rest of the catalog was updated.",
 

@@ -50,7 +50,7 @@ function figurenStammResponse() {
   };
 }
 
-// Claude-Single-Pass B: Orte + Songs + Fakten + Szenen.
+// Claude-Single-Pass B: Orte + Songs + Szenen (Fakten laufen über Call C).
 function ortePassResponse() {
   return {
     orte: [{
@@ -58,12 +58,18 @@ function ortePassResponse() {
       kapitel: [{ name: 'Kapitel Eins', haeufigkeit: 1 }], figuren: ['fig_1'],
     }],
     songs: [],
-    fakten: [{ kategorie: 'wetter', subjekt: 'Wald', fakt: 'kalt', seite: 'Seite Eins' }],
     szenen: [{
       seite: 'Seite Eins', kapitel: 'Kapitel Eins', titel: 'Anna im Wald',
       wertung: 'mittel', kommentar: 'kurze Szene',
       figuren_namen: ['Anna'], orte_namen: ['Wald'],
     }],
+  };
+}
+
+// Claude-Single-Pass C: nur Fakten (eigener Call).
+function faktenPassResponse() {
+  return {
+    fakten: [{ kategorie: 'wetter', subjekt: 'Wald', fakt: 'kalt', seite: 'Seite Eins' }],
   };
 }
 
@@ -97,6 +103,11 @@ test('Komplettanalyse Single-Pass: 1 Kapitel, P1 + P8 → done', async () => {
     (e) => e.schemaKeys.includes('orte') && e.schemaKeys.includes('szenen') && !e.schemaKeys.includes('figuren'),
     ortePassResponse(),
   );
+  // C: Fakten (nur fakten).
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('fakten'),
+    faktenPassResponse(),
+  );
   // A2: Beziehungen.
   ctx.mockAi.on(
     (e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('beziehungen'),
@@ -119,8 +130,8 @@ test('Komplettanalyse Single-Pass: 1 Kapitel, P1 + P8 → done', async () => {
   assert.equal(job.result.szenenCount, 1);
   assert.equal(job.passMode, 'single');
 
-  // Exactly 4 AI calls: A1 + B + A2 + P8.
-  assert.equal(ctx.mockAi.log.length, 4, `expected 4 AI calls, got ${ctx.mockAi.log.length}`);
+  // Exactly 5 AI calls: A1 + B + C + A2 + P8.
+  assert.equal(ctx.mockAi.log.length, 5, `expected 5 AI calls, got ${ctx.mockAi.log.length}`);
 
   // Figures saved (Anna + Bert).
   const figRows = ctx.dbSchema.db.prepare(
@@ -464,6 +475,10 @@ test('Komplettanalyse: Cache-Hit Phase 1 → nur P8 ruft AI', async () => {
     ortePassResponse(),
   );
   ctx.mockAi.on(
+    (e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('fakten'),
+    faktenPassResponse(),
+  );
+  ctx.mockAi.on(
     (e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('beziehungen'),
     beziehungenResponse(),
   );
@@ -472,13 +487,13 @@ test('Komplettanalyse: Cache-Hit Phase 1 → nur P8 ruft AI', async () => {
     kontinuitaetResponse(),
   );
 
-  // Run 1: populates cache (A1 + B + A2 + P8 = 4 calls).
+  // Run 1: populates cache (A1 + B + C + A2 + P8 = 5 calls).
   const jobId1 = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
   ctx.shared.enqueueJob(jobId1, () =>
     ctx.komplett.runKomplettAnalyseJob(jobId1, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
   );
   await waitForJob(ctx.shared, jobId1, { timeoutMs: 8000 });
-  assert.equal(ctx.mockAi.log.length, 4, 'run 1: 4 AI calls (A1+B+A2+P8)');
+  assert.equal(ctx.mockAi.log.length, 5, 'run 1: 5 AI calls (A1+B+C+A2+P8)');
 
   // Run 2: same book, cache should hit Phase 1 → only P8 calls AI.
   const callsBeforeRun2 = ctx.mockAi.log.length;

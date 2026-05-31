@@ -91,6 +91,49 @@ test('Tippen führt zu Recenter (scroll bewegt sich)', async ({ page }) => {
   expect(await scrollTop(page)).toBeGreaterThan(200);
 });
 
+test('Manueller Scroll verschiebt Spotlight auf Viewport-Center-Absatz (preferCenter)', async ({ page }) => {
+  await enter(page);
+
+  // Caret in Absatz 0 (oben). Bei Caret-first bliebe das Spotlight hier kleben,
+  // auch wenn man weit nach unten scrollt.
+  await placeCaretInParagraph(page, 0);
+  await page.evaluate(() => window.harness._focusUpdateActive(false));
+  await page.waitForTimeout(60);
+
+  // Manuell ins untere Drittel scrollen; IntersectionObserver-Callbacks
+  // (visibleBlocks-Set) müssen settlen, bevor der Center-Pick greift — sonst
+  // pickt findBlockAtViewportCenter aus dem stale Set einen Block der alten
+  // Scroll-Position.
+  await page.evaluate((sel) => {
+    document.querySelector(sel).scrollTop = Math.round(document.querySelector(sel).scrollHeight * 0.6);
+  }, EDITOR);
+  await page.waitForTimeout(150);
+
+  // expectedScroll=0 → echter User-Scroll, kein programmatischer Typewriter.
+  // Spotlight muss dem Viewport-Center folgen, nicht beim Caret-Absatz 0 bleiben.
+  const { activeIdx, centerIdx } = await page.evaluate((sel) => {
+    const el = document.querySelector(sel);
+    if (window.harness._focusListeners) window.harness._focusListeners.expectedScroll = 0;
+    el.dispatchEvent(new Event('scroll'));
+    return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => {
+      const ps = [...el.querySelectorAll('p')];
+      const active = el.querySelector('.focus-paragraph-active');
+      const cr = el.getBoundingClientRect();
+      const centerY = cr.top + cr.height / 2;
+      let best = -1, bestDist = Infinity;
+      ps.forEach((p, i) => {
+        const r = p.getBoundingClientRect();
+        const d = Math.abs((r.top + r.bottom) / 2 - centerY);
+        if (d < bestDist) { bestDist = d; best = i; }
+      });
+      resolve({ activeIdx: active ? ps.indexOf(active) : -1, centerIdx: best });
+    })));
+  }, EDITOR);
+
+  expect(activeIdx).toBeGreaterThan(0);                            // nicht mehr beim Caret-Absatz
+  expect(Math.abs(activeIdx - centerIdx)).toBeLessThanOrEqual(1);  // folgt dem Viewport-Center
+});
+
 test('Pointer-Schonfrist verhindert Recenter (Klick-Verhalten)', async ({ page }) => {
   await enter(page);
 

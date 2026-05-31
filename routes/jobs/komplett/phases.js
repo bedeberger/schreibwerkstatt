@@ -109,14 +109,16 @@ async function runPhase1(ctx) {
       // dürfen die beziehungslosen Figuren NICHT als '__singlepass__'-Cache eingefroren
       // werden (sonst Phantom-Erfolg bei jedem Folgelauf bis zur Seitenedition).
       let relationsFailed = false;
+      let faktenFailed = false;
       if (effectiveProvider === 'claude') {
-        // Claude-Split: Figuren-Stammdaten (A1) + Orte/Szenen (B) parallel, danach
-        // Beziehungen (A2) aus den A1-IDs. Alle drei Calls teilen denselben Buchtext-
+        // Claude-Split: Figuren-Stammdaten (A1) + Orte/Szenen (B) + Fakten (C) parallel,
+        // danach Beziehungen (A2) aus den A1-IDs. Alle Calls teilen denselben Buchtext-
         // Block (cache_control 1h) → Folge-Calls zahlen cache_read; Phase 8 trifft
-        // denselben Prefix. Kleinere Schemas pro Call senken das Truncation-Risiko des
-        // ehemals einen 6-Array-Mega-Calls.
+        // denselben Prefix. Kleinere Schemas pro Call senken das Truncation-Risiko.
+        // Fakten als eigener Call (C): volle Modell-Aufmerksamkeit auf dichte
+        // Faktenerfassung statt im 4-Array-Orte-Pass um Output-Budget zu konkurrieren.
         const bookSystemBlock = { text: buildBookSystemBlockText(bookName, pageContents.length, fullBookText), ttl: '1h' };
-        const [stammRes, orteRes] = await settledAll([
+        const [stammRes, orteRes, faktenRes] = await settledAll([
           () => retryOnTransientAi(() => call(jobId, tok,
             prompts.buildExtraktionFigurenStammPrompt('Gesamtbuch', bookName, pageContents.length, null),
             [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KOMPLETT_FIGUREN_STAMM_BLOCKS, '1h')],
@@ -127,8 +129,13 @@ async function runPhase1(ctx) {
             [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KOMPLETT_ORTE_PASS_BLOCKS, '1h')],
             12, 20, claudeExtractCap, 0.2, null, prompts.SCHEMA_KOMPLETT_ORTE_PASS,
           ), { log, label: 'Single-Pass Orte/Szenen (B)' }),
+          () => retryOnTransientAi(() => call(jobId, tok,
+            prompts.buildExtraktionFaktenPassPrompt('Gesamtbuch', bookName, pageContents.length, null),
+            [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KOMPLETT_FAKTEN_PASS_BLOCKS, '1h')],
+            12, 20, claudeExtractCap, 0.2, null, prompts.SCHEMA_KOMPLETT_FAKTEN_PASS,
+          ), { log, label: 'Single-Pass Fakten (C)' }),
         // warmup: A1 läuft seriell zuerst und schreibt den 1h-bookSystemBlock-Cache;
-        // B (und das nachgelagerte A2/P8) lesen ihn dann statt ihn ein zweites Mal
+        // B/C (und das nachgelagerte A2/P8) lesen ihn dann statt ihn ein zweites Mal
         // teuer neu zu erstellen. Spart ~1× cache_creation auf dem ~grössten Block.
         ], { warmup: true });
         if (stammRes.status === 'rejected') throw stammRes.reason;
@@ -140,6 +147,18 @@ async function runPhase1(ctx) {
         // legitim ortloses Buch liefert fulfilled mit leerem Array und cached korrekt.
         if (orteRes.status === 'rejected') throw orteRes.reason;
         passB = orteRes.value || {};
+        // Fakten-Pass (C): nicht fatal – ein gescheiterter Fakten-Call soll die
+        // teure Figuren-/Orte-Extraktion nicht verwerfen. Stattdessen leere Fakten +
+        // Warnung; faktenFailed verhindert das Einfrieren des '__singlepass__'-Caches
+        // (sonst Phantom-leere-Fakten bis zur nächsten Seitenedition).
+        if (faktenRes.status === 'rejected') {
+          faktenFailed = true;
+          log.warn(`Single-Pass Fakten-Pass (C) fehlgeschlagen, Fakten leer: ${faktenRes.reason?.message}`);
+          ctx.warnings?.push({ key: 'job.warn.faktenFailed' });
+          passB.fakten = [];
+        } else {
+          passB.fakten = faktenRes.value?.fakten || [];
+        }
 
         // A2: Beziehungen separat – braucht die stabilen IDs aus A1.
         let stammFiguren = stamm.figuren || [];
@@ -176,9 +195,9 @@ async function runPhase1(ctx) {
       chapterSzenen      = [{ kapitel: 'Gesamtbuch', szenen:      passB.szenen      || [] }];
       chapterAssignments = [{ kapitel: 'Gesamtbuch', assignments: passA.assignments || [] }];
       const totalEvents = (passA.assignments || []).reduce((s, a) => s + (a.lebensereignisse?.length || 0), 0);
-      log.info(`Single-Pass OK – fig=${chapterFiguren[0].figuren.length} orte=${chapterOrte[0].orte.length} songs=${chapterSongs[0].songs.length} sz=${chapterSzenen[0].szenen.length} (${totalEvents} Ereignisse)`);
-      if (relationsFailed) {
-        log.warn('Single-Pass Cache übersprungen – A2 (Beziehungen) gescheitert, beziehungsloser Stand wird nicht eingefroren.');
+      log.info(`Single-Pass OK – fig=${chapterFiguren[0].figuren.length} orte=${chapterOrte[0].orte.length} songs=${chapterSongs[0].songs.length} fakten=${chapterFakten[0].fakten.length} sz=${chapterSzenen[0].szenen.length} (${totalEvents} Ereignisse)`);
+      if (relationsFailed || faktenFailed) {
+        log.warn(`Single-Pass Cache übersprungen – ${relationsFailed ? 'A2 (Beziehungen)' : 'C (Fakten)'} gescheitert, Teilstand wird nicht eingefroren.`);
       } else {
         saveChapterExtractCache(bookIdInt, email, '__singlepass__', bookPagesSig, {
           chapterFiguren, chapterOrte, chapterSongs, chapterFakten, chapterSzenen, chapterAssignments,

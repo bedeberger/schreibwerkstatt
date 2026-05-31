@@ -140,12 +140,14 @@ export const FAKTEN_SCHEMA = `"fakten": [
   ]`;
 
 export const FAKTEN_RULES = `Fakten-Regeln:
-- Nur konkrete, prüfbare Aussagen – keine Interpretationen
-- Figuren-Zustände besonders genau erfassen (Wissen, Können, körperlicher Zustand, Wohnort, Beruf)
+- Erfasse möglichst VOLLSTÄNDIG alle konkreten, prüfbaren Aussagen über die Welt des Buchs – nicht nur eng kontinuitätskritische. Lieber zu viele Fakten als zu wenige.
+- Welt/Setting dicht erfassen: Geographie, Epoche, Institutionen, Technik, Regeln und Gesetze der erzählten Welt, Kultur, Historie, gesellschaftliche Verhältnisse.
+- Figuren-Zustände besonders genau erfassen (Wissen, Können, körperlicher Zustand, Wohnort, Beruf, Besitz)
 - Soziolekt: Wenn eine Figur erstmals oder markant spricht, ein Faktum erfassen das ihr Sprachregister beschreibt. Kategorie «soziolekt» verwenden.
 - Objekte: Wer besitzt was, wo liegt was, in welchem Zustand
 - Zeitangaben: Relative («am nächsten Morgen») und absolute («1943») erfassen
-- Kein Cap auf Anzahl Fakten – vollständige, präzise Erfassung wichtiger als Kürze`;
+- Nur prüfbare Aussagen aus dem Text – keine Interpretationen, Wertungen oder Spekulationen
+- Kein Cap auf Anzahl Fakten – vollständige, präzise Erfassung ist das Ziel`;
 
 // ── Kontinuitäts-Probleme-Schema (verwendet in Check und SinglePass) ─────────
 
