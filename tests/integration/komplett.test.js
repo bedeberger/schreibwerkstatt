@@ -170,6 +170,58 @@ test('Komplettanalyse Single-Pass: 1 Kapitel, P1 + P8 → done', async () => {
   assert.equal(cont.summary, 'Stimmig.');
 });
 
+test('Komplettanalyse Single-Pass: Fakten-Pass (C) scheitert → Job ok, Warnung, KEIN Cache', async () => {
+  const BOOK_ID = 56;
+  seedTinyBook(BOOK_ID);
+
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.includes('figuren') && e.schemaKeys.includes('assignments') && !e.schemaKeys.includes('orte'),
+    figurenStammResponse(),
+  );
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.includes('orte') && e.schemaKeys.includes('szenen') && !e.schemaKeys.includes('figuren'),
+    ortePassResponse(),
+  );
+  // C (Fakten) wirft einen deterministischen Fehler → faktenFailed-Pfad.
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('fakten'),
+    () => { throw new Error('fakten-pass kaputt'); },
+  );
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('beziehungen'),
+    beziehungenResponse(),
+  );
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.includes('zusammenfassung') && e.schemaKeys.includes('probleme'),
+    kontinuitaetResponse(),
+  );
+
+  const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
+  ctx.shared.enqueueJob(jobId, () =>
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Testbuch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+  );
+
+  const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 8000 });
+  // Job bleibt erfolgreich – ein gescheiterter Fakten-Call verwirft nicht die teure
+  // Figuren-/Orte-Extraktion.
+  assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
+  assert.equal(job.result.figCount, 2);
+  // Degradierung user-sichtbar als Warnung.
+  assert.ok((job.result.warnings || []).some(w => w.key === 'job.warn.faktenFailed'),
+    `expected faktenFailed warning, got ${JSON.stringify(job.result.warnings)}`);
+  // Keine Fakten gespeichert (C ist gescheitert).
+  const faktRows = ctx.dbSchema.db.prepare(
+    'SELECT COUNT(*) AS n FROM world_facts WHERE book_id = ?'
+  ).get(BOOK_ID);
+  assert.equal(faktRows.n, 0);
+  // KRITISCH: der '__singlepass__'-Cache (book_extract_cache) darf NICHT eingefroren
+  // werden – sonst Phantom-leere-Fakten bei jedem Folgelauf bis zur Seitenedition.
+  const cacheRows = ctx.dbSchema.db.prepare(
+    'SELECT COUNT(*) AS n FROM book_extract_cache WHERE book_id = ?'
+  ).get(BOOK_ID);
+  assert.equal(cacheRows.n, 0, 'Single-Pass-Cache muss bei faktenFailed übersprungen werden');
+});
+
 test('Komplettanalyse: leeres Buch → result.empty, kein AI-Call', async () => {
   const BOOK_ID = 51;
   ctx.dbSeed.setBook({ chapters: [], pages: [], pageBodies: {}, books: [{ id: BOOK_ID, name: 'Leer' }] });

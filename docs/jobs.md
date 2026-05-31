@@ -47,7 +47,7 @@ queued → running → done | error | cancelled
    - **i18n-Fehler**: `throw i18nError('error.MY_KEY', { foo: 42 })` — `failJob` extrahiert `i18nParams` als `errorParams` für Frontend `t(key, params)`.
 7. **Router mounten** in [routes/jobs.js](../routes/jobs.js).
 
-Beispiel: [routes/jobs/lektorat.js](../routes/jobs/lektorat.js) (Single-Page-Job), [routes/jobs/komplett.js](../routes/jobs/komplett.js) (Multi-Phase mit Checkpoints).
+Beispiel: [routes/jobs/lektorat.js](../routes/jobs/lektorat.js) (Single-Page-Job), [routes/jobs/komplett/](../routes/jobs/komplett/) (Multi-Phase mit Checkpoints — Details: [docs/komplett.md](komplett.md)).
 
 ## Dedup
 

@@ -1,0 +1,173 @@
+'use strict';
+// Unit: regelbasierte Figuren-Dedup-/Merge-Helper der Komplettanalyse-Phase 2.
+// Decken die subtilen Korrektheits-Invarianten ab (gleicher Nachname ≠ Merge,
+// Indizien-Schwelle, Mode-Vote nur bei Stimmen-Split, Beschreibungs-Rescue),
+// die sonst nur indirekt über die Integration-Pipeline berührt werden.
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const {
+  preMergeChapterFiguren, mergeDuplicateFiguren,
+  applySozialschichtModeVote, validateBeziehungenDescriptions,
+} = require('../../routes/jobs/komplett/figuren-merge');
+
+// ── preMergeChapterFiguren ────────────────────────────────────────────────────
+test('preMerge: exakter Name über Kapitel hinweg wird zusammengeführt', () => {
+  const chapterFiguren = [
+    { kapitel: 'K1', figuren: [{ id: 'a', name: 'Anna', kapitel: [{ name: 'K1', haeufigkeit: 2 }], eigenschaften: ['mutig'] }] },
+    { kapitel: 'K2', figuren: [{ id: 'b', name: 'Anna', kapitel: [{ name: 'K2', haeufigkeit: 3 }], eigenschaften: ['klug'] }] },
+  ];
+  const { chapterFiguren: out, dupesRemoved } = preMergeChapterFiguren(chapterFiguren);
+  assert.equal(dupesRemoved, 1);
+  // Nur ein Vorkommen bleibt (im ersten Kapitel), das zweite ist konsumiert.
+  const flat = out.flatMap(c => c.figuren);
+  assert.equal(flat.length, 1);
+  const anna = flat[0];
+  // Kapitel-Häufigkeiten aggregiert, Eigenschaften verschmolzen.
+  assert.deepEqual(anna.kapitel.sort((x, y) => x.name.localeCompare(y.name)),
+    [{ name: 'K1', haeufigkeit: 2 }, { name: 'K2', haeufigkeit: 3 }]);
+  assert.deepEqual([...anna.eigenschaften].sort(), ['klug', 'mutig']);
+});
+
+test('preMerge: Titel-Präfix normalisiert (Dr. Anna == Anna)', () => {
+  const { dupesRemoved } = preMergeChapterFiguren([
+    { kapitel: 'K1', figuren: [{ id: 'a', name: 'Dr. Anna' }] },
+    { kapitel: 'K2', figuren: [{ id: 'b', name: 'Anna' }] },
+  ]);
+  assert.equal(dupesRemoved, 1);
+});
+
+test('preMerge: Teilname + 2 Indizien → Merge', () => {
+  // «Gerold» Teilmenge von «Gerold Brunner»; gleicher Beruf (+1) + gleiches Kapitel (+1) = 2.
+  const { chapterFiguren: out, dupesRemoved } = preMergeChapterFiguren([
+    { kapitel: 'K1', figuren: [{ id: 'a', name: 'Gerold Brunner', beruf: 'Schmied', kapitel: [{ name: 'K1', haeufigkeit: 1 }] }] },
+    { kapitel: 'K2', figuren: [{ id: 'b', name: 'Gerold', beruf: 'Schmied', kapitel: [{ name: 'K1', haeufigkeit: 1 }] }] },
+  ]);
+  assert.equal(dupesRemoved, 1);
+  assert.equal(out.flatMap(c => c.figuren).length, 1);
+});
+
+test('preMerge: gleicher Nachname, andere Vornamen → NICHT zusammengeführt', () => {
+  const { chapterFiguren: out, dupesRemoved } = preMergeChapterFiguren([
+    { kapitel: 'K1', figuren: [{ id: 'a', name: 'Paul Schmidt', beruf: 'Arzt', kapitel: [{ name: 'K1', haeufigkeit: 1 }] }] },
+    { kapitel: 'K2', figuren: [{ id: 'b', name: 'Marta Schmidt', beruf: 'Arzt', kapitel: [{ name: 'K1', haeufigkeit: 1 }] }] },
+  ]);
+  assert.equal(dupesRemoved, 0);
+  assert.equal(out.flatMap(c => c.figuren).length, 2);
+});
+
+// ── mergeDuplicateFiguren ─────────────────────────────────────────────────────
+test('mergeDuplicate Stufe 1: exakter Name, längere Beschreibung gewinnt als Kanon', () => {
+  const { figuren, mergedCount, stage1Saved, idRemap } = mergeDuplicateFiguren([
+    { id: 'fig_1', name: 'Anna', beschreibung: 'kurz' },
+    { id: 'fig_2', name: 'Anna', beschreibung: 'eine deutlich längere Beschreibung' },
+  ]);
+  assert.equal(mergedCount, 1);
+  assert.equal(stage1Saved, 1);
+  assert.equal(figuren.length, 1);
+  // group.sort stellt die längere Beschreibung nach vorn → fig_2 ist Kanon.
+  assert.equal(figuren[0].id, 'fig_2');
+  assert.equal(idRemap['fig_1'], 'fig_2');
+});
+
+test('mergeDuplicate Stufe 2: Teilname + Indizien, Beziehungen werden auf Kanon-ID umgebogen', () => {
+  const { figuren, stage2Saved, idRemap } = mergeDuplicateFiguren([
+    { id: 'fig_1', name: 'Gerold Brunner', beruf: 'Schmied', geschlecht: 'm',
+      kapitel: [{ name: 'K1' }], beschreibung: 'der Schmied' },
+    { id: 'fig_2', name: 'Gerold', beruf: 'Schmied', geschlecht: 'm', kapitel: [{ name: 'K1' }] },
+    { id: 'fig_3', name: 'Klara', beziehungen: [{ figur_id: 'fig_2', typ: 'freund' }] },
+  ]);
+  assert.equal(stage2Saved, 1);
+  assert.equal(idRemap['fig_2'], 'fig_1');
+  // Klaras Beziehung zeigte auf fig_2 (gemergt) → muss jetzt auf fig_1 zeigen.
+  const klara = figuren.find(f => f.name === 'Klara');
+  assert.equal(klara.beziehungen[0].figur_id, 'fig_1');
+});
+
+test('mergeDuplicate: Selbst-Referenz + Beziehung auf nicht existente ID werden entfernt', () => {
+  const { figuren } = mergeDuplicateFiguren([
+    { id: 'fig_1', name: 'Anna', beziehungen: [
+      { figur_id: 'fig_1', typ: 'andere' },   // Selbst-Ref
+      { figur_id: 'fig_99', typ: 'feind' },    // unbekannt
+      { figur_id: 'fig_2', typ: 'freund' },    // gültig
+    ] },
+    { id: 'fig_2', name: 'Bert' },
+  ]);
+  const anna = figuren.find(f => f.name === 'Anna');
+  assert.equal(anna.beziehungen.length, 1);
+  assert.equal(anna.beziehungen[0].figur_id, 'fig_2');
+});
+
+// ── applySozialschichtModeVote ────────────────────────────────────────────────
+test('modeVote: Mehrheit über Phase-1-Rohdaten korrigiert die konsolidierte Schicht', () => {
+  const chapterFiguren = [
+    { figuren: [{ name: 'Anna', sozialschicht: 'oben' }] },
+    { figuren: [{ name: 'Anna', sozialschicht: 'oben' }] },
+    { figuren: [{ name: 'Anna', sozialschicht: 'oben' }] },
+    { figuren: [{ name: 'Anna', sozialschicht: 'mitte' }] },
+  ];
+  const figuren = [{ name: 'Anna', sozialschicht: 'mitte' }];
+  const changes = applySozialschichtModeVote(chapterFiguren, figuren);
+  assert.equal(changes, 1);
+  assert.equal(figuren[0].sozialschicht, 'oben');
+});
+
+test('modeVote: Gleichstand → keine Korrektur', () => {
+  const chapterFiguren = [
+    { figuren: [{ name: 'Anna', sozialschicht: 'oben' }] },
+    { figuren: [{ name: 'Anna', sozialschicht: 'mitte' }] },
+  ];
+  const figuren = [{ name: 'Anna', sozialschicht: 'mitte' }];
+  assert.equal(applySozialschichtModeVote(chapterFiguren, figuren), 0);
+  assert.equal(figuren[0].sozialschicht, 'mitte');
+});
+
+test('modeVote: einstimmige Schicht (keine Stimmen-Streuung) → kein Eingriff', () => {
+  // entries.length < 2 → die einstimmig gevotete Schicht überschreibt NICHT.
+  const chapterFiguren = [
+    { figuren: [{ name: 'Anna', sozialschicht: 'oben' }] },
+    { figuren: [{ name: 'Anna', sozialschicht: 'oben' }] },
+  ];
+  const figuren = [{ name: 'Anna', sozialschicht: 'mitte' }];
+  assert.equal(applySozialschichtModeVote(chapterFiguren, figuren), 0);
+  assert.equal(figuren[0].sozialschicht, 'mitte');
+});
+
+// ── validateBeziehungenDescriptions ───────────────────────────────────────────
+test('beziehungsBeschreibung: passende Beschreibung bleibt unangetastet', () => {
+  const figuren = [
+    { id: 'fig_1', name: 'Anna', beziehungen: [{ figur_id: 'fig_2', typ: 'freund', beschreibung: 'Bert ist Annas Begleiter' }] },
+    { id: 'fig_2', name: 'Bert' },
+  ];
+  const { cleared, moved } = validateBeziehungenDescriptions(figuren);
+  assert.equal(cleared, 0);
+  assert.equal(moved, 0);
+  assert.equal(figuren[0].beziehungen[0].beschreibung, 'Bert ist Annas Begleiter');
+});
+
+test('beziehungsBeschreibung: an die richtige (leere) Beziehung verschoben', () => {
+  const figuren = [
+    { id: 'fig_1', name: 'Anna', beziehungen: [
+      { figur_id: 'fig_2', typ: 'freund', beschreibung: 'Cara ist die Schwester' }, // erwähnt Cara, nicht Bert
+      { figur_id: 'fig_3', typ: 'geschwister' },                                     // leer → Ziel
+    ] },
+    { id: 'fig_2', name: 'Bert' },
+    { id: 'fig_3', name: 'Cara' },
+  ];
+  const { cleared, moved } = validateBeziehungenDescriptions(figuren);
+  assert.equal(moved, 1);
+  assert.equal(cleared, 0);
+  assert.equal(figuren[0].beziehungen[0].beschreibung, null);
+  assert.equal(figuren[0].beziehungen[1].beschreibung, 'Cara ist die Schwester');
+});
+
+test('beziehungsBeschreibung: ohne erkennbare Figur → geleert', () => {
+  const figuren = [
+    { id: 'fig_1', name: 'Anna', beziehungen: [{ figur_id: 'fig_2', typ: 'freund', beschreibung: 'irgendeine Notiz ohne Namen' }] },
+    { id: 'fig_2', name: 'Bert' },
+  ];
+  const { cleared, moved } = validateBeziehungenDescriptions(figuren);
+  assert.equal(cleared, 1);
+  assert.equal(moved, 0);
+  assert.equal(figuren[0].beziehungen[0].beschreibung, null);
+});

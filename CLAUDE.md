@@ -13,6 +13,7 @@ Themen-Spickzettel ausgelagert (Drift-Schutz: CLAUDE.md-Regeln, Details in den S
 - [docs/ai-providers.md](docs/ai-providers.md) — `callAI`-Vertrag, JSON-Parse-Fallback, Token-Budgets, Caching, Mutex bei Ollama/Llama, Retries.
 - [docs/testing.md](docs/testing.md) — Wann Unit/Integration/E2E, Mock-AI-Setup, Harness-Konventionen, häufige Fallen.
 - [docs/erd.md](docs/erd.md) — Schema-ERD (Mermaid) + offene Schema-Verbesserungen.
+- [docs/komplett.md](docs/komplett.md) — Komplettanalyse (Kern-Pipeline): Phasen P1–P8, Single-/Multi-Pass, Claude-Split (A1/B/C/A2) vs. lokal, Delta-Cache + `book_extract_cache` + Checkpoint, Cache-Versionierung, faktenFailed/relationsFailed-Cache-Skip, Kontinuitäts-Verify-Stufe, Nacht-Cron, Pflicht-Invarianten.
 - [docs/figur-werkstatt.md](docs/figur-werkstatt.md) — Figuren-Werkstatt: jsMind-Mindmap, Import aus `figures`, Brainstorm-/Consistency-Jobs, Run-Historie, Hash-Permalinks.
 - [docs/buchchat-tools.md](docs/buchchat-tools.md) — Agentic Buch-Chat: Tool-Inventar (31 Stück inkl. `final_answer`-Endpunkt), `ctx`-Vertrag, Truncation, Loop-Constraints, neues Tool anlegen.
 - **Drei unabhängige Editoren — bei Änderungen MUSS der User nennen, welcher gemeint ist** (siehe Harte Regel „Editor-Spezifikation" weiter unten):
@@ -363,37 +364,7 @@ Jobs in `routes/jobs/` verwenden ein Single-Pass/Multi-Pass-Muster. Limits und B
 
 ## Komplettanalyse-Job
 
-**Pipeline-Phasen und Abhängigkeiten:**
-
-```
-Phase 1 – Vollextraktion (parallel pro Kapitel oder Single-Pass)
-          → figuren, orte, fakten, szenen(Namen), assignments(Namen)
-          → Claude-Single-Pass: 4 Calls (A1 Figuren-Stammdaten + B Orte/Szenen + C Fakten
-            parallel, danach A2 Beziehungen aus den A1-IDs), alle teilen den 1h-gecachten
-            Buchtext-Block; Beziehungen via mergeBeziehungenIntoFiguren zurück in
-            figuren[].beziehungen gefaltet. C (Fakten) ist non-fatal: scheitert er, leere
-            Fakten + Warnung (job.warn.faktenFailed) + Cache-Skip (kein Phantom-Freeze).
-            Fakten als eigener Call = volle Modell-Aufmerksamkeit auf dichte Faktenerfassung.
-            Lokale Provider + Multi-Pass: kombinierter Call (SCHEMA_KOMPLETT_EXTRAKTION) bzw.
-            Split Pass A (Figuren) + Pass B (Orte/Songs/Fakten/Szenen) — dort bleiben Fakten in B.
-          → Checkpoint 'p1_full_done'
-                    ↓
-Phase 2 – Figuren konsolidieren + Soziogramm (aus P2-Output, kein Extra-Call)
-Phase 3 – Schauplätze konsolidieren
-Phase 3b – Kapitelübergreifende Beziehungen (nur Multi-Pass, non-critical)
-                    ↓
-Block 2 [parallel]:
-  Phase 5 – Szenen remappen (kein API-Call, Namen → IDs)
-  Phase 6 – Zeitstrahl konsolidieren
-  Phase 8 – Kontinuitätscheck (Single-Pass: voller Text, Multi-Pass: Fakten)
-```
-
-**Standalone-Kontinuitätscheck:** `POST /jobs/kontinuitaet` — läuft Phase 8 einzeln, ohne die volle Pipeline. Exportiert `runKontinuitaetJob` aus `routes/jobs/komplett/job.js`.
-
-**Wichtige Mechanismen:**
-- **Delta-Cache:** Phase 1 prüft `chapter_extract_cache` in der DB. Cache-Key enthält `pages_sig` (sortierte `page_id:updated_at`-Paare). Ändert sich eine Seite → Cache-Miss → Neu-Extraktion. Single-Pass cached unter `chapter_key='__singlepass__'` (Gesamt-Seitensignatur); der gecachte Eintrag enthält die fertig gefalteten Figuren inkl. Beziehungen.
-- **Prompt-Caching:** System-Prompt mit eingebettetem Schema wird bei parallelen Kapitel-Calls gecacht (~10% des Input-Preises für Folge-Calls).
-- **Checkpoint-Wiederaufnahme:** `p1_full_done` speichert alle 5 Arrays.
+Kern-Pipeline (Figuren/Orte/Songs/Fakten/Szenen/Zeitstrahl/Kontinuität) — Phasen, Single-/Multi-Pass-Entscheidung, Delta-Cache + Checkpoint, Cache-Versionierung, Verify-Stufe, Nacht-Cron und Pflicht-Invarianten: **[docs/komplett.md](docs/komplett.md)**. Standalone-Kontinuitätscheck `POST /jobs/kontinuitaet` (`runKontinuitaetJob`) ebenda.
 
 ## Finetune-Export
 

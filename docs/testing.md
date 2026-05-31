@@ -92,6 +92,6 @@ Die folgenden Bereiche haben die kritischsten Tests; bei Aenderungen dort vor Co
 - Card-Exklusivitaet ([card-exclusivity.test.mjs](../tests/unit/card-exclusivity.test.mjs))
 - Hash-Router ([hash-router.test.mjs](../tests/unit/hash-router.test.mjs))
 - XSS-Escape-Invariante ([escape-xss.test.mjs](../tests/unit/escape-xss.test.mjs))
-- Komplettanalyse-Pipeline ([komplett.test.js](../tests/integration/komplett.test.js))
+- Komplettanalyse-Pipeline ([komplett.test.js](../tests/integration/komplett.test.js), [kontinuitaet.test.js](../tests/integration/kontinuitaet.test.js)) + Pure-Helper ([figuren-merge.test.js](../tests/unit/figuren-merge.test.js), [komplett-remap.test.js](../tests/unit/komplett-remap.test.js), [figuren-beziehungen-merge.test.js](../tests/unit/figuren-beziehungen-merge.test.js), [figuren-backfill.test.js](../tests/unit/figuren-backfill.test.js)) — Feature-Doku [docs/komplett.md](komplett.md)
 - PDF-Export ([pdf-export-defaults.test.js](../tests/unit/pdf-export-defaults.test.js), [pdf-render.test.mjs](../tests/unit/pdf-render.test.mjs), [pdf-export.spec.js](../tests/e2e/pdf-export.spec.js))
 - Fokus-Editor ([focus-editor.spec.js](../tests/e2e/focus-editor.spec.js))
