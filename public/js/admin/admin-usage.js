@@ -205,19 +205,38 @@ export const adminUsageMethods = {
 
   // ── Tab: Summary (mit Charts) ──────────────────────────────────────────────
   async adminUsageLoadSummary() {
-    if (this.adminUsageLoading) return;
-    this.adminUsageLoading = true;
-    try {
-      const data = await this._adminUsageFetch('/admin/usage/summary');
-      this.adminUsageSummary = data;
-      this.$nextTick(() => this._adminUsageRenderCharts(data));
-    } catch (e) { this.adminUsageError = e.message; }
-    finally { this.adminUsageLoading = false; }
+    // Fetch nur, wenn nicht schon ein Load laeuft. Das Chart-Rendering haengt
+    // NICHT am Loading-Guard: bei schnellem Tab-Wechsel hin/zurueck muessen die
+    // Charts aus dem Cache neu gezeichnet werden, auch waehrend ein frueherer
+    // Fetch noch laeuft (sonst bleibt das Summary-Pane leer).
+    if (!this.adminUsageLoading) {
+      this.adminUsageLoading = true;
+      try {
+        this.adminUsageSummary = await this._adminUsageFetch('/admin/usage/summary');
+      } catch (e) { this.adminUsageError = e.message; }
+      finally { this.adminUsageLoading = false; }
+    }
+    if (this.adminUsageSummary) {
+      this.$nextTick(() => this._adminUsageRenderCharts(this.adminUsageSummary));
+    }
+  },
+
+  _adminUsageDestroyCharts() {
+    if (!this._adminUsageCharts) return;
+    for (const k of Object.keys(this._adminUsageCharts)) {
+      try { this._adminUsageCharts[k]?.destroy?.(); } catch {}
+    }
+    this._adminUsageCharts = {};
   },
 
   async _adminUsageRenderCharts(data) {
+    // Tab koennte waehrend des nextTick/await schon gewechselt haben. Charts auf
+    // einem via x-show versteckten Canvas zu instanziieren loest Chart.js'
+    // Resize-Crash aus ("Cannot read properties of null (reading 'ownerDocument')").
+    if (this.adminUsageTab !== 'summary') return;
     let Chart;
     try { Chart = await loadChart(); } catch { return; }
+    if (this.adminUsageTab !== 'summary') return;
     const palette = ['#5b8def', '#23bf81', '#f0a23a', '#e85c79', '#9b7ce3', '#23b0bf'];
 
     const destroy = (key) => {
@@ -227,10 +246,13 @@ export const adminUsageMethods = {
     };
     if (!this._adminUsageCharts) this._adminUsageCharts = {};
 
+    // Nur auf sichtbarem Canvas instanziieren (offsetParent === null ⇒ display:none-Vorfahr).
+    const visible = (el) => el && el.offsetParent !== null;
+
     // Top-User-Bar
     const topUsers = (data.topUsers || []).slice(0, 10);
     const elUsers = this.$refs?.chartUsers;
-    if (elUsers && topUsers.length) {
+    if (visible(elUsers) && topUsers.length) {
       destroy('users');
       this._adminUsageCharts.users = new Chart(elUsers.getContext('2d'), {
         type: 'bar',
@@ -248,7 +270,7 @@ export const adminUsageMethods = {
     // Pro-Modell-Pie
     const byModel = data.byModel || [];
     const elModel = this.$refs?.chartModel;
-    if (elModel && byModel.length) {
+    if (visible(elModel) && byModel.length) {
       destroy('model');
       this._adminUsageCharts.model = new Chart(elModel.getContext('2d'), {
         type: 'doughnut',
@@ -262,7 +284,7 @@ export const adminUsageMethods = {
     // Pro-Job-Typ-Bar
     const byType = data.byType || [];
     const elType = this.$refs?.chartType;
-    if (elType && byType.length) {
+    if (visible(elType) && byType.length) {
       destroy('type');
       this._adminUsageCharts.type = new Chart(elType.getContext('2d'), {
         type: 'bar',

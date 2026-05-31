@@ -52,6 +52,11 @@ export function registerAdminUsageCard() {
         if (!visible) return;
         await this.adminUsageEnter();
       });
+      // Summary-Charts beim Verlassen des Tabs zerstoeren (Klick UND Hash-Router),
+      // damit Chart.js' ResizeObserver nicht auf dem versteckten Canvas crasht.
+      this.$watch(() => this.adminUsageTab, (tab, prev) => {
+        if (prev === 'summary' && tab !== 'summary') this._adminUsageDestroyCharts();
+      });
       this.$watch(() => this.adminUsageFrom, () => { if (window.__app.showAdminUsageCard) this.adminUsageLoadTab(); });
       this.$watch(() => this.adminUsageTo,   () => { if (window.__app.showAdminUsageCard) this.adminUsageLoadTab(); });
       // Multi-Select-Filter: bei jeder Array-Veraenderung Pagination zuruecksetzen
@@ -72,12 +77,7 @@ export function registerAdminUsageCard() {
 
     destroy() {
       if (this._onViewReset) window.removeEventListener('view:reset', this._onViewReset);
-      if (this._adminUsageCharts) {
-        for (const k of Object.keys(this._adminUsageCharts)) {
-          try { this._adminUsageCharts[k]?.destroy?.(); } catch {}
-        }
-        this._adminUsageCharts = null;
-      }
+      this._adminUsageDestroyCharts();
     },
 
     ...adminUsageMethods,
