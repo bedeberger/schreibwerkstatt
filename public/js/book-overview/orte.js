@@ -1,22 +1,27 @@
 // Schauplatz-Tile: Count + Top-Liste + Präsenz-Matrix.
 // Datenquelle: /locations/:book_id liefert pro Ort `kapitel: [{name, haeufigkeit}]`
 // (sortiert haeufigkeit desc) und `figuren: [fig_id]`. Kein Geo, keine Koordinaten.
-// Ranking: Summe der Kapitel-Häufigkeiten = Gesamt-Präsenz im Buch.
+// Ranking: Summe der Kapitel-Häufigkeiten = Gesamt-Präsenz im Buch. Bevorzugt
+// mehrfach erwähnte Schauplätze (total >= 2); Einmal-Nennungen nur als Fallback.
 export const orteMethods = {
   overviewOrteCount() { return (this.overviewOrte || []).length; },
 
   overviewTopOrte() {
     const orte = this.overviewOrte || [];
     return this._memo('topOrte', [orte], () => {
-      return orte
+      const ranked = orte
         .map(o => {
           const kap = Array.isArray(o.kapitel) ? o.kapitel : [];
           const total = kap.reduce((s, k) => s + (Number(k.haeufigkeit) || 0), 0);
           return { id: o.id, name: o.name, typ: o.typ || 'andere', total };
         })
-        .filter(o => o.total > 0 || (this.overviewOrte || []).length <= 6)
-        .sort((a, b) => b.total - a.total)
-        .slice(0, 6);
+        .sort((a, b) => b.total - a.total);
+      // Bevorzugt mehrfach erwähnte Schauplätze. Einmal-Nennungen (häufig alle aus
+      // einem einzelnen Kapitel) verdrängen sonst die wiederkehrenden Orte. Fallback
+      // auf die alte Schwelle, falls kein Ort mehrfach vorkommt (z. B. dünne Daten).
+      const recurring = ranked.filter(o => o.total >= 2);
+      const base = recurring.length ? recurring : ranked.filter(o => o.total > 0 || orte.length <= 6);
+      return base.slice(0, 6);
     });
   },
 
@@ -58,7 +63,11 @@ export const orteMethods = {
 
       if (candidates.length === 0) return empty;
       candidates.sort((a, b) => b.total - a.total);
-      const selected = candidates.slice(0, MAX_COLS);
+      // Nur mehrfach erwähnte Schauplätze in die Matrix. Einmal-Nennungen aus einem
+      // einzelnen Kapitel würden die Top-Spalten sonst fluten und die wiederkehrenden
+      // Orte verdrängen. Fallback auf alle, falls kein Ort mehrfach vorkommt.
+      const recurring = candidates.filter(c => c.total >= 2);
+      const selected = (recurring.length ? recurring : candidates).slice(0, MAX_COLS);
 
       const lookup = (c, ch) => c.byRootId.get(Number(ch.id)) ?? 0;
 

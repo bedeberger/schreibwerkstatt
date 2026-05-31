@@ -183,6 +183,50 @@ test('overviewOrtPresence: location-Kapitel-rows aggregiert', () => {
   assert.equal(rowB.cells[0].value, 4);
 });
 
+test('overviewOrtPresence: Einmal-Nennungen verdrängen wiederkehrende Orte nicht', () => {
+  const tree = makeTree();
+  const ctx = makeCtx(tree);
+  // Ein wiederkehrender Ort (2 Kapitel) + zwei Einmal-Nennungen aus demselben Kapitel.
+  ctx.overviewOrte = [
+    { id: 'wieder', name: 'Marktplatz', typ: 'andere', kapitel: [
+      { chapter_id: 1, name: 'Root A', haeufigkeit: 1 },
+      { chapter_id: 5, name: 'Root B', haeufigkeit: 1 },
+    ] },
+    { id: 'einmal1', name: 'Gasse', typ: 'andere', kapitel: [
+      { chapter_id: 1, name: 'Root A', haeufigkeit: 1 },
+    ] },
+    { id: 'einmal2', name: 'Brunnen', typ: 'andere', kapitel: [
+      { chapter_id: 1, name: 'Root A', haeufigkeit: 1 },
+    ] },
+  ];
+  const out = ctx.overviewOrtPresence();
+  assert.deepEqual(out.places.map(p => p.id), ['wieder'], 'nur der mehrfach erwähnte Ort');
+});
+
+test('overviewOrtPresence: Fallback zeigt Einmal-Nennungen, wenn kein Ort wiederkehrt', () => {
+  const tree = makeTree();
+  const ctx = makeCtx(tree);
+  ctx.overviewOrte = [
+    { id: 'a', name: 'Gasse', typ: 'andere', kapitel: [{ chapter_id: 1, name: 'Root A', haeufigkeit: 1 }] },
+    { id: 'b', name: 'Brunnen', typ: 'andere', kapitel: [{ chapter_id: 5, name: 'Root B', haeufigkeit: 1 }] },
+  ];
+  const out = ctx.overviewOrtPresence();
+  assert.equal(out.places.length, 2, 'Fallback: beide Einmal-Orte sichtbar');
+});
+
+test('overviewTopOrte: bevorzugt mehrfach erwähnte Schauplätze', () => {
+  const tree = makeTree();
+  const ctx = makeCtx(tree);
+  ctx.overviewOrte = [
+    { id: 'wieder', name: 'Marktplatz', kapitel: [
+      { chapter_id: 1, name: 'Root A', haeufigkeit: 1 },
+      { chapter_id: 5, name: 'Root B', haeufigkeit: 1 },
+    ] },
+    { id: 'einmal', name: 'Gasse', kapitel: [{ chapter_id: 1, name: 'Root A', haeufigkeit: 1 }] },
+  ];
+  assert.deepEqual(ctx.overviewTopOrte().map(o => o.id), ['wieder']);
+});
+
 test('overviewLatest.chapter_count: Sub-Kapitel zählen nicht eigenständig', () => {
   const tree = makeTree();
   // Pages mit chapter_id — quer durch Hierarchie
