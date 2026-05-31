@@ -16,7 +16,7 @@ export const figurenMethods = {
         if (!Array.isArray(s.fig_ids)) continue;
         for (const fid of s.fig_ids) totals.set(fid, (totals.get(fid) || 0) + 1);
       }
-      return figs
+      const ranked = figs
         .map(f => ({
           id: f.id,
           name: f.name,
@@ -24,15 +24,20 @@ export const figurenMethods = {
           rolle: f.rolle || null,
           mentions: totals.get(f.id) || 0,
         }))
-        .sort((a, b) => b.mentions - a.mentions)
-        .slice(0, 6);
+        .sort((a, b) => b.mentions - a.mentions);
+      // Bevorzugt Figuren mit mehreren Szenen; Einmal-Auftritte nur als Fallback,
+      // falls keine Figur mehrfach vorkommt (analog Orte-Tile).
+      const recurring = ranked.filter(f => f.mentions >= 2);
+      const base = recurring.length ? recurring : ranked;
+      return base.slice(0, 6);
     });
   },
 
   // Figuren-Präsenz-Matrix: Kapitel (Zeilen) × Top-Figuren (Spalten).
   // Cell-Wert = Anzahl Szenen, in denen die Figur im Kapitel auftritt
   // (gezählt aus overviewSzenen.fig_ids). Auswahl: Top-MAX_COLS Figuren nach
-  // Gesamt-Szenen. Match Kapitel primär per chapter_id (stabil), Fallback
+  // Gesamt-Szenen, bevorzugt mehrfach auftretende (total >= 2); Einmal-Auftritte
+  // nur als Fallback. Match Kapitel primär per chapter_id (stabil), Fallback
   // auf Name. Skalierung global über alle Cells.
   overviewFigurePresence() {
     const figs = this.overviewFiguren || [];
@@ -83,7 +88,11 @@ export const figurenMethods = {
     candidates.sort((a, b) => b.total - a.total);
     if (candidates.length === 0) return empty;
 
-    const selected = candidates.slice(0, MAX_COLS);
+    // Nur mehrfach auftretende Figuren in die Matrix. Einmal-Szenen-Statisten
+    // würden die Spalten sonst auffüllen und die wiederkehrenden Figuren optisch
+    // verdrängen. Fallback auf alle, falls keine Figur mehrfach vorkommt.
+    const recurring = candidates.filter(c => c.total >= 2);
+    const selected = (recurring.length ? recurring : candidates).slice(0, MAX_COLS);
 
     const figures = selected.map(c => ({ id: c.id, name: c.name }));
     // Globaler Max über alle Cells: einziger Skala-Bezug. Spalten-Normierung

@@ -161,6 +161,37 @@ test('overviewFigurePresence: Szenen aus Sub-Kapiteln in Root-Spalte', () => {
   assert.equal(cellBertA.value, 1);
 });
 
+test('overviewFigurePresence: Einmal-Szenen-Statisten verdrängen Hauptfiguren nicht', () => {
+  const tree = makeTree();
+  const ctx = makeCtx(tree);
+  ctx.overviewFiguren = [
+    { id: 'haupt', name: 'Anna', kurzname: 'Anna' },
+    { id: 'statist', name: 'Kellner', kurzname: 'Kellner' },
+  ];
+  ctx.overviewSzenen = [
+    { chapter_id: 1, fig_ids: ['haupt'] },
+    { chapter_id: 5, fig_ids: ['haupt'] },
+    { chapter_id: 1, fig_ids: ['statist'] },
+  ];
+  const out = ctx.overviewFigurePresence();
+  assert.deepEqual(out.figures.map(f => f.id), ['haupt'], 'nur die mehrfach auftretende Figur');
+});
+
+test('overviewTopFiguren: bevorzugt Figuren mit mehreren Szenen', () => {
+  const tree = makeTree();
+  const ctx = makeCtx(tree);
+  ctx.overviewFiguren = [
+    { id: 'haupt', name: 'Anna', kurzname: 'Anna' },
+    { id: 'statist', name: 'Kellner', kurzname: 'Kellner' },
+  ];
+  ctx.overviewSzenen = [
+    { chapter_id: 1, fig_ids: ['haupt'] },
+    { chapter_id: 5, fig_ids: ['haupt'] },
+    { chapter_id: 1, fig_ids: ['statist'] },
+  ];
+  assert.deepEqual(ctx.overviewTopFiguren().map(f => f.id), ['haupt']);
+});
+
 test('overviewOrtPresence: location-Kapitel-rows aggregiert', () => {
   const tree = makeTree();
   const ctx = makeCtx(tree);
