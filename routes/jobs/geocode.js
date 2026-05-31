@@ -40,23 +40,36 @@ function _parseResolved(result) {
   return map;
 }
 
-// Wohnadressen der mit den Orten verknuepften Figuren → Map(locationId → [adr]).
+// Wohnadressen der mit den Orten verknuepften Figuren → Map(loc_id → [adr]).
 // Soft-Hinweis fuers Disambiguieren (z.B. gleichnamige Orte); die KI gewichtet,
 // der geografische Anker des Labels selbst hat im Prompt Vorrang.
-function _figureHints(itemIds) {
-  const ids = itemIds.filter(n => Number.isInteger(n));
+// Das Frontend identifiziert Orte ueber loc_id (TEXT); location_figures.location_id
+// referenziert aber den Integer-PK locations.id → erst loc_id → id mappen.
+function _figureHints(locIds, bookId, userEmail) {
   const byLoc = new Map();
-  if (!ids.length) return byLoc;
-  const placeholders = ids.map(() => '?').join(',');
+  if (!locIds.length || !bookId) return byLoc;
+  const emailCond = userEmail ? 'user_email = ?' : 'user_email IS NULL';
+  const emailVal = userEmail ? [userEmail] : [];
+  const locPlaceholders = locIds.map(() => '?').join(',');
+  const locRows = db.prepare(
+    `SELECT id, loc_id FROM locations
+      WHERE book_id = ? AND ${emailCond} AND loc_id IN (${locPlaceholders})`
+  ).all(bookId, ...emailVal, ...locIds);
+  if (!locRows.length) return byLoc;
+  const pkToLocId = new Map(locRows.map(r => [r.id, r.loc_id]));
+  const pks = locRows.map(r => r.id);
+  const placeholders = pks.map(() => '?').join(',');
   const rows = db.prepare(
     `SELECT lf.location_id AS lid, f.wohnadresse AS wohn
        FROM location_figures lf JOIN figures f ON f.id = lf.figure_id
       WHERE lf.location_id IN (${placeholders})
         AND f.wohnadresse IS NOT NULL AND TRIM(f.wohnadresse) != ''`
-  ).all(...ids);
+  ).all(...pks);
   for (const r of rows) {
-    if (!byLoc.has(r.lid)) byLoc.set(r.lid, []);
-    const list = byLoc.get(r.lid);
+    const locId = pkToLocId.get(r.lid);
+    if (!locId) continue;
+    if (!byLoc.has(locId)) byLoc.set(locId, []);
+    const list = byLoc.get(locId);
     const v = String(r.wohn).trim();
     if (list.length < MAX_HINTS_PER_ITEM && !list.includes(v)) list.push(v);
   }
@@ -73,7 +86,7 @@ async function runGeocodeResolveJob(jobId, items, bookId, userEmail) {
     const region = settings?.schauplatz_land || null;
     const bookContext = (settings?.buch_kontext || '').trim().slice(0, BOOK_CONTEXT_MAX) || null;
 
-    const hintsByLoc = _figureHints(items.map(it => it.id));
+    const hintsByLoc = _figureHints(items.map(it => it.id), bookId, userEmail);
     const { buildSystemGeocodeResolve, buildGeocodeResolvePrompt, SCHEMA_GEOCODE_RESOLVE } = await getPrompts();
     const promptItems = items.map(it => ({
       id: String(it.id),
@@ -118,9 +131,10 @@ async function runGeocodeResolveJob(jobId, items, bookId, userEmail) {
 geocodeRouter.post('/geocode-resolve', jsonBody, (req, res) => {
   const book_id = toIntId(req.body?.book_id);
   if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
+  // id ist die loc_id (TEXT, vom Frontend als o.id geliefert), KEIN Integer-PK.
   const items = (Array.isArray(req.body?.items) ? req.body.items : [])
-    .map(it => ({ id: toIntId(it?.id), name: String(it?.name || '').trim() }))
-    .filter(it => it.id != null && it.name)
+    .map(it => ({ id: String(it?.id ?? '').trim(), name: String(it?.name || '').trim() }))
+    .filter(it => it.id && it.name)
     .slice(0, MAX_ITEMS);
   if (!items.length) return res.status(400).json({ error_code: 'ITEMS_REQUIRED' });
   setContext({ book: book_id });
@@ -130,7 +144,7 @@ geocodeRouter.post('/geocode-resolve', jsonBody, (req, res) => {
     catch (e) { if (sendACLError(res, e)) return; throw e; }
   }
   const userEmail = req.session?.user?.email || null;
-  const entityKey = `${book_id}|${items.map(i => i.id).sort((a, b) => a - b).join(',')}`;
+  const entityKey = `${book_id}|${items.map(i => i.id).sort().join(',')}`;
   const existing = findActiveJobId('geocode-resolve', entityKey, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });
   const jobId = createJob('geocode-resolve', book_id, userEmail,
