@@ -26,7 +26,7 @@ const { invalidateRenamedChapterCaches, loadAndValidateCheckpoint, restorePhase1
 const { remapSzenen, remapAssignments, saveSzenenAndEvents, saveKontinuitaetResult } = require('./remap');
 const {
   runPhase1, runPhase2, runPhase3, runPhase3Songs, runPhase3b, runZeitstrahl,
-  buildPrelimFigurenKompakt, runPhase3OrteCall,
+  buildPrelimFigurenKompakt, runPhase3OrteCall, komplettMaxTokens,
 } = require('./phases');
 
 // ── Verify-Stufe für den Multi-Pass-Kontinuitätscheck ────────────────────────
@@ -285,13 +285,13 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
           return await retryOnTransientAi(() => call(jobId, tok,
             prompts.buildKontinuitaetSinglePassPrompt(bookName, null, figKompakt, orteKompakt, narrativeLabels(getBookSettings(bookIdInt, email))),
             [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KONTINUITAET_BLOCKS, '1h')],
-            82, 97, 5000, 0.2, null, prompts.SCHEMA_KONTINUITAET_PROBLEME,
+            82, 97, komplettMaxTokens(effectiveProvider), 0.2, null, prompts.SCHEMA_KONTINUITAET_PROBLEME,
           ), { log, label: 'Kontinuität Single-Pass (P8)' });
         }
         log.info(`Kontinuität facts-basiert: ${chapterFakten.length} Kapitel, ${figKompakt.length} Figuren`);
         return await retryOnTransientAi(() => call(jobId, tok,
           prompts.buildKontinuitaetCheckPrompt(bookName, chapterFakten, figKompakt, orteKompakt),
-          sys.SYSTEM_KONTINUITAET_BLOCKS, 82, 97, effectiveProvider === 'claude' ? 5000 : 2500, 0.2, null, prompts.SCHEMA_KONTINUITAET_PROBLEME,
+          sys.SYSTEM_KONTINUITAET_BLOCKS, 82, 97, komplettMaxTokens(effectiveProvider), 0.2, null, prompts.SCHEMA_KONTINUITAET_PROBLEME,
         ), { log, label: 'Kontinuität facts-basiert (P8)' });
       } catch (e) {
         if (e.name === 'AbortError') throw e;
@@ -422,7 +422,7 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
       kontFullText = bookText;
       result = await retryOnTransientAi(() => call(jobId, tok,
         prompts.buildKontinuitaetSinglePassPrompt(bookName, bookText, figurenKompakt, orteKompakt, narrativeLabels(getBookSettings(bookIdInt, email))),
-        sys.SYSTEM_KONTINUITAET_BLOCKS, 60, 97, 5000, 0.2, null, prompts.SCHEMA_KONTINUITAET_PROBLEME,
+        sys.SYSTEM_KONTINUITAET_BLOCKS, 60, 97, komplettMaxTokens(effectiveProvider), 0.2, null, prompts.SCHEMA_KONTINUITAET_PROBLEME,
       ), { log, label: 'Kontinuität Single-Pass' });
       pt.mark('Single-Pass Check');
     } else {
@@ -448,7 +448,7 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
           // transienter Blip würde sonst dauerhaft Fakten verlieren.
           const chResult = await retryOnTransientAi(() => call(jobId, tok,
             prompts.buildKontinuitaetChapterFactsPrompt(group.name, chText),
-            sys.SYSTEM_KONTINUITAET_BLOCKS, fromPct, toPct, 1500, 0.2, null, prompts.SCHEMA_KONTINUITAET_FAKTEN,
+            sys.SYSTEM_KONTINUITAET_BLOCKS, fromPct, toPct, komplettMaxTokens(effectiveProvider), 0.2, null, prompts.SCHEMA_KONTINUITAET_FAKTEN,
           ), { log, label: `Fakten «${group.name}»` });
           chapterFacts.push({ kapitel: group.name, fakten: chResult.fakten || [] });
         } catch (e) {
@@ -462,7 +462,7 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
       updateJob(jobId, { progress: 88, statusText: 'job.phase.checkContradictions' });
       result = await retryOnTransientAi(() => call(jobId, tok,
         prompts.buildKontinuitaetCheckPrompt(bookName, chapterFacts, figurenKompakt, orteKompakt),
-        sys.SYSTEM_KONTINUITAET_BLOCKS, 88, 95, 5000, 0.2, null, prompts.SCHEMA_KONTINUITAET_PROBLEME,
+        sys.SYSTEM_KONTINUITAET_BLOCKS, 88, 95, komplettMaxTokens(effectiveProvider), 0.2, null, prompts.SCHEMA_KONTINUITAET_PROBLEME,
       ), { log, label: 'Kontinuität Check (Multi-Pass)' });
       // Fakten-basierte Befunde gegen den Originaltext verifizieren (False-Positive-Filter).
       if (effectiveProvider === 'claude') {

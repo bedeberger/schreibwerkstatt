@@ -558,6 +558,10 @@ document.addEventListener('alpine:init', () => {
     async init() {
       // Referenz für $app-Magic (siehe oben).
       window.__app = this;
+      // Boot erfolgreich → Watchdog-Flag (failsafe-reveal.js) zurücksetzen,
+      // damit ein künftiger echter Boot-Fehler wieder einmalig reloaden darf
+      // und späte Lazy-Load-Fehler keinen Reload mehr auslösen.
+      try { sessionStorage.removeItem('bootReloadDone'); } catch (_) {}
       this._abortCtrl?.abort();
       this._abortCtrl = new AbortController();
       const signal = this._abortCtrl.signal;

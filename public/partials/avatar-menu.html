@@ -85,6 +85,12 @@
       <span class="avatar-menu-item-label" x-text="t('admin.books.title')"></span>
     </button>
 
+    <button type="button" class="avatar-menu-item" role="menuitem"
+            x-show="currentUser?.role === 'admin'"
+            @click="showAvatarMenu = false; toggleAdminLogsCard()">
+      <span class="avatar-menu-item-label" x-text="t('admin.logs.title')"></span>
+    </button>
+
     <div class="avatar-menu-divider"></div>
 
     <div class="avatar-menu-provider" :data-tip="t('header.providerTitle')">

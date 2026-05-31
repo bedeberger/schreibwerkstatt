@@ -25,6 +25,20 @@ const appSettings = require('../../../lib/app-settings');
 const { getContextConfigFor } = require('../../../lib/ai');
 
 /**
+ * Output-Cap für Komplettanalyse-Calls (Extraktion + Konsolidierung), provider-abhängig.
+ * Claude rechnet nur generierte Tokens ab — reserviertes max_tokens ist gratis — also
+ * grosszügig aufs Provider-Ceiling deckeln (kein Truncation-Risiko, keine Retry-Ladder).
+ * Lokale Provider knapper auf das konfigurierte ai.komplett.extract_max_tokens (VRAM/Latenz),
+ * gedeckelt aufs jeweilige Ceiling. aiCall deckelt selbst nochmal aufs Provider-Ceiling.
+ */
+function komplettMaxTokens(provider) {
+  const ceiling = getContextConfigFor(provider).maxTokensOut;
+  if (provider === 'claude') return ceiling;
+  const base = Math.max(1024, parseInt(appSettings.get('ai.komplett.extract_max_tokens'), 10) || 16000);
+  return Math.min(base, ceiling);
+}
+
+/**
  * Phase 1: Vollextraktion (Figuren+Orte+Fakten+Szenen+Events).
  * Single-Pass für kleine Bücher, Multi-Pass mit Delta-Cache für grosse.
  * Schema und Regeln im System-Prompt (SYSTEM_KOMPLETT_EXTRAKTION) → gecacht über alle Kapitel.
@@ -46,7 +60,13 @@ async function runPhase1(ctx) {
   // Phase 1 (job.error.phase1Incomplete). aiCall deckelt jeden Cap selbst aufs
   // Provider-Ceiling; extractRetryCap = Ceiling ist die echte obere Grenze.
   const extractBaseCap = Math.max(1024, parseInt(appSettings.get('ai.komplett.extract_max_tokens'), 10) || 16000);
-  const extractRetryCap = Math.max(extractBaseCap, getContextConfigFor(effectiveProvider).maxTokensOut);
+  const providerMaxOut = getContextConfigFor(effectiveProvider).maxTokensOut;
+  const extractRetryCap = Math.max(extractBaseCap, providerMaxOut);
+  // Claude rechnet nur generierte Tokens ab — reserviertes max_tokens ist gratis.
+  // Darum die Claude-Extraktions-Calls direkt grosszügig aufs Provider-Ceiling
+  // deckeln statt knapp mit Truncation-Retry-Ladder: spart Round-Trips und
+  // verhindert, dass ein figuren-/orts-/beziehungsdichtes Buch Phase 1 killt.
+  const claudeExtractCap = providerMaxOut;
   const callExtract = (label, prompt, system, fromPct, toPct, expectedChars, schema) =>
     retryOnTransientAi(() => call(jobId, tok, prompt, system, fromPct, toPct, expectedChars, 0.2, extractBaseCap, schema),
       { log, label })
@@ -96,27 +116,16 @@ async function runPhase1(ctx) {
         // denselben Prefix. Kleinere Schemas pro Call senken das Truncation-Risiko des
         // ehemals einen 6-Array-Mega-Calls.
         const bookSystemBlock = { text: buildBookSystemBlockText(bookName, pageContents.length, fullBookText), ttl: '1h' };
-        // A1 trägt jetzt mehr Tiefe-Felder pro Figur (aeusseres/stimme/hintergrund/arc) →
-        // höheres Truncation-Risiko bei figurendichten Büchern. Bei Truncation einmal mit
-        // höherem Cap nachfassen (aiCall deckelt selbst auf MAX_TOKENS_OUT) statt den Job
-        // hart zu killen.
-        const callFigurenStamm = (maxTok) => retryOnTransientAi(() => call(jobId, tok,
-          prompts.buildExtraktionFigurenStammPrompt('Gesamtbuch', bookName, pageContents.length, null),
-          [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KOMPLETT_FIGUREN_STAMM_BLOCKS, '1h')],
-          12, 20, maxTok, 0.2, null, prompts.SCHEMA_KOMPLETT_FIGUREN_STAMM,
-        ), { log, label: 'Single-Pass Figuren-Stamm (A1)' });
         const [stammRes, orteRes] = await settledAll([
-          () => callFigurenStamm(14000).catch(e => {
-            if (e?.message === 'job.error.aiTruncated') {
-              log.warn('A1 Figuren-Stamm bei 14000 Tokens trunkiert – Retry mit höherem Cap (24000).');
-              return callFigurenStamm(24000);
-            }
-            throw e;
-          }),
+          () => retryOnTransientAi(() => call(jobId, tok,
+            prompts.buildExtraktionFigurenStammPrompt('Gesamtbuch', bookName, pageContents.length, null),
+            [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KOMPLETT_FIGUREN_STAMM_BLOCKS, '1h')],
+            12, 20, claudeExtractCap, 0.2, null, prompts.SCHEMA_KOMPLETT_FIGUREN_STAMM,
+          ), { log, label: 'Single-Pass Figuren-Stamm (A1)' }),
           () => retryOnTransientAi(() => call(jobId, tok,
             prompts.buildExtraktionOrtePassPrompt('Gesamtbuch', bookName, pageContents.length, null),
             [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KOMPLETT_ORTE_PASS_BLOCKS, '1h')],
-            12, 20, 8000, 0.2, null, prompts.SCHEMA_KOMPLETT_ORTE_PASS,
+            12, 20, claudeExtractCap, 0.2, null, prompts.SCHEMA_KOMPLETT_ORTE_PASS,
           ), { log, label: 'Single-Pass Orte/Szenen (B)' }),
         // warmup: A1 läuft seriell zuerst und schreibt den 1h-bookSystemBlock-Cache;
         // B (und das nachgelagerte A2/P8) lesen ihn dann statt ihn ein zweites Mal
@@ -140,7 +149,7 @@ async function runPhase1(ctx) {
             const bzRes = await retryOnTransientAi(() => call(jobId, tok,
               prompts.buildFigurenBeziehungenExtraktionPrompt(bookName, stammFiguren, null),
               [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_FIGUREN_BLOCKS, '1h')],
-              20, 28, 8000, 0.2, null, prompts.SCHEMA_BEZIEHUNGEN,
+              20, 28, claudeExtractCap, 0.2, null, prompts.SCHEMA_BEZIEHUNGEN,
             ), { log, label: 'Single-Pass Beziehungen (A2)' });
             const flatBz = Array.isArray(bzRes?.beziehungen) ? bzRes.beziehungen : [];
             stammFiguren = mergeBeziehungenIntoFiguren(stammFiguren, flatBz);
@@ -247,7 +256,7 @@ async function runPhase1(ctx) {
           log.info(`${chunkLabel} – Cache-MISS, KI-Call…`);
           const result = await retryOnTransientAi(() => call(jobId, tok,
             prompts.buildExtraktionKomplettChapterPrompt(chunk.name, bookName, chunk.pages.length, chText),
-            sys.SYSTEM_KOMPLETT_EXTRAKTION_BLOCKS, null, null, 14000, 0.2, null, prompts.SCHEMA_KOMPLETT_EXTRAKTION,
+            sys.SYSTEM_KOMPLETT_EXTRAKTION_BLOCKS, null, null, claudeExtractCap, 0.2, null, prompts.SCHEMA_KOMPLETT_EXTRAKTION,
           ), { log, label: chunkLabel });
           saveChapterExtractCache(bookIdInt, email, key, pagesSig, result, effectiveProvider);
           log.info(`${chunkLabel} – OK (fig=${result?.figuren?.length ?? 0} orte=${result?.orte?.length ?? 0} songs=${result?.songs?.length ?? 0} sz=${result?.szenen?.length ?? 0}).`);
@@ -353,7 +362,7 @@ async function runPhase2(ctx, chapterFiguren, chapterAssignments, chapterSzenen)
     const figProgressEnd = effectiveProvider === 'claude' ? 40 : 43;
     const figResult = await call(jobId, tok,
       prompts.buildFiguresBasisConsolidationPrompt(bookName, preMerged, sys.BUCH_KONTEXT || ''),
-      sys.SYSTEM_FIGUREN_BLOCKS, 30, figProgressEnd, 8000, 0.2, null, prompts.SCHEMA_FIGUREN_KONSOL,
+      sys.SYSTEM_FIGUREN_BLOCKS, 30, figProgressEnd, komplettMaxTokens(effectiveProvider), 0.2, null, prompts.SCHEMA_FIGUREN_KONSOL,
     );
     if (!Array.isArray(figResult?.figuren)) throw i18nError('job.error.figurenMissing');
     figuren = figResult.figuren.map((f, i) => ({ ...f, id: f.id || ('fig_' + (i + 1)) }));
@@ -399,7 +408,7 @@ async function runPhase2(ctx, chapterFiguren, chapterAssignments, chapterSzenen)
       try {
         const sozResult = await call(jobId, tok,
           prompts.buildSoziogrammConsolidationPrompt(bookName, figuren, sys.BUCH_KONTEXT || ''),
-          sys.SYSTEM_FIGUREN_BLOCKS, 40, 43, 3000, 0.2, null, prompts.SCHEMA_SOZIOGRAMM_KONSOL,
+          sys.SYSTEM_FIGUREN_BLOCKS, 40, 43, komplettMaxTokens(effectiveProvider), 0.2, null, prompts.SCHEMA_SOZIOGRAMM_KONSOL,
         );
         const validIds = new Set(figuren.map(f => f.id));
         const prelimSchichtById = Object.fromEntries(sozFiguren.map(s => [s.fig_id, s.sozialschicht]));
@@ -444,7 +453,7 @@ async function runPhase2(ctx, chapterFiguren, chapterAssignments, chapterSzenen)
  *  idRemap aus mergeDuplicateFiguren abgeglichen (gemergte Figuren werden umgebogen,
  *  nicht mehr existente entfernt). */
 async function runPhase3(ctx, chapterOrte, figurenKompakt, isSinglePass, idRemap, opts = {}) {
-  const { jobId, bookIdInt, bookName, email, call, tok, log, prompts, sys, idMaps } = ctx;
+  const { jobId, bookIdInt, bookName, email, call, tok, log, prompts, sys, idMaps, effectiveProvider } = ctx;
   const prefetched = opts.prefetchedOrteRaw || null;
 
   let orte;
@@ -465,7 +474,7 @@ async function runPhase3(ctx, chapterOrte, figurenKompakt, isSinglePass, idRemap
     updateJob(jobId, { progress: 43, statusText: 'job.phase.consolidatingOrte' });
     const orteResultRaw = prefetched || await call(jobId, tok,
       prompts.buildLocationsConsolidationPrompt(bookName, chapterOrte, figurenKompakt),
-      sys.SYSTEM_ORTE_BLOCKS, 43, 55, 6000, 0.2, null, prompts.SCHEMA_ORTE_KONSOL,
+      sys.SYSTEM_ORTE_BLOCKS, 43, 55, komplettMaxTokens(effectiveProvider), 0.2, null, prompts.SCHEMA_ORTE_KONSOL,
     );
     if (!Array.isArray(orteResultRaw?.orte)) throw i18nError('job.error.orteMissing');
     if (prefetched) {
@@ -497,7 +506,7 @@ async function runPhase3(ctx, chapterOrte, figurenKompakt, isSinglePass, idRemap
  *  Single-Pass: Songs aus Pass B übernehmen (figuren-Refs gegen idRemap+validFigIds filtern).
  *  Multi-Pass: KI-Call konsolidiert dedupliziert (Titel+Interpret) über alle Kapitel. */
 async function runPhase3Songs(ctx, chapterSongs, figurenKompakt, isSinglePass, idRemap) {
-  const { jobId, bookIdInt, bookName, email, call, tok, log, prompts, sys, idMaps } = ctx;
+  const { jobId, bookIdInt, bookName, email, call, tok, log, prompts, sys, idMaps, effectiveProvider } = ctx;
   const validFigIds = new Set(figurenKompakt.map(f => f.id));
 
   let songs;
@@ -524,7 +533,7 @@ async function runPhase3Songs(ctx, chapterSongs, figurenKompakt, isSinglePass, i
       // Vorher überlappten Songs 56-58 mit P3b 55-58 → sichtbarer Range-Konflikt.
       const songsResultRaw = await call(jobId, tok,
         prompts.buildSongsConsolidationPrompt(bookName, chapterSongs, figurenKompakt),
-        sys.SYSTEM_ORTE_BLOCKS, 55, 56, 3000, 0.2, null, prompts.SCHEMA_SONGS_KONSOL,
+        sys.SYSTEM_ORTE_BLOCKS, 55, 56, komplettMaxTokens(effectiveProvider), 0.2, null, prompts.SCHEMA_SONGS_KONSOL,
       );
       const raw = Array.isArray(songsResultRaw?.songs) ? songsResultRaw.songs : [];
       songs = raw.map((s, i) => ({
@@ -559,12 +568,12 @@ function buildPrelimFigurenKompakt(chapterFiguren) {
 /** Nur der Orte-Konso-AI-Call (Multi-Pass) – ohne DB-Save, ohne Progress-Update.
  *  Aufrufer wendet idRemap+validFigIds-Filter via runPhase3(opts.prefetchedOrteRaw) an. */
 async function runPhase3OrteCall(ctx, chapterOrte, figurenKompaktForPrompt) {
-  const { jobId, bookName, call, tok, prompts, sys } = ctx;
+  const { jobId, bookName, call, tok, prompts, sys, effectiveProvider } = ctx;
   return call(jobId, tok,
     prompts.buildLocationsConsolidationPrompt(bookName, chapterOrte, figurenKompaktForPrompt),
     sys.SYSTEM_ORTE_BLOCKS,
     null, null,
-    6000, 0.2, null, prompts.SCHEMA_ORTE_KONSOL,
+    komplettMaxTokens(effectiveProvider), 0.2, null, prompts.SCHEMA_ORTE_KONSOL,
   );
 }
 
@@ -575,7 +584,7 @@ async function runPhase3OrteCall(ctx, chapterOrte, figurenKompaktForPrompt) {
  * verschiedener Kapitel hier nachträglich identifiziert.
  */
 async function runPhase3b(ctx, figuren) {
-  const { jobId, bookIdInt, email, call, tok, log, prompts, sys, singlePassLimit, bookName, fullBookText, pageContents } = ctx;
+  const { jobId, bookIdInt, email, call, tok, log, prompts, sys, singlePassLimit, bookName, fullBookText, pageContents, effectiveProvider } = ctx;
 
   updateJob(jobId, { progress: 56, statusText: 'job.phase.crossChapterRelations' });
 
@@ -643,7 +652,7 @@ async function runPhase3b(ctx, figuren) {
 
   const bzResult = await call(jobId, tok,
     prompts.buildKapiteluebergreifendeBeziehungenPrompt(bookName, figuren, textForPrompt),
-    sys.SYSTEM_FIGUREN_BLOCKS, 56, 58, 2000, 0.2, null, prompts.SCHEMA_BEZIEHUNGEN,
+    sys.SYSTEM_FIGUREN_BLOCKS, 56, 58, komplettMaxTokens(effectiveProvider), 0.2, null, prompts.SCHEMA_BEZIEHUNGEN,
   );
   const newBz = Array.isArray(bzResult?.beziehungen) ? bzResult.beziehungen : [];
   if (newBz.length > 0) addFigurenBeziehungen(bookIdInt, newBz, email, ctx.idMaps);
@@ -652,7 +661,7 @@ async function runPhase3b(ctx, figuren) {
 
 /** P6: Zeitstrahl aus gespeicherten Events konsolidieren. */
 async function runZeitstrahl(ctx, opts = {}) {
-  const { jobId, bookIdInt, email, call, tok, log, prompts, sys, idMaps } = ctx;
+  const { jobId, bookIdInt, email, call, tok, log, prompts, sys, idMaps, effectiveProvider } = ctx;
   // silent: keine Progress-/Status-Updates; nötig wenn parallel zu P8 (Claude),
   // damit P8 die Bar exklusiv kontrolliert.
   const silent = !!opts.silent;
@@ -736,7 +745,7 @@ async function runZeitstrahl(ctx, opts = {}) {
     prompts.buildZeitstrahlConsolidationPrompt(zeitstrahlEvents),
     sys.SYSTEM_ZEITSTRAHL_BLOCKS,
     silent ? null : 78, silent ? null : 82,
-    3000, 0.2, null, prompts.SCHEMA_ZEITSTRAHL,
+    komplettMaxTokens(effectiveProvider), 0.2, null, prompts.SCHEMA_ZEITSTRAHL,
   );
   if (Array.isArray(ztResult?.ereignisse)) {
     saveZeitstrahlEvents(bookIdInt, email, ztResult.ereignisse, idMaps.chNameToId, idMaps.pageNameToIdByChapter);
@@ -748,4 +757,5 @@ async function runZeitstrahl(ctx, opts = {}) {
 module.exports = {
   runPhase1, runPhase2, runPhase3, runPhase3Songs,
   buildPrelimFigurenKompakt, runPhase3OrteCall, runPhase3b, runZeitstrahl,
+  komplettMaxTokens,
 };
