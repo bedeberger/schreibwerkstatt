@@ -4,6 +4,9 @@
   "description": "Schreibwerkstatt — Schreiben, Lektorat und Buchanalyse mit KI",
   "license": "AGPL-3.0-or-later",
   "main": "server.js",
+  "engines": {
+    "node": ">=20 <26"
+  },
   "scripts": {
     "start": "node server.js",
     "test": "npm run test:unit && npm run test:integration && npm run test:e2e",
