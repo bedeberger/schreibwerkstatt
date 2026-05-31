@@ -70,7 +70,7 @@ const aiProviderState = () => ({
   claudeMaxTokens: 64000,
   apiProvider: 'claude',
   ollamaModel: 'llama3.2',
-  llamaModel:  'llama3.2',
+  openaiCompatModel: 'llama3.2',
 });
 
 const navigationState = () => ({

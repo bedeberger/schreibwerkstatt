@@ -16,6 +16,7 @@ const _META_COLS = [
   'epub_font_size', 'epub_line_height', 'epub_paragraph_style', 'epub_indent_size',
   'epub_hyphenation', 'epub_chapter_pagebreak', 'epub_drop_caps', 'epub_nest_pages_in_toc',
   'epub_scene_separator', 'epub_titlepage_mode',
+  'epub_chapter_numbering', 'epub_chapter_numbering_mode',
   'epub_rights', 'epub_pubdate', 'epub_translator', 'epub_illustrator', 'epub_editor_name', 'epub_uuid',
 ];
 

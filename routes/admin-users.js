@@ -183,17 +183,17 @@ router.put('/:email', express.json(), (req, res) => {
     }
   }
   // AI-Provider-Override. NULL/'' = follows global ai.provider.
-  // Validierung: Provider muss konfiguriert sein. Ollama/Llama brauchen host.
+  // Validierung: Provider muss konfiguriert sein. Ollama/OpenAI-kompatibel brauchen host.
   if (ai_provider_override !== undefined) {
     const next = (ai_provider_override === null || ai_provider_override === '') ? null : String(ai_provider_override).toLowerCase();
-    if (next !== null && !['claude','ollama','llama'].includes(next)) {
+    if (next !== null && !['claude','ollama','openai-compat'].includes(next)) {
       return res.status(400).json({ error_code: 'AI_PROVIDER_INVALID' });
     }
     if (next === 'ollama' && !appSettings.get('ai.ollama.host')) {
       return res.status(400).json({ error_code: 'AI_PROVIDER_NOT_CONFIGURED', detail: 'ollama' });
     }
-    if (next === 'llama' && !appSettings.get('ai.llama.host')) {
-      return res.status(400).json({ error_code: 'AI_PROVIDER_NOT_CONFIGURED', detail: 'llama' });
+    if (next === 'openai-compat' && !appSettings.get('ai.openai-compat.host')) {
+      return res.status(400).json({ error_code: 'AI_PROVIDER_NOT_CONFIGURED', detail: 'openai-compat' });
     }
     if (next === 'claude' && !appSettings.get('ai.claude.api_key')) {
       return res.status(400).json({ error_code: 'AI_PROVIDER_NOT_CONFIGURED', detail: 'claude' });

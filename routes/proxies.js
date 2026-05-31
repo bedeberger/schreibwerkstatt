@@ -53,7 +53,7 @@ router.get('/config', (req, res) => {
     apiProvider: appSettings.get('ai.provider') || 'claude',
     charsPerToken: CHARS_PER_TOKEN,
     ollamaModel: appSettings.get('ai.ollama.model') || 'llama3.2',
-    llamaModel:  appSettings.get('ai.llama.model')  || 'llama3.2',
+    openaiCompatModel: appSettings.get('ai.openai-compat.model') || 'llama3.2',
     user,
     userSettings,
     devMode: process.env.LOCAL_DEV_MODE === 'true',

@@ -92,9 +92,11 @@ router.post('/test-provider', express.json(), async (req, res) => {
       const r = await fetch(`${host}/api/tags`).catch(() => null);
       return res.json({ ok: !!r?.ok, status: r?.status || 0, provider, latency_ms: Date.now() - t0 });
     }
-    if (provider === 'llama') {
-      const host = String(appSettings.get('ai.llama.host') || '').replace(/\/$/, '');
-      const r = await fetch(`${host}/v1/models`).catch(() => null);
+    if (provider === 'openai-compat') {
+      const host = String(appSettings.get('ai.openai-compat.host') || '').replace(/\/$/, '');
+      const apiKey = String(appSettings.get('ai.openai-compat.api_key') || '').trim();
+      const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined;
+      const r = await fetch(`${host}/v1/models`, { headers }).catch(() => null);
       return res.json({ ok: !!r?.ok, status: r?.status || 0, provider, latency_ms: Date.now() - t0 });
     }
     return res.json({ ok: false, error: 'UNKNOWN_PROVIDER', provider });

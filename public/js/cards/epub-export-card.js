@@ -25,7 +25,8 @@ const _EMPTY_META = () => ({
   epub_font_size: 'normal', epub_line_height: 'normal', epub_paragraph_style: 'indent',
   epub_indent_size: 'medium', epub_hyphenation: false, epub_chapter_pagebreak: true,
   epub_drop_caps: false, epub_nest_pages_in_toc: true, epub_scene_separator: 'line',
-  epub_titlepage_mode: 'generated', epub_rights: '', epub_pubdate: '',
+  epub_titlepage_mode: 'generated', epub_chapter_numbering: 'none',
+  epub_chapter_numbering_mode: 'nested', epub_rights: '', epub_pubdate: '',
   epub_translator: '', epub_illustrator: '', epub_editor_name: '', epub_uuid: '',
 });
 
@@ -181,6 +182,17 @@ export function registerEpubExportCard() {
     indentSizeOptions()     { return this._enumOptions(['small', 'medium', 'large'], 'epubExport.indentSize'); },
     sceneSeparatorOptions() { return this._enumOptions(['line', 'asterism', 'stars', 'blank', 'fleuron'], 'epubExport.sceneSep'); },
     titlepageModeOptions()  { return this._enumOptions(['generated', 'cover', 'none'], 'epubExport.titlepageMode'); },
+    // Kapitel-Numerierung: arabic/roman als literale Beispiele, none/word i18n.
+    chapterNumberingOptions() {
+      const t = window.__app.t;
+      return [
+        { value: 'none',   label: t('epubExport.numbering.none') },
+        { value: 'arabic', label: '1, 2, 3' },
+        { value: 'roman',  label: 'I, II, III' },
+        { value: 'word',   label: t('epubExport.numbering.word') },
+      ];
+    },
+    chapterNumberingModeOptions() { return this._enumOptions(['nested', 'flat'], 'epubExport.numberingMode'); },
 
     openBookSettings() {
       window.__app?.toggleBookSettingsCard?.();

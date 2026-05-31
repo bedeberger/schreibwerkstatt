@@ -101,7 +101,7 @@ test('listForAdmin enthaelt auch Default-Keys ohne DB-Row', () => {
 
 test('audit-Tabelle erhaelt Hashes bei jedem set', () => {
   const before = db.prepare("SELECT COUNT(*) AS c FROM app_settings_audit WHERE key = 'ai.provider'").get().c;
-  settings.set('ai.provider', 'llama', { updatedBy: 'audit-tester@x' });
+  settings.set('ai.provider', 'openai-compat', { updatedBy: 'audit-tester@x' });
   const after = db.prepare("SELECT COUNT(*) AS c FROM app_settings_audit WHERE key = 'ai.provider'").get().c;
   assert.ok(after > before, 'audit-Eintrag fehlt');
   const row = db.prepare("SELECT new_hash, updated_by FROM app_settings_audit WHERE key = 'ai.provider' ORDER BY id DESC LIMIT 1").get();

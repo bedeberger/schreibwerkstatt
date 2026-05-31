@@ -18,7 +18,7 @@ export const adminSettingsMethods = {
       // diff't vs. map und sendet nur geaenderte Keys ans Backend.
       this.adminSettingsForm = this._adminSettingsBuildForm(map);
       const cur = this.adminSettingsForm['ai.provider'];
-      if (cur === 'claude' || cur === 'ollama' || cur === 'llama') {
+      if (cur === 'claude' || cur === 'ollama' || cur === 'openai-compat') {
         this.adminSettingsProviderSubtab = cur;
       }
     } catch (e) {

@@ -43,6 +43,16 @@ test('div.poem kollabiert führende/doppelte/schliessende Leerzeilen', () => {
   assert.equal(blocks[0].lines[2][0].text, 'B');
 });
 
+test('leerer Absatz (Leerzeile) wird als blankline-Block erhalten', () => {
+  const blocks = parseHtmlToBlocks('<p>Erster</p><p></p><p>Zweiter</p>');
+  assert.deepEqual(blocks.map(b => b.kind), ['paragraph', 'blankline', 'paragraph']);
+});
+
+test('blankline: führende/abschliessende verworfen, aufeinanderfolgende kollabiert', () => {
+  const blocks = parseHtmlToBlocks('<p><br></p><p>A</p><p></p><p><br></p><p>B</p><p></p>');
+  assert.deepEqual(blocks.map(b => b.kind), ['paragraph', 'blankline', 'paragraph']);
+});
+
 test('Listen mit ordered/unordered + verschachtelte Inline-Styles', () => {
   const blocks = parseHtmlToBlocks('<ol><li>Eins</li><li>Zwei mit <em>kursiv</em></li></ol>');
   assert.equal(blocks[0].kind, 'list');

@@ -7038,6 +7038,123 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 169 abgeschlossen (book_publication.author_name).');
   }
 
+  if (version < 170) {
+    // Provider `llama` (llama.cpp/OpenAI-kompatibel) umbenannt nach `openai-compat`,
+    // weil der Call-Pfad ohnehin gegen /v1/chat/completions geht und jetzt auch
+    // gehostete OpenAI-kompatible Endpoints (vLLM/LiteLLM/OpenAI) mit Bearer-Token
+    // bedient. Reines Daten-Rename: app_settings-Keys + -Wert, Per-User-Override,
+    // provider-Spalten in Caches + Verlauf. Keine Schemaaenderung.
+
+    // 1) app_settings-Keys `ai.llama.*` → `ai.openai-compat.*` (PK = key; nur
+    //    umziehen, wenn das Ziel noch nicht existiert — sonst PK-Kollision).
+    const llamaKeys = db.prepare("SELECT key FROM app_settings WHERE key LIKE 'ai.llama.%'").all();
+    const renameKey = db.prepare('UPDATE app_settings SET key = ? WHERE key = ?');
+    const keyExists = db.prepare('SELECT 1 FROM app_settings WHERE key = ?');
+    for (const { key } of llamaKeys) {
+      const newKey = key.replace(/^ai\.llama\./, 'ai.openai-compat.');
+      if (!keyExists.get(newKey)) renameKey.run(newKey, key);
+    }
+
+    // 2) Aktiver Provider-Wert (value_json ist JSON-encoded).
+    db.prepare("UPDATE app_settings SET value_json = '\"openai-compat\"' WHERE key = 'ai.provider' AND value_json = '\"llama\"'").run();
+
+    // 3) Per-User-Override: CHECK-Constraint erlaubt nur claude/ollama/llama —
+    //    Recreate-Pattern, um 'llama' durch 'openai-compat' zu ersetzen (sowohl im
+    //    CHECK als auch im Datenwert). Andere Spalten unveraendert uebernommen.
+    db.pragma('foreign_keys = OFF');
+    db.exec('DROP TABLE IF EXISTS app_users_new');
+    db.exec(`
+      CREATE TABLE app_users_new (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        email            TEXT NOT NULL UNIQUE,
+        display_name     TEXT,
+        avatar_url       TEXT,
+        global_role      TEXT NOT NULL DEFAULT 'user'
+                              CHECK(global_role IN ('admin','user')),
+        status           TEXT NOT NULL DEFAULT 'active'
+                              CHECK(status IN ('invited','active','suspended','deleted')),
+        language         TEXT DEFAULT 'de',
+        model_override   TEXT,
+        can_invite_users INTEGER NOT NULL DEFAULT 1,
+        first_seen_at    TEXT,
+        last_seen_at     TEXT,
+        invited_by       TEXT,
+        invited_at       TEXT,
+        created_at       TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        monthly_budget_usd REAL,
+        budget_mode      TEXT NOT NULL DEFAULT 'none'
+                              CHECK(budget_mode IN ('none','soft','hard')),
+        ai_provider_override TEXT
+                              CHECK(ai_provider_override IN ('claude','ollama','openai-compat') OR ai_provider_override IS NULL),
+        last_login_at    TEXT,
+        theme            TEXT,
+        default_buchtyp  TEXT,
+        default_language TEXT,
+        default_region   TEXT,
+        focus_granularity TEXT
+      )
+    `);
+    db.exec(`
+      INSERT INTO app_users_new (id, email, display_name, avatar_url, global_role, status,
+                                 language, model_override, can_invite_users, first_seen_at,
+                                 last_seen_at, invited_by, invited_at, created_at,
+                                 monthly_budget_usd, budget_mode, ai_provider_override,
+                                 last_login_at, theme, default_buchtyp, default_language,
+                                 default_region, focus_granularity)
+      SELECT id, email, display_name, avatar_url, global_role, status,
+             language, model_override, can_invite_users, first_seen_at,
+             last_seen_at, invited_by, invited_at, created_at,
+             monthly_budget_usd, budget_mode,
+             CASE WHEN ai_provider_override = 'llama' THEN 'openai-compat' ELSE ai_provider_override END,
+             last_login_at, theme, default_buchtyp, default_language,
+             default_region, focus_granularity
+        FROM app_users
+    `);
+    db.exec('DROP TABLE app_users');
+    db.exec('ALTER TABLE app_users_new RENAME TO app_users');
+    db.pragma('foreign_keys = ON');
+
+    // 4) provider-Spalten in Cache- + Verlaufs-Tabellen (Cache-PK enthaelt provider —
+    //    da 'openai-compat' noch nirgends vorkommt, keine Kollision moeglich).
+    const providerTables = [
+      'chapter_extract_cache', 'book_extract_cache',
+      'chapter_review_cache', 'book_review_cache', 'chapter_macro_review_cache',
+      'synonym_cache', 'lektorat_cache',
+      'chat_messages', 'job_runs',
+    ];
+    for (const tbl of providerTables) {
+      const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name = ?").get(tbl);
+      if (exists) db.prepare(`UPDATE ${tbl} SET provider = 'openai-compat' WHERE provider = 'llama'`).run();
+    }
+
+    const fkErrors170 = db.pragma('foreign_key_check');
+    if (fkErrors170.length) {
+      throw new Error(`Migration 170: foreign_key_check meldet ${fkErrors170.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 170').run();
+    logger.info('DB-Migration auf Version 170 abgeschlossen (Provider llama → openai-compat).');
+  }
+
+  if (version < 171) {
+    // Kapitel-Numerierung im EPUB-Export (book_publication): Format
+    // (none|arabic|roman|word) + Modus (flat|nested). Pendant zur PDF-Option —
+    // das Label wird dem Kapiteltitel im Inhaltsverzeichnis und in der
+    // Kapitelueberschrift vorangestellt. Additiv.
+    const pubCols = db.pragma('table_info(book_publication)').map(c => c.name);
+    const addPubCol = (name, ddl) => {
+      if (!pubCols.includes(name)) db.exec(`ALTER TABLE book_publication ADD COLUMN ${ddl}`);
+    };
+    addPubCol('epub_chapter_numbering',      "epub_chapter_numbering TEXT DEFAULT 'none'");
+    addPubCol('epub_chapter_numbering_mode', "epub_chapter_numbering_mode TEXT DEFAULT 'nested'");
+
+    const fkErrors171 = db.pragma('foreign_key_check');
+    if (fkErrors171.length) {
+      throw new Error(`Migration 171: foreign_key_check meldet ${fkErrors171.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 171').run();
+    logger.info('DB-Migration auf Version 171 abgeschlossen (book_publication: EPUB-Kapitelnumerierung).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

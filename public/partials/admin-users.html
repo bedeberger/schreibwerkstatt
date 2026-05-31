@@ -108,9 +108,9 @@
               <div x-data="combobox($app.t('admin.users.aiProvider'))"
                    x-effect="value = u.ai_provider_override || ''; options = [
                      { value: '',        label: $app.t('admin.users.aiProvider.global', { provider: adminUsersGlobalProvider }) },
-                     { value: 'claude',  label: 'claude' },
-                     { value: 'ollama',  label: 'ollama' },
-                     { value: 'llama',   label: 'llama' },
+                     { value: 'claude',        label: 'claude' },
+                     { value: 'ollama',        label: 'ollama' },
+                     { value: 'openai-compat', label: 'openai-compat' },
                    ]"
                    @combobox-change="if ($event.detail !== (u.ai_provider_override || '')) adminUsersUpdate(u, { ai_provider_override: $event.detail || null })"></div>
             </td>

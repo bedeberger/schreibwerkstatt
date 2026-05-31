@@ -127,6 +127,18 @@
              x-effect="options = sceneSeparatorOptions()"></div>
       </div>
       <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('epubExport.field.numbering')"></label>
+        <div x-data="combobox($app.t('epubExport.field.numbering'))"
+             x-modelable="value" x-model="pub.epub_chapter_numbering"
+             x-effect="options = chapterNumberingOptions()"></div>
+      </div>
+      <div class="card-form-row" x-show="pub.epub_chapter_numbering !== 'none'">
+        <label class="card-form-label" x-text="$app.t('epubExport.field.numberingMode')"></label>
+        <div x-data="combobox($app.t('epubExport.field.numberingMode'))"
+             x-modelable="value" x-model="pub.epub_chapter_numbering_mode"
+             x-effect="options = chapterNumberingModeOptions()"></div>
+      </div>
+      <div class="card-form-row">
         <label class="book-settings-option">
           <input type="checkbox" x-model="pub.epub_chapter_pagebreak" :disabled="!canEditPublication()">
           <span x-text="$app.t('epubExport.field.chapterPagebreak')"></span>

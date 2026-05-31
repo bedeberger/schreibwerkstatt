@@ -4,7 +4,7 @@ Code: [lib/ai.js](../lib/ai.js). Drei Provider, ein Vertrag.
 
 ## Provider-Auswahl
 
-Admin setzt `ai.provider` global in `app_settings` (`claude` (Default) | `ollama` | `llama`). Pro User kann ein Override via `app_users.ai_provider_override` gesetzt werden — siehe „Per-User-Override" weiter unten.
+Admin setzt `ai.provider` global in `app_settings` (`claude` (Default) | `ollama` | `openai-compat`). Pro User kann ein Override via `app_users.ai_provider_override` gesetzt werden — siehe „Per-User-Override" weiter unten.
 
 ### Auflösungs-Reihenfolge
 
@@ -19,7 +19,7 @@ Admin setzt `ai.provider` global in `app_settings` (`claude` (Default) | `ollama
 ### Per-User-Override
 
 - **Wahl** pro User; **Credentials** bleiben global in `app_settings`. Kein Per-User-API-Key.
-- Admin setzt den Override in der AdminUsersCard (Combobox `(Global: …)` | `claude` | `ollama` | `llama`). PUT `/admin/users/:email` mit `{ ai_provider_override: 'ollama' | null }`. NULL/'' löscht den Override.
+- Admin setzt den Override in der AdminUsersCard (Combobox `(Global: …)` | `claude` | `ollama` | `openai-compat`). PUT `/admin/users/:email` mit `{ ai_provider_override: 'ollama' | null }`. NULL/'' löscht den Override.
 - API-Guard: Override auf nicht-konfigurierten Provider → `400 AI_PROVIDER_NOT_CONFIGURED`.
 - `GET /config` liefert den resolvten Provider read-only (`apiProvider`) für die Frontend-Statuszeile.
 - Self-Service nein. Cost-Verteilung gehört zum Admin-Kontrakt.
@@ -40,7 +40,7 @@ Alle KI-Konfig liegt in der `app_settings`-Tabelle. Admin-PUT via `/admin/settin
 
 | Setting-Key | Default | Boot-Env | Bedeutung |
 |-------------|---------|----------|-----------|
-| `ai.provider` | `claude` | `API_PROVIDER` | Globaler Provider (`claude` \| `ollama` \| `llama`) |
+| `ai.provider` | `claude` | `API_PROVIDER` | Globaler Provider (`claude` \| `ollama` \| `openai-compat`) |
 | `ai.claude.api_key` | – | `ANTHROPIC_API_KEY` | Pflicht bei Claude |
 | `ai.claude.model` | `claude-sonnet-4-6` | `MODEL_NAME` | |
 | `ai.claude.context_window` | 200 000 | `MODEL_CONTEXT` | Gesamtfenster (Input+Output) |
@@ -52,11 +52,14 @@ Alle KI-Konfig liegt in der `app_settings`-Tabelle. Admin-PUT via `/admin/settin
 | `ai.ollama.temperature` | 0.7 | `OLLAMA_TEMPERATURE` | Default `0.2` für Lock-Logik |
 | `ai.ollama.context_window` | 32 000 | – | Per-Provider-Override |
 | `ai.ollama.max_tokens_out` | 16 000 | – | |
-| `ai.llama.host` | `http://localhost:8080` | `LLAMA_HOST` | |
-| `ai.llama.model` | `llama3.2` | `LLAMA_MODEL` | |
-| `ai.llama.temperature` | 0.7 | `LLAMA_TEMPERATURE` | Default `0.1` für Lock-Logik |
-| `ai.llama.context_window` | 32 000 | – | |
-| `ai.llama.max_tokens_out` | 16 000 | – | |
+| `ai.ollama.think` | `false` | – | Reasoning an/aus (top-level `think`-Flag); aus spart Output-Token |
+| `ai.openai-compat.host` | `http://localhost:8080` | `OPENAI_COMPAT_HOST` | OpenAI-kompatibler `/v1/chat/completions`-Endpoint |
+| `ai.openai-compat.model` | `llama3.2` | `OPENAI_COMPAT_MODEL` | |
+| `ai.openai-compat.api_key` | – | `OPENAI_COMPAT_API_KEY` | Optionaler Bearer-Token (encrypted); leer = kein `Authorization`-Header |
+| `ai.openai-compat.temperature` | 0.7 | `OPENAI_COMPAT_TEMPERATURE` | Default `0.1` für Lock-Logik |
+| `ai.openai-compat.context_window` | 32 000 | – | |
+| `ai.openai-compat.max_tokens_out` | 16 000 | – | |
+| `ai.openai-compat.think` | `false` | – | Reasoning an/aus; aus sendet `chat_template_kwargs.enable_thinking=false`, an sendet nichts (Modell-Default; nötig für echtes OpenAI) |
 | `ai.chars_per_token` | provider-default (3 Claude / 4 lokal) | – | Tokenizer-Heuristik (Boot-frozen) |
 | `ai.chat_temperature` | – | – | Override nur für Seiten-/Buch-Chat |
 
@@ -64,9 +67,16 @@ Alle KI-Konfig liegt in der `app_settings`-Tabelle. Admin-PUT via `/admin/settin
 |----------|-----------|----------|---------|
 | `claude` | SSE | Ja (`callAIWithTools`) | `cache_control: ephemeral`, optional `ttl: '1h'` |
 | `ollama` | NDJSON | Nein | Nein |
-| `llama` | OpenAI-SSE | Nein | Nein |
+| `openai-compat` | OpenAI-SSE | Nein | Nein |
 
-Ollama + Llama laufen über globalen **Mutex** (`withOllamaLock`/`withLlamaLock`) — VRAM-Schutz, parallele Calls würden Modelle abschmieren lassen. Jobs laufen weiter parallel; nur die KI-Calls serialisieren am Server.
+Ollama + OpenAI-kompatibel laufen über globalen **Mutex** (`withOllamaLock`/`withOpenAICompatLock`) — VRAM-Schutz, parallele Calls würden Modelle abschmieren lassen. Jobs laufen weiter parallel; nur die KI-Calls serialisieren am Server.
+
+### Reasoning/„Thinking" (nur lokale Provider)
+
+Viele lokale Modelle (Qwen3, DeepSeek-R1-Distill, Magistral …) denken per Default und verbrennen Output-Token für eine `<think>`-Spur, die der App nichts bringt (wir parsen nur `message.content` bzw. `delta.content`, die Spur landet in `thinking`/`reasoning_content` und wird verworfen). `ai.ollama.think` / `ai.openai-compat.think` (Default `false`) schalten das pro Provider ab; per-Call gelesen → Admin-Änderung greift ohne Server-Restart.
+
+- **Ollama:** top-level `think: <bool>` im `/api/chat`-Body (nicht in `options` — dort wird es ignoriert).
+- **OpenAI-kompatibel:** bei `false` reicht der Body `chat_template_kwargs: { enable_thinking: false }` an die Jinja-Chat-Vorlage durch (vLLM/SGLang/llama.cpp; Server ohne dieses Kwarg ignorieren es folgenlos). Bei `true` wird das Feld **nicht** gesendet, damit echtes OpenAI (lehnt unbekannte Felder ab) nutzbar bleibt.
 
 ## Token-Budgets
 
@@ -151,7 +161,7 @@ if (!parsed.fehler) throw new Error('Pflichtfeld `fehler` fehlt.');
 ## Grammar-Constrained Decoding (lokal)
 
 Optionales 7. Argument `jsonSchema`:
-- **Llama**: `response_format: { type: 'json_schema', json_schema: { strict: true, schema } }` → GBNF-Grammar erzwingt Schema-Konformität + korrekt escapete Strings.
+- **OpenAI-kompatibel**: `response_format: { type: 'json_schema', json_schema: { strict: true, schema } }` → GBNF-Grammar erzwingt Schema-Konformität + korrekt escapete Strings.
 - **Ollama**: `format: <schema>` mit demselben Effekt.
 - **Claude**: ignoriert (Claude nutzt prompt-basierte Schema-Validierung).
 
@@ -173,7 +183,7 @@ Hard-Timeout via `ai.claude.timeout_ms` (Default 600 000 ms = 10 min). `_combine
 
 ## Connection-Fehler (lokal)
 
-`_connErrorCode` erkennt `ECONNREFUSED`/`ENOTFOUND`/`EHOSTUNREACH`/`ETIMEDOUT`/`EAI_AGAIN`/`ECONNRESET`/`ENETUNREACH` + node-fetch-`fetch failed`. Wirft i18n-keyed `error.OLLAMA_UNREACHABLE`/`error.LLAMA_UNREACHABLE` mit `i18nParams: { host, detail }`.
+`_connErrorCode` erkennt `ECONNREFUSED`/`ENOTFOUND`/`EHOSTUNREACH`/`ETIMEDOUT`/`EAI_AGAIN`/`ECONNRESET`/`ENETUNREACH` + node-fetch-`fetch failed`. Wirft i18n-keyed `error.OLLAMA_UNREACHABLE`/`error.OPENAI_COMPAT_UNREACHABLE` mit `i18nParams: { host, detail }`.
 
 ## Sicherheits-Abbruch (lokal)
 

@@ -21,6 +21,27 @@ test('_applyBreaks: unbekannter sceneSep → line-Default, leeres html durchgere
   assert.ok(_applyBreaks('<hr data-bid="x">', 'bogus').includes('<hr class="scene-line" />'));
 });
 
+test('_applyBreaks: Leerzeile → scene-gap nur bei aktivem Einzug (Belletristik)', () => {
+  // indentActive=true: leerer Absatz wird Szenentrenner-Leerzeile.
+  const on = _applyBreaks('<p>A</p><p data-bid="x"></p><p>B</p>', 'line', true);
+  assert.ok(on.includes('<p class="scene-gap">&#160;</p>'));
+  // indentActive=false (Sachbuch-Satz): unangetastet, Absatzabstand trennt selbst.
+  const off = _applyBreaks('<p>A</p><p></p><p>B</p>', 'line', false);
+  assert.ok(!off.includes('scene-gap'));
+});
+
+test('_applyBreaks: scene-gaps kollabieren + führend/abschliessend entfernt', () => {
+  const out = _applyBreaks('<p><br></p><p>A</p><p></p><p><br></p><p>B</p><p></p>', 'line', true);
+  assert.equal(out.match(/scene-gap/g).length, 1);
+  assert.ok(out.startsWith('<p>A</p>'));
+  assert.ok(out.endsWith('<p>B</p>'));
+});
+
+test('_buildCss: scene-gap-Regel nur im Belletristik-Satz', () => {
+  assert.ok(epub._buildCss({}).includes('.scene-gap + p'));
+  assert.ok(!epub._buildCss({ epub_paragraph_style: 'spaced' }).includes('.scene-gap'));
+});
+
 test('_resolveEpubMeta: opts.author/lang gewinnen vor Domain-Shape', () => {
   const m = _resolveEpubMeta({ created_by: { name: 'Alt' } }, { author: 'Owner Name', lang: 'en' });
   assert.equal(m.author, 'Owner Name');
@@ -148,6 +169,38 @@ async function _unzip(buf) {
   return JSZip.loadAsync(buf);
 }
 const _oneGroup = () => ([{ chapterId: null, chapter: null, pages: [{ p: { name: 'S1' }, pd: { html: '<p>x</p>' } }] }]);
+
+test('buildEpub: Kapitelnumerierung prependet Label an TOC-Titel + Ueberschrift', async () => {
+  const bundle = {
+    scope: 'book', book: { id: 1, name: 'B' },
+    groups: [
+      { chapterId: 10, chapter: { id: 10, name: 'Anfang' }, pages: [{ p: { name: 'S1' }, pd: { html: '<p>a</p>' } }] },
+      { chapterId: 11, chapter: { id: 11, name: 'Mitte' }, pages: [{ p: { name: 'S2' }, pd: { html: '<p>b</p>' } }] },
+    ],
+  };
+  const buf = await buildEpub(bundle, {
+    lang: 'de', author: 'A',
+    meta: { epub_chapter_numbering: 'arabic', epub_chapter_numbering_mode: 'flat' },
+  });
+  const zip = await _unzip(buf);
+  const nav = await zip.file('OEBPS/toc.xhtml').async('string');
+  assert.ok(nav.includes('1. Anfang') && nav.includes('2. Mitte'), 'TOC-Eintraege fehlt Numerierung');
+  const ncx = await zip.file('OEBPS/toc.ncx').async('string');
+  assert.ok(ncx.includes('<text>1. Anfang</text>'), 'NavMap fehlt Numerierung');
+  const entry = await zip.file('OEBPS/entry_0.xhtml').async('string');
+  assert.ok(entry.includes('<h1>1. Anfang</h1>'), 'Body-Ueberschrift fehlt Numerierung');
+});
+
+test('buildEpub: numbering none (Default) → keine Label-Praefixe', async () => {
+  const bundle = {
+    scope: 'book', book: { id: 1, name: 'B' },
+    groups: [{ chapterId: 10, chapter: { id: 10, name: 'Anfang' }, pages: [{ p: { name: 'S1' }, pd: { html: '<p>a</p>' } }] }],
+  };
+  const buf = await buildEpub(bundle, { lang: 'de', author: 'A', meta: {} });
+  const zip = await _unzip(buf);
+  const entry = await zip.file('OEBPS/entry_0.xhtml').async('string');
+  assert.ok(entry.includes('<h1>Anfang</h1>') && !/<h1>\d+\.\s/.test(entry), 'Default darf nicht numerieren');
+});
 
 test('buildEpub: description-Fallback book→meta, publisher/series in OPF', async () => {
   const bundle = { scope: 'book', book: { id: 1, name: 'Mein Buch', description: 'Buch-Beschreibung' }, groups: _oneGroup() };

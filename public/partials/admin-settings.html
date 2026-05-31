@@ -77,7 +77,7 @@
       <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.providerChoice')"></p>
 
       <nav class="admin-settings-subtabs" role="tablist">
-        <template x-for="p in ['claude','ollama','llama']" :key="p">
+        <template x-for="p in ['claude','ollama','openai-compat']" :key="p">
           <button type="button" role="tab"
                   :class="['admin-settings-subtab', adminSettingsProviderSubtab === p ? 'is-active' : '', adminSettingsForm['ai.provider'] === p ? 'is-default-provider' : '']"
                   @click="adminSettingsProviderSubtab = p">
@@ -127,24 +127,41 @@
           <input type="text" x-data="numInput({ step: 0.05, decimals: 2, min: 1, max: 2 })" x-modelable="value" x-model="adminSettingsForm['ai.ollama.repeat_penalty']">
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.repeatPenalty')"></small>
         </label>
+        <label class="checkbox-row">
+          <input type="checkbox" :checked="adminSettingsForm['ai.ollama.think'] === true || adminSettingsForm['ai.ollama.think'] === 'true'"
+                 @change="adminSettingsForm['ai.ollama.think'] = $event.target.checked">
+          <span>ai.ollama.think</span>
+        </label>
+        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.think')"></small>
       </div>
 
-      <div x-show="adminSettingsProviderSubtab === 'llama'" class="admin-settings-subsection">
-        <label>ai.llama.host <input type="url" x-model="adminSettingsForm['ai.llama.host']" placeholder="http://localhost:8080"></label>
-        <label>ai.llama.model <input type="text" x-model="adminSettingsForm['ai.llama.model']"></label>
-        <label>ai.llama.temperature <input type="text" x-data="numInput({ step: 0.01, decimals: 2, min: 0, max: 2 })" x-modelable="value" x-model="adminSettingsForm['ai.llama.temperature']"></label>
-        <label>ai.llama.context_window
-          <input type="text" x-data="numInput({ integer: true, min: 2048, max: 2000000 })" x-modelable="value" x-model="adminSettingsForm['ai.llama.context_window']">
+      <div x-show="adminSettingsProviderSubtab === 'openai-compat'" class="admin-settings-subsection">
+        <label>ai.openai-compat.host <input type="url" x-model="adminSettingsForm['ai.openai-compat.host']" placeholder="http://localhost:8080"></label>
+        <label>ai.openai-compat.model <input type="text" x-model="adminSettingsForm['ai.openai-compat.model']"></label>
+        <label>ai.openai-compat.api_key
+          <input type="password" x-model="adminSettingsForm['ai.openai-compat.api_key']" :placeholder="$app.t('admin.settings.secret.masked')">
+          <small x-show="adminSettingsMap['ai.openai-compat.api_key']?.masked" class="muted-msg muted-msg--sm" x-text="adminSettingsMap['ai.openai-compat.api_key']?.masked"></small>
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.openaiCompatApiKey')"></small>
+        </label>
+        <label>ai.openai-compat.temperature <input type="text" x-data="numInput({ step: 0.01, decimals: 2, min: 0, max: 2 })" x-modelable="value" x-model="adminSettingsForm['ai.openai-compat.temperature']"></label>
+        <label>ai.openai-compat.context_window
+          <input type="text" x-data="numInput({ integer: true, min: 2048, max: 2000000 })" x-modelable="value" x-model="adminSettingsForm['ai.openai-compat.context_window']">
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.contextWindow')"></small>
         </label>
-        <label>ai.llama.max_tokens_out
-          <input type="text" x-data="numInput({ integer: true, min: 512, max: 200000 })" x-modelable="value" x-model="adminSettingsForm['ai.llama.max_tokens_out']">
+        <label>ai.openai-compat.max_tokens_out
+          <input type="text" x-data="numInput({ integer: true, min: 512, max: 200000 })" x-modelable="value" x-model="adminSettingsForm['ai.openai-compat.max_tokens_out']">
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.maxTokensOut')"></small>
         </label>
-        <label>ai.llama.repeat_penalty
-          <input type="text" x-data="numInput({ step: 0.05, decimals: 2, min: 1, max: 2 })" x-modelable="value" x-model="adminSettingsForm['ai.llama.repeat_penalty']">
+        <label>ai.openai-compat.repeat_penalty
+          <input type="text" x-data="numInput({ step: 0.05, decimals: 2, min: 1, max: 2 })" x-modelable="value" x-model="adminSettingsForm['ai.openai-compat.repeat_penalty']">
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.repeatPenalty')"></small>
         </label>
+        <label class="checkbox-row">
+          <input type="checkbox" :checked="adminSettingsForm['ai.openai-compat.think'] === true || adminSettingsForm['ai.openai-compat.think'] === 'true'"
+                 @change="adminSettingsForm['ai.openai-compat.think'] = $event.target.checked">
+          <span>ai.openai-compat.think</span>
+        </label>
+        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.thinkOpenaiCompat')"></small>
       </div>
 
       <div class="admin-settings-actions">

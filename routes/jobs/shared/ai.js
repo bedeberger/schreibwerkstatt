@@ -245,8 +245,8 @@ async function aiCall(jobId, tok, prompt, system, fromPct, toPct, expectedChars 
   };
   // Output-Ceiling pro Call aus dem TATSAECHLICHEN Provider dieses Calls ableiten,
   // nicht aus dem globalen MAX_TOKENS_OUT (= ai.claude.max_tokens_out). Sonst klemmt
-  // der Claude-Cap auch llama/ollama-Jobs runter (z.B. 8000), obwohl der Admin
-  // ai.llama.max_tokens_out hoeher gesetzt hat → vorzeitige Truncation. Undefined
+  // der Claude-Cap auch openai-compat/ollama-Jobs runter (z.B. 8000), obwohl der Admin
+  // ai.openai-compat.max_tokens_out hoeher gesetzt hat → vorzeitige Truncation. Undefined
   // provider faellt in getContextConfigFor auf 'claude' zurueck (Verhalten unveraendert).
   const providerMaxOut = getContextConfigFor(provider).maxTokensOut;
   const maxTokensOverride = maxTokens != null

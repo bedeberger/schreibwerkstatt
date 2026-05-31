@@ -491,9 +491,9 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
 
 // ── Nacht-Cron: Komplettanalyse für alle Bücher × alle User ──────────────────
 async function runKomplettAnalyseAll() {
-  const cronProvider = appSettings.get('ai.provider') || 'llama';
-  const cronHostOk = cronProvider === 'llama'  ? !!appSettings.get('ai.llama.host')
-                   : cronProvider === 'ollama' ? !!appSettings.get('ai.ollama.host')
+  const cronProvider = appSettings.get('ai.provider') || 'claude';
+  const cronHostOk = cronProvider === 'openai-compat' ? !!appSettings.get('ai.openai-compat.host')
+                   : cronProvider === 'ollama'        ? !!appSettings.get('ai.ollama.host')
                    : true;
   if (!cronHostOk) {
     logger.info(`Nacht-Analyse übersprungen: ai.${cronProvider}.host nicht konfiguriert.`);

@@ -56,11 +56,11 @@ test('resolveProvider: Override gewinnt ueber Global', () => {
 test('resolveProvider: NULL-Override faellt auf Global', () => {
   const ctx = _bootstrap();
   try {
-    ctx.appSettings.set('ai.provider', 'llama');
+    ctx.appSettings.set('ai.provider', 'openai-compat');
     ctx.appUsers.createUser({ email: 'u@example.com' });
     ctx.appUsers.setAiProviderOverride('u@example.com', 'claude');
     ctx.appUsers.setAiProviderOverride('u@example.com', null);
-    assert.equal(ctx.ai.resolveProvider({ userEmail: 'u@example.com' }), 'llama');
+    assert.equal(ctx.ai.resolveProvider({ userEmail: 'u@example.com' }), 'openai-compat');
   } finally { ctx.teardown(); }
 });
 

@@ -15,7 +15,7 @@ Verbindlicher Aufbau des Alpine-State. Vor jeder UI-Änderung die richtige Ebene
 | Slice | Inhalt |
 |-------|--------|
 | `shellState` | currentUser, devMode, appReady, sessionExpired, serverOffline, isOffline, updateAvailable, themePref, focusGranularity, uiLocale, defaultRegion, appTimezone, isMac, promptConfig, `_abortCtrl`, `_usersByEmail`/Loading |
-| `aiProviderState` | claudeModel, claudeMaxTokens, apiProvider, ollamaModel, llamaModel |
+| `aiProviderState` | claudeModel, claudeMaxTokens, apiProvider, ollamaModel, openaiCompatModel |
 | `navigationState` | books, bookFilter\*, selectedBookId, bookRoles/currentBookRole/bookSharedFlags (ACL), pages, tree, Hash-Router-Internals (`_applyingHash`, `_hashInitialized`, `_inHashApply`, `_hashUpdatePending`, `_navDepth`), Order-Maps (`_chapterOrderMap`, `_pageOrderMap`, `_pageIdOrderMap`), pageSearch, newChapter-Felder |
 | `pageState` | Mode-agnostischer Seiten-Inhalt: currentPage, currentPageEmpty/IdeenOpenCount/ChatSessionCount, renderedPageHtml, originalHtml, chapterFigures/showChapterFigures, newPage-Felder. Notebook, Focus und View lesen alle hier |
 | `notebookState` | Notebook-Editor-Lifecycle: editMode, editDirty, editSaving, saveOffline, editConflict, pendingDraft, lastAutosaveAt/lastDraftSavedAt, Auto-Save-Timer (`_autosaveIdleTimer`, `_autosaveMaxTimer`, `_draftTimer`, `_onlineHandler`), pageEditorFullscreen/Zoom/FitWidth |

@@ -47,12 +47,12 @@ function _promptsContentHash() {
 /**
  * Pflichtaufruf beim App-Start. Wirft bei fehlender Config.
  * @param {Object} cfg        promptConfig-Objekt (aus prompt-config.json bzw. /config)
- * @param {string} [provider] 'claude' | 'ollama' | 'llama' – Default: 'claude'.
- *   Bei 'ollama'/'llama' werden die Prompts abgespeckt.
+ * @param {string} [provider] 'claude' | 'ollama' | 'openai-compat' – Default: 'claude'.
+ *   Bei 'ollama'/'openai-compat' werden die Prompts abgespeckt.
  */
 export function configurePrompts(cfg, provider = 'claude') {
   if (!cfg) throw new Error('prompt-config.json fehlt oder ist ungültig – Prompts können nicht konfiguriert werden.');
-  _setIsLocal(provider === 'ollama' || provider === 'llama');
+  _setIsLocal(provider === 'ollama' || provider === 'openai-compat');
   _rebuildLektoratSchema();
   _rebuildKomplettSchemas();
   configureLocales(cfg);

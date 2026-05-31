@@ -42,7 +42,7 @@ function _pageBookId(pageId) {
 // kein POV-/Tempus-Block. Alle Einsparungen auch in public/js/prompts.js (_isLocal).
 const _isLocalProvider = () => {
   const p = appSettings.get('ai.provider') || 'claude';
-  return p === 'ollama' || p === 'llama';
+  return p === 'ollama' || p === 'openai-compat';
 };
 
 // Letzten Absatz eines Texts extrahieren (max. maxChars Zeichen). Dient als
