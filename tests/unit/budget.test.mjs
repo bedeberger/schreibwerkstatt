@@ -79,7 +79,11 @@ test('checkBudget: lokaler Provider (ollama) zaehlt 0 USD', () => {
 
 test('checkBudget: monatliche Grenze schneidet Vormonats-Jobs ab', () => {
   seedUser('lastmonth@ex.com', 'hard', 1);
+  // Tag auf 15 fixen vor der Monats-Subtraktion: setUTCMonth an einem Monatsende
+  // (z.B. 31.) laeuft sonst in den Folgemonat ueber, und der Job landet im
+  // aktuellen statt im Vormonat.
   const lastMonth = new Date();
+  lastMonth.setUTCDate(15);
   lastMonth.setUTCMonth(lastMonth.getUTCMonth() - 1);
   insertJobRun({ email: 'lastmonth@ex.com', tokensIn: 10_000_000, tokensOut: 10_000_000, when: lastMonth });
   const r = checkBudget('lastmonth@ex.com');
