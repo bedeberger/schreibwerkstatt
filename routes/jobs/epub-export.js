@@ -16,6 +16,7 @@ const {
 const { getBookSettings } = require('../../db/schema');
 const { getOwnerEmail } = require('../../db/book-access');
 const { getUser } = require('../../db/app-users');
+const appSettings = require('../../lib/app-settings');
 const bp = require('../../db/book-publication');
 const { loadContents } = require('../../lib/load-contents');
 const { buildEpub } = require('../../lib/export-builders/epub');
@@ -55,7 +56,12 @@ async function runEpubExportJob(jobId, { scope, entityId, includeSubchapters, us
 
     updateJob(jobId, { progress: 40, statusText: 'job.phase.renderEpub' });
     const lang = (book?.id ? getBookSettings(book.id)?.language : null) || 'de';
-    const opts = { lang };
+    // Provenienz-Nachweis im OPF: Instanz-Domain (wo) + exportierender User (wer).
+    const opts = {
+      lang,
+      instanceUrl: (appSettings.get('app.public_url') || '').replace(/\/$/, ''),
+      exportedBy: userEmail || '',
+    };
     if (book?.id) {
       const meta = bp.getMeta(book.id);
       opts.meta = meta;

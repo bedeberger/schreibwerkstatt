@@ -184,12 +184,11 @@ export function registerEpubExportCard() {
     titlepageModeOptions()  { return this._enumOptions(['generated', 'cover', 'none'], 'epubExport.titlepageMode'); },
     // Kapitel-Numerierung: arabic/roman als literale Beispiele, none/word i18n.
     chapterNumberingOptions() {
-      const t = window.__app.t;
       return [
-        { value: 'none',   label: t('epubExport.numbering.none') },
+        { value: 'none',   label: window.__app.t('epubExport.numbering.none') },
         { value: 'arabic', label: '1, 2, 3' },
         { value: 'roman',  label: 'I, II, III' },
-        { value: 'word',   label: t('epubExport.numbering.word') },
+        { value: 'word',   label: window.__app.t('epubExport.numbering.word') },
       ];
     },
     chapterNumberingModeOptions() { return this._enumOptions(['nested', 'flat'], 'epubExport.numberingMode'); },

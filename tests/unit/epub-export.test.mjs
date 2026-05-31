@@ -154,12 +154,25 @@ test('_buildOpfExtraMeta: keywords → dc:subject je Term (escaped), series → 
   assert.ok(out.includes('calibre:series') && out.includes('calibre:series_index'));
 });
 
-test('_buildContentOPF: undefined ohne Extra-Meta, sonst injiziert vor </metadata>', () => {
-  assert.equal(_buildContentOPF({}), undefined);
+test('_buildContentOPF: stempelt App-generator, injiziert Extra-Meta vor </metadata>', () => {
+  const bare = _buildContentOPF({});
+  assert.ok(bare.includes('<meta name="generator" content="Schreibwerkstatt '), 'generator weist die App aus');
+  assert.ok(!bare.includes('content="epub-gen"'), 'Lib-generator-Tag ist ersetzt');
   const opf = _buildContentOPF({ keywords: 'X' });
   assert.ok(opf.includes('<dc:subject>X</dc:subject>'));
   assert.ok(opf.indexOf('<dc:subject>X</dc:subject>') < opf.indexOf('</metadata>'), 'Extra-Meta muss vor </metadata> stehen');
   assert.ok(opf.includes('<%= title %>'), 'ejs-Platzhalter der Lib bleiben erhalten');
+  assert.ok(opf.includes('dcterms:modified'), '"wann" (Build-Zeitstempel) bleibt erhalten');
+});
+
+test('_buildContentOPF: Provenienz — Instanz-Domain im generator, User in generated-by', () => {
+  const opf = _buildContentOPF({}, { instanceUrl: 'https://buch.example.ch', exportedBy: 'a@b.ch' });
+  assert.ok(/<meta name="generator" content="Schreibwerkstatt [^"]*\(https:\/\/buch\.example\.ch\)" \/>/.test(opf), 'Instanz-URL im generator-Content');
+  assert.ok(opf.includes('<meta name="generated-by" content="a@b.ch" />'), 'exportierender User als generated-by');
+  // Ohne Provenienz kein generated-by, generator ohne Klammer-Zusatz.
+  const bare = _buildContentOPF({});
+  assert.ok(!bare.includes('generated-by'), 'kein generated-by ohne User');
+  assert.ok(/<meta name="generator" content="Schreibwerkstatt [^"(]*" \/>/.test(bare), 'generator ohne Instanz-Zusatz wenn keine URL');
 });
 
 // content.opf + style.css liegen DEFLATE-komprimiert im Zip — Buffer-Grep findet
