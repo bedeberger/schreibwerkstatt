@@ -19,13 +19,22 @@ Regeln:
 - Beruecksichtige regionale/umgangssprachliche Begriffe (CH-Deutsch: Badi = Badeanstalt, Beiz = Wirtschaft, …) und loese sie auf die genannte reale Ortschaft auf.
 - Bestimme das Land als ISO-3166-1-alpha-2-Code (z.B. CH, DE, AT). Wenn unklar, leer lassen.
 - Rein erfundene Orte ohne realen Anker (z.B. «Hogwarts», «Mittelerde»): «ort» leer lassen.
-- Bei Mehrdeutigkeit den bekanntesten/groessten realen Ort waehlen; den Laender-Hinweis (falls gegeben) bevorzugen.${_jsonOnly()}`;
+- Nutze Buch-Kontext (Setting des Romans) und die Wohnadressen verknuepfter Figuren als Disambiguierungs-Hinweise — etwa um zwischen gleichnamigen Orten zu waehlen oder ein knappes Label zu verorten. Der geografische Anker des Labels selbst hat aber Vorrang; widerspricht das Label dem Hinweis klar, gewinnt das Label.
+- Bei Mehrdeutigkeit den bekanntesten/groessten realen Ort waehlen; Laender-Hinweis und Buch-Kontext bevorzugen.${_jsonOnly()}`;
 }
 
-export function buildGeocodeResolvePrompt(items, regionHint) {
-  const hint = regionHint ? `\nLaender-Hinweis des Buchs (bei Mehrdeutigkeit bevorzugen): ${regionHint}` : '';
-  const list = items.map(it => `- id=${it.id}: ${it.name}`).join('\n');
-  return `Bestimme zu jedem folgenden Schauplatz-Label den realen Karten-Anker.${hint}
+export function buildGeocodeResolvePrompt(items, ctx = {}) {
+  const ctxLines = [];
+  if (ctx.region) ctxLines.push(`Laender-Hinweis des Buchs (bei Mehrdeutigkeit bevorzugen): ${ctx.region}`);
+  if (ctx.bookContext) ctxLines.push(`Buch-Kontext (Setting/Schauplatz des Romans): ${ctx.bookContext}`);
+  const ctxBlock = ctxLines.length ? '\n' + ctxLines.join('\n') : '';
+  const list = items.map(it => {
+    const hints = Array.isArray(it.hints) && it.hints.length
+      ? ` (Wohnadressen verknuepfter Figuren: ${it.hints.map(h => `«${h}»`).join(', ')})`
+      : '';
+    return `- id=${it.id}: ${it.name}${hints}`;
+  }).join('\n');
+  return `Bestimme zu jedem folgenden Schauplatz-Label den realen Karten-Anker.${ctxBlock}
 
 Labels:
 ${list}

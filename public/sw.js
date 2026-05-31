@@ -10,7 +10,7 @@
 //  - Auth/KI/Job-Queue/SSE: Network-Only, nie cachen
 //  - Version-Bump der Konstanten invalidiert den jeweiligen Cache
 
-const SHELL_CACHE = 'schreibwerkstatt-shell-v1086';
+const SHELL_CACHE = 'schreibwerkstatt-shell-v1088';
 const CONTENT_CACHE = 'schreibwerkstatt-content-v1';
 const CONFIG_CACHE = 'schreibwerkstatt-config-v2';
 const ACTIVE_CACHES = new Set([SHELL_CACHE, CONTENT_CACHE, CONFIG_CACHE]);
@@ -63,10 +63,12 @@ self.addEventListener('install', (event) => {
     const cache = await caches.open(SHELL_CACHE);
     // Einstiegspunkt best-effort vorcachen – scheitert bei Offline-Install lautlos
     try { await cache.add(new Request('/', { cache: 'reload' })); } catch {}
-    // skipWaiting: neuer SW übernimmt sofort, ohne dass alle Tabs geschlossen
-    // werden müssen. controllerchange im Client schützt aktive Editor-Tabs
-    // (kein Auto-Reload bei editDirty, sonst beforeunload-Prompt).
-    await self.skipWaiting();
+    // Bewusst KEIN skipWaiting hier: der neue SW bleibt `waiting`, bis der
+    // User das Update-Banner klickt (applyUpdate → 'skip-waiting'-Message).
+    // Sonst übernähme der neue SW eine laufende (Editor-)Seite sofort und
+    // bediente neue Network-First-Partials gegen die noch im Speicher
+    // laufenden ALTEN JS-Module → Skew (z.B. ReferenceError auf neu
+    // hinzugefügten Card-State-Feldern, die das alte Modul nicht kennt).
   })());
 });
 
@@ -74,7 +76,9 @@ self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
     await Promise.all(keys.filter(k => !ACTIVE_CACHES.has(k)).map(k => caches.delete(k)));
-    await self.clients.claim();
+    // Kein clients.claim(): laufende Tabs behalten den alten SW (= alte
+    // Partials + alte Module, kohärent), bis sie via Banner/Reload wechseln.
+    // Activate läuft ohnehin erst nach 'skip-waiting', also nach User-Klick.
   })());
 });
 

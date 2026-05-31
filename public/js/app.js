@@ -138,11 +138,12 @@ if ('serviceWorker' in navigator) {
             if (nw.state === 'installed') notify(nw);
           });
         });
-        // Controllerchange feuert, sobald der neue SW (skipWaiting in sw.js)
-        // die Seite übernimmt. Auto-Reload nur, wenn der Editor nicht dirty ist
-        // — sonst Banner zeigen, damit der User erst speichern kann. Die neue
-        // SW-Version bedient zwar schon Assets, aber alte JS-Module laufen
-        // noch; Reload räumt das mit dem nächsten User-Klick auf.
+        // Controllerchange feuert erst, nachdem der User das Update-Banner
+        // bestätigt hat (applyUpdate → 'skip-waiting' → SW aktiviert; sw.js
+        // macht bewusst kein skipWaiting/clients.claim beim Deploy). Bis dahin
+        // bedient der ALTE SW die laufende Seite kohärent (alte Partials + alte
+        // Module). Auto-Reload hier nur, wenn der Editor nicht dirty ist —
+        // sonst Banner stehen lassen, damit der User erst speichern kann.
         // hadController-Snapshot: beim First-Install (Tab ohne Controller
         // geladen) feuert clients.claim() ein controllerchange — ohne Snapshot
         // würde die Seite direkt nach dem ersten Laden nochmal reloaden.

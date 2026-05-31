@@ -33,9 +33,15 @@
 }
 
 @media (max-width: 1099px) {
+  /* Flex-Spalte statt Block: erlaubt Reihenfolge-Umkehr. Befunde zuerst, damit
+     der Korrekturvorschlag direkt nach der Toolbar sichtbar ist – sonst steht
+     das Panel hinter der vollhohen Preview (mehrere Tausend px) und ist auf
+     dem Handy faktisch unerreichbar. Preview folgt darunter für den Kontext. */
   .lektorat-split {
-    display: block;
+    display: flex;
+    flex-direction: column;
   }
+  .lektorat-split-findings { order: -1; }
   .lektorat-split-preview,
   .lektorat-split-findings {
     height: auto;
@@ -46,7 +52,7 @@
     max-height: none;
     overflow: visible;
   }
-  .lektorat-split-findings { margin-top: 1rem; }
+  .lektorat-split-preview { margin-top: 1rem; }
 }
 
 /* Inline-Fehlermarkierung. Scroll-Margin für Hover-Sync im Split-Modus,
