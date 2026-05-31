@@ -436,7 +436,7 @@ router.delete('/pages/:page_id', async (req, res) => {
   } catch (e) { _fail(res, e, 'DELETE /content/pages/:id'); }
 });
 
-// POST /content/chapters — Neues Kapitel. Body: { book_id, name, position?, description? }.
+// POST /content/chapters — Neues Kapitel. Body: { book_id, name, position?, parent_chapter_id? }.
 router.post('/chapters', jsonBody, async (req, res) => {
   const bookId = toIntId(req.body?.book_id);
   const name = (req.body?.name || '').toString().trim();
@@ -451,21 +451,19 @@ router.post('/chapters', jsonBody, async (req, res) => {
       book_id: bookId,
       name,
       position: req.body?.position,
-      description: req.body?.description,
       parent_chapter_id: parentChapterId,
     }, req);
     res.json(created);
   } catch (e) { _fail(res, e, 'POST /content/chapters'); }
 });
 
-// PUT /content/chapters/:chapter_id — Kapitel-Update (rename / reorder / description).
+// PUT /content/chapters/:chapter_id — Kapitel-Update (rename / reorder).
 router.put('/chapters/:chapter_id', jsonBody, async (req, res) => {
   const chapterId = toIntId(req.params.chapter_id);
   if (!chapterId) return res.status(400).json({ error_code: 'INVALID_CHAPTER_ID' });
   const hasName = typeof req.body?.name === 'string';
   const hasPos = Number.isFinite(req.body?.position);
-  const hasDesc = typeof req.body?.description === 'string';
-  if (!hasName && !hasPos && !hasDesc) {
+  if (!hasName && !hasPos) {
     return res.status(400).json({ error_code: 'EMPTY_BODY' });
   }
   if (_guardChapter(req, res, chapterId, 'editor') == null) return;

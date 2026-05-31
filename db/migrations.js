@@ -7155,6 +7155,22 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 171 abgeschlossen (book_publication: EPUB-Kapitelnumerierung).');
   }
 
+  if (version < 172) {
+    // chapters.description (Legacy-BookStack-Kapitelintro) entfernt — Feature
+    // wird nicht genutzt. Export-/PDF-Builder rendern Kapitel nur noch mit
+    // Ueberschrift. Reiner Spalten-Drop, keine FK-/Index-Beruehrung.
+    const chapCols172 = db.pragma('table_info(chapters)').map(c => c.name);
+    if (chapCols172.includes('description')) {
+      db.exec('ALTER TABLE chapters DROP COLUMN description');
+    }
+    const fkErrors172 = db.pragma('foreign_key_check');
+    if (fkErrors172.length) {
+      throw new Error(`Migration 172: foreign_key_check meldet ${fkErrors172.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 172').run();
+    logger.info('DB-Migration auf Version 172 abgeschlossen (chapters.description entfernt).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

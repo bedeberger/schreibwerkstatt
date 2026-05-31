@@ -117,7 +117,7 @@ async function runBookImportJob(jobId, { userEmail }) {
       if (o.op === 'chapter') {
         try {
           const ch = await contentStore.createChapter(
-            { book_id: bookId, name: o.name || '', description: o.description || '', parent_chapter_id: parentChapterId },
+            { book_id: bookId, name: o.name || '', parent_chapter_id: parentChapterId },
             ctx,
           );
           chapterIdByTemp.set(o.tempId, ch.id);
