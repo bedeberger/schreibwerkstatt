@@ -80,7 +80,9 @@ selectionchange / input / scroll / focus → _focusUpdateActive(…)
                               │ 1. Generation-Check          │
                               │ 2. Block aus Caret-Anchor    │
                               │    (Fallback: Viewport-Center│
-                              │    via IO-Set / QSA)         │
+                              │    via IO-Set / QSA;         │
+                              │    preferCenter → direkt     │
+                              │    Viewport-Center)          │
                               │ 3. setActiveBlock + nearBlocks│
                               │    (Cache-Short-Circuit)     │
                               │ 4. Sentence-Highlight        │
@@ -89,6 +91,7 @@ selectionchange / input / scroll / focus → _focusUpdateActive(…)
                               └──────────────────────────────┘
 ```
 
+- **Manueller Scroll verschiebt das Spotlight** ([card.js](../public/js/editor/focus/card.js) `onScroll` → `_focusUpdateActive(false, { preferCenter: true })`): beim Lese-/Scroll-Durchlauf bestimmt nicht der (unsichtbare) Caret den aktiven Block, sondern der Absatz in der Viewport-Mitte. Die Granularitäts-Regel (paragraph/sentence/window-3) greift unverändert auf diesen Block. `preferCenter` gilt **ausschliesslich** für den User-Scroll-Pfad — `applyViewport` (Mobile-Tastatur/Resize) bleibt caret-basiert (`_focusUpdateActive(false)` ohne `preferCenter`), sonst springt das Spotlight bei jedem KB-Frame. Programmatischer Typewriter-Scroll wird vom `expectedScroll`-Counter verschluckt und löst kein Center-Pick aus.
 - **Aktive Textmarkierung blockt Recenter** — User zieht Auswahl auf, Viewport darf nicht springen.
 - **Klick markiert `pointerIntent`** ([card.js:153-157](../public/js/editor/focus/card.js#L153-L157)) — folgender `selectionchange` recentert NICHT (Klick ist absichtliche Positionsänderung). Flag fällt nach `POINTER_GRACE_MS=300` ms automatisch zurück (Klick in leeren Margin erzeugt keinen selectionchange).
 - **Typewriter-Schwelle dynamisch** ([typewriter.js:11-18](../public/js/editor/focus/typewriter.js#L11-L18)): `max(16, line-height * 0.5)`. Statisches 16 px scrollte schon bei subpixel-Jitter — halbe Zeilenhöhe ist die natürliche „echte Zeilenwechsel"-Grenze.

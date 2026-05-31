@@ -248,7 +248,10 @@ export const focusCardMethods = {
     const onScroll = () => {
       if (this._focusState !== 'active') return;
       if (ctx.expectedScroll > 0) { ctx.expectedScroll--; return; }
-      this._focusUpdateActive(false);
+      // Manueller Scroll: Spotlight auf den Absatz in der Viewport-Mitte
+      // setzen (preferCenter), nicht auf den Caret. scroll=false → kein
+      // programmatischer Typewriter-Scroll, der gegen den User-Scroll kämpft.
+      this._focusUpdateActive(false, { preferCenter: true });
     };
 
     // Editor verliert Fokus (z.B. Modal öffnet, Sidebar-Klick) → aktive
@@ -477,9 +480,10 @@ export const focusCardMethods = {
     this._focusState = 'idle';
   },
 
-  _focusUpdateActive(scroll) {
+  _focusUpdateActive(scroll, opts = {}) {
     if (this._focusState !== 'active') return;
     if (this._focusRaf) cancelAnimationFrame(this._focusRaf);
+    const preferCenter = opts.preferCenter === true;
     const gen = this._focusGen;
     this._focusRaf = requestAnimationFrame(() => {
       this._focusRaf = null;
@@ -494,9 +498,14 @@ export const focusCardMethods = {
         const container = ctx.container;
         if (!container) return;
 
+        // Block-Quelle: normalerweise Caret-Anchor (Spotlight folgt dem
+        // Cursor beim Tippen). `preferCenter` (manueller Scroll) ignoriert den
+        // Caret und nimmt den Absatz in der Viewport-Mitte — beim Lese-/Scroll-
+        // Durchlauf wandert die Hervorhebung mit dem Sichtfeld, nicht mit dem
+        // (unsichtbaren) Cursor im alten Absatz.
         let block = null;
         const sel = document.getSelection();
-        if (sel && sel.rangeCount > 0) {
+        if (!preferCenter && sel && sel.rangeCount > 0) {
           const anchor = sel.anchorNode;
           if (anchor && container.contains(anchor)) {
             block = findBlockFromNode(anchor, container);
