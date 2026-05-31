@@ -8,6 +8,17 @@
   align-items: center;
 }
 
+/* Tabs-Wrapper: Margin pro Karte; Pattern-Look kommt aus components/tabs.css. */
+.epubx-tabs { margin: 0.6rem 0 1rem; }
+
+.epubx-tab-panel { padding: 1rem 0.875rem 0.75rem; }
+
+/* Checkbox-Zeilen haben keine Label-Spalte: über beide Grid-Spalten spannen,
+   damit die volle Kartenbreite genutzt wird (statt nur die 170px-Spalte). */
+.epubx-tab-panel .card-form-row > .book-settings-option {
+  grid-column: 1 / -1;
+}
+
 .epubx-progress {
   display: flex;
   flex-direction: column;

@@ -55,11 +55,20 @@
 
   <p class="card-form-hint" x-text="$app.t('epubExport.hint')"></p>
 
-  <div class="card-form-grid">
-    <!-- Typografie -->
-    <section class="book-settings-section">
-      <h3 class="book-settings-section-title" x-text="$app.t('epubExport.section.typography')"></h3>
+  <!-- Tabs (DESIGN.md .tabs) -->
+  <div class="tabs tabs--scrollable epubx-tabs">
+    <template x-for="tab in ['typography','structure','metadata']" :key="tab">
+      <button type="button"
+              class="tabs-btn"
+              :class="{ 'tabs-btn--active': isTab(tab) }"
+              @click="setTab(tab)"
+              x-text="$app.t('epubExport.section.' + tab)"></button>
+    </template>
+  </div>
 
+  <div class="epubx-body">
+    <!-- Typografie -->
+    <section class="epubx-tab-panel" x-show="isTab('typography')">
       <div class="card-form-row">
         <label class="card-form-label" x-text="$app.t('epubExport.cssStyle')"></label>
         <div x-data="combobox($app.t('epubExport.cssStyle'))"
@@ -111,9 +120,7 @@
     </section>
 
     <!-- Struktur -->
-    <section class="book-settings-section">
-      <h3 class="book-settings-section-title" x-text="$app.t('epubExport.section.structure')"></h3>
-
+    <section class="epubx-tab-panel" x-show="isTab('structure')">
       <div class="card-form-row">
         <label class="card-form-label" x-text="$app.t('epubExport.field.titlepageMode')"></label>
         <div x-data="combobox($app.t('epubExport.field.titlepageMode'))"
@@ -159,8 +166,7 @@
     </section>
 
     <!-- Metadaten (OPF) -->
-    <section class="book-settings-section">
-      <h3 class="book-settings-section-title" x-text="$app.t('epubExport.section.metadata')"></h3>
+    <section class="epubx-tab-panel" x-show="isTab('metadata')">
       <p class="card-form-field-note" x-text="$app.t('epubExport.metadataHint')"></p>
 
       <div class="card-form-row">
@@ -195,20 +201,21 @@
                maxlength="100" :placeholder="$app.t('epubExport.field.uuidPlaceholder')"
                :disabled="!canEditPublication()">
       </div>
-
-      <div class="card-actions" x-show="canEditPublication()">
-        <span class="card-form-saved" x-show="savedAt" x-cloak x-transition.opacity.duration.250ms x-text="$app.t('epubExport.saved')"></span>
-        <button type="button" :disabled="saving" @click="savePublication()">
-          <span x-show="saving" class="spinner"></span>
-          <span x-text="saving ? $app.t('common.saving') : $app.t('common.save')"></span>
-        </button>
-      </div>
     </section>
 
+    <!-- Persistenter Footer: Speichern gilt für alle Tabs (book_publication) -->
     <p class="card-form-hint">
       <span x-text="$app.t('epubExport.metaHint')"></span>
       <span class="internal-link" @click="openBookSettings()" x-text="$app.t('epubExport.metaLink')"></span>
     </p>
+
+    <div class="card-actions" x-show="canEditPublication()">
+      <span class="card-form-saved" x-show="savedAt" x-cloak x-transition.opacity.duration.250ms x-text="$app.t('epubExport.saved')"></span>
+      <button type="button" :disabled="saving" @click="savePublication()">
+        <span x-show="saving" class="spinner"></span>
+        <span x-text="saving ? $app.t('common.saving') : $app.t('common.save')"></span>
+      </button>
+    </div>
 
     <!-- Progress / Errors -->
     <div class="epubx-progress" x-show="exporting || (exportProgress > 0 && !exportError)">

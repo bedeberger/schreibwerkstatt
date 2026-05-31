@@ -15,6 +15,8 @@
 
 import { startPoll } from './job-helpers.js';
 
+const TABS = ['typography', 'structure', 'metadata'];
+
 const _EMPTY_META = () => ({
   author_name: '',
   isbn: '', subtitle: '', year: '', dedication: '', imprint: '', copyright: '',
@@ -37,6 +39,8 @@ export function registerEpubExportCard() {
     exportChapterId: null,
     exportPageId: null,
     exportIncludeSubchapters: false,
+
+    activeTab: 'typography',
 
     pub: _EMPTY_META(),
     pubLoaded: false,
@@ -103,6 +107,7 @@ export function registerEpubExportCard() {
         this.exportScope = 'book';
         this.exportChapterId = null;
         this.exportPageId = null;
+        this.activeTab = 'typography';
       };
       window.addEventListener('view:reset', this._onViewReset);
     },
@@ -192,6 +197,9 @@ export function registerEpubExportCard() {
       ];
     },
     chapterNumberingModeOptions() { return this._enumOptions(['nested', 'flat'], 'epubExport.numberingMode'); },
+
+    setTab(tab) { if (TABS.includes(tab)) this.activeTab = tab; },
+    isTab(tab) { return this.activeTab === tab; },
 
     openBookSettings() {
       window.__app?.toggleBookSettingsCard?.();

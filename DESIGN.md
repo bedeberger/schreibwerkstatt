@@ -318,6 +318,8 @@ mit `myCardOptions() { return this.cardData.map(...); }` am Karten-Scope.
 
 **Modifier `.tabs--fullwidth`** für Modus-Toggles, bei denen Buttons gleichberechtigt die volle Container-Breite teilen sollen (statt inline-flex zu Content-Breite). Beispiel: Figuren-Graph-Modus ([public/partials/figuren.html](public/partials/figuren.html)).
 
+**Tab-Panels brauchen eigenes Padding (Pflicht).** `.tabs` rendert nur die Button-Reihe — **kein** umschliessender Container/Box um die Panels. Der zugehörige Panel-Container sitzt deshalb sonst bündig an Tab-Reihe und Kartenrand. Jede Karten-eigene Panel-Klasse (`.pdfx-tab-panel`, `.epubx-tab-panel`, …) bekommt darum `padding: 1rem 0.875rem 0.75rem` (Top-Abstand zur Tab-Reihe + horizontaler Innenabstand). Convention pro Karte als eigene `*-tab-panel`-Klasse in der Karten-CSS, nicht generisch in `tabs.css` (Padding ist content-abhängig). Beispiele: [public/css/book/pdf-export.css](public/css/book/pdf-export.css), [public/css/book/epub-export.css](public/css/book/epub-export.css).
+
 ---
 
 ## Badges & Tags
