@@ -170,6 +170,30 @@ export const orteMapMethods = {
     });
     marker.addTo(this._markers);
     this._markerById[o.id] = marker;
+    // Verortete Marker respektieren die Lock-Sperre (Schutz gegen
+    // versehentliches Ziehen). Unverortete Pins bleiben immer ziehbar — ihr
+    // Zweck ist gerade, vom User platziert zu werden. Marker werden bewusst
+    // immer mit draggable:true erzeugt, damit der Drag-Handler existiert und
+    // sich später per disable()/enable() umschalten lässt.
+    if (!unlocated && this.geoLocked) marker.dragging?.disable();
+  },
+
+  // Lock-Sperre umschalten: schützt verortete Marker vor versehentlichem
+  // Ziehen. Persistiert die Wahl + schaltet die Drag-Handler bestehender
+  // Marker live um (kein Re-Render → Popup/Position bleiben erhalten).
+  toggleGeoLock() {
+    this.geoLocked = !this.geoLocked;
+    localStorage.setItem('orte.geoLocked', this.geoLocked ? '1' : '0');
+    this._applyGeoLock();
+  },
+
+  _applyGeoLock() {
+    if (!this._map) return;
+    for (const o of this.orteMapped()) {
+      const m = this._markerById?.[o.id];
+      if (!m?.dragging) continue;
+      if (this.geoLocked) m.dragging.disable(); else m.dragging.enable();
+    }
   },
 
   // Reicher Marker-Popup: Stammdaten + klickbare Querverweise (Seite/Figuren/

@@ -104,6 +104,12 @@
   color: var(--color-text);
 }
 
+.graph-tool-btn[aria-pressed="true"] {
+  background: var(--color-surface);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
 .graph-tool-btn--reset {
   font-size: var(--font-size-sm);
 }

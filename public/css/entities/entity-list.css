@@ -22,6 +22,9 @@
   box-sizing: border-box;
 }
 .filter-search-input:focus { outline: none; border-color: var(--color-border-focus); }
+/* Wrapper für Suchfeld + Clear-X (reusable .search-clear--icon aus search.css). */
+.filter-search-wrap { position: relative; display: inline-flex; align-items: center; }
+.filter-search-wrap .filter-search-input { padding-right: 26px; }
 
 /* Filter-Tabs in der Leiste auf die Höhe + Eckenrundung der Compact-Controls
    (Suchfeld, combobox--compact) bringen. Die generische .tabs-Komponente ist
@@ -236,6 +239,7 @@
     font-size: var(--font-size-micro);
   }
   .filter-search-input { width: 100%; }
+  .filter-search-wrap { flex: 1 1 100%; }
   .filter-bar > .combobox-wrap--compact { flex: 1 1 45%; min-width: 0; }
   .filter-count { width: 100%; text-align: right; }
   /* Skeleton soll sich nicht aufblähen, behält single-line */

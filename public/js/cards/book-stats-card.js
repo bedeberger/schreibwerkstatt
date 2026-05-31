@@ -68,6 +68,13 @@ export function registerBookStatsCard() {
         },
         extraListeners: [{ type: 'book-stats:select', handler: onSelect }],
       });
+
+      // Chart beim Ausblenden der Karte zerstoeren, damit Chart.js'
+      // Resize-Handler (responsive) nicht auf dem versteckten Canvas crasht.
+      // Reopen baut es ohnehin frisch (renderStatsChart destroy + new).
+      this.$watch(() => window.__app.showBookStatsCard, (visible) => {
+        if (!visible) _destroyStatsChart();
+      });
     },
 
     destroy() {

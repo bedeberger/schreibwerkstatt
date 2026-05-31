@@ -23,6 +23,7 @@ export function registerOrteCard() {
     geocodingAll: false,      // Batch-Geocode laeuft (sperrt Einzel-Buttons)
     highlightOrtId: null,     // Cross-Highlight Marker ↔ Locate-Liste
     orteMapStatus: '',
+    geoLocked: localStorage.getItem('orte.geoLocked') !== '0', // verortete Marker gegen versehentliches Ziehen sperren (Default an)
     _geoUndoStack: [],        // Pin-Positions-History (max 10) — siehe orte-map.js
     _geoRedoStack: [],
     _geoLang: 'de',

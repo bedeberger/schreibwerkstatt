@@ -35,7 +35,10 @@
 
   <!-- Filter-Leiste -->
   <div x-show="$app.songs.length > 0" class="filter-bar">
-    <input type="text" x-model="$app.songsFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
+    <span class="filter-search-wrap">
+      <input type="text" x-model="$app.songsFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
+      <button type="button" class="search-clear--icon" x-show="$app.songsFilters.suche" @click="$app.songsFilters.suche=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#x"/></svg></button>
+    </span>
     <div x-data="catalogFilter('figur')"
          x-modelable="value" x-model="$app.songsFilters.figurId"
          x-effect="options = $app.figuren.filter(f => $app.songs.some(s => (s.figuren || []).some(x => (x.fig_id || x) === f.id))).map(f => ({value: f.id, label: f.kurzname || f.name}))">

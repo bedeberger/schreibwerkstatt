@@ -102,7 +102,10 @@
     </div>
     <!-- Filter-Leiste -->
     <div class="filter-bar">
-      <input type="text" x-model="$app.szenenFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
+      <span class="filter-search-wrap">
+        <input type="text" x-model="$app.szenenFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
+        <button type="button" class="search-clear--icon" x-show="$app.szenenFilters.suche" @click="$app.szenenFilters.suche=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#x"/></svg></button>
+      </span>
       <div class="tabs">
         <button type="button" class="tabs-btn"
                 :class="{ 'tabs-btn--active': $app.szenenFilters.wertung === '' }"

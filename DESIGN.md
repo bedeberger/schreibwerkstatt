@@ -941,10 +941,20 @@ Kein Skeleton ohne Shimmer-Animation. CSS-File-Referenzen: [entity-list.css](pub
 **Markup:**
 ```html
 <div class="filter-bar">
-  <input class="filter-search-input" type="text" :placeholder="$app.t('filter.search')" x-model="filterText">
+  <span class="filter-search-wrap">
+    <input class="filter-search-input" type="text" :placeholder="$app.t('common.search')" x-model="filterText">
+    <button type="button" class="search-clear--icon" x-show="filterText" @click="filterText=''"
+            :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#x"/></svg>
+    </button>
+  </span>
   <span class="filter-count" x-text="filteredItems.length + ' / ' + items.length"></span>
 </div>
 ```
+
+Das Suchfeld sitzt in einem `.filter-search-wrap` (position:relative) zusammen mit dem
+Clear-X. `.search-clear--icon` ist der wiederverwendbare X-Button (aus [search.css](public/css/search.css),
+geteilt mit der Sidebar-Page-Suche) — nur sichtbar (`x-show`), wenn das Suchfeld befüllt ist.
 
 **Severity-/Wertungs-Filter:** generisches `.tabs` / `.tabs-btn` (siehe Tabs-Sektion oben). Kein eigenes Filter-Pattern. Beispiele: [public/partials/kontinuitaet.html](public/partials/kontinuitaet.html), [public/partials/szenen.html](public/partials/szenen.html).
 

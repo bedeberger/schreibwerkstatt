@@ -115,7 +115,10 @@
 
      <!-- Filter -->
     <div x-show="$app.figuren.length > 0 && figurenKapitelListe().length > 0" class="filter-bar">
-      <input type="text" x-model="$app.figurenFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
+      <span class="filter-search-wrap">
+        <input type="text" x-model="$app.figurenFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
+        <button type="button" class="search-clear--icon" x-show="$app.figurenFilters.suche" @click="$app.figurenFilters.suche=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#x"/></svg></button>
+      </span>
       <div x-data="catalogFilter('chapter')"
           x-modelable="value" x-model="$app.figurenFilters.kapitel"
           x-effect="options = figurenKapitelListe().map(k => ({value: k, label: k}))"
@@ -218,7 +221,12 @@
           <!-- Erste Erwähnung -->
           <div x-show="f.erste_erwaehnung" class="figur-detail-row">
             <span class="bewertung-section-title bewertung-section-title--inline" x-text="$app.t('figuren.field.ersteErwaehnung') + ' '"></span>
-            <span class="figur-detail-value" x-text="f.erste_erwaehnung"></span>
+            <template x-if="f.erste_erwaehnung_page_id">
+              <span class="figur-detail-value internal-link" @click.stop="$app.gotoPageById(f.erste_erwaehnung_page_id)" x-text="f.erste_erwaehnung"></span>
+            </template>
+            <template x-if="!f.erste_erwaehnung_page_id">
+              <span class="figur-detail-value" x-text="f.erste_erwaehnung"></span>
+            </template>
           </div>
           <!-- Musikgeschmack — abgeleitet aus song_figures-Rollup -->
           <div x-show="$app.songsByFigurId.get(f.id)?.length" class="figur-musikgeschmack">

@@ -47,7 +47,10 @@
 
   <!-- Filter-Leiste -->
   <div x-show="$app.orte.length > 0" class="filter-bar">
-    <input type="text" x-model="$app.orteFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
+    <span class="filter-search-wrap">
+      <input type="text" x-model="$app.orteFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
+      <button type="button" class="search-clear--icon" x-show="$app.orteFilters.suche" @click="$app.orteFilters.suche=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#x"/></svg></button>
+    </span>
     <div x-data="catalogFilter('figur')"
          x-modelable="value" x-model="$app.orteFilters.figurId"
          x-effect="options = $app.figuren.filter(f => $app.orte.some(o => (o.figuren || []).includes(f.id))).map(f => ({value: f.id, label: f.kurzname || f.name}))"
@@ -200,11 +203,18 @@
               :disabled="_geoRedoStack.length === 0"
               @click="redoGeoMove()"
               :data-tip="$app.t('orte.map.redoTip')" :aria-label="$app.t('orte.map.redo')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#redo"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=688#redo"/></svg>
+      </button>
+      <button type="button" class="graph-tool-btn"
+              :aria-pressed="geoLocked"
+              @click="toggleGeoLock()"
+              :data-tip="$app.t(geoLocked ? 'orte.map.unlockTip' : 'orte.map.lockTip')"
+              :aria-label="$app.t(geoLocked ? 'orte.map.unlock' : 'orte.map.lock')">
+        <svg class="icon" aria-hidden="true"><use :href="(geoLocked ? '/icons.svg?v=688#lock' : '/icons.svg?v=688#lock-open')"/></svg>
       </button>
     </div>
     <div x-ref="orteMapEl" class="ort-map" role="application" :aria-label="$app.t('orte.map.tab')"></div>
-    <p class="ort-map-hint" x-text="$app.t('orte.map.dragHint')"></p>
+    <p class="ort-map-hint" x-text="$app.t(geoLocked ? 'orte.map.lockedHint' : 'orte.map.dragHint')"></p>
     <div class="ort-map-locate-head">
       <span class="ort-map-locate-count"
             x-text="$app.t('orte.map.unlocatedCount', { n: unlocatedOrte().length, total: $app.orteFiltered.length })"></span>

@@ -24,6 +24,7 @@
              :aria-label="$app.t('bookOrganizer.searchPlaceholder')"
              class="page-search"
              autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other">
+      <button type="button" class="search-clear--icon" x-show="organizerSearch" @click="organizerSearch=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#x"/></svg></button>
     </span>
     <div class="btn-group organizer-action-group">
       <button type="button" class="graph-tool-btn organizer-icon-btn"

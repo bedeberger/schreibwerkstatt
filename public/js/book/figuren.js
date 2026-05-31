@@ -13,6 +13,27 @@ export function _cleanStr(v) {
   return s;
 }
 
+// Umschliessende Anführungszeichen entfernen: Das Display wrappt Zitate selbst
+// mit «…» (figuren.html, Prompt-Kontext). Liefert die KI das Zitat bereits in
+// Original-Interpunktion mit Gänsefüsschen, gäbe das sonst ««…»». Idempotent.
+const _QUOTE_PAIRS = [['«', '»'], ['„', '“'], ['“', '”'], ['‚', '‘'], ['‘', '’'], ['"', '"'], ["'", "'"]];
+export function _stripQuotes(v) {
+  let s = _cleanStr(v);
+  if (!s) return s;
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const [open, close] of _QUOTE_PAIRS) {
+      if (s.length > open.length + close.length - 1 && s.startsWith(open) && s.endsWith(close)) {
+        s = s.slice(open.length, s.length - close.length).trim();
+        changed = true;
+        break;
+      }
+    }
+  }
+  return s || null;
+}
+
 // Strukturierter Entwicklungsbogen: leere Felder bereinigen; null wenn nichts übrig.
 function _sanitizeArc(arc) {
   if (!arc || typeof arc !== 'object') return null;
@@ -45,7 +66,7 @@ export function _sanitizeFigur(f) {
     entwicklung: _cleanStr(f.entwicklung),
     arc: _sanitizeArc(f.arc),
     erste_erwaehnung: _cleanStr(f.erste_erwaehnung),
-    schluesselzitate: (f.schluesselzitate || []).map(_cleanStr).filter(Boolean).slice(0, 5),
+    schluesselzitate: (f.schluesselzitate || []).map(_stripQuotes).filter(Boolean).slice(0, 5),
     eigenschaften: (f.eigenschaften || []).map(_cleanStr).filter(Boolean),
     lebensereignisse: (f.lebensereignisse || []).map(ev => ({
       ...ev,
