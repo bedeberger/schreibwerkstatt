@@ -91,6 +91,17 @@ async function runEpubExportJob(jobId, { scope, entityId, includeSubchapters, us
     }
     if (validation.available && !validation.passed) {
       log.warn(`epubcheck flagged EPUB as non-compliant (errors=${validation.errors}, fatals=${validation.fatals}, job=${jobId})`);
+      // Einzelmeldungen mitloggen, damit man ohne lokales Reproduzieren sieht,
+      // welche Regeln greifen. Nur ERROR/FATAL, gedeckelt gegen Log-Flut.
+      const blocking = (validation.items || []).filter((m) => m.severity === 'ERROR' || m.severity === 'FATAL');
+      const LOG_CAP = 20;
+      for (const m of blocking.slice(0, LOG_CAP)) {
+        const where = m.path ? `${m.path}${m.line ? `:${m.line}${m.column ? `:${m.column}` : ''}` : ''}` : '?';
+        log.warn(`  epubcheck ${m.severity} ${m.id || '?'} @ ${where} — ${m.message}`);
+      }
+      if (blocking.length > LOG_CAP) {
+        log.warn(`  … ${blocking.length - LOG_CAP} weitere epubcheck-Meldungen (gekürzt)`);
+      }
     }
 
     if (ctrl?.signal.aborted) throw new Error('job.cancelled');
@@ -112,6 +123,9 @@ async function runEpubExportJob(jobId, { scope, entityId, includeSubchapters, us
         warnings: validation.warnings || 0,
         fatals: validation.fatals || 0,
         reason: validation.reason || null,
+        // Einzelmeldungen für die Frontend-Anzeige; gegen aufgeblähte Job-Results
+        // gedeckelt (epubcheck kann bei kaputten Dateien hunderte werfen).
+        items: (validation.items || []).slice(0, 50),
       },
     });
   } catch (e) {
