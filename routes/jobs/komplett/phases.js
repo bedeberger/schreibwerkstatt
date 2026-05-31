@@ -54,30 +54,19 @@ async function runPhase1(ctx) {
   const perChunkLimit = effectiveProvider === 'claude' ? singlePassLimit : ctxPerChunkLimit;
   const { chunkOrder, chunks } = splitGroupsIntoChunks(groups, groupOrder, perChunkLimit);
 
-  // Output-Cap für Extraktions-Calls. Basis aus app_settings, bei Truncation einmal
-  // auf das Provider-Ceiling (ai.<provider>.max_tokens_out) eskalieren statt den
-  // Chunk zu verwerfen — ein einziger truncierter Chunk killt sonst die ganze
-  // Phase 1 (job.error.phase1Incomplete). aiCall deckelt jeden Cap selbst aufs
-  // Provider-Ceiling; extractRetryCap = Ceiling ist die echte obere Grenze.
-  const extractBaseCap = Math.max(1024, parseInt(appSettings.get('ai.komplett.extract_max_tokens'), 10) || 16000);
-  const providerMaxOut = getContextConfigFor(effectiveProvider).maxTokensOut;
-  const extractRetryCap = Math.max(extractBaseCap, providerMaxOut);
-  // Claude rechnet nur generierte Tokens ab — reserviertes max_tokens ist gratis.
-  // Darum die Claude-Extraktions-Calls direkt grosszügig aufs Provider-Ceiling
-  // deckeln statt knapp mit Truncation-Retry-Ladder: spart Round-Trips und
-  // verhindert, dass ein figuren-/orts-/beziehungsdichtes Buch Phase 1 killt.
-  const claudeExtractCap = providerMaxOut;
+  // Output-Cap für lokale Extraktions-Calls (Single-Pass-lokal + Multi-Pass Split A/B):
+  // ai.komplett.extract_max_tokens, gedeckelt aufs Provider-Ceiling (komplettMaxTokens).
+  // KEIN Eskalations-Retry: lokale Modelle, die hier trunkieren, tun das wegen
+  // Wiederholungsschleifen — ein höherer Cap generiert nur länger, bevor er ebenso
+  // reisst (verdoppelt die Wartezeit). Gegen die Schleifen wirkt repeat_penalty
+  // (ai.<provider>.repeat_penalty, lib/ai.js); echte Truncation einzelner Chunks wird
+  // in der Multi-Pass-Auswertung als nicht-fatal behandelt (Teilabdeckung + Warnung).
+  // Claude rechnet nur generierte Tokens ab — reserviertes max_tokens ist gratis —,
+  // darum die Claude-Extraktions-Calls direkt grosszügig aufs Provider-Ceiling deckeln.
+  const claudeExtractCap = getContextConfigFor(effectiveProvider).maxTokensOut;
   const callExtract = (label, prompt, system, fromPct, toPct, expectedChars, schema) =>
-    retryOnTransientAi(() => call(jobId, tok, prompt, system, fromPct, toPct, expectedChars, 0.2, extractBaseCap, schema),
-      { log, label })
-      .catch(e => {
-        if (e?.message === 'job.error.aiTruncated' && extractRetryCap > extractBaseCap) {
-          log.warn(`${label} bei ${extractBaseCap} Output-Tokens trunkiert – Retry mit höherem Cap (${extractRetryCap}).`);
-          return retryOnTransientAi(() => call(jobId, tok, prompt, system, fromPct, toPct, expectedChars, 0.2, extractRetryCap, schema),
-            { log, label: `${label} (Retry höherer Cap)` });
-        }
-        throw e;
-      });
+    retryOnTransientAi(() => call(jobId, tok, prompt, system, fromPct, toPct, expectedChars, 0.2, komplettMaxTokens(effectiveProvider), schema),
+      { log, label });
 
   log.info(`Phase 1 – ${totalChars} Zeichen, ${effectiveProvider} → ${totalChars <= singlePassLimit ? 'Single-Pass' : `Multi-Pass (${groupOrder.length} Kapitel → ${chunkOrder.length} Chunks)`}`);
 
@@ -338,11 +327,31 @@ async function runPhase1(ctx) {
     const cacheLookups = chunkTexts.length * (isSplit ? 2 : 1);
     log.info(`Phase 1 Multi-Pass – ${settled.length - failedChunks.length}/${settled.length} OK (${cacheHits}/${cacheLookups} Cache-Hits), fig=${chapterFiguren.reduce((s, c) => s + c.figuren.length, 0)} orte=${chapterOrte.reduce((s, c) => s + c.orte.length, 0)} songs=${chapterSongs.reduce((s, c) => s + (c.songs?.length || 0), 0)} sz=${chapterSzenen.reduce((s, c) => s + c.szenen.length, 0)}`);
     if (failedChunks.length > 0) {
-      const failedDetails = chunkTexts
+      const failedInfo = chunkTexts
         .map((ct, i) => ({ ct, r: settled[i] }))
         .filter(({ r }) => r.status === 'rejected')
-        .map(({ ct, r }) => `${ct.chunk.name}: ${r.reason?.message || 'unbekannt'}`);
-      throw i18nError('job.error.phase1Incomplete', { count: failedChunks.length, details: failedDetails.join('; ') });
+        .map(({ ct, r }) => ({ name: ct.chunk.name, message: r.reason?.message || 'unbekannt' }));
+      const details = failedInfo.map(f => `${f.name}: ${f.message}`).join('; ');
+      const onlyTruncation = failedInfo.every(f => f.message === 'job.error.aiTruncated');
+      const someSucceeded = (settled.length - failedChunks.length) > 0;
+      // Truncation einzelner Chunks ist nicht-fatal, SOLANGE mindestens ein Chunk
+      // Daten lieferte: das lokale Modell dreht bei dichten Kapiteln in Wiederholungs-
+      // schleifen (kein Cap fixt das — repeat_penalty mildert es). Betroffene
+      // (Teil-)Chunks tragen dann nichts bei; wiederkehrende Figuren/Orte werden über
+      // die übrigen Chunks meist trotzdem erfasst. Andere Fehlerarten (Provider down,
+      // Parse-Fehler) ODER ein Totalausfall (0 OK) bleiben hart — dann hat Phase 1
+      // keine verlässliche Basis und der Job bricht ehrlich ab, statt ein leeres
+      // Ergebnis als „fertig" auszugeben.
+      if (onlyTruncation && someSucceeded) {
+        const skippedChapters = [...new Set(failedInfo.map(f => f.name))];
+        log.warn(`Phase 1 – ${failedChunks.length} Chunk(s) durch Truncation übersprungen (nicht-fatal): ${details}`);
+        ctx.warnings?.push({
+          key: 'job.warn.chunksTruncated',
+          params: { count: failedChunks.length, chapters: skippedChapters.join(', ') },
+        });
+      } else {
+        throw i18nError('job.error.phase1Incomplete', { count: failedChunks.length, details });
+      }
     }
   }
 

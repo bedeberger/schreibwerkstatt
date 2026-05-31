@@ -52,7 +52,7 @@
     </ul>
     <ul class="komplett-warnings" x-show="!alleAktualisierenLoading && alleAktualisierenWarnings.length" x-cloak>
       <template x-for="w in alleAktualisierenWarnings" :key="w.key">
-        <li class="komplett-warning-item" x-text="t(w.key)"></li>
+        <li class="komplett-warning-item" x-text="t(w.key, w.params)"></li>
       </template>
     </ul>
   </div>

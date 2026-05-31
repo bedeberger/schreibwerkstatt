@@ -1913,6 +1913,7 @@
   "admin.settings.help.appTimezone":    "IANA time zone (e.g. Europe/Zurich). Applies to cron jobs, server date buckets (streak, page_stats), and all GUI date formatters — browser time zone is overridden.",
   "admin.settings.help.contextWindow":  "Full model context window (input + output) in tokens. For local models, set this to the native context size (Mistral-Small3.2 / Gemma3 / Llama-3.1: 128 000; older: 32 000 / 8 000).",
   "admin.settings.help.maxTokensOut":   "Output cap in tokens. Must be well below `context_window` (the rest = input budget). Per-job overrides are capped on top.",
+  "admin.settings.help.repeatPenalty":  "Anti-loop: penalises recently repeated tokens and breaks repetition loops (e.g. during JSON extraction). 1.0 = off, 1.1–1.2 mild recommended. Values too high can damage valid JSON.",
   "admin.settings.help.charsPerToken":  "Scales char-to-token estimates. Provider-agnostic. Default 3.0 is calibrated for German.",
   "admin.settings.help.pageRevisionLimit": "Floor for page-revisions retention: newest N revisions per page are always kept on top of the GFS schema (24h / 1 per day / 1 per week / 1 per month / 1 per year, oldest of each). Cleanup runs daily.",
   "admin.settings.help.advancedGlobal": "Apply regardless of provider.",
@@ -2306,6 +2307,7 @@
   "job.warn.faktenFailed":           "Fact extraction failed – the rest of the catalog was updated.",
   "job.warn.crossChapterFailed":     "Cross-chapter relationships could not be determined.",
   "job.warn.continuityFailed":       "Continuity check skipped – the rest of the catalog was updated.",
+  "job.warn.chunksTruncated":        "{count} text section(s) could not be fully analysed by the model (repetition loop) and were skipped: {chapters}. The remaining sections were processed normally.",
 
   "job.phase.preparing":             "Preparing…",
   "job.phase.aiReply":               "AI replying…",

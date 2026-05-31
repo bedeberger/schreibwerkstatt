@@ -108,6 +108,10 @@
           <input type="text" x-data="numInput({ integer: true, min: 512 })" x-modelable="value" x-model="adminSettingsForm['ai.ollama.max_tokens_out']">
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.maxTokensOut')"></small>
         </label>
+        <label>ai.ollama.repeat_penalty
+          <input type="text" x-data="numInput({ step: 0.05, decimals: 2, min: 1, max: 2 })" x-modelable="value" x-model="adminSettingsForm['ai.ollama.repeat_penalty']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.repeatPenalty')"></small>
+        </label>
       </div>
 
       <div x-show="adminSettingsProviderSubtab === 'llama'" class="admin-settings-subsection">
@@ -121,6 +125,10 @@
         <label>ai.llama.max_tokens_out
           <input type="text" x-data="numInput({ integer: true, min: 512 })" x-modelable="value" x-model="adminSettingsForm['ai.llama.max_tokens_out']">
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.maxTokensOut')"></small>
+        </label>
+        <label>ai.llama.repeat_penalty
+          <input type="text" x-data="numInput({ step: 0.05, decimals: 2, min: 1, max: 2 })" x-modelable="value" x-model="adminSettingsForm['ai.llama.repeat_penalty']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.repeatPenalty')"></small>
         </label>
       </div>
 
