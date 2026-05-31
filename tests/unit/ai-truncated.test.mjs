@@ -48,6 +48,8 @@ const fakeAI = {
   },
   CHARS_PER_TOKEN: 3,
   MAX_TOKENS_OUT: 64000,
+  // aiCall leitet das Output-Ceiling pro Call aus dem Provider ab.
+  getContextConfigFor: () => ({ maxTokensOut: 64000 }),
 };
 
 require.cache[aiPath] = {

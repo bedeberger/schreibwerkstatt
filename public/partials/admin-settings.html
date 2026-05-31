@@ -452,6 +452,7 @@
         <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.advancedGlobal')"></p>
         <label>ai.chat_temperature <input type="text" x-data="numInput({ step: 0.01, decimals: 2, min: 0, max: 2 })" x-modelable="value" x-model="adminSettingsForm['ai.chat_temperature']"></label>
         <label>ai.lektorat_batch_concurrency <input type="text" x-data="numInput({ step: 1, min: 1, max: 8 })" x-modelable="value" x-model="adminSettingsForm['ai.lektorat_batch_concurrency']"></label>
+        <label>ai.komplett.extract_max_tokens <input type="text" x-data="numInput({ integer: true, min: 1024 })" x-modelable="value" x-model="adminSettingsForm['ai.komplett.extract_max_tokens']"></label>
         <label>ai.chars_per_token
           <input type="text" x-data="numInput({ step: 0.1, min: 1, max: 10 })" x-modelable="value" x-model="adminSettingsForm['ai.chars_per_token']">
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.charsPerToken')"></small>

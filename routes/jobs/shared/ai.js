@@ -1,5 +1,5 @@
 'use strict';
-const { callAI, parseJSON, CHARS_PER_TOKEN, MAX_TOKENS_OUT } = require('../../../lib/ai');
+const { callAI, parseJSON, CHARS_PER_TOKEN, getContextConfigFor } = require('../../../lib/ai');
 const appSettings = require('../../../lib/app-settings');
 const { jobAbortControllers } = require('./state');
 const { updateJob, i18nError } = require('./jobs');
@@ -243,9 +243,15 @@ async function aiCall(jobId, tok, prompt, system, fromPct, toPct, expectedChars 
     }
     if (Object.keys(updates).length) updateJob(jobId, updates);
   };
+  // Output-Ceiling pro Call aus dem TATSAECHLICHEN Provider dieses Calls ableiten,
+  // nicht aus dem globalen MAX_TOKENS_OUT (= ai.claude.max_tokens_out). Sonst klemmt
+  // der Claude-Cap auch llama/ollama-Jobs runter (z.B. 8000), obwohl der Admin
+  // ai.llama.max_tokens_out hoeher gesetzt hat → vorzeitige Truncation. Undefined
+  // provider faellt in getContextConfigFor auf 'claude' zurueck (Verhalten unveraendert).
+  const providerMaxOut = getContextConfigFor(provider).maxTokensOut;
   const maxTokensOverride = maxTokens != null
-    ? Math.min(maxTokens, MAX_TOKENS_OUT)
-    : MAX_TOKENS_OUT;
+    ? Math.min(maxTokens, providerMaxOut)
+    : providerMaxOut;
   const signal = jobAbortControllers.get(jobId)?.signal;
   const { text, truncated, tokensIn, tokensOut, cacheReadIn = 0, cacheCreationIn = 0, genDurationMs } = await callAI(prompt, system, onProgress, maxTokensOverride, signal, provider, jsonSchema);
   tok.inflight?.delete(callId);

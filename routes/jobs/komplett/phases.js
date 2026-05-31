@@ -22,6 +22,7 @@ const {
   mergeBeziehungenIntoFiguren, backfillFiguren,
 } = require('./figuren-merge');
 const appSettings = require('../../../lib/app-settings');
+const { getContextConfigFor } = require('../../../lib/ai');
 
 /**
  * Phase 1: Vollextraktion (Figuren+Orte+Fakten+Szenen+Events).
@@ -38,6 +39,25 @@ async function runPhase1(ctx) {
   // Provider chunken nach `ai.<provider>.context_window` (siehe ctx.perChunkLimit aus chunkLimitsFor).
   const perChunkLimit = effectiveProvider === 'claude' ? singlePassLimit : ctxPerChunkLimit;
   const { chunkOrder, chunks } = splitGroupsIntoChunks(groups, groupOrder, perChunkLimit);
+
+  // Output-Cap für Extraktions-Calls. Basis aus app_settings, bei Truncation einmal
+  // auf das Provider-Ceiling (ai.<provider>.max_tokens_out) eskalieren statt den
+  // Chunk zu verwerfen — ein einziger truncierter Chunk killt sonst die ganze
+  // Phase 1 (job.error.phase1Incomplete). aiCall deckelt jeden Cap selbst aufs
+  // Provider-Ceiling; extractRetryCap = Ceiling ist die echte obere Grenze.
+  const extractBaseCap = Math.max(1024, parseInt(appSettings.get('ai.komplett.extract_max_tokens'), 10) || 16000);
+  const extractRetryCap = Math.max(extractBaseCap, getContextConfigFor(effectiveProvider).maxTokensOut);
+  const callExtract = (label, prompt, system, fromPct, toPct, expectedChars, schema) =>
+    retryOnTransientAi(() => call(jobId, tok, prompt, system, fromPct, toPct, expectedChars, 0.2, extractBaseCap, schema),
+      { log, label })
+      .catch(e => {
+        if (e?.message === 'job.error.aiTruncated' && extractRetryCap > extractBaseCap) {
+          log.warn(`${label} bei ${extractBaseCap} Output-Tokens trunkiert – Retry mit höherem Cap (${extractRetryCap}).`);
+          return retryOnTransientAi(() => call(jobId, tok, prompt, system, fromPct, toPct, expectedChars, 0.2, extractRetryCap, schema),
+            { log, label: `${label} (Retry höherer Cap)` });
+        }
+        throw e;
+      });
 
   log.info(`Phase 1 – ${totalChars} Zeichen, ${effectiveProvider} → ${totalChars <= singlePassLimit ? 'Single-Pass' : `Multi-Pass (${groupOrder.length} Kapitel → ${chunkOrder.length} Chunks)`}`);
 
@@ -134,10 +154,9 @@ async function runPhase1(ctx) {
         passA = { figuren: stammFiguren, assignments: stamm.assignments };
       } else {
         // Lokale Provider: kombinierter Call (kein 1h-Cache → Split wäre 3× voller Input).
-        const r = await retryOnTransientAi(() => call(jobId, tok,
+        const r = await callExtract('Single-Pass Extraktion (lokal)',
           prompts.buildExtraktionKomplettChapterPrompt('Gesamtbuch', bookName, pageContents.length, fullBookText),
-          sys.SYSTEM_KOMPLETT_EXTRAKTION_BLOCKS, 12, 28, 16000, 0.2, null, prompts.SCHEMA_KOMPLETT_EXTRAKTION,
-        ), { log, label: 'Single-Pass Extraktion (lokal)' });
+          sys.SYSTEM_KOMPLETT_EXTRAKTION_BLOCKS, 12, 28, 16000, prompts.SCHEMA_KOMPLETT_EXTRAKTION);
         passA = { figuren: r?.figuren, assignments: r?.assignments };
         passB = { orte: r?.orte, songs: r?.songs, fakten: r?.fakten, szenen: r?.szenen };
       }
@@ -245,10 +264,9 @@ async function runPhase1(ctx) {
         if (passA) { cacheHits++; log.info(`${chunkLabel} Pass A (Figuren) – Cache-HIT.`); }
         else {
           log.info(`${chunkLabel} Pass A (Figuren) – KI-Call…`);
-          passA = await retryOnTransientAi(() => call(jobId, tok,
+          passA = await callExtract(`${chunkLabel} Pass A`,
             prompts.buildExtraktionFigurenPassPrompt(chunk.name, bookName, chunk.pages.length, chText),
-            sys.SYSTEM_KOMPLETT_FIGUREN_PASS_BLOCKS, null, null, 8000, 0.2, null, prompts.SCHEMA_KOMPLETT_FIGUREN_PASS,
-          ), { log, label: `${chunkLabel} Pass A` });
+            sys.SYSTEM_KOMPLETT_FIGUREN_PASS_BLOCKS, null, null, 8000, prompts.SCHEMA_KOMPLETT_FIGUREN_PASS);
           saveChapterExtractCache(bookIdInt, email, figKey, pagesSig, passA, effectiveProvider);
         }
 
@@ -256,10 +274,9 @@ async function runPhase1(ctx) {
         if (passB) { cacheHits++; log.info(`${chunkLabel} Pass B (Orte/Szenen) – Cache-HIT.`); }
         else {
           log.info(`${chunkLabel} Pass B (Orte/Szenen) – KI-Call…`);
-          passB = await retryOnTransientAi(() => call(jobId, tok,
+          passB = await callExtract(`${chunkLabel} Pass B`,
             prompts.buildExtraktionOrtePassPrompt(chunk.name, bookName, chunk.pages.length, chText),
-            sys.SYSTEM_KOMPLETT_ORTE_PASS_BLOCKS, null, null, 6000, 0.2, null, prompts.SCHEMA_KOMPLETT_ORTE_PASS,
-          ), { log, label: `${chunkLabel} Pass B` });
+            sys.SYSTEM_KOMPLETT_ORTE_PASS_BLOCKS, null, null, 6000, prompts.SCHEMA_KOMPLETT_ORTE_PASS);
           saveChapterExtractCache(bookIdInt, email, ortKey, pagesSig, passB, effectiveProvider);
         }
 
