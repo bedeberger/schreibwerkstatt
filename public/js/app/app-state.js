@@ -179,6 +179,11 @@ const notebookState = () => ({
   // Tab geschlossen + wieder geöffnet). Form `{ savedAt }`. Banner bietet
   // Resume (öffnet Edit-Mode + Draft-Restore via startEdit) oder Discard.
   pendingDraft: null,
+  // Transient-Feedback nach Anführungszeichen-Normalisierung (Toolbar-Button):
+  // `null` = kein Flash, sonst `{ count }`. Timer-gesteuert (~1.8 s) — Button
+  // swappt Quote-Icon gegen Check + Success-Tönung als Abschluss-Indikator.
+  quotesNormalizedFlash: null,
+  _quotesFlashTimer: null,
   lastAutosaveAt: null,
   lastDraftSavedAt: null,
   _autosaveIdleTimer: null,

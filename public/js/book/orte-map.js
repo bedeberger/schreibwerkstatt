@@ -95,6 +95,50 @@ export const orteMapMethods = {
     }
   },
 
+  // --- Undo/Redo der Pin-Positionen (max 10 Schritte) ----------------------
+  // Eine Marker-Verschiebung legt die vorherige Position auf _geoUndoStack.
+  // Stacks halten Snapshots { id, lat, lng } (lat/lng=null = unverortet).
+
+  // Vorherige Position vor einer Verschiebung sichern. Neuer Zug verwirft den
+  // Redo-Stack (klassische Undo/Redo-Semantik); Stack auf 10 Einträge gekappt.
+  _pushGeoHistory(snap) {
+    this._geoUndoStack.push(snap);
+    if (this._geoUndoStack.length > 10) this._geoUndoStack.shift();
+    this._geoRedoStack = [];
+  },
+
+  // Snapshot anwenden: aktuelle Position auf den Gegen-Stack legen, dann die
+  // gespeicherten Koordinaten zurückschreiben + persistieren + neu rendern.
+  async _applyGeoSnapshot(snap, counterStack) {
+    const app = window.__app;
+    const target = app.orte.find(x => x.id === snap.id);
+    if (!target) return; // Ort gelöscht → Eintrag verfällt still
+    counterStack.push({ id: snap.id, lat: target.lat, lng: target.lng });
+    target.lat = snap.lat;
+    target.lng = snap.lng;
+    await app.saveOrte();
+    if (this.viewMode === 'map') {
+      const L = await loadLeaflet();
+      this._renderOrteMarkers(L);
+    }
+  },
+
+  async undoGeoMove() {
+    const snap = this._geoUndoStack.pop();
+    if (snap) await this._applyGeoSnapshot(snap, this._geoRedoStack);
+  },
+
+  async redoGeoMove() {
+    const snap = this._geoRedoStack.pop();
+    if (snap) await this._applyGeoSnapshot(snap, this._geoUndoStack);
+  },
+
+  // History leeren (Buchwechsel / View-Reset / Teardown).
+  _resetGeoHistory() {
+    this._geoUndoStack = [];
+    this._geoRedoStack = [];
+  },
+
   // Einen Marker bauen + verdrahten. `unlocated` → roter Pin in der Kartenmitte
   // (kein lat/lng am Ort); Dragend setzt echte Koordinaten → wird blau.
   _addOrtMarker(L, o, latlng, unlocated) {
@@ -113,6 +157,9 @@ export const orteMapMethods = {
       const ll = marker.getLatLng();
       const target = window.__app.orte.find(x => x.id === o.id);
       if (target) {
+        // Vorherige Position auf den Undo-Stack legen, BEVOR sie überschrieben
+        // wird (bei „unlocated" Pins lat/lng=null → Undo macht ihn wieder rot).
+        this._pushGeoHistory({ id: o.id, lat: target.lat, lng: target.lng });
         target.lat = ll.lat;
         target.lng = ll.lng;
         await window.__app.saveOrte();
@@ -327,6 +374,7 @@ export const orteMapMethods = {
   },
 
   _teardownMap() {
+    this._resetGeoHistory();
     if (this._map) {
       // Laufende Pan/Zoom-Anim hart stoppen + Marker abräumen, bevor remove()
       // die Panes nullt — sonst feuert ein queued Anim-Callback ins Leere.

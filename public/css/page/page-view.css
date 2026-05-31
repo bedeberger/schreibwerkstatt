@@ -277,6 +277,11 @@
   border-color: var(--color-primary);
   color: var(--color-primary);
 }
+/* Abschluss-Indikator: kurzer Success-Flash nach Quote-Normalisierung. */
+.page-editor-toolbar .graph-tool-btn.is-success {
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
 @media (max-width: 600px) {
   .page-editor-toolbar { justify-content: flex-start; }
 }

@@ -16,6 +16,13 @@
   z-index: 0; /* haelt Leaflet-Panes unter App-Overlays/Popovers */
 }
 
+.ort-map-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2xs);
+}
+
 .ort-map-hint {
   font-size: var(--font-size-xs);
   color: var(--color-muted);

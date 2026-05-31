@@ -859,6 +859,12 @@ export const notebookEditMethods = {
       app._markEditDirty?.();
       editEl.dispatchEvent(new Event('input', { bubbles: true }));
     }
+    app.quotesNormalizedFlash = { count };
+    if (app._quotesFlashTimer) clearTimeout(app._quotesFlashTimer);
+    app._quotesFlashTimer = setTimeout(() => {
+      app.quotesNormalizedFlash = null;
+      app._quotesFlashTimer = null;
+    }, 1800);
     window.dispatchEvent(new CustomEvent('languagetool:recheck'));
   },
 

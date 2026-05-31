@@ -23,6 +23,8 @@ export function registerOrteCard() {
     geocodingAll: false,      // Batch-Geocode laeuft (sperrt Einzel-Buttons)
     highlightOrtId: null,     // Cross-Highlight Marker ↔ Locate-Liste
     orteMapStatus: '',
+    _geoUndoStack: [],        // Pin-Positions-History (max 10) — siehe orte-map.js
+    _geoRedoStack: [],
     _geoLang: 'de',
     _bookLand: null,          // book_settings.schauplatz_land → Geocode-Länder-Bias
     _map: null,               // Leaflet-Instanz (transienter Runtime-Handle)

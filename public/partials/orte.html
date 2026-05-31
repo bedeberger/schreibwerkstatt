@@ -189,6 +189,20 @@
 
   <!-- Geo-Karte: Marker je verorteter Schauplatz + Geocode-Liste -->
   <div x-show="$app.orte.length > 0 && viewMode === 'map'" class="ort-map-view" x-cloak>
+    <div class="ort-map-actions">
+      <button type="button" class="graph-tool-btn"
+              :disabled="_geoUndoStack.length === 0"
+              @click="undoGeoMove()"
+              :data-tip="$app.t('orte.map.undoTip')" :aria-label="$app.t('orte.map.undo')">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#undo"/></svg>
+      </button>
+      <button type="button" class="graph-tool-btn"
+              :disabled="_geoRedoStack.length === 0"
+              @click="redoGeoMove()"
+              :data-tip="$app.t('orte.map.redoTip')" :aria-label="$app.t('orte.map.redo')">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#redo"/></svg>
+      </button>
+    </div>
     <div x-ref="orteMapEl" class="ort-map" role="application" :aria-label="$app.t('orte.map.tab')"></div>
     <p class="ort-map-hint" x-text="$app.t('orte.map.dragHint')"></p>
     <div class="ort-map-locate-head">

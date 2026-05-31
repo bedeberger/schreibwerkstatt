@@ -212,9 +212,16 @@
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#separator-horizontal"/></svg>
     </button>
     <button type="button" class="graph-tool-btn"
-            :data-tip="t('editor.toolbar.quotesTitle')" :aria-label="t('editor.toolbar.quotesTitle')"
+            :class="{ 'is-success': quotesNormalizedFlash }"
+            :data-tip="quotesNormalizedFlash
+              ? (quotesNormalizedFlash.count > 0
+                  ? t('editor.toolbar.quotesDone', { count: quotesNormalizedFlash.count })
+                  : t('editor.toolbar.quotesNone'))
+              : t('editor.toolbar.quotesTitle')"
+            :aria-label="t('editor.toolbar.quotesTitle')"
             @click="normalizeQuotes()">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#quote"/></svg>
+      <svg class="icon" aria-hidden="true" x-show="!quotesNormalizedFlash"><use href="/icons.svg?v=636#quote"/></svg>
+      <svg class="icon" aria-hidden="true" x-show="quotesNormalizedFlash" x-cloak><use href="/icons.svg?v=636#check"/></svg>
     </button>
     <span class="action-sep" aria-hidden="true"></span>
     <button type="button" class="graph-tool-btn"
