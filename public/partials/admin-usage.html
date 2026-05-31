@@ -166,7 +166,7 @@
         <template x-for="r in sorted" :key="r.id">
           <tr>
             <td x-text="r.userEmail || '—'"></td>
-            <td x-text="r.type"></td>
+            <td x-text="_adminUsageTypeLabel(r.type)"></td>
             <td x-text="r.model || '—'"></td>
             <td x-text="adminUsageInt(r.tokensIn)"></td>
             <td x-text="adminUsageInt(r.tokensOut)"></td>

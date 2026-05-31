@@ -35,6 +35,12 @@ export const adminUsageMethods = {
   _adminUsageLocale() {
     return (window.__app?.uiLocale === 'en') ? 'en-US' : 'de-CH';
   },
+  // Job-Typ-String (DB-Wert aus job_runs.type) → übersetztes Label. Fallback: roher Typ.
+  _adminUsageTypeLabel(type) {
+    const key = `admin.usage.jobType.${type}`;
+    const label = window.__app?.t?.(key);
+    return (label && label !== key) ? label : type;
+  },
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
   async adminUsageEnter() {
@@ -261,7 +267,7 @@ export const adminUsageMethods = {
       this._adminUsageCharts.type = new Chart(elType.getContext('2d'), {
         type: 'bar',
         data: {
-          labels: byType.map(t => t.type),
+          labels: byType.map(t => this._adminUsageTypeLabel(t.type)),
           datasets: [{ label: 'USD', data: byType.map(t => Number(t.usd?.toFixed?.(4) || t.usd || 0)), backgroundColor: palette[2] }],
         },
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } },
