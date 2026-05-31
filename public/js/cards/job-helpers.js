@@ -40,6 +40,13 @@ export function startPoll(ctx, config) {
       if (config.progressProp) ctx[config.progressProp] = job.progress || 0;
       if (job.status === 'running' || job.status === 'queued') { config.onProgress?.(job); return; }
       done = true; stop();
+      // Race-freier Toast: sobald dieser per-Card-Poller den Terminal-Status
+      // sieht, toasten — unabhängig vom 5-s-Queue-Diff (der schnelle Jobs
+      // verpassen kann). `_maybeShowJobToast` dedupt via Job-ID gegen den
+      // Queue-Diff-Pfad. cancelled wird dort selbst ausgefiltert.
+      window.__app?._maybeShowJobToast?.({
+        type: job.type, job, bookId: job.bookId ?? null, dedupId: job.dedupId ?? null,
+      });
       if (job.status === 'cancelled') { await config.onError?.(job); return; }
       if (job.status === 'error') await config.onError?.(job);
       else await config.onDone?.(job);

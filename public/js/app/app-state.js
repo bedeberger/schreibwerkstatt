@@ -548,13 +548,17 @@ const jobsState = () => ({
   // Non-critical-Degradierungen aus dem letzten Komplettlauf (Job-Result.warnings):
   // [{ key }] – im Status-Panel als Hinweiszeilen gerendert.
   alleAktualisierenWarnings: [],
-  // Globaler Job-Done-Toast. Wird von `_onJobFinished` für relevante
-  // langlaufende Job-Typen gesetzt (komplett-analyse, review, kapitel-review,
-  // figuren, kontinuitaet, book-chat, finetune-export, pdf-export, batch-check,
+  // Globaler Job-Done-Toast. Wird von `_maybeShowJobToast` für relevante
+  // Job-Typen gesetzt (komplett-analyse, review, kapitel-review, figuren,
+  // kontinuitaet, book-chat, finetune-export, pdf-export, batch-check,
   // werkstatt-*). Auto-Dismiss via `_jobToastTimer`. Severity 'ok' für done,
-  // 'err' für error.
+  // 'err' für error. Zwei Auslösepfade: per-Card-Poller (`startPoll`, race-frei
+  // sobald der Job terminal ist) und Queue-Diff (`_onJobFinished`, fängt
+  // Reload/Buchwechsel/geschlossene-Karte). `_toastedJobIds` dedupt, damit ein
+  // Job genau einmal toastet, egal welcher Pfad zuerst feuert.
   jobToast: null,
   _jobToastTimer: null,
+  _toastedJobIds: new Set(),
 });
 
 export function initialLektoratState() {

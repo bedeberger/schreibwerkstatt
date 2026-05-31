@@ -2285,6 +2285,9 @@
   "toast.job.hubspotImport":         "HubSpot initial import",
   "toast.job.hubspotPush":           "HubSpot push",
   "toast.job.hubspotReconcile":      "HubSpot reconcile",
+  "toast.job.bookImport":            "Book import",
+  "toast.job.epubExport":            "EPUB export",
+  "toast.job.geocodeResolve":        "Geolocation",
   "toast.job.fallback":              "Job",
 
   "job.error.sessionNotFound":       "Session not found.",

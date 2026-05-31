@@ -172,6 +172,7 @@ sharedRouter.get('/:id', (req, res) => {
   }
   res.json({
     id: job.id, type: job.type, status: job.status,
+    bookId: job.bookId, dedupId: job.dedupId,
     progress: job.progress, statusText, statusParams,
     label: job.label, labelParams: job.labelParams,
     tokensIn: job.tokensIn, tokensOut: job.tokensOut,

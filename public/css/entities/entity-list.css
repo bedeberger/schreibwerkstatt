@@ -13,7 +13,7 @@
 .filter-search-input {
   font-size: var(--font-size-mini);
   line-height: 1.4;
-  padding: var(--space-3) 8px;
+  padding: var(--space-xs) 8px;
   border: 0.5px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-bg);
@@ -22,6 +22,17 @@
   box-sizing: border-box;
 }
 .filter-search-input:focus { outline: none; border-color: var(--color-border-focus); }
+
+/* Filter-Tabs in der Leiste auf die Höhe + Eckenrundung der Compact-Controls
+   (Suchfeld, combobox--compact) bringen. Die generische .tabs-Komponente ist
+   höher (13px + space-sm-Padding, eckig) und wirkt neben den 12px-Compact-
+   Feldern sonst versetzt. Scope auf .filter-bar lässt eigenständige
+   View-Toggle-Tabs (.tabs.entity-view-toggle) unberührt. */
+.filter-bar .tabs { border-radius: var(--radius-md); }
+.filter-bar .tabs-btn {
+  font-size: var(--font-size-mini);
+  padding: var(--space-xs) var(--space-md);
+}
 
 /* === Entity-Liste (geteilt: Orte, Szenen, Kontinuität, …) ===
    Pattern: kompakte Klick-Zeile + ausklappbarer Detail-Drawer.

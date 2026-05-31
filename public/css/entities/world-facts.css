@@ -5,14 +5,14 @@
 .weltfakten-groups {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: var(--space-lg);
 }
 
 .weltfakten-group-head {
   display: flex;
   align-items: center;
   gap: var(--space-xs);
-  margin-bottom: var(--space-xs);
+  margin-bottom: var(--space-6);
 }
 
 .weltfakten-group-count {
@@ -21,11 +21,16 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Glossar-Zeile: Subjekt als feste linke Schlüssel-Spalte, Aussage rechts
+   daneben (durch dezenten Divider getrennt), Kapitel/Seite darunter im
+   Body-Block. Mehr Padding + Zeilenabstand als die kompakte entity-row,
+   weil dies eine Lese-/Nachschlage-Ansicht ohne Klick-Drawer ist. */
 .weltfakten-row {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2xs);
-  padding: var(--space-xs) var(--space-sm);
+  display: grid;
+  grid-template-columns: minmax(6rem, 12rem) 1fr;
+  align-items: baseline;
+  gap: var(--space-sm);
+  padding: var(--space-10) var(--space-sm);
   border-left: 3px solid var(--card-accent);
 }
 
@@ -33,26 +38,32 @@
   border-top: 1px solid var(--color-border);
 }
 
-.weltfakten-row-main {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--space-xs);
-}
+/* Fakt ohne Subjekt: Aussage füllt die volle Breite, kein Spalten-Divider. */
+.weltfakten-row--nosubj { grid-template-columns: 1fr; }
 
 .weltfakten-subjekt {
   font-weight: 600;
   color: var(--color-text);
+  line-height: var(--lh-base);
+  overflow-wrap: anywhere;
 }
 
-.weltfakten-subjekt::after {
-  content: ':';
-  color: var(--color-muted);
+.weltfakten-row-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+  padding-left: var(--space-sm);
+  border-left: 1px solid var(--color-border);
+}
+.weltfakten-row--nosubj .weltfakten-row-body {
+  padding-left: 0;
+  border-left: none;
 }
 
 .weltfakten-fakt {
   color: var(--color-text);
-  flex: 1 1 16rem;
+  line-height: var(--lh-base);
 }
 
 .weltfakten-row-meta {
@@ -67,7 +78,8 @@
   color: var(--color-muted);
 }
 
+/* Mobil: Spalten stapeln, Subjekt wird zur Label-Zeile über der Aussage. */
 @media (max-width: 640px) {
-  .weltfakten-row-main { flex-direction: column; gap: var(--space-2xs); }
-  .weltfakten-fakt { flex-basis: auto; }
+  .weltfakten-row { grid-template-columns: 1fr; gap: var(--space-2xs); }
+  .weltfakten-row-body { padding-left: 0; border-left: none; }
 }

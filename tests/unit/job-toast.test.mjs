@@ -161,11 +161,32 @@ test('batch-check error → kein refreshPageAges', () => {
   assert.equal(ctx.refreshAgesCalls, 0);
 });
 
+test('derselbe Job toastet genau einmal (Dedup per-Card-Poller + Queue-Diff)', () => {
+  const ctx = makeCtx();
+  // per-Card-Poller-Pfad: Job hat eine echte id
+  ctx._maybeShowJobToast({ type: 'review', job: { id: 'job-xyz', status: 'done' }, bookId: 1 });
+  assert.ok(ctx.jobToast);
+  ctx._dismissJobToast();
+  // Queue-Diff-Pfad für denselben Job (jobId == job.id) → kein zweiter Toast
+  ctx._onJobFinished({ type: 'review', jobId: 'job-xyz', bookId: 1, job: { id: 'job-xyz', status: 'done' } });
+  assert.equal(ctx.jobToast, null);
+});
+
+test('neue Whitelist-Typen (book-import, epub-export, geocode-resolve) toasten', () => {
+  for (const t of ['book-import', 'epub-export', 'geocode-resolve']) {
+    const ctx = makeCtx();
+    ctx._onJobFinished({ type: t, jobId: 1, bookId: 1, job: { status: 'done' } });
+    assert.ok(ctx.jobToast, `${t} sollte Toast erzeugen`);
+    assert.equal(ctx.jobToast.severity, 'ok');
+  }
+});
+
 test('alle Whitelist-Typen erzeugen Toast', () => {
   const types = [
     'komplett-analyse','kontinuitaet','review','chapter-review','check',
     'book-chat','finetune-export','pdf-export','batch-check',
     'werkstatt-brainstorm','werkstatt-consistency',
+    'book-import','epub-export','geocode-resolve',
   ];
   for (const t of types) {
     const ctx = makeCtx();

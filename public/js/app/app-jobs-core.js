@@ -273,7 +273,18 @@ export const appJobsCoreMethods = {
       'hubspot-import':        'toast.job.hubspotImport',
       'hubspot-push':          'toast.job.hubspotPush',
       'hubspot-reconcile':     'toast.job.hubspotReconcile',
+      'book-import':           'toast.job.bookImport',
+      'epub-export':           'toast.job.epubExport',
+      'geocode-resolve':       'toast.job.geocodeResolve',
     };
+    // Dedup: derselbe Job kann über den per-Card-Poller UND den Queue-Diff
+    // terminal werden — Toast trotzdem genau einmal.
+    if (!this._toastedJobIds) this._toastedJobIds = new Set();
+    const jobId = job.id ?? detail.jobId;
+    if (jobId != null) {
+      if (this._toastedJobIds.has(jobId)) return;
+      this._toastedJobIds.add(jobId);
+    }
     const labelKey = labels[detail.type];
     const isError = job.status !== 'done';
     // Errors immer toasten — auch für Job-Typen ohne explizites Label
