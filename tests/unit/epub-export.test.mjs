@@ -1,8 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import epub from '../../lib/export-builders/epub.js';
+import sharp from 'sharp';
+import JSZip from 'jszip';
 
-const { _resolveEpubMeta, _countUnfetchableImages, _buildFrontmatter, _buildBackmatter, _proseToXhtml, buildEpub, _buildOpfExtraMeta, _buildAccessibilityMeta, _buildLandmarksNav, _buildContentOPF, _applyBreaks } = epub;
+const { _resolveEpubMeta, _countUnfetchableImages, _buildFrontmatter, _buildBackmatter, _proseToXhtml, buildEpub, _buildOpfExtraMeta, _buildAccessibilityMeta, _buildLandmarksNav, _buildContentOPF, _buildCoverXhtml, _applyBreaks } = epub;
 
 test('_applyBreaks: Editor-hr nach Klasse → pagebreak/blankpage/Szenentrenner', () => {
   const html = '<hr class="pagebreak" data-bid="a1">x'
@@ -138,6 +140,60 @@ test('buildEpub: erzeugt Buffer mit Frontmatter/Backmatter-Dateien + Cover', asy
   assert.ok(s.includes('front_title.xhtml'), 'Titelseite fehlt');
   assert.ok(s.includes('front_dedication.xhtml'), 'Widmung fehlt');
   assert.ok(s.includes('back_author.xhtml'), 'Autor-Seite fehlt');
+});
+
+test('_buildCoverXhtml: SVG-viewBox bei bekannten Maßen, jpeg-Endung wie die Lib', () => {
+  const svg = _buildCoverXhtml({ mime: 'image/jpeg', width: 750, height: 1200 });
+  assert.ok(svg.includes('viewBox="0 0 750 1200"'));
+  // epub-gen-memory legt das Bild als cover.jpeg ab (mime.getExtension) — Referenz muss matchen.
+  assert.ok(svg.includes('xlink:href="cover.jpeg"'));
+  assert.ok(svg.includes('class="cover-page"'));
+  // Roh-Fallback (keine Maße) → einfaches <img>, png behält png-Endung.
+  const fallback = _buildCoverXhtml({ mime: 'image/png', width: 0, height: 0 });
+  assert.ok(fallback.includes('<img src="cover.png"') && !fallback.includes('<svg'));
+});
+
+test('buildEpub: Cover wird auf Hochformat gecroppt + als Vollbild-Cover-Seite injiziert', async () => {
+  // Querformat-Quelle (1600×900) → muss zu ~1:1.6 Hochformat beschnitten werden.
+  const landscape = await sharp({ create: { width: 1600, height: 900, channels: 3, background: { r: 44, g: 62, b: 80 } } }).png().toBuffer();
+  const bundle = {
+    scope: 'book', book: { id: 1, name: 'Buch', description: 'D' },
+    groups: [{ chapterId: null, chapter: null, pages: [{ p: { name: 'S1' }, pd: { html: '<p>x</p>' } }] }],
+  };
+  const buf = await buildEpub(bundle, { lang: 'de', author: 'A', meta: {}, cover: { image: landscape, mime: 'image/png' } });
+
+  // OCF: mimetype als erste Entry + unkomprimiert (STORE = Methode 0).
+  assert.equal(buf.readUInt16LE(8), 0, 'mimetype muss STORE bleiben');
+
+  const zip = await JSZip.loadAsync(buf);
+  const names = Object.keys(zip.files).filter(n => !zip.files[n].dir);
+  assert.equal(names[0], 'mimetype');
+  const opfPath = names.find(n => n.endsWith('.opf'));
+  const dir = opfPath.replace(/[^/]+$/, '');
+
+  // Cover-Bild ist Hochformat (~1:1.6), immer JPEG.
+  const cov = await zip.file(`${dir}cover.jpeg`).async('nodebuffer');
+  const m = await sharp(cov).metadata();
+  assert.ok(Math.abs(m.height / m.width - 1.6) < 0.02, `Cover-Ratio ${m.height}/${m.width} ≠ ~1.6`);
+
+  // Cover-Seite existiert, SVG mit korrektem viewBox + Bildreferenz.
+  const cx = await zip.file(`${dir}front_cover.xhtml`).async('string');
+  assert.ok(cx.includes(`viewBox="0 0 ${m.width} ${m.height}"`));
+  assert.ok(cx.includes('xlink:href="cover.jpeg"'));
+
+  // OPF: EPUB3-cover-image-Property + Cover als erste Spine-Seite + Manifest-Item.
+  const opf = await zip.file(opfPath).async('string');
+  assert.ok(/properties="cover-image"/.test(opf));
+  assert.ok(/<item id="cover-page"[^>]*href="front_cover\.xhtml"/.test(opf));
+  assert.ok(/<spine[^>]*>\s*<itemref idref="cover-page"/.test(opf), 'Cover muss erste Spine-Seite sein');
+});
+
+test('buildEpub: ohne Cover keine Cover-Seite, mimetype bleibt STORE', async () => {
+  const bundle = { scope: 'book', book: { id: 1, name: 'B', description: 'D' }, groups: [{ chapterId: null, chapter: null, pages: [{ p: { name: 'S1' }, pd: { html: '<p>x</p>' } }] }] };
+  const buf = await buildEpub(bundle, { lang: 'de', author: 'A', meta: {} });
+  assert.equal(buf.readUInt16LE(8), 0);
+  const zip = await JSZip.loadAsync(buf);
+  assert.ok(!Object.keys(zip.files).some(n => n.endsWith('front_cover.xhtml')));
 });
 
 test('_buildOpfExtraMeta: leer ohne keywords/series', () => {

@@ -66,23 +66,27 @@ export function tErrorRaw(response) {
 }
 
 // Alpine-Methoden: `t` referenziert `this.uiLocale`, damit Alpine bei Sprachwechsel re-evaluiert.
+// `this?.` ist Pflicht: Wird die Methode aus einem Scope aufgerufen, in dem Alpine
+// den Receiver verliert (z. B. via `window.__app.t()` aus einer x-effect-Expression
+// einer spät hydratisierten Combobox), wäre `this` undefined und der reine
+// Reaktivitäts-Touch würde die ganze Alpine-Effect-Kette crashen. Übersetzung
+// fällt dann auf die globale `_locale` zurück (tRaw), statt die Karte zu killen.
 export const i18nMethods = {
   t(key, params) {
-    void this.uiLocale;
+    void this?.uiLocale;
     return tRaw(key, params);
   },
 
   /** Backend-Fehler übersetzen. Siehe tErrorRaw für Schema. */
   tError(response) {
-    void this.uiLocale;
+    void this?.uiLocale;
     return tErrorRaw(response);
   },
 
   /** ISO-Timestamp → relativer Lokalisiertext. Lazy-Import um Zykel zu vermeiden. */
   formatLastRun(isoStr) {
-    void this.uiLocale;
     if (!isoStr) return '';
-    return _formatLastRunImpl(isoStr, (k, p) => tRaw(k, p), this.uiLocale);
+    return _formatLastRunImpl(isoStr, (k, p) => tRaw(k, p), this?.uiLocale);
   },
 
   /** Sprache wechseln, neue Messages laden und auf Server persistieren. */
