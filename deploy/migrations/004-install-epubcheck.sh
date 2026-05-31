@@ -57,9 +57,11 @@ EOF
 $SUDO chmod +x "$SYMLINK"
 
 echo "→ Smoke-Test"
-# EPUBCheck kennt kein sauberes --version; ohne Argumente druckt es das
-# "EPUBCheck vX.Y.Z"-Banner und beendet sich non-zero → || true und grep.
-SMOKE="$(epubcheck 2>&1 || true)"
+# EPUBCheck kennt kein sauberes --version. Ohne Argumente bricht der Arg-Parser
+# sofort mit "At least one argument expected" ab — noch BEVOR das Banner kommt.
+# Der --help-Pfad druckt dagegen das "EPUBCheck vX.Y.Z"-Banner + Usage und
+# beendet sich non-zero → || true und grep.
+SMOKE="$(epubcheck --help 2>&1 || true)"
 if ! echo "$SMOKE" | grep -qi "epubcheck"; then
   echo "✗ Smoke-Test fehlgeschlagen — kein EPUBCheck-Banner"
   echo "$SMOKE" | head -n5

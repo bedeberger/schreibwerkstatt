@@ -300,7 +300,7 @@
                 <input type="file" accept="image/jpeg,image/png,image/webp" hidden @change="uploadPublicationCover($event)">
                 <span x-text="pubCoverUploading ? $app.t('publication.uploading') : (bookPublication.has_cover ? $app.t('publication.replace') : $app.t('publication.upload'))"></span>
               </label>
-              <button type="button" x-show="bookPublication.has_cover" @click="removePublicationCover()" x-text="$app.t('publication.remove')"></button>
+              <button type="button" class="btn-compact" x-show="bookPublication.has_cover" @click="removePublicationCover()" x-text="$app.t('publication.remove')"></button>
             </div>
           </div>
           <p class="card-form-error" x-show="pubCoverError" x-text="pubCoverError"></p>
@@ -322,7 +322,7 @@
                 <input type="file" accept="image/jpeg,image/png,image/webp" hidden @change="uploadPublicationAuthorImage($event)">
                 <span x-text="pubAuthorUploading ? $app.t('publication.uploading') : (bookPublication.has_author_image ? $app.t('publication.replace') : $app.t('publication.upload'))"></span>
               </label>
-              <button type="button" x-show="bookPublication.has_author_image" @click="removePublicationAuthorImage()" x-text="$app.t('publication.remove')"></button>
+              <button type="button" class="btn-compact" x-show="bookPublication.has_author_image" @click="removePublicationAuthorImage()" x-text="$app.t('publication.remove')"></button>
             </div>
           </div>
           <p class="card-form-error" x-show="pubAuthorError" x-text="pubAuthorError"></p>
