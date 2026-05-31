@@ -4,7 +4,7 @@ import epub from '../../lib/export-builders/epub.js';
 import sharp from 'sharp';
 import JSZip from 'jszip';
 
-const { _resolveEpubMeta, _countUnfetchableImages, _buildFrontmatter, _buildBackmatter, _proseToXhtml, buildEpub, _buildOpfExtraMeta, _buildAccessibilityMeta, _buildLandmarksNav, _buildContentOPF, _buildCoverXhtml, _applyBreaks } = epub;
+const { _resolveEpubMeta, _countUnfetchableImages, _buildFrontmatter, _buildBackmatter, _proseToXhtml, buildEpub, _buildOpfExtraMeta, _buildAccessibilityMeta, _buildLandmarksNav, _buildContentOPF, _buildCoverXhtml, _applyBreaks, _dedupeIds } = epub;
 
 test('_applyBreaks: Editor-hr nach Klasse → pagebreak/blankpage/Szenentrenner', () => {
   const html = '<hr class="pagebreak" data-bid="a1">x'
@@ -37,6 +37,57 @@ test('_applyBreaks: scene-gaps kollabieren + führend/abschliessend entfernt', (
   assert.equal(out.match(/scene-gap/g).length, 1);
   assert.ok(out.startsWith('<p>A</p>'));
   assert.ok(out.endsWith('<p>B</p>'));
+});
+
+test('_dedupeIds: doppelte IDs werden eindeutig, erstes Vorkommen bleibt', () => {
+  const out = _dedupeIds('<p id="bkmrk-a">1</p><p id="bkmrk-a">2</p><p id="bkmrk-a">3</p>');
+  assert.equal((out.match(/id="bkmrk-a"/g) || []).length, 1, 'erstes bkmrk-a bleibt');
+  assert.ok(out.includes('id="bkmrk-a-2"') && out.includes('id="bkmrk-a-3"'), 'Duplikate durchnummeriert');
+});
+
+test('_dedupeIds: synthetischer Suffix kollidiert nicht mit echter ID', () => {
+  // "x-2" existiert bereits — das umbenannte Duplikat von "x" muss "x-3" werden.
+  const out = _dedupeIds('<p id="x">a</p><p id="x-2">b</p><p id="x">c</p>');
+  assert.ok(out.includes('id="x-2">b'), 'echte x-2 bleibt unangetastet');
+  assert.ok(out.includes('id="x-3"'), 'Duplikat weicht auf x-3 aus');
+});
+
+test('_dedupeIds: leere id wird entfernt, ohne ids unveraendert', () => {
+  assert.equal(_dedupeIds('<p id="">x</p>'), '<p>x</p>');
+  assert.equal(_dedupeIds('<p id="bkmrk-">a</p><p id="bkmrk-">b</p>'), '<p id="bkmrk-">a</p><p id="bkmrk--2">b</p>');
+  const plain = '<p class="x">kein id</p>';
+  assert.equal(_dedupeIds(plain), plain);
+});
+
+test('_buildContentOPF: leerer Verlag → keine leeren publisher-Elemente', () => {
+  const opf = _buildContentOPF({}, {}, { hasImages: false, lang: 'de' });
+  assert.ok(!/<dc:publisher>/.test(opf), 'leeres dc:publisher entfernt');
+  assert.ok(!/dcterms:publisher/.test(opf), 'leeres dcterms:publisher-meta entfernt');
+  assert.ok(!/ by <%= publisher %>/.test(opf), 'Copyright-Default ohne dangling "by"');
+  // Mit Verlag bleiben die Zeilen (ejs-Platzhalter) erhalten.
+  const withPub = _buildContentOPF({ publisher: 'Mein Verlag' }, {}, { hasImages: false, lang: 'de' });
+  assert.ok(/<dc:publisher><%= publisher %><\/dc:publisher>/.test(withPub), 'publisher-Zeile bleibt bei gesetztem Verlag');
+});
+
+test('buildEpub: ohne publisher kein leeres dc:publisher im OPF (RSC-005)', async () => {
+  const bundle = { scope: 'book', book: { id: 1, name: 'B', description: 'D' }, groups: _oneGroup() };
+  const buf = await buildEpub(bundle, { lang: 'de', author: 'A', meta: {} });
+  const zip = await _unzip(buf);
+  const opf = await zip.file('OEBPS/content.opf').async('string');
+  assert.ok(!/<dc:publisher>\s*<\/dc:publisher>/.test(opf), 'kein leeres dc:publisher');
+  assert.ok(!/<meta property="dcterms:publisher">\s*<\/meta>/.test(opf), 'kein leeres dcterms:publisher-meta');
+});
+
+test('buildEpub: doppelte bkmrk-IDs aus Seiten-HTML werden im XHTML dedupliziert', async () => {
+  const bundle = {
+    scope: 'book', book: { id: 1, name: 'B' },
+    groups: [{ chapterId: null, chapter: null, pages: [{ p: { name: 'S1' }, pd: { html: '<p id="bkmrk-a">x</p><p id="bkmrk-a">y</p>' } }] }],
+  };
+  const buf = await buildEpub(bundle, { lang: 'de', author: 'A', meta: {} });
+  const zip = await _unzip(buf);
+  const entry = await zip.file('OEBPS/entry_0.xhtml').async('string');
+  assert.equal((entry.match(/id="bkmrk-a"/g) || []).length, 1, 'nur ein bkmrk-a');
+  assert.ok(entry.includes('id="bkmrk-a-2"'), 'Duplikat umbenannt');
 });
 
 test('_buildCss: scene-gap-Regel nur im Belletristik-Satz', () => {
