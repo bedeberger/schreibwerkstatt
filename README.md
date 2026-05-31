@@ -96,6 +96,21 @@ java -cp installer-${VERAPDF_VERSION}.jar org.verapdf.apps.Installer -options au
 # /opt/verapdf-installation in PATH oder VERAPDF_BIN setzen
 ```
 
+### Optional: EPUBCheck (EPUB-Validierung)
+
+Auf Prod erledigt das die Deploy-Migration [deploy/migrations/004-install-epubcheck.sh](deploy/migrations/004-install-epubcheck.sh) automatisch (läuft bei jedem Deploy, idempotent). Ohne EPUBCheck läuft die EPUB-Validierung im Skip-Modus, das EPUB wird trotzdem geliefert. Manuell (W3C-Referenzvalidator, Java):
+
+```bash
+# Einfachster Weg: paketverwalteter Wrapper (liefert ein 'epubcheck'-Executable in PATH)
+apt-get install -y epubcheck            # oder: apk add epubcheck / brew install epubcheck
+
+# Alternativ ein eigenes Wrapper-Skript anlegen und via EPUBCHECK_BIN referenzieren —
+# EPUBCHECK_BIN muss ein aufrufbares Executable sein (kein "java -jar …"-String):
+#   #!/bin/sh
+#   exec java -jar /opt/epubcheck/epubcheck.jar "$@"
+# Deaktivieren ohne Deinstallation: app_settings epub.validate.disabled = true
+```
+
 ### Update
 
 ```bash

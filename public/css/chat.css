@@ -153,6 +153,37 @@
   border-radius: var(--radius-sm);
 }
 
+.chat-link {
+  color: var(--color-primary);
+  text-decoration: underline;
+  word-break: break-word;
+}
+
+.chat-pre {
+  margin: var(--space-6) 0;
+  padding: var(--space-3) 10px;
+  background: var(--color-hover-strong);
+  border: 0.5px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+}
+.chat-pre code {
+  font-family: monospace;
+  font-size: var(--font-em-90);
+  white-space: pre;
+  background: none;
+  padding: 0;
+}
+
+.chat-quote {
+  margin: var(--space-6) 0;
+  padding: var(--space-3) 12px;
+  border-left: 2px solid var(--color-primary);
+  background: var(--color-hover);
+  color: var(--color-muted);
+  font-style: italic;
+}
+
 .chat-table {
   border-collapse: collapse;
   font-size: var(--font-em-90);

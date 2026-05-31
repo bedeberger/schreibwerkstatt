@@ -20,6 +20,7 @@ const appSettings = require('../../lib/app-settings');
 const bp = require('../../db/book-publication');
 const { loadContents } = require('../../lib/load-contents');
 const { buildEpub } = require('../../lib/export-builders/epub');
+const { validateEpub } = require('../../lib/epubcheck-validate');
 const { buildExportFilename } = require('../../lib/filenames');
 const { resolveSlug } = require('../../lib/export-builders/shared');
 const { toIntId } = require('../../lib/validate');
@@ -77,12 +78,42 @@ async function runEpubExportJob(jobId, { scope, entityId, includeSubchapters, us
 
     if (ctrl?.signal.aborted) throw new Error('job.cancelled');
 
+    // EPUBCheck-Validierung (non-fatal, Pendant zu veraPDF beim PDF-Export):
+    // fehlt das Binary, wird übersprungen; meldet es Fehler, liefern wir das
+    // EPUB trotzdem aus und zeigen eine Warnung im Job-Result.
+    updateJob(jobId, { progress: 80, statusText: 'job.phase.validateEpub' });
+    let validation = { available: false };
+    try {
+      validation = await validateEpub(buffer);
+    } catch (e) {
+      log.warn(`EPUB validation threw (${e.message}); ignoring`);
+      validation = { available: false, reason: 'validator-error' };
+    }
+    if (validation.available && !validation.passed) {
+      log.warn(`epubcheck flagged EPUB as non-compliant (errors=${validation.errors}, fatals=${validation.fatals}, job=${jobId})`);
+    }
+
+    if (ctrl?.signal.aborted) throw new Error('job.cancelled');
+
     const filename = buildExportFilename({ prefix: scope, slug: resolveSlug(bundle), ext: 'epub', date: new Date() });
     epubResults.set(jobId, { buffer, mime: 'application/epub+zip', filename });
     _scheduleResultCleanup(jobId);
 
-    log.info(`EPUB generiert «${filename}» (${Math.round(buffer.length / 1024)} KB, scope=${scope})`);
-    completeJob(jobId, { ready: true, size: buffer.length, mime: 'application/epub+zip', filename, scope });
+    const checkLog = validation.available
+      ? (validation.passed ? 'epubcheck=pass' : `epubcheck=fail(${validation.errors}E/${validation.fatals}F)`)
+      : 'epubcheck=skipped';
+    log.info(`EPUB generiert «${filename}» (${Math.round(buffer.length / 1024)} KB, scope=${scope}, ${checkLog})`);
+    completeJob(jobId, {
+      ready: true, size: buffer.length, mime: 'application/epub+zip', filename, scope,
+      epubcheck: {
+        validatorAvailable: !!validation.available,
+        passed: validation.available ? !!validation.passed : null,
+        errors: validation.errors || 0,
+        warnings: validation.warnings || 0,
+        fatals: validation.fatals || 0,
+        reason: validation.reason || null,
+      },
+    });
   } catch (e) {
     if (e?.name === 'AbortError' || e?.message === 'job.cancelled') { failJob(jobId, e); return; }
     if (e?.code === 'BOOK_EMPTY')    { failJob(jobId, i18nError('job.error.bookEmpty'));    return; }

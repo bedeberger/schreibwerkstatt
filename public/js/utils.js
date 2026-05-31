@@ -809,25 +809,87 @@ function _mentionAncestorSkip(node) {
   return false;
 }
 
+// Erkennt eine Listenzeile (geordnet «1. » oder ungeordnet «- »/«* ») inkl.
+// führender Einrückung (Spaces/Tabs). Gruppe 1 = Indent, 2 = Marker, 3 = Text.
+const _CHAT_LIST_RE = /^([ \t]*)([-*]|\d+\.)[ ]+(.*)$/;
+
+// Baut aus aufeinanderfolgenden Listenzeilen verschachtelte <ul>/<ol> anhand
+// der Einrückungstiefe. Tabs zählen als 4 Spaces. Pure Funktion (kein DOM).
+function _buildNestedList(blockLines) {
+  const items = [];
+  for (const l of blockLines) {
+    const m = l.match(_CHAT_LIST_RE);
+    if (!m) continue;
+    items.push({
+      indent: m[1].replace(/\t/g, '    ').length,
+      ordered: /\d/.test(m[2]),
+      text: m[3],
+    });
+  }
+  const open = (ord) => ord ? '<ol class="chat-list chat-list--ol">' : '<ul class="chat-list">';
+  const close = (ord) => ord ? '</ol>' : '</ul>';
+  const stack = [];
+  let out = '';
+  for (const it of items) {
+    const top = stack[stack.length - 1];
+    if (!top || it.indent > top.indent) {
+      stack.push(it);
+      out += open(it.ordered) + '<li>' + it.text;
+    } else if (it.indent === top.indent) {
+      out += '</li><li>' + it.text;
+    } else {
+      while (stack.length > 1 && it.indent < stack[stack.length - 1].indent) {
+        out += '</li>' + close(stack.pop().ordered);
+      }
+      out += '</li><li>' + it.text;
+    }
+  }
+  while (stack.length) out += '</li>' + close(stack.pop().ordered);
+  return out;
+}
+
+// Ersetzt zusammenhängende Listenblöcke im Text durch ihr verschachteltes
+// HTML; alle übrigen Zeilen bleiben unangetastet. Eine einzelne Leerzeile
+// zwischen Items hält die Liste zusammen.
+function _renderChatLists(html) {
+  const lines = html.split('\n');
+  const out = [];
+  let i = 0;
+  while (i < lines.length) {
+    if (!_CHAT_LIST_RE.test(lines[i])) { out.push(lines[i]); i++; continue; }
+    const block = [];
+    while (i < lines.length) {
+      if (_CHAT_LIST_RE.test(lines[i])) { block.push(lines[i]); i++; continue; }
+      if (lines[i].trim() === '' && _CHAT_LIST_RE.test(lines[i + 1] || '')) { i++; continue; }
+      break;
+    }
+    out.push(_buildNestedList(block));
+  }
+  return out.join('\n');
+}
+
 /**
  * Einfaches Markdown → HTML für Chat-Antworten.
- * Unterstützt: # Überschriften, **fett**, *kursiv*, `code`, Zeilenumbrüche, Listen (- und 1.).
+ * Unterstützt: # Überschriften, **fett**, *kursiv*, `code`, ```Code-Blöcke```,
+ * [Links](url), Blockquotes (>), Tabellen, Zeilenumbrüche, verschachtelte Listen (- und 1.).
  */
 export function renderChatMarkdown(text) {
   if (!text) return '';
   let html = escHtml(text);
 
+  // Fenced Code-Blöcke ```…``` vorab extrahieren und durch Platzhalter ersetzen,
+  // damit weder Listen-/Inline-Regex noch \n→<br> ihren Inhalt anfassen. Inhalt
+  // ist durch escHtml bereits sicher; \n bleiben für die <pre>-Anzeige erhalten.
+  const codeBlocks = [];
+  html = html.replace(/```[^\n]*\n([\s\S]*?)```/g, (_m, body) => {
+    codeBlocks.push('<pre class="chat-pre"><code>' + body.replace(/\n+$/, '') + '</code></pre>');
+    return ' CB' + (codeBlocks.length - 1) + ' ';
+  });
+
   // Überschriften: ### ## #
   html = html.replace(/^### (.+)$/gm, '<h4 class="chat-heading chat-heading--3">$1</h4>');
   html = html.replace(/^## (.+)$/gm,  '<h3 class="chat-heading chat-heading--2">$1</h3>');
   html = html.replace(/^# (.+)$/gm,   '<h2 class="chat-heading chat-heading--1">$1</h2>');
-
-  // Geordnete Listen: Zeilen mit «1. » «2. » usw. → temporäres <oli>-Tag
-  html = html.replace(/^\d+\. (.+)$/gm, '<oli>$1</oli>');
-  html = html.replace(/(<oli>.*?<\/oli>\n{0,2})+/g, m =>
-    '<ol class="chat-list chat-list--ol">' +
-    m.replace(/<oli>/g, '<li>').replace(/<\/oli>\n{0,2}/g, '</li>') +
-    '</ol>');
 
   // Horizontale Linie
   html = html.replace(/^---$/gm, '<hr class="chat-hr">');
@@ -844,12 +906,23 @@ export function renderChatMarkdown(text) {
     return `<div class="table-scroll"><table class="chat-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table></div>`;
   });
 
-  // Ungeordnete Listen: Zeilen mit «- » oder «* » → temporäres <uli>-Tag
-  html = html.replace(/^[-*] (.+)$/gm, '<uli>$1</uli>');
-  html = html.replace(/(<uli>.*?<\/uli>\n{0,2})+/g, m =>
-    '<ul class="chat-list">' +
-    m.replace(/<uli>/g, '<li>').replace(/<\/uli>\n{0,2}/g, '</li>') +
-    '</ul>');
+  // Listen (geordnet + ungeordnet, mit Verschachtelung via Einrückung)
+  html = _renderChatLists(html);
+
+  // Blockquote: Zeilen mit «> » (nach escHtml «&gt; ») → temporäres <bq>-Tag,
+  // aufeinanderfolgende Zeilen werden zu einem <blockquote> gruppiert.
+  html = html.replace(/^&gt; ?(.*)$/gm, '<bq>$1</bq>');
+  html = html.replace(/(?:<bq>[\s\S]*?<\/bq>\n?)+/g, m =>
+    '<blockquote class="chat-quote">' +
+    m.replace(/<bq>/g, '').replace(/<\/bq>\n?/g, '\n').trimEnd() +
+    '</blockquote>');
+
+  // Inline: [Text](url) — nur http(s)/mailto, sonst Klartext belassen (XSS-Schutz).
+  // url ist durch escHtml bereits attribut-sicher (" → &quot; etc.).
+  html = html.replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, (m, label, url) =>
+    /^(https?:|mailto:)/i.test(url)
+      ? `<a href="${url}" target="_blank" rel="noopener noreferrer" class="chat-link">${label}</a>`
+      : m);
 
   // Inline: **fett**
   html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
@@ -863,9 +936,12 @@ export function renderChatMarkdown(text) {
   // Einfacher Zeilenumbruch → <br>
   html = html.replace(/\n/g, '<br>');
 
+  // Fenced Code-Blöcke zurückspielen (Inhalt war über Platzhalter geschützt)
+  html = html.replace(/ CB(\d+) /g, (_m, i) => codeBlocks[Number(i)] || '');
+
   // Überschüssige <br> direkt vor/nach Block-Elementen entfernen
-  html = html.replace(/(<br>\s*)+(<(?:ol|ul|h[2-4]|hr)\b)/gi, '$2');
-  html = html.replace(/(\/(?:ol|ul|h[2-4])>|<hr[^>]*>)(\s*<br>)+/gi, '$1');
+  html = html.replace(/(<br>\s*)+(<(?:ol|ul|h[2-4]|hr|blockquote|pre)\b)/gi, '$2');
+  html = html.replace(/(\/(?:ol|ul|h[2-4]|blockquote|pre)>|<hr[^>]*>)(\s*<br>)+/gi, '$1');
 
   return html;
 }

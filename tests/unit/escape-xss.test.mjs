@@ -115,3 +115,27 @@ test('renderChatMarkdown: Tabelle escapt Zelleninhalt', () => {
   assert.ok(!out.includes('<script>'),
     'Tabellenzellen müssen escaped sein – sonst XSS via Markdown-Tabelle');
 });
+
+test('renderChatMarkdown: [Text](url) → Link bei http(s)/mailto', () => {
+  const out = renderChatMarkdown('Siehe [Anthropic](https://anthropic.com).');
+  assert.match(out, /<a href="https:\/\/anthropic\.com" target="_blank" rel="noopener noreferrer" class="chat-link">Anthropic<\/a>/);
+});
+
+test('renderChatMarkdown: gefährliches Link-Protokoll bleibt Klartext', () => {
+  // javascript:/data: dürfen NICHT zu href werden – Markdown-Link-XSS.
+  const out = renderChatMarkdown('Klick [hier](javascript:alert(1)).');
+  assert.ok(!out.includes('<a '), 'javascript:-URL darf kein <a>-Tag erzeugen');
+  assert.ok(!out.includes('href='));
+});
+
+test('renderChatMarkdown: verschachtelte Liste → genestete <ul>/<ol>', () => {
+  const out = renderChatMarkdown('- A\n  - A1\n- B');
+  assert.match(out, /<ul class="chat-list"><li>A<ul class="chat-list"><li>A1<\/li><\/ul><\/li><li>B<\/li><\/ul>/);
+});
+
+test('renderChatMarkdown: Fenced Code-Block bleibt unzerstückelt + escaped', () => {
+  const out = renderChatMarkdown('x\n```json\n{ "a": 1 }\n```\ny');
+  assert.match(out, /<pre class="chat-pre"><code>/);
+  assert.match(out, /&quot;a&quot;/, 'Code-Inhalt muss escaped sein');
+  assert.ok(!out.includes('<br>{'), 'Code-Block darf nicht in <br>-Fragmente zerfallen');
+});

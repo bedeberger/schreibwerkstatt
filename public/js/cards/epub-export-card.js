@@ -265,15 +265,18 @@ export function registerEpubExportCard() {
         onDone: (job) => {
           this.exporting = false;
           this.exportProgress = 100;
-          this.exportStatus = window.__app.t('epubExport.done');
           const result = job.result || {};
+          // epubcheck non-fatal: lief der Validator und meldet er Fehler, Warnung
+          // zeigen (Datei wird trotzdem geliefert), sonst Standard-Done.
+          const checkWarn = result.epubcheck?.validatorAvailable && !result.epubcheck.passed;
+          this.exportStatus = window.__app.t(checkWarn ? 'epubExport.checkWarning' : 'epubExport.done');
           this._triggerDownload(jobId, result.filename);
           if (this._exportStatusTimer) clearTimeout(this._exportStatusTimer);
           this._exportStatusTimer = setTimeout(() => {
             this.exportStatus = '';
             this.exportProgress = 0;
             this._exportStatusTimer = null;
-          }, 3500);
+          }, checkWarn ? 8000 : 3500);
         },
       });
     },

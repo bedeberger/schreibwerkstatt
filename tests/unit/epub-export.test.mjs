@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import epub from '../../lib/export-builders/epub.js';
 
-const { _resolveEpubMeta, _countUnfetchableImages, _buildFrontmatter, _buildBackmatter, _proseToXhtml, buildEpub, _buildOpfExtraMeta, _buildContentOPF, _applyBreaks } = epub;
+const { _resolveEpubMeta, _countUnfetchableImages, _buildFrontmatter, _buildBackmatter, _proseToXhtml, buildEpub, _buildOpfExtraMeta, _buildAccessibilityMeta, _buildLandmarksNav, _buildContentOPF, _applyBreaks } = epub;
 
 test('_applyBreaks: Editor-hr nach Klasse → pagebreak/blankpage/Szenentrenner', () => {
   const html = '<hr class="pagebreak" data-bid="a1">x'
@@ -154,6 +154,48 @@ test('_buildOpfExtraMeta: keywords → dc:subject je Term (escaped), series → 
   assert.ok(out.includes('calibre:series') && out.includes('calibre:series_index'));
 });
 
+test('_buildOpfExtraMeta: ISBN → dc:identifier urn:isbn + onix-Code, Bindestriche gestrippt', () => {
+  const out13 = _buildOpfExtraMeta({ isbn: '978-3-16-148410-0' });
+  assert.ok(out13.includes('<dc:identifier id="isbn">urn:isbn:9783161484100</dc:identifier>'));
+  assert.ok(out13.includes('property="identifier-type" scheme="onix:codelist5">15</meta>'), 'ISBN-13 → onix 15');
+  // ISBN-10 (mit X-Pruefziffer) → onix 02.
+  const out10 = _buildOpfExtraMeta({ isbn: '3-16-148410-X' });
+  assert.ok(out10.includes('urn:isbn:316148410X'));
+  assert.ok(out10.includes('>02</meta>'), 'ISBN-10 → onix 02');
+  // Kein ISBN → kein Identifier.
+  assert.ok(!_buildOpfExtraMeta({}).includes('urn:isbn'));
+});
+
+test('_buildAccessibilityMeta: textual immer, visual nur mit Bildern, Sprach-Summary', () => {
+  const noImg = _buildAccessibilityMeta({ hasImages: false, lang: 'de' });
+  assert.ok(noImg.includes('schema:accessMode">textual<'));
+  assert.ok(!noImg.includes('>visual<'), 'kein visual ohne Bilder');
+  assert.ok(noImg.includes('schema:accessibilityFeature">tableOfContents<'));
+  assert.ok(noImg.includes('schema:accessibilityHazard">none<'));
+  assert.ok(noImg.includes('Reflowierbarer Text'), 'DE-Summary');
+  assert.ok(noImg.includes('dcterms:conformsTo'), 'conformsTo-Link fehlt');
+  const withImg = _buildAccessibilityMeta({ hasImages: true, lang: 'en' });
+  assert.ok(withImg.includes('>visual<'), 'visual bei Bildern');
+  assert.ok(withImg.includes('Reflowable text'), 'EN-Summary');
+});
+
+test('_buildLandmarksNav: toc + bodymatter, bodymatter nur mit Start-Datei', () => {
+  const nav = _buildLandmarksNav('entry_0.xhtml', 'de');
+  assert.ok(nav.includes('epub:type="landmarks"') && nav.includes('hidden="'));
+  assert.ok(nav.includes('epub:type="toc" href="toc.xhtml"'));
+  assert.ok(nav.includes('epub:type="bodymatter" href="entry_0.xhtml"'));
+  assert.ok(nav.includes('Inhaltsverzeichnis') && nav.includes('Textbeginn'));
+  // Ohne Start-Datei kein bodymatter-Eintrag.
+  assert.ok(!_buildLandmarksNav(null, 'en').includes('bodymatter'));
+});
+
+test('_buildContentOPF: injiziert Accessibility-Meta (immer) + ISBN', () => {
+  const opf = _buildContentOPF({ isbn: '9783161484100' }, {}, { hasImages: false, lang: 'de' });
+  assert.ok(opf.includes('schema:accessMode">textual<'), 'a11y-Meta immer eingebettet');
+  assert.ok(opf.includes('urn:isbn:9783161484100'));
+  assert.ok(opf.indexOf('schema:accessibilitySummary') < opf.indexOf('</metadata>'), 'a11y vor </metadata>');
+});
+
 test('_buildContentOPF: stempelt App-generator, injiziert Extra-Meta vor </metadata>', () => {
   const bare = _buildContentOPF({});
   assert.ok(bare.includes('<meta name="generator" content="Schreibwerkstatt '), 'generator weist die App aus');
@@ -235,6 +277,26 @@ test('buildEpub: ohne meta.description faellt auf book.description', async () =>
   const zip = await _unzip(buf);
   const opf = await zip.file('OEBPS/content.opf').async('string');
   assert.ok(opf.includes('<dc:description>NurBuchDesc</dc:description>'));
+});
+
+test('buildEpub: nav.xhtml enthält Landmarks, OPF enthält Accessibility-Meta', async () => {
+  const bundle = { scope: 'book', book: { id: 1, name: 'B' }, groups: _oneGroup() };
+  const buf = await buildEpub(bundle, { lang: 'de', author: 'A', meta: {} });
+  const zip = await _unzip(buf);
+  const nav = await zip.file('OEBPS/toc.xhtml').async('string');
+  assert.ok(nav.includes('epub:type="landmarks"'), 'Landmarks-nav fehlt');
+  assert.ok(nav.includes('epub:type="bodymatter"'), 'bodymatter-Landmark fehlt');
+  const opf = await zip.file('OEBPS/content.opf').async('string');
+  assert.ok(opf.includes('schema:accessMode">textual<'), 'a11y-Meta fehlt im OPF');
+  assert.ok(opf.includes('dcterms:conformsTo'), 'conformsTo fehlt');
+});
+
+test('buildEpub: ISBN landet als urn:isbn-Identifier im OPF', async () => {
+  const bundle = { scope: 'book', book: { id: 1, name: 'B' }, groups: _oneGroup() };
+  const buf = await buildEpub(bundle, { lang: 'de', author: 'A', meta: { isbn: '978-3-16-148410-0' } });
+  const zip = await _unzip(buf);
+  const opf = await zip.file('OEBPS/content.opf').async('string');
+  assert.ok(opf.includes('urn:isbn:9783161484100'), 'ISBN-Identifier fehlt im OPF');
 });
 
 test('buildEpub: epub_css_style sans → sans-serif body font', async () => {
