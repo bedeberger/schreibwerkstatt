@@ -38,6 +38,7 @@ router.put('/:key', express.json(), (req, res) => {
   const { key } = req.params;
   const body = req.body || {};
   if (!('value' in body)) return res.status(400).json({ error_code: 'VALUE_REQUIRED' });
+  if (!appSettings.isKnownKey(key)) return res.status(400).json({ error_code: 'UNKNOWN_KEY', key });
   const updatedBy = req.session.user.email;
   try {
     const stored = appSettings.set(key, body.value, { updatedBy });

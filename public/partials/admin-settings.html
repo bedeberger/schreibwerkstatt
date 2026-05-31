@@ -52,6 +52,21 @@
                @change="adminSettingsForm['auth.allow_open_signup'] = $event.target.checked">
         <span>auth.allow_open_signup</span>
       </label>
+      <label>auth.registration.expire_days
+        <input type="text" x-data="numInput({ integer: true, min: 1, max: 365 })" x-modelable="value" x-model="adminSettingsForm['auth.registration.expire_days']">
+        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.registrationExpireDays')"></small>
+      </label>
+
+      <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.auth.captchaTitle')"></span></h4>
+      <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.auth.captchaHint')"></p>
+      <label>auth.captcha.site_key
+        <input type="text" x-model="adminSettingsForm['auth.captcha.site_key']" placeholder="(optional)" autocomplete="off">
+      </label>
+      <label>auth.captcha.secret_key
+        <input type="password" x-model="adminSettingsForm['auth.captcha.secret_key']" :placeholder="$app.t('admin.settings.secret.masked')" autocomplete="off">
+        <small x-show="adminSettingsMap['auth.captcha.secret_key']?.masked" class="muted-msg muted-msg--sm" x-text="adminSettingsMap['auth.captcha.secret_key']?.masked"></small>
+      </label>
+
       <div class="admin-settings-actions">
         <button type="button" @click="adminSettingsTest('oauth')" x-text="$app.t('admin.settings.test.oauth')"></button>
       </div>
@@ -81,11 +96,11 @@
           <input type="text" x-model="adminSettingsForm['ai.claude.model']" placeholder="claude-sonnet-4-6">
         </label>
         <label>ai.claude.context_window
-          <input type="text" x-data="numInput({ integer: true, min: 8000 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.context_window']">
+          <input type="text" x-data="numInput({ integer: true, min: 8000, max: 2000000 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.context_window']">
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.contextWindow')"></small>
         </label>
         <label>ai.claude.max_tokens_out
-          <input type="text" x-data="numInput({ integer: true, min: 1024 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.max_tokens_out']">
+          <input type="text" x-data="numInput({ integer: true, min: 1024, max: 200000 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.max_tokens_out']">
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.maxTokensOut')"></small>
         </label>
       </div>
@@ -101,11 +116,11 @@
           <input type="text" x-data="numInput({ step: 0.01, decimals: 2, min: 0, max: 2 })" x-modelable="value" x-model="adminSettingsForm['ai.ollama.temperature']">
         </label>
         <label>ai.ollama.context_window
-          <input type="text" x-data="numInput({ integer: true, min: 2048 })" x-modelable="value" x-model="adminSettingsForm['ai.ollama.context_window']">
+          <input type="text" x-data="numInput({ integer: true, min: 2048, max: 2000000 })" x-modelable="value" x-model="adminSettingsForm['ai.ollama.context_window']">
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.contextWindow')"></small>
         </label>
         <label>ai.ollama.max_tokens_out
-          <input type="text" x-data="numInput({ integer: true, min: 512 })" x-modelable="value" x-model="adminSettingsForm['ai.ollama.max_tokens_out']">
+          <input type="text" x-data="numInput({ integer: true, min: 512, max: 200000 })" x-modelable="value" x-model="adminSettingsForm['ai.ollama.max_tokens_out']">
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.maxTokensOut')"></small>
         </label>
         <label>ai.ollama.repeat_penalty
@@ -119,11 +134,11 @@
         <label>ai.llama.model <input type="text" x-model="adminSettingsForm['ai.llama.model']"></label>
         <label>ai.llama.temperature <input type="text" x-data="numInput({ step: 0.01, decimals: 2, min: 0, max: 2 })" x-modelable="value" x-model="adminSettingsForm['ai.llama.temperature']"></label>
         <label>ai.llama.context_window
-          <input type="text" x-data="numInput({ integer: true, min: 2048 })" x-modelable="value" x-model="adminSettingsForm['ai.llama.context_window']">
+          <input type="text" x-data="numInput({ integer: true, min: 2048, max: 2000000 })" x-modelable="value" x-model="adminSettingsForm['ai.llama.context_window']">
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.contextWindow')"></small>
         </label>
         <label>ai.llama.max_tokens_out
-          <input type="text" x-data="numInput({ integer: true, min: 512 })" x-modelable="value" x-model="adminSettingsForm['ai.llama.max_tokens_out']">
+          <input type="text" x-data="numInput({ integer: true, min: 512, max: 200000 })" x-modelable="value" x-model="adminSettingsForm['ai.llama.max_tokens_out']">
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.maxTokensOut')"></small>
         </label>
         <label>ai.llama.repeat_penalty
@@ -171,6 +186,36 @@
         <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.mail.adminRecipientHint')"></small>
       </label>
 
+      <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.mail.notifyTitle')"></span></h4>
+      <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.mail.notifyHint')"></p>
+      <label class="checkbox-row">
+        <input type="checkbox" :checked="adminSettingsForm['mail.notify.admin_on_job_fail'] === true || adminSettingsForm['mail.notify.admin_on_job_fail'] === 'true'"
+               @change="adminSettingsForm['mail.notify.admin_on_job_fail'] = $event.target.checked">
+        <span>mail.notify.admin_on_job_fail</span>
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" :checked="adminSettingsForm['mail.notify.admin_on_token_cap'] === true || adminSettingsForm['mail.notify.admin_on_token_cap'] === 'true'"
+               @change="adminSettingsForm['mail.notify.admin_on_token_cap'] = $event.target.checked">
+        <span>mail.notify.admin_on_token_cap</span>
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" :checked="adminSettingsForm['mail.notify.user_on_budget_overrun'] === true || adminSettingsForm['mail.notify.user_on_budget_overrun'] === 'true'"
+               @change="adminSettingsForm['mail.notify.user_on_budget_overrun'] = $event.target.checked">
+        <span>mail.notify.user_on_budget_overrun</span>
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" :checked="adminSettingsForm['mail.notify.admin_on_budget_overrun'] === true || adminSettingsForm['mail.notify.admin_on_budget_overrun'] === 'true'"
+               @change="adminSettingsForm['mail.notify.admin_on_budget_overrun'] = $event.target.checked">
+        <span>mail.notify.admin_on_budget_overrun</span>
+      </label>
+      <label>mail.notify.job_fail_throttle_min
+        <input type="text" x-data="numInput({ integer: true, min: 0, max: 1440 })" x-modelable="value" x-model="adminSettingsForm['mail.notify.job_fail_throttle_min']">
+      </label>
+      <label>mail.notify.skip_errors
+        <input type="text" x-model="adminSettingsForm['mail.notify.skip_errors']" placeholder="job.cancelled,BUDGET_EXCEEDED,…">
+        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.mail.skipErrorsHint')"></small>
+      </label>
+
       <div class="admin-settings-actions">
         <button type="button" @click="adminSettingsTest('smtp')" x-text="$app.t('admin.settings.test.smtp')"></button>
       </div>
@@ -187,7 +232,7 @@
         </select>
       </label>
       <label>jobs.book_chat.max_tool_iter <input type="text" x-data="numInput({ step: 1, min: 1, max: 50 })" x-modelable="value" x-model="adminSettingsForm['jobs.book_chat.max_tool_iter']"></label>
-      <label>jobs.book_chat.token_budget <input type="text" x-data="numInput({ step: 1, min: 0 })" x-modelable="value" x-model="adminSettingsForm['jobs.book_chat.token_budget']"></label>
+      <label>jobs.book_chat.token_budget <input type="text" x-data="numInput({ step: 1, min: 0, max: 2000000 })" x-modelable="value" x-model="adminSettingsForm['jobs.book_chat.token_budget']"></label>
     </section>
 
     <!-- Cron-Tab -->
@@ -458,9 +503,13 @@
       <div class="admin-settings-subsection">
         <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.section.global')"></span></h4>
         <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.advancedGlobal')"></p>
+        <label>app.name
+          <input type="text" x-model="adminSettingsForm['app.name']" placeholder="Schreibwerkstatt">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.appName')"></small>
+        </label>
         <label>ai.chat_temperature <input type="text" x-data="numInput({ step: 0.01, decimals: 2, min: 0, max: 2 })" x-modelable="value" x-model="adminSettingsForm['ai.chat_temperature']"></label>
         <label>ai.lektorat_batch_concurrency <input type="text" x-data="numInput({ step: 1, min: 1, max: 8 })" x-modelable="value" x-model="adminSettingsForm['ai.lektorat_batch_concurrency']"></label>
-        <label>ai.komplett.extract_max_tokens <input type="text" x-data="numInput({ integer: true, min: 1024 })" x-modelable="value" x-model="adminSettingsForm['ai.komplett.extract_max_tokens']"></label>
+        <label>ai.komplett.extract_max_tokens <input type="text" x-data="numInput({ integer: true, min: 1024, max: 200000 })" x-modelable="value" x-model="adminSettingsForm['ai.komplett.extract_max_tokens']"></label>
         <label>ai.chars_per_token
           <input type="text" x-data="numInput({ step: 0.1, min: 1, max: 10 })" x-modelable="value" x-model="adminSettingsForm['ai.chars_per_token']">
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.charsPerToken')"></small>
@@ -478,7 +527,7 @@
         </h4>
         <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.advancedClaude')"></p>
         <label>ai.claude.retry_max <input type="text" x-data="numInput({ step: 1, min: 0, max: 10 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.retry_max']"></label>
-        <label>ai.claude.timeout_ms <input type="text" x-data="numInput({ step: 1, min: 1000 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.timeout_ms']"></label>
+        <label>ai.claude.timeout_ms <input type="text" x-data="numInput({ step: 1, min: 1000, max: 3600000 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.timeout_ms']"></label>
         <label>ai.claude.phase1_concurrency <input type="text" x-data="numInput({ step: 1, min: 1, max: 16 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.phase1_concurrency']"></label>
       </div>
     </section>
