@@ -137,13 +137,35 @@ export const dndMethods = {
   // Scope weiterhin auf ihn → Orphan/Duplikat-Nodes, driftender DOM, falsche
   // Positionen. Nach Revert ist Alpine alleiniger DOM-Besitzer; das Modell (unten
   // mutiert) ist die Wahrheit, x-for rendert daraus neu.
+  // Draggable-Space-Index eines Elements innerhalb seines Parents — zählt
+  // exakt wie SortableJS' internes index() (Template-Anker + Clone übersprungen),
+  // damit Revert-Refs im selben Indexraum wie evt.oldIndex/newIndex liegen.
+  _sortableIndexOf(el) {
+    let idx = 0;
+    let cur = el;
+    while ((cur = cur.previousElementSibling)) {
+      if (cur.tagName !== 'TEMPLATE') idx++;
+    }
+    return idx;
+  },
+
   _revertSortable(evt) {
     const { item, from, oldIndex } = evt;
-    if (!item || !from) return;
-    if (item.parentNode === from
-        && Array.prototype.indexOf.call(from.children, item) === oldIndex) return;
-    const ref = from.children[oldIndex] || null;
-    from.insertBefore(item, ref);
+    if (!item || !from || !Number.isFinite(oldIndex)) return;
+    // Schon am richtigen Slot? (Index im SortableJS-Raum vergleichen, nicht im
+    // rohen from.children-Raum — Alpines <template x-for> ist immer erstes Kind
+    // und verschiebt die rohe HTMLCollection um 1 gegen evt.oldIndex.)
+    if (item.parentNode === from && this._sortableIndexOf(item) === oldIndex) return;
+    // Referenz-Knoten am draggable-Slot oldIndex finden — Template (und das
+    // gezogene Item selbst, falls noch in `from`) beim Zählen überspringen.
+    let ref = null;
+    let idx = 0;
+    for (const child of from.children) {
+      if (child === item || child.tagName === 'TEMPLATE') continue;
+      if (idx === oldIndex) { ref = child; break; }
+      idx++;
+    }
+    from.insertBefore(item, ref); // ref===null → ans Ende
   },
 
   _setSubtreeDepth(node, depth) {
