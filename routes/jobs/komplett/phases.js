@@ -790,12 +790,26 @@ async function runZeitstrahl(ctx, opts = {}) {
     return;
   }
 
-  const ztResult = await call(jobId, tok,
-    prompts.buildZeitstrahlConsolidationPrompt(zeitstrahlEvents),
-    sys.SYSTEM_ZEITSTRAHL_BLOCKS,
-    silent ? null : 78, silent ? null : 82,
-    komplettMaxTokens(effectiveProvider), 0.2, null, prompts.SCHEMA_ZEITSTRAHL,
-  );
+  let ztResult;
+  try {
+    ztResult = await call(jobId, tok,
+      prompts.buildZeitstrahlConsolidationPrompt(zeitstrahlEvents),
+      sys.SYSTEM_ZEITSTRAHL_BLOCKS,
+      silent ? null : 78, silent ? null : 82,
+      komplettMaxTokens(effectiveProvider), 0.2, null, prompts.SCHEMA_ZEITSTRAHL,
+    );
+  } catch (e) {
+    if (e.name === 'AbortError') throw e;
+    // Die Konsolidierung ist rein kosmetisch (Dedup + kanonische Formulierung) – die
+    // Events sind in `zeitstrahlEvents` bereits gruppiert und vollständig. Ein Fehler hier
+    // (typisch: aiTruncated bei vielen Events + kleinem lokalem Output-Cap, Parse-Fehler,
+    // erschöpfter Retry) darf den gesamten Katalog NICHT verwerfen – Figuren/Orte/Szenen
+    // sind längst gespeichert. Fallback: pre-gruppierte Events direkt persistieren.
+    log.warn(`Zeitstrahl-Konsolidierung fehlgeschlagen, speichere ${zeitstrahlEvents.length} pre-gruppierte Events direkt: ${e.message}`);
+    saveZeitstrahlEvents(bookIdInt, email, zeitstrahlEvents, idMaps.chNameToId, idMaps.pageNameToIdByChapter);
+    if (!silent) updateJob(jobId, { progress: 82 });
+    return;
+  }
   if (Array.isArray(ztResult?.ereignisse)) {
     saveZeitstrahlEvents(bookIdInt, email, ztResult.ereignisse, idMaps.chNameToId, idMaps.pageNameToIdByChapter);
     log.info(`${ztResult.ereignisse.length} Zeitstrahl-Ereignisse gespeichert.`);

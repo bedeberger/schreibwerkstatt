@@ -350,9 +350,9 @@ Drei Provider, konfiguriert via `API_PROVIDER` in `.env`:
 | `ollama` | `OLLAMA_HOST`, `OLLAMA_MODEL`, `OLLAMA_TEMPERATURE` | Mutex-Serialisierung (VRAM-Schutz), dynamische `num_ctx`-Berechnung |
 | `openai-compat` | `OPENAI_COMPAT_HOST`, `OPENAI_COMPAT_MODEL`, `OPENAI_COMPAT_TEMPERATURE`, `OPENAI_COMPAT_API_KEY` | OpenAI-kompatibler `/v1/chat/completions`-Endpoint (llama.cpp, vLLM, LiteLLM, OpenAI); optionaler Bearer-Token (`ai.openai-compat.api_key`), Mutex-serialisiert |
 
-**`MODEL_TOKEN`** setzt den globalen Output-Token-Cap (`MAX_TOKENS_OUT` in `lib/ai.js`, Default 64 000). Job-spezifische Overrides werden per `Math.min` gedeckelt.
+**`ai.claude.max_tokens_out`** (App-Setting, Default 64 000) setzt den globalen Output-Token-Cap (`MAX_TOKENS_OUT` in `lib/ai.js`); die Per-Provider-Pendants `ai.ollama.max_tokens_out` / `ai.openai-compat.max_tokens_out` löst `getContextConfigFor(provider)` pro Call auf. Job-spezifische Overrides werden per `Math.min` gegen den Provider-Cap gedeckelt. `.env`-`MODEL_TOKEN` dient nur als einmaliger Bootstrap in die DB (`ENV_MAP` in `lib/app-settings.js`), danach ist der App-Setting-Wert massgeblich.
 
-**`MODEL_CONTEXT`** setzt das gesamte Kontextfenster (Input + Output, Default 200 000). Daraus leitet `lib/ai.js` das `INPUT_BUDGET_TOKENS` (= `MODEL_CONTEXT − MODEL_TOKEN − 2000`) ab. Alle kontextabhängigen Grenzen skalieren automatisch: `SINGLE_PASS_LIMIT`/`PER_CHUNK_LIMIT` (Komplettanalyse), `BOOK_CHAT_TOKEN_BUDGET`-Default, Buch-Chat-Tool-Result-Caps und das Classic-Buch-Chat-Text-Budget. Bei lokalen Modellen auf die native Kontextgrösse setzen (Mistral-Small3.2 / Gemma3 / Llama-3.1: 128 000, ältere: 32 000 / 8 000).
+**`ai.claude.context_window`** (App-Setting, Default 200 000) setzt das gesamte Kontextfenster (Input + Output). Daraus leitet `lib/ai.js` das `INPUT_BUDGET_TOKENS` (= `context_window − max_tokens_out − 2000`) ab. Alle kontextabhängigen Grenzen skalieren automatisch: `SINGLE_PASS_LIMIT`/`PER_CHUNK_LIMIT` (Komplettanalyse), `BOOK_CHAT_TOKEN_BUDGET`-Default, Buch-Chat-Tool-Result-Caps und das Classic-Buch-Chat-Text-Budget. Bei lokalen Modellen auf die native Kontextgrösse setzen (Mistral-Small3.2 / Gemma3 / Llama-3.1: 128 000, ältere: 32 000 / 8 000).
 
 **JSON-Parsing:** `lib/ai.js` hat mehrstufigen Fallback: `JSON.parse()` → `extractBalancedJson()` → `jsonrepair()`.
 
