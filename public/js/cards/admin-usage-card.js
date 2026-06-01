@@ -49,7 +49,11 @@ export function registerAdminUsageCard() {
 
     init() {
       this.$watch(() => window.__app.showAdminUsageCard, async (visible) => {
-        if (!visible) return;
+        // Beim Schliessen der ganzen Karte (Hash-Router wechselt auf ein anderes
+        // Admin-Pane, ohne den Tab zu aendern) bleibt der Summary-Tab aktiv und
+        // die Charts haengen sonst mit aktivem ResizeObserver am versteckten
+        // Canvas -> Chart.js crasht beim naechsten Resize ("ownerDocument of null").
+        if (!visible) { this._adminUsageDestroyCharts(); return; }
         await this.adminUsageEnter();
       });
       // Summary-Charts beim Verlassen des Tabs zerstoeren (Klick UND Hash-Router),
