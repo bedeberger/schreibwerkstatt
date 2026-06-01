@@ -1,5 +1,5 @@
 'use strict';
-const { callAI, parseJSON, CHARS_PER_TOKEN, getContextConfigFor } = require('../../../lib/ai');
+const { callAI, parseJSON, CHARS_PER_TOKEN, getContextConfigFor, resolveProvider } = require('../../../lib/ai');
 const appSettings = require('../../../lib/app-settings');
 const { jobAbortControllers } = require('./state');
 const { updateJob, i18nError } = require('./jobs');
@@ -246,14 +246,18 @@ async function aiCall(jobId, tok, prompt, system, fromPct, toPct, expectedChars 
   // Output-Ceiling pro Call aus dem TATSAECHLICHEN Provider dieses Calls ableiten,
   // nicht aus dem globalen MAX_TOKENS_OUT (= ai.claude.max_tokens_out). Sonst klemmt
   // der Claude-Cap auch openai-compat/ollama-Jobs runter (z.B. 8000), obwohl der Admin
-  // ai.openai-compat.max_tokens_out hoeher gesetzt hat → vorzeitige Truncation. Undefined
-  // provider faellt in getContextConfigFor auf 'claude' zurueck (Verhalten unveraendert).
-  const providerMaxOut = getContextConfigFor(provider).maxTokensOut;
+  // ai.openai-compat.max_tokens_out hoeher gesetzt hat → vorzeitige Truncation.
+  // WICHTIG: undefined `provider` zuerst auflösen – exakt so, wie callAI es intern tut
+  // (provider || resolveProvider()). Sonst fiele getContextConfigFor auf 'claude' zurück,
+  // während callAI den echten Provider (z.B. openai-compat) anspricht → Cap und Call
+  // divergieren und der Output wird vorzeitig auf den Claude-Default gekappt.
+  const effProvider = provider || resolveProvider();
+  const providerMaxOut = getContextConfigFor(effProvider).maxTokensOut;
   const maxTokensOverride = maxTokens != null
     ? Math.min(maxTokens, providerMaxOut)
     : providerMaxOut;
   const signal = jobAbortControllers.get(jobId)?.signal;
-  const { text, truncated, tokensIn, tokensOut, cacheReadIn = 0, cacheCreationIn = 0, genDurationMs } = await callAI(prompt, system, onProgress, maxTokensOverride, signal, provider, jsonSchema);
+  const { text, truncated, tokensIn, tokensOut, cacheReadIn = 0, cacheCreationIn = 0, genDurationMs } = await callAI(prompt, system, onProgress, maxTokensOverride, signal, effProvider, jsonSchema);
   tok.inflight?.delete(callId);
   tok.in += tokensIn;
   tok.out += tokensOut;

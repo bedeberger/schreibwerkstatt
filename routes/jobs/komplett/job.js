@@ -107,9 +107,14 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
   const pt = makePhaseTimer(log);
   // call akzeptiert optional ein JSON-Schema als letztes Argument (11. Position in aiCall).
   // Schemas werden nur von lokalen Providern (ollama/llama) verwendet – Claude ignoriert sie.
-  const call = (jobId_, tok_, prompt_, system_, fromPct, toPct, expectedChars, outputRatio, maxTokens, schema) =>
-    aiCall(jobId_, tok_, prompt_, system_, fromPct, toPct, expectedChars, outputRatio, maxTokens, provider, schema);
+  // WICHTIG: effektiven (aufgelösten) Provider binden, nicht die rohe `provider`-Variable.
+  // Wird der Job ohne expliziten Provider gestartet (Regelfall), ist `provider` undefined →
+  // getContextConfigFor(undefined) fiele in aiCall auf 'claude' zurück und würde das Output-
+  // Ceiling fälschlich auf ai.claude.max_tokens_out kappen, während callAI intern den echten
+  // Provider auflöst und z.B. openai-compat/ollama anspricht → vorzeitige Truncation.
   const effectiveProvider = provider || appSettings.get('ai.provider') || 'claude';
+  const call = (jobId_, tok_, prompt_, system_, fromPct, toPct, expectedChars, outputRatio, maxTokens, schema) =>
+    aiCall(jobId_, tok_, prompt_, system_, fromPct, toPct, expectedChars, outputRatio, maxTokens, effectiveProvider, schema);
   // Per-Provider-Skalierung aus dessen `ai.<p>.context_window` (lib/ai.js#getContextConfigFor).
   // Bei Claude 200K-Kontext ≈ 420K Zeichen Single-Pass – reicht für fast alle Bücher.
   const { singlePass: singlePassLimit, perChunk: perChunkLimit } = chunkLimitsFor(effectiveProvider);
@@ -358,9 +363,11 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
   const email = userEmail || null;
   const log = makeJobLogger(jobId);
   const pt = makePhaseTimer(log);
-  const call = (jobId_, tok_, prompt_, system_, fromPct, toPct, expectedChars, outputRatio, maxTokens, schema) =>
-    aiCall(jobId_, tok_, prompt_, system_, fromPct, toPct, expectedChars, outputRatio, maxTokens, provider, schema);
+  // Effektiven Provider binden (siehe runKomplettAnalyseJob) – sonst kappt aiCall das
+  // Output-Ceiling fälschlich auf den Claude-Default, wenn der Job ohne expliziten Provider läuft.
   const effectiveProvider = provider || appSettings.get('ai.provider') || 'claude';
+  const call = (jobId_, tok_, prompt_, system_, fromPct, toPct, expectedChars, outputRatio, maxTokens, schema) =>
+    aiCall(jobId_, tok_, prompt_, system_, fromPct, toPct, expectedChars, outputRatio, maxTokens, effectiveProvider, schema);
   const { singlePass: singlePassLimit } = chunkLimitsFor(effectiveProvider);
   const prompts = await getPrompts();
   const sys = await getBookPrompts(bookId, email);
