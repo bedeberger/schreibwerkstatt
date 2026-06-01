@@ -3,6 +3,28 @@
 
 import { escHtml, fmtTok } from '../utils.js';
 
+// Footer-Sync: Der Job-Queue-Footer pollt `/jobs/queue` nur alle 5 s, der
+// per-Job-Poller `/jobs/:id` alle 2 s. Bei langen Jobs mit vielen schnellen
+// Progress-Updates (z.B. Komplettanalyse über viele kleine Chunks) driften
+// obere Progressbar und Footer dadurch sichtbar auseinander. Beide lesen
+// serverseitig dasselbe Job-Objekt — wir patchen darum den passenden
+// jobQueueItems-Eintrag direkt mit dem frischen 2-s-Snapshot, damit Footer und
+// Karten-Bar denselben Stand zeigen. Nur für laufende Jobs; das Entfernen
+// terminaler Jobs bleibt Sache der Queue-Disappearance-Detection.
+function syncJobQueueItem(job) {
+  const items = window.__app?.jobQueueItems;
+  if (!Array.isArray(items)) return;
+  const item = items.find(j => j.id === job.id);
+  if (!item) return;
+  item.progress = job.progress;
+  item.statusText = job.statusText;
+  item.statusParams = job.statusParams;
+  item.tokensIn = job.tokensIn || 0;
+  item.tokensOut = job.tokensOut || 0;
+  item.maxTokensOut = job.maxTokensOut || 0;
+  item.tokensPerSec = job.tokensPerSec || 0;
+}
+
 // Generischer Job-Poller. `ctx` ist das Komponenten-Objekt (Root oder Card),
 // in dessen Feldern `timerProp` und `progressProp` geschrieben wird.
 //
@@ -38,7 +60,11 @@ export function startPoll(ctx, config) {
       const job = await resp.json();
       if (done) return;
       if (config.progressProp) ctx[config.progressProp] = job.progress || 0;
-      if (job.status === 'running' || job.status === 'queued') { config.onProgress?.(job); return; }
+      if (job.status === 'running' || job.status === 'queued') {
+        syncJobQueueItem(job);
+        config.onProgress?.(job);
+        return;
+      }
       done = true; stop();
       // Race-freier Toast: sobald dieser per-Card-Poller den Terminal-Status
       // sieht, toasten — unabhängig vom 5-s-Queue-Diff (der schnelle Jobs
