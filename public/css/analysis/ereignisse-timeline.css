@@ -40,7 +40,13 @@
 }
 
 .gz-timeline .vis-item.vis-dot { border-color: var(--color-primary); }
-.gz-timeline .vis-item.vis-selected {
+
+/* Selektion (Klick) bleibt in Primärfarbe statt Vendor-Gelb. vis-Vendor stylt
+   Point-Items via `.vis-item.vis-point.vis-selected` (Spezifität 0,3,0) und wird
+   zur Laufzeit NACH dieser Datei injiziert — bei Gleichstand gewänne der Vendor.
+   Darum hier zusätzlich mit `.vis-point` qualifiziert (0,4,0), um zu überstimmen. */
+.gz-timeline .vis-item.vis-selected,
+.gz-timeline .vis-item.vis-point.vis-selected {
   background: color-mix(in srgb, var(--color-primary) 32%, var(--color-surface));
   border-color: var(--color-primary);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 35%, transparent);
@@ -53,6 +59,14 @@
   color: var(--color-err-text);
 }
 .gz-timeline .vis-item.gz-vis-item--extern.vis-dot { border-color: var(--color-err-border); }
+/* Selektiertes Weltgeschehen behält Error-Tönung (statt Vendor-Gelb) — gleiche
+   Spezifitäts-Logik wie oben, zusätzlich .vis-point für die Point-Variante. */
+.gz-timeline .vis-item.gz-vis-item--extern.vis-selected,
+.gz-timeline .vis-item.gz-vis-item--extern.vis-point.vis-selected {
+  background: color-mix(in srgb, var(--color-err-text) 22%, var(--color-surface));
+  border-color: var(--color-err-border);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-err-border) 35%, transparent);
+}
 
 /* Tooltip (volltext, via title-Element). */
 .vis-tooltip {
