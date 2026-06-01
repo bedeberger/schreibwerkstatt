@@ -4,7 +4,9 @@
 // typografischen Quote-Varianten (`„` `“` `”` `‚` `‘` `’` `«` `»` `‹` `›`)
 // durch das Buch-Locale (book_settings.language + region). Bereits style-
 // konforme Quotes bleiben unverändert. Apostroph zwischen Buchstaben/
-// Ziffern → U+2019.
+// Ziffern → U+2019; ebenso ein einzelner `'` direkt nach Wort, wenn kein
+// Single-Quote offen ist (Saxon-Genitiv/Elision `Chris'`, `auf geht's`) —
+// sonst würde er fälschlich als schliessendes Single-Quote (de-CH `›`) gesetzt.
 // Skip: <pre>, <code>, <script>, <style>.
 //
 // Klassifikation rein kontextbasiert — kein Open/Close-State. Jeder Quote
@@ -144,7 +146,7 @@ function _classifyDouble(c, prev, prevNonWs, next, style) {
   return { repl: style.rdquo, role: 'close' };
 }
 
-function _classifySingle(c, prev, prevNonWs, next, style, wordAfter) {
+function _classifySingle(c, prev, prevNonWs, next, style, wordAfter, singleOpen) {
   const prevLD = _isLetterDigit(prev);
   const nextLD = _isLetterDigit(next);
   if (prevLD && nextLD) return { repl: style.apostrophe, role: 'apostrophe' };
@@ -156,7 +158,17 @@ function _classifySingle(c, prev, prevNonWs, next, style, wordAfter) {
     return { repl: style.apostrophe, role: 'apostrophe' };
   }
   if (prevOpen && !nextClose) return { repl: style.lsquo, role: 'open' };
-  if (!prevOpen && nextClose) return { repl: style.rsquo, role: 'close' };
+  if (!prevOpen && nextClose) {
+    // Buchstabe/Ziffer davor + Schliess-Kontext danach ist mehrdeutig:
+    // echtes schliessendes Single-Quote (`‹Hallo Chris›`) vs. Saxon-Genitiv-/
+    // Elisions-Apostroph (`Chris'`, `kids'`, `auf geht's`). Nur ein aktuell
+    // offenes Single-Quote macht es zum Schliesser; sonst ist es ein Apostroph
+    // — man kann nicht schliessen, was nicht offen ist. (In en fällt rsquo mit
+    // apostrophe (’) zusammen, der Unterschied wird erst bei de-CH/de-DE/fr/it
+    // mit eigenständiger ›/‘-Glyphe sichtbar.)
+    if (prevLD && !singleOpen) return { repl: style.apostrophe, role: 'apostrophe' };
+    return { repl: style.rsquo, role: 'close' };
+  }
   // Ambig
   if (SINGLE_LEFT.has(c))  return { repl: style.lsquo, role: 'open' };
   if (c === '›')           return { repl: style.rsquo, role: 'close' };
@@ -311,9 +323,10 @@ function _normalizeBlock(blockEl, style) {
       }
       const next = i + 1 < s.length ? s[i + 1] : _peekNext(textNodes, nodeIdx);
       const wordAfter = (isSingle && _isEnglish(style)) ? _peekWord(s, i + 1, textNodes, nodeIdx) : '';
+      const singleOpen = isSingle && quoteStack.includes('s');
       const cls = isDouble
         ? _classifyDouble(c, prevChar, prevNonWs, next, style)
-        : _classifySingle(c, prevChar, prevNonWs, next, style, wordAfter);
+        : _classifySingle(c, prevChar, prevNonWs, next, style, wordAfter, singleOpen);
       const repl = _depthRepl(cls.role, quoteStack.length, style, cls.repl, isDouble);
       // Idempotenz: nur sinnvoll, wenn `repl` mit Space (NBSP / reg) startet
       // (FR-Style). Dann darf der bereits in `out` vorhandene Space als erstes
@@ -337,7 +350,7 @@ function _normalizeBlock(blockEl, style) {
       for (let k = repl.length - 1; k >= 0; k--) {
         if (!SPACES.has(repl[k])) { prevNonWs = repl[k]; break; }
       }
-      if (cls.role === 'open') quoteStack.push(1);
+      if (cls.role === 'open') quoteStack.push(isDouble ? 'd' : 's');
       else if (cls.role === 'close' && quoteStack.length) quoteStack.pop();
     }
     if (out !== s) node.nodeValue = out;
@@ -358,10 +371,11 @@ function _consumeForStack(s, stack, style, prevCharIn, prevNonWsIn) {
     if (isDouble || isSingle) {
       const next = i + 1 < s.length ? s[i + 1] : '';
       const wordAfter = (isSingle && _isEnglish(style)) ? _peekWordInString(s, i + 1) : '';
+      const singleOpen = isSingle && stack.includes('s');
       const cls = isDouble
         ? _classifyDouble(c, prevChar, prevNonWs, next, style)
-        : _classifySingle(c, prevChar, prevNonWs, next, style, wordAfter);
-      if (cls.role === 'open') stack.push(1);
+        : _classifySingle(c, prevChar, prevNonWs, next, style, wordAfter, singleOpen);
+      if (cls.role === 'open') stack.push(isDouble ? 'd' : 's');
       else if (cls.role === 'close' && stack.length) stack.pop();
     }
     prevChar = c;
@@ -490,9 +504,10 @@ export function normalizeQuotesInRange(range, style) {
       }
       const next = i + 1 < s.length ? s[i + 1] : _peekNext(all, nodeIdx);
       const wordAfter = (isSingle && _isEnglish(style)) ? _peekWord(s, i + 1, all, nodeIdx) : '';
+      const singleOpen = isSingle && quoteStack.includes('s');
       const cls = isDouble
         ? _classifyDouble(c, prevChar, prevNonWs, next, style)
-        : _classifySingle(c, prevChar, prevNonWs, next, style, wordAfter);
+        : _classifySingle(c, prevChar, prevNonWs, next, style, wordAfter, singleOpen);
       const repl = _depthRepl(cls.role, quoteStack.length, style, cls.repl, isDouble);
       const matchOffset = (SPACES.has(repl[0]) && out.length && out[out.length - 1] === repl[0]) ? 1 : 0;
       const consumeLen = repl.length - matchOffset;
@@ -512,7 +527,7 @@ export function normalizeQuotesInRange(range, style) {
       }
       prevChar = repl[repl.length - 1] || c;
       _updateNonWs(repl);
-      if (cls.role === 'open') quoteStack.push(1);
+      if (cls.role === 'open') quoteStack.push(isDouble ? 'd' : 's');
       else if (cls.role === 'close' && quoteStack.length) quoteStack.pop();
     }
     if (endOff < s.length) {

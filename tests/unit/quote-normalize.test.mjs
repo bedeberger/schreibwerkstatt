@@ -332,6 +332,37 @@ test('normalizeQuotes: Apostroph U+2019 zwischen Buchstaben bleibt', () => {
   assert.equal(root.querySelector('p').textContent, 'Marie’s Buch und don’t go');
 });
 
+test('normalizeQuotes: de-CH Saxon-Genitiv Chris\' wird Apostroph, nicht ›', () => {
+  const root = makeRoot('<p>Dort machte er jeweils Chris\' berufliche Karriere.</p>');
+  const style = resolveQuoteStyle('de', 'CH');
+  normalizeQuotes(root, style);
+  assert.equal(
+    root.querySelector('p').textContent,
+    'Dort machte er jeweils Chris’ berufliche Karriere.',
+  );
+});
+
+test('normalizeQuotes: de-CH Genitiv-Apostroph vor Satzzeichen', () => {
+  const root = makeRoot('<p>Das ist Chris\'.</p>');
+  const style = resolveQuoteStyle('de', 'CH');
+  normalizeQuotes(root, style);
+  assert.equal(root.querySelector('p').textContent, 'Das ist Chris’.');
+});
+
+test('normalizeQuotes: de-CH Genitiv-Apostroph innerhalb offenem Double-Quote', () => {
+  const root = makeRoot('<p>"Das war Chris\' Idee."</p>');
+  const style = resolveQuoteStyle('de', 'CH');
+  normalizeQuotes(root, style);
+  assert.equal(root.querySelector('p').textContent, '«Das war Chris’ Idee.»');
+});
+
+test('normalizeQuotes: de-CH echtes schliessendes Single-Quote bleibt ›', () => {
+  const root = makeRoot('<p>Er sagte \'Hallo Chris\' laut.</p>');
+  const style = resolveQuoteStyle('de', 'CH');
+  normalizeQuotes(root, style);
+  assert.equal(root.querySelector('p').textContent, 'Er sagte ‹Hallo Chris› laut.');
+});
+
 test('normalizeQuotes: FR-Style fügt NBSP innen ein', () => {
   const root = makeRoot('<p>Il a dit "Bonjour" fort.</p>');
   const style = resolveQuoteStyle('fr', '');
