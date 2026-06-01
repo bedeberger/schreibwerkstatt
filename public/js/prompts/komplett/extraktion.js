@@ -54,7 +54,7 @@ Antworte mit diesem JSON-Schema:
           "datum_ende_month": null,
           "datum_ende_day":   null,
           "story_tag":   null,        // Relative Story-Zeit (Tag 3, Day 12) wenn kein realer Kalender
-          "subtyp":      "wendepunkt", // geburt|tod|hochzeit|reise|konflikt|wendepunkt|entdeckung|verlust|sieg|extern_politisch|extern_natur|extern_kulturell|sonstiges (Default 'sonstiges')
+          "subtyp":      "wendepunkt", // geburt|tod|hochzeit|liebe|trennung|krankheit|reise|umzug|konflikt|wendepunkt|entdeckung|verlust|sieg|extern_politisch|extern_wirtschaftlich|extern_natur|extern_kulturell|extern_krieg|sonstiges (Default 'sonstiges')
           "ereignis": "Was passierte – neutral und kanonisch formuliert, NICHT aus der Figurenperspektive. Ereignisse die mehrere Figuren betreffen MÜSSEN bei allen beteiligten Figuren identisch formuliert sein (z.B. 'Geburt von Maria' für Vater, Mutter und Kind – nicht 'Geburt seiner Tochter' oder 'Eigene Geburt').",
           "typ": "persoenlich|extern",
           "bedeutung": "Bedeutung für diese Figur (1 Satz, leer wenn nicht klar)",
@@ -106,7 +106,7 @@ Szenen-Regeln:
 Ereignis-Regeln:
 - typ='persoenlich': echte biografische Wendepunkte (Geburt, Tod, Trauma, neue/beendete Beziehung, Jobwechsel, Umzug, wichtige Entscheidung) – nur wenn tatsächlich im Text belegt
 - typ='extern': gesellschaftliche/historische Ereignisse – SEHR GROSSZÜGIG erfassen: Kriege, politische Umbrüche, Sport- und Kulturereignisse, Wirtschaftskrisen, Seuchen, Naturkatastrophen; auch wenn nur kurz erwähnt; jedes externe Ereignis ALLEN betroffenen Figuren zuweisen
-- subtyp: feiner Subtyp (Whitelist) – geburt, tod, hochzeit, reise, konflikt, wendepunkt, entdeckung, verlust, sieg (für typ=persoenlich) bzw. extern_politisch, extern_natur, extern_kulturell (für typ=extern). Wenn nichts klar passt: 'sonstiges'.
+- subtyp: feiner Subtyp (Whitelist) – geburt, tod, hochzeit, liebe, trennung, krankheit, reise, umzug, konflikt, wendepunkt, entdeckung, verlust, sieg (für typ=persoenlich) bzw. extern_politisch, extern_wirtschaftlich, extern_natur, extern_kulturell, extern_krieg (für typ=extern). liebe=Beginn einer Liebesbeziehung; trennung=Scheidung/Trennung; krankheit=Erkrankung/Verletzung; umzug=dauerhafter Wohnortwechsel (nicht reise); extern_wirtschaftlich=Wirtschaftskrise/Crash; extern_krieg=Krieg/Schlacht. Wenn nichts klar passt: 'sonstiges'.
 - datum: Original-String wie im Text vorhanden (z.B. «Mai 1850», «12. März 1850», «1850», «Tag 3», «vor der Reise»). datum_label spiegelt das in einer user-lesbaren Form.
 - datum_year/datum_month/datum_day PFLICHT zerlegen falls aus Text/Kontext berechenbar; Felder ohne Information null lassen. Events OHNE jegliche Datums-Information (auch keine relative Story-Zeit) trotzdem aufnehmen – Felder dann null, das Event landet im «unbekannt»-Bucket.
 - Spannen-Events (Krieg, Reise, Studium, Schwangerschaft): Start in datum_year/month/day, Ende in datum_ende_year/month/day. Ein-Punkt-Events lassen datum_ende_* null.

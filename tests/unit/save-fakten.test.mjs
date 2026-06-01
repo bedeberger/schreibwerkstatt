@@ -62,6 +62,24 @@ test('saveFaktenToDb: Full-Replace ersetzt vorherigen Stand, keine Dubletten', (
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM world_fact_chapters').get().n, 1);
 });
 
+test('saveFaktenToDb: kategorie auf Whitelist normalisiert (Whitelist behalten, Rest → sonstiges)', () => {
+  setup();
+  schema.saveFaktenToDb(BOOK, [{ kapitel: 'Kapitel 1', fakten: [
+    { kategorie: 'figur',  fakt: 'bekannt' },          // Whitelist → bleibt
+    { kategorie: ' ORT ',  fakt: 'trim+lowercase' },   // → 'ort'
+    { kategorie: 'magie',  fakt: 'unbekannt' },         // nicht WL → 'sonstiges'
+    { fakt: 'ohne kategorie' },                         // fehlt → 'sonstiges'
+  ] }], USER, { 'Kapitel 1': 7001 });
+
+  const rows = db.prepare('SELECT kategorie, fakt FROM world_facts WHERE book_id=? AND user_email=? ORDER BY sort_order').all(BOOK, USER);
+  assert.deepEqual(rows.map(r => [r.fakt, r.kategorie]), [
+    ['bekannt', 'figur'],
+    ['trim+lowercase', 'ort'],
+    ['unbekannt', 'sonstiges'],
+    ['ohne kategorie', 'sonstiges'],
+  ]);
+});
+
 test('saveFaktenToDb: leeres chapterFakten → 0 Rows', () => {
   setup();
   schema.saveFaktenToDb(BOOK, [], USER, {});

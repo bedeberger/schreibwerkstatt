@@ -1,0 +1,68 @@
+/* Theme-Overrides für vis-timeline (Ereignisse-Jahres-Zeitstrahl).
+ *
+ * BEWUSST UNLAYERED: Das vis-Vendor-CSS wird zur Laufzeit via _ensureCss in den
+ * <head> injiziert (nach allen index.html-Links) und ist ebenfalls unlayered.
+ * Unlayered schlägt jede @layer-Regel — unsere Overrides müssen daher ohne
+ * @layer auskommen und gewinnen über höhere Spezifität (`.gz-timeline .vis-*`
+ * = 0,2,0 vs. Vendor `.vis-*` = 0,1,0). Einzige unlayered CSS-Datei im Projekt;
+ * Tokens bleiben global verfügbar. */
+
+.gz-timeline {
+  border: 0.5px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+
+/* Grundgerüst: Rahmen/Trennlinien auf Token-Farben ziehen. */
+.gz-timeline .vis-timeline { border: none; font-family: inherit; }
+
+.gz-timeline .vis-panel.vis-center,
+.gz-timeline .vis-panel.vis-left,
+.gz-timeline .vis-panel.vis-right,
+.gz-timeline .vis-panel.vis-top,
+.gz-timeline .vis-panel.vis-bottom {
+  border-color: var(--color-border);
+}
+
+/* Zeitachse: Beschriftung + Gitter. */
+.gz-timeline .vis-time-axis .vis-text { color: var(--color-muted); font-size: var(--font-size-xs); }
+.gz-timeline .vis-time-axis .vis-text.vis-major { color: var(--color-text); font-weight: 700; }
+.gz-timeline .vis-time-axis .vis-grid.vis-minor { border-color: color-mix(in srgb, var(--color-border) 50%, transparent); }
+.gz-timeline .vis-time-axis .vis-grid.vis-major { border-color: var(--color-border); }
+
+/* Items (Punkte + Spannen): interner Standard = Primärfarbe. */
+.gz-timeline .vis-item {
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-primary) 16%, var(--color-surface));
+  border-color: var(--color-primary);
+}
+
+.gz-timeline .vis-item.vis-dot { border-color: var(--color-primary); }
+.gz-timeline .vis-item.vis-selected {
+  background: color-mix(in srgb, var(--color-primary) 32%, var(--color-surface));
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 35%, transparent);
+}
+
+/* Weltgeschehen (extern) — analog zur Liste in Error-Tönung. */
+.gz-timeline .vis-item.gz-vis-item--extern {
+  background: var(--color-err-bg);
+  border-color: var(--color-err-border);
+  color: var(--color-err-text);
+}
+.gz-timeline .vis-item.gz-vis-item--extern.vis-dot { border-color: var(--color-err-border); }
+
+/* Tooltip (volltext, via title-Element). */
+.vis-tooltip {
+  background: var(--color-text);
+  color: var(--color-surface);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: var(--font-size-xs);
+  padding: var(--space-2xs) var(--space-6);
+  max-width: 320px;
+  white-space: normal;
+}

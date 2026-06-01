@@ -638,7 +638,7 @@ function tool_list_revisions(input, ctx) {
 // zur Lesezeit (kein Snapshot).
 function tool_list_world_facts(input, ctx) {
   const userEmail = ctx.userEmail || null;
-  const kategorie = typeof input?.kategorie === 'string' && input.kategorie.trim() ? input.kategorie.trim() : null;
+  const kategorie = typeof input?.kategorie === 'string' && input.kategorie.trim() ? input.kategorie.trim().toLowerCase() : null;
   const subjekt   = typeof input?.subjekt === 'string' && input.subjekt.trim() ? input.subjekt.trim() : null;
 
   let sql = `

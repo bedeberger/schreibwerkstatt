@@ -19,7 +19,7 @@ Antworte mit diesem JSON-Schema:
       "datum_ende_month": null,
       "datum_ende_day":   null,
       "story_tag": null,            // Relative Story-Zeit (Tag 3, Day 12) wenn kein Kalender
-      "subtyp": "wendepunkt",       // geburt|tod|hochzeit|reise|konflikt|wendepunkt|entdeckung|verlust|sieg|extern_politisch|extern_natur|extern_kulturell|sonstiges
+      "subtyp": "wendepunkt",       // geburt|tod|hochzeit|liebe|trennung|krankheit|reise|umzug|konflikt|wendepunkt|entdeckung|verlust|sieg|extern_politisch|extern_wirtschaftlich|extern_natur|extern_kulturell|extern_krieg|sonstiges
       "ereignis": "kanonische Formulierung",
       "typ": "persoenlich|extern",
       "bedeutung": "zusammengeführte Bedeutung oder leer",
@@ -34,7 +34,7 @@ Regeln:
 - Strukturierte Datums-Felder PFLICHT: datum_year/month/day aus jedem datum_label extrahieren. Nur ein Teil bekannt? Restliche Felder null.
 - Spannen (z.B. «Krieg 1914–1918», «Reise Mai–August 1850»): datum_*_year/month/day = Start, datum_ende_*_year/month/day = Ende.
 - Behalte die chronologische Reihenfolge (aufsteigend nach datum_year, dann _month, _day)
-- subtyp: Eines aus der Whitelist. Default 'sonstiges'. Bei externen Welt-Events: extern_politisch|extern_natur|extern_kulturell.
+- subtyp: Eines aus der Whitelist. Default 'sonstiges'. Bei externen Welt-Events: extern_politisch|extern_wirtschaftlich|extern_natur|extern_kulturell|extern_krieg.
 - Dedupliziere figuren (gleiche id nur einmal pro Ereignis)
 - kapitel: Alle Kapitel der zusammengeführten Ereignisse beibehalten (Union der Arrays, Duplikate entfernen)
 - seiten: Alle Seiten der zusammengeführten Ereignisse beibehalten (Union der Arrays, Duplikate entfernen)

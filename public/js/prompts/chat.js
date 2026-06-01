@@ -416,7 +416,7 @@ export const BOOK_CHAT_TOOLS = [
     input_schema: {
       type: 'object',
       properties: {
-        kategorie: { type: 'string', description: 'Nur Fakten dieser Kategorie (exakt, z.B. "Magiesystem", "Geografie").' },
+        kategorie: { type: 'string', description: 'Nur Fakten dieser Kategorie. Gültige Werte: figur, ort, objekt, organisation, technik, regel, kultur, historie, zeit, soziolekt, ereignis, sonstiges.' },
         subjekt:   { type: 'string', description: 'Nur Fakten zu diesem Subjekt (Teilstring, case-insensitive).' },
       },
       required: [],

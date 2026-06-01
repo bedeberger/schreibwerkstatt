@@ -18,35 +18,35 @@
 
   <div class="organizer-toolbar">
     <span class="search-affix">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#search"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#search"/></svg>
       <input type="text" x-model="organizerSearch"
              :placeholder="$app.t('bookOrganizer.searchPlaceholder')"
              :aria-label="$app.t('bookOrganizer.searchPlaceholder')"
              class="page-search"
              autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other">
-      <button type="button" class="search-clear--icon" x-show="organizerSearch" @click="organizerSearch=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#x"/></svg></button>
+      <button type="button" class="search-clear--icon" x-show="organizerSearch" @click="organizerSearch=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#x"/></svg></button>
     </span>
     <div class="btn-group organizer-action-group">
       <button type="button" class="graph-tool-btn organizer-icon-btn"
               @click="historyUndo()"
               :disabled="_undoStack.length === 0 || organizerSaving"
               :data-tip="$app.t('bookOrganizer.undoTip')"
-              :aria-label="$app.t('bookOrganizer.undo')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#undo"/></svg></button>
+              :aria-label="$app.t('bookOrganizer.undo')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#undo"/></svg></button>
       <button type="button" class="graph-tool-btn organizer-icon-btn"
               @click="historyRedo()"
               :disabled="_redoStack.length === 0 || organizerSaving"
               :data-tip="$app.t('bookOrganizer.redoTip')"
-              :aria-label="$app.t('bookOrganizer.redo')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#redo"/></svg></button>
+              :aria-label="$app.t('bookOrganizer.redo')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#redo"/></svg></button>
       <button type="button" class="graph-tool-btn organizer-icon-btn"
               @click="expandAll()"
               :disabled="workTree.length === 0 || !!organizerSearch"
               :data-tip="$app.t('sidebar.expandAll')"
-              :aria-label="$app.t('sidebar.expandAll')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#chevron-down"/></svg></button>
+              :aria-label="$app.t('sidebar.expandAll')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#chevron-down"/></svg></button>
       <button type="button" class="graph-tool-btn organizer-icon-btn"
               @click="collapseAll()"
               :disabled="workTree.length === 0 || !!organizerSearch"
               :data-tip="$app.t('sidebar.collapseAll')"
-              :aria-label="$app.t('sidebar.collapseAll')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#chevron-up"/></svg></button>
+              :aria-label="$app.t('sidebar.collapseAll')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#chevron-up"/></svg></button>
     </div>
     <div class="organizer-jump"
          x-show="workTree.length > 0 && !organizerSearch"
@@ -97,7 +97,7 @@
                         :data-tip="$app.t(prov.key + '.action.push')"
                         :aria-label="$app.t(prov.key + '.action.push')">
                   <template x-if="!prov.card.pushBusy[page.id]">
-                    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#arrow-up"/></svg>
+                    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#arrow-up"/></svg>
                   </template>
                   <template x-if="prov.card.pushBusy[page.id]">
                     <span class="display-contents">
@@ -199,7 +199,7 @@
                             :data-tip="$app.t(prov.key + '.action.push')"
                             :aria-label="$app.t(prov.key + '.action.push')">
                       <template x-if="!prov.card.pushBusy[page.id]">
-                        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#arrow-up"/></svg>
+                        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#arrow-up"/></svg>
                       </template>
                       <template x-if="prov.card.pushBusy[page.id]">
                         <span class="display-contents">
@@ -299,7 +299,7 @@
                                   :data-tip="$app.t(prov.key + '.action.push')"
                                   :aria-label="$app.t(prov.key + '.action.push')">
                             <template x-if="!prov.card.pushBusy[page.id]">
-                              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#arrow-up"/></svg>
+                              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#arrow-up"/></svg>
                             </template>
                             <template x-if="prov.card.pushBusy[page.id]">
                               <span class="display-contents">
@@ -389,7 +389,7 @@
                                         :data-tip="$app.t(prov.key + '.action.push')"
                                         :aria-label="$app.t(prov.key + '.action.push')">
                                   <template x-if="!prov.card.pushBusy[page.id]">
-                                    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#arrow-up"/></svg>
+                                    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#arrow-up"/></svg>
                                   </template>
                                   <template x-if="prov.card.pushBusy[page.id]">
                                     <span class="display-contents">

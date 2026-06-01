@@ -116,9 +116,10 @@ function _szenenField() {
 // Whitelist für Event-Subtypen (Phase 2). KI darf nur diese Werte liefern;
 // Server-Save fällt sonst auf 'sonstiges' zurück.
 const EVENT_SUBTYP_ENUM = [
-  'geburt', 'tod', 'hochzeit', 'reise', 'konflikt', 'wendepunkt',
-  'entdeckung', 'verlust', 'sieg',
-  'extern_politisch', 'extern_natur', 'extern_kulturell', 'sonstiges',
+  'geburt', 'tod', 'hochzeit', 'liebe', 'trennung', 'krankheit',
+  'reise', 'umzug', 'konflikt', 'wendepunkt', 'entdeckung', 'verlust', 'sieg',
+  'extern_politisch', 'extern_wirtschaftlich', 'extern_natur', 'extern_kulturell', 'extern_krieg',
+  'sonstiges',
 ];
 
 function _assignmentsField() {

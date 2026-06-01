@@ -181,4 +181,25 @@
 .gz-figur-badge--nebenfigur { /* fällt auf Default-Grau zurück */ }
 .gz-figur-badge--andere     { --fig-hue: var(--color-accent); }
 
+/* === Jahres-Zeitstrahl (vis-timeline) — Layout-Wrapper ===
+   Theme-Overrides der vis-Vendor-Klassen liegen in
+   public/css/analysis/ereignisse-timeline.css (unlayered, sonst schlägt das
+   dynamisch nachgeladene Vendor-CSS unsere @layer-Regeln). */
+.gz-layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  margin-top: var(--space-14);
+}
+
+.gz-layout .global-zeitstrahl-body {
+  margin-top: 0;
+}
+
+.gz-timeline-hint {
+  font-size: var(--font-size-mini);
+  color: var(--color-muted);
+  font-style: italic;
+}
+
 }

@@ -203,7 +203,7 @@ SSoT: `_scrollToCardByKey(key)` + `_scrollToCardEl(el)` in [public/js/app/app-vi
 
 ## Lazy-Loaded Libs
 
-vis-network (Figuren-Graph) und Chart.js (BookStats) laden ausschliesslich on-demand via [public/js/lazy-libs.js](public/js/lazy-libs.js). Kein neuer `<script>`-Tag im `index.html` für grosse Libs — sie würden den initialen Page-Load mit ~800 KB unbenutztem JS belasten.
+vis-network (Figuren-Graph), vis-timeline (Ereignisse-Jahres-Zeitstrahl) und Chart.js (BookStats) laden ausschliesslich on-demand via [public/js/lazy-libs.js](public/js/lazy-libs.js). Kein neuer `<script>`-Tag im `index.html` für grosse Libs — sie würden den initialen Page-Load mit ~800 KB unbenutztem JS belasten. vis-network und vis-timeline sind separate Standalone-Bundles derselben vis.js-Familie; beide mergen in `window.vis` (`.vis = vis||{}`) und koexistieren — `loadVis()` prüft daher `window.vis?.Network`, `loadVisTimeline()` prüft `window.vis?.Timeline`.
 
 ## Prompt-System
 

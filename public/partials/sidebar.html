@@ -10,9 +10,9 @@
   <!-- Suche + Expand/Collapse -->
   <div class="search-wrap sidebar-search-wrap">
     <span class="search-affix">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#search"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#search"/></svg>
       <input type="text" x-model.debounce.200ms="pageSearch" @keydown="onPageSearchKeydown($event)" :placeholder="t('sidebar.searchPage')" :aria-label="t('sidebar.searchPage')" :data-tip="t('sidebar.searchPageTitle')" class="page-search">
-      <button type="button" class="search-clear--icon" x-show="pageSearch" @click="pageSearch=''" :aria-label="t('search.clear')" :data-tip="t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#x"/></svg></button>
+      <button type="button" class="search-clear--icon" x-show="pageSearch" @click="pageSearch=''" :aria-label="t('search.clear')" :data-tip="t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#x"/></svg></button>
     </span>
     <div class="btn-group sidebar-action-group">
       <button type="button" class="graph-tool-btn"
@@ -22,7 +22,7 @@
               :data-tip="sidebarMode === 'calendar' ? t('sidebar.modeToggle.tree') : t('sidebar.modeToggle.calendar')"
               :aria-label="sidebarMode === 'calendar' ? t('sidebar.modeToggle.tree') : t('sidebar.modeToggle.calendar')">
         <svg class="icon" aria-hidden="true">
-          <use :href="sidebarMode === 'calendar' ? '/icons.svg?v=636#list' : '/icons.svg?v=636#calendar'"/>
+          <use :href="sidebarMode === 'calendar' ? '/icons.svg?v=689#list' : '/icons.svg?v=689#calendar'"/>
         </svg>
       </button>
       <button type="button" class="graph-tool-btn"
@@ -30,13 +30,13 @@
               @click="setAllChaptersOpen(true)"
               :disabled="!!pageSearch"
               :data-tip="t('sidebar.expandAll')"
-              :aria-label="t('sidebar.expandAll')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#chevron-down"/></svg></button>
+              :aria-label="t('sidebar.expandAll')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#chevron-down"/></svg></button>
       <button type="button" class="graph-tool-btn"
               x-show="sidebarMode !== 'calendar'"
               @click="setAllChaptersOpen(false)"
               :disabled="!!pageSearch"
               :data-tip="t('sidebar.collapseAll')"
-              :aria-label="t('sidebar.collapseAll')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#chevron-up"/></svg></button>
+              :aria-label="t('sidebar.collapseAll')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#chevron-up"/></svg></button>
     </div>
   </div>
 

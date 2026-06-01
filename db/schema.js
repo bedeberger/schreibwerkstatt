@@ -24,6 +24,22 @@ const SUBTYP_WL = new Set([
   'extern_politisch', 'extern_natur', 'extern_kulturell', 'sonstiges',
 ]);
 
+// Whitelist für Welt-Fakten-Kategorien (harte Gruppierung analog SUBTYP_WL).
+// KI liefert die Kategorie im Komplettanalyse-Output; unbekannte/leere Werte
+// fallen auf 'sonstiges' zurück. Frontend rendert Label + Icon je Key
+// (public/js/cards/world-facts-card.js, i18n weltfakten.kategorie.*).
+const FAKT_KATEGORIE_WL = new Set([
+  'figur', 'ort', 'objekt', 'organisation', 'technik', 'regel',
+  'kultur', 'historie', 'zeit', 'soziolekt', 'ereignis', 'sonstiges',
+]);
+
+// Normalisiert einen KI-Kategorie-String auf einen Whitelist-Key (lowercase,
+// getrimmt). Unbekannt/leer → 'sonstiges'.
+function _normFaktKategorie(raw) {
+  const k = (raw == null ? '' : String(raw)).trim().toLowerCase();
+  return FAKT_KATEGORIE_WL.has(k) ? k : 'sonstiges';
+}
+
 // Strukturierte Datums-Felder aus AI-Output extrahieren; fehlt etwas, parseDatum
 // als Fallback. Liefert Felder, die direkt in zeitstrahl_events/figure_events
 // eingefügt werden können.
@@ -402,7 +418,7 @@ function saveFaktenToDb(bookId, chapterFakten, userEmail, chNameToId = null) {
         const fakt = _toRefString(f?.fakt);
         if (!fakt) continue;
         const { lastInsertRowid } = ins.run(
-          bookId, _toRefString(f?.kategorie) || null, _toRefString(f?.subjekt) || null,
+          bookId, _normFaktKategorie(f?.kategorie), _toRefString(f?.subjekt) || null,
           fakt, _toRefString(f?.seite) || null, order++, userEmail || null, now
         );
         if (chapId != null) insWfc.run(lastInsertRowid, chapId);

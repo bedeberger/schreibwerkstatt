@@ -157,15 +157,21 @@
   --card-accent-event-geburt:           #4c8a4c;
   --card-accent-event-tod:              #555c66;
   --card-accent-event-hochzeit:         #b86fa0;
+  --card-accent-event-liebe:            #d4707a;
+  --card-accent-event-trennung:         #6f7a96;
+  --card-accent-event-krankheit:        #4a9aa0;
   --card-accent-event-reise:            #4a86b8;
+  --card-accent-event-umzug:            #8f8a46;
   --card-accent-event-konflikt:         #b85a48;
   --card-accent-event-wendepunkt:       #8e5fbd;
   --card-accent-event-entdeckung:       #d18a3a;
   --card-accent-event-verlust:          #7a6478;
   --card-accent-event-sieg:             #c8a23a;
   --card-accent-event-extern_politisch: #4a6a8e;
+  --card-accent-event-extern_wirtschaftlich: #9c7e3c;
   --card-accent-event-extern_natur:     #4e8a72;
   --card-accent-event-extern_kulturell: #a05a7a;
+  --card-accent-event-extern_krieg:     #8e4438;
   --card-accent-event-sonstiges:        #8a8278;
 
   /* Job-Queue-Footer */
@@ -328,15 +334,21 @@
   --card-accent-event-geburt:           #88c488;
   --card-accent-event-tod:              #98a0aa;
   --card-accent-event-hochzeit:         #e0a4cc;
+  --card-accent-event-liebe:            #e89aa6;
+  --card-accent-event-trennung:         #9aa4c0;
+  --card-accent-event-krankheit:        #7cc4ca;
   --card-accent-event-reise:            #8ab8d4;
+  --card-accent-event-umzug:            #c2bc78;
   --card-accent-event-konflikt:         #e0907e;
   --card-accent-event-wendepunkt:       #c4a4e4;
   --card-accent-event-entdeckung:       #efb678;
   --card-accent-event-verlust:          #b8a4b4;
   --card-accent-event-sieg:             #e8cc78;
   --card-accent-event-extern_politisch: #8aaadc;
+  --card-accent-event-extern_wirtschaftlich: #c8a85e;
   --card-accent-event-extern_natur:     #8ec4a8;
   --card-accent-event-extern_kulturell: #d098b0;
+  --card-accent-event-extern_krieg:     #c47a6c;
   --card-accent-event-sonstiges:        #b8b0a6;
 
   --color-border-contrast: #d8d8d8;

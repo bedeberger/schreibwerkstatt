@@ -49,7 +49,7 @@
   <div x-show="$app.orte.length > 0" class="filter-bar">
     <span class="filter-search-wrap">
       <input type="text" x-model="$app.orteFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
-      <button type="button" class="search-clear--icon" x-show="$app.orteFilters.suche" @click="$app.orteFilters.suche=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#x"/></svg></button>
+      <button type="button" class="search-clear--icon" x-show="$app.orteFilters.suche" @click="$app.orteFilters.suche=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#x"/></svg></button>
     </span>
     <div x-data="catalogFilter('figur')"
          x-modelable="value" x-model="$app.orteFilters.figurId"
@@ -197,20 +197,20 @@
               :disabled="_geoUndoStack.length === 0"
               @click="undoGeoMove()"
               :data-tip="$app.t('orte.map.undoTip')" :aria-label="$app.t('orte.map.undo')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#undo"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#undo"/></svg>
       </button>
       <button type="button" class="graph-tool-btn"
               :disabled="_geoRedoStack.length === 0"
               @click="redoGeoMove()"
               :data-tip="$app.t('orte.map.redoTip')" :aria-label="$app.t('orte.map.redo')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=688#redo"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#redo"/></svg>
       </button>
       <button type="button" class="graph-tool-btn"
               :aria-pressed="geoLocked"
               @click="toggleGeoLock()"
               :data-tip="$app.t(geoLocked ? 'orte.map.unlockTip' : 'orte.map.lockTip')"
               :aria-label="$app.t(geoLocked ? 'orte.map.unlock' : 'orte.map.lock')">
-        <svg class="icon" aria-hidden="true"><use :href="(geoLocked ? '/icons.svg?v=688#lock' : '/icons.svg?v=688#lock-open')"/></svg>
+        <svg class="icon" aria-hidden="true"><use :href="(geoLocked ? '/icons.svg?v=689#lock' : '/icons.svg?v=689#lock-open')"/></svg>
       </button>
     </div>
     <div x-ref="orteMapEl" class="ort-map" role="application" :aria-label="$app.t('orte.map.tab')"></div>

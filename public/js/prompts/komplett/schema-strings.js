@@ -132,7 +132,7 @@ export const SONGS_RULES = `Regeln:
 
 export const FAKTEN_SCHEMA = `"fakten": [
     {
-      "kategorie": "figur|ort|objekt|zeit|ereignis|soziolekt|sonstiges",
+      "kategorie": "figur|ort|objekt|organisation|technik|regel|kultur|historie|zeit|soziolekt|ereignis|sonstiges",
       "subjekt": "Über wen/was geht es (Name oder Bezeichnung)",
       "fakt": "Was genau behauptet wird (1 Satz, so präzise wie möglich)",
       "seite": "Seitenname oder Abschnittsname (leer wenn unklar)"
@@ -146,6 +146,18 @@ export const FAKTEN_RULES = `Fakten-Regeln:
 - Soziolekt: Wenn eine Figur erstmals oder markant spricht, ein Faktum erfassen das ihr Sprachregister beschreibt. Kategorie «soziolekt» verwenden.
 - Objekte: Wer besitzt was, wo liegt was, in welchem Zustand
 - Zeitangaben: Relative («am nächsten Morgen») und absolute («1943») erfassen
+- PFLICHT: «kategorie» ist genau EINER der vorgegebenen Werte – NIE ein eigener Freitext. «sonstiges» nur als letzte Wahl, wenn wirklich keine andere Kategorie passt; ordne so spezifisch wie möglich ein:
+  · figur = Eigenschaften/Zustände einer Figur (Wissen, Können, Körper, Beruf, Besitz, Wohnort)
+  · ort = Schauplätze, Lage, Geografie, Klima, Wege
+  · objekt = Gegenstände, Artefakte, Besitz und deren Zustand
+  · organisation = Institutionen, Gruppen, Fraktionen, gesellschaftliche Strukturen
+  · technik = Technik, Wissenschaft, Magie-/Welt-Mechanik und ihre Funktionsweise
+  · regel = Regeln, Gesetze, Normen, Verbote der erzählten Welt
+  · kultur = Kultur, Bräuche, Religion, Werte, gesellschaftliche Verhältnisse
+  · historie = Vorgeschichte, historische Fakten/Ereignisse der Welt vor der Handlung
+  · zeit = Zeitangaben und Chronologie (relativ wie absolut)
+  · soziolekt = Sprachregister/Sprechweise einer Figur
+  · ereignis = konkrete Geschehnisse in der Handlungsgegenwart
 - Nur prüfbare Aussagen aus dem Text – keine Interpretationen, Wertungen oder Spekulationen
 - Kein Cap auf Anzahl Fakten – vollständige, präzise Erfassung ist das Ziel`;
 
@@ -216,7 +228,7 @@ export const _ASSIGNMENTS_SCHEMA_BLOCK = `"assignments": [
           "datum_ende_month": null,
           "datum_ende_day":   null,
           "story_tag":   null,         // Relative Story-Zeit
-          "subtyp":      "sonstiges",  // geburt|tod|hochzeit|reise|konflikt|wendepunkt|entdeckung|verlust|sieg|extern_politisch|extern_natur|extern_kulturell|sonstiges
+          "subtyp":      "sonstiges",  // geburt|tod|hochzeit|liebe|trennung|krankheit|reise|umzug|konflikt|wendepunkt|entdeckung|verlust|sieg|extern_politisch|extern_wirtschaftlich|extern_natur|extern_kulturell|extern_krieg|sonstiges
           "ereignis": "Was passierte – neutral formuliert. Gleiches Ereignis bei allen beteiligten Figuren identisch.",
           "typ": "persoenlich|extern",
           "bedeutung": "Bedeutung für diese Figur (1 Satz, leer wenn nicht klar)",
@@ -231,5 +243,5 @@ export const _EREIGNIS_RULES = `Ereignis-Regeln:
 - typ='persoenlich' / typ='extern' wie oben dokumentiert.
 - datum_label = Original-String; datum_year/month/day strukturiert zerlegen (null wenn unbekannt). Events ohne Datums-Information trotzdem aufnehmen (alles null).
 - Spannen (Krieg, Reise, Studium): Start in datum_*, Ende in datum_ende_*.
-- subtyp aus Whitelist; persoenlich → geburt|tod|hochzeit|reise|konflikt|wendepunkt|entdeckung|verlust|sieg|sonstiges; extern → extern_politisch|extern_natur|extern_kulturell|sonstiges.
+- subtyp aus Whitelist; persoenlich → geburt|tod|hochzeit|liebe|trennung|krankheit|reise|umzug|konflikt|wendepunkt|entdeckung|verlust|sieg|sonstiges; extern → extern_politisch|extern_wirtschaftlich|extern_natur|extern_kulturell|extern_krieg|sonstiges. liebe=Beginn einer Liebesbeziehung; trennung=Scheidung/Trennung; krankheit=Erkrankung/Verletzung; umzug=dauerhafter Wohnortwechsel (NICHT reise=temporär); extern_wirtschaftlich=Wirtschaftskrise/Crash/Inflation; extern_krieg=Krieg/Schlacht/militärischer Konflikt.
 - Nur Figuren ausgeben die mindestens ein Ereignis haben.`;

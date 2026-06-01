@@ -995,6 +995,38 @@ Nur in Sidebar-Tree verwendet. Bei neuer hierarchischer Liste: erst prüfen, ob 
 
 ---
 
+## Jahres-Zeitstrahl (vis-timeline)
+
+**Use:** Interaktiver Zeitstrahl über einer langen, datierten Liste — jedes datierte Element als Item auf einer Jahresachse (Punkt bzw. Range bei Spannen), Zoom/Pan, Klick auf ein Item scrollt zum zugehörigen Listeneintrag. Erste Konsumentin: Ereignisse-Karte (Jahr-Achse über `globalZeitstrahl`).
+
+**Markup:**
+```html
+<div class="gz-layout">
+  <div class="gz-timeline" :aria-label="…"></div>            <!-- vis-Container, JS mountet hinein -->
+  <div class="gz-timeline-hint" x-show="…" x-text="…"></div>  <!-- Hinweis: N undatierte Events -->
+  <div class="…list-body">…<div :data-ev-index="i">…</div>…</div>
+</div>
+```
+
+**Lib:** vis-timeline (Standalone-Bundle, gleiche vis.js-Familie wie vis-network), lazy via `loadVisTimeline()` aus [public/js/lazy-libs.js](public/js/lazy-libs.js). Vendor-CSS wird dort per `_ensureCss` injiziert.
+
+**Klassen** [public/css/analysis/zeitleiste.css](public/css/analysis/zeitleiste.css) (Layout) + [public/css/analysis/ereignisse-timeline.css](public/css/analysis/ereignisse-timeline.css) (Vendor-Theme):
+- `.gz-layout` — Flex-Wrapper, `flex-direction: column` (Zeitstrahl oben, Liste darunter)
+- `.gz-timeline` — vis-Mount-Container (Rahmen + Hintergrund aus Tokens)
+- `.gz-timeline-hint` — Fussnote zu undatierten Events
+- `.gz-vis-item` / `.gz-vis-item--extern` — Item-className (intern = Primärfarbe, extern = Error-Tönung)
+
+**Regeln:**
+- **Theme-Overrides der `.vis-*`-Vendor-Klassen sind UNLAYERED** ([ereignisse-timeline.css](public/css/analysis/ereignisse-timeline.css)) — das dynamisch nachgeladene Vendor-CSS ist unlayered und schlägt sonst jede `@layer`-Regel. Scoping via `.gz-timeline .vis-*` für die nötige Spezifität.
+- Items aus der **gefilterten** Liste bauen (`buildTimelineItems`, pure + getestet); nur Events mit `datum_year` landen auf der Achse, undatierte bleiben nur in der Liste (Hinweis-Text).
+- Item-`id` = Listen-Index → Klick (`select`-Event) ruft `scrollToEventIndex(id)` via `[data-ev-index]` + `scrollIntoView`.
+- Lazy rendern: erst wenn Karte sichtbar (`display:none` → vis misst 0). Re-Render bei Filter-/Sichtbarkeits-Wechsel, Instanz wiederverwenden (`DataSet.clear()/add()`), im `destroy()` `timeline.destroy()`.
+- Datums-Bau via `setFullYear` (nicht `new Date(year,…)`) — sonst landen Jahre < 100 auf 1900+year.
+
+**Beispiele:** [public/partials/ereignisse.html](public/partials/ereignisse.html), [public/js/cards/ereignisse-card.js](public/js/cards/ereignisse-card.js)
+
+---
+
 ## Context-Menu (Rechtsklick-Popover)
 
 **Use:** Sekundäre Aktionen pro Element via Rechtsklick (Desktop) bzw. Long-Press (Touch — noch nicht verdrahtet). Erste Konsumentin: Pagetree (`.pagetree-context-menu` für Pages + Chapters).
@@ -1770,7 +1802,8 @@ Drei Editoren leben in eigenen Subfoldern (`book/`, `focus/`, `notebook/`); edit
 | [analysis/heatmap.css](public/css/analysis/heatmap.css) | `.heatmap-*` Tabelle + Detail-Drawer. |
 | [analysis/kontinuitaet.css](public/css/analysis/kontinuitaet.css) | Kontinuitätsprüfung + Buch-Einstellungen-Spezifika. |
 | [analysis/komplett-status.css](public/css/analysis/komplett-status.css) | Komplettanalyse-Status-Header. |
-| [analysis/zeitleiste.css](public/css/analysis/zeitleiste.css) | Globaler Zeitstrahl. |
+| [analysis/zeitleiste.css](public/css/analysis/zeitleiste.css) | Globaler Zeitstrahl (Liste + `.gz-timeline`-Layout). |
+| [analysis/ereignisse-timeline.css](public/css/analysis/ereignisse-timeline.css) | vis-timeline Vendor-Theme (Jahres-Zeitstrahl). **Unlayered** — schlägt das dynamisch nachgeladene Vendor-CSS. |
 | [analysis/kapitel-review.css](public/css/analysis/kapitel-review.css) | Kapitel-Review. |
 
 ### admin/

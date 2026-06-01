@@ -213,14 +213,14 @@
         <button type="button"
                 @click="finetuneDownload('train')"
                 :disabled="!finetuneJobId || (finetuneStats.train ?? 0) === 0">
-          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#download"/></svg>
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#download"/></svg>
           <span x-text="$app.t('finetune.download.train')"></span>
           <span class="form-size-hint" x-text="'(' + finetuneFormatBytes(finetuneStats.trainBytes) + ')'" x-show="finetuneStats.trainBytes > 0"></span>
         </button>
         <button type="button"
                 @click="finetuneDownload('val')"
                 :disabled="!finetuneJobId || (finetuneStats.val ?? 0) === 0">
-          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#download"/></svg>
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#download"/></svg>
           <span x-text="$app.t('finetune.download.val')"></span>
           <span class="form-size-hint" x-text="'(' + finetuneFormatBytes(finetuneStats.valBytes) + ')'" x-show="finetuneStats.valBytes > 0"></span>
         </button>

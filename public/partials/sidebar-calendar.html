@@ -8,14 +8,14 @@
             @click="diaryCalendarStep(-1)"
             :data-tip="t('calendar.prevMonth')"
             :aria-label="t('calendar.prevMonth')">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#chevron-left"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#chevron-left"/></svg>
     </button>
     <span class="sidebar-calendar-month-label" x-text="diaryCalendarMonthLabel()"></span>
     <button type="button" class="graph-tool-btn"
             @click="diaryCalendarStep(1)"
             :data-tip="t('calendar.nextMonth')"
             :aria-label="t('calendar.nextMonth')">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#chevron-right"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#chevron-right"/></svg>
     </button>
   </div>
 
@@ -23,7 +23,7 @@
           x-show="canEdit() && !diaryHasTodayEntry()"
           @click="createDiaryEntryToday()"
           :data-tip="t('calendar.todayTip')">
-    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#plus"/></svg>
+    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#plus"/></svg>
     <span x-text="t('calendar.today')"></span>
   </button>
 

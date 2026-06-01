@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { applyEreignisseFilters, subtypIcon } = await import('../../public/js/cards/ereignisse-card.js');
+const { applyEreignisseFilters, subtypIcon, buildTimelineItems } = await import('../../public/js/cards/ereignisse-card.js');
 
 const EVENTS = [
   {
@@ -165,4 +165,56 @@ test('subtypIcon: unbekannter Subtyp → sonstiges-Fallback', () => {
   assert.equal(subtypIcon(undefined),    'more-horizontal');
   assert.equal(subtypIcon(null),         'more-horizontal');
   assert.equal(subtypIcon(''),           'more-horizontal');
+});
+
+// --- vis-timeline-Items (Jahres-Zeitstrahl) ---
+
+test('buildTimelineItems: nur datierte Events landen auf der Achse, id = Listen-Index', () => {
+  const items = buildTimelineItems([
+    { datum_year: 1990, ereignis: 'A' },   // 0 → Punkt
+    { story_tag: 'Tag 3', ereignis: 'B' }, // 1 → übersprungen (kein Jahr)
+    {},                                     // 2 → übersprungen
+    { datum_year: 1995, ereignis: 'C' },   // 3 → Punkt
+  ]);
+  assert.equal(items.length, 2);
+  assert.deepEqual(items.map(i => i.id), [0, 3]);
+  assert.equal(items[0].type, 'point');
+  assert.equal(items[0].content, 'A');
+  assert.equal(items[0].start.getFullYear(), 1990);
+});
+
+test('buildTimelineItems: Spanne mit Ende-Jahr → Range-Item', () => {
+  const [item] = buildTimelineItems([
+    { datum_year: 1980, datum_ende_year: 1985, ereignis: 'Krieg' },
+  ]);
+  assert.equal(item.type, 'range');
+  assert.equal(item.start.getFullYear(), 1980);
+  assert.equal(item.end.getFullYear(), 1985);
+});
+
+test('buildTimelineItems: Ende <= Start fällt auf Punkt zurück', () => {
+  const [item] = buildTimelineItems([
+    { datum_year: 1980, datum_ende_year: 1980, ereignis: 'X' },
+  ]);
+  assert.equal(item.type, 'point');
+  assert.equal(item.end, undefined);
+});
+
+test('buildTimelineItems: extern-Flag aus typ', () => {
+  const [a, b] = buildTimelineItems([
+    { datum_year: 1990, typ: 'extern', ereignis: 'Welt' },
+    { datum_year: 1991, typ: 'persoenlich', ereignis: 'Privat' },
+  ]);
+  assert.equal(a.extern, true);
+  assert.equal(b.extern, false);
+});
+
+test('buildTimelineItems: frühes Jahr (<100) wird nicht auf 1900+ gemappt', () => {
+  const [item] = buildTimelineItems([{ datum_year: 50, ereignis: 'Antike' }]);
+  assert.equal(item.start.getFullYear(), 50);
+});
+
+test('buildTimelineItems: leere/fehlende Liste → []', () => {
+  assert.deepEqual(buildTimelineItems([]), []);
+  assert.deepEqual(buildTimelineItems(undefined), []);
 });

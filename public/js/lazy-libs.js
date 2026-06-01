@@ -8,6 +8,7 @@
 // Update = neue Datei + alte löschen + SHELL_CACHE in public/sw.js bumpen.
 
 let _visPromise = null;
+let _visTimelinePromise = null;
 let _chartPromise = null;
 let _jsMindPromise = null;
 let _sortablePromise = null;
@@ -34,13 +35,30 @@ function _ensureCss(href) {
 }
 
 export function loadVis() {
-  if (typeof window.vis !== 'undefined') return Promise.resolve(window.vis);
+  // .Network statt nur window.vis prüfen — vis-timeline mergt ebenfalls in
+  // window.vis (ohne Network), darf den Graph-Loader also nicht kurzschliessen.
+  if (window.vis?.Network) return Promise.resolve(window.vis);
   if (!_visPromise) {
     _visPromise = _loadScript('vendor/vis-network-10.0.2.min.js')
       .then(() => window.vis)
       .catch(err => { _visPromise = null; throw err; });
   }
   return _visPromise;
+}
+
+// vis-timeline (Ereignisse-Zeitstrahl). Eigenes Standalone-Bundle aus derselben
+// vis.js-Familie wie vis-network; beide mergen in window.vis (`.vis = vis||{}`)
+// und koexistieren. CSS via _ensureCss (analog Leaflet), Theme-Overrides in
+// public/css/analysis/ereignisse-timeline.css.
+export function loadVisTimeline() {
+  _ensureCss('vendor/vis-timeline-7.7.3/vis-timeline-graph2d.min.css');
+  if (window.vis?.Timeline) return Promise.resolve(window.vis);
+  if (!_visTimelinePromise) {
+    _visTimelinePromise = _loadScript('vendor/vis-timeline-7.7.3/vis-timeline-graph2d.min.js')
+      .then(() => window.vis)
+      .catch(err => { _visTimelinePromise = null; throw err; });
+  }
+  return _visTimelinePromise;
 }
 
 export function loadChart() {

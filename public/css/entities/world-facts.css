@@ -15,6 +15,29 @@
   margin-bottom: var(--space-6);
 }
 
+/* Kategorie-Tag mit Icon + Label: Breite an Inhalt statt feste entity-typ-tag-Spalte. */
+.weltfakten-kat-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  width: auto;
+}
+.weltfakten-kat-tag .icon {
+  width: 0.85em;
+  height: 0.85em;
+  flex-shrink: 0;
+}
+
+/* Filter-Tabs der Welt-Fakten tragen ein Kategorie-Icon — Button auf Flex
+   stellen, damit Icon, Label und Count sauber vertikal mitten sitzen. */
+.card--weltfakten .tabs-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+}
+.card--weltfakten .tabs-btn-count { margin-left: 0; }
+.card--weltfakten .tabs-btn .icon { width: 0.9em; height: 0.9em; }
+
 .weltfakten-group-count {
   font-size: var(--font-size-xs);
   color: var(--color-muted);

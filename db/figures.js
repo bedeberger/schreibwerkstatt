@@ -183,9 +183,10 @@ function saveFigurenToDb(bookId, figuren, userEmail, idMaps) {
 function updateFigurenEvents(bookId, assignments, userEmail, idMaps) {
   const { parseDatum } = require('../lib/datum-parse');
   const SUBTYP_WL = new Set([
-    'geburt', 'tod', 'hochzeit', 'reise', 'konflikt', 'wendepunkt',
-    'entdeckung', 'verlust', 'sieg',
-    'extern_politisch', 'extern_natur', 'extern_kulturell', 'sonstiges',
+    'geburt', 'tod', 'hochzeit', 'liebe', 'trennung', 'krankheit',
+    'reise', 'umzug', 'konflikt', 'wendepunkt', 'entdeckung', 'verlust', 'sieg',
+    'extern_politisch', 'extern_wirtschaftlich', 'extern_natur', 'extern_kulturell', 'extern_krieg',
+    'sonstiges',
   ]);
   db.transaction(() => {
     const figRows = db.prepare(

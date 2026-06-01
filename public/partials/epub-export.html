@@ -26,7 +26,7 @@
                 :aria-pressed="exportIncludeSubchapters"
                 :data-tip="$app.t('epubExport.includeSubchaptersTip')">
           <svg class="icon" aria-hidden="true">
-            <use :href="exportIncludeSubchapters ? '/icons.svg?v=687#check' : '/icons.svg?v=687#chevron-down'"/>
+            <use :href="exportIncludeSubchapters ? '/icons.svg?v=689#check' : '/icons.svg?v=689#chevron-down'"/>
           </svg>
           <span x-text="$app.t('epubExport.includeSubchapters')"></span>
         </button>
@@ -41,7 +41,7 @@
               :disabled="!$app.selectedBookId"
               :data-tip="!$app.selectedBookId ? $app.t('epubExport.export.noBookHint') : ''"
               @click="exportEpub()">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#download"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#download"/></svg>
         <span x-text="$app.t('epubExport.export')"></span>
       </button>
       <button type="button"
