@@ -402,7 +402,11 @@ async function runPhase2(ctx, chapterFiguren, chapterAssignments, chapterSzenen)
       // Phase-1-Arbeit – zu verwerfen, auf die bereits regelbasiert pre-gemergten Figuren zurückfallen.
       // mergeDuplicateFiguren + backfill unten laufen ohnehin noch; das Soziogramm wird sparser
       // (kapitel-lokale Beziehungs-Refs filtert die Soziogramm-Stufe via validIds heraus).
-      const fallback = preMerged.flatMap(c => c.figuren || []);
+      // Kapitel-lokale fig_ids sind NICHT global eindeutig (jedes Kapitel beginnt bei fig_1);
+      // normalerweise vergibt Phase 2 eindeutige IDs. Im Fallback selbst neu durchnummerieren,
+      // sonst kollidieren gleiche Kapitel-Indizes verschiedener Figuren im
+      // UNIQUE(book_id, fig_id, user_email) von saveFigurenToDb.
+      const fallback = preMerged.flatMap(c => c.figuren || []).map((f, i) => ({ ...f, id: 'fig_' + (i + 1) }));
       log.warn(`Phase-2-Figuren-Konsolidierung übersprungen (${e.message}) – Fallback auf ${fallback.length} pre-gemergte Figuren.`);
       ctx.warnings?.push({ key: 'job.warn.figurenKonsolidierungDegraded' });
       figResult = { figuren: fallback };
