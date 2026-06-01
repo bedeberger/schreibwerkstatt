@@ -388,11 +388,26 @@ async function runPhase2(ctx, chapterFiguren, chapterAssignments, chapterSzenen)
     const { chapterFiguren: preMerged, dupesRemoved } = preMergeChapterFiguren(chapterFiguren);
     if (dupesRemoved > 0) log.info(`Rollierender Pre-Merge – ${dupesRemoved} Figuren-Duplikate regelbasiert zusammengeführt.`);
     const figProgressEnd = effectiveProvider === 'claude' ? 40 : 43;
-    const figResult = await call(jobId, tok,
-      prompts.buildFiguresBasisConsolidationPrompt(bookName, preMerged, sys.BUCH_KONTEXT || ''),
-      sys.SYSTEM_FIGUREN_BLOCKS, 30, figProgressEnd, komplettMaxTokens(effectiveProvider), 0.2, null, prompts.SCHEMA_FIGUREN_KONSOL,
-    );
-    if (!Array.isArray(figResult?.figuren)) throw i18nError('job.error.figurenMissing');
+    let figResult;
+    try {
+      figResult = await call(jobId, tok,
+        prompts.buildFiguresBasisConsolidationPrompt(bookName, preMerged, sys.BUCH_KONTEXT || ''),
+        sys.SYSTEM_FIGUREN_BLOCKS, 30, figProgressEnd, komplettMaxTokens(effectiveProvider), 0.2, null, prompts.SCHEMA_FIGUREN_KONSOL,
+      );
+      if (!Array.isArray(figResult?.figuren)) throw i18nError('job.error.figurenMissing');
+    } catch (e) {
+      if (e.name === 'AbortError') throw e;
+      // Konsolidierungs-Call fehlgeschlagen (typisch: aiTruncated, wenn ein kleines lokales Modell
+      // viele Figuren in einen Output packen müsste). Statt den gesamten Job – inkl. mehrstündiger
+      // Phase-1-Arbeit – zu verwerfen, auf die bereits regelbasiert pre-gemergten Figuren zurückfallen.
+      // mergeDuplicateFiguren + backfill unten laufen ohnehin noch; das Soziogramm wird sparser
+      // (kapitel-lokale Beziehungs-Refs filtert die Soziogramm-Stufe via validIds heraus).
+      const fallback = preMerged.flatMap(c => c.figuren || []);
+      log.warn(`Phase-2-Figuren-Konsolidierung übersprungen (${e.message}) – Fallback auf ${fallback.length} pre-gemergte Figuren.`);
+      ctx.warnings?.push({ key: 'job.warn.figurenKonsolidierungDegraded' });
+      figResult = { figuren: fallback };
+      updateJob(jobId, { progress: figProgressEnd });
+    }
     figuren = figResult.figuren.map((f, i) => ({ ...f, id: f.id || ('fig_' + (i + 1)) }));
   }
   const { figuren: mergedFiguren, mergedCount, stage1Saved, stage2Saved, idRemap } = mergeDuplicateFiguren(figuren);

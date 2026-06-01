@@ -2345,6 +2345,7 @@
   "job.error.gesamtnoteMissing":     "AI response invalid: overall grade missing.",
 
   "job.warn.soziogrammDegraded":     "Sociogram refinement skipped – preliminary values used.",
+  "job.warn.figurenKonsolidierungDegraded": "Character consolidation skipped (response too long) – rule-based merged characters used.",
   "job.warn.relationsFailed":        "Relationship analysis failed – characters saved without relationships.",
   "job.warn.faktenFailed":           "Fact extraction failed – the rest of the catalog was updated.",
   "job.warn.crossChapterFailed":     "Cross-chapter relationships could not be determined.",

@@ -2346,6 +2346,7 @@
   "job.error.gesamtnoteMissing":     "KI-Antwort ungültig: Gesamtnote fehlt.",
 
   "job.warn.soziogrammDegraded":     "Soziogramm-Verfeinerung übersprungen – vorläufige Werte verwendet.",
+  "job.warn.figurenKonsolidierungDegraded": "Figuren-Konsolidierung übersprungen (Antwort zu lang) – regelbasiert zusammengeführte Figuren verwendet.",
   "job.warn.relationsFailed":        "Beziehungs-Analyse fehlgeschlagen – Figuren ohne Beziehungen gespeichert.",
   "job.warn.faktenFailed":           "Fakten-Extraktion fehlgeschlagen – übriger Katalog wurde aktualisiert.",
   "job.warn.crossChapterFailed":     "Kapitelübergreifende Beziehungen konnten nicht ermittelt werden.",
