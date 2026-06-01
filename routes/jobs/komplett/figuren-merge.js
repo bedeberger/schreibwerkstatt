@@ -407,9 +407,27 @@ function backfillFiguren(figuren, chapterSzenen, chapterAssignments, log) {
  *  (oder kollidiert eine explizite `fig_N` mit einer index-generierten), würden
  *  sonst beide eingefügt und der INSERT bricht ab. Die ERSTE Figur einer ID
  *  behält sie (eingehende beziehungen.figur_id bleiben gültig); jede weitere
- *  Kollision bzw. leere ID bekommt eine frische `fig_<maxIdx+1>`. Mutiert
- *  `figuren` und gibt die Anzahl neu vergebener IDs zurück. */
+ *  Kollision bzw. leere ID bekommt eine frische `fig_<maxIdx+1>`.
+ *
+ *  **Doppelte Objekt-Referenzen zuerst kollabieren:** liegt dieselbe Figur-Instanz
+ *  zweimal im Array (Merge-/Backfill-Pfad teilt versehentlich eine Referenz), würde
+ *  die ID-Neuvergabe unten DASSELBE Objekt mutieren – beide Slots blieben identisch
+ *  und der INSERT bräche trotzdem mit UNIQUE. Darum werden exakte Referenz-Duplikate
+ *  (erste Vorkommen bleibt) vorab entfernt; das ist semantisch korrekt (dieselbe
+ *  Figur soll nur einmal gespeichert werden). Mutiert `figuren` (in-place, ggf.
+ *  verkürzt) und gibt die Anzahl neu vergebener IDs zurück. */
 function ensureUniqueFigIds(figuren) {
+  // Schritt 1: exakte Objekt-Referenz-Duplikate entfernen (erste Position behalten).
+  const objSeen = new Set();
+  let w = 0;
+  for (let r = 0; r < figuren.length; r++) {
+    if (objSeen.has(figuren[r])) continue;
+    objSeen.add(figuren[r]);
+    figuren[w++] = figuren[r];
+  }
+  figuren.length = w;
+
+  // Schritt 2: eindeutige, nicht-leere id pro (jetzt distinkter) Figur.
   let maxIdx = 0;
   for (const f of figuren) {
     const m = /^fig_(\d+)$/.exec(f.id || '');

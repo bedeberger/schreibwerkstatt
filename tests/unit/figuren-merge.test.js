@@ -216,3 +216,24 @@ test('ensureUniqueFigIds: bereits eindeutig → no-op', () => {
   assert.equal(ensureUniqueFigIds(figuren), 0);
   assert.deepEqual(figuren.map(f => f.id), ['fig_1', 'fig_2']);
 });
+
+// Regression: dieselbe Objekt-Referenz zweimal im Array. Ohne Vorab-Dedup würde
+// die ID-Neuvergabe beide Slots (= dasselbe Objekt) gleich mutieren → erneut
+// kollidierende fig_id → UNIQUE-Crash in saveFigurenToDb. Erwartung: Referenz
+// einmal behalten, eindeutige IDs.
+test('ensureUniqueFigIds: doppelte Objekt-Referenz wird kollabiert (nicht dupliziert)', () => {
+  const shared = { id: 'fig_5', name: 'Anna' };
+  const figuren = [shared, { id: 'fig_2', name: 'Bert' }, shared];
+  ensureUniqueFigIds(figuren);
+  assert.equal(figuren.length, 2, 'doppelte Referenz entfernt');
+  assert.equal(new Set(figuren.map(f => f.id)).size, 2, 'IDs eindeutig');
+  assert.ok(figuren.includes(shared));
+});
+
+test('ensureUniqueFigIds: doppelte Referenz UND ID-Kollision gemischt', () => {
+  const shared = { id: 'fig_1', name: 'Anna' };
+  const figuren = [shared, shared, { id: 'fig_1', name: 'Bert' }];
+  ensureUniqueFigIds(figuren);
+  assert.equal(figuren.length, 2);
+  assert.equal(new Set(figuren.map(f => f.id)).size, 2);
+});
