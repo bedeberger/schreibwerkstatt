@@ -133,6 +133,41 @@
   margin-bottom: var(--space-lg);
 }
 
+/* Komplettanalyse-Budget-Hinweis unter den Provider-Feldern: neutral als
+   Info-Box, amber bei knappem Kontextfenster, rot bei kritisch kleinem. */
+.admin-settings-budget {
+  margin-top: var(--space-md);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--color-border);
+  background: var(--color-tag-bg);
+  font-size: var(--font-size-sm);
+}
+
+.admin-settings-budget strong { display: block; margin-bottom: var(--space-xs); }
+
+.admin-settings-budget p { margin: var(--space-xs) 0 0; }
+
+.admin-settings-budget.is-warn {
+  border-left-color: var(--color-mittel);
+  background: var(--color-warn-bg);
+  color: var(--color-warn-text);
+}
+
+.admin-settings-budget.is-bad {
+  border-left-color: var(--color-err-border, var(--color-schwach-text));
+  background: var(--color-err-bg);
+  color: var(--color-err-text);
+}
+
+/* In den eingefärbten Varianten erbt der abgeleitete Hinweis die Box-Farbe
+   (sonst überschreibt die graue .muted-msg-Farbe → schlechter Kontrast). */
+.admin-settings-budget.is-warn .muted-msg,
+.admin-settings-budget.is-bad .muted-msg {
+  color: inherit;
+  opacity: 0.85;
+}
+
 .admin-settings-sweep {
   display: grid;
   gap: var(--space-md);

@@ -624,6 +624,10 @@ Neue Aktionen erweitern diese Tabelle und das Sprite (siehe [Icon-System](#icon-
 
 `.card-form-hint` (12 px, muted, italic), `.card-form-error` (rot), `.card-form-saved` (success — ✓-Prefix via `::before`, fade via `x-transition.opacity.duration.250ms`, Auto-Dismiss 2500 ms via `_savedAtTimer` in der Karte).
 
+### Abgeleiteter Severity-Hinweis (`.admin-settings-budget`)
+
+Inline-Box unterhalb von Form-Feldern, die aus den eingegebenen Werten **live** eine Konsequenz ableitet und je nach Schwere einfärbt — Use-Case: Kontextfenster → Auswirkung auf die Komplettanalyse-Pässe. Neutral (Info, `--color-tag-bg`), `.is-warn` (amber, `--color-warn-bg/-text`), `.is-bad` (rot, `--color-err-bg/-text`), linker 3 px-Border in der jeweiligen Akzentfarbe. Schwellen + abgeleitete Zahlen kommen aus einer Karten-Methode (`adminSettingsBudget(provider)`), nicht aus CSS. Markup: `<strong>`-Titel + `.muted-msg.muted-msg--sm`-Ableitung + optionaler Warn-Absatz (nur bei `level !== 'ok'`). CSS in [admin/admin-settings.css](public/css/admin/admin-settings.css). Use, wenn eine Einstellung eine nicht-offensichtliche Folgewirkung auf ein anderes Feature hat, die der Admin beim Setzen kennen soll.
+
 ### Validation-State auf Inputs (Pflicht bei Fehler)
 
 Inputs mit Fehler bekommen `aria-invalid="true"` + `aria-describedby="<error-id>"`. Visuell rote Border via `[aria-invalid="true"]`-Selektor in [card-form.css](public/css/components/card-form.css). Kein eigener `.form-input--invalid`-State daneben — `aria-invalid` ist Pflicht-Attribut, der Selektor leitet daraus die Optik ab.

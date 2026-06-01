@@ -19,7 +19,7 @@ const {
 const {
   preMergeChapterFiguren, applySozialschichtModeVote,
   mergeDuplicateFiguren, validateBeziehungenDescriptions,
-  mergeBeziehungenIntoFiguren, backfillFiguren,
+  mergeBeziehungenIntoFiguren, backfillFiguren, ensureUniqueFigIds,
 } = require('./figuren-merge');
 const appSettings = require('../../../lib/app-settings');
 const { getContextConfigFor } = require('../../../lib/ai');
@@ -429,6 +429,8 @@ async function runPhase2(ctx, chapterFiguren, chapterAssignments, chapterSzenen)
   }
   const backfilled = backfillFiguren(figuren, chapterSzenen, chapterAssignments, log);
   if (backfilled > 0) log.info(`${backfilled} Figur(en) aus Szenen/Events nachgetragen (Phase-1-Recall-Lücke).`);
+  const reassignedIds = ensureUniqueFigIds(figuren);
+  if (reassignedIds > 0) log.warn(`${reassignedIds} kollidierende/leere Figuren-IDs neu vergeben (Schutz vor UNIQUE-Verletzung beim Speichern).`);
   saveFigurenToDb(bookIdInt, figuren, email, idMaps);
   log.info(`${figuren.length} Figuren gespeichert.`);
   try {

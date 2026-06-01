@@ -9,6 +9,7 @@ const assert = require('node:assert/strict');
 const {
   preMergeChapterFiguren, mergeDuplicateFiguren,
   applySozialschichtModeVote, validateBeziehungenDescriptions,
+  ensureUniqueFigIds,
 } = require('../../routes/jobs/komplett/figuren-merge');
 
 // ── preMergeChapterFiguren ────────────────────────────────────────────────────
@@ -170,4 +171,48 @@ test('beziehungsBeschreibung: ohne erkennbare Figur → geleert', () => {
   assert.equal(cleared, 1);
   assert.equal(moved, 0);
   assert.equal(figuren[0].beziehungen[0].beschreibung, null);
+});
+
+// ── ensureUniqueFigIds ────────────────────────────────────────────────────────
+// Schutz vor UNIQUE(book_id, fig_id, user_email): mergeDuplicateFiguren dedupt
+// nur nach Namen, nicht nach id. Verschieden benannte Figuren mit gleicher id
+// (KI-Konsolidierung oder fig_N-Index-Kollision) würden sonst den INSERT brechen.
+test('ensureUniqueFigIds: doppelte id wird neu vergeben, erste behält sie', () => {
+  const figuren = [
+    { id: 'fig_3', name: 'Anna' },
+    { id: 'fig_3', name: 'Bert' }, // Kollision
+  ];
+  const reassigned = ensureUniqueFigIds(figuren);
+  assert.equal(reassigned, 1);
+  assert.equal(figuren[0].id, 'fig_3');           // erste behält
+  assert.notEqual(figuren[1].id, 'fig_3');         // zweite neu
+  assert.equal(new Set(figuren.map(f => f.id)).size, 2);
+});
+
+test('ensureUniqueFigIds: neue id liegt über dem bisherigen Maximum', () => {
+  const figuren = [
+    { id: 'fig_3', name: 'Anna' },
+    { id: 'fig_3', name: 'Bert' },
+    { id: 'fig_7', name: 'Cara' },
+  ];
+  ensureUniqueFigIds(figuren);
+  assert.equal(figuren[1].id, 'fig_8');
+});
+
+test('ensureUniqueFigIds: leere/fehlende id wird vergeben', () => {
+  const figuren = [
+    { id: 'fig_1', name: 'Anna' },
+    { id: '', name: 'Bert' },
+    { name: 'Cara' },
+  ];
+  const reassigned = ensureUniqueFigIds(figuren);
+  assert.equal(reassigned, 2);
+  assert.equal(new Set(figuren.map(f => f.id)).size, 3);
+  assert.ok(figuren.every(f => /^fig_\d+$/.test(f.id)));
+});
+
+test('ensureUniqueFigIds: bereits eindeutig → no-op', () => {
+  const figuren = [{ id: 'fig_1', name: 'Anna' }, { id: 'fig_2', name: 'Bert' }];
+  assert.equal(ensureUniqueFigIds(figuren), 0);
+  assert.deepEqual(figuren.map(f => f.id), ['fig_1', 'fig_2']);
 });

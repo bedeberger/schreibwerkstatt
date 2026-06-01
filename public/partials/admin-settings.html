@@ -164,6 +164,17 @@
         <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.thinkOpenaiCompat')"></small>
       </div>
 
+      <template x-if="adminSettingsBudget(adminSettingsProviderSubtab)">
+        <div class="admin-settings-budget"
+             :class="{ 'is-warn': adminSettingsBudget(adminSettingsProviderSubtab).level === 'warn', 'is-bad': adminSettingsBudget(adminSettingsProviderSubtab).level === 'bad' }">
+          <strong x-text="$app.t('admin.settings.komplett.title')"></strong>
+          <p class="muted-msg muted-msg--sm"
+             x-text="$app.t('admin.settings.komplett.derived', adminSettingsBudget(adminSettingsProviderSubtab).f)"></p>
+          <p x-show="adminSettingsBudget(adminSettingsProviderSubtab).level !== 'ok'"
+             x-text="$app.t('admin.settings.komplett.' + adminSettingsBudget(adminSettingsProviderSubtab).level, adminSettingsBudget(adminSettingsProviderSubtab).f)"></p>
+        </div>
+      </template>
+
       <div class="admin-settings-actions">
         <button type="button"
                 @click="adminSettingsForm['ai.provider'] = adminSettingsProviderSubtab"

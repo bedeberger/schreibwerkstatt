@@ -400,8 +400,35 @@ function backfillFiguren(figuren, chapterSzenen, chapterAssignments, log) {
   return created;
 }
 
+/** Letzte Absicherung vor saveFigurenToDb gegen das UNIQUE(book_id, fig_id,
+ *  user_email): garantiert, dass jede Figur eine eindeutige, nicht-leere `id`
+ *  trägt. mergeDuplicateFiguren dedupliziert nur nach Namen – liefert die
+ *  Phase-2-Konsolidierung zwei verschieden benannte Figuren mit derselben `id`
+ *  (oder kollidiert eine explizite `fig_N` mit einer index-generierten), würden
+ *  sonst beide eingefügt und der INSERT bricht ab. Die ERSTE Figur einer ID
+ *  behält sie (eingehende beziehungen.figur_id bleiben gültig); jede weitere
+ *  Kollision bzw. leere ID bekommt eine frische `fig_<maxIdx+1>`. Mutiert
+ *  `figuren` und gibt die Anzahl neu vergebener IDs zurück. */
+function ensureUniqueFigIds(figuren) {
+  let maxIdx = 0;
+  for (const f of figuren) {
+    const m = /^fig_(\d+)$/.exec(f.id || '');
+    if (m) maxIdx = Math.max(maxIdx, parseInt(m[1], 10));
+  }
+  const seen = new Set();
+  let reassigned = 0;
+  for (const f of figuren) {
+    if (!f.id || seen.has(f.id)) {
+      f.id = 'fig_' + (++maxIdx);
+      reassigned++;
+    }
+    seen.add(f.id);
+  }
+  return reassigned;
+}
+
 module.exports = {
   preMergeChapterFiguren, applySozialschichtModeVote,
   mergeDuplicateFiguren, validateBeziehungenDescriptions,
-  mergeBeziehungenIntoFiguren, backfillFiguren,
+  mergeBeziehungenIntoFiguren, backfillFiguren, ensureUniqueFigIds,
 };

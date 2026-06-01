@@ -1,5 +1,7 @@
 // AdminSettingsCard-Methods.
 
+import { formatNum, localeTagFromUi } from '../num-input.js';
+
 export const adminSettingsMethods = {
   async adminSettingsLoad() {
     if (this.adminSettingsLoading) return;
@@ -231,5 +233,38 @@ export const adminSettingsMethods = {
     const coerced = this._adminSettingsCoerceValue(key, raw);
     if (s.encrypted) return coerced !== '__unchanged__';
     return JSON.stringify(coerced) !== JSON.stringify(s.value);
+  },
+
+  // Spiegelt die Budget-Ableitung aus lib/ai.js (getContextConfigFor) +
+  // routes/jobs/shared/loader.js (chunkLimitsFor) im Frontend, damit der Admin
+  // schon beim Tippen sieht, wie das Kontextfenster die Komplettanalyse-Pässe
+  // skaliert. Reiner Schätzwert (charsPerToken provider-typisch) — die echte
+  // Quelle bleibt der Server. Liefert null, wenn context_window noch ungültig.
+  adminSettingsBudget(provider) {
+    const p = (provider === 'claude' || provider === 'ollama' || provider === 'openai-compat') ? provider : 'claude';
+    const ctx = Number(this.adminSettingsForm[`ai.${p}.context_window`]);
+    if (!Number.isFinite(ctx) || ctx <= 0) return null;
+    let out = Number(this.adminSettingsForm[`ai.${p}.max_tokens_out`]);
+    if (!Number.isFinite(out) || out <= 0) out = p === 'claude' ? 64000 : 16000;
+    const cptRaw = Number(this.adminSettingsForm['ai.chars_per_token']);
+    const charsPerToken = Number.isFinite(cptRaw) && cptRaw > 0 ? cptRaw : (p === 'claude' ? 3 : 4);
+    const inputBudgetTokens = Math.max(2000, ctx - out - 2000);
+    const inputBudgetChars = inputBudgetTokens * charsPerToken;
+    const singlePass = Math.max(20000, Math.min(2000000, Math.floor(inputBudgetChars * 0.70)));
+    const perChunk = Math.max(10000, Math.min(200000, Math.floor(inputBudgetChars * 0.35)));
+    const RECOMMENDED = 128000;
+    const level = ctx >= RECOMMENDED ? 'ok' : (ctx >= 64000 ? 'warn' : 'bad');
+    const tag = localeTagFromUi(window.__app?.uiLocale);
+    const fmt = (n) => formatNum(n, { localeTag: tag, decimals: 0 });
+    return {
+      level,
+      f: {
+        ctx: fmt(ctx),
+        recommended: fmt(RECOMMENDED),
+        budget: fmt(inputBudgetChars),
+        single: fmt(singlePass),
+        chunk: fmt(perChunk),
+      },
+    };
   },
 };
