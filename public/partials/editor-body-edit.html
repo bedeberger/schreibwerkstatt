@@ -23,4 +23,28 @@
        @click="_onEditClick($event)"
        @pointermove="handleMarkPointer($event)"
        @pointerleave="handleMarkPointerLeave($event)"></div>
+
+  <!-- STT-Diktat: schwebender Mic-Button unten rechts im Editorfeld (analog
+       zum LanguageTool-Badge oben rechts). Nur sichtbar, wenn Admin STT
+       aktiviert hat (sttEnabled = Root-State aus /config). Sprache loest der
+       Proxy aus der Buch-Locale auf. -->
+  <template x-if="sttEnabled">
+    <div class="stt-dock" x-cloak>
+      <!-- Live-Status links vom Mic: „Bereit", „Hört zu" (Sprache erkannt,
+           roter Puls) oder „Transkribiert" (Segment-Upload, Akzent-Puls). -->
+      <span class="stt-status" aria-live="polite"
+            x-show="sttRecording || sttTranscribing > 0"
+            :class="{ 'is-hearing': sttListening && sttTranscribing === 0, 'is-transcribing': sttTranscribing > 0 }"
+            x-text="sttTranscribing > 0 ? t('stt.status.transcribing') : (sttListening ? t('stt.status.hearing') : t('stt.status.listening'))"></span>
+      <button type="button" class="stt-dock-btn"
+              :aria-pressed="sttRecording"
+              :class="{ 'is-recording': sttRecording, 'is-pending': sttPending }"
+              :disabled="sttPending"
+              :data-tip="sttRecording ? t('stt.stop') : t('stt.dictate')"
+              :aria-label="sttRecording ? t('stt.stop') : t('stt.dictate')"
+              @click="toggleSttDictation()">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#mic"/></svg>
+      </button>
+    </div>
+  </template>
 </div>

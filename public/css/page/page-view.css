@@ -282,38 +282,81 @@
   border-color: var(--color-success);
   color: var(--color-success);
 }
-/* Slot wrappt Trenner + Mic-Button (Alpine `<template x-if>` braucht eine
-   Wurzel). `display: contents` hebt den Span auf, damit beide Kinder direkte
-   Flex-Items der Toolbar werden — sonst greift `align-self: stretch` am
-   `.action-sep` nicht und der Trenner kollabiert unsichtbar. */
-.page-editor-toolbar .stt-toolbar-slot { display: contents; }
-/* STT-Diktat: aktive Aufnahme rot mit pulsierendem Akzent (uebersteuert den
-   generischen aria-pressed-Highlight). Pending = kurzer Wartezustand
-   (getUserMedia laeuft) ohne Puls. */
-.page-editor-toolbar .stt-mic-btn.is-recording[aria-pressed="true"] {
+@media (max-width: 600px) {
+  .page-editor-toolbar { justify-content: flex-start; }
+}
+
+/* STT-Diktat: schwebender Mic-Button + Live-Status unten rechts im Editorfeld.
+   Visuell analog zum LanguageTool-Badge oben rechts, kollidiert aber nie mit
+   ihm. `position: sticky` haelt den Mic am unteren Rand des sichtbaren
+   Editorbereichs, waehrend das Feld scrollt (Seite ODER Karte im Vollbild
+   scrollt — sticky bezieht sich auf den jeweiligen Scrollport). Negativer
+   margin-top zieht die Box in den Textfluss zurueck, sodass sie keine eigene
+   Layout-Hoehe verbraucht und wirklich „schwebt". Der Container faengt keine
+   Klicks (pointer-events:none) — nur seine Kinder, damit der freie Bereich
+   darum weiter den Text trifft. */
+.stt-dock {
+  position: sticky;
+  bottom: var(--space-sm);
+  align-self: flex-end;
+  margin-right: var(--space-sm);
+  margin-top: calc(-1 * (36px + var(--space-sm)));
+  z-index: var(--z-overlay-spellcheck, 9);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  pointer-events: none;
+}
+.stt-dock > * { pointer-events: auto; }
+
+.stt-dock-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-muted);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+}
+.stt-dock-btn .icon { width: 18px; height: 18px; }
+.stt-dock-btn:hover { color: var(--color-primary); border-color: var(--color-primary); }
+/* Aktive Aufnahme: rot mit pulsierendem Akzent. */
+.stt-dock-btn.is-recording[aria-pressed="true"] {
   border-color: var(--color-danger, #b04040);
   color: var(--color-danger, #b04040);
   background: color-mix(in srgb, var(--color-danger, #b04040) 10%, transparent);
   animation: sttRecPulse 1.4s ease-in-out infinite;
 }
-.page-editor-toolbar .stt-mic-btn.is-pending {
-  opacity: 0.6;
-}
+/* Pending = kurzer Wartezustand (getUserMedia laeuft) ohne Puls. */
+.stt-dock-btn.is-pending { opacity: 0.6; cursor: default; }
 @keyframes sttRecPulse {
   0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-danger, #b04040) 45%, transparent); }
-  50%      { box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-danger, #b04040) 0%, transparent); }
+  50%      { box-shadow: 0 0 0 5px color-mix(in srgb, var(--color-danger, #b04040) 0%, transparent); }
 }
-/* Live-Status-Label neben dem Mic-Button. Punkt-Indikator links: grau (bereit),
-   rot pulsierend (erkennt Sprache), akzentfarben pulsierend (transkribiert). */
-.page-editor-toolbar .stt-status {
+
+/* Status-Pill links vom Mic. Punkt-Indikator: grau (bereit), rot pulsierend
+   (erkennt Sprache), akzentfarben pulsierend (transkribiert). */
+.stt-dock .stt-status {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: var(--font-em-85, 0.85em);
+  padding: var(--space-3) var(--space-6);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  font-size: var(--font-size-xs);
+  line-height: 1;
   color: var(--color-muted);
   white-space: nowrap;
+  user-select: none;
 }
-.page-editor-toolbar .stt-status::before {
+.stt-dock .stt-status::before {
   content: "";
   width: 8px;
   height: 8px;
@@ -321,17 +364,19 @@
   background: var(--color-muted);
   flex: none;
 }
-.page-editor-toolbar .stt-status.is-hearing {
+.stt-dock .stt-status.is-hearing {
   color: var(--color-danger, #b04040);
+  border-color: color-mix(in srgb, var(--color-danger, #b04040) 40%, transparent);
 }
-.page-editor-toolbar .stt-status.is-hearing::before {
+.stt-dock .stt-status.is-hearing::before {
   background: var(--color-danger, #b04040);
   animation: sttDotBlink 1s ease-in-out infinite;
 }
-.page-editor-toolbar .stt-status.is-transcribing {
+.stt-dock .stt-status.is-transcribing {
   color: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
 }
-.page-editor-toolbar .stt-status.is-transcribing::before {
+.stt-dock .stt-status.is-transcribing::before {
   background: var(--color-accent);
   animation: sttDotBlink 0.8s linear infinite;
 }
@@ -340,11 +385,8 @@
   50%      { opacity: 0.25; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .page-editor-toolbar .stt-mic-btn.is-recording[aria-pressed="true"] { animation: none; }
-  .page-editor-toolbar .stt-status::before { animation: none !important; }
-}
-@media (max-width: 600px) {
-  .page-editor-toolbar { justify-content: flex-start; }
+  .stt-dock-btn.is-recording[aria-pressed="true"] { animation: none; }
+  .stt-dock .stt-status::before { animation: none !important; }
 }
 
 /* Vollbild: Karte als Overlay, Header (Save/Cancel/Status) bleibt sichtbar.

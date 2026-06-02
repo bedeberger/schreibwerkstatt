@@ -265,29 +265,8 @@
             @click="toggleEntitiesEnabledForCurrentBook(); entityPanelOpen = !entitiesEnabledForCurrentBook ? entityPanelOpen : true">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#radio"/></svg>
     </button>
-    <!-- STT-Diktat-Toggle. Nur sichtbar wenn Admin STT aktiviert hat
-         (sttEnabled = Root-State aus /config). Recording-State via aria-pressed
-         (CSS-Puls). Sprache loest der Proxy aus der Buch-Locale auf. -->
-    <template x-if="sttEnabled">
-      <span class="stt-toolbar-slot">
-        <span class="action-sep" aria-hidden="true"></span>
-        <button type="button" class="graph-tool-btn stt-mic-btn"
-                :aria-pressed="sttRecording"
-                :class="{ 'is-recording': sttRecording, 'is-pending': sttPending }"
-                :disabled="sttPending"
-                :data-tip="sttRecording ? t('stt.stop') : t('stt.dictate')"
-                :aria-label="sttRecording ? t('stt.stop') : t('stt.dictate')"
-                @click="toggleSttDictation()">
-          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#mic"/></svg>
-        </button>
-        <!-- Live-Status: zeigt, ob gerade Sprache erkannt wird („hoert") bzw.
-             ein Segment transkribiert wird („transkribiert"). -->
-        <span class="stt-status" x-cloak aria-live="polite"
-              x-show="sttRecording || sttTranscribing > 0"
-              :class="{ 'is-hearing': sttListening && sttTranscribing === 0, 'is-transcribing': sttTranscribing > 0 }"
-              x-text="sttTranscribing > 0 ? t('stt.status.transcribing') : (sttListening ? t('stt.status.hearing') : t('stt.status.listening'))"></span>
-      </span>
-    </template>
+    <!-- STT-Diktat-Mic schwebt im Editorfeld unten rechts (siehe
+         editor-body-edit.html), nicht hier in der Toolbar. -->
   </div>
   </div><!-- /editor-card__topbar -->
 
