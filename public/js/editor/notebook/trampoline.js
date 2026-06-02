@@ -43,4 +43,5 @@ export const notebookTrampoline = {
     return card()?._checkPageConflict(pageId, expectedUpdatedAt) ?? null;
   },
   _getEditEl() { return card()?._getEditEl() ?? null; },
+  _scrollEditCaretIntoView(rect) { card()?._scrollEditCaretIntoView(rect); },
 };

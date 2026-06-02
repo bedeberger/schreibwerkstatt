@@ -203,7 +203,27 @@ export const sttDictationMethods = {
     try { rec.start(); } catch { /* noop */ }
     this.sttRecording = true;
     this.sttPending = false;
+    // Mic-Klick = „ans Ende anfügen": Caret beim Start ans Editorende setzen,
+    // damit Diktat unten anwächst, statt an einer evtl. veralteten Caret-Position
+    // mitten im Text einzufügen. Folgesegmente hängen am vorrückenden Caret weiter.
+    this._sttAnchorToEnd();
     rt.vadTimer = setInterval(() => this._sttVadTick(), 100);
+  },
+
+  // Setzt den Caret ans Ende des Editorinhalts und scrollt dorthin — Anker für
+  // die erste Diktat-Einfügung (siehe _sttStart).
+  _sttAnchorToEnd() {
+    const editEl = this._getEditEl?.();
+    if (!editEl) return;
+    try {
+      const range = document.createRange();
+      range.selectNodeContents(editEl);
+      range.collapse(false);
+      const sel = document.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+      this._scrollEditCaretIntoView?.();
+    } catch { /* noop */ }
   },
 
   _sttNow() {
@@ -329,6 +349,11 @@ export const sttDictationMethods = {
     sel?.removeAllRanges();
     sel?.addRange(range);
     this._markEditDirty?.();
+    // Programmatischer Insert: der Browser zieht den Scroll nicht automatisch
+    // nach — den eingefügten Knoten selbst vermessen und ins Sichtfeld holen.
+    let caretRect = null;
+    try { const rr = document.createRange(); rr.selectNode(node); caretRect = rr.getBoundingClientRect(); } catch { /* noop */ }
+    this._scrollEditCaretIntoView?.(caretRect);
   },
 
   // Zeichen unmittelbar vor dem Caret (fuer Leerzeichen-Heuristik). Der Caret

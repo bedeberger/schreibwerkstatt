@@ -716,6 +716,37 @@ export const notebookEditMethods = {
     this._scheduleDraftSave();
     this._scheduleAutosave();
     this._historyPushSoon?.();
+    this._scrollEditCaretIntoView();
+  },
+
+  // Hält den Caret im sichtbaren Bereich des Edit-Felds. Das contenteditable ist
+  // sein eigener Scroll-Container (max-height + overflow-y:auto), darum nicht
+  // scrollIntoView (das würde die ganze Seite scrollen), sondern den eigenen
+  // scrollTop nachziehen. Nur ein Nudge, wenn der Caret über/unter den
+  // sichtbaren Rand rutscht — scrollt der User bewusst weg (ohne zu tippen),
+  // bleibt das unberührt (kein Input-Event). Aufrufer: `_markEditDirty`
+  // (Tippen/Paste/Toolbar — Sicherheitsnetz) und STT (programmatischer Insert,
+  // bei dem der Browser NICHT automatisch nachzieht). `rect` optional: STT
+  // misst den eingefügten Knoten direkt, sonst wird der Live-Caret vermessen.
+  _scrollEditCaretIntoView(rect) {
+    const el = this._getEditEl();
+    if (!el) return;
+    let r = rect;
+    if (!r) {
+      const sel = document.getSelection();
+      if (!sel || !sel.rangeCount) return;
+      const range = sel.getRangeAt(0);
+      if (!el.contains(range.commonAncestorContainer) && el !== range.commonAncestorContainer) return;
+      r = range.getBoundingClientRect();
+    }
+    if (!r || (!r.height && !r.top && !r.bottom)) return; // kein verlässliches Rect
+    const host = el.getBoundingClientRect();
+    const margin = 28;
+    if (r.bottom > host.bottom - margin) {
+      el.scrollTop += r.bottom - (host.bottom - margin);
+    } else if (r.top < host.top + margin) {
+      el.scrollTop -= (host.top + margin) - r.top;
+    }
   },
 
   _scheduleDraftSave() {
