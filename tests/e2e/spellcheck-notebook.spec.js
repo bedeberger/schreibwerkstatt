@@ -6,7 +6,7 @@
 // DOM-Element pro Match) — Tests greifen Highlight-Sets aus `CSS.highlights`
 // ab und klicken via Maus-Koordinaten ins highlight-Range.
 
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./_helpers/fixtures');
 
 const HARNESS = '/tests/fixtures/spellcheck-harness.html?kind=notebook';
 

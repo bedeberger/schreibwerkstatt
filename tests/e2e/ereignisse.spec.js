@@ -6,7 +6,7 @@
 // Unbekannt-Bucket-Klasse, Subtyp-Filter, und dass die formatEventDate-
 // Logik die strukturierten Felder korrekt rendert.
 
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./_helpers/fixtures');
 
 test.beforeEach(async ({ page }) => {
   await page.goto('http://localhost:8765/tests/fixtures/ereignisse-harness.html', { waitUntil: 'domcontentloaded' });

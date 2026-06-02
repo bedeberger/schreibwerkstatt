@@ -3,7 +3,7 @@
 // /jobs/epub-export* in tests/server.js und prüft, dass der Export-Button den
 // Job startet, pollt und die EPUB-Datei als Download auslöst.
 
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./_helpers/fixtures');
 
 test.describe('epub-export-card', () => {
   test.beforeEach(async ({ page }) => {

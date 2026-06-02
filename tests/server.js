@@ -9,6 +9,10 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+// Echte PDF-Default-Config, damit der Mock-Profile-POST dieselbe vollstaendige
+// Struktur liefert wie die Produktion — sonst rendert die pdfExportCard gegen
+// fehlende Felder (marginsMm/bodyInsetMm/font[role] …) und wirft Alpine-Errors.
+const { defaultConfig } = require('../lib/pdf-export-defaults');
 
 const PORT = 8765;
 const ROOT = path.resolve(__dirname, '..');
@@ -170,7 +174,7 @@ async function handleMockRoute(req, res, urlPath) {
     const id = ++pdfProfileSeq;
     const profile = {
       id, book_id: payload.book_id || 0, user_email: 'test@x',
-      name: payload.name || 'Profil', config: { layout: { pageSize: 'A4' }, font: {}, chapter: {}, cover: {}, toc: {}, extras: {}, print: {}, coverSpec: {}, pdfa: {} },
+      name: payload.name || 'Profil', config: defaultConfig(),
       is_default: false, has_cover: false, has_back_cover: false,
     };
     pdfProfiles.push(profile);

@@ -3,14 +3,18 @@
 //  - Navigate (/, /index.html): Stale-While-Revalidate im SHELL_CACHE
 //    → 0-Latenz-Render bei Repeat-Visit; neues HTML wird parallel geladen.
 //    Deploy-Update fliesst über `skip-waiting` + controllerchange-Reload.
-//  - Shell-Assets (CSS/JS/Icons): Stale-While-Revalidate im SHELL_CACHE
-//  - HTML-Partials: Network-First mit Cache-Fallback (verhindert eingefrorene UI-Bugs)
+//  - Shell-Assets (CSS/JS/Icons) + HTML-Partials + i18n-JSON: Cache-First im
+//    SHELL_CACHE, generationsgebunden. Eine SW-Generation bedient genau einen
+//    kohärenten Asset-Satz — neue Partials erscheinen NIE gegen alte, noch im
+//    Speicher laufende JS-Module (sonst ReferenceError auf neuen Card-Feldern).
+//    Frische Assets kommen ausschliesslich über eine neue SW-Generation
+//    (eigener SHELL_CACHE), die der Update-Banner aktiviert.
 //  - Content-GETs (/content/*): Stale-While-Revalidate im CONTENT_CACHE → Navigation + Seiteninhalt offline
 //  - Schreibende Requests (PUT/POST/DELETE): nie behandelt (method-Check am Anfang)
 //  - Auth/KI/Job-Queue/SSE: Network-Only, nie cachen
 //  - Version-Bump der Konstanten invalidiert den jeweiligen Cache
 
-const SHELL_CACHE = 'schreibwerkstatt-shell-v1129';
+const SHELL_CACHE = 'schreibwerkstatt-shell-v1131';
 const CONTENT_CACHE = 'schreibwerkstatt-content-v1';
 const CONFIG_CACHE = 'schreibwerkstatt-config-v2';
 const ACTIVE_CACHES = new Set([SHELL_CACHE, CONTENT_CACHE, CONFIG_CACHE]);
@@ -37,9 +41,6 @@ const NEVER_CACHE_PREFIXES = [
 
 const SHELL_ASSET_REGEX = /\.(?:css|js|mjs|json|svg|ico|png|woff2?)$/i;
 const PARTIAL_REGEX = /^\/partials\//;
-// i18n-JSON: Network-First wie Partials, damit neue Keys nicht als Raw-Key
-// im UI hängenbleiben.
-const I18N_REGEX = /^\/js\/i18n\/[a-z]{2}\.json$/i;
 
 // /js/plausible-init.js wird vom Server dynamisch aus app_settings gerendert
 // (Plausible an/aus + URL). Niemals cachen, sonst greift Admin-Toggle nicht
@@ -66,7 +67,7 @@ self.addEventListener('install', (event) => {
     // Bewusst KEIN skipWaiting hier: der neue SW bleibt `waiting`, bis der
     // User das Update-Banner klickt (applyUpdate → 'skip-waiting'-Message).
     // Sonst übernähme der neue SW eine laufende (Editor-)Seite sofort und
-    // bediente neue Network-First-Partials gegen die noch im Speicher
+    // bediente Partials/Assets der neuen Generation gegen die noch im Speicher
     // laufenden ALTEN JS-Module → Skew (z.B. ReferenceError auf neu
     // hinzugefügten Card-State-Feldern, die das alte Modul nicht kennt).
   })());
@@ -106,35 +107,24 @@ async function handleNavigate(req) {
   return new Response('Offline – Shell nicht im Cache.', { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
 }
 
+// Shell-Assets (JS/CSS/Icons/Partials/i18n): Cache-First, generationsgebunden.
+// Bewusst KEINE Hintergrund-Revalidierung und KEIN Network-First: beides zöge
+// neuere Assets in eine laufende Session, deren JS-Module noch die alte
+// Generation sind → Skew (neues Partial referenziert ein Card-Feld, das das
+// alte Modul nicht kennt → ReferenceError). Frische Assets erscheinen nur mit
+// einer neuen SW-Generation: deren SHELL_CACHE ist leer, die erste Anfrage
+// füllt ihn per Netz, ab dann liefert der Cache einen kohärenten Satz.
 async function handleShellAsset(req) {
   const cache = await caches.open(SHELL_CACHE);
-  const url = new URL(req.url);
-  // Partials & i18n-JSON: Network-First, damit Markup- und Locale-Updates
-  // sofort durchschlagen.
-  if (PARTIAL_REGEX.test(url.pathname) || I18N_REGEX.test(url.pathname)) {
-    try {
-      const net = await fetch(req);
-      if (net && net.ok) cache.put(req, net.clone());
-      return net;
-    } catch {
-      const cached = await cache.match(req);
-      if (cached) return cached;
-      return new Response('Offline', { status: 503 });
-    }
-  }
   const cached = await cache.match(req);
-  const netPromise = fetch(req).then((res) => {
-    if (res && res.ok) cache.put(req, res.clone());
-    return res;
-  }).catch(() => null);
-
-  if (cached) {
-    netPromise.catch(() => {});
-    return cached;
+  if (cached) return cached;
+  try {
+    const net = await fetch(req);
+    if (net && net.ok) cache.put(req, net.clone());
+    return net;
+  } catch {
+    return new Response('Offline', { status: 503 });
   }
-  const net = await netPromise;
-  if (net) return net;
-  return new Response('Offline', { status: 503 });
 }
 
 // Content-GETs: Stale-While-Revalidate, damit Buch-/Kapitel-/Seitenlisten

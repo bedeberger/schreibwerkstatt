@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./_helpers/fixtures');
 
 const HARNESS = '/tests/fixtures/focus-harness.html';
 const EDITOR = '#editor-card .focus-editor__content';
@@ -465,7 +465,10 @@ test('Chromium-Split: zwei .focus-paragraph-active → setActiveBlock räumt ab'
   expect(await page.locator('.focus-paragraph-active').count()).toBe(1);
 });
 
-test('Save-Fail beim Exit: User bleibt im Edit-Modus (Draft retten)', async ({ page }) => {
+test('Save-Fail beim Exit: User bleibt im Edit-Modus (Draft retten)', async ({ page, consoleGuard }) => {
+  // Negativ-Test: provoziert absichtlich einen Save-Fehler ("offline"), den der
+  // Editor erwartungsgemaess via console.error loggt — kein echter Bug.
+  consoleGuard.skip();
   await enter(page);
   await page.evaluate(() => {
     window.harness.editDirty = true;
@@ -537,7 +540,10 @@ test('visualViewport-resize debounced: setzt --focus-vh, kein Recenter-Storm', a
   expect(vh).toMatch(/^\d+px$/);
 });
 
-test('Enter-Error (fehlender Scroll-Container) → sauberer Rollback', async ({ page }) => {
+test('Enter-Error (fehlender Scroll-Container) → sauberer Rollback', async ({ page, consoleGuard }) => {
+  // Negativ-Test: _focusInstall wirft absichtlich ("no scroll container"), was
+  // der Editor erwartungsgemaess via console.error loggt — kein echter Bug.
+  consoleGuard.skip();
   // _focusInstall throwt → try/catch → rollback: focusActive=false,
   // body.focus-mode weg, state=idle. Ohne Rollback würde die body-Klasse
   // bestehen und die App fühlte sich „hängend" an.

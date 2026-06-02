@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./_helpers/fixtures');
 
 test('cleanContentArtefacts strips paste artefacts but keeps structure + img styles', async ({ page }) => {
   await page.goto('http://localhost:8765/tests/fixtures/focus-harness.html', { waitUntil: 'domcontentloaded' });

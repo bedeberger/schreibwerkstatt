@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./_helpers/fixtures');
 
 // Block-Level-Merge (Notebook + Focus). Same-User-Multi-Device-Konflikt:
 // nicht-kollidierende Block-Edits mergen still, echter Block-Overlap öffnet das

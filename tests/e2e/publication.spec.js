@@ -3,7 +3,7 @@
 // Speichern (PUT) und Cover-Upload (Vorschau). Der EPUB-Export hat eine eigene
 // Karte (epubExportCard) — Download-Test in tests/e2e/epub-export.spec.js.
 
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./_helpers/fixtures');
 
 // Serial: alle Tests teilen den Mock-State (publication{}). Reset je beforeEach.
 test.describe.configure({ mode: 'serial' });

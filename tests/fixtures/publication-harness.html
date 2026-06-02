@@ -45,6 +45,7 @@
       appTimezone: 'Europe/Zurich',
       t: tStub,
       tError: (d) => (d && (d.error_code || d.error)) || 'error',
+      formatLastRun: (iso) => iso || '',
       async loadBooks() {},
       async loadPages() {},
       dailyProgressIsFinished: false,

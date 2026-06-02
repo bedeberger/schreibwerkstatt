@@ -233,6 +233,10 @@ export const adminUsageMethods = {
     // Tab koennte waehrend des nextTick/await schon gewechselt haben. Charts auf
     // einem via x-show versteckten Canvas zu instanziieren loest Chart.js'
     // Resize-Crash aus ("Cannot read properties of null (reading 'ownerDocument')").
+    // Alle Charts laufen mit animation:false. Chart.js' Animations-rAF-Loop haelt
+    // sonst eine Referenz auf den Chart; wird der beim Tab-Wechsel via destroy()
+    // (ctx=null) abgeraeumt, zeichnet ein noch eingereihter Frame auf den null-Context
+    // ("Cannot read properties of null (reading 'save')") und zerschiesst den Render.
     if (this.adminUsageTab !== 'summary') return;
     let Chart;
     try { Chart = await loadChart(); } catch { return; }
@@ -264,7 +268,7 @@ export const adminUsageMethods = {
             backgroundColor: palette[0],
           }],
         },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } },
+        options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { display: false } } },
       });
     }
     // Pro-Modell-Pie
@@ -278,7 +282,7 @@ export const adminUsageMethods = {
           labels: byModel.map(m => m.model),
           datasets: [{ data: byModel.map(m => Number(m.usd?.toFixed?.(4) || m.usd || 0)), backgroundColor: palette }],
         },
-        options: { responsive: true, maintainAspectRatio: false },
+        options: { responsive: true, maintainAspectRatio: false, animation: false },
       });
     }
     // Pro-Job-Typ-Bar
@@ -292,7 +296,7 @@ export const adminUsageMethods = {
           labels: byType.map(t => this._adminUsageTypeLabel(t.type)),
           datasets: [{ label: 'USD', data: byType.map(t => Number(t.usd?.toFixed?.(4) || t.usd || 0)), backgroundColor: palette[2] }],
         },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } },
+        options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { display: false } } },
       });
     }
   },

@@ -1,7 +1,7 @@
 // E2E-Smoke-Test für pdfExportCard. Lädt das Harness, mockt Backend in
 // tests/server.js, klickt durch Profile-CRUD und Tab-Wechsel.
 
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./_helpers/fixtures');
 
 // Serial-Mode: alle pdf-export-Tests teilen sich denselben Mock-Server-State
 // (pdfProfiles[]). Parallel würden sich Profile-IDs überlappen und CRUD-

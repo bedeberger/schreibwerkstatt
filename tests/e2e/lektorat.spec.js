@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./_helpers/fixtures');
 
 const HARNESS = '/tests/fixtures/lektorat-harness.html';
 

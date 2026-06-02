@@ -1,6 +1,6 @@
 // E2E: Spellcheck-Controller im Focus-Editor-Setup.
 
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./_helpers/fixtures');
 
 const HARNESS = '/tests/fixtures/spellcheck-harness.html?kind=focus';
 

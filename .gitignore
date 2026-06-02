@@ -16,3 +16,6 @@ playwright-report/
 schreibwerkstatt.db.*.bak
 # Output-Intent-ICC: Binaerprofil, per Deploy-Migration geladen (assets/icc/README.md)
 assets/icc/*.icc
+
+# Smoke-Test Wegwerf-DB
+tests/.tmp/
