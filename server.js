@@ -84,8 +84,6 @@ app.set('trust proxy', 1);
 // connect-src 'self' deckt alle XHR/SSE-Endpunkte (Server proxy'd Anthropic +
 // Ollama; Storage geht ueber /content/*); Plausible-Origin wird zur Laufzeit
 // aus app_settings ergänzt, falls Analytics aktiv ist.
-const HCAPTCHA_ORIGINS = ['https://hcaptcha.com', 'https://*.hcaptcha.com'];
-
 function plausibleOriginFromSettings() {
   if (!appSettings.get('analytics.plausible.enabled')) return '';
   const url = String(appSettings.get('analytics.plausible.script_url') || '').trim();
@@ -96,12 +94,12 @@ function plausibleOriginFromSettings() {
 
 function buildCspHeader() {
   const plausible = plausibleOriginFromSettings();
-  const scriptSrc  = ["'self'", "'unsafe-eval'", ...(plausible ? [plausible] : []), ...HCAPTCHA_ORIGINS];
-  const styleSrc   = ["'self'", "'unsafe-inline'", ...HCAPTCHA_ORIGINS];
+  const scriptSrc  = ["'self'", "'unsafe-eval'", ...(plausible ? [plausible] : [])];
+  const styleSrc   = ["'self'", "'unsafe-inline'"];
   const imgSrc     = ["'self'", 'data:', 'blob:', 'https://*.googleusercontent.com', 'https://*.tile.openstreetmap.org'];
   const fontSrc    = ["'self'"];
-  const connectSrc = ["'self'", ...(plausible ? [plausible] : []), ...HCAPTCHA_ORIGINS];
-  const frameSrc   = ["'self'", ...HCAPTCHA_ORIGINS];
+  const connectSrc = ["'self'", ...(plausible ? [plausible] : [])];
+  const frameSrc   = ["'self'"];
   const dir = {
     'default-src':  ["'self'"],
     'script-src':   scriptSrc,
@@ -110,7 +108,8 @@ function buildCspHeader() {
     'font-src':     fontSrc,
     'connect-src':  connectSrc,
     'frame-src':    frameSrc,
-    'worker-src':   ["'self'"],
+    // ALTCHA loest das PoW in einem Blob-Web-Worker.
+    'worker-src':   ["'self'", 'blob:'],
     'manifest-src': ["'self'"],
     'object-src':   ["'none'"],
     'base-uri':     ["'self'"],

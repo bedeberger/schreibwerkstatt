@@ -323,7 +323,7 @@ router.get('/login', (req, res) => {
     ? `    <altcha-widget challengeurl="/altcha/challenge" name="altcha" auto="onload"></altcha-widget>\n`
     : '';
   const adminBlock = hasAdminPw
-    ? `  <form id="admin-form" class="public-form" novalidate data-returnto="${_escAttr(returnTo)}" data-msg-invalid="${_escAttr(t('auth.login.errInvalid'))}" data-msg-rate-tpl="${_escAttr(t('auth.login.errRateTpl'))}">
+    ? `  <form id="admin-form" class="public-form" novalidate data-returnto="${_escAttr(returnTo)}" data-msg-invalid="${_escAttr(t('auth.login.errInvalid'))}" data-msg-rate-tpl="${_escAttr(t('auth.login.errRateTpl'))}" data-msg-captcha="${_escAttr(t('auth.login.errCaptcha'))}">
     <h2 class="public-form-title">${t('auth.login.adminTitle')}</h2>
     <label><span>${t('auth.login.email')}</span><input type="email" id="email" required autocomplete="username"></label>
     <label><span>${t('auth.login.password')}</span><input type="password" id="password" required autocomplete="current-password"></label>

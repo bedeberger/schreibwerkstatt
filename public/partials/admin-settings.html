@@ -59,12 +59,14 @@
 
       <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.auth.captchaTitle')"></span></h4>
       <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.auth.captchaHint')"></p>
-      <label>auth.captcha.site_key
-        <input type="text" x-model="adminSettingsForm['auth.captcha.site_key']" placeholder="(optional)" autocomplete="off">
+      <label class="checkbox-row">
+        <input type="checkbox" :checked="adminSettingsForm['auth.altcha.enabled'] === true || adminSettingsForm['auth.altcha.enabled'] === 'true'"
+               @change="adminSettingsForm['auth.altcha.enabled'] = $event.target.checked">
+        <span>auth.altcha.enabled</span>
       </label>
-      <label>auth.captcha.secret_key
-        <input type="password" x-model="adminSettingsForm['auth.captcha.secret_key']" :placeholder="$app.t('admin.settings.secret.masked')" autocomplete="off">
-        <small x-show="adminSettingsMap['auth.captcha.secret_key']?.masked" class="muted-msg muted-msg--sm" x-text="adminSettingsMap['auth.captcha.secret_key']?.masked"></small>
+      <label>auth.altcha.complexity
+        <input type="text" x-data="numInput({ integer: true, min: 1000, max: 5000000 })" x-modelable="value" x-model="adminSettingsForm['auth.altcha.complexity']">
+        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.altchaComplexity')"></small>
       </label>
 
       <div class="admin-settings-actions">

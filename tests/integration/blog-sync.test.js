@@ -9,6 +9,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
+// Mock-WP laeuft ueber gestubbtes globalThis.fetch mit Reserved-TLD-Host
+// (wp.test) — DNS-Aufloesung im SSRF-Guard ueberspringen (Literal-Block bleibt).
+process.env.SSRF_SKIP_DNS_CHECK = '1';
 
 const { bootstrap, waitForJob } = require('./_helpers/setup');
 
