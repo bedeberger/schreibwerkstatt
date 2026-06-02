@@ -124,6 +124,40 @@ test('_computeSpacedInsert: Sprechpause nach Whitespace -> unveraendert', () => 
   assert.equal(m._computeSpacedInsert(' ', 'Das', true), 'Das');
 });
 
+test('_computeSpacedInsert: Modell-Satzzeichen hinter schliessender Anfuehrung -> kein eigener Punkt', () => {
+  // Dialog endet mit Punkt + schliessendem Guillemet/Quote: nur Leerzeichen,
+  // kein zusaetzlicher Punkt.
+  assert.equal(m._computeSpacedInsert('»Komm her.«', 'Dann ging er', true), ' Dann ging er');
+  assert.equal(m._computeSpacedInsert('"Wirklich?"', 'Sie nickte', true), ' Sie nickte');
+  assert.equal(m._computeSpacedInsert('…sagte er.”', 'Stille', true), ' Stille');
+});
+
+test('_computeSpacedInsert: Sprechpause ohne Satzzeichen (auch mit Vortext) -> Punkt ergaenzt', () => {
+  assert.equal(m._computeSpacedInsert('nach Hause', 'Dann', true), '. Dann');
+});
+
+// --- _endsSentence ----------------------------------------------------------
+
+test('_endsSentence: nacktes Satzendezeichen', () => {
+  assert.equal(m._endsSentence('.'), true);
+  assert.equal(m._endsSentence('Wirklich?'), true);
+  assert.equal(m._endsSentence('Halt!'), true);
+  assert.equal(m._endsSentence('…'), true);
+});
+
+test('_endsSentence: Satzendezeichen hinter schliessender Anfuehrung/Klammer', () => {
+  assert.equal(m._endsSentence('her.«'), true);
+  assert.equal(m._endsSentence('?"'), true);
+  assert.equal(m._endsSentence('(ja.)'), true);
+});
+
+test('_endsSentence: kein Satzende', () => {
+  assert.equal(m._endsSentence('Wort'), false);
+  assert.equal(m._endsSentence('her«'), false);
+  assert.equal(m._endsSentence(''), false);
+  assert.equal(m._endsSentence(','), false);
+});
+
 // --- _normalizeTranscript ---------------------------------------------------
 
 test('_normalizeTranscript: kollabiert interne Mehrfach-Whitespace', () => {

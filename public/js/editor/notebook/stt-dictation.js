@@ -94,25 +94,41 @@ export const sttDictationMethods = {
     );
   },
 
+  // True, wenn der vorausgehende Text auf einem Satzendezeichen endet — auch
+  // wenn danach noch schliessende Anfuehrungs-/Klammerzeichen stehen
+  // („…her.«", „…?"", „…!)"). So erkennen wir vom Modell gesetzte Satzzeichen
+  // (Whisper punktiert selbst) und ergaenzen keinen eigenen Punkt. Pure/testbar.
+  _endsSentence(prevText) {
+    const s = String(prevText || '').replace(/[\s"'’”“»«)\]]+$/u, '');
+    return /[.!?…]$/.test(s);
+  },
+
   // Fuegt vor dem Transkript ein Leerzeichen ein, wenn unmittelbar davor ein
   // Nicht-Whitespace steht und der neue Text nicht mit Satzzeichen beginnt —
   // damit Worte ueber Segmentgrenzen hinweg nicht zusammenkleben.
   //
+  // `prevText` ist der (Teil-)Text links vom Caret; das letzte Zeichen bestimmt
+  // die Leerzeichen-Heuristik, der getrimmte Schwanz die Satzende-Erkennung.
   // startsNewSentence = das vorige Segment wurde an einer Sprechpause
-  // abgeschnitten: dann ist die Segmentgrenze eine Satzgrenze. Fehlt am Vortext
-  // ein Satzendezeichen, wird ein Punkt ergaenzt (". " statt nur " ").
-  // Beginnt ein neuer Satz (Sprechpause, Doc/Block-Anfang oder Vortext endet auf
-  // Satzzeichen), wird der erste Buchstabe gross geschrieben.
-  _computeSpacedInsert(prevChar, text, startsNewSentence) {
+  // abgeschnitten: dann ist die Segmentgrenze eine Satzgrenze. Liefert das
+  // Modell selbst ein Satzendezeichen (auch hinter einer schliessenden
+  // Anfuehrung wie „…her.«"), ergaenzen wir KEINEN eigenen Punkt — nur das
+  // trennende Leerzeichen. Nur wenn der Vortext gar kein Satzendezeichen hat,
+  // wird einer gesetzt (". " statt nur " "). Beginnt ein neuer Satz, wird der
+  // erste Buchstabe gross geschrieben.
+  _computeSpacedInsert(prevText, text, startsNewSentence) {
     let t = this._normalizeTranscript(text);
     if (!t) return '';
-    const newSentence = startsNewSentence || !prevChar || /[.!?…]/.test(prevChar);
+    const prev = String(prevText || '');
+    const prevChar = prev ? prev[prev.length - 1] : '';
+    const prevEndsSentence = this._endsSentence(prev);
+    const newSentence = startsNewSentence || !prevChar || prevEndsSentence;
     if (newSentence) t = this._capitalizeSentenceStart(t);
     if (!prevChar) return t;
     const startsPunct = /^[\s,.;:!?…)»"'’-]/.test(t);
     if (/\s/.test(prevChar)) return t; // schon Whitespace davor
     if (startsNewSentence && !startsPunct) {
-      return /[.!?…]/.test(prevChar) ? ' ' + t : '. ' + t;
+      return prevEndsSentence ? ' ' + t : '. ' + t;
     }
     return startsPunct ? t : ' ' + t;
   },
@@ -469,7 +485,8 @@ export const sttDictationMethods = {
     if (range.collapsed && this._computeEatPrevSpace(prevChar, clean) && this._sttDeletePrevWhitespace(range)) {
       prevChar = this._sttCharBefore(range);
     }
-    const node = document.createTextNode(this._computeSpacedInsert(prevChar, clean, startsNewSentence));
+    const prevText = this._sttTextBefore(range);
+    const node = document.createTextNode(this._computeSpacedInsert(prevText, clean, startsNewSentence));
     range.deleteContents();
     range.insertNode(node);
     range.setStartAfter(node);
@@ -532,7 +549,10 @@ export const sttDictationMethods = {
   _sttEnsureTerminalPunct(block) {
     try {
       if (!block || block.nodeType !== 1) return;
-      const txt = (block.textContent || '').replace(/\s+$/, '');
+      // Schliessende Anfuehrungs-/Klammerzeichen mit abstreifen, damit ein vom
+      // Modell gesetztes Satzzeichen im Dialog („…her.«") erkannt wird und wir
+      // keinen zweiten Punkt anhaengen.
+      const txt = (block.textContent || '').replace(/[\s"'’”“»«)\]]+$/u, '');
       if (!txt || /[.!?…:;]$/.test(txt)) return;
       const lastTextNode = (node) => {
         for (let i = node.childNodes.length - 1; i >= 0; i--) {
@@ -553,6 +573,23 @@ export const sttDictationMethods = {
   // eingefuegten Textknoten), wo `startContainer` ein Elementknoten ist — darum
   // den gesamten Text links vom Caret per Range einsammeln und das letzte
   // Zeichen nehmen (deckt Text- und Elementknoten gleichermassen ab).
+  // Letzte n Zeichen links vom Caret (Default 12) — genug Kontext, um ein
+  // Satzendezeichen auch hinter einer schliessenden Anfuehrung zu erkennen
+  // (siehe `_endsSentence`). Sammelt den Text per Range ueber Knotengrenzen.
+  _sttTextBefore(range, n = 12) {
+    try {
+      const editEl = this._getEditEl?.();
+      if (!editEl) return '';
+      const probe = range.cloneRange();
+      probe.collapse(true);
+      const left = document.createRange();
+      left.selectNodeContents(editEl);
+      left.setEnd(probe.startContainer, probe.startOffset);
+      return left.toString().slice(-n);
+    } catch { /* noop */ }
+    return '';
+  },
+
   _sttCharBefore(range) {
     try {
       const probe = range.cloneRange();
