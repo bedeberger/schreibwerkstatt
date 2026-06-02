@@ -123,3 +123,39 @@ test('_computeSpacedInsert: Sprechpause, Text beginnt mit Satzzeichen -> kein Pu
 test('_computeSpacedInsert: Sprechpause nach Whitespace -> unveraendert', () => {
   assert.equal(m._computeSpacedInsert(' ', 'Das', true), 'Das');
 });
+
+// --- _normalizeTranscript ---------------------------------------------------
+
+test('_normalizeTranscript: kollabiert interne Mehrfach-Whitespace', () => {
+  assert.equal(m._normalizeTranscript('Hallo   Welt'), 'Hallo Welt');
+  assert.equal(m._normalizeTranscript('Hallo\n\tWelt'), 'Hallo Welt');
+});
+
+test('_normalizeTranscript: tilgt Leerzeichen vor Satzzeichen', () => {
+  assert.equal(m._normalizeTranscript('Hallo , Welt .'), 'Hallo, Welt.');
+  assert.equal(m._normalizeTranscript('Wirklich ?'), 'Wirklich?');
+});
+
+test('_normalizeTranscript: trimmt aussen', () => {
+  assert.equal(m._normalizeTranscript('  Hallo Welt  '), 'Hallo Welt');
+  assert.equal(m._normalizeTranscript('   '), '');
+});
+
+test('_computeSpacedInsert: kollabiert interne Doppel-Leerzeichen mit', () => {
+  assert.equal(m._computeSpacedInsert('t', 'Hallo   Welt'), ' Hallo Welt');
+});
+
+// --- _computeEatPrevSpace ---------------------------------------------------
+
+test('_computeEatPrevSpace: Leerzeichen vor Satzzeichen -> true', () => {
+  assert.equal(m._computeEatPrevSpace(' ', ', dann'), true);
+  assert.equal(m._computeEatPrevSpace(' ', '. Punkt'), true);
+});
+
+test('_computeEatPrevSpace: kein Whitespace davor -> false', () => {
+  assert.equal(m._computeEatPrevSpace('t', ', dann'), false);
+});
+
+test('_computeEatPrevSpace: Text beginnt mit Wort -> false', () => {
+  assert.equal(m._computeEatPrevSpace(' ', 'dann'), false);
+});

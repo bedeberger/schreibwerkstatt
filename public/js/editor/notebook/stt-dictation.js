@@ -61,6 +61,17 @@ export const sttDictationMethods = {
     return '';
   },
 
+  // Normalisiert ein Transkript-Segment fuer die Einfuegung: trimmt, kollabiert
+  // interne Whitespace-Folgen (Whisper liefert gelegentlich Doppel-Leerzeichen
+  // oder Zeilenumbrueche) und tilgt ein Leerzeichen DIREKT vor Satzzeichen
+  // („Wort , dann" -> „Wort, dann").
+  _normalizeTranscript(text) {
+    return String(text || '')
+      .replace(/\s+/g, ' ')
+      .replace(/\s+([,.;:!?…])/g, '$1')
+      .trim();
+  },
+
   // Fuegt vor dem Transkript ein Leerzeichen ein, wenn unmittelbar davor ein
   // Nicht-Whitespace steht und der neue Text nicht mit Satzzeichen beginnt —
   // damit Worte ueber Segmentgrenzen hinweg nicht zusammenkleben.
@@ -69,7 +80,7 @@ export const sttDictationMethods = {
   // abgeschnitten: dann ist die Segmentgrenze eine Satzgrenze. Fehlt am Vortext
   // ein Satzendezeichen, wird ein Punkt ergaenzt (". " statt nur " ").
   _computeSpacedInsert(prevChar, text, startsNewSentence) {
-    const t = String(text || '').trim();
+    const t = this._normalizeTranscript(text);
     if (!t) return '';
     if (!prevChar) return t;
     const startsPunct = /^[\s,.;:!?…)»"'’-]/.test(t);
@@ -78,6 +89,15 @@ export const sttDictationMethods = {
       return /[.!?…]/.test(prevChar) ? ' ' + t : '. ' + t;
     }
     return startsPunct ? t : ' ' + t;
+  },
+
+  // Plausibilisierung am Caret: liefert true, wenn ein Whitespace direkt vor
+  // dem Caret getilgt werden soll, weil das neue Segment mit Satzzeichen
+  // beginnt (sonst entstuende „Wort , dann"). Pure/testbar.
+  _computeEatPrevSpace(prevChar, text) {
+    const t = String(text || '').trim();
+    if (!t) return false;
+    return /\s/.test(prevChar) && /^[,.;:!?…]/.test(t);
   },
 
   // ── Lifecycle ───────────────────────────────────────────────────────────
@@ -277,7 +297,7 @@ export const sttDictationMethods = {
   },
 
   _sttInsertText(text, startsNewSentence) {
-    const clean = String(text || '').trim();
+    const clean = this._normalizeTranscript(text);
     if (!clean) return; // leerer/Whitespace-Transkript -> nichts einfuegen
     const editEl = this._getEditEl?.();
     if (!editEl) return;
@@ -295,7 +315,12 @@ export const sttDictationMethods = {
       range.selectNodeContents(editEl);
       range.collapse(false);
     }
-    const prevChar = this._sttCharBefore(range);
+    let prevChar = this._sttCharBefore(range);
+    // Beginnt das Segment mit Satzzeichen und steht davor schon ein Leerzeichen,
+    // dieses entfernen (kein „Wort , dann").
+    if (range.collapsed && this._computeEatPrevSpace(prevChar, clean) && this._sttDeletePrevWhitespace(range)) {
+      prevChar = this._sttCharBefore(range);
+    }
     const node = document.createTextNode(this._computeSpacedInsert(prevChar, clean, startsNewSentence));
     range.deleteContents();
     range.insertNode(node);
@@ -329,5 +354,29 @@ export const sttDictationMethods = {
       }
     } catch { /* noop */ }
     return '';
+  },
+
+  // Loescht ein einzelnes Whitespace-Zeichen direkt vor dem (kollabierten)
+  // Caret und setzt `range` an die Tilgungsstelle. Liefert true bei Erfolg.
+  // Deckt Textknoten-Caret und Element-Knoten-Grenze (vorausgehender Textknoten)
+  // ab. Idempotent-sicher: tilgt nur, wenn dort wirklich Whitespace steht.
+  _sttDeletePrevWhitespace(range) {
+    try {
+      if (!range.collapsed) return false;
+      let node = range.startContainer;
+      let offset = range.startOffset;
+      if (node.nodeType === 1 && offset > 0) {
+        let child = node.childNodes[offset - 1];
+        while (child && child.nodeType === 1 && child.lastChild) child = child.lastChild;
+        if (child && child.nodeType === 3) { node = child; offset = child.textContent.length; }
+      }
+      if (node.nodeType === 3 && offset > 0 && /\s/.test(node.textContent[offset - 1])) {
+        node.deleteData(offset - 1, 1);
+        range.setStart(node, offset - 1);
+        range.collapse(true);
+        return true;
+      }
+    } catch { /* noop */ }
+    return false;
   },
 };
