@@ -569,6 +569,7 @@ const isP1Extract  = (e) => e.schemaKeys.includes('figuren') && e.schemaKeys.inc
 const isFigKonsol  = (e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('figuren');
 const isSoziogramm = (e) => e.schemaKeys.includes('figuren') && e.schemaKeys.includes('beziehungen');
 const isOrteKonsol = (e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('orte');
+const isSongsKonsol = (e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('songs');
 const isBeziehung  = (e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('beziehungen');
 const isZeitstrahl = (e) => e.schemaKeys.includes('ereignisse');
 const isKontinuitaet = (e) => e.schemaKeys.includes('zusammenfassung') && e.schemaKeys.includes('probleme');
@@ -731,6 +732,97 @@ test('Komplettanalyse Phase 3 Orte-Konsolidierung trunkiert → Job ok, Warnung,
   ).all(BOOK_ID, 'tester@test.dev');
   assert.deepEqual(orte.map(o => o.name), ['Berg', 'Land']);
   assert.equal(job.result.orteCount, 2);
+});
+
+test('Komplettanalyse Phase 3 Orte-Fallback: kapitelweise wiederverwendete loc_ids kollidieren nicht (UNIQUE)', async () => {
+  const BOOK_ID = 712;
+  seedMultiChapterBook(BOOK_ID, 3); // Multi-Pass → echter Orte-Konsol-Call
+
+  // Jedes Kapitel vergibt seine loc_ids pro Kapitel NEU (ort_1, ort_2) — aber für
+  // verschiedene Namen. Nach dem Flatten im Fallback tragen also verschiedene Orte
+  // dieselbe loc_id. Vor dem Fix → UNIQUE(book_id, loc_id, user_email)-Crash.
+  const perChapterOrte = {
+    1: [{ id: 'ort_1', name: 'Berg' }, { id: 'ort_2', name: 'Wald' }],
+    2: [{ id: 'ort_1', name: 'See' }, { id: 'ort_2', name: 'Fluss' }],
+    3: [{ id: 'ort_1', name: 'Stadt' }, { id: 'ort_2', name: 'Dorf' }],
+  };
+  ctx.mockAi.on(isP1Extract, ({ prompt }) => {
+    const m = prompt.match(/Kapitel (\d+)/);
+    const num = m ? Number(m[1]) : 1;
+    const chap = m ? m[0] : 'Kapitel';
+    return {
+      figuren: [{ id: 'fig_anna', name: 'Anna', kurzname: 'Anna', typ: 'protagonist', praesenz: 'zentral', sozialschicht: 'mitte', kapitel: [{ name: chap, haeufigkeit: 1 }], beziehungen: [] }],
+      orte: (perChapterOrte[num] || []).map(o => ({ ...o, typ: 'natur', beschreibung: 'x', kapitel: [{ name: chap, haeufigkeit: 1 }], figuren: [] })),
+      fakten: [], songs: [],
+      szenen: [], assignments: [{ figur_name: 'Anna', lebensereignisse: [] }],
+    };
+  });
+  ctx.mockAi.on(isFigKonsol, figKonsolResponse([
+    { id: 'fig_anna', name: 'Anna', kurzname: 'Anna', typ: 'protagonist', praesenz: 'zentral', sozialschicht: 'mitte', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 1 }], beziehungen: [] },
+  ]));
+  ctx.mockAi.on(isOrteKonsol, { truncated: true, text: '{"orte":[' }); // erzwingt Fallback
+  ctx.mockAi.on(isBeziehung, { beziehungen: [] });
+  ctx.mockAi.on(isKontinuitaet, kontinuitaetResponse());
+
+  const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
+  ctx.shared.enqueueJob(jobId, () =>
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+  );
+  const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 10000 });
+  assert.equal(job.status, 'done', `expected done (kein UNIQUE-Crash), got ${job.status}: ${job.error || ''}`);
+
+  const orte = ctx.dbSchema.db.prepare(
+    'SELECT name, loc_id FROM locations WHERE book_id = ? AND user_email = ? ORDER BY name'
+  ).all(BOOK_ID, 'tester@test.dev');
+  assert.deepEqual(orte.map(o => o.name), ['Berg', 'Dorf', 'Fluss', 'See', 'Stadt', 'Wald']);
+  // loc_ids müssen über alle Orte eindeutig sein.
+  assert.equal(new Set(orte.map(o => o.loc_id)).size, orte.length, 'loc_ids nicht eindeutig');
+});
+
+test('Komplettanalyse Phase 3 Songs-Konsolidierung trunkiert → Job ok, Fallback, song_uid kollidiert nicht', async () => {
+  const BOOK_ID = 713;
+  seedMultiChapterBook(BOOK_ID, 3);
+
+  // Jedes Kapitel vergibt seine song-uids pro Kapitel neu (song_1, song_2) für
+  // verschiedene Titel → nach Flatten im Fallback Kollisionsgefahr auf UNIQUE(song_uid).
+  const perChapterSongs = {
+    1: [{ id: 'song_1', titel: 'Lied A' }, { id: 'song_2', titel: 'Lied B' }],
+    2: [{ id: 'song_1', titel: 'Lied C' }, { id: 'song_2', titel: 'Lied D' }],
+    3: [{ id: 'song_1', titel: 'Lied E' }],
+  };
+  ctx.mockAi.on(isP1Extract, ({ prompt }) => {
+    const m = prompt.match(/Kapitel (\d+)/);
+    const num = m ? Number(m[1]) : 1;
+    const chap = m ? m[0] : 'Kapitel';
+    return {
+      figuren: [{ id: 'fig_anna', name: 'Anna', kurzname: 'Anna', typ: 'protagonist', praesenz: 'zentral', sozialschicht: 'mitte', kapitel: [{ name: chap, haeufigkeit: 1 }], beziehungen: [] }],
+      orte: [{ id: 'ort_1', name: 'Berg', typ: 'natur', beschreibung: 'x', kapitel: [{ name: chap, haeufigkeit: 1 }], figuren: [] }],
+      songs: (perChapterSongs[num] || []).map(s => ({ ...s, interpret: 'X', beschreibung: 'b', kapitel: [{ name: chap, haeufigkeit: 1 }], figuren: [] })),
+      fakten: [], szenen: [], assignments: [{ figur_name: 'Anna', lebensereignisse: [] }],
+    };
+  });
+  ctx.mockAi.on(isFigKonsol, figKonsolResponse([
+    { id: 'fig_anna', name: 'Anna', kurzname: 'Anna', typ: 'protagonist', praesenz: 'zentral', sozialschicht: 'mitte', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 1 }], beziehungen: [] },
+  ]));
+  ctx.mockAi.on(isOrteKonsol, { orte: [{ id: 'ort_1', name: 'Berg', typ: 'natur', figuren: [] }] });
+  ctx.mockAi.on(isSongsKonsol, { truncated: true, text: '{"songs":[' }); // erzwingt Fallback
+  ctx.mockAi.on(isBeziehung, { beziehungen: [] });
+  ctx.mockAi.on(isKontinuitaet, kontinuitaetResponse());
+
+  const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
+  ctx.shared.enqueueJob(jobId, () =>
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+  );
+  const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 10000 });
+  assert.equal(job.status, 'done', `expected done (graceful fallback, kein UNIQUE-Crash), got ${job.status}: ${job.error || ''}`);
+  assert.ok((job.result.warnings || []).some(w => w.key === 'job.warn.songsKonsolidierungDegraded'),
+    `expected songsKonsolidierungDegraded warning, got ${JSON.stringify(job.result.warnings)}`);
+
+  const songs = ctx.dbSchema.db.prepare(
+    'SELECT titel, song_uid FROM songs WHERE book_id = ? AND user_email = ? ORDER BY titel'
+  ).all(BOOK_ID, 'tester@test.dev');
+  assert.deepEqual(songs.map(s => s.titel), ['Lied A', 'Lied B', 'Lied C', 'Lied D', 'Lied E']);
+  assert.equal(new Set(songs.map(s => s.song_uid)).size, songs.length, 'song_uids nicht eindeutig');
 });
 
 // Baut N Lebensereignisse für eine Figur (distinct datum+ereignis → N Gruppen in P6).

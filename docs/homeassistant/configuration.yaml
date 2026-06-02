@@ -131,6 +131,23 @@ rest:
           {{ ((value | regex_findall('sw_lektorat_seconds_today (\d+)')) + ['0']) | first | int(0) }}
         state_class: measurement
 
+      - name: Schreibwerkstatt STT Seconds Today
+        unique_id: sw_stt_seconds_today
+        icon: mdi:microphone-outline
+        unit_of_measurement: s
+        device_class: duration
+        value_template: >
+          {{ ((value | regex_findall('sw_stt_seconds_today (\d+)')) + ['0']) | first | int(0) }}
+        state_class: measurement
+
+      - name: Schreibwerkstatt STT Chars Today
+        unique_id: sw_stt_chars_today
+        icon: mdi:microphone-message
+        unit_of_measurement: Zeichen
+        value_template: >
+          {{ ((value | regex_findall('sw_stt_chars_today (\d+)')) + ['0']) | first | int(0) }}
+        state_class: measurement
+
       # ---- Job-Queue (In-Memory, resettet bei Server-Restart) ----
       - name: Schreibwerkstatt Jobs Running
         unique_id: sw_jobs_running
@@ -257,6 +274,15 @@ template:
         state_class: measurement
         state: >
           {{ (states('sensor.schreibwerkstatt_lektorat_seconds_today') | int(0) / 60) | round(1) }}
+
+      - name: Schreibwerkstatt STT Today Minutes
+        unique_id: sw_stt_today_min
+        icon: mdi:microphone
+        unit_of_measurement: min
+        device_class: duration
+        state_class: measurement
+        state: >
+          {{ (states('sensor.schreibwerkstatt_stt_seconds_today') | int(0) / 60) | round(1) }}
 
       - name: Schreibwerkstatt Cache Hit Ratio
         unique_id: sw_cache_hit_ratio

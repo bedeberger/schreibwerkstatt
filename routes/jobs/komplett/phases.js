@@ -517,7 +517,38 @@ function buildFallbackOrte(chapterOrte, validFigIds, idRemap) {
       }
     }
   }
-  return [...byName.values()].map((o, i) => ({ ...o, id: o.id || ('ort_' + (i + 1)) }));
+  // loc_id IMMER sequenziell neu vergeben: die kapitelweise extrahierten Orte tragen
+  // pro Kapitel neu startende ids (ort_1, ort_2, …), nach dem Flatten kollidieren also
+  // verschiedene Namen auf derselben id → UNIQUE(book_id, loc_id, user_email) in
+  // saveOrteToDb. Das run-interne Text-Handle ist frei wählbar (ortNameToId wird daraus
+  // gebaut, downstream zählt die DB-id), darum hier kollisionsfrei durchnummerieren.
+  return [...byName.values()].map((o, i) => ({ ...o, id: 'ort_' + (i + 1) }));
+}
+
+/** Regelbasierter Songs-Merge als Fallback, wenn die KI-Konsolidierung scheitert (analog
+ *  buildFallbackOrte). Flattet chapterSongs über alle Kapitel, dedupliziert nach Titel+Interpret
+ *  (case-insensitive, erstes Vorkommen gewinnt, figuren-Refs vereinigt), biegt figuren-IDs gegen
+ *  idRemap um und vergibt song_uid kollisionsfrei sequenziell neu (UNIQUE(book_id, song_uid, user_email)). */
+function buildFallbackSongs(chapterSongs, validFigIds, idRemap) {
+  const byKey = new Map();
+  for (const ch of (chapterSongs || [])) {
+    for (const s of (ch.songs || [])) {
+      const titel = (s.titel || s.title || '').trim();
+      const key = (titel + '|' + (s.interpret || '').trim()).toLowerCase();
+      if (!titel) continue;
+      const figIds = (s.figuren || [])
+        .map(fid => idRemap?.[fid] || fid)
+        .filter(fid => validFigIds.has(fid));
+      if (!byKey.has(key)) {
+        byKey.set(key, { ...s, figuren: [...new Set(figIds)] });
+      } else {
+        const ex = byKey.get(key);
+        ex.figuren = [...new Set([...ex.figuren, ...figIds])];
+        if (!ex.beschreibung && s.beschreibung) ex.beschreibung = s.beschreibung;
+      }
+    }
+  }
+  return [...byKey.values()].map((s, i) => ({ ...s, id: 'song_' + (i + 1) }));
 }
 
 /** Phase 3: Orte konsolidieren + Name→ID Lookup.
@@ -630,19 +661,36 @@ async function runPhase3Songs(ctx, chapterSongs, figurenKompakt, isSinglePass, i
       log.info(`Phase 3 Songs übersprungen (keine Songs in Pass B – KI-Call gespart).`);
     } else {
       // Songs-Range 55→56 (klein, ~3K Out): lässt 56→58 frei für P3b.
-      // Vorher überlappten Songs 56-58 mit P3b 55-58 → sichtbarer Range-Konflikt.
-      const songsResultRaw = await call(jobId, tok,
-        prompts.buildSongsConsolidationPrompt(bookName, chapterSongs, figurenKompakt),
-        sys.SYSTEM_ORTE_BLOCKS, 55, 56, komplettMaxTokens(effectiveProvider), 0.2, null, prompts.SCHEMA_SONGS_KONSOL,
-      );
-      const raw = Array.isArray(songsResultRaw?.songs) ? songsResultRaw.songs : [];
-      songs = raw.map((s, i) => ({
-        ...s,
-        id: s.id || ('song_' + (i + 1)),
-        figuren: (s.figuren || [])
-          .map(fid => idRemap?.[fid] || fid)
-          .filter(fid => validFigIds.has(fid)),
-      }));
+      let songsResultRaw = null;
+      try {
+        songsResultRaw = await call(jobId, tok,
+          prompts.buildSongsConsolidationPrompt(bookName, chapterSongs, figurenKompakt),
+          sys.SYSTEM_ORTE_BLOCKS, 55, 56, komplettMaxTokens(effectiveProvider), 0.2, null, prompts.SCHEMA_SONGS_KONSOL,
+        );
+      } catch (e) {
+        if (e.name === 'AbortError') throw e;
+        // Wie Orte/Figuren/Zeitstrahl: nicht katalog-kritisch – die Songs sind kapitelweise
+        // bereits extrahiert. Ein Konsolidierungs-Fehler (typisch: aiTruncated) darf den Job
+        // inkl. bereits gespeicherter Figuren/Orte NICHT verwerfen.
+        log.warn(`Songs-Konsolidierung fehlgeschlagen (${e.message}) – Fallback auf kapitel-extrahierte Songs.`);
+        ctx.warnings?.push({ key: 'job.warn.songsKonsolidierungDegraded' });
+      }
+      if (Array.isArray(songsResultRaw?.songs)) {
+        songs = songsResultRaw.songs.map((s, i) => ({
+          ...s,
+          id: s.id || ('song_' + (i + 1)),
+          figuren: (s.figuren || [])
+            .map(fid => idRemap?.[fid] || fid)
+            .filter(fid => validFigIds.has(fid)),
+        }));
+      } else {
+        if (songsResultRaw !== null) {
+          log.warn('Songs-Konsolidierung lieferte kein songs-Array – Fallback auf kapitel-extrahierte Songs.');
+          ctx.warnings?.push({ key: 'job.warn.songsKonsolidierungDegraded' });
+        }
+        songs = buildFallbackSongs(chapterSongs, validFigIds, idRemap);
+      }
+      updateJob(jobId, { progress: 56 });
     }
   }
   saveSongsToDb(bookIdInt, songs, email, idMaps.chNameToId, idMaps.pageNameToIdByChapter);

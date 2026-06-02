@@ -25,12 +25,16 @@ const METRIC_KEYS = {
   writing_cumulative: 'bookstats.metric.writingCumulative',
   lektorat_minutes:    'bookstats.metric.lektoratMinutes',
   lektorat_cumulative: 'bookstats.metric.lektoratCumulative',
+  stt_minutes:         'bookstats.metric.sttMinutes',
+  stt_cumulative:      'bookstats.metric.sttCumulative',
+  stt_chars:           'bookstats.metric.sttChars',
 };
 
 const WRITING_METRICS  = new Set(['writing_minutes',  'writing_cumulative']);
 const LEKTORAT_METRICS = new Set(['lektorat_minutes', 'lektorat_cumulative']);
-const MINUTES_METRICS    = new Set(['writing_minutes',    'lektorat_minutes']);
-const CUMULATIVE_METRICS = new Set(['writing_cumulative', 'lektorat_cumulative']);
+const STT_METRICS      = new Set(['stt_minutes', 'stt_cumulative', 'stt_chars']);
+const MINUTES_METRICS    = new Set(['writing_minutes',    'lektorat_minutes',    'stt_minutes']);
+const CUMULATIVE_METRICS = new Set(['writing_cumulative', 'lektorat_cumulative', 'stt_cumulative']);
 
 // Ausserhalb von Alpine gespeichert, damit die Chart.js-Instanz nicht durch
 // Alpines Reaktivitäts-Proxy beschädigt wird.
@@ -66,6 +70,7 @@ export const bookstatsMethods = {
       fetchJson('/history/coverage/' + bookId),
       fetchJson('/history/writing-time/' + bookId),
       fetchJson('/history/lektorat-time/' + bookId),
+      fetchJson('/history/stt-time/' + bookId),
     ]);
 
     // Stale-Guard: spätere Response eines alten Buchs nicht in neuen State kippen.
@@ -74,12 +79,13 @@ export const bookstatsMethods = {
     const failed = results.filter(r => r.status === 'rejected');
     for (const r of failed) console.error('[loadBookStats]', r.reason);
 
-    const [rowsRes, coverageRes, writingRes, lektoratRes] = results;
+    const [rowsRes, coverageRes, writingRes, lektoratRes, sttRes] = results;
     const rows = rowsRes.status === 'fulfilled' ? rowsRes.value : [];
     this.bookStatsData = rows;
     this.bookStatsCoverage = coverageRes.status === 'fulfilled' ? coverageRes.value : null;
     this.writingTimeData = writingRes.status === 'fulfilled' ? writingRes.value : null;
     this.lektoratTimeData = lektoratRes.status === 'fulfilled' ? lektoratRes.value : null;
+    this.sttTimeData = sttRes.status === 'fulfilled' ? sttRes.value : null;
     const last = rows[rows.length - 1];
     const prev = rows[rows.length - 2];
     this.bookStatsDelta = (last && prev) ? last.words - prev.words : null;
@@ -147,13 +153,16 @@ export const bookstatsMethods = {
     const metric = this.bookStatsMetric;
     const isWriting  = WRITING_METRICS.has(metric);
     const isLektorat = LEKTORAT_METRICS.has(metric);
+    const isStt      = STT_METRICS.has(metric);
 
-    // Writing-/Lektorat-Metriken laufen auf der writing_time/lektorat_time-Zeitachse
-    // (nur aktive Tage), nicht auf der book_stats_history-Timeline — sonst fehlen
-    // Tage ohne Sync, und Snapshots ohne Tracking-Zeit würden als 0-Punkte erscheinen.
+    // Writing-/Lektorat-/STT-Metriken laufen auf der writing_time/lektorat_time/
+    // stt_time-Zeitachse (nur aktive Tage), nicht auf der book_stats_history-
+    // Timeline — sonst fehlen Tage ohne Sync, und Snapshots ohne Tracking-Zeit
+    // würden als 0-Punkte erscheinen.
     let rows;
     if (isWriting)       rows = (this.writingTimeData?.daily  || []).map(d => ({ recorded_at: d.date, seconds: d.seconds }));
     else if (isLektorat) rows = (this.lektoratTimeData?.daily || []).map(d => ({ recorded_at: d.date, seconds: d.seconds }));
+    else if (isStt)      rows = (this.sttTimeData?.daily      || []).map(d => ({ recorded_at: d.date, seconds: d.seconds, chars: d.chars }));
     else                 rows = this.bookStatsData;
     if (!rows.length) return;
 
@@ -176,6 +185,7 @@ export const bookstatsMethods = {
     else if (isPpc) data = rows.map(r => r.chapter_count > 0 ? Math.round((r.page_count / r.chapter_count) * 10) / 10 : null);
     else if (isMin) data = rows.map(r => Math.round(r.seconds / 60));
     else if (isCum) { let sum = 0; data = rows.map(r => { sum += r.seconds; return Math.round(sum / 360) / 10; }); }
+    else if (metric === 'stt_chars') data = rows.map(r => Number(r.chars) || 0);
     else data = rows.map(r => r[metric] ?? null);
 
     // Leading-Null-Tage abschneiden: X-Achse startet am ersten echten Messpunkt

@@ -588,6 +588,65 @@ router.get('/writing-time/:book_id', (req, res) => {
   });
 });
 
+// Diktat-Tracking (STT): Heartbeat solange das Mikrofon aufnimmt und der Tab
+// sichtbar ist. Pro (User, Buch, Tag) werden Sekunden UND diktierte Zeichen
+// aufsummiert. seconds: Server-Clamp auf 1 h/Ping (Uhrensprung-Schutz). chars:
+// Clamp auf 100k/Ping (defensiv gegen manipulierte Werte). Buchweit wie
+// writing-time — STT laeuft nur im Notebook-Editor.
+router.post('/stt-time', jsonBody, (req, res) => {
+  const user_email = req.session?.user?.email || null;
+  if (!user_email) return res.status(401).json({ error_code: 'NOT_LOGGED_IN' });
+  const book_id = toIntId(req.body?.book_id);
+  const secondsRaw = Number(req.body?.seconds);
+  const charsRaw = Number(req.body?.chars);
+  if (!book_id) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
+  if (!_guardBook(req, res, book_id, 'viewer')) return;
+  const seconds = Number.isFinite(secondsRaw) && secondsRaw > 0 ? Math.min(Math.round(secondsRaw), 3600) : 0;
+  const chars = Number.isFinite(charsRaw) && charsRaw > 0 ? Math.min(Math.round(charsRaw), 100000) : 0;
+  if (seconds <= 0 && chars <= 0) return res.json({ ok: true, added_seconds: 0, added_chars: 0 });
+  const date = localIsoDate();
+  db.prepare(`
+    INSERT INTO stt_time (user_email, book_id, date, seconds, chars)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(user_email, book_id, date) DO UPDATE SET
+      seconds = seconds + excluded.seconds,
+      chars   = chars   + excluded.chars
+  `).run(user_email, book_id, date, seconds, chars);
+  res.json({ ok: true, added_seconds: seconds, added_chars: chars });
+});
+
+// Aggregat + Tagesreihe der Diktat-Nutzung pro Buch fuer den eingeloggten User.
+// daily liefert pro Tag seconds + chars fuer das BookStats-Chart (nur Tage mit
+// Aktivitaet). active_days = Tage mit seconds > 0 ODER chars > 0.
+router.get('/stt-time/:book_id', (req, res) => {
+  const user_email = req.session?.user?.email || null;
+  if (!user_email) return res.status(401).json({ error_code: 'NOT_LOGGED_IN' });
+  const book_id = toIntId(req.params.book_id);
+  if (!book_id) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
+  const row = db.prepare(`
+    SELECT COALESCE(SUM(seconds), 0) AS total_seconds,
+           COALESCE(SUM(chars),   0) AS total_chars,
+           COUNT(*)                  AS active_days,
+           MIN(date)                 AS first_date,
+           MAX(date)                 AS last_date
+    FROM stt_time
+    WHERE user_email = ? AND book_id = ? AND (seconds > 0 OR chars > 0)
+  `).get(user_email, book_id);
+  const daily = db.prepare(`
+    SELECT date, seconds, chars FROM stt_time
+    WHERE user_email = ? AND book_id = ? AND (seconds > 0 OR chars > 0)
+    ORDER BY date ASC
+  `).all(user_email, book_id);
+  res.json({
+    total_seconds: row?.total_seconds || 0,
+    total_chars:   row?.total_chars   || 0,
+    active_days:   row?.active_days   || 0,
+    first_date:    row?.first_date    || null,
+    last_date:     row?.last_date     || null,
+    daily,
+  });
+});
+
 // Lektoratszeit-Tracking: Heartbeat solange checkDone (Prüfmodus) aktiv und
 // Tab sichtbar. Pro (User, Buch, Seite, Tag) aufsummiert. Server-Clamp auf 1 h.
 router.post('/lektorat-time', jsonBody, (req, res) => {

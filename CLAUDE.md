@@ -35,7 +35,7 @@ Themen-Spickzettel ausgelagert (Drift-Schutz: CLAUDE.md-Regeln, Details in den S
 - [docs/metrics-api.md](docs/metrics-api.md) — Metrics-API: `GET /metrics` im Prometheus-Text-Format (HA/Grafana/Prometheus), Bearer-Token-Auth mit Scopes, `api_tokens`-Lifecycle, exponierte Kennzahlen-Liste, Pflicht-Invarianten.
 - [docs/blog-sync.md](docs/blog-sync.md) — Blog-Sync (Buch ↔ WordPress, Buchtyp `blog`): Initial-Import + Pull + Push, LWW-Konfliktstrategie, Gutenberg-Block-Mapping, Buchorganizer-Status-Badges.
 - [docs/hubspot-sync.md](docs/hubspot-sync.md) — HubSpot-Sync (Buch ↔ HubSpot-Blog, Buchtyp `blog`): einmaliger Initial-Import + Create-Draft-Push (kein Update, kein Pull-Back), PAT-Auth, Rate-Limit-Bucket.
-- [docs/homeassistant/](docs/homeassistant/) — Home-Assistant-Integration: `rest`-Sensor-Config + Template-Sensoren + fertiges Lovelace-Dashboard, deckt alle Metriken ab.
+- [docs/homeassistant/](docs/homeassistant/) — Home-Assistant-Integration: `rest`-Sensor-Config + Template-Sensoren + fertiges Lovelace-Dashboard, deckt alle Metriken ab. **Pflicht: jede neue `/metrics`-Kennzahl (in [lib/metrics-collector.js](lib/metrics-collector.js)) braucht im selben Commit einen Eintrag in [docs/homeassistant/configuration.yaml](docs/homeassistant/configuration.yaml) (REST-Sensor + ggf. abgeleiteter `template:`-Sensor), [docs/homeassistant/dashboard.yaml](docs/homeassistant/dashboard.yaml) (Dashboard-Kachel) und der Sensor-Übersicht in [docs/homeassistant/README.md](docs/homeassistant/README.md) — sonst erscheint sie nie in HA.**
 
 ## Feature-Pläne
 

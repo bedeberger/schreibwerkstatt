@@ -147,6 +147,27 @@ test('Buch-Locale gewinnt als Sprache (de-CH -> de)', async () => {
   db.prepare('DELETE FROM books WHERE book_id = ?').run(910001);
 });
 
+test('temperature aus App-Setting wird forwarded (Default 0)', async () => {
+  const appSettings = require('../../lib/app-settings');
+  setStt({ enabled: true, host: 'http://whisper.lan:8000' });
+  let sawTemp = null;
+  fetchHandler = async (_url, opts) => {
+    sawTemp = opts.body.get('temperature');
+    return new Response(JSON.stringify({ text: 'x' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  let r = await postAudio(Buffer.from('d'));
+  assert.equal(r.status, 200);
+  assert.equal(sawTemp, '0');
+
+  appSettings.set('stt.temperature', 0.3, { updatedBy: 'test' });
+  appSettings.clearCache();
+  r = await postAudio(Buffer.from('d'));
+  assert.equal(r.status, 200);
+  assert.equal(sawTemp, '0.3');
+  appSettings.set('stt.temperature', 0, { updatedBy: 'test' });
+  appSettings.clearCache();
+});
+
 test('upstream 500 -> 502 stt_upstream', async () => {
   setStt({ enabled: true, host: 'http://whisper.lan:8000' });
   fetchHandler = async () => new Response('boom', { status: 500 });

@@ -17,6 +17,7 @@ import { ereignisseMethods } from './book/ereignisse.js';
 import { registerBookOverviewCard } from './cards/book-overview-card.js';
 import { registerBookStatsCard } from './cards/book-stats-card.js';
 import { writingTimeMethods } from './book/writing-time.js';
+import { sttTimeMethods } from './book/stt-time.js';
 import { lektoratTimeMethods } from './book/lektorat-time.js';
 import { registerCatalogStore } from './cards/catalog-store.js';
 import { registerEreignisseCard } from './cards/ereignisse-card.js';
@@ -786,6 +787,7 @@ document.addEventListener('alpine:init', () => {
         if (this.selectedBookId) this._startCollabPoll(this.selectedBookId);
         this._setupWritingTime();
         this._setupLektoratTime();
+        this._setupSttTime();
         // _setupNotebookRestore lebt jetzt in editor-notebook-card.js#init.
       } catch (e) {
         console.error('[init]', e);
@@ -812,6 +814,10 @@ document.addEventListener('alpine:init', () => {
     // lektoratTimeMethods analog: lauscht auf checkDone (Prüfmodus) +
     // currentPage.id + selectedBookId; bucht Sekunden pro (User, Buch, Seite, Tag).
     ...lektoratTimeMethods,
+    // sttTimeMethods: lauscht auf sttRecording (Mic aktiv); bucht Diktat-Sekunden
+    // + diktierte Zeichen pro (User, Buch, Tag). _trackSttChars wird aus
+    // stt-dictation.js beim Einfügen jedes Transkript-Segments aufgerufen.
+    ...sttTimeMethods,
     ...szenenMethods,
     ...orteMethods,
     ...songsMethods,

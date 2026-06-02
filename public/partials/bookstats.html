@@ -27,7 +27,7 @@
   <div x-show="bookStatsSyncStatus" class="card-status" x-html="bookStatsSyncStatus"></div>
 
   <!-- Metrik- & Zeitraum-Umschalter -->
-  <div x-show="bookStatsData.length > 0 || (writingTimeData?.daily?.length > 0) || (lektoratTimeData?.daily?.length > 0)" class="book-stats-controls">
+  <div x-show="bookStatsData.length > 0 || (writingTimeData?.daily?.length > 0) || (lektoratTimeData?.daily?.length > 0) || (sttTimeData?.daily?.length > 0)" class="book-stats-controls">
     <div x-data="combobox($app.t('bookstats.metric'))"
          x-modelable="value" x-model="bookStatsMetric"
          x-effect="options = [
@@ -46,7 +46,10 @@
            {value:'writing_minutes',     label: $app.t('bookstats.metric.writingMinutes')},
            {value:'writing_cumulative',  label: $app.t('bookstats.metric.writingCumulative')},
            {value:'lektorat_minutes',    label: $app.t('bookstats.metric.lektoratMinutes')},
-           {value:'lektorat_cumulative', label: $app.t('bookstats.metric.lektoratCumulative')}
+           {value:'lektorat_cumulative', label: $app.t('bookstats.metric.lektoratCumulative')},
+           {value:'stt_minutes',         label: $app.t('bookstats.metric.sttMinutes')},
+           {value:'stt_cumulative',      label: $app.t('bookstats.metric.sttCumulative')},
+           {value:'stt_chars',           label: $app.t('bookstats.metric.sttChars')}
          ]"
          @combobox-change="$nextTick(() => renderStatsChart())"
          >
@@ -60,7 +63,7 @@
   </div>
 
   <!-- Diagramm -->
-  <div x-show="bookStatsData.length > 0 || (writingTimeData?.daily?.length > 0) || (lektoratTimeData?.daily?.length > 0)" class="book-stats-chart-wrap">
+  <div x-show="bookStatsData.length > 0 || (writingTimeData?.daily?.length > 0) || (lektoratTimeData?.daily?.length > 0) || (sttTimeData?.daily?.length > 0)" class="book-stats-chart-wrap">
     <canvas id="book-stats-chart" role="img" :aria-label="$app.t('bookstats.chartFallback')"><span x-text="$app.t('bookstats.chartFallback')"></span></canvas>
   </div>
 
@@ -93,8 +96,12 @@
       x-text="$app.t('bookstats.lektoratTotal', { h: ((lektoratTimeData?.total_seconds ?? 0) / 3600).toLocaleString($app.uiLocale === 'en' ? 'en-US' : 'de-CH', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) })"></span>
     <span class="tok-badge tok-neutral" x-show="(lektoratTimeData?.active_days ?? 0) > 0"
       x-text="$app.t('bookstats.lektoratAvg', { m: Math.round((lektoratTimeData?.total_seconds ?? 0) / 60 / (lektoratTimeData?.active_days || 1)).toLocaleString($app.uiLocale === 'en' ? 'en-US' : 'de-CH') })"></span>
+    <span class="tok-badge tok-neutral" x-show="(sttTimeData?.total_seconds ?? 0) > 0"
+      x-text="$app.t('bookstats.sttTotal', { h: ((sttTimeData?.total_seconds ?? 0) / 3600).toLocaleString($app.uiLocale === 'en' ? 'en-US' : 'de-CH', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) })"></span>
+    <span class="tok-badge tok-neutral" x-show="(sttTimeData?.total_chars ?? 0) > 0"
+      x-text="$app.t('bookstats.sttChars', { n: (sttTimeData?.total_chars ?? 0).toLocaleString($app.uiLocale === 'en' ? 'en-US' : 'de-CH') })"></span>
   </div>
 
   <!-- Leer-Zustand -->
-  <div x-show="!bookStatsData.length && !(writingTimeData?.daily?.length > 0) && !(lektoratTimeData?.daily?.length > 0) && !bookStatsLoading" class="muted-msg muted-msg--spaced" x-text="$app.t('bookstats.emptyState')"></div>
+  <div x-show="!bookStatsData.length && !(writingTimeData?.daily?.length > 0) && !(lektoratTimeData?.daily?.length > 0) && !(sttTimeData?.daily?.length > 0) && !bookStatsLoading" class="muted-msg muted-msg--spaced" x-text="$app.t('bookstats.emptyState')"></div>
 </div>

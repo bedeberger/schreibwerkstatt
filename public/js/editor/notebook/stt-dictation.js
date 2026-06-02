@@ -36,6 +36,34 @@ const STT_MAX_RETRY = 1;
 const STT_RETRY_DELAY_MS = 600;
 const STT_RETRYABLE_STATUS = new Set([408, 500, 502, 503]);
 
+// Bekannte Whisper-Halluzinationen bei stillen/unverstaendlichen Segmenten.
+// EXACT trifft nur, wenn das ganze (normalisierte) Segment der Phrase gleicht;
+// PATTERNS treffen eindeutige Untertitel-/Copyright-Marker, die in echtem
+// Prosatext nicht vorkommen. Siehe `_isLikelyHallucination`.
+const STT_HALLUCINATION_EXACT = new Set([
+  'vielen dank',
+  'vielen dank fürs zuschauen',
+  'vielen dank fürs zuhören',
+  'vielen dank für ihre aufmerksamkeit',
+  'danke fürs zuschauen',
+  'bis zum nächsten mal',
+  'tschüss',
+  'das war\'s',
+  'untertitel',
+  'untertitelung',
+  'thank you',
+  'thanks for watching',
+]);
+const STT_HALLUCINATION_PATTERNS = [
+  /untertitel(ung)?\s+(des|der|im auftrag|von|aufgrund|erstellt)/i,
+  /amara\.org/i,
+  /\b(zdf|ard|wdr|swr|ndr|orf|srf)\b/i,
+  /\bfunk\b[^.]*\b\d{4}\b/i,
+  /^\s*copyright\b/i,
+  /^\s*©/,
+  /\buntertitel\b.*\b\d{4}\b/i,
+];
+
 export const sttDictationMethods = {
   // ── Pure Compute (testbar ohne Browser) ────────────────────────────────
 
@@ -107,30 +135,41 @@ export const sttDictationMethods = {
   // Nicht-Whitespace steht und der neue Text nicht mit Satzzeichen beginnt —
   // damit Worte ueber Segmentgrenzen hinweg nicht zusammenkleben.
   //
-  // `prevText` ist der (Teil-)Text links vom Caret; das letzte Zeichen bestimmt
-  // die Leerzeichen-Heuristik, der getrimmte Schwanz die Satzende-Erkennung.
-  // startsNewSentence = das vorige Segment wurde an einer Sprechpause
-  // abgeschnitten: dann ist die Segmentgrenze eine Satzgrenze. Liefert das
-  // Modell selbst ein Satzendezeichen (auch hinter einer schliessenden
-  // Anfuehrung wie „…her.«"), ergaenzen wir KEINEN eigenen Punkt — nur das
-  // trennende Leerzeichen. Nur wenn der Vortext gar kein Satzendezeichen hat,
-  // wird einer gesetzt (". " statt nur " "). Beginnt ein neuer Satz, wird der
-  // erste Buchstabe gross geschrieben.
-  _computeSpacedInsert(prevText, text, startsNewSentence) {
+  // Satzgrenzen folgen ausschliesslich der Punktierung des Modells: NUR wenn der
+  // Vortext (bzw. der Doc-/Block-Anfang) auf einem Satzendezeichen steht, wird
+  // der erste Buchstabe gross geschrieben. Eine blosse Sprechpause (Atemholen)
+  // ist KEIN Satzende — wir ergaenzen weder einen eigenen Punkt noch eine
+  // Grossschreibung, weil Whisper selbst punktiert und grossschreibt. `prevText`
+  // ist der (Teil-)Text links vom Caret; das letzte Zeichen bestimmt die
+  // Leerzeichen-Heuristik, der getrimmte Schwanz die Satzende-Erkennung
+  // (`_endsSentence` erkennt Satzzeichen auch hinter schliessender Anfuehrung).
+  _computeSpacedInsert(prevText, text) {
     let t = this._normalizeTranscript(text);
     if (!t) return '';
     const prev = String(prevText || '');
     const prevChar = prev ? prev[prev.length - 1] : '';
-    const prevEndsSentence = this._endsSentence(prev);
-    const newSentence = startsNewSentence || !prevChar || prevEndsSentence;
-    if (newSentence) t = this._capitalizeSentenceStart(t);
+    if (!prevChar || this._endsSentence(prev)) t = this._capitalizeSentenceStart(t);
     if (!prevChar) return t;
-    const startsPunct = /^[\s,.;:!?…)»"'’-]/.test(t);
     if (/\s/.test(prevChar)) return t; // schon Whitespace davor
-    if (startsNewSentence && !startsPunct) {
-      return prevEndsSentence ? ' ' + t : '. ' + t;
-    }
+    const startsPunct = /^[\s,.;:!?…)»"'’-]/.test(t);
     return startsPunct ? t : ' ' + t;
+  },
+
+  // Whisper „halluziniert" bei stillen/unverstaendlichen Segmenten bekannte
+  // Boilerplate-Phrasen (Video-Untertitel-Floskeln, Dank-/Abschiedsformeln).
+  // True, wenn das GANZE Segment einer solchen Phrase entspricht — dann wird es
+  // verworfen statt eingefuegt. Bewusst Whole-Segment-Match bzw. eindeutige
+  // Marker (ZDF/ARD/Amara/funk/Copyright), damit legitimer Prosatext, der eine
+  // dieser Floskeln enthaelt, nicht faelschlich getilgt wird. Pure/testbar.
+  _isLikelyHallucination(text) {
+    const norm = String(text || '')
+      .replace(/\s+/g, ' ')
+      .replace(/[.!?…»«„“”"'’\s]+$/u, '')
+      .trim()
+      .toLowerCase();
+    if (!norm) return false;
+    if (STT_HALLUCINATION_EXACT.has(norm)) return true;
+    return STT_HALLUCINATION_PATTERNS.some((re) => re.test(text));
   },
 
   // Effektiver VAD-Threshold aus gemessenem Geraeuschboden: leicht ueber dem
@@ -461,8 +500,9 @@ export const sttDictationMethods = {
   _sttInsertText(text, boundaryKind) {
     const clean = this._normalizeTranscript(text);
     if (!clean) return; // leerer/Whitespace-Transkript -> nichts einfuegen
+    if (this._isLikelyHallucination(clean)) return; // Whisper-Geisterphrase -> verwerfen
+    this._trackSttChars?.(clean.length); // Diktat-Tracking: diktierte Zeichen buchen
     if (boundaryKind === 'paragraph') { this._sttInsertParagraph(clean); return; }
-    const startsNewSentence = boundaryKind === 'sentence';
     const editEl = this._getEditEl?.();
     if (!editEl) return;
     const sel = document.getSelection();
@@ -486,7 +526,7 @@ export const sttDictationMethods = {
       prevChar = this._sttCharBefore(range);
     }
     const prevText = this._sttTextBefore(range);
-    const node = document.createTextNode(this._computeSpacedInsert(prevText, clean, startsNewSentence));
+    const node = document.createTextNode(this._computeSpacedInsert(prevText, clean));
     range.deleteContents();
     range.insertNode(node);
     range.setStartAfter(node);

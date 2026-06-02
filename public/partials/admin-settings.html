@@ -364,6 +364,11 @@
         <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.stt.language.help')"></small>
       </label>
       <label>
+        <span x-text="$app.t('admin.settings.stt.temperature.label')"></span>
+        <input type="text" x-data="numInput({ step: 0.05, min: 0, max: 1, decimals: 2 })" x-modelable="value" x-model="adminSettingsForm['stt.temperature']">
+        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.stt.temperature.help')"></small>
+      </label>
+      <label>
         <span x-text="$app.t('admin.settings.stt.vadSilenceMs.label')"></span>
         <input type="text" x-data="numInput({ integer: true, min: 200, max: 5000 })" x-modelable="value" x-model="adminSettingsForm['stt.vad.silence_ms']">
         <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.stt.vadSilenceMs.help')"></small>

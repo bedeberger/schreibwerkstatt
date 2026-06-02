@@ -7171,6 +7171,31 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 172 abgeschlossen (chapters.description entfernt).');
   }
 
+  if (version < 173) {
+    // stt_time: Diktat-Nutzung pro (User, Buch, Tag) — analog writing_time, aber
+    // mit zusaetzlicher chars-Spalte fuer die diktierten Zeichen. Sekunden kommen
+    // aus dem Frontend-Heartbeat (Mic aktiv + Tab sichtbar), chars aus der Laenge
+    // der eingefuegten Transkript-Segmente. Buchweit (keine page_id), weil STT nur
+    // im Notebook-Editor laeuft und die Auswertung als Tagesreihe im BookStats-
+    // Chart erscheint. FK auf books + app_users (CASCADE) wie writing_time.
+    db.exec(`CREATE TABLE IF NOT EXISTS stt_time (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_email TEXT    NOT NULL REFERENCES app_users(email) ON DELETE CASCADE,
+        book_id    INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        date       TEXT    NOT NULL,
+        seconds    INTEGER NOT NULL DEFAULT 0,
+        chars      INTEGER NOT NULL DEFAULT 0
+      )`);
+    db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_stt_user_book_date ON stt_time(user_email, book_id, date)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_stt_book ON stt_time(book_id)');
+    const fkErrors173 = db.pragma('foreign_key_check');
+    if (fkErrors173.length) {
+      throw new Error(`Migration 173: foreign_key_check meldet ${fkErrors173.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 173').run();
+    logger.info('DB-Migration auf Version 173 abgeschlossen (stt_time für Diktat-Tracking).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

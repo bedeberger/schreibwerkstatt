@@ -25,6 +25,14 @@ views:
             entity: sensor.schreibwerkstatt_lektorat_today_minutes
             name: Lektorat heute
             icon: mdi:book-edit
+          - type: entity
+            entity: sensor.schreibwerkstatt_stt_today_minutes
+            name: Diktiert heute
+            icon: mdi:microphone
+          - type: entity
+            entity: sensor.schreibwerkstatt_stt_chars_today
+            name: Zeichen diktiert heute
+            icon: mdi:microphone-message
 
       - type: glance
         title: Inhalte
@@ -117,11 +125,12 @@ views:
           - entity: sensor.schreibwerkstatt_jobs_queued
 
       - type: history-graph
-        title: Schreib- / Lektorat-Minuten heute
+        title: Schreib- / Lektorat- / Diktat-Minuten heute
         hours_to_show: 24
         entities:
           - entity: sensor.schreibwerkstatt_writing_today_minutes
           - entity: sensor.schreibwerkstatt_lektorat_today_minutes
+          - entity: sensor.schreibwerkstatt_stt_today_minutes
 
       - type: history-graph
         title: Kosten USD (kumuliert, 30d)

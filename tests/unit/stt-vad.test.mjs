@@ -106,34 +106,54 @@ test('_computeSpacedInsert: trimmt und liefert leer bei Whitespace-only', () => 
   assert.equal(m._computeSpacedInsert('t', '  Welt  '), ' Welt');
 });
 
-test('_computeSpacedInsert: Sprechpause ohne Satzendezeichen -> Punkt + Leerzeichen', () => {
-  assert.equal(m._computeSpacedInsert('t', 'Das', true), '. Das');
+test('_computeSpacedInsert: Atempause ohne Modell-Satzzeichen -> kein Punkt, klein', () => {
+  // Eine blosse Sprechpause ist kein Satzende: nur Leerzeichen, keine
+  // Grossschreibung, kein injizierter Punkt — Whisper punktiert selbst.
+  assert.equal(m._computeSpacedInsert('ging sie', 'zum markt'), ' zum markt');
+  assert.equal(m._computeSpacedInsert('nach Hause', 'dann'), ' dann');
 });
 
-test('_computeSpacedInsert: Sprechpause nach vorhandenem Satzendezeichen -> nur Leerzeichen', () => {
-  assert.equal(m._computeSpacedInsert('.', 'Das', true), ' Das');
-  assert.equal(m._computeSpacedInsert('!', 'Das', true), ' Das');
-  assert.equal(m._computeSpacedInsert('?', 'Das', true), ' Das');
+test('_computeSpacedInsert: nach vorhandenem Satzendezeichen -> Leerzeichen + gross', () => {
+  assert.equal(m._computeSpacedInsert('.', 'das', true), ' Das');
+  assert.equal(m._computeSpacedInsert('!', 'das', true), ' Das');
+  assert.equal(m._computeSpacedInsert('?', 'das', true), ' Das');
 });
 
-test('_computeSpacedInsert: Sprechpause, Text beginnt mit Satzzeichen -> kein Punkt', () => {
-  assert.equal(m._computeSpacedInsert('t', ', dann', true), ', dann');
+test('_computeSpacedInsert: Text beginnt mit Satzzeichen -> kein Leerzeichen', () => {
+  assert.equal(m._computeSpacedInsert('t', ', dann'), ', dann');
 });
 
-test('_computeSpacedInsert: Sprechpause nach Whitespace -> unveraendert', () => {
-  assert.equal(m._computeSpacedInsert(' ', 'Das', true), 'Das');
+test('_computeSpacedInsert: nach Whitespace -> unveraendert', () => {
+  assert.equal(m._computeSpacedInsert(' ', 'Das'), 'Das');
 });
 
 test('_computeSpacedInsert: Modell-Satzzeichen hinter schliessender Anfuehrung -> kein eigener Punkt', () => {
   // Dialog endet mit Punkt + schliessendem Guillemet/Quote: nur Leerzeichen,
-  // kein zusaetzlicher Punkt.
-  assert.equal(m._computeSpacedInsert('»Komm her.«', 'Dann ging er', true), ' Dann ging er');
-  assert.equal(m._computeSpacedInsert('"Wirklich?"', 'Sie nickte', true), ' Sie nickte');
-  assert.equal(m._computeSpacedInsert('…sagte er.”', 'Stille', true), ' Stille');
+  // neuer Satz wird grossgeschrieben, KEIN zusaetzlicher Punkt.
+  assert.equal(m._computeSpacedInsert('»Komm her.«', 'Dann ging er'), ' Dann ging er');
+  assert.equal(m._computeSpacedInsert('"Wirklich?"', 'sie nickte'), ' Sie nickte');
+  assert.equal(m._computeSpacedInsert('…sagte er.”', 'stille'), ' Stille');
 });
 
-test('_computeSpacedInsert: Sprechpause ohne Satzzeichen (auch mit Vortext) -> Punkt ergaenzt', () => {
-  assert.equal(m._computeSpacedInsert('nach Hause', 'Dann', true), '. Dann');
+// --- _isLikelyHallucination -------------------------------------------------
+
+test('_isLikelyHallucination: Whole-Segment-Floskeln', () => {
+  assert.equal(m._isLikelyHallucination('Vielen Dank.'), true);
+  assert.equal(m._isLikelyHallucination('  vielen dank  '), true);
+  assert.equal(m._isLikelyHallucination('Tschüss!'), true);
+  assert.equal(m._isLikelyHallucination('Untertitel'), true);
+});
+
+test('_isLikelyHallucination: Untertitel-/Sender-Marker', () => {
+  assert.equal(m._isLikelyHallucination('Untertitel des ZDF, 2017'), true);
+  assert.equal(m._isLikelyHallucination('Untertitelung im Auftrag des ZDF'), true);
+  assert.equal(m._isLikelyHallucination('Untertitel der Amara.org-Community'), true);
+});
+
+test('_isLikelyHallucination: legitimer Prosatext bleibt', () => {
+  assert.equal(m._isLikelyHallucination('Vielen Dank, sagte er und ging.'), false);
+  assert.equal(m._isLikelyHallucination('Sie schaute aus dem Fenster.'), false);
+  assert.equal(m._isLikelyHallucination(''), false);
 });
 
 // --- _endsSentence ----------------------------------------------------------

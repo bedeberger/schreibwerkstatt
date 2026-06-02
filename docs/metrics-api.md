@@ -44,6 +44,7 @@ Naming-Convention: Prefix `sw_`, Counter mit `_total`-Suffix, Gauges ohne. Label
 ### Writing-Activity (heute, app.timezone)
 
 - `sw_writing_seconds_today`, `sw_lektorat_seconds_today` — Gauge, `SUM(seconds)` aus `writing_time` / `lektorat_time` für `date = localIsoDate(new Date())` ([lib/local-date.js](../lib/local-date.js)).
+- `sw_stt_seconds_today`, `sw_stt_chars_today` — Gauge, `SUM(seconds)` / `SUM(chars)` aus `stt_time` (Diktat-Nutzung) für `date = localIsoDate(new Date())`.
 
 ### Job-Queue (In-Memory)
 
@@ -96,7 +97,7 @@ scrape_configs:
 
 ### Home Assistant
 
-Vollständige Sensor-Config + Lovelace-Dashboard: [homeassistant/](homeassistant/) (README, `configuration.yaml`, `dashboard.yaml`). Deckt alle 20 Metriken ab inkl. abgeleiteter Werte (Minuten, Normseiten, Cache-Hit-Ratio) und einer fertigen Übersichts-View mit Gauges, Glance-Tiles und History-Graphs. `rest`-Plattform (Top-Level, nicht `sensor: - platform: rest`) gruppiert mehrere Sensoren pro Endpoint — ein Request, alle Werte. `unique_id` pro Sensor ist Pflicht, sonst kein Entity-Registry-Eintrag (kein Umbenennen, keine Energy-Dashboard-Aufnahme).
+Vollständige Sensor-Config + Lovelace-Dashboard: [homeassistant/](homeassistant/) (README, `configuration.yaml`, `dashboard.yaml`). Deckt alle hier exponierten Metriken ab inkl. abgeleiteter Werte (Minuten, Normseiten, Cache-Hit-Ratio) und einer fertigen Übersichts-View mit Gauges, Glance-Tiles und History-Graphs. `rest`-Plattform (Top-Level, nicht `sensor: - platform: rest`) gruppiert mehrere Sensoren pro Endpoint — ein Request, alle Werte. `unique_id` pro Sensor ist Pflicht, sonst kein Entity-Registry-Eintrag (kein Umbenennen, keine Energy-Dashboard-Aufnahme).
 
 Die Admin-UI im Tab **API / Metrics** zeigt diese Snippets aufklappbar inkl. Host-Substitution.
 
@@ -112,6 +113,7 @@ Fertiges Dashboard: [grafana/schreibwerkstatt.json](grafana/schreibwerkstatt.jso
 - **401 statt Redirect.** Bei jedem Auth-Fehler im Bearer-Pfad: 401 JSON + `WWW-Authenticate`. Kein HTML, kein Redirect.
 - **Cost re-computed, nicht materialisiert.** `sw_cost_usd_total` nutzt `costUsd()` zur Lese-Zeit. Preis-Update in [lib/pricing.js](../lib/pricing.js) wirkt sofort rückwirkend auf alle Counter-Werte. Niemals `usd` als Spalte in `job_runs`/`chat_messages` materialisieren.
 - **Counter sind kumuliert seit DB-Init.** Server-Restart resetted die In-Memory-Job-Queue-Gauges, NICHT die `*_total`-Counter aus `job_runs`. Prometheus berechnet `rate()` selbst — keine Reset-Logik beim Collector.
+- **Neue Metric ⇒ Home-Assistant-Eintrag Pflicht.** Wer eine Kennzahl in [lib/metrics-collector.js](../lib/metrics-collector.js) ergänzt, pflegt sie im selben Commit in [homeassistant/configuration.yaml](homeassistant/configuration.yaml) (REST-Sensor, ggf. abgeleiteter `template:`-Sensor), [homeassistant/dashboard.yaml](homeassistant/dashboard.yaml) (Kachel) und der Sensor-Übersicht in [homeassistant/README.md](homeassistant/README.md). Die HA-Config soll alle Metriken abdecken — ohne Eintrag erscheint die neue Kennzahl nie in HA und der Anspruch driftet.
 
 ## Code-Karte
 

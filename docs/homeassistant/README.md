@@ -21,8 +21,10 @@ schreibwerkstatt_url: "https://app.example.com/metrics"
 
 Inhalt von [configuration.yaml](configuration.yaml) in die HA-`configuration.yaml` mergen. Enthält:
 
-- **`rest:`-Block** mit einem HTTP-Call alle 60 s. Parst Prometheus-Text via `regex_findall_index` und befüllt 20 Sensoren in einem Rutsch.
+- **`rest:`-Block** mit einem HTTP-Call alle 60 s. Parst Prometheus-Text via `regex_findall` und befüllt die Sensoren in einem Rutsch.
 - **`template:`-Block** für abgeleitete Werte (Minuten, Normseiten, Cache-Hit-Ratio).
+
+> **Pflicht bei neuer Metric:** Jede neue `/metrics`-Kennzahl ([lib/metrics-collector.js](../../lib/metrics-collector.js)) braucht hier einen Eintrag — sonst erscheint sie nie in HA. Konkret: REST-Sensor in [configuration.yaml](configuration.yaml) (Pattern `((value | regex_findall('…')) + ['0']) | first | int(0)`), ggf. abgeleiteter `template:`-Sensor, eine Dashboard-Kachel in [dashboard.yaml](dashboard.yaml) und eine Zeile in der Sensor-Übersicht unten. Diese Doku-Pflicht ist auch in [metrics-api.md](../metrics-api.md) und [CLAUDE.md](../../CLAUDE.md) vermerkt.
 
 Anschliessend HA neu starten (Settings → System → Restart).
 
@@ -42,6 +44,8 @@ Inhalt von [dashboard.yaml](dashboard.yaml) als neues Dashboard anlegen: Setting
 | `sensor.schreibwerkstatt_normseiten` | Template (chars / 1800) | Total |
 | `sensor.schreibwerkstatt_writing_seconds_today` / `_minutes` | `sw_writing_seconds_today` | Duration |
 | `sensor.schreibwerkstatt_lektorat_seconds_today` / `_minutes` | `sw_lektorat_seconds_today` | Duration |
+| `sensor.schreibwerkstatt_stt_seconds_today` / `_minutes` | `sw_stt_seconds_today` | Duration |
+| `sensor.schreibwerkstatt_stt_chars_today` | `sw_stt_chars_today` | Count |
 | `sensor.schreibwerkstatt_jobs_running` / `_queued` | `sw_jobs_running/queued` | Gauge |
 | `sensor.schreibwerkstatt_jobs_finished_total` | `sw_jobs_finished_total` (Sum) | Counter |
 | `sensor.schreibwerkstatt_tokens_in_total` / `_out_total` | `sw_tokens_*_total` (Sum) | Counter |
@@ -58,13 +62,13 @@ Inhalt von [dashboard.yaml](dashboard.yaml) als neues Dashboard anlegen: Setting
 Eine View **Übersicht** mit folgenden Sektionen:
 
 1. **Header** — Version + Active-User-Snapshot via Markdown.
-2. **Heute schreiben** — Writing- und Lektorat-Minuten (Entity-Cards).
+2. **Heute schreiben** — Writing-, Lektorat- und Diktat-Minuten + diktierte Zeichen heute (Entity-Cards).
 3. **Inhalte** — Bücher / Kapitel / Seiten / Zeichen / Normseiten (Glance, 5 Spalten).
 4. **User** — Status-Aufschlüsselung + Aktivitäts-Fenster (Glance).
 5. **Job-Queue (Live)** — Zwei Gauges mit Severity-Schwellen (grün / gelb / rot).
 6. **KI-Kosten & Tokens** — Kumulierte USD, Input-/Output-Tokens, Cache-Hit (Glance).
 7. **Block-Merge** — Auto-Merge / Banner / aufgelöste Blöcke / Overwrite-Fallback (Glance).
-8. **Trends** — Drei `history-graph`-Karten: Zeichen-Wachstum 7d, Job-Queue 24h, Schreib-Minuten 24h, Kosten 30d.
+8. **Trends** — `history-graph`-Karten: Zeichen-Wachstum 7d, Job-Queue 24h, Schreib-/Lektorat-/Diktat-Minuten 24h, Kosten 30d.
 
 ## Per-Provider-/Model-Aufschlüsselung
 

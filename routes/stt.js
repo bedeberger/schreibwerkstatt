@@ -99,6 +99,10 @@ router.post('/transcribe', rawAudioBody, async (req, res) => {
     if (model) form.append('model', model);
     if (language) form.append('language', language);
     form.append('response_format', 'json');
+    // Sampling-Temperatur (App-Setting, Default 0 = deterministisch, weniger
+    // Halluzinationen bei stillen/unklaren Segmenten).
+    const temperature = Number(appSettings.get('stt.temperature'));
+    form.append('temperature', String(Number.isFinite(temperature) ? temperature : 0));
 
     const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined;
     const upstream = await fetch(`${host}/v1/audio/transcriptions`, {
