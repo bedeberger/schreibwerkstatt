@@ -687,6 +687,52 @@ test('Komplettanalyse Phase 3 Orte-Konsolidierung: Konsol-Output dedupliziert di
   assert.equal(job.result.orteCount, 2);
 });
 
+test('Komplettanalyse Phase 3 Orte-Konsolidierung trunkiert → Job ok, Warnung, Fallback auf Kapitel-Orte', async () => {
+  const BOOK_ID = 711;
+  seedMultiChapterBook(BOOK_ID, 3); // Multi-Pass → echter Orte-Konsol-Call
+
+  ctx.mockAi.on(isP1Extract, ({ prompt }) => {
+    const m = prompt.match(/Kapitel \d+/);
+    const chap = m ? m[0] : 'Kapitel';
+    return {
+      figuren: [{ id: 'fig_anna', name: 'Anna', kurzname: 'Anna', typ: 'protagonist', praesenz: 'zentral', sozialschicht: 'mitte', kapitel: [{ name: chap, haeufigkeit: 1 }], beziehungen: [] }],
+      orte: [
+        { id: 'ort_land', name: 'Land', typ: 'natur', beschreibung: 'weit', kapitel: [{ name: chap, haeufigkeit: 1 }], figuren: ['fig_anna'] },
+        { id: 'ort_berg', name: 'Berg', typ: 'natur', beschreibung: 'hoch', kapitel: [{ name: chap, haeufigkeit: 1 }], figuren: [] },
+      ],
+      fakten: [], songs: [],
+      szenen: [{ seite: 'Seite', kapitel: chap, titel: 'Anna unterwegs', wertung: 'mittel', kommentar: 'k', figuren_namen: ['Anna'], orte_namen: ['Land'] }],
+      assignments: [{ figur_name: 'Anna', lebensereignisse: [] }],
+    };
+  });
+  ctx.mockAi.on(isFigKonsol, figKonsolResponse([
+    { id: 'fig_anna', name: 'Anna', kurzname: 'Anna', typ: 'protagonist', praesenz: 'zentral', sozialschicht: 'mitte', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 1 }], beziehungen: [] },
+  ]));
+  // Orte-Konsolidierung dreht durch (lokales Modell, Wiederholungsschleife) → truncated.
+  // Der Job darf NICHT scheitern: Figuren/Fakten sind längst gespeichert, die Orte sind
+  // kapitelweise extrahiert → regelbasierter Fallback-Merge.
+  ctx.mockAi.on(isOrteKonsol, { truncated: true, text: '{"orte":[' });
+  ctx.mockAi.on(isBeziehung, { beziehungen: [] });
+  ctx.mockAi.on(isKontinuitaet, kontinuitaetResponse());
+
+  const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
+  ctx.shared.enqueueJob(jobId, () =>
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+  );
+  const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 10000 });
+  assert.equal(job.status, 'done', `expected done (graceful fallback), got ${job.status}: ${job.error || ''}`);
+
+  assert.ok((job.result.warnings || []).some(w => w.key === 'job.warn.orteKonsolidierungDegraded'),
+    `expected orteKonsolidierungDegraded warning, got ${JSON.stringify(job.result.warnings)}`);
+
+  // Fallback dedupliziert die Kapitel-Orte (3×Land + 3×Berg) regelbasiert auf 2.
+  const orte = ctx.dbSchema.db.prepare(
+    'SELECT name FROM locations WHERE book_id = ? AND user_email = ? ORDER BY name'
+  ).all(BOOK_ID, 'tester@test.dev');
+  assert.deepEqual(orte.map(o => o.name), ['Berg', 'Land']);
+  assert.equal(job.result.orteCount, 2);
+});
+
 // Baut N Lebensereignisse für eine Figur (distinct datum+ereignis → N Gruppen in P6).
 function lebensereignisse(n) {
   return Array.from({ length: n }, (_, i) => ({

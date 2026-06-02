@@ -495,6 +495,31 @@ async function runPhase2(ctx, chapterFiguren, chapterAssignments, chapterSzenen)
   return { figuren, figNameToId, figNameToIdLower, figurenKompakt, idRemap, isSinglePass };
 }
 
+/** Regelbasierter Orte-Merge als Fallback, wenn die KI-Konsolidierung scheitert (z.B.
+ *  aiTruncated bei kleinem lokalem Modell). Flattet chapterOrte über alle Kapitel, dedupliziert
+ *  nach Name (case-insensitive, erstes Vorkommen gewinnt, figuren-Refs vereinigt) und biegt
+ *  figuren-IDs gegen idRemap um bzw. filtert nicht (mehr) existente heraus – analog Single-Pass. */
+function buildFallbackOrte(chapterOrte, validFigIds, idRemap) {
+  const byName = new Map();
+  for (const ch of (chapterOrte || [])) {
+    for (const o of (ch.orte || [])) {
+      const key = (o.name || '').trim().toLowerCase();
+      if (!key) continue;
+      const figIds = (o.figuren || [])
+        .map(fid => idRemap?.[fid] || fid)
+        .filter(fid => validFigIds.has(fid));
+      if (!byName.has(key)) {
+        byName.set(key, { ...o, figuren: [...new Set(figIds)] });
+      } else {
+        const ex = byName.get(key);
+        ex.figuren = [...new Set([...ex.figuren, ...figIds])];
+        if (!ex.beschreibung && o.beschreibung) ex.beschreibung = o.beschreibung;
+      }
+    }
+  }
+  return [...byName.values()].map((o, i) => ({ ...o, id: o.id || ('ort_' + (i + 1)) }));
+}
+
 /** Phase 3: Orte konsolidieren + Name→ID Lookup.
  *  Single-Pass-Optimierung analog zu Phase 2: Wenn Phase 1 im Single-Pass-Modus lief,
  *  sind die Orte bereits holistisch extrahiert – ein Konsolidierungs-Call fügt nichts
@@ -503,6 +528,9 @@ async function runPhase2(ctx, chapterFiguren, chapterAssignments, chapterSzenen)
  *  nicht mehr existente entfernt). */
 async function runPhase3(ctx, chapterOrte, figurenKompakt, isSinglePass, idRemap, opts = {}) {
   const { jobId, bookIdInt, bookName, email, call, tok, log, prompts, sys, idMaps, effectiveProvider } = ctx;
+  // prefetchAttempted: im Claude-Parallel-Pfad wurde der Orte-Call bereits gefahren (Promise.all).
+  // null heisst dann „Prefetch fehlgeschlagen" (Warnung schon geloggt) → direkt Fallback, kein Re-Call.
+  const prefetchAttempted = 'prefetchedOrteRaw' in opts;
   const prefetched = opts.prefetchedOrteRaw || null;
 
   let orte;
@@ -521,13 +549,36 @@ async function runPhase3(ctx, chapterOrte, figurenKompakt, isSinglePass, idRemap
     updateJob(jobId, { progress: 55 });
   } else {
     updateJob(jobId, { progress: 43, statusText: 'job.phase.consolidatingOrte' });
-    const orteResultRaw = prefetched || await call(jobId, tok,
-      prompts.buildLocationsConsolidationPrompt(bookName, chapterOrte, figurenKompakt),
-      sys.SYSTEM_ORTE_BLOCKS, 43, 55, komplettMaxTokens(effectiveProvider), 0.2, null, prompts.SCHEMA_ORTE_KONSOL,
-    );
-    if (!Array.isArray(orteResultRaw?.orte)) throw i18nError('job.error.orteMissing');
-    if (prefetched) {
-      const validFigIds = new Set(figurenKompakt.map(f => f.id));
+    const validFigIds = new Set(figurenKompakt.map(f => f.id));
+    let orteResultRaw = prefetched;
+    if (!orteResultRaw && !prefetchAttempted) {
+      try {
+        orteResultRaw = await call(jobId, tok,
+          prompts.buildLocationsConsolidationPrompt(bookName, chapterOrte, figurenKompakt),
+          sys.SYSTEM_ORTE_BLOCKS, 43, 55, komplettMaxTokens(effectiveProvider), 0.2, null, prompts.SCHEMA_ORTE_KONSOL,
+        );
+      } catch (e) {
+        if (e.name === 'AbortError') throw e;
+        // Wie Phase 2 (Figuren) / Zeitstrahl: die Orte-Konsolidierung ist nicht
+        // katalog-kritisch – die Orte sind in chapterOrte bereits kapitelweise extrahiert.
+        // Ein Konsolidierungs-Fehler (typisch: aiTruncated, wenn ein kleines lokales Modell
+        // viele Orte in einen Output packen müsste, Parse-Fehler, erschöpfter Retry) darf den
+        // gesamten Job – inkl. bereits gespeicherter Figuren/Soziogramm/Fakten – NICHT verwerfen.
+        log.warn(`Orte-Konsolidierung fehlgeschlagen (${e.message}) – Fallback auf kapitel-extrahierte Orte.`);
+        ctx.warnings?.push({ key: 'job.warn.orteKonsolidierungDegraded' });
+        orteResultRaw = null;
+      }
+    }
+    if (!Array.isArray(orteResultRaw?.orte)) {
+      // Call gescheitert ODER Antwort ohne orte-Array: kapitelweise extrahierte Orte
+      // regelbasiert mergen (flatten + Dedup nach Name, figuren-Refs gegen idRemap+validFigIds).
+      if (orteResultRaw !== null) {
+        log.warn('Orte-Konsolidierung lieferte kein orte-Array – Fallback auf kapitel-extrahierte Orte.');
+        ctx.warnings?.push({ key: 'job.warn.orteKonsolidierungDegraded' });
+      }
+      orte = buildFallbackOrte(chapterOrte, validFigIds, idRemap);
+      updateJob(jobId, { progress: 55 });
+    } else if (prefetched) {
       orte = orteResultRaw.orte.map((o, i) => ({
         ...o,
         id: o.id || ('ort_' + (i + 1)),
@@ -617,13 +668,22 @@ function buildPrelimFigurenKompakt(chapterFiguren) {
 /** Nur der Orte-Konso-AI-Call (Multi-Pass) – ohne DB-Save, ohne Progress-Update.
  *  Aufrufer wendet idRemap+validFigIds-Filter via runPhase3(opts.prefetchedOrteRaw) an. */
 async function runPhase3OrteCall(ctx, chapterOrte, figurenKompaktForPrompt) {
-  const { jobId, bookName, call, tok, prompts, sys, effectiveProvider } = ctx;
-  return call(jobId, tok,
-    prompts.buildLocationsConsolidationPrompt(bookName, chapterOrte, figurenKompaktForPrompt),
-    sys.SYSTEM_ORTE_BLOCKS,
-    null, null,
-    komplettMaxTokens(effectiveProvider), 0.2, null, prompts.SCHEMA_ORTE_KONSOL,
-  );
+  const { jobId, bookName, call, tok, log, prompts, sys, effectiveProvider } = ctx;
+  try {
+    return await call(jobId, tok,
+      prompts.buildLocationsConsolidationPrompt(bookName, chapterOrte, figurenKompaktForPrompt),
+      sys.SYSTEM_ORTE_BLOCKS,
+      null, null,
+      komplettMaxTokens(effectiveProvider), 0.2, null, prompts.SCHEMA_ORTE_KONSOL,
+    );
+  } catch (e) {
+    if (e.name === 'AbortError') throw e;
+    // Läuft parallel zu Phase 2 (Figuren) in Promise.all – ein Reject würde auch das
+    // P2-Ergebnis verwerfen. null zurückgeben; runPhase3 fällt dann auf den regelbasierten
+    // Orte-Merge zurück (kapitel-extrahierte Orte), statt den Job zu killen.
+    log.warn(`Orte-Konsolidierung (parallel) fehlgeschlagen (${e.message}) – Fallback auf kapitel-extrahierte Orte.`);
+    return null;
+  }
 }
 
 /**
