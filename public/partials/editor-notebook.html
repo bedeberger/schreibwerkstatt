@@ -69,7 +69,7 @@
                       :data-tip="t(prov.key + '.action.push')"
                       :aria-label="t(prov.key + '.action.push')">
                 <template x-if="!prov.card.pushBusy[currentPage?.id]">
-                  <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#arrow-up"/></svg>
+                  <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#arrow-up"/></svg>
                 </template>
                 <template x-if="prov.card.pushBusy[currentPage?.id]">
                   <span class="display-contents">
@@ -90,7 +90,7 @@
                       @click="window.open(prov.card.viewUrl(currentPage), '_blank', 'noopener')"
                       :data-tip="t(prov.key + '.action.view')"
                       :aria-label="t(prov.key + '.action.view')">
-                <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#external-link"/></svg>
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#external-link"/></svg>
               </button>
             </template>
           </span>
@@ -127,14 +127,14 @@
                     :disabled="!diaryPrevPage()"
                     :data-tip="t('diary.prevEntry')"
                     :aria-label="t('diary.prevEntry')">
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#chevron-left"/></svg>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#chevron-left"/></svg>
             </button>
             <button type="button" class="graph-tool-btn"
                     @click="diaryGo(1)"
                     :disabled="!diaryNextPage()"
                     :data-tip="t('diary.nextEntry')"
                     :aria-label="t('diary.nextEntry')">
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#chevron-right"/></svg>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#chevron-right"/></svg>
             </button>
           </span>
           <span class="action-sep" aria-hidden="true" x-show="isTagebuch()"></span>
@@ -197,19 +197,19 @@
             :disabled="!notebookCanUndo()"
             :data-tip="t('editor.toolbar.undoTitle')" :aria-label="t('editor.toolbar.undoTitle')"
             @click="notebookUndo()">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#undo"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#undo"/></svg>
     </button>
     <button type="button" class="graph-tool-btn"
             :disabled="!notebookCanRedo()"
             :data-tip="t('editor.toolbar.redoTitle')" :aria-label="t('editor.toolbar.redoTitle')"
             @click="notebookRedo()">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#redo"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#redo"/></svg>
     </button>
     <span class="action-sep" aria-hidden="true"></span>
     <button type="button" class="graph-tool-btn"
             :data-tip="t('editor.toolbar.hrTitle')" :aria-label="t('editor.toolbar.hrTitle')"
             @click="insertHorizontalRule()">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#separator-horizontal"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#separator-horizontal"/></svg>
     </button>
     <button type="button" class="graph-tool-btn"
             :class="{ 'is-success': quotesNormalizedFlash }"
@@ -220,38 +220,38 @@
               : t('editor.toolbar.quotesTitle')"
             :aria-label="t('editor.toolbar.quotesTitle')"
             @click="normalizeQuotes()">
-      <svg class="icon" aria-hidden="true" x-show="!quotesNormalizedFlash"><use href="/icons.svg?v=689#quote"/></svg>
-      <svg class="icon" aria-hidden="true" x-show="quotesNormalizedFlash" x-cloak><use href="/icons.svg?v=689#check"/></svg>
+      <svg class="icon" aria-hidden="true" x-show="!quotesNormalizedFlash"><use href="/icons.svg?v=690#quote"/></svg>
+      <svg class="icon" aria-hidden="true" x-show="quotesNormalizedFlash" x-cloak><use href="/icons.svg?v=690#check"/></svg>
     </button>
     <span class="action-sep" aria-hidden="true"></span>
     <button type="button" class="graph-tool-btn"
             :data-tip="t('graph.zoomOut')" :aria-label="t('graph.zoomOut')"
             @click="pageEditorZoomOut()">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#minus"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#minus"/></svg>
     </button>
     <button type="button" class="graph-tool-btn"
             :data-tip="t('graph.zoomIn')" :aria-label="t('graph.zoomIn')"
             @click="pageEditorZoomIn()">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#plus"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#plus"/></svg>
     </button>
     <button type="button" class="graph-tool-btn"
             :data-tip="t('graph.reset')" :aria-label="t('graph.reset')"
             @click="pageEditorZoomReset()">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#scan"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#scan"/></svg>
     </button>
     <button type="button" class="graph-tool-btn"
             :aria-pressed="pageEditorFitWidth"
             :data-tip="pageEditorFitWidth ? t('editor.fitWidthOff') : t('editor.fitWidth')"
             :aria-label="pageEditorFitWidth ? t('editor.fitWidthOff') : t('editor.fitWidth')"
             @click="togglePageEditorFitWidth()">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#move-horizontal"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#move-horizontal"/></svg>
     </button>
     <button type="button" class="graph-tool-btn"
             :aria-pressed="pageEditorFullscreen"
             :data-tip="pageEditorFullscreen ? t('graph.fullscreenClose') : t('graph.fullscreen')"
             :aria-label="pageEditorFullscreen ? t('graph.fullscreenClose') : t('graph.fullscreen')"
             @click="togglePageEditorFullscreen()">
-      <svg class="icon" aria-hidden="true"><use :href="pageEditorFullscreen ? '/icons.svg?v=689#minimize-2' : '/icons.svg?v=689#maximize-2'"/></svg>
+      <svg class="icon" aria-hidden="true"><use :href="pageEditorFullscreen ? '/icons.svg?v=690#minimize-2' : '/icons.svg?v=690#maximize-2'"/></svg>
     </button>
     <span class="action-sep" aria-hidden="true"></span>
     <!-- Entity-Linking-Toggle (Figuren/Orte-Highlights + Szenen/Ereignisse-Panel).
@@ -263,8 +263,25 @@
             :data-tip="entitiesEnabledForCurrentBook ? t('entities.toggle.off') : t('entities.toggle.on')"
             :aria-label="entitiesEnabledForCurrentBook ? t('entities.toggle.off') : t('entities.toggle.on')"
             @click="toggleEntitiesEnabledForCurrentBook(); entityPanelOpen = !entitiesEnabledForCurrentBook ? entityPanelOpen : true">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#radio"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#radio"/></svg>
     </button>
+    <!-- STT-Diktat-Toggle. Nur sichtbar wenn Admin STT aktiviert hat
+         (sttEnabled = Root-State aus /config). Recording-State via aria-pressed
+         (CSS-Puls). Sprache loest der Proxy aus der Buch-Locale auf. -->
+    <template x-if="sttEnabled">
+      <span class="stt-toolbar-slot">
+        <span class="action-sep" aria-hidden="true"></span>
+        <button type="button" class="graph-tool-btn stt-mic-btn"
+                :aria-pressed="sttRecording"
+                :class="{ 'is-recording': sttRecording, 'is-pending': sttPending }"
+                :disabled="sttPending"
+                :data-tip="sttRecording ? t('stt.stop') : t('stt.dictate')"
+                :aria-label="sttRecording ? t('stt.stop') : t('stt.dictate')"
+                @click="toggleSttDictation()">
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#mic"/></svg>
+        </button>
+      </span>
+    </template>
   </div>
   </div><!-- /editor-card__topbar -->
 
@@ -320,7 +337,7 @@
   <!-- Cross-User-Konflikt aus _checkPageConflict / Server-OCC. Bleibt im
        Fokusmodus sichtbar (eigene Klasse, nicht via #status versteckt). -->
   <div class="editor-conflict-banner" role="alert" x-show="editConflict" x-cloak>
-    <svg class="icon editor-conflict-banner__icon" aria-hidden="true"><use href="/icons.svg?v=689#alert-triangle"/></svg>
+    <svg class="icon editor-conflict-banner__icon" aria-hidden="true"><use href="/icons.svg?v=690#alert-triangle"/></svg>
     <span class="editor-conflict-banner__text"
           x-text="t('edit.conflict.banner', {
             user: editConflict?.remoteUserName || t('edit.conflict.unknownUser'),

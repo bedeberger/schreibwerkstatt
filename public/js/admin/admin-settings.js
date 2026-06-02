@@ -103,6 +103,7 @@ export const adminSettingsMethods = {
                : kind === 'oauth'        ? '/admin/settings/test-oauth'
                : kind === 'smtp'         ? '/admin/settings/smtp/test-send'
                : kind === 'languagetool' ? '/admin/settings/test-languagetool'
+               : kind === 'stt'          ? '/admin/settings/test-stt'
                : kind === 'geocode'      ? '/admin/settings/test-geocode'
                : null;
     if (!path) return;

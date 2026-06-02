@@ -59,6 +59,7 @@ import { pageViewMethods } from './book/page-view.js';
 import { notebookTrampoline } from './editor/notebook/trampoline.js';
 import { registerEditorFindCard } from './cards/editor-find-card.js';
 import { focusMethods } from './editor/focus.js';
+import { sttDictationMethods } from './editor/notebook/stt-dictation.js';
 import { synonymMethods } from './editor/synonyme.js';
 import { registerEditorSynonymeCard } from './cards/editor-synonyme-card.js';
 import { figurLookupMethods } from './editor/figur-lookup.js';
@@ -579,6 +580,7 @@ document.addEventListener('alpine:init', () => {
       }, { signal });
       window.addEventListener('session-expired', () => { this.sessionExpired = true; }, { signal });
       window.addEventListener('job:finished', (e) => this._onJobFinished(e.detail), { signal });
+      this._initSttDictation?.(signal);
       // Sleep/Wake-Recovery: bei längerer Hide-Phase (>30 s) Daten neu laden,
       // sonst bleiben Listen leer (in-flight Fetches sterben mit TCP-Socket).
       let _hiddenAt = 0;
@@ -691,6 +693,14 @@ document.addEventListener('alpine:init', () => {
         this.languagetoolEnabled = !!cfg.languagetool?.enabled;
         if (Number.isFinite(cfg.languagetool?.debounceMs)) {
           this.languagetoolDebounceMs = cfg.languagetool.debounceMs;
+        }
+        this.sttEnabled = !!cfg.stt?.enabled;
+        if (cfg.stt?.vad) {
+          this.sttVad = {
+            silenceMs:   Number(cfg.stt.vad.silenceMs)   || this.sttVad.silenceMs,
+            threshold:   Number(cfg.stt.vad.threshold)   || this.sttVad.threshold,
+            maxSegmentS: Number(cfg.stt.vad.maxSegmentS) || this.sttVad.maxSegmentS,
+          };
         }
 
         // Hash vorab auswerten, damit loadBooks das gewünschte Buch wählt.
@@ -809,6 +819,7 @@ document.addEventListener('alpine:init', () => {
     ...pageViewMethods,
     ...notebookTrampoline,
     ...focusMethods,
+    ...sttDictationMethods,
     ...synonymMethods,
     ...figurLookupMethods,
     ...shortcutsMethods,

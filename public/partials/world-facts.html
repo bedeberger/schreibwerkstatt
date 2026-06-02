@@ -31,7 +31,7 @@
   <div x-show="fakten.length > 0" class="filter-bar">
     <span class="filter-search-wrap">
       <input type="text" x-model="wfFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
-      <button type="button" class="search-clear--icon" x-show="wfFilters.suche" @click="wfFilters.suche=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#x"/></svg></button>
+      <button type="button" class="search-clear--icon" x-show="wfFilters.suche" @click="wfFilters.suche=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#x"/></svg></button>
     </span>
     <div x-show="wfSeiteListe.length > 0"
          x-data="combobox($app.t('weltfakten.filterKapitel'), $app.t('common.all'))"
