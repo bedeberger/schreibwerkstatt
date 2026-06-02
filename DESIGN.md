@@ -962,6 +962,10 @@ geteilt mit der Sidebar-Page-Suche) — nur sichtbar (`x-show`), wenn das Suchfe
 
 **Severity-/Wertungs-Filter:** generisches `.tabs` / `.tabs-btn` (siehe Tabs-Sektion oben). Kein eigenes Filter-Pattern. Beispiele: [public/partials/kontinuitaet.html](public/partials/kontinuitaet.html), [public/partials/szenen.html](public/partials/szenen.html).
 
+**Kapitel-/Kategorie-Filter:** Compact-Combobox (`x-data="combobox(...)"`, rendert `.combobox-wrap--compact`). Beispiele: [public/partials/world-facts.html](public/partials/world-facts.html), [public/partials/songs.html](public/partials/songs.html).
+
+**Höhen-Invariante (Pflicht):** Alle Controls in einer `.filter-bar` — Suchfeld (`.filter-search-input`), Compact-Combobox (`.combobox-wrap--compact`) und Tabs (`.tabs` / `.tabs-btn`) — rendern auf **identischer Höhe**, ausgerichtet am Suchfeld als Referenz. Sie teilen font-size 12px (`--font-size-mini` / `--size-compact-font-size`), vertikales Padding 4px (`--space-xs` / `--size-compact-padding`), 0.5px-Border **und** `line-height: 1.4`. Die Angleichung lebt in [public/css/entities/entity-list.css](public/css/entities/entity-list.css) (`.filter-bar .tabs-btn`, `.filter-bar .combobox-wrap--compact .combobox-trigger`) und greift automatisch für alle Filter-Bars. **Neuer Control-Typ in einer Filter-Bar** → dieselben 4 Werte (Font/Padding/Border/line-height) treffen, sonst sitzt er höher/tiefer als die Nachbarn. Kein Control-spezifisches Padding/line-height, das die Höhe wieder auseinandertreibt.
+
 ---
 
 ## Heatmap-Visualisierung

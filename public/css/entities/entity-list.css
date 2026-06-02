@@ -26,16 +26,21 @@
 .filter-search-wrap { position: relative; display: inline-flex; align-items: center; }
 .filter-search-wrap .filter-search-input { padding-right: 26px; }
 
-/* Filter-Tabs in der Leiste auf die Höhe + Eckenrundung der Compact-Controls
-   (Suchfeld, combobox--compact) bringen. Die generische .tabs-Komponente ist
-   höher (13px + space-sm-Padding, eckig) und wirkt neben den 12px-Compact-
-   Feldern sonst versetzt. Scope auf .filter-bar lässt eigenständige
-   View-Toggle-Tabs (.tabs.entity-view-toggle) unberührt. */
+/* Alle Filter-Bar-Controls auf identische Höhe bringen, ausgerichtet am
+   Suchfeld (.filter-search-input). Sie teilen bereits font-size (12px),
+   vertikales Padding (--space-xs) und 0.5px-Border; die einzige Abweichung war
+   die line-height (Suchfeld 1.4 vs. combobox/tabs geerbtes `normal` ~1.2). Tabs
+   bekommen zusätzlich radius-md + 12px-Font + space-xs-Padding (die generische
+   .tabs-Komponente ist sonst höher/eckiger). Scope auf .filter-bar lässt
+   eigenständige View-Toggle-Tabs (.tabs.entity-view-toggle) und combobox--compact
+   ausserhalb von Filter-Bars unberührt. */
 .filter-bar .tabs { border-radius: var(--radius-md); }
 .filter-bar .tabs-btn {
   font-size: var(--font-size-mini);
   padding: var(--space-xs) var(--space-md);
+  line-height: 1.4;
 }
+.filter-bar .combobox-wrap--compact .combobox-trigger { line-height: 1.4; }
 
 /* === Entity-Liste (geteilt: Orte, Szenen, Kontinuität, …) ===
    Pattern: kompakte Klick-Zeile + ausklappbarer Detail-Drawer.

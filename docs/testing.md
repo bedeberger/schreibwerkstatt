@@ -1,12 +1,13 @@
 # Tests
 
-Drei Suiten, sequenziell via `npm test`. Erstmaliges Setup: `npx playwright install chromium`.
+Vier Suiten, sequenziell via `npm test`. Erstmaliges Setup: `npx playwright install chromium`.
 
 | Suite | Runner | Pfad | Befehl | Charakter |
 |-------|--------|------|--------|-----------|
 | Unit | `node --test` | [tests/unit/](../tests/unit/) | `npm run test:unit` | Pure, parallelisiert (concurrency 4), kein Browser |
 | Integration | `node --test` | [tests/integration/](../tests/integration/) | `npm run test:integration` | Sequenziell, Mock-AI, Content-Store gegen Test-SQLite |
 | E2E | Playwright | [tests/e2e/](../tests/e2e/) | `npm run test:e2e` | Chromium gegen `tests/server.js` mit Fixture-Harness |
+| Smoke | Playwright | [tests/e2e-app/](../tests/e2e-app/) | `npm run test:smoke` | Chromium gegen die **echte** App (`node server.js`, `LOCAL_DEV_MODE`) |
 
 ## Wann welche Suite?
 
@@ -26,6 +27,11 @@ Drei Suiten, sequenziell via `npm test`. Erstmaliges Setup: `npx playwright inst
 - Lektorat-Flow mit Mock-Server.
 - PDF-Export-Profile-CRUD inkl. Cover-Upload.
 - Paste-Artefakt-Stripping (`cleanContentArtefacts`).
+
+**Smoke:**
+- Brüche, die nur über dem **kompletten** Template-Baum auftauchen: kaputte `$app`-Verdrahtung, fehlende Methode/`t()`-Key in einem Template, falsch gemountete Sub-Komponente.
+- Boot der echten SPA + Öffnen jeder Hauptkarte + aller drei Editoren ohne Browser-Fehler.
+- **Nicht** für gezielte Verhaltens-Assertions (das machen E2E-Harnesses) — Smoke ist reine „rendert ohne Crash"-Absicherung.
 
 ## Unit-Test-Konventionen
 
@@ -73,6 +79,20 @@ Handler-API:
 `fullyParallel: false` (sequenziell), `retries: CI ? 2 : 0`, Timeout 60 s.
 
 Harness-Fixtures müssen die **gleichen `<link rel=stylesheet>`-Tags in derselben Reihenfolge** wie [public/index.html](../public/index.html) haben, sonst weicht Cascade-Order ab und Layout-Tests sind unzuverlaessig. Neuer CSS-File → in beide Files.
+
+### Console-Fehler-Guard
+
+Specs importieren `test`/`expect` aus [tests/e2e/_helpers/fixtures.js](../tests/e2e/_helpers/fixtures.js) statt direkt aus `@playwright/test`. Eine Auto-Fixture (`consoleGuard`) hängt [tests/e2e/_helpers/console-guard.js](../tests/e2e/_helpers/console-guard.js) an die Page: gesammelt werden `pageerror`, `console.error` und Alpine-Warnungen (`Alpine Expression Error`/`Alpine Warn`). Nach dem Test (sofern er nicht ohnehin scheitert) wird `assertClean()` gerufen — jeder unbehandelte Fehler macht den Test rot.
+
+- **Negativ-Test**, der einen Fehler absichtlich provoziert (z.B. erzwungener Save-Fail, fehlender Scroll-Container): `consoleGuard.skip()` am Test-Anfang.
+- **Bekannte, erwartete Meldung** erlauben: `consoleGuard.ignore(/Regex/)`. Default-Allowlist deckt Netzwerk-Rauschen (fehlende Mock-Route, 401/403/404, ResizeObserver-Loop) ab.
+- **Harness-Datenlücke** statt Bug: tritt der Fehler nur auf, weil der Harness dünnere Mock-Daten/Root mountet als Produktion (fehlende Methode, unvollständige Config), den **Harness** produktionsnah machen — nicht ignorieren. Beispiel: pdf-Mock-Profile liefert `defaultConfig()` aus [lib/pdf-export-defaults.js](../lib/pdf-export-defaults.js).
+
+## Smoke (echte App)
+
+[playwright.app.config.js](../playwright.app.config.js) bootet `node server.js` mit `LOCAL_DEV_MODE=true` (OAuth gebypasst → Dev-Admin-Session aus [server.js](../server.js); [lib/dev-seed.js](../lib/dev-seed.js) seedet ein Kafka-Buch) auf einer Wegwerf-DB (`DB_PATH=tests/.tmp/smoke.db`, vor jedem Lauf gelöscht → frischer Seed; Port 8766, eigenes `SESSION_SECRET`). KI-Keys sind nicht nötig — der Smoke triggert keine Jobs.
+
+[tests/e2e-app/smoke.spec.js](../tests/e2e-app/smoke.spec.js) wählt das Seed-Buch via Hash-Deeplink, zieht die Toggle-Namen aus `EXCLUSIVE_CARDS` ([feature-registry.js](../public/js/cards/feature-registry.js), kein Drift) und öffnet jede Karte + alle drei Editoren, jeweils mit Console-Guard-Prüfung. **Warum:** Alpine wirft Expression-Fehler asynchron (`setTimeout(() => { throw })`) und loggt sie nur — Unit/Integration sehen davon nichts, Harnesses nur ihre eine Karte. Erst der komplette Template-Baum im echten Browser fängt sie. Neue Karte ⇒ automatisch im Smoke.
 
 ## Häufige Fallen
 
