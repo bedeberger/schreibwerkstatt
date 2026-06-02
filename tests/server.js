@@ -234,6 +234,16 @@ async function handleMockRoute(req, res, urlPath) {
     return true;
   }
 
+  // /stt/transcribe Mock fuer STT-Diktat-E2E. Liest das Audio-Binary (egal
+  // welches), liefert deterministisches Transkript. enabled-Guard simuliert via
+  // ?bookId — irrelevant; gibt immer { text }.
+  if (urlPath.startsWith('/stt/transcribe') && req.method === 'POST') {
+    await readBody(req); // Audio-Binary konsumieren + verwerfen
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ text: 'Hallo Welt' }));
+    return true;
+  }
+
   // ── Publication-Tab + EPUB-Export-Mocks ─────────────────────────────────
   if (urlPath === '/__mock/publication-reset' && req.method === 'POST') {
     publication = {}; epubJobSeq = 0; lastPubPut = null;

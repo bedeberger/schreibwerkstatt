@@ -236,6 +236,15 @@ router.post('/page-stats/batch', express.json(), (req, res) => {
       .map(r => [r.page_id, r.book_id])
   );
 
+  // ACL: nur Buecher, fuer die der User Editor-Zugriff hat. page_stats ist ein
+  // geteilter Cache — ohne diese Pruefung koennte jeder eingeloggte User die
+  // Statistik fremder Buecher ueberschreiben (IDOR, body-supplied book_id).
+  const allowedBooks = new Set();
+  for (const ownerBook of new Set(ownerByPage.values())) {
+    try { requireBookAccess(req, ownerBook, 'editor'); allowedBooks.add(ownerBook); }
+    catch { /* kein Zugriff -> Rows dieses Buchs werden unten verworfen */ }
+  }
+
   const stmt = db.prepare(`
     INSERT INTO page_stats (page_id, book_id, tok, words, chars, updated_at, cached_at)
     VALUES (@page_id, @book_id, @tok, @words, @chars, @updated_at, @cached_at)
@@ -251,7 +260,7 @@ router.post('/page-stats/batch', express.json(), (req, res) => {
       const pageId = toIntId(s?.page_id);
       const bookId = toIntId(s?.book_id);
       const ownerBook = pageId ? ownerByPage.get(pageId) : null;
-      if (!pageId || !bookId || !ownerBook || ownerBook !== bookId) {
+      if (!pageId || !bookId || !ownerBook || ownerBook !== bookId || !allowedBooks.has(ownerBook)) {
         skipped.push({ page_id: s?.page_id, book_id: s?.book_id, owner_book: ownerBook ?? null });
         continue;
       }
@@ -537,6 +546,7 @@ router.post('/writing-time', jsonBody, (req, res) => {
   const book_id = toIntId(req.body?.book_id);
   const secondsRaw = Number(req.body?.seconds);
   if (!book_id) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
+  if (!_guardBook(req, res, book_id, 'viewer')) return;
   if (!Number.isFinite(secondsRaw) || secondsRaw <= 0) return res.json({ ok: true, added: 0 });
   const seconds = Math.min(Math.round(secondsRaw), 3600);
   const date = localIsoDate();
@@ -588,6 +598,8 @@ router.post('/lektorat-time', jsonBody, (req, res) => {
   const secondsRaw = Number(req.body?.seconds);
   if (!book_id) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
   if (!page_id) return res.status(400).json({ error_code: 'INVALID_PAGE_ID' });
+  if (!_guardBook(req, res, book_id, 'viewer')) return;
+  if (_pageBookId(page_id) !== book_id) return res.status(400).json({ error_code: 'BOOK_MISMATCH' });
   if (!Number.isFinite(secondsRaw) || secondsRaw <= 0) return res.json({ ok: true, added: 0 });
   const seconds = Math.min(Math.round(secondsRaw), 3600);
   const date = localIsoDate();

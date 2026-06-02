@@ -21,6 +21,7 @@ const appUsers = require('../db/app-users');
 const regRequests = require('../db/registration-requests');
 const mailer = require('../lib/mailer');
 const rateLimit = require('../lib/register-ratelimit');
+const altcha = require('../lib/altcha');
 const { tServer } = require('../lib/i18n-server');
 
 const router = express.Router();
@@ -56,7 +57,9 @@ function _bodyLang(req) {
 }
 
 function _clientIp(req) {
-  return req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || null;
+  // Nur req.ip (aufgeloest via `trust proxy`-Hop). Client-supplied X-Forwarded-For
+  // ist spoofbar und darf fuer Rate-Limit-/Anti-Abuse-Keys nicht verwendet werden.
+  return req.ip || null;
 }
 
 function _renderLanding(req, res) {
@@ -87,10 +90,9 @@ function _renderLanding(req, res) {
 function _renderRegister(req, res) {
   const lang = _bodyLang(req);
   const t = (key) => tServer(key, lang);
-  const captchaSiteKey = appSettings.get('auth.captcha.site_key') || '';
   res.set('Cache-Control', 'no-store');
   const config = {
-    captchaSiteKey,
+    altchaEnabled: altcha.isEnabled(),
     i18n: {
       success:   t('register.success'),
       rateLimit: t('register.rateLimit'),
@@ -108,7 +110,6 @@ function _renderRegister(req, res) {
     submitLabel:    t('register.submitLabel'),
     backToLanding:  t('register.backToLanding'),
     footerHint:     t('register.footer'),
-    captchaSiteKey,
     configJson:     JSON.stringify(config).replace(/</g, '\\u003c'),
   }));
 }
@@ -124,31 +125,19 @@ router.get('/', (req, res, next) => {
 router.get('/landing', _renderLanding);
 router.get('/register', _renderRegister);
 
-// hCaptcha verifizieren — nur wenn beide Keys gesetzt sind. Sonst Hard
-// Rate-Limit reicht als Spam-Schutz.
-async function _verifyCaptcha(token, remoteIp) {
-  const siteKey = appSettings.get('auth.captcha.site_key');
-  const secret  = appSettings.get('auth.captcha.secret_key');
-  if (!siteKey || !secret) return { ok: true, skipped: true };
-  if (!token) return { ok: false, reason: 'missing-token' };
+// ALTCHA-Challenge fuer Register- + Admin-Login-Widget (kein Auth-Zwang, vor
+// dem Guard gemountet). Liefert eine frische signierte Challenge; 503 wenn
+// ALTCHA aus ist (das Widget wird dann gar nicht erst geladen).
+router.get('/altcha/challenge', async (req, res) => {
+  if (!altcha.isEnabled()) return res.status(503).json({ error_code: 'ALTCHA_DISABLED' });
+  res.set('Cache-Control', 'no-store');
   try {
-    const params = new URLSearchParams();
-    params.set('secret', secret);
-    params.set('response', token);
-    if (remoteIp) params.set('remoteip', remoteIp);
-    const r = await fetch('https://hcaptcha.com/siteverify', {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: params.toString(),
-    });
-    const j = await r.json().catch(() => ({}));
-    if (j.success) return { ok: true };
-    return { ok: false, reason: 'verify-failed', codes: j['error-codes'] || [] };
+    res.json(await altcha.createPowChallenge());
   } catch (e) {
-    logger.warn(`captcha verify failed: ${e.message}`);
-    return { ok: false, reason: 'verify-error' };
+    logger.warn(`ALTCHA challenge failed: ${e.message}`);
+    res.status(500).json({ error_code: 'ALTCHA_CHALLENGE_FAILED' });
   }
-}
+});
 
 const _emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -161,14 +150,14 @@ router.post('/register', express.json({ limit: '8kb' }), async (req, res) => {
     return res.status(429).json({ error_code: 'RATE_LIMITED', retryAfter: limit.retryAfterSec });
   }
 
-  const { email, displayName, message, captchaToken } = req.body || {};
+  const { email, displayName, message, altcha: altchaSolution } = req.body || {};
   const e = String(email || '').trim().toLowerCase();
   if (!e || !_emailRegex.test(e) || e.length > 320) {
     rateLimit.record(ip); // Fehlversuch zaehlt — sonst freier Spam-Probe
     return res.status(400).json({ error_code: 'EMAIL_INVALID' });
   }
 
-  const captcha = await _verifyCaptcha(captchaToken, ip);
+  const captcha = await altcha.verify(altchaSolution);
   if (!captcha.ok) {
     rateLimit.record(ip);
     return res.status(400).json({ error_code: 'CAPTCHA_FAILED' });

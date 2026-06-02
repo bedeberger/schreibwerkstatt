@@ -6,6 +6,7 @@
   const returnTo = form.dataset.returnto || '/';
   const msgInvalid = form.dataset.msgInvalid || 'Invalid credentials.';
   const msgRateTpl = form.dataset.msgRateTpl || 'Too many attempts. Retry in {sec}s.';
+  const msgCaptcha = form.dataset.msgCaptcha || 'Verification failed. Please retry.';
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -14,11 +15,13 @@
     err.textContent = '';
     const email = document.getElementById('email').value.trim();
     const password = document.getElementById('password').value;
+    // ALTCHA-Loesung (form-assoziiertes Widget). Feld fehlt, wenn ALTCHA aus ist.
+    const altcha = new FormData(form).get('altcha') || null;
     try {
       const r = await fetch('/auth/admin-login', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, altcha }),
       });
       if (r.ok) {
         window.location.href = returnTo;
@@ -28,6 +31,9 @@
       if (r.status === 429) {
         const sec = j.retryAfter || 900;
         err.textContent = msgRateTpl.replace('{sec}', sec);
+      } else if (r.status === 400 && j.error_code === 'CAPTCHA_FAILED') {
+        err.textContent = msgCaptcha;
+        try { document.querySelector('#admin-form altcha-widget')?.reset?.(); } catch {}
       } else {
         err.textContent = msgInvalid;
       }

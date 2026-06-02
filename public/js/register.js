@@ -2,16 +2,25 @@
   const cfgEl = document.getElementById('register-config');
   if (!cfgEl) return;
   const cfg = JSON.parse(cfgEl.textContent || '{}');
-  const siteKey = cfg.captchaSiteKey || '';
+  const altchaOn = cfg.altchaEnabled === true;
   const I18N = cfg.i18n || {};
 
-  if (siteKey) {
-    const slot = document.getElementById('captcha-slot');
-    if (slot) slot.hidden = false;
+  // ALTCHA-Widget (self-hosted PoW) nur einhaengen, wenn aktiv. Das Modul
+  // registriert das <altcha-widget>-Custom-Element; auto="onload" loest die
+  // Challenge unsichtbar beim Laden. Der geloeste Wert landet als Feld `altcha`
+  // in der FormData (form-assoziiertes Custom-Element).
+  if (altchaOn) {
+    const slot = document.getElementById('altcha-slot');
+    if (slot) {
+      const w = document.createElement('altcha-widget');
+      w.setAttribute('challengeurl', '/altcha/challenge');
+      w.setAttribute('name', 'altcha');
+      w.setAttribute('auto', 'onload');
+      slot.appendChild(w);
+    }
     const s = document.createElement('script');
-    s.src = 'https://js.hcaptcha.com/1/api.js';
-    s.async = true;
-    s.defer = true;
+    s.type = 'module';
+    s.src = '/vendor/altcha-3.0.11.min.js';
     document.head.appendChild(s);
   }
 
@@ -25,15 +34,11 @@
     msg.className = 'public-msg';
 
     const data = new FormData(form);
-    let captchaToken = null;
-    if (siteKey && typeof hcaptcha !== 'undefined') {
-      try { captchaToken = hcaptcha.getResponse(); } catch {}
-    }
     const payload = {
       email: (data.get('email') || '').trim(),
       displayName: (data.get('displayName') || '').trim() || null,
       message: (data.get('message') || '').trim() || null,
-      captchaToken,
+      altcha: altchaOn ? (data.get('altcha') || null) : null,
     };
 
     try {

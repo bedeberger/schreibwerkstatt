@@ -5,6 +5,7 @@ const logger = require('../logger');
 const appUsers = require('../db/app-users');
 const rateLimit = require('../lib/admin-login-ratelimit');
 const appSettings = require('../lib/app-settings');
+const altcha = require('../lib/altcha');
 const avatarCache = require('../lib/avatar-cache');
 const { tServer } = require('../lib/i18n-server');
 
@@ -51,7 +52,9 @@ async function getClient() {
 const MAX_PENDING_FLOWS = 5;
 
 function _clientIp(req) {
-  return req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.connection?.remoteAddress || null;
+  // Nur req.ip (aufgeloest via `trust proxy`-Hop). Client-supplied X-Forwarded-For
+  // ist spoofbar und darf fuer Rate-Limit-/Anti-Abuse-Keys nicht verwendet werden.
+  return req.ip || null;
 }
 
 // Konstant-zeit-Vergleich gleichgrosser Buffer. ENV-Passwort + User-Input
@@ -312,12 +315,19 @@ router.get('/login', (req, res) => {
 ` : '';
   const orBlock = hasGoogle && hasAdminPw ? `  <div class="public-sep">${t('auth.login.or')}</div>
 ` : '';
+  // ALTCHA-Widget nur einhaengen, wenn aktiv. Form-assoziiertes Custom-Element:
+  // der geloeste Wert landet als Feld `altcha` in der FormData (admin-login.js
+  // liest ihn raus). Das Modul registriert <altcha-widget> beim Laden.
+  const altchaOn = hasAdminPw && altcha.isEnabled();
+  const altchaWidget = altchaOn
+    ? `    <altcha-widget challengeurl="/altcha/challenge" name="altcha" auto="onload"></altcha-widget>\n`
+    : '';
   const adminBlock = hasAdminPw
     ? `  <form id="admin-form" class="public-form" novalidate data-returnto="${_escAttr(returnTo)}" data-msg-invalid="${_escAttr(t('auth.login.errInvalid'))}" data-msg-rate-tpl="${_escAttr(t('auth.login.errRateTpl'))}">
     <h2 class="public-form-title">${t('auth.login.adminTitle')}</h2>
     <label><span>${t('auth.login.email')}</span><input type="email" id="email" required autocomplete="username"></label>
     <label><span>${t('auth.login.password')}</span><input type="password" id="password" required autocomplete="current-password"></label>
-    <div class="public-form-actions">
+${altchaWidget}    <div class="public-form-actions">
       <button type="submit" class="public-btn public-btn--primary">${t('auth.login.submit')}</button>
     </div>
     <p class="public-msg public-msg--err" id="err" hidden></p>
@@ -326,13 +336,16 @@ router.get('/login', (req, res) => {
     : (hasGoogle ? '' : `  <p class="public-sub">${t('auth.login.noAdmin')}</p>
 `);
   res.set('Cache-Control', 'no-store');
+  const adminScripts = hasAdminPw
+    ? `${altchaOn ? '<script type="module" src="/vendor/altcha-3.0.11.min.js"></script>\n' : ''}<script src="/js/admin/admin-login.js"></script>\n`
+    : '';
   res.send(_renderPublicShell({
     lang,
     title,
     mainHtml: `<main class="public-shell">
   <header class="public-header"><h1>${title}</h1></header>
 ${googleBlock}${orBlock}${adminBlock}</main>`,
-    scripts: hasAdminPw ? `<script src="/js/admin/admin-login.js"></script>\n` : '',
+    scripts: adminScripts,
   }));
 });
 
@@ -342,7 +355,7 @@ ${googleBlock}${orBlock}${adminBlock}</main>`,
 // SHA-256-Hash beider Werte (gleiche Buffer-Laenge, konstantzeit-Vergleich).
 // Rate-Limit pro IP via lib/admin-login-ratelimit. Ohne ADMIN_PASSWORD-ENV
 // liefert die Route 404 (Login-Pfad B komplett deaktiviert).
-router.post('/auth/admin-login', express.json(), (req, res) => {
+router.post('/auth/admin-login', express.json(), async (req, res) => {
   if (!process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD) {
     return res.status(404).json({ error_code: 'ADMIN_LOGIN_DISABLED' });
   }
@@ -352,7 +365,14 @@ router.post('/auth/admin-login', express.json(), (req, res) => {
     res.set('Retry-After', String(state.retryAfterSec || 900));
     return res.status(429).json({ error_code: 'RATE_LIMITED', retryAfter: state.retryAfterSec });
   }
-  const { email, password } = req.body || {};
+  const { email, password, altcha: altchaSolution } = req.body || {};
+  // ALTCHA vor dem Credential-Check: ohne gueltige PoW-Loesung kein Versuch.
+  // Kein recordFailure hier — ein fehlendes/ungueltiges Token ist keine
+  // Credential-Brute-Force, und der Solver-CPU-Aufwand deckelt Bots bereits.
+  const captcha = await altcha.verify(altchaSolution);
+  if (!captcha.ok) {
+    return res.status(400).json({ error_code: 'CAPTCHA_FAILED' });
+  }
   const givenEmail = (email || '').toLowerCase().trim();
   const expectedEmail = (process.env.ADMIN_EMAIL || '').toLowerCase().trim();
   const userAgent = req.headers['user-agent'] || null;

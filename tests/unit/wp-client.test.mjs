@@ -45,6 +45,14 @@ test('validateBaseUrl: https only, strips trailing slash', () => {
   assert.throws(() => validateBaseUrl('not-a-url'), /BLOG_INVALID_URL/);
 });
 
+test('validateBaseUrl: blocks internal hosts (SSRF literal guard)', () => {
+  assert.throws(() => validateBaseUrl('https://169.254.169.254/wp'), /BLOG_BLOCKED_HOST/);
+  assert.throws(() => validateBaseUrl('https://127.0.0.1/wp'), /BLOG_BLOCKED_HOST/);
+  assert.throws(() => validateBaseUrl('https://10.0.0.5/wp'), /BLOG_BLOCKED_HOST/);
+  assert.throws(() => validateBaseUrl('https://192.168.1.1/wp'), /BLOG_BLOCKED_HOST/);
+  assert.throws(() => validateBaseUrl('https://localhost/wp'), /BLOG_BLOCKED_HOST/);
+});
+
 test('authHeader: Basic base64 of user:password', () => {
   const h = authHeader('alice', 'secret pass');
   assert.equal(h, 'Basic ' + Buffer.from('alice:secret pass').toString('base64'));

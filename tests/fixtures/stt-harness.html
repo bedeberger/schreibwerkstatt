@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="de-CH">
+<head>
+  <meta charset="UTF-8">
+  <title>STT Dictation Test Harness</title>
+  <link rel="stylesheet" href="/public/css/tokens.css">
+  <link rel="stylesheet" href="/public/css/page/page-view.css">
+  <style>
+    body { margin: 0; padding: 24px; font: 16px/1.6 system-ui, sans-serif; }
+    .page-content-view--editing {
+      min-height: 160px; padding: 12px; border: 1px solid #ccc;
+      border-radius: 4px; outline: none; white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="page-editor-toolbar" id="toolbar"></div>
+  <div class="page-content-view--editing" id="editor" contenteditable="true"><p>Start.</p></div>
+
+  <script type="module">
+    import { sttDictationMethods } from '/public/js/editor/notebook/stt-dictation.js';
+
+    const params = new URLSearchParams(location.search);
+    const enabled = params.get('enabled') !== 'false';
+    const denyMic = params.get('deny') === 'true';
+
+    // ── Browser-API-Mocks ───────────────────────────────────────────────
+    window.__voice = false;          // steuert die simulierte Lautstaerke
+    window.__dirtyCount = 0;
+    window.__toasts = [];
+    window.__micStopped = 0;
+
+    // navigator.mediaDevices ist read-only + ueber HTTP (kein Secure-Context)
+    // gar nicht vorhanden -> via defineProperty mocken statt zuweisen.
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: async () => {
+          if (denyMic) { const e = new Error('denied'); e.name = 'NotAllowedError'; throw e; }
+          return { getTracks: () => [{ stop() { window.__micStopped++; } }] };
+        },
+      },
+    });
+
+    class MockMediaRecorder {
+      constructor(stream, opts) {
+        this.stream = stream;
+        this.mimeType = (opts && opts.mimeType) || 'audio/webm';
+        this.state = 'inactive';
+        this.ondataavailable = null;
+        this.onstop = null;
+      }
+      start() { this.state = 'recording'; }
+      stop() {
+        if (this.state !== 'recording') return;
+        this.state = 'inactive';
+        if (this.ondataavailable) this.ondataavailable({ data: new Blob(['fakeaudio'], { type: this.mimeType }) });
+        if (this.onstop) this.onstop();
+      }
+    }
+    MockMediaRecorder.isTypeSupported = (m) => m === 'audio/webm;codecs=opus' || m === 'audio/webm';
+    window.MediaRecorder = MockMediaRecorder;
+
+    class MockAudioContext {
+      createMediaStreamSource() { return { connect() {}, disconnect() {} }; }
+      createAnalyser() {
+        return {
+          fftSize: 1024,
+          getByteTimeDomainData(buf) { buf.fill(window.__voice ? 220 : 128); },
+        };
+      }
+      close() { return Promise.resolve(); }
+    }
+    window.AudioContext = MockAudioContext;
+
+    // ── Minimaler App-Kontext (Root-Stand-in) ───────────────────────────
+    const editor = document.getElementById('editor');
+    const app = {
+      ...sttDictationMethods,
+      sttEnabled: enabled,
+      // Schnelle Schwellen fuer den Test (sonst 800ms Stille pro Cut).
+      sttVad: { silenceMs: 150, threshold: 0.02, maxSegmentS: 30 },
+      sttRecording: false,
+      sttPending: false,
+      selectedBookId: 1,
+      t: (k) => k,
+      _getEditEl: () => editor,
+      _markEditDirty: () => { window.__dirtyCount++; },
+      _showJobToast: (o) => { window.__toasts.push(o); },
+    };
+    window.__sttApp = app;
+
+    // Mic-Button (Markup wie editor-notebook.html), nur wenn enabled.
+    if (enabled) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'graph-tool-btn stt-mic-btn';
+      btn.id = 'stt-mic';
+      btn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="/public/icons.svg?v=690#mic"/></svg>';
+      btn.addEventListener('click', () => app.toggleSttDictation());
+      document.getElementById('toolbar').appendChild(btn);
+      // State -> DOM spiegeln (Alpine-Ersatz im Harness).
+      setInterval(() => {
+        btn.setAttribute('aria-pressed', String(app.sttRecording));
+        btn.classList.toggle('is-recording', app.sttRecording);
+        btn.classList.toggle('is-pending', app.sttPending);
+        btn.disabled = app.sttPending;
+      }, 30);
+    }
+
+    window.__harnessReady = true;
+  </script>
+</body>
+</html>

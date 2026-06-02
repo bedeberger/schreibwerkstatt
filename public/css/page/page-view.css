@@ -282,6 +282,11 @@
   border-color: var(--color-success);
   color: var(--color-success);
 }
+/* Slot wrappt Trenner + Mic-Button (Alpine `<template x-if>` braucht eine
+   Wurzel). `display: contents` hebt den Span auf, damit beide Kinder direkte
+   Flex-Items der Toolbar werden — sonst greift `align-self: stretch` am
+   `.action-sep` nicht und der Trenner kollabiert unsichtbar. */
+.page-editor-toolbar .stt-toolbar-slot { display: contents; }
 /* STT-Diktat: aktive Aufnahme rot mit pulsierendem Akzent (uebersteuert den
    generischen aria-pressed-Highlight). Pending = kurzer Wartezustand
    (getUserMedia laeuft) ohne Puls. */
