@@ -105,3 +105,21 @@ test('_computeSpacedInsert: trimmt und liefert leer bei Whitespace-only', () => 
   assert.equal(m._computeSpacedInsert('t', '   '), '');
   assert.equal(m._computeSpacedInsert('t', '  Welt  '), ' Welt');
 });
+
+test('_computeSpacedInsert: Sprechpause ohne Satzendezeichen -> Punkt + Leerzeichen', () => {
+  assert.equal(m._computeSpacedInsert('t', 'Das', true), '. Das');
+});
+
+test('_computeSpacedInsert: Sprechpause nach vorhandenem Satzendezeichen -> nur Leerzeichen', () => {
+  assert.equal(m._computeSpacedInsert('.', 'Das', true), ' Das');
+  assert.equal(m._computeSpacedInsert('!', 'Das', true), ' Das');
+  assert.equal(m._computeSpacedInsert('?', 'Das', true), ' Das');
+});
+
+test('_computeSpacedInsert: Sprechpause, Text beginnt mit Satzzeichen -> kein Punkt', () => {
+  assert.equal(m._computeSpacedInsert('t', ', dann', true), ', dann');
+});
+
+test('_computeSpacedInsert: Sprechpause nach Whitespace -> unveraendert', () => {
+  assert.equal(m._computeSpacedInsert(' ', 'Das', true), 'Das');
+});

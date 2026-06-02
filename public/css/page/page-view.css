@@ -303,8 +303,45 @@
   0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-danger, #b04040) 45%, transparent); }
   50%      { box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-danger, #b04040) 0%, transparent); }
 }
+/* Live-Status-Label neben dem Mic-Button. Punkt-Indikator links: grau (bereit),
+   rot pulsierend (erkennt Sprache), akzentfarben pulsierend (transkribiert). */
+.page-editor-toolbar .stt-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-em-85, 0.85em);
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+.page-editor-toolbar .stt-status::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-muted);
+  flex: none;
+}
+.page-editor-toolbar .stt-status.is-hearing {
+  color: var(--color-danger, #b04040);
+}
+.page-editor-toolbar .stt-status.is-hearing::before {
+  background: var(--color-danger, #b04040);
+  animation: sttDotBlink 1s ease-in-out infinite;
+}
+.page-editor-toolbar .stt-status.is-transcribing {
+  color: var(--color-accent);
+}
+.page-editor-toolbar .stt-status.is-transcribing::before {
+  background: var(--color-accent);
+  animation: sttDotBlink 0.8s linear infinite;
+}
+@keyframes sttDotBlink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.25; }
+}
 @media (prefers-reduced-motion: reduce) {
   .page-editor-toolbar .stt-mic-btn.is-recording[aria-pressed="true"] { animation: none; }
+  .page-editor-toolbar .stt-status::before { animation: none !important; }
 }
 @media (max-width: 600px) {
   .page-editor-toolbar { justify-content: flex-start; }

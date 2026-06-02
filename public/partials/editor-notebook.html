@@ -280,6 +280,12 @@
                 @click="toggleSttDictation()">
           <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#mic"/></svg>
         </button>
+        <!-- Live-Status: zeigt, ob gerade Sprache erkannt wird („hoert") bzw.
+             ein Segment transkribiert wird („transkribiert"). -->
+        <span class="stt-status" x-cloak aria-live="polite"
+              x-show="sttRecording || sttTranscribing > 0"
+              :class="{ 'is-hearing': sttListening && sttTranscribing === 0, 'is-transcribing': sttTranscribing > 0 }"
+              x-text="sttTranscribing > 0 ? t('stt.status.transcribing') : (sttListening ? t('stt.status.hearing') : t('stt.status.listening'))"></span>
       </span>
     </template>
   </div>

@@ -64,11 +64,20 @@ export const sttDictationMethods = {
   // Fuegt vor dem Transkript ein Leerzeichen ein, wenn unmittelbar davor ein
   // Nicht-Whitespace steht und der neue Text nicht mit Satzzeichen beginnt —
   // damit Worte ueber Segmentgrenzen hinweg nicht zusammenkleben.
-  _computeSpacedInsert(prevChar, text) {
+  //
+  // startsNewSentence = das vorige Segment wurde an einer Sprechpause
+  // abgeschnitten: dann ist die Segmentgrenze eine Satzgrenze. Fehlt am Vortext
+  // ein Satzendezeichen, wird ein Punkt ergaenzt (". " statt nur " ").
+  _computeSpacedInsert(prevChar, text, startsNewSentence) {
     const t = String(text || '').trim();
     if (!t) return '';
-    const needsSpace = prevChar && !/\s/.test(prevChar) && !/^[\s,.;:!?…)»"'’-]/.test(t);
-    return needsSpace ? ' ' + t : t;
+    if (!prevChar) return t;
+    const startsPunct = /^[\s,.;:!?…)»"'’-]/.test(t);
+    if (/\s/.test(prevChar)) return t; // schon Whitespace davor
+    if (startsNewSentence && !startsPunct) {
+      return /[.!?…]/.test(prevChar) ? ' ' + t : '. ' + t;
+    }
+    return startsPunct ? t : ' ' + t;
   },
 
   // ── Lifecycle ───────────────────────────────────────────────────────────
@@ -142,6 +151,10 @@ export const sttDictationMethods = {
       hasVoice: false,
       mime: rec.mimeType || mime || 'audio/webm',
       stopping: false,
+      // Cut-Grund des zuletzt geschnittenen Segments; bestimmt, ob das naechste
+      // Segment einen neuen Satz beginnt (silence = Sprechpause = Satzgrenze).
+      lastCutReason: null,
+      boundaryForNext: false,
     };
     this._sttRt = rt;
 
@@ -149,7 +162,12 @@ export const sttDictationMethods = {
     rec.onstop = () => {
       const blob = rt.chunks.length ? new Blob(rt.chunks, { type: rt.mime }) : null;
       rt.chunks = [];
-      if (blob && blob.size > 0 && rt.hasVoice) this._sttSendSegment(blob, rt.mime);
+      const startsNewSentence = !!rt.boundaryForNext;
+      if (blob && blob.size > 0 && rt.hasVoice) this._sttSendSegment(blob, rt.mime, startsNewSentence);
+      // Wurde dieses Segment an einer Sprechpause abgeschnitten, beginnt das
+      // naechste einen neuen Satz.
+      rt.boundaryForNext = (rt.lastCutReason === 'silence');
+      rt.lastCutReason = null;
       // Naechstes Segment, falls noch aktiv.
       if (!rt.stopping && this.sttRecording) {
         rt.hasVoice = false;
@@ -188,7 +206,9 @@ export const sttDictationMethods = {
       maxSegmentS: this.sttVad.maxSegmentS,
     });
     if (decision.voiced) { rt.hasVoice = true; rt.lastVoiceTs = now; }
+    this.sttListening = decision.voiced; // Pegel-Indikator („hoert")
     if (decision.cut && rt.rec.state === 'recording') {
+      rt.lastCutReason = decision.reason;
       // stop() triggert onstop -> Segment senden + naechstes Segment starten.
       try { rt.rec.stop(); } catch { /* noop */ }
     }
@@ -198,6 +218,7 @@ export const sttDictationMethods = {
     const rt = this._sttRt;
     this.sttRecording = false;
     this.sttPending = false;
+    this.sttListening = false;
     if (!rt) return;
     rt.stopping = true;
     if (rt.vadTimer) { clearInterval(rt.vadTimer); rt.vadTimer = null; }
@@ -210,8 +231,9 @@ export const sttDictationMethods = {
 
   // ── Segment-Upload + Insert ───────────────────────────────────────────────
 
-  async _sttSendSegment(blob, mime) {
+  async _sttSendSegment(blob, mime, startsNewSentence) {
     const bookId = this.selectedBookId ? `?bookId=${encodeURIComponent(this.selectedBookId)}` : '';
+    this.sttTranscribing++; // Indikator „transkribiert"
     let res;
     try {
       res = await fetch(`/stt/transcribe${bookId}`, {
@@ -222,19 +244,22 @@ export const sttDictationMethods = {
     } catch {
       // Einzelnes Segment-Fehlschlag stoppt die Session nicht (Edge-Case-Regel).
       this._showJobToast?.({ message: this.t('stt.error.failed'), severity: 'err', jobType: 'stt', bookId: null });
+      this.sttTranscribing = Math.max(0, this.sttTranscribing - 1);
       return;
     }
-    if (res.status === 404) { this._sttStop(); return; } // Feature serverseitig aus
+    if (res.status === 404) { this.sttTranscribing = Math.max(0, this.sttTranscribing - 1); this._sttStop(); return; } // Feature serverseitig aus
     if (!res.ok) {
       this._showJobToast?.({ message: this.t('stt.error.failed'), severity: 'err', jobType: 'stt', bookId: null });
+      this.sttTranscribing = Math.max(0, this.sttTranscribing - 1);
       return;
     }
     let text = '';
-    try { text = (await res.json())?.text || ''; } catch { return; }
-    this._sttInsertText(text);
+    try { text = (await res.json())?.text || ''; } catch { this.sttTranscribing = Math.max(0, this.sttTranscribing - 1); return; }
+    this.sttTranscribing = Math.max(0, this.sttTranscribing - 1);
+    this._sttInsertText(text, startsNewSentence);
   },
 
-  _sttInsertText(text) {
+  _sttInsertText(text, startsNewSentence) {
     const clean = String(text || '').trim();
     if (!clean) return; // leerer/Whitespace-Transkript -> nichts einfuegen
     const editEl = this._getEditEl?.();
@@ -254,7 +279,7 @@ export const sttDictationMethods = {
       range.collapse(false);
     }
     const prevChar = this._sttCharBefore(range);
-    const node = document.createTextNode(this._computeSpacedInsert(prevChar, clean));
+    const node = document.createTextNode(this._computeSpacedInsert(prevChar, clean, startsNewSentence));
     range.deleteContents();
     range.insertNode(node);
     range.setStartAfter(node);
@@ -264,7 +289,11 @@ export const sttDictationMethods = {
     this._markEditDirty?.();
   },
 
-  // Zeichen unmittelbar vor dem Caret (fuer Leerzeichen-Heuristik).
+  // Zeichen unmittelbar vor dem Caret (fuer Leerzeichen-Heuristik). Der Caret
+  // steht zwischen Segmenten meist an einer Knotengrenze (nach dem zuletzt
+  // eingefuegten Textknoten), wo `startContainer` ein Elementknoten ist — darum
+  // den gesamten Text links vom Caret per Range einsammeln und das letzte
+  // Zeichen nehmen (deckt Text- und Elementknoten gleichermassen ab).
   _sttCharBefore(range) {
     try {
       const probe = range.cloneRange();
@@ -272,6 +301,14 @@ export const sttDictationMethods = {
       const node = probe.startContainer;
       if (node.nodeType === 3 && probe.startOffset > 0) {
         return node.textContent[probe.startOffset - 1] || '';
+      }
+      const editEl = this._getEditEl?.();
+      if (editEl) {
+        const left = document.createRange();
+        left.selectNodeContents(editEl);
+        left.setEnd(probe.startContainer, probe.startOffset);
+        const txt = left.toString();
+        if (txt.length) return txt[txt.length - 1];
       }
     } catch { /* noop */ }
     return '';
