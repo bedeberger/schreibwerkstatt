@@ -10,7 +10,11 @@
   border-bottom: 1px solid var(--color-border);
 }
 .filter-count { font-size: var(--font-size-xs); color: var(--color-muted); margin-left: auto; }
-.filter-search-input {
+/* Scope auf .filter-bar nötig: die generische `input[type=text]`-Regel
+   (card-form.css) hat höhere Spezifität (0,1,1) als eine nackte Klasse (0,1,0)
+   und würde sonst font-size/padding/width überschreiben — das Suchfeld käme
+   dann in Default-Grösse (14px/8px) und wäre höher als die Compact-Combobox. */
+.filter-bar .filter-search-input {
   font-size: var(--font-size-mini);
   line-height: 1.4;
   padding: var(--space-xs) 8px;
@@ -21,7 +25,7 @@
   width: 120px;
   box-sizing: border-box;
 }
-.filter-search-input:focus { outline: none; border-color: var(--color-border-focus); }
+.filter-bar .filter-search-input:focus { outline: none; border-color: var(--color-border-focus); }
 /* Wrapper für Suchfeld + Clear-X (reusable .search-clear--icon aus search.css). */
 .filter-search-wrap { position: relative; display: inline-flex; align-items: center; }
 .filter-search-wrap .filter-search-input { padding-right: 26px; }
@@ -243,7 +247,7 @@
     padding: var(--space-2xs) 5px;
     font-size: var(--font-size-micro);
   }
-  .filter-search-input { width: 100%; }
+  .filter-bar .filter-search-input { width: 100%; }
   .filter-search-wrap { flex: 1 1 100%; }
   .filter-bar > .combobox-wrap--compact { flex: 1 1 45%; min-width: 0; }
   .filter-count { width: 100%; text-align: right; }

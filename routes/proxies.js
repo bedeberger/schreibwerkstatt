@@ -65,6 +65,19 @@ router.get('/config', (req, res) => {
         && !!String(appSettings.get('languagetool.url') || '').replace(/\/$/, '').replace(/\/v2$/i, '').trim(),
       debounceMs: Number(appSettings.get('languagetool.debounce_ms')) || 1500,
     },
+    // STT: nur enabled + VAD-Schwellen (VAD laeuft im Browser). Host/Key/Model/
+    // Language verlassen den Server nicht — die Sprache loest /stt/transcribe
+    // pro Request aus der Buch-Locale auf.
+    stt: {
+      enabled: appSettings.get('stt.enabled') === true
+        && !!String(appSettings.get('stt.host') || '').trim(),
+      provider: 'openai-compat',
+      vad: {
+        silenceMs:    Number(appSettings.get('stt.vad.silence_ms')) || 800,
+        threshold:    Number(appSettings.get('stt.vad.threshold')) || 0.015,
+        maxSegmentS:  Number(appSettings.get('stt.vad.max_segment_s')) || 30,
+      },
+    },
   });
 });
 

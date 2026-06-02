@@ -391,6 +391,7 @@ app.use('/draft-figures', draftFiguresRouter);
 app.use('/content', contentRouter);
 app.use('/search', require('./routes/search'));
 app.use('/languagetool', require('./routes/languagetool'));
+app.use('/stt', require('./routes/stt'));
 app.use('/dictionary', require('./routes/dictionary'));
 app.use('/books', require('./routes/book-access'));
 app.use('/book-editor', require('./routes/book-editor'));

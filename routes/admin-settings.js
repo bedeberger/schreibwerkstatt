@@ -142,6 +142,26 @@ router.post('/test-languagetool', async (req, res) => {
   }
 });
 
+// POST /admin/settings/test-stt — Health-Probe des konfigurierten Whisper-
+// Hosts. Pingt /v1/models (billig, no-Body) mit optionalem Bearer; ok wenn 200.
+router.post('/test-stt', async (req, res) => {
+  const enabled = appSettings.get('stt.enabled') === true;
+  const host = String(appSettings.get('stt.host') || '').replace(/\/+$/, '').replace(/\/v1$/i, '');
+  if (!host) return res.json({ ok: false, error: 'NO_HOST', enabled });
+  const apiKey = String(appSettings.get('stt.api_key') || '').trim();
+  const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined;
+  const t0 = Date.now();
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 5000);
+    const r = await fetch(`${host}/v1/models`, { headers, signal: ctrl.signal });
+    clearTimeout(timer);
+    return res.json({ ok: !!r.ok, status: r.status, latency_ms: Date.now() - t0, enabled });
+  } catch (e) {
+    return res.json({ ok: false, error: e.name === 'AbortError' ? 'TIMEOUT' : e.message, latency_ms: Date.now() - t0, enabled });
+  }
+});
+
 // POST /admin/settings/test-geocode — Health-Probe der konfigurierten
 // Geocoding-Quelle. Fragt eine bekannte Stadt ab; ok wenn >=1 Treffer.
 router.post('/test-geocode', async (req, res) => {

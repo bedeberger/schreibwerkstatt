@@ -1,6 +1,6 @@
 # Sprach-Diktat im Notebook-Editor (Self-hosted STT)
 
-- **Status:** Draft <!-- Draft → Ready erst wenn „Offene Fragen" leer -->
+- **Status:** Ready <!-- Draft → Ready erst wenn „Offene Fragen" leer -->
 - **Aufwand:** M
 - **Severity:** medium
 
@@ -14,9 +14,11 @@ Passt zur App-Philosophie: STT schreibt **nicht generativ** in den Text — es t
 
 - **Nur Notebook-Editor.** Focus-Editor und Bucheditor bleiben unberührt (Phase 2).
 - Mikrofon-Button in der Notebook-Toolbar, **nur sichtbar wenn** `sttEnabled` (Admin hat STT aktiviert + Host gesetzt).
-- **VAD-Segment-Streaming**: kontinuierliche `MediaRecorder`-Aufnahme; browserseitige Sprechpausen-Erkennung (WebAudio-RMS-Schwelle) schneidet an Satz-/Halbsatz-Grenzen ab. Jedes abgeschlossene Segment geht an den Proxy; der zurückkommende Text wird **am Cursor** eingefügt, während schon das nächste Segment aufgenommen wird.
+- **VAD-Segment-Streaming**: kontinuierliche `MediaRecorder`-Aufnahme; browserseitige Sprechpausen-Erkennung (WebAudio-RMS-Schwelle) schneidet an Satz-/Halbsatz-Grenzen ab. Jedes abgeschlossene Segment geht an den Proxy; der zurückkommende Text wird **am Cursor** eingefügt, während schon das nächste Segment aufgenommen wird. **VAD-Schwellen sind über `app_settings` (`stt.vad.*`) konfigurierbar** und kommen über `/config` ins Frontend.
+- **Sprache aus Buch-Locale:** Transkriptionssprache = `getBookLocale(bookId)` (SSoT, konsistent mit LanguageTool); `stt.language` nur Fallback ohne Buchscope.
 - Backend: Sync-Proxy `POST /stt/transcribe` → leitet das Audiosegment an einen **OpenAI-kompatiblen Whisper-Endpunkt** (`${host}/v1/audio/transcriptions`) weiter. Credentials/Host verlassen den Server nie.
-- Admin-Konfiguration über neuen Tab im Admin-Settings-Partial: enabled-Toggle, Host, Model, API-Key (encrypted), Sprache. Test-Button (Health-Probe).
+- **Whisper-kompatibles Audio:** Browser nimmt im besten verfügbaren `MediaRecorder`-Format auf (Präferenz `audio/webm;codecs=opus`, Fallback `audio/mp4`/`audio/ogg`); der Proxy reicht das Segment mit korrekter Datei-Extension + Content-Type weiter, sodass der ffmpeg-basierte Whisper-Endpunkt es dekodiert.
+- Admin-Konfiguration über neuen Tab im Admin-Settings-Partial: enabled-Toggle, Host, Model, API-Key (encrypted), Fallback-Sprache, VAD-Schwellen. Test-Button (Health-Probe).
 - Aktivieren/Deaktivieren rein über `stt.enabled` — aus ⇒ Button verschwindet, Proxy antwortet `404 { error: 'stt_disabled' }`.
 
 ## Out-of-Scope
@@ -49,7 +51,7 @@ Passt zur App-Philosophie: STT schreibt **nicht generativ** in den Text — es t
 - **DB-Integrität / Migration:** n/a — keine neue Tabelle. Config lebt in `app_settings` (Key-Value), kein neues Schema.
 - **`x-html` nur escaped:** betroffen, falls Recording-Status/Transkript-Preview via `x-html`. Transkript-Text **immer** durch `escHtml()` vor Interpolation — bzw. via DOM-`createTextNode`/`range.insertNode` einfügen (keine HTML-Interpretation des Whisper-Outputs).
 - **LanguageTool auf Prosafeldern:** n/a für den Mic-Button selbst; der eingefügte Text wird vom bestehenden Notebook-Spellcheck-Dispatcher ohnehin geprüft.
-- **Combobox statt `<select>` / numInput:** betroffen im Admin-UI — Sprach-/Provider-Auswahl via `combobox`, kein nacktes `<select>`. (MVP nur ein Provider-Typ → Sprache als combobox, Provider-Feld ggf. erst bei Phase 2 nötig.)
+- **Combobox statt `<select>` / numInput:** betroffen im Admin-UI — Fallback-Sprache via `combobox`, kein nacktes `<select>`; VAD-Schwellen (silence_ms/threshold/max_segment_s) via `numInput` (kein `<input type=number>`). Ranges deckungsgleich mit den `VALIDATORS` in `lib/app-settings.js`.
 - **DB-Timestamps ISO+Z:** n/a — keine `*_at`-Spalten.
 - **Logging-Context `book`:** betroffen. `/stt/transcribe` bekommt `bookId` im Body → nach `toIntId` `setContext({ book })` (wie LanguageTool-Proxy).
 - **SHELL_CACHE bumpen:** ja, bei JS/CSS-Änderungen.
@@ -57,6 +59,7 @@ Passt zur App-Philosophie: STT schreibt **nicht generativ** in den Text — es t
 ## Abhängigkeiten
 
 - `lib/app-settings.js` (DEFAULTS/VALIDATORS/ENCRYPTED_KEYS) — neue `stt.*`-Keys.
+- `db/schema.js` `getBookLocale(bookId, userEmail)` — Sprach-SSoT (wie LanguageTool-Proxy).
 - `routes/proxies.js` `/config` — liefert `stt`-Block (ohne Secrets).
 - `routes/admin-settings.js` — Test-Endpunkt; `public/partials/admin-settings.html` + `public/js/admin/admin-settings.js` — Admin-Tab.
 - Notebook-Toolbar: `public/js/editor/notebook/toolbar.js` (Insert-/Caret-Mechanik) + `public/js/cards/editor-toolbar-card.js`.
@@ -67,11 +70,13 @@ Passt zur App-Philosophie: STT schreibt **nicht generativ** in den Text — es t
 
 **`routes/stt.js`** (neuer Sync-Proxy-Router, Muster: `routes/languagetool.js`)
 
-- `POST /stt/transcribe` — Multipart/Form-Data (Audio-Blob) oder Body mit Audio.
+- `POST /stt/transcribe` — Multipart/Form-Data (Audio-Blob).
   - Guard: `appSettings.get('stt.enabled') === true` **und** `stt.host` gesetzt; sonst `404 { error: 'stt_disabled' }`.
   - `bookId` (optional) aus dem Request → `toIntId` → `setContext({ book })`.
+  - **Sprache:** `bookId` vorhanden → `getBookLocale(bookId, userEmail)` gewinnt (SSoT, exakt wie `routes/languagetool.js:50-59`); sonst `stt.language` als Fallback.
+  - **Audio-Format/Whisper-Kompatibilität:** Datei-Extension + Content-Type aus dem hochgeladenen Mime ableiten (`audio/webm`→`.webm`, `audio/mp4`→`.m4a`, `audio/ogg`→`.ogg`, `audio/wav`→`.wav`) und beim Forward 1:1 mitgeben — der OpenAI-kompatible Whisper-Endpunkt dekodiert via ffmpeg/libav. Mime-Whitelist gegen Fremdformate; unbekannt → `415 { error: 'stt_unsupported_audio' }`.
   - Audio-Cap (Segment-Grösse begrenzt, z. B. ≤ 5 MB — kurze Segmente bei VAD).
-  - Forward an `${stt.host}/v1/audio/transcriptions` als Multipart (`file`, `model`, `language`), optional `Authorization: Bearer ${stt.api_key}`.
+  - Forward an `${stt.host}/v1/audio/transcriptions` als Multipart (`file` mit korrekter Extension, `model`, `language`), optional `Authorization: Bearer ${stt.api_key}`.
   - Upstream-Timeout (z. B. 15 s) via `AbortController`; Abbruch → `408 { error: 'stt_timeout' }`, Upstream-Fehler → `502 { error: 'stt_upstream' }`.
   - Antwort: `{ text }` (verbatim Whisper-Transkript), kein Audio-Echo.
 - Mount in `server.js` hinter dem Auth-Guard (wie alle Nicht-`/auth`-Routen).
@@ -82,38 +87,42 @@ Passt zur App-Philosophie: STT schreibt **nicht generativ** in den Text — es t
 
 **`routes/proxies.js`** (`/config`)
 
-- Block ergänzen: `stt: { enabled: stt.enabled && !!stt.host, provider: 'openai-compat', language: stt.language }`. **Keine** Host/Key-Felder.
+- Block ergänzen: `stt: { enabled: stt.enabled && !!stt.host, provider: 'openai-compat', vad: { silenceMs, threshold, maxSegmentS } }`. **Keine** Host/Key/Model/Language-Felder — Sprache löst der Server pro Request aus der Buch-Locale auf, nicht das Frontend. Die VAD-Schwellen müssen ins Frontend (VAD läuft im Browser).
 
 **`lib/app-settings.js`**
 
-- `DEFAULTS`: `stt.enabled=false`, `stt.host=''`, `stt.model=''` (z. B. `Systran/faster-whisper-large-v3`), `stt.language='de'`.
+- `DEFAULTS`: `stt.enabled=false`, `stt.host=''`, `stt.model=''` (z. B. `Systran/faster-whisper-large-v3`), `stt.language='de'` (Fallback ohne Buchscope), `stt.vad.silence_ms=800`, `stt.vad.threshold=0.015`, `stt.vad.max_segment_s=30`.
 - `ENCRYPTED_KEYS`: `stt.api_key`.
-- `VALIDATORS`: ggf. `stt.language` als freier String (kein Validator), `stt.enabled` bool. Keine Range-Keys im MVP.
+- `VALIDATORS`: `stt.vad.silence_ms` (int, 200–5000), `stt.vad.threshold` (number, 0–1), `stt.vad.max_segment_s` (int, 5–120). `stt.language`/`stt.host`/`stt.model` als freie Strings (kein Validator — „leer = aus" valider Zustand).
 - ENV_MAP: optional Bootstrap-Keys (z. B. `STT_HOST`), falls gewünscht — sonst rein DB-konfiguriert.
 
 ## Frontend
 
-**Notebook-Toolbar (kein neues Karten-Recipe nötig — kein Hauptkarten-Toggle):**
+**Mic-Toggle-Icon in der Notebook-Icon-Bar (kein neues Karten-Recipe — kein Hauptkarten-Toggle):**
 
-- Mic-Button in `editor-toolbar-card` (Notebook), `x-show="$app.sttEnabled"`.
-- Neues Modul `public/js/editor/notebook/stt-dictation.js` (Facade-Methoden, in `editor-toolbar-card` gespreaded — analog Toolbar-Methoden), Body via `_computeXxx` testbar halten:
-  - `getUserMedia({ audio })`, `MediaRecorder` + WebAudio-`AnalyserNode` für RMS-VAD.
-  - VAD-Logik: Aufnahme läuft; sinkt RMS für N ms unter Schwelle → aktuelles Segment finalisieren → an `/stt/transcribe` POSTen → Text bei Erfolg am Cursor einfügen.
-  - Insert über bestehende Caret-/`range`-Mechanik aus `toolbar.js` (`range.insertNode(document.createTextNode(text))` o. ä.), danach Save-Pipeline-Trigger wie bei manueller Eingabe (`input`-Event/Draft-Dirty).
-  - Re-Klick stoppt Aufnahme, gibt Mic frei (`track.stop()`), räumt AudioContext ab (Leak-Freiheit — wie Focus-Editor-Cleanup-Tests).
-- State in `app-state.js`: `sttEnabled` (aus `/config`), `sttProvider`, `sttLanguage`. Recording-State (`sttRecording`, `sttPending`) lokal in der Toolbar-Card (kurzlebiger UI-State).
-- Config-Load in `app.js`: `this.sttEnabled = !!cfg.stt?.enabled` etc.
+- Button in der persistenten Icon-Bar `.page-editor-toolbar` ([public/partials/editor-notebook.html:195](public/partials/editor-notebook.html#L195)), als letzter Eintrag hinter `action-sep` — **gleiches Markup wie der Entity-Toggle daneben** (Zeile 261): `<button type="button" class="graph-tool-btn" :aria-pressed="sttRecording" :data-tip="sttRecording ? t('stt.stop') : t('stt.dictate')" :aria-label="…" @click="toggleSttDictation()">` mit `<svg class="icon"><use href="/icons.svg?v=NNN#mic"/></svg>`.
+- **Sichtbarkeit:** `x-show="sttEnabled"` direkt am Button (`.page-editor-toolbar` läuft im **Root-Scope** `lektorat`, nicht in `editorToolbarCard` — `sttEnabled` ist Root-State, kein `$app.`-Prefix nötig). Bei `stt.enabled=false` ist der Button nicht im DOM-Flow.
+- **Scope-Korrektur:** Weil die Icon-Bar Root-Methoden ruft (`notebookUndo`, `toggleEntitiesEnabledForCurrentBook`), werden die Diktat-Methoden in den **Root** gespreaded (wie die übrigen `public/js/editor/`-Module), **nicht** in `editor-toolbar-card`.
+- Neues Modul `public/js/editor/notebook/stt-dictation.js` → `export const sttDictationMethods = { … }`, im Root-`Alpine.data('lektorat')`-Aufbau gespreaded; Pure-Compute-Teile als `_computeXxx` testbar halten:
+  - `toggleSttDictation()`: idle → `getUserMedia({ audio })` + `MediaRecorder` + WebAudio-`AnalyserNode` (RMS-VAD) starten; recording → stoppen.
+  - VAD-Logik: sinkt RMS unter `sttVad.threshold` für `sttVad.silenceMs` → Segment finalisieren → an `/stt/transcribe` POSTen → Text bei Erfolg am Cursor einfügen. `sttVad.maxSegmentS` erzwingt Cut bei Dauer-Sprechen. Schwellen aus `/config`, keine Hardcodes.
+  - `MediaRecorder`-Mime via `MediaRecorder.isTypeSupported` (Präferenz `audio/webm;codecs=opus`, Fallback `audio/mp4`/`audio/ogg`); Blob mit Mime + passender Extension hochladen.
+  - Insert über die bestehende Caret-/`range`-Mechanik (`range.insertNode(document.createTextNode(text))`), danach Save-Pipeline-Trigger wie bei manueller Eingabe (`_markEditDirty()`/`input`-Event).
+  - Stop gibt Mic frei (`track.stop()`), räumt AudioContext ab (Leak-Freiheit — analog Focus-Editor-Cleanup-Tests). `book:changed`/`view:reset`/Edit-Modus-Verlassen stoppen die Aufnahme.
+- State in `app-state.js` (Root): `sttEnabled`, `sttVad` (`{ silenceMs, threshold, maxSegmentS }`, beide aus `/config`), `sttRecording`, `sttPending` (kurzlebiger UI-State, als Re-Entry-Guard dokumentiert). Sprache wird **nicht** im Frontend gehalten — der Proxy löst sie aus der Buch-Locale.
+- Config-Load in `app.js`: `this.sttEnabled = !!cfg.stt?.enabled`; `this.sttVad = cfg.stt?.vad || { … defaults }`.
+- **Icon-Sprite:** `mic`-Symbol (Lucide) in [public/icons.svg](public/icons.svg) ergänzen; Sprite-Cache-Bust `?v=689` → `?v=690` in allen ~24 referenzierenden Dateien hochziehen.
 
-**Admin-UI:** neuer Tab/Block in `public/partials/admin-settings.html` (Muster openai-compat-Block: enabled-Checkbox, Host-URL, Model-Text, API-Key-Password mit Masking, Sprache-combobox, Test-Button → `adminSettingsTest('stt')`). Save/Diff/Encrypted-Coercion läuft über das bestehende `admin-settings.js`-Gerüst.
+**Admin-UI:** neuer Tab/Block in `public/partials/admin-settings.html` (Muster openai-compat-Block: enabled-Checkbox, Host-URL, Model-Text, API-Key-Password mit Masking, Fallback-Sprache-combobox, VAD-Felder via `numInput` (silence_ms/threshold/max_segment_s), Test-Button → `adminSettingsTest('stt')`). Save/Diff/Encrypted-Coercion läuft über das bestehende `admin-settings.js`-Gerüst.
 
 ## CSS
 
-- Mic-Button-States (idle/recording/pending) in bestehender Notebook-Toolbar-CSS-Datei (`public/css/editor/`). Recording-Puls via CSS-Keyframe (kein `x-transition`). Falls eigene Datei nötig → `index.html`-Link + `SHELL_CACHE`-Bump + DESIGN.md-Inventar. Akzentfarbe via vorhandene Toolbar-Tokens. Mobile-Breakpoint im selben Commit.
+- Button erbt das bestehende `.graph-tool-btn`-Pattern (gleiche Icon-Bar, kein neuer Button-Typ). Nur der **Recording-State** braucht eigene CSS: Puls/Akzent via Keyframe in der Datei der `.page-editor-toolbar`-Styles (`public/css/editor/`), getriggert über `[aria-pressed="true"]`. Kein `x-transition`. Keine neue CSS-Datei nötig (also kein zusätzlicher `index.html`-Link); `SHELL_CACHE`-Bump trotzdem Pflicht. Mobile-Verhalten erbt die Icon-Bar.
 
 ## i18n
 
 - `stt.dictate` (Button-Tooltip „Diktat starten/stoppen"), `stt.recording`, `stt.listening`, `stt.transcribing`, `stt.error.permission`, `stt.error.unavailable`, `stt.error.failed`.
-- `admin.settings.stt.title`, `.enabled`, `.host`, `.model`, `.apiKey`, `.language`, `.test`, `.testOk`, `.testFail`.
+- `admin.settings.stt.title`, `.enabled`, `.host`, `.model`, `.apiKey`, `.language`, `.vadSilenceMs`, `.vadThreshold`, `.vadMaxSegmentS`, `.test`, `.testOk`, `.testFail`.
 - Beide Locales (de = Fallback, en = Übersetzung) im selben Commit. Server-`stt_disabled` ist intern (kein User-Text) — Frontend behandelt 404 als „Feature aus".
 
 ## DB
@@ -163,9 +172,11 @@ n/a für MVP. Optional Phase 2: Counter „STT-Segmente/-Sekunden" für `/metric
   - `server.js` (Mount `routes/stt.js`)
   - `public/partials/admin-settings.html` (STT-Tab)
   - `public/js/admin/admin-settings.js` (falls Tab-/Test-Verdrahtung nötig)
-  - `public/js/cards/editor-toolbar-card.js` (Mic-Button + Spread STT-Methoden)
+  - `public/partials/editor-notebook.html` (Mic-Toggle-Button in `.page-editor-toolbar`)
+  - `public/icons.svg` (`mic`-Symbol) + `?v=689`→`?v=690`-Bump in den referenzierenden Dateien
+  - `public/js/app.js` (Spread `sttDictationMethods` in den Root + Config-Load)
   - `public/js/editor/notebook/toolbar.js` (Insert-/Caret-Helfer ggf. wiederverwenden/exportieren)
-  - `public/js/app/app-state.js` (`sttEnabled`/`sttProvider`/`sttLanguage`)
+  - `public/js/app/app-state.js` (`sttEnabled`/`sttVad`/`sttRecording`/`sttPending`)
   - `public/js/app.js` (Config-Load)
   - `public/js/i18n/de.json`, `public/js/i18n/en.json`
   - `public/css/editor/<toolbar>.css` (Mic-Button-States)
@@ -174,12 +185,14 @@ n/a für MVP. Optional Phase 2: Counter „STT-Segmente/-Sekunden" für `/metric
   - `CLAUDE.md` (LanguageTool-Doku-Zeile um STT als zweite Sync-Proxy-Ausnahme ergänzen) + ggf. neue Spickzettel-Doku
 - **Create:**
   - `routes/stt.js`
-  - `public/js/editor/notebook/stt-dictation.js`
+  - `public/js/editor/notebook/stt-dictation.js` (`sttDictationMethods`, Root-Spread)
   - `tests/unit/stt-vad.test.mjs`, `tests/integration/stt-proxy.test.js`, `tests/e2e/stt-dictation.spec.js`
   - ggf. `docs/stt.md` (Spickzettel)
 
 ## Offene Fragen
 
-- **VAD-Schwellen** (RMS-Threshold, Pausen-Dauer ms, Max-Segmentlänge s): sinnvolle Defaults im MVP fix verdrahten oder als `app_settings` (`stt.vad.*`) konfigurierbar? Vorschlag: fix im MVP, später Setting.
-- **Sprache pro Buch vs. global:** `stt.language` global, oder analog LanguageTool die Buch-Locale (`getBookLocale`) als SSoT bevorzugen? Vorschlag: Buch-Locale gewinnt wenn `bookId` vorhanden, `stt.language` als Fallback — konsistent mit LanguageTool.
-- **Audio-Format:** `MediaRecorder`-Default ist `audio/webm;codecs=opus`. Akzeptiert das vorgesehene Whisper-Backend (Speaches/faster-whisper-server) webm/opus direkt, oder braucht es serverseitige Transkodierung? (Speaches akzeptiert opus i. d. R. — vor Implementierung am konkreten Backend verifizieren.)
+_Keine — entschieden:_
+
+- **VAD-Schwellen:** konfigurierbar als `stt.vad.silence_ms` / `stt.vad.threshold` / `stt.vad.max_segment_s` in `app_settings`, ans Frontend via `/config`.
+- **Sprache:** aus Buch-Locale (`getBookLocale`, SSoT wie LanguageTool); `stt.language` nur Fallback ohne Buchscope.
+- **Audio-Format:** `MediaRecorder` wählt das beste unterstützte Format (`audio/webm;codecs=opus` bevorzugt); Proxy reicht es mit korrekter Extension/Content-Type an den ffmpeg-basierten Whisper-Endpunkt weiter. Mime-Whitelist, unbekannt → 415.
