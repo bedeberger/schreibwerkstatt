@@ -24,6 +24,18 @@ const STT_MIME_CANDIDATES = [
   'audio/ogg',
 ];
 
+// Rausch-Kalibrierung: Fenster, in dem vor dem ersten Sprechen der
+// Geraeuschboden gesammelt wird (blockiert die Spracherkennung nicht).
+const STT_CALIB_MS = 350;
+// Absatz-Erkennung: ist die Gesamt-Sprechpause >= silenceMs * Faktor, gilt die
+// Segmentgrenze als Absatzgrenze (neuer `<p>`) statt nur als Satzgrenze.
+const STT_PARAGRAPH_FACTOR = 2.5;
+// Segment-Retry: transiente Upstream-Fehler einmal wiederholen, bevor der
+// Fehler-Toast kommt (kein verlorener Satz bei kurzem Haenger).
+const STT_MAX_RETRY = 1;
+const STT_RETRY_DELAY_MS = 600;
+const STT_RETRYABLE_STATUS = new Set([408, 500, 502, 503]);
+
 export const sttDictationMethods = {
   // ── Pure Compute (testbar ohne Browser) ────────────────────────────────
 
@@ -72,6 +84,16 @@ export const sttDictationMethods = {
       .trim();
   },
 
+  // Schreibt den ersten Buchstaben gross (ggf. nach einem oeffnenden Zeichen wie
+  // Anfuehrung/Klammer). No-op, wenn der Text mit Ziffer/Satzzeichen beginnt
+  // oder schon gross ist. Pure/testbar.
+  _capitalizeSentenceStart(text) {
+    return String(text || '').replace(
+      /^([\s"'»«„“‚‘(\[]*)(\p{L})/u,
+      (_, pre, ch) => pre + ch.toUpperCase(),
+    );
+  },
+
   // Fuegt vor dem Transkript ein Leerzeichen ein, wenn unmittelbar davor ein
   // Nicht-Whitespace steht und der neue Text nicht mit Satzzeichen beginnt —
   // damit Worte ueber Segmentgrenzen hinweg nicht zusammenkleben.
@@ -79,9 +101,13 @@ export const sttDictationMethods = {
   // startsNewSentence = das vorige Segment wurde an einer Sprechpause
   // abgeschnitten: dann ist die Segmentgrenze eine Satzgrenze. Fehlt am Vortext
   // ein Satzendezeichen, wird ein Punkt ergaenzt (". " statt nur " ").
+  // Beginnt ein neuer Satz (Sprechpause, Doc/Block-Anfang oder Vortext endet auf
+  // Satzzeichen), wird der erste Buchstabe gross geschrieben.
   _computeSpacedInsert(prevChar, text, startsNewSentence) {
-    const t = this._normalizeTranscript(text);
+    let t = this._normalizeTranscript(text);
     if (!t) return '';
+    const newSentence = startsNewSentence || !prevChar || /[.!?…]/.test(prevChar);
+    if (newSentence) t = this._capitalizeSentenceStart(t);
     if (!prevChar) return t;
     const startsPunct = /^[\s,.;:!?…)»"'’-]/.test(t);
     if (/\s/.test(prevChar)) return t; // schon Whitespace davor
@@ -89,6 +115,16 @@ export const sttDictationMethods = {
       return /[.!?…]/.test(prevChar) ? ' ' + t : '. ' + t;
     }
     return startsPunct ? t : ' ' + t;
+  },
+
+  // Effektiver VAD-Threshold aus gemessenem Geraeuschboden: leicht ueber dem
+  // Rauschen, nie unter dem Admin-Wert und auf das 5-Fache gedeckelt (verhindert
+  // Ueber-Unterdrueckung, falls waehrend der Kalibrierung doch gesprochen wurde).
+  // Pure/testbar.
+  _computeNoiseThreshold(noiseFloor, base) {
+    const b = Number(base) || 0;
+    const cand = (Number(noiseFloor) || 0) * 1.8 + 0.004;
+    return Math.min(Math.max(b, cand), Math.max(b * 5, 0.08));
   },
 
   // Plausibilisierung am Caret: liefert true, wenn ein Whitespace direkt vor
@@ -181,7 +217,18 @@ export const sttDictationMethods = {
       // Cut-Grund des zuletzt geschnittenen Segments; bestimmt, ob das naechste
       // Segment einen neuen Satz beginnt (silence = Sprechpause = Satzgrenze).
       lastCutReason: null,
-      boundaryForNext: false,
+      // Grenz-Art VOR dem aktuell aufgenommenen Segment: 'none' | 'sentence' |
+      // 'paragraph'. silence-Cut => mind. 'sentence'; eine deutlich laengere
+      // Gesamtpause stuft beim naechsten Sprechen auf 'paragraph' hoch.
+      boundaryKindForNext: 'none',
+      silenceCutAt: null, // Zeitpunkt des letzten silence-Cuts (fuer Pausenmessung)
+      // VAD-Threshold dieser Session: startet beim Admin-Wert, wird durch die
+      // Rausch-Kalibrierung ggf. angehoben.
+      threshold: this.sttVad.threshold,
+      calibrating: true,
+      calibStart: 0,
+      noiseSum: 0,
+      noiseCount: 0,
     };
     this._sttRt = rt;
 
@@ -189,11 +236,13 @@ export const sttDictationMethods = {
     rec.onstop = () => {
       const blob = rt.chunks.length ? new Blob(rt.chunks, { type: rt.mime }) : null;
       rt.chunks = [];
-      const startsNewSentence = !!rt.boundaryForNext;
-      if (blob && blob.size > 0 && rt.hasVoice) this._sttSendSegment(blob, rt.mime, startsNewSentence);
-      // Wurde dieses Segment an einer Sprechpause abgeschnitten, beginnt das
-      // naechste einen neuen Satz.
-      rt.boundaryForNext = (rt.lastCutReason === 'silence');
+      // Grenz-Art VOR diesem Segment (ggf. waehrend der Aufnahme auf 'paragraph'
+      // hochgestuft) bestimmt, wie das Transkript angefuegt wird.
+      const boundaryKind = rt.boundaryKindForNext;
+      if (blob && blob.size > 0 && rt.hasVoice) this._sttSendSegment(blob, rt.mime, boundaryKind);
+      // Grenze fuer das naechste Segment: silence-Cut => mind. neuer Satz;
+      // max-Cut (Dauer-Sprechen) => keine Grenze (mitten im Satz).
+      rt.boundaryKindForNext = (rt.lastCutReason === 'silence') ? 'sentence' : 'none';
       rt.lastCutReason = null;
       // Naechstes Segment, falls noch aktiv.
       if (!rt.stopping && this.sttRecording) {
@@ -206,6 +255,7 @@ export const sttDictationMethods = {
 
     rt.segmentStart = this._sttNow();
     rt.lastVoiceTs = rt.segmentStart;
+    rt.calibStart = rt.segmentStart;
     try { rec.start(); } catch { /* noop */ }
     this.sttRecording = true;
     this.sttPending = false;
@@ -256,9 +306,25 @@ export const sttDictationMethods = {
     rt.analyser.getByteTimeDomainData(rt.timeDomain);
     const rms = this._computeRms(rt.timeDomain);
     const now = this._sttNow();
+    const voiced = rms >= rt.threshold;
+
+    // Rausch-Kalibrierung: vor dem ersten Sprechen die ruhigen Frames sammeln
+    // und den Threshold ueber den Geraeuschboden legen. Blockiert die
+    // Spracherkennung NICHT (es gilt bis zur Finalisierung der Admin-Wert);
+    // wird sofort gesprochen oder fehlen ruhige Frames, bleibt es beim Wert.
+    if (rt.calibrating) {
+      if (!voiced) { rt.noiseSum += rms; rt.noiseCount++; }
+      if (voiced || (now - rt.calibStart) >= STT_CALIB_MS) {
+        if (rt.noiseCount >= 2) {
+          rt.threshold = this._computeNoiseThreshold(rt.noiseSum / rt.noiseCount, this.sttVad.threshold);
+        }
+        rt.calibrating = false;
+      }
+    }
+
     const decision = this._computeVadCut({
       rms,
-      threshold: this.sttVad.threshold,
+      threshold: rt.threshold,
       now,
       segmentStart: rt.segmentStart,
       lastVoiceTs: rt.lastVoiceTs,
@@ -267,8 +333,23 @@ export const sttDictationMethods = {
       maxSegmentS: this.sttVad.maxSegmentS,
     });
     if (decision.voiced) { rt.hasVoice = true; rt.lastVoiceTs = now; }
+
+    // Absatz-Erkennung: erstes Sprechen nach einem silence-Cut -> Gesamtpause
+    // messen (silenceMs vor dem Cut + Luecke bis jetzt). Ist sie deutlich
+    // laenger als eine normale Sprechpause, wird die vorausgehende Grenze von
+    // 'sentence' auf 'paragraph' hochgestuft (neuer Absatz statt nur ". ").
+    if (decision.voiced && rt.silenceCutAt != null && rt.boundaryKindForNext === 'sentence') {
+      const totalPause = (now - rt.silenceCutAt) + this.sttVad.silenceMs;
+      if (totalPause >= this.sttVad.silenceMs * STT_PARAGRAPH_FACTOR) {
+        rt.boundaryKindForNext = 'paragraph';
+      }
+      rt.silenceCutAt = null;
+    }
+
     if (decision.cut && rt.rec.state === 'recording') {
       rt.lastCutReason = decision.reason;
+      // Pausenanfang fuer die Absatz-Messung des naechsten Segments merken.
+      rt.silenceCutAt = decision.reason === 'silence' ? now : null;
       // stop() triggert onstop -> Segment senden + naechstes Segment starten.
       try { rt.rec.stop(); } catch { /* noop */ }
     }
@@ -295,6 +376,7 @@ export const sttDictationMethods = {
     this.sttRecording = false;
     this.sttPending = false;
     this.sttBusy = false;
+    this.sttTranscribing = 0;
     if (this._sttBusyTimer) { clearTimeout(this._sttBusyTimer); this._sttBusyTimer = null; }
     if (!rt) return;
     rt.stopping = true;
@@ -308,9 +390,25 @@ export const sttDictationMethods = {
 
   // ── Segment-Upload + Insert ───────────────────────────────────────────────
 
-  async _sttSendSegment(blob, mime, startsNewSentence) {
-    const bookId = this.selectedBookId ? `?bookId=${encodeURIComponent(this.selectedBookId)}` : '';
+  async _sttSendSegment(blob, mime, boundaryKind) {
     this._sttBusyOn(); // Indikator „transkribiert" (mit Mindest-Standzeit)
+    let text = null;
+    try {
+      text = await this._sttFetchTranscript(blob, mime, 0);
+    } finally {
+      this._sttBusyOff();
+    }
+    if (text == null) return; // Fehler bereits behandelt (Toast/Stop)
+    this._sttInsertText(text, boundaryKind);
+  },
+
+  // Transkribiert ein Segment; gibt den Text zurueck oder null (Fehler bereits
+  // behandelt). Transiente Fehler (Netzwerk-Throw, 408/5xx) werden bis zu
+  // STT_MAX_RETRY-mal wiederholt, bevor der Fehler-Toast kommt — ein kurzer
+  // Upstream-Haenger kostet so keinen Satz. 404 (Feature aus) und 4xx
+  // (z. B. 413/415) werden NICHT wiederholt.
+  async _sttFetchTranscript(blob, mime, attempt) {
+    const bookId = this.selectedBookId ? `?bookId=${encodeURIComponent(this.selectedBookId)}` : '';
     let res;
     try {
       res = await fetch(`/stt/transcribe${bookId}`, {
@@ -319,26 +417,36 @@ export const sttDictationMethods = {
         body: blob,
       });
     } catch {
-      // Einzelnes Segment-Fehlschlag stoppt die Session nicht (Edge-Case-Regel).
-      this._showJobToast?.({ message: this.t('stt.error.failed'), severity: 'err', jobType: 'stt', bookId: null });
-      this._sttBusyOff();
-      return;
+      if (attempt < STT_MAX_RETRY) {
+        await this._sttDelay(STT_RETRY_DELAY_MS);
+        return this._sttFetchTranscript(blob, mime, attempt + 1);
+      }
+      this._sttToastFailed();
+      return null;
     }
-    if (res.status === 404) { this._sttBusyOff(); this._sttStop(); return; } // Feature serverseitig aus
+    if (res.status === 404) { this._sttStop(); return null; } // Feature serverseitig aus
     if (!res.ok) {
-      this._showJobToast?.({ message: this.t('stt.error.failed'), severity: 'err', jobType: 'stt', bookId: null });
-      this._sttBusyOff();
-      return;
+      if (STT_RETRYABLE_STATUS.has(res.status) && attempt < STT_MAX_RETRY) {
+        await this._sttDelay(STT_RETRY_DELAY_MS);
+        return this._sttFetchTranscript(blob, mime, attempt + 1);
+      }
+      this._sttToastFailed();
+      return null;
     }
-    let text = '';
-    try { text = (await res.json())?.text || ''; } catch { this._sttBusyOff(); return; }
-    this._sttBusyOff();
-    this._sttInsertText(text, startsNewSentence);
+    try { return (await res.json())?.text || ''; } catch { return null; }
   },
 
-  _sttInsertText(text, startsNewSentence) {
+  _sttDelay(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); },
+
+  _sttToastFailed() {
+    this._showJobToast?.({ message: this.t('stt.error.failed'), severity: 'err', jobType: 'stt', bookId: null });
+  },
+
+  _sttInsertText(text, boundaryKind) {
     const clean = this._normalizeTranscript(text);
     if (!clean) return; // leerer/Whitespace-Transkript -> nichts einfuegen
+    if (boundaryKind === 'paragraph') { this._sttInsertParagraph(clean); return; }
+    const startsNewSentence = boundaryKind === 'sentence';
     const editEl = this._getEditEl?.();
     if (!editEl) return;
     const sel = document.getSelection();
@@ -374,6 +482,70 @@ export const sttDictationMethods = {
     let caretRect = null;
     try { const rr = document.createRange(); rr.selectNode(node); caretRect = rr.getBoundingClientRect(); } catch { /* noop */ }
     this._scrollEditCaretIntoView?.(caretRect);
+  },
+
+  // Fuegt das Transkript als NEUEN Absatz (`<p>`) ein — getriggert, wenn die
+  // Sprechpause deutlich laenger war (Absatz-Erkennung im VAD). Der neue Absatz
+  // wird hinter den Block gesetzt, in dem der Caret steht (sonst ans Editorende);
+  // der vorausgehende Block bekommt ein Satzendezeichen, falls es fehlt. Erster
+  // Buchstabe gross (neuer Absatz = neuer Satz). data-bid vergibt der Write-
+  // Chokepoint beim Speichern (idempotent) — hier kein manuelles Setzen noetig.
+  _sttInsertParagraph(clean) {
+    const editEl = this._getEditEl?.();
+    if (!editEl) return;
+    const sel = document.getSelection();
+    let range = null;
+    if (sel && sel.rangeCount) {
+      const r = sel.getRangeAt(0);
+      if (editEl.contains(r.commonAncestorContainer) || editEl === r.commonAncestorContainer) range = r;
+    }
+    if (!range) { range = document.createRange(); range.selectNodeContents(editEl); range.collapse(false); }
+
+    // Direkten Kind-Block von editEl ermitteln, in dem der Caret steht.
+    let block = range.startContainer;
+    while (block && block !== editEl && block.parentNode !== editEl) block = block.parentNode;
+    if (block === editEl) block = editEl.lastElementChild; // Caret direkt am Root
+
+    const p = document.createElement('p');
+    p.textContent = this._capitalizeSentenceStart(clean);
+    if (block && block.parentNode === editEl) {
+      this._sttEnsureTerminalPunct(block);
+      block.after(p);
+    } else {
+      editEl.appendChild(p);
+    }
+
+    const r2 = document.createRange();
+    r2.selectNodeContents(p);
+    r2.collapse(false);
+    sel?.removeAllRanges();
+    sel?.addRange(r2);
+    this._markEditDirty?.();
+    let rect = null;
+    try { rect = p.getBoundingClientRect(); } catch { /* noop */ }
+    this._scrollEditCaretIntoView?.(rect);
+  },
+
+  // Haengt ein '.' an den letzten Textknoten eines Blocks an, wenn dieser nicht
+  // bereits auf einem Satz-/Doppelpunkt endet — damit beim Absatzwechsel der
+  // vorausgehende Satz sauber schliesst.
+  _sttEnsureTerminalPunct(block) {
+    try {
+      if (!block || block.nodeType !== 1) return;
+      const txt = (block.textContent || '').replace(/\s+$/, '');
+      if (!txt || /[.!?…:;]$/.test(txt)) return;
+      const lastTextNode = (node) => {
+        for (let i = node.childNodes.length - 1; i >= 0; i--) {
+          const c = node.childNodes[i];
+          if (c.nodeType === 3 && c.textContent.trim()) return c;
+          if (c.nodeType === 1) { const r = lastTextNode(c); if (r) return r; }
+        }
+        return null;
+      };
+      const tn = lastTextNode(block);
+      if (tn) tn.textContent = tn.textContent.replace(/\s+$/, '') + '.';
+      else block.appendChild(document.createTextNode('.'));
+    } catch { /* noop */ }
   },
 
   // Zeichen unmittelbar vor dem Caret (fuer Leerzeichen-Heuristik). Der Caret

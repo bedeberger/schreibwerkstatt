@@ -145,6 +145,50 @@ test('_computeSpacedInsert: kollabiert interne Doppel-Leerzeichen mit', () => {
   assert.equal(m._computeSpacedInsert('t', 'Hallo   Welt'), ' Hallo Welt');
 });
 
+// --- _capitalizeSentenceStart + Satzanfang-Gross --------------------------
+
+test('_capitalizeSentenceStart: erster Buchstabe wird gross', () => {
+  assert.equal(m._capitalizeSentenceStart('hallo welt'), 'Hallo welt');
+});
+
+test('_capitalizeSentenceStart: nach oeffnendem Zeichen', () => {
+  assert.equal(m._capitalizeSentenceStart('"hallo"'), '"Hallo"');
+  assert.equal(m._capitalizeSentenceStart('„guten tag'), '„Guten tag');
+});
+
+test('_capitalizeSentenceStart: Ziffer/Satzzeichen am Anfang -> unveraendert', () => {
+  assert.equal(m._capitalizeSentenceStart('3 Aepfel'), '3 Aepfel');
+  assert.equal(m._capitalizeSentenceStart(', dann'), ', dann');
+});
+
+test('_computeSpacedInsert: Satzanfang nach Punkt wird grossgeschrieben', () => {
+  assert.equal(m._computeSpacedInsert('.', 'das war gut', true), ' Das war gut');
+});
+
+test('_computeSpacedInsert: Doc-Anfang wird grossgeschrieben', () => {
+  assert.equal(m._computeSpacedInsert('', 'guten morgen'), 'Guten morgen');
+});
+
+test('_computeSpacedInsert: Satzmitte bleibt klein', () => {
+  assert.equal(m._computeSpacedInsert('t', 'und weiter'), ' und weiter');
+});
+
+// --- _computeNoiseThreshold -------------------------------------------------
+
+test('_computeNoiseThreshold: stille Umgebung -> Admin-Wert bleibt Untergrenze', () => {
+  assert.equal(m._computeNoiseThreshold(0, 0.02), 0.02);
+});
+
+test('_computeNoiseThreshold: laute Umgebung hebt den Threshold an', () => {
+  const t = m._computeNoiseThreshold(0.02, 0.02);
+  assert.ok(t > 0.02, `erwartet > 0.02, war ${t}`);
+});
+
+test('_computeNoiseThreshold: gedeckelt auf 5x Admin-Wert (bzw. 0.08)', () => {
+  const t = m._computeNoiseThreshold(1, 0.02);
+  assert.ok(t <= Math.max(0.02 * 5, 0.08) + 1e-9, `erwartet <= 0.1, war ${t}`);
+});
+
 // --- _computeEatPrevSpace ---------------------------------------------------
 
 test('_computeEatPrevSpace: Leerzeichen vor Satzzeichen -> true', () => {

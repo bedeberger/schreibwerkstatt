@@ -76,6 +76,32 @@ test('Bewusst gesetzter Caret: Diktat fuegt dort ein', async ({ page }) => {
   expect(text.includes('Start.')).toBe(true);
 });
 
+test('Lange Sprechpause -> zweites Segment wird neuer Absatz', async ({ page }) => {
+  await ready(page, HARNESS + '?enabled=true');
+  // Harness-VAD: silenceMs=150 -> Absatzschwelle = 150*2.5 = 375ms Gesamtpause.
+  await page.locator('#stt-mic').click();
+  await page.waitForFunction(() => window.__sttApp.sttRecording === true);
+
+  // Segment 1: sprechen -> Stille (Silence-Cut).
+  await page.evaluate(() => { window.__voice = true; });
+  await page.waitForTimeout(350);
+  await page.evaluate(() => { window.__voice = false; });
+  // Lange Pause (> Absatzschwelle), danach wieder sprechen.
+  await page.waitForTimeout(550);
+  await page.evaluate(() => { window.__voice = true; });
+  await page.waitForTimeout(350);
+  await page.evaluate(() => { window.__voice = false; });
+  await page.waitForTimeout(400);
+
+  // Zwei <p>: der urspruengliche + ein neuer Absatz fuers zweite Segment.
+  await page.waitForFunction(() => document.querySelectorAll('#editor p').length >= 2);
+  const lastP = await page.evaluate(() => {
+    const ps = document.querySelectorAll('#editor p');
+    return ps[ps.length - 1].textContent;
+  });
+  expect(lastP.includes('Hallo Welt')).toBe(true);
+});
+
 test('Button nur bei sttEnabled vorhanden', async ({ page }) => {
   await ready(page, HARNESS + '?enabled=false');
   await expect(page.locator('#stt-mic')).toHaveCount(0);
