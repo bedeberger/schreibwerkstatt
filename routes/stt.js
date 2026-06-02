@@ -59,22 +59,28 @@ router.post('/transcribe', rawAudioBody, async (req, res) => {
     return res.status(404).json({ error: 'stt_disabled' });
   }
 
+  const bookId = toIntId(req.query.bookId);
+  const pageId = toIntId(req.query.pageId);
+  if (bookId) setContext({ book: bookId });
+  const userEmail = req.session?.user?.email || null;
+  const mime = baseMime(req.headers['content-type']);
+  const log = logger.child({ job: 'stt', user: userEmail || '-', book: bookId || '-' });
+  const ctx = `page=${pageId || '-'} mime=${mime || '-'} bytes=${Buffer.isBuffer(req.body) ? req.body.length : 0}`;
+
   if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+    log.warn(`reject no-audio ${ctx}`);
     return res.status(400).json({ error: 'stt_no_audio' });
   }
   if (req.body.length > AUDIO_MAX) {
+    log.warn(`reject too-large ${ctx} max=${AUDIO_MAX}`);
     return res.status(413).json({ error: 'stt_audio_too_large', max: AUDIO_MAX });
   }
 
-  const mime = baseMime(req.headers['content-type']);
   const ext = MIME_EXT[mime];
   if (!ext) {
+    log.warn(`reject unsupported-mime ${ctx}`);
     return res.status(415).json({ error: 'stt_unsupported_audio' });
   }
-
-  const bookId = toIntId(req.query.bookId);
-  if (bookId) setContext({ book: bookId });
-  const userEmail = req.session?.user?.email || null;
 
   // Book ist SSoT fuer Locale: bookId vorhanden -> getBookLocale gewinnt.
   // stt.language nur Fallback (Aufrufe ohne Buchscope). Whisper erwartet einen
@@ -88,7 +94,6 @@ router.post('/transcribe', rawAudioBody, async (req, res) => {
 
   const model = String(appSettings.get('stt.model') || '').trim();
   const apiKey = String(appSettings.get('stt.api_key') || '').trim();
-  const log = logger.child({ job: 'stt', user: userEmail || '-', book: bookId || '-' });
 
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), UPSTREAM_TIMEOUT_MS);
@@ -112,16 +117,18 @@ router.post('/transcribe', rawAudioBody, async (req, res) => {
       signal: ctrl.signal,
     });
     if (!upstream.ok) {
-      log.warn(`upstream ${upstream.status} bytes=${req.body.length} latency=${Date.now() - t0}ms`);
+      log.warn(`upstream ${upstream.status} ${ctx} latency=${Date.now() - t0}ms`);
       return res.status(502).json({ error: 'stt_upstream', upstream_status: upstream.status });
     }
     const json = await upstream.json().catch(() => null);
     const text = typeof json?.text === 'string' ? json.text : '';
-    log.info(`bytes=${req.body.length} lang=${language || '-'} chars=${text.length} ${Date.now() - t0}ms`);
+    // Leeres Resultat (Stille/VAD-Fehltrigger/Whisper-Guard) als eigenen Marker —
+    // sonst nicht von einem echten Treffer unterscheidbar.
+    log.info(`${text.length ? 'ok' : 'empty'} ${ctx} lang=${language || '-'} chars=${text.length} ${Date.now() - t0}ms`);
     return res.json({ text });
   } catch (err) {
     const isAbort = err && (err.name === 'AbortError' || err.code === 'ABORT_ERR');
-    log.warn(`fetch ${isAbort ? 'TIMEOUT' : err.message} bytes=${req.body.length} latency=${Date.now() - t0}ms`);
+    log.warn(`fetch ${isAbort ? 'TIMEOUT' : err.message} ${ctx} latency=${Date.now() - t0}ms`);
     return res.status(isAbort ? 408 : 502).json({ error: isAbort ? 'stt_timeout' : 'stt_upstream' });
   } finally {
     clearTimeout(timer);

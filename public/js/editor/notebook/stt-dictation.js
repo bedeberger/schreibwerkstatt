@@ -199,6 +199,12 @@ export const sttDictationMethods = {
     // async-Re-Entry-Guards. Pro Aufnahme-Session neu befuellt, bei Stop genullt.
     this._sttRt = null;
     this._sttBusyTimer = null; // Mindest-Standzeit-Timer fuer den „Transkribiert"-Status
+    // Vorwaerts-Anker: der zuletzt von STT eingefuegte Knoten. Der Caret der
+    // naechsten Einfuegung wird HINTER diesen gesetzt — nie die Live-Selection
+    // gelesen, die der Browser nach laengeren Pausen (Fokusverlust) an den
+    // Editoranfang zuruecksetzt und den Caret sonst „nach oben" springen liesse.
+    // Bewegt sich ausschliesslich vorwaerts; pro Session zurueckgesetzt.
+    this._sttLastNode = null;
     // Aufnahme beenden + den bewussten-Caret-Anker zuruecksetzen (neuer Kontext
     // = kein gueltiger Anker mehr; STT haengt wieder ans Editorende an, bis der
     // User erneut bewusst klickt).
@@ -286,6 +292,7 @@ export const sttDictationMethods = {
       noiseCount: 0,
     };
     this._sttRt = rt;
+    this._sttLastNode = null; // frischer Vorwaerts-Anker pro Aufnahme-Session
 
     rec.ondataavailable = (e) => { if (e.data && e.data.size > 0) rt.chunks.push(e.data); };
     rec.onstop = () => {
@@ -441,6 +448,34 @@ export const sttDictationMethods = {
     try { rt.source.disconnect(); } catch { /* noop */ }
     try { rt.audioCtx.close(); } catch { /* noop */ }
     this._sttRt = null;
+    this._sttLastNode = null;
+  },
+
+  // Range fuer die naechste Einfuegung. Bevorzugt den Vorwaerts-Anker
+  // (`_sttLastNode`): Caret direkt HINTER dem zuletzt diktierten Knoten. So
+  // bewegt sich die Einfuegestelle nur vorwaerts. Die Live-Selection ist
+  // unzuverlaessig — der Browser kollabiert/resettet sie nach laengeren Pausen
+  // an den Editoranfang, was den Caret „nach oben" springen liesse. Nur fuer
+  // das ERSTE Segment (kein Anker) wird die Live-Selection (vom User bewusst
+  // gesetzter Caret bzw. der Start-Anker ans Ende) honoriert, sonst Editorende.
+  _sttResolveRange() {
+    const editEl = this._getEditEl?.();
+    if (!editEl) return null;
+    if (this._sttLastNode && editEl.contains(this._sttLastNode)) {
+      const range = document.createRange();
+      range.setStartAfter(this._sttLastNode);
+      range.collapse(true);
+      return range;
+    }
+    const sel = document.getSelection();
+    if (sel && sel.rangeCount) {
+      const r = sel.getRangeAt(0);
+      if (editEl === r.commonAncestorContainer || editEl.contains(r.commonAncestorContainer)) return r;
+    }
+    const range = document.createRange();
+    range.selectNodeContents(editEl);
+    range.collapse(false);
+    return range;
   },
 
   // ── Segment-Upload + Insert ───────────────────────────────────────────────
@@ -463,10 +498,13 @@ export const sttDictationMethods = {
   // Upstream-Haenger kostet so keinen Satz. 404 (Feature aus) und 4xx
   // (z. B. 413/415) werden NICHT wiederholt.
   async _sttFetchTranscript(blob, mime, attempt) {
-    const bookId = this.selectedBookId ? `?bookId=${encodeURIComponent(this.selectedBookId)}` : '';
+    const params = new URLSearchParams();
+    if (this.selectedBookId) params.set('bookId', this.selectedBookId);
+    if (this.currentPage?.id) params.set('pageId', this.currentPage.id);
+    const qs = params.toString() ? `?${params}` : '';
     let res;
     try {
-      res = await fetch(`/stt/transcribe${bookId}`, {
+      res = await fetch(`/stt/transcribe${qs}`, {
         method: 'POST',
         headers: { 'Content-Type': mime },
         body: blob,
@@ -503,22 +541,9 @@ export const sttDictationMethods = {
     if (this._isLikelyHallucination(clean)) return; // Whisper-Geisterphrase -> verwerfen
     this._trackSttChars?.(clean.length); // Diktat-Tracking: diktierte Zeichen buchen
     if (boundaryKind === 'paragraph') { this._sttInsertParagraph(clean); return; }
-    const editEl = this._getEditEl?.();
-    if (!editEl) return;
+    const range = this._sttResolveRange();
+    if (!range) return;
     const sel = document.getSelection();
-    let range = null;
-    if (sel && sel.rangeCount) {
-      const r = sel.getRangeAt(0);
-      if (editEl.contains(r.commonAncestorContainer) || editEl === r.commonAncestorContainer) {
-        range = r;
-      }
-    }
-    if (!range) {
-      // Cursor nicht im Editor -> ans Ende anhaengen.
-      range = document.createRange();
-      range.selectNodeContents(editEl);
-      range.collapse(false);
-    }
     let prevChar = this._sttCharBefore(range);
     // Beginnt das Segment mit Satzzeichen und steht davor schon ein Leerzeichen,
     // dieses entfernen (kein „Wort , dann").
@@ -529,6 +554,7 @@ export const sttDictationMethods = {
     const node = document.createTextNode(this._computeSpacedInsert(prevText, clean));
     range.deleteContents();
     range.insertNode(node);
+    this._sttLastNode = node; // Vorwaerts-Anker auf den frisch eingefuegten Knoten
     range.setStartAfter(node);
     range.collapse(true);
     sel?.removeAllRanges();
@@ -550,13 +576,9 @@ export const sttDictationMethods = {
   _sttInsertParagraph(clean) {
     const editEl = this._getEditEl?.();
     if (!editEl) return;
+    const range = this._sttResolveRange();
+    if (!range) return;
     const sel = document.getSelection();
-    let range = null;
-    if (sel && sel.rangeCount) {
-      const r = sel.getRangeAt(0);
-      if (editEl.contains(r.commonAncestorContainer) || editEl === r.commonAncestorContainer) range = r;
-    }
-    if (!range) { range = document.createRange(); range.selectNodeContents(editEl); range.collapse(false); }
 
     // Direkten Kind-Block von editEl ermitteln, in dem der Caret steht.
     let block = range.startContainer;
@@ -572,6 +594,9 @@ export const sttDictationMethods = {
       editEl.appendChild(p);
     }
 
+    // Vorwaerts-Anker auf den Textknoten IM neuen Absatz, damit das naechste
+    // Segment innerhalb dieses `<p>` weiterschreibt (nicht dahinter am Root).
+    this._sttLastNode = p.firstChild || p;
     const r2 = document.createRange();
     r2.selectNodeContents(p);
     r2.collapse(false);
