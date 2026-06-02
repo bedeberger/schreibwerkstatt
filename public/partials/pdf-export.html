@@ -38,7 +38,7 @@
                 :aria-pressed="exportIncludeSubchapters"
                 :data-tip="$app.t('pdfExport.includeSubchaptersTip')">
           <svg class="icon" aria-hidden="true">
-            <use :href="exportIncludeSubchapters ? '/icons.svg?v=689#check' : '/icons.svg?v=689#chevron-down'"/>
+            <use :href="exportIncludeSubchapters ? '/icons.svg?v=690#check' : '/icons.svg?v=690#chevron-down'"/>
           </svg>
           <span x-text="$app.t('pdfExport.includeSubchapters')"></span>
         </button>
@@ -53,7 +53,7 @@
               :disabled="!$app.selectedBookId"
               :data-tip="!$app.selectedBookId ? $app.t('pdfExport.export.noBookHint') : ''"
               @click="exportPdf()">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#download"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#download"/></svg>
         <span x-text="$app.t('pdfExport.export')"></span>
       </button>
       <button type="button"
@@ -723,7 +723,7 @@
                       :disabled="!coverSpecReady() || !$app.selectedBookId"
                       :data-tip="!coverSpecReady() ? $app.t('pdfExport.cover.spineNeedsValues') : ''"
                       @click="exportPdf('cover')">
-                <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#download"/></svg>
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#download"/></svg>
                 <span x-text="$app.t('pdfExport.cover.renderCover')"></span>
               </button>
             </div>

@@ -282,6 +282,25 @@
   border-color: var(--color-success);
   color: var(--color-success);
 }
+/* STT-Diktat: aktive Aufnahme rot mit pulsierendem Akzent (uebersteuert den
+   generischen aria-pressed-Highlight). Pending = kurzer Wartezustand
+   (getUserMedia laeuft) ohne Puls. */
+.page-editor-toolbar .stt-mic-btn.is-recording[aria-pressed="true"] {
+  border-color: var(--color-danger, #b04040);
+  color: var(--color-danger, #b04040);
+  background: color-mix(in srgb, var(--color-danger, #b04040) 10%, transparent);
+  animation: sttRecPulse 1.4s ease-in-out infinite;
+}
+.page-editor-toolbar .stt-mic-btn.is-pending {
+  opacity: 0.6;
+}
+@keyframes sttRecPulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-danger, #b04040) 45%, transparent); }
+  50%      { box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-danger, #b04040) 0%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-editor-toolbar .stt-mic-btn.is-recording[aria-pressed="true"] { animation: none; }
+}
 @media (max-width: 600px) {
   .page-editor-toolbar { justify-content: flex-start; }
 }

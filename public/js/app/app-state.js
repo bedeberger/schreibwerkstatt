@@ -51,6 +51,16 @@ const shellState = () => ({
   // Aus /config → app_settings `languagetool.debounce_ms`. Form-Felder
   // (input/textarea) nutzen eigene Defaults und ignorieren diesen Wert.
   languagetoolDebounceMs: 1500,
+  // STT-Diktat (nur Notebook-Editor). /config liefert `stt.enabled` (true wenn
+  // Admin enabled + Host gesetzt). Blendet den Mic-Button in der Notebook-
+  // Toolbar ein. Sprache loest der Proxy aus der Buch-Locale auf — kein
+  // Frontend-State dafuer. sttVad steuert die browserseitige VAD-Segmentierung
+  // (aus /config). sttRecording = aktive Aufnahme; sttPending = kurzlebiger
+  // Re-Entry-Guard waehrend getUserMedia/Stop laeuft.
+  sttEnabled: false,
+  sttVad: { silenceMs: 800, threshold: 0.015, maxSegmentS: 30 },
+  sttRecording: false,
+  sttPending: false,
   // Plattform-Detect für Tasten-Hint-Anzeige (⌘ vs. Ctrl). Wird in init()
   // gesetzt; default true wäre auf Windows falsch, default false ist sichere
   // Annahme bevor JS gelaufen ist (Hero erscheint mit Ctrl, dann snap auf ⌘ falls Mac).

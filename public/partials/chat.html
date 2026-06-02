@@ -77,7 +77,7 @@
     ></textarea>
     <button type="button" class="chat-send-btn" @click="sendChatMessage()" :disabled="chatLoading || !chatInput.trim()" :aria-label="$app.t('chat.send')">
       <span x-show="chatLoading" class="spinner"></span>
-      <svg x-show="!chatLoading" class="icon" aria-hidden="true"><use href="/icons.svg?v=689#arrow-up"/></svg>
+      <svg x-show="!chatLoading" class="icon" aria-hidden="true"><use href="/icons.svg?v=690#arrow-up"/></svg>
     </button>
   </div>
   <div class="chat-input-hint" x-text="$app.t('chat.inputHint')"></div>
@@ -159,7 +159,7 @@
                   <button type="button" x-show="(msg.context_info.pages || []).length > 3"
                           class="chat-context-toggle"
                           @click.stop="expanded = !expanded">
-                    <template x-if="expanded"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=689#chevron-up"/></svg></template>
+                    <template x-if="expanded"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#chevron-up"/></svg></template>
                     <template x-if="!expanded"><span x-text="'+' + ((msg.context_info.pages || []).length - 3)"></span></template>
                   </button>
                   <template x-if="msg.context_info.totalPages > (msg.context_info.pages || []).length">
