@@ -364,25 +364,32 @@
   background: var(--color-muted);
   flex: none;
 }
-.stt-dock .stt-status.is-hearing {
+/* Aufnahme laeuft: roter Punkt, ruhiger langsamer Puls (signalisiert „aktiv",
+   reagiert aber NICHT auf den Mikrofonpegel — das strobte frueher). */
+.stt-dock .stt-status.is-listening {
   color: var(--color-danger, #b04040);
   border-color: color-mix(in srgb, var(--color-danger, #b04040) 40%, transparent);
 }
-.stt-dock .stt-status.is-hearing::before {
+.stt-dock .stt-status.is-listening::before {
   background: var(--color-danger, #b04040);
-  animation: sttDotBlink 1s ease-in-out infinite;
+  animation: sttDotBreathe 2s ease-in-out infinite;
 }
+/* Segment wird transkribiert: Akzentfarbe, etwas zuegigerer Puls. */
 .stt-dock .stt-status.is-transcribing {
   color: var(--color-accent);
   border-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
 }
 .stt-dock .stt-status.is-transcribing::before {
   background: var(--color-accent);
-  animation: sttDotBlink 0.8s linear infinite;
+  animation: sttDotBlink 0.9s linear infinite;
 }
 @keyframes sttDotBlink {
   0%, 100% { opacity: 1; }
   50%      { opacity: 0.25; }
+}
+@keyframes sttDotBreathe {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
 }
 @media (prefers-reduced-motion: reduce) {
   .stt-dock-btn.is-recording[aria-pressed="true"] { animation: none; }

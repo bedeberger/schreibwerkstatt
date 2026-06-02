@@ -305,7 +305,6 @@
   "entities.toggle.off":          "Entitäten-Hervorhebung aus",
   "stt.dictate":                  "Diktat starten",
   "stt.stop":                     "Diktat stoppen",
-  "stt.status.listening":         "Bereit – sprich",
   "stt.status.hearing":           "Hört zu …",
   "stt.status.transcribing":      "Transkribiert …",
   "stt.error.permission":         "Mikrofon-Zugriff verweigert. Bitte im Browser erlauben.",

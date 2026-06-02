@@ -87,6 +87,7 @@ export const sttDictationMethods = {
     // kein deklarierter Karten-State, sondern ein Runtime-Container analog den
     // async-Re-Entry-Guards. Pro Aufnahme-Session neu befuellt, bei Stop genullt.
     this._sttRt = null;
+    this._sttBusyTimer = null; // Mindest-Standzeit-Timer fuer den „Transkribiert"-Status
     const stop = () => { if (this.sttRecording || this.sttPending) this._sttStop(); };
     window.addEventListener('book:changed', stop, { signal });
     window.addEventListener('view:reset', stop, { signal });
@@ -206,7 +207,6 @@ export const sttDictationMethods = {
       maxSegmentS: this.sttVad.maxSegmentS,
     });
     if (decision.voiced) { rt.hasVoice = true; rt.lastVoiceTs = now; }
-    this.sttListening = decision.voiced; // Pegel-Indikator („hoert")
     if (decision.cut && rt.rec.state === 'recording') {
       rt.lastCutReason = decision.reason;
       // stop() triggert onstop -> Segment senden + naechstes Segment starten.
@@ -214,11 +214,28 @@ export const sttDictationMethods = {
     }
   },
 
+  // „Transkribiert"-Status mit Mindest-Standzeit: An sofort beim Start eines
+  // Segment-Uploads, Aus erst, wenn KEIN Request mehr laeuft — und dann
+  // verzoegert (600 ms), damit kurze Segmente den Status nicht aufblitzen
+  // lassen.
+  _sttBusyOn() {
+    this.sttTranscribing++;
+    this.sttBusy = true;
+    if (this._sttBusyTimer) { clearTimeout(this._sttBusyTimer); this._sttBusyTimer = null; }
+  },
+  _sttBusyOff() {
+    this.sttTranscribing = Math.max(0, this.sttTranscribing - 1);
+    if (this.sttTranscribing > 0) return;
+    if (this._sttBusyTimer) clearTimeout(this._sttBusyTimer);
+    this._sttBusyTimer = setTimeout(() => { this.sttBusy = false; this._sttBusyTimer = null; }, 600);
+  },
+
   _sttStop() {
     const rt = this._sttRt;
     this.sttRecording = false;
     this.sttPending = false;
-    this.sttListening = false;
+    this.sttBusy = false;
+    if (this._sttBusyTimer) { clearTimeout(this._sttBusyTimer); this._sttBusyTimer = null; }
     if (!rt) return;
     rt.stopping = true;
     if (rt.vadTimer) { clearInterval(rt.vadTimer); rt.vadTimer = null; }
@@ -233,7 +250,7 @@ export const sttDictationMethods = {
 
   async _sttSendSegment(blob, mime, startsNewSentence) {
     const bookId = this.selectedBookId ? `?bookId=${encodeURIComponent(this.selectedBookId)}` : '';
-    this.sttTranscribing++; // Indikator „transkribiert"
+    this._sttBusyOn(); // Indikator „transkribiert" (mit Mindest-Standzeit)
     let res;
     try {
       res = await fetch(`/stt/transcribe${bookId}`, {
@@ -244,18 +261,18 @@ export const sttDictationMethods = {
     } catch {
       // Einzelnes Segment-Fehlschlag stoppt die Session nicht (Edge-Case-Regel).
       this._showJobToast?.({ message: this.t('stt.error.failed'), severity: 'err', jobType: 'stt', bookId: null });
-      this.sttTranscribing = Math.max(0, this.sttTranscribing - 1);
+      this._sttBusyOff();
       return;
     }
-    if (res.status === 404) { this.sttTranscribing = Math.max(0, this.sttTranscribing - 1); this._sttStop(); return; } // Feature serverseitig aus
+    if (res.status === 404) { this._sttBusyOff(); this._sttStop(); return; } // Feature serverseitig aus
     if (!res.ok) {
       this._showJobToast?.({ message: this.t('stt.error.failed'), severity: 'err', jobType: 'stt', bookId: null });
-      this.sttTranscribing = Math.max(0, this.sttTranscribing - 1);
+      this._sttBusyOff();
       return;
     }
     let text = '';
-    try { text = (await res.json())?.text || ''; } catch { this.sttTranscribing = Math.max(0, this.sttTranscribing - 1); return; }
-    this.sttTranscribing = Math.max(0, this.sttTranscribing - 1);
+    try { text = (await res.json())?.text || ''; } catch { this._sttBusyOff(); return; }
+    this._sttBusyOff();
     this._sttInsertText(text, startsNewSentence);
   },
 

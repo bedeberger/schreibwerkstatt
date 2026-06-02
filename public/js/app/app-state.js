@@ -56,15 +56,17 @@ const shellState = () => ({
   // Toolbar ein. Sprache loest der Proxy aus der Buch-Locale auf — kein
   // Frontend-State dafuer. sttVad steuert die browserseitige VAD-Segmentierung
   // (aus /config). sttRecording = aktive Aufnahme; sttPending = kurzlebiger
-  // Re-Entry-Guard waehrend getUserMedia/Stop laeuft. sttListening = Pegel
-  // aktuell ueber Schwelle (Indikator „hoert"); sttTranscribing = Anzahl
-  // laufender Transkriptions-Requests (Indikator „transkribiert").
+  // Re-Entry-Guard waehrend getUserMedia/Stop laeuft. sttTranscribing = Anzahl
+  // laufender Transkriptions-Requests; sttBusy = davon abgeleiteter
+  // Anzeige-Flag mit Mindest-Standzeit (verhindert Sub-Sekunden-Flackern des
+  // „Transkribiert"-Status bei kurzen Segmenten). Kein per-Tick-Pegel-State im
+  // Label — das strobte frueher mit jeder Silbe.
   sttEnabled: false,
   sttVad: { silenceMs: 800, threshold: 0.015, maxSegmentS: 30 },
   sttRecording: false,
   sttPending: false,
-  sttListening: false,
   sttTranscribing: 0,
+  sttBusy: false,
   // Plattform-Detect für Tasten-Hint-Anzeige (⌘ vs. Ctrl). Wird in init()
   // gesetzt; default true wäre auf Windows falsch, default false ist sichere
   // Annahme bevor JS gelaufen ist (Hero erscheint mit Ctrl, dann snap auf ⌘ falls Mac).

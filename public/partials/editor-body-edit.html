@@ -30,12 +30,13 @@
        Proxy aus der Buch-Locale auf. -->
   <template x-if="sttEnabled">
     <div class="stt-dock" x-cloak>
-      <!-- Live-Status links vom Mic: „Bereit", „Hört zu" (Sprache erkannt,
-           roter Puls) oder „Transkribiert" (Segment-Upload, Akzent-Puls). -->
+      <!-- Live-Status links vom Mic: zwei ruhige Zustaende ohne Sub-Sekunden-
+           Flackern — „Hört zu" (Aufnahme laeuft) bzw. „Transkribiert"
+           (Segment-Upload, mit Mindest-Standzeit ueber sttBusy). -->
       <span class="stt-status" aria-live="polite"
-            x-show="sttRecording || sttTranscribing > 0"
-            :class="{ 'is-hearing': sttListening && sttTranscribing === 0, 'is-transcribing': sttTranscribing > 0 }"
-            x-text="sttTranscribing > 0 ? t('stt.status.transcribing') : (sttListening ? t('stt.status.hearing') : t('stt.status.listening'))"></span>
+            x-show="sttRecording || sttBusy"
+            :class="sttBusy ? 'is-transcribing' : 'is-listening'"
+            x-text="sttBusy ? t('stt.status.transcribing') : t('stt.status.hearing')"></span>
       <button type="button" class="stt-dock-btn"
               :aria-pressed="sttRecording"
               :class="{ 'is-recording': sttRecording, 'is-pending': sttPending }"
