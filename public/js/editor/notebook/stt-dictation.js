@@ -108,7 +108,13 @@ export const sttDictationMethods = {
     // async-Re-Entry-Guards. Pro Aufnahme-Session neu befuellt, bei Stop genullt.
     this._sttRt = null;
     this._sttBusyTimer = null; // Mindest-Standzeit-Timer fuer den „Transkribiert"-Status
-    const stop = () => { if (this.sttRecording || this.sttPending) this._sttStop(); };
+    // Aufnahme beenden + den bewussten-Caret-Anker zuruecksetzen (neuer Kontext
+    // = kein gueltiger Anker mehr; STT haengt wieder ans Editorende an, bis der
+    // User erneut bewusst klickt).
+    const stop = () => {
+      this.sttCaretUserSet = false;
+      if (this.sttRecording || this.sttPending) this._sttStop();
+    };
     window.addEventListener('book:changed', stop, { signal });
     window.addEventListener('view:reset', stop, { signal });
     // Edit-Modus verlassen / Seite gewechselt -> Aufnahme beenden, Mic freigeben.
@@ -203,11 +209,25 @@ export const sttDictationMethods = {
     try { rec.start(); } catch { /* noop */ }
     this.sttRecording = true;
     this.sttPending = false;
-    // Mic-Klick = „ans Ende anfügen": Caret beim Start ans Editorende setzen,
-    // damit Diktat unten anwächst, statt an einer evtl. veralteten Caret-Position
-    // mitten im Text einzufügen. Folgesegmente hängen am vorrückenden Caret weiter.
-    this._sttAnchorToEnd();
+    // Einfüge-Anker bestimmen: hat der User bewusst per Klick einen Caret im
+    // Edit-Feld gesetzt (sttCaretUserSet) und steht dieser noch im Editor, wird
+    // dort eingefügt (nur sichtbar scrollen). Sonst — z. B. blosser Mic-Klick
+    // ohne Caret-Platzierung — hängt das Diktat ans Editorende an.
+    if (this.sttCaretUserSet && this._sttCaretInEditor()) {
+      this._scrollEditCaretIntoView?.();
+    } else {
+      this._sttAnchorToEnd();
+    }
     rt.vadTimer = setInterval(() => this._sttVadTick(), 100);
+  },
+
+  // True, wenn die aktuelle Selection (Caret) innerhalb des Edit-Felds liegt.
+  _sttCaretInEditor() {
+    const editEl = this._getEditEl?.();
+    const sel = typeof document !== 'undefined' ? document.getSelection() : null;
+    if (!editEl || !sel || !sel.rangeCount) return false;
+    const c = sel.getRangeAt(0).commonAncestorContainer;
+    return editEl === c || editEl.contains(c);
   },
 
   // Setzt den Caret ans Ende des Editorinhalts und scrollt dorthin — Anker für

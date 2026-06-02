@@ -74,6 +74,9 @@ export const figurLookupMethods = {
 
   _onEditClick(e) {
     if (!this.editMode) return;
+    // Klick ins Edit-Feld = bewusst gesetzter Caret → STT-Diktat fuegt dort ein
+    // statt ans Editorende (siehe _sttStart / sttCaretUserSet).
+    this.sttCaretUserSet = true;
     if (!(e.ctrlKey || e.metaKey)) return;
     this._tryOpenFigurLookupAt(e);
   },

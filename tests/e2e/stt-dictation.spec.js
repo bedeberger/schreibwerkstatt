@@ -27,6 +27,55 @@ async function placeCaret(page) {
   });
 }
 
+// Caret an den Anfang des Editor-Inhalts setzen (collapse to start). `userSet`
+// markiert ihn als bewusst gesetzt (sonst gilt er als veraltet -> Editorende).
+async function placeCaretStart(page, userSet) {
+  await page.evaluate((flag) => {
+    const el = document.getElementById('editor');
+    el.focus();
+    const r = document.createRange();
+    r.selectNodeContents(el);
+    r.collapse(true);
+    const sel = document.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(r);
+    window.__sttApp.sttCaretUserSet = !!flag;
+  }, userSet);
+}
+
+// Ein VAD-Segment ausloesen (sprechen -> Stille -> Schnitt) und auf das
+// eingefuegte Transkript warten.
+async function dictateOneSegment(page) {
+  await page.locator('#stt-mic').click();
+  await page.waitForFunction(() => window.__sttApp.sttRecording === true);
+  await page.evaluate(() => { window.__voice = true; });
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { window.__voice = false; });
+  await page.waitForFunction(() => document.getElementById('editor').textContent.includes('Hallo Welt'));
+}
+
+test('Mic-Klick ohne bewussten Caret haengt ans Editorende an', async ({ page }) => {
+  await ready(page, HARNESS + '?enabled=true');
+  // Veralteter Caret am Anfang, NICHT bewusst gesetzt -> muss ans Ende anhaengen.
+  await placeCaretStart(page, false);
+  await dictateOneSegment(page);
+
+  const text = await page.evaluate(() => document.getElementById('editor').textContent);
+  expect(text.startsWith('Start')).toBe(true);
+  expect(text.trimEnd().endsWith('Hallo Welt')).toBe(true);
+});
+
+test('Bewusst gesetzter Caret: Diktat fuegt dort ein', async ({ page }) => {
+  await ready(page, HARNESS + '?enabled=true');
+  // Bewusster Caret am Anfang -> Diktat erscheint VOR "Start.".
+  await placeCaretStart(page, true);
+  await dictateOneSegment(page);
+
+  const text = await page.evaluate(() => document.getElementById('editor').textContent);
+  expect(text.startsWith('Hallo Welt')).toBe(true);
+  expect(text.includes('Start.')).toBe(true);
+});
+
 test('Button nur bei sttEnabled vorhanden', async ({ page }) => {
   await ready(page, HARNESS + '?enabled=false');
   await expect(page.locator('#stt-mic')).toHaveCount(0);

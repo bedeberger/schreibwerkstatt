@@ -67,6 +67,11 @@ const shellState = () => ({
   sttPending: false,
   sttTranscribing: 0,
   sttBusy: false,
+  // True, sobald der User bewusst per Klick einen Caret im Edit-Feld gesetzt
+  // hat. Steuert den STT-Einfuege-Anker: gesetzt -> Diktat startet an der
+  // Caret-Position, sonst haengt es ans Editorende an. Auto-Fokus beim Öffnen
+  // des Edit-Modus zaehlt NICHT (in startEdit auf false zurueckgesetzt).
+  sttCaretUserSet: false,
   // Plattform-Detect für Tasten-Hint-Anzeige (⌘ vs. Ctrl). Wird in init()
   // gesetzt; default true wäre auf Windows falsch, default false ist sichere
   // Annahme bevor JS gelaufen ist (Hero erscheint mit Ctrl, dann snap auf ⌘ falls Mac).
