@@ -223,9 +223,13 @@ export function registerPaletteCard() {
           filled.push(k);
           seen.add(k);
         }
+        // Recents gegen das sichtbare Subset filtern — sonst tauchen Cards
+        // auf, die für den aktuellen Buchtyp/Rolle gar nicht verfügbar sind
+        // (z.B. Tagebuch-Rückblick nach Wechsel auf Gesellschaftsroman).
+        const visibleKeys = new Set(visibleFeatures.map(f => f.key));
         const recent = filled
           .map(k => featureByKey(k))
-          .filter(Boolean);
+          .filter(f => f && visibleKeys.has(f.key));
         if (recent.length) {
           sections.push({
             key: 'recent',
