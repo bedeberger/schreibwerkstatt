@@ -13,7 +13,7 @@
     </div>
     <div class="card-actions rb-actions">
       <div class="rb-zeitraum">
-        <div x-data="combobox($app.t('rueckblick.zeitraum'))"
+        <div x-data="combobox({ placeholder: $app.t('rueckblick.zeitraum'), compact: false })"
              x-modelable="value" x-model="rueckblickZeitraum"
              x-effect="options = availableZeitraeume()"></div>
       </div>
