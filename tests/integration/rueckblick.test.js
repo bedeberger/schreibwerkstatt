@@ -1,0 +1,166 @@
+'use strict';
+// Integration test: Tagebuch-Rückblick (rueckblick.js) — Single-Pass, Map-Reduce
+// über Monate, Cache-HIT, Leerzustand, kein content-store-Write.
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+
+const { bootstrap, waitForJob } = require('./_helpers/setup');
+
+let ctx;
+test.before(() => { ctx = bootstrap(); });
+test.after(() => { ctx.cleanup(); });
+
+test.beforeEach(() => {
+  ctx.mockAi.reset();
+  ctx.dbSeed.reset();
+});
+
+function rueckblickResponse(summary = 'Ein ruhiger Monat.') {
+  return {
+    themen: [{ label: 'Arbeit', haeufigkeit: 2, belege: ['2024-03-04'] }],
+    personen: [{ name: 'Anna', haeufigkeit: 3 }],
+    orte: [{ name: 'Zürich', haeufigkeit: 1 }],
+    bemerkenswerteTage: [{ datum: '2024-03-15', begruendung: 'großer Tag' }],
+    zusammenfassung: summary,
+  };
+}
+
+// Diary-Seiten: page_name = 'YYYY-MM-DD'. Ein Kapitel pro Jahr genügt.
+function seedDiary(bookId, dates, { charsPerEntry = 60 } = {}) {
+  const chapters = [{ id: bookId * 10, book_id: bookId, name: '2024' }];
+  const pages = [];
+  const pageBodies = {};
+  dates.forEach((d, i) => {
+    const pid = bookId * 100 + i;
+    pages.push({ id: pid, book_id: bookId, chapter_id: bookId * 10, name: d, updated_at: '2024-12-31T10:00:00Z' });
+    pageBodies[pid] = '<p>' + `Heute war ein Tag. `.repeat(charsPerEntry) + '</p>';
+  });
+  ctx.dbSeed.setBook({ chapters, pages, pageBodies });
+}
+
+test('Single-Pass: ein Monat → 1 AI-Call, Ergebnis + Cache-Zeile', async () => {
+  const BOOK_ID = 700;
+  seedDiary(BOOK_ID, ['2024-03-04', '2024-03-15', '2024-03-22']);
+
+  ctx.mockAi.on((e) => e.schemaKeys.includes('zusammenfassung') && e.schemaKeys.includes('themen'),
+    rueckblickResponse());
+
+  const jobId = ctx.shared.createJob('rueckblick', BOOK_ID, 'tester@test.dev', 'job.label.rueckblick', { zeitraum: '2024-03' }, `${BOOK_ID}:2024-03`);
+  ctx.shared.enqueueJob(jobId, () =>
+    ctx.rueckblick.runRueckblickJob(jobId, BOOK_ID, 'tester@test.dev', null, '2024-03'));
+  const job = await waitForJob(ctx.shared, jobId);
+
+  assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
+  assert.equal(job.result.rueckblick.zusammenfassung, 'Ein ruhiger Monat.');
+  assert.equal(job.result.entryCount, 3);
+  assert.equal(ctx.mockAi.log.length, 1);
+
+  const cacheRow = ctx.dbSchema.db.prepare(
+    'SELECT pages_sig FROM tagebuch_rueckblick_cache WHERE book_id = ? AND user_email = ? AND zeitraum = ?'
+  ).get(BOOK_ID, 'tester@test.dev', '2024-03');
+  assert.ok(cacheRow, 'Cache-Zeile fehlt nach 1. Run');
+});
+
+test('Zeitraum-Filter: nur Einträge des gewählten Monats', async () => {
+  const BOOK_ID = 701;
+  seedDiary(BOOK_ID, ['2024-03-04', '2024-03-15', '2024-04-02', '2023-12-31']);
+
+  let seenEntryCount = null;
+  ctx.mockAi.on((e) => e.schemaKeys.includes('zusammenfassung'), (entry) => {
+    // Prompt enthält die Einträge — zähle die Datums-Header des Monats März.
+    seenEntryCount = (entry.prompt.match(/### 2024-03-/g) || []).length;
+    return rueckblickResponse();
+  });
+
+  const jobId = ctx.shared.createJob('rueckblick', BOOK_ID, 'tester@test.dev', 'job.label.rueckblick', { zeitraum: '2024-03' }, `${BOOK_ID}:2024-03`);
+  ctx.shared.enqueueJob(jobId, () =>
+    ctx.rueckblick.runRueckblickJob(jobId, BOOK_ID, 'tester@test.dev', null, '2024-03'));
+  const job = await waitForJob(ctx.shared, jobId);
+
+  assert.equal(job.status, 'done');
+  assert.equal(job.result.entryCount, 2, 'nur die zwei März-Einträge');
+  assert.equal(seenEntryCount, 2);
+});
+
+test('Map-Reduce: Jahr über mehrere große Monate → Monats-Calls + Reduce', async () => {
+  const BOOK_ID = 702;
+  // 3 Monate × große Einträge → totalChars überschreitet SINGLE_PASS_LIMIT (≈ 20K via Test-Budget).
+  seedDiary(BOOK_ID, ['2024-01-10', '2024-02-10', '2024-03-10'], { charsPerEntry: 600 });
+
+  ctx.mockAi.on((e) => e.schemaKeys.includes('zusammenfassung'), rueckblickResponse('Jahr.'));
+
+  const jobId = ctx.shared.createJob('rueckblick', BOOK_ID, 'tester@test.dev', 'job.label.rueckblick', { zeitraum: '2024' }, `${BOOK_ID}:2024`);
+  ctx.shared.enqueueJob(jobId, () =>
+    ctx.rueckblick.runRueckblickJob(jobId, BOOK_ID, 'tester@test.dev', null, '2024'));
+  const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 8000 });
+
+  assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
+  assert.equal(ctx.mockAi.log.length, 4, '3 Monats-Analysen + 1 Reduce');
+  assert.equal(job.result.rueckblick.zusammenfassung, 'Jahr.');
+});
+
+test('Cache-HIT: identischer 2. Lauf → 0 AI-Calls', async () => {
+  const BOOK_ID = 703;
+  seedDiary(BOOK_ID, ['2024-05-01', '2024-05-09']);
+  ctx.mockAi.on((e) => e.schemaKeys.includes('zusammenfassung'), rueckblickResponse());
+
+  const jobId1 = ctx.shared.createJob('rueckblick', BOOK_ID, 'tester@test.dev', 'job.label.rueckblick', { zeitraum: '2024-05' }, `${BOOK_ID}:2024-05`);
+  ctx.shared.enqueueJob(jobId1, () =>
+    ctx.rueckblick.runRueckblickJob(jobId1, BOOK_ID, 'tester@test.dev', null, '2024-05'));
+  const job1 = await waitForJob(ctx.shared, jobId1);
+  assert.equal(job1.status, 'done');
+  assert.equal(ctx.mockAi.log.length, 1);
+
+  const jobId2 = ctx.shared.createJob('rueckblick', BOOK_ID, 'tester@test.dev', 'job.label.rueckblick', { zeitraum: '2024-05' }, `${BOOK_ID}:2024-05_b`);
+  ctx.shared.enqueueJob(jobId2, () =>
+    ctx.rueckblick.runRueckblickJob(jobId2, BOOK_ID, 'tester@test.dev', null, '2024-05'));
+  const job2 = await waitForJob(ctx.shared, jobId2);
+  assert.equal(job2.status, 'done');
+  assert.equal(job2.result.rueckblick.zusammenfassung, 'Ein ruhiger Monat.');
+  assert.equal(ctx.mockAi.log.length, 1, 'Cache-HIT: kein neuer AI-Call');
+});
+
+test('Leerer Zeitraum → result.empty, kein AI-Call', async () => {
+  const BOOK_ID = 704;
+  seedDiary(BOOK_ID, ['2024-03-04']);
+
+  const jobId = ctx.shared.createJob('rueckblick', BOOK_ID, 'tester@test.dev', 'job.label.rueckblick', { zeitraum: '2024-08' }, `${BOOK_ID}:2024-08`);
+  ctx.shared.enqueueJob(jobId, () =>
+    ctx.rueckblick.runRueckblickJob(jobId, BOOK_ID, 'tester@test.dev', null, '2024-08'));
+  const job = await waitForJob(ctx.shared, jobId);
+
+  assert.equal(job.status, 'done');
+  assert.equal(job.result.empty, true);
+  assert.equal(ctx.mockAi.log.length, 0);
+});
+
+test('Pflichtfeld zusammenfassung fehlt → failJob', async () => {
+  const BOOK_ID = 705;
+  seedDiary(BOOK_ID, ['2024-06-01']);
+  ctx.mockAi.on(() => true, { themen: [], personen: [], orte: [], bemerkenswerteTage: [] });
+
+  const jobId = ctx.shared.createJob('rueckblick', BOOK_ID, 'tester@test.dev', 'job.label.rueckblick', { zeitraum: '2024-06' }, `${BOOK_ID}:2024-06`);
+  ctx.shared.enqueueJob(jobId, () =>
+    ctx.rueckblick.runRueckblickJob(jobId, BOOK_ID, 'tester@test.dev', null, '2024-06'));
+  const job = await waitForJob(ctx.shared, jobId);
+
+  assert.equal(job.status, 'error');
+  assert.equal(job.error, 'job.error.rueckblickEmpty');
+});
+
+test('kein content-store-Write: Buchinhalt bleibt unverändert', async () => {
+  const BOOK_ID = 706;
+  seedDiary(BOOK_ID, ['2024-07-01', '2024-07-02']);
+  const before = ctx.dbSchema.db.prepare('SELECT page_id, body_html, updated_at FROM pages WHERE book_id = ? ORDER BY page_id').all(BOOK_ID);
+
+  ctx.mockAi.on((e) => e.schemaKeys.includes('zusammenfassung'), rueckblickResponse());
+  const jobId = ctx.shared.createJob('rueckblick', BOOK_ID, 'tester@test.dev', 'job.label.rueckblick', { zeitraum: '2024-07' }, `${BOOK_ID}:2024-07`);
+  ctx.shared.enqueueJob(jobId, () =>
+    ctx.rueckblick.runRueckblickJob(jobId, BOOK_ID, 'tester@test.dev', null, '2024-07'));
+  const job = await waitForJob(ctx.shared, jobId);
+  assert.equal(job.status, 'done');
+
+  const after = ctx.dbSchema.db.prepare('SELECT page_id, body_html, updated_at FROM pages WHERE book_id = ? ORDER BY page_id').all(BOOK_ID);
+  assert.deepEqual(after, before, 'Seiteninhalt/updated_at unverändert (Job ist rein lesend)');
+});

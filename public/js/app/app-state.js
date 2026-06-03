@@ -265,6 +265,7 @@ const cardsState = () => ({
   showSongsCard: false,
   showWorldFactsCard: false,
   showKontinuitaetCard: false,
+  showTagebuchRueckblickCard: false,
   showBookStatsCard: false,
   showStilCard: false,
   showFehlerHeatmapCard: false,

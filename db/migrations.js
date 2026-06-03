@@ -7196,6 +7196,32 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 173 abgeschlossen (stt_time für Diktat-Tracking).');
   }
 
+  if (version < 174) {
+    // tagebuch_rueckblick_cache: Endergebnis-Cache des KI-Rückblicks pro
+    // (Buch, User, Zeitraum, Provider). zeitraum ist 'YYYY' oder 'YYYY-MM'.
+    // pages_sig (page_id:updated_at sortiert + zeitraum + cacheVersion) macht den
+    // Cache selbst-invalidierend bei Eintrags-Änderung. provider im PK gegen
+    // Cross-Provider-Bleeding (Muster der Review-/Extract-Caches). Pro User, weil
+    // Tagebuch persönlich ist; CASCADE mit dem Buch. result_json = SCHEMA_RUECKBLICK.
+    db.exec(`CREATE TABLE IF NOT EXISTS tagebuch_rueckblick_cache (
+        book_id     INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        user_email  TEXT    NOT NULL,
+        zeitraum    TEXT    NOT NULL,
+        provider    TEXT    NOT NULL,
+        pages_sig   TEXT    NOT NULL,
+        result_json TEXT    NOT NULL,
+        created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        PRIMARY KEY (book_id, user_email, zeitraum, provider)
+      )`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_tagebuch_rueckblick_book ON tagebuch_rueckblick_cache(book_id)');
+    const fkErrors174 = db.pragma('foreign_key_check');
+    if (fkErrors174.length) {
+      throw new Error(`Migration 174: foreign_key_check meldet ${fkErrors174.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 174').run();
+    logger.info('DB-Migration auf Version 174 abgeschlossen (tagebuch_rueckblick_cache).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

@@ -1,0 +1,98 @@
+<!-- Tagebuch-Rückblick (nur Buchtyp 'tagebuch') -->
+<!--
+  Alpine.data-Sub-Komponente — siehe public/js/cards/tagebuch-rueckblick-card.js.
+  `showTagebuchRueckblickCard` bleibt am Root (Hash-Router + Exklusivität);
+  fachlicher State (Zeitraum/Result/Loading/Progress/Status, PollTimer) lebt in
+  der Sub. KI-Felder via x-text (auto-escaped) — kein x-html-Sink.
+-->
+<div class="card card--tagebuchRueckblick" x-data="tagebuchRueckblickCard" x-show="$app.showTagebuchRueckblickCard" x-cloak>
+  <div class="card-header">
+    <div class="card-header-titlebar">
+      <span class="card-eyebrow" x-text="$app.selectedBookName"></span>
+      <span class="card-title" x-text="$app.t('rueckblick.title')"></span>
+    </div>
+    <div class="card-actions rb-actions">
+      <div class="rb-zeitraum">
+        <div x-data="combobox($app.t('rueckblick.zeitraum'))"
+             x-modelable="value" x-model="rueckblickZeitraum"
+             x-effect="options = availableZeitraeume()"></div>
+      </div>
+      <button type="button" @click="runTagebuchRueckblick()" :disabled="rueckblickLoading || !rueckblickZeitraum">
+        <span x-show="rueckblickLoading" class="spinner"></span>
+        <span x-text="hasRueckblickResult() ? $app.t('rueckblick.rerun') : $app.t('rueckblick.start')"></span>
+      </button>
+    </div>
+  </div>
+
+  <div class="progress-bar-wrap" x-show="rueckblickProgress > 0">
+    <div class="progress-bar" :style="{ '--progress': rueckblickProgress + '%' }"></div>
+  </div>
+  <div class="card-status" x-html="rueckblickStatus"></div>
+
+  <!-- Leerzustand: keine datierten Einträge im Zeitraum -->
+  <div class="rb-empty" x-show="rueckblickEmpty" x-cloak>
+    <span x-text="$app.t('rueckblick.empty')"></span>
+  </div>
+
+  <!-- Ergebnis -->
+  <div class="rb-result" x-show="hasRueckblickResult()" x-cloak>
+    <!-- Zusammenfassung -->
+    <div class="rb-section rb-summary">
+      <template x-for="(para, i) in rueckblickParagraphs()" :key="i">
+        <p x-text="para"></p>
+      </template>
+    </div>
+
+    <!-- Themen -->
+    <div class="rb-section" x-show="rueckblickResult?.themen?.length">
+      <div class="history-heading" x-text="$app.t('rueckblick.themen')"></div>
+      <div class="rb-badges">
+        <template x-for="(t, i) in (rueckblickResult?.themen || [])" :key="i">
+          <span class="rb-theme" :data-tip="(t.belege || []).join(', ')">
+            <span class="rb-theme-label" x-text="t.label"></span>
+            <span class="rb-count" x-text="t.haeufigkeit"></span>
+          </span>
+        </template>
+      </div>
+    </div>
+
+    <!-- Personen + Orte nebeneinander -->
+    <div class="rb-cols">
+      <div class="rb-section" x-show="rueckblickResult?.personen?.length">
+        <div class="history-heading" x-text="$app.t('rueckblick.personen')"></div>
+        <div class="rb-badges">
+          <template x-for="(p, i) in (rueckblickResult?.personen || [])" :key="i">
+            <span class="rb-entity">
+              <span x-text="p.name"></span>
+              <span class="rb-count" x-text="p.haeufigkeit"></span>
+            </span>
+          </template>
+        </div>
+      </div>
+      <div class="rb-section" x-show="rueckblickResult?.orte?.length">
+        <div class="history-heading" x-text="$app.t('rueckblick.orte')"></div>
+        <div class="rb-badges">
+          <template x-for="(o, i) in (rueckblickResult?.orte || [])" :key="i">
+            <span class="rb-entity">
+              <span x-text="o.name"></span>
+              <span class="rb-count" x-text="o.haeufigkeit"></span>
+            </span>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bemerkenswerte Tage -->
+    <div class="rb-section" x-show="rueckblickResult?.bemerkenswerteTage?.length">
+      <div class="history-heading" x-text="$app.t('rueckblick.tage')"></div>
+      <ul class="rb-tage">
+        <template x-for="(tag, i) in (rueckblickResult?.bemerkenswerteTage || [])" :key="i">
+          <li class="rb-tag-item">
+            <span class="internal-link rb-tag-datum" @click="gotoRueckblickTag(tag.datum)" x-text="tag.datum"></span>
+            <span class="rb-tag-text" x-text="tag.begruendung"></span>
+          </li>
+        </template>
+      </ul>
+    </div>
+  </div>
+</div>

@@ -14,6 +14,7 @@ import * as lektoratNs from './prompts/lektorat.js';
 import * as reviewNs from './prompts/review.js';
 import * as komplettNs from './prompts/komplett.js';
 import * as synonymNs from './prompts/synonym.js';
+import * as tagebuchNs from './prompts/tagebuch.js';
 
 // FNV-1a 32-bit über einen String → base36. Deterministisch, dependency-frei,
 // in Browser + Node identisch. Zweck ist Cache-Busting, nicht Kryptografie:
@@ -40,6 +41,7 @@ function _promptsContentHash() {
     komplettNs.SCHEMA_BEZIEHUNGEN,
     komplettNs.SCHEMA_FIGUREN_KONSOL, komplettNs.SCHEMA_KONTINUITAET_PROBLEME,
     synonymNs.SCHEMA_SYNONYM,
+    tagebuchNs.SCHEMA_RUECKBLICK,
   ]);
   return _hashContent(_allLocalePromptsSnapshot() + schemaPart);
 }
@@ -154,6 +156,12 @@ export {
   buildSynonymPrompt,
   SCHEMA_SYNONYM,
 } from './prompts/synonym.js';
+
+export {
+  buildRueckblickPrompt,
+  buildRueckblickReducePrompt,
+  SCHEMA_RUECKBLICK,
+} from './prompts/tagebuch.js';
 
 export {
   buildBrainstormPrompt,

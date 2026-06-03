@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="de-CH">
+<head>
+  <meta charset="UTF-8">
+  <title>Tagebuch-Rückblick Test Harness</title>
+  <link rel="stylesheet" href="/public/css/tokens.css">
+  <link rel="stylesheet" href="/public/css/page/tagebuch-rueckblick.css">
+  <style>
+    body { margin: 0; padding: 24px; font: 16px/1.5 system-ui, sans-serif; }
+  </style>
+</head>
+<body>
+  <!-- Slim-Variante des Partials. Combobox durch <select> ersetzt (wie das
+       Ereignisse-Harness die catalogFilter-Combobox umgeht). Render-Block für
+       Themen/Personen/Orte/Tage/Zusammenfassung 1:1 aus dem Partial. -->
+  <div id="root" class="card card--tagebuchRueckblick" x-data="tagebuchRueckblickCard" x-show="$app.showTagebuchRueckblickCard">
+    <div class="card-actions rb-actions">
+      <select data-test="zeitraum" x-model="rueckblickZeitraum">
+        <option value="">—</option>
+        <template x-for="opt in availableZeitraeume()" :key="opt.value">
+          <option :value="opt.value" x-text="opt.label"></option>
+        </template>
+      </select>
+      <button type="button" data-test="run" @click="runTagebuchRueckblick()" :disabled="rueckblickLoading || !rueckblickZeitraum">
+        <span x-text="hasRueckblickResult() ? 'rerun' : 'run'"></span>
+      </button>
+    </div>
+
+    <div class="rb-empty" data-test="empty" x-show="rueckblickEmpty">leer</div>
+
+    <div class="rb-result" data-test="result" x-show="hasRueckblickResult()">
+      <div class="rb-summary" data-test="summary">
+        <template x-for="(para, i) in rueckblickParagraphs()" :key="i">
+          <p x-text="para"></p>
+        </template>
+      </div>
+      <div class="rb-badges" data-test="themen">
+        <template x-for="(t, i) in (rueckblickResult?.themen || [])" :key="i">
+          <span class="rb-theme"><span class="rb-theme-label" x-text="t.label"></span><span class="rb-count" x-text="t.haeufigkeit"></span></span>
+        </template>
+      </div>
+      <ul class="rb-tage" data-test="tage">
+        <template x-for="(tag, i) in (rueckblickResult?.bemerkenswerteTage || [])" :key="i">
+          <li class="rb-tag-item">
+            <span class="internal-link rb-tag-datum" :data-test="'tag-' + tag.datum" @click="gotoRueckblickTag(tag.datum)" x-text="tag.datum"></span>
+            <span class="rb-tag-text" x-text="tag.begruendung"></span>
+          </li>
+        </template>
+      </ul>
+    </div>
+  </div>
+
+  <script type="module">
+    const { registerTagebuchRueckblickCard } = await import('/public/js/cards/tagebuch-rueckblick-card.js');
+
+    // fetch stubben: active-job-Check (onVisible) + Run-POST liefern harmlose
+    // Antworten, damit kein Netzwerkfehler den Console-Guard auslöst.
+    const _resp = (obj) => ({ ok: true, status: 200, json: async () => obj, clone() { return _resp(obj); } });
+    window.__selectedTag = null;
+    window.fetch = async (url) => {
+      if (String(url).includes('/jobs/active')) return _resp({ jobId: null });
+      if (String(url).includes('/jobs/rueckblick')) return _resp({ jobId: 'mock-job-1' });
+      return _resp({});
+    };
+
+    const PAGES = [
+      { id: 1, name: '2024-03-04' },
+      { id: 2, name: '2024-03-15' },
+      { id: 3, name: '2024-04-02' },
+      { id: 4, name: '2023-12-31' },
+      { id: 5, name: 'Über mich' }, // nicht datiert → ignoriert
+    ];
+
+    document.addEventListener('alpine:init', () => {
+      window.__app = window.Alpine.reactive({
+        selectedBookId: 1,
+        selectedBookName: 'Mein Tagebuch',
+        // Start false; nach Mount auf true geflippt → $watch fängt die steigende
+        // Flanke (wie im echten App-Pfad: Partial-Inject vor Flag-Set) und ruft
+        // onShow → onOpen (Default-Zeitraum).
+        showTagebuchRueckblickCard: false,
+        uiLocale: 'de',
+        pages: PAGES,
+        t: (k, params) => params ? `${k} ${JSON.stringify(params)}` : k,
+        selectPage: (p) => { window.__selectedTag = p?.name || null; },
+      });
+      window.Alpine.magic('app', () => window.__app);
+      registerTagebuchRueckblickCard();
+    });
+
+    document.addEventListener('alpine:initialized', () => {
+      // Steigende Flanke des Show-Flags auslösen (onShow → onOpen).
+      window.__app.showTagebuchRueckblickCard = true;
+      setTimeout(() => { window.__harnessReady = true; }, 50);
+    });
+
+    const s = document.createElement('script');
+    s.src = '/public/vendor/alpine-3.14.9.min.js';
+    document.head.appendChild(s);
+  </script>
+</body>
+</html>

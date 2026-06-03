@@ -658,6 +658,40 @@ function deleteChapterMacroReviewCache(bookId, userEmail) {
   return _deleteChapterMacroReviewCache.run(parseInt(bookId), userEmail || '').changes;
 }
 
+// ── Endergebnis-Cache: Tagebuch-Rückblick (rueckblick.js) ─────────────────────
+// Single-Row pro (Buch, User, Zeitraum, Provider). pages_sig macht den Cache
+// selbst-invalidierend bei Eintrags-Änderung im Zeitraum. provider im PK gegen
+// Cross-Provider-Bleeding. Kein Monats-Delta (bewusst: Endergebnis pro zeitraum).
+const _loadRueckblickCache = db.prepare(
+  `SELECT result_json FROM tagebuch_rueckblick_cache
+   WHERE book_id = ? AND user_email = ? AND zeitraum = ? AND provider = ? AND pages_sig = ?`
+);
+const _saveRueckblickCache = db.prepare(
+  `INSERT OR REPLACE INTO tagebuch_rueckblick_cache
+   (book_id, user_email, zeitraum, provider, pages_sig, result_json, created_at)
+   VALUES (?, ?, ?, ?, ?, ?, ?)`
+);
+const _deleteRueckblickCache = db.prepare(
+  `DELETE FROM tagebuch_rueckblick_cache WHERE book_id = ? AND user_email = ?`
+);
+
+function loadRueckblickCache(bookId, userEmail, zeitraum, pagesSig, provider = '') {
+  const row = _loadRueckblickCache.get(parseInt(bookId), userEmail || '', zeitraum, provider || '', pagesSig);
+  if (!row) return null;
+  try { return JSON.parse(row.result_json); } catch { return null; }
+}
+
+function saveRueckblickCache(bookId, userEmail, zeitraum, pagesSig, result, provider = '') {
+  _saveRueckblickCache.run(
+    parseInt(bookId), userEmail || '', zeitraum, provider || '',
+    pagesSig, JSON.stringify(result), new Date().toISOString(),
+  );
+}
+
+function deleteRueckblickCache(bookId, userEmail) {
+  return _deleteRueckblickCache.run(parseInt(bookId), userEmail || '').changes;
+}
+
 // ── Delta-Cache: Synonym-Suche (synonyme.js) ──────────────────────────────────
 // Key-Hash deckt wort + satz + buchtyp + locale + cacheVersion ab. Pro User.
 const _loadSynonymCache = db.prepare(
@@ -1170,6 +1204,7 @@ module.exports = {
   loadChapterReviewCache, saveChapterReviewCache,
   loadBookReviewCache, saveBookReviewCache, deleteReviewCache,
   loadChapterMacroReviewCache, saveChapterMacroReviewCache, deleteChapterMacroReviewCache,
+  loadRueckblickCache, saveRueckblickCache, deleteRueckblickCache,
   loadSynonymCache, saveSynonymCache, deleteSynonymCache,
   loadLektoratCache, saveLektoratCache, deleteLektoratCache,
   loadFinetuneAiCache, saveFinetuneAiCache, deleteFinetuneAiCache,

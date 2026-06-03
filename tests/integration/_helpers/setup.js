@@ -50,6 +50,7 @@ function bootstrap() {
   const komplett = require('../../../routes/jobs/komplett');
   const review = require('../../../routes/jobs/review');
   const kapitel = require('../../../routes/jobs/kapitel');
+  const rueckblick = require('../../../routes/jobs/rueckblick');
   const lektorat = require('../../../routes/jobs/lektorat');
   const synonyme = require('../../../routes/jobs/synonyme');
   const shared = require('../../../routes/jobs/shared');
@@ -61,7 +62,7 @@ function bootstrap() {
     try { fs.unlinkSync(`${dbFile}-shm`); } catch (_) {}
   }
 
-  return { mockAi, dbSeed, komplett, review, kapitel, lektorat, synonyme, shared, dbSchema, dbFile, cleanup };
+  return { mockAi, dbSeed, komplett, review, kapitel, rueckblick, lektorat, synonyme, shared, dbSchema, dbFile, cleanup };
 }
 
 async function waitForJob(shared, jobId, { timeoutMs = 5000 } = {}) {

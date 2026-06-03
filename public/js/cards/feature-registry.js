@@ -10,6 +10,8 @@
 //   `requiresBook`  – disabled, wenn kein Buch gewählt.
 //   `minRole`       – Buch-Rolle, ab der die Karte sichtbar ist.
 //                     Hierarchie: viewer < lektor < editor < owner. Pflichtfeld.
+//   `requiresBuchtyp` – Karte erscheint nur bei diesem Buchtyp (z.B. 'tagebuch').
+//                     Gate greift in Palette (featuresVisibleFor) + isFeatureAvailable.
 //   `dependsOnKomplett` – true: Karte konsumiert Komplettanalyse-Output
 //                     (Figuren/Orte/Szenen/Ereignisse/Fakten/Soziogramm/Kontinuität).
 //                     Palette zeigt dafür ein Hinweis-Badge.
@@ -32,6 +34,9 @@ export const FEATURES = [
     aliases: ['errors','heatmap','findings','lektorat','typo','tippfehler'] },
   { key: 'kontinuitaet',   kind: 'toggle', group: 'review', labelKey: 'tile.kontinuitaet',   descKey: 'tile.kontinuitaet.desc',   flag: 'showKontinuitaetCard',   toggle: 'toggleKontinuitaetCard',   requiresBook: true, minRole: 'editor', dependsOnKomplett: true,
     aliases: ['continuity','widerspruch','plot-hole','contradiction','consistency'] },
+  // Tagebuch-Rückblick: nur bei Buchtyp 'tagebuch'. Rückwärtsgewandte KI-Verdichtung.
+  { key: 'tagebuchRueckblick', kind: 'toggle', group: 'review', labelKey: 'tile.tagebuchRueckblick', descKey: 'tile.tagebuchRueckblick.desc', flag: 'showTagebuchRueckblickCard', toggle: 'toggleTagebuchRueckblickCard', requiresBook: true, minRole: 'editor', requiresBuchtyp: 'tagebuch',
+    aliases: ['rückblick','rueckblick','retrospective','diary','tagebuch','jahresrückblick','monatsrückblick','review'] },
   // Welt & Plot — World-Cards: editor+ (für Viewer/Lektor nicht relevant).
   { key: 'figuren',        kind: 'toggle', group: 'world',  labelKey: 'tile.figuren',        descKey: 'tile.figuren.desc',        flag: 'showFiguresCard',        toggle: 'toggleFiguresCard',        requiresBook: true, minRole: 'editor', dependsOnKomplett: true,
     aliases: ['characters','personen','cast','protagonist','antagonist','soziogramm','graph'] },
@@ -174,6 +179,7 @@ export const EXCLUSIVE_CARDS = [
   { key: 'songs',          flag: 'showSongsCard',          toggle: 'toggleSongsCard',          onReclick: 'refresh', partial: 'songs',
     loadDeps: [{ method: 'loadFiguren', skipIfNonEmpty: 'figuren' }] },
   { key: 'kontinuitaet',   flag: 'showKontinuitaetCard',   toggle: 'toggleKontinuitaetCard',   onReclick: 'refresh', partial: 'kontinuitaet' },
+  { key: 'tagebuchRueckblick', flag: 'showTagebuchRueckblickCard', toggle: 'toggleTagebuchRueckblickCard', onReclick: 'refresh', requiresBook: true, requiresBuchtyp: 'tagebuch', partial: 'tagebuch-rueckblick' },
   { key: 'bookSettings',   flag: 'showBookSettingsCard',   toggle: 'toggleBookSettingsCard',   onReclick: 'close', partial: 'book-settings' },
   { key: 'userSettings',   flag: 'showUserSettingsCard',   toggle: 'toggleUserSettingsCard',   onReclick: 'close', partial: 'user-settings' },
   { key: 'adminUsers',     flag: 'showAdminUsersCard',     toggle: 'toggleAdminUsersCard',     onReclick: 'close', partial: 'admin-users' },
@@ -222,6 +228,7 @@ export function isFeatureAvailable(feature, ctx) {
   if (!feature) return false;
   if (feature.requiresBook && !ctx.selectedBookId) return false;
   if (feature.requiresPages && !(ctx.pages && ctx.pages.length > 0)) return false;
+  if (feature.requiresBuchtyp && ctx.buchtyp !== feature.requiresBuchtyp) return false;
   return true;
 }
 
@@ -230,6 +237,7 @@ export function unavailabilityReasonKey(feature, ctx) {
   if (!feature) return null;
   if (feature.requiresBook && !ctx.selectedBookId) return 'palette.disabled.needBook';
   if (feature.requiresPages && !(ctx.pages && ctx.pages.length > 0)) return 'palette.disabled.needPages';
+  if (feature.requiresBuchtyp && ctx.buchtyp !== feature.requiresBuchtyp) return 'palette.disabled.needBook';
   if (feature.minRole && ctx.bookRole && !hasMinRole(ctx.bookRole, feature.minRole)) return 'palette.disabled.insufficientRole';
   return null;
 }
@@ -249,10 +257,12 @@ export function hasMinRole(actual, required) {
 
 // Filter `features` aufs sichtbare Subset für eine Buchrolle. Cards ohne
 // `minRole` sind nur für editor+ sichtbar (defensive: kein impliziter Viewer).
-export function featuresVisibleFor(features, role) {
-  if (!role) return features.filter(f => !f.requiresBook && !f.requiresPages);
+// `buchtyp` (optional): blendet `requiresBuchtyp`-Cards aus, deren Typ nicht passt.
+export function featuresVisibleFor(features, role, buchtyp = null) {
+  const byBuchtyp = (f) => !f.requiresBuchtyp || f.requiresBuchtyp === buchtyp;
+  if (!role) return features.filter(f => !f.requiresBook && !f.requiresPages && byBuchtyp(f));
   return features.filter(f => {
     const min = f.minRole || 'editor';
-    return hasMinRole(role, min);
+    return hasMinRole(role, min) && byBuchtyp(f);
   });
 }

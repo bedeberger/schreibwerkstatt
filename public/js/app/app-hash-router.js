@@ -53,6 +53,7 @@ export const appHashRouterMethods = {
     else if (this.showEreignisseCard) parts.push('ereignisse');
     else if (this.showWorldFactsCard) parts.push('fakten');
     else if (this.showKontinuitaetCard) parts.push('kontinuitaet');
+    else if (this.showTagebuchRueckblickCard) parts.push('rueckblick');
     else if (this.showBookReviewCard) parts.push('bewertung');
     else if (this.showKapitelReviewCard) parts.push('kapitel');
     else if (this.showBookChatCard) parts.push('chat');
@@ -325,6 +326,10 @@ export const appHashRouterMethods = {
         case 'kontinuitaet':
           if (!this.showKontinuitaetCard) await this.toggleKontinuitaetCard();
           break;
+        case 'rueckblick':
+          if (!this.showTagebuchRueckblickCard) await this.toggleTagebuchRueckblickCard();
+          else this._scrollToCardByKey('tagebuchRueckblick');
+          break;
         case 'bewertung':
           if (!this.showBookReviewCard) await this.toggleBookReviewCard();
           break;
@@ -391,7 +396,7 @@ export const appHashRouterMethods = {
       'selectedBookId', 'currentPage', 'showEditorCard',
       'selectedFigurId', 'selectedOrtId', 'selectedSongId', 'selectedSzeneId',
       'showFiguresCard', 'showFigurWerkstattCard', 'showOrteCard', 'showSongsCard', 'showSzenenCard', 'showEreignisseCard', 'showWorldFactsCard',
-      'showKontinuitaetCard', 'showBookReviewCard', 'showBookChatCard',
+      'showKontinuitaetCard', 'showTagebuchRueckblickCard', 'showBookReviewCard', 'showBookChatCard',
       'showKapitelReviewCard', 'kapitelReviewChapterId',
       'werkstattDraftId',
       'showBookStatsCard', 'showStilCard', 'showFehlerHeatmapCard',

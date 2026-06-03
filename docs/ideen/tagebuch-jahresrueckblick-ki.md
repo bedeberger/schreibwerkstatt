@@ -1,6 +1,6 @@
 # KI-Jahres-/Monatsrückblick (Tagebuch)
 
-- **Status:** Draft <!-- Draft → Ready erst wenn „Offene Fragen" leer -->
+- **Status:** Umgesetzt (MVP)
 - **Aufwand:** L
 - **Severity:** medium <!-- Differenzierungsmerkmal für Buchtyp `tagebuch`, aber kein Kern-Workflow -->
 
@@ -169,7 +169,9 @@ Karte über `FEATURES`/`EXCLUSIVE_CARDS`-Eintrag entfernbar (verschwindet aus Pi
 
 ## Offene Fragen
 
-- Monats-Teilanalysen einzeln cachen (Delta-Cache pro Monat, spart Re-Analyse bei Jahres-Lauf nach Eintrag-Änderung) oder nur Endergebnis pro `zeitraum`? (Delta granularer, mehr Schema/Tabellen-Aufwand.)
-- Stimmungskurve-Datenmodell: liefert `tagebuch-stimmung-tags` Mood als eigene Tabelle/Spalte? Muss vor Phase 2 spezifiziert sein — Kurven-Achse (1 Wert/Tag vs. mehrere Tags/Tag) hängt davon ab.
-- Soll der Rückblick bei mehreren Autoren (Buch-ACL mit mehreren Editoren) pro User getrennt sein (Cache trägt `user_email`) oder buch-weit geteilt? Aktuell pro User angenommen.
-- Sprache des KI-Outputs: Buch-Locale oder UI-Locale des anfordernden Users?
+Alle für den MVP geklärt:
+
+- **Cache-Granularität:** nur Endergebnis pro `zeitraum` (Tabelle `tagebuch_rueckblick_cache`, PK inkl. `zeitraum`+`provider`). Kein Monats-Delta — Multi-Pass chunkt intern trotzdem nach Monat. Delta-Cache bleibt potenzielles Phase-2-Thema.
+- **Stimmungskurve:** out-of-scope (Phase 2, hängt an `tagebuch-stimmung-tags`).
+- **Cache pro User vs. buch-weit:** pro User (Cache-Key trägt `user_email`; Tagebuch ist persönlich).
+- **Output-Sprache:** Buch-Locale (via `getBookPrompts` → `SYSTEM_RUECKBLICK_BLOCKS`), konsistent mit Review/Komplettanalyse.

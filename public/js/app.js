@@ -36,6 +36,7 @@ import { szenenMethods } from './book/szenen.js';
 import { orteMethods } from './book/orte.js';
 import { songsMethods } from './book/songs.js';
 import { registerKontinuitaetCard } from './cards/kontinuitaet-card.js';
+import { registerTagebuchRueckblickCard } from './cards/tagebuch-rueckblick-card.js';
 import { registerBookSettingsCard } from './cards/book-settings-card.js';
 import { registerUserSettingsCard } from './cards/user-settings-card.js';
 import { registerAdminUsersCard } from './cards/admin-users-card.js';
@@ -283,6 +284,7 @@ document.addEventListener('alpine:init', () => {
   registerFolderImportCard();
   registerShareLinksCard();
   registerKontinuitaetCard();
+  registerTagebuchRueckblickCard();
   registerEreignisseCard();
   registerOrteCard();
   registerSongsCard();

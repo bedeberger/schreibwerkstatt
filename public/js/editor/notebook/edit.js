@@ -16,6 +16,7 @@ import { getActiveEditorContainer } from '../shared/active-editor.js';
 import { installEditCounter } from '../shared/edit-counter.js';
 import { writeNormalSnapshot, clearNormalSnapshot, readEditorPrefs, writeEditorPrefs } from './storage.js';
 import { runQuoteNormalize } from '../shared/quote-normalize.js';
+import { ensureTrailingParagraph } from '../shared/auto-slot.js';
 
 // Auto-Save nach BookStack: idle-debounce + max-Cap. Jede Schreibaktion
 // resettet den Idle-Timer; läuft der User durchgehend, greift der Max-Timer.
@@ -328,6 +329,15 @@ export const notebookEditMethods = {
       const lastBlock = el.lastElementChild;
       if (lastBlock && lastBlock.tagName === 'P' && !lastBlock.hasChildNodes()) {
         lastBlock.appendChild(document.createElement('br'));
+      } else if (lastBlock && lastBlock.tagName === 'HR') {
+        // Trailing <hr> ist ein void-Element ohne Caret-Slot. Endet die Seite
+        // damit, gibt es keinen Block, um dahinter weiterzuschreiben — ein
+        // Klick ans Seitenende landet vor der Linie. Folge-Absatz als
+        // Schreib-Anker ergänzen (gleicher Slot wie insertHorizontalRule).
+        // html-clean strippt das leere <p><br></p> beim nächsten Save wieder,
+        // und normalizeForCompare ignoriert es im Dirty-Vergleich → kein
+        // Persistenz- oder Falsch-Dirty-Effekt.
+        ensureTrailingParagraph(el);
       }
     }
     setTimeout(() => this._getEditEl()?.focus(), 0);

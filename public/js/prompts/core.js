@@ -125,6 +125,7 @@ function _buildLocalePrompts(localeConfig, globalErklaerungRule, buchKontext = '
   const SYS_ORTE_CORE             = buildSystem(sp.orte              || 'Du bist ein Literaturanalytiker. Du identifizierst Schauplätze und Orte präzise und konservativ – nur was im Text eindeutig belegt ist.', rules);
   const SYS_KONTINUITAET_CORE     = buildSystem(sp.kontinuitaet      || 'Du bist ein sorgfältiger Literaturlektor. Du prüfst einen Roman auf Kontinuitätsfehler und Widersprüche – Figuren, Zeitabläufe, Orte, Objekte und Charakterverhalten.', rules);
   const SYS_ZEITSTRAHL_CORE       = buildSystem(sp.zeitstrahl        || '', rules);
+  const SYS_RUECKBLICK_CORE       = buildSystem(sp.rueckblick        || 'Du bist ein aufmerksamer, einfühlsamer Beobachter. Du verdichtest datierte Tagebuch-Einträge rückblickend zu Themen, Personen, Orten und bemerkenswerten Tagen – ausschliesslich belegt, ohne zu werten und ohne den Tagebuchtext fortzuschreiben.', rules);
   // Komplett-Extraktion enthält das Schema; buchKontext fliesst in das Schema-Embedding ein,
   // bleibt aber für die _toCacheBlocks-Split-Logik separat sichtbar — der Core ist
   // bewusst der Builder-Output OHNE bookContextStr-Section (siehe getLocalePromptsForBook).
@@ -170,6 +171,10 @@ function _buildLocalePrompts(localeConfig, globalErklaerungRule, buchKontext = '
     SYSTEM_KONTINUITAET_BLOCKS:  _toCacheBlocks(SYS_KONTINUITAET_CORE, bookContextStr),
     SYSTEM_ZEITSTRAHL:           _aug(SYS_ZEITSTRAHL_CORE),
     SYSTEM_ZEITSTRAHL_BLOCKS:    _toCacheBlocks(SYS_ZEITSTRAHL_CORE, bookContextStr),
+    // Tagebuch-Rückblick: rückwärtsgewandte Verdichtung. Persona-Fallback wenn
+    // prompt-config.json keinen `rueckblick`-Slot liefert. Buch-Locale via baseRules.
+    SYSTEM_RUECKBLICK:           _aug(SYS_RUECKBLICK_CORE),
+    SYSTEM_RUECKBLICK_BLOCKS:    _toCacheBlocks(SYS_RUECKBLICK_CORE, bookContextStr),
     // Kombinierter System-Prompt für buildExtraktionKomplettChapterPrompt (P1+P5 merged).
     // Schema und Regeln sind im System-Prompt → werden gecacht; User-Message enthält nur Kapiteltext.
     SYSTEM_KOMPLETT_EXTRAKTION:        _aug(SYS_KOMPLETT_EXTRAKTION_CORE),

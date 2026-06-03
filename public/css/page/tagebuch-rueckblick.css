@@ -1,0 +1,100 @@
+/* Tagebuch-Rückblick-Karte. Akzent via var(--card-accent) (.card--tagebuchRueckblick
+   → card-accents.css). Badges eckig (--radius-sm). Mobile-Breakpoint im selben File. */
+
+.card--tagebuchRueckblick .rb-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.card--tagebuchRueckblick .rb-zeitraum {
+  min-width: 12rem;
+}
+
+.card--tagebuchRueckblick .rb-empty {
+  color: var(--color-muted);
+  padding: var(--space-md) 0;
+  font-size: var(--font-size-sm);
+}
+
+.card--tagebuchRueckblick .rb-section {
+  margin-top: var(--space-lg);
+}
+
+.card--tagebuchRueckblick .rb-summary p {
+  margin: 0 0 var(--space-sm);
+  line-height: 1.6;
+}
+
+.card--tagebuchRueckblick .rb-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs, var(--space-2xs));
+}
+
+.card--tagebuchRueckblick .rb-theme,
+.card--tagebuchRueckblick .rb-entity {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  padding: var(--space-2xs) var(--space-sm);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--card-accent);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  font-size: var(--font-size-sm);
+}
+
+.card--tagebuchRueckblick .rb-count {
+  min-width: 1.4em;
+  padding: 0 var(--space-2xs);
+  border-radius: var(--radius-sm);
+  background: var(--color-hover);
+  color: var(--color-muted);
+  font-size: var(--font-size-xs);
+  text-align: center;
+}
+
+.card--tagebuchRueckblick .rb-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-lg);
+}
+
+.card--tagebuchRueckblick .rb-tage {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs, var(--space-2xs));
+}
+
+.card--tagebuchRueckblick .rb-tag-item {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: baseline;
+}
+
+.card--tagebuchRueckblick .rb-tag-datum {
+  flex: 0 0 auto;
+  color: var(--card-accent);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.card--tagebuchRueckblick .rb-tag-datum:hover {
+  text-decoration: underline;
+}
+
+.card--tagebuchRueckblick .rb-tag-text {
+  color: var(--color-text);
+}
+
+@media (max-width: 720px) {
+  .card--tagebuchRueckblick .rb-cols {
+    grid-template-columns: 1fr;
+  }
+}

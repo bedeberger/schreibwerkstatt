@@ -139,6 +139,7 @@ export function registerPaletteCard() {
         selectedBookId: root.selectedBookId,
         pages: root.pages,
         bookRole: root.currentBookRole || null,
+        buchtyp: (typeof root.currentBuchtyp === 'function' ? root.currentBuchtyp() : null) || null,
       };
     },
 
@@ -152,6 +153,7 @@ export function registerPaletteCard() {
         this.paletteQuery,
         ctx.selectedBookId || '',
         ctx.bookRole || '',
+        ctx.buchtyp || '',
         ctx.backend || '',
         (ctx.pages || []).length,
         (root.figuren || []).length,
@@ -179,8 +181,8 @@ export function registerPaletteCard() {
       // FEATURES unverändert lassen — Cards mit `requiresBook` sind dann eh
       // disabled.
       const visibleFeatures = ctx.bookRole
-        ? featuresVisibleFor(FEATURES, ctx.bookRole)
-        : FEATURES;
+        ? featuresVisibleFor(FEATURES, ctx.bookRole, ctx.buchtyp)
+        : FEATURES.filter(f => !f.requiresBuchtyp || f.requiresBuchtyp === ctx.buchtyp);
 
       // Provider-Modus: nur dieser eine Provider.
       if (parsed.mode === 'provider') {

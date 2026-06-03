@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 173, 90 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 174, 91 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -49,6 +49,7 @@ erDiagram
   books ||--o{ chapter_review_cache  : has
   books ||--o{ book_review_cache     : has
   books ||--o{ chapter_macro_review_cache : has
+  books ||--o{ tagebuch_rueckblick_cache : has
   books ||--o{ lektorat_cache        : has
   books ||--o{ finetune_ai_cache     : has
   books ||--o{ draft_figures         : has
@@ -801,6 +802,15 @@ erDiagram
     TEXT    pages_sig
     TEXT    review_json
     TEXT    cached_at
+  }
+  tagebuch_rueckblick_cache {
+    INTEGER book_id      PK,FK
+    TEXT    user_email   PK
+    TEXT    zeitraum     PK
+    TEXT    provider     PK
+    TEXT    pages_sig
+    TEXT    result_json
+    TEXT    created_at
   }
   synonym_cache {
     TEXT    user_email   PK

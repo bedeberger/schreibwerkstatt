@@ -47,14 +47,26 @@ test('featuresVisibleFor(lektor): viewer-Set (lektor hat keine zusätzlichen FEA
   for (const k of viewerSet) assert.ok(lektorSet.has(k), `${k} fehlt bei lektor`);
 });
 
-test('featuresVisibleFor(editor): alle FEATURES', () => {
+// `requiresBuchtyp`-Karten sind nur sichtbar, wenn der Buchtyp passt — auch für
+// editor/owner. Ohne passenden Buchtyp fallen sie raus.
+test('featuresVisibleFor(editor, buchtyp=tagebuch): alle FEATURES', () => {
   const all = FEATURES.map(f => f.key).sort();
-  const visible = featuresVisibleFor(FEATURES, 'editor').map(f => f.key).sort();
+  const visible = featuresVisibleFor(FEATURES, 'editor', 'tagebuch').map(f => f.key).sort();
   assert.deepEqual(visible, all);
 });
 
-test('featuresVisibleFor(owner): alle FEATURES', () => {
+test('featuresVisibleFor(owner, buchtyp=tagebuch): alle FEATURES', () => {
   const all = FEATURES.map(f => f.key).sort();
-  const visible = featuresVisibleFor(FEATURES, 'owner').map(f => f.key).sort();
+  const visible = featuresVisibleFor(FEATURES, 'owner', 'tagebuch').map(f => f.key).sort();
   assert.deepEqual(visible, all);
+});
+
+test('featuresVisibleFor(editor) ohne passenden Buchtyp blendet requiresBuchtyp-Karten aus', () => {
+  const gated = FEATURES.filter(f => f.requiresBuchtyp).map(f => f.key);
+  assert.ok(gated.includes('tagebuchRueckblick'), 'Test-Voraussetzung: gated Card existiert');
+  const visibleNoBuchtyp = new Set(featuresVisibleFor(FEATURES, 'editor').map(f => f.key));
+  for (const k of gated) assert.ok(!visibleNoBuchtyp.has(k), `${k} darf ohne passenden Buchtyp nicht sichtbar sein`);
+  // Mit passendem Buchtyp wieder sichtbar.
+  const visibleTagebuch = new Set(featuresVisibleFor(FEATURES, 'editor', 'tagebuch').map(f => f.key));
+  assert.ok(visibleTagebuch.has('tagebuchRueckblick'));
 });
