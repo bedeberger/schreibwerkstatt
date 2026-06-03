@@ -108,9 +108,9 @@
           <span class="rb-history-zeitraum" x-text="zeitraumLabel(entry.zeitraum)"></span>
           <span class="history-date" x-text="rueckblickEntryDate(entry.created_at)"></span>
           <span class="tag" x-show="entry.model" x-text="entry.model"></span>
-          <button type="button" class="btn-delete-history" @click.stop="deleteRueckblickHistory(entry.id)"
+          <button type="button" class="history-item-delete" @click.stop="deleteRueckblickHistory(entry.id)"
                   :data-tip="$app.t('common.deleteEntry')" :aria-label="$app.t('common.deleteEntry')">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg#trash-2"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg>
           </button>
         </div>
       </div>

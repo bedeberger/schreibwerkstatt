@@ -17,7 +17,8 @@ Für den Buchtyp `tagebuch` fehlt eine rückwärtsgewandte Verdichtung: Wer ein 
 - Map-Reduce-Chunking über Monate, wenn Zeitraum > `SINGLE_PASS_LIMIT` (siehe Backend).
 - Anzeige in der Karte: Zusammenfassungs-Text + Themen-/Personen-/Orte-Listen + bemerkenswerte Tage als anklickbare Links zur Seite (`gotoStelle`/`selectPage`).
 - Halluzinations-Constraint im Prompt: nur belegte Aussagen, jedes Thema/jeder Tag mit Datums-Beleg; keine erfundenen Ereignisse.
-- Cache pro `(book_id, user_email, zeitraum, provider, cacheVersion)` analog Review-Caches.
+- Cache pro `(book_id, user_email, zeitraum, provider, cacheVersion)` analog Review-Caches (evictbar, TTL).
+- **History (dauerhaft):** jeder „Erstellen"-Lauf (auch Cache-HIT) schreibt eine Zeile in `tagebuch_rueckblicke` (analog `book_reviews`). Die Karte zeigt einen „Frühere Rückblicke"-Block (Zeitraum-Label + Datum + Modell); Klick lädt den gespeicherten Rückblick zurück in die Anzeige (kein neuer KI-Call), pro Eintrag löschbar. Bewusst **nicht** im cache-cleanup-TTL (sonst verschwinden alte Rückblicke).
 
 ## Out-of-Scope
 
@@ -34,6 +35,7 @@ Für den Buchtyp `tagebuch` fehlt eine rückwärtsgewandte Verdichtung: Wer ein 
 - Ergebnis nennt nur belegte Themen/Personen/Orte/Tage mit Datums-Beleg; kein Buchtext wird verändert (verifizierbar: keine `content-store`-Write-Calls im Job-Pfad).
 - Zweiter identischer Lauf trifft den Cache (kein KI-Call, Log „Cache-HIT").
 - Ein-Jahr-Buch mit vielen Einträgen läuft über Map-Reduce ohne Token-Überlauf durch.
+- Jeder Lauf erscheint im „Frühere Rückblicke"-Block; ein Klick auf einen historischen Eintrag zeigt ihn ohne KI-Call wieder an; Löschen entfernt ihn.
 
 ## Hard-Rule-Audit
 
@@ -82,7 +84,8 @@ Für den Buchtyp `tagebuch` fehlt eine rückwärtsgewandte Verdichtung: Wer ein 
 - **Card-Recipe:** `FEATURES` + `EXCLUSIVE_CARDS` in [feature-registry.js](../../public/js/cards/feature-registry.js) (`{ key: 'tagebuchRueckblick', flag: 'showTagebuchRueckblickCard' }`, gated via `buchtyp === 'tagebuch'`); `ALLOWED_KEYS` in [routes/usage.js](../../routes/usage.js); Hash-Router-Branch in [app-hash-router.js](../../public/js/app/app-hash-router.js); `toggleTagebuchRueckblickCard()` in [app-view.js](../../public/js/app/app-view.js) (Flag-Toggle + `_closeOtherMainCards`).
 - **Zeitraum-Auswahl:** Combobox (`Alpine.data('combobox')`), Optionen aus den vorhandenen Eintrags-Datümern berechnet (Monate + Jahre).
 - **Job-Polling:** via `startPoll` aus [job-helpers.js](../../public/js/cards/job-helpers.js) bzw. `createCardJobFeature`. `onDone` rendert Ergebnis; `book:changed`/`view:reset` resetten State; `job:reconnect` übernimmt laufenden Job.
-- **Rendering:** KI-Felder via `escHtml()`; bemerkenswerte Tage als `.internal-link` zu `selectPage`.
+- **Rendering:** KI-Felder via `x-text` (auto-escaped); bemerkenswerte Tage als `.internal-link` zu `selectPage`.
+- **History-Block:** `loadRueckblickHistory()` (GET `/history/rueckblick/:bookId`) in `onOpen` + nach `onDone`; `openRueckblickHistory(entry)` lädt `result_json` ohne KI-Call zurück in die Anzeige (+ setzt `zeitraum`); `deleteRueckblickHistory(id)` (DELETE) entfernt lokal. Wiederverwendet `.card-history-section`/`.history-item`/`.history-date`-Pattern (DESIGN.md).
 
 ## CSS
 
@@ -111,6 +114,23 @@ CREATE INDEX idx_tagebuch_rueckblick_book ON tagebuch_rueckblick_cache(book_id);
 ```
 
 `provider` im PK gegen Cross-Provider-Bleeding (Muster bestehender Caches). Migration endet mit `foreign_key_check` + `UPDATE schema_version`. Danach `npm run squash:regen` + [docs/erd.md](../erd.md) bumpen (Cache-Block + FK-Kante in Section 1, thematisches Sub-Diagramm Caches).
+
+**History-Tabelle** (Migration 175) — dauerhaft, analog `book_reviews`:
+
+```sql
+CREATE TABLE IF NOT EXISTS tagebuch_rueckblicke (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  book_id     INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+  user_email  TEXT NOT NULL,
+  zeitraum    TEXT NOT NULL,
+  result_json TEXT NOT NULL,
+  model       TEXT,
+  created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX idx_tagebuch_rueckblicke_book ON tagebuch_rueckblicke(book_id, user_email);
+```
+
+Bewusst **nicht** in `lib/cache-cleanup.js` POLICIES (wie `book_reviews` dauerhaft). Endpoints: `GET /history/rueckblick/:book_id` (letzte 20), `DELETE /history/rueckblick/:id` ([routes/history.js](../../routes/history.js)); zusätzlich im Buch-History-Reset (`DELETE /history/book/:book_id`) mitgelöscht. DB-Helper `insertRueckblick`/`listRueckblicke`/`deleteRueckblick` in [db/schema.js](../../db/schema.js).
 
 ## Security
 
@@ -144,6 +164,7 @@ Karte über `FEATURES`/`EXCLUSIVE_CARDS`-Eintrag entfernbar (verschwindet aus Pi
 
 - **Modify:**
   - [routes/jobs.js](../../routes/jobs.js) (Router-Mount)
+  - [routes/history.js](../../routes/history.js) (GET/DELETE `/history/rueckblick`, Buch-Reset)
   - [public/js/prompts.js](../../public/js/prompts.js) (Facade-Re-Export + `_promptsContentHash`)
   - [public/js/cards/feature-registry.js](../../public/js/cards/feature-registry.js) (`FEATURES` + `EXCLUSIVE_CARDS`)
   - [routes/usage.js](../../routes/usage.js) (`ALLOWED_KEYS`)
