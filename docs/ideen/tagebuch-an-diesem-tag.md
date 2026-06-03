@@ -1,4 +1,7 @@
-# Rückblick „Vor einem Jahr heute"
+# „An diesem Tag" — Vorjahres-Rückblick (non-KI)
+
+<!-- Nicht verwechseln mit dem bereits umgesetzten KI-Monats/Jahresrückblick (`routes/jobs/rueckblick.js`, Karte `tagebuch-rueckblick-card.js`). Dieser Plan ist das rein clientseitige, KI-freie „vor einem Jahr heute"-Resurfacing. -->
+
 
 - **Status:** Draft <!-- Draft → Ready erst wenn „Offene Fragen" leer -->
 - **Aufwand:** S
@@ -10,9 +13,9 @@ Tagebuchschreiben lebt vom Wiederbegegnen: „Was habe ich heute vor einem Jahr 
 
 Das Feature passt strikt zur App-Philosophie (KI rückwärtsgewandt, nie generativ in den Buchtext): es ist rein lesend, schreibt nichts, ruft kein Modell. Es nutzt ausschliesslich bereits geladene Daten und einen vorhandenen Cache.
 
-Dieser Plan ist die **einzige Heimat** des nicht-KI-Rückblicks „vor einem Jahr heute". Die ursprünglich im Overview-Plan skizzierte „An diesem Tag"-Kachel wurde bewusst hierher konsolidiert (eine Resurfacing-Logik, ein Surface) — siehe [tagebuch-overview-kacheln.md](tagebuch-overview-kacheln.md), das nur noch Lücken & Konsistenz + Wochentag-Rhythmus enthält.
+Dieser Plan ist die **einzige Heimat** des nicht-KI-Rückblicks „vor einem Jahr heute". Die ursprünglich im Overview-Plan skizzierte „An diesem Tag"-Kachel wurde bewusst hierher konsolidiert (eine Resurfacing-Logik, ein Surface) — siehe [tagebuch-overview-kacheln.md](tagebuch-overview-kacheln.md), das Lücken & Konsistenz, Wochentag-Rhythmus + Rückblick-Heatmap enthält.
 
-Geschwister-Pläne der Tagebuch-Linie: [tagebuch-heute-eintrag.md](tagebuch-heute-eintrag.md), [tagebuch-overview-kacheln.md](tagebuch-overview-kacheln.md), [tagebuch-stimmung-tags.md](tagebuch-stimmung-tags.md), [tagebuch-erinnerung.md](tagebuch-erinnerung.md), [tagebuch-jahresrueckblick-ki.md](tagebuch-jahresrueckblick-ki.md), [tagebuch-fotos.md](tagebuch-fotos.md).
+Geschwister-Pläne der Tagebuch-Linie: [tagebuch-heute-eintrag.md](tagebuch-heute-eintrag.md), [tagebuch-overview-kacheln.md](tagebuch-overview-kacheln.md), [tagebuch-stimmung-tags.md](tagebuch-stimmung-tags.md), [tagebuch-erinnerung.md](tagebuch-erinnerung.md). Der KI-Monats/Jahresrückblick ist bereits **umgesetzt** (`routes/jobs/rueckblick.js`).
 
 ## Scope MVP
 
@@ -25,7 +28,7 @@ Geschwister-Pläne der Tagebuch-Linie: [tagebuch-heute-eintrag.md](tagebuch-heut
 
 ## Out-of-Scope
 
-- Jede KI-Auswertung (Zusammenfassung, Stimmungsverlauf, „Jahresrückblick") — separat in [tagebuch-jahresrueckblick-ki.md](tagebuch-jahresrueckblick-ki.md).
+- Jede KI-Auswertung (Zusammenfassung, Stimmungsverlauf, „Jahresrückblick") — der KI-Monats/Jahresrückblick ist bereits umgesetzt (`routes/jobs/rueckblick.js`), dieses Feature ist bewusst KI-frei.
 - Push/E-Mail-Benachrichtigung „dein Rückblick ist da" — separat in [tagebuch-erinnerung.md](tagebuch-erinnerung.md).
 - Volltext-Datumsfilter im FTS5-Index (`lib/search.js` bleibt unberührt — sein `query()` hat bewusst keinen Datumsparameter).
 - Rückblick für Nicht-Tagebuch-Bücher (kein `YYYY-MM-DD`-Namensvertrag).

@@ -12,7 +12,7 @@ Dieses Feature ergänzt pro Tagebuch-Seite zwei leichte, **vom User selbst geset
 - **Stimmung (Mood):** eine feste 5-stufige Skala (Emoji + i18n-Label).
 - **Tags/Themen:** mehrfach, leichtgewichtig, frei wählbar (z.B. „Arbeit", „Familie", „Schlaf").
 
-Es ist die Datengrundlage für spätere Auswertungen (Stimmungskurve, Themen-Häufung) — explizit für `tagebuch-jahresrueckblick-ki.md`. **App-Philosophie:** Mood/Tags sind reine User-Eingabe, kein KI-Generat (KI bleibt rückwärtsgewandt/auswertend).
+Es ist die Datengrundlage für spätere Auswertungen (Stimmungskurve, Themen-Häufung) — insbesondere als Phase-2-Erweiterung des bereits umgesetzten KI-Monats/Jahresrückblicks (`routes/jobs/rueckblick.js`). **App-Philosophie:** Mood/Tags sind reine User-Eingabe, kein KI-Generat (KI bleibt rückwärtsgewandt/auswertend).
 
 ## Scope MVP
 
@@ -24,7 +24,7 @@ Es ist die Datengrundlage für spätere Auswertungen (Stimmungskurve, Themen-Hä
 
 ## Out-of-Scope
 
-- Stimmungskurve / Themen-Diagramme / KI-Auswertung → eigene Pläne (`tagebuch-jahresrueckblick-ki.md`, `tagebuch-rueckblick.md`).
+- Stimmungskurve / Themen-Diagramme / KI-Auswertung → umgesetzter KI-Monats/Jahresrückblick (`routes/jobs/rueckblick.js`) bzw. [tagebuch-an-diesem-tag.md](tagebuch-an-diesem-tag.md).
 - Mood/Tags in anderen Buchtypen als `tagebuch`.
 - Tags in Focus-Editor und Bucheditor (MVP nur Notebook-Editor).
 - Tag-Hierarchien, Tag-Farben, Tag-Umbenennen-über-alle-Seiten (Phase 2).
@@ -56,8 +56,8 @@ Es ist die Datengrundlage für spätere Auswertungen (Stimmungskurve, Themen-Hä
 
 ## Abhängigkeiten
 
-- **Voraussetzung für** `tagebuch-jahresrueckblick-ki.md` (Stimmungskurve + Themen-Häufung lesen `journal_mood`/`journal_tags`) — dort als Dependency benennen.
-- Geschwister-Pläne `tagebuch-heute-eintrag.md`, `tagebuch-rueckblick.md`, `tagebuch-erinnerung.md`, `tagebuch-fotos.md`: kein harter Konflikt; ggf. gemeinsame Tagebuch-Editor-Kopfzeile (Koordination).
+- **Voraussetzung für** die Stimmungskurve-Phase-2 des umgesetzten KI-Monats/Jahresrückblicks (`routes/jobs/rueckblick.js` liest dann `journal_mood`/`journal_tags`).
+- Geschwister-Pläne [tagebuch-heute-eintrag.md](tagebuch-heute-eintrag.md), [tagebuch-an-diesem-tag.md](tagebuch-an-diesem-tag.md), [tagebuch-erinnerung.md](tagebuch-erinnerung.md): kein harter Konflikt; ggf. gemeinsame Tagebuch-Editor-Kopfzeile (Koordination).
 - Buchtyp-Erkennung: `books`-Buchtyp / BookSettings (`routes/booksettings.js`) liefert das `tagebuch`-Flag fürs konditionale Einblenden.
 
 ## Backend
@@ -186,4 +186,4 @@ n/a — kein neuer `/metrics`-Counter im MVP. (Optional Phase 2: Anteil Tagebuch
 - `book_id`-Spalte in `journal_tags` behalten (Distinct-Query ohne JOIN) oder weglassen und über `pages.book_id` joinen? Entscheidung mit Blick auf erd-drift/Snapshot-Regel.
 - Mood-Skala: 5-stufig Emoji (vorgeschlagen) vs. feinere Skala — Festlegung der konkreten Emoji + Labels mit dem User.
 - Tag-Caps (Länge/Anzahl pro Seite) konkrete Werte bestätigen.
-- Gemeinsame Tagebuch-Editor-Kopfzeile mit Geschwister-Plänen (`tagebuch-heute-eintrag.md`, `tagebuch-fotos.md`) koordinieren — eigenes Modul oder gemeinsamer Container?
+- Gemeinsame Tagebuch-Editor-Kopfzeile mit Geschwister-Plan `tagebuch-heute-eintrag.md` koordinieren — eigenes Modul oder gemeinsamer Container?

@@ -12,7 +12,7 @@ Quellen sind konzeptionell **„bessere Ideen"**: dasselbe Recherche-/Erarbeitun
 
 Passt zur Produkt-Philosophie „KI rückwärtsgewandt" ([user_app_philosophy]): Quellen sind reine **Autoren-Inputs**, kein KI-Material. Im MVP **kein** `callAI` auf Quellen (PDF-Volltext → Weltaufbau-Kontext wäre eine spätere, bewusst separate Phase).
 
-Bezug zum bestehenden Code: das Schwester-Feature `ideen` (`routes/ideen.js`, `public/js/cards/ideen-card.js`, Side-Panel im `editor-chat-wrap`-Mutex-Slot) liefert das 1:1-Vorbild für Scope, Toggle, User-Isolation und Panel-Layout. Die BLOB-/Upload-/sharp-Härtungs-Bausteine kommen aus `lib/cover-prepare.js` und dem Plan `tagebuch-fotos.md`.
+Bezug zum bestehenden Code: das Schwester-Feature `ideen` (`routes/ideen.js`, `public/js/cards/ideen-card.js`, Side-Panel im `editor-chat-wrap`-Mutex-Slot) liefert das 1:1-Vorbild für Scope, Toggle, User-Isolation und Panel-Layout. Die BLOB-/Upload-/sharp-Härtungs-Bausteine kommen aus `lib/cover-prepare.js`.
 
 ## Scope MVP
 
@@ -36,7 +36,7 @@ Bezug zum bestehenden Code: das Schwester-Feature `ideen` (`routes/ideen.js`, `p
 - **PDF-Volltext-Suche (FTS5)** — Phase 2. MVP indiziert nur Titel/Notiz im normalen Such-Index (optional, siehe Offene Fragen).
 - **PDF-Thumbnail-Render** — MVP zeigt generisches PDF-Icon, kein erste-Seite-Rendering.
 - **Drag&Drop / Paste-Upload** — Phase 2. MVP: expliziter Datei-Dialog (wie Cover-Upload).
-- **Quellen-Einbettung in den Buchtext** (`<img>`/Link ins `body_html`) — das ist explizit das Feature `tagebuch-fotos.md` (Bild *im* Eintrag). Quellen sind **daneben**, kein Editor-Content, fliessen **nicht** in Export/`.swbook`-Buchinhalt.
+- **Quellen-Einbettung in den Buchtext** (`<img>`/Link ins `body_html`) — dauerhaft ausgeschlossen. Quellen sind **daneben**, kein Editor-Content, fliessen **nicht** in Export/`.swbook`-Buchinhalt.
 - **Versionierung/Revisions** von Quellen — keine. Anders als Page-Body.
 - **Mehrfach-Upload pro Aktion** — Phase 2. MVP: eine Datei pro Upload.
 - **Bild-Editing (Crop/Rotate im Browser)** — Phase 2. MVP rotiert nur via EXIF-Orientation serverseitig.
@@ -77,12 +77,11 @@ Bezug zum bestehenden Code: das Schwester-Feature `ideen` (`routes/ideen.js`, `p
 ## Abhängigkeiten
 
 - `routes/ideen.js` + `public/js/cards/ideen-card.js` + `public/js/book/ideen.js` — Vorbild für Scope-Modell, Toggle (`toggleIdeenCard`/`toggleChapterIdeenCard` in `app-view.js`), User-Isolation, Panel-Mutex im Editor-Slot, Counts.
-- `lib/cover-prepare.js` — sharp-Härtung (Magic-Bytes, sRGB, kein Alpha, Resize); Vorlage/geteilter Baustein für Foto-Verarbeitung (`prepareInlinePhoto` aus `tagebuch-fotos.md` wiederverwendbar, falls dort schon gebaut).
+- `lib/cover-prepare.js` — sharp-Härtung (Magic-Bytes, sRGB, kein Alpha, Resize); Vorlage für die Foto-Verarbeitung dieses Plans.
 - `lib/acl.js` — `requireBookAccess(editor)` für Schreiben, `(viewer)` für File-Auslieferung.
 - `lib/app-settings.js` — neues Setting `quellen.max_bytes`.
 - `db/pdf-export.js` — Vorlage für BLOB-CRUD-Layer.
 - `public/js/editor/notebook/toolbar.js` (bzw. `partials/editor-notebook.html`) — neuer Toolbar-Button neben Ideen/Chat.
-- `tagebuch-fotos.md` — Schwester-Plan; teilt Foto-Härtungs-/BLOB-Bausteine, ist aber funktional disjunkt (Bild *im* Text vs. Quelle *daneben*).
 
 ## Backend
 
@@ -99,7 +98,7 @@ Neuer DB-Layer `db/quellen.js`: `insertQuelle`, `getQuelle`, `getQuelleFile` (BL
 
 **Such-Index:** Schreibpfade rufen die FTS-Hooks aus `lib/search.js` (analog `routes/ideen.js`, das `searchIndex` importiert) — Insert/Update/Delete halten den `quelle`-Eintrag (Titel) synchron. Neuer `kind = 'quelle'` im Index + `_runFulltextHit`-Branch in `public/js/cards/palette-providers.js`.
 
-Foto-Härtung: `prepareInlinePhoto(buffer)` aus neuer `lib/photo-prepare.js` (geteilt mit `tagebuch-fotos.md`; falls jener Plan sie schon angelegt hat → wiederverwenden, sonst hier neu) — EXIF-Strip via `.withMetadata({ icc: 'srgb' })`, kein Portrait-Crop.
+Foto-Härtung: `prepareInlinePhoto(buffer)` aus neuer `lib/photo-prepare.js` — EXIF-Strip via `.withMetadata({ icc: 'srgb' })`, kein Portrait-Crop.
 
 **Speicher: BLOB-in-SQLite + konfigurierbarer Size-Cap (entschieden).** Konsistent mit `pdf_export_profile.cover_image`; FK-CASCADE/SET-NULL räumt automatisch ab; ein-File-Backup. Kosten offen benannt: DB wächst (PDFs sind grösser als Fotos) → konfigurierbarer Cap + kein Original-Behalt; FS-Migration ist Phase-2-Pfad bei absehbar grossen Beständen.
 
@@ -189,7 +188,7 @@ CREATE INDEX IF NOT EXISTS idx_quellen_user_email ON quellen(user_email);
 ## Reversibilität
 
 - **Kill-Switch:** App-Setting `quellen.enabled` (analog `stt.enabled`) — aus → Toolbar-Button + Buch-weit-Einstieg verschwinden, Routes liefern `403`. Bestehende Quellen bleiben in der DB.
-- **Daten-Rückbau:** `quellen`-Tabelle via Migration droppbar; da Quellen **nicht** im `body_html` referenziert sind (kein Editor-Content), entstehen **keine** Broken-Links im Buchtext beim Ausbau — sauberer Rückbau als bei `tagebuch-fotos`.
+- **Daten-Rückbau:** `quellen`-Tabelle via Migration droppbar; da Quellen **nicht** im `body_html` referenziert sind (kein Editor-Content), entstehen **keine** Broken-Links im Buchtext beim Ausbau.
 - BLOB-Storage auf FS migrierbar (Phase 2), URL-Schema `/quellen/:id/file` bleibt stabil.
 
 ## Tests
@@ -211,7 +210,7 @@ CREATE INDEX IF NOT EXISTS idx_quellen_user_email ON quellen(user_email);
 - **Korruptes Bild** → sharp `failOn:'error'` → `400 QUELLE_UNSUPPORTED`.
 - **Link mit Tracking-/sehr langer URL** → kein Limit-Problem (TEXT), aber URL-Schema-Gate greift.
 - **Gleiches PDF mehrfach hochgeladen** → keine Dedup (MVP), jede Quelle eigene Row. Akzeptiert.
-- **Quelle im Share-Link** → Quellen sind privat (Recherche), erscheinen **nicht** in der öffentlichen Reader-View. Kein token-Pfad nötig (anders als `tagebuch-fotos`).
+- **Quelle im Share-Link** → Quellen sind privat (Recherche), erscheinen **nicht** in der öffentlichen Reader-View. Kein token-Pfad nötig.
 - **Palette-Treffer auf buch-weite (verwaiste) Quelle** → FTS-Hit auf Titel ohne page/chapter → `run()` öffnet die Datei direkt (kein Navigations-Ziel). Defensiv behandeln.
 
 ## Kritische Dateien
@@ -221,7 +220,7 @@ CREATE INDEX IF NOT EXISTS idx_quellen_user_email ON quellen(user_email);
   - `db/migrations.js` — Migration 174 (`quellen`).
   - `db/squashed-schema.js` — via `npm run squash:regen`.
   - `docs/erd.md` — Stand-Zeile + `quellen`-Block + FK-Kanten.
-  - `lib/photo-prepare.js` — Foto-Härtung mit EXIF-Strip (neu **oder** geteilt mit `tagebuch-fotos.md`, falls dort schon angelegt → wiederverwenden statt duplizieren).
+  - `lib/photo-prepare.js` — Foto-Härtung mit EXIF-Strip (neu).
   - `lib/app-settings.js` — Setting `quellen.max_bytes` + `quellen.enabled`.
   - `lib/search.js` — `kind='quelle'`-Index-Hooks (insert/update/delete).
   - `routes/admin/settings.js` (bzw. der Admin-Settings-Router) — `quellen.max_bytes`-Feld.
@@ -243,7 +242,7 @@ CREATE INDEX IF NOT EXISTS idx_quellen_user_email ON quellen(user_email);
   - `public/js/cards/quellen-card.js` — Alpine-Sub-Komponente.
   - `public/partials/quellen.html` — Panel-Markup.
   - `public/css/entities/quellen.css` — Panel-Styles + Mobile.
-  - `tests/unit/quellen-db.test.mjs`, `tests/unit/photo-prepare.test.mjs` (falls noch nicht aus `tagebuch-fotos` da).
+  - `tests/unit/quellen-db.test.mjs`, `tests/unit/photo-prepare.test.mjs`.
   - `tests/integration/quellen.test.js`.
   - `tests/e2e/quellen.spec.js`.
 
@@ -258,6 +257,6 @@ _Keine offenen Fragen — alle Forks entschieden (siehe Entscheidungs-Log unten)
 - **Such-Index:** Titel **ja** (FTS5 + Palette-Kategorie „Anhänge", Prefix `&`); Notiz nein.
 - **PDF-Auslieferung:** Download (`Content-Disposition: attachment`).
 - **Max-Bytes:** konfigurierbar via App-Setting `quellen.max_bytes` (Admin-Tab), Default 10 MB, ein Wert für alle Typen (nicht typ-spezifisch).
-- **Foto-Härtung:** `lib/photo-prepare.js`, geteilt mit `tagebuch-fotos.md` falls dort schon vorhanden.
+- **Foto-Härtung:** `lib/photo-prepare.js`.
 
 **Minor (Implementierungs-Detail, kein Blocker):** finaler Palette-Prefix-Char (`&` vorgeschlagen) — falls `&` in einer Locale-Eingabe stört, Alternative `~`.

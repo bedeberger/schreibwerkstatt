@@ -27,7 +27,7 @@ Dieser Plan dokumentiert daher (a) den IST-Stand des Quick-Entry zur Referenz un
 - KI-generierte oder kontextabhängige Impulse (verstößt gegen App-Philosophie „KI nie generativ in den Buchtext"). Dauerhaft ausgeschlossen.
 - Impuls im Focus-Editor oder Bucheditor — nur Notebook-Editor (Tagebuch-Workflow läuft über die Kalender-Sidebar + Notebook-Edit).
 - User-pflegbarer/eigener Impuls-Pool, Impuls-Kategorien, Häufigkeits-Steuerung → ggf. Phase 2.
-- Stimmungs-Tags ([tagebuch-stimmung-tags.md](tagebuch-stimmung-tags.md)), Rückblick-Features ([tagebuch-rueckblick.md](tagebuch-rueckblick.md), [tagebuch-jahresrueckblick-ki.md](tagebuch-jahresrueckblick-ki.md), [tagebuch-erinnerung.md](tagebuch-erinnerung.md)), Fotos ([tagebuch-fotos.md](tagebuch-fotos.md)).
+- Stimmungs-Tags ([tagebuch-stimmung-tags.md](tagebuch-stimmung-tags.md)), Rückblick-Features ([tagebuch-an-diesem-tag.md](tagebuch-an-diesem-tag.md), [tagebuch-erinnerung.md](tagebuch-erinnerung.md); KI-Monats/Jahresrückblick bereits umgesetzt).
 
 ## Done when
 
@@ -55,7 +55,7 @@ Dieser Plan dokumentiert daher (a) den IST-Stand des Quick-Entry zur Referenz un
 - Bestehende Kalender-Sidebar + `_createDiaryEntry`-Pipeline ([public/js/book/diary-calendar.js](../../public/js/book/diary-calendar.js)) — IST, Voraussetzung.
 - `localIsoDate()` (TZ-aware, [public/js/utils.js](../../public/js/utils.js):152) für „heute" + deterministische Impuls-Auswahl pro Datum.
 - Notebook-Editor-Edit-View ([public/js/editor/notebook/edit.js](../../public/js/editor/notebook/edit.js)) — Andock-Punkt für die Anzeige.
-- Keine harte Abhängigkeit zu den Geschwister-Plänen ([tagebuch-stimmung-tags.md](tagebuch-stimmung-tags.md), [tagebuch-rueckblick.md](tagebuch-rueckblick.md), [tagebuch-erinnerung.md](tagebuch-erinnerung.md), [tagebuch-jahresrueckblick-ki.md](tagebuch-jahresrueckblick-ki.md), [tagebuch-fotos.md](tagebuch-fotos.md)); Stimmungs-Tags könnten denselben „leerer-Eintrag"-Hook nutzen — bei paralleler Umsetzung Banner-Layout koordinieren.
+- Keine harte Abhängigkeit zu den Geschwister-Plänen ([tagebuch-stimmung-tags.md](tagebuch-stimmung-tags.md), [tagebuch-an-diesem-tag.md](tagebuch-an-diesem-tag.md), [tagebuch-erinnerung.md](tagebuch-erinnerung.md)); Stimmungs-Tags könnten denselben „leerer-Eintrag"-Hook nutzen — bei paralleler Umsetzung Banner-Layout koordinieren.
 
 ## Backend
 
