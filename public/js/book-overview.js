@@ -34,10 +34,12 @@ import { songsMethods as overviewSongsMethods } from './book-overview/songs.js';
 import { kapitelMethods } from './book-overview/kapitel.js';
 import { recentMethods } from './book-overview/recent.js';
 import { formatMethods } from './book-overview/format.js';
+import { diaryMethods } from './book-overview/diary.js';
 
 export const bookOverviewMethods = {
   ...loadMethods,
   ...statsMethods,
+  ...diaryMethods,
   ...coverageMethods,
   ...reviewMethods,
   ...figurenMethods,

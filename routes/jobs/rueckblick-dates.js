@@ -38,4 +38,42 @@ function matchesZeitraum(ed, z) {
   return true;
 }
 
-module.exports = { parseZeitraum, entryDate, matchesZeitraum };
+// Aggregiert datierte Seiten + vorhandene Rückblicke zu Monats-/Jahres-Buckets
+// für die Overview-Heatmap. Pure (kein DB-State) — Datums-Parsing bleibt
+// serverseitige SSoT, das Frontend bekommt fertige Buckets.
+//   pages:  [{ page_name }]
+//   rbRows: [{ zeitraum, id, created_at }]  (jüngster Rückblick je Zeitraum)
+// minYear/maxYear spannen die Union aus Eintrags-Jahren UND Rückblick-Jahren,
+// damit „verwaiste" Rückblicke (Einträge nachträglich gelöscht) sichtbar bleiben.
+function buildRueckblickCoverage(pages, rbRows) {
+  const months = {};
+  const years = {};
+  let minYear = null, maxYear = null;
+  const ensureMonth = (k) => (months[k] || (months[k] = { entries: 0, rueckblick: null }));
+  const ensureYear = (k) => (years[k] || (years[k] = { entries: 0, rueckblick: null }));
+  const track = (y) => {
+    if (minYear == null || y < minYear) minYear = y;
+    if (maxYear == null || y > maxYear) maxYear = y;
+  };
+  for (const p of (pages || [])) {
+    const ed = entryDate(p.page_name);
+    if (!ed) continue;
+    ensureYear(String(ed.year)).entries++;
+    if (ed.monthKey) ensureMonth(ed.monthKey).entries++;
+    track(ed.year);
+  }
+  for (const r of (rbRows || [])) {
+    const z = String(r.zeitraum || '');
+    const rb = { id: r.id, created_at: r.created_at };
+    if (/^\d{4}-\d{2}$/.test(z)) {
+      ensureMonth(z).rueckblick = rb;
+      track(parseInt(z.slice(0, 4), 10));
+    } else if (/^\d{4}$/.test(z)) {
+      ensureYear(z).rueckblick = rb;
+      track(parseInt(z, 10));
+    }
+  }
+  return { months, years, minYear, maxYear };
+}
+
+module.exports = { parseZeitraum, entryDate, matchesZeitraum, buildRueckblickCoverage };

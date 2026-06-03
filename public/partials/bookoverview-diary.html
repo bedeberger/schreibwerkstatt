@@ -1,0 +1,51 @@
+<!-- Tagebuch-Tiles: Lücken & Konsistenz + Wochentag-Rhythmus. Nur bei
+     buchtyp 'tagebuch' und vorhandenen datierten Einträgen. Rein clientseitig
+     aus pages + tokEsts (kein Fetch). Rendering via x-text / :data-tip — keine
+     x-html-Sinks. Siehe public/js/book-overview/diary.js. -->
+
+<template x-if="overviewIsTagebuch() && diaryHasEntries()">
+  <div class="overview-tile overview-tile--medium">
+    <div class="overview-tile-label" x-text="$app.t('overview.diary.consistency')"></div>
+    <div class="overview-consistency-grid">
+      <div class="overview-consistency-item">
+        <span class="overview-consistency-value"
+              x-text="diaryGapsConsistency().daysSinceLast == null ? '–' : _fmtNum(diaryGapsConsistency().daysSinceLast)"></span>
+        <span class="overview-consistency-label" x-text="$app.t('overview.diary.daysSinceLast')"></span>
+      </div>
+      <div class="overview-consistency-item">
+        <span class="overview-consistency-value" x-text="_fmtNum(diaryGapsConsistency().currentStreak)"></span>
+        <span class="overview-consistency-label" x-text="$app.t('overview.diary.currentStreak')"></span>
+      </div>
+      <div class="overview-consistency-item">
+        <span class="overview-consistency-value" x-text="_fmtNum(diaryGapsConsistency().longestGap)"></span>
+        <span class="overview-consistency-label" x-text="$app.t('overview.diary.longestGap')"></span>
+      </div>
+      <div class="overview-consistency-item">
+        <span class="overview-consistency-value" x-text="_fmtNum(diaryGapsConsistency().entriesThisMonth)"></span>
+        <span class="overview-consistency-label" x-text="$app.t('overview.diary.thisMonth')"></span>
+      </div>
+      <div class="overview-consistency-item">
+        <span class="overview-consistency-value" x-text="_fmtNum(diaryGapsConsistency().entriesPrevMonth)"></span>
+        <span class="overview-consistency-label" x-text="$app.t('overview.diary.prevMonth')"></span>
+      </div>
+    </div>
+  </div>
+</template>
+
+<template x-if="overviewIsTagebuch() && diaryHasEntries()">
+  <div class="overview-tile overview-tile--medium">
+    <div class="overview-tile-label" x-text="$app.t('overview.diary.weekday')"></div>
+    <div class="overview-weekday-bars">
+      <template x-for="(d, i) in diaryWeekdayRhythm()" :key="i">
+        <div class="overview-weekday-col"
+             :data-tip="$app.t('overview.diary.weekdayTip', { count: _fmtNum(d.count), chars: _fmtNum(d.chars) })">
+          <div class="overview-weekday-track">
+            <div class="overview-weekday-fill" :style="{ '--progress': d.pct + '%' }"></div>
+          </div>
+          <span class="overview-weekday-count" x-text="_fmtNum(d.count)"></span>
+          <span class="overview-weekday-label" x-text="d.weekday"></span>
+        </div>
+      </template>
+    </div>
+  </div>
+</template>

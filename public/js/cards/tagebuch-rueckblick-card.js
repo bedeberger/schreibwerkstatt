@@ -38,6 +38,14 @@ export function registerTagebuchRueckblickCard() {
         this.startTagebuchRueckblickPoll(d.jobId);
       };
 
+      // Zeitraum-Vorauswahl aus der Overview-Heatmap (warmer Fall: Karte offen).
+      // Cold-Open läuft über pendingRueckblickZeitraum im onOpen-Hook.
+      const onRueckblickSelect = (e) => {
+        const z = e.detail?.zeitraum;
+        if (!z || !window.__app.showTagebuchRueckblickCard) return;
+        this._applyRueckblickZeitraum(z);
+      };
+
       this._lifecycle = setupCardLifecycle(this, {
         name: 'tagebuchRueckblick',
         showFlag: 'showTagebuchRueckblickCard',
@@ -54,6 +62,7 @@ export function registerTagebuchRueckblickCard() {
         },
         extraListeners: [
           { type: 'job:reconnect', handler: onJobReconnect },
+          { type: 'rueckblick:select', handler: onRueckblickSelect },
         ],
       });
     },
@@ -109,9 +118,17 @@ export function registerTagebuchRueckblickCard() {
         await this.loadRueckblickHistory();
       },
       async onOpen() {
-        // Default-Zeitraum setzen, sobald Karte sichtbar und noch keiner gewählt.
+        // Cold-Open via Overview-Heatmap: pending-Zeitraum übernehmen (gewinnt
+        // vor dem Default). Sonst jüngster Monat als Default.
+        const pending = window.__app.pendingRueckblickZeitraum;
+        if (pending) { window.__app.pendingRueckblickZeitraum = null; this.rueckblickZeitraum = pending; }
         if (!this.rueckblickZeitraum) this.rueckblickZeitraum = this.defaultZeitraum();
         await this.loadRueckblickHistory();
+        // Vorhandenen Rückblick fürs Pending-Zeitfenster zeigen (kein Auto-Run).
+        if (pending) {
+          const existing = (this.rueckblickHistory || []).find(en => en.zeitraum === pending);
+          if (existing) this.openRueckblickHistory(existing);
+        }
       },
     }),
   }));

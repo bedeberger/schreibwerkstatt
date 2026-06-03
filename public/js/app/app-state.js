@@ -385,6 +385,13 @@ const kapitelReviewState = () => ({
   kapitelReviewChapterId: '',
 });
 
+// Zeitraum-Vorauswahl beim Sprung Overview-Heatmap → Tagebuch-Rückblick-Karte.
+// Beim Cold-Open (Karte noch nicht gemountet) liest der onOpen-Hook der Karte
+// diesen Wert; beim warmen Fall greift der `rueckblick:select`-Event-Listener.
+const tagebuchRueckblickNavState = () => ({
+  pendingRueckblickZeitraum: null,
+});
+
 // Hash-Router-SSoT für Figuren-Werkstatt-Draft. Sub-Card spiegelt
 // selectedDraftId in dieses Feld; Hash-Router liest/schreibt nur hier.
 // werkstattDrafts: Spiegel der Sub-Card-Liste, damit die Command-Palette die
@@ -598,6 +605,7 @@ export function initialLektoratState() {
     ...lektoratState(),
     ...bookReviewState(),
     ...kapitelReviewState(),
+    ...tagebuchRueckblickNavState(),
     ...figurWerkstattState(),
     ...figurenState(),
     ...ereignisseState(),

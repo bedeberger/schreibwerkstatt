@@ -1,0 +1,62 @@
+<!-- Rückblick-Heatmap: Jahr×Monat-Raster, Zell-Intensität nach Eintragszahl
+     (Level 0..4), Marker auf Monaten/Jahren mit vorhandenem KI-Rückblick.
+     Klick auf eine Zelle öffnet die Rückblick-Karte mit vorausgewähltem
+     Zeitraum (kein Auto-Run). Nur bei buchtyp 'tagebuch'. Rendering via
+     x-text / :data-tip — keine x-html-Sinks. Siehe diary.js. -->
+
+<template x-if="overviewIsTagebuch()">
+  <div class="overview-tile overview-tile--wide">
+    <div class="overview-tile-head">
+      <div class="overview-tile-label" x-text="$app.t('overview.rueckblickHeatmap.title')"></div>
+    </div>
+
+    <template x-if="!overviewRueckblickHeatmap().years.length">
+      <div class="muted-msg" x-text="$app.t('overview.rueckblickHeatmap.empty')"></div>
+    </template>
+
+    <template x-if="overviewRueckblickHeatmap().years.length">
+      <div class="rb-heatmap">
+        <div class="rb-heatmap-scroll">
+          <div class="rb-heatmap-grid">
+            <div class="rb-heatmap-row rb-heatmap-row--head">
+              <span class="rb-heatmap-corner"></span>
+              <template x-for="(mLabel, mi) in rueckblickMonthLabels()" :key="mi">
+                <span class="rb-heatmap-month-label" x-text="mLabel"></span>
+              </template>
+            </div>
+            <template x-for="row in overviewRueckblickHeatmap().years" :key="row.year">
+              <div class="rb-heatmap-row">
+                <button type="button"
+                        class="rb-heatmap-year"
+                        :class="{ 'rb-heatmap-year--has': row.hasRueckblick }"
+                        @click="$app.openRueckblickFor(String(row.year))"
+                        :data-tip="row.hasRueckblick
+                          ? $app.t('overview.rueckblickHeatmap.tooltip.hasRueckblick', { date: rueckblickCreatedLabel(row.yearCreatedAt) })
+                          : $app.t('overview.rueckblickHeatmap.tooltip.noRueckblick')"
+                        x-text="row.year"></button>
+                <template x-for="cell in row.months" :key="cell.key">
+                  <button type="button"
+                          class="rb-heatmap-cell"
+                          :class="'rb-heatmap-cell--lvl' + cell.level + (cell.hasRueckblick ? ' rb-heatmap-cell--has' : '')"
+                          @click="$app.openRueckblickFor(cell.key)"
+                          :data-tip="rueckblickCellTip(cell)"></button>
+                </template>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <div class="rb-heatmap-legend">
+          <span class="rb-heatmap-legend-label" x-text="$app.t('overview.rueckblickHeatmap.legend')"></span>
+          <span class="rb-heatmap-cell rb-heatmap-cell--lvl0"></span>
+          <span class="rb-heatmap-cell rb-heatmap-cell--lvl1"></span>
+          <span class="rb-heatmap-cell rb-heatmap-cell--lvl2"></span>
+          <span class="rb-heatmap-cell rb-heatmap-cell--lvl3"></span>
+          <span class="rb-heatmap-cell rb-heatmap-cell--lvl4"></span>
+          <span class="rb-heatmap-cell rb-heatmap-cell--has rb-heatmap-cell--lvl0"></span>
+          <span class="rb-heatmap-legend-label" x-text="$app.t('overview.rueckblickHeatmap.legendMarker')"></span>
+        </div>
+      </div>
+    </template>
+  </div>
+</template>

@@ -4,6 +4,7 @@ const { toIntId } = require('../lib/validate');
 const { localIsoDate } = require('../lib/local-date');
 const { setContext } = require('../lib/log-context');
 const { aclParamGuard, requireBookAccess, sendACLError } = require('../lib/acl');
+const { buildRueckblickCoverage } = require('./jobs/rueckblick-dates');
 const logger = require('../logger');
 
 const router = express.Router();
@@ -192,6 +193,28 @@ router.get('/rueckblick/:book_id', (req, res) => {
     WHERE book_id = ? AND user_email = ?
     ORDER BY created_at DESC LIMIT 20`).all(bookId, user_email);
   res.json(rows.map(r => ({ ...r, result_json: JSON.parse(r.result_json || 'null') })));
+});
+
+// Rückblick-Heatmap-Coverage: aggregiert datierte Seiten (Monats-/Jahres-Buckets)
+// + vorhandene KI-Rückblicke des Users zu fertigen Buckets fürs Overview-Tile.
+// Liest nur Metadaten (page_name/page_id) zur Datums-Aggregation — kein Buch-
+// Inhalt (folgt der Praxis von /fehler-heatmap, /style-stats). Kein KI-Call.
+router.get('/rueckblick-coverage/:book_id', (req, res) => {
+  const user_email = req.session?.user?.email || null;
+  const bookId = toIntId(req.params.book_id);
+  if (!bookId) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
+  const pages = db.prepare('SELECT page_id, page_name FROM pages WHERE book_id = ?').all(bookId);
+  // Jüngster Rückblick je Zeitraum (user-spezifisch — tagebuch_rueckblicke ist persönlich).
+  const rbRows = db.prepare(`
+    WITH ranked AS (
+      SELECT id, zeitraum, created_at,
+             ROW_NUMBER() OVER (PARTITION BY zeitraum ORDER BY created_at DESC, id DESC) AS rn
+      FROM tagebuch_rueckblicke
+      WHERE book_id = ? AND user_email = ?
+    )
+    SELECT id, zeitraum, created_at FROM ranked WHERE rn = 1
+  `).all(bookId, user_email);
+  res.json(buildRueckblickCoverage(pages, rbRows));
 });
 
 // Kapitel-Reviews: alle Einträge eines Buchs, gruppiert als { [chapter_id]: [entries] }.

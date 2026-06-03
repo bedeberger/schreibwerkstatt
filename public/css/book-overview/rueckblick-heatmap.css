@@ -1,0 +1,121 @@
+@layer components {
+/* Rückblick-Heatmap: Jahr×Monat-Raster. Zell-Intensität (Level 0..4) nach
+   Eintragszahl pro Monat — Farb-Stufen analog overviewStreakHeatmap aus
+   var(--color-accent) (Overview-Akzent, keine neue Hue). „Rückblick vorhanden"-
+   Marker als eckiger Eckpunkt (kein Icon). Sehr lange Tagebücher scrollen
+   vertikal innerhalb des Tiles. Mobile via Container-Query. Siehe diary.js. */
+
+.rb-heatmap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  --rb-year-col: 3rem;
+}
+/* Vertikal scrollbar bei vielen Jahren, horizontal bei engen Slots — das Tile
+   sprengt nicht das Overview-Grid. */
+.rb-heatmap-scroll {
+  max-height: 320px;
+  overflow: auto;
+}
+.rb-heatmap-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 320px;
+}
+.rb-heatmap-row {
+  display: grid;
+  grid-template-columns: var(--rb-year-col) repeat(12, 1fr);
+  gap: var(--space-3);
+  align-items: center;
+}
+.rb-heatmap-row--head {
+  position: sticky;
+  top: 0;
+  background: var(--color-bg);
+  z-index: 1;
+  padding-bottom: var(--space-2xs);
+}
+.rb-heatmap-corner { min-width: 0; }
+.rb-heatmap-month-label {
+  font-size: var(--font-size-micro);
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rb-heatmap-year {
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-muted);
+  text-align: right;
+  padding: 0 var(--space-6) 0 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.rb-heatmap-year:hover { color: var(--color-text); text-decoration: underline; }
+.rb-heatmap-year--has { color: var(--color-text); font-weight: 600; }
+
+.rb-heatmap-cell {
+  position: relative;
+  width: 100%;
+  min-width: 12px;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--radius-sm);
+  background: var(--color-tag-bg);
+  border: 0.5px solid transparent;
+  padding: 0;
+  cursor: pointer;
+  transition: filter var(--transition-base);
+}
+.rb-heatmap-cell:hover { filter: brightness(1.12); }
+.rb-heatmap-cell--lvl0 { background: var(--color-tag-bg); }
+.rb-heatmap-cell--lvl1 { background: color-mix(in srgb, var(--color-accent) 22%, var(--color-bg)); }
+.rb-heatmap-cell--lvl2 { background: color-mix(in srgb, var(--color-accent) 45%, var(--color-bg)); }
+.rb-heatmap-cell--lvl3 { background: color-mix(in srgb, var(--color-accent) 68%, var(--color-bg)); }
+.rb-heatmap-cell--lvl4 { background: var(--color-accent); }
+
+/* „Rückblick vorhanden"-Marker: eckiger Punkt in der oberen rechten Ecke. */
+.rb-heatmap-cell--has { border-color: var(--color-accent); }
+.rb-heatmap-cell--has::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 4px;
+  height: 4px;
+  background: var(--color-accent);
+  border-radius: var(--radius-sm);
+}
+
+.rb-heatmap-legend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  flex-wrap: wrap;
+}
+.rb-heatmap-legend-label { margin-right: var(--space-6); }
+.rb-heatmap-legend .rb-heatmap-cell {
+  width: 11px;
+  min-width: 11px;
+  height: 11px;
+  aspect-ratio: auto;
+  flex-shrink: 0;
+  cursor: default;
+}
+.rb-heatmap-legend .rb-heatmap-cell:hover { filter: none; }
+
+@container (max-width: 480px) {
+  .rb-heatmap { --rb-year-col: 2.4rem; }
+  .rb-heatmap-grid { min-width: 260px; }
+  .rb-heatmap-month-label { letter-spacing: 0; }
+}
+}

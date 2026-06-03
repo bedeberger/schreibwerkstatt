@@ -1,0 +1,79 @@
+@layer components {
+/* Tagebuch-Tiles der Buch-Overview: Lücken & Konsistenz (Kennzahlen-Grid) +
+   Wochentag-Rhythmus (7 vertikale Balken). Akzentfarbe erbt den Overview-Akzent
+   (var(--color-accent)); keine neue Hue. Mobile via Container-Query (Tiles
+   leben im variablen Grid-Slot). Siehe public/js/book-overview/diary.js. */
+
+/* ── Lücken & Konsistenz ───────────────────────────────────────────────────── */
+.overview-consistency-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  gap: var(--space-md);
+}
+.overview-consistency-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  min-width: 0;
+}
+.overview-consistency-value {
+  font-family: var(--font-serif);
+  font-size: var(--font-size-2xl);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.overview-consistency-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  line-height: 1.2;
+}
+
+/* ── Wochentag-Rhythmus ────────────────────────────────────────────────────── */
+.overview-weekday-bars {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: var(--space-xs);
+  align-items: end;
+  min-height: 84px;
+}
+.overview-weekday-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2xs);
+  min-width: 0;
+}
+.overview-weekday-track {
+  width: 100%;
+  height: 56px;
+  display: flex;
+  align-items: flex-end;
+}
+.overview-weekday-fill {
+  width: 100%;
+  min-height: 2px;
+  height: var(--progress, 0%);
+  background: var(--color-accent);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  transition: height 0.18s ease;
+}
+.overview-weekday-count {
+  font-size: var(--font-size-micro);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+.overview-weekday-label {
+  font-size: var(--font-size-micro);
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+@container (max-width: 320px) {
+  .overview-consistency-value { font-size: var(--font-size-xl); }
+  .overview-weekday-track { height: 44px; }
+  .overview-weekday-bars { min-height: 68px; }
+}
+}

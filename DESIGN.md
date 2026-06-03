@@ -1838,7 +1838,7 @@ Drei Editoren leben in eigenen Subfoldern (`book/`, `focus/`, `notebook/`); edit
 | [book/epub-export.css](public/css/book/epub-export.css) | EPUB-Export-Karte (Scope-Picker + Reflow-Settings). |
 
 ### book-overview/ (dichtes Tile-Grid)
-[coverage.css](public/css/book-overview/coverage.css), [domain.css](public/css/book-overview/domain.css), [kapitel.css](public/css/book-overview/kapitel.css), [presence.css](public/css/book-overview/presence.css), [recent-actions.css](public/css/book-overview/recent-actions.css), [stats.css](public/css/book-overview/stats.css), [base.css](public/css/book-overview/base.css), [review.css](public/css/book-overview/review.css) — pro Tile-Familie ein File.
+[coverage.css](public/css/book-overview/coverage.css), [domain.css](public/css/book-overview/domain.css), [kapitel.css](public/css/book-overview/kapitel.css), [presence.css](public/css/book-overview/presence.css), [recent-actions.css](public/css/book-overview/recent-actions.css), [stats.css](public/css/book-overview/stats.css), [base.css](public/css/book-overview/base.css), [review.css](public/css/book-overview/review.css), [diary.css](public/css/book-overview/diary.css) (Tagebuch-Tiles: Lücken/Konsistenz-Kennzahlen + Wochentag-Rhythmus-Balken), [rueckblick-heatmap.css](public/css/book-overview/rueckblick-heatmap.css) (Jahr×Monat-Heatmap der Rückblick-Abdeckung; Level 0..4 aus var(--color-accent), Marker als eckiger Eckpunkt) — pro Tile-Familie ein File.
 
 ---
 

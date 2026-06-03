@@ -59,6 +59,14 @@ export const loadMethods = {
       this.overviewDailyGoalChars = settings?.daily_goal_chars != null ? Number(settings.daily_goal_chars) : null;
       this.overviewBuchtyp = settings?.buchtyp || null;
       this._memos = {};
+      // Rückblick-Heatmap-Coverage nur für Tagebücher laden — der Buchtyp steht
+      // erst nach `settings` fest, daher sequenziell (non-Tagebuch fetcht nie).
+      this.overviewRueckblickCoverage = null;
+      if (this.overviewBuchtyp === 'tagebuch') {
+        const cov = await fetchJsonRetry(`/history/rueckblick-coverage/${bookId}`).catch(() => null);
+        if (this.overviewBookId !== bookId) return;
+        this.overviewRueckblickCoverage = cov || null;
+      }
     } catch (e) {
       console.error('[loadBookOverview]', e);
     } finally {
@@ -195,6 +203,7 @@ export const loadMethods = {
     this.overviewIsFinished = false;
     this.overviewDailyGoalChars = null;
     this.overviewBuchtyp = null;
+    this.overviewRueckblickCoverage = null;
     this.overviewBookId = null;
     this._memos = {};
   },

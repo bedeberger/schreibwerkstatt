@@ -316,6 +316,19 @@ export const appViewMethods = {
     });
   },
 
+  // Sprung Overview-Rückblick-Heatmap → Tagebuch-Rückblick-Karte mit
+  // vorausgewähltem Zeitraum (kein Auto-Run). `rueckblick:select` versorgt den
+  // warmen Fall (Karte schon offen); für den Cold-Open hält `pendingRueckblickZeitraum`
+  // den Wert, bis der onOpen-Hook der Karte ihn übernimmt. Scroll-to + Partial-Load
+  // erledigt der generische Toggle-Pfad.
+  openRueckblickFor(zeitraum) {
+    if (!zeitraum) return;
+    this.pendingRueckblickZeitraum = zeitraum;
+    window.dispatchEvent(new CustomEvent('rueckblick:select', { detail: { zeitraum } }));
+    if (!this.showTagebuchRueckblickCard) this.toggleTagebuchRueckblickCard();
+    else this._scrollToCardByKey('tagebuchRueckblick');
+  },
+
   // Lädt Badge-Counts (offene Ideen, Chat-Sessions) für die geöffnete Seite.
   // Race-safe: prüft pageId gegen aktuelle Seite vor Set, falls User schnell wechselt.
   async _loadPageBadgeCounts(pageId) {

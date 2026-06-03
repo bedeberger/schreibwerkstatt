@@ -80,6 +80,18 @@ export const tagebuchRueckblickMethods = {
     }
   },
 
+  // Zeitraum-Vorauswahl (aus Overview-Heatmap, warmer Fall): Zeitraum setzen
+  // und einen bereits vorhandenen Rückblick anzeigen — nie auto-generieren.
+  _applyRueckblickZeitraum(zeitraum) {
+    if (!zeitraum) return;
+    this.rueckblickZeitraum = zeitraum;
+    this.selectedRueckblickId = null;
+    this.rueckblickResult = null;
+    this.rueckblickEmpty = false;
+    const existing = (this.rueckblickHistory || []).find(e => e.zeitraum === zeitraum);
+    if (existing) this.openRueckblickHistory(existing);
+  },
+
   // Historischen Rückblick in die Anzeige laden (kein neuer KI-Call).
   openRueckblickHistory(entry) {
     if (!entry?.result_json) return;
