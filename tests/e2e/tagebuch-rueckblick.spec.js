@@ -71,6 +71,27 @@ test('Klick auf bemerkenswerten Tag ruft selectPage mit der Tagebuch-Seite', asy
   expect(selected).toBe('2024-03-04');
 });
 
+test('History: frühere Rückblicke werden beim Öffnen geladen + gelistet', async ({ page }) => {
+  await expect(page.locator('[data-test="history"]')).toBeVisible();
+  await expect(page.locator('[data-test="history"] .history-item')).toHaveCount(2);
+  await expect(page.locator('[data-test="hist-11"]')).toContainText('April');
+});
+
+test('History: Klick auf Eintrag lädt den gespeicherten Rückblick (kein Job)', async ({ page }) => {
+  await page.locator('[data-test="hist-12"]').click();
+  await expect(page.locator('[data-test="result"]')).toBeVisible();
+  await expect(page.locator('[data-test="summary"]')).toContainText('März-Rückblick.');
+  // Zeitraum übernommen.
+  expect(await page.locator('[data-test="zeitraum"]').inputValue()).toBe('2024-03');
+});
+
+test('History: Eintrag löschen entfernt ihn aus der Liste', async ({ page }) => {
+  await expect(page.locator('[data-test="history"] .history-item')).toHaveCount(2);
+  await page.locator('[data-test="hist-del-11"]').click();
+  await expect(page.locator('[data-test="history"] .history-item')).toHaveCount(1);
+  await expect(page.locator('[data-test="hist-11"]')).toHaveCount(0);
+});
+
 test('Leerzustand sichtbar, wenn rueckblickEmpty', async ({ page }) => {
   await page.evaluate(() => {
     const data = window.Alpine.$data(document.querySelector('#root'));

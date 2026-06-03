@@ -125,6 +125,16 @@ router.delete('/review/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// Tagebuch-Rückblick (History-Eintrag) löschen
+router.delete('/rueckblick/:id', (req, res) => {
+  const user_email = req.session?.user?.email || null;
+  const id = toIntId(req.params.id);
+  if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
+  db.prepare('DELETE FROM tagebuch_rueckblicke WHERE id = ? AND user_email = ?')
+    .run(id, user_email);
+  res.json({ ok: true });
+});
+
 // Kompletter History-Reset für ein Buch: löscht page_checks, book_reviews und
 // chat_sessions (inkl. Nachrichten via ON DELETE CASCADE) des eingeloggten Users.
 router.delete('/book/:book_id', (req, res) => {
@@ -138,6 +148,7 @@ router.delete('/book/:book_id', (req, res) => {
   const delChReviews  = db.prepare('DELETE FROM chapter_reviews  WHERE book_id = ? AND user_email = ?');
   const delSessions   = db.prepare('DELETE FROM chat_sessions    WHERE book_id = ? AND user_email = ?');
   const delWerkRuns   = db.prepare('DELETE FROM werkstatt_runs   WHERE book_id = ? AND user_email = ?');
+  const delRueckblicke = db.prepare('DELETE FROM tagebuch_rueckblicke WHERE book_id = ? AND user_email = ?');
 
   const result = db.transaction(() => ({
     page_checks:      delChecks.run(book_id, user_email).changes,
@@ -145,13 +156,14 @@ router.delete('/book/:book_id', (req, res) => {
     chapter_reviews:  delChReviews.run(book_id, user_email).changes,
     chat_sessions:    delSessions.run(book_id, user_email).changes,
     werkstatt_runs:   delWerkRuns.run(book_id, user_email).changes,
+    rueckblicke:      delRueckblicke.run(book_id, user_email).changes,
   }))();
 
   logger.info(
     `History-Reset: book=${book_id} user=${user_email} ` +
     `page_checks=${result.page_checks} book_reviews=${result.book_reviews} ` +
     `chapter_reviews=${result.chapter_reviews} chat_sessions=${result.chat_sessions} ` +
-    `werkstatt_runs=${result.werkstatt_runs}`
+    `werkstatt_runs=${result.werkstatt_runs} rueckblicke=${result.rueckblicke}`
   );
   res.json({ ok: true, deleted: result });
 });
@@ -167,6 +179,19 @@ router.get('/review/:book_id', (req, res) => {
     WHERE br.book_id = ? AND br.user_email = ?
     ORDER BY br.reviewed_at DESC LIMIT 10`).all(bookId, user_email);
   res.json(rows.map(r => ({ ...r, review_json: JSON.parse(r.review_json || 'null') })));
+});
+
+// Tagebuch-Rückblicke: letzte 20 generierte Rückblicke eines Buchs (re-öffenbar).
+router.get('/rueckblick/:book_id', (req, res) => {
+  const user_email = req.session?.user?.email || null;
+  const bookId = toIntId(req.params.book_id);
+  if (!bookId) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
+  const rows = db.prepare(`
+    SELECT id, zeitraum, result_json, model, created_at
+    FROM tagebuch_rueckblicke
+    WHERE book_id = ? AND user_email = ?
+    ORDER BY created_at DESC LIMIT 20`).all(bookId, user_email);
+  res.json(rows.map(r => ({ ...r, result_json: JSON.parse(r.result_json || 'null') })));
 });
 
 // Kapitel-Reviews: alle Einträge eines Buchs, gruppiert als { [chapter_id]: [entries] }.

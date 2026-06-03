@@ -6,8 +6,8 @@
 // (Buch, User, Zeitraum, Provider). Vorlage: routes/jobs/review.js.
 const express = require('express');
 const {
-  db, getBookSettings,
-  loadRueckblickCache, saveRueckblickCache,
+  db,
+  loadRueckblickCache, saveRueckblickCache, insertRueckblick,
 } = require('../../db/schema');
 const {
   makeJobLogger, updateJob, completeJob, failJob, i18nError, contentHttpError,
@@ -79,64 +79,66 @@ async function runRueckblickJob(jobId, bookId, userEmail, userToken, zeitraum) {
       .sort((a, b) => a.datum.localeCompare(b.datum));
 
     const pagesSig = entries.map(e => `${e.id}:${e.updated_at || ''}`).sort().join('|') + `||${zeitraum}||${cacheVersion}`;
-    const cached = loadRueckblickCache(bookIdInt, email, zeitraum, pagesSig, effectiveProvider);
-    if (cached) {
+    let r = loadRueckblickCache(bookIdInt, email, zeitraum, pagesSig, effectiveProvider);
+    const fromCache = !!r;
+
+    if (fromCache) {
       logger.info('Rückblick – Cache-HIT (pages_sig match) – spart KI-Call.');
       updateJob(jobId, { progress: 97, statusText: 'job.phase.checkpointLoaded' });
-      completeJob(jobId, { rueckblick: cached, zeitraum, entryCount: entries.length, tokensIn: 0, tokensOut: 0 },
-        null, `«${zeitraum}» ${entries.length} Einträge (Cache)`);
-      return;
-    }
-
-    const totalChars = entries.reduce((s, e) => s + e.text.length, 0);
-    // Monats-Gruppen (für Map-Reduce-Entscheidung).
-    const byMonth = new Map();
-    for (const e of entries) {
-      const key = e.monthKey || String(z.year);
-      if (!byMonth.has(key)) byMonth.set(key, []);
-      byMonth.get(key).push(e);
-    }
-
-    let r;
-    if (totalChars <= SINGLE_PASS_LIMIT || byMonth.size <= 1) {
-      updateJob(jobId, { progress: 55, statusText: 'job.phase.rueckblickConsolidating' });
-      r = await aiCall(jobId, tok,
-        buildRueckblickPrompt(entries, { zeitraum, figurenNamen, orteNamen }),
-        SYSTEM_RUECKBLICK, 55, 97, 3000, 0.25, null, effectiveProvider, SCHEMA_RUECKBLICK,
-      );
     } else {
-      // Map: pro Monat ein Teil-Rückblick. Reduce: konsolidiert zum Zeitraum.
-      const monthKeys = [...byMonth.keys()].sort();
-      const monthResults = [];
-      for (let mi = 0; mi < monthKeys.length; mi++) {
-        if (jobAbortControllers.get(jobId)?.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
-        const key = monthKeys[mi];
-        const fromPct = 55 + Math.round((mi / monthKeys.length) * 30);
-        const toPct = 55 + Math.round(((mi + 1) / monthKeys.length) * 30);
-        updateJob(jobId, {
-          progress: fromPct, statusText: 'job.phase.rueckblickAnalyzingMonth',
-          statusParams: { monat: key, current: mi + 1, total: monthKeys.length },
-        });
-        const mr = await aiCall(jobId, tok,
-          buildRueckblickPrompt(byMonth.get(key), { zeitraum: key, figurenNamen, orteNamen }),
-          SYSTEM_RUECKBLICK, fromPct, toPct, 2000, 0.25, null, effectiveProvider, SCHEMA_RUECKBLICK,
-        );
-        monthResults.push({ ...mr, monat: key });
+      const totalChars = entries.reduce((s, e) => s + e.text.length, 0);
+      // Monats-Gruppen (für Map-Reduce-Entscheidung).
+      const byMonth = new Map();
+      for (const e of entries) {
+        const key = e.monthKey || String(z.year);
+        if (!byMonth.has(key)) byMonth.set(key, []);
+        byMonth.get(key).push(e);
       }
-      updateJob(jobId, { progress: 88, statusText: 'job.phase.rueckblickConsolidating' });
-      r = await aiCall(jobId, tok,
-        buildRueckblickReducePrompt(monthResults, { zeitraum }),
-        SYSTEM_RUECKBLICK, 88, 97, 3000, 0.25, null, effectiveProvider, SCHEMA_RUECKBLICK,
-      );
+
+      if (totalChars <= SINGLE_PASS_LIMIT || byMonth.size <= 1) {
+        updateJob(jobId, { progress: 55, statusText: 'job.phase.rueckblickConsolidating' });
+        r = await aiCall(jobId, tok,
+          buildRueckblickPrompt(entries, { zeitraum, figurenNamen, orteNamen }),
+          SYSTEM_RUECKBLICK, 55, 97, 3000, 0.25, null, effectiveProvider, SCHEMA_RUECKBLICK,
+        );
+      } else {
+        // Map: pro Monat ein Teil-Rückblick. Reduce: konsolidiert zum Zeitraum.
+        const monthKeys = [...byMonth.keys()].sort();
+        const monthResults = [];
+        for (let mi = 0; mi < monthKeys.length; mi++) {
+          if (jobAbortControllers.get(jobId)?.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+          const key = monthKeys[mi];
+          const fromPct = 55 + Math.round((mi / monthKeys.length) * 30);
+          const toPct = 55 + Math.round(((mi + 1) / monthKeys.length) * 30);
+          updateJob(jobId, {
+            progress: fromPct, statusText: 'job.phase.rueckblickAnalyzingMonth',
+            statusParams: { monat: key, current: mi + 1, total: monthKeys.length },
+          });
+          const mr = await aiCall(jobId, tok,
+            buildRueckblickPrompt(byMonth.get(key), { zeitraum: key, figurenNamen, orteNamen }),
+            SYSTEM_RUECKBLICK, fromPct, toPct, 2000, 0.25, null, effectiveProvider, SCHEMA_RUECKBLICK,
+          );
+          monthResults.push({ ...mr, monat: key });
+        }
+        updateJob(jobId, { progress: 88, statusText: 'job.phase.rueckblickConsolidating' });
+        r = await aiCall(jobId, tok,
+          buildRueckblickReducePrompt(monthResults, { zeitraum }),
+          SYSTEM_RUECKBLICK, 88, 97, 3000, 0.25, null, effectiveProvider, SCHEMA_RUECKBLICK,
+        );
+      }
+
+      if (!r || typeof r.zusammenfassung !== 'string' || !r.zusammenfassung.trim()) {
+        throw i18nError('job.error.rueckblickEmpty');
+      }
+      saveRueckblickCache(bookIdInt, email, zeitraum, pagesSig, r, effectiveProvider);
     }
 
-    if (!r || typeof r.zusammenfassung !== 'string' || !r.zusammenfassung.trim()) {
-      throw i18nError('job.error.rueckblickEmpty');
-    }
-    saveRueckblickCache(bookIdInt, email, zeitraum, pagesSig, r, effectiveProvider);
+    // History-Zeile pro „Erstellen"-Lauf (auch bei Cache-HIT) → re-öffenbar.
+    const model = _modelName(effectiveProvider);
+    insertRueckblick(bookIdInt, email, zeitraum, r, model);
 
-    completeJob(jobId, { rueckblick: r, zeitraum, entryCount: entries.length, tokensIn: tok.in, tokensOut: tok.out },
-      tps(tok), `«${zeitraum}» ${entries.length} Einträge`);
+    completeJob(jobId, { rueckblick: r, zeitraum, entryCount: entries.length, fromCache, tokensIn: tok.in, tokensOut: tok.out },
+      fromCache ? null : tps(tok), `«${zeitraum}» ${entries.length} Einträge${fromCache ? ' (Cache)' : ''}`);
   } catch (e) {
     if (e.name !== 'AbortError') logger.error(`Fehler: ${e.message}`, { stack: e.stack });
     failJob(jobId, e);

@@ -7222,6 +7222,30 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 174 abgeschlossen (tagebuch_rueckblick_cache).');
   }
 
+  if (version < 175) {
+    // tagebuch_rueckblicke: dauerhafte History generierter Rückblicke (analog
+    // book_reviews zum book_review_cache). Pro „Erstellen"-Lauf eine Zeile —
+    // re-öffenbar + löschbar. Bewusst NICHT im cache-cleanup-TTL (wie book_reviews),
+    // damit alte Rückblicke nicht stillschweigend verschwinden. result_json =
+    // SCHEMA_RUECKBLICK. FK auf books (CASCADE).
+    db.exec(`CREATE TABLE IF NOT EXISTS tagebuch_rueckblicke (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id     INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        user_email  TEXT    NOT NULL,
+        zeitraum    TEXT    NOT NULL,
+        result_json TEXT    NOT NULL,
+        model       TEXT,
+        created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      )`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_tagebuch_rueckblicke_book ON tagebuch_rueckblicke(book_id, user_email)');
+    const fkErrors175 = db.pragma('foreign_key_check');
+    if (fkErrors175.length) {
+      throw new Error(`Migration 175: foreign_key_check meldet ${fkErrors175.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 175').run();
+    logger.info('DB-Migration auf Version 175 abgeschlossen (tagebuch_rueckblicke History).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

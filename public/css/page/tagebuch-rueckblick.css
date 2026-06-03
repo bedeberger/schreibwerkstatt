@@ -93,6 +93,11 @@
   color: var(--color-text);
 }
 
+.card--tagebuchRueckblick .rb-history-zeitraum {
+  font-weight: 600;
+  color: var(--card-accent);
+}
+
 @media (max-width: 720px) {
   .card--tagebuchRueckblick .rb-cols {
     grid-template-columns: 1fr;

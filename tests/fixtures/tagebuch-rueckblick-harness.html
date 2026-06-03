@@ -48,6 +48,16 @@
         </template>
       </ul>
     </div>
+
+    <div class="card-history-section" data-test="history" x-show="rueckblickHistory.length > 0">
+      <template x-for="entry in rueckblickHistory" :key="entry.id">
+        <div class="history-item" :data-test="'hist-' + entry.id" @click="openRueckblickHistory(entry)">
+          <span class="rb-history-zeitraum" x-text="zeitraumLabel(entry.zeitraum)"></span>
+          <span class="history-date" x-text="rueckblickEntryDate(entry.created_at)"></span>
+          <button type="button" :data-test="'hist-del-' + entry.id" @click.stop="deleteRueckblickHistory(entry.id)">x</button>
+        </div>
+      </template>
+    </div>
   </div>
 
   <script type="module">
@@ -57,9 +67,20 @@
     // Antworten, damit kein Netzwerkfehler den Console-Guard auslöst.
     const _resp = (obj) => ({ ok: true, status: 200, json: async () => obj, clone() { return _resp(obj); } });
     window.__selectedTag = null;
-    window.fetch = async (url) => {
+    // Mock-History für /history/rueckblick/:bookId (2 frühere Rückblicke).
+    window.__MOCK_HISTORY = [
+      { id: 11, zeitraum: '2024-04', model: 'claude', created_at: '2024-05-01T09:00:00Z',
+        result_json: { themen: [{ label: 'April-Thema', haeufigkeit: 1, belege: [] }], personen: [], orte: [], bemerkenswerteTage: [], zusammenfassung: 'April-Rückblick.' } },
+      { id: 12, zeitraum: '2024-03', model: 'claude', created_at: '2024-04-01T09:00:00Z',
+        result_json: { themen: [], personen: [], orte: [], bemerkenswerteTage: [], zusammenfassung: 'März-Rückblick.' } },
+    ];
+    window.fetch = async (url, opts) => {
       if (String(url).includes('/jobs/active')) return _resp({ jobId: null });
       if (String(url).includes('/jobs/rueckblick')) return _resp({ jobId: 'mock-job-1' });
+      if (String(url).includes('/history/rueckblick/')) {
+        if (opts?.method === 'DELETE') return _resp({ ok: true });
+        return _resp(window.__MOCK_HISTORY);
+      }
       return _resp({});
     };
 

@@ -4,7 +4,7 @@
 // (siehe tagebuch-rueckblick-card.js). KI-Felder werden im Template via x-text
 // (auto-escaped) gerendert — kein x-html-Sink.
 
-import { tzOpts } from '../utils.js';
+import { tzOpts, fetchJson } from '../utils.js';
 
 // Tagebuch-Seitennamen sind 'YYYY-MM-DD'. Hier rein clientseitig per Regex
 // (kein Bedarf am vollen lib/datum-parse-Fallback).
@@ -66,5 +66,45 @@ export const tagebuchRueckblickMethods = {
   hasRueckblickResult() {
     const r = this.rueckblickResult;
     return !!(r && (r.zusammenfassung || (r.themen && r.themen.length)));
+  },
+
+  // ── History (dauerhaft gespeicherte Rückblicke, re-öffenbar) ────────────────
+  async loadRueckblickHistory() {
+    const bookId = window.__app?.selectedBookId;
+    if (!bookId) { this.rueckblickHistory = []; return; }
+    try {
+      this.rueckblickHistory = await fetchJson('/history/rueckblick/' + bookId);
+    } catch (e) {
+      console.error('[loadRueckblickHistory]', e);
+      this.rueckblickHistory = [];
+    }
+  },
+
+  // Historischen Rückblick in die Anzeige laden (kein neuer KI-Call).
+  openRueckblickHistory(entry) {
+    if (!entry?.result_json) return;
+    this.rueckblickResult = entry.result_json;
+    this.rueckblickEmpty = false;
+    this.rueckblickZeitraum = entry.zeitraum || this.rueckblickZeitraum;
+    this.selectedRueckblickId = entry.id;
+  },
+
+  async deleteRueckblickHistory(id) {
+    try {
+      await fetchJson('/history/rueckblick/' + id, { method: 'DELETE' });
+      this.rueckblickHistory = (this.rueckblickHistory || []).filter(e => e.id !== id);
+      if (this.selectedRueckblickId === id) this.selectedRueckblickId = null;
+    } catch (e) {
+      console.error('[deleteRueckblickHistory]', e);
+    }
+  },
+
+  // Datum eines History-Eintrags (TZ-aware).
+  rueckblickEntryDate(iso) {
+    if (!iso) return '';
+    try {
+      return new Date(iso).toLocaleString(window.__app?.uiLocale === 'en' ? 'en-US' : 'de-CH',
+        tzOpts({ day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }));
+    } catch { return iso; }
   },
 };

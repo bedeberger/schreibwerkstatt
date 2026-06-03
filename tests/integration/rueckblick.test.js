@@ -60,6 +60,35 @@ test('Single-Pass: ein Monat → 1 AI-Call, Ergebnis + Cache-Zeile', async () =>
     'SELECT pages_sig FROM tagebuch_rueckblick_cache WHERE book_id = ? AND user_email = ? AND zeitraum = ?'
   ).get(BOOK_ID, 'tester@test.dev', '2024-03');
   assert.ok(cacheRow, 'Cache-Zeile fehlt nach 1. Run');
+
+  // History-Zeile geschrieben (dauerhaft, re-öffenbar).
+  const histRows = ctx.dbSchema.db.prepare(
+    'SELECT zeitraum, result_json FROM tagebuch_rueckblicke WHERE book_id = ? AND user_email = ?'
+  ).all(BOOK_ID, 'tester@test.dev');
+  assert.equal(histRows.length, 1, 'eine History-Zeile nach 1. Run');
+  assert.equal(histRows[0].zeitraum, '2024-03');
+  assert.equal(JSON.parse(histRows[0].result_json).zusammenfassung, 'Ein ruhiger Monat.');
+});
+
+test('History: jeder Lauf (auch Cache-HIT) schreibt eine History-Zeile', async () => {
+  const BOOK_ID = 707;
+  seedDiary(BOOK_ID, ['2024-09-01', '2024-09-08']);
+  ctx.mockAi.on((e) => e.schemaKeys.includes('zusammenfassung'), rueckblickResponse());
+
+  for (let i = 0; i < 2; i++) {
+    const jobId = ctx.shared.createJob('rueckblick', BOOK_ID, 'tester@test.dev', 'job.label.rueckblick', { zeitraum: '2024-09' }, `${BOOK_ID}:2024-09_${i}`);
+    ctx.shared.enqueueJob(jobId, () =>
+      ctx.rueckblick.runRueckblickJob(jobId, BOOK_ID, 'tester@test.dev', null, '2024-09'));
+    const job = await waitForJob(ctx.shared, jobId);
+    assert.equal(job.status, 'done');
+    assert.equal(job.result.fromCache, i === 1, `Lauf ${i}: fromCache=${i === 1}`);
+  }
+  // Cache-HIT im 2. Lauf → nur 1 AI-Call insgesamt, aber 2 History-Zeilen.
+  assert.equal(ctx.mockAi.log.length, 1, 'Cache-HIT: kein 2. AI-Call');
+  const histCount = ctx.dbSchema.db.prepare(
+    'SELECT COUNT(*) AS n FROM tagebuch_rueckblicke WHERE book_id = ? AND user_email = ?'
+  ).get(BOOK_ID, 'tester@test.dev').n;
+  assert.equal(histCount, 2, 'beide Läufe als History-Zeile persistiert');
 });
 
 test('Zeitraum-Filter: nur Einträge des gewählten Monats', async () => {

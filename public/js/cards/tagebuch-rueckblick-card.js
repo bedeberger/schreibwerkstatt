@@ -20,6 +20,8 @@ export function registerTagebuchRueckblickCard() {
     rueckblickLoading: false,
     rueckblickProgress: 0,
     rueckblickStatus: '',
+    rueckblickHistory: [],
+    selectedRueckblickId: null,
     _rueckblickPollTimer: null,
     _lifecycle: null,
 
@@ -47,6 +49,8 @@ export function registerTagebuchRueckblickCard() {
           rueckblickLoading: false,
           rueckblickProgress: 0,
           rueckblickStatus: '',
+          rueckblickHistory: [],
+          selectedRueckblickId: null,
         },
         extraListeners: [
           { type: 'job:reconnect', handler: onJobReconnect },
@@ -100,10 +104,14 @@ export function registerTagebuchRueckblickCard() {
         this.rueckblickResult = job.result?.rueckblick || null;
         this.rueckblickEmpty = false;
         this.rueckblickStatus = '';
+        this.selectedRueckblickId = null;
+        // History wurde serverseitig fortgeschrieben → Liste aktualisieren.
+        await this.loadRueckblickHistory();
       },
       async onOpen() {
         // Default-Zeitraum setzen, sobald Karte sichtbar und noch keiner gewählt.
         if (!this.rueckblickZeitraum) this.rueckblickZeitraum = this.defaultZeitraum();
+        await this.loadRueckblickHistory();
       },
     }),
   }));

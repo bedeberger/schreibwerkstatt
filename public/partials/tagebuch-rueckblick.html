@@ -95,4 +95,25 @@
       </ul>
     </div>
   </div>
+
+  <!-- History: früher generierte Rückblicke (re-öffenbar) -->
+  <div x-show="rueckblickHistory.length > 0"
+       class="card-history-section"
+       :class="{ 'card-history-section--borderless': !hasRueckblickResult() && !rueckblickEmpty }">
+    <div class="history-heading" x-text="$app.t('rueckblick.history')"></div>
+    <template x-for="entry in rueckblickHistory" :key="entry.id">
+      <div>
+        <div class="history-item" :class="{ 'history-item--open': selectedRueckblickId === entry.id }"
+             @click="openRueckblickHistory(entry)">
+          <span class="rb-history-zeitraum" x-text="zeitraumLabel(entry.zeitraum)"></span>
+          <span class="history-date" x-text="rueckblickEntryDate(entry.created_at)"></span>
+          <span class="tag" x-show="entry.model" x-text="entry.model"></span>
+          <button type="button" class="btn-delete-history" @click.stop="deleteRueckblickHistory(entry.id)"
+                  :data-tip="$app.t('common.deleteEntry')" :aria-label="$app.t('common.deleteEntry')">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#trash-2"/></svg>
+          </button>
+        </div>
+      </div>
+    </template>
+  </div>
 </div>

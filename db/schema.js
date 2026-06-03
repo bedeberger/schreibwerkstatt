@@ -692,6 +692,37 @@ function deleteRueckblickCache(bookId, userEmail) {
   return _deleteRueckblickCache.run(parseInt(bookId), userEmail || '').changes;
 }
 
+// ── History: Tagebuch-Rückblicke (dauerhaft, analog book_reviews) ─────────────
+// Eine Zeile pro „Erstellen"-Lauf — re-öffenbar im Karten-History-Block.
+const _insertRueckblick = db.prepare(
+  `INSERT INTO tagebuch_rueckblicke (book_id, user_email, zeitraum, result_json, model, created_at)
+   VALUES (?, ?, ?, ?, ?, ?)`
+);
+const _listRueckblicke = db.prepare(
+  `SELECT id, zeitraum, result_json, model, created_at
+   FROM tagebuch_rueckblicke WHERE book_id = ? AND user_email = ?
+   ORDER BY created_at DESC LIMIT ?`
+);
+const _deleteRueckblick = db.prepare(
+  `DELETE FROM tagebuch_rueckblicke WHERE id = ? AND user_email = ?`
+);
+
+function insertRueckblick(bookId, userEmail, zeitraum, result, model = null) {
+  return _insertRueckblick.run(
+    parseInt(bookId), userEmail || '', zeitraum,
+    JSON.stringify(result), model || null, new Date().toISOString(),
+  ).lastInsertRowid;
+}
+
+function listRueckblicke(bookId, userEmail, limit = 20) {
+  return _listRueckblicke.all(parseInt(bookId), userEmail || '', limit)
+    .map(r => ({ ...r, result_json: JSON.parse(r.result_json || 'null') }));
+}
+
+function deleteRueckblick(id, userEmail) {
+  return _deleteRueckblick.run(parseInt(id), userEmail || '').changes;
+}
+
 // ── Delta-Cache: Synonym-Suche (synonyme.js) ──────────────────────────────────
 // Key-Hash deckt wort + satz + buchtyp + locale + cacheVersion ab. Pro User.
 const _loadSynonymCache = db.prepare(
@@ -1205,6 +1236,7 @@ module.exports = {
   loadBookReviewCache, saveBookReviewCache, deleteReviewCache,
   loadChapterMacroReviewCache, saveChapterMacroReviewCache, deleteChapterMacroReviewCache,
   loadRueckblickCache, saveRueckblickCache, deleteRueckblickCache,
+  insertRueckblick, listRueckblicke, deleteRueckblick,
   loadSynonymCache, saveSynonymCache, deleteSynonymCache,
   loadLektoratCache, saveLektoratCache, deleteLektoratCache,
   loadFinetuneAiCache, saveFinetuneAiCache, deleteFinetuneAiCache,
