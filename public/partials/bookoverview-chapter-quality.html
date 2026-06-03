@@ -3,7 +3,7 @@
      als Sekundärwert in der Zeilen-Meta sichtbar.
      Klick auf Tile-Header → Fehler-Heatmap; Zeilen sind nicht klickbar
      (Heatmap zeigt eh alles). -->
-<template x-if="overviewChapterFindings().some(c => !c.noCheck)">
+<template x-if="!overviewIsTagebuch() && overviewChapterFindings().some(c => !c.noCheck)">
   <div class="overview-tile overview-tile--medium internal-link"
        @click="$app.toggleFehlerHeatmapCard()">
     <div class="overview-tile-head">

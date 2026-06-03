@@ -14,6 +14,8 @@ ai_parse_fails/
 test-results/
 playwright-report/
 schreibwerkstatt.db.*.bak
+# Verirrte SQLite-Datei (nicht vom App-Pfad genutzt; Default ist schreibwerkstatt.db)
+app.db
 # Output-Intent-ICC: Binaerprofil, per Deploy-Migration geladen (assets/icc/README.md)
 assets/icc/*.icc
 

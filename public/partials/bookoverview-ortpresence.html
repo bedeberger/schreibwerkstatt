@@ -2,7 +2,7 @@
      Cell-Wert = location_chapters.haeufigkeit. Cell-Intensität = per Spalte
      skaliert. Match primär per chapter_id, Fallback chapter_name.
      Immer medium — Matrix mit Spalten-Header braucht Breite (siehe DESIGN.md). -->
-<template x-if="overviewOrtPresence().places.length > 0">
+<template x-if="!overviewIsTagebuch() && overviewOrtPresence().places.length > 0">
   <div class="overview-tile overview-tile--medium">
     <div class="overview-tile-label" x-text="$app.t('overview.ortPresence')"></div>
     <div class="overview-presence-wrap">

@@ -24,7 +24,7 @@
 </template>
 
 <!-- Szenen: Total + Stacked-Bar Wertungs-Verteilung -->
-<template x-if="overviewSzenenCount() > 0">
+<template x-if="!overviewIsTagebuch() && overviewSzenenCount() > 0">
   <div class="overview-tile internal-link"
        @click="$app.toggleSzenenCard()"
        :aria-label="$app.t('tile.szenen') + ': ' + _fmtNum(overviewSzenenCount()) + ' ' + $app.t('overview.unit.total')">

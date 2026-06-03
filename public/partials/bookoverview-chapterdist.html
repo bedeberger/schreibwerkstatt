@@ -1,6 +1,6 @@
 <!-- Kapitel-Verteilung: horizontale Bars pro Kapitel (Zeichen relativ).
      Immer medium — Bar + 5 Meta-Zellen brauchen Breite, sonst Stack-Wrap. -->
-<template x-if="overviewChapterDistribution().length > 0">
+<template x-if="!overviewIsTagebuch() && overviewChapterDistribution().length > 0">
   <div class="overview-tile overview-tile--medium">
     <div class="overview-tile-head">
       <div class="overview-tile-label" x-text="$app.t('overview.chapterDist')"></div>

@@ -57,6 +57,7 @@ export const loadMethods = {
       this.overviewLektoratTime = lektoratTime || null;
       this.overviewIsFinished = !!settings?.is_finished;
       this.overviewDailyGoalChars = settings?.daily_goal_chars != null ? Number(settings.daily_goal_chars) : null;
+      this.overviewBuchtyp = settings?.buchtyp || null;
       this._memos = {};
     } catch (e) {
       console.error('[loadBookOverview]', e);
@@ -170,6 +171,15 @@ export const loadMethods = {
     }
   },
 
+  // Tagebücher (buchtyp 'tagebuch') sind Ich-Perspektive + datierte Einträge ohne
+  // Ensemble/Dramaturgie — die narrativen Analyse-Tiles (Figuren-/Schauplatz-Matrix,
+  // Szenen-Wertung, Kapitel-Verteilung/-Findings) sind dort bedeutungslos und werden
+  // ausgeblendet. Schreibstats/Streak, Lektorat, Bewertung, Recent und die
+  // Figuren-/Orte-Top-Listen bleiben.
+  overviewIsTagebuch() {
+    return this.overviewBuchtyp === 'tagebuch';
+  },
+
   resetBookOverview() {
     this.overviewStats = [];
     this.overviewCoverage = null;
@@ -184,6 +194,7 @@ export const loadMethods = {
     this.overviewLektoratTime = null;
     this.overviewIsFinished = false;
     this.overviewDailyGoalChars = null;
+    this.overviewBuchtyp = null;
     this.overviewBookId = null;
     this._memos = {};
   },
