@@ -63,3 +63,30 @@ test('SCHEMA_RUECKBLICK: Struktur + Pflichtfelder', () => {
   assert.equal(SCHEMA_RUECKBLICK.properties.themen.items.properties.haeufigkeit.type, 'number');
   assert.equal(SCHEMA_RUECKBLICK.properties.zusammenfassung.type, 'string');
 });
+
+test('SCHEMA_RUECKBLICK: Personen + Orte tragen Datums-Belege', () => {
+  for (const k of ['personen', 'orte']) {
+    const item = SCHEMA_RUECKBLICK.properties[k].items;
+    assert.ok(item.properties.belege, `${k}: belege-Feld fehlt`);
+    assert.equal(item.properties.belege.type, 'array');
+    assert.equal(item.properties.belege.items.type, 'string');
+    assert.ok(item.required.includes('belege'), `${k}: belege nicht required`);
+  }
+});
+
+test('buildRueckblickPrompt: Personen/Orte-Belege im Output-Schema + Constraint', () => {
+  const p = buildRueckblickPrompt(ENTRIES, { zeitraum: '2024-03' });
+  // Output-Beispiel enthält belege bei personen/orte.
+  assert.match(p, /"personen":[^\]]*"belege"/);
+  assert.match(p, /"orte":[^\]]*"belege"/);
+  // Constraint deckt Personen/Orte explizit ab.
+  assert.match(p, /jede Person, jeder Ort/);
+});
+
+test('buildRueckblickReducePrompt: Personen-Belege fliessen in den Reduce-Text', () => {
+  const monthResults = [
+    { monat: '2024-01', themen: [], personen: [{ name: 'Anna', haeufigkeit: 2, belege: ['2024-01-03', '2024-01-09'] }], orte: [], bemerkenswerteTage: [], zusammenfassung: 'Januar.' },
+  ];
+  const p = buildRueckblickReducePrompt(monthResults, { zeitraum: '2024' });
+  assert.match(p, /Anna \(2×; 2024-01-03, 2024-01-09\)/);
+});

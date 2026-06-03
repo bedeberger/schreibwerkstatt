@@ -1771,6 +1771,7 @@ Struktur: 8 thematische Subfolder unter [public/css/](public/css/) + Root-Solit�
 | [page/page-list.css](public/css/page/page-list.css) | Seiten-Liste in Sidebar, `.tok-stats`, `.tok-totals`. |
 | [page/page-view.css](public/css/page/page-view.css) | `.page-content-view` Reading-Frame, Callouts, Marginalia-Stripe, Mention-/Channel-Chips. |
 | [page/sidebar-calendar.css](public/css/page/sidebar-calendar.css) | `.sidebar-calendar` — Monats-Grid + Stepper für Tagebuch-Sidebar. |
+| [page/diary-anniversary.css](public/css/page/diary-anniversary.css) | `.diary-anniversary` / `.diary-range` — Rückblick „An diesem Tag" + Zeitraum-Suche im Kalender-Sidebar. |
 | [page/page-revision-viewer.css](public/css/page/page-revision-viewer.css) | Page-Revision-Diff-Viewer. |
 | [page/tree-history.css](public/css/page/tree-history.css) | Sidebar-Tree, `.history-*`, `.history-chevron`. |
 | [page/tagebuch-rueckblick.css](public/css/page/tagebuch-rueckblick.css) | `.card--tagebuchRueckblick` — Rückblick-Karte: Themen-/Personen-/Orte-Badges (eckig), bemerkenswerte Tage als `.internal-link`. |

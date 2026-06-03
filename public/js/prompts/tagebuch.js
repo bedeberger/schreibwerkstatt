@@ -14,8 +14,9 @@ import { _jsonOnly } from './state.js';
 const RUECKBLICK_CONSTRAINT = `
 Strenge Regeln (verbindlich):
 - Stütze JEDE Aussage ausschliesslich auf die vorgelegten Einträge. Erfinde nichts.
-- Jedes Thema und jeder bemerkenswerte Tag MUSS mit mindestens einem Eintragsdatum (YYYY-MM-DD) belegt sein, das im Material vorkommt.
-- "haeufigkeit" ist die Anzahl der Einträge, in denen das Thema / die Person / der Ort vorkommt — keine Schätzung darüber hinaus.
+- Jedes Thema, jede Person, jeder Ort und jeder bemerkenswerte Tag MUSS mit mindestens einem Eintragsdatum (YYYY-MM-DD) belegt sein, das im Material vorkommt.
+- "belege" listet ALLE Eintragsdaten (YYYY-MM-DD), in denen das Thema / die Person / der Ort vorkommt — aufsteigend, nur tatsächlich vorhandene Daten.
+- "haeufigkeit" ist die Anzahl der Einträge, in denen das Thema / die Person / der Ort vorkommt (= Länge von "belege") — keine Schätzung darüber hinaus.
 - Personen und Orte nur nennen, wenn sie im Text tatsächlich erwähnt werden. Keine Auflösung von Pronomen zu erfundenen Namen.
 - Schreibe NICHT in den Tagebuchtext, schlage keine neuen Einträge vor. Du verdichtest nur das Geschriebene.
 - "zusammenfassung" ist ein beobachtender Rückblick (2–4 Absätze) über den Zeitraum, kein Ratgeber und keine Fortsetzung.`;
@@ -29,8 +30,8 @@ Antworte mit diesem JSON-Schema:
   "themen": [
     { "label": "kurzes Themen-Label", "haeufigkeit": 3, "belege": ["2024-03-04", "2024-03-12"] }
   ],
-  "personen": [ { "name": "im Text genannter Name", "haeufigkeit": 5 } ],
-  "orte":     [ { "name": "im Text genannter Ort", "haeufigkeit": 2 } ],
+  "personen": [ { "name": "im Text genannter Name", "haeufigkeit": 5, "belege": ["2024-03-04", "2024-03-12"] } ],
+  "orte":     [ { "name": "im Text genannter Ort", "haeufigkeit": 2, "belege": ["2024-03-04"] } ],
   "bemerkenswerteTage": [ { "datum": "2024-03-15", "begruendung": "ein Satz, warum dieser Tag heraussticht" } ],
   "zusammenfassung": "2–4 Absätze Fliesstext: zentrale Stimmungen, Entwicklungen und roter Faden des Zeitraums – nur belegt"
 }
@@ -78,8 +79,8 @@ ${_formatEntries(entries)}
 function _formatMonthResults(monthResults) {
   return monthResults.map(m => {
     const themen = (m.themen || []).map(t => `${t.label} (${t.haeufigkeit}×; ${(t.belege || []).join(', ')})`).join('; ') || '–';
-    const personen = (m.personen || []).map(p => `${p.name} (${p.haeufigkeit}×)`).join('; ') || '–';
-    const orte = (m.orte || []).map(o => `${o.name} (${o.haeufigkeit}×)`).join('; ') || '–';
+    const personen = (m.personen || []).map(p => `${p.name} (${p.haeufigkeit}×; ${(p.belege || []).join(', ')})`).join('; ') || '–';
+    const orte = (m.orte || []).map(o => `${o.name} (${o.haeufigkeit}×; ${(o.belege || []).join(', ')})`).join('; ') || '–';
     const tage = (m.bemerkenswerteTage || []).map(t => `${t.datum}: ${t.begruendung}`).join(' | ') || '–';
     return `## Monat ${m.monat}\nThemen: ${themen}\nPersonen: ${personen}\nOrte: ${orte}\nBemerkenswerte Tage: ${tage}\nZusammenfassung: ${m.zusammenfassung || '–'}`;
   }).join('\n\n');
@@ -117,6 +118,7 @@ const _themaItem = _obj({
 const _nennungItem = _obj({
   name:        _str,
   haeufigkeit: _num,
+  belege:      { type: 'array', items: _str },
 });
 
 const _tagItem = _obj({

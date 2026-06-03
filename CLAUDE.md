@@ -39,7 +39,7 @@ Themen-Spickzettel ausgelagert (Drift-Schutz: CLAUDE.md-Regeln, Details in den S
 
 ## Feature-Pläne
 
-Neue grössere Features werden vor Implementierung als Plan unter [docs/ideen/](docs/ideen/) festgehalten — Skelett: [docs/ideen/_template.md](docs/ideen/_template.md) (verbindliche Sektionsreihenfolge: Header mit Status/Aufwand/Severity, Context, Scope MVP, Out-of-Scope, Done when, Hard-Rule-Audit, Abhängigkeiten, Backend, Frontend, CSS, i18n, DB, Security, Telemetrie, Reversibilität, Tests, Edge-Cases, Kritische Dateien Modify/Create, Offene Fragen). Plan kopieren, Status `Draft` → `Ready` erst wenn „Offene Fragen" leer. Optionale Sektionen als `n/a` markieren statt entfernen (Drift sichtbar).
+Standardmässig **keine** Plan-Dateien anlegen — auch nicht unter [docs/ideen/](docs/ideen/). Grössere Features werden direkt im Chat besprochen und umgesetzt. Eine Plan-Datei (und erst recht ein grosses Mehrseiten-Dokument) entsteht **nur**, wenn der User es ausdrücklich verlangt; Ablageort dann mit dem User klären, nicht automatisch `docs/ideen/`.
 
 ## Doku-Stil dieser Datei
 

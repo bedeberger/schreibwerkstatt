@@ -57,6 +57,68 @@ export const tagebuchRueckblickMethods = {
     if (page) window.__app.selectPage(page);
   },
 
+  // ── Belege-Popover (Klick auf Thema/Person/Ort → referenzierte Seiten) ───────
+  // Öffnet ein fixed-positioniertes Popover, das sich am angeklickten Badge
+  // ausrichtet (unter dem Element, bei zu wenig Platz darüber — mobil wie
+  // desktop) und am Viewport-Rand geclampt wird. Jeder Tag navigiert zur Seite.
+  openBelegePopover(event, label, belege) {
+    const anchor = event?.currentTarget || event?.target || null;
+    const days = [...new Set((belege || []).map(d => String(d).slice(0, 10)).filter(Boolean))].sort();
+    this.rbPopover = { open: true, label: label || '', belege: days, x: -9999, y: -9999 };
+    // Sync-Vorabplatzierung (ohne gemessene Höhe → unter dem Element) gegen
+    // Flackern, dann nach Render mit echter Höhe verfeinern (Flip oben/unten).
+    this._placeBelegePopover(anchor);
+    const place = () => this._placeBelegePopover(anchor);
+    if (window.Alpine?.nextTick) window.Alpine.nextTick(place);
+    else setTimeout(place, 0);
+  },
+
+  // Positioniert das Popover relativ zum Anker-Element. Unter dem Element, sofern
+  // dort Platz ist; sonst darüber, wenn oben mehr Raum bleibt. Horizontal an der
+  // linken Anker-Kante, beidseitig auf den Viewport geclampt.
+  _placeBelegePopover(anchor) {
+    const rect = anchor?.getBoundingClientRect?.();
+    if (!rect) return;
+    const pop = anchor.closest?.('.card')?.querySelector?.('.rb-belege-popover');
+    const EDGE = 8, GAP = 6;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const popW = pop?.offsetWidth || 240;
+    const popH = pop?.offsetHeight || 0;
+    let left = Math.min(rect.left, vw - popW - EDGE);
+    left = Math.max(EDGE, left);
+    const spaceBelow = vh - rect.bottom;
+    let top;
+    if (popH && spaceBelow < popH + GAP && rect.top > spaceBelow) {
+      top = rect.top - popH - GAP; // oben aufklappen
+    } else {
+      top = rect.bottom + GAP;     // unter dem Element
+    }
+    if (popH) top = Math.max(EDGE, Math.min(top, vh - popH - EDGE));
+    this.rbPopover.x = Math.round(left);
+    this.rbPopover.y = Math.round(top);
+  },
+
+  closeBelegePopover() {
+    this.rbPopover = { open: false, label: '', belege: [], x: 0, y: 0 };
+  },
+
+  // Tag aus dem Popover anspringen + Popover schliessen.
+  gotoBelegTag(datum) {
+    this.closeBelegePopover();
+    this.gotoRueckblickTag(datum);
+  },
+
+  // 'YYYY-MM-DD' → lokalisierter Tag (TZ-aware, Noon-UTC verhindert Datums-Rollover).
+  belegLabel(datum) {
+    const m = ISO_DATE_RE.exec(String(datum || ''));
+    if (!m) return String(datum || '');
+    const d = new Date(Date.UTC(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10), 12));
+    try {
+      return d.toLocaleDateString(window.__app?.uiLocale === 'en' ? 'en-US' : 'de-CH',
+        tzOpts({ weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }));
+    } catch { return String(datum); }
+  },
+
   // Zusammenfassung in Absätze splitten (Doppel-Newline oder Single-Newline).
   rueckblickParagraphs() {
     const txt = this.rueckblickResult?.zusammenfassung || '';
@@ -78,6 +140,31 @@ export const tagebuchRueckblickMethods = {
       console.error('[loadRueckblickHistory]', e);
       this.rueckblickHistory = [];
     }
+  },
+
+  // Gefilterte History (Volltext über Zeitraum-Label + Inhalt der gespeicherten
+  // Rückblicke: Zusammenfassung, Themen, Personen, Orte, bemerkenswerte Tage).
+  // Rein clientseitig über die bereits geladene Liste.
+  filteredRueckblickHistory() {
+    const all = this.rueckblickHistory || [];
+    const q = String(this.rbHistorySearch || '').trim().toLowerCase();
+    if (!q) return all;
+    return all.filter(e => this._rueckblickHaystack(e).includes(q));
+  },
+
+  // Durchsuchbarer Text eines History-Eintrags (lowercase).
+  _rueckblickHaystack(entry) {
+    const r = entry?.result_json || {};
+    const parts = [
+      entry?.zeitraum || '',
+      this.zeitraumLabel(entry?.zeitraum),
+      r.zusammenfassung || '',
+      ...(r.themen || []).map(t => t.label),
+      ...(r.personen || []).map(p => p.name),
+      ...(r.orte || []).map(o => o.name),
+      ...(r.bemerkenswerteTage || []).map(t => t.begruendung),
+    ];
+    return parts.filter(Boolean).join(' ').toLowerCase();
   },
 
   // Zeitraum-Vorauswahl (aus Overview-Heatmap, warmer Fall): Zeitraum setzen

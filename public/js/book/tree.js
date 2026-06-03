@@ -475,6 +475,7 @@ export const treeMethods = {
     // Tagebuch-User den Kalender verlässlich beim Aufruf sehen.
     this.sidebarMode = this.isTagebuch() ? 'calendar' : 'tree';
     this.diaryCalendarYearMonth = null;
+    this.diaryAnniversaryOpen = this._loadDiaryAnniversaryOpen();
     try {
       this.setStatus(this.t('tree.loadingPages'), true);
       // Tree/Pages werden NICHT vorab geleert — alter Tree bleibt sichtbar

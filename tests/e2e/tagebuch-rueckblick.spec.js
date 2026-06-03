@@ -71,6 +71,40 @@ test('Klick auf bemerkenswerten Tag ruft selectPage mit der Tagebuch-Seite', asy
   expect(selected).toBe('2024-03-04');
 });
 
+test('Klick auf Thema öffnet Belege-Popover; Klick auf Beleg navigiert + schliesst', async ({ page }) => {
+  await page.evaluate(() => {
+    const data = window.Alpine.$data(document.querySelector('#root'));
+    data.rueckblickResult = {
+      themen: [{ label: 'Arbeit', haeufigkeit: 2, belege: ['2024-03-15', '2024-03-04'] }],
+      personen: [], orte: [], bemerkenswerteTage: [], zusammenfassung: 'Text.',
+    };
+  });
+  await page.locator('[data-test="theme-Arbeit"]').click();
+  await expect(page.locator('[data-test="popover"]')).toBeVisible();
+  // Popover richtet sich am Anker-Element aus (unter dem Badge, linke Kanten nah,
+  // vollständig im Viewport) — nicht an Klick-Koordinaten.
+  const anchorBox = await page.locator('[data-test="theme-Arbeit"]').boundingBox();
+  const popBox = await page.locator('[data-test="popover"]').boundingBox();
+  expect(popBox.y).toBeGreaterThanOrEqual(anchorBox.y + anchorBox.height - 1);
+  expect(Math.abs(popBox.x - anchorBox.x)).toBeLessThan(4);
+  expect(popBox.x).toBeGreaterThanOrEqual(0);
+  expect(popBox.x + popBox.width).toBeLessThanOrEqual(await page.evaluate(() => window.innerWidth));
+  // Belege dedupliziert + aufsteigend sortiert → erstes Item ist 2024-03-04.
+  await expect(page.locator('[data-test="beleg-2024-03-04"]')).toBeVisible();
+  await page.locator('[data-test="beleg-2024-03-15"]').click();
+  expect(await page.evaluate(() => window.__selectedTag)).toBe('2024-03-15');
+  await expect(page.locator('[data-test="popover"]')).not.toBeVisible();
+});
+
+test('History-Suche filtert nach Inhalt der gespeicherten Rückblicke', async ({ page }) => {
+  await expect(page.locator('[data-test="history"] .history-item')).toHaveCount(2);
+  await page.locator('[data-test="history-search"]').fill('April');
+  await expect(page.locator('[data-test="history"] .history-item')).toHaveCount(1);
+  await expect(page.locator('[data-test="hist-11"]')).toBeVisible();
+  await page.locator('[data-test="history-search"]').fill('xyz-nope');
+  await expect(page.locator('[data-test="history"] .history-item')).toHaveCount(0);
+});
+
 test('History: frühere Rückblicke werden beim Öffnen geladen + gelistet', async ({ page }) => {
   await expect(page.locator('[data-test="history"]')).toBeVisible();
   await expect(page.locator('[data-test="history"] .history-item')).toHaveCount(2);

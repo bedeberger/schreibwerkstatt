@@ -22,6 +22,8 @@ export function registerTagebuchRueckblickCard() {
     rueckblickStatus: '',
     rueckblickHistory: [],
     selectedRueckblickId: null,
+    rbHistorySearch: '',
+    rbPopover: { open: false, label: '', belege: [], x: 0, y: 0 },
     _rueckblickPollTimer: null,
     _lifecycle: null,
 
@@ -59,6 +61,8 @@ export function registerTagebuchRueckblickCard() {
           rueckblickStatus: '',
           rueckblickHistory: [],
           selectedRueckblickId: null,
+          rbHistorySearch: '',
+          rbPopover: { open: false, label: '', belege: [], x: 0, y: 0 },
         },
         extraListeners: [
           { type: 'job:reconnect', handler: onJobReconnect },

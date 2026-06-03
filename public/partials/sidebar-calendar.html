@@ -59,4 +59,71 @@
       </button>
     </template>
   </div>
+
+  <!-- „An diesem Tag": Einträge vom selben MM-DD aus Vorjahren (rein lesend). -->
+  <div class="diary-anniversary">
+    <button type="button"
+            class="collapsible-toggle"
+            @click="toggleDiaryAnniversaryOpen()"
+            :aria-expanded="diaryAnniversaryOpen">
+      <span class="history-chevron" :class="{ open: diaryAnniversaryOpen }">›</span>
+      <span x-text="t('diary.anniversary.title')"></span>
+    </button>
+    <div x-show="diaryAnniversaryOpen" x-cloak>
+      <template x-if="diaryAnniversaryEntries().length === 0">
+        <p class="diary-anniversary-empty" x-text="t('diary.anniversary.empty')"></p>
+      </template>
+      <ul class="diary-anniversary-list">
+        <template x-for="entry in diaryAnniversaryEntries()" :key="entry.key">
+          <li>
+            <button type="button" class="diary-anniversary-item" @click="selectPage(entry.page)">
+              <span class="diary-anniversary-meta">
+                <span class="badge" x-text="diaryAnniversaryYearsAgoLabel(entry.yearsAgo)"></span>
+                <span class="diary-anniversary-weekday" x-text="entry.weekday + ', ' + entry.year"></span>
+              </span>
+              <span class="diary-anniversary-preview" x-show="entry.preview" x-text="entry.preview"></span>
+            </button>
+          </li>
+        </template>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Zeitraum-Suche: Von/Bis-Datumsfilter über die Diary-Seiten (clientseitig). -->
+  <div class="diary-range">
+    <div class="diary-range-header">
+      <span class="diary-range-title" x-text="t('diary.range.title')"></span>
+      <button type="button" class="search-clear--icon diary-range-clear"
+              x-show="diaryRangeFrom || diaryRangeTo"
+              @click="diaryRangeFrom = ''; diaryRangeTo = ''"
+              :aria-label="t('search.clear')" :data-tip="t('search.clear')">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#x"/></svg>
+      </button>
+    </div>
+    <div class="diary-range-fields">
+      <label class="diary-range-field">
+        <span x-text="t('diary.range.from')"></span>
+        <input type="date" x-model="diaryRangeFrom">
+      </label>
+      <label class="diary-range-field">
+        <span x-text="t('diary.range.to')"></span>
+        <input type="date" x-model="diaryRangeTo">
+      </label>
+    </div>
+    <template x-if="diaryRangeFrom && diaryRangeTo && diaryRangeEntries().length === 0">
+      <p class="diary-anniversary-empty" x-text="t('diary.range.empty')"></p>
+    </template>
+    <ul class="diary-anniversary-list" x-show="diaryRangeEntries().length > 0">
+      <template x-for="entry in diaryRangeEntries()" :key="entry.key">
+        <li>
+          <button type="button" class="diary-anniversary-item" @click="selectPage(entry.page)">
+            <span class="diary-anniversary-meta">
+              <span class="diary-anniversary-weekday" x-text="entry.dateLabel"></span>
+            </span>
+            <span class="diary-anniversary-preview" x-show="entry.preview" x-text="entry.preview"></span>
+          </button>
+        </li>
+      </template>
+    </ul>
+  </div>
 </div>

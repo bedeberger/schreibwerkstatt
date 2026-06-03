@@ -141,6 +141,10 @@ const navigationState = () => ({
   sidebarMode: 'tree',
   diaryCalendarYearMonth: null,
   _diaryCalendarJumpModel: '',
+  // Diary-Rückblick „An diesem Tag" + Zeitraum-Suche (rein lesend, kein KI-Call).
+  diaryAnniversaryOpen: true,
+  diaryRangeFrom: '',
+  diaryRangeTo: '',
   // Pagetree-Rechtsklick-Menü. SSoT für Open/Pos/Target; Render in sidebar.html.
   // Target-Form: { kind: 'page'|'chapter', id, name }. Position viewport-fixed
   // (sidebar liegt ausserhalb einer transform-Card, daher kein Containing-Block-

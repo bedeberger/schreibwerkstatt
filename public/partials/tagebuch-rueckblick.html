@@ -48,7 +48,8 @@
       <div class="history-heading" x-text="$app.t('rueckblick.themen')"></div>
       <div class="rb-badges">
         <template x-for="(t, i) in (rueckblickResult?.themen || [])" :key="i">
-          <span class="rb-theme" :data-tip="(t.belege || []).join(', ')">
+          <span class="rb-theme internal-link" @click="openBelegePopover($event, t.label, t.belege)"
+                :data-tip="$app.t('rueckblick.showReferences')">
             <span class="rb-theme-label" x-text="t.label"></span>
             <span class="rb-count" x-text="t.haeufigkeit"></span>
           </span>
@@ -62,7 +63,8 @@
         <div class="history-heading" x-text="$app.t('rueckblick.personen')"></div>
         <div class="rb-badges">
           <template x-for="(p, i) in (rueckblickResult?.personen || [])" :key="i">
-            <span class="rb-entity">
+            <span class="rb-entity internal-link" @click="openBelegePopover($event, p.name, p.belege)"
+                  :data-tip="$app.t('rueckblick.showReferences')">
               <span x-text="p.name"></span>
               <span class="rb-count" x-text="p.haeufigkeit"></span>
             </span>
@@ -73,7 +75,8 @@
         <div class="history-heading" x-text="$app.t('rueckblick.orte')"></div>
         <div class="rb-badges">
           <template x-for="(o, i) in (rueckblickResult?.orte || [])" :key="i">
-            <span class="rb-entity">
+            <span class="rb-entity internal-link" @click="openBelegePopover($event, o.name, o.belege)"
+                  :data-tip="$app.t('rueckblick.showReferences')">
               <span x-text="o.name"></span>
               <span class="rb-count" x-text="o.haeufigkeit"></span>
             </span>
@@ -101,7 +104,15 @@
        class="card-history-section"
        :class="{ 'card-history-section--borderless': !hasRueckblickResult() && !rueckblickEmpty }">
     <div class="history-heading" x-text="$app.t('rueckblick.history')"></div>
-    <template x-for="entry in rueckblickHistory" :key="entry.id">
+    <span class="filter-search-wrap rb-history-search-wrap" x-show="rueckblickHistory.length > 2">
+      <input type="text" class="filter-search-input rb-history-search" x-model="rbHistorySearch"
+             :placeholder="$app.t('rueckblick.historySearch')" :aria-label="$app.t('rueckblick.historySearch')">
+      <button type="button" class="search-clear--icon" x-show="rbHistorySearch" @click="rbHistorySearch=''"
+              :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#x"/></svg>
+      </button>
+    </span>
+    <template x-for="entry in filteredRueckblickHistory()" :key="entry.id">
       <div>
         <div class="history-item" :class="{ 'history-item--open': selectedRueckblickId === entry.id }"
              @click="openRueckblickHistory(entry)">
@@ -115,5 +126,27 @@
         </div>
       </div>
     </template>
+    <div class="rb-empty" x-show="rbHistorySearch && !filteredRueckblickHistory().length" x-cloak
+         x-text="$app.t('rueckblick.historyNoMatch')"></div>
+  </div>
+
+  <!-- Belege-Popover: referenzierte Einträge der angeklickten Entität -->
+  <div class="rb-belege-popover" x-show="rbPopover.open" x-cloak
+       @click.outside="closeBelegePopover()" @keydown.escape.window="closeBelegePopover()"
+       @scroll.window="closeBelegePopover()" @resize.window="closeBelegePopover()"
+       :style="{ top: rbPopover.y + 'px', left: rbPopover.x + 'px' }">
+    <div class="rb-belege-header">
+      <span class="rb-belege-title" x-text="rbPopover.label"></span>
+      <button type="button" class="rb-belege-close" @click="closeBelegePopover()"
+              :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg>
+      </button>
+    </div>
+    <div class="rb-belege-body">
+      <template x-for="(d, i) in rbPopover.belege" :key="i">
+        <button type="button" class="rb-belege-item internal-link" @click="gotoBelegTag(d)" x-text="belegLabel(d)"></button>
+      </template>
+      <div class="rb-belege-empty" x-show="!rbPopover.belege.length" x-text="$app.t('rueckblick.belegeEmpty')"></div>
+    </div>
   </div>
 </div>

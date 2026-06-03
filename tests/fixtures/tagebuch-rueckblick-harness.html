@@ -36,7 +36,7 @@
       </div>
       <div class="rb-badges" data-test="themen">
         <template x-for="(t, i) in (rueckblickResult?.themen || [])" :key="i">
-          <span class="rb-theme"><span class="rb-theme-label" x-text="t.label"></span><span class="rb-count" x-text="t.haeufigkeit"></span></span>
+          <span class="rb-theme internal-link" :data-test="'theme-' + t.label" @click="openBelegePopover($event, t.label, t.belege)"><span class="rb-theme-label" x-text="t.label"></span><span class="rb-count" x-text="t.haeufigkeit"></span></span>
         </template>
       </div>
       <ul class="rb-tage" data-test="tage">
@@ -50,13 +50,29 @@
     </div>
 
     <div class="card-history-section" data-test="history" x-show="rueckblickHistory.length > 0">
-      <template x-for="entry in rueckblickHistory" :key="entry.id">
+      <input type="text" class="rb-history-search" data-test="history-search" x-model="rbHistorySearch" placeholder="suche">
+      <template x-for="entry in filteredRueckblickHistory()" :key="entry.id">
         <div class="history-item" :data-test="'hist-' + entry.id" @click="openRueckblickHistory(entry)">
           <span class="rb-history-zeitraum" x-text="zeitraumLabel(entry.zeitraum)"></span>
           <span class="history-date" x-text="rueckblickEntryDate(entry.created_at)"></span>
           <button type="button" :data-test="'hist-del-' + entry.id" @click.stop="deleteRueckblickHistory(entry.id)">x</button>
         </div>
       </template>
+    </div>
+
+    <div class="rb-belege-popover" data-test="popover" x-show="rbPopover.open"
+         @click.outside="closeBelegePopover()" @scroll.window="closeBelegePopover()" @resize.window="closeBelegePopover()"
+         :style="{ top: rbPopover.y + 'px', left: rbPopover.x + 'px' }">
+      <div class="rb-belege-header">
+        <span class="rb-belege-title" x-text="rbPopover.label"></span>
+        <button type="button" data-test="popover-close" @click="closeBelegePopover()">x</button>
+      </div>
+      <div class="rb-belege-body">
+        <template x-for="(d, i) in rbPopover.belege" :key="i">
+          <button type="button" class="rb-belege-item internal-link" :data-test="'beleg-' + d" @click="gotoBelegTag(d)" x-text="belegLabel(d)"></button>
+        </template>
+        <div class="rb-belege-empty" data-test="popover-empty" x-show="!rbPopover.belege.length">leer</div>
+      </div>
     </div>
   </div>
 

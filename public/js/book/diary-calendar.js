@@ -7,10 +7,39 @@
 // Page), wir wollen aber nicht pro Render rebuilden.
 
 import { contentRepo } from '../repo/content.js';
-import { fetchJson, localIsoDate } from '../utils.js';
+import { fetchJson, localIsoDate, tzOpts } from '../utils.js';
 import { _sortSoloFirst } from './tree.js';
 
 const _CACHE_KEY = '_diaryCalendarCache';
+
+// Pure: alle Map-Keys mit gleichem `MM-DD` und Jahr < `todayYear`, absteigend
+// nach Jahr. `map` ist Map<'YYYY-MM-DD', page> (diaryCalendarPagesMap-Shape).
+// Exakt-Matching auf `MM-DD` (29.02. matcht nur echte 29.02.-Einträge).
+export function _computeAnniversary(map, todayMMDD, todayYear) {
+  const out = [];
+  for (const [key, page] of map.entries()) {
+    if (key.slice(5) !== todayMMDD) continue;
+    const year = parseInt(key.slice(0, 4), 10);
+    if (year >= todayYear) continue;
+    out.push({ key, year, yearsAgo: todayYear - year, page });
+  }
+  out.sort((a, b) => b.year - a.year);
+  return out;
+}
+
+// Pure: alle Map-Keys im inklusiven Bereich [from, to] (ISO-Strings, sortierbar),
+// absteigend nach Datum. Bei from > to werden die Grenzen getauscht.
+export function _computeRange(map, from, to) {
+  if (!from || !to) return [];
+  let lo = from, hi = to;
+  if (lo > hi) { lo = to; hi = from; }
+  const out = [];
+  for (const [key, page] of map.entries()) {
+    if (key >= lo && key <= hi) out.push({ key, page });
+  }
+  out.sort((a, b) => b.key.localeCompare(a.key));
+  return out;
+}
 
 function _ensureCache(app) {
   if (!app[_CACHE_KEY]) app[_CACHE_KEY] = { pagesRef: null, map: null, months: null, langByBookId: {} };
@@ -63,6 +92,9 @@ export const diaryCalendarMethods = {
     cache.pagesRef = this.pages;
     cache.map = m;
     cache.months = null;
+    cache.sorted = null;
+    cache.anniversary = null;
+    cache.range = null;
     return m;
   },
 
@@ -352,5 +384,92 @@ export const diaryCalendarMethods = {
   // setzt Tree-Code beim Buchwechsel auf 'calendar' (in tree.js loadPages).
   toggleSidebarMode() {
     this.sidebarMode = this.sidebarMode === 'calendar' ? 'tree' : 'calendar';
+  },
+
+  // ── Rückblick „An diesem Tag" + Zeitraum-Suche (KI-frei, rein lesend) ──────
+
+  // Bezugstag = heute als `MM-DD`, TZ-aware (app.timezone), nicht Browser-TZ.
+  diaryAnniversaryToday() {
+    return localIsoDate().slice(5);
+  },
+
+  // [{ key, year, yearsAgo, weekday, preview, page }] absteigend nach Jahr.
+  // Cache an pagesRef + Bezugstag gekoppelt (Invalidierung in diaryCalendarPagesMap).
+  diaryAnniversaryEntries() {
+    const cache = _ensureCache(this);
+    const mmdd = this.diaryAnniversaryToday();
+    if (cache.pagesRef === this.pages && cache.anniversary && cache.anniversaryKey === mmdd) {
+      return cache.anniversary;
+    }
+    const map = this.diaryCalendarPagesMap();
+    const todayYear = parseInt(localIsoDate().slice(0, 4), 10);
+    const list = _computeAnniversary(map, mmdd, todayYear).map(e => ({
+      ...e,
+      weekday: this._diaryWeekdayLabel(e.key),
+      preview: e.page?.preview_text || '',
+    }));
+    cache.anniversary = list;
+    cache.anniversaryKey = mmdd;
+    return list;
+  },
+
+  // [{ key, dateLabel, weekday, preview, page }] absteigend nach Datum.
+  // Cache an pagesRef + Von/Bis-Bereich gekoppelt.
+  diaryRangeEntries() {
+    const cache = _ensureCache(this);
+    const ck = `${this.diaryRangeFrom}|${this.diaryRangeTo}`;
+    if (cache.pagesRef === this.pages && cache.range && cache.rangeKey === ck) {
+      return cache.range;
+    }
+    const map = this.diaryCalendarPagesMap();
+    const list = _computeRange(map, this.diaryRangeFrom, this.diaryRangeTo).map(e => ({
+      ...e,
+      dateLabel: this._diaryDateLabel(e.key),
+      weekday: this._diaryWeekdayLabel(e.key),
+      preview: e.page?.preview_text || '',
+    }));
+    cache.range = list;
+    cache.rangeKey = ck;
+    return list;
+  },
+
+  // Wochentag (lang) eines `YYYY-MM-DD`. Noon-UTC + tzOpts → kein TZ-Tagessprung.
+  _diaryWeekdayLabel(dateIso) {
+    const locale = this.uiLocale === 'en' ? 'en-US' : 'de-CH';
+    return new Date(`${dateIso}T12:00:00Z`).toLocaleDateString(locale, tzOpts({ weekday: 'long' }));
+  },
+
+  // Volles Datum (z.B. „3. Juni 2025") eines `YYYY-MM-DD`.
+  _diaryDateLabel(dateIso) {
+    const locale = this.uiLocale === 'en' ? 'en-US' : 'de-CH';
+    return new Date(`${dateIso}T12:00:00Z`).toLocaleDateString(
+      locale, tzOpts({ day: 'numeric', month: 'long', year: 'numeric' }));
+  },
+
+  diaryAnniversaryYearsAgoLabel(yearsAgo) {
+    return yearsAgo === 1 ? this.t('diary.anniversary.oneYearAgo') : this.t('diary.anniversary.yearsAgo', { n: yearsAgo });
+  },
+
+  // Aufklapp-Zustand des „An diesem Tag"-Panels pro Buch (+ User) im
+  // localStorage. Default `true` (offen) für Bücher ohne gespeicherte Wahl.
+  // `_loadDiaryAnniversaryOpen` ruft tree.js#loadPages bei jedem Buchwechsel.
+  _diaryAnniversaryStorageKey(bookId) {
+    if (!bookId) return '';
+    return `sw:diaryAnniversaryOpen:${this.currentUser?.email || ''}:${bookId}`;
+  },
+  _loadDiaryAnniversaryOpen() {
+    try {
+      const key = this._diaryAnniversaryStorageKey(this.selectedBookId);
+      if (!key) return true;
+      const raw = localStorage.getItem(key);
+      return raw === null ? true : raw === '1';
+    } catch { return true; }
+  },
+  toggleDiaryAnniversaryOpen() {
+    this.diaryAnniversaryOpen = !this.diaryAnniversaryOpen;
+    try {
+      const key = this._diaryAnniversaryStorageKey(this.selectedBookId);
+      if (key) localStorage.setItem(key, this.diaryAnniversaryOpen ? '1' : '0');
+    } catch { /* quota / disabled storage — ignore */ }
   },
 };
