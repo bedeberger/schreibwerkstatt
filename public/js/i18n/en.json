@@ -131,6 +131,7 @@
   "rueckblick.zeitraum":         "Select period",
   "rueckblick.start":            "Create retrospective",
   "rueckblick.rerun":            "Recreate",
+  "rueckblick.upToDate":         "Up to date – this period's entries haven't changed since the last generation.",
   "rueckblick.starting":         "Starting retrospective…",
   "rueckblick.empty":            "No dated entries in this period.",
   "rueckblick.facet.worueber":   "about",
@@ -142,6 +143,7 @@
   "rueckblick.belegeEmpty":      "No dated references.",
   "rueckblick.historySearch":    "Search retrospectives…",
   "rueckblick.historyNoMatch":   "No matching retrospectives.",
+  "rueckblick.historyEmpty":     "No retrospectives saved yet. Pick a period above and create your first one.",
 
   "review.starting":             "Starting analysis…",
   "review.pagesAnalyzed":        "{n} pages analysed.",

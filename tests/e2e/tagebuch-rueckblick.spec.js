@@ -48,9 +48,9 @@ test('Struktur-Ergebnis rendert Themen + bemerkenswerte Tage; Leerzustand aus', 
 
   await expect(page.locator('[data-test="result"]')).toBeVisible();
   await expect(page.locator('[data-test="empty"]')).not.toBeVisible();
-  // Zwei Themen-Badges.
-  await expect(page.locator('[data-test="themen"] .rb-theme')).toHaveCount(2);
-  await expect(page.locator('[data-test="themen"] .rb-theme').first()).toContainText('Arbeit');
+  // Zwei Themen-Chips, nach Häufigkeit sortiert (Arbeit 3 vor Familie 1).
+  await expect(page.locator('[data-test="themen"] .rb-chip')).toHaveCount(2);
+  await expect(page.locator('[data-test="themen"] .rb-chip').first()).toContainText('Arbeit');
   // Zusammenfassung in zwei Absätze gesplittet.
   await expect(page.locator('[data-test="summary"] p')).toHaveCount(2);
   // Bemerkenswerter Tag.
@@ -71,7 +71,26 @@ test('Klick auf bemerkenswerten Tag ruft selectPage mit der Tagebuch-Seite', asy
   expect(selected).toBe('2024-03-04');
 });
 
-test('Klick auf Thema öffnet Belege-Popover; Klick auf Beleg navigiert + schliesst', async ({ page }) => {
+test('Klick auf Thema-Chip zeigt Belegtage inline; Klick auf Beleg navigiert + schliesst', async ({ page }) => {
+  await page.evaluate(() => {
+    const data = window.Alpine.$data(document.querySelector('#root'));
+    data.rueckblickResult = {
+      themen: [{ label: 'Arbeit', haeufigkeit: 2, belege: ['2024-03-15', '2024-03-04'] }],
+      personen: [], orte: [], bemerkenswerteTage: [], zusammenfassung: 'Text.',
+    };
+  });
+  // Chip aktivieren → Inline-Belege-Leiste erscheint, Chip ist markiert.
+  await page.locator('[data-test="theme-Arbeit"]').click();
+  await expect(page.locator('[data-test="belege-strip"]')).toBeVisible();
+  await expect(page.locator('[data-test="theme-Arbeit"]')).toHaveClass(/rb-chip--active/);
+  // Belege dedupliziert + aufsteigend sortiert → erstes Item ist 2024-03-04.
+  await expect(page.locator('[data-test="beleg-2024-03-04"]')).toBeVisible();
+  await page.locator('[data-test="beleg-2024-03-15"]').click();
+  expect(await page.evaluate(() => window.__selectedTag)).toBe('2024-03-15');
+  await expect(page.locator('[data-test="belege-strip"]')).not.toBeVisible();
+});
+
+test('Erneuter Klick auf aktiven Chip schliesst die Belege-Leiste', async ({ page }) => {
   await page.evaluate(() => {
     const data = window.Alpine.$data(document.querySelector('#root'));
     data.rueckblickResult = {
@@ -80,20 +99,9 @@ test('Klick auf Thema öffnet Belege-Popover; Klick auf Beleg navigiert + schlie
     };
   });
   await page.locator('[data-test="theme-Arbeit"]').click();
-  await expect(page.locator('[data-test="popover"]')).toBeVisible();
-  // Popover richtet sich am Anker-Element aus (unter dem Badge, linke Kanten nah,
-  // vollständig im Viewport) — nicht an Klick-Koordinaten.
-  const anchorBox = await page.locator('[data-test="theme-Arbeit"]').boundingBox();
-  const popBox = await page.locator('[data-test="popover"]').boundingBox();
-  expect(popBox.y).toBeGreaterThanOrEqual(anchorBox.y + anchorBox.height - 1);
-  expect(Math.abs(popBox.x - anchorBox.x)).toBeLessThan(4);
-  expect(popBox.x).toBeGreaterThanOrEqual(0);
-  expect(popBox.x + popBox.width).toBeLessThanOrEqual(await page.evaluate(() => window.innerWidth));
-  // Belege dedupliziert + aufsteigend sortiert → erstes Item ist 2024-03-04.
-  await expect(page.locator('[data-test="beleg-2024-03-04"]')).toBeVisible();
-  await page.locator('[data-test="beleg-2024-03-15"]').click();
-  expect(await page.evaluate(() => window.__selectedTag)).toBe('2024-03-15');
-  await expect(page.locator('[data-test="popover"]')).not.toBeVisible();
+  await expect(page.locator('[data-test="belege-strip"]')).toBeVisible();
+  await page.locator('[data-test="theme-Arbeit"]').click();
+  await expect(page.locator('[data-test="belege-strip"]')).not.toBeVisible();
 });
 
 test('History-Suche filtert nach Inhalt der gespeicherten Rückblicke', async ({ page }) => {

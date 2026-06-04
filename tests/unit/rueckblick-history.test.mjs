@@ -1,6 +1,6 @@
-// Unit: Tagebuch-Rückblick Frontend-Methoden — History-Volltextfilter +
-// Belege-Popover (book/tagebuch-rueckblick.js). Pure genug für node:test, sobald
-// ein minimales window vorhanden ist (uiLocale + innerWidth).
+// Unit: Tagebuch-Rückblick Frontend-Methoden — History-Volltextfilter, sortierte
+// Facetten + Inline-Belege (book/tagebuch-rueckblick.js). Pure genug für
+// node:test, sobald ein minimales window vorhanden ist (uiLocale + innerWidth).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -13,7 +13,8 @@ function ctx(overrides = {}) {
   return Object.assign(Object.create(M), {
     rueckblickHistory: [],
     rbHistorySearch: '',
-    rbPopover: { open: false, label: '', belege: [], x: 0, y: 0 },
+    rueckblickResult: null,
+    rbBeleg: { key: null, label: '', belege: [] },
     ...overrides,
   });
 }
@@ -50,39 +51,37 @@ test('filteredRueckblickHistory: trifft Zeitraum-Roh-Wert', () => {
   assert.deepEqual(c.filteredRueckblickHistory().map(e => e.id), [2]);
 });
 
-// Fake-Anker mit getBoundingClientRect (kein DOM in node:test → kein closest/
-// querySelector, _placeBelegePopover fällt auf popH=0 = "unter dem Element").
-function fakeAnchor(rect) {
-  return { getBoundingClientRect: () => rect };
-}
-
-test('openBelegePopover: dedup + sortiert, öffnet mit Label', () => {
-  const c = ctx();
-  c.openBelegePopover({ currentTarget: fakeAnchor({ left: 100, top: 200, bottom: 224, right: 180 }) },
-    'Anna', ['2024-03-12', '2024-03-04', '2024-03-12']);
-  assert.equal(c.rbPopover.open, true);
-  assert.equal(c.rbPopover.label, 'Anna');
-  assert.deepEqual(c.rbPopover.belege, ['2024-03-04', '2024-03-12']);
+test('rbThemen/rbPersonen/rbOrte: nach Häufigkeit absteigend sortiert', () => {
+  const c = ctx({ rueckblickResult: {
+    themen: [{ label: 'A', haeufigkeit: 1 }, { label: 'B', haeufigkeit: 5 }, { label: 'C', haeufigkeit: 3 }],
+    personen: [{ name: 'Anna', haeufigkeit: 2 }, { name: 'Bernd', haeufigkeit: 9 }],
+    orte: [],
+  } });
+  assert.deepEqual(c.rbThemen().map(t => t.label), ['B', 'C', 'A']);
+  assert.deepEqual(c.rbPersonen().map(p => p.name), ['Bernd', 'Anna']);
+  assert.deepEqual(c.rbOrte(), []);
 });
 
-test('_placeBelegePopover: unter dem Element (linke Kante), am rechten Rand geclampt', () => {
+test('toggleBeleg: setzt aktiven Key + dedupte/sortierte Belegtage, erneuter Klick schliesst', () => {
   const c = ctx();
-  c.rbPopover = { open: true, label: '', belege: [], x: 0, y: 0 };
-  // Anker links → x = rect.left, y = rect.bottom + GAP(6). popH=0 → kein Flip.
-  c._placeBelegePopover(fakeAnchor({ left: 120, top: 200, bottom: 224, right: 200 }));
-  assert.equal(c.rbPopover.x, 120);
-  assert.equal(c.rbPopover.y, 230);
-  // Anker am rechten Rand → x in den Viewport gezogen (vw - popW(240) - EDGE(8)).
-  c._placeBelegePopover(fakeAnchor({ left: 990, top: 10, bottom: 34, right: 998 }));
-  assert.equal(c.rbPopover.x, 1000 - 240 - 8);
+  c.toggleBeleg('personen:Anna', 'Anna', ['2024-03-12', '2024-03-04', '2024-03-12']);
+  assert.equal(c.rbBeleg.key, 'personen:Anna');
+  assert.equal(c.rbBeleg.label, 'Anna');
+  assert.deepEqual(c.rbBeleg.belege, ['2024-03-04', '2024-03-12']);
+  // Gleicher Key erneut → schliesst.
+  c.toggleBeleg('personen:Anna', 'Anna', ['2024-03-12']);
+  assert.equal(c.rbBeleg.key, null);
+  // Anderer Key → wechselt.
+  c.toggleBeleg('orte:Zürich', 'Zürich', ['2024-03-04']);
+  assert.equal(c.rbBeleg.key, 'orte:Zürich');
 });
 
-test('gotoBelegTag: schliesst Popover + navigiert', () => {
+test('gotoBelegTag: schliesst Belege-Leiste + navigiert', () => {
   selected = null;
   globalThis.window.__app.pages = [{ name: '2024-03-04', id: 7 }];
-  const c = ctx({ rbPopover: { open: true, label: 'x', belege: ['2024-03-04'], x: 0, y: 0 } });
+  const c = ctx({ rbBeleg: { key: 'orte:x', label: 'x', belege: ['2024-03-04'] } });
   c.gotoBelegTag('2024-03-04');
-  assert.equal(c.rbPopover.open, false);
+  assert.equal(c.rbBeleg.key, null);
   assert.deepEqual(selected, { name: '2024-03-04', id: 7 });
 });
 

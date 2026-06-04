@@ -45,6 +45,8 @@ export const appHashRouterMethods = {
       parts.push('kapitel', String(this.kapitelReviewChapterId));
     } else if (this.showFigurWerkstattCard && this.werkstattDraftId) {
       parts.push('werkstatt', String(this.werkstattDraftId));
+    } else if (this.showTagebuchRueckblickCard && this.rueckblickEntryId) {
+      parts.push('rueckblick', String(this.rueckblickEntryId));
     } else if (this.showFiguresCard) parts.push('figuren');
     else if (this.showFigurWerkstattCard) parts.push('werkstatt');
     else if (this.showOrteCard) parts.push('orte');
@@ -327,6 +329,10 @@ export const appHashRouterMethods = {
           if (!this.showKontinuitaetCard) await this.toggleKontinuitaetCard();
           break;
         case 'rueckblick':
+          // Optionaler History-Eintrag-Permalink (#…/rueckblick/<entryId>). Root-
+          // SSoT vor Toggle setzen; die Sub-Card öffnet den Eintrag im onOpen-Hook
+          // bzw. via $watch auf window.__app.rueckblickEntryId.
+          this.rueckblickEntryId = arg ? String(arg) : null;
           if (!this.showTagebuchRueckblickCard) await this.toggleTagebuchRueckblickCard();
           else this._scrollToCardByKey('tagebuchRueckblick');
           break;
@@ -396,7 +402,7 @@ export const appHashRouterMethods = {
       'selectedBookId', 'currentPage', 'showEditorCard',
       'selectedFigurId', 'selectedOrtId', 'selectedSongId', 'selectedSzeneId',
       'showFiguresCard', 'showFigurWerkstattCard', 'showOrteCard', 'showSongsCard', 'showSzenenCard', 'showEreignisseCard', 'showWorldFactsCard',
-      'showKontinuitaetCard', 'showTagebuchRueckblickCard', 'showBookReviewCard', 'showBookChatCard',
+      'showKontinuitaetCard', 'showTagebuchRueckblickCard', 'rueckblickEntryId', 'showBookReviewCard', 'showBookChatCard',
       'showKapitelReviewCard', 'kapitelReviewChapterId',
       'werkstattDraftId',
       'showBookStatsCard', 'showStilCard', 'showFehlerHeatmapCard',

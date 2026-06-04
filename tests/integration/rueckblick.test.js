@@ -70,8 +70,12 @@ test('Single-Pass: ein Monat → 1 AI-Call, Ergebnis + Cache-Zeile', async () =>
   assert.equal(JSON.parse(histRows[0].result_json).zusammenfassung, 'Ein ruhiger Monat.');
 });
 
-test('History: jeder Lauf (auch Cache-HIT) schreibt eine History-Zeile', async () => {
+test('History: identischer Re-Run (Cache-HIT) dedupliziert, neues Ergebnis schreibt Zeile', async () => {
   const BOOK_ID = 707;
+  const histCount = () => ctx.dbSchema.db.prepare(
+    'SELECT COUNT(*) AS n FROM tagebuch_rueckblicke WHERE book_id = ? AND user_email = ?'
+  ).get(BOOK_ID, 'tester@test.dev').n;
+
   seedDiary(BOOK_ID, ['2024-09-01', '2024-09-08']);
   ctx.mockAi.on((e) => e.schemaKeys.includes('zusammenfassung'), rueckblickResponse());
 
@@ -83,12 +87,22 @@ test('History: jeder Lauf (auch Cache-HIT) schreibt eine History-Zeile', async (
     assert.equal(job.status, 'done');
     assert.equal(job.result.fromCache, i === 1, `Lauf ${i}: fromCache=${i === 1}`);
   }
-  // Cache-HIT im 2. Lauf → nur 1 AI-Call insgesamt, aber 2 History-Zeilen.
+  // Cache-HIT im 2. Lauf → nur 1 AI-Call; identisches result_json → keine Duplikat-Zeile.
   assert.equal(ctx.mockAi.log.length, 1, 'Cache-HIT: kein 2. AI-Call');
-  const histCount = ctx.dbSchema.db.prepare(
-    'SELECT COUNT(*) AS n FROM tagebuch_rueckblicke WHERE book_id = ? AND user_email = ?'
-  ).get(BOOK_ID, 'tester@test.dev').n;
-  assert.equal(histCount, 2, 'beide Läufe als History-Zeile persistiert');
+  assert.equal(histCount(), 1, 'identischer Re-Run dedupliziert → eine History-Zeile');
+
+  // Inhaltlich neuer Lauf (neuer Eintrag bricht den Cache, neue Zusammenfassung)
+  // → zweite History-Zeile.
+  ctx.mockAi.reset();
+  seedDiary(BOOK_ID, ['2024-09-01', '2024-09-08', '2024-09-20']);
+  ctx.mockAi.on((e) => e.schemaKeys.includes('zusammenfassung'), rueckblickResponse('Ein bewegter Monat.'));
+  const jobId3 = ctx.shared.createJob('rueckblick', BOOK_ID, 'tester@test.dev', 'job.label.rueckblick', { zeitraum: '2024-09' }, `${BOOK_ID}:2024-09_c`);
+  ctx.shared.enqueueJob(jobId3, () =>
+    ctx.rueckblick.runRueckblickJob(jobId3, BOOK_ID, 'tester@test.dev', null, '2024-09'));
+  const job3 = await waitForJob(ctx.shared, jobId3);
+  assert.equal(job3.status, 'done');
+  assert.equal(job3.result.fromCache, false, 'neuer Eintrag → Cache-MISS');
+  assert.equal(histCount(), 2, 'neues Ergebnis → zweite History-Zeile');
 });
 
 test('Zeitraum-Filter: nur Einträge des gewählten Monats', async () => {

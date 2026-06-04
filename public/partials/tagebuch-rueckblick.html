@@ -9,7 +9,9 @@
   <div class="card-header">
     <div class="card-header-titlebar">
       <span class="card-eyebrow" x-text="$app.selectedBookName"></span>
-      <span class="card-title" x-text="$app.t('rueckblick.title')"></span>
+      <span class="card-title">
+        <span x-text="$app.t('rueckblick.title')"></span><span class="rb-title-period" x-show="viewingZeitraumLabel()" x-cloak x-text="viewingZeitraumLabel()"></span>
+      </span>
     </div>
     <div class="card-actions rb-actions">
       <div class="rb-zeitraum">
@@ -17,7 +19,8 @@
              x-modelable="value" x-model="rueckblickZeitraum"
              x-effect="options = availableZeitraeume()"></div>
       </div>
-      <button type="button" @click="runTagebuchRueckblick()" :disabled="rueckblickLoading || !rueckblickZeitraum">
+      <button type="button" @click="runTagebuchRueckblick()"
+              :disabled="rueckblickLoading || !rueckblickZeitraum || rueckblickUpToDate()">
         <span x-show="rueckblickLoading" class="spinner"></span>
         <span x-text="hasRueckblickResult() ? $app.t('rueckblick.rerun') : $app.t('rueckblick.start')"></span>
       </button>
@@ -28,6 +31,11 @@
     <div class="progress-bar" :style="{ '--progress': rueckblickProgress + '%' }"></div>
   </div>
   <div class="card-status" x-html="rueckblickStatus"></div>
+
+  <!-- Neugenerierung gesperrt: Einträge des Zeitraums unverändert seit Generierung -->
+  <div class="rb-uptodate" x-show="rueckblickUpToDate() && !rueckblickLoading" x-cloak>
+    <span x-text="$app.t('rueckblick.upToDate')"></span>
+  </div>
 
   <!-- Leerzustand: keine datierten Einträge im Zeitraum -->
   <div class="rb-empty" x-show="rueckblickEmpty" x-cloak>
@@ -43,43 +51,58 @@
       </template>
     </div>
 
-    <!-- Facetten: worüber / wer / wo — Stichwörter, Zähler dezent. Klick → Belege. -->
+    <!-- Facetten: worüber / wer / wo — sortierte Chips (häufigste zuerst), Zähler
+         nur bei Wiederholung. Klick → Belegtage in der Inline-Leiste unten. -->
     <div class="rb-facets"
          x-show="rueckblickResult?.themen?.length || rueckblickResult?.personen?.length || rueckblickResult?.orte?.length">
       <div class="rb-facet" x-show="rueckblickResult?.themen?.length">
         <span class="rb-facet-label" x-text="$app.t('rueckblick.facet.worueber')"></span>
-        <span class="rb-facet-words">
-          <template x-for="(t, i) in (rueckblickResult?.themen || [])" :key="i">
-            <button type="button" class="rb-word" @click="openBelegePopover($event, t.label, t.belege)"
+        <span class="rb-facet-chips">
+          <template x-for="(t, i) in rbThemen()" :key="i">
+            <button type="button" class="rb-chip" :class="{ 'rb-chip--active': rbBeleg.key === 'themen:'+t.label }"
+                    @click="toggleBeleg('themen:'+t.label, t.label, t.belege)"
                     :data-tip="$app.t('rueckblick.showReferences')">
-              <span class="rb-word-label" x-text="t.label"></span>
-              <span class="rb-word-count" x-text="t.haeufigkeit"></span>
+              <span x-text="t.label"></span>
+              <span class="rb-chip-count" x-show="t.haeufigkeit > 1" x-text="t.haeufigkeit"></span>
             </button>
           </template>
         </span>
       </div>
       <div class="rb-facet" x-show="rueckblickResult?.personen?.length">
         <span class="rb-facet-label" x-text="$app.t('rueckblick.facet.wer')"></span>
-        <span class="rb-facet-words">
-          <template x-for="(p, i) in (rueckblickResult?.personen || [])" :key="i">
-            <button type="button" class="rb-word" @click="openBelegePopover($event, p.name, p.belege)"
+        <span class="rb-facet-chips">
+          <template x-for="(p, i) in rbPersonen()" :key="i">
+            <button type="button" class="rb-chip" :class="{ 'rb-chip--active': rbBeleg.key === 'personen:'+p.name }"
+                    @click="toggleBeleg('personen:'+p.name, p.name, p.belege)"
                     :data-tip="$app.t('rueckblick.showReferences')">
-              <span class="rb-word-label" x-text="p.name"></span>
-              <span class="rb-word-count" x-text="p.haeufigkeit"></span>
+              <span x-text="p.name"></span>
+              <span class="rb-chip-count" x-show="p.haeufigkeit > 1" x-text="p.haeufigkeit"></span>
             </button>
           </template>
         </span>
       </div>
       <div class="rb-facet" x-show="rueckblickResult?.orte?.length">
         <span class="rb-facet-label" x-text="$app.t('rueckblick.facet.wo')"></span>
-        <span class="rb-facet-words">
-          <template x-for="(o, i) in (rueckblickResult?.orte || [])" :key="i">
-            <button type="button" class="rb-word" @click="openBelegePopover($event, o.name, o.belege)"
+        <span class="rb-facet-chips">
+          <template x-for="(o, i) in rbOrte()" :key="i">
+            <button type="button" class="rb-chip" :class="{ 'rb-chip--active': rbBeleg.key === 'orte:'+o.name }"
+                    @click="toggleBeleg('orte:'+o.name, o.name, o.belege)"
                     :data-tip="$app.t('rueckblick.showReferences')">
-              <span class="rb-word-label" x-text="o.name"></span>
-              <span class="rb-word-count" x-text="o.haeufigkeit"></span>
+              <span x-text="o.name"></span>
+              <span class="rb-chip-count" x-show="o.haeufigkeit > 1" x-text="o.haeufigkeit"></span>
             </button>
           </template>
+        </span>
+      </div>
+
+      <!-- Belegtage des aktiven Stichworts (inline, keine Fehlplatzierung) -->
+      <div class="rb-belege-strip" x-show="rbBeleg.key" x-cloak>
+        <span class="rb-belege-strip-label" x-text="rbBeleg.label"></span>
+        <span class="rb-belege-strip-days">
+          <template x-for="(d, i) in rbBeleg.belege" :key="i">
+            <button type="button" class="rb-belege-day" @click="gotoBelegTag(d)" x-text="belegLabel(d)"></button>
+          </template>
+          <span class="rb-belege-strip-empty" x-show="!rbBeleg.belege.length" x-text="$app.t('rueckblick.belegeEmpty')"></span>
         </span>
       </div>
     </div>
@@ -114,7 +137,7 @@
     </span>
     <template x-for="entry in filteredRueckblickHistory()" :key="entry.id">
       <div>
-        <div class="history-item" :class="{ 'history-item--open': selectedRueckblickId === entry.id }"
+        <div class="history-item" :class="{ 'history-item--active': selectedRueckblickId === entry.id }"
              @click="openRueckblickHistory(entry)">
           <span class="rb-history-zeitraum" x-text="zeitraumLabel(entry.zeitraum)"></span>
           <span class="history-date" x-text="rueckblickEntryDate(entry.created_at)"></span>
@@ -130,23 +153,11 @@
          x-text="$app.t('rueckblick.historyNoMatch')"></div>
   </div>
 
-  <!-- Belege-Popover: referenzierte Einträge der angeklickten Entität -->
-  <div class="rb-belege-popover" x-show="rbPopover.open" x-cloak
-       @click.outside="closeBelegePopover()" @keydown.escape.window="closeBelegePopover()"
-       @scroll.window="closeBelegePopover()" @resize.window="closeBelegePopover()"
-       :style="{ top: rbPopover.y + 'px', left: rbPopover.x + 'px' }">
-    <div class="rb-belege-header">
-      <span class="rb-belege-title" x-text="rbPopover.label"></span>
-      <button type="button" class="rb-belege-close" @click="closeBelegePopover()"
-              :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg>
-      </button>
-    </div>
-    <div class="rb-belege-body">
-      <template x-for="(d, i) in rbPopover.belege" :key="i">
-        <button type="button" class="rb-belege-item internal-link" @click="gotoBelegTag(d)" x-text="belegLabel(d)"></button>
-      </template>
-      <div class="rb-belege-empty" x-show="!rbPopover.belege.length" x-text="$app.t('rueckblick.belegeEmpty')"></div>
-    </div>
+  <!-- Hinweis, solange noch kein Rückblick gespeichert wurde -->
+  <div class="card-history-section rb-history-empty"
+       :class="{ 'card-history-section--borderless': !hasRueckblickResult() && !rueckblickEmpty }"
+       x-show="rbHistoryLoaded && !rueckblickHistory.length && !rueckblickLoading" x-cloak>
+    <div class="history-heading" x-text="$app.t('rueckblick.history')"></div>
+    <p class="rb-history-empty-text" x-text="$app.t('rueckblick.historyEmpty')"></p>
   </div>
 </div>

@@ -131,6 +131,7 @@
   "rueckblick.zeitraum":         "Zeitraum wählen",
   "rueckblick.start":            "Rückblick erstellen",
   "rueckblick.rerun":            "Neu erstellen",
+  "rueckblick.upToDate":         "Aktuell – die Einträge dieses Zeitraums haben sich seit der letzten Generierung nicht geändert.",
   "rueckblick.starting":         "Starte Rückblick…",
   "rueckblick.empty":            "Keine datierten Einträge in diesem Zeitraum.",
   "rueckblick.facet.worueber":   "worüber",
@@ -142,6 +143,7 @@
   "rueckblick.belegeEmpty":      "Keine datierten Belege.",
   "rueckblick.historySearch":    "Rückblicke durchsuchen…",
   "rueckblick.historyNoMatch":   "Keine passenden Rückblicke.",
+  "rueckblick.historyEmpty":     "Noch keine Rückblicke gespeichert. Wähle oben einen Zeitraum und erstelle deinen ersten Rückblick.",
 
   "review.starting":             "Starte Analyse…",
   "review.pagesAnalyzed":        "{n} Seiten analysiert.",

@@ -70,6 +70,39 @@ export const tagebuchRueckblickMethods = {
     return firstMonth ? firstMonth.value : (opts[0]?.value || '');
   },
 
+  // ── Neugenerierungs-Sperre ───────────────────────────────────────────────────
+  // Ein Rückblick wird NICHT neu generiert, solange sich die datierten Einträge des
+  // Zeitraums seit der letzten Generierung nicht geändert haben. Signal: jüngste
+  // updated_at aller datierten Seiten des Zeitraums vs. created_at des gespeicherten
+  // Rückblicks. Ist keine Seite jünger als der Rückblick → aktuell → Button gesperrt.
+  // Deckt sich mit der serverseitigen Cache-Invalidierung (pages_sig keyt ebenfalls
+  // auf updated_at): unveränderte Seiten ⇒ Cache-HIT ⇒ ohnehin kein KI-Call.
+  rueckblickUpToDate() {
+    const z = this.rueckblickZeitraum;
+    if (!z) return false;
+    const entry = (this.rueckblickHistory || []).find(e => e.zeitraum === z);
+    if (!entry?.created_at) return false;
+    const genMs = new Date(entry.created_at).getTime();
+    if (!genMs) return false;
+    return this._newestPageMtimeForZeitraum(z) <= genMs;
+  },
+
+  // Jüngste updated_at (ms) aller datierten Seiten des Zeitraums; 0 wenn keine.
+  _newestPageMtimeForZeitraum(z) {
+    const pages = window.__app?.pages || [];
+    return this._memo('newestMtime:' + z, [pages, z], () => {
+      const prefix = /^\d{4}$/.test(z) ? z + '-' : z; // Jahr → 'YYYY-', Monat → 'YYYY-MM'
+      let newest = 0;
+      for (const p of pages) {
+        const name = p?.name || '';
+        if (!ISO_DATE_RE.test(name) || !name.startsWith(prefix)) continue;
+        const ms = p.updated_at ? new Date(p.updated_at).getTime() : 0;
+        if (ms > newest) newest = ms;
+      }
+      return newest;
+    });
+  },
+
   // Springt zur Tagebuch-Seite eines Datums (page_name === 'YYYY-MM-DD').
   gotoRueckblickTag(datum) {
     const pages = window.__app?.pages || [];
@@ -77,54 +110,36 @@ export const tagebuchRueckblickMethods = {
     if (page) window.__app.selectPage(page);
   },
 
-  // ── Belege-Popover (Klick auf Thema/Person/Ort → referenzierte Seiten) ───────
-  // Öffnet ein fixed-positioniertes Popover, das sich am angeklickten Badge
-  // ausrichtet (unter dem Element, bei zu wenig Platz darüber — mobil wie
-  // desktop) und am Viewport-Rand geclampt wird. Jeder Tag navigiert zur Seite.
-  openBelegePopover(event, label, belege) {
-    const anchor = event?.currentTarget || event?.target || null;
+  // ── Facetten sortiert (häufigste zuerst) ────────────────────────────────────
+  // Wiederkehrendes steht oben, Einmal-Nennungen hinten. Memoized über die
+  // Quell-Referenz, damit nicht bei jedem Render neu sortiert wird.
+  rbThemen()   { return this._sortedFacet('themen'); },
+  rbPersonen() { return this._sortedFacet('personen'); },
+  rbOrte()     { return this._sortedFacet('orte'); },
+
+  _sortedFacet(key) {
+    const arr = this.rueckblickResult?.[key] || [];
+    return this._memo('facet:' + key, [arr],
+      () => [...arr].sort((a, b) => (b.haeufigkeit || 0) - (a.haeufigkeit || 0)));
+  },
+
+  // ── Belege inline (Klick auf Thema/Person/Ort → referenzierte Tage) ──────────
+  // Statt eines schwebenden Popovers: eine Inline-Leiste unter den Facetten zeigt
+  // die Belegtage des aktiven Stichworts. Kein Positioning-Math, keine Fehlplatz-
+  // ierung. Erneuter Klick (gleicher Key) schliesst die Leiste.
+  toggleBeleg(key, label, belege) {
+    if (this.rbBeleg.key === key) { this.clearBeleg(); return; }
     const days = [...new Set((belege || []).map(d => String(d).slice(0, 10)).filter(Boolean))].sort();
-    this.rbPopover = { open: true, label: label || '', belege: days, x: -9999, y: -9999 };
-    // Sync-Vorabplatzierung (ohne gemessene Höhe → unter dem Element) gegen
-    // Flackern, dann nach Render mit echter Höhe verfeinern (Flip oben/unten).
-    this._placeBelegePopover(anchor);
-    const place = () => this._placeBelegePopover(anchor);
-    if (window.Alpine?.nextTick) window.Alpine.nextTick(place);
-    else setTimeout(place, 0);
+    this.rbBeleg = { key, label: label || '', belege: days };
   },
 
-  // Positioniert das Popover relativ zum Anker-Element. Unter dem Element, sofern
-  // dort Platz ist; sonst darüber, wenn oben mehr Raum bleibt. Horizontal an der
-  // linken Anker-Kante, beidseitig auf den Viewport geclampt.
-  _placeBelegePopover(anchor) {
-    const rect = anchor?.getBoundingClientRect?.();
-    if (!rect) return;
-    const pop = anchor.closest?.('.card')?.querySelector?.('.rb-belege-popover');
-    const EDGE = 8, GAP = 6;
-    const vw = window.innerWidth, vh = window.innerHeight;
-    const popW = pop?.offsetWidth || 240;
-    const popH = pop?.offsetHeight || 0;
-    let left = Math.min(rect.left, vw - popW - EDGE);
-    left = Math.max(EDGE, left);
-    const spaceBelow = vh - rect.bottom;
-    let top;
-    if (popH && spaceBelow < popH + GAP && rect.top > spaceBelow) {
-      top = rect.top - popH - GAP; // oben aufklappen
-    } else {
-      top = rect.bottom + GAP;     // unter dem Element
-    }
-    if (popH) top = Math.max(EDGE, Math.min(top, vh - popH - EDGE));
-    this.rbPopover.x = Math.round(left);
-    this.rbPopover.y = Math.round(top);
+  clearBeleg() {
+    this.rbBeleg = { key: null, label: '', belege: [] };
   },
 
-  closeBelegePopover() {
-    this.rbPopover = { open: false, label: '', belege: [], x: 0, y: 0 };
-  },
-
-  // Tag aus dem Popover anspringen + Popover schliessen.
+  // Tag aus der Belege-Leiste anspringen + Leiste schliessen.
   gotoBelegTag(datum) {
-    this.closeBelegePopover();
+    this.clearBeleg();
     this.gotoRueckblickTag(datum);
   },
 
@@ -155,15 +170,28 @@ export const tagebuchRueckblickMethods = {
     return !!(r && (r.zusammenfassung || (r.themen && r.themen.length)));
   },
 
+  // Label des aktuell angezeigten Rückblick-Zeitraums — nur wenn tatsächlich ein
+  // Ergebnis oder der Leerzustand sichtbar ist (sonst leer). Trägt den Card-Title:
+  // zeigt dem User, für welchen Zeitraum er den Rückblick gerade anschaut. Der
+  // Combobox-Wert ist dagegen das Generierungs-Ziel und kann davon abweichen.
+  viewingZeitraumLabel() {
+    if (!this.hasRueckblickResult() && !this.rueckblickEmpty) return '';
+    return this.zeitraumLabel(this.rueckblickZeitraum);
+  },
+
   // ── History (dauerhaft gespeicherte Rückblicke, re-öffenbar) ────────────────
   async loadRueckblickHistory() {
     const bookId = window.__app?.selectedBookId;
-    if (!bookId) { this.rueckblickHistory = []; return; }
+    if (!bookId) { this.rueckblickHistory = []; this.rbHistoryLoaded = true; return; }
     try {
       this.rueckblickHistory = await fetchJson('/history/rueckblick/' + bookId);
     } catch (e) {
       console.error('[loadRueckblickHistory]', e);
       this.rueckblickHistory = [];
+    } finally {
+      // Erst nach dem ersten Fetch darf der Leer-Hinweis erscheinen (kein Flash
+      // der „noch keine Rückblicke"-Zeile, während die Liste noch lädt).
+      this.rbHistoryLoaded = true;
     }
   },
 
@@ -202,6 +230,7 @@ export const tagebuchRueckblickMethods = {
     this.selectedRueckblickId = null;
     this.rueckblickResult = null;
     this.rueckblickEmpty = false;
+    this.clearBeleg();
     const existing = (this.rueckblickHistory || []).find(e => e.zeitraum === zeitraum);
     if (existing) this.openRueckblickHistory(existing);
   },
@@ -213,6 +242,13 @@ export const tagebuchRueckblickMethods = {
     this.rueckblickEmpty = false;
     this.rueckblickZeitraum = entry.zeitraum || this.rueckblickZeitraum;
     this.selectedRueckblickId = entry.id;
+    this.clearBeleg();
+  },
+
+  // History-Eintrag per id öffnen (Permalink-Eingang #…/rueckblick/<id>).
+  _openRueckblickEntryById(id) {
+    const entry = (this.rueckblickHistory || []).find(e => String(e.id) === String(id));
+    if (entry) this.openRueckblickHistory(entry);
   },
 
   async deleteRueckblickHistory(id) {
