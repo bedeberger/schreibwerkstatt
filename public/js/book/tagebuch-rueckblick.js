@@ -11,10 +11,30 @@ import { tzOpts, fetchJson } from '../utils.js';
 const ISO_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})\b/;
 
 export const tagebuchRueckblickMethods = {
+  // Memo-Helper (CLAUDE.md-Pattern): genau einer pro Modul, Array-Deps shallow ===.
+  // Aggregat-Getter, die mehrfach pro Render laufen (availableZeitraeume via
+  // Combobox-x-effect, filteredRueckblickHistory in x-for + Empty-Check), cachen
+  // darüber. Invalidierung rein über die Deps — kein expliziter Reset nötig.
+  _memo(key, deps, fn) {
+    if (!this._memos) this._memos = {};
+    const prev = this._memos[key];
+    if (prev && prev.deps.length === deps.length && prev.deps.every((d, i) => d === deps[i])) {
+      return prev.val;
+    }
+    const val = fn();
+    this._memos[key] = { deps, val };
+    return val;
+  },
+
   // Liefert die für die Combobox verfügbaren Zeiträume (Jahre + Monate),
   // absteigend (neueste zuerst). Format: [{ value, label }].
   availableZeitraeume() {
     const pages = window.__app?.pages || [];
+    return this._memo('zeitraeume', [pages, window.__app?.uiLocale],
+      () => this._computeZeitraeume(pages));
+  },
+
+  _computeZeitraeume(pages) {
     const months = new Set();
     const years = new Set();
     for (const p of pages) {
@@ -119,10 +139,15 @@ export const tagebuchRueckblickMethods = {
     } catch { return String(datum); }
   },
 
-  // Zusammenfassung in Absätze splitten (Doppel-Newline oder Single-Newline).
+  // Zusammenfassung in Absätze splitten. Bevorzugt Doppel-Newline (Claude); nur
+  // wenn keiner vorkommt, auf Einzel-Newline ausweichen (lokale Provider) — so
+  // wird ein weicher Umbruch innerhalb eines Absatzes nicht fälschlich getrennt.
   rueckblickParagraphs() {
-    const txt = this.rueckblickResult?.zusammenfassung || '';
-    return String(txt).split(/\n{2,}|\n/).map(s => s.trim()).filter(Boolean);
+    const txt = String(this.rueckblickResult?.zusammenfassung || '');
+    if (!txt.trim()) return [];
+    const byDouble = txt.split(/\n{2,}/).map(s => s.trim()).filter(Boolean);
+    if (byDouble.length > 1) return byDouble;
+    return txt.split(/\n/).map(s => s.trim()).filter(Boolean);
   },
 
   hasRueckblickResult() {
@@ -148,8 +173,10 @@ export const tagebuchRueckblickMethods = {
   filteredRueckblickHistory() {
     const all = this.rueckblickHistory || [];
     const q = String(this.rbHistorySearch || '').trim().toLowerCase();
-    if (!q) return all;
-    return all.filter(e => this._rueckblickHaystack(e).includes(q));
+    return this._memo('histFilter', [all, q, window.__app?.uiLocale], () => {
+      if (!q) return all;
+      return all.filter(e => this._rueckblickHaystack(e).includes(q));
+    });
   },
 
   // Durchsuchbarer Text eines History-Eintrags (lowercase).

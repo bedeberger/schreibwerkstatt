@@ -34,64 +34,64 @@
     <span x-text="$app.t('rueckblick.empty')"></span>
   </div>
 
-  <!-- Ergebnis -->
+  <!-- Ergebnis: editorial — Reflexion zuerst, Stichwort-Facetten, Tage als Akzent-Liste -->
   <div class="rb-result" x-show="hasRueckblickResult()" x-cloak>
-    <!-- Zusammenfassung -->
-    <div class="rb-section rb-summary">
+    <!-- Zusammenfassung als ruhiger Lesetext -->
+    <div class="rb-essay">
       <template x-for="(para, i) in rueckblickParagraphs()" :key="i">
         <p x-text="para"></p>
       </template>
     </div>
 
-    <!-- Themen -->
-    <div class="rb-section" x-show="rueckblickResult?.themen?.length">
-      <div class="history-heading" x-text="$app.t('rueckblick.themen')"></div>
-      <div class="rb-badges">
-        <template x-for="(t, i) in (rueckblickResult?.themen || [])" :key="i">
-          <span class="rb-theme internal-link" @click="openBelegePopover($event, t.label, t.belege)"
-                :data-tip="$app.t('rueckblick.showReferences')">
-            <span class="rb-theme-label" x-text="t.label"></span>
-            <span class="rb-count" x-text="t.haeufigkeit"></span>
-          </span>
-        </template>
+    <!-- Facetten: worüber / wer / wo — Stichwörter, Zähler dezent. Klick → Belege. -->
+    <div class="rb-facets"
+         x-show="rueckblickResult?.themen?.length || rueckblickResult?.personen?.length || rueckblickResult?.orte?.length">
+      <div class="rb-facet" x-show="rueckblickResult?.themen?.length">
+        <span class="rb-facet-label" x-text="$app.t('rueckblick.facet.worueber')"></span>
+        <span class="rb-facet-words">
+          <template x-for="(t, i) in (rueckblickResult?.themen || [])" :key="i">
+            <button type="button" class="rb-word" @click="openBelegePopover($event, t.label, t.belege)"
+                    :data-tip="$app.t('rueckblick.showReferences')">
+              <span class="rb-word-label" x-text="t.label"></span>
+              <span class="rb-word-count" x-text="t.haeufigkeit"></span>
+            </button>
+          </template>
+        </span>
       </div>
-    </div>
-
-    <!-- Personen + Orte nebeneinander -->
-    <div class="rb-cols">
-      <div class="rb-section" x-show="rueckblickResult?.personen?.length">
-        <div class="history-heading" x-text="$app.t('rueckblick.personen')"></div>
-        <div class="rb-badges">
+      <div class="rb-facet" x-show="rueckblickResult?.personen?.length">
+        <span class="rb-facet-label" x-text="$app.t('rueckblick.facet.wer')"></span>
+        <span class="rb-facet-words">
           <template x-for="(p, i) in (rueckblickResult?.personen || [])" :key="i">
-            <span class="rb-entity internal-link" @click="openBelegePopover($event, p.name, p.belege)"
-                  :data-tip="$app.t('rueckblick.showReferences')">
-              <span x-text="p.name"></span>
-              <span class="rb-count" x-text="p.haeufigkeit"></span>
-            </span>
+            <button type="button" class="rb-word" @click="openBelegePopover($event, p.name, p.belege)"
+                    :data-tip="$app.t('rueckblick.showReferences')">
+              <span class="rb-word-label" x-text="p.name"></span>
+              <span class="rb-word-count" x-text="p.haeufigkeit"></span>
+            </button>
           </template>
-        </div>
+        </span>
       </div>
-      <div class="rb-section" x-show="rueckblickResult?.orte?.length">
-        <div class="history-heading" x-text="$app.t('rueckblick.orte')"></div>
-        <div class="rb-badges">
+      <div class="rb-facet" x-show="rueckblickResult?.orte?.length">
+        <span class="rb-facet-label" x-text="$app.t('rueckblick.facet.wo')"></span>
+        <span class="rb-facet-words">
           <template x-for="(o, i) in (rueckblickResult?.orte || [])" :key="i">
-            <span class="rb-entity internal-link" @click="openBelegePopover($event, o.name, o.belege)"
-                  :data-tip="$app.t('rueckblick.showReferences')">
-              <span x-text="o.name"></span>
-              <span class="rb-count" x-text="o.haeufigkeit"></span>
-            </span>
+            <button type="button" class="rb-word" @click="openBelegePopover($event, o.name, o.belege)"
+                    :data-tip="$app.t('rueckblick.showReferences')">
+              <span class="rb-word-label" x-text="o.name"></span>
+              <span class="rb-word-count" x-text="o.haeufigkeit"></span>
+            </button>
           </template>
-        </div>
+        </span>
       </div>
     </div>
 
-    <!-- Bemerkenswerte Tage -->
-    <div class="rb-section" x-show="rueckblickResult?.bemerkenswerteTage?.length">
+    <!-- Bemerkenswerte Tage als Akzent-Liste -->
+    <div class="rb-days" x-show="rueckblickResult?.bemerkenswerteTage?.length">
       <div class="history-heading" x-text="$app.t('rueckblick.tage')"></div>
       <ul class="rb-tage">
         <template x-for="(tag, i) in (rueckblickResult?.bemerkenswerteTage || [])" :key="i">
           <li class="rb-tag-item">
-            <span class="internal-link rb-tag-datum" @click="gotoRueckblickTag(tag.datum)" x-text="tag.datum"></span>
+            <button type="button" class="rb-tag-datum" @click="gotoRueckblickTag(tag.datum)"
+                    x-text="belegLabel(tag.datum)"></button>
             <span class="rb-tag-text" x-text="tag.begruendung"></span>
           </li>
         </template>

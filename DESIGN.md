@@ -1774,7 +1774,7 @@ Struktur: 8 thematische Subfolder unter [public/css/](public/css/) + Root-Solit�
 | [page/diary-anniversary.css](public/css/page/diary-anniversary.css) | `.diary-anniversary` / `.diary-range` — Rückblick „An diesem Tag" + Zeitraum-Suche im Kalender-Sidebar. |
 | [page/page-revision-viewer.css](public/css/page/page-revision-viewer.css) | Page-Revision-Diff-Viewer. |
 | [page/tree-history.css](public/css/page/tree-history.css) | Sidebar-Tree, `.history-*`, `.history-chevron`. |
-| [page/tagebuch-rueckblick.css](public/css/page/tagebuch-rueckblick.css) | `.card--tagebuchRueckblick` — Rückblick-Karte: Themen-/Personen-/Orte-Badges (eckig), bemerkenswerte Tage als `.internal-link`. |
+| [page/tagebuch-rueckblick.css](public/css/page/tagebuch-rueckblick.css) | `.card--tagebuchRueckblick` — Rückblick-Karte, editorial: `.rb-essay` (Zusammenfassung als ruhiger Lesetext, max 64ch), `.rb-facets`/`.rb-facet` (worüber/wer/wo — Label-Spalte + `.rb-word`-Stichwörter mit dezentem `.rb-word-count`, Klick → Belege-Popover), `.rb-tage` (bemerkenswerte Tage als Akzent-Liste mit linker Karten-Hue-Kante). |
 
 ### editor/
 Drei Editoren leben in eigenen Subfoldern (`book/`, `focus/`, `notebook/`); editor-übergreifende Chrome-Komponenten unter `shared/`. Kein Editor importiert CSS aus einem anderen Editor.

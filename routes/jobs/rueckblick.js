@@ -7,7 +7,7 @@
 const express = require('express');
 const {
   db,
-  loadRueckblickCache, saveRueckblickCache, insertRueckblick,
+  loadRueckblickCache, saveRueckblickCache, insertRueckblick, latestRueckblickJson,
 } = require('../../db/schema');
 const {
   makeJobLogger, updateJob, completeJob, failJob, i18nError, contentHttpError,
@@ -133,9 +133,13 @@ async function runRueckblickJob(jobId, bookId, userEmail, userToken, zeitraum) {
       saveRueckblickCache(bookIdInt, email, zeitraum, pagesSig, r, effectiveProvider);
     }
 
-    // History-Zeile pro „Erstellen"-Lauf (auch bei Cache-HIT) → re-öffenbar.
+    // History-Zeile nur bei inhaltlich neuem Ergebnis → re-öffenbar. Identische
+    // Re-Runs / Cache-HITs (gleicher Zeitraum, gleiches result_json) erzeugen
+    // keine Duplikat-Zeile.
     const model = _modelName(effectiveProvider);
-    insertRueckblick(bookIdInt, email, zeitraum, r, model);
+    if (JSON.stringify(r) !== latestRueckblickJson(bookIdInt, email, zeitraum)) {
+      insertRueckblick(bookIdInt, email, zeitraum, r, model);
+    }
 
     completeJob(jobId, { rueckblick: r, zeitraum, entryCount: entries.length, fromCache, tokensIn: tok.in, tokensOut: tok.out },
       fromCache ? null : tps(tok), `«${zeitraum}» ${entries.length} Einträge${fromCache ? ' (Cache)' : ''}`);

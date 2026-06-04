@@ -18,77 +18,114 @@
   font-size: var(--font-size-sm);
 }
 
-.card--tagebuchRueckblick .rb-section {
+/* Zusammenfassung: ruhiger Lesetext, lesefreundliche Zeilenlänge. Trägt das
+   Editorial-Gewicht der Karte — Reflexion zuerst. */
+.card--tagebuchRueckblick .rb-essay {
+  margin-top: var(--space-md);
+  max-width: 64ch;
+}
+
+.card--tagebuchRueckblick .rb-essay p {
+  margin: 0 0 var(--space-md);
+  font-size: var(--font-size-md);
+  line-height: 1.75;
+  color: var(--color-text);
+}
+
+.card--tagebuchRueckblick .rb-essay p:last-child {
+  margin-bottom: 0;
+}
+
+/* Facetten: worüber / wer / wo. Label-Spalte links, Stichwörter rechts. Die
+   Stichwörter sind keine Zähl-Badges, sondern unterstrichene Wörter; der Zähler
+   tritt als kleine, gedämpfte Zahl zurück. Klick öffnet das Belege-Popover. */
+.card--tagebuchRueckblick .rb-facets {
   margin-top: var(--space-lg);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
 }
 
-.card--tagebuchRueckblick .rb-summary p {
-  margin: 0 0 var(--space-sm);
-  line-height: 1.6;
+.card--tagebuchRueckblick .rb-facet {
+  display: grid;
+  grid-template-columns: 5rem 1fr;
+  gap: var(--space-md);
+  align-items: baseline;
 }
 
-.card--tagebuchRueckblick .rb-badges {
+.card--tagebuchRueckblick .rb-facet-label {
+  color: var(--color-muted);
+  font-size: var(--font-size-sm);
+  letter-spacing: 0.02em;
+}
+
+.card--tagebuchRueckblick .rb-facet-words {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-xs, var(--space-2xs));
+  gap: var(--space-2xs) var(--space-md);
 }
 
-.card--tagebuchRueckblick .rb-theme,
-.card--tagebuchRueckblick .rb-entity {
+.card--tagebuchRueckblick .rb-word {
   display: inline-flex;
-  align-items: center;
+  align-items: baseline;
   gap: var(--space-2xs);
-  padding: var(--space-2xs) var(--space-sm);
-  border: 1px solid var(--color-border);
-  border-left: 3px solid var(--card-accent);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  font-size: var(--font-size-sm);
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-text);
+  font-size: var(--font-size-md);
   cursor: pointer;
 }
 
-.card--tagebuchRueckblick .rb-theme:hover,
-.card--tagebuchRueckblick .rb-entity:hover {
-  border-color: var(--card-accent);
-  background: var(--color-hover);
+.card--tagebuchRueckblick .rb-word-label {
+  border-bottom: 1px solid transparent;
 }
 
-.card--tagebuchRueckblick .rb-count {
-  min-width: 1.4em;
-  padding: 0 var(--space-2xs);
-  border-radius: var(--radius-sm);
-  background: var(--color-hover);
+.card--tagebuchRueckblick .rb-word:hover .rb-word-label {
+  border-bottom-color: var(--card-accent);
+  color: var(--card-accent);
+}
+
+.card--tagebuchRueckblick .rb-word-count {
   color: var(--color-muted);
   font-size: var(--font-size-xs);
-  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
-.card--tagebuchRueckblick .rb-cols {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-lg);
+/* Bemerkenswerte Tage: Akzent-Liste mit linker Akzentkante (Karten-Hue). */
+.card--tagebuchRueckblick .rb-days {
+  margin-top: var(--space-lg);
 }
 
 .card--tagebuchRueckblick .rb-tage {
   list-style: none;
-  margin: 0;
+  margin: var(--space-sm) 0 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs, var(--space-2xs));
+  gap: var(--space-sm);
 }
 
 .card--tagebuchRueckblick .rb-tag-item {
-  display: flex;
-  gap: var(--space-sm);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-2xs) var(--space-md);
   align-items: baseline;
+  padding-left: var(--space-sm);
+  border-left: 3px solid var(--card-accent);
 }
 
 .card--tagebuchRueckblick .rb-tag-datum {
-  flex: 0 0 auto;
+  padding: 0;
+  border: none;
+  background: none;
   color: var(--card-accent);
   font-variant-numeric: tabular-nums;
   font-weight: 600;
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -98,6 +135,7 @@
 
 .card--tagebuchRueckblick .rb-tag-text {
   color: var(--color-text);
+  line-height: 1.5;
 }
 
 .card--tagebuchRueckblick .rb-history-zeitraum {
@@ -201,7 +239,8 @@
 }
 
 @media (max-width: 720px) {
-  .card--tagebuchRueckblick .rb-cols {
+  .card--tagebuchRueckblick .rb-facet {
     grid-template-columns: 1fr;
+    gap: var(--space-2xs);
   }
 }

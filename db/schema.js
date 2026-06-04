@@ -696,12 +696,17 @@ function deleteRueckblickCache(bookId, userEmail) {
 // Eine Zeile pro „Erstellen"-Lauf — re-öffenbar im Karten-History-Block.
 const _insertRueckblick = db.prepare(
   `INSERT INTO tagebuch_rueckblicke (book_id, user_email, zeitraum, result_json, model, created_at)
-   VALUES (?, ?, ?, ?, ?, ?)`
+   VALUES (?, ?, ?, ?, ?, ${NOW_ISO_SQL})`
 );
 const _listRueckblicke = db.prepare(
   `SELECT id, zeitraum, result_json, model, created_at
    FROM tagebuch_rueckblicke WHERE book_id = ? AND user_email = ?
    ORDER BY created_at DESC LIMIT ?`
+);
+const _latestRueckblickJson = db.prepare(
+  `SELECT result_json FROM tagebuch_rueckblicke
+   WHERE book_id = ? AND user_email = ? AND zeitraum = ?
+   ORDER BY created_at DESC, id DESC LIMIT 1`
 );
 const _deleteRueckblick = db.prepare(
   `DELETE FROM tagebuch_rueckblicke WHERE id = ? AND user_email = ?`
@@ -710,8 +715,16 @@ const _deleteRueckblick = db.prepare(
 function insertRueckblick(bookId, userEmail, zeitraum, result, model = null) {
   return _insertRueckblick.run(
     parseInt(bookId), userEmail || '', zeitraum,
-    JSON.stringify(result), model || null, new Date().toISOString(),
+    JSON.stringify(result), model || null,
   ).lastInsertRowid;
+}
+
+// Roher result_json-String des jüngsten History-Eintrags eines Zeitraums (oder
+// null). Dient dem Dedup: identische Re-Runs / Cache-HITs erzeugen keine neue
+// Zeile, nur inhaltlich abweichende Läufe werden festgehalten.
+function latestRueckblickJson(bookId, userEmail, zeitraum) {
+  const row = _latestRueckblickJson.get(parseInt(bookId), userEmail || '', zeitraum);
+  return row ? row.result_json : null;
 }
 
 function listRueckblicke(bookId, userEmail, limit = 20) {
@@ -1236,7 +1249,7 @@ module.exports = {
   loadBookReviewCache, saveBookReviewCache, deleteReviewCache,
   loadChapterMacroReviewCache, saveChapterMacroReviewCache, deleteChapterMacroReviewCache,
   loadRueckblickCache, saveRueckblickCache, deleteRueckblickCache,
-  insertRueckblick, listRueckblicke, deleteRueckblick,
+  insertRueckblick, latestRueckblickJson, listRueckblicke, deleteRueckblick,
   loadSynonymCache, saveSynonymCache, deleteSynonymCache,
   loadLektoratCache, saveLektoratCache, deleteLektoratCache,
   loadFinetuneAiCache, saveFinetuneAiCache, deleteFinetuneAiCache,
