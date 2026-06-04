@@ -1758,7 +1758,6 @@
   "editor.slash.heute":          "Datum einfügen",
   "editor.slash.jetzt":          "Datum + Zeit einfügen",
   "editor.slash.zeit":           "Uhrzeit einfügen",
-  "editor.slash.quotes":         "Anführungszeichen normalisieren",
 
   "editor.synonym.searchFor":    "Synonym suchen für «{word}»",
   "editor.synonym.titleFor":     "Synonyme für «{word}»",

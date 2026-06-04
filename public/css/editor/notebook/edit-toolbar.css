@@ -77,19 +77,16 @@
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-md);
-  padding: var(--space-xs);
-  min-width: 220px;
+  padding: var(--space-3);
+  min-width: 184px;
   max-height: 320px;
   overflow-y: auto;
 }
 .edit-slash-hint {
-  padding: var(--space-xs) 10px 6px;
+  padding: var(--space-3) 10px;
   font-size: var(--font-size-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.03em;
   color: var(--color-muted);
-  border-bottom: 1px solid var(--color-border);
-  margin-bottom: var(--space-3);
 }
 .edit-slash-item {
   display: block;
@@ -97,8 +94,8 @@
   text-align: left;
   background: transparent;
   border: none;
-  padding: var(--space-6) 12px;
-  font-size: var(--font-size-base);
+  padding: var(--space-3) 10px;
+  font-size: var(--font-size-sm);
   color: var(--color-text);
   cursor: pointer;
   font-family: inherit;
@@ -112,7 +109,7 @@
   color: var(--color-text);
 }
 .edit-slash-empty {
-  padding: var(--space-6) 12px;
+  padding: var(--space-3) 10px;
   font-size: var(--font-size-xs);
   color: var(--color-muted);
 }

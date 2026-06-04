@@ -10,14 +10,12 @@
 
 import { getEditEl, placeCaretIn, WORD_RE } from '../utils.js';
 import { tzOpts, localeTag } from '../../utils.js';
-import { runQuoteNormalize } from '../shared/quote-normalize.js';
 
 // Blocktyp-Definitionen für Slash-Transform. `tag` ist das Zielelement;
 // `className` optional (aktuell für .poem + .todo). `list: true` wrappt den
 // Inhalt in ein <li>. `todoList: true` erzeugt eine Checkbox-Liste.
 // `insertText: 'date'|'time'|'datetime'` ersetzt den Block durch einen
-// formatierten Datums-/Zeit-Stempel. `action: '<id>'` triggert eine
-// page-scoped Aktion ohne Block-Transform.
+// formatierten Datums-/Zeit-Stempel.
 const SLASH_ITEMS = [
   { key: 'paragraph',  tag: 'p' },
   { key: 'h2',         tag: 'h2' },
@@ -32,7 +30,6 @@ const SLASH_ITEMS = [
   { key: 'heute',      insertText: 'date' },
   { key: 'jetzt',      insertText: 'datetime' },
   { key: 'zeit',       insertText: 'time' },
-  { key: 'quotes',     action: 'normalize-quotes' },
 ];
 
 // Datums-/Zeit-Stempel im uiLocale + appTimezone. Kein Locale-Param —
@@ -121,6 +118,21 @@ function findTodoLi(node, root) {
     if (cur.nodeType === 1 && cur.tagName === 'LI'
         && cur.parentNode?.tagName === 'UL'
         && cur.parentNode.classList?.contains('todo')) {
+      return cur;
+    }
+    cur = cur.parentNode;
+  }
+  return null;
+}
+
+// Liefert das <p> innerhalb eines <div class="poem">, falls die Caret-Position
+// in einem Gedicht liegt. Sonst null.
+function findPoemP(node, root) {
+  let cur = node && node.nodeType === 3 ? node.parentNode : node;
+  while (cur && cur !== root) {
+    if (cur.nodeType === 1 && cur.tagName === 'P'
+        && cur.parentNode?.tagName === 'DIV'
+        && cur.parentNode.classList?.contains('poem')) {
       return cur;
     }
     cur = cur.parentNode;
@@ -251,22 +263,33 @@ export const toolbarCardMethods = {
   },
 
   // ── Slash-Menü ────────────────────────────────────────────────────────
-  // Reaktive Labels: jedes Mal frisch aus i18n (günstig). Kein Getter –
-  // der Spread in der Alpine-data-Fabrik würde sonst sofort `this.t`
-  // aufrufen (auf toolbarCardMethods selbst), bevor die Komponente steht, und
-  // die gesamte Initialisierung scheitern lassen.
-  // Filter: Substring-Match (case-insensitive) auf Label + Key, damit
-  // sowohl DE-Labels („Über") als auch interne Keys („h2") tippbar sind.
-  slashItems() {
+  // Labels werden einmalig beim Öffnen aufgelöst (`_slashLabels`, gesetzt in
+  // `_openSlashAt`) statt bei jedem Keystroke 14× `t()` aufzurufen.
+  // `_buildSlashLabels` ist der Fallback, falls `slashItems` vor dem Öffnen
+  // läuft (defensiv) – kein Getter im Data-Spread, sonst würde `this.t` zu
+  // früh auf `toolbarCardMethods` selbst aufgerufen.
+  _buildSlashLabels() {
     const app = window.__app;
-    const q = (this.slashQuery || '').trim().toLowerCase();
-    const items = SLASH_ITEMS.map(it => ({
+    return SLASH_ITEMS.map(it => ({
       key: it.key,
       label: app?.t('editor.slash.' + it.key) || it.key,
     }));
-    if (!q) return items;
-    return items.filter(it =>
+  },
+  // Filter: Substring-Match (case-insensitive) auf Label + Key, damit sowohl
+  // DE-Labels („Über") als auch interne Keys („h2") tippbar sind. Ergebnis
+  // wird pro Query gecacht – Template ruft `slashItems()` zweimal pro Render
+  // (x-for + Leer-Check), der zweite Aufruf trifft den Cache statt neu zu
+  // filtern.
+  slashItems() {
+    const q = (this.slashQuery || '').trim().toLowerCase();
+    if (this._slashFilterCache && this._slashFilterCache.q === q) {
+      return this._slashFilterCache.r;
+    }
+    const items = this._slashLabels || this._buildSlashLabels();
+    const r = !q ? items : items.filter(it =>
       it.label.toLowerCase().includes(q) || it.key.toLowerCase().includes(q));
+    this._slashFilterCache = { q, r };
+    return r;
   },
 
   _onEditKeydown(e) {
@@ -316,6 +339,31 @@ export const toolbarCardMethods = {
             li.parentNode.insertBefore(newLi, li.nextSibling);
             placeCaretIn(span);
           }
+          app._markEditDirty?.();
+          return;
+        }
+      }
+    }
+
+    // Doppel-Enter in einem Gedicht (<div class="poem"><p>…</p></div>): trifft
+    // Enter ein leeres <p>, raus aus dem Gedicht in ein <p> dahinter. Der erste
+    // Enter auf einer Textzeile erzeugt per Browser-Default die leere Zeile, der
+    // zweite trifft sie und verlässt den Block. Spiegelt das Verhalten der
+    // Checkbox-Liste (leeres todo-li → raus).
+    if (e.key === 'Enter' && !e.shiftKey) {
+      const editEl = getEditEl();
+      const sel = editEl ? document.getSelection() : null;
+      if (sel && sel.rangeCount > 0) {
+        const p = findPoemP(sel.getRangeAt(0).startContainer, editEl);
+        if (p && !(p.textContent || '').trim()) {
+          e.preventDefault();
+          const poem = p.parentNode;
+          const out = document.createElement('p');
+          out.appendChild(document.createElement('br'));
+          poem.parentNode.insertBefore(out, poem.nextSibling);
+          p.remove();
+          if (!poem.querySelector('p')) poem.remove();
+          placeCaretIn(out);
           app._markEditDirty?.();
           return;
         }
@@ -487,6 +535,9 @@ export const toolbarCardMethods = {
     this._slashBlock = block;
     this.slashIdx = 0;
     this.slashQuery = '';
+    // Labels einmalig in der aktuellen Sprache auflösen; Filter-Cache leeren.
+    this._slashLabels = this._buildSlashLabels();
+    this._slashFilterCache = null;
     const rect = block.getBoundingClientRect();
     this.slashX = rect.left;
     this.slashY = Math.max(4, window.innerHeight - rect.top + 4);
@@ -497,6 +548,8 @@ export const toolbarCardMethods = {
     this.slashShow = false;
     this.slashQuery = '';
     this._slashBlock = null;
+    this._slashLabels = null;
+    this._slashFilterCache = null;
     getEditEl()?.focus();
   },
 
@@ -509,15 +562,6 @@ export const toolbarCardMethods = {
     const editEl = getEditEl();
     const block = this._slashBlock;
     if (!editEl || !block || !block.parentNode) { this._closeSlash(); return; }
-
-    // Page-scoped Aktion ohne Block-Transform (z.B. Anführungszeichen
-    // normalisieren). Block bleibt leer, Caret kehrt nach der Aktion dorthin
-    // zurück.
-    if (item.action === 'normalize-quotes') {
-      this._closeSlash();
-      this._runNormalizeQuotes(editEl, block);
-      return;
-    }
 
     // Datums-/Zeit-Stempel: ersetzt den (per Trigger leeren) Block durch
     // einen <p> mit dem formatierten Stempel-String. Caret hinter den Text,
@@ -595,18 +639,5 @@ export const toolbarCardMethods = {
     placeCaretIn(caretTarget);
     window.__app?._markEditDirty?.();
     this._closeSlash();
-  },
-
-  async _runNormalizeQuotes(editEl, block) {
-    const app = window.__app;
-    const bookId = app?.selectedBookId;
-    const { ok, count } = await runQuoteNormalize({ bookId, rootEl: editEl });
-    if (!ok) return;
-    if (count > 0) {
-      app._markEditDirty?.();
-      editEl.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-    if (block && block.isConnected) placeCaretIn(block);
-    else editEl.focus();
   },
 };

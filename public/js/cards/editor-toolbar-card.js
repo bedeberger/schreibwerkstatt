@@ -2,7 +2,7 @@
 // (Inline-Formate auf Selektion) und Slash-Menü (Block-Transforms).
 //
 // Eigener State: bubbleShow, bubbleX/Y, slashShow, slashX/Y, slashIdx,
-//   _slashBlock.
+//   _slashBlock, _slashLabels (Label-Cache), _slashFilterCache (Filter-Memo).
 // Root behält: editMode, focusActive, _markEditDirty (→ $app / window.__app).
 //
 // Die Sub installiert globale Listener (selectionchange, scroll) und
@@ -24,6 +24,8 @@ export function registerEditorToolbarCard() {
     slashIdx: 0,
     slashQuery: '',
     _slashBlock: null,
+    _slashLabels: null,
+    _slashFilterCache: null,
     linkShow: false,
     linkX: 0,
     linkY: 0,
