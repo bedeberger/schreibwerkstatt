@@ -31,6 +31,12 @@ const _EMPTY_META = () => ({
   epub_chapter_numbering_mode: 'nested', epub_unnumbered_chapter_ids: [],
   epub_rights: '', epub_pubdate: '',
   epub_translator: '', epub_illustrator: '', epub_editor_name: '', epub_uuid: '',
+  // Pendants zu PDF-Profil-Optionen (Migration 179).
+  epub_imprint_position: 'front', epub_chapter_title_style: 'centered-large',
+  epub_heading_font: 'match', epub_heading_scale: 'normal', epub_cover_fit: 'contain',
+  epub_numerals: 'default', epub_toc_depth: 2,
+  epub_subchapter_pagebreak: false, epub_chapter_rule: false, epub_page_rule: false,
+  epub_toc_enabled: true,
 });
 
 export function registerEpubExportCard() {
@@ -198,6 +204,25 @@ export function registerEpubExportCard() {
       ];
     },
     chapterNumberingModeOptions() { return this._enumOptions(['nested', 'flat'], 'epubExport.numberingMode'); },
+
+    // ── PDF-Pendant-Optionen (Migration 179) ──────────────────────────────
+    // Heading-Font: 'match' (wie Fliesstext) + dieselben Familien wie der Body-Font.
+    headingFontOptions() {
+      return [{ value: 'match', label: window.__app.t('epubExport.headingFont.match') }, ...this.publicationCssOptions()];
+    },
+    headingScaleOptions()     { return this._enumOptions(['small', 'normal', 'large'], 'epubExport.headingScale'); },
+    numeralsOptions()         { return this._enumOptions(['default', 'lining', 'oldstyle'], 'epubExport.numerals'); },
+    chapterTitleStyleOptions() { return this._enumOptions(['centered-large', 'left-rule', 'minimal'], 'epubExport.titleStyle'); },
+    imprintPositionOptions()  { return this._enumOptions(['front', 'back'], 'epubExport.imprintPosition'); },
+    coverFitOptions()         { return this._enumOptions(['contain', 'cover'], 'epubExport.coverFit'); },
+    // TOC-Tiefe: numerische Werte (1/2) — combobox vergleicht via String(), Auswahl
+    // setzt den rohen Wert zurueck (Number). validateMeta parst beides.
+    tocDepthOptions() {
+      return [
+        { value: 1, label: window.__app.t('epubExport.tocDepth.1') },
+        { value: 2, label: window.__app.t('epubExport.tocDepth.2') },
+      ];
+    },
 
     // ── Kapitel ohne Nummer (Pendant zur PDF-Option) ──────────────────────
     // Optionen aus dem Buch-Tree; Tiefe via Einrueckung im Label sichtbar.

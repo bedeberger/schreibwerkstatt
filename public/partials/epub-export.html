@@ -117,6 +117,24 @@
           <span x-text="$app.t('epubExport.field.dropCaps')"></span>
         </label>
       </div>
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('epubExport.field.headingFont')"></label>
+        <div x-data="combobox($app.t('epubExport.field.headingFont'))"
+             x-modelable="value" x-model="pub.epub_heading_font"
+             x-effect="options = headingFontOptions()"></div>
+      </div>
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('epubExport.field.headingScale')"></label>
+        <div x-data="combobox($app.t('epubExport.field.headingScale'))"
+             x-modelable="value" x-model="pub.epub_heading_scale"
+             x-effect="options = headingScaleOptions()"></div>
+      </div>
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('epubExport.field.numerals')"></label>
+        <div x-data="combobox($app.t('epubExport.field.numerals'))"
+             x-modelable="value" x-model="pub.epub_numerals"
+             x-effect="options = numeralsOptions()"></div>
+      </div>
     </section>
 
     <!-- Struktur -->
@@ -126,6 +144,36 @@
         <div x-data="combobox($app.t('epubExport.field.titlepageMode'))"
              x-modelable="value" x-model="pub.epub_titlepage_mode"
              x-effect="options = titlepageModeOptions()"></div>
+      </div>
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('epubExport.field.coverFit')"></label>
+        <div x-data="combobox($app.t('epubExport.field.coverFit'))"
+             x-modelable="value" x-model="pub.epub_cover_fit"
+             x-effect="options = coverFitOptions()"></div>
+      </div>
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('epubExport.field.imprintPosition')"></label>
+        <div x-data="combobox($app.t('epubExport.field.imprintPosition'))"
+             x-modelable="value" x-model="pub.epub_imprint_position"
+             x-effect="options = imprintPositionOptions()"></div>
+      </div>
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('epubExport.field.titleStyle')"></label>
+        <div x-data="combobox($app.t('epubExport.field.titleStyle'))"
+             x-modelable="value" x-model="pub.epub_chapter_title_style"
+             x-effect="options = chapterTitleStyleOptions()"></div>
+      </div>
+      <div class="card-form-row" x-show="pub.epub_chapter_title_style !== 'left-rule'">
+        <label class="book-settings-option">
+          <input type="checkbox" x-model="pub.epub_chapter_rule" :disabled="!canEditPublication()">
+          <span x-text="$app.t('epubExport.field.chapterRule')"></span>
+        </label>
+      </div>
+      <div class="card-form-row">
+        <label class="book-settings-option">
+          <input type="checkbox" x-model="pub.epub_page_rule" :disabled="!canEditPublication()">
+          <span x-text="$app.t('epubExport.field.pageRule')"></span>
+        </label>
       </div>
       <div class="card-form-row">
         <label class="card-form-label" x-text="$app.t('epubExport.field.sceneSep')"></label>
@@ -169,6 +217,24 @@
           <input type="checkbox" x-model="pub.epub_chapter_pagebreak" :disabled="!canEditPublication()">
           <span x-text="$app.t('epubExport.field.chapterPagebreak')"></span>
         </label>
+      </div>
+      <div class="card-form-row">
+        <label class="book-settings-option">
+          <input type="checkbox" x-model="pub.epub_subchapter_pagebreak" :disabled="!canEditPublication()">
+          <span x-text="$app.t('epubExport.field.subchapterPagebreak')"></span>
+        </label>
+      </div>
+      <div class="card-form-row">
+        <label class="book-settings-option">
+          <input type="checkbox" x-model="pub.epub_toc_enabled" :disabled="!canEditPublication()">
+          <span x-text="$app.t('epubExport.field.tocEnabled')"></span>
+        </label>
+      </div>
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('epubExport.field.tocDepth')"></label>
+        <div x-data="combobox($app.t('epubExport.field.tocDepth'))"
+             x-modelable="value" x-model="pub.epub_toc_depth"
+             x-effect="options = tocDepthOptions()"></div>
       </div>
       <div class="card-form-row">
         <label class="book-settings-option">

@@ -4,7 +4,7 @@ import epub from '../../lib/export-builders/epub.js';
 import sharp from 'sharp';
 import JSZip from 'jszip';
 
-const { _resolveEpubMeta, _countUnfetchableImages, _buildFrontmatter, _buildBackmatter, _proseToXhtml, buildEpub, _buildOpfExtraMeta, _buildAccessibilityMeta, _buildLandmarksNav, _buildContentOPF, _buildCoverXhtml, _buildCss, _applyBreaks, _dedupeIds } = epub;
+const { _resolveEpubMeta, _countUnfetchableImages, _buildFrontmatter, _buildBackmatter, _buildImprintBackmatter, _buildExtraSections, _proseToXhtml, buildEpub, _buildOpfExtraMeta, _buildAccessibilityMeta, _buildLandmarksNav, _buildContentOPF, _buildCoverXhtml, _buildCss, _applyBreaks, _dedupeIds } = epub;
 
 test('_applyBreaks: Editor-hr nach Klasse → pagebreak/blankpage/Szenentrenner', () => {
   const html = '<hr class="pagebreak" data-bid="a1">x'
@@ -482,4 +482,147 @@ test('buildEpub: epub_css_style sans → sans-serif body font', async () => {
   const zip = await _unzip(buf);
   const css = await zip.file('OEBPS/style.css').async('string');
   assert.ok(css.includes('font-family: sans-serif'));
+});
+
+test('_buildOpfExtraMeta: co_authors → zusätzliche dc:creator mit aut-Relator + file-as', () => {
+  const out = _buildOpfExtraMeta({ co_authors: [{ name: 'Max Muster', file_as: 'Muster, Max' }, { name: 'Eva <K>' }] });
+  assert.ok(out.includes('<dc:creator id="creator-co1">Max Muster</dc:creator>'));
+  assert.ok(out.includes('<meta refines="#creator-co1" property="role" scheme="marc:relators">aut</meta>'));
+  assert.ok(out.includes('<meta refines="#creator-co1" property="file-as">Muster, Max</meta>'));
+  // Zweiter Co-Autor escaped, ohne file-as keine file-as-Zeile.
+  assert.ok(out.includes('<dc:creator id="creator-co2">Eva &lt;K&gt;</dc:creator>'));
+  assert.ok(!out.includes('refines="#creator-co2" property="file-as"'));
+});
+
+test('_buildContentOPF: author_file_as überschreibt file-as des Hauptautors', () => {
+  const opf = _buildContentOPF({ author_file_as: 'Beispiel, Anna' }, {}, { hasImages: false, lang: 'de' });
+  assert.ok(opf.includes('<meta refines="#creator" property="file-as">Beispiel, Anna</meta>'));
+  // Ohne author_file_as bleibt der ejs-Platzhalter der Lib erhalten.
+  const bare = _buildContentOPF({}, {}, { hasImages: false, lang: 'de' });
+  assert.ok(/<meta refines="#creator" property="file-as"><%=/.test(bare));
+});
+
+test('_buildExtraSections: front/back-Split, leere verworfen, CTA-Link nur http/mailto', () => {
+  const { front, back } = _buildExtraSections({ extra_sections: [
+    { placement: 'front', title: 'Warnung', body: 'Inhalt.' },
+    { placement: 'back', title: 'Newsletter', body: 'Trag dich ein.', link_url: 'https://x.test', link_label: 'Anmelden' },
+    { placement: 'back', title: '', body: '', link_url: '' },                       // leer → verworfen
+    { placement: 'back', title: 'NoLink', body: 'x', link_url: 'javascript:alert(1)' }, // bad scheme → kein <a>
+  ] }, { lang: 'de' });
+  assert.equal(front.length, 1);
+  assert.equal(back.length, 2);
+  assert.ok(front[0].beforeToc === true && front[0].__toc === true);
+  assert.ok(front[0].content.includes('<h2>Warnung</h2>'));
+  assert.ok(back[0].content.includes('<p class="cta"><a href="https://x.test">Anmelden</a></p>'));
+  assert.ok(!back[1].content.includes('<a '), 'unsicheres Schema → kein Link');
+});
+
+test('_buildExtraSections: toc=false / titelloser Eintrag nicht im TOC', () => {
+  const { back } = _buildExtraSections({ extra_sections: [
+    { placement: 'back', title: 'Danke', body: 'x', toc: false },
+    { placement: 'back', title: '', body: 'nurBody' },
+  ] }, { lang: 'de' });
+  assert.equal(back[0].__toc, false); // explizit toc:false
+  assert.equal(back[1].__toc, false); // kein Titel → kein TOC-Label
+});
+
+test('buildEpub: extra_sections → front_extra/back_extra Dateien + TOC-Eintraege', async () => {
+  const bundle = { scope: 'book', book: { id: 1, name: 'B' }, groups: _oneGroup() };
+  const buf = await buildEpub(bundle, { lang: 'de', author: 'A', meta: { extra_sections: [
+    { placement: 'front', title: 'Triggerwarnung', body: 'Gewalt.' },
+    { placement: 'back', title: 'Newsletter', body: 'Melde dich an.', link_url: 'https://nl.test', link_label: 'Anmelden' },
+  ] } });
+  const zip = await _unzip(buf);
+  assert.ok(zip.file('OEBPS/front_extra_0.xhtml'), 'front-Sektion fehlt');
+  assert.ok(zip.file('OEBPS/back_extra_1.xhtml'), 'back-Sektion fehlt');
+  const back = await zip.file('OEBPS/back_extra_1.xhtml').async('string');
+  assert.ok(back.includes('href="https://nl.test"'), 'CTA-Link fehlt');
+  const nav = await zip.file('OEBPS/toc.xhtml').async('string');
+  assert.ok(nav.includes('Triggerwarnung') && nav.includes('Newsletter'), 'extra-Sektionen fehlen im TOC');
+});
+
+test('buildEpub: co_authors → Anzeige-Autor + zusätzliche dc:creator + file-as im OPF', async () => {
+  const bundle = { scope: 'book', book: { id: 1, name: 'B' }, groups: _oneGroup() };
+  const buf = await buildEpub(bundle, { lang: 'de', author: 'Anna Beispiel', meta: {
+    author_file_as: 'Beispiel, Anna',
+    co_authors: [{ name: 'Max Muster', file_as: 'Muster, Max' }],
+  } });
+  const zip = await _unzip(buf);
+  const title = await zip.file('OEBPS/front_title.xhtml').async('string');
+  assert.ok(title.includes('Anna Beispiel') && title.includes('Max Muster'), 'Titelseite zeigt beide Autoren');
+  const opf = await zip.file('OEBPS/content.opf').async('string');
+  assert.ok(opf.includes('<meta refines="#creator" property="file-as">Beispiel, Anna</meta>'), 'Hauptautor file-as fehlt');
+  assert.ok(opf.includes('<dc:creator id="creator-co1">Max Muster</dc:creator>'), 'Co-Autor-creator fehlt');
+  const ncx = await zip.file('OEBPS/toc.ncx').async('string');
+  assert.ok(ncx.includes('Anna Beispiel') && ncx.includes('Max Muster'), 'NCX docAuthor zeigt nicht beide');
+});
+
+// ── PDF-Pendant-Optionen (Migration 179) ────────────────────────────────────
+
+test('_buildCss: Heading-Font/Scale/Numerals + getrennte Kapitel/Sub-Umbrueche', () => {
+  const on = _buildCss({ epub_chapter_pagebreak: true, epub_subchapter_pagebreak: true, epub_heading_font: 'garamond', epub_heading_scale: 'large', epub_numerals: 'oldstyle' });
+  assert.ok(on.includes('EB Garamond'), 'Heading-Font-Stack');
+  assert.ok(/\nh1 \{ font-size: 2\.6em; \}/.test(on), 'Heading-Scale large');
+  assert.ok(on.includes('oldstyle-nums'), 'Oldstyle-Ziffern');
+  assert.ok(on.includes('.epub-chapter-head--top { page-break-before: always'), 'Top-Kapitelumbruch');
+  assert.ok(on.includes('.epub-chapter-head--sub { page-break-before: always'), 'Sub-Kapitelumbruch');
+  // Defaults: kein Heading-Override, keine Ziffern-Regel, kein Sub-Umbruch.
+  const off = _buildCss({ epub_chapter_pagebreak: true });
+  assert.ok(!/\nh1 \{ font-size/.test(off) && !off.includes('font-variant-numeric'), 'match/normal/default → kein Override');
+  assert.ok(!off.includes('.epub-chapter-head--sub { page-break'), 'Sub-Umbruch default aus');
+});
+
+test('_buildCoverXhtml: epub_cover_fit cover→slice (+Klasse), default contain→meet', () => {
+  const cov = _buildCoverXhtml({ mime: 'image/jpeg', width: 750, height: 1200 }, 'de', 'cover');
+  assert.ok(cov.includes('xMidYMid slice') && cov.includes('cover-page--cover'), 'cover → slice + Klasse');
+  const contain = _buildCoverXhtml({ mime: 'image/jpeg', width: 750, height: 1200 });
+  assert.ok(contain.includes('xMidYMid meet') && contain.includes('class="cover-page"') && !contain.includes('cover-page--cover'), 'default contain → meet');
+});
+
+test('_buildImprintBackmatter: front → [], back → eigener Backmatter-Eintrag', () => {
+  assert.deepEqual(_buildImprintBackmatter({ imprint: 'X', epub_imprint_position: 'front' }), [], 'front → kein Backmatter');
+  assert.deepEqual(_buildImprintBackmatter({ epub_imprint_position: 'back' }), [], 'leeres Impressum → kein Backmatter');
+  const ib = _buildImprintBackmatter({ imprint: 'Verlag X', isbn: '123', epub_imprint_position: 'back' });
+  assert.equal(ib.length, 1);
+  assert.equal(ib[0].filename, 'back_imprint.xhtml');
+  assert.equal(ib[0].__toc, false);
+  assert.ok(ib[0].content.includes('Verlag X') && ib[0].content.includes('ISBN: 123'));
+});
+
+test('buildEpub: titleStyle left-rule + epub_page_rule + Sub-Wrapper', async () => {
+  const bundle = { scope: 'book', book: { id: 1, name: 'B' }, groups: [
+    { chapterId: 10, chapter: { id: 10, name: 'Eins' }, pages: [{ p: { name: 'S1' }, pd: { html: '<p>a</p>' } }, { p: { name: 'S2' }, pd: { html: '<p>b</p>' } }] },
+    { chapterId: 11, chapter: { id: 11, name: 'Zwei', parent_chapter_id: 10 }, pages: [{ p: { name: 'S3' }, pd: { html: '<p>c</p>' } }] },
+  ] };
+  const buf = await buildEpub(bundle, { lang: 'de', author: 'A', meta: { epub_chapter_title_style: 'left-rule', epub_page_rule: true } });
+  const zip = await JSZip.loadAsync(buf);
+  const chap0 = await zip.file('OEBPS/chap_0.xhtml').async('string');
+  assert.ok(chap0.includes('epub-chapter-head--ts-left-rule') && chap0.includes('epub-chapter-head--top'), 'Top-Wrapper-Klassen');
+  assert.ok(chap0.includes('epub-title-rule'), 'left-rule zeichnet den Titel-Strich (auch ohne epub_chapter_rule)');
+  const page0 = await zip.file('OEBPS/chap_0_p_0.xhtml').async('string');
+  assert.ok(page0.includes('epub-page-rule'), 'Seitentitel-Strich bei epub_page_rule');
+  const sub = await zip.file('OEBPS/entry_1.xhtml').async('string');
+  assert.ok(sub.includes('epub-chapter-head--sub') && !sub.includes('epub-title-rule'), 'Sub-Kapitel: --sub-Klasse, kein Titel-Strich');
+});
+
+test('buildEpub: epub_toc_enabled=false entfernt TOC aus der Spine, Nav bleibt im Manifest', async () => {
+  const bundle = { scope: 'book', book: { id: 1, name: 'B' }, groups: [{ chapterId: null, chapter: null, pages: [{ p: { name: 'S1' }, pd: { html: '<p>x</p>' } }] }] };
+  const on = await buildEpub(bundle, { lang: 'de', author: 'A', meta: {} });
+  assert.ok((await (await JSZip.loadAsync(on)).file('OEBPS/content.opf').async('string')).includes('<itemref idref="toc" />'), 'Default: TOC in Spine');
+  const off = await buildEpub(bundle, { lang: 'de', author: 'A', meta: { epub_toc_enabled: false } });
+  const opf = await (await JSZip.loadAsync(off)).file('OEBPS/content.opf').async('string');
+  assert.ok(!opf.includes('<itemref idref="toc" />'), 'TOC aus Spine entfernt');
+  assert.ok(opf.includes('properties="nav"'), 'Nav-Dokument bleibt im Manifest');
+  assert.equal(off.readUInt16LE(8), 0, 'mimetype bleibt STORE nach Rezip');
+});
+
+test('buildEpub: epub_toc_depth=1 blendet Sub-/Seiten-Eintraege aus dem TOC aus', async () => {
+  const bundle = { scope: 'book', book: { id: 1, name: 'B' }, groups: [
+    { chapterId: 10, chapter: { id: 10, name: 'Eins' }, pages: [{ p: { name: 'S1' }, pd: { html: '<p>a</p>' } }, { p: { name: 'S2' }, pd: { html: '<p>b</p>' } }] },
+  ] };
+  const buf = await buildEpub(bundle, { lang: 'de', author: 'A', meta: { epub_toc_depth: 1, epub_nest_pages_in_toc: true } });
+  const zip = await JSZip.loadAsync(buf);
+  const nav = await zip.file('OEBPS/toc.xhtml').async('string');
+  assert.ok(nav.includes('>Eins<'), 'Top-Kapitel sichtbar');
+  assert.ok(!nav.includes('>S1<') && !nav.includes('>S2<'), 'Seiten-Eintraege bei depth=1 ausgeblendet');
 });

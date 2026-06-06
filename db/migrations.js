@@ -7308,6 +7308,35 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 178 abgeschlossen (book_publication: Selfpublishing-Belletristik-Felder).');
   }
 
+  if (version < 179) {
+    // book_publication: weitere EPUB-Export-Optionen als Pendants zu PDF-Profil-
+    // Feldern (pdf_export_profile.config) — Impressum-Position (front/back),
+    // Kapiteltitel-Stil + dekorative Striche, separater Heading-Font + -Skala,
+    // Sub-Kapitel-Umbruch, Cover-Fit, Ziffernstil, TOC-Schalter + -Tiefe. Additiv.
+    const bpCols179 = db.pragma('table_info(book_publication)').map(c => c.name);
+    const addPubCol179 = (name, ddl) => {
+      if (!bpCols179.includes(name)) db.exec(`ALTER TABLE book_publication ADD COLUMN ${ddl}`);
+    };
+    addPubCol179('epub_imprint_position',    "epub_imprint_position TEXT DEFAULT 'front'");
+    addPubCol179('epub_chapter_title_style', "epub_chapter_title_style TEXT DEFAULT 'centered-large'");
+    addPubCol179('epub_heading_font',        "epub_heading_font TEXT DEFAULT 'match'");
+    addPubCol179('epub_heading_scale',       "epub_heading_scale TEXT DEFAULT 'normal'");
+    addPubCol179('epub_cover_fit',           "epub_cover_fit TEXT DEFAULT 'contain'");
+    addPubCol179('epub_numerals',            "epub_numerals TEXT DEFAULT 'default'");
+    addPubCol179('epub_subchapter_pagebreak', 'epub_subchapter_pagebreak INTEGER DEFAULT 0');
+    addPubCol179('epub_chapter_rule',        'epub_chapter_rule INTEGER DEFAULT 0');
+    addPubCol179('epub_page_rule',           'epub_page_rule INTEGER DEFAULT 0');
+    addPubCol179('epub_toc_enabled',         'epub_toc_enabled INTEGER DEFAULT 1');
+    addPubCol179('epub_toc_depth',           'epub_toc_depth INTEGER DEFAULT 2');
+
+    const fkErrors179 = db.pragma('foreign_key_check');
+    if (fkErrors179.length) {
+      throw new Error(`Migration 179: foreign_key_check meldet ${fkErrors179.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 179').run();
+    logger.info('DB-Migration auf Version 179 abgeschlossen (book_publication: weitere EPUB-Optionen).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

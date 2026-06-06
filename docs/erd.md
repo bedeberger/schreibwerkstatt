@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 178, 92 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 179, 92 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -1103,6 +1103,17 @@ erDiagram
     TEXT    epub_illustrator "dc:contributor ill"
     TEXT    epub_editor_name "dc:contributor edt"
     TEXT    epub_uuid "OPF identifier"
+    TEXT    epub_imprint_position "front|back"
+    TEXT    epub_chapter_title_style "z.B. centered-large"
+    TEXT    epub_heading_font "match|eigener Heading-Font"
+    TEXT    epub_heading_scale "normal|…"
+    TEXT    epub_cover_fit "contain|…"
+    TEXT    epub_numerals "default|…"
+    INTEGER epub_subchapter_pagebreak "0|1"
+    INTEGER epub_chapter_rule "0|1 dekorativer Strich"
+    INTEGER epub_page_rule "0|1"
+    INTEGER epub_toc_enabled "0|1"
+    INTEGER epub_toc_depth "TOC-Tiefe"
     TEXT    created_at
     TEXT    updated_at
   }

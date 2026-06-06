@@ -18,12 +18,17 @@ const _META_COLS = [
   'epub_scene_separator', 'epub_titlepage_mode',
   'epub_chapter_numbering', 'epub_chapter_numbering_mode', 'epub_unnumbered_chapter_ids',
   'epub_rights', 'epub_pubdate', 'epub_translator', 'epub_illustrator', 'epub_editor_name', 'epub_uuid',
+  'epub_imprint_position', 'epub_chapter_title_style', 'epub_heading_font', 'epub_heading_scale',
+  'epub_cover_fit', 'epub_numerals', 'epub_toc_depth',
+  'epub_subchapter_pagebreak', 'epub_chapter_rule', 'epub_page_rule', 'epub_toc_enabled',
 ];
 
 // 0/1-Spalten — beim Upsert aus bool zu Integer wandeln, beim Lesen via
-// validateMeta wieder zu bool (validateMeta akzeptiert 0/1/'1').
+// validateMeta wieder zu bool (validateMeta akzeptiert 0/1/'1'). epub_toc_depth ist
+// KEIN Bool (INTEGER-Enum) und bleibt darum hier aussen vor.
 const _BOOL_COLS = [
   'epub_justify', 'epub_hyphenation', 'epub_chapter_pagebreak', 'epub_drop_caps', 'epub_nest_pages_in_toc',
+  'epub_subchapter_pagebreak', 'epub_chapter_rule', 'epub_page_rule', 'epub_toc_enabled',
 ];
 
 // JSON-Array-Spalten — beim Upsert aus Array zu JSON-String serialisieren, beim

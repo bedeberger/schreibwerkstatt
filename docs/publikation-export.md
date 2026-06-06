@@ -78,5 +78,5 @@ Migration 166 seedet `book_publication` je Buch aus dem Gewinner-PDF-Profil (`is
 
 ## Tests
 
-- Unit: [tests/unit/publication-meta.test.mjs](../tests/unit/publication-meta.test.mjs) (Validator/ISBN-Checksum), [tests/unit/epub-export.test.mjs](../tests/unit/epub-export.test.mjs) (Meta-Resolver, Frontmatter/Backmatter, Bild-Zähler, ISBN-`dc:identifier`, Accessibility-Meta, Landmarks-nav, genEpub-Smoke).
+- Unit: [tests/unit/publication-meta.test.mjs](../tests/unit/publication-meta.test.mjs) (Validator/ISBN-Checksum, `author_file_as`/`co_authors`/`extra_sections`-Normalisierung), [tests/unit/epub-export.test.mjs](../tests/unit/epub-export.test.mjs) (Meta-Resolver, Frontmatter/Backmatter, Bild-Zähler, ISBN-`dc:identifier`, Accessibility-Meta, Landmarks-nav, file-as-Override + Co-Autoren-`dc:creator`, freie Vor-/Nachsatz-Seiten, genEpub-Smoke).
 - E2E: [tests/e2e/publication.spec.js](../tests/e2e/publication.spec.js) (Tab, Speichern, Cover-Upload, EPUB-Download) — Harness [tests/fixtures/publication-harness.html](../tests/fixtures/publication-harness.html), Mocks in [tests/server.js](../tests/server.js).
