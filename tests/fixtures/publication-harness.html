@@ -71,6 +71,15 @@
     const slot = document.getElementById('partial-book-settings');
     slot.appendChild(tpl.content);
     window.Alpine.initTree(slot);
+
+    // Produktion lädt book_publication beim Karten-Öffnen (onShow). Hier ist das
+    // Show-Flag schon bei init true, also stösst die Lifecycle-Watch nicht an —
+    // loadPublication explizit aufrufen, damit bookPublicationLoaded gesetzt ist
+    // (savePublication speichert sonst bewusst nicht, um keinen leeren Full-
+    // Replace-Upsert auszulösen). Nur diese eine Quelle, nicht der ganze onShow.
+    const card = window.Alpine.$data(slot.querySelector('[x-data="bookSettingsCard"]'));
+    await card.loadPublication();
+
     window.__harnessReady = true;
   });
 </script>

@@ -21,6 +21,8 @@ Validator + Defaults: [lib/publication-meta.js](../lib/publication-meta.js) (`de
 
 Tab **Publikation** in der BookSettings-Karte ([public/partials/book-settings.html](../public/partials/book-settings.html), Methoden in [public/js/book/book-settings.js](../public/js/book/book-settings.js)). Cover-/Foto-Upload nutzt das DESIGN.md-Pattern „Bild-Upload mit Vorschau" (`.pub-image-*`). Keine eigene Karte/Registry/Hash-Router — bewusst als Tab.
 
+**Ein Save-Button, zwei Stores:** Der Header-Save (`saveActiveTab`) schreibt auf jedem Klick **beide** Backends parallel — `book_settings` (`/booksettings`) **und** `book_publication` (`/publication`). Beide sind unabhängige Full-Replace-Writes auf getrennte Tabellen; ein Klick persistiert alles, egal in welchem Tab editiert wurde. **Why:** Tab-abhängiges Dispatch verlor stillschweigend die jeweils andere Seite (Publikation-Edit ging verloren, wenn aus einem anderen Tab gespeichert wurde). `savePublication` ist gegen `bookPublicationLoaded` geschützt — vor erfolgreichem GET kein PUT, sonst überschriebe der strikte Upsert den DB-Stand mit leeren Defaults.
+
 ## Route
 
 [routes/publication.js](../routes/publication.js), gemountet `/publication`, ACL via `aclParamGuard` (viewer lesen, editor schreiben), `/publication` in `NEVER_CACHE_PREFIXES` ([public/sw.js](../public/sw.js)):

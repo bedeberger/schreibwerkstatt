@@ -7246,6 +7246,23 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 175 abgeschlossen (tagebuch_rueckblicke History).');
   }
 
+  if (version < 176) {
+    // books.cover_image (BLOB) entfernen: tote Spalte ohne Lese-/Schreibpfad.
+    // Der publikations-relevante Cover lebt in book_publication.cover_image
+    // (SSoT fuer PDF- und EPUB-Export). Reines DROP COLUMN — die Spalte ist Teil
+    // keines FK/Index/Constraints, daher kein Recreate-Pattern noetig.
+    const booksCols176 = db.pragma('table_info(books)').map(c => c.name);
+    if (booksCols176.includes('cover_image')) {
+      db.exec('ALTER TABLE books DROP COLUMN cover_image');
+    }
+    const fkErrors176 = db.pragma('foreign_key_check');
+    if (fkErrors176.length) {
+      throw new Error(`Migration 176: foreign_key_check meldet ${fkErrors176.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 176').run();
+    logger.info('DB-Migration auf Version 176 abgeschlossen (books.cover_image entfernt).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

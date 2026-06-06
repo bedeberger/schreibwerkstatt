@@ -75,15 +75,18 @@ export const bookSettingsMethods = {
     }
   },
 
-  // Header-Save dispatcht je Tab: Publikation schreibt /publication/, sonst
-  // /booksettings/. Methoden (keine Getter) — bookSettingsMethods wird gespreadet,
-  // Getter würden beim Spread eval't statt durchgereicht.
-  _isPublicationTab() { return this.bookSettingsTab === 'publication'; },
-  saveActiveTab() { return this._isPublicationTab() ? this.savePublication() : this.saveBookSettings(); },
-  headerSaving() { return this._isPublicationTab() ? this.pubSaving : this.bookSettingsSaving; },
-  headerSaved() { return this._isPublicationTab() ? this.pubSaved : this.bookSettingsSaved; },
-  headerError() { return this._isPublicationTab() ? this.pubError : this.bookSettingsError; },
-  headerDisabled() { return this._isPublicationTab() ? this.pubSaving : (this.bookSettingsSaving || this.bookSettingsLoading); },
+  // Ein Header-Save-Button schreibt BEIDE Stores: book_settings (/booksettings)
+  // UND book_publication (/publication). Beide sind unabhängige Full-Replace-
+  // Writes auf getrennte Tabellen — ein Klick persistiert alles, egal in welchem
+  // Tab editiert wurde (Titelei/Klappentext im Publikation-Tab + Sprache/Kontext/
+  // Tagesziel in den anderen Tabs). Beide laufen parallel; die Header-Status-
+  // Getter aggregieren über beide. Methoden (keine Getter) — bookSettingsMethods
+  // wird gespreadet, Getter würden beim Spread eval't statt durchgereicht.
+  async saveActiveTab() { await Promise.all([this.saveBookSettings(), this.savePublication()]); },
+  headerSaving()   { return this.bookSettingsSaving || this.pubSaving; },
+  headerError()    { return this.bookSettingsError || this.pubError; },
+  headerSaved()    { return (this.bookSettingsSaved || this.pubSaved) && !this.headerError(); },
+  headerDisabled() { return this.bookSettingsSaving || this.pubSaving || this.bookSettingsLoading; },
 
   async saveBookSettings() {
     if (!window.__app.selectedBookId) return;
@@ -149,6 +152,7 @@ export const bookSettingsMethods = {
     if (!bookId) return;
     try {
       this.bookPublication = await fetchJson(`/publication/${bookId}`);
+      this.bookPublicationLoaded = true;
     } catch (e) {
       console.error('[book-settings] Publikation laden fehlgeschlagen:', e);
     }
@@ -157,6 +161,10 @@ export const bookSettingsMethods = {
   async savePublication() {
     const bookId = window.__app.selectedBookId;
     if (!bookId) return;
+    // Nicht speichern, bevor die volle Meta geladen ist — der strikte Full-
+    // Replace-Upsert würde den DB-Stand sonst mit leeren Defaults überschreiben.
+    // saveActiveTab ruft uns auf jedem Save-Klick auf, auch ohne Publikations-Edit.
+    if (!this.bookPublicationLoaded) return;
     this.pubSaving = true; this.pubSaved = false; this.pubError = '';
     try {
       // Volle geladene Meta zurueckschreiben — der strikte Upsert setzt jedes

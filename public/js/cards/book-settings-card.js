@@ -5,6 +5,23 @@
 import { bookSettingsMethods } from '../book/book-settings.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
 
+// Vollständiges Default-Meta (alle book_publication-Felder). Der /publication-PUT
+// ist Full-Replace — ein unvollständiges Objekt setzt fehlende Felder serverseitig
+// auf Default zurück. Deckungsgleich mit defaultMeta() in lib/publication-meta.js
+// + den UI-Flags (has_cover/has_author_image).
+const _EMPTY_PUB_META = () => ({
+  author_name: '', isbn: '', subtitle: '', year: '', dedication: '', imprint: '',
+  copyright: '', frontmatter: '', author_bio: '', epub_css_style: 'serif', epub_toc_title: '',
+  description: '', publisher: '', series: '', series_index: '', keywords: '',
+  epub_font_size: 'normal', epub_line_height: 'normal', epub_paragraph_style: 'indent',
+  epub_indent_size: 'medium', epub_scene_separator: 'line', epub_titlepage_mode: 'generated',
+  epub_chapter_numbering: 'none', epub_chapter_numbering_mode: 'nested',
+  epub_rights: '', epub_pubdate: '', epub_translator: '', epub_illustrator: '',
+  epub_editor_name: '', epub_uuid: '', epub_justify: true, epub_hyphenation: false,
+  epub_chapter_pagebreak: true, epub_drop_caps: false, epub_nest_pages_in_toc: true,
+  has_cover: false, has_author_image: false,
+});
+
 export function registerBookSettingsCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
   window.Alpine.data('bookSettingsCard', () => ({
@@ -70,7 +87,8 @@ export function registerBookSettingsCard() {
     hubspotImportJobId: null,
     hubspotReconcileJobId: null,
     // Publikation (book_publication: Cover/Titelei/Bio, geteilt mit PDF+EPUB).
-    bookPublication: { author_name: '', isbn: '', subtitle: '', year: '', dedication: '', imprint: '', copyright: '', frontmatter: '', author_bio: '', epub_css_style: 'serif', epub_justify: true, epub_toc_title: '', description: '', publisher: '', series: '', series_index: '', keywords: '', has_cover: false, has_author_image: false },
+    bookPublication: _EMPTY_PUB_META(),
+    bookPublicationLoaded: false,
     pubSaving: false,
     pubSaved: false,
     pubError: '',
@@ -124,7 +142,8 @@ export function registerBookSettingsCard() {
           hubspotError: '',
           hubspotImportJobId: null,
           hubspotReconcileJobId: null,
-          bookPublication: { author_name: '', isbn: '', subtitle: '', year: '', dedication: '', imprint: '', copyright: '', frontmatter: '', author_bio: '', epub_css_style: 'serif', epub_justify: true, epub_toc_title: '', description: '', publisher: '', series: '', series_index: '', keywords: '', has_cover: false, has_author_image: false },
+          bookPublication: _EMPTY_PUB_META(),
+          bookPublicationLoaded: false,
           pubError: '',
           pubCoverError: '',
           pubAuthorError: '',
