@@ -145,6 +145,25 @@
              x-modelable="value" x-model="pub.epub_chapter_numbering_mode"
              x-effect="options = chapterNumberingModeOptions()"></div>
       </div>
+      <div class="card-form-row card-form-row--top" x-show="pub.epub_chapter_numbering !== 'none'">
+        <label class="card-form-label" x-text="$app.t('epubExport.field.unnumberedChapters')"></label>
+        <div class="card-form-field">
+          <div x-data="combobox({ placeholder: $app.t('epubExport.field.unnumberedPick'), multiple: true })"
+               x-modelable="value" x-model="pub.epub_unnumbered_chapter_ids"
+               x-effect="options = unnumberedChapterPickOptions()"></div>
+          <div class="epubx-chip-row" x-show="unnumberedChapterChips().length">
+            <template x-for="chip in unnumberedChapterChips()" :key="chip.id">
+              <span class="epubx-chip">
+                <span x-text="chip.label"></span>
+                <button type="button" class="epubx-chip-remove"
+                        :aria-label="$app.t('common.remove')"
+                        @click="removeUnnumberedChapter(chip.id)">×</button>
+              </span>
+            </template>
+          </div>
+          <p class="card-form-field-note" x-text="$app.t('epubExport.field.unnumberedHint')"></p>
+        </div>
+      </div>
       <div class="card-form-row">
         <label class="book-settings-option">
           <input type="checkbox" x-model="pub.epub_chapter_pagebreak" :disabled="!canEditPublication()">

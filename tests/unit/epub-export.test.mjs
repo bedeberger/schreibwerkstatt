@@ -4,7 +4,7 @@ import epub from '../../lib/export-builders/epub.js';
 import sharp from 'sharp';
 import JSZip from 'jszip';
 
-const { _resolveEpubMeta, _countUnfetchableImages, _buildFrontmatter, _buildBackmatter, _proseToXhtml, buildEpub, _buildOpfExtraMeta, _buildAccessibilityMeta, _buildLandmarksNav, _buildContentOPF, _buildCoverXhtml, _applyBreaks, _dedupeIds } = epub;
+const { _resolveEpubMeta, _countUnfetchableImages, _buildFrontmatter, _buildBackmatter, _proseToXhtml, buildEpub, _buildOpfExtraMeta, _buildAccessibilityMeta, _buildLandmarksNav, _buildContentOPF, _buildCoverXhtml, _buildCss, _applyBreaks, _dedupeIds } = epub;
 
 test('_applyBreaks: Editor-hr nach Klasse → pagebreak/blankpage/Szenentrenner', () => {
   const html = '<hr class="pagebreak" data-bid="a1">x'
@@ -247,9 +247,13 @@ test('buildEpub: ohne Cover keine Cover-Seite, mimetype bleibt STORE', async () 
   assert.ok(!Object.keys(zip.files).some(n => n.endsWith('front_cover.xhtml')));
 });
 
-test('_buildOpfExtraMeta: leer ohne keywords/series', () => {
-  assert.equal(_buildOpfExtraMeta({}), '');
-  assert.equal(_buildOpfExtraMeta({ keywords: '  ,  ' }), '');
+test('_buildOpfExtraMeta: ohne keywords/series nur Hauptautor-aut-Relator', () => {
+  // Hauptautor-MARC-Relator (aut auf das Lib-#creator) wird immer emittiert;
+  // ohne keywords/series/Co-Autoren ist das die einzige Zeile.
+  const AUT = '<meta refines="#creator" property="role" scheme="marc:relators">aut</meta>';
+  assert.equal(_buildOpfExtraMeta({}), AUT);
+  assert.equal(_buildOpfExtraMeta({ keywords: '  ,  ' }), AUT);
+  assert.ok(!_buildOpfExtraMeta({}).includes('dc:subject') && !_buildOpfExtraMeta({}).includes('belongs-to-collection'), 'kein Subject/Collection ohne keywords/series');
 });
 
 test('_buildOpfExtraMeta: keywords → dc:subject je Term (escaped), series → collection + calibre', () => {
@@ -350,7 +354,73 @@ test('buildEpub: Kapitelnumerierung prependet Label an TOC-Titel + Ueberschrift'
   const ncx = await zip.file('OEBPS/toc.ncx').async('string');
   assert.ok(ncx.includes('<text>1. Anfang</text>'), 'NavMap fehlt Numerierung');
   const entry = await zip.file('OEBPS/entry_0.xhtml').async('string');
-  assert.ok(entry.includes('<h1>1. Anfang</h1>'), 'Body-Ueberschrift fehlt Numerierung');
+  // Body-Ueberschrift gestapelt: Nummer + Titel in eigenen Spans (TOC bleibt flach).
+  assert.ok(entry.includes('class="epub-chapter-num">1</span>') && entry.includes('class="epub-chapter-name">Anfang</span>'), 'Body-Ueberschrift gestapelt mit Numerierung');
+});
+
+test('buildEpub: numerierte Ueberschrift gestapelt — Reihenfolge Nummer → Strich → Titel, Strich dekorativ', async () => {
+  const bundle = {
+    scope: 'book', book: { id: 1, name: 'B' },
+    groups: [{ chapterId: 10, chapter: { id: 10, name: 'Anfang' }, pages: [{ p: { name: 'S1' }, pd: { html: '<p>a</p>' } }] }],
+  };
+  const buf = await buildEpub(bundle, {
+    lang: 'de', author: 'A',
+    meta: { epub_chapter_numbering: 'arabic', epub_chapter_numbering_mode: 'flat' },
+  });
+  const zip = await _unzip(buf);
+  const entry = await zip.file('OEBPS/entry_0.xhtml').async('string');
+  const iNum = entry.indexOf('epub-chapter-num');
+  const iRule = entry.indexOf('epub-chapter-rule');
+  const iName = entry.indexOf('epub-chapter-name');
+  assert.ok(iNum >= 0 && iRule > iNum && iName > iRule, 'Reihenfolge Nummer → Strich → Titel');
+  assert.ok(/epub-chapter-rule"[^>]*aria-hidden="true"/.test(entry), 'Strich-Trenner ist dekorativ (aria-hidden)');
+  assert.ok(entry.includes('epub-chapter-title--numbered'), 'gestapelte Ueberschrift traegt --numbered-Klasse');
+  // Stylesheet enthaelt die Layout-Regel fuer die gestapelte Ueberschrift.
+  assert.ok(_buildCss({}).includes('.epub-chapter-title--numbered'), 'CSS-Regel fuer gestapelte Ueberschrift vorhanden');
+});
+
+test('buildEpub: epub_unnumbered_chapter_ids — markiertes Kapitel ohne Nummer, Zaehlung ohne Luecke', async () => {
+  const bundle = {
+    scope: 'book', book: { id: 1, name: 'B' },
+    groups: [
+      { chapterId: 10, chapter: { id: 10, name: 'Anfang' }, pages: [{ p: { name: 'S1' }, pd: { html: '<p>a</p>' } }] },
+      { chapterId: 11, chapter: { id: 11, name: 'Vorwort' }, pages: [{ p: { name: 'S2' }, pd: { html: '<p>b</p>' } }] },
+      { chapterId: 12, chapter: { id: 12, name: 'Mitte' }, pages: [{ p: { name: 'S3' }, pd: { html: '<p>c</p>' } }] },
+    ],
+  };
+  const buf = await buildEpub(bundle, {
+    lang: 'de', author: 'A',
+    meta: { epub_chapter_numbering: 'arabic', epub_chapter_numbering_mode: 'flat', epub_unnumbered_chapter_ids: [11] },
+  });
+  const zip = await _unzip(buf);
+  const e0 = await zip.file('OEBPS/entry_0.xhtml').async('string');
+  const e1 = await zip.file('OEBPS/entry_1.xhtml').async('string');
+  const e2 = await zip.file('OEBPS/entry_2.xhtml').async('string');
+  assert.ok(e0.includes('class="epub-chapter-num">1</span>') && e0.includes('class="epub-chapter-name">Anfang</span>'), 'erstes Kapitel numeriert');
+  assert.ok(e1.includes('<h1>Vorwort</h1>') && !e1.includes('epub-chapter-num'), 'markiertes Kapitel ohne Nummer (schlichte Ueberschrift)');
+  assert.ok(e2.includes('class="epub-chapter-num">2</span>') && e2.includes('class="epub-chapter-name">Mitte</span>'), 'naechstes Kapitel laeuft ohne Luecke weiter (2, nicht 3)');
+});
+
+test('buildEpub: unnumbered cascade — markiertes Top-Kapitel zieht Sub-Kapitel mit', async () => {
+  const bundle = {
+    scope: 'book', book: { id: 1, name: 'B' },
+    groups: [
+      { chapterId: 20, chapter: { id: 20, name: 'Teil', parent_chapter_id: null }, pages: [{ p: { name: 'S1' }, pd: { html: '<p>a</p>' } }] },
+      { chapterId: 21, chapter: { id: 21, name: 'Unterkapitel', parent_chapter_id: 20 }, pages: [{ p: { name: 'S2' }, pd: { html: '<p>b</p>' } }] },
+      { chapterId: 22, chapter: { id: 22, name: 'Echtes', parent_chapter_id: null }, pages: [{ p: { name: 'S3' }, pd: { html: '<p>c</p>' } }] },
+    ],
+  };
+  const buf = await buildEpub(bundle, {
+    lang: 'de', author: 'A',
+    meta: { epub_chapter_numbering: 'arabic', epub_chapter_numbering_mode: 'flat', epub_unnumbered_chapter_ids: [20] },
+  });
+  const zip = await _unzip(buf);
+  const e0 = await zip.file('OEBPS/entry_0.xhtml').async('string');
+  const e1 = await zip.file('OEBPS/entry_1.xhtml').async('string');
+  const e2 = await zip.file('OEBPS/entry_2.xhtml').async('string');
+  assert.ok(e0.includes('<h1>Teil</h1>') && !e0.includes('epub-chapter-num'), 'Top-Kapitel ohne Nummer');
+  assert.ok(e1.includes('<h1>Unterkapitel</h1>') && !e1.includes('epub-chapter-num'), 'Sub-Kapitel erbt unnumbered via Cascade');
+  assert.ok(e2.includes('class="epub-chapter-num">1</span>') && e2.includes('class="epub-chapter-name">Echtes</span>'), 'erstes echtes Kapitel ist 1 (Cascade verbrauchte keine Nummer)');
 });
 
 test('buildEpub: numbering none (Default) → keine Label-Praefixe', async () => {
@@ -361,7 +431,7 @@ test('buildEpub: numbering none (Default) → keine Label-Praefixe', async () =>
   const buf = await buildEpub(bundle, { lang: 'de', author: 'A', meta: {} });
   const zip = await _unzip(buf);
   const entry = await zip.file('OEBPS/entry_0.xhtml').async('string');
-  assert.ok(entry.includes('<h1>Anfang</h1>') && !/<h1>\d+\.\s/.test(entry), 'Default darf nicht numerieren');
+  assert.ok(entry.includes('<h1>Anfang</h1>') && !entry.includes('epub-chapter-num'), 'Default darf nicht numerieren');
 });
 
 test('buildEpub: description-Fallback book→meta, publisher/series in OPF', async () => {

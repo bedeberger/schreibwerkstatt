@@ -338,6 +338,25 @@
           <p class="card-form-hint" x-text="$app.t('publication.authorNameHint')"></p>
         </div>
         <div class="card-form-row">
+          <label class="card-form-label" for="pub-author-file-as" x-text="$app.t('publication.authorFileAs')"></label>
+          <input type="text" id="pub-author-file-as" class="card-form-input" x-model="bookPublication.author_file_as" maxlength="200" :placeholder="$app.t('publication.authorFileAsPlaceholder')">
+          <p class="card-form-hint" x-text="$app.t('publication.authorFileAsHint')"></p>
+        </div>
+        <div class="card-form-row">
+          <label class="card-form-label" x-text="$app.t('publication.coAuthors')"></label>
+          <p class="card-form-hint" x-text="$app.t('publication.coAuthorsHint')"></p>
+          <div class="pub-repeater">
+            <template x-for="(c, i) in (bookPublication.co_authors || [])" :key="i">
+              <div class="pub-repeater-row">
+                <input type="text" class="card-form-input" x-model="c.name" maxlength="200" :placeholder="$app.t('publication.coAuthorName')" data-spellcheck="spelling">
+                <input type="text" class="card-form-input" x-model="c.file_as" maxlength="200" :placeholder="$app.t('publication.coAuthorFileAs')">
+                <button type="button" class="btn-compact danger" @click="removeCoAuthor(i)" x-text="$app.t('common.remove')"></button>
+              </div>
+            </template>
+            <button type="button" class="btn-compact" @click="addCoAuthor()" x-text="$app.t('publication.coAuthorAdd')"></button>
+          </div>
+        </div>
+        <div class="card-form-row">
           <label class="card-form-label" for="pub-subtitle" x-text="$app.t('publication.subtitle')"></label>
           <input type="text" id="pub-subtitle" class="card-form-input" x-model="bookPublication.subtitle" maxlength="300" data-spellcheck="spelling">
         </div>
@@ -368,6 +387,37 @@
         <div class="card-form-row">
           <label class="card-form-label" for="pub-bio" x-text="$app.t('publication.authorBio')"></label>
           <textarea id="pub-bio" class="card-form-textarea" rows="4" x-model="bookPublication.author_bio" maxlength="4000" data-spellcheck="spelling"></textarea>
+        </div>
+      </section>
+
+      <section class="book-settings-section">
+        <h3 class="book-settings-section-title" x-text="$app.t('publication.section.matter')"></h3>
+        <p class="card-form-hint" x-text="$app.t('publication.matterHint')"></p>
+        <div class="pub-repeater">
+          <template x-for="(s, i) in (bookPublication.extra_sections || [])" :key="i">
+            <div class="pub-matter-card">
+              <div class="pub-matter-head">
+                <div class="seg-toggle">
+                  <button type="button" :class="{ 'seg-toggle--active': (s.placement || 'back') === 'front' }"
+                          @click="s.placement = 'front'" x-text="$app.t('publication.matter.front')"></button>
+                  <button type="button" :class="{ 'seg-toggle--active': (s.placement || 'back') === 'back' }"
+                          @click="s.placement = 'back'" x-text="$app.t('publication.matter.back')"></button>
+                </div>
+                <button type="button" class="btn-compact danger" @click="removeExtraSection(i)" x-text="$app.t('common.remove')"></button>
+              </div>
+              <input type="text" class="card-form-input" x-model="s.title" maxlength="200" :placeholder="$app.t('publication.matter.titlePlaceholder')" data-spellcheck="spelling">
+              <textarea class="card-form-textarea" rows="3" x-model="s.body" maxlength="8000" :placeholder="$app.t('publication.matter.bodyPlaceholder')" data-spellcheck="spelling"></textarea>
+              <div class="pub-matter-link">
+                <input type="text" class="card-form-input" x-model="s.link_url" maxlength="500" :placeholder="$app.t('publication.matter.linkUrlPlaceholder')">
+                <input type="text" class="card-form-input" x-model="s.link_label" maxlength="200" :placeholder="$app.t('publication.matter.linkLabelPlaceholder')" data-spellcheck="spelling">
+              </div>
+              <label class="form-check">
+                <input type="checkbox" x-model="s.toc">
+                <span class="form-check-title" x-text="$app.t('publication.matter.toc')"></span>
+              </label>
+            </div>
+          </template>
+          <button type="button" class="btn-compact" @click="addExtraSection()" x-text="$app.t('publication.matter.add')"></button>
         </div>
       </section>
 

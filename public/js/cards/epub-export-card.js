@@ -28,7 +28,8 @@ const _EMPTY_META = () => ({
   epub_indent_size: 'medium', epub_hyphenation: false, epub_chapter_pagebreak: true,
   epub_drop_caps: false, epub_nest_pages_in_toc: true, epub_scene_separator: 'line',
   epub_titlepage_mode: 'generated', epub_chapter_numbering: 'none',
-  epub_chapter_numbering_mode: 'nested', epub_rights: '', epub_pubdate: '',
+  epub_chapter_numbering_mode: 'nested', epub_unnumbered_chapter_ids: [],
+  epub_rights: '', epub_pubdate: '',
   epub_translator: '', epub_illustrator: '', epub_editor_name: '', epub_uuid: '',
 });
 
@@ -197,6 +198,32 @@ export function registerEpubExportCard() {
       ];
     },
     chapterNumberingModeOptions() { return this._enumOptions(['nested', 'flat'], 'epubExport.numberingMode'); },
+
+    // ── Kapitel ohne Nummer (Pendant zur PDF-Option) ──────────────────────
+    // Optionen aus dem Buch-Tree; Tiefe via Einrueckung im Label sichtbar.
+    // Cascade-Hinweis: ein gewaehltes Top-Kapitel macht auch alle Subs unnumeriert.
+    unnumberedChapterPickOptions() {
+      const app = window.__app;
+      if (!app || !Array.isArray(app.tree)) return [];
+      return app.tree
+        .filter(c => c.type === 'chapter' && !c.solo)
+        .map(c => ({
+          value: c.id,
+          label: ((c.depth || 1) > 1 ? '— '.repeat((c.depth || 1) - 1) : '') + c.name,
+        }));
+    },
+    unnumberedChapterChips() {
+      const ids = this.pub?.epub_unnumbered_chapter_ids || [];
+      const opts = this.unnumberedChapterPickOptions();
+      return ids.map(id => {
+        const o = opts.find(x => x.value === id);
+        return o ? { id, label: o.label } : { id, label: '#' + id };
+      });
+    },
+    removeUnnumberedChapter(id) {
+      const arr = this.pub?.epub_unnumbered_chapter_ids || [];
+      this.pub.epub_unnumbered_chapter_ids = arr.filter(v => v !== id);
+    },
 
     setTab(tab) { if (TABS.includes(tab)) this.activeTab = tab; },
     isTab(tab) { return this.activeTab === tab; },

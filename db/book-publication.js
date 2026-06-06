@@ -9,14 +9,14 @@ const { NOW_ISO_SQL } = require('./now');
 const { defaultMeta, validateMeta } = require('../lib/publication-meta');
 
 const _META_COLS = [
-  'author_name',
+  'author_name', 'author_file_as', 'co_authors', 'extra_sections',
   'isbn', 'subtitle', 'year', 'dedication', 'imprint', 'copyright',
   'frontmatter', 'author_bio', 'epub_css_style', 'epub_justify', 'epub_toc_title',
   'description', 'publisher', 'series', 'series_index', 'keywords',
   'epub_font_size', 'epub_line_height', 'epub_paragraph_style', 'epub_indent_size',
   'epub_hyphenation', 'epub_chapter_pagebreak', 'epub_drop_caps', 'epub_nest_pages_in_toc',
   'epub_scene_separator', 'epub_titlepage_mode',
-  'epub_chapter_numbering', 'epub_chapter_numbering_mode',
+  'epub_chapter_numbering', 'epub_chapter_numbering_mode', 'epub_unnumbered_chapter_ids',
   'epub_rights', 'epub_pubdate', 'epub_translator', 'epub_illustrator', 'epub_editor_name', 'epub_uuid',
 ];
 
@@ -25,6 +25,10 @@ const _META_COLS = [
 const _BOOL_COLS = [
   'epub_justify', 'epub_hyphenation', 'epub_chapter_pagebreak', 'epub_drop_caps', 'epub_nest_pages_in_toc',
 ];
+
+// JSON-Array-Spalten — beim Upsert aus Array zu JSON-String serialisieren, beim
+// Lesen via validateMeta wieder zu Array (validateMeta._idList parst den String).
+const _JSON_COLS = ['epub_unnumbered_chapter_ids', 'co_authors', 'extra_sections'];
 
 const _stmtGet = db.prepare(`
   SELECT book_id, ${_META_COLS.join(', ')},
@@ -83,6 +87,7 @@ function getMeta(bookId) {
 function upsertMeta(bookId, meta) {
   const v = validateMeta(meta);
   for (const col of _BOOL_COLS) v[col] = v[col] ? 1 : 0;
+  for (const col of _JSON_COLS) v[col] = JSON.stringify(Array.isArray(v[col]) ? v[col] : []);
   _stmtUpsertMeta.run({ book_id: parseInt(bookId), ...v });
   return getMeta(bookId);
 }

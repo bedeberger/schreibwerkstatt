@@ -189,6 +189,26 @@ export const bookSettingsMethods = {
     }
   },
 
+  // Co-Autoren (Schreib-Duos) + freie Vor-/Nachsatz-Seiten: rein lokale Array-
+  // Mutation der geladenen Meta. Persistiert wie alles andere ueber savePublication
+  // (Full-Replace-Spread → der Server validiert/serialisiert via validateMeta).
+  addCoAuthor() {
+    if (!this.bookPublication) return;
+    if (!Array.isArray(this.bookPublication.co_authors)) this.bookPublication.co_authors = [];
+    this.bookPublication.co_authors.push({ name: '', file_as: '' });
+  },
+  removeCoAuthor(i) {
+    this.bookPublication?.co_authors?.splice(i, 1);
+  },
+  addExtraSection() {
+    if (!this.bookPublication) return;
+    if (!Array.isArray(this.bookPublication.extra_sections)) this.bookPublication.extra_sections = [];
+    this.bookPublication.extra_sections.push({ placement: 'back', title: '', body: '', link_url: '', link_label: '', toc: true });
+  },
+  removeExtraSection(i) {
+    this.bookPublication?.extra_sections?.splice(i, 1);
+  },
+
   async uploadPublicationCover(ev) {
     const file = ev?.target?.files?.[0];
     const bookId = window.__app.selectedBookId;

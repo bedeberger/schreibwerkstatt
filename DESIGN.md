@@ -621,6 +621,17 @@ Neue Aktionen erweitern diese Tabelle und das Sprite (siehe [Icon-System](#icon-
 
 `.card-form-section-divider` — `<p>`-Tag mit Border-Top + erklärendem Text, trennt logische Form-Sektionen (Beispiel: AI-Augmentierung in finetune-export).
 
+### In-Form-Repeater (`.pub-repeater`) + Segment-Toggle (`.seg-toggle`)
+
+**Use:** lokal editierbare Liste variabler Länge innerhalb eines Forms, die als Ganzes über den normalen Karten-Save persistiert (kein eigener Server-CRUD-Roundtrip pro Zeile). Eingesetzt im Publikation-Tab (Co-Autoren als Zeilen, freie Vor-/Nachsatz-Seiten als Sub-Karten). CSS: [public/css/book/book-settings.css](public/css/book/book-settings.css).
+
+- `.pub-repeater` — flex-column-Container, am Ende ein `.btn-compact`-„Hinzufügen"-Button.
+- `.pub-repeater-row` — flache Zeile (Inputs + `.btn-compact.danger`-Entfernen), Inputs `flex: 1`.
+- `.pub-matter-card` — eckige Sub-Karte für reichere Einträge (Kopf + mehrere Felder).
+- Mutation per Alpine `x-for="(s, i) in arr"` + `x-model="s.feld"` (Loop-Var ist reaktive Referenz ins Array) + `arr.push(...)` / `arr.splice(i, 1)`. `:key="i"`. Kein Server-Call beim Add/Remove — der Karten-Save schreibt das volle Array.
+
+`.seg-toggle` — **binärer Inline-Umschalter** (zwei aneinanderliegende, eckige Buttons; aktiver Zustand getintet via `--color-tag-bg` + `--color-accent`). Reuse statt nativem `<select>`/Combobox, wenn genau 2–3 sich gegenseitig ausschliessende Werte direkt in einer dichten Repeater-Zeile gesetzt werden. Markup: `<div class="seg-toggle"><button :class="{ 'seg-toggle--active': v==='a' }" @click="v='a'">…</button>…</div>`.
+
 ### Hint / Error / Saved unterhalb der Form
 
 `.card-form-hint` (12 px, muted, italic), `.card-form-error` (rot), `.card-form-saved` (success — ✓-Prefix via `::before`, fade via `x-transition.opacity.duration.250ms`, Auto-Dismiss 2500 ms via `_savedAtTimer` in der Karte).

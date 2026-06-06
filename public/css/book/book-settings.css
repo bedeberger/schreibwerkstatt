@@ -409,7 +409,60 @@
 }
 .pub-upload-btn:hover { border-color: var(--color-accent); background: var(--color-bg); }
 
+/* === Publikation-Tab: Repeater (Co-Autoren + freie Vor-/Nachsatz-Seiten) === */
+.pub-repeater {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+.pub-repeater-row {
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+  align-items: center;
+}
+.pub-repeater-row .card-form-input { flex: 1 1 0; min-width: 0; }
+.pub-matter-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.75rem;
+  border: 0.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+}
+.pub-matter-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+.pub-matter-link { display: flex; gap: 0.5rem; }
+.pub-matter-link .card-form-input { flex: 1 1 0; min-width: 0; }
+/* Segment-Toggle: zwei aneinanderliegende Buttons, aktiver Zustand getintet. Eckig. */
+.seg-toggle { display: inline-flex; }
+.seg-toggle button {
+  font-size: var(--size-compact-font-size);
+  padding: var(--size-compact-padding);
+  border: 0.5px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-muted);
+  cursor: pointer;
+  transition: background var(--transition-base), border-color var(--transition-base), color var(--transition-base);
+}
+.seg-toggle button:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+.seg-toggle button:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; border-left-width: 0; }
+.seg-toggle button.seg-toggle--active {
+  background: var(--color-tag-bg);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
 @media (max-width: 600px) {
   .pub-image-block { flex-direction: column; }
   .pub-image-preview { width: 100%; max-width: 200px; }
+  .pub-repeater-row, .pub-matter-link { flex-direction: column; align-items: stretch; }
 }

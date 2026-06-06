@@ -7263,6 +7263,51 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 176 abgeschlossen (books.cover_image entfernt).');
   }
 
+  if (version < 177) {
+    // book_publication.epub_unnumbered_chapter_ids: Kapitel-IDs, die im EPUB OHNE
+    // Nummer im Titel + Inhaltsverzeichnis erscheinen (Pendant zur PDF-Option
+    // chapter.unnumberedChapterIds). Bewusst als JSON-Array in einer TEXT-Spalte
+    // (kein FK): es ist eine Konfig-Liste analog zum PDF-Profil-config-Blob, kein
+    // relationaler Verweis — verwaiste IDs nach Kapitel-Loeschung sind harmlos
+    // (matchen beim Render schlicht kein Kapitel). Additiver ALTER, kein Recreate.
+    const bpCols177 = db.pragma('table_info(book_publication)').map(c => c.name);
+    if (!bpCols177.includes('epub_unnumbered_chapter_ids')) {
+      db.exec(`ALTER TABLE book_publication ADD COLUMN epub_unnumbered_chapter_ids TEXT NOT NULL DEFAULT '[]'`);
+    }
+    const fkErrors177 = db.pragma('foreign_key_check');
+    if (fkErrors177.length) {
+      throw new Error(`Migration 177: foreign_key_check meldet ${fkErrors177.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 177').run();
+    logger.info('DB-Migration auf Version 177 abgeschlossen (book_publication.epub_unnumbered_chapter_ids).');
+  }
+
+  if (version < 178) {
+    // book_publication: Selfpublishing-Belletristik-Felder.
+    //  - author_file_as: Sortiername des Hauptautors (z.B. "Beispiel, Anna") fuer
+    //    Buchhandels-/Reader-Katalog-Sortierung (EPUB-OPF file-as auf #creator).
+    //  - co_authors: JSON-Array [{name, file_as}] — Schreib-Duos als zusaetzliche
+    //    dc:creator (Rolle aut) im OPF.
+    //  - extra_sections: JSON-Array [{placement, title, body, link_url, link_label,
+    //    toc}] — freie Vor-/Nachsatz-Seiten (Newsletter-CTA, Auch-von, Rezensions-
+    //    Bitte, Leseprobe, Danksagung, Content-Warnungen). co_authors/extra_sections
+    //    sind Konfig-Blobs analog epub_unnumbered_chapter_ids (kein FK). Additiv.
+    const bpCols178 = db.pragma('table_info(book_publication)').map(c => c.name);
+    const addPubCol178 = (name, ddl) => {
+      if (!bpCols178.includes(name)) db.exec(`ALTER TABLE book_publication ADD COLUMN ${ddl}`);
+    };
+    addPubCol178('author_file_as', 'author_file_as TEXT');
+    addPubCol178('co_authors',     "co_authors TEXT NOT NULL DEFAULT '[]'");
+    addPubCol178('extra_sections', "extra_sections TEXT NOT NULL DEFAULT '[]'");
+
+    const fkErrors178 = db.pragma('foreign_key_check');
+    if (fkErrors178.length) {
+      throw new Error(`Migration 178: foreign_key_check meldet ${fkErrors178.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 178').run();
+    logger.info('DB-Migration auf Version 178 abgeschlossen (book_publication: Selfpublishing-Belletristik-Felder).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {
