@@ -71,7 +71,12 @@ export function registerEpubExportCard() {
     init() {
       this.$watch(() => window.__app.showEpubExportCard, async (visible) => {
         if (!visible) return;
-        if (!this.pubLoaded) await this.loadPublication();
+        // Bei jedem Öffnen das Neueste aus /publication ziehen — book_publication
+        // ist SSoT (im BookSettings-Publikation-Tab gepflegt); diese Karte hält
+        // keinen eigenen Cache. Ein stale `pub` würde beim Full-Replace-Save
+        // (savePublication) die dort gepflegte Titelei (Impressum, Widmung, …)
+        // mit veralteten Werten überschreiben.
+        await this.loadPublication();
         this._ensureExportPicked();
       });
       this.$watch(() => this.exportScope, () => this._ensureExportPicked());
@@ -143,6 +148,13 @@ export function registerEpubExportCard() {
     async savePublication() {
       const bookId = window.__app?.selectedBookId;
       if (!bookId) return;
+      // Nicht speichern, bevor die volle Meta geladen ist — der strikte Full-
+      // Replace-Upsert (PUT /publication) wuerde den DB-Stand sonst mit leeren
+      // Defaults ueberschreiben (author_name/isbn/Titelei + alle epub_*-Felder).
+      // exportEpub ruft uns vor jedem Export auf; schlug loadPublication still
+      // fehl oder lief sie nie (Cold-Open), exportieren wir den DB-Stand statt
+      // ihn zu loeschen.
+      if (!this.pubLoaded) return;
       this.saving = true;
       this.savedAt = null;
       this.exportError = '';

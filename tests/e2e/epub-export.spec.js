@@ -20,4 +20,22 @@ test.describe('epub-export-card', () => {
     ]);
     expect(download.suggestedFilename()).toBe('book.epub');
   });
+
+  // Regression: als editor ruft exportEpub() savePublication() vor dem Export.
+  // Im Harness bleibt pubLoaded false (kein false→true-Wechsel von
+  // showEpubExportCard, den der $watch beobachten könnte) → loadPublication lief
+  // nie. Ohne den pubLoaded-Guard würde der Export ein Full-Replace-PUT mit
+  // leeren Defaults schicken und damit Titelei/Cover-Metadaten (book_publication)
+  // löschen. Erwartet: kein destruktiver PUT, Export läuft trotzdem mit DB-Stand.
+  test('Export als editor mit ungeladener Meta löscht book_publication nicht', async ({ page }) => {
+    await page.evaluate(() => { window.__app.currentBookRole = 'editor'; });
+    const exportBtn = page.locator('.card-header button.primary', { hasText: 'Exportieren' });
+    const [download] = await Promise.all([
+      page.waitForEvent('download', { timeout: 15000 }),
+      exportBtn.click(),
+    ]);
+    expect(download.suggestedFilename()).toBe('book.epub');
+    const state = await page.request.get('http://localhost:8765/__mock/state').then(r => r.json());
+    expect(state.lastPubPut).toBeNull();
+  });
 });

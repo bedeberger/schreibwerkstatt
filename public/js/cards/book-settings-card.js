@@ -10,15 +10,22 @@ import { setupCardLifecycle } from './card-lifecycle.js';
 // auf Default zurück. Deckungsgleich mit defaultMeta() in lib/publication-meta.js
 // + den UI-Flags (has_cover/has_author_image).
 const _EMPTY_PUB_META = () => ({
-  author_name: '', isbn: '', subtitle: '', year: '', dedication: '', imprint: '',
+  author_name: '', author_file_as: '', co_authors: [], extra_sections: [],
+  isbn: '', subtitle: '', year: '', dedication: '', imprint: '',
   copyright: '', frontmatter: '', author_bio: '', epub_css_style: 'serif', epub_toc_title: '',
   description: '', publisher: '', series: '', series_index: '', keywords: '',
   epub_font_size: 'normal', epub_line_height: 'normal', epub_paragraph_style: 'indent',
   epub_indent_size: 'medium', epub_scene_separator: 'line', epub_titlepage_mode: 'generated',
-  epub_chapter_numbering: 'none', epub_chapter_numbering_mode: 'nested',
+  epub_chapter_numbering: 'none', epub_chapter_numbering_mode: 'nested', epub_unnumbered_chapter_ids: [],
   epub_rights: '', epub_pubdate: '', epub_translator: '', epub_illustrator: '',
   epub_editor_name: '', epub_uuid: '', epub_justify: true, epub_hyphenation: false,
   epub_chapter_pagebreak: true, epub_drop_caps: false, epub_nest_pages_in_toc: true,
+  // Pendants zu PDF-Profil-Optionen (Migration 179).
+  epub_imprint_position: 'front', epub_chapter_title_style: 'centered-large',
+  epub_heading_font: 'match', epub_heading_scale: 'normal', epub_cover_fit: 'contain',
+  epub_numerals: 'default', epub_toc_depth: 2,
+  epub_subchapter_pagebreak: false, epub_chapter_rule: false, epub_page_rule: false,
+  epub_toc_enabled: true,
   has_cover: false, has_author_image: false,
 });
 
