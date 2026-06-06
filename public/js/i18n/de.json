@@ -889,6 +889,7 @@
   "epubExport.titleStyle.left-rule":       "Linksbündig mit Strich",
   "epubExport.titleStyle.minimal":         "Schlicht",
   "epubExport.field.chapterRule":          "Strich unter der Kapitelüberschrift",
+  "epubExport.field.chapterNumberDivider": "Strich zwischen Kapitelnummer und Titel",
   "epubExport.field.pageRule":             "Strich unter dem Seitentitel",
   "epubExport.field.subchapterPagebreak":  "Unterkapitel auf neuer Seite beginnen",
   "epubExport.field.imprintPosition":      "Position des Impressums",

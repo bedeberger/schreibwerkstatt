@@ -36,7 +36,7 @@ const _EMPTY_META = () => ({
   epub_heading_font: 'match', epub_heading_scale: 'normal', epub_cover_fit: 'contain',
   epub_numerals: 'default', epub_toc_depth: 2,
   epub_subchapter_pagebreak: false, epub_chapter_rule: false, epub_page_rule: false,
-  epub_toc_enabled: true,
+  epub_toc_enabled: true, epub_chapter_number_divider: true,
 });
 
 export function registerEpubExportCard() {

@@ -890,6 +890,7 @@
   "epubExport.titleStyle.left-rule":       "Left-aligned with rule",
   "epubExport.titleStyle.minimal":         "Minimal",
   "epubExport.field.chapterRule":          "Rule beneath the chapter heading",
+  "epubExport.field.chapterNumberDivider": "Rule between chapter number and title",
   "epubExport.field.pageRule":             "Rule beneath the page heading",
   "epubExport.field.subchapterPagebreak":  "Start sub-chapters on a new page",
   "epubExport.field.imprintPosition":      "Imprint position",

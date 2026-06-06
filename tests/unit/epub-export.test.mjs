@@ -379,6 +379,23 @@ test('buildEpub: numerierte Ueberschrift gestapelt — Reihenfolge Nummer → St
   assert.ok(_buildCss({}).includes('.epub-chapter-title--numbered'), 'CSS-Regel fuer gestapelte Ueberschrift vorhanden');
 });
 
+test('buildEpub: epub_chapter_number_divider=false → Nummer + Titel ohne ———-Strich', async () => {
+  const bundle = {
+    scope: 'book', book: { id: 1, name: 'B' },
+    groups: [{ chapterId: 10, chapter: { id: 10, name: 'Anfang' }, pages: [{ p: { name: 'S1' }, pd: { html: '<p>a</p>' } }] }],
+  };
+  const buf = await buildEpub(bundle, {
+    lang: 'de', author: 'A',
+    meta: { epub_chapter_numbering: 'arabic', epub_chapter_numbering_mode: 'flat', epub_chapter_number_divider: false },
+  });
+  const zip = await _unzip(buf);
+  const entry = await zip.file('OEBPS/entry_0.xhtml').async('string');
+  assert.ok(entry.includes('class="epub-chapter-num">1</span>'), 'Nummer bleibt erhalten');
+  assert.ok(entry.includes('class="epub-chapter-name">Anfang</span>'), 'Titel bleibt erhalten');
+  assert.ok(!entry.includes('epub-chapter-rule'), 'kein Strich-Trenner mehr');
+  assert.ok(entry.includes('epub-chapter-title--numbered'), 'gestapelte Ueberschrift bleibt');
+});
+
 test('buildEpub: epub_unnumbered_chapter_ids — markiertes Kapitel ohne Nummer, Zaehlung ohne Luecke', async () => {
   const bundle = {
     scope: 'book', book: { id: 1, name: 'B' },

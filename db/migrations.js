@@ -7337,6 +7337,23 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 179 abgeschlossen (book_publication: weitere EPUB-Optionen).');
   }
 
+  if (version < 180) {
+    // book_publication: Strich-Trenner zwischen Kapitelnummer und Titel in der
+    // gestapelten, numerierten EPUB-Ueberschrift abschaltbar (epub-chapter-rule
+    // ———). Default 1 = an, damit bestehende Buecher unveraendert rendern. Additiv.
+    const bpCols180 = db.pragma('table_info(book_publication)').map(c => c.name);
+    if (!bpCols180.includes('epub_chapter_number_divider')) {
+      db.exec('ALTER TABLE book_publication ADD COLUMN epub_chapter_number_divider INTEGER DEFAULT 1');
+    }
+
+    const fkErrors180 = db.pragma('foreign_key_check');
+    if (fkErrors180.length) {
+      throw new Error(`Migration 180: foreign_key_check meldet ${fkErrors180.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 180').run();
+    logger.info('DB-Migration auf Version 180 abgeschlossen (book_publication.epub_chapter_number_divider).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {
