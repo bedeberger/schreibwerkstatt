@@ -320,7 +320,7 @@ router.get('/login', (req, res) => {
   // liest ihn raus). Das Modul registriert <altcha-widget> beim Laden.
   const altchaOn = hasAdminPw && altcha.isEnabled();
   const altchaWidget = altchaOn
-    ? `    <altcha-widget challengeurl="/altcha/challenge" name="altcha" auto="onload"></altcha-widget>\n`
+    ? `    <altcha-widget challenge="/altcha/challenge" name="altcha" auto="onload"></altcha-widget>\n`
     : '';
   const adminBlock = hasAdminPw
     ? `  <form id="admin-form" class="public-form" novalidate data-returnto="${_escAttr(returnTo)}" data-msg-invalid="${_escAttr(t('auth.login.errInvalid'))}" data-msg-rate-tpl="${_escAttr(t('auth.login.errRateTpl'))}" data-msg-captcha="${_escAttr(t('auth.login.errCaptcha'))}">

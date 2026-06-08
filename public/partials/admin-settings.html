@@ -121,6 +121,10 @@
           <input type="text" x-data="numInput({ integer: true, min: 0, max: 200000 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.max_tokens_out.komplett']">
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.komplettMaxTokensOut')"></small>
         </label>
+        <label>ai.claude.timeout_ms.komplett
+          <input type="text" x-data="numInput({ integer: true, min: 0, max: 3600000 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.timeout_ms.komplett']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.komplettTimeoutMs')"></small>
+        </label>
         <label>ai.komplett.completeness_passes
           <input type="text" x-data="numInput({ integer: true, min: 0, max: 3 })" x-modelable="value" x-model="adminSettingsForm['ai.komplett.completeness_passes']">
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.completenessPasses')"></small>

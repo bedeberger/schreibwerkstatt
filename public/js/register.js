@@ -13,7 +13,12 @@
     const slot = document.getElementById('altcha-slot');
     if (slot) {
       const w = document.createElement('altcha-widget');
-      w.setAttribute('challengeurl', '/altcha/challenge');
+      // v3-Widget: `challenge` ist die SSoT fuer die Challenge — ein Wert ohne
+      // fuehrende `{` wird als URL gefetcht (Antwort muss application/json sein),
+      // ein JSON-String wird inline geparst. Das alte v1/v2-Attribut
+      // `challengeurl` kennt dieses Build nicht (wuerde die leere Default-URL =
+      // aktuelle Seite fetchen → HTML → "invalid content-type").
+      w.setAttribute('challenge', '/altcha/challenge');
       w.setAttribute('name', 'altcha');
       w.setAttribute('auto', 'onload');
       slot.appendChild(w);

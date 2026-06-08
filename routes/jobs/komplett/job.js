@@ -102,10 +102,11 @@ async function verifyKontinuitaetProbleme(ctx, result, fromPct, toPct) {
 //   P5 Szenen remappen
 //   P6 Zeitstrahl + P8 Kontinuität: parallel bei Claude (P8 ownt Progress-Bar), sonst sequentiell
 // Per-Job-Claude-Overrides für die Komplettanalyse-Familie (nur ai.provider = claude):
-// Modell, Kontextfenster und Output-Cap dürfen eigenständig vom globalen ai.claude.*
-// abweichen (z.B. Opus 4.8 mit 128K Output für die gründlichere Extraktion, während
-// global Sonnet 4.6 / 64K fürs Lektorat läuft). Leer/0 = folgt global. Via ALS-Context an
-// lib/ai.js (_resolveClaudeModel/_resolveClaudeContextWindow/_resolveClaudeMaxOut) gereicht
+// Modell, Kontextfenster, Output-Cap und Hard-Timeout dürfen eigenständig vom globalen
+// ai.claude.* abweichen (z.B. Opus 4.8 mit 128K Output + längerem Timeout für die
+// gründlichere Extraktion, während global Sonnet 4.6 / 64K / 10min fürs Lektorat läuft).
+// Leer/0 = folgt global. Via ALS-Context an lib/ai.js
+// (_resolveClaudeModel/_resolveClaudeContextWindow/_resolveClaudeMaxOut/_claudeTimeoutMs) gereicht
 // → greift für alle Claude-Calls dieses Jobs (P1–P8), ohne globale Calls zu beeinflussen.
 // Cache-Version reflektiert das Modell (Kontext/Output ändern nur Limits, nicht den Inhalt).
 function _komplettClaudeOverrides(effectiveProvider) {
@@ -113,10 +114,12 @@ function _komplettClaudeOverrides(effectiveProvider) {
   const model = String(appSettings.get('ai.claude.model.komplett') || '').trim();
   const contextWindow = parseInt(appSettings.get('ai.claude.context_window.komplett'), 10) || 0;
   const maxTokensOut = parseInt(appSettings.get('ai.claude.max_tokens_out.komplett'), 10) || 0;
+  const timeoutMs = parseInt(appSettings.get('ai.claude.timeout_ms.komplett'), 10) || 0;
   const patch = {};
   if (model) patch.claudeModel = model;
   if (contextWindow > 0) patch.claudeContextWindow = contextWindow;
   if (maxTokensOut > 0) patch.claudeMaxTokensOut = maxTokensOut;
+  if (timeoutMs > 0) patch.claudeTimeoutMs = timeoutMs;
   return Object.keys(patch).length ? patch : null;
 }
 
@@ -136,7 +139,7 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
   const overrides = _komplettClaudeOverrides(effectiveProvider);
   if (overrides) {
     setContext(overrides);
-    log.info(`Komplettanalyse-Claude-Override: ${JSON.stringify(overrides)} (global model=${appSettings.get('ai.claude.model')}, ctx=${appSettings.get('ai.claude.context_window')}, out=${appSettings.get('ai.claude.max_tokens_out')}).`);
+    log.info(`Komplettanalyse-Claude-Override: ${JSON.stringify(overrides)} (global model=${appSettings.get('ai.claude.model')}, ctx=${appSettings.get('ai.claude.context_window')}, out=${appSettings.get('ai.claude.max_tokens_out')}, timeout=${appSettings.get('ai.claude.timeout_ms')}).`);
   }
   const komplettModel = overrides?.claudeModel || '';
   const call = (jobId_, tok_, prompt_, system_, fromPct, toPct, expectedChars, outputRatio, maxTokens, schema) =>
