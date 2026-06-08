@@ -90,16 +90,13 @@
       </nav>
 
       <div x-show="adminSettingsProviderSubtab === 'claude'" class="admin-settings-subsection">
+        <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.claude.standardTitle')"></span></h4>
         <label>ai.claude.api_key
           <input type="password" x-model="adminSettingsForm['ai.claude.api_key']" :placeholder="$app.t('admin.settings.secret.masked')">
           <small x-show="adminSettingsMap['ai.claude.api_key']?.masked" class="muted-msg muted-msg--sm" x-text="adminSettingsMap['ai.claude.api_key']?.masked"></small>
         </label>
         <label>ai.claude.model
           <input type="text" x-model="adminSettingsForm['ai.claude.model']" placeholder="claude-sonnet-4-6">
-        </label>
-        <label>ai.claude.model.komplett
-          <input type="text" x-model="adminSettingsForm['ai.claude.model.komplett']" placeholder="claude-opus-4-8">
-          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.komplettModel')"></small>
         </label>
         <label>ai.claude.context_window
           <input type="text" x-data="numInput({ integer: true, min: 8000, max: 2000000 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.context_window']">
@@ -108,6 +105,25 @@
         <label>ai.claude.max_tokens_out
           <input type="text" x-data="numInput({ integer: true, min: 1024, max: 200000 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.max_tokens_out']">
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.maxTokensOut')"></small>
+        </label>
+
+        <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.claude.komplettTitle')"></span></h4>
+        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.claude.komplettIntro')"></small>
+        <label>ai.claude.model.komplett
+          <input type="text" x-model="adminSettingsForm['ai.claude.model.komplett']" placeholder="claude-opus-4-8">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.komplettModel')"></small>
+        </label>
+        <label>ai.claude.context_window.komplett
+          <input type="text" x-data="numInput({ integer: true, min: 0, max: 2000000 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.context_window.komplett']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.komplettContextWindow')"></small>
+        </label>
+        <label>ai.claude.max_tokens_out.komplett
+          <input type="text" x-data="numInput({ integer: true, min: 0, max: 200000 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.max_tokens_out.komplett']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.komplettMaxTokensOut')"></small>
+        </label>
+        <label>ai.komplett.completeness_passes
+          <input type="text" x-data="numInput({ integer: true, min: 0, max: 3 })" x-modelable="value" x-model="adminSettingsForm['ai.komplett.completeness_passes']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.completenessPasses')"></small>
         </label>
       </div>
 
@@ -602,10 +618,6 @@
         <label>ai.komplett.extract_max_tokens
           <input type="text" x-data="numInput({ integer: true, min: 1024, max: 200000 })" x-modelable="value" x-model="adminSettingsForm['ai.komplett.extract_max_tokens']">
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.komplettExtractMaxTokens')"></small>
-        </label>
-        <label>ai.komplett.completeness_passes
-          <input type="text" x-data="numInput({ integer: true, min: 0, max: 3 })" x-modelable="value" x-model="adminSettingsForm['ai.komplett.completeness_passes']">
-          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.completenessPasses')"></small>
         </label>
         <label>ai.chars_per_token
           <input type="text" x-data="numInput({ step: 0.1, min: 1, max: 10 })" x-modelable="value" x-model="adminSettingsForm['ai.chars_per_token']">

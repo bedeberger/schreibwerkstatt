@@ -23,6 +23,28 @@ test('_claudeAcceptsTemperature: Opus 4.7+ lehnt ab, Sonnet/Opus 4.6 akzeptieren
   }
 });
 
+// Per-Job-Override (ALS) für Kontextfenster/Output-Cap: getContextConfigFor('claude')
+// muss claudeContextWindow/claudeMaxTokensOut aus dem ALS-Store bevorzugen, andere
+// Provider unberührt lassen. So fährt die Komplettanalyse auf Opus mit eigenem Cap,
+// ohne globale (Sonnet-)Calls zu beeinflussen.
+test('getContextConfigFor(claude): ALS-Override schlägt globalen Wert', () => {
+  const { getContextConfigFor } = require('../../lib/ai');
+  const { runWithContext } = require('../../lib/log-context');
+  // Ohne Override: Default-Pfad (kein Throw, sinnvolle Werte).
+  const base = getContextConfigFor('claude');
+  assert.ok(base.maxTokensOut > 0 && base.contextWindow > 0);
+  // Mit Override: contextWindow/maxTokensOut werden übernommen, inputBudget folgt.
+  runWithContext({ claudeContextWindow: 1000000, claudeMaxTokensOut: 128000 }, () => {
+    const cfg = getContextConfigFor('claude');
+    assert.equal(cfg.contextWindow, 1000000);
+    assert.equal(cfg.maxTokensOut, 128000);
+    assert.equal(cfg.inputBudgetTokens, 1000000 - 128000 - 2000);
+    // Andere Provider ignorieren den Claude-Override.
+    const oll = getContextConfigFor('ollama');
+    assert.notEqual(oll.maxTokensOut, 128000);
+  });
+});
+
 // extractBalancedJson ist nicht direkt exportiert – wir testen es indirekt
 // über parseJSON mit Trailing-Content, das nur gematcht werden kann, wenn die
 // balancierte Extraktion korrekt stackt.

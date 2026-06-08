@@ -101,14 +101,23 @@ async function verifyKontinuitaetProbleme(ctx, result, fromPct, toPct) {
 //   P3b (Kapitelübergreifende Beziehungen, nur Multi-Pass, non-critical)
 //   P5 Szenen remappen
 //   P6 Zeitstrahl + P8 Kontinuität: parallel bei Claude (P8 ownt Progress-Bar), sonst sequentiell
-// Per-Job-Claude-Modell für die Komplettanalyse-Familie: ai.claude.model.komplett
-// überschreibt das globale ai.claude.model NUR für diese Pipeline (z.B. Opus für die
-// gründlichere Extraktion, während global Sonnet fürs Lektorat läuft). Leer = globales
-// Modell. Wird via ALS-Context an lib/ai.js#_resolveClaudeModel durchgereicht und greift
-// damit für alle Claude-Calls dieses Jobs (P1–P8). Cache-Version reflektiert das Modell.
-function _komplettModelOverride(effectiveProvider) {
-  if (effectiveProvider !== 'claude') return '';
-  return String(appSettings.get('ai.claude.model.komplett') || '').trim();
+// Per-Job-Claude-Overrides für die Komplettanalyse-Familie (nur ai.provider = claude):
+// Modell, Kontextfenster und Output-Cap dürfen eigenständig vom globalen ai.claude.*
+// abweichen (z.B. Opus 4.8 mit 128K Output für die gründlichere Extraktion, während
+// global Sonnet 4.6 / 64K fürs Lektorat läuft). Leer/0 = folgt global. Via ALS-Context an
+// lib/ai.js (_resolveClaudeModel/_resolveClaudeContextWindow/_resolveClaudeMaxOut) gereicht
+// → greift für alle Claude-Calls dieses Jobs (P1–P8), ohne globale Calls zu beeinflussen.
+// Cache-Version reflektiert das Modell (Kontext/Output ändern nur Limits, nicht den Inhalt).
+function _komplettClaudeOverrides(effectiveProvider) {
+  if (effectiveProvider !== 'claude') return null;
+  const model = String(appSettings.get('ai.claude.model.komplett') || '').trim();
+  const contextWindow = parseInt(appSettings.get('ai.claude.context_window.komplett'), 10) || 0;
+  const maxTokensOut = parseInt(appSettings.get('ai.claude.max_tokens_out.komplett'), 10) || 0;
+  const patch = {};
+  if (model) patch.claudeModel = model;
+  if (contextWindow > 0) patch.claudeContextWindow = contextWindow;
+  if (maxTokensOut > 0) patch.claudeMaxTokensOut = maxTokensOut;
+  return Object.keys(patch).length ? patch : null;
 }
 
 async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userToken, provider = undefined) {
@@ -124,11 +133,12 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
   // Ceiling fälschlich auf ai.claude.max_tokens_out kappen, während callAI intern den echten
   // Provider auflöst und z.B. openai-compat/ollama anspricht → vorzeitige Truncation.
   const effectiveProvider = provider || appSettings.get('ai.provider') || 'claude';
-  const komplettModel = _komplettModelOverride(effectiveProvider);
-  if (komplettModel) {
-    setContext({ claudeModel: komplettModel });
-    log.info(`Komplettanalyse-Modell-Override «${komplettModel}» (global: ${appSettings.get('ai.claude.model')}).`);
+  const overrides = _komplettClaudeOverrides(effectiveProvider);
+  if (overrides) {
+    setContext(overrides);
+    log.info(`Komplettanalyse-Claude-Override: ${JSON.stringify(overrides)} (global model=${appSettings.get('ai.claude.model')}, ctx=${appSettings.get('ai.claude.context_window')}, out=${appSettings.get('ai.claude.max_tokens_out')}).`);
   }
+  const komplettModel = overrides?.claudeModel || '';
   const call = (jobId_, tok_, prompt_, system_, fromPct, toPct, expectedChars, outputRatio, maxTokens, schema) =>
     aiCall(jobId_, tok_, prompt_, system_, fromPct, toPct, expectedChars, outputRatio, maxTokens, effectiveProvider, schema);
   // Per-Provider-Skalierung aus dessen `ai.<p>.context_window` (lib/ai.js#getContextConfigFor).
@@ -382,10 +392,10 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
   // Effektiven Provider binden (siehe runKomplettAnalyseJob) – sonst kappt aiCall das
   // Output-Ceiling fälschlich auf den Claude-Default, wenn der Job ohne expliziten Provider läuft.
   const effectiveProvider = provider || appSettings.get('ai.provider') || 'claude';
-  const komplettModel = _komplettModelOverride(effectiveProvider);
-  if (komplettModel) {
-    setContext({ claudeModel: komplettModel });
-    log.info(`Kontinuität-Modell-Override «${komplettModel}» (global: ${appSettings.get('ai.claude.model')}).`);
+  const overrides = _komplettClaudeOverrides(effectiveProvider);
+  if (overrides) {
+    setContext(overrides);
+    log.info(`Kontinuität-Claude-Override: ${JSON.stringify(overrides)} (global model=${appSettings.get('ai.claude.model')}).`);
   }
   const call = (jobId_, tok_, prompt_, system_, fromPct, toPct, expectedChars, outputRatio, maxTokens, schema) =>
     aiCall(jobId_, tok_, prompt_, system_, fromPct, toPct, expectedChars, outputRatio, maxTokens, effectiveProvider, schema);
