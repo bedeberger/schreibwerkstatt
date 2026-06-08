@@ -89,11 +89,6 @@
   background: var(--color-accent-soft);
 }
 
-.admin-settings-subsection.is-active-provider {
-  border-color: var(--card-accent);
-  background: var(--color-accent-bg);
-}
-
 .admin-settings-subheading {
   margin: 0;
   font-size: var(--font-size-sm);

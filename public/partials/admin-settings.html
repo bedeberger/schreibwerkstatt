@@ -129,6 +129,12 @@
           <input type="text" x-data="numInput({ integer: true, min: 0, max: 3 })" x-modelable="value" x-model="adminSettingsForm['ai.komplett.completeness_passes']">
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.completenessPasses')"></small>
         </label>
+
+        <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.claude.advancedTitle')"></span></h4>
+        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.advancedClaude')"></small>
+        <label>ai.claude.retry_max <input type="text" x-data="numInput({ step: 1, min: 0, max: 10 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.retry_max']"></label>
+        <label>ai.claude.timeout_ms <input type="text" x-data="numInput({ step: 1, min: 1000, max: 3600000 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.timeout_ms']"></label>
+        <label>ai.claude.phase1_concurrency <input type="text" x-data="numInput({ step: 1, min: 1, max: 16 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.phase1_concurrency']"></label>
       </div>
 
       <div x-show="adminSettingsProviderSubtab === 'ollama'" class="admin-settings-subsection">
@@ -606,7 +612,7 @@
       </div>
     </section>
 
-    <!-- Erweitert-Tab: global vs. Claude-only sauber getrennt -->
+    <!-- Erweitert-Tab: globale, provider-uebergreifende Tuning-Parameter (Claude-spezifische liegen im Provider-Tab) -->
     <section x-show="adminSettingsTab === 'advanced'" class="admin-settings-section">
       <p class="muted-msg" x-text="$app.t('admin.settings.advanced.disclaimer')"></p>
 
@@ -631,17 +637,6 @@
           <input type="text" x-data="numInput({ integer: true, min: 1, max: 500 })" x-modelable="value" x-model="adminSettingsForm['app.page_revision_limit']">
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.pageRevisionLimit')"></small>
         </label>
-      </div>
-
-      <div :class="['admin-settings-subsection', adminSettingsForm['ai.provider'] === 'claude' ? 'is-active-provider' : '']">
-        <h4 class="admin-settings-subheading">
-          <span x-text="$app.t('admin.settings.section.claudeOnly')"></span>
-          <span x-show="adminSettingsForm['ai.provider'] === 'claude'" class="admin-settings-active-badge" x-text="$app.t('admin.settings.provider.active')"></span>
-        </h4>
-        <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.advancedClaude')"></p>
-        <label>ai.claude.retry_max <input type="text" x-data="numInput({ step: 1, min: 0, max: 10 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.retry_max']"></label>
-        <label>ai.claude.timeout_ms <input type="text" x-data="numInput({ step: 1, min: 1000, max: 3600000 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.timeout_ms']"></label>
-        <label>ai.claude.phase1_concurrency <input type="text" x-data="numInput({ step: 1, min: 1, max: 16 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.phase1_concurrency']"></label>
       </div>
     </section>
 
