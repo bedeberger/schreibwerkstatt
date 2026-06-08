@@ -449,4 +449,5 @@ module.exports = {
   preMergeChapterFiguren, applySozialschichtModeVote,
   mergeDuplicateFiguren, validateBeziehungenDescriptions,
   mergeBeziehungenIntoFiguren, backfillFiguren, ensureUniqueFigIds,
+  _normalizeName,
 };

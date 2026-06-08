@@ -120,6 +120,8 @@ export {
   buildExtraktionFigurenStammPrompt,
   buildExtraktionOrtePassPrompt,
   buildExtraktionFaktenPassPrompt,
+  buildFigurenStammGapPrompt,
+  buildOrteGapPrompt,
   buildZeitstrahlConsolidationPrompt,
   buildLocationsConsolidationPrompt,
   buildSongsConsolidationPrompt,

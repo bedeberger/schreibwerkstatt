@@ -21,6 +21,7 @@ const {
 } = require('../shared');
 const contentStore = require('../../../lib/content-store');
 const appSettings = require('../../../lib/app-settings');
+const { setContext } = require('../../../lib/log-context');
 const { runNonCritical, buildBookSystemBlockText, buildBookPagesSig, _stelleQuote, makePhaseTimer } = require('./utils');
 const { invalidateRenamedChapterCaches, loadAndValidateCheckpoint, restorePhase1FromCheckpoint } = require('./checkpoint');
 const { remapSzenen, remapAssignments, saveSzenenAndEvents, saveKontinuitaetResult } = require('./remap');
@@ -100,6 +101,16 @@ async function verifyKontinuitaetProbleme(ctx, result, fromPct, toPct) {
 //   P3b (Kapitelübergreifende Beziehungen, nur Multi-Pass, non-critical)
 //   P5 Szenen remappen
 //   P6 Zeitstrahl + P8 Kontinuität: parallel bei Claude (P8 ownt Progress-Bar), sonst sequentiell
+// Per-Job-Claude-Modell für die Komplettanalyse-Familie: ai.claude.model.komplett
+// überschreibt das globale ai.claude.model NUR für diese Pipeline (z.B. Opus für die
+// gründlichere Extraktion, während global Sonnet fürs Lektorat läuft). Leer = globales
+// Modell. Wird via ALS-Context an lib/ai.js#_resolveClaudeModel durchgereicht und greift
+// damit für alle Claude-Calls dieses Jobs (P1–P8). Cache-Version reflektiert das Modell.
+function _komplettModelOverride(effectiveProvider) {
+  if (effectiveProvider !== 'claude') return '';
+  return String(appSettings.get('ai.claude.model.komplett') || '').trim();
+}
+
 async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userToken, provider = undefined) {
   const bookIdInt = parseInt(bookId);
   const email = userEmail || null;
@@ -113,6 +124,11 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
   // Ceiling fälschlich auf ai.claude.max_tokens_out kappen, während callAI intern den echten
   // Provider auflöst und z.B. openai-compat/ollama anspricht → vorzeitige Truncation.
   const effectiveProvider = provider || appSettings.get('ai.provider') || 'claude';
+  const komplettModel = _komplettModelOverride(effectiveProvider);
+  if (komplettModel) {
+    setContext({ claudeModel: komplettModel });
+    log.info(`Komplettanalyse-Modell-Override «${komplettModel}» (global: ${appSettings.get('ai.claude.model')}).`);
+  }
   const call = (jobId_, tok_, prompt_, system_, fromPct, toPct, expectedChars, outputRatio, maxTokens, schema) =>
     aiCall(jobId_, tok_, prompt_, system_, fromPct, toPct, expectedChars, outputRatio, maxTokens, effectiveProvider, schema);
   // Per-Provider-Skalierung aus dessen `ai.<p>.context_window` (lib/ai.js#getContextConfigFor).
@@ -182,7 +198,7 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
     // Cache-Version: Modellname + Prompts-Schema-Version. Ändert sich eins davon,
     // werden alle persistierten Phase-1-Caches automatisch verworfen (Hit-Test
     // matcht den vollen Sig-String inkl. dieser Version).
-    const cacheVersion = `${_modelName(effectiveProvider)}:${prompts.PROMPTS_VERSION || ''}`;
+    const cacheVersion = `${komplettModel || _modelName(effectiveProvider)}:${prompts.PROMPTS_VERSION || ''}`;
     // Buch-weite Signatur (Seitenstand + Settings + Modell/Prompt-Version) – dieselbe
     // Gate wie der chapter_extract_cache. Validiert den Checkpoint-Resume.
     const bookPagesSig = buildBookPagesSig(pageContents, getBookSettings(bookIdInt, email), cacheVersion);
@@ -366,6 +382,11 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
   // Effektiven Provider binden (siehe runKomplettAnalyseJob) – sonst kappt aiCall das
   // Output-Ceiling fälschlich auf den Claude-Default, wenn der Job ohne expliziten Provider läuft.
   const effectiveProvider = provider || appSettings.get('ai.provider') || 'claude';
+  const komplettModel = _komplettModelOverride(effectiveProvider);
+  if (komplettModel) {
+    setContext({ claudeModel: komplettModel });
+    log.info(`Kontinuität-Modell-Override «${komplettModel}» (global: ${appSettings.get('ai.claude.model')}).`);
+  }
   const call = (jobId_, tok_, prompt_, system_, fromPct, toPct, expectedChars, outputRatio, maxTokens, schema) =>
     aiCall(jobId_, tok_, prompt_, system_, fromPct, toPct, expectedChars, outputRatio, maxTokens, effectiveProvider, schema);
   const { singlePass: singlePassLimit } = chunkLimitsFor(effectiveProvider);

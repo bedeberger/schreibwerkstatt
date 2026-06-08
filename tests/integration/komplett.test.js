@@ -170,6 +170,55 @@ test('Komplettanalyse Single-Pass: 1 Kapitel, P1 + P8 → done', async () => {
   assert.equal(cont.summary, 'Stimmig.');
 });
 
+test('Komplettanalyse Single-Pass: Completeness-Pass ergänzt übersehene Figuren/Orte additiv', async () => {
+  const BOOK_ID = 51;
+  seedTinyBook(BOOK_ID);
+
+  // Gap-Matcher ZUERST registrieren (Dispatcher = first-match): über den Prompt-Marker
+  // `bereits_erfasste_*` von der Erst-Extraktion unterschieden. Liefert je eine NEUE
+  // Entität, die der Erstdurchgang ausgelassen hat.
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.includes('figuren') && e.prompt.includes('bereits_erfasste_figuren'),
+    { figuren: [{ id: 'fig_1', name: 'Clara', kurzname: 'Clara', typ: 'nebenfigur', beschreibung: 'übersehen',
+      kapitel: [{ name: 'Kapitel Eins', haeufigkeit: 1 }], eigenschaften: [], schluesselzitate: [] }], assignments: [] },
+  );
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.includes('orte') && e.prompt.includes('bereits_erfasste_schauplaetze'),
+    { orte: [{ id: 'ort_1', name: 'Hütte', typ: 'gebaeude', beschreibung: 'übersehen',
+      kapitel: [{ name: 'Kapitel Eins', haeufigkeit: 1 }], figuren: [] }], songs: [], szenen: [] },
+  );
+  // Erst-Extraktion (A1 + B + C + A2) + P8 wie im Basis-Test.
+  ctx.mockAi.on((e) => e.schemaKeys.includes('figuren') && e.schemaKeys.includes('assignments') && !e.schemaKeys.includes('orte'), figurenStammResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.includes('orte') && e.schemaKeys.includes('szenen') && !e.schemaKeys.includes('figuren'), ortePassResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('fakten'), faktenPassResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('beziehungen'), beziehungenResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.includes('zusammenfassung') && e.schemaKeys.includes('probleme'), kontinuitaetResponse());
+
+  const appSettings = require('../../lib/app-settings');
+  appSettings.set('ai.komplett.completeness_passes', 1);
+  try {
+    const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
+    ctx.shared.enqueueJob(jobId, () =>
+      ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Testbuch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+    );
+    const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 8000 });
+    assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
+    // Anna + Bert (A1) + Clara (Figuren-Gap) = 3; Wald (B) + Hütte (Orte-Gap) = 2.
+    assert.equal(job.result.figCount, 3, 'Completeness-Pass ergänzt die übersehene Figur Clara');
+    assert.equal(job.result.orteCount, 2, 'Completeness-Pass ergänzt den übersehenen Ort Hütte');
+
+    const figNames = ctx.dbSchema.db.prepare(
+      'SELECT name FROM figures WHERE book_id = ? AND user_email = ? ORDER BY name'
+    ).all(BOOK_ID, 'tester@test.dev').map(r => r.name);
+    assert.deepEqual(figNames, ['Anna', 'Bert', 'Clara']);
+
+    // 7 Calls: A1 + B + C + Figuren-Gap + Orte-Gap + A2 + P8.
+    assert.equal(ctx.mockAi.log.length, 7, `expected 7 AI calls, got ${ctx.mockAi.log.length}`);
+  } finally {
+    appSettings.set('ai.komplett.completeness_passes', 0);
+  }
+});
+
 test('Komplettanalyse Single-Pass: Fakten-Pass (C) scheitert → Job ok, Warnung, KEIN Cache', async () => {
   const BOOK_ID = 56;
   seedTinyBook(BOOK_ID);

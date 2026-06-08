@@ -603,13 +603,11 @@ export const notebookEditMethods = {
     writeDraft(app.currentPage.id, newHtml, app.originalHtml, app.currentPage.updated_at);
     app.lastDraftSavedAt = Date.now();
 
-    const localeTag = (app.uiLocale === 'en') ? 'en-US' : 'de-CH';
-
-    if (!navigator.onLine) {
-      app.saveOffline = true;
-      app.setStatus(app.t('edit.offlineSavedAt', { time: new Date().toLocaleTimeString(localeTag, tzOpts()) }), false, 3000);
-      return;
-    }
+    // Bewusst KEIN navigator.onLine-Gate vor dem PUT: der Flag meldet (Sleep/Wake,
+    // VPN-Wechsel, Netzwerk-Interface-Flap) faelschlich `false` und feuert danach
+    // kein `online`-Event — ein Vorab-Abbruch wuerde den Editor dauerhaft auf
+    // "offline" nageln (Recovery haengt am `online`-Event). Stattdessen den Fetch
+    // immer wagen; sein echter Ausgang entscheidet ueber saveOffline (Catch unten).
 
     // editSaving früh setzen — verhindert, dass parallele Auto-Save-Tick + Ctrl+S
     // (oder exitFocusMode-quickSave + Auto-Save-Timer) den gleichen PUT zweimal
@@ -707,7 +705,14 @@ export const notebookEditMethods = {
       }
       console.error('[quickSave]', e);
       app.saveOffline = true;
-      app.setStatus(app.t('edit.saveFailedRetry'), false, 6000);
+      // navigator.onLine ist hier nur noch Hinweis fuer die Wortwahl, kein Gate:
+      // bei echtem Offline die freundlichere Meldung, sonst generischer Retry-Hinweis.
+      if (!navigator.onLine) {
+        const localeTag = (app.uiLocale === 'en') ? 'en-US' : 'de-CH';
+        app.setStatus(app.t('edit.offlineSavedAt', { time: new Date().toLocaleTimeString(localeTag, tzOpts()) }), false, 3000);
+      } else {
+        app.setStatus(app.t('edit.saveFailedRetry'), false, 6000);
+      }
     } finally {
       app.editSaving = false;
     }
@@ -840,18 +845,32 @@ export const notebookEditMethods = {
   _installOnlineRetry() {
     const app = window.__app;
     if (!app || app._onlineHandler) return;
-    app._onlineHandler = () => {
-      if (app.editMode && app.editDirty && app.saveOffline) {
+    // Retry-Trigger fuer einen haengengebliebenen Offline-Save. Das `online`-Event
+    // allein genuegt nicht: es feuert nur bei einem echten Offline→Online-Wechsel,
+    // nicht bei einem transienten Server-Blip oder einem faelschlichen
+    // navigator.onLine-`false`. Tab-Refokus (visibilitychange/focus) ist der
+    // zuverlaessige zweite Anlass, den Netzwerkversuch erneut zu wagen.
+    const retry = () => {
+      if (app.editMode && app.editDirty && app.saveOffline && !app.editSaving) {
         this.quickSave();
       }
     };
+    app._onlineHandler = retry;
+    app._onlineVisHandler = () => { if (document.visibilityState === 'visible') retry(); };
     window.addEventListener('online', app._onlineHandler);
+    window.addEventListener('focus', app._onlineHandler);
+    document.addEventListener('visibilitychange', app._onlineVisHandler);
   },
 
   _uninstallOnlineRetry() {
     const app = window.__app;
     if (!app || !app._onlineHandler) return;
     window.removeEventListener('online', app._onlineHandler);
+    window.removeEventListener('focus', app._onlineHandler);
+    if (app._onlineVisHandler) {
+      document.removeEventListener('visibilitychange', app._onlineVisHandler);
+      app._onlineVisHandler = null;
+    }
     app._onlineHandler = null;
   },
 

@@ -342,6 +342,51 @@ ${kapitelNote}
 ${textBlock}`;
 }
 
+// ── Completeness-/Gap-Pässe (Claude Single-Pass) ──────────────────────────────
+// Nach der Erst-Extraktion ein zweiter (oder dritter) Durchgang gegen DENSELBEN
+// gecachten Buchtext-Block + dasselbe System-Schema, der gezielt die Entitäten
+// nachzieht, die der Erst-Call ausgelassen hat (Long-Tail: Nebenfiguren, einmal
+// erwähnte Schauplätze). Die bereits gefundenen Namen werden mitgegeben, damit das
+// Modell sie NICHT erneut ausgibt. Additive Vereinigung im Job – nie droppen.
+
+function _knownList(names) {
+  const arr = (names || []).filter(Boolean);
+  return arr.length ? arr.map(n => `- ${n}`).join('\n') : '(noch keine)';
+}
+
+/** Gap-Pass A1: fehlende Figuren-Stammdaten (+ Lebensereignisse). Reuse von
+ *  SYSTEM_KOMPLETT_FIGUREN_STAMM_BLOCKS + SCHEMA_KOMPLETT_FIGUREN_STAMM. */
+export function buildFigurenStammGapPrompt(bookName, knownNames) {
+  return `<aufgabe>
+Du hast das Buch «${bookName}» bereits einmal nach Figuren durchsucht. Unten steht die Liste der bereits erfassten Figuren. Durchsuche den Buchtext (im System-Prompt oben) GRÜNDLICH ERNEUT und gib AUSSCHLIESSLICH Figuren aus, die in dieser Liste FEHLEN – besonders Nebenfiguren, nur kurz auftretende oder einmal erwähnte Personen mit eigenem Namen. Für jede neue Figur dieselben Stammdaten (OHNE Beziehungen) und Lebensereignisse wie im Erstdurchgang. Figuren, die bereits in der Liste stehen, NICHT erneut ausgeben. Wenn keine weitere Figur existiert: leeres figuren-Array.
+</aufgabe>
+
+<bereits_erfasste_figuren>
+${_knownList(knownNames)}
+</bereits_erfasste_figuren>
+
+Der Text ist in Kapitel-Sektionen gegliedert (## Kapitelname) mit Seiten darunter (### Seitentitel). Für kapitel[].name und lebensereignisse[].kapitel: exakt aus dem ## Header entnehmen.
+
+<text>Der Buchtext steht im System-Prompt oben.</text>`;
+}
+
+/** Gap-Pass B: fehlende Schauplätze. Reuse von SYSTEM_KOMPLETT_ORTE_PASS_BLOCKS +
+ *  SCHEMA_KOMPLETT_ORTE_PASS. songs/szenen dürfen leer bleiben – im Job wird nur
+ *  das orte-Array additiv vereinigt. */
+export function buildOrteGapPrompt(bookName, knownNames) {
+  return `<aufgabe>
+Du hast das Buch «${bookName}» bereits einmal nach Schauplätzen durchsucht. Unten die bereits erfassten Schauplätze. Durchsuche den Buchtext (im System-Prompt oben) GRÜNDLICH ERNEUT und gib AUSSCHLIESSLICH Schauplätze aus, die in dieser Liste FEHLEN – auch nur kurz erwähnte oder einmalige Orte. Schauplätze, die bereits in der Liste stehen, NICHT erneut ausgeben. songs und szenen als leere Arrays zurückgeben (in diesem Pass nicht gefragt). Wenn kein weiterer Schauplatz existiert: leeres orte-Array.
+</aufgabe>
+
+<bereits_erfasste_schauplaetze>
+${_knownList(knownNames)}
+</bereits_erfasste_schauplaetze>
+
+Der Text ist in Kapitel-Sektionen gegliedert (## Kapitelname). Für alle Kapitel-Felder den Namen aus dem zugehörigen ## Header entnehmen.
+
+<text>Der Buchtext steht im System-Prompt oben.</text>`;
+}
+
 /** Claude-Single-Pass C: nur Fakten – eigener Call gegen den gecachten Buchtext-Block. */
 export function buildExtraktionFaktenPassPrompt(chapterName, bookName, pageCount, chText) {
   const isSinglePass = chapterName === 'Gesamtbuch';

@@ -28,6 +28,8 @@ export {
   buildExtraktionFigurenStammPrompt,
   buildExtraktionOrtePassPrompt,
   buildExtraktionFaktenPassPrompt,
+  buildFigurenStammGapPrompt,
+  buildOrteGapPrompt,
 } from './komplett/extraktion.js';
 
 export {

@@ -97,6 +97,10 @@
         <label>ai.claude.model
           <input type="text" x-model="adminSettingsForm['ai.claude.model']" placeholder="claude-sonnet-4-6">
         </label>
+        <label>ai.claude.model.komplett
+          <input type="text" x-model="adminSettingsForm['ai.claude.model.komplett']" placeholder="claude-opus-4-8">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.komplettModel')"></small>
+        </label>
         <label>ai.claude.context_window
           <input type="text" x-data="numInput({ integer: true, min: 8000, max: 2000000 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.context_window']">
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.contextWindow')"></small>
@@ -598,6 +602,10 @@
         <label>ai.komplett.extract_max_tokens
           <input type="text" x-data="numInput({ integer: true, min: 1024, max: 200000 })" x-modelable="value" x-model="adminSettingsForm['ai.komplett.extract_max_tokens']">
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.komplettExtractMaxTokens')"></small>
+        </label>
+        <label>ai.komplett.completeness_passes
+          <input type="text" x-data="numInput({ integer: true, min: 0, max: 3 })" x-modelable="value" x-model="adminSettingsForm['ai.komplett.completeness_passes']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.completenessPasses')"></small>
         </label>
         <label>ai.chars_per_token
           <input type="text" x-data="numInput({ step: 0.1, min: 1, max: 10 })" x-modelable="value" x-model="adminSettingsForm['ai.chars_per_token']">

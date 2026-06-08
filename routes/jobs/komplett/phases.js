@@ -20,6 +20,7 @@ const {
   preMergeChapterFiguren, applySozialschichtModeVote,
   mergeDuplicateFiguren, validateBeziehungenDescriptions,
   mergeBeziehungenIntoFiguren, backfillFiguren, ensureUniqueFigIds,
+  _normalizeName,
 } = require('./figuren-merge');
 const appSettings = require('../../../lib/app-settings');
 const { getContextConfigFor } = require('../../../lib/ai');
@@ -36,6 +37,52 @@ function komplettMaxTokens(provider) {
   if (provider === 'claude') return ceiling;
   const base = Math.max(1024, parseInt(appSettings.get('ai.komplett.extract_max_tokens'), 10) || 16000);
   return Math.min(base, ceiling);
+}
+
+/**
+ * Additiver Completeness-/Gap-Pass (nur Claude Single-Pass): nach der Erst-Extraktion
+ * erneut gegen den GECACHTEN Buchtext-Block + dasselbe System-Schema prompten und gezielt
+ * die Entitäten nachziehen, die der Erst-Call ausgelassen hat (Long-Tail: Nebenfiguren,
+ * einmal erwähnte Schauplätze). Die bereits gefundenen Namen werden mitgegeben, damit das
+ * Modell sie NICHT erneut ausgibt. Loop-until-dry (Stop, sobald eine Runde nichts Neues
+ * liefert) bis maxPasses. NON-FATAL: ein gescheiterter Gap-Call verwirft die teure
+ * Haupt-Extraktion nicht — er wird geloggt und übersprungen. Gibt die NEU gefundenen Items
+ * zurück (dedupliziert gegen bekannte + frühere Gap-Treffer per normalisiertem Namen);
+ * der Caller vereinigt additiv.
+ */
+async function runCompletenessGap(ctx, {
+  label, statusText, knownNames, buildPrompt, systemBlocks, schema, extractItems, claudeExtractCap, maxPasses,
+}) {
+  const { call, jobId, tok, log } = ctx;
+  const seen = new Set((knownNames || []).map(n => _normalizeName(n)).filter(Boolean));
+  const display = (knownNames || []).filter(Boolean);
+  const fresh = [];
+  for (let round = 1; round <= maxPasses; round++) {
+    updateJob(jobId, { statusText });
+    let res;
+    try {
+      res = await retryOnTransientAi(() => call(jobId, tok,
+        buildPrompt(display), systemBlocks, null, null, claudeExtractCap, 0.2, null, schema,
+      ), { log, label: `${label} (Gap ${round}/${maxPasses})` });
+    } catch (e) {
+      if (e.name === 'AbortError') throw e;
+      log.warn(`${label} Gap-Pass ${round} fehlgeschlagen (${e.message}) – übersprungen.`);
+      break;
+    }
+    const items = (extractItems(res) || []).filter(it => it && it.name);
+    const newOnes = [];
+    for (const it of items) {
+      const key = _normalizeName(it.name);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      display.push(it.name);
+      newOnes.push(it);
+    }
+    fresh.push(...newOnes);
+    log.info(`${label} Gap-Pass ${round}: ${items.length} zurück, +${newOnes.length} neu.`);
+    if (newOnes.length === 0) break; // loop-until-dry
+  }
+  return fresh;
 }
 
 /**
@@ -149,8 +196,59 @@ async function runPhase1(ctx) {
           passB.fakten = faktenRes.value?.fakten || [];
         }
 
-        // A2: Beziehungen separat – braucht die stabilen IDs aus A1.
+        // ── Completeness-/Gap-Pässe (Long-Tail-Recall, nur Claude Single-Pass) ──
+        // Ein einzelner Extraktions-Call über das ganze Buch erfasst Haupt-Entitäten
+        // zuverlässig, lässt aber den Long-Tail (Nebenfiguren, Einmal-Schauplätze) oft
+        // aus. ai.komplett.completeness_passes (Default 0 = aus) zieht sie additiv nach.
+        // Läuft VOR A2, damit der Beziehungs-Pass die ergänzten Figuren mit abdeckt.
         let stammFiguren = stamm.figuren || [];
+        const completenessPasses = Math.max(0, Math.min(3,
+          parseInt(appSettings.get('ai.komplett.completeness_passes'), 10) || 0));
+        if (completenessPasses > 0) {
+          if (stammFiguren.length > 0) {
+            const freshFig = await runCompletenessGap(ctx, {
+              label: 'Single-Pass Figuren', statusText: 'job.phase.completenessFiguren',
+              knownNames: stammFiguren.flatMap(f => [f.name, f.kurzname]),
+              buildPrompt: (known) => prompts.buildFigurenStammGapPrompt(bookName, known),
+              systemBlocks: [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KOMPLETT_FIGUREN_STAMM_BLOCKS, '1h')],
+              schema: prompts.SCHEMA_KOMPLETT_FIGUREN_STAMM,
+              extractItems: (r) => r?.figuren,
+              claudeExtractCap, maxPasses: completenessPasses,
+            });
+            if (freshFig.length) {
+              // Frische, kollisionsfreie IDs (Gap-Output beginnt wieder bei fig_1).
+              // Events/Assignments referenzieren Klarnamen → von der Neu-ID unberührt;
+              // A2 unten bezieht die ergänzten Figuren über die vereinigte Liste ein.
+              let maxIdx = 0;
+              for (const f of stammFiguren) { const m = /^fig_(\d+)$/.exec(f.id || ''); if (m) maxIdx = Math.max(maxIdx, +m[1]); }
+              for (const f of freshFig) f.id = 'fig_' + (++maxIdx);
+              stammFiguren = stammFiguren.concat(freshFig);
+              log.info(`Completeness: +${freshFig.length} Figuren ergänzt (gesamt ${stammFiguren.length}).`);
+            }
+          }
+          const knownOrte = passB.orte || [];
+          const freshOrte = await runCompletenessGap(ctx, {
+            label: 'Single-Pass Orte', statusText: 'job.phase.completenessOrte',
+            knownNames: knownOrte.map(o => o.name),
+            buildPrompt: (known) => prompts.buildOrteGapPrompt(bookName, known),
+            systemBlocks: [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KOMPLETT_ORTE_PASS_BLOCKS, '1h')],
+            schema: prompts.SCHEMA_KOMPLETT_ORTE_PASS,
+            extractItems: (r) => r?.orte,
+            claudeExtractCap, maxPasses: completenessPasses,
+          });
+          if (freshOrte.length) {
+            // Frische, kollisionsfreie ort_ids (Gap-Output beginnt wieder bei ort_1 →
+            // Kollision mit dem Erst-Pass; Phase 3 Single-Pass behält explizite ids bei →
+            // sonst UNIQUE(book_id, loc_id, user_email)-Verletzung beim Speichern).
+            let maxIdx = 0;
+            for (const o of knownOrte) { const m = /^ort_(\d+)$/.exec(o.id || ''); if (m) maxIdx = Math.max(maxIdx, +m[1]); }
+            for (const o of freshOrte) o.id = 'ort_' + (++maxIdx);
+            passB.orte = knownOrte.concat(freshOrte);
+            log.info(`Completeness: +${freshOrte.length} Orte ergänzt (gesamt ${passB.orte.length}).`);
+          }
+        }
+
+        // A2: Beziehungen separat – braucht die stabilen IDs aus A1.
         if (stammFiguren.length >= 2) {
           updateJob(jobId, { progress: 20, statusText: 'job.phase.extractingRelations' });
           try {
