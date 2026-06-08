@@ -10,7 +10,7 @@ const assert = require('node:assert/strict');
 // Sub-Module, aber so bleibt das Setup identisch zum Prod-Boot.
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 
-const { parseJSON, _claudeAcceptsTemperature } = require('../../lib/ai');
+const { parseJSON, _claudeAcceptsTemperature, _claudeUsesAdaptiveThinking } = require('../../lib/ai');
 
 // Opus 4.7+ haben temperature/top_p/top_k entfernt → 400 bei Verwendung.
 // _callClaude muss temperature für diese Modelle weglassen, für ältere senden.
@@ -20,6 +20,18 @@ test('_claudeAcceptsTemperature: Opus 4.7+ lehnt ab, Sonnet/Opus 4.6 akzeptieren
   }
   for (const m of ['claude-opus-4-7', 'claude-opus-4-8', 'claude-opus-4-8[1m]', 'claude-opus-4-9', 'claude-opus-4-10']) {
     assert.equal(_claudeAcceptsTemperature(m), false, `${m} sollte temperature ablehnen`);
+  }
+});
+
+// Opus 4.7+ schreiben bei deaktiviertem Thinking Reasoning-Prosa in den sichtbaren
+// Output → bläht JSON-Only-Antworten bis zum Truncation-Wurf. _callClaude muss daher
+// für diese Modelle adaptive Thinking senden, für Sonnet 4.6 / Opus 4.6 / ältere nicht.
+test('_claudeUsesAdaptiveThinking: nur Opus 4.7+ (gleiche Generationen wie temperature-Verbot)', () => {
+  for (const m of ['claude-opus-4-7', 'claude-opus-4-8', 'claude-opus-4-8[1m]', 'claude-opus-4-9', 'claude-opus-4-10']) {
+    assert.equal(_claudeUsesAdaptiveThinking(m), true, `${m} sollte adaptive Thinking nutzen`);
+  }
+  for (const m of ['claude-sonnet-4-6', 'claude-opus-4-6', 'claude-opus-4-5', 'claude-opus-4-1', 'claude-haiku-4-5', '']) {
+    assert.equal(_claudeUsesAdaptiveThinking(m), false, `${m} sollte kein thinking-Feld senden`);
   }
 });
 
