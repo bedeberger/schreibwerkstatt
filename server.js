@@ -264,6 +264,13 @@ const PUBLIC_ASSETS = new Set([
   '/favicon.ico',
   '/js/admin/admin-login.js',
   '/js/share-reader.js',
+  // Skripte der Pre-Auth-Seiten (register.html + admin-login). Ohne Freigabe
+  // landet ihr Request im Auth-Guard und kommt als HTML (`/login?returnTo=...`)
+  // zurück → Browser verweigert die Ausführung wegen falschem MIME-Type.
+  '/js/register.js',
+  // ALTCHA-PoW-Widget (Custom-Element): von register.html + admin-login per
+  // dynamic `<script type="module">` nachgeladen, sobald ALTCHA aktiv ist.
+  '/vendor/altcha-3.0.11.min.js',
 ]);
 // Pre-auth-erlaubte Prefixes: landing.html + register.html ziehen /css/tokens.css
 // + /css/landing.css (+ deren @import-Sub-Tokens) und Variable-Fonts aus /fonts/.
