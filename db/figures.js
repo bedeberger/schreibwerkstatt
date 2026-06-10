@@ -182,12 +182,7 @@ function saveFigurenToDb(bookId, figuren, userEmail, idMaps) {
 // schützt vor Re-Run-Overwrite.
 function updateFigurenEvents(bookId, assignments, userEmail, idMaps) {
   const { parseDatum } = require('../lib/datum-parse');
-  const SUBTYP_WL = new Set([
-    'geburt', 'tod', 'hochzeit', 'liebe', 'trennung', 'krankheit',
-    'reise', 'umzug', 'konflikt', 'wendepunkt', 'entdeckung', 'verlust', 'sieg',
-    'extern_politisch', 'extern_wirtschaftlich', 'extern_natur', 'extern_kulturell', 'extern_krieg',
-    'sonstiges',
-  ]);
+  const { normEventSubtyp } = require('./event-subtyp');
   db.transaction(() => {
     const figRows = db.prepare(
       'SELECT id, fig_id FROM figures WHERE book_id = ? AND user_email = ?'
@@ -221,7 +216,7 @@ function updateFigurenEvents(bookId, assignments, userEmail, idMaps) {
           : null;
         const labelSrc = ev.datum_label || ev.datum || '';
         const p = parseDatum(labelSrc);
-        const subtyp = SUBTYP_WL.has(ev.subtyp) ? ev.subtyp : 'sonstiges';
+        const subtyp = normEventSubtyp(ev.subtyp);
         insEvt.run(
           rowId, ev.datum || labelSrc || '',
           ev.datum_label || labelSrc || p.label || '',

@@ -14,17 +14,10 @@ const books = require('./books');
 const tokenUsage = require('./token-usage');
 const draftFigures = require('./draft-figures');
 const { parseDatum } = require('../lib/datum-parse');
+const { normEventSubtyp } = require('./event-subtyp');
 const logger = require('../logger');
 
-// Whitelist für Event-Subtypen (Phase 2). Unbekannte Werte fallen auf
-// 'sonstiges' zurück. Persoenlich/extern bleibt in `typ` getrennt.
-const SUBTYP_WL = new Set([
-  'geburt', 'tod', 'hochzeit', 'reise', 'konflikt', 'wendepunkt',
-  'entdeckung', 'verlust', 'sieg',
-  'extern_politisch', 'extern_natur', 'extern_kulturell', 'sonstiges',
-]);
-
-// Whitelist für Welt-Fakten-Kategorien (harte Gruppierung analog SUBTYP_WL).
+// Whitelist für Welt-Fakten-Kategorien (harte Gruppierung analog EVENT_SUBTYP_WL).
 // KI liefert die Kategorie im Komplettanalyse-Output; unbekannte/leere Werte
 // fallen auf 'sonstiges' zurück. Frontend rendert Label + Icon je Key
 // (public/js/cards/world-facts-card.js, i18n weltfakten.kategorie.*).
@@ -57,7 +50,7 @@ function _structuredDatum(ev) {
     story_tag:         ev.story_tag         ?? p.story_tag ?? null,
     // Nur sinnvoll, wenn ein Jahr vorliegt; ohne datum_year ist "unsicher" bedeutungslos.
     datum_unsicher:    (ev.datum_unsicher && (ev.datum_year ?? p.year) != null) ? 1 : 0,
-    subtyp:            SUBTYP_WL.has(ev.subtyp) ? ev.subtyp : 'sonstiges',
+    subtyp:            normEventSubtyp(ev.subtyp),
   };
 }
 

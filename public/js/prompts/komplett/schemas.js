@@ -115,8 +115,10 @@ function _szenenField() {
 }
 
 // Whitelist für Event-Subtypen (Phase 2). KI darf nur diese Werte liefern;
-// Server-Save fällt sonst auf 'sonstiges' zurück.
-const EVENT_SUBTYP_ENUM = [
+// Server-Save fällt sonst auf 'sonstiges' zurück. SSoT des KI-Vertrags – die
+// Server-Persistenz (db/event-subtyp.js) MUSS deckungsgleich bleiben (gegated
+// durch tests/unit/event-subtyp-drift.test.mjs).
+export const EVENT_SUBTYP_ENUM = [
   'geburt', 'tod', 'hochzeit', 'liebe', 'trennung', 'krankheit',
   'reise', 'umzug', 'konflikt', 'wendepunkt', 'entdeckung', 'verlust', 'sieg',
   'extern_politisch', 'extern_wirtschaftlich', 'extern_natur', 'extern_kulturell', 'extern_krieg',

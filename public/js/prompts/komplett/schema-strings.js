@@ -157,7 +157,9 @@ export const FAKTEN_RULES = `Fakten-Regeln:
   · historie = Vorgeschichte, historische Fakten/Ereignisse der Welt vor der Handlung
   · zeit = Zeitangaben und Chronologie (relativ wie absolut)
   · soziolekt = Sprachregister/Sprechweise einer Figur
-  · ereignis = konkrete Geschehnisse in der Handlungsgegenwart
+  · ereignis = welt-/kontinuitätsrelevante Geschehnisse, die KEINER einzelnen Figur zuzuordnen sind (Krieg, Naturkatastrophe, öffentliches/gesellschaftliches Ereignis, Umbruch). Biografische Ereignisse einzelner Figuren gehören NICHT hierher.
+- PRIORITÄT: Bevorzuge immer die spezifischste Sach-Kategorie. «ereignis» ist die letzte Wahl unter den handlungsnahen Optionen – wenn ein Geschehen einen stabilen Weltzustand offenbart, erfasse diesen Zustand («ort»/«objekt»/«regel»/«figur»), nicht das Geschehen (z.B. statt «Robert betritt die Fabrik» → «ort»: «Die Fabrik liegt am Stadtrand»).
+- KEINE gewöhnlichen Handlungsschritte erfassen (Figur betritt einen Raum, führt ein Gespräch, geht irgendwohin, denkt nach). Solche Sätze sind keine Welt-Fakten.
 - Nur prüfbare Aussagen aus dem Text – keine Interpretationen, Wertungen oder Spekulationen
 - Kein Cap auf Anzahl Fakten – vollständige, präzise Erfassung ist das Ziel`;
 
