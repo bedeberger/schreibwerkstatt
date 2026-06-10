@@ -54,6 +54,7 @@ Antworte mit diesem JSON-Schema:
           "datum_ende_month": null,
           "datum_ende_day":   null,
           "story_tag":   null,        // Relative Story-Zeit (Tag 3, Day 12) wenn kein realer Kalender
+          "datum_unsicher": false,    // true NUR wenn datum_year aus dem Kontext abgeleitet (nicht explizit belegt) wurde
           "subtyp":      "wendepunkt", // geburt|tod|hochzeit|liebe|trennung|krankheit|reise|umzug|konflikt|wendepunkt|entdeckung|verlust|sieg|extern_politisch|extern_wirtschaftlich|extern_natur|extern_kulturell|extern_krieg|sonstiges (Default 'sonstiges')
           "ereignis": "Was passierte – neutral und kanonisch formuliert, NICHT aus der Figurenperspektive. Ereignisse die mehrere Figuren betreffen MÜSSEN bei allen beteiligten Figuren identisch formuliert sein (z.B. 'Geburt von Maria' für Vater, Mutter und Kind – nicht 'Geburt seiner Tochter' oder 'Eigene Geburt').",
           "typ": "persoenlich|extern",
@@ -76,7 +77,7 @@ Kernregeln:
 - kapitel[].name: immer der Kapitelname (aus dem ## Header oder dem Prompt-Kontext), niemals Seitentitel.
 - figuren_namen / orte_namen / figur_name: Klarnamen exakt wie im Text.
 - Songs: nur mit konkretem Titel oder Interpret aufnehmen; kontext_typ Pflicht.
-- Ereignisse: datum_label = Original-String, datum_year/month/day strukturiert (jeweils null wenn unbekannt). subtyp aus Whitelist; im Zweifel 'sonstiges'. Gleiches Ereignis bei allen beteiligten Figuren identisch formulieren.
+- Ereignisse: datum_label = Original-String, datum_year/month/day strukturiert (jeweils null wenn unbekannt). Ist das Jahr nicht explizit, aber aus dem Kontext erschliessbar (verankerte Jahreszahl + relative Angaben, Lebensspanne, Epoche), das abgeleitete Jahr trotzdem in datum_year eintragen und datum_unsicher=true setzen; sonst datum_unsicher=false. subtyp aus Whitelist; im Zweifel 'sonstiges'. Gleiches Ereignis bei allen beteiligten Figuren identisch formulieren.
 - Leere Arrays wenn nichts gefunden.`;
   }
 
@@ -108,7 +109,9 @@ Ereignis-Regeln:
 - typ='extern': gesellschaftliche/historische Ereignisse – SEHR GROSSZÜGIG erfassen: Kriege, politische Umbrüche, Sport- und Kulturereignisse, Wirtschaftskrisen, Seuchen, Naturkatastrophen; auch wenn nur kurz erwähnt; jedes externe Ereignis ALLEN betroffenen Figuren zuweisen
 - subtyp: feiner Subtyp (Whitelist) – geburt, tod, hochzeit, liebe, trennung, krankheit, reise, umzug, konflikt, wendepunkt, entdeckung, verlust, sieg (für typ=persoenlich) bzw. extern_politisch, extern_wirtschaftlich, extern_natur, extern_kulturell, extern_krieg (für typ=extern). liebe=Beginn einer Liebesbeziehung; trennung=Scheidung/Trennung; krankheit=Erkrankung/Verletzung; umzug=dauerhafter Wohnortwechsel (nicht reise); extern_wirtschaftlich=Wirtschaftskrise/Crash; extern_krieg=Krieg/Schlacht. Wenn nichts klar passt: 'sonstiges'.
 - datum: Original-String wie im Text vorhanden (z.B. «Mai 1850», «12. März 1850», «1850», «Tag 3», «vor der Reise»). datum_label spiegelt das in einer user-lesbaren Form.
-- datum_year/datum_month/datum_day PFLICHT zerlegen falls aus Text/Kontext berechenbar; Felder ohne Information null lassen. Events OHNE jegliche Datums-Information (auch keine relative Story-Zeit) trotzdem aufnehmen – Felder dann null, das Event landet im «unbekannt»-Bucket.
+- datum_year/datum_month/datum_day PFLICHT zerlegen falls aus Text/Kontext berechenbar; Felder ohne Information null lassen.
+- JAHRES-INFERENZ (wichtig): Steht am Ereignis kein explizites Datum, ist das Jahr aber aus dem Kontext erschliessbar – aus einer vorher verankerten Jahreszahl plus relativen Angaben («zwei Jahre später», «im Frühjahr darauf», «als sie 30 war»), aus der Lebensspanne der Figur oder der etablierten Epoche/dem Setting – dann das abgeleitete Jahr (notfalls nur das Jahrzehnt) GROSSZÜGIG in datum_year eintragen und datum_unsicher=true setzen. Lieber ein plausibel abgeleitetes (als unsicher markiertes) Jahr als gar keins.
+- datum_unsicher=false NUR für explizit im Text belegte Datumsangaben. Ist auch das Jahr nicht erschliessbar, bleibt alles null – Event landet im «unbekannt»-Bucket, wird aber trotzdem aufgenommen.
 - Spannen-Events (Krieg, Reise, Studium, Schwangerschaft): Start in datum_year/month/day, Ende in datum_ende_year/month/day. Ein-Punkt-Events lassen datum_ende_* null.
 - story_tag: Wenn der Text relative Zeit nutzt («Tag 3», «am dritten Tag der Reise») statt eines Kalenders, hier den INT-Wert eintragen.
 - figur_name: exakt wie in figuren[].name dieser Antwort (kanonischen Namen aus der Figurenliste verwenden, KEINE Textvariante, kein Titel, kein Spitzname der dort nicht steht)

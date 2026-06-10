@@ -202,8 +202,8 @@ function updateFigurenEvents(bookId, assignments, userEmail, idMaps) {
       (figure_id, datum, datum_label,
        datum_year, datum_month, datum_day,
        datum_ende_year, datum_ende_month, datum_ende_day,
-       story_tag, ereignis, bedeutung, typ, subtyp, chapter_id, page_id, sort_order)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+       story_tag, datum_unsicher, ereignis, bedeutung, typ, subtyp, chapter_id, page_id, sort_order)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     for (const assignment of assignments) {
       const rowId = figIdToRowId[assignment.fig_id];
       if (!rowId) continue;
@@ -232,6 +232,8 @@ function updateFigurenEvents(bookId, assignments, userEmail, idMaps) {
           ev.datum_ende_month ?? null,
           ev.datum_ende_day   ?? null,
           ev.story_tag        ?? p.story_tag  ?? null,
+          // "unsicher" nur sinnvoll mit Jahr; abgeleitetes Jahr von der KI markiert.
+          (ev.datum_unsicher && (ev.datum_year ?? p.year) != null) ? 1 : 0,
           ev.ereignis || '', ev.bedeutung || null,
           ev.typ || 'persoenlich', subtyp, chId, pageId, j,
         );

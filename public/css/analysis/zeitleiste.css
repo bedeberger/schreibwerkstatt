@@ -100,6 +100,14 @@
   letter-spacing: 0.03em;
 }
 
+/* Aus dem Kontext abgeleitetes (unsicheres) Jahr: «ca.»-Prefix kommt aus i18n,
+   hier nur das visuelle Signal — kursiv + gepunktete Unterstreichung. */
+.gz-datum--unsicher {
+  font-style: italic;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+
 .gz-extern-badge {
   font-size: var(--font-size-micro);
   font-weight: 400;

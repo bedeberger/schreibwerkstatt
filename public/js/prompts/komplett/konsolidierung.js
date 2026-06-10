@@ -19,6 +19,7 @@ Antworte mit diesem JSON-Schema:
       "datum_ende_month": null,
       "datum_ende_day":   null,
       "story_tag": null,            // Relative Story-Zeit (Tag 3, Day 12) wenn kein Kalender
+      "datum_unsicher": false,      // true wenn datum_year nur aus dem Kontext abgeleitet (nicht explizit belegt) ist
       "subtyp": "wendepunkt",       // geburt|tod|hochzeit|liebe|trennung|krankheit|reise|umzug|konflikt|wendepunkt|entdeckung|verlust|sieg|extern_politisch|extern_wirtschaftlich|extern_natur|extern_kulturell|extern_krieg|sonstiges
       "ereignis": "kanonische Formulierung",
       "typ": "persoenlich|extern",
@@ -32,6 +33,7 @@ Antworte mit diesem JSON-Schema:
 
 Regeln:
 - Strukturierte Datums-Felder PFLICHT: datum_year/month/day aus jedem datum_label extrahieren. Nur ein Teil bekannt? Restliche Felder null.
+- datum_unsicher unverändert aus den Eingabe-Ereignissen übernehmen. Beim Zusammenführen: ist mindestens ein zusammengeführtes Ereignis sicher datiert (datum_unsicher=false mit datum_year), gilt das Ergebnis als sicher (datum_unsicher=false); sonst datum_unsicher=true. Niemals ein abgeleitetes Jahr als sicher ausgeben.
 - Spannen (z.B. «Krieg 1914–1918», «Reise Mai–August 1850»): datum_*_year/month/day = Start, datum_ende_*_year/month/day = Ende.
 - Behalte die chronologische Reihenfolge (aufsteigend nach datum_year, dann _month, _day)
 - subtyp: Eines aus der Whitelist. Default 'sonstiges'. Bei externen Welt-Events: extern_politisch|extern_wirtschaftlich|extern_natur|extern_kulturell|extern_krieg.

@@ -1460,6 +1460,8 @@
   "events.worldEvent":           "Weltgeschehen",
   "events.unknownDate":          "ohne Datum",
   "events.span":                 "{start} – {ende}",
+  "events.circa":                "ca. {date}",
+  "events.estimatedHint":        "Jahr aus dem Kontext abgeleitet (nicht explizit im Text belegt)",
   "events.filter.subtyp":        "Subtyp",
   "events.filter.allSubtypes":   "Alle Subtypen",
   "events.subtyp.geburt":            "Geburt",

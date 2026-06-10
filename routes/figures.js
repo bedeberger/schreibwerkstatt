@@ -24,7 +24,7 @@ router.get('/zeitstrahl/:book_id', (req, res) => {
   const rows = db.prepare(`
     SELECT id, datum, datum_label, datum_year, datum_month, datum_day,
            datum_ende_year, datum_ende_month, datum_ende_day,
-           story_tag, ereignis, typ, subtyp, bedeutung,
+           story_tag, datum_unsicher, ereignis, typ, subtyp, bedeutung,
            storyline_id, manually_edited, sort_order
     FROM zeitstrahl_events
     WHERE book_id = ? AND user_email = ?
@@ -111,6 +111,7 @@ router.get('/zeitstrahl/:book_id', (req, res) => {
     datum_ende_month: r.datum_ende_month,
     datum_ende_day:   r.datum_ende_day,
     story_tag:        r.story_tag,
+    datum_unsicher:   !!r.datum_unsicher,
     ereignis:         r.ereignis,
     typ:              r.typ || 'persoenlich',
     subtyp:           r.subtyp || 'sonstiges',

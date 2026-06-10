@@ -999,7 +999,7 @@ async function runZeitstrahl(ctx, opts = {}) {
            fe.datum, fe.datum_label,
            fe.datum_year, fe.datum_month, fe.datum_day,
            fe.datum_ende_year, fe.datum_ende_month, fe.datum_ende_day,
-           fe.story_tag, fe.subtyp,
+           fe.story_tag, fe.datum_unsicher, fe.subtyp,
            fe.ereignis, fe.typ AS evt_typ, fe.bedeutung,
            c.chapter_name AS kapitel, p.page_name AS seite
     FROM figure_events fe
@@ -1030,6 +1030,7 @@ async function runZeitstrahl(ctx, opts = {}) {
         datum_ende_month: row.datum_ende_month,
         datum_ende_day:   row.datum_ende_day,
         story_tag:        row.story_tag,
+        datum_unsicher:   row.datum_unsicher ? true : false,
         subtyp:           row.subtyp || 'sonstiges',
         ereignis: row.ereignis, typ: row.evt_typ,
         bedeutung: row.bedeutung || '',
@@ -1039,6 +1040,9 @@ async function runZeitstrahl(ctx, opts = {}) {
       });
     }
     const ev = evtGroupMap.get(key);
+    // Sicheres Datum gewinnt: ist eine der zusammengeführten Figuren-Zeilen
+    // explizit belegt (datum_unsicher=0), gilt das Gruppen-Event als sicher.
+    if (!row.datum_unsicher) ev.datum_unsicher = false;
     if (!ev.figuren.some(f => f.id === row.fig_id))
       ev.figuren.push({ id: row.fig_id, name: row.fig_name, typ: row.fig_typ || 'andere' });
     if (row.kapitel && !ev.kapitel.includes(row.kapitel)) ev.kapitel.push(row.kapitel);

@@ -228,6 +228,7 @@ export const _ASSIGNMENTS_SCHEMA_BLOCK = `"assignments": [
           "datum_ende_month": null,
           "datum_ende_day":   null,
           "story_tag":   null,         // Relative Story-Zeit
+          "datum_unsicher": false,     // true NUR wenn datum_year aus dem Kontext abgeleitet (nicht explizit belegt) wurde
           "subtyp":      "sonstiges",  // geburt|tod|hochzeit|liebe|trennung|krankheit|reise|umzug|konflikt|wendepunkt|entdeckung|verlust|sieg|extern_politisch|extern_wirtschaftlich|extern_natur|extern_kulturell|extern_krieg|sonstiges
           "ereignis": "Was passierte – neutral formuliert. Gleiches Ereignis bei allen beteiligten Figuren identisch.",
           "typ": "persoenlich|extern",
@@ -242,7 +243,9 @@ export const _ASSIGNMENTS_SCHEMA_BLOCK = `"assignments": [
 export const _EREIGNIS_RULES = `Ereignis-Regeln:
 - VOLLSTÄNDIGKEIT vor Kürze: Gehe jede Figur einzeln durch und erfasse ALLE im Text belegten Ereignisse – kein Cap. Neben den grossen biografischen Wendepunkten (Geburt, Tod, Trauma, neue/beendete Beziehung, Jobwechsel, Umzug, wichtige Entscheidung) auch kleinere, aber belegte Vorfälle (erste Begegnung, Streit/Versöhnung, Reise-Etappe, Erkrankung/Genesung, Erfolg/Niederlage, prägende Beobachtung). Ziel ist die möglichst lückenlose Biografie jeder Figur. Im Zweifel aufnehmen statt weglassen – solange im Text belegt.
 - typ='persoenlich' = biografische Ereignisse der Figur; typ='extern' = gesellschaftliche/historische Ereignisse (Kriege, Politik, Wirtschaft, Kultur, Natur) – diese SEHR GROSSZÜGIG erfassen und ALLEN betroffenen Figuren zuweisen.
-- datum_label = Original-String; datum_year/month/day strukturiert zerlegen (null wenn unbekannt). Events ohne Datums-Information trotzdem aufnehmen (alles null) – sie landen im «unbekannt»-Bucket, dürfen aber NICHT entfallen.
+- datum_label = Original-String; datum_year/month/day strukturiert zerlegen (null wenn unbekannt).
+- JAHRES-INFERENZ (wichtig): Steht am Ereignis kein explizites Datum, das Jahr ist aber aus dem Kontext erschliessbar – z.B. aus einer vorher im Kapitel/Buch verankerten Jahreszahl plus relativen Angaben («zwei Jahre später», «im Frühjahr darauf», «als sie 30 war»), aus der Lebensspanne der Figur oder aus der etablierten Epoche/dem Setting – dann das abgeleitete Jahr (notfalls nur das Jahrzehnt, dann z.B. 1850) trotzdem in datum_year eintragen und datum_unsicher=true setzen. Sei dabei GROSSZÜGIG: lieber ein plausibel abgeleitetes Jahr (als unsicher markiert) als gar keins. Monat/Tag nur füllen, wenn ebenfalls ableitbar.
+- datum_unsicher=false NUR für explizit im Text belegte Datumsangaben. Ist auch das Jahr nicht erschliessbar, bleibt alles null (Event landet im «unbekannt»-Bucket, darf aber NICHT entfallen).
 - Spannen (Krieg, Reise, Studium, Schwangerschaft): Start in datum_*, Ende in datum_ende_*.
 - ereignis: neutral und kanonisch formuliert (NICHT aus der Figurenperspektive). Ein Ereignis, das mehrere Figuren betrifft, bei ALLEN beteiligten Figuren WORTGLEICH formulieren (z.B. 'Geburt von Maria' für Vater, Mutter und Kind) – sonst scheitert die spätere Zusammenführung.
 - subtyp aus Whitelist; persoenlich → geburt|tod|hochzeit|liebe|trennung|krankheit|reise|umzug|konflikt|wendepunkt|entdeckung|verlust|sieg|sonstiges; extern → extern_politisch|extern_wirtschaftlich|extern_natur|extern_kulturell|extern_krieg|sonstiges. liebe=Beginn einer Liebesbeziehung; trennung=Scheidung/Trennung; krankheit=Erkrankung/Verletzung; umzug=dauerhafter Wohnortwechsel (NICHT reise=temporär); extern_wirtschaftlich=Wirtschaftskrise/Crash/Inflation; extern_krieg=Krieg/Schlacht/militärischer Konflikt.

@@ -85,7 +85,7 @@
         <div class="gz-marker" :class="ev.typ === 'extern' ? 'gz-marker--extern' : ''"></div>
         <div class="gz-content">
           <div class="gz-datum-row">
-            <span class="gz-datum" x-text="formatEventDate(ev)"></span>
+            <span class="gz-datum" :class="ev.datum_unsicher && ev.datum_year != null ? 'gz-datum--unsicher' : ''" :title="ev.datum_unsicher && ev.datum_year != null ? $app.t('events.estimatedHint') : null" x-text="formatEventDate(ev)"></span>
             <span class="gz-subtyp-badge"
                   :class="'gz-subtyp-badge--' + (ev.subtyp || 'sonstiges')">
               <svg class="icon gz-subtyp-icon" aria-hidden="true"><use :href="'/icons.svg?v=690#' + subtypIcon(ev.subtyp || 'sonstiges')"/></svg>

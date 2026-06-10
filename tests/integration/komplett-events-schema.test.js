@@ -65,11 +65,12 @@ function eventsPassResponse() {
           typ: 'persoenlich',
           kapitel: 'Kapitel Eins', seite: 'Seite Eins',
         },
-        // 2) Spannen-Event (datum_ende_year gesetzt)
+        // 2) Spannen-Event (datum_ende_year gesetzt) + aus Kontext abgeleitetes Jahr
         {
           datum: '1851–1853',
           datum_label: '1851–1853',
           datum_year: 1851, datum_ende_year: 1853,
+          datum_unsicher: true,
           subtyp: 'reise',
           ereignis: 'Reise durch Europa',
           bedeutung: '',
@@ -85,9 +86,11 @@ function eventsPassResponse() {
           typ: 'persoenlich',
           kapitel: 'Kapitel Eins',
         },
-        // 4) Unknown-Date-Event: kein Year, kein parsebares Label → unbekannt-Bucket
+        // 4) Unknown-Date-Event: kein Year, kein parsebares Label → unbekannt-Bucket.
+        //    datum_unsicher=true ist hier bedeutungslos (kein Jahr) → muss auf 0 fallen.
         {
           datum_label: 'vor der Reise',
+          datum_unsicher: true,
           subtyp: 'sonstiges',
           ereignis: 'unbekannter Vorfall',
           typ: 'persoenlich',
@@ -178,7 +181,7 @@ test('Komplettanalyse: AI-Events landen mit strukturierten Feldern + Subtyp in f
            fe.datum_label,
            fe.datum_year, fe.datum_month, fe.datum_day,
            fe.datum_ende_year, fe.datum_ende_month, fe.datum_ende_day,
-           fe.story_tag, fe.manually_edited
+           fe.story_tag, fe.datum_unsicher, fe.manually_edited
     FROM figure_events fe
     JOIN figures f ON f.id = fe.figure_id
     WHERE f.book_id = ? AND f.user_email = ?
@@ -199,6 +202,7 @@ test('Komplettanalyse: AI-Events landen mit strukturierten Feldern + Subtyp in f
   assert.equal(ev1.datum_month, 5);
   assert.equal(ev1.datum_day, 12);
   assert.equal(ev1.datum_ende_year, null);
+  assert.equal(ev1.datum_unsicher, 0, 'explizit belegtes Datum ist nicht unsicher');
   assert.equal(ev1.manually_edited, 0, 'frisch importierte Events sind nicht manuell editiert');
 
   // 2) Spannen-Event
@@ -207,6 +211,7 @@ test('Komplettanalyse: AI-Events landen mit strukturierten Feldern + Subtyp in f
   assert.equal(ev2.subtyp, 'reise');
   assert.equal(ev2.datum_year, 1851);
   assert.equal(ev2.datum_ende_year, 1853, 'Spannen-Ende muss durchgereicht werden');
+  assert.equal(ev2.datum_unsicher, 1, 'aus Kontext abgeleitetes Jahr ist als unsicher markiert');
 
   // 3) Label-only-Event: Parser muss Year aus Label ziehen
   const ev3 = byName['Tod der Mutter'];
@@ -222,6 +227,7 @@ test('Komplettanalyse: AI-Events landen mit strukturierten Feldern + Subtyp in f
   assert.equal(ev4.datum_month, null);
   assert.equal(ev4.datum_day, null);
   assert.equal(ev4.story_tag, null);
+  assert.equal(ev4.datum_unsicher, 0, 'ohne Jahr ist "unsicher" bedeutungslos → 0');
   assert.equal(ev4.datum_label, 'vor der Reise', 'Original-Label bleibt für Anzeige erhalten');
 
   // 5) Invalid-Subtyp → Whitelist-Default 'sonstiges'

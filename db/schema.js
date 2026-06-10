@@ -55,6 +55,8 @@ function _structuredDatum(ev) {
     datum_ende_month:  ev.datum_ende_month  ?? null,
     datum_ende_day:    ev.datum_ende_day    ?? null,
     story_tag:         ev.story_tag         ?? p.story_tag ?? null,
+    // Nur sinnvoll, wenn ein Jahr vorliegt; ohne datum_year ist "unsicher" bedeutungslos.
+    datum_unsicher:    (ev.datum_unsicher && (ev.datum_year ?? p.year) != null) ? 1 : 0,
     subtyp:            SUBTYP_WL.has(ev.subtyp) ? ev.subtyp : 'sonstiges',
   };
 }
@@ -149,8 +151,8 @@ function saveZeitstrahlEvents(bookId, userEmail, ereignisse, chNameToId = {}, pa
       (book_id, user_email, datum, datum_label,
        datum_year, datum_month, datum_day,
        datum_ende_year, datum_ende_month, datum_ende_day,
-       story_tag, ereignis, typ, subtyp, bedeutung, sort_order, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+       story_tag, datum_unsicher, ereignis, typ, subtyp, bedeutung, sort_order, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     const insZec = db.prepare('INSERT INTO zeitstrahl_event_chapters (event_id, chapter_id, sort_order) VALUES (?, ?, ?)');
     const insZep = db.prepare('INSERT INTO zeitstrahl_event_pages    (event_id, page_id, sort_order)    VALUES (?, ?, ?)');
     const insZef = db.prepare('INSERT INTO zeitstrahl_event_figures  (event_id, figure_id, figur_name, sort_order) VALUES (?, ?, ?, ?)');
@@ -173,7 +175,7 @@ function saveZeitstrahlEvents(bookId, userEmail, ereignisse, chNameToId = {}, pa
         ev.datum || sd.datum_label || '', sd.datum_label,
         sd.datum_year, sd.datum_month, sd.datum_day,
         sd.datum_ende_year, sd.datum_ende_month, sd.datum_ende_day,
-        sd.story_tag,
+        sd.story_tag, sd.datum_unsicher,
         ev.ereignis || '', ev.typ || 'persoenlich', sd.subtyp, ev.bedeutung || null,
         i, now
       );

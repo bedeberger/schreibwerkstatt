@@ -119,8 +119,11 @@ function _formatEventDate(ev, t) {
   };
   const start = yPart(ev.datum_year, ev.datum_month, ev.datum_day);
   const ende  = yPart(ev.datum_ende_year, ev.datum_ende_month, ev.datum_ende_day);
-  if (ende && start) return t('events.span', { start, ende });
-  if (start) return start;
+  // Aus dem Kontext abgeleitetes (unsicheres) Datum → «ca.»-Prefix; nur relevant
+  // wenn ein Jahr vorliegt (Story-Tags/Labels bleiben unverändert).
+  const circa = (d) => ev.datum_unsicher ? t('events.circa', { date: d }) : d;
+  if (ende && start) return circa(t('events.span', { start, ende }));
+  if (start) return circa(start);
   if (ev.story_tag != null) return String(ev.story_tag);
   if (ev.datum_label) return ev.datum_label;
   return t('events.unknownDate');

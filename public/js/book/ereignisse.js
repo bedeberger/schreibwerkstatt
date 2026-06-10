@@ -40,6 +40,7 @@ export const ereignisseMethods = {
           datum_ende_month: ev.datum_ende_month ?? null,
           datum_ende_day:   ev.datum_ende_day   ?? null,
           story_tag:    ev.story_tag    ?? null,
+          datum_unsicher: ev.datum_unsicher ?? false,
           ereignis: ev.ereignis || '',
           typ:      ev.typ || 'persoenlich',
           subtyp:   ev.subtyp || 'sonstiges',

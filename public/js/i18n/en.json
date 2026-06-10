@@ -1459,6 +1459,8 @@
   "events.worldEvent":           "World event",
   "events.unknownDate":          "no date",
   "events.span":                 "{start} – {ende}",
+  "events.circa":                "approx. {date}",
+  "events.estimatedHint":        "Year inferred from context (not explicitly stated in the text)",
   "events.filter.subtyp":        "Subtype",
   "events.filter.allSubtypes":   "All subtypes",
   "events.subtyp.geburt":            "Birth",

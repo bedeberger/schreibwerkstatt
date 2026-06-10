@@ -7375,6 +7375,29 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 181 abgeschlossen (locations.geo_query + locations.geo_land).');
   }
 
+  if (version < 182) {
+    // datum_unsicher pro Event: markiert ein datum_year, das die KI aus dem
+    // Kontext abgeleitet hat (relative Zeitangabe, Lebensspanne, Epoche) statt
+    // es explizit im Text belegt zu finden. 0 = explizit belegt (oder kein Jahr),
+    // 1 = abgeleitet/geschätzt. Frontend rendert abgeleitete Jahre mit «ca.»-
+    // Prefix. Additiv (ADD COLUMN, kein FK-Recreate).
+    const feCols182 = db.pragma('table_info(figure_events)').map(c => c.name);
+    if (!feCols182.includes('datum_unsicher')) {
+      db.exec('ALTER TABLE figure_events ADD COLUMN datum_unsicher INTEGER NOT NULL DEFAULT 0');
+    }
+    const zeCols182 = db.pragma('table_info(zeitstrahl_events)').map(c => c.name);
+    if (!zeCols182.includes('datum_unsicher')) {
+      db.exec('ALTER TABLE zeitstrahl_events ADD COLUMN datum_unsicher INTEGER NOT NULL DEFAULT 0');
+    }
+
+    const fkErrors182 = db.pragma('foreign_key_check');
+    if (fkErrors182.length) {
+      throw new Error(`Migration 182: foreign_key_check meldet ${fkErrors182.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 182').run();
+    logger.info('DB-Migration auf Version 182 abgeschlossen (figure_events.datum_unsicher + zeitstrahl_events.datum_unsicher).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {
