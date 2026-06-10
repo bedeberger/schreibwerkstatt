@@ -32,6 +32,25 @@
       </label>
     </div>
 
+    <div class="folder-import-field" x-show="importKind === 'diary'">
+      <label class="folder-import-label" x-text="$app.t('folderImport.grouping.label')"></label>
+      <div class="folder-import-mode">
+        <label class="folder-import-radio">
+          <input type="radio" value="year-month" x-model="grouping">
+          <span x-text="$app.t('folderImport.grouping.yearMonth')"></span>
+        </label>
+        <label class="folder-import-radio">
+          <input type="radio" value="year" x-model="grouping">
+          <span x-text="$app.t('folderImport.grouping.year')"></span>
+        </label>
+        <label class="folder-import-radio">
+          <input type="radio" value="flat" x-model="grouping">
+          <span x-text="$app.t('folderImport.grouping.flat')"></span>
+        </label>
+      </div>
+      <div class="folder-import-label" x-text="$app.t('folderImport.grouping.hint.' + grouping)"></div>
+    </div>
+
     <div class="folder-import-field" x-show="importKind === 'diary' && mode === 'new-book'">
       <label class="folder-import-label" x-text="$app.t('folderImport.bookName')"></label>
       <input type="text" class="folder-import-input" x-model="bookName"

@@ -70,11 +70,14 @@ function buildAuthorChatHelpers(ctx) {
     return out;
   };
 
-  const pushQA = (id, q, a) => {
+  // `sourceKey` optional: nur dort setzen, wo die Antwort wörtlichen Buchtext
+  // reproduziert (z.B. Figur-Passagen), damit der Train/Val-Split auf
+  // Quell-Ebene greift. Fakten-/Q&A-Antworten lassen ihn weg → Split per id.
+  const pushQA = (id, q, a, sourceKey) => {
     const qq = (q || '').trim();
     const aa = (a || '').trim();
     if (qq.length < 4 || aa.length < 20) return;
-    samples.push({
+    const sample = {
       id,
       type: 'authorChat',
       messages: [
@@ -82,7 +85,9 @@ function buildAuthorChatHelpers(ctx) {
         { role: 'user',   content: qq },
         { role: 'assistant', content: aa },
       ],
-    });
+    };
+    if (sourceKey) sample.sourceKey = sourceKey;
+    samples.push(sample);
     counts.authorChat++;
   };
 

@@ -556,3 +556,84 @@ test('folder-import: zwei Files gleicher Tag ohne Thema → HTML gemerged in ein
   assert.match(page.html, /\bB\b/);
   assert.match(page.html, /day-merge/);
 });
+
+test('folder-import (grouping=year): nur Jahr-Kapitel, keine Monats-Subs', async () => {
+  const userEmail = 'tester@test.dev';
+  const book = await contentStore.createBook(
+    { name: 'GroupYear', owner_email: userEmail },
+    { session: { user: { email: userEmail } } },
+  );
+  const { db } = require('../../db/connection');
+  db.prepare(`INSERT OR IGNORE INTO book_access (book_id, user_email, role, granted_at) VALUES (?, ?, 'owner', datetime('now'))`).run(book.id, userEmail);
+
+  const buffer = await buildArchive([
+    ['2023/12/2023-12-31.docx', await makeDocx('Silvester.')],
+    ['2024/01/2024-01-01.odt',  await makeOdt('Neujahr.')],
+    ['2024/03/2024-03-05.docx', await makeDocx('Maerz.')],
+  ]);
+
+  const jobId = ctx.shared.createJob(
+    'folder-import', book.id, userEmail,
+    'job.label.folderImport', { name: 'GroupYear' },
+    'merge:' + book.id + ':group-year',
+  );
+  folderImport.importBuffers.set(jobId, { buffer, mode: 'merge', bookName: '', bookId: book.id });
+
+  await folderImport.runFolderImportJob(jobId, {
+    userEmail, mode: 'merge', bookName: '', bookId: book.id, grouping: 'year',
+  });
+
+  const job = ctx.shared.jobs.get(jobId);
+  assert.equal(job.status, 'done', `Job-Status: ${job.status}, err: ${job.error || '-'}`);
+  assert.equal(job.result.pagesCreated, 3);
+  assert.equal(job.result.yearChaptersCreated, 2);
+  assert.equal(job.result.monthSubChaptersCreated, 0);
+
+  const chapters = await contentStore.listChapters(book.id, { session: { user: { email: userEmail } } });
+  assert.equal(chapters.filter(c => c.parent_chapter_id).length, 0, 'keine Sub-Chapter erwartet');
+  const yearByName = new Map(chapters.map(c => [c.name, c.id]));
+
+  // Alle Seiten haengen direkt am jeweiligen Year-Chapter
+  const pages = await contentStore.listPages(book.id, { session: { user: { email: userEmail } } });
+  for (const p of pages) {
+    assert.equal(p.chapter_id, yearByName.get(p.name.slice(0, 4)), `Page ${p.name} sollte am Year-Chapter haengen`);
+  }
+});
+
+test('folder-import (grouping=flat): keine Kapitel, Seiten direkt am Buch', async () => {
+  const userEmail = 'tester@test.dev';
+  const book = await contentStore.createBook(
+    { name: 'GroupFlat', owner_email: userEmail },
+    { session: { user: { email: userEmail } } },
+  );
+  const { db } = require('../../db/connection');
+  db.prepare(`INSERT OR IGNORE INTO book_access (book_id, user_email, role, granted_at) VALUES (?, ?, 'owner', datetime('now'))`).run(book.id, userEmail);
+
+  const buffer = await buildArchive([
+    ['2023/12/2023-12-31.docx', await makeDocx('Silvester.')],
+    ['2024/01/2024-01-01.odt',  await makeOdt('Neujahr.')],
+  ]);
+
+  const jobId = ctx.shared.createJob(
+    'folder-import', book.id, userEmail,
+    'job.label.folderImport', { name: 'GroupFlat' },
+    'merge:' + book.id + ':group-flat',
+  );
+  folderImport.importBuffers.set(jobId, { buffer, mode: 'merge', bookName: '', bookId: book.id });
+
+  await folderImport.runFolderImportJob(jobId, {
+    userEmail, mode: 'merge', bookName: '', bookId: book.id, grouping: 'flat',
+  });
+
+  const job = ctx.shared.jobs.get(jobId);
+  assert.equal(job.status, 'done', `Job-Status: ${job.status}, err: ${job.error || '-'}`);
+  assert.equal(job.result.pagesCreated, 2);
+  assert.equal(job.result.chaptersCreated, 0);
+
+  const chapters = await contentStore.listChapters(book.id, { session: { user: { email: userEmail } } });
+  assert.equal(chapters.length, 0, 'keine Kapitel erwartet');
+
+  const pages = await contentStore.listPages(book.id, { session: { user: { email: userEmail } } });
+  assert.equal(pages.length, 2);
+  for (const p of pages) assert.ok(!p.chapter_id, `Page ${p.name} sollte kapitellos sein`);
+});

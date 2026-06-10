@@ -11,7 +11,10 @@ import { loadLeaflet } from '../lazy-libs.js';
 import { countryLabel } from '../country-codes.js';
 import { startPoll } from '../cards/job-helpers.js';
 
-const OSM_TILES = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+// Fallback-Tile-URL, falls /config noch nicht geladen ist (window.__app.mapTiles
+// liefert die konfigurierte URL — self-hosted Tile-Server via app_settings
+// geocode.tiles.url).
+const OSM_TILES_DEFAULT = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 
 export const orteMapMethods = {
   // Liest orte_real + Sprache aus den Buch-Einstellungen. Schaltet bei
@@ -53,9 +56,10 @@ export const orteMapMethods = {
       // feuert dann ihr zoomanim-rAF auf Marker, deren Map-Panes schon weg sind
       // (_animateZoom liest null) → Crash. Instant-Zoom umgeht den Pfad ganz.
       this._map = L.map(el, { scrollWheelZoom: true, zoomAnimation: false }).setView([20, 0], 2);
-      L.tileLayer(OSM_TILES, {
+      const tiles = window.__app.mapTiles || {};
+      L.tileLayer(tiles.url || OSM_TILES_DEFAULT, {
         maxZoom: 19,
-        attribution: window.__app.t('orte.map.attribution'),
+        attribution: tiles.attribution || window.__app.t('orte.map.attribution'),
       }).addTo(this._map);
       this._markers = L.layerGroup().addTo(this._map);
     }

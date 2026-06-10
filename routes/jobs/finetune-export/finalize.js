@@ -1,17 +1,23 @@
 'use strict';
 
+const crypto = require('crypto');
 const { estimateTokens, renderMistralChat, percentile, recommendSeqLen } = require('./lib/tokens');
 const { hashSplit } = require('./lib/names');
 const { splitAtSentence } = require('./lib/text');
 const { storeFinetuneResult } = require('./lib/store');
 
-// Token-Stats berechnen, optional nach `maxSeqTokens` filtern, train/val
-// per `hashSplit` aufteilen, JSONL serialisieren und im Result-Store ablegen.
+const sha1 = (s) => crypto.createHash('sha1').update(s).digest('hex');
+
+// Token-Stats berechnen, optional nach `maxSeqTokens` filtern, exakte Dubletten
+// entfernen, optional pro Sample-Typ deckeln, train/val auf Quell-Ebene
+// (`sourceKey`) aufteilen, deterministisch shuffeln, JSONL serialisieren und im
+// Result-Store ablegen.
 //
 // Gibt `stats`-Objekt zurück, das in completeJob gepackt wird.
 function finalizeFinetuneSamples(jobId, ctx) {
   const { samples, opts, langIsEn, counts, bookName } = ctx;
   const { valSplit, valSeed, maxSeqTokens, emitText, truncateLong } = opts;
+  const maxTypeShare = Math.max(0, Math.min(0.95, Number(opts.maxTypeShare) || 0));
 
   // ── Token-Budget pro Sample (für Stats + Filter) ──────────────────────
   // Pro Sample: Summe aller Nachrichten + fester Template-Overhead. Mistral-
@@ -67,6 +73,48 @@ function finalizeFinetuneSamples(jobId, ctx) {
     kept = withTokens;
   }
 
+  // ── Exakt-Dedup (identische messages) ─────────────────────────────────
+  // Kurze Seiten/Kapitel erzeugen über mehrere Sampler bit-identische Samples
+  // (z.B. ein 1-Seiten-Kapitel: page-Sample == chapter-Sample). Verschiedene
+  // Framings (scene vs. verbatim) bleiben erhalten — nur exakte Dubletten
+  // fallen raus. Erstes Vorkommen gewinnt.
+  let dedupedCount = 0;
+  {
+    const seenMsg = new Set();
+    const out = [];
+    for (const e of kept) {
+      const key = sha1(JSON.stringify(e.s.messages));
+      if (seenMsg.has(key)) { dedupedCount++; continue; }
+      seenMsg.add(key);
+      out.push(e);
+    }
+    kept = out;
+  }
+
+  // ── Typ-Balance-Cap (optional, `maxTypeShare`) ────────────────────────
+  // Verhindert, dass die volumenstarken Text-Sampler (style/scene/verbatim)
+  // das Welt-/Figurenwissen (authorChat/aiAugment) erschlagen. Pro Typ wird
+  // auf `maxTypeShare × Gesamt` gedeckelt; die Auswahl ist deterministisch
+  // (Hash über die Sample-id), also bei gleichem Seed reproduzierbar.
+  let balancedCount = 0;
+  if (maxTypeShare > 0 && maxTypeShare < 1 && kept.length) {
+    const cap = Math.max(1, Math.floor(kept.length * maxTypeShare));
+    const byType = new Map();
+    for (const e of kept) {
+      if (!byType.has(e.s.type)) byType.set(e.s.type, []);
+      byType.get(e.s.type).push(e);
+    }
+    const keepSet = new Set();
+    for (const [, arr] of byType) {
+      if (arr.length <= cap) { for (const e of arr) keepSet.add(e); continue; }
+      const ranked = [...arr].sort(
+        (a, b) => hashSplit('bal|' + a.s.id, valSeed) - hashSplit('bal|' + b.s.id, valSeed));
+      for (let i = 0; i < cap; i++) keepSet.add(ranked[i]);
+      balancedCount += arr.length - cap;
+    }
+    kept = kept.filter(e => keepSet.has(e));
+  }
+
   // ── Token-Histogramm (p50/p95/max) ────────────────────────────────────
   const tokenCounts = kept.map(e => e.tokens).sort((a, b) => a - b);
   const tokensP50 = percentile(tokenCounts, 0.50);
@@ -74,12 +122,34 @@ function finalizeFinetuneSamples(jobId, ctx) {
   const tokensMax = tokenCounts.length ? tokenCounts[tokenCounts.length - 1] : 0;
   const recommendedSeqLen = recommendSeqLen(tokensP95);
 
+  // ── Train/Val-Split auf Quell-Ebene ──────────────────────────────────
+  // Gehasht wird `sourceKey` (Kapitel-Schlüssel der trainierten Completion),
+  // nicht die Sample-id. So landen ALLE Ableitungen eines Kapitels (style,
+  // scene, verbatim, dialog …) im selben Split → val ist ein echtes Holdout
+  // und der Eval-Loss misst Generalisierung statt Memorisierung von
+  // Trainingstext. Samples ohne `sourceKey` (Fakten-Q&A, Korrekturen) splitten
+  // weiter per id — sie reproduzieren keinen zusammenhängenden Buchtext.
   const trainArr = [];
   const valArr = [];
   for (const { s } of kept) {
-    if (valSplit > 0 && hashSplit(s.id, valSeed) < valSplit) valArr.push(s);
+    const splitKey = s.sourceKey || s.id;
+    if (valSplit > 0 && hashSplit(splitKey, valSeed) < valSplit) valArr.push(s);
     else trainArr.push(s);
   }
+
+  // Deterministisches Shuffle pro Split, damit Tools ohne eigenes Shuffle
+  // (oder Streaming-Loader) keine Sampler-Block-Reihenfolge sehen. Seed-stabil.
+  const shuffle = (arr) => arr
+    .map(s => [hashSplit('shuf|' + s.id, valSeed), s])
+    .sort((a, b) => a[0] - b[0])
+    .map(([, s]) => s);
+  const trainOut = shuffle(trainArr);
+  const valOut = shuffle(valArr);
+
+  // Per-Typ-Zählung aus dem FINALEN kept (nach Filter/Dedup/Balance) — das
+  // spiegelt, was tatsächlich exportiert wird, nicht die Build-Rohzahlen.
+  const exported = { style: 0, scene: 0, verbatim: 0, dialog: 0, authorChat: 0, correction: 0, aiAugment: 0 };
+  for (const { s } of kept) if (s.type in exported) exported[s.type]++;
 
   // JSONL-Line: immer `messages`-Feld. Mit `emitText=true` zusätzlich ein
   // vorgerendertes `text`-Feld (Mistral-Tekken-V7-Template, Mistral-Small-3.2-
@@ -95,26 +165,29 @@ function finalizeFinetuneSamples(jobId, ctx) {
     ? arr.map(serialize).join('\n') + '\n'
     : '';
 
-  const trainJsonl = toJsonl(trainArr);
-  const valJsonl   = toJsonl(valArr);
+  const trainJsonl = toJsonl(trainOut);
+  const valJsonl   = toJsonl(valOut);
   const stats = {
     total: kept.length,
     dropped: droppedCount,
     capped: cappedCount,
-    train: trainArr.length,
-    val: valArr.length,
-    styleCount: counts.style,
-    sceneCount: counts.scene,
-    verbatimCount: counts.verbatim || 0,
-    dialogCount: counts.dialog,
-    authorChatCount: counts.authorChat,
-    correctionCount: counts.correction,
-    aiAugmentCount: counts.aiAugment || 0,
+    deduped: dedupedCount,
+    balanced: balancedCount,
+    train: trainOut.length,
+    val: valOut.length,
+    styleCount: exported.style,
+    sceneCount: exported.scene,
+    verbatimCount: exported.verbatim,
+    dialogCount: exported.dialog,
+    authorChatCount: exported.authorChat,
+    correctionCount: exported.correction,
+    aiAugmentCount: exported.aiAugment,
     trainBytes: Buffer.byteLength(trainJsonl, 'utf8'),
     valBytes:   Buffer.byteLength(valJsonl,   'utf8'),
     tokensP50, tokensP95, tokensMax,
     recommendedSeqLen,
     maxSeqTokens: maxSeqTokens || null,
+    maxTypeShare: maxTypeShare || null,
     emitText,
   };
 

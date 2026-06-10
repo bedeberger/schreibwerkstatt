@@ -1,12 +1,20 @@
 # Folder-Import
 
-Importiert Tagebuch-Archive mit Struktur `<YYYY>/<Monat>/<Tagesdatei>` aus ZIP. Erzeugt **ein Top-Level-Kapitel pro Jahr**, **ein Sub-Kapitel pro Monat** (parent_chapter_id zeigt aufs Jahr-Kapitel; Sub-Name-Format `YYYY Monatsname` z.B. `2020 November`), **eine Seite pro Tagesdatei** unterhalb des Monat-Sub-Kapitels (Page-Name = ISO-Datum `YYYY-MM-DD`). Modi: `new-book` (Buch anlegen) oder `merge` (in bestehendes Buch importieren).
+Importiert Tagebuch-Archive mit Struktur `<YYYY>/<Monat>/<Tagesdatei>` aus ZIP. Erzeugt **ein Top-Level-Kapitel pro Jahr**, **ein Sub-Kapitel pro Monat** (parent_chapter_id zeigt aufs Jahr-Kapitel; Sub-Name-Format `YYYY Monatsname` z.B. `2020 November` — Monatsname aus der Buch-Locale via `getBookLocale`, DE/EN), **eine Seite pro Tagesdatei** unterhalb des Monat-Sub-Kapitels (Page-Name = ISO-Datum `YYYY-MM-DD`). Modi: `new-book` (Buch anlegen) oder `merge` (in bestehendes Buch importieren).
 
 Bei `year-only`-Fallback (kein Monat ableitbar) hängt die Seite direkt am Year-Chapter, ohne Month-Sub.
 
+**Kapitel-Gruppierung (Query-Param `grouping`, pro Import in der Karte wählbar):**
+
+- `year-month` (Default) — Jahr-Kapitel → Monats-Sub-Kapitel → Seite pro Tag (oben beschrieben).
+- `year` — nur Jahr-Top-Level-Kapitel, alle Tage hängen direkt darunter (keine Monats-Subs).
+- `flat` — keine Kapitel; alle Seiten hängen kapitellos direkt am Buch (`chapter_id = null`), chronologisch sortiert. Im `merge`-Modus wird das Einlesen bestehender Kapitel übersprungen.
+
+Unbekannte Werte fallen serverseitig auf `year-month` zurück (`GROUPINGS`-Set in [routes/jobs/folder-import.js](../routes/jobs/folder-import.js)).
+
 ## Architektur
 
-- **Route:** `POST /jobs/folder-import` ([routes/jobs/folder-import.js](../routes/jobs/folder-import.js)). Body = raw ZIP (`application/zip`, Limit 200 MB). Query: `mode`, `book_name` (new-book) / `book_id` (merge).
+- **Route:** `POST /jobs/folder-import` ([routes/jobs/folder-import.js](../routes/jobs/folder-import.js)). Body = raw ZIP (`application/zip`, Limit 200 MB). Query: `mode`, `book_name` (new-book) / `book_id` (merge), `grouping` (`year-month` | `year` | `flat`, Default `year-month`).
 - **Buffer-Map:** ZIP landet in modulinterner `importBuffers`-Map (TTL 30 min), Worker konsumiert + cleart in `finally`.
 - **Worker:** `runFolderImportJob` ist Job-Queue-konform (Pflicht: KI-Calls nur via Queue). Phasen via `updateJob({ statusText, statusParams })` als i18n-Keys (`job.folder-import.*`).
 - **Parser:** [lib/import-parsers/](../lib/import-parsers/)
@@ -86,7 +94,7 @@ Karte [public/js/cards/folder-import-card.js](../public/js/cards/folder-import-c
 | Reason | Bedeutung |
 |--------|-----------|
 | `BAD_PATH` | Pfad matched nicht `YYYY/Monat/Datei` |
-| `UNSUPPORTED_EXT` | Nicht `.docx` oder `.odt` |
+| `UNSUPPORTED_EXT` | Endung nicht in `SUPPORTED_EXTS` (`.docx`, `.doc`, `.odt`, `.abw`) |
 | `NO_DATE` | Weder Regel noch AI konnten Datum ableiten |
 | `FILE_TOO_LARGE` | > 10 MB pro Datei |
 | `PARSE_FAILED` | mammoth/odt-Parser warf |

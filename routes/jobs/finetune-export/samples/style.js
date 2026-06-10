@@ -26,6 +26,10 @@ function buildStyleSamples(ctx) {
 
   for (const p of pageContents) {
     const paragraphs = splitParagraphs(p.text);
+    // Split-Gruppe = Kapitel der Seite (siehe finalize.js: Train/Val-Split auf
+    // Quell-Ebene, damit Ableitungen derselben Seite/desselben Kapitels nicht
+    // über train und val lecken).
+    const pageCh = 'ch:' + (p.chapter_id ?? 0);
 
     // ── Intra-Absatz-Splits (Sliding-Windows) ─────────────────────────
     for (let pi = 0; pi < paragraphs.length; pi++) {
@@ -38,6 +42,7 @@ function buildStyleSamples(ctx) {
         samples.push({
           id: 'style|' + p.id + '|' + pi + '|r' + ri,
           type: 'style',
+          sourceKey: pageCh,
           messages: [
             { role: 'system', content: unifiedSys },
             { role: 'user', content: prefix + first },
@@ -68,6 +73,7 @@ function buildStyleSamples(ctx) {
       samples.push({
         id: 'styleCtx|' + p.id + '|' + i,
         type: 'style',
+        sourceKey: pageCh,
         messages: [
           { role: 'system', content: unifiedSys },
           { role: 'user', content: contextPrefix + ctxClipped },
@@ -93,6 +99,7 @@ function buildStyleSamples(ctx) {
       samples.push({
         id: 'styleSent|' + p.id + '|' + i,
         type: 'style',
+        sourceKey: pageCh,
         messages: [
           { role: 'system', content: unifiedSys },
           { role: 'user',   content: sentPrefix + prev },
@@ -129,6 +136,7 @@ function buildStyleSamples(ctx) {
     samples.push({
       id: 'chapTrans|' + kA + '|' + kB,
       type: 'style',
+      sourceKey: 'ch:' + kB, // Completion = Anfang Kapitel B
       messages: [
         { role: 'system', content: unifiedSys },
         { role: 'user',   content: prompt },
@@ -149,7 +157,7 @@ function buildStyleSamples(ctx) {
     if (!sceneByChapterKey.has(k)) sceneByChapterKey.set(k, []);
     sceneByChapterKey.get(k).push(s);
   }
-  for (const [, scenesInCh] of sceneByChapterKey) {
+  for (const [scnChKey, scenesInCh] of sceneByChapterKey) {
     for (let i = 0; i + 1 < scenesInCh.length; i++) {
       const sA = scenesInCh[i], sB = scenesInCh[i + 1];
       const txtA = pageTextById.get(sA.page_id) || '';
@@ -164,6 +172,7 @@ function buildStyleSamples(ctx) {
       samples.push({
         id: 'scnTrans|' + sA.id + '|' + sB.id,
         type: 'style',
+        sourceKey: 'ch:' + scnChKey,
         messages: [
           { role: 'system', content: unifiedSys },
           { role: 'user',   content: prompt },
@@ -199,6 +208,7 @@ function buildStyleSamples(ctx) {
       samples.push({
         id: 'chapWin|' + k + '|' + i,
         type: 'style',
+        sourceKey: 'ch:' + k,
         messages: [
           { role: 'system', content: unifiedSys },
           { role: 'user',   content: chapWinPrefix + ctxClipped },

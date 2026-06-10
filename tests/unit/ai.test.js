@@ -10,7 +10,7 @@ const assert = require('node:assert/strict');
 // Sub-Module, aber so bleibt das Setup identisch zum Prod-Boot.
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 
-const { parseJSON, _claudeAcceptsTemperature, _claudeUsesAdaptiveThinking } = require('../../lib/ai');
+const { parseJSON, _claudeAcceptsTemperature, _claudeUsesAdaptiveThinking, _claudeAcceptsEffort } = require('../../lib/ai');
 
 // Opus 4.7+ haben temperature/top_p/top_k entfernt → 400 bei Verwendung.
 // _callClaude muss temperature für diese Modelle weglassen, für ältere senden.
@@ -32,6 +32,18 @@ test('_claudeUsesAdaptiveThinking: nur Opus 4.7+ (gleiche Generationen wie tempe
   }
   for (const m of ['claude-sonnet-4-6', 'claude-opus-4-6', 'claude-opus-4-5', 'claude-opus-4-1', 'claude-haiku-4-5', '']) {
     assert.equal(_claudeUsesAdaptiveThinking(m), false, `${m} sollte kein thinking-Feld senden`);
+  }
+});
+
+// effort (output_config) ist auf Opus 4.5+ und Sonnet 4.6 verfügbar; Sonnet 4.5 /
+// Haiku 4.5 / leeres Modell lehnen ab (400). _claudeOutputConfigParams sendet effort
+// nur, wenn das Modell es akzeptiert (sonst stille Auslassung statt 400).
+test('_claudeAcceptsEffort: Opus 4.5+ und Sonnet 4.6 akzeptieren, Sonnet 4.5/Haiku/leer nicht', () => {
+  for (const m of ['claude-opus-4-5', 'claude-opus-4-6', 'claude-opus-4-7', 'claude-opus-4-8', 'claude-opus-4-8[1m]', 'claude-sonnet-4-6']) {
+    assert.equal(_claudeAcceptsEffort(m), true, `${m} sollte effort akzeptieren`);
+  }
+  for (const m of ['claude-sonnet-4-5', 'claude-haiku-4-5', 'claude-opus-4-1', '']) {
+    assert.equal(_claudeAcceptsEffort(m), false, `${m} sollte effort ablehnen`);
   }
 });
 

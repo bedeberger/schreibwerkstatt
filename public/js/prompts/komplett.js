@@ -23,13 +23,17 @@ export {
   buildSystemKomplettFigurenStamm,
   buildSystemKomplettOrteSzenen,
   buildSystemKomplettFakten,
+  buildSystemKomplettEvents,
   buildExtraktionKomplettChapterPrompt,
   buildExtraktionFigurenPassPrompt,
   buildExtraktionFigurenStammPrompt,
   buildExtraktionOrtePassPrompt,
   buildExtraktionFaktenPassPrompt,
+  buildExtraktionEventsPassPrompt,
   buildFigurenStammGapPrompt,
   buildOrteGapPrompt,
+  buildFaktenGapPrompt,
+  buildSzenenGapPrompt,
 } from './komplett/extraktion.js';
 
 export {
@@ -52,6 +56,7 @@ export {
   SCHEMA_KOMPLETT_FIGUREN_STAMM,
   SCHEMA_KOMPLETT_ORTE_PASS,
   SCHEMA_KOMPLETT_FAKTEN_PASS,
+  SCHEMA_KOMPLETT_EVENTS,
   SCHEMA_FIGUREN_KONSOL,
   SCHEMA_BEZIEHUNGEN,
   SCHEMA_ORTE_KONSOL,

@@ -11,6 +11,7 @@ export function registerFolderImportCard() {
   window.Alpine.data('folderImportCard', () => ({
     importKind: 'diary', // 'diary' = Tagebuch-ZIP (YYYY/Monat), 'swbook' = Buch-Migration
     mode: 'new-book',
+    grouping: 'year-month', // Kapitel-Gruppierung: 'year-month' | 'year' | 'flat'
     bookName: '',
     file: null,
     fileName: '',
@@ -125,6 +126,7 @@ export function registerFolderImportCard() {
       } else {
         const params = new URLSearchParams();
         params.set('mode', this.mode);
+        params.set('grouping', this.grouping);
         if (this.mode === 'new-book') params.set('book_name', this.bookName.trim());
         else params.set('book_id', String(window.__app.selectedBookId));
         url = '/jobs/folder-import?' + params.toString();

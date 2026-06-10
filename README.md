@@ -5,11 +5,14 @@ Schreiben, Lektorat und Buchanalyse mit KI. Eigenständiger Node.js-Service, Mul
 ## Features
 
 ### Schreiben & Editor
-- **Bearbeitungsmodus** – Seiten direkt bearbeiten. Auto-Save alle 30 s, lokaler Draft (localStorage), Offline-Modus mit Retry, Konflikterkennung gegen Server-Version.
+- **Bearbeitungsmodus** (Notebook-Editor) – Seiten direkt bearbeiten. Auto-Save (Idle 60 s / Max 120 s), lokaler Draft (localStorage), Offline-Modus mit Retry, Block-Level-Merge bei parallelen Edits mit Konflikt-Auflösung.
 - **Fokusmodus** (Cmd/Ctrl+Shift+E) – Vollbild, Typewriter-Scroll, Absatz-Hervorhebung. Auto-Save, Schreibzeit-Tracking, Live-Zeichen-/Wortzähler, Mobile-/IME-Support.
 - **Bucheditor** – Ganzes Buch als scrollbarer Stream mit Kapitel-Trennern und Outline. Inline-Edit pro Seite, Save-All sequenziell. Buchweite Suche & Ersetzen (Case/Whole-Word, Treffer-Navigation, Replace-All).
+- **Live-Rechtschreibung** – Optionale LanguageTool-Integration (self-hosted, regelbasiert) auf allen drei Editoren und Prosa-Formularfeldern, mit eigenem Wörterbuch.
+- **Diktat** – Speech-to-Text im Notebook-Editor über einen self-hosted Whisper-Endpunkt (browserseitige Sprachpausen-Erkennung, Text verbatim am Cursor).
 - **Volltextsuche** – FTS5-Index über alle Seiten, Filterung nach Kapitel/Buch.
-- **Buchorganizer** – Kapitel & Seiten per Drag&Drop ordnen, anlegen, umbenennen, löschen.
+- **Buchorganizer** – Kapitel & Seiten per Drag&Drop ordnen, anlegen, umbenennen, löschen. Kapitel-Hierarchie bis 3 Ebenen.
+- **Ordner-Import** – Tagebuch-Archive (ZIP mit Jahr/Monat/Tag-Struktur, Formate docx/doc/odt/abw) mit regelbasierter Datumserkennung + KI-Fallback.
 - **Seiten-Verlauf** – Revisionen pro Seite mit Vergleich + Restore.
 
 ### KI-Lektorat & Chat
@@ -22,29 +25,42 @@ Schreiben, Lektorat und Buchanalyse mit KI. Eigenständiger Node.js-Service, Mul
 
 ### Analyse & Übersichten
 - **Buch-Übersicht** – Dashboard pro Buch: Zeichen-Trend, Schreib-Heatmap, Lektorat-Abdeckung, Top-Fehlertypen, Kapitel-Qualität, Figuren-/Orts-Präsenz.
+- **Komplettanalyse** – Pipeline, die Figuren, Schauplätze, Szenen, Ereignisse, Weltfakten, Soziogramm und Kontinuität aus dem Buch extrahiert (Delta-Cache + Checkpoint, Nacht-Cron). [docs/komplett.md](docs/komplett.md).
 - **Figurenübersicht** – Charakterextraktion mit Beziehungsgraph (Vollbild); Figurenkontext im Lektorat einblendbar.
 - **Figuren-Werkstatt** – jsMind-Mindmap-Editor mit KI-Brainstorm pro Knoten + Konsistenz-Check. [docs/figur-werkstatt.md](docs/figur-werkstatt.md).
-- **Ereignisse / Schauplätze / Szenen** – Übersichten pro Kapitel.
+- **Ereignisse / Schauplätze / Szenen** – Übersichten pro Kapitel, Ereignisse zusätzlich als Jahres-Zeitstrahl.
+- **Orte-Karte** – Geocodierte Schauplätze auf interaktiver Leaflet-Karte; KI-gestützte Verortung, Geocoding via Nominatim/Photon. [docs/geocode.md](docs/geocode.md).
+- **Weltfakten** – Sammlung von Weltregeln/Lore/Kanon aus der Komplettanalyse.
 - **Kontinuitätsprüfer** – Findet Widersprüche.
 - **Stil-Heatmap / Fehler-Heatmap** – Satzlänge, Adverbien, Füllwörter, Fehlertypen pro Kapitel.
 - **Buchstatistik** – Tägliche Snapshots (Zeichen, Wörter, Tokens) als Zeitliniendiagramm.
 - **Ideen-Sammlung** – Notiz-Sammelbox pro Buch oder Seite.
 - **Musikbibliothek** – Pro Buch kuratierte Tracks (Titel, Interpret, Genre, Stimmung, Kontext-Typ) als Schreib-Inspiration; KI-gestützter Stimmungs-Match.
+- **Tagebuch-Rückblick** – Rückwärtsgewandte KI-Verdichtung für Bücher vom Typ Tagebuch.
 
 ### Multi-User & Kollaboration
 - **Rollen-ACL pro Buch** – owner / editor / lektor / viewer. Apply-only-Pfad für Lektoren (Korrekturen anwenden ohne freie Edit-Rechte).
 - **Presence** – Mit-Anwesende pro Seite/Buch sichtbar (Avatar-Pip im Sidebar-Tree, Banner im Editor).
 - **Page-Locks** – Soft-Lock beim Edit, automatische Heartbeats, Banner bei fremdem Lock.
 - **Registrierung mit Approval** – Selbst-Registrierung mit Admin-Approval; Anti-Enumeration; optional Captcha.
+- **Share-Links** – Seiten/Kapitel über opaken Token öffentlich (read-only) teilen; SSR-Reader-View, Rate-Limit + Honeypot, GDPR-IP-Hashing, Unread-Tracking für den Owner. [docs/share-link.md](docs/share-link.md).
 - **Admin-Konsole** – Web-UI für User, Bücher, Settings, Kategorien, Usage.
 
 ### Export & Tooling
 - **Command-Palette** (Cmd/Ctrl+K bzw. `/`) – Fuzzy-Suche über Karten, Aktionen, Seiten, Kapitel, Figuren, Orte, Szenen. Prefix-Modi: `>` `#` `!` `@` `$` `%`.
 - **Fine-Tuning-Export** – JSONL-Trainingsdaten (Stil, Szenen, Dialoge, Q&A, Korrekturen). [docs/finetuning.md](docs/finetuning.md).
 - **Buch-Export** – PDF, HTML, Markdown, Plaintext, EPUB mit Timestamp-Filename.
-- **Custom-PDF-Export** – Eigener pdfkit-Renderer mit druckfertiger PDF/A-2B-Konformität, freier Schriftwahl aus Google Fonts (30-Tage-Cache), Cover, TOC, Profile pro Buch+User. Optional Server-Validierung via veraPDF.
+- **Custom-PDF-Export** – Eigener pdfkit-Renderer mit druckfertiger PDF/A-2B- bzw. PDF/X-3-Konformität, freier Schriftwahl aus Google Fonts (30-Tage-Cache), Cover (inkl. Umschlagbogen mit Rücken/EAN-13), TOC, Profile pro Buch+User. Optional Server-Validierung via veraPDF.
+- **EPUB-Export** – Reflow-fähiges E-Book mit eigenem Builder (Cover, Frontmatter, TOC, Blocksatz). Optionale Validierung via EPUBCheck.
+- **Publikations-Metadaten** – Zentrale Pflege (Titel, Autor, ISBN, Impressum, Widmung …) als gemeinsame Quelle für PDF- und EPUB-Export. [docs/publikation-export.md](docs/publikation-export.md).
+- **Buch-Migration** – Verlustfreier Buch-Round-Trip zwischen Instanzen als `.swbook`-Bundle (Export + Import-Job). [docs/book-migration.md](docs/book-migration.md).
 - **Bucheinstellungen** – Sprache, Buchtyp, Erzählperspektive, Erzählzeit, Freitext-Kontext fliessen in alle Prompts.
 - **Theme** – Hell/Dunkel/Auto, Sprachumschaltung Deutsch/Englisch.
+
+### Integrationen & Monitoring
+- **Blog-Sync (WordPress)** – Bücher vom Typ `blog` mit WordPress synchronisieren: Initial-Import, Pull, Push, LWW-Konfliktstrategie, Gutenberg-Block-Mapping. [docs/blog-sync.md](docs/blog-sync.md).
+- **HubSpot-Sync** – Initial-Import + Push als Blog-Draft (kein Update/Pull-back). [docs/hubspot-sync.md](docs/hubspot-sync.md).
+- **Metrics-API** – `GET /metrics` im Prometheus-Format (Bearer-Token mit Scopes); fertige Dashboards für Home Assistant und Grafana. [docs/metrics-api.md](docs/metrics-api.md).
 
 ## Voraussetzungen
 
@@ -62,7 +78,7 @@ npm ci --omit=dev
 node server.js         # Port 3737
 ```
 
-KI-Provider, Google-OAuth, App-URL, Modell-Limits, Mailer, Cron, veraPDF konfiguriert die **Admin-Konsole** (Tabelle `app_settings`, kein Restart nötig).
+KI-Provider, Google-OAuth, App-URL, Modell-Limits, Mailer, Cron, veraPDF/EPUBCheck sowie die optionalen self-hosted Dienste (LanguageTool, Whisper-Diktat) konfiguriert die **Admin-Konsole** (Tabelle `app_settings`, kein Restart nötig).
 
 Produktiv: systemd-Service via [deploy/schreibwerkstatt.service](deploy/schreibwerkstatt.service), Erst-Install `bash deploy/install.sh`, CD `bash deploy/deploy.sh`.
 
@@ -123,7 +139,7 @@ Unter `/admin` für User mit `global_role = 'admin'`:
 - **Users** — Rollen, Sperren, Provider-Override pro User.
 - **Books** — alle Bücher mit ACL-Einsicht/Übertragung.
 - **Registrierungs-Anfragen** — Approval-Queue für `/register`-Selbstanmeldungen.
-- **Settings** — KI-Provider + Keys, Google OAuth, App-URL, Modell-Limits, Mailer, Cron, veraPDF-Flavour.
+- **Settings** — KI-Provider + Keys, Google OAuth, App-URL, Modell-Limits, Mailer, Cron, veraPDF/EPUBCheck, LanguageTool + Diktat, Metrics-Token.
 - **Kategorien** — globaler Pool, Zuordnung pro Buch via ACL.
 - **Usage** — Token-Verbrauch pro User/Provider/Job-Typ.
 

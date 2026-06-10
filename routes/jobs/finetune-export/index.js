@@ -82,6 +82,10 @@ async function runFinetuneExportJob(jobId, bookId, bookName, userEmail, userToke
     // Passagen-Caps). 1 = bisheriges Verhalten, >1 = mehr redundante Samples
     // pro Quelle → stärkeres Memorisierungs-Bias. Geclamped auf 1..5.
     const biasBoost = Math.max(1, Math.min(5, Number(opts.biasBoost) || 1));
+    // `maxTypeShare`: deckelt jeden Sample-Typ auf diesen Anteil am Gesamt
+    // (0 = aus). Hält die volumenstarken Text-Sampler davon ab, das
+    // Welt-/Figurenwissen zu erschlagen. Geclamped in finalize auf 0..0.95.
+    const maxTypeShare = Math.max(0, Math.min(0.95, Number(opts.maxTypeShare) || 0));
 
     // Einheitliche Identität über alle Sample-Typen: Modell soll *eine* Stimme
     // lernen — die des Buchs — statt mehrerer Personae (Lektor, Dialogschreiber,
@@ -97,7 +101,7 @@ async function runFinetuneExportJob(jobId, bookId, bookName, userEmail, userToke
 
     // Normalised opts mit übernommenen Defaults — wird in alle Sub-Module gereicht.
     const optsNorm = { ...opts, minChars, maxChars, valSplit, valSeed: seed, maxSeqTokens, emitText,
-                       fulltext, maxFullChars, truncateLong, biasBoost };
+                       fulltext, maxFullChars, truncateLong, biasBoost, maxTypeShare };
 
     const ctx = {
       jobId, logger,
@@ -172,7 +176,8 @@ async function runFinetuneExportJob(jobId, bookId, bookName, userEmail, userToke
 
 finetuneExportRouter.post('/finetune-export', jsonBody, (req, res) => {
   const { book_id, book_name, types, min_chars, max_chars, val_split, val_seed,
-          max_seq_tokens, emit_text, fulltext, max_full_chars, truncate_long, bias_boost, ai } = req.body || {};
+          max_seq_tokens, emit_text, fulltext, max_full_chars, truncate_long, bias_boost,
+          max_type_share, ai } = req.body || {};
   if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
   setContext({ book: book_id });
   const { requireBookAccess, sendACLError } = require('../../../lib/acl');
@@ -206,6 +211,7 @@ finetuneExportRouter.post('/finetune-export', jsonBody, (req, res) => {
     maxFullChars: Number(max_full_chars) || 60000,
     truncateLong: !!truncate_long,
     biasBoost: Number(bias_boost) || 1,
+    maxTypeShare: Number(max_type_share) || 0,
     ai: aiOpts,
   };
   if (!Object.values(opts.types).some(v => v)) {

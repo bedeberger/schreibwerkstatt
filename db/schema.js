@@ -289,9 +289,10 @@ function saveOrteToDb(bookId, orte, userEmail, chNameToId = null, pageNameToIdBy
 
   db.transaction(() => {
     const existing = db.prepare(
-      `SELECT id, loc_id FROM locations WHERE book_id = ? AND ${emailCond}`
+      `SELECT id, loc_id, name, lat, lng FROM locations WHERE book_id = ? AND ${emailCond}`
     ).all(bookId, ...emailVal);
     const existingMap = Object.fromEntries(existing.map(r => [r.loc_id, r.id]));
+    const prevByLocId = Object.fromEntries(existing.map(r => [r.loc_id, r]));
 
     // Komplettanalyse liefert keine Geo-Daten (AI extrahiert kein lat/lng) und
     // wuerde manuell gepinnte/gegeocodete Koordinaten beim Full-Replace mit NULL
@@ -300,6 +301,7 @@ function saveOrteToDb(bookId, orte, userEmail, chNameToId = null, pageNameToIdBy
     // Manuell-Pfad (routes/locations.js) setzt das Flag NICHT → Coords bleiben
     // dort leerbar.
     let coordByName = null;
+    let geoByName = null;
     if (opts.preserveExistingCoords) {
       coordByName = new Map();
       const cr = db.prepare(
@@ -308,6 +310,19 @@ function saveOrteToDb(bookId, orte, userEmail, chNameToId = null, pageNameToIdBy
       for (const r of cr) {
         const key = String(r.name || '').trim().toLowerCase();
         if (key && !coordByName.has(key)) coordByName.set(key, r);
+      }
+      // Geocode-Resolve-Cache (geo_query/geo_land) ueber die Komplettanalyse-
+      // Reextraktion retten — die regeneriert loc_ids und wuerde die Rows sonst
+      // neu anlegen (Cache verloren → naechster «Alle verorten»-Lauf ruft die KI
+      // erneut). Per normalisiertem Namen reattachen, unabhaengig von Koordinaten
+      // (auch rein fiktive Orte mit geo_query='' sollen den Cache behalten).
+      geoByName = new Map();
+      const gr = db.prepare(
+        `SELECT name, geo_query, geo_land FROM locations WHERE book_id = ? AND ${emailCond} AND geo_query IS NOT NULL`
+      ).all(bookId, ...emailVal);
+      for (const r of gr) {
+        const key = String(r.name || '').trim().toLowerCase();
+        if (key && !geoByName.has(key)) geoByName.set(key, r);
       }
     }
 
@@ -330,6 +345,10 @@ function saveOrteToDb(bookId, orte, userEmail, chNameToId = null, pageNameToIdBy
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     const delLf = db.prepare('DELETE FROM location_figures WHERE location_id = ?');
     const delLc = db.prepare('DELETE FROM location_chapters WHERE location_id = ?');
+    // Geocode-Resolve-Cache: bei Umbenennung nullen (Toponym-Aufloesung ist dann
+    // stale), bei Komplett-Reextraktion per Name reattachen (geoByName).
+    const resetGeo = db.prepare('UPDATE locations SET geo_query = NULL, geo_land = NULL WHERE id = ?');
+    const setGeo = db.prepare('UPDATE locations SET geo_query = ?, geo_land = ? WHERE id = ?');
     // location_figures.figure_id ist INTEGER (figures.id) seit Mig 73 — Lookup TEXT → INT.
     const figRows = db.prepare(
       'SELECT id, fig_id FROM figures WHERE book_id = ? AND user_email IS ?'
@@ -357,6 +376,16 @@ function saveOrteToDb(bookId, orte, userEmail, chNameToId = null, pageNameToIdBy
           land, lat, lng, i, now, locDbId);
         delLf.run(locDbId);
         delLc.run(locDbId);
+        // Resolve-Cache fallen lassen, wenn das Label sich aendert ODER der User
+        // die Georeferenz manuell entfernt (hatte Koordinaten, jetzt keine) — Letzteres
+        // ist sein «nochmal von vorn»-Signal, dann soll auch die KI neu aufloesen.
+        // Komplett-Reextraktion (preserveExistingCoords) reattacht Coords und faellt
+        // hier nicht durch.
+        const prev = prevByLocId[o.id];
+        const renamed = String(prev?.name ?? '') !== String(o.name ?? '');
+        const clearedCoords = !opts.preserveExistingCoords
+          && prev && prev.lat != null && prev.lng != null && (lat == null || lng == null);
+        if (renamed || clearedCoords) resetGeo.run(locDbId);
       } else {
         const { lastInsertRowid } = ins.run(
           bookId, o.id, o.name, o.typ || null, o.beschreibung || null,
@@ -364,6 +393,11 @@ function saveOrteToDb(bookId, orte, userEmail, chNameToId = null, pageNameToIdBy
           land, lat, lng, i, userEmail || null, now
         );
         locDbId = lastInsertRowid;
+        // Komplett-Reextraktion: Cache der namensgleichen Vorgaenger-Row uebernehmen.
+        if (geoByName) {
+          const g = geoByName.get(String(o.name || '').trim().toLowerCase());
+          if (g) setGeo.run(g.geo_query, g.geo_land || null, locDbId);
+        }
       }
       for (const fid of (o.figuren || [])) {
         const ref = _toRefString(fid);

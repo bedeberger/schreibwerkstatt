@@ -71,7 +71,10 @@ export function createSyncCard(spec) {
         };
         this._onJobFinished = (ev) => {
           const t = ev?.detail?.type;
-          if (linkRefreshTypes.has(t)) this.loadLinks();
+          if (linkRefreshTypes.has(t)) {
+            this._applyPushRenames(ev?.detail?.job);
+            this.loadLinks();
+          }
           else if (refreshTypes.has(t)) window.__app?.loadPages?.();
         };
         window.addEventListener('pages:loaded', this._onPagesLoaded);
@@ -178,12 +181,35 @@ export function createSyncCard(spec) {
             this.pushProgress = { ...this.pushProgress, [pageId]: job.progress || 0 };
             if (job.status === 'running' || job.status === 'queued') return;
             this._clearPushBusy(pageId);
-            if (job.status !== 'error' && job.status !== 'cancelled') this.loadLinks();
+            if (job.status !== 'error' && job.status !== 'cancelled') {
+              this._applyPushRenames(job);
+              this.loadLinks();
+            }
           } catch (e) { /* swallow; nächster Tick versucht erneut */ }
         };
         if (this._pushTimers[pageId]) clearInterval(this._pushTimers[pageId]);
         this._pushTimers = { ...this._pushTimers, [pageId]: setInterval(tick, 1000) };
         tick();
+      },
+
+      // Push-Create kann den lokalen page_name prägen (z.B. WordPress-Datum-
+      // Prefix, app-intern). Das Backend liefert `result.renamed: [{ pageId,
+      // name }]`. `loadLinks()` deckt nur die Badges — Sidebar-Tree und offener
+      // Editor-Titel zeigen sonst weiter den alten Namen. Tree via loadPages()
+      // neu aufbauen; den offenen Editor-Titel (`currentPage.name`) direkt
+      // nachziehen (loadPages refetcht nur den Page-Body, nicht den Namen).
+      // No-op, wenn der Job nichts umbenannt hat (z.B. reiner Update-Push).
+      _applyPushRenames(job) {
+        const renamed = job?.result?.renamed;
+        if (!Array.isArray(renamed) || !renamed.length) return;
+        const app = window.__app;
+        if (!app) return;
+        for (const r of renamed) {
+          if (app.currentPage && String(app.currentPage.id) === String(r.pageId)) {
+            app.currentPage.name = r.name;
+          }
+        }
+        app.loadPages?.();
       },
 
       _clearPushBusy(pageId) {

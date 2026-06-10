@@ -213,10 +213,48 @@ function _scorePageRelevance(query, text, stopwords = _BOOK_CHAT_STOPWORDS) {
   return score;
 }
 
+// Per-Job-Claude-Override für den Buch-Chat (klassisch + agentisch), analog zur
+// Komplettanalyse (_komplettClaudeOverrides in routes/jobs/komplett/job.js). Nur wirksam,
+// wenn in den App-Settings gesetzt und der effektive Provider Claude ist; leer/0 = folgt
+// dem globalen Wert. Erlaubt z.B. Opus für den agentischen Tool-Loop, während global
+// Sonnet 4.6 läuft. Kein eigener Timeout-Default (anders als komplett) – der Buch-Chat
+// macht pro Call nur eine Tool-Use-Runde, der globale 10-Min-Timeout reicht.
+function _bookChatClaudeOverrides(effectiveProvider) {
+  if (effectiveProvider !== 'claude') return null;
+  const model = String(appSettings.get('ai.claude.model.bookchat') || '').trim();
+  const contextWindow = parseInt(appSettings.get('ai.claude.context_window.bookchat'), 10) || 0;
+  const maxTokensOut = parseInt(appSettings.get('ai.claude.max_tokens_out.bookchat'), 10) || 0;
+  const timeoutMs = parseInt(appSettings.get('ai.claude.timeout_ms.bookchat'), 10) || 0;
+  // effort (output_config) für Opus 4.5+/Sonnet 4.6: low|medium|high|xhigh|max. Leer = API-Default
+  // (high). lib/ai.js klemmt Tier-Mismatch (max→Opus-only, xhigh→Opus-4.7+) automatisch auf high.
+  const effort = String(appSettings.get('ai.claude.effort.bookchat') || '').trim();
+  const patch = {};
+  if (model) patch.claudeModel = model;
+  if (contextWindow > 0) patch.claudeContextWindow = contextWindow;
+  if (maxTokensOut > 0) patch.claudeMaxTokensOut = maxTokensOut;
+  if (timeoutMs > 0) patch.claudeTimeoutMs = timeoutMs;
+  if (effort) patch.claudeEffort = effort;
+  return Object.keys(patch).length ? patch : null;
+}
+
+// Override via ALS-Context binden (greift für alle Claude-Calls dieses Jobs, ohne globale
+// Calls zu beeinflussen). MUSS vor getContextConfigFor() laufen, damit das aiCfg (Token-
+// Budget, Tool-Result-Cap) das Buch-Chat-Kontextfenster/Output-Cap reflektiert.
+function _applyBookChatClaudeOverrides(effectiveProvider, logger) {
+  const overrides = _bookChatClaudeOverrides(effectiveProvider);
+  if (overrides) {
+    setContext(overrides);
+    logger.info(`Buch-Chat-Claude-Override: ${JSON.stringify(overrides)} (global model=${appSettings.get('ai.claude.model')}).`);
+  }
+  return overrides;
+}
+
 async function runBookChatJob(jobId, sessionId, userMsgId, message, userEmail, userToken) {
   const logger = makeJobLogger(jobId);
   const { buildBookChatSystemPrompt, SCHEMA_BOOK_CHAT } = await getPrompts();
-  const aiCfg = getContextConfigFor(resolveProvider({ userEmail }));
+  const effectiveProvider = resolveProvider({ userEmail });
+  _applyBookChatClaudeOverrides(effectiveProvider, logger);
+  const aiCfg = getContextConfigFor(effectiveProvider);
   try {
     updateJob(jobId, { statusText: 'job.phase.preparing', progress: 5 });
 
@@ -476,7 +514,9 @@ function _bookChatUseAgent() {
 async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEmail, userToken) {
   const logger = makeJobLogger(jobId);
   const { buildBookChatAgentSystemPrompt, BOOK_CHAT_TOOLS } = await getPrompts();
-  const aiCfg = getContextConfigFor(resolveProvider({ userEmail }));
+  const effectiveProvider = resolveProvider({ userEmail });
+  _applyBookChatClaudeOverrides(effectiveProvider, logger);
+  const aiCfg = getContextConfigFor(effectiveProvider);
   try {
     updateJob(jobId, { statusText: 'job.phase.preparing', progress: 5 });
 
@@ -514,6 +554,7 @@ async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEma
     let totalTokIn = 0, totalTokOut = 0, totalCacheRead = 0, totalCacheCreation = 0;
     let finalText = null;
     let genMs = 0;
+    let lastModel = null; // tatsächlich genutztes Claude-Modell (reflektiert ggf. den Bookchat-Override)
     const toolLog = []; // für context_info
     let iter = 0;
 
@@ -541,6 +582,7 @@ async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEma
       totalCacheRead     += (result.cacheReadIn || 0);
       totalCacheCreation += (result.cacheCreationIn || 0);
       if (result.genDurationMs) genMs += result.genDurationMs;
+      if (result.model) lastModel = result.model;
 
       // UI mit echten Claude-Zahlen nachziehen (onProgress liefert nur chars-basierte Schätzung,
       // die bei reinen Tool-Use-Iterationen ohne Text-Stream 0 bleibt).
@@ -681,7 +723,7 @@ async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEma
     const asstMsgResult = db.prepare(`
       INSERT INTO chat_messages (session_id, role, content, tokens_in, tokens_out, cache_read_in, cache_creation_in, provider, model, tps, context_info, created_at)
       VALUES (?, 'assistant', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(session.id, antwort, totalTokIn, totalTokOut, totalCacheRead, totalCacheCreation, 'claude', (appSettings.get('ai.claude.model') || 'claude-sonnet-4-6'), tpsVal, JSON.stringify(contextInfo), assistantNow);
+    `).run(session.id, antwort, totalTokIn, totalTokOut, totalCacheRead, totalCacheCreation, 'claude', (lastModel || appSettings.get('ai.claude.model') || 'claude-sonnet-4-6'), tpsVal, JSON.stringify(contextInfo), assistantNow);
     db.prepare('UPDATE chat_sessions SET last_message_at = ? WHERE id = ?').run(assistantNow, session.id);
 
     completeJob(jobId, {

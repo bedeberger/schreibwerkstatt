@@ -304,9 +304,13 @@ test('Push (Create): praegt Page-Name mit YYYY-MM-DD-Prefix von heute', async ()
 
     const created = wp.posts[0];
     assert.ok(created, 'WP-Post wurde nicht angelegt');
-    assert.equal(created.title.raw, expected);
+    // WP bekommt den Titel OHNE Datum-Prefix (app-intern).
+    assert.equal(created.title.raw, 'Neuer App-Titel');
+    // Lokaler page_name behält den Datum-Prefix.
     const reloaded = await contentStore.loadPage(page.id);
     assert.equal(reloaded.name, expected);
+    // Job-Result liefert die lokale Umbenennung für den Frontend-Refresh.
+    assert.deepEqual(job.result.renamed, [{ pageId: page.id, name: expected }]);
   } finally {
     restore();
   }
@@ -339,7 +343,8 @@ test('Push (Create): leerer Titel wird zu YYYY-MM-DD von heute', async () => {
     const job = jobs.get(jobId);
     assert.equal(job.status, 'done', JSON.stringify(job.error));
 
-    assert.equal(wp.posts[0].title.raw, expected);
+    // Leerer Rest → WP bekommt leeren Titel, lokal nur das Datum.
+    assert.equal(wp.posts[0].title.raw, '');
     const reloaded = await contentStore.loadPage(page.id);
     assert.equal(reloaded.name, expected);
   } finally {
@@ -377,7 +382,8 @@ test('Push (Create): bumpt YYYY-MM-DD im Titel auf heute, lokal + WP synchron', 
     assert.equal(job.status, 'done', JSON.stringify(job.error));
     assert.equal(job.result.createdRemote, 1);
 
-    assert.equal(wp.posts[0].title.raw, expected, 'WP-Titel sollte heute-bumpt sein');
+    // WP bekommt nur den Rest ohne Datum, lokal wird der Prefix auf heute gebumpt.
+    assert.equal(wp.posts[0].title.raw, 'Mein Eintrag', 'WP-Titel sollte ohne Datum sein');
 
     const reloaded = await contentStore.loadPage(page.id);
     assert.equal(reloaded.name, expected, 'Lokaler page_name sollte heute-bumpt sein');
@@ -411,7 +417,8 @@ test('Push (Create): Titel ohne YYYY-MM-DD bekommt heute als Prefix', async () =
     runningJobs.set(jobId, { type: 'blog-push', bookId });
 
     await blogSync.runBlogPushJob(jobId, bookId, null, [page.id]);
-    assert.equal(wp.posts[0].title.raw, expected);
+    // WP bekommt den Titel ohne Datum, lokal mit Prefix.
+    assert.equal(wp.posts[0].title.raw, 'Kein Datum hier');
 
     const reloaded = await contentStore.loadPage(page.id);
     assert.equal(reloaded.name, expected);

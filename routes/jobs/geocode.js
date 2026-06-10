@@ -25,19 +25,56 @@ const MAX_ITEMS = 200;
 const BOOK_CONTEXT_MAX = 400;
 const MAX_HINTS_PER_ITEM = 3;
 
-// KI-Resultat → Map(idStr → { ort, land }). Verwirft Eintraege ohne realen Anker
-// (leeres «ort», z.B. rein fiktive Orte). land nur als gueltiger ISO-2-Code.
+// KI-Resultat → Map(idStr → { ort, land }). `ort` leer = kein realer Anker (rein
+// fiktiv) — bewusst BEHALTEN, damit der Cache (geo_query='') die KI bei einem
+// Re-Run nicht erneut nach demselben fiktiven Label fragt; der Geocode-Schritt
+// ueberspringt leere Anker. land nur als gueltiger ISO-2-Code.
 function _parseResolved(result) {
   const map = new Map();
   const arr = Array.isArray(result?.orte) ? result.orte : [];
   for (const r of arr) {
     if (!r || r.id == null) continue;
     const ort = String(r.ort || '').trim();
-    if (!ort) continue;
     const land = /^[A-Za-z]{2}$/.test(String(r.land || '').trim()) ? String(r.land).trim().toLowerCase() : null;
     map.set(String(r.id), { ort, land });
   }
   return map;
+}
+
+// Persistierte Aufloesungen (geo_query/geo_land) der angefragten Orte laden →
+// Map(loc_idStr → { ort, land }). Nur Rows mit gesetztem geo_query (NULL = nie
+// aufgeloest). `ort` kann '' sein (fiktiv, kein Anker). Per Umbenennung wird der
+// Cache im Schreibpfad genullt, daher ist ein Treffer hier fuer das aktuelle
+// Label gueltig.
+function _loadResolved(locIds, bookId, userEmail) {
+  const map = new Map();
+  if (!locIds.length || !bookId) return map;
+  const emailCond = userEmail ? 'user_email = ?' : 'user_email IS NULL';
+  const emailVal = userEmail ? [userEmail] : [];
+  const ph = locIds.map(() => '?').join(',');
+  const rows = db.prepare(
+    `SELECT loc_id, geo_query, geo_land FROM locations
+      WHERE book_id = ? AND ${emailCond} AND loc_id IN (${ph}) AND geo_query IS NOT NULL`
+  ).all(bookId, ...emailVal, ...locIds);
+  for (const r of rows) {
+    const land = /^[A-Za-z]{2}$/.test(String(r.geo_land || '').trim()) ? String(r.geo_land).trim().toLowerCase() : null;
+    map.set(String(r.loc_id), { ort: String(r.geo_query || ''), land });
+  }
+  return map;
+}
+
+// Frisch aufgeloeste Toponyme zuruckschreiben (Cache fuer den naechsten Lauf).
+function _persistResolved(entries, bookId, userEmail) {
+  if (!entries.length || !bookId) return;
+  const emailCond = userEmail ? 'user_email = ?' : 'user_email IS NULL';
+  const emailVal = userEmail ? [userEmail] : [];
+  const stmt = db.prepare(
+    `UPDATE locations SET geo_query = ?, geo_land = ?
+      WHERE book_id = ? AND ${emailCond} AND loc_id = ?`
+  );
+  db.transaction(() => {
+    for (const { id, ort, land } of entries) stmt.run(ort, land || null, bookId, ...emailVal, String(id));
+  })();
 }
 
 // Wohnadressen der mit den Orten verknuepften Figuren → Map(loc_id → [adr]).
@@ -86,32 +123,43 @@ async function runGeocodeResolveJob(jobId, items, bookId, userEmail) {
     const region = settings?.schauplatz_land || null;
     const bookContext = (settings?.buch_kontext || '').trim().slice(0, BOOK_CONTEXT_MAX) || null;
 
-    const hintsByLoc = _figureHints(items.map(it => it.id), bookId, userEmail);
-    const { buildSystemGeocodeResolve, buildGeocodeResolvePrompt, SCHEMA_GEOCODE_RESOLVE } = await getPrompts();
-    const promptItems = items.map(it => ({
-      id: String(it.id),
-      name: it.name,
-      hints: hintsByLoc.get(it.id) || [],
-    }));
+    // Schon aufgeloeste Labels aus dem Cache nehmen; nur die offenen an die KI.
+    const resolved = _loadResolved(items.map(it => it.id), bookId, userEmail);
+    const toResolve = items.filter(it => !resolved.has(String(it.id)));
 
     const tok = { in: 0, out: 0, ms: 0 };
-    // Output skaliert mit der Label-Anzahl: pro Label ein { id, ort, land }-Objekt
-    // (~30 Output-Tokens). Statischer Cap truncated sonst grosse Batches still.
-    const maxOut = 800 + promptItems.length * 60;
-    const expectedChars = Math.max(1200, promptItems.length * 70);
-    const result = await aiCall(jobId, tok,
-      buildGeocodeResolvePrompt(promptItems, { region, bookContext }),
-      buildSystemGeocodeResolve(),
-      10, 60, expectedChars, 0.3, maxOut, undefined, SCHEMA_GEOCODE_RESOLVE,
-    );
-    if (!Array.isArray(result?.orte)) throw i18nError('job.error.geocodeOrteMissing');
-    const resolved = _parseResolved(result);
+    if (toResolve.length) {
+      const hintsByLoc = _figureHints(toResolve.map(it => it.id), bookId, userEmail);
+      const { buildSystemGeocodeResolve, buildGeocodeResolvePrompt, SCHEMA_GEOCODE_RESOLVE } = await getPrompts();
+      const promptItems = toResolve.map(it => ({
+        id: String(it.id),
+        name: it.name,
+        hints: hintsByLoc.get(it.id) || [],
+      }));
+      // Output skaliert mit der Label-Anzahl: pro Label ein { id, ort, land }-Objekt
+      // (~30 Output-Tokens). Statischer Cap truncated sonst grosse Batches still.
+      const maxOut = 800 + promptItems.length * 60;
+      const expectedChars = Math.max(1200, promptItems.length * 70);
+      const result = await aiCall(jobId, tok,
+        buildGeocodeResolvePrompt(promptItems, { region, bookContext }),
+        buildSystemGeocodeResolve(),
+        10, 60, expectedChars, 0.3, maxOut, undefined, SCHEMA_GEOCODE_RESOLVE,
+      );
+      if (!Array.isArray(result?.orte)) throw i18nError('job.error.geocodeOrteMissing');
+      const fresh = _parseResolved(result);
+      const toPersist = [];
+      for (const [id, v] of fresh) { resolved.set(id, v); toPersist.push({ id, ort: v.ort, land: v.land }); }
+      _persistResolved(toPersist, bookId, userEmail);
+    } else {
+      logger.info('Alle Labels aus Cache aufgeloest — KI uebersprungen.');
+    }
 
     updateJob(jobId, { statusText: 'job.phase.geocodeLookup', progress: 65 });
     const results = [];
     for (const it of items) {
       const r = resolved.get(String(it.id));
-      if (!r) { results.push({ id: it.id, lat: null, lng: null }); continue; }
+      // Kein Eintrag oder leerer Anker (rein fiktiv) → unverortet, kein Geocoder-Call.
+      if (!r || !r.ort) { results.push({ id: it.id, lat: null, lng: null }); continue; }
       const cands = await geocode(r.ort, { lang: language, region: r.land || region });
       const c = cands[0];
       results.push(c
@@ -120,8 +168,9 @@ async function runGeocodeResolveJob(jobId, items, bookId, userEmail) {
     }
 
     const hits = results.filter(r => r.lat != null).length;
+    const cached = items.length - toResolve.length;
     completeJob(jobId, { results, tokensIn: tok.in, tokensOut: tok.out },
-      tps(tok), `${hits}/${items.length} via KI verortet`);
+      tps(tok), `${hits}/${items.length} verortet${cached ? `, ${cached} aus Cache` : ''}`);
   } catch (e) {
     if (e.name !== 'AbortError') logger.error(`Geocode-Resolve Fehler: ${e.message}`, { stack: e.stack });
     failJob(jobId, e);

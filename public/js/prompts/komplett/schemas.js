@@ -95,6 +95,7 @@ export let SCHEMA_KOMPLETT_FIGUREN_PASS = null;
 export let SCHEMA_KOMPLETT_FIGUREN_STAMM = null;
 export let SCHEMA_KOMPLETT_ORTE_PASS = null;
 export let SCHEMA_KOMPLETT_FAKTEN_PASS = null;
+export let SCHEMA_KOMPLETT_EVENTS = null;
 export let SCHEMA_FIGUREN_KONSOL = null;
 export let SCHEMA_BEZIEHUNGEN = null;
 
@@ -169,11 +170,20 @@ function _buildFigurenPassSchema() {
   });
 }
 
+// Claude-Single-Pass A1: reine Figuren-Stammdaten OHNE Beziehungen UND OHNE
+// Lebensereignisse – Events zieht Claude in einen eigenen Pass (SCHEMA_KOMPLETT_EVENTS),
+// damit das gesamte Output-Budget der Event-Erfassung gewidmet ist (analog Fakten-Pass C).
 function _buildFigurenStammSchema() {
   return _obj({
     figuren: { type: 'array', items: _figurStammSchema },
-    assignments: _assignmentsField(),
   });
+}
+
+// Claude-Single-Pass E: nur Lebensereignisse pro Figur (eigener Call gegen den
+// gecachten Buchtext-Block). Volle Modell-Aufmerksamkeit auf vollständige
+// Event-Erfassung, ohne mit Figuren-Stammdaten ums Attention-Budget zu konkurrieren.
+function _buildEventsPassSchema() {
+  return _obj({ assignments: _assignmentsField() });
 }
 
 // Claude zieht Fakten in einen eigenen Pass (SCHEMA_KOMPLETT_FAKTEN_PASS); nur lokale
@@ -208,6 +218,7 @@ export function _rebuildKomplettSchemas() {
   SCHEMA_KOMPLETT_FIGUREN_STAMM = _buildFigurenStammSchema();
   SCHEMA_KOMPLETT_ORTE_PASS = _buildOrtePassSchema();
   SCHEMA_KOMPLETT_FAKTEN_PASS = _buildFaktenPassSchema();
+  SCHEMA_KOMPLETT_EVENTS = _buildEventsPassSchema();
   SCHEMA_FIGUREN_KONSOL = _obj({ figuren: { type: 'array', items: _figurSchema } });
   SCHEMA_BEZIEHUNGEN = _buildBeziehungenSchema();
 }

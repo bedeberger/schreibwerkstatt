@@ -105,6 +105,7 @@ export const adminSettingsMethods = {
                : kind === 'languagetool' ? '/admin/settings/test-languagetool'
                : kind === 'stt'          ? '/admin/settings/test-stt'
                : kind === 'geocode'      ? '/admin/settings/test-geocode'
+               : kind === 'tiles'        ? '/admin/settings/test-tiles'
                : null;
     if (!path) return;
     this.adminSettingsTestResult = { kind, running: true };

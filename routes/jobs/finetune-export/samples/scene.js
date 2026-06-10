@@ -17,6 +17,10 @@ function buildSceneSamples(ctx) {
   } = ctx;
   const { minChars, maxChars, maxFullChars, fulltext } = opts;
 
+  // Seite → Kapitel-Schlüssel (für Train/Val-Split auf Quell-Ebene, siehe
+  // finalize.js — alle Ableitungen eines Kapitels landen im selben Split).
+  const pageChById = new Map(pageContents.map(p => [p.id, p.chapter_id ?? 0]));
+
   const scenesByPageId = new Map();
   for (const s of sceneRows) {
     if (!s.page_id) continue;
@@ -47,6 +51,7 @@ function buildSceneSamples(ctx) {
     samples.push({
       id: 'scene|' + pageId,
       type: 'scene',
+      sourceKey: 'ch:' + (pageChById.get(pageId) ?? 0),
       messages: [
         { role: 'system', content: unifiedSys },
         { role: 'user', content: instr },
@@ -63,6 +68,7 @@ function buildSceneSamples(ctx) {
   // metadaten-reicher), hier einfacher und vollständig deckend.
   for (const p of pageContents) {
     if (!p.text || p.text.length < minChars) continue;
+    const pageCh = 'ch:' + (p.chapter_id ?? 0);
     const completion = p.text.length > maxChars ? p.text.slice(0, maxChars) : p.text;
     const metaParts = [];
     if (bookName) metaParts.push(langIsEn ? `Book: «${bookName}»` : `Buch: «${bookName}»`);
@@ -74,6 +80,7 @@ function buildSceneSamples(ctx) {
     samples.push({
       id: 'page|' + p.id,
       type: 'scene',
+      sourceKey: pageCh,
       messages: [
         { role: 'system', content: unifiedSys },
         { role: 'user', content: instr },
@@ -94,6 +101,7 @@ function buildSceneSamples(ctx) {
         samples.push({
           id: 'pageCont|' + p.id + '|' + Math.round(cut * 100),
           type: 'scene',
+          sourceKey: pageCh,
           messages: [
             { role: 'system', content: unifiedSys },
             { role: 'user', content: (langIsEn
@@ -119,6 +127,7 @@ function buildSceneSamples(ctx) {
         samples.push({
           id: 'pageCloze|' + p.id,
           type: 'scene',
+          sourceKey: pageCh,
           messages: [
             { role: 'system', content: unifiedSys },
             { role: 'user', content: (langIsEn
@@ -151,6 +160,7 @@ function buildSceneSamples(ctx) {
       samples.push({
         id: 'pageMulti|' + cur.id,
         type: 'scene',
+        sourceKey: 'ch:' + (cur.chapter_id ?? 0),
         messages: [
           { role: 'system', content: unifiedSys },
           { role: 'user', content: (langIsEn
@@ -239,6 +249,7 @@ function buildSceneSamples(ctx) {
     samples.push({
       id: 'chapOpen|' + k,
       type: 'scene',
+      sourceKey: 'ch:' + k,
       messages: [
         { role: 'system', content: unifiedSys },
         { role: 'user',   content: instr },
@@ -319,6 +330,7 @@ function buildSceneSamples(ctx) {
         samples.push({
           id: total > 1 ? 'chapFullChunk|' + k + '|' + si : 'chapFull|' + k,
           type: 'scene',
+          sourceKey: 'ch:' + k,
           messages: [
             { role: 'system', content: unifiedSys },
             { role: 'user', content: instr },
@@ -338,6 +350,7 @@ function buildSceneSamples(ctx) {
         samples.push({
           id: 'chapCont|' + k + '|' + Math.round(cut * 100),
           type: 'scene',
+          sourceKey: 'ch:' + k,
           messages: [
             { role: 'system', content: unifiedSys },
             { role: 'user', content: (langIsEn
@@ -369,6 +382,7 @@ function buildSceneSamples(ctx) {
             samples.push({
               id: 'chapBridge|' + k,
               type: 'scene',
+              sourceKey: 'ch:' + k,
               messages: [
                 { role: 'system', content: unifiedSys },
                 { role: 'user', content: (langIsEn

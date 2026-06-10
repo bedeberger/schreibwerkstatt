@@ -21,6 +21,9 @@ test.after(() => { ctx.cleanup(); });
 test.beforeEach(() => {
   ctx.mockAi.reset();
   ctx.dbSeed.reset();
+  // Completeness-Gap-Pässe aus – diese Tests prüfen das Durchreichen der Event-Felder
+  // aus dem E-Pass, nicht den Long-Tail-Recall. Lazy require nach bootstrap (DB_PATH).
+  require('../../lib/app-settings').set('ai.komplett.completeness_passes', 0);
 });
 
 function seedBook(bookId) {
@@ -31,10 +34,8 @@ function seedBook(bookId) {
   });
 }
 
-// AI-Output mit Mix aus strukturierten, Spannen-, Label-only-, Unknown- und
-// invalid-subtyp-Events. Claude-Single-Pass A1 (Figuren-Stammdaten +
-// assignments) trägt die Lebensereignisse; B (Orte/Szenen) separat.
-function figurenStammWithEvents() {
+// Claude-Single-Pass A1: nur Figuren-Stammdaten (Events kommen aus dem E-Pass).
+function figurenStammResponse() {
   return {
     figuren: [{
       id: 'fig_anna', name: 'Anna', kurzname: 'Anna', typ: 'protagonist',
@@ -42,6 +43,14 @@ function figurenStammWithEvents() {
       kapitel: [{ name: 'Kapitel Eins', haeufigkeit: 1 }],
       eigenschaften: [], schluesselzitate: [],
     }],
+  };
+}
+
+// AI-Output mit Mix aus strukturierten, Spannen-, Label-only-, Unknown- und
+// invalid-subtyp-Events. Claude-Single-Pass E (nur assignments) trägt die
+// Lebensereignisse; A1 (Figuren-Stammdaten) und B (Orte/Szenen) separat.
+function eventsPassResponse() {
+  return {
     assignments: [{
       figur_name: 'Anna',
       lebensereignisse: [
@@ -133,10 +142,15 @@ test('Komplettanalyse: AI-Events landen mit strukturierten Feldern + Subtyp in f
   const BOOK_ID = 70;
   seedBook(BOOK_ID);
 
-  // A1: Figuren-Stammdaten + assignments (Events), KEIN orte.
+  // A1: Figuren-Stammdaten (nur figuren, KEINE assignments, KEIN orte).
   ctx.mockAi.on(
-    (e) => e.schemaKeys.includes('figuren') && e.schemaKeys.includes('assignments') && !e.schemaKeys.includes('orte'),
-    figurenStammWithEvents(),
+    (e) => e.schemaKeys.includes('figuren') && !e.schemaKeys.includes('assignments') && !e.schemaKeys.includes('orte'),
+    figurenStammResponse(),
+  );
+  // E: Lebensereignisse (nur assignments) – trägt die Event-Felder.
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('assignments'),
+    eventsPassResponse(),
   );
   // B: Orte/Szenen, KEINE figuren.
   ctx.mockAi.on(
@@ -221,10 +235,14 @@ test('Komplettanalyse: figure_events ORDER BY platziert Unknown-Bucket ans Ende'
   const BOOK_ID = 71;
   seedBook(BOOK_ID);
 
-  // A1: Figuren-Stammdaten + assignments (Events), KEIN orte.
+  // A1: Figuren-Stammdaten (nur figuren). E: Lebensereignisse (nur assignments).
   ctx.mockAi.on(
-    (e) => e.schemaKeys.includes('figuren') && e.schemaKeys.includes('assignments') && !e.schemaKeys.includes('orte'),
-    figurenStammWithEvents(),
+    (e) => e.schemaKeys.includes('figuren') && !e.schemaKeys.includes('assignments') && !e.schemaKeys.includes('orte'),
+    figurenStammResponse(),
+  );
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('assignments'),
+    eventsPassResponse(),
   );
   // B: Orte/Szenen, KEINE figuren.
   ctx.mockAi.on(

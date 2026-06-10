@@ -32,6 +32,7 @@ function buildDialogSamples(ctx) {
       samples.push({
         id: 'dialog|' + p.id + '|' + d.start,
         type: 'dialog',
+        sourceKey: 'ch:' + (p.chapter_id ?? 0),
         messages: [
           { role: 'system', content: unifiedSys },
           { role: 'user', content: userPart },

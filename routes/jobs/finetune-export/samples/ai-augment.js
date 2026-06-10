@@ -124,6 +124,7 @@ async function buildReversePromptSamples(ctx) {
       samples.push({
         id: `aiRev|${p.id}|${variantIdx++}`,
         type: 'aiAugment',
+        sourceKey: 'ch:' + (p.chapter_id ?? 0),
         messages: [
           { role: 'system', content: unifiedSys },
           { role: 'user', content: instr },

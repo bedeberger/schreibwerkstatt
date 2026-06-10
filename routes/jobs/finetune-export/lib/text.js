@@ -4,15 +4,44 @@ function splitParagraphs(text) {
   return text.split(/\n\s*\n+/).map(p => p.trim()).filter(Boolean);
 }
 
+// Abkürzungen, die mit einem Punkt enden, aber KEIN Satzende markieren. Ohne
+// diese Liste schneidet der Splitter „z. B.", „Dr.", „S. 12", „d. h." mitten
+// im Satz — und Prompt endet auf „z." während die Completion mit „B. …"
+// beginnt. Single-Letter-Fall (Initialen, gesplittete Abk. wie „z. B.") wird
+// generisch behandelt, Mehrbuchstaben-Abk. über das Set.
+const ABBREVIATIONS = new Set([
+  // Deutsch
+  'dr', 'prof', 'nr', 'hr', 'fr', 'frl', 'hrsg', 'ggf', 'evtl', 'bzw', 'usw',
+  'etc', 'ca', 'vgl', 'abb', 'kap', 'bd', 'aufl', 'sog', 'inkl', 'exkl', 'max',
+  'min', 'mio', 'mrd', 'tel', 'str', 'geb', 'gest', 'jh', 'jhdt', 'jt', 'pos',
+  'art', 'abs', 'zit', 'ebd', 'ders', 'dies', 'bspw', 'tsd', 'urspr', 'eigtl',
+  // Englisch
+  'mr', 'mrs', 'ms', 'sr', 'jr', 'st', 'vs', 'inc', 'ltd', 'co', 'corp',
+  'dept', 'fig', 'vol', 'pp', 'ed', 'eds', 'al', 'approx', 'esp',
+]);
+
+// True, wenn der Punkt an `dotIdx` zu einer Abkürzung gehört (kein Satzende).
+function isAbbreviationBefore(text, dotIdx) {
+  let i = dotIdx - 1;
+  let word = '';
+  while (i >= 0 && /[A-Za-zÄÖÜäöüß]/.test(text[i])) { word = text[i] + word; i--; }
+  if (!word) return false;
+  if (word.length === 1) return true; // Initial / gesplittete Abk. („z. B.")
+  return ABBREVIATIONS.has(word.toLowerCase());
+}
+
 // Zerlegt Fliesstext in Sätze. Heuristik: Satzende = [.!?…], optional gefolgt
 // von schliessender Anführungszeichen, dann Whitespace oder EOT. Hängt den
 // Schlussrest (ohne Satzzeichen-Ende) als eigenen Satz an. Für deutsche und
-// englische Prosa ausreichend zuverlässig; keine Abkürzungs-Erkennung.
+// englische Prosa ausreichend zuverlässig; einfacher Punkt nach einer
+// Abkürzung (siehe `isAbbreviationBefore`) gilt nicht als Satzende.
 function splitSentences(text) {
   const out = [];
-  const re = /([.!?…]+[”"«»„"']?)(\s+|$)/g;
+  const re = /([.!?…]+["”«»„‹›']?)(\s+|$)/g;
   let lastEnd = 0, m;
   while ((m = re.exec(text)) !== null) {
+    const dotCore = m[1].replace(/["”«»„‹›']$/, '');
+    if (dotCore === '.' && isAbbreviationBefore(text, m.index)) continue;
     const sentence = text.slice(lastEnd, m.index + m[1].length).trim();
     if (sentence) out.push(sentence);
     lastEnd = m.index + m[0].length;
@@ -22,26 +51,41 @@ function splitSentences(text) {
   return out;
 }
 
-// Splittet `text` nahe `ratio` (0–1) an einer Satzgrenze. Sucht zuerst rückwärts
-// vom Zielindex nach dem letzten Satzende, fällt dann vorwärts zurück.
+// Liefert die Start-Indizes aller Sätze nach einer Satzgrenze (= Index des
+// ersten Zeichens des Folgesatzes). Überspringt Abkürzungs-Punkte und verlangt
+// — wie die alte Heuristik — dass der Folgesatz mit Grossbuchstabe, Ziffer oder
+// öffnendem Anführungszeichen beginnt.
+function sentenceBoundaryIndices(text) {
+  const re = /([.!?…]+["”«»„‹›']?)(\s+)/g;
+  const out = [];
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    const dotCore = m[1].replace(/["”«»„‹›']$/, '');
+    if (dotCore === '.' && isAbbreviationBefore(text, m.index)) continue;
+    const nextIdx = m.index + m[0].length;
+    const nextChar = text[nextIdx];
+    if (nextChar && !/[A-ZÄÖÜ"„«»0-9]/.test(nextChar)) continue;
+    out.push(nextIdx);
+  }
+  return out;
+}
+
+// Splittet `text` an der Satzgrenze, die `ratio` (0–1) am nächsten liegt.
+// Gibt exakte Substrings zurück (nur an den Enden getrimmt) — wichtig für den
+// Verbatim-Sampler, der wörtliche Wiedergabe verlangt.
 function splitAtSentence(text, ratio) {
   const target = Math.max(1, Math.min(text.length - 1, Math.floor(text.length * ratio)));
-  const head = text.slice(0, target);
-  const tail = text.slice(target);
-  const lastStop = head.search(/[.!?…][”"«»„"']?\s+[A-ZÄÖÜ"„«][^.!?…]*$/);
-  if (lastStop !== -1) {
-    const after = head.slice(lastStop).search(/\s/);
-    if (after !== -1) {
-      const idx = lastStop + after + 1;
-      return [text.slice(0, idx).trim(), text.slice(idx).trim()];
+  const bounds = sentenceBoundaryIndices(text);
+  if (bounds.length) {
+    let best = bounds[0];
+    let bestDist = Math.abs(best - target);
+    for (let i = 1; i < bounds.length; i++) {
+      const d = Math.abs(bounds[i] - target);
+      if (d < bestDist) { best = bounds[i]; bestDist = d; }
     }
+    return [text.slice(0, best).trim(), text.slice(best).trim()];
   }
-  const nextStop = tail.search(/[.!?…][”"«»„"']?\s+[A-ZÄÖÜ"„«]/);
-  if (nextStop !== -1) {
-    const idx = target + nextStop + 1;
-    return [text.slice(0, idx + 1).trim(), text.slice(idx + 1).trim()];
-  }
-  return [head.trim(), tail.trim()];
+  return [text.slice(0, target).trim(), text.slice(target).trim()];
 }
 
 const splitHalfAtSentence = (text) => splitAtSentence(text, 0.5);

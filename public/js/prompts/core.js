@@ -14,6 +14,7 @@ import {
   buildSystemKomplettFigurenStamm,
   buildSystemKomplettOrteSzenen,
   buildSystemKomplettFakten,
+  buildSystemKomplettEvents,
 } from './komplett.js';
 
 // Versionsmarker für persistente Caches (z.B. chapter_extract_cache, Phase-1
@@ -134,6 +135,7 @@ function _buildLocalePrompts(localeConfig, globalErklaerungRule, buchKontext = '
   const SYS_KOMPLETT_FIGUREN_STAMM_CORE = buildSystemKomplettFigurenStamm(sp.figuren || '', rules, buchKontext);
   const SYS_KOMPLETT_ORTE_PASS_CORE     = buildSystemKomplettOrteSzenen(sp.orte || sp.figuren || '', rules, buchKontext);
   const SYS_KOMPLETT_FAKTEN_PASS_CORE   = buildSystemKomplettFakten(sp.figuren || '', rules, buchKontext);
+  const SYS_KOMPLETT_EVENTS_PASS_CORE   = buildSystemKomplettEvents(sp.figuren || '', rules, buchKontext);
 
   // Augmented Strings (Backward-Compat): Core + Book-Context als Single-String.
   // Konsumenten ohne Multi-Block-Support (chat-builder, proxies.js) bleiben funktionsfähig.
@@ -191,6 +193,9 @@ function _buildLocalePrompts(localeConfig, globalErklaerungRule, buchKontext = '
     // Claude-Single-Pass C: eigener Fakten-Pass parallel zu A1/B (lokal: Fakten in Pass B).
     SYSTEM_KOMPLETT_FAKTEN_PASS:         _aug(SYS_KOMPLETT_FAKTEN_PASS_CORE),
     SYSTEM_KOMPLETT_FAKTEN_PASS_BLOCKS:  _toCacheBlocks(SYS_KOMPLETT_FAKTEN_PASS_CORE, bookContextStr),
+    // Claude-Single-Pass E: eigener Lebensereignis-Pass über die finale Figurenliste.
+    SYSTEM_KOMPLETT_EVENTS_PASS:         _aug(SYS_KOMPLETT_EVENTS_PASS_CORE),
+    SYSTEM_KOMPLETT_EVENTS_PASS_BLOCKS:  _toCacheBlocks(SYS_KOMPLETT_EVENTS_PASS_CORE, bookContextStr),
   };
 }
 

@@ -30,6 +30,7 @@ export function registerFinetuneExportCard() {
     finetuneMinChars:     200,
     finetuneMaxChars:     4000,
     finetuneBiasBoost:    1,
+    finetuneMaxTypeShare: 0,   // 0 = kein Typ-Cap; sonst Anteil 0.1–0.95 pro Typ
     finetuneValSplit:     0.1,
     finetuneValSeed:      0,
     finetuneMaxSeqTokens: 4096,   // Sweet-Spot Mistral-Small-3.2-24B-QLoRA @ 20 GB VRAM
@@ -122,6 +123,7 @@ export function registerFinetuneExportCard() {
           min_chars:      Number(this.finetuneMinChars) || 200,
           max_chars:      Number(this.finetuneMaxChars) || 4000,
           bias_boost:     Number(this.finetuneBiasBoost) || 1,
+          max_type_share: Number(this.finetuneMaxTypeShare) || 0,
           val_split:      Number(this.finetuneValSplit) || 0,
           val_seed:       Number(this.finetuneValSeed)  || 0,
           max_seq_tokens: Number(this.finetuneMaxSeqTokens) || 0,

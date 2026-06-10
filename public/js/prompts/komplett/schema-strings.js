@@ -164,7 +164,7 @@ export const FAKTEN_RULES = `Fakten-Regeln:
 // ── Kontinuitäts-Probleme-Schema (verwendet in Check und SinglePass) ─────────
 
 export const PROBLEME_SCHEMA = `{
-  "_reasoning": "Knappe Stichpunkte (max 6 Zeilen) zu deinem Vorgehen: 1) zentrale Fakten/Behauptungen, die du gesammelt hast; 2) paarweise Vergleiche, die du angestellt hast (welche Stellen gegen welche?); 3) Kandidaten, die du verworfen hast (mit Kurz-Begründung – z.B. ‹durch Rückblende erklärbar›, ‹im selben Kapitel auflösbar›); 4) bestätigte Widersprüche, die ins probleme-Array kommen.",
+  "_reasoning": "Kurzer Prüf-Audit (max 6 Zeilen Stichpunkte), KEINE ausführliche Herleitung. Wenn du intern bereits Schritt für Schritt nachgedacht hast, wiederhole das hier NICHT in voller Länge – fasse nur das Ergebnis zusammen: 1) als harmlos verworfene Kandidaten mit Kurz-Grund (z.B. ‹durch Rückblende erklärbar›, ‹im selben Kapitel auflösbar›); 2) bestätigte Widersprüche, die ins probleme-Array kommen.",
   "probleme": [
     {
       "schwere": "kritisch|mittel|niedrig",
@@ -240,8 +240,10 @@ export const _ASSIGNMENTS_SCHEMA_BLOCK = `"assignments": [
   ]`;
 
 export const _EREIGNIS_RULES = `Ereignis-Regeln:
-- typ='persoenlich' / typ='extern' wie oben dokumentiert.
-- datum_label = Original-String; datum_year/month/day strukturiert zerlegen (null wenn unbekannt). Events ohne Datums-Information trotzdem aufnehmen (alles null).
-- Spannen (Krieg, Reise, Studium): Start in datum_*, Ende in datum_ende_*.
+- VOLLSTÄNDIGKEIT vor Kürze: Gehe jede Figur einzeln durch und erfasse ALLE im Text belegten Ereignisse – kein Cap. Neben den grossen biografischen Wendepunkten (Geburt, Tod, Trauma, neue/beendete Beziehung, Jobwechsel, Umzug, wichtige Entscheidung) auch kleinere, aber belegte Vorfälle (erste Begegnung, Streit/Versöhnung, Reise-Etappe, Erkrankung/Genesung, Erfolg/Niederlage, prägende Beobachtung). Ziel ist die möglichst lückenlose Biografie jeder Figur. Im Zweifel aufnehmen statt weglassen – solange im Text belegt.
+- typ='persoenlich' = biografische Ereignisse der Figur; typ='extern' = gesellschaftliche/historische Ereignisse (Kriege, Politik, Wirtschaft, Kultur, Natur) – diese SEHR GROSSZÜGIG erfassen und ALLEN betroffenen Figuren zuweisen.
+- datum_label = Original-String; datum_year/month/day strukturiert zerlegen (null wenn unbekannt). Events ohne Datums-Information trotzdem aufnehmen (alles null) – sie landen im «unbekannt»-Bucket, dürfen aber NICHT entfallen.
+- Spannen (Krieg, Reise, Studium, Schwangerschaft): Start in datum_*, Ende in datum_ende_*.
+- ereignis: neutral und kanonisch formuliert (NICHT aus der Figurenperspektive). Ein Ereignis, das mehrere Figuren betrifft, bei ALLEN beteiligten Figuren WORTGLEICH formulieren (z.B. 'Geburt von Maria' für Vater, Mutter und Kind) – sonst scheitert die spätere Zusammenführung.
 - subtyp aus Whitelist; persoenlich → geburt|tod|hochzeit|liebe|trennung|krankheit|reise|umzug|konflikt|wendepunkt|entdeckung|verlust|sieg|sonstiges; extern → extern_politisch|extern_wirtschaftlich|extern_natur|extern_kulturell|extern_krieg|sonstiges. liebe=Beginn einer Liebesbeziehung; trennung=Scheidung/Trennung; krankheit=Erkrankung/Verletzung; umzug=dauerhafter Wohnortwechsel (NICHT reise=temporär); extern_wirtschaftlich=Wirtschaftskrise/Crash/Inflation; extern_krieg=Krieg/Schlacht/militärischer Konflikt.
 - Nur Figuren ausgeben die mindestens ein Ereignis haben.`;

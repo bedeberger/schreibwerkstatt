@@ -148,26 +148,25 @@ ${figurenBasisRules(kontext)}
 ${_EREIGNIS_RULES}`;
 }
 
-/** Schema-Block nur für Figuren-Stammdaten (OHNE Beziehungen) + Lebensereignisse.
- *  Claude-Single-Pass A1; Beziehungen folgen im separaten A2-Pass. */
+/** Schema-Block nur für Figuren-Stammdaten (OHNE Beziehungen, OHNE Lebensereignisse).
+ *  Claude-Single-Pass A1; Beziehungen folgen im A2-Pass, Lebensereignisse im E-Pass
+ *  (buildKomplettSchemaEvents) – beides separat, damit A1 das Output-Budget allein den
+ *  Stammdaten widmet und Events/Beziehungen nicht darum konkurrieren. */
 function buildKomplettSchemaFigurenStamm(kontext = '') {
-  const schemaPart = `Antworte mit diesem JSON-Schema (nur Figuren-Stammdaten OHNE Beziehungen und Lebensereignisse):
+  const schemaPart = `Antworte mit diesem JSON-Schema (nur Figuren-Stammdaten OHNE Beziehungen und OHNE Lebensereignisse):
 {
-  ${_schemaBody(FIGUREN_STAMM_SCHEMA)},
-  ${_ASSIGNMENTS_SCHEMA_BLOCK}
+  ${_schemaBody(FIGUREN_STAMM_SCHEMA)}
 }`;
-  const noBzNote = 'WICHTIG: In DIESEM Pass KEINE Beziehungen ausgeben (kein beziehungen-Feld) – Beziehungen werden in einem separaten Pass erfasst.';
+  const noBzNote = 'WICHTIG: In DIESEM Pass KEINE Beziehungen und KEINE Lebensereignisse ausgeben (kein beziehungen-Feld, kein assignments-Feld) – beide werden in separaten Pässen erfasst.';
   if (_isLocal) {
     return `${schemaPart}
 
 Kernregeln:
-- Nur Figuren-Stammdaten erfassen, keine Orte/Szenen/Fakten, KEINE Beziehungen.
+- Nur Figuren-Stammdaten erfassen, keine Orte/Szenen/Fakten, KEINE Beziehungen, KEINE Lebensereignisse.
 - Eindeutige IDs (fig_1, fig_2, …).
 - KONSERVATIV: Nur was im Text eindeutig belegt ist.
 - Keine historischen/realen Personen die nur erwähnt werden.
 - kapitel[].name: aus ## Header oder Prompt-Kontext. Nie Seitentitel.
-- figur_name: Klarname exakt wie im Text.
-- Ereignisse: datum_label = Original-String, datum_year/month/day strukturiert (null wenn unbekannt). subtyp aus Whitelist; im Zweifel 'sonstiges'.
 - Leere Arrays wenn nichts gefunden.`;
   }
   return `${schemaPart}
@@ -175,7 +174,18 @@ Kernregeln:
 ${noBzNote}
 
 Figuren-Regeln:
-${figurenBasisRules(kontext)}
+${figurenBasisRules(kontext)}`;
+}
+
+/** Schema-Block nur für Lebensereignisse pro Figur (Claude-Single-Pass E, eigener Call
+ *  gegen den gecachten Buchtext-Block). Volle Modell-Aufmerksamkeit auf vollständige
+ *  Event-Erfassung – analog zum Fakten-Pass C. */
+function buildKomplettSchemaEvents(_kontext = '') {
+  const schemaPart = `Antworte mit diesem JSON-Schema (nur Lebensereignisse pro Figur):
+{
+  ${_ASSIGNMENTS_SCHEMA_BLOCK}
+}`;
+  return `${schemaPart}
 
 ${_EREIGNIS_RULES}`;
 }
@@ -258,6 +268,9 @@ export function buildSystemKomplettOrteSzenen(prefix, rules, kontext) {
 export function buildSystemKomplettFakten(prefix, rules, kontext) {
   return `${prefix}\n\n${rules}\n\n${buildKomplettSchemaFakten(kontext)}${_jsonOnly()}`;
 }
+export function buildSystemKomplettEvents(prefix, rules, kontext) {
+  return `${prefix}\n\n${rules}\n\n${buildKomplettSchemaEvents(kontext)}${_jsonOnly()}`;
+}
 
 /**
  * Kombinierter Vollextraktion-Prompt (P1 + P5 in einem Call):
@@ -308,16 +321,38 @@ export function buildExtraktionFigurenStammPrompt(chapterName, bookName, pageCou
   const isSinglePass = chapterName === 'Gesamtbuch';
   const scope = isSinglePass ? `dem Buch «${bookName}»` : `dem Kapitel «${chapterName}» des Buchs «${bookName}»`;
   const kapitelNote = isSinglePass
-    ? 'Der Text ist in Kapitel-Sektionen gegliedert (## Kapitelname) mit Seiten darunter (### Seitentitel). Für kapitel[].name und lebensereignisse[].kapitel: exakt aus dem ## Header entnehmen.'
-    : `Für kapitel[].name und lebensereignisse[].kapitel: immer genau «${chapterName}» verwenden – ### Überschriften sind Seitentitel.`;
+    ? 'Der Text ist in Kapitel-Sektionen gegliedert (## Kapitelname) mit Seiten darunter (### Seitentitel). Für kapitel[].name: exakt aus dem ## Header entnehmen.'
+    : `Für kapitel[].name: immer genau «${chapterName}» verwenden – ### Überschriften sind Seitentitel.`;
   const textBlock = chText == null
     ? '<text>Der Buchtext steht im System-Prompt oben.</text>'
     : `<${isSinglePass ? 'buchtext' : 'kapiteltext'} seiten="${pageCount}">\n${chText}\n</${isSinglePass ? 'buchtext' : 'kapiteltext'}>`;
   return `<aufgabe>
-Extrahiere aus ${scope} AUSSCHLIESSLICH: alle Figuren-Stammdaten (OHNE Beziehungen – die werden in einem separaten Pass erfasst) und alle Lebensereignisse der Figuren. Keine Orte, keine Fakten, keine Szenen.
+Extrahiere aus ${scope} AUSSCHLIESSLICH: alle Figuren-Stammdaten (OHNE Beziehungen und OHNE Lebensereignisse – beide werden in separaten Pässen erfasst). Keine Orte, keine Fakten, keine Szenen.
 </aufgabe>
 
 ${kapitelNote}
+
+${textBlock}`;
+}
+
+/** Claude-Single-Pass E: nur Lebensereignisse pro Figur. Eigener Call gegen den
+ *  gecachten Buchtext-Block (System-Prompt) mit der finalen Figurenliste – widmet das
+ *  gesamte Output-Budget der vollständigen Event-Erfassung (analog Fakten-Pass C). */
+export function buildExtraktionEventsPassPrompt(bookName, figuren, chText) {
+  const namen = (figuren || []).map(f => f && f.name).filter(Boolean);
+  const namenListe = namen.length ? namen.map(n => `- ${n}`).join('\n') : '(keine)';
+  const textBlock = chText == null
+    ? '<text>Der Buchtext steht im System-Prompt oben.</text>'
+    : `<buchtext>\n${chText}\n</buchtext>`;
+  return `<aufgabe>
+Extrahiere aus dem Buch «${bookName}» AUSSCHLIESSLICH die Lebensereignisse der Figuren – vollständig und erschöpfend. Gehe jede Figur aus der untenstehenden Liste einzeln durch und sammle ALLE im Text belegten Ereignisse (grosse Wendepunkte UND kleinere belegte Vorfälle). Kein Cap – die möglichst lückenlose Biografie jeder Figur ist wichtiger als Kürze. Keine Figuren-Stammdaten, keine Orte, keine Szenen, keine Fakten.
+</aufgabe>
+
+<figuren>
+${namenListe}
+</figuren>
+
+Verwende im Feld figur_name AUSSCHLIESSLICH die kanonischen Namen aus dieser Liste (exakt wie dort geschrieben) – sonst wird das Ereignis beim ID-Mapping verworfen. Der Text ist in Kapitel-Sektionen (## Kapitelname) mit Seiten (### Seitentitel) gegliedert; für lebensereignisse[].kapitel den ## Header, für .seite den ### Header verwenden.
 
 ${textBlock}`;
 }
@@ -354,18 +389,19 @@ function _knownList(names) {
   return arr.length ? arr.map(n => `- ${n}`).join('\n') : '(noch keine)';
 }
 
-/** Gap-Pass A1: fehlende Figuren-Stammdaten (+ Lebensereignisse). Reuse von
- *  SYSTEM_KOMPLETT_FIGUREN_STAMM_BLOCKS + SCHEMA_KOMPLETT_FIGUREN_STAMM. */
+/** Gap-Pass A1: fehlende Figuren-Stammdaten (OHNE Lebensereignisse – die zieht der
+ *  E-Pass über die finale Figurenliste nach). Reuse von SYSTEM_KOMPLETT_FIGUREN_STAMM_BLOCKS
+ *  + SCHEMA_KOMPLETT_FIGUREN_STAMM. */
 export function buildFigurenStammGapPrompt(bookName, knownNames) {
   return `<aufgabe>
-Du hast das Buch «${bookName}» bereits einmal nach Figuren durchsucht. Unten steht die Liste der bereits erfassten Figuren. Durchsuche den Buchtext (im System-Prompt oben) GRÜNDLICH ERNEUT und gib AUSSCHLIESSLICH Figuren aus, die in dieser Liste FEHLEN – besonders Nebenfiguren, nur kurz auftretende oder einmal erwähnte Personen mit eigenem Namen. Für jede neue Figur dieselben Stammdaten (OHNE Beziehungen) und Lebensereignisse wie im Erstdurchgang. Figuren, die bereits in der Liste stehen, NICHT erneut ausgeben. Wenn keine weitere Figur existiert: leeres figuren-Array.
+Du hast das Buch «${bookName}» bereits einmal nach Figuren durchsucht. Unten steht die Liste der bereits erfassten Figuren. Durchsuche den Buchtext (im System-Prompt oben) GRÜNDLICH ERNEUT und gib AUSSCHLIESSLICH Figuren aus, die in dieser Liste FEHLEN – besonders Nebenfiguren, nur kurz auftretende oder einmal erwähnte Personen mit eigenem Namen. Für jede neue Figur dieselben Stammdaten (OHNE Beziehungen, OHNE Lebensereignisse) wie im Erstdurchgang. Figuren, die bereits in der Liste stehen, NICHT erneut ausgeben. Wenn keine weitere Figur existiert: leeres figuren-Array.
 </aufgabe>
 
 <bereits_erfasste_figuren>
 ${_knownList(knownNames)}
 </bereits_erfasste_figuren>
 
-Der Text ist in Kapitel-Sektionen gegliedert (## Kapitelname) mit Seiten darunter (### Seitentitel). Für kapitel[].name und lebensereignisse[].kapitel: exakt aus dem ## Header entnehmen.
+Der Text ist in Kapitel-Sektionen gegliedert (## Kapitelname) mit Seiten darunter (### Seitentitel). Für kapitel[].name: exakt aus dem ## Header entnehmen.
 
 <text>Der Buchtext steht im System-Prompt oben.</text>`;
 }
@@ -383,6 +419,40 @@ ${_knownList(knownNames)}
 </bereits_erfasste_schauplaetze>
 
 Der Text ist in Kapitel-Sektionen gegliedert (## Kapitelname). Für alle Kapitel-Felder den Namen aus dem zugehörigen ## Header entnehmen.
+
+<text>Der Buchtext steht im System-Prompt oben.</text>`;
+}
+
+/** Gap-Pass C: fehlende Welt-/Kontinuitätsfakten. Reuse von SYSTEM_KOMPLETT_FAKTEN_PASS_BLOCKS
+ *  + SCHEMA_KOMPLETT_FAKTEN_PASS. Die bereits erfassten Fakten werden als kompakte
+ *  «subjekt: fakt»-Liste mitgegeben, damit das Modell sie NICHT erneut ausgibt. */
+export function buildFaktenGapPrompt(bookName, knownFacts) {
+  return `<aufgabe>
+Du hast das Buch «${bookName}» bereits einmal nach Welt- und Kontinuitätsfakten durchsucht. Unten die bereits erfassten Fakten. Durchsuche den Buchtext (im System-Prompt oben) GRÜNDLICH ERNEUT und gib AUSSCHLIESSLICH Fakten aus, die in dieser Liste FEHLEN – besonders beiläufige Welt-Details, Nebenfiguren-Zustände, einmal genannte Objekte, Regeln, Zeit- oder Ortsangaben. Bereits erfasste Fakten NICHT erneut ausgeben. Wenn kein weiteres Faktum existiert: leeres fakten-Array.
+</aufgabe>
+
+<bereits_erfasste_fakten>
+${_knownList(knownFacts)}
+</bereits_erfasste_fakten>
+
+Im «seite»-Feld jedes Faktums den reinen Seitentitel aus dem zugehörigen ### Header eintragen (OHNE «### »-Markierung); leer lassen wenn nicht eindeutig zuordenbar.
+
+<text>Der Buchtext steht im System-Prompt oben.</text>`;
+}
+
+/** Gap-Pass Szenen: fehlende Szenen. Reuse von SYSTEM_KOMPLETT_ORTE_PASS_BLOCKS +
+ *  SCHEMA_KOMPLETT_ORTE_PASS. orte/songs dürfen leer bleiben – im Job wird nur das
+ *  szenen-Array additiv vereinigt. */
+export function buildSzenenGapPrompt(bookName, knownScenes) {
+  return `<aufgabe>
+Du hast das Buch «${bookName}» bereits einmal in Szenen zerlegt. Unten die bereits erfassten Szenen. Durchsuche den Buchtext (im System-Prompt oben) GRÜNDLICH ERNEUT und gib AUSSCHLIESSLICH Szenen aus, die in dieser Liste FEHLEN – übergangene Handlungsabschnitte, Nebenszenen, kurze aber klar abgegrenzte Abschnitte. Bereits erfasste Szenen NICHT erneut ausgeben. orte und songs als leere Arrays zurückgeben (in diesem Pass nicht gefragt). Wenn keine weitere Szene existiert: leeres szenen-Array.
+</aufgabe>
+
+<bereits_erfasste_szenen>
+${_knownList(knownScenes)}
+</bereits_erfasste_szenen>
+
+Der Text ist in Kapitel-Sektionen gegliedert (## Kapitelname) mit Seiten darunter (### Seitentitel). Für szenen[].kapitel den reinen ## Kapitelnamen, für szenen[].seite den reinen ### Seitentitel (jeweils ohne Markierung) verwenden.
 
 <text>Der Buchtext steht im System-Prompt oben.</text>`;
 }

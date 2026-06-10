@@ -114,7 +114,7 @@ Voraussetzung: Initial-Import durch. Sonst 400 `IMPORT_FIRST`.
 
 1. pro `pageId`:
    - kein Link → `createPost({ title, content: appToWpHtml, status: conn.default_status, slug })` → Link anlegen.
-     **Titel-Normalisierung (nur Create):** Titel wird auf `YYYY-MM-DD: Rest` gebracht (Datum = `localIsoDate()`); leerer Rest → nur das Datum. Vorhandener Datum-Prefix (`^\d{4}-\d{2}-\d{2}(?:\s*:\s*…)?$`) wird durch heute ersetzt. Lokaler `page_name` zieht via `contentStore.savePage` synchron nach. Updates rühren den Titel nicht an.
+     **Titel-Normalisierung (nur Create):** Der Datum-Prefix `YYYY-MM-DD:` ist **app-intern**. Der lokale `page_name` wird auf `YYYY-MM-DD: Rest` gebracht (Datum = `localIsoDate()`); leerer Rest → nur das Datum; vorhandener Prefix (`^\d{4}-\d{2}-\d{2}(?:\s*:\s*…)?$`) wird durch heute ersetzt. **WordPress bekommt den Titel ohne Datum** (nur `Rest`; leerer Rest → leerer WP-Titel). Lokaler `page_name` zieht via `contentStore.savePage` synchron nach; jede Umbenennung landet in `job.result.renamed: [{ pageId, name }]`, damit das Frontend Sidebar-Tree + offenen Editor-Titel nachzieht (`sync-core.js#_applyPushRenames`). Updates rühren den Titel nicht an.
    - Link da, kein Konflikt → `updatePost(id, …)`, `wp_modified_at` aus Response übernehmen
    - `conflict_state='detected'` → skip, Fehler in Job-Result
    - **WP-Post drüben gelöscht** (`BLOG_HTTP_404` von `updatePost`) → Link wird entfernt, Error-Code `BLOG_REMOTE_GONE` ins Result; Page-Badge flippt auf `new`. Erneuter Push erstellt einen frischen Post.

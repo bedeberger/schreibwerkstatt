@@ -299,6 +299,7 @@ async function runBlogPushJob(jobId, bookId, userEmail, pageIds) {
     let createdRemote = 0;
     let conflictSkipped = 0;
     const errors = [];
+    const renamed = []; // [{ pageId, name }] — lokale Umbenennungen (Datum-Prefix)
 
     for (let i = 0; i < ids.length; i++) {
       if (_abortSignal(jobId)?.aborted) throw new DOMException('Aborted', 'AbortError');
@@ -330,33 +331,34 @@ async function runBlogPushJob(jobId, bookId, userEmail, pageIds) {
 
       const wpHtml = appToWpHtml(pageRow.html || pageRow.body_html || '<p></p>');
 
-      // Beim Create: Titel auf `YYYY-MM-DD: Rest` normalisieren (oder nur
-      // `YYYY-MM-DD`, falls Rest leer). Bereits vorhandener Datum-Prefix wird
-      // durch heute ersetzt. Lokaler page_name wird synchron gezogen.
-      let titleForCreate = pageRow.name || '';
+      // Beim Create: der Datum-Prefix `YYYY-MM-DD:` ist app-intern. Der lokale
+      // page_name bekommt `YYYY-MM-DD: Rest` (oder nur `YYYY-MM-DD`, falls Rest
+      // leer; bereits vorhandener Prefix wird durch heute ersetzt). WordPress
+      // bekommt den Titel OHNE Datum (nur `Rest`).
+      let wpTitleForCreate = '';
+      let localNameForCreate = pageRow.name || '';
       let renamedLocally = false;
       if (!link) {
         const today = localIsoDate();
-        const raw = String(titleForCreate).trim();
+        const raw = String(pageRow.name || '').trim();
         const m = /^\d{4}-\d{2}-\d{2}(?:\s*:\s*(.*))?$/.exec(raw);
         const rest = (m ? (m[1] || '') : raw).trim();
-        const normalized = rest ? `${today}: ${rest}` : today;
-        if (normalized !== titleForCreate) {
-          titleForCreate = normalized;
-          renamedLocally = true;
-        }
+        wpTitleForCreate = rest;
+        localNameForCreate = rest ? `${today}: ${rest}` : today;
+        if (localNameForCreate !== pageRow.name) renamedLocally = true;
       }
 
       try {
         const remote = link
           ? await wp.updatePost(link.wp_post_id, { content: wpHtml })
           : await wp.createPost({
-              title: titleForCreate,
+              title: wpTitleForCreate,
               content: wpHtml,
               status: conn.defaultStatus,
             });
         if (renamedLocally) {
-          await contentStore.savePage(pageId, { name: titleForCreate }, null);
+          await contentStore.savePage(pageId, { name: localNameForCreate }, null);
+          renamed.push({ pageId, name: localNameForCreate });
         }
         blogs.upsertLink({
           pageId,
@@ -368,7 +370,7 @@ async function runBlogPushJob(jobId, bookId, userEmail, pageIds) {
           lastPushedAt: new Date().toISOString(),
         });
         if (!link) {
-          logger.info(`Blog-Push: Page ${pageId} "${titleForCreate}" -> WP-Post ${remote.id} neu erstellt`);
+          logger.info(`Blog-Push: Page ${pageId} "${localNameForCreate}" -> WP-Post ${remote.id} neu erstellt`);
           createdRemote++;
         } else {
           logger.info(`Blog-Push: Page ${pageId} "${pageRow.name}" -> WP-Post ${remote.id} aktualisiert`);
@@ -391,7 +393,7 @@ async function runBlogPushJob(jobId, bookId, userEmail, pageIds) {
 
     blogs.touchPush(conn.id);
     logger.info(`Push: ${pushed} aktualisiert, ${createdRemote} neu in WP, ${conflictSkipped} Konflikt skipped, ${errors.length} Fehler.`);
-    completeJob(jobId, { pushed, createdRemote, conflictSkipped, errors }, null,
+    completeJob(jobId, { pushed, createdRemote, conflictSkipped, errors, renamed }, null,
       `${pushed + createdRemote} gepusht / ${errors.length} Fehler`);
   } catch (e) {
     if (e.name !== 'AbortError') makeJobLogger(jobId).error(`Blog-Push-Fehler: ${e.message}`);

@@ -34,10 +34,11 @@ function buildVerbatimSamples(ctx) {
     return out;
   };
 
-  const push = (id, instr, completion) => {
+  const push = (id, sourceKey, instr, completion) => {
     samples.push({
       id,
       type: 'verbatim',
+      sourceKey,
       messages: [
         { role: 'system', content: unifiedSys },
         { role: 'user', content: instr },
@@ -49,7 +50,8 @@ function buildVerbatimSamples(ctx) {
 
   // Emittiert einen (ggf. gestückelten) Verbatim-Block. `noun` ist die
   // vollständige Nominalphrase inkl. Artikel (z.B. „die Seite «X»").
-  const emitChunked = (text, noun, idPrefix) => {
+  // `sourceKey` gruppiert alle Slices fürs Train/Val-Splitting auf Kapitel-Ebene.
+  const emitChunked = (text, noun, idPrefix, sourceKey) => {
     const slices = sliceAtSentence(text, maxFullChars);
     const total = slices.length;
     for (let si = 0; si < total; si++) {
@@ -65,7 +67,7 @@ function buildVerbatimSamples(ctx) {
       const instr = (langIsEn
         ? `Reproduce ${noun} word for word, exactly as written:`
         : `Gib ${noun} wörtlich wieder, exakt wie geschrieben:`) + partLabel + ctxBlock;
-      push(total > 1 ? `${idPrefix}|${si}` : idPrefix, instr, slice);
+      push(total > 1 ? `${idPrefix}|${si}` : idPrefix, sourceKey, instr, slice);
     }
   };
 
@@ -77,7 +79,7 @@ function buildVerbatimSamples(ctx) {
     if (p.chapter) locParts.push(langIsEn ? `chapter «${p.chapter}»` : `Kapitel «${p.chapter}»`);
     const suffix = locParts.length ? ' (' + locParts.join(', ') + ')' : '';
     const noun = (langIsEn ? `the page «${p.title}»` : `die Seite «${p.title}»`) + suffix;
-    emitChunked(p.text, noun, 'verbPage|' + p.id);
+    emitChunked(p.text, noun, 'verbPage|' + p.id, 'ch:' + (p.chapter_id ?? 0));
   }
 
   // ── Kapitel verbatim (volltext, ungekürzt) ────────────────────────────
@@ -87,7 +89,7 @@ function buildVerbatimSamples(ctx) {
     const name = chapterNameByKey.get(k);
     const noun = (langIsEn ? `the chapter «${name}»` : `das Kapitel «${name}»`)
       + (bookName ? (langIsEn ? ` from «${bookName}»` : ` aus «${bookName}»`) : '');
-    emitChunked(text, noun, 'verbChap|' + k);
+    emitChunked(text, noun, 'verbChap|' + k, 'ch:' + k);
   }
 }
 

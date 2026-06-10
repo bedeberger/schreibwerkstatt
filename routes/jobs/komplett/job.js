@@ -109,6 +109,14 @@ async function verifyKontinuitaetProbleme(ctx, result, fromPct, toPct) {
 // (_resolveClaudeModel/_resolveClaudeContextWindow/_resolveClaudeMaxOut/_claudeTimeoutMs) gereicht
 // → greift für alle Claude-Calls dieses Jobs (P1–P8), ohne globale Calls zu beeinflussen.
 // Cache-Version reflektiert das Modell (Kontext/Output ändern nur Limits, nicht den Inhalt).
+// Per-Call-Timeout-Default für die Komplettanalyse, wenn ein eigenes Komplett-Profil
+// (Modell/Kontext/Output) gesetzt ist, aber kein expliziter timeout_ms.komplett: 30 Min.
+// Begründung: (a) die globalen 10 Min sind für Opus-Single-Pass-Calls über ein ganzes Buch
+// zu knapp; (b) 30 Min < 1h-Prompt-Cache-TTL — aufeinanderfolgende Calls (P1…P8, alle auf
+// demselben gecachten 1h-Buchtext-Block) stossen den Cache so stets vor Ablauf neu an. Ein
+// einzelner Call, der die TTL überdauert, zahlte sonst cache_creation statt cache_read.
+const KOMPLETT_DEFAULT_TIMEOUT_MS = 1800000; // 30 min
+
 function _komplettClaudeOverrides(effectiveProvider) {
   if (effectiveProvider !== 'claude') return null;
   const model = String(appSettings.get('ai.claude.model.komplett') || '').trim();
@@ -119,7 +127,15 @@ function _komplettClaudeOverrides(effectiveProvider) {
   if (model) patch.claudeModel = model;
   if (contextWindow > 0) patch.claudeContextWindow = contextWindow;
   if (maxTokensOut > 0) patch.claudeMaxTokensOut = maxTokensOut;
-  if (timeoutMs > 0) patch.claudeTimeoutMs = timeoutMs;
+  // Eigenes Komplett-Profil aktiv? Dann den Timeout-Default greifen lassen (nie unter den
+  // expliziten globalen Wert senken). Ohne Profil bleibt es beim globalen Timeout.
+  const hasKomplettProfile = !!(model || contextWindow > 0 || maxTokensOut > 0);
+  if (timeoutMs > 0) {
+    patch.claudeTimeoutMs = timeoutMs;
+  } else if (hasKomplettProfile) {
+    const globalTimeoutMs = parseInt(appSettings.get('ai.claude.timeout_ms'), 10) || 600000;
+    patch.claudeTimeoutMs = Math.max(KOMPLETT_DEFAULT_TIMEOUT_MS, globalTimeoutMs);
+  }
   return Object.keys(patch).length ? patch : null;
 }
 

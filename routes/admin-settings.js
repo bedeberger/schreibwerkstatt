@@ -197,6 +197,35 @@ router.post('/test-geocode', async (req, res) => {
   }
 });
 
+// POST /admin/settings/test-tiles — Health-Probe des konfigurierten Tile-Servers.
+// Laedt die Welt-Kachel z/x/y = 0/0/0 (existiert auf jedem OSM-kompatiblen
+// Server) und prueft Status + image/*-Content-Type. {s}/{r} (Subdomain/Retina)
+// werden auf konkrete Werte ersetzt.
+router.post('/test-tiles', async (req, res) => {
+  const tmpl = String(appSettings.get('geocode.tiles.url') || 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+  const url = tmpl
+    .replace(/\{s\}/g, 'a').replace(/\{r\}/g, '')
+    .replace(/\{z\}/g, '0').replace(/\{x\}/g, '0').replace(/\{y\}/g, '0');
+  const t0 = Date.now();
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 5000);
+    const r = await fetch(url, {
+      headers: { 'User-Agent': 'Schreibwerkstatt/1.0 (self-hosted book tool)' },
+      signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+    await r.arrayBuffer().catch(() => {}); // Body draenen → Socket freigeben
+    const ctype = r.headers.get('content-type') || '';
+    const latency_ms = Date.now() - t0;
+    if (!r.ok) return res.json({ ok: false, error: `HTTP_${r.status}`, status: r.status, latency_ms });
+    if (!ctype.startsWith('image/')) return res.json({ ok: false, error: 'NOT_IMAGE', content_type: ctype, latency_ms });
+    return res.json({ ok: true, status: r.status, content_type: ctype, latency_ms });
+  } catch (e) {
+    return res.json({ ok: false, error: e.name === 'AbortError' ? 'TIMEOUT' : e.message, latency_ms: Date.now() - t0 });
+  }
+});
+
 // POST /admin/settings/smtp/test-send { to? } — sendet ein 'test'-Template
 // an `to` (Default: Gmail-User des Mailers). Liefert { ok, latencyMs, error? }.
 router.post('/smtp/test-send', express.json(), async (req, res) => {

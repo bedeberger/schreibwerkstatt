@@ -30,18 +30,19 @@ function buildFigurePassageSamples(ctx) {
     }
     for (let j = 0; j < found.length; j++) {
       const { para, page } = found[j];
+      const pageCh = 'ch:' + (page.chapter_id ?? 0);
       pushQA('authorChat|figPass|' + f.fig_id + '|' + j,
         langIsEn
           ? `Show me a passage where ${f.name} appears.`
           : `Zeig mir eine Passage mit ${f.name}.`,
-        para);
+        para, pageCh);
       // Variante mit Kapitel-Kontext als weitere Formulierung
       if (page.chapter && j === 0) {
         pushQA('authorChat|figPassCh|' + f.fig_id,
           langIsEn
             ? `How does ${f.name} appear in «${page.chapter}»?`
             : `Wie tritt ${f.name} in «${page.chapter}» auf?`,
-          para);
+          para, pageCh);
       }
     }
   }

@@ -130,6 +130,25 @@
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.completenessPasses')"></small>
         </label>
 
+        <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.claude.bookchatTitle')"></span></h4>
+        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.claude.bookchatIntro')"></small>
+        <label>ai.claude.model.bookchat
+          <input type="text" x-model="adminSettingsForm['ai.claude.model.bookchat']" placeholder="claude-opus-4-8">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.bookchatModel')"></small>
+        </label>
+        <label>ai.claude.context_window.bookchat
+          <input type="text" x-data="numInput({ integer: true, min: 0, max: 2000000 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.context_window.bookchat']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.bookchatContextWindow')"></small>
+        </label>
+        <label>ai.claude.max_tokens_out.bookchat
+          <input type="text" x-data="numInput({ integer: true, min: 0, max: 200000 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.max_tokens_out.bookchat']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.bookchatMaxTokensOut')"></small>
+        </label>
+        <label>ai.claude.timeout_ms.bookchat
+          <input type="text" x-data="numInput({ integer: true, min: 0, max: 3600000 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.timeout_ms.bookchat']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.bookchatTimeoutMs')"></small>
+        </label>
+
         <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.claude.advancedTitle')"></span></h4>
         <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.advancedClaude')"></small>
         <label>ai.claude.retry_max <input type="text" x-data="numInput({ step: 1, min: 0, max: 10 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.retry_max']"></label>
@@ -418,8 +437,10 @@
       </div>
     </section>
 
-    <!-- Geocode-Tab: Koordinaten-Ermittlung fuer die Orte-Karte -->
+    <!-- Geocode-Tab: zwei Sub-Sektionen — Koordinaten-Ermittlung (Geocoding) +
+         Karten-Kacheln (Tiles) der Orte-Karte. -->
     <section x-show="adminSettingsTab === 'geocode'" class="admin-settings-section">
+      <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.geocode.geocodingTitle')"></span></h4>
       <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.geocode.hint')"></p>
       <label>
         <span x-text="$app.t('admin.settings.geocode.provider.label')"></span>
@@ -439,6 +460,22 @@
       </label>
       <div class="admin-settings-actions">
         <button type="button" @click="adminSettingsTest('geocode')" x-text="$app.t('admin.settings.test.geocode')"></button>
+      </div>
+
+      <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.geocode.tilesTitle')"></span></h4>
+      <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.geocode.tilesHint')"></p>
+      <label>
+        <span x-text="$app.t('admin.settings.geocode.tiles.label')"></span>
+        <input type="url" x-model="adminSettingsForm['geocode.tiles.url']" :placeholder="$app.t('admin.settings.geocode.tiles.placeholder')">
+        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.geocode.tiles.help')"></small>
+      </label>
+      <label>
+        <span x-text="$app.t('admin.settings.geocode.tilesAttribution.label')"></span>
+        <input type="text" x-model="adminSettingsForm['geocode.tiles.attribution']" :placeholder="$app.t('admin.settings.geocode.tilesAttribution.placeholder')">
+        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.geocode.tilesAttribution.help')"></small>
+      </label>
+      <div class="admin-settings-actions">
+        <button type="button" @click="adminSettingsTest('tiles')" x-text="$app.t('admin.settings.test.tiles')"></button>
       </div>
     </section>
 
@@ -642,7 +679,7 @@
 
     <!-- Test-Result-Anzeige (pro Tab gescoped via kind→tab-Mapping) -->
     <div class="admin-settings-test-result"
-         x-show="adminSettingsTestResult && ({ oauth: 'auth', provider: 'provider', smtp: 'smtp', languagetool: 'languagetool', stt: 'stt', geocode: 'geocode' }[adminSettingsTestResult.kind] === adminSettingsTab)">
+         x-show="adminSettingsTestResult && ({ oauth: 'auth', provider: 'provider', smtp: 'smtp', languagetool: 'languagetool', stt: 'stt', geocode: 'geocode', tiles: 'geocode' }[adminSettingsTestResult.kind] === adminSettingsTab)">
       <strong x-text="$app.t('admin.settings.test.' + (adminSettingsTestResult?.ok ? 'ok' : 'fail'))"></strong>
       <span x-show="adminSettingsTestResult?.latency_ms" x-text="' · ' + adminSettingsTestResult?.latency_ms + ' ms'"></span>
       <span x-show="adminSettingsTestResult?.error" x-text="' · ' + adminSettingsTestResult?.error"></span>

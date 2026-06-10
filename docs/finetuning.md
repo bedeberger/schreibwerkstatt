@@ -19,13 +19,18 @@ Vom JSONL-Export der Fine-Tuning-Karte zu einem lokal laufenden Modell, das Stil
 
 UI → Buch → Kachel **Fine-Tuning-Export**:
 
-- Alle fünf Typen aktiv: `Stil`, `Szene`, `Dialog`, `Autor-Chat`, `Korrekturen`.
+- Alle Typen aktiv: `Stil`, `Szene`, `Wörtlich`, `Dialog`, `Autor-Chat`, `Korrekturen`.
 - `Min. Zeichen = 200`, `Max. Zeichen = 4000`.
 - `Validation-Split = 0.05` (> 20 000 Samples), sonst `0.1`.
 - `Max. Token pro Sample = 4096`.
 - `Vorgerendertes text-Feld` optional.
+- `Typ-Balance` (Max. Anteil pro Typ) optional — `0` lässt die Rohmischung, `0.4`–`0.5` deckelt die volumenstarken Text-Sampler, damit Autor-Chat/KI-Q&A (Welt- und Figurenwissen) nicht untergehen.
 
-Stats nach Generierung: p95/max Token, empfohlene `seq_len`, verworfene Samples.
+**Train/Val wird pro Kapitel gesplittet:** alle Samples eines Kapitels (Stil, Szene, Wörtlich, Dialog, Figur-Passagen) landen gemeinsam in `train` **oder** `val`. So ist `val` ein echtes Holdout — der Eval-Loss misst Generalisierung statt auswendig gelernten Trainingstext, und `load_best_model_at_end`/EarlyStopping (siehe [train_book.py](unsloth-config/train_book.py)) wählen sinnvoll aus. Fakten-Q&A und Korrekturen splitten per Sample (sie geben keinen zusammenhängenden Buchtext wieder). Konsequenz: bei sehr wenigen Kapiteln kann der Val-Anteil schwanken (ggf. `Validation-Split` erhöhen).
+
+**Loss-Masking:** Trainiere über das `messages`-Feld + `train_on_responses_only` (so im CLI-Script verdrahtet) — dann fliesst der Loss nur auf die Assistant-Tokens, User-Instruktionen/System-Prompts werden maskiert. Das `text`-Feld (`emit_text=true`) ist nur ein Fallback für Loader, die `dataset_text_field` erwarten; es kann den Prompt nicht maskieren, das Modell lernt dann auch die Instruktions-Phrasen mit.
+
+Stats nach Generierung: p95/max Token, empfohlene `seq_len`, verworfene Samples, entfernte Dubletten, per Typ-Cap entfernte Samples. Exakte Dubletten-Entfernung und ein deterministisches Shuffle pro Split laufen immer.
 
 Format pro Zeile:
 

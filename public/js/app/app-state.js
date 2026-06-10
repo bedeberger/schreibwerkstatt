@@ -41,6 +41,12 @@ const shellState = () => ({
   // <title>, apple-mobile-web-app-title, Site-Header-H1 und Locale-Platzhalter
   // `{appName}`. Default deckt Hard-Refresh ab, bevor /config geladen ist.
   appName: 'Schreibwerkstatt',
+  // Tile-Server der Orte-Karte (vom Server via /config → app_settings
+  // geocode.tiles.*). Leaflet holt die Kacheln direkt im Browser; die URL liegt
+  // hier, damit ein self-hosted Tile-Server konfigurierbar ist. attribution
+  // leer = orte-map.js faellt auf den i18n-Default zurueck. Default deckt den
+  // Hard-Refresh ab, bevor /config geladen ist.
+  mapTiles: { url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', attribution: '' },
   // LT-Spellcheck-Aktivierung. /config liefert
   // `languagetool.enabled` (true wenn Admin enabled + URL gesetzt). Wird in
   // Editor-Templates via `:spellcheck="!$app.languagetoolEnabled"` gelesen

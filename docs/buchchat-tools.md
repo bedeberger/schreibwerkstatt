@@ -21,8 +21,17 @@ Jede Tool-Funktion: `(input, ctx) → JSON-serialisierbares Objekt` (sync oder a
 
 ## Loop-Constraints
 
-- `BOOK_CHAT_MAX_TOOL_ITER = 6` (env `BOOK_CHAT_MAX_TOOL_ITER`). Nach 6 Iterationen ohne `stop_reason='end_turn'` bricht der Loop ab und der letzte Text wird geliefert.
-- Aktivierung: `API_PROVIDER=claude` und `BOOK_CHAT_MODE != 'classic'`. Andere Provider/Modes nutzen den klassischen Single-Pass-Chat ohne Tools.
+- Max. Tool-Iterationen: App-Setting `jobs.book_chat.max_tool_iter` (Default 6). Nach Erreichen ohne `stop_reason='end_turn'` bricht der Loop ab und der letzte Text wird geliefert.
+- Aktivierung (`_bookChatUseAgent`): effektiver Provider `claude` und `jobs.book_chat.mode != 'classic'` (`auto`/`agent`). Andere Provider/Modes nutzen den klassischen Single-Pass-Chat ohne Tools (`runBookChatJob`).
+- Per-Job-Claude-Override (analog Komplettanalyse): `ai.claude.model.bookchat` / `…context_window.bookchat` / `…max_tokens_out.bookchat` / `…timeout_ms.bookchat` / `…effort.bookchat` (App-Settings, leer/0 = folgt global). Greift nur bei `ai.provider = claude`, für **beide** Buch-Chat-Pfade (klassisch + agentisch). Gebunden via `setContext` in `routes/jobs/chat.js#_applyBookChatClaudeOverrides` **vor** `getContextConfigFor`, damit Token-Budget/Tool-Result-Cap das Override-Kontextfenster reflektieren. Kein eigener Timeout-Default (anders als komplett). So läuft z.B. der Tool-Loop auf Opus, während global Sonnet 4.6 fürs Lektorat bleibt.
+
+## Claude-/Opus-Call (Tool-Use)
+
+Der agentische Loop ruft `callAIWithTools` → `_callClaudeWithToolsAttempt` ([lib/ai.js](../lib/ai.js)) — ein **eigener Pfad** neben dem Nicht-Tool-`_callClaudeAttempt`. Wer den Buch-Chat auf Opus optimiert, fasst diesen Pfad an, nicht den Nicht-Tool-Pfad.
+
+- **Adaptive Thinking:** auf Opus 4.7+ sendet der Tool-Pfad `thinking:{type:'adaptive'}` (Modell-Erkennung `_claudeUsesAdaptiveThinking`, identisch zum temperature-Verbot). **Pflicht-Invariante:** die im Stream erfassten `thinking`/`redacted_thinking`-Blöcke (inkl. `signature`) werden in `rawContentBlocks` in Originalreihenfolge zurückgespielt — der assistant-Turn MUSS mit dem Thinking-Block beginnen, sonst quittiert die Folge-Iteration mit HTTP 400. Sonnet 4.6 / Opus 4.6 / lokale Provider: kein `thinking`-Feld → unverändert. **Folge:** Thinking zählt gegen `max_tokens_out` — Output-Cap (`…max_tokens_out.bookchat`) großzügig halten (≥ 32–64K), sonst Truncation-Wurf.
+- **Prompt-Caching (Multi-Turn):** System + Tools tragen einen Cache-Breakpoint (über `_buildClaudeSystemBlocks`); zusätzlich setzt `_withCacheBreakpointOnLastMessage` pro Iteration einen Breakpoint auf den letzten Block der letzten Nachricht. Die wachsende `tool_result`-History wird damit ab Iteration 2 aus dem Cache gelesen statt voll bezahlt (Render-Order tools→system→messages; 2 von max 4 Breakpoints). Nur der Tool-Pfad; das Original-`messages`-Array bleibt unangetastet (geklont).
+- **effort:** `ai.claude.effort.bookchat` (`low|medium|high|xhigh|max`) → `output_config.effort`, nur für den Buch-Chat (ALS-Override `claudeEffort`; andere Jobs unberührt). Tier-Mismatch wird geklemmt (`max`→Opus-only, `xhigh`→Opus-4.7+, sonst `high`) statt 400. Leer = API-Default (`high`).
 
 ## Tools
 

@@ -7,9 +7,10 @@ Reale Schauplätze auf einer Leaflet-Karte verorten. Pro Buch via `book_settings
 - `book_settings.orte_real` (INTEGER, Default 0) — schaltet den Karten-Tab pro Buch frei.
 - `book_settings.schauplatz_land` (TEXT, nullable) — Länder-Hint (Region) fürs Geocoding, schränkt Nominatim/Photon-Treffer ein.
 - `locations.lat` / `locations.lng` (REAL, nullable) — Koordinaten. Range-geclampt (lat ∈ [-90,90], lng ∈ [-180,180]) im `PUT /locations`-Pfad.
-- `locations.land` (TEXT, nullable) — pro-Ort-Land.
+- `locations.land` (TEXT, nullable) — pro-Ort-Land (KI-extrahiert/User-kuratiert).
+- `locations.geo_query` / `locations.geo_land` (TEXT, nullable) — Geocode-Resolve-Cache: das von der KI aufgelöste Toponym + der Ziel-Ländercode. `geo_query` Semantik: `NULL` = nie aufgelöst, `''` = aufgelöst aber kein realer Anker (rein fiktiv) → kein Geocoder-Call, sonst = Toponym für den Lookup. Bewusst getrennt von `land`.
 
-Migrationen 162 (`orte_real` + `lat`/`lng`) und 163 (`schauplatz_land` + `locations.land`).
+Migrationen 162 (`orte_real` + `lat`/`lng`), 163 (`schauplatz_land` + `locations.land`) und 181 (`locations.geo_query` + `geo_land`).
 
 ## Geocode-Lib (`lib/geocode.js`)
 
@@ -27,14 +28,24 @@ Antwort-Normalisierung: `parseNominatimResults` / `parsePhotonResults` → `[{ l
 - `geocode.provider` (`GEOCODE_PROVIDER`) — `nominatim` | `photon`
 - `geocode.nominatim.url` (`NOMINATIM_URL`)
 - `geocode.photon.url` (`PHOTON_URL`)
+- `geocode.tiles.url` (`OSM_TILES_URL`) — Tile-Server der Karte im `{z}/{x}/{y}.png`-Schema (Default Public-OSM). Self-hosted Tile-Server (openstreetmap-tile-server / tileserver-gl) hier eintragen. `{s}`-Subdomain optional (Leaflet ignoriert den Platzhalter, wenn die URL ihn nicht enthält).
+- `geocode.tiles.attribution` (`OSM_TILES_ATTRIBUTION`) — Attribution unten rechts auf der Karte; leer = i18n-Default `orte.map.attribution`.
+
+## Tiles (Karten-Kacheln)
+
+Leaflet holt die Kacheln **direkt im Browser** (kein Server-Proxy), daher liefert `/config` die `mapTiles: { url, attribution }` ans Frontend (Quelle: `geocode.tiles.*`). [orte-map.js](../public/js/book/orte-map.js) liest `window.__app.mapTiles` mit Public-OSM als Fallback. **Why:** wer den Geocoder self-hostet, will auch die Public-OSM-Tile-Usage-Policy nicht weiter hämmern — konsistent zur Self-Host-OSS-Philosophie ist der Tile-Server konfigurierbar. Bei leerer Attribution greift der i18n-Default `orte.map.attribution`; ein eigener Server kann sie überschreiben.
+
+**Admin-UI:** Der Geocode-Tab ist in zwei Sub-Sektionen geteilt — *Koordinaten-Ermittlung (Geocoding)* und *Karten-Kacheln (Tiles)* — mit je eigenem Health-Check-Button. **Probe `POST /admin/settings/test-tiles`** lädt die Welt-Kachel `z/x/y = 0/0/0` (existiert auf jedem OSM-kompatiblen Server; `{s}`/`{r}` werden auf konkrete Werte ersetzt) und meldet `ok` bei Status 200 + `image/*`-Content-Type (sonst `HTTP_<status>` / `NOT_IMAGE` / `TIMEOUT`).
 
 ## Route: `GET /geocode` (`routes/geocode.js`)
 
-Auth-geschützt (globaler Guard). Params: `q` (Pflicht, ≤200 Zeichen, sonst 400), `lang` (`de`|`en`, Default `de`), `region` (2-Letter-CC). Antwort `{ candidates: [...] }`. Kein Server-Proxy für Tiles — die holt der Browser direkt von OSM (Betreiber-Sache, self-hosted OSS); App liefert nur Voreinstellung + Pflicht-Attribution.
+Auth-geschützt (globaler Guard). Params: `q` (Pflicht, ≤200 Zeichen, sonst 400), `lang` (`de`|`en`, Default `de`), `region` (2-Letter-CC). Antwort `{ candidates: [...] }`.
 
 ## KI-Normalisierungs-Job: `POST /jobs/geocode-resolve` (`routes/jobs/geocode.js`)
 
-Einziger Verortungspfad der Orte-Karte (KI-first, keine Cron-Auto-Verortung mehr). Input: `{ book_id, items: [{ id, name }] }` (Batch, max 200). `runGeocodeResolveJob` schickt alle Labels in **einem** `aiCall` (Job → Token-/Statistik-Tracking; Prompt/Schema in [public/js/prompts/geocode.js](../public/js/prompts/geocode.js): `buildSystemGeocodeResolve` + `buildGeocodeResolvePrompt` + `SCHEMA_GEOCODE_RESOLVE`), bekommt pro Label `{ ort, land }` (präzise reale Anfrage — Strasse+Stadt wenn das Label sie hergibt, sonst Stadt; nicht-geografische Beschreibungen wie Bar/Badi/Café entfernt; ISO-2-Code; leer = rein fiktiv, kein Anker), geocodet jeden via `geocode(ort, { region: land })` und liefert `{ results: [{ id, lat, lng }|null] }`. Kein Cache (kein `geocode_*_cache`), daher **nicht** in `_promptsContentHash`.
+Einziger Verortungspfad der Orte-Karte (KI-first, keine Cron-Auto-Verortung mehr). Input: `{ book_id, items: [{ id, name }] }` (Batch, max 200). `runGeocodeResolveJob` schickt die **noch nicht aufgelösten** Labels in **einem** `aiCall` (Job → Token-/Statistik-Tracking; Prompt/Schema in [public/js/prompts/geocode.js](../public/js/prompts/geocode.js): `buildSystemGeocodeResolve` + `buildGeocodeResolvePrompt` + `SCHEMA_GEOCODE_RESOLVE`), bekommt pro Label `{ ort, land }` (präzise reale Anfrage — Strasse+Stadt wenn das Label sie hergibt, sonst Stadt; nicht-geografische Beschreibungen wie Bar/Badi/Café entfernt; ISO-2-Code; leer = rein fiktiv, kein Anker), geocodet jeden via `geocode(ort, { region: land })` und liefert `{ results: [{ id, lat, lng }|null] }`.
+
+**Geocode-Resolve-Cache (`locations.geo_query`/`geo_land`):** Vor dem `aiCall` lädt der Job die persistierten Auflösungen der angefragten Orte (`_loadResolved`); nur Labels ohne Cache-Eintrag gehen an die KI, frische Auflösungen werden zurückgeschrieben (`_persistResolved`). Sind alle Labels gecacht, entfällt der `aiCall` ganz (kein Token-Verbrauch). **Why:** ein erneuter „Alle verorten"-Lauf besteht v.a. aus rein fiktiven Orten (geo_query=`''`) und zuvor verfehlten Treffern — ohne Cache fragt jeder Klick die KI erneut. Der Cache ist **labelbasiert**, nicht prompt-gehasht. Invalidierung im Schreibpfad ([db/schema.js](../db/schema.js)#`saveOrteToDb`): bei Umbenennung **und** bei manuellem „Georeferenz entfernen" (hatte Koordinaten, jetzt keine — das „nochmal von vorn"-Signal des Users) werden `geo_query`/`geo_land` genullt, sodass ein erneutes Verorten die KI frisch laufen lässt. Bei Komplett-Reextraktion (`preserveExistingCoords`) reattacht `saveOrteToDb` den Cache per normalisiertem Namen (sonst wischt der Nacht-Cron ihn) und fällt nicht durch die Coord-Clear-Heuristik. Reine Wortlaut-Änderungen am Resolve-Prompt invalidieren den Cache **nicht** — Auflösung ist labeldeterministisch und niedrig-stakes. Da kein prompt-gateter Cache → **nicht** in `_promptsContentHash`.
 
 **Disambiguierungs-Kontext** (alles optional, in den Prompt gefaltet): Buch-Land (`schauplatz_land`) + Buch-Kontext-Freitext (`buch_kontext`, auf 400 Zeichen gekappt) als globaler Block; pro Ort die Wohnadressen der verknüpften Figuren (`location_figures` → `figures.wohnadresse`, max 3, via `_figureHints`). Der geografische Anker des Labels selbst hat im Prompt Vorrang — widerspricht das Label dem Hinweis, gewinnt das Label.
 

@@ -7354,6 +7354,27 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 180 abgeschlossen (book_publication.epub_chapter_number_divider).');
   }
 
+  if (version < 181) {
+    // Geocode-Resolve-Cache pro Ort: `geo_query` haelt den von der KI aufgeloesten
+    // realen Toponym (z.B. «Badi Olten» → «Olten»), `geo_land` den Ziel-Laendercode
+    // (ISO-3166-1-alpha-2) fuer den Geocoder-Bias. So skippt ein erneuter
+    // «Alle verorten»-Lauf die KI fuer schon aufgeloeste Labels. Semantik von
+    // geo_query: NULL = nie aufgeloest; '' = aufgeloest, aber kein realer Anker
+    // (rein fiktiv) → kein Geocoder-Call; sonst = Toponym fuer den Lookup. Bewusst
+    // getrennt von `land` (User-/Komplettanalyse-kuratiertes Ort-Land). Bei einer
+    // Umbenennung wird der Cache im Schreibpfad (saveOrteToDb) genullt. Additiv.
+    const locCols181 = db.pragma('table_info(locations)').map(c => c.name);
+    if (!locCols181.includes('geo_query')) db.exec('ALTER TABLE locations ADD COLUMN geo_query TEXT');
+    if (!locCols181.includes('geo_land'))  db.exec('ALTER TABLE locations ADD COLUMN geo_land TEXT');
+
+    const fkErrors181 = db.pragma('foreign_key_check');
+    if (fkErrors181.length) {
+      throw new Error(`Migration 181: foreign_key_check meldet ${fkErrors181.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 181').run();
+    logger.info('DB-Migration auf Version 181 abgeschlossen (locations.geo_query + locations.geo_land).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

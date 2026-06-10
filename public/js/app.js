@@ -705,6 +705,12 @@ document.addEventListener('alpine:init', () => {
             maxSegmentS: Number(cfg.stt.vad.maxSegmentS) || this.sttVad.maxSegmentS,
           };
         }
+        if (cfg.mapTiles?.url) {
+          this.mapTiles = {
+            url: cfg.mapTiles.url,
+            attribution: cfg.mapTiles.attribution || '',
+          };
+        }
 
         // Hash vorab auswerten, damit loadBooks das gewünschte Buch wählt.
         // _applyingHash unterdrückt Watcher/URL-Writes während der Initialisierung.

@@ -35,6 +35,9 @@ export const appKomplettMethods = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ book_id: parseInt(bookId), book_name: bookName }),
       });
+      // Sofort-Refresh des Footer-Polls, sonst sieht die Job-Queue-Bar den Job
+      // erst nach bis zu 5 s und driftet so lange gegen die 2-s-Karten-Bar.
+      window.dispatchEvent(new CustomEvent('job:enqueued', { detail: { type: 'komplett-analyse', jobId } }));
       this._startKomplettPoll(jobId, bookId);
     } catch (e) {
       console.error('[alleAktualisieren]', e);

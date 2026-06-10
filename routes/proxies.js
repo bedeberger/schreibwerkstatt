@@ -78,6 +78,14 @@ router.get('/config', (req, res) => {
         maxSegmentS:  Number(appSettings.get('stt.vad.max_segment_s')) || 30,
       },
     },
+    // Tile-Server der Orte-Karte. Leaflet holt die Kacheln direkt im Browser,
+    // darum muss die URL ans Frontend (anders als die Geocoder-URLs, die nur der
+    // server-seitige /geocode-Proxy nutzt). attribution leer = Frontend faellt
+    // auf den i18n-Default (orte.map.attribution) zurueck.
+    mapTiles: {
+      url: appSettings.get('geocode.tiles.url') || 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      attribution: String(appSettings.get('geocode.tiles.attribution') || '').trim(),
+    },
   });
 });
 

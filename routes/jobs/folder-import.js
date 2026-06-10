@@ -21,6 +21,7 @@ const { setContext } = require('../../lib/log-context');
 const { resolveProvider } = require('../../lib/ai');
 const { requireBookAccess, sendACLError } = require('../../lib/acl');
 const bookAccess = require('../../db/book-access');
+const { getBookLocale } = require('../../db/schema');
 const { db } = require('../../db/connection');
 const logger = require('../../logger');
 
@@ -31,6 +32,15 @@ const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const CONFIDENCE_THRESHOLD = 0.8;
 const AI_SAMPLE_SIZE = 30;
 const BUFFER_TTL_MS = 30 * 60 * 1000;
+
+// Kapitel-Gruppierung pro Import (Query-Param `grouping`): Jahr+Monat (Default),
+// nur Jahr, oder flach (keine Kapitel). Unbekannte Werte fallen auf 'year-month'.
+const GROUPINGS = new Set(['year-month', 'year', 'flat']);
+
+// Monatsnamen fuer die Sub-Chapter-Benennung ("2020 November"). Sprache richtet
+// sich nach der Buch-Locale (getBookLocale), nicht hartcodiert deutsch.
+const MONTH_NAMES_DE = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+const MONTH_NAMES_EN = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 // jobId -> { buffer, mode, bookName, bookId }
 const importBuffers = new Map();
@@ -65,22 +75,7 @@ function _monthFromRaw(monthRaw) {
   return parseMonthToken(monthRaw);
 }
 
-async function _detectDatesViaAI(samples, log) {
-  try {
-    const prompts = await getPrompts();
-    const { buildDateDetectPrompt, SCHEMA_DATE_DETECT } = prompts;
-    const SYSTEM = 'Du bist ein Assistent fuer das Erkennen von Datumsformaten in Dateinamen. Du antwortest ausschliesslich mit einem JSON-Objekt.';
-    const prompt = buildDateDetectPrompt(samples);
-    // Use minimal jobId stub so aiCall does not error if jobId missing — actually
-    // it needs jobs.get(jobId) for abort signal. Call inside worker with real jobId.
-    return { prompt, system: SYSTEM, schema: SCHEMA_DATE_DETECT };
-  } catch (e) {
-    log.warn(`AI date-detect prompt build failed: ${e.message}`);
-    return null;
-  }
-}
-
-async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) {
+async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId, grouping = 'year-month' }) {
   const log = makeJobLogger(jobId);
   // Audit-Log: jeder User-relevante Schritt landet hier UND in den Winston-Logs.
   // Result-JSON liefert das Array ans Frontend (Collapsible "Import-Log").
@@ -352,8 +347,10 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
     // Sub-Chapter (parent_chapter_id = Jahr-Chapter-ID).
     const chapterByYear = new Map();        // year (Number) -> chapter_id
     const chapterByYearMonth = new Map();   // "YYYY-MM" -> chapter_id
-    const MONTH_NAMES_DE = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
-    if (mode === 'merge') {
+    // Buch-Locale steuert die Monatsnamen der Sub-Chapter. Fuer neue Buecher
+    // greift getBookSettings auf die default_language des Users zurueck.
+    const MONTH_NAMES = getBookLocale(effBookId, userEmail).startsWith('en') ? MONTH_NAMES_EN : MONTH_NAMES_DE;
+    if (mode === 'merge' && grouping !== 'flat') {
       const existing = await contentStore.listChapters(effBookId, { session: { user: { email: userEmail } } });
       // Erst Top-Level (Jahre) cachen, dann Sub-Chapter (Monate) den Parents zuordnen.
       for (const ch of existing) {
@@ -390,38 +387,45 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }) 
         statusParams: { file: f.relativePath, current, total },
       });
 
-      // Year-Chapter (Top-Level) sicherstellen
-      let yearChapterId = chapterByYear.get(f.year);
-      if (!yearChapterId) {
-        const ch = await contentStore.createChapter(
-          { book_id: effBookId, name: String(f.year), position: f.year },
-          { session: { user: { email: userEmail } } },
-        );
-        yearChapterId = ch.id;
-        chapterByYear.set(f.year, yearChapterId);
-        audit('info', `Year-Chapter angelegt: ${f.year} (id=${yearChapterId})`);
-      }
-
-      // Month-Sub-Chapter (parent = year-chapter). Wenn Monat unbekannt (z.B.
-      // year-only-Fallback), die Seite direkt ans Year-Chapter haengen.
-      // Name-Format: "YYYY Monatsname" (z.B. "2020 November").
-      let chapterId = yearChapterId;
-      const isoMonth = f.isoDate.slice(5, 7);
-      const monthNum = parseInt(isoMonth, 10);
-      if (Number.isFinite(monthNum) && monthNum >= 1 && monthNum <= 12 && f.dateSource !== 'year-only') {
-        const ymKey = `${f.year}-${isoMonth}`;
-        let subId = chapterByYearMonth.get(ymKey);
-        if (!subId) {
-          const subName = `${f.year} ${MONTH_NAMES_DE[monthNum - 1]}`;
-          const sub = await contentStore.createChapter(
-            { book_id: effBookId, name: subName, parent_chapter_id: yearChapterId, position: monthNum },
+      // Kapitel-Zuordnung je nach Gruppierungs-Modus:
+      //   'flat'       → keine Kapitel, Seite haengt direkt am Buch (chapter_id null)
+      //   'year'       → nur Jahr-Top-Level-Chapter
+      //   'year-month' → Jahr-Chapter + Monats-Sub-Chapter (Default)
+      let chapterId = null;
+      if (grouping !== 'flat') {
+        // Year-Chapter (Top-Level) sicherstellen
+        let yearChapterId = chapterByYear.get(f.year);
+        if (!yearChapterId) {
+          const ch = await contentStore.createChapter(
+            { book_id: effBookId, name: String(f.year), position: f.year },
             { session: { user: { email: userEmail } } },
           );
-          subId = sub.id;
-          chapterByYearMonth.set(ymKey, subId);
-          audit('info', `Month-Sub-Chapter angelegt: ${subName} unter ${f.year} (id=${subId})`);
+          yearChapterId = ch.id;
+          chapterByYear.set(f.year, yearChapterId);
+          audit('info', `Year-Chapter angelegt: ${f.year} (id=${yearChapterId})`);
         }
-        chapterId = subId;
+        chapterId = yearChapterId;
+
+        // Month-Sub-Chapter nur im 'year-month'-Modus (parent = year-chapter).
+        // Wenn Monat unbekannt (year-only-Fallback), bleibt die Seite am
+        // Year-Chapter. Name-Format: "YYYY Monatsname" (z.B. "2020 November").
+        const isoMonth = f.isoDate.slice(5, 7);
+        const monthNum = parseInt(isoMonth, 10);
+        if (grouping === 'year-month' && Number.isFinite(monthNum) && monthNum >= 1 && monthNum <= 12 && f.dateSource !== 'year-only') {
+          const ymKey = `${f.year}-${isoMonth}`;
+          let subId = chapterByYearMonth.get(ymKey);
+          if (!subId) {
+            const subName = `${f.year} ${MONTH_NAMES[monthNum - 1]}`;
+            const sub = await contentStore.createChapter(
+              { book_id: effBookId, name: subName, parent_chapter_id: yearChapterId, position: monthNum },
+              { session: { user: { email: userEmail } } },
+            );
+            subId = sub.id;
+            chapterByYearMonth.set(ymKey, subId);
+            audit('info', `Month-Sub-Chapter angelegt: ${subName} unter ${f.year} (id=${subId})`);
+          }
+          chapterId = subId;
+        }
       }
 
       // Page-Name: ISO-Date bei echtem Datum, sonst "YYYY-MM <Thema>" fuer
@@ -522,6 +526,7 @@ router.post('/folder-import', rawZipBody, async (req, res) => {
   const mode = (req.query?.mode === 'merge') ? 'merge' : 'new-book';
   const bookName = String(req.query?.book_name || '').trim();
   const bookId = mode === 'merge' ? toIntId(req.query?.book_id) : null;
+  const grouping = GROUPINGS.has(req.query?.grouping) ? req.query.grouping : 'year-month';
 
   if (mode === 'new-book' && !bookName) {
     return res.status(400).json({ error_code: 'BOOK_NAME_REQUIRED' });
@@ -558,7 +563,7 @@ router.post('/folder-import', rawZipBody, async (req, res) => {
   importBuffers.set(jobId, { buffer: req.body, mode, bookName, bookId });
   _scheduleBufferCleanup(jobId);
 
-  enqueueJob(jobId, () => runFolderImportJob(jobId, { userEmail, mode, bookName, bookId }));
+  enqueueJob(jobId, () => runFolderImportJob(jobId, { userEmail, mode, bookName, bookId, grouping }));
   res.status(202).json({ jobId });
 });
 

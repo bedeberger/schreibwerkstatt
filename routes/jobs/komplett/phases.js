@@ -52,6 +52,11 @@ function komplettMaxTokens(provider) {
  */
 async function runCompletenessGap(ctx, {
   label, statusText, knownNames, buildPrompt, systemBlocks, schema, extractItems, claudeExtractCap, maxPasses,
+  // keyOf/isValid/displayOf generalisieren den Helper über die name-tragenden Entitäten
+  // (Figuren/Orte) hinaus auf Fakten (subjekt+fakt) und Szenen (titel+kapitel). Für die
+  // Dedup-Konsistenz MUSS keyOf dieselbe Zeichenkette liefern, die als knownNames-Seed und
+  // via displayOf in die Prompt-Liste fliesst (beide werden mit _normalizeName normalisiert).
+  keyOf = (it) => it.name, isValid = (it) => it && it.name, displayOf = (it) => it.name,
 }) {
   const { call, jobId, tok, log } = ctx;
   const seen = new Set((knownNames || []).map(n => _normalizeName(n)).filter(Boolean));
@@ -69,13 +74,13 @@ async function runCompletenessGap(ctx, {
       log.warn(`${label} Gap-Pass ${round} fehlgeschlagen (${e.message}) – übersprungen.`);
       break;
     }
-    const items = (extractItems(res) || []).filter(it => it && it.name);
+    const items = (extractItems(res) || []).filter(isValid);
     const newOnes = [];
     for (const it of items) {
-      const key = _normalizeName(it.name);
+      const key = _normalizeName(keyOf(it));
       if (!key || seen.has(key)) continue;
       seen.add(key);
-      display.push(it.name);
+      display.push(displayOf(it));
       newOnes.push(it);
     }
     fresh.push(...newOnes);
@@ -146,6 +151,7 @@ async function runPhase1(ctx) {
       // werden (sonst Phantom-Erfolg bei jedem Folgelauf bis zur Seitenedition).
       let relationsFailed = false;
       let faktenFailed = false;
+      let eventsFailed = false;
       if (effectiveProvider === 'claude') {
         // Claude-Split: Figuren-Stammdaten (A1) + Orte/Szenen (B) + Fakten (C) parallel,
         // danach Beziehungen (A2) aus den A1-IDs. Alle Calls teilen denselben Buchtext-
@@ -246,6 +252,71 @@ async function runPhase1(ctx) {
             passB.orte = knownOrte.concat(freshOrte);
             log.info(`Completeness: +${freshOrte.length} Orte ergänzt (gesamt ${passB.orte.length}).`);
           }
+
+          // Fakten-Gap nur wenn der Erst-Fakten-Pass (C) erfolgreich war – sonst würde der
+          // Gap-Pass die ausgefallene Faktenerfassung kaschieren, während faktenFailed den
+          // Cache-Skip beibehält (Teilstand bliebe trotzdem nicht eingefroren).
+          if (!faktenFailed) {
+            const knownFakten = passB.fakten || [];
+            const faktKey = (f) => `${f.subjekt || ''}: ${f.fakt || ''}`;
+            const freshFakten = await runCompletenessGap(ctx, {
+              label: 'Single-Pass Fakten', statusText: 'job.phase.completenessFakten',
+              knownNames: knownFakten.map(faktKey),
+              buildPrompt: (known) => prompts.buildFaktenGapPrompt(bookName, known),
+              systemBlocks: [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KOMPLETT_FAKTEN_PASS_BLOCKS, '1h')],
+              schema: prompts.SCHEMA_KOMPLETT_FAKTEN_PASS,
+              extractItems: (r) => r?.fakten,
+              keyOf: faktKey, displayOf: faktKey, isValid: (f) => f && f.fakt,
+              claudeExtractCap, maxPasses: completenessPasses,
+            });
+            if (freshFakten.length) {
+              passB.fakten = knownFakten.concat(freshFakten);
+              log.info(`Completeness: +${freshFakten.length} Fakten ergänzt (gesamt ${passB.fakten.length}).`);
+            }
+          }
+
+          const knownSzenen = passB.szenen || [];
+          const szeneKey = (s) => `${s.titel || ''} (${s.kapitel || ''})`;
+          const freshSzenen = await runCompletenessGap(ctx, {
+            label: 'Single-Pass Szenen', statusText: 'job.phase.completenessSzenen',
+            knownNames: knownSzenen.map(szeneKey),
+            buildPrompt: (known) => prompts.buildSzenenGapPrompt(bookName, known),
+            systemBlocks: [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KOMPLETT_ORTE_PASS_BLOCKS, '1h')],
+            schema: prompts.SCHEMA_KOMPLETT_ORTE_PASS,
+            extractItems: (r) => r?.szenen,
+            keyOf: szeneKey, displayOf: szeneKey, isValid: (s) => s && s.titel,
+            claudeExtractCap, maxPasses: completenessPasses,
+          });
+          if (freshSzenen.length) {
+            passB.szenen = knownSzenen.concat(freshSzenen);
+            log.info(`Completeness: +${freshSzenen.length} Szenen ergänzt (gesamt ${passB.szenen.length}).`);
+          }
+        }
+
+        // E: Lebensereignisse separat – eigener Call gegen den gecachten Buchtext-Block
+        // mit der finalen Figurenliste (post-Completeness). Volle Modell-Aufmerksamkeit
+        // auf vollständige Event-Erfassung, statt in A1 mit den Figuren-Stammdaten ums
+        // Output-Budget zu konkurrieren (analog Fakten-Pass C). Non-fatal: ein gescheiterter
+        // Events-Call verwirft die teure Figuren-/Orte-Extraktion nicht – stattdessen leere
+        // Events + Warnung; eventsFailed verhindert das Einfrieren des '__singlepass__'-
+        // Caches (sonst Phantom-leere-Events bis zur nächsten Seitenedition).
+        let assignments = [];
+        if (stammFiguren.length > 0) {
+          updateJob(jobId, { progress: 19, statusText: 'job.phase.extractingEvents' });
+          try {
+            const evRes = await retryOnTransientAi(() => call(jobId, tok,
+              prompts.buildExtraktionEventsPassPrompt(bookName, stammFiguren, null),
+              [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KOMPLETT_EVENTS_PASS_BLOCKS, '1h')],
+              19, 20, claudeExtractCap, 0.2, null, prompts.SCHEMA_KOMPLETT_EVENTS,
+            ), { log, label: 'Single-Pass Lebensereignisse (E)' });
+            assignments = Array.isArray(evRes?.assignments) ? evRes.assignments : [];
+            const nEv = assignments.reduce((s, a) => s + (a.lebensereignisse?.length || 0), 0);
+            log.info(`Single-Pass Events-Pass (E) – ${nEv} Ereignisse für ${assignments.length} Figuren.`);
+          } catch (e) {
+            eventsFailed = true;
+            log.warn(`Single-Pass Events-Pass (E) fehlgeschlagen, Events leer: ${e.message}`);
+            ctx.warnings?.push({ key: 'job.warn.eventsFailed' });
+          }
         }
 
         // A2: Beziehungen separat – braucht die stabilen IDs aus A1.
@@ -266,7 +337,7 @@ async function runPhase1(ctx) {
             ctx.warnings?.push({ key: 'job.warn.relationsFailed' });
           }
         }
-        passA = { figuren: stammFiguren, assignments: stamm.assignments };
+        passA = { figuren: stammFiguren, assignments };
       } else {
         // Lokale Provider: kombinierter Call (kein 1h-Cache → Split wäre 3× voller Input).
         const r = await callExtract('Single-Pass Extraktion (lokal)',
@@ -283,8 +354,9 @@ async function runPhase1(ctx) {
       chapterAssignments = [{ kapitel: 'Gesamtbuch', assignments: passA.assignments || [] }];
       const totalEvents = (passA.assignments || []).reduce((s, a) => s + (a.lebensereignisse?.length || 0), 0);
       log.info(`Single-Pass OK – fig=${chapterFiguren[0].figuren.length} orte=${chapterOrte[0].orte.length} songs=${chapterSongs[0].songs.length} fakten=${chapterFakten[0].fakten.length} sz=${chapterSzenen[0].szenen.length} (${totalEvents} Ereignisse)`);
-      if (relationsFailed || faktenFailed) {
-        log.warn(`Single-Pass Cache übersprungen – ${relationsFailed ? 'A2 (Beziehungen)' : 'C (Fakten)'} gescheitert, Teilstand wird nicht eingefroren.`);
+      if (relationsFailed || faktenFailed || eventsFailed) {
+        const which = relationsFailed ? 'A2 (Beziehungen)' : faktenFailed ? 'C (Fakten)' : 'E (Events)';
+        log.warn(`Single-Pass Cache übersprungen – ${which} gescheitert, Teilstand wird nicht eingefroren.`);
       } else {
         saveChapterExtractCache(bookIdInt, email, '__singlepass__', bookPagesSig, {
           chapterFiguren, chapterOrte, chapterSongs, chapterFakten, chapterSzenen, chapterAssignments,
