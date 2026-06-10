@@ -214,6 +214,55 @@ test('Nach Stop wird kein noch laufendes Transkript mehr eingefuegt', async ({ p
   expect(after.includes('Hallo Welt')).toBe(false);
 });
 
+test('getUserMedia bekommt Mono + DSP-Constraints', async ({ page }) => {
+  await ready(page, HARNESS + '?enabled=true');
+  await page.locator('#stt-mic').click();
+  await page.waitForFunction(() => window.__sttApp.sttRecording === true);
+  const c = await page.evaluate(() => window.__lastConstraints);
+  expect(c.audio.channelCount).toBe(1);
+  expect(c.audio.noiseSuppression).toBe(true);
+  expect(c.audio.echoCancellation).toBe(true);
+  expect(c.audio.autoGainControl).toBe(true);
+});
+
+test('Kaputter 200-Body -> Fehler-Toast statt stiller Drop', async ({ page }) => {
+  await page.route('**/stt/transcribe*', async (route) => {
+    // 200, aber kein gueltiges JSON -> res.json() wirft.
+    try { await route.fulfill({ status: 200, contentType: 'application/json', body: 'NICHT JSON' }); } catch { /* abgebrochen */ }
+  });
+  await ready(page, HARNESS + '?enabled=true');
+  await placeCaret(page);
+  const before = await page.evaluate(() => document.getElementById('editor').textContent);
+  await page.locator('#stt-mic').click();
+  await page.waitForFunction(() => window.__sttApp.sttRecording === true);
+  await page.evaluate(() => { window.__voice = true; });
+  await page.waitForTimeout(250);
+  await page.evaluate(() => { window.__voice = false; });
+
+  await page.waitForFunction(() => window.__toasts.some((t) => t.message === 'stt.error.failed'));
+  const after = await page.evaluate(() => document.getElementById('editor').textContent);
+  expect(after).toBe(before); // nichts eingefuegt
+  await page.evaluate(() => window.__sttApp._sttStop()); // Toast-Flut beim Teardown vermeiden
+});
+
+test('401 (Session abgelaufen) -> Aufnahme stoppt, kein Fehler-Toast', async ({ page }) => {
+  await page.route('**/stt/transcribe*', async (route) => {
+    try { await route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ error_code: 'NOT_LOGGED_IN' }) }); } catch { /* abgebrochen */ }
+  });
+  await ready(page, HARNESS + '?enabled=true');
+  await placeCaret(page);
+  await page.locator('#stt-mic').click();
+  await page.waitForFunction(() => window.__sttApp.sttRecording === true);
+  await page.evaluate(() => { window.__voice = true; });
+  await page.waitForTimeout(250);
+  await page.evaluate(() => { window.__voice = false; });
+
+  // 401 -> _sttStop -> Aufnahme aus; kein Fehler-Toast (Session-Banner kaeme global).
+  await page.waitForFunction(() => window.__sttApp.sttRecording === false);
+  const toasts = await page.evaluate(() => window.__toasts.map((t) => t.message));
+  expect(toasts).not.toContain('stt.error.failed');
+});
+
 test('Mic-Permission verweigert -> i18n-Fehler, kein Crash', async ({ page, consoleGuard }) => {
   await ready(page, HARNESS + '?deny=true');
   await placeCaret(page);

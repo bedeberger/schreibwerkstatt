@@ -35,7 +35,8 @@
     Object.defineProperty(navigator, 'mediaDevices', {
       configurable: true,
       value: {
-        getUserMedia: async () => {
+        getUserMedia: async (constraints) => {
+          window.__lastConstraints = constraints;
           if (denyMic) { const e = new Error('denied'); e.name = 'NotAllowedError'; throw e; }
           return { getTracks: () => [{ stop() { window.__micStopped++; } }] };
         },

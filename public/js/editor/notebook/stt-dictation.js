@@ -239,7 +239,12 @@ export const sttDictationMethods = {
     this.sttPending = true;
     let stream;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Mono + DSP-Filter: kleinere Segmente (Diktat = ein Sprecher) und weniger
+      // Whisper-Halluzinationen an der Quelle. Boolean-Constraints sind
+      // best-effort — ein Geraet, das sie nicht kann, wirft hier nicht.
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
+      });
     } catch (e) {
       this.sttPending = false;
       const key = e?.name === 'NotAllowedError' || e?.name === 'SecurityError'
@@ -548,6 +553,11 @@ export const sttDictationMethods = {
       return null;
     }
     if (res.status === 404) { this._sttStop(); return null; } // Feature serverseitig aus
+    // 401 = Session abgelaufen: der globale fetch-Wrapper (app.js) hat bereits
+    // den Session-Banner ausgeloest. Hier nur die Aufnahme stoppen (logged-out =
+    // kein Diktat) — KEIN Fehler-Toast (der Banner kommuniziert es) und keine
+    // Toast-Flut pro Folgesegment. Analog zum 404-Zweig.
+    if (res.status === 401) { this._sttStop(); return null; }
     if (!res.ok) {
       if (STT_RETRYABLE_STATUS.has(res.status) && attempt < STT_MAX_RETRY) {
         await this._sttDelay(STT_RETRY_DELAY_MS, signal);
@@ -556,7 +566,15 @@ export const sttDictationMethods = {
       this._sttToastFailed();
       return null;
     }
-    try { return (await res.json())?.text || ''; } catch { return null; }
+    // 200 mit kaputtem Body (Server-/Proxy-Fehler): nicht stumm verwerfen.
+    // Bei Abort waehrend des Body-Reads aber still bleiben (Stop).
+    try {
+      return (await res.json())?.text || '';
+    } catch (e) {
+      if (signal?.aborted || e?.name === 'AbortError') return null;
+      this._sttToastFailed();
+      return null;
+    }
   },
 
   // Verzoegerung fuer Retry-Waits; loest beim Abort der Session sofort auf, damit

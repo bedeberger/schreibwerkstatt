@@ -319,7 +319,7 @@ app.use('/metrics', require('./routes/metrics'));
 
 // ── Auth-Guard ────────────────────────────────────────────────────────────────
 // API-Pfade → 401 JSON; HTML-Pfade → Redirect zu /auth/login
-const API_PREFIXES = ['/history/', '/figures/', '/locations/', '/world-facts/', '/songs/', '/jobs/', '/sync/', '/chat/', '/booksettings/', '/publication/', '/content/', '/books/', '/me/', '/admin/', '/local/', '/config', '/share/api/'];
+const API_PREFIXES = ['/history/', '/figures/', '/locations/', '/world-facts/', '/songs/', '/jobs/', '/sync/', '/chat/', '/booksettings/', '/publication/', '/content/', '/stt/', '/books/', '/me/', '/admin/', '/local/', '/config', '/share/api/'];
 
 app.use((req, res, next) => {
   if (req.session?.user) return next();
