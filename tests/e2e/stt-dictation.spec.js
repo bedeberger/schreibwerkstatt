@@ -145,6 +145,75 @@ test('Stop gibt Mikrofon frei (kein Leak)', async ({ page }) => {
   await expect(page.locator('#stt-mic')).toHaveAttribute('aria-pressed', 'false');
 });
 
+test('Segmente werden in Sprechreihenfolge eingefuegt, auch wenn Transkripte out-of-order zurueckkommen', async ({ page }) => {
+  // Erstes Segment kuenstlich stark verzoegern, zweites sofort beantworten ->
+  // die Transkripte loesen in UMGEKEHRTER Reihenfolge auf. Trotzdem muss "AAA"
+  // (frueher gesprochen) vor "BBB" im Text stehen — die Insert-Kette serialisiert.
+  let n = 0;
+  await page.route('**/stt/transcribe*', async (route) => {
+    const i = ++n;
+    if (i === 1) await new Promise((r) => setTimeout(r, 800)); // erstes Segment langsam
+    try {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ text: i === 1 ? 'AAA' : 'BBB' }) });
+    } catch { /* Request ggf. abgebrochen */ }
+  });
+  await ready(page, HARNESS + '?enabled=true');
+  await placeCaret(page);
+  await page.locator('#stt-mic').click();
+  await page.waitForFunction(() => window.__sttApp.sttRecording === true);
+
+  // Segment 1: sprechen -> Stille (Silence-Cut, langsame Antwort).
+  await page.evaluate(() => { window.__voice = true; });
+  await page.waitForTimeout(250);
+  await page.evaluate(() => { window.__voice = false; });
+  await page.waitForTimeout(250);
+  // Segment 2: sprechen -> Stille (Silence-Cut, schnelle Antwort).
+  await page.evaluate(() => { window.__voice = true; });
+  await page.waitForTimeout(250);
+  await page.evaluate(() => { window.__voice = false; });
+  await page.waitForTimeout(250);
+
+  await page.waitForFunction(() => {
+    const t = document.getElementById('editor').textContent;
+    return t.includes('AAA') && t.includes('BBB');
+  });
+  const text = await page.evaluate(() => document.getElementById('editor').textContent);
+  expect(text.indexOf('AAA')).toBeLessThan(text.indexOf('BBB'));
+});
+
+test('Nach Stop wird kein noch laufendes Transkript mehr eingefuegt', async ({ page }) => {
+  // Antwort verzoegern, dann waehrend der Transkription stoppen -> der Abort
+  // bricht den Request ab, das spaet eintreffende "Hallo Welt" darf NICHT mehr
+  // im Editor landen.
+  await page.route('**/stt/transcribe*', async (route) => {
+    await new Promise((r) => setTimeout(r, 600));
+    try {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ text: 'Hallo Welt' }) });
+    } catch { /* Request abgebrochen */ }
+  });
+  await ready(page, HARNESS + '?enabled=true');
+  await placeCaret(page);
+  const before = await page.evaluate(() => document.getElementById('editor').textContent);
+
+  const reqSent = page.waitForRequest('**/stt/transcribe*');
+  await page.locator('#stt-mic').click();
+  await page.waitForFunction(() => window.__sttApp.sttRecording === true);
+  // Ein Segment senden (Silence-Cut), dann sofort stoppen — vor der Antwort.
+  await page.evaluate(() => { window.__voice = true; });
+  await page.waitForTimeout(250);
+  await page.evaluate(() => { window.__voice = false; });
+  await page.waitForTimeout(250);
+  await reqSent; // Request ist raus, Antwort noch unterwegs
+  await page.locator('#stt-mic').click(); // STOP
+  await page.waitForFunction(() => window.__sttApp.sttRecording === false);
+
+  // Antwort kaeme jetzt — abwarten und sicherstellen, dass NICHTS eingefuegt wurde.
+  await page.waitForTimeout(900);
+  const after = await page.evaluate(() => document.getElementById('editor').textContent);
+  expect(after).toBe(before);
+  expect(after.includes('Hallo Welt')).toBe(false);
+});
+
 test('Mic-Permission verweigert -> i18n-Fehler, kein Crash', async ({ page, consoleGuard }) => {
   await ready(page, HARNESS + '?deny=true');
   await placeCaret(page);

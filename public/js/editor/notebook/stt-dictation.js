@@ -275,6 +275,16 @@ export const sttDictationMethods = {
       hasVoice: false,
       mime: rec.mimeType || mime || 'audio/webm',
       stopping: false,
+      // AbortController dieser Session: bricht beim Stop alle laufenden
+      // Transkriptions-Requests (inkl. Retry-Waits) ab — kein Transkript wird
+      // nach dem Stop noch eingefuegt.
+      abort: new AbortController(),
+      // Einfuege-Reihenfolge: die Fetches laufen parallel (Durchsatz), die DOM-
+      // Einfuegung jedes Segments wird aber ueber diese Promise-Kette in
+      // Sende-Reihenfolge serialisiert — sonst koennte ein spaeter gesendetes,
+      // aber schneller transkribiertes Segment (oder eines nach Retry) vor einem
+      // frueheren im Text landen.
+      insertChain: Promise.resolve(),
       // Cut-Grund des zuletzt geschnittenen Segments; bestimmt, ob das naechste
       // Segment einen neuen Satz beginnt (silence = Sprechpause = Satzgrenze).
       lastCutReason: null,
@@ -442,6 +452,10 @@ export const sttDictationMethods = {
     if (this._sttBusyTimer) { clearTimeout(this._sttBusyTimer); this._sttBusyTimer = null; }
     if (!rt) return;
     rt.stopping = true;
+    // Laufende Transkriptions-Requests + Retry-Waits abbrechen (kein Insert nach
+    // dem Stop). Bewusst VOR rec.stop(): der finale onstop koennte sonst noch ein
+    // Segment mit gueltigem Signal senden.
+    try { rt.abort.abort(); } catch { /* noop */ }
     if (rt.vadTimer) { clearInterval(rt.vadTimer); rt.vadTimer = null; }
     try { if (rt.rec.state === 'recording') rt.rec.stop(); } catch { /* noop */ }
     try { rt.stream.getTracks().forEach(t => t.stop()); } catch { /* noop */ }
@@ -480,24 +494,38 @@ export const sttDictationMethods = {
 
   // ── Segment-Upload + Insert ───────────────────────────────────────────────
 
-  async _sttSendSegment(blob, mime, boundaryKind) {
+  // Transkribiert ein Segment und fuegt es ein. Der Fetch startet sofort (mehrere
+  // Segmente transkribieren parallel), die EINFUEGUNG wird aber ueber
+  // `rt.insertChain` in Sende-Reihenfolge serialisiert — so landet ein frueher
+  // gesprochenes Segment auch dann vor einem spaeteren im Text, wenn dessen
+  // Transkript (z. B. nach einem Retry) erst spaeter zurueckkommt. Der Guard
+  // `this._sttRt === rt` verwirft Inserts, deren Session inzwischen beendet oder
+  // gewechselt wurde (Stop, Seitenwechsel).
+  _sttSendSegment(blob, mime, boundaryKind) {
+    const rt = this._sttRt;
+    if (!rt) return;
     this._sttBusyOn(); // Indikator „transkribiert" (mit Mindest-Standzeit)
-    let text = null;
-    try {
-      text = await this._sttFetchTranscript(blob, mime, 0);
-    } finally {
-      this._sttBusyOff();
-    }
-    if (text == null) return; // Fehler bereits behandelt (Toast/Stop)
-    this._sttInsertText(text, boundaryKind);
+    const fetchP = this._sttFetchTranscript(blob, mime, 0, rt.abort.signal)
+      .finally(() => this._sttBusyOff());
+    rt.insertChain = rt.insertChain
+      .then(async () => {
+        const text = await fetchP;
+        if (text == null) return; // Fehler/Abbruch bereits behandelt (Toast/Stop)
+        if (this._sttRt !== rt) return; // Session beendet -> nicht mehr einfuegen
+        this._sttInsertText(text, boundaryKind);
+      })
+      .catch(() => { /* ein fehlgeschlagener Insert darf die Kette nicht brechen */ });
   },
 
   // Transkribiert ein Segment; gibt den Text zurueck oder null (Fehler bereits
   // behandelt). Transiente Fehler (Netzwerk-Throw, 408/5xx) werden bis zu
   // STT_MAX_RETRY-mal wiederholt, bevor der Fehler-Toast kommt — ein kurzer
   // Upstream-Haenger kostet so keinen Satz. 404 (Feature aus) und 4xx
-  // (z. B. 413/415) werden NICHT wiederholt.
-  async _sttFetchTranscript(blob, mime, attempt) {
+  // (z. B. 413/415) werden NICHT wiederholt. `signal` (Session-AbortController)
+  // beendet Request UND Retry-Wait sofort und still beim Stop — ein
+  // abgebrochenes Segment liefert `null` ohne Fehler-Toast.
+  async _sttFetchTranscript(blob, mime, attempt, signal) {
+    if (signal?.aborted) return null; // Session beendet -> still verwerfen
     const params = new URLSearchParams();
     if (this.selectedBookId) params.set('bookId', this.selectedBookId);
     if (this.currentPage?.id) params.set('pageId', this.currentPage.id);
@@ -508,11 +536,13 @@ export const sttDictationMethods = {
         method: 'POST',
         headers: { 'Content-Type': mime },
         body: blob,
+        signal,
       });
-    } catch {
+    } catch (e) {
+      if (signal?.aborted || e?.name === 'AbortError') return null; // Stop -> kein Toast/Retry
       if (attempt < STT_MAX_RETRY) {
-        await this._sttDelay(STT_RETRY_DELAY_MS);
-        return this._sttFetchTranscript(blob, mime, attempt + 1);
+        await this._sttDelay(STT_RETRY_DELAY_MS, signal);
+        return this._sttFetchTranscript(blob, mime, attempt + 1, signal);
       }
       this._sttToastFailed();
       return null;
@@ -520,8 +550,8 @@ export const sttDictationMethods = {
     if (res.status === 404) { this._sttStop(); return null; } // Feature serverseitig aus
     if (!res.ok) {
       if (STT_RETRYABLE_STATUS.has(res.status) && attempt < STT_MAX_RETRY) {
-        await this._sttDelay(STT_RETRY_DELAY_MS);
-        return this._sttFetchTranscript(blob, mime, attempt + 1);
+        await this._sttDelay(STT_RETRY_DELAY_MS, signal);
+        return this._sttFetchTranscript(blob, mime, attempt + 1, signal);
       }
       this._sttToastFailed();
       return null;
@@ -529,7 +559,16 @@ export const sttDictationMethods = {
     try { return (await res.json())?.text || ''; } catch { return null; }
   },
 
-  _sttDelay(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); },
+  // Verzoegerung fuer Retry-Waits; loest beim Abort der Session sofort auf, damit
+  // ein laufender Retry-Wait das Stoppen nicht um STT_RETRY_DELAY_MS verzoegert
+  // (der Aufrufer verwirft danach via `signal.aborted`-Guard).
+  _sttDelay(ms, signal) {
+    return new Promise((resolve) => {
+      if (signal?.aborted) return resolve();
+      const t = setTimeout(resolve, ms);
+      signal?.addEventListener?.('abort', () => { clearTimeout(t); resolve(); }, { once: true });
+    });
+  },
 
   _sttToastFailed() {
     this._showJobToast?.({ message: this.t('stt.error.failed'), severity: 'err', jobType: 'stt', bookId: null });
