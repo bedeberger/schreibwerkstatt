@@ -5,7 +5,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { remapSzenen, remapAssignments } = require('../../routes/jobs/komplett/remap');
+const { remapSzenen, remapAssignments, _isSelfCancelled } = require('../../routes/jobs/komplett/remap');
 
 const noopLog = { info() {}, warn() {} };
 
@@ -104,4 +104,38 @@ test('remapAssignments: Event-Kapitel-Präfix gestrippt, unbekanntes Kapitel →
   assert.equal(evs[0].kapitel, 'Kapitel Eins');
   assert.equal(evs[0].seite, 'Seite Eins');
   assert.equal(evs[1].kapitel, 'Kapitel Eins'); // Fallback auf äusseres Kapitel
+});
+
+// ── remapAssignments: figur_name als Objekt (KI-Drift) darf nicht crashen ──────
+test('remapAssignments: figur_name als Objekt wird via _refToString aufgelöst (kein Crash)', () => {
+  const out = remapAssignments([
+    { kapitel: 'Kapitel Eins', assignments: [
+      { figur_name: { name: 'Anna' }, lebensereignisse: [{ datum_year: 2000, ereignis: 'X' }] },
+      { figur_name: { id: 'fig_99' }, lebensereignisse: [{ datum_year: 2001, ereignis: 'Y' }] }, // nicht auflösbar → gedroppt
+    ] },
+  ], FIG, FIG_LOWER, CH, noopLog, 'job1');
+  assert.equal(out.length, 1, 'Objekt {name:"Anna"} → fig_1, der unauflösbare wird gedroppt');
+  assert.equal(out[0].fig_id, 'fig_1');
+});
+
+// ── _isSelfCancelled: Selbst-Entwarnungs-Filter (synchron mit PROBLEME_RULES) ──
+test('_isSelfCancelled: echte Entwarnungs-Phrasen werden erkannt', () => {
+  assert.ok(_isSelfCancelled({ beschreibung: 'Hier liegt kein echter Widerspruch vor.' }));
+  assert.ok(_isSelfCancelled({ beschreibung: 'Das passt zusammen.' }));
+  assert.ok(_isSelfCancelled({ beschreibung: 'Das ist korrekt.' }));
+  assert.ok(_isSelfCancelled({ empfehlung: 'Eintrag entfernen.' }));
+  // «lässt sich erklären durch …» als Entwarnung in der beschreibung
+  assert.ok(_isSelfCancelled({ beschreibung: 'Der scheinbare Bruch lässt sich erklären durch eine Rückblende.' }));
+});
+
+test('_isSelfCancelled: legitime Lösungs-Empfehlung mit «lässt sich erklären» bleibt erhalten (Rang 7)', () => {
+  // KERN-REGRESSION: eine Empfehlung, die eine LÖSUNG vorschlägt, darf den Befund NICHT annullieren.
+  assert.equal(_isSelfCancelled({
+    beschreibung: 'Anna ist in Kapitel 2 tot, taucht aber in Kapitel 5 lebend auf.',
+    empfehlung: 'Der Widerspruch lässt sich erklären, indem in Kapitel 3 ein Hinweis auf ihr Überleben ergänzt wird.',
+  }), false);
+  // «lässt sich erklären» OHNE «durch» in der beschreibung ist ebenfalls keine Annullierung mehr.
+  assert.equal(_isSelfCancelled({
+    beschreibung: 'Der Bruch lässt sich erklären, wenn man Kapitel 4 ergänzt.',
+  }), false);
 });

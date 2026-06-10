@@ -132,7 +132,6 @@ function _clampCoord(v, max) {
 // pageNameToIdByChapter: optionaler Map chapter_id → (page_name → page_id) für
 // kapitel-scoped Auflösung der seiten-Einträge. Fehlt er, bleiben page_ids leer.
 function saveZeitstrahlEvents(bookId, userEmail, ereignisse, chNameToId = {}, pageNameToIdByChapter = null) {
-  const now = new Date().toISOString();
   db.transaction(() => {
     // Nur AI-generierte Rows (manually_edited=0) ersetzen — user-kuratierte
     // Events bleiben über Re-Runs hinweg erhalten. CASCADE löscht ihre Child-
@@ -145,7 +144,7 @@ function saveZeitstrahlEvents(bookId, userEmail, ereignisse, chNameToId = {}, pa
        datum_year, datum_month, datum_day,
        datum_ende_year, datum_ende_month, datum_ende_day,
        story_tag, datum_unsicher, ereignis, typ, subtyp, bedeutung, sort_order, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${NOW_ISO_SQL})`);
     const insZec = db.prepare('INSERT INTO zeitstrahl_event_chapters (event_id, chapter_id, sort_order) VALUES (?, ?, ?)');
     const insZep = db.prepare('INSERT INTO zeitstrahl_event_pages    (event_id, page_id, sort_order)    VALUES (?, ?, ?)');
     const insZef = db.prepare('INSERT INTO zeitstrahl_event_figures  (event_id, figure_id, figur_name, sort_order) VALUES (?, ?, ?, ?)');
@@ -170,7 +169,7 @@ function saveZeitstrahlEvents(bookId, userEmail, ereignisse, chNameToId = {}, pa
         sd.datum_ende_year, sd.datum_ende_month, sd.datum_ende_day,
         sd.story_tag, sd.datum_unsicher,
         ev.ereignis || '', ev.typ || 'persoenlich', sd.subtyp, ev.bedeutung || null,
-        i, now
+        i
       );
 
       const rawKapitel = Array.isArray(ev.kapitel) ? ev.kapitel : (ev.kapitel ? [ev.kapitel] : []);
@@ -277,7 +276,6 @@ function saveOrteToDb(bookId, orte, userEmail, chNameToId = null, pageNameToIdBy
     }
     return cand.length === 1 ? cand[0] : null;
   };
-  const now = new Date().toISOString();
   const emailCond = userEmail ? 'user_email = ?' : 'user_email IS NULL';
   const emailVal  = userEmail ? [userEmail] : [];
   let droppedFigRefs = 0;
@@ -332,12 +330,12 @@ function saveOrteToDb(bookId, orte, userEmail, chNameToId = null, pageNameToIdBy
 
     const upd = db.prepare(`
       UPDATE locations SET name=?, typ=?, beschreibung=?, erste_erwaehnung=?, erste_erwaehnung_page_id=?, stimmung=?,
-        land=?, lat=?, lng=?, sort_order=?, updated_at=?
+        land=?, lat=?, lng=?, sort_order=?, updated_at=${NOW_ISO_SQL}
       WHERE id=?`);
     const ins = db.prepare(`
       INSERT INTO locations (book_id, loc_id, name, typ, beschreibung, erste_erwaehnung, erste_erwaehnung_page_id, stimmung,
         land, lat, lng, sort_order, user_email, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${NOW_ISO_SQL})`);
     const delLf = db.prepare('DELETE FROM location_figures WHERE location_id = ?');
     const delLc = db.prepare('DELETE FROM location_chapters WHERE location_id = ?');
     // Geocode-Resolve-Cache: bei Umbenennung nullen (Toponym-Aufloesung ist dann
@@ -368,7 +366,7 @@ function saveOrteToDb(bookId, orte, userEmail, chNameToId = null, pageNameToIdBy
         // integer id (und scene_locations) bleibt erhalten
         upd.run(o.name, o.typ || null, o.beschreibung || null,
           o.erste_erwaehnung || null, erstPageId, o.stimmung || null,
-          land, lat, lng, i, now, locDbId);
+          land, lat, lng, i, locDbId);
         delLf.run(locDbId);
         delLc.run(locDbId);
         // Resolve-Cache fallen lassen, wenn das Label sich aendert ODER der User
@@ -385,7 +383,7 @@ function saveOrteToDb(bookId, orte, userEmail, chNameToId = null, pageNameToIdBy
         const { lastInsertRowid } = ins.run(
           bookId, o.id, o.name, o.typ || null, o.beschreibung || null,
           o.erste_erwaehnung || null, erstPageId, o.stimmung || null,
-          land, lat, lng, i, userEmail || null, now
+          land, lat, lng, i, userEmail || null
         );
         locDbId = lastInsertRowid;
         // Komplett-Reextraktion: Cache der namensgleichen Vorgaenger-Row uebernehmen.
@@ -426,7 +424,6 @@ function saveFaktenToDb(bookId, chapterFakten, userEmail, chNameToId = null) {
     const rows = db.prepare('SELECT chapter_id, chapter_name FROM chapters WHERE book_id = ?').all(bookId);
     chNameToId = Object.fromEntries(rows.map(r => [r.chapter_name, r.chapter_id]));
   }
-  const now = new Date().toISOString();
   const emailCond = userEmail ? 'user_email = ?' : 'user_email IS NULL';
   const emailVal  = userEmail ? [userEmail] : [];
 
@@ -436,7 +433,7 @@ function saveFaktenToDb(bookId, chapterFakten, userEmail, chNameToId = null) {
 
     const ins = db.prepare(`
       INSERT INTO world_facts (book_id, kategorie, subjekt, fakt, seite_label, sort_order, user_email, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
+      VALUES (?, ?, ?, ?, ?, ?, ?, ${NOW_ISO_SQL})`);
     const insWfc = db.prepare('INSERT OR IGNORE INTO world_fact_chapters (fact_id, chapter_id) VALUES (?, ?)');
 
     let order = 0;
@@ -448,7 +445,7 @@ function saveFaktenToDb(bookId, chapterFakten, userEmail, chNameToId = null) {
         if (!fakt) continue;
         const { lastInsertRowid } = ins.run(
           bookId, _normFaktKategorie(f?.kategorie), _toRefString(f?.subjekt) || null,
-          fakt, _toRefString(f?.seite) || null, order++, userEmail || null, now
+          fakt, _toRefString(f?.seite) || null, order++, userEmail || null
         );
         if (chapId != null) insWfc.run(lastInsertRowid, chapId);
       }
@@ -949,12 +946,12 @@ function setBookEntitiesEnabled(bookId, enabled) {
 
 const _insContinuityCheck = db.prepare(
   `INSERT INTO continuity_checks (book_id, user_email, checked_at, summary, model)
-   VALUES (?, ?, ?, ?, ?)`
+   VALUES (?, ?, ${NOW_ISO_SQL}, ?, ?)`
 );
 const _insContinuityIssue = db.prepare(
   `INSERT INTO continuity_issues
    (check_id, book_id, user_email, schwere, typ, beschreibung, stelle_a, stelle_b, empfehlung, sort_order, updated_at)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${NOW_ISO_SQL})`
 );
 const _insContinuityIssueFig = db.prepare(
   `INSERT INTO continuity_issue_figures (issue_id, figure_id, figur_name, sort_order) VALUES (?, ?, ?, ?)`
@@ -972,7 +969,6 @@ const _insContinuityIssueCh = db.prepare(
 function saveContinuityCheck(bookId, userEmail, summary, model, issues, figNameToId, chNameToId) {
   const bookIdInt = parseInt(bookId);
   const email = userEmail || null;
-  const now = new Date().toISOString();
   const normalizedIssues = [];
   let checkId = null;
   // continuity_issue_figures.figure_id ist INTEGER (figures.id) seit Mig 73 —
@@ -983,7 +979,7 @@ function saveContinuityCheck(bookId, userEmail, summary, model, issues, figNameT
   const figIdToRowId = Object.fromEntries(figRows.map(r => [r.fig_id, r.id]));
   db.transaction(() => {
     const { lastInsertRowid: cid } = _insContinuityCheck.run(
-      bookIdInt, email, now, summary || '', model || null,
+      bookIdInt, email, summary || '', model || null,
     );
     checkId = cid;
     const issuesArr = Array.isArray(issues) ? issues : [];
@@ -993,7 +989,7 @@ function saveContinuityCheck(bookId, userEmail, summary, model, issues, figNameT
         cid, bookIdInt, email,
         it.schwere || null, it.typ || null, it.beschreibung || null,
         it.stelle_a || null, it.stelle_b || null, it.empfehlung || null,
-        i, now,
+        i,
       );
       const figNames = Array.isArray(it.figuren) ? it.figuren.map(_toRefString).filter(Boolean) : [];
       const fig_ids = [];
@@ -1142,7 +1138,6 @@ function saveSongsToDb(bookId, songs, userEmail, chNameToId = null, pageNameToId
     }
     return cand.length === 1 ? cand[0] : null;
   };
-  const now = new Date().toISOString();
   const emailCond = userEmail ? 'user_email = ?' : 'user_email IS NULL';
   const emailVal  = userEmail ? [userEmail] : [];
 
@@ -1162,12 +1157,12 @@ function saveSongsToDb(bookId, songs, userEmail, chNameToId = null, pageNameToId
     const upd = db.prepare(`
       UPDATE songs SET titel=?, interpret=?, genre=?, beschreibung=?, stimmung=?,
         kontext_typ=?, erste_erwaehnung=?, erste_erwaehnung_page_id=?,
-        sort_order=?, updated_at=?
+        sort_order=?, updated_at=${NOW_ISO_SQL}
       WHERE id=?`);
     const ins = db.prepare(`
       INSERT INTO songs (book_id, song_uid, titel, interpret, genre, beschreibung, stimmung,
         kontext_typ, erste_erwaehnung, erste_erwaehnung_page_id, sort_order, user_email, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${NOW_ISO_SQL})`);
     const delSf = db.prepare('DELETE FROM song_figures WHERE song_id = ?');
     const delSc = db.prepare('DELETE FROM song_chapters WHERE song_id = ?');
     const figRows = db.prepare(
@@ -1184,14 +1179,14 @@ function saveSongsToDb(bookId, songs, userEmail, chNameToId = null, pageNameToId
       if (songDbId !== undefined) {
         upd.run(s.titel || s.title || '', s.interpret || null, s.genre || null,
           s.beschreibung || null, s.stimmung || null, s.kontext_typ || null,
-          s.erste_erwaehnung || null, erstPageId, i, now, songDbId);
+          s.erste_erwaehnung || null, erstPageId, i, songDbId);
         delSf.run(songDbId);
         delSc.run(songDbId);
       } else {
         const { lastInsertRowid } = ins.run(
           bookId, s.id, s.titel || s.title || '', s.interpret || null, s.genre || null,
           s.beschreibung || null, s.stimmung || null, s.kontext_typ || null,
-          s.erste_erwaehnung || null, erstPageId, i, userEmail || null, now
+          s.erste_erwaehnung || null, erstPageId, i, userEmail || null
         );
         songDbId = lastInsertRowid;
       }

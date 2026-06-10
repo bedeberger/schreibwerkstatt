@@ -289,6 +289,10 @@ test('Komplettanalyse Single-Pass: Fakten-Pass (C) scheitert → Job ok, Warnung
     'SELECT COUNT(*) AS n FROM book_extract_cache WHERE book_id = ?'
   ).get(BOOK_ID);
   assert.equal(cacheRows.n, 0, 'Single-Pass-Cache muss bei faktenFailed übersprungen werden');
+  // KRITISCH (Phantom-Erfolg über Resume): ebenso darf KEIN Checkpoint eingefroren werden,
+  // sonst lädt ein Resume nach Crash den fakten-losen Teilstand und überspringt Phase 1 ganz.
+  const cp = ctx.dbSchema.loadCheckpoint('komplett-analyse', BOOK_ID, 'tester@test.dev');
+  assert.equal(cp, null, 'Checkpoint muss bei faktenFailed übersprungen werden (partialFailure-Gate)');
 });
 
 test('Komplettanalyse: leeres Buch → result.empty, kein AI-Call', async () => {
@@ -469,6 +473,65 @@ test('Komplettanalyse Delta-Cache: Touch einer Seite → nur dieser Chunk re-ext
   assert.equal(run2Calls, 4, `delta-cache run: expected 4 AI calls, got ${run2Calls}`);
 });
 
+test('Komplettanalyse Delta-Cache: Kapitel umbenannt → nur dessen Chunk re-extrahiert (Rename-Invalidation)', async () => {
+  const BOOK_ID = 67;
+  seedMultiChapterBook(BOOK_ID, 3);
+
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.includes('figuren') && e.schemaKeys.includes('orte') && e.schemaKeys.includes('assignments'),
+    ({ prompt }) => {
+      const m = prompt.match(/Kapitel \d+/);
+      return extraktionResponseFor(m ? m[0] : 'Kapitel');
+    },
+  );
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('figuren'),
+    { figuren: [{ id: 'fig_anna', name: 'Anna', kurzname: 'Anna', typ: 'protagonist', beschreibung: '', sozialschicht: 'mitte', praesenz: 'zentral', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 1 }], beziehungen: [], eigenschaften: [], schluesselzitate: [] }] },
+  );
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('orte'),
+    { orte: [{ id: 'ort_land', name: 'Land', typ: 'natur', beschreibung: '', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 1 }], figuren: ['fig_anna'] }] },
+  );
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.includes('zusammenfassung') && e.schemaKeys.includes('probleme'),
+    kontinuitaetResponse(),
+  );
+
+  // Run 1: füllt den chapter_extract_cache für alle 3 Chunks.
+  const jobId1 = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
+  ctx.shared.enqueueJob(jobId1, () =>
+    ctx.komplett.runKomplettAnalyseJob(jobId1, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+  );
+  await waitForJob(ctx.shared, jobId1, { timeoutMs: 10000 });
+  const run1Calls = ctx.mockAi.log.length;
+  assert.equal(run1Calls, 6, `run 1: expected 6 AI calls, got ${run1Calls}`);
+
+  // Kapitel 2 UMBENENNEN — Seiten + updated_at unverändert. Einzige Änderung: chapter_name.
+  const chapters = [
+    { id: 2000, book_id: BOOK_ID, name: 'Kapitel 1' },
+    { id: 2001, book_id: BOOK_ID, name: 'Kapitel 2 NEU' }, // renamed
+    { id: 2002, book_id: BOOK_ID, name: 'Kapitel 3' },
+  ];
+  const pages = [
+    { id: 3000, book_id: BOOK_ID, chapter_id: 2000, name: 'Seite 1', updated_at: '2026-01-01' },
+    { id: 3001, book_id: BOOK_ID, chapter_id: 2001, name: 'Seite 2', updated_at: '2026-01-01' },
+    { id: 3002, book_id: BOOK_ID, chapter_id: 2002, name: 'Seite 3', updated_at: '2026-01-01' },
+  ];
+  const body = '<p>' + 'Anna ging weiter durch das Land. '.repeat(280) + '</p>';
+  ctx.dbSeed.setBook({ chapters, pages, pageBodies: { 3000: body, 3001: body, 3002: body } });
+
+  // Run 2: nur der Chunk des umbenannten Kapitels darf re-extrahieren (Kapitelname
+  // im Chunk-pages_sig → MISS), die anderen zwei kommen aus dem Cache.
+  const jobId2 = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
+  ctx.shared.enqueueJob(jobId2, () =>
+    ctx.komplett.runKomplettAnalyseJob(jobId2, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+  );
+  await waitForJob(ctx.shared, jobId2, { timeoutMs: 10000 });
+  const run2Calls = ctx.mockAi.log.length - run1Calls;
+  // 1 Chunk re-extract + P2 + P3 + P8 = 4 (ohne Rename-Invalidation wären es nur 3).
+  assert.equal(run2Calls, 4, `rename-invalidation run: expected 4 AI calls, got ${run2Calls}`);
+});
+
 test('Komplettanalyse Checkpoint-Recovery: p1_full_done → überspringt Phase 1', async () => {
   const BOOK_ID = 62;
   seedMultiChapterBook(BOOK_ID, 3);
@@ -477,7 +540,11 @@ test('Komplettanalyse Checkpoint-Recovery: p1_full_done → überspringt Phase 1
   // bookPagesSig MUSS dem entsprechen, was der Job aus dem aktuellen Seitenstand
   // berechnet — sonst verwirft die Staleness-Gate den Checkpoint und P1 läuft neu.
   const prompts = await ctx.shared.getPrompts();
-  const cacheVersion = `${ctx.shared._modelName('claude')}:${prompts.PROMPTS_VERSION || ''}`;
+  // cacheVersion-Format spiegelt job.js: model:PROMPTS_VERSION:cp<completeness_passes>.
+  // completeness_passes ist in beforeEach auf 0 gesetzt → Suffix :cp0.
+  const completenessPasses = Math.max(0, Math.min(3,
+    parseInt(require('../../lib/app-settings').get('ai.komplett.completeness_passes'), 10) || 0));
+  const cacheVersion = `${ctx.shared._modelName('claude')}:${prompts.PROMPTS_VERSION || ''}:cp${completenessPasses}`;
   const pageMeta = [
     { id: 3000, updated_at: '2026-01-01', chapter_id: 2000, chapter: 'Kapitel 1' },
     { id: 3001, updated_at: '2026-01-01', chapter_id: 2001, chapter: 'Kapitel 2' },

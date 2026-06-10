@@ -2521,6 +2521,9 @@
   "job.warn.eventsFailed":           "Life-event extraction failed – the rest of the catalog was updated.",
   "job.warn.crossChapterFailed":     "Cross-chapter relationships could not be determined.",
   "job.warn.continuityFailed":       "Continuity check skipped – the rest of the catalog was updated.",
+  "job.warn.zeitstrahlDegraded":     "Timeline consolidation skipped – events saved as raw groups.",
+  "job.warn.timelineFailed":         "Timeline phase failed – the rest of the catalog was updated.",
+  "job.warn.factsChapterSkipped":    "Facts for some chapters could not be extracted ({chapters}) – the continuity check ran on a reduced fact base.",
   "job.warn.chunksTruncated":        "{count} text section(s) could not be fully analysed by the model (repetition loop) and were skipped: {chapters}. The remaining sections were processed normally.",
 
   "job.phase.preparing":             "Preparing…",

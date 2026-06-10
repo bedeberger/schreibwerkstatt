@@ -4,6 +4,7 @@ const {
 } = require('../../../db/schema');
 const { _modelName } = require('../shared');
 const { _refToString, _stelleQuote } = require('./utils');
+const { NOW_ISO_SQL } = require('../../../db/now');
 const searchIndex = require('../../../lib/search');
 
 /** Mappt Szenen-Klarnamen (aus Phase 1) auf konsolidierte Figuren-/Ort-IDs.
@@ -67,11 +68,13 @@ function remapAssignments(chAssignments, figNameToId, figNameToIdLower, chNameTo
 
   for (const { kapitel, assignments: chAss } of (chAssignments || [])) {
     for (const assignment of (chAss || [])) {
-      const figId = figNameToId[assignment.figur_name]
-        || figNameToIdLower[assignment.figur_name?.toLowerCase()] || null;
+      // figur_name kann als Objekt statt String kommen (KI-Drift) → _refToString,
+      // sonst wirft .toLowerCase() und der gesamte Job failt nach gespeichertem Katalog.
+      const figName = _refToString(assignment.figur_name);
+      const figId = (figName && (figNameToId[figName] || figNameToIdLower[figName.toLowerCase()])) || null;
       if (!figId) {
         dropped++;
-        log.warn(`Assignment «${assignment.figur_name}» (${assignment.lebensereignisse?.length || 0} Ereignisse) – keine Figuren-ID.`);
+        log.warn(`Assignment «${figName ?? '(ohne Name)'}» (${assignment.lebensereignisse?.length || 0} Ereignisse) – keine Figuren-ID.`);
         continue;
       }
       if (!mergedEvtMap.has(figId)) mergedEvtMap.set(figId, []);
@@ -105,10 +108,9 @@ function remapAssignments(chAssignments, figNameToId, figNameToIdLower, chNameTo
 function saveSzenenAndEvents(bookIdInt, email, szenen, assignments, locIdToDbId, idMaps, log, jobId) {
   db.transaction(() => {
     db.prepare('DELETE FROM figure_scenes WHERE book_id = ? AND user_email = ?').run(bookIdInt, email);
-    const now = new Date().toISOString();
     const ins = db.prepare(`INSERT INTO figure_scenes
       (book_id, user_email, titel, wertung, kommentar, chapter_id, page_id, sort_order, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ${NOW_ISO_SQL})`);
     // scene_figures.figure_id ist INTEGER (figures.id) seit Mig 73 — Lookup TEXT → INT.
     const figRows = db.prepare(
       'SELECT id, fig_id FROM figures WHERE book_id = ? AND user_email IS ?'
@@ -125,7 +127,7 @@ function saveSzenenAndEvents(bookIdInt, email, szenen, assignments, locIdToDbId,
         bookIdInt, email,
         s.titel, s.wertung, s.kommentar,
         chapterId, pageId,
-        s.sort_order, now,
+        s.sort_order,
       );
       for (const fid of s.fig_ids) {
         const rowId = figIdToRowId[fid];
@@ -162,12 +164,25 @@ function saveSzenenAndEvents(bookIdInt, email, szenen, assignments, locIdToDbId,
 
 // Patterns, mit denen die KI eine eigene Entwarnung in beschreibung/empfehlung
 // signalisiert. Synchron mit Prompt-Selbstcheck in
-// public/js/prompts/komplett.js (PROBLEME_RULES). KI hält die Selbstcheck-Regel
-// nicht zuverlässig ein → Server filtert defensiv nach.
-const SELF_CANCEL_PATTERN = /\b(kein(en)?\s+(echten?\s+)?widerspruch|kein\s+problem|das\s+ist\s+korrekt|konsistent|pass(t|en)\s+zusammen|stimmig|unproblematisch|entwarnung|wird\s+nicht\s+gemeldet|l(ä|ae)sst\s+sich\s+erkl(ä|ae)ren|eintrag\s+entfernen)\b/i;
+// public/js/prompts/komplett/schema-strings.js (PROBLEME_RULES, Z. «Selbstcheck …»).
+// KI hält die Selbstcheck-Regel nicht zuverlässig ein → Server filtert defensiv nach.
+// `echte[rns]?` deckt alle Genus-/Kasus-Formen ab («kein echter/echte/echten Widerspruch»).
+const SELF_CANCEL_PATTERN = /\b(kein(en)?\s+(echte[rns]?\s+)?widerspruch|kein\s+problem|das\s+ist\s+korrekt|konsistent|pass(t|en)\s+zusammen|stimmig|unproblematisch|entwarnung|wird\s+nicht\s+gemeldet|eintrag\s+entfernen)\b/i;
+
+// «lässt sich erklären» ist NUR eine Selbst-Annullierung, wenn es einen Erklär-GRUND
+// nennt («… lässt sich erklären durch …») — exakt der Prompt-Wortlaut «lässt sich
+// erklären durch … (als Entwarnung)». Eine Lösungs-EMPFEHLUNG dagegen («Der Widerspruch
+// lässt sich erklären, indem in Kapitel 3 ein Hinweis ergänzt wird») ist ein ECHTER Befund
+// mit Fix-Vorschlag und darf NICHT verworfen werden. Darum (a) nur «… erklären durch …»
+// (nicht das blosse «erklären») und (b) nur in der `beschreibung` werten — die `empfehlung`
+// soll laut Prompt eine Lösung vorschlagen und enthält «erklären» legitim.
+const SELF_CANCEL_EXPLAIN = /l(ä|ae)sst\s+sich\s+erkl(ä|ae)ren\s+durch/i;
 
 function _isSelfCancelled(p) {
-  return SELF_CANCEL_PATTERN.test(p.beschreibung || '') || SELF_CANCEL_PATTERN.test(p.empfehlung || '');
+  const beschr = p.beschreibung || '';
+  const empf = p.empfehlung || '';
+  return SELF_CANCEL_PATTERN.test(beschr) || SELF_CANCEL_PATTERN.test(empf)
+    || SELF_CANCEL_EXPLAIN.test(beschr);
 }
 
 /** Speichert Kontinuitätsprüfung in die DB (eine Zeile pro Issue + Bridge-Tabellen

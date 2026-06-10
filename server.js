@@ -629,7 +629,10 @@ try {
   }, { timezone: cronTz });
   logger.info(`Cron-Job registriert: registration_requests-Expire täglich 02:30 (${cronTz})`);
 
-  // 03:00 – Nacht-Komplettanalyse für alle Bücher × alle User (deaktiviert)
+  // 03:00 – Nacht-Komplettanalyse für alle Bücher × alle User (DEAKTIVIERT).
+  // Bei Reaktivierung den Body in runWithContext({ job: 'cron', user: 'system' }, …) wrappen
+  // (wie die aktiven Crons oben), damit die enqueue-Logs den ALS-Context tragen; die
+  // einzelnen Jobs erhalten ihren Context ohnehin über drainQueue.
   // cron.schedule('0 3 * * *', () => {
   //   logger.info('Cron: Starte nächtliche Komplettanalyse…');
   //   runKomplettAnalyseAll().catch(e => logger.error('Cron-Komplettanalyse Fehler: ' + e.message));

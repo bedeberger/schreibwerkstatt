@@ -18,6 +18,7 @@ const {
   jobAbortControllers,
 } = require('./shared');
 const { geocode } = require('../../lib/geocode');
+const { NOW_ISO_SQL } = require('../../db/now');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
 
@@ -75,6 +76,29 @@ function _persistResolved(entries, bookId, userEmail) {
   );
   db.transaction(() => {
     for (const { id, ort, land } of entries) stmt.run(ort, land || null, bookId, ...emailVal, String(id));
+  })();
+}
+
+// Gefundene Koordinaten direkt persistieren — der Job ist die SSoT der Verortung,
+// NICHT der Client. Analog _persistResolved (gleiches user_email/loc_id-Scope).
+// Why: lat/lng nur als Job-Result zurueckzugeben und auf einen Frontend-saveOrte
+// zu vertrauen ist fragil — ein fehlender/fehlgeschlagener Save (ACL: Geocoden
+// braucht 'lektor', saveOrte 'editor'; Wegnavigieren bei langem Batch; still
+// geschluckter PUT-Fehler) liesse die gefundene Verortung verschwinden, obwohl
+// der teure KI- + Geocoder-Lauf schon gelaufen ist. Das Frontend spiegelt die
+// Werte nur noch in-memory und darf KEIN saveOrte mehr ausloesen (ein Full-Replace
+// mit dem alten coord-losen Array wuerde diese Coords via clearedCoords-Heuristik
+// in saveOrteToDb sofort wieder nullen).
+function _persistCoords(entries, bookId, userEmail) {
+  if (!entries.length || !bookId) return;
+  const emailCond = userEmail ? 'user_email = ?' : 'user_email IS NULL';
+  const emailVal = userEmail ? [userEmail] : [];
+  const stmt = db.prepare(
+    `UPDATE locations SET lat = ?, lng = ?, updated_at = ${NOW_ISO_SQL}
+      WHERE book_id = ? AND ${emailCond} AND loc_id = ?`
+  );
+  db.transaction(() => {
+    for (const { id, lat, lng } of entries) stmt.run(lat, lng, bookId, ...emailVal, String(id));
   })();
 }
 
@@ -181,6 +205,12 @@ async function runGeocodeResolveJob(jobId, items, bookId, userEmail) {
         : { id: it.id, lat: null, lng: null, ort: r.ort, land: r.land || null });
     }
 
+    // Treffer serverseitig persistieren (SSoT) — Frontend spiegelt nur noch.
+    _persistCoords(
+      results.filter(r => r.lat != null && r.lng != null).map(r => ({ id: r.id, lat: r.lat, lng: r.lng })),
+      bookId, userEmail,
+    );
+
     const hits = results.filter(r => r.lat != null).length;
     const cached = items.length - toResolve.length;
     completeJob(jobId, { results, tokensIn: tok.in, tokensOut: tok.out },
@@ -216,4 +246,4 @@ geocodeRouter.post('/geocode-resolve', jsonBody, (req, res) => {
   res.json({ jobId });
 });
 
-module.exports = { geocodeRouter, runGeocodeResolveJob };
+module.exports = { geocodeRouter, runGeocodeResolveJob, _persistCoords };

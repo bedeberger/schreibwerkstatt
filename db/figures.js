@@ -1,4 +1,5 @@
 const { db } = require('./connection');
+const { NOW_ISO_SQL } = require('./now');
 require('./migrations');
 
 // Gerichtete Beziehungstypen und ihre Inverse. A→B elternteil ≡ B→A kind,
@@ -99,7 +100,6 @@ function _arcToFlat(arc) {
 }
 
 function saveFigurenToDb(bookId, figuren, userEmail, idMaps) {
-  const now = new Date().toISOString();
   db.transaction(() => {
     if (userEmail) {
       db.prepare('DELETE FROM figures WHERE book_id = ? AND user_email = ?').run(bookId, userEmail);
@@ -114,7 +114,7 @@ function saveFigurenToDb(bookId, figuren, userEmail, idMaps) {
         (book_id, fig_id, name, kurzname, typ, geburtstag, geschlecht, beruf, wohnadresse, aeusseres, stimme, hintergrund,
          beschreibung, sozialschicht, praesenz, rolle, motivation, konflikt, entwicklung, arc,
          erste_erwaehnung, erste_erwaehnung_page_id, schluesselzitate, sort_order, user_email, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${NOW_ISO_SQL})`);
     const insTag = db.prepare('INSERT OR IGNORE INTO figure_tags (figure_id, tag) VALUES (?, ?)');
     const insApp = db.prepare('INSERT OR IGNORE INTO figure_appearances (figure_id, chapter_id, haeufigkeit) VALUES (?, ?, ?)');
     const insRel = db.prepare('INSERT INTO figure_relations (book_id, from_fig_id, to_fig_id, typ, beschreibung, machtverhaltnis, belege, user_email) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
@@ -143,7 +143,7 @@ function saveFigurenToDb(bookId, figuren, userEmail, idMaps) {
         f.beschreibung || null, f.sozialschicht || null,
         f.praesenz || null, f.rolle || null, f.motivation || null, f.konflikt || null,
         entwicklungFlat, arcJson, ersteErwaehnung, erstPageId, zitate,
-        i, userEmail || null, now
+        i, userEmail || null
       );
       figIdToRowId[f.id] = fid;
       for (const tag of (f.eigenschaften || [])) insTag.run(fid, tag);

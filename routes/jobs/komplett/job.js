@@ -17,13 +17,13 @@ const {
   chunkLimitsFor, BATCH_SIZE, jobAbortControllers,
   _modelName, fmtTok, tps,
   createJob, enqueueJob, findActiveJobId,
-  retryOnTransientAi,
+  retryOnTransientAi, settledAll,
 } = require('../shared');
 const contentStore = require('../../../lib/content-store');
 const appSettings = require('../../../lib/app-settings');
 const { setContext } = require('../../../lib/log-context');
 const { runNonCritical, buildBookSystemBlockText, buildBookPagesSig, _stelleQuote, makePhaseTimer } = require('./utils');
-const { invalidateRenamedChapterCaches, loadAndValidateCheckpoint, restorePhase1FromCheckpoint } = require('./checkpoint');
+const { loadAndValidateCheckpoint, restorePhase1FromCheckpoint } = require('./checkpoint');
 const { remapSzenen, remapAssignments, saveSzenenAndEvents, saveKontinuitaetResult } = require('./remap');
 const {
   runPhase1, runPhase2, runPhase3, runPhase3Songs, runPhase3b, runZeitstrahl,
@@ -67,7 +67,11 @@ async function verifyKontinuitaetProbleme(ctx, result, fromPct, toPct) {
   const probleme = Array.isArray(result?.probleme) ? result.probleme : [];
   if (!probleme.length) return result;
   updateJob(jobId, { progress: fromPct, statusText: 'job.phase.verifyContradictions' });
-  const verdicts = await Promise.all(probleme.map(async (p) => {
+  // Concurrency-Cap wie Phase 1 (settledAll + ai.claude.phase1_concurrency, Warmup gegen den
+  // gecachten Buchtext-Block): bei 40-60 Befunden würde Promise.all sonst Dutzende Claude-Calls
+  // gleichzeitig feuern → TPM-Burst (429/overloaded, auch auf andere Pipeline-Calls).
+  const claudeConcurrency = Math.max(1, parseInt(appSettings.get('ai.claude.phase1_concurrency'), 10) || 4);
+  const settled = await settledAll(probleme.map((p) => async () => {
     const kap = Array.isArray(p.kapitel) ? p.kapitel : [];
     if (!kap.length) return { p, keep: true };
     const exA = _verifyExcerpt(groups, groupOrder, kap, _stelleQuote(p.stelle_a));
@@ -83,7 +87,12 @@ async function verifyKontinuitaetProbleme(ctx, result, fromPct, toPct) {
       log.warn(`Kontinuität Verify übersprungen: ${e.message}`);
       return { p, keep: true };
     }
-  }));
+  }), { concurrency: claudeConcurrency, warmup: true });
+  // Abbruch (AbortError in einem Verify-Call) muss den Job stoppen — settledAll fängt
+  // Rejects ab, darum gezielt re-raisen. Übrige Rejects konservativ als keep behandeln.
+  const aborted = settled.find(r => r.status === 'rejected' && r.reason?.name === 'AbortError');
+  if (aborted) throw aborted.reason;
+  const verdicts = settled.map((r, i) => r.status === 'fulfilled' ? r.value : { p: probleme[i], keep: true });
   const kept = verdicts.filter(v => v.keep).map(v => v.p);
   const dropped = probleme.length - kept.length;
   if (dropped > 0) log.info(`Kontinuität Verify: ${dropped}/${probleme.length} False-Positive(s) verworfen.`);
@@ -172,7 +181,7 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
 
     // ── Seiten laden ──────────────────────────────────────────────────────────
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
-    const { chMap, chNameToId, chaptersFlat, pages } = await loadOrderedBookContents(bookId, userToken)
+    const { chMap, chNameToId, pages } = await loadOrderedBookContents(bookId, userToken)
       .catch(e => { throw contentHttpError(e); });
     if (!pages.length) { completeJob(jobId, { empty: true }); return; }
 
@@ -198,7 +207,8 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
         return map;
       })(),
     };
-    invalidateRenamedChapterCaches(bookIdInt, chaptersFlat, log, jobId);
+    // Kapitel-Umbenennung invalidiert den Multi-Pass-Delta-Cache über den Kapitelnamen
+    // im Chunk-pages_sig (phases.js) — keine separate Invalidierungs-Funktion mehr nötig.
 
     // Buchtext-Preprocessing (claude-only): unbekannte HTML-Entities (&nbsp;,
     // &mdash;, …), Zero-Width-Zeichen, Soft Hyphen, NBSP, doppelte Spaces raus.
@@ -224,10 +234,17 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
     const passMode = totalChars <= singlePassLimit ? 'single' : 'multi';
     updateJob(jobId, { passMode });
 
-    // Cache-Version: Modellname + Prompts-Schema-Version. Ändert sich eins davon,
-    // werden alle persistierten Phase-1-Caches automatisch verworfen (Hit-Test
+    // completeness_passes (geclampt) verändert den Single-Pass-Extraktionsinhalt (zusätzliche
+    // Long-Tail-Entitäten), muss also Teil der Cache-Version sein — sonst liefert ein Hochsetzen
+    // von 0→N bei unverändertem Seitenstand weiter den alten HIT ohne Long-Tail (stiller
+    // Qualitätsverlust). Über cacheVersion fliesst der Wert automatisch in den Single-Pass-Key,
+    // die Multi-Pass-Chunk-Keys und den Checkpoint-bookPagesSig (alle drei invalidieren).
+    const completenessPasses = Math.max(0, Math.min(3,
+      parseInt(appSettings.get('ai.komplett.completeness_passes'), 10) || 0));
+    // Cache-Version: Modellname + Prompts-Schema-Version + completeness_passes. Ändert sich
+    // eins davon, werden alle persistierten Phase-1-Caches automatisch verworfen (Hit-Test
     // matcht den vollen Sig-String inkl. dieser Version).
-    const cacheVersion = `${komplettModel || _modelName(effectiveProvider)}:${prompts.PROMPTS_VERSION || ''}`;
+    const cacheVersion = `${komplettModel || _modelName(effectiveProvider)}:${prompts.PROMPTS_VERSION || ''}:cp${completenessPasses}`;
     // Buch-weite Signatur (Seitenstand + Settings + Modell/Prompt-Version) – dieselbe
     // Gate wie der chapter_extract_cache. Validiert den Checkpoint-Resume.
     const bookPagesSig = buildBookPagesSig(pageContents, getBookSettings(bookIdInt, email), cacheVersion);
@@ -239,7 +256,7 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
     const ctx = {
       jobId, bookIdInt, bookName, email, call, tok, log,
       effectiveProvider, singlePassLimit, perChunkLimit, cacheVersion, bookPagesSig, prompts, sys,
-      idMaps, pageContents, groups, groupOrder, totalChars, fullBookText, warnings,
+      idMaps, pageContents, groups, groupOrder, totalChars, fullBookText, warnings, completenessPasses,
     };
     pt.mark('Laden');
 
@@ -356,18 +373,40 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
     };
 
     let kontResult;
+    // P6 (Zeitstrahl) non-critical kapseln: ein Fehler im Zeitstrahl-DB-Save (oder im
+    // Konsolidierungs-Call, der im Fallback synchron speichert) darf den bereits gültig
+    // gespeicherten Katalog NICHT verwerfen — P6 ist Endphase, kein kritischer Pfad.
+    // AbortError (User-Cancel) muss aber durchschlagen → eigene Kapselung statt
+    // runNonCritical (das AbortError schluckt). runP8 ist intern bereits so abgesichert;
+    // damit kann keiner der beiden Promise.all-Zweige den Job über failJob kippen.
+    const runZeitstrahlSafe = async (opts) => {
+      try { await runZeitstrahl(ctx, opts); }
+      catch (e) {
+        if (e.name === 'AbortError') throw e;
+        log.warn(`Zeitstrahl-Phase fehlgeschlagen (Katalog bleibt erhalten): ${e.message}`);
+        warnings.push({ key: 'job.warn.timelineFailed' });
+      }
+    };
     if (effectiveProvider === 'claude') {
       // Parallel: P6 silent, P8 ownt Bar (82..97).
       updateJob(jobId, { progress: 82, statusText: 'job.phase.checkContinuity' });
       const [, p8Out] = await Promise.all([
-        runZeitstrahl(ctx, { silent: true }),
+        runZeitstrahlSafe({ silent: true }),
         runP8(),
       ]);
       kontResult = p8Out;
     } else {
-      await runZeitstrahl(ctx);
+      await runZeitstrahlSafe();
       updateJob(jobId, { progress: 82, statusText: 'job.phase.checkContinuity' });
       kontResult = await runP8();
+    }
+    // Pflichtfeld-Check als Degradierung (P8 read-only → kein throw): ein schema-valides
+    // Ergebnis ohne «zusammenfassung» würde saveKontinuitaetResult wortlos null liefern
+    // (kein Befund, kein Hinweis) → der User hielte die Prüfung für sauber durchgelaufen.
+    if (kontResult && typeof kontResult.zusammenfassung === 'undefined') {
+      log.warn('Kontinuitätsprüfung: Pflichtfeld «zusammenfassung» fehlt – Ergebnis verworfen, Warnung gesammelt.');
+      warnings.push({ key: 'job.warn.continuityFailed' });
+      kontResult = null;
     }
     if (kontResult) {
       // Multi-Pass-Befunde gegen den Originaltext verifizieren (False-Positive-Filter).
@@ -431,7 +470,13 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
       .catch(e => { throw contentHttpError(e); });
     if (!pages.length) { completeJob(jobId, { empty: true }); return; }
 
-    const tok = { in: 0, out: 0, ms: 0 };
+    // inflight wie in runKomplettAnalyseJob: parallele Verify-Calls (Promise/settledAll)
+    // streamen Token gleichzeitig — ohne die inflight-Map überschreiben sich die
+    // Zwischenstände in der Live-Anzeige (Endsumme bleibt korrekt, Anzeige unterzählt).
+    const tok = { in: 0, out: 0, ms: 0, inflight: new Map() };
+    // Sammelt non-critical-Degradierungen (übersprungene Fakten-Kapitel) → ins Job-Result,
+    // analog runKomplettAnalyseJob. Ohne dies bliebe eine Faktenlücke dem User verborgen.
+    const warnings = [];
 
     // Bekannte Figuren + Orte aus DB laden
     const figRows = db.prepare(`
@@ -485,6 +530,10 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
     } else {
       // Multi-Pass: Fakten pro Kapitel extrahieren – ggf. aus Checkpoint fortsetzen
       let chapterFacts = cp?.chapterFacts ?? [];
+      // Übersprungene Kapitel persistent merken: der Checkpoint rückt nextGi vor (sonst
+      // Endlosschleife bei deterministischem Fehler), aber failedGis hält die Lücke fest,
+      // damit ein Resume sie im Retry-Pass unten gezielt nachholt statt sie zu zementieren.
+      let failedGis = Array.isArray(cp?.failedGis) ? [...cp.failedGis] : [];
       const startGi = cp?.nextGi ?? 0;
       if (startGi > 0) {
         updateJob(jobId, {
@@ -510,9 +559,37 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
           chapterFacts.push({ kapitel: group.name, fakten: chResult.fakten || [] });
         } catch (e) {
           if (e.name === 'AbortError') throw e;
-          log.warn(`Fakten «${group.name}» übersprungen: ${e.message}`);
+          log.warn(`Fakten «${group.name}» übersprungen (Retry folgt): ${e.message}`);
+          if (!failedGis.includes(gi)) failedGis.push(gi);
         }
-        saveCheckpoint('kontinuitaet', bookIdInt, email, { chapterFacts, nextGi: gi + 1 });
+        saveCheckpoint('kontinuitaet', bookIdInt, email, { chapterFacts, nextGi: gi + 1, failedGis });
+      }
+      // Übersprungene Kapitel gezielt nachholen — ein (transienter) Ausfall darf nicht
+      // dauerhaft Fakten verlieren, auch nicht über einen Resume hinweg. Bleibt es bei einem
+      // deterministischen Fehler, wird die Lücke als Warnung user-sichtbar (statt still).
+      if (failedGis.length) {
+        const stillFailed = [];
+        for (const gi of failedGis) {
+          const group = groups.get(groupOrder[gi]);
+          if (!group) continue;
+          const chText = group.pages.map(p => `### ${p.title}\n${p.text}`).join('\n\n---\n\n');
+          try {
+            const chResult = await retryOnTransientAi(() => call(jobId, tok,
+              prompts.buildKontinuitaetChapterFactsPrompt(group.name, chText),
+              sys.SYSTEM_KONTINUITAET_BLOCKS, 86, 88, komplettMaxTokens(effectiveProvider), 0.2, null, prompts.SCHEMA_KONTINUITAET_FAKTEN,
+            ), { log, label: `Fakten-Retry «${group.name}»` });
+            chapterFacts.push({ kapitel: group.name, fakten: chResult.fakten || [] });
+          } catch (e) {
+            if (e.name === 'AbortError') throw e;
+            stillFailed.push(group.name);
+            log.warn(`Fakten «${group.name}» auch im Retry fehlgeschlagen: ${e.message}`);
+          }
+        }
+        failedGis = [];
+        saveCheckpoint('kontinuitaet', bookIdInt, email, { chapterFacts, nextGi: groupOrder.length, failedGis });
+        if (stillFailed.length) {
+          warnings.push({ key: 'job.warn.factsChapterSkipped', params: { chapters: stillFailed.join(', ') } });
+        }
       }
       pt.mark('Fakten-Extraktion');
 
@@ -538,8 +615,9 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
       count: normalizedProbleme.length,
       issues: normalizedProbleme,
       zusammenfassung: result.zusammenfassung,
+      warnings,
       tokensIn: tok.in, tokensOut: tok.out,
-    }, tps(tok), `${normalizedProbleme.length} Probleme`);
+    }, tps(tok), `${normalizedProbleme.length} Probleme${warnings.length ? ` warn=${warnings.length}` : ''}`);
   } catch (e) {
     if (e.name !== 'AbortError') log.error(`Fehler: ${e.message}`);
     failJob(jobId, e);

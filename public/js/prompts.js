@@ -32,11 +32,21 @@ function _hashContent(str) {
 // Kanonischer Inhalt für den Versions-Hash: alle Locale-Prompts (alle Sprachen,
 // SYSTEM_*-Cores inkl. eingebettetem Komplett-Schema) + die cache-gateten Schemas,
 // die NICHT im Prompt-Text eingebettet sind (Lektorat/Review/Synonym).
+//
+// PFLICHT: hier müssen ALLE Schemas stehen, die als Grammar an einen Call gehen, dessen
+// Ergebnis PERSISTENT gecacht wird (chapter_extract_cache/book_extract_cache: Phase-1-
+// Extraktion inkl. Multi-Pass-Split-Pässe FIGUREN_PASS/ORTE_PASS; chapter_review_cache etc.).
+// Eine isolierte Änderung NUR an einem hier fehlenden Schema würde den persistenten Cache
+// nicht invalidieren → stale Extraktion. Konsolidierungs-/Kontinuitäts-Schemas (Zeitstrahl/
+// Orte-Konsol/Songs/Soziogramm/Kontinuität-Check) sind bewusst NICHT gelistet: ihre Outputs
+// werden pro Lauf frisch berechnet, nie persistent gecacht. Wer das ändert (eine Konsolidierung
+// cachen), muss deren Schema + Regeltext hier nachziehen.
 function _promptsContentHash() {
   const schemaPart = JSON.stringify([
     lektoratNs.SCHEMA_LEKTORAT,
     reviewNs.SCHEMA_REVIEW, reviewNs.SCHEMA_CHAPTER_ANALYSIS, reviewNs.SCHEMA_CHAPTER_REVIEW,
     komplettNs.SCHEMA_KOMPLETT_EXTRAKTION, komplettNs.SCHEMA_KOMPLETT_FIGUREN_STAMM,
+    komplettNs.SCHEMA_KOMPLETT_FIGUREN_PASS,
     komplettNs.SCHEMA_KOMPLETT_ORTE_PASS, komplettNs.SCHEMA_KOMPLETT_FAKTEN_PASS,
     komplettNs.SCHEMA_KOMPLETT_EVENTS,
     komplettNs.SCHEMA_BEZIEHUNGEN,

@@ -10,12 +10,14 @@ const assert = require('node:assert');
 const { bootstrap } = require('./_helpers/setup');
 
 const BOOK = 9100;
-let ctx, db, dbSchema;
+let ctx, db, dbSchema, persistCoords;
 
 before(() => {
   ctx = bootstrap();
   db = require('../../db/connection').db;
   dbSchema = ctx.dbSchema;
+  // Nach bootstrap requiren — der Job zieht ./shared (Job-Queue) mit rein.
+  persistCoords = require('../../routes/jobs/geocode')._persistCoords;
   ctx.dbSeed.setBook({ books: [{ id: BOOK, name: 'Geo-Cache-Test' }] });
 });
 after(() => ctx.cleanup());
@@ -77,4 +79,50 @@ test('Komplett-Reextraktion mit neuer loc_id reattacht den Cache per Name', () =
   assert.equal(r.geo_query, 'Olten');
   assert.equal(r.geo_land, 'ch');
   assert.equal(r.lat, 47.35);
+});
+
+// --- _persistCoords: der Job ist SSoT der Verortung (nicht der Client) --------
+
+test('_persistCoords schreibt lat/lng und laesst den Resolve-Cache unberuehrt', () => {
+  dbSchema.saveOrteToDb(BOOK, [{ id: 'a', name: 'Olten' }], null);
+  setGeo('a', 'Olten', 'ch');           // simuliert _persistResolved (laeuft vor dem Lookup)
+  assert.equal(getLoc('a').lat, null);  // noch unverortet
+
+  persistCoords([{ id: 'a', lat: 47.35, lng: 7.9 }], BOOK, null);
+
+  const r = getLoc('a');
+  assert.equal(r.lat, 47.35);
+  assert.equal(r.lng, 7.9);
+  assert.equal(r.geo_query, 'Olten');   // Cache bleibt erhalten
+  assert.equal(r.geo_land, 'ch');
+});
+
+test('_persistCoords ist auf book_id + user_email + loc_id gescoped', () => {
+  dbSchema.saveOrteToDb(BOOK, [{ id: 'a', name: 'Olten' }], null);
+
+  // Falscher User → kein Update (Row gehoert user_email IS NULL).
+  persistCoords([{ id: 'a', lat: 1, lng: 2 }], BOOK, 'fremd@example.com');
+  assert.equal(getLoc('a').lat, null);
+
+  // Falsches Buch → kein Update.
+  persistCoords([{ id: 'a', lat: 1, lng: 2 }], BOOK + 1, null);
+  assert.equal(getLoc('a').lat, null);
+
+  // Korrekter Scope → Update.
+  persistCoords([{ id: 'a', lat: 47.35, lng: 7.9 }], BOOK, null);
+  assert.equal(getLoc('a').lat, 47.35);
+});
+
+test('Full-Replace mit coord-losem Array wuerde Coords+Cache nullen (darum spiegelt das Frontend nach dem Job nur in-memory, kein saveOrte)', () => {
+  dbSchema.saveOrteToDb(BOOK, [{ id: 'a', name: 'Olten' }], null);
+  setGeo('a', 'Olten', 'ch');
+  persistCoords([{ id: 'a', lat: 47.35, lng: 7.9 }], BOOK, null);  // Job verortet
+
+  // Schriebe das Frontend jetzt sein altes (vor dem Job geladenes) coord-loses
+  // Array zurueck, greift clearedCoords (hatte Coords, jetzt null) → alles weg.
+  // Genau dieser Pfad ist im Frontend entfernt; der Test friert die Begruendung ein.
+  dbSchema.saveOrteToDb(BOOK, [{ id: 'a', name: 'Olten', lat: null, lng: null }], null);
+  const r = getLoc('a');
+  assert.equal(r.lat, null);
+  assert.equal(r.geo_query, null);
 });

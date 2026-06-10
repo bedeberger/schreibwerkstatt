@@ -2,9 +2,11 @@
 // Buch auf "Orte real" (book_settings.orte_real) steht. Leaflet laedt lazy.
 // Wird in Alpine.data('orteCard') gespreadet; Root-Zugriffe via window.__app.
 //
-// Marker-Koordinaten leben auf den Orten selbst (o.lat/o.lng) und werden ueber
-// den bestehenden saveOrte-Pfad persistiert. _map/_markers sind transiente
-// Leaflet-Runtime-Handles (wie Timer), kein fachlicher State.
+// Marker-Koordinaten leben auf den Orten selbst (o.lat/o.lng). Manuelle Aenderungen
+// (Marker-Drag, Undo/Redo, Georeferenz entfernen) persistiert der saveOrte-Pfad;
+// die KI-Verortung (_geocodeViaAI) persistiert der Geocode-Job serverseitig selbst
+// und spiegelt die Werte hier nur in-memory (kein saveOrte). _map/_markers sind
+// transiente Leaflet-Runtime-Handles (wie Timer), kein fachlicher State.
 
 import { fetchJson, escHtml } from '../utils.js';
 import { loadLeaflet } from '../lazy-libs.js';
@@ -271,23 +273,13 @@ export const orteMapMethods = {
     return window.__app.orteFiltered.filter(o => o.lat == null || o.lng == null);
   },
 
-  // Koordinaten auf einen Ort im Speicher schreiben + persistieren. Gibt true,
-  // wenn der Ort noch existiert (sonst no-op → false).
-  async _applyCoords(id, lat, lng) {
-    const target = window.__app.orte.find(x => x.id === id);
-    if (!target) return false;
-    target.lat = lat;
-    target.lng = lng;
-    await window.__app.saveOrte();
-    return true;
-  },
-
   // KI-first-Verortung für eine Liste von Orten. Der Server normalisiert jedes
   // Label zuerst auf eine präzise reale Anfrage („Badi Olten" → „Olten") und
   // geocodet sie dann — verhindert, dass der tolerante Geocoder das rohe Label
   // auf einen falschen Treffer (z.B. in DE) zieht. Resolved → Set der ids mit
-  // Treffer (Koordinaten bereits gesetzt + gespeichert). Misses bleiben
-  // unverortet (roter Pin, User schiebt zurecht).
+  // Treffer. Koordinaten (und geo_query/geo_land) persistiert der Job selbst;
+  // hier werden sie nur in-memory gespiegelt. Misses bleiben unverortet (roter
+  // Pin, User schiebt zurecht).
   async _geocodeViaAI(items) {
     const app = window.__app;
     const hitIds = new Set();
@@ -315,15 +307,20 @@ export const orteMapMethods = {
       });
     });
 
+    // Der Job hat lat/lng + geo_query/geo_land bereits serverseitig persistiert.
+    // Hier nur die In-Memory-Orte spiegeln (Marker/Popup ohne Reload korrekt) —
+    // KEIN saveOrte: ein Full-Replace mit dem alten, coord-losen Array wuerde die
+    // gerade gespeicherten Koordinaten via clearedCoords-Heuristik wieder nullen.
     for (const r of results) {
-      if (r && r.lat != null && r.lng != null && await this._applyCoords(r.id, r.lat, r.lng)) {
-        // Aufgelösten Toponym + Land in-memory mitführen → Popup zeigt sofort, als
-        // was der Ort verortet wurde (Match-Konfidenz). Serverseitig im Resolve-Job
-        // persistiert (geo_query/geo_land), nicht über saveOrte.
-        const t = app.orte.find(x => x.id === r.id);
-        if (t) { t.geo_query = r.ort || null; t.geo_land = r.land || null; }
-        hitIds.add(r.id);
+      if (!r || r.lat == null || r.lng == null) continue;
+      const t = app.orte.find(x => x.id === r.id);
+      if (t) {
+        t.lat = r.lat;
+        t.lng = r.lng;
+        t.geo_query = r.ort || null;
+        t.geo_land = r.land || null;
       }
+      hitIds.add(r.id);
     }
     return hitIds;
   },

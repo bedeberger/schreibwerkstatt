@@ -93,7 +93,16 @@ function createJob(type, bookId, userEmail, label, labelParams = null, dedupId =
   const dedupValue = dedupId != null ? String(dedupId) : null;
   const key = jobKey(type, dedupValue ?? bookId, userEmail);
   const provider = String(appSettings.get('ai.provider') || 'claude').toLowerCase();
-  const model = _modelName(provider);
+  let model = _modelName(provider);
+  // Komplettanalyse-Familie kann ein eigenes Claude-Modell fahren (ai.claude.model.komplett,
+  // siehe routes/jobs/komplett/job.js#_komplettClaudeOverrides). Dann muss job_runs.model das
+  // TATSÄCHLICH genutzte Modell spiegeln, nicht das globale — sonst verbucht das Kosten-Tracking
+  // einen Opus-Komplett-Lauf zum Sonnet-Default-Tarif. Greift nur bei globalem Provider=claude
+  // (Override wird sonst von _komplettClaudeOverrides ohnehin verworfen).
+  if (provider === 'claude' && (type === 'komplett-analyse' || type === 'kontinuitaet')) {
+    const komplettModel = String(appSettings.get('ai.claude.model.komplett') || '').trim();
+    if (komplettModel) model = komplettModel;
+  }
   jobs.set(id, {
     id, type, bookId: String(bookId), dedupId: dedupValue, userEmail: userEmail || null,
     label: label || null,

@@ -23,6 +23,17 @@ function extractField(settled, chunkTexts, field) {
   }));
 }
 
+/** Mappt Figuren-Refs einer Entität (Ort/Song) gegen `idRemap` (gemergte Figuren-IDs
+ *  aus mergeDuplicateFiguren) und filtert auf weiterhin existierende IDs. SSoT für das
+ *  in den Single-/Multi-Pass-Übernahmen mehrfach wiederholte Remap-Idiom.
+ *  KEIN Set-Dedup: die direkten Aufrufer brauchen keins; die regelbasierten Fallback-
+ *  Merges (buildFallbackOrte/buildFallbackSongs) deduplizieren separat und bleiben unberührt. */
+function _remapFigRefs(refs, idRemap, validFigIds) {
+  return (refs || [])
+    .map(fid => idRemap?.[fid] || fid)
+    .filter(fid => validFigIds.has(fid));
+}
+
 /**
  * Baut den System-Block mit dem Buchtext, der über mehrere Claude-Calls gecached wird.
  * Byte-identische Formatierung in Phase 1 Pass A/B und Phase 8 Kontinuität,
@@ -120,6 +131,11 @@ function buildFigNameLookup(figuren, chapterFiguren, chapterAssignments, chapter
   );
 
   function tryTokenFallback(name) {
+    // KI liefert figur_name gelegentlich als Objekt statt String. Call-Sites
+    // normalisieren via _refToString; dieser Guard macht den Helper zusätzlich
+    // aufrufer-unabhängig robust (sonst würde name.toLowerCase() auf einem Objekt werfen
+    // und den gesamten Job nach bereits gespeichertem Katalog killen).
+    if (typeof name !== 'string') return;
     if (!name || nameToId[name] || nameToIdLower[name.toLowerCase()]) return;
     const tokens = new Set(name.toLowerCase().split(/[\s\-\.]+/).filter(t => t.length > 2));
     if (!tokens.size) return;
@@ -141,7 +157,7 @@ function buildFigNameLookup(figuren, chapterFiguren, chapterAssignments, chapter
   for (const { figuren: chFigs } of (chapterFiguren || []))
     for (const f1 of (chFigs || [])) tryTokenFallback(f1.name);
   for (const { assignments: chAss } of (chapterAssignments || []))
-    for (const a of (chAss || [])) tryTokenFallback(a?.figur_name);
+    for (const a of (chAss || [])) tryTokenFallback(_refToString(a?.figur_name));
   // Szenen-Namen ebenfalls einbeziehen: eine Szenenfigur «Gerold», die nur als
   // Teilname zu «Gerold Brunner» existiert, soll im Remap auflösen statt droppen.
   for (const { szenen: chSz } of (chapterSzenen || []))
@@ -152,7 +168,7 @@ function buildFigNameLookup(figuren, chapterFiguren, chapterAssignments, chapter
 }
 
 module.exports = {
-  _refToString, extractField,
+  _refToString, _remapFigRefs, extractField,
   buildBookSystemBlockText, buildBookPagesSig, bookSettingsSigPart,
   _stelleQuote,
   makePhaseTimer,

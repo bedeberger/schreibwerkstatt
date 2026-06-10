@@ -1,20 +1,12 @@
 'use strict';
-const { db, loadCheckpoint, deleteCheckpoint } = require('../../../db/schema');
+const { loadCheckpoint, deleteCheckpoint } = require('../../../db/schema');
 const { fmtTok, updateJob } = require('../shared');
 
-/** Invalidiert Delta-Cache-Einträge für umbenannte Kapitel. */
-function invalidateRenamedChapterCaches(bookIdInt, chaptersData, log, jobId) {
-  const stored = db.prepare('SELECT chapter_id, chapter_name FROM chapters WHERE book_id = ?').all(bookIdInt);
-  const storedChMap = Object.fromEntries(stored.map(r => [r.chapter_id, r.chapter_name]));
-  // Mig 75: chapter_id INTEGER + phase TEXT — DELETE alle phases pro umbenanntem Kapitel.
-  const delCacheByChapterId = db.prepare('DELETE FROM chapter_extract_cache WHERE book_id = ? AND chapter_id = ?');
-  for (const c of chaptersData) {
-    if (storedChMap[c.id] !== undefined && storedChMap[c.id] !== c.name) {
-      log.info(`Kapitel ${c.id} umbenannt («${storedChMap[c.id]}» → «${c.name}») – Cache invalidiert.`);
-      delCacheByChapterId.run(bookIdInt, c.id);
-    }
-  }
-}
+// Kapitel-Umbenennung invalidiert den Multi-Pass-Delta-Cache über den Kapitelnamen
+// im Chunk-pages_sig (phases.js, `||ch:<name>`), nicht über eine separate
+// Vergleichsfunktion: der Name fliesst via buildExtraktionKomplettChapterPrompt in
+// den Prompt → Rename ergibt automatisch einen Cache-MISS, ohne einen «alten» Namen
+// vorhalten zu müssen (der hier nirgends sentinel-frei gespeichert wäre).
 
 /** Lädt und validiert einen Komplett-Analyse-Checkpoint. Gibt null zurück wenn ungültig. */
 function loadAndValidateCheckpoint(bookIdInt, email, log, jobId) {
@@ -52,4 +44,4 @@ function restorePhase1FromCheckpoint(cp, tok, log, jobId) {
   return { chapterFiguren, chapterOrte, chapterSongs: chapterSongs || [], chapterFakten, chapterSzenen, chapterAssignments };
 }
 
-module.exports = { invalidateRenamedChapterCaches, loadAndValidateCheckpoint, restorePhase1FromCheckpoint };
+module.exports = { loadAndValidateCheckpoint, restorePhase1FromCheckpoint };

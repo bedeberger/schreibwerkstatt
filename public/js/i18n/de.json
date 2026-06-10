@@ -2522,6 +2522,9 @@
   "job.warn.eventsFailed":           "Lebensereignis-Extraktion fehlgeschlagen – übriger Katalog wurde aktualisiert.",
   "job.warn.crossChapterFailed":     "Kapitelübergreifende Beziehungen konnten nicht ermittelt werden.",
   "job.warn.continuityFailed":       "Kontinuitätsprüfung übersprungen – übriger Katalog wurde aktualisiert.",
+  "job.warn.zeitstrahlDegraded":     "Zeitstrahl-Konsolidierung übersprungen – Ereignisse roh gruppiert gespeichert.",
+  "job.warn.timelineFailed":         "Zeitstrahl-Phase fehlgeschlagen – übriger Katalog wurde aktualisiert.",
+  "job.warn.factsChapterSkipped":    "Fakten einzelner Kapitel konnten nicht extrahiert werden ({chapters}) – Kontinuitätsprüfung lief auf reduzierter Faktenbasis.",
   "job.warn.chunksTruncated":        "{count} Textabschnitt(e) konnten vom Modell nicht vollständig analysiert werden (Wiederholungsschleife) und wurden übersprungen: {chapters}. Übrige Abschnitte wurden normal ausgewertet.",
 
   "job.phase.preparing":             "Vorbereitung…",
