@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const { parseNominatimResults, parsePhotonResults } = require('../../routes/geocode.js');
-const { geocode, parseToponym } = require('../../lib/geocode.js');
+const { geocode, parseToponym, preferCountry } = require('../../lib/geocode.js');
 
 test('geocode: leere Query → leeres Array (kein Netzwerk-Call)', async () => {
   assert.deepEqual(await geocode(''), []);
@@ -65,15 +65,28 @@ test('parseNominatimResults: fehlender display_name → leerer String', () => {
   assert.equal(out[0].displayName, '');
 });
 
-test('parsePhotonResults: [lon,lat]-Reihenfolge → {lat,lng} + zusammengesetzter displayName', () => {
+test('parsePhotonResults: [lon,lat]-Reihenfolge → {lat,lng} + zusammengesetzter displayName + countrycode', () => {
   const out = parsePhotonResults({
     type: 'FeatureCollection',
     features: [
       { geometry: { type: 'Point', coordinates: [8.5417, 47.3769] },
-        properties: { name: 'Zürich', state: 'Zürich', country: 'Schweiz' } },
+        properties: { name: 'Zürich', state: 'Zürich', country: 'Schweiz', countrycode: 'CH' } },
     ],
   });
-  assert.deepEqual(out, [{ lat: 47.3769, lng: 8.5417, displayName: 'Zürich, Zürich, Schweiz' }]);
+  assert.deepEqual(out, [{ lat: 47.3769, lng: 8.5417, displayName: 'Zürich, Zürich, Schweiz', countrycode: 'ch' }]);
+});
+
+test('preferCountry: bevorzugt Treffer im Zielland, faellt sonst auf alle zurueck', () => {
+  const cands = [
+    { displayName: 'Olten, DE', countrycode: 'de' },
+    { displayName: 'Olten, CH', countrycode: 'ch' },
+  ];
+  // Treffer im Land → nur diese.
+  assert.deepEqual(preferCountry(cands, 'ch'), [{ displayName: 'Olten, CH', countrycode: 'ch' }]);
+  // Kein Treffer im Land → ungefilterte Liste (nie schlechter als ohne Hinweis).
+  assert.deepEqual(preferCountry(cands, 'fr'), cands);
+  // Kein cc → unveraendert.
+  assert.deepEqual(preferCountry(cands, null), cands);
 });
 
 test('parsePhotonResults: verwirft Features ohne gueltige Koordinaten', () => {

@@ -15,6 +15,7 @@ const {
   makeJobLogger, updateJob, completeJob, failJob, i18nError,
   aiCall, getPrompts, tps,
   createJob, enqueueJob, findActiveJobId, jsonBody,
+  jobAbortControllers,
 } = require('./shared');
 const { geocode } = require('../../lib/geocode');
 const { toIntId } = require('../../lib/validate');
@@ -155,16 +156,29 @@ async function runGeocodeResolveJob(jobId, items, bookId, userEmail) {
     }
 
     updateJob(jobId, { statusText: 'job.phase.geocodeLookup', progress: 65 });
+    const signal = jobAbortControllers.get(jobId)?.signal;
+    // Identische (Toponym + effektive Region) nur EINMAL geocodieren — viele Szenen
+    // teilen sich denselben realen Ort. Spart externe Calls (auf Public-Nominatim
+    // je ≥1.1 s serialisiert).
+    const lookupCache = new Map();
     const results = [];
     for (const it of items) {
       const r = resolved.get(String(it.id));
       // Kein Eintrag oder leerer Anker (rein fiktiv) → unverortet, kein Geocoder-Call.
       if (!r || !r.ort) { results.push({ id: it.id, lat: null, lng: null }); continue; }
-      const cands = await geocode(r.ort, { lang: language, region: r.land || region });
-      const c = cands[0];
+      const effRegion = r.land || region;
+      const key = `${r.ort} ${effRegion || ''}`;
+      if (!lookupCache.has(key)) {
+        // Abbruch (User-Cancel) nicht bis zum letzten Label durchlaufen.
+        if (signal?.aborted) { const e = new Error('aborted'); e.name = 'AbortError'; throw e; }
+        const cands = await geocode(r.ort, { lang: language, region: effRegion });
+        const c = cands[0];
+        lookupCache.set(key, c ? { lat: c.lat, lng: c.lng, displayName: c.displayName } : null);
+      }
+      const c = lookupCache.get(key);
       results.push(c
-        ? { id: it.id, lat: c.lat, lng: c.lng, displayName: c.displayName, ort: r.ort }
-        : { id: it.id, lat: null, lng: null, ort: r.ort });
+        ? { id: it.id, lat: c.lat, lng: c.lng, displayName: c.displayName, ort: r.ort, land: r.land || null }
+        : { id: it.id, lat: null, lng: null, ort: r.ort, land: r.land || null });
     }
 
     const hits = results.filter(r => r.lat != null).length;

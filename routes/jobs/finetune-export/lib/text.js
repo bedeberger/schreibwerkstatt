@@ -70,20 +70,18 @@ function sentenceBoundaryIndices(text) {
   return out;
 }
 
-// Splittet `text` an der Satzgrenze, die `ratio` (0–1) am nächsten liegt.
-// Gibt exakte Substrings zurück (nur an den Enden getrimmt) — wichtig für den
-// Verbatim-Sampler, der wörtliche Wiedergabe verlangt.
+// Splittet `text` an einer Satzgrenze nahe `ratio` (0–1). Bevorzugt die letzte
+// Grenze bei/vor dem Zielindex (kein Überschiessen — wichtig fürs
+// Verbatim-Chunking), sonst die erste danach. Gibt exakte Substrings zurück
+// (nur an den Enden getrimmt) — der Verbatim-Sampler verlangt wörtliche Wiedergabe.
 function splitAtSentence(text, ratio) {
   const target = Math.max(1, Math.min(text.length - 1, Math.floor(text.length * ratio)));
-  const bounds = sentenceBoundaryIndices(text);
+  const bounds = sentenceBoundaryIndices(text); // aufsteigend
   if (bounds.length) {
-    let best = bounds[0];
-    let bestDist = Math.abs(best - target);
-    for (let i = 1; i < bounds.length; i++) {
-      const d = Math.abs(bounds[i] - target);
-      if (d < bestDist) { best = bounds[i]; bestDist = d; }
-    }
-    return [text.slice(0, best).trim(), text.slice(best).trim()];
+    let pick = -1;
+    for (const b of bounds) { if (b <= target) pick = b; else break; }
+    if (pick === -1) pick = bounds[0]; // alle Grenzen liegen hinter dem Ziel
+    return [text.slice(0, pick).trim(), text.slice(pick).trim()];
   }
   return [text.slice(0, target).trim(), text.slice(target).trim()];
 }

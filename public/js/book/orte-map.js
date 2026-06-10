@@ -208,6 +208,13 @@ export const orteMapMethods = {
     let h = `<div class="ort-popup"><strong class="ort-popup__name">${esc(o.name)}</strong>`;
     const sub = [o.typ, o.stimmung].filter(Boolean).map(esc).join(' · ');
     if (sub) h += `<div class="ort-popup__sub">${sub}</div>`;
+    // Match-Konfidenz: als was hat der Geocoder den Ort verortet (Toponym + Land)?
+    // Nur bei KI-verorteten Orten gesetzt; deckt Fehltreffer auf (z.B. falsches Land).
+    if (o.geo_query) {
+      const landLbl = o.geo_land ? countryLabel(o.geo_land, this._geoLang || 'de') : '';
+      const resolvedTxt = landLbl ? `${o.geo_query} (${landLbl})` : o.geo_query;
+      h += `<div class="ort-popup__resolved">${esc(app.t('orte.map.resolvedAs', { ort: resolvedTxt }))}</div>`;
+    }
     if (o.beschreibung) {
       const t = o.beschreibung.length > 160 ? o.beschreibung.slice(0, 160) + '…' : o.beschreibung;
       h += `<p class="ort-popup__desc">${esc(t)}</p>`;
@@ -309,7 +316,14 @@ export const orteMapMethods = {
     });
 
     for (const r of results) {
-      if (r && r.lat != null && r.lng != null && await this._applyCoords(r.id, r.lat, r.lng)) hitIds.add(r.id);
+      if (r && r.lat != null && r.lng != null && await this._applyCoords(r.id, r.lat, r.lng)) {
+        // Aufgelösten Toponym + Land in-memory mitführen → Popup zeigt sofort, als
+        // was der Ort verortet wurde (Match-Konfidenz). Serverseitig im Resolve-Job
+        // persistiert (geo_query/geo_land), nicht über saveOrte.
+        const t = app.orte.find(x => x.id === r.id);
+        if (t) { t.geo_query = r.ort || null; t.geo_land = r.land || null; }
+        hitIds.add(r.id);
+      }
     }
     return hitIds;
   },

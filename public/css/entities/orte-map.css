@@ -122,6 +122,13 @@
   color: var(--color-muted);
 }
 
+/* Geocoder-Match (als was der Ort verortet wurde) — Konfidenz-Signal zum
+   Aufspueren von Fehltreffern. */
+.ort-popup__resolved {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+
 .ort-popup__desc {
   margin: 0;
   font-size: var(--font-size-xs);
