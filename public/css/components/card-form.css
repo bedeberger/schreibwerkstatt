@@ -492,6 +492,11 @@ select:focus {
   line-height: 1.5;
   box-sizing: border-box;
 }
+/* Mobile: 16px verhindert iOS-Zoom beim Fokus. Eigener Selektor noetig, weil die
+   Klassen-font-size oben die globale textarea-Regel ueberspezifiziert. */
+@media (max-width: 768px) {
+  .card-form-textarea { font-size: var(--font-size-reading); }
+}
 
 /* Validation-State: aria-invalid="true" reicht — kein paralleler Klassen-State.
    Screen-Reader liest aria-invalid; Selektor leitet Optik daraus ab. */

@@ -94,7 +94,8 @@ test('monthlyTotals: Top-User + byModel + byType', () => {
   // Seed-State variieren — daher nur Anwesenheit pruefen.
   const xtop = s.topUsers.find(u => u.email === 'xtop@ex.com');
   assert.ok(xtop, 'xtop in topUsers');
-  assert.ok(xtop.usd > 30);
+  // 5M sonnet-4-6 ($3/Mio = $15) + 2M opus-4-7 ($5/Mio = $10) = $25
+  assert.ok(xtop.usd > 20);
   const models = s.byModel.map(m => m.model);
   assert.ok(models.includes('claude-sonnet-4-6'));
   assert.ok(models.includes('claude-opus-4-7'));

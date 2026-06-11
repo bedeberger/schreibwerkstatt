@@ -58,6 +58,10 @@
   min-height: 60px;
   font-family: inherit;
 }
+/* Mobile: 16px verhindert iOS-Zoom beim Fokus (erbt sonst <16px via font: inherit). */
+@media (max-width: 768px) {
+  .share-create__textarea { font-size: var(--font-size-reading); }
+}
 .share-create__hint {
   font-size: 12px;
   color: var(--color-faint);

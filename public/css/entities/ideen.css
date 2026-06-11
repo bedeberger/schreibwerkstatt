@@ -26,6 +26,10 @@
 }
 .ideen-input:focus { outline: none; border-color: var(--color-border-focus); }
 .ideen-input:disabled { opacity: var(--opacity-disabled); }
+/* Mobile: 16px verhindert iOS-Zoom beim Fokus. */
+@media (max-width: 768px) {
+  .ideen-input { font-size: var(--font-size-reading); }
+}
 .ideen-add-btn { flex-shrink: 0; align-self: stretch; }
 .ideen-loading,
 .ideen-empty {
