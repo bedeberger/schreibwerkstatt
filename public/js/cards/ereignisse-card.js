@@ -52,8 +52,9 @@ function _eventDate(year, month, day) {
 // Pure: übersetzt die (gefilterte) Event-Liste in vis-timeline-Items. Nur
 // datierte Events (datum_year gesetzt) landen auf der Achse — story_tag/undatiert
 // bleiben nur in der Liste. id = Listen-Index (Brücke zu [data-ev-index] für
-// Klick→Scroll). Spannen (datum_ende_year) werden zu Range-Items. Extrahiert
-// für Tests (siehe ereignisse-card-filter.test.mjs).
+// Klick→Scroll). Spannen (datum_ende_year) werden zu Range-Items. subtyp trägt
+// die Farbcodierung der Liste auf die Achse. Extrahiert für Tests (siehe
+// ereignisse-card-filter.test.mjs).
 export function buildTimelineItems(events) {
   const items = [];
   (events || []).forEach((ev, i) => {
@@ -63,6 +64,7 @@ export function buildTimelineItems(events) {
       id: i,
       start,
       extern: ev.typ === 'extern',
+      subtyp: ev.subtyp || 'sonstiges',
       content: ev.ereignis || '',
     };
     if (ev.datum_ende_year != null) {
@@ -145,6 +147,9 @@ export function registerEreignisseCard() {
     // vis-timeline-Instanz + Item-DataSet (lazy beim ersten Sichtbarwerden).
     _timeline: null,
     _timelineItems: null,
+    // Buch-ID, für die zuletzt ein fit() (Voll-Zoom) lief. Filteränderungen
+    // dürfen den User-Zoom NICHT zurücksetzen — fit() nur bei Buchwechsel.
+    _lastFitBookId: null,
     // Re-Entry-Guards: _renderTimeline ist async (await loadVisTimeline) und kann
     // von zwei Watches quasi-gleichzeitig getriggert werden → sonst Doppel-Mount.
     _timelineRendering: false,
@@ -248,6 +253,46 @@ export function registerEreignisseCard() {
       node?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     },
 
+    // Index des ersten undatierten Events (kein Kalenderjahr) in der gefilterten
+    // Liste, oder -1. Diese Events landen nicht auf der Achse — Basis für die
+    // Listen-Trennlinie (gz-section-divider) und den klickbaren Achse-Hinweis.
+    firstUndatedIndex() {
+      const list = this.filteredEreignisse();
+      for (let i = 0; i < list.length; i++) if (list[i].datum_year == null) return i;
+      return -1;
+    },
+
+    // Klick auf den Achse-Hinweis → zum ersten undatierten Listeneintrag scrollen.
+    scrollToFirstUndated() {
+      const idx = this.firstUndatedIndex();
+      if (idx >= 0) this.scrollToEventIndex(idx);
+    },
+
+    // Liste → Achse: zentriert + selektiert das Timeline-Item zum Listen-Index.
+    // No-op für undatierte Events (kein Achsen-Item) oder vor dem Lazy-Mount.
+    selectTimelineEvent(index) {
+      if (!this._timeline || !this._timelineItems?.get(index)) return;
+      this._timeline.setSelection(index, { focus: true });
+    },
+
+    // Achse/Zeile → Manuskript: öffnet die erste verknüpfte Seite, sonst das
+    // erste Kapitel. Liefert true, wenn ein Sprungziel existiert.
+    openEventText(ev) {
+      if (!ev) return false;
+      const pageId = Array.isArray(ev.page_ids) ? ev.page_ids[0] : null;
+      if (pageId != null) { window.__app.gotoPageById(pageId); return true; }
+      const kap = Array.isArray(ev.kapitel) ? ev.kapitel[0] : ev.kapitel;
+      if (kap) { window.__app.gotoStelle(kap, null); return true; }
+      return false;
+    },
+
+    // True, wenn openEventText ein Ziel hätte (steuert .internal-link-Affordance).
+    eventHasTarget(ev) {
+      const pageId = Array.isArray(ev?.page_ids) ? ev.page_ids[0] : null;
+      const kap = Array.isArray(ev?.kapitel) ? ev.kapitel[0] : ev?.kapitel;
+      return pageId != null || !!kap;
+    },
+
     // Coalescing-Wrapper: serialisiert konkurrierende Render-Aufrufe und
     // stellt sicher, dass nach dem laufenden Render ggf. einmal nachgezogen wird.
     _renderTimeline() {
@@ -275,6 +320,7 @@ export function registerEreignisseCard() {
         this._timeline?.destroy();
         this._timeline = null;
         this._timelineItems = null;
+        this._lastFitBookId = null;
         return;
       }
 
@@ -292,12 +338,16 @@ export function registerEreignisseCard() {
           start: it.start,
           end: it.end,
           type: it.type,
-          className: 'gz-vis-item' + (it.extern ? ' gz-vis-item--extern' : ''),
+          // Subtyp-Klasse trägt die Listen-Farbcodierung auf die Achse;
+          // extern überschreibt sie (Weltgeschehen bleibt in Error-Tönung).
+          className: 'gz-vis-item gz-vis-item--subtyp-' + (it.subtyp || 'sonstiges')
+            + (it.extern ? ' gz-vis-item--extern' : ''),
           content: escHtml((it.content || '').slice(0, 48)),
           title: tip,
         };
       });
 
+      const bookId = root.selectedBookId;
       if (!this._timeline) {
         this._timelineItems = new vis.DataSet(visItems);
         this._timeline = new vis.Timeline(el, this._timelineItems, {
@@ -310,17 +360,34 @@ export function registerEreignisseCard() {
           showCurrentTime: false,
           margin: { item: 4, axis: 6 },
           orientation: 'top',
+          // Dichte bändigen: überlappende Items (z.B. viele Geburten im selben
+          // Jahr) bündeln sich rausgezoomt zu einer Zähler-Blase und entfalten
+          // sich beim Reinzoomen.
+          cluster: { maxItems: 1, showStipes: true },
         });
-        // Jeder Klick auf ein Item (nicht nur Selektionswechsel) → zum
-        // Listeneintrag scrollen. props.item ist die Item-id (= Listen-Index).
+        // Einfachklick auf ein Item → zum Listeneintrag scrollen.
+        // props.item ist die Item-id (= Listen-Index).
         this._timeline.on('click', (props) => {
           if (props.item != null) this.scrollToEventIndex(Number(props.item));
         });
+        // Doppelklick → direkt ins Manuskript (erste verknüpfte Seite/Kapitel).
+        this._timeline.on('doubleClick', (props) => {
+          if (props.item == null) return;
+          const ev = this.filteredEreignisse()[Number(props.item)];
+          this.openEventText(ev);
+        });
+        this._timeline.fit();
+        this._lastFitBookId = bookId;
       } else {
         this._timelineItems.clear();
         this._timelineItems.add(visItems);
+        // fit() (Voll-Zoom) NUR bei Buchwechsel — sonst würde jede Filter-/
+        // Suchänderung den vom User eingestellten Zoom-Bereich zurücksetzen.
+        if (this._lastFitBookId !== bookId) {
+          this._timeline.fit();
+          this._lastFitBookId = bookId;
+        }
       }
-      this._timeline.fit();
     },
   }));
 }

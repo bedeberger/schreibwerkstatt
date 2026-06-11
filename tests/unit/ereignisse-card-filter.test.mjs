@@ -209,6 +209,15 @@ test('buildTimelineItems: extern-Flag aus typ', () => {
   assert.equal(b.extern, false);
 });
 
+test('buildTimelineItems: subtyp wird durchgereicht (Achsen-Farbcodierung)', () => {
+  const [a, b] = buildTimelineItems([
+    { datum_year: 1990, subtyp: 'geburt', ereignis: 'A' },
+    { datum_year: 1991, /* kein subtyp */ ereignis: 'B' },
+  ]);
+  assert.equal(a.subtyp, 'geburt');
+  assert.equal(b.subtyp, 'sonstiges', 'fehlender Subtyp → sonstiges-Fallback');
+});
+
 test('buildTimelineItems: frühes Jahr (<100) wird nicht auf 1900+ gemappt', () => {
   const [item] = buildTimelineItems([{ datum_year: 50, ereignis: 'Antike' }]);
   assert.equal(item.start.getFullYear(), 50);

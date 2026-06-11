@@ -1,4 +1,4 @@
-import { DEFAULT_FONT, nodeLabel } from './constants.js';
+import { DEFAULT_FONT, TIER_COLOR } from './constants.js';
 
 // Figurengraph: Kapitel-Swimlane (deterministisch).
 // Layout-Idee:
@@ -26,10 +26,6 @@ export const figurengraphMethods = {
     const TIER_BASE_GAP   = 80;   // Zusatz-Luft zwischen zwei Tiers
     const MIN_DX          = 130;  // Minimaler horizontaler Abstand zwischen zwei Figuren derselben Zeile
     const TIER_ORDER      = ['hauptfigur', 'antagonist', 'mentor', 'nebenfigur', 'randfigur', 'andere'];
-    const TIER_COLOR = {
-      hauptfigur: '#2d6a9f', antagonist: '#E24B4A',
-      mentor:     '#639922', nebenfigur: '#666',    randfigur: '#999', andere: '#c4a55a',
-    };
     const tierOf = f => TIER_ORDER.includes(f.typ) ? f.typ : 'andere';
 
     // Pro Figur: gewichteter x-Index, Ersterscheinung, Tier, Wichtigkeit
@@ -103,17 +99,7 @@ export const figurengraphMethods = {
     // Rückzug dort bleiben, wohin der Nutzer sie zieht.
     this._figurenNodes = new vis.DataSet(nodePositions.map(({ f, x, y }) => {
       const borderWidth = Math.min(4, 1 + Math.round(Math.log2(Math.max(1, info[f.id].importance))));
-      return {
-        id: f.id,
-        label: nodeLabel(f),
-        color: this._figTypColor(f.typ),
-        font: DEFAULT_FONT,
-        shape: 'box',
-        margin: 10,
-        widthConstraint: { maximum: 160 },
-        borderWidth,
-        x, y,
-      };
+      return { ...this._baseNode(f), borderWidth, x, y };
     }));
     const nodes = this._figurenNodes;
 
@@ -179,7 +165,7 @@ export const figurengraphMethods = {
         const step     = Math.max(1, Math.ceil(70 / Math.max(1, pxPerCol)));
         ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.font = `600 ${headerFs * dpr}px system-ui,-apple-system,sans-serif`;
+        ctx.font = `600 ${headerFs * dpr}px ${DEFAULT_FONT.face}`;
         ctx.textAlign    = 'center';
         ctx.textBaseline = 'top';
         ctx.fillStyle    = '#555';
@@ -197,7 +183,7 @@ export const figurengraphMethods = {
       // 3) Tier-Labels links am Canvas-Rand (Screen-Koordinaten)
       ctx.save();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.font = `600 ${tierFs * dpr}px system-ui,-apple-system,sans-serif`;
+      ctx.font = `600 ${tierFs * dpr}px ${DEFAULT_FONT.face}`;
       ctx.textBaseline = 'middle';
       ctx.textAlign    = 'left';
       const padY = (tierFs * 0.9) * dpr;
@@ -225,25 +211,31 @@ export const figurengraphMethods = {
     // Min-Breite skaliert mit N (min 3 px pro Segment), Cap bei 220 px gegen Overlap.
     if (N > 0) {
       const minBarW = Math.min(220, Math.max(70, N * 3));
+      // Konstante Presence-Daten je Figur einmal vorberechnen — afterDrawing feuert
+      // bei jedem Pan/Zoom/Redraw; nur die Bounding-Box ist pro Frame variabel (Drag),
+      // kapsByName + RGB-Parse sind es nicht.
+      const hexToRgb = col => col && col.startsWith('#')
+        ? [parseInt(col.slice(1, 3), 16), parseInt(col.slice(3, 5), 16), parseInt(col.slice(5, 7), 16)]
+        : [45, 106, 159];
+      const presenceData = figuren.map(f => {
+        const kapsByName = {};
+        for (const k of (f.kapitel || [])) kapsByName[k.name] = k.haeufigkeit || 1;
+        return { id: f.id, kapsByName, rgb: hexToRgb(TIER_COLOR[info[f.id].tier]) };
+      });
       network.on('afterDrawing', ctx => {
         ctx.save();
-        for (const f of figuren) {
-          const bb = network.getBoundingBox(f.id);
+        for (const { id, kapsByName, rgb: [r, g, b] } of presenceData) {
+          const bb = network.getBoundingBox(id);
           if (!bb) continue;
           const barW    = Math.max(bb.right - bb.left, minBarW);
           const barLeft = (bb.left + bb.right) / 2 - barW / 2;
           const barY    = bb.bottom + 4;
           const barH    = 4;
           const segW    = barW / N;
-          const kapsByName = {};
-          for (const k of (f.kapitel || [])) kapsByName[k.name] = k.haeufigkeit || 1;
           // Hintergrund
           ctx.fillStyle = 'rgba(0,0,0,0.07)';
           ctx.fillRect(barLeft, barY, barW, barH);
           // Gefüllte Segmente pro Kapitel mit Auftritt
-          const tier = info[f.id].tier;
-          const col  = TIER_COLOR[tier] || '#2d6a9f';
-          const [r, g, b] = col.startsWith('#') ? [parseInt(col.slice(1,3),16), parseInt(col.slice(3,5),16), parseInt(col.slice(5,7),16)] : [45,106,159];
           for (let i = 0; i < N; i++) {
             const h = kapsByName[chapterOrder[i]];
             if (!h) continue;
@@ -271,10 +263,11 @@ export const figurengraphMethods = {
     // Sofort fitten (keine Stabilisierung nötig, Physics ist aus).
     // fit() auf Node-IDs statt Canvas: leere Kapitel-Spalten würden sonst die
     // Bounding-Box aufblähen → Nodes mikroskopisch im Viewport.
+    // Kapitel-Filter wird zentral aus core.js#renderFigurGraph angewandt (alle Modi),
+    // hier nur fitten.
     const fitIds = figuren.map(f => f.id);
     requestAnimationFrame(() => {
       network.fit({ nodes: fitIds, animation: { duration: 250, easingFunction: 'easeInOutQuad' } });
-      if (this.figurenGraphKapitel) this._figurenGraphSetKapitel(this.figurenGraphKapitel);
     });
 
     this._attachTooltip(container);

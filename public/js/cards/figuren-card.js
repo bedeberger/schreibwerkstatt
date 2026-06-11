@@ -17,7 +17,7 @@ import { setupCardLifecycle } from './card-lifecycle.js';
 import { attachFullscreenSync } from '../fullscreen.js';
 import { memoizeByIdentity } from '../utils.js';
 
-const FIGUR_TYP_ORDER = { hauptfigur: 0, antagonist: 1, mentor: 2, nebenfigur: 3, andere: 4 };
+const FIGUR_TYP_ORDER = { hauptfigur: 0, antagonist: 1, mentor: 2, nebenfigur: 3, randfigur: 4, andere: 5 };
 
 const _memoFiguren = () => memoizeByIdentity(([figuren, chapterMap, suche, kapitel, seite]) => {
   let result = figuren;

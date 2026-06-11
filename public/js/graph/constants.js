@@ -1,5 +1,7 @@
 // Konstanten + Helper für Figurengraph/Familie/Soziogramm.
-// Wird von allen Render-Pfaden geteilt.
+// Wird von allen Render-Pfaden geteilt. SSoT für sämtliche Graph-Farben:
+// Schicht- und Typ-Paletten leben ausschliesslich hier, die Render-Slices
+// importieren nur noch.
 
 export const DEFAULT_FONT = { size: 13, face: 'system-ui, -apple-system, sans-serif' };
 
@@ -7,16 +9,29 @@ export const DEFAULT_FONT = { size: 13, face: 'system-ui, -apple-system, sans-se
 export const nodeLabel = f => (f.kurzname || f.name) + (f.geburtstag ? '\n* ' + f.geburtstag : '');
 
 // ── Sozialschicht-Palette (Schweiz, Mittelland, 1990er–2010er) ───────────────
+// Jeder Eintrag hält alle Schicht-Visuals an einer Stelle:
+//   background/border/highlight → vis-Node-Farbe
+//   font                        → optionaler Node-Font (heller Text auf dunklem Band)
+//   band                        → halbtransparenter Hintergrund-Streifen im Soziogramm
+//   label                       → Textfarbe des Schicht-Labels links
 export const SCHICHT_COLOR = {
-  wirtschaftselite:    { background: '#FFF3CC', border: '#A07800', highlight: { background: '#FFE566', border: '#7A5A00' } },
-  gehobenes_buergertum:{ background: '#D4E8FF', border: '#2d6a9f', highlight: { background: '#BDD8FF', border: '#1d4b73' } },
-  mittelschicht:       { background: '#E8F4E8', border: '#3a7a3a', highlight: { background: '#D0EBD0', border: '#275927' } },
-  arbeiterschicht:     { background: '#F5EAD4', border: '#8B5E26', highlight: { background: '#EDD9A8', border: '#6B3F0D' } },
-  migrantenmilieu:     { background: '#FDEBD0', border: '#C0602A', highlight: { background: '#FAD5A8', border: '#9A4010' } },
-  prekariat:           { background: '#F5EDED', border: '#8B3A3A', highlight: { background: '#EDD5D5', border: '#6B1A1A' } },
+  wirtschaftselite:    { background: '#FFF3CC', border: '#A07800', highlight: { background: '#FFE566', border: '#7A5A00' },
+                         band: 'rgba(255,243,204,0.40)', label: '#8B6A00' },
+  gehobenes_buergertum:{ background: '#D4E8FF', border: '#2d6a9f', highlight: { background: '#BDD8FF', border: '#1d4b73' },
+                         band: 'rgba(212,232,255,0.35)', label: '#1d4b73' },
+  mittelschicht:       { background: '#E8F4E8', border: '#3a7a3a', highlight: { background: '#D0EBD0', border: '#275927' },
+                         band: 'rgba(232,244,232,0.35)', label: '#275927' },
+  arbeiterschicht:     { background: '#F5EAD4', border: '#8B5E26', highlight: { background: '#EDD9A8', border: '#6B3F0D' },
+                         band: 'rgba(245,234,212,0.38)', label: '#6B3F0D' },
+  migrantenmilieu:     { background: '#FDEBD0', border: '#C0602A', highlight: { background: '#FAD5A8', border: '#9A4010' },
+                         band: 'rgba(253,235,208,0.40)', label: '#9A4010' },
+  prekariat:           { background: '#F5EDED', border: '#8B3A3A', highlight: { background: '#EDD5D5', border: '#6B1A1A' },
+                         band: 'rgba(245,237,237,0.40)', label: '#6B1A1A' },
   unterwelt:           { background: '#3A3A3A', border: '#111',    highlight: { background: '#505050', border: '#000' },
-                         font: { ...DEFAULT_FONT, color: '#fff' } },
-  andere:              { background: '#FFF5DC', border: '#c4a55a', highlight: { background: '#FFEEBB', border: '#8a6a20' } },
+                         font: { ...DEFAULT_FONT, color: '#fff' },
+                         band: 'rgba(40,40,40,0.22)', label: '#333' },
+  andere:              { background: '#FFF5DC', border: '#c4a55a', highlight: { background: '#FFEEBB', border: '#8a6a20' },
+                         band: 'rgba(255,245,220,0.25)', label: '#888' },
 };
 
 // Vertikale Ebene pro Schicht (0 = oben)
@@ -29,6 +44,24 @@ export const SCHICHT_LEVEL = {
   prekariat:           5,
   unterwelt:           6,
   andere:              2,
+};
+
+// ── Figurentyp-Palette ────────────────────────────────────────────────────────
+// TYP_COLOR = vis-Node-Füllung (background/border/highlight).
+export const TYP_COLOR = {
+  hauptfigur:  { background: '#D4E8FF', border: '#2d6a9f', highlight: { background: '#BDD8FF', border: '#1d4b73' } },
+  nebenfigur:  { background: '#F0F0F0', border: '#888',    highlight: { background: '#E4E4E4', border: '#555' } },
+  antagonist:  { background: '#FFE0E0', border: '#E24B4A', highlight: { background: '#FFC7C7', border: '#B03030' } },
+  mentor:      { background: '#EAF3DE', border: '#639922', highlight: { background: '#D5EBBD', border: '#3B6D11' } },
+  randfigur:   { background: '#F7F7F7', border: '#BBB',    highlight: { background: '#EDEDED', border: '#999' } },
+  andere:      { background: '#FFF5DC', border: '#c4a55a', highlight: { background: '#FFEEBB', border: '#8a6a20' } },
+};
+// TIER_COLOR = Text-/Akzentfarbe (Tier-Label + Presence-Bar im Figurengraph).
+// Bewusst eigenständig: neben-/randfigur nutzen dunklere Werte als die Node-Border,
+// damit Label und Balken auf hellem Grund genug Kontrast haben.
+export const TIER_COLOR = {
+  hauptfigur: '#2d6a9f', antagonist: '#E24B4A', mentor: '#639922',
+  nebenfigur: '#666',    randfigur:  '#999',    andere: '#c4a55a',
 };
 
 // ── Beziehungstyp-Styling (Figurengraph) ─────────────────────────────────────

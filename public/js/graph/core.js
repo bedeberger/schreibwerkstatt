@@ -42,7 +42,10 @@ export const coreMethods = {
     if (!container) return;
     const figuren = window.__app.figuren;
 
-    if (typeof window.vis === 'undefined') {
+    // .Network statt nur window.vis prüfen — vis-timeline (Ereignisse) mergt
+    // ebenfalls in window.vis (ohne Network); ein vorher geladener Zeitstrahl
+    // würde den Loader sonst kurzschliessen und new vis.Network crasht.
+    if (!window.vis?.Network) {
       const ph = document.createElement('span');
       ph.className = 'muted-msg muted-msg--block';
       ph.textContent = window.__app.t('graph.empty.visLoading');
@@ -54,10 +57,17 @@ export const coreMethods = {
       }
     }
 
-    const kapSig = figuren.map(f =>
-      f.id + ':' + (f.kapitel || []).map(k => k.name + k.haeufigkeit).join(',')
-    ).join('|');
-    const hash = kapSig + '|' + this.figurenGraphModus + '|' + window.__app.uiLocale;
+    // Render-Signatur deckt ALLE layout-/edge-relevanten Felder ab: typ (Tier),
+    // sozialschicht (Soziogramm-Band), Kapitel (X-Achse + Presence) und Beziehungen
+    // inkl. Machtverhältnis (Edges + Macht-Sortierung). Nur Kapitel zu prüfen würde
+    // nach einem Beziehungs-/Typ-/Schicht-Edit den alten Stand zeigen (Hash matcht
+    // trotz Datenänderung → No-op).
+    const sig = figuren.map(f => {
+      const kap = (f.kapitel || []).map(k => k.name + k.haeufigkeit).join(',');
+      const bz  = (f.beziehungen || []).map(b => b.figur_id + b.typ + (b.machtverhaltnis ?? '')).join(',');
+      return [f.id, f.typ || '', f.sozialschicht || '', kap, bz].join('::');
+    }).join('|');
+    const hash = sig + '|' + this.figurenGraphModus + '|' + window.__app.uiLocale;
     if (this._figurenNetwork && this._figurenHash === hash) return;
     this._figurenHash = hash;
 

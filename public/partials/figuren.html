@@ -100,7 +100,7 @@
           <button type="button" class="graph-tool-btn" :aria-pressed="figurenGraphFullscreen" :data-tip="figurenGraphFullscreen ? $app.t('graph.fullscreenClose') : $app.t('graph.fullscreen')" :aria-label="figurenGraphFullscreen ? $app.t('graph.fullscreenClose') : $app.t('graph.fullscreen')" @click="toggleFigurenGraphFullscreen()"><svg class="icon" aria-hidden="true"><use :href="figurenGraphFullscreen ? '/icons.svg?v=690#minimize-2' : '/icons.svg?v=690#maximize-2'"/></svg></button>
         </div>
       </div>
-      <div id="figuren-graph" class="figuren-graph-container"></div>
+      <div id="figuren-graph" class="figuren-graph-container" role="img" :aria-label="$app.t('graph.ariaLabel')"></div>
       <div id="figur-tooltip" class="figur-tooltip"></div>
     </div>
   </div>

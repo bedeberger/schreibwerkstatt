@@ -8,9 +8,9 @@ Code: [public/js/graph.js](../public/js/graph.js) (Facade) + [public/js/graph/](
 
 | Slice | Verantwortung |
 |-------|---------------|
-| `graph/constants.js` | `DEFAULT_FONT`, `nodeLabel`, `SCHICHT_COLOR`, `SCHICHT_LEVEL`, `BZ` (Edge-Styles Figurengraph), `BZ_SOZIO_COLOR`/`BZ_SOZIO_CAT` (Soziogramm), `DIRECTED_TYPES`. |
+| `graph/constants.js` | **SSoT für alle Graph-Farben.** `DEFAULT_FONT`, `nodeLabel`, `SCHICHT_COLOR` (inkl. `band`-Streifen + `label`-Textfarbe pro Schicht), `SCHICHT_LEVEL`, `TYP_COLOR` (Node-Füllung), `TIER_COLOR` (Text-/Akzentfarbe), `BZ` (Edge-Styles Figurengraph), `BZ_SOZIO_COLOR`/`BZ_SOZIO_CAT` (Soziogramm), `DIRECTED_TYPES`. |
 | `graph/core.js` | Mode-Switch (`setFigurenGraphModus`), Fullscreen-Toggle, Render-Dispatcher (`renderFigurGraph`), Hash-Cache, vis-Lazy-Load. |
-| `graph/shared.js` | `_figTypColor`, `_figurenGraphSetKapitel` (Kapitel-Filter dim/highlight), `_buildEdges` (gemeinsame Edge-Liste mit Dedup), `_attachTooltip` (Hover-Tooltip mit Escape). |
+| `graph/shared.js` | `_figTypColor` (Lookup in `TYP_COLOR`), `_baseNode` (gemeinsame vis-Node-Basis), `_figurenGraphSetKapitel` (Kapitel-Filter dim/highlight), `_buildEdges` (Edge-Liste mit Dedup, id→Figur-Map), `_attachTooltip` (Hover-Tooltip mit Escape, id→Figur-Map). |
 | `graph/figurengraph.js` | Kapitel-Swimlane (deterministisch, ohne Physics). |
 | `graph/familiengraph.js` | Hierarchischer Baum, nur Familien-Edges (elternteil/kind/geschwister). |
 | `graph/soziogramm.js` | Sozialschicht-Bands, Macht-Sortierung innerhalb Schicht. |
@@ -34,7 +34,7 @@ _figurenEdges           // vis.DataSet
 ```
 container vorhanden?           → sonst no-op
 vis geladen?                   → sonst loadVis() (lazy-libs), Placeholder währenddessen
-hash = kapSig + modus + locale → match? no-op
+hash = renderSig + modus + locale → match? no-op
 network destroyen + null'en
 figuren leer?                  → Placeholder, return
 modus switch:
@@ -44,7 +44,7 @@ modus switch:
 falls figurenGraphKapitel → rAF → _figurenGraphSetKapitel
 ```
 
-`kapSig` ist `figId:k1Name+k1Häufigkeit,k2Name+…|figId:…` — derselbe Cache-Key erkennt Kapitel-Häufigkeits-Drift, ignoriert aber irrelevante Felder. Locale ist Teil des Keys, weil Labels (Tier-Pills, Schicht-Labels, Tooltips) lokalisiert sind.
+`renderSig` deckt pro Figur **alle** layout-/edge-relevanten Felder ab: `id`, `typ` (Tier-Achse), `sozialschicht` (Soziogramm-Band), Kapitel (`name+häufigkeit` → X-Achse + Presence) und Beziehungen (`figur_id+typ+machtverhältnis` → Edges + Macht-Sortierung). Nur die Kapitel zu prüfen würde nach einem Typ-/Schicht-/Beziehungs-Edit den alten Stand zeigen (Hash matcht trotz Datenänderung). Locale ist Teil des Keys, weil Labels (Tier-Pills, Schicht-Labels, Tooltips) lokalisiert sind.
 
 ## Modi
 
@@ -121,7 +121,7 @@ Hängt am `#figur-tooltip`-Element. Listener: `hoverNode`/`blurNode`, `hoverEdge
 - **vis-Lazy-Load:** `_renderXxx` setzt `loadVis()` voraus. `renderFigurGraph` checkt `window.vis` und lädt bei Bedarf, mit Placeholder.
 - **`escHtml` für jeden User-/KI-Wert** in Tooltips + Placeholder-Strings. `container.innerHTML` mit raw `t()`-Output wäre unsicher (Übersetzungen sind statisch, aber Konvention im Repo zwingt Escape überall).
 - **Network destroyen vor Re-Render.** `renderFigurGraph` cleant `_figurenNetwork` vor Neu-Erzeugung; Card-Lifecycle (`onBookChanged`, `destroy`) ebenso.
-- **Hash-Cache prüft Kapitel-Häufigkeits-Signatur**, nicht nur Figurenanzahl — Modus-Switches und Locale-Wechsel erzwingen Re-Render.
+- **Hash-Cache prüft die komplette Render-Signatur** (id, typ, sozialschicht, Kapitel-Häufigkeiten, Beziehungen inkl. Machtverhältnis), nicht nur die Kapitel — sonst zeigt ein Re-Render nach Typ-/Schicht-/Beziehungs-Edit den alten Stand. Modus-Switches und Locale-Wechsel erzwingen ebenfalls Re-Render.
 - **`fit()` nimmt Node-IDs**, nicht Canvas-Bounding-Box (Figurengraph hat sonst leere Spalten am Rand).
 - **Soziogramm fixiert Y**, Figurengraph läuft komplett ohne Physics (User-Drags bleiben stehen), Familiengraph deaktiviert Physics nach Stabilisierung.
 

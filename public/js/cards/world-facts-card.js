@@ -40,13 +40,14 @@ export function registerWorldFactsCard() {
     wfUpdatedAt: null,
     wfLoading: false,
     wfFilters: { suche: '', kategorie: '', seite: '' },
+    wfOpenGroups: {},
     _lifecycle: null,
 
     init() {
       this._lifecycle = setupCardLifecycle(this, {
         name: 'weltfakten',
         showFlag: 'showWorldFactsCard',
-        resetState: { fakten: [], wfUpdatedAt: null, wfLoading: false, wfFilters: { suche: '', kategorie: '', seite: '' } },
+        resetState: { fakten: [], wfUpdatedAt: null, wfLoading: false, wfFilters: { suche: '', kategorie: '', seite: '' }, wfOpenGroups: {} },
         load: () => this.loadWorldFacts(),
       });
     },
@@ -86,6 +87,17 @@ export function registerWorldFactsCard() {
     wfKatCount(key) {
       const k = _normKat(key);
       return this.fakten.reduce((n, f) => n + (_normKat(f.kategorie) === k ? 1 : 0), 0);
+    },
+
+    wfToggleGroup(key) {
+      this.wfOpenGroups[key] = !this.wfOpenGroups[key];
+    },
+    // Gruppe sichtbar, wenn explizit aufgeklappt — oder zwangsoffen: bei aktiver
+    // Suche/Kapitel-Filter (Treffer müssen sichtbar sein) und bei aktivem
+    // Kategorie-Tab (Gruppen-Kopf ist dort ausgeblendet, Liste zeigt direkt).
+    wfGroupOpen(key) {
+      if (this.wfFilters.kategorie || this.wfFilters.seite || this.wfFilters.suche.trim()) return true;
+      return !!this.wfOpenGroups[key];
     },
 
     // Alle in Fakten referenzierten Kapitel-/Seitennamen (aus seite_label).

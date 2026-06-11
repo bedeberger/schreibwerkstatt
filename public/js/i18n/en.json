@@ -1424,6 +1424,7 @@
   "figuren.rel.sibling":             "Sibling",
   "figuren.external":                "external",
 
+  "graph.ariaLabel":             "Interactive character relationship graph",
   "graph.zoomIn":                "Zoom in",
   "graph.zoomOut":               "Zoom out",
   "graph.reset":                 "Reset view",
@@ -1485,6 +1486,10 @@
   "events.gotoChapter":           "Open chapter",
   "events.timelineNav":           "Timeline navigation",
   "events.timelineUndated":       "{count} events without a year are listed below only",
+  "events.timelineUndatedHint":   "Jump to the first undated event",
+  "events.showOnTimeline":        "Show on the timeline",
+  "events.openText":              "Open passage",
+  "events.undatedSection":        "Without a year",
   "events.manuallyEdited":        "Manually edited",
 
   "orte.title":                  "Locations",

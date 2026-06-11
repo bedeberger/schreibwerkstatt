@@ -1425,6 +1425,7 @@
   "figuren.rel.sibling":             "Geschwister",
   "figuren.external":                "extern",
 
+  "graph.ariaLabel":             "Interaktiver Figuren-Beziehungsgraph",
   "graph.zoomIn":                "Zoom in",
   "graph.zoomOut":               "Zoom out",
   "graph.reset":                 "Ansicht zurücksetzen",
@@ -1486,6 +1487,10 @@
   "events.gotoChapter":           "Kapitel öffnen",
   "events.timelineNav":           "Zeitstrahl-Navigation",
   "events.timelineUndated":       "{count} Ereignisse ohne Jahr werden nur unten gelistet",
+  "events.timelineUndatedHint":   "Zum ersten undatierten Ereignis springen",
+  "events.showOnTimeline":        "Auf dem Zeitstrahl zeigen",
+  "events.openText":              "Textstelle öffnen",
+  "events.undatedSection":        "Ohne Jahr",
   "events.manuallyEdited":        "Manuell bearbeitet",
 
   "orte.title":                  "Schauplätze",

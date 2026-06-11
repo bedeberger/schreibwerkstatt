@@ -68,24 +68,32 @@
   <!-- Zeitleiste: interaktiver Jahres-Zeitstrahl (vis-timeline) + Liste darunter -->
   <div x-show="$app.globalZeitstrahl.length > 0" class="gz-layout">
     <div class="gz-timeline" :aria-label="$app.t('events.timelineNav')"></div>
-    <div class="gz-timeline-hint" x-show="timelineItemCount < filteredEreignisse().length"
+    <div class="gz-timeline-hint internal-link" x-show="timelineItemCount < filteredEreignisse().length"
+         @click="scrollToFirstUndated()" :data-tip="$app.t('events.timelineUndatedHint')"
          x-text="$app.t('events.timelineUndated', { count: filteredEreignisse().length - timelineItemCount })"></div>
     <div class="global-zeitstrahl-body global-zeitstrahl-body--card">
     <template x-for="(ev, i) in filteredEreignisse()" :key="ev.id ?? i">
       <div class="gz-item"
            :data-ev-index="i"
+           :data-section-label="(i === firstUndatedIndex() && i > 0) ? $app.t('events.undatedSection') : null"
            :class="[
              ev.typ === 'extern' ? 'gz-item--extern' : '',
              'gz-item--subtyp-' + (ev.subtyp || 'sonstiges'),
              eventSpanYears(ev) > 0 ? 'gz-item--span' : '',
              ev.datum_year == null && ev.story_tag == null ? 'gz-item--unknown' : '',
              ev.manually_edited ? 'gz-item--manual' : '',
+             (i === firstUndatedIndex() && i > 0) ? 'gz-item--section-start' : '',
            ]"
            :style="eventSpanYears(ev) > 0 ? ('--span-years:' + eventSpanYears(ev)) : null">
         <div class="gz-marker" :class="ev.typ === 'extern' ? 'gz-marker--extern' : ''"></div>
         <div class="gz-content">
           <div class="gz-datum-row">
-            <span class="gz-datum" :class="ev.datum_unsicher && ev.datum_year != null ? 'gz-datum--unsicher' : ''" :title="ev.datum_unsicher && ev.datum_year != null ? $app.t('events.estimatedHint') : null" x-text="formatEventDate(ev)"></span>
+            <span class="gz-datum"
+                  :class="{ 'gz-datum--unsicher': ev.datum_unsicher && ev.datum_year != null, 'internal-link': ev.datum_year != null }"
+                  :title="ev.datum_unsicher && ev.datum_year != null ? $app.t('events.estimatedHint') : null"
+                  :data-tip="ev.datum_year != null ? $app.t('events.showOnTimeline') : null"
+                  @click="ev.datum_year != null && selectTimelineEvent(i)"
+                  x-text="formatEventDate(ev)"></span>
             <span class="gz-subtyp-badge"
                   :class="'gz-subtyp-badge--' + (ev.subtyp || 'sonstiges')">
               <svg class="icon gz-subtyp-icon" aria-hidden="true"><use :href="'/icons.svg?v=690#' + subtypIcon(ev.subtyp || 'sonstiges')"/></svg>
@@ -98,7 +106,11 @@
               <span class="gz-manual-badge" :title="$app.t('events.manuallyEdited')" x-text="$app.t('events.manuallyEdited')"></span>
             </template>
           </div>
-          <div class="gz-ereignis" x-text="ev.ereignis"></div>
+          <div class="gz-ereignis"
+               :class="{ 'internal-link': eventHasTarget(ev) }"
+               :data-tip="eventHasTarget(ev) ? $app.t('events.openText') : null"
+               @click="eventHasTarget(ev) && openEventText(ev)"
+               x-text="ev.ereignis"></div>
           <!-- Multi-Kapitel-Liste: jeder Eintrag ist klickbar; Bug behoben,
                der bisher immer kapitel[0] genutzt hat. -->
           <div x-show="Array.isArray(ev.kapitel) ? ev.kapitel.length : ev.kapitel" class="gz-kapitel">

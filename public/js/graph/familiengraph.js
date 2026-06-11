@@ -1,5 +1,4 @@
 import { escHtml } from '../utils.js';
-import { DEFAULT_FONT, nodeLabel } from './constants.js';
 
 // Familienbaum: hierarchisches Layout, nur Familien-Edges.
 // innerHTML mit escHtml() — Escape-Invariante aus harten Regeln eingehalten.
@@ -15,15 +14,7 @@ export const familiengraphMethods = {
     const familyIds = new Set();
     for (const e of familyEdges) { familyIds.add(e.from); familyIds.add(e.to); }
 
-    const nodes = new vis.DataSet(figuren.filter(f => familyIds.has(f.id)).map(f => ({
-      id: f.id,
-      label: nodeLabel(f),
-      color: this._figTypColor(f.typ),
-      font: DEFAULT_FONT,
-      shape: 'box',
-      margin: 10,
-      widthConstraint: { maximum: 160 },
-    })));
+    const nodes = new vis.DataSet(figuren.filter(f => familyIds.has(f.id)).map(f => this._baseNode(f)));
     const edges = new vis.DataSet(familyEdges);
     this._figurenNodes = nodes;
     this._figurenEdges = edges;

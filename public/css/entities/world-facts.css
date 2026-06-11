@@ -5,15 +5,15 @@
 .weltfakten-groups {
   display: flex;
   flex-direction: column;
-  gap: var(--space-lg);
+  gap: var(--space-xs);
 }
 
-.weltfakten-group-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  margin-bottom: var(--space-6);
-}
+/* Aufgeklappte Liste: Abstand zum Toggle-Kopf darüber. */
+.weltfakten-group .entity-list { margin-top: var(--space-6); }
+
+/* Gruppen-Kopf = .collapsible-toggle-Button (Chevron + Kategorie-Tag + Count).
+   Display/Padding kommen vom Pattern (entity-list.css) — hier nur Gap-Feinschliff. */
+.weltfakten-group-head { gap: var(--space-xs); }
 
 /* Kategorie-Tag mit Icon + Label: Breite an Inhalt statt feste entity-typ-tag-Spalte. */
 .weltfakten-kat-tag {

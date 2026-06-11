@@ -1,5 +1,5 @@
 import { escHtml } from '../utils.js';
-import { DEFAULT_FONT, SCHICHT_COLOR, SCHICHT_LEVEL, nodeLabel } from './constants.js';
+import { DEFAULT_FONT, SCHICHT_COLOR, SCHICHT_LEVEL } from './constants.js';
 
 // Soziogramm: nach Sozialschicht gefärbt, Schicht-Rows, Machtpfeile.
 // innerHTML mit escHtml() — Escape-Invariante eingehalten.
@@ -52,13 +52,9 @@ export const soziogrammMethods = {
       const { x, y } = posById.get(f.id);
       const schichtStyle = SCHICHT_COLOR[f.sozialschicht] || SCHICHT_COLOR.andere;
       return {
-        id: f.id,
-        label: nodeLabel(f),
+        ...this._baseNode(f),
         color: { background: schichtStyle.background, border: schichtStyle.border, highlight: schichtStyle.highlight },
         font: schichtStyle.font || DEFAULT_FONT,
-        shape: 'box',
-        margin: 10,
-        widthConstraint: { maximum: 160 },
         x, y,
         fixed: { x: false, y: true }, // Schicht-Zeile fixieren; horizontal löst Physics Überlappungen
       };
@@ -88,26 +84,6 @@ export const soziogrammMethods = {
       if (!levelToSchicht[lev]) levelToSchicht[lev] = f.sozialschicht || 'andere';
     }
 
-    const SCHICHT_BAND_COLOR = {
-      wirtschaftselite:    'rgba(255,243,204,0.40)',
-      gehobenes_buergertum:'rgba(212,232,255,0.35)',
-      mittelschicht:       'rgba(232,244,232,0.35)',
-      arbeiterschicht:     'rgba(245,234,212,0.38)',
-      migrantenmilieu:     'rgba(253,235,208,0.40)',
-      prekariat:           'rgba(245,237,237,0.40)',
-      unterwelt:           'rgba(40,40,40,0.22)',
-      andere:              'rgba(255,245,220,0.25)',
-    };
-    const SCHICHT_LABEL_COLOR = {
-      wirtschaftselite:    '#8B6A00',
-      gehobenes_buergertum:'#1d4b73',
-      mittelschicht:       '#275927',
-      arbeiterschicht:     '#6B3F0D',
-      migrantenmilieu:     '#9A4010',
-      prekariat:           '#6B1A1A',
-      unterwelt:           '#333',
-      andere:              '#888',
-    };
     const BAND_H      = LEVEL_Y_GAP * 0.90;
     const BAND_HALF   = BAND_H / 2;
     const BAND_EXTENT = 9000;
@@ -118,7 +94,7 @@ export const soziogrammMethods = {
       ctx.save();
       for (const [levStr, schicht] of Object.entries(levelToSchicht)) {
         const y = Number(levStr) * LEVEL_Y_GAP;
-        ctx.fillStyle = SCHICHT_BAND_COLOR[schicht] || 'rgba(200,200,200,0.18)';
+        ctx.fillStyle = (SCHICHT_COLOR[schicht] || SCHICHT_COLOR.andere).band;
         ctx.fillRect(-BAND_EXTENT, y - BAND_HALF, BAND_EXTENT * 2, BAND_H);
         // Trennlinie unten
         ctx.strokeStyle = 'rgba(0,0,0,0.07)';
@@ -138,7 +114,7 @@ export const soziogrammMethods = {
       const dpr = window.devicePixelRatio || 1;
       const cHeightCss = ctx.canvas.height / dpr;
       const schichtFs  = Math.max(10, Math.min(15, cHeightCss / 65));
-      ctx.font = `bold ${schichtFs * dpr}px system-ui, -apple-system, sans-serif`;
+      ctx.font = `bold ${schichtFs * dpr}px ${DEFAULT_FONT.face}`;
       ctx.textBaseline = 'middle';
       const padY  = (schichtFs * 0.9) * dpr;
       const pillH = (schichtFs * 1.6) * dpr;
@@ -163,7 +139,7 @@ export const soziogrammMethods = {
           ctx.closePath();
         }
         ctx.fill();
-        ctx.fillStyle = SCHICHT_LABEL_COLOR[schicht] || '#666';
+        ctx.fillStyle = (SCHICHT_COLOR[schicht] || SCHICHT_COLOR.andere).label;
         ctx.fillText(label, 12 * dpr, cY);
       }
       ctx.restore();

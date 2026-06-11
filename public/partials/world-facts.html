@@ -61,14 +61,18 @@
   <div x-show="fakten.length > 0" class="weltfakten-groups">
     <template x-for="g in wfGrouped" :key="g.kategorie">
       <div class="weltfakten-group">
-        <div class="weltfakten-group-head" x-show="!wfFilters.kategorie">
+        <button type="button" class="collapsible-toggle weltfakten-group-head"
+                x-show="!wfFilters.kategorie"
+                @click="wfToggleGroup(g.kategorie)"
+                :aria-expanded="wfGroupOpen(g.kategorie)">
+          <span class="history-chevron" :class="{ open: wfGroupOpen(g.kategorie) }" aria-hidden="true">›</span>
           <span class="tag entity-typ-tag weltfakten-kat-tag">
             <svg class="icon" aria-hidden="true"><use :href="'/icons.svg?v=636#' + wfKatIcon(g.kategorie)"/></svg>
             <span x-text="wfKatLabel(g.kategorie)"></span>
           </span>
           <span class="weltfakten-group-count" x-text="g.fakten.length"></span>
-        </div>
-        <div class="entity-list entity-list--accented">
+        </button>
+        <div x-show="wfGroupOpen(g.kategorie)" x-cloak class="entity-list entity-list--accented">
           <template x-for="f in g.fakten" :key="f.id">
             <div class="weltfakten-row" :class="{ 'weltfakten-row--nosubj': !f.subjekt }">
               <span x-show="f.subjekt" class="weltfakten-subjekt" x-text="f.subjekt"></span>

@@ -1,26 +1,35 @@
 import { escHtml } from '../utils.js';
 import {
   DEFAULT_FONT,
+  TYP_COLOR,
   SCHICHT_COLOR,
   BZ,
   BZ_SOZIO_COLOR,
   BZ_SOZIO_CAT,
   DIRECTED_TYPES,
+  nodeLabel,
 } from './constants.js';
 
-// Gemeinsame Methoden: Typ-Color, Edge-Bau, Tooltip, Kapitel-Filter.
+// Gemeinsame Methoden: Typ-Color, Node-Basis, Edge-Bau, Tooltip, Kapitel-Filter.
 // Werden in graphMethods gespreaded und nutzen `this`-Refs aus Card.
 export const sharedMethods = {
   _figTypColor(typ) {
-    const colors = {
-      hauptfigur: { background: '#D4E8FF', border: '#2d6a9f', highlight: { background: '#BDD8FF', border: '#1d4b73' } },
-      nebenfigur:  { background: '#F0F0F0', border: '#888',    highlight: { background: '#E4E4E4', border: '#555' } },
-      antagonist:  { background: '#FFE0E0', border: '#E24B4A', highlight: { background: '#FFC7C7', border: '#B03030' } },
-      mentor:      { background: '#EAF3DE', border: '#639922', highlight: { background: '#D5EBBD', border: '#3B6D11' } },
-      randfigur:   { background: '#F7F7F7', border: '#BBB',    highlight: { background: '#EDEDED', border: '#999' } },
-      andere:      { background: '#FFF5DC', border: '#c4a55a', highlight: { background: '#FFEEBB', border: '#8a6a20' } },
+    return TYP_COLOR[typ] || TYP_COLOR.andere;
+  },
+
+  // Gemeinsame vis-Node-Basis. Familiengraph nutzt sie direkt; Figurengraph
+  // ergänzt borderWidth + x/y, Soziogramm überschreibt color/font und ergänzt
+  // x/y + fixed (spätere Keys gewinnen beim Spread).
+  _baseNode(f) {
+    return {
+      id: f.id,
+      label: nodeLabel(f),
+      color: this._figTypColor(f.typ),
+      font: DEFAULT_FONT,
+      shape: 'box',
+      margin: 10,
+      widthConstraint: { maximum: 160 },
     };
-    return colors[typ] || colors.andere;
   },
 
   _figurenGraphSetKapitel(ch) {
@@ -69,12 +78,15 @@ export const sharedMethods = {
 
   _buildEdges(soziogrammModus) {
     const figuren = window.__app.figuren;
+    // id→Figur einmal indizieren (String-Keys: bz.figur_id und f.id sind beide der
+    // TEXT-fig_id, die Normalisierung deckt Alt-Daten mit Zahl-IDs mit ab).
+    const byId = new Map(figuren.map(f => [String(f.id), f]));
     const edgeList = [];
     const addedPairs = new Set();
 
     for (const f of figuren) {
       for (const bz of (f.beziehungen || [])) {
-        const targetFigur = figuren.find(x => x.id == bz.figur_id);
+        const targetFigur = byId.get(String(bz.figur_id));
         if (!targetFigur) continue;
         const toId = targetFigur.id;
 
@@ -125,6 +137,8 @@ export const sharedMethods = {
   _attachTooltip(container) {
     const tip = document.getElementById('figur-tooltip');
     if (!tip) return;
+    // id→Figur einmal pro Render indizieren (Hover-Handler statt O(F)-find).
+    const byId = new Map((window.__app.figuren || []).map(f => [f.id, f]));
 
     const showTipAt = (html, clientX, clientY) => {
       tip.innerHTML = html;
@@ -150,7 +164,7 @@ export const sharedMethods = {
     const hideTip = () => tip.classList.remove('visible');
 
     this._figurenNetwork.on('hoverNode', ({ node, event }) => {
-      const f = window.__app.figuren.find(x => x.id === node);
+      const f = byId.get(node);
       if (!f) return;
       const schichtLabel = f.sozialschicht && f.sozialschicht !== 'andere'
         ? window.__app.t('figuren.schicht.' + f.sozialschicht) : '';
@@ -165,8 +179,8 @@ export const sharedMethods = {
     this._figurenNetwork.on('hoverEdge', ({ edge, event }) => {
       const e = this._figurenEdges?.get(edge);
       if (!e) return;
-      const fromF = window.__app.figuren.find(x => x.id === e.from);
-      const toF   = window.__app.figuren.find(x => x.id === e.to);
+      const fromF = byId.get(e.from);
+      const toF   = byId.get(e.to);
       const typLabel = window.__app.t('figuren.bz.' + e.typ);
       const arrow = e.arrows === 'to' ? '→' : e.arrows === 'from' ? '←' : '↔';
       const pair = fromF && toF

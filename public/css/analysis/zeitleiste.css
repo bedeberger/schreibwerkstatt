@@ -59,6 +59,32 @@
 
 .gz-item:last-child { padding-bottom: 0; }
 
+/* Trennlinie vor dem ersten undatierten Event (kein Kalenderjahr → nicht auf
+   der Achse). Label kommt via data-section-label aus dem Template (i18n). Der
+   Marker wird um die Trenn-Höhe nach unten geschoben, damit er nicht in die
+   Linie ragt. */
+.gz-item--section-start {
+  margin-top: var(--space-20);
+  padding-top: var(--space-18);
+  border-top: 0.5px solid var(--color-border);
+}
+
+.gz-item--section-start::before {
+  content: attr(data-section-label);
+  position: absolute;
+  top: calc(-1 * var(--space-6));
+  left: 0;
+  padding: 0 var(--space-6);
+  background: var(--color-surface);
+  font-size: var(--font-size-micro);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.gz-item--section-start .gz-marker { top: calc(var(--space-18) + 4px); }
+
 .gz-marker {
   position: absolute;
   left: -33px;
