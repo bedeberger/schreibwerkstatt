@@ -200,6 +200,7 @@ select {
   input[type=search],
   input[type=tel],
   input[type=number],
+  textarea,
   select {
     font-size: var(--font-size-reading);
   }

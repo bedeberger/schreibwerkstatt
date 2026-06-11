@@ -4,7 +4,7 @@
 
 /* Nachrichtenliste – scrollbarer Bereich */
 .chat-messages {
-  max-height: 480px;
+  max-height: min(480px, 60dvh);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -199,6 +199,12 @@
   background: var(--color-hover);
   font-weight: 700;
 }
+/* Mobile: Tabelle behaelt natuerliche Breite und scrollt im .table-scroll
+   horizontal, statt Spalten unter die Wortbreite zu quetschen. Uebersteuert
+   utilities.css `.table-scroll > table { min-width: 100% }` (hoehere Spezifitaet). */
+@media (max-width: 600px) {
+  .table-scroll > .chat-table { min-width: max-content; }
+}
 
 /* Änderungsvorschläge — auch ausserhalb von .chat-msg verwendbar (Werkstatt-Brainstorm). */
 .chat-vorschlaege {
@@ -290,6 +296,12 @@
   border-color: var(--color-border-focus);
 }
 .chat-input:disabled { opacity: var(--opacity-disabled); }
+/* Mobile: 16px verhindert iOS-Zoom beim Fokus. Eigener Selektor, weil die
+   globale textarea-Regel (card-form.css) von der .chat-input-Klasse
+   ueberspezifiziert wuerde. */
+@media (max-width: 768px) {
+  .chat-input { font-size: var(--font-size-reading); }
+}
 .chat-send-btn {
   flex-shrink: 0;
   align-self: stretch;

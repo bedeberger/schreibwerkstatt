@@ -201,7 +201,7 @@
     ></textarea>
     <button type="button" class="chat-send-btn" @click="sendBookChatMessage()" :disabled="bookChatLoading || !bookChatInput.trim()" :aria-label="$app.t('chat.send')">
       <span x-show="bookChatLoading" class="spinner"></span>
-      <span x-show="!bookChatLoading">↑</span>
+      <svg x-show="!bookChatLoading" class="icon" aria-hidden="true"><use href="/icons.svg?v=690#arrow-up"/></svg>
     </button>
   </div>
   <div class="chat-input-hint" x-text="$app.t('chat.inputHint')"></div>
