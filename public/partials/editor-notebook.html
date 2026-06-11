@@ -255,14 +255,15 @@
     </button>
     <span class="action-sep" aria-hidden="true"></span>
     <!-- Entity-Linking-Toggle (Figuren/Orte-Highlights + Szenen/Ereignisse-Panel).
-         Aktivieren oeffnet automatisch die Klappschiene; Deaktivieren raeumt sie auf.
+         Aendert nur die Buch-Setting; der Auf/Zu-Zustand der Klappschiene
+         (entityPanelOpen) bleibt User-Wahl und wird nicht uebersteuert.
          Pure Buch-Setting (book_settings.entities_enabled) — Schreib-Pfad ist
          PUT /booksettings/:id/entities-enabled, Event book:settings:updated. -->
     <button type="button" class="graph-tool-btn"
             :aria-pressed="entitiesEnabledForCurrentBook"
             :data-tip="entitiesEnabledForCurrentBook ? t('entities.toggle.off') : t('entities.toggle.on')"
             :aria-label="entitiesEnabledForCurrentBook ? t('entities.toggle.off') : t('entities.toggle.on')"
-            @click="toggleEntitiesEnabledForCurrentBook(); entityPanelOpen = !entitiesEnabledForCurrentBook ? entityPanelOpen : true">
+            @click="toggleEntitiesEnabledForCurrentBook()">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#radio"/></svg>
     </button>
     <!-- STT-Diktat-Mic schwebt im Editorfeld unten rechts (siehe

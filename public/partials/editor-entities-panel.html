@@ -10,21 +10,33 @@
      x-data: editorEntitiesCard (cards/editor-entities-card.js). -->
 <div x-data="editorEntitiesCard" class="display-contents">
 
-  <div class="figure-context-panel"
-       x-show="$app.chapterFigures.length > 0
-               || panelScenes().onPage.length + panelScenes().inChapter.length > 0
-               || panelEvents().onPage.length + panelEvents().inChapter.length > 0"
-       x-cloak>
+  <!-- Sichtbarkeit haengt am Buch-Level (extractionEmpty), nicht an den
+       Sektionen der aktuellen Seite: das Panel bleibt beim Seitenwechsel
+       stehen statt zu verschwinden/reinzuploppen (Layout-Sprung ueber dem
+       Editor-Body). Seiten ohne Eintraege zeigen den Empty-Hinweis im Body. -->
+  <div class="figure-context-panel" x-show="!extractionEmpty()" x-cloak>
     <div class="figure-context-header internal-link"
          @click="$app.entityPanelOpen = !$app.entityPanelOpen"
          :aria-expanded="$app.entityPanelOpen ? 'true' : 'false'">
       <span class="figure-context-title">
         <span x-text="$app.t('entities.panel.title')"></span>
+        <!-- Zaehler-Badges: machen den zugeklappten Zustand informativ —
+             ohne Aufklappen sichtbar, ob/wie viel die Seite an Kontext hat. -->
+        <span class="figure-context-counts">
+          <span x-show="$app.chapterFigures.length > 0" class="tag"
+                x-text="$app.t('entities.panel.figures') + ': ' + $app.chapterFigures.length"></span>
+          <span x-show="panelScenes().onPage.length + panelScenes().inChapter.length > 0" class="tag"
+                x-text="$app.t('entities.panel.scenes') + ': ' + (panelScenes().onPage.length + panelScenes().inChapter.length)"></span>
+          <span x-show="panelEvents().onPage.length + panelEvents().inChapter.length > 0" class="tag"
+                x-text="$app.t('entities.panel.events') + ': ' + (panelEvents().onPage.length + panelEvents().inChapter.length)"></span>
+        </span>
       </span>
       <span class="history-chevron" :class="{ open: $app.entityPanelOpen }" aria-hidden="true">›</span>
     </div>
 
-    <div x-show="$app.entityPanelOpen" x-cloak class="figure-context-body figure-context-body--rows">
+    <!-- Collapse via Grid-Row 0fr→1fr (CSS-Transition) statt x-show-Snap. -->
+    <div class="figure-context-collapse" :class="{ open: $app.entityPanelOpen }">
+    <div class="figure-context-body figure-context-body--rows">
 
       <!-- Figuren (Kapitel-Scope, wie urspruengliches figure-context-panel) -->
       <template x-if="$app.chapterFigures.length > 0">
@@ -95,6 +107,13 @@
         </div>
       </template>
 
+      <!-- Seite ohne Kontext-Eintraege: Panel bleibt stehen (stabile Praesenz),
+           Body sagt explizit, dass es hier nichts gibt. -->
+      <template x-if="$app.chapterFigures.length === 0 && panelEmpty()">
+        <span class="figure-context-empty" x-text="$app.t('entities.panel.empty')"></span>
+      </template>
+
+    </div>
     </div>
   </div>
 

@@ -217,6 +217,8 @@ Code: pure Helpers + CSS-Highlight-API in [public/js/editor/notebook/entities.js
 
 **Toggle-Sync:** Toolbar-Klick PUTtet `/booksettings/:id/entities-enabled` (Quick-Update-Endpoint, separat von `PUT /booksettings/:id` für die Volledit-Karte), dispatcht `book:settings:updated`; Root-Flag ist `entitiesEnabledForCurrentBook` (in [tree.js](../public/js/book/tree.js)).
 
+**Kontext-Panel-Collapse:** Panel-Sichtbarkeit hängt am Buch-Level (`extractionEmpty()` — hat das Buch überhaupt Extraktionsdaten?), nicht an den Sektionen der aktuellen Seite — das Panel bleibt beim Seitenwechsel stehen statt zu verschwinden/reinzuploppen; Seiten ohne Einträge zeigen `entities.panel.empty` im Body. Der Header trägt Zähler-Badges pro Sektion (Figuren/Szenen/Ereignisse), damit der zugeklappte Zustand informativ ist. Auf/Zu animiert via Grid-Transition (`.figure-context-collapse`, `grid-template-rows` 0fr→1fr + Padding/Visibility, [entities.css](../public/css/editor/notebook/entities.css)) statt `x-show`-Snap; `visibility: hidden` hält zugeklappte Chips aus der Tab-Reihenfolge. Auf/Zu-State `entityPanelOpen` lebt am Root (localStorage `sw:entityPanelOpen`) und ist reine User-Wahl — der Entity-Toggle übersteuert ihn nicht.
+
 **Pflicht-Invarianten:**
 1. **Nur Notebook.** Focus-Editor und Bucheditor sind explizit out-of-scope — kein gemeinsamer Code mit `shared/`. Sub-Karte mountet sich gegen `#editor-card .page-content-view--editing`.
 2. **Read-only.** Kein Markup im gespeicherten HTML, keine `data-bid`-Berührung. Highlights sind reine Range-Overlays. Save-Invariante getestet in [tests/unit/entities-save-invariant.test.mjs](../tests/unit/entities-save-invariant.test.mjs).

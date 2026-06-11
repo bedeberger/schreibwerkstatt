@@ -23,6 +23,42 @@
        editor/notebook/lektorat.css (gemeinsam mit Lektorat-Markup).
        Hier nur Multi-Section-Layout + Chapter-Dimming. */
 
+  /* Zaehler-Badges im Header — Collapsed-Zustand bleibt informativ. */
+  .figure-context-counts {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+  }
+
+  /* Sanfter Collapse: Grid-Row 0fr→1fr animiert die Hoehe, das Body-Padding
+     laeuft mit (sonst bleibt zugeklappt ein Padding-Sliver stehen).
+     `visibility: hidden` haelt zugeklappte Chips aus der Tab-Reihenfolge —
+     die `.internal-link`-Delegation macht sie sonst fokussierbar. */
+  .figure-context-collapse {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows var(--transition-slow);
+  }
+  .figure-context-collapse.open { grid-template-rows: 1fr; }
+  .figure-context-collapse > .figure-context-body {
+    overflow: hidden;
+    min-height: 0;
+    visibility: hidden;
+    padding-top: 0;
+    padding-bottom: 0;
+    transition: visibility var(--transition-slow), padding var(--transition-slow);
+  }
+  .figure-context-collapse.open > .figure-context-body {
+    visibility: visible;
+    padding-top: var(--space-xs);
+    padding-bottom: 10px;
+  }
+
+  .figure-context-empty {
+    font-size: var(--font-size-sm);
+    color: var(--color-subtle);
+  }
+
   .figure-context-body--rows {
     display: flex;
     flex-direction: column;
