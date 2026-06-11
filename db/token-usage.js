@@ -15,7 +15,7 @@ const { db } = require('./connection');
  * @param {string} [opts.userEmail]    Filter auf einen User. Ohne: alle.
  * @param {string} [opts.provider]     Filter auf einen Provider (claude/ollama/llama).
  * @param {string} [opts.source]       'job' | 'chat' | 'all' (default).
- * @returns {Array<{day:string,userEmail:string,provider:string,model:string,source:string,type:string,calls:number,tokensIn:number,tokensOut:number,cacheReadIn:number,cacheCreationIn:number}>}
+ * @returns {Array<{day:string,userEmail:string,provider:string,model:string,source:string,type:string,calls:number,tokensIn:number,tokensOut:number,cacheReadIn:number,cacheCreationIn:number,cacheCreation1hIn:number}>}
  */
 function getDailyTokenUsage({ from, to, userEmail, provider, source = 'all' } = {}) {
   const fromIso = from || new Date(Date.now() - 30 * 86400_000).toISOString();
@@ -45,7 +45,8 @@ function getDailyTokenUsage({ from, to, userEmail, provider, source = 'all' } = 
         COALESCE(SUM(tokens_in), 0)         AS tokensIn,
         COALESCE(SUM(tokens_out), 0)        AS tokensOut,
         COALESCE(SUM(cache_read_in), 0)     AS cacheReadIn,
-        COALESCE(SUM(cache_creation_in), 0) AS cacheCreationIn
+        COALESCE(SUM(cache_creation_in), 0) AS cacheCreationIn,
+        COALESCE(SUM(cache_creation_1h_in), 0) AS cacheCreation1hIn
       FROM job_runs
       WHERE ${jobWhere}
       GROUP BY day, user_email, provider, model, type
@@ -64,7 +65,8 @@ function getDailyTokenUsage({ from, to, userEmail, provider, source = 'all' } = 
         COALESCE(SUM(cm.tokens_in), 0)         AS tokensIn,
         COALESCE(SUM(cm.tokens_out), 0)        AS tokensOut,
         COALESCE(SUM(cm.cache_read_in), 0)     AS cacheReadIn,
-        COALESCE(SUM(cm.cache_creation_in), 0) AS cacheCreationIn
+        COALESCE(SUM(cm.cache_creation_in), 0) AS cacheCreationIn,
+        COALESCE(SUM(cm.cache_creation_1h_in), 0) AS cacheCreation1hIn
       FROM chat_messages cm
       JOIN chat_sessions cs ON cs.id = cm.session_id
       WHERE ${cmWhere}
@@ -92,13 +94,14 @@ function getDailyTotalsByUser({ from, to, userEmail } = {}) {
     const key = `${r.day}\t${r.userEmail || ''}\t${r.provider || ''}`;
     const acc = byKey.get(key) || {
       day: r.day, userEmail: r.userEmail, provider: r.provider,
-      calls: 0, tokensIn: 0, tokensOut: 0, cacheReadIn: 0, cacheCreationIn: 0,
+      calls: 0, tokensIn: 0, tokensOut: 0, cacheReadIn: 0, cacheCreationIn: 0, cacheCreation1hIn: 0,
     };
-    acc.calls           += r.calls;
-    acc.tokensIn        += r.tokensIn;
-    acc.tokensOut       += r.tokensOut;
-    acc.cacheReadIn     += r.cacheReadIn;
-    acc.cacheCreationIn += r.cacheCreationIn;
+    acc.calls             += r.calls;
+    acc.tokensIn          += r.tokensIn;
+    acc.tokensOut         += r.tokensOut;
+    acc.cacheReadIn       += r.cacheReadIn;
+    acc.cacheCreationIn   += r.cacheCreationIn;
+    acc.cacheCreation1hIn += r.cacheCreation1hIn;
     byKey.set(key, acc);
   }
   return [...byKey.values()].sort((a, b) =>

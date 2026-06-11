@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 182, 92 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 183, 92 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -696,7 +696,8 @@ erDiagram
     INTEGER tokens_in
     INTEGER tokens_out
     INTEGER cache_read_in     "Claude prompt-cache hit (lokal: 0)"
-    INTEGER cache_creation_in "Claude prompt-cache write (lokal: 0)"
+    INTEGER cache_creation_in "Claude prompt-cache write, alle TTLs (lokal: 0)"
+    INTEGER cache_creation_1h_in "1h-TTL-Anteil von cache_creation_in (2x-Tarif)"
     REAL    tps
     TEXT    created_at
   }
@@ -747,7 +748,8 @@ erDiagram
     INTEGER tokens_in
     INTEGER tokens_out
     INTEGER cache_read_in     "Claude prompt-cache hit (lokal: 0)"
-    INTEGER cache_creation_in "Claude prompt-cache write (lokal: 0)"
+    INTEGER cache_creation_in "Claude prompt-cache write, alle TTLs (lokal: 0)"
+    INTEGER cache_creation_1h_in "1h-TTL-Anteil von cache_creation_in (2x-Tarif)"
     TEXT    provider          "claude|ollama|llama"
     TEXT    model
     REAL    tokens_per_sec

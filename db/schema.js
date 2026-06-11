@@ -63,7 +63,7 @@ const _stmtStartJobRun = db.prepare(
   `UPDATE job_runs SET status = 'running', started_at = ${NOW_ISO_SQL} WHERE job_id = ?`
 );
 const _stmtEndJobRun = db.prepare(
-  `UPDATE job_runs SET status = ?, ended_at = ${NOW_ISO_SQL}, tokens_in = ?, tokens_out = ?, cache_read_in = ?, cache_creation_in = ?, tokens_per_sec = ?, error = ?, error_params = ? WHERE job_id = ?`
+  `UPDATE job_runs SET status = ?, ended_at = ${NOW_ISO_SQL}, tokens_in = ?, tokens_out = ?, cache_read_in = ?, cache_creation_in = ?, cache_creation_1h_in = ?, tokens_per_sec = ?, error = ?, error_params = ? WHERE job_id = ?`
 );
 
 function insertJobRun(job) {
@@ -81,12 +81,12 @@ function insertJobRun(job) {
 function startJobRun(jobId) {
   _stmtStartJobRun.run(jobId);
 }
-function endJobRun(jobId, status, tokensIn, tokensOut, cacheReadIn, cacheCreationIn, tokensPerSec, error, errorParams = null) {
+function endJobRun(jobId, status, tokensIn, tokensOut, cacheReadIn, cacheCreationIn, cacheCreation1hIn, tokensPerSec, error, errorParams = null) {
   const paramsJson = errorParams ? JSON.stringify(errorParams) : null;
   _stmtEndJobRun.run(
     status,
     tokensIn || 0, tokensOut || 0,
-    cacheReadIn || 0, cacheCreationIn || 0,
+    cacheReadIn || 0, cacheCreationIn || 0, cacheCreation1hIn || 0,
     tokensPerSec ?? null, error || null, paramsJson, jobId,
   );
 }

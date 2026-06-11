@@ -7398,6 +7398,30 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 182 abgeschlossen (figure_events.datum_unsicher + zeitstrahl_events.datum_unsicher).');
   }
 
+  if (version < 183) {
+    // 1h-TTL-Anteil der Cache-Writes (Claude): 1h-Writes kosten 2x Input statt
+    // 1.25x (5min). cache_creation_in bleibt das TTL-uebergreifende Total;
+    // cache_creation_1h_in ist die Teilmenge davon mit 1h-TTL (Buchtext-Block
+    // der Komplettanalyse/Kontinuitaet, Stable-Block des Buch-Chats).
+    // lib/pricing.js#costUsd rechnet den Split; Rows ohne Aufschluesselung (0)
+    // laufen zum 5-min-Satz. Additiv (ADD COLUMN, kein FK-Recreate).
+    const jrCols183 = db.pragma('table_info(job_runs)').map(c => c.name);
+    if (!jrCols183.includes('cache_creation_1h_in')) {
+      db.exec('ALTER TABLE job_runs ADD COLUMN cache_creation_1h_in INTEGER DEFAULT 0');
+    }
+    const cmCols183 = db.pragma('table_info(chat_messages)').map(c => c.name);
+    if (!cmCols183.includes('cache_creation_1h_in')) {
+      db.exec('ALTER TABLE chat_messages ADD COLUMN cache_creation_1h_in INTEGER DEFAULT 0');
+    }
+
+    const fkErrors183 = db.pragma('foreign_key_check');
+    if (fkErrors183.length) {
+      throw new Error(`Migration 183: foreign_key_check meldet ${fkErrors183.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 183').run();
+    logger.info('DB-Migration auf Version 183 abgeschlossen (job_runs.cache_creation_1h_in + chat_messages.cache_creation_1h_in).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

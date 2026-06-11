@@ -146,11 +146,11 @@ async function runChatJob(jobId, sessionId, userMsgId, message, userEmail, userT
     };
 
     const signal = jobAbortControllers.get(jobId)?.signal;
-    const { text, truncated, tokensIn, tokensOut, cacheReadIn = 0, cacheCreationIn = 0, provider, model, genDurationMs } = await callAIChat(aiMessages, systemPrompt, onProgress, null, signal, undefined, SCHEMA_CHAT, chatTemperature());
+    const { text, truncated, tokensIn, tokensOut, cacheReadIn = 0, cacheCreationIn = 0, cacheCreation1hIn = 0, provider, model, genDurationMs } = await callAIChat(aiMessages, systemPrompt, onProgress, null, signal, undefined, SCHEMA_CHAT, chatTemperature());
     // Job-State auf echte Provider-Werte setzen, damit Status-Anzeige und
     // gespeicherte Chat-Nachricht dieselben Tokens zeigen (statt eines
     // Streaming-Zwischenstands).
-    updateJob(jobId, { tokensIn, tokensOut, cacheReadIn, cacheCreationIn });
+    updateJob(jobId, { tokensIn, tokensOut, cacheReadIn, cacheCreationIn, cacheCreation1hIn });
     if (truncated) throw i18nError('job.error.aiTruncated', { max: aiCfg.maxTokensOut, tokIn: tokensIn, tokOut: tokensOut, total: tokensIn + tokensOut });
 
     const { antwort, vorschlaege, fallback } = _parseChatResponse(text);
@@ -162,12 +162,12 @@ async function runChatJob(jobId, sessionId, userMsgId, message, userEmail, userT
     const assistantNow = new Date().toISOString();
     const chatTps = (genDurationMs != null && tokensOut > 0) ? tokensOut / (genDurationMs / 1000) : null;
     const asstMsgResult = db.prepare(`
-      INSERT INTO chat_messages (session_id, role, content, vorschlaege, tokens_in, tokens_out, cache_read_in, cache_creation_in, provider, model, tps, created_at)
-      VALUES (?, 'assistant', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO chat_messages (session_id, role, content, vorschlaege, tokens_in, tokens_out, cache_read_in, cache_creation_in, cache_creation_1h_in, provider, model, tps, created_at)
+      VALUES (?, 'assistant', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       session.id, antwort,
       vorschlaege.length > 0 ? JSON.stringify(vorschlaege) : null,
-      tokensIn, tokensOut, cacheReadIn, cacheCreationIn, provider, model, chatTps, assistantNow
+      tokensIn, tokensOut, cacheReadIn, cacheCreationIn, cacheCreation1hIn, provider, model, chatTps, assistantNow
     );
     db.prepare('UPDATE chat_sessions SET last_message_at = ? WHERE id = ?').run(assistantNow, session.id);
     completeJob(jobId, {
@@ -389,11 +389,11 @@ async function runBookChatJob(jobId, sessionId, userMsgId, message, userEmail, u
       updateJob(jobId, updates);
     };
 
-    const { text, truncated, tokensIn, tokensOut, cacheReadIn = 0, cacheCreationIn = 0, provider, model, genDurationMs } = await callAIChat(aiMessages, systemPrompt, onProgress, null, jobSignal, undefined, SCHEMA_BOOK_CHAT, chatTemperature(), '{"antwort":"');
+    const { text, truncated, tokensIn, tokensOut, cacheReadIn = 0, cacheCreationIn = 0, cacheCreation1hIn = 0, provider, model, genDurationMs } = await callAIChat(aiMessages, systemPrompt, onProgress, null, jobSignal, undefined, SCHEMA_BOOK_CHAT, chatTemperature(), '{"antwort":"');
     // Job-State auf echte Provider-Werte setzen (Ollama/Llama melden prompt_tokens
     // erst am Streaming-Ende; ohne diesen Update bleibt die Status-Anzeige auf
     // einem Zwischenstand und weicht von der DB-Nachricht ab).
-    updateJob(jobId, { tokensIn, tokensOut, cacheReadIn, cacheCreationIn });
+    updateJob(jobId, { tokensIn, tokensOut, cacheReadIn, cacheCreationIn, cacheCreation1hIn });
     if (truncated) throw i18nError('job.error.aiTruncated', { max: aiCfg.maxTokensOut, tokIn: tokensIn, tokOut: tokensOut, total: tokensIn + tokensOut });
 
     const { antwort, fallback } = _parseChatResponse(text);
@@ -405,9 +405,9 @@ async function runBookChatJob(jobId, sessionId, userMsgId, message, userEmail, u
     const assistantNow = new Date().toISOString();
     const bookChatTps = (genDurationMs != null && tokensOut > 0) ? tokensOut / (genDurationMs / 1000) : null;
     const asstMsgResult = db.prepare(`
-      INSERT INTO chat_messages (session_id, role, content, tokens_in, tokens_out, cache_read_in, cache_creation_in, provider, model, tps, context_info, created_at)
-      VALUES (?, 'assistant', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(session.id, antwort, tokensIn, tokensOut, cacheReadIn, cacheCreationIn, provider, model, bookChatTps, JSON.stringify(contextInfo), assistantNow);
+      INSERT INTO chat_messages (session_id, role, content, tokens_in, tokens_out, cache_read_in, cache_creation_in, cache_creation_1h_in, provider, model, tps, context_info, created_at)
+      VALUES (?, 'assistant', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(session.id, antwort, tokensIn, tokensOut, cacheReadIn, cacheCreationIn, cacheCreation1hIn, provider, model, bookChatTps, JSON.stringify(contextInfo), assistantNow);
     db.prepare('UPDATE chat_sessions SET last_message_at = ? WHERE id = ?').run(assistantNow, session.id);
     completeJob(jobId, {
       session_id: session.id,
@@ -551,7 +551,7 @@ async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEma
     const historyWithoutLast = _bookChatBuildHistory(session.id).slice(0, -1);
     let messages = [...historyWithoutLast, { role: 'user', content: message }];
 
-    let totalTokIn = 0, totalTokOut = 0, totalCacheRead = 0, totalCacheCreation = 0;
+    let totalTokIn = 0, totalTokOut = 0, totalCacheRead = 0, totalCacheCreation = 0, totalCacheCreation1h = 0;
     let finalText = null;
     let genMs = 0;
     let lastModel = null; // tatsächlich genutztes Claude-Modell (reflektiert ggf. den Bookchat-Override)
@@ -579,8 +579,9 @@ async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEma
       );
       totalTokIn  += result.tokensIn;
       totalTokOut += result.tokensOut;
-      totalCacheRead     += (result.cacheReadIn || 0);
-      totalCacheCreation += (result.cacheCreationIn || 0);
+      totalCacheRead       += (result.cacheReadIn || 0);
+      totalCacheCreation   += (result.cacheCreationIn || 0);
+      totalCacheCreation1h += (result.cacheCreation1hIn || 0);
       if (result.genDurationMs) genMs += result.genDurationMs;
       if (result.model) lastModel = result.model;
 
@@ -589,6 +590,7 @@ async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEma
       updateJob(jobId, {
         tokensIn: totalTokIn, tokensOut: totalTokOut,
         cacheReadIn: totalCacheRead, cacheCreationIn: totalCacheCreation,
+        cacheCreation1hIn: totalCacheCreation1h,
       });
 
       if (result.truncated) throw i18nError('job.error.aiTruncated', { max: aiCfg.maxTokensOut, tokIn: totalTokIn, tokOut: totalTokOut, total: totalTokIn + totalTokOut });
@@ -721,9 +723,9 @@ async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEma
       iterations: iter + 1,
     };
     const asstMsgResult = db.prepare(`
-      INSERT INTO chat_messages (session_id, role, content, tokens_in, tokens_out, cache_read_in, cache_creation_in, provider, model, tps, context_info, created_at)
-      VALUES (?, 'assistant', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(session.id, antwort, totalTokIn, totalTokOut, totalCacheRead, totalCacheCreation, 'claude', (lastModel || appSettings.get('ai.claude.model') || 'claude-sonnet-4-6'), tpsVal, JSON.stringify(contextInfo), assistantNow);
+      INSERT INTO chat_messages (session_id, role, content, tokens_in, tokens_out, cache_read_in, cache_creation_in, cache_creation_1h_in, provider, model, tps, context_info, created_at)
+      VALUES (?, 'assistant', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(session.id, antwort, totalTokIn, totalTokOut, totalCacheRead, totalCacheCreation, totalCacheCreation1h, 'claude', (lastModel || appSettings.get('ai.claude.model') || 'claude-sonnet-4-6'), tpsVal, JSON.stringify(contextInfo), assistantNow);
     db.prepare('UPDATE chat_sessions SET last_message_at = ? WHERE id = ?').run(assistantNow, session.id);
 
     completeJob(jobId, {

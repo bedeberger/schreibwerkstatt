@@ -257,17 +257,19 @@ async function aiCall(jobId, tok, prompt, system, fromPct, toPct, expectedChars 
     ? Math.min(maxTokens, providerMaxOut)
     : providerMaxOut;
   const signal = jobAbortControllers.get(jobId)?.signal;
-  const { text, truncated, tokensIn, tokensOut, cacheReadIn = 0, cacheCreationIn = 0, genDurationMs } = await callAI(prompt, system, onProgress, maxTokensOverride, signal, effProvider, jsonSchema);
+  const { text, truncated, tokensIn, tokensOut, cacheReadIn = 0, cacheCreationIn = 0, cacheCreation1hIn = 0, genDurationMs } = await callAI(prompt, system, onProgress, maxTokensOverride, signal, effProvider, jsonSchema);
   tok.inflight?.delete(callId);
   tok.in += tokensIn;
   tok.out += tokensOut;
   tok.cacheRead = (tok.cacheRead || 0) + cacheReadIn;
   tok.cacheCreate = (tok.cacheCreate || 0) + cacheCreationIn;
+  tok.cacheCreate1h = (tok.cacheCreate1h || 0) + cacheCreation1hIn;
   if (genDurationMs != null) tok.ms += genDurationMs;
   const liveTps = tok.ms > 0 ? tok.out / (tok.ms / 1000) : null;
   updateJob(jobId, {
     tokensIn: tok.in, tokensOut: tok.out,
     cacheReadIn: tok.cacheRead, cacheCreationIn: tok.cacheCreate,
+    cacheCreation1hIn: tok.cacheCreate1h,
     tokensPerSec: liveTps,
   });
   if (truncated) throw i18nError('job.error.aiTruncated', { max: maxTokensOverride, tokIn: tokensIn, tokOut: tokensOut, total: tokensIn + tokensOut });

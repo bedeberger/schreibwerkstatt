@@ -29,14 +29,14 @@ function _resolveRange({ from, to } = {}) {
 
 const _stmtJobsRange = db.prepare(`
   SELECT user_email, provider, model, tokens_in, tokens_out,
-         cache_read_in, cache_creation_in
+         cache_read_in, cache_creation_in, cache_creation_1h_in
     FROM job_runs
    WHERE queued_at >= ? AND queued_at < ?
 `);
 
 const _stmtChatsRange = db.prepare(`
   SELECT cs.user_email AS user_email, cm.provider, cm.model,
-         cm.tokens_in, cm.tokens_out, cm.cache_read_in, cm.cache_creation_in
+         cm.tokens_in, cm.tokens_out, cm.cache_read_in, cm.cache_creation_in, cm.cache_creation_1h_in
     FROM chat_messages cm
     JOIN chat_sessions cs ON cs.id = cm.session_id
    WHERE cm.created_at >= ? AND cm.created_at < ? AND cm.role = 'assistant'
@@ -47,6 +47,7 @@ function _cost(row) {
     provider: row.provider, model: row.model,
     tokensIn: row.tokens_in, tokensOut: row.tokens_out,
     cacheReadIn: row.cache_read_in, cacheCreationIn: row.cache_creation_in,
+    cacheCreation1hIn: row.cache_creation_1h_in,
   });
 }
 
@@ -132,7 +133,7 @@ function _buildJobsQuery({ emailCount, includeWhere }) {
     SELECT id, job_id, user_email, type, book_id, label, status,
            queued_at, started_at, ended_at,
            provider, model,
-           tokens_in, tokens_out, cache_read_in, cache_creation_in
+           tokens_in, tokens_out, cache_read_in, cache_creation_in, cache_creation_1h_in
       FROM job_runs
      WHERE ${where.join(' AND ')}
      ORDER BY queued_at DESC
@@ -192,7 +193,7 @@ function _buildChatQuery({ emailCount, includeWhere }) {
     SELECT cm.id, cm.session_id, cs.user_email, cm.created_at,
            cs.kind AS session_kind, cs.book_id, cs.page_id,
            cm.provider, cm.model,
-           cm.tokens_in, cm.tokens_out, cm.cache_read_in, cm.cache_creation_in
+           cm.tokens_in, cm.tokens_out, cm.cache_read_in, cm.cache_creation_in, cm.cache_creation_1h_in
       FROM chat_messages cm
       JOIN chat_sessions cs ON cs.id = cm.session_id
      WHERE ${where.join(' AND ')}
@@ -297,7 +298,7 @@ function monthlyTotals({ from, to } = {}) {
 
   // Job-Typ-Aggregat braucht separates Query mit `type`-Spalte
   const typeRows = db.prepare(`
-    SELECT user_email, type, provider, model, tokens_in, tokens_out, cache_read_in, cache_creation_in
+    SELECT user_email, type, provider, model, tokens_in, tokens_out, cache_read_in, cache_creation_in, cache_creation_1h_in
       FROM job_runs WHERE queued_at >= ? AND queued_at < ?
   `).all(fromIso, toIso).filter(notAdmin);
   for (const r of typeRows) {
