@@ -11,6 +11,16 @@ const appSettings = require('../lib/app-settings');
 
 const router = express.Router();
 
+const OSM_TILES_DEFAULT = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+
+// Liefert die Tile-URL fuers Frontend: nur-HTTP-Upstreams ueber den Same-Origin-
+// Proxy (/tiles) ausspielen (sonst Mixed-Content-Block bei HTTPS-App), sonst die
+// konfigurierte URL direkt. Siehe routes/tiles.js.
+function tileFrontendUrl() {
+  const tpl = String(appSettings.get('geocode.tiles.url') || '').trim() || OSM_TILES_DEFAULT;
+  return /^http:\/\//i.test(tpl) ? '/tiles/{z}/{x}/{y}' : tpl;
+}
+
 // Modell-Konfiguration ans Frontend liefern (keine Credentials)
 router.get('/config', (req, res) => {
   const sessionUser = req.session?.user || null;
@@ -80,10 +90,13 @@ router.get('/config', (req, res) => {
     },
     // Tile-Server der Orte-Karte. Leaflet holt die Kacheln direkt im Browser,
     // darum muss die URL ans Frontend (anders als die Geocoder-URLs, die nur der
-    // server-seitige /geocode-Proxy nutzt). attribution leer = Frontend faellt
-    // auf den i18n-Default (orte.map.attribution) zurueck.
+    // server-seitige /geocode-Proxy nutzt). Ein nur-HTTP-Upstream (z. B. LAN-Tile-
+    // Server) wuerde von einer HTTPS-App als Mixed-Content geblockt → dann liefern
+    // wir die Same-Origin-Proxy-URL (/tiles, routes/tiles.js) statt der http-URL.
+    // HTTPS-/OSM-Upstreams laedt Leaflet weiterhin direkt. attribution leer =
+    // Frontend faellt auf den i18n-Default (orte.map.attribution) zurueck.
     mapTiles: {
-      url: appSettings.get('geocode.tiles.url') || 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      url: tileFrontendUrl(),
       attribution: String(appSettings.get('geocode.tiles.attribution') || '').trim(),
     },
   });

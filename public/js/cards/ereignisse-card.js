@@ -68,7 +68,7 @@ export function buildTimelineItems(events) {
       subtyp: ev.subtyp || 'sonstiges',
       content: ev.ereignis || '',
     };
-    if (ev.datum_ende_year != null) {
+    if (ev.datum_ende_year != null && !POINT_SUBTYPES.has(item.subtyp)) {
       const end = _eventDate(ev.datum_ende_year, ev.datum_ende_month, ev.datum_ende_day);
       if (end > start) { item.end = end; item.type = 'range'; }
       else item.type = 'point';
@@ -122,6 +122,15 @@ const SUBTYP_ICON = {
 export function subtypIcon(subtyp) {
   return SUBTYP_ICON[subtyp] || SUBTYP_ICON.sonstiges;
 }
+
+// Instantane Subtypen (Momente, kein Zeitraum): bekommen nie einen Span-Balken,
+// auch wenn die Daten ein Ende-Jahr tragen (z.B. Geburt mit Ende = „Jetzt" der
+// Geschichte → sonst 50-Jahre-Spanne statt Punkt). Dauer-fähige Subtypen
+// (liebe, krankheit, reise, umzug, konflikt, extern_*) bleiben Spannen.
+export const POINT_SUBTYPES = new Set([
+  'geburt', 'tod', 'hochzeit', 'trennung',
+  'wendepunkt', 'entdeckung', 'sieg', 'verlust',
+]);
 
 // Formatiert das Anzeige-Datum aus den strukturierten Feldern. Punkt-Events
 // und Spannen werden unterschiedlich gerendert. Fallback auf datum_label
@@ -276,6 +285,7 @@ export function registerEreignisseCard() {
     // Wird per CSS-Custom-Prop --span-years konsumiert. 0 für Punkt-Events.
     eventSpanYears(ev) {
       if (ev.datum_year == null || ev.datum_ende_year == null) return 0;
+      if (POINT_SUBTYPES.has(ev.subtyp || 'sonstiges')) return 0;
       const diff = ev.datum_ende_year - ev.datum_year;
       return diff > 0 ? Math.min(diff, 50) : 0;
     },
@@ -375,8 +385,8 @@ export function registerEreignisseCard() {
       if (!this._timeline) return;
       this.$nextTick(() => {
         this._timeline?.setOptions(active
-          ? { maxHeight: null, height: '100%' }
-          : { maxHeight: 420, height: null });
+          ? { maxHeight: '100%', height: '100%' }
+          : { maxHeight: 420, height: '' });
         this._timeline?.redraw();
       });
     },

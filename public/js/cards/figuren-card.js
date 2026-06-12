@@ -102,14 +102,23 @@ export function registerFigurenCard() {
           this.renderFigurGraph();
         },
         // book:changed: Netzwerk wegwerfen + Header-Timestamp + Kapitelfilter
-        // resetten. loadFiguren läuft bereits aus _resetBookScopedState
-        // (loadPages) — wir warten nur auf den Reactive-Update und rendern dann.
+        // resetten, dann neu rendern. loadFiguren läuft zwar parallel aus
+        // _resetBookScopedState (loadPages), ist aber ein Netz-Fetch — book:changed
+        // feuert synchron davor. Ein blosses $nextTick würde rendern, solange
+        // figuren noch [] ist → Leer-Platzhalter + gecachter Leer-Hash, und der
+        // Reactive-Update löst keinen erneuten Render aus. Darum hier den Load
+        // explizit awaiten (idempotent zum loadPages-Load) und erst dann rendern.
         onBookChanged: async (e, ctx, root) => {
           destroyNet();
           ctx.figurenUpdatedAt = null;
           ctx.figurenGraphKapitel = null;
           if (!root.showFiguresCard) return;
-          if (!root.selectedBookId) return;
+          const bookId = root.selectedBookId;
+          if (!bookId) return;
+          await root.loadFiguren(bookId);
+          // Schneller Folge-Buchwechsel: Ergebnis verwerfen, der neue
+          // book:changed-Handler rendert.
+          if (String(root.selectedBookId) !== String(bookId)) return;
           await ctx.$nextTick();
           ctx.renderFigurGraph();
         },

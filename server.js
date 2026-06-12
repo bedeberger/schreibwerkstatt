@@ -398,6 +398,7 @@ app.use('/figures', figuresRouter);
 app.use('/locations', locationsRouter);
 app.use('/world-facts', require('./routes/world-facts'));
 app.use('/geocode', require('./routes/geocode'));
+app.use('/tiles', require('./routes/tiles'));
 app.use('/songs', songsRouter);
 app.use('/jobs', jobsRouter);
 app.use('/chat', chatRouter);

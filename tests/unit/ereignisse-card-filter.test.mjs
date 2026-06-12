@@ -192,6 +192,15 @@ test('buildTimelineItems: Spanne mit Ende-Jahr → Range-Item', () => {
   assert.equal(item.end.getFullYear(), 1985);
 });
 
+test('buildTimelineItems: instantaner Subtyp ignoriert Ende-Jahr → Punkt', () => {
+  // Geburt mit Ende = „Jetzt" der Geschichte darf keine 50-Jahre-Spanne werden.
+  const [item] = buildTimelineItems([
+    { datum_year: 1970, datum_ende_year: 2022, subtyp: 'geburt', ereignis: 'Geburt' },
+  ]);
+  assert.equal(item.type, 'point');
+  assert.equal(item.end, undefined);
+});
+
 test('buildTimelineItems: Ende <= Start fällt auf Punkt zurück', () => {
   const [item] = buildTimelineItems([
     { datum_year: 1980, datum_ende_year: 1980, ereignis: 'X' },
