@@ -50,7 +50,14 @@ router.get('/:z/:x/:y', async (req, res) => {
     res.setHeader('Cache-Control', CACHE_CONTROL);
     res.end(buf);
   } catch (err) {
-    if (err.name !== 'AbortError') logger.warn(`tile-proxy ${z}/${x}/${y}: ${err.message}`);
+    // undici verpackt den echten Grund (DNS/Connect/TLS) in err.cause; err.message
+    // ist nur das generische "fetch failed". Cause mitloggen, sonst ist ein nicht
+    // erreichbarer self-hosted Tile-Server nicht diagnostizierbar (ENOTFOUND =
+    // DNS, ECONNREFUSED = Port/Server, ETIMEDOUT/EHOSTUNREACH = Routing/Firewall).
+    if (err.name !== 'AbortError') {
+      const cause = err.cause ? ` (${err.cause.code || err.cause.message})` : '';
+      logger.warn(`tile-proxy ${z}/${x}/${y} → ${url}: ${err.message}${cause}`);
+    }
     res.status(502).end();
   } finally {
     clearTimeout(timer);
