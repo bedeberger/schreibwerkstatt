@@ -9,6 +9,7 @@
 import { setupCardLifecycle } from './card-lifecycle.js';
 import { memoizeByIdentity, escHtml } from '../utils.js';
 import { loadVisTimeline } from '../lazy-libs.js';
+import { toggleWrapFullscreen, attachFullscreenSync } from '../fullscreen.js';
 
 // Pure Filter-Logik. Aus dem memoized Wrapper extrahiert, damit sie ohne
 // Alpine-Root testbar ist (siehe tests/unit/ereignisse-card-filter.test.mjs).
@@ -79,6 +80,21 @@ export function buildTimelineItems(events) {
   return items;
 }
 
+// Pure: früheste Start- und späteste End-/Start-Zeit (ms) der datierten
+// Timeline-Items. Basis für die Sprung-Buttons (moveTo). null bei leerer Liste.
+// Extrahiert für Tests (ereignisse-card-filter.test.mjs).
+export function timelineBounds(items) {
+  const list = items || [];
+  let min = Infinity, max = -Infinity;
+  for (const it of list) {
+    const s = +new Date(it.start);
+    const e = it.end != null ? +new Date(it.end) : s;
+    if (s < min) min = s;
+    if (e > max) max = e;
+  }
+  return Number.isFinite(min) ? { min, max } : null;
+}
+
 // Mapping Subtyp → Lucide-Sprite-Icon-ID. Whitelist deckungsgleich mit
 // prompts/komplett.js + i18n events.subtyp.*. Unbekannte/ungültige Subtypen
 // fallen auf 'sonstiges' → more-horizontal.
@@ -143,6 +159,9 @@ export function registerEreignisseCard() {
     _consolidatePollTimer: null,
     _ereignisseExtractPollTimer: null,
     _lifecycle: null,
+    // Gebundener visibilitychange-Handler (Tab-Rückwechsel → Timeline-redraw),
+    // in init() registriert und in destroy() abgeräumt.
+    _onVisibility: null,
     _memoFiltered: _memoEreignisse(),
     // vis-timeline-Instanz + Item-DataSet (lazy beim ersten Sichtbarwerden).
     _timeline: null,
@@ -156,6 +175,8 @@ export function registerEreignisseCard() {
     _timelineRerun: false,
     // Wieviele datierte Items zuletzt auf der Achse landeten (Hinweis-Text).
     timelineItemCount: 0,
+    // Vollbild-Flag (CSS-Overlay-Fallback; native :fullscreen läuft parallel).
+    timelineFullscreen: false,
 
     init() {
       this._lifecycle = setupCardLifecycle(this, {
@@ -179,9 +200,34 @@ export function registerEreignisseCard() {
       this.$watch(() => this.filteredEreignisse(), () => this._renderTimeline());
       this.$watch(() => window.__app.showEreignisseCard, (v) => { if (v) this._renderTimeline(); });
       this.$nextTick(() => this._renderTimeline());
+      // Tab-Rückwechsel: vis misst Dimensionen träge, wenn der Tab beim letzten
+      // Layout im Hintergrund war. Ein redraw() bei Wiedersichtbarkeit räumt
+      // ein evtl. kollabiertes/verschobenes Achsen-Layout auf.
+      this._onVisibility = () => {
+        if (document.visibilityState === 'visible' && window.__app?.showEreignisseCard) {
+          this._timeline?.redraw();
+        }
+      };
+      document.addEventListener('visibilitychange', this._onVisibility);
+      // Native Fullscreen-API: State spiegeln + vis-Höhe anpassen; beim Verlassen
+      // (Esc / Browser-UI) das Toggle-Flag sauber zurücksetzen.
+      attachFullscreenSync({
+        resolveWrap: () => this.$el?.querySelector('.gz-timeline-wrap'),
+        signal: this._lifecycle.signal,
+        onChange: (active) => {
+          this.timelineFullscreen = active;
+          this._applyTimelineFullscreenSize(active);
+        },
+      });
     },
 
     destroy() {
+      // Falls die Karte im Vollbild abgebaut wird (Buchwechsel etc.): erst raus.
+      if (document.fullscreenElement?.classList?.contains?.('gz-timeline-wrap')) {
+        try { document.exitFullscreen?.(); } catch {}
+      }
+      if (this._onVisibility) document.removeEventListener('visibilitychange', this._onVisibility);
+      this._onVisibility = null;
       this._timeline?.destroy();
       this._timeline = null;
       this._timelineItems = null;
@@ -293,6 +339,48 @@ export function registerEreignisseCard() {
       return pageId != null || !!kap;
     },
 
+    // --- Timeline-Toolbar: Zoom / Fit / Sprung / Vollbild -------------------
+    // Zoom-Buttons machen den sonst hinter Ctrl+Scroll versteckten Zoom sichtbar.
+    timelineZoomIn()  { this._timeline?.zoomIn(0.5); },
+    timelineZoomOut() { this._timeline?.zoomOut(0.5); },
+    timelineFit()     { this._timeline?.fit({ animation: { duration: 300, easingFunction: 'easeInOutQuad' } }); },
+
+    // Sprung an den Rand: behält den Zoom, schwenkt nur auf das früheste bzw.
+    // späteste datierte Item (moveTo, nicht focus → keine Zoom-Änderung).
+    timelineJumpFirst() { this._timelineMoveToBound('min'); },
+    timelineJumpLast()  { this._timelineMoveToBound('max'); },
+    _timelineMoveToBound(which) {
+      if (!this._timeline || !this._timelineItems) return;
+      const b = timelineBounds(this._timelineItems.get());
+      if (!b) return;
+      this._timeline.moveTo(new Date(b[which]), { animation: { duration: 300, easingFunction: 'easeInOutQuad' } });
+    },
+
+    // Vollbild: native Fullscreen-API, CSS-Overlay-Fallback im catch (analog
+    // Figuren-Graph). Den nativen Pfad spiegelt der fullscreenchange-Listener.
+    async toggleTimelineFullscreen() {
+      const wrap = this.$el?.querySelector('.gz-timeline-wrap');
+      if (!wrap) return;
+      try {
+        await toggleWrapFullscreen(wrap);
+      } catch {
+        this.timelineFullscreen = !this.timelineFullscreen;
+        this._applyTimelineFullscreenSize(this.timelineFullscreen);
+      }
+    },
+
+    // vis-timeline wächst nur bis maxHeight (420 px) — im Vollbild füllt es die
+    // Höhe (height:'100%'), beim Verlassen zurück in den maxHeight-Modus.
+    _applyTimelineFullscreenSize(active) {
+      if (!this._timeline) return;
+      this.$nextTick(() => {
+        this._timeline?.setOptions(active
+          ? { maxHeight: null, height: '100%' }
+          : { maxHeight: 420, height: null });
+        this._timeline?.redraw();
+      });
+    },
+
     // Coalescing-Wrapper: serialisiert konkurrierende Render-Aufrufe und
     // stellt sicher, dass nach dem laufenden Render ggf. einmal nachgezogen wird.
     _renderTimeline() {
@@ -352,7 +440,7 @@ export function registerEreignisseCard() {
         this._timelineItems = new vis.DataSet(visItems);
         this._timeline = new vis.Timeline(el, this._timelineItems, {
           stack: true,
-          maxHeight: 260,
+          maxHeight: 420,
           verticalScroll: true,
           horizontalScroll: true,
           zoomKey: 'ctrlKey',
@@ -366,21 +454,37 @@ export function registerEreignisseCard() {
           cluster: { maxItems: 1, showStipes: true },
         });
         // Einfachklick auf ein Item → zum Listeneintrag scrollen.
-        // props.item ist die Item-id (= Listen-Index).
+        // props.item ist die Item-id (= Listen-Index); bei Clustern eine
+        // generierte UUID — daher der isCluster-Guard.
+        // Einfachklick auf eine Cluster-Blase → aufklappen: focus() zoomt
+        // animiert auf die enthaltenen Items, der Cluster löst sich auf.
         this._timeline.on('click', (props) => {
+          if (props.isCluster) {
+            if (props.items?.length) this._timeline.focus(props.items);
+            return;
+          }
           if (props.item != null) this.scrollToEventIndex(Number(props.item));
         });
         // Doppelklick → direkt ins Manuskript (erste verknüpfte Seite/Kapitel).
+        // Cluster überlässt der Guard dem eingebauten fitOnDoubleClick.
         this._timeline.on('doubleClick', (props) => {
-          if (props.item == null) return;
+          if (props.isCluster || props.item == null) return;
           const ev = this.filteredEreignisse()[Number(props.item)];
           this.openEventText(ev);
         });
         this._timeline.fit();
         this._lastFitBookId = bookId;
+        // Falls bei (Neu-)Mount bereits Vollbild aktiv ist: Höhe nachziehen.
+        if (this.timelineFullscreen) this._applyTimelineFullscreenSize(true);
       } else {
-        this._timelineItems.clear();
-        this._timelineItems.add(visItems);
+        // Diff-Update statt clear()+add(): clear() leert das DataSet kurz ganz,
+        // sodass die Achse zwischen den beiden Events leer aufblitzt (sichtbar
+        // beim Tippen im Filter). update() + gezieltes remove() halten den
+        // Bestand durchgehend gefüllt → kein Flackern.
+        const nextIds = new Set(visItems.map(it => it.id));
+        const staleIds = this._timelineItems.getIds().filter(id => !nextIds.has(id));
+        if (staleIds.length) this._timelineItems.remove(staleIds);
+        this._timelineItems.update(visItems);
         // fit() (Voll-Zoom) NUR bei Buchwechsel — sonst würde jede Filter-/
         // Suchänderung den vom User eingestellten Zoom-Bereich zurücksetzen.
         if (this._lastFitBookId !== bookId) {

@@ -417,7 +417,7 @@ Mehr Masken in `:root` ergänzen, sobald sie ein zweites Mal gebraucht werden (L
 
 ## Icon-Toolbar (`.graph-tool-btn`)
 
-**Use:** Kompakte Icon-Button-Reihe für Canvas-/Viewport-Steuerung (Zoom +/−, Reset, Fullscreen-Toggle). Genutzt von Figuren-Graph (vis-network) und Figur-Werkstatt-Mindmap (jsMind). Erste Wahl für jeden weiteren Graph/Map/Canvas-Viewer. Icons kommen aus dem [Lucide-Sprite](#icon-system-lucide-sprite).
+**Use:** Kompakte Icon-Button-Reihe für Canvas-/Viewport-Steuerung (Zoom +/−, Reset, Fullscreen-Toggle). Genutzt von Figuren-Graph (vis-network), Figur-Werkstatt-Mindmap (jsMind) und Ereignisse-Zeitstrahl (vis-timeline; zusätzlich Sprung an Anfang/Ende der Zeitachse). Erste Wahl für jeden weiteren Graph/Map/Canvas-Viewer. Icons kommen aus dem [Lucide-Sprite](#icon-system-lucide-sprite).
 
 **Markup (Overlay-Variante, oben rechts in Canvas-Ecke):**
 ```html
@@ -473,6 +473,7 @@ Mehr Masken in `:root` ergänzen, sobald sie ein zweites Mal gebraucht werden (L
 | Fullscreen schliessen | `minimize-2` | Diagonale Pfeile einwärts |
 | Undo / Redo | `undo` / `redo` | Action-Group-Variante (siehe unten) |
 | Expand-all / Collapse-all | `chevron-down` / `chevron-up` | Action-Group-Variante |
+| Sprung an den Anfang / ans Ende | `chevron-first` / `chevron-last` | Zeitachsen-Navigation (Zeitstrahl), behält den Zoom |
 
 Neue Aktionen erweitern diese Tabelle und das Sprite (siehe [Icon-System](#icon-system-lucide-sprite)).
 

@@ -236,4 +236,43 @@
   font-style: italic;
 }
 
+/* Toolbar-Wrap über dem Zeitstrahl (Zoom/Fit/Sprung/Vollbild). Trägt den
+   Vollbild-Zustand analog .figuren-graph-wrap. Buttons nutzen die geteilte
+   .graph-tool-btn-Klasse (siehe DESIGN.md „Icon-Toolbar"). */
+.gz-timeline-wrap {
+  position: relative;
+}
+
+.gz-timeline-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-xs);
+}
+
+/* Vollbild: native API primär (:fullscreen), .is-fullscreen als CSS-Overlay-
+   Fallback (iOS Safari u.ä.). Die vis-Höhe selbst stellt
+   _applyTimelineFullscreenSize per setOptions auf height:'100%' um — hier nur
+   das Flex-Gerüst, damit der Container die Resthöhe bekommt. */
+.gz-timeline-wrap:fullscreen,
+.gz-timeline-wrap.is-fullscreen {
+  background: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+}
+
+.gz-timeline-wrap.is-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+}
+
+.gz-timeline-wrap:fullscreen .gz-timeline,
+.gz-timeline-wrap.is-fullscreen .gz-timeline {
+  flex: 1;
+  min-height: 0;
+}
+
 }

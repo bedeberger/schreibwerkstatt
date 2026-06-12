@@ -80,7 +80,8 @@ app.set('trust proxy', 1);
 // inline-style-Attribute setzt (z.B. progress-bar via --progress).
 // img-src deckt data:/blob: für Generated Charts/Graphs plus
 // *.googleusercontent.com für Google-Profilbilder im Avatar-Menü plus
-// *.tile.openstreetmap.org für die Leaflet-Karte der Schauplätze.
+// *.tile.openstreetmap.org für die Leaflet-Karte der Schauplätze plus den
+// Host eines self-hosted Tile-Servers (geocode.tiles.url), zur Laufzeit ergänzt.
 // connect-src 'self' deckt alle XHR/SSE-Endpunkte (Server proxy'd Anthropic +
 // Ollama; Storage geht ueber /content/*); Plausible-Origin wird zur Laufzeit
 // aus app_settings ergänzt, falls Analytics aktiv ist.
@@ -92,11 +93,27 @@ function plausibleOriginFromSettings() {
   catch { return ''; }
 }
 
+// CSP-img-src-Quelle aus der konfigurierten Tile-Server-URL (geocode.tiles.url).
+// Leaflet laedt die Kacheln direkt im Browser, also muss der Host im img-src
+// stehen. Das {s}-Subdomain-Token wird zum Wildcard-Host (https://*.host); ohne
+// {s} liefert die Origin den exakten Host:Port. Leer/ungueltig → kein Eintrag.
+function tileImgSrcFromSettings() {
+  const tpl = String(appSettings.get('geocode.tiles.url') || '').trim();
+  if (!tpl) return '';
+  const hasSub = tpl.includes('{s}');
+  try {
+    const probe = tpl.replace('{s}', 'a').replace(/\{[zxy]\}/g, '0');
+    const u = new URL(probe);
+    return hasSub ? `${u.protocol}//*.${u.host.replace(/^a\./, '')}` : u.origin;
+  } catch { return ''; }
+}
+
 function buildCspHeader() {
   const plausible = plausibleOriginFromSettings();
+  const tileSrc    = tileImgSrcFromSettings();
   const scriptSrc  = ["'self'", "'unsafe-eval'", ...(plausible ? [plausible] : [])];
   const styleSrc   = ["'self'", "'unsafe-inline'"];
-  const imgSrc     = ["'self'", 'data:', 'blob:', 'https://*.googleusercontent.com', 'https://*.tile.openstreetmap.org'];
+  const imgSrc     = ["'self'", 'data:', 'blob:', 'https://*.googleusercontent.com', 'https://*.tile.openstreetmap.org', ...(tileSrc ? [tileSrc] : [])];
   const fontSrc    = ["'self'"];
   const connectSrc = ["'self'", ...(plausible ? [plausible] : [])];
   const frameSrc   = ["'self'"];
@@ -123,7 +140,8 @@ function buildCspHeader() {
 let _cspHeader = buildCspHeader();
 appSettings.on('changed', (evt) => {
   if (!evt || !evt.key) return;
-  if (evt.key === 'analytics.plausible.enabled' || evt.key === 'analytics.plausible.script_url') {
+  if (evt.key === 'analytics.plausible.enabled' || evt.key === 'analytics.plausible.script_url'
+      || evt.key === 'geocode.tiles.url') {
     _cspHeader = buildCspHeader();
   }
 });

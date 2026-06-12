@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { applyEreignisseFilters, subtypIcon, buildTimelineItems } = await import('../../public/js/cards/ereignisse-card.js');
+const { applyEreignisseFilters, subtypIcon, buildTimelineItems, timelineBounds } = await import('../../public/js/cards/ereignisse-card.js');
 
 const EVENTS = [
   {
@@ -226,4 +226,31 @@ test('buildTimelineItems: frühes Jahr (<100) wird nicht auf 1900+ gemappt', () 
 test('buildTimelineItems: leere/fehlende Liste → []', () => {
   assert.deepEqual(buildTimelineItems([]), []);
   assert.deepEqual(buildTimelineItems(undefined), []);
+});
+
+// --- timelineBounds (Sprung-Buttons: früheste/späteste Achsenzeit) ---
+
+test('timelineBounds: min = frühester Start, max = spätestes Ende/Start', () => {
+  const items = buildTimelineItems([
+    { datum_year: 1990, ereignis: 'A' },
+    { datum_year: 1980, datum_ende_year: 1985, ereignis: 'Spanne' },
+    { datum_year: 2000, ereignis: 'C' },
+  ]);
+  const b = timelineBounds(items);
+  assert.equal(new Date(b.min).getFullYear(), 1980, 'min = frühester Start');
+  assert.equal(new Date(b.max).getFullYear(), 2000, 'max = spätester Start/Ende');
+});
+
+test('timelineBounds: Spannen-Ende zählt für max', () => {
+  const items = buildTimelineItems([
+    { datum_year: 1990, ereignis: 'A' },
+    { datum_year: 1995, datum_ende_year: 2010, ereignis: 'lange Spanne' },
+  ]);
+  const b = timelineBounds(items);
+  assert.equal(new Date(b.max).getFullYear(), 2010);
+});
+
+test('timelineBounds: leere/fehlende Liste → null', () => {
+  assert.equal(timelineBounds([]), null);
+  assert.equal(timelineBounds(undefined), null);
 });

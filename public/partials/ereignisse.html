@@ -67,7 +67,17 @@
 
   <!-- Zeitleiste: interaktiver Jahres-Zeitstrahl (vis-timeline) + Liste darunter -->
   <div x-show="$app.globalZeitstrahl.length > 0" class="gz-layout">
-    <div class="gz-timeline" :aria-label="$app.t('events.timelineNav')"></div>
+    <div class="gz-timeline-wrap" :class="{ 'is-fullscreen': timelineFullscreen }" @keydown.escape.window="timelineFullscreen && toggleTimelineFullscreen()">
+      <div class="gz-timeline-toolbar" x-show="timelineItemCount > 0">
+        <button type="button" class="graph-tool-btn" :data-tip="$app.t('graph.zoomIn')" :aria-label="$app.t('graph.zoomIn')" @click="timelineZoomIn()"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#plus"/></svg></button>
+        <button type="button" class="graph-tool-btn" :data-tip="$app.t('graph.zoomOut')" :aria-label="$app.t('graph.zoomOut')" @click="timelineZoomOut()"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#minus"/></svg></button>
+        <button type="button" class="graph-tool-btn" :data-tip="$app.t('graph.reset')" :aria-label="$app.t('graph.reset')" @click="timelineFit()"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#scan"/></svg></button>
+        <button type="button" class="graph-tool-btn" :data-tip="$app.t('events.timelineJumpFirst')" :aria-label="$app.t('events.timelineJumpFirst')" @click="timelineJumpFirst()"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#chevron-first"/></svg></button>
+        <button type="button" class="graph-tool-btn" :data-tip="$app.t('events.timelineJumpLast')" :aria-label="$app.t('events.timelineJumpLast')" @click="timelineJumpLast()"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#chevron-last"/></svg></button>
+        <button type="button" class="graph-tool-btn" :aria-pressed="timelineFullscreen" :data-tip="timelineFullscreen ? $app.t('graph.fullscreenClose') : $app.t('graph.fullscreen')" :aria-label="timelineFullscreen ? $app.t('graph.fullscreenClose') : $app.t('graph.fullscreen')" @click="toggleTimelineFullscreen()"><svg class="icon" aria-hidden="true"><use :href="timelineFullscreen ? '/icons.svg?v=690#minimize-2' : '/icons.svg?v=690#maximize-2'"/></svg></button>
+      </div>
+      <div class="gz-timeline" :aria-label="$app.t('events.timelineNav')"></div>
+    </div>
     <div class="gz-timeline-hint internal-link" x-show="timelineItemCount < filteredEreignisse().length"
          @click="scrollToFirstUndated()" :data-tip="$app.t('events.timelineUndatedHint')"
          x-text="$app.t('events.timelineUndated', { count: filteredEreignisse().length - timelineItemCount })"></div>
