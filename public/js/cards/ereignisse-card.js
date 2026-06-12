@@ -11,6 +11,10 @@ import { memoizeByIdentity, escHtml } from '../utils.js';
 import { loadVisTimeline } from '../lazy-libs.js';
 import { toggleWrapFullscreen, attachFullscreenSync } from '../fullscreen.js';
 
+// Auto-Höhe der vis-timeline ist auf diesen Wert gedeckelt; im Vollbild füllt
+// sie stattdessen die Resthöhe (height:'100%').
+const TIMELINE_MAX_HEIGHT = 420;
+
 // Pure Filter-Logik. Aus dem memoized Wrapper extrahiert, damit sie ohne
 // Alpine-Root testbar ist (siehe tests/unit/ereignisse-card-filter.test.mjs).
 export function applyEreignisseFilters(events, { suche = '', figurId = '', subtyp = '', kapitel = '', seite = '' } = {}) {
@@ -379,15 +383,22 @@ export function registerEreignisseCard() {
       }
     },
 
-    // vis-timeline wächst nur bis maxHeight (420 px) — im Vollbild füllt es die
-    // Höhe (height:'100%'), beim Verlassen zurück in den maxHeight-Modus.
+    // vis-timeline wächst nur bis maxHeight — im Vollbild füllt es die Höhe
+    // (height:'100%'), beim Verlassen zurück in den Auto-Höhe-Modus.
     _applyTimelineFullscreenSize(active) {
       if (!this._timeline) return;
       this.$nextTick(() => {
-        this._timeline?.setOptions(active
-          ? { maxHeight: '100%', height: '100%' }
-          : { maxHeight: 420, height: '' });
-        this._timeline?.redraw();
+        if (!this._timeline) return;
+        if (active) {
+          this._timeline.setOptions({ maxHeight: '100%', height: '100%' });
+        } else {
+          // vis akzeptiert weder null noch '' zum Zurücksetzen auf Auto-Höhe
+          // (Validator-Reject bzw. Kollaps auf 1 px). Die Option direkt löschen
+          // lässt vis die Höhe wieder aus dem Inhalt bestimmen.
+          this._timeline.options.height = undefined;
+          this._timeline.setOptions({ maxHeight: TIMELINE_MAX_HEIGHT });
+        }
+        this._timeline.redraw();
       });
     },
 
@@ -450,7 +461,7 @@ export function registerEreignisseCard() {
         this._timelineItems = new vis.DataSet(visItems);
         this._timeline = new vis.Timeline(el, this._timelineItems, {
           stack: true,
-          maxHeight: 420,
+          maxHeight: TIMELINE_MAX_HEIGHT,
           verticalScroll: true,
           horizontalScroll: true,
           zoomKey: 'ctrlKey',
