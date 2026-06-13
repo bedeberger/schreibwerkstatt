@@ -15,7 +15,7 @@
       <button type="button" class="search-clear--icon" x-show="pageSearch" @click="pageSearch=''" :aria-label="t('search.clear')" :data-tip="t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#x"/></svg></button>
     </span>
     <div class="btn-group sidebar-action-group">
-      <button type="button" class="graph-tool-btn"
+      <button type="button" class="icon-btn"
               x-show="isTagebuch()"
               :aria-pressed="sidebarMode === 'calendar'"
               @click="toggleSidebarMode()"
@@ -25,13 +25,13 @@
           <use :href="sidebarMode === 'calendar' ? '/icons.svg?v=690#list' : '/icons.svg?v=690#calendar'"/>
         </svg>
       </button>
-      <button type="button" class="graph-tool-btn"
+      <button type="button" class="icon-btn"
               x-show="sidebarMode !== 'calendar'"
               @click="setAllChaptersOpen(true)"
               :disabled="!!pageSearch"
               :data-tip="t('sidebar.expandAll')"
               :aria-label="t('sidebar.expandAll')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#chevron-down"/></svg></button>
-      <button type="button" class="graph-tool-btn"
+      <button type="button" class="icon-btn"
               x-show="sidebarMode !== 'calendar'"
               @click="setAllChaptersOpen(false)"
               :disabled="!!pageSearch"

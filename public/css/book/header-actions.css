@@ -90,40 +90,9 @@
   to { transform: rotate(360deg); }
 }
 
-/* Kompakte Icon-Buttons im Cluster (Cache-Clear, Zeiten) */
-.header-icon-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  background: transparent;
-  border: 0.5px solid transparent;
-  border-radius: var(--radius-sm);
-  color: var(--color-muted);
-  font-size: var(--font-size-base);
-  line-height: 1;
-  cursor: pointer;
-  font-family: inherit;
-  transition: background var(--transition-base), color var(--transition-base);
-}
-.header-icon-btn:hover:not(:disabled) {
-  background: var(--color-surface);
-  color: var(--color-text);
-  border-color: var(--color-border);
-}
-.header-icon-btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-.header-icon-btn--active {
-  background: var(--color-surface);
-  color: var(--color-text);
-  border-color: var(--color-border);
-}
-/* ⋯-Trigger für das Komplettanalyse-Status-/Aktionsmenü. Icon erbt 1em
-   aus .header-icon-btn (font-size-base) → kein eigener Size-Override nötig. */
+/* Kompakte Icon-Buttons im Cluster (Cache-Clear, Zeiten, ⋯-Status-Trigger)
+   nutzen die generische Ghost-Variante: `class="icon-btn icon-btn--ghost"`,
+   aktiver Zustand via `.is-active`. CSS in components/icon-btn.css. */
 
 /* Avatar-Button (Trigger für Identitäts-Menü) */
 .avatar-btn {

@@ -201,19 +201,19 @@
   <!-- Geo-Karte: Marker je verorteter Schauplatz + Geocode-Liste -->
   <div x-show="$app.orte.length > 0 && viewMode === 'map'" class="ort-map-view" x-cloak>
     <div class="ort-map-actions">
-      <button type="button" class="graph-tool-btn"
+      <button type="button" class="icon-btn"
               :disabled="_geoUndoStack.length === 0"
               @click="undoGeoMove()"
               :data-tip="$app.t('orte.map.undoTip')" :aria-label="$app.t('orte.map.undo')">
         <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#undo"/></svg>
       </button>
-      <button type="button" class="graph-tool-btn"
+      <button type="button" class="icon-btn"
               :disabled="_geoRedoStack.length === 0"
               @click="redoGeoMove()"
               :data-tip="$app.t('orte.map.redoTip')" :aria-label="$app.t('orte.map.redo')">
         <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#redo"/></svg>
       </button>
-      <button type="button" class="graph-tool-btn"
+      <button type="button" class="icon-btn"
               :aria-pressed="geoLocked"
               @click="toggleGeoLock()"
               :data-tip="$app.t(geoLocked ? 'orte.map.unlockTip' : 'orte.map.lockTip')"

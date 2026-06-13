@@ -16,8 +16,8 @@
     <span class="update-all-btn-label" x-text="t('header.updateAll')"></span>
   </button>
   <button type="button"
-          class="header-icon-btn header-icon-btn--status"
-          :class="{ 'header-icon-btn--active': showKomplettStatus }"
+          class="icon-btn icon-btn--ghost"
+          :class="{ 'is-active': showKomplettStatus }"
           @click="showKomplettStatus = !showKomplettStatus"
           :disabled="!selectedBookId"
           :data-tip="t('header.statusMenu')"

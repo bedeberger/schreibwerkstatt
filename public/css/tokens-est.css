@@ -85,34 +85,8 @@
   flex-shrink: 0;
 }
 
-.graph-tool-btn {
-  background: var(--color-bg);
-  border: 0.5px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  color: var(--color-muted);
-  cursor: pointer;
-  font-family: var(--font-sans);
-  font-size: var(--font-size-md);
-  line-height: 1;
-  padding: var(--space-3) 9px;
-  min-width: 28px;
-  transition: background var(--transition-fast), color var(--transition-fast);
-}
-
-.graph-tool-btn:hover {
-  background: var(--color-surface);
-  color: var(--color-text);
-}
-
-.graph-tool-btn[aria-pressed="true"] {
-  background: var(--color-surface);
-  border-color: var(--color-accent);
-  color: var(--color-accent);
-}
-
-.graph-tool-btn--reset {
-  font-size: var(--font-size-sm);
-}
+/* Icon-Button-Basis (`.icon-btn` / `.icon-btn--ghost`) lebt in
+   components/icon-btn.css. Die Graph-Toolbar konsumiert sie nur. */
 
 .figuren-graph-wrap {
   position: relative;

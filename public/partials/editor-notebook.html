@@ -122,14 +122,14 @@
       <template x-if="!editMode">
         <span class="display-contents">
           <span class="action-group" x-show="isTagebuch()">
-            <button type="button" class="graph-tool-btn"
+            <button type="button" class="icon-btn"
                     @click="diaryGo(-1)"
                     :disabled="!diaryPrevPage()"
                     :data-tip="t('diary.prevEntry')"
                     :aria-label="t('diary.prevEntry')">
               <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#chevron-left"/></svg>
             </button>
-            <button type="button" class="graph-tool-btn"
+            <button type="button" class="icon-btn"
                     @click="diaryGo(1)"
                     :disabled="!diaryNextPage()"
                     :data-tip="t('diary.nextEntry')"
@@ -193,25 +193,25 @@
        sie über die bestehende Sticky-Region permanent sichtbar bleibt — auch
        beim Scrollen tief in die Seite (Vollbild). -->
   <div class="page-editor-toolbar" x-show="editMode && !focusActive" x-cloak>
-    <button type="button" class="graph-tool-btn"
+    <button type="button" class="icon-btn"
             :disabled="!notebookCanUndo()"
             :data-tip="t('editor.toolbar.undoTitle')" :aria-label="t('editor.toolbar.undoTitle')"
             @click="notebookUndo()">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#undo"/></svg>
     </button>
-    <button type="button" class="graph-tool-btn"
+    <button type="button" class="icon-btn"
             :disabled="!notebookCanRedo()"
             :data-tip="t('editor.toolbar.redoTitle')" :aria-label="t('editor.toolbar.redoTitle')"
             @click="notebookRedo()">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#redo"/></svg>
     </button>
     <span class="action-sep" aria-hidden="true"></span>
-    <button type="button" class="graph-tool-btn"
+    <button type="button" class="icon-btn"
             :data-tip="t('editor.toolbar.hrTitle')" :aria-label="t('editor.toolbar.hrTitle')"
             @click="insertHorizontalRule()">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#separator-horizontal"/></svg>
     </button>
-    <button type="button" class="graph-tool-btn"
+    <button type="button" class="icon-btn"
             :class="{ 'is-success': quotesNormalizedFlash }"
             :data-tip="quotesNormalizedFlash
               ? (quotesNormalizedFlash.count > 0
@@ -224,29 +224,29 @@
       <svg class="icon" aria-hidden="true" x-show="quotesNormalizedFlash" x-cloak><use href="/icons.svg?v=690#check"/></svg>
     </button>
     <span class="action-sep" aria-hidden="true"></span>
-    <button type="button" class="graph-tool-btn"
+    <button type="button" class="icon-btn"
             :data-tip="t('graph.zoomOut')" :aria-label="t('graph.zoomOut')"
             @click="pageEditorZoomOut()">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#minus"/></svg>
     </button>
-    <button type="button" class="graph-tool-btn"
+    <button type="button" class="icon-btn"
             :data-tip="t('graph.zoomIn')" :aria-label="t('graph.zoomIn')"
             @click="pageEditorZoomIn()">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#plus"/></svg>
     </button>
-    <button type="button" class="graph-tool-btn"
+    <button type="button" class="icon-btn"
             :data-tip="t('graph.reset')" :aria-label="t('graph.reset')"
             @click="pageEditorZoomReset()">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#scan"/></svg>
     </button>
-    <button type="button" class="graph-tool-btn"
+    <button type="button" class="icon-btn"
             :aria-pressed="pageEditorFitWidth"
             :data-tip="pageEditorFitWidth ? t('editor.fitWidthOff') : t('editor.fitWidth')"
             :aria-label="pageEditorFitWidth ? t('editor.fitWidthOff') : t('editor.fitWidth')"
             @click="togglePageEditorFitWidth()">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#move-horizontal"/></svg>
     </button>
-    <button type="button" class="graph-tool-btn"
+    <button type="button" class="icon-btn"
             :aria-pressed="pageEditorFullscreen"
             :data-tip="pageEditorFullscreen ? t('graph.fullscreenClose') : t('graph.fullscreen')"
             :aria-label="pageEditorFullscreen ? t('graph.fullscreenClose') : t('graph.fullscreen')"
@@ -259,7 +259,7 @@
          (entityPanelOpen) bleibt User-Wahl und wird nicht uebersteuert.
          Pure Buch-Setting (book_settings.entities_enabled) — Schreib-Pfad ist
          PUT /booksettings/:id/entities-enabled, Event book:settings:updated. -->
-    <button type="button" class="graph-tool-btn"
+    <button type="button" class="icon-btn"
             :aria-pressed="entitiesEnabledForCurrentBook"
             :data-tip="entitiesEnabledForCurrentBook ? t('entities.toggle.off') : t('entities.toggle.on')"
             :aria-label="entitiesEnabledForCurrentBook ? t('entities.toggle.off') : t('entities.toggle.on')"

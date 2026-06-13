@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="de-CH">
+<head>
+  <meta charset="UTF-8">
+  <title>Ereignisse Scroll Repro</title>
+  <link rel="stylesheet" href="/public/css/tokens.css">
+  <link rel="stylesheet" href="/public/css/components/icons.css">
+  <link rel="stylesheet" href="/public/css/analysis/zeitleiste.css">
+  <link rel="stylesheet" href="/public/css/entities/ereignisse-subtyp.css">
+  <link rel="stylesheet" href="/public/css/entities/ereignisse-span.css">
+  <style> body { margin: 0; padding: 24px; font: 16px/1.5 system-ui, sans-serif; } </style>
+</head>
+<body>
+  <div id="root" x-data="ereignisseCard" x-show="$app.showEreignisseCard">
+    <div x-show="$app.globalZeitstrahl.length > 0" class="gz-layout">
+      <div class="gz-band" x-show="timelineItemCount > 0" role="group"
+           :style="{ '--gz-band-lanes': bandModel().lanes }">
+        <div class="gz-band-track">
+          <template x-for="m in bandModel().markers" :key="m.kind + m.id">
+            <button type="button" class="gz-band-marker"
+                    :style="bandMarkerStyle(m)" :data-ev-id="m.id"
+                    @click="onBandMarkerClick(m.id)"></button>
+          </template>
+        </div>
+      </div>
+      <div class="gz-timeline-hint internal-link" data-test="hint"
+           x-show="timelineItemCount < filteredEreignisse().length"
+           @click="scrollToFirstUndated()"
+           x-text="$app.t('events.timelineUndated', { count: filteredEreignisse().length - timelineItemCount })"></div>
+      <div class="global-zeitstrahl-body global-zeitstrahl-body--card">
+        <template x-for="(ev, i) in filteredEreignisse()" :key="ev.id ?? i">
+          <div class="gz-item" :data-ev-index="i" :data-test="'event-' + ev.id"
+               :data-section-label="(i === firstUndatedIndex() && i > 0) ? 'Ohne Jahr' : null"
+               :class="[ (i === firstUndatedIndex() && i > 0) ? 'gz-item--section-start' : '', ev.datum_year == null ? 'gz-item--unknown' : '' ]">
+            <div class="gz-marker"></div>
+            <div class="gz-content">
+              <div class="gz-datum-row"><span class="gz-datum" x-text="formatEventDate(ev)"></span></div>
+              <div class="gz-ereignis" x-text="ev.ereignis"></div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    const { registerEreignisseCard } = await import('/public/js/cards/ereignisse-card.js');
+
+    // 20 dated + 78 undated events.
+    const MOCK = [];
+    for (let i = 0; i < 20; i++) MOCK.push({
+      id: i + 1, ereignis: 'Datiert ' + i, subtyp: 'sonstiges', typ: 'persoenlich',
+      datum_year: 1800 + i, datum_month: null, datum_day: null,
+      story_tag: null, datum_label: String(1800 + i), figuren: [], kapitel: [], seiten: [],
+    });
+    for (let i = 0; i < 78; i++) MOCK.push({
+      id: 100 + i, ereignis: 'Ohne Jahr ' + i, subtyp: 'sonstiges', typ: 'persoenlich',
+      datum_year: null, datum_month: null, datum_day: null,
+      story_tag: null, datum_label: 'unbekannt', figuren: [], kapitel: [], seiten: [],
+    });
+
+    document.addEventListener('alpine:init', () => {
+      window.__app = window.Alpine.reactive({
+        selectedBookId: 1, selectedBookName: 'Testbuch', showEreignisseCard: true,
+        figuren: [], globalZeitstrahl: MOCK,
+        ereignisseFilters: { suche: '', figurId: '', kapitel: '', seite: '', subtyp: '' },
+        alleAktualisierenLastRun: null,
+        t: (k, params) => params ? `${k} ${JSON.stringify(params)}` : k,
+        _deriveKapitel: () => [], _deriveSeiten: () => [], _reloadZeitstrahl: () => {},
+        gotoStelle: () => {}, openFigurById: () => {}, gotoPageById: () => {},
+      });
+      window.Alpine.magic('app', () => window.__app);
+      window.Alpine.store('catalog', { figuren: [], orte: [], szenen: [], globalZeitstrahl: MOCK });
+      registerEreignisseCard();
+    });
+    document.addEventListener('alpine:initialized', () => {
+      queueMicrotask(() => { window.__harnessReady = true; });
+    });
+    const s = document.createElement('script');
+    s.src = '/public/vendor/alpine-3.14.9.min.js';
+    document.head.appendChild(s);
+  </script>
+</body>
+</html>

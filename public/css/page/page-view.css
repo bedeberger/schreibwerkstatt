@@ -260,10 +260,10 @@
   gap: var(--space-xs);
   margin-top: var(--space-xs);
 }
-/* Icon-only Buttons: quadratisch + Icon zentriert. Base-`.graph-tool-btn`
+/* Icon-only Buttons: quadratisch + Icon zentriert. Base-`.icon-btn`
    nutzt asymmetrisches Padding (3px/9px) ohne `justify-content`, was bei
    schmaleren Icons (z.B. radio/scan/quote) optisch rechtslastig wirkt. */
-.page-editor-toolbar .graph-tool-btn {
+.page-editor-toolbar .icon-btn {
   width: 28px;
   height: 28px;
   display: inline-flex;
@@ -272,13 +272,13 @@
   min-width: 0;
   padding: 0;
 }
-.page-editor-toolbar .graph-tool-btn[aria-pressed="true"] {
+.page-editor-toolbar .icon-btn[aria-pressed="true"] {
   background: var(--color-history-active-bg);
   border-color: var(--color-primary);
   color: var(--color-primary);
 }
 /* Abschluss-Indikator: kurzer Success-Flash nach Quote-Normalisierung. */
-.page-editor-toolbar .graph-tool-btn.is-success {
+.page-editor-toolbar .icon-btn.is-success {
   border-color: var(--color-success);
   color: var(--color-success);
 }

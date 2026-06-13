@@ -27,22 +27,22 @@
       <button type="button" class="search-clear--icon" x-show="organizerSearch" @click="organizerSearch=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#x"/></svg></button>
     </span>
     <div class="btn-group organizer-action-group">
-      <button type="button" class="graph-tool-btn organizer-icon-btn"
+      <button type="button" class="icon-btn organizer-icon-btn"
               @click="historyUndo()"
               :disabled="_undoStack.length === 0 || organizerSaving"
               :data-tip="$app.t('bookOrganizer.undoTip')"
               :aria-label="$app.t('bookOrganizer.undo')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#undo"/></svg></button>
-      <button type="button" class="graph-tool-btn organizer-icon-btn"
+      <button type="button" class="icon-btn organizer-icon-btn"
               @click="historyRedo()"
               :disabled="_redoStack.length === 0 || organizerSaving"
               :data-tip="$app.t('bookOrganizer.redoTip')"
               :aria-label="$app.t('bookOrganizer.redo')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#redo"/></svg></button>
-      <button type="button" class="graph-tool-btn organizer-icon-btn"
+      <button type="button" class="icon-btn organizer-icon-btn"
               @click="expandAll()"
               :disabled="workTree.length === 0 || !!organizerSearch"
               :data-tip="$app.t('sidebar.expandAll')"
               :aria-label="$app.t('sidebar.expandAll')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#chevron-down"/></svg></button>
-      <button type="button" class="graph-tool-btn organizer-icon-btn"
+      <button type="button" class="icon-btn organizer-icon-btn"
               @click="collapseAll()"
               :disabled="workTree.length === 0 || !!organizerSearch"
               :data-tip="$app.t('sidebar.collapseAll')"

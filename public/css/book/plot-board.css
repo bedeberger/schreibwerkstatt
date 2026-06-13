@@ -71,25 +71,20 @@
     flex: 0 0 auto;
   }
 
-  /* ── Icon-Buttons (board-lokal) ─────────────────────────────────────────── */
+  /* ── Icon-Buttons (board-lokal) ─────────────────────────────────────────────
+     Basis = generische Ghost-Variante (`icon-btn icon-btn--ghost`,
+     components/icon-btn.css). Marker trägt nur die Board-Deltas: kompaktere
+     24px, randlos, eigener Hover-Tint, kleineres 15px-Icon. */
   .plot-icon-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
     width: 24px;
     height: 24px;
-    padding: 0;
     border: none;
-    background: transparent;
-    color: var(--color-muted);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
   }
-  .plot-icon-btn:hover {
+  .plot-icon-btn:hover:not(:disabled) {
     background: var(--color-hover-light);
     color: var(--color-text);
   }
-  .plot-icon-btn--danger:hover {
+  .plot-icon-btn--danger:hover:not(:disabled) {
     color: var(--color-err-text);
     background: var(--color-err-bg);
   }
@@ -200,6 +195,12 @@
     background: var(--card-accent);
     color: #fff;
   }
+  /* Globales `button:hover { background: var(--color-hover) }` (gleiche @layer)
+     wuerde den Chip-Hintergrund ueberschreiben — beim ausgewaehlten Chip bliebe
+     dann weisser Text auf hellem Hover-Tint stehen. Hover-Hintergrund explizit
+     re-asserten (Specificity 0,2,0 schlaegt button:hover 0,1,1). */
+  .plot-figure-chip:hover { background: var(--color-tag-bg); border-color: var(--card-accent); }
+  .plot-figure-chip--on:hover { background: var(--card-accent); }
   .plot-beat-edit-actions {
     display: flex;
     align-items: center;
@@ -215,7 +216,9 @@
   }
   .plot-add-beat-input {
     width: 100%;
+    min-height: 5rem;
     font-size: var(--font-size-sm);
+    line-height: 1.45;
     padding: var(--space-xs);
     border: 1px solid var(--card-accent);
     border-radius: var(--radius-sm);

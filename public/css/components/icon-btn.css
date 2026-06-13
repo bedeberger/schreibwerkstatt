@@ -1,0 +1,66 @@
+@layer components {
+/* === Generischer Icon-Button =============================================
+   Quadratischer Button für ein einzelnes Sprite-Icon. SSoT für alle Icon-only
+   Buttons der App — nicht pro Feature neu erfinden. Zwei Varianten:
+   - Default (`.icon-btn`): outlined — sichtbarer Rahmen + Flächenfüllung.
+     Erste Wahl für Canvas-/Viewport-Toolbars (Graph, Map, Mindmap) und
+     Action-Groups. Innenliegendes <svg.icon> zentriert sich via line-height:1.
+   - `.icon-btn--ghost`: transparent bis Hover, zentriert via Flexbox.
+     Für dichte Header-/Board-Cluster.
+   Kontext-Anpassungen (feste Größe, Segment-Look) via Scoping-Klasse
+   `.<feature>-icon-btn` bzw. `.<wrapper> .icon-btn` — siehe DESIGN.md. */
+.icon-btn {
+  background: var(--color-bg);
+  border: 0.5px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-muted);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  line-height: 1;
+  padding: var(--space-3) 9px;
+  min-width: 28px;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.icon-btn:hover {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+.icon-btn[aria-pressed="true"] {
+  background: var(--color-surface);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+.icon-btn--reset {
+  font-size: var(--font-size-sm);
+}
+
+/* Ghost-Variante: zentriert, transparent bis Hover. Rahmen erscheint erst
+   beim Hover/aktiven Zustand. */
+.icon-btn--ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border-color: transparent;
+  font-size: var(--font-size-base);
+}
+.icon-btn--ghost:hover:not(:disabled) {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+.icon-btn--ghost:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+.icon-btn--ghost.is-active,
+.icon-btn--ghost[aria-pressed="true"] {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+}

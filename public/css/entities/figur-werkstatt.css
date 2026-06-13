@@ -212,7 +212,7 @@
   backdrop-filter: blur(4px);
 }
 
-.werkstatt-mindmap-controls .graph-tool-btn[aria-pressed="true"] {
+.werkstatt-mindmap-controls .icon-btn[aria-pressed="true"] {
   background: var(--color-history-active-bg);
   border-color: var(--color-primary);
   color: var(--color-primary);

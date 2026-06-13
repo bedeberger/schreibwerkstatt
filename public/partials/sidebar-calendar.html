@@ -4,14 +4,14 @@
      Combobox zum Sprung auf Monat mit Einträgen. -->
 <div class="sidebar-calendar" x-show="isTagebuch() && sidebarMode === 'calendar'" x-cloak>
   <div class="sidebar-calendar-header">
-    <button type="button" class="graph-tool-btn"
+    <button type="button" class="icon-btn"
             @click="diaryCalendarStep(-1)"
             :data-tip="t('calendar.prevMonth')"
             :aria-label="t('calendar.prevMonth')">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#chevron-left"/></svg>
     </button>
     <span class="sidebar-calendar-month-label" x-text="diaryCalendarMonthLabel()"></span>
-    <button type="button" class="graph-tool-btn"
+    <button type="button" class="icon-btn"
             @click="diaryCalendarStep(1)"
             :data-tip="t('calendar.nextMonth')"
             :aria-label="t('calendar.nextMonth')">

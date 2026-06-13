@@ -1,12 +1,4 @@
 @layer utilities {
-/* === Icon-Buttons (quadratisch, für Diff/Chat/Synonyme) === */
-.btn-icon {
-  padding: var(--space-sm) 11px;
-  font-size: var(--font-size-md);
-  min-width: 36px;
-}
-
-
 /* === Layout-Pattern: Header-Zeile ===
    Verwenden für jede Listen-/Karten-Sektion mit horizontalem Header
    (Titel + Aktionen). Mobile: bricht auf Spalte.

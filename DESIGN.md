@@ -18,7 +18,7 @@ Token-Referenz (Farben, Radien, Spacing, Schriftgrössen): [public/css/tokens.cs
 - [Karten](#karten-card) — `.card` + Akzentfarben
 - [Buttons](#buttons) — Hierarchie, Counter
 - [Icon-System](#icon-system-lucide-sprite) — `<svg class="icon"><use href="/icons.svg#name"/></svg>` (Lucide-Sprite)
-- [Icon-Toolbar](#icon-toolbar-graph-tool-btn) — Zoom/Reset/Fullscreen-Cluster über Canvas-Viewports
+- [Icon-Button](#icon-button-icon-btn) — generischer Icon-only Button (`.icon-btn` outlined + `--ghost`), SSoT für Canvas-/Header-/Board-Cluster
 - [Toolbar-Action-Group](#toolbar-action-group-segmentierter-icon-cluster-neben-form-feldern) — segmentierte Icon-Reihe bündig mit Search/Combobox
 - [Badges & Tags](#badges--tags) — eckig, Severity, Hue-Palette
 - [Combobox](#combobox-auswahlfeld) — ersetzt `<select>`
@@ -418,30 +418,34 @@ Mehr Masken in `:root` ergänzen, sobald sie ein zweites Mal gebraucht werden (L
 
 ---
 
-## Icon-Toolbar (`.graph-tool-btn`)
+## Icon-Button (`.icon-btn`)
 
-**Use:** Kompakte Icon-Button-Reihe für Canvas-/Viewport-Steuerung (Zoom +/−, Reset, Fullscreen-Toggle). Genutzt von Figuren-Graph (vis-network) und Figur-Werkstatt-Mindmap (jsMind). Erste Wahl für jeden weiteren Graph/Map/Canvas-Viewer. Icons kommen aus dem [Lucide-Sprite](#icon-system-lucide-sprite).
+**Use:** Generischer quadratischer Button für ein einzelnes Sprite-Icon — **SSoT für alle Icon-only Buttons der App**, nicht pro Feature neu erfinden. Zwei Varianten:
+- **Default (`.icon-btn`)** — *outlined*: sichtbarer Rahmen + Flächenfüllung. Erste Wahl für Canvas-/Viewport-Toolbars (Figuren-Graph via vis-network, Figur-Werkstatt-Mindmap via jsMind) und für die Action-Group-Variante (Buchorganizer/Sidebar, siehe unten).
+- **Ghost (`.icon-btn icon-btn--ghost`)** — transparent bis Hover. Für dichte Cluster ohne Rahmen-Rauschen: Header-Action-Cluster (Status-`⋯`-Trigger) und Plot-Board-Spaltenaktionen. Aktiver Zustand via `.is-active` oder `:aria-pressed`.
+
+Kontext-Anpassungen (feste Grösse, Segment-Look, kompaktere Variante) laufen über eine Scoping-Klasse `.<feature>-icon-btn` bzw. `.<wrapper> .icon-btn` — nicht über eine parallele Basis-Klasse. Icons kommen aus dem [Lucide-Sprite](#icon-system-lucide-sprite).
 
 **Markup (Overlay-Variante, oben rechts in Canvas-Ecke):**
 ```html
 <div class="<viewer>-canvas" style="position: relative">
   <div class="…-mindmap-controls …-mindmap-controls--overlay">
-    <button type="button" class="graph-tool-btn"
+    <button type="button" class="icon-btn"
             :data-tip="$app.t('graph.zoomIn')" :aria-label="$app.t('graph.zoomIn')"
             @click="…zoomIn()">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg#plus"/></svg>
     </button>
-    <button type="button" class="graph-tool-btn"
+    <button type="button" class="icon-btn"
             :data-tip="$app.t('graph.zoomOut')" :aria-label="$app.t('graph.zoomOut')"
             @click="…zoomOut()">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg#minus"/></svg>
     </button>
-    <button type="button" class="graph-tool-btn"
+    <button type="button" class="icon-btn"
             :data-tip="$app.t('graph.reset')" :aria-label="$app.t('graph.reset')"
             @click="…fit()">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg#scan"/></svg>
     </button>
-    <button type="button" class="graph-tool-btn"
+    <button type="button" class="icon-btn"
             :aria-pressed="fullscreen"
             :data-tip="fullscreen ? $app.t('graph.fullscreenClose') : $app.t('graph.fullscreen')"
             :aria-label="fullscreen ? $app.t('graph.fullscreenClose') : $app.t('graph.fullscreen')"
@@ -459,7 +463,7 @@ Mehr Masken in `:root` ergänzen, sobald sie ein zweites Mal gebraucht werden (L
 <div class="figuren-graph-toolbar">
   <span class="card-status">…Legende…</span>
   <div class="figuren-graph-toolbar-zoom">
-    <button class="graph-tool-btn"><svg class="icon"><use href="/icons.svg#plus"/></svg></button>
+    <button class="icon-btn"><svg class="icon"><use href="/icons.svg#plus"/></svg></button>
     …
   </div>
 </div>
@@ -479,22 +483,23 @@ Mehr Masken in `:root` ergänzen, sobald sie ein zweites Mal gebraucht werden (L
 
 Neue Aktionen erweitern diese Tabelle und das Sprite (siehe [Icon-System](#icon-system-lucide-sprite)).
 
-**Klassen** ([public/css/tokens-est.css](public/css/tokens-est.css), Overlay-Modifier in [public/css/entities/figur-werkstatt.css](public/css/entities/figur-werkstatt.css)):
-- `.graph-tool-btn` — quadratischer Icon-Button (28px min, `--radius-sm`, `--border-thin` solid `--color-border`, `--color-muted` Text, Hover-Tint via `--color-surface`). Innenliegendes `<svg.icon>` zentriert sich automatisch (`line-height: 1`).
-- `.graph-tool-btn--reset` — Legacy-Override für mehrzeichige Glyphen; mit SVG-Icons nicht mehr nötig (kann beim nächsten Refactor entfernt werden).
-- `.graph-tool-btn[aria-pressed="true"]` — aktiver Toggle (Fullscreen ein): `--color-history-active-bg` Hintergrund, `--color-primary` Border + Text. Greift automatisch — Konsument setzt nur `:aria-pressed`.
+**Klassen** (Basis in [public/css/components/icon-btn.css](public/css/components/icon-btn.css), Overlay-Modifier in [public/css/entities/figur-werkstatt.css](public/css/entities/figur-werkstatt.css)):
+- `.icon-btn` — quadratischer Icon-Button (28px min, `--radius-sm`, `--border-thin` solid `--color-border`, `--color-muted` Text, Hover-Tint via `--color-surface`). Innenliegendes `<svg.icon>` zentriert sich automatisch (`line-height: 1`).
+- `.icon-btn--ghost` — Ghost-Variante: `display: inline-flex` zentriert, 28×28 fix, transparent (Rahmen + Fläche), `font-size-base`. Hover/`.is-active`/`[aria-pressed="true"]` blenden `--color-surface`-Fläche + `--color-border`-Rahmen ein; `:disabled` → `opacity: 0.3`. Feature-Marker (`.plot-icon-btn` o.ä.) setzen darauf nur ihre Deltas (Grösse, Hover-Tint, Icon-Grösse).
+- `.icon-btn--reset` — Legacy-Override für mehrzeichige Glyphen; mit SVG-Icons nicht mehr nötig (kann beim nächsten Refactor entfernt werden).
+- `.icon-btn[aria-pressed="true"]` — aktiver Toggle (Fullscreen ein): `--color-history-active-bg` Hintergrund, `--color-primary` Border + Text. Greift automatisch — Konsument setzt nur `:aria-pressed`.
 - `.stt-mic-btn.is-recording[aria-pressed="true"]` — Recording-State des STT-Diktat-Mic-Buttons (Notebook-Toolbar): roter Akzent (`--color-danger`) + pulsierender `box-shadow` via `@keyframes sttRecPulse` (1.4s, `prefers-reduced-motion` aus). `.is-pending` = `opacity: 0.6` während getUserMedia läuft. Übersteuert den generischen `aria-pressed`-Highlight. CSS in [public/css/page/page-view.css](public/css/page/page-view.css). Verwendung nur Notebook-STT.
 - `.figuren-graph-toolbar` — Inline-Wrapper: `display: flex; justify-content: space-between; gap: --space-sm`, oberhalb/unterhalb der Canvas.
 - `.figuren-graph-toolbar-zoom` — Button-Cluster mit `gap: --space-xs`, `flex-shrink: 0`.
 - `.<viewer>-mindmap-controls--overlay` — Overlay-Wrapper: `position: absolute; top: 8px; right: 8px`, `--color-surface` 88% mit `backdrop-filter: blur(4px)`, `--border-thin` + `--radius-sm` + `--shadow-sm`, `z-index: --z-sticky`. Parent muss `position: relative`.
 
 **Regeln:**
-- **Kein eigenes Button-Vokabular pro Viewer.** Neuer Graph/Map/Canvas → `.graph-tool-btn` wiederverwenden, ggf. eigenen Wrapper-Modifier (`--overlay` analog). Kein `.figuren-zoom-btn` o.ä. parallel anlegen.
+- **Kein eigenes Button-Vokabular pro Feature.** Neuer Icon-only Button (Viewer, Header, Board, Toolbar) → `.icon-btn` (+ ggf. `--ghost`) wiederverwenden, kontext-spezifisches via Scoping-Klasse `.<feature>-icon-btn`. Kein paralleles `.figuren-zoom-btn` / `.header-icon-btn` / `.btn-icon` o.ä. neu anlegen.
 - **Icons aus Sprite, nicht Unicode.** `<svg class="icon"><use href="/icons.svg#name"/></svg>` ist Pflicht. Unicode-Glyphen (`+`, `−`, `⤢`, `⛶`, `✕`) im Button-Markup sind seit Lucide-Migration verboten — Icon-Map oben ist der Index.
 - **Toggle-Icons via `<use :href="…">`** (reaktiv), nicht via `x-text` — `x-text` ersetzt den SVG-Inhalt.
 - **Tooltip Pflicht** über `data-tip` (sofort-Hover, siehe [Sofort-Tooltip](#sofort-tooltip-data-tip--default-variante)), `aria-label` zusätzlich für Screen-Reader.
 - **Overlay-Position** nicht ohne Grund verschieben — oben-rechts ist konsistent über Figuren-Graph (Inline) + Werkstatt (Overlay).
-- **Klassen-Präfix** weiterhin `graph-tool-btn` — nicht in `toolbar-btn` o.ä. umbenennen; Pattern teilt sich Vokabular über mehrere Features.
+- **Klassen-Präfix** `icon-btn` — das Pattern teilt sich Vokabular über alle Features (Graph, Header, Board, Toolbar). Nicht in `toolbar-btn`/`*-icon-btn`-Basis o.ä. umbenennen oder forken.
 
 **Beispiele:** [public/partials/figuren.html:86-100](public/partials/figuren.html#L86), [public/partials/figur-werkstatt.html:210-233](public/partials/figur-werkstatt.html#L210).
 
@@ -509,19 +514,19 @@ Neue Aktionen erweitern diese Tabelle und das Sprite (siehe [Icon-System](#icon-
 <div class="<feature>-toolbar">
   <input type="text" class="page-search" x-model="search" :placeholder="…">
   <div class="btn-group <feature>-action-group">
-    <button type="button" class="graph-tool-btn <feature>-icon-btn"
+    <button type="button" class="icon-btn <feature>-icon-btn"
             @click="undo()" :data-tip="…" :aria-label="…">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg#undo"/></svg>
     </button>
-    <button type="button" class="graph-tool-btn <feature>-icon-btn"
+    <button type="button" class="icon-btn <feature>-icon-btn"
             @click="redo()" :data-tip="…" :aria-label="…">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg#redo"/></svg>
     </button>
-    <button type="button" class="graph-tool-btn <feature>-icon-btn"
+    <button type="button" class="icon-btn <feature>-icon-btn"
             @click="expandAll()" :data-tip="…" :aria-label="…">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg#chevron-down"/></svg>
     </button>
-    <button type="button" class="graph-tool-btn <feature>-icon-btn"
+    <button type="button" class="icon-btn <feature>-icon-btn"
             @click="collapseAll()" :data-tip="…" :aria-label="…">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg#chevron-up"/></svg>
     </button>
@@ -554,7 +559,7 @@ Neue Aktionen erweitern diese Tabelle und das Sprite (siehe [Icon-System](#icon-
   gap: 0;                        /* Segment-Look: keine Lücke zwischen Buttons */
   flex-shrink: 0;
 }
-.<feature>-action-group .graph-tool-btn {
+.<feature>-action-group .icon-btn {
   width: 34px; height: 34px;
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 0; padding: 0;
@@ -562,15 +567,15 @@ Neue Aktionen erweitern diese Tabelle und das Sprite (siehe [Icon-System](#icon-
   line-height: 1; box-sizing: border-box;
   border-radius: 0;
 }
-.<feature>-action-group .graph-tool-btn:first-child {
+.<feature>-action-group .icon-btn:first-child {
   border-top-left-radius: var(--radius-md);
   border-bottom-left-radius: var(--radius-md);
 }
-.<feature>-action-group .graph-tool-btn:last-child {
+.<feature>-action-group .icon-btn:last-child {
   border-top-right-radius: var(--radius-md);
   border-bottom-right-radius: var(--radius-md);
 }
-.<feature>-action-group .graph-tool-btn + .graph-tool-btn {
+.<feature>-action-group .icon-btn + .icon-btn {
   border-left-width: 0;          /* doppelte Border vermeiden */
 }
 ```
@@ -579,8 +584,8 @@ Neue Aktionen erweitern diese Tabelle und das Sprite (siehe [Icon-System](#icon-
 - **Vertikal-Alignment Pflicht:** Toolbar IMMER `align-items: stretch` und Nachbar-Elemente (Input, Combobox-Trigger, Buttons) auf **gleiche fixe Höhe** (`34px`-Standard). Ohne stretch + fixe Höhe ergeben Padding-Differenzen schräge Auslinierungen — der häufigste Bug bei diesem Pattern.
 - **Combobox-Trigger anpassen:** `.combobox-trigger` hat Eigenpadding via `--size-compact-padding`. In der Toolbar mit `height: 34px; padding-block: 0;` override, sonst überragt der Trigger die Action-Group. Wrapper-Div bleibt leer (Helper überschreibt `innerHTML`).
 - **Segment-Style statt Gap:** Buttons rücken aneinander (`gap: 0` auf Action-Group, `border-left-width: 0` auf Folge-Buttons). Aussenseiten gerundet via `:first-child` / `:last-child`. Liest sich als zusammengehörige Gruppe. Wer Lücke statt Segment will: anderes Pattern verwenden (z.B. `card-actions`).
-- **Icons aus Sprite, kein Glyph-Wrapper mehr.** `<svg class="icon"><use href="/icons.svg#name"/></svg>` direkt im Button. `.icon` (1em-Quadrat) zentriert sich via Button-Flex automatisch — keine `font-size: 0`-Tricks, kein `<span class="…-icon">`-Wrapper, keine Font-Metrik-Wackelei. Icon-Map siehe [Icon-Toolbar](#icon-toolbar-graph-tool-btn).
-- **Disabled-State** via `:disabled` (z.B. Undo bei leerem Stack). Greift automatisch durch `.graph-tool-btn`-Default-Styling.
+- **Icons aus Sprite, kein Glyph-Wrapper mehr.** `<svg class="icon"><use href="/icons.svg#name"/></svg>` direkt im Button. `.icon` (1em-Quadrat) zentriert sich via Button-Flex automatisch — keine `font-size: 0`-Tricks, kein `<span class="…-icon">`-Wrapper, keine Font-Metrik-Wackelei. Icon-Map siehe [Icon-Button](#icon-button-icon-btn).
+- **Disabled-State** via `:disabled` (z.B. Undo bei leerem Stack). Greift automatisch durch `.icon-btn`-Default-Styling.
 - **Mobile:** Im `@media (max-width: 600px)`-Block Toolbar zu `flex-direction: column; align-items: stretch` drehen; Search + Combobox auf `width: 100%`. Action-Group bleibt horizontal (segmentierte Reihe), nimmt eigene Zeile ein.
 
 **Beispiele:** [public/partials/buchorganizer.html:16-50](public/partials/buchorganizer.html#L16) (4 Buttons + Search + Combobox), [public/partials/sidebar.html:11-22](public/partials/sidebar.html#L11) (2 Buttons neben Search, kein Combobox).
@@ -1783,6 +1788,7 @@ Struktur: 8 thematische Subfolder unter [public/css/](public/css/) + Root-Solit�
 |------|--------|
 | [components/card-form.css](public/css/components/card-form.css) | `.card`, `.card-header*`, `.card-actions*`, `.btn-card-close`, `.card-form-*` Grid, Form-Wertspalten, Combobox-Klassen, `cardFadeIn`, `.token-setup-*` First-Run-Modal. |
 | [components/buttons-badges.css](public/css/components/buttons-badges.css) | `<button>` Hierarchie, `.badge-*`, `.avatar-*`, `.btn-group`, `.btn-compact`. |
+| [components/icon-btn.css](public/css/components/icon-btn.css) | `.icon-btn` (outlined) + `.icon-btn--ghost` — SSoT für alle Icon-only Buttons (Graph/Map/Mindmap-Toolbars, Header-Cluster, Plot-Board, Action-Groups). Feature-Marker setzen nur Deltas darauf. |
 | [components/tabs.css](public/css/components/tabs.css) | `.tabs` / `.tabs-btn` + `--active`/`--scrollable`/`--fullwidth`. |
 | [components/confirm-dialog.css](public/css/components/confirm-dialog.css) | `.confirm-overlay` / `-dialog`, Shortcuts-Overlay. |
 | [components/icons.css](public/css/components/icons.css) | `.icon`-Klasse, SVG-Sprite-Konsumenten. |
