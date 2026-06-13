@@ -5,6 +5,7 @@
 
 import { plotMethods } from '../book/plot.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
+import { attachFullscreenSync } from '../fullscreen.js';
 
 export function registerPlotCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -53,6 +54,10 @@ export function registerPlotCard() {
     // Spannungsbogen ein-/ausgeklappt (nur sichtbar, wenn ≥2 Beats Intensität tragen).
     tensionOpen: true,
 
+    // Native-Fullscreen-Status (gespiegelt vom fullscreenchange-Listener) — mehr
+    // horizontaler Platz fürs Akt-Board. Toggle in plotMethods.togglePlotFullscreen.
+    plotFullscreen: false,
+
     // Drag & Drop
     _dragBeatId: null,
     _dragOverActId: null,
@@ -89,6 +94,14 @@ export function registerPlotCard() {
         },
         onViewReset: () => this.resetPlot(),
         onCardRefresh: () => this.loadBoard(),
+      });
+
+      // Native Fullscreen-API: Status spiegeln (Toggle-Button + Esc-Exit).
+      // $root = die Karten-Wurzel (.card--plot), unabhängig vom Klick-Kontext.
+      attachFullscreenSync({
+        resolveWrap: () => this.$root,
+        signal: this._lifecycle.signal,
+        onChange: (active) => { this.plotFullscreen = active; },
       });
     },
 

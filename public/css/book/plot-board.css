@@ -567,6 +567,17 @@
     color: var(--color-muted);
   }
 
+  /* ── Vollbild: ganze Karte nimmt den Viewport, Board scrollt horizontal über
+       die volle Breite (mehr Platz für alle Akte). Header/Filter bleiben oben. */
+  .card--plot:fullscreen {
+    position: fixed;
+    inset: 0;
+    background: var(--color-surface);
+    padding: var(--space-lg);
+    z-index: var(--z-overlay);
+    overflow-y: auto;
+  }
+
   /* ── Mobile: Spalten stapeln ───────────────────────────────────────────── */
   @media (max-width: 600px) {
     .plot-board { flex-direction: column; overflow-x: visible; }

@@ -12,7 +12,7 @@ Trigger: `tile.plot` (Quick-Pill / Palette-Aliase `handlung|beat|board|akt|struk
 plot_acts (id, book_id→books CASCADE, user_email, name, farbe, position, created_at, updated_at)
    └── 1:N plot_beats (id, book_id→books CASCADE, act_id→plot_acts CASCADE, user_email,
                        titel, beschreibung, status, chapter_id→chapters SET NULL,
-                       sort_order, created_at, updated_at)
+                       intensitaet, sort_order, created_at, updated_at)
           ├── M:N plot_beat_figures (beat_id→plot_beats CASCADE, figure_id→figures CASCADE,
           │                          PK(beat_id, figure_id))
           └── M:N plot_beat_draft_figures (beat_id→plot_beats CASCADE,
@@ -24,7 +24,8 @@ plot_acts (id, book_id→books CASCADE, user_email, name, farbe, position, creat
 - **`plot_beats`** — Karten in einem Akt, geordnet via `sort_order`. `status ∈ {geplant, entwurf, im_buch, verworfen}` (CHECK-Constraint) hält „geplant → schon geschrieben" nach. `chapter_id` (SET NULL) verknüpft den Beat mit dem Zielkapitel im Manuskript.
 - **`plot_beat_figures`** — M:N-Brücke Beat ↔ Katalog-Figur (`figures.id`, INTEGER-FK), welche Figuren ein Handlungspunkt involviert. Nach aussen wird die TEXT-`fig_id` exponiert (Frontend-Identität), Schreib-/Lesepfad übersetzt via `resolveFigureIds`.
 - **`plot_beat_draft_figures`** — parallele M:N-Brücke Beat ↔ Werkstatt-Figur (`draft_figures.id`, INTEGER-FK). Anders als bei Katalog-Figuren IST die `draft_figures.id` bereits die Frontend-Identität (keine TEXT-Indirektion). So kann ein Beat sowohl bereits extrahierte Buch-Figuren als auch vorwärts-entwickelte, evtl. noch nicht im Manuskript stehende Werkstatt-Figuren involvieren.
-- Migration **184** (Akte/Beats/Katalog-Brücke) + **185** (`plot_beat_draft_figures`) ([db/migrations.js](../db/migrations.js)). ERD-Block + thematisches Sub-Diagramm in [erd.md](erd.md).
+- **`plot_beats.intensitaet`** — optionaler Spannungswert 1–5 (CHECK `NULL OR BETWEEN 1 AND 5`), speist den Spannungsbogen. `NULL` = nicht gesetzt; verworfene Beats fliessen nicht in den Bogen.
+- Migration **184** (Akte/Beats/Katalog-Brücke) + **185** (`plot_beat_draft_figures`) + **186** (`plot_beats.intensitaet`, additives ADD COLUMN) ([db/migrations.js](../db/migrations.js)). ERD-Block + thematisches Sub-Diagramm in [erd.md](erd.md).
 
 ## Routen (CRUD)
 
@@ -80,7 +81,15 @@ Sub-Komponente `plotCard` ([public/js/cards/plot-card.js](../public/js/cards/plo
 
 **Lifecycle:** `setupCardLifecycle({ name:'plot', showFlag:'showPlotCard', timerKeys:['_brainstormPollTimer','_consistencyPollTimer'], onShow: loadBoard, onBookChanged: reset+reload, onViewReset: resetPlot, onCardRefresh: loadBoard })`.
 
-**Memo:** genau ein `_memo(key, deps[], fn)`-Helper (Array-Deps shallow `===`); `beatsForAct` + `boardStats` memoized, `this._memos = {}` bei jeder Daten-Mutation/`loadBoard`.
+**Memo:** genau ein `_memo(key, deps[], fn)`-Helper (Array-Deps shallow `===`); `beatsForAct`/`boardStats`/`actStats`/`tensionCurve`/`visibleBeatsForAct` memoized, `this._memos = {}` bei jeder Daten-Mutation/`loadBoard`.
+
+**Akt-Farbe:** jeder Akt trägt eine optionale Farb-Identität (`plot_acts.farbe` = Palette-Key aus `ACT_PALETTE`, referenziert die theme-aware `--palette-*`-Tokens). Swatch im Spaltenkopf → Palette-Popover (`setActColor` → `PATCH /plot/acts/:id { farbe }`, `null` setzt zurück). `actAccent(act)` baut den CSS-Wert (`var(--palette-<key>)` oder Karten-Akzent-Fallback, Whitelist gegen Injection); das Markup bindet ihn als `--col-accent`-Custom-Prop pro Spalte. Spalten-Header-Border, Dropzone, Beat-Intensität, Intensitäts-Editor und die Spannungspunkte erben diese Farbe.
+
+**Status-Verteilung:** board-weiter segmentierter Balken (`.plot-dist-bar` + Legende) aus `boardStats().by` (geplant/entwurf/im_buch/verworfen) + Mini-Variante pro Spaltenkopf aus `actStats(actId).by`. Breite via `flex-grow: var(--seg-grow)` (Count, kein Width-String).
+
+**Spannungsbogen:** klappbares Inline-SVG-Band (`tensionCurve()`): Beats mit Intensität 1–5 in Board-Lesereihenfolge (Akt-Position → `sort_order`) als Kurve; verworfene Beats zählen nicht. Punkte (`.plot-tension-dot`, Akt-Farbe) öffnen per Klick den Beat-Edit; Polyline via `preserveAspectRatio="none"` + `vector-effect="non-scaling-stroke"`. Sichtbar ab ≥2 Punkten. Intensität wird im Beat-Edit über eine 1–5-Stufenwahl gesetzt (`setBeatDraftIntensitaet`, erneuter Klick = zurücksetzen) und in der Beat-Kopfzeile als Signal-Meter angezeigt.
+
+**Verworfen-Collapse:** verworfene Beats sind pro Spalte einklappbar (`visibleBeatsForAct` vs. `filteredBeatsForAct`, `+N verworfen`-Toggle via `.collapsible-toggle`); Drag/Reorder operieren weiter auf der vollständigen Liste.
 
 **Akt-Reordering** per Pfeil-Button (`moveAct(act, dir)`, a11y statt Spalten-Drag) → `PUT /plot/acts/order`.
 
@@ -93,6 +102,8 @@ Sub-Komponente `plotCard` ([public/js/cards/plot-card.js](../public/js/cards/plo
 **Brainstorm-UI:** pro Akt ein Button → Job-Poll (`startPoll` aus [job-helpers.js](../public/js/cards/job-helpers.js)) → Vorschlags-Panel im Akt. `applyBrainstorm(idx)` legt aus dem Vorschlag direkt einen Beat an (`label`→`titel`, `begruendung`→`beschreibung`) und entfernt ihn aus der Liste.
 
 **Consistency-UI:** Button im Card-Header (deaktiviert bei leerem Board) → Panel mit `fazit` + aufklappbarer Konflikt-Liste (Severity-Tag + betroffener Beat + Vorschlag).
+
+**Vollbild:** Icon-Button (`maximize-2`/`minimize-2`) im Card-Header → `togglePlotFullscreen()` setzt die ganze Karte (`$root` = `.card--plot`) per Native-Fullscreen-API auf den Viewport, damit das horizontal scrollende Board mehr Platz für alle Akte hat. Status `plotFullscreen` wird vom `fullscreenchange`-Listener (`attachFullscreenSync` aus [public/js/fullscreen.js](../public/js/fullscreen.js), abgemeldet via Lifecycle-`signal`) gespiegelt; CSS-Regel `.card--plot:fullscreen` in [plot-board.css](../public/css/book/plot-board.css). Esc beendet (Browser-nativ).
 
 ## i18n
 

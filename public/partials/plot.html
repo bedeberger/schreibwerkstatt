@@ -20,6 +20,11 @@
               @click="runConsistency()"
               :disabled="consistencyLoading || !beats.length"
               x-text="$app.t('plot.consistency.run')"></button>
+      <button type="button" class="icon-btn"
+              :aria-pressed="plotFullscreen"
+              @click="togglePlotFullscreen()"
+              :aria-label="plotFullscreen ? $app.t('plot.fullscreenExit.tip') : $app.t('plot.fullscreen.tip')"
+              :data-tip="plotFullscreen ? $app.t('plot.fullscreenExit.tip') : $app.t('plot.fullscreen.tip')"><svg class="icon" aria-hidden="true"><use :href="plotFullscreen ? '/icons.svg?v=691#minimize-2' : '/icons.svg?v=691#maximize-2'"/></svg></button>
     </div>
   </div>
 
@@ -175,7 +180,7 @@
             <input type="text" class="plot-column-title-input" x-model="actDraft"
                    data-spellcheck="spelling"
                    @keydown.enter="saveEditAct(act)" @keydown.escape="cancelEditAct()"
-                   @blur="saveEditAct(act)">
+                   @blur="onActBlur(act, $event)">
           </template>
           <span class="plot-column-count" x-text="filteredBeatsForAct(act.id).length"></span>
           <div class="plot-column-actions">

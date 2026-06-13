@@ -5,6 +5,7 @@
 
 import { fetchJson } from '../utils.js';
 import { startPoll, runningJobStatus } from '../cards/job-helpers.js';
+import { toggleWrapFullscreen } from '../fullscreen.js';
 
 const STATUSES = ['geplant', 'entwurf', 'im_buch', 'verworfen'];
 
@@ -249,8 +250,26 @@ export const plotMethods = {
     } finally { this.busy = false; }
   },
 
-  startEditAct(act) { this.editingActId = act.id; this.actDraft = act.name; },
+  startEditAct(act) {
+    this.editingActId = act.id;
+    this.actDraft = act.name;
+    this.$nextTick(() => { document.querySelector('.plot-column-title-input')?.focus(); });
+  },
   cancelEditAct() { this.editingActId = null; this.actDraft = ''; },
+
+  // Der Spellcheck-Dispatcher wickelt das Feld beim Fokus in ein
+  // <span class="lt-field-wrap"> — der DOM-Move feuert ein synchrones blur,
+  // obwohl der Fokus unmittelbar danach wiederhergestellt wird. Würde blur
+  // sofort speichern, liefe saveEditAct → cancelEditAct und das x-if blendete
+  // das Input direkt beim ersten Klick wieder aus. Darum eine Frame deferren und
+  // nur speichern, wenn der Fokus das Feld wirklich verlassen hat.
+  onActBlur(act, ev) {
+    const input = ev?.target || null;
+    requestAnimationFrame(() => {
+      if (input && document.activeElement === input) return;
+      this.saveEditAct(act);
+    });
+  },
 
   async saveEditAct(act) {
     const app = window.__app;
@@ -663,6 +682,16 @@ export const plotMethods = {
   },
 
   dismissConsistency() { this.consistencyResult = null; this.selectedKonfliktIdx = null; },
+
+  // Ganze Plot-Karte ins Native-Vollbild — mehr horizontaler Platz fürs Akt-Board.
+  // Status-Sync via fullscreenchange-Listener in plot-card.js (plotFullscreen).
+  async togglePlotFullscreen() {
+    try {
+      await toggleWrapFullscreen(this.$root);
+    } catch {
+      this.errorMessage = window.__app.t('plot.error.fullscreen');
+    }
+  },
 
   _clearJobs() {
     if (this._brainstormPollTimer) { clearInterval(this._brainstormPollTimer); this._brainstormPollTimer = null; }
