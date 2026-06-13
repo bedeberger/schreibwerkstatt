@@ -1894,6 +1894,9 @@
   "editor.slash.heute":          "Datum einfügen",
   "editor.slash.jetzt":          "Datum + Zeit einfügen",
   "editor.slash.zeit":           "Uhrzeit einfügen",
+  "editor.slash.group.block":    "Format",
+  "editor.slash.group.break":    "Trenner",
+  "editor.slash.group.insert":   "Einfügen",
 
   "editor.synonym.searchFor":    "Synonym suchen für «{word}»",
   "editor.synonym.titleFor":     "Synonyme für «{word}»",

@@ -137,6 +137,7 @@ export function buildBookChatAgentSystemPrompt(bookName, figuren, review, system
     '- Ganze Kapitel lesen → get_chapter_text (statt list_chapters→get_pages)',
     '- Lektorat: Übersicht → get_lektorat_hotspots, konkrete Findings → get_lektorat_findings',
     '- Kapitel-Qualität, Stärken/Schwächen → get_reviews',
+    '- Geplante Handlung / Beat-Board / was noch nicht geschrieben ist → get_plot_board',
     '',
     'Rufe Werkzeuge an, bevor du vermutest. Bei interpretatorischen Fragen (Stil, Ton, Wirkung) kannst du direkt antworten oder mit search_passages Belege suchen.',
     'Wörtliche Zitate: IMMER über quote_match (Pattern → Stelle) oder quote_passage (offset+length) holen, NIE aus Erinnerung paraphrasieren. Beim final_answer-Call jedes wörtliche Zitat in `zitate` mitliefern — Server validiert.',
@@ -468,6 +469,18 @@ export const BOOK_CHAT_TOOLS = [
         figur_name:   { type: 'string',  description: 'Alternative: Name des Werkstatt-Drafts (exakt oder Substring).' },
         include_runs: { type: 'boolean', description: 'true = KI-Läufe mitliefern. Default: true.' },
         run_limit:    { type: 'integer', description: 'Max. Anzahl Läufe (default 5, max 20).' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'get_plot_board',
+    description: 'Liefert das geplante Beat-Board der Plot-Werkstatt: Akte (Spalten) → Beats (Handlungspunkte) mit Titel, Beschreibung, Status (geplant/entwurf/im_buch/verworfen), verknüpftem Zielkapitel und beteiligten Figuren (Katalog + Werkstatt). Das ist die VORWÄRTSGERICHTETE Planung des Users (was er vorhat), getrennt von der rückwärtsgewandten Szenen-/Ereignis-Analyse des geschriebenen Texts. Beantwortet "wie ist die Handlung geplant?", "welche Beats sind noch nicht geschrieben (status=geplant)?", "welcher Beat gehört zu Kapitel X?", "passt der Plot zum bisherigen Buch?". Pro Buch + User. Leeres Board heisst nur: keine separate Plot-Planung angelegt – nicht, dass das Buch keine Handlung hat. Für den GESCHRIEBENEN Text nutze list_scenes/get_timeline statt dieses Tools.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        status:  { type: 'string', enum: ['geplant', 'entwurf', 'im_buch', 'verworfen'], description: 'Optional: nur Beats mit diesem Status zurückgeben. status_counts zeigt immer die Gesamtverteilung über alle Beats.' },
+        act_id:  { type: 'integer', description: 'Optional: nur diesen Akt (Spalte) zurückgeben (id aus einem vorherigen Aufruf).' },
       },
       required: [],
     },

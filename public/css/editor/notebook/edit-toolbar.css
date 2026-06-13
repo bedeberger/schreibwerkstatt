@@ -77,38 +77,141 @@
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-md);
-  padding: var(--space-3);
-  min-width: 184px;
-  max-height: 320px;
+  padding: var(--space-xs);
+  min-width: 240px;
+  max-width: 360px;
+  max-height: 360px;
   overflow-y: auto;
 }
+
+/* Hint-/Query-Zeile: ohne Eingabe ein Tipp, mit Eingabe ein Filter-Echo mit
+   Such-Affordance (Akzent-Kante + Tönung). */
 .edit-slash-hint {
-  padding: var(--space-3) 10px;
+  padding: var(--space-5) var(--space-10);
   font-size: var(--font-size-xs);
   letter-spacing: 0.03em;
   color: var(--color-muted);
 }
+.edit-slash-hint--query {
+  letter-spacing: 0;
+  background: var(--color-hover);
+  border-left: 2px solid var(--color-accent, var(--color-text));
+  padding-left: var(--space-sm);
+}
+.edit-slash-query {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  font-size: var(--font-size-sm);
+  text-transform: none;
+  color: var(--color-text);
+}
+.edit-slash-query-slash { color: var(--color-muted); }
+
+/* Gruppen-Header (Format / Trenner / Einfügen) */
+.edit-slash-group {
+  padding: var(--space-6) var(--space-10) var(--space-1);
+  font-size: var(--font-size-micro);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+.edit-slash-row:first-child .edit-slash-group { padding-top: var(--space-1); }
+
+/* Item-Grundgerüst: Label links, Preview/Linie rechts. Aktiv-Akzent als linke
+   Kante (unterscheidet Tastatur-Auswahl von blossem Maus-Hover). */
 .edit-slash-item {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
   width: 100%;
   text-align: left;
   background: transparent;
   border: none;
-  padding: var(--space-3) 10px;
+  border-left: 2px solid transparent;
+  padding: var(--space-5) var(--space-10);
   font-size: var(--font-size-sm);
   color: var(--color-text);
   cursor: pointer;
   font-family: inherit;
 }
-.edit-slash-item:hover,
-.edit-slash-item--active { background: var(--color-hover); }
-.edit-slash-query {
-  text-transform: none;
-  letter-spacing: 0;
-  color: var(--color-text);
+.edit-slash-item:hover { background: var(--color-hover); }
+.edit-slash-item--active {
+  background: var(--color-hover);
+  border-left-color: var(--color-accent, var(--color-text));
 }
+.edit-slash-label { min-width: 0; }
+.edit-slash-prev {
+  flex: none;
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Typografische Vorschau: jeder Eintrag sieht aus wie sein Ergebnis. */
+.edit-slash-item--h2 .edit-slash-label {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  line-height: 1.2;
+}
+.edit-slash-item--h3 .edit-slash-label {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  line-height: 1.2;
+}
+.edit-slash-item--blockquote .edit-slash-label {
+  padding-left: var(--space-sm);
+  border-left: 2px solid var(--color-border);
+  font-style: italic;
+}
+.edit-slash-item--poem .edit-slash-label {
+  font-family: var(--font-serif);
+  font-style: italic;
+}
+.edit-slash-item--list .edit-slash-label,
+.edit-slash-item--todo .edit-slash-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.edit-slash-item--list .edit-slash-label::before {
+  content: "";
+  flex: none;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.edit-slash-item--todo .edit-slash-label::before {
+  content: "";
+  flex: none;
+  width: 11px;
+  height: 11px;
+  border: 1.5px solid currentColor;
+  border-radius: var(--radius-sm);
+}
+
+/* Trenner-Gruppe: echte Linien-/Seiten-Vorschau rechts statt Text. */
+.edit-slash-item--hr::after,
+.edit-slash-item--pagebreak::after {
+  content: "";
+  flex: none;
+  width: 56px;
+}
+.edit-slash-item--hr::after { border-top: 1px solid var(--color-border); }
+.edit-slash-item--pagebreak::after { border-top: 1px dashed var(--color-muted); }
+.edit-slash-item--blankpage::after {
+  content: "";
+  flex: none;
+  width: 13px;
+  height: 17px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
 .edit-slash-empty {
-  padding: var(--space-3) 10px;
+  padding: var(--space-5) var(--space-10);
   font-size: var(--font-size-xs);
   color: var(--color-muted);
 }

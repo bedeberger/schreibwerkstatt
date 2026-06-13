@@ -17,19 +17,19 @@ import { tzOpts, localeTag } from '../../utils.js';
 // `insertText: 'date'|'time'|'datetime'` ersetzt den Block durch einen
 // formatierten Datums-/Zeit-Stempel.
 const SLASH_ITEMS = [
-  { key: 'paragraph',  tag: 'p' },
-  { key: 'h2',         tag: 'h2' },
-  { key: 'h3',         tag: 'h3' },
-  { key: 'blockquote', tag: 'blockquote', wrapP: true },
-  { key: 'poem',       tag: 'div', className: 'poem', wrapP: true },
-  { key: 'list',       tag: 'ul', list: true },
-  { key: 'todo',       tag: 'ul', className: 'todo', todoList: true },
-  { key: 'hr',         tag: 'hr' },
-  { key: 'pagebreak',  tag: 'hr', className: 'pagebreak' },
-  { key: 'blankpage',  tag: 'hr', className: 'blankpage' },
-  { key: 'heute',      insertText: 'date' },
-  { key: 'jetzt',      insertText: 'datetime' },
-  { key: 'zeit',       insertText: 'time' },
+  { key: 'paragraph',  tag: 'p',          group: 'block' },
+  { key: 'h2',         tag: 'h2',         group: 'block' },
+  { key: 'h3',         tag: 'h3',         group: 'block' },
+  { key: 'blockquote', tag: 'blockquote', wrapP: true,                   group: 'block' },
+  { key: 'poem',       tag: 'div', className: 'poem', wrapP: true,       group: 'block' },
+  { key: 'list',       tag: 'ul', list: true,                           group: 'block' },
+  { key: 'todo',       tag: 'ul', className: 'todo', todoList: true,     group: 'block' },
+  { key: 'hr',         tag: 'hr',                          group: 'break' },
+  { key: 'pagebreak',  tag: 'hr', className: 'pagebreak',  group: 'break' },
+  { key: 'blankpage',  tag: 'hr', className: 'blankpage',  group: 'break' },
+  { key: 'heute',      insertText: 'date',     group: 'insert' },
+  { key: 'jetzt',      insertText: 'datetime', group: 'insert' },
+  { key: 'zeit',       insertText: 'time',     group: 'insert' },
 ];
 
 // Datums-/Zeit-Stempel im uiLocale + appTimezone. Kein Locale-Param —
@@ -272,7 +272,12 @@ export const toolbarCardMethods = {
     const app = window.__app;
     return SLASH_ITEMS.map(it => ({
       key: it.key,
+      group: it.group,
       label: app?.t('editor.slash.' + it.key) || it.key,
+      // Datums-/Zeit-Items zeigen den tatsächlich einzufügenden Wert als
+      // Sekundär-Text (beim Öffnen aufgelöst; `_applySlashItem` rechnet beim
+      // Einfügen ohnehin frisch).
+      preview: it.insertText ? _formatStamp(it.insertText) : '',
     }));
   },
   // Filter: Substring-Match (case-insensitive) auf Label + Key, damit sowohl

@@ -12,6 +12,7 @@ const figures = require('./tools-figures');
 const analysis = require('./tools-analysis');
 const revisions = require('./tools-revisions');
 const werkstatt = require('./tools-werkstatt');
+const plot = require('./tools-plot');
 const { validateFinalAnswerCitations } = require('./citations');
 
 const TOOLS = {
@@ -52,6 +53,8 @@ const TOOLS = {
 
   list_werkstatt_drafts:  werkstatt.tool_list_werkstatt_drafts,
   get_werkstatt_draft:    werkstatt.tool_get_werkstatt_draft,
+
+  get_plot_board:         plot.tool_get_plot_board,
 };
 
 async function executeTool(name, input, ctx) {

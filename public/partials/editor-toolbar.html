@@ -57,18 +57,24 @@
          class="edit-slash-menu"
          :style="{ left: slashX + 'px', bottom: slashY + 'px' }"
          @click.outside="_closeSlash()">
-      <div class="edit-slash-hint">
+      <div class="edit-slash-hint" :class="{ 'edit-slash-hint--query': slashQuery }">
         <span x-show="!slashQuery" x-text="$app.t('editor.slash.hint')"></span>
-        <span x-show="slashQuery" class="edit-slash-query" x-text="'/' + slashQuery"></span>
+        <span x-show="slashQuery" class="edit-slash-query"><span class="edit-slash-query-slash">/</span><span x-text="slashQuery"></span></span>
       </div>
       <template x-for="(it, i) in slashItems()" :key="it.key">
-        <button type="button"
-                class="edit-slash-item"
-                :class="{ 'edit-slash-item--active': slashIdx === i }"
-                @mousedown.prevent
-                @click="_applySlashByKey(it.key)"
-                @mouseenter="slashIdx = i"
-                x-text="it.label"></button>
+        <div class="edit-slash-row">
+          <div x-show="i === 0 || it.group !== slashItems()[i - 1].group"
+               class="edit-slash-group" x-text="$app.t('editor.slash.group.' + it.group)"></div>
+          <button type="button"
+                  class="edit-slash-item"
+                  :class="{ ['edit-slash-item--' + it.key]: true, 'edit-slash-item--active': slashIdx === i }"
+                  @mousedown.prevent
+                  @click="_applySlashByKey(it.key)"
+                  @mouseenter="slashIdx = i">
+            <span class="edit-slash-label" x-text="it.label"></span>
+            <span x-show="it.preview" class="edit-slash-prev" x-text="it.preview"></span>
+          </button>
+        </div>
       </template>
       <div x-show="slashItems().length === 0" class="edit-slash-empty"
            x-text="$app.t('editor.slash.noMatch')"></div>

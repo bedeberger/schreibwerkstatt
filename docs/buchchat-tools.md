@@ -35,7 +35,7 @@ Der agentische Loop ruft `callAIWithTools` → `_callClaudeWithToolsAttempt` ([l
 
 ## Tools
 
-31 Tools, gruppiert nach Domäne. Alle Read-Only ausser `final_answer` (Pflicht-Endpunkt, kein DB-Read).
+32 Tools, gruppiert nach Domäne. Alle Read-Only ausser `final_answer` (Pflicht-Endpunkt, kein DB-Read).
 
 ### Buch/Kapitel-Überblick
 
@@ -112,6 +112,12 @@ Der agentische Loop ruft `callAIWithTools` → `_callClaudeWithToolsAttempt` ([l
 | `list_werkstatt_drafts` | — | Liste aller Werkstatt-Drafts (Name, Archetyp, Quell-Figur, notes-Vorschau, Run-Counts, letzter Lauf). | `draft_figures` + `werkstatt_runs` |
 | `get_werkstatt_draft` | `draft_id?` ∨ `figur_name?`, `include_runs?` (default true), `run_limit?` (default 5, max 20) | Detail eines Drafts inkl. Mindmap (eingerückter Plaintext, User-Locale aufgelöst) + KI-Läufe (Brainstorm/Consistency) gekürzt. | `draft_figures` + `werkstatt_runs` |
 | `find_first_last_mention` | `figur_id?` ∨ `figur_name?` ∨ `loc_id?` | Erste + letzte Erwähnung einer Figur (page-level) bzw. eines Orts (chapter-level). Schmaler als `get_figure_mentions`. | `page_figure_mentions` / `location_chapters` |
+
+### Plot-Werkstatt
+
+| Tool | Input | Zweck | Quelle |
+|------|-------|-------|--------|
+| `get_plot_board` | `status?` (`geplant`/`entwurf`/`im_buch`/`verworfen`), `act_id?` | Geplantes Beat-Board (vorwärtsgerichtete Planung, getrennt vom geschriebenen Text): Akte → Beats mit Titel, Beschreibung (Preview 600 Zeichen), Status, Zielkapitel (`chapter_name`), beteiligte Katalog- + Werkstatt-Figuren (auf Namen aufgelöst). `status_counts` = Gesamtverteilung über alle Beats (immer, vor Filter). Pro Buch + User. Leeres Board → `hint` statt Fehler. | `plot_acts` + `plot_beats` (via [db/plot.js](../db/plot.js)) + `figures`/`draft_figures` (Namens-Maps) |
 
 ### Endpunkt
 

@@ -1893,6 +1893,9 @@
   "editor.slash.heute":          "Insert date",
   "editor.slash.jetzt":          "Insert date + time",
   "editor.slash.zeit":           "Insert time",
+  "editor.slash.group.block":    "Format",
+  "editor.slash.group.break":    "Breaks",
+  "editor.slash.group.insert":   "Insert",
 
   "editor.synonym.searchFor":    "Find synonym for \"{word}\"",
   "editor.synonym.titleFor":     "Synonyms for \"{word}\"",

@@ -98,6 +98,10 @@ Sub-Komponente `plotCard` ([public/js/cards/plot-card.js](../public/js/cards/plo
 
 Alle Keys unter `plot.*` (Titel, Stats, Status-Labels, Severity, Brainstorm-/Consistency-UI, Fehler) in [public/js/i18n/de.json](../public/js/i18n/de.json) / [en.json](../public/js/i18n/en.json). Server-Status-Keys: `job.plot.brainstorm.aiReply`, `job.plot.consistency.aiReply`. Fehler: `job.error.plot.{actMissing|vorschlaegeMissing|boardEmpty|konflikteMissing|fazitMissing}`. Job-Labels: `job.label.plotBrainstorm|plotConsistency`.
 
+## Buch-Chat-Integration
+
+Der agentische Buch-Chat liest das Board read-only über das Tool `get_plot_board` ([routes/jobs/book-chat-tools/tools-plot.js](../routes/jobs/book-chat-tools/tools-plot.js), Schema in [public/js/prompts/chat.js#BOOK_CHAT_TOOLS](../public/js/prompts/chat.js)) — siehe [buchchat-tools.md](buchchat-tools.md). Liefert Akte → Beats (Status, Zielkapitel, beteiligte Katalog-/Werkstatt-Figuren auf Namen aufgelöst) als kompakten Snapshot, damit der Chat „geplant vs. schon im Buch", Chronologie-Fragen und Plot-Stimmigkeit beantworten kann. Optionaler `status`-/`act_id`-Filter; `status_counts` zeigt immer die Gesamtverteilung. Pro Buch + User gescoped (`WHERE book_id = ? AND user_email = ?`, identisch zur CRUD-Skopierung). Rein lesend — der Chat plant nichts, er liest die Planung des Users; die beiden planenden KI-Jobs (Brainstorm/Consistency) bleiben der Karte vorbehalten.
+
 ## Pflicht-Invarianten
 
 - **Nie generativ in den Text** — beide KI-Jobs liefern nur Struktur-Stichpunkte (Beats) bzw. Befunde, nie Prosa. Der System-Prompt erzwingt das explizit; bleibt bei Änderungen erhalten (App-Philosophie: KI rückwärtsgewandt/weltaufbauend, nie in den Buchtext schreibend).
