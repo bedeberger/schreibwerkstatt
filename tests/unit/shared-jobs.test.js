@@ -138,6 +138,43 @@ test('findActiveJobId: kein Job → null (kein Crash)', () => {
   assert.equal(shared.findActiveJobId('does-not-exist', 'no-id', 'no@one'), null);
 });
 
+// ── createJob: Per-Job-Modell-Override landet in job_runs.model ──────────────
+// Damit das Kosten-Tracking einen Opus-Lauf nicht zum Sonnet-Tarif verbucht,
+// muss job_runs.model das TATSAECHLICH genutzte Modell spiegeln (komplett +
+// book-chat fahren eigene Claude-Modelle), nicht das globale.
+test('createJob: Modell-Recording (global vs. komplett vs. book-chat)', () => {
+  const appSettings = require('../../lib/app-settings');
+  appSettings.set('ai.provider', 'claude');
+  appSettings.set('ai.claude.model', 'claude-sonnet-4-6');
+  appSettings.set('ai.claude.model.komplett', 'claude-opus-4-8');
+  appSettings.set('ai.claude.model.bookchat', 'claude-opus-4-8');
+  const modelOf = (jobId) => shared.jobs.get(jobId).model;
+  const persistedModelOf = (jobId) =>
+    db.prepare('SELECT model FROM job_runs WHERE job_id = ?').get(jobId)?.model;
+
+  // Lektorat folgt dem globalen Modell (Sonnet).
+  const checkId = shared.createJob('check', 'mb1', 'u@x', null);
+  assert.equal(modelOf(checkId), 'claude-sonnet-4-6');
+  assert.equal(persistedModelOf(checkId), 'claude-sonnet-4-6');
+
+  // Komplettanalyse + Kontinuität fahren den Komplett-Override (Opus).
+  const komplettId = shared.createJob('komplett-analyse', 'mb2', 'u@x', null);
+  assert.equal(modelOf(komplettId), 'claude-opus-4-8');
+  assert.equal(persistedModelOf(komplettId), 'claude-opus-4-8');
+  const kontId = shared.createJob('kontinuitaet', 'mb3', 'u@x', null);
+  assert.equal(modelOf(kontId), 'claude-opus-4-8');
+
+  // Buch-Chat fährt den Bookchat-Override (Opus).
+  const bookChatId = shared.createJob('book-chat', 'mb4', 'u@x', null);
+  assert.equal(modelOf(bookChatId), 'claude-opus-4-8');
+  assert.equal(persistedModelOf(bookChatId), 'claude-opus-4-8');
+
+  // Leerer Override → Fallback auf globales Modell.
+  appSettings.set('ai.claude.model.komplett', '');
+  const komplettNoOverride = shared.createJob('komplett-analyse', 'mb5', 'u@x', null);
+  assert.equal(modelOf(komplettNoOverride), 'claude-sonnet-4-6');
+});
+
 test('retryOnTransientAi: Erfolg im ersten Versuch ruft fn nur einmal', async () => {
   let calls = 0;
   const out = await shared.retryOnTransientAi(async () => { calls++; return 'ok'; });

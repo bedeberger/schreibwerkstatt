@@ -7,6 +7,7 @@
 // Cache-Tokens (Claude) werden in cache_read_in (billig) und cache_creation_in (teuer)
 // getrennt geführt. Lokale Provider liefern dort 0.
 const { db } = require('./connection');
+const { excludeChatSourcedSql } = require('../lib/usage-sources');
 
 /**
  * @param {object} opts
@@ -24,6 +25,9 @@ function getDailyTokenUsage({ from, to, userEmail, provider, source = 'all' } = 
   const where = ['queued_at >= @from', 'queued_at < @to'];
   if (userEmail) where.push('user_email = @userEmail');
   if (provider)  where.push('provider = @provider');
+  // Chat-Typen ausschliessen: ihr Verbrauch kommt aus chat_messages (source='chat'),
+  // sonst Doppelzaehlung beim source='all'-Mix.
+  where.push(excludeChatSourcedSql());
   const jobWhere = where.join(' AND ');
 
   const whereCm = ['cm.created_at >= @from', 'cm.created_at < @to', "cm.role = 'assistant'"];

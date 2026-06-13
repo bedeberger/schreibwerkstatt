@@ -104,6 +104,25 @@ test('monthlyTotals: Top-User + byModel + byType', () => {
   assert.ok(types.includes('check'));
 });
 
+test('Kein Doppelzaehlen: book-chat zaehlt einmal (chat_messages = SSoT)', () => {
+  seedUser('bc@ex.com');
+  seedBook(5200);
+  // Production schreibt EINEN book-chat-Verbrauch in BEIDE Tabellen: job_runs
+  // (Lifecycle, type='book-chat') + chat_messages (Detail). Die Aggregation darf
+  // ihn nicht doppeln — der job_runs-Row ist aus dem Kosten-Aggregat ausgeschlossen.
+  insertJobRun({ email: 'bc@ex.com', bookId: 5200, type: 'book-chat', tokensIn: 1_000_000, tokensOut: 0 });
+  insertChatMsg({ email: 'bc@ex.com', bookId: 5200, kind: 'book', tokensIn: 1_000_000, tokensOut: 0 });
+
+  const u = adminUsage.listUsersWithUsage({}).find(r => r.email === 'bc@ex.com');
+  assert.ok(u);
+  // 1 Mio Input = $3.00 — EINMAL, nicht $6.00.
+  assert.equal(u.tokensIn, 1_000_000);
+  assert.equal(Math.round(u.usd * 100) / 100, 3.00);
+  // Chat-Call gezaehlt; der book-chat job_runs-Row fliesst NICHT ins job-Aggregat.
+  assert.equal(u.chatCalls, 1);
+  assert.equal(u.jobCalls, 0);
+});
+
 test('getJobRuns: User-Filter paginiert + Cost pro Row', () => {
   seedUser('p@ex.com');
   for (let i = 0; i < 5; i++) {

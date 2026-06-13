@@ -21,14 +21,14 @@ function seedUser(email, mode = 'none', budget = null) {
   appUsers.setBudget(email, { usd: budget, mode });
 }
 
-function insertJobRun({ email, tokensIn = 0, tokensOut = 0, model = 'claude-sonnet-4-6', provider = 'claude', when = new Date() }) {
+function insertJobRun({ email, type = 'check', tokensIn = 0, tokensOut = 0, model = 'claude-sonnet-4-6', provider = 'claude', when = new Date() }) {
   db.prepare(`
     INSERT INTO job_runs (job_id, type, book_id, user_email, status, queued_at, started_at, ended_at,
                           tokens_in, tokens_out, provider, model, cache_read_in, cache_creation_in)
-    VALUES (?, 'check', NULL, ?, 'done', ?, ?, ?, ?, ?, ?, ?, 0, 0)
+    VALUES (?, ?, NULL, ?, 'done', ?, ?, ?, ?, ?, ?, ?, 0, 0)
   `).run(
     `j-${Math.random().toString(36).slice(2, 10)}`,
-    email, when.toISOString(), when.toISOString(), when.toISOString(),
+    type, email, when.toISOString(), when.toISOString(), when.toISOString(),
     tokensIn, tokensOut, provider, model,
   );
 }
@@ -124,6 +124,23 @@ test('sumCostUsdSince: aggregiert ueber job_runs + chat_messages', () => {
   const total = sumCostUsdSince('agg@ex.com', firstOfCurrentMonthIso());
   // 2 Mio Input @ 3 USD/Mio = 6 USD
   assert.equal(Math.round(total * 100) / 100, 6.00);
+});
+
+test('sumCostUsdSince: book-chat job_run wird NICHT mit chat_message doppelt gezaehlt', () => {
+  seedUser('bcdup@ex.com', 'none', null);
+  // Production schreibt EINEN book-chat-Verbrauch in BEIDE Tabellen: job_runs
+  // (Lifecycle) + chat_messages (Detail). chat_messages ist SSoT; der job_runs-
+  // Row darf nicht zusaetzlich ins Budget zaehlen.
+  insertJobRun({ email: 'bcdup@ex.com', type: 'book-chat', tokensIn: 1_000_000, tokensOut: 0 });
+  db.prepare(`INSERT OR IGNORE INTO books (book_id, name, created_at, updated_at)
+              VALUES (4343, 'bc-dup', datetime('now'), datetime('now'))`).run();
+  const cs = db.prepare(`INSERT INTO chat_sessions (book_id, kind, user_email, created_at, last_message_at)
+                         VALUES (4343, 'book', 'bcdup@ex.com', datetime('now'), datetime('now'))`).run();
+  db.prepare(`INSERT INTO chat_messages (session_id, role, content, tokens_in, tokens_out, provider, model, cache_read_in, cache_creation_in, created_at)
+              VALUES (?, 'assistant', 'hi', 1000000, 0, 'claude', 'claude-sonnet-4-6', 0, 0, datetime('now'))`).run(cs.lastInsertRowid);
+  const total = sumCostUsdSince('bcdup@ex.com', firstOfCurrentMonthIso());
+  // 1 Mio Input = $3.00 EINMAL.
+  assert.equal(Math.round(total * 100) / 100, 3.00);
 });
 
 test('enforceBudget middleware: GET → next() ohne Pruefung', () => {

@@ -12,6 +12,7 @@
 const { db } = require('./connection');
 const { costUsd } = require('../lib/pricing');
 const { firstOfCurrentMonthIso } = require('../lib/budget');
+const { excludeChatSourcedSql } = require('../lib/usage-sources');
 
 function _isoOrNull(v) {
   if (!v) return null;
@@ -27,11 +28,13 @@ function _resolveRange({ from, to } = {}) {
 
 // ── Cost-Aggregation ────────────────────────────────────────────────────────
 
+// Chat-Verbrauch wird hier NICHT aus job_runs gezogen — er lebt in chat_messages
+// (_stmtChatsRange). Ohne Ausschluss zaehlte jeder Chat-Dollar doppelt.
 const _stmtJobsRange = db.prepare(`
   SELECT user_email, provider, model, tokens_in, tokens_out,
          cache_read_in, cache_creation_in, cache_creation_1h_in
     FROM job_runs
-   WHERE queued_at >= ? AND queued_at < ?
+   WHERE queued_at >= ? AND queued_at < ? AND ${excludeChatSourcedSql()}
 `);
 
 const _stmtChatsRange = db.prepare(`
@@ -296,10 +299,12 @@ function monthlyTotals({ from, to } = {}) {
     if (r.model) bumpModel(r.model, usd, r);
   }
 
-  // Job-Typ-Aggregat braucht separates Query mit `type`-Spalte
+  // Job-Typ-Aggregat braucht separates Query mit `type`-Spalte. Chat-Typen
+  // ausgeschlossen (siehe _stmtJobsRange) — sie werden unten als ein 'chat'-
+  // Bucket aus chat_messages addiert, nicht doppelt aus job_runs.
   const typeRows = db.prepare(`
     SELECT user_email, type, provider, model, tokens_in, tokens_out, cache_read_in, cache_creation_in, cache_creation_1h_in
-      FROM job_runs WHERE queued_at >= ? AND queued_at < ?
+      FROM job_runs WHERE queued_at >= ? AND queued_at < ? AND ${excludeChatSourcedSql()}
   `).all(fromIso, toIso).filter(notAdmin);
   for (const r of typeRows) {
     bumpType(r.type || 'unknown', _cost(r));
