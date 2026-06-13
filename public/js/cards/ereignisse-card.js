@@ -190,6 +190,9 @@ export function registerEreignisseCard() {
     timelineItemCount: 0,
     // Vollbild-Flag (CSS-Overlay-Fallback; native :fullscreen läuft parallel).
     timelineFullscreen: false,
+    // Erst true, wenn vis sein erstes Layout (inkl. fit) fertig gemalt hat —
+    // bis dahin Spinner statt der zusammengequetschten Roh-Achse zeigen.
+    timelineReady: false,
 
     init() {
       this._lifecycle = setupCardLifecycle(this, {
@@ -203,6 +206,7 @@ export function registerEreignisseCard() {
           zeitstrahlConsolidating: false,
           zeitstrahlProgress: 0,
           zeitstrahlStatus: '',
+          timelineReady: false,
         },
         load: (root) => root._reloadZeitstrahl(),
         refreshNeedsBookId: false,
@@ -241,6 +245,7 @@ export function registerEreignisseCard() {
       }
       if (this._onVisibility) document.removeEventListener('visibilitychange', this._onVisibility);
       this._onVisibility = null;
+      this._cancelTimelineReveal();
       this._timeline?.destroy();
       this._timeline = null;
       this._timelineItems = null;
@@ -402,6 +407,40 @@ export function registerEreignisseCard() {
       });
     },
 
+    // Blendet die Achse erst ein, wenn vis sein erstes Layout (nach fit) fertig
+    // hat — vorher ist sie auf eine 2-px-Zeile zusammengequetscht. vis feuert
+    // `changed` nach jedem Redraw; der erste mit echter Höhe (>8 px) gilt als
+    // „fertig". Fallback-Timer, damit der Lade-Zustand nie hängen bleibt.
+    _revealTimelineWhenReady() {
+      this._cancelTimelineReveal();
+      if (!this._timeline) return;
+      this.timelineReady = false;
+      const tryReveal = () => {
+        if (!this._timeline) return;
+        const inner = this.$el?.querySelector('.gz-timeline .vis-timeline');
+        if (!inner || inner.clientHeight <= 8) return;
+        this._cancelTimelineReveal();
+        // Ein Frame Puffer, damit der finale Redraw sicher gemalt ist.
+        this._timelineRevealRaf = requestAnimationFrame(() => { this.timelineReady = true; });
+      };
+      this._timelineOnChanged = tryReveal;
+      this._timeline.on('changed', tryReveal);
+      this._timelineRevealFallback = setTimeout(() => {
+        this._cancelTimelineReveal();
+        this.timelineReady = true;
+      }, 1500);
+      tryReveal(); // sofort versuchen (Re-Open: Achse ist schon gerendert)
+    },
+
+    _cancelTimelineReveal() {
+      if (this._timelineOnChanged) {
+        try { this._timeline?.off('changed', this._timelineOnChanged); } catch {}
+        this._timelineOnChanged = null;
+      }
+      clearTimeout(this._timelineRevealFallback);
+      cancelAnimationFrame(this._timelineRevealRaf);
+    },
+
     // Coalescing-Wrapper: serialisiert konkurrierende Render-Aufrufe und
     // stellt sicher, dass nach dem laufenden Render ggf. einmal nachgezogen wird.
     _renderTimeline() {
@@ -426,10 +465,12 @@ export function registerEreignisseCard() {
 
       // Keine datierten Events → vorhandene Instanz abräumen, Container leeren.
       if (!items.length) {
+        this._cancelTimelineReveal();
         this._timeline?.destroy();
         this._timeline = null;
         this._timelineItems = null;
         this._lastFitBookId = null;
+        this.timelineReady = false;
         return;
       }
 
@@ -495,6 +536,8 @@ export function registerEreignisseCard() {
         });
         this._timeline.fit();
         this._lastFitBookId = bookId;
+        // Achse erst nach fertigem Layout einblenden (Spinner überbrückt).
+        this._revealTimelineWhenReady();
         // Falls bei (Neu-)Mount bereits Vollbild aktiv ist: Höhe nachziehen.
         if (this.timelineFullscreen) this._applyTimelineFullscreenSize(true);
       } else {
@@ -508,9 +551,12 @@ export function registerEreignisseCard() {
         this._timelineItems.update(visItems);
         // fit() (Voll-Zoom) NUR bei Buchwechsel — sonst würde jede Filter-/
         // Suchänderung den vom User eingestellten Zoom-Bereich zurücksetzen.
+        // Buchwechsel = frische Achse → kurz ausblenden + neu offenbaren.
+        // Reine Filter-Updates lassen die Achse sichtbar (kein Flackern).
         if (this._lastFitBookId !== bookId) {
           this._timeline.fit();
           this._lastFitBookId = bookId;
+          this._revealTimelineWhenReady();
         }
       }
     },

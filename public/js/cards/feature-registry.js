@@ -46,7 +46,7 @@ export const FEATURES = [
     aliases: ['scenes','beats','sequences','akt'] },
   { key: 'orte',           kind: 'toggle', group: 'world',  labelKey: 'tile.orte',           descKey: 'tile.orte.desc',           flag: 'showOrteCard',           toggle: 'toggleOrteCard',           requiresBook: true, minRole: 'editor', dependsOnKomplett: true,
     aliases: ['locations','schauplaetze','places','setting','welt','world'] },
-  { key: 'songs',          kind: 'toggle', group: 'world',  labelKey: 'tile.songs',          descKey: 'tile.songs.desc',          flag: 'showSongsCard',          toggle: 'toggleSongsCard',          requiresBook: true, minRole: 'editor',
+  { key: 'songs',          kind: 'toggle', group: 'world',  labelKey: 'tile.songs',          descKey: 'tile.songs.desc',          flag: 'showSongsCard',          toggle: 'toggleSongsCard',          requiresBook: true, minRole: 'editor', dependsOnKomplett: true,
     aliases: ['musik','music','songs','musikstuecke','musikstücke','playlist','soundtrack','band','interpret','tracks'] },
   { key: 'ereignisse',     kind: 'toggle', group: 'world',  labelKey: 'tile.events',         descKey: 'tile.events.desc',         flag: 'showEreignisseCard',     toggle: 'toggleEreignisseCard',     requiresBook: true, minRole: 'editor', dependsOnKomplett: true,
     aliases: ['events','timeline','zeitstrahl','plot','chronologie'] },

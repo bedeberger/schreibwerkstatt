@@ -109,6 +109,12 @@
       <li x-text="$app.t('folderImport.result.chapters', { n: result?.chaptersCreated || 0 })"></li>
       <li x-show="(result?.skipped?.length || 0) > 0"
           x-text="$app.t('folderImport.result.skipped', { n: result?.skipped?.length || 0 })"></li>
+      <li x-show="result?.extras?.analysis"
+          x-text="$app.t('folderImport.result.analysis', { figures: result?.extras?.analysis?.figures || 0, locations: result?.extras?.analysis?.locations || 0, scenes: result?.extras?.analysis?.scenes || 0 })"></li>
+      <li x-show="result?.extras?.lektorat"
+          x-text="$app.t('folderImport.result.lektorat', { n: result?.extras?.lektorat?.pageChecks || 0 })"></li>
+      <li x-show="result?.extras?.chats"
+          x-text="$app.t('folderImport.result.chats', { sessions: result?.extras?.chats?.sessions || 0, messages: result?.extras?.chats?.messages || 0 })"></li>
     </ul>
     <div x-data="{ open: false }" x-show="(result?.skipped?.length || 0) > 0" class="folder-import-skipped-block">
       <button type="button" class="collapsible-toggle" @click="open = !open" :aria-expanded="open">

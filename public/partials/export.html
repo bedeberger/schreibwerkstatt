@@ -51,6 +51,31 @@
   <div class="book-export-migration">
     <label class="book-export-scope-label" x-text="$app.t('book.export.migrationTitle')"></label>
     <p class="book-export-hint" x-text="$app.t('book.export.migrationHint')"></p>
+
+    <div class="form-stack book-export-migration-options">
+      <label class="form-check">
+        <input type="checkbox" id="migrate-analysis" name="migrate-analysis" x-model="migrateAnalysis">
+        <span>
+          <span class="form-check-title" x-text="$app.t('book.export.migrate.analysis')"></span>
+          <span class="form-check-desc" x-text="$app.t('book.export.migrate.analysis.desc')"></span>
+        </span>
+      </label>
+      <label class="form-check">
+        <input type="checkbox" id="migrate-lektorat" name="migrate-lektorat" x-model="migrateLektorat">
+        <span>
+          <span class="form-check-title" x-text="$app.t('book.export.migrate.lektorat')"></span>
+          <span class="form-check-desc" x-text="$app.t('book.export.migrate.lektorat.desc')"></span>
+        </span>
+      </label>
+      <label class="form-check">
+        <input type="checkbox" id="migrate-chats" name="migrate-chats" x-model="migrateChats">
+        <span>
+          <span class="form-check-title" x-text="$app.t('book.export.migrate.chats')"></span>
+          <span class="form-check-desc" x-text="$app.t('book.export.migrate.chats.desc')"></span>
+        </span>
+      </label>
+    </div>
+
     <button type="button"
             :class="{ 'is-running': bookExportLoading === 'swbook' }"
             :disabled="!!bookExportLoading || !$app.selectedBookId"

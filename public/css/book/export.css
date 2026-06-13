@@ -48,6 +48,9 @@
   padding-top: 16px;
   border-top: 1px solid var(--color-border);
 }
+.book-export-migration-options {
+  margin: 12px 0;
+}
 .book-export-migration button {
   display: inline-flex;
   align-items: center;

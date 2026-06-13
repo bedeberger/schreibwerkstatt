@@ -5,15 +5,24 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const {
   FORMAT, VERSION, MAX_DEPTH,
-  buildManifest, treeToNodes, buildBookJson,
+  buildManifest, normalizeIncludes, treeToNodes, buildBookJson,
   validateManifest, validateBookJson, planFromNodes,
 } = require('../../lib/book-bundle.js');
 
-test('buildManifest setzt Format + Version', () => {
+test('buildManifest setzt Format + Version + normalisierte includes', () => {
   const m = buildManifest({ sourceBookId: 42, exportedAt: '2026-05-30T00:00:00Z' });
   assert.equal(m.format, FORMAT);
   assert.equal(m.version, VERSION);
   assert.equal(m.sourceBookId, 42);
+  assert.deepEqual(m.includes, { analysis: false, lektorat: false, chats: false });
+
+  const m2 = buildManifest({ sourceBookId: 1, includes: { analysis: true, chats: 1 } });
+  assert.deepEqual(m2.includes, { analysis: true, lektorat: false, chats: true });
+});
+
+test('normalizeIncludes ist tolerant gegen Müll', () => {
+  assert.deepEqual(normalizeIncludes(null), { analysis: false, lektorat: false, chats: false });
+  assert.deepEqual(normalizeIncludes({ analysis: 'yes', foo: 1 }), { analysis: true, lektorat: false, chats: false });
 });
 
 test('treeToNodes baut Hierarchie + Reihenfolge inkl. inline-HTML', () => {
@@ -43,6 +52,27 @@ test('treeToNodes baut Hierarchie + Reihenfolge inkl. inline-HTML', () => {
   assert.equal(ch.children[1].name, 'S2');
   assert.equal(ch.children[2].type, 'chapter'); // subchapter nach pages
   assert.equal(ch.children[2].children[0].html, '<p>c</p>');
+
+  // srcId traegt die Quell-IDs fuer die Import-Remap-Maps.
+  assert.equal(nodes[0].srcId, 1);
+  assert.equal(ch.srcId, 10);
+  assert.equal(ch.children[0].srcId, 2);
+  assert.equal(ch.children[2].srcId, 11);
+  assert.equal(ch.children[2].children[0].srcId, 4);
+});
+
+test('planFromNodes reicht srcId durch (Page + Chapter)', () => {
+  const nodes = [
+    { type: 'page', name: 'P', html: '<p>x</p>', srcId: 7 },
+    { type: 'chapter', name: 'K', srcId: 99, children: [{ type: 'page', name: 'S', html: '', srcId: 8 }] },
+  ];
+  const { ops } = planFromNodes(nodes);
+  assert.equal(ops[0].srcId, 7);
+  assert.equal(ops[1].srcId, 99);
+  assert.equal(ops[2].srcId, 8);
+  // Fehlt srcId -> null (v1-Altbestand)
+  const { ops: o2 } = planFromNodes([{ type: 'page', name: 'P' }]);
+  assert.equal(o2[0].srcId, null);
 });
 
 test('buildBookJson uebernimmt Buch-Meta + bereinigte Settings', () => {

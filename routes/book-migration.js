@@ -9,7 +9,8 @@ const JSZip = require('jszip');
 const logger = require('../logger');
 const contentStore = require('../lib/content-store');
 const { getBookSettings } = require('../db/schema');
-const { buildManifest, treeToNodes, buildBookJson } = require('../lib/book-bundle');
+const { buildManifest, treeToNodes, buildBookJson, normalizeIncludes } = require('../lib/book-bundle');
+const { collectExtras } = require('../db/book-migration-data');
 const { slugify } = require('../lib/slug');
 const { toIntId } = require('../lib/validate');
 const { setContext } = require('../lib/log-context');
@@ -22,7 +23,17 @@ router.get('/:bookId', async (req, res) => {
   if (!bookId) return res.status(400).json({ error_code: 'ID_REQUIRED' });
   setContext({ book: bookId });
 
-  try { requireBookAccess(req, bookId, 'viewer'); }
+  // Optionale Extra-Bloecke via Query-Flags (?analysis=1&lektorat=1&chats=1).
+  const includes = normalizeIncludes({
+    analysis: req.query.analysis === '1' || req.query.analysis === 'true',
+    lektorat: req.query.lektorat === '1' || req.query.lektorat === 'true',
+    chats:    req.query.chats === '1' || req.query.chats === 'true',
+  });
+  const wantsExtras = includes.analysis || includes.lektorat || includes.chats;
+
+  // Extra-Bloecke enthalten potenziell personenbezogene Daten (Chats/Lektorat
+  // aller Mitarbeitenden) → nur fuer Owner. Reiner Content-Export bleibt viewer.
+  try { requireBookAccess(req, bookId, wantsExtras ? 'owner' : 'viewer'); }
   catch (e) { if (sendACLError(res, e)) return; throw e; }
 
   let book, tree;
@@ -65,7 +76,17 @@ router.get('/:bookId', async (req, res) => {
   const nodes = treeToNodes(tree, htmlById);
   const settings = (() => { try { return getBookSettings(bookId); } catch { return null; } })();
 
-  const manifest = buildManifest({ sourceBookId: bookId, exportedAt: new Date().toISOString() });
+  // Optionale Extra-Bloecke einsammeln (synchroner DB-Read, kein KI-Call).
+  let extras = {};
+  if (wantsExtras) {
+    try { extras = collectExtras(bookId, includes); }
+    catch (e) {
+      logger.error(`swbook-Export Extras fehlgeschlagen (book=${bookId}): ${e.message}`);
+      return res.status(502).json({ error_code: 'EXPORT_FAILED' });
+    }
+  }
+
+  const manifest = buildManifest({ sourceBookId: bookId, exportedAt: new Date().toISOString(), includes });
   const bookJson = buildBookJson({ book, settings, nodes });
 
   let buf;
@@ -73,6 +94,9 @@ router.get('/:bookId', async (req, res) => {
     const zip = new JSZip();
     zip.file('manifest.json', JSON.stringify(manifest, null, 2));
     zip.file('book.json', JSON.stringify(bookJson, null, 2));
+    if (extras.analysis) zip.file('analysis.json', JSON.stringify(extras.analysis));
+    if (extras.lektorat) zip.file('lektorat.json', JSON.stringify(extras.lektorat));
+    if (extras.chats)    zip.file('chats.json', JSON.stringify(extras.chats));
     buf = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
   } catch (e) {
     logger.error(`swbook-Export ZIP fehlgeschlagen (book=${bookId}): ${e.message}`);
@@ -82,7 +106,8 @@ router.get('/:bookId', async (req, res) => {
   const slug = book.slug || slugify(book.name || `book-${bookId}`) || `book-${bookId}`;
   const filename = `${slug}.swbook`;
   const sizeKb = Math.round(buf.length / 1024);
-  logger.info(`swbook-Export «${filename}» (${sizeKb} KB, book=${bookId}, pages=${metas.length})`);
+  const extraTags = Object.keys(includes).filter(k => includes[k]).join(',') || 'keine';
+  logger.info(`swbook-Export «${filename}» (${sizeKb} KB, book=${bookId}, pages=${metas.length}, extras=${extraTags})`);
 
   res.setHeader('Content-Type', 'application/zip');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

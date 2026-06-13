@@ -13,7 +13,8 @@ const {
   jobs, createJob, enqueueJob, findActiveJobId,
 } = require('./shared');
 const contentStore = require('../../lib/content-store');
-const { validateManifest, validateBookJson, planFromNodes } = require('../../lib/book-bundle');
+const { validateManifest, validateBookJson, planFromNodes, normalizeIncludes } = require('../../lib/book-bundle');
+const { restoreExtras } = require('../../db/book-migration-data');
 const { saveBookSettings, setBookEntitiesEnabled } = require('../../db/schema');
 const { setContext } = require('../../lib/log-context');
 const bookAccess = require('../../db/book-access');
@@ -98,7 +99,10 @@ async function runBookImportJob(jobId, { userEmail }) {
     }
 
     // Kapitel + Seiten in Op-Reihenfolge anlegen. tempId -> echte chapter_id.
+    // srcId -> neue ID baut die Remap-Maps fuer die optionalen Extra-Bloecke.
     const chapterIdByTemp = new Map();
+    const pageIdMap = new Map();    // srcPageId    -> neue page_id
+    const chapterIdMap = new Map(); // srcChapterId -> neue chapter_id
     const total = ops.length;
     let done = 0;
     let pagesCreated = 0;
@@ -108,7 +112,7 @@ async function runBookImportJob(jobId, { userEmail }) {
       done += 1;
       if (done % 10 === 0 || done === total) {
         updateJob(jobId, {
-          progress: 25 + Math.round(70 * (done / total)),
+          progress: 25 + Math.round(65 * (done / total)),
           statusText: 'job.book-import.creatingPages',
           statusParams: { current: done, total },
         });
@@ -121,20 +125,41 @@ async function runBookImportJob(jobId, { userEmail }) {
             ctx,
           );
           chapterIdByTemp.set(o.tempId, ch.id);
+          if (o.srcId != null) chapterIdMap.set(o.srcId, ch.id);
           chaptersCreated += 1;
         } catch (e) { log.warn(`book-import: createChapter «${o.name}» fail: ${e.message}`); }
       } else if (o.op === 'page') {
         try {
-          await contentStore.createPage(
+          const pg = await contentStore.createPage(
             { book_id: bookId, chapter_id: parentChapterId, name: o.name || '', html: o.html || '' },
             ctx,
           );
+          if (o.srcId != null && pg?.id) pageIdMap.set(o.srcId, pg.id);
           pagesCreated += 1;
         } catch (e) { log.warn(`book-import: createPage «${o.name}» fail: ${e.message}`); }
       }
     }
 
     log.info(`book-import abgeschlossen: ${pagesCreated} Seiten, ${chaptersCreated} Kapitel`);
+
+    // Optionale Extra-Bloecke (Komplettanalyse / Lektorat / Chats) wiederherstellen.
+    // Non-fatal: scheitert das, bleibt das Buch mit Inhalt erhalten.
+    const includes = normalizeIncludes(manifest.includes);
+    let extrasResult = null;
+    if (includes.analysis || includes.lektorat || includes.chats) {
+      updateJob(jobId, { progress: 92, statusText: 'job.book-import.restoringExtras' });
+      const extras = {};
+      try {
+        if (includes.analysis) extras.analysis = await _readJsonEntry(zip, 'analysis.json');
+        if (includes.lektorat) extras.lektorat = await _readJsonEntry(zip, 'lektorat.json');
+        if (includes.chats)    extras.chats = await _readJsonEntry(zip, 'chats.json');
+        extrasResult = restoreExtras(bookId, extras, { pageIdMap, chapterIdMap }, userEmail);
+        log.info(`book-import Extras wiederhergestellt: ${JSON.stringify(extrasResult)}`);
+      } catch (e) {
+        log.warn(`book-import: Extra-Wiederherstellung fehlgeschlagen: ${e.message}`);
+        extrasResult = { error: true };
+      }
+    }
 
     // Stats syncen + Vortags-Baseline (analog folder-import: Tages-Donut braucht
     // einen prevChars-Snapshot vor heute).
@@ -157,7 +182,7 @@ async function runBookImportJob(jobId, { userEmail }) {
       } catch (e) { log.warn(`book-import: Baseline-Snapshot fail: ${e.message}`); }
     }
 
-    completeJob(jobId, { bookId, bookName: bookJson.book.name, pagesCreated, chaptersCreated, cappedChapters });
+    completeJob(jobId, { bookId, bookName: bookJson.book.name, pagesCreated, chaptersCreated, cappedChapters, extras: extrasResult });
   } catch (e) {
     if (e?.name !== 'AbortError') log.error(`book-import job ${jobId}: ${e.message}`, { stack: e.stack });
     failJob(jobId, e);

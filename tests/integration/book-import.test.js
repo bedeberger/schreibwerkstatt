@@ -29,7 +29,7 @@ after(() => { ctxBoot.cleanup(); });
 
 beforeEach(() => { ctxBoot.dbSeed.reset(); });
 
-async function buildBundleBuffer(bookId) {
+async function buildBundleBuffer(bookId, includes = null) {
   const tree = await contentStore.bookTree(bookId, reqCtx);
   const book = await contentStore.loadBook(bookId, reqCtx);
   const metas = [];
@@ -39,11 +39,19 @@ async function buildBundleBuffer(bookId) {
   const htmlById = new Map();
   for (const d of details) if (d && d.id) htmlById.set(d.id, d.html || '');
   const nodes = bookBundle.treeToNodes(tree, htmlById);
-  const manifest = bookBundle.buildManifest({ sourceBookId: bookId, exportedAt: '2026-05-30T00:00:00Z' });
+  const norm = bookBundle.normalizeIncludes(includes);
+  const manifest = bookBundle.buildManifest({ sourceBookId: bookId, exportedAt: '2026-05-30T00:00:00Z', includes: norm });
   const bookJson = bookBundle.buildBookJson({ book, settings: { language: 'de', region: 'CH', buchtyp: 'roman' }, nodes });
   const zip = new JSZip();
   zip.file('manifest.json', JSON.stringify(manifest));
   zip.file('book.json', JSON.stringify(bookJson));
+  if (norm.analysis || norm.lektorat || norm.chats) {
+    const { collectExtras } = require('../../db/book-migration-data');
+    const extras = collectExtras(bookId, norm);
+    if (extras.analysis) zip.file('analysis.json', JSON.stringify(extras.analysis));
+    if (extras.lektorat) zip.file('lektorat.json', JSON.stringify(extras.lektorat));
+    if (extras.chats)    zip.file('chats.json', JSON.stringify(extras.chats));
+  }
   return zip.generateAsync({ type: 'nodebuffer' });
 }
 
@@ -122,6 +130,89 @@ test('Re-Import erzeugt ein zweites unabhaengiges Buch', async () => {
   assert.equal(j1.status, 'done');
   assert.equal(j2.status, 'done');
   assert.notEqual(j1.result.bookId, j2.result.bookId);
+});
+
+test('Extra-Round-Trip: Analyse/Lektorat/Chats werden mit remappten IDs uebernommen', async () => {
+  ctxBoot.dbSeed.setBook({
+    books: [{ id: 950, name: 'AnalyseQuelle' }],
+    chapters: [{ id: 9501, book_id: 950, name: 'Kap', position: 0 }],
+    pages: [{ id: 95001, book_id: 950, name: 'Seite1', chapter_id: 9501, position: 0 }],
+    pageBodies: { 95001: '<p>Text</p>' },
+  });
+
+  const { db } = require('../../db/connection');
+  const iso = '2026-05-30T10:00:00.000Z';
+  // Figur mit Page-Referenz
+  db.prepare(`INSERT INTO figures (book_id,fig_id,name,updated_at,user_email,erste_erwaehnung_page_id)
+              VALUES (?,?,?,?,?,?)`).run(950, 'fig-held', 'Held', iso, OWNER, 95001);
+  // Szene mit Chapter+Page-Referenz
+  db.prepare(`INSERT INTO figure_scenes (book_id,user_email,titel,chapter_id,page_id,updated_at)
+              VALUES (?,?,?,?,?,?)`).run(950, OWNER, 'Showdown', 9501, 95001, iso);
+  // Lektorat-Check
+  db.prepare(`INSERT INTO page_checks (page_id,book_id,checked_at,error_count,fazit,user_email,chapter_id)
+              VALUES (?,?,?,?,?,?,?)`).run(95001, 950, iso, 2, 'solide', OWNER, 9501);
+  // Chat-Session (page) + Nachricht
+  const sess = db.prepare(`INSERT INTO chat_sessions (book_id,kind,page_id,user_email,created_at,last_message_at)
+              VALUES (?,?,?,?,?,?)`).run(950, 'page', 95001, OWNER, iso, iso);
+  db.prepare(`INSERT INTO chat_messages (session_id,role,content,created_at)
+              VALUES (?,?,?,?)`).run(sess.lastInsertRowid, 'user', 'Hallo', iso);
+
+  const buffer = await buildBundleBuffer(950, { analysis: true, lektorat: true, chats: true });
+  const job = await runImport(buffer);
+  assert.equal(job.status, 'done', job.error || '');
+  const newBookId = job.result.bookId;
+
+  assert.equal(job.result.extras.analysis.figures, 1);
+  assert.equal(job.result.extras.lektorat.pageChecks, 1);
+  assert.equal(job.result.extras.chats.sessions, 1);
+  assert.equal(job.result.extras.chats.messages, 1);
+
+  // Neue Page-/Chapter-IDs ermitteln.
+  const tree = await contentStore.bookTree(newBookId, reqCtx);
+  const flat = contentStore.flattenTree(tree);
+  const newPageId = flat.find(f => f.page.name === 'Seite1').page.id;
+  const newChapterId = (tree.chapters || [])[0].id;
+  assert.ok(newPageId && newPageId !== 95001);
+
+  const fig = db.prepare('SELECT * FROM figures WHERE book_id = ?').get(newBookId);
+  assert.equal(fig.name, 'Held');
+  assert.equal(fig.user_email, OWNER);
+  assert.equal(fig.erste_erwaehnung_page_id, newPageId); // Page-Referenz remapped
+
+  const scene = db.prepare('SELECT * FROM figure_scenes WHERE book_id = ?').get(newBookId);
+  assert.equal(scene.titel, 'Showdown');
+  assert.equal(scene.page_id, newPageId);
+  assert.equal(scene.chapter_id, newChapterId); // Chapter-Referenz remapped
+
+  const pc = db.prepare('SELECT * FROM page_checks WHERE book_id = ?').get(newBookId);
+  assert.equal(pc.page_id, newPageId);
+  assert.equal(pc.fazit, 'solide');
+  assert.equal(pc.user_email, OWNER);
+
+  const cs = db.prepare('SELECT * FROM chat_sessions WHERE book_id = ?').get(newBookId);
+  assert.equal(cs.kind, 'page');
+  assert.equal(cs.page_id, newPageId);
+  const msgCount = db.prepare('SELECT COUNT(*) AS c FROM chat_messages WHERE session_id = ?').get(cs.id);
+  assert.equal(msgCount.c, 1);
+});
+
+test('Content-only-Export (keine includes) laesst Extra-Tabellen leer', async () => {
+  ctxBoot.dbSeed.setBook({
+    books: [{ id: 951, name: 'NurInhalt' }],
+    chapters: [{ id: 9511, book_id: 951, name: 'K', position: 0 }],
+    pages: [{ id: 95101, book_id: 951, name: 'S', chapter_id: 9511, position: 0 }],
+    pageBodies: { 95101: '<p>x</p>' },
+  });
+  const { db } = require('../../db/connection');
+  db.prepare(`INSERT INTO figures (book_id,fig_id,name,updated_at,user_email) VALUES (?,?,?,?,?)`)
+    .run(951, 'f1', 'X', '2026-05-30T10:00:00.000Z', OWNER);
+
+  const buffer = await buildBundleBuffer(951); // keine includes
+  const job = await runImport(buffer);
+  assert.equal(job.status, 'done', job.error || '');
+  assert.equal(job.result.extras, null);
+  const fig = db.prepare('SELECT COUNT(*) AS c FROM figures WHERE book_id = ?').get(job.result.bookId);
+  assert.equal(fig.c, 0);
 });
 
 test('Kaputtes Manifest -> Job-Error badManifest', async () => {

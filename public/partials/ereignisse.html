@@ -76,7 +76,13 @@
         <button type="button" class="graph-tool-btn" :data-tip="$app.t('events.timelineJumpLast')" :aria-label="$app.t('events.timelineJumpLast')" @click="timelineJumpLast()"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#chevron-last"/></svg></button>
         <button type="button" class="graph-tool-btn" :aria-pressed="timelineFullscreen" :data-tip="timelineFullscreen ? $app.t('graph.fullscreenClose') : $app.t('graph.fullscreen')" :aria-label="timelineFullscreen ? $app.t('graph.fullscreenClose') : $app.t('graph.fullscreen')" @click="toggleTimelineFullscreen()"><svg class="icon" aria-hidden="true"><use :href="timelineFullscreen ? '/icons.svg?v=690#minimize-2' : '/icons.svg?v=690#maximize-2'"/></svg></button>
       </div>
-      <div class="gz-timeline" :aria-label="$app.t('events.timelineNav')"></div>
+      <div class="gz-timeline-stage" :class="{ 'is-loading': timelineItemCount > 0 && !timelineReady }">
+        <div class="gz-timeline" :aria-label="$app.t('events.timelineNav')"></div>
+        <div class="gz-timeline-loading" x-show="timelineItemCount > 0 && !timelineReady" x-cloak role="status">
+          <span class="spinner" aria-hidden="true"></span>
+          <span x-text="$app.t('events.timelineLoading')"></span>
+        </div>
+      </div>
     </div>
     <div class="gz-timeline-hint internal-link" x-show="timelineItemCount < filteredEreignisse().length"
          @click="scrollToFirstUndated()" :data-tip="$app.t('events.timelineUndatedHint')"

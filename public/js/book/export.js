@@ -33,7 +33,12 @@ export const exportMethods = {
     this.bookExportLoading = 'swbook';
     this.bookExportError = '';
     try {
-      const r = await fetch(`/book-migration/${encodeURIComponent(bid)}`);
+      const qs = new URLSearchParams();
+      if (this.migrateAnalysis) qs.set('analysis', '1');
+      if (this.migrateLektorat) qs.set('lektorat', '1');
+      if (this.migrateChats)    qs.set('chats', '1');
+      const suffix = qs.toString() ? `?${qs}` : '';
+      const r = await fetch(`/book-migration/${encodeURIComponent(bid)}${suffix}`);
       if (!r.ok) {
         let data = null;
         try { data = await r.json(); } catch (_) {}

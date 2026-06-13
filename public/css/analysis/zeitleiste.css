@@ -250,6 +250,40 @@
   margin-bottom: var(--space-xs);
 }
 
+/* Bühne über der Achse: trägt den Lade-Spinner. Die Achse wird erst sichtbar,
+   wenn vis sein erstes Layout (inkl. fit) fertig hat — bis dahin überdeckt der
+   Spinner die noch zusammengequetschte Roh-Achse, statt sie flackern zu lassen.
+   Fail-safe: Default ist sichtbar; nur .is-loading blendet aus. */
+.gz-timeline-stage {
+  position: relative;
+}
+
+.gz-timeline-stage.is-loading {
+  min-height: 96px;
+}
+
+.gz-timeline {
+  opacity: 1;
+  transition: opacity var(--transition-emphasized);  /* nur die Einblendung animieren */
+}
+
+.gz-timeline-stage.is-loading .gz-timeline {
+  opacity: 0;
+  transition: none;  /* Ausblenden sofort — kein Fade der Roh-Achse */
+}
+
+.gz-timeline-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  background: var(--color-surface);
+  color: var(--color-muted);
+  font-size: var(--font-size-mini);
+}
+
 /* Vollbild: native API primär (:fullscreen), .is-fullscreen als CSS-Overlay-
    Fallback (iOS Safari u.ä.). Die vis-Höhe selbst stellt
    _applyTimelineFullscreenSize per setOptions auf height:'100%' um — hier nur
@@ -269,10 +303,15 @@
   z-index: var(--z-overlay);
 }
 
-.gz-timeline-wrap:fullscreen .gz-timeline,
-.gz-timeline-wrap.is-fullscreen .gz-timeline {
+.gz-timeline-wrap:fullscreen .gz-timeline-stage,
+.gz-timeline-wrap.is-fullscreen .gz-timeline-stage {
   flex: 1;
   min-height: 0;
+}
+
+.gz-timeline-wrap:fullscreen .gz-timeline,
+.gz-timeline-wrap.is-fullscreen .gz-timeline {
+  height: 100%;
 }
 
 }
