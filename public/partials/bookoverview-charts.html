@@ -75,7 +75,7 @@
     <div class="overview-tile-label" x-text="$app.t('overview.today.title')"></div>
     <div class="overview-donut-row">
       <svg class="overview-donut overview-today-ring"
-           :class="{ 'overview-today-ring--active': overviewTodayRing(overviewDailyGoalChars || 1500).active, 'overview-today-ring--reached': overviewTodayRing(overviewDailyGoalChars || 1500).reached }"
+           :class="{ 'overview-today-ring--active': overviewTodayRing(overviewDailyGoalChars || 1500).active, 'overview-today-ring--reached': overviewTodayRing(overviewDailyGoalChars || 1500).reached, 'overview-donut--empty': !overviewTodayRing(overviewDailyGoalChars || 1500).active }"
            viewBox="0 0 72 72" aria-hidden="true">
         <circle cx="36" cy="36" :r="overviewTodayRing(overviewDailyGoalChars || 1500).r"
                 fill="none" stroke="var(--color-border)" stroke-width="6"></circle>

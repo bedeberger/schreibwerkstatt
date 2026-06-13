@@ -79,7 +79,6 @@
   <link rel="stylesheet" href="css/analysis/kontinuitaet.css">
   <link rel="stylesheet" href="css/analysis/komplett-status.css">
   <link rel="stylesheet" href="css/analysis/zeitleiste.css">
-  <link rel="stylesheet" href="css/analysis/ereignisse-timeline.css">
   <link rel="stylesheet" href="css/entities/ereignisse-subtyp.css">
   <link rel="stylesheet" href="css/entities/ereignisse-span.css">
   <link rel="stylesheet" href="css/analysis/kapitel-review.css">
@@ -96,6 +95,7 @@
   <link rel="stylesheet" href="css/book/book-settings.css">
   <link rel="stylesheet" href="css/book/header-actions.css">
   <link rel="stylesheet" href="css/book/buchorganizer.css">
+  <link rel="stylesheet" href="css/book/plot-board.css">
   <link rel="stylesheet" href="css/book/export.css">
   <link rel="stylesheet" href="css/book/pdf-export.css">
   <link rel="stylesheet" href="css/book/epub-export.css">
@@ -338,7 +338,7 @@
     <template x-if="currentUser && !isAdminOnly && selectedBookId && dailyProgressBookId == selectedBookId && !dailyProgressIsFinished">
       <button type="button"
               class="header-today-ring"
-              :class="{ 'header-today-ring--active': headerTodayRing().active, 'header-today-ring--reached': headerTodayRing().reached }"
+              :class="{ 'header-today-ring--active': headerTodayRing().active, 'header-today-ring--reached': headerTodayRing().reached, 'header-today-ring--empty': !headerTodayRing().active }"
               @click="toggleBookOverviewCard()"
               :data-tip="headerTodayRing().active
                 ? t('overview.today.meta', { chars: headerTodayRing().chars.toLocaleString(uiLocale === 'de' ? 'de-CH' : 'en-US'), goal: headerTodayRing().goal.toLocaleString(uiLocale === 'de' ? 'de-CH' : 'en-US') })
@@ -430,6 +430,7 @@
 <div id="partial-figur-werkstatt"></div>
 <div id="partial-szenen"></div>
 <div id="partial-ereignisse"></div>
+<div id="partial-plot"></div>
 <div id="partial-world-facts"></div>
 <div id="partial-orte"></div>
 <div id="partial-songs"></div>

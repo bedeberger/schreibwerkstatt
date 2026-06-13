@@ -112,6 +112,38 @@
   margin-top: var(--space-2xs);
 }
 
+/* Aktionen am Panel-Fuss (z.B. Delta-Cache leeren) — bewusst de-prominent,
+   nur über das ⋯-Menü erreichbar statt als nackter Header-Button. */
+.komplett-status-actions {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 0.5px solid var(--color-border);
+}
+.komplett-status-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: var(--font-size-mini);
+  color: var(--color-muted);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.komplett-status-action-btn:hover:not(:disabled) {
+  background: var(--color-err-bg);
+  color: var(--color-err-text);
+}
+.komplett-status-action-btn:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+
 @media (max-width: 600px) {
   .komplett-status-panel {
     position: fixed;

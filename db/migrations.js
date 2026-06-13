@@ -7422,6 +7422,61 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 183 abgeschlossen (job_runs.cache_creation_1h_in + chat_messages.cache_creation_1h_in).');
   }
 
+  if (version < 184) {
+    // Plot-Werkstatt (Beat-Board): planendes Pendant zur rückwärtsgewandten
+    // Szenen-/Ereignis-Analyse. Der User skizziert die Handlung als Spalten
+    // (plot_acts = Akte/Phasen) mit Karten darin (plot_beats = einzelne
+    // Handlungspunkte). KI assistiert ausschliesslich planend/überwachend
+    // (Brainstorm + Consistency gegen Buchrealität), schreibt nie in den Text.
+    // Pro Buch + User skopiert.
+    db.exec(`CREATE TABLE IF NOT EXISTS plot_acts (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id     INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        user_email  TEXT    NOT NULL,
+        name        TEXT    NOT NULL,
+        farbe       TEXT,
+        position    INTEGER NOT NULL DEFAULT 0,
+        created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        updated_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      )`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_plot_acts_book ON plot_acts(book_id, user_email)');
+
+    // status: geplant → entwurf → im_buch (Nachhalten „schon geschrieben?"),
+    // verworfen = ausgemustert, bleibt für Nachvollziehbarkeit. chapter_id
+    // (SET NULL) verknüpft einen Beat mit dem Kapitel, in dem er landet.
+    db.exec(`CREATE TABLE IF NOT EXISTS plot_beats (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id      INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        act_id       INTEGER NOT NULL REFERENCES plot_acts(id) ON DELETE CASCADE,
+        user_email   TEXT    NOT NULL,
+        titel        TEXT    NOT NULL,
+        beschreibung TEXT,
+        status       TEXT    NOT NULL DEFAULT 'geplant' CHECK(status IN ('geplant','entwurf','im_buch','verworfen')),
+        chapter_id   INTEGER REFERENCES chapters(chapter_id) ON DELETE SET NULL,
+        sort_order   INTEGER NOT NULL DEFAULT 0,
+        created_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        updated_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      )`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_plot_beats_act ON plot_beats(act_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_plot_beats_book ON plot_beats(book_id, user_email)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_plot_beats_chapter ON plot_beats(chapter_id)');
+
+    // M:M Beat ↔ Figur. Welche Figuren ein Handlungspunkt involviert.
+    db.exec(`CREATE TABLE IF NOT EXISTS plot_beat_figures (
+        beat_id   INTEGER NOT NULL REFERENCES plot_beats(id) ON DELETE CASCADE,
+        figure_id INTEGER NOT NULL REFERENCES figures(id) ON DELETE CASCADE,
+        PRIMARY KEY (beat_id, figure_id)
+      )`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_plot_beat_figures_figure ON plot_beat_figures(figure_id)');
+
+    const fkErrors184 = db.pragma('foreign_key_check');
+    if (fkErrors184.length) {
+      throw new Error(`Migration 184: foreign_key_check meldet ${fkErrors184.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 184').run();
+    logger.info('DB-Migration auf Version 184 abgeschlossen (plot_acts + plot_beats + plot_beat_figures).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

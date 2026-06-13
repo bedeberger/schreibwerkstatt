@@ -60,7 +60,8 @@
            x-model="selectedImportFigureId"
            x-effect="options = importables.map(f => ({
              value: String(f.id),
-             label: f.name + (f.typ ? ' [' + f.typ + ']' : '')
+             label: f.name + (f.typ ? ' [' + f.typ + ']' : ''),
+             sublabel: importFigureContext(f)
            }))"></div>
     </div>
     <div class="row">
@@ -116,7 +117,8 @@
                x-model="selectedImportFigureId"
                x-effect="options = importables.map(f => ({
                  value: String(f.id),
-                 label: f.name + (f.typ ? ' [' + f.typ + ']' : '')
+                 label: f.name + (f.typ ? ' [' + f.typ + ']' : ''),
+                 sublabel: importFigureContext(f)
                }))"></div>
         </div>
         <div class="werkstatt-create-row">

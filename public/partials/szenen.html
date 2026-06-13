@@ -21,8 +21,16 @@
   </div>
   <div x-show="szenenStatus" class="card-status" x-html="szenenStatus"></div>
 
-  <!-- Leer-Hinweis -->
-  <div x-show="!$app.szenen.length && !szenenLoading && !szenenStatus" class="card-status" x-text="$app.t('common.noDataYet')"></div>
+  <!-- Leer-Hinweis mit CTA -->
+  <div x-show="!$app.szenen.length && !szenenLoading && !szenenStatus" class="card-empty">
+    <p class="card-empty-text" x-text="$app.t('common.noAnalysisYet')"></p>
+    <button type="button" class="primary card-empty-cta"
+            @click="$app.alleAktualisieren()"
+            :disabled="$app.alleAktualisierenLoading || !$app.selectedBookId">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#rotate-cw"/></svg>
+      <span x-text="$app.t('header.updateAll')"></span>
+    </button>
+  </div>
 
   <!-- Skeleton während Loading vor erstem Datensatz -->
   <div x-show="szenenLoading && !$app.szenen.length" class="entity-skeleton entity-list--accented" x-cloak>

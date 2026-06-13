@@ -6,7 +6,7 @@
        :data-tip="$app.t('overview.openHeatmap')">
     <div class="overview-tile-label" x-text="$app.t('overview.lektorat')"></div>
     <div class="overview-donut-row">
-      <svg class="overview-donut" viewBox="0 0 72 72" aria-hidden="true">
+      <svg class="overview-donut" :class="{ 'overview-donut--empty': overviewCoverageRing().pct === 0 }" viewBox="0 0 72 72" aria-hidden="true">
         <circle cx="36" cy="36" :r="overviewCoverageRing().r"
                 fill="none" stroke="var(--color-border)" stroke-width="6"></circle>
         <circle cx="36" cy="36" :r="overviewCoverageRing().r"

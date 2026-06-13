@@ -53,6 +53,7 @@ export const appHashRouterMethods = {
     else if (this.showSongsCard) parts.push('songs');
     else if (this.showSzenenCard) parts.push('szenen');
     else if (this.showEreignisseCard) parts.push('ereignisse');
+    else if (this.showPlotCard) parts.push('plot');
     else if (this.showWorldFactsCard) parts.push('fakten');
     else if (this.showKontinuitaetCard) parts.push('kontinuitaet');
     else if (this.showTagebuchRueckblickCard) parts.push('rueckblick');
@@ -321,6 +322,10 @@ export const appHashRouterMethods = {
         case 'ereignisse':
           if (!this.showEreignisseCard) await this.toggleEreignisseCard();
           break;
+        case 'plot':
+          if (!this.showPlotCard) await this.togglePlotCard();
+          else { this._closeOtherMainCards('plot'); this._scrollToCardByKey('plot'); }
+          break;
         case 'fakten':
           if (!this.showWorldFactsCard) await this.toggleWorldFactsCard();
           else { this._closeOtherMainCards('weltfakten'); this._scrollToCardByKey('weltfakten'); }
@@ -401,7 +406,7 @@ export const appHashRouterMethods = {
     const watchers = [
       'selectedBookId', 'currentPage', 'showEditorCard',
       'selectedFigurId', 'selectedOrtId', 'selectedSongId', 'selectedSzeneId',
-      'showFiguresCard', 'showFigurWerkstattCard', 'showOrteCard', 'showSongsCard', 'showSzenenCard', 'showEreignisseCard', 'showWorldFactsCard',
+      'showFiguresCard', 'showFigurWerkstattCard', 'showOrteCard', 'showSongsCard', 'showSzenenCard', 'showEreignisseCard', 'showPlotCard', 'showWorldFactsCard',
       'showKontinuitaetCard', 'showTagebuchRueckblickCard', 'rueckblickEntryId', 'showBookReviewCard', 'showBookChatCard',
       'showKapitelReviewCard', 'kapitelReviewChapterId',
       'werkstattDraftId',

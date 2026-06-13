@@ -14,7 +14,15 @@
     </div>
   </div>
 
-  <div x-show="fakten.length === 0 && !wfLoading" class="card-status" x-text="$app.t('weltfakten.empty')"></div>
+  <div x-show="fakten.length === 0 && !wfLoading" class="card-empty">
+    <p class="card-empty-text" x-text="$app.t('weltfakten.empty')"></p>
+    <button type="button" class="primary card-empty-cta"
+            @click="$app.alleAktualisieren()"
+            :disabled="$app.alleAktualisierenLoading || !$app.selectedBookId">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#rotate-cw"/></svg>
+      <span x-text="$app.t('header.updateAll')"></span>
+    </button>
+  </div>
 
   <!-- Skeleton während Loading vor erstem Datensatz -->
   <div x-show="wfLoading && fakten.length === 0" class="entity-skeleton entity-list--accented" x-cloak>

@@ -266,6 +266,8 @@ export const appJobsCoreMethods = {
       'batch-check':           'toast.job.batchCheck',
       'werkstatt-brainstorm':  'toast.job.werkstattBrainstorm',
       'werkstatt-consistency': 'toast.job.werkstattConsistency',
+      'plot-brainstorm':       'toast.job.plotBrainstorm',
+      'plot-consistency':      'toast.job.plotConsistency',
       'blog-import':           'toast.job.blogImport',
       'blog-pull':             'toast.job.blogPull',
       'blog-push':             'toast.job.blogPush',

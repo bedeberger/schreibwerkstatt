@@ -10,7 +10,10 @@
   --color-vignette: rgba(0, 0, 0, 0.045);
   --color-text: #1f1c18;
   --color-muted: #6b6258;
-  --color-subtle: #9a9085;
+  /* subtle: tertiärer Text — auf 4.5:1 (WCAG AA) gebracht (4.87 auf surface,
+     4.55 auf bg), bleibt unter muted. faint ist rein dekorativ (Skeleton,
+     Fokus-Dim) und NICHT AA-tauglich — nie für lesbaren Text verwenden. */
+  --color-subtle: #787068;
   --color-faint: #b8aea2;
   --color-border: rgba(0, 0, 0, 0.12);
   --color-border-input: rgba(0, 0, 0, 0.2);
@@ -152,6 +155,7 @@
   --card-accent-blog: #4a7aa0;
   --card-accent-hubspot: #c45a3a;
   --card-accent-share: #5a4a8e;
+  --card-accent-plot: #4a52a0;
 
   /* Event-Subtyp-Akzente (Phase 2): Mapping in card-accents.css.
      Light-Theme: kräftige Hues für Badge-Background. */
@@ -219,7 +223,9 @@
   --color-vignette: rgba(0, 0, 0, 0.35);
   --color-text: #e6e2d9;
   --color-muted: #9a948a;
-  --color-subtle: #6e685f;
+  /* subtle: auf 4.71:1 angehoben (WCAG AA), bleibt unter muted (4.94).
+     faint ist dekorativ (kein AA) — nie für lesbaren Text. */
+  --color-subtle: #989083;
   --color-faint: #524d46;
   --color-border: rgba(255, 255, 255, 0.12);
   --color-border-input: rgba(255, 255, 255, 0.22);
@@ -331,6 +337,7 @@
   --card-accent-blog: #88aacc;
   --card-accent-hubspot: #e08a72;
   --card-accent-share: #998ac6;
+  --card-accent-plot: #8f96dd;
 
   /* Event-Subtyp-Akzente (Dark) — heller, geringer gesättigt. */
   --card-accent-event-geburt:           #88c488;

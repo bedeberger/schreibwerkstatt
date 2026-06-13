@@ -166,6 +166,11 @@
   user-select: none;
 }
 .figure-context-header:hover { background: var(--color-hover-light); }
+/* `.internal-link` traegt der Header nur fuer die Tastatur-Delegation (role=button,
+   Tab-Fokus). Die globale Link-Optik (Underline + Opacity-Dip) passt nicht zu einem
+   Collapse-Toggle — Hintergrund-Hover + Chevron sind die Affordanz, Fokus-Ring bleibt. */
+.figure-context-header.internal-link:hover,
+.figure-context-header.internal-link:focus-visible { opacity: 1; text-decoration: none; }
 .figure-context-title { display: flex; align-items: center; gap: var(--space-6); font-size: var(--font-size-sm); font-weight: 400; }
 .figure-context-body { padding: var(--space-xs) 12px 10px; display: flex; flex-wrap: wrap; gap: var(--space-6); }
 .figure-context-chip {

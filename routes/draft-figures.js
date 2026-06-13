@@ -184,21 +184,57 @@ router.put('/:id', jsonBody, (req, res) => {
 // Liste der figures eines Buchs, die noch nicht importiert wurden.
 // Ausgeschlossen: figures, für die der User bereits einen Werkstatt-Draft hat
 // (per source_figure_id). Genutzt vom Import-Picker im Frontend.
+//
+// Pro Figur kommt Kontext mit (Hauptkapitel = häufigster Auftritt, Beruf,
+// Geburtstag/Jahrgang), den der Picker als Zweitzeile anzeigt.
+//
+// Dedupe pro Name: der figures-Katalog kann durch Komplettanalyse-Merge-
+// Kollisionen (fig_id `__2`-Suffix) zwei Rows mit demselben Namen enthalten.
+// Im Picker pro Name nur die inhaltsreichste Row anbieten (meiste Auftritte,
+// Tie-Break längere Beschreibung, dann höchste id = neuere Extraktion), damit
+// dieselbe Figur nicht doppelt erscheint.
 router.get('/:book_id/importable', (req, res) => {
   const userEmail = userEmailOrNull(req);
   const bookId = toIntId(req.params.book_id);
   if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
   if (!bookId)    return res.status(400).json({ error_code: 'INVALID_ID' });
   const rows = db.prepare(`
-    SELECT f.id, f.name, f.kurzname, f.typ, f.beschreibung
+    SELECT f.id, f.name, f.kurzname, f.typ, f.beschreibung, f.beruf, f.geburtstag,
+           (SELECT c.chapter_name
+              FROM figure_appearances fa
+              JOIN chapters c ON c.chapter_id = fa.chapter_id
+             WHERE fa.figure_id = f.id
+             ORDER BY fa.haeufigkeit DESC, c.position
+             LIMIT 1) AS hauptkapitel,
+           (SELECT COALESCE(SUM(fa.haeufigkeit), 0)
+              FROM figure_appearances fa
+             WHERE fa.figure_id = f.id) AS auftritte
       FROM figures f
       LEFT JOIN draft_figures d
         ON d.source_figure_id = f.id AND d.user_email = ?
      WHERE f.book_id = ? AND f.user_email IS ? AND d.id IS NULL
      ORDER BY f.sort_order, f.id
   `).all(userEmail, bookId, userEmail);
-  res.json(rows);
+
+  const byName = new Map();
+  for (const r of rows) {
+    const key = r.name.trim().toLowerCase();
+    const prev = byName.get(key);
+    if (!prev || _figureRicher(r, prev)) byName.set(key, r);
+  }
+  const deduped = [...byName.values()]
+    .sort((a, b) => (a.sort_order - b.sort_order) || (a.id - b.id))
+    .map(({ auftritte, ...rest }) => rest);
+  res.json(deduped);
 });
+
+// Welche von zwei gleichnamigen figures-Rows ist im Import-Picker zu bevorzugen?
+function _figureRicher(a, b) {
+  if ((a.auftritte || 0) !== (b.auftritte || 0)) return (a.auftritte || 0) > (b.auftritte || 0);
+  const al = (a.beschreibung || '').length, bl = (b.beschreibung || '').length;
+  if (al !== bl) return al > bl;
+  return a.id > b.id;
+}
 
 // Werkstatt-Figur aus bestehender figures-Row importieren. Body: { figureId }.
 // Idempotent gegenüber doppelten Klicks: bestehender Draft mit gleicher

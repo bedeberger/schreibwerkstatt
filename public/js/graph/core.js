@@ -42,9 +42,8 @@ export const coreMethods = {
     if (!container) return;
     const figuren = window.__app.figuren;
 
-    // .Network statt nur window.vis prüfen — vis-timeline (Ereignisse) mergt
-    // ebenfalls in window.vis (ohne Network); ein vorher geladener Zeitstrahl
-    // würde den Loader sonst kurzschliessen und new vis.Network crasht.
+    // .Network statt nur window.vis prüfen: erst wenn das vis-network-Bundle
+    // wirklich geladen ist, lässt sich `new vis.Network` aufrufen.
     if (!window.vis?.Network) {
       const ph = document.createElement('span');
       ph.className = 'muted-msg muted-msg--block';

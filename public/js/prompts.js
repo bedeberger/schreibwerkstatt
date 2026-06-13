@@ -190,6 +190,15 @@ export {
 } from './prompts/figur-werkstatt.js';
 
 export {
+  buildPlotSystemPrompt,
+  buildPlotBrainstormPrompt,
+  buildPlotConsistencyPrompt,
+  SCHEMA_PLOT_BRAINSTORM,
+  SCHEMA_PLOT_CONSISTENCY,
+  PLOT_SEVERITY_ENUM,
+} from './prompts/plot.js';
+
+export {
   buildDateDetectPrompt,
   SCHEMA_DATE_DETECT,
 } from './prompts/import.js';

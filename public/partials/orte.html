@@ -20,7 +20,15 @@
   </div>
   <div x-show="orteStatus" class="card-status" x-html="orteStatus"></div>
 
-  <div x-show="$app.orte.length === 0 && !orteLoading && !orteStatus" class="card-status" x-text="$app.t('common.noDataYet')"></div>
+  <div x-show="$app.orte.length === 0 && !orteLoading && !orteStatus" class="card-empty">
+    <p class="card-empty-text" x-text="$app.t('common.noAnalysisYet')"></p>
+    <button type="button" class="primary card-empty-cta"
+            @click="$app.alleAktualisieren()"
+            :disabled="$app.alleAktualisierenLoading || !$app.selectedBookId">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#rotate-cw"/></svg>
+      <span x-text="$app.t('header.updateAll')"></span>
+    </button>
+  </div>
 
   <!-- Skeleton während Loading vor erstem Datensatz -->
   <div x-show="orteLoading && $app.orte.length === 0" class="entity-skeleton entity-list--accented" x-cloak>

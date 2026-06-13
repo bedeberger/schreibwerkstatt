@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 183, 92 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 184, 95 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -58,6 +58,12 @@ erDiagram
   books ||--o{ storylines            : has
   storylines ||--o{ zeitstrahl_events : groups
   storylines ||--o{ figure_events     : groups
+  books ||--o{ plot_acts             : has
+  books ||--o{ plot_beats            : has
+  plot_acts ||--o{ plot_beats        : groups
+  chapters ||--o| plot_beats         : "beat lands in"
+  plot_beats ||--o{ plot_beat_figures : has
+  figures ||--o{ plot_beat_figures   : "appears in beat"
   books }o--o| book_categories       : "category_id"
   books ||--o| blog_connections      : "wp-link"
   blog_connections ||--o{ blog_page_links : "has"
@@ -659,6 +665,34 @@ erDiagram
     INTEGER sort_order
   }
 
+  plot_acts {
+    INTEGER id          PK
+    INTEGER book_id     FK
+    TEXT    user_email
+    TEXT    name
+    TEXT    farbe        "optionaler Akzent"
+    INTEGER position     "Spalten-Reihenfolge"
+    TEXT    created_at
+    TEXT    updated_at
+  }
+  plot_beats {
+    INTEGER id           PK
+    INTEGER book_id      FK
+    INTEGER act_id       FK "CASCADE — Spalte"
+    TEXT    user_email
+    TEXT    titel
+    TEXT    beschreibung
+    TEXT    status       "geplant|entwurf|im_buch|verworfen"
+    INTEGER chapter_id   FK "SET NULL — landet in Kapitel"
+    INTEGER sort_order   "Reihenfolge in Spalte"
+    TEXT    created_at
+    TEXT    updated_at
+  }
+  plot_beat_figures {
+    INTEGER beat_id   FK "PK, CASCADE"
+    INTEGER figure_id FK "PK, CASCADE"
+  }
+
   continuity_checks ||--o{ continuity_issues          : has
   continuity_issues ||--o{ continuity_issue_figures   : refs
   continuity_issues ||--o{ continuity_issue_chapters  : refs
@@ -666,7 +700,11 @@ erDiagram
   zeitstrahl_events ||--o{ zeitstrahl_event_pages     : refs
   zeitstrahl_events ||--o{ zeitstrahl_event_figures   : refs
   storylines        ||--o{ zeitstrahl_events          : groups
+  plot_acts         ||--o{ plot_beats                 : groups
+  plot_beats        ||--o{ plot_beat_figures          : refs
 ```
+
+**Plot-Werkstatt (Beat-Board).** Planendes Pendant zur rückwärtsgewandten Szenen-/Ereignis-Analyse: `plot_acts` sind die Spalten (Akte/Phasen, geordnet via `position`), `plot_beats` die Karten darin (Handlungspunkte, geordnet via `sort_order`). `status` hält „geplant → entwurf → im_buch (schon geschrieben) → verworfen" nach; `chapter_id` (SET NULL) verknüpft einen Beat mit dem Zielkapitel; `plot_beat_figures` ist die M:M-Brücke zu beteiligten Figuren. Pro Buch + User skopiert. KI assistiert ausschliesslich planend/überwachend (Brainstorm + Consistency gegen Buchrealität), nie generativ in den Text.
 
 ---
 

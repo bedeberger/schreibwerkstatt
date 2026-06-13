@@ -122,9 +122,8 @@
   color: var(--color-text);
   border-color: var(--color-border);
 }
-.header-icon-btn--cache {
-  font-size: var(--font-size-sm);
-}
+/* ⋯-Trigger für das Komplettanalyse-Status-/Aktionsmenü. Icon erbt 1em
+   aus .header-icon-btn (font-size-base) → kein eigener Size-Override nötig. */
 
 /* Avatar-Button (Trigger für Identitäts-Menü) */
 .avatar-btn {
@@ -368,6 +367,12 @@
 }
 .header-today-ring--reached circle:nth-of-type(2) {
   stroke: var(--color-success);
+}
+/* 0 %-Zustand: gestrichelte Spur statt blassem Vollring (sah wie leerer
+   Avatar/Spinner aus). Arc ist bei 0 % unsichtbar (dash = 0). */
+.header-today-ring--empty circle:first-of-type {
+  stroke-dasharray: 1.6 2;
+  stroke-opacity: var(--opacity-strong);
 }
 @media (prefers-reduced-motion: reduce) {
   .header-today-ring--active circle:nth-of-type(2) { animation: none; }

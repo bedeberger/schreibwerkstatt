@@ -152,9 +152,15 @@ export const appChromeMethods = {
   _avatarInitials() {
     const src = (this.currentUser && (this.currentUser.name || this.currentUser.email)) || '';
     if (!src) return '·';
-    const parts = src.split('@')[0].split(/[\s._-]+/).filter(Boolean);
-    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-    return (parts[0] || src).slice(0, 2).toUpperCase();
+    const local = src.split('@')[0];
+    // Erstes alphanumerisches Zeichen pro Wort — ignoriert Klammern/Satzzeichen
+    // (sonst ergab z.B. „Dev (lokal)" das Initial „D(" statt „DL").
+    const inits = local.split(/[\s._-]+/)
+      .map(w => (w.match(/[\p{L}\p{N}]/u) || [''])[0])
+      .filter(Boolean);
+    if (inits.length >= 2) return (inits[0] + inits[1]).toUpperCase();
+    const alnum = local.match(/[\p{L}\p{N}]/gu) || [];
+    return (alnum.slice(0, 2).join('') || inits[0] || '·').toUpperCase();
   },
 
   // Confirm-Dialog via natives HTMLDialogElement.

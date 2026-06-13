@@ -1,4 +1,4 @@
-<!-- Komplettanalyse: Primärbutton mit eingebettetem Fortschrittsring + Cache-Clear + Status-Panel -->
+<!-- Komplettanalyse: Primärbutton mit eingebettetem Fortschrittsring + Status-/Aktionsmenü (⋯) -->
 <div class="komplett-status-wrap" @click.outside="showKomplettStatus = false" @mouseenter="if (alleAktualisierenLoading) showKomplettStatus = true">
   <button type="button"
           class="update-all-btn"
@@ -10,50 +10,70 @@
           x-show="alleAktualisierenLoading"
           :style="{ '--progress': (alleAktualisierenProgress || 0) + '%' }"
           aria-hidden="true"></span>
-    <span class="update-all-btn-icon" x-show="!alleAktualisierenLoading" aria-hidden="true">↻</span>
+    <span class="update-all-btn-icon" x-show="!alleAktualisierenLoading" aria-hidden="true">
+      <svg class="icon"><use href="/icons.svg?v=691#rotate-cw"/></svg>
+    </span>
     <span class="update-all-btn-label" x-text="t('header.updateAll')"></span>
   </button>
   <button type="button"
-          class="header-icon-btn header-icon-btn--cache"
-          @click="clearChapterCache()"
-          :disabled="alleAktualisierenLoading || !selectedBookId"
-          :data-tip="t('header.clearCacheTitle')"
-          :aria-label="t('header.clearCache')">
-    <span aria-hidden="true">⌫</span>
+          class="header-icon-btn header-icon-btn--status"
+          :class="{ 'header-icon-btn--active': showKomplettStatus }"
+          @click="showKomplettStatus = !showKomplettStatus"
+          :disabled="!selectedBookId"
+          :data-tip="t('header.statusMenu')"
+          :aria-label="t('header.statusMenu')"
+          aria-haspopup="menu"
+          :aria-expanded="showKomplettStatus">
+    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#more-horizontal"/></svg>
   </button>
   <span class="komplett-last-run"
         x-show="!alleAktualisierenLoading && alleAktualisierenLastRun"
         x-cloak
         x-text="t('common.asOf', { date: alleAktualisierenLastRun })"></span>
-  <div class="komplett-status-panel" x-show="showKomplettStatus" x-cloak>
+  <div class="komplett-status-panel" x-show="showKomplettStatus" x-cloak role="menu">
     <div class="komplett-status-title" x-text="t('komplett.title')"></div>
     <div class="komplett-status-laststamp" x-show="alleAktualisierenLastRun" x-cloak
          x-text="t('common.asOf', { date: alleAktualisierenLastRun })"></div>
-    <div class="progress-bar-wrap komplett-progress-bar-wrap">
-      <div class="progress-bar" :style="{ '--progress': alleAktualisierenProgress + '%' }"></div>
-    </div>
-    <div class="komplett-progress-label">
-      <span x-text="alleAktualisierenStatus || t('komplett.done')"></span>
-      <span x-show="alleAktualisierenTokIn > 0 || alleAktualisierenTokOut > 0" class="komplett-tokens">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#arrow-up"/></svg><span x-text="_fmtTok(alleAktualisierenTokIn)"></span>
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#arrow-down"/></svg><span x-text="_fmtTok(alleAktualisierenTokOut)"></span>
-        <span x-show="alleAktualisierenTps" x-text="' · ' + Math.round(alleAktualisierenTps) + ' tok/s'"></span>
-      </span>
-    </div>
-    <ul class="komplett-phase-list">
-      <template x-for="phase in _komplettPhasen()" :key="phase.key || phase.label">
-        <li class="komplett-phase-item" :class="{ 'is-done': phase.done, 'is-active': phase.active }">
-          <span class="komplett-phase-icon">
-            <svg class="icon" aria-hidden="true"><use :href="phase.done ? '/icons.svg?v=690#check' : (phase.active ? '/icons.svg?v=690#play' : '/icons.svg?v=690#circle')"/></svg>
+    <template x-if="alleAktualisierenLoading || alleAktualisierenLastRun">
+      <div class="komplett-status-progress">
+        <div class="progress-bar-wrap komplett-progress-bar-wrap">
+          <div class="progress-bar" :style="{ '--progress': alleAktualisierenProgress + '%' }"></div>
+        </div>
+        <div class="komplett-progress-label">
+          <span x-text="alleAktualisierenStatus || t('komplett.done')"></span>
+          <span x-show="alleAktualisierenTokIn > 0 || alleAktualisierenTokOut > 0" class="komplett-tokens">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#arrow-up"/></svg><span x-text="_fmtTok(alleAktualisierenTokIn)"></span>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#arrow-down"/></svg><span x-text="_fmtTok(alleAktualisierenTokOut)"></span>
+            <span x-show="alleAktualisierenTps" x-text="' · ' + Math.round(alleAktualisierenTps) + ' tok/s'"></span>
           </span>
-          <span x-text="phase.label"></span>
-        </li>
-      </template>
-    </ul>
+        </div>
+        <ul class="komplett-phase-list" x-show="_komplettPhasen().length">
+          <template x-for="phase in _komplettPhasen()" :key="phase.key || phase.label">
+            <li class="komplett-phase-item" :class="{ 'is-done': phase.done, 'is-active': phase.active }">
+              <span class="komplett-phase-icon">
+                <svg class="icon" aria-hidden="true"><use :href="phase.done ? '/icons.svg?v=691#check' : (phase.active ? '/icons.svg?v=691#play' : '/icons.svg?v=691#circle')"/></svg>
+              </span>
+              <span x-text="phase.label"></span>
+            </li>
+          </template>
+        </ul>
+      </div>
+    </template>
     <ul class="komplett-warnings" x-show="!alleAktualisierenLoading && alleAktualisierenWarnings.length" x-cloak>
       <template x-for="w in alleAktualisierenWarnings" :key="w.key">
         <li class="komplett-warning-item" x-text="t(w.key, w.params)"></li>
       </template>
     </ul>
+    <div class="komplett-status-actions">
+      <button type="button"
+              class="komplett-status-action-btn"
+              role="menuitem"
+              @click="showKomplettStatus = false; clearChapterCache()"
+              :disabled="alleAktualisierenLoading || !selectedBookId"
+              :data-tip="t('header.clearCacheTitle')">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#trash"/></svg>
+        <span x-text="t('header.clearCache')"></span>
+      </button>
+    </div>
   </div>
 </div>

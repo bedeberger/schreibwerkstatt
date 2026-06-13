@@ -21,7 +21,15 @@
   </div>
   <div x-show="kontinuitaetStatus" class="card-status" x-html="kontinuitaetStatus"></div>
 
-  <div x-show="!kontinuitaetResult && !kontinuitaetLoading && !kontinuitaetStatus" class="card-status" x-text="$app.t('common.noDataYet')"></div>
+  <div x-show="!kontinuitaetResult && !kontinuitaetLoading && !kontinuitaetStatus" class="card-empty">
+    <p class="card-empty-text" x-text="$app.t('common.noAnalysisYet')"></p>
+    <button type="button" class="primary card-empty-cta"
+            @click="$app.alleAktualisieren()"
+            :disabled="$app.alleAktualisierenLoading || !$app.selectedBookId">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#rotate-cw"/></svg>
+      <span x-text="$app.t('header.updateAll')"></span>
+    </button>
+  </div>
 
   <!-- Skeleton während Loading vor erstem Ergebnis -->
   <div x-show="kontinuitaetLoading && !kontinuitaetResult" class="entity-skeleton entity-list--accented" x-cloak>

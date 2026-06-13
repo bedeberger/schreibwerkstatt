@@ -57,7 +57,7 @@ Token-Referenz (Farben, Radien, Spacing, Schriftgrössen): [public/css/tokens.cs
 - [Sofort-Tooltip (`data-tip`)](#sofort-tooltip-data-tip--default-variante)
 - [Keyboard-Shortcut (`<kbd>`)](#keyboard-shortcut-anzeige-kbd)
 - [Loading-Overlay](#loading-overlay) — Status: kein generisches Pattern
-- [Empty-State mit CTA](#empty-state-mit-cta) — Status: kein generisches Pattern
+- [Empty-State mit CTA](#empty-state-mit-cta) — `.card-empty` + CTA-Button
 - [Inline-Action-Group](#inline-action-group) — Status: kein Standard
 - [Drawer / Side-Panel](#drawer--side-panel) — noch kein generisches Pattern
 - [Toast/Snackbar](#toastsnackbar) — noch kein generisches Pattern
@@ -209,8 +209,11 @@ Wiederkehrende Werte gehen über Tokens. Ad-hoc-Werte (`box-shadow: 0 4px 12px .
 - `.combobox-dropdown` — Popover-Liste (mit `--up`-Modifier wenn nach oben aufklappt).
 - `.combobox-search` — Input innerhalb Dropdown.
 - `.combobox-option` / `.combobox-option--active` / `.combobox-empty`.
+- `.combobox-option__label` / `.combobox-option__sub` — Label-Zeile + optionale gedämpfte Zweitzeile.
 
 **Regel:** Wrapper-Div leer lassen (Helper überschreibt `innerHTML`). Pflicht-Pattern: `x-data="combobox(placeholder, emptyLabel?)" x-modelable="value" x-model="ref" x-effect="options = …"`.
+
+**Optionale Zweitzeile:** Eine Option darf neben `{ value, label }` ein `sublabel` tragen (`{ value, label, sublabel }`). Die Combobox rendert es als gedämpfte zweite Zeile unter dem Label und bezieht es in die Such-Filterung mit ein. Fehlt `sublabel`, bleibt die Option einzeilig (rein additiv, alle bestehenden Comboboxen unverändert). Use-Case: Kontext zur Auswahl (z. B. Figuren-Import-Picker zeigt Hauptkapitel · Beruf · Jahrgang).
 
 ### Catalog-Filter-Spezialisierung
 
@@ -381,7 +384,7 @@ Niemals `x-text` für Icon-Buttons mit zwei Zuständen — `x-text` setzt `textC
 
 **Verfügbare Icons (Stand v1, Lucide-Namen):**
 - Chevrons / Arrows: `chevron-left/right/up/down`, `arrow-left/right/up/down`
-- Aktionen: `check`, `x`, `plus`, `minus`, `pencil`, `trash`, `search`, `play`, `undo`, `redo`
+- Aktionen: `check`, `x`, `plus`, `minus`, `pencil`, `trash`, `search`, `play`, `undo`, `redo`, `rotate-cw` (Analysieren/Neu-Ausführen), `more-horizontal` (⋯-Overflow-/Status-Menü)
 - Status: `circle`, `alert-triangle`, `loader`
 - Viewport: `maximize`, `maximize-2`, `minimize-2`, `scan`
 - Editor: `separator-horizontal` (Trennlinie), `move-horizontal` (Fit-Width)
@@ -417,7 +420,7 @@ Mehr Masken in `:root` ergänzen, sobald sie ein zweites Mal gebraucht werden (L
 
 ## Icon-Toolbar (`.graph-tool-btn`)
 
-**Use:** Kompakte Icon-Button-Reihe für Canvas-/Viewport-Steuerung (Zoom +/−, Reset, Fullscreen-Toggle). Genutzt von Figuren-Graph (vis-network), Figur-Werkstatt-Mindmap (jsMind) und Ereignisse-Zeitstrahl (vis-timeline; zusätzlich Sprung an Anfang/Ende der Zeitachse). Erste Wahl für jeden weiteren Graph/Map/Canvas-Viewer. Icons kommen aus dem [Lucide-Sprite](#icon-system-lucide-sprite).
+**Use:** Kompakte Icon-Button-Reihe für Canvas-/Viewport-Steuerung (Zoom +/−, Reset, Fullscreen-Toggle). Genutzt von Figuren-Graph (vis-network) und Figur-Werkstatt-Mindmap (jsMind). Erste Wahl für jeden weiteren Graph/Map/Canvas-Viewer. Icons kommen aus dem [Lucide-Sprite](#icon-system-lucide-sprite).
 
 **Markup (Overlay-Variante, oben rechts in Canvas-Ecke):**
 ```html
@@ -473,7 +476,6 @@ Mehr Masken in `:root` ergänzen, sobald sie ein zweites Mal gebraucht werden (L
 | Fullscreen schliessen | `minimize-2` | Diagonale Pfeile einwärts |
 | Undo / Redo | `undo` / `redo` | Action-Group-Variante (siehe unten) |
 | Expand-all / Collapse-all | `chevron-down` / `chevron-up` | Action-Group-Variante |
-| Sprung an den Anfang / ans Ende | `chevron-first` / `chevron-last` | Zeitachsen-Navigation (Zeitstrahl), behält den Zoom |
 
 Neue Aktionen erweitern diese Tabelle und das Sprite (siehe [Icon-System](#icon-system-lucide-sprite)).
 
@@ -1016,33 +1018,47 @@ Nur in Sidebar-Tree verwendet. Bei neuer hierarchischer Liste: erst prüfen, ob 
 
 ---
 
-## Jahres-Zeitstrahl (vis-timeline)
+## Jahres-Band (selbstgebaut)
 
-**Use:** Interaktiver Zeitstrahl über einer langen, datierten Liste — jedes datierte Element als Item auf einer Jahresachse (Punkt bzw. Range bei Spannen), Zoom/Pan, Klick auf ein Item scrollt zum zugehörigen Listeneintrag. Erste Konsumentin: Ereignisse-Karte (Jahr-Achse über `globalZeitstrahl`).
+**Use:** Kompaktes Jahres-Band über einer langen, datierten Liste — jedes datierte Element als farbcodierter Marker (Subtyp-Farbe) auf einer Jahresachse, Klick auf einen Marker scrollt zum zugehörigen Listeneintrag und hebt ihn hervor. Übersicht + Navigation, **nicht** der Detail-Reader (das ist die Liste darunter). Erste Konsumentin: Ereignisse-Karte (Jahr-Achse über `globalZeitstrahl`).
+
+**Warum kein vis-timeline (mehr):** Die Lib clusterte asynchron und stapelte ihre Achse erst ~1 s nach dem ersten Paint nach → sichtbares „Einklappen, dann Expandieren". Das Band ist rein DOM/CSS positioniert (`left` in Prozent, Spur via `--gz-band-lane`), rendert synchron aus dem Daten-Modell und erscheint sofort in finaler Höhe — kein Lazy-Lib-Load, kein Layout-Shift.
 
 **Markup:**
 ```html
 <div class="gz-layout">
-  <div class="gz-timeline" :aria-label="…"></div>            <!-- vis-Container, JS mountet hinein -->
+  <div class="gz-band" x-show="timelineItemCount > 0" :style="{ '--gz-band-lanes': bandModel().lanes }">
+    <div class="gz-band-track">
+      <template x-for="tick in bandModel().ticks"><div class="gz-band-tick" :style="{ left: tick.x + '%' }">…</div></template>
+      <template x-for="m in bandModel().markers">
+        <button class="gz-band-marker" :class="…" :style="bandMarkerStyle(m)" :data-ev-id="m.id"
+                :data-tip="…" @click="onBandMarkerClick(m.id)"></button>
+      </template>
+    </div>
+  </div>
   <div class="gz-timeline-hint" x-show="…" x-text="…"></div>  <!-- Hinweis: N undatierte Events -->
   <div class="…list-body">…<div :data-ev-index="i">…</div>…</div>
 </div>
 ```
 
-**Lib:** vis-timeline (Standalone-Bundle, gleiche vis.js-Familie wie vis-network), lazy via `loadVisTimeline()` aus [public/js/lazy-libs.js](public/js/lazy-libs.js). Vendor-CSS wird dort per `_ensureCss` injiziert.
-
-**Klassen** [public/css/analysis/zeitleiste.css](public/css/analysis/zeitleiste.css) (Layout) + [public/css/analysis/ereignisse-timeline.css](public/css/analysis/ereignisse-timeline.css) (Vendor-Theme):
-- `.gz-layout` — Flex-Wrapper, `flex-direction: column` (Zeitstrahl oben, Liste darunter)
-- `.gz-timeline` — vis-Mount-Container (Rahmen + Hintergrund aus Tokens)
+**Klassen** [public/css/analysis/zeitleiste.css](public/css/analysis/zeitleiste.css) (`@layer components`, kein Vendor-Theme mehr):
+- `.gz-layout` — Flex-Wrapper, `flex-direction: column` (Band oben, Liste darunter)
+- `.gz-band` / `.gz-band-track` — Container + positioniertes Koordinatensystem; Höhe aus `--gz-band-lanes`
+- `.gz-band-tick` / `.gz-band-tick-label` — Jahres-Gridline + Label
+- `.gz-band-marker` (+ `--range` / `--more` / `--selected`) — eckiger Marker; Farbe via `--gz-marker-color`
 - `.gz-timeline-hint` — Fussnote zu undatierten Events
-- `.gz-vis-item` / `.gz-vis-item--extern` — Item-className (intern = Primärfarbe, extern = Error-Tönung)
+
+**Pure Layout-Helfer** (in [ereignisse-card.js](public/js/cards/ereignisse-card.js), getestet in [ereignisse-card-filter.test.mjs](tests/unit/ereignisse-card-filter.test.mjs)):
+- `buildTimelineItems(events)` — nur Events mit `datum_year` werden Achsen-Items; `id` = Listen-Index.
+- `layoutBandItems(items)` — Greedy-Lane-Packing, x in Prozent; Höhe gedeckelt bei `maxLanes` (Default 6). Überzählige in dichten Jahren bündeln pro x-Spalte zu **einem** `kind:'more'`-Marker (kleiner „+N"-Chip statt Riesen-Zählblase). Kein stilles Wegschneiden — jedes Event zählt in den Count, Klick springt zum ersten in der Liste.
+- `bandAxisTicks(bounds)` — „nette" Jahres-Ticks (Schrittweite 1/2/5/10/…).
+- `buildBandModel(events)` — fügt die drei zusammen; in der Karte über `memoizeByIdentity` an die gefilterte Liste gebunden.
 
 **Regeln:**
-- **Theme-Overrides der `.vis-*`-Vendor-Klassen sind UNLAYERED** ([ereignisse-timeline.css](public/css/analysis/ereignisse-timeline.css)) — das dynamisch nachgeladene Vendor-CSS ist unlayered und schlägt sonst jede `@layer`-Regel. Scoping via `.gz-timeline .vis-*` für die nötige Spezifität.
-- Items aus der **gefilterten** Liste bauen (`buildTimelineItems`, pure + getestet); nur Events mit `datum_year` landen auf der Achse, undatierte bleiben nur in der Liste (Hinweis-Text).
-- Item-`id` = Listen-Index → Klick (`select`-Event) ruft `scrollToEventIndex(id)` via `[data-ev-index]` + `scrollIntoView`.
-- Lazy rendern: erst wenn Karte sichtbar (`display:none` → vis misst 0). Re-Render bei Filter-/Sichtbarkeits-Wechsel, Instanz wiederverwenden (`DataSet.clear()/add()`), im `destroy()` `timeline.destroy()`.
+- Marker-Farbe NICHT pro Subtyp als CSS-Selektor duplizieren, sondern `--gz-marker-color` inline via `:style` (`bandMarkerStyle`) auf `var(--card-accent-event-<subtyp>)` setzen (SSoT-Tokens, gleiche Codierung wie die Listen-Badges); `extern` → `--color-err-border`.
+- `x` ist der Mittelpunkt eines Punkt-Markers (`translateX(-50%)`); Spannen (`--range`) starten bei `x` mit inline gesetzter `width` (kein Zentrieren).
 - Datums-Bau via `setFullYear` (nicht `new Date(year,…)`) — sonst landen Jahre < 100 auf 1900+year.
+- Klick auf Marker → `onBandMarkerClick(id)` → `scrollToEventIndex` + `selectedEventIndex`; Liste→Band über `selectTimelineEvent(i)` (hebt Marker hervor + scrollt ihn ins Bild).
 
 **Beispiele:** [public/partials/ereignisse.html](public/partials/ereignisse.html), [public/js/cards/ereignisse-card.js](public/js/cards/ereignisse-card.js)
 
@@ -1825,8 +1841,7 @@ Drei Editoren leben in eigenen Subfoldern (`book/`, `focus/`, `notebook/`); edit
 | [analysis/heatmap.css](public/css/analysis/heatmap.css) | `.heatmap-*` Tabelle + Detail-Drawer. |
 | [analysis/kontinuitaet.css](public/css/analysis/kontinuitaet.css) | Kontinuitätsprüfung + Buch-Einstellungen-Spezifika. |
 | [analysis/komplett-status.css](public/css/analysis/komplett-status.css) | Komplettanalyse-Status-Header. |
-| [analysis/zeitleiste.css](public/css/analysis/zeitleiste.css) | Globaler Zeitstrahl (Liste + `.gz-timeline`-Layout). |
-| [analysis/ereignisse-timeline.css](public/css/analysis/ereignisse-timeline.css) | vis-timeline Vendor-Theme (Jahres-Zeitstrahl). **Unlayered** — schlägt das dynamisch nachgeladene Vendor-CSS. |
+| [analysis/zeitleiste.css](public/css/analysis/zeitleiste.css) | Globaler Zeitstrahl: Ereignis-Liste + selbstgebautes `.gz-band`-Jahres-Band. |
 | [analysis/kapitel-review.css](public/css/analysis/kapitel-review.css) | Kapitel-Review. |
 
 ### admin/
@@ -1846,6 +1861,7 @@ Drei Editoren leben in eigenen Subfoldern (`book/`, `focus/`, `notebook/`); edit
 | [book/book-settings.css](public/css/book/book-settings.css) | Buch-Einstellungen Job-Stats-Tabellen. |
 | [book/header-actions.css](public/css/book/header-actions.css) | `.header-actions`-Cluster, Update-All-Panel. |
 | [book/buchorganizer.css](public/css/book/buchorganizer.css) | Buch-Organisations-Karte. |
+| [book/plot-board.css](public/css/book/plot-board.css) | Plot-Werkstatt (Beat-Board / Kanban). |
 | [book/export.css](public/css/book/export.css) | Buch-Export. |
 | [book/pdf-export.css](public/css/book/pdf-export.css) | PDF-Export-Profile + Tabs. |
 | [book/epub-export.css](public/css/book/epub-export.css) | EPUB-Export-Karte (Scope-Picker + Reflow-Settings). |
@@ -1927,20 +1943,28 @@ Position: absolute innerhalb `.card`, `background: var(--color-surface) / 0.7` m
 
 ## Empty-State mit CTA
 
-**Status:** Aktiv (eingeführt mit Figuren-Werkstatt). Klassen leben in [card-form.css](public/css/components/card-form.css). Verwenden, wann immer eine Karte „Keine Daten — hier der Button um welche zu erzeugen" rendert (z.B. leere Findings, leere Figuren-Liste).
+**Status:** Aktiv. Klassen leben in [card-form.css](public/css/components/card-form.css). Verwenden, wann immer eine Karte „Keine Daten — hier der Button um welche zu erzeugen" rendert. Ersetzt den nackten `.card-status`-Leertext. Konsumenten: Figuren-Werkstatt (Inline-Input-Variante) **und** alle Komplettanalyse-Katalogkarten (Figuren, Orte, Szenen, Ereignisse, Weltfakten, Kontinuität, Songs) mit „Buch analysieren"-CTA.
 
-**Markup:**
+**Markup (Standard-CTA mit Icon — Komplettanalyse-Katalogkarten):**
 ```html
-<div class="card-empty">
-  <p class="card-empty-text" x-text="$app.t('feature.empty.title')"></p>
-  <p class="card-empty-hint" x-text="$app.t('feature.empty.hint')"></p>
-  <button class="primary" @click="…" x-text="$app.t('feature.empty.cta')"></button>
+<div x-show="…leer & nicht-loading…" class="card-empty">
+  <p class="card-empty-text" x-text="$app.t('common.noAnalysisYet')"></p>
+  <button type="button" class="primary card-empty-cta"
+          @click="$app.alleAktualisieren()"
+          :disabled="$app.alleAktualisierenLoading || !$app.selectedBookId">
+    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#rotate-cw"/></svg>
+    <span x-text="$app.t('header.updateAll')"></span>
+  </button>
 </div>
 ```
 - `.card-empty` — flex-column, zentriert, Padding `--space-2xl --space-lg` (Mobile: `--space-xl --space-md`)
-- `.card-empty-text` — semantischer Hauptsatz, `--font-size-md`, `--fw-medium`
-- `.card-empty-hint` — 12 px muted Erklärung, `max-width: 32em`
-- Button ist Standard `.primary` — kein eigener Empty-CTA-Stil
+- `.card-empty-text` — semantischer Hauptsatz, `--font-size-md`, `--fw-medium`, Text-Farbe
+- `.card-empty-hint` — 12 px muted Erklärung, `max-width: 32em` (optional, nur wenn der Hauptsatz Kontext braucht)
+- `.card-empty-cta` — `inline-flex` + Gap, damit Lucide-Icon + Label im `.primary`-Button bündig sitzen. Basis bleibt `.primary`.
+
+**Regeln:**
+- CTA muss zur **tatsächlichen** Datenquelle der Karte passen. Komplettanalyse-Outputs → `$app.alleAktualisieren()`. Lektorat-getriebene Karten (Fehler-/Stil-Heatmap) NICHT mit diesem CTA versehen — sie entstehen über den Prüf-Flow, nicht über die Komplettanalyse.
+- CTA `:disabled`, solange die Analyse läuft oder kein Buch gewählt ist.
 
 Wenn die Karte zusätzlich Inline-Inputs braucht (z.B. „Neue Figur — Name eingeben"), `.card-empty` als Container für Input + Button-Row mit `.row` weiternutzen — siehe [public/partials/figur-werkstatt.html](public/partials/figur-werkstatt.html).
 
@@ -1987,6 +2011,36 @@ Wenn die Karte zusätzlich Inline-Inputs braucht (z.B. „Neue Figur — Name ei
 - Vorschau-URL trägt `?v=${previewVersion}`-Counter → Cache-Bust nach Upload/Remove (kein veraltetes Bild).
 - Upload via `fetch(POST, body: file)` mit `Content-Type: file.type`; Server härtet durch `prepareCover` (sharp, Magic-Bytes, sRGB-JPEG).
 - CSS: PDF-Export `.pdfx-cover-preview`/`.pdfx-file-btn` ([public/css/book/pdf-export.css](public/css/book/pdf-export.css)), BookSettings `.pub-image-preview`/`.pub-upload-btn` ([public/css/book/book-settings.css](public/css/book/book-settings.css)).
+
+---
+
+## Plot-Beat-Board (Kanban)
+
+**Use:** Planendes Spalten-Board — Akte als Spalten (`.plot-column`), Handlungspunkte als ziehbare Karten (`.plot-beat`). Einzige Kanban-Komponente der App; nur für die Plot-Werkstatt. Kein generisches Board-Framework — wer ein zweites Board braucht, abstrahiert vorher.
+
+**Struktur:**
+```html
+<div class="plot-board">                         <!-- flex, horizontal scroll; Mobile: column-stack -->
+  <div class="plot-column" :class="{ 'plot-column--dropzone': _dragOverActId === act.id }"
+       @dragover.prevent="onActDragOver(act.id)" @drop.prevent="onBeatDrop(act.id, null)">
+    <div class="plot-column-header">…Titel + .plot-column-count + .plot-column-actions (.plot-icon-btn)…</div>
+    <div class="plot-column-body">
+      <div class="plot-beat plot-beat--im_buch" draggable="true"
+           @dragstart="onBeatDragStart(beat, $event)" @drop.prevent.stop="onBeatDrop(act.id, beat.id)">
+        <button class="plot-status-tag plot-status-tag--im_buch">…</button>  <!-- Klick = Status zyklisch -->
+      </div>
+      <button class="plot-add-beat-btn">+ Beat</button>
+      <button class="plot-brainstorm-btn">KI: Beats vorschlagen</button>
+    </div>
+  </div>
+  <div class="plot-column plot-column--add">…neuer Akt…</div>
+</div>
+```
+
+- **CSS:** [public/css/book/plot-board.css](public/css/book/plot-board.css). Akzent via `var(--card-accent)` (Mapping `.card--plot` in [card-accents.css](public/css/card-accents.css) → `--card-accent-plot`).
+- **DnD:** natives HTML5 Drag-and-Drop (kein SortableJS). Beats sind `draggable`; Drop-Targets sind die Spalte (`@drop` → ans Ende) **und** jeder Beat (`@drop.prevent.stop` → davor einfügen). Reihenfolge wird lokal neu nummeriert und via `PUT /plot/beats/order` persistiert. Akte werden per Pfeil-Buttons verschoben (a11y), nicht per Drag.
+- **Status:** vier Werte mit eigenen `--<status>`-Modifiern auf `.plot-beat` (linke Border) und `.plot-status-tag` (Badge): `geplant` (neutral) · `entwurf` (warn) · `im_buch` (ok) · `verworfen` (gedimmt, durchgestrichen). Eigene Klassen, NICHT `severity-tag--*` (das sind andere Werte). Konflikt-Severity im Consistency-Panel nutzt dagegen die bestehenden `severity-tag--*`.
+- **Icon-Buttons:** board-lokale `.plot-icon-btn` (+ `--danger`), analog zu `.organizer-icon-btn` im Buchorganizer — kein globaler `.icon-btn` existiert.
 
 ---
 

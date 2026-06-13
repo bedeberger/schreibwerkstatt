@@ -296,6 +296,20 @@ select:focus {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Optionale Zweitzeile (opt.sublabel) — gedämpfter Kontext unter dem Label.
+   Beide Spans clippen einzeln, da das ellipsis der Option bei Block-Kindern
+   nicht greift. */
+.combobox-option__label,
+.combobox-option__sub {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.combobox-option__sub {
+  margin-top: 1px;
+  font-size: var(--size-compact-font-size);
+  color: var(--color-muted);
+}
 .combobox-option:hover,
 .combobox-option--hl { background: var(--color-hover); }
 .combobox-option--selected { font-weight: 400; color: var(--color-accent); }
@@ -363,9 +377,13 @@ select:focus {
     min-width: 0;
     max-width: 100%;
   }
-  .combobox-option {
+  .combobox-option,
+  .combobox-option__label,
+  .combobox-option__sub {
     white-space: normal;
     overflow-wrap: anywhere;
+    overflow: visible;
+    text-overflow: clip;
   }
 }
 
@@ -473,6 +491,13 @@ select:focus {
   color: var(--color-muted);
   max-width: 32em;
   line-height: var(--lh-base);
+}
+/* CTA-Button im Empty-State: inline-flex, damit Lucide-Icon + Label bündig
+   zentriert sitzen. Basis bleibt .primary. */
+.card-empty-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
 }
 @media (max-width: 600px) {
   .card-empty {
@@ -673,6 +698,15 @@ select[aria-invalid="true"],
 @media (max-width: 700px) {
   .card-actions { width: 100%; }
   .card-actions button { flex: 1 1 auto; min-width: 0; }
+  /* Gruppierte Editor-Toolbar (Prüfen/Bearbeiten/Fokus/Chat/Ideen/Teilen):
+     viele Buttons → natürliche Breite + kompakteres Padding/Schrift, damit sie
+     pro Reihe dichter packen (≈2 statt 3 Reihen vor dem Seiteninhalt). Andere
+     Karten (oft nur 1 CTA) behalten den Full-Width-Stretch. */
+  .card-actions--grouped button {
+    flex: 0 1 auto;
+    padding: var(--size-default-padding-y) 10px;
+    font-size: var(--font-size-sm);
+  }
   .card-actions--grouped .action-sep { display: none; }
   /* Icon-only Buttons (z.B. Tagebuch Vor/Zurueck) sind via `.graph-tool-btn`
      nur ~22px hoch — unter dem 44px-Touch-Target, Finger verfehlen sie. Auf

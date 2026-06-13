@@ -186,6 +186,17 @@
   .overview-today-ring--active circle:nth-of-type(2) { animation: none; }
 }
 
+/* 0 %-Zustand: gestrichelte Spur statt voller grauer Vollring → liest als
+   „Ziel, noch nicht begonnen" statt als leerer/kaputter Donut. Der Arc
+   (circle 2) ist bei 0 % ohnehin unsichtbar (dash = 0). */
+.overview-donut--empty circle:first-of-type {
+  stroke-dasharray: 3 4;
+  stroke-opacity: var(--opacity-strong);
+}
+.overview-donut--empty .overview-donut-text {
+  fill: var(--color-subtle);
+}
+
 /* ── Streak-Heatmap (52 Wochen × 7 Tage GitHub-Stil) ─────────────────────── */
 .overview-streak-meta {
   display: flex;

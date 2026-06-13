@@ -61,7 +61,10 @@ export function comboboxData(cfg = {}) {
       get filtered() {
         if (!this.query) return this._allOptions;
         const q = this.query.toLowerCase();
-        return this._allOptions.filter(o => String(o.label).toLowerCase().includes(q));
+        // Optionale sublabel (Zweitzeile, z. B. Figuren-Kontext) ist mitsuchbar.
+        return this._allOptions.filter(o =>
+          String(o.label).toLowerCase().includes(q) ||
+          (o.sublabel && String(o.sublabel).toLowerCase().includes(q)));
       },
       _isSelected(val) {
         if (this._multiple) {
@@ -205,8 +208,10 @@ export function comboboxData(cfg = {}) {
           '          :id="$id(\'cb-opt\') + \'-\' + i"',
           '          :aria-selected="_isSelected(opt.value) ? \'true\' : \'false\'"',
           '          :class="{\'combobox-option--selected\': _isSelected(opt.value), \'combobox-option--hl\': i === highlighted}"',
-          '          @click="select(opt.value)" @mouseenter="highlighted = i"',
-          '          x-text="opt.label"></li>',
+          '          @click="select(opt.value)" @mouseenter="highlighted = i">',
+          '        <span class="combobox-option__label" x-text="opt.label"></span>',
+          '        <span class="combobox-option__sub" x-show="opt.sublabel" x-cloak x-text="opt.sublabel"></span>',
+          '      </li>',
           '    </template>',
           '    <li class="combobox-empty" x-show="filtered.length === 0" x-text="$app.t(\'find.noMatches\')"></li>',
           '  </ul>',

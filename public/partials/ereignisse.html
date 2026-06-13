@@ -31,8 +31,16 @@
   </div>
   <div x-show="zeitstrahlStatus && !ereignisseLoading" class="card-status" x-html="zeitstrahlStatus"></div>
 
-  <!-- Leer-Hinweis -->
-  <div x-show="$app.globalZeitstrahl.length === 0 && !zeitstrahlConsolidating && !ereignisseLoading" class="card-status" x-text="$app.t('common.noDataYet')"></div>
+  <!-- Leer-Hinweis mit CTA -->
+  <div x-show="$app.globalZeitstrahl.length === 0 && !zeitstrahlConsolidating && !ereignisseLoading" class="card-empty">
+    <p class="card-empty-text" x-text="$app.t('common.noAnalysisYet')"></p>
+    <button type="button" class="primary card-empty-cta"
+            @click="$app.alleAktualisieren()"
+            :disabled="$app.alleAktualisierenLoading || !$app.selectedBookId">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#rotate-cw"/></svg>
+      <span x-text="$app.t('header.updateAll')"></span>
+    </button>
+  </div>
 
   <!-- Filter -->
   <div x-show="$app.globalZeitstrahl.length > 0" class="filter-bar">
@@ -65,23 +73,29 @@
     <span class="filter-count" x-text="filteredEreignisse().length + ' / ' + $app.globalZeitstrahl.length"></span>
   </div>
 
-  <!-- Zeitleiste: interaktiver Jahres-Zeitstrahl (vis-timeline) + Liste darunter -->
+  <!-- Zeitleiste: Jahres-Band (selbstgebaut, farbcodierte Marker pro Subtyp) + Liste darunter -->
   <div x-show="$app.globalZeitstrahl.length > 0" class="gz-layout">
-    <div class="gz-timeline-wrap" :class="{ 'is-fullscreen': timelineFullscreen }" @keydown.escape.window="timelineFullscreen && toggleTimelineFullscreen()">
-      <div class="gz-timeline-toolbar" x-show="timelineItemCount > 0">
-        <button type="button" class="graph-tool-btn" :data-tip="$app.t('graph.zoomIn')" :aria-label="$app.t('graph.zoomIn')" @click="timelineZoomIn()"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#plus"/></svg></button>
-        <button type="button" class="graph-tool-btn" :data-tip="$app.t('graph.zoomOut')" :aria-label="$app.t('graph.zoomOut')" @click="timelineZoomOut()"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#minus"/></svg></button>
-        <button type="button" class="graph-tool-btn" :data-tip="$app.t('graph.reset')" :aria-label="$app.t('graph.reset')" @click="timelineFit()"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#scan"/></svg></button>
-        <button type="button" class="graph-tool-btn" :data-tip="$app.t('events.timelineJumpFirst')" :aria-label="$app.t('events.timelineJumpFirst')" @click="timelineJumpFirst()"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#chevron-first"/></svg></button>
-        <button type="button" class="graph-tool-btn" :data-tip="$app.t('events.timelineJumpLast')" :aria-label="$app.t('events.timelineJumpLast')" @click="timelineJumpLast()"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#chevron-last"/></svg></button>
-        <button type="button" class="graph-tool-btn" :aria-pressed="timelineFullscreen" :data-tip="timelineFullscreen ? $app.t('graph.fullscreenClose') : $app.t('graph.fullscreen')" :aria-label="timelineFullscreen ? $app.t('graph.fullscreenClose') : $app.t('graph.fullscreen')" @click="toggleTimelineFullscreen()"><svg class="icon" aria-hidden="true"><use :href="timelineFullscreen ? '/icons.svg?v=690#minimize-2' : '/icons.svg?v=690#maximize-2'"/></svg></button>
-      </div>
-      <div class="gz-timeline-stage" :class="{ 'is-loading': timelineItemCount > 0 && !timelineReady }">
-        <div class="gz-timeline" :aria-label="$app.t('events.timelineNav')"></div>
-        <div class="gz-timeline-loading" x-show="timelineItemCount > 0 && !timelineReady" x-cloak role="status">
-          <span class="spinner" aria-hidden="true"></span>
-          <span x-text="$app.t('events.timelineLoading')"></span>
-        </div>
+    <div class="gz-band" x-show="timelineItemCount > 0" role="group"
+         :aria-label="$app.t('events.timelineNav')"
+         :style="{ '--gz-band-lanes': bandModel().lanes }">
+      <div class="gz-band-track">
+        <!-- Achse: Jahres-Ticks (Gridline + Label) -->
+        <template x-for="tick in bandModel().ticks" :key="'t' + tick.year">
+          <div class="gz-band-tick" :style="{ left: tick.x.toFixed(3) + '%' }">
+            <span class="gz-band-tick-label" x-text="tick.year"></span>
+          </div>
+        </template>
+        <!-- Marker: Einzel-Events (Punkt/Spanne) + gebündelte „+N"-Chips bei dichten Jahren -->
+        <template x-for="m in bandModel().markers" :key="m.kind + m.id">
+          <button type="button"
+                  class="gz-band-marker"
+                  :class="[ m.kind === 'more' ? 'gz-band-marker--more' : '', m.isRange ? 'gz-band-marker--range' : '', (selectedEventIndex === m.id && m.kind !== 'more') ? 'gz-band-marker--selected' : '' ]"
+                  :style="bandMarkerStyle(m)"
+                  :data-ev-id="m.id"
+                  :data-tip="m.kind === 'more' ? $app.t('events.timelineCluster', { count: m.count }) : m.content"
+                  :aria-label="m.kind === 'more' ? $app.t('events.timelineCluster', { count: m.count }) : m.content"
+                  @click="onBandMarkerClick(m.id)"><span x-show="m.kind === 'more'" x-text="'+' + m.count"></span></button>
+        </template>
       </div>
     </div>
     <div class="gz-timeline-hint internal-link" x-show="timelineItemCount < filteredEreignisse().length"

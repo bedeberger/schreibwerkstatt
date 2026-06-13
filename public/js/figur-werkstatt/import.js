@@ -71,6 +71,19 @@ export const importMethods = {
     }
   },
 
+  // Zweitzeile (sublabel) im Import-Picker: Hauptkapitel · Beruf · Jahrgang,
+  // jeweils nur wenn bekannt. Server liefert hauptkapitel/beruf/geburtstag.
+  importFigureContext(f) {
+    const app = window.__app;
+    const t = (k, p) => app?.t?.(k, p) ?? '';
+    const parts = [];
+    if (f.hauptkapitel) parts.push(t('werkstatt.import.ctx.chapter', { name: f.hauptkapitel }));
+    if (f.beruf) parts.push(String(f.beruf).trim());
+    const jahr = f.geburtstag && String(f.geburtstag).match(/\d{4}/);
+    if (jahr) parts.push(t('werkstatt.import.ctx.year', { year: jahr[0] }));
+    return parts.join(' · ');
+  },
+
   // Quell-Figur-Name für Header-Badge. null wenn frei angelegt oder Quell-Figur
   // gelöscht (FK SET NULL).
   importedFromName() {

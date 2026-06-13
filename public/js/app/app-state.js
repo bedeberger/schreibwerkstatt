@@ -270,6 +270,7 @@ const cardsState = () => ({
   showFigurWerkstattCard: false,
   showGlobalZeitstrahl: false,
   showEreignisseCard: false,
+  showPlotCard: false,
   showSzenenCard: false,
   showOrteCard: false,
   showSongsCard: false,

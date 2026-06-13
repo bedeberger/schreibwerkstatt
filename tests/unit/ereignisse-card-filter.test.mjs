@@ -10,7 +10,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { applyEreignisseFilters, subtypIcon, buildTimelineItems, timelineBounds } = await import('../../public/js/cards/ereignisse-card.js');
+const {
+  applyEreignisseFilters, subtypIcon, buildTimelineItems, timelineBounds,
+  layoutBandItems, bandAxisTicks, buildBandModel, bandMarkerColor,
+} = await import('../../public/js/cards/ereignisse-card.js');
 
 const EVENTS = [
   {
@@ -167,7 +170,7 @@ test('subtypIcon: unbekannter Subtyp → sonstiges-Fallback', () => {
   assert.equal(subtypIcon(''),           'more-horizontal');
 });
 
-// --- vis-timeline-Items (Jahres-Zeitstrahl) ---
+// --- Achsen-Items (Jahres-Band) ---
 
 test('buildTimelineItems: nur datierte Events landen auf der Achse, id = Listen-Index', () => {
   const items = buildTimelineItems([
@@ -262,4 +265,111 @@ test('timelineBounds: Spannen-Ende zählt für max', () => {
 test('timelineBounds: leere/fehlende Liste → null', () => {
   assert.equal(timelineBounds([]), null);
   assert.equal(timelineBounds(undefined), null);
+});
+
+// --- layoutBandItems (Lane-Packing + x-Position) ---
+
+test('layoutBandItems: leere Items → 0 Lanes, keine Marker', () => {
+  const r = layoutBandItems(buildTimelineItems([]));
+  assert.equal(r.lanes, 0);
+  assert.deepEqual(r.markers, []);
+  assert.equal(r.bounds, null);
+});
+
+test('layoutBandItems: x in Prozent über [min..max], Ränder bei 0% und 100%', () => {
+  const items = buildTimelineItems([
+    { datum_year: 1900, ereignis: 'A' },
+    { datum_year: 1950, ereignis: 'B' },
+    { datum_year: 2000, ereignis: 'C' },
+  ]);
+  const { markers } = layoutBandItems(items);
+  const byId = Object.fromEntries(markers.map(m => [m.id, m]));
+  assert.equal(byId[0].x.toFixed(1), '0.0', 'frühestes Event ganz links');
+  assert.equal(byId[2].x.toFixed(1), '100.0', 'spätestes Event ganz rechts');
+  assert.ok(byId[1].x > 49 && byId[1].x < 51, 'mittleres Event ~50%');
+});
+
+test('layoutBandItems: kollidierende Events bekommen getrennte Spuren', () => {
+  // Drei Events im selben Jahr → können nicht in einer Spur ohne Überlappung.
+  const items = buildTimelineItems([
+    { datum_year: 1980, ereignis: 'A' },
+    { datum_year: 1980, ereignis: 'B' },
+    { datum_year: 1980, ereignis: 'C' },
+  ]);
+  const { lanes, markers } = layoutBandItems(items, { maxLanes: 6 });
+  assert.equal(lanes, 3, 'drei Lanes für drei überlappende Marker');
+  assert.deepEqual(markers.map(m => m.lane).sort(), [0, 1, 2]);
+});
+
+test('layoutBandItems: Höhe gedeckelt — Überlauf bündelt zu +N-Chip, kein Datenverlust', () => {
+  // 10 Events im selben Jahr, maxLanes=3 → 3 Einzel-Marker + 1 „more"-Chip(7).
+  const events = Array.from({ length: 10 }, (_, i) => ({ datum_year: 1990, ereignis: 'E' + i }));
+  const { lanes, markers } = layoutBandItems(buildTimelineItems(events), { maxLanes: 3 });
+  assert.ok(lanes <= 3, 'Lanes auf maxLanes gedeckelt');
+  const single = markers.filter(m => m.kind === 'event');
+  const more = markers.filter(m => m.kind === 'more');
+  assert.equal(single.length, 3, '3 Einzel-Marker sichtbar');
+  assert.equal(more.length, 1, 'ein gebündelter Chip');
+  assert.equal(more[0].count, 7, 'Chip zählt die 7 überzähligen');
+  assert.equal(single.length + more[0].count, 10, 'kein Event verschluckt');
+  assert.ok(Number.isInteger(more[0].id), 'Chip-id = Listen-Index des ersten überzähligen Events (Klick-Ziel)');
+});
+
+test('layoutBandItems: Spanne trägt isRange + widthPct', () => {
+  const items = buildTimelineItems([
+    { datum_year: 1900, ereignis: 'Start' },
+    { datum_year: 1950, datum_ende_year: 2000, ereignis: 'Lange Spanne' },
+  ]);
+  const span = layoutBandItems(items).markers.find(m => m.id === 1);
+  assert.equal(span.isRange, true);
+  assert.ok(span.widthPct > 0, 'Spanne hat Breite');
+});
+
+// --- bandAxisTicks (Jahres-Ticks) ---
+
+test('bandAxisTicks: null bounds → []', () => {
+  assert.deepEqual(bandAxisTicks(null), []);
+});
+
+test('bandAxisTicks: Ticks liegen im Jahresbereich, x in Prozent', () => {
+  const bounds = timelineBounds(buildTimelineItems([
+    { datum_year: 1960, ereignis: 'A' },
+    { datum_year: 2000, ereignis: 'B' },
+  ]));
+  const ticks = bandAxisTicks(bounds, { targetTicks: 6 });
+  assert.ok(ticks.length >= 2, 'mehrere Ticks');
+  for (const t of ticks) {
+    assert.ok(t.year >= 1960 && t.year <= 2000, `Tick ${t.year} im Bereich`);
+    assert.ok(t.x >= -0.01 && t.x <= 100.01, `x ${t.x} in [0..100]`);
+  }
+});
+
+// --- buildBandModel (Gesamtmodell) ---
+
+test('buildBandModel: bündelt itemCount + lanes + markers + ticks', () => {
+  const events = [
+    { datum_year: 1980, subtyp: 'geburt', ereignis: 'A' },
+    { story_tag: 'Tag 1', ereignis: 'undatiert' },     // nicht auf Achse
+    { datum_year: 1990, typ: 'extern', ereignis: 'Welt' },
+  ];
+  const bm = buildBandModel(events);
+  assert.equal(bm.itemCount, 2, 'nur datierte Events zählen');
+  assert.ok(bm.lanes >= 1);
+  assert.equal(bm.markers.filter(m => m.kind !== 'more').length, 2);
+  assert.ok(bm.ticks.length >= 1);
+  assert.equal(bm.markers.find(m => m.id === 2).extern, true);
+});
+
+// --- bandMarkerColor (Subtyp → Token) ---
+
+test('bandMarkerColor: bekannter Subtyp → passendes Akzent-Token', () => {
+  assert.equal(bandMarkerColor('geburt', false), 'var(--card-accent-event-geburt)');
+});
+
+test('bandMarkerColor: unbekannter Subtyp → sonstiges-Fallback', () => {
+  assert.equal(bandMarkerColor('schwurbel', false), 'var(--card-accent-event-sonstiges)');
+});
+
+test('bandMarkerColor: extern übersteuert mit Error-Randfarbe', () => {
+  assert.equal(bandMarkerColor('geburt', true), 'var(--color-err-border)');
 });

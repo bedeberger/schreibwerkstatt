@@ -27,6 +27,7 @@ const ALLOWED_KEYS = new Set([
   'orte',
   'songs',
   'ereignisse',
+  'plot',
   'weltfakten',
   'bookchat',
   'stats',

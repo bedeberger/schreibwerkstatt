@@ -40,7 +40,7 @@ export const FEATURES = [
   // Welt & Plot — World-Cards: editor+ (für Viewer/Lektor nicht relevant).
   { key: 'figuren',        kind: 'toggle', group: 'world',  labelKey: 'tile.figuren',        descKey: 'tile.figuren.desc',        flag: 'showFiguresCard',        toggle: 'toggleFiguresCard',        requiresBook: true, minRole: 'editor', dependsOnKomplett: true,
     aliases: ['characters','personen','cast','protagonist','antagonist','soziogramm','graph'] },
-  { key: 'werkstatt',      kind: 'toggle', group: 'world',  labelKey: 'tile.werkstatt',      descKey: 'tile.werkstatt.desc',      flag: 'showFigurWerkstattCard', toggle: 'toggleFigurWerkstattCard', requiresBook: true, minRole: 'editor', dependsOnKomplett: true,
+  { key: 'werkstatt',      kind: 'toggle', group: 'world',  labelKey: 'tile.werkstatt',      descKey: 'tile.werkstatt.desc',      flag: 'showFigurWerkstattCard', toggle: 'toggleFigurWerkstattCard', requiresBook: true, minRole: 'editor',
     aliases: ['workshop','mindmap','draft','entwurf','brainstorm','character','figur','vorwaerts'] },
   { key: 'szenen',         kind: 'toggle', group: 'world',  labelKey: 'tile.szenen',         descKey: 'tile.szenen.desc',         flag: 'showSzenenCard',         toggle: 'toggleSzenenCard',         requiresBook: true, minRole: 'editor', dependsOnKomplett: true,
     aliases: ['scenes','beats','sequences','akt'] },
@@ -50,6 +50,8 @@ export const FEATURES = [
     aliases: ['musik','music','songs','musikstuecke','musikstücke','playlist','soundtrack','band','interpret','tracks'] },
   { key: 'ereignisse',     kind: 'toggle', group: 'world',  labelKey: 'tile.events',         descKey: 'tile.events.desc',         flag: 'showEreignisseCard',     toggle: 'toggleEreignisseCard',     requiresBook: true, minRole: 'editor', dependsOnKomplett: true,
     aliases: ['events','timeline','zeitstrahl','plot','chronologie'] },
+  { key: 'plot',           kind: 'toggle', group: 'world',  labelKey: 'tile.plot',           descKey: 'tile.plot.desc',           flag: 'showPlotCard',           toggle: 'togglePlotCard',           requiresBook: true, minRole: 'editor',
+    aliases: ['plot','handlung','beat','beat-board','board','akt','struktur','outline','dramaturgie','story','plotten','beats','skizze','wendepunkt'] },
   { key: 'weltfakten',     kind: 'toggle', group: 'world',  labelKey: 'tile.weltfakten',     descKey: 'tile.weltfakten.desc',     flag: 'showWorldFactsCard',     toggle: 'toggleWorldFactsCard',     requiresBook: true, minRole: 'editor', dependsOnKomplett: true,
     aliases: ['facts','fakten','weltregeln','worldbuilding','lore','magiesystem','rules','kanon','canon','regeln'] },
   // Werkzeug
@@ -168,6 +170,8 @@ export const EXCLUSIVE_CARDS = [
   { key: 'szenen',         flag: 'showSzenenCard',         toggle: 'toggleSzenenCard',         onReclick: 'refresh', partial: 'szenen',
     loadDeps: [{ method: 'loadFiguren', skipIfNonEmpty: 'figuren' }, { method: 'loadOrte', skipIfNonEmpty: 'orte' }] },
   { key: 'ereignisse',     flag: 'showEreignisseCard',     toggle: 'toggleEreignisseCard',     onReclick: 'refresh', partial: 'ereignisse',
+    loadDeps: [{ method: 'loadFiguren', skipIfNonEmpty: 'figuren' }] },
+  { key: 'plot',           flag: 'showPlotCard',           toggle: 'togglePlotCard',           onReclick: 'refresh', requiresBook: true, partial: 'plot',
     loadDeps: [{ method: 'loadFiguren', skipIfNonEmpty: 'figuren' }] },
   { key: 'weltfakten',     flag: 'showWorldFactsCard',     toggle: 'toggleWorldFactsCard',     onReclick: 'refresh', extraRefreshOnOpen: true, partial: 'world-facts' },
   { key: 'bookStats',      flag: 'showBookStatsCard',      toggle: 'toggleBookStatsCard',      onReclick: 'close', partial: 'bookstats' },

@@ -20,7 +20,15 @@
   </div>
   <div x-show="songsStatus" class="card-status" x-html="songsStatus"></div>
 
-  <div x-show="$app.songs.length === 0 && !songsLoading && !songsStatus" class="card-status" x-text="$app.t('common.noDataYet')"></div>
+  <div x-show="$app.songs.length === 0 && !songsLoading && !songsStatus" class="card-empty">
+    <p class="card-empty-text" x-text="$app.t('common.noAnalysisYet')"></p>
+    <button type="button" class="primary card-empty-cta"
+            @click="$app.alleAktualisieren()"
+            :disabled="$app.alleAktualisierenLoading || !$app.selectedBookId">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#rotate-cw"/></svg>
+      <span x-text="$app.t('header.updateAll')"></span>
+    </button>
+  </div>
 
   <!-- Skeleton -->
   <div x-show="songsLoading && $app.songs.length === 0" class="entity-skeleton entity-list--accented" x-cloak>
