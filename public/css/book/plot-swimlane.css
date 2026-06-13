@@ -144,8 +144,25 @@
   /* Kompakte Icon-Add-/Brainstorm-Buttons in der Zelle (Basis: .plot-add-beat-btn). */
   .plot-add-beat-btn--cell { flex: 1 1 auto; width: auto; padding: var(--space-2xs); }
 
-  /* ── Vollbild: Grid scrollt über die volle Breite (Regel-Pendant zu .plot-board) */
+  /* ── Vollbild: Grid füllt den Viewport fluid auf (Pendant zu .plot-board) ───
+     `width: max-content; min-width: 100%` ⇒ effektive Breite = max(Inhalt, 100%):
+     wenige Akte → 100% + grow verteilt den Platz, viele Akte → Inhalt > 100% +
+     Horizontal-Scroll. Zellen `flex: 1 0 0` mit `min-width: var(--cell-w)` als
+     Floor (treibt auch die max-content-Breite); `width: auto`, weil `flex-basis: 0`
+     die fixe Zellbreite ablöst. acthead + cell teilen exakt dieselbe Flex-Regel →
+     Spalten bleiben ausgerichtet. Lane/Corner bleiben fix (kein Override). */
   .card--plot:fullscreen .plot-swimlane { max-height: none; }
+  .card--plot:fullscreen .plot-swim {
+    width: max-content;
+    min-width: 100%;
+  }
+  .card--plot:fullscreen .plot-swim-acthead,
+  .card--plot:fullscreen .plot-swim-cell {
+    flex: 1 0 0;
+    width: auto;
+    min-width: var(--cell-w);
+    max-width: 420px;
+  }
 
   /* ── Mobile: engere Spuren, Grid bleibt horizontal scrollbar (2D-Struktur) ─ */
   @media (max-width: 600px) {

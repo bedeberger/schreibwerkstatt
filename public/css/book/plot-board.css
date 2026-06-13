@@ -154,8 +154,8 @@
   .plot-status-tag {
     flex: 0 0 auto;
     font-size: var(--font-size-micro);
-    line-height: 1.4;
-    padding: 0 var(--space-xs);
+    line-height: 1.25;
+    padding: 1px var(--space-2xs);
     border: 1px solid transparent;
     border-radius: var(--radius-sm);
     cursor: pointer;
@@ -576,6 +576,14 @@
     padding: var(--space-lg);
     z-index: var(--z-overlay);
     overflow-y: auto;
+  }
+  /* Akt-Spalten füllen den Viewport fluid auf (wenige Akte → keine Leerfläche,
+     keine Scroll); ab ~280px greift der Min, danach Horizontal-Scroll wie sonst.
+     max-width hält die Spalten lesbar, wenn nur wenige Akte da sind. Die
+     „Neuer Akt"-Spalte wächst nicht mit. */
+  .card--plot:fullscreen .plot-column:not(.plot-column--add) {
+    flex: 1 1 280px;
+    max-width: 420px;
   }
 
   /* ── Mobile: Spalten stapeln ───────────────────────────────────────────── */

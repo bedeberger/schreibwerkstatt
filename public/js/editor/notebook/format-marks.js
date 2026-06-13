@@ -1,10 +1,12 @@
-// Steuerzeichen-Overlay für den Notebook-Editor: zeichnet einen Soft-Break-
-// Pfeil (↵) über jedes <br> im contenteditable. Reine Read-only-Dekoration in
-// einer separaten Overlay-Schicht (.page-editor-marks-layer) — editierbarer DOM
-// und gespeichertes HTML bleiben unberührt (gleiche Philosophie wie die
-// Entity-Highlights). Absatzmarken (¶) macht CSS allein (page-view.css); ein
-// <br> lässt sich aber von keinem Browser per CSS/Pseudo-Element dekorieren
-// (kein Box-Modell), daher dieser JS-Pfad mit Positionsmessung.
+// Steuerzeichen-Overlay für den Notebook-Editor: zeichnet Soft-Break-Pfeile (↵)
+// über jedes <br> sowie Absatzmarken (¶) für Blöcke mit direktem <br>. Reine
+// Read-only-Dekoration in einer separaten Overlay-Schicht
+// (.page-editor-marks-layer) — editierbarer DOM und gespeichertes HTML bleiben
+// unberührt (gleiche Philosophie wie die Entity-Highlights). Die ¶ der übrigen
+// Blöcke macht CSS allein (page-view.css). Begründung des JS-Pfads: ein <br>
+// lässt sich von keinem Browser per CSS/Pseudo-Element dekorieren (kein
+// Box-Modell), und die ¶-::after-Marke rutscht in einem Block mit <br> hinter
+// den Umbruch auf eine Phantom-Zweitzeile → gemessene Platzierung nötig.
 //
 // Aktiv nur wenn editMode && !focusActive && pageEditorShowMarks. Recompute via
 // rAF-Coalesce bei: Tippen (input), internem Scroll und Grössenänderung
@@ -47,18 +49,21 @@ export const formatMarksMethods = {
 
     const range = document.createRange();
     const frag = document.createDocumentFragment();
-    // Marke an einer gemessenen Umbruch-Position platzieren. height = Zeilenhöhe,
-    // damit die CSS-Mittelzentrierung (.format-mark) den Pfeil vertikal auf
-    // Textmitte legt statt an den oberen Rand der Zeile.
+    // Marke an einer gemessenen Position platzieren. height = Zeilenhöhe, damit
+    // die CSS-Mittelzentrierung (.format-mark) das Glyph vertikal auf Textmitte
+    // legt statt an den oberen Rand der Zeile.
+    const mark = (cls, char, left, top, height) => {
+      const m = document.createElement('span');
+      m.className = 'format-mark ' + cls;
+      m.textContent = char;
+      m.style.left = (left - editRect.left) + 'px';
+      m.style.top = (top - editRect.top) + 'px';
+      m.style.height = height + 'px';
+      frag.appendChild(m);
+    };
     const place = (r) => {
       if (!r || !r.height) return; // degenerierte Messung überspringen
-      const mark = document.createElement('span');
-      mark.className = 'format-mark format-mark--br';
-      mark.textContent = '↵';
-      mark.style.left = (r.left - editRect.left) + 'px';
-      mark.style.top = (r.top - editRect.top) + 'px';
-      mark.style.height = r.height + 'px';
-      frag.appendChild(mark);
+      mark('format-mark--br', '↵', r.left, r.top, r.height);
     };
 
     // 1) Echte <br>-Elemente (Soft-Break via Shift+Enter).
@@ -83,6 +88,34 @@ export const formatMarksMethods = {
         place(range.getClientRects()[0]);
       }
     }
+
+    // 3) Absatzmarken (¶) für Blöcke mit direktem <br>. CSS lässt die bewusst
+    //    aus (`:not(:has(> br))`), weil ::after hinter dem <br> auf eine
+    //    Phantom-Zweitzeile rutscht → verdoppelt die Blockhöhe und entkoppelt
+    //    die sichtbare Marke vom Caret-Slot. Hier gemessen platziert: leerer
+    //    Caret-Slot-Block (<p><br></p>) → ¶ auf der Slot-Zeile am Block-Anfang;
+    //    Soft-Break-Absatz (<p>…<br>…</p>) → ¶ am Ende der letzten Zeile.
+    editEl.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, pre').forEach((b) => {
+      let hasDirectBr = false;
+      for (const c of b.children) { if (c.tagName === 'BR') { hasDirectBr = true; break; } }
+      if (!hasDirectBr) return; // Rest macht CSS ::after
+      let r;
+      let atEnd = true;
+      if (b.childNodes.length === 1) {
+        // Leerer Caret-Slot-Block: ¶ am Slot (Zeilenanfang), einzeilig.
+        range.selectNode(b.firstChild);
+        r = range.getBoundingClientRect();
+        atEnd = false;
+      } else {
+        range.selectNodeContents(b);
+        const rects = range.getClientRects();
+        r = rects[rects.length - 1];
+      }
+      if (!r || !r.height) return;
+      // Kleiner Abstand wie das CSS-`margin-inline-start: 0.15em` am Zeilenende;
+      // am leeren Slot direkt auf die Caret-Position (kein Versatz).
+      mark('format-mark--pilcrow', '¶', (atEnd ? r.right + 2 : r.left), r.top, r.height);
+    });
 
     layer.replaceChildren(frag);
   },

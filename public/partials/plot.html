@@ -14,7 +14,7 @@
       <span class="card-title" x-text="$app.t('plot.title')"></span>
       <div class="card-subline" x-show="acts.length > 0">
         <span class="card-timestamp"
-              x-text="$app.t('plot.stats', { total: boardStats().total, imBuch: boardStats().imBuch, geplant: boardStats().geplant })"></span>
+              x-text="$app.t('plot.stats', { total: boardStats().total })"></span>
       </div>
     </div>
     <div class="card-header-aside">
@@ -31,7 +31,7 @@
   </div>
 
   <!-- Status-Verteilung (board-weit): segmentierter Balken + Legende -->
-  <div class="plot-progress" x-show="beats.length > 0" x-cloak>
+  <div class="plot-progress" x-show="Object.values(boardStats().by).filter(n => n > 0).length > 1" x-cloak>
     <div class="plot-dist-bar">
       <template x-for="s in statusList()" :key="s">
         <div class="plot-dist-seg" :class="'plot-dist-seg--' + s"

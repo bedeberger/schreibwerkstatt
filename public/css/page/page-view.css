@@ -248,9 +248,15 @@
    also kein Markup im Save-HTML, kein Caret-Slot betroffen, nicht selektierbar.
    Nur im Edit-Modus aktiv (gleicher --editing-Scope wie alle Edit-Spezifika).
    Container (blockquote, div.poem) werden NICHT markiert — ihre inneren <p>
-   tragen die Marke, sonst doppeltes ¶. */
+   tragen die Marke, sonst doppeltes ¶.
+   `:not(:has(> br))`: Blöcke mit direktem <br> — leerer Caret-Slot-Block
+   (<p><br></p>) und Soft-Break-Absätze (<p>…<br>…</p>) — bekommen ihre ¶ NICHT
+   von CSS, sondern gemessen aus dem Overlay (format-marks.js). Grund: ::after
+   fliesst hinter den <br> auf eine Phantom-Zweitzeile → verdoppelt die
+   Blockhöhe und entkoppelt die sichtbare Marke vom Caret-Slot, sodass der leere
+   Absatz unklickbar/unselektierbar wirkt. */
 .page-content-view--editing.page-content-view--show-marks
-  :is(p, h1, h2, h3, h4, h5, h6, li, pre)::after {
+  :is(p, h1, h2, h3, h4, h5, h6, li, pre):not(:has(> br))::after {
   content: '¶';
   color: var(--color-primary);
   opacity: 0.4;

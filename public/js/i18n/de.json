@@ -762,7 +762,7 @@
   "tile.plot.desc":              "Handlung in Akten & Handlungspunkten planen",
   "plot.title":                  "Plot-Werkstatt",
   "plot.loading":                "Board wird geladen…",
-  "plot.stats":                  "{total} Handlungspunkte · {imBuch} im Buch · {geplant} geplant",
+  "plot.stats":                  "{total} Handlungspunkte",
   "plot.empty.hint":             "Skizziere deine Handlung: Akte als Spalten, Handlungspunkte als Karten. Lege zuerst einen Akt an.",
   "plot.empty.addAct":           "Ersten Akt anlegen",
   "plot.addAct":                 "Akt",
