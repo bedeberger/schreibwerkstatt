@@ -79,6 +79,7 @@ export const appKomplettMethods = {
             this.loadFiguren(bookId),
             this.loadOrte(bookId),
             this.loadSzenen(bookId),
+            this.loadSongs(bookId),
             this.loadLastKomplettRun(bookId),
             this._reloadZeitstrahl(),
           ]);
