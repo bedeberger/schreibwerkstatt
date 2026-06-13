@@ -740,6 +740,12 @@ export const notebookEditMethods = {
     this._scheduleAutosave();
     this._historyPushSoon?.();
     this._scrollEditCaretIntoView();
+    // Steuerzeichen-Overlay neu vermessen: programmatische Mutationen (STT,
+    // Paste, Cut, Toolbar) feuern KEIN `input`-Event, an dem die Marks-Schicht
+    // sonst hängt — ohne diesen Aufruf bleibt die ↵/¶-Dekoration während des
+    // Diktats stehen und entkoppelt sich vom Text. rAF-coalesced/idempotent,
+    // daher für den Tipp-Pfad (feuert ohnehin `input`) ein No-op.
+    this._scheduleFormatMarks?.();
   },
 
   // Hält den Caret im sichtbaren Bereich des Edit-Felds. Das contenteditable ist
@@ -761,6 +767,18 @@ export const notebookEditMethods = {
       const range = sel.getRangeAt(0);
       if (!el.contains(range.commonAncestorContainer) && el !== range.commonAncestorContainer) return;
       r = range.getBoundingClientRect();
+      // Kollabierte Range in einem frisch erzeugten leeren `<p><br></p>` liefert
+      // in Chromium {top:0, bottom:0, height:0}. Greift dann der Block-Fallback
+      // nicht, bricht der Nudge beim Enter ab und der Editor zieht erst beim
+      // ersten getippten Zeichen nach -> sichtbarer Scroll-Sprung. Stattdessen
+      // den umschliessenden Block vermessen (wie der STT-Pfad mit explizitem
+      // Knoten-Rect), damit der neue Absatz schon beim Enter mitscrollt.
+      if (!r || (!r.height && !r.top && !r.bottom)) {
+        let node = range.commonAncestorContainer;
+        if (node && node.nodeType === 3) node = node.parentNode;
+        while (node && node.parentNode && node.parentNode !== el) node = node.parentNode;
+        if (node && node !== el && node.getBoundingClientRect) r = node.getBoundingClientRect();
+      }
     }
     if (!r || (!r.height && !r.top && !r.bottom)) return; // kein verlässliches Rect
     const host = el.getBoundingClientRect();

@@ -64,7 +64,9 @@ Facade re-exportiert; externer Import läuft über [editor/focus.js](../public/j
 | `window-3` | Aktiver + direkter Vorgänger + direkter Nachfolger (`.focus-paragraph-near`) hell |
 | `typewriter-only` | Keine Block-Markierung, alle Blöcke hell. Nur Caret-Scroll bleibt |
 
-`_focusUpdateActive` ([card.js:404-475](../public/js/editor/focus/card.js#L404-L475)) hat einen **Short-Circuit-Cache** (`ctx._lastBlock` / `ctx._lastGranularity`): bleibt der aktive Block beim Tippen gleich, werden `setActiveBlock`/`setNearBlocks`/Sentence-Highlight übersprungen. **Cache-Reset Pflicht** bei `beforeinput insertParagraph/insertLineBreak` ([card.js:195-205](../public/js/editor/focus/card.js#L195-L205)) — sonst hält der Cache den vermeintlich noch aktiven Block fest, neuer Absatz bleibt ungemarkt.
+`_focusUpdateActive` ([card.js:404-475](../public/js/editor/focus/card.js#L404-L475)) hat einen **Short-Circuit-Cache** (`ctx._lastBlock` / `ctx._lastGranularity`): bleibt der aktive Block beim Tippen gleich, werden `setActiveBlock`/`setNearBlocks`/Sentence-Highlight übersprungen.
+
+**Absatz-/Zeilen-Split synchron im `input`-Handler** ([card.js](../public/js/editor/focus/card.js) `onInput`): bei `inputType insertParagraph/insertLineBreak` wird der neue aktive Block **synchron im selben Task** (vor dem Paint) gesetzt + `ctx._lastBlock` darauf gecacht — NICHT erst im RAF einen Frame später. **Why:** Chromium kopiert beim Split die `.focus-paragraph-active`-Klasse auf beide `<p>`. Würde der RAF erst im nächsten Frame aufräumen, leuchteten kurz zwei Absätze. Das frühere Clearen im `beforeinput` (`setActiveBlock(null)`) vermied zwar den Doppelflash, erzeugte aber einen **Dim-Flash**: für einen Frame ist nichts aktiv → der ganze sichtbare Text snappt auf `opacity 0.35` und zurück (sichtbares „Ruckeln" vor dem ersten Buchstaben, weil die Dim-Regel bewusst ohne Transition snappt). Da `input` synchron vor dem Paint feuert, rendert die synchrone Markierung keinen Zwischenzustand — kein `beforeinput`-Listener mehr nötig.
 
 ## Recenter-Pipeline
 

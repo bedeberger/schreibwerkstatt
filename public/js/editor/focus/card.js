@@ -217,26 +217,34 @@ export const focusCardMethods = {
     // durch externe Module. Wort-/Zeichen-Counter läuft via installEditCounter
     // (in edit.js gestartet, Voraussetzung für Fokus) — kein zweiter Listener
     // hier nötig.
-    const onInput = () => {
+    const onInput = (e) => {
       if (this._focusState !== 'active') return;
       if (ctx.composing) return;
-      this._focusUpdateActive(true);
-    };
-
-    // Chromium kopiert beim Paragraph-Split in contenteditable die Klasse auf
-    // beide <p>. Bis _focusUpdateActive im nächsten RAF aufräumt, sind kurz
-    // ZWEI Absätze .focus-paragraph-active → sichtbarer Doppelflash. Aktiven
-    // Marker hier synchron VOR dem Split abräumen; RAF setzt danach neu.
-    const onBeforeInput = (e) => {
-      if (this._focusState !== 'active') return;
-      if (e.inputType === 'insertParagraph' || e.inputType === 'insertLineBreak') {
-        setActiveBlock(container, null);
-        setNearBlocks(container, null);
-        // Cache invalidieren — sonst hält der Short-Circuit in
-        // _focusUpdateActive den vermeintlich „noch aktiven" Block fest
-        // und setzt nach dem Split keine neue Markierung.
-        ctx._lastBlock = null;
+      // Paragraph-/Zeilen-Split: aktiven Block SYNCHRON neu setzen, statt erst
+      // im RAF einen Frame später. Chromium kopiert beim Split die
+      // .focus-paragraph-active-Klasse auf beide <p>; würde der RAF erst im
+      // nächsten Frame aufräumen, leuchteten kurz zwei Absätze. Das frühere
+      // Clearen im `beforeinput` vermied zwar den Doppel-, erzeugte aber einen
+      // Dim-Flash (für einen Frame ist NICHTS aktiv → ganzer Text snappt auf
+      // opacity 0.35 und zurück). `input` feuert synchron im selben Task VOR
+      // dem Paint — die korrekte Markierung hier setzen rendert keinen
+      // Zwischenzustand, also kein „Ruckeln". RAF reconciliiert + scrollt.
+      if (e?.inputType === 'insertParagraph' || e?.inputType === 'insertLineBreak') {
+        const sel = document.getSelection();
+        const anchor = sel && sel.rangeCount > 0 ? sel.anchorNode : null;
+        const block = anchor && container.contains(anchor)
+          ? findBlockFromNode(anchor, container) : null;
+        const granularity = window.__app?.focusGranularity || 'paragraph';
+        if (granularity === 'typewriter-only') {
+          setActiveBlock(container, null);
+          setNearBlocks(container, null);
+        } else {
+          setActiveBlock(container, block);
+          setNearBlocks(container, granularity === 'window-3' ? block : null);
+        }
+        ctx._lastBlock = block;
       }
+      this._focusUpdateActive(true);
     };
 
     const onCompositionStart = () => { ctx.composing = true; };
@@ -333,7 +341,6 @@ export const focusCardMethods = {
     applyViewport();
 
     document.addEventListener('selectionchange', onSelection, { signal });
-    container.addEventListener('beforeinput', onBeforeInput, { signal });
     container.addEventListener('input', onInput, { signal });
     container.addEventListener('compositionstart', onCompositionStart, { signal });
     container.addEventListener('compositionend', onCompositionEnd, { signal });

@@ -25,6 +25,21 @@ function isCaretFiller(br) {
   return !!p && p.childNodes.length === 1 && /^(P|H[1-6]|LI)$/.test(p.tagName);
 }
 
+// Nachgestelltes <br> als letztes (sichtbares) Kind eines Text-Blocks: der
+// Browser rendert es inert — keine sichtbare Folgezeile, das Rect kollabiert ans
+// Zeilenende. Kein ↵; die ¶ des Blocks (Schritt 3) markiert dort bereits das
+// Absatzende. Ohne dieses Skip lägen ↵ und ¶ übereinander (ein einziges,
+// verschmolzenes Glyph). Mitten im Block (<p>…<br>…</p>) bleibt das <br> ein
+// echter Umbruch und behält sein ↵.
+function isTrailingBr(br) {
+  for (let n = br.nextSibling; n; n = n.nextSibling) {
+    if (n.nodeType === 3 && !n.nodeValue.trim()) continue; // nur Whitespace folgt
+    return false;
+  }
+  const p = br.parentElement;
+  return !!p && /^(P|H[1-6]|LI|PRE)$/.test(p.tagName);
+}
+
 export const formatMarksMethods = {
   _renderFormatMarks() {
     const app = window.__app;
@@ -68,7 +83,7 @@ export const formatMarksMethods = {
 
     // 1) Echte <br>-Elemente (Soft-Break via Shift+Enter).
     editEl.querySelectorAll('br').forEach((br) => {
-      if (isCaretFiller(br)) return;
+      if (isCaretFiller(br) || isTrailingBr(br)) return;
       range.selectNode(br);
       place(range.getBoundingClientRect());
     });

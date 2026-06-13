@@ -50,6 +50,31 @@ function _formatStamp(kind) {
   return `${date} ${time}`;
 }
 
+// Steht links vom (kollabierten) Caret schon ein <br>? Dann würde ein weiterer
+// Soft-Break einen zweiten aufeinanderfolgenden <br> erzeugen, den
+// collapseEmptyBlocks (utils.js) beim Save ohnehin wegräumt — der User sähe zwei
+// Umbrüche, von denen nach dem Reload nur einer überlebt. Whitespace-Textknoten
+// zwischen <br> und Caret werden übersprungen (exakt die, die der Collapse auch
+// ignoriert). Inline-Element-Grenzen werden bewusst nicht überstiegen; den
+// seltenen Rest fängt der Cleaner verlustfrei ab.
+function _brLeftOfCaret(sel) {
+  if (!sel || !sel.isCollapsed || sel.rangeCount === 0) return false;
+  const range = sel.getRangeAt(0);
+  const c = range.startContainer;
+  const o = range.startOffset;
+  let probe;
+  if (c.nodeType === 3) {
+    if (c.nodeValue.slice(0, o).trim() !== '') return false; // echter Text links → erlauben
+    probe = c.previousSibling;
+  } else {
+    probe = o > 0 ? c.childNodes[o - 1] : null;
+  }
+  while (probe && probe.nodeType === 3 && !probe.nodeValue.trim()) {
+    probe = probe.previousSibling;
+  }
+  return !!(probe && probe.nodeType === 1 && probe.tagName === 'BR');
+}
+
 // Link-URL normalisieren: leerer/whitespace-only String → ''. Bekannte Schemes
 // (http/https/mailto/tel) durchreichen. Plain `foo@bar.tld` → mailto:. Sonst
 // `https://` voranstellen.
@@ -328,6 +353,12 @@ export const toolbarCardMethods = {
     // setzt das <br> cross-browser konsistent (WebKit + Chromium getestet).
     if (e.key === 'Enter' && e.shiftKey) {
       e.preventDefault();
+      // Auf einer bereits leeren Soft-Break-Zeile (links steht ein <br>) keinen
+      // zweiten <br> einfügen — der würde beim Save eh kollabieren. No-Op statt
+      // sichtbarer Doppel-Umbruch, der nach dem Reload verschwindet.
+      const editEl = getEditEl();
+      const sel = editEl ? document.getSelection() : null;
+      if (sel && _brLeftOfCaret(sel)) return;
       document.execCommand('insertLineBreak');
       app._markEditDirty?.();
       return;
