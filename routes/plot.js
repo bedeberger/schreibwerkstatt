@@ -32,19 +32,6 @@ function _guard(req, res, bookId, minRole = 'editor') {
   catch (e) { return !sendACLError(res, e); }
 }
 
-// figure_ids aufs Subset filtern, das wirklich zu (Buch, User) gehört —
-// verhindert Fremd-/Verweis-Verschmutzung der M:M-Tabelle.
-function _validFigureIds(bookId, userEmail, ids) {
-  if (!Array.isArray(ids) || !ids.length) return [];
-  const wanted = ids.map(x => parseInt(x)).filter(Number.isInteger);
-  if (!wanted.length) return [];
-  const placeholders = wanted.map(() => '?').join(',');
-  const rows = db.prepare(
-    `SELECT id FROM figures WHERE book_id = ? AND user_email = ? AND id IN (${placeholders})`
-  ).all(bookId, userEmail, ...wanted);
-  return rows.map(r => r.id);
-}
-
 // chapter_id muss zum Buch gehören, sonst NULL (kein Fremd-Verweis).
 function _validChapterId(bookId, chapterId) {
   if (!chapterId) return null;
@@ -142,7 +129,7 @@ router.post('/beats', jsonBody, (req, res) => {
   const beschreibung = req.body?.beschreibung ? String(req.body.beschreibung).slice(0, MAX_BESCHREIBUNG) : null;
   const status = STATUSES.includes(req.body?.status) ? req.body.status : 'geplant';
   const chapterId = _validChapterId(bookId, toIntId(req.body?.chapter_id));
-  const figureIds = _validFigureIds(bookId, userEmail, req.body?.figure_ids);
+  const figureIds = plotDb.resolveFigureIds(bookId, userEmail, req.body?.figure_ids);
 
   const beat = plotDb.createBeat(bookId, actId, userEmail, { titel, beschreibung, status, chapterId, figureIds });
   logger.info(`[plot] beat create id=${beat.id} act=${actId} book=${bookId}`);
@@ -184,7 +171,7 @@ router.patch('/beats/:id', jsonBody, (req, res) => {
     fields.act_id = act.id;
   }
   const figureIds = Array.isArray(req.body?.figure_ids)
-    ? _validFigureIds(beat.book_id, userEmail, req.body.figure_ids)
+    ? plotDb.resolveFigureIds(beat.book_id, userEmail, req.body.figure_ids)
     : undefined;
 
   if (!Object.keys(fields).length && typeof figureIds === 'undefined') {

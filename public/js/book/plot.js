@@ -59,6 +59,7 @@ export const plotMethods = {
     this.brainstormActId = null;
     this.consistencyResult = null;
     this.selectedKonfliktIdx = null;
+    this.plotFilters = { kapitel: '', figurId: '' };
     this.errorMessage = '';
     this.busy = false;
   },
@@ -82,6 +83,39 @@ export const plotMethods = {
   },
 
   statusList() { return STATUSES; },
+
+  // ── Filter (Kapitel / Figur) ───────────────────────────────────────────────
+  // Kapitel-Optionen aus den Beats ableiten (buchgeordnet via Root-Helper),
+  // damit nur Kapitel angeboten werden, die im Board überhaupt vorkommen.
+  plotKapitelListe() {
+    return window.__app._deriveKapitel(this.beats, b => b.chapter_name);
+  },
+
+  plotFilterActive() {
+    return !!(this.plotFilters.kapitel || this.plotFilters.figurId);
+  },
+
+  _beatMatchesFilter(b) {
+    const f = this.plotFilters;
+    return (!f.kapitel || b.chapter_name === f.kapitel) &&
+           (!f.figurId || (b.fig_ids || []).includes(f.figurId));
+  },
+
+  // Gefilterte Beats pro Akt — nur fürs Rendering. Ohne aktiven Filter wird der
+  // (bereits memoisierte) ungefilterte beatsForAct-Array unverändert durchgereicht.
+  filteredBeatsForAct(actId) {
+    const f = this.plotFilters;
+    const base = this.beatsForAct(actId);
+    if (!f.kapitel && !f.figurId) return base;
+    return this._memo(`fbeats:${actId}`, [base, f.kapitel, f.figurId], () =>
+      base.filter(b => this._beatMatchesFilter(b)));
+  },
+
+  filteredBeatCount() {
+    const f = this.plotFilters;
+    return this._memo('fcount', [this.beats, f.kapitel, f.figurId], () =>
+      (this.beats || []).filter(b => this._beatMatchesFilter(b)).length);
+  },
 
   // ── Akte ─────────────────────────────────────────────────────────────────
   async addAct() {
@@ -172,13 +206,16 @@ export const plotMethods = {
     this.addingActId = actId;
     this.newBeatTitel = '';
     this.$nextTick(() => {
-      const el = this.$el?.querySelector(`[data-add-beat-act="${actId}"] .plot-add-beat-input`);
+      const el = this.$root?.querySelector(`[data-add-beat-act="${actId}"] .plot-add-beat-input`);
       el?.focus();
     });
   },
   cancelAddBeat() { this.addingActId = null; this.newBeatTitel = ''; },
 
-  async saveNewBeat(actId) {
+  // keepAdding=true (Enter / „Hinzufügen"): Feld leeren + refokussieren zum
+  // schnellen Stapeln. keepAdding=false (Verlassen via Blur): speichern und den
+  // Add-Modus schliessen, ohne den Fokus zurückzureissen.
+  async saveNewBeat(actId, { keepAdding = true } = {}) {
     const app = window.__app;
     const titel = (this.newBeatTitel || '').trim();
     if (!titel) { this.cancelAddBeat(); return; }
@@ -192,15 +229,31 @@ export const plotMethods = {
       this.beats = [...this.beats, beat];
       this._memos = {};
       this.newBeatTitel = '';
-      // im Add-Modus bleiben → schnelles Stapeln mehrerer Beats
-      this.$nextTick(() => {
-        const el = this.$el?.querySelector(`[data-add-beat-act="${actId}"] .plot-add-beat-input`);
-        el?.focus();
-      });
       this.errorMessage = '';
+      if (keepAdding) {
+        this.$nextTick(() => {
+          const el = this.$root?.querySelector(`[data-add-beat-act="${actId}"] .plot-add-beat-input`);
+          el?.focus();
+        });
+      } else {
+        this.addingActId = null;
+      }
     } catch (e) {
       this.errorMessage = app.t('plot.error.save');
     } finally { this.busy = false; }
+  },
+
+  // Auto-Save beim Verlassen des Eingabefelds (analog Akt-Umbenennen). NICHT
+  // speichern, wenn der Fokus auf die Add-Buttons (Hinzufügen/Abbrechen) oder ins
+  // LanguageTool-Badge/-Popover wandert — die behandeln den Klick selbst bzw. der
+  // User korrigiert gerade Rechtschreibung. Leeres Feld → Add-Modus nur schliessen.
+  onAddBeatBlur(actId, ev) {
+    if (this.busy || this.addingActId !== actId) return;
+    const to = ev?.relatedTarget;
+    if (to?.closest?.('.plot-add-beat-actions, .lt-badge, .lt-popover')) return;
+    if (document.querySelector('.lt-popover')) return;
+    if (!(this.newBeatTitel || '').trim()) { this.cancelAddBeat(); return; }
+    this.saveNewBeat(actId, { keepAdding: false });
   },
 
   startEditBeat(beat) {

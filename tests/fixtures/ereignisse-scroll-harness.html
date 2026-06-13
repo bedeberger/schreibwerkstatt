@@ -1,8 +1,17 @@
 <!DOCTYPE html>
 <html lang="de-CH">
+<!--
+  Scroll-Harness der Ereignisse-Karte. Mountet ereignisseCard mit dem echten
+  Band-/Hinweis-/Listen-Markup (inkl. .global-zeitstrahl-body--card +
+  data-ev-index) und einer langen Event-Liste (datiert + undatiert), damit
+  Klick→Scroll real prüfbar ist. Regression-Anker für den $el-vs-$root-Bug: aus
+  einem @click-Handler heraus zeigt $el aufs geklickte Kind (Band-Marker /
+  Achse-Hinweis), nicht auf die Karten-Wurzel — die Scroll-Methoden müssen über
+  $root suchen, sonst läuft der querySelector leer und nichts scrollt.
+-->
 <head>
   <meta charset="UTF-8">
-  <title>Ereignisse Scroll Repro</title>
+  <title>Ereignisse Scroll Harness</title>
   <link rel="stylesheet" href="/public/css/tokens.css">
   <link rel="stylesheet" href="/public/css/components/icons.css">
   <link rel="stylesheet" href="/public/css/analysis/zeitleiste.css">

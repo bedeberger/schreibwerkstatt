@@ -93,24 +93,43 @@ const _stmtSetBeatSlot = db.prepare(`
    WHERE id = ? AND book_id = ? AND user_email = ?
 `);
 
-// Figuren-Links pro Beat
+// Figuren-Links pro Beat. plot_beat_figures.figure_id ist INTEGER-FK auf
+// figures.id; nach aussen wird aber die TEXT-fig_id exponiert bzw. erwartet —
+// das ist die Figur-Identität, mit der das Frontend arbeitet ($app.figuren[].id
+// === fig_id, vgl. routes/figures.js). resolveFigureIds übersetzt eingehende
+// fig_ids → figures.id, die Lese-Aggregate liefern fig_id zurück.
 const _stmtListFigsForBook = db.prepare(`
-  SELECT pbf.beat_id, pbf.figure_id
+  SELECT pbf.beat_id, f.fig_id AS fig_id
     FROM plot_beat_figures pbf
     JOIN plot_beats b ON b.id = pbf.beat_id
+    JOIN figures   f ON f.id = pbf.figure_id
    WHERE b.book_id = ? AND b.user_email = ?
 `);
 const _stmtDeleteFigsForBeat = db.prepare('DELETE FROM plot_beat_figures WHERE beat_id = ?');
 const _stmtInsertFig = db.prepare('INSERT OR IGNORE INTO plot_beat_figures (beat_id, figure_id) VALUES (?, ?)');
 
+// TEXT-fig_id (Frontend-Identität) → INTEGER figures.id (FK-Target), gefiltert
+// aufs Subset, das wirklich zu (Buch, User) gehört. Unbekannte/Fremd-fig_ids
+// fallen still raus (kein Cross-Buch-Leak in die M:M-Tabelle).
+function resolveFigureIds(bookId, userEmail, figIds) {
+  if (!Array.isArray(figIds) || !figIds.length) return [];
+  const wanted = figIds.map(x => String(x).trim()).filter(Boolean);
+  if (!wanted.length) return [];
+  const placeholders = wanted.map(() => '?').join(',');
+  return db.prepare(
+    `SELECT id FROM figures WHERE book_id = ? AND user_email = ? AND fig_id IN (${placeholders})`
+  ).all(parseInt(bookId), userEmail, ...wanted).map(r => r.id);
+}
+
 function _figMapForBook(bookId, userEmail) {
   const map = {};
   for (const r of _stmtListFigsForBook.all(parseInt(bookId), userEmail)) {
-    (map[r.beat_id] = map[r.beat_id] || []).push(r.figure_id);
+    (map[r.beat_id] = map[r.beat_id] || []).push(r.fig_id);
   }
   return map;
 }
 
+// figureIds = INTEGER figures.id (bereits via resolveFigureIds aufgelöst).
 function _setBeatFigures(beatId, figureIds) {
   _stmtDeleteFigsForBeat.run(parseInt(beatId));
   for (const fid of (figureIds || [])) {
@@ -181,4 +200,5 @@ const reorderBeats = db.transaction((bookId, userEmail, order) => {
 module.exports = {
   listActs, getAct, createAct, updateAct, deleteAct, reorderActs,
   listBeats, getBeat, createBeat, updateBeat, deleteBeat, reorderBeats,
+  resolveFigureIds,
 };

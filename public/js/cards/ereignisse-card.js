@@ -108,18 +108,22 @@ function _yearToMs(year) {
   return +d;
 }
 
-// Pure: ordnet datierte Timeline-Items (aus buildTimelineItems) in horizontale
-// Spuren ("Lanes") und berechnet ihre x-Position als Prozent entlang [min..max].
-// Greedy: jedes Item kommt in die erste Spur, in der es den Mindestabstand zum
-// zuletzt belegten Slot wahrt — verhindert, dass Marker überlappen. Spannen
-// belegen [x..xEnd], Punkte reservieren einen schmalen Slot (minSlotPct).
+// Pure: ordnet datierte Timeline-Items (aus buildTimelineItems) in eine
+// Säulen-Dichte an und berechnet ihre x-Position als Prozent entlang [min..max].
+// Statt greedy über die Breite zu streuen (zerstreutes „Konfetti") werden
+// Punkt-Events nach x-Spalte gebündelt und vom Baseline (Spur 0, unten) nach
+// oben gestapelt: hohe Säule = ereignisreiches Jahr, lesbar wie ein farbiges
+// Histogramm. `lane` zählt von der Baseline aufwärts; CSS verankert unten.
 //
-// Höhe gedeckelt bei maxLanes: in dichten Jahren (z.B. viele Geburten im selben
-// Jahr) würde striktes Nicht-Überlappen sonst zweistellige Spurenzahlen erzwingen.
-// Was über die letzte Spur hinaus drängt, wird je x-Spalte zu EINEM kleinen
-// „+N"-Marker (kind:'more') gebündelt statt als Riesen-Zählblase — die Achse
-// bleibt flach und ruhig. Kein stilles Wegschneiden: jedes überzählige Event
-// zählt in den sichtbaren Count, Klick springt zum ersten in der Liste.
+// Spannen (datum_ende) liegen als horizontale Balken auf den untersten Spuren
+// (unter sich greedy gepackt); Punkte stapeln darüber (baseLane = #Spannen-Spuren).
+//
+// Höhe gedeckelt bei maxLanes: in dichten Jahren (z.B. viele Geburten) würde
+// striktes Einzeln-Stapeln zweistellige Spurenzahlen erzwingen. Läuft eine Säule
+// über, ersetzt EIN „+N"-Marker (kind:'more') die oberste Zelle der Säule statt
+// als Extra-Blase zu kollidieren — die Achse bleibt flach. Kein stilles
+// Wegschneiden: jedes überzählige Event zählt in count, Klick springt zum ersten
+// in der Liste.
 //
 // `lane`/`x`/`widthPct` werden vom Template in CSS-Custom-Props übersetzt.
 // Extrahiert für Tests (ereignisse-card-filter.test.mjs).
@@ -130,45 +134,66 @@ export function layoutBandItems(items, { minSlotPct = 1.4, maxLanes = 6 } = {}) 
   const toPct = (ms) => ((ms - bounds.min) / spanMs) * 100;
   // Nach Start sortieren (defensiv) + Original-id für Klick→Liste behalten.
   const sorted = [...(items || [])].sort((a, b) => (+new Date(a.start)) - (+new Date(b.start)));
-  const laneEnd = [];          // höchste belegte x-Position (Prozent) je Spur
-  const overflowByCol = new Map(); // x-Spalte → gebündelter „+N"-Marker
+  const ranges = sorted.filter(it => it.type === 'range' && it.end != null);
+  const points = sorted.filter(it => !(it.type === 'range' && it.end != null));
   const markers = [];
   let usedLanes = 0;
-  for (const it of sorted) {
+
+  // 1) Spannen: greedy unter sich lane-packen → liegen als Balken auf den
+  //    untersten Spuren. Punkte stapeln darüber.
+  const rangeLaneEnd = [];
+  for (const it of ranges) {
     const x = toPct(+new Date(it.start));
-    const isRange = it.type === 'range' && it.end != null;
-    const xEnd = isRange ? toPct(+new Date(it.end)) : x;
+    const xEnd = toPct(+new Date(it.end));
     const slotEnd = Math.max(xEnd, x + minSlotPct);
     let lane = 0;
-    while (lane < laneEnd.length && laneEnd[lane] > x + 0.0001) lane++;
-    if (lane >= maxLanes) {
-      // Überlauf: pro x-Spalte (gerundet) zu einem +N-Marker auf der obersten
-      // Spur bündeln. id = erstes überzähliges Event (Klick → Liste).
-      const colKey = Math.round(x / minSlotPct);
-      let chip = overflowByCol.get(colKey);
-      if (!chip) {
-        chip = { kind: 'more', id: it.id, x, lane: maxLanes - 1, count: 0 };
-        overflowByCol.set(colKey, chip);
-        markers.push(chip);
-      }
-      chip.count++;
-      continue;
-    }
-    laneEnd[lane] = slotEnd;
+    while (lane < rangeLaneEnd.length && rangeLaneEnd[lane] > x + 0.0001) lane++;
+    if (lane >= maxLanes) lane = maxLanes - 1; // Notfall: Spannen kollabieren
+    rangeLaneEnd[lane] = slotEnd;
     if (lane + 1 > usedLanes) usedLanes = lane + 1;
     markers.push({
-      kind: 'event',
-      id: it.id,
-      x,
-      lane,
-      isRange,
-      widthPct: isRange ? Math.max(xEnd - x, minSlotPct) : 0,
-      subtyp: it.subtyp || 'sonstiges',
-      extern: !!it.extern,
-      content: it.content || '',
+      kind: 'event', id: it.id, x, lane, isRange: true,
+      widthPct: Math.max(xEnd - x, minSlotPct),
+      subtyp: it.subtyp || 'sonstiges', extern: !!it.extern, content: it.content || '',
     });
   }
-  return { lanes: Math.min(Math.max(usedLanes, overflowByCol.size ? maxLanes : 0), maxLanes), markers, bounds };
+  const baseLane = rangeLaneEnd.length;     // Punkte beginnen über den Spannen
+  const capacity = Math.max(1, maxLanes - baseLane); // Punkt-Spuren pro Säule
+
+  // 2) Punkte je Kalenderjahr zu einer Säule bündeln (nicht nach x-Spalte —
+  //    sonst spalten sich Monate desselben Jahres in Nachbar-Säulchen auf).
+  //    Repräsentant-x = erstes (frühestes) Event des Jahres, damit Einzel-Events
+  //    ihre exakte Position (inkl. Boundary 0%/100%) behalten.
+  const cols = new Map();
+  for (const it of points) {
+    const start = new Date(it.start);
+    const colKey = start.getFullYear();
+    let col = cols.get(colKey);
+    if (!col) { col = { x: toPct(+start), items: [] }; cols.set(colKey, col); }
+    col.items.push(it);
+  }
+
+  for (const col of cols.values()) {
+    const list = col.items;                      // bereits nach start sortiert
+    const overflow = list.length > capacity;
+    const showN = overflow ? capacity - 1 : list.length; // Platz für +N-Zelle
+    for (let i = 0; i < showN; i++) {
+      const it = list[i];
+      const lane = baseLane + i;
+      if (lane + 1 > usedLanes) usedLanes = lane + 1;
+      markers.push({
+        kind: 'event', id: it.id, x: col.x, lane, isRange: false, widthPct: 0,
+        subtyp: it.subtyp || 'sonstiges', extern: !!it.extern, content: it.content || '',
+      });
+    }
+    if (overflow) {
+      const lane = baseLane + capacity - 1;      // oberste Zelle der Säule
+      if (lane + 1 > usedLanes) usedLanes = lane + 1;
+      markers.push({ kind: 'more', id: list[showN].id, x: col.x, lane, count: list.length - showN });
+    }
+  }
+
+  return { lanes: Math.min(usedLanes, maxLanes), markers, bounds };
 }
 
 // Pure: "nette" Jahres-Ticks für die Achsenbeschriftung. Schrittweite aus einer
@@ -378,8 +403,11 @@ export function registerEreignisseCard() {
     },
 
     // Scrollt das Event am Listen-Index ins Sichtfeld (Klick auf Timeline-Item).
+    // $root (Karten-Wurzel), nicht $el: aus einem @click-Handler heraus zeigt
+    // $el auf das geklickte Kind (Band-Marker bzw. Achse-Hinweis), dessen
+    // Subtree die Liste nicht enthält — die Suche liefe sonst leer.
     scrollToEventIndex(index) {
-      const node = this.$el?.querySelector(`.global-zeitstrahl-body--card [data-ev-index="${index}"]`);
+      const node = this.$root?.querySelector(`.global-zeitstrahl-body--card [data-ev-index="${index}"]`);
       node?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     },
 
@@ -403,7 +431,7 @@ export function registerEreignisseCard() {
     selectTimelineEvent(index) {
       this.selectedEventIndex = index;
       this.$nextTick(() => {
-        const marker = this.$el?.querySelector(`.gz-band-marker[data-ev-id="${index}"]`);
+        const marker = this.$root?.querySelector(`.gz-band-marker[data-ev-id="${index}"]`);
         marker?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
       });
     },

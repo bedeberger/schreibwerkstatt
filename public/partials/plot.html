@@ -75,6 +75,19 @@
             x-show="!addingAct" x-text="$app.t('plot.empty.addAct')"></button>
   </div>
 
+  <!-- Filter-Leiste (Kapitel / Figur) — filtert die Beats pro Akt-Spalte -->
+  <div class="filter-bar" x-show="beats.length > 0" x-cloak>
+    <div x-data="catalogFilter('figur')"
+         x-modelable="value" x-model="plotFilters.figurId"
+         x-effect="options = $app.figuren.filter(f => beats.some(b => (b.fig_ids||[]).includes(f.id))).map(f => ({value: f.id, label: f.kurzname || f.name}))">
+    </div>
+    <div x-data="catalogFilter('chapter')"
+         x-modelable="value" x-model="plotFilters.kapitel"
+         x-effect="options = plotKapitelListe().map(k => ({value: k, label: k}))">
+    </div>
+    <span class="filter-count" x-text="filteredBeatCount() + ' / ' + beats.length"></span>
+  </div>
+
   <!-- Board -->
   <div class="plot-board" x-show="acts.length || addingAct" x-cloak>
     <template x-for="act in acts" :key="act.id">
@@ -94,7 +107,7 @@
                    @keydown.enter="saveEditAct(act)" @keydown.escape="cancelEditAct()"
                    @blur="saveEditAct(act)">
           </template>
-          <span class="plot-column-count" x-text="beatsForAct(act.id).length"></span>
+          <span class="plot-column-count" x-text="filteredBeatsForAct(act.id).length"></span>
           <div class="plot-column-actions">
             <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn" @click="moveAct(act, -1)" :data-tip="$app.t('plot.act.moveLeft')" :aria-label="$app.t('plot.act.moveLeft')">
               <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#chevron-left"/></svg>
@@ -113,7 +126,7 @@
 
         <!-- Beats -->
         <div class="plot-column-body">
-          <template x-for="beat in beatsForAct(act.id)" :key="beat.id">
+          <template x-for="beat in filteredBeatsForAct(act.id)" :key="beat.id">
             <div class="plot-beat" :class="'plot-beat--' + beat.status"
                  draggable="true"
                  @dragstart="onBeatDragStart(beat, $event)" @dragend="onBeatDragEnd()"
@@ -186,9 +199,10 @@
           <!-- Beat hinzufügen -->
           <template x-if="addingActId === act.id">
             <div class="plot-add-beat" :data-add-beat-act="act.id">
-              <textarea class="plot-add-beat-input" x-model="newBeatTitel" rows="3"
+              <textarea class="plot-add-beat-input" x-model="newBeatTitel" rows="1"
                         data-spellcheck="spelling" :placeholder="$app.t('plot.beat.titelPlaceholder')"
-                        @keydown.enter.prevent="saveNewBeat(act.id)" @keydown.escape="cancelAddBeat()"></textarea>
+                        @keydown.enter.prevent="saveNewBeat(act.id)" @keydown.escape="cancelAddBeat()"
+                        @blur="onAddBeatBlur(act.id, $event)"></textarea>
               <div class="plot-add-beat-actions">
                 <button type="button" class="btn-compact" @click="saveNewBeat(act.id)" :disabled="busy" x-text="$app.t('plot.beat.add')"></button>
                 <button type="button" class="btn-compact btn-compact--ghost" @click="cancelAddBeat()" x-text="$app.t('common.cancel')"></button>

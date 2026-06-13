@@ -301,18 +301,37 @@ test('layoutBandItems: kollidierende Events bekommen getrennte Spuren', () => {
   assert.deepEqual(markers.map(m => m.lane).sort(), [0, 1, 2]);
 });
 
-test('layoutBandItems: Höhe gedeckelt — Überlauf bündelt zu +N-Chip, kein Datenverlust', () => {
-  // 10 Events im selben Jahr, maxLanes=3 → 3 Einzel-Marker + 1 „more"-Chip(7).
+test('layoutBandItems: Höhe gedeckelt — oberste Zelle wird +N-Chip, kein Datenverlust', () => {
+  // 10 Events im selben Jahr, maxLanes=3 → die oberste Säulen-Zelle wird zum
+  // „more"-Chip: 2 Einzel-Marker (Spuren 0/1) + 1 Chip(8) auf Spur 2.
   const events = Array.from({ length: 10 }, (_, i) => ({ datum_year: 1990, ereignis: 'E' + i }));
   const { lanes, markers } = layoutBandItems(buildTimelineItems(events), { maxLanes: 3 });
   assert.ok(lanes <= 3, 'Lanes auf maxLanes gedeckelt');
   const single = markers.filter(m => m.kind === 'event');
   const more = markers.filter(m => m.kind === 'more');
-  assert.equal(single.length, 3, '3 Einzel-Marker sichtbar');
+  assert.equal(single.length, 2, 'maxLanes-1 Einzel-Marker sichtbar (oberste Zelle = Chip)');
   assert.equal(more.length, 1, 'ein gebündelter Chip');
-  assert.equal(more[0].count, 7, 'Chip zählt die 7 überzähligen');
+  assert.equal(more[0].count, 8, 'Chip zählt die 8 überzähligen');
   assert.equal(single.length + more[0].count, 10, 'kein Event verschluckt');
+  assert.equal(more[0].lane, 2, 'Chip sitzt allein auf der obersten Spur (keine Kollision)');
+  assert.ok(single.every(m => m.lane !== more[0].lane), 'kein Einzel-Marker auf der Chip-Spur');
   assert.ok(Number.isInteger(more[0].id), 'Chip-id = Listen-Index des ersten überzähligen Events (Klick-Ziel)');
+});
+
+test('layoutBandItems: Punkte stapeln je Säule von der Baseline (Spur 0) aufwärts', () => {
+  // Zwei Events im selben Jahr stapeln in einer Säule (gleiches x, Spuren 0/1);
+  // ein drittes in einem fernen Jahr steht für sich auf Spur 0.
+  const items = buildTimelineItems([
+    { datum_year: 1980, ereignis: 'A' },
+    { datum_year: 1980, ereignis: 'B' },
+    { datum_year: 2000, ereignis: 'C' },
+  ]);
+  const { markers } = layoutBandItems(items, { maxLanes: 6 });
+  const byId = Object.fromEntries(markers.map(m => [m.id, m]));
+  assert.equal(byId[0].lane, 0, 'erstes Event der Säule auf der Baseline');
+  assert.equal(byId[1].lane, 1, 'zweites Event der Säule eine Spur höher');
+  assert.equal(byId[0].x.toFixed(1), byId[1].x.toFixed(1), 'gestapelte Events teilen die x-Position');
+  assert.equal(byId[2].lane, 0, 'Event im fernen Jahr beginnt wieder auf der Baseline');
 });
 
 test('layoutBandItems: Spanne trägt isRange + widthPct', () => {

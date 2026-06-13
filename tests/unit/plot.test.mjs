@@ -13,6 +13,7 @@ process.env.DB_PATH = path.join('/tmp', `plot-db-test-${process.pid}-${Date.now(
 const schema = require('../../db/schema');
 const appUsers = require('../../db/app-users');
 const plot = require('../../db/plot');
+const { db } = require('../../db/connection');
 
 const USER = 'plot@x.test';
 const BOOK = 770001;
@@ -20,6 +21,14 @@ const BOOK = 770001;
 function seed() {
   appUsers.createUser({ email: USER, displayName: 'Plot Tester' });
   schema.upsertBookByName(BOOK, 'Plot-Testbuch');
+}
+
+// Figur direkt anlegen — fig_id (TEXT, Frontend-Identität) + id (INTEGER PK).
+function seedFigur(bookId, userEmail, figId, name) {
+  return db.prepare(
+    `INSERT INTO figures (book_id, user_email, fig_id, name, kurzname, updated_at)
+     VALUES (?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))`
+  ).run(bookId, userEmail, figId, name, name).lastInsertRowid;
 }
 
 test('plot DB: Akt-CRUD + Positionsvergabe', () => {
@@ -58,6 +67,42 @@ test('plot DB: Beat-CRUD inkl. Figuren-Links + Status', () => {
 
   plot.deleteBeat(beat.id);
   assert.equal(plot.listBeats(BOOK, USER).filter(b => b.act_id === act.id).length, 0);
+});
+
+test('plot DB: Beat-Figuren persistieren als TEXT-fig_id (id↔fig_id-Übersetzung)', () => {
+  const anna = seedFigur(BOOK, USER, 'fig_anna', 'Anna');
+  const bert = seedFigur(BOOK, USER, 'fig_bert', 'Bert');
+  // resolveFigureIds übersetzt die Frontend-fig_ids in INTEGER figures.id
+  const annaIds = plot.resolveFigureIds(BOOK, USER, ['fig_anna']);
+  assert.deepEqual(annaIds, [anna]);
+
+  const act = plot.createAct(BOOK, USER, { name: 'Fig-Akt' });
+  // createBeat erwartet bereits aufgelöste INTEGER-ids (wie der Route-Handler liefert)
+  const beat = plot.createBeat(BOOK, act.id, USER, { titel: 'Treffen', figureIds: [anna] });
+  // ... Lese-Aggregat gibt aber die TEXT-fig_id zurück (Frontend-Identität)
+  assert.deepEqual(beat.fig_ids, ['fig_anna']);
+
+  // Update ersetzt die Links komplett (Anna + Bert)
+  const upd = plot.updateBeat(beat.id, {}, plot.resolveFigureIds(BOOK, USER, ['fig_anna', 'fig_bert']));
+  assert.deepEqual([...upd.fig_ids].sort(), ['fig_anna', 'fig_bert']);
+  // listBeats spiegelt denselben Stand
+  const reread = plot.listBeats(BOOK, USER).find(b => b.id === beat.id);
+  assert.deepEqual([...reread.fig_ids].sort(), ['fig_anna', 'fig_bert']);
+
+  // Leeres Array löscht alle Links
+  const cleared = plot.updateBeat(beat.id, {}, []);
+  assert.deepEqual(cleared.fig_ids, []);
+
+  plot.deleteAct(act.id);
+});
+
+test('plot DB: resolveFigureIds filtert Fremd-/Unbekannt-fig_ids raus', () => {
+  const own = seedFigur(BOOK, USER, 'fig_own', 'Eigen');
+  appUsers.createUser({ email: 'someone-else@x.test', displayName: 'Fremd' });
+  seedFigur(BOOK, 'someone-else@x.test', 'fig_foreign', 'Fremd'); // anderer User
+  const resolved = plot.resolveFigureIds(BOOK, USER, ['fig_own', 'fig_foreign', 'fig_ghost']);
+  assert.deepEqual(resolved, [own]);
+  assert.deepEqual(plot.resolveFigureIds(BOOK, USER, []), []);
 });
 
 test('plot DB: Beat-Reorder verschiebt act_id + sort_order', () => {

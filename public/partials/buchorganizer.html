@@ -27,22 +27,22 @@
       <button type="button" class="search-clear--icon" x-show="organizerSearch" @click="organizerSearch=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#x"/></svg></button>
     </span>
     <div class="btn-group organizer-action-group">
-      <button type="button" class="icon-btn organizer-icon-btn"
+      <button type="button" class="icon-btn"
               @click="historyUndo()"
               :disabled="_undoStack.length === 0 || organizerSaving"
               :data-tip="$app.t('bookOrganizer.undoTip')"
               :aria-label="$app.t('bookOrganizer.undo')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#undo"/></svg></button>
-      <button type="button" class="icon-btn organizer-icon-btn"
+      <button type="button" class="icon-btn"
               @click="historyRedo()"
               :disabled="_redoStack.length === 0 || organizerSaving"
               :data-tip="$app.t('bookOrganizer.redoTip')"
               :aria-label="$app.t('bookOrganizer.redo')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#redo"/></svg></button>
-      <button type="button" class="icon-btn organizer-icon-btn"
+      <button type="button" class="icon-btn"
               @click="expandAll()"
               :disabled="workTree.length === 0 || !!organizerSearch"
               :data-tip="$app.t('sidebar.expandAll')"
               :aria-label="$app.t('sidebar.expandAll')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#chevron-down"/></svg></button>
-      <button type="button" class="icon-btn organizer-icon-btn"
+      <button type="button" class="icon-btn"
               @click="collapseAll()"
               :disabled="workTree.length === 0 || !!organizerSearch"
               :data-tip="$app.t('sidebar.collapseAll')"
@@ -160,14 +160,14 @@
                     :disabled="organizerSaving || ch.depth >= 3"
                     :data-tip="ch.depth >= 3 ? $app.t('bookOrganizer.maxDepthReached') : $app.t('bookOrganizer.addSubchapter')"
                     x-text="$app.t('bookOrganizer.addSubchapter')"></button>
-            <button type="button" class="organizer-icon-btn"
+            <button type="button" class="icon-btn icon-btn--ghost"
                     @click="promoteChapter(ch.id)" :disabled="organizerSaving || !canPromoteChapter(ch.id)"
                     :data-tip="$app.t('bookOrganizer.promote')"
-                    :aria-label="$app.t('bookOrganizer.promote')">←</button>
-            <button type="button" class="organizer-icon-btn"
+                    :aria-label="$app.t('bookOrganizer.promote')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#arrow-left"/></svg></button>
+            <button type="button" class="icon-btn icon-btn--ghost"
                     @click="demoteChapter(ch.id)" :disabled="organizerSaving || !canDemoteChapter(ch.id)"
                     :data-tip="$app.t('bookOrganizer.demote')"
-                    :aria-label="$app.t('bookOrganizer.demote')">→</button>
+                    :aria-label="$app.t('bookOrganizer.demote')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#arrow-right"/></svg></button>
             <button type="button" class="organizer-delete-btn organizer-delete-btn--chapter" @click="deleteChapter(ch.id)"
                     :disabled="organizerSaving || ch.pages.length > 0 || (ch.subchapters?.length || 0) > 0"
                     :data-tip="(ch.pages.length > 0 || (ch.subchapters?.length || 0) > 0) ? $app.t('bookOrganizer.deleteChapterNotEmptyHint') : $app.t('bookOrganizer.deleteChapter')"
@@ -260,14 +260,14 @@
                           :disabled="organizerSaving || sub.depth >= 3"
                           :data-tip="sub.depth >= 3 ? $app.t('bookOrganizer.maxDepthReached') : $app.t('bookOrganizer.addSubchapter')"
                           x-text="$app.t('bookOrganizer.addSubchapter')"></button>
-                  <button type="button" class="organizer-icon-btn"
+                  <button type="button" class="icon-btn icon-btn--ghost"
                           @click="promoteChapter(sub.id)" :disabled="organizerSaving || !canPromoteChapter(sub.id)"
                           :data-tip="$app.t('bookOrganizer.promote')"
-                          :aria-label="$app.t('bookOrganizer.promote')">←</button>
-                  <button type="button" class="organizer-icon-btn"
+                          :aria-label="$app.t('bookOrganizer.promote')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#arrow-left"/></svg></button>
+                  <button type="button" class="icon-btn icon-btn--ghost"
                           @click="demoteChapter(sub.id)" :disabled="organizerSaving || !canDemoteChapter(sub.id)"
                           :data-tip="$app.t('bookOrganizer.demote')"
-                          :aria-label="$app.t('bookOrganizer.demote')">→</button>
+                          :aria-label="$app.t('bookOrganizer.demote')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#arrow-right"/></svg></button>
                   <button type="button" class="organizer-delete-btn organizer-delete-btn--chapter" @click="deleteChapter(sub.id)"
                           :disabled="organizerSaving || sub.pages.length > 0 || (sub.subchapters?.length || 0) > 0"
                           :data-tip="(sub.pages.length > 0 || (sub.subchapters?.length || 0) > 0) ? $app.t('bookOrganizer.deleteChapterNotEmptyHint') : $app.t('bookOrganizer.deleteChapter')"
@@ -354,10 +354,10 @@
                       <span class="organizer-chapter-meta tag" x-text="subsub.pages.length === 1 ? $app.t('sidebar.pagesCountOne') : $app.t('sidebar.pagesCount', { n: subsub.pages.length })"></span>
                       <div class="organizer-chapter-actions">
                         <button type="button" class="btn-compact" @click="createPage(subsub.id)" :disabled="organizerSaving" x-text="$app.t('bookOrganizer.addPageHere')"></button>
-                        <button type="button" class="organizer-icon-btn"
+                        <button type="button" class="icon-btn icon-btn--ghost"
                                 @click="promoteChapter(subsub.id)" :disabled="organizerSaving || !canPromoteChapter(subsub.id)"
                                 :data-tip="$app.t('bookOrganizer.promote')"
-                                :aria-label="$app.t('bookOrganizer.promote')">←</button>
+                                :aria-label="$app.t('bookOrganizer.promote')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#arrow-left"/></svg></button>
                         <button type="button" class="organizer-delete-btn organizer-delete-btn--chapter" @click="deleteChapter(subsub.id)"
                                 :disabled="organizerSaving || subsub.pages.length > 0"
                                 :data-tip="subsub.pages.length > 0 ? $app.t('bookOrganizer.deleteChapterNotEmptyHint') : $app.t('bookOrganizer.deleteChapter')"

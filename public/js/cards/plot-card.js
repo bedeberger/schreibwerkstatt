@@ -16,6 +16,11 @@ export function registerPlotCard() {
     errorMessage: '',
     _memos: {},
 
+    // Filter (Kapitel / Figur) — wie szenen/ereignisse; filtert die Beats pro
+    // Akt-Spalte rein fürs Rendering (beatsForAct bleibt ungefiltert für
+    // Drag&Drop + Order-Persistenz).
+    plotFilters: { kapitel: '', figurId: '' },
+
     // Beat-Edit / -Add
     editingBeatId: null,
     beatDraft: { titel: '', beschreibung: '', status: 'geplant', chapter_id: '', figure_ids: [] },

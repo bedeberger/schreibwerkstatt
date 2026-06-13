@@ -514,19 +514,19 @@ Neue Aktionen erweitern diese Tabelle und das Sprite (siehe [Icon-System](#icon-
 <div class="<feature>-toolbar">
   <input type="text" class="page-search" x-model="search" :placeholder="…">
   <div class="btn-group <feature>-action-group">
-    <button type="button" class="icon-btn <feature>-icon-btn"
+    <button type="button" class="icon-btn"
             @click="undo()" :data-tip="…" :aria-label="…">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg#undo"/></svg>
     </button>
-    <button type="button" class="icon-btn <feature>-icon-btn"
+    <button type="button" class="icon-btn"
             @click="redo()" :data-tip="…" :aria-label="…">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg#redo"/></svg>
     </button>
-    <button type="button" class="icon-btn <feature>-icon-btn"
+    <button type="button" class="icon-btn"
             @click="expandAll()" :data-tip="…" :aria-label="…">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg#chevron-down"/></svg>
     </button>
-    <button type="button" class="icon-btn <feature>-icon-btn"
+    <button type="button" class="icon-btn"
             @click="collapseAll()" :data-tip="…" :aria-label="…">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg#chevron-up"/></svg>
     </button>
@@ -584,6 +584,7 @@ Neue Aktionen erweitern diese Tabelle und das Sprite (siehe [Icon-System](#icon-
 - **Vertikal-Alignment Pflicht:** Toolbar IMMER `align-items: stretch` und Nachbar-Elemente (Input, Combobox-Trigger, Buttons) auf **gleiche fixe Höhe** (`34px`-Standard). Ohne stretch + fixe Höhe ergeben Padding-Differenzen schräge Auslinierungen — der häufigste Bug bei diesem Pattern.
 - **Combobox-Trigger anpassen:** `.combobox-trigger` hat Eigenpadding via `--size-compact-padding`. In der Toolbar mit `height: 34px; padding-block: 0;` override, sonst überragt der Trigger die Action-Group. Wrapper-Div bleibt leer (Helper überschreibt `innerHTML`).
 - **Segment-Style statt Gap:** Buttons rücken aneinander (`gap: 0` auf Action-Group, `border-left-width: 0` auf Folge-Buttons). Aussenseiten gerundet via `:first-child` / `:last-child`. Liest sich als zusammengehörige Gruppe. Wer Lücke statt Segment will: anderes Pattern verwenden (z.B. `card-actions`).
+- **Scoping über den Wrapper, kein Per-Button-Marker.** Buttons tragen nur `class="icon-btn"`; die Kontext-Overrides hängen an `.<feature>-action-group .icon-btn` (siehe CSS oben). **Kein** zusätzliches `.<feature>-icon-btn` am Button — eine inerte Marker-Klasse ohne eigene Regel führt nur in die Irre.
 - **Icons aus Sprite, kein Glyph-Wrapper mehr.** `<svg class="icon"><use href="/icons.svg#name"/></svg>` direkt im Button. `.icon` (1em-Quadrat) zentriert sich via Button-Flex automatisch — keine `font-size: 0`-Tricks, kein `<span class="…-icon">`-Wrapper, keine Font-Metrik-Wackelei. Icon-Map siehe [Icon-Button](#icon-button-icon-btn).
 - **Disabled-State** via `:disabled` (z.B. Undo bei leerem Stack). Greift automatisch durch `.icon-btn`-Default-Styling.
 - **Mobile:** Im `@media (max-width: 600px)`-Block Toolbar zu `flex-direction: column; align-items: stretch` drehen; Search + Combobox auf `width: 100%`. Action-Group bleibt horizontal (segmentierte Reihe), nimmt eigene Zeile ein.
@@ -1025,9 +1026,9 @@ Nur in Sidebar-Tree verwendet. Bei neuer hierarchischer Liste: erst prüfen, ob 
 
 ## Jahres-Band (selbstgebaut)
 
-**Use:** Kompaktes Jahres-Band über einer langen, datierten Liste — jedes datierte Element als farbcodierter Marker (Subtyp-Farbe) auf einer Jahresachse, Klick auf einen Marker scrollt zum zugehörigen Listeneintrag und hebt ihn hervor. Übersicht + Navigation, **nicht** der Detail-Reader (das ist die Liste darunter). Erste Konsumentin: Ereignisse-Karte (Jahr-Achse über `globalZeitstrahl`).
+**Use:** Kompaktes Jahres-Band über einer langen, datierten Liste — datierte Elemente werden je Kalenderjahr zu einer **Säule** gebündelt und von einer Baseline nach oben gestapelt (farbcodierte Marker pro Subtyp): hohe Säule = ereignisreiches Jahr, lesbar wie ein farbiges Histogramm. Klick auf einen Marker scrollt zum zugehörigen Listeneintrag und hebt ihn hervor. Übersicht + Navigation, **nicht** der Detail-Reader (das ist die Liste darunter). Erste Konsumentin: Ereignisse-Karte (Jahr-Achse über `globalZeitstrahl`).
 
-**Warum kein vis-timeline (mehr):** Die Lib clusterte asynchron und stapelte ihre Achse erst ~1 s nach dem ersten Paint nach → sichtbares „Einklappen, dann Expandieren". Das Band ist rein DOM/CSS positioniert (`left` in Prozent, Spur via `--gz-band-lane`), rendert synchron aus dem Daten-Modell und erscheint sofort in finaler Höhe — kein Lazy-Lib-Load, kein Layout-Shift.
+**Warum kein vis-timeline (mehr):** Die Lib clusterte asynchron und stapelte ihre Achse erst ~1 s nach dem ersten Paint nach → sichtbares „Einklappen, dann Expandieren". Das Band ist rein DOM/CSS positioniert (`left` in Prozent, Spur via `--gz-band-lane`, von der Baseline aufwärts), rendert synchron aus dem Daten-Modell und erscheint sofort in finaler Höhe — kein Lazy-Lib-Load, kein Layout-Shift.
 
 **Markup:**
 ```html
@@ -1048,14 +1049,15 @@ Nur in Sidebar-Tree verwendet. Bei neuer hierarchischer Liste: erst prüfen, ob 
 
 **Klassen** [public/css/analysis/zeitleiste.css](public/css/analysis/zeitleiste.css) (`@layer components`, kein Vendor-Theme mehr):
 - `.gz-layout` — Flex-Wrapper, `flex-direction: column` (Band oben, Liste darunter)
-- `.gz-band` / `.gz-band-track` — Container + positioniertes Koordinatensystem; Höhe aus `--gz-band-lanes`
-- `.gz-band-tick` / `.gz-band-tick-label` — Jahres-Gridline + Label
-- `.gz-band-marker` (+ `--range` / `--more` / `--selected`) — eckiger Marker; Farbe via `--gz-marker-color`
+- `.gz-band` / `.gz-band-track` — Container + positioniertes Koordinatensystem; Höhe aus `--gz-band-lanes`. `.gz-band-track::after` = Baseline-Linie, auf der die Säulen aufsitzen (Marker via `bottom` von der Baseline aufwärts gestapelt).
+- `.gz-band-tick` / `.gz-band-tick-label` — Jahres-Gridline (top→Baseline) + Label am Fuss (`--gz-axis-h`)
+- `.gz-band-marker` (+ `--range` / `--more` / `--selected`) — eckiger Marker; Farbe via `--gz-marker-color` (solider Fill, dunklerer Rand)
 - `.gz-timeline-hint` — Fussnote zu undatierten Events
+- `.gz-meta` — fliessende Zeile in der Liste, bündelt Kapitel + Seite („wo") in **eine** Zeile statt zwei (dichteres Scannen); nur in der Ereignisse-Liste, **nicht** im Figuren-Detail-Zeitstrahl (dort Spalten-Layout mit Margins).
 
 **Pure Layout-Helfer** (in [ereignisse-card.js](public/js/cards/ereignisse-card.js), getestet in [ereignisse-card-filter.test.mjs](tests/unit/ereignisse-card-filter.test.mjs)):
 - `buildTimelineItems(events)` — nur Events mit `datum_year` werden Achsen-Items; `id` = Listen-Index.
-- `layoutBandItems(items)` — Greedy-Lane-Packing, x in Prozent; Höhe gedeckelt bei `maxLanes` (Default 6). Überzählige in dichten Jahren bündeln pro x-Spalte zu **einem** `kind:'more'`-Marker (kleiner „+N"-Chip statt Riesen-Zählblase). Kein stilles Wegschneiden — jedes Event zählt in den Count, Klick springt zum ersten in der Liste.
+- `layoutBandItems(items)` — Punkte je Kalenderjahr zu Säulen bündeln und von Spur 0 (Baseline) aufwärts stapeln; x in Prozent (Repräsentant = frühestes Event des Jahres, behält Boundary 0 %/100 %). Spannen liegen vorab als Balken auf den untersten Spuren (`baseLane`), Punkte stapeln darüber. Höhe gedeckelt bei `maxLanes` (Default 6): läuft eine Säule über, **ersetzt** EIN `kind:'more'`-Marker („+N"-Chip) die oberste Zelle — kollidiert nicht mehr mit Achse/Marker. Kein stilles Wegschneiden — jedes Event zählt in den Count, Klick springt zum ersten in der Liste.
 - `bandAxisTicks(bounds)` — „nette" Jahres-Ticks (Schrittweite 1/2/5/10/…).
 - `buildBandModel(events)` — fügt die drei zusammen; in der Karte über `memoizeByIdentity` an die gefilterte Liste gebunden.
 
@@ -2046,7 +2048,7 @@ Wenn die Karte zusätzlich Inline-Inputs braucht (z.B. „Neue Figur — Name ei
 - **CSS:** [public/css/book/plot-board.css](public/css/book/plot-board.css). Akzent via `var(--card-accent)` (Mapping `.card--plot` in [card-accents.css](public/css/card-accents.css) → `--card-accent-plot`).
 - **DnD:** natives HTML5 Drag-and-Drop (kein SortableJS). Beats sind `draggable`; Drop-Targets sind die Spalte (`@drop` → ans Ende) **und** jeder Beat (`@drop.prevent.stop` → davor einfügen). Reihenfolge wird lokal neu nummeriert und via `PUT /plot/beats/order` persistiert. Akte werden per Pfeil-Buttons verschoben (a11y), nicht per Drag.
 - **Status:** vier Werte mit eigenen `--<status>`-Modifiern auf `.plot-beat` (linke Border) und `.plot-status-tag` (Badge): `geplant` (neutral) · `entwurf` (warn) · `im_buch` (ok) · `verworfen` (gedimmt, durchgestrichen). Eigene Klassen, NICHT `severity-tag--*` (das sind andere Werte). Konflikt-Severity im Consistency-Panel nutzt dagegen die bestehenden `severity-tag--*`.
-- **Icon-Buttons:** board-lokale `.plot-icon-btn` (+ `--danger`), analog zu `.organizer-icon-btn` im Buchorganizer — kein globaler `.icon-btn` existiert.
+- **Icon-Buttons:** generische [`.icon-btn icon-btn--ghost`](#icon-button-icon-btn)-Basis; `.plot-icon-btn` (+ `--danger`) ist nur der board-lokale Scoping-Marker für die Deltas (24px, randlos, Hover-Tint, 15px-Icon). Kein eigener Icon-Button-Stil.
 
 ---
 
