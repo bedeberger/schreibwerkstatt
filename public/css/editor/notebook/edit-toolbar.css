@@ -103,7 +103,6 @@
 .edit-slash-item:hover,
 .edit-slash-item--active { background: var(--color-hover); }
 .edit-slash-query {
-  font-family: var(--font-mono, ui-monospace, monospace);
   text-transform: none;
   letter-spacing: 0;
   color: var(--color-text);
