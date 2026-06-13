@@ -56,7 +56,6 @@
 .share-create__textarea {
   resize: vertical;
   min-height: 60px;
-  font-family: inherit;
 }
 /* Mobile: 16px verhindert iOS-Zoom beim Fokus (erbt sonst <16px via font: inherit). */
 @media (max-width: 768px) {

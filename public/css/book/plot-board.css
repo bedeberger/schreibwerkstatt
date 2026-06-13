@@ -164,6 +164,7 @@
   .plot-beat-edit-titel,
   .plot-beat-edit-desc {
     width: 100%;
+    font-family: inherit;
     font-size: var(--font-size-sm);
     padding: var(--space-2xs) var(--space-xs);
     border: 1px solid var(--color-border);
@@ -233,6 +234,7 @@
   .plot-add-beat-input {
     width: 100%;
     min-height: 2.25rem;
+    font-family: inherit;
     font-size: var(--font-size-sm);
     line-height: 1.45;
     padding: var(--space-xs);
