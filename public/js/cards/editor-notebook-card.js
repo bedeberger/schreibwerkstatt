@@ -10,6 +10,7 @@
 import { notebookCardMethods } from '../editor/notebook/card.js';
 import { notebookEditMethods } from '../editor/notebook/edit.js';
 import { notebookHistoryMethods } from '../editor/notebook/history.js';
+import { formatMarksMethods } from '../editor/notebook/format-marks.js';
 
 export function registerEditorNotebookCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -21,6 +22,11 @@ export function registerEditorNotebookCard() {
     _undoIdx: -1,
     _undoTimer: null,
     _undoApplying: false,
+    // Steuerzeichen-Overlay (Soft-Break-Marken ↵): Listener-/Observer-Handles
+    // (siehe editor/notebook/format-marks.js).
+    _formatMarksRaf: null,
+    _formatMarksRO: null,
+    _formatMarksAbort: null,
 
     init() {
       // Globaler Selbst-Ref für die Root-Trampoline. Pendant zu __focusCard /
@@ -37,5 +43,6 @@ export function registerEditorNotebookCard() {
     ...notebookCardMethods,
     ...notebookEditMethods,
     ...notebookHistoryMethods,
+    ...formatMarksMethods,
   }));
 }

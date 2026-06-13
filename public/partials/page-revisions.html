@@ -47,6 +47,13 @@
                 :disabled="restoringId === rev.id"
                 :data-tip="$app.t('editor.revisions.restoreTitle')"
                 x-text="restoringId === rev.id ? $app.t('editor.revisions.restoring') : $app.t('editor.revisions.restore')"></button>
+        <button type="button"
+                class="btn-toggle-saved btn-toggle-saved--off"
+                x-show="hasPrevRevFor(rev)"
+                @click.stop="restorePrevious(rev)"
+                :disabled="restoringId !== null"
+                :data-tip="$app.t('editor.revisions.restorePrevTitle')"
+                x-text="$app.t('editor.revisions.restorePrev')"></button>
       </div>
     </template>
   </div>
@@ -161,6 +168,13 @@
                     class="revision-viewer__btn"
                     @click="closeViewer()"
                     x-text="$app.t('editor.revisions.viewer.close')"></button>
+            <button type="button"
+                    class="revision-viewer__btn"
+                    x-show="hasPrevRev()"
+                    @click="restorePreviousFromViewer()"
+                    :disabled="restoringId !== null || viewerLoading"
+                    :data-tip="$app.t('editor.revisions.restorePrevTitle')"
+                    x-text="$app.t('editor.revisions.restorePrev')"></button>
             <button type="button"
                     class="revision-viewer__btn revision-viewer__btn--primary"
                     @click="restoreFromViewer()"

@@ -1,6 +1,8 @@
 'use strict';
 // CRUD fuer page_revisions.
-// Schreib-Pfad: content-store-Facade ruft `insert()` vor jedem Backend-Save.
+// Schreib-Pfad: content-store-Facade ruft `insert()` nach jedem erfolgreichen
+//   Backend-Save und legt den gerade geschriebenen Stand als Snapshot ab (jede
+//   Revision = Inhalt NACH ihrem Save, nicht der Vorzustand).
 // Lese-Pfad: routes/content.js Revisions-Endpoints.
 // Retention: lib/cache-cleanup.js POLICIES ruft `pruneTiered()` taeglich.
 // Strategie: Grandfather-Father-Son (GFS).

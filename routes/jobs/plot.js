@@ -77,9 +77,29 @@ function _szenenContext(bookId, userEmail) {
   return scenes.map(s => ({ titel: s.titel, kapitel: s.kapitel, figuren: byScene[s.id] || [] }));
 }
 
+// Handlungsstränge (Swimlanes) mit aufgelöster Hauptfigur. Katalog-Bindung über
+// die TEXT-fig_id (figures), Werkstatt-Bindung über draft_figures.id. Best-effort.
+function _threadContext(bookId, userEmail) {
+  let threads;
+  try { threads = plotDb.listThreads(bookId, userEmail); } catch { return []; }
+  if (!threads.length) return [];
+  const figByFigId = {};
+  for (const r of db.prepare('SELECT fig_id, name FROM figures WHERE book_id = ? AND user_email = ?').all(parseInt(bookId), userEmail)) {
+    figByFigId[r.fig_id] = r.name;
+  }
+  const draftById = {};
+  try { for (const d of draftFiguresDb.listDraftFigures(bookId, userEmail)) draftById[d.id] = d.name; } catch {}
+  return threads.map(t => ({
+    id: t.id,
+    name: t.name,
+    figur: t.fig_id ? (figByFigId[t.fig_id] || null)
+      : (t.draft_figure_id ? (draftById[t.draft_figure_id] || null) : null),
+  }));
+}
+
 // ── Brainstorm-Job ────────────────────────────────────────────────────────────
 
-async function runPlotBrainstormJob(jobId, bookId, actId, userEmail) {
+async function runPlotBrainstormJob(jobId, bookId, actId, threadId, userEmail) {
   const logger = makeJobLogger(jobId);
   const { buildPlotSystemPrompt, buildPlotBrainstormPrompt, SCHEMA_PLOT_BRAINSTORM } = await getPrompts();
 
@@ -93,13 +113,15 @@ async function runPlotBrainstormJob(jobId, bookId, actId, userEmail) {
     const figuren = _figurenContext(bookId, userEmail);
     const werkstattFiguren = _werkstattFigurenContext(bookId, userEmail);
     const kapitel = await _kapitelContext(bookId);
+    const threads = _threadContext(bookId, userEmail);
+    const threadInfo = threadId != null ? (threads.find(t => t.id === threadId) || null) : null;
 
-    logger.info(`Plot-Brainstorm Start: book=${bookId} akt="${act.name}" beats=${beats.length} figuren=${figuren.length} werkstatt=${werkstattFiguren.length}`);
+    logger.info(`Plot-Brainstorm Start: book=${bookId} akt="${act.name}"${threadInfo ? ` strang="${threadInfo.name}"` : ''} beats=${beats.length} figuren=${figuren.length} werkstatt=${werkstattFiguren.length}`);
     updateJob(jobId, { statusText: 'job.plot.brainstorm.aiReply', progress: 10 });
 
     const tok = { in: 0, out: 0, ms: 0 };
     const result = await aiCall(jobId, tok,
-      buildPlotBrainstormPrompt(act.name, acts, beats, BUCH_KONTEXT, figuren, kapitel, werkstattFiguren),
+      buildPlotBrainstormPrompt(act.name, acts, beats, BUCH_KONTEXT, figuren, kapitel, werkstattFiguren, threads, threadInfo),
       buildPlotSystemPrompt(),
       10, 95, 1500, 0.3, 1500, undefined, SCHEMA_PLOT_BRAINSTORM,
     );
@@ -112,7 +134,7 @@ async function runPlotBrainstormJob(jobId, bookId, actId, userEmail) {
         begruendung: typeof v.begruendung === 'string' ? v.begruendung.trim() : '',
       }));
 
-    completeJob(jobId, { vorschlaege, actId, tokensIn: tok.in, tokensOut: tok.out },
+    completeJob(jobId, { vorschlaege, actId, threadId: threadId ?? null, tokensIn: tok.in, tokensOut: tok.out },
       tps(tok), `${vorschlaege.length} Vorschläge für "${act.name}"`);
   } catch (e) {
     if (e.name !== 'AbortError') logger.error(`Plot-Brainstorm-Fehler book=${bookId}: ${e.message}`, { stack: e.stack });
@@ -136,13 +158,14 @@ async function runPlotConsistencyJob(jobId, bookId, userEmail) {
     const werkstattFiguren = _werkstattFigurenContext(bookId, userEmail);
     const kapitel = await _kapitelContext(bookId);
     const szenen = _szenenContext(bookId, userEmail);
+    const threads = _threadContext(bookId, userEmail);
 
-    logger.info(`Plot-Consistency Start: book=${bookId} beats=${beats.length} szenen=${szenen.length} kapitel=${kapitel.length} werkstatt=${werkstattFiguren.length}`);
+    logger.info(`Plot-Consistency Start: book=${bookId} beats=${beats.length} szenen=${szenen.length} kapitel=${kapitel.length} werkstatt=${werkstattFiguren.length} straenge=${threads.length}`);
     updateJob(jobId, { statusText: 'job.plot.consistency.aiReply', progress: 10 });
 
     const tok = { in: 0, out: 0, ms: 0 };
     const result = await aiCall(jobId, tok,
-      buildPlotConsistencyPrompt(acts, beats, kapitel, szenen, figuren, BUCH_KONTEXT, werkstattFiguren),
+      buildPlotConsistencyPrompt(acts, beats, kapitel, szenen, figuren, BUCH_KONTEXT, werkstattFiguren, threads),
       buildPlotSystemPrompt(),
       10, 95, 2500, 0.3, 3000, undefined, SCHEMA_PLOT_CONSISTENCY,
     );
@@ -186,13 +209,15 @@ plotRouter.post('/plot-brainstorm', jsonBody, (req, res) => {
   if (!act || act.book_id !== bookId || act.user_email !== userEmail) {
     return res.status(404).json({ error_code: 'ACT_NOT_FOUND' });
   }
+  // Optionaler Strang (Grid): aufs (Buch, User)-Subset validieren, Fremd/leer → null.
+  const threadId = plotDb._validThreadId(bookId, userEmail, toIntId(req.body?.thread_id));
 
-  const entityKey = `${bookId}|brainstorm|${actId}`;
+  const entityKey = `${bookId}|brainstorm|${actId}|${threadId || 'none'}`;
   const existing = findActiveJobId('plot-brainstorm', entityKey, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });
 
   const jobId = createJob('plot-brainstorm', bookId, userEmail, 'job.label.plotBrainstorm', { akt: act.name }, entityKey);
-  enqueueJob(jobId, () => runPlotBrainstormJob(jobId, bookId, actId, userEmail));
+  enqueueJob(jobId, () => runPlotBrainstormJob(jobId, bookId, actId, threadId, userEmail));
   res.json({ jobId });
 });
 

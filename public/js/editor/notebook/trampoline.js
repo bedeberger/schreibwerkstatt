@@ -20,6 +20,7 @@ export const notebookTrampoline = {
   insertHorizontalRule() { card()?.insertHorizontalRule(); },
   togglePageEditorFullscreen() { card()?.togglePageEditorFullscreen(); },
   togglePageEditorFitWidth() { card()?.togglePageEditorFitWidth(); },
+  togglePageEditorShowMarks() { card()?.togglePageEditorShowMarks(); },
   pageEditorZoomIn() { card()?.pageEditorZoomIn(); },
   pageEditorZoomOut() { card()?.pageEditorZoomOut(); },
   pageEditorZoomReset() { card()?.pageEditorZoomReset(); },

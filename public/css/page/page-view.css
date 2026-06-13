@@ -242,6 +242,47 @@
   transform: translateZ(0);
 }
 
+/* Steuerzeichen-Anzeige (Toolbar-Toggle `pageEditorShowMarks`): Absatzmarke ¶
+   am Ende jedes Text-Blocks + Soft-Break-Pfeil ↵ vor jedem <br>. Reine
+   ::after/::before-Pseudo-Dekoration — landet nie in textContent/innerHTML,
+   also kein Markup im Save-HTML, kein Caret-Slot betroffen, nicht selektierbar.
+   Nur im Edit-Modus aktiv (gleicher --editing-Scope wie alle Edit-Spezifika).
+   Container (blockquote, div.poem) werden NICHT markiert — ihre inneren <p>
+   tragen die Marke, sonst doppeltes ¶. */
+.page-content-view--editing.page-content-view--show-marks
+  :is(p, h1, h2, h3, h4, h5, h6, li, pre)::after {
+  content: '¶';
+  color: var(--color-primary);
+  opacity: 0.4;
+  margin-inline-start: 0.15em;
+  font-weight: 400;
+  -webkit-user-select: none;
+  user-select: none;
+  pointer-events: none;
+}
+/* Soft-Break-Marken (↵): <br> lässt sich von keinem Browser per CSS/Pseudo-
+   Element dekorieren (kein Box-Modell). Daher zeichnet format-marks.js die
+   Pfeile in eine Read-only-Overlay-Schicht über dem contenteditable, an den
+   gemessenen <br>-Positionen. Schicht ist pointer-events-transparent und
+   liegt im selben Koordinatensystem wie der Editor (offsetParent
+   .page-editor-wrap). overflow:hidden clippt Marken, die durch den internen
+   Editor-Scroll aus dem Sichtfenster laufen. */
+.page-editor-marks-layer {
+  position: absolute;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 1;
+  color: var(--color-primary);
+}
+.page-editor-marks-layer .format-mark {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+  opacity: 0.4;
+  white-space: pre;
+}
+
 /* Edit-Wrap: contenteditable. Toolbar (Zoom/FitWidth/Fullscreen/HR) lebt nicht
    mehr hier, sondern im sticky `.editor-card__topbar` (editor-notebook.html),
    damit sie beim Scrollen permanent sichtbar bleibt.

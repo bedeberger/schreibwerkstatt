@@ -1,0 +1,305 @@
+<!-- Plot-Werkstatt: Swimlane-Grid (Akte = Spalten × Stränge = Zeilen), gerendert
+     sobald mindestens ein Strang existiert (Render-Weiche in plot.html). Eine
+     Zelle = (Akt, Strang); Beats werden per DnD zwischen Zellen verschoben. Die
+     unterste Zeile ist die „ohne Strang"-Lane (thread_id NULL).
+     Beat-Markup (Ansicht/Bearbeiten) ist mit plot-board-flat.html synchron zu halten. -->
+<div class="plot-swimlane" x-show="threads.length" x-cloak>
+  <div class="plot-swim" :style="{ '--act-count': acts.length }">
+
+    <!-- Kopfzeile: Ecke + Akt-Köpfe -->
+    <div class="plot-swim-row plot-swim-row--header">
+      <div class="plot-swim-corner" x-text="$app.t('plot.thread.axisLabel')"></div>
+      <template x-for="act in acts" :key="act.id">
+        <div class="plot-swim-acthead" :style="{ '--col-accent': actAccent(act) }">
+          <div class="plot-color-swatch-wrap" x-show="editingActId !== act.id">
+            <button type="button" class="plot-color-swatch"
+                    @click.stop="toggleActColorPicker(act.id)"
+                    :data-tip="$app.t('plot.act.color')" :aria-label="$app.t('plot.act.color')"></button>
+            <div class="plot-color-popover" x-show="actColorPickerId === act.id" x-cloak
+                 @click.outside="actColorPickerId === act.id && (actColorPickerId = null)">
+              <button type="button" class="plot-color-opt plot-color-opt--none"
+                      :class="{ 'plot-color-opt--on': !act.farbe }"
+                      @click="setActColor(act, null)"
+                      :data-tip="$app.t('plot.act.colorNone')" :aria-label="$app.t('plot.act.colorNone')"></button>
+              <template x-for="key in actPalette()" :key="key">
+                <button type="button" class="plot-color-opt"
+                        :style="{ '--col-accent': 'var(--palette-' + key + ')' }"
+                        :class="{ 'plot-color-opt--on': act.farbe === key }"
+                        @click="setActColor(act, key)" :aria-label="key"></button>
+              </template>
+            </div>
+          </div>
+          <template x-if="editingActId !== act.id">
+            <span class="plot-column-title" @dblclick="startEditAct(act)" x-text="act.name"></span>
+          </template>
+          <template x-if="editingActId === act.id">
+            <input type="text" class="plot-column-title-input" x-model="actDraft"
+                   data-spellcheck="spelling"
+                   @keydown.enter="saveEditAct(act)" @keydown.escape="cancelEditAct()"
+                   @blur="onActBlur(act, $event)">
+          </template>
+          <div class="plot-column-actions">
+            <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn" @click="moveAct(act, -1)" :data-tip="$app.t('plot.act.moveLeft')" :aria-label="$app.t('plot.act.moveLeft')">
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#chevron-left"/></svg>
+            </button>
+            <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn" @click="moveAct(act, 1)" :data-tip="$app.t('plot.act.moveRight')" :aria-label="$app.t('plot.act.moveRight')">
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#chevron-right"/></svg>
+            </button>
+            <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn" @click="startEditAct(act)" :data-tip="$app.t('plot.act.rename')" :aria-label="$app.t('plot.act.rename')">
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#pencil"/></svg>
+            </button>
+            <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn plot-icon-btn--danger" @click="deleteAct(act)" :data-tip="$app.t('plot.act.delete')" :aria-label="$app.t('plot.act.delete')">
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#trash"/></svg>
+            </button>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- Strang-Zeilen (+ „ohne Strang"-Lane am Ende) -->
+    <template x-for="lane in threadLanes()" :key="lane.id === null ? 'none' : lane.id">
+      <div class="plot-swim-row" :class="{ 'plot-swim-row--default': lane.isDefault }">
+
+        <!-- Lane-Label (sticky links) -->
+        <div class="plot-swim-lane"
+             :style="{ '--col-accent': lane.thread ? threadAccent(lane.thread) : 'var(--card-accent)' }">
+
+          <!-- „ohne Strang"-Lane -->
+          <template x-if="lane.isDefault">
+            <span class="plot-swim-lane-name plot-swim-lane-name--muted" x-text="$app.t('plot.thread.noThread')"></span>
+          </template>
+
+          <!-- Strang-Lane: Ansicht -->
+          <template x-if="lane.thread && editingThreadId !== lane.id">
+            <div class="plot-swim-lane-view">
+              <div class="plot-color-swatch-wrap">
+                <button type="button" class="plot-color-swatch"
+                        @click.stop="toggleThreadColorPicker(lane.id)"
+                        :data-tip="$app.t('plot.thread.color')" :aria-label="$app.t('plot.thread.color')"></button>
+                <div class="plot-color-popover" x-show="threadColorPickerId === lane.id" x-cloak
+                     @click.outside="threadColorPickerId === lane.id && (threadColorPickerId = null)">
+                  <button type="button" class="plot-color-opt plot-color-opt--none"
+                          :class="{ 'plot-color-opt--on': !lane.thread.farbe }"
+                          @click="setThreadColor(lane.thread, null)"
+                          :data-tip="$app.t('plot.act.colorNone')" :aria-label="$app.t('plot.act.colorNone')"></button>
+                  <template x-for="key in actPalette()" :key="key">
+                    <button type="button" class="plot-color-opt"
+                            :style="{ '--col-accent': 'var(--palette-' + key + ')' }"
+                            :class="{ 'plot-color-opt--on': lane.thread.farbe === key }"
+                            @click="setThreadColor(lane.thread, key)" :aria-label="key"></button>
+                  </template>
+                </div>
+              </div>
+              <div class="plot-swim-lane-text">
+                <span class="plot-swim-lane-name" @dblclick="startEditThread(lane.thread)" x-text="lane.thread.name"></span>
+                <span class="plot-swim-lane-figure internal-link" x-show="threadFigureLabel(lane.thread)"
+                      @click.stop="lane.thread.fig_id ? $app.openFigurById(lane.thread.fig_id) : (lane.thread.draft_figure_id && $app.openWerkstattDraftById(lane.thread.draft_figure_id))"
+                      x-text="threadFigureLabel(lane.thread)"></span>
+              </div>
+              <div class="plot-swim-lane-actions">
+                <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn" @click="moveThread(lane.thread, -1)" :data-tip="$app.t('plot.thread.moveUp')" :aria-label="$app.t('plot.thread.moveUp')">
+                  <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#chevron-up"/></svg>
+                </button>
+                <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn" @click="moveThread(lane.thread, 1)" :data-tip="$app.t('plot.thread.moveDown')" :aria-label="$app.t('plot.thread.moveDown')">
+                  <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#chevron-down"/></svg>
+                </button>
+                <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn" @click="startEditThread(lane.thread)" :data-tip="$app.t('plot.thread.rename')" :aria-label="$app.t('plot.thread.rename')">
+                  <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#pencil"/></svg>
+                </button>
+                <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn plot-icon-btn--danger" @click="deleteThread(lane.thread)" :data-tip="$app.t('plot.thread.delete')" :aria-label="$app.t('plot.thread.delete')">
+                  <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#trash"/></svg>
+                </button>
+              </div>
+            </div>
+          </template>
+
+          <!-- Strang-Lane: Bearbeiten (Name + Figuren-Bindung) -->
+          <template x-if="lane.thread && editingThreadId === lane.id">
+            <div class="plot-swim-lane-edit">
+              <input type="text" class="plot-thread-name-input" x-model="threadDraft.name"
+                     data-spellcheck="spelling" :placeholder="$app.t('plot.thread.namePlaceholder')"
+                     @keydown.enter="saveEditThread(lane.thread)" @keydown.escape="cancelEditThread()">
+              <label class="plot-edit-label" x-show="$app.figuren.length" x-text="$app.t('plot.thread.bindFigure')"></label>
+              <div x-show="$app.figuren.length"
+                   x-data="combobox({ placeholder: $app.t('plot.thread.bindFigurePlaceholder'), emptyLabel: $app.t('plot.thread.noFigure') })"
+                   x-modelable="value" x-model="threadDraft.figure_id"
+                   @combobox-change="threadDraft.figure_id && (threadDraft.draft_figure_id = '')"
+                   x-effect="options = $app.figuren.map(f => ({ value: f.id, label: f.kurzname || f.name }))"></div>
+              <label class="plot-edit-label" x-show="draftFiguren.length" x-text="$app.t('plot.thread.bindDraftFigure')"></label>
+              <div x-show="draftFiguren.length"
+                   x-data="combobox({ placeholder: $app.t('plot.thread.bindFigurePlaceholder'), emptyLabel: $app.t('plot.thread.noFigure') })"
+                   x-modelable="value" x-model="threadDraft.draft_figure_id"
+                   @combobox-change="threadDraft.draft_figure_id && (threadDraft.figure_id = '')"
+                   x-effect="options = draftFiguren.map(d => ({ value: d.id, label: d.name }))"></div>
+              <div class="plot-add-beat-actions">
+                <button type="button" class="btn-compact" @click="saveEditThread(lane.thread)" :disabled="busy" x-text="$app.t('common.save')"></button>
+                <button type="button" class="btn-compact btn-compact--ghost" @click="cancelEditThread()" x-text="$app.t('common.cancel')"></button>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- Zellen (Akt × Strang) -->
+        <template x-for="act in acts" :key="act.id">
+          <div class="plot-swim-cell"
+               :class="{ 'plot-swim-cell--dropzone': _dragOverCell === (act.id + ':' + (lane.id === null ? 'null' : lane.id)) }"
+               @dragover.prevent="onCellDragOver(act.id, lane.id)"
+               @drop.prevent="onCellDrop(act.id, lane.id, null)">
+
+            <template x-for="beat in filteredBeatsForCell(act.id, lane.id)" :key="beat.id">
+              <div class="plot-beat" :class="'plot-beat--' + beat.status"
+                   draggable="true"
+                   @dragstart="onBeatDragStart(beat, $event)" @dragend="onBeatDragEnd()"
+                   @dragover.prevent.stop="onCellDragOver(act.id, lane.id)"
+                   @drop.prevent.stop="onCellDrop(act.id, lane.id, beat.id)">
+
+                <!-- Ansicht -->
+                <template x-if="editingBeatId !== beat.id">
+                  <div class="plot-beat-view">
+                    <div class="plot-beat-head">
+                      <button type="button" class="plot-status-tag" :class="'plot-status-tag--' + beat.status"
+                              @click.stop="cycleBeatStatus(beat)" :data-tip="$app.t('plot.status.cycleTip')"
+                              x-text="$app.t('plot.status.' + beat.status)"></button>
+                      <span class="plot-beat-title" @click="startEditBeat(beat)" x-text="beat.titel"></span>
+                      <span class="plot-beat-intensity" x-show="beat.intensitaet"
+                            :data-tip="$app.t('plot.beat.intensitaet') + ': ' + beat.intensitaet + '/5'"
+                            :aria-label="$app.t('plot.beat.intensitaet') + ': ' + beat.intensitaet + '/5'">
+                        <template x-for="lvl in intensitaetScale()" :key="lvl">
+                          <span class="plot-beat-intensity-pip" :class="{ 'plot-beat-intensity-pip--on': lvl <= (beat.intensitaet || 0) }"></span>
+                        </template>
+                      </span>
+                    </div>
+                    <p class="plot-beat-desc" x-show="beat.beschreibung" x-text="beat.beschreibung"></p>
+                    <div class="plot-beat-meta" x-show="beat.chapter_name || (beat.fig_ids && beat.fig_ids.length) || (beat.draft_fig_ids && beat.draft_fig_ids.length)">
+                      <span class="kapitel-badge kapitel-badge--primary internal-link" x-show="beat.chapter_name"
+                            @click.stop="beat.chapter_name && $app.openKapitelByName(beat.chapter_name)"
+                            x-text="beat.chapter_name"></span>
+                      <template x-for="figId in (beat.fig_ids || [])" :key="figId">
+                        <span class="tag internal-link" @click.stop="$app.openFigurById(figId)"
+                              x-text="$app.figurenById.get(figId)?.kurzname || $app.figurenById.get(figId)?.name || figId"></span>
+                      </template>
+                      <template x-for="dfId in (beat.draft_fig_ids || [])" :key="'d' + dfId">
+                        <span class="tag tag--werkstatt internal-link" @click.stop="$app.openWerkstattDraftById(dfId)"
+                              :data-tip="$app.t('plot.beat.werkstattFiguren')"
+                              x-text="draftFigurenById.get(dfId)?.name || dfId"></span>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+
+                <!-- Bearbeiten -->
+                <template x-if="editingBeatId === beat.id">
+                  <div class="plot-beat-edit">
+                    <input type="text" class="plot-beat-edit-titel" x-model="beatDraft.titel"
+                           data-spellcheck="spelling" :placeholder="$app.t('plot.beat.titelPlaceholder')"
+                           @keydown.escape="cancelEditBeat()">
+                    <textarea class="plot-beat-edit-desc" x-model="beatDraft.beschreibung" rows="3"
+                              data-spellcheck="spelling" :placeholder="$app.t('plot.beat.descPlaceholder')"></textarea>
+                    <div class="tabs plot-status-tabs" role="group" :aria-label="$app.t('plot.beat.statusLabel')">
+                      <template x-for="s in statusList()" :key="s">
+                        <button type="button" class="tabs-btn"
+                                :class="{ 'tabs-btn--active': beatDraft.status === s }"
+                                @click="beatDraft.status = s"
+                                x-text="$app.t('plot.status.' + s)"></button>
+                      </template>
+                    </div>
+                    <label class="plot-edit-label" x-text="$app.t('plot.beat.intensitaet')"></label>
+                    <div class="plot-intensity" role="group" :aria-label="$app.t('plot.beat.intensitaet')">
+                      <template x-for="n in intensitaetScale()" :key="n">
+                        <button type="button" class="plot-intensity-step"
+                                :class="{ 'plot-intensity-step--on': beatDraft.intensitaet && n <= beatDraft.intensitaet }"
+                                @click="setBeatDraftIntensitaet(n)"
+                                :data-tip="$app.t('plot.beat.intensitaetTip')"
+                                :aria-pressed="beatDraft.intensitaet === n ? 'true' : 'false'"
+                                x-text="n"></button>
+                      </template>
+                    </div>
+                    <label class="plot-edit-label" x-text="$app.t('plot.beat.chapter')"></label>
+                    <div x-data="combobox({ placeholder: $app.t('plot.beat.chapterPlaceholder'), emptyLabel: $app.t('plot.beat.noChapter') })"
+                         x-modelable="value" x-model="beatDraft.chapter_id"
+                         x-effect="options = $app.tree.filter(it => it.type === 'chapter').map(c => ({ value: c.id, label: c.name }))"></div>
+                    <label class="plot-edit-label" x-show="$app.figuren.length" x-text="$app.t('plot.beat.figuren')"></label>
+                    <div class="plot-figure-picker" x-show="$app.figuren.length">
+                      <template x-for="f in $app.figuren" :key="f.id">
+                        <button type="button" class="tag plot-figure-chip"
+                                :class="{ 'plot-figure-chip--on': beatDraft.figure_ids.includes(f.id) }"
+                                @click="toggleBeatDraftFigure(f.id)"
+                                x-text="f.kurzname || f.name"></button>
+                      </template>
+                    </div>
+                    <label class="plot-edit-label" x-show="draftFiguren.length" x-text="$app.t('plot.beat.werkstattFiguren')"></label>
+                    <div class="plot-figure-picker" x-show="draftFiguren.length">
+                      <template x-for="d in draftFiguren" :key="'d' + d.id">
+                        <button type="button" class="tag plot-figure-chip plot-figure-chip--werkstatt"
+                                :class="{ 'plot-figure-chip--on': beatDraft.draft_figure_ids.includes(d.id) }"
+                                @click="toggleBeatDraftWerkstattFigure(d.id)"
+                                x-text="d.name"></button>
+                      </template>
+                    </div>
+                    <div class="plot-beat-edit-actions">
+                      <button type="button" class="btn-compact" @click="saveEditBeat(beat)" :disabled="busy" x-text="$app.t('common.save')"></button>
+                      <button type="button" class="btn-compact btn-compact--ghost" @click="cancelEditBeat()" x-text="$app.t('common.cancel')"></button>
+                      <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn plot-icon-btn--danger plot-beat-delete" @click="deleteBeat(beat)" :data-tip="$app.t('plot.beat.delete')" :aria-label="$app.t('plot.beat.delete')">
+                        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#trash"/></svg>
+                      </button>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </template>
+
+            <!-- Beat in dieser Zelle hinzufügen -->
+            <template x-if="addingCell === (act.id + ':' + (lane.id === null ? 'null' : lane.id))">
+              <div class="plot-add-beat" :data-add-beat-cell="act.id + ':' + (lane.id === null ? 'null' : lane.id)">
+                <textarea class="plot-add-beat-input" x-model="newBeatTitel" rows="1"
+                          data-spellcheck="spelling" :placeholder="$app.t('plot.beat.titelPlaceholder')"
+                          @keydown.enter.prevent="saveNewBeatCell(act.id, lane.id)" @keydown.escape="cancelAddBeatCell()"
+                          @blur="onAddBeatCellBlur(act.id, lane.id, $event)"></textarea>
+                <div class="plot-add-beat-actions">
+                  <button type="button" class="btn-compact" @click="saveNewBeatCell(act.id, lane.id)" :disabled="busy" x-text="$app.t('plot.beat.add')"></button>
+                  <button type="button" class="btn-compact btn-compact--ghost" @click="cancelAddBeatCell()" x-text="$app.t('common.cancel')"></button>
+                </div>
+              </div>
+            </template>
+            <div class="plot-swim-cell-foot" x-show="addingCell !== (act.id + ':' + (lane.id === null ? 'null' : lane.id))">
+              <button type="button" class="plot-add-beat-btn plot-add-beat-btn--cell" @click="startAddBeatCell(act.id, lane.id)"
+                      :data-tip="$app.t('plot.addBeat')" :aria-label="$app.t('plot.addBeat')">
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#plus"/></svg>
+              </button>
+              <!-- Strang-Brainstorm pro Zelle (nur echte Stränge — Figuren-/Strang-Kontext) -->
+              <button type="button" class="plot-add-beat-btn plot-add-beat-btn--cell" x-show="lane.thread"
+                      @click="runBrainstorm(act, lane.thread)" :disabled="brainstormLoading"
+                      :data-tip="$app.t('plot.brainstorm.run')" :aria-label="$app.t('plot.brainstorm.run')">
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#zap"/></svg>
+              </button>
+            </div>
+
+            <!-- Brainstorm-Status + Ergebnis dieser Zelle -->
+            <div class="plot-brainstorm-loading" x-show="brainstormLoading && brainstormActId === act.id && brainstormThreadId === lane.id">
+              <span class="card-status" x-html="brainstormStatus"></span>
+              <button type="button" class="btn-compact btn-compact--ghost" @click="cancelBrainstorm()" x-text="$app.t('plot.brainstorm.cancel')"></button>
+            </div>
+            <div class="plot-brainstorm-panel" x-show="brainstormResult && brainstormResult.actId === act.id && (brainstormResult.threadId ?? null) === lane.id" x-cloak>
+              <div class="plot-brainstorm-head">
+                <span class="entity-meta-label" x-text="$app.t('plot.brainstorm.title')"></span>
+                <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn" @click="dismissBrainstorm()" :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')">
+                  <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#x"/></svg>
+                </button>
+              </div>
+              <template x-for="(v, idx) in (brainstormResult ? brainstormResult.vorschlaege : [])" :key="idx">
+                <div class="plot-vorschlag">
+                  <div class="plot-vorschlag-body">
+                    <span class="plot-vorschlag-label" x-text="v.label"></span>
+                    <span class="plot-vorschlag-begruendung" x-show="v.begruendung" x-text="v.begruendung"></span>
+                  </div>
+                  <button type="button" class="btn-compact" @click="applyBrainstorm(idx)" :disabled="busy" x-text="$app.t('plot.brainstorm.apply')"></button>
+                </div>
+              </template>
+              <div x-show="brainstormResult && !brainstormResult.vorschlaege.length" class="card-status" x-text="$app.t('plot.brainstorm.allApplied')"></div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </template>
+  </div>
+</div>

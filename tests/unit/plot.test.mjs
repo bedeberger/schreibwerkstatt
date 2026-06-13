@@ -197,6 +197,147 @@ test('plot DB: Akt-Löschung kaskadiert auf Beats (FK CASCADE)', () => {
   assert.equal(plot.getBeat(beat.id), null);
 });
 
+// ── Handlungsstränge (Swimlanes) ───────────────────────────────────────────
+
+test('plot DB: Strang-CRUD + Positionsvergabe + Reorder', () => {
+  const t1 = plot.createThread(BOOK, USER, { name: 'Strang A' });
+  const t2 = plot.createThread(BOOK, USER, { name: 'Strang B' });
+  assert.equal(t1.position, 0);
+  assert.equal(t2.position, 1);
+  assert.deepEqual(plot.listThreads(BOOK, USER).map(t => t.name), ['Strang A', 'Strang B']);
+
+  const renamed = plot.updateThread(t1.id, { name: 'Haupt-Strang', farbe: 'blue' });
+  assert.equal(renamed.name, 'Haupt-Strang');
+  assert.equal(renamed.farbe, 'blue');
+
+  plot.reorderThreads(BOOK, USER, [t2.id, t1.id]);
+  assert.deepEqual(plot.listThreads(BOOK, USER).map(t => t.name), ['Strang B', 'Haupt-Strang']);
+
+  plot.deleteThread(t1.id);
+  plot.deleteThread(t2.id);
+  assert.equal(plot.listThreads(BOOK, USER).length, 0);
+});
+
+test('plot DB: Strang-Figuren-Bindung — Katalog exponiert TEXT-fig_id, Werkstatt INTEGER-id', () => {
+  const carl = seedFigur(BOOK, USER, 'fig_carl', 'Carl');
+  const draft = draftFigures.createDraftFigure(BOOK, USER, { name: 'Entwurf-Strang-Figur', mindmap: { topic: 'x' } });
+
+  // Katalog-Bindung: createThread bekommt INTEGER figures.id (wie Route nach resolveFigureIds liefert)
+  const tCat = plot.createThread(BOOK, USER, { name: 'Carls Strang', figureId: carl });
+  assert.equal(tCat.figure_id, carl);
+  assert.equal(tCat.fig_id, 'fig_carl');         // Lese-Aggregat liefert die Frontend-Identität
+  assert.equal(tCat.draft_figure_id, null);
+
+  // Werkstatt-Bindung: draft_figures.id ist bereits die Frontend-Identität
+  const tDraft = plot.createThread(BOOK, USER, { name: 'Entwurf-Strang', draftFigureId: draft.id });
+  assert.equal(tDraft.draft_figure_id, draft.id);
+  assert.equal(tDraft.figure_id, null);
+  assert.equal(tDraft.fig_id, null);
+
+  // Bindung lässt sich nullen
+  const cleared = plot.updateThread(tCat.id, { name: 'Carls Strang', figureId: null });
+  assert.equal(cleared.figure_id, null);
+  assert.equal(cleared.fig_id, null);
+
+  plot.deleteThread(tCat.id);
+  plot.deleteThread(tDraft.id);
+});
+
+test('plot DB: _validThreadId filtert Fremd-/Unbekannt-Stränge raus', () => {
+  const own = plot.createThread(BOOK, USER, { name: 'Eigen-Strang' });
+  appUsers.createUser({ email: 'thread-foreign@x.test', displayName: 'Fremd' });
+  const foreign = plot.createThread(BOOK, 'thread-foreign@x.test', { name: 'Fremd-Strang' });
+
+  assert.equal(plot._validThreadId(BOOK, USER, own.id), own.id);
+  assert.equal(plot._validThreadId(BOOK, USER, foreign.id), null); // anderer User
+  assert.equal(plot._validThreadId(BOOK, USER, 999999), null);     // unbekannt
+  assert.equal(plot._validThreadId(BOOK, USER, null), null);
+
+  plot.deleteThread(own.id);
+  plot.deleteThread(foreign.id);
+});
+
+test('plot DB: Beat trägt thread_id; sort_order ist pro Zelle (Akt × Strang)', () => {
+  const act = plot.createAct(BOOK, USER, { name: 'Zell-Akt' });
+  const t1 = plot.createThread(BOOK, USER, { name: 'Zeile 1' });
+  const t2 = plot.createThread(BOOK, USER, { name: 'Zeile 2' });
+
+  // Zwei Beats in derselben Zelle (act, t1) → sort_order 0,1
+  const b1 = plot.createBeat(BOOK, act.id, USER, { titel: 'A', threadId: t1.id });
+  const b2 = plot.createBeat(BOOK, act.id, USER, { titel: 'B', threadId: t1.id });
+  assert.equal(b1.thread_id, t1.id);
+  assert.equal(b1.sort_order, 0);
+  assert.equal(b2.sort_order, 1);
+
+  // Beat in anderer Zelle (act, t2) startet wieder bei 0 (per-Zelle, nicht per-Akt)
+  const b3 = plot.createBeat(BOOK, act.id, USER, { titel: 'C', threadId: t2.id });
+  assert.equal(b3.sort_order, 0);
+
+  // „ohne Strang"-Lane (thread_id null) ist eine eigene Zelle, ebenfalls ab 0
+  const b4 = plot.createBeat(BOOK, act.id, USER, { titel: 'D' });
+  assert.equal(b4.thread_id, null);
+  assert.equal(b4.sort_order, 0);
+
+  plot.deleteAct(act.id);
+  plot.deleteThread(t1.id);
+  plot.deleteThread(t2.id);
+});
+
+test('plot DB: 2D-Reorder setzt act_id + thread_id + sort_order', () => {
+  const act = plot.createAct(BOOK, USER, { name: '2D-Akt' });
+  const t1 = plot.createThread(BOOK, USER, { name: 'T1' });
+  const t2 = plot.createThread(BOOK, USER, { name: 'T2' });
+  const b1 = plot.createBeat(BOOK, act.id, USER, { titel: 'X', threadId: t1.id });
+  const b2 = plot.createBeat(BOOK, act.id, USER, { titel: 'Y', threadId: t1.id });
+
+  // b1 in Zelle (act, t2) verschieben, b2 bleibt in (act, t1)
+  plot.reorderBeats(BOOK, USER, [
+    { actId: act.id, threadId: t1.id, beatIds: [b2.id] },
+    { actId: act.id, threadId: t2.id, beatIds: [b1.id] },
+  ]);
+  const moved = plot.getBeat(b1.id);
+  assert.equal(moved.thread_id, t2.id);
+  assert.equal(moved.sort_order, 0);
+  const stayed = plot.getBeat(b2.id);
+  assert.equal(stayed.thread_id, t1.id);
+  assert.equal(stayed.sort_order, 0);
+
+  // Reorder in die „ohne Strang"-Lane (threadId weggelassen → null)
+  plot.reorderBeats(BOOK, USER, [{ actId: act.id, beatIds: [b1.id] }]);
+  assert.equal(plot.getBeat(b1.id).thread_id, null);
+
+  plot.deleteAct(act.id);
+  plot.deleteThread(t1.id);
+  plot.deleteThread(t2.id);
+});
+
+test('plot DB: Strang-Löschung setzt Beat.thread_id auf NULL (SET NULL, Beat bleibt)', () => {
+  const act = plot.createAct(BOOK, USER, { name: 'SetNull-Akt' });
+  const thread = plot.createThread(BOOK, USER, { name: 'Vergänglicher Strang' });
+  const beat = plot.createBeat(BOOK, act.id, USER, { titel: 'überlebt', threadId: thread.id });
+  assert.equal(beat.thread_id, thread.id);
+
+  plot.deleteThread(thread.id);
+  const survivor = plot.getBeat(beat.id);
+  assert.ok(survivor, 'Beat darf nicht mitgelöscht werden');
+  assert.equal(survivor.thread_id, null, 'thread_id fällt auf NULL (ohne Strang)');
+
+  plot.deleteAct(act.id);
+});
+
+test('plot DB: updateBeat kann thread_id setzen + nullen (PATCH-Pfad)', () => {
+  const act = plot.createAct(BOOK, USER, { name: 'Patch-Akt' });
+  const thread = plot.createThread(BOOK, USER, { name: 'Patch-Strang' });
+  const beat = plot.createBeat(BOOK, act.id, USER, { titel: 'zu' });
+  assert.equal(beat.thread_id, null);
+
+  assert.equal(plot.updateBeat(beat.id, { thread_id: thread.id }, undefined).thread_id, thread.id);
+  assert.equal(plot.updateBeat(beat.id, { thread_id: null }, undefined).thread_id, null);
+
+  plot.deleteAct(act.id);
+  plot.deleteThread(thread.id);
+});
+
 // ── Prompts ──────────────────────────────────────────────────────────────────
 
 const prompts = await import('../../public/js/prompts/plot.js');
@@ -233,6 +374,47 @@ test('plot prompts: Consistency listet Status-Legende + Szenen-Realität + Werks
   assert.ok(out.includes('Mara'));
   assert.ok(out.includes('"konflikte"'));
   assert.ok(out.includes('"fazit"'));
+});
+
+test('plot prompts: Brainstorm mit Ziel-Strang nennt Strang + Hauptfigur + filtert Beats der Zelle', () => {
+  const acts = [{ id: 1, name: 'Akt 1' }];
+  const beats = [
+    { id: 9, act_id: 1, thread_id: 7, titel: 'Maras Aufbruch', status: 'geplant', chapter_name: null },
+    { id: 10, act_id: 1, thread_id: 8, titel: 'Lucas Plan', status: 'geplant', chapter_name: null },
+  ];
+  const threads = [{ id: 7, name: 'Mara', figur: 'Mara Stein' }, { id: 8, name: 'Luca', figur: null }];
+  const out = prompts.buildPlotBrainstormPrompt('Akt 1', acts, beats, '', [], [], [], threads, threads[0]);
+  assert.ok(out.includes('HANDLUNGSSTRÄNGE'));
+  assert.ok(out.includes('ZIEL-STRANG: "Mara"'));
+  assert.ok(out.includes('Mara Stein'));            // gebundene Hauptfigur
+  assert.ok(out.includes('{Strang: Mara}'));        // Board-Annotation
+  // Existierende Beats sind auf die Zelle (Strang 7) gefiltert: Maras Beat ja, Lucas nein
+  assert.ok(out.includes('IN DIESER ZELLE'));
+  assert.ok(out.includes('Maras Aufbruch'));
+  const existingBlock = out.split('IN DIESER ZELLE')[1] || '';
+  assert.ok(!existingBlock.includes('Lucas Plan'));
+});
+
+test('plot prompts: Consistency mit Strängen listet Stränge + Strang-Prüfpunkte', () => {
+  const acts = [{ id: 1, name: 'Akt 1' }];
+  const beats = [{ id: 9, act_id: 1, thread_id: 7, titel: 'Showdown', status: 'geplant', chapter_name: null }];
+  const threads = [{ id: 7, name: 'Mara', figur: 'Mara Stein' }];
+  const out = prompts.buildPlotConsistencyPrompt(acts, beats, [], [], [], '', [], threads);
+  assert.ok(out.includes('HANDLUNGSSTRÄNGE'));
+  assert.ok(out.includes('Mara'));
+  assert.ok(/Strang-Balance|vollständiger Bogen|POV/i.test(out)); // Strang-spezifische Checks
+  assert.ok(out.includes('{Strang: Mara}'));
+});
+
+test('plot prompts: ohne Stränge bleibt der Strang-Block weg (Abwärtskompat)', () => {
+  const acts = [{ id: 1, name: 'Akt 1' }];
+  const beats = [{ id: 9, act_id: 1, titel: 'Auftakt', status: 'geplant', chapter_name: null }];
+  const bs = prompts.buildPlotBrainstormPrompt('Akt 1', acts, beats, '', [], []);
+  assert.ok(!bs.includes('HANDLUNGSSTRÄNGE'));
+  assert.ok(!bs.includes('ZIEL-STRANG'));
+  const cons = prompts.buildPlotConsistencyPrompt(acts, beats, [], [], [], '');
+  assert.ok(!cons.includes('HANDLUNGSSTRÄNGE'));
+  assert.ok(!cons.includes('Strang-Balance'));
 });
 
 test('plot prompts: Schemas haben die erwartete Form', () => {

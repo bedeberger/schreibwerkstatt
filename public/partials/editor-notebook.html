@@ -253,6 +253,16 @@
             @click="togglePageEditorFullscreen()">
       <svg class="icon" aria-hidden="true"><use :href="pageEditorFullscreen ? '/icons.svg?v=690#minimize-2' : '/icons.svg?v=690#maximize-2'"/></svg>
     </button>
+    <!-- Steuerzeichen-Anzeige (Absatzmarken ¶ + Soft-Break ↵). Reine
+         CSS-Pseudo-Element-Dekoration auf dem contenteditable — kein Markup im
+         gespeicherten HTML. State pageEditorShowMarks (in editorPrefs). -->
+    <button type="button" class="icon-btn"
+            :aria-pressed="pageEditorShowMarks"
+            :data-tip="pageEditorShowMarks ? t('editor.toolbar.marksOff') : t('editor.toolbar.marksOn')"
+            :aria-label="pageEditorShowMarks ? t('editor.toolbar.marksOff') : t('editor.toolbar.marksOn')"
+            @click="togglePageEditorShowMarks()">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=692#pilcrow"/></svg>
+    </button>
     <span class="action-sep" aria-hidden="true"></span>
     <!-- Entity-Linking-Toggle (Figuren/Orte-Highlights + Szenen/Ereignisse-Panel).
          Aendert nur die Buch-Setting; der Auf/Zu-Zustand der Klappschiene

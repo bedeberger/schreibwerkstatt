@@ -5,7 +5,7 @@
 // skopiert (kein geteilter Katalog). Read-only, kein KI-Call.
 
 const { db } = require('../../../db/schema');
-const { listActs, listBeats } = require('../../../db/plot');
+const { listActs, listThreads, listBeats } = require('../../../db/plot');
 const { listDraftFigures } = require('../../../db/draft-figures');
 const { _truncateResult } = require('./shared');
 
@@ -50,6 +50,20 @@ function tool_get_plot_board(input, ctx) {
   const figNames = _figureNameMap(ctx.bookId, userEmail);
   const draftNames = _draftFigureNameMap(ctx.bookId, userEmail);
 
+  // Handlungsstränge (Swimlanes): Name + gebundene Hauptfigur (Katalog via fig_id,
+  // sonst Werkstatt via draft_figure_id). id→Name-Map für die Beat-Annotation.
+  const threads = listThreads(ctx.bookId, userEmail);
+  const threadNameById = {};
+  const threadList = threads.map(t => {
+    threadNameById[t.id] = t.name;
+    return {
+      id: t.id,
+      name: t.name,
+      figur: t.fig_id ? (figNames[t.fig_id] || null)
+        : (t.draft_figure_id ? (draftNames[t.draft_figure_id] || null) : null),
+    };
+  });
+
   // Statusverteilung ueber das GANZE Board (vor Filter) — gibt dem Modell die
   // Gesamtsicht „wie viel geplant vs. schon im Buch".
   const statusCounts = { geplant: 0, entwurf: 0, im_buch: 0, verworfen: 0 };
@@ -70,6 +84,7 @@ function tool_get_plot_board(input, ctx) {
       status: b.status,
       chapter_id: b.chapter_id || null,
       chapter_name: b.chapter_name || null,
+      thread: b.thread_id != null ? (threadNameById[b.thread_id] || null) : null,
       figures: (b.fig_ids || []).map(fid => figNames[fid] || fid),
       werkstatt_figures: (b.draft_fig_ids || []).map(did => draftNames[did]).filter(Boolean),
     });
@@ -92,9 +107,11 @@ function tool_get_plot_board(input, ctx) {
     acts: actList,
     total_acts: acts.length,
     total_beats: allBeats.length,
+    ...(threadList.length ? { threads: threadList } : {}),
     status_counts: statusCounts,
     ...(statusFilter ? { status_filter: statusFilter } : {}),
     status_legende: 'geplant = noch nicht geschrieben · entwurf = in Arbeit · im_buch = im Manuskript umgesetzt · verworfen = aufgegeben',
+    ...(threadList.length ? { strang_hinweis: 'threads = parallele Erzähllinien (Swimlanes), oft je Hauptfigur. Jeder Beat trägt sein thread-Feld (Strang-Name oder null = ohne Strang).' } : {}),
   });
 }
 

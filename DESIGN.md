@@ -1870,6 +1870,7 @@ Drei Editoren leben in eigenen Subfoldern (`book/`, `focus/`, `notebook/`); edit
 | [book/header-actions.css](public/css/book/header-actions.css) | `.header-actions`-Cluster, Update-All-Panel. |
 | [book/buchorganizer.css](public/css/book/buchorganizer.css) | Buch-Organisations-Karte. |
 | [book/plot-board.css](public/css/book/plot-board.css) | Plot-Werkstatt (Beat-Board / Kanban). |
+| [book/plot-swimlane.css](public/css/book/plot-swimlane.css) | Plot-Werkstatt: Swimlane-Grid (Akte × Stränge) + Strang-Leiste. Ergänzt plot-board.css. |
 | [book/export.css](public/css/book/export.css) | Buch-Export. |
 | [book/pdf-export.css](public/css/book/pdf-export.css) | PDF-Export-Profile + Tabs. |
 | [book/epub-export.css](public/css/book/epub-export.css) | EPUB-Export-Karte (Scope-Picker + Reflow-Settings). |
@@ -2055,6 +2056,7 @@ Wenn die Karte zusätzlich Inline-Inputs braucht (z.B. „Neue Figur — Name ei
 - **Beat-Intensität:** Anzeige als 5-stufiges Signal-Meter (`.plot-beat-intensity-pip`, aufsteigende Höhe) in der Kopfzeile; Editor als 1–5-Stufenwahl (`.plot-intensity-step`, erneuter Klick auf aktiven Wert = zurücksetzen).
 - **Verworfen-Collapse:** verworfene Beats werden pro Spalte über `.plot-verworfen-toggle` (`.collapsible-toggle`) ein-/ausgeblendet (`visibleBeatsForAct` vs. `filteredBeatsForAct`); Drag/Reorder bleiben auf der vollen Liste.
 - **Scroll/Sticky:** Board `scroll-snap-type: x proximity` + Spalten `scroll-snap-align: start`; Spaltenköpfe `position: sticky; top: 0` (Desktop) für Trello-artiges Mitlaufen beim Seiten-Scroll (Mobile: `static`).
+- **Swimlane-Grid (Akte × Stränge), [book/plot-swimlane.css](public/css/book/plot-swimlane.css):** optionale zweite Ordnungsachse (Handlungsstränge / POV). **Render-Weiche:** ohne Strang das flache Board (`.plot-board`, unverändert), ab ≥1 Strang das Grid (`.plot-swimlane`). Beide Boards liegen als Geschwister im Card-Root (je `x-show`), `plot.html` ist nur der Rahmen + verschachtelte Partials (`plot-board-flat`, `plot-board-grid`, `plot-thread-bar` via `_loadPartials`-Cascade). Layout: Flex-Zeilen (`.plot-swim-row`), erste Spalte (`.plot-swim-lane` / `.plot-swim-corner`) `position: sticky; left: 0` → Strang-Label bleibt beim horizontalen Akt-Scroll stehen; Zellen (`.plot-swim-cell`) `flex: 0 0 var(--cell-w)`. Zeilenbreite via `min-width: max-content` erzwingt H-Scroll. Letzte Zeile ist die „ohne Strang"-Lane (`thread_id` NULL, `.plot-swim-row--default`). Beat-Karte + Add-/Farb-/Brainstorm-/Intensitäts-Styles werden 1:1 aus `plot-board.css` wiederverwendet (Markup in beiden Boards synchron halten). Strang-Akzent `--col-accent` via `threadAccent()` (gleiche Palette-Whitelist wie `actAccent`). DnD setzt `act_id` **+** `thread_id` (`onCellDrop` → `PUT /plot/beats/order` mit `{actId, threadId, beatIds}`-Gruppen). **Opt-in-Einstieg:** `.plot-thread-bar` (sichtbar sobald Akte existieren) mit „+ Strang". Strang-Brainstorm zell-granular (nur echte Stränge, `#zap`-Icon). Spannungsbogen: pro Strang eine farbige Polyline (sonst eine globale Kurve).
 
 ---
 

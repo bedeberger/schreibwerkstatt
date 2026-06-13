@@ -21,9 +21,10 @@ import {
 // Single-Pass-Cache). Der manuelle Prefix erlaubt einen erzwungenen Bump; der
 // Suffix `-<hash>` wird von configurePrompts() automatisch aus dem tatsächlich
 // gebauten Prompt-/Schema-Inhalt abgeleitet (_setPromptsContentHash). Dadurch
-// invalidiert jede Wortlaut- oder Schema-Änderung den Cache von selbst – kein
-// manueller Bump bei reinen Text-Edits mehr nötig.
-const PROMPTS_VERSION_BASE = '19';
+// invalidiert jede Wortlaut- oder Schema-Änderung der SYSTEM_*-Prompts/Schemas den
+// Cache von selbst. Änderungen am dynamisch gebauten Lektorat-USER-Prompt (blocks.js,
+// buildLektoratPrompt) fliessen NICHT in den Hash → bei solchen Edits den Prefix manuell bumpen.
+const PROMPTS_VERSION_BASE = '20';
 export let PROMPTS_VERSION = PROMPTS_VERSION_BASE;
 
 /** Setzt den Content-Hash-Suffix an PROMPTS_VERSION (von der Facade aufgerufen,

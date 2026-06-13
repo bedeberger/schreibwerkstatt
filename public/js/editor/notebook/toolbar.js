@@ -83,6 +83,12 @@ function _applyLinkAtRange(range, url) {
 
 const BLOCK_SEL = 'p, h1, h2, h3, h4, h5, h6, blockquote, pre, li, div.poem';
 
+// Absatz-artige Top-Level-Blöcke, deren Verschmelzung über eine Absatzgrenze
+// hinweg (Backspace am Anfang / Delete am Ende) wir bei weichen Umbrüchen
+// selbst übernehmen. Listen, Tabellen, Gedichte, <pre>, <hr> bleiben aussen
+// vor — dort ist das native bzw. das HR-Verhalten gewünscht.
+const MERGE_BLOCK_TAGS = new Set(['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6']);
+
 function findBlock(node, root) {
   let cur = node && node.nodeType === 3 ? node.parentNode : node;
   while (cur && cur !== root) {
@@ -530,6 +536,24 @@ export const toolbarCardMethods = {
               app._markEditDirty?.();
               return;
             }
+            // Absatz-Grenze löschen (Merge zweier Absätze): enthält der
+            // Quell-Absatz weiche Umbrüche (<br>), zieht der Browser nur dessen
+            // ERSTE Zeile hoch und befördert den ersten <br> zu einer neuen
+            // Absatzgrenze — aus einem gelöschten Absatz werden so „automatisch"
+            // mehrere. Bei top-level Absätzen daher den Merge selbst übernehmen:
+            // gesamten Quell-Inhalt anhängen, weiche Umbrüche bleiben weich.
+            if (neighbour && block.parentNode === editEl
+                && MERGE_BLOCK_TAGS.has(block.tagName)
+                && MERGE_BLOCK_TAGS.has(neighbour.tagName)) {
+              const source = e.key === 'Backspace' ? block : neighbour;
+              if (source.querySelector('br') && (source.textContent || '').trim()) {
+                e.preventDefault();
+                const receiver = e.key === 'Backspace' ? neighbour : block;
+                this._mergeBlocksManually(receiver, source);
+                app._markEditDirty?.();
+                return;
+              }
+            }
           }
         }
       }
@@ -549,6 +573,31 @@ export const toolbarCardMethods = {
       e.preventDefault();
       this._openSlashAt(block);
     }
+  },
+
+  // Verschmilzt `source` (gesamter Inhalt inkl. weicher <br>-Umbrüche) ans Ende
+  // von `receiver` und entfernt `source`. Setzt den Caret an die Naht zwischen
+  // Alt-Inhalt und angehängtem Inhalt. Ersetzt das native Merge-Verhalten, das
+  // bei <br>-haltigen Absätzen nur die erste Zeile übernimmt und den Rest zu
+  // einem neuen Absatz abspaltet.
+  _mergeBlocksManually(receiver, source) {
+    // Leeres Placeholder-<br> im Receiver entfernen, sonst bliebe eine Leerzeile
+    // vor dem angehängten Text stehen.
+    if (receiver.childNodes.length === 1 && receiver.firstChild.nodeName === 'BR') {
+      receiver.removeChild(receiver.firstChild);
+    }
+    const anchor = receiver.lastChild; // Naht-Anker (null, wenn Receiver leer war)
+    while (source.firstChild) receiver.appendChild(source.firstChild);
+    source.remove();
+    const sel = document.getSelection();
+    if (!sel) return;
+    const r = document.createRange();
+    if (anchor && anchor.nodeType === 3) r.setStart(anchor, anchor.textContent.length);
+    else if (anchor) r.setStartAfter(anchor);
+    else r.setStart(receiver, 0);
+    r.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(r);
   },
 
   _openSlashAt(block) {

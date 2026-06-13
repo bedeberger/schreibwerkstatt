@@ -7514,6 +7514,45 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 186 abgeschlossen (plot_beats.intensitaet).');
   }
 
+  if (version < 187) {
+    // Handlungsstränge (Swimlanes) für die Plot-Werkstatt: zweite Ordnungsachse
+    // neben den Akten. Das Board wird zum Raster Akte (Spalten) × Stränge (Zeilen);
+    // ein Beat sitzt in der Zelle (act_id, thread_id). thread_id NULL = „ohne
+    // Strang"-Lane (= heutiges flaches Board bei null Strängen). Strang optional
+    // an eine Katalog- ODER Werkstatt-Figur gebunden (Hauptfigur-Strang).
+    db.exec(`CREATE TABLE IF NOT EXISTS plot_threads (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id         INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        user_email      TEXT NOT NULL,
+        name            TEXT NOT NULL,
+        farbe           TEXT,
+        figure_id       INTEGER REFERENCES figures(id) ON DELETE SET NULL,
+        draft_figure_id INTEGER REFERENCES draft_figures(id) ON DELETE SET NULL,
+        position        INTEGER NOT NULL DEFAULT 0,
+        created_at      TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        updated_at      TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      )`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_plot_threads_book ON plot_threads(book_id, user_email)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_plot_threads_figure ON plot_threads(figure_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_plot_threads_draft_figure ON plot_threads(draft_figure_id)');
+
+    // thread_id auf plot_beats (SET NULL — Strang löschen lässt die Beats stehen,
+    // sie fallen in die „ohne Strang"-Lane). Additiv: nullable FK ohne Default,
+    // kein Recreate nötig (analog chapters.parent_chapter_id, Migration 135).
+    const beatCols187 = db.pragma('table_info(plot_beats)').map(c => c.name);
+    if (!beatCols187.includes('thread_id')) {
+      db.exec('ALTER TABLE plot_beats ADD COLUMN thread_id INTEGER REFERENCES plot_threads(id) ON DELETE SET NULL');
+    }
+    db.exec('CREATE INDEX IF NOT EXISTS idx_plot_beats_thread ON plot_beats(thread_id)');
+
+    const fkErrors187 = db.pragma('foreign_key_check');
+    if (fkErrors187.length) {
+      throw new Error(`Migration 187: foreign_key_check meldet ${fkErrors187.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 187').run();
+    logger.info('DB-Migration auf Version 187 abgeschlossen (plot_threads + plot_beats.thread_id).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

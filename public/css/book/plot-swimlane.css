@@ -1,0 +1,154 @@
+/* Plot-Werkstatt: Swimlane-Grid (Akte = Spalten × Stränge = Zeilen). Ergänzt
+   plot-board.css — Beat-/Add-/Farb-/Brainstorm-/Intensitäts-Styles werden von
+   dort wiederverwendet; hier nur die Grid-spezifischen Klassen + die Strang-Leiste.
+   Render-Weiche: nur sichtbar, sobald ≥1 Strang existiert (sonst flaches Board). */
+
+@layer components {
+
+  /* ── Strang-Leiste (Opt-in-Einstieg) ───────────────────────────────────── */
+  .plot-thread-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-xs);
+    margin-bottom: var(--space-sm);
+  }
+  .plot-thread-bar-label { font-size: var(--font-size-xs); font-weight: 600; color: var(--color-muted); }
+  .plot-thread-bar-hint { font-size: var(--font-size-micro); color: var(--color-muted); }
+  .plot-thread-chip {
+    --col-accent: var(--card-accent);
+    border-left: 3px solid var(--col-accent);
+    background: var(--color-tag-bg);
+    color: var(--color-text);
+  }
+  .plot-thread-add-form { display: inline-flex; align-items: center; gap: var(--space-xs); }
+  .plot-thread-add-input {
+    font-size: var(--font-size-sm);
+    padding: var(--space-2xs) var(--space-xs);
+    border: 1px solid var(--card-accent);
+    border-radius: var(--radius-sm);
+    background: var(--color-card-bg);
+    color: var(--color-text);
+  }
+  .plot-thread-add-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2xs);
+    padding: var(--space-2xs) var(--space-xs);
+    border: 1px dashed var(--color-border);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--color-muted);
+    font-size: var(--font-size-xs);
+    cursor: pointer;
+  }
+  .plot-thread-add-btn:hover { border-color: var(--card-accent); color: var(--color-text); }
+  .plot-thread-add-btn .icon { width: 14px; height: 14px; }
+
+  /* ── Grid-Container ─────────────────────────────────────────────────────── */
+  .plot-swimlane {
+    overflow-x: auto;
+    padding: var(--space-sm) var(--space-2xs) var(--space-lg);
+  }
+  .plot-swim {
+    --lane-w: 180px;
+    --cell-w: 260px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    min-width: max-content; /* erzwingt Zeilenbreite = Lane + alle Akt-Zellen → H-Scroll */
+  }
+  .plot-swim-row { display: flex; gap: var(--space-sm); align-items: stretch; }
+  .plot-swim-row--header { align-items: flex-end; }
+
+  /* ── Sticky linke Spalte: Ecke + Lane-Labels ────────────────────────────── */
+  .plot-swim-corner,
+  .plot-swim-lane {
+    position: sticky;
+    left: 0;
+    z-index: var(--z-base);
+    flex: 0 0 var(--lane-w);
+    width: var(--lane-w);
+    background: var(--color-surface);
+  }
+  .plot-swim-corner {
+    display: flex;
+    align-items: flex-end;
+    font-size: var(--font-size-micro);
+    color: var(--color-muted);
+    padding-bottom: var(--space-xs);
+    border-bottom: 2px solid var(--color-border);
+  }
+
+  /* ── Akt-Kopf (Kopfzeile) — nutzt .plot-column-title/-input/-actions ────── */
+  .plot-swim-acthead {
+    --col-accent: var(--card-accent);
+    flex: 0 0 var(--cell-w);
+    width: var(--cell-w);
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding-bottom: var(--space-xs);
+    border-bottom: 2px solid var(--col-accent);
+  }
+
+  /* ── Lane-Label (sticky) ────────────────────────────────────────────────── */
+  .plot-swim-lane {
+    --col-accent: var(--card-accent);
+    display: flex;
+    align-items: flex-start;
+    border-left: 3px solid var(--col-accent);
+    border-right: 1px solid var(--color-border);
+    border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+    padding: var(--space-xs);
+  }
+  .plot-swim-row--default .plot-swim-lane { border-left-color: var(--color-border); }
+  .plot-swim-lane-view { display: flex; align-items: flex-start; gap: var(--space-2xs); width: 100%; }
+  .plot-swim-lane-text { flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; overflow-wrap: anywhere; }
+  .plot-swim-lane-name { font-weight: 600; font-size: var(--font-size-sm); color: var(--color-text); cursor: text; }
+  .plot-swim-lane-name--muted { font-weight: 400; font-style: italic; color: var(--color-muted); cursor: default; }
+  .plot-swim-lane-figure { font-size: var(--font-size-micro); color: var(--color-muted); cursor: pointer; }
+  .plot-swim-lane-figure:hover { color: var(--color-text); }
+  .plot-swim-lane-actions { display: flex; flex-wrap: wrap; flex: 0 0 auto; }
+  .plot-swim-lane-edit { display: flex; flex-direction: column; gap: var(--space-xs); width: 100%; }
+  .plot-thread-name-input {
+    width: 100%;
+    font-weight: 600;
+    font-size: var(--font-size-sm);
+    padding: var(--space-2xs) var(--space-xs);
+    border: 1px solid var(--card-accent);
+    border-radius: var(--radius-sm);
+    background: var(--color-card-bg);
+    color: var(--color-text);
+  }
+
+  /* ── Zelle (Akt × Strang) ──────────────────────────────────────────────── */
+  .plot-swim-cell {
+    --col-accent: var(--card-accent);
+    flex: 0 0 var(--cell-w);
+    width: var(--cell-w);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    min-height: 56px;
+    padding: var(--space-xs);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+  }
+  .plot-swim-cell--dropzone {
+    border-color: var(--col-accent);
+    box-shadow: inset 0 0 0 1px var(--col-accent);
+  }
+  .plot-swim-cell-foot { display: flex; gap: var(--space-2xs); }
+  /* Kompakte Icon-Add-/Brainstorm-Buttons in der Zelle (Basis: .plot-add-beat-btn). */
+  .plot-add-beat-btn--cell { flex: 1 1 auto; width: auto; padding: var(--space-2xs); }
+
+  /* ── Vollbild: Grid scrollt über die volle Breite (Regel-Pendant zu .plot-board) */
+  .card--plot:fullscreen .plot-swimlane { max-height: none; }
+
+  /* ── Mobile: engere Spuren, Grid bleibt horizontal scrollbar (2D-Struktur) ─ */
+  @media (max-width: 600px) {
+    .plot-swim { --lane-w: 132px; --cell-w: 220px; }
+  }
+}

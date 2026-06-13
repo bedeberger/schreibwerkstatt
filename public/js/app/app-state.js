@@ -193,6 +193,10 @@ const notebookState = () => ({
   pageEditorFullscreen: false,
   pageEditorZoom: 1,
   pageEditorFitWidth: false,
+  // Steuerzeichen anzeigen (Absatzmarken ¶ + Zeilenumbruch ↵). Reine
+  // CSS-Pseudo-Element-Dekoration auf dem contenteditable (page-view.css),
+  // kein Markup im gespeicherten HTML. User-Wahl, in editorPrefs persistiert.
+  pageEditorShowMarks: false,
   // Cross-User-Konflikt aus _checkPageConflict. quickSave (Auto-Save / Exit-
   // Fokus) zeigt keinen Modal — der Banner ist im Fokus-Header sichtbar und
   // bleibt bis zum nächsten erfolgreichen Save oder bis User explizit

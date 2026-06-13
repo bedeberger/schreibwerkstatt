@@ -369,6 +369,8 @@ export const notebookEditMethods = {
     const prefs = readEditorPrefs();
     app.pageEditorFullscreen = prefs.fullscreen;
     app.pageEditorFitWidth = prefs.fitWidth;
+    app.pageEditorShowMarks = prefs.showMarks;
+    if (app.pageEditorShowMarks) this._installFormatMarks();
   },
 
   async cancelEdit() {
@@ -386,6 +388,7 @@ export const notebookEditMethods = {
     clearNormalSnapshot();
     this._stopAutosave();
     this._uninstallOnlineRetry();
+    this._uninstallFormatMarks();
     app._editCounterCtx?.teardown?.();
     app._stopPresenceHeartbeat?.();
     app._releaseEditLock?.(app.currentPage?.id);
@@ -517,6 +520,7 @@ export const notebookEditMethods = {
         clearNormalSnapshot();
         this._stopAutosave();
         this._uninstallOnlineRetry();
+        this._uninstallFormatMarks();
         app._editCounterCtx?.teardown?.();
         app._stopPresenceHeartbeat?.();
         app._releaseEditLock?.(app.currentPage?.id);
@@ -878,7 +882,7 @@ export const notebookEditMethods = {
     const app = window.__app;
     if (!app) return;
     app.pageEditorFullscreen = !app.pageEditorFullscreen;
-    writeEditorPrefs({ fullscreen: app.pageEditorFullscreen, fitWidth: app.pageEditorFitWidth });
+    writeEditorPrefs({ fullscreen: app.pageEditorFullscreen, fitWidth: app.pageEditorFitWidth, showMarks: app.pageEditorShowMarks });
   },
 
   // Fit-Width ist Pure-CSS (Container-Query in page-view.css). Toggle ändert
@@ -888,25 +892,40 @@ export const notebookEditMethods = {
     const app = window.__app;
     if (!app) return;
     app.pageEditorFitWidth = !app.pageEditorFitWidth;
-    writeEditorPrefs({ fullscreen: app.pageEditorFullscreen, fitWidth: app.pageEditorFitWidth });
+    writeEditorPrefs({ fullscreen: app.pageEditorFullscreen, fitWidth: app.pageEditorFitWidth, showMarks: app.pageEditorShowMarks });
+  },
+
+  // Steuerzeichen-Anzeige (Absatzmarken ¶ + Soft-Break ↵). Reiner Klassen-
+  // Toggle auf dem contenteditable — die Marken sind CSS-Pseudo-Elemente
+  // (page-view.css), kein Markup im gespeicherten HTML, kein Caret-Slot.
+  togglePageEditorShowMarks() {
+    const app = window.__app;
+    if (!app) return;
+    app.pageEditorShowMarks = !app.pageEditorShowMarks;
+    writeEditorPrefs({ fullscreen: app.pageEditorFullscreen, fitWidth: app.pageEditorFitWidth, showMarks: app.pageEditorShowMarks });
+    if (app.pageEditorShowMarks) this._installFormatMarks();
+    else this._uninstallFormatMarks();
   },
 
   pageEditorZoomIn() {
     const app = window.__app;
     if (!app) return;
     app.pageEditorZoom = Math.min(2.5, Math.round((app.pageEditorZoom + 0.1) * 100) / 100);
+    this._scheduleFormatMarks?.();
   },
 
   pageEditorZoomOut() {
     const app = window.__app;
     if (!app) return;
     app.pageEditorZoom = Math.max(0.7, Math.round((app.pageEditorZoom - 0.1) * 100) / 100);
+    this._scheduleFormatMarks?.();
   },
 
   pageEditorZoomReset() {
     const app = window.__app;
     if (!app) return;
     app.pageEditorZoom = 1;
+    this._scheduleFormatMarks?.();
   },
 
   async normalizeQuotes() {

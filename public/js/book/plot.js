@@ -35,17 +35,18 @@ export const plotMethods = {
   async loadBoard() {
     const app = window.__app;
     const bookId = app.selectedBookId;
-    if (!bookId) { this.acts = []; this.beats = []; this.draftFiguren = []; return; }
+    if (!bookId) { this.acts = []; this.threads = []; this.beats = []; this.draftFiguren = []; return; }
     this.loading = true;
     this._memos = {};
     try {
       const data = await fetchJson(`/plot?book_id=${bookId}`);
       this.acts = Array.isArray(data.acts) ? data.acts : [];
+      this.threads = Array.isArray(data.threads) ? data.threads : [];
       this.beats = Array.isArray(data.beats) ? data.beats : [];
       this.errorMessage = '';
     } catch (e) {
       this.errorMessage = app.t('plot.error.load');
-      this.acts = []; this.beats = [];
+      this.acts = []; this.threads = []; this.beats = [];
     } finally {
       this.loading = false;
     }
@@ -63,20 +64,28 @@ export const plotMethods = {
   resetPlot() {
     this._clearJobs();
     this.acts = [];
+    this.threads = [];
     this.beats = [];
     this.draftFiguren = [];
     this._memos = {};
     this.editingBeatId = null;
     this.addingActId = null;
+    this.addingCell = null;
     this.newBeatTitel = '';
     this.editingActId = null;
     this.actDraft = '';
     this.addingAct = false;
     this.newActName = '';
+    this.editingThreadId = null;
+    this.addingThread = false;
+    this.newThreadName = '';
+    this.threadColorPickerId = null;
     this._dragBeatId = null;
     this._dragOverActId = null;
+    this._dragOverCell = null;
     this.brainstormResult = null;
     this.brainstormActId = null;
+    this.brainstormThreadId = null;
     this.consistencyResult = null;
     this.selectedKonfliktIdx = null;
     this.plotFilters = { kapitel: '', figurId: '', draftFigurId: '' };
@@ -91,6 +100,17 @@ export const plotMethods = {
     return this._memo(`beats:${actId}`, [this.beats, actId], () =>
       (this.beats || [])
         .filter(b => b.act_id === actId)
+        .sort((a, b) => (a.sort_order - b.sort_order) || (a.id - b.id))
+    );
+  },
+
+  // Beats einer Grid-Zelle (Akt × Strang). threadId === null = „ohne Strang"-Lane.
+  // Im Grid-Pfad das Pendant zu beatsForAct.
+  beatsForCell(actId, threadId) {
+    const tid = threadId == null ? null : threadId;
+    return this._memo(`cell:${actId}:${tid}`, [this.beats, actId, tid], () =>
+      (this.beats || [])
+        .filter(b => b.act_id === actId && (b.thread_id ?? null) === tid)
         .sort((a, b) => (a.sort_order - b.sort_order) || (a.id - b.id))
     );
   },
@@ -114,6 +134,41 @@ export const plotMethods = {
   },
 
   statusList() { return STATUSES; },
+
+  // ── Stränge (Swimlanes, Derived) ───────────────────────────────────────────
+  // Zeilen des Grids: Stränge in Position-Reihenfolge + die „ohne Strang"-Lane
+  // (id null) immer am Ende — sie ist Drop-Ziel zum Entkoppeln und fängt alle
+  // nicht zugeordneten Beats.
+  threadLanes() {
+    return this._memo('lanes', [this.threads], () => {
+      const rows = [...(this.threads || [])]
+        .sort((a, b) => a.position - b.position)
+        .map(t => ({ id: t.id, thread: t, isDefault: false }));
+      rows.push({ id: null, thread: null, isDefault: true });
+      return rows;
+    });
+  },
+
+  // CSS-Akzent eines Strangs (gleiche Palette-Whitelist wie actAccent).
+  threadAccent(thread) {
+    const key = thread && thread.farbe;
+    return (key && ACT_PALETTE.includes(key)) ? `var(--palette-${key})` : 'var(--card-accent)';
+  },
+
+  // Anzeigename der an den Strang gebundenen Figur (Katalog via fig_id, sonst
+  // Werkstatt via draft_figure_id). Leer, wenn keine Figur gebunden.
+  threadFigureLabel(thread) {
+    if (!thread) return '';
+    if (thread.fig_id) {
+      const f = window.__app.figurenById?.get(thread.fig_id);
+      return f ? (f.kurzname || f.name) : '';
+    }
+    if (thread.draft_figure_id) {
+      const d = this.draftFigurenById?.get(thread.draft_figure_id);
+      return d ? d.name : '';
+    }
+    return '';
+  },
 
   // ── Akt-Farben ───────────────────────────────────────────────────────────
   actPalette() { return ACT_PALETTE; },
@@ -152,26 +207,52 @@ export const plotMethods = {
   // Bogen nicht) in Board-Lesereihenfolge (Akt-Position → sort_order) zu einer
   // Kurve. Punkte als Prozent-Koordinaten + Polyline-String für die SVG-Linie.
   tensionCurve() {
-    return this._memo('tension', [this.beats, this.acts], () => {
+    return this._memo('tension', [this.beats, this.acts, this.threads], () => {
       const actPos = new Map((this.acts || []).map(a => [a.id, a.position]));
       const actById = new Map((this.acts || []).map(a => [a.id, a]));
-      const seq = (this.beats || [])
-        .filter(b => b.status !== 'verworfen' && b.intensitaet != null)
-        .sort((a, b) =>
-          ((actPos.get(a.act_id) ?? 0) - (actPos.get(b.act_id) ?? 0)) ||
-          (a.sort_order - b.sort_order) || (a.id - b.id));
-      const n = seq.length;
-      const points = seq.map((b, k) => {
+      const order = (a, b) =>
+        ((actPos.get(a.act_id) ?? 0) - (actPos.get(b.act_id) ?? 0)) ||
+        (a.sort_order - b.sort_order) || (a.id - b.id);
+
+      // Eine Punkt-Reihe aus einer Beat-Teilmenge (verworfene + ohne Intensität raus).
+      const _line = (subset, color) => {
+        const seq = subset
+          .filter(b => b.status !== 'verworfen' && b.intensitaet != null)
+          .sort(order);
+        const n = seq.length;
+        const pts = seq.map((b, k) => {
+          const xPct = n === 1 ? 50 : +(5 + (k / (n - 1)) * 90).toFixed(2);
+          const bottomPct = +_intensityBottomPct(b.intensitaet).toFixed(2);
+          return {
+            beat: b, act: actById.get(b.act_id) || null, color,
+            xPct, bottomPct, xSvg: xPct, ySvg: +(100 - bottomPct).toFixed(2),
+          };
+        });
+        return { points: pts, polyline: pts.map(p => `${p.xSvg},${p.ySvg}`).join(' '), count: n };
+      };
+
+      // Globale Kurve (alle Beats, Akt-Akzent pro Punkt) — Board ohne Stränge.
+      const all = (this.beats || []).filter(b => b.status !== 'verworfen' && b.intensitaet != null).sort(order);
+      const nAll = all.length;
+      const points = all.map((b, k) => {
         const act = actById.get(b.act_id) || null;
-        const xPct = n === 1 ? 50 : +(5 + (k / (n - 1)) * 90).toFixed(2);
+        const xPct = nAll === 1 ? 50 : +(5 + (k / (nAll - 1)) * 90).toFixed(2);
         const bottomPct = +_intensityBottomPct(b.intensitaet).toFixed(2);
-        return {
-          beat: b, act, color: this.actAccent(act),
-          xPct, bottomPct,
-          xSvg: xPct, ySvg: +(100 - bottomPct).toFixed(2),
-        };
+        return { beat: b, act, color: this.actAccent(act), xPct, bottomPct, xSvg: xPct, ySvg: +(100 - bottomPct).toFixed(2) };
       });
-      return { points, polyline: points.map(p => `${p.xSvg},${p.ySvg}`).join(' '), count: n };
+
+      // Pro-Strang-Serien (nur wenn Stränge existieren) — je Strang eine eigene
+      // farbige Polyline. Leere Stränge fallen raus.
+      const series = (this.threads || [])
+        .slice()
+        .sort((a, b) => a.position - b.position)
+        .map(t => {
+          const line = _line((this.beats || []).filter(b => b.thread_id === t.id), this.threadAccent(t));
+          return { key: `t${t.id}`, thread: t, label: t.name, ...line };
+        })
+        .filter(s => s.count >= 1);
+
+      return { points, polyline: points.map(p => `${p.xSvg},${p.ySvg}`).join(' '), count: nAll, series };
     });
   },
 
@@ -229,6 +310,18 @@ export const plotMethods = {
       (this.beats || []).filter(b => this._beatMatchesFilter(b)).length);
   },
 
+  // Gefilterte Beats einer Grid-Zelle — Pendant zu filteredBeatsForAct. Anders als
+  // der flache Akt-Pfad gibt es im Grid keinen Verworfen-Collapse (Zellen sind klein,
+  // verworfene Beats bleiben sichtbar/durchgestrichen).
+  filteredBeatsForCell(actId, threadId) {
+    const f = this.plotFilters;
+    const base = this.beatsForCell(actId, threadId);
+    if (!f.kapitel && !f.figurId && !f.draftFigurId) return base;
+    const tid = threadId == null ? null : threadId;
+    return this._memo(`fcell:${actId}:${tid}`, [base, f.kapitel, f.figurId, f.draftFigurId], () =>
+      base.filter(b => this._beatMatchesFilter(b)));
+  },
+
   // ── Akte ─────────────────────────────────────────────────────────────────
   async addAct() {
     const app = window.__app;
@@ -253,7 +346,12 @@ export const plotMethods = {
   startEditAct(act) {
     this.editingActId = act.id;
     this.actDraft = act.name;
-    this.$nextTick(() => { document.querySelector('.plot-column-title-input')?.focus(); });
+    // Flaches Board + Grid sind beide im DOM (eines via x-show versteckt) — die
+    // sichtbare Titel-Eingabe fokussieren, nicht die display:none-Variante.
+    this.$nextTick(() => {
+      const inputs = [...(this.$root?.querySelectorAll('.plot-column-title-input') || [])];
+      (inputs.find(el => el.offsetParent !== null) || inputs[0])?.focus();
+    });
   },
   cancelEditAct() { this.editingActId = null; this.actDraft = ''; },
 
@@ -331,6 +429,144 @@ export const plotMethods = {
     } catch (e) { this.errorMessage = app.t('plot.error.save'); }
   },
 
+  // ── Stränge (Swimlanes, CRUD) ───────────────────────────────────────────────
+  async addThread() {
+    const app = window.__app;
+    const name = (this.newThreadName || '').trim();
+    if (!name) { this.errorMessage = app.t('plot.error.nameRequired'); return; }
+    this.busy = true;
+    try {
+      const thread = await fetchJson('/plot/threads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ book_id: app.selectedBookId, name }),
+      });
+      this.threads = [...this.threads, thread];
+      this._memos = {};
+      this.newThreadName = '';
+      this.addingThread = false;
+      this.errorMessage = '';
+    } catch (e) {
+      this.errorMessage = app.t('plot.error.save');
+    } finally { this.busy = false; }
+  },
+
+  startEditThread(thread) {
+    this.editingThreadId = thread.id;
+    this.threadColorPickerId = null;
+    this.threadDraft = {
+      name: thread.name || '',
+      farbe: thread.farbe || null,
+      // Katalog-Bindung wird als TEXT-fig_id geführt (matcht $app.figuren),
+      // Werkstatt-Bindung als INTEGER draft_figures.id.
+      figure_id: thread.fig_id || '',
+      draft_figure_id: thread.draft_figure_id || '',
+    };
+    this.$nextTick(() => { this.$root?.querySelector('.plot-thread-name-input')?.focus(); });
+  },
+  cancelEditThread() { this.editingThreadId = null; },
+
+  // Bindung ist exklusiv: eine Strang-Zeile gehört zu höchstens einer Figur.
+  setThreadDraftFigure(figId) {
+    this.threadDraft.figure_id = (this.threadDraft.figure_id === figId) ? '' : figId;
+    if (this.threadDraft.figure_id) this.threadDraft.draft_figure_id = '';
+  },
+  setThreadDraftDraftFigure(draftId) {
+    this.threadDraft.draft_figure_id = (this.threadDraft.draft_figure_id === draftId) ? '' : draftId;
+    if (this.threadDraft.draft_figure_id) this.threadDraft.figure_id = '';
+  },
+
+  async saveEditThread(thread) {
+    const app = window.__app;
+    const name = (this.threadDraft.name || '').trim();
+    if (!name) { this.errorMessage = app.t('plot.error.nameRequired'); return; }
+    this.busy = true;
+    try {
+      const updated = await fetchJson(`/plot/threads/${thread.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          farbe: this.threadDraft.farbe || null,
+          figure_id: this.threadDraft.figure_id || null,
+          draft_figure_id: this.threadDraft.draft_figure_id || null,
+        }),
+      });
+      this.threads = this.threads.map(t => (t.id === updated.id ? updated : t));
+      this._memos = {};
+      this.editingThreadId = null;
+      this.errorMessage = '';
+    } catch (e) {
+      this.errorMessage = app.t('plot.error.save');
+    } finally { this.busy = false; }
+  },
+
+  toggleThreadColorPicker(threadId) {
+    this.threadColorPickerId = this.threadColorPickerId === threadId ? null : threadId;
+  },
+
+  async setThreadColor(thread, key) {
+    const app = window.__app;
+    this.threadColorPickerId = null;
+    const farbe = ACT_PALETTE.includes(key) ? key : null;
+    if (farbe === (thread.farbe || null)) return;
+    try {
+      const updated = await fetchJson(`/plot/threads/${thread.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ farbe }),
+      });
+      this.threads = this.threads.map(t => (t.id === updated.id ? updated : t));
+      this._memos = {};
+      this.errorMessage = '';
+    } catch (e) {
+      this.errorMessage = app.t('plot.error.save');
+    }
+  },
+
+  async deleteThread(thread) {
+    const app = window.__app;
+    const beatCount = (this.beats || []).filter(b => b.thread_id === thread.id).length;
+    if (!await app.appConfirm({
+      message: app.t('plot.thread.confirmDelete', { name: thread.name, n: beatCount }),
+      confirmLabel: app.t('common.delete'),
+      danger: true,
+    })) return;
+    this.busy = true;
+    try {
+      await fetchJson(`/plot/threads/${thread.id}`, { method: 'DELETE' });
+      this.threads = this.threads.filter(t => t.id !== thread.id);
+      // Server setzt thread_id der Beats auf NULL (SET NULL) — lokal spiegeln,
+      // die Beats fallen in die „ohne Strang"-Lane.
+      this.beats = this.beats.map(b => (b.thread_id === thread.id ? { ...b, thread_id: null } : b));
+      this._memos = {};
+      if (this.editingThreadId === thread.id) this.editingThreadId = null;
+      this.errorMessage = '';
+    } catch (e) {
+      this.errorMessage = app.t('plot.error.delete');
+    } finally { this.busy = false; }
+  },
+
+  // Strang-Reihenfolge per Pfeil-Button (a11y, analog moveAct).
+  async moveThread(thread, dir) {
+    const app = window.__app;
+    const ordered = [...this.threads].sort((a, b) => a.position - b.position);
+    const idx = ordered.findIndex(t => t.id === thread.id);
+    const swap = idx + dir;
+    if (idx < 0 || swap < 0 || swap >= ordered.length) return;
+    [ordered[idx], ordered[swap]] = [ordered[swap], ordered[idx]];
+    ordered.forEach((t, i) => { t.position = i; });
+    this.threads = ordered;
+    this._memos = {};
+    try {
+      await fetchJson('/plot/threads/order', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ book_id: app.selectedBookId, order: ordered.map(t => t.id) }),
+      });
+    } catch (e) { this.errorMessage = app.t('plot.error.save'); }
+  },
+
   // ── Beats ──────────────────────────────────────────────────────────────────
   startAddBeat(actId) {
     this.addingActId = actId;
@@ -377,13 +613,85 @@ export const plotMethods = {
   // speichern, wenn der Fokus auf die Add-Buttons (Hinzufügen/Abbrechen) oder ins
   // LanguageTool-Badge/-Popover wandert — die behandeln den Klick selbst bzw. der
   // User korrigiert gerade Rechtschreibung. Leeres Feld → Add-Modus nur schliessen.
+  //
+  // Der Spellcheck-Dispatcher wickelt das Feld beim Fokus in ein
+  // <span class="lt-field-wrap"> — der DOM-Move feuert ein synchrones blur,
+  // obwohl der Fokus unmittelbar danach wiederhergestellt wird. Würde blur sofort
+  // cancelAddBeat (leeres Feld beim ersten Klick), blendete das x-if das Input
+  // direkt wieder aus und der User kann gar nichts eingeben. Darum eine Frame
+  // deferren und nur reagieren, wenn der Fokus das Feld wirklich verlassen hat
+  // (analog onActBlur).
   onAddBeatBlur(actId, ev) {
     if (this.busy || this.addingActId !== actId) return;
     const to = ev?.relatedTarget;
     if (to?.closest?.('.plot-add-beat-actions, .lt-badge, .lt-popover')) return;
     if (document.querySelector('.lt-popover')) return;
-    if (!(this.newBeatTitel || '').trim()) { this.cancelAddBeat(); return; }
-    this.saveNewBeat(actId, { keepAdding: false });
+    const input = ev?.target || null;
+    requestAnimationFrame(() => {
+      if (this.busy || this.addingActId !== actId) return;
+      if (input && document.activeElement === input) return;
+      if (!(this.newBeatTitel || '').trim()) { this.cancelAddBeat(); return; }
+      this.saveNewBeat(actId, { keepAdding: false });
+    });
+  },
+
+  // ── Beat hinzufügen in einer Grid-Zelle (Akt × Strang) ─────────────────────
+  // Eigener Pfad neben startAddBeat/saveNewBeat (die akt-only sind), weil im Grid
+  // beim Anlegen direkt der Strang (thread_id) mitgesetzt wird. addingCell ist der
+  // Zell-Schlüssel `${actId}:${threadId|null}`.
+  _cellKey(actId, threadId) { return `${actId}:${threadId == null ? 'null' : threadId}`; },
+
+  startAddBeatCell(actId, threadId) {
+    this.addingCell = this._cellKey(actId, threadId);
+    this.newBeatTitel = '';
+    this.$nextTick(() => {
+      const el = this.$root?.querySelector(`[data-add-beat-cell="${this.addingCell}"] .plot-add-beat-input`);
+      el?.focus();
+    });
+  },
+  cancelAddBeatCell() { this.addingCell = null; this.newBeatTitel = ''; },
+
+  async saveNewBeatCell(actId, threadId, { keepAdding = true } = {}) {
+    const app = window.__app;
+    const titel = (this.newBeatTitel || '').trim();
+    if (!titel) { this.cancelAddBeatCell(); return; }
+    this.busy = true;
+    try {
+      const beat = await fetchJson('/plot/beats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ book_id: app.selectedBookId, act_id: actId, thread_id: threadId ?? null, titel }),
+      });
+      this.beats = [...this.beats, beat];
+      this._memos = {};
+      this.newBeatTitel = '';
+      this.errorMessage = '';
+      if (keepAdding) {
+        this.$nextTick(() => {
+          const el = this.$root?.querySelector(`[data-add-beat-cell="${this._cellKey(actId, threadId)}"] .plot-add-beat-input`);
+          el?.focus();
+        });
+      } else {
+        this.addingCell = null;
+      }
+    } catch (e) {
+      this.errorMessage = app.t('plot.error.save');
+    } finally { this.busy = false; }
+  },
+
+  onAddBeatCellBlur(actId, threadId, ev) {
+    const key = this._cellKey(actId, threadId);
+    if (this.busy || this.addingCell !== key) return;
+    const to = ev?.relatedTarget;
+    if (to?.closest?.('.plot-add-beat-actions, .lt-badge, .lt-popover')) return;
+    if (document.querySelector('.lt-popover')) return;
+    const input = ev?.target || null;
+    requestAnimationFrame(() => {
+      if (this.busy || this.addingCell !== key) return;
+      if (input && document.activeElement === input) return;
+      if (!(this.newBeatTitel || '').trim()) { this.cancelAddBeatCell(); return; }
+      this.saveNewBeatCell(actId, threadId, { keepAdding: false });
+    });
   },
 
   startEditBeat(beat) {
@@ -490,45 +798,69 @@ export const plotMethods = {
     this._dragBeatId = beat.id;
     if (ev?.dataTransfer) { ev.dataTransfer.effectAllowed = 'move'; try { ev.dataTransfer.setData('text/plain', String(beat.id)); } catch {} }
   },
-  onBeatDragEnd() { this._dragBeatId = null; this._dragOverActId = null; },
+  onBeatDragEnd() { this._dragBeatId = null; this._dragOverActId = null; this._dragOverCell = null; },
   onActDragOver(actId) { if (this._dragBeatId != null) this._dragOverActId = actId; },
+  onCellDragOver(actId, threadId) { if (this._dragBeatId != null) this._dragOverCell = this._cellKey(actId, threadId); },
 
+  // Flacher Pfad (Board ohne Stränge): Drop in eine Akt-Spalte → Strang bleibt
+  // NULL. Signatur unverändert, damit das flache Board-Template unberührt bleibt.
   async onBeatDrop(targetActId, beforeBeatId = null) {
+    return this._dropBeat(targetActId, null, beforeBeatId);
+  },
+  // Grid-Pfad: Drop in eine Zelle (Akt × Strang) → setzt act_id + thread_id.
+  async onCellDrop(targetActId, targetThreadId, beforeBeatId = null) {
+    return this._dropBeat(targetActId, targetThreadId, beforeBeatId);
+  },
+
+  // Gemeinsame DnD-Mechanik für beide Pfade: verschiebt den gezogenen Beat in die
+  // Ziel-Zelle (Akt × Strang; threadId null = „ohne Strang"), nummeriert Ziel- und
+  // Quell-Zelle neu und persistiert nur die betroffenen Zellen.
+  async _dropBeat(targetActId, targetThreadId, beforeBeatId = null) {
     const beatId = this._dragBeatId;
     this._dragOverActId = null;
+    this._dragOverCell = null;
     if (beatId == null) return;
     const beat = this.beats.find(b => b.id === beatId);
     if (!beat) { this._dragBeatId = null; return; }
     const origActId = beat.act_id;
+    const origThreadId = beat.thread_id ?? null;
+    const tid = targetThreadId ?? null;
     if (beforeBeatId === beatId) { this._dragBeatId = null; return; }
 
-    const target = this.beatsForAct(targetActId).filter(b => b.id !== beatId);
+    const target = this.beatsForCell(targetActId, tid).filter(b => b.id !== beatId);
     let insertIdx = target.length;
     if (beforeBeatId != null) {
       const i = target.findIndex(b => b.id === beforeBeatId);
       if (i >= 0) insertIdx = i;
     }
     beat.act_id = targetActId;
+    beat.thread_id = tid;
     target.splice(insertIdx, 0, beat);
     target.forEach((b, i) => { b.sort_order = i; });
-    // Quell-Spalte (falls verschieden) neu durchnummerieren.
-    if (origActId !== targetActId) {
-      this.beats.filter(b => b.act_id === origActId).sort((a, b) => a.sort_order - b.sort_order)
+    // Quell-Zelle (falls verschieden) neu durchnummerieren.
+    const sameCell = origActId === targetActId && origThreadId === tid;
+    if (!sameCell) {
+      this.beats
+        .filter(b => b.act_id === origActId && (b.thread_id ?? null) === origThreadId && b.id !== beatId)
+        .sort((a, b) => a.sort_order - b.sort_order)
         .forEach((b, i) => { b.sort_order = i; });
     }
     this.beats = [...this.beats];
     this._memos = {};
     this._dragBeatId = null;
 
-    const affected = origActId !== targetActId ? [origActId, targetActId] : [targetActId];
-    await this._persistOrder(affected);
+    const cells = sameCell
+      ? [{ actId: targetActId, threadId: tid }]
+      : [{ actId: origActId, threadId: origThreadId }, { actId: targetActId, threadId: tid }];
+    await this._persistCells(cells);
   },
 
-  async _persistOrder(actIds) {
+  async _persistCells(cells) {
     const app = window.__app;
-    const order = actIds.map(actId => ({
+    const order = cells.map(({ actId, threadId }) => ({
       actId,
-      beatIds: this.beatsForAct(actId).map(b => b.id),
+      threadId: threadId ?? null,
+      beatIds: this.beatsForCell(actId, threadId ?? null).map(b => b.id),
     }));
     try {
       await fetchJson('/plot/beats/order', {
@@ -543,9 +875,12 @@ export const plotMethods = {
   },
 
   // ── KI: Brainstorm ──────────────────────────────────────────────────────
-  async runBrainstorm(act) {
+  // Im flachen Board akt-weit (thread = null), im Grid zell-granular (Strang
+  // mitgegeben → die KI grundiert den Vorschlag mit Strang + gebundener Figur).
+  async runBrainstorm(act, thread = null) {
     const app = window.__app;
     this.brainstormActId = act.id;
+    this.brainstormThreadId = thread ? thread.id : null;
     this.brainstormLoading = true;
     this.brainstormStatus = '';
     this.brainstormResult = null;
@@ -553,7 +888,7 @@ export const plotMethods = {
       const resp = await fetchJson('/jobs/plot-brainstorm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ book_id: app.selectedBookId, act_id: act.id }),
+        body: JSON.stringify({ book_id: app.selectedBookId, act_id: act.id, thread_id: thread ? thread.id : null }),
       });
       this._brainstormJobId = resp.jobId;
       startPoll(this, {
@@ -569,7 +904,7 @@ export const plotMethods = {
           this.brainstormLoading = false;
           this.brainstormStatus = '';
           this._brainstormJobId = null;
-          this.brainstormResult = { actId: job.result.actId, vorschlaege: job.result.vorschlaege || [] };
+          this.brainstormResult = { actId: job.result.actId, threadId: job.result.threadId ?? null, vorschlaege: job.result.vorschlaege || [] };
         },
         onError: (job) => {
           this.brainstormLoading = false;
@@ -600,7 +935,7 @@ export const plotMethods = {
       const beat = await fetchJson('/plot/beats', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ book_id: app.selectedBookId, act_id: actId, titel: v.label, beschreibung: v.begruendung || '' }),
+        body: JSON.stringify({ book_id: app.selectedBookId, act_id: actId, thread_id: this.brainstormResult.threadId ?? null, titel: v.label, beschreibung: v.begruendung || '' }),
       });
       this.beats = [...this.beats, beat];
       this._memos = {};
@@ -621,7 +956,7 @@ export const plotMethods = {
     this._brainstormJobId = null;
   },
 
-  dismissBrainstorm() { this.brainstormResult = null; this.brainstormActId = null; },
+  dismissBrainstorm() { this.brainstormResult = null; this.brainstormActId = null; this.brainstormThreadId = null; },
 
   // ── KI: Consistency ─────────────────────────────────────────────────────
   async runConsistency() {

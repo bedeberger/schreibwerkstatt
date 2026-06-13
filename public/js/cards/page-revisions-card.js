@@ -123,16 +123,19 @@ export function registerPageRevisionsCard() {
     },
 
     // ── Viewer ───────────────────────────────────────────────────────────────
-    async openViewer(rev) {
+    async openViewer(rev, { keepMode = false } = {}) {
       if (!rev?.id) return;
       const app = window.__app;
       const pageId = app?.currentPage?.id;
       if (!pageId) return;
 
       const firstOpen = !this.viewerOpen;
+      // Bei Prev/Next-Navigation den aktiven Tab beibehalten; beim Frischoeffnen
+      // immer mit 'content' starten.
+      const mode = keepMode && this.viewerMode === 'diff' ? 'diff' : 'content';
       this.viewerOpen = true;
       this.viewerRev = rev;
-      this.viewerMode = 'content';
+      this.viewerMode = mode;
       this.viewerBody = '';
       this.viewerError = '';
       this.viewerDiffHtml = '';
@@ -157,6 +160,9 @@ export function registerPageRevisionsCard() {
       } finally {
         this.viewerLoading = false;
       }
+
+      // Vergleichs-Tab beibehalten → Diff fuer die neu geladene Revision ziehen.
+      if (this.viewerMode === 'diff' && !this.viewerError) await this._ensureDiff();
     },
 
     // Liste DESC sortiert (juengste zuerst). 'prev' = aelter = idx+1.
@@ -172,7 +178,7 @@ export function registerPageRevisionsCard() {
     hasNextRev() { return !!this._siblingRev('next'); },
     gotoRev(direction) {
       const target = this._siblingRev(direction);
-      if (target) this.openViewer(target);
+      if (target) this.openViewer(target, { keepMode: true });
     },
 
     closeViewer() {
@@ -238,6 +244,30 @@ export function registerPageRevisionsCard() {
 
     async restoreFromViewer() {
       if (this.viewerRev) await this.restore(this.viewerRev);
+    },
+
+    // Vorgaengerin einer beliebigen Listen-Revision. Liste DESC sortiert
+    // (juengste zuerst) → der "Stand davor" ist der naechstaeltere = idx+1.
+    _prevRevFor(rev) {
+      if (!rev?.id) return null;
+      const idx = this.revisions.findIndex(r => r.id === rev.id);
+      if (idx < 0) return null;
+      return this.revisions[idx + 1] || null;
+    },
+    hasPrevRevFor(rev) { return !!this._prevRevFor(rev); },
+
+    // "Stand davor wiederherstellen": schreibt die Vorgaenger-Revision zurueck —
+    // also den Inhalt, der unmittelbar vor diesem Save existierte. Jede Revision
+    // ist der Stand NACH ihrem Save, daher ist Revision N+1 (aelter) bytegenau
+    // der Vor-Save-Stand von Revision N.
+    async restorePrevious(rev) {
+      const prev = this._prevRevFor(rev);
+      if (prev) await this.restore(prev);
+    },
+
+    async restorePreviousFromViewer() {
+      const prev = this._siblingRev('prev');
+      if (prev) await this.restore(prev);
     },
 
     async restore(rev) {

@@ -45,13 +45,14 @@ const EDITOR_PREFS_KEY = 'notebook.editorPrefs';
 export function readEditorPrefs() {
   try {
     const raw = localStorage.getItem(EDITOR_PREFS_KEY);
-    if (!raw) return { fullscreen: false, fitWidth: false };
+    if (!raw) return { fullscreen: false, fitWidth: false, showMarks: false };
     const prefs = JSON.parse(raw);
     return {
       fullscreen: !!prefs?.fullscreen,
       fitWidth: !!prefs?.fitWidth,
+      showMarks: !!prefs?.showMarks,
     };
-  } catch { return { fullscreen: false, fitWidth: false }; }
+  } catch { return { fullscreen: false, fitWidth: false, showMarks: false }; }
 }
 
 export function writeEditorPrefs(prefs) {
@@ -59,6 +60,7 @@ export function writeEditorPrefs(prefs) {
     localStorage.setItem(EDITOR_PREFS_KEY, JSON.stringify({
       fullscreen: !!prefs?.fullscreen,
       fitWidth: !!prefs?.fitWidth,
+      showMarks: !!prefs?.showMarks,
     }));
   } catch {}
 }

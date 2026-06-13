@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 186, 96 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 187, 97 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -60,7 +60,11 @@ erDiagram
   storylines ||--o{ figure_events     : groups
   books ||--o{ plot_acts             : has
   books ||--o{ plot_beats            : has
+  books ||--o{ plot_threads          : has
   plot_acts ||--o{ plot_beats        : groups
+  plot_threads ||--o| plot_beats     : "beat in lane"
+  figures ||--o| plot_threads        : "thread of figure"
+  draft_figures ||--o| plot_threads  : "thread of draft figure"
   chapters ||--o| plot_beats         : "beat lands in"
   plot_beats ||--o{ plot_beat_figures : has
   figures ||--o{ plot_beat_figures   : "appears in beat"
@@ -677,17 +681,30 @@ erDiagram
     TEXT    created_at
     TEXT    updated_at
   }
+  plot_threads {
+    INTEGER id              PK
+    INTEGER book_id         FK
+    TEXT    user_email
+    TEXT    name
+    TEXT    farbe            "optionaler Akzent"
+    INTEGER figure_id        FK "SET NULL — gebundene Katalog-Figur"
+    INTEGER draft_figure_id  FK "SET NULL — gebundene Werkstatt-Figur"
+    INTEGER position         "Zeilen-Reihenfolge"
+    TEXT    created_at
+    TEXT    updated_at
+  }
   plot_beats {
     INTEGER id           PK
     INTEGER book_id      FK
     INTEGER act_id       FK "CASCADE — Spalte"
+    INTEGER thread_id    FK "SET NULL — Strang/Zeile"
     TEXT    user_email
     TEXT    titel
     TEXT    beschreibung
     TEXT    status       "geplant|entwurf|im_buch|verworfen"
     INTEGER chapter_id   FK "SET NULL — landet in Kapitel"
     INTEGER intensitaet  "1-5, optional — Spannungsbogen"
-    INTEGER sort_order   "Reihenfolge in Spalte"
+    INTEGER sort_order   "Reihenfolge in Zelle (Akt × Strang)"
     TEXT    created_at
     TEXT    updated_at
   }
@@ -708,11 +725,14 @@ erDiagram
   zeitstrahl_events ||--o{ zeitstrahl_event_figures   : refs
   storylines        ||--o{ zeitstrahl_events          : groups
   plot_acts         ||--o{ plot_beats                 : groups
+  plot_threads      ||--o| plot_beats                 : "lane"
+  figures           ||--o| plot_threads               : "bound figure"
+  draft_figures     ||--o| plot_threads               : "bound draft figure"
   plot_beats        ||--o{ plot_beat_figures          : refs
   plot_beats        ||--o{ plot_beat_draft_figures    : refs
 ```
 
-**Plot-Werkstatt (Beat-Board).** Planendes Pendant zur rückwärtsgewandten Szenen-/Ereignis-Analyse: `plot_acts` sind die Spalten (Akte/Phasen, geordnet via `position`), `plot_beats` die Karten darin (Handlungspunkte, geordnet via `sort_order`). `status` hält „geplant → entwurf → im_buch (schon geschrieben) → verworfen" nach; `chapter_id` (SET NULL) verknüpft einen Beat mit dem Zielkapitel; `plot_beat_figures` ist die M:M-Brücke zu beteiligten Katalog-Figuren (`figures`), `plot_beat_draft_figures` die parallele M:M-Brücke zu Werkstatt-Figuren (`draft_figures`, vorwärts-entwickelt, evtl. noch nicht im Manuskript) — beide CASCADE auf Beat- und Figur-Seite. Pro Buch + User skopiert. KI assistiert ausschliesslich planend/überwachend (Brainstorm + Consistency gegen Buchrealität, beide kennen Katalog- **und** Werkstatt-Figuren), nie generativ in den Text.
+**Plot-Werkstatt (Beat-Board).** Planendes Pendant zur rückwärtsgewandten Szenen-/Ereignis-Analyse: `plot_acts` sind die Spalten (Akte/Phasen, geordnet via `position`), `plot_beats` die Karten darin (Handlungspunkte, geordnet via `sort_order`). Optionale zweite Ordnungsachse sind die Handlungsstränge (`plot_threads`, Swimlanes, geordnet via `position`) — das Board wird ein Raster Akte × Stränge, ein Beat sitzt in der Zelle (`act_id`, `thread_id`). `thread_id` (SET NULL) ist die Strang-Zuordnung (NULL = „ohne Strang"-Lane; null Stränge = flaches Board); ein Strang ist optional an eine Katalog-Figur (`figure_id`) ODER Werkstatt-Figur (`draft_figure_id`) gebunden (beide SET NULL — Hauptfigur-Strang). `status` hält „geplant → entwurf → im_buch (schon geschrieben) → verworfen" nach; `chapter_id` (SET NULL) verknüpft einen Beat mit dem Zielkapitel; `plot_beat_figures` ist die M:M-Brücke zu beteiligten Katalog-Figuren (`figures`), `plot_beat_draft_figures` die parallele M:M-Brücke zu Werkstatt-Figuren (`draft_figures`, vorwärts-entwickelt, evtl. noch nicht im Manuskript) — beide CASCADE auf Beat- und Figur-Seite. Pro Buch + User skopiert. KI assistiert ausschliesslich planend/überwachend (Brainstorm + Consistency gegen Buchrealität, beide kennen Katalog- **und** Werkstatt-Figuren), nie generativ in den Text.
 
 ---
 

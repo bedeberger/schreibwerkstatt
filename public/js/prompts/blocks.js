@@ -1,6 +1,42 @@
 // Wiederverwendbare Regel-Blöcke für Lektorat- und Review-Prompts.
 // Pure Funktionen – keine Modul-State-Abhängigkeiten.
 
+// Grammatik + Zeichensetzung/Interpunktion (beide unter typ «grammatik»). Locale-scharf.
+// Beide Fehlergruppen sind objektiv und mechanisch – sie werden SYSTEMATISCH geprüft und
+// IMMER gemeldet (keine Schwere-Schwelle, keine Mengen-Obergrenze). Zeichensetzungsfehler
+// sind ein häufig übersehener, aber objektiver Mangel – darum hier explizit ausbuchstabiert.
+export function _buildGrammatikBlock(langCode = 'de') {
+  if (langCode === 'en') {
+    return `
+Grammar & punctuation rules (typ: «grammatik»):
+- These are OBJECTIVE, mechanical errors. Scan the WHOLE text sentence by sentence – do not sample. Every clear violation is reported; none is dropped as "minor" or "matter of taste".
+- Grammar: subject-verb agreement, pronoun case and reference, verb tense formation, dangling/misplaced modifiers, article misuse, faulty parallelism, comparative/superlative errors, preposition/idiom errors.
+- Punctuation / commas: comma splices (two independent clauses joined by only a comma), missing comma after an introductory clause/phrase, missing comma before a coordinating conjunction joining two independent clauses, missing paired commas around non-restrictive clauses/appositives, inconsistent serial (Oxford) comma, apostrophe errors (its vs it's, possessive vs plural), missing or doubled terminal punctuation, capitalisation at sentence start, quotation/dash/ellipsis misuse.
+- «original»: the exact span containing the error – for a comma error, copy the phrase around the spot (with enough surrounding words to be uniquely findable), character-exact.
+- «korrektur»: the SAME span with the grammar/punctuation corrected (1:1 replacement, same span type).
+- «erklaerung»: ONE sentence naming the rule («missing comma before the subordinate clause», «comma splice – use a period or semicolon», «its = possessive, no apostrophe», …).
+- Report inside direct speech too – punctuation and grammar errors are mistakes there as well, unless an intentional dialect/idiolect is clearly signalled.`;
+  }
+  // Default: Deutsch
+  return `
+Grammatik- & Zeichensetzungs-Regeln (typ: «grammatik»):
+- Das sind OBJEKTIVE, mechanische Fehler. Prüfe den GESAMTEN Text Satz für Satz – nicht stichprobenartig. Jeder eindeutige Verstoss wird gemeldet; keiner wird als «geringfügig» oder «Geschmacksache» weggelassen.
+- Grammatik: Subjekt-Verb-Kongruenz (Numerus), Kasus/Rektion (z.B. «wegen/trotz/während» + Genitiv, Dativ-statt-Genitiv, Akkusativ-statt-Dativ und umgekehrt), Adjektiv-/Artikeldeklination, falsche Verbformen (starke/schwache Konjugation, Partizip, «ich habe gegangen» statt «bin gegangen»), Modus (Konjunktiv I in indirekter Rede, Konjunktiv II im Irrealis/Konditional), Wortstellung (Verbzweit-/Verbletztstellung), falscher Pronomen-/Relativbezug, doppelte Verneinung, «als/wie»-Verwechslung, «scheinbar/anscheinend».
+- Zeichensetzung / Interpunktion (PFLICHT, häufig übersehen):
+  · Komma vor Nebensätzen (dass, weil, obwohl, wenn, als, damit …) und vor/um Relativsätze.
+  · Komma beim erweiterten Infinitiv mit «zu» (um/ohne/(an)statt … zu; sowie bei ankündigendem Hinweiswort).
+  · Paariges Komma bei Einschüben, Appositionen, nachgestellten Erläuterungen, Partizip-/Adjektivgruppen, Anreden, Ausrufen («ja, nein, bitte, danke»).
+  · Komma zwischen zwei vollständigen Hauptsätzen, insbesondere vor «aber, sondern, doch, denn»; bei «und/oder» zwischen selbstständigen Hauptsätzen optional, aber konsistent.
+  · KEIN Komma zwischen gleichrangigen Satzgliedern, die mit «und/oder» verbunden sind.
+  · Satzschlusszeichen: fehlende oder doppelte Punkte/Frage-/Ausrufezeichen, fehlendes Fragezeichen bei direkter Frage, Grossschreibung am Satzanfang.
+  · Apostroph: Genitiv ohne Apostroph («Annas Buch», nicht «Anna's»), korrekter Auslassungsapostroph.
+  · Gedankenstrich (Halbgeviert «–») vs. Bindestrich («-»), Auslassungspunkte («…»), Doppelpunkt – jeweils korrekte Verwendung und Abstände.
+- «original»: die fehlerhafte Stelle zeichengenau – bei Kommafehlern die Phrase um die Stelle kopieren (mit genug Kontext, damit sie eindeutig auffindbar ist).
+- «korrektur»: dieselbe Stelle mit korrigierter Grammatik/Zeichensetzung (1:1-Ersatz, gleicher Span-Typ).
+- «erklaerung»: EIN Satz, benennt die verletzte Regel («Komma vor dem Nebensatz fehlt», «wegen verlangt den Genitiv», «Komma zwischen zwei Hauptsätzen fehlt», «Genitiv ohne Apostroph»).
+- AUCH in direkter Rede / Dialog melden: Zeichensetzungs- und Grammatikfehler sind dort genauso Fehler – Ausnahme nur, wenn klar erkennbar bewusste Figurensprache/Dialekt vorliegt.`;
+}
+
 export function _buildStilBlock() {
   return `
 Stil-Regeln (typ: «stil»):
@@ -221,12 +257,12 @@ export function _buildTempuswechselBlock() {
 Tempuswechsel-Regeln (typ: «tempuswechsel»):
 - WENN oben ein Block «Etablierte Erzählform des Buchs» angegeben ist, ist DAS die verbindliche Referenz – primär gegen diese Vorgabe prüfen, nicht gegen Default-Annahmen. Ein Satz im Präsens innerhalb eines per Buch-Konfiguration auf Präteritum festgelegten Erzähltextes ist ein Bruch (sofern nicht durch eine der Ausnahmen unten gedeckt).
 - WENN kein Erzählform-Block vorliegt: das in den ersten Absätzen der Seite dominante Tempus aus dem Text ableiten und gegen Abweichungen prüfen.
-- Unbeabsichtigte Wechsel der Erzählzeit innerhalb einer Szene oder eines Abschnitts identifizieren
+- VORGEHEN (Pflicht, systematisch – nicht stichprobenartig): Prüfe das finite Verb JEDES Erzählsatzes gegen das etablierte Erzähltempus. Jeder Erzählsatz, dessen finites Verb ohne dramaturgischen Grund vom etablierten Tempus abweicht, ist ein Bruch und wird gemeldet. Tempusbrüche sind ein häufig übersehener, aber objektiver Fehler – behandle sie wie einen Grammatikfehler, nicht wie eine Geschmacksfrage. Im Zweifel, ob ein Wechsel beabsichtigt ist, lieber melden (der Autor entscheidet beim Durchsehen).
 - Typisch: Erzählung im Präteritum mit plötzlichem Wechsel ins Präsens (oder umgekehrt), ohne dass ein Stilmittel erkennbar ist
 - «original»: vollständiger Satz zeichengenau aus dem Text
 - «korrektur»: derselbe Satz im korrekten Tempus der umgebenden Passage
 - «erklaerung»: benennen, welches Tempus in der Passage etabliert ist (mit Verweis auf den Erzählform-Block, falls vorhanden) und welches im Satz verwendet wird
-- Nicht melden bei: Plusquamperfekt für Rückblenden, historischem Präsens als bewusstem Stilmittel, Tempuswechsel in direkter Rede / Dialog (Figuren sprechen in ihrer eigenen Zeit), zitierten Briefen / Tagebucheinträgen / Nachrichten, Wechsel an Szenen-/Kapitelgrenzen`;
+- Nicht melden bei: Plusquamperfekt für Rückblenden, historischem Präsens als bewusstem Stilmittel, Tempuswechsel in direkter Rede / Dialog (Figuren sprechen in ihrer eigenen Zeit), zitierten Briefen / Tagebucheinträgen / Nachrichten, Wechsel an Szenen-/Kapitelgrenzen, sowie allgemeingültigen Aussagen / zeitlosen Wahrheiten im Präsens innerhalb einer Präteritum-Erzählung («Die Sonne geht im Osten auf»).`;
 }
 
 /**

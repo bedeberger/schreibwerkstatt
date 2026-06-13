@@ -11,6 +11,9 @@ export function registerPlotCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
   window.Alpine.data('plotCard', () => ({
     acts: [],
+    // Handlungsstränge (Swimlanes): optionale zweite Ordnungsachse. Leeres Array
+    // = flaches Board (heutiges Verhalten). Pro Buch + User, lokal in der Karte.
+    threads: [],
     beats: [],
     // Werkstatt-Figuren (draft_figures) des Buchs, fürs Beat-Picker + Badges.
     // Lokal in der Karte geladen (nicht im catalog-store — wie die Plot-Daten).
@@ -30,6 +33,15 @@ export function registerPlotCard() {
       return this._draftFigMap;
     },
 
+    // O(1)-Lookup-Map id→Strang (gleiches Referenz-Wechsel-Muster).
+    get threadsById() {
+      if (this._threadMapRef !== this.threads) {
+        this._threadMapRef = this.threads;
+        this._threadMap = new Map((this.threads || []).map(t => [t.id, t]));
+      }
+      return this._threadMap;
+    },
+
     // Filter (Kapitel / Figur / Werkstatt-Figur) — wie szenen/ereignisse; filtert
     // die Beats pro Akt-Spalte rein fürs Rendering (beatsForAct bleibt ungefiltert
     // für Drag&Drop + Order-Persistenz).
@@ -39,6 +51,8 @@ export function registerPlotCard() {
     editingBeatId: null,
     beatDraft: { titel: '', beschreibung: '', status: 'geplant', chapter_id: '', intensitaet: null, figure_ids: [], draft_figure_ids: [] },
     addingActId: null,
+    // Grid-Add-Beat: Zell-Schlüssel `${actId}:${threadId|null}` (statt addingActId).
+    addingCell: null,
     newBeatTitel: '',
 
     // Akt-Edit / -Add / -Farbe
@@ -47,6 +61,13 @@ export function registerPlotCard() {
     addingAct: false,
     newActName: '',
     actColorPickerId: null,
+
+    // Strang-Edit / -Add / -Farbe (Swimlanes)
+    editingThreadId: null,
+    threadDraft: { name: '', farbe: null, figure_id: '', draft_figure_id: '' },
+    addingThread: false,
+    newThreadName: '',
+    threadColorPickerId: null,
 
     // Eingeklappte „verworfen"-Beats pro Akt ({ [actId]: true }).
     verworfenOpen: {},
@@ -61,9 +82,12 @@ export function registerPlotCard() {
     // Drag & Drop
     _dragBeatId: null,
     _dragOverActId: null,
+    // Grid-Drop-Ziel: Zell-Schlüssel `${actId}:${threadId|null}`.
+    _dragOverCell: null,
 
     // KI: Brainstorm
     brainstormActId: null,
+    brainstormThreadId: null,
     brainstormLoading: false,
     brainstormStatus: '',
     brainstormProgress: 0,

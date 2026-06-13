@@ -9,7 +9,7 @@
      und permanent sichtbar bleibt — besonders im Vollbild beim Scrollen. -->
 <div x-show="editMode && !focusActive" class="page-editor-wrap normal-editor">
   <div class="page-content-view page-content-view--editing"
-       :class="{ 'page-content-view--fit-width': pageEditorFitWidth }"
+       :class="{ 'page-content-view--fit-width': pageEditorFitWidth, 'page-content-view--show-marks': pageEditorShowMarks }"
        :style="`--editor-zoom: ${pageEditorZoom}`"
        contenteditable="true"
        :spellcheck="!$app.languagetoolEnabled"
@@ -23,6 +23,12 @@
        @click="_onEditClick($event)"
        @pointermove="handleMarkPointer($event)"
        @pointerleave="handleMarkPointerLeave($event)"></div>
+
+  <!-- Steuerzeichen-Overlay (Soft-Break-Marken ↵). Read-only Dekorations-
+       Schicht über dem contenteditable — Inhalt wird per JS aus den <br>-
+       Positionen gezeichnet (format-marks.js), nie editierbar, nie gespeichert.
+       <br> lässt sich nicht per CSS dekorieren, daher dieser Overlay-Pfad. -->
+  <div class="page-editor-marks-layer" aria-hidden="true" hidden></div>
 
   <!-- STT-Diktat: schwebender Mic-Button unten rechts im Editorfeld (analog
        zum LanguageTool-Badge oben rechts). Nur sichtbar, wenn Admin STT

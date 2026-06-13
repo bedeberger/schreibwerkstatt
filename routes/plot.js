@@ -21,6 +21,7 @@ const STATUSES = ['geplant', 'entwurf', 'im_buch', 'verworfen'];
 const MAX_TITEL = 200;
 const MAX_BESCHREIBUNG = 4000;
 const MAX_ACT_NAME = 120;
+const MAX_THREAD_NAME = 120;
 
 function userEmailOrNull(req) {
   return req.session?.user?.email || null;
@@ -46,6 +47,16 @@ function _validIntensitaet(raw) {
   return (Number.isInteger(n) && n >= 1 && n <= 5) ? n : null;
 }
 
+// Figuren-Bindung eines Strangs auflösen + aufs (Buch, User)-Subset validieren.
+// figure_id kommt als TEXT-fig_id (Frontend-Identität) → INTEGER figures.id;
+// draft_figure_id ist bereits INTEGER draft_figures.id. Fremd/leer → null.
+function _resolveThreadFigure(bookId, userEmail, rawFigId) {
+  return rawFigId ? (plotDb.resolveFigureIds(bookId, userEmail, [rawFigId])[0] || null) : null;
+}
+function _resolveThreadDraftFigure(bookId, userEmail, rawDraftId) {
+  return rawDraftId ? (plotDb.resolveDraftFigureIds(bookId, userEmail, [rawDraftId])[0] || null) : null;
+}
+
 // ── Board laden ──────────────────────────────────────────────────────────────
 router.get('/', (req, res) => {
   const userEmail = userEmailOrNull(req);
@@ -55,6 +66,7 @@ router.get('/', (req, res) => {
   if (!_guard(req, res, bookId)) return;
   res.json({
     acts: plotDb.listActs(bookId, userEmail),
+    threads: plotDb.listThreads(bookId, userEmail),
     beats: plotDb.listBeats(bookId, userEmail),
   });
 });
@@ -116,6 +128,74 @@ router.put('/acts/order', jsonBody, (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Handlungsstränge (Swimlanes) ───────────────────────────────────────────
+router.post('/threads', jsonBody, (req, res) => {
+  const userEmail = userEmailOrNull(req);
+  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  const bookId = toIntId(req.body?.book_id);
+  const name = (req.body?.name || '').toString().trim();
+  const farbe = req.body?.farbe ? String(req.body.farbe).slice(0, 32) : null;
+  if (!bookId) return res.status(400).json({ error_code: 'BOOKID_REQ' });
+  if (!name)   return res.status(400).json({ error_code: 'NAME_REQ' });
+  if (name.length > MAX_THREAD_NAME) return res.status(400).json({ error_code: 'NAME_TOO_LONG' });
+  if (!_guard(req, res, bookId)) return;
+  const figureId = _resolveThreadFigure(bookId, userEmail, req.body?.figure_id);
+  const draftFigureId = _resolveThreadDraftFigure(bookId, userEmail, req.body?.draft_figure_id);
+  const thread = plotDb.createThread(bookId, userEmail, { name, farbe, figureId, draftFigureId });
+  logger.info(`[plot] thread create id=${thread.id} book=${bookId}`);
+  res.json(thread);
+});
+
+router.patch('/threads/:id', jsonBody, (req, res) => {
+  const userEmail = userEmailOrNull(req);
+  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  const id = toIntId(req.params.id);
+  if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
+  const thread = plotDb.getThread(id);
+  if (!thread || thread.user_email !== userEmail) return res.status(404).json({ error_code: 'THREAD_NOT_FOUND' });
+  if (!_guard(req, res, thread.book_id)) return;
+  const name = typeof req.body?.name === 'string' ? req.body.name.trim() : thread.name;
+  if (!name) return res.status(400).json({ error_code: 'NAME_REQ' });
+  if (name.length > MAX_THREAD_NAME) return res.status(400).json({ error_code: 'NAME_TOO_LONG' });
+  const farbe = typeof req.body?.farbe === 'string' ? req.body.farbe.slice(0, 32)
+    : (req.body?.farbe === null ? null : thread.farbe);
+  // Bindung nur ändern, wenn der Key explizit mitkommt — sonst Bestand behalten.
+  let figureId = thread.figure_id;
+  if (typeof req.body?.figure_id !== 'undefined') {
+    figureId = _resolveThreadFigure(thread.book_id, userEmail, req.body.figure_id);
+  }
+  let draftFigureId = thread.draft_figure_id;
+  if (typeof req.body?.draft_figure_id !== 'undefined') {
+    draftFigureId = _resolveThreadDraftFigure(thread.book_id, userEmail, req.body.draft_figure_id);
+  }
+  res.json(plotDb.updateThread(id, { name, farbe, figureId, draftFigureId }));
+});
+
+router.delete('/threads/:id', (req, res) => {
+  const userEmail = userEmailOrNull(req);
+  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  const id = toIntId(req.params.id);
+  if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
+  const thread = plotDb.getThread(id);
+  if (!thread || thread.user_email !== userEmail) return res.status(404).json({ error_code: 'THREAD_NOT_FOUND' });
+  if (!_guard(req, res, thread.book_id)) return;
+  plotDb.deleteThread(id);
+  logger.info(`[plot] thread delete id=${id} book=${thread.book_id}`);
+  res.json({ ok: true });
+});
+
+router.put('/threads/order', jsonBody, (req, res) => {
+  const userEmail = userEmailOrNull(req);
+  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  const bookId = toIntId(req.body?.book_id);
+  const order = Array.isArray(req.body?.order) ? req.body.order : null;
+  if (!bookId) return res.status(400).json({ error_code: 'BOOKID_REQ' });
+  if (!order)  return res.status(400).json({ error_code: 'ORDER_REQ' });
+  if (!_guard(req, res, bookId)) return;
+  plotDb.reorderThreads(bookId, userEmail, order);
+  res.json({ ok: true });
+});
+
 // ── Beats ──────────────────────────────────────────────────────────────────
 router.post('/beats', jsonBody, (req, res) => {
   const userEmail = userEmailOrNull(req);
@@ -137,10 +217,11 @@ router.post('/beats', jsonBody, (req, res) => {
   const status = STATUSES.includes(req.body?.status) ? req.body.status : 'geplant';
   const chapterId = _validChapterId(bookId, toIntId(req.body?.chapter_id));
   const intensitaet = _validIntensitaet(req.body?.intensitaet);
+  const threadId = plotDb._validThreadId(bookId, userEmail, toIntId(req.body?.thread_id));
   const figureIds = plotDb.resolveFigureIds(bookId, userEmail, req.body?.figure_ids);
   const draftFigureIds = plotDb.resolveDraftFigureIds(bookId, userEmail, req.body?.draft_figure_ids);
 
-  const beat = plotDb.createBeat(bookId, actId, userEmail, { titel, beschreibung, status, chapterId, intensitaet, figureIds, draftFigureIds });
+  const beat = plotDb.createBeat(bookId, actId, userEmail, { titel, beschreibung, status, chapterId, intensitaet, threadId, figureIds, draftFigureIds });
   logger.info(`[plot] beat create id=${beat.id} act=${actId} book=${bookId}`);
   res.json(beat);
 });
@@ -181,6 +262,10 @@ router.patch('/beats/:id', jsonBody, (req, res) => {
       return res.status(400).json({ error_code: 'ACT_MISMATCH' });
     }
     fields.act_id = act.id;
+  }
+  // thread_id-Zuordnung (Strang) — Fremd/leer → NULL („ohne Strang"-Lane).
+  if (typeof req.body?.thread_id !== 'undefined') {
+    fields.thread_id = plotDb._validThreadId(beat.book_id, userEmail, toIntId(req.body.thread_id));
   }
   const figureIds = Array.isArray(req.body?.figure_ids)
     ? plotDb.resolveFigureIds(beat.book_id, userEmail, req.body.figure_ids)

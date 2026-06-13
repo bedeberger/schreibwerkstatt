@@ -1,0 +1,29 @@
+<!-- Plot-Werkstatt: Strang-Leiste (Opt-in-Einstieg zu den Swimlanes).
+     Sichtbar sobald Akte existieren. „+ Strang" legt den ersten Strang an →
+     das Board schaltet von der flachen Spaltenansicht aufs Akte×Stränge-Grid um.
+     Das eigentliche Strang-Management (umbenennen/färben/verschieben/binden/löschen)
+     lebt in den Lane-Labels des Grids (plot-board-grid.html). -->
+<div class="plot-thread-bar" x-show="acts.length > 0" x-cloak>
+  <span class="plot-thread-bar-label" x-text="$app.t('plot.thread.barLabel')"></span>
+
+  <template x-for="t in threads" :key="t.id">
+    <span class="tag plot-thread-chip" :style="{ '--col-accent': threadAccent(t) }" x-text="t.name"></span>
+  </template>
+
+  <template x-if="addingThread">
+    <span class="plot-thread-add-form">
+      <input type="text" class="plot-thread-add-input" x-model="newThreadName"
+             data-spellcheck="spelling" :placeholder="$app.t('plot.thread.namePlaceholder')"
+             @keydown.enter="addThread()" @keydown.escape="addingThread = false; newThreadName = ''">
+      <button type="button" class="btn-compact" @click="addThread()" :disabled="busy" x-text="$app.t('plot.thread.add')"></button>
+      <button type="button" class="btn-compact btn-compact--ghost" @click="addingThread = false; newThreadName = ''" x-text="$app.t('common.cancel')"></button>
+    </span>
+  </template>
+  <button type="button" class="plot-thread-add-btn" x-show="!addingThread"
+          @click="addingThread = true; $nextTick(() => $root.querySelector('.plot-thread-add-input')?.focus())">
+    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#plus"/></svg>
+    <span x-text="$app.t('plot.thread.add')"></span>
+  </button>
+
+  <span class="plot-thread-bar-hint" x-show="!threads.length" x-text="$app.t('plot.thread.hint')"></span>
+</div>

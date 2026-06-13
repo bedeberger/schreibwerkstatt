@@ -23,17 +23,35 @@ const STATUS_LABEL = {
 // ── Hilfen ───────────────────────────────────────────────────────────────────
 
 // Kompakte Board-Übersicht: Akte als Spalten, Beats darunter mit Status + Kapitel.
-function _boardOutline(acts, beats) {
+// threadById (optional): Map id→Name; existieren Stränge, wird je Beat der Strang
+// annotiert, damit die KI die parallelen Erzähllinien erkennt.
+function _boardOutline(acts, beats, threadById = null) {
   return (acts || []).map(act => {
     const own = (beats || [])
       .filter(b => b.act_id === act.id)
       .map(b => {
         const st = STATUS_LABEL[b.status] || b.status;
         const kap = b.chapter_name ? ` → Kapitel: ${b.chapter_name}` : '';
-        return `  - ${b.titel} [${st}]${kap}`;
+        const strangName = threadById && b.thread_id != null ? threadById[b.thread_id] : null;
+        const str = strangName ? ` {Strang: ${strangName}}` : '';
+        return `  - ${b.titel} [${st}]${kap}${str}`;
       });
     return `AKT: ${act.name}\n${own.length ? own.join('\n') : '  (noch keine Beats)'}`;
   }).join('\n\n');
+}
+
+// Handlungsstränge (Swimlanes) als Block: Name + optional gebundene Hauptfigur.
+function _straengeLines(threads) {
+  return (threads || []).slice(0, 40)
+    .map(t => `- ${t.name}${t.figur ? ` (Hauptfigur: ${t.figur})` : ''}`)
+    .join('\n');
+}
+
+// Lookup id→Name aus der Stränge-Liste (für die Board-Annotation).
+function _threadNameMap(threads) {
+  const map = {};
+  for (const t of (threads || [])) if (t && t.id != null) map[t.id] = t.name;
+  return map;
 }
 
 function _figurenLines(figuren) {
@@ -80,7 +98,7 @@ WICHTIG: Du planst und prüfst nur die STRUKTUR. Du schreibst NIEMALS Fliesstext
 // Schlägt 3–7 Beats für einen bestimmten Akt vor, passend zum bisherigen Board,
 // Buchkontext und Figuren-Ensemble.
 
-export function buildPlotBrainstormPrompt(aktName, acts, beats, buchKontext, figuren = [], kapitel = [], werkstattFiguren = []) {
+export function buildPlotBrainstormPrompt(aktName, acts, beats, buchKontext, figuren = [], kapitel = [], werkstattFiguren = [], threads = [], threadInfo = null) {
   const ctxSeg = (buchKontext || '').trim() ? `\nBUCH-KONTEXT:\n${buchKontext}\n` : '';
   const figLines = _figurenLines(figuren);
   const figSeg = figLines ? `\nFIGUREN-ENSEMBLE:\n${figLines}\n` : '';
@@ -88,21 +106,31 @@ export function buildPlotBrainstormPrompt(aktName, acts, beats, buchKontext, fig
   const wfSeg = wfLines ? `\nFIGUREN-WERKSTATT (in Entwicklung, evtl. noch nicht im Manuskript — als Beat-Figuren nutzbar):\n${wfLines}\n` : '';
   const kapLines = _kapitelLines(kapitel);
   const kapSeg = kapLines ? `\nVORHANDENE KAPITEL (chronologisch):\n${kapLines}\n` : '';
+  const strLines = _straengeLines(threads);
+  const strSeg = strLines ? `\nHANDLUNGSSTRÄNGE (Swimlanes — parallele Erzähllinien, oft je Hauptfigur):\n${strLines}\n` : '';
+
+  // Zielzelle: bei gesetztem Strang sind „bereits vorhandene Beats" die der Zelle
+  // (Akt × Strang); sonst akt-weit.
   const existing = (beats || [])
     .filter(b => acts.find(a => a.id === b.act_id && a.name === aktName))
+    .filter(b => !threadInfo || (b.thread_id ?? null) === (threadInfo.id ?? null))
     .map(b => `- ${b.titel}`);
   const existSeg = existing.length
-    ? `\nBEREITS VORHANDENE BEATS IN DIESEM AKT (NICHT wiederholen):\n${existing.join('\n')}\n`
+    ? `\nBEREITS VORHANDENE BEATS ${threadInfo ? 'IN DIESER ZELLE' : 'IN DIESEM AKT'} (NICHT wiederholen):\n${existing.join('\n')}\n`
     : '';
 
-  return `Die Autorin skizziert die Handlung ihres Buches als Beat-Board und braucht 3–7 prägnante neue Beats (Handlungspunkte) für den Akt "${aktName}".
+  const threadGoal = threadInfo
+    ? `\nZIEL-STRANG: "${threadInfo.name}"${threadInfo.figur ? ` (Hauptfigur: ${threadInfo.figur})` : ''}\nDie Beats sollen GENAU diesen Erzählstrang vorantreiben${threadInfo.figur ? ` und ${threadInfo.figur} ins Zentrum stellen` : ''} — nicht die anderen Stränge.\n`
+    : '';
+
+  return `Die Autorin skizziert die Handlung ihres Buches als Beat-Board und braucht 3–7 prägnante neue Beats (Handlungspunkte) für den Akt "${aktName}"${threadInfo ? ` im Strang "${threadInfo.name}"` : ''}.
 
 AKTUELLES BOARD:
-${_boardOutline(acts, beats)}
-${ctxSeg}${figSeg}${wfSeg}${kapSeg}${existSeg}
+${_boardOutline(acts, beats, _threadNameMap(threads))}
+${ctxSeg}${figSeg}${wfSeg}${kapSeg}${strSeg}${threadGoal}${existSeg}
 ZIEL-AKT: "${aktName}"
 
-Liefere 3–7 konkrete, voneinander unterscheidbare Beat-Vorschläge für diesen Akt. Jeder Beat:
+Liefere 3–7 konkrete, voneinander unterscheidbare Beat-Vorschläge für diesen Akt${threadInfo ? ' + Strang' : ''}. Jeder Beat:
 - 3–10 Wörter im Label (kurz, dramaturgisch konkret: Wendepunkt, Konflikt, Entscheidung, Enthüllung — kein vager Themen-Begriff)
 - Knappe Begründung (1 Satz), warum der Beat an dieser Stelle die Handlung trägt und zum Ensemble passt
 - Baut auf den vorhandenen Beats auf und treibt die Spannungskurve voran
@@ -128,7 +156,7 @@ export const SCHEMA_PLOT_BRAINSTORM = _obj({
 // Prüft den geplanten Plot gegen die Buchrealität: extrahierte Szenen + Kapitel +
 // Figuren. Findet Brüche, Lücken und „geplant vs. schon geschrieben"-Drift.
 
-export function buildPlotConsistencyPrompt(acts, beats, kapitel = [], szenen = [], figuren = [], buchKontext = '', werkstattFiguren = []) {
+export function buildPlotConsistencyPrompt(acts, beats, kapitel = [], szenen = [], figuren = [], buchKontext = '', werkstattFiguren = [], threads = []) {
   const ctxSeg = (buchKontext || '').trim() ? `\nBUCH-KONTEXT:\n${buchKontext}\n` : '';
   const kapLines = _kapitelLines(kapitel);
   const kapSeg = kapLines ? `\nKAPITEL DES BUCHS (chronologisch):\n${kapLines}\n` : '';
@@ -140,12 +168,21 @@ export function buildPlotConsistencyPrompt(acts, beats, kapitel = [], szenen = [
   const figSeg = figLines ? `\nFIGUREN-ENSEMBLE:\n${figLines}\n` : '';
   const wfLines = _werkstattFigurenLines(werkstattFiguren);
   const wfSeg = wfLines ? `\nFIGUREN-WERKSTATT (geplante/in Entwicklung befindliche Figuren — Beats dürfen sie referenzieren, ohne dass sie schon im Manuskript stehen müssen):\n${wfLines}\n` : '';
+  const strLines = _straengeLines(threads);
+  const strSeg = strLines ? `\nHANDLUNGSSTRÄNGE (Swimlanes — parallele Erzähllinien, oft je Hauptfigur; im Board hinter den Beats als {Strang: …} annotiert):\n${strLines}\n` : '';
+  // Strang-spezifische Prüfpunkte nur ergänzen, wenn überhaupt Stränge existieren.
+  const strChecks = strLines
+    ? `
+- Pro Strang ein vollständiger Bogen: Hat jeder Handlungsstrang (besonders je Hauptfigur) Setup, Eskalation und Auflösung — oder bricht eine Erzähllinie ohne Abschluss ab?
+- Strang-Balance: Wird ein Strang über lange Strecken (Akte) gar nicht bedient, während ein anderer dominiert? POV-/Aufmerksamkeits-Lücken benennen.
+- Verweben: Treffen/kreuzen sich die Stränge an sinnvollen Stellen, oder laufen sie beziehungslos nebeneinander her?`
+    : '';
 
   return `Du prüfst die GEPLANTE Handlung (Beat-Board) der Autorin auf Stimmigkeit — in sich und gegen die tatsächliche Buchrealität (Kapitel + analysierte Szenen). Sei schonungslos, aber konstruktiv.
 
 GEPLANTES BEAT-BOARD:
-${_boardOutline(acts, beats)}
-${ctxSeg}${kapSeg}${szSeg}${figSeg}${wfSeg}
+${_boardOutline(acts, beats, _threadNameMap(threads))}
+${ctxSeg}${kapSeg}${szSeg}${figSeg}${wfSeg}${strSeg}
 Status-Legende der Beats: geplant (noch nicht geschrieben) · Entwurf (in Arbeit) · im Buch (laut Plan schon geschrieben) · verworfen (ausgemustert).
 
 Prüfe auf:
@@ -154,7 +191,7 @@ Prüfe auf:
 - Chronologie-Brüche: die Reihenfolge der Beats (Akte → Beats) passt nicht zur Reihenfolge der verknüpften Kapitel
 - Logische Brüche / Widersprüche innerhalb der Handlung (Kausalität, Motivation, Figurenlogik)
 - Lücken: Kapitel mit Szenen, für die es keinen Beat gibt — oder dramaturgische Leerstellen (fehlender Wendepunkt, fehlende Auflösung eines Konflikts)
-- Verworfene Beats, deren Inhalt trotzdem noch im Buch auftaucht
+- Verworfene Beats, deren Inhalt trotzdem noch im Buch auftaucht${strChecks}
 
 Schwere-Skala:
 - "kritisch": logischer Bruch oder Plan-Realität-Widerspruch, der die Handlung zerstört
