@@ -11,19 +11,32 @@ export function registerPlotCard() {
   window.Alpine.data('plotCard', () => ({
     acts: [],
     beats: [],
+    // Werkstatt-Figuren (draft_figures) des Buchs, fürs Beat-Picker + Badges.
+    // Lokal in der Karte geladen (nicht im catalog-store — wie die Plot-Daten).
+    draftFiguren: [],
     loading: false,
     busy: false,
     errorMessage: '',
     _memos: {},
 
-    // Filter (Kapitel / Figur) — wie szenen/ereignisse; filtert die Beats pro
-    // Akt-Spalte rein fürs Rendering (beatsForAct bleibt ungefiltert für
-    // Drag&Drop + Order-Persistenz).
-    plotFilters: { kapitel: '', figurId: '' },
+    // O(1)-Lookup-Map id→Draft (gleiches Muster wie $app.figurenById): Getter
+    // baut nur bei Referenz-Wechsel neu (loadBoard reassignt draftFiguren).
+    get draftFigurenById() {
+      if (this._draftFigMapRef !== this.draftFiguren) {
+        this._draftFigMapRef = this.draftFiguren;
+        this._draftFigMap = new Map((this.draftFiguren || []).map(d => [d.id, d]));
+      }
+      return this._draftFigMap;
+    },
+
+    // Filter (Kapitel / Figur / Werkstatt-Figur) — wie szenen/ereignisse; filtert
+    // die Beats pro Akt-Spalte rein fürs Rendering (beatsForAct bleibt ungefiltert
+    // für Drag&Drop + Order-Persistenz).
+    plotFilters: { kapitel: '', figurId: '', draftFigurId: '' },
 
     // Beat-Edit / -Add
     editingBeatId: null,
-    beatDraft: { titel: '', beschreibung: '', status: 'geplant', chapter_id: '', figure_ids: [] },
+    beatDraft: { titel: '', beschreibung: '', status: 'geplant', chapter_id: '', figure_ids: [], draft_figure_ids: [] },
     addingActId: null,
     newBeatTitel: '',
 

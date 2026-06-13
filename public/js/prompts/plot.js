@@ -42,6 +42,14 @@ function _figurenLines(figuren) {
     .join('\n');
 }
 
+// Werkstatt-Figuren (Figuren-Werkstatt-Drafts): in Entwicklung, evtl. noch nicht
+// im Manuskript. Name + optionaler Archetyp.
+function _werkstattFigurenLines(figuren) {
+  return (figuren || []).slice(0, 60)
+    .map(f => `- ${f.name}${f.archetype ? ` [${f.archetype}]` : ''}`)
+    .join('\n');
+}
+
 function _kapitelLines(kapitel) {
   return (kapitel || []).slice(0, 120)
     .map((k, i) => `${i + 1}. ${k}`)
@@ -72,10 +80,12 @@ WICHTIG: Du planst und prüfst nur die STRUKTUR. Du schreibst NIEMALS Fliesstext
 // Schlägt 3–7 Beats für einen bestimmten Akt vor, passend zum bisherigen Board,
 // Buchkontext und Figuren-Ensemble.
 
-export function buildPlotBrainstormPrompt(aktName, acts, beats, buchKontext, figuren = [], kapitel = []) {
+export function buildPlotBrainstormPrompt(aktName, acts, beats, buchKontext, figuren = [], kapitel = [], werkstattFiguren = []) {
   const ctxSeg = (buchKontext || '').trim() ? `\nBUCH-KONTEXT:\n${buchKontext}\n` : '';
   const figLines = _figurenLines(figuren);
   const figSeg = figLines ? `\nFIGUREN-ENSEMBLE:\n${figLines}\n` : '';
+  const wfLines = _werkstattFigurenLines(werkstattFiguren);
+  const wfSeg = wfLines ? `\nFIGUREN-WERKSTATT (in Entwicklung, evtl. noch nicht im Manuskript — als Beat-Figuren nutzbar):\n${wfLines}\n` : '';
   const kapLines = _kapitelLines(kapitel);
   const kapSeg = kapLines ? `\nVORHANDENE KAPITEL (chronologisch):\n${kapLines}\n` : '';
   const existing = (beats || [])
@@ -89,7 +99,7 @@ export function buildPlotBrainstormPrompt(aktName, acts, beats, buchKontext, fig
 
 AKTUELLES BOARD:
 ${_boardOutline(acts, beats)}
-${ctxSeg}${figSeg}${kapSeg}${existSeg}
+${ctxSeg}${figSeg}${wfSeg}${kapSeg}${existSeg}
 ZIEL-AKT: "${aktName}"
 
 Liefere 3–7 konkrete, voneinander unterscheidbare Beat-Vorschläge für diesen Akt. Jeder Beat:
@@ -118,7 +128,7 @@ export const SCHEMA_PLOT_BRAINSTORM = _obj({
 // Prüft den geplanten Plot gegen die Buchrealität: extrahierte Szenen + Kapitel +
 // Figuren. Findet Brüche, Lücken und „geplant vs. schon geschrieben"-Drift.
 
-export function buildPlotConsistencyPrompt(acts, beats, kapitel = [], szenen = [], figuren = [], buchKontext = '') {
+export function buildPlotConsistencyPrompt(acts, beats, kapitel = [], szenen = [], figuren = [], buchKontext = '', werkstattFiguren = []) {
   const ctxSeg = (buchKontext || '').trim() ? `\nBUCH-KONTEXT:\n${buchKontext}\n` : '';
   const kapLines = _kapitelLines(kapitel);
   const kapSeg = kapLines ? `\nKAPITEL DES BUCHS (chronologisch):\n${kapLines}\n` : '';
@@ -128,12 +138,14 @@ export function buildPlotConsistencyPrompt(acts, beats, kapitel = [], szenen = [
     : '\nHINWEIS: Es liegen noch keine analysierten Szenen vor (Komplettanalyse evtl. nicht gelaufen). Prüfe den Plot dann primär gegen die Kapitelstruktur.\n';
   const figLines = _figurenLines(figuren);
   const figSeg = figLines ? `\nFIGUREN-ENSEMBLE:\n${figLines}\n` : '';
+  const wfLines = _werkstattFigurenLines(werkstattFiguren);
+  const wfSeg = wfLines ? `\nFIGUREN-WERKSTATT (geplante/in Entwicklung befindliche Figuren — Beats dürfen sie referenzieren, ohne dass sie schon im Manuskript stehen müssen):\n${wfLines}\n` : '';
 
   return `Du prüfst die GEPLANTE Handlung (Beat-Board) der Autorin auf Stimmigkeit — in sich und gegen die tatsächliche Buchrealität (Kapitel + analysierte Szenen). Sei schonungslos, aber konstruktiv.
 
 GEPLANTES BEAT-BOARD:
 ${_boardOutline(acts, beats)}
-${ctxSeg}${kapSeg}${szSeg}${figSeg}
+${ctxSeg}${kapSeg}${szSeg}${figSeg}${wfSeg}
 Status-Legende der Beats: geplant (noch nicht geschrieben) · Entwurf (in Arbeit) · im Buch (laut Plan schon geschrieben) · verworfen (ausgemustert).
 
 Prüfe auf:

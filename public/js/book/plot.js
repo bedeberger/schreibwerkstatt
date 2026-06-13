@@ -25,7 +25,7 @@ export const plotMethods = {
   async loadBoard() {
     const app = window.__app;
     const bookId = app.selectedBookId;
-    if (!bookId) { this.acts = []; this.beats = []; return; }
+    if (!bookId) { this.acts = []; this.beats = []; this.draftFiguren = []; return; }
     this.loading = true;
     this._memos = {};
     try {
@@ -39,12 +39,22 @@ export const plotMethods = {
     } finally {
       this.loading = false;
     }
+    // Werkstatt-Figuren separat laden — ein Fehler hier darf das Board nicht
+    // leeren (Board ist die Primärdaten, Drafts nur Beilage fürs Picker/Badge).
+    // draftFigurenById (Getter in plot-card.js) baut sich aus der neuen Referenz neu.
+    try {
+      const drafts = await fetchJson(`/draft-figures/${bookId}`);
+      this.draftFiguren = Array.isArray(drafts) ? drafts : [];
+    } catch (e) {
+      this.draftFiguren = [];
+    }
   },
 
   resetPlot() {
     this._clearJobs();
     this.acts = [];
     this.beats = [];
+    this.draftFiguren = [];
     this._memos = {};
     this.editingBeatId = null;
     this.addingActId = null;
@@ -59,7 +69,7 @@ export const plotMethods = {
     this.brainstormActId = null;
     this.consistencyResult = null;
     this.selectedKonfliktIdx = null;
-    this.plotFilters = { kapitel: '', figurId: '' };
+    this.plotFilters = { kapitel: '', figurId: '', draftFigurId: '' };
     this.errorMessage = '';
     this.busy = false;
   },
@@ -92,13 +102,16 @@ export const plotMethods = {
   },
 
   plotFilterActive() {
-    return !!(this.plotFilters.kapitel || this.plotFilters.figurId);
+    return !!(this.plotFilters.kapitel || this.plotFilters.figurId || this.plotFilters.draftFigurId);
   },
 
   _beatMatchesFilter(b) {
     const f = this.plotFilters;
+    // draftFigurId kommt aus der Combobox als Roh-Value (INTEGER) — String-
+    // koerziert vergleichen, da draft_fig_ids INTEGER sind.
     return (!f.kapitel || b.chapter_name === f.kapitel) &&
-           (!f.figurId || (b.fig_ids || []).includes(f.figurId));
+           (!f.figurId || (b.fig_ids || []).includes(f.figurId)) &&
+           (!f.draftFigurId || (b.draft_fig_ids || []).map(String).includes(String(f.draftFigurId)));
   },
 
   // Gefilterte Beats pro Akt — nur fürs Rendering. Ohne aktiven Filter wird der
@@ -106,14 +119,14 @@ export const plotMethods = {
   filteredBeatsForAct(actId) {
     const f = this.plotFilters;
     const base = this.beatsForAct(actId);
-    if (!f.kapitel && !f.figurId) return base;
-    return this._memo(`fbeats:${actId}`, [base, f.kapitel, f.figurId], () =>
+    if (!f.kapitel && !f.figurId && !f.draftFigurId) return base;
+    return this._memo(`fbeats:${actId}`, [base, f.kapitel, f.figurId, f.draftFigurId], () =>
       base.filter(b => this._beatMatchesFilter(b)));
   },
 
   filteredBeatCount() {
     const f = this.plotFilters;
-    return this._memo('fcount', [this.beats, f.kapitel, f.figurId], () =>
+    return this._memo('fcount', [this.beats, f.kapitel, f.figurId, f.draftFigurId], () =>
       (this.beats || []).filter(b => this._beatMatchesFilter(b)).length);
   },
 
@@ -264,6 +277,7 @@ export const plotMethods = {
       status: beat.status || 'geplant',
       chapter_id: beat.chapter_id || '',
       figure_ids: [...(beat.fig_ids || [])],
+      draft_figure_ids: [...(beat.draft_fig_ids || [])],
     };
   },
   cancelEditBeat() { this.editingBeatId = null; },
@@ -272,6 +286,13 @@ export const plotMethods = {
     const set = new Set(this.beatDraft.figure_ids);
     if (set.has(figId)) set.delete(figId); else set.add(figId);
     this.beatDraft.figure_ids = [...set];
+  },
+
+  // Werkstatt-Figur (draft_figures.id, INTEGER) im Beat an-/abwählen.
+  toggleBeatDraftWerkstattFigure(draftId) {
+    const set = new Set(this.beatDraft.draft_figure_ids);
+    if (set.has(draftId)) set.delete(draftId); else set.add(draftId);
+    this.beatDraft.draft_figure_ids = [...set];
   },
 
   async saveEditBeat(beat) {
@@ -289,6 +310,7 @@ export const plotMethods = {
           status: this.beatDraft.status,
           chapter_id: this.beatDraft.chapter_id ? parseInt(this.beatDraft.chapter_id) : null,
           figure_ids: this.beatDraft.figure_ids,
+          draft_figure_ids: this.beatDraft.draft_figure_ids,
         }),
       });
       this._replaceBeat(updated);

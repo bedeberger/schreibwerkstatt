@@ -108,6 +108,18 @@ const _stmtListFigsForBook = db.prepare(`
 const _stmtDeleteFigsForBeat = db.prepare('DELETE FROM plot_beat_figures WHERE beat_id = ?');
 const _stmtInsertFig = db.prepare('INSERT OR IGNORE INTO plot_beat_figures (beat_id, figure_id) VALUES (?, ?)');
 
+// Werkstatt-Figuren (draft_figures) pro Beat. Anders als bei plot_beat_figures
+// IST die draft_figures.id (INTEGER) bereits die Frontend-Identität — keine
+// TEXT-fig_id-Indirektion. Lese-Aggregat liefert die INTEGER-id direkt zurück.
+const _stmtListDraftFigsForBook = db.prepare(`
+  SELECT pbdf.beat_id, pbdf.draft_figure_id AS draft_id
+    FROM plot_beat_draft_figures pbdf
+    JOIN plot_beats b ON b.id = pbdf.beat_id
+   WHERE b.book_id = ? AND b.user_email = ?
+`);
+const _stmtDeleteDraftFigsForBeat = db.prepare('DELETE FROM plot_beat_draft_figures WHERE beat_id = ?');
+const _stmtInsertDraftFig = db.prepare('INSERT OR IGNORE INTO plot_beat_draft_figures (beat_id, draft_figure_id) VALUES (?, ?)');
+
 // TEXT-fig_id (Frontend-Identität) → INTEGER figures.id (FK-Target), gefiltert
 // aufs Subset, das wirklich zu (Buch, User) gehört. Unbekannte/Fremd-fig_ids
 // fallen still raus (kein Cross-Buch-Leak in die M:M-Tabelle).
@@ -121,10 +133,31 @@ function resolveFigureIds(bookId, userEmail, figIds) {
   ).all(parseInt(bookId), userEmail, ...wanted).map(r => r.id);
 }
 
+// Werkstatt-Figur-IDs (INTEGER draft_figures.id) aufs Subset filtern, das wirklich
+// zu (Buch, User) gehört. Unbekannte/Fremd-IDs fallen still raus (kein Cross-Buch-
+// Leak in die M:M-Tabelle). Eingang sind bereits INTEGER-IDs (Frontend-Identität).
+function resolveDraftFigureIds(bookId, userEmail, draftIds) {
+  if (!Array.isArray(draftIds) || !draftIds.length) return [];
+  const wanted = draftIds.map(x => parseInt(x)).filter(n => Number.isInteger(n) && n > 0);
+  if (!wanted.length) return [];
+  const placeholders = wanted.map(() => '?').join(',');
+  return db.prepare(
+    `SELECT id FROM draft_figures WHERE book_id = ? AND user_email = ? AND id IN (${placeholders})`
+  ).all(parseInt(bookId), userEmail, ...wanted).map(r => r.id);
+}
+
 function _figMapForBook(bookId, userEmail) {
   const map = {};
   for (const r of _stmtListFigsForBook.all(parseInt(bookId), userEmail)) {
     (map[r.beat_id] = map[r.beat_id] || []).push(r.fig_id);
+  }
+  return map;
+}
+
+function _draftFigMapForBook(bookId, userEmail) {
+  const map = {};
+  for (const r of _stmtListDraftFigsForBook.all(parseInt(bookId), userEmail)) {
+    (map[r.beat_id] = map[r.beat_id] || []).push(r.draft_id);
   }
   return map;
 }
@@ -137,31 +170,44 @@ function _setBeatFigures(beatId, figureIds) {
   }
 }
 
-function _beatRow(beatId, figMap = null) {
+// draftFigureIds = INTEGER draft_figures.id (bereits via resolveDraftFigureIds aufgelöst).
+function _setBeatDraftFigures(beatId, draftFigureIds) {
+  _stmtDeleteDraftFigsForBeat.run(parseInt(beatId));
+  for (const fid of (draftFigureIds || [])) {
+    if (Number.isInteger(fid) || /^\d+$/.test(String(fid))) _stmtInsertDraftFig.run(parseInt(beatId), parseInt(fid));
+  }
+}
+
+function _beatRow(beatId, figMap = null, draftFigMap = null) {
   const r = _stmtGetBeat.get(parseInt(beatId));
   if (!r) return null;
   const figs = figMap ? (figMap[r.id] || []) : _figMapForBook(r.book_id, r.user_email)[r.id] || [];
-  return { ...r, fig_ids: figs };
+  const draftFigs = draftFigMap ? (draftFigMap[r.id] || []) : _draftFigMapForBook(r.book_id, r.user_email)[r.id] || [];
+  return { ...r, fig_ids: figs, draft_fig_ids: draftFigs };
 }
 
 function listBeats(bookId, userEmail) {
   const figMap = _figMapForBook(bookId, userEmail);
-  return _stmtListBeats.all(parseInt(bookId), userEmail).map(r => ({ ...r, fig_ids: figMap[r.id] || [] }));
+  const draftFigMap = _draftFigMapForBook(bookId, userEmail);
+  return _stmtListBeats.all(parseInt(bookId), userEmail)
+    .map(r => ({ ...r, fig_ids: figMap[r.id] || [], draft_fig_ids: draftFigMap[r.id] || [] }));
 }
 
-const createBeat = db.transaction((bookId, actId, userEmail, { titel, beschreibung = null, status = 'geplant', chapterId = null, figureIds = [], sortOrder = null }) => {
+const createBeat = db.transaction((bookId, actId, userEmail, { titel, beschreibung = null, status = 'geplant', chapterId = null, figureIds = [], draftFigureIds = [], sortOrder = null }) => {
   const pos = sortOrder != null ? parseInt(sortOrder) : (_stmtMaxBeatOrder.get(parseInt(actId)).m + 1);
   const info = _stmtInsertBeat.run(
     parseInt(bookId), parseInt(actId), userEmail, titel, beschreibung, status,
     chapterId != null ? parseInt(chapterId) : null, pos
   );
   _setBeatFigures(info.lastInsertRowid, figureIds);
+  _setBeatDraftFigures(info.lastInsertRowid, draftFigureIds);
   return _beatRow(info.lastInsertRowid);
 });
 
 // Partielles Update: nur übergebene Felder ändern. `fields` enthält bereits
-// validierte Werte; `figureIds` (falls Array) ersetzt die Figuren-Links komplett.
-const updateBeat = db.transaction((id, fields, figureIds) => {
+// validierte Werte; `figureIds`/`draftFigureIds` (falls Array) ersetzen die
+// jeweiligen Figuren-Links komplett.
+const updateBeat = db.transaction((id, fields, figureIds, draftFigureIds) => {
   const sets = [];
   const vals = [];
   for (const [col, val] of Object.entries(fields)) {
@@ -174,6 +220,7 @@ const updateBeat = db.transaction((id, fields, figureIds) => {
     db.prepare(`UPDATE plot_beats SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
   }
   if (Array.isArray(figureIds)) _setBeatFigures(id, figureIds);
+  if (Array.isArray(draftFigureIds)) _setBeatDraftFigures(id, draftFigureIds);
   return _beatRow(id);
 });
 
@@ -200,5 +247,5 @@ const reorderBeats = db.transaction((bookId, userEmail, order) => {
 module.exports = {
   listActs, getAct, createAct, updateAct, deleteAct, reorderActs,
   listBeats, getBeat, createBeat, updateBeat, deleteBeat, reorderBeats,
-  resolveFigureIds,
+  resolveFigureIds, resolveDraftFigureIds,
 };

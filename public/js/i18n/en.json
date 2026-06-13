@@ -199,6 +199,8 @@
 
   "filter.figur":                "Character…",
   "filter.allFiguren":           "All characters",
+  "filter.werkstattFigur":       "Workshop character…",
+  "filter.allWerkstattFiguren":  "All workshop characters",
   "filter.chapter":              "Chapter…",
   "filter.allChapters":          "All chapters",
   "filter.page":                 "Page…",
@@ -780,6 +782,7 @@
   "plot.beat.chapterPlaceholder": "Choose chapter …",
   "plot.beat.noChapter":         "No chapter",
   "plot.beat.figuren":           "Characters",
+  "plot.beat.werkstattFiguren":  "Workshop characters",
   "plot.status.geplant":         "planned",
   "plot.status.entwurf":         "draft",
   "plot.status.im_buch":         "in book",

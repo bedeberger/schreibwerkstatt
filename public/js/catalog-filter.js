@@ -19,6 +19,7 @@ import { comboboxData } from './combobox.js';
 
 const FILTER_KINDS = {
   figur:   { placeholder: 'filter.figur',   empty: 'filter.allFiguren' },
+  werkstattFigur: { placeholder: 'filter.werkstattFigur', empty: 'filter.allWerkstattFiguren' },
   chapter: { placeholder: 'filter.chapter', empty: 'filter.allChapters' },
   page:    { placeholder: 'filter.page',    empty: 'filter.allPages' },
   ort:     { placeholder: 'filter.ort',     empty: 'filter.allOrte' },

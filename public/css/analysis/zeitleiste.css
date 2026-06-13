@@ -163,10 +163,9 @@
   gap: var(--space-6);
 }
 
-.gz-meta .gz-kapitel,
-.gz-meta .gz-seite { margin-bottom: 0; }
+.gz-meta .gz-kapitel { margin-bottom: 0; }
 
-.gz-meta .gz-seite { align-self: center; }
+.gz-meta .gz-seite { margin-bottom: 0; align-self: center; }
 
 .gz-kapitel {
   display: inline-flex;

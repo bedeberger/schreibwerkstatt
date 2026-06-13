@@ -7477,6 +7477,27 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 184 abgeschlossen (plot_acts + plot_beats + plot_beat_figures).');
   }
 
+  if (version < 185) {
+    // M:M Beat ↔ Werkstatt-Figur (draft_figures). Parallel zu plot_beat_figures,
+    // aber auf den vorwärts-entwickelten Figuren-Werkstatt-Drafts: ein Beat kann
+    // sowohl Katalog-Figuren (figures) als auch noch-nicht-im-Manuskript-Figuren
+    // aus der Werkstatt involvieren. CASCADE auf beide Seiten — verschwindet der
+    // Beat oder der Draft, geht auch der Link.
+    db.exec(`CREATE TABLE IF NOT EXISTS plot_beat_draft_figures (
+        beat_id         INTEGER NOT NULL REFERENCES plot_beats(id) ON DELETE CASCADE,
+        draft_figure_id INTEGER NOT NULL REFERENCES draft_figures(id) ON DELETE CASCADE,
+        PRIMARY KEY (beat_id, draft_figure_id)
+      )`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_plot_beat_draft_figures_draft ON plot_beat_draft_figures(draft_figure_id)');
+
+    const fkErrors185 = db.pragma('foreign_key_check');
+    if (fkErrors185.length) {
+      throw new Error(`Migration 185: foreign_key_check meldet ${fkErrors185.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 185').run();
+    logger.info('DB-Migration auf Version 185 abgeschlossen (plot_beat_draft_figures).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

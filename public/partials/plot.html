@@ -81,6 +81,11 @@
          x-modelable="value" x-model="plotFilters.figurId"
          x-effect="options = $app.figuren.filter(f => beats.some(b => (b.fig_ids||[]).includes(f.id))).map(f => ({value: f.id, label: f.kurzname || f.name}))">
     </div>
+    <div x-data="catalogFilter('werkstattFigur')"
+         x-show="beats.some(b => (b.draft_fig_ids||[]).length)"
+         x-modelable="value" x-model="plotFilters.draftFigurId"
+         x-effect="options = draftFiguren.filter(d => beats.some(b => (b.draft_fig_ids||[]).includes(d.id))).map(d => ({value: d.id, label: d.name}))">
+    </div>
     <div x-data="catalogFilter('chapter')"
          x-modelable="value" x-model="plotFilters.kapitel"
          x-effect="options = plotKapitelListe().map(k => ({value: k, label: k}))">
@@ -143,13 +148,18 @@
                     <span class="plot-beat-title" @click="startEditBeat(beat)" x-text="beat.titel"></span>
                   </div>
                   <p class="plot-beat-desc" x-show="beat.beschreibung" x-text="beat.beschreibung"></p>
-                  <div class="plot-beat-meta" x-show="beat.chapter_name || (beat.fig_ids && beat.fig_ids.length)">
+                  <div class="plot-beat-meta" x-show="beat.chapter_name || (beat.fig_ids && beat.fig_ids.length) || (beat.draft_fig_ids && beat.draft_fig_ids.length)">
                     <span class="kapitel-badge kapitel-badge--primary internal-link" x-show="beat.chapter_name"
                           @click.stop="beat.chapter_name && $app.openKapitelByName(beat.chapter_name)"
                           x-text="beat.chapter_name"></span>
                     <template x-for="figId in (beat.fig_ids || [])" :key="figId">
                       <span class="tag internal-link" @click.stop="$app.openFigurById(figId)"
                             x-text="$app.figurenById.get(figId)?.kurzname || $app.figurenById.get(figId)?.name || figId"></span>
+                    </template>
+                    <template x-for="dfId in (beat.draft_fig_ids || [])" :key="'d' + dfId">
+                      <span class="tag tag--werkstatt internal-link" @click.stop="$app.openWerkstattDraftById(dfId)"
+                            :data-tip="$app.t('plot.beat.werkstattFiguren')"
+                            x-text="draftFigurenById.get(dfId)?.name || dfId"></span>
                     </template>
                   </div>
                 </div>
@@ -182,6 +192,15 @@
                               :class="{ 'plot-figure-chip--on': beatDraft.figure_ids.includes(f.id) }"
                               @click="toggleBeatDraftFigure(f.id)"
                               x-text="f.kurzname || f.name"></button>
+                    </template>
+                  </div>
+                  <label class="plot-edit-label" x-show="draftFiguren.length" x-text="$app.t('plot.beat.werkstattFiguren')"></label>
+                  <div class="plot-figure-picker" x-show="draftFiguren.length">
+                    <template x-for="d in draftFiguren" :key="'d' + d.id">
+                      <button type="button" class="tag plot-figure-chip plot-figure-chip--werkstatt"
+                              :class="{ 'plot-figure-chip--on': beatDraft.draft_figure_ids.includes(d.id) }"
+                              @click="toggleBeatDraftWerkstattFigure(d.id)"
+                              x-text="d.name"></button>
                     </template>
                   </div>
                   <div class="plot-beat-edit-actions">

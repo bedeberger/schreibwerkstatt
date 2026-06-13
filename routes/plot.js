@@ -130,8 +130,9 @@ router.post('/beats', jsonBody, (req, res) => {
   const status = STATUSES.includes(req.body?.status) ? req.body.status : 'geplant';
   const chapterId = _validChapterId(bookId, toIntId(req.body?.chapter_id));
   const figureIds = plotDb.resolveFigureIds(bookId, userEmail, req.body?.figure_ids);
+  const draftFigureIds = plotDb.resolveDraftFigureIds(bookId, userEmail, req.body?.draft_figure_ids);
 
-  const beat = plotDb.createBeat(bookId, actId, userEmail, { titel, beschreibung, status, chapterId, figureIds });
+  const beat = plotDb.createBeat(bookId, actId, userEmail, { titel, beschreibung, status, chapterId, figureIds, draftFigureIds });
   logger.info(`[plot] beat create id=${beat.id} act=${actId} book=${bookId}`);
   res.json(beat);
 });
@@ -173,11 +174,14 @@ router.patch('/beats/:id', jsonBody, (req, res) => {
   const figureIds = Array.isArray(req.body?.figure_ids)
     ? plotDb.resolveFigureIds(beat.book_id, userEmail, req.body.figure_ids)
     : undefined;
+  const draftFigureIds = Array.isArray(req.body?.draft_figure_ids)
+    ? plotDb.resolveDraftFigureIds(beat.book_id, userEmail, req.body.draft_figure_ids)
+    : undefined;
 
-  if (!Object.keys(fields).length && typeof figureIds === 'undefined') {
+  if (!Object.keys(fields).length && typeof figureIds === 'undefined' && typeof draftFigureIds === 'undefined') {
     return res.status(400).json({ error_code: 'NO_FIELDS' });
   }
-  res.json(plotDb.updateBeat(id, fields, figureIds));
+  res.json(plotDb.updateBeat(id, fields, figureIds, draftFigureIds));
 });
 
 router.delete('/beats/:id', (req, res) => {

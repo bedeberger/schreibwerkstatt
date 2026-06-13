@@ -15,6 +15,7 @@ const { setContext } = require('../../lib/log-context');
 const { requireBookAccess, sendACLError } = require('../../lib/acl');
 const { db } = require('../../db/connection');
 const plotDb = require('../../db/plot');
+const draftFiguresDb = require('../../db/draft-figures');
 
 const plotRouter = express.Router();
 
@@ -25,6 +26,19 @@ const SEVERITY = ['kritisch', 'stark', 'mittel', 'schwach', 'niedrig'];
 // Figuren-Ensemble (Name + Typ) als Grundierung für beide Jobs.
 function _figurenContext(bookId, userEmail) {
   return getFiguren(bookId, userEmail).map(f => ({ name: f.name, typ: f.typ || null }));
+}
+
+// Werkstatt-Figuren (Figuren-Werkstatt-Drafts, Name + Archetyp): vorwärts-
+// entwickelte Figuren, evtl. noch nicht im Manuskript. Brainstorm kann sie als
+// Beat-Figuren vorschlagen; Consistency darf sie als legitime Beat-Referenz
+// erkennen statt sie als „unbekannte Figur" zu beanstanden. Best-effort.
+function _werkstattFigurenContext(bookId, userEmail) {
+  try {
+    return draftFiguresDb.listDraftFigures(bookId, userEmail)
+      .map(d => ({ name: d.name, archetype: d.archetype || null }));
+  } catch {
+    return [];
+  }
 }
 
 // Kapitelnamen in echter Buchorganizer-Reihenfolge (über die Content-Store-
@@ -77,14 +91,15 @@ async function runPlotBrainstormJob(jobId, bookId, actId, userEmail) {
 
     const { BUCH_KONTEXT } = await getBookPrompts(bookId, userEmail);
     const figuren = _figurenContext(bookId, userEmail);
+    const werkstattFiguren = _werkstattFigurenContext(bookId, userEmail);
     const kapitel = await _kapitelContext(bookId);
 
-    logger.info(`Plot-Brainstorm Start: book=${bookId} akt="${act.name}" beats=${beats.length} figuren=${figuren.length}`);
+    logger.info(`Plot-Brainstorm Start: book=${bookId} akt="${act.name}" beats=${beats.length} figuren=${figuren.length} werkstatt=${werkstattFiguren.length}`);
     updateJob(jobId, { statusText: 'job.plot.brainstorm.aiReply', progress: 10 });
 
     const tok = { in: 0, out: 0, ms: 0 };
     const result = await aiCall(jobId, tok,
-      buildPlotBrainstormPrompt(act.name, acts, beats, BUCH_KONTEXT, figuren, kapitel),
+      buildPlotBrainstormPrompt(act.name, acts, beats, BUCH_KONTEXT, figuren, kapitel, werkstattFiguren),
       buildPlotSystemPrompt(),
       10, 95, 1500, 0.3, 1500, undefined, SCHEMA_PLOT_BRAINSTORM,
     );
@@ -118,15 +133,16 @@ async function runPlotConsistencyJob(jobId, bookId, userEmail) {
 
     const { BUCH_KONTEXT } = await getBookPrompts(bookId, userEmail);
     const figuren = _figurenContext(bookId, userEmail);
+    const werkstattFiguren = _werkstattFigurenContext(bookId, userEmail);
     const kapitel = await _kapitelContext(bookId);
     const szenen = _szenenContext(bookId, userEmail);
 
-    logger.info(`Plot-Consistency Start: book=${bookId} beats=${beats.length} szenen=${szenen.length} kapitel=${kapitel.length}`);
+    logger.info(`Plot-Consistency Start: book=${bookId} beats=${beats.length} szenen=${szenen.length} kapitel=${kapitel.length} werkstatt=${werkstattFiguren.length}`);
     updateJob(jobId, { statusText: 'job.plot.consistency.aiReply', progress: 10 });
 
     const tok = { in: 0, out: 0, ms: 0 };
     const result = await aiCall(jobId, tok,
-      buildPlotConsistencyPrompt(acts, beats, kapitel, szenen, figuren, BUCH_KONTEXT),
+      buildPlotConsistencyPrompt(acts, beats, kapitel, szenen, figuren, BUCH_KONTEXT, werkstattFiguren),
       buildPlotSystemPrompt(),
       10, 95, 2500, 0.3, 3000, undefined, SCHEMA_PLOT_CONSISTENCY,
     );

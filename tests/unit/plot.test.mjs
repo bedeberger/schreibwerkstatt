@@ -13,6 +13,7 @@ process.env.DB_PATH = path.join('/tmp', `plot-db-test-${process.pid}-${Date.now(
 const schema = require('../../db/schema');
 const appUsers = require('../../db/app-users');
 const plot = require('../../db/plot');
+const draftFigures = require('../../db/draft-figures');
 const { db } = require('../../db/connection');
 
 const USER = 'plot@x.test';
@@ -96,6 +97,42 @@ test('plot DB: Beat-Figuren persistieren als TEXT-fig_id (id↔fig_id-Übersetzu
   plot.deleteAct(act.id);
 });
 
+test('plot DB: Beat-Werkstatt-Figuren (draft_figures) linken + persistieren', () => {
+  const act = plot.createAct(BOOK, USER, { name: 'Werkstatt-Akt' });
+  const d1 = draftFigures.createDraftFigure(BOOK, USER, { name: 'Entwurf-Held', mindmap: { topic: 'Entwurf-Held' } });
+  const d2 = draftFigures.createDraftFigure(BOOK, USER, { name: 'Entwurf-Gegner', mindmap: { topic: 'Entwurf-Gegner' } });
+
+  // resolveDraftFigureIds filtert aufs (Buch, User)-Subset; IDs sind INTEGER (keine TEXT-Indirektion)
+  assert.deepEqual(plot.resolveDraftFigureIds(BOOK, USER, [d1.id, d2.id]).sort((a, b) => a - b), [d1.id, d2.id].sort((a, b) => a - b));
+
+  const beat = plot.createBeat(BOOK, act.id, USER, { titel: 'Konfrontation', draftFigureIds: [d1.id] });
+  assert.deepEqual(beat.draft_fig_ids, [d1.id]);
+  assert.deepEqual(beat.fig_ids, []); // Katalog- und Werkstatt-Brücke sind getrennt
+
+  // Update ersetzt die Werkstatt-Links komplett, ohne die (leeren) Katalog-Links anzufassen
+  const upd = plot.updateBeat(beat.id, {}, undefined, [d1.id, d2.id]);
+  assert.deepEqual([...upd.draft_fig_ids].sort((a, b) => a - b), [d1.id, d2.id].sort((a, b) => a - b));
+
+  // listBeats spiegelt denselben Stand
+  const reread = plot.listBeats(BOOK, USER).find(b => b.id === beat.id);
+  assert.deepEqual([...reread.draft_fig_ids].sort((a, b) => a - b), [d1.id, d2.id].sort((a, b) => a - b));
+
+  // Leeres Array löscht alle Werkstatt-Links
+  const cleared = plot.updateBeat(beat.id, {}, undefined, []);
+  assert.deepEqual(cleared.draft_fig_ids, []);
+
+  plot.deleteAct(act.id);
+});
+
+test('plot DB: resolveDraftFigureIds filtert Fremd-/Unbekannt-IDs raus', () => {
+  const own = draftFigures.createDraftFigure(BOOK, USER, { name: 'Eigen-Draft', mindmap: { topic: 'Eigen' } });
+  appUsers.createUser({ email: 'plot-foreign@x.test', displayName: 'Fremd' });
+  const foreign = draftFigures.createDraftFigure(BOOK, 'plot-foreign@x.test', { name: 'Fremd-Draft', mindmap: { topic: 'Fremd' } });
+  const resolved = plot.resolveDraftFigureIds(BOOK, USER, [own.id, foreign.id, 99999]);
+  assert.deepEqual(resolved, [own.id]);
+  assert.deepEqual(plot.resolveDraftFigureIds(BOOK, USER, []), []);
+});
+
 test('plot DB: resolveFigureIds filtert Fremd-/Unbekannt-fig_ids raus', () => {
   const own = seedFigur(BOOK, USER, 'fig_own', 'Eigen');
   appUsers.createUser({ email: 'someone-else@x.test', displayName: 'Fremd' });
@@ -136,24 +173,36 @@ test('plot DB: Akt-Löschung kaskadiert auf Beats (FK CASCADE)', () => {
 
 const prompts = await import('../../public/js/prompts/plot.js');
 
-test('plot prompts: Brainstorm nennt Ziel-Akt + listet Board + verlangt JSON', () => {
+test('plot prompts: Brainstorm nennt Ziel-Akt + listet Board + Werkstatt-Figuren + verlangt JSON', () => {
   const acts = [{ id: 1, name: 'Akt 1' }, { id: 2, name: 'Akt 2' }];
   const beats = [{ id: 9, act_id: 1, titel: 'Auftakt', status: 'geplant', chapter_name: null }];
-  const out = prompts.buildPlotBrainstormPrompt('Akt 2', acts, beats, 'Krimi', [{ name: 'Anna', typ: 'Prot' }], ['Kap 1']);
+  const out = prompts.buildPlotBrainstormPrompt('Akt 2', acts, beats, 'Krimi',
+    [{ name: 'Anna', typ: 'Prot' }], ['Kap 1'], [{ name: 'Mara', archetype: 'mentor' }]);
   assert.ok(out.includes('Akt 2'));
   assert.ok(out.includes('AKT: Akt 1'));
   assert.ok(out.includes('Auftakt'));
+  assert.ok(out.includes('FIGUREN-WERKSTATT'));
+  assert.ok(out.includes('Mara'));
+  assert.ok(out.includes('mentor'));
   assert.ok(out.includes('"vorschlaege"'));
 });
 
-test('plot prompts: Consistency listet Status-Legende + Szenen-Realität', () => {
+test('plot prompts: Brainstorm ohne Werkstatt-Figuren lässt den Block weg', () => {
+  const out = prompts.buildPlotBrainstormPrompt('Akt 1', [{ id: 1, name: 'Akt 1' }], [], '', [], []);
+  assert.ok(!out.includes('FIGUREN-WERKSTATT'));
+});
+
+test('plot prompts: Consistency listet Status-Legende + Szenen-Realität + Werkstatt-Figuren', () => {
   const acts = [{ id: 1, name: 'Akt 1' }];
   const beats = [{ id: 9, act_id: 1, titel: 'Showdown', status: 'im_buch', chapter_name: 'Kap 3' }];
   const szenen = [{ titel: 'Duell', kapitel: 'Kap 3', figuren: ['Anna'] }];
-  const out = prompts.buildPlotConsistencyPrompt(acts, beats, ['Kap 1', 'Kap 3'], szenen, [{ name: 'Anna' }], 'Krimi');
+  const out = prompts.buildPlotConsistencyPrompt(acts, beats, ['Kap 1', 'Kap 3'], szenen,
+    [{ name: 'Anna' }], 'Krimi', [{ name: 'Mara', archetype: 'mentor' }]);
   assert.ok(out.includes('Showdown'));
   assert.ok(out.includes('im Buch'));     // Status-Label
   assert.ok(out.includes('Duell'));        // Szene als Realität
+  assert.ok(out.includes('FIGUREN-WERKSTATT'));
+  assert.ok(out.includes('Mara'));
   assert.ok(out.includes('"konflikte"'));
   assert.ok(out.includes('"fazit"'));
 });

@@ -201,6 +201,20 @@
      re-asserten (Specificity 0,2,0 schlaegt button:hover 0,1,1). */
   .plot-figure-chip:hover { background: var(--color-tag-bg); border-color: var(--card-accent); }
   .plot-figure-chip--on:hover { background: var(--card-accent); }
+
+  /* Werkstatt-Figuren (draft_figures) vom Katalog absetzen: gestrichelter Rahmen
+     = „in Entwicklung, evtl. noch nicht im Manuskript", eigener Werkstatt-Akzent
+     (gleicher Token wie die Figuren-Werkstatt-Karte). */
+  .plot-figure-chip--werkstatt { border-style: dashed; border-color: var(--card-accent-werkstatt); }
+  .plot-figure-chip--werkstatt:hover { border-color: var(--card-accent-werkstatt); }
+  .plot-figure-chip--werkstatt.plot-figure-chip--on {
+    border-style: solid;
+    border-color: var(--card-accent-werkstatt);
+    background: var(--card-accent-werkstatt);
+  }
+  .plot-figure-chip--werkstatt.plot-figure-chip--on:hover { background: var(--card-accent-werkstatt); }
+  /* Werkstatt-Badge im Beat-Meta (Ansichtsmodus). */
+  .plot-beat-meta .tag--werkstatt { border: 1px dashed var(--card-accent-werkstatt); }
   .plot-beat-edit-actions {
     display: flex;
     align-items: center;
