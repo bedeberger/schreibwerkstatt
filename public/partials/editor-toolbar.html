@@ -63,11 +63,11 @@
       </div>
       <template x-for="(it, i) in slashItems()" :key="it.key">
         <div class="edit-slash-row">
-          <div x-show="i === 0 || it.group !== slashItems()[i - 1].group"
-               class="edit-slash-group" x-text="$app.t('editor.slash.group.' + it.group)"></div>
+          <div x-show="it.showGroup"
+               class="edit-slash-group" x-text="it.groupLabel"></div>
           <button type="button"
                   class="edit-slash-item"
-                  :class="{ ['edit-slash-item--' + it.key]: true, 'edit-slash-item--active': slashIdx === i }"
+                  :class="it.modClass + (slashIdx === i ? ' edit-slash-item--active' : '')"
                   @mousedown.prevent
                   @click="_applySlashByKey(it.key)"
                   @mouseenter="slashIdx = i">

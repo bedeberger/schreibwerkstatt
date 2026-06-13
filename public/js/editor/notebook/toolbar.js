@@ -270,10 +270,16 @@ export const toolbarCardMethods = {
   // früh auf `toolbarCardMethods` selbst aufgerufen.
   _buildSlashLabels() {
     const app = window.__app;
+    // Alles, was sich pro Eintrag nicht mit der Query ändert, wird hier einmal
+    // beim Öffnen aufgelöst (Label, Gruppen-Label, Modifier-Klasse, Stempel).
+    // Das Template liest dann nur noch Properties – keine `t()`-/Funktions-
+    // Aufrufe pro Eintrag und Render, die beim Tippen reaktiv neu liefen.
     return SLASH_ITEMS.map(it => ({
       key: it.key,
       group: it.group,
+      groupLabel: app?.t('editor.slash.group.' + it.group) || it.group,
       label: app?.t('editor.slash.' + it.key) || it.key,
+      modClass: 'edit-slash-item--' + it.key,
       // Datums-/Zeit-Items zeigen den tatsächlich einzufügenden Wert als
       // Sekundär-Text (beim Öffnen aufgelöst; `_applySlashItem` rechnet beim
       // Einfügen ohnehin frisch).
@@ -291,8 +297,17 @@ export const toolbarCardMethods = {
       return this._slashFilterCache.r;
     }
     const items = this._slashLabels || this._buildSlashLabels();
-    const r = !q ? items : items.filter(it =>
+    const filtered = !q ? items : items.filter(it =>
       it.label.toLowerCase().includes(q) || it.key.toLowerCase().includes(q));
+    // `showGroup`: erstes Item seiner Gruppe in der gefilterten Liste → der
+    // Gruppen-Header wird gerendert. Einmal pro Query berechnet, damit das
+    // Template beim Tippen nicht pro Eintrag erneut `slashItems()` aufruft.
+    let prevGroup = null;
+    const r = filtered.map(it => {
+      const showGroup = it.group !== prevGroup;
+      prevGroup = it.group;
+      return { ...it, showGroup };
+    });
     this._slashFilterCache = { q, r };
     return r;
   },
