@@ -8,6 +8,15 @@ import { startPoll, runningJobStatus } from '../cards/job-helpers.js';
 
 const STATUSES = ['geplant', 'entwurf', 'im_buch', 'verworfen'];
 
+// Akt-Farbpalette: Schlüssel referenzieren die theme-aware --palette-*-Tokens
+// (tokens/colors.css, geteilt mit der Figuren-Palette). In plot_acts.farbe wird
+// nur der Schlüssel gespeichert; actAccent() baut daraus die CSS-Variable und
+// fällt bei unbekanntem/leerem Wert auf den Karten-Akzent zurück (kein Inline-Hue).
+const ACT_PALETTE = ['blue', 'green', 'amber', 'orange', 'red', 'wine', 'pink', 'purple', 'brown', 'gray'];
+
+// Intensität → vertikale Position im Spannungsband (10–90 %, etwas Rand oben/unten).
+const _intensityBottomPct = (i) => 10 + ((i - 1) / 4) * 80;
+
 export const plotMethods = {
   // ── Memo-Helper (ein Helper pro Modul, Array-Deps shallow ===) ─────────────
   _memo(key, deps, fn) {
@@ -70,6 +79,8 @@ export const plotMethods = {
     this.consistencyResult = null;
     this.selectedKonfliktIdx = null;
     this.plotFilters = { kapitel: '', figurId: '', draftFigurId: '' };
+    this.verworfenOpen = {};
+    this.actColorPickerId = null;
     this.errorMessage = '';
     this.busy = false;
   },
@@ -84,15 +95,102 @@ export const plotMethods = {
   },
 
   boardStats() {
-    return this._memo('stats', [this.beats], () => {
-      const total = (this.beats || []).length;
-      const imBuch = (this.beats || []).filter(b => b.status === 'im_buch').length;
-      const geplant = (this.beats || []).filter(b => b.status === 'geplant').length;
-      return { total, imBuch, geplant };
-    });
+    return this._memo('stats', [this.beats], () => this._computeStats(this.beats || []));
+  },
+
+  // Status-Zählung über eine Beat-Liste (board-weit oder pro Akt). imBuch/geplant
+  // bleiben als Top-Level-Felder erhalten (von plot.stats-i18n konsumiert).
+  _computeStats(list) {
+    const by = { geplant: 0, entwurf: 0, im_buch: 0, verworfen: 0 };
+    for (const b of list) if (by[b.status] != null) by[b.status]++;
+    return { total: list.length, by, imBuch: by.im_buch, geplant: by.geplant };
+  },
+
+  // Pro-Akt-Status-Verteilung (für die Mini-Fortschrittsleiste im Spaltenkopf).
+  actStats(actId) {
+    return this._memo(`astats:${actId}`, [this.beats, actId], () =>
+      this._computeStats((this.beats || []).filter(b => b.act_id === actId)));
   },
 
   statusList() { return STATUSES; },
+
+  // ── Akt-Farben ───────────────────────────────────────────────────────────
+  actPalette() { return ACT_PALETTE; },
+
+  // CSS-Wert für den Akt-Akzent: bekannter Palette-Key → --palette-<key>,
+  // sonst Karten-Akzent. Whitelist verhindert CSS-Injection aus dem Freitextfeld.
+  actAccent(act) {
+    const key = act && act.farbe;
+    return (key && ACT_PALETTE.includes(key)) ? `var(--palette-${key})` : 'var(--card-accent)';
+  },
+
+  toggleActColorPicker(actId) {
+    this.actColorPickerId = this.actColorPickerId === actId ? null : actId;
+  },
+
+  async setActColor(act, key) {
+    const app = window.__app;
+    this.actColorPickerId = null;
+    const farbe = ACT_PALETTE.includes(key) ? key : null;
+    if (farbe === (act.farbe || null)) return;
+    try {
+      const updated = await fetchJson(`/plot/acts/${act.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ farbe }),
+      });
+      this.acts = this.acts.map(a => (a.id === updated.id ? updated : a));
+      this.errorMessage = '';
+    } catch (e) {
+      this.errorMessage = app.t('plot.error.save');
+    }
+  },
+
+  // ── Spannungsbogen ─────────────────────────────────────────────────────────
+  // Beats mit gesetzter Intensität (verworfene zählen nicht — sie formen den
+  // Bogen nicht) in Board-Lesereihenfolge (Akt-Position → sort_order) zu einer
+  // Kurve. Punkte als Prozent-Koordinaten + Polyline-String für die SVG-Linie.
+  tensionCurve() {
+    return this._memo('tension', [this.beats, this.acts], () => {
+      const actPos = new Map((this.acts || []).map(a => [a.id, a.position]));
+      const actById = new Map((this.acts || []).map(a => [a.id, a]));
+      const seq = (this.beats || [])
+        .filter(b => b.status !== 'verworfen' && b.intensitaet != null)
+        .sort((a, b) =>
+          ((actPos.get(a.act_id) ?? 0) - (actPos.get(b.act_id) ?? 0)) ||
+          (a.sort_order - b.sort_order) || (a.id - b.id));
+      const n = seq.length;
+      const points = seq.map((b, k) => {
+        const act = actById.get(b.act_id) || null;
+        const xPct = n === 1 ? 50 : +(5 + (k / (n - 1)) * 90).toFixed(2);
+        const bottomPct = +_intensityBottomPct(b.intensitaet).toFixed(2);
+        return {
+          beat: b, act, color: this.actAccent(act),
+          xPct, bottomPct,
+          xSvg: xPct, ySvg: +(100 - bottomPct).toFixed(2),
+        };
+      });
+      return { points, polyline: points.map(p => `${p.xSvg},${p.ySvg}`).join(' '), count: n };
+    });
+  },
+
+  // ── Verworfen-Collapse (pro Akt) ────────────────────────────────────────────
+  // Verworfene Beats werden eingeklappt, damit sie die Spalte nicht aufblähen;
+  // ein „+N verworfen"-Toggle blendet sie ein. Drag/Reorder bleibt unberührt
+  // (operiert weiter auf beatsForAct/filteredBeatsForAct mit allen Beats).
+  visibleBeatsForAct(actId) {
+    const base = this.filteredBeatsForAct(actId);
+    if (this.verworfenOpen[actId]) return base;
+    return this._memo(`vbeats:${actId}`, [base], () => base.filter(b => b.status !== 'verworfen'));
+  },
+
+  verworfenCountForAct(actId) {
+    return this.filteredBeatsForAct(actId).filter(b => b.status === 'verworfen').length;
+  },
+
+  toggleVerworfen(actId) {
+    this.verworfenOpen = { ...this.verworfenOpen, [actId]: !this.verworfenOpen[actId] };
+  },
 
   // ── Filter (Kapitel / Figur) ───────────────────────────────────────────────
   // Kapitel-Optionen aus den Beats ableiten (buchgeordnet via Root-Helper),
@@ -276,11 +374,19 @@ export const plotMethods = {
       beschreibung: beat.beschreibung || '',
       status: beat.status || 'geplant',
       chapter_id: beat.chapter_id || '',
+      intensitaet: beat.intensitaet || null,
       figure_ids: [...(beat.fig_ids || [])],
       draft_figure_ids: [...(beat.draft_fig_ids || [])],
     };
   },
   cancelEditBeat() { this.editingBeatId = null; },
+
+  intensitaetScale() { return [1, 2, 3, 4, 5]; },
+
+  // Intensität setzen — erneuter Klick auf den aktiven Wert löscht ihn (null).
+  setBeatDraftIntensitaet(n) {
+    this.beatDraft.intensitaet = (this.beatDraft.intensitaet === n) ? null : n;
+  },
 
   toggleBeatDraftFigure(figId) {
     const set = new Set(this.beatDraft.figure_ids);
@@ -309,6 +415,7 @@ export const plotMethods = {
           beschreibung: this.beatDraft.beschreibung || '',
           status: this.beatDraft.status,
           chapter_id: this.beatDraft.chapter_id ? parseInt(this.beatDraft.chapter_id) : null,
+          intensitaet: this.beatDraft.intensitaet || null,
           figure_ids: this.beatDraft.figure_ids,
           draft_figure_ids: this.beatDraft.draft_figure_ids,
         }),

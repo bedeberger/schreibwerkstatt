@@ -697,6 +697,28 @@ const _VOID_TAGS = new Set([
   'area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr',
 ]);
 
+// Inline-Elemente, ueber die eine Ersetzung gefahrlos hinweggehen darf — ihre
+// Tag-Balance haelt der Orphan-Schutz in `_splitOrphanTags`. Alles andere
+// (p, li, h1-h6, blockquote, pre, table-Teile, div, figure …) ist eine
+// Block-Grenze: ein Match, der sie kreuzt, wuerde beim Ersetzen Absatzstruktur
+// zerreissen (verschachtelte/aufgespaltene Bloecke). Default-Deny: unbekannte
+// Tags gelten als Block-Grenze, damit nichts stillschweigend korrumpiert.
+const _INLINE_TAGS = new Set([
+  'a','abbr','b','bdi','bdo','br','cite','code','data','dfn','em','i','kbd',
+  'mark','q','rp','rt','ruby','s','samp','small','span','strong','sub','sup',
+  'time','u','var','wbr',
+]);
+
+// True, wenn der Slice ein Nicht-Inline-Tag (Block-Grenze) enthaelt.
+function _crossesBlockBoundary(slice) {
+  const tagRe = /<\/?([a-zA-Z][a-zA-Z0-9]*)\b[^>]*>/g;
+  let m;
+  while ((m = tagRe.exec(slice))) {
+    if (!_INLINE_TAGS.has(m[1].toLowerCase())) return true;
+  }
+  return false;
+}
+
 /**
  * Findet im Slice Tags ohne Partner: Closes ohne vorheriges Open im Slice
  * (Open liegt VOR dem Slice, Tag muss nach dem Replacement erhalten bleiben),
@@ -724,12 +746,19 @@ function _splitOrphanTags(slice) {
 
 /**
  * Ersetzt `needle` im HTML durch `replacement`. Nutzt `findInHtml` für die
- * Position. Wenn der Match Tag-Grenzen kreuzt (toleranter Match), bleiben
- * Waisen-Tags innerhalb der ersetzten Range erhalten, sonst zerbricht die
- * Tag-Balance (typisch: KI ändert Phrase, die ein `<em>kursiv</em>` umfasst,
+ * Position. Wenn der Match nur Inline-Tag-Grenzen kreuzt (toleranter Match),
+ * bleiben Waisen-Tags innerhalb der ersetzten Range erhalten, sonst zerbricht
+ * die Tag-Balance (typisch: KI ändert Phrase, die ein `<em>kursiv</em>` umfasst,
  * dabei darf weder das öffnende noch das schliessende Tag verloren gehen).
  *
- * Gibt das neue HTML zurück, oder das Original wenn nichts gefunden.
+ * Kreuzt der Match dagegen eine BLOCK-Grenze (`</p><p>`, `</li><li>`, Heading,
+ * Tabelle …), wird NICHT ersetzt — eine solche Ersetzung würde verschachtelte
+ * oder aufgespaltene Blöcke erzeugen und damit Absätze zerstören. Die Korrektur
+ * wird dann stillschweigend übersprungen (Text bleibt unverändert) statt die
+ * Struktur zu beschädigen.
+ *
+ * Gibt das neue HTML zurück, oder das Original wenn nichts gefunden bzw. der
+ * Match eine Block-Grenze kreuzt.
  */
 export function replaceInHtml(html, needle, replacement) {
   if (!html || !needle) return html;
@@ -738,6 +767,7 @@ export function replaceInHtml(html, needle, replacement) {
   const removed = html.slice(m.htmlStart, m.htmlEnd);
   let inserted = replacement;
   if (removed.includes('<')) {
+    if (_crossesBlockBoundary(removed)) return html;
     const { orphanOpens, orphanCloses } = _splitOrphanTags(removed);
     if (orphanOpens.length || orphanCloses.length) {
       inserted = orphanOpens.join('') + replacement + orphanCloses.join('');

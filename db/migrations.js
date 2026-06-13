@@ -7498,6 +7498,22 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 185 abgeschlossen (plot_beat_draft_figures).');
   }
 
+  if (version < 186) {
+    // Spannungs-/Intensitätswert pro Beat (1–5), optional. Speist den
+    // Spannungsbogen (Tension-Arc) über das Board. NULL = nicht gesetzt;
+    // verworfene Beats fliessen nicht in den Bogen. Additiv (ADD COLUMN).
+    const beatCols = db.pragma('table_info(plot_beats)').map(c => c.name);
+    if (!beatCols.includes('intensitaet')) {
+      db.exec('ALTER TABLE plot_beats ADD COLUMN intensitaet INTEGER CHECK(intensitaet IS NULL OR (intensitaet BETWEEN 1 AND 5))');
+    }
+    const fkErrors186 = db.pragma('foreign_key_check');
+    if (fkErrors186.length) {
+      throw new Error(`Migration 186: foreign_key_check meldet ${fkErrors186.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 186').run();
+    logger.info('DB-Migration auf Version 186 abgeschlossen (plot_beats.intensitaet).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

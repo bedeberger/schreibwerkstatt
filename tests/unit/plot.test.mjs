@@ -97,6 +97,34 @@ test('plot DB: Beat-Figuren persistieren als TEXT-fig_id (id↔fig_id-Übersetzu
   plot.deleteAct(act.id);
 });
 
+test('plot DB: Beat-Intensität (1–5) persistiert + lässt sich nullen', () => {
+  const act = plot.createAct(BOOK, USER, { name: 'Spannungs-Akt' });
+  const beat = plot.createBeat(BOOK, act.id, USER, { titel: 'Showdown', intensitaet: 5 });
+  assert.equal(beat.intensitaet, 5);
+
+  // listBeats/getBeat spiegeln den Wert
+  assert.equal(plot.getBeat(beat.id).intensitaet, 5);
+  assert.equal(plot.listBeats(BOOK, USER).find(b => b.id === beat.id).intensitaet, 5);
+
+  // partielles Update ändert nur die Intensität
+  assert.equal(plot.updateBeat(beat.id, { intensitaet: 2 }, undefined).intensitaet, 2);
+  // null setzt zurück
+  assert.equal(plot.updateBeat(beat.id, { intensitaet: null }, undefined).intensitaet, null);
+
+  // Default beim Anlegen ohne Wert ist NULL
+  const plain = plot.createBeat(BOOK, act.id, USER, { titel: 'Ohne Spannung' });
+  assert.equal(plain.intensitaet, null);
+
+  plot.deleteAct(act.id);
+});
+
+test('plot DB: CHECK-Constraint lehnt Intensität ausserhalb 1–5 ab', () => {
+  const act = plot.createAct(BOOK, USER, { name: 'Check-Akt' });
+  // createBeat schreibt den Wert ungefiltert (Route validiert) — DB-CHECK greift.
+  assert.throws(() => plot.createBeat(BOOK, act.id, USER, { titel: 'Zu hoch', intensitaet: 9 }));
+  plot.deleteAct(act.id);
+});
+
 test('plot DB: Beat-Werkstatt-Figuren (draft_figures) linken + persistieren', () => {
   const act = plot.createAct(BOOK, USER, { name: 'Werkstatt-Akt' });
   const d1 = draftFigures.createDraftFigure(BOOK, USER, { name: 'Entwurf-Held', mindmap: { topic: 'Entwurf-Held' } });
@@ -218,4 +246,82 @@ test('plot prompts: System-Prompt verbietet Fliesstext + erzwingt JSON (Claude-M
   const sys = prompts.buildPlotSystemPrompt();
   assert.ok(/NIEMALS Fliesstext|kein.*Fliesstext|niemals.*Text/i.test(sys));
   assert.ok(sys.includes('JSON-Objekt'));
+});
+
+// ── Frontend-Logik (plotMethods, pure Helfer ohne Alpine/DOM) ────────────────
+
+const { plotMethods } = await import('../../public/js/book/plot.js');
+
+// Minimaler Karten-Kontext: plotMethods auf ein Plain-Object gemappt, `this`=ctx.
+function makeCtx({ beats = [], acts = [], verworfenOpen = {} } = {}) {
+  return Object.assign(
+    { _memos: {}, beats, acts, verworfenOpen, plotFilters: { kapitel: '', figurId: '', draftFigurId: '' } },
+    plotMethods,
+  );
+}
+
+test('plotMethods.actAccent: Palette-Key → --palette-*, sonst Karten-Akzent', () => {
+  const ctx = makeCtx();
+  assert.equal(ctx.actAccent({ farbe: 'green' }), 'var(--palette-green)');
+  assert.equal(ctx.actAccent({ farbe: null }), 'var(--card-accent)');
+  // Nicht-Whitelist-Wert fällt zurück (keine CSS-Injection aus dem Freitextfeld)
+  assert.equal(ctx.actAccent({ farbe: 'evil); }' }), 'var(--card-accent)');
+});
+
+test('plotMethods.boardStats/_computeStats: Status-Zählung + imBuch/geplant-Spiegel', () => {
+  const ctx = makeCtx({ beats: [
+    { status: 'geplant' }, { status: 'geplant' }, { status: 'im_buch' },
+    { status: 'entwurf' }, { status: 'verworfen' },
+  ] });
+  const s = ctx.boardStats();
+  assert.equal(s.total, 5);
+  assert.deepEqual(s.by, { geplant: 2, entwurf: 1, im_buch: 1, verworfen: 1 });
+  assert.equal(s.imBuch, 1);
+  assert.equal(s.geplant, 2);
+});
+
+test('plotMethods.tensionCurve: nur Beats mit Intensität, Board-Reihenfolge, verworfen excluded', () => {
+  const acts = [{ id: 1, name: 'A1', position: 0 }, { id: 2, name: 'A2', position: 1 }];
+  const beats = [
+    { id: 10, act_id: 2, sort_order: 0, status: 'geplant', intensitaet: 4, titel: 'Mitte' },
+    { id: 11, act_id: 1, sort_order: 1, status: 'im_buch', intensitaet: 2, titel: 'Auftakt2' },
+    { id: 12, act_id: 1, sort_order: 0, status: 'geplant', intensitaet: 1, titel: 'Auftakt1' },
+    { id: 13, act_id: 2, sort_order: 1, status: 'verworfen', intensitaet: 5, titel: 'gestrichen' },
+    { id: 14, act_id: 2, sort_order: 2, status: 'geplant', intensitaet: null, titel: 'ohne' },
+  ];
+  const curve = makeCtx({ beats, acts }).tensionCurve();
+  // verworfen (13) + ohne Intensität (14) fliegen raus → 3 Punkte
+  assert.equal(curve.count, 3);
+  // Reihenfolge: Akt-Position dann sort_order → 12, 11, 10
+  assert.deepEqual(curve.points.map(p => p.beat.id), [12, 11, 10]);
+  // x von 5 % bis 95 %, y aus Intensität (1 → bottom 10 %, 4 → bottom 70 %)
+  assert.equal(curve.points[0].xPct, 5);
+  assert.equal(curve.points[2].xPct, 95);
+  assert.equal(curve.points[0].bottomPct, 10);
+  assert.equal(curve.points[2].bottomPct, 70);
+  // Punktfarbe folgt dem Akt-Akzent
+  assert.equal(curve.points[2].color, 'var(--card-accent)');
+  // Polyline-String hat 3 Koordinatenpaare
+  assert.equal(curve.polyline.split(' ').length, 3);
+});
+
+test('plotMethods.tensionCurve: <2 Punkte → count steuert Sichtbarkeit', () => {
+  const acts = [{ id: 1, name: 'A1', position: 0 }];
+  const curve = makeCtx({ beats: [{ id: 1, act_id: 1, sort_order: 0, status: 'geplant', intensitaet: 3 }], acts }).tensionCurve();
+  assert.equal(curve.count, 1);
+  assert.equal(curve.points[0].xPct, 50); // Einzelpunkt zentriert
+});
+
+test('plotMethods.visibleBeatsForAct: verworfen versteckt bis aufgeklappt', () => {
+  const acts = [{ id: 1, name: 'A1', position: 0 }];
+  const beats = [
+    { id: 1, act_id: 1, sort_order: 0, status: 'geplant', fig_ids: [], draft_fig_ids: [] },
+    { id: 2, act_id: 1, sort_order: 1, status: 'verworfen', fig_ids: [], draft_fig_ids: [] },
+  ];
+  const ctx = makeCtx({ beats, acts });
+  assert.deepEqual(ctx.visibleBeatsForAct(1).map(b => b.id), [1]);
+  assert.equal(ctx.verworfenCountForAct(1), 1);
+  ctx.verworfenOpen = { 1: true };
+  ctx._memos = {};
+  assert.deepEqual(ctx.visibleBeatsForAct(1).map(b => b.id), [1, 2]);
 });

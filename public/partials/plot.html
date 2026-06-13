@@ -23,6 +23,26 @@
     </div>
   </div>
 
+  <!-- Status-Verteilung (board-weit): segmentierter Balken + Legende -->
+  <div class="plot-progress" x-show="beats.length > 0" x-cloak>
+    <div class="plot-dist-bar">
+      <template x-for="s in statusList()" :key="s">
+        <div class="plot-dist-seg" :class="'plot-dist-seg--' + s"
+             x-show="boardStats().by[s] > 0"
+             :style="{ '--seg-grow': boardStats().by[s] }"
+             :data-tip="$app.t('plot.status.' + s) + ': ' + boardStats().by[s]"></div>
+      </template>
+    </div>
+    <div class="plot-progress-legend">
+      <template x-for="s in statusList()" :key="s">
+        <span class="plot-legend-item" x-show="boardStats().by[s] > 0">
+          <span class="plot-legend-swatch" :class="'plot-dist-seg--' + s"></span>
+          <span x-text="$app.t('plot.status.' + s) + ' · ' + boardStats().by[s]"></span>
+        </span>
+      </template>
+    </div>
+  </div>
+
   <!-- Fehler -->
   <div x-show="errorMessage" class="card-status card-status--error" x-text="errorMessage"></div>
 
@@ -93,16 +113,61 @@
     <span class="filter-count" x-text="filteredBeatCount() + ' / ' + beats.length"></span>
   </div>
 
+  <!-- Spannungsbogen: Intensität der Beats (1–5) in Board-Lesereihenfolge als Kurve.
+       Nur sichtbar, wenn mind. 2 nicht-verworfene Beats eine Intensität tragen. -->
+  <div class="plot-tension" x-show="tensionCurve().count >= 2" x-cloak>
+    <button type="button" class="collapsible-toggle plot-tension-toggle" @click="tensionOpen = !tensionOpen" :aria-expanded="tensionOpen">
+      <span class="history-chevron" :class="{ open: tensionOpen }">›</span>
+      <span x-text="$app.t('plot.tension.title')"></span>
+    </button>
+    <div class="plot-tension-body" x-show="tensionOpen" x-cloak>
+      <div class="plot-tension-chart">
+        <span class="plot-tension-axis plot-tension-axis--high" x-text="$app.t('plot.tension.high')"></span>
+        <span class="plot-tension-axis plot-tension-axis--low" x-text="$app.t('plot.tension.low')"></span>
+        <svg class="plot-tension-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          <polyline :points="tensionCurve().polyline" vector-effect="non-scaling-stroke" />
+        </svg>
+        <template x-for="p in tensionCurve().points" :key="p.beat.id">
+          <button type="button" class="plot-tension-dot"
+                  :style="{ left: p.xPct + '%', bottom: p.bottomPct + '%', '--col-accent': p.color }"
+                  @click="startEditBeat(p.beat)"
+                  :data-tip="(p.act ? p.act.name + ' · ' : '') + p.beat.titel + ' (' + p.beat.intensitaet + '/5)'"
+                  :aria-label="p.beat.titel"></button>
+        </template>
+      </div>
+    </div>
+  </div>
+
   <!-- Board -->
   <div class="plot-board" x-show="acts.length || addingAct" x-cloak>
     <template x-for="act in acts" :key="act.id">
       <div class="plot-column"
            :class="{ 'plot-column--dropzone': _dragOverActId === act.id }"
+           :style="{ '--col-accent': actAccent(act) }"
            @dragover.prevent="onActDragOver(act.id)"
            @drop.prevent="onBeatDrop(act.id, null)">
 
         <!-- Spalten-Kopf -->
         <div class="plot-column-header">
+          <!-- Akt-Farbe: Swatch öffnet ein Palette-Popover -->
+          <div class="plot-color-swatch-wrap" x-show="editingActId !== act.id">
+            <button type="button" class="plot-color-swatch"
+                    @click.stop="toggleActColorPicker(act.id)"
+                    :data-tip="$app.t('plot.act.color')" :aria-label="$app.t('plot.act.color')"></button>
+            <div class="plot-color-popover" x-show="actColorPickerId === act.id" x-cloak
+                 @click.outside="actColorPickerId === act.id && (actColorPickerId = null)">
+              <button type="button" class="plot-color-opt plot-color-opt--none"
+                      :class="{ 'plot-color-opt--on': !act.farbe }"
+                      @click="setActColor(act, null)"
+                      :data-tip="$app.t('plot.act.colorNone')" :aria-label="$app.t('plot.act.colorNone')"></button>
+              <template x-for="key in actPalette()" :key="key">
+                <button type="button" class="plot-color-opt"
+                        :style="{ '--col-accent': 'var(--palette-' + key + ')' }"
+                        :class="{ 'plot-color-opt--on': act.farbe === key }"
+                        @click="setActColor(act, key)" :aria-label="key"></button>
+              </template>
+            </div>
+          </div>
           <template x-if="editingActId !== act.id">
             <span class="plot-column-title" @dblclick="startEditAct(act)" x-text="act.name"></span>
           </template>
@@ -129,9 +194,19 @@
           </div>
         </div>
 
+        <!-- Mini-Fortschritt: Status-Verteilung dieses Akts -->
+        <div class="plot-dist-bar plot-dist-bar--mini" x-show="actStats(act.id).total > 0">
+          <template x-for="s in statusList()" :key="s">
+            <div class="plot-dist-seg" :class="'plot-dist-seg--' + s"
+                 x-show="actStats(act.id).by[s] > 0"
+                 :style="{ '--seg-grow': actStats(act.id).by[s] }"
+                 :data-tip="$app.t('plot.status.' + s) + ': ' + actStats(act.id).by[s]"></div>
+          </template>
+        </div>
+
         <!-- Beats -->
         <div class="plot-column-body">
-          <template x-for="beat in filteredBeatsForAct(act.id)" :key="beat.id">
+          <template x-for="beat in visibleBeatsForAct(act.id)" :key="beat.id">
             <div class="plot-beat" :class="'plot-beat--' + beat.status"
                  draggable="true"
                  @dragstart="onBeatDragStart(beat, $event)" @dragend="onBeatDragEnd()"
@@ -146,6 +221,13 @@
                             @click.stop="cycleBeatStatus(beat)" :data-tip="$app.t('plot.status.cycleTip')"
                             x-text="$app.t('plot.status.' + beat.status)"></button>
                     <span class="plot-beat-title" @click="startEditBeat(beat)" x-text="beat.titel"></span>
+                    <span class="plot-beat-intensity" x-show="beat.intensitaet"
+                          :data-tip="$app.t('plot.beat.intensitaet') + ': ' + beat.intensitaet + '/5'"
+                          :aria-label="$app.t('plot.beat.intensitaet') + ': ' + beat.intensitaet + '/5'">
+                      <template x-for="lvl in intensitaetScale()" :key="lvl">
+                        <span class="plot-beat-intensity-pip" :class="{ 'plot-beat-intensity-pip--on': lvl <= (beat.intensitaet || 0) }"></span>
+                      </template>
+                    </span>
                   </div>
                   <p class="plot-beat-desc" x-show="beat.beschreibung" x-text="beat.beschreibung"></p>
                   <div class="plot-beat-meta" x-show="beat.chapter_name || (beat.fig_ids && beat.fig_ids.length) || (beat.draft_fig_ids && beat.draft_fig_ids.length)">
@@ -181,6 +263,17 @@
                               x-text="$app.t('plot.status.' + s)"></button>
                     </template>
                   </div>
+                  <label class="plot-edit-label" x-text="$app.t('plot.beat.intensitaet')"></label>
+                  <div class="plot-intensity" role="group" :aria-label="$app.t('plot.beat.intensitaet')">
+                    <template x-for="n in intensitaetScale()" :key="n">
+                      <button type="button" class="plot-intensity-step"
+                              :class="{ 'plot-intensity-step--on': beatDraft.intensitaet && n <= beatDraft.intensitaet }"
+                              @click="setBeatDraftIntensitaet(n)"
+                              :data-tip="$app.t('plot.beat.intensitaetTip')"
+                              :aria-pressed="beatDraft.intensitaet === n ? 'true' : 'false'"
+                              x-text="n"></button>
+                    </template>
+                  </div>
                   <label class="plot-edit-label" x-text="$app.t('plot.beat.chapter')"></label>
                   <div x-data="combobox({ placeholder: $app.t('plot.beat.chapterPlaceholder'), emptyLabel: $app.t('plot.beat.noChapter') })"
                        x-modelable="value" x-model="beatDraft.chapter_id"
@@ -214,6 +307,14 @@
               </template>
             </div>
           </template>
+
+          <!-- Verworfene Beats ein-/ausklappen -->
+          <button type="button" class="collapsible-toggle plot-verworfen-toggle"
+                  x-show="verworfenCountForAct(act.id) > 0"
+                  @click="toggleVerworfen(act.id)" :aria-expanded="!!verworfenOpen[act.id]">
+            <span class="history-chevron" :class="{ open: verworfenOpen[act.id] }">›</span>
+            <span x-text="$app.t('plot.verworfen.toggle', { n: verworfenCountForAct(act.id) })"></span>
+          </button>
 
           <!-- Beat hinzufügen -->
           <template x-if="addingActId === act.id">

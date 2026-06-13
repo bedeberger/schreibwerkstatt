@@ -36,15 +36,22 @@ export function registerPlotCard() {
 
     // Beat-Edit / -Add
     editingBeatId: null,
-    beatDraft: { titel: '', beschreibung: '', status: 'geplant', chapter_id: '', figure_ids: [], draft_figure_ids: [] },
+    beatDraft: { titel: '', beschreibung: '', status: 'geplant', chapter_id: '', intensitaet: null, figure_ids: [], draft_figure_ids: [] },
     addingActId: null,
     newBeatTitel: '',
 
-    // Akt-Edit / -Add
+    // Akt-Edit / -Add / -Farbe
     editingActId: null,
     actDraft: '',
     addingAct: false,
     newActName: '',
+    actColorPickerId: null,
+
+    // Eingeklappte „verworfen"-Beats pro Akt ({ [actId]: true }).
+    verworfenOpen: {},
+
+    // Spannungsbogen ein-/ausgeklappt (nur sichtbar, wenn ≥2 Beats Intensität tragen).
+    tensionOpen: true,
 
     // Drag & Drop
     _dragBeatId: null,

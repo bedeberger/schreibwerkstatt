@@ -71,7 +71,7 @@ const reorderActs = db.transaction((bookId, userEmail, orderedIds) => {
 
 const _BEAT_SELECT = `
   SELECT b.id, b.book_id, b.act_id, b.user_email, b.titel, b.beschreibung,
-         b.status, b.chapter_id, c.chapter_name, b.sort_order,
+         b.status, b.chapter_id, c.chapter_name, b.intensitaet, b.sort_order,
          b.created_at, b.updated_at
     FROM plot_beats b
     LEFT JOIN chapters c ON c.chapter_id = b.chapter_id
@@ -83,8 +83,8 @@ const _stmtListBeats = db.prepare(`
 `);
 const _stmtGetBeat = db.prepare(`${_BEAT_SELECT} WHERE b.id = ?`);
 const _stmtInsertBeat = db.prepare(`
-  INSERT INTO plot_beats (book_id, act_id, user_email, titel, beschreibung, status, chapter_id, sort_order, created_at, updated_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ${NOW_ISO_SQL}, ${NOW_ISO_SQL})
+  INSERT INTO plot_beats (book_id, act_id, user_email, titel, beschreibung, status, chapter_id, intensitaet, sort_order, created_at, updated_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ${NOW_ISO_SQL}, ${NOW_ISO_SQL})
 `);
 const _stmtDeleteBeat = db.prepare('DELETE FROM plot_beats WHERE id = ?');
 const _stmtMaxBeatOrder = db.prepare('SELECT COALESCE(MAX(sort_order), -1) AS m FROM plot_beats WHERE act_id = ?');
@@ -193,11 +193,12 @@ function listBeats(bookId, userEmail) {
     .map(r => ({ ...r, fig_ids: figMap[r.id] || [], draft_fig_ids: draftFigMap[r.id] || [] }));
 }
 
-const createBeat = db.transaction((bookId, actId, userEmail, { titel, beschreibung = null, status = 'geplant', chapterId = null, figureIds = [], draftFigureIds = [], sortOrder = null }) => {
+const createBeat = db.transaction((bookId, actId, userEmail, { titel, beschreibung = null, status = 'geplant', chapterId = null, intensitaet = null, figureIds = [], draftFigureIds = [], sortOrder = null }) => {
   const pos = sortOrder != null ? parseInt(sortOrder) : (_stmtMaxBeatOrder.get(parseInt(actId)).m + 1);
   const info = _stmtInsertBeat.run(
     parseInt(bookId), parseInt(actId), userEmail, titel, beschreibung, status,
-    chapterId != null ? parseInt(chapterId) : null, pos
+    chapterId != null ? parseInt(chapterId) : null,
+    intensitaet != null ? parseInt(intensitaet) : null, pos
   );
   _setBeatFigures(info.lastInsertRowid, figureIds);
   _setBeatDraftFigures(info.lastInsertRowid, draftFigureIds);

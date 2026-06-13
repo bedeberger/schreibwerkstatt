@@ -39,6 +39,13 @@ function _validChapterId(bookId, chapterId) {
   return (r && r.book_id === bookId) ? parseInt(chapterId) : null;
 }
 
+// Spannungswert (1–5) für den Spannungsbogen, sonst NULL. Out-of-Range / Müll → NULL.
+function _validIntensitaet(raw) {
+  if (raw === null || raw === '' || typeof raw === 'undefined') return null;
+  const n = parseInt(raw);
+  return (Number.isInteger(n) && n >= 1 && n <= 5) ? n : null;
+}
+
 // ── Board laden ──────────────────────────────────────────────────────────────
 router.get('/', (req, res) => {
   const userEmail = userEmailOrNull(req);
@@ -129,10 +136,11 @@ router.post('/beats', jsonBody, (req, res) => {
   const beschreibung = req.body?.beschreibung ? String(req.body.beschreibung).slice(0, MAX_BESCHREIBUNG) : null;
   const status = STATUSES.includes(req.body?.status) ? req.body.status : 'geplant';
   const chapterId = _validChapterId(bookId, toIntId(req.body?.chapter_id));
+  const intensitaet = _validIntensitaet(req.body?.intensitaet);
   const figureIds = plotDb.resolveFigureIds(bookId, userEmail, req.body?.figure_ids);
   const draftFigureIds = plotDb.resolveDraftFigureIds(bookId, userEmail, req.body?.draft_figure_ids);
 
-  const beat = plotDb.createBeat(bookId, actId, userEmail, { titel, beschreibung, status, chapterId, figureIds, draftFigureIds });
+  const beat = plotDb.createBeat(bookId, actId, userEmail, { titel, beschreibung, status, chapterId, intensitaet, figureIds, draftFigureIds });
   logger.info(`[plot] beat create id=${beat.id} act=${actId} book=${bookId}`);
   res.json(beat);
 });
@@ -162,6 +170,9 @@ router.patch('/beats/:id', jsonBody, (req, res) => {
   }
   if (typeof req.body?.chapter_id !== 'undefined') {
     fields.chapter_id = _validChapterId(beat.book_id, toIntId(req.body.chapter_id));
+  }
+  if (typeof req.body?.intensitaet !== 'undefined') {
+    fields.intensitaet = _validIntensitaet(req.body.intensitaet);
   }
   // act_id-Move ohne Reorder (z.B. Detail-Edit): act muss zum Buch gehören.
   if (typeof req.body?.act_id !== 'undefined') {
