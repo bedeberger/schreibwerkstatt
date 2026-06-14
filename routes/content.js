@@ -20,6 +20,7 @@ const bookAccess = require('../db/book-access');
 const { db } = require('../db/connection');
 const { localIsoDaysAgo } = require('../lib/local-date');
 const editorBundle = require('../lib/editor-bundle');
+const macclientI18n = require('../lib/macclient-i18n');
 const deviceTokens = require('../db/device-tokens');
 
 const router = express.Router();
@@ -668,6 +669,33 @@ router.get('/editor-bundle.zip', async (req, res) => {
     logger.info(`editor-bundle.zip: ausgeliefert (${client}, ${(buffer.length / 1024).toFixed(0)} KB, etag=${etag.slice(0, 12)})`);
     res.send(buffer);
   } catch (e) { _fail(res, e, 'GET /content/editor-bundle.zip'); }
+});
+
+// GET /content/macclient-i18n.json — OTA-Override der UI-Strings des nativen
+// macOS-Clients (schreibwerkstatt-focuseditor). Body: { de: {…}, en: {…} },
+// flaches Key→Value je Locale. Der Client liefert dieselben Kataloge gebuendelt
+// mit; dieser Endpunkt erlaubt es, einzelne Keys zentral zu ueberschreiben —
+// fehlende Keys fallen im Client auf den gebuendelten Stand zurueck. SSoT der
+// Server-Overrides: assets/macclient-i18n/{de,en}.json (Details in
+// [lib/macclient-i18n.js](../lib/macclient-i18n.js)).
+//
+// Auth: globaler Guard (server.js) — Session ODER Device-Token, wie alle
+// /content/-Routen. ETag = sha256(Body); bei If-None-Match mit passendem ETag →
+// 304 ohne Body, sodass der Client konditional anfragen kann.
+router.get('/macclient-i18n.json', (req, res) => {
+  try {
+    const { etag, body } = macclientI18n.getCatalogs();
+    res.set('ETag', etag);
+    res.set('Cache-Control', 'no-cache'); // immer revalidieren (via If-None-Match)
+    const client = _clientLabel(req);
+    if (req.headers['if-none-match'] === etag) {
+      logger.info(`macclient-i18n.json: 304 unveraendert (${client}, etag=${etag.slice(1, 13)})`);
+      return res.status(304).end();
+    }
+    res.set('Content-Type', 'application/json; charset=utf-8');
+    logger.info(`macclient-i18n.json: ausgeliefert (${client}, ${(Buffer.byteLength(body) / 1024).toFixed(1)} KB, etag=${etag.slice(1, 13)})`);
+    res.send(body);
+  } catch (e) { _fail(res, e, 'GET /content/macclient-i18n.json'); }
 });
 
 module.exports = router;
