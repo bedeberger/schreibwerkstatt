@@ -21,6 +21,15 @@ export function registerUserSettingsCard() {
     dictEntries: [],
     dictOpen: false,
     dictFilter: '',
+    // Device-Tokens (native Clients, z.B. Mac-Focus-Writer)
+    deviceTokensOpen: false,
+    deviceTokensList: [],
+    deviceTokensLoading: false,
+    deviceTokensCreating: false,
+    deviceTokensError: '',
+    deviceTokensNewName: '',
+    deviceTokensJustCreated: null,
+    deviceTokensCopiedAt: 0,
     _savedAtTimer: null,
 
     get dictEntriesFiltered() {
@@ -36,6 +45,7 @@ export function registerUserSettingsCard() {
         if (!visible) return;
         await this.loadUserSettings();
         await this.loadDictEntries();
+        await this.loadDeviceTokens();
       });
 
       this._onViewReset = () => {

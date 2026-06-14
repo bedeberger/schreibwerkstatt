@@ -75,4 +75,77 @@ export const userSettingsMethods = {
       { value: 'typewriter-only', label: app.t('profile.focus.typewriterOnly') },
     ];
   },
+
+  // ── Device-Tokens (native Clients, z.B. Mac-Focus-Writer) ───────────────────
+  // Plain-Token kommt vom Server NUR einmal nach POST und bleibt in
+  // `deviceTokensJustCreated`, bis der User ihn wegklickt. DB haelt nur den Hash.
+
+  async loadDeviceTokens() {
+    this.deviceTokensLoading = true;
+    this.deviceTokensError = '';
+    try {
+      const data = await fetchJson('/me/device-tokens');
+      this.deviceTokensList = Array.isArray(data.tokens) ? data.tokens : [];
+    } catch (e) {
+      this.deviceTokensError = e.message;
+    } finally {
+      this.deviceTokensLoading = false;
+    }
+  },
+
+  async deviceTokensCreate() {
+    const name = (this.deviceTokensNewName || '').trim();
+    if (!name) { this.deviceTokensError = window.__app.t('profile.devices.errorNameRequired'); return; }
+    this.deviceTokensCreating = true;
+    this.deviceTokensError = '';
+    try {
+      const r = await fetch('/me/device-tokens', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ device_name: name }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(window.__app.tError ? window.__app.tError(j) : (j.error_code || `HTTP ${r.status}`));
+      this.deviceTokensJustCreated = j.token;
+      this.deviceTokensNewName = '';
+      await this.loadDeviceTokens();
+    } catch (e) {
+      this.deviceTokensError = e.message;
+    } finally {
+      this.deviceTokensCreating = false;
+    }
+  },
+
+  async deviceTokensRevoke(id) {
+    if (!confirm(window.__app.t('profile.devices.confirmRevoke'))) return;
+    try {
+      const r = await fetch(`/me/device-tokens/${id}/revoke`, { method: 'POST', credentials: 'same-origin' });
+      if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error_code || `HTTP ${r.status}`); }
+      await this.loadDeviceTokens();
+    } catch (e) { this.deviceTokensError = e.message; }
+  },
+
+  async deviceTokensDelete(id) {
+    if (!confirm(window.__app.t('profile.devices.confirmDelete'))) return;
+    try {
+      const r = await fetch(`/me/device-tokens/${id}`, { method: 'DELETE', credentials: 'same-origin' });
+      if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error_code || `HTTP ${r.status}`); }
+      await this.loadDeviceTokens();
+    } catch (e) { this.deviceTokensError = e.message; }
+  },
+
+  async deviceTokensCopyPlain() {
+    const t = this.deviceTokensJustCreated?.plain_token;
+    if (!t) return;
+    try {
+      await navigator.clipboard.writeText(t);
+      this.deviceTokensCopiedAt = Date.now();
+      setTimeout(() => { this.deviceTokensCopiedAt = 0; }, 2000);
+    } catch (_) {}
+  },
+
+  deviceTokensDismissPlain() {
+    this.deviceTokensJustCreated = null;
+  },
 };

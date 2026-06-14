@@ -12,6 +12,7 @@ const { runWithContext } = require('./lib/log-context');
 // DB-Setup + Migrationen laufen beim Import
 const { db, cleanupStuckJobRuns, pruneStaleByAge } = require('./db/schema');
 const appUsers = require('./db/app-users');
+const { tryDeviceAuth } = require('./lib/device-auth');
 const bookAccess = require('./db/book-access');
 const { ensureAdminFromEnv, touchUserLastSeen, addUserActivity } = appUsers;
 const appSettings = require('./lib/app-settings');
@@ -342,6 +343,16 @@ const API_PREFIXES = ['/history/', '/figures/', '/locations/', '/world-facts/', 
 
 app.use((req, res, next) => {
   if (req.session?.user) return next();
+  // Device-Token (native Clients, z.B. Mac-Focus-Writer): Bearer swd_… loest auf
+  // den echten User + dessen echte Rolle auf und respektiert das Status-Gate.
+  // req.session.user wird gesetzt, sodass downstream (ACL, Logging, Activity)
+  // den Request wie eine normale Session behandelt. Bei ungueltigem/fehlendem
+  // Token faellt der Guard auf seinen normalen 401/Redirect-Pfad zurueck.
+  const deviceUser = tryDeviceAuth(req);
+  if (deviceUser) {
+    req.session.user = deviceUser;
+    return next();
+  }
   // Dev-Logout-Marker (gesetzt durch /auth/logout): Auto-Dev-Session unterbinden,
   // damit der User Logout/Login-Flow wie in Prod testen kann. /auth/login raeumt
   // den Marker.

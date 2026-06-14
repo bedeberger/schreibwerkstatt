@@ -1,0 +1,92 @@
+/* Device-Token-Verwaltung (User-Settings → native Clients, z.B. Mac-Focus-Writer).
+   Row-List-Layout (kein Table) — wenige Eintraege pro User. Reveal-Block zeigt
+   den Klartext-Token einmalig nach Create. */
+
+.device-tokens-body {
+  display: grid;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+.device-tokens-reveal {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.device-tokens-reveal-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.device-tokens-plain {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono, monospace);
+  font-size: var(--font-size-sm);
+  word-break: break-all;
+  user-select: all;
+}
+
+.device-tokens-create {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.device-tokens-create input {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+.device-tokens-list {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.device-tokens-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.device-tokens-row.is-revoked {
+  opacity: 0.6;
+}
+
+.device-tokens-row-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.device-tokens-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.device-tokens-meta {
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .device-tokens-row {
+    grid-template-columns: 1fr auto;
+  }
+  .device-tokens-meta {
+    grid-column: 1 / -1;
+    white-space: normal;
+  }
+}

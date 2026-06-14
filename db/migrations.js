@@ -7553,6 +7553,35 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 187 abgeschlossen (plot_threads + plot_beats.thread_id).');
   }
 
+  if (version < 188) {
+    // Device-Tokens fuer native Clients (Mac-Focus-Writer): per-User-Bearer-Token,
+    // damit ein Offline-Client sich ohne interaktiven OIDC-Flow authentifizieren
+    // kann. Getrennt von api_tokens (admin-scoped, Metrics) — diese hier loesen auf
+    // den echten User + dessen echte Rolle auf. Plain-Token nur einmal beim Create
+    // ausgegeben; DB haelt ausschliesslich den SHA-256-Hash. Format `swd_<hex>`.
+    db.exec(`CREATE TABLE IF NOT EXISTS device_tokens (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_email   TEXT NOT NULL REFERENCES app_users(email) ON DELETE CASCADE,
+        token_hash   TEXT NOT NULL UNIQUE,
+        device_name  TEXT NOT NULL,
+        platform     TEXT,
+        scopes       TEXT NOT NULL DEFAULT 'content:read,content:write',
+        last_used_at TEXT,
+        last_used_ip TEXT,
+        expires_at   TEXT,
+        revoked_at   TEXT,
+        created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      )`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_device_tokens_user ON device_tokens(user_email)');
+
+    const fkErrors188 = db.pragma('foreign_key_check');
+    if (fkErrors188.length) {
+      throw new Error(`Migration 188: foreign_key_check meldet ${fkErrors188.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 188').run();
+    logger.info('DB-Migration auf Version 188 abgeschlossen (device_tokens).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

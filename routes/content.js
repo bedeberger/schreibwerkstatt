@@ -158,6 +158,48 @@ router.get('/books/:book_id/changes', aclParamGuard('viewer'), (req, res) => {
   });
 });
 
+// GET /content/books/:book_id/sync?since=<iso>&since_id=<n>&limit=<n> —
+// Inkrementeller Delta-Pull fuer native Offline-Clients (Mac-Focus-Writer).
+// Liefert ALLE seit dem Cursor geaenderten/neuen Seiten des Buchs INKLUSIVE
+// eigener Edits, mit vollem HTML, damit der Client seinen lokalen Spiegel
+// aktualisieren kann. (Unterschied zu /changes: das ist self-exkludierend +
+// ohne HTML, fuer Collab-Toasts.) Ohne `since` = Voll-Pull (Baseline).
+//
+// Keyset-Cursor (updated_at, page_id): die Antwort traegt `cursor` (Position
+// NACH der letzten gelieferten Seite) + `has_more`. Der Client paged mit diesem
+// Cursor weiter, bis has_more=false. Push laeuft ueber den bestehenden
+// PUT /content/pages/:id (409 PAGE_CONFLICT → Block-Merge clientseitig).
+// Geloeschte Seiten: Client reconciled ueber GET /content/books/:id/tree.
+const SYNC_PAGE_LIMIT = 200;
+router.get('/books/:book_id/sync', aclParamGuard('viewer'), async (req, res) => {
+  const sinceRaw = (req.query?.since || '').toString().trim();
+  const since = sinceRaw && !Number.isNaN(Date.parse(sinceRaw)) ? sinceRaw : null;
+  const sinceId = parseInt(req.query?.since_id, 10) || 0;
+  const limit = Math.min(Math.max(parseInt(req.query?.limit, 10) || SYNC_PAGE_LIMIT, 1), SYNC_PAGE_LIMIT);
+  const nowIso = new Date().toISOString();
+  try {
+    // limit+1 ziehen, um has_more ohne zweite Query zu erkennen.
+    const metas = contentStore.pagesChangedSince(req.bookId, { since, sinceId }, limit + 1);
+    const hasMore = metas.length > limit;
+    const wanted = metas.slice(0, limit);
+    const loaded = (await contentStore.loadPagesBatch(
+      wanted.map(m => ({ id: m.id })), req, { onError: () => null }
+    )).filter(Boolean);
+    const pages = loaded.map(p => ({
+      page_id: p.id,
+      page_name: p.name,
+      chapter_id: p.chapter_id,
+      updated_at: p.updated_at,
+      html: p.html,
+    }));
+    const last = wanted.length ? wanted[wanted.length - 1] : null;
+    const cursor = last
+      ? { since: last.updated_at, since_id: last.id }
+      : { since: sinceRaw || null, since_id: sinceId };
+    res.json({ now: nowIso, pages, has_more: hasMore, cursor });
+  } catch (e) { _fail(res, e, 'GET /content/books/:id/sync'); }
+});
+
 // Eigene Sortierung.
 //
 // GET /content/books/:book_id/order — Tree-Snapshot + Audit-Meta. Auto-init:

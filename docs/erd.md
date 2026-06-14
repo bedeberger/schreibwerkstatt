@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 187, 97 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 188, 98 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -1313,6 +1313,19 @@ erDiagram
     TEXT    revoked_at    "Soft-Revoke-Marker"
     TEXT    created_at    "DEFAULT NOW_ISO_SQL"
   }
+  device_tokens {
+    INTEGER id            PK
+    TEXT    user_email    FK "FK app_users(email) ON DELETE CASCADE"
+    TEXT    token_hash    "SHA-256 des Plain-Tokens (swd_…), UNIQUE"
+    TEXT    device_name   "Label fuer User-UI"
+    TEXT    platform      "z.B. 'macos', nullable"
+    TEXT    scopes        "Komma-Liste, Default 'content:read,content:write'"
+    TEXT    last_used_at  "ISO bei jedem Request"
+    TEXT    last_used_ip
+    TEXT    expires_at    "ISO oder NULL = nie"
+    TEXT    revoked_at    "Soft-Revoke-Marker"
+    TEXT    created_at    "DEFAULT NOW_ISO_SQL"
+  }
 
   books            ||--o| blog_connections  : "wp-link"
   blog_connections ||--o{ blog_page_links   : has
@@ -1326,6 +1339,7 @@ erDiagram
   app_users        ||--o{ share_links       : owns
   share_links      ||--o{ share_comments    : has
   app_users        ||--o{ api_tokens        : owns
+  app_users        ||--o{ device_tokens     : owns
 
   chat_sessions ||--o{ chat_messages : has
   user_invites  ||--o{ registration_requests : "linked invite"

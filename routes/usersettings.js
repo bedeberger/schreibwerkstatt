@@ -2,6 +2,7 @@
 const express = require('express');
 const appUsers = require('../db/app-users');
 const { getUser, updateUserSettings } = appUsers;
+const deviceTokens = require('../db/device-tokens');
 const { setContext } = require('../lib/log-context');
 const logger = require('../logger');
 
@@ -150,6 +151,60 @@ router.post('/invite', jsonBody, (req, res) => {
     logger.error(`Self-Invite: ${e.message}`, { user: inviter });
     res.status(500).json({ error_code: 'INVITE_FAILED', detail: e.message });
   }
+});
+
+// ── Device-Tokens (native Clients, z.B. Mac-Focus-Writer) ────────────────────
+// Per-User-Bearer-Token. Klartext verlaesst den Server NUR einmal in der
+// Create-Response; danach existiert in der DB ausschliesslich der Hash.
+
+/** Liste der Device-Tokens des eingeloggten Users (ohne Klartext). */
+router.get('/device-tokens', (req, res) => {
+  const email = req.session.user.email;
+  res.json({ tokens: deviceTokens.listDeviceTokens(email) });
+});
+
+/** Neuen Device-Token ausstellen. Body: { device_name, platform? }.
+ *  Antwort enthaelt `plain_token` — wird nie wieder ausgegeben. */
+router.post('/device-tokens', jsonBody, (req, res) => {
+  const email = req.session.user.email;
+  // Device-Tokens duerfen nicht selbst ueber ein Device-Token ausgestellt werden
+  // (kein Self-Minting offline): nur echte interaktive Sessions.
+  if (req.session.user.via === 'device_token') {
+    return res.status(403).json({ error_code: 'DEVICE_TOKEN_SELF_MINT_FORBIDDEN' });
+  }
+  const deviceName = String(req.body?.device_name || '').trim();
+  if (!deviceName) return res.status(400).json({ error_code: 'DEVICE_NAME_REQUIRED' });
+  const platform = req.body?.platform ? String(req.body.platform).trim() : null;
+  try {
+    const tok = deviceTokens.createDeviceToken({ userEmail: email, deviceName, platform });
+    logger.info(`Device-Token ausgestellt: "${tok.device_name}"`, { user: email });
+    res.json({ token: tok });
+  } catch (e) {
+    logger.error(`Device-Token create: ${e.message}`, { user: email });
+    res.status(500).json({ error_code: 'DEVICE_TOKEN_CREATE_FAILED', detail: e.message });
+  }
+});
+
+/** Device-Token widerrufen (Soft-Revoke, sofort ungueltig). */
+router.post('/device-tokens/:id/revoke', (req, res) => {
+  const email = req.session.user.email;
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isInteger(id)) return res.status(400).json({ error_code: 'INVALID_ID' });
+  const ok = deviceTokens.revokeDeviceToken(id, email);
+  if (!ok) return res.status(404).json({ error_code: 'TOKEN_NOT_FOUND' });
+  logger.info(`Device-Token widerrufen (id=${id})`, { user: email });
+  res.json({ ok: true });
+});
+
+/** Device-Token endgueltig loeschen. */
+router.delete('/device-tokens/:id', (req, res) => {
+  const email = req.session.user.email;
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isInteger(id)) return res.status(400).json({ error_code: 'INVALID_ID' });
+  const ok = deviceTokens.deleteDeviceToken(id, email);
+  if (!ok) return res.status(404).json({ error_code: 'TOKEN_NOT_FOUND' });
+  logger.info(`Device-Token geloescht (id=${id})`, { user: email });
+  res.json({ ok: true });
 });
 
 module.exports = router;
