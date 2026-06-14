@@ -24,7 +24,7 @@ const { htmlToPlainText } = require('../lib/html-text');
 
 const VALID_SOURCES = new Set([
   'focus', 'main', 'book', 'chat-apply', 'lektorat-apply',
-  'import', 'conflict',
+  'import', 'conflict', 'macapp',
 ]);
 
 function _statsFromHtml(html) {

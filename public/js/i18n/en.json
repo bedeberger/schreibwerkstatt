@@ -1840,6 +1840,7 @@
   "editor.revisions.source.lektorat-apply": "Editorial",
   "editor.revisions.source.import":         "Import",
   "editor.revisions.source.conflict":       "Conflict",
+  "editor.revisions.source.macapp":         "Mac app",
   "editor.revisions.viewer.openTitle":      "View this revision's content",
   "editor.revisions.viewer.title":          "Revision #{n}",
   "editor.revisions.viewer.close":          "Close",

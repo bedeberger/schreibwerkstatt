@@ -1841,6 +1841,7 @@
   "editor.revisions.source.lektorat-apply": "Lektorat",
   "editor.revisions.source.import":         "Import",
   "editor.revisions.source.conflict":       "Konflikt",
+  "editor.revisions.source.macapp":         "Mac-App",
   "editor.revisions.viewer.openTitle":      "Inhalt dieser Version ansehen",
   "editor.revisions.viewer.title":          "Revision #{n}",
   "editor.revisions.viewer.close":          "Schliessen",
