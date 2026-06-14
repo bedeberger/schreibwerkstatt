@@ -1,4 +1,5 @@
-// Typewriter-Scroll: hält die Cursor-Zeile in der Viewport-Mitte.
+// Typewriter-Scroll: hält die Cursor-Zeile auf einer konfigurierbaren
+// vertikalen Anker-Position (Default Viewport-Mitte, anchorRatio 0.5).
 //
 // Schwelle dynamisch aus computed line-height — Tippen innerhalb derselben
 // Zeile löst dank Caret-Rect-Jitter sonst Mini-Scrolls aus, die den Editor
@@ -7,6 +8,12 @@
 import { TYPEWRITER_THRESHOLD_PX, prefersReducedMotion } from './constants.js';
 
 export { TYPEWRITER_THRESHOLD_PX };
+
+// Normalisiert den Anker-Ratio auf [0,1]. Ungültig/nicht gesetzt → 0.5 (Mitte),
+// damit das Default-Verhalten pixelidentisch zur fixen Mitten-Variante bleibt.
+function normAnchorRatio(r) {
+  return Number.isFinite(r) && r >= 0 && r <= 1 ? r : 0.5;
+}
 
 export function dynamicTypewriterThreshold(block, fallback = TYPEWRITER_THRESHOLD_PX) {
   if (!block || typeof window === 'undefined' || !window.getComputedStyle) return fallback;
@@ -60,21 +67,24 @@ export function getCaretRect(container, selection) {
   return expandRangeRect(range);
 }
 
-// Pure: wie weit muss gescrollt werden, damit targetRect auf containerRect-
-// Mitte sitzt? Unter Schwelle → no-op. Schwelle ist grob eine Zeilenhöhe,
-// damit Tippen innerhalb derselben Textzeile (Caret-Rect-Jitter, subpixel-
-// Shifts) keinen Mini-Scroll auslöst und der Editor „ruhig" wirkt.
-export function computeTypewriterDelta(containerRect, targetRect, threshold = TYPEWRITER_THRESHOLD_PX) {
+// Pure: wie weit muss gescrollt werden, damit targetRect auf der Anker-Position
+// des containerRect sitzt? `anchorRatio` ist der relative vertikale Anker
+// (0 = oben, 0.5 = Mitte [Default], 0.33 = oberes Drittel). Unter Schwelle →
+// no-op. Schwelle ist grob eine Zeilenhöhe, damit Tippen innerhalb derselben
+// Textzeile (Caret-Rect-Jitter, subpixel-Shifts) keinen Mini-Scroll auslöst und
+// der Editor „ruhig" wirkt.
+export function computeTypewriterDelta(containerRect, targetRect, threshold = TYPEWRITER_THRESHOLD_PX, anchorRatio = 0.5) {
   if (!containerRect || !targetRect) return 0;
+  const ratio = normAnchorRatio(anchorRatio);
   const targetCenter = targetRect.top + targetRect.height / 2;
-  const containerCenter = containerRect.top + containerRect.height / 2;
-  const delta = targetCenter - containerCenter;
+  const containerAnchor = containerRect.top + containerRect.height * ratio;
+  const delta = targetCenter - containerAnchor;
   return Math.abs(delta) < threshold ? 0 : delta;
 }
 
-export function typewriterScroll(container, targetRect, ctx, threshold = TYPEWRITER_THRESHOLD_PX) {
+export function typewriterScroll(container, targetRect, ctx, threshold = TYPEWRITER_THRESHOLD_PX, anchorRatio = 0.5) {
   if (!container || !targetRect) return 0;
-  const delta = computeTypewriterDelta(container.getBoundingClientRect(), targetRect, threshold);
+  const delta = computeTypewriterDelta(container.getBoundingClientRect(), targetRect, threshold, anchorRatio);
   if (delta === 0) return 0;
   // Programmatischen Scroll vorab im Counter ankündigen, damit onScroll uns
   // nicht für eine User-Interaktion hält und unnötig recentert.

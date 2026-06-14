@@ -206,6 +206,23 @@ test('computeTypewriterDelta: null-input → 0', () => {
   assert.equal(computeTypewriterDelta({ top: 0, bottom: 1, height: 1 }, null), 0);
 });
 
+test('computeTypewriterDelta: anchorRatio 0.33 ankert aufs obere Drittel', () => {
+  const cRect = { top: 0, bottom: 1000, height: 1000 }; // oberes Drittel = 330
+  const tRect = { top: 800, bottom: 840, height: 40 };  // Mitte = 820
+  assert.equal(computeTypewriterDelta(cRect, tRect, 16, 0.33), 820 - 330);
+});
+
+test('computeTypewriterDelta: anchorRatio Default/ungültig → Mitte (0.5)', () => {
+  const cRect = { top: 0, bottom: 1000, height: 1000 };
+  const tRect = { top: 800, bottom: 840, height: 40 };  // Mitte = 820
+  const mitte = 820 - 500;
+  // weggelassen, undefined, ausserhalb [0,1], NaN → alle wie 0.5
+  assert.equal(computeTypewriterDelta(cRect, tRect), mitte);
+  assert.equal(computeTypewriterDelta(cRect, tRect, 16, undefined), mitte);
+  assert.equal(computeTypewriterDelta(cRect, tRect, 16, 1.5), mitte);
+  assert.equal(computeTypewriterDelta(cRect, tRect, 16, NaN), mitte);
+});
+
 // --- getCaretRect -----------------------------------------------------------
 
 function mkSelection({

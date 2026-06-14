@@ -565,7 +565,11 @@ export const focusCardMethods = {
           const targetRect = getCaretRect(container);
           if (targetRect) {
             const threshold = dynamicTypewriterThreshold(block);
-            typewriterScroll(container, targetRect, ctx, threshold);
+            // Anker-Position des Typewriter-Scrolls (z.B. Mitte vs. oberes
+            // Drittel). Host-/Config-gesteuert; nicht gesetzt → Default 0.5
+            // (Mitte) via typewriterScroll, also unverändertes Verhalten.
+            const anchorRatio = editorHost()?.typewriterAnchor;
+            typewriterScroll(container, targetRect, ctx, threshold, anchorRatio);
           }
         }
       } catch (err) {

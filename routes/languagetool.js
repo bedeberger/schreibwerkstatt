@@ -58,7 +58,11 @@ router.post('/check', express.json({ limit: '600kb' }), async (req, res) => {
     language = raw && raw !== 'auto' ? raw : 'auto';
   }
 
-  const picky = appSettings.get('languagetool.picky') === true;
+  // Per-Request-Override: Client kann picky:true/false schicken und damit den
+  // serverseitigen Default fuer genau diesen Request uebersteuern. Ohne Feld im
+  // Body bleibt der globale app_settings-Wert massgeblich (Default = heute).
+  const bodyPicky = typeof body.picky === 'boolean' ? body.picky : null;
+  const picky = bodyPicky !== null ? bodyPicky : (appSettings.get('languagetool.picky') === true);
   const pageId = toIntId(body.pageId);
   const log = logger.child({ job: 'lt', user: userEmail || '-', book: bookId || '-' });
 

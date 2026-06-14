@@ -13,6 +13,8 @@
 //   loadPage(): Promise<{ id, name, html }>     — aktuelle Seite + Body
 //   savePage({ id, name, html }): Promise<any>  — lokal persistieren + Sync-Queue
 //   granularity?: string                        — initiale Fokus-Granularität
+//   typewriterAnchor?: number                   — vertikaler Typewriter-Anker
+//                                                 0–1 (0.5 Mitte, 0.33 oberes Drittel)
 //
 // Der Bridge-Host erfüllt denselben Vertrag wie window.__app (siehe
 // shared/editor-host.js): die Engine merkt keinen Unterschied.
@@ -51,6 +53,9 @@ function makeHost(bridge, scheduleSave) {
     editDirty: false,
     editSaving: false,
     focusGranularity: bridge.granularity || 'paragraph',
+    // Vertikaler Typewriter-Anker (0–1). Roh durchgereicht — typewriter.js
+    // normalisiert ungültige/fehlende Werte auf 0.5 (Mitte).
+    typewriterAnchor: bridge.typewriterAnchor,
     currentPage: null,
     renderedPageHtml: null,
     originalHtml: null,

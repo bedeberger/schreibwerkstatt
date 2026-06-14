@@ -31,6 +31,10 @@ const shellState = () => ({
   bossScreenActive: false,
   themePref: 'auto',
   focusGranularity: 'paragraph',
+  // Vertikale Anker-Position des Typewriter-Scrollings im Focus-Editor
+  // (0 = oben, 0.5 = Mitte, 0.33 = oberes Drittel). Default 0.5 = unveraendertes
+  // Verhalten. Primaer fuer fremde Schalen (macOS-Client via Bridge) gedacht.
+  typewriterAnchor: 0.5,
   uiLocale: '',
   defaultRegion: '',
   // App-weite Zeitzone (vom Server via /config → app_settings.app.timezone).

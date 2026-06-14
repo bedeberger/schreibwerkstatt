@@ -77,6 +77,13 @@ body.palette-open { overflow: hidden; overscroll-behavior: contain; }
    erst NACH unserem $nextTick → contenteditable-offsetParent kurz null →
    getActiveEditorContainer fiel auf den Normal-Container zurück → alle Focus-
    Listener am falschen Element → typewriter/highlight/counter/cursor-hide tot). */
+/* Fokus-eigene Dim-Variablen mit Default = heutigem Wert. Der macOS-Client
+   überschreibt sie (z.B. via `<style id="sw-native-typography">` auf :root),
+   ohne das global genutzte --opacity-faint zu verbiegen. */
+.focus-editor {
+  --focus-dim-opacity: var(--opacity-faint);
+  --focus-near-opacity: 0.7;
+}
 .focus-editor:not(.is-active) { display: none; }
 .focus-editor.is-active {
   position: fixed;
@@ -234,7 +241,7 @@ body.palette-open { overflow: hidden; overscroll-behavior: contain; }
    statt 18, deutlich günstiger im Style-Recalc bei jedem Active-Block-Wechsel. */
 .focus-editor.is-active:not(.focus-mode--typewriter-only) .focus-editor__content
   :is(p, h1, h2, h3, h4, h5, h6, blockquote, li, pre):not(.focus-paragraph-active):not(.focus-paragraph-near) {
-  opacity: var(--opacity-faint);
+  opacity: var(--focus-dim-opacity);
   /* Bewusst KEIN transition: vorheriger aktiver Block würde 1.0 → 0.35 faden
      und dabei mid-transition anders rendern (GPU-Subpixel-Aliasing), was als
      „extra grau" auffällt. Snap-Out auf dim. */
@@ -249,7 +256,7 @@ body.palette-open { overflow: hidden; overscroll-behavior: contain; }
 /* Window-3-Modus: Nachbarn (prev/next) bekommen abgeschwächten Mid-Tone,
    damit aktiver Block weiter heraussticht, Kontext aber lesbar bleibt. */
 .focus-editor__content .focus-paragraph-near {
-  opacity: 0.7;
+  opacity: var(--focus-near-opacity);
 }
 
 /* Sentence-Modus: nicht-aktive Sätze im aktiven Block werden via CSS Custom
