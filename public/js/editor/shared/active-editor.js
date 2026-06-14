@@ -4,6 +4,8 @@
 // und der App-State `focusActive` meldet, gewinnt der Focus-Container.
 // Sonst → Normal-Editor-Container.
 
+import { editorHost } from './editor-host.js';
+
 const NORMAL_SELECTOR = '#editor-card .page-content-view--editing';
 // `.is-active` filtert den Skeleton-Cardroot (x-show=false, ohne `.is-active`) aus.
 const FOCUS_SELECTOR = '.focus-editor.is-active .focus-editor__content';
@@ -13,7 +15,7 @@ const FOCUS_SELECTOR = '.focus-editor.is-active .focus-editor__content';
 // ist (offsetParent !== null) — sonst würden Sub-Komponenten in einen
 // unsichtbaren Container schreiben.
 export function getActiveEditorContainer() {
-  const app = typeof window !== 'undefined' ? window.__app : null;
+  const app = editorHost();
   if (app?.focusActive) {
     const focusEl = document.querySelector(FOCUS_SELECTOR);
     if (focusEl && focusEl.offsetParent !== null) return focusEl;
@@ -23,7 +25,7 @@ export function getActiveEditorContainer() {
 
 // 'normal' | 'focus' | null. Beruht auf `focusActive` als SSoT.
 export function getActiveEditorMode() {
-  const app = typeof window !== 'undefined' ? window.__app : null;
+  const app = editorHost();
   if (!app) return null;
   if (app.focusActive) return 'focus';
   if (app.editMode) return 'normal';

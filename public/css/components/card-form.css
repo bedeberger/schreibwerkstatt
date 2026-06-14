@@ -405,6 +405,17 @@ select:focus {
 .card-form-row--top {
   align-items: flex-start;
 }
+/* Klappbare Voll-Breite-Sections im Form-Grid (Wörterbuch, Geräte-Tokens):
+   brechen aus dem 170px/1fr-Raster aus. Sonst wird der .collapsible-toggle in
+   die schmale Label-Spalte gequetscht (Uppercase-Titel bricht um) und der Body
+   sitzt versetzt rechts daneben. Block + Top-Divider = eigenständige Section,
+   Toggle linksbündig als Header, Body fliesst darunter. */
+.card-form-row--dict,
+.card-form-row--devices {
+  display: block;
+  border-top: 0.5px solid var(--color-border);
+  padding-top: var(--space-10);
+}
 .card-form-label {
   font-weight: 700;
   font-size: var(--font-size-sm);

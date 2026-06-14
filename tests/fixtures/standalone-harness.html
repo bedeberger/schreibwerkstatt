@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="de-CH">
+<head>
+  <meta charset="UTF-8">
+  <title>Standalone Focus Bootstrap Harness</title>
+  <!-- Simuliert die fremde Schale (Mac-Focus-Writer in WKWebView): KEIN Alpine,
+       KEINE SPA-Root. Nur das contenteditable + die Focus-Engine via
+       mountStandaloneFocus + ein In-Memory-Bridge-Stub. Verifiziert, dass der
+       Editor-Kern ohne window.__app läuft (setEditorHost). -->
+  <link rel="stylesheet" href="/public/css/tokens.css">
+  <link rel="stylesheet" href="/public/css/editor/focus/focus-mode.css">
+  <style>
+    body { margin: 0; font: 16px/1.6 system-ui, sans-serif; }
+    #mount { height: 100vh; display: flex; flex-direction: column; }
+  </style>
+</head>
+<body>
+  <div id="mount"></div>
+
+  <script type="module">
+    import { mountStandaloneFocus } from '/public/js/editor/focus/standalone.js';
+
+    // 60 Absätze, damit der Container über die Höhe scrollt (Typewriter-Test).
+    let html = '';
+    for (let i = 0; i < 60; i++) {
+      html += `<p>Absatz ${i}: Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>`;
+    }
+
+    const saveLog = [];
+    const bridge = {
+      granularity: 'paragraph',
+      loadPage: async () => ({ id: 42, name: 'Testseite', html }),
+      savePage: async (p) => { saveLog.push({ id: p.id, name: p.name, html: p.html }); return { updated_at: '2026-01-01T00:00:00.000Z' }; },
+    };
+    window.__saveLog = saveLog;
+
+    window.__standalone = await mountStandaloneFocus({ mount: document.getElementById('mount'), bridge, autosaveMs: 150 });
+    window.standaloneReady = true;
+  </script>
+</body>
+</html>
