@@ -27,7 +27,6 @@
 // LT-Browser-Extension-Detection pausiert Highlights solange Extension-Marker
 // im DOM existieren.
 
-import { escHtml } from '../../utils.js';
 import { buildOffsetTable, rangeFromOffset } from './mapping.js';
 
 const DEFAULT_DEBOUNCE_MS = 1500;
@@ -60,6 +59,28 @@ export function createSpellcheckController({
   isEnabled = () => true,
   getDebounceMs = () => DEFAULT_DEBOUNCE_MS,
   i18n = (key) => key,
+  checkText = async ({ text, language, bookId, pageId, signal }) => {
+    const resp = await fetch('/languagetool/check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, language, bookId, pageId }),
+      signal,
+      credentials: 'same-origin',
+    });
+    if (resp.status === 404) return { disabled: true };
+    if (!resp.ok) throw new Error('lt_http_' + resp.status);
+    const json = await resp.json();
+    return { matches: Array.isArray(json.matches) ? json.matches : [] };
+  },
+  addWord = async ({ word, bookId, lang }) => {
+    const resp = await fetch('/dictionary', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ word, bookId, lang }),
+      credentials: 'same-origin',
+    });
+    return resp.ok;
+  },
 }) {
   if (!root) throw new Error('spellcheck: root required');
 
@@ -267,35 +288,24 @@ export function createSpellcheckController({
 
     _updateBadge('loading');
 
+    let result;
     try {
-      const resp = await fetch('/languagetool/check', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: table.text, language, bookId, pageId }),
-        signal: abortCtrl.signal,
-        credentials: 'same-origin',
+      result = await checkText({
+        text: table.text, language, bookId, pageId, signal: abortCtrl.signal,
       });
-      if (resp.status === 404) {
-        _renderMatches([]);
-        _updateBadge('disabled');
-        return;
-      }
-      if (!resp.ok) { _updateBadge('error'); return; }
-      const json = await resp.json();
-      if (myReq !== seq) return; // stale
-      const currentSnap = getHtml ? getHtml() : root.innerHTML;
-      if (currentSnap !== lastHtmlSnapshot) return; // DOM mutated mid-flight
-      const matches = Array.isArray(json.matches) ? json.matches : [];
-      _renderMatches(matches, table);
-      lastCheckedText = table.text;
-      const visibleCount = matches.filter((m) => !ignored.has(_matchId(m))).length;
-      _updateBadge(visibleCount ? 'matches' : 'clean', { count: visibleCount });
     } catch (err) {
-      if (err && err.name !== 'AbortError') {
-        _updateBadge('error');
-        return;
-      }
+      if (err && err.name !== 'AbortError') _updateBadge('error');
+      return;
     }
+    if (myReq !== seq) return; // stale
+    if (result && result.disabled) { _renderMatches([]); _updateBadge('disabled'); return; }
+    const currentSnap = getHtml ? getHtml() : root.innerHTML;
+    if (currentSnap !== lastHtmlSnapshot) return; // DOM mutated mid-flight
+    const matches = (result && Array.isArray(result.matches)) ? result.matches : [];
+    _renderMatches(matches, table);
+    lastCheckedText = table.text;
+    const visibleCount = matches.filter((m) => !ignored.has(_matchId(m))).length;
+    _updateBadge(visibleCount ? 'matches' : 'clean', { count: visibleCount });
   }
 
   function _renderMatches(matches, table) {
@@ -460,13 +470,8 @@ export function createSpellcheckController({
           try {
             const rawLang = getBookLocale ? getBookLocale() : '*';
             const lang = (!rawLang || rawLang === 'auto') ? '*' : rawLang;
-            const resp = await fetch('/dictionary', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ word, bookId: 0, lang }),
-              credentials: 'same-origin',
-            });
-            if (resp.ok) {
+            const ok = await addWord({ word, bookId: 0, lang });
+            if (ok) {
               const entry3 = squiggles.get(matchId);
               if (entry3) {
                 highlights[entry3.category]?.delete(entry3.range);
@@ -765,9 +770,3 @@ export function createSpellcheckController({
 
   return { attach, detach, refresh, isAttached: () => attached };
 }
-
-// XSS-Safety-Hinweis: alle User-/LT-Strings landen via textContent in der DOM
-// (badge.textContent, btn.textContent, msg.textContent). Kein innerHTML mit
-// LT-Response — escHtml ist als Import vorhanden, falls künftig eine
-// hervorgehobene Kontext-Anzeige im Popover gewuenscht ist.
-void escHtml;
