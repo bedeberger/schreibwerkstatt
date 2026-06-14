@@ -7,7 +7,7 @@ const session = require('express-session');
 const SqliteStore = require('better-sqlite3-session-store')(session);
 const path = require('path');
 const logger = require('./logger');
-const { runWithContext } = require('./lib/log-context');
+const { runWithContext, setContext } = require('./lib/log-context');
 
 // DB-Setup + Migrationen laufen beim Import
 const { db, cleanupStuckJobRuns, pruneStaleByAge } = require('./db/schema');
@@ -351,6 +351,10 @@ app.use((req, res, next) => {
   const deviceUser = tryDeviceAuth(req);
   if (deviceUser) {
     req.session.user = deviceUser;
+    // Der ALS-Log-Context wurde oben mit user=null eingefroren (Device-Auth laeuft
+    // erst hier, nach Session-Pruefung) — User nachtragen, damit Mac-Client-Requests
+    // im Log-Tag dem User zugeordnet sind, nicht anonym laufen.
+    setContext({ user: deviceUser.email });
     return next();
   }
   // Dev-Logout-Marker (gesetzt durch /auth/logout): Auto-Dev-Session unterbinden,
