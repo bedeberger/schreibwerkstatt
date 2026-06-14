@@ -20,11 +20,24 @@ const bookAccess = require('../db/book-access');
 const { db } = require('../db/connection');
 const { localIsoDaysAgo } = require('../lib/local-date');
 const editorBundle = require('../lib/editor-bundle');
+const deviceTokens = require('../db/device-tokens');
 
 const router = express.Router();
 router.param('book_id', bookParamHandler);
 
 function _userEmail(req) { return req.session?.user?.email || null; }
+
+// Beschreibt den anfragenden Client fuer Logs. Bei Device-Token-Auth (nativer
+// Mac-Client) loest es Geraetename + Plattform aus dem Token auf, sonst "session".
+function _clientLabel(req) {
+  const u = req.session?.user;
+  if (u?.via !== 'device_token') return 'session';
+  try {
+    const dev = deviceTokens.getDeviceTokenById(u.tokenId);
+    if (dev) return `device "${dev.device_name}"${dev.platform ? ` ${dev.platform}` : ''}`;
+  } catch { /* Lookup-Fehler nie den Bundle-Download blockieren lassen */ }
+  return 'device';
+}
 
 function _pageBookId(pageId) {
   const r = db.prepare('SELECT book_id FROM pages WHERE page_id = ?').get(parseInt(pageId, 10));
@@ -630,9 +643,8 @@ router.post('/books', jsonBody, async (req, res) => {
 // ES-Modul-Import-Closure ab focus.js / focus/standalone.js /
 // shared/editor-host.js / shared/block-merge.js, die Focus-Editor-CSS-Dateien
 // und ein bundle-manifest.json ({ sourceCommit, jsFiles[], cssFiles[] }). KEIN
-// index.html — das Boot-/Bridge-HTML besitzt der Client. Closure-Logik in
-// [lib/editor-bundle.js](../lib/editor-bundle.js) (Spiegel der Build-Referenz
-// bundle-editor.mjs).
+// index.html — das Boot-/Bridge-HTML besitzt der Client. Closure-Logik (SSoT)
+// in [lib/editor-bundle.js](../lib/editor-bundle.js).
 //
 // Auth: greift ueber den globalen Guard (server.js) — Session ODER Device-Token
 // (Bearer swd_…) wie alle /content/-Routen; keine zusaetzliche unauthentifizierte
@@ -646,9 +658,14 @@ router.get('/editor-bundle.zip', async (req, res) => {
     const { etag, buffer } = await editorBundle.getBundle();
     res.set('ETag', etag);
     res.set('Cache-Control', 'no-cache'); // immer revalidieren (via If-None-Match)
-    if (req.headers['if-none-match'] === etag) return res.status(304).end();
+    const client = _clientLabel(req);
+    if (req.headers['if-none-match'] === etag) {
+      logger.info(`editor-bundle.zip: 304 unveraendert (${client}, etag=${etag.slice(0, 12)})`);
+      return res.status(304).end();
+    }
     res.set('Content-Type', 'application/zip');
     res.set('Content-Disposition', 'attachment; filename="editor-bundle.zip"');
+    logger.info(`editor-bundle.zip: ausgeliefert (${client}, ${(buffer.length / 1024).toFixed(0)} KB, etag=${etag.slice(0, 12)})`);
     res.send(buffer);
   } catch (e) { _fail(res, e, 'GET /content/editor-bundle.zip'); }
 });

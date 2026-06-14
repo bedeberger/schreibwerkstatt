@@ -53,6 +53,10 @@ function touchTokenUsage(tokenId, ip) {
     .run(String(ip || '').slice(0, 64), tokenId);
 }
 
+function getDeviceTokenById(id) {
+  return db.prepare('SELECT id, user_email, device_name, platform FROM device_tokens WHERE id = ?').get(id) || null;
+}
+
 function listDeviceTokens(userEmail) {
   return db.prepare(`
     SELECT id, user_email, device_name, platform, scopes,
@@ -84,6 +88,7 @@ module.exports = {
   createDeviceToken,
   findActiveTokenByPlain,
   touchTokenUsage,
+  getDeviceTokenById,
   listDeviceTokens,
   revokeDeviceToken,
   deleteDeviceToken,
