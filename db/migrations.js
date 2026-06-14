@@ -7582,6 +7582,27 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 188 abgeschlossen (device_tokens).');
   }
 
+  if (version < 189) {
+    // Backfill: Legacy-/Seed-Seiten ohne updated_at bekommen einen Nicht-NULL-Wert.
+    // Eine NULL-updated_at-Seite sortiert im Sync-Keyset-Cursor (pagesChangedSince)
+    // ganz nach vorne, der Antwort-Cursor `since` bleibt NULL → der Offline-Client
+    // (Mac-Focus-Writer) kann den Cursor nie vorruecken und zieht bei jedem Poll
+    // erneut den kompletten Baseline-Pull. local_updated_at als beste Quelle, sonst
+    // EPOCH (statisch, damit die Seite ans Anfangsende sortiert ohne NULL zu sein).
+    db.prepare(`
+      UPDATE pages
+         SET updated_at = COALESCE(updated_at, local_updated_at, '1970-01-01T00:00:00.000Z')
+       WHERE updated_at IS NULL
+    `).run();
+
+    const fkErrors189 = db.pragma('foreign_key_check');
+    if (fkErrors189.length) {
+      throw new Error(`Migration 189: foreign_key_check meldet ${fkErrors189.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 189').run();
+    logger.info('DB-Migration auf Version 189 abgeschlossen (pages.updated_at-Backfill).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

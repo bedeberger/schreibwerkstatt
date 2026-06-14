@@ -109,7 +109,9 @@ function _upsertPagesCache(bookId, pages, chapters) {
       _upsertPageCacheStmt.run(
         p.id, bookId, p.name,
         p.chapter_id || null,
-        p.updated_at || null,
+        // updated_at nie NULL schreiben — sonst blockiert die Row den Sync-Keyset-
+        // Cursor (pagesChangedSince). seenAt als Fallback fuer Quellen ohne Stamp.
+        p.updated_at || seenAt,
         seenAt
       );
     }
@@ -387,7 +389,8 @@ router.post('/page-stats/:book_id', express.json(), async (req, res) => {
       const seenAt = new Date().toISOString();
       const want = new Set(requestedIds);
       db.transaction(() => {
-        for (const p of pages) if (want.has(p.id)) stmt.run(p.id, bookId, p.name, p.updated_at || null, seenAt);
+        // updated_at nie NULL — sonst blockiert die Row den Sync-Keyset-Cursor.
+        for (const p of pages) if (want.has(p.id)) stmt.run(p.id, bookId, p.name, p.updated_at || seenAt, seenAt);
       })();
     } else {
       // Full-Backfill: vollwertiger pages-Cache-Update (Chapters, Prune, Reconcile).

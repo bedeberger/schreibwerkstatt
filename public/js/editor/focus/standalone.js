@@ -144,6 +144,22 @@ export async function mountStandaloneFocus({ mount, bridge, autosaveMs = DEFAULT
   return {
     host,
     controller,
+    // Inhalt OHNE Speichern austauschen — für fremde Schalen, die die Seite
+    // wechseln (nativer Picker) oder einen frischeren Server-Stand still
+    // einspielen (Sync-Pull der sauberen offenen Seite). Bewusst KEIN Save:
+    // der neue Stand IST bereits die Quelle der Wahrheit; ein Save würde ihn
+    // mit dem alten Inhalt überschreiben. Fokus-Engine wird neu aufgesetzt.
+    setPage(next) {
+      clearTimeout(saveTimer);
+      controller._focusTeardown();
+      controller._focusState = 'idle';
+      content.innerHTML = (next && next.html) || '<p><br></p>';
+      host.currentPage = next ? { id: next.id, name: next.name } : null;
+      host.renderedPageHtml = content.innerHTML;
+      host.originalHtml = content.innerHTML;
+      host.editDirty = false;
+      controller.enterFocusMode();
+    },
     // Sofort speichern (z.B. vor Fenster-Schliessen / Seitenwechsel).
     async save() {
       clearTimeout(saveTimer);

@@ -19,6 +19,7 @@ const { aclParamGuard, requireBookAccess, sendACLError, ACLError } = require('..
 const bookAccess = require('../db/book-access');
 const { db } = require('../db/connection');
 const { localIsoDaysAgo } = require('../lib/local-date');
+const editorBundle = require('../lib/editor-bundle');
 
 const router = express.Router();
 router.param('book_id', bookParamHandler);
@@ -619,6 +620,37 @@ router.post('/books', jsonBody, async (req, res) => {
       detail: detail || e.message,
     });
   }
+});
+
+// GET /content/editor-bundle.zip — OTA-Bundle des Focus-Editors fuer den nativen
+// macOS-Client (schreibwerkstatt-focuseditor), der die Editor-Assets zur Laufzeit
+// zieht und lokal cacht (statt sie zur Build-Zeit aus dem Repo zu kopieren).
+//
+// Inhalt (strukturerhaltend, Pfade relativ wie unter public/): die transitive
+// ES-Modul-Import-Closure ab focus.js / focus/standalone.js /
+// shared/editor-host.js / shared/block-merge.js, die Focus-Editor-CSS-Dateien
+// und ein bundle-manifest.json ({ sourceCommit, jsFiles[], cssFiles[] }). KEIN
+// index.html — das Boot-/Bridge-HTML besitzt der Client. Closure-Logik in
+// [lib/editor-bundle.js](../lib/editor-bundle.js) (Spiegel der Build-Referenz
+// bundle-editor.mjs).
+//
+// Auth: greift ueber den globalen Guard (server.js) — Session ODER Device-Token
+// (Bearer swd_…) wie alle /content/-Routen; keine zusaetzliche unauthentifizierte
+// Flaeche (Editor-JS waere unter public/js zwar ohnehin oeffentlich).
+//
+// ETag = sha256(sourceCommit + sortierte Datei-Hashes). Bei If-None-Match mit
+// passendem ETag → 304 ohne Body, sodass der Client bei jedem Online-Start
+// konditional anfragen kann, ohne ein unveraendertes Bundle neu zu laden.
+router.get('/editor-bundle.zip', async (req, res) => {
+  try {
+    const { etag, buffer } = await editorBundle.getBundle();
+    res.set('ETag', etag);
+    res.set('Cache-Control', 'no-cache'); // immer revalidieren (via If-None-Match)
+    if (req.headers['if-none-match'] === etag) return res.status(304).end();
+    res.set('Content-Type', 'application/zip');
+    res.set('Content-Disposition', 'attachment; filename="editor-bundle.zip"');
+    res.send(buffer);
+  } catch (e) { _fail(res, e, 'GET /content/editor-bundle.zip'); }
 });
 
 module.exports = router;

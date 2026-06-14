@@ -6,7 +6,7 @@ Schreiben, Lektorat und Buchanalyse mit KI. Eigenständiger Node.js-Service, Mul
 
 ### Schreiben & Editor
 - **Bearbeitungsmodus** (Notebook-Editor) – Seiten direkt bearbeiten. Auto-Save (Idle 60 s / Max 120 s), lokaler Draft (localStorage), Offline-Modus mit Retry, Block-Level-Merge bei parallelen Edits mit Konflikt-Auflösung.
-- **Fokusmodus** (Cmd/Ctrl+Shift+E) – Vollbild, Typewriter-Scroll, Absatz-Hervorhebung. Auto-Save, Schreibzeit-Tracking, Live-Zeichen-/Wortzähler, Mobile-/IME-Support.
+- **Fokusmodus** (Cmd/Ctrl+Shift+E) – Vollbild, Typewriter-Scroll, Absatz-Hervorhebung. Auto-Save, Schreibzeit-Tracking, Live-Zeichen-/Wortzähler, Mobile-/IME-Support. Auch als nativer **macOS-Client** (offline-first, lokaler SQLite-Store + Sync) verfügbar: [schreibwerkstatt-focuseditor](https://github.com/bedeberger/schreibwerkstatt-focuseditor).
 - **Bucheditor** – Ganzes Buch als scrollbarer Stream mit Kapitel-Trennern und Outline. Inline-Edit pro Seite, Save-All sequenziell. Buchweite Suche & Ersetzen (Case/Whole-Word, Treffer-Navigation, Replace-All).
 - **Live-Rechtschreibung** – Optionale LanguageTool-Integration (self-hosted, regelbasiert) auf allen drei Editoren und Prosa-Formularfeldern, mit eigenem Wörterbuch.
 - **Diktat** – Speech-to-Text im Notebook-Editor über einen self-hosted Whisper-Endpunkt (browserseitige Sprachpausen-Erkennung, Text verbatim am Cursor).

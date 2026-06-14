@@ -70,3 +70,50 @@ test('pagesChangedSince: Re-Save (neuer Timestamp) taucht wieder im Delta auf', 
   const after = contentStore.pagesChangedSince(BOOK, { since: cursor.since, sinceId: cursor.since_id }, 200);
   assert.deepEqual(after.map(r => r.id), [1]);
 });
+
+test('pagesChangedSince: Seite ohne updated_at liefert Nicht-NULL-Cursor (kein Baseline-Loop)', () => {
+  const NULL_BOOK = 5003;
+  schema.upsertBookByName(NULL_BOOK, 'Null-Stamp-Buch');
+  // Legacy-/Seed-Seite ganz ohne Timestamp (weder updated_at noch local_updated_at).
+  db.prepare(`
+    INSERT INTO pages (page_id, book_id, page_name, body_html, updated_at, local_updated_at)
+    VALUES (?, ?, ?, ?, NULL, NULL)
+  `).run(200, NULL_BOOK, 'Legacy', '<p>Legacy</p>');
+  db.prepare(`
+    INSERT INTO pages (page_id, book_id, page_name, body_html, updated_at)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(201, NULL_BOOK, 'Frisch', '<p>Frisch</p>', '2026-05-01T08:00:00.000Z');
+
+  // Baseline-Pull: alle Seiten, NULL-Row sortiert ans Anfangsende.
+  const baseline = contentStore.pagesChangedSince(NULL_BOOK, { since: null, sinceId: 0 }, 200);
+  assert.deepEqual(baseline.map(r => r.id), [200, 201]);
+  for (const r of baseline) {
+    assert.ok(r.updated_at != null, 'kein Eintrag darf einen NULL-Cursor-Wert tragen');
+  }
+
+  // Cursor aus der letzten gelieferten Zeile bauen (wie GET /sync). Darf nie NULL sein.
+  const last = baseline[baseline.length - 1];
+  assert.ok(last.updated_at != null, 'Antwort-Cursor `since` darf nie NULL werden');
+
+  // Mit diesem Cursor weiterpollen → keine Seite wird erneut geliefert (kein Loop).
+  const next = contentStore.pagesChangedSince(
+    NULL_BOOK, { since: last.updated_at, sinceId: last.id }, 200
+  );
+  assert.equal(next.length, 0, 'Cursor rueckt monoton vor — keine Endlos-Baseline');
+});
+
+test('pagesChangedSince: Cursor rueckt auch ueber die NULL-Row hinweg vor', () => {
+  const NULL_BOOK = 5003;
+  // Page-by-page mit limit=1 durchpagen: jede Seite genau einmal, monoton.
+  const seen = [];
+  let cursor = { since: null, sinceId: 0 };
+  for (let i = 0; i < 10; i++) {
+    const batch = contentStore.pagesChangedSince(NULL_BOOK, cursor, 1);
+    if (!batch.length) break;
+    const row = batch[0];
+    assert.ok(row.updated_at != null);
+    seen.push(row.id);
+    cursor = { since: row.updated_at, sinceId: row.id };
+  }
+  assert.deepEqual(seen, [200, 201], 'jede Seite genau einmal, in Cursor-Ordnung');
+});
