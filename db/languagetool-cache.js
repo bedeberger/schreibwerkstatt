@@ -28,6 +28,9 @@ const _stmtUpsert = db.prepare(
 const _stmtPurgeForPage = db.prepare(
   `DELETE FROM page_languagetool_cache WHERE page_id = ?`
 );
+const _stmtPageExists = db.prepare(
+  `SELECT 1 FROM pages WHERE page_id = ? LIMIT 1`
+);
 
 function hashText(text) {
   return crypto.createHash('sha1').update(typeof text === 'string' ? text : '').digest('hex');
@@ -43,6 +46,12 @@ function getCached({ pageId, contentHash, lang, picky }) {
 
 function setCached({ pageId, contentHash, lang, picky, matches }) {
   if (!pageId || !contentHash || !lang) return;
+  // Offline-Clients (Mac-Focus-Writer) pruefen LT gegen eine pageId, die
+  // serverseitig noch nicht (oder nicht mehr) existiert -- der LT-Proxy bekommt
+  // den Text ja im Body, braucht die Page nicht. Caching ist dann sinnlos
+  // (FK CASCADE wuerde den Eintrag ohnehin nie aufraeumen koennen): still skip
+  // statt FK-Verletzung zu werfen.
+  if (!_stmtPageExists.get(pageId)) return;
   const json = JSON.stringify(Array.isArray(matches) ? matches : []);
   _stmtUpsert.run(pageId, contentHash, lang, picky ? 1 : 0, json);
 }
