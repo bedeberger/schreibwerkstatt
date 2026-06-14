@@ -40,8 +40,19 @@ function _boardOutline(acts, beats, threadInfo = null) {
         const str = info ? ` {Strang: ${info.name}}` : '';
         return `  - ${b.titel} [${st}]${kap}${str}`;
       });
-    return `AKT: ${act.name}\n${own.length ? own.join('\n') : '  (noch keine Beats)'}`;
+    // Hybrid-Akte: ein Akt kann GETEILT sein (alle Stränge) oder einem Strang
+    // EIGEN gehören (thread_id). Eigene Akte ausweisen, damit die KI versteht,
+    // dass dieser Strang eine unabhängige Aktstruktur hat (kein „fehlt"-Befund).
+    const owner = act.thread_id != null && threadInfo ? threadInfo[act.thread_id] : null;
+    const head = owner ? `AKT (eigener Akt von Strang „${owner.name}"): ${act.name}` : `AKT (geteilt): ${act.name}`;
+    return `${head}\n${own.length ? own.join('\n') : '  (noch keine Beats)'}`;
   }).join('\n\n');
+}
+
+// Haben Stränge eine eigene Aktstruktur (Hybrid)? Dann lohnt der Erklär-Hinweis,
+// dass geteilte und strang-eigene Akte nebeneinander existieren.
+function _hasOwnActs(acts) {
+  return (acts || []).some(a => a && a.thread_id != null);
 }
 
 // Handlungsstränge (Swimlanes) als Block: Name + optional gebundene Hauptfigur +
@@ -208,6 +219,9 @@ export function buildPlotConsistencyPrompt(acts, beats, kapitel = [], szenen = [
     ? '\nVERERBUNG: Ein Beat in einem Strang beteiligt IMPLIZIT dessen Hauptfigur; hat er kein eigenes Kapitel, gilt das Kapitel des Strangs (im Board als „(vom Strang)" markiert). Beanstande einen Beat NICHT als „Figur fehlt"/„Kapitel fehlt", wenn der Strang sie liefert.\n'
     : '';
   const strSeg = strLines ? `\nHANDLUNGSSTRÄNGE (Swimlanes — parallele Erzähllinien, oft je Hauptfigur; im Board hinter den Beats als {Strang: …} annotiert):\n${strLines}\n${inheritNote}` : '';
+  const hybridNote = _hasOwnActs(acts)
+    ? '\nHYBRID-AKTE: Manche Stränge haben eine EIGENE Aktstruktur (im Board als „eigener Akt von Strang …" gekennzeichnet), andere teilen sich die geteilten Akte. Ein Strang mit eigenen Akten plant absichtlich unabhängig — beanstande NICHT, dass er die geteilten Akte „überspringt". Prüfe seinen dramaturgischen Bogen INNERHALB seiner eigenen Akte.\n'
+    : '';
   // Strang-spezifische Prüfpunkte nur ergänzen, wenn überhaupt Stränge existieren.
   const strChecks = strLines
     ? `
@@ -220,7 +234,7 @@ export function buildPlotConsistencyPrompt(acts, beats, kapitel = [], szenen = [
 
 GEPLANTES BEAT-BOARD:
 ${_boardOutline(acts, beats, _threadInfoMap(threads))}
-${ctxSeg}${kapSeg}${szSeg}${figSeg}${wfSeg}${strSeg}
+${ctxSeg}${kapSeg}${szSeg}${figSeg}${wfSeg}${strSeg}${hybridNote}
 Status-Legende der Beats: geplant (noch nicht geschrieben) · Entwurf (in Arbeit) · im Buch (laut Plan schon geschrieben) · verworfen (ausgemustert).
 
 Prüfe auf:

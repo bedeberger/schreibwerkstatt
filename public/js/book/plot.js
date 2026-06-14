@@ -77,6 +77,7 @@ export const plotMethods = {
     this.editingActId = null;
     this.actDraft = '';
     this.addingAct = false;
+    this.addingActScope = false;
     this.newActName = '';
     this.editingThreadId = null;
     this.addingThread = false;
@@ -149,6 +150,56 @@ export const plotMethods = {
         .sort((a, b) => a.position - b.position)
         .map(t => ({ id: t.id, thread: t, isDefault: false }));
       rows.push({ id: null, thread: null, isDefault: true });
+      return rows;
+    });
+  },
+
+  // ── Hybrid-Akte (Derived) ───────────────────────────────────────────────────
+  // Geteilte Akte (thread_id NULL) — die Spalten des flachen Boards und aller
+  // Stränge ohne eigene Aktstruktur.
+  sharedActs() {
+    return this._memo('sharedActs', [this.acts], () =>
+      (this.acts || []).filter(a => a.thread_id == null).sort((a, b) => a.position - b.position));
+  },
+
+  // Strang-eigene Akte (thread_id === threadId), positionsgeordnet.
+  actsForThread(threadId) {
+    return this._memo(`tacts:${threadId}`, [this.acts, threadId], () =>
+      (this.acts || []).filter(a => a.thread_id === threadId).sort((a, b) => a.position - b.position));
+  },
+
+  // Hat der Strang eine eigene Aktstruktur (≥1 strang-eigener Akt)? Aus den Daten
+  // abgeleitet — kein Flag (kein Drift). Für null (ohne Strang) immer false.
+  _threadHasOwn(threadId) {
+    return threadId != null && (this.acts || []).some(a => a.thread_id === threadId);
+  },
+  threadHasOwnActs(threadId) { return this._threadHasOwn(threadId); },
+
+  // Render-Plan des Grids als flache Zeilen-Deskriptoren (eine x-for-Schleife im
+  // Partial, je Deskriptor ein Header- ODER Lane-Block). So bleibt das (grosse)
+  // Beat-Zell-Markup an EINER Stelle, obwohl geteilte Lanes und strang-eigene
+  // Blöcke unterschiedliche Spalten-Sets (acts) tragen:
+  //   - Geteilte Region: ein Header (sharedActs) + alle Lanes ohne eigene Akte
+  //     (inkl. „ohne Strang") — Spalten richten sich aus.
+  //   - Pro Strang mit eigener Aktstruktur: ein eigener Header (seine Akte) + seine
+  //     Lane darunter (eigene Spaltenzahl, nicht ausgerichtet — gewollt).
+  // kind: 'header' → { acts, thread } ; kind: 'lane' → { lane, acts }.
+  gridRows() {
+    return this._memo('gridRows', [this.acts, this.threads], () => {
+      const lanes = this.threadLanes();
+      const shared = this.sharedActs();
+      const rows = [];
+      const sharedLanes = lanes.filter(l => l.isDefault || !this._threadHasOwn(l.id));
+      if (sharedLanes.length) {
+        rows.push({ kind: 'header', key: 'h:shared', acts: shared, thread: null });
+        for (const l of sharedLanes) rows.push({ kind: 'lane', key: `l:${l.id ?? 'none'}`, lane: l, acts: shared });
+      }
+      for (const l of lanes) {
+        if (l.isDefault || !this._threadHasOwn(l.id)) continue;
+        const own = this.actsForThread(l.id);
+        rows.push({ kind: 'header', key: `h:${l.id}`, acts: own, thread: l.thread });
+        rows.push({ kind: 'lane', key: `l:${l.id}`, lane: l, acts: own });
+      }
       return rows;
     });
   },
@@ -453,15 +504,23 @@ export const plotMethods = {
   },
 
   // Akt-Reihenfolge per Pfeil-Button verschieben (a11y statt Drag der Spalten).
+  // Position ist PRO SCOPE (geteilt vs. strang-eigen) — nur innerhalb desselben
+  // thread_id-Scopes umsortieren, der andere Scope bleibt unberührt.
   async moveAct(act, dir) {
     const app = window.__app;
-    const ordered = [...this.acts].sort((a, b) => a.position - b.position);
+    const scope = act.thread_id ?? null;
+    const ordered = (this.acts || [])
+      .filter(a => (a.thread_id ?? null) === scope)
+      .sort((a, b) => a.position - b.position);
     const idx = ordered.findIndex(a => a.id === act.id);
     const swap = idx + dir;
     if (idx < 0 || swap < 0 || swap >= ordered.length) return;
     [ordered[idx], ordered[swap]] = [ordered[swap], ordered[idx]];
     ordered.forEach((a, i) => { a.position = i; });
-    this.acts = ordered;
+    // Nur die Akte dieses Scopes ersetzen, der Rest bleibt.
+    const byId = new Map(ordered.map(a => [a.id, a]));
+    this.acts = (this.acts || []).map(a => byId.get(a.id) || a);
+    this._memos = {};
     try {
       await fetchJson('/plot/acts/order', {
         method: 'PUT',
@@ -469,6 +528,82 @@ export const plotMethods = {
         body: JSON.stringify({ book_id: app.selectedBookId, order: ordered.map(a => a.id) }),
       });
     } catch (e) { this.errorMessage = app.t('plot.error.save'); }
+  },
+
+  // ── Akt scoped hinzufügen (Grid: geteilt ODER strang-eigen) ─────────────────
+  // addingActScope: false = aus, null = geteilter Akt, <threadId> = strang-eigen.
+  // Datenattribut-Schlüssel fürs Fokussieren: 'shared' bzw. die Strang-ID.
+  _addActScopeKey(threadId) { return threadId == null ? 'shared' : String(threadId); },
+
+  startAddAct(threadId = null) {
+    this.addingActScope = threadId;
+    this.newActName = '';
+    this.$nextTick(() => {
+      const sel = `[data-add-act-scope="${this._addActScopeKey(threadId)}"] .plot-new-act-input`;
+      this.$root?.querySelector(sel)?.focus();
+    });
+  },
+  cancelAddAct() { this.addingActScope = false; this.newActName = ''; },
+
+  async addActScoped() {
+    const app = window.__app;
+    const threadId = this.addingActScope; // false darf hier nicht ankommen
+    const name = (this.newActName || '').trim();
+    if (!name) { this.errorMessage = app.t('plot.error.nameRequired'); return; }
+    this.busy = true;
+    try {
+      const act = await fetchJson('/plot/acts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ book_id: app.selectedBookId, name, thread_id: threadId == null ? null : threadId }),
+      });
+      this.acts = [...this.acts, act];
+      this._memos = {};
+      this.newActName = '';
+      this.addingActScope = false;
+      this.errorMessage = '';
+    } catch (e) {
+      this.errorMessage = app.t('plot.error.save');
+    } finally { this.busy = false; }
+  },
+
+  // ── Hybrid-Akte: eigene Aktstruktur eines Strangs an-/ausschalten ───────────
+  // Aktivieren klont die geteilten Akte in den Strang (Server) und hängt dessen
+  // Beats auf die Klone um — danach Board neu laden (act_id-Remap betrifft viele
+  // Beats, lokales Spiegeln wäre fehleranfällig).
+  async forkThreadActs(thread) {
+    const app = window.__app;
+    if (!this.sharedActs().length) { this.errorMessage = app.t('plot.thread.forkNoActs'); return; }
+    if (!await app.appConfirm({
+      message: app.t('plot.thread.confirmFork', { name: thread.name }),
+      confirmLabel: app.t('plot.thread.ownActs'),
+    })) return;
+    this.busy = true;
+    try {
+      await fetchJson(`/plot/threads/${thread.id}/fork-acts`, { method: 'POST' });
+      await this.loadBoard();
+      this.errorMessage = '';
+    } catch (e) {
+      this.errorMessage = app.t('plot.error.save');
+    } finally { this.busy = false; }
+  },
+
+  // Auflösen: Beats positionsweise zurück auf die geteilten Akte, eigene Akte weg.
+  async unforkThreadActs(thread) {
+    const app = window.__app;
+    if (!await app.appConfirm({
+      message: app.t('plot.thread.confirmUnfork', { name: thread.name }),
+      confirmLabel: app.t('plot.thread.sharedActs'),
+      danger: true,
+    })) return;
+    this.busy = true;
+    try {
+      await fetchJson(`/plot/threads/${thread.id}/fork-acts`, { method: 'DELETE' });
+      await this.loadBoard();
+      this.errorMessage = '';
+    } catch (e) {
+      this.errorMessage = app.t('plot.error.save');
+    } finally { this.busy = false; }
   },
 
   // ── Stränge (Swimlanes, CRUD) ───────────────────────────────────────────────

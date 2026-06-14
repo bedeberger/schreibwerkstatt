@@ -239,6 +239,51 @@ test('Enter in <p> splittet sauber in zwei <p> (Standardfall)', async ({ page })
   expect(await page.locator(`${EDITOR} > div`).count()).toBe(0);
 });
 
+test('Shift+Enter erzeugt <br> im selben <p> (kein neuer Absatz, kein <div>)', async ({ page }) => {
+  // Gegenstück zum insertParagraph-Test: Shift+Enter löst insertLineBreak aus.
+  // Der onInput-Handler in card.js behandelt insertLineBreak wie
+  // insertParagraph (synchrone Block-Markierung, kein Dim-Flash), darf aber
+  // KEINEN neuen <p> erzeugen — der Soft-Break bleibt als <br> im selben
+  // Absatz. Bisher war nur der Output-Cleaner (collapseEmptyBlocks) auf <br>
+  // getestet, nicht der Eingabepfad im Fokus-Editor.
+  await page.evaluate(() => window.harness.startEdit());
+  await enter(page);
+
+  const before = await page.locator(`${EDITOR} > p`).count();
+
+  // Caret mitten in den Text von Absatz 3 setzen (Offset 10, nicht an den
+  // Rand), damit der Umbruch sichtbar innerhalb des Absatzes landet.
+  await page.evaluate(() => {
+    const p = document.querySelectorAll('#editor-card .focus-editor__content > p')[3];
+    const range = document.createRange();
+    range.setStart(p.firstChild, 10);
+    range.collapse(true);
+    getSelection().removeAllRanges();
+    getSelection().addRange(range);
+  });
+
+  await page.keyboard.press('Shift+Enter');
+  await page.waitForTimeout(50);
+
+  // Absatz-Anzahl unverändert: Shift+Enter splittet NICHT in zwei <p>.
+  expect(await page.locator(`${EDITOR} > p`).count()).toBe(before);
+  expect(await page.locator(`${EDITOR} > div`).count()).toBe(0);
+
+  // Der bearbeitete Absatz enthält jetzt einen <br>.
+  const brCount = await page.evaluate(() =>
+    document.querySelectorAll('#editor-card .focus-editor__content > p')[3].querySelectorAll('br').length);
+  expect(brCount).toBeGreaterThanOrEqual(1);
+
+  // Aktiv-Markierung bleibt auf demselben Absatz (insertLineBreak-Zweig in
+  // card.js setzt den Block synchron, RAF reconciliiert auf denselben).
+  const activeIsP3 = await page.evaluate(() => {
+    const active = document.querySelector('#editor-card .focus-editor__content .focus-paragraph-active');
+    const p3 = document.querySelectorAll('#editor-card .focus-editor__content > p')[3];
+    return active === p3;
+  });
+  expect(activeIsP3).toBe(true);
+});
+
 test('Enter im Fokus-Mode zentriert auf den neuen Absatz (Typewriter-Scroll)', async ({ page }) => {
   // Regression: vor defaultParagraphSeparator=p erzeugte Enter <div>, das
   // nicht in BLOCK_TAGS ist → findBlockFromNode lieferte null → kein

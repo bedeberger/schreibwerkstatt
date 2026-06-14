@@ -338,9 +338,97 @@ test('plot DB: updateBeat kann thread_id setzen + nullen (PATCH-Pfad)', () => {
   plot.deleteThread(thread.id);
 });
 
+// ── Hybrid-Akte (eigene Aktstruktur pro Strang) ──────────────────────────────
+
+test('plot DB: forkThreadActs klont geteilte Akte in den Strang + hängt Beats um', () => {
+  const a1 = plot.createAct(BOOK, USER, { name: 'H-A1' });
+  const a2 = plot.createAct(BOOK, USER, { name: 'H-A2' });
+  const t = plot.createThread(BOOK, USER, { name: 'Fork-Strang' });
+  const beat = plot.createBeat(BOOK, a1.id, USER, { titel: 'geforkt', threadId: t.id });
+  // Geteilte Akte vor dem Fork (das Test-BOOK kann Akte aus anderen Tests tragen).
+  const sharedBefore = plot.listActs(BOOK, USER).filter(a => a.thread_id == null).length;
+
+  assert.equal(plot.threadHasOwnActs(BOOK, USER, t.id), false);
+  plot.forkThreadActs(BOOK, USER, t.id);
+  assert.equal(plot.threadHasOwnActs(BOOK, USER, t.id), true);
+
+  // Es gibt jetzt strang-eigene Klone (thread_id = t.id), je geteiltem Akt einen.
+  const own = plot.listActs(BOOK, USER).filter(a => a.thread_id === t.id);
+  assert.equal(own.length, sharedBefore);
+  assert.ok(own.some(a => a.name === 'H-A1') && own.some(a => a.name === 'H-A2'));
+
+  // Der Beat sitzt nicht mehr auf dem geteilten Akt, sondern auf dem H-A1-Klon.
+  const moved = plot.getBeat(beat.id);
+  assert.notEqual(moved.act_id, a1.id);
+  assert.equal(moved.thread_id, t.id);
+  assert.equal(plot.getAct(moved.act_id).name, 'H-A1');
+
+  plot.deleteThread(t.id);
+  plot.deleteAct(a1.id);
+  plot.deleteAct(a2.id);
+});
+
+test('plot DB: unforkThreadActs hängt Beats zurück auf geteilte Akte + löscht eigene', () => {
+  const a1 = plot.createAct(BOOK, USER, { name: 'U-A1' });
+  const t = plot.createThread(BOOK, USER, { name: 'Unfork-Strang' });
+  const beat = plot.createBeat(BOOK, a1.id, USER, { titel: 'zurück', threadId: t.id });
+  plot.forkThreadActs(BOOK, USER, t.id);
+  assert.equal(plot.threadHasOwnActs(BOOK, USER, t.id), true);
+
+  plot.unforkThreadActs(BOOK, USER, t.id);
+  assert.equal(plot.threadHasOwnActs(BOOK, USER, t.id), false);
+  // Beat lebt weiter und sitzt wieder auf einem geteilten Akt (thread_id NULL).
+  const back = plot.getBeat(beat.id);
+  assert.equal(back.act_id, a1.id);
+  const act = plot.getAct(back.act_id);
+  assert.equal(act.thread_id, null);
+
+  plot.deleteThread(t.id);
+  plot.deleteAct(a1.id);
+});
+
+test('plot DB: deleteThread mit eigenen Akten verliert keine Beats (auf geteilte umgehängt)', () => {
+  const a1 = plot.createAct(BOOK, USER, { name: 'D-A1' });
+  const t = plot.createThread(BOOK, USER, { name: 'Del-Strang' });
+  const beat = plot.createBeat(BOOK, a1.id, USER, { titel: 'überlebt', threadId: t.id });
+  plot.forkThreadActs(BOOK, USER, t.id);
+
+  plot.deleteThread(t.id);
+  const survivor = plot.getBeat(beat.id);
+  assert.ok(survivor, 'Beat überlebt die Strang-Löschung');
+  assert.equal(survivor.thread_id, null, 'fällt in die „ohne Strang"-Lane');
+  assert.equal(survivor.act_id, a1.id, 'sitzt auf dem geteilten Akt');
+
+  plot.deleteAct(a1.id);
+});
+
+test('plot DB: createAct mit threadId nummeriert position pro Scope', () => {
+  const shared = plot.createAct(BOOK, USER, { name: 'S-A1' });
+  const t = plot.createThread(BOOK, USER, { name: 'Scope-Strang' });
+  const own1 = plot.createAct(BOOK, USER, { name: 'O-A1', threadId: t.id });
+  const own2 = plot.createAct(BOOK, USER, { name: 'O-A2', threadId: t.id });
+  // Strang-eigene Akte starten ihre eigene 0..n-Sequenz, unabhängig von geteilten.
+  assert.equal(own1.thread_id, t.id);
+  assert.equal(own1.position, 0);
+  assert.equal(own2.position, 1);
+
+  plot.deleteThread(t.id);
+  plot.deleteAct(shared.id);
+});
+
 // ── Prompts ──────────────────────────────────────────────────────────────────
 
 const prompts = await import('../../public/js/prompts/plot.js');
+
+test('plot prompts: Board-Outline kennzeichnet geteilte vs. strang-eigene Akte + Hybrid-Hinweis', () => {
+  const acts = [{ id: 1, name: 'Geteilt' }, { id: 2, name: 'Eigen', thread_id: 7 }];
+  const beats = [{ id: 9, act_id: 2, thread_id: 7, titel: 'B', status: 'geplant', chapter_name: null }];
+  const threads = [{ id: 7, name: 'Mara', figur: null }];
+  const out = prompts.buildPlotConsistencyPrompt(acts, beats, [], [], [], '', [], threads);
+  assert.ok(out.includes('AKT (geteilt): Geteilt'));
+  assert.ok(out.includes('eigener Akt von Strang „Mara"'));
+  assert.ok(out.includes('HYBRID-AKTE'));
+});
 
 test('plot prompts: Brainstorm nennt Ziel-Akt + listet Board + Werkstatt-Figuren + verlangt JSON', () => {
   const acts = [{ id: 1, name: 'Akt 1' }, { id: 2, name: 'Akt 2' }];
@@ -348,7 +436,7 @@ test('plot prompts: Brainstorm nennt Ziel-Akt + listet Board + Werkstatt-Figuren
   const out = prompts.buildPlotBrainstormPrompt('Akt 2', acts, beats, 'Krimi',
     [{ name: 'Anna', typ: 'Prot' }], ['Kap 1'], [{ name: 'Mara', archetype: 'mentor' }]);
   assert.ok(out.includes('Akt 2'));
-  assert.ok(out.includes('AKT: Akt 1'));
+  assert.ok(out.includes('AKT (geteilt): Akt 1'));
   assert.ok(out.includes('Auftakt'));
   assert.ok(out.includes('FIGUREN-WERKSTATT'));
   assert.ok(out.includes('Mara'));

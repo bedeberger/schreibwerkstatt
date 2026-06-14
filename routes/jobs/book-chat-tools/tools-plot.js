@@ -112,6 +112,8 @@ function tool_get_plot_board(input, ctx) {
         id: a.id,
         name: a.name,
         ...(a.farbe ? { farbe: a.farbe } : {}),
+        // Hybrid-Akte: ein Akt ist GETEILT (alle Stränge) oder gehört EINEM Strang.
+        ...(a.thread_id != null ? { eigener_akt_von_strang: threadNameById[a.thread_id] || null } : {}),
         beat_count: beats.length,
         beats,
       };
@@ -125,7 +127,7 @@ function tool_get_plot_board(input, ctx) {
     status_counts: statusCounts,
     ...(statusFilter ? { status_filter: statusFilter } : {}),
     status_legende: 'geplant = noch nicht geschrieben · entwurf = in Arbeit · im_buch = im Manuskript umgesetzt · verworfen = aufgegeben',
-    ...(threadList.length ? { strang_hinweis: 'threads = parallele Erzähllinien (Swimlanes), oft je Hauptfigur, optional mit gebundenem Kapitel. Jeder Beat trägt sein thread-Feld (Strang-Name oder null = ohne Strang). Beats erben die Hauptfigur (geerbte_figur) und — ohne eigenes Kapitel — das Kapitel (geerbtes_kapitel) ihres Strangs implizit.' } : {}),
+    ...(threadList.length ? { strang_hinweis: 'threads = parallele Erzähllinien (Swimlanes), oft je Hauptfigur, optional mit gebundenem Kapitel. Jeder Beat trägt sein thread-Feld (Strang-Name oder null = ohne Strang). Beats erben die Hauptfigur (geerbte_figur) und — ohne eigenes Kapitel — das Kapitel (geerbtes_kapitel) ihres Strangs implizit. Akte ohne eigener_akt_von_strang sind GETEILT (gelten für alle Stränge); ein Akt mit eigener_akt_von_strang gehört nur diesem Strang (Hybrid — dieser Strang plant mit einer eigenen Aktstruktur).' } : {}),
   });
 }
 

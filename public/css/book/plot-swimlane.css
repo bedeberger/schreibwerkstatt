@@ -58,8 +58,21 @@
     gap: var(--space-sm);
     min-width: max-content; /* erzwingt Zeilenbreite = Lane + alle Akt-Zellen → H-Scroll */
   }
+  /* display:contents-Wrapper: die x-for-Schleife (gridRows) braucht EIN Wurzel-
+     Element pro Iteration, aber Header/Lane sollen direkte Flex-Kinder von
+     .plot-swim bleiben (sticky-left + max-content-Breite). contents blendet die
+     Wrapper-Box aus, sodass die Zeile selbst zum Flex-Item wird. */
+  .plot-swim-rowgroup { display: contents; }
   .plot-swim-row { display: flex; gap: var(--space-sm); align-items: stretch; }
   .plot-swim-row--header { align-items: flex-end; }
+  /* Strang-eigene Aktstruktur (Hybrid): die Kopfzeile bekommt etwas Luft nach
+     oben, damit der eigene Block optisch vom geteilten Raster getrennt ist. */
+  .plot-swim-row--ownhead { margin-top: var(--space-md); }
+  .plot-swim-corner--thread {
+    font-weight: 600;
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+  }
 
   /* ── Sticky linke Spalte: Ecke + Lane-Labels ────────────────────────────── */
   .plot-swim-corner,
@@ -148,6 +161,25 @@
   .plot-swim-cell-foot { display: flex; gap: var(--space-2xs); }
   /* Kompakte Icon-Add-/Brainstorm-Buttons in der Zelle (Basis: .plot-add-beat-btn). */
   .plot-add-beat-btn--cell { flex: 1 1 auto; width: auto; padding: var(--space-2xs); }
+
+  /* ── Akt scoped hinzufügen (Kopfzeile, geteilt bzw. strang-eigen) ─────────── */
+  .plot-swim-acthead--add {
+    align-items: flex-end;
+    border-bottom: 2px dashed var(--color-border);
+  }
+  .plot-add-act-btn--head {
+    width: auto;
+    padding: var(--space-2xs) var(--space-xs);
+    margin-bottom: var(--space-xs);
+  }
+
+  /* „Eigene Akte"-Marker im Lane-Label + aktiver Fork-Toggle. */
+  .plot-swim-lane-ownacts {
+    font-size: var(--font-size-micro);
+    font-weight: 600;
+    color: var(--col-accent);
+  }
+  .plot-icon-btn--on { color: var(--col-accent); }
 
   /* ── Vollbild: Grid füllt den Viewport fluid auf (Pendant zu .plot-board) ───
      `width: max-content; min-width: 100%` ⇒ effektive Breite = max(Inhalt, 100%):

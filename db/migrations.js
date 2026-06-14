@@ -7692,6 +7692,29 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 192 abgeschlossen (plot_threads.chapter_id).');
   }
 
+  if (version < 193) {
+    // Hybrid-Akte: ein Handlungsstrang kann optional eine EIGENE Aktstruktur haben
+    // (statt der geteilten Akte). plot_acts.thread_id NULL = geteilter Akt (Default,
+    // flaches Board + alle Stränge ohne eigene Akte); thread_id = T = Akt gehört nur
+    // Strang T. „Eigene Akte" wird aus der Existenz strang-eigener Akte abgeleitet
+    // (kein Flag). ON DELETE CASCADE: Strang löschen entfernt seine eigenen Akte —
+    // die zugehörigen Beats werden in routes/db VOR dem Löschen auf geteilte Akte
+    // umgehängt (Invariante „Strang löschen ≠ Beats löschen"). Additiv: nullable FK
+    // ohne Default, kein Recreate nötig (analog plot_beats.thread_id, Migration 187).
+    const actCols193 = db.pragma('table_info(plot_acts)').map(c => c.name);
+    if (!actCols193.includes('thread_id')) {
+      db.exec('ALTER TABLE plot_acts ADD COLUMN thread_id INTEGER REFERENCES plot_threads(id) ON DELETE CASCADE');
+    }
+    db.exec('CREATE INDEX IF NOT EXISTS idx_plot_acts_thread ON plot_acts(thread_id)');
+
+    const fkErrors193 = db.pragma('foreign_key_check');
+    if (fkErrors193.length) {
+      throw new Error(`Migration 193: foreign_key_check meldet ${fkErrors193.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 193').run();
+    logger.info('DB-Migration auf Version 193 abgeschlossen (plot_acts.thread_id — Hybrid-Akte pro Strang).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

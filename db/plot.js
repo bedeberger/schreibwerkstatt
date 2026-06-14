@@ -16,15 +16,17 @@ const { NOW_ISO_SQL } = require('./now');
 
 // ── Akte ─────────────────────────────────────────────────────────────────────
 
+// thread_id NULL = geteilter Akt (Default, flaches Board + Stränge ohne eigene
+// Akte); thread_id = T = Akt gehört nur Strang T (Hybrid-Akte, Migration 193).
 const _stmtListActs = db.prepare(`
-  SELECT id, book_id, user_email, name, farbe, position, created_at, updated_at
+  SELECT id, book_id, user_email, name, farbe, thread_id, position, created_at, updated_at
     FROM plot_acts
    WHERE book_id = ? AND user_email = ?
    ORDER BY position, id
 `);
 const _stmtInsertAct = db.prepare(`
-  INSERT INTO plot_acts (book_id, user_email, name, farbe, position, created_at, updated_at)
-  VALUES (?, ?, ?, ?, ?, ${NOW_ISO_SQL}, ${NOW_ISO_SQL})
+  INSERT INTO plot_acts (book_id, user_email, name, farbe, thread_id, position, created_at, updated_at)
+  VALUES (?, ?, ?, ?, ?, ?, ${NOW_ISO_SQL}, ${NOW_ISO_SQL})
 `);
 const _stmtGetAct = db.prepare('SELECT * FROM plot_acts WHERE id = ?');
 const _stmtUpdateAct = db.prepare(`
@@ -34,7 +36,9 @@ const _stmtSetActPosition = db.prepare(`
   UPDATE plot_acts SET position = ?, updated_at = ${NOW_ISO_SQL} WHERE id = ? AND book_id = ? AND user_email = ?
 `);
 const _stmtDeleteAct = db.prepare('DELETE FROM plot_acts WHERE id = ?');
-const _stmtMaxActPos = db.prepare('SELECT COALESCE(MAX(position), -1) AS m FROM plot_acts WHERE book_id = ? AND user_email = ?');
+// position ist PRO SCOPE (thread_id IS ?) lückenlos: geteilte Akte und die Akte
+// jedes Strangs bilden je eine eigene 0..n-Sequenz. thread_id IS ? ist NULL-safe.
+const _stmtMaxActPos = db.prepare('SELECT COALESCE(MAX(position), -1) AS m FROM plot_acts WHERE book_id = ? AND user_email = ? AND thread_id IS ?');
 
 function listActs(bookId, userEmail) {
   return _stmtListActs.all(parseInt(bookId), userEmail);
@@ -44,9 +48,10 @@ function getAct(id) {
   return _stmtGetAct.get(parseInt(id)) || null;
 }
 
-function createAct(bookId, userEmail, { name, farbe = null, position = null }) {
-  const pos = position != null ? parseInt(position) : (_stmtMaxActPos.get(parseInt(bookId), userEmail).m + 1);
-  const info = _stmtInsertAct.run(parseInt(bookId), userEmail, name, farbe, pos);
+function createAct(bookId, userEmail, { name, farbe = null, threadId = null, position = null }) {
+  const tid = threadId != null ? parseInt(threadId) : null;
+  const pos = position != null ? parseInt(position) : (_stmtMaxActPos.get(parseInt(bookId), userEmail, tid).m + 1);
+  const info = _stmtInsertAct.run(parseInt(bookId), userEmail, name, farbe, tid, pos);
   return getAct(info.lastInsertRowid);
 }
 
@@ -133,11 +138,17 @@ function updateThread(id, { name, farbe = null, figureId = null, draftFigureId =
   return getThread(id);
 }
 
-function deleteThread(id) {
-  // plot_beats.thread_id hängt via ON DELETE SET NULL — die Beats bleiben und
-  // fallen in die „ohne Strang"-Lane (kein Daten-Verlust).
+// Strang löschen. plot_beats.thread_id hängt via SET NULL — die Beats bleiben und
+// fallen in die „ohne Strang"-Lane. ABER: hat der Strang eigene Akte (Hybrid),
+// hingen diese via plot_acts.thread_id-CASCADE am Strang und würden ihre Beats
+// mit-kaskadieren. Darum VOR dem Löschen die Beats eigener Akte auf geteilte Akte
+// umhängen (oder die eigenen Akte zu geteilten befördern, falls keine geteilten
+// existieren) — Invariante „Strang löschen ≠ Beats löschen".
+const deleteThread = db.transaction((id) => {
+  const t = _stmtGetThread.get(parseInt(id));
+  if (t) _landThreadBeatsOnSharedActs(t.book_id, t.user_email, t.id);
   _stmtDeleteThread.run(parseInt(id));
-}
+});
 
 // Strang-Reihenfolge neu setzen (Zeilen-Reorder). orderedIds in Zielreihenfolge.
 const reorderThreads = db.transaction((bookId, userEmail, orderedIds) => {
@@ -337,6 +348,96 @@ const reorderBeats = db.transaction((bookId, userEmail, order) => {
   }
 });
 
+// ── Hybrid-Akte: eigene Aktstruktur pro Strang ──────────────────────────────
+// Ein Strang nutzt standardmässig die geteilten Akte (thread_id IS NULL). Er kann
+// optional eine EIGENE Aktstruktur bekommen (Klon der geteilten Akte, thread_id = T)
+// und später wieder auf die geteilten zurückfallen. „Eigene Akte" wird allein aus
+// der Existenz strang-eigener Akte abgeleitet (kein Flag).
+const _stmtSharedActsFull = db.prepare(`
+  SELECT id, name, farbe, position FROM plot_acts
+   WHERE book_id = ? AND user_email = ? AND thread_id IS NULL ORDER BY position, id
+`);
+const _stmtThreadActs = db.prepare(`
+  SELECT id, position FROM plot_acts
+   WHERE book_id = ? AND user_email = ? AND thread_id = ? ORDER BY position, id
+`);
+// Beats eines Strangs, die auf einem bestimmten Akt sitzen, auf einen anderen Akt
+// umhängen. thread_id IS ? ist NULL-safe (für Fork/Unfork ist T nie NULL).
+const _stmtRemapBeatAct = db.prepare(`
+  UPDATE plot_beats SET act_id = ?, updated_at = ${NOW_ISO_SQL}
+   WHERE book_id = ? AND user_email = ? AND thread_id IS ? AND act_id = ?
+`);
+const _stmtPromoteThreadActs = db.prepare(`
+  UPDATE plot_acts SET thread_id = NULL, updated_at = ${NOW_ISO_SQL}
+   WHERE book_id = ? AND user_email = ? AND thread_id = ?
+`);
+const _stmtDeleteThreadActs = db.prepare(`
+  DELETE FROM plot_acts WHERE book_id = ? AND user_email = ? AND thread_id = ?
+`);
+const _stmtBeatsInCell = db.prepare(`
+  SELECT id FROM plot_beats
+   WHERE book_id = ? AND user_email = ? AND act_id = ? AND thread_id IS ? ORDER BY sort_order, id
+`);
+const _stmtSetBeatSortOnly = db.prepare(`
+  UPDATE plot_beats SET sort_order = ?, updated_at = ${NOW_ISO_SQL} WHERE id = ?
+`);
+
+function threadHasOwnActs(bookId, userEmail, threadId) {
+  return _stmtThreadActs.all(parseInt(bookId), userEmail, parseInt(threadId)).length > 0;
+}
+
+// Beats eines Strangs von seinen EIGENEN Akten zurück auf die GETEILTEN Akte
+// umhängen (positionsweise; Überzahl → letzte geteilte Spalte, dann neu nummeriert)
+// und die eigenen Akte löschen. Gibt es keine geteilten Akte, werden die eigenen
+// stattdessen zu geteilten befördert (Beats bleiben dran). Plain Function (kein
+// eigenes Transaction-Wrapping) — läuft innerhalb der aufrufenden Transaktion.
+function _landThreadBeatsOnSharedActs(bookId, userEmail, threadId) {
+  const bid = parseInt(bookId);
+  const tid = parseInt(threadId);
+  const ownActs = _stmtThreadActs.all(bid, userEmail, tid);
+  if (!ownActs.length) return; // Strang nutzt bereits geteilte Akte — nichts zu tun.
+  const shared = _stmtSharedActsFull.all(bid, userEmail);
+  if (!shared.length) {
+    // Keine geteilten Akte: eigene Akte zu geteilten befördern (Beats bleiben).
+    _stmtPromoteThreadActs.run(bid, userEmail, tid);
+    return;
+  }
+  const targets = new Set();
+  ownActs.forEach((own, idx) => {
+    const target = shared[Math.min(idx, shared.length - 1)];
+    _stmtRemapBeatAct.run(target.id, bid, userEmail, tid, own.id);
+    targets.add(target.id);
+  });
+  // Ziel-Zellen (geteilter Akt × Strang) neu durchnummerieren — mehrere eigene
+  // Akte können in dieselbe geteilte Spalte zusammenfallen (sort_order-Kollision).
+  for (const targetActId of targets) {
+    _stmtBeatsInCell.all(bid, userEmail, targetActId, tid)
+      .forEach((b, i) => _stmtSetBeatSortOnly.run(i, b.id));
+  }
+  _stmtDeleteThreadActs.run(bid, userEmail, tid); // eigene Akte sind jetzt beat-frei.
+}
+
+// Strang T bekommt eine eigene Aktstruktur: die geteilten Akte 1:1 klonen
+// (thread_id = T) und Ts Beats von den geteilten auf die geklonten Akte umhängen.
+// Idempotent (hat T schon eigene Akte → no-op). Wirft NO_SHARED_ACTS, wenn es
+// keine geteilten Akte zu klonen gibt (Route deckelt zusätzlich).
+const forkThreadActs = db.transaction((bookId, userEmail, threadId) => {
+  const bid = parseInt(bookId);
+  const tid = parseInt(threadId);
+  if (_stmtThreadActs.all(bid, userEmail, tid).length) return; // schon geforkt.
+  const shared = _stmtSharedActsFull.all(bid, userEmail);
+  if (!shared.length) { const e = new Error('NO_SHARED_ACTS'); e.code = 'NO_SHARED_ACTS'; throw e; }
+  for (const a of shared) {
+    const info = _stmtInsertAct.run(bid, userEmail, a.name, a.farbe, tid, a.position);
+    _stmtRemapBeatAct.run(info.lastInsertRowid, bid, userEmail, tid, a.id);
+  }
+});
+
+// Strang T zurück auf die geteilten Akte (eigene Aktstruktur auflösen).
+const unforkThreadActs = db.transaction((bookId, userEmail, threadId) => {
+  _landThreadBeatsOnSharedActs(bookId, userEmail, threadId);
+});
+
 // ── Konsistenz-Prüfungs-Historie ────────────────────────────────────────────
 // Persistierte Plot-Consistency-Läufe pro (Buch, User). Insert beim Job-Complete
 // in routes/jobs/plot.js; List/Get/Delete via /plot/consistency-runs Routes. Die
@@ -390,6 +491,7 @@ function deletePlotConsistencyRun(id, userEmail) {
 
 module.exports = {
   listActs, getAct, createAct, updateAct, deleteAct, reorderActs,
+  threadHasOwnActs, forkThreadActs, unforkThreadActs,
   listThreads, getThread, createThread, updateThread, deleteThread, reorderThreads, _validThreadId,
   listBeats, getBeat, createBeat, updateBeat, deleteBeat, reorderBeats,
   resolveFigureIds, resolveDraftFigureIds,

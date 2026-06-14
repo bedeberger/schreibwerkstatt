@@ -910,10 +910,14 @@ export function renderChatMarkdown(text) {
   // Fenced Code-Blöcke ```…``` vorab extrahieren und durch Platzhalter ersetzen,
   // damit weder Listen-/Inline-Regex noch \n→<br> ihren Inhalt anfassen. Inhalt
   // ist durch escHtml bereits sicher; \n bleiben für die <pre>-Anzeige erhalten.
+  // Platzhalter-Delimiter ist U+E000 (Private-Use-Area): kommt in echtem
+  // Chat-/Markdown-Text nicht vor (kollisionsfrei) und ist — anders als das
+  // früher genutzte NUL — druckbares UTF-8, sodass die Datei text-/grep-bar
+  // bleibt. Restore weiter unten muss denselben Delimiter matchen.
   const codeBlocks = [];
   html = html.replace(/```[^\n]*\n([\s\S]*?)```/g, (_m, body) => {
     codeBlocks.push('<pre class="chat-pre"><code>' + body.replace(/\n+$/, '') + '</code></pre>');
-    return ' CB' + (codeBlocks.length - 1) + ' ';
+    return 'CB' + (codeBlocks.length - 1) + '';
   });
 
   // Überschriften: ### ## #
@@ -967,7 +971,7 @@ export function renderChatMarkdown(text) {
   html = html.replace(/\n/g, '<br>');
 
   // Fenced Code-Blöcke zurückspielen (Inhalt war über Platzhalter geschützt)
-  html = html.replace(/ CB(\d+) /g, (_m, i) => codeBlocks[Number(i)] || '');
+  html = html.replace(/CB(\d+)/g, (_m, i) => codeBlocks[Number(i)] || '');
 
   // Überschüssige <br> direkt vor/nach Block-Elementen entfernen
   html = html.replace(/(<br>\s*)+(<(?:ol|ul|h[2-4]|hr|blockquote|pre)\b)/gi, '$2');

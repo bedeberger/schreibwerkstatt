@@ -61,6 +61,10 @@ export function registerPlotCard() {
     addingAct: false,
     newActName: '',
     actColorPickerId: null,
+    // Grid-Add-Akt-Scope: false = nicht im Add-Modus, null = geteilter Akt,
+    // <threadId> = strang-eigener Akt (Hybrid). Eigene Variable neben `addingAct`
+    // (flaches Board), weil das Grid scoped hinzufügt.
+    addingActScope: false,
 
     // Strang-Edit / -Add / -Farbe (Swimlanes)
     editingThreadId: null,

@@ -40,6 +40,13 @@ function _validChapterId(bookId, chapterId) {
   return (r && r.book_id === bookId) ? parseInt(chapterId) : null;
 }
 
+// Ein Akt passt zu einem Strang, wenn er GETEILT ist (thread_id NULL) ODER genau
+// diesem Strang gehört (Hybrid-Akte). Verhindert, dass ein Beat in den eigenen Akt
+// eines FREMDEN Strangs (oder in die „ohne Strang"-Lane auf einem eigenen Akt) wandert.
+function _actFitsThread(act, threadId) {
+  return act.thread_id == null || act.thread_id === (threadId ?? null);
+}
+
 // Spannungswert (1–5) für den Spannungsbogen, sonst NULL. Out-of-Range / Müll → NULL.
 function _validIntensitaet(raw) {
   if (raw === null || raw === '' || typeof raw === 'undefined') return null;
@@ -82,8 +89,11 @@ router.post('/acts', jsonBody, (req, res) => {
   if (!name)   return res.status(400).json({ error_code: 'NAME_REQ' });
   if (name.length > MAX_ACT_NAME) return res.status(400).json({ error_code: 'NAME_TOO_LONG' });
   if (!_guard(req, res, bookId)) return;
-  const act = plotDb.createAct(bookId, userEmail, { name, farbe });
-  logger.info(`[plot] act create id=${act.id} book=${bookId}`);
+  // thread_id optional: gesetzt → strang-eigener Akt (Hybrid). Fremd/leer → NULL
+  // (geteilter Akt). Validierung gegen (Buch, User) via _validThreadId.
+  const threadId = plotDb._validThreadId(bookId, userEmail, toIntId(req.body?.thread_id));
+  const act = plotDb.createAct(bookId, userEmail, { name, farbe, threadId });
+  logger.info(`[plot] act create id=${act.id} book=${bookId} thread=${threadId ?? '-'}`);
   res.json(act);
 });
 
@@ -202,6 +212,42 @@ router.put('/threads/order', jsonBody, (req, res) => {
   res.json({ ok: true });
 });
 
+// Eigene Aktstruktur für einen Strang aktivieren (Hybrid-Akte): die geteilten Akte
+// werden in den Strang geklont, dessen Beats wandern auf die Klone. Braucht ≥1
+// geteilten Akt (sonst NO_SHARED_ACTS). Idempotent (schon geforkt → ok).
+router.post('/threads/:id/fork-acts', (req, res) => {
+  const userEmail = userEmailOrNull(req);
+  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  const id = toIntId(req.params.id);
+  if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
+  const thread = plotDb.getThread(id);
+  if (!thread || thread.user_email !== userEmail) return res.status(404).json({ error_code: 'THREAD_NOT_FOUND' });
+  if (!_guard(req, res, thread.book_id)) return;
+  try {
+    plotDb.forkThreadActs(thread.book_id, userEmail, id);
+  } catch (e) {
+    if (e.code === 'NO_SHARED_ACTS') return res.status(400).json({ error_code: 'NO_SHARED_ACTS' });
+    throw e;
+  }
+  logger.info(`[plot] thread fork-acts id=${id} book=${thread.book_id}`);
+  res.json({ ok: true });
+});
+
+// Eigene Aktstruktur auflösen: Beats zurück auf die geteilten Akte umhängen
+// (positionsweise) und die strang-eigenen Akte löschen.
+router.delete('/threads/:id/fork-acts', (req, res) => {
+  const userEmail = userEmailOrNull(req);
+  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  const id = toIntId(req.params.id);
+  if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
+  const thread = plotDb.getThread(id);
+  if (!thread || thread.user_email !== userEmail) return res.status(404).json({ error_code: 'THREAD_NOT_FOUND' });
+  if (!_guard(req, res, thread.book_id)) return;
+  plotDb.unforkThreadActs(thread.book_id, userEmail, id);
+  logger.info(`[plot] thread unfork-acts id=${id} book=${thread.book_id}`);
+  res.json({ ok: true });
+});
+
 // ── Beats ──────────────────────────────────────────────────────────────────
 router.post('/beats', jsonBody, (req, res) => {
   const userEmail = userEmailOrNull(req);
@@ -224,6 +270,7 @@ router.post('/beats', jsonBody, (req, res) => {
   const chapterId = _validChapterId(bookId, toIntId(req.body?.chapter_id));
   const intensitaet = _validIntensitaet(req.body?.intensitaet);
   const threadId = plotDb._validThreadId(bookId, userEmail, toIntId(req.body?.thread_id));
+  if (!_actFitsThread(act, threadId)) return res.status(400).json({ error_code: 'ACT_THREAD_MISMATCH' });
   const figureIds = plotDb.resolveFigureIds(bookId, userEmail, req.body?.figure_ids);
   const draftFigureIds = plotDb.resolveDraftFigureIds(bookId, userEmail, req.body?.draft_figure_ids);
 
@@ -272,6 +319,16 @@ router.patch('/beats/:id', jsonBody, (req, res) => {
   // thread_id-Zuordnung (Strang) — Fremd/leer → NULL („ohne Strang"-Lane).
   if (typeof req.body?.thread_id !== 'undefined') {
     fields.thread_id = plotDb._validThreadId(beat.book_id, userEmail, toIntId(req.body.thread_id));
+  }
+  // Akt-Strang-Kompatibilität des Resultats prüfen (Hybrid-Akte): der effektive
+  // Akt darf kein eigener Akt eines anderen Strangs sein als der effektive Strang.
+  if (typeof fields.act_id !== 'undefined' || typeof fields.thread_id !== 'undefined') {
+    const effActId = typeof fields.act_id !== 'undefined' ? fields.act_id : beat.act_id;
+    const effThreadId = typeof fields.thread_id !== 'undefined' ? fields.thread_id : (beat.thread_id ?? null);
+    const effAct = plotDb.getAct(effActId);
+    if (effAct && !_actFitsThread(effAct, effThreadId)) {
+      return res.status(400).json({ error_code: 'ACT_THREAD_MISMATCH' });
+    }
   }
   const figureIds = Array.isArray(req.body?.figure_ids)
     ? plotDb.resolveFigureIds(beat.book_id, userEmail, req.body.figure_ids)

@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 192, 99 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 193, 99 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -62,6 +62,7 @@ erDiagram
   books ||--o{ plot_beats            : has
   books ||--o{ plot_threads          : has
   plot_acts ||--o{ plot_beats        : groups
+  plot_threads ||--o{ plot_acts      : "own acts (hybrid)"
   plot_threads ||--o| plot_beats     : "beat in lane"
   figures ||--o| plot_threads        : "thread of figure"
   draft_figures ||--o| plot_threads  : "thread of draft figure"
@@ -679,7 +680,8 @@ erDiagram
     TEXT    user_email
     TEXT    name
     TEXT    farbe        "optionaler Akzent"
-    INTEGER position     "Spalten-Reihenfolge"
+    INTEGER thread_id    FK "NULL=geteilt, sonst strang-eigener Akt (Hybrid)"
+    INTEGER position     "Spalten-Reihenfolge (pro Scope)"
     TEXT    created_at
     TEXT    updated_at
   }
@@ -737,6 +739,7 @@ erDiagram
   zeitstrahl_events ||--o{ zeitstrahl_event_figures   : refs
   storylines        ||--o{ zeitstrahl_events          : groups
   plot_acts         ||--o{ plot_beats                 : groups
+  plot_threads      ||--o{ plot_acts                  : "own acts (hybrid)"
   plot_threads      ||--o| plot_beats                 : "lane"
   figures           ||--o| plot_threads               : "bound figure"
   draft_figures     ||--o| plot_threads               : "bound draft figure"

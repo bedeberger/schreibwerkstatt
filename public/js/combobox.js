@@ -39,6 +39,7 @@ export function comboboxData(cfg = {}) {
       _transient: !!cfg.transient,
       _footer: (cfg.footer && typeof cfg.footer.action === 'function') ? cfg.footer : null,
       _onOutside: null,
+      _onScrollResize: null,
       highlighted: -1,
       openUp: false,
 
@@ -100,25 +101,54 @@ export function comboboxData(cfg = {}) {
           this.highlighted = this._allOptions.findIndex(o => String(o.value) === String(this.value));
         }
         this.$nextTick(() => {
-          this._decideOpenDirection();
+          this._positionDropdown();
           this.$refs.cbInput?.focus();
+          // Listener erst nach Position + Fokus binden — ein evtl. durch den
+          // Fokus ausgeloestes scrollIntoView soll das Dropdown nicht sofort
+          // wieder schliessen.
+          window.addEventListener('scroll', this._onScrollResize, true);
+          window.addEventListener('resize', this._onScrollResize);
         });
       },
-      _decideOpenDirection() {
+      // Dropdown ist `position: fixed` und wird hier an den Trigger gekoppelt —
+      // so entkommt es overflow-clippenden Vorfahren (z. B. dem horizontal
+      // scrollenden Plot-Swimlane-Grid). Bei Scroll/Resize wird stattdessen
+      // geschlossen (siehe _onScrollResize), statt nachzuziehen.
+      _positionDropdown() {
         const trigger = this.$el.querySelector('.combobox-trigger');
         const dropdown = this.$el.querySelector('.combobox-dropdown');
         if (!trigger || !dropdown) { this.openUp = false; return; }
-        const triggerRect = trigger.getBoundingClientRect();
+        const tr = trigger.getBoundingClientRect();
         const dropdownH = dropdown.getBoundingClientRect().height || 250;
-        const spaceBelow = window.innerHeight - triggerRect.bottom;
-        const spaceAbove = triggerRect.top;
+        const spaceBelow = window.innerHeight - tr.bottom;
+        const spaceAbove = tr.top;
         this.openUp = spaceBelow < dropdownH && spaceAbove > spaceBelow;
+
+        const margin = 8;
+        const width = Math.min(
+          Math.max(tr.width, this._compact ? 180 : 0),
+          window.innerWidth - margin * 2
+        );
+        let left = tr.left;
+        if (left + width > window.innerWidth - margin) left = window.innerWidth - margin - width;
+        if (left < margin) left = margin;
+        dropdown.style.left = left + 'px';
+        dropdown.style.width = width + 'px';
+        if (this.openUp) {
+          dropdown.style.top = 'auto';
+          dropdown.style.bottom = (window.innerHeight - tr.top) + 'px';
+        } else {
+          dropdown.style.bottom = 'auto';
+          dropdown.style.top = tr.bottom + 'px';
+        }
       },
       close() {
         this.open = false;
         this.query = '';
         this.highlighted = -1;
         this.openUp = false;
+        window.removeEventListener('scroll', this._onScrollResize, true);
+        window.removeEventListener('resize', this._onScrollResize);
       },
       select(val) {
         if (this._multiple) {
@@ -178,6 +208,7 @@ export function comboboxData(cfg = {}) {
         if (this._compact) this.$el.classList.add('combobox-wrap--compact');
 
         this._onOutside = (e) => { if (!this.$el.contains(e.target)) this.close(); };
+        this._onScrollResize = () => { if (this.open) this.close(); };
         document.addEventListener('mousedown', this._onOutside);
         this.$el.addEventListener('keydown', (e) => this.onKeydown(e));
 
@@ -231,6 +262,11 @@ export function comboboxData(cfg = {}) {
         if (this._onOutside) {
           document.removeEventListener('mousedown', this._onOutside);
           this._onOutside = null;
+        }
+        if (this._onScrollResize) {
+          window.removeEventListener('scroll', this._onScrollResize, true);
+          window.removeEventListener('resize', this._onScrollResize);
+          this._onScrollResize = null;
         }
       },
     };

@@ -251,11 +251,11 @@ select:focus {
   opacity: var(--opacity-muted);
 }
 .combobox-chevron--open { transform: rotate(180deg); }
+/* `position: fixed` + JS-Geometrie (combobox.js#_positionDropdown) — entkommt
+   overflow-clippenden Vorfahren (horizontal scrollende Container wie das
+   Plot-Swimlane-Grid). top/left/bottom/width werden inline gesetzt. */
 .combobox-dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
+  position: fixed;
   z-index: var(--z-header);
   background: var(--color-surface);
   border: 0.5px solid var(--color-border-focus);
@@ -263,8 +263,6 @@ select:focus {
   box-shadow: var(--shadow-md);
 }
 .combobox-dropdown--up {
-  top: auto;
-  bottom: 100%;
   border-top: 0.5px solid var(--color-border-focus);
   border-bottom: none;
   box-shadow: var(--shadow-md);
@@ -334,10 +332,6 @@ select:focus {
   border-color: var(--color-border);
   background: var(--color-bg);
 }
-.combobox-wrap--compact .combobox-dropdown {
-  right: auto;
-  min-width: 180px;
-}
 .combobox-wrap--compact .combobox-search { font-size: var(--size-compact-font-size); padding: var(--space-5) 8px; }
 .combobox-wrap--compact .combobox-option { font-size: var(--size-compact-font-size); padding: var(--space-5) 8px; }
 .combobox-wrap--compact .combobox-empty { font-size: var(--size-compact-font-size); padding: var(--space-5) 8px; }
@@ -362,21 +356,10 @@ select:focus {
 .combobox-footer-btn:focus-visible { background: var(--color-hover); outline: none; }
 .combobox-wrap--compact .combobox-footer-btn { font-size: var(--size-compact-font-size); padding: var(--space-5) 8px; }
 
-/* Mobile: Dropdown darf Viewport nicht horizontal sprengen.
-   Compact-Variante setzt sonst `min-width: 180px` + `right: auto`, kombiniert mit
-   `white-space: nowrap` auf Optionen → lange Labels (Kapitel-/Figur-/Ort-Namen)
-   schieben Dropdown über den rechten Viewport-Rand und erzeugen Horizontal-Scroll.
-   Auf Mobile: Dropdown an Wrap-Breite binden, lange Options wrappen. */
+/* Mobile: lange Labels (Kapitel-/Figur-/Ort-Namen) wrappen statt zu ellipsen,
+   damit sie in der viewport-geklemmten Breite (JS setzt width/left, siehe
+   combobox.js#_positionDropdown) lesbar bleiben. */
 @media (max-width: 600px) {
-  .combobox-dropdown {
-    max-width: calc(100vw - 16px);
-  }
-  .combobox-wrap--compact .combobox-dropdown {
-    left: 0;
-    right: 0;
-    min-width: 0;
-    max-width: 100%;
-  }
   .combobox-option,
   .combobox-option__label,
   .combobox-option__sub {
