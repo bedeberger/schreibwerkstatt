@@ -23,9 +23,19 @@ const SEVERITY = ['kritisch', 'stark', 'mittel', 'schwach', 'niedrig'];
 
 // ── Kontext-Loader ────────────────────────────────────────────────────────────
 
-// Figuren-Ensemble (Name + Typ) als Grundierung für beide Jobs.
+// Figuren-Ensemble als Grundierung für beide Jobs. Brainstorm rendert den
+// reichen Kontext (Beschreibung/Beruf/Tags), Consistency nutzt nur Name + Typ —
+// die Extra-Felder bleiben dort ungenutzt (kein zweiter DB-Load nötig).
 function _figurenContext(bookId, userEmail) {
-  return getFiguren(bookId, userEmail).map(f => ({ name: f.name, typ: f.typ || null }));
+  return getFiguren(bookId, userEmail).map(f => ({
+    name: f.name,
+    typ: f.typ || null,
+    kurzname: f.kurzname || null,
+    beschreibung: f.beschreibung || null,
+    beruf: f.beruf || null,
+    geschlecht: f.geschlecht || null,
+    tags: typeof f.tags === 'string' && f.tags ? f.tags.split(',').filter(Boolean) : [],
+  }));
 }
 
 // Werkstatt-Figuren (Figuren-Werkstatt-Drafts, Name + Archetyp): vorwärts-
@@ -94,6 +104,8 @@ function _threadContext(bookId, userEmail) {
     name: t.name,
     figur: t.fig_id ? (figByFigId[t.fig_id] || null)
       : (t.draft_figure_id ? (draftById[t.draft_figure_id] || null) : null),
+    // Beats der Lane erben dieses Kapitel implizit, sofern sie kein eigenes haben.
+    kapitel: t.chapter_name || null,
   }));
 }
 
@@ -163,11 +175,14 @@ async function runPlotConsistencyJob(jobId, bookId, userEmail) {
     logger.info(`Plot-Consistency Start: book=${bookId} beats=${beats.length} szenen=${szenen.length} kapitel=${kapitel.length} werkstatt=${werkstattFiguren.length} straenge=${threads.length}`);
     updateJob(jobId, { statusText: 'job.plot.consistency.aiReply', progress: 10 });
 
+    // maxTokens grosszuegig: ein schonungsloser Check ueber alle Beats/Szenen/
+    // Straenge produziert leicht 15–40 Konflikte (je beat+schwere+problem+vorschlag).
+    // 3000 schnitt die JSON-Antwort regelmaessig mitten im Array ab → Truncation.
     const tok = { in: 0, out: 0, ms: 0 };
     const result = await aiCall(jobId, tok,
       buildPlotConsistencyPrompt(acts, beats, kapitel, szenen, figuren, BUCH_KONTEXT, werkstattFiguren, threads),
       buildPlotSystemPrompt(),
-      10, 95, 2500, 0.3, 3000, undefined, SCHEMA_PLOT_CONSISTENCY,
+      10, 95, 6000, 0.3, 12000, undefined, SCHEMA_PLOT_CONSISTENCY,
     );
 
     if (!Array.isArray(result?.konflikte)) throw i18nError('job.error.plot.konflikteMissing');
@@ -183,7 +198,19 @@ async function runPlotConsistencyJob(jobId, bookId, userEmail) {
       }));
     const fazit = result.fazit.trim();
 
-    completeJob(jobId, { konflikte, fazit, tokensIn: tok.in, tokensOut: tok.out },
+    // Lauf historisieren, damit der User die Prüfung später nochmal ansehen kann.
+    // Best-effort: ein DB-Fehler hier darf das Job-Resultat nicht verschlucken.
+    let runId = null;
+    try {
+      runId = plotDb.insertPlotConsistencyRun({
+        bookId, userEmail, konfliktCount: konflikte.length,
+        result: { konflikte, fazit }, model: _modelName(),
+      });
+    } catch (e) {
+      logger.warn(`Plot-Consistency-Run-Insert fehlgeschlagen book=${bookId}: ${e.message}`);
+    }
+
+    completeJob(jobId, { konflikte, fazit, runId, tokensIn: tok.in, tokensOut: tok.out },
       tps(tok), `${konflikte.length} Konflikte`);
   } catch (e) {
     if (e.name !== 'AbortError') logger.error(`Plot-Consistency-Fehler book=${bookId}: ${e.message}`, { stack: e.stack });

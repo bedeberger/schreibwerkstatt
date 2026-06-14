@@ -165,6 +165,25 @@ export async function mountStandaloneFocus({ mount, bridge, autosaveMs = DEFAULT
       host.editDirty = false;
       controller.enterFocusMode();
     },
+    // Fokus-Granularität live umschalten — für fremde Schalen (nativer
+    // macOS-Client), die die Stufe zur Laufzeit ändern. Spiegelt das
+    // $watch-Verhalten der SPA-Karte: Host-Feld setzen, die `focus-mode--`-
+    // Klasse tauschen (wie enterFocusMode sie initial setzt) und das
+    // Fokus-Overlay neu rechnen. Kapselt den internen `_focusUpdateActive`-
+    // Aufruf, damit die Schale nicht auf Engine-Interna zugreifen muss.
+    setGranularity(g) {
+      const valid = ['paragraph', 'sentence', 'window-3', 'typewriter-only'];
+      const gran = valid.indexOf(g) >= 0 ? g : 'paragraph';
+      host.focusGranularity = gran;
+      const focusEl = mount.querySelector('.focus-editor');
+      if (focusEl) {
+        focusEl.classList.remove(
+          'focus-mode--paragraph', 'focus-mode--sentence',
+          'focus-mode--window-3', 'focus-mode--typewriter-only');
+        focusEl.classList.add('focus-mode--' + gran);
+      }
+      try { controller._focusUpdateActive(false); } catch (_) {}
+    },
     // Sofort speichern (z.B. vor Fenster-Schliessen / Seitenwechsel).
     async save() {
       clearTimeout(saveTimer);

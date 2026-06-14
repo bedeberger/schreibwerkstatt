@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 190, 98 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 192, 99 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -65,7 +65,9 @@ erDiagram
   plot_threads ||--o| plot_beats     : "beat in lane"
   figures ||--o| plot_threads        : "thread of figure"
   draft_figures ||--o| plot_threads  : "thread of draft figure"
+  chapters ||--o| plot_threads       : "thread chapter"
   chapters ||--o| plot_beats         : "beat lands in"
+  books ||--o{ plot_consistency_runs : has
   plot_beats ||--o{ plot_beat_figures : has
   figures ||--o{ plot_beat_figures   : "appears in beat"
   plot_beats ||--o{ plot_beat_draft_figures : has
@@ -689,6 +691,7 @@ erDiagram
     TEXT    farbe            "optionaler Akzent"
     INTEGER figure_id        FK "SET NULL — gebundene Katalog-Figur"
     INTEGER draft_figure_id  FK "SET NULL — gebundene Werkstatt-Figur"
+    INTEGER chapter_id       FK "SET NULL — gebundenes Kapitel (Beats erben es)"
     INTEGER position         "Zeilen-Reihenfolge"
     TEXT    created_at
     TEXT    updated_at
@@ -716,6 +719,15 @@ erDiagram
     INTEGER beat_id         FK "PK, CASCADE"
     INTEGER draft_figure_id FK "PK, CASCADE"
   }
+  plot_consistency_runs {
+    INTEGER id             PK
+    INTEGER book_id        FK "CASCADE"
+    TEXT    user_email
+    TEXT    created_at
+    INTEGER konflikt_count "denormalisiert fürs Listen-Rendering"
+    TEXT    result_json    "konflikte + fazit"
+    TEXT    model
+  }
 
   continuity_checks ||--o{ continuity_issues          : has
   continuity_issues ||--o{ continuity_issue_figures   : refs
@@ -728,11 +740,13 @@ erDiagram
   plot_threads      ||--o| plot_beats                 : "lane"
   figures           ||--o| plot_threads               : "bound figure"
   draft_figures     ||--o| plot_threads               : "bound draft figure"
+  chapters          ||--o| plot_threads               : "thread chapter"
   plot_beats        ||--o{ plot_beat_figures          : refs
   plot_beats        ||--o{ plot_beat_draft_figures    : refs
+  books             ||--o{ plot_consistency_runs      : "ki-history"
 ```
 
-**Plot-Werkstatt (Beat-Board).** Planendes Pendant zur rückwärtsgewandten Szenen-/Ereignis-Analyse: `plot_acts` sind die Spalten (Akte/Phasen, geordnet via `position`), `plot_beats` die Karten darin (Handlungspunkte, geordnet via `sort_order`). Optionale zweite Ordnungsachse sind die Handlungsstränge (`plot_threads`, Swimlanes, geordnet via `position`) — das Board wird ein Raster Akte × Stränge, ein Beat sitzt in der Zelle (`act_id`, `thread_id`). `thread_id` (SET NULL) ist die Strang-Zuordnung (NULL = „ohne Strang"-Lane; null Stränge = flaches Board); ein Strang ist optional an eine Katalog-Figur (`figure_id`) ODER Werkstatt-Figur (`draft_figure_id`) gebunden (beide SET NULL — Hauptfigur-Strang). `status` hält „geplant → entwurf → im_buch (schon geschrieben) → verworfen" nach; `chapter_id` (SET NULL) verknüpft einen Beat mit dem Zielkapitel; `plot_beat_figures` ist die M:M-Brücke zu beteiligten Katalog-Figuren (`figures`), `plot_beat_draft_figures` die parallele M:M-Brücke zu Werkstatt-Figuren (`draft_figures`, vorwärts-entwickelt, evtl. noch nicht im Manuskript) — beide CASCADE auf Beat- und Figur-Seite. Pro Buch + User skopiert. KI assistiert ausschliesslich planend/überwachend (Brainstorm + Consistency gegen Buchrealität, beide kennen Katalog- **und** Werkstatt-Figuren), nie generativ in den Text.
+**Plot-Werkstatt (Beat-Board).** Planendes Pendant zur rückwärtsgewandten Szenen-/Ereignis-Analyse: `plot_acts` sind die Spalten (Akte/Phasen, geordnet via `position`), `plot_beats` die Karten darin (Handlungspunkte, geordnet via `sort_order`). Optionale zweite Ordnungsachse sind die Handlungsstränge (`plot_threads`, Swimlanes, geordnet via `position`) — das Board wird ein Raster Akte × Stränge, ein Beat sitzt in der Zelle (`act_id`, `thread_id`). `thread_id` (SET NULL) ist die Strang-Zuordnung (NULL = „ohne Strang"-Lane; null Stränge = flaches Board); ein Strang ist optional an eine Katalog-Figur (`figure_id`) ODER Werkstatt-Figur (`draft_figure_id`) gebunden (beide SET NULL — Hauptfigur-Strang). `status` hält „geplant → entwurf → im_buch (schon geschrieben) → verworfen" nach; `chapter_id` (SET NULL) verknüpft einen Beat mit dem Zielkapitel; `plot_beat_figures` ist die M:M-Brücke zu beteiligten Katalog-Figuren (`figures`), `plot_beat_draft_figures` die parallele M:M-Brücke zu Werkstatt-Figuren (`draft_figures`, vorwärts-entwickelt, evtl. noch nicht im Manuskript) — beide CASCADE auf Beat- und Figur-Seite. Pro Buch + User skopiert. KI assistiert ausschliesslich planend/überwachend (Brainstorm + Consistency gegen Buchrealität, beide kennen Katalog- **und** Werkstatt-Figuren), nie generativ in den Text. `plot_consistency_runs` historisiert jede Konsistenz-Prüfung als kompletten Result-JSON (`konflikte` + `fazit`, `konflikt_count` denormalisiert fürs Listen-Rendering) — `ON DELETE CASCADE` auf `book_id`, pro (Buch, User) skopiert; das Frontend zeigt einen klappbaren Prüfungs-Verlauf, Klick lädt einen Lauf wie ein Live-Resultat ins Consistency-Panel.
 
 ---
 

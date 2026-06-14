@@ -23,40 +23,72 @@ const STATUS_LABEL = {
 // ── Hilfen ───────────────────────────────────────────────────────────────────
 
 // Kompakte Board-Übersicht: Akte als Spalten, Beats darunter mit Status + Kapitel.
-// threadById (optional): Map id→Name; existieren Stränge, wird je Beat der Strang
-// annotiert, damit die KI die parallelen Erzähllinien erkennt.
-function _boardOutline(acts, beats, threadById = null) {
+// threadInfo (optional): Map id→{name, figur, kapitel}; existieren Stränge, wird je
+// Beat der Strang annotiert. Vererbung (live): ein Beat ohne eigenes Kapitel erbt
+// das Strang-Kapitel (als „(vom Strang)" markiert); die Strang-Hauptfigur gilt
+// implizit als beteiligt (Regel-Hinweis im Prompt, hier nicht pro Beat wiederholt).
+function _boardOutline(acts, beats, threadInfo = null) {
   return (acts || []).map(act => {
     const own = (beats || [])
       .filter(b => b.act_id === act.id)
       .map(b => {
         const st = STATUS_LABEL[b.status] || b.status;
-        const kap = b.chapter_name ? ` → Kapitel: ${b.chapter_name}` : '';
-        const strangName = threadById && b.thread_id != null ? threadById[b.thread_id] : null;
-        const str = strangName ? ` {Strang: ${strangName}}` : '';
+        const info = threadInfo && b.thread_id != null ? threadInfo[b.thread_id] : null;
+        const kap = b.chapter_name
+          ? ` → Kapitel: ${b.chapter_name}`
+          : (info && info.kapitel ? ` → Kapitel: ${info.kapitel} (vom Strang)` : '');
+        const str = info ? ` {Strang: ${info.name}}` : '';
         return `  - ${b.titel} [${st}]${kap}${str}`;
       });
     return `AKT: ${act.name}\n${own.length ? own.join('\n') : '  (noch keine Beats)'}`;
   }).join('\n\n');
 }
 
-// Handlungsstränge (Swimlanes) als Block: Name + optional gebundene Hauptfigur.
+// Handlungsstränge (Swimlanes) als Block: Name + optional gebundene Hauptfigur +
+// gebundenes Kapitel. Beats der Lane erben Figur + Kapitel implizit.
 function _straengeLines(threads) {
   return (threads || []).slice(0, 40)
-    .map(t => `- ${t.name}${t.figur ? ` (Hauptfigur: ${t.figur})` : ''}`)
+    .map(t => {
+      const fig = t.figur ? ` (Hauptfigur: ${t.figur})` : '';
+      const kap = t.kapitel ? ` (Kapitel: ${t.kapitel})` : '';
+      return `- ${t.name}${fig}${kap}`;
+    })
     .join('\n');
 }
 
-// Lookup id→Name aus der Stränge-Liste (für die Board-Annotation).
-function _threadNameMap(threads) {
+// Lookup id→{name, figur, kapitel} aus der Stränge-Liste (Board-Annotation inkl.
+// Kapitel-Vererbung).
+function _threadInfoMap(threads) {
   const map = {};
-  for (const t of (threads || [])) if (t && t.id != null) map[t.id] = t.name;
+  for (const t of (threads || [])) if (t && t.id != null) map[t.id] = { name: t.name, figur: t.figur || null, kapitel: t.kapitel || null };
   return map;
+}
+
+// Hat irgendein Strang eine gebundene Hauptfigur oder ein Kapitel? Dann lohnt der
+// Vererbungs-Hinweis im Prompt.
+function _hasThreadInheritance(threads) {
+  return (threads || []).some(t => t && (t.figur || t.kapitel));
 }
 
 function _figurenLines(figuren) {
   return (figuren || []).slice(0, 60)
     .map(f => `- ${f.name}${f.typ ? ` [${f.typ}]` : ''}`)
+    .join('\n');
+}
+
+// Detaillierter Figuren-Block für den Brainstorm: Name + Kurzname, Rollen-Meta
+// (Typ/Beruf/Geschlecht), Tags und eine gekürzte Beschreibung — damit die KI
+// die Beats auf konkrete Figurenprofile statt nur Namen zuschneiden kann.
+function _figurenLinesDetail(figuren) {
+  const trunc = (s) => { const t = (s || '').trim().replace(/\s+/g, ' '); return t.length > 280 ? `${t.slice(0, 280)}…` : t; };
+  return (figuren || []).slice(0, 60)
+    .map(f => {
+      const meta = [f.typ, f.beruf, f.geschlecht].filter(Boolean).join(', ');
+      const head = `- ${f.name}${f.kurzname ? ` („${f.kurzname}")` : ''}${meta ? ` [${meta}]` : ''}`;
+      const besch = f.beschreibung ? `\n  ${trunc(f.beschreibung)}` : '';
+      const tags = (f.tags || []).length ? `\n  Tags: ${f.tags.join(', ')}` : '';
+      return `${head}${besch}${tags}`;
+    })
     .join('\n');
 }
 
@@ -100,14 +132,17 @@ WICHTIG: Du planst und prüfst nur die STRUKTUR. Du schreibst NIEMALS Fliesstext
 
 export function buildPlotBrainstormPrompt(aktName, acts, beats, buchKontext, figuren = [], kapitel = [], werkstattFiguren = [], threads = [], threadInfo = null) {
   const ctxSeg = (buchKontext || '').trim() ? `\nBUCH-KONTEXT:\n${buchKontext}\n` : '';
-  const figLines = _figurenLines(figuren);
+  const figLines = _figurenLinesDetail(figuren);
   const figSeg = figLines ? `\nFIGUREN-ENSEMBLE:\n${figLines}\n` : '';
   const wfLines = _werkstattFigurenLines(werkstattFiguren);
   const wfSeg = wfLines ? `\nFIGUREN-WERKSTATT (in Entwicklung, evtl. noch nicht im Manuskript — als Beat-Figuren nutzbar):\n${wfLines}\n` : '';
   const kapLines = _kapitelLines(kapitel);
   const kapSeg = kapLines ? `\nVORHANDENE KAPITEL (chronologisch):\n${kapLines}\n` : '';
   const strLines = _straengeLines(threads);
-  const strSeg = strLines ? `\nHANDLUNGSSTRÄNGE (Swimlanes — parallele Erzähllinien, oft je Hauptfigur):\n${strLines}\n` : '';
+  const inheritNote = _hasThreadInheritance(threads)
+    ? '\nVERERBUNG: Ein Beat in einem Strang beteiligt IMPLIZIT dessen Hauptfigur; hat er kein eigenes Kapitel, gilt das Kapitel des Strangs. Behandle das als gesetzt, auch wenn es nicht pro Beat wiederholt wird.\n'
+    : '';
+  const strSeg = strLines ? `\nHANDLUNGSSTRÄNGE (Swimlanes — parallele Erzähllinien, oft je Hauptfigur):\n${strLines}\n${inheritNote}` : '';
 
   // Zielzelle: bei gesetztem Strang sind „bereits vorhandene Beats" die der Zelle
   // (Akt × Strang); sonst akt-weit.
@@ -120,13 +155,13 @@ export function buildPlotBrainstormPrompt(aktName, acts, beats, buchKontext, fig
     : '';
 
   const threadGoal = threadInfo
-    ? `\nZIEL-STRANG: "${threadInfo.name}"${threadInfo.figur ? ` (Hauptfigur: ${threadInfo.figur})` : ''}\nDie Beats sollen GENAU diesen Erzählstrang vorantreiben${threadInfo.figur ? ` und ${threadInfo.figur} ins Zentrum stellen` : ''} — nicht die anderen Stränge.\n`
+    ? `\nZIEL-STRANG: "${threadInfo.name}"${threadInfo.figur ? ` (Hauptfigur: ${threadInfo.figur})` : ''}${threadInfo.kapitel ? ` (Kapitel: ${threadInfo.kapitel})` : ''}\nDie Beats sollen GENAU diesen Erzählstrang vorantreiben${threadInfo.figur ? ` und ${threadInfo.figur} ins Zentrum stellen` : ''}${threadInfo.kapitel ? ` (sie spielen im Kapitel „${threadInfo.kapitel}", sofern nicht anders nötig)` : ''} — nicht die anderen Stränge.\n`
     : '';
 
   return `Die Autorin skizziert die Handlung ihres Buches als Beat-Board und braucht 3–7 prägnante neue Beats (Handlungspunkte) für den Akt "${aktName}"${threadInfo ? ` im Strang "${threadInfo.name}"` : ''}.
 
 AKTUELLES BOARD:
-${_boardOutline(acts, beats, _threadNameMap(threads))}
+${_boardOutline(acts, beats, _threadInfoMap(threads))}
 ${ctxSeg}${figSeg}${wfSeg}${kapSeg}${strSeg}${threadGoal}${existSeg}
 ZIEL-AKT: "${aktName}"
 
@@ -169,7 +204,10 @@ export function buildPlotConsistencyPrompt(acts, beats, kapitel = [], szenen = [
   const wfLines = _werkstattFigurenLines(werkstattFiguren);
   const wfSeg = wfLines ? `\nFIGUREN-WERKSTATT (geplante/in Entwicklung befindliche Figuren — Beats dürfen sie referenzieren, ohne dass sie schon im Manuskript stehen müssen):\n${wfLines}\n` : '';
   const strLines = _straengeLines(threads);
-  const strSeg = strLines ? `\nHANDLUNGSSTRÄNGE (Swimlanes — parallele Erzähllinien, oft je Hauptfigur; im Board hinter den Beats als {Strang: …} annotiert):\n${strLines}\n` : '';
+  const inheritNote = _hasThreadInheritance(threads)
+    ? '\nVERERBUNG: Ein Beat in einem Strang beteiligt IMPLIZIT dessen Hauptfigur; hat er kein eigenes Kapitel, gilt das Kapitel des Strangs (im Board als „(vom Strang)" markiert). Beanstande einen Beat NICHT als „Figur fehlt"/„Kapitel fehlt", wenn der Strang sie liefert.\n'
+    : '';
+  const strSeg = strLines ? `\nHANDLUNGSSTRÄNGE (Swimlanes — parallele Erzähllinien, oft je Hauptfigur; im Board hinter den Beats als {Strang: …} annotiert):\n${strLines}\n${inheritNote}` : '';
   // Strang-spezifische Prüfpunkte nur ergänzen, wenn überhaupt Stränge existieren.
   const strChecks = strLines
     ? `
@@ -181,7 +219,7 @@ export function buildPlotConsistencyPrompt(acts, beats, kapitel = [], szenen = [
   return `Du prüfst die GEPLANTE Handlung (Beat-Board) der Autorin auf Stimmigkeit — in sich und gegen die tatsächliche Buchrealität (Kapitel + analysierte Szenen). Sei schonungslos, aber konstruktiv.
 
 GEPLANTES BEAT-BOARD:
-${_boardOutline(acts, beats, _threadNameMap(threads))}
+${_boardOutline(acts, beats, _threadInfoMap(threads))}
 ${ctxSeg}${kapSeg}${szSeg}${figSeg}${wfSeg}${strSeg}
 Status-Legende der Beats: geplant (noch nicht geschrieben) · Entwurf (in Arbeit) · im Buch (laut Plan schon geschrieben) · verworfen (ausgemustert).
 
@@ -201,6 +239,8 @@ Schwere-Skala:
 - "niedrig": kosmetisch / Status-Pflege
 
 Nenne im Feld "beat" den Titel des betroffenen Beats — oder "—" für übergreifende Befunde (Lücken, fehlende Wendepunkte). Wenn alles stimmig ist, gib ein leeres "konflikte"-Array zurück und schreibe ein bestätigendes Fazit.
+
+Priorisiere nach Schwere und melde die wichtigsten Befunde (höchstens ~25) — keine redundanten oder rein kosmetischen Dopplungen. Halte "problem" und "vorschlag" knapp (je 1–2 Sätze).
 
 Antworte mit diesem JSON-Schema:
 {

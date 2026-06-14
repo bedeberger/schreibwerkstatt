@@ -70,6 +70,9 @@
     flex: 0 0 var(--lane-w);
     width: var(--lane-w);
     background: var(--color-surface);
+    /* Eigene Compositor-Ebene: Border wird einmal gerastert + nur komponiert,
+       statt beim H-Scroll pro Frame neu (sub-pixel) gezeichnet → kein Border-Flackern. */
+    will-change: transform;
   }
   .plot-swim-corner {
     display: flex;
@@ -109,7 +112,9 @@
   .plot-swim-lane-name--muted { font-weight: 400; font-style: italic; color: var(--color-muted); cursor: default; }
   .plot-swim-lane-figure { font-size: var(--font-size-micro); color: var(--color-muted); cursor: pointer; }
   .plot-swim-lane-figure:hover { color: var(--color-text); }
-  .plot-swim-lane-actions { display: flex; flex-wrap: wrap; flex: 1 0 100%; justify-content: flex-end; }
+  .plot-swim-lane-chapter { font-size: var(--font-size-micro); color: var(--color-muted); cursor: pointer; }
+  .plot-swim-lane-chapter:hover { color: var(--color-text); }
+  .plot-swim-lane-actions { display: flex; flex-wrap: wrap; flex: 1 0 100%; justify-content: flex-start; margin-top: var(--space-2xs); }
   .plot-swim-lane-edit { display: flex; flex-direction: column; gap: var(--space-xs); width: 100%; }
   .plot-thread-name-input {
     width: 100%;

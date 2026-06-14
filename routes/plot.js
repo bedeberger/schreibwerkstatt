@@ -141,7 +141,8 @@ router.post('/threads', jsonBody, (req, res) => {
   if (!_guard(req, res, bookId)) return;
   const figureId = _resolveThreadFigure(bookId, userEmail, req.body?.figure_id);
   const draftFigureId = _resolveThreadDraftFigure(bookId, userEmail, req.body?.draft_figure_id);
-  const thread = plotDb.createThread(bookId, userEmail, { name, farbe, figureId, draftFigureId });
+  const chapterId = _validChapterId(bookId, toIntId(req.body?.chapter_id));
+  const thread = plotDb.createThread(bookId, userEmail, { name, farbe, figureId, draftFigureId, chapterId });
   logger.info(`[plot] thread create id=${thread.id} book=${bookId}`);
   res.json(thread);
 });
@@ -168,7 +169,12 @@ router.patch('/threads/:id', jsonBody, (req, res) => {
   if (typeof req.body?.draft_figure_id !== 'undefined') {
     draftFigureId = _resolveThreadDraftFigure(thread.book_id, userEmail, req.body.draft_figure_id);
   }
-  res.json(plotDb.updateThread(id, { name, farbe, figureId, draftFigureId }));
+  // Kapitel-Bindung nur ändern, wenn der Key explizit mitkommt — sonst Bestand.
+  let chapterId = thread.chapter_id;
+  if (typeof req.body?.chapter_id !== 'undefined') {
+    chapterId = _validChapterId(thread.book_id, toIntId(req.body.chapter_id));
+  }
+  res.json(plotDb.updateThread(id, { name, farbe, figureId, draftFigureId, chapterId }));
 });
 
 router.delete('/threads/:id', (req, res) => {
@@ -302,6 +308,42 @@ router.put('/beats/order', jsonBody, (req, res) => {
   if (!order)  return res.status(400).json({ error_code: 'ORDER_REQ' });
   if (!_guard(req, res, bookId)) return;
   plotDb.reorderBeats(bookId, userEmail, order);
+  res.json({ ok: true });
+});
+
+// ── Konsistenz-Prüfungs-Historie ────────────────────────────────────────────
+// Persistierte Plot-Consistency-Läufe pro (Buch, User), damit der User frühere
+// Prüfungen später nochmal ansehen kann. Insert geschieht beim Job-Complete in
+// routes/jobs/plot.js. Hier nur Lesen + Löschen.
+router.get('/consistency-runs', (req, res) => {
+  const userEmail = userEmailOrNull(req);
+  const bookId = toIntId(req.query.book_id);
+  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  if (!bookId)    return res.status(400).json({ error_code: 'INVALID_ID' });
+  if (!_guard(req, res, bookId)) return;
+  res.json(plotDb.listPlotConsistencyRuns(bookId, userEmail));
+});
+
+router.get('/consistency-runs/:id', (req, res) => {
+  const userEmail = userEmailOrNull(req);
+  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  const id = toIntId(req.params.id);
+  if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
+  const run = plotDb.getPlotConsistencyRun(id);
+  if (!run || run.user_email !== userEmail) return res.status(404).json({ error_code: 'RUN_NOT_FOUND' });
+  if (!_guard(req, res, run.book_id)) return;
+  res.json(run);
+});
+
+router.delete('/consistency-runs/:id', (req, res) => {
+  const userEmail = userEmailOrNull(req);
+  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  const id = toIntId(req.params.id);
+  if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
+  const run = plotDb.getPlotConsistencyRun(id);
+  if (!run || run.user_email !== userEmail) return res.status(404).json({ error_code: 'RUN_NOT_FOUND' });
+  if (!_guard(req, res, run.book_id)) return;
+  plotDb.deletePlotConsistencyRun(id, userEmail);
   res.json({ ok: true });
 });
 

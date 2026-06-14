@@ -104,6 +104,11 @@ export function registerPlotCard() {
     _consistencyJobId: null,
     _consistencyPollTimer: null,
 
+    // Konsistenz-Prüfungs-Historie (persistierte Läufe pro Buch). Klick auf einen
+    // Eintrag lädt sein Result in das bestehende Consistency-Panel (selectedRunId).
+    consistencyRuns: [],
+    selectedRunId: null,
+
     _lifecycle: null,
 
     init() {

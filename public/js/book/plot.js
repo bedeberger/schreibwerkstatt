@@ -3,7 +3,7 @@
 // und zwei KI-Jobs (Brainstorm + Consistency) — die KI plant/prüft nur die
 // Struktur, schreibt nie Fliesstext ins Manuskript.
 
-import { fetchJson } from '../utils.js';
+import { fetchJson, tzOpts } from '../utils.js';
 import { startPoll, runningJobStatus } from '../cards/job-helpers.js';
 import { toggleWrapFullscreen } from '../fullscreen.js';
 
@@ -59,6 +59,8 @@ export const plotMethods = {
     } catch (e) {
       this.draftFiguren = [];
     }
+    // Konsistenz-Prüfungs-Historie laden (best-effort, eigenständig vom Board).
+    this.loadConsistencyRuns();
   },
 
   resetPlot() {
@@ -88,6 +90,8 @@ export const plotMethods = {
     this.brainstormThreadId = null;
     this.consistencyResult = null;
     this.selectedKonfliktIdx = null;
+    this.consistencyRuns = [];
+    this.selectedRunId = null;
     this.plotFilters = { kapitel: '', figurId: '', draftFigurId: '' };
     this.verworfenOpen = {};
     this.actColorPickerId = null;
@@ -168,6 +172,44 @@ export const plotMethods = {
       return d ? d.name : '';
     }
     return '';
+  },
+
+  // ── Live-Vererbung Strang → Beat ────────────────────────────────────────────
+  // Ein Beat in einer Strang-Lane erbt implizit die Hauptfigur + das Kapitel des
+  // Strangs (nie auf dem Beat gespeichert — rein Anzeige + KI-Kontext). Eigene
+  // Beat-Werte haben Vorrang: die Strang-Figur wird nur als geerbter Zusatz
+  // gezeigt, das Strang-Kapitel nur, wenn der Beat kein eigenes Kapitel hat.
+  _threadOf(beat) {
+    const tid = beat && beat.thread_id;
+    if (tid == null) return null;
+    return (this.threads || []).find(t => t.id === tid) || null;
+  },
+
+  // Vom Strang geerbte Figur als { kind:'catalog'|'werkstatt', id, label } —
+  // oder null, wenn kein Strang, keine gebundene Figur, oder der Beat sie bereits
+  // explizit führt (keine Doppelanzeige).
+  inheritedFigureForBeat(beat) {
+    const t = this._threadOf(beat);
+    if (!t) return null;
+    if (t.fig_id) {
+      if ((beat.fig_ids || []).includes(t.fig_id)) return null;
+      const f = window.__app.figurenById?.get(t.fig_id);
+      return { kind: 'catalog', id: t.fig_id, label: f ? (f.kurzname || f.name) : t.fig_id };
+    }
+    if (t.draft_figure_id) {
+      if ((beat.draft_fig_ids || []).map(String).includes(String(t.draft_figure_id))) return null;
+      const d = this.draftFigurenById?.get(t.draft_figure_id);
+      return { kind: 'werkstatt', id: t.draft_figure_id, label: d ? d.name : t.draft_figure_id };
+    }
+    return null;
+  },
+
+  // Vom Strang geerbter Kapitelname — nur wenn der Beat kein eigenes Kapitel hat
+  // und der Strang eines bindet. Leer sonst.
+  inheritedChapterForBeat(beat) {
+    if (beat.chapter_id) return '';
+    const t = this._threadOf(beat);
+    return (t && t.chapter_name) ? t.chapter_name : '';
   },
 
   // ── Akt-Farben ───────────────────────────────────────────────────────────
@@ -461,6 +503,7 @@ export const plotMethods = {
       // Werkstatt-Bindung als INTEGER draft_figures.id.
       figure_id: thread.fig_id || '',
       draft_figure_id: thread.draft_figure_id || '',
+      chapter_id: thread.chapter_id || '',
     };
     this.$nextTick(() => { this.$root?.querySelector('.plot-thread-name-input')?.focus(); });
   },
@@ -490,6 +533,7 @@ export const plotMethods = {
           farbe: this.threadDraft.farbe || null,
           figure_id: this.threadDraft.figure_id || null,
           draft_figure_id: this.threadDraft.draft_figure_id || null,
+          chapter_id: this.threadDraft.chapter_id ? parseInt(this.threadDraft.chapter_id) : null,
         }),
       });
       this.threads = this.threads.map(t => (t.id === updated.id ? updated : t));
@@ -987,6 +1031,10 @@ export const plotMethods = {
           this.consistencyStatus = '';
           this._consistencyJobId = null;
           this.consistencyResult = { konflikte: job.result.konflikte || [], fazit: job.result.fazit || '' };
+          this.selectedKonfliktIdx = null;
+          // Frisch persistierten Lauf als ausgewählt markieren + Historie neu laden.
+          this.selectedRunId = job.result.runId || null;
+          this.loadConsistencyRuns();
         },
         onError: (job) => {
           this.consistencyLoading = false;
@@ -1016,7 +1064,71 @@ export const plotMethods = {
     this._consistencyJobId = null;
   },
 
-  dismissConsistency() { this.consistencyResult = null; this.selectedKonfliktIdx = null; },
+  dismissConsistency() { this.consistencyResult = null; this.selectedKonfliktIdx = null; this.selectedRunId = null; },
+
+  // ── KI: Konsistenz-Prüfungs-Historie ─────────────────────────────────────
+  // Persistierte Läufe pro Buch. Liste kommt ohne result_json (Spaltensparsam);
+  // Detail wird beim Öffnen lazy geholt und ins bestehende Consistency-Panel
+  // (consistencyResult) gelegt — genau wie ein frischer Lauf.
+  async loadConsistencyRuns() {
+    const app = window.__app;
+    const bookId = app.selectedBookId;
+    if (!bookId) { this.consistencyRuns = []; return; }
+    try {
+      const rows = await fetchJson(`/plot/consistency-runs?book_id=${bookId}`);
+      this.consistencyRuns = Array.isArray(rows) ? rows : [];
+    } catch (e) {
+      this.consistencyRuns = [];
+    }
+  },
+
+  // Toggle: Klick auf den aktiv markierten Eintrag schliesst das Panel; sonst
+  // Detail laden und consistencyResult füllen. Während eines Live-Laufs gesperrt.
+  async openConsistencyRun(runId) {
+    const app = window.__app;
+    if (!runId || this.consistencyLoading) return;
+    if (this.selectedRunId === runId) {
+      this.selectedRunId = null;
+      this.consistencyResult = null;
+      this.selectedKonfliktIdx = null;
+      return;
+    }
+    try {
+      const run = await fetchJson(`/plot/consistency-runs/${runId}`);
+      if (!run?.result) throw new Error('no result');
+      this.consistencyResult = { konflikte: run.result.konflikte || [], fazit: run.result.fazit || '' };
+      this.selectedKonfliktIdx = null;
+      this.selectedRunId = run.id;
+    } catch (e) {
+      this.errorMessage = app.t('plot.error.runLoad');
+    }
+  },
+
+  async deleteConsistencyRun(runId) {
+    const app = window.__app;
+    if (!runId) return;
+    if (!await app.appConfirm({ message: app.t('plot.consistency.confirmDeleteRun'), danger: true })) return;
+    try {
+      await fetchJson(`/plot/consistency-runs/${runId}`, { method: 'DELETE' });
+      this.consistencyRuns = this.consistencyRuns.filter(r => r.id !== runId);
+      if (this.selectedRunId === runId) {
+        this.selectedRunId = null;
+        this.consistencyResult = null;
+        this.selectedKonfliktIdx = null;
+      }
+    } catch (e) {
+      this.errorMessage = app.t('plot.error.runDelete');
+    }
+  },
+
+  formatRunDate(iso) {
+    if (!iso) return '';
+    try {
+      const d = new Date(iso);
+      const locale = window.__app?.uiLocale === 'en' ? 'en-GB' : 'de-CH';
+      return d.toLocaleString(locale, tzOpts());
+    } catch { return iso; }
+  },
 
   // Ganze Plot-Karte ins Native-Vollbild — mehr horizontaler Platz fürs Akt-Board.
   // Status-Sync via fullscreenchange-Listener in plot-card.js (plotFullscreen).

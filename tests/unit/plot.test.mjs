@@ -361,6 +361,29 @@ test('plot prompts: Brainstorm ohne Werkstatt-Figuren lässt den Block weg', () 
   assert.ok(!out.includes('FIGUREN-WERKSTATT'));
 });
 
+test('plot prompts: Brainstorm rendert reichen Katalog-Figuren-Kontext (Kurzname/Meta/Beschreibung/Tags)', () => {
+  const figuren = [{
+    name: 'Anna Held', kurzname: 'Anni', typ: 'Protagonistin', beruf: 'Kommissarin',
+    geschlecht: 'weiblich', beschreibung: 'Zynische Ermittlerin mit Vergangenheit.',
+    tags: ['traumatisiert', 'loyal'],
+  }];
+  const out = prompts.buildPlotBrainstormPrompt('Akt 1', [{ id: 1, name: 'Akt 1' }], [], '', figuren);
+  assert.ok(out.includes('FIGUREN-ENSEMBLE'));
+  assert.ok(out.includes('Anna Held'));
+  assert.ok(out.includes('Anni'));
+  assert.ok(out.includes('Kommissarin'));
+  assert.ok(out.includes('Zynische Ermittlerin mit Vergangenheit.'));
+  assert.ok(out.includes('traumatisiert, loyal'));
+});
+
+test('plot prompts: Brainstorm kürzt überlange Figuren-Beschreibung', () => {
+  const lang = 'X'.repeat(400);
+  const out = prompts.buildPlotBrainstormPrompt('Akt 1', [{ id: 1, name: 'Akt 1' }], [], '',
+    [{ name: 'Anna', beschreibung: lang }]);
+  assert.ok(out.includes('…'));
+  assert.ok(!out.includes('X'.repeat(300)));
+});
+
 test('plot prompts: Consistency listet Status-Legende + Szenen-Realität + Werkstatt-Figuren', () => {
   const acts = [{ id: 1, name: 'Akt 1' }];
   const beats = [{ id: 9, act_id: 1, titel: 'Showdown', status: 'im_buch', chapter_name: 'Kap 3' }];

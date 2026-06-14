@@ -54,13 +54,19 @@ function tool_get_plot_board(input, ctx) {
   // sonst Werkstatt via draft_figure_id). id→Name-Map für die Beat-Annotation.
   const threads = listThreads(ctx.bookId, userEmail);
   const threadNameById = {};
+  // Vererbung (live): Beats einer Strang-Lane erben Hauptfigur + Kapitel des Strangs.
+  // threadInfoById hält die gebundenen Werte zur Beat-Annotation.
+  const threadInfoById = {};
   const threadList = threads.map(t => {
     threadNameById[t.id] = t.name;
+    const figur = t.fig_id ? (figNames[t.fig_id] || null)
+      : (t.draft_figure_id ? (draftNames[t.draft_figure_id] || null) : null);
+    threadInfoById[t.id] = { figur, kapitel: t.chapter_name || null };
     return {
       id: t.id,
       name: t.name,
-      figur: t.fig_id ? (figNames[t.fig_id] || null)
-        : (t.draft_figure_id ? (draftNames[t.draft_figure_id] || null) : null),
+      figur,
+      ...(t.chapter_name ? { kapitel: t.chapter_name } : {}),
     };
   });
 
@@ -75,6 +81,12 @@ function tool_get_plot_board(input, ctx) {
   for (const b of allBeats) {
     if (statusFilter && b.status !== statusFilter) continue;
     if (!beatsByAct.has(b.act_id)) beatsByAct.set(b.act_id, []);
+    const tInfo = b.thread_id != null ? threadInfoById[b.thread_id] : null;
+    const figures = (b.fig_ids || []).map(fid => figNames[fid] || fid);
+    // Implizit vom Strang geerbt: Hauptfigur (falls nicht schon explizit) + Kapitel
+    // (nur wenn der Beat kein eigenes hat). Faktisch wirksam, daher exponiert.
+    const geerbteFigur = tInfo && tInfo.figur && !figures.includes(tInfo.figur) ? tInfo.figur : null;
+    const geerbtesKapitel = !b.chapter_name && tInfo && tInfo.kapitel ? tInfo.kapitel : null;
     beatsByAct.get(b.act_id).push({
       id: b.id,
       titel: b.titel,
@@ -85,8 +97,10 @@ function tool_get_plot_board(input, ctx) {
       chapter_id: b.chapter_id || null,
       chapter_name: b.chapter_name || null,
       thread: b.thread_id != null ? (threadNameById[b.thread_id] || null) : null,
-      figures: (b.fig_ids || []).map(fid => figNames[fid] || fid),
+      figures,
       werkstatt_figures: (b.draft_fig_ids || []).map(did => draftNames[did]).filter(Boolean),
+      ...(geerbteFigur ? { geerbte_figur: geerbteFigur } : {}),
+      ...(geerbtesKapitel ? { geerbtes_kapitel: geerbtesKapitel } : {}),
     });
   }
 
@@ -111,7 +125,7 @@ function tool_get_plot_board(input, ctx) {
     status_counts: statusCounts,
     ...(statusFilter ? { status_filter: statusFilter } : {}),
     status_legende: 'geplant = noch nicht geschrieben · entwurf = in Arbeit · im_buch = im Manuskript umgesetzt · verworfen = aufgegeben',
-    ...(threadList.length ? { strang_hinweis: 'threads = parallele Erzähllinien (Swimlanes), oft je Hauptfigur. Jeder Beat trägt sein thread-Feld (Strang-Name oder null = ohne Strang).' } : {}),
+    ...(threadList.length ? { strang_hinweis: 'threads = parallele Erzähllinien (Swimlanes), oft je Hauptfigur, optional mit gebundenem Kapitel. Jeder Beat trägt sein thread-Feld (Strang-Name oder null = ohne Strang). Beats erben die Hauptfigur (geerbte_figur) und — ohne eigenes Kapitel — das Kapitel (geerbtes_kapitel) ihres Strangs implizit.' } : {}),
   });
 }
 

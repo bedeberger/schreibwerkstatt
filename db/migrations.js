@@ -7646,6 +7646,52 @@ function _runMigrationsLocked() {
     logger.info("DB-Migration auf Version 190 abgeschlossen (page_revisions.source-CHECK um 'macapp' erweitert).");
   }
 
+  if (version < 191) {
+    // plot_consistency_runs: Historie der Plot-Konsistenz-Prüfungen. Pro Lauf
+    // eine Zeile mit Result-JSON (konflikte + fazit); Frontend zeigt eine
+    // klappbare Verlaufs-Liste pro Buch. Anders als werkstatt_runs ist Plot
+    // pro (Buch, User) skopiert (kein Draft-Owner) → book_id ist die Bezugs-
+    // entität. ON DELETE CASCADE: Historie stirbt mit dem Buch.
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS plot_consistency_runs (
+        id             INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id        INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        user_email     TEXT    NOT NULL,
+        created_at     TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        konflikt_count INTEGER NOT NULL DEFAULT 0,
+        result_json    TEXT    NOT NULL,
+        model          TEXT
+      )
+    `).run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_pcr_book_user_date ON plot_consistency_runs(book_id, user_email, created_at DESC)').run();
+    const fkErrors191 = db.pragma('foreign_key_check');
+    if (fkErrors191.length) {
+      throw new Error(`Migration 191: foreign_key_check meldet ${fkErrors191.length} Verstoesse: ${JSON.stringify(fkErrors191.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 191').run();
+    logger.info('DB-Migration auf Version 191 abgeschlossen (plot_consistency_runs).');
+  }
+
+  if (version < 192) {
+    // plot_threads.chapter_id: ein Handlungsstrang kann zusätzlich zur Hauptfigur
+    // ein Zielkapitel binden. Beats der Strang-Lane erben Figur + Kapitel implizit
+    // (live, nicht gespeichert) — der Beat überschreibt das Kapitel nur mit einem
+    // eigenen chapter_id. Additiv: nullable FK ohne Default, SET NULL (Kapitel
+    // löschen entkoppelt nur die Bindung), kein Recreate nötig (analog Mig. 187).
+    const threadCols192 = db.pragma('table_info(plot_threads)').map(c => c.name);
+    if (!threadCols192.includes('chapter_id')) {
+      db.exec('ALTER TABLE plot_threads ADD COLUMN chapter_id INTEGER REFERENCES chapters(chapter_id) ON DELETE SET NULL');
+    }
+    db.exec('CREATE INDEX IF NOT EXISTS idx_plot_threads_chapter ON plot_threads(chapter_id)');
+
+    const fkErrors192 = db.pragma('foreign_key_check');
+    if (fkErrors192.length) {
+      throw new Error(`Migration 192: foreign_key_check meldet ${fkErrors192.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 192').run();
+    logger.info('DB-Migration auf Version 192 abgeschlossen (plot_threads.chapter_id).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

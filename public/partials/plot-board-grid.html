@@ -95,6 +95,10 @@
                 <span class="plot-swim-lane-figure internal-link" x-show="threadFigureLabel(lane.thread)"
                       @click.stop="lane.thread.fig_id ? $app.openFigurById(lane.thread.fig_id) : (lane.thread.draft_figure_id && $app.openWerkstattDraftById(lane.thread.draft_figure_id))"
                       x-text="threadFigureLabel(lane.thread)"></span>
+                <span class="plot-swim-lane-chapter internal-link" x-show="lane.thread.chapter_name"
+                      @click.stop="lane.thread.chapter_name && $app.openKapitelByName(lane.thread.chapter_name)"
+                      :data-tip="$app.t('plot.thread.bindChapter')"
+                      x-text="lane.thread.chapter_name"></span>
               </div>
               <div class="plot-swim-lane-actions">
                 <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn" @click="moveThread(lane.thread, -1)" :data-tip="$app.t('plot.thread.moveUp')" :aria-label="$app.t('plot.thread.moveUp')">
@@ -131,6 +135,10 @@
                    x-modelable="value" x-model="threadDraft.draft_figure_id"
                    @combobox-change="threadDraft.draft_figure_id && (threadDraft.figure_id = '')"
                    x-effect="options = draftFiguren.map(d => ({ value: d.id, label: d.name }))"></div>
+              <label class="plot-edit-label" x-text="$app.t('plot.thread.bindChapter')"></label>
+              <div x-data="combobox({ placeholder: $app.t('plot.beat.chapterPlaceholder'), emptyLabel: $app.t('plot.beat.noChapter') })"
+                   x-modelable="value" x-model="threadDraft.chapter_id"
+                   x-effect="options = $app.tree.filter(it => it.type === 'chapter').map(c => ({ value: c.id, label: c.name }))"></div>
               <div class="plot-add-beat-actions">
                 <button type="button" class="btn-compact" @click="saveEditThread(lane.thread)" :disabled="busy" x-text="$app.t('common.save')"></button>
                 <button type="button" class="btn-compact btn-compact--ghost" @click="cancelEditThread()" x-text="$app.t('common.cancel')"></button>
@@ -170,10 +178,15 @@
                       </span>
                     </div>
                     <p class="plot-beat-desc" x-show="beat.beschreibung" x-text="beat.beschreibung"></p>
-                    <div class="plot-beat-meta" x-show="beat.chapter_name || (beat.fig_ids && beat.fig_ids.length) || (beat.draft_fig_ids && beat.draft_fig_ids.length)">
+                    <div class="plot-beat-meta" x-show="beat.chapter_name || (beat.fig_ids && beat.fig_ids.length) || (beat.draft_fig_ids && beat.draft_fig_ids.length) || inheritedChapterForBeat(beat) || inheritedFigureForBeat(beat)">
                       <span class="kapitel-badge kapitel-badge--primary internal-link" x-show="beat.chapter_name"
                             @click.stop="beat.chapter_name && $app.openKapitelByName(beat.chapter_name)"
                             x-text="beat.chapter_name"></span>
+                      <!-- Vom Strang geerbtes Kapitel (nur ohne eigenes Beat-Kapitel) -->
+                      <span class="kapitel-badge kapitel-badge--inherited internal-link" x-show="inheritedChapterForBeat(beat)"
+                            @click.stop="inheritedChapterForBeat(beat) && $app.openKapitelByName(inheritedChapterForBeat(beat))"
+                            :data-tip="$app.t('plot.beat.inheritedChapter')"
+                            x-text="inheritedChapterForBeat(beat)"></span>
                       <template x-for="figId in (beat.fig_ids || [])" :key="figId">
                         <span class="tag internal-link" @click.stop="$app.openFigurById(figId)"
                               x-text="$app.figurenById.get(figId)?.kurzname || $app.figurenById.get(figId)?.name || figId"></span>
@@ -182,6 +195,14 @@
                         <span class="tag tag--werkstatt internal-link" @click.stop="$app.openWerkstattDraftById(dfId)"
                               :data-tip="$app.t('plot.beat.werkstattFiguren')"
                               x-text="draftFigurenById.get(dfId)?.name || dfId"></span>
+                      </template>
+                      <!-- Vom Strang geerbte Hauptfigur (nicht schon explizit am Beat) -->
+                      <template x-if="inheritedFigureForBeat(beat)">
+                        <span class="tag tag--inherited internal-link"
+                              :class="{ 'tag--werkstatt': inheritedFigureForBeat(beat).kind === 'werkstatt' }"
+                              @click.stop="inheritedFigureForBeat(beat).kind === 'werkstatt' ? $app.openWerkstattDraftById(inheritedFigureForBeat(beat).id) : $app.openFigurById(inheritedFigureForBeat(beat).id)"
+                              :data-tip="$app.t('plot.beat.inheritedFigure')"
+                              x-text="inheritedFigureForBeat(beat).label"></span>
                       </template>
                     </div>
                   </div>

@@ -74,21 +74,26 @@ const reorderActs = db.transaction((bookId, userEmail, orderedIds) => {
 // (draft_figure_id → draft_figures.id) gebunden. Nach aussen wird für die
 // Katalog-Bindung die TEXT-fig_id exponiert (Frontend-Identität, vgl. Beats);
 // die Werkstatt-Bindung ist bereits die INTEGER-id (keine Indirektion).
+// chapter_id (SET NULL) bindet optional ein Zielkapitel an den Strang; die Beats
+// der Lane erben es live (Anzeige + KI-Kontext, nie auf den Beat geschrieben).
+// chapter_name via JOIN als Anzeige-Wert zur Lesezeit (kein Snapshot).
 const _THREAD_SELECT = `
   SELECT t.id, t.book_id, t.user_email, t.name, t.farbe,
          t.figure_id, f.fig_id AS fig_id, t.draft_figure_id,
+         t.chapter_id, c.chapter_name AS chapter_name,
          t.position, t.created_at, t.updated_at
     FROM plot_threads t
     LEFT JOIN figures f ON f.id = t.figure_id
+    LEFT JOIN chapters c ON c.chapter_id = t.chapter_id
 `;
 const _stmtListThreads = db.prepare(`${_THREAD_SELECT} WHERE t.book_id = ? AND t.user_email = ? ORDER BY t.position, t.id`);
 const _stmtGetThread = db.prepare(`${_THREAD_SELECT} WHERE t.id = ?`);
 const _stmtInsertThread = db.prepare(`
-  INSERT INTO plot_threads (book_id, user_email, name, farbe, figure_id, draft_figure_id, position, created_at, updated_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ${NOW_ISO_SQL}, ${NOW_ISO_SQL})
+  INSERT INTO plot_threads (book_id, user_email, name, farbe, figure_id, draft_figure_id, chapter_id, position, created_at, updated_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ${NOW_ISO_SQL}, ${NOW_ISO_SQL})
 `);
 const _stmtUpdateThread = db.prepare(`
-  UPDATE plot_threads SET name = ?, farbe = ?, figure_id = ?, draft_figure_id = ?, updated_at = ${NOW_ISO_SQL} WHERE id = ?
+  UPDATE plot_threads SET name = ?, farbe = ?, figure_id = ?, draft_figure_id = ?, chapter_id = ?, updated_at = ${NOW_ISO_SQL} WHERE id = ?
 `);
 const _stmtSetThreadPosition = db.prepare(`
   UPDATE plot_threads SET position = ?, updated_at = ${NOW_ISO_SQL} WHERE id = ? AND book_id = ? AND user_email = ?
@@ -105,22 +110,25 @@ function getThread(id) {
 }
 
 // figureId/draftFigureId sind bereits INTEGER-IDs (in der Route via
-// resolveFigureIds/resolveDraftFigureIds aufgelöst), oder null.
-function createThread(bookId, userEmail, { name, farbe = null, figureId = null, draftFigureId = null, position = null }) {
+// resolveFigureIds/resolveDraftFigureIds aufgelöst), oder null. chapterId ist
+// bereits via _validChapterId aufs Buch validiert, oder null.
+function createThread(bookId, userEmail, { name, farbe = null, figureId = null, draftFigureId = null, chapterId = null, position = null }) {
   const pos = position != null ? parseInt(position) : (_stmtMaxThreadPos.get(parseInt(bookId), userEmail).m + 1);
   const info = _stmtInsertThread.run(
     parseInt(bookId), userEmail, name, farbe,
     figureId != null ? parseInt(figureId) : null,
-    draftFigureId != null ? parseInt(draftFigureId) : null, pos
+    draftFigureId != null ? parseInt(draftFigureId) : null,
+    chapterId != null ? parseInt(chapterId) : null, pos
   );
   return getThread(info.lastInsertRowid);
 }
 
-function updateThread(id, { name, farbe = null, figureId = null, draftFigureId = null }) {
+function updateThread(id, { name, farbe = null, figureId = null, draftFigureId = null, chapterId = null }) {
   _stmtUpdateThread.run(
     name, farbe,
     figureId != null ? parseInt(figureId) : null,
-    draftFigureId != null ? parseInt(draftFigureId) : null, parseInt(id)
+    draftFigureId != null ? parseInt(draftFigureId) : null,
+    chapterId != null ? parseInt(chapterId) : null, parseInt(id)
   );
   return getThread(id);
 }
@@ -329,9 +337,61 @@ const reorderBeats = db.transaction((bookId, userEmail, order) => {
   }
 });
 
+// ── Konsistenz-Prüfungs-Historie ────────────────────────────────────────────
+// Persistierte Plot-Consistency-Läufe pro (Buch, User). Insert beim Job-Complete
+// in routes/jobs/plot.js; List/Get/Delete via /plot/consistency-runs Routes. Die
+// Liste kommt ohne result_json (Spaltensparsamkeit bei vielen Einträgen) —
+// konflikt_count ist denormalisiert fürs Listen-Rendering; Detail liefert vollen JSON.
+
+const _stmtInsertConsistencyRun = db.prepare(`
+  INSERT INTO plot_consistency_runs (book_id, user_email, created_at, konflikt_count, result_json, model)
+  VALUES (?, ?, ?, ?, ?, ?)
+`);
+const _stmtListConsistencyRuns = db.prepare(`
+  SELECT id, book_id, created_at, konflikt_count, model
+    FROM plot_consistency_runs
+   WHERE book_id = ? AND user_email = ?
+   ORDER BY created_at DESC, id DESC
+`);
+const _stmtGetConsistencyRun = db.prepare(`
+  SELECT id, book_id, user_email, created_at, konflikt_count, result_json, model
+    FROM plot_consistency_runs
+   WHERE id = ?
+`);
+const _stmtDeleteConsistencyRun = db.prepare('DELETE FROM plot_consistency_runs WHERE id = ? AND user_email = ?');
+
+function insertPlotConsistencyRun({ bookId, userEmail, konfliktCount = 0, result, model = null }) {
+  const now = new Date().toISOString();
+  const info = _stmtInsertConsistencyRun.run(
+    parseInt(bookId), userEmail, now, parseInt(konfliktCount) || 0, JSON.stringify(result), model
+  );
+  return info.lastInsertRowid;
+}
+
+function listPlotConsistencyRuns(bookId, userEmail) {
+  return _stmtListConsistencyRuns.all(parseInt(bookId), userEmail);
+}
+
+function getPlotConsistencyRun(id) {
+  const r = _stmtGetConsistencyRun.get(parseInt(id));
+  if (!r) return null;
+  let result = null;
+  try { result = JSON.parse(r.result_json); } catch { result = null; }
+  return {
+    id: r.id, book_id: r.book_id, user_email: r.user_email,
+    created_at: r.created_at, konflikt_count: r.konflikt_count,
+    result, model: r.model,
+  };
+}
+
+function deletePlotConsistencyRun(id, userEmail) {
+  return _stmtDeleteConsistencyRun.run(parseInt(id), userEmail).changes;
+}
+
 module.exports = {
   listActs, getAct, createAct, updateAct, deleteAct, reorderActs,
   listThreads, getThread, createThread, updateThread, deleteThread, reorderThreads, _validThreadId,
   listBeats, getBeat, createBeat, updateBeat, deleteBeat, reorderBeats,
   resolveFigureIds, resolveDraftFigureIds,
+  insertPlotConsistencyRun, listPlotConsistencyRuns, getPlotConsistencyRun, deletePlotConsistencyRun,
 };
