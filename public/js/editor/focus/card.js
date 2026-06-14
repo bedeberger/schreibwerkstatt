@@ -5,8 +5,9 @@
 // (_focusGen) invalidiert asynchrone Nachzügler (RAFs, die nach einem schnellen
 // exit noch feuern wollen).
 //
-// `this` zeigt auf Alpine.data('editorFocusCard'). `window.__app` ist der
-// reaktive Root-Proxy.
+// `this` zeigt auf Alpine.data('editorFocusCard'). Root-Zugriff läuft
+// ausschliesslich über `focusHost()` (./host.js) — in der SPA der reaktive
+// `window.__app`-Proxy, in einer fremden Schale ein injizierter Host.
 
 import {
   BLOCK_TAGS, BLOCK_SEL,
@@ -24,6 +25,7 @@ import {
   dynamicTypewriterThreshold, getCaretRect, typewriterScroll,
 } from './typewriter.js';
 import { writeFocusSnapshot, clearFocusSnapshot } from './storage.js';
+import { focusHost } from './host.js';
 import { installEditCounter } from '../shared/edit-counter.js';
 import { bindInlineFormattingShortcuts } from '../shared/shortcuts.js';
 
@@ -35,7 +37,7 @@ export const focusCardMethods = {
   // Overlay setzt sich anschliessend drüber. Phase 4f-real: Focus-Cardroot
   // mountet eigenständig, ohne Normal-Editor-Detour.
   enterFocusFromPageview() {
-    const app = window.__app;
+    const app = focusHost();
     if (!app) return;
     if (!app.editMode) {
       app.startEdit?.();
@@ -45,7 +47,7 @@ export const focusCardMethods = {
   },
 
   enterFocusMode() {
-    const app = window.__app;
+    const app = focusHost();
     if (!app) return;
     if (this._focusState !== 'idle') return;
     if (!app.showEditorCard || !app.editMode) return;
@@ -116,7 +118,7 @@ export const focusCardMethods = {
   },
 
   _focusInstall() {
-    const app = window.__app;
+    const app = focusHost();
     const container = getScrollContainer();
     if (!container) throw new Error('focus: no scroll container');
 
@@ -234,7 +236,7 @@ export const focusCardMethods = {
         const anchor = sel && sel.rangeCount > 0 ? sel.anchorNode : null;
         const block = anchor && container.contains(anchor)
           ? findBlockFromNode(anchor, container) : null;
-        const granularity = window.__app?.focusGranularity || 'paragraph';
+        const granularity = focusHost()?.focusGranularity || 'paragraph';
         if (granularity === 'typewriter-only') {
           setActiveBlock(container, null);
           setNearBlocks(container, null);
@@ -391,7 +393,7 @@ export const focusCardMethods = {
   },
 
   async exitFocusMode() {
-    const app = window.__app;
+    const app = focusHost();
     if (!app) return;
     if (this._focusState !== 'active') return;
     this._focusState = 'exiting';
@@ -520,7 +522,7 @@ export const focusCardMethods = {
         }
         if (!block) block = findBlockAtViewportCenter(container, ctx.visibleBlocks);
 
-        const granularity = window.__app?.focusGranularity || 'paragraph';
+        const granularity = focusHost()?.focusGranularity || 'paragraph';
         const blockChanged = block !== ctx._lastBlock;
         const granularityChanged = granularity !== ctx._lastGranularity;
 

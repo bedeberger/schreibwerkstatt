@@ -45,6 +45,7 @@ Facade re-exportiert; externer Import läuft über [editor/focus.js](../public/j
 
 | Modul | Verantwortlich für |
 |---|---|
+| [host.js](../public/js/editor/focus/host.js) | **Host-Facade** `focusHost()`/`setFocusHost()` — einziger Zugang zur Root. `focus/`-Code greift NICHT direkt auf `window.__app` zu. Default = `window.__app` (SPA, reaktiver Proxy); fremde Schalen (nativer Mac-Focus-Writer in WKWebView, ohne Alpine) injizieren via `setFocusHost()` einen eigenen Host mit demselben Vertrag (Felder/Methoden im File-Kopf dokumentiert). |
 | [constants.js](../public/js/editor/focus/constants.js) | `BLOCK_TAGS` (P/H1-H6/BLOCKQUOTE/LI/PRE/TD/TH/FIGURE/FIGCAPTION — **DIV bewusst nicht drin**), Timing (`POINTER_GRACE_MS=300`, `VV_DEBOUNCE_MS=100`, `CURSOR_HIDE_MS=2000`, `COUNTER_DEBOUNCE_MS=220`), Feature-Detects (`HAS_IO`/`HAS_MO`), `prefersReducedMotion`, `reportError`-Sink |
 | [trampoline.js](../public/js/editor/focus/trampoline.js) | Root-Methoden: 4 Event-Dispatcher + `handleFocusHotkey` (Body-Listener-Routing je nach `focusActive`/`editMode`) |
 | [card.js](../public/js/editor/focus/card.js) | Sub-Methoden: `toggleFocusMode`/`enterFocusMode`/`startFocusEdit`/`exitFocusMode`/`_focusInstall`/`_focusTeardown`/`_focusUpdateActive`. **Listener-Setup + RAF-Recenter-Pipeline** |
@@ -157,6 +158,7 @@ Beim Enter springt der Caret an Buchende. `jumpToTrailingParagraph` ([dom-blocks
 
 ## Pflicht-Invarianten (zusätzlich zu CLAUDE.md)
 
+0. **`focus/` greift nie direkt auf `window.__app` zu.** Root-Zugriff ausschliesslich über `focusHost()` aus [host.js](../public/js/editor/focus/host.js) — Voraussetzung dafür, dass der Editor in einer fremden Schale (nativer Mac-Focus-Writer in WKWebView, ohne Alpine-Root) per `setFocusHost()` lauffähig ist. SPA-Glue ([cards/editor-focus-card.js](../public/js/cards/editor-focus-card.js), `$watch`) darf `window.__app` nutzen — das ist die SPA-Adaption, kein Bestandteil des bündelbaren `focus/`-Kerns.
 1. **`focusActive → editMode`** (CLAUDE.md schon). Sub-`enterFocusMode` bricht ab, wenn `!app.editMode`. `cancelEdit` ruft `exitFocusMode` zuerst.
 2. **Listener nur via `AbortController`-Signal.** Jeder `addEventListener` im `_focusInstall` bekommt `{ signal }`. Kein manueller `removeEventListener`. Teardown ist ein `abort()`.
 3. **IO observe nur addedNodes, unobserve removedNodes.** Vollscan bei jeder Mutation = O(n²) bei grossen Pastes. Removed-Nodes müssen aus `visibleBlocks` raus, sonst IO-Refs auf abgehängten Knoten.
