@@ -303,6 +303,21 @@
     </div>
   </template>
 
+  <!-- Push-getriebener „Zuletzt bearbeitet auf <Gerät>"-Hint: das letzte Save
+       dieser Seite kam von einem anderen EIGENEN Gerät (z. B. nativer Mac-Focus-
+       Client). Passiv, kein Live-Signal — aktualisiert sich erst beim nächsten
+       Speichern/Reload, nicht beim Tippen. Eigenes aktuelles Gerät + fremde User
+       sind bereits in _resolvePageLastEditor ausgefiltert. -->
+  <template x-if="pageLastEditor">
+    <div class="editor-presence-banner editor-presence-banner--device" x-cloak>
+      <span class="editor-presence-banner__text"
+            x-text="t('presence.lastEdited', {
+              device: pageLastEditor.device_name,
+              rel: formatRelativeShort(pageLastEditor.updated_at)
+            })"></span>
+    </div>
+  </template>
+
   <!-- Soft-Edit-Lock-Hinweis: anderer User hatte Editor zuletzt offen
        (last_heartbeat <30min). Reine Info; kein Save-Block (OCC schuetzt). -->
   <div class="editor-presence-banner editor-presence-banner--lock"

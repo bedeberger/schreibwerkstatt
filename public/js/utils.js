@@ -128,6 +128,28 @@ export function formatLastRun(isoStr, t, uiLocale) {
   return t('job.lastRun.dateAt', { date, time });
 }
 
+// Kurz-relative Zeit aus ISO-Timestamp („vor 3 Minuten"/„vor 2 Stunden"/
+// „vor 1 Tag"), lokalisiert via Intl.RelativeTimeFormat. Anders als
+// formatLastRun (Tag-Bucket + Uhrzeit) feiner gestaffelt — passend für
+// push-getriebene „Zuletzt bearbeitet"-Hints. Unter 1 Minute auf 1 geklemmt,
+// damit nie „in 0 Minuten" erscheint.
+export function formatRelativeShort(isoStr, uiLocale) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) return '';
+  const tag = localeTag(uiLocale);
+  let rtf = _RTF_CACHE.get(tag);
+  if (!rtf) {
+    rtf = new Intl.RelativeTimeFormat(tag, { numeric: 'auto' });
+    _RTF_CACHE.set(tag, rtf);
+  }
+  const diffMin = Math.round((Date.now() - d.getTime()) / 60000);
+  if (diffMin < 60) return rtf.format(-Math.max(diffMin, 1), 'minute');
+  const diffH = Math.round(diffMin / 60);
+  if (diffH < 24) return rtf.format(-diffH, 'hour');
+  return rtf.format(-Math.round(diffH / 24), 'day');
+}
+
 // Locale-korrekte Zahl mit fixer Dezimalstellenzahl. Null/NaN → '–'.
 export function formatNumber(value, uiLocale, decimals = 1) {
   if (value == null || !isFinite(value)) return '–';

@@ -1,4 +1,4 @@
-import { escPreserveStrong, fetchText, tzOpts } from '../utils.js';
+import { escPreserveStrong, fetchText, tzOpts, formatRelativeShort } from '../utils.js';
 
 // Pure Filter-Logik für die Szenen-Liste. Getrennt von Alpine-Getter, damit
 // Unit-Tests den Kapitel-Filter direkt gegen Fixtures prüfen können.
@@ -177,6 +177,12 @@ export const appUiMethods = {
       day: '2-digit', month: '2-digit', year: 'numeric',
       hour: '2-digit', minute: '2-digit',
     }));
+  },
+
+  // Kurz-relative Zeit („vor 3 Minuten") für push-getriebene Hints wie den
+  // „Zuletzt bearbeitet auf <Gerät>"-Banner. Lokalisierung via Intl in utils.
+  formatRelativeShort(iso) {
+    return formatRelativeShort(iso, this.uiLocale);
   },
 
   escPreserveStrong,

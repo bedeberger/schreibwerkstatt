@@ -14,7 +14,7 @@
 //  - Auth/KI/Job-Queue/SSE: Network-Only, nie cachen
 //  - Version-Bump der Konstanten invalidiert den jeweiligen Cache
 
-const SHELL_CACHE = 'schreibwerkstatt-shell-v1279';
+const SHELL_CACHE = 'schreibwerkstatt-shell-v1280';
 const CONTENT_CACHE = 'schreibwerkstatt-content-v1';
 const CONFIG_CACHE = 'schreibwerkstatt-config-v2';
 const ACTIVE_CACHES = new Set([SHELL_CACHE, CONTENT_CACHE, CONFIG_CACHE]);
@@ -256,7 +256,15 @@ self.addEventListener('fetch', (event) => {
   if (isNeverCache(url)) return;
 
   if (req.mode === 'navigate') {
-    event.respondWith(handleNavigate(req));
+    // Nur die SPA-Shell selbst (/ bzw. /index.html) ist eine Shell-Navigation.
+    // Server-gerenderte Public-Seiten (/datenschutz, /register, /landing, /privacy)
+    // sind ebenfalls navigate-Requests, dürfen aber NIE durch handleNavigate
+    // laufen: das würde ihre Antwort unter SHELL_PATH cachen und den nächsten
+    // SPA-Load mit der falschen Seite (z.B. der Datenschutzerklärung) bedienen.
+    // Diese Pfade gehen unbehandelt ans Netz.
+    if (url.pathname === '/' || url.pathname === '/index.html') {
+      event.respondWith(handleNavigate(req));
+    }
     return;
   }
   if (url.pathname === CONFIG_PATH) {

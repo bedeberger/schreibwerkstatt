@@ -176,6 +176,11 @@ const navigationState = () => ({
 // schreibt hier.
 const pageState = () => ({
   currentPage: null,
+  // Push-getriebener „Zuletzt bearbeitet auf <Gerät>"-Hint der offenen Seite.
+  // Vom Server (loadPage → last_editor) befüllt, in selectPage/_refetchCurrentPage
+  // gegen das aktuelle Gerät gefiltert (nur fremde EIGENE Geräte, nicht live).
+  // null = kein Hint (eigener Browser, fehlende Daten oder fremder User).
+  pageLastEditor: null,
   currentPageEmpty: false,
   currentPageIdeenOpenCount: 0,
   currentPageChatSessionCount: 0,

@@ -4,6 +4,7 @@ import { EXCLUSIVE_CARDS } from '../cards/feature-registry.js';
 import { contentRepo } from '../repo/content.js';
 import { readDraft, clearDraft } from '../editor/draft-storage.js';
 import { setLastPageId, getLastPageId, getFilters } from '../local-prefs.js';
+import { getDeviceId } from '../device-id.js';
 
 // Karten-Scopes, deren Filter pro Buch im localStorage persistiert werden.
 // Defaults werden bei Buchwechsel angewandt; gespeicherte Werte überschreiben
@@ -122,6 +123,7 @@ export const appViewMethods = {
       // Listing-Cache kann stale sein (Page-Save aktualisiert ihn nicht).
       if (pd.updated_at) p.updated_at = pd.updated_at;
       this.currentPageEmpty = !htmlToText(html).trim();
+      this.pageLastEditor = this._resolvePageLastEditor(pd.last_editor);
       this.analysisOut = '';
       this._refreshPendingDraft(p.id, html);
     } catch (e) {
@@ -168,6 +170,17 @@ export const appViewMethods = {
   // Lädt die aktuell offene Seite neu vom Server (SW-Cache umgangen). Wird
   // beim Re-Klick auf die offene Sidebar-Seite verwendet, damit nach externer
   // Änderung in BookStack kein veralteter Stand stehenbleibt.
+  // Push-getriebenen „Zuletzt bearbeitet"-Hint aufbereiten. Zeigt nur, wenn das
+  // letzte Save von einem ANDEREN eigenen Gerät kam: device_name ist serverseitig
+  // schon user-scoped (kein Fremd-Leak), hier zusätzlich das AKTUELLE Gerät
+  // ausfiltern (is_current_device → kein irritierender Selbst-Hinweis). Kein
+  // Live-Signal: der Stand stammt aus dem letzten Save, refresht nur bei Reload.
+  _resolvePageLastEditor(le) {
+    if (!le || !le.device_name || !le.device_id) return null;
+    if (le.device_id === getDeviceId()) return null;
+    return { device_name: le.device_name, updated_at: le.updated_at || null };
+  },
+
   async _refetchCurrentPage() {
     if (!this.currentPage) return;
     const pageId = this.currentPage.id;
@@ -180,6 +193,7 @@ export const appViewMethods = {
       this._updatePageViewHeight();
       if (pd.updated_at) this.currentPage.updated_at = pd.updated_at;
       this.currentPageEmpty = !htmlToText(html).trim();
+      this.pageLastEditor = this._resolvePageLastEditor(pd.last_editor);
       this._refreshPendingDraft(pageId, html);
       // Findings/Marks erhalten: ohne Refilter würden Marks beim Refetch
       // (Re-Klick, Collab-Remote-Edit, Revision-Restore) verschwinden, obwohl
@@ -488,6 +502,7 @@ export const appViewMethods = {
     this.ideenScope = 'page';
     this._checkDoneBeforeChat = false;
     this.currentPage = null;
+    this.pageLastEditor = null;
     this.currentPageEmpty = false;
     this.currentPageIdeenOpenCount = 0;
     this.currentPageChatSessionCount = 0;

@@ -1840,6 +1840,7 @@
   "presence.self.bannerMany":           "You are editing this page on {count} other devices.",
   "presence.device.unknown":            "Unknown device",
   "presence.device.thisDevice":         "This device",
+  "presence.lastEdited":                "Last edited on “{device}” · {rel}",
   "editor.revisions.restore":           "Restore",
   "editor.revisions.restoring":         "Restoring…",
   "editor.revisions.restoreTitle":      "Set this version as current",

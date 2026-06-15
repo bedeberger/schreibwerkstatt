@@ -1841,6 +1841,7 @@
   "presence.self.bannerMany":           "Du editierst diese Seite gerade auf {count} weiteren Geräten.",
   "presence.device.unknown":            "Unbekanntes Gerät",
   "presence.device.thisDevice":         "Dieses Gerät",
+  "presence.lastEdited":                "Zuletzt bearbeitet auf „{device}“ · {rel}",
   "editor.revisions.restore":           "Wiederherstellen",
   "editor.revisions.restoring":         "Wird wiederhergestellt…",
   "editor.revisions.restoreTitle":      "Diese Version als aktuellen Stand setzen",
