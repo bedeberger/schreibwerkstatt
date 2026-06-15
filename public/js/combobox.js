@@ -208,7 +208,15 @@ export function comboboxData(cfg = {}) {
         if (this._compact) this.$el.classList.add('combobox-wrap--compact');
 
         this._onOutside = (e) => { if (!this.$el.contains(e.target)) this.close(); };
-        this._onScrollResize = () => { if (this.open) this.close(); };
+        // Bei Scroll/Resize schliessen (fixed Dropdown zieht nicht nach). Scroll
+        // INNERHALB der eigenen Liste (lange Kapitel-/Figurenliste) darf nicht
+        // schliessen — der capture-Listener auf window faengt sonst auch den
+        // List-Scroll ab.
+        this._onScrollResize = (e) => {
+          if (!this.open) return;
+          if (e && e.type === 'scroll' && this.$el.contains(e.target)) return;
+          this.close();
+        };
         document.addEventListener('mousedown', this._onOutside);
         this.$el.addEventListener('keydown', (e) => this.onKeydown(e));
 
