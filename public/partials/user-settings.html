@@ -250,7 +250,7 @@
         <p x-show="macRelease.notes" class="mac-app-notes muted-msg muted-msg--sm" x-text="macRelease.notes"></p>
 
         <div class="mac-app-download">
-          <a class="btn-compact" :href="macRelease.dmg.downloadUrl" :download="macRelease.dmg.name"
+          <a class="btn-compact" :href="macRelease.dmg?.downloadUrl" :download="macRelease.dmg?.name"
              x-text="$app.t('profile.macApp.download')"></a>
           <span x-show="!macReleaseIsMacPlatform()" class="muted-msg muted-msg--sm"
                 x-text="$app.t('profile.macApp.forMacOnly')"></span>
@@ -260,8 +260,13 @@
 
     <!-- App-Version (SSoT: VERSION-Datei, vom Server via /config) -->
     <div class="card-form-row" x-show="$app.appVersion" x-cloak>
-      <label class="card-form-label" x-text="$app.t('profile.appVersion')"></label>
-      <div class="muted-msg muted-msg--sm" x-text="'v' + $app.appVersion"></div>
+      <p class="muted-msg muted-msg--sm">
+        <span x-text="$app.t('profile.appVersion') + ': v' + $app.appVersion"></span>
+        <span> · </span>
+        <a href="https://github.com/bedeberger/schreibwerkstatt"
+           target="_blank" rel="noopener noreferrer"
+           x-text="$app.t('landing.githubLabel')"></a>
+      </p>
     </div>
   </div>
 </div>

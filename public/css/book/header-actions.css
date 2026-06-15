@@ -7,15 +7,26 @@
   font-size: var(--font-size-sm);
   color: var(--color-muted);
   white-space: nowrap;
+  /* Bricht die Action-Zeile unter den Titel um, bleibt sie rechtsbuendig
+     (sonst landet der Avatar links und das absolut positionierte Dropdown
+     oeffnet ueber den Content). */
+  margin-left: auto;
 }
 .header-action-cluster {
   display: flex;
   align-items: center;
   gap: 0.25rem;
+  height: 28px;
   padding: var(--space-2xs);
   background: var(--color-hover);
   border: 0.5px solid var(--color-border);
   border-radius: var(--radius-sm);
+}
+/* Inner controls fit innerhalb der 28px-Chip-Höhe (= Höhe von Ring + Avatar),
+   damit alle Header-Controls gleich hoch sind. */
+.header-action-cluster .icon-btn--ghost {
+  width: 22px;
+  height: 22px;
 }
 
 /* Primärbutton „Buch analysieren" mit integriertem Fortschrittsring */
@@ -23,7 +34,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  height: 28px;
+  height: 22px;
   padding: 0 12px 0 10px;
   background: var(--color-surface);
   border: 0.5px solid var(--color-border);
