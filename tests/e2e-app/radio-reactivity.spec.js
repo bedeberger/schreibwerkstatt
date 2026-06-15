@@ -1,5 +1,13 @@
-// TEMPORÄR: verifiziert die reaktiven radioGroup-Pfade gegen die echte App.
-// Nach dem Lauf wieder löschen.
+// Interaktions-Regressionsguard für die radioGroup-Komponente gegen die echte
+// App (playwright.app.config.js). Der Smoke-Test prüft nur Konsolenfehler, NICHT
+// Interaktivität — diese Schicht klickt durch:
+//   1. book-settings: Region-Optionen reagieren reaktiv auf den Sprachwechsel
+//      (inline x-effect liest bookSettingsLanguage), Region ist wählbar.
+//   2. folder-import: das per-Option `disabled`-Flag (Card-Variante) reagiert
+//      reaktiv auf $app.selectedBookId.
+// Warum nötig: `:disabled="opt.disabled"` mit undefined sperrt in Alpine JEDE
+// Option (Boolean-Attr wird bei undefined nicht entfernt) — ein Bug, der ohne
+// echten Klick unsichtbar bleibt.
 const { test, expect } = require('@playwright/test');
 
 async function bootApp(page) {

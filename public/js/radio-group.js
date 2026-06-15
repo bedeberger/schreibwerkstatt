@@ -44,11 +44,14 @@ export function radioGroupData(cfg = {}) {
       // Gemeinsamer name für native Pfeil-Tastatur-Nav innerhalb der Gruppe.
       this._name = this.$id('radio-group');
       // Optionen mit `disabled: true` werden ausgegraut + nicht wählbar.
+      // Bool-Cast Pflicht: Alpine entfernt das Boolean-Attribut bei `undefined`
+      // NICHT (nur bei explizit false), sonst wäre jede Option ohne disabled-Key
+      // gesperrt.
       const template = [
         '<template x-for="opt in options" :key="String(opt.value)">',
-        '  <label class="form-radio-option" :class="{ \'is-disabled\': opt.disabled }">',
+        '  <label class="form-radio-option" :class="{ \'is-disabled\': opt.disabled === true }">',
         '    <input type="radio" :name="_name" :value="opt.value"',
-        '           :checked="_isSelected(opt.value)" :disabled="opt.disabled"',
+        '           :checked="_isSelected(opt.value)" :disabled="opt.disabled === true"',
         '           @change="select(opt.value)">',
         '    <span x-text="opt.label"></span>',
         '  </label>',
