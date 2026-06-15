@@ -695,6 +695,7 @@ document.addEventListener('alpine:init', () => {
           const meta = document.querySelector('meta[name="apple-mobile-web-app-title"]');
           if (meta) meta.setAttribute('content', cfg.appName);
         }
+        if (cfg.appVersion) this.appVersion = cfg.appVersion;
         this.languagetoolEnabled = !!cfg.languagetool?.enabled;
         if (Number.isFinite(cfg.languagetool?.debounceMs)) {
           this.languagetoolDebounceMs = cfg.languagetool.debounceMs;

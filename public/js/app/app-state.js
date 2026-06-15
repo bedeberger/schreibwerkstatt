@@ -45,6 +45,9 @@ const shellState = () => ({
   // <title>, apple-mobile-web-app-title, Site-Header-H1 und Locale-Platzhalter
   // `{appName}`. Default deckt Hard-Refresh ab, bevor /config geladen ist.
   appName: 'Schreibwerkstatt',
+  // App-Version (vom Server via /config → VERSION-Datei). Manuell vor jedem
+  // Commit gepflegt; SSoT ist lib/version.js. Anzeige in den UserSettings.
+  appVersion: '',
   // Tile-Server der Orte-Karte (vom Server via /config → app_settings
   // geocode.tiles.*). Leaflet holt die Kacheln direkt im Browser; die URL liegt
   // hier, damit ein self-hosted Tile-Server konfigurierbar ist. attribution

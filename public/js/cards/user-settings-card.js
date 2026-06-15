@@ -30,6 +30,9 @@ export function registerUserSettingsCard() {
     deviceTokensNewName: '',
     deviceTokensJustCreated: null,
     deviceTokensCopiedAt: 0,
+    // macOS-App-Download (schreibwerkstatt-focuseditor)
+    macAppOpen: false,
+    macRelease: { available: false },
     _savedAtTimer: null,
 
     get dictEntriesFiltered() {
@@ -46,6 +49,7 @@ export function registerUserSettingsCard() {
         await this.loadUserSettings();
         await this.loadDictEntries();
         await this.loadDeviceTokens();
+        await this.loadMacRelease();
       });
 
       this._onViewReset = () => {

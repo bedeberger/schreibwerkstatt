@@ -21,7 +21,9 @@ const { db } = require('../db/connection');
 const { localIsoDaysAgo } = require('../lib/local-date');
 const editorBundle = require('../lib/editor-bundle');
 const macclientI18n = require('../lib/macclient-i18n');
+const macclientRelease = require('../lib/macclient-release');
 const deviceTokens = require('../db/device-tokens');
+const { createHash } = require('node:crypto');
 
 const router = express.Router();
 router.param('book_id', bookParamHandler);
@@ -696,6 +698,31 @@ router.get('/macclient-i18n.json', (req, res) => {
     logger.info(`macclient-i18n.json: ausgeliefert (${client}, ${(Buffer.byteLength(body) / 1024).toFixed(1)} KB, etag=${etag.slice(1, 13)})`);
     res.send(body);
   } catch (e) { _fail(res, e, 'GET /content/macclient-i18n.json'); }
+});
+
+// GET /content/macclient/release.json — latest-Release-Metadaten der nativen
+// macOS-App (schreibwerkstatt-focuseditor) fuer den Download-Hinweis im Profil.
+// Body: { available, version, notes, publishedAt, dmg:{ name, sizeBytes,
+// downloadUrl } } bzw. { available:false }. Quelle: GitHub-Public-API ueber
+// [lib/macclient-release.js](../lib/macclient-release.js) (In-Memory-Cache).
+//
+// Die UI verlinkt direkt auf dmg.downloadUrl (GitHub-CDN) — kein Download-Proxy.
+// Da das Client-Repo oeffentlich ist, ist die Asset-URL selbst oeffentlich; der
+// Download wird nur Eingeloggten *angezeigt* (Anzeige-Gating, kein Hard-Gating).
+//
+// Auth: globaler Guard (server.js). ETag = sha256(version); bei If-None-Match
+// mit passendem ETag → 304 ohne Body.
+router.get('/macclient/release.json', async (req, res) => {
+  try {
+    const rel = await macclientRelease.getLatestRelease();
+    const body = JSON.stringify(rel);
+    const etag = `"${createHash('sha256').update(`macclient-release:${rel.available ? rel.version : 'none'}`).digest('hex')}"`;
+    res.set('ETag', etag);
+    res.set('Cache-Control', 'no-cache'); // immer revalidieren (via If-None-Match)
+    if (req.headers['if-none-match'] === etag) return res.status(304).end();
+    res.set('Content-Type', 'application/json; charset=utf-8');
+    res.send(body);
+  } catch (e) { _fail(res, e, 'GET /content/macclient/release.json'); }
 });
 
 module.exports = router;

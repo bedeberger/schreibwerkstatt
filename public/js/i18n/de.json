@@ -2562,6 +2562,13 @@
   "profile.devices.status.revoked":     "Widerrufen",
   "profile.devices.status.expired":     "Abgelaufen",
 
+  "profile.macApp.title":               "macOS-App",
+  "profile.macApp.intro":               "Der native Focus-Writer für macOS – schreibe offline in Vollbild. Lade die App herunter und melde dich mit einem Geräte-Token (siehe oben) an.",
+  "profile.macApp.version":             "Version",
+  "profile.macApp.download":            "Für macOS herunterladen",
+  "profile.macApp.forMacOnly":          "Nur für macOS.",
+  "profile.appVersion":                 "App-Version",
+
   "lang.de":                     "Deutsch",
   "lang.en":                     "English",
 

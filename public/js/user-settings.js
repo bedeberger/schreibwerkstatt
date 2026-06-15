@@ -148,4 +148,29 @@ export const userSettingsMethods = {
   deviceTokensDismissPlain() {
     this.deviceTokensJustCreated = null;
   },
+
+  // ── macOS-App-Download (schreibwerkstatt-focuseditor) ───────────────────────
+  // latest-Release-Metadaten vom Server (GitHub-Public-API-Proxy). Wirft nie;
+  // bei { available:false } wird der Abschnitt schlicht nicht gerendert.
+  async loadMacRelease() {
+    try {
+      const data = await fetchJson('/content/macclient/release.json');
+      this.macRelease = data && data.available ? data : { available: false };
+    } catch (e) {
+      console.error('[user-settings] Mac-Release laden fehlgeschlagen:', e);
+      this.macRelease = { available: false };
+    }
+  },
+
+  /** Dateigröße des .dmg in MB, locale-formatiert. */
+  macReleaseSizeMb() {
+    const bytes = this.macRelease?.dmg?.sizeBytes || 0;
+    if (!bytes) return '';
+    return (bytes / 1048576).toLocaleString(window.__app.uiLocale === 'en' ? 'en-US' : 'de-CH', { maximumFractionDigits: 1 });
+  },
+
+  /** Dezent erkennen, ob der Besucher auf macOS ist (nur für einen Hinweis). */
+  macReleaseIsMacPlatform() {
+    return /Mac/i.test(navigator.platform || navigator.userAgent || '');
+  },
 };

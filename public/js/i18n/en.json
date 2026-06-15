@@ -2561,6 +2561,13 @@
   "profile.devices.status.revoked":     "Revoked",
   "profile.devices.status.expired":     "Expired",
 
+  "profile.macApp.title":               "macOS app",
+  "profile.macApp.intro":               "The native focus writer for macOS — write offline in full screen. Download the app and sign in with a device token (see above).",
+  "profile.macApp.version":             "Version",
+  "profile.macApp.download":            "Download for macOS",
+  "profile.macApp.forMacOnly":          "For macOS only.",
+  "profile.appVersion":                 "App version",
+
   "lang.de":                     "German",
   "lang.en":                     "English",
 

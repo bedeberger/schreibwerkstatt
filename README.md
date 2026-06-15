@@ -127,6 +127,10 @@ apt-get install -y epubcheck            # oder: apk add epubcheck / brew install
 # Deaktivieren ohne Deinstallation: app_settings epub.validate.disabled = true
 ```
 
+### Optional: GITHUB_TOKEN (macOS-App-Download)
+
+Das Profil (`/me`) zeigt eingeloggten Usern Version + Download-Link der nativen macOS-App. Der Server liest dafür das `latest`-Release des öffentlichen Repos [schreibwerkstatt-focuseditor](https://github.com/bedeberger/schreibwerkstatt-focuseditor) über die GitHub-Public-API ([lib/macclient-release.js](lib/macclient-release.js), In-Memory-Cache ~10 min). Kein Token nötig. Ist `GITHUB_TOKEN` in `.env` gesetzt, wird es als Bearer mitgeschickt, um das API-Rate-Limit anzuheben (60→5000 Requests/h).
+
 ### Update
 
 ```bash

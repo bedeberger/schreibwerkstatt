@@ -16,6 +16,7 @@ const { tryDeviceAuth } = require('./lib/device-auth');
 const bookAccess = require('./db/book-access');
 const { ensureAdminFromEnv, touchUserLastSeen, addUserActivity } = appUsers;
 const appSettings = require('./lib/app-settings');
+const { getVersion } = require('./lib/version');
 
 // Admin-Bootstrap: ADMIN_EMAIL aus ENV → app_users-Row mit
 // global_role='admin'. Idempotent + ENV-Wechsel-tauglich (kein Restart-Zwang).
@@ -495,7 +496,7 @@ function bootstrapDevAccess(stage) {
 }
 
 const server = app.listen(PORT, '0.0.0.0', () => {
-  logger.info(`${appSettings.get('app.name')} läuft auf http://0.0.0.0:${PORT}`);
+  logger.info(`${appSettings.get('app.name')} v${getVersion()} läuft auf http://0.0.0.0:${PORT}`);
 
   bootstrapDevAccess('boot');
 

@@ -226,5 +226,42 @@
         </div>
       </div>
     </div>
+
+    <!-- macOS-App-Download (schreibwerkstatt-focuseditor) -->
+    <div class="card-form-row card-form-row--devices" x-show="macRelease.available" x-cloak>
+      <button type="button"
+              class="collapsible-toggle"
+              @click="macAppOpen = !macAppOpen"
+              :aria-expanded="macAppOpen">
+        <svg class="icon history-chevron" :class="{ 'is-open': macAppOpen }" aria-hidden="true"><use href="/icons.svg#chevron-right"/></svg>
+        <span x-text="$app.t('profile.macApp.title')"></span>
+        <span class="lt-dict-count" x-text="macRelease.version"></span>
+      </button>
+      <div class="device-tokens-body" x-show="macAppOpen" x-cloak>
+        <p class="muted-msg muted-msg--sm" x-text="$app.t('profile.macApp.intro')"></p>
+
+        <div class="mac-app-meta muted-msg muted-msg--sm">
+          <span x-text="$app.t('profile.macApp.version') + ': ' + macRelease.version"></span>
+          <span x-show="macReleaseSizeMb()" x-text="' · ' + macReleaseSizeMb() + ' MB'"></span>
+          <span x-show="macRelease.publishedAt"
+                x-text="' · ' + new Date(macRelease.publishedAt).toLocaleDateString($app.uiLocale, $app.tzOpts ? $app.tzOpts() : {})"></span>
+        </div>
+
+        <p x-show="macRelease.notes" class="mac-app-notes muted-msg muted-msg--sm" x-text="macRelease.notes"></p>
+
+        <div class="mac-app-download">
+          <a class="btn-compact" :href="macRelease.dmg.downloadUrl" :download="macRelease.dmg.name"
+             x-text="$app.t('profile.macApp.download')"></a>
+          <span x-show="!macReleaseIsMacPlatform()" class="muted-msg muted-msg--sm"
+                x-text="$app.t('profile.macApp.forMacOnly')"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- App-Version (SSoT: VERSION-Datei, vom Server via /config) -->
+    <div class="card-form-row" x-show="$app.appVersion" x-cloak>
+      <label class="card-form-label" x-text="$app.t('profile.appVersion')"></label>
+      <div class="muted-msg muted-msg--sm" x-text="'v' + $app.appVersion"></div>
+    </div>
   </div>
 </div>

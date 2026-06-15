@@ -90,3 +90,23 @@
     white-space: normal;
   }
 }
+
+/* macOS-App-Download (schreibwerkstatt-focuseditor) — gleicher Abschnitt wie
+   die Device-Tokens (native Clients). Latest-Release-Metadaten + Download-Link. */
+.mac-app-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+}
+
+.mac-app-notes {
+  white-space: pre-line;
+}
+
+.mac-app-download {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  margin-top: var(--space-xs);
+}
