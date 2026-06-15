@@ -2255,6 +2255,7 @@
   "admin.settings.help.charsPerToken":  "Skaliert Token-Schätzungen aus Zeichen. Provider-unabhängig. Default 3.0 ist für Deutsch kalibriert.",
   "admin.settings.help.pageRevisionLimit": "Floor für Page-Revisions-Retention: jüngste N Revisionen pro Seite werden zusätzlich zum GFS-Schema (24h / 1 pro Tag / 1 pro Woche / 1 pro Monat / 1 pro Jahr, jeweils älteste) garantiert behalten. Cleanup läuft täglich.",
   "admin.settings.help.advancedGlobal": "Greifen unabhängig vom Provider.",
+  "admin.settings.help.macclientGithubToken": "Optionaler GitHub-Token (PAT) für den Abruf der macOS-App-Version im Profil. Leer = unauthentifiziert (60 Anfragen/h pro IP). Gesetzt = hebt das Rate-Limit (5000/h). Behebt keine Netzwerk-Timeouts.",
   "admin.settings.help.advancedClaude": "Steuern Retries, Timeout und Parallelität der Claude-Calls gegen Anthropic-TPM-Limits.",
   "admin.settings.saved":        "{count} Einstellung(en) gespeichert.",
 
