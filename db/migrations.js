@@ -7715,6 +7715,28 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 193 abgeschlossen (plot_acts.thread_id — Hybrid-Akte pro Strang).');
   }
 
+  if (version < 194) {
+    // pages.last_editor_device_id: welches Geraet (app_users_devices) den letzten
+    // Body-Edit geschrieben hat. Macht den Collab-/changes-Feed geraete-bewusst:
+    // eigene Edits VON EINEM ANDEREN Geraet desselben Users (z.B. nativer
+    // Mac-Focus-Client) werden im Browser jetzt als Remote-Change erkannt, waehrend
+    // der Echo des EIGENEN Browsers (gleiche device_id) weiter ausgefiltert bleibt.
+    // Additiv: nullable FK ohne Default (ON DELETE SET NULL — Geraet widerrufen
+    // entkoppelt die Page-Zuordnung), kein Recreate noetig (analog Migration 193).
+    const pageCols194 = db.pragma('table_info(pages)').map(c => c.name);
+    if (!pageCols194.includes('last_editor_device_id')) {
+      db.exec('ALTER TABLE pages ADD COLUMN last_editor_device_id TEXT REFERENCES app_users_devices(device_id) ON DELETE SET NULL');
+    }
+    db.exec('CREATE INDEX IF NOT EXISTS idx_pages_last_editor_device ON pages(last_editor_device_id)');
+
+    const fkErrors194 = db.pragma('foreign_key_check');
+    if (fkErrors194.length) {
+      throw new Error(`Migration 194: foreign_key_check meldet ${fkErrors194.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 194').run();
+    logger.info('DB-Migration auf Version 194 abgeschlossen (pages.last_editor_device_id — geraete-bewusster Collab-Feed).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

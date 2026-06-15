@@ -8,8 +8,11 @@
 //   - Andere Seite des Buchs → page_id in `recentRemoteEdits` (Tree-Badge);
 //     bei mehreren in einem Tick: aggregierter Toast
 //
-// User-eigene Edits sind serverseitig ausgefiltert (last_editor_email !=
-// session.email); Poller bekommt sie gar nicht erst zu sehen.
+// Serverseitig wird nur der Echo DIESES Geraets ausgefiltert (per device_id):
+// Edits eines anderen ACL-Users ODER eines eigenen Zweit-Geraets (z.B. nativer
+// Mac-Client) kommen als Remote-Change durch, der Save des eigenen Browsers nicht.
+
+import { getDeviceId } from '../device-id.js';
 
 const COLLAB_POLL_MS = 5000;
 
@@ -18,36 +21,6 @@ const COLLAB_POLL_MS = 5000;
 // 5s-Collab-Poll (changes + presence) startet erst, wenn dieser Ping >1 eigenes
 // Geraet meldet (oder das Buch ohnehin geteilt ist).
 const BOOK_DEVICE_PING_MS = 40000;
-
-// Stabile Device-ID pro Browser-Profil. localStorage ueberlebt Reloads,
-// trennt Browser-Profile/Geraete sauber. Beim ersten Aufruf wird eine UUID
-// generiert; spaeter wiederverwendet — selber Browser = selbes Device.
-const DEVICE_ID_KEY = 'sw_device_id';
-let _cachedDeviceId = null;
-function _getDeviceId() {
-  if (_cachedDeviceId) return _cachedDeviceId;
-  try {
-    let id = localStorage.getItem(DEVICE_ID_KEY);
-    if (!id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
-      id = (typeof crypto !== 'undefined' && crypto.randomUUID)
-        ? crypto.randomUUID()
-        : _uuidFallback();
-      localStorage.setItem(DEVICE_ID_KEY, id);
-    }
-    _cachedDeviceId = id;
-    return id;
-  } catch {
-    // Safari Private Mode etc. — Ephemeral-UUID pro Session, kein Persist.
-    if (!_cachedDeviceId) _cachedDeviceId = _uuidFallback();
-    return _cachedDeviceId;
-  }
-}
-function _uuidFallback() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-    const r = Math.random() * 16 | 0;
-    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-  });
-}
 
 export const appCollabMethods = {
   _startCollabPoll(bookId) {
@@ -118,6 +91,7 @@ export const appCollabMethods = {
     const bid = this._bookDevicePingBookId;
     this._bookDevicePingBookId = null;
     this._selfPageDeviceCount = 0;
+    this._selfBookDeviceCount = 0;
     if (bid) this._sendBookDeviceLeave(bid);
   },
 
@@ -128,13 +102,14 @@ export const appCollabMethods = {
       const r = await fetch('/content/books/' + bookId + '/device-ping', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ device_id: _getDeviceId(), page_id: this.currentPage?.id || null }),
+        body: JSON.stringify({ device_id: getDeviceId(), page_id: this.currentPage?.id || null }),
       });
       if (r.status === 403) { this._handleBookAccessLost(bookId); return; }
       if (!r.ok) return;
       data = await r.json();
     } catch { return; }
     this._selfPageDeviceCount = Number(data?.self_page_device_count) || 0;
+    this._selfBookDeviceCount = Number(data?.self_book_device_count) || 0;
     this._reconcileFullCollabPoll(bookId);
   },
 
@@ -145,13 +120,16 @@ export const appCollabMethods = {
     if (bid) this._sendBookDevicePing(bid);
   },
 
-  // Voller Poll an/aus je nach erkannter Zweit-Partei AUF DERSELBEN SEITE.
-  // `bookSharedFlags` deckt andere ACL-User ab (buchweit), `_selfPageDeviceCount`
-  // das eigene Multi-Device auf der aktuell offenen Seite.
+  // Voller Poll an/aus je nach erkannter Zweit-Partei. `bookSharedFlags` deckt
+  // andere ACL-User ab (buchweit); `_selfBookDeviceCount` das eigene Multi-Device
+  // im GANZEN Buch (z.B. nativer Mac-Client, der eine BELIEBIGE Seite pusht — so
+  // landet sein Push auch dann als Tree-Marker, wenn der Browser eine andere Seite
+  // offen hat); `_selfPageDeviceCount` deckt zusaetzlich den Seitenkonflikt ab.
   _reconcileFullCollabPoll(bookId) {
     if (!bookId || String(bookId) !== String(this.selectedBookId)) return;
     const id = String(bookId);
     const needFull = this.bookSharedFlags[id] === true
+      || this._selfBookDeviceCount > 1
       || (this.currentPage?.id && this._selfPageDeviceCount > 1);
     if (needFull) this._ensureFullCollabPoll(id);
     else this._stopFullCollabPoll();
@@ -160,7 +138,7 @@ export const appCollabMethods = {
   _sendBookDeviceLeave(bookId) {
     if (!bookId) return;
     try {
-      const did = _getDeviceId();
+      const did = getDeviceId();
       fetch('/content/books/' + bookId + '/device-ping?device_id=' + encodeURIComponent(did), {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
@@ -207,8 +185,11 @@ export const appCollabMethods = {
   },
 
   async _collabFetchChanges(bookId) {
-    const url = '/content/books/' + bookId + '/changes'
-      + (this._collabSince ? '?since=' + encodeURIComponent(this._collabSince) : '');
+    // device_id: macht den Feed geraete-bewusst — der Server filtert nur den Echo
+    // DIESES Browsers aus, eigene Edits anderer Geraete (Mac-Client) bleiben.
+    const params = new URLSearchParams({ device_id: getDeviceId() });
+    if (this._collabSince) params.set('since', this._collabSince);
+    const url = '/content/books/' + bookId + '/changes?' + params.toString();
     let data;
     try {
       const r = await fetch(url);
@@ -230,7 +211,7 @@ export const appCollabMethods = {
   async _collabFetchPresence(bookId) {
     let data;
     try {
-      const url = '/content/books/' + bookId + '/presence?device_id=' + encodeURIComponent(_getDeviceId());
+      const url = '/content/books/' + bookId + '/presence?device_id=' + encodeURIComponent(getDeviceId());
       const r = await fetch(url);
       if (r.status === 403) { this._handleBookAccessLost(bookId); return; }
       if (!r.ok) return;
@@ -379,7 +360,7 @@ export const appCollabMethods = {
       fetch('/content/pages/' + pageId + '/presence', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ device_id: _getDeviceId() }),
+        body: JSON.stringify({ device_id: getDeviceId() }),
       }).catch(() => {});
     } catch {}
   },
@@ -389,7 +370,7 @@ export const appCollabMethods = {
     try {
       // device_id auch als Query-Param: keepalive/sendBeacon koennen Body
       // verschlucken; Server akzeptiert beide.
-      const did = _getDeviceId();
+      const did = getDeviceId();
       fetch('/content/pages/' + pageId + '/presence?device_id=' + encodeURIComponent(did), {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },

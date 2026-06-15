@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 193, 99 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 194, 99 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -127,6 +127,7 @@ erDiagram
   books ||--o{ book_presence         : "open on devices"
   app_users_devices ||--o{ page_presence : "pinged from"
   app_users_devices ||--o{ book_presence : "pinged from"
+  app_users_devices ||--o{ pages         : "last edited from"
 
   chapters ||--o{ figure_appearances     : has
   chapters ||--o{ figure_events          : at
@@ -234,6 +235,7 @@ erDiagram
     TEXT    remote_updated_at
     INTEGER dirty "Konflikterkennung Sync-Pull"
     TEXT    last_editor_email "Letzter Body-Autor; Quelle fuer Tree-/Toast-Hinweise"
+    TEXT    last_editor_device_id FK "ON DELETE SET NULL; Geraet des letzten Body-Edits, geraete-bewusster /changes-Feed"
   }
   page_stats {
     INTEGER page_id          PK,FK

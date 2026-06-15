@@ -33,6 +33,14 @@ export function registerShareLinksCard() {
     _copiedTimer: null,
     _lifecycle: null,
 
+    shareKindOptions() {
+      const app = window.__app;
+      return [
+        { value: 'page',    label: app.t('share.create.page') },
+        { value: 'chapter', label: app.t('share.create.chapter') },
+      ];
+    },
+
     init() {
       this._lifecycle = setupCardLifecycle(this, {
         name: 'shareLinks',

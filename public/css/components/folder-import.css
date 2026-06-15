@@ -12,37 +12,8 @@
     gap: var(--space-lg);
   }
 
-  .folder-import-mode {
-    display: flex;
-    gap: var(--space-lg);
-    flex-wrap: wrap;
-  }
-
-  .folder-import-radio {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-sm);
-    padding: var(--space-sm) var(--space-md);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    background: var(--color-bg);
-    transition: border-color 120ms, background 120ms;
-  }
-
-  .folder-import-radio:has(input:checked) {
-    border-color: var(--card-accent);
-    background: color-mix(in srgb, var(--card-accent) 8%, var(--color-bg));
-  }
-
-  .folder-import-radio.is-disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-  }
-
-  .folder-import-radio input {
-    accent-color: var(--card-accent);
-  }
+  /* Import-/Modus-/Gruppierungs-Auswahl nutzt die Card-Variante des
+     selbst-rendernden .form-radio-group (card-form.css). */
 
   .folder-import-field {
     display: flex;
@@ -237,8 +208,6 @@
   }
 
   @media (max-width: 640px) {
-    .folder-import-mode { flex-direction: column; }
-    .folder-import-radio { width: 100%; }
     .folder-import-actions { justify-content: stretch; }
     .folder-import-actions .btn-compact { flex: 1; }
   }

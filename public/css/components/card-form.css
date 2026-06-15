@@ -564,6 +564,51 @@ select[aria-invalid="true"],
   color: var(--color-text);
 }
 
+/* Radio-Gruppe (selbst-rendernd via Alpine.data('radioGroup')). Wertspalten-
+   Baustein: horizontale, umbrechende Reihe aus Radio-Optionen. */
+.form-radio-group {
+  display: flex;
+  gap: var(--space-20);
+  flex-wrap: wrap;
+}
+.form-radio-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+.form-radio-option input[type="radio"] {
+  accent-color: var(--color-primary);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+/* Variante „card": umrandete Radio-Karten mit Akzent-Tint bei Auswahl
+   (z.B. Folder-Import). --card-accent kommt aus dem umgebenden Karten-Scope. */
+.form-radio-group--card {
+  gap: var(--space-lg);
+}
+.form-radio-group--card .form-radio-option {
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  transition: border-color 120ms, background 120ms;
+}
+.form-radio-group--card .form-radio-option:has(input:checked) {
+  border-color: var(--card-accent);
+  background: color-mix(in srgb, var(--card-accent) 8%, var(--color-bg));
+}
+.form-radio-group--card .form-radio-option.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.form-radio-group--card .form-radio-option input[type="radio"] {
+  accent-color: var(--card-accent);
+}
+
 .form-num {
   font-size: var(--font-size-sm);
   padding: var(--pad-badge);
@@ -638,6 +683,15 @@ select[aria-invalid="true"],
     flex: 1;
     width: auto;
     min-width: 0;
+  }
+  .form-radio-group {
+    gap: var(--space-md);
+  }
+  .form-radio-group--card {
+    flex-direction: column;
+  }
+  .form-radio-group--card .form-radio-option {
+    width: 100%;
   }
 }
 

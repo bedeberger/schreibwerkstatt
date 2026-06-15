@@ -263,7 +263,10 @@ const JOB_TYPE_LABELS = {
   'synonym':               'job.label.synonym',
   'finetune-export':       'job.label.finetuneExport',
   'folder-import':         'job.label.folderImport',
+  'geocode-resolve':       'job.label.geocodeResolveType',
   'pdf-export':            'job.label.pdfExport',
+  'epub-export':           'job.label.epubExport',
+  'book-import':           'job.label.bookImport',
   'blog-import':           'job.label.blogImport',
   'blog-pull':             'job.label.blogPull',
   'blog-push':             'job.label.blogPush',
@@ -273,6 +276,8 @@ const JOB_TYPE_LABELS = {
   'hubspot-reconcile':     'job.label.hubspotReconcile',
   'werkstatt-brainstorm':  'job.label.werkstattBrainstorm',
   'werkstatt-consistency': 'job.label.werkstattConsistency',
+  'plot-brainstorm':       'job.label.plotBrainstormType',
+  'plot-consistency':      'job.label.plotConsistency',
 };
 
 // Job-Typen, die vom Superjob (komplett-analyse) abgedeckt werden und nicht in der Statistik erscheinen sollen

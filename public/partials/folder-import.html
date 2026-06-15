@@ -6,48 +6,31 @@
   </div>
 
   <div class="folder-import-body" x-show="!jobId">
-    <div class="folder-import-mode">
-      <label class="folder-import-radio">
-        <input type="radio" value="diary" x-model="importKind">
-        <span x-text="$app.t('folderImport.kind.diary')"></span>
-      </label>
-      <label class="folder-import-radio">
-        <input type="radio" value="swbook" x-model="importKind">
-        <span x-text="$app.t('folderImport.kind.swbook')"></span>
-      </label>
-    </div>
+    <div x-data="radioGroup({ variant: 'card' })" x-modelable="value" x-model="importKind"
+         x-effect="options = [
+           { value: 'diary',  label: $app.t('folderImport.kind.diary') },
+           { value: 'swbook', label: $app.t('folderImport.kind.swbook') }
+         ]"></div>
 
     <div class="folder-import-field" x-show="importKind === 'swbook'">
       <div class="folder-import-merge-info" x-text="$app.t('folderImport.swbookHint')"></div>
     </div>
 
-    <div class="folder-import-mode" x-show="importKind === 'diary'">
-      <label class="folder-import-radio">
-        <input type="radio" value="new-book" x-model="mode">
-        <span x-text="$app.t('folderImport.mode.newBook')"></span>
-      </label>
-      <label class="folder-import-radio" :class="{ 'is-disabled': !$app.selectedBookId }">
-        <input type="radio" value="merge" x-model="mode" :disabled="!$app.selectedBookId">
-        <span x-text="$app.t('folderImport.mode.merge')"></span>
-      </label>
-    </div>
+    <div x-show="importKind === 'diary'"
+         x-data="radioGroup({ variant: 'card' })" x-modelable="value" x-model="mode"
+         x-effect="options = [
+           { value: 'new-book', label: $app.t('folderImport.mode.newBook') },
+           { value: 'merge', label: $app.t('folderImport.mode.merge'), disabled: !$app.selectedBookId }
+         ]"></div>
 
     <div class="folder-import-field" x-show="importKind === 'diary'">
       <label class="folder-import-label" x-text="$app.t('folderImport.grouping.label')"></label>
-      <div class="folder-import-mode">
-        <label class="folder-import-radio">
-          <input type="radio" value="year-month" x-model="grouping">
-          <span x-text="$app.t('folderImport.grouping.yearMonth')"></span>
-        </label>
-        <label class="folder-import-radio">
-          <input type="radio" value="year" x-model="grouping">
-          <span x-text="$app.t('folderImport.grouping.year')"></span>
-        </label>
-        <label class="folder-import-radio">
-          <input type="radio" value="flat" x-model="grouping">
-          <span x-text="$app.t('folderImport.grouping.flat')"></span>
-        </label>
-      </div>
+      <div x-data="radioGroup({ variant: 'card' })" x-modelable="value" x-model="grouping"
+           x-effect="options = [
+             { value: 'year-month', label: $app.t('folderImport.grouping.yearMonth') },
+             { value: 'year',       label: $app.t('folderImport.grouping.year') },
+             { value: 'flat',       label: $app.t('folderImport.grouping.flat') }
+           ]"></div>
       <div class="folder-import-label" x-text="$app.t('folderImport.grouping.hint.' + grouping)"></div>
     </div>
 

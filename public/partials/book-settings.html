@@ -73,46 +73,19 @@
 
       <div class="card-form-row">
         <label class="card-form-label" x-text="$app.t('book.settings.language')"></label>
-        <div class="book-settings-options">
-          <label class="book-settings-option">
-            <input type="radio" name="bs-lang" value="de" x-model="bookSettingsLanguage" @change="bookSettingsRegion = (bookSettingsLanguage === 'de' ? 'CH' : 'US'); bookSettingsBuchtyp = ''">
-            <span x-text="$app.t('lang.de')"></span>
-          </label>
-          <label class="book-settings-option">
-            <input type="radio" name="bs-lang" value="en" x-model="bookSettingsLanguage" @change="bookSettingsRegion = (bookSettingsLanguage === 'de' ? 'CH' : 'US'); bookSettingsBuchtyp = ''">
-            <span x-text="$app.t('lang.en')"></span>
-          </label>
-        </div>
+        <div x-data="radioGroup()" x-modelable="value" x-model="bookSettingsLanguage"
+             x-effect="options = bookSettingsLangOptions()"
+             @radio-change="bookSettingsRegion = ($event.detail === 'de' ? 'CH' : 'US'); bookSettingsBuchtyp = ''"></div>
       </div>
 
       <div class="card-form-row">
         <label class="card-form-label" x-text="$app.t('book.settings.region')"></label>
-        <div class="book-settings-options">
-          <template x-if="bookSettingsLanguage === 'de'">
-            <div class="book-settings-options">
-              <label class="book-settings-option">
-                <input type="radio" name="bs-region" value="CH" x-model="bookSettingsRegion">
-                <span x-text="$app.t('region.de.CH')"></span>
-              </label>
-              <label class="book-settings-option">
-                <input type="radio" name="bs-region" value="DE" x-model="bookSettingsRegion">
-                <span x-text="$app.t('region.de.DE')"></span>
-              </label>
-            </div>
-          </template>
-          <template x-if="bookSettingsLanguage === 'en'">
-            <div class="book-settings-options">
-              <label class="book-settings-option">
-                <input type="radio" name="bs-region" value="US" x-model="bookSettingsRegion">
-                <span x-text="$app.t('region.en.US')"></span>
-              </label>
-              <label class="book-settings-option">
-                <input type="radio" name="bs-region" value="GB" x-model="bookSettingsRegion">
-                <span x-text="$app.t('region.en.GB')"></span>
-              </label>
-            </div>
-          </template>
-        </div>
+        <div x-data="radioGroup()" x-modelable="value" x-model="bookSettingsRegion"
+             x-effect="options = (bookSettingsLanguage === 'de'
+               ? [{ value: 'CH', label: $app.t('region.de.CH') }, { value: 'DE', label: $app.t('region.de.DE') }]
+               : bookSettingsLanguage === 'en'
+               ? [{ value: 'US', label: $app.t('region.en.US') }, { value: 'GB', label: $app.t('region.en.GB') }]
+               : [])"></div>
       </div>
     </section>
 

@@ -81,6 +81,7 @@ import { registerBlogSyncCard } from './cards/blog-sync-card.js';
 import { registerHubspotSyncCard } from './cards/hubspot-sync-card.js';
 import { registerNumInput } from './num-input.js';
 import { registerCombobox } from './combobox.js';
+import { registerRadioGroup } from './radio-group.js';
 import { registerSortableTable } from './sortable-table.js';
 import { registerCatalogFilter } from './catalog-filter.js';
 import { shortcutsMethods } from './editor/shortcuts.js';
@@ -315,6 +316,7 @@ document.addEventListener('alpine:init', () => {
   registerHubspotSyncCard();
   registerNumInput();
   registerCombobox();
+  registerRadioGroup();
   registerSortableTable();
   registerCatalogFilter();
 

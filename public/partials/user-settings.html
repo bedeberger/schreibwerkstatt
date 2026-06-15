@@ -30,16 +30,9 @@
     <div class="card-form-row">
       <label class="card-form-label" x-text="$app.t('profile.uiLanguage')"></label>
       <div class="card-form-field">
-        <div class="book-settings-options">
-          <label class="book-settings-option">
-            <input type="radio" name="us-ui-lang" value="de" :checked="$app.uiLocale === 'de'" @change="$app.changeLocale('de')">
-            <span x-text="$app.t('lang.de')"></span>
-          </label>
-          <label class="book-settings-option">
-            <input type="radio" name="us-ui-lang" value="en" :checked="$app.uiLocale === 'en'" @change="$app.changeLocale('en')">
-            <span x-text="$app.t('lang.en')"></span>
-          </label>
-        </div>
+        <div x-data="radioGroup()"
+             x-effect="value = $app.uiLocale; options = userSettingsUiLangOptions()"
+             @radio-change="$app.changeLocale($event.detail)"></div>
         <p class="card-form-field-note" x-text="$app.t('profile.uiLanguageHint')"></p>
       </div>
     </div>
@@ -48,50 +41,19 @@
 
     <div class="card-form-row">
       <label class="card-form-label" x-text="$app.t('profile.defaultLanguage')"></label>
-      <div class="book-settings-options">
-        <label class="book-settings-option">
-          <input type="radio" name="us-lang" value="" x-model="userSettingsDefaultLanguage" @change="userSettingsDefaultRegion = ''; userSettingsDefaultBuchtyp = ''">
-          <span x-text="$app.t('common.notSet')"></span>
-        </label>
-        <label class="book-settings-option">
-          <input type="radio" name="us-lang" value="de" x-model="userSettingsDefaultLanguage" @change="userSettingsDefaultRegion = 'CH'; userSettingsDefaultBuchtyp = ''">
-          <span x-text="$app.t('lang.de')"></span>
-        </label>
-        <label class="book-settings-option">
-          <input type="radio" name="us-lang" value="en" x-model="userSettingsDefaultLanguage" @change="userSettingsDefaultRegion = 'US'; userSettingsDefaultBuchtyp = ''">
-          <span x-text="$app.t('lang.en')"></span>
-        </label>
-      </div>
+      <div x-data="radioGroup()" x-modelable="value" x-model="userSettingsDefaultLanguage"
+           x-effect="options = userSettingsDefaultLangOptions()"
+           @radio-change="userSettingsDefaultRegion = ($event.detail === 'de' ? 'CH' : ($event.detail === 'en' ? 'US' : '')); userSettingsDefaultBuchtyp = ''"></div>
     </div>
 
     <div class="card-form-row" x-show="userSettingsDefaultLanguage">
       <label class="card-form-label" x-text="$app.t('profile.defaultRegion')"></label>
-      <div class="book-settings-options">
-        <template x-if="userSettingsDefaultLanguage === 'de'">
-          <div class="book-settings-options">
-            <label class="book-settings-option">
-              <input type="radio" name="us-region" value="CH" x-model="userSettingsDefaultRegion">
-              <span x-text="$app.t('region.de.CH')"></span>
-            </label>
-            <label class="book-settings-option">
-              <input type="radio" name="us-region" value="DE" x-model="userSettingsDefaultRegion">
-              <span x-text="$app.t('region.de.DE')"></span>
-            </label>
-          </div>
-        </template>
-        <template x-if="userSettingsDefaultLanguage === 'en'">
-          <div class="book-settings-options">
-            <label class="book-settings-option">
-              <input type="radio" name="us-region" value="US" x-model="userSettingsDefaultRegion">
-              <span x-text="$app.t('region.en.US')"></span>
-            </label>
-            <label class="book-settings-option">
-              <input type="radio" name="us-region" value="GB" x-model="userSettingsDefaultRegion">
-              <span x-text="$app.t('region.en.GB')"></span>
-            </label>
-          </div>
-        </template>
-      </div>
+      <div x-data="radioGroup()" x-modelable="value" x-model="userSettingsDefaultRegion"
+           x-effect="options = (userSettingsDefaultLanguage === 'de'
+             ? [{ value: 'CH', label: $app.t('region.de.CH') }, { value: 'DE', label: $app.t('region.de.DE') }]
+             : userSettingsDefaultLanguage === 'en'
+             ? [{ value: 'US', label: $app.t('region.en.US') }, { value: 'GB', label: $app.t('region.en.GB') }]
+             : [])"></div>
     </div>
 
     <div class="card-form-row" x-show="userSettingsDefaultLanguage">

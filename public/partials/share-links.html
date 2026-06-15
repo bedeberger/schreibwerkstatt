@@ -16,14 +16,8 @@
   <section class="share-create">
     <h3 class="share-create__title" x-text="$app.t('share.create.title')"></h3>
     <div class="share-create__row">
-      <label class="share-create__option">
-        <input type="radio" name="share-kind" value="page" x-model="createKind">
-        <span x-text="$app.t('share.create.page')"></span>
-      </label>
-      <label class="share-create__option">
-        <input type="radio" name="share-kind" value="chapter" x-model="createKind">
-        <span x-text="$app.t('share.create.chapter')"></span>
-      </label>
+      <div x-data="radioGroup()" x-modelable="value" x-model="createKind"
+           x-effect="options = shareKindOptions()"></div>
     </div>
 
     <template x-if="createKind === 'page'">

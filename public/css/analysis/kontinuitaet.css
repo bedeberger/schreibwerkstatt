@@ -122,22 +122,13 @@
 /* ── Buch-Einstellungen (spezifische Klassen) ───────────────────────────────────
    Generische Form-Klassen .card-form-grid / -row / -label / -field / -hint /
    -section-divider / -saved / -error / -textarea leben in card-form.css. */
-.book-settings-options {
-  display: flex;
-  gap: var(--space-20);
-  flex-wrap: wrap;
-}
+/* Inline-Checkbox mit Label (EPUB-Export-Reflow-Toggles). Radio-Gruppen nutzen
+   den selbst-rendernden .form-radio-group-Baustein in card-form.css. */
 .book-settings-option {
   display: flex;
   align-items: center;
   gap: var(--space-6);
   font-size: var(--font-size-sm);
-  cursor: pointer;
-}
-.book-settings-option input[type="radio"] {
-  accent-color: var(--color-primary);
-  width: 15px;
-  height: 15px;
   cursor: pointer;
 }
 .book-settings-locale-display {
@@ -226,9 +217,6 @@
 @media (max-width: 600px) {
   .book-settings-kontext-wrap {
     width: 100%;
-  }
-  .book-settings-options {
-    gap: var(--space-md);
   }
   .book-settings-select {
     min-width: 0;

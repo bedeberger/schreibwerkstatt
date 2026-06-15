@@ -616,6 +616,7 @@ Neue Aktionen erweitern diese Tabelle und das Sprite (siehe [Icon-System](#icon-
 |--------|------------|
 | `.form-stack` | flex-column gap 10 — vertikale Liste (mehrere Checks oder Sub-Gruppen) |
 | `.form-inline` | flex-row gap 20 wrap — Inline-Felder nebeneinander (z.B. Min/Max) |
+| `.form-radio-group` / `.form-radio-option` | horizontale, umbrechende Radio-Gruppe — selbst-gerendert via `radioGroup` (siehe „Radio-Gruppe" unten), nicht handgeschrieben |
 | `.form-inline-field` | Wrapper aus Label + Input (`<label><span/><input/></label>`) |
 | `.form-num` | numerischer Input, 90 px breit, kompakt — paart mit `.form-inline-field` |
 | `.form-check` | Grid 18 px-Checkbox + Title-Desc-Stack |
@@ -629,6 +630,27 @@ Neue Aktionen erweitern diese Tabelle und das Sprite (siehe [Icon-System](#icon-
 ### Section-Trenner innerhalb des Forms
 
 `.card-form-section-divider` — `<p>`-Tag mit Border-Top + erklärendem Text, trennt logische Form-Sektionen (Beispiel: AI-Augmentierung in finetune-export).
+
+### Radio-Gruppe (`radioGroup`)
+
+**Regel:** Radio-Auswahlen nutzen ausschliesslich `Alpine.data('radioGroup')` aus [public/js/radio-group.js](public/js/radio-group.js). **Kein handgeschriebenes `<label><input type="radio">…`-Markup** mehr (kein paralleles `.book-settings-option`-Vokabular pro Karte) — sonst driftet die Geometrie auseinander und Felder werden inkonsistent. Bei Berührung einer bestehenden handgeschriebenen Radio-Gruppe: mitziehen, nicht „später".
+
+**Use:** beschriftete Auswahl aus wenigen, gleichrangigen Werten, die alle sichtbar bleiben sollen (Sprache, Region). Für lange/durchsuchbare Listen stattdessen `combobox`; für Einzel-Boolean eine Checkbox (`.form-check`). Selbst-rendernde Komponente analog `combobox`/`numInput` — Markup wird aus `options` generiert, ist also überall identisch. CSS: `.form-radio-group` / `.form-radio-option` in [card-form.css](public/css/components/card-form.css).
+
+Pflicht-Pattern (Wrapper-Div leer lassen, nur Attribute setzen):
+
+```html
+<div x-data="radioGroup()"
+     x-modelable="value" x-model="bookSettingsRegion"
+     x-effect="options = bookSettingsRegionOptions()"></div>
+```
+
+- `options`: Array `[{ value, label, disabled? }]` (`value` darf `''` sein, z.B. „nicht gesetzt"; `disabled: true` graut eine Option aus + macht sie unwählbar). **Bei reaktiver Datenquelle aus dem Karten-Scope (`this.xxx`/`$app.xxx`) die Options-Liste inline im `x-effect` bauen, nicht über eine Card-Methode** — Method-Indirection trackt nicht zuverlässig (siehe „Reaktivität bei Datenquelle aus Karten-Scope"). Beispiel: die sprachabhängige Region-Liste und das `disabled`-Flag (`!$app.selectedBookId`) stehen inline.
+- `x-modelable="value" x-model="ref"` koppelt an das äussere Feld. Optional `@radio-change="…"` für Side-Effects (Detail = neuer Wert).
+- Felder, die nicht per `x-model` schreiben (z.B. UI-Sprache via `changeLocale`): `value` per `x-effect` seeden und nur `@radio-change` konsumieren.
+- **Variante `card`** (`radioGroup({ variant: 'card' })`): umrandete Radio-Karten mit Akzent-Tint bei Auswahl (`.form-radio-group--card`, `--card-accent` aus dem Karten-Scope) — für prominentere Modus-Auswahlen (Folder-Import). Default = plain.
+
+Referenz: [user-settings.html](public/partials/user-settings.html), [book-settings.html](public/partials/book-settings.html) (plain), [folder-import.html](public/partials/folder-import.html) (Variante `card` + `disabled`).
 
 ### In-Form-Repeater (`.pub-repeater`) + Segment-Toggle (`.seg-toggle`)
 

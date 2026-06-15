@@ -134,18 +134,32 @@ router.get('/books/:book_id/tree', aclParamGuard('viewer'), async (req, res) => 
   catch (e) { _fail(res, e, 'GET /content/books/:id/tree'); }
 });
 
-// GET /content/books/:book_id/changes?since=<iso> — Seiten, die seit `since`
-// von ANDEREN Usern editiert wurden (last_editor_email != session.email).
-// Polling-Endpoint fuer das Collab-Toast-Signal. Ohne `since` liefert er den
-// Server-„jetzt"-Stempel + leeres Array (Baseline-Sync). Cap 200 Rows.
+// GET /content/books/:book_id/changes?since=<iso>&device_id=<uuid> — Seiten, die
+// seit `since` von einer ANDEREN Partei editiert wurden. „Andere Partei" =
+// anderer User ODER ein anderes EIGENES Geraet (z.B. nativer Mac-Focus-Client).
+// Nur der Echo des ANFRAGENDEN Geraets (gleiche device_id) wird ausgefiltert.
+// Ohne `device_id` (Legacy-Client) faellt der Filter auf reine E-Mail-Exklusion
+// zurueck. Polling-Endpoint fuer das Collab-Toast-Signal. Ohne `since` liefert er
+// den Server-„jetzt"-Stempel + leeres Array (Baseline-Sync). Cap 200 Rows.
 router.get('/books/:book_id/changes', aclParamGuard('viewer'), (req, res) => {
   const email = _userEmail(req);
   const sinceRaw = (req.query?.since || '').toString().trim();
   const nowIso = new Date().toISOString();
   if (!sinceRaw) return res.json({ now: nowIso, changes: [] });
   const since = !Number.isNaN(Date.parse(sinceRaw)) ? sinceRaw : nowIso;
+  const reqDeviceId = (req.query?.device_id || '').toString();
+  const hasDevice = _validDeviceId(reqDeviceId);
   let rows = [];
   try {
+    // Mit device_id: nur ausfiltern, wenn der Edit von DIESEM Geraet stammt —
+    // also gleiche E-Mail UND (device == mein Geraet ODER device unbekannt/NULL,
+    // z.B. Server-/Job-Write, der weiter wie eigener Edit gilt). Fremde User und
+    // eigene Edits von anderen Geraeten (non-NULL, abweichende device_id) bleiben.
+    const selfFilter = hasDevice
+      ? `AND NOT (p.last_editor_email = ?
+                  AND (p.last_editor_device_id IS NULL OR p.last_editor_device_id = ?))`
+      : `AND (? IS NULL OR p.last_editor_email <> ?)`;
+    const selfArgs = hasDevice ? [email, reqDeviceId] : [email, email];
     rows = db.prepare(`
       SELECT p.page_id, p.page_name, p.chapter_id,
              p.updated_at, p.last_editor_email,
@@ -155,10 +169,10 @@ router.get('/books/:book_id/changes', aclParamGuard('viewer'), (req, res) => {
        WHERE p.book_id = ?
          AND p.updated_at > ?
          AND p.last_editor_email IS NOT NULL
-         AND (? IS NULL OR p.last_editor_email <> ?)
+         ${selfFilter}
        ORDER BY p.updated_at ASC
        LIMIT 200
-    `).all(req.bookId, since, email, email);
+    `).all(req.bookId, since, ...selfArgs);
   } catch (e) {
     return _fail(res, e, 'GET /content/books/:id/changes');
   }
@@ -281,6 +295,25 @@ router.put('/pages/:page_id', jsonBody, async (req, res) => {
     locked_by_email: blocking.locked_by_email,
     expires_at: blocking.expires_at,
   });
+  // Geraet, das den Edit schreibt, vorab registrieren — sonst verletzt das
+  // FK-getragene pages.last_editor_device_id die Referenz auf app_users_devices,
+  // falls der erste device-ping/presence-Heartbeat noch nicht durch ist.
+  if (req.body && req.body.device_id !== undefined) {
+    if (_validDeviceId(req.body.device_id)) {
+      try {
+        appUsersDevices.upsertDevice(req.body.device_id, email, req.get('user-agent') || '');
+        // Push registriert das schreibende Geraet zugleich als Buch-Praesenz —
+        // so erkennt ein paralleler Browser (eigener device-ping) das Zweit-Geraet
+        // (z.B. nativer Mac-Client) ueber self_book_device_count und schaltet den
+        // Collab-Poll frei, der dann diesen Edit via /changes als Remote-Change
+        // einsammelt. Ephemeral (90s-Stale), kein eigener Heartbeat noetig.
+        if (email) bookPresence.ping(bookId, email, req.body.device_id, pageId);
+      } catch { /* nicht-fatal: savePage faellt auf NULL device zurueck */ }
+    } else {
+      // Ungueltige device_id verwerfen, damit savePage keine FK-Verletzung schreibt.
+      req.body.device_id = null;
+    }
+  }
   try { res.json(await contentStore.savePage(pageId, req.body || {}, req)); }
   catch (e) {
     if (e.code === 'EMPTY_BODY') return res.status(400).json({ error_code: 'EMPTY_BODY' });
@@ -341,9 +374,11 @@ router.delete('/pages/:page_id/presence', jsonBody, async (req, res) => {
 // offen, nicht zwingend Edit-Mode). Bootstrap fuer page-scoped
 // Multi-Device-Erkennung: Body traegt die aktuell offene `page_id` (optional),
 // Antwort enthaelt `self_page_device_count` (aktive eigene Geraete auf DERSELBEN
-// Seite inkl. diesem). Der Client startet den vollen Collab-Poll, sobald >1 — so
-// wird das eigene Zweit-Geraet auf derselben Seite auch bei Einzel-Owner-Buechern
-// sichtbar. Min-Role viewer.
+// Seite inkl. diesem) UND `self_book_device_count` (eigene Geraete im GANZEN Buch,
+// seitenuebergreifend). Der Client startet den vollen Collab-Poll, sobald eine der
+// beiden >1 ist — so wird ein eigenes Zweit-Geraet (z.B. nativer Mac-Client) auch
+// bei Einzel-Owner-Buechern sichtbar, selbst wenn es eine ANDERE Seite editiert.
+// Min-Role viewer.
 router.post('/books/:book_id/device-ping', aclParamGuard('viewer'), jsonBody, (req, res) => {
   const email = _userEmail(req);
   if (!email) return res.status(401).json({ error_code: 'NOT_LOGGED_IN' });
@@ -357,7 +392,12 @@ router.post('/books/:book_id/device-ping', aclParamGuard('viewer'), jsonBody, (r
     appUsersDevices.upsertDevice(deviceId, email, req.get('user-agent') || '');
     bookPresence.ping(req.bookId, email, deviceId, pageId);
     const selfPageDeviceCount = pageId ? bookPresence.countSelfDevicesOnPage(pageId, email) : 0;
-    res.json({ ok: true, self_page_device_count: selfPageDeviceCount });
+    const selfBookDeviceCount = bookPresence.countSelfDevicesInBook(req.bookId, email);
+    res.json({
+      ok: true,
+      self_page_device_count: selfPageDeviceCount,
+      self_book_device_count: selfBookDeviceCount,
+    });
   } catch (e) { return _fail(res, e, 'POST /content/books/:id/device-ping'); }
 });
 

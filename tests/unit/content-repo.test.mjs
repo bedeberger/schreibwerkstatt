@@ -90,7 +90,12 @@ test('savePage → PUT /content/pages/:id mit JSON-Body', async () => {
   assert.equal(calls[0].url, '/content/pages/1');
   assert.equal(calls[0].opts.method, 'PUT');
   assert.equal(calls[0].opts.headers['Content-Type'], 'application/json');
-  assert.deepEqual(JSON.parse(calls[0].opts.body), { html: '<p>new</p>', name: 'X' });
+  // Body-Change traegt zusaetzlich die device_id (geraete-bewusster /changes-Feed).
+  const sent = JSON.parse(calls[0].opts.body);
+  assert.equal(sent.html, '<p>new</p>');
+  assert.equal(sent.name, 'X');
+  assert.equal(typeof sent.device_id, 'string');
+  assert.ok(sent.device_id.length > 0);
   assert.equal(out.id, 1);
 });
 

@@ -66,6 +66,26 @@ export const userSettingsMethods = {
     return this.userSettingsBuchtypen().map(t => ({ value: t.key, label: t.label }));
   },
 
+  userSettingsUiLangOptions() {
+    const app = window.__app;
+    return [
+      { value: 'de', label: app.t('lang.de') },
+      { value: 'en', label: app.t('lang.en') },
+    ];
+  },
+
+  userSettingsDefaultLangOptions() {
+    const app = window.__app;
+    return [
+      { value: '',   label: app.t('common.notSet') },
+      { value: 'de', label: app.t('lang.de') },
+      { value: 'en', label: app.t('lang.en') },
+    ];
+  },
+  // Region-Optionen werden inline im x-effect gebaut (reaktiv auf
+  // userSettingsDefaultLanguage) — Method-Indirection trackt das nicht
+  // zuverlässig, siehe DESIGN.md „Reaktivität bei Datenquelle aus Karten-Scope".
+
   userSettingsFocusOptions() {
     const app = window.__app;
     return [

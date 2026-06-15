@@ -32,14 +32,6 @@
   gap: var(--space-md);
   justify-content: flex-end;
 }
-.share-create__option {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-6);
-  margin-right: var(--space-lg);
-  font-size: 14px;
-  cursor: pointer;
-}
 .share-create__label {
   font-size: 13px;
   color: var(--color-muted);

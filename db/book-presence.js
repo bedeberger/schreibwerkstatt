@@ -63,7 +63,26 @@ function countSelfDevicesOnPage(pageId, userEmail) {
   return row?.n || 0;
 }
 
+const _stmtCountSelfDevicesInBook = db.prepare(`
+  SELECT COUNT(DISTINCT device_id) AS n
+    FROM book_presence
+   WHERE book_id = ? AND user_email = ?
+     AND last_ping_at > ?
+`);
+
+// Anzahl der aktiven (nicht-stale) Geraete desselben Users im GANZEN Buch —
+// inkl. des soeben pingenden Geraets, seitenuebergreifend. >1 ⇒ derselbe User hat
+// das Buch auf mehreren Geraeten offen (z.B. Browser + nativer Mac-Client). Der
+// Client schaltet daraufhin den vollen Collab-Poll frei, damit Pushes EINES
+// Geraets auf BELIEBIGE Seiten beim anderen als Remote-Change ankommen — nicht
+// nur bei Geraeten auf derselben Seite (countSelfDevicesOnPage).
+function countSelfDevicesInBook(bookId, userEmail) {
+  if (!bookId || !userEmail) return 0;
+  const row = _stmtCountSelfDevicesInBook.get(bookId, userEmail, _staleCutoffIso());
+  return row?.n || 0;
+}
+
 module.exports = {
   STALE_AFTER_MS,
-  ping, leave, countSelfDevicesOnPage,
+  ping, leave, countSelfDevicesOnPage, countSelfDevicesInBook,
 };

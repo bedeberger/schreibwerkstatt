@@ -6,6 +6,8 @@
 //   GET  /landing       — immer landing.html
 //   GET  /register      — Formular (kein Session-Zwang)
 //   POST /register      — Anfrage anlegen + Admin-Mail (Rate-Limit + optional Captcha)
+//   GET  /datenschutz    — öffentliche Datenschutzerklärung (kein Session-Zwang)
+//   GET  /privacy        — englischer Alias auf dieselbe Seite (Sprache via Accept-Language)
 //
 // Anti-User-Enumeration: POST /register liefert IMMER 202 mit derselben
 // Erfolgsmeldung, egal ob Email schon existiert, bereits pending ist oder
@@ -77,6 +79,7 @@ function _renderLanding(req, res) {
     footer:        t('landing.footer'),
     githubUrl:     'https://github.com/bedeberger/schreibwerkstatt',
     githubLabel:   t('landing.githubLabel'),
+    privacyLabel:  t('privacy.footerLink'),
     featuresTitle: t('landing.featuresTitle'),
     feat1Title:    t('landing.feat1Title'), feat1Desc: t('landing.feat1Desc'),
     feat2Title:    t('landing.feat2Title'), feat2Desc: t('landing.feat2Desc'),
@@ -110,7 +113,38 @@ function _renderRegister(req, res) {
     submitLabel:    t('register.submitLabel'),
     backToLanding:  t('register.backToLanding'),
     footerHint:     t('register.footer'),
+    privacyLabel:   t('privacy.footerLink'),
     configJson:     JSON.stringify(config).replace(/</g, '\\u003c'),
+  }));
+}
+
+// Öffentliche Datenschutzerklärung. Statisches Template mit i18n-Substitution,
+// kein Session-Zwang — verlinkt u.a. aus dem nativen macOS-Client und für die
+// Apple-App-Store-Einreichung erreichbar. Sprache via Accept-Language.
+function _renderPrivacy(req, res) {
+  const lang = _bodyLang(req);
+  const t = (key) => tServer(key, lang);
+  const appName = appSettings.get('app.name') || 'Schreibwerkstatt';
+  res.set('Cache-Control', 'no-store');
+  res.type('html').send(_render('datenschutz.html', {
+    lang,
+    appName,
+    pageTitle:     t('privacy.title'),
+    lastUpdated:   t('privacy.lastUpdated'),
+    intro:         t('privacy.intro'),
+    sec1Title:     t('privacy.sec1Title'),  sec1Body:  t('privacy.sec1Body'),
+    sec2Title:     t('privacy.sec2Title'),  sec2Intro: t('privacy.sec2Intro'),
+    sec2ItemA:     t('privacy.sec2ItemA'),  sec2ItemB: t('privacy.sec2ItemB'),
+    sec2ItemC:     t('privacy.sec2ItemC'),  sec2ItemD: t('privacy.sec2ItemD'),
+    sec3Title:     t('privacy.sec3Title'),  sec3Body:  t('privacy.sec3Body'),
+    sec4Title:     t('privacy.sec4Title'),  sec4Body:  t('privacy.sec4Body'),
+    secAiTitle:    t('privacy.secAiTitle'), secAiBody: t('privacy.secAiBody'),
+    sec5Title:     t('privacy.sec5Title'),  sec5Body:  t('privacy.sec5Body'),
+    sec6Title:     t('privacy.sec6Title'),  sec6Body:  t('privacy.sec6Body'),
+    sec7Title:     t('privacy.sec7Title'),  sec7Body:  t('privacy.sec7Body'),
+    sec8Title:     t('privacy.sec8Title'),  sec8Body:  t('privacy.sec8Body'),
+    sec9Title:     t('privacy.sec9Title'),  sec9Body:  t('privacy.sec9Body'),
+    backToLanding: t('privacy.backToLanding'),
   }));
 }
 
@@ -124,6 +158,8 @@ router.get('/', (req, res, next) => {
 
 router.get('/landing', _renderLanding);
 router.get('/register', _renderRegister);
+router.get('/datenschutz', _renderPrivacy);
+router.get('/privacy', _renderPrivacy); // englischer Alias — eine Seite, Sprache via _bodyLang
 
 // ALTCHA-Challenge fuer Register- + Admin-Login-Widget (kein Auth-Zwang, vor
 // dem Guard gemountet). Liefert eine frische signierte Challenge; 503 wenn
