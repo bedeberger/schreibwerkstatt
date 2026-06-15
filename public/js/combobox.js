@@ -40,8 +40,13 @@ export function comboboxData(cfg = {}) {
       _footer: (cfg.footer && typeof cfg.footer.action === 'function') ? cfg.footer : null,
       _onOutside: null,
       _onScrollResize: null,
+      _rootEl: null,
       _justOpened: false,
       sheetMode: false,
+      // Dropdown-Geometrie als reaktiver State (gebunden via `:style`), NICHT
+      // imperativ via dropdown.style.* — letzteres wird von Alpines Re-Render
+      // (x-for/`:class`) ueberschrieben. Reaktiv re-applied Alpine es selbst.
+      ddStyle: {},
       highlighted: -1,
       openUp: false,
 
@@ -138,19 +143,14 @@ export function comboboxData(cfg = {}) {
       // scrollenden Plot-Swimlane-Grid). Bei Scroll/Resize wird stattdessen
       // geschlossen (siehe _onScrollResize), statt nachzuziehen.
       _positionDropdown() {
-        const trigger = this.$el.querySelector('.combobox-trigger');
-        const dropdown = this.$el.querySelector('.combobox-dropdown');
+        const trigger = this._rootEl.querySelector('.combobox-trigger');
+        const dropdown = this._rootEl.querySelector('.combobox-dropdown');
         if (!trigger || !dropdown) { this.openUp = false; return; }
         if (this.sheetMode) {
           // Bottom-Sheet: Geometrie kommt rein aus CSS (.combobox-dropdown--sheet
-          // → fixed, left/right/bottom: 0). KEINE inline-Geometrie hier — Alpines
-          // Re-Render (`:class`/x-for) wuerde imperativ gesetzte Styles/Klassen
-          // sonst wieder entfernen. Inline-Reste vom Desktop-Pfad zuruecksetzen.
-          dropdown.style.left = '';
-          dropdown.style.right = '';
-          dropdown.style.top = '';
-          dropdown.style.bottom = '';
-          dropdown.style.width = '';
+          // → fixed, left/right/bottom: 0). Reaktive Inline-Geometrie leeren,
+          // damit die CSS-Regeln greifen.
+          this.ddStyle = {};
           this.openUp = false;
           return;
         }
@@ -168,15 +168,9 @@ export function comboboxData(cfg = {}) {
         let left = tr.left;
         if (left + width > window.innerWidth - margin) left = window.innerWidth - margin - width;
         if (left < margin) left = margin;
-        dropdown.style.left = left + 'px';
-        dropdown.style.width = width + 'px';
-        if (this.openUp) {
-          dropdown.style.top = 'auto';
-          dropdown.style.bottom = (window.innerHeight - tr.top) + 'px';
-        } else {
-          dropdown.style.bottom = 'auto';
-          dropdown.style.top = tr.bottom + 'px';
-        }
+        this.ddStyle = this.openUp
+          ? { left: left + 'px', width: width + 'px', top: 'auto', bottom: (window.innerHeight - tr.top) + 'px' }
+          : { left: left + 'px', width: width + 'px', bottom: 'auto', top: tr.bottom + 'px' };
       },
       close() {
         this.open = false;
@@ -185,6 +179,7 @@ export function comboboxData(cfg = {}) {
         this.openUp = false;
         this._justOpened = false;
         this.sheetMode = false;
+        this.ddStyle = {};
         window.removeEventListener('scroll', this._onScrollResize, true);
         window.removeEventListener('resize', this._onScrollResize);
       },
@@ -236,16 +231,20 @@ export function comboboxData(cfg = {}) {
       },
       _scrollHl() {
         this.$nextTick(() => {
-          const list = this.$el.querySelector('.combobox-list');
+          const list = this._rootEl.querySelector('.combobox-list');
           const item = list?.children[this.highlighted];
           item?.scrollIntoView({ block: 'nearest' });
         });
       },
       init() {
-        this.$el.classList.add('combobox-wrap');
-        if (this._compact) this.$el.classList.add('combobox-wrap--compact');
+        // Wrap-Element (x-data-Root) cachen. `this.$el` zeigt zur Laufzeit
+        // (z. B. aus dem @click-Handler des Triggers) auf den Trigger-Button,
+        // nicht auf den Wrap — Methoden brauchen aber zuverlaessig den Wrap.
+        this._rootEl = this.$el;
+        this._rootEl.classList.add('combobox-wrap');
+        if (this._compact) this._rootEl.classList.add('combobox-wrap--compact');
 
-        this._onOutside = (e) => { if (!this.$el.contains(e.target)) this.close(); };
+        this._onOutside = (e) => { if (!this._rootEl.contains(e.target)) this.close(); };
         // Bei Scroll/Resize schliessen (fixed Dropdown zieht nicht nach). Scroll
         // INNERHALB der eigenen Liste (lange Kapitel-/Figurenliste) darf nicht
         // schliessen — der capture-Listener auf window faengt sonst auch den
@@ -255,17 +254,17 @@ export function comboboxData(cfg = {}) {
           // Direkt nach dem Oeffnen ausgeloestes scroll/resize (Fokus, Layout-
           // Settle) ignorieren — sonst schliesst sich das Dropdown sofort.
           if (this._justOpened) return;
-          if (e && e.type === 'scroll' && this.$el.contains(e.target)) return;
+          if (e && e.type === 'scroll' && this._rootEl.contains(e.target)) return;
           this.close();
         };
         document.addEventListener('mousedown', this._onOutside);
-        this.$el.addEventListener('keydown', (e) => this.onKeydown(e));
+        this._rootEl.addEventListener('keydown', (e) => this.onKeydown(e));
 
-        this.$el.setAttribute('role', 'combobox');
-        this.$el.setAttribute('aria-haspopup', 'listbox');
+        this._rootEl.setAttribute('role', 'combobox');
+        this._rootEl.setAttribute('aria-haspopup', 'listbox');
         if (this._multiple) {
-          this.$el.classList.add('combobox-wrap--multi');
-          this.$el.setAttribute('aria-multiselectable', 'true');
+          this._rootEl.classList.add('combobox-wrap--multi');
+          this._rootEl.setAttribute('aria-multiselectable', 'true');
         }
         this.$watch('query', () => {
           this.highlighted = this.filtered.length > 0 ? 0 : -1;
@@ -277,7 +276,7 @@ export function comboboxData(cfg = {}) {
           '  <span class="combobox-value" x-text="selectedLabel || placeholder"></span>',
           '  <svg class="combobox-chevron" :class="{\'combobox-chevron--open\': open}" width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M1.5 3.5L5 7L8.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
           '</button>',
-          '<div class="combobox-dropdown" :class="{\'combobox-dropdown--up\': openUp, \'combobox-dropdown--sheet\': sheetMode}" x-show="open" x-cloak>',
+          '<div class="combobox-dropdown" :class="{\'combobox-dropdown--up\': openUp, \'combobox-dropdown--sheet\': sheetMode}" :style="ddStyle" x-show="open" x-cloak>',
           '  <input type="text" class="combobox-search" x-model="query" x-ref="cbInput"',
           '         :placeholder="$app.t(\'common.searchShort\')" role="searchbox" :aria-label="$app.t(\'common.searchShort\')">',
           '  <ul class="combobox-list" role="listbox"',
@@ -301,11 +300,11 @@ export function comboboxData(cfg = {}) {
           '          x-text="_footerLabel"></button>',
           '</div>',
         ].join('\n');
-        this.$el.innerHTML = template;
+        this._rootEl.innerHTML = template;
         // Alpine processed das frisch gesetzte Markup nicht zuverlaessig, wenn
         // die Combobox innerhalb eines spaet hydratisierten Subtrees liegt
         // (template x-if mit nested x-data-Wrappern, Beispiel pdfExportCard).
-        window.Alpine.initTree(this.$el);
+        window.Alpine.initTree(this._rootEl);
       },
       destroy() {
         if (this._onOutside) {
