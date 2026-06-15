@@ -3072,6 +3072,9 @@
   "landing.feat5Desc":     "Buch- und Kapitel-Review aus Lektor-Perspektive mit Stärken, Schwächen und konkreten Verbesserungen.",
   "landing.feat6Title":    "Export",
   "landing.feat6Desc":     "Druckfertiges PDF/A, EPUB, Markdown und Trainingsdaten für eigene Finetunes.",
+  "landing.macTitle":      "Auch als macOS-App",
+  "landing.macDesc":       "Der Fokus-Editor als native, offline-fähige App für den Mac — lokaler Speicher mit Sync zu deinem Konto.",
+  "landing.macLinkLabel":  "Für macOS laden",
 
   "register.title":         "Zugang anfordern",
   "register.subtitle":      "Wir antworten per Mail an die angegebene Adresse, sobald deine Anfrage geprüft wurde.",

@@ -87,6 +87,10 @@ function _renderLanding(req, res) {
     feat4Title:    t('landing.feat4Title'), feat4Desc: t('landing.feat4Desc'),
     feat5Title:    t('landing.feat5Title'), feat5Desc: t('landing.feat5Desc'),
     feat6Title:    t('landing.feat6Title'), feat6Desc: t('landing.feat6Desc'),
+    macTitle:      t('landing.macTitle'),
+    macDesc:       t('landing.macDesc'),
+    macLinkLabel:  t('landing.macLinkLabel'),
+    macUrl:        'https://github.com/bedeberger/schreibwerkstatt-focuseditor/releases/latest',
   }));
 }
 

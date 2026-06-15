@@ -40,8 +40,18 @@ export function comboboxData(cfg = {}) {
       _footer: (cfg.footer && typeof cfg.footer.action === 'function') ? cfg.footer : null,
       _onOutside: null,
       _onScrollResize: null,
+      _justOpened: false,
+      sheetMode: false,
       highlighted: -1,
       openUp: false,
+
+      // Mobile = schmaler Viewport: dort rendert das Dropdown als Bottom-Sheet
+      // (combobox.js#_positionDropdown), nicht als am Trigger verankertes Popup.
+      // `innerWidth` statt `matchMedia` — letzteres lieferte im Event-getriebenen
+      // Tap-Pfad unzuverlaessige Ergebnisse.
+      _isMobile() {
+        return typeof window !== 'undefined' && window.innerWidth <= 600;
+      },
 
       get placeholder() {
         const p = this._placeholder;
@@ -92,6 +102,10 @@ export function comboboxData(cfg = {}) {
         if (this.open) { this.close(); return; }
         this.open = true;
         this.query = '';
+        // Sheet-Modus reaktiv setzen → die `--sheet`-Klasse haengt am Alpine-
+        // `:class`-Binding (nicht imperativ), sonst wuerde ein Re-Render sie
+        // wieder entfernen.
+        this.sheetMode = this._isMobile();
         if (this._multiple) {
           const arr = Array.isArray(this.value) ? this.value : [];
           this.highlighted = arr.length
@@ -102,12 +116,21 @@ export function comboboxData(cfg = {}) {
         }
         this.$nextTick(() => {
           this._positionDropdown();
-          this.$refs.cbInput?.focus();
-          // Listener erst nach Position + Fokus binden — ein evtl. durch den
-          // Fokus ausgeloestes scrollIntoView soll das Dropdown nicht sofort
-          // wieder schliessen.
-          window.addEventListener('scroll', this._onScrollResize, true);
-          window.addEventListener('resize', this._onScrollResize);
+          // Auf Mobile NICHT auto-fokussieren: der Fokus oeffnet die Bildschirm-
+          // Tastatur, deren scroll/resize das Dropdown sofort wieder schliessen
+          // wuerde. Das Bottom-Sheet ist auch ohne Fokus voll bedienbar.
+          if (!this._isMobile()) this.$refs.cbInput?.focus();
+          // Kurzes Fenster: ein durch Fokus/Layout-Settle ausgeloestes
+          // scroll/resize direkt nach dem Oeffnen darf nicht sofort schliessen.
+          this._justOpened = true;
+          setTimeout(() => { this._justOpened = false; }, 350);
+          // Scroll/Resize-Close nur auf Desktop (fixed Popup zieht nicht nach,
+          // schliesst stattdessen). Mobile-Sheet ist viewport-verankert und
+          // schliesst nur via Outside-Tap / Auswahl.
+          if (!this._isMobile()) {
+            window.addEventListener('scroll', this._onScrollResize, true);
+            window.addEventListener('resize', this._onScrollResize);
+          }
         });
       },
       // Dropdown ist `position: fixed` und wird hier an den Trigger gekoppelt —
@@ -118,6 +141,19 @@ export function comboboxData(cfg = {}) {
         const trigger = this.$el.querySelector('.combobox-trigger');
         const dropdown = this.$el.querySelector('.combobox-dropdown');
         if (!trigger || !dropdown) { this.openUp = false; return; }
+        if (this.sheetMode) {
+          // Bottom-Sheet: Geometrie kommt rein aus CSS (.combobox-dropdown--sheet
+          // → fixed, left/right/bottom: 0). KEINE inline-Geometrie hier — Alpines
+          // Re-Render (`:class`/x-for) wuerde imperativ gesetzte Styles/Klassen
+          // sonst wieder entfernen. Inline-Reste vom Desktop-Pfad zuruecksetzen.
+          dropdown.style.left = '';
+          dropdown.style.right = '';
+          dropdown.style.top = '';
+          dropdown.style.bottom = '';
+          dropdown.style.width = '';
+          this.openUp = false;
+          return;
+        }
         const tr = trigger.getBoundingClientRect();
         const dropdownH = dropdown.getBoundingClientRect().height || 250;
         const spaceBelow = window.innerHeight - tr.bottom;
@@ -147,6 +183,8 @@ export function comboboxData(cfg = {}) {
         this.query = '';
         this.highlighted = -1;
         this.openUp = false;
+        this._justOpened = false;
+        this.sheetMode = false;
         window.removeEventListener('scroll', this._onScrollResize, true);
         window.removeEventListener('resize', this._onScrollResize);
       },
@@ -214,6 +252,9 @@ export function comboboxData(cfg = {}) {
         // List-Scroll ab.
         this._onScrollResize = (e) => {
           if (!this.open) return;
+          // Direkt nach dem Oeffnen ausgeloestes scroll/resize (Fokus, Layout-
+          // Settle) ignorieren — sonst schliesst sich das Dropdown sofort.
+          if (this._justOpened) return;
           if (e && e.type === 'scroll' && this.$el.contains(e.target)) return;
           this.close();
         };
@@ -236,7 +277,7 @@ export function comboboxData(cfg = {}) {
           '  <span class="combobox-value" x-text="selectedLabel || placeholder"></span>',
           '  <svg class="combobox-chevron" :class="{\'combobox-chevron--open\': open}" width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M1.5 3.5L5 7L8.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
           '</button>',
-          '<div class="combobox-dropdown" :class="{\'combobox-dropdown--up\': openUp}" x-show="open" x-cloak>',
+          '<div class="combobox-dropdown" :class="{\'combobox-dropdown--up\': openUp, \'combobox-dropdown--sheet\': sheetMode}" x-show="open" x-cloak>',
           '  <input type="text" class="combobox-search" x-model="query" x-ref="cbInput"',
           '         :placeholder="$app.t(\'common.searchShort\')" role="searchbox" :aria-label="$app.t(\'common.searchShort\')">',
           '  <ul class="combobox-list" role="listbox"',

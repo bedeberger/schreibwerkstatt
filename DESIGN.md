@@ -200,13 +200,15 @@ Wiederkehrende Werte gehen über Tokens. Ad-hoc-Werte (`box-shadow: 0 4px 12px .
 
 **Hier (visuelles):**
 
-**Grösse muss mit umliegenden Form-Elementen matchen** — Combobox in Zeile mit `<input>`/`<button>` MUSS dieselbe Geometrie haben. Helper ist per Default **compact**; neben default-Input/Button → Object-Form `combobox({ placeholder, compact: false })`. Details + Compact-/Default-Sets siehe [Regel: Gleiche Höhe pro Form-Zeile](#regel-gleiche-höhe-pro-form-zeile).
+**Grösse muss mit umliegenden Form-Elementen matchen** — Combobox in Zeile mit `<input>`/`<button>` MUSS dieselbe Geometrie haben. Helper ist per Default **compact**; neben default-Input/Button → Object-Form `combobox({ placeholder, compact: false })`. Details + Compact-/Default-Sets siehe [Regel: Gleiche Höhe pro Form-Zeile](#regel-gleiche-höhe-pro-form-zeile). **Innerhalb `.card-form-row`** rendert auch eine compact-Combobox automatisch in Feldgrösse (volle Höhe + Surface-Hintergrund), damit sie zu den `<input>`-Feldern derselben Form passt — CSS-Override in `card-form.css`, kein Per-Call-Flag nötig.
+
+**Mobile = Bottom-Sheet** — auf schmalen Viewports (`innerWidth <= 600`) öffnet das Dropdown als voll breites, am unteren Viewport-Rand verankertes Sheet (`.combobox-dropdown--sheet`) statt als am Trigger verankertes Popup. So bleibt es unabhängig von der Bildschirm-Tastatur sichtbar (Desktop-Popup würde durch keyboard-`resize`/`scroll` sofort schliessen + am Trigger vorbei rutschen). Die Sheet-Klasse hängt am Alpine-`:class`-Binding (`sheetMode`) und die Geometrie kommt rein aus CSS — nie imperativ setzen, sonst entfernt sie ein Re-Render wieder. **Voraussetzung:** kein Vorfahr darf einen `transform`/`will-change`/`contain` tragen (etabliert sonst einen Containing-Block für das `position: fixed`-Sheet → landet in der Karte statt am Bildschirm); `.card` nutzt darum `animation-fill-mode: backwards`, nicht `both`.
 
 **Klassen** ([public/css/components/card-form.css](public/css/components/card-form.css)):
 - `.combobox-wrap` — Wrapper, vom Helper auto-gesetzt (mit `--compact` per Default).
 - `.combobox-trigger` — Button-Look (gleiche Höhe wie `<input>` über `--size-default-padding-y`).
 - `.combobox-chevron` — Disclosure-Marker `▾`, rotiert via `.combobox-chevron--open` 0°→180°.
-- `.combobox-dropdown` — Popover-Liste (mit `--up`-Modifier wenn nach oben aufklappt).
+- `.combobox-dropdown` — Popover-Liste (mit `--up`-Modifier wenn nach oben aufklappt, `--sheet`-Modifier für Mobile-Bottom-Sheet).
 - `.combobox-search` — Input innerhalb Dropdown.
 - `.combobox-option` / `.combobox-option--active` / `.combobox-empty`.
 - `.combobox-option__label` / `.combobox-option__sub` — Label-Zeile + optionale gedämpfte Zweitzeile.

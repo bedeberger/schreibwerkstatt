@@ -3072,6 +3072,9 @@
   "landing.feat5Desc":     "Book and chapter reviews from an editor’s angle, with strengths, weaknesses and concrete fixes.",
   "landing.feat6Title":    "Export",
   "landing.feat6Desc":     "Print-ready PDF/A, EPUB, Markdown and training data for your own finetunes.",
+  "landing.macTitle":      "Also a macOS app",
+  "landing.macDesc":       "The focus editor as a native, offline-capable Mac app — local storage that syncs to your account.",
+  "landing.macLinkLabel":  "Download for macOS",
 
   "register.title":         "Request access",
   "register.subtitle":      "We will reply by email to the address you provide once your request has been reviewed.",

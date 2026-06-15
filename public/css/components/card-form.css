@@ -11,7 +11,13 @@
   border-top: 2px solid var(--card-accent, var(--color-border));
   padding: 1.25rem;
   margin-bottom: 1rem;
-  animation: cardFadeIn var(--transition-slow) both;
+  /* `backwards` (nicht `both`): wendet den `from`-Zustand vor dem Start an
+     (kein Eintritts-Flash), revertiert aber nach Ende auf den Basiszustand.
+     Mit `both` bliebe `transform: translateY(0)` (Identitäts-Matrix) dauerhaft
+     gesetzt — das etabliert einen Containing-Block für `position: fixed` und
+     verschiebt das viewport-verankerte Combobox-Dropdown (Bottom-Sheet/Popup)
+     in die Karte hinein statt an den Bildschirm. */
+  animation: cardFadeIn var(--transition-slow) backwards;
   box-shadow: 0 1px 0 var(--color-shadow-soft);
   transition: box-shadow var(--transition-base);
 }
@@ -356,9 +362,40 @@ select:focus {
 .combobox-footer-btn:focus-visible { background: var(--color-hover); outline: none; }
 .combobox-wrap--compact .combobox-footer-btn { font-size: var(--size-compact-font-size); padding: var(--space-5) 8px; }
 
+/* In Standard-Formularzeilen matchen Comboboxen die Feldgrösse von Input/Select
+   (volle Höhe, Surface-Hintergrund) — kompakte Defaults wirken sonst kleiner
+   als die übrigen Felder derselben Form. Breite ist via width:100% ohnehin
+   identisch. */
+.card-form-row .combobox-wrap--compact .combobox-trigger {
+  padding: var(--size-default-padding-y) 10px;
+  font-size: var(--font-size-base);
+  background: var(--color-surface);
+  border-color: var(--color-border-input);
+}
+
+/* Mobile-Bottom-Sheet: volle Geometrie rein aus CSS (Alpine-gebundene Klasse
+   via sheetMode) — am unteren Viewport-Rand verankert statt am Trigger, damit
+   das Dropdown unabhängig von der Bildschirm-Tastatur sichtbar bleibt. Keine
+   inline-Geometrie aus combobox.js (würde von Alpine-Re-Render überschrieben). */
+.combobox-dropdown--sheet {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: auto;
+  width: auto;
+  border: 0.5px solid var(--color-border-focus);
+  border-bottom: none;
+  border-top-left-radius: var(--radius-md);
+  border-top-right-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+}
+.combobox-dropdown--sheet .combobox-list { max-height: none; flex: 1 1 auto; }
+
 /* Mobile: lange Labels (Kapitel-/Figur-/Ort-Namen) wrappen statt zu ellipsen,
-   damit sie in der viewport-geklemmten Breite (JS setzt width/left, siehe
-   combobox.js#_positionDropdown) lesbar bleiben. */
+   damit sie in der Sheet-Breite lesbar bleiben. */
 @media (max-width: 600px) {
   .combobox-option,
   .combobox-option__label,
@@ -368,6 +405,9 @@ select:focus {
     overflow: visible;
     text-overflow: clip;
   }
+  /* iOS: font-size >= 16px verhindert Zoom-in beim Fokus der Sheet-Suche. */
+  .combobox-search,
+  .combobox-wrap--compact .combobox-search { font-size: 16px; }
 }
 
 /* === Form-Patterns (in Karten wiederverwendbar) ===
