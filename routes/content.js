@@ -42,6 +42,18 @@ function _clientLabel(req) {
   return 'device';
 }
 
+// Echter Geraetename aus dem Device-Token (nativer Client), fuer das
+// app_users_devices.label → „Zuletzt bearbeitet auf <Geraet>"-Hint. Browser
+// (Session-Auth) liefern null → upsertDevice faellt auf das UA-Label zurueck.
+function _deviceTokenLabel(req) {
+  const u = req.session?.user;
+  if (u?.via !== 'device_token' || !u.tokenId) return null;
+  try {
+    const dev = deviceTokens.getDeviceTokenById(u.tokenId);
+    return dev?.device_name?.trim() || null;
+  } catch { return null; }
+}
+
 function _pageBookId(pageId) {
   const r = db.prepare('SELECT book_id FROM pages WHERE page_id = ?').get(parseInt(pageId, 10));
   return r?.book_id || null;
@@ -301,7 +313,10 @@ router.put('/pages/:page_id', jsonBody, async (req, res) => {
   if (req.body && req.body.device_id !== undefined) {
     if (_validDeviceId(req.body.device_id)) {
       try {
-        appUsersDevices.upsertDevice(req.body.device_id, email, req.get('user-agent') || '');
+        // Nativer Client (Device-Token-Auth) liefert seinen echten Geraetenamen
+        // ueber device_tokens.device_name — als Label durchreichen, sonst stuende
+        // im „Zuletzt bearbeitet"-Hint nur das UA-Label („Unbekanntes Geraet").
+        appUsersDevices.upsertDevice(req.body.device_id, email, req.get('user-agent') || '', _deviceTokenLabel(req));
         // Push registriert das schreibende Geraet zugleich als Buch-Praesenz —
         // so erkennt ein paralleler Browser (eigener device-ping) das Zweit-Geraet
         // (z.B. nativer Mac-Client) ueber self_book_device_count und schaltet den

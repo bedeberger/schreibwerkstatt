@@ -105,13 +105,31 @@
 }
 
 /* Device-Variante: push-getriebener „Zuletzt bearbeitet auf <Gerät>"-Hint.
-   Wie die Self-Variante muted — passiver Hinweis (kein Live-Signal, kein
-   Alarm), hebt sich klar von der aktiven Fremd-Presence ab. */
+   Maximal diskret — kein Box-Chrome (Hintergrund/Border), nur muted Kleintext +
+   schliessbares × — passiver Hinweis (kein Live-Signal, kein Alarm), tritt
+   gegenüber der aktiven Fremd-Presence komplett zurück. */
 .editor-presence-banner--device {
-  background: color-mix(in srgb, var(--color-muted) 10%, transparent);
-  border-color: color-mix(in srgb, var(--color-muted) 30%, transparent);
+  background: none;
+  border: none;
   color: var(--color-muted);
+  padding: 0 12px;
+  font-size: var(--font-size-xs);
+  gap: var(--space-6);
 }
+.editor-presence-banner__dismiss {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  background: none;
+  border: none;
+  color: inherit;
+  opacity: 0.7;
+  cursor: pointer;
+}
+.editor-presence-banner__dismiss:hover { opacity: 1; }
+.editor-presence-banner__dismiss .icon { width: 14px; height: 14px; }
 
 /* Local-Draft-Recovery-Banner: User hat Seite ohne Edit-Mode geöffnet, aber
    localStorage hält einen ungespeicherten Entwurf — z. B. nach Server-Crash

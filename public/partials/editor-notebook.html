@@ -315,6 +315,11 @@
               device: pageLastEditor.device_name,
               rel: formatRelativeShort(pageLastEditor.updated_at)
             })"></span>
+      <button type="button" class="editor-presence-banner__dismiss"
+              @click="pageLastEditor = null"
+              :aria-label="t('common.close')" :data-tip="t('common.close')">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#x"/></svg>
+      </button>
     </div>
   </template>
 

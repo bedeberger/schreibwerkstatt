@@ -17,13 +17,21 @@ const _stmtUpsert = db.prepare(`
   ON CONFLICT(device_id) DO UPDATE SET
     user_email   = excluded.user_email,
     user_agent   = excluded.user_agent,
+    label        = COALESCE(?, label),
     last_seen_at = ${NOW_ISO_SQL}
 `);
 
-function upsertDevice(deviceId, userEmail, userAgent) {
+// explicitLabel: bei nativen Clients der echte Geraetename aus dem Device-Token
+// (device_tokens.device_name) — sonst liefert der UA-String nur „Unbekanntes
+// Geraet". Browser uebergeben keinen → Fallback auf das UA-Label. Auf CONFLICT
+// wird das Label nur ueberschrieben, wenn ein explizites mitkommt (COALESCE):
+// so heilt eine alte „Unbekanntes Geraet"-Row beim naechsten Token-Push, ohne
+// dass ein Browser-Ping einen guten Namen wieder verwaessert.
+function upsertDevice(deviceId, userEmail, userAgent, explicitLabel = null) {
   if (!deviceId || !userEmail) return false;
-  const label = uaLabel(userAgent || '');
-  _stmtUpsert.run(deviceId, userEmail, label, userAgent || '');
+  const clean = (typeof explicitLabel === 'string' && explicitLabel.trim()) ? explicitLabel.trim() : null;
+  const insertLabel = clean || uaLabel(userAgent || '');
+  _stmtUpsert.run(deviceId, userEmail, insertLabel, userAgent || '', clean);
   return true;
 }
 
