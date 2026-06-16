@@ -193,20 +193,32 @@
      wenige Akte → 100% + grow verteilt den Platz, viele Akte → Inhalt > 100% +
      Horizontal-Scroll. Zellen `flex: 1 0 0` mit `min-width: var(--cell-w)` als
      Floor (treibt auch die max-content-Breite); `width: auto`, weil `flex-basis: 0`
-     die fixe Zellbreite ablöst. acthead + cell teilen exakt dieselbe Flex-Regel →
-     Spalten bleiben ausgerichtet. Lane/Corner bleiben fix (kein Override). */
+     die fixe Zellbreite ablöst. acthead + cell + spacer teilen exakt dieselbe
+     Flex-Regel → Spalten bleiben ausgerichtet. Lane/Corner bleiben fix (kein
+     Override).
+     WICHTIG: Die Kopfzeile trägt zusätzlich die „Akt hinzufügen"-Spalte, die
+     Lane-Zeilen NICHT. Ohne Ausgleich verteilt die Kopfzeile den Platz auf N+1
+     Spalten, die Lanes nur auf N → Kopf-Spalten schmaler als ihre Zellen, der
+     Versatz akkumuliert nach rechts. `.plot-swim-spacer` ist der unsichtbare
+     Lane-Zwilling der Add-Spalte und stellt gleiche Spaltenzahl pro Zeile her. */
   .card--plot:fullscreen .plot-swimlane { max-height: none; }
   .card--plot:fullscreen .plot-swim {
     width: max-content;
     min-width: 100%;
   }
   .card--plot:fullscreen .plot-swim-acthead,
-  .card--plot:fullscreen .plot-swim-cell {
+  .card--plot:fullscreen .plot-swim-cell,
+  .card--plot:fullscreen .plot-swim-spacer {
     flex: 1 0 0;
     width: auto;
     min-width: var(--cell-w);
     max-width: 420px;
   }
+
+  /* Lane-Zwilling der Add-Spalte: nur im Vollbild aktiv (sonst ist die Kopfzeile
+     wie gehabt um eine Spalte länger und die N Akt-Spalten sind fix breit). */
+  .plot-swim-spacer { display: none; }
+  .card--plot:fullscreen .plot-swim-spacer { display: block; }
 
   /* ── Mobile: engere Spuren, Grid bleibt horizontal scrollbar (2D-Struktur) ─ */
   @media (max-width: 600px) {
