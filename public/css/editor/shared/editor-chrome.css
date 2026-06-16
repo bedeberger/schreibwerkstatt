@@ -105,15 +105,18 @@
 }
 
 /* Device-Variante: push-getriebener „Zuletzt bearbeitet auf <Gerät>"-Hint.
-   Maximal diskret — kein Box-Chrome (Hintergrund/Border), nur muted Kleintext +
-   schliessbares × — passiver Hinweis (kein Live-Signal, kein Alarm), tritt
-   gegenüber der aktiven Fremd-Presence komplett zurück. */
+   Maximal diskret — kein Box-Chrome (Hintergrund/Border), nur abgedimmter
+   Kleintext + schliessbares × — passiver Hinweis (kein Live-Signal, kein Alarm),
+   tritt gegenüber der aktiven Fremd-Presence komplett zurück. Farbe = muted Richtung
+   Hintergrund gefadet: dimmt symmetrisch in Light & Dark und bleibt lesbar (faint
+   wäre in Dark zu kontrastarm). */
 .editor-presence-banner--device {
   background: none;
   border: none;
-  color: var(--color-muted);
+  color: color-mix(in srgb, var(--color-muted) 68%, var(--color-bg));
   padding: 0 12px;
   font-size: var(--font-size-xs);
+  font-style: italic;
   gap: var(--space-6);
 }
 .editor-presence-banner__dismiss {
