@@ -1,0 +1,10 @@
+/* Generischer Baseline-Style für das fileDrop-Primitive (public/js/file-drop.js).
+   Die Komponente setzt `file-drop` auf $el und während Drag zusätzlich `is-drag`.
+   Visuals (Rahmen, Drag-Tönung, Padding) gehören in die jeweilige Konsumenten-
+   Komponente (z.B. .folder-import-drop) — hier nur das, was für JEDE Drop-Zone
+   gilt: die ganze Fläche ist klickbar. */
+@layer components {
+  .file-drop {
+    cursor: pointer;
+  }
+}

@@ -155,16 +155,6 @@ export const userSettingsMethods = {
     } catch (e) { this.deviceTokensError = e.message; }
   },
 
-  async deviceTokensCopyPlain() {
-    const t = this.deviceTokensJustCreated?.plain_token;
-    if (!t) return;
-    try {
-      await navigator.clipboard.writeText(t);
-      this.deviceTokensCopiedAt = Date.now();
-      setTimeout(() => { this.deviceTokensCopiedAt = 0; }, 2000);
-    } catch (_) {}
-  },
-
   deviceTokensDismissPlain() {
     this.deviceTokensJustCreated = null;
   },

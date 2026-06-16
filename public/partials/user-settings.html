@@ -81,16 +81,13 @@
     <p class="card-form-error" x-show="userSettingsError" x-text="userSettingsError"></p>
 
     <template x-if="$app.languagetoolEnabled">
-      <div class="card-form-row card-form-row--dict">
-        <button type="button"
-                class="collapsible-toggle"
-                @click="dictOpen = !dictOpen"
-                :aria-expanded="dictOpen">
-          <svg class="icon history-chevron" :class="{ 'is-open': dictOpen }" aria-hidden="true"><use href="/icons.svg#chevron-right"/></svg>
+      <div class="card-form-row card-form-row--dict" x-data="collapsible()">
+        <button type="button" class="collapsible-toggle" x-bind="trigger">
+          <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
           <span x-text="$app.t('spellcheck.dict.title')"></span>
           <span class="lt-dict-count" x-text="dictEntries.length"></span>
         </button>
-        <div class="lt-dict-body" x-show="dictOpen" x-cloak>
+        <div class="lt-dict-body" x-bind="panel" x-cloak>
           <template x-if="!dictEntries.length">
             <p class="muted-msg muted-msg--sm" x-text="$app.t('spellcheck.dict.empty')"></p>
           </template>
@@ -122,16 +119,13 @@
     </template>
 
     <!-- Device-Tokens (native Clients, z.B. Mac-Focus-Writer) -->
-    <div class="card-form-row card-form-row--devices">
-      <button type="button"
-              class="collapsible-toggle"
-              @click="deviceTokensOpen = !deviceTokensOpen"
-              :aria-expanded="deviceTokensOpen">
-        <svg class="icon history-chevron" :class="{ 'is-open': deviceTokensOpen }" aria-hidden="true"><use href="/icons.svg#chevron-right"/></svg>
+    <div class="card-form-row card-form-row--devices" x-data="collapsible()">
+      <button type="button" class="collapsible-toggle" x-bind="trigger">
+        <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
         <span x-text="$app.t('profile.devices.title')"></span>
         <span class="lt-dict-count" x-text="deviceTokensList.filter(t => !t.revoked_at).length"></span>
       </button>
-      <div class="device-tokens-body" x-show="deviceTokensOpen" x-cloak>
+      <div class="device-tokens-body" x-bind="panel" x-cloak>
         <p class="muted-msg muted-msg--sm" x-text="$app.t('profile.devices.intro')"></p>
 
         <!-- Plain-Token-Anzeige direkt nach Create (NUR einmal sichtbar) -->
@@ -140,8 +134,7 @@
           <p class="muted-msg muted-msg--sm" x-text="$app.t('profile.devices.justCreatedHint')"></p>
           <div class="device-tokens-reveal-row">
             <code class="device-tokens-plain" x-text="deviceTokensJustCreated?.plain_token"></code>
-            <button type="button" @click="deviceTokensCopyPlain()"
-                    x-text="deviceTokensCopiedAt ? $app.t('common.copied') : $app.t('common.copy')"></button>
+            <button x-data="copyButton({ text: () => deviceTokensJustCreated?.plain_token })"></button>
             <button type="button" @click="deviceTokensDismissPlain()" x-text="$app.t('common.hide')"></button>
           </div>
         </div>
@@ -190,16 +183,13 @@
     </div>
 
     <!-- macOS-App-Download (schreibwerkstatt-focuseditor) -->
-    <div class="card-form-row card-form-row--devices" x-show="macRelease.available" x-cloak>
-      <button type="button"
-              class="collapsible-toggle"
-              @click="macAppOpen = !macAppOpen"
-              :aria-expanded="macAppOpen">
-        <svg class="icon history-chevron" :class="{ 'is-open': macAppOpen }" aria-hidden="true"><use href="/icons.svg#chevron-right"/></svg>
+    <div class="card-form-row card-form-row--devices" x-show="macRelease.available" x-cloak x-data="collapsible()">
+      <button type="button" class="collapsible-toggle" x-bind="trigger">
+        <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
         <span x-text="$app.t('profile.macApp.title')"></span>
         <span class="lt-dict-count" x-text="macRelease.version"></span>
       </button>
-      <div class="device-tokens-body" x-show="macAppOpen" x-cloak>
+      <div class="device-tokens-body" x-bind="panel" x-cloak>
         <p class="muted-msg muted-msg--sm" x-text="$app.t('profile.macApp.intro')"></p>
 
         <div class="mac-app-meta muted-msg muted-msg--sm">

@@ -133,16 +133,6 @@ export const adminUsersMethods = {
     }
   },
 
-  async adminUsersInviteCopyUrl(inv) {
-    if (!inv?.invite_url) return;
-    const url = inv.invite_url.startsWith('http') ? inv.invite_url : `${location.origin}${inv.invite_url}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      this.adminUsersInvitesCopiedId = inv.id;
-      setTimeout(() => { this.adminUsersInvitesCopiedId = null; }, 1500);
-    } catch {}
-  },
-
   async adminUsersUpdate(user, patch) {
     this.adminUsersError = '';
     try {
@@ -199,15 +189,6 @@ export const adminUsersMethods = {
     } catch (e) {
       this.adminUsersError = e.message;
     }
-  },
-
-  async adminUsersCopyInviteUrl() {
-    if (!this.adminUsersInviteResult?.url) return;
-    try {
-      await navigator.clipboard.writeText(this.adminUsersInviteResult.url);
-      this.adminUsersCopied = true;
-      setTimeout(() => { this.adminUsersCopied = false; }, 1500);
-    } catch {}
   },
 
   // ─── Registration-Requests ─────────────────────────────────────────────
@@ -284,12 +265,4 @@ export const adminUsersMethods = {
     }
   },
 
-  async adminUsersCopyRequestInviteUrl(id, url) {
-    if (!url) return;
-    try {
-      await navigator.clipboard.writeText(url);
-      this.adminUsersRequestsCopiedId = id;
-      setTimeout(() => { this.adminUsersRequestsCopiedId = null; }, 1500);
-    } catch {}
-  },
 };

@@ -39,23 +39,24 @@ export function comboboxData(cfg = {}) {
       _transient: !!cfg.transient,
       _footer: (cfg.footer && typeof cfg.footer.action === 'function') ? cfg.footer : null,
       _onOutside: null,
-      _onScrollResize: null,
       _rootEl: null,
-      _justOpened: false,
       sheetMode: false,
-      // Dropdown-Geometrie als reaktiver State (gebunden via `:style`), NICHT
-      // imperativ via dropdown.style.* — letzteres wird von Alpines Re-Render
-      // (x-for/`:class`) ueberschrieben. Reaktiv re-applied Alpine es selbst.
-      ddStyle: {},
+      // Nur noch die BREITE wird an den Trigger angeglichen (damit das Dropdown
+      // wie ein <select> mindestens trigger-breit ist). POSITION + Flip +
+      // Overflow-Escape + Reposition-bei-Scroll macht x-anchor (Floating UI).
+      ddWidth: null,
       highlighted: -1,
-      openUp: false,
 
-      // Mobile = schmaler Viewport: dort rendert das Dropdown als Bottom-Sheet
-      // (combobox.js#_positionDropdown), nicht als am Trigger verankertes Popup.
-      // `innerWidth` statt `matchMedia` — letzteres lieferte im Event-getriebenen
-      // Tap-Pfad unzuverlaessige Ergebnisse.
+      // Mobile = schmaler Viewport ODER Touch-Geraet (keine Maus): dort rendert
+      // das Dropdown als Bottom-Sheet statt als am Trigger verankertes Popup.
+      // Touch-Erkennung ist Pflicht — sonst landen breitere Touch-Geraete
+      // (Tablet, grosses Phone im Querformat) im Desktop-Pfad, dessen Auto-Fokus
+      // die Bildschirm-Tastatur oeffnet und das Dropdown via resize sofort wieder
+      // schliesst ("geht auf und wieder zu").
       _isMobile() {
-        return typeof window !== 'undefined' && window.innerWidth <= 600;
+        if (typeof window === 'undefined') return false;
+        if (window.innerWidth <= 600) return true;
+        return window.matchMedia?.('(hover: none) and (pointer: coarse)')?.matches ?? false;
       },
 
       get placeholder() {
@@ -119,69 +120,28 @@ export function comboboxData(cfg = {}) {
         } else {
           this.highlighted = this._allOptions.findIndex(o => String(o.value) === String(this.value));
         }
-        this.$nextTick(() => {
-          this._positionDropdown();
-          // Auf Mobile NICHT auto-fokussieren: der Fokus oeffnet die Bildschirm-
-          // Tastatur, deren scroll/resize das Dropdown sofort wieder schliessen
-          // wuerde. Das Bottom-Sheet ist auch ohne Fokus voll bedienbar.
-          if (!this._isMobile()) this.$refs.cbInput?.focus();
-          // Kurzes Fenster: ein durch Fokus/Layout-Settle ausgeloestes
-          // scroll/resize direkt nach dem Oeffnen darf nicht sofort schliessen.
-          this._justOpened = true;
-          setTimeout(() => { this._justOpened = false; }, 350);
-          // Scroll/Resize-Close nur auf Desktop (fixed Popup zieht nicht nach,
-          // schliesst stattdessen). Mobile-Sheet ist viewport-verankert und
-          // schliesst nur via Outside-Tap / Auswahl.
-          if (!this._isMobile()) {
-            window.addEventListener('scroll', this._onScrollResize, true);
-            window.addEventListener('resize', this._onScrollResize);
-          }
-        });
-      },
-      // Dropdown ist `position: fixed` und wird hier an den Trigger gekoppelt —
-      // so entkommt es overflow-clippenden Vorfahren (z. B. dem horizontal
-      // scrollenden Plot-Swimlane-Grid). Bei Scroll/Resize wird stattdessen
-      // geschlossen (siehe _onScrollResize), statt nachzuziehen.
-      _positionDropdown() {
-        const trigger = this._rootEl.querySelector('.combobox-trigger');
-        const dropdown = this._rootEl.querySelector('.combobox-dropdown');
-        if (!trigger || !dropdown) { this.openUp = false; return; }
-        if (this.sheetMode) {
-          // Bottom-Sheet: Geometrie kommt rein aus CSS (.combobox-dropdown--sheet
-          // → fixed, left/right/bottom: 0). Reaktive Inline-Geometrie leeren,
-          // damit die CSS-Regeln greifen.
-          this.ddStyle = {};
-          this.openUp = false;
-          return;
+        // Breite an den Trigger angleichen (Desktop). Im Sheet-Modus kommt die
+        // Breite aus CSS (full-bleed), darum dort null.
+        if (!this.sheetMode) {
+          const trig = this._rootEl.querySelector('.combobox-trigger');
+          const w = trig ? Math.max(trig.offsetWidth, this._compact ? 180 : 0) : 0;
+          this.ddWidth = w ? w + 'px' : null;
+        } else {
+          this.ddWidth = null;
         }
-        const tr = trigger.getBoundingClientRect();
-        const dropdownH = dropdown.getBoundingClientRect().height || 250;
-        const spaceBelow = window.innerHeight - tr.bottom;
-        const spaceAbove = tr.top;
-        this.openUp = spaceBelow < dropdownH && spaceAbove > spaceBelow;
-
-        const margin = 8;
-        const width = Math.min(
-          Math.max(tr.width, this._compact ? 180 : 0),
-          window.innerWidth - margin * 2
-        );
-        let left = tr.left;
-        if (left + width > window.innerWidth - margin) left = window.innerWidth - margin - width;
-        if (left < margin) left = margin;
-        this.ddStyle = this.openUp
-          ? { left: left + 'px', width: width + 'px', top: 'auto', bottom: (window.innerHeight - tr.top) + 'px' }
-          : { left: left + 'px', width: width + 'px', bottom: 'auto', top: tr.bottom + 'px' };
+        this.$nextTick(() => {
+          // Auf Mobile NICHT auto-fokussieren: der Fokus oeffnet die Bildschirm-
+          // Tastatur, deren resize das Sheet stoeren wuerde. Das Bottom-Sheet ist
+          // auch ohne Fokus voll bedienbar.
+          if (!this._isMobile()) this.$refs.cbInput?.focus();
+        });
       },
       close() {
         this.open = false;
         this.query = '';
         this.highlighted = -1;
-        this.openUp = false;
-        this._justOpened = false;
         this.sheetMode = false;
-        this.ddStyle = {};
-        window.removeEventListener('scroll', this._onScrollResize, true);
-        window.removeEventListener('resize', this._onScrollResize);
+        this.ddWidth = null;
       },
       select(val) {
         if (this._multiple) {
@@ -245,18 +205,6 @@ export function comboboxData(cfg = {}) {
         if (this._compact) this._rootEl.classList.add('combobox-wrap--compact');
 
         this._onOutside = (e) => { if (!this._rootEl.contains(e.target)) this.close(); };
-        // Bei Scroll/Resize schliessen (fixed Dropdown zieht nicht nach). Scroll
-        // INNERHALB der eigenen Liste (lange Kapitel-/Figurenliste) darf nicht
-        // schliessen — der capture-Listener auf window faengt sonst auch den
-        // List-Scroll ab.
-        this._onScrollResize = (e) => {
-          if (!this.open) return;
-          // Direkt nach dem Oeffnen ausgeloestes scroll/resize (Fokus, Layout-
-          // Settle) ignorieren — sonst schliesst sich das Dropdown sofort.
-          if (this._justOpened) return;
-          if (e && e.type === 'scroll' && this._rootEl.contains(e.target)) return;
-          this.close();
-        };
         document.addEventListener('mousedown', this._onOutside);
         this._rootEl.addEventListener('keydown', (e) => this.onKeydown(e));
 
@@ -270,13 +218,18 @@ export function comboboxData(cfg = {}) {
           this.highlighted = this.filtered.length > 0 ? 0 : -1;
         });
         const template = [
-          '<button type="button" class="combobox-trigger" @click="toggle()"',
+          '<button type="button" class="combobox-trigger" @click="toggle()" x-ref="cbTrigger"',
           '        :aria-expanded="open ? \'true\' : \'false\'"',
           '        :aria-label="selectedLabel || placeholder">',
           '  <span class="combobox-value" x-text="selectedLabel || placeholder"></span>',
           '  <svg class="combobox-chevron" :class="{\'combobox-chevron--open\': open}" width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M1.5 3.5L5 7L8.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
           '</button>',
-          '<div class="combobox-dropdown" :class="{\'combobox-dropdown--up\': openUp, \'combobox-dropdown--sheet\': sheetMode}" :style="ddStyle" x-show="open" x-cloak>',
+          '<div class="combobox-backdrop" x-show="open && sheetMode" x-cloak @click="close()" aria-hidden="true"></div>',
+          // Position via x-anchor (Floating UI): `.fixed` entkommt overflow-
+          // clippenden Vorfahren (Plot-Swimlane-Grid), Flip passiert automatisch.
+          // Im Sheet-Modus ueberschreibt CSS (.--sheet, !important) die inline-
+          // Geometrie von x-anchor. Breite via ddWidth (nur Desktop).
+          '<div class="combobox-dropdown" :class="{\'combobox-dropdown--sheet\': sheetMode}" :style="ddWidth && !sheetMode ? { width: ddWidth } : {}" x-anchor:bottom-start.fixed="$refs.cbTrigger" x-show="open" x-cloak>',
           '  <input type="text" class="combobox-search" x-model="query" x-ref="cbInput"',
           '         :placeholder="$app.t(\'common.searchShort\')" role="searchbox" :aria-label="$app.t(\'common.searchShort\')">',
           '  <ul class="combobox-list" role="listbox"',
@@ -310,11 +263,6 @@ export function comboboxData(cfg = {}) {
         if (this._onOutside) {
           document.removeEventListener('mousedown', this._onOutside);
           this._onOutside = null;
-        }
-        if (this._onScrollResize) {
-          window.removeEventListener('scroll', this._onScrollResize, true);
-          window.removeEventListener('resize', this._onScrollResize);
-          this._onScrollResize = null;
         }
       },
     };

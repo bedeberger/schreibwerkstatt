@@ -112,7 +112,8 @@
   <div x-show="!_formMounted" class="card-status" x-text="$app.t('pdfExport.empty')"></div>
 
   <template x-if="_formMounted">
-    <div>
+    <div x-data="tabs(['layout','font','chapter','cover','toc','extras','print','pdfa'])"
+         x-modelable="value" x-model="activeTab">
       <!-- Profil-Header: Name + Default-Toggle + Delete -->
       <div class="list-header list-header--between list-header--wrap">
         <input type="text" class="pdfx-name-input" x-model="activeProfile.name">
@@ -128,19 +129,17 @@
         </div>
       </div>
 
-      <!-- Tabs (DESIGN.md .tabs) -->
-      <div class="tabs tabs--scrollable pdfx-tabs">
-        <template x-for="tab in ['layout','font','chapter','cover','toc','extras','print','pdfa']" :key="tab">
-          <button type="button"
-                  class="tabs-btn"
-                  :class="{ 'tabs-btn--active': isTab(tab) }"
-                  @click="setTab(tab)"
+      <!-- Tabs (DESIGN.md .tabs / Alpine.data('tabs')) -->
+      <div class="tabs tabs--scrollable pdfx-tabs" x-bind="tablist">
+        <template x-for="tab in tabs" :key="tab">
+          <button class="tabs-btn"
+                  x-bind="tabBtn(tab)"
                   x-text="$app.t('pdfExport.tab.' + tab)"></button>
         </template>
       </div>
 
       <!-- Layout-Tab -->
-      <div class="pdfx-tab-panel" x-show="isTab('layout')">
+      <div class="pdfx-tab-panel" x-bind="panel('layout')">
         <div class="card-form-grid">
           <div class="card-form-row">
             <label class="card-form-label" x-text="$app.t('pdfExport.layout.pageSize')"></label>
@@ -172,15 +171,12 @@
             </div>
           </div>
 
-          <div class="collapsible-wrap">
-            <button type="button"
-                    class="collapsible-toggle"
-                    @click="secOpen.margins = !secOpen.margins"
-                    :aria-expanded="secOpen.margins">
-              <span class="history-chevron" :class="{ open: secOpen.margins }">›</span>
+          <div class="collapsible-wrap" x-data="collapsible()">
+            <button type="button" class="collapsible-toggle" x-bind="trigger">
+              <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
               <span x-text="$app.t('pdfExport.layout.margins')"></span>
             </button>
-            <div x-show="secOpen.margins" x-cloak class="collapsible-section">
+            <div x-bind="panel" x-cloak class="collapsible-section">
               <div class="pdfx-num-grid pdfx-num-grid--4">
                 <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.top')"></span><input type="text" x-data="numInput({ step: 1, min: 5, max: 80 })" x-modelable="value" x-model="activeProfile.config.layout.marginsMm.top" class="pdfx-num-input"></label>
                 <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.right')"></span><input type="text" x-data="numInput({ step: 1, min: 5, max: 80 })" x-modelable="value" x-model="activeProfile.config.layout.marginsMm.right" class="pdfx-num-input"></label>
@@ -205,15 +201,12 @@
             </div>
           </div>
 
-          <div class="collapsible-wrap">
-            <button type="button"
-                    class="collapsible-toggle"
-                    @click="secOpen.bodyInset = !secOpen.bodyInset"
-                    :aria-expanded="secOpen.bodyInset">
-              <span class="history-chevron" :class="{ open: secOpen.bodyInset }">›</span>
+          <div class="collapsible-wrap" x-data="collapsible()">
+            <button type="button" class="collapsible-toggle" x-bind="trigger">
+              <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
               <span x-text="$app.t('pdfExport.layout.bodyInset')"></span>
             </button>
-            <div x-show="secOpen.bodyInset" x-cloak class="collapsible-section">
+            <div x-bind="panel" x-cloak class="collapsible-section">
               <p class="card-form-field-note" x-text="$app.t('pdfExport.layout.bodyInsetHint')"></p>
               <div class="pdfx-num-grid pdfx-num-grid--4">
                 <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.top')"></span><input type="text" x-data="numInput({ step: 1, min: 0, max: 60 })" x-modelable="value" x-model="activeProfile.config.layout.bodyInsetMm.top" class="pdfx-num-input"></label>
@@ -224,15 +217,12 @@
             </div>
           </div>
 
-          <div class="collapsible-wrap">
-            <button type="button"
-                    class="collapsible-toggle"
-                    @click="secOpen.headerFooter = !secOpen.headerFooter"
-                    :aria-expanded="secOpen.headerFooter">
-              <span class="history-chevron" :class="{ open: secOpen.headerFooter }">›</span>
+          <div class="collapsible-wrap" x-data="collapsible()">
+            <button type="button" class="collapsible-toggle" x-bind="trigger">
+              <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
               <span x-text="$app.t('pdfExport.layout.headerFooter')"></span>
             </button>
-            <div x-show="secOpen.headerFooter" x-cloak class="collapsible-section">
+            <div x-bind="panel" x-cloak class="collapsible-section">
               <p class="card-form-field-note" x-text="$app.t('pdfExport.layout.tokensHint')"></p>
               <div class="card-form-row">
                 <label class="card-form-label" x-text="$app.t('pdfExport.layout.headerLeft')"></label>
@@ -318,7 +308,7 @@
       </div>
 
       <!-- Schrift-Tab -->
-      <div class="pdfx-tab-panel" x-show="isTab('font')">
+      <div class="pdfx-tab-panel" x-bind="panel('font')">
         <template x-for="group in [
             { key: 'body',       roles: ['body','heading'] },
             { key: 'titlePages', roles: ['title','subtitle','byline','dedication','frontMatter','year'] },
@@ -329,18 +319,15 @@
             <h4 class="pdfx-font-group-title" x-text="$app.t('pdfExport.font.group.' + group.key)"></h4>
 
             <template x-for="role in group.roles" :key="role">
-              <div class="pdfx-font-role collapsible-wrap">
-                <button type="button"
-                        class="collapsible-toggle pdfx-font-role-toggle"
-                        @click="fontRoleOpen[role] = !fontRoleOpen[role]"
-                        :aria-expanded="fontRoleOpen[role]">
-                  <span class="history-chevron" :class="{ open: fontRoleOpen[role] }" aria-hidden="true">›</span>
+              <div class="pdfx-font-role collapsible-wrap" x-data="collapsible(role === 'body')">
+                <button type="button" class="collapsible-toggle pdfx-font-role-toggle" x-bind="trigger">
+                  <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
                   <span x-text="$app.t('pdfExport.font.' + role)"></span>
                   <span class="pdfx-font-role-summary"
                         x-text="activeProfile.config.font[role].family + ' : ' + activeProfile.config.font[role].weight"></span>
                 </button>
 
-                <div x-show="fontRoleOpen[role]" x-cloak class="collapsible-section">
+                <div x-bind="panel" x-cloak class="collapsible-section">
                   <div class="card-form-row">
                     <label class="card-form-label" x-text="$app.t('pdfExport.font.family')"></label>
                     <div class="card-form-field">
@@ -447,7 +434,7 @@
       </div>
 
       <!-- Kapitel-Tab -->
-      <div class="pdfx-tab-panel" x-show="isTab('chapter')">
+      <div class="pdfx-tab-panel" x-bind="panel('chapter')">
         <div class="card-form-grid">
           <div class="card-form-row">
             <label class="card-form-label" x-text="$app.t('pdfExport.chapter.breakBefore')"></label>
@@ -575,15 +562,12 @@
             </div>
           </div>
 
-          <div class="collapsible-wrap">
-            <button type="button"
-                    class="collapsible-toggle"
-                    @click="secOpen.pageStructure = !secOpen.pageStructure"
-                    :aria-expanded="secOpen.pageStructure">
-              <span class="history-chevron" :class="{ open: secOpen.pageStructure }">›</span>
+          <div class="collapsible-wrap" x-data="collapsible()">
+            <button type="button" class="collapsible-toggle" x-bind="trigger">
+              <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
               <span x-text="$app.t('pdfExport.chapter.pageStructureLegend')"></span>
             </button>
-            <div x-show="secOpen.pageStructure" x-cloak class="collapsible-section">
+            <div x-bind="panel" x-cloak class="collapsible-section">
               <p class="card-form-field-note" x-text="$app.t('pdfExport.chapter.pageStructureHint')"></p>
               <div class="card-form-row">
                 <label class="card-form-label" x-text="$app.t('pdfExport.chapter.pageStructure')"></label>
@@ -609,7 +593,7 @@
       </div>
 
       <!-- Cover-Tab -->
-      <div class="pdfx-tab-panel" x-show="isTab('cover')">
+      <div class="pdfx-tab-panel" x-bind="panel('cover')">
         <label class="pdfx-check pdfx-check--leading">
           <input type="checkbox" x-model="activeProfile.config.cover.enabled">
           <span x-text="$app.t('pdfExport.cover.enabled')"></span>
@@ -618,15 +602,12 @@
           <div>
             <p class="card-form-field-note" x-text="$app.t('pdfExport.cover.imageFromPublication')"></p>
 
-            <div class="collapsible-wrap">
-              <button type="button"
-                      class="collapsible-toggle"
-                      @click="secOpen.coverOptions = !secOpen.coverOptions"
-                      :aria-expanded="secOpen.coverOptions">
-                <span class="history-chevron" :class="{ open: secOpen.coverOptions }">›</span>
+            <div class="collapsible-wrap" x-data="collapsible()">
+              <button type="button" class="collapsible-toggle" x-bind="trigger">
+                <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
                 <span x-text="$app.t('pdfExport.cover.optionsLegend')"></span>
               </button>
-              <div x-show="secOpen.coverOptions" x-cloak class="collapsible-section">
+              <div x-bind="panel" x-cloak class="collapsible-section">
                 <div class="card-form-grid">
                   <div class="card-form-row">
                     <label class="card-form-label" x-text="$app.t('pdfExport.cover.fit')"></label>
@@ -644,15 +625,12 @@
         </template>
 
         <!-- Separates Umschlag-PDF (Druck): Rückseite + Buchrücken + Vorderseite -->
-        <div class="collapsible-wrap pdfx-cover-spine">
-          <button type="button"
-                  class="collapsible-toggle"
-                  @click="secOpen.coverSpine = !secOpen.coverSpine"
-                  :aria-expanded="secOpen.coverSpine">
-            <span class="history-chevron" :class="{ open: secOpen.coverSpine }">›</span>
+        <div class="collapsible-wrap pdfx-cover-spine" x-data="collapsible()">
+          <button type="button" class="collapsible-toggle" x-bind="trigger">
+            <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
             <span x-text="$app.t('pdfExport.cover.spineLegend')"></span>
           </button>
-          <div x-show="secOpen.coverSpine" x-cloak class="collapsible-section">
+          <div x-bind="panel" x-cloak class="collapsible-section">
             <p class="card-form-field-note" x-text="$app.t('pdfExport.cover.spineHint')"></p>
             <div class="card-form-grid">
               <div class="card-form-row">
@@ -705,10 +683,11 @@
               </template>
             </div>
             <div class="pdfx-cover-actions">
-              <label class="pdfx-file-btn">
-                <input type="file" accept="image/jpeg,image/png,image/webp" hidden @change="uploadBackCover($event)">
+              <div class="pdfx-file-btn"
+                   x-data="fileDrop({ accept: 'image/jpeg,image/png,image/webp', drag: false })"
+                   @file-drop="uploadBackCover($event.detail.file)">
                 <span x-text="backCoverUploading ? $app.t('pdfExport.cover.backUploading') : (activeProfile.has_back_cover ? $app.t('pdfExport.cover.backReplace') : $app.t('pdfExport.cover.backUpload'))"></span>
-              </label>
+              </div>
               <button type="button"
                       x-show="activeProfile.has_back_cover"
                       @click="removeBackCover()"
@@ -732,7 +711,7 @@
       </div>
 
       <!-- TOC-Tab -->
-      <div class="pdfx-tab-panel" x-show="isTab('toc')">
+      <div class="pdfx-tab-panel" x-bind="panel('toc')">
         <label class="pdfx-check pdfx-check--leading">
           <input type="checkbox" x-model="activeProfile.config.toc.enabled">
           <span x-text="$app.t('pdfExport.toc.enabled')"></span>
@@ -800,17 +779,14 @@
 
             <h4 class="pdfx-font-group-title" x-text="$app.t('pdfExport.toc.format.heading')"></h4>
             <template x-for="role in ['tocTitle', 'toc']" :key="role">
-              <div class="pdfx-font-role collapsible-wrap">
-                <button type="button"
-                        class="collapsible-toggle pdfx-font-role-toggle"
-                        @click="fontRoleOpen[role] = !fontRoleOpen[role]"
-                        :aria-expanded="fontRoleOpen[role]">
-                  <span class="history-chevron" :class="{ open: fontRoleOpen[role] }" aria-hidden="true">›</span>
+              <div class="pdfx-font-role collapsible-wrap" x-data="collapsible()">
+                <button type="button" class="collapsible-toggle pdfx-font-role-toggle" x-bind="trigger">
+                  <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
                   <span x-text="$app.t('pdfExport.toc.font.' + role)"></span>
                   <span class="pdfx-font-role-summary"
                         x-text="activeProfile.config.font[role].family + ' : ' + activeProfile.config.font[role].weight"></span>
                 </button>
-                <div x-show="fontRoleOpen[role]" x-cloak class="collapsible-section">
+                <div x-bind="panel" x-cloak class="collapsible-section">
                   <div class="card-form-row">
                     <label class="card-form-label" x-text="$app.t('pdfExport.font.family')"></label>
                     <div class="card-form-field">
@@ -872,7 +848,7 @@
       <!-- Extras-Tab: nur Render-Platzierung. Inhaltliche Titelei (ISBN, Subtitle,
            Jahr, Widmung, Impressum, Copyright, Frontmatter, Bio) + Cover/Autorfoto
            leben buch-weit unter BookSettings → Publikation (book_publication). -->
-      <div class="pdfx-tab-panel" x-show="isTab('extras')">
+      <div class="pdfx-tab-panel" x-bind="panel('extras')">
         <p class="card-form-field-note" x-text="$app.t('pdfExport.extras.hint')"></p>
         <div class="card-form-grid">
           <div class="card-form-row">
@@ -898,7 +874,7 @@
       </div>
 
       <!-- Druck-Tab (Druckvorstufe / klassische Druckerei) -->
-      <div class="pdfx-tab-panel" x-show="isTab('print')">
+      <div class="pdfx-tab-panel" x-bind="panel('print')">
         <p class="card-form-field-note" x-text="$app.t('pdfExport.print.hint')"></p>
         <div class="card-form-grid">
           <div class="card-form-row card-form-row--top">
@@ -948,7 +924,7 @@
       </div>
 
       <!-- Norm-Tab (PDF/A / PDF/X / kein) -->
-      <div class="pdfx-tab-panel" x-show="isTab('pdfa')">
+      <div class="pdfx-tab-panel" x-bind="panel('pdfa')">
         <div class="card-form-grid">
           <div class="card-form-row">
             <label class="card-form-label" x-text="$app.t('pdfExport.norm.standard')"></label>

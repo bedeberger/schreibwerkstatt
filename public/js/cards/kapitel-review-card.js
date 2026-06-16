@@ -27,7 +27,6 @@ export function registerKapitelReviewCard() {
     // Per-Sub-Kapitel Collapse-State in der Sub-Kapitel-Section
     // (default offen, User kann pro Sub zuklappen).
     _subOpenByChapter: {},
-    _subSectionOpen: true,
     _lifecycle: null,
 
     init() {
@@ -377,10 +376,6 @@ export function registerKapitelReviewCard() {
       if (!k) return;
       const current = this.isSubchapterOpen(k);
       this._subOpenByChapter = { ...this._subOpenByChapter, [k]: !current };
-    },
-
-    toggleSubSection() {
-      this._subSectionOpen = !this._subSectionOpen;
     },
 
     kapitelReviewSelectedChapter() {

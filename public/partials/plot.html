@@ -142,12 +142,12 @@
   <!-- Spannungsbogen: Intensität der Beats (1–5) als Kurve. Ohne Stränge eine
        globale Kurve in Board-Lesereihenfolge; mit Strängen je Strang eine eigene
        farbige Kurve. Sichtbar ab 2 nicht-verworfenen Beats mit Intensität. -->
-  <div class="plot-tension" x-show="tensionCurve().count >= 2" x-cloak>
-    <button type="button" class="collapsible-toggle plot-tension-toggle" @click="tensionOpen = !tensionOpen" :aria-expanded="tensionOpen">
-      <span class="history-chevron" :class="{ open: tensionOpen }">›</span>
+  <div class="plot-tension" x-show="tensionCurve().count >= 2" x-cloak x-data="collapsible(true)">
+    <button type="button" class="collapsible-toggle plot-tension-toggle" x-bind="trigger">
+      <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
       <span x-text="$app.t('plot.tension.title')"></span>
     </button>
-    <div class="plot-tension-body" x-show="tensionOpen" x-cloak>
+    <div class="plot-tension-body" x-bind="panel" x-cloak>
       <div class="plot-tension-chart">
         <span class="plot-tension-axis plot-tension-axis--high" x-text="$app.t('plot.tension.high')"></span>
         <span class="plot-tension-axis plot-tension-axis--low" x-text="$app.t('plot.tension.low')"></span>

@@ -435,16 +435,16 @@
        Bar um Median — gleicher Pattern wie Buch-Übersicht (overview-chapter-*).
        Quelle: chapterLengthDist() aus root.tree-Stats. Klick auf Zeile springt
        zum Kapitel. Erst ab >1 Kapitel sinnvoll (Median/Verteilung). -->
-  <div class="organizer-lengthdist" x-data="{ open: false }"
+  <div class="organizer-lengthdist" x-data="collapsible()"
        x-show="chapterLengthDist().length > 1" x-cloak>
-    <button type="button" class="collapsible-toggle" @click="open = !open" :aria-expanded="open">
-      <svg class="icon history-chevron" :class="{ 'is-open': open }" aria-hidden="true"><use href="/icons.svg#chevron-right"/></svg>
+    <button type="button" class="collapsible-toggle" x-bind="trigger">
+      <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
       <span x-text="$app.t('bookOrganizer.lengthDist')"></span>
       <span class="overview-tile-median"
             x-show="open && chapterLengthDist()[0]?.median > 0"
             x-text="$app.t('overview.medianTick') + ': ' + _fmtNum(Math.round(chapterLengthDist()[0]?.median)) + ' ' + $app.t('bookstats.unit.z')"></span>
     </button>
-    <ul class="overview-chapter-list" x-show="open" x-cloak>
+    <ul class="overview-chapter-list" x-bind="panel" x-cloak>
       <template x-for="ch in chapterLengthDist()" :key="ch.id">
         <li class="overview-chapter-row internal-link"
             :class="{ 'overview-chapter-row--max': ch.isMax, 'overview-chapter-row--min': ch.isMin }"

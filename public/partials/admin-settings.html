@@ -493,8 +493,7 @@
         <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.api.justCreatedHint')"></p>
         <div class="admin-api-token-reveal-row">
           <code class="admin-api-token-plain" x-text="adminApiTokensJustCreated?.plain_token"></code>
-          <button type="button" @click="adminApiTokensCopyPlain()"
-                  x-text="adminApiTokensCopiedAt ? $app.t('common.copied') : $app.t('common.copy')"></button>
+          <button x-data="copyButton({ text: () => adminApiTokensJustCreated?.plain_token })"></button>
           <button type="button" @click="adminApiTokensDismissPlain()" x-text="$app.t('common.hide')"></button>
         </div>
       </div>
@@ -589,15 +588,12 @@
       <div class="admin-settings-subsection">
         <h4 class="admin-settings-subheading" x-text="$app.t('admin.settings.api.snippetsTitle')"></h4>
         <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.api.snippetsHint')"></p>
-        <div class="collapsible-wrap">
-        <button type="button"
-                class="collapsible-toggle"
-                @click="adminSnippetPrometheusOpen = !adminSnippetPrometheusOpen"
-                :aria-expanded="adminSnippetPrometheusOpen">
-          <span class="history-chevron" :class="{ open: adminSnippetPrometheusOpen }">›</span>
+        <div class="collapsible-wrap" x-data="collapsible()">
+        <button type="button" class="collapsible-toggle" x-bind="trigger">
+          <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
           <span x-text="$app.t('admin.settings.api.snippetPrometheus')"></span>
         </button>
-        <div x-show="adminSnippetPrometheusOpen" x-cloak class="collapsible-section">
+        <div x-bind="panel" x-cloak class="collapsible-section">
 <pre class="admin-api-snippet">scrape_configs:
   - job_name: schreibwerkstatt
     scheme: https
@@ -609,15 +605,12 @@
       credentials: sw_REPLACE_WITH_TOKEN</pre>
         </div>
         </div>
-        <div class="collapsible-wrap">
-        <button type="button"
-                class="collapsible-toggle"
-                @click="adminSnippetHomeAssistantOpen = !adminSnippetHomeAssistantOpen"
-                :aria-expanded="adminSnippetHomeAssistantOpen">
-          <span class="history-chevron" :class="{ open: adminSnippetHomeAssistantOpen }">›</span>
+        <div class="collapsible-wrap" x-data="collapsible()">
+        <button type="button" class="collapsible-toggle" x-bind="trigger">
+          <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
           <span x-text="$app.t('admin.settings.api.snippetHomeAssistant')"></span>
         </button>
-        <div x-show="adminSnippetHomeAssistantOpen" x-cloak class="collapsible-section">
+        <div x-bind="panel" x-cloak class="collapsible-section">
 <pre class="admin-api-snippet">rest:
   - resource: <span x-text="location.origin"></span>/metrics
     method: GET
