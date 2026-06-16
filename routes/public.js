@@ -39,12 +39,14 @@ function _loadTemplate(name) {
 
 // Mini-Template-Substitution: {{key}} → vars[key]. Werte werden HTML-escaped,
 // ausser sie enden auf "Json" (dann roher JSON-Stream fuer Inline-Skript).
+// Konditionale Bloecke: {{#if flag}}…{{/if}} bleiben nur, wenn vars[flag] truthy ist.
 const _escHtml = (s) => String(s ?? '')
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
 function _render(name, vars) {
-  const tpl = _loadTemplate(name);
+  const tpl = _loadTemplate(name)
+    .replace(/\{\{#if (\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g, (_, flag, body) => (vars[flag] ? body : ''));
   return tpl.replace(/\{\{(\w+)\}\}/g, (_, key) => {
     const raw = vars[key];
     if (raw === undefined || raw === null) return '';
@@ -129,10 +131,12 @@ function _renderPrivacy(req, res) {
   const lang = _bodyLang(req);
   const t = (key) => tServer(key, lang);
   const appName = appSettings.get('app.name') || 'Schreibwerkstatt';
+  const analyticsEnabled = !!appSettings.get('analytics.plausible.enabled');
   res.set('Cache-Control', 'no-store');
   res.type('html').send(_render('datenschutz.html', {
     lang,
     appName,
+    analyticsEnabled,
     pageTitle:     t('privacy.title'),
     lastUpdated:   t('privacy.lastUpdated'),
     intro:         t('privacy.intro'),
@@ -146,7 +150,9 @@ function _renderPrivacy(req, res) {
     sec5Title:     t('privacy.sec5Title'),  sec5Body:  t('privacy.sec5Body'),
     sec6Title:     t('privacy.sec6Title'),  sec6Body:  t('privacy.sec6Body'),
     sec7Title:     t('privacy.sec7Title'),  sec7Body:  t('privacy.sec7Body'),
-    sec8Title:     t('privacy.sec8Title'),  sec8Body:  t('privacy.sec8Body'),
+    sec8Title:     t('privacy.sec8Title'),
+    sec8Body:      analyticsEnabled ? t('privacy.sec8BodyAnalytics') : t('privacy.sec8Body'),
+    secAnalyticsTitle: t('privacy.secAnalyticsTitle'), secAnalyticsBody: t('privacy.secAnalyticsBody'),
     sec9Title:     t('privacy.sec9Title'),  sec9Body:  t('privacy.sec9Body'),
     backToLanding: t('privacy.backToLanding'),
   }));

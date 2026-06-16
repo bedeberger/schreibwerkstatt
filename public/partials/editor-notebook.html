@@ -281,16 +281,8 @@
   </div>
   </div><!-- /editor-card__topbar -->
 
-  <!-- Live-Presence-Hinweis: andere User editieren dieselbe Seite gerade.
-       Kein Block — nur Hinweis, damit kein Schock beim spaeteren 409.  -->
-  <template x-if="currentPage && presenceFor(currentPage.id).filter(p => !p.is_self).length > 0">
-    <div class="editor-presence-banner" x-cloak>
-      <span class="editor-presence-banner__text"
-            x-text="presenceFor(currentPage.id).filter(p => !p.is_self).length === 1
-              ? t('collab.presence.bannerOne', { user: presenceFor(currentPage.id).filter(p => !p.is_self)[0].user_display_name })
-              : t('collab.presence.bannerMany', { count: presenceFor(currentPage.id).filter(p => !p.is_self).length })"></span>
-    </div>
-  </template>
+  <!-- Live-Presence anderer User wird über den globalen Collab-Toast gemeldet
+       (collab-toast.html, Variante currentPage), nicht über einen Editor-Banner. -->
 
   <!-- Self-Multi-Device: derselbe User hat dieselbe Seite auf einem anderen
        Gerät offen. Eigene aktuelle Session ist serverseitig schon ausgefiltert. -->

@@ -179,6 +179,22 @@
   color: var(--color-muted);
 }
 
+/* Touch: native Checkbox (1em ≈ 16–18px) ist als Tap-Ziel zu schmal. Box,
+   Gap und vertikales Row-Spacing nur auf Pointer-coarse anheben — gibt dem
+   Daumen mehr Trefferfläche, ohne Desktop zu verändern. Pointer-Typ statt
+   Viewport-Breite, weil es um Touch geht, nicht um Bildschirmgrösse. */
+@media (pointer: coarse) {
+  .page-content-view ul.todo > li.todo-item {
+    gap: var(--space-sm);
+    margin: 0.35em 0;
+  }
+  .page-content-view ul.todo > li.todo-item > input[type="checkbox"] {
+    width: 1.4em;
+    height: 1.4em;
+    margin-top: calc((1lh - 1.4em) / 2);
+  }
+}
+
 /* BookStack-Callouts (div.callout.info / .warning / .danger / .success) */
 .page-content-view .callout {
   border-left: 4px solid var(--color-border);
