@@ -76,9 +76,6 @@ export function registerPlotCard() {
     // Eingeklappte „verworfen"-Beats pro Akt ({ [actId]: true }).
     verworfenOpen: {},
 
-    // Spannungsbogen ein-/ausgeklappt (nur sichtbar, wenn ≥2 Beats Intensität tragen).
-    tensionOpen: true,
-
     // Native-Fullscreen-Status (gespiegelt vom fullscreenchange-Listener) — mehr
     // horizontaler Platz fürs Akt-Board. Toggle in plotMethods.togglePlotFullscreen.
     plotFullscreen: false,

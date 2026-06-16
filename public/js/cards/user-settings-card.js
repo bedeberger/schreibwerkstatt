@@ -19,19 +19,15 @@ export function registerUserSettingsCard() {
     userSettingsSaved: false,
     userSettingsError: '',
     dictEntries: [],
-    dictOpen: false,
     dictFilter: '',
     // Device-Tokens (native Clients, z.B. Mac-Focus-Writer)
-    deviceTokensOpen: false,
     deviceTokensList: [],
     deviceTokensLoading: false,
     deviceTokensCreating: false,
     deviceTokensError: '',
     deviceTokensNewName: '',
     deviceTokensJustCreated: null,
-    deviceTokensCopiedAt: 0,
     // macOS-App-Download (schreibwerkstatt-focuseditor)
-    macAppOpen: false,
     macRelease: { available: false },
     _savedAtTimer: null,
 

@@ -81,9 +81,13 @@ import { registerBlogSyncCard } from './cards/blog-sync-card.js';
 import { registerHubspotSyncCard } from './cards/hubspot-sync-card.js';
 import { registerNumInput } from './num-input.js';
 import { registerCombobox } from './combobox.js';
+import { registerCopyButton } from './copy-button.js';
+import { registerFileDrop } from './file-drop.js';
 import { registerRadioGroup } from './radio-group.js';
 import { registerSortableTable } from './sortable-table.js';
 import { registerCatalogFilter } from './catalog-filter.js';
+import { registerCollapsible } from './collapsible.js';
+import { registerTabs } from './tabs.js';
 import { shortcutsMethods } from './editor/shortcuts.js';
 import { featuresUsageMethods } from './features-usage.js';
 import { initialLektoratState } from './app/app-state.js';
@@ -316,9 +320,13 @@ document.addEventListener('alpine:init', () => {
   registerHubspotSyncCard();
   registerNumInput();
   registerCombobox();
+  registerCopyButton();
+  registerFileDrop();
   registerRadioGroup();
   registerSortableTable();
   registerCatalogFilter();
+  registerCollapsible();
+  registerTabs();
 
   Alpine.data('lektorat', () => {
     // Root-Getter (z.B. tokTotals) leben in app/app-root-getters.js als

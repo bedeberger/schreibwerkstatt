@@ -12,7 +12,6 @@ export function registerKontinuitaetCard() {
     kontinuitaetProgress: 0,
     kontinuitaetStatus: '',
     selectedKontinuitaetIssueKey: null,
-    kontinuitaetSummaryOpen: false,
     _kontinuitaetPollTimer: null,
     _lifecycle: null,
 

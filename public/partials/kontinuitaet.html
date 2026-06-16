@@ -44,15 +44,12 @@
 
   <!-- Zusammenfassung (klappbar) — ausserhalb x-if, sonst werden Filter und
        Zusammenfassung beim Result-Wechsel komplett neu gemountet. -->
-  <div x-show="kontinuitaetResult?.summary" class="collapsible-wrap" x-cloak>
-    <button type="button"
-            class="collapsible-toggle"
-            @click="kontinuitaetSummaryOpen = !kontinuitaetSummaryOpen"
-            :aria-expanded="kontinuitaetSummaryOpen">
-      <span class="history-chevron" :class="{ open: kontinuitaetSummaryOpen }">›</span>
+  <div x-show="kontinuitaetResult?.summary" class="collapsible-wrap" x-cloak x-data="collapsible()">
+    <button type="button" class="collapsible-toggle" x-bind="trigger">
+      <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
       <span x-text="$app.t('kontinuitaet.summary')"></span>
     </button>
-    <div x-show="kontinuitaetSummaryOpen" class="collapsible-section kontinuitaet-summary" x-cloak x-text="kontinuitaetResult?.summary || ''"></div>
+    <div x-bind="panel" class="collapsible-section kontinuitaet-summary" x-cloak x-text="kontinuitaetResult?.summary || ''"></div>
   </div>
 
   <!-- Filter-Leiste — MUSS ausserhalb x-if bleiben, sonst trackt Alpine x-effect

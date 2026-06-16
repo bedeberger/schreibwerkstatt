@@ -45,19 +45,16 @@
     </div>
 
     <div class="folder-import-drop"
-         :class="{ 'is-drag': dragOver, 'has-file': !!file }"
-         @dragover.prevent="dragOver = true"
-         @dragleave.prevent="dragOver = false"
-         @drop="onDrop($event)">
-      <input type="file" :accept="importKind === 'swbook' ? '.swbook,.zip,application/zip' : '.zip,application/zip'" id="folder-import-file"
-             class="folder-import-file-input" @change="onFilePick($event)">
-      <label for="folder-import-file" class="folder-import-drop-label">
+         :class="{ 'has-file': !!file }"
+         x-data="fileDrop({ accept: () => importKind === 'swbook' ? '.swbook,.zip,application/zip' : '.zip,application/zip' })"
+         @file-drop="setFile($event.detail.file)">
+      <div class="folder-import-drop-label">
         <div class="folder-import-drop-text" x-show="!file" x-text="$app.t('folderImport.dropZone')"></div>
         <div class="folder-import-drop-file" x-show="file">
           <strong x-text="fileName"></strong>
           <span class="folder-import-size" x-text="(fileSize / 1024 / 1024).toFixed(1) + ' MB'"></span>
         </div>
-      </label>
+      </div>
     </div>
 
     <div class="folder-import-actions">
@@ -99,12 +96,12 @@
       <li x-show="result?.extras?.chats"
           x-text="$app.t('folderImport.result.chats', { sessions: result?.extras?.chats?.sessions || 0, messages: result?.extras?.chats?.messages || 0 })"></li>
     </ul>
-    <div x-data="{ open: false }" x-show="(result?.skipped?.length || 0) > 0" class="folder-import-skipped-block">
-      <button type="button" class="collapsible-toggle" @click="open = !open" :aria-expanded="open">
-        <svg class="icon history-chevron" :class="{ 'is-open': open }" aria-hidden="true"><use href="/icons.svg#chevron-right"/></svg>
+    <div x-data="collapsible()" x-show="(result?.skipped?.length || 0) > 0" class="folder-import-skipped-block">
+      <button type="button" class="collapsible-toggle" x-bind="trigger">
+        <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
         <span x-text="$app.t('folderImport.result.skippedDetails')"></span>
       </button>
-      <ul class="folder-import-skipped" x-show="open" x-cloak>
+      <ul class="folder-import-skipped" x-bind="panel" x-cloak>
         <template x-for="s in (result?.skipped || [])" :key="s.path">
           <li>
             <code x-text="s.path"></code>
@@ -113,12 +110,12 @@
         </template>
       </ul>
     </div>
-    <div x-data="{ open: false }" x-show="(result?.auditLog?.length || 0) > 0" class="folder-import-log-block">
-      <button type="button" class="collapsible-toggle" @click="open = !open" :aria-expanded="open">
-        <svg class="icon history-chevron" :class="{ 'is-open': open }" aria-hidden="true"><use href="/icons.svg#chevron-right"/></svg>
+    <div x-data="collapsible()" x-show="(result?.auditLog?.length || 0) > 0" class="folder-import-log-block">
+      <button type="button" class="collapsible-toggle" x-bind="trigger">
+        <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
         <span x-text="$app.t('folderImport.result.logDetails', { n: result?.auditLog?.length || 0 })"></span>
       </button>
-      <ul class="folder-import-log" x-show="open" x-cloak>
+      <ul class="folder-import-log" x-bind="panel" x-cloak>
         <template x-for="(entry, idx) in (result?.auditLog || [])" :key="idx">
           <li :class="'folder-import-log-line is-' + entry.level">
             <time x-text="fmtLogTime(entry.ts)"></time>

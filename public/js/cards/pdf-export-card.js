@@ -13,8 +13,6 @@
 
 import { startPoll } from './job-helpers.js';
 
-const TABS = ['layout', 'font', 'chapter', 'cover', 'toc', 'extras', 'print', 'pdfa'];
-
 // Druckerei-Trim-Presets (mm). Setzen pageSize='custom' + Masse. Decken die
 // gängigen Buchformate ab, die A4/A5/A6/Letter nicht abbilden.
 const TRIM_PRESETS = [
@@ -43,32 +41,6 @@ export function registerPdfExportCard() {
 
     fontList: [],
     fontPreviewLoaded: new Set(),
-
-    // Collapsible-Toggles für lange Sektionen.
-    secOpen: {
-      margins: false,
-      bodyInset: false,
-      headerFooter: false,
-      pageStructure: false,
-      coverOptions: false,
-      coverSpine: false,
-    },
-
-    // Pro-Rolle-Akkordeon im Schrift-Tab. `body` default offen, Rest zu.
-    fontRoleOpen: {
-      body: true,
-      heading: false,
-      title: false,
-      subtitle: false,
-      byline: false,
-      dedication: false,
-      frontMatter: false,
-      authorBio: false,
-      year: false,
-      imprint: false,
-      tocTitle: false,
-      toc: false,
-    },
 
     creating: false,
     newProfileName: '',
@@ -284,8 +256,7 @@ export function registerPdfExportCard() {
     },
 
     // ── Umschlag-Rückseitenbild (separates Cover-PDF) ─────────────────────
-    async uploadBackCover(ev) {
-      const file = ev?.target?.files?.[0];
+    async uploadBackCover(file) {
       if (!file || !this.activeProfile) return;
       this.backCoverUploading = true;
       this.backCoverError = '';
@@ -303,7 +274,6 @@ export function registerPdfExportCard() {
         await this.selectProfile(this.activeProfile.id);
       } finally {
         this.backCoverUploading = false;
-        ev.target.value = '';
       }
     },
 
@@ -625,8 +595,8 @@ export function registerPdfExportCard() {
     },
 
     // ── Helpers fürs Template ────────────────────────────────────────────
-    setTab(tab) { if (TABS.includes(tab)) this.activeTab = tab; },
-    isTab(tab) { return this.activeTab === tab; },
+    // Tab-State (activeTab) lebt über die `tabs`-Komponente im Markup
+    // (x-modelable an activeTab gekoppelt) — kein setTab/isTab mehr hier.
 
     // Combobox-Options sind als Inline-Expressions im Template (siehe DESIGN.md
     // "Reaktivitaet bei Datenquelle aus Karten-Scope"). Nested x-data der Combobox

@@ -15,7 +15,6 @@ export function registerAdminUsersCard() {
     adminUsersInviteRole: 'user',
     adminUsersInviting: false,
     adminUsersInviteResult: null,
-    adminUsersCopied: false,
     adminUsersAuditEmail: null,
     adminUsersAuditEvents: [],
     // Registration-Requests-Tab.
@@ -25,13 +24,11 @@ export function registerAdminUsersCard() {
     adminUsersRequestsLoading: false,
     adminUsersRequestsBusy: null,            // id during approve/deny
     adminUsersRequestsResult: null,          // { id, inviteUrl, mail }
-    adminUsersRequestsCopiedId: null,
     // Invites-Tab (offene Einladungen).
     adminUsersInvitesList: [],
     adminUsersInvitesLoading: false,
     adminUsersInvitesBusy: null,             // id during remind/revoke
     adminUsersInvitesResult: null,           // { id, mail | cooldown, retryAfter }
-    adminUsersInvitesCopiedId: null,
 
     _onViewReset: null,
 

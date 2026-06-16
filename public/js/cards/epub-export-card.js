@@ -15,8 +15,6 @@
 
 import { startPoll } from './job-helpers.js';
 
-const TABS = ['typography', 'structure', 'metadata'];
-
 const _EMPTY_META = () => ({
   author_name: '',
   isbn: '', subtitle: '', year: '', dedication: '', imprint: '', copyright: '',
@@ -262,8 +260,8 @@ export function registerEpubExportCard() {
       this.pub.epub_unnumbered_chapter_ids = arr.filter(v => v !== id);
     },
 
-    setTab(tab) { if (TABS.includes(tab)) this.activeTab = tab; },
-    isTab(tab) { return this.activeTab === tab; },
+    // Tab-State (activeTab) lebt über die `tabs`-Komponente im Markup
+    // (x-modelable an activeTab gekoppelt) — kein setTab/isTab mehr hier.
 
     openBookSettings() {
       window.__app?.toggleBookSettingsCard?.();

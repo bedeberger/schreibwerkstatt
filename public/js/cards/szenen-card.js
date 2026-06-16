@@ -14,7 +14,6 @@ export function registerSzenenCard() {
     szenenLoading: false,
     szenenProgress: 0,
     szenenStatus: '',
-    szenenUebersichtOpen: false,
     viewMode: localStorage.getItem('szenen.viewMode') === 'grid' ? 'grid' : 'list', // 'list' | 'grid'
     _szenenPollTimer: null,
     _lifecycle: null,

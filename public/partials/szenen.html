@@ -44,15 +44,12 @@
   </div>
 
   <!-- Szenen-Übersicht: klappbar -->
-  <div x-show="$app.szenen.length > 0" class="szenen-uebersicht">
-    <button type="button"
-            class="collapsible-toggle"
-            @click="szenenUebersichtOpen = !szenenUebersichtOpen"
-            :aria-expanded="szenenUebersichtOpen">
-      <span class="history-chevron" :class="{ open: szenenUebersichtOpen }">›</span>
+  <div x-show="$app.szenen.length > 0" class="szenen-uebersicht" x-data="collapsible()">
+    <button type="button" class="collapsible-toggle" x-bind="trigger">
+      <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
       <span x-text="$app.t('szenen.distribution')"></span>
     </button>
-    <div x-show="szenenUebersichtOpen" class="szenen-uebersicht-grid" x-cloak>
+    <div x-bind="panel" class="szenen-uebersicht-grid" x-cloak>
       <!-- Pro Figur -->
       <div class="szenen-uebersicht-block">
         <div class="bewertung-section-title" x-text="$app.t('szenen.byFigur')"></div>
