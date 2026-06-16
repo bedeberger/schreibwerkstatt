@@ -804,11 +804,11 @@ select[aria-invalid="true"],
   }
   .card-actions--grouped .action-sep { display: none; }
   /* Icon-only Buttons (z.B. Tagebuch Vor/Zurueck) sind via `.icon-btn`
-     nur ~22px hoch — unter dem 44px-Touch-Target, Finger verfehlen sie. Auf
-     Touch volle Zeilenhoehe + 44px-Minimum, Icon zentriert. */
+     natuerlich niedriger als die Text-Buttons der Gruppe. Auf Touch auf die
+     Zeilenhoehe der benachbarten Buttons strecken, damit die Pfeile exakt so
+     gross wie die Buttons sind; Icon bleibt zentriert. */
   .card-actions .icon-btn {
     align-self: stretch;
-    min-height: 44px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
