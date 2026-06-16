@@ -21,6 +21,8 @@
 
 import { focusCardMethods } from './card.js';
 import { setEditorHost } from '../shared/editor-host.js';
+import { isNoChange } from '../shared/save-pipeline.js';
+import { stripLektoratMarks } from '../shared/html-clean.js';
 
 const DEFAULT_AUTOSAVE_MS = 1500;
 
@@ -73,7 +75,17 @@ function makeHost(bridge, scheduleSave) {
     async quickSave() {
       if (!this.currentPage) return;
       const content = document.querySelector('.focus-editor.is-active .focus-editor__content');
-      const html = content ? content.innerHTML : this.originalHtml;
+      // stripLektoratMarks wie im Notebook-Editor (saveEdit): transiente
+      // Fokus-Markup (`focus-paragraph-active`, leerer Auto-Trailing-<p>) raus,
+      // bevor verglichen + persistiert wird.
+      const html = content ? stripLektoratMarks(content.innerHTML) : this.originalHtml;
+      // Inhaltsgleich → kein PUT. quickSave feuert auch bei Escape/Seitenwechsel/
+      // destroy, nicht nur beim Tippen; die Fokus-Engine normalisiert das DOM
+      // beim Mount (Block-Wrap, Schluss-<p>), sodass roher innerHTML nie
+      // byte-gleich zum geladenen Stand ist. Ohne diesen Gate bumpt jeder
+      // Öffnen/Wechsel updated_at unnötig. isNoChange bringt beide Seiten via
+      // normalizeForCompare auf dieselbe Normalform.
+      if (isNoChange(html, this.originalHtml)) { this.editDirty = false; return; }
       this.editSaving = true;
       try {
         await bridge.savePage({ id: this.currentPage.id, name: this.currentPage.name, html });

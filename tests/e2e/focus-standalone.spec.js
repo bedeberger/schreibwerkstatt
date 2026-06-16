@@ -81,7 +81,17 @@ test('Escape speichert, ohne den Editor abzureißen (kein Lese-Modus)', async ({
   expect(after.listeners).toBe(true);
 });
 
-test('destroy() speichert und räumt Engine-Listener ab', async ({ page }) => {
+test('destroy() speichert geänderten Inhalt und räumt Engine-Listener ab', async ({ page }) => {
+  await page.evaluate(() => {
+    const c = document.querySelector('.focus-editor__content');
+    c.focus();
+    const p = c.querySelector('p');
+    const sel = window.getSelection(); const r = document.createRange();
+    r.selectNodeContents(p); r.collapse(false); sel.removeAllRanges(); sel.addRange(r);
+  });
+  await page.keyboard.type(' Y');
+  await page.evaluate(() => window.__saveLog.length = 0); // Autosave-Eintrag ignorieren
+
   await page.evaluate(async () => { await window.__standalone.destroy(); });
   const state = await page.evaluate(() => ({
     saved: window.__saveLog.length >= 1,
@@ -91,4 +101,20 @@ test('destroy() speichert und räumt Engine-Listener ab', async ({ page }) => {
   expect(state.saved).toBe(true);
   expect(state.focusState).toBe('idle');
   expect(state.listeners).toBe(null);
+});
+
+test('kein redundanter Save bei ungeänderter Seite (Gate via isNoChange)', async ({ page }) => {
+  // Frisch geöffnete Seite: nur die Fokus-Engine hat das DOM normalisiert
+  // (Aktiv-Markierung, Auto-Trailing-<p>) — inhaltlich nichts geändert.
+  // Weder explizites save() noch destroy() dürfen einen PUT auslösen.
+  const result = await page.evaluate(async () => {
+    window.__saveLog.length = 0;
+    await window.__standalone.save();
+    const afterSave = window.__saveLog.length;
+    await window.__standalone.destroy();
+    return { afterSave, afterDestroy: window.__saveLog.length, dirty: window.__standalone.host.editDirty };
+  });
+  expect(result.afterSave).toBe(0);
+  expect(result.afterDestroy).toBe(0);
+  expect(result.dirty).toBe(false);
 });
