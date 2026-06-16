@@ -151,7 +151,7 @@
   <template x-if="!pageSearch && selectedBookId && tree.length === 0 && !treeLoading">
     <div class="sidebar-empty-book">
       <div class="muted-msg muted-msg--sm" x-text="t('sidebar.emptyBook')"></div>
-      <button type="button" @click="createChapter()" x-text="t('bookOrganizer.newChapter')"></button>
+      <button type="button" @click="createChapterPrompt()" x-text="t('bookOrganizer.newChapter')"></button>
     </div>
   </template>
   </div><!-- /sidebarMode !== 'calendar' -->

@@ -21,41 +21,30 @@
 
   <div x-show="bookSettingsLoading" class="muted-msg" x-text="$app.t('common.loading')"></div>
 
-  <div x-show="!bookSettingsLoading">
+  <div x-show="!bookSettingsLoading"
+       x-data="tabs(['book','context','share','publication','sync','stats','danger'])"
+       x-modelable="value" x-model="bookSettingsTab">
 
-    <div class="tabs tabs--scrollable">
-      <button type="button" class="tabs-btn"
-              :class="{ 'tabs-btn--active': bookSettingsTab === 'book' }"
-              @click="bookSettingsTab = 'book'"
+    <!-- Tabs (DESIGN.md .tabs / Alpine.data('tabs')) -->
+    <div class="tabs tabs--scrollable" x-bind="tablist">
+      <button class="tabs-btn" x-bind="tabBtn('book')"
               x-text="$app.t('book.settings.tab.book')"></button>
-      <button type="button" class="tabs-btn"
-              :class="{ 'tabs-btn--active': bookSettingsTab === 'context' }"
-              @click="bookSettingsTab = 'context'"
+      <button class="tabs-btn" x-bind="tabBtn('context')"
               x-text="$app.t('book.settings.tab.context')"></button>
-      <button type="button" class="tabs-btn"
-              :class="{ 'tabs-btn--active': bookSettingsTab === 'share' }"
-              @click="bookSettingsTab = 'share'"
+      <button class="tabs-btn" x-bind="tabBtn('share')"
               x-text="$app.t('book.settings.tab.share')"></button>
-      <button type="button" class="tabs-btn"
-              :class="{ 'tabs-btn--active': bookSettingsTab === 'publication' }"
-              @click="bookSettingsTab = 'publication'"
+      <button class="tabs-btn" x-bind="tabBtn('publication')"
               x-text="$app.t('book.settings.tab.publication')"></button>
-      <button type="button" class="tabs-btn"
+      <button class="tabs-btn" x-bind="tabBtn('sync')"
               x-show="bookSettingsBuchtyp === 'blog'" x-cloak
-              :class="{ 'tabs-btn--active': bookSettingsTab === 'sync' }"
-              @click="bookSettingsTab = 'sync'"
               x-text="$app.t('book.settings.tab.sync')"></button>
-      <button type="button" class="tabs-btn"
-              :class="{ 'tabs-btn--active': bookSettingsTab === 'stats' }"
-              @click="bookSettingsTab = 'stats'"
+      <button class="tabs-btn" x-bind="tabBtn('stats')"
               x-text="$app.t('book.settings.tab.stats')"></button>
-      <button type="button" class="tabs-btn"
-              :class="{ 'tabs-btn--active': bookSettingsTab === 'danger' }"
-              @click="bookSettingsTab = 'danger'"
+      <button class="tabs-btn" x-bind="tabBtn('danger')"
               x-text="$app.t('book.settings.tab.danger')"></button>
     </div>
 
-    <div class="card-form-grid" x-show="bookSettingsTab === 'book'" x-cloak>
+    <div class="card-form-grid" x-bind="panel('book')" x-cloak>
 
     <section class="book-settings-section">
       <h3 class="book-settings-section-title" x-text="$app.t('book.settings.section.basics')"></h3>
@@ -136,7 +125,7 @@
 
     </div><!-- /tab: book -->
 
-    <div class="card-form-grid" x-show="bookSettingsTab === 'context'" x-cloak>
+    <div class="card-form-grid" x-bind="panel('context')" x-cloak>
 
     <section class="book-settings-section">
       <h3 class="book-settings-section-title" x-text="$app.t('book.settings.section.context')"></h3>
@@ -206,7 +195,7 @@
 
     </div><!-- /tab: context -->
 
-    <div class="card-form-grid" x-show="bookSettingsTab === 'danger'" x-cloak>
+    <div class="card-form-grid" x-bind="panel('danger')" x-cloak>
 
     <div class="book-settings-danger-zone">
       <div class="book-settings-danger-title">
@@ -252,7 +241,7 @@
 
     <!-- Publikation: buch-weite Metadaten (Cover, Titelei, Bio) — geteilt von
          PDF- und EPUB-Export. Plus EPUB-Export-Trigger. -->
-    <div class="card-form-grid" x-show="bookSettingsTab === 'publication'" x-cloak>
+    <div class="card-form-grid" x-bind="panel('publication')" x-cloak>
 
       <section class="book-settings-section">
         <h3 class="book-settings-section-title" x-text="$app.t('publication.section.images')"></h3>
@@ -269,10 +258,11 @@
               </template>
             </div>
             <div class="pub-image-actions">
-              <label class="pub-upload-btn">
-                <input type="file" accept="image/jpeg,image/png,image/webp" hidden @change="uploadPublicationCover($event)">
+              <div class="pub-upload-btn"
+                   x-data="fileDrop({ accept: 'image/jpeg,image/png,image/webp', drag: false })"
+                   @file-drop="uploadPublicationCover($event.detail.file)">
                 <span x-text="pubCoverUploading ? $app.t('publication.uploading') : (bookPublication.has_cover ? $app.t('publication.replace') : $app.t('publication.upload'))"></span>
-              </label>
+              </div>
               <button type="button" class="btn-compact" x-show="bookPublication.has_cover" @click="removePublicationCover()" x-text="$app.t('publication.remove')"></button>
             </div>
           </div>
@@ -291,10 +281,11 @@
               </template>
             </div>
             <div class="pub-image-actions">
-              <label class="pub-upload-btn">
-                <input type="file" accept="image/jpeg,image/png,image/webp" hidden @change="uploadPublicationAuthorImage($event)">
+              <div class="pub-upload-btn"
+                   x-data="fileDrop({ accept: 'image/jpeg,image/png,image/webp', drag: false })"
+                   @file-drop="uploadPublicationAuthorImage($event.detail.file)">
                 <span x-text="pubAuthorUploading ? $app.t('publication.uploading') : (bookPublication.has_author_image ? $app.t('publication.replace') : $app.t('publication.upload'))"></span>
-              </label>
+              </div>
               <button type="button" class="btn-compact" x-show="bookPublication.has_author_image" @click="removePublicationAuthorImage()" x-text="$app.t('publication.remove')"></button>
             </div>
           </div>
@@ -434,7 +425,7 @@
 
     </div><!-- /tab: publication -->
 
-    <div class="card-form-grid" x-show="bookSettingsTab === 'share'" x-cloak>
+    <div class="card-form-grid" x-bind="panel('share')" x-cloak>
 
     <!-- Sharing + Buch-Chat-Opt-In für Lektor. Sichtbar für alle
          Buch-Berechtigten (read-only für nicht-Owner). -->
@@ -528,18 +519,16 @@
 
     </div><!-- /tab: share -->
 
-    <div class="card-form-grid" x-show="bookSettingsTab === 'sync'" x-cloak>
+    <div class="card-form-grid" x-bind="panel('sync')" x-cloak>
 
-    <section class="book-settings-section" x-show="bookSettingsBuchtyp === 'blog'" x-cloak>
-      <button type="button"
-              class="collapsible-toggle"
-              @click="blogSectionOpen = !blogSectionOpen"
-              :aria-expanded="blogSectionOpen">
-        <span class="history-chevron" :class="{ open: blogSectionOpen }" aria-hidden="true">›</span>
+    <section class="book-settings-section" x-show="bookSettingsBuchtyp === 'blog'" x-cloak
+             x-data="collapsible()" x-modelable="open" x-model="blogSectionOpen">
+      <button type="button" class="collapsible-toggle" x-bind="trigger">
+        <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
         <span x-text="$app.t('blog.connect.title')"></span>
       </button>
 
-      <div x-show="blogSectionOpen" x-cloak>
+      <div x-bind="panel" x-cloak>
 
       <div class="card-form-row" x-show="blogConnection">
         <label class="card-form-label" x-text="$app.t('blog.status.title')"></label>
@@ -658,16 +647,14 @@
       </div>
     </section>
 
-    <section class="book-settings-section" x-show="bookSettingsBuchtyp === 'blog'" x-cloak>
-      <button type="button"
-              class="collapsible-toggle"
-              @click="hubspotSectionOpen = !hubspotSectionOpen"
-              :aria-expanded="hubspotSectionOpen">
-        <span class="history-chevron" :class="{ open: hubspotSectionOpen }" aria-hidden="true">›</span>
+    <section class="book-settings-section" x-show="bookSettingsBuchtyp === 'blog'" x-cloak
+             x-data="collapsible()" x-modelable="open" x-model="hubspotSectionOpen">
+      <button type="button" class="collapsible-toggle" x-bind="trigger">
+        <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
         <span x-text="$app.t('hubspot.connect.title')"></span>
       </button>
 
-      <div x-show="hubspotSectionOpen" x-cloak>
+      <div x-bind="panel" x-cloak>
 
       <div class="card-form-row" x-show="hubspotConnection">
         <label class="card-form-label" x-text="$app.t('hubspot.status.title')"></label>
@@ -772,7 +759,7 @@
 
     </div><!-- /tab: sync -->
 
-    <div class="card-form-grid" x-show="bookSettingsTab === 'stats'" x-cloak>
+    <div class="card-form-grid" x-bind="panel('stats')" x-cloak>
 
     <section class="book-settings-section">
       <h3 class="book-settings-section-title" x-text="$app.t('jobStats.title')"></h3>

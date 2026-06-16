@@ -214,16 +214,6 @@ export const adminSettingsMethods = {
     }
   },
 
-  async adminApiTokensCopyPlain() {
-    const t = this.adminApiTokensJustCreated?.plain_token;
-    if (!t) return;
-    try {
-      await navigator.clipboard.writeText(t);
-      this.adminApiTokensCopiedAt = Date.now();
-      setTimeout(() => { this.adminApiTokensCopiedAt = 0; }, 2000);
-    } catch (_) {}
-  },
-
   adminApiTokensDismissPlain() {
     this.adminApiTokensJustCreated = null;
   },

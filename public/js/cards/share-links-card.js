@@ -5,6 +5,7 @@
 
 import { setupCardLifecycle } from './card-lifecycle.js';
 import { fetchJson } from '../utils.js';
+import { copyText } from '../copy-button.js';
 
 export function registerShareLinksCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -186,7 +187,7 @@ export function registerShareLinksCard() {
         this.links = [j, ...this.links];
         this.createIntro = '';
         this.createExpiresAt = '';
-        this.copyToClipboard(this.linkUrl(j.token));
+        copyText(this.linkUrl(j.token));
         this.copiedToken = j.token;
         if (this._copiedTimer) clearTimeout(this._copiedTimer);
         this._copiedTimer = setTimeout(() => { this.copiedToken = null; }, 2500);
@@ -282,21 +283,8 @@ export function registerShareLinksCard() {
       }
     },
 
-    async copyToClipboard(text) {
-      try {
-        await navigator.clipboard.writeText(text);
-      } catch {
-        const ta = document.createElement('textarea');
-        ta.value = text;
-        document.body.appendChild(ta);
-        ta.select();
-        try { document.execCommand('copy'); } catch {}
-        document.body.removeChild(ta);
-      }
-    },
-
     async copyLink(token) {
-      await this.copyToClipboard(this.linkUrl(token));
+      await copyText(this.linkUrl(token));
       this.copiedToken = token;
       if (this._copiedTimer) clearTimeout(this._copiedTimer);
       this._copiedTimer = setTimeout(() => { this.copiedToken = null; }, 2500);

@@ -26,9 +26,6 @@ export function registerAdminSettingsCard() {
     adminApiTokensNewName: '',
     adminApiTokensNewExpiresAt: '',
     adminApiTokensJustCreated: null,
-    adminApiTokensCopiedAt: 0,
-    adminSnippetPrometheusOpen: false,
-    adminSnippetHomeAssistantOpen: false,
 
     _onViewReset: null,
 

@@ -38,6 +38,7 @@
   <link rel="stylesheet" href="css/components/job-toast.css">
   <link rel="stylesheet" href="css/components/user-chip.css">
   <link rel="stylesheet" href="css/components/feature-tiles.css">
+  <link rel="stylesheet" href="css/components/file-drop.css">
   <link rel="stylesheet" href="css/components/folder-import.css">
   <link rel="stylesheet" href="css/components/share-links.css">
   <link rel="stylesheet" href="css/components/tooltip.css">
@@ -132,6 +133,9 @@
   <link rel="modulepreload" href="js/features-usage.js">
   <link rel="modulepreload" href="js/user-settings.js">
   <link rel="modulepreload" href="js/num-input.js">
+  <link rel="modulepreload" href="js/tabs.js">
+  <link rel="modulepreload" href="js/copy-button.js">
+  <link rel="modulepreload" href="js/file-drop.js">
   <link rel="modulepreload" href="js/lazy-libs.js">
   <link rel="modulepreload" href="js/fullscreen.js">
   <link rel="modulepreload" href="js/graph.js">
@@ -263,7 +267,10 @@
   <!-- Alpine self-hosted statt CDN: spart externen Roundtrip beim First-Load,
        wird vom Service-Worker zusammen mit der Shell gecached und funktioniert
        offline (Zug-Szenario). Pin per Dateiname; bumpen + SHELL_CACHE erhöhen. -->
-  <script defer src="vendor/alpine-3.14.9.min.js"></script>
+  <!-- Anchor-Plugin (Floating UI) für Combobox-Positionierung — MUSS vor dem
+       Alpine-Core stehen, damit sein alpine:init-Listener vor Alpine.start läuft. -->
+  <script defer src="vendor/alpine-anchor-3.15.12.min.js"></script>
+  <script defer src="vendor/alpine-3.15.12.min.js"></script>
   <!-- Geteilter Tooltip-Layer für [data-tip]. -->
   <script defer src="js/tooltip.js"></script>
   <!-- Privacy-friendly analytics by Plausible (self-hosted). Nur auf Produktion (kein localhost/.local). -->

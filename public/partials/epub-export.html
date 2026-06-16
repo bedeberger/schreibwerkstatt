@@ -55,20 +55,20 @@
 
   <p class="card-form-hint" x-text="$app.t('epubExport.hint')"></p>
 
-  <!-- Tabs (DESIGN.md .tabs) -->
-  <div class="tabs tabs--scrollable epubx-tabs">
-    <template x-for="tab in ['typography','structure','metadata']" :key="tab">
-      <button type="button"
-              class="tabs-btn"
-              :class="{ 'tabs-btn--active': isTab(tab) }"
-              @click="setTab(tab)"
+  <!-- Tabs (DESIGN.md .tabs / Alpine.data('tabs')) -->
+  <div x-data="tabs(['typography','structure','metadata'])"
+       x-modelable="value" x-model="activeTab">
+  <div class="tabs tabs--scrollable epubx-tabs" x-bind="tablist">
+    <template x-for="tab in tabs" :key="tab">
+      <button class="tabs-btn"
+              x-bind="tabBtn(tab)"
               x-text="$app.t('epubExport.section.' + tab)"></button>
     </template>
   </div>
 
   <div class="epubx-body">
     <!-- Typografie -->
-    <section class="epubx-tab-panel" x-show="isTab('typography')">
+    <section class="epubx-tab-panel" x-bind="panel('typography')">
       <div class="card-form-row">
         <label class="card-form-label" x-text="$app.t('epubExport.cssStyle')"></label>
         <div x-data="combobox($app.t('epubExport.cssStyle'))"
@@ -138,7 +138,7 @@
     </section>
 
     <!-- Struktur -->
-    <section class="epubx-tab-panel" x-show="isTab('structure')">
+    <section class="epubx-tab-panel" x-bind="panel('structure')">
       <div class="card-form-row">
         <label class="card-form-label" x-text="$app.t('epubExport.field.titlepageMode')"></label>
         <div x-data="combobox($app.t('epubExport.field.titlepageMode'))"
@@ -257,7 +257,7 @@
     </section>
 
     <!-- Metadaten (OPF) -->
-    <section class="epubx-tab-panel" x-show="isTab('metadata')">
+    <section class="epubx-tab-panel" x-bind="panel('metadata')">
       <p class="card-form-field-note" x-text="$app.t('epubExport.metadataHint')"></p>
 
       <div class="card-form-row">
@@ -316,5 +316,6 @@
       <p class="card-form-field-note" x-text="exportStatus"></p>
     </div>
     <p class="card-form-error" x-show="exportError" x-text="exportError"></p>
+  </div>
   </div>
 </div>

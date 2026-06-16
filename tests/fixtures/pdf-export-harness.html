@@ -19,7 +19,7 @@
   <style>body { padding: 1rem; max-width: 1200px; margin: 0 auto; }</style>
 
   <!-- Alpine als globaler Script-Tag (gleich wie public/index.html) -->
-  <script src="/public/vendor/alpine-3.14.9.min.js" defer></script>
+  <script src="/public/vendor/alpine-3.15.12.min.js" defer></script>
 </head>
 <body>
 
@@ -66,6 +66,16 @@
     // Tests prüfen Zahlen-Propagation in die Config.
     const { registerNumInput } = await import('/public/js/num-input.js');
     registerNumInput();
+
+    // tabs ist eine echte Komponente — die Tab-Reihe nutzt x-data="tabs(...)".
+    const { registerTabs } = await import('/public/js/tabs.js');
+    registerTabs();
+
+    // collapsible (lange Sektionen) + fileDrop (Cover-Upload) — vom Partial genutzt.
+    const { registerCollapsible } = await import('/public/js/collapsible.js');
+    registerCollapsible();
+    const { registerFileDrop } = await import('/public/js/file-drop.js');
+    registerFileDrop();
 
     const { registerPdfExportCard } = await import('/public/js/cards/pdf-export-card.js');
     registerPdfExportCard();

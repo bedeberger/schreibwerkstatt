@@ -117,15 +117,12 @@
         navigiert in das jeweilige Sub-Kapitel (kapitelReviewChapterId-Switch).
       -->
       <template x-if="kapitelReviewSubchapterTree($app.kapitelReviewChapterId).length > 0">
-        <div class="kapitel-subchapters">
-          <button type="button"
-                  class="collapsible-toggle kapitel-subchapters-heading"
-                  @click="toggleSubSection()"
-                  :aria-expanded="_subSectionOpen">
-            <span class="history-chevron" :class="{ open: _subSectionOpen }">›</span>
+        <div class="kapitel-subchapters" x-data="collapsible(true)">
+          <button type="button" class="collapsible-toggle kapitel-subchapters-heading" x-bind="trigger">
+            <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
             <span x-text="$app.t('kapitelReview.subchaptersHeading', { n: kapitelReviewSubchapterTree($app.kapitelReviewChapterId).length })"></span>
           </button>
-          <div class="kapitel-subchapters-body" x-show="_subSectionOpen" x-cloak>
+          <div class="kapitel-subchapters-body" x-bind="panel" x-cloak>
             <template x-for="sub in kapitelReviewSubchapterTree($app.kapitelReviewChapterId)" :key="sub.id">
               <div class="kapitel-subchapter" :style="{ '--sub-depth': sub.depthOffset }">
                 <div class="kapitel-subchapter-header">

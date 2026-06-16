@@ -127,7 +127,11 @@ export const bookSettingsMethods = {
       const newBuchtyp = this.bookSettingsBuchtyp || null;
       const buchtypChanged = (currentBook?.buchtyp ?? null) !== newBuchtyp;
       if (newName !== (currentBook?.name || '') || buchtypChanged) {
-        await window.__app.loadBooks?.({ skipPages: true, fresh: true });
+        // Buchtyp-Wechsel MUSS den Pagetree neu laden (skipPages: false), weil
+        // nur loadPages den sidebarMode (Tagebuch → Kalender, sonst Tree) aus
+        // isTagebuch() ableitet. Reiner Rename bleibt metadaten-only (skipPages),
+        // damit der Pagetree nicht unnötig flackert.
+        await window.__app.loadBooks?.({ skipPages: !buchtypChanged, fresh: true });
       }
       // Header-Donut konsumiert dailyProgressIsFinished + dailyProgressDailyGoalChars
       // am Root — direkt spiegeln, damit Toggle Buch-Abschluss und neues Tagesziel
@@ -209,8 +213,7 @@ export const bookSettingsMethods = {
     this.bookPublication?.extra_sections?.splice(i, 1);
   },
 
-  async uploadPublicationCover(ev) {
-    const file = ev?.target?.files?.[0];
+  async uploadPublicationCover(file) {
     const bookId = window.__app.selectedBookId;
     if (!file || !bookId) return;
     this.pubCoverUploading = true; this.pubCoverError = '';
@@ -221,7 +224,6 @@ export const bookSettingsMethods = {
       await this.loadPublication();
     } finally {
       this.pubCoverUploading = false;
-      ev.target.value = '';
     }
   },
 
@@ -240,8 +242,7 @@ export const bookSettingsMethods = {
     return `/publication/${bookId}/cover?v=${this.pubPreviewVersion}`;
   },
 
-  async uploadPublicationAuthorImage(ev) {
-    const file = ev?.target?.files?.[0];
+  async uploadPublicationAuthorImage(file) {
     const bookId = window.__app.selectedBookId;
     if (!file || !bookId) return;
     this.pubAuthorUploading = true; this.pubAuthorError = '';
@@ -252,7 +253,6 @@ export const bookSettingsMethods = {
       await this.loadPublication();
     } finally {
       this.pubAuthorUploading = false;
-      ev.target.value = '';
     }
   },
 

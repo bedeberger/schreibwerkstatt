@@ -44,16 +44,13 @@
     </div>
 
     <!-- Legende (klappbar, Chevron-Stil wie Kontinuität) -->
-    <div class="figur-legend-wrap">
-      <button type="button"
-              class="collapsible-toggle"
-              @click="figurenLegendOpen = !figurenLegendOpen"
-              :aria-expanded="figurenLegendOpen">
-        <span class="history-chevron" :class="{ open: figurenLegendOpen }">›</span>
+    <div class="figur-legend-wrap" x-data="collapsible()">
+      <button type="button" class="collapsible-toggle" x-bind="trigger">
+        <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
         <span x-text="$app.t('figuren.legend.toggle')"></span>
       </button>
 
-      <template x-if="figurenLegendOpen && figurenGraphModus !== 'soziogramm'">
+      <template x-if="open && figurenGraphModus !== 'soziogramm'">
         <div class="figur-legend-body">
           <div class="figur-legend">
             <span class="figur-legend-entry"><span class="figur-legend-dot figur-legend-dot--hauptfigur"></span><span x-text="$app.t('figuren.type.hauptfigur')"></span></span>
@@ -75,7 +72,7 @@
         </div>
       </template>
 
-      <template x-if="figurenLegendOpen && figurenGraphModus === 'soziogramm'">
+      <template x-if="open && figurenGraphModus === 'soziogramm'">
         <div class="figur-legend-body">
           <div class="figur-legend figur-legend--soziogramm">
             <span class="figur-legend-entry"><span class="figur-legend-dot figur-legend-dot--wirtschaftselite"></span><span x-text="$app.t('figuren.schicht.wirtschaftselite')"></span></span>

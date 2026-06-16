@@ -16,7 +16,6 @@ export function registerFolderImportCard() {
     file: null,
     fileName: '',
     fileSize: 0,
-    dragOver: false,
     busy: false,
     errorMessage: '',
     jobId: null,
@@ -63,18 +62,6 @@ export function registerFolderImportCard() {
       this.jobTokOut = 0;
       this.jobTokPerSec = null;
       this.result = null;
-    },
-
-    onFilePick(e) {
-      const f = e.target.files?.[0];
-      if (f) this.setFile(f);
-    },
-
-    onDrop(e) {
-      e.preventDefault();
-      this.dragOver = false;
-      const f = e.dataTransfer?.files?.[0];
-      if (f) this.setFile(f);
     },
 
     setFile(f) {

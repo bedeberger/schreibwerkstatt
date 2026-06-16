@@ -15,7 +15,7 @@
   <link rel="stylesheet" href="/public/css/book/book-settings.css">
   <style>body { padding: 1rem; max-width: 1200px; margin: 0 auto; } [x-cloak] { display: none !important; }</style>
 
-  <script src="/public/vendor/alpine-3.14.9.min.js" defer></script>
+  <script src="/public/vendor/alpine-3.15.12.min.js" defer></script>
 </head>
 <body>
 
@@ -64,6 +64,15 @@
 
     const { registerRadioGroup } = await import('/public/js/radio-group.js');
     registerRadioGroup();
+
+    const { registerTabs } = await import('/public/js/tabs.js');
+    registerTabs();
+
+    // collapsible (lange Sektionen) + fileDrop (Cover-Upload) — vom Partial genutzt.
+    const { registerCollapsible } = await import('/public/js/collapsible.js');
+    registerCollapsible();
+    const { registerFileDrop } = await import('/public/js/file-drop.js');
+    registerFileDrop();
 
     const { registerBookSettingsCard } = await import('/public/js/cards/book-settings-card.js');
     registerBookSettingsCard();

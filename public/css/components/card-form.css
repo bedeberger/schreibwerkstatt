@@ -257,20 +257,15 @@ select:focus {
   opacity: var(--opacity-muted);
 }
 .combobox-chevron--open { transform: rotate(180deg); }
-/* `position: fixed` + JS-Geometrie (combobox.js#_positionDropdown) — entkommt
+/* Position kommt von x-anchor (Floating UI, `.fixed`-Strategie) — entkommt
    overflow-clippenden Vorfahren (horizontal scrollende Container wie das
-   Plot-Swimlane-Grid). top/left/bottom/width werden inline gesetzt. */
+   Plot-Swimlane-Grid) und flippt automatisch nach oben, wenn unten kein Platz
+   ist. left/top werden von x-anchor inline gesetzt, die Breite via ddWidth. */
 .combobox-dropdown {
   position: fixed;
   z-index: var(--z-header);
   background: var(--color-surface);
   border: 0.5px solid var(--color-border-focus);
-  border-top: none;
-  box-shadow: var(--shadow-md);
-}
-.combobox-dropdown--up {
-  border-top: 0.5px solid var(--color-border-focus);
-  border-bottom: none;
   box-shadow: var(--shadow-md);
 }
 .combobox-search {
@@ -378,21 +373,33 @@ select:focus {
    das Dropdown unabhängig von der Bildschirm-Tastatur sichtbar bleibt. Keine
    inline-Geometrie aus combobox.js (würde von Alpine-Re-Render überschrieben). */
 .combobox-dropdown--sheet {
-  left: 0;
-  right: 0;
-  bottom: 0;
-  top: auto;
-  width: auto;
+  /* x-anchor setzt inline left/top am selben Element — hier mit !important
+     ueberschreiben, damit das Bottom-Sheet full-bleed am Viewport-Rand klebt. */
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  top: auto !important;
+  width: auto !important;
+  z-index: calc(var(--z-overlay) + 1);
   border: 0.5px solid var(--color-border-focus);
   border-bottom: none;
-  border-top-left-radius: var(--radius-md);
-  border-top-right-radius: var(--radius-md);
+  border-top-left-radius: var(--radius-xl);
+  border-top-right-radius: var(--radius-xl);
   box-shadow: var(--shadow-lg);
-  max-height: 70vh;
+  max-height: 75vh;
   display: flex;
   flex-direction: column;
 }
 .combobox-dropdown--sheet .combobox-list { max-height: none; flex: 1 1 auto; }
+/* Backdrop hinter dem Bottom-Sheet: verdunkelt den Hintergrund, faengt
+   Outside-Taps zum Schliessen ab (zuverlaessiger als document-mousedown auf
+   Touch). Nur im Sheet-Modus sichtbar. Liegt eine Ebene unter dem Sheet. */
+.combobox-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  background: var(--color-overlay, rgba(0, 0, 0, 0.4));
+}
 
 /* Mobile: lange Labels (Kapitel-/Figur-/Ort-Namen) wrappen statt zu ellipsen,
    damit sie in der Sheet-Breite lesbar bleiben. */

@@ -657,6 +657,21 @@ export const treeMethods = {
     }
   },
 
+  // Sidebar-Empty-Book-CTA: fragt per appPrompt nach dem Namen und legt das
+  // Kapitel an. createChapter() selbst liest newChapterTitle (vom Kapitel-Review-
+  // Input gespeist) — ohne Input-Feld in der Sidebar wäre der Direktaufruf ein
+  // No-op, darum hier der Prompt-Pfad.
+  async createChapterPrompt() {
+    const name = await this.appPrompt?.({
+      message: this.t('bookOrganizer.promptChapterName'),
+      placeholder: this.t('bookOrganizer.placeholderChapterName'),
+      confirmLabel: this.t('bookOrganizer.create'),
+    });
+    if (!name) return null;
+    this.newChapterTitle = name;
+    return this.createChapter();
+  },
+
   async createChapter({ afterChapterId } = {}) {
     const bookId = this.selectedBookId;
     const title = (this.newChapterTitle || '').trim();

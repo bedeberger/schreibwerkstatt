@@ -61,7 +61,7 @@
               x-text="$app.t('admin.users.invite.mailerDisabledHint')"></span>
         <div class="admin-users-invite-url">
           <code x-text="adminUsersInviteResult?.url"></code>
-          <button type="button" @click="adminUsersCopyInviteUrl()" x-text="adminUsersCopied ? $app.t('common.copied') : $app.t('common.copy')"></button>
+          <button x-data="copyButton({ text: () => adminUsersInviteResult?.url })"></button>
         </div>
       </div>
     </fieldset>
@@ -228,8 +228,7 @@
                     x-text="$app.t('admin.users.invites.reminder.last', { count: inv.reminder_count, at: new Date(inv.last_reminder_at).toLocaleString(($app.uiLocale === 'en' ? 'en-US' : 'de-CH'), { timeZone: $app.appTimezone }) })"></span>
             </td>
             <td class="admin-users-actions">
-              <button type="button" @click="adminUsersInviteCopyUrl(inv)"
-                      x-text="adminUsersInvitesCopiedId === inv.id ? $app.t('common.copied') : $app.t('admin.users.invites.copyUrl')"></button>
+              <button x-data="copyButton({ text: () => inv.invite_url?.startsWith('http') ? inv.invite_url : location.origin + inv.invite_url, label: () => window.__app.t('admin.users.invites.copyUrl') })"></button>
               <button type="button" @click="adminUsersInviteRemind(inv)"
                       :disabled="inv.expired || adminUsersInvitesBusy === inv.id"
                       x-text="$app.t('admin.users.invites.remind')"></button>
@@ -276,9 +275,7 @@
             x-text="$app.t('admin.users.requests.mailerDisabledHint')"></span>
       <div class="admin-users-invite-url" x-show="adminUsersRequestsResult?.inviteUrl">
         <code x-text="adminUsersRequestsResult?.inviteUrl"></code>
-        <button type="button"
-                @click="adminUsersCopyRequestInviteUrl(adminUsersRequestsResult.id, adminUsersRequestsResult.inviteUrl)"
-                x-text="adminUsersRequestsCopiedId === adminUsersRequestsResult?.id ? $app.t('common.copied') : $app.t('common.copy')"></button>
+        <button x-data="copyButton({ text: () => adminUsersRequestsResult?.inviteUrl })"></button>
       </div>
     </div>
 

@@ -73,7 +73,6 @@ export function registerFigurenCard() {
     figurenGraphModus: 'figur',
     figurenGraphKapitel: null,
     figurenGraphFullscreen: false,
-    figurenLegendOpen: false,
     _figurenNetwork: null,
     _figurenHash: null,
     _figurenNodes: null,
