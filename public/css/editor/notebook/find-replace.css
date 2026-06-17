@@ -54,6 +54,9 @@
   font-variant-numeric: tabular-nums;
 }
 .edit-find-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex: 0 0 auto;
   background: transparent;
   color: var(--color-text);

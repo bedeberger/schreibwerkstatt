@@ -140,6 +140,9 @@
   font-weight: 700;
 }
 .job-queue-cancel-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: none;
   border: none;
   color: var(--color-muted);

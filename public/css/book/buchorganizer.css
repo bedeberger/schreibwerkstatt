@@ -139,6 +139,9 @@
 .organizer-page:hover { background: var(--color-hover); }
 
 .organizer-delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 0;
   background: transparent;
   color: var(--color-subtle);

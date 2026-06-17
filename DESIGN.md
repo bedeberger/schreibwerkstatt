@@ -17,6 +17,7 @@ Token-Referenz (Farben, Radien, Spacing, Schriftgrössen): [public/css/tokens.cs
 **Komponenten**
 - [Karten](#karten-card) — `.card` + Akzentfarben
 - [Buttons](#buttons) — Hierarchie, Counter
+- [Action-Icon-Library](#action-icon-library-verbindlich) — **verbindlich**: Vokabular für alle Aktions-Buttons (icon-only vs. Label), Guard-Test
 - [Icon-System](#icon-system-lucide-sprite) — `<svg class="icon"><use href="/icons.svg#name"/></svg>` (Lucide-Sprite)
 - [Icon-Button](#icon-button-icon-btn) — generischer Icon-only Button (`.icon-btn` outlined + `--ghost`), SSoT für Canvas-/Header-/Board-Cluster
 - [Toolbar-Action-Group](#toolbar-action-group-segmentierter-icon-cluster-neben-form-feldern) — segmentierte Icon-Reihe bündig mit Search/Combobox
@@ -382,6 +383,31 @@ mit `myCardOptions() { return this.cardData.map(...); }` am Karten-Scope.
 - `:disabled` — Opacity 0.4, cursor not-allowed
 
 **Counter in Button:** `<span class="btn-count">N</span>` rechts vom Label.
+
+---
+
+## Action-Icon-Library (verbindlich)
+
+**Use:** Das **verbindliche** Vokabular für Aktions-Buttons der ganzen App. Jedes neue Frontend-Feature nutzt es — keine parallelen Button-Erfindungen. Ziel: eine einheitliche, „echte App"-Frontend-Erfahrung. Gegated durch [tests/unit/button-icons.test.mjs](tests/unit/button-icons.test.mjs) (läuft in `npm run test:unit`).
+
+**Die Bausteine** (alle weiter unten im Detail dokumentiert):
+- [Icon-System](#icon-system-lucide-sprite) — Lucide-Sprite `<svg class="icon"><use href="/icons.svg#name"/></svg>`. **Einzige** Icon-Quelle.
+- [Icon-Button](#icon-button-icon-btn) — `.icon-btn` (outlined) / `.icon-btn--ghost` (transparent bis Hover) für Icon-only-Aktionen. `.icon-btn--success` (grüner Bestätigungs-Akzent).
+- [Icon-Button-Count-Badge](#icon-button-count-badge-icon-btn-badge) — Zähler oben rechts (`.icon-btn-badge`).
+- [Toolbar-Action-Group](#toolbar-action-group-segmentierter-icon-cluster-neben-form-feldern) — segmentierte Icon-Reihe.
+- [Context-Menu → Dropdown-Variante](#context-menu-rechtsklick-popover) — `⋯`-Overflow (`.context-menu--dropdown`) für sekundäre Aktionen, Einträge mit `.context-menu-item--icon`.
+- [Sofort-Tooltip](#sofort-tooltip-data-tip--default-variante) — `data-tip` (Pflicht bei Icon-only) + `aria-label`.
+
+**Regeln (verbindlich):**
+- **Icon-only** für: Toolbars, Header-Action-Cluster (`.card-actions`), Editoren, Close, Inline-Item-Aktionen (Löschen/Entfernen), Toasts. Pflicht: `data-tip` **und** `aria-label` (Label lebt im Tooltip).
+- **Icon + Label** behalten: primäre Formular-Aktionen im Footer/Settings (z.B. „Speichern"), prominente nav-Buttons mit Text (Revisions Vor/Zurück). Label = Klarheit + A11y. Konsistenz kommt hier aus dem [Button-System](#buttons), nicht aus Icon-only.
+- **Schliessen = immer `x`** (Sprite), nie `×`/`&#x2715;`/Text-„Schliessen". Siehe Icon-Liste unten.
+- **Destruktiv** (Löschen) = `trash`; **Entfernen/Chip/Dismiss** = `x`. Andere Semantik als Schliessen.
+- **Reaktive Icons** via `<use :href="…">`, nie `x-text` (killt das SVG).
+- **Verboten:** Unicode-Glyphen als Icon-Inhalt eines Buttons (`× ✕ ↑ ↓ ← → ⤢ ⛶ …`). Ausnahme nur als visuell versteckter Fallback in `.history-chevron`-SPANs (kein Button).
+- **Neue Aktion** → erst Icon-Map (Icon-System + Icon-Button) prüfen/erweitern, Sprite-Symbol in [public/icons.svg](public/icons.svg) ergänzen, `SHELL_CACHE` bumpen.
+
+**Guard-Test** ([tests/unit/button-icons.test.mjs](tests/unit/button-icons.test.mjs)) prüft über alle `public/partials/*.html` + `index.html`: (1) kein Button hat eine Unicode-Glyphe als Icon-Inhalt; (2) jeder `.icon-btn` enthält ein `<svg class="icon"><use…>`. Neuer „klassischer" Button → CI rot.
 
 ---
 

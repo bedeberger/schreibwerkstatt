@@ -120,7 +120,7 @@
                x-effect="options = chapterMoveOptions(0)"
                @combobox-change="movePageToChapter(page.id, $event.detail)"></div>
           <button type="button" class="organizer-delete-btn" @click="deletePage(page.id)" :disabled="organizerSaving"
-                  :data-tip="$app.t('bookOrganizer.deletePage')" :aria-label="$app.t('bookOrganizer.deletePage')">×</button>
+                  :data-tip="$app.t('bookOrganizer.deletePage')" :aria-label="$app.t('bookOrganizer.deletePage')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
         </li>
       </template>
       <li class="organizer-empty" x-show="filteredSoloPages().length === 0 && !organizerSearch" x-text="$app.t('bookOrganizer.noSoloPages')"></li>
@@ -171,7 +171,7 @@
             <button type="button" class="organizer-delete-btn organizer-delete-btn--chapter" @click="deleteChapter(ch.id)"
                     :disabled="organizerSaving || ch.pages.length > 0 || (ch.subchapters?.length || 0) > 0"
                     :data-tip="(ch.pages.length > 0 || (ch.subchapters?.length || 0) > 0) ? $app.t('bookOrganizer.deleteChapterNotEmptyHint') : $app.t('bookOrganizer.deleteChapter')"
-                    :aria-label="$app.t('bookOrganizer.deleteChapter')">×</button>
+                    :aria-label="$app.t('bookOrganizer.deleteChapter')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
           </div>
         </div>
         <template x-if="organizerSearch ? true : chapterOpen[ch.id]">
@@ -222,7 +222,7 @@
                    x-effect="options = chapterMoveOptions(ch.id)"
                    @combobox-change="movePageToChapter(page.id, $event.detail)"></div>
               <button type="button" class="organizer-delete-btn" @click="deletePage(page.id)" :disabled="organizerSaving"
-                      :data-tip="$app.t('bookOrganizer.deletePage')" :aria-label="$app.t('bookOrganizer.deletePage')">×</button>
+                      :data-tip="$app.t('bookOrganizer.deletePage')" :aria-label="$app.t('bookOrganizer.deletePage')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
             </li>
           </template>
           <li class="organizer-empty" x-show="ch.pages.length === 0 && !(ch.subchapters?.length)" x-text="$app.t('bookOrganizer.noPagesInChapter')"></li>
@@ -271,7 +271,7 @@
                   <button type="button" class="organizer-delete-btn organizer-delete-btn--chapter" @click="deleteChapter(sub.id)"
                           :disabled="organizerSaving || sub.pages.length > 0 || (sub.subchapters?.length || 0) > 0"
                           :data-tip="(sub.pages.length > 0 || (sub.subchapters?.length || 0) > 0) ? $app.t('bookOrganizer.deleteChapterNotEmptyHint') : $app.t('bookOrganizer.deleteChapter')"
-                          :aria-label="$app.t('bookOrganizer.deleteChapter')">×</button>
+                          :aria-label="$app.t('bookOrganizer.deleteChapter')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
                 </div>
               </div>
               <template x-if="organizerSearch ? true : chapterOpen[sub.id]">
@@ -322,7 +322,7 @@
                          x-effect="options = chapterMoveOptions(sub.id)"
                          @combobox-change="movePageToChapter(page.id, $event.detail)"></div>
                     <button type="button" class="organizer-delete-btn" @click="deletePage(page.id)" :disabled="organizerSaving"
-                            :data-tip="$app.t('bookOrganizer.deletePage')" :aria-label="$app.t('bookOrganizer.deletePage')">×</button>
+                            :data-tip="$app.t('bookOrganizer.deletePage')" :aria-label="$app.t('bookOrganizer.deletePage')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
                   </li>
                 </template>
                 <li class="organizer-empty" x-show="sub.pages.length === 0 && !(sub.subchapters?.length)" x-text="$app.t('bookOrganizer.noPagesInChapter')"></li>
@@ -361,7 +361,7 @@
                         <button type="button" class="organizer-delete-btn organizer-delete-btn--chapter" @click="deleteChapter(subsub.id)"
                                 :disabled="organizerSaving || subsub.pages.length > 0"
                                 :data-tip="subsub.pages.length > 0 ? $app.t('bookOrganizer.deleteChapterNotEmptyHint') : $app.t('bookOrganizer.deleteChapter')"
-                                :aria-label="$app.t('bookOrganizer.deleteChapter')">×</button>
+                                :aria-label="$app.t('bookOrganizer.deleteChapter')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
                       </div>
                     </div>
                     <template x-if="organizerSearch ? true : chapterOpen[subsub.id]">
@@ -412,7 +412,7 @@
                                x-effect="options = chapterMoveOptions(subsub.id)"
                                @combobox-change="movePageToChapter(page.id, $event.detail)"></div>
                           <button type="button" class="organizer-delete-btn" @click="deletePage(page.id)" :disabled="organizerSaving"
-                                  :data-tip="$app.t('bookOrganizer.deletePage')" :aria-label="$app.t('bookOrganizer.deletePage')">×</button>
+                                  :data-tip="$app.t('bookOrganizer.deletePage')" :aria-label="$app.t('bookOrganizer.deletePage')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
                         </li>
                       </template>
                       <li class="organizer-empty" x-show="subsub.pages.length === 0" x-text="$app.t('bookOrganizer.noPagesInChapter')"></li>
@@ -480,7 +480,7 @@
     <div class="blog-conflict-modal">
       <div class="blog-conflict-header">
         <span class="card-title" x-text="$app.t('blog.conflict.title')"></span>
-        <button type="button" class="organizer-delete-btn" @click="$blog.closeConflict()" aria-label="✕">×</button>
+        <button type="button" class="organizer-delete-btn" @click="$blog.closeConflict()" :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
       </div>
       <template x-if="!$blog.conflictData">
         <div class="muted-msg" x-text="$app.t('common.loading')"></div>

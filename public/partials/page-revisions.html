@@ -151,7 +151,7 @@
                     @click="gotoRev('prev')"
                     :disabled="!hasPrevRev()"
                     :data-tip="$app.t('editor.revisions.viewer.prevTitle')">
-              <span aria-hidden="true">←</span>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#arrow-left"/></svg>
               <span x-text="$app.t('editor.revisions.viewer.prev')"></span>
             </button>
             <button type="button"
@@ -160,7 +160,7 @@
                     :disabled="!hasNextRev()"
                     :data-tip="$app.t('editor.revisions.viewer.nextTitle')">
               <span x-text="$app.t('editor.revisions.viewer.next')"></span>
-              <span aria-hidden="true">→</span>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#arrow-right"/></svg>
             </button>
           </div>
           <div class="revision-viewer__foot-actions">

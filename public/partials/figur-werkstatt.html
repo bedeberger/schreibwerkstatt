@@ -313,7 +313,7 @@
               <button type="button" class="history-item-delete"
                       @click.stop="deleteRun(r.id, 'brainstorm')"
                       :data-tip="$app.t('common.deleteEntry')"
-                      :aria-label="$app.t('common.deleteEntry')">×</button>
+                      :aria-label="$app.t('common.deleteEntry')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
             </div>
             <div x-show="selectedRunId === r.id && brainstormResult" class="history-detail" x-cloak>
               <div class="chat-vorschlaege">
@@ -350,7 +350,7 @@
               <button type="button" class="history-item-delete"
                       @click.stop="deleteRun(r.id, 'consistency')"
                       :data-tip="$app.t('common.deleteEntry')"
-                      :aria-label="$app.t('common.deleteEntry')">×</button>
+                      :aria-label="$app.t('common.deleteEntry')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
             </div>
             <div x-show="selectedRunId === r.id && consistencyResult" class="history-detail" x-cloak>
               <p class="werkstatt-consistency-fazit" x-show="consistencyResult && consistencyResult.fazit" x-text="consistencyResult ? consistencyResult.fazit : ''"></p>

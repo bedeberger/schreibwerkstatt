@@ -15,8 +15,8 @@
       <div class="section-heading finding-header">
         <span x-text="$app.t('editor.findings.count', { n: $app.lektoratFindings.length })"></span>
         <div class="finding-toggle-group">
-          <button type="button" class="btn-compact" @click="$app.selectAllFindings(true)" x-text="$app.t('editor.findings.selectAll')"></button>
-          <button type="button" class="btn-compact" @click="$app.selectAllFindings(false)" x-text="$app.t('editor.findings.selectNone')"></button>
+          <button type="button" class="icon-btn icon-btn--ghost" @click="$app.selectAllFindings(true)" :data-tip="$app.t('editor.findings.selectAll')" :aria-label="$app.t('editor.findings.selectAll')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#check"/></svg></button>
+          <button type="button" class="icon-btn icon-btn--ghost" @click="$app.selectAllFindings(false)" :data-tip="$app.t('editor.findings.selectNone')" :aria-label="$app.t('editor.findings.selectNone')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
         </div>
       </div>
       <template x-for="(f, i) in $app.lektoratFindings" :key="i">

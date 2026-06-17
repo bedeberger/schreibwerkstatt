@@ -22,7 +22,7 @@
       class="btn-compact search-clear"
       x-show="q"
       @click="q=''; runSearch();"
-      :title="$app.t('search.clear')">×</button>
+      :title="$app.t('search.clear')" :aria-label="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
   </div>
 
   <div class="search-filters">

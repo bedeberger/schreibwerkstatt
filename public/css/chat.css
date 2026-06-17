@@ -361,6 +361,9 @@
   flex-shrink: 0;
 }
 .chat-session-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 0 4px;
   font-size: var(--font-size-base);
   flex-shrink: 0;
