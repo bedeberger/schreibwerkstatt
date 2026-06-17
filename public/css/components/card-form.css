@@ -825,11 +825,6 @@ select[aria-invalid="true"],
   .card-actions button { min-width: 80px; }
 }
 
-/* Variante: Actions permanent unter dem Titel, volle Breite (Sidebar-Card) */
-.card--stacked-actions > .card-header { flex-direction: column; align-items: stretch; }
-.card--stacked-actions > .card-header > .card-actions { width: 100%; margin-left: 0; }
-.card--stacked-actions > .card-header > .card-actions button { flex: 1 1 auto; min-width: 0; }
-
 /* === Close-Button in Card-Header === */
 .btn-card-close {
   background: none;
