@@ -40,19 +40,17 @@ export function comboboxData(cfg = {}) {
       _footer: (cfg.footer && typeof cfg.footer.action === 'function') ? cfg.footer : null,
       _onOutside: null,
       _rootEl: null,
-      sheetMode: false,
       // Nur noch die BREITE wird an den Trigger angeglichen (damit das Dropdown
       // wie ein <select> mindestens trigger-breit ist). POSITION + Flip +
       // Overflow-Escape + Reposition-bei-Scroll macht x-anchor (Floating UI).
       ddWidth: null,
       highlighted: -1,
 
-      // Mobile = schmaler Viewport ODER Touch-Geraet (keine Maus): dort rendert
-      // das Dropdown als Bottom-Sheet statt als am Trigger verankertes Popup.
-      // Touch-Erkennung ist Pflicht — sonst landen breitere Touch-Geraete
-      // (Tablet, grosses Phone im Querformat) im Desktop-Pfad, dessen Auto-Fokus
-      // die Bildschirm-Tastatur oeffnet und das Dropdown via resize sofort wieder
-      // schliesst ("geht auf und wieder zu").
+      // Mobile = schmaler Viewport ODER Touch-Geraet (keine Maus). Steuert nur
+      // den Auto-Fokus: auf Touch NICHT aufs Suchfeld fokussieren, sonst oeffnet
+      // die Bildschirm-Tastatur und ihr resize verschiebt das am Trigger
+      // verankerte Dropdown. Touch-Erkennung ist Pflicht — sonst landen breitere
+      // Touch-Geraete (Tablet, grosses Phone im Querformat) im Auto-Fokus-Pfad.
       _isMobile() {
         if (typeof window === 'undefined') return false;
         if (window.innerWidth <= 600) return true;
@@ -108,10 +106,6 @@ export function comboboxData(cfg = {}) {
         if (this.open) { this.close(); return; }
         this.open = true;
         this.query = '';
-        // Sheet-Modus reaktiv setzen → die `--sheet`-Klasse haengt am Alpine-
-        // `:class`-Binding (nicht imperativ), sonst wuerde ein Re-Render sie
-        // wieder entfernen.
-        this.sheetMode = this._isMobile();
         if (this._multiple) {
           const arr = Array.isArray(this.value) ? this.value : [];
           this.highlighted = arr.length
@@ -120,19 +114,15 @@ export function comboboxData(cfg = {}) {
         } else {
           this.highlighted = this._allOptions.findIndex(o => String(o.value) === String(this.value));
         }
-        // Breite an den Trigger angleichen (Desktop). Im Sheet-Modus kommt die
-        // Breite aus CSS (full-bleed), darum dort null.
-        if (!this.sheetMode) {
-          const trig = this._rootEl.querySelector('.combobox-trigger');
-          const w = trig ? Math.max(trig.offsetWidth, this._compact ? 180 : 0) : 0;
-          this.ddWidth = w ? w + 'px' : null;
-        } else {
-          this.ddWidth = null;
-        }
+        // Breite an den Trigger angleichen, damit das Dropdown wie ein <select>
+        // mindestens trigger-breit ist.
+        const trig = this._rootEl.querySelector('.combobox-trigger');
+        const w = trig ? Math.max(trig.offsetWidth, this._compact ? 180 : 0) : 0;
+        this.ddWidth = w ? w + 'px' : null;
         this.$nextTick(() => {
-          // Auf Mobile NICHT auto-fokussieren: der Fokus oeffnet die Bildschirm-
-          // Tastatur, deren resize das Sheet stoeren wuerde. Das Bottom-Sheet ist
-          // auch ohne Fokus voll bedienbar.
+          // Auf Mobile/Touch NICHT auto-fokussieren: der Fokus oeffnet die
+          // Bildschirm-Tastatur, deren resize das am Trigger verankerte Dropdown
+          // verschieben wuerde. Die Liste ist auch ohne Fokus voll bedienbar.
           if (!this._isMobile()) this.$refs.cbInput?.focus();
         });
       },
@@ -140,7 +130,6 @@ export function comboboxData(cfg = {}) {
         this.open = false;
         this.query = '';
         this.highlighted = -1;
-        this.sheetMode = false;
         this.ddWidth = null;
       },
       select(val) {
@@ -224,12 +213,11 @@ export function comboboxData(cfg = {}) {
           '  <span class="combobox-value" x-text="selectedLabel || placeholder"></span>',
           '  <svg class="combobox-chevron" :class="{\'combobox-chevron--open\': open}" width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M1.5 3.5L5 7L8.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
           '</button>',
-          '<div class="combobox-backdrop" x-show="open && sheetMode" x-cloak @click="close()" aria-hidden="true"></div>',
           // Position via x-anchor (Floating UI): `.fixed` entkommt overflow-
-          // clippenden Vorfahren (Plot-Swimlane-Grid), Flip passiert automatisch.
-          // Im Sheet-Modus ueberschreibt CSS (.--sheet, !important) die inline-
-          // Geometrie von x-anchor. Breite via ddWidth (nur Desktop).
-          '<div class="combobox-dropdown" :class="{\'combobox-dropdown--sheet\': sheetMode}" :style="ddWidth && !sheetMode ? { width: ddWidth } : {}" x-anchor:bottom-start.fixed="$refs.cbTrigger" x-show="open" x-cloak>',
+          // clippenden Vorfahren (Plot-Swimlane-Grid), Flip nach oben passiert
+          // automatisch, wenn unten kein Platz ist (auch auf Mobile). Breite via
+          // ddWidth (= Trigger-Breite).
+          '<div class="combobox-dropdown" :style="ddWidth ? { width: ddWidth } : {}" x-anchor:bottom-start.fixed="$refs.cbTrigger" x-show="open" x-cloak>',
           '  <input type="text" class="combobox-search" x-model="query" x-ref="cbInput"',
           '         :placeholder="$app.t(\'common.searchShort\')" role="searchbox" :aria-label="$app.t(\'common.searchShort\')">',
           '  <ul class="combobox-list" role="listbox"',

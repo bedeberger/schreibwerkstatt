@@ -35,8 +35,11 @@
   font-size: var(--font-size-sm);
 }
 
-/* Ghost-Variante: zentriert, transparent bis Hover. Rahmen erscheint erst
-   beim Hover/aktiven Zustand. */
+/* Ghost-Variante: zentriert, weiche Flächenfüllung im Ruhezustand (Chip-Optik
+   für Kontrast ohne Rahmen-Rauschen in dichten Clustern). Der Hintergrund ist
+   ein halbtransparenter Overlay über --color-text: dunkelt jede Unterlage
+   (Karte/Seite) gleichmäßig ab und adaptiert an Light/Dark. Rahmen erscheint
+   erst beim Hover/aktiven Zustand. */
 .icon-btn--ghost {
   display: inline-flex;
   align-items: center;
@@ -44,12 +47,13 @@
   width: 28px;
   height: 28px;
   padding: 0;
-  background: transparent;
+  background: var(--icon-ghost-fill);
   border-color: transparent;
+  color: var(--color-text);
   font-size: var(--font-size-base);
 }
 .icon-btn--ghost:hover:not(:disabled) {
-  background: var(--color-surface);
+  background: var(--icon-ghost-fill-hover);
   border-color: var(--color-border);
   color: var(--color-text);
 }
@@ -59,7 +63,7 @@
 }
 .icon-btn--ghost.is-active,
 .icon-btn--ghost[aria-pressed="true"] {
-  background: var(--color-surface);
+  background: var(--icon-ghost-fill-hover);
   border-color: var(--color-border);
   color: var(--color-text);
 }

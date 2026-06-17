@@ -103,13 +103,13 @@
   color: inherit;
 }
 
-/* Mobile: als Bottom-Sheet wie Avatar-/Komplett-Status-Menü. */
+/* Mobile: bleibt trigger-verankertes Popover (wie die Combobox), nicht als
+   Bottom-Sheet. min-width auf die verfügbare Breite begrenzen, damit das Menü
+   bei sehr schmalen Viewports nicht über den rechten Kartenrand hinausläuft —
+   right:0 hält es an der Triggerkante ausgerichtet. */
 @media (max-width: 600px) {
   .context-menu--dropdown {
-    position: fixed;
-    inset: auto 0 0 0;
     min-width: 0;
-    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-    box-shadow: var(--shadow-lg);
+    max-width: min(280px, calc(100vw - 2 * var(--space-md)));
   }
 }

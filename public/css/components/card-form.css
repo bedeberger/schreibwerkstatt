@@ -38,10 +38,15 @@
   margin-bottom: var(--space-lg);
   border-bottom: 1px solid var(--color-border);
   flex-wrap: wrap;
+  position: relative;
 }
 
 @media (max-width: 700px) {
-  .card-header { flex-direction: column; align-items: flex-start; }
+  .card-header { flex-direction: column; align-items: flex-start; padding-right: var(--space-xl); }
+  /* Column-Stack schiebt den Close-Button sonst nach unten-links; oben-rechts
+     verankern. Nur Direkt-Kind — `.btn-card-close` wird auch in Session-/
+     History-Zeilen wiederverwendet, die nicht im Header sitzen. */
+  .card-header > .btn-card-close { position: absolute; top: 0; right: 0; margin-left: 0; }
 }
 
 .card-title {
@@ -368,41 +373,8 @@ select:focus {
   border-color: var(--color-border-input);
 }
 
-/* Mobile-Bottom-Sheet: volle Geometrie rein aus CSS (Alpine-gebundene Klasse
-   via sheetMode) — am unteren Viewport-Rand verankert statt am Trigger, damit
-   das Dropdown unabhängig von der Bildschirm-Tastatur sichtbar bleibt. Keine
-   inline-Geometrie aus combobox.js (würde von Alpine-Re-Render überschrieben). */
-.combobox-dropdown--sheet {
-  /* x-anchor setzt inline left/top am selben Element — hier mit !important
-     ueberschreiben, damit das Bottom-Sheet full-bleed am Viewport-Rand klebt. */
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  top: auto !important;
-  width: auto !important;
-  z-index: calc(var(--z-overlay) + 1);
-  border: 0.5px solid var(--color-border-focus);
-  border-bottom: none;
-  border-top-left-radius: var(--radius-xl);
-  border-top-right-radius: var(--radius-xl);
-  box-shadow: var(--shadow-lg);
-  max-height: 75vh;
-  display: flex;
-  flex-direction: column;
-}
-.combobox-dropdown--sheet .combobox-list { max-height: none; flex: 1 1 auto; }
-/* Backdrop hinter dem Bottom-Sheet: verdunkelt den Hintergrund, faengt
-   Outside-Taps zum Schliessen ab (zuverlaessiger als document-mousedown auf
-   Touch). Nur im Sheet-Modus sichtbar. Liegt eine Ebene unter dem Sheet. */
-.combobox-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-overlay);
-  background: var(--color-overlay, rgba(0, 0, 0, 0.4));
-}
-
 /* Mobile: lange Labels (Kapitel-/Figur-/Ort-Namen) wrappen statt zu ellipsen,
-   damit sie in der Sheet-Breite lesbar bleiben. */
+   damit sie in der schmalen Dropdown-Breite lesbar bleiben. */
 @media (max-width: 600px) {
   .combobox-option,
   .combobox-option__label,
@@ -412,7 +384,7 @@ select:focus {
     overflow: visible;
     text-overflow: clip;
   }
-  /* iOS: font-size >= 16px verhindert Zoom-in beim Fokus der Sheet-Suche. */
+  /* iOS: font-size >= 16px verhindert Zoom-in beim Fokus der Suche. */
   .combobox-search,
   .combobox-wrap--compact .combobox-search { font-size: 16px; }
 }
@@ -797,7 +769,9 @@ select[aria-invalid="true"],
 }
 
 @media (max-width: 700px) {
-  .card-actions { width: 100%; }
+  /* Engere Gaps: auf Touch werden die Icon-Buttons auf ≥40px Tap-Target
+     gestreckt — mit kleinerem Gap packen sie pro Reihe dichter beieinander. */
+  .card-actions { width: 100%; gap: var(--space-xs); }
   .card-actions button { flex: 1 1 auto; min-width: 0; }
   /* Gruppierte Editor-Toolbar (Prüfen/Bearbeiten/Fokus/Chat/Ideen/Teilen):
      viele Buttons → natürliche Breite + kompakteres Padding/Schrift, damit sie
@@ -822,7 +796,12 @@ select[aria-invalid="true"],
 }
 
 @media (max-width: 480px) {
-  .card-actions button { min-width: 80px; }
+  /* Text-Buttons (Speichern/Abbrechen/Export) bekommen eine Mindestbreite,
+     damit sie tappbar bleiben. Icon-only Buttons sind davon ausgenommen — sie
+     behalten ihre kompakte Quadrat-Größe (Touch-Tap-Target ≥40px kommt aus
+     icon-btn.css @media pointer:coarse), sonst reissen 80px-Slots die Action-
+     Icons unnötig weit auseinander. */
+  .card-actions button:not(.icon-btn) { min-width: 80px; }
 }
 
 /* === Close-Button in Card-Header === */

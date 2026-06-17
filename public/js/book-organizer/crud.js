@@ -134,6 +134,11 @@ export const crudMethods = {
     const created = await contentRepo.createPage(body);
     if (!created?.id) return null;
     this._mirrorCreatedPage(created, chapterId);
+    // Kapitel aufklappen, damit die neue Seite sichtbar ist (frisch erstellte
+    // Kapitel sind im Organizer per Default zu). Vor _rerender setzen:
+    // _recomputeInitialOpenState behält bekannte Keys, danach bindet
+    // _initSortables die jetzt sichtbare Pages-UL.
+    if (chapterId) this.chapterOpen = { ...this.chapterOpen, [chapterId]: true };
     await this._rerender();
     return created;
   },

@@ -20,6 +20,10 @@
   --color-border-focus: rgba(0, 0, 0, 0.4);
   --color-hover: rgba(0, 0, 0, 0.05);
   --color-tag-bg: rgba(0, 0, 0, 0.06);
+  /* Ghost-Icon-Chip-Füllung. Light schwächer als Dark — ein dunkler Overlay
+     auf hellem Grund wirkt bei gleicher Deckung kräftiger als umgekehrt. */
+  --icon-ghost-fill: color-mix(in srgb, var(--color-text) 3.5%, transparent);
+  --icon-ghost-fill-hover: color-mix(in srgb, var(--color-text) 8%, transparent);
 
   /* === Status-Achse 1: operational (Banner, System, Validation) === */
   --color-ok-bg: #EAF3DE;
@@ -240,6 +244,8 @@
   --color-border-focus: rgba(255, 255, 255, 0.45);
   --color-hover: rgba(255, 255, 255, 0.06);
   --color-tag-bg: rgba(255, 255, 255, 0.08);
+  --icon-ghost-fill: color-mix(in srgb, var(--color-text) 6%, transparent);
+  --icon-ghost-fill-hover: color-mix(in srgb, var(--color-text) 12%, transparent);
 
   --color-ok-bg: rgba(99, 153, 34, 0.18);
   --color-ok-text: #a5d06b;

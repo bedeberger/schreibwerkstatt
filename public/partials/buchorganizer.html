@@ -70,7 +70,7 @@
     <div class="organizer-chapter-header">
       <span class="organizer-chapter-label" x-text="$app.t('bookOrganizer.soloHeader')"></span>
       <div class="organizer-chapter-actions">
-        <button type="button" class="btn-compact" @click="createPage(0)" :disabled="organizerSaving" x-text="$app.t('bookOrganizer.addPageHere')"></button>
+        <button type="button" class="icon-btn icon-btn--ghost" @click="createPage(0)" :disabled="organizerSaving" :data-tip="$app.t('bookOrganizer.addPageHere')" :aria-label="$app.t('bookOrganizer.addPageHere')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#file-plus"/></svg></button>
       </div>
     </div>
     <ul class="organizer-pages" data-organizer="page-list" :data-chapter-id="0">
@@ -155,11 +155,11 @@
           <span class="organizer-chapter-meta tag" x-show="ch.subchapters?.length"
                 x-text="$app.t('bookOrganizer.subchaptersCount', { n: ch.subchapters.length })"></span>
           <div class="organizer-chapter-actions">
-            <button type="button" class="btn-compact" @click="createPage(ch.id)" :disabled="organizerSaving" x-text="$app.t('bookOrganizer.addPageHere')"></button>
-            <button type="button" class="btn-compact" @click="createSubchapter(ch.id)"
+            <button type="button" class="icon-btn icon-btn--ghost" @click="createPage(ch.id)" :disabled="organizerSaving" :data-tip="$app.t('bookOrganizer.addPageHere')" :aria-label="$app.t('bookOrganizer.addPageHere')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#file-plus"/></svg></button>
+            <button type="button" class="icon-btn icon-btn--ghost" @click="createSubchapter(ch.id)"
                     :disabled="organizerSaving || ch.depth >= 3"
                     :data-tip="ch.depth >= 3 ? $app.t('bookOrganizer.maxDepthReached') : $app.t('bookOrganizer.addSubchapter')"
-                    x-text="$app.t('bookOrganizer.addSubchapter')"></button>
+                    :aria-label="$app.t('bookOrganizer.addSubchapter')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#folder-plus"/></svg></button>
             <button type="button" class="icon-btn icon-btn--ghost"
                     @click="promoteChapter(ch.id)" :disabled="organizerSaving || !canPromoteChapter(ch.id)"
                     :data-tip="$app.t('bookOrganizer.promote')"
@@ -255,11 +255,11 @@
                 <span class="organizer-chapter-meta tag" x-show="sub.subchapters?.length"
                       x-text="$app.t('bookOrganizer.subchaptersCount', { n: sub.subchapters.length })"></span>
                 <div class="organizer-chapter-actions">
-                  <button type="button" class="btn-compact" @click="createPage(sub.id)" :disabled="organizerSaving" x-text="$app.t('bookOrganizer.addPageHere')"></button>
-                  <button type="button" class="btn-compact" @click="createSubchapter(sub.id)"
+                  <button type="button" class="icon-btn icon-btn--ghost" @click="createPage(sub.id)" :disabled="organizerSaving" :data-tip="$app.t('bookOrganizer.addPageHere')" :aria-label="$app.t('bookOrganizer.addPageHere')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#file-plus"/></svg></button>
+                  <button type="button" class="icon-btn icon-btn--ghost" @click="createSubchapter(sub.id)"
                           :disabled="organizerSaving || sub.depth >= 3"
                           :data-tip="sub.depth >= 3 ? $app.t('bookOrganizer.maxDepthReached') : $app.t('bookOrganizer.addSubchapter')"
-                          x-text="$app.t('bookOrganizer.addSubchapter')"></button>
+                          :aria-label="$app.t('bookOrganizer.addSubchapter')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#folder-plus"/></svg></button>
                   <button type="button" class="icon-btn icon-btn--ghost"
                           @click="promoteChapter(sub.id)" :disabled="organizerSaving || !canPromoteChapter(sub.id)"
                           :data-tip="$app.t('bookOrganizer.promote')"
@@ -353,7 +353,7 @@
                              :aria-label="$app.t('bookOrganizer.renameChapter')">
                       <span class="organizer-chapter-meta tag" x-text="subsub.pages.length === 1 ? $app.t('sidebar.pagesCountOne') : $app.t('sidebar.pagesCount', { n: subsub.pages.length })"></span>
                       <div class="organizer-chapter-actions">
-                        <button type="button" class="btn-compact" @click="createPage(subsub.id)" :disabled="organizerSaving" x-text="$app.t('bookOrganizer.addPageHere')"></button>
+                        <button type="button" class="icon-btn icon-btn--ghost" @click="createPage(subsub.id)" :disabled="organizerSaving" :data-tip="$app.t('bookOrganizer.addPageHere')" :aria-label="$app.t('bookOrganizer.addPageHere')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#file-plus"/></svg></button>
                         <button type="button" class="icon-btn icon-btn--ghost"
                                 @click="promoteChapter(subsub.id)" :disabled="organizerSaving || !canPromoteChapter(subsub.id)"
                                 :data-tip="$app.t('bookOrganizer.promote')"
