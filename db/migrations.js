@@ -7737,6 +7737,29 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 194 abgeschlossen (pages.last_editor_device_id — geraete-bewusster Collab-Feed).');
   }
 
+  if (version < 195) {
+    // Mac-Client-Telemetrie auf device_tokens: client_version (vom Client per
+    // X-Client-Version-Header gemeldet, beim Token-Touch persistiert) + use_count
+    // (Gesamtzahl authentifizierter Device-Token-Requests, bei jedem Touch +1).
+    // Speist den Admin-Tab „Geräte" (installierte Client-Version + Nutzung pro
+    // Gerät, abgleichbar gegen das neueste GitHub-Release). Additiv: zwei Spalten
+    // ohne FK, kein Recreate nötig.
+    const dtCols195 = db.pragma('table_info(device_tokens)').map(c => c.name);
+    if (!dtCols195.includes('client_version')) {
+      db.exec('ALTER TABLE device_tokens ADD COLUMN client_version TEXT');
+    }
+    if (!dtCols195.includes('use_count')) {
+      db.exec('ALTER TABLE device_tokens ADD COLUMN use_count INTEGER NOT NULL DEFAULT 0');
+    }
+
+    const fkErrors195 = db.pragma('foreign_key_check');
+    if (fkErrors195.length) {
+      throw new Error(`Migration 195: foreign_key_check meldet ${fkErrors195.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 195').run();
+    logger.info('DB-Migration auf Version 195 abgeschlossen (device_tokens.client_version + use_count — Mac-Client-Telemetrie).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

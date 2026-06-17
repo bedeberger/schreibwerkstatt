@@ -223,6 +223,42 @@ test('computeTypewriterDelta: anchorRatio Default/ungültig → Mitte (0.5)', ()
   assert.equal(computeTypewriterDelta(cRect, tRect, 16, NaN), mitte);
 });
 
+test('computeTypewriterDelta: Dead-Zone → Caret im Band löst keinen Scroll aus', () => {
+  // Band = 30% von 1000 = 300px um die Mitte (500) → [200, 800].
+  const cRect = { top: 0, bottom: 1000, height: 1000 };
+  // Caret deutlich über der Mitte, aber innerhalb des Bands (Mitte = 350).
+  const inBand = { top: 330, bottom: 370, height: 40 };
+  assert.equal(computeTypewriterDelta(cRect, inBand, 16, 0.5, 0.3), 0);
+  // Genau an der oberen Bandkante (Mitte = 200) → noch im Band.
+  assert.equal(computeTypewriterDelta(cRect, { top: 180, bottom: 220, height: 40 }, 16, 0.5, 0.3), 0);
+});
+
+test('computeTypewriterDelta: Dead-Zone → ausserhalb des Bands nur bis zur Bandkante', () => {
+  const cRect = { top: 0, bottom: 1000, height: 1000 }; // Mitte 500, Band ±300
+  // Caret unter dem Band (Mitte = 900), rawDelta = 400 → scroll nur 400-300=100.
+  assert.equal(computeTypewriterDelta(cRect, { top: 880, bottom: 920, height: 40 }, 16, 0.5, 0.3), 100);
+  // Caret über dem Band (Mitte = 100), rawDelta = -400 → scroll nur -100.
+  assert.equal(computeTypewriterDelta(cRect, { top: 80, bottom: 120, height: 40 }, 16, 0.5, 0.3), -100);
+});
+
+test('computeTypewriterDelta: Dead-Zone → Bandkanten-Delta unter Schwelle bleibt 0', () => {
+  const cRect = { top: 0, bottom: 1000, height: 1000 }; // Band ±300
+  // Mitte = 810 → rawDelta 310, nach Band 10px < Schwelle 16 → 0.
+  assert.equal(computeTypewriterDelta(cRect, { top: 790, bottom: 830, height: 40 }, 16, 0.5, 0.3), 0);
+});
+
+test('computeTypewriterDelta: deadZoneRatio 0 → exakt altes Anker-Verhalten', () => {
+  const cRect = { top: 0, bottom: 1000, height: 1000 };
+  const tRect = { top: 800, bottom: 840, height: 40 };  // Mitte = 820
+  assert.equal(computeTypewriterDelta(cRect, tRect, 16, 0.5, 0), 820 - 500);
+});
+
+test('computeTypewriterDelta: deadZoneRatio auf <halbe Höhe gedeckelt', () => {
+  const cRect = { top: 0, bottom: 1000, height: 1000 };
+  // 0.9 wird auf 0.5 → Band 500. Caret-Mitte 950, rawDelta 450 < 500 → im Band → 0.
+  assert.equal(computeTypewriterDelta(cRect, { top: 930, bottom: 970, height: 40 }, 16, 0.5, 0.9), 0);
+});
+
 // --- getCaretRect -----------------------------------------------------------
 
 function mkSelection({

@@ -194,6 +194,7 @@ export const EXCLUSIVE_CARDS = [
   { key: 'adminLogs',      flag: 'showAdminLogsCard',      toggle: 'toggleAdminLogsCard',      onReclick: 'close', partial: 'admin-logs' },
   { key: 'adminParseFails',flag: 'showAdminParseFailsCard',toggle: 'toggleAdminParseFailsCard',onReclick: 'close', partial: 'admin-parse-fails' },
   { key: 'adminJsErrors',  flag: 'showAdminJsErrorsCard',  toggle: 'toggleAdminJsErrorsCard',  onReclick: 'close', partial: 'admin-js-errors' },
+  { key: 'adminDevices',   flag: 'showAdminDevicesCard',   toggle: 'toggleAdminDevicesCard',   onReclick: 'refresh', partial: 'admin-devices' },
   { key: 'finetuneExport', flag: 'showFinetuneExportCard', toggle: 'toggleFinetuneExportCard', onReclick: 'close', partial: 'finetune-export' },
   { key: 'export',         flag: 'showExportCard',         toggle: 'toggleExportCard',         onReclick: 'close', partial: 'export' },
   { key: 'pdfExport',      flag: 'showPdfExportCard',      toggle: 'togglePdfExportCard',      onReclick: 'close', partial: 'pdf-export' },

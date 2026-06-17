@@ -20,6 +20,15 @@ export const CURSOR_HIDE_MS = 2000;
 // Zeilenwechsel". 16 dient als Fallback, falls computed style nicht greifbar.
 export const TYPEWRITER_THRESHOLD_PX = 16;
 
+// Dead-Zone-Band um den Typewriter-Anker, als Anteil der Container-Höhe. Solange
+// der Caret innerhalb dieses Bands liegt, wird gar nicht recentert; erst beim
+// Verlassen zieht der Scroll nur bis zur Bandkante (nicht auf den exakten Anker).
+// Verhindert den Mini-Ruck, wenn beim ersten Tippen ein bereits sichtbarer Caret
+// unnötig auf die Mitte gezogen würde (z.B. kurze Seiten). Beim kontinuierlichen
+// Schreiben führt das Band den Caret an seiner unteren Kante mit — gleiche
+// Zeilen-für-Zeilen-Kadenz wie zuvor, nur knapp unterhalb der exakten Mitte.
+export const TYPEWRITER_DEADZONE_RATIO = 0.3;
+
 export const HAS_IO = typeof IntersectionObserver !== 'undefined';
 export const HAS_MO = typeof MutationObserver !== 'undefined';
 

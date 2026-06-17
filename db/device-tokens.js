@@ -48,9 +48,20 @@ function findActiveTokenByPlain(plain) {
   return row;
 }
 
-function touchTokenUsage(tokenId, ip) {
-  db.prepare(`UPDATE device_tokens SET last_used_at = ${NOW_ISO_SQL}, last_used_ip = ? WHERE id = ?`)
-    .run(String(ip || '').slice(0, 64), tokenId);
+// Bei jedem authentifizierten Device-Token-Request: last_used_at/-ip aktualisieren,
+// use_count +1 und — falls der Client eine Version meldet (X-Client-Version) —
+// client_version persistieren. COALESCE haelt den letzten bekannten Wert, wenn
+// ein Request mal ohne Versions-Header kommt.
+function touchTokenUsage(tokenId, ip, clientVersion = null) {
+  const ver = clientVersion ? String(clientVersion).trim().slice(0, 40) : null;
+  db.prepare(`
+    UPDATE device_tokens
+       SET last_used_at = ${NOW_ISO_SQL},
+           last_used_ip = ?,
+           use_count    = use_count + 1,
+           client_version = COALESCE(?, client_version)
+     WHERE id = ?
+  `).run(String(ip || '').slice(0, 64), ver, tokenId);
 }
 
 function getDeviceTokenById(id) {
@@ -59,12 +70,25 @@ function getDeviceTokenById(id) {
 
 function listDeviceTokens(userEmail) {
   return db.prepare(`
-    SELECT id, user_email, device_name, platform, scopes,
+    SELECT id, user_email, device_name, platform, scopes, client_version, use_count,
            last_used_at, last_used_ip, expires_at, revoked_at, created_at
     FROM device_tokens
     WHERE user_email = ?
     ORDER BY (revoked_at IS NULL) DESC, created_at DESC
   `).all(userEmail);
+}
+
+// Admin: alle Device-Tokens user-uebergreifend (fuer den Admin-Tab „Geraete").
+// JOIN auf app_users fuer den Anzeigenamen — Snapshot-frei (Wahrheit in app_users).
+function listAllDeviceTokens() {
+  return db.prepare(`
+    SELECT dt.id, dt.user_email, u.display_name AS user_display_name,
+           dt.device_name, dt.platform, dt.client_version, dt.use_count,
+           dt.last_used_at, dt.last_used_ip, dt.expires_at, dt.revoked_at, dt.created_at
+    FROM device_tokens dt
+    LEFT JOIN app_users u ON u.email = dt.user_email
+    ORDER BY (dt.revoked_at IS NULL) DESC, dt.last_used_at DESC NULLS LAST, dt.created_at DESC
+  `).all();
 }
 
 function revokeDeviceToken(id, userEmail) {
@@ -90,6 +114,7 @@ module.exports = {
   touchTokenUsage,
   getDeviceTokenById,
   listDeviceTokens,
+  listAllDeviceTokens,
   revokeDeviceToken,
   deleteDeviceToken,
 };

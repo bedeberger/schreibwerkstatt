@@ -8,7 +8,7 @@
 import { BLOCK_TAGS, BLOCK_SEL } from './constants.js';
 import { ensureTrailingParagraph } from '../shared/auto-slot.js';
 import { getActiveEditorContainer } from '../shared/active-editor.js';
-export { isEmptyParagraph } from '../shared/auto-slot.js';
+export { isEmptyParagraph, removeAutoAddedParagraph } from '../shared/auto-slot.js';
 
 // Beim Eintritt in den Fokusmodus: Caret an Buchende. Letzter Absatz schon
 // leer → wiederverwenden, sonst neuen `<p><br></p>` anhängen. Slot-DOM-Logik
@@ -19,7 +19,7 @@ export { isEmptyParagraph } from '../shared/auto-slot.js';
 // NICHT als dirty markieren – der neue Absatz ist nur ein „Schreib-Slot".
 // Bleibt er leer und der User schliesst Focus-Mode wieder, räumt
 // exitFocusMode den Slot via removeAutoAddedParagraph ab → keine
-// Phantom-Revision in BookStack.
+// Phantom-Revision im Content-Store.
 export function jumpToTrailingParagraph(container) {
   if (!container) return null;
   const added = ensureTrailingParagraph(container);

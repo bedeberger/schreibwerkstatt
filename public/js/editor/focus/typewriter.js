@@ -73,18 +73,34 @@ export function getCaretRect(container, selection) {
 // no-op. Schwelle ist grob eine Zeilenhöhe, damit Tippen innerhalb derselben
 // Textzeile (Caret-Rect-Jitter, subpixel-Shifts) keinen Mini-Scroll auslöst und
 // der Editor „ruhig" wirkt.
-export function computeTypewriterDelta(containerRect, targetRect, threshold = TYPEWRITER_THRESHOLD_PX, anchorRatio = 0.5) {
+//
+// `deadZoneRatio` (0 = aus [Default], sonst Anteil der Container-Höhe) spannt ein
+// Sichtband um den Anker: Liegt der Caret darin, wird gar nicht recentert
+// (Mini-Ruck beim ersten Tippen auf bereits sichtbarem Caret vermieden). Verlässt
+// er das Band, wird nur bis zur Bandkante gescrollt — nicht auf den exakten Anker.
+// Beim kontinuierlichen Schreiben sitzt der Caret so an der unteren Bandkante und
+// wird Zeile für Zeile wie bisher mitgeführt. deadZoneRatio = 0 reproduziert das
+// exakte alte Anker-Verhalten.
+export function computeTypewriterDelta(containerRect, targetRect, threshold = TYPEWRITER_THRESHOLD_PX, anchorRatio = 0.5, deadZoneRatio = 0) {
   if (!containerRect || !targetRect) return 0;
   const ratio = normAnchorRatio(anchorRatio);
   const targetCenter = targetRect.top + targetRect.height / 2;
   const containerAnchor = containerRect.top + containerRect.height * ratio;
-  const delta = targetCenter - containerAnchor;
+  const rawDelta = targetCenter - containerAnchor;
+  // Band auf < halbe Container-Höhe deckeln, damit es nie über den verfügbaren
+  // Raum hinaus wächst; <= 0 → Dead-Zone aus.
+  const band = deadZoneRatio > 0 ? containerRect.height * Math.min(deadZoneRatio, 0.5) : 0;
+  let delta = rawDelta;
+  if (band > 0) {
+    if (Math.abs(rawDelta) <= band) return 0;
+    delta = rawDelta - Math.sign(rawDelta) * band;
+  }
   return Math.abs(delta) < threshold ? 0 : delta;
 }
 
-export function typewriterScroll(container, targetRect, ctx, threshold = TYPEWRITER_THRESHOLD_PX, anchorRatio = 0.5) {
+export function typewriterScroll(container, targetRect, ctx, threshold = TYPEWRITER_THRESHOLD_PX, anchorRatio = 0.5, deadZoneRatio = 0) {
   if (!container || !targetRect) return 0;
-  const delta = computeTypewriterDelta(container.getBoundingClientRect(), targetRect, threshold, anchorRatio);
+  const delta = computeTypewriterDelta(container.getBoundingClientRect(), targetRect, threshold, anchorRatio, deadZoneRatio);
   if (delta === 0) return 0;
   // Programmatischen Scroll vorab im Counter ankündigen, damit onScroll uns
   // nicht für eine User-Interaktion hält und unnötig recentert.

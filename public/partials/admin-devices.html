@@ -1,0 +1,76 @@
+<!-- Admin: Geraete (native Mac-Focus-Clients) -->
+<!--
+  Alpine.data-Sub-Komponente — siehe public/js/cards/admin-devices-card.js.
+  `showAdminDevicesCard` + `toggleAdminDevicesCard` im Root. Nur sichtbar bei
+  $app.currentUser.role === 'admin'. Listet alle device_tokens mit gemeldeter
+  Client-Version (X-Client-Version), Nutzungszaehler und letzter Aktivitaet.
+  Read-only: Tokens ausstellen/widerrufen passiert beim User unter /me.
+-->
+<div class="card card--admin-devices" x-data="adminDevicesCard" x-show="$app.showAdminDevicesCard" x-cloak>
+  <div class="card-header">
+    <span class="card-title" x-text="$app.t('admin.devices.title')"></span>
+    <div class="card-actions">
+      <button type="button" @click="devicesRefresh()" :disabled="devicesLoading" x-text="$app.t('common.refresh')"></button>
+    </div>
+  </div>
+
+  <p class="muted-msg" x-text="$app.t('admin.devices.intro')"></p>
+  <p class="muted-msg muted-msg--sm" x-show="devicesLatestVersion">
+    <span x-text="$app.t('admin.devices.latestRelease')"></span>
+    <code x-text="devicesLatestVersion"></code>
+  </p>
+
+  <div x-show="devicesLoading" class="muted-msg" x-text="$app.t('common.loading')"></div>
+  <div x-show="devicesError" class="error-msg" x-text="devicesError"></div>
+
+  <div class="table-scroll" x-show="devicesList.length">
+    <table class="admin-pool-table"
+           x-data="sortableTable({
+             rows: () => devicesList,
+             defaultKey: 'last_used_at',
+             persistKey: 'admin.devices',
+             types: { use_count: 'number', last_used_at: 'date', created_at: 'date' },
+           })">
+      <thead>
+        <tr>
+          <th class="sortable-th" :class="sortClass('user_email')" :aria-sort="ariaSort('user_email')"
+              @click="sortBy('user_email')" x-text="$app.t('admin.devices.col.user')"></th>
+          <th class="sortable-th" :class="sortClass('device_name')" :aria-sort="ariaSort('device_name')"
+              @click="sortBy('device_name')" x-text="$app.t('admin.devices.col.device')"></th>
+          <th class="sortable-th" :class="sortClass('platform')" :aria-sort="ariaSort('platform')"
+              @click="sortBy('platform')" x-text="$app.t('admin.devices.col.platform')"></th>
+          <th class="sortable-th" :class="sortClass('client_version')" :aria-sort="ariaSort('client_version')"
+              @click="sortBy('client_version')" x-text="$app.t('admin.devices.col.version')"></th>
+          <th class="admin-pool-num sortable-th" :class="sortClass('use_count')" :aria-sort="ariaSort('use_count')"
+              @click="sortBy('use_count')" x-text="$app.t('admin.devices.col.uses')"></th>
+          <th class="sortable-th" :class="sortClass('last_used_at')" :aria-sort="ariaSort('last_used_at')"
+              @click="sortBy('last_used_at')" x-text="$app.t('admin.devices.col.lastUsed')"></th>
+          <th x-text="$app.t('admin.devices.col.lastIp')"></th>
+          <th x-text="$app.t('admin.devices.col.status')"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-for="d in sorted" :key="d.id">
+          <tr>
+            <td x-text="d.user_display_name ? (d.user_display_name + ' (' + d.user_email + ')') : d.user_email"></td>
+            <td x-text="d.device_name"></td>
+            <td x-text="d.platform || '—'"></td>
+            <td>
+              <code x-show="d.client_version" x-text="d.client_version"></code>
+              <span x-show="!d.client_version" class="muted-msg muted-msg--sm">—</span>
+              <span x-show="devicesIsOutdated(d)" class="badge badge-warn"
+                    :data-tip="$app.t('admin.devices.outdatedTip')"
+                    x-text="$app.t('admin.devices.outdated')"></span>
+            </td>
+            <td class="admin-pool-num" x-text="d.use_count ?? 0"></td>
+            <td x-text="devicesFmtTs(d.last_used_at)"></td>
+            <td><code class="muted-msg muted-msg--sm" x-text="d.last_used_ip || '—'"></code></td>
+            <td x-text="devicesStatus(d)"></td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </div>
+
+  <div x-show="!devicesList.length && !devicesLoading && !devicesError" class="muted-msg" x-text="$app.t('admin.devices.empty')"></div>
+</div>

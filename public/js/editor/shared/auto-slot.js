@@ -35,12 +35,10 @@ export function ensureTrailingParagraph(container) {
 
 // Entfernt einen zuvor via ensureTrailingParagraph erzeugten Slot wieder,
 // sofern er nach wie vor leer ist. Wurde der Slot zwischenzeitlich befüllt
-// (User hat in den Slot geschrieben), bleibt er stehen.
+// (User hat in den Slot geschrieben), bleibt er stehen. Leer-Prüfung über
+// `isEmptyParagraph` (inkl. nbsp-Strip) — eine Quelle, kein Drift.
 export function removeAutoAddedParagraph(added) {
-  if (!added) return;
-  if (!added.parentNode) return;
-  if (added.tagName !== 'P') return;
-  const txt = (added.textContent || '').replace(/ /g, ' ').trim();
-  if (txt !== '') return;
+  if (!added || !added.parentNode) return;
+  if (!isEmptyParagraph(added)) return;
   added.parentNode.removeChild(added);
 }

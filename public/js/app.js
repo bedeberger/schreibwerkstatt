@@ -48,6 +48,7 @@ import { registerAdminBooksCard } from './cards/admin-books-card.js';
 import { registerAdminLogsCard } from './cards/admin-logs-card.js';
 import { registerAdminParseFailsCard } from './cards/admin-parse-fails-card.js';
 import { registerAdminJsErrorsCard } from './cards/admin-js-errors-card.js';
+import { registerAdminDevicesCard } from './cards/admin-devices-card.js';
 import { registerFinetuneExportCard } from './cards/finetune-export-card.js';
 import { registerExportCard } from './cards/export-card.js';
 import { registerPdfExportCard } from './cards/pdf-export-card.js';
@@ -280,6 +281,7 @@ document.addEventListener('alpine:init', () => {
   registerAdminLogsCard();
   registerAdminParseFailsCard();
   registerAdminJsErrorsCard();
+  registerAdminDevicesCard();
   registerFinetuneExportCard();
   registerExportCard();
   registerPdfExportCard();

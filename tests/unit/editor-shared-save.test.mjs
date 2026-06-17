@@ -223,6 +223,14 @@ test('removeAutoAddedParagraph: befüllter Slot bleibt stehen', () => {
   assert.equal(div.children.length, 2);
 });
 
+test('removeAutoAddedParagraph: nbsp-only Slot gilt als leer → entfernt', () => {
+  const div = document.createElement('div');
+  const added = ensureTrailingParagraph(div);
+  added.textContent = ' ';
+  removeAutoAddedParagraph(added);
+  assert.equal(div.children.length, 0);
+});
+
 test('removeAutoAddedParagraph: null/undefined → kein Throw', () => {
   removeAutoAddedParagraph(null);
   removeAutoAddedParagraph(undefined);
