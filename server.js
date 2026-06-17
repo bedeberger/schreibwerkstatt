@@ -12,7 +12,8 @@ const { runWithContext, setContext } = require('./lib/log-context');
 // DB-Setup + Migrationen laufen beim Import
 const { db, cleanupStuckJobRuns, pruneStaleByAge } = require('./db/schema');
 const appUsers = require('./db/app-users');
-const { tryDeviceAuth } = require('./lib/device-auth');
+const { tryDeviceAuth, extractBearer } = require('./lib/device-auth');
+const deviceTokens = require('./db/device-tokens');
 const bookAccess = require('./db/book-access');
 const { ensureAdminFromEnv, touchUserLastSeen, addUserActivity } = appUsers;
 const appSettings = require('./lib/app-settings');
@@ -343,12 +344,22 @@ app.use('/metrics', require('./routes/metrics'));
 const API_PREFIXES = ['/history/', '/figures/', '/locations/', '/world-facts/', '/songs/', '/jobs/', '/sync/', '/chat/', '/booksettings/', '/publication/', '/content/', '/stt/', '/books/', '/me/', '/admin/', '/local/', '/config', '/share/api/'];
 
 app.use((req, res, next) => {
-  if (req.session?.user) return next();
   // Device-Token (native Clients, z.B. Mac-Focus-Writer): Bearer swd_… loest auf
   // den echten User + dessen echte Rolle auf und respektiert das Status-Gate.
   // req.session.user wird gesetzt, sodass downstream (ACL, Logging, Activity)
   // den Request wie eine normale Session behandelt. Bei ungueltigem/fehlendem
   // Token faellt der Guard auf seinen normalen 401/Redirect-Pfad zurueck.
+  //
+  // Traegt der Request ein swd_-Bearer-Token, hat die Device-Auth IMMER Vorrang —
+  // auch wenn schon ein Session-Cookie existiert. express-session setzt beim
+  // ersten Touch ein Cookie, das der native Client mitsendet; ohne diesen Vorrang
+  // wuerde der Session-Pfad die Device-Auth danach 7 Tage kurzschliessen
+  // (touchTokenUsage-Telemetrie eingefroren, widerrufene Tokens blieben gueltig).
+  // Bei ungueltigem/widerrufenem Token wird ein altes Cookie bewusst ignoriert,
+  // damit der Recheck nicht ausgehebelt wird.
+  const bearer = extractBearer(req);
+  const isDeviceBearer = !!bearer && bearer.startsWith(deviceTokens.TOKEN_PREFIX);
+  if (req.session?.user && !isDeviceBearer) return next();
   const deviceUser = tryDeviceAuth(req);
   if (deviceUser) {
     req.session.user = deviceUser;
@@ -357,6 +368,14 @@ app.use((req, res, next) => {
     // im Log-Tag dem User zugeordnet sind, nicht anonym laufen.
     setContext({ user: deviceUser.email });
     return next();
+  }
+  if (isDeviceBearer) {
+    // swd_-Token vorhanden, aber ungueltig/widerrufen/abgelaufen → 401/Redirect
+    // (unten), ohne auf eine evtl. bestehende Session zurueckzufallen.
+    if (API_PREFIXES.some(p => req.path.startsWith(p))) {
+      return res.status(401).json({ error_code: 'NOT_LOGGED_IN' });
+    }
+    return res.redirect(`/login?returnTo=${encodeURIComponent(req.originalUrl)}`);
   }
   // Dev-Logout-Marker (gesetzt durch /auth/logout): Auto-Dev-Session unterbinden,
   // damit der User Logout/Login-Flow wie in Prod testen kann. /auth/login raeumt
