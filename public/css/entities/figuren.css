@@ -111,13 +111,13 @@
 
 /* === Figuren: Kerninfo (Rolle/Motivation/Konflikt/Entwicklung) === */
 .figur-kerninfo {
-  margin-bottom: var(--space-10);
-  padding: var(--space-sm) 10px;
-  background: var(--color-surface-alt, var(--color-surface));
-  border-left: 2px solid var(--color-border);
+  margin-bottom: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background: color-mix(in srgb, var(--card-accent) 6%, var(--color-surface));
+  border-left: 2px solid color-mix(in srgb, var(--card-accent) 55%, var(--color-border));
   border-radius: var(--radius-sm);
 }
-.figur-kerninfo-row { font-size: var(--font-size-sm); line-height: 1.5; margin-bottom: var(--space-2xs); }
+.figur-kerninfo-row { font-size: var(--font-size-sm); line-height: 1.55; margin-bottom: var(--space-xs); }
 .figur-kerninfo-row:last-child { margin-bottom: 0; }
 
 /* === Figuren: Entwicklungsbogen === */
@@ -132,14 +132,40 @@
 .figur-arc-stations li { margin-bottom: var(--space-2xs); }
 .figur-arc-stations li:last-child { margin-bottom: 0; }
 
-/* === Figuren: Schlüsselzitate === */
-.figur-zitate-list { margin-bottom: var(--space-10); }
-.figur-zitat {
-  font-style: italic;
-  color: var(--color-muted);
-  font-size: var(--font-size-sm);
-  line-height: 1.5;
+/* === Figuren: Detail-Sektionstitel mit zartem Akzent-Tick (an Karten-Identität gekoppelt) === */
+.figur-detail .bewertung-section-title:not(.bewertung-section-title--inline) {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-top: var(--space-xl);
+  margin-bottom: var(--space-sm);
 }
+.figur-detail .bewertung-section-title:not(.bewertung-section-title--inline)::before {
+  content: "";
+  width: 2px;
+  height: 0.72em;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--card-accent) 32%, var(--color-border));
+}
+
+/* === Figuren: Schlüsselzitate === */
+.figur-zitate-list {
+  margin-bottom: var(--space-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.figur-zitate-list .figur-zitat {
+  font-style: italic;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  line-height: 1.55;
+  padding: var(--space-2xs) 0 var(--space-2xs) var(--space-md);
+  border-left: 2px solid color-mix(in srgb, var(--card-accent) 35%, var(--color-border));
+}
+/* Akzent-Bar ersetzt den Bullet-Strich aus .bullet-list */
+.figur-zitate-list .figur-zitat::before { content: none; }
 
 /* === Figuren: Beziehungs-Belege === */
 .figur-bz-belege {
@@ -248,28 +274,30 @@
 }
 
 .figur-beschreibung {
-  font-size: var(--font-size-sm);
-  line-height: 1.6;
-  margin-bottom: var(--space-sm);
+  font-size: var(--font-size-base);
+  line-height: 1.65;
+  color: var(--color-text);
+  margin-bottom: var(--space-lg);
 }
 
-.figur-detail-row { margin-bottom: var(--space-sm); }
+.figur-detail-row { font-size: var(--font-size-sm); line-height: 1.55; margin-bottom: var(--space-md); }
 
 .bewertung-section-title--inline { display: inline; }
 
 .figur-detail-value { font-size: var(--font-size-sm); }
 
-.figur-eigenschaften-list { margin-bottom: var(--space-10); }
+.figur-eigenschaften-list { margin-bottom: var(--space-sm); }
+.figur-detail .figur-eigenschaften-list li { padding-top: var(--space-6); padding-bottom: var(--space-6); }
 
 .figur-tags-row {
   font-size: var(--font-size-sm);
-  margin-bottom: var(--space-10);
+  margin-bottom: var(--space-sm);
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-xs);
+  gap: var(--space-sm);
 }
 
-.figur-bz-list { margin-bottom: var(--space-10); }
+.figur-bz-list { margin-bottom: var(--space-sm); }
 
 .figur-bz-name {
   font-size: var(--font-size-sm);

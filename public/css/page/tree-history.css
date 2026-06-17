@@ -199,7 +199,7 @@
   border: 0.5px solid var(--color-border);
   border-top: none;
   border-radius: 0;
-  padding: var(--space-md) 14px 14px;
+  padding: var(--space-lg) var(--space-lg) var(--space-lg);
   margin-bottom: var(--space-6);
   background: var(--color-bg);
 }
