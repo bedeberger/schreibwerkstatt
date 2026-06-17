@@ -9,9 +9,10 @@
       <span class="card-title" x-text="$app.t('overview.title')"></span>
     </div>
     <div class="card-actions">
-      <button type="button" @click="loadBookOverview($app.selectedBookId)" :disabled="overviewLoading">
+      <button type="button" class="icon-btn icon-btn--ghost" @click="loadBookOverview($app.selectedBookId)" :disabled="overviewLoading"
+              :data-tip="$app.t('overview.refresh')" :aria-label="$app.t('overview.refresh')">
         <span x-show="overviewLoading" class="spinner"></span>
-        <span x-text="$app.t('overview.refresh')"></span>
+        <svg x-show="!overviewLoading" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#rotate-cw"/></svg>
       </button>
     </div>
   </div>

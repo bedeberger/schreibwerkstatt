@@ -75,6 +75,9 @@
 }
 .edit-find-btn--text { padding: var(--space-3) 10px; }
 .edit-find-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex: 0 0 auto;
   background: transparent;
   color: var(--color-muted);

@@ -203,6 +203,9 @@
   font-weight: 500;
 }
 .heatmap-detail-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: var(--space-2xs) 8px;
   font-size: var(--font-size-sm);
   background: transparent;

@@ -92,7 +92,7 @@
                   class="revision-viewer__close"
                   @click="closeViewer()"
                   :data-tip="$app.t('editor.revisions.viewer.close')"
-                  aria-label="Close">×</button>
+                  :aria-label="$app.t('editor.revisions.viewer.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
         </header>
 
         <nav class="revision-viewer__tabs" role="tablist">

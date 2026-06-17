@@ -26,6 +26,9 @@
   color: var(--color-text);
 }
 .figur-lookup-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   border: none;
   cursor: pointer;

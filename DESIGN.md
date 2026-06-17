@@ -417,6 +417,7 @@ Niemals `x-text` für Icon-Buttons mit zwei Zuständen — `x-text` setzt `textC
 - Editor: `separator-horizontal` (Trennlinie), `move-horizontal` (Fit-Width)
 - Seiten-Actions: `spell-check` (Lektorat/Prüfen), `pencil` (Bearbeiten), `maximize` (Fokus-Editor), `message-square` (Seiten-Chat), `lightbulb` (Ideen), `share-2` (Seite teilen)
 - Sidebar / Navigation: `rotate-cw` (Seiten neu laden), `list-tree` (Buch organisieren), `download` (Export), `book-open` (Seite öffnen)
+- **Schliessen: immer `x`** (Lucide) — alle Karten-/Panel-/Overlay-Close-Buttons rendern das `x`-Sprite-Icon, nie ein `×`/`&#x2715;`-Glyph oder ein Text-„Schliessen". Die jeweilige Close-Klasse (`.btn-card-close`, `.edit-find-close`, `.figur-lookup-close`, `.synonym-picker-close`, `.entity-popover-close`, `.heatmap-detail-close`, `.revision-viewer__close`, `.shortcuts-close`) zentriert das Icon via `inline-flex`. Destruktives Entfernen (Chips, Session/Seite/Kapitel löschen) ist **kein** Schliessen — eigene Semantik.
 
 Neuer Bedarf → Lucide-SVG von [lucide.dev](https://lucide.dev) als `<symbol>` in `public/icons.svg` ergänzen + `SHELL_CACHE` in `public/sw.js` bumpen.
 

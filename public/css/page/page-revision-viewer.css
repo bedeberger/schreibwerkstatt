@@ -58,6 +58,9 @@
   color: var(--color-muted);
 }
 .revision-viewer__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: var(--font-size-xl);
   line-height: 1;
   background: transparent;

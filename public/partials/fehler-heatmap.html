@@ -108,7 +108,7 @@
                   })"></span>
             <button type="button" class="heatmap-detail-close"
                     @click="activeFehlerDetailKey = null"
-                    x-text="$app.t('common.close')"></button>
+                    :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
           </div>
           <div class="heatmap-detail-list">
             <template x-for="page in fehlerHeatmapActiveDetail().pages" :key="page.page_id">
