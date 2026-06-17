@@ -16,7 +16,7 @@
         <svg class="icon" aria-hidden="true"><use href="/icons.svg#radio"></use></svg>
         <span x-text="$app.t('admin.logs.liveTail')"></span>
       </button>
-      <button type="button" @click="adminLogsClearAndLive()" :disabled="adminLogsLoading" x-text="$app.t('common.refresh')"></button>
+      <button type="button" class="icon-btn icon-btn--ghost" @click="adminLogsClearAndLive()" :disabled="adminLogsLoading" :data-tip="$app.t('common.refresh')" :aria-label="$app.t('common.refresh')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#rotate-cw"/></svg></button>
     </div>
   </div>
 

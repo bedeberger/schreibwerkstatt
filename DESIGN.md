@@ -407,7 +407,7 @@ mit `myCardOptions() { return this.cardData.map(...); }` am Karten-Scope.
 - **Verboten:** Unicode-Glyphen als Icon-Inhalt eines Buttons (`× ✕ ↑ ↓ ← → ⤢ ⛶ …`). Ausnahme nur als visuell versteckter Fallback in `.history-chevron`-SPANs (kein Button).
 - **Neue Aktion** → erst Icon-Map (Icon-System + Icon-Button) prüfen/erweitern, Sprite-Symbol in [public/icons.svg](public/icons.svg) ergänzen, `SHELL_CACHE` bumpen.
 
-**Guard-Test** ([tests/unit/button-icons.test.mjs](tests/unit/button-icons.test.mjs)) prüft über alle `public/partials/*.html` + `index.html`: (1) kein Button hat eine Unicode-Glyphe als Icon-Inhalt; (2) jeder `.icon-btn` enthält ein `<svg class="icon"><use…>`. Neuer „klassischer" Button → CI rot.
+**Guard-Test** ([tests/unit/button-icons.test.mjs](tests/unit/button-icons.test.mjs)) prüft über alle `public/partials/*.html` + `index.html`: (1) kein Button hat eine Unicode-Glyphe als Icon-Inhalt; (2) jeder `.icon-btn` enthält ein `<svg class="icon"><use…>`; (3) jeder Button in einer `.card-actions`-Leiste ist ein Icon-Button **oder** trägt `data-label-ok` (= bewusst beschriftete primäre Aktion wie Speichern/Export/Abbrechen). `.tabs-btn` (Modus-Toggle) und `admin-*`-Partials (internes Tooling, label-lastige Konvention) sind von (3) ausgenommen. Neuer „klassischer" Button → CI rot.
 
 ---
 

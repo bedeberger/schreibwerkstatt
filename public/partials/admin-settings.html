@@ -9,7 +9,7 @@
   <div class="card-header">
     <span class="card-title" x-text="$app.t('admin.settings.title')"></span>
     <div class="card-actions">
-      <button type="button" @click="adminSettingsLoad()" :disabled="adminSettingsLoading || adminSettingsSaving" x-text="$app.t('common.refresh')"></button>
+      <button type="button" class="icon-btn icon-btn--ghost" @click="adminSettingsLoad()" :disabled="adminSettingsLoading || adminSettingsSaving" :data-tip="$app.t('common.refresh')" :aria-label="$app.t('common.refresh')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#rotate-cw"/></svg></button>
       <button type="button" @click="adminSettingsSave()" :disabled="adminSettingsLoading || adminSettingsSaving">
         <span x-show="adminSettingsSaving" class="spinner"></span>
         <span x-text="adminSettingsSaving ? $app.t('common.saving') : $app.t('common.save')"></span>
@@ -525,9 +525,9 @@
       <div class="admin-settings-subsection">
         <h4 class="admin-settings-subheading">
           <span x-text="$app.t('admin.settings.api.listTitle')"></span>
-          <button type="button" class="admin-settings-refresh-inline"
+          <button type="button" class="admin-settings-refresh-inline icon-btn icon-btn--ghost"
                   @click="adminApiTokensLoad()" :disabled="adminApiTokensLoading"
-                  x-text="$app.t('common.refresh')"></button>
+                  :data-tip="$app.t('common.refresh')" :aria-label="$app.t('common.refresh')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#rotate-cw"/></svg></button>
         </h4>
         <div x-show="adminApiTokensError" class="error-msg" x-text="adminApiTokensError"></div>
         <div x-show="adminApiTokensLoading" class="muted-msg" x-text="$app.t('common.loading')"></div>

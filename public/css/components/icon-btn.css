@@ -101,4 +101,27 @@
   line-height: 1;
   pointer-events: none;
 }
+
+/* Touch: auf coarse Pointern (Finger) vergrößerte Tap-Targets (≥40px). Nötig,
+   weil `data-tip`-Tooltips hover-basiert sind (auf Touch unsichtbar) und 28px
+   unter der empfohlenen Mindest-Tap-Größe liegen. Greift für alle Icon-only-
+   Buttons der App — Sprite-Icon zentriert sich via inline-flex. */
+@media (pointer: coarse) {
+  .icon-btn,
+  .btn-card-close,
+  .job-toast-close,
+  .organizer-delete-btn,
+  .chat-session-delete,
+  .history-item-delete,
+  .edit-find-close,
+  .figur-lookup-close,
+  .synonym-picker-close,
+  .entity-popover-close,
+  .heatmap-detail-close,
+  .search-clear,
+  .job-queue-cancel-btn {
+    min-width: 40px;
+    min-height: 40px;
+  }
+}
 }

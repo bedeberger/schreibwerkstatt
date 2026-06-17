@@ -14,6 +14,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { parseHTML } from 'linkedom';
 
 const PARTIALS_DIR = fileURLToPath(new URL('../../public/partials', import.meta.url));
 const INDEX_HTML = fileURLToPath(new URL('../../public/index.html', import.meta.url));
@@ -80,5 +81,53 @@ test('Buttons: jeder .icon-btn enthält ein Sprite-Icon (<svg class="icon"><use�
   assert.equal(
     offenders.length, 0,
     `.icon-btn ohne Sprite-Icon (DESIGN.md → Action-Icon-Library):\n${offenders.join('\n')}`,
+  );
+});
+
+// Buttons in einer Header-/Toolbar-Action-Leiste (.card-actions) müssen Icon-
+// Buttons sein — ein „klassischer" Text-Button rutscht damit nicht mehr durch.
+// Legitime Ausnahmen (primäre Formular-Aktion wie „Speichern", die ihr Label
+// behalten soll) markieren den Button explizit mit `data-label-ok`.
+// Admin-Partials sind ausgenommen: internes Tooling mit eigener,
+// label-lastiger Button-Konvention (Test/Anwenden/Aktivieren/Mehr laden).
+function collectCardActionButtons(html) {
+  const { document } = parseHTML(`<!DOCTYPE html><html><body>${html}</body></html>`);
+  const out = [];
+  const seen = new Set();
+  const scan = (root) => {
+    for (const ca of root.querySelectorAll('.card-actions')) {
+      for (const btn of ca.querySelectorAll('button')) {
+        if (seen.has(btn)) continue;
+        seen.add(btn);
+        out.push(btn);
+      }
+    }
+    // In <template> (Alpine x-for/x-if) gewickelte Action-Leisten mitnehmen.
+    for (const tpl of root.querySelectorAll('template')) {
+      if (tpl.content) scan(tpl.content);
+    }
+  };
+  scan(document);
+  return out;
+}
+
+test('Buttons: keine klassischen Text-Buttons in .card-actions (Icon oder data-label-ok)', () => {
+  const offenders = [];
+  for (const [file, html] of sources()) {
+    if (file.startsWith('partials/admin-')) continue; // internes Tooling, eigene Konvention
+    for (const btn of collectCardActionButtons(html)) {
+      const classes = (btn.getAttribute('class') || '').split(/\s+/);
+      if (classes.includes('tabs-btn')) continue; // Modus-Toggle/Tabs = eigenes Label-Pattern
+      const hasIcon = !!btn.querySelector('svg');
+      const labelOk = btn.hasAttribute('data-label-ok');
+      if (!hasIcon && !labelOk) {
+        const label = (btn.getAttribute('x-text') || btn.textContent || '').trim().slice(0, 50);
+        offenders.push(`${file}: Text-Button in .card-actions ("${label}") → Icon-Button oder data-label-ok`);
+      }
+    }
+  }
+  assert.equal(
+    offenders.length, 0,
+    `Klassische Text-Buttons in Action-Leiste (DESIGN.md → Action-Icon-Library):\n${offenders.join('\n')}`,
   );
 });

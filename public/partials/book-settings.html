@@ -12,7 +12,7 @@
     <div class="card-actions">
       <span class="card-form-saved" x-show="headerSaved()" x-cloak x-transition.opacity.duration.250ms x-text="$app.t('common.settingsSaved')"></span>
       <span class="card-form-error" x-show="headerError()" x-text="headerError()"></span>
-      <button type="button" @click="saveActiveTab()" :disabled="headerDisabled()">
+      <button type="button" data-label-ok @click="saveActiveTab()" :disabled="headerDisabled()">
         <span x-show="headerSaving()" class="spinner"></span>
         <span x-text="headerSaving() ? $app.t('common.saving') : $app.t('common.save')"></span>
       </button>
@@ -416,9 +416,9 @@
         <h3 class="book-settings-section-title" x-text="$app.t('publication.section.export')"></h3>
         <p class="card-form-hint" x-text="$app.t('publication.exportToolsHint')"></p>
         <div class="card-actions">
-          <button type="button" class="primary" :disabled="!$app.selectedBookId"
+          <button type="button" class="primary" data-label-ok :disabled="!$app.selectedBookId"
                   @click="$app.togglePdfExportCard()" x-text="$app.t('book.export.pdfCustom')"></button>
-          <button type="button" class="primary" :disabled="!$app.selectedBookId"
+          <button type="button" class="primary" data-label-ok :disabled="!$app.selectedBookId"
                   @click="$app.toggleEpubExportCard()" x-text="$app.t('book.export.epubCustom')"></button>
         </div>
       </section>

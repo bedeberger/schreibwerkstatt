@@ -125,10 +125,10 @@
 
         <div class="share-row__actions">
           <template x-if="editingToken !== link.token && linkStatus(link) === 'active'">
-            <button type="button" @click="startEdit(link)" x-text="$app.t('share.edit')"></button>
+            <button type="button" class="icon-btn icon-btn--ghost" @click="startEdit(link)" :data-tip="$app.t('share.edit')" :aria-label="$app.t('share.edit')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#pencil"/></svg></button>
           </template>
           <template x-if="linkStatus(link) === 'active'">
-            <button type="button" class="danger" @click="revokeLink(link.token)" x-text="$app.t('share.revoke')"></button>
+            <button type="button" class="icon-btn icon-btn--ghost" @click="revokeLink(link.token)" :data-tip="$app.t('share.revoke')" :aria-label="$app.t('share.revoke')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
           </template>
         </div>
 

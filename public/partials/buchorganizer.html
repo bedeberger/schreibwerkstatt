@@ -11,8 +11,8 @@
       <span class="card-title" x-text="$app.t('bookOrganizer.title')"></span>
     </div>
     <div class="card-actions">
-      <button type="button" @click="createChapter()" :disabled="organizerSaving" x-text="$app.t('bookOrganizer.newChapter')"></button>
-      <button type="button" @click="createPage(0)" :disabled="organizerSaving" x-text="$app.t('bookOrganizer.newSoloPage')"></button>
+      <button type="button" class="icon-btn icon-btn--ghost" @click="createChapter()" :disabled="organizerSaving" :data-tip="$app.t('bookOrganizer.newChapter')" :aria-label="$app.t('bookOrganizer.newChapter')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#folder-plus"/></svg></button>
+      <button type="button" class="icon-btn icon-btn--ghost" @click="createPage(0)" :disabled="organizerSaving" :data-tip="$app.t('bookOrganizer.newSoloPage')" :aria-label="$app.t('bookOrganizer.newSoloPage')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#file-plus"/></svg></button>
     </div>
   </div>
 

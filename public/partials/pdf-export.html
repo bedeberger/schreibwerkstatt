@@ -15,7 +15,7 @@
   <div class="card-header">
     <span class="card-title" x-text="$app.t('pdfExport.title')"></span>
     <div class="card-actions" x-show="_formMounted">
-      <button type="button"
+      <button type="button" data-label-ok
               :disabled="saving"
               @click="saveActiveProfile()">
         <span x-show="saving" class="spinner"></span>
@@ -56,7 +56,7 @@
         <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#download"/></svg>
         <span x-text="$app.t('pdfExport.export')"></span>
       </button>
-      <button type="button"
+      <button type="button" data-label-ok
               x-show="exporting"
               @click="cancelExport()">
         <span class="spinner"></span>
@@ -118,11 +118,11 @@
       <div class="list-header list-header--between list-header--wrap">
         <input type="text" class="pdfx-name-input" x-model="activeProfile.name">
         <div class="card-actions">
-          <button type="button"
+          <button type="button" data-label-ok
                   :disabled="activeProfile.is_default"
                   @click="setDefault(activeProfile.id)"
                   x-text="activeProfile.is_default ? $app.t('pdfExport.isDefault') : $app.t('pdfExport.setDefault')"></button>
-          <button type="button"
+          <button type="button" data-label-ok
                   class="danger"
                   @click="deleteProfile(activeProfile.id)"
                   x-text="$app.t('common.delete')"></button>

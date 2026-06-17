@@ -9,7 +9,7 @@
   <div class="card-header">
     <span class="card-title" x-text="$app.t('admin.jsErrors.title')"></span>
     <div class="card-actions">
-      <button type="button" @click="jsErrorsRefresh()" :disabled="jsErrorsLoading" x-text="$app.t('common.refresh')"></button>
+      <button type="button" class="icon-btn icon-btn--ghost" @click="jsErrorsRefresh()" :disabled="jsErrorsLoading" :data-tip="$app.t('common.refresh')" :aria-label="$app.t('common.refresh')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#rotate-cw"/></svg></button>
       <button type="button" class="danger" @click="jsErrorsClearAll()"
               :disabled="jsErrorsLoading || !jsErrorsList.length"
               x-text="$app.t('admin.jsErrors.clearAll')"></button>

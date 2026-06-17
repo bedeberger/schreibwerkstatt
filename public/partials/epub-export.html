@@ -44,7 +44,7 @@
         <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#download"/></svg>
         <span x-text="$app.t('epubExport.export')"></span>
       </button>
-      <button type="button"
+      <button type="button" data-label-ok
               x-show="exporting"
               @click="cancelExport()">
         <span class="spinner"></span>
@@ -302,7 +302,7 @@
 
     <div class="card-actions" x-show="canEditPublication()">
       <span class="card-form-saved" x-show="savedAt" x-cloak x-transition.opacity.duration.250ms x-text="$app.t('epubExport.saved')"></span>
-      <button type="button" :disabled="saving" @click="savePublication()">
+      <button type="button" data-label-ok :disabled="saving" @click="savePublication()">
         <span x-show="saving" class="spinner"></span>
         <span x-text="saving ? $app.t('common.saving') : $app.t('common.save')"></span>
       </button>

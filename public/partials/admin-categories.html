@@ -8,7 +8,7 @@
   <div class="card-header">
     <span class="card-title" x-text="$app.t('admin.categories.title')"></span>
     <div class="card-actions">
-      <button type="button" @click="loadAll()" :disabled="loading" x-text="$app.t('common.refresh')"></button>
+      <button type="button" class="icon-btn icon-btn--ghost" @click="loadAll()" :disabled="loading" :data-tip="$app.t('common.refresh')" :aria-label="$app.t('common.refresh')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#rotate-cw"/></svg></button>
     </div>
   </div>
 
@@ -28,7 +28,7 @@
                @keydown.enter.prevent="createCategory()"
                :disabled="busy"
                maxlength="120">
-        <button type="button" @click="createCategory()" :disabled="busy || !newCategoryName.trim()" x-text="$app.t('common.new')"></button>
+        <button type="button" class="icon-btn icon-btn--ghost" @click="createCategory()" :disabled="busy || !newCategoryName.trim()" :data-tip="$app.t('common.new')" :aria-label="$app.t('common.new')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#plus"/></svg></button>
       </div>
 
       <p class="muted-msg muted-msg--sm" x-show="categories.length === 0" x-text="$app.t('categories.empty')"></p>
@@ -54,8 +54,8 @@
               <td x-text="cat.name"></td>
               <td><code class="muted-msg muted-msg--sm" x-text="cat.slug"></code></td>
               <td class="admin-pool-actions">
-                <button type="button" @click="renameCategory(cat)" x-text="$app.t('admin.cat.rename')"></button>
-                <button type="button" class="danger" @click="deleteCategory(cat)" x-text="$app.t('common.delete')"></button>
+                <button type="button" class="icon-btn icon-btn--ghost" @click="renameCategory(cat)" :data-tip="$app.t('admin.cat.rename')" :aria-label="$app.t('admin.cat.rename')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#pencil"/></svg></button>
+                <button type="button" class="icon-btn icon-btn--ghost" @click="deleteCategory(cat)" :data-tip="$app.t('common.delete')" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
               </td>
             </tr>
           </template>

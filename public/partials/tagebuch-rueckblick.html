@@ -19,10 +19,12 @@
              x-modelable="value" x-model="rueckblickZeitraum"
              x-effect="options = availableZeitraeume()"></div>
       </div>
-      <button type="button" @click="runTagebuchRueckblick()"
-              :disabled="rueckblickLoading || !rueckblickZeitraum || rueckblickUpToDate()">
+      <button type="button" class="icon-btn icon-btn--ghost" @click="runTagebuchRueckblick()"
+              :disabled="rueckblickLoading || !rueckblickZeitraum || rueckblickUpToDate()"
+              :data-tip="hasRueckblickResult() ? $app.t('rueckblick.rerun') : $app.t('rueckblick.start')"
+              :aria-label="hasRueckblickResult() ? $app.t('rueckblick.rerun') : $app.t('rueckblick.start')">
         <span x-show="rueckblickLoading" class="spinner"></span>
-        <span x-text="hasRueckblickResult() ? $app.t('rueckblick.rerun') : $app.t('rueckblick.start')"></span>
+        <svg x-show="!rueckblickLoading" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#rotate-cw"/></svg>
       </button>
     </div>
   </div>

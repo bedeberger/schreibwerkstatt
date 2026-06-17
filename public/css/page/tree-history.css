@@ -260,6 +260,9 @@
 .history-detail .bewertung-header { margin-bottom: var(--space-10); }
 
 .btn-delete-history {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: var(--space-xs) 12px;
   font-size: var(--font-size-xs);
   border: 1px solid var(--color-err-text);

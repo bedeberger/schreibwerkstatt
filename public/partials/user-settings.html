@@ -8,7 +8,7 @@
   <div class="card-header">
     <span class="card-title" x-text="$app.t('profile.title')"></span>
     <div class="card-actions">
-      <button type="button" @click="saveUserSettings()" :disabled="userSettingsSaving || userSettingsLoading">
+      <button type="button" data-label-ok @click="saveUserSettings()" :disabled="userSettingsSaving || userSettingsLoading">
         <span x-show="userSettingsSaving" class="spinner"></span>
         <span x-text="userSettingsSaving ? $app.t('common.saving') : $app.t('common.save')"></span>
       </button>

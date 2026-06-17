@@ -9,7 +9,7 @@
   <div class="card-header">
     <span class="card-title" x-text="$app.t('admin.users.title')"></span>
     <div class="card-actions">
-      <button type="button" @click="adminUsersLoad()" :disabled="adminUsersLoading" x-text="$app.t('common.refresh')"></button>
+      <button type="button" class="icon-btn icon-btn--ghost" @click="adminUsersLoad()" :disabled="adminUsersLoading" :data-tip="$app.t('common.refresh')" :aria-label="$app.t('common.refresh')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#rotate-cw"/></svg></button>
     </div>
   </div>
 
@@ -158,7 +158,7 @@
   <div class="card-form-grid" x-show="!adminUsersLoading && adminUsersTab === 'invites'">
 
     <div class="admin-users-requests-filter">
-      <button type="button" @click="adminUsersInvitesLoad()" :disabled="adminUsersInvitesLoading" x-text="$app.t('common.refresh')"></button>
+      <button type="button" class="icon-btn icon-btn--ghost" @click="adminUsersInvitesLoad()" :disabled="adminUsersInvitesLoading" :data-tip="$app.t('common.refresh')" :aria-label="$app.t('common.refresh')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#rotate-cw"/></svg></button>
     </div>
 
     <div x-show="adminUsersInvitesLoading" class="muted-msg" x-text="$app.t('common.loading')"></div>
@@ -260,7 +260,7 @@
              { value: 'expired',  label: $app.t('admin.users.requests.status.expired') },
              { value: 'all',      label: $app.t('admin.users.requests.status.all') },
            ]"></div>
-      <button type="button" @click="adminUsersRequestsLoad()" :disabled="adminUsersRequestsLoading" x-text="$app.t('common.refresh')"></button>
+      <button type="button" class="icon-btn icon-btn--ghost" @click="adminUsersRequestsLoad()" :disabled="adminUsersRequestsLoading" :data-tip="$app.t('common.refresh')" :aria-label="$app.t('common.refresh')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#rotate-cw"/></svg></button>
     </div>
 
     <div x-show="adminUsersRequestsLoading" class="muted-msg" x-text="$app.t('common.loading')"></div>
