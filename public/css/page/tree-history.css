@@ -162,6 +162,19 @@
   margin-bottom: 0;
 }
 
+/* Mobil: Badges/Buttons nicht umbrechen (unschönes Stapeln), sondern die
+   Zeile horizontal scrollbar machen. Gilt fuer Verlauf + page_revisions-Liste
+   (beide nutzen .history-item). */
+@media (max-width: 600px) {
+  .history-item {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .history-item > * { flex-shrink: 0; }
+  .history-item .history-date { flex: 0 0 auto; }
+}
+
 .history-date {
   font-size: var(--font-size-sm);
   color: var(--color-muted);

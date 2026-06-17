@@ -79,7 +79,9 @@
   .plot-swim-lane {
     position: sticky;
     left: 0;
-    z-index: var(--z-base);
+    /* Über den horizontal scrollenden Akt-Köpfen/Zellen halten (sonst malen die
+       statischen Spalten beim H-Scroll über die promotete Sticky-Schicht). */
+    z-index: var(--z-sticky);
     flex: 0 0 var(--lane-w);
     width: var(--lane-w);
     background: var(--color-surface);
