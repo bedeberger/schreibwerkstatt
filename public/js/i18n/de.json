@@ -1890,6 +1890,7 @@
   "editor.btn.saveCorrections":  "Korrekturen speichern",
   "editor.btn.saveCorrectionsProgress": "Wird gespeichert…",
   "editor.btn.saveEditTitle":    "Speichern (Strg/⌘+S)",
+  "editor.btn.moreActions":      "Weitere Aktionen",
   "editor.btn.chat":             "Chat",
   "editor.btn.chatTitle":        "Chat mit dieser Seite",
   "editor.btn.chatCountTitle":   "{n} Chat-Verläufe zu dieser Seite",

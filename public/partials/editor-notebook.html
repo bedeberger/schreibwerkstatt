@@ -122,62 +122,93 @@
       <template x-if="!editMode">
         <span class="display-contents">
           <span class="action-group" x-show="isTagebuch()">
-            <button type="button" class="icon-btn"
+            <button type="button" class="icon-btn icon-btn--ghost"
                     @click="diaryGo(-1)"
                     :disabled="!diaryPrevPage()"
                     :data-tip="t('diary.prevEntry')"
                     :aria-label="t('diary.prevEntry')">
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#chevron-left"/></svg>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#chevron-left"/></svg>
             </button>
-            <button type="button" class="icon-btn"
+            <button type="button" class="icon-btn icon-btn--ghost"
                     @click="diaryGo(1)"
                     :disabled="!diaryNextPage()"
                     :data-tip="t('diary.nextEntry')"
                     :aria-label="t('diary.nextEntry')">
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#chevron-right"/></svg>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#chevron-right"/></svg>
             </button>
           </span>
           <span class="action-sep" aria-hidden="true" x-show="isTagebuch()"></span>
           <span class="action-group" x-show="canReview()">
-            <button type="button" @click="runCheck()" :disabled="checkLoading || currentPageEmpty" :data-tip="currentPageEmpty ? t('editor.btn.pageEmpty') : t('editor.btn.checkTitle')" x-text="t('editor.btn.check')"></button>
-            <button type="button" @click="closeFindings()" x-show="checkDone" :data-tip="t('editor.btn.exitCheckTitle')" x-text="t('editor.btn.exitCheck')"></button>
-            <button type="button" class="success" @click="saveCorrections()" :disabled="saveApplying != null" x-show="canEdit() && ((correctedHtml && selectedFindings.some(v => v)) || saveApplying != null)">
-              <span x-show="saveApplying != null" class="spinner"></span><span x-text="saveApplying != null ? t('editor.btn.saveCorrectionsProgress') : t('editor.btn.saveCorrections')"></span>
+            <button type="button" class="icon-btn icon-btn--ghost" @click="runCheck()" :disabled="checkLoading || currentPageEmpty" :data-tip="currentPageEmpty ? t('editor.btn.pageEmpty') : t('editor.btn.checkTitle')" :aria-label="t('editor.btn.check')">
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#spell-check"/></svg>
+            </button>
+            <button type="button" class="icon-btn icon-btn--ghost" @click="closeFindings()" x-show="checkDone" :data-tip="t('editor.btn.exitCheckTitle')" :aria-label="t('editor.btn.exitCheck')">
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg>
+            </button>
+            <button type="button" class="icon-btn icon-btn--ghost icon-btn--success" @click="saveCorrections()" :disabled="saveApplying != null" x-show="canEdit() && ((correctedHtml && selectedFindings.some(v => v)) || saveApplying != null)" :data-tip="saveApplying != null ? t('editor.btn.saveCorrectionsProgress') : t('editor.btn.saveCorrections')" :aria-label="t('editor.btn.saveCorrections')">
+              <span x-show="saveApplying != null" class="spinner"></span>
+              <svg x-show="saveApplying == null" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#check"/></svg>
             </button>
           </span>
           <span class="action-sep" aria-hidden="true" x-show="canReview() && canEdit() && !checkDone"></span>
           <span class="action-group" x-show="canEdit() && !checkDone">
-            <button type="button" @click="startEdit()" :disabled="checkLoading || saveApplying != null || originalHtml === null" :data-tip="t('editor.btn.editTitle')" x-text="t('editor.btn.edit')"></button>
-            <button type="button" @click="enterFocusFromPageview()" :disabled="checkLoading || saveApplying != null || originalHtml === null" :data-tip="t('editor.btn.focusTitle')" x-text="t('editor.btn.focus')"></button>
+            <button type="button" class="icon-btn icon-btn--ghost" @click="startEdit()" :disabled="checkLoading || saveApplying != null || originalHtml === null" :data-tip="t('editor.btn.editTitle')" :aria-label="t('editor.btn.edit')">
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#pencil"/></svg>
+            </button>
+            <button type="button" class="icon-btn icon-btn--ghost" @click="enterFocusFromPageview()" :disabled="checkLoading || saveApplying != null || originalHtml === null" :data-tip="t('editor.btn.focusTitle')" :aria-label="t('editor.btn.focus')">
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#maximize"/></svg>
+            </button>
           </span>
           <span class="action-sep" aria-hidden="true"></span>
           <span class="action-group">
-            <button type="button" @click="toggleChatCard()" x-show="canReview()" :class="{ primary: showChatCard }" :disabled="currentPageEmpty" :data-tip="t('editor.btn.chatTitle')">
-              <span x-text="t('editor.btn.chat')"></span>
-              <span class="btn-count" x-show="currentPageChatSessionCount > 0" x-text="currentPageChatSessionCount" :data-tip="t('editor.btn.chatCountTitle', { n: currentPageChatSessionCount })"></span>
-            </button>
-            <button type="button" @click="toggleIdeenCard()" :class="{ primary: showIdeenCard }" :data-tip="t('ideen.title')">
-              <span x-text="t('ideen.title')"></span>
-              <span class="btn-count" x-show="currentPageIdeenOpenCount > 0" x-text="currentPageIdeenOpenCount" :data-tip="t('ideen.openCountTitle', { n: currentPageIdeenOpenCount })"></span>
-            </button>
-            <button type="button" x-show="canEdit() && currentPage" @click="openShareLinksForPage(currentPage.id)"
-                    :disabled="currentPageEmpty"
-                    :data-tip="t('share.btn.sharePageTitle')"
-                    x-text="t('share.btn.sharePage')"></button>
+            <span class="icon-btn-badge-wrap" x-show="canReview()">
+              <button type="button" class="icon-btn icon-btn--ghost" @click="toggleChatCard()" :class="{ 'is-active': showChatCard }" :disabled="currentPageEmpty" :data-tip="t('editor.btn.chatTitle')" :aria-label="t('editor.btn.chat')">
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#message-square"/></svg>
+              </button>
+              <span class="icon-btn-badge" x-show="currentPageChatSessionCount > 0" x-text="currentPageChatSessionCount" :data-tip="t('editor.btn.chatCountTitle', { n: currentPageChatSessionCount })"></span>
+            </span>
+            <span class="action-overflow" @click.outside="pageActionsMenuOpen = false" @keydown.escape.window="pageActionsMenuOpen = false">
+              <span class="icon-btn-badge-wrap">
+                <button type="button" class="icon-btn icon-btn--ghost"
+                        :class="{ 'is-active': pageActionsMenuOpen }"
+                        @click="pageActionsMenuOpen = !pageActionsMenuOpen"
+                        aria-haspopup="menu" :aria-expanded="pageActionsMenuOpen"
+                        :data-tip="t('editor.btn.moreActions')" :aria-label="t('editor.btn.moreActions')">
+                  <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#more-horizontal"/></svg>
+                </button>
+                <span class="icon-btn-badge" x-show="currentPageIdeenOpenCount > 0" x-text="currentPageIdeenOpenCount" :data-tip="t('ideen.openCountTitle', { n: currentPageIdeenOpenCount })"></span>
+              </span>
+              <div class="context-menu context-menu--dropdown" x-show="pageActionsMenuOpen" x-cloak role="menu">
+                <button type="button" class="context-menu-item context-menu-item--icon" :class="{ 'context-menu-item--on': showIdeenCard }" role="menuitem" @click="toggleIdeenCard(); pageActionsMenuOpen = false">
+                  <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#lightbulb"/></svg>
+                  <span x-text="t('ideen.title')"></span>
+                  <span class="btn-count" x-show="currentPageIdeenOpenCount > 0" x-text="currentPageIdeenOpenCount"></span>
+                </button>
+                <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem" x-show="canEdit() && currentPage" :disabled="currentPageEmpty" @click="openShareLinksForPage(currentPage.id); pageActionsMenuOpen = false">
+                  <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#share-2"/></svg>
+                  <span x-text="t('share.btn.sharePage')"></span>
+                </button>
+              </div>
+            </span>
           </span>
         </span>
       </template>
       <template x-if="editMode">
         <span class="display-contents">
           <span class="action-group">
-            <button type="button" class="success" @click="saveEdit()" :disabled="editSaving" :data-tip="t('editor.btn.saveEditTitle')">
-              <span x-show="editSaving" class="spinner"></span><span x-text="editSaving ? t('common.saving') : t('common.save')"></span>
+            <button type="button" class="icon-btn icon-btn--ghost icon-btn--success" @click="saveEdit()" :disabled="editSaving" :data-tip="t('editor.btn.saveEditTitle')" :aria-label="t('common.save')">
+              <span x-show="editSaving" class="spinner"></span>
+              <svg x-show="!editSaving" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#check"/></svg>
             </button>
-            <button type="button" @click="cancelEdit()" :disabled="editSaving" x-text="t('common.cancel')"></button>
+            <button type="button" class="icon-btn icon-btn--ghost" @click="cancelEdit()" :disabled="editSaving" :data-tip="t('common.cancel')" :aria-label="t('common.cancel')">
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg>
+            </button>
           </span>
           <span class="action-sep" aria-hidden="true"></span>
           <span class="action-group">
-            <button type="button" @click="focusActive ? exitFocusMode() : enterFocusMode()" :class="{ primary: focusActive }" :data-tip="focusActive ? t('editor.btn.leaveFocusTitle') : t('editor.btn.enterFocusTitle')" x-text="focusActive ? t('editor.btn.leaveFocus') : t('editor.btn.focusShort')"></button>
+            <button type="button" class="icon-btn icon-btn--ghost" @click="focusActive ? exitFocusMode() : enterFocusMode()" :class="{ 'is-active': focusActive }" :aria-pressed="focusActive" :data-tip="focusActive ? t('editor.btn.leaveFocusTitle') : t('editor.btn.enterFocusTitle')" :aria-label="focusActive ? t('editor.btn.leaveFocus') : t('editor.btn.focusShort')">
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#maximize"/></svg>
+            </button>
           </span>
         </span>
       </template>

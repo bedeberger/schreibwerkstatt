@@ -63,4 +63,42 @@
   border-color: var(--color-border);
   color: var(--color-text);
 }
+
+/* Success-Variante: grüner Akzent für Bestätigungsaktionen (Speichern,
+   Korrekturen übernehmen) als Icon-only Button. */
+.icon-btn--success {
+  color: var(--color-success);
+}
+.icon-btn--success:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-success) 14%, transparent);
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+
+/* Count-Badge an einem Icon-Button (z.B. Chat-Verläufe, offene Ideen).
+   Der Wrap ist Positionierungs-Anker; das Badge sitzt oben rechts auf dem
+   Button. Wrap übernimmt ein eventuelles x-show des Buttons. */
+.icon-btn-badge-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.icon-btn-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: var(--fw-semibold);
+  line-height: 1;
+  pointer-events: none;
+}
 }

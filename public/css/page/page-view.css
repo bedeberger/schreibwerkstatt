@@ -349,6 +349,13 @@
   .page-editor-toolbar { justify-content: flex-start; }
 }
 
+/* Overflow-"⋯"-Menü der Seiten-Action-Leiste: Positionierungs-Anker für das
+   .context-menu--dropdown-Popover. */
+.action-overflow {
+  position: relative;
+  display: inline-flex;
+}
+
 /* STT-Diktat: schwebender Mic-Button + Live-Status unten rechts im Editorfeld.
    Visuell analog zum LanguageTool-Badge oben rechts, kollidiert aber nie mit
    ihm. `position: sticky` haelt den Mic am unteren Rand des sichtbaren

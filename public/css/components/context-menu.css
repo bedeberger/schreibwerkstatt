@@ -69,3 +69,43 @@
   background: var(--color-border);
   margin: var(--space-xs) 0;
 }
+
+/* Dropdown-Variante: an einen Trigger-Button gekoppeltes Klick-Popover
+   (statt Rechtsklick-Menü). Konsument wickelt Trigger + Menü in einen
+   position: relative-Wrapper und togglet per Boolean (@click.outside zum
+   Schliessen). Use-Case: Overflow-"⋯"-Menü der Seiten-Action-Leiste. */
+.context-menu--dropdown {
+  position: absolute;
+  top: calc(100% + var(--space-2xs));
+  right: 0;
+  min-width: 200px;
+}
+
+/* Menü-Eintrag mit führendem Icon (+ optionalem Count-Badge rechts). */
+.context-menu-item--icon {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.context-menu-item--icon .icon {
+  flex-shrink: 0;
+  color: var(--color-muted);
+}
+.context-menu-item--icon .btn-count {
+  margin-left: auto;
+}
+.context-menu-item--on,
+.context-menu-item--on .icon {
+  color: var(--color-primary);
+}
+
+/* Mobile: als Bottom-Sheet wie Avatar-/Komplett-Status-Menü. */
+@media (max-width: 600px) {
+  .context-menu--dropdown {
+    position: fixed;
+    inset: auto 0 0 0;
+    min-width: 0;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    box-shadow: var(--shadow-lg);
+  }
+}

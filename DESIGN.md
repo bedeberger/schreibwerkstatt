@@ -20,6 +20,7 @@ Token-Referenz (Farben, Radien, Spacing, Schriftgrössen): [public/css/tokens.cs
 - [Icon-System](#icon-system-lucide-sprite) — `<svg class="icon"><use href="/icons.svg#name"/></svg>` (Lucide-Sprite)
 - [Icon-Button](#icon-button-icon-btn) — generischer Icon-only Button (`.icon-btn` outlined + `--ghost`), SSoT für Canvas-/Header-/Board-Cluster
 - [Toolbar-Action-Group](#toolbar-action-group-segmentierter-icon-cluster-neben-form-feldern) — segmentierte Icon-Reihe bündig mit Search/Combobox
+- [Icon-Button-Count-Badge](#icon-button-count-badge-icon-btn-badge) — Counter oben rechts auf Icon-Button
 - [Badges & Tags](#badges--tags) — eckig, Severity, Hue-Palette
 - [Combobox](#combobox-auswahlfeld) — ersetzt `<select>`
 - [Tabs / Modus-Toggle](#tabs--modus-toggle) — `.tabs` + `.tabs-btn`
@@ -414,6 +415,7 @@ Niemals `x-text` für Icon-Buttons mit zwei Zuständen — `x-text` setzt `textC
 - Status: `circle`, `alert-triangle`, `loader`
 - Viewport: `maximize`, `maximize-2`, `minimize-2`, `scan`
 - Editor: `separator-horizontal` (Trennlinie), `move-horizontal` (Fit-Width)
+- Seiten-Actions: `spell-check` (Lektorat/Prüfen), `pencil` (Bearbeiten), `maximize` (Fokus-Editor), `message-square` (Seiten-Chat), `lightbulb` (Ideen), `share-2` (Seite teilen)
 
 Neuer Bedarf → Lucide-SVG von [lucide.dev](https://lucide.dev) als `<symbol>` in `public/icons.svg` ergänzen + `SHELL_CACHE` in `public/sw.js` bumpen.
 
@@ -1200,6 +1202,62 @@ Nur in Sidebar-Tree verwendet. Bei neuer hierarchischer Liste: erst prüfen, ob 
 - `pageTreeMenuTarget: { kind: 'page'|'chapter', id, name }`
 
 **Wann nicht:** für selten genutzte Aktionen ohne klares Trigger-Element — Command-Palette ist dann passender (kein räumlicher Kontext nötig). Auch nicht für Bulk-Operationen — dafür gibt es Selection + Toolbar.
+
+### Dropdown-Variante (`.context-menu--dropdown`) — Overflow-"⋯"-Menü
+
+**Use:** Klick-gebundenes Dropdown an einem Trigger-Button (statt Rechtsklick). Bündelt sekundäre Aktionen einer kompakten Icon-Leiste hinter einem `more-horizontal`-Trigger. Erste Konsumentin: Seiten-Action-Leiste der Notebook-Seitenansicht ([editor-notebook.html](public/partials/editor-notebook.html), State `pageActionsMenuOpen` am Root). Teilt das `.context-menu`-Vokabular (`-item`, `-item--danger`, `-sep`) — kein eigenes Menü-CSS.
+
+**Zusatz-Klassen** [public/css/components/context-menu.css](public/css/components/context-menu.css):
+- `.context-menu--dropdown` — `position: absolute; top: calc(100% + …); right: 0` (am Trigger verankert, statt viewport-fixed via JS). Mobile (`max-width: 600px`): Bottom-Sheet (`position: fixed; inset: auto 0 0 0`).
+- `.context-menu-item--icon` — Eintrag mit führendem `<svg class="icon">` + Label, optionales `.btn-count` rechts (`margin-left: auto`).
+- `.context-menu-item--on` — aktiver Eintrag (zugehörige Karte offen), primary-getönt.
+
+**Markup:**
+```html
+<span class="action-overflow" @click.outside="pageActionsMenuOpen = false"
+      @keydown.escape.window="pageActionsMenuOpen = false">
+  <button type="button" class="icon-btn icon-btn--ghost" :class="{ 'is-active': pageActionsMenuOpen }"
+          @click="pageActionsMenuOpen = !pageActionsMenuOpen"
+          aria-haspopup="menu" :aria-expanded="pageActionsMenuOpen"
+          :data-tip="t('editor.btn.moreActions')" :aria-label="t('editor.btn.moreActions')">
+    <svg class="icon" aria-hidden="true"><use href="/icons.svg#more-horizontal"/></svg>
+  </button>
+  <div class="context-menu context-menu--dropdown" x-show="pageActionsMenuOpen" x-cloak role="menu">
+    <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem"
+            @click="toggleIdeenCard(); pageActionsMenuOpen = false">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#lightbulb"/></svg>
+      <span x-text="t('ideen.title')"></span>
+      <span class="btn-count" x-show="count > 0" x-text="count"></span>
+    </button>
+  </div>
+</span>
+```
+
+**Regeln:**
+- Trigger-Wrapper braucht `position: relative` (Konsumenten-Klasse, z.B. `.action-overflow` in [page-view.css](public/css/page/page-view.css)) — sonst verankert das absolute Popover am falschen Ancestor.
+- Schliessen via `@click.outside` + `@keydown.escape.window` am Wrapper. Kein eigener Document-Listener nötig (anders als Rechtsklick-Variante).
+- Kein `transform`/`contain`/`will-change` auf Ancestors bis zur Karte (Containing-Block-Falle wie bei Combobox/Sheet).
+
+---
+
+## Icon-Button-Count-Badge (`.icon-btn-badge`)
+
+**Use:** Kleines Counter-Badge oben rechts auf einem Icon-Button (offene Chat-Verläufe, offene Ideen) — das Icon-only-Pendant zum `.btn-count` in Text-Buttons.
+
+**Markup:**
+```html
+<span class="icon-btn-badge-wrap" x-show="…">
+  <button type="button" class="icon-btn icon-btn--ghost" :aria-label="…" :data-tip="…">
+    <svg class="icon" aria-hidden="true"><use href="/icons.svg#message-square"/></svg>
+  </button>
+  <span class="icon-btn-badge" x-show="count > 0" x-text="count"></span>
+</span>
+```
+
+**Klassen** [public/css/components/icon-btn.css](public/css/components/icon-btn.css):
+- `.icon-btn-badge-wrap` — `position: relative; display: inline-flex`; übernimmt ein eventuelles `x-show` des Buttons.
+- `.icon-btn-badge` — absolut oben-rechts, primary-Fläche, `--color-text-inverse`, `pointer-events: none`.
+- `.icon-btn--success` — grüner Akzent für Bestätigungs-Icon-Buttons (Speichern, Korrekturen übernehmen).
 
 ---
 

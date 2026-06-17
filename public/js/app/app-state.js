@@ -322,6 +322,8 @@ const cardsState = () => ({
   showShareLinksCard: false,
   showKomplettStatus: false,
   showAvatarMenu: false,
+  // Overflow-Menü ("⋯") der Seiten-Action-Leiste (Notebook-Seitenansicht).
+  pageActionsMenuOpen: false,
 });
 
 const statusState = () => ({
