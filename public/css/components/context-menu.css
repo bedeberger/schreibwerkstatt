@@ -98,6 +98,10 @@
 .context-menu-item--on .icon {
   color: var(--color-primary);
 }
+/* Danger-Eintrag (z.B. Löschen): Icon erbt die rote Textfarbe statt muted. */
+.context-menu-item--danger.context-menu-item--icon .icon {
+  color: inherit;
+}
 
 /* Mobile: als Bottom-Sheet wie Avatar-/Komplett-Status-Menü. */
 @media (max-width: 600px) {

@@ -13,9 +13,11 @@
       <span class="card-title" x-text="$app.t('review.title')"></span>
     </div>
     <div class="card-actions">
-      <button type="button" @click="runBookReview()" :disabled="bookReviewLoading">
+      <button type="button" class="icon-btn icon-btn--ghost" @click="runBookReview()" :disabled="bookReviewLoading"
+              :data-tip="bookReviewOut ? $app.t('review.rerun') : $app.t('review.start')"
+              :aria-label="bookReviewOut ? $app.t('review.rerun') : $app.t('review.start')">
         <span x-show="bookReviewLoading" class="spinner"></span>
-        <span x-text="bookReviewOut ? $app.t('review.rerun') : $app.t('review.start')"></span>
+        <svg x-show="!bookReviewLoading" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#rotate-cw"/></svg>
       </button>
     </div>
   </div>

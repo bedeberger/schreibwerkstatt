@@ -138,17 +138,40 @@
                 x-text="$app.t('werkstatt.importedFrom', { name: importedFromName() })"></span>
         </div>
         <div class="card-actions">
-          <button type="button" class="primary" :disabled="busy || !editName.trim()" @click="saveDraft()" x-text="$app.t('werkstatt.action.save')"></button>
-          <button type="button"
-                  :disabled="busy || brainstormLoading || !selectedKnotenId"
-                  @click="runBrainstorm()"
-                  :data-tip="selectedKnotenId ? $app.t('werkstatt.action.brainstorm') : $app.t('werkstatt.action.brainstormSelectFirst')"
-                  x-text="$app.t('werkstatt.action.brainstorm')"></button>
-          <button type="button"
-                  :disabled="busy || consistencyLoading"
-                  @click="runConsistency()"
-                  x-text="$app.t('werkstatt.action.consistency')"></button>
-          <button type="button" :disabled="busy" @click="requestDelete()" x-text="$app.t('werkstatt.action.delete')"></button>
+          <button type="button" class="icon-btn icon-btn--ghost icon-btn--success"
+                  :disabled="busy || !editName.trim()" @click="saveDraft()"
+                  :data-tip="$app.t('werkstatt.action.save')" :aria-label="$app.t('werkstatt.action.save')">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#check"/></svg>
+          </button>
+          <span class="action-overflow" @click.outside="werkstattMenuOpen = false" @keydown.escape.window="werkstattMenuOpen = false">
+            <button type="button" class="icon-btn icon-btn--ghost"
+                    :class="{ 'is-active': werkstattMenuOpen }"
+                    @click="werkstattMenuOpen = !werkstattMenuOpen"
+                    aria-haspopup="menu" :aria-expanded="werkstattMenuOpen"
+                    :data-tip="$app.t('editor.btn.moreActions')" :aria-label="$app.t('editor.btn.moreActions')">
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#more-horizontal"/></svg>
+            </button>
+            <div class="context-menu context-menu--dropdown" x-show="werkstattMenuOpen" x-cloak role="menu">
+              <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem"
+                      :disabled="busy || brainstormLoading || !selectedKnotenId"
+                      @click="runBrainstorm(); werkstattMenuOpen = false">
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#lightbulb"/></svg>
+                <span x-text="$app.t('werkstatt.action.brainstorm')"></span>
+              </button>
+              <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem"
+                      :disabled="busy || consistencyLoading"
+                      @click="runConsistency(); werkstattMenuOpen = false">
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#spell-check"/></svg>
+                <span x-text="$app.t('werkstatt.action.consistency')"></span>
+              </button>
+              <div class="context-menu-sep" role="separator"></div>
+              <button type="button" class="context-menu-item context-menu-item--icon context-menu-item--danger" role="menuitem"
+                      :disabled="busy" @click="requestDelete(); werkstattMenuOpen = false">
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg>
+                <span x-text="$app.t('werkstatt.action.delete')"></span>
+              </button>
+            </div>
+          </span>
         </div>
       </div>
 

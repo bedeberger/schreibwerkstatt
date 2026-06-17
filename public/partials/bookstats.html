@@ -15,9 +15,10 @@
     </div>
     <div class="card-header-aside">
       <div class="card-actions">
-        <button type="button" @click="syncBookStats()" :disabled="bookStatsLoading">
+        <button type="button" class="icon-btn icon-btn--ghost" @click="syncBookStats()" :disabled="bookStatsLoading"
+                :data-tip="$app.t('bookstats.sync')" :aria-label="$app.t('bookstats.sync')">
           <span x-show="bookStatsLoading" class="spinner"></span>
-          <span x-text="bookStatsLoading ? '' : $app.t('bookstats.sync')"></span>
+          <svg x-show="!bookStatsLoading" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#rotate-cw"/></svg>
         </button>
       </div>
     </div>

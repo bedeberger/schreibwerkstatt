@@ -18,10 +18,13 @@
       </div>
     </div>
     <div class="card-header-aside">
-      <button type="button" class="btn-compact"
+      <button type="button" class="icon-btn icon-btn--ghost"
               @click="runConsistency()"
               :disabled="consistencyLoading || !beats.length"
-              x-text="$app.t('plot.consistency.run')"></button>
+              :data-tip="$app.t('plot.consistency.run')" :aria-label="$app.t('plot.consistency.run')">
+        <span x-show="consistencyLoading" class="spinner"></span>
+        <svg x-show="!consistencyLoading" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#rotate-cw"/></svg>
+      </button>
       <button type="button" class="icon-btn"
               :aria-pressed="plotFullscreen"
               @click="togglePlotFullscreen()"

@@ -21,6 +21,8 @@ export function registerKapitelReviewCard() {
     // kapitelReviewChapterId lebt am Root (Hash-Router + Sidebar lesen es).
     kapitelReviewHistory: {},
     selectedKapitelReviewId: null,
+    // Overflow-"⋯"-Menü der Header-Action-Leiste (Ideen + Kapitel teilen).
+    kapitelReviewMenuOpen: false,
     _kapitelReviewByChapter: {}, // { [chapterId]: emptySlot() }
     // Per-Kapitel-Flag „Sub-Kapitel mitbewerten" (default true wenn Subs vorhanden).
     _includeSubchaptersByChapter: {},

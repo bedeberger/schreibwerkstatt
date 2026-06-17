@@ -15,9 +15,10 @@
     </div>
     <div class="card-header-aside">
       <div class="card-actions">
-        <button type="button" @click="runStilSync()" :disabled="stilSyncing || stilLoading">
+        <button type="button" class="icon-btn icon-btn--ghost" @click="runStilSync()" :disabled="stilSyncing || stilLoading"
+                :data-tip="$app.t('stil.recompute')" :aria-label="$app.t('stil.recompute')">
           <span x-show="stilSyncing" class="spinner"></span>
-          <span x-text="stilSyncing ? '' : $app.t('stil.recompute')"></span>
+          <svg x-show="!stilSyncing" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#rotate-cw"/></svg>
         </button>
       </div>
     </div>

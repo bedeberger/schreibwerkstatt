@@ -20,6 +20,8 @@ export function registerFigurWerkstattCard() {
     loading: false,
     busy: false,
     errorMessage: '',
+    // Overflow-"⋯"-Menü der Detail-Header-Leiste (Brainstorm + Konsistenz).
+    werkstattMenuOpen: false,
     brainstormLoading: false,
     brainstormProgress: 0,
     brainstormStatus: '',

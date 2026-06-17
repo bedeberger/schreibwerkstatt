@@ -10,7 +10,9 @@
       <span class="card-title" x-text="$app.t('chat.title')"></span>
     </div>
     <div class="card-actions">
-      <button type="button" @click="startNewChatSession()" :disabled="chatLoading" :data-tip="$app.t('chat.newSessionTitle')" x-text="$app.t('chat.newSession')"></button>
+      <button type="button" class="icon-btn icon-btn--ghost" @click="startNewChatSession()" :disabled="chatLoading" :data-tip="$app.t('chat.newSessionTitle')" :aria-label="$app.t('chat.newSession')">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#plus"/></svg>
+      </button>
     </div>
     <button type="button" class="btn-card-close" @click="$app.toggleChatCard()" :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')">×</button>
   </div>
@@ -110,7 +112,9 @@
       <span class="card-title" x-text="$app.t('chat.titleBook')"></span>
     </div>
     <div class="card-actions">
-      <button type="button" @click="startNewBookChatSession()" :disabled="bookChatLoading" :data-tip="$app.t('chat.newSessionTitle')" x-text="$app.t('chat.newSession')"></button>
+      <button type="button" class="icon-btn icon-btn--ghost" @click="startNewBookChatSession()" :disabled="bookChatLoading" :data-tip="$app.t('chat.newSessionTitle')" :aria-label="$app.t('chat.newSession')">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#plus"/></svg>
+      </button>
     </div>
   </div>
 

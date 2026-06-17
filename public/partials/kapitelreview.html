@@ -36,39 +36,55 @@
       </span>
       <div class="card-actions">
         <button type="button"
-                class="kapitel-include-subs-btn"
+                class="icon-btn icon-btn--ghost"
                 x-show="kapitelReviewHasSubchapters($app.kapitelReviewChapterId)"
                 @click="setKapitelReviewIncludeSubchapters($app.kapitelReviewChapterId, !kapitelReviewIncludeSubchapters($app.kapitelReviewChapterId))"
-                :class="{ primary: kapitelReviewIncludeSubchapters($app.kapitelReviewChapterId) }"
+                :class="{ 'is-active': kapitelReviewIncludeSubchapters($app.kapitelReviewChapterId) }"
                 :aria-pressed="kapitelReviewIncludeSubchapters($app.kapitelReviewChapterId)"
-                :data-tip="$app.t('kapitelReview.includeSubchaptersTip')">
+                :data-tip="$app.t('kapitelReview.includeSubchaptersTip')"
+                :aria-label="$app.t('kapitelReview.includeSubchapters')">
           <svg class="icon" aria-hidden="true">
-            <use :href="kapitelReviewIncludeSubchapters($app.kapitelReviewChapterId) ? '/icons.svg?v=690#check' : '/icons.svg?v=690#chevron-down'"/>
+            <use :href="kapitelReviewIncludeSubchapters($app.kapitelReviewChapterId) ? '/icons.svg?v=693#check' : '/icons.svg?v=693#chevron-down'"/>
           </svg>
-          <span x-text="$app.t('kapitelReview.includeSubchapters')"></span>
         </button>
         <button type="button"
-                @click="$app.toggleChapterIdeenCard($app.kapitelReviewChapterId)"
-                :class="{ primary: $app.showIdeenCard && $app.ideenScope === 'chapter' }"
-                :disabled="!$app.kapitelReviewChapterId"
-                :data-tip="$app.t('ideen.chapter.toggleTitle')">
-          <span x-text="$app.t('ideen.chapter.toggle')"></span>
-          <span class="btn-count"
-                x-show="($app.chapterIdeenCounts[$app.kapitelReviewChapterId] || 0) > 0"
-                x-text="$app.chapterIdeenCounts[$app.kapitelReviewChapterId]"
-                :data-tip="$app.t('ideen.openCountTitle', { n: $app.chapterIdeenCounts[$app.kapitelReviewChapterId] })"></span>
-        </button>
-        <button type="button"
-                x-show="$app.canEdit() && $app.kapitelReviewChapterId"
-                @click="$app.openShareLinksForChapter($app.kapitelReviewChapterId)"
-                :data-tip="$app.t('share.btn.shareChapterTitle')"
-                x-text="$app.t('share.btn.shareChapter')"></button>
-        <button type="button"
+                class="icon-btn icon-btn--ghost"
                 @click="runKapitelReview()"
-                :disabled="kapitelReviewLoading || !$app.kapitelReviewChapterId">
+                :disabled="kapitelReviewLoading || !$app.kapitelReviewChapterId"
+                :data-tip="kapitelReviewOut ? $app.t('kapitelReview.rerun') : $app.t('kapitelReview.start')"
+                :aria-label="kapitelReviewOut ? $app.t('kapitelReview.rerun') : $app.t('kapitelReview.start')">
           <span x-show="kapitelReviewLoading" class="spinner"></span>
-          <span x-text="kapitelReviewOut ? $app.t('kapitelReview.rerun') : $app.t('kapitelReview.start')"></span>
+          <svg x-show="!kapitelReviewLoading" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#rotate-cw"/></svg>
         </button>
+        <span class="action-overflow" @click.outside="kapitelReviewMenuOpen = false" @keydown.escape.window="kapitelReviewMenuOpen = false">
+          <span class="icon-btn-badge-wrap">
+            <button type="button" class="icon-btn icon-btn--ghost"
+                    :class="{ 'is-active': kapitelReviewMenuOpen }"
+                    @click="kapitelReviewMenuOpen = !kapitelReviewMenuOpen"
+                    aria-haspopup="menu" :aria-expanded="kapitelReviewMenuOpen"
+                    :data-tip="$app.t('editor.btn.moreActions')" :aria-label="$app.t('editor.btn.moreActions')">
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#more-horizontal"/></svg>
+            </button>
+            <span class="icon-btn-badge" x-show="($app.chapterIdeenCounts[$app.kapitelReviewChapterId] || 0) > 0" x-text="$app.chapterIdeenCounts[$app.kapitelReviewChapterId]"></span>
+          </span>
+          <div class="context-menu context-menu--dropdown" x-show="kapitelReviewMenuOpen" x-cloak role="menu">
+            <button type="button" class="context-menu-item context-menu-item--icon"
+                    :class="{ 'context-menu-item--on': $app.showIdeenCard && $app.ideenScope === 'chapter' }"
+                    role="menuitem"
+                    :disabled="!$app.kapitelReviewChapterId"
+                    @click="$app.toggleChapterIdeenCard($app.kapitelReviewChapterId); kapitelReviewMenuOpen = false">
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#lightbulb"/></svg>
+              <span x-text="$app.t('ideen.chapter.toggle')"></span>
+              <span class="btn-count" x-show="($app.chapterIdeenCounts[$app.kapitelReviewChapterId] || 0) > 0" x-text="$app.chapterIdeenCounts[$app.kapitelReviewChapterId]"></span>
+            </button>
+            <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem"
+                    x-show="$app.canEdit() && $app.kapitelReviewChapterId"
+                    @click="$app.openShareLinksForChapter($app.kapitelReviewChapterId); kapitelReviewMenuOpen = false">
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#share-2"/></svg>
+              <span x-text="$app.t('share.btn.shareChapter')"></span>
+            </button>
+          </div>
+        </span>
       </div>
     </div>
   </div>

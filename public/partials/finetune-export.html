@@ -15,11 +15,13 @@
       <span class="card-title" x-text="$app.t('finetune.title')"></span>
     </div>
     <div class="card-actions">
-      <button type="button"
+      <button type="button" class="icon-btn icon-btn--ghost"
               @click="runFinetuneExport()"
-              :disabled="finetuneLoading || !finetuneAnyTypeSelected() || !$app.selectedBookId">
+              :disabled="finetuneLoading || !finetuneAnyTypeSelected() || !$app.selectedBookId"
+              :data-tip="finetuneLoading ? $app.t('finetune.generating') : $app.t('finetune.generate')"
+              :aria-label="$app.t('finetune.generate')">
         <span x-show="finetuneLoading" class="spinner"></span>
-        <span x-text="finetuneLoading ? $app.t('finetune.generating') : $app.t('finetune.generate')"></span>
+        <svg x-show="!finetuneLoading" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#play"/></svg>
       </button>
     </div>
   </div>

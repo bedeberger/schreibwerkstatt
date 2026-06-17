@@ -778,6 +778,12 @@ select[aria-invalid="true"],
   white-space: nowrap;
 }
 
+/* Icon-only Buttons in der Action-Leiste behalten ihre quadratische Größe —
+   nie auf Button-Breite strecken (übersteuert den Mobile-`flex: 1 1 auto`). */
+.card-actions .icon-btn {
+  flex: 0 0 auto;
+}
+
 /* Gruppen-Modifier: semantische Bündel mit Trennstrich.
    .action-group ist display:contents — kein Layout-Bruch zum Flex-Parent. */
 .action-group { display: contents; }
