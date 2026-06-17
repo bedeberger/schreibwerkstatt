@@ -263,14 +263,15 @@ body.palette-open { overflow: hidden; overscroll-behavior: contain; }
    Highlight API gedimmt. Range-Registrierung in editor-focus.js.
    Color matcht den Block-Dim (opacity 0.35 auf schwarzer Schrift) — sonst
    stehen 3 Grautöne im UI: aktiver Satz schwarz, restl. aktiver Block hell-
-   grau (zu hell), andere Blöcke mittelgrau.
-   Theme-Selector via :root[data-theme] (App-Theme), NICHT prefers-color-
-   scheme — sonst greift System-DM auch wenn App auf light steht. */
+   grau (zu hell), andere Blöcke mittelgrau. Farbe statt opacity, weil die
+   Custom Highlight API kein opacity kennt.
+   Quelle ist der Token --color-focus-sentence-dim (light/dark in
+   tokens/colors.css) — derselbe Override-Pfad wie --focus-dim-opacity, damit
+   fremde Schalen (macOS-Client) ihn an Papier/Dim-Regler koppeln können. Der
+   Token trägt den Light/Dark-Unterschied bereits, daher keine separate
+   data-theme-Regel mehr nötig. */
 ::highlight(focus-sentence-dim) {
-  color: rgba(0, 0, 0, 0.35);
-}
-:root[data-theme="dark"] ::highlight(focus-sentence-dim) {
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--color-focus-sentence-dim);
 }
 
 /* Typewriter-only-Modus: kein Dim. Body-Class-Guard auf der Dim-Rule oben

@@ -123,6 +123,14 @@
      gegen dim-Blöcke (opacity 0.35). Dark-Theme behält --color-text. */
   --color-focus-active-text: #000;
 
+  /* Sentence-Modus: gedimmte (nicht-aktive) Sätze des aktiven Blocks. Eigener
+     Token statt opacity, weil die CSS Custom Highlight API kein `opacity`
+     unterstützt — nur Farb-/Decoration-Properties. Wert matcht visuell die
+     Block-Dim-Stufe (opacity 0.35 auf schwarzer Schrift). Tokenisiert, damit
+     fremde Schalen (macOS-Client) den Sentence-Dim analog zu
+     --focus-dim-opacity an ihr Papier/ihren Dim-Regler anpassen können. */
+  --color-focus-sentence-dim: rgba(0, 0, 0, 0.35);
+
   /* Text auf accent-Background (find-replace current match, …) */
   --color-on-accent: #1a1a1a;
 
@@ -308,6 +316,7 @@
   --ort-typ-region:     #b58cd0;
 
   --color-focus-active-text: var(--color-text);
+  --color-focus-sentence-dim: rgba(255, 255, 255, 0.5);
   --color-on-accent: #1a1a1a;
 
   --card-accent-orte: #8aaa6a;

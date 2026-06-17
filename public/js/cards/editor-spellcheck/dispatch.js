@@ -10,6 +10,7 @@
 
 import { createSpellcheckController } from './controller.js';
 import { createFormFieldSpellcheck } from './form-controller.js';
+import { applySpellcheckReplacement } from '../../editor/shared/apply-replacement.js';
 
 const NOTEBOOK_SEL = '.page-content-view--editing';
 const FOCUS_SEL = '.focus-editor__content';
@@ -54,29 +55,6 @@ export function setupSpellcheckDispatch(app) {
   function _debounceMs() {
     const v = Number(app.languagetoolDebounceMs);
     return Number.isFinite(v) && v > 0 ? v : 1500;
-  }
-
-  function _onApply(kind, range, text) {
-    if (!range) return;
-    const startEl = range.startContainer?.parentElement || null;
-    try {
-      range.deleteContents();
-      range.insertNode(document.createTextNode(text));
-    } catch { return; }
-    // Selection hinter Insertion setzen, Input-Event dispatchen (Editor-Save).
-    try {
-      const sel = window.getSelection();
-      sel?.removeAllRanges();
-      const r2 = document.createRange();
-      r2.setStartAfter(range.endContainer);
-      r2.collapse(true);
-      sel?.addRange(r2);
-    } catch {}
-    const host = startEl?.closest(`${NOTEBOOK_SEL}, ${FOCUS_SEL}, ${BOOK_SEL}`);
-    if (host) {
-      host.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-    // Bucheditor: Block-Activate triggert eigene dirty-Logik via input-Event.
   }
 
   function _detach() {
@@ -132,7 +110,7 @@ export function setupSpellcheckDispatch(app) {
       root,
       scrollContainer,
       getHtml: () => root.innerHTML,
-      onApplyReplacement: (range, text) => _onApply(kind, range, text),
+      onApplyReplacement: (range, text) => applySpellcheckReplacement(range, text),
       editorKind: kind,
       getBookLocale: _locale,
       getBookId: _bookId,

@@ -111,7 +111,7 @@ selectionchange / input / scroll / focus → _focusUpdateActive(…)
 ### Enter
 1. Guards: nur aus `idle` heraus, nur wenn `showEditorCard && editMode`.
 2. `_flushDraftSaveNow` — offene Debounce-Drafts ins Backend, damit kein getippter Inhalt verloren geht, falls späterer Cancel im Fokus.
-3. `_focusGen++` → `focusActive=true`, body-class `focus-mode` + `focus-mode--<granularity>` setzen.
+3. `_focusGen++` → `focusActive=true`, body-class `focus-mode` setzen; die `focus-mode--<granularity>`-Klasse sitzt auf `.focus-editor` (nicht am Body — der Dim-Selektor scoped via `.focus-editor.is-active:not(.focus-mode--typewriter-only)`).
 4. `$nextTick(_focusInstall)`: erst nach Alpine-Render → `--editing`-Container existiert.
 5. `_focusInstall`: Container holen, `AbortController` aufmachen, IO/MO setzen, alle Listener mit `{ signal }` registrieren, `applyViewport` direkt (ohne Debounce), Cursor zeigen, `--editing`-Container fokussieren, `jumpToTrailingParagraph` (legt Auto-`<p>` an oder recycelt leeren letzten Absatz).
 6. `_focusState='active'` → erstes `_focusUpdateActive(true)` → `writeFocusSnapshot(pageId)`.

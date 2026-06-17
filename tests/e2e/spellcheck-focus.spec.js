@@ -55,6 +55,37 @@ test('focus: ignore entfernt squiggle bis zur naechsten Pruefung', async ({ page
   await expect.poll(() => squiggleCount(page)).toBeLessThan(initial);
 });
 
+test('focus: ersetzung am absatz-ende lässt caret IM absatz (kein sprung in den leeren folge-<p>)', async ({ page }) => {
+  await page.goto(HARNESS, { waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(() => window.__harnessReady === true);
+  const res = await page.evaluate(() => {
+    const root = document.getElementById('editor');
+    // Typo als LETZTES Wort im Absatz + leerer Folge-<p> (wie der Focus-Auto-
+    // Trailing-Slot). Genau diese Geometrie liess den Caret früher hinter den
+    // Absatz in den leeren <p> rutschen (setStartAfter(range.endContainer) →
+    // Boundary auf <p> → Caret nach dem Block → Normalisierung in den nächsten).
+    root.innerHTML = '<p>Das ist wunderbra</p><p><br></p>';
+    const paras = Array.from(root.querySelectorAll('p'));
+    const tn = paras[0].firstChild;
+    const range = document.createRange();
+    range.setStart(tn, 'Das ist '.length);
+    range.setEnd(tn, tn.length);
+    window.__applySpellcheckReplacement(range, 'wunderbar');
+    const sel = window.getSelection();
+    const n = sel.anchorNode;
+    const el = n && (n.nodeType === 3 ? n.parentElement : n);
+    const block = el && el.closest('p');
+    return {
+      firstText: paras[0].textContent,
+      caretInFirstParagraph: block === paras[0],
+      caretInTrailingEmpty: block === paras[1],
+    };
+  });
+  expect(res.firstText).toBe('Das ist wunderbar');
+  expect(res.caretInFirstParagraph).toBe(true);
+  expect(res.caretInTrailingEmpty).toBe(false);
+});
+
 test('focus: detach raeumt highlights + badge', async ({ page }) => {
   await page.goto(HARNESS, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.__harnessReady === true);

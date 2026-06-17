@@ -25,6 +25,7 @@
 
   <script type="module">
     import { createSpellcheckController } from '/public/js/cards/editor-spellcheck/controller.js';
+    import { applySpellcheckReplacement } from '/public/js/editor/shared/apply-replacement.js';
 
     const params = new URLSearchParams(location.search);
     const kind = params.get('kind') || 'notebook';
@@ -40,11 +41,7 @@
       root,
       scrollContainer: window,
       getHtml: () => root.innerHTML,
-      onApplyReplacement: (range, text) => {
-        range.deleteContents();
-        range.insertNode(document.createTextNode(text));
-        root.dispatchEvent(new Event('input', { bubbles: true }));
-      },
+      onApplyReplacement: (range, text) => applySpellcheckReplacement(range, text),
       editorKind: kind,
       getBookLocale: () => 'de-DE',
       getBookId: () => 1,
@@ -56,6 +53,7 @@
     ctl.attach();
 
     window.__spellcheckCtl = ctl;
+    window.__applySpellcheckReplacement = applySpellcheckReplacement;
     window.__harnessReady = true;
   </script>
 </body>
