@@ -417,6 +417,9 @@
     font-variant-numeric: tabular-nums;
   }
   .book-editor-find-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     padding: var(--space-xs) var(--space-sm);
     border: 1px solid var(--color-border);
     background: var(--color-surface);
@@ -438,6 +441,9 @@
   }
   .book-editor-find-btn--text { min-width: 6em; }
   .book-editor-find-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     margin-inline-start: auto;
     padding: var(--space-xs) var(--space-sm);
     border: none;

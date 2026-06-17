@@ -9,6 +9,7 @@
       <div class="card-subline"
            x-text="$app.ideenScope === 'chapter' ? $app.t('ideen.chatNoteChapter') : $app.t('ideen.chatNote')"></div>
     </div>
+    <button type="button" class="btn-card-close" @click="$app.showIdeenCard = false" :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')">×</button>
   </div>
 
   <div x-show="errorMessage" class="card-status card-status--error" x-text="errorMessage"></div>

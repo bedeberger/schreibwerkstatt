@@ -36,16 +36,20 @@
         </span>
       </div>
       <div class="focus-editor__actions">
-        <button type="button" class="success"
+        <button type="button" class="icon-btn icon-btn--ghost icon-btn--success"
                 @click="$app.saveEdit()"
                 :disabled="$app.editSaving"
-                :data-tip="$app.t('editor.btn.saveEditTitle')">
-          <span x-show="$app.editSaving" class="spinner"></span><span x-text="$app.editSaving ? $app.t('common.saving') : $app.t('common.save')"></span>
+                :data-tip="$app.t('editor.btn.saveEditTitle')"
+                :aria-label="$app.t('common.save')">
+          <span x-show="$app.editSaving" class="spinner"></span>
+          <svg x-show="!$app.editSaving" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#check"/></svg>
         </button>
-        <button type="button"
+        <button type="button" class="icon-btn icon-btn--ghost"
                 @click="exitFocusMode()"
                 :data-tip="$app.t('editor.btn.leaveFocusTitle')"
-                x-text="$app.t('editor.btn.leaveFocus')"></button>
+                :aria-label="$app.t('editor.btn.leaveFocus')">
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#minimize-2"/></svg>
+        </button>
       </div>
     </div>
     <div class="focus-editor__content"

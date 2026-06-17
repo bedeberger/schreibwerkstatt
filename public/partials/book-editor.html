@@ -18,19 +18,27 @@
     </div>
     <div class="card-header-aside">
       <div class="card-actions">
-        <button type="button" @click="outlineOpen = !outlineOpen"
-                :class="{ primary: outlineOpen }"
+        <button type="button" class="icon-btn icon-btn--ghost" @click="outlineOpen = !outlineOpen"
+                :class="{ 'is-active': outlineOpen }"
                 :data-tip="$app.t('bookEditor.btn.outlineTitle')"
-                x-text="$app.t('bookEditor.btn.outline')"></button>
-        <button type="button" @click="openFind()"
-                :data-tip="$app.t('bookEditor.btn.findTitle')"
-                x-text="$app.t('bookEditor.btn.find')"></button>
-        <button type="button" class="success" @click="saveAllDirty()"
-                :disabled="saveAllRunning || dirtyCount === 0"
-                :data-tip="$app.t('bookEditor.btn.saveAllTitle')">
-          <span x-show="saveAllRunning" class="spinner"></span>
-          <span x-text="saveAllRunning ? $app.t('bookEditor.btn.saveAllProgress', { done: saveAllDone, total: saveAllTotal }) : $app.t('bookEditor.btn.saveAll')"></span>
+                :aria-label="$app.t('bookEditor.btn.outline')">
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#list"/></svg>
         </button>
+        <button type="button" class="icon-btn icon-btn--ghost" @click="openFind()"
+                :data-tip="$app.t('bookEditor.btn.findTitle')"
+                :aria-label="$app.t('bookEditor.btn.find')">
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#search"/></svg>
+        </button>
+        <span class="icon-btn-badge-wrap">
+          <button type="button" class="icon-btn icon-btn--ghost icon-btn--success" @click="saveAllDirty()"
+                  :disabled="saveAllRunning || dirtyCount === 0"
+                  :data-tip="saveAllRunning ? $app.t('bookEditor.btn.saveAllProgress', { done: saveAllDone, total: saveAllTotal }) : $app.t('bookEditor.btn.saveAllTitle')"
+                  :aria-label="$app.t('bookEditor.btn.saveAll')">
+            <span x-show="saveAllRunning" class="spinner"></span>
+            <svg x-show="!saveAllRunning" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#check"/></svg>
+          </button>
+          <span class="icon-btn-badge" x-show="dirtyCount > 0" x-text="dirtyCount"></span>
+        </span>
       </div>
     </div>
   </div>
@@ -195,10 +203,12 @@
                 : ''"></span>
         <button type="button" class="book-editor-find-btn" @click="findPrev()"
                 :disabled="findMatches.length === 0"
-                :data-tip="$app.t('find.prev')" :aria-label="$app.t('find.prev')">&#x2191;</button>
+                :data-tip="$app.t('find.prev')" :aria-label="$app.t('find.prev')">
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#chevron-up"/></svg></button>
         <button type="button" class="book-editor-find-btn" @click="findNext()"
                 :disabled="findMatches.length === 0"
-                :data-tip="$app.t('find.next')" :aria-label="$app.t('find.next')">&#x2193;</button>
+                :data-tip="$app.t('find.next')" :aria-label="$app.t('find.next')">
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#chevron-down"/></svg></button>
         <button type="button" class="book-editor-find-btn"
                 :class="{ 'book-editor-find-btn--active': findCaseSensitive }"
                 @click="findCaseSensitive = !findCaseSensitive; recomputeFindMatches()"
@@ -210,7 +220,8 @@
                 :data-tip="$app.t('find.wholeWord')" :aria-label="$app.t('find.wholeWord')"
                 :aria-pressed="findWholeWord">W</button>
         <button type="button" class="book-editor-find-close" @click="closeFind()"
-                :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')">&#x2715;</button>
+                :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')">
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
       </div>
       <div class="book-editor-find-row">
         <input type="text"
