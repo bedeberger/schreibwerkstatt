@@ -176,7 +176,7 @@
         <button type="button" class="collapsible-toggle plot-verworfen-toggle"
                 x-show="verworfenCountForAct(act.id) > 0"
                 @click="toggleVerworfen(act.id)" :aria-expanded="!!verworfenOpen[act.id]">
-          <span class="history-chevron" :class="{ open: verworfenOpen[act.id] }">›</span>
+          <span class="history-chevron" :class="{ open: verworfenOpen[act.id] }" aria-hidden="true"></span>
           <span x-text="$app.t('plot.verworfen.toggle', { n: verworfenCountForAct(act.id) })"></span>
         </button>
 

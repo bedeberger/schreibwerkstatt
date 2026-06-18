@@ -137,6 +137,10 @@
 
   /* Text auf accent-Background (find-replace current match, …) */
   --color-on-accent: #1a1a1a;
+  /* Text auf einer gesättigten Card-Accent-/Palette-Fläche (ausgewählte Chips,
+     Intensitäts-Steps). Light-Mode: unsere Accent-Flächen sind dunkel-gesättigt
+     → helle Schrift. Dark-Mode (s.u.): Flächen sind pastellig → dunkle Schrift. */
+  --color-on-accent-fill: #fff;
 
   /* Card-Akzente — siehe tokens/scale.css (Karten-spezifische Mapping-Regeln)
      liegen pro Karte in der jeweiligen CSS-Datei. Hier Basis-Hues: */
@@ -324,6 +328,7 @@
   --color-focus-active-text: var(--color-text);
   --color-focus-sentence-dim: rgba(255, 255, 255, 0.5);
   --color-on-accent: #1a1a1a;
+  --color-on-accent-fill: #1a1a1a;
 
   --card-accent-orte: #8aaa6a;
   --card-accent-szenen: #b39ad9;

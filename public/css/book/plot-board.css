@@ -161,10 +161,12 @@
     cursor: pointer;
     white-space: nowrap;
   }
-  .plot-status-tag--geplant   { background: var(--color-tag-bg);  color: var(--color-muted); }
-  .plot-status-tag--entwurf   { background: var(--color-warn-bg); color: var(--color-warn-text); }
-  .plot-status-tag--im_buch   { background: var(--color-ok-bg);   color: var(--color-ok-text); }
-  .plot-status-tag--verworfen { background: var(--color-tag-bg);  color: var(--color-muted); text-decoration: line-through; }
+  /* Border-Color = derselbe „solide" Indikator-Token wie Beat-Border-Left /
+     Verteilungsbalken-Segment → Pille und Balken/Border lesen als ein System. */
+  .plot-status-tag--geplant   { background: var(--color-tag-bg);  color: var(--color-muted);     border-color: var(--color-muted); }
+  .plot-status-tag--entwurf   { background: var(--color-warn-bg); color: var(--color-warn-text); border-color: var(--color-warn-text); }
+  .plot-status-tag--im_buch   { background: var(--color-ok-bg);   color: var(--color-ok-text);   border-color: var(--color-ok-border); }
+  .plot-status-tag--verworfen { background: var(--color-tag-bg);  color: var(--color-muted);     border-color: var(--color-border); text-decoration: line-through; }
 
   /* ── Beat-Edit ─────────────────────────────────────────────────────────── */
   .plot-beat-edit {
@@ -215,7 +217,7 @@
   .plot-figure-chip--on {
     border-color: var(--card-accent);
     background: var(--card-accent);
-    color: #fff;
+    color: var(--color-on-accent-fill);
   }
   /* Globales `button:hover { background: var(--color-hover) }` (gleiche @layer)
      wuerde den Chip-Hintergrund ueberschreiben — beim ausgewaehlten Chip bliebe
@@ -438,7 +440,16 @@
   .plot-dist-seg--geplant   { background: var(--color-muted); }
   .plot-dist-seg--entwurf   { background: var(--color-warn-text); }
   .plot-dist-seg--im_buch   { background: var(--color-ok-border); }
-  .plot-dist-seg--verworfen { background: var(--color-border); }
+  /* Schraffur statt Vollton: liest als „durchgestrichen/verworfen", deutlich
+     abgesetzt vom Vollton-Grau von „geplant" (sonst zwei kaum trennbare Graus). */
+  .plot-dist-seg--verworfen,
+  .plot-legend-swatch.plot-dist-seg--verworfen {
+    background: repeating-linear-gradient(
+      -45deg,
+      var(--color-border) 0, var(--color-border) 2px,
+      transparent 2px, transparent 4px
+    );
+  }
   /* Mini-Variante im Spaltenkopf */
   .plot-dist-bar--mini { height: 4px; }
 
@@ -534,7 +545,7 @@
   .plot-intensity-step--on, .plot-intensity-step--on:hover {
     background: var(--col-accent);
     border-color: var(--col-accent);
-    color: #fff;
+    color: var(--color-on-accent-fill);
   }
 
   /* ── Spannungsbogen (Tension-Arc) ──────────────────────────────────────── */
@@ -559,7 +570,9 @@
     stroke-width: 2;
     stroke-linejoin: round;
     stroke-linecap: round;
-    opacity: 0.55;
+    /* Höhere Deckkraft: bei mehreren Strang-Kurven (jeweils eigene Farbe) bleiben
+       die Linien trennbar statt zu Grau-Matsch zu überlagern. */
+    opacity: 0.85;
   }
   .plot-tension-dot {
     position: absolute;
@@ -572,6 +585,14 @@
     transform: translate(-50%, 50%);
     cursor: pointer;
     transition: transform var(--transition-fast);
+  }
+  /* 12px-Dot ist unter dem 24px-Touch-Mindestmaß: unsichtbare Hit-Area aufspannen,
+     ohne die visuelle Punktgröße zu ändern. */
+  .plot-tension-dot::before {
+    content: '';
+    position: absolute;
+    inset: -8px;
+    border-radius: 50%;
   }
   .plot-tension-dot:hover {
     background: var(--col-accent, var(--card-accent));

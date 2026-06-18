@@ -168,7 +168,7 @@
             <span class="severity-tag" :class="'severity-tag--' + k.schwere" x-text="$app.t('plot.severity.' + k.schwere)"></span>
             <span class="plot-konflikt-beat" x-text="k.beat"></span>
             <span class="plot-konflikt-problem" x-text="k.problem"></span>
-            <span class="history-chevron" :class="{ open: selectedKonfliktIdx === idx }">›</span>
+            <span class="history-chevron" :class="{ open: selectedKonfliktIdx === idx }" aria-hidden="true"></span>
           </div>
           <div x-show="selectedKonfliktIdx === idx && k.vorschlag" class="plot-konflikt-vorschlag" x-cloak>
             <span class="entity-meta-label" x-text="$app.t('plot.consistency.suggestion')"></span>
@@ -189,7 +189,7 @@
         <span class="history-date" x-text="formatRunDate(r.created_at)"></span>
         <span class="tag" x-text="$app.t('plot.consistency.konfliktCount', { n: r.konflikt_count })"></span>
         <span x-show="r.model" class="tag" x-text="r.model"></span>
-        <span class="history-chevron" :class="{ open: selectedRunId === r.id }">›</span>
+        <span class="history-chevron" :class="{ open: selectedRunId === r.id }" aria-hidden="true"></span>
         <button type="button" class="history-item-delete"
                 @click.stop="deleteConsistencyRun(r.id)"
                 :data-tip="$app.t('common.deleteEntry')"
