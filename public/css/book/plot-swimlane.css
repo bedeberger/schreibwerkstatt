@@ -92,6 +92,11 @@
   .plot-swim-corner {
     display: flex;
     align-items: flex-end;
+    /* Header-Zeile ist flex-end (Akt-Köpfe unten ausgerichtet) → ohne Stretch
+       bliebe die Ecke nur so hoch wie ihr Label, und der scrollende Akt-Kopf
+       lugt über dem freien Raum darüber hervor. Stretch füllt die volle
+       Zeilenhöhe, sodass die opake Ecke die Spalte komplett verdeckt. */
+    align-self: stretch;
     font-size: var(--font-size-micro);
     color: var(--color-muted);
     padding-bottom: var(--space-xs);
