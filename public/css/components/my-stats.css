@@ -1,92 +1,19 @@
 @layer components {
-/* „Meine Statistik": Hero (Zeichen + Normseiten) + Substat-Zeile + Entwicklungs-
-   Chart. Akzent kommt aus dem Karten-Scope (var(--card-accent), SSoT
-   card-accents.css → .card--mystats). Markup: public/partials/my-stats.html. */
+/* „Meine Statistik": teilt das Tile-Grid + die Tile-Atome der Buch-Übersicht
+   (.overview-grid / .overview-tile / .overview-hero-* / .overview-substat* /
+   .overview-streak-* / .overview-weekday-* / .overview-consistency-* — siehe
+   public/css/book-overview/). Akzent = globaler var(--color-accent). Hier nur
+   die mystats-eigenen Reste: Hinweiszeile, Chart-Controls/-Canvas, Meilenstein-
+   Badges. Markup: public/partials/my-stats.html. */
 
 /* Hinweis direkt unter dem Titel: diese Werte umfassen alle eigenen Bücher. */
 .mystats-allbooks-note {
   font-size: var(--font-size-sm);
   color: var(--color-muted);
-  margin: calc(-1 * var(--space-xs)) 0 var(--space-sm);
-}
-
-.mystats-body {
-  margin-top: var(--space-sm);
-}
-
-/* ── Hero: zwei grosse Kennzahlen in einem Akzent-Panel ──────────────────── */
-.mystats-hero {
-  display: flex;
-  border: 1px solid color-mix(in srgb, var(--card-accent) 28%, transparent);
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--card-accent) 7%, var(--color-bg));
-  overflow: hidden;
-}
-.mystats-hero-cell {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-  padding: var(--space-lg);
-  min-width: 0;
-}
-.mystats-hero-cell + .mystats-hero-cell {
-  border-left: 1px solid color-mix(in srgb, var(--card-accent) 20%, transparent);
-}
-.mystats-hero-value {
-  font-family: var(--font-serif);
-  font-size: var(--font-size-4xl);
-  font-weight: 500;
-  letter-spacing: -0.02em;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-  color: var(--card-accent);
-}
-.mystats-hero-label {
-  font-size: var(--font-size-sm);
-  color: var(--color-muted);
-}
-
-/* ── Substat-Zeile: kleinere Kennzahlen, durch dünne Rules getrennt ───────── */
-.mystats-substats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-md) var(--space-xl);
-  margin-top: var(--space-md);
-  padding: 0 var(--space-xs);
-}
-.mystats-substat {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.mystats-substat-value {
-  font-family: var(--font-serif);
-  font-size: var(--font-size-xl);
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  font-variant-numeric: tabular-nums;
-  color: var(--color-text);
-}
-.mystats-substat-label {
-  font-size: var(--font-size-xs);
-  color: var(--color-muted);
+  margin: calc(-1 * var(--space-xs)) 0 var(--space-md);
 }
 
 /* ── Entwicklungs-Chart (Chart.js, lazy) ─────────────────────────────────── */
-.mystats-chart-section {
-  margin-top: var(--space-xl);
-  border-top: 1px solid var(--color-border);
-  padding-top: var(--space-lg);
-}
-.mystats-section-label {
-  font-size: var(--font-size-xs);
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-muted);
-  margin-bottom: var(--space-sm);
-}
 .mystats-controls {
   display: flex;
   flex-wrap: wrap;
@@ -100,113 +27,7 @@
   margin: var(--space-md) 0 var(--space-xs);
 }
 
-/* ── Schreibrhythmus: Streak-Heatmap + Wochentags-Muster ──────────────────── */
-.mystats-rhythm-section {
-  margin-top: var(--space-xl);
-  border-top: 1px solid var(--color-border);
-  padding-top: var(--space-lg);
-}
-.mystats-rhythm-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-md) var(--space-xl);
-  margin-bottom: var(--space-lg);
-  padding: 0 var(--space-xs);
-}
-.mystats-rhythm-stats .mystats-substat { gap: 2px; }
-
-/* Streak-Heatmap (52 Wochen × 7 Tage GitHub-Stil), Akzent aus Karten-Scope. */
-.mystats-streak-grid {
-  display: grid;
-  grid-auto-flow: column;
-  grid-template-rows: repeat(7, 1fr);
-  gap: var(--space-3);
-  width: 100%;
-  min-height: 96px;
-  overflow-x: auto;
-  padding-bottom: var(--space-xs);
-}
-.mystats-streak-week { display: contents; }
-.mystats-streak-cell {
-  width: 100%;
-  min-width: 9px;
-  aspect-ratio: 1 / 1;
-  border-radius: var(--radius-sm);
-  background: var(--color-tag-bg);
-  transition: filter var(--transition-base);
-}
-.mystats-streak-cell:hover { filter: brightness(1.1); }
-.mystats-streak-cell--empty { visibility: hidden; }
-.mystats-streak-cell--future { opacity: 0.25; }
-.mystats-streak-cell--lvl0 { background: var(--color-tag-bg); }
-.mystats-streak-cell--lvl1 { background: color-mix(in srgb, var(--card-accent) 25%, var(--color-bg)); }
-.mystats-streak-cell--lvl2 { background: color-mix(in srgb, var(--card-accent) 48%, var(--color-bg)); }
-.mystats-streak-cell--lvl3 { background: color-mix(in srgb, var(--card-accent) 70%, var(--color-bg)); }
-.mystats-streak-cell--lvl4 { background: var(--card-accent); }
-
-.mystats-streak-legend {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  margin-top: var(--space-sm);
-  font-size: var(--font-size-xs);
-  color: var(--color-muted);
-}
-.mystats-streak-legend-label { margin-right: var(--space-6); }
-.mystats-streak-legend .mystats-streak-cell {
-  width: 11px;
-  min-width: 11px;
-  height: 11px;
-  aspect-ratio: auto;
-}
-
-/* Wochentags-Muster: 7 Balken Mo..So. */
-.mystats-weekday-label {
-  font-size: var(--font-size-xs);
-  color: var(--color-muted);
-  margin: var(--space-lg) 0 var(--space-sm);
-}
-.mystats-weekday-bars {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: var(--space-xs);
-  align-items: end;
-  min-height: 76px;
-}
-.mystats-weekday-col {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2xs);
-  min-width: 0;
-}
-.mystats-weekday-track {
-  width: 100%;
-  height: 56px;
-  display: flex;
-  align-items: flex-end;
-}
-.mystats-weekday-fill {
-  width: 100%;
-  min-height: 2px;
-  height: var(--progress, 0%);
-  background: var(--card-accent);
-  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-  transition: height 0.18s ease;
-}
-.mystats-weekday-name {
-  font-size: var(--font-size-micro);
-  color: var(--color-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-/* ── Meilensteine: erreichte Badges + naechstes Ziel ──────────────────────── */
-.mystats-milestones-section {
-  margin-top: var(--space-xl);
-  border-top: 1px solid var(--color-border);
-  padding-top: var(--space-lg);
-}
+/* ── Meilensteine: erreichte Badges + nächstes Ziel ──────────────────────── */
 .mystats-badges {
   display: flex;
   flex-wrap: wrap;
@@ -219,9 +40,9 @@
   font-size: var(--font-size-xs);
   font-weight: 500;
   border-radius: var(--radius-sm);
-  color: var(--card-accent);
-  background: color-mix(in srgb, var(--card-accent) 12%, var(--color-bg));
-  border: 1px solid color-mix(in srgb, var(--card-accent) 28%, transparent);
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-bg));
+  border: 1px solid color-mix(in srgb, var(--color-accent) 28%, transparent);
 }
 .mystats-milestone-next {
   margin-top: var(--space-md);
@@ -236,21 +57,63 @@
   margin-bottom: var(--space-2xs);
 }
 
+/* Ausgelagerte Insight-Tiles (my-stats-insights.html): Wrapper aus dem Box-Tree
+   fallen lassen, damit die .overview-tile direkte Grid-Children bleiben (Spans
+   greifen). Analog zu .book-overview in css/book-overview/base.css. */
+.card--mystats .overview-grid > [id^="partial-my-stats-"] { display: contents; }
+
+/* ── Wochen-Delta in der Hero-Kachel ─────────────────────────────────────── */
+.mystats-week-delta {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-sm);
+  margin-top: var(--space-sm);
+}
+.mystats-week-delta .overview-trend-pct { font-size: var(--font-size-sm); font-weight: 600; }
+.mystats-week-delta-label { font-size: var(--font-size-sm); color: var(--color-text); }
+.mystats-week-delta-prev { font-size: var(--font-size-xs); color: var(--color-muted); }
+
+/* ── Lesbarkeits-Trend-Icon (richtungsneutral, gedämpft) ─────────────────── */
+.mystats-trend {
+  width: 0.85em;
+  height: 0.85em;
+  color: var(--color-muted);
+  vertical-align: baseline;
+}
+
+/* ── Aufwand: Schreiben vs. Überarbeiten ─────────────────────────────────── */
+.mystats-effort-bar {
+  display: flex;
+  height: 14px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--color-tag-bg);
+}
+.mystats-effort-seg { height: 100%; transition: width 0.18s ease; }
+.mystats-effort-seg--write { background: var(--color-accent); }
+.mystats-effort-seg--edit  { background: color-mix(in srgb, var(--color-accent) 35%, var(--color-bg)); }
+.mystats-effort-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm) var(--space-md);
+  margin-top: var(--space-sm);
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+.mystats-effort-key { display: inline-flex; align-items: center; gap: var(--space-2xs); }
+.mystats-effort-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-sm);
+  flex: none;
+}
+.mystats-effort-dot--write { background: var(--color-accent); }
+.mystats-effort-dot--edit  { background: color-mix(in srgb, var(--color-accent) 35%, var(--color-bg)); }
+
 @media (max-width: 600px) {
-  .mystats-hero {
-    flex-direction: column;
-  }
-  .mystats-hero-cell + .mystats-hero-cell {
-    border-left: none;
-    border-top: 1px solid color-mix(in srgb, var(--card-accent) 20%, transparent);
-  }
-  .mystats-hero-value {
-    font-size: var(--font-size-3xl);
-  }
   .mystats-chart-wrap {
     height: 200px;
   }
-  .mystats-weekday-track { height: 44px; }
-  .mystats-weekday-bars { min-height: 64px; }
 }
 }

@@ -3,7 +3,10 @@
    internal-link-Override, Trend-Pct-Farben). Tile-spezifische Visuals leben
    in book-overview/{stats,coverage,review,domain,presence,kapitel,recent-actions}.css. */
 
-.book-overview .overview-grid {
+/* Tile-Grid: genutzt von der Buch-Übersicht (.book-overview) und der
+   „Meine Statistik"-Karte (.card--mystats). Unscoped, damit beide Karten
+   dasselbe Tile-Layout teilen statt es zu duplizieren. */
+.overview-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: var(--space-md);
@@ -100,14 +103,14 @@
 .overview-trend-pct--down { color: var(--color-err-text); }
 
 @media (max-width: 700px) {
-  .book-overview .overview-grid {
+  .overview-grid {
     grid-template-columns: 1fr;
   }
   .overview-tile--hero { grid-column: 1 / -1; }
 }
 
 @media (max-width: 480px) {
-  .book-overview .overview-grid { gap: var(--space-10); }
+  .overview-grid { gap: var(--space-10); }
   .overview-tile { padding: var(--space-md); gap: var(--space-6); }
 }
 }

@@ -95,7 +95,7 @@ router.get('/profile-stats', (req, res) => {
   const owned = listBookIdsForUser(email)
     .filter(r => r.role === 'owner')
     .map(r => r.book_id);
-  const empty = { books: 0, chapters: 0, pages: 0, chars: 0, words: 0, unique_words: 0, tok: 0, writing_seconds: 0 };
+  const empty = { books: 0, chapters: 0, pages: 0, chars: 0, words: 0, unique_words: 0, tok: 0, writing_seconds: 0, lektorat_seconds: 0 };
   if (!owned.length) return res.json(empty);
   try {
     const ph = owned.map(() => '?').join(',');
@@ -122,15 +122,21 @@ router.get('/profile-stats', (req, res) => {
       SELECT COALESCE(SUM(seconds), 0) AS writing_seconds
       FROM writing_time WHERE user_email = ? AND book_id IN (${ph})
     `).get(email, ...owned);
+    // Lektoratszeit (Ueberarbeiten) pro User — Gegenstueck zur Schreibzeit.
+    const lt = db.prepare(`
+      SELECT COALESCE(SUM(seconds), 0) AS lektorat_seconds
+      FROM lektorat_time WHERE user_email = ? AND book_id IN (${ph})
+    `).get(email, ...owned);
     res.json({
-      books:           owned.length,
-      chapters:        snap?.chapters || 0,
-      pages:           content?.pages || 0,
-      chars:           content?.chars || 0,
-      words:           content?.words || 0,
-      unique_words:    snap?.unique_words || 0,
-      tok:             content?.tok || 0,
-      writing_seconds: wt?.writing_seconds || 0,
+      books:            owned.length,
+      chapters:         snap?.chapters || 0,
+      pages:            content?.pages || 0,
+      chars:            content?.chars || 0,
+      words:            content?.words || 0,
+      unique_words:     snap?.unique_words || 0,
+      tok:              content?.tok || 0,
+      writing_seconds:  wt?.writing_seconds || 0,
+      lektorat_seconds: lt?.lektorat_seconds || 0,
     });
   } catch (e) {
     logger.error('[me/profile-stats] DB-Fehler: ' + e.message, { user: email });
@@ -155,7 +161,8 @@ router.get('/profile-stats-history', (req, res) => {
   try {
     const ph = owned.map(() => '?').join(',');
     const history = db.prepare(`
-      SELECT book_id, recorded_at, chars, words, tok, page_count, chapter_count, unique_words
+      SELECT book_id, recorded_at, chars, words, tok, page_count, chapter_count, unique_words,
+             avg_sentence_len, avg_lix, avg_flesch_de
       FROM book_stats_history WHERE book_id IN (${ph})
       ORDER BY recorded_at ASC
     `).all(...owned);

@@ -1,0 +1,77 @@
+<!-- Insight-Tiles der „Meine Statistik" (nested via <div id="partial-my-stats-insights">
+     in public/partials/my-stats.html, im x-data="myStatsCard"-Scope). Wrapper ist
+     display:contents (css/components/my-stats.css), damit die .overview-tile direkte
+     Grid-Children der .overview-grid bleiben. Daten: my-stats-card.js / -compute.js. -->
+
+<!-- Lesbarkeit: chars-gewichteter Mittelwert + Trend ggü. ~30 Tagen -->
+<template x-if="myStatsHasReadability">
+  <div class="overview-tile overview-tile--medium">
+    <div class="overview-tile-label" x-text="$app.t('mystats.readability')"></div>
+    <div class="overview-consistency-grid">
+      <div class="overview-consistency-item" x-show="myStatsReadability().flesch !== null">
+        <span class="overview-consistency-value">
+          <span x-text="myStatsDec(myStatsReadability().flesch)"></span>
+          <svg class="icon mystats-trend" aria-hidden="true"><use :href="'/icons.svg#' + myStatsTrendIcon(myStatsReadability().fleschTrend)"></use></svg>
+        </span>
+        <span class="overview-consistency-label"
+              x-text="$app.t('mystats.flesch') + ' · ' + myStatsFleschLabel(myStatsReadability().flesch)"></span>
+      </div>
+      <div class="overview-consistency-item" x-show="myStatsReadability().lix !== null">
+        <span class="overview-consistency-value">
+          <span x-text="myStatsDec(myStatsReadability().lix)"></span>
+          <svg class="icon mystats-trend" aria-hidden="true"><use :href="'/icons.svg#' + myStatsTrendIcon(myStatsReadability().lixTrend)"></use></svg>
+        </span>
+        <span class="overview-consistency-label" x-text="$app.t('mystats.lix')"></span>
+      </div>
+      <div class="overview-consistency-item" x-show="myStatsReadability().sentenceLen !== null">
+        <span class="overview-consistency-value">
+          <span x-text="myStatsDec(myStatsReadability().sentenceLen)"></span>
+          <svg class="icon mystats-trend" aria-hidden="true"><use :href="'/icons.svg#' + myStatsTrendIcon(myStatsReadability().sentenceLenTrend)"></use></svg>
+        </span>
+        <span class="overview-consistency-label" x-text="$app.t('mystats.sentenceLen')"></span>
+      </div>
+    </div>
+  </div>
+</template>
+
+<!-- Aufwand: Schreiben vs. Überarbeiten -->
+<template x-if="myStatsEffort().hasData">
+  <div class="overview-tile overview-tile--medium">
+    <div class="overview-tile-label" x-text="$app.t('mystats.effort')"></div>
+    <div class="mystats-effort-bar" role="img"
+         :aria-label="$app.t('mystats.effortWriting') + ' ' + myStatsEffort().writingPct + '%'">
+      <div class="mystats-effort-seg mystats-effort-seg--write" :style="{ width: myStatsEffort().writingPct + '%' }"></div>
+      <div class="mystats-effort-seg mystats-effort-seg--edit" :style="{ width: myStatsEffort().lektoratPct + '%' }"></div>
+    </div>
+    <div class="mystats-effort-legend">
+      <span class="mystats-effort-key">
+        <span class="mystats-effort-dot mystats-effort-dot--write"></span>
+        <span x-text="$app.t('mystats.effortWriting') + ' · ' + myStatsEffort().writingPct + '%'"></span>
+      </span>
+      <span class="mystats-effort-key">
+        <span class="mystats-effort-dot mystats-effort-dot--edit"></span>
+        <span x-text="$app.t('mystats.effortEditing') + ' · ' + myStatsEffort().lektoratPct + '%'"></span>
+      </span>
+    </div>
+  </div>
+</template>
+
+<!-- Wo deine Zeit hinfloss: Schreibzeit pro Buch -->
+<template x-if="myStatsHasPerBook">
+  <div class="overview-tile overview-tile--medium">
+    <div class="overview-tile-label" x-text="$app.t('mystats.perBookTime')"></div>
+    <ul class="overview-chapter-list">
+      <template x-for="b in myStatsPerBookTime()" :key="b.book_id">
+        <li class="overview-chapter-row">
+          <span class="overview-chapter-name" :data-tip="b.name" x-text="b.name"></span>
+          <div class="overview-chapter-bar-track">
+            <div class="overview-chapter-bar-fill" :style="{ width: b.pct + '%' }"></div>
+          </div>
+          <span class="overview-chapter-meta">
+            <span class="overview-chapter-chars" x-text="myStatsMinFmt(b.minutes)"></span>
+          </span>
+        </li>
+      </template>
+    </ul>
+  </div>
+</template>

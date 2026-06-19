@@ -6,7 +6,8 @@
 
 import { loadChart } from '../lazy-libs.js';
 import { tzOpts } from '../utils.js';
-import { computeWritingStreak, computeWeekdayPattern, computeDerived, computeMilestones } from './my-stats-compute.js';
+import { computeWritingStreak, computeWeekdayPattern, computeDerived, computeMilestones,
+         computeReadability, computeWeeklyDelta, computePerBookTime, computeEffortSplit } from './my-stats-compute.js';
 
 const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
@@ -162,6 +163,44 @@ export function registerMyStatsCard() {
 
     myStatsMilestoneLabel(category, target) {
       return window.__app.t(MILESTONE_LABELS[category] || 'mystats.milestone.chars', { n: this._myStatsFmt(target) });
+    },
+
+    // ── Lesbarkeit (1), Aufwand (2), Pro-Buch-Zeit (3), Wochen-Delta (4) ────
+    myStatsReadability() {
+      return this._memo('readability', [this.myStatsHistory], () => computeReadability(this.myStatsHistory));
+    },
+    myStatsWeekDelta() {
+      return this._memo('weekDelta', [this.myStatsHistory], () => computeWeeklyDelta(this.myStatsHistory));
+    },
+    myStatsEffort() {
+      return this._memo('effort', [this.myStatsData], () =>
+        computeEffortSplit(this.myStatsData?.writing_seconds, this.myStatsData?.lektorat_seconds));
+    },
+    myStatsPerBookTime() {
+      return this._memo('perBook', [this.myStatsWriting], () =>
+        computePerBookTime(this.myStatsWriting).map(r => ({ ...r, name: this._bookName(r.book_id) })));
+    },
+
+    get myStatsHasReadability() { return this.myStatsReadability().hasData; },
+    get myStatsHasPerBook() { return this.myStatsPerBookTime().length > 1; },
+
+    // Zahl mit einer Nachkommastelle (Lesbarkeitswerte), Locale-aware.
+    myStatsDec(n) {
+      if (n == null) return '–';
+      const loc = window.__app.uiLocale === 'de' ? 'de-CH' : 'en-US';
+      return Number(n).toLocaleString(loc, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    },
+
+    // Flesch-DE in Klartext-Band (4 Stufen).
+    myStatsFleschLabel(v) {
+      if (v == null) return '';
+      const key = v >= 70 ? 'easy' : v >= 50 ? 'medium' : v >= 30 ? 'hard' : 'veryHard';
+      return window.__app.t('mystats.flesch.' + key);
+    },
+
+    // Trend-Richtung → Sprite-Icon (richtungsneutral, ohne Wertung).
+    myStatsTrendIcon(dir) {
+      return dir > 0 ? 'arrow-up' : dir < 0 ? 'arrow-down' : 'minus';
     },
 
     _destroyChart() {

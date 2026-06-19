@@ -6,7 +6,8 @@ import assert from 'node:assert/strict';
 // utils/date.js liest window.__app fuer Timezone — minimal stubben.
 globalThis.window = { __app: { uiLocale: 'de' } };
 
-const { computeWritingStreak, computeWeekdayPattern, computeDerived, computeMilestones, secondsByDate } =
+const { computeWritingStreak, computeWeekdayPattern, computeDerived, computeMilestones, secondsByDate,
+        computeReadability, computeWeeklyDelta, computePerBookTime, computeEffortSplit } =
   await import('../../public/js/cards/my-stats-compute.js');
 
 import { localIsoDaysAgo } from '../../public/js/utils.js';
@@ -118,4 +119,81 @@ test('computeMilestones: nichts erreicht → leere Badges, aber naechstes Ziel',
   const m = computeMilestones({ chars: 0, words: 0, books: 0 }, { activeDays: 0 });
   assert.equal(m.achieved.length, 0);
   assert.ok(m.next);
+});
+
+test('computeReadability: chars-gewichteter Mittelwert ueber letztes Snapshot je Buch', () => {
+  const rows = [
+    // Buch 1: zwei Snapshots, letzter zaehlt; Buch 2: ein Snapshot.
+    { book_id: 1, recorded_at: '2026-06-01', chars: 1000, avg_flesch_de: 50, avg_lix: 40, avg_sentence_len: 12 },
+    { book_id: 1, recorded_at: '2026-06-10', chars: 3000, avg_flesch_de: 60, avg_lix: 45, avg_sentence_len: 14 },
+    { book_id: 2, recorded_at: '2026-06-09', chars: 1000, avg_flesch_de: 80, avg_lix: 35, avg_sentence_len: 10 },
+  ];
+  const r = computeReadability(rows);
+  assert.ok(r.hasData);
+  // (60*3000 + 80*1000) / 4000 = 65
+  assert.equal(r.flesch, 65);
+  assert.equal(r.lix, (45 * 3000 + 35 * 1000) / 4000);
+});
+
+test('computeReadability: ohne Werte → hasData false, Trends 0', () => {
+  const r = computeReadability([{ book_id: 1, recorded_at: '2026-06-01', chars: 1000, avg_flesch_de: null, avg_lix: null, avg_sentence_len: null }]);
+  assert.equal(r.hasData, false);
+  assert.equal(r.fleschTrend, 0);
+});
+
+test('computeReadability: Trend vergleicht mit ~30 Tagen zuvor', () => {
+  const rows = [
+    { book_id: 1, recorded_at: isoDaysAgo(40), chars: 1000, avg_flesch_de: 50, avg_lix: 50, avg_sentence_len: 12 },
+    { book_id: 1, recorded_at: isoDaysAgo(0),  chars: 1000, avg_flesch_de: 60, avg_lix: 45, avg_sentence_len: 12 },
+  ];
+  const r = computeReadability(rows);
+  assert.equal(r.fleschTrend, 1, 'Flesch gestiegen');
+  assert.equal(r.lixTrend, -1, 'LIX gesunken');
+  assert.equal(r.sentenceLenTrend, 0, 'Satzlaenge unveraendert');
+});
+
+test('computeWeeklyDelta: Zuwachs diese Woche vs. letzte Woche', () => {
+  // chars = kumulierte Gesamtgroesse. Basis je Woche = letzter Snapshot davor.
+  const rows = [
+    { book_id: 1, recorded_at: isoDaysAgo(20), chars: 1000 }, // vor letzter Woche
+    { book_id: 1, recorded_at: isoDaysAgo(9),  chars: 1500 }, // Basis letzte Woche-Ende grob
+    { book_id: 1, recorded_at: isoDaysAgo(0),  chars: 2200 }, // jetzt
+  ];
+  const r = computeWeeklyDelta(rows);
+  assert.equal(typeof r.thisWeek, 'number');
+  assert.equal(typeof r.lastWeek, 'number');
+  assert.ok(r.thisWeek >= 0);
+});
+
+test('computePerBookTime: absteigend sortiert, pct relativ zum Spitzenbuch', () => {
+  const rows = [
+    { book_id: 1, date: '2026-06-01', seconds: 600 },
+    { book_id: 2, date: '2026-06-01', seconds: 1800 },
+    { book_id: 1, date: '2026-06-02', seconds: 600 },
+  ];
+  const r = computePerBookTime(rows);
+  assert.equal(r.length, 2);
+  assert.equal(r[0].book_id, 2, 'Buch 2 fuehrt (1800s)');
+  assert.equal(r[0].pct, 100);
+  assert.equal(r[1].book_id, 1);
+  assert.equal(r[1].minutes, 20);
+  assert.equal(r[1].pct, Math.round((1200 / 1800) * 100));
+});
+
+test('computePerBookTime: Buecher ohne Zeit fallen raus', () => {
+  const r = computePerBookTime([{ book_id: 1, date: '2026-06-01', seconds: 0 }]);
+  assert.equal(r.length, 0);
+});
+
+test('computeEffortSplit: Prozente summieren grob zu 100', () => {
+  const e = computeEffortSplit(7200, 1800); // 2h schreiben, 30min lektorat
+  assert.ok(e.hasData);
+  assert.equal(e.writingPct, 80);
+  assert.equal(e.lektoratPct, 20);
+});
+
+test('computeEffortSplit: ohne Daten → hasData false', () => {
+  const e = computeEffortSplit(0, 0);
+  assert.equal(e.hasData, false);
+  assert.equal(e.writingPct, 0);
 });

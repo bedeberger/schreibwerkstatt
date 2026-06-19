@@ -175,3 +175,119 @@ export function computeMilestones(data, derived) {
   }
   return { achieved, next };
 }
+
+// ── Snapshot-Helfer (book_stats_history) ────────────────────────────────────
+// Letzter Snapshot je Buch (max recorded_at).
+export function latestSnapshotPerBook(historyRows) {
+  const m = new Map();
+  for (const r of (historyRows || [])) {
+    const prev = m.get(r.book_id);
+    if (!prev || r.recorded_at > prev.recorded_at) m.set(r.book_id, r);
+  }
+  return m;
+}
+
+// Letzter Snapshot je Buch mit recorded_at <= cutoff (ISO YYYY-MM-DD).
+export function snapshotPerBookOnOrBefore(historyRows, cutoffIso) {
+  const m = new Map();
+  for (const r of (historyRows || [])) {
+    if (r.recorded_at > cutoffIso) continue;
+    const prev = m.get(r.book_id);
+    if (!prev || r.recorded_at > prev.recorded_at) m.set(r.book_id, r);
+  }
+  return m;
+}
+
+// Chars-gewichteter Mittelwert eines Feldes ueber eine Snapshot-Map.
+function weightedAvg(snapMap, field) {
+  let num = 0, den = 0;
+  for (const r of snapMap.values()) {
+    const v = r[field];
+    const w = Number(r.chars) || 0;
+    if (v == null || w <= 0) continue;
+    num += Number(v) * w;
+    den += w;
+  }
+  return den > 0 ? num / den : null;
+}
+
+// Lesbarkeit (chars-gewichtet ueber das letzte Snapshot je Buch) + Trend
+// gegenueber ~30 Tagen zuvor. Trend ∈ {-1,0,1} (richtungsneutral, keine
+// Gut/Schlecht-Wertung — Flesch hoeher = leichter, LIX hoeher = schwerer).
+export function computeReadability(historyRows, todayLocal = new Date()) {
+  const latest = latestSnapshotPerBook(historyRows);
+  const today = new Date(todayLocal); today.setHours(12, 0, 0, 0);
+  const past = snapshotPerBookOnOrBefore(historyRows, localIsoDaysAgo(30, today));
+
+  const flesch = weightedAvg(latest, 'avg_flesch_de');
+  const lix = weightedAvg(latest, 'avg_lix');
+  const sentenceLen = weightedAvg(latest, 'avg_sentence_len');
+  const hasData = flesch != null || lix != null || sentenceLen != null;
+
+  const trend = (cur, field, eps) => {
+    if (cur == null) return 0;
+    const before = weightedAvg(past, field);
+    if (before == null) return 0;
+    const d = cur - before;
+    return d > eps ? 1 : d < -eps ? -1 : 0;
+  };
+
+  return {
+    hasData,
+    flesch, lix, sentenceLen,
+    fleschTrend:      trend(flesch, 'avg_flesch_de', 1),
+    lixTrend:         trend(lix, 'avg_lix', 1),
+    sentenceLenTrend: trend(sentenceLen, 'avg_sentence_len', 0.3),
+  };
+}
+
+// Geschriebene Zeichen diese Woche vs. letzte Woche (Mo-Start, lokal).
+// chars im Snapshot ist die Gesamtgroesse → Zuwachs = Differenz der
+// Wochengrenz-Snapshots. Basis je Buch = letzter Snapshot vor Wochenbeginn.
+export function computeWeeklyDelta(historyRows, todayLocal = new Date()) {
+  const today = new Date(todayLocal); today.setHours(12, 0, 0, 0);
+  const dowMon = (today.getDay() + 6) % 7;            // Mo=0 ... So=6
+  const cThisBase = localIsoDaysAgo(dowMon + 1, today); // Sonntag vor dieser Woche
+  const cLastBase = localIsoDaysAgo(dowMon + 8, today); // Sonntag vor letzter Woche
+
+  const cur = latestSnapshotPerBook(historyRows);
+  const thisBase = snapshotPerBookOnOrBefore(historyRows, cThisBase);
+  const lastBase = snapshotPerBookOnOrBefore(historyRows, cLastBase);
+  const charsOf = (map, id) => Number(map.get(id)?.chars) || 0;
+
+  let thisWeek = 0, lastWeek = 0;
+  for (const id of cur.keys()) {
+    thisWeek += charsOf(cur, id) - charsOf(thisBase, id);
+    lastWeek += charsOf(thisBase, id) - charsOf(lastBase, id);
+  }
+  return { thisWeek, lastWeek };
+}
+
+// Schreibzeit je Buch (absteigend) fuer das „wo deine Zeit hinfloss"-Ranking.
+// pct relativ zum Spitzenbuch. Namen werden im Card via _bookName aufgeloest.
+export function computePerBookTime(writingRows) {
+  const secByBook = new Map();
+  for (const r of (writingRows || [])) {
+    secByBook.set(r.book_id, (secByBook.get(r.book_id) || 0) + (Number(r.seconds) || 0));
+  }
+  const rows = [...secByBook.entries()]
+    .map(([book_id, seconds]) => ({ book_id, seconds, minutes: Math.round(seconds / 60) }))
+    .filter(r => r.seconds > 0)
+    .sort((a, b) => b.seconds - a.seconds);
+  const max = rows.length ? rows[0].seconds : 1;
+  return rows.map(r => ({ ...r, pct: Math.round((r.seconds / max) * 100) }));
+}
+
+// Aufwands-Aufteilung Schreiben vs. Ueberarbeiten (Sekunden → Prozent).
+export function computeEffortSplit(writingSeconds, lektoratSeconds) {
+  const w = Math.max(0, Number(writingSeconds) || 0);
+  const l = Math.max(0, Number(lektoratSeconds) || 0);
+  const total = w + l;
+  return {
+    writingSeconds: w,
+    lektoratSeconds: l,
+    hasData: total > 0,
+    writingPct: total > 0 ? Math.round((w / total) * 100) : 0,
+    lektoratPct: total > 0 ? Math.round((l / total) * 100) : 0,
+  };
+}
