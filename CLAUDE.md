@@ -334,7 +334,7 @@ Browser → NGINX (HTTPS) → Express (Port 3737)
   /public/*        → Unauthentifizierte Endpoints (Health, Marketing)
   /                → public/index.html (SPA)
 
-Cron (täglich 02:00) → syncAllBooks() → page_stats + book_stats_history
+Cron (täglich nachts; Uhrzeit in server.js, TZ aus app.timezone) → syncAllBooks() → page_stats + book_stats_history
 ```
 
 **Auth:** Alle Routen ausser `/auth/*` sind durch Session-Guard geschützt. HTML-Requests → Redirect auf Login. API-Requests → `401 JSON`.

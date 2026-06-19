@@ -32,6 +32,10 @@
           <span class="mystats-substat-value" x-text="_myStatsFmt(myStatsData.words)"></span>
           <span class="mystats-substat-label" x-text="$app.t('mystats.words')"></span>
         </div>
+        <div class="mystats-substat" x-show="myStatsData.unique_words > 0">
+          <span class="mystats-substat-value" x-text="_myStatsFmt(myStatsData.unique_words)"></span>
+          <span class="mystats-substat-label" x-text="$app.t('mystats.uniqueWords')"></span>
+        </div>
         <div class="mystats-substat">
           <span class="mystats-substat-value" x-text="_myStatsFmt(myStatsData.books)"></span>
           <span class="mystats-substat-label" x-text="$app.t('mystats.books')"></span>
@@ -49,6 +53,103 @@
           <span class="mystats-substat-label" x-text="$app.t('mystats.writingTime')"></span>
         </div>
       </div>
+    </div>
+  </template>
+
+  <!-- Schreibrhythmus: Streak-Heatmap + Wochentags-Muster + Kennzahlen -->
+  <template x-if="!myStatsLoading && !myStatsError && myStatsHasRhythm">
+    <div class="mystats-rhythm-section">
+      <div class="mystats-section-label" x-text="$app.t('mystats.rhythm')"></div>
+
+      <div class="mystats-rhythm-stats">
+        <div class="mystats-substat">
+          <span class="mystats-substat-value" x-text="$app.t('mystats.days', { n: myStatsStreak().currentStreak })"></span>
+          <span class="mystats-substat-label" x-text="$app.t('mystats.streakCurrent')"></span>
+        </div>
+        <div class="mystats-substat">
+          <span class="mystats-substat-value" x-text="$app.t('mystats.days', { n: myStatsStreak().longestStreak })"></span>
+          <span class="mystats-substat-label" x-text="$app.t('mystats.streakLongest')"></span>
+        </div>
+        <div class="mystats-substat">
+          <span class="mystats-substat-value" x-text="_myStatsFmt(myStatsStreak().totalActiveDays)"></span>
+          <span class="mystats-substat-label" x-text="$app.t('mystats.activeDays')"></span>
+        </div>
+        <div class="mystats-substat">
+          <span class="mystats-substat-value" x-text="myStatsMinFmt(myStatsDerived().dailyAvgMin)"></span>
+          <span class="mystats-substat-label" x-text="$app.t('mystats.dailyAvg')"></span>
+        </div>
+        <div class="mystats-substat" x-show="myStatsDerived().bestDayMin > 0">
+          <span class="mystats-substat-value" x-text="myStatsMinFmt(myStatsDerived().bestDayMin)"></span>
+          <span class="mystats-substat-label"
+                x-text="$app.t('mystats.bestDay') + ' · ' + myStatsDateLabel(myStatsDerived().bestDayDate)"></span>
+        </div>
+        <div class="mystats-substat" x-show="myStatsDerived().paceCharsPerHour > 0">
+          <span class="mystats-substat-value" x-text="$app.t('mystats.pace', { n: _myStatsFmt(myStatsDerived().paceCharsPerHour) })"></span>
+          <span class="mystats-substat-label" x-text="$app.t('mystats.paceLabel')"></span>
+        </div>
+      </div>
+
+      <!-- Streak-Heatmap: 52×7 GitHub-Stil, aktive Schreibtage -->
+      <div class="mystats-streak-grid" role="img" :aria-label="$app.t('mystats.rhythm')">
+        <template x-for="(week, wi) in myStatsStreak().weeks" :key="wi">
+          <div class="mystats-streak-week">
+            <template x-for="(cell, di) in week" :key="di">
+              <div class="mystats-streak-cell"
+                   :class="cell ? ('mystats-streak-cell--lvl' + cell.level + (cell.future ? ' mystats-streak-cell--future' : '')) : 'mystats-streak-cell--empty'"
+                   :data-tip="cell && cell.iso
+                     ? (cell.active
+                         ? $app.t('mystats.cellTip', { date: myStatsDateLabel(cell.iso), min: cell.minutes })
+                         : $app.t('mystats.cellTipNone', { date: myStatsDateLabel(cell.iso) }))
+                     : null"></div>
+            </template>
+          </div>
+        </template>
+      </div>
+      <div class="mystats-streak-legend">
+        <span class="mystats-streak-legend-label" x-text="$app.t('mystats.legend')"></span>
+        <span class="mystats-streak-cell mystats-streak-cell--lvl0"></span>
+        <span class="mystats-streak-cell mystats-streak-cell--lvl1"></span>
+        <span class="mystats-streak-cell mystats-streak-cell--lvl2"></span>
+        <span class="mystats-streak-cell mystats-streak-cell--lvl3"></span>
+        <span class="mystats-streak-cell mystats-streak-cell--lvl4"></span>
+      </div>
+
+      <!-- Wochentags-Muster: 7 Balken Mo..So (Summe Schreibminuten) -->
+      <div class="mystats-weekday-label" x-text="$app.t('mystats.weekdayPattern')"></div>
+      <div class="mystats-weekday-bars">
+        <template x-for="(d, i) in myStatsWeekdays()" :key="i">
+          <div class="mystats-weekday-col"
+               :data-tip="$app.t('mystats.weekdayTip', { day: myStatsWeekdayLabels()[i], time: myStatsMinFmt(d.minutes) })">
+            <div class="mystats-weekday-track">
+              <div class="mystats-weekday-fill" :style="{ '--progress': d.pct + '%' }"></div>
+            </div>
+            <span class="mystats-weekday-name" x-text="myStatsWeekdayLabels()[i]"></span>
+          </div>
+        </template>
+      </div>
+    </div>
+  </template>
+
+  <!-- Meilensteine -->
+  <template x-if="!myStatsLoading && !myStatsError && myStatsData && myStatsData.books > 0 && (myStatsMilestones().achieved.length || myStatsMilestones().next)">
+    <div class="mystats-milestones-section">
+      <div class="mystats-section-label" x-text="$app.t('mystats.milestones')"></div>
+      <div class="mystats-badges">
+        <template x-for="m in myStatsMilestones().achieved" :key="m.category">
+          <span class="mystats-badge" x-text="myStatsMilestoneLabel(m.category, m.target)"></span>
+        </template>
+      </div>
+      <template x-if="myStatsMilestones().next">
+        <div class="mystats-milestone-next">
+          <div class="mystats-milestone-next-head">
+            <span x-text="$app.t('mystats.nextGoal')"></span>
+            <span x-text="myStatsMilestoneLabel(myStatsMilestones().next.category, myStatsMilestones().next.target)"></span>
+          </div>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar" :style="{ '--progress': myStatsMilestones().next.progress + '%' }"></div>
+          </div>
+        </div>
+      </template>
     </div>
   </template>
 
@@ -70,11 +171,19 @@
                {value:'chars',         label: $app.t('mystats.metric.chars')},
                {value:'normseiten',    label: $app.t('mystats.metric.normseiten')},
                {value:'words',         label: $app.t('mystats.metric.words')},
+               {value:'unique_words',  label: $app.t('mystats.metric.uniqueWords')},
                {value:'page_count',    label: $app.t('mystats.metric.pages')},
                {value:'chapter_count', label: $app.t('mystats.metric.chapters')},
                {value:'writing',       label: $app.t('mystats.metric.writing')}
              ]"
              @combobox-change="$nextTick(() => renderMyStatsChart())"></div>
+        <div class="btn-group" x-show="myStatsMetric === 'writing'" x-cloak>
+          <template x-for="c in [{v:false,k:'daily'},{v:true,k:'cumulative'}]" :key="String(c.v)">
+            <button type="button" class="btn-compact" :class="{ primary: myStatsCumulative === c.v }"
+                    @click="myStatsCumulative = c.v; renderMyStatsChart()"
+                    x-text="$app.t('mystats.cumul.' + c.k)"></button>
+          </template>
+        </div>
         <div class="btn-group">
           <template x-for="r in [{v:30,k:'30'},{v:90,k:'90'},{v:365,k:'365'},{v:0,k:'all'}]" :key="r.v">
             <button type="button" class="btn-compact" :class="{ primary: myStatsRange === r.v }"

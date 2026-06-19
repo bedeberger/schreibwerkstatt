@@ -5,6 +5,8 @@
 // `GET /me/profile-stats` (Tiles) + `GET /me/profile-stats-history` (Chart).
 
 import { loadChart } from '../lazy-libs.js';
+import { tzOpts } from '../utils.js';
+import { computeWritingStreak, computeWeekdayPattern, computeDerived, computeMilestones } from './my-stats-compute.js';
 
 const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
@@ -14,9 +16,18 @@ const METRIC_KEYS = {
   chars:         'mystats.metric.chars',
   normseiten:    'mystats.metric.normseiten',
   words:         'mystats.metric.words',
+  unique_words:  'mystats.metric.uniqueWords',
   page_count:    'mystats.metric.pages',
   chapter_count: 'mystats.metric.chapters',
   writing:       'mystats.metric.writing',
+};
+
+// Meilenstein-Label-Keys pro Kategorie (Wert via {n} interpoliert).
+const MILESTONE_LABELS = {
+  chars:      'mystats.milestone.chars',
+  words:      'mystats.milestone.words',
+  activeDays: 'mystats.milestone.activeDays',
+  books:      'mystats.milestone.books',
 };
 
 // Farbpalette fuer Pro-Buch-Linien — mittlere Saettigung, lesbar auf Light+Dark.
@@ -40,8 +51,10 @@ export function registerMyStatsCard() {
     myStatsMetric: 'chars',
     myStatsRange: 0,
     myStatsChartMode: 'total', // 'total' | 'byBook'
+    myStatsCumulative: false,  // nur fuer Metrik 'writing' (kumulierte Schreibzeit)
     myStatsLoading: false,
     myStatsError: '',
+    _myStatsMemos: {},
 
     init() {
       this.$watch(() => window.__app.showMyStatsCard, (visible) => {
@@ -63,6 +76,7 @@ export function registerMyStatsCard() {
     async loadMyStats() {
       this.myStatsLoading = true;
       this.myStatsError = '';
+      this._myStatsMemos = {};
       try {
         const [statsR, histR] = await Promise.all([
           fetch('/me/profile-stats', { credentials: 'same-origin' }),
@@ -88,6 +102,66 @@ export function registerMyStatsCard() {
 
     get myStatsHasChart() {
       return this.myStatsHistory.length > 0 || this.myStatsWriting.length > 0;
+    },
+
+    // Ein Memo-Helper pro Modul (CLAUDE.md): Aggregat-Getter werden im Template
+    // mehrfach pro Render aufgerufen → Cache mit shallow-Array-Deps. Reset bei
+    // jedem Daten-Reload via this._myStatsMemos = {} in loadMyStats().
+    _memo(key, deps, fn) {
+      const prev = this._myStatsMemos[key];
+      if (prev && prev.deps.length === deps.length && prev.deps.every((d, i) => d === deps[i])) {
+        return prev.val;
+      }
+      const val = fn();
+      this._myStatsMemos[key] = { deps, val };
+      return val;
+    },
+
+    // ── Schreibrhythmus (alle aus der writing-Zeitreihe) ───────────────────
+    myStatsStreak() {
+      return this._memo('streak', [this.myStatsWriting], () => computeWritingStreak(this.myStatsWriting));
+    },
+    myStatsWeekdays() {
+      return this._memo('weekdays', [this.myStatsWriting], () => computeWeekdayPattern(this.myStatsWriting));
+    },
+    myStatsDerived() {
+      return this._memo('derived', [this.myStatsData, this.myStatsWriting], () =>
+        computeDerived(this.myStatsData, this.myStatsWriting));
+    },
+    myStatsMilestones() {
+      return this._memo('milestones', [this.myStatsData, this.myStatsWriting], () =>
+        computeMilestones(this.myStatsData, this.myStatsDerived()));
+    },
+
+    get myStatsHasRhythm() {
+      return (this.myStatsWriting || []).length > 0;
+    },
+
+    // Wochentags-Kurzlabels Mo..So (Locale-aware, TZ-bereinigt).
+    myStatsWeekdayLabels() {
+      const tag = window.__app.uiLocale === 'en' ? 'en-US' : 'de-CH';
+      const fmt = new Intl.DateTimeFormat(tag, tzOpts({ weekday: 'short' }));
+      const monRef = new Date(2027, 0, 4); // 2027-01-04 ist ein Montag
+      return Array.from({ length: 7 }, (_, i) => fmt.format(new Date(monRef.getTime() + i * 86400000)));
+    },
+
+    // Datum eines Streak-/Bestleistungs-Tages lesbar formatieren.
+    myStatsDateLabel(iso) {
+      if (!iso) return '';
+      const tag = window.__app.uiLocale === 'en' ? 'en-US' : 'de-CH';
+      return new Date(iso + 'T12:00:00').toLocaleDateString(tag, tzOpts({ day: 'numeric', month: 'short', year: 'numeric' }));
+    },
+
+    // Minuten kompakt: „2 h 10 min" / „45 min".
+    myStatsMinFmt(min) {
+      const total = Math.max(0, Math.round(Number(min) || 0));
+      const h = Math.floor(total / 60), m = total % 60;
+      const t = window.__app.t;
+      return h > 0 ? t('mystats.hm', { h: this._myStatsFmt(h), m }) : t('mystats.m', { m });
+    },
+
+    myStatsMilestoneLabel(category, target) {
+      return window.__app.t(MILESTONE_LABELS[category] || 'mystats.milestone.chars', { n: this._myStatsFmt(target) });
     },
 
     _destroyChart() {
@@ -146,6 +220,26 @@ export function registerMyStatsCard() {
       }
       if (!rows.length) return;
 
+      // Nur bis zum letzten vollständigen Sync zeigen: book_stats_history bekommt
+      // pro Buch eine Tageszeile vom Nacht-Cron. Ein manueller Einzelbuch-Sync
+      // mitten am Tag (oder ein noch ausstehender Nachtlauf) erzeugt sonst einen
+      // Teil-Tages-Punkt mit weniger Büchern als der Vortag — als künstlicher
+      // Einbruch sichtbar. Darum jüngste Tage abschneiden, solange ihre Buch-Zahl
+      // unter der des Vortags liegt. Nur für Content-Historie — Schreibzeit ist
+      // naturgemäss dünn (nur aktive Tage) und kennt kein „vollständiges" Tagesbild.
+      if (!isWriting) {
+        const allDates = [...new Set(rows.map(r => r.date))].sort();
+        const booksOn = new Map();
+        for (const r of rows) {
+          if (!booksOn.has(r.date)) booksOn.set(r.date, new Set());
+          booksOn.get(r.date).add(r.book_id);
+        }
+        let last = allDates.length - 1;
+        while (last > 0 && booksOn.get(allDates[last]).size < booksOn.get(allDates[last - 1]).size) last--;
+        const lastDate = allDates[last];
+        rows = rows.filter(r => r.date <= lastDate);
+      }
+
       const valOf = (raw) => {
         if (metric === 'normseiten') return Math.round(((Number(raw.chars) || 0) / 1500) * 10) / 10;
         if (isWriting)              return Math.round((Number(raw.seconds) || 0) / 60);
@@ -197,9 +291,17 @@ export function registerMyStatsCard() {
         // Gesamt: Summe pro Tag über alle Bücher.
         const sumByDate = new Map();
         for (const r of rows) sumByDate.set(r.date, (sumByDate.get(r.date) || 0) + valOf(r.raw));
+        let series = dates.map(d => sumByDate.has(d) ? sumByDate.get(d) : 0);
+        // Kumuliert nur fuer Schreibzeit sinnvoll (Tages-Deltas aufsummiert →
+        // total investierte Zeit). Inhaltsmetriken sind bereits kumulative
+        // Snapshot-Groessen, daher dort kein Cumulative-Toggle im UI.
+        if (this.myStatsCumulative && isWriting) {
+          let acc = 0;
+          series = series.map(v => (acc += v));
+        }
         datasets = [{
           label: metricLabel,
-          data: dates.map(d => sumByDate.has(d) ? sumByDate.get(d) : 0),
+          data: series,
           borderColor: primary,
           backgroundColor: primary + '12',
           pointBackgroundColor: primary,

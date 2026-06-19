@@ -95,7 +95,7 @@ router.get('/profile-stats', (req, res) => {
   const owned = listBookIdsForUser(email)
     .filter(r => r.role === 'owner')
     .map(r => r.book_id);
-  const empty = { books: 0, chapters: 0, pages: 0, chars: 0, words: 0, tok: 0, writing_seconds: 0 };
+  const empty = { books: 0, chapters: 0, pages: 0, chars: 0, words: 0, unique_words: 0, tok: 0, writing_seconds: 0 };
   if (!owned.length) return res.json(empty);
   try {
     const ph = owned.map(() => '?').join(',');
@@ -106,9 +106,12 @@ router.get('/profile-stats', (req, res) => {
              COUNT(*)                AS pages
       FROM page_stats WHERE book_id IN (${ph})
     `).get(...owned);
-    // Letzter Snapshot pro Buch (MAX(recorded_at)) — daraus chapter_count summieren.
-    const chapters = db.prepare(`
-      SELECT COALESCE(SUM(bsh.chapter_count), 0) AS chapters
+    // Letzter Snapshot pro Buch (MAX(recorded_at)) — daraus chapter_count +
+    // unique_words summieren (Wortschatz; ueber Buecher summiert = Naeherung,
+    // gleiche Konvention wie chars).
+    const snap = db.prepare(`
+      SELECT COALESCE(SUM(bsh.chapter_count), 0) AS chapters,
+             COALESCE(SUM(bsh.unique_words), 0)  AS unique_words
       FROM book_stats_history bsh
       JOIN (
         SELECT book_id, MAX(recorded_at) AS mx
@@ -121,10 +124,11 @@ router.get('/profile-stats', (req, res) => {
     `).get(email, ...owned);
     res.json({
       books:           owned.length,
-      chapters:        chapters?.chapters || 0,
+      chapters:        snap?.chapters || 0,
       pages:           content?.pages || 0,
       chars:           content?.chars || 0,
       words:           content?.words || 0,
+      unique_words:    snap?.unique_words || 0,
       tok:             content?.tok || 0,
       writing_seconds: wt?.writing_seconds || 0,
     });

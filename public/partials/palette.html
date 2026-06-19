@@ -42,6 +42,7 @@
               <template x-for="item in section.items" :key="section.key + ':' + item.key">
                 <button type="button"
                         class="palette-item"
+                        tabindex="-1"
                         :id="paletteItemId(section.key, item.key)"
                         :class="{
                           'palette-item--active': paletteIsActive(section.key, item.key),

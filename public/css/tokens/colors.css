@@ -38,13 +38,21 @@
   --color-err-light: #fc8181;
   --color-style-border: #EF9F27;
 
-  --color-primary: #1e3a5f;
-  --color-primary-hover: #16293d;
-  --color-primary-light: #6a8cb0;
+  /* Marken-Blau aus dem Logo: primary = Buchrücken (#1d4b73, AA mit Weiss),
+     primary-light = Buchkörper-Blau (#2d6a9f, Signatur-Ton). */
+  --color-primary: #1d4b73;
+  --color-primary-hover: #143855;
+  --color-primary-light: #2d6a9f;
   --color-on-primary: #ffffff;
-  --color-accent: #9a7f3e;
+  /* Akzent = Feder-Gold aus dem Logo. */
+  --color-accent: #c4a55a;
   --color-success: #34d399;
   --color-success-hover: #1D9E75;
+
+  /* KI-Funken aus dem Logo — dekorative Akzente für KI-/Analyse-Kontexte. */
+  --color-spark-blue: #7eb8f0;
+  --color-spark-purple: #a78bfa;
+  --color-spark-green: var(--color-success);
 
   /* === Status-Achse 2: content-severity (Findings, Continuity) ===
      Eigene Shades — semantisch reicher als ok/warn/err und visuell
@@ -61,11 +69,12 @@
 
   --color-card-bg: var(--color-surface);
   --color-neutral-bg: #e8e8e8;
-  --color-accent-bg: rgba(154, 127, 62, 0.14);
-  --color-accent-text: #6e5a26;
-  --color-accent-hover: rgba(154, 127, 62, 0.09);
-  --color-accent-soft: rgba(154, 127, 62, 0.06);
-  --color-running: #2d6a9f;
+  --color-accent-bg: rgba(196, 165, 90, 0.16);
+  --color-accent-text: #8a6a20;
+  --color-accent-hover: rgba(196, 165, 90, 0.10);
+  --color-accent-soft: rgba(196, 165, 90, 0.06);
+  /* Konsolidiert auf den Signatur-Blau-Ton statt eigenem Hex. */
+  --color-running: var(--color-primary-light);
 
   /* Schatten-Alpha (Tokens in tokens/motion.css greifen darauf zu) */
   --color-shadow-soft: rgba(0, 0, 0, 0.1);
@@ -84,7 +93,7 @@
   /* Inline-Markierungen (Lektorat + Chat) */
   --color-mark-bg: rgba(255, 200, 50, 0.35);
   --color-mark-bg-hover: rgba(255, 200, 50, 0.55);
-  --color-mark-border: #d4a017;
+  --color-mark-border: var(--color-accent);
   --color-mark-del-bg: rgba(220, 60, 60, 0.10);
   --color-mark-del-bg-hover: rgba(220, 60, 60, 0.18);
   --color-mark-del-border: #d33;
@@ -94,9 +103,9 @@
   --color-mark-ins-text: #1a7f37;
   --color-mark-highlight: #fff3b0;
 
-  /* Historie aktiv */
-  --color-history-active-bg: rgba(30, 58, 95, 0.08);
-  --color-history-active-bg-hover: rgba(30, 58, 95, 0.14);
+  /* Historie aktiv (Tönung aus dem Marken-Blau #1d4b73) */
+  --color-history-active-bg: rgba(29, 75, 115, 0.08);
+  --color-history-active-bg-hover: rgba(29, 75, 115, 0.14);
   --color-history-section-bg: #e8e6e0;
 
   /* Page-Content-View + Tooltip-Panels */
@@ -270,6 +279,11 @@
   --color-success: #4fd9aa;
   --color-success-hover: #6eead0;
 
+  /* KI-Funken — aufgehellt für dunklen Grund. */
+  --color-spark-blue: #9ec8f5;
+  --color-spark-purple: #c4abff;
+  --color-spark-green: var(--color-success);
+
   --color-stark: #6ac96e;
   --color-stark-bg: rgba(58, 143, 62, 0.18);
   --color-stark-text: #9bd49e;
@@ -297,7 +311,7 @@
 
   --color-mark-bg: rgba(255, 200, 50, 0.28);
   --color-mark-bg-hover: rgba(255, 200, 50, 0.42);
-  --color-mark-border: #e5b82a;
+  --color-mark-border: var(--color-accent);
   --color-mark-del-bg: rgba(220, 60, 60, 0.22);
   --color-mark-del-bg-hover: rgba(220, 60, 60, 0.35);
   --color-mark-del-border: #e85858;
