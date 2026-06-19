@@ -12,6 +12,7 @@ const pdfExport = require('./pdf-export');
 const fonts = require('./fonts');
 const books = require('./books');
 const tokenUsage = require('./token-usage');
+const { recordJobLedger } = require('./cost-ledger');
 const draftFigures = require('./draft-figures');
 const { parseDatum } = require('../lib/datum-parse');
 const { normEventSubtyp } = require('./event-subtyp');
@@ -89,6 +90,9 @@ function endJobRun(jobId, status, tokensIn, tokensOut, cacheReadIn, cacheCreatio
     cacheReadIn || 0, cacheCreationIn || 0, cacheCreation1hIn || 0,
     tokensPerSec ?? null, error || null, paramsJson, jobId,
   );
+  // Eingefrorene Kosten ins persistente Ledger schreiben (chat-sourced Typen
+  // werden dort uebersprungen — ihr Verbrauch laeuft ueber chat_messages).
+  recordJobLedger(jobId);
 }
 
 /** Setzt alle hängenden job_runs (status 'running' oder 'queued') auf 'error'.

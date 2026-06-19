@@ -16,6 +16,7 @@ const { executeTool, validateFinalAnswerCitations } = require('./book-chat-tools
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
 const appSettings = require('../../lib/app-settings');
+const { recordChatLedgerForMessage } = require('../../db/cost-ledger');
 
 const chatRouter = express.Router();
 
@@ -170,6 +171,7 @@ async function runChatJob(jobId, sessionId, userMsgId, message, userEmail, userT
       tokensIn, tokensOut, cacheReadIn, cacheCreationIn, cacheCreation1hIn, provider, model, chatTps, assistantNow
     );
     db.prepare('UPDATE chat_sessions SET last_message_at = ? WHERE id = ?').run(assistantNow, session.id);
+    recordChatLedgerForMessage(asstMsgResult.lastInsertRowid);
     completeJob(jobId, {
       session_id: session.id,
       user_message_id: userMsgId,
@@ -409,6 +411,7 @@ async function runBookChatJob(jobId, sessionId, userMsgId, message, userEmail, u
       VALUES (?, 'assistant', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(session.id, antwort, tokensIn, tokensOut, cacheReadIn, cacheCreationIn, cacheCreation1hIn, provider, model, bookChatTps, JSON.stringify(contextInfo), assistantNow);
     db.prepare('UPDATE chat_sessions SET last_message_at = ? WHERE id = ?').run(assistantNow, session.id);
+    recordChatLedgerForMessage(asstMsgResult.lastInsertRowid);
     completeJob(jobId, {
       session_id: session.id,
       user_message_id: userMsgId,
@@ -727,6 +730,7 @@ async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEma
       VALUES (?, 'assistant', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(session.id, antwort, totalTokIn, totalTokOut, totalCacheRead, totalCacheCreation, totalCacheCreation1h, 'claude', (lastModel || appSettings.get('ai.claude.model') || 'claude-sonnet-4-6'), tpsVal, JSON.stringify(contextInfo), assistantNow);
     db.prepare('UPDATE chat_sessions SET last_message_at = ? WHERE id = ?').run(assistantNow, session.id);
+    recordChatLedgerForMessage(asstMsgResult.lastInsertRowid);
 
     completeJob(jobId, {
       session_id: session.id,

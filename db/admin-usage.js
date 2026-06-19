@@ -1,9 +1,14 @@
 'use strict';
 // Admin-Usage-Queries.
 //
-// Cost lebt in lib/pricing.js (Re-Compute zur Lese-Zeit). Hier werden nur
-// die noetigen Token-/Modell-/Provider-Felder geladen, costUsd() pro Row
-// gerufen und aggregiert. Keine Materialisierung in DB.
+// KOSTEN-AGGREGATE (Pro-User-Summen, monatliche Totals) lesen aus dem
+// persistenten Kosten-Ledger (db/cost-ledger) mit zur Schreib-Zeit
+// eingefrorener usd — entkoppelt von der job_runs-Wegwerf-Historie (30-Tage-
+// Prune), sodass aeltere Zeitraeume nicht mehr schrumpfen.
+// DETAIL-LISTEN (getJobRuns/getChatMessages, paginierte Row-Ansichten mit
+// Label/Status/Session-Infos) lesen weiterhin direkt aus job_runs/chat_messages
+// und re-computen usd via costUsd — operative Views, fuer Jobs naturgemaess auf
+// die letzten ~30 Tage begrenzt.
 //
 // Privacy-Boundary: keine Joins auf books.name — `book_id` bleibt anonyme
 // Integer-Spalte fuer den Admin. Wer Buchnamen sehen will, braucht ACL-
@@ -12,7 +17,7 @@
 const { db } = require('./connection');
 const { costUsd } = require('../lib/pricing');
 const { firstOfCurrentMonthIso } = require('../lib/budget');
-const { excludeChatSourcedSql } = require('../lib/usage-sources');
+const costLedger = require('./cost-ledger');
 
 function _isoOrNull(v) {
   if (!v) return null;
@@ -26,25 +31,10 @@ function _resolveRange({ from, to } = {}) {
   return { fromIso, toIso };
 }
 
-// ── Cost-Aggregation ────────────────────────────────────────────────────────
+// ── Cost-Aggregation (aus dem Ledger) ───────────────────────────────────────
 
-// Chat-Verbrauch wird hier NICHT aus job_runs gezogen — er lebt in chat_messages
-// (_stmtChatsRange). Ohne Ausschluss zaehlte jeder Chat-Dollar doppelt.
-const _stmtJobsRange = db.prepare(`
-  SELECT user_email, provider, model, tokens_in, tokens_out,
-         cache_read_in, cache_creation_in, cache_creation_1h_in
-    FROM job_runs
-   WHERE queued_at >= ? AND queued_at < ? AND ${excludeChatSourcedSql()}
-`);
-
-const _stmtChatsRange = db.prepare(`
-  SELECT cs.user_email AS user_email, cm.provider, cm.model,
-         cm.tokens_in, cm.tokens_out, cm.cache_read_in, cm.cache_creation_in, cm.cache_creation_1h_in
-    FROM chat_messages cm
-    JOIN chat_sessions cs ON cs.id = cm.session_id
-   WHERE cm.created_at >= ? AND cm.created_at < ? AND cm.role = 'assistant'
-`);
-
+// Re-Compute fuer DETAIL-Listen (getJobRuns/getChatMessages), die direkt aus
+// den Quelltabellen lesen. Aggregate nutzen die eingefrorene row.usd des Ledgers.
 function _cost(row) {
   return costUsd({
     provider: row.provider, model: row.model,
@@ -67,25 +57,23 @@ function _adminEmailSet() {
 function _aggregateByUser({ fromIso, toIso }) {
   const admins = _adminEmailSet();
   const acc = new Map();
-  const add = (row, source) => {
+  for (const row of costLedger.queryRange({ fromIso, toIso })) {
     const email = row.user_email || '';
-    if (!email || admins.has(email)) return;
+    if (!email || admins.has(email)) continue;
     const prev = acc.get(email) || {
       email, usd: 0, tokensIn: 0, tokensOut: 0,
       cacheReadIn: 0, cacheCreationIn: 0,
       jobCalls: 0, chatCalls: 0,
     };
-    prev.usd += _cost(row);
+    prev.usd += row.usd || 0;
     prev.tokensIn        += row.tokens_in || 0;
     prev.tokensOut       += row.tokens_out || 0;
     prev.cacheReadIn     += row.cache_read_in || 0;
     prev.cacheCreationIn += row.cache_creation_in || 0;
-    if (source === 'job')  prev.jobCalls  += 1;
-    if (source === 'chat') prev.chatCalls += 1;
+    if (row.source === 'job')  prev.jobCalls  += 1;
+    if (row.source === 'chat') prev.chatCalls += 1;
     acc.set(email, prev);
-  };
-  for (const r of _stmtJobsRange.all(fromIso, toIso))  add(r, 'job');
-  for (const r of _stmtChatsRange.all(fromIso, toIso)) add(r, 'chat');
+  }
   return acc;
 }
 
@@ -253,11 +241,11 @@ function getChatMessages({ emails, email, from, to, limit = 50, offset = 0 } = {
 function monthlyTotals({ from, to } = {}) {
   const { fromIso, toIso } = _resolveRange({ from, to });
   const admins = _adminEmailSet();
-  const notAdmin = (r) => r.user_email && !admins.has(r.user_email);
-  const jobs = _stmtJobsRange.all(fromIso, toIso).filter(notAdmin);
-  const chats = _stmtChatsRange.all(fromIso, toIso).filter(notAdmin);
+  const rows = costLedger.queryRange({ fromIso, toIso })
+    .filter(r => r.user_email && !admins.has(r.user_email));
 
   let totalUsd = 0, totalIn = 0, totalOut = 0, totalCacheR = 0, totalCacheW = 0;
+  let chatCount = 0;
   const byUser  = new Map();
   const byModel = new Map();
   const byType  = new Map();
@@ -278,8 +266,8 @@ function monthlyTotals({ from, to } = {}) {
     byType.set(type, v);
   };
 
-  for (const r of jobs) {
-    const usd = _cost(r);
+  for (const r of rows) {
+    const usd = r.usd || 0;
     totalUsd += usd;
     totalIn += r.tokens_in || 0;
     totalOut += r.tokens_out || 0;
@@ -287,34 +275,12 @@ function monthlyTotals({ from, to } = {}) {
     totalCacheW += r.cache_creation_in || 0;
     if (r.user_email) bumpUser(r.user_email, usd, r);
     if (r.model) bumpModel(r.model, usd, r);
-  }
-  for (const r of chats) {
-    const usd = _cost(r);
-    totalUsd += usd;
-    totalIn += r.tokens_in || 0;
-    totalOut += r.tokens_out || 0;
-    totalCacheR += r.cache_read_in || 0;
-    totalCacheW += r.cache_creation_in || 0;
-    if (r.user_email) bumpUser(r.user_email, usd, r);
-    if (r.model) bumpModel(r.model, usd, r);
+    // Job-Typen einzeln; Chat-Verbrauch in einen 'chat'-Bucket gesammelt.
+    if (r.source === 'chat') { bumpType('chat', usd); chatCount += 1; }
+    else bumpType(r.type || 'unknown', usd);
   }
 
-  // Job-Typ-Aggregat braucht separates Query mit `type`-Spalte. Chat-Typen
-  // ausgeschlossen (siehe _stmtJobsRange) — sie werden unten als ein 'chat'-
-  // Bucket aus chat_messages addiert, nicht doppelt aus job_runs.
-  const typeRows = db.prepare(`
-    SELECT user_email, type, provider, model, tokens_in, tokens_out, cache_read_in, cache_creation_in, cache_creation_1h_in
-      FROM job_runs WHERE queued_at >= ? AND queued_at < ? AND ${excludeChatSourcedSql()}
-  `).all(fromIso, toIso).filter(notAdmin);
-  for (const r of typeRows) {
-    bumpType(r.type || 'unknown', _cost(r));
-  }
-  // Chat als eigener „Typ"
-  const chatTypeUsd = chats.reduce((s, r) => s + _cost(r), 0);
-  if (chatTypeUsd > 0 || chats.length > 0) {
-    byType.set('chat', { type: 'chat', usd: chatTypeUsd, count: chats.length });
-  }
-
+  const jobCalls = rows.length - chatCount;
   const topUsers = [...byUser.values()].sort((a, b) => b.usd - a.usd).slice(0, 10);
   const byModelArr = [...byModel.values()].sort((a, b) => b.usd - a.usd);
   const byTypeArr  = [...byType.values()].sort((a, b) => b.usd - a.usd);
@@ -324,7 +290,7 @@ function monthlyTotals({ from, to } = {}) {
     totals: {
       usd: totalUsd, tokensIn: totalIn, tokensOut: totalOut,
       cacheReadIn: totalCacheR, cacheCreationIn: totalCacheW,
-      jobCalls: jobs.length, chatCalls: chats.length,
+      jobCalls, chatCalls: chatCount,
     },
     topUsers, byModel: byModelArr, byType: byTypeArr,
   };

@@ -189,7 +189,7 @@ export const EXCLUSIVE_CARDS = [
   { key: 'tagebuchRueckblick', flag: 'showTagebuchRueckblickCard', toggle: 'toggleTagebuchRueckblickCard', onReclick: 'refresh', requiresBook: true, requiresBuchtyp: 'tagebuch', partial: 'tagebuch-rueckblick' },
   { key: 'bookSettings',   flag: 'showBookSettingsCard',   toggle: 'toggleBookSettingsCard',   onReclick: 'close', partial: 'book-settings' },
   { key: 'userSettings',   flag: 'showUserSettingsCard',   toggle: 'toggleUserSettingsCard',   onReclick: 'close', partial: 'user-settings' },
-  { key: 'myStats',        flag: 'showMyStatsCard',        toggle: 'toggleMyStatsCard',        onReclick: 'refresh', partial: 'my-stats' },
+  { key: 'myStats',        flag: 'showMyStatsCard',        toggle: 'toggleMyStatsCard',        onReclick: 'close', partial: 'my-stats' },
   { key: 'adminUsers',     flag: 'showAdminUsersCard',     toggle: 'toggleAdminUsersCard',     onReclick: 'close', partial: 'admin-users' },
   { key: 'adminSettings',  flag: 'showAdminSettingsCard',  toggle: 'toggleAdminSettingsCard',  onReclick: 'close', partial: 'admin-settings' },
   { key: 'adminUsage',     flag: 'showAdminUsageCard',     toggle: 'toggleAdminUsageCard',     onReclick: 'close', partial: 'admin-usage' },

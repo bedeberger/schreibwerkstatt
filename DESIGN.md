@@ -1967,6 +1967,7 @@ Struktur: 8 thematische Subfolder unter [public/css/](public/css/) + Root-Solit�
 | [components/icon-btn.css](public/css/components/icon-btn.css) | `.icon-btn` (outlined) + `.icon-btn--ghost` — SSoT für alle Icon-only Buttons (Graph/Map/Mindmap-Toolbars, Header-Cluster, Plot-Board, Action-Groups). Feature-Marker setzen nur Deltas darauf. |
 | [components/tabs.css](public/css/components/tabs.css) | `.tabs` / `.tabs-btn` + `--active`/`--scrollable`/`--fullwidth`. |
 | [components/device-tokens.css](public/css/components/device-tokens.css) | `.device-tokens-*` — Token-Verwaltung in User-Settings (Reveal-Block für Klartext-Token einmalig nach Create, Row-List statt Table). |
+| [components/my-stats.css](public/css/components/my-stats.css) | `.mystats-grid` / `.mystats-tile` (+ `--primary`) / `.mystats-value` / `.mystats-label` — Kennzahl-Grid der „Meine Statistik"-Karte (aggregierte Schreib-Werte über alle eigenen Bücher). Eckige Tiles, serifige Tabular-Nums-Werte; Primär-Tiles (Zeichen, Normseiten) mit Akzent-Tönung. |
 | [components/confirm-dialog.css](public/css/components/confirm-dialog.css) | `.confirm-overlay` / `-dialog`, Shortcuts-Overlay. |
 | [components/icons.css](public/css/components/icons.css) | `.icon`-Klasse, SVG-Sprite-Konsumenten. |
 | [components/job-toast.css](public/css/components/job-toast.css) | `.job-toast` (Job-Done-Floater). |

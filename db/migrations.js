@@ -7760,6 +7760,106 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 195 abgeschlossen (device_tokens.client_version + use_count — Mac-Client-Telemetrie).');
   }
 
+  if (version < 196) {
+    // Persistentes Kosten-Ledger: eine Zeile pro abgerechnetem KI-Call mit zur
+    // Schreib-Zeit EINGEFRORENER USD-Kosten. Entkoppelt die Kostenhistorie von
+    // der Job-Wegwerf-Historie — job_runs wird nach 30 Tagen geprunt
+    // (lib/cache-cleanup.js), wodurch jede zur Lese-Zeit re-computete Kosten-
+    // Aggregation ueber aeltere Zeitraeume schrumpfte. Das Ledger wird NIE
+    // geprunt; Aggregate (Admin-Usage, Budget, Daily-Usage, /metrics) lesen
+    // daraus. Quelltabellen (job_runs/chat_messages) bleiben SSoT fuer die
+    // operativen Detail-Listen.
+    //
+    // source_ref ist ein opaker Trace-/Idempotenz-Schluessel ('job:<job_id>' |
+    // 'chatmsg:<id>'), bewusst KEIN Integer-FK — er muss den Prune der
+    // Quellzeile ueberleben. UNIQUE verhindert Doppel-Inserts bei Re-Entry.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS ai_cost_ledger (
+        id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+        ts                   TEXT    NOT NULL,
+        user_email           TEXT,
+        source               TEXT    NOT NULL CHECK(source IN ('job','chat')),
+        type                 TEXT,
+        book_id              INTEGER REFERENCES books(book_id) ON DELETE SET NULL,
+        provider             TEXT,
+        model                TEXT,
+        tokens_in            INTEGER NOT NULL DEFAULT 0,
+        tokens_out           INTEGER NOT NULL DEFAULT 0,
+        cache_read_in        INTEGER NOT NULL DEFAULT 0,
+        cache_creation_in    INTEGER NOT NULL DEFAULT 0,
+        cache_creation_1h_in INTEGER NOT NULL DEFAULT 0,
+        usd                  REAL    NOT NULL DEFAULT 0,
+        source_ref           TEXT    UNIQUE
+      );
+      CREATE INDEX IF NOT EXISTS idx_cost_ledger_ts   ON ai_cost_ledger(ts);
+      CREATE INDEX IF NOT EXISTS idx_cost_ledger_user ON ai_cost_ledger(user_email);
+      CREATE INDEX IF NOT EXISTS idx_cost_ledger_book ON ai_cost_ledger(book_id);
+    `);
+
+    // Backfill: noch vorhandene Quelldaten (job_runs: letzte ~30 Tage nach Prune;
+    // chat_messages: ungeprunt) ins Ledger uebernehmen, damit Aggregate ab Deploy
+    // nahtlos weiterlaufen. usd wird mit den AKTUELLEN Tarifen eingefroren — fuer
+    // historische Rows die beste verfuegbare Naeherung. Chat-Job-Typen aus
+    // job_runs ausgeschlossen (Verbrauch lebt in chat_messages), sonst Doppel-
+    // zaehlung. INSERT OR IGNORE haelt den Backfill idempotent gegen source_ref.
+    const { costUsd: _costUsd } = require('../lib/pricing');
+    const _insLedger = db.prepare(`
+      INSERT OR IGNORE INTO ai_cost_ledger
+        (ts, user_email, source, type, book_id, provider, model,
+         tokens_in, tokens_out, cache_read_in, cache_creation_in, cache_creation_1h_in, usd, source_ref)
+      VALUES (@ts, @user_email, @source, @type, @book_id, @provider, @model,
+              @tokens_in, @tokens_out, @cache_read_in, @cache_creation_in, @cache_creation_1h_in, @usd, @source_ref)
+    `);
+    const _backfill = db.transaction((rows, source, refPrefix) => {
+      for (const r of rows) {
+        _insLedger.run({
+          ts: r.ts || new Date().toISOString(),
+          user_email: r.user_email || null,
+          source,
+          type: r.type || null,
+          book_id: r.book_id || null,
+          provider: r.provider || null,
+          model: r.model || null,
+          tokens_in: r.tokens_in || 0,
+          tokens_out: r.tokens_out || 0,
+          cache_read_in: r.cache_read_in || 0,
+          cache_creation_in: r.cache_creation_in || 0,
+          cache_creation_1h_in: r.cache_creation_1h_in || 0,
+          usd: _costUsd({
+            provider: r.provider, model: r.model,
+            tokensIn: r.tokens_in, tokensOut: r.tokens_out,
+            cacheReadIn: r.cache_read_in, cacheCreationIn: r.cache_creation_in,
+            cacheCreation1hIn: r.cache_creation_1h_in,
+          }),
+          source_ref: `${refPrefix}${r.ref}`,
+        });
+      }
+    });
+    const _jobRows = db.prepare(`
+      SELECT job_id AS ref, ended_at AS ts, user_email, type, book_id, provider, model,
+             tokens_in, tokens_out, cache_read_in, cache_creation_in, cache_creation_1h_in
+        FROM job_runs
+       WHERE type NOT IN ('chat','book-chat') AND ended_at IS NOT NULL
+    `).all();
+    _backfill(_jobRows, 'job', 'job:');
+    const _chatRows = db.prepare(`
+      SELECT cm.id AS ref, cm.created_at AS ts, cs.user_email AS user_email, cs.kind AS type,
+             cs.book_id AS book_id, cm.provider, cm.model,
+             cm.tokens_in, cm.tokens_out, cm.cache_read_in, cm.cache_creation_in, cm.cache_creation_1h_in
+        FROM chat_messages cm
+        JOIN chat_sessions cs ON cs.id = cm.session_id
+       WHERE cm.role = 'assistant'
+    `).all();
+    _backfill(_chatRows, 'chat', 'chatmsg:');
+
+    const fkErrors196 = db.pragma('foreign_key_check');
+    if (fkErrors196.length) {
+      throw new Error(`Migration 196: foreign_key_check meldet ${fkErrors196.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 196').run();
+    logger.info(`DB-Migration auf Version 196 abgeschlossen (ai_cost_ledger + Backfill: ${_jobRows.length} Job- / ${_chatRows.length} Chat-Rows).`);
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {
