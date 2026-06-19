@@ -195,7 +195,7 @@
                    @drop.prevent="onCellDrop(act.id, row.lane.id, null)">
 
                 <template x-for="beat in filteredBeatsForCell(act.id, row.lane.id)" :key="beat.id">
-                  <div class="plot-beat" :class="'plot-beat--' + beat.status"
+                  <div class="plot-beat" :class="'plot-beat--' + beat.status" :data-beat-id="beat.id"
                        draggable="true"
                        @dragstart="onBeatDragStart(beat, $event)" @dragend="onBeatDragEnd()"
                        @dragover.prevent.stop="onCellDragOver(act.id, row.lane.id)"
@@ -209,6 +209,13 @@
                                   @click.stop="cycleBeatStatus(beat)" :data-tip="$app.t('plot.status.cycleTip')"
                                   x-text="$app.t('plot.status.' + beat.status)"></button>
                           <span class="plot-beat-title" @click="startEditBeat(beat)" x-text="beat.titel"></span>
+                          <!-- Konsistenz-Warn-Badge: zeigt, dass der aktive Prüflauf diesen Beat beanstandet -->
+                          <button type="button" class="plot-beat-warn" :class="'plot-beat-warn--' + beatTopSeverity(beat)"
+                                  x-show="consistencyResult && beatKonflikte(beat).length"
+                                  @click.stop="focusKonfliktForBeat(beat)"
+                                  :data-tip="beatKonflikteTip(beat)" :aria-label="$app.t('plot.beat.konfliktBadge')">
+                            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#alert-triangle"/></svg>
+                          </button>
                           <span class="plot-beat-intensity" x-show="beat.intensitaet"
                                 :data-tip="$app.t('plot.beat.intensitaet') + ': ' + beat.intensitaet + '/5'"
                                 :aria-label="$app.t('plot.beat.intensitaet') + ': ' + beat.intensitaet + '/5'">

@@ -129,3 +129,90 @@ test('_filterFindingsAfterSave: alle weg → Prüfmodus-Reset', () => {
   assert.equal(app.correctedHtml, null);
   assert.equal(app.hasErrors, false);
 });
+
+// --- submitConflictResolution: erneuter 409 → Re-Merge statt Sackgasse -------
+// Deckt den Pfad ab, in dem ein DRITTER Schreibvorgang zwischen Konflikt-Anzeige
+// und „Auflösung übernehmen" passiert: der finale PUT (expected =
+// cr.remoteUpdatedAt) trifft erneut 409. Statt nur saveFailed anzuzeigen, muss
+// die aufgelöste Fassung gegen den neuen Remote-Stand neu block-gemergt werden
+// (Verhalten analog saveEdit). Der Merge-Motor selbst ist in block-merge.test.mjs
+// getestet — hier wird _attemptBlockMerge gestubbt, um die Orchestrierung zu prüfen.
+
+const conflict409 = (extra = {}) => Object.assign(new Error('conflict'), {
+  status: 409, code: 'PAGE_CONFLICT', body: { server_editor_name: 'Carol', server_updated_at: '2026-04-04T00:00:00Z', ...extra },
+});
+
+function setConflictApp(extra = {}) {
+  const app = {
+    editSaving: false,
+    focusActive: false,
+    originalHtml: '<p data-bid="aa">base</p>',
+    currentPage: { id: 7, name: 'S', updated_at: '2026-01-01T00:00:00Z' },
+    conflictResolution: {
+      pageId: 7,
+      source: 'main',
+      merged: [{ bid: 'aa', html: '<p data-bid="aa">x</p>' }],
+      conflicts: [{ bid: 'aa' }],
+      decisions: { aa: 'local' },
+      remoteUpdatedAt: '2026-02-02T00:00:00Z',
+    },
+    t: (k) => k,
+    setStatus() {},
+    _syncPageStatsAfterSave() {},
+    refreshPageAges() {},
+    updatePageView() {},
+    ...extra,
+  };
+  window.__app = app;
+  return app;
+}
+
+test('submitConflictResolution: 2. 409 + kollisionsfreier Re-Merge → stille Re-Save', async () => {
+  const app = setConflictApp();
+  let calls = 0;
+  const saved = [];
+  contentRepo.savePage = async (id, payload) => {
+    calls++;
+    saved.push(payload);
+    if (calls === 1) throw conflict409();
+    return { updated_at: '2026-05-05T00:00:00Z' };
+  };
+  notebookEditMethods._attemptBlockMerge = async () => ({ merged: true, saveHtml: '<p data-bid="aa">merged</p>', expectedAt: '2026-04-04T00:00:00Z' });
+
+  await notebookEditMethods.submitConflictResolution();
+
+  assert.equal(calls, 2, 'zweiter Save nach Re-Merge');
+  assert.equal(saved[1].expected_updated_at, '2026-04-04T00:00:00Z', 'Re-Save nutzt frischen Remote-Stand');
+  assert.equal(app.originalHtml, '<p data-bid="aa">merged</p>');
+  assert.equal(app.currentPage.updated_at, '2026-05-05T00:00:00Z');
+  assert.equal(app.conflictResolution, null, 'Banner geschlossen');
+  assert.equal(app.editSaving, false);
+});
+
+test('submitConflictResolution: 2. 409 + echte Block-Kollision → neuer Banner, keine Re-Save', async () => {
+  const app = setConflictApp();
+  let calls = 0;
+  contentRepo.savePage = async () => { calls++; throw conflict409(); };
+  // _attemptBlockMerge öffnet bei Kollision einen neuen conflictResolution-State.
+  const reopened = { pageId: 7, conflicts: [{ bid: 'aa' }], decisions: { aa: 'local' }, remoteUpdatedAt: '2026-04-04T00:00:00Z' };
+  notebookEditMethods._attemptBlockMerge = async () => { window.__app.conflictResolution = reopened; return { conflict: true }; };
+
+  await notebookEditMethods.submitConflictResolution();
+
+  assert.equal(calls, 1, 'nur der erste (fehlgeschlagene) Save');
+  assert.equal(app.conflictResolution, reopened, 'neuer Konflikt-State offen, keine Sackgasse');
+  assert.equal(app.editSaving, false);
+});
+
+test('submitConflictResolution: 2. 409 + Merge null → Draft behalten + editConflict-Banner', async () => {
+  const app = setConflictApp();
+  contentRepo.savePage = async () => { throw conflict409(); };
+  notebookEditMethods._attemptBlockMerge = async () => null;
+
+  await notebookEditMethods.submitConflictResolution();
+
+  assert.equal(app.saveOffline, true);
+  assert.deepEqual(app.editConflict, { remoteUserName: 'Carol', remoteUpdatedAt: '2026-04-04T00:00:00Z' });
+  assert.ok(app.conflictResolution, 'Auflösungs-State bleibt für erneuten Versuch erhalten');
+  assert.equal(app.editSaving, false);
+});

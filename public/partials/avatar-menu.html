@@ -55,6 +55,10 @@
       <span class="avatar-menu-item-label" x-text="t('header.profile')"></span>
     </button>
 
+    <button type="button" class="avatar-menu-item" role="menuitem" @click="showAvatarMenu = false; toggleMyStatsCard()">
+      <span class="avatar-menu-item-label" x-text="t('header.myStats')"></span>
+    </button>
+
     <button type="button" class="avatar-menu-item" role="menuitem"
             x-show="currentUser?.role === 'admin'"
             @click="showAvatarMenu = false; toggleAdminUsersCard()">

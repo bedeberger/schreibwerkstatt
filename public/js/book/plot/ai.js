@@ -155,6 +155,39 @@ export const aiMethods = {
 
   dismissConsistency() { this.consistencyResult = null; this.selectedKonfliktIdx = null; this.selectedRunId = null; },
 
+  // ── Konsistenz-Triage: Befund ↔ Beat ──────────────────────────────────────
+  // Scrollt einen Beat ins Sichtfeld und hebt ihn kurz hervor. $root-skopiert
+  // (funktioniert auch im Vollbild). Kein Auto-Edit — der User entscheidet.
+  scrollToBeat(beatId) {
+    const el = this.$root?.querySelector(`[data-beat-id="${beatId}"]`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.remove('plot-beat--flash');
+    void el.offsetWidth; // Reflow erzwingen → Animation startet auch beim zweiten Klick neu
+    el.classList.add('plot-beat--flash');
+    setTimeout(() => el.classList.remove('plot-beat--flash'), 1600);
+  },
+
+  // Aus einem Konsistenz-Befund zum benannten Beat springen (Titel-Match, gleiche
+  // Vertragsbasis wie der Befund). Übergreifende Befunde ("—") haben kein Ziel.
+  gotoKonfliktBeat(k) {
+    if (!k || !k.beat || k.beat === '—') return;
+    const key = (k.beat || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const beat = (this.beats || []).find(b => (b.titel || '').trim().toLowerCase().replace(/\s+/g, ' ') === key);
+    if (beat) this.scrollToBeat(beat.id);
+  },
+
+  // Vom Warn-Badge eines Beats zum Befund: ersten zugehörigen Konflikt aufklappen
+  // und das Consistency-Panel ins Sichtfeld holen.
+  focusKonfliktForBeat(beat) {
+    const list = this.beatKonflikte(beat);
+    if (!list.length) return;
+    this.selectedKonfliktIdx = list[0].idx;
+    this.$nextTick(() => {
+      this.$root?.querySelector('.plot-consistency-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  },
+
   // ── KI: Konsistenz-Prüfungs-Historie ─────────────────────────────────────
   // Persistierte Läufe pro Buch. Liste kommt ohne result_json (Spaltensparsam);
   // Detail wird beim Öffnen lazy geholt und ins bestehende Consistency-Panel

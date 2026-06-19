@@ -137,6 +137,33 @@
     overflow-wrap: anywhere;
   }
   .plot-beat--verworfen .plot-beat-title { text-decoration: line-through; }
+
+  /* Konsistenz-Warn-Badge am Beat — sichtbar, solange ein Prüflauf angezeigt wird
+     und diesen Beat beanstandet. Farbe = höchste Schwere (gleiche Tokens wie die
+     severity-tags). Klick öffnet den passenden Befund im Consistency-Panel. */
+  .plot-beat-warn {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: var(--color-muted);
+  }
+  .plot-beat-warn .icon { width: 14px; height: 14px; }
+  .plot-beat-warn--kritisch,
+  .plot-beat-warn--schwach { color: var(--color-schwach); }
+  .plot-beat-warn--stark   { color: var(--color-stark); }
+  .plot-beat-warn--mittel  { color: var(--color-mittel); }
+  .plot-beat-warn--niedrig { color: var(--color-muted); }
+
+  /* Kurzes Hervorheben beim Springen aus einem Befund zum Beat. */
+  @keyframes plotBeatFlash {
+    0%, 100% { box-shadow: none; }
+    20%, 65% { box-shadow: 0 0 0 2px var(--card-accent); }
+  }
+  .plot-beat--flash { animation: plotBeatFlash 1.6s ease; }
   .plot-beat-desc {
     margin: var(--space-xs) 0 0;
     font-size: var(--font-size-xs);
@@ -416,6 +443,17 @@
     font-size: var(--font-size-xs);
     color: var(--color-text);
   }
+
+  /* ── Kapitel-Coverage (lokales Aggregat, kein KI-Job) ──────────────────── */
+  .plot-coverage { margin-bottom: var(--space-sm); }
+  .plot-coverage-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    padding: var(--space-xs) 0 0;
+  }
+  .plot-coverage-group { display: flex; flex-direction: column; gap: var(--space-2xs); }
+  .plot-coverage-chips { display: flex; flex-wrap: wrap; gap: var(--space-2xs); }
 
   /* ── Status-Verteilungsbalken (board-weit + Mini pro Akt) ──────────────── */
   .plot-progress {

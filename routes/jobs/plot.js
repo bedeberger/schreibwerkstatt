@@ -23,6 +23,17 @@ const SEVERITY = ['kritisch', 'stark', 'mittel', 'schwach', 'niedrig'];
 
 // ── Kontext-Loader ────────────────────────────────────────────────────────────
 
+// Wandelt einen echten Lade-/DB-Fehler aus einem Kontext-Loader in einen
+// i18n-Job-Fehler um (Original-Fehler als `cause` für den Log). So failt der Job
+// sauber über failJob, statt mit halbem/falschem Board-Bild weiterzulaufen — ein
+// leeres Ergebnis (keine Stränge/Figuren) ist kein Fehler und kommt regulär als
+// [] zurück, nur ein geworfener Fehler landet hier.
+function _plotContextError(source, cause) {
+  const err = i18nError('job.error.plot.contextLoadFailed', { source });
+  err.cause = cause;
+  return err;
+}
+
 // Figuren-Ensemble als Grundierung für beide Jobs. Brainstorm rendert den
 // reichen Kontext (Beschreibung/Beruf/Tags), Consistency nutzt nur Name + Typ —
 // die Extra-Felder bleiben dort ungenutzt (kein zweiter DB-Load nötig).
@@ -41,24 +52,27 @@ function _figurenContext(bookId, userEmail) {
 // Werkstatt-Figuren (Figuren-Werkstatt-Drafts, Name + Archetyp): vorwärts-
 // entwickelte Figuren, evtl. noch nicht im Manuskript. Brainstorm kann sie als
 // Beat-Figuren vorschlagen; Consistency darf sie als legitime Beat-Referenz
-// erkennen statt sie als „unbekannte Figur" zu beanstanden. Best-effort.
+// erkennen statt sie als „unbekannte Figur" zu beanstanden. Echter DB-Fehler →
+// Job failen (nicht stillschweigend ohne Werkstatt-Figuren weiterlaufen).
 function _werkstattFigurenContext(bookId, userEmail) {
   try {
     return draftFiguresDb.listDraftFigures(bookId, userEmail)
       .map(d => ({ name: d.name, archetype: d.archetype || null }));
-  } catch {
-    return [];
+  } catch (e) {
+    throw _plotContextError('werkstattFiguren', e);
   }
 }
 
 // Kapitelnamen in echter Buchorganizer-Reihenfolge (über die Content-Store-
-// Facade — kein Direkt-SQL auf chapters). Best-effort: bei Fehler leeres Array.
+// Facade — kein Direkt-SQL auf chapters). Ein Buch ohne Kapitel liefert regulär
+// []; ein echter Lade-Fehler failt den Job (statt der KI stillschweigend den
+// Kapitel-Kontext zu unterschlagen).
 async function _kapitelContext(bookId) {
   try {
     const { chaptersFlat } = await loadOrderedBookContents(bookId, null);
     return (chaptersFlat || []).map(c => c.name);
-  } catch {
-    return [];
+  } catch (e) {
+    throw _plotContextError('kapitel', e);
   }
 }
 
@@ -88,17 +102,24 @@ function _szenenContext(bookId, userEmail) {
 }
 
 // Handlungsstränge (Swimlanes) mit aufgelöster Hauptfigur. Katalog-Bindung über
-// die TEXT-fig_id (figures), Werkstatt-Bindung über draft_figures.id. Best-effort.
+// die TEXT-fig_id (figures), Werkstatt-Bindung über draft_figures.id. Ein Board
+// ohne Stränge liefert regulär [] (flaches Board, opt-in); ein echter DB-Fehler
+// failt den Job — sonst würde die KI mit falschem (flachem) statt Strang-Raster-
+// Kontext brainstormen/prüfen und der User bekäme stillschweigend schlechtere
+// Vorschläge. Der figures-/draft-Lookup ist Anreicherung, schlägt aber auf
+// denselben echten Fehler ebenfalls durch (keine stille Teil-Auflösung).
 function _threadContext(bookId, userEmail) {
-  let threads;
-  try { threads = plotDb.listThreads(bookId, userEmail); } catch { return []; }
-  if (!threads.length) return [];
-  const figByFigId = {};
-  for (const r of db.prepare('SELECT fig_id, name FROM figures WHERE book_id = ? AND user_email = ?').all(parseInt(bookId), userEmail)) {
-    figByFigId[r.fig_id] = r.name;
+  let threads, figByFigId = {}, draftById = {};
+  try {
+    threads = plotDb.listThreads(bookId, userEmail);
+    if (!threads.length) return [];
+    for (const r of db.prepare('SELECT fig_id, name FROM figures WHERE book_id = ? AND user_email = ?').all(parseInt(bookId), userEmail)) {
+      figByFigId[r.fig_id] = r.name;
+    }
+    for (const d of draftFiguresDb.listDraftFigures(bookId, userEmail)) draftById[d.id] = d.name;
+  } catch (e) {
+    throw _plotContextError('threads', e);
   }
-  const draftById = {};
-  try { for (const d of draftFiguresDb.listDraftFigures(bookId, userEmail)) draftById[d.id] = d.name; } catch {}
   return threads.map(t => ({
     id: t.id,
     name: t.name,
@@ -149,7 +170,7 @@ async function runPlotBrainstormJob(jobId, bookId, actId, threadId, userEmail) {
     completeJob(jobId, { vorschlaege, actId, threadId: threadId ?? null, tokensIn: tok.in, tokensOut: tok.out },
       tps(tok), `${vorschlaege.length} Vorschläge für "${act.name}"`);
   } catch (e) {
-    if (e.name !== 'AbortError') logger.error(`Plot-Brainstorm-Fehler book=${bookId}: ${e.message}`, { stack: e.stack });
+    if (e.name !== 'AbortError') logger.error(`Plot-Brainstorm-Fehler book=${bookId}: ${e.message}${e.cause ? ` (${e.cause.message})` : ''}`, { stack: e.cause?.stack || e.stack });
     failJob(jobId, e);
   }
 }
@@ -213,7 +234,7 @@ async function runPlotConsistencyJob(jobId, bookId, userEmail) {
     completeJob(jobId, { konflikte, fazit, runId, tokensIn: tok.in, tokensOut: tok.out },
       tps(tok), `${konflikte.length} Konflikte`);
   } catch (e) {
-    if (e.name !== 'AbortError') logger.error(`Plot-Consistency-Fehler book=${bookId}: ${e.message}`, { stack: e.stack });
+    if (e.name !== 'AbortError') logger.error(`Plot-Consistency-Fehler book=${bookId}: ${e.message}${e.cause ? ` (${e.cause.message})` : ''}`, { stack: e.cause?.stack || e.stack });
     failJob(jobId, e);
   }
 }

@@ -167,13 +167,14 @@ export const notebookEditMethods = {
     const cr = app.conflictResolution;
     if (!cr || app.editSaving) return;
     const finalHtml = buildResolvedHtml(cr.merged, cr.decisions);
+    const source = cr.source || (app.focusActive ? 'focus' : 'main');
     app.editSaving = true;
     app.setStatus(app.t('edit.saving'), true);
     try {
       const saved = await savePage(cr.pageId, {
         html: finalHtml,
         pageName: app.currentPage?.name,
-        source: cr.source || (app.focusActive ? 'focus' : 'main'),
+        source,
         expectedUpdatedAt: cr.remoteUpdatedAt,
       });
       if (saved?.updated_at) app.currentPage.updated_at = saved.updated_at;
@@ -189,21 +190,76 @@ export const notebookEditMethods = {
       app.editDirty = false;
       app.saveOffline = false;
       app.editConflict = null;
-      const mix = { local: 0, remote: 0, both: 0 };
-      for (const c of cr.conflicts) {
-        const choice = cr.decisions[c.bid] || 'local';
-        if (mix[choice] != null) mix[choice]++;
-      }
-      trackMerge('conflict_resolved', { mix });
+      trackMerge('conflict_resolved', { mix: this._resolutionMix(cr) });
       app.conflictResolution = null;
       app.updatePageView?.();
       app.setStatus('');
     } catch (e) {
+      if (isPageConflict(e)) {
+        // Dritter Schreibvorgang zwischen Konflikt-Anzeige und „Auflösung
+        // übernehmen": der finale PUT (expected = cr.remoteUpdatedAt) trifft
+        // erneut 409. Statt Sackgasse (User klickt immer in denselben 409) die
+        // lokal aufgelöste Fassung gegen den jetzt frischen Remote-Stand neu
+        // block-mergen — analog zum 409-Pfad in saveEdit, nur mit finalHtml als
+        // lokaler Quelle (= die gerade getroffene Auflösung).
+        app.editSaving = false;
+        const merge = await this._attemptBlockMerge({ localHtml: finalHtml, source });
+        // _openConflictResolution hat den conflictResolution-State auf den neuen
+        // Remote-Stand ersetzt → User löst die neue Kollision auf.
+        if (merge?.conflict) return;
+        if (merge?.merged) {
+          // Kollisionsfrei gegen den neuen Stand: gemergte Auflösung nachspeichern.
+          try {
+            const saved = await savePage(cr.pageId, {
+              html: merge.saveHtml, pageName: app.currentPage?.name, source,
+              expectedUpdatedAt: merge.expectedAt,
+            });
+            if (saved?.updated_at) app.currentPage.updated_at = saved.updated_at;
+            this._applyMergedToEditor(merge.saveHtml);
+            app.originalHtml = merge.saveHtml;
+            app.currentPageEmpty = !htmlToText(merge.saveHtml).trim();
+            this._filterFindingsAfterSave(merge.saveHtml);
+            app._syncPageStatsAfterSave?.(app.currentPage, merge.saveHtml);
+            app.refreshPageAges?.();
+            clearDraft(cr.pageId);
+            app.lastAutosaveAt = Date.now();
+            app.lastDraftSavedAt = null;
+            app.editDirty = false;
+            app.saveOffline = false;
+            app.editConflict = null;
+            trackMerge('conflict_resolved', { mix: this._resolutionMix(cr) });
+            app.conflictResolution = null;
+            app.updatePageView?.();
+            app.setStatus(app.t('edit.conflict.merged.silent'), false, 3000);
+            return;
+          } catch (e2) { console.warn('[submitConflictResolution] merged re-save failed', e2); }
+        }
+        // Fallback (Merge null: Flag off / leere Base / Read-Fehler): die
+        // aufgelöste Arbeit als Draft sichern, Offline-/Konflikt-Banner zeigen.
+        // conflictResolution bleibt offen — User kann erneut übernehmen/abbrechen.
+        writeDraft(cr.pageId, finalHtml, app.originalHtml, app.currentPage?.updated_at);
+        app.lastDraftSavedAt = Date.now();
+        app.saveOffline = true;
+        app.editConflict = readConflictBody(e);
+        app.setStatus(app.t('edit.conflict.kept'), false, 8000);
+        return;
+      }
       console.error('[submitConflictResolution]', e);
       app.setStatus(app.t('edit.saveFailed', { msg: e.message }), false, 8000);
     } finally {
       app.editSaving = false;
     }
+  },
+
+  // Auflösungs-Mix (Meine/Andere/Beide) für Telemetrie aus dem
+  // conflictResolution-State zählen.
+  _resolutionMix(cr) {
+    const mix = { local: 0, remote: 0, both: 0 };
+    for (const c of cr.conflicts) {
+      const choice = cr.decisions[c.bid] || 'local';
+      if (mix[choice] != null) mix[choice]++;
+    }
+    return mix;
   },
 
   // Auflösung abbrechen: Konflikt-State verwerfen, frischen Server-Stand laden.

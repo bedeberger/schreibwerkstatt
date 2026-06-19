@@ -6,7 +6,7 @@ const { aclParamGuard } = require('../lib/acl');
 const { CHARS_PER_TOKEN } = require('../lib/ai');
 const { toIntId } = require('../lib/validate');
 const contentStore = require('../lib/content-store');
-const { computePageIndex, writePageIndex, writeFigureMentionsForPageAllUsers, tokenizeNamesForStopwords } = require('../lib/page-index');
+const { computePageIndex, writePageIndex, writeFigureMentionsForPageAllUsers, loadBookFiguresForMentions, tokenizeNamesForStopwords } = require('../lib/page-index');
 const { invalidateBookPageCache } = require('./jobs/chat');
 const { localIsoDate } = require('../lib/local-date');
 const searchIndex = require('../lib/search');
@@ -268,8 +268,10 @@ async function syncBook(bookId, ctx) {
 
   // Figuren-Mentions mit Volltext neu berechnen (präziser als preview_text-Hook in saveFigurenToDb).
   // Läuft über alle User, die Figuren für dieses Buch haben (figure_id ist eindeutig pro User).
+  // Figuren-Liste einmal pro Buch laden und durchreichen — die Query ist pro Seite identisch.
+  const bookFigures = loadBookFiguresForMentions(bookId);
   for (const item of indexItems) {
-    try { writeFigureMentionsForPageAllUsers(item.page_id, bookId, item.fullText); }
+    try { writeFigureMentionsForPageAllUsers(item.page_id, bookId, item.fullText, bookFigures); }
     catch (e) { logger.warn(`Figuren-Mentions für Seite ${item.page_id} fehlgeschlagen: ${e.message}`); }
   }
 

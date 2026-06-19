@@ -301,6 +301,7 @@ const cardsState = () => ({
   showBookChatCard: false,
   showBookSettingsCard: false,
   showUserSettingsCard: false,
+  showMyStatsCard: false,
   showAdminUsersCard: false,
   showAdminSettingsCard: false,
   showAdminUsageCard: false,

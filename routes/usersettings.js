@@ -3,6 +3,8 @@ const express = require('express');
 const appUsers = require('../db/app-users');
 const { getUser, updateUserSettings } = appUsers;
 const deviceTokens = require('../db/device-tokens');
+const { db } = require('../db/schema');
+const { listBookIdsForUser } = require('../db/book-access');
 const { setContext } = require('../lib/log-context');
 const logger = require('../logger');
 
@@ -78,6 +80,58 @@ router.get('/settings', (req, res) => {
   const user = getUser(email);
   if (!user) return res.status(404).json({ error_code: 'USER_PROFILE_NOT_FOUND' });
   res.json(toResponse(user));
+});
+
+/**
+ * Aggregierte Schreib-Statistik ueber ALLE eigenen Buecher (role='owner').
+ * Inhalts-Kennzahlen (chars/words/tok/pages) live aus `page_stats` — gleiche
+ * Quelle wie admin-books, frischer als der Tages-Snapshot. Kapitel-Anzahl aus
+ * dem letzten `book_stats_history`-Snapshot pro Buch (taeglich synchronisiert).
+ * Schreibzeit aus `writing_time` (per-User). `page_stats`/`book_stats_history`/
+ * `writing_time` sind Cache-/Aggregat-Tabellen (kein Content-Store-Verstoss).
+ */
+router.get('/profile-stats', (req, res) => {
+  const email = req.session.user.email;
+  const owned = listBookIdsForUser(email)
+    .filter(r => r.role === 'owner')
+    .map(r => r.book_id);
+  const empty = { books: 0, chapters: 0, pages: 0, chars: 0, words: 0, tok: 0, writing_seconds: 0 };
+  if (!owned.length) return res.json(empty);
+  try {
+    const ph = owned.map(() => '?').join(',');
+    const content = db.prepare(`
+      SELECT COALESCE(SUM(chars), 0) AS chars,
+             COALESCE(SUM(words), 0) AS words,
+             COALESCE(SUM(tok),   0) AS tok,
+             COUNT(*)                AS pages
+      FROM page_stats WHERE book_id IN (${ph})
+    `).get(...owned);
+    // Letzter Snapshot pro Buch (MAX(recorded_at)) — daraus chapter_count summieren.
+    const chapters = db.prepare(`
+      SELECT COALESCE(SUM(bsh.chapter_count), 0) AS chapters
+      FROM book_stats_history bsh
+      JOIN (
+        SELECT book_id, MAX(recorded_at) AS mx
+        FROM book_stats_history WHERE book_id IN (${ph}) GROUP BY book_id
+      ) m ON m.book_id = bsh.book_id AND m.mx = bsh.recorded_at
+    `).get(...owned);
+    const wt = db.prepare(`
+      SELECT COALESCE(SUM(seconds), 0) AS writing_seconds
+      FROM writing_time WHERE user_email = ? AND book_id IN (${ph})
+    `).get(email, ...owned);
+    res.json({
+      books:           owned.length,
+      chapters:        chapters?.chapters || 0,
+      pages:           content?.pages || 0,
+      chars:           content?.chars || 0,
+      words:           content?.words || 0,
+      tok:             content?.tok || 0,
+      writing_seconds: wt?.writing_seconds || 0,
+    });
+  } catch (e) {
+    logger.error('[me/profile-stats] DB-Fehler: ' + e.message, { user: email });
+    res.status(500).json({ error_code: 'DB_ERROR' });
+  }
 });
 
 /**

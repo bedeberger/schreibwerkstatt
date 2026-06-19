@@ -1,0 +1,50 @@
+<!-- Meine Statistik: aggregierte Schreib-Kennzahlen ueber alle eigenen Buecher.
+     Alpine.data-Sub-Komponente — siehe public/js/cards/my-stats-card.js.
+     User-bound (role='owner'), nicht buch-bound. -->
+<div class="card card--mystats" x-data="myStatsCard" x-show="$app.showMyStatsCard" x-cloak>
+  <div class="card-header">
+    <span class="card-title" x-text="$app.t('mystats.title')"></span>
+    <div class="card-actions">
+      <button type="button" @click="$app.toggleMyStatsCard()" x-text="$app.t('common.close')"></button>
+    </div>
+  </div>
+
+  <div x-show="myStatsLoading" class="muted-msg" x-text="$app.t('common.loading')"></div>
+  <p x-show="myStatsError" x-cloak class="card-form-error" x-text="myStatsError"></p>
+  <p x-show="myStatsIsEmpty" x-cloak class="muted-msg" x-text="$app.t('mystats.empty')"></p>
+
+  <template x-if="!myStatsLoading && !myStatsError && myStatsData && myStatsData.books > 0">
+    <div class="mystats-grid">
+      <!-- Primaer: Zeichen + Normseiten -->
+      <div class="mystats-tile mystats-tile--primary">
+        <div class="mystats-value" x-text="_myStatsFmt(myStatsData.chars)"></div>
+        <div class="mystats-label" x-text="$app.t('mystats.chars')"></div>
+      </div>
+      <div class="mystats-tile mystats-tile--primary">
+        <div class="mystats-value" x-text="myStatsNormpages()"></div>
+        <div class="mystats-label" x-text="$app.t('mystats.normpages')"></div>
+      </div>
+
+      <div class="mystats-tile">
+        <div class="mystats-value" x-text="_myStatsFmt(myStatsData.words)"></div>
+        <div class="mystats-label" x-text="$app.t('mystats.words')"></div>
+      </div>
+      <div class="mystats-tile">
+        <div class="mystats-value" x-text="_myStatsFmt(myStatsData.books)"></div>
+        <div class="mystats-label" x-text="$app.t('mystats.books')"></div>
+      </div>
+      <div class="mystats-tile">
+        <div class="mystats-value" x-text="_myStatsFmt(myStatsData.chapters)"></div>
+        <div class="mystats-label" x-text="$app.t('mystats.chapters')"></div>
+      </div>
+      <div class="mystats-tile">
+        <div class="mystats-value" x-text="_myStatsFmt(myStatsData.pages)"></div>
+        <div class="mystats-label" x-text="$app.t('mystats.pages')"></div>
+      </div>
+      <div class="mystats-tile">
+        <div class="mystats-value" x-text="myStatsWritingTime()"></div>
+        <div class="mystats-label" x-text="$app.t('mystats.writingTime')"></div>
+      </div>
+    </div>
+  </template>
+</div>

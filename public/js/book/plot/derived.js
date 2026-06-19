@@ -4,6 +4,12 @@
 
 import { STATUSES, ACT_PALETTE, _intensityBottomPct } from './constants.js';
 
+// Schwere-Rangfolge (höher = gravierender) für die Badge-Farbwahl am Beat.
+const SEV_RANK = { kritisch: 5, stark: 4, mittel: 3, schwach: 2, niedrig: 1 };
+// Beat-Titel normalisieren für den Abgleich Befund ↔ Beat (gleiche Vertragsbasis
+// wie der Consistency-Job, der den Beat nur per Titel-String referenziert).
+const _normTitle = (s) => (s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
 export const derivedMethods = {
   // ── Derived (memoized) ──────────────────────────────────────────────────────
   beatsForAct(actId) {
@@ -250,7 +256,70 @@ export const derivedMethods = {
     this.verworfenOpen = { ...this.verworfenOpen, [actId]: !this.verworfenOpen[actId] };
   },
 
-  // ── Filter (Kapitel / Figur) ───────────────────────────────────────────────
+  // ── Konsistenz-Befunde ↔ Beats (aktiver Lauf) ──────────────────────────────
+  // Index normalisierter Beat-Titel → Befunde des gerade angezeigten Laufs.
+  // Übergreifende Befunde ("—") haben kein Beat-Ziel und fallen raus. Memoisiert
+  // auf das Result-Objekt — es wird bei jedem Lauf/Öffnen neu zugewiesen, sodass
+  // der Referenz-Vergleich greift.
+  _konfliktIndex() {
+    return this._memo('konfliktIdx', [this.consistencyResult], () => {
+      const map = new Map();
+      const ks = this.consistencyResult?.konflikte || [];
+      ks.forEach((k, idx) => {
+        const key = _normTitle(k.beat);
+        if (!key || key === '—') return;
+        if (!map.has(key)) map.set(key, []);
+        map.get(key).push({ ...k, idx });
+      });
+      return map;
+    });
+  },
+
+  // Befunde, die genau diesen Beat (per Titel) betreffen — leer, wenn kein Lauf
+  // angezeigt wird oder der Beat sauber ist.
+  beatKonflikte(beat) {
+    if (!this.consistencyResult) return [];
+    return this._konfliktIndex().get(_normTitle(beat?.titel)) || [];
+  },
+
+  // Höchste Schwere unter den Befunden eines Beats (steuert die Badge-Farbe).
+  beatTopSeverity(beat) {
+    let top = 'mittel', rank = 0;
+    for (const k of this.beatKonflikte(beat)) {
+      const r = SEV_RANK[k.schwere] || 0;
+      if (r > rank) { rank = r; top = k.schwere; }
+    }
+    return top;
+  },
+
+  // Tooltip am Warn-Badge: alle Probleme dieses Beats untereinander.
+  beatKonflikteTip(beat) {
+    return this.beatKonflikte(beat).map(k => k.problem).filter(Boolean).join('\n');
+  },
+
+  // ── Kapitel-Coverage (lokales Aggregat, kein KI-Job) ────────────────────────
+  // Welche Buch-Kapitel haben (noch) keinen Beat, und wie viele nicht-verworfenen
+  // Beats hängen an keinem Kapitel. Match über chapter_name (Anzeige-Join), Quelle
+  // sind die $app.tree-Kapitel.
+  plotCoverage() {
+    const tree = window.__app.tree || [];
+    return this._memo('coverage', [this.beats, tree], () => {
+      const chapters = tree.filter(it => it.type === 'chapter');
+      const covered = new Set((this.beats || []).map(b => b.chapter_name).filter(Boolean));
+      const uncovered = chapters.filter(c => !covered.has(c.name)).map(c => c.name);
+      const beatsNoChapter = (this.beats || []).filter(b => !b.chapter_name && b.status !== 'verworfen').length;
+      return { uncovered, beatsNoChapter, totalChapters: chapters.length };
+    });
+  },
+
+  // Lohnt die Coverage-Sektion? Nur wenn Kapitel existieren und es etwas zu
+  // melden gibt (offene Kapitel oder kapitellose Beats).
+  plotCoverageRelevant() {
+    const c = this.plotCoverage();
+    return c.totalChapters > 0 && (c.uncovered.length > 0 || c.beatsNoChapter > 0);
+  },
+
+  // ── Filter (Volltext / Kapitel / Figur) ─────────────────────────────────────
   // Kapitel-Optionen aus den Beats ableiten (buchgeordnet via Root-Helper),
   // damit nur Kapitel angeboten werden, die im Board überhaupt vorkommen.
   plotKapitelListe() {
@@ -258,14 +327,17 @@ export const derivedMethods = {
   },
 
   plotFilterActive() {
-    return !!(this.plotFilters.kapitel || this.plotFilters.figurId || this.plotFilters.draftFigurId);
+    const f = this.plotFilters;
+    return !!(f.kapitel || f.figurId || f.draftFigurId || (f.text || '').trim());
   },
 
   _beatMatchesFilter(b) {
     const f = this.plotFilters;
+    const txt = (f.text || '').trim().toLowerCase();
     // draftFigurId kommt aus der Combobox als Roh-Value (INTEGER) — String-
     // koerziert vergleichen, da draft_fig_ids INTEGER sind.
-    return (!f.kapitel || b.chapter_name === f.kapitel) &&
+    return (!txt || (b.titel || '').toLowerCase().includes(txt) || (b.beschreibung || '').toLowerCase().includes(txt)) &&
+           (!f.kapitel || b.chapter_name === f.kapitel) &&
            (!f.figurId || (b.fig_ids || []).includes(f.figurId)) &&
            (!f.draftFigurId || (b.draft_fig_ids || []).map(String).includes(String(f.draftFigurId)));
   },
@@ -275,14 +347,14 @@ export const derivedMethods = {
   filteredBeatsForAct(actId) {
     const f = this.plotFilters;
     const base = this.beatsForAct(actId);
-    if (!f.kapitel && !f.figurId && !f.draftFigurId) return base;
-    return this._memo(`fbeats:${actId}`, [base, f.kapitel, f.figurId, f.draftFigurId], () =>
+    if (!this.plotFilterActive()) return base;
+    return this._memo(`fbeats:${actId}`, [base, f.kapitel, f.figurId, f.draftFigurId, f.text], () =>
       base.filter(b => this._beatMatchesFilter(b)));
   },
 
   filteredBeatCount() {
     const f = this.plotFilters;
-    return this._memo('fcount', [this.beats, f.kapitel, f.figurId, f.draftFigurId], () =>
+    return this._memo('fcount', [this.beats, f.kapitel, f.figurId, f.draftFigurId, f.text], () =>
       (this.beats || []).filter(b => this._beatMatchesFilter(b)).length);
   },
 
@@ -292,9 +364,9 @@ export const derivedMethods = {
   filteredBeatsForCell(actId, threadId) {
     const f = this.plotFilters;
     const base = this.beatsForCell(actId, threadId);
-    if (!f.kapitel && !f.figurId && !f.draftFigurId) return base;
+    if (!this.plotFilterActive()) return base;
     const tid = threadId == null ? null : threadId;
-    return this._memo(`fcell:${actId}:${tid}`, [base, f.kapitel, f.figurId, f.draftFigurId], () =>
+    return this._memo(`fcell:${actId}:${tid}`, [base, f.kapitel, f.figurId, f.draftFigurId, f.text], () =>
       base.filter(b => this._beatMatchesFilter(b)));
   },
 };
