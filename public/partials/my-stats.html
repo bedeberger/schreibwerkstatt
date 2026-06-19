@@ -11,36 +11,41 @@
   <p x-show="myStatsIsEmpty" x-cloak class="muted-msg" x-text="$app.t('mystats.empty')"></p>
 
   <template x-if="!myStatsLoading && !myStatsError && myStatsData && myStatsData.books > 0">
-    <div class="mystats-grid">
-      <!-- Primaer: Zeichen + Normseiten -->
-      <div class="mystats-tile mystats-tile--primary">
-        <div class="mystats-value" x-text="_myStatsFmt(myStatsData.chars)"></div>
-        <div class="mystats-label" x-text="$app.t('mystats.chars')"></div>
-      </div>
-      <div class="mystats-tile mystats-tile--primary">
-        <div class="mystats-value" x-text="myStatsNormpages()"></div>
-        <div class="mystats-label" x-text="$app.t('mystats.normpages')"></div>
+    <div class="mystats-body">
+      <!-- Hero: Zeichen + Normseiten gross nebeneinander -->
+      <div class="mystats-hero">
+        <div class="mystats-hero-cell">
+          <div class="mystats-hero-value" x-text="_myStatsFmt(myStatsData.chars)"></div>
+          <div class="mystats-hero-label" x-text="$app.t('mystats.chars')"></div>
+        </div>
+        <div class="mystats-hero-cell">
+          <div class="mystats-hero-value" x-text="myStatsNormpages()"></div>
+          <div class="mystats-hero-label" x-text="$app.t('mystats.normpages')"></div>
+        </div>
       </div>
 
-      <div class="mystats-tile">
-        <div class="mystats-value" x-text="_myStatsFmt(myStatsData.words)"></div>
-        <div class="mystats-label" x-text="$app.t('mystats.words')"></div>
-      </div>
-      <div class="mystats-tile">
-        <div class="mystats-value" x-text="_myStatsFmt(myStatsData.books)"></div>
-        <div class="mystats-label" x-text="$app.t('mystats.books')"></div>
-      </div>
-      <div class="mystats-tile">
-        <div class="mystats-value" x-text="_myStatsFmt(myStatsData.chapters)"></div>
-        <div class="mystats-label" x-text="$app.t('mystats.chapters')"></div>
-      </div>
-      <div class="mystats-tile">
-        <div class="mystats-value" x-text="_myStatsFmt(myStatsData.pages)"></div>
-        <div class="mystats-label" x-text="$app.t('mystats.pages')"></div>
-      </div>
-      <div class="mystats-tile">
-        <div class="mystats-value" x-text="myStatsWritingTime()"></div>
-        <div class="mystats-label" x-text="$app.t('mystats.writingTime')"></div>
+      <!-- Sekundär-Kennzahlen als kompakte Zeile -->
+      <div class="mystats-substats">
+        <div class="mystats-substat">
+          <span class="mystats-substat-value" x-text="_myStatsFmt(myStatsData.words)"></span>
+          <span class="mystats-substat-label" x-text="$app.t('mystats.words')"></span>
+        </div>
+        <div class="mystats-substat">
+          <span class="mystats-substat-value" x-text="_myStatsFmt(myStatsData.books)"></span>
+          <span class="mystats-substat-label" x-text="$app.t('mystats.books')"></span>
+        </div>
+        <div class="mystats-substat">
+          <span class="mystats-substat-value" x-text="_myStatsFmt(myStatsData.chapters)"></span>
+          <span class="mystats-substat-label" x-text="$app.t('mystats.chapters')"></span>
+        </div>
+        <div class="mystats-substat">
+          <span class="mystats-substat-value" x-text="_myStatsFmt(myStatsData.pages)"></span>
+          <span class="mystats-substat-label" x-text="$app.t('mystats.pages')"></span>
+        </div>
+        <div class="mystats-substat">
+          <span class="mystats-substat-value" x-text="myStatsWritingTime()"></span>
+          <span class="mystats-substat-label" x-text="$app.t('mystats.writingTime')"></span>
+        </div>
       </div>
     </div>
   </template>
@@ -48,6 +53,7 @@
   <!-- Entwicklung über die Zeit -->
   <template x-if="!myStatsLoading && !myStatsError && myStatsHasChart">
     <div class="mystats-chart-section">
+      <div class="mystats-section-label" x-text="$app.t('mystats.development')"></div>
       <div class="mystats-controls">
         <div x-data="combobox($app.t('mystats.metric'))"
              x-modelable="value" x-model="myStatsMetric"

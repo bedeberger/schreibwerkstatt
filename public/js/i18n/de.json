@@ -2047,6 +2047,7 @@
   "mystats.writingTime":         "Schreibzeit",
   "mystats.hm":                  "{h} h {m} min",
   "mystats.m":                   "{m} min",
+  "mystats.development":         "Entwicklung über die Zeit",
   "mystats.metric":              "Kennzahl",
   "mystats.metric.chars":        "Zeichen",
   "mystats.metric.normseiten":   "Normseiten",

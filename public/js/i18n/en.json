@@ -2046,6 +2046,7 @@
   "mystats.writingTime":         "Writing time",
   "mystats.hm":                  "{h}h {m}min",
   "mystats.m":                   "{m}min",
+  "mystats.development":         "Development over time",
   "mystats.metric":              "Metric",
   "mystats.metric.chars":        "Characters",
   "mystats.metric.normseiten":   "Standard pages",

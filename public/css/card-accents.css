@@ -13,6 +13,7 @@
   .card--ereignisse       { --card-accent: var(--card-accent-ereignisse); }
   .card--heatmap          { --card-accent: var(--card-accent-heatmap); }
   .card--bookstats        { --card-accent: var(--card-accent-bookstats); }
+  .card--mystats          { --card-accent: var(--card-accent-mystats); }
   .card--review           { --card-accent: var(--card-accent-review); }
   .card--kapitel          { --card-accent: var(--card-accent-kapitel); }
   .card--chat             { --card-accent: var(--card-accent-chat); }
