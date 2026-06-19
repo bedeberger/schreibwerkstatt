@@ -19,6 +19,13 @@ const METRIC_KEYS = {
   writing:       'mystats.metric.writing',
 };
 
+// Farbpalette fuer Pro-Buch-Linien — mittlere Saettigung, lesbar auf Light+Dark.
+const BOOK_COLORS = [
+  '#5b6ee1', '#e08a3c', '#3fae6e', '#c45fa0',
+  '#c9a93a', '#46a7bd', '#d05a5a', '#8f7ae0',
+  '#6aaf4e', '#b06ad0', '#d98f5e', '#4e8fd0',
+];
+
 // Chart.js-Instanz + Theme-Observer ausserhalb von Alpine halten, damit der
 // Reaktivitaets-Proxy die Instanz nicht beschaedigt (analog bookstats.js).
 let _chart = null;
@@ -32,6 +39,7 @@ export function registerMyStatsCard() {
     myStatsWriting: [],
     myStatsMetric: 'chars',
     myStatsRange: 0,
+    myStatsChartMode: 'total', // 'total' | 'byBook'
     myStatsLoading: false,
     myStatsError: '',
 
@@ -99,6 +107,12 @@ export function registerMyStatsCard() {
       });
     },
 
+    // Buchname aus der bereits geladenen Root-Buchliste (id → name).
+    _bookName(bookId) {
+      const b = (window.__app.books || []).find(x => String(x.id) === String(bookId));
+      return b?.name || (window.__app.t('mystats.unknownBook') + ' ' + bookId);
+    },
+
     async renderMyStatsChart() {
       const canvas = document.getElementById('my-stats-chart');
       if (!canvas) return;
@@ -117,72 +131,109 @@ export function registerMyStatsCard() {
 
       const metric = this.myStatsMetric;
       const isWriting = metric === 'writing';
-      let rows = isWriting
-        ? this.myStatsWriting.map(d => ({ recorded_at: d.date, seconds: d.seconds }))
-        : this.myStatsHistory;
+      const byBook = this.myStatsChartMode === 'byBook';
+
+      // Quelle vereinheitlichen auf { book_id, date, raw }.
+      const src = isWriting ? this.myStatsWriting : this.myStatsHistory;
+      let rows = src.map(r => ({ book_id: r.book_id, date: r.recorded_at || r.date, raw: r }));
       if (!rows.length) return;
 
       if (this.myStatsRange > 0) {
         const cutoff = new Date();
         cutoff.setDate(cutoff.getDate() - this.myStatsRange);
         const cutoffStr = cutoff.toISOString().slice(0, 10);
-        rows = rows.filter(r => r.recorded_at >= cutoffStr);
+        rows = rows.filter(r => r.date >= cutoffStr);
       }
       if (!rows.length) return;
 
-      let data;
-      if (metric === 'normseiten') data = rows.map(r => Math.round(((Number(r.chars) || 0) / 1500) * 10) / 10);
-      else if (isWriting)         data = rows.map(r => Math.round((Number(r.seconds) || 0) / 60));
-      else                        data = rows.map(r => Number(r[metric]) || 0);
+      const valOf = (raw) => {
+        if (metric === 'normseiten') return Math.round(((Number(raw.chars) || 0) / 1500) * 10) / 10;
+        if (isWriting)              return Math.round((Number(raw.seconds) || 0) / 60);
+        return Number(raw[metric]) || 0;
+      };
 
-      const labels = rows.map(r => {
-        const [y, m, d] = r.recorded_at.split('-');
-        return `${d}.${m}.${y.slice(2)}`;
-      });
+      // X-Achse = sortierte eindeutige Tage über alle Bücher.
+      const dates = [...new Set(rows.map(r => r.date))].sort();
+      const labels = dates.map(d => { const [y, m, dd] = d.split('-'); return `${dd}.${m}.${y.slice(2)}`; });
 
       const metricLabel = window.__app.t(METRIC_KEYS[metric] || metric);
       const localeTag = (window.__app.uiLocale === 'en') ? 'en-US' : 'de-CH';
       const isDecimal = metric === 'normseiten';
-      const fmt = v => isDecimal
+      const fmt = v => (v == null) ? '' : (isDecimal
         ? v.toLocaleString(localeTag, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
-        : Math.round(v).toLocaleString(localeTag);
+        : Math.round(v).toLocaleString(localeTag));
 
       const primary  = cssVar('--color-primary');
       const muted    = cssVar('--color-muted');
       const gridLine = cssVar('--color-border');
 
+      let datasets;
+      if (byBook) {
+        // Eine Linie pro Buch (Reihenfolge nach erstem Auftreten = stabile Farbe).
+        const order = [];
+        const perBook = new Map(); // book_id → Map(date → value)
+        for (const r of rows) {
+          if (!perBook.has(r.book_id)) { perBook.set(r.book_id, new Map()); order.push(r.book_id); }
+          perBook.get(r.book_id).set(r.date, valOf(r.raw));
+        }
+        datasets = order.map((bid, i) => {
+          const color = BOOK_COLORS[i % BOOK_COLORS.length];
+          const dmap = perBook.get(bid);
+          return {
+            label: this._bookName(bid),
+            data: dates.map(d => dmap.has(d) ? dmap.get(d) : null),
+            borderColor: color,
+            backgroundColor: color,
+            pointBackgroundColor: color,
+            borderWidth: 2,
+            tension: 0.3,
+            pointRadius: 2,
+            pointHoverRadius: 5,
+            fill: false,
+            spanGaps: true,
+          };
+        });
+      } else {
+        // Gesamt: Summe pro Tag über alle Bücher.
+        const sumByDate = new Map();
+        for (const r of rows) sumByDate.set(r.date, (sumByDate.get(r.date) || 0) + valOf(r.raw));
+        datasets = [{
+          label: metricLabel,
+          data: dates.map(d => sumByDate.has(d) ? sumByDate.get(d) : 0),
+          borderColor: primary,
+          backgroundColor: primary + '12',
+          pointBackgroundColor: primary,
+          borderWidth: 2,
+          tension: 0.35,
+          pointRadius: 3,
+          pointHoverRadius: 6,
+          fill: true,
+          spanGaps: false,
+        }];
+      }
+
       this._ensureThemeObserver();
 
       _chart = new window.Chart(canvas, {
         type: 'line',
-        data: {
-          labels,
-          datasets: [{
-            label: metricLabel,
-            data,
-            borderColor: primary,
-            backgroundColor: primary + '12',
-            borderWidth: 2,
-            tension: 0.35,
-            pointRadius: 3,
-            pointHoverRadius: 6,
-            pointBackgroundColor: primary,
-            fill: true,
-            spanGaps: false,
-          }],
-        },
+        data: { labels, datasets },
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
           plugins: {
-            legend: { display: false },
-            tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fmt(ctx.parsed.y)}` } },
+            legend: {
+              display: byBook,
+              position: 'bottom',
+              labels: { boxWidth: 12, boxHeight: 12, font: { size: 11 }, color: muted, usePointStyle: true },
+            },
+            tooltip: { callbacks: { label: ctx => ctx.parsed.y == null ? null : ` ${ctx.dataset.label}: ${fmt(ctx.parsed.y)}` } },
           },
           scales: {
-            x: { grid: { color: gridLine }, ticks: { font: { size: 11 }, color: muted } },
+            x: { grid: { color: gridLine }, ticks: { font: { size: 11 }, color: muted, maxTicksLimit: 12 } },
             y: {
               grid: { color: gridLine },
-              beginAtZero: isWriting,
+              beginAtZero: isWriting || byBook,
               ticks: {
                 font: { size: 11 }, color: muted,
                 callback: v => fmt(v),

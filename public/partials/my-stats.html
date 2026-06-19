@@ -6,6 +6,8 @@
     <span class="card-title" x-text="$app.t('mystats.title')"></span>
   </div>
 
+  <p class="mystats-allbooks-note" x-text="$app.t('mystats.allBooksNote')"></p>
+
   <div x-show="myStatsLoading" class="muted-msg" x-text="$app.t('common.loading')"></div>
   <p x-show="myStatsError" x-cloak class="card-form-error" x-text="myStatsError"></p>
   <p x-show="myStatsIsEmpty" x-cloak class="muted-msg" x-text="$app.t('mystats.empty')"></p>
@@ -55,6 +57,13 @@
     <div class="mystats-chart-section">
       <div class="mystats-section-label" x-text="$app.t('mystats.development')"></div>
       <div class="mystats-controls">
+        <div class="btn-group">
+          <template x-for="m in [{v:'total',k:'total'},{v:'byBook',k:'byBook'}]" :key="m.v">
+            <button type="button" class="btn-compact" :class="{ primary: myStatsChartMode === m.v }"
+                    @click="myStatsChartMode = m.v; renderMyStatsChart()"
+                    x-text="$app.t('mystats.chart.' + m.k)"></button>
+          </template>
+        </div>
         <div x-data="combobox($app.t('mystats.metric'))"
              x-modelable="value" x-model="myStatsMetric"
              x-effect="options = [

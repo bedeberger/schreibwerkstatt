@@ -135,11 +135,12 @@ router.get('/profile-stats', (req, res) => {
 });
 
 /**
- * Tages-Zeitreihe ueber ALLE eigenen Buecher fuer den Entwicklungs-Chart.
- * `history`: pro Tag (`recorded_at`, YYYY-MM-DD) die Summe der letzten
- * Buch-Snapshots aller eigenen Buecher — book_stats_history hat genau eine Row
- * pro (book_id, Tag), Summe ueber book_id ergibt den Gesamtstand an dem Tag.
- * `writing`: pro Tag die summierten Schreib-Sekunden (eigene Buecher).
+ * Tages-Zeitreihe fuer den Entwicklungs-Chart — pro Buch aufgeschluesselt.
+ * `history`: book_stats_history-Rows aller eigenen Buecher (eine pro (book_id,
+ * Tag)). Das Frontend baut daraus sowohl die Gesamt-Kurve (Summe pro Tag) als
+ * auch die Pro-Buch-Linien; Buchnamen kommen aus der bereits geladenen
+ * Root-Buchliste (kein books-Query hier → Content-Store-Regel).
+ * `writing`: Schreib-Sekunden pro (book_id, Tag) (nur aktive Tage).
  */
 router.get('/profile-stats-history', (req, res) => {
   const email = req.session.user.email;
@@ -150,20 +151,14 @@ router.get('/profile-stats-history', (req, res) => {
   try {
     const ph = owned.map(() => '?').join(',');
     const history = db.prepare(`
-      SELECT recorded_at,
-             COALESCE(SUM(chars),         0) AS chars,
-             COALESCE(SUM(words),         0) AS words,
-             COALESCE(SUM(tok),           0) AS tok,
-             COALESCE(SUM(page_count),    0) AS page_count,
-             COALESCE(SUM(chapter_count), 0) AS chapter_count,
-             COALESCE(SUM(unique_words),  0) AS unique_words
+      SELECT book_id, recorded_at, chars, words, tok, page_count, chapter_count, unique_words
       FROM book_stats_history WHERE book_id IN (${ph})
-      GROUP BY recorded_at ORDER BY recorded_at ASC
+      ORDER BY recorded_at ASC
     `).all(...owned);
     const writing = db.prepare(`
-      SELECT date, COALESCE(SUM(seconds), 0) AS seconds
-      FROM writing_time WHERE user_email = ? AND book_id IN (${ph})
-      GROUP BY date ORDER BY date ASC
+      SELECT book_id, date, seconds
+      FROM writing_time WHERE user_email = ? AND book_id IN (${ph}) AND seconds > 0
+      ORDER BY date ASC
     `).all(email, ...owned);
     res.json({ history, writing });
   } catch (e) {

@@ -3,6 +3,13 @@
    Chart. Akzent kommt aus dem Karten-Scope (var(--card-accent), SSoT
    card-accents.css → .card--mystats). Markup: public/partials/my-stats.html. */
 
+/* Hinweis direkt unter dem Titel: diese Werte umfassen alle eigenen Bücher. */
+.mystats-allbooks-note {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+  margin: calc(-1 * var(--space-xs)) 0 var(--space-sm);
+}
+
 .mystats-body {
   margin-top: var(--space-sm);
 }
