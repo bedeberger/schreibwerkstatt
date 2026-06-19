@@ -1,0 +1,88 @@
+// Plot-Werkstatt: Lifecycle (Board laden, Reset) + Memo-Helper.
+// _memo lebt hier und wird in die Facade gespreadet — alle Sub-Module nutzen
+// `this._memo` über den gemeinsamen `this._memos`-Speicher pro Card-Instanz.
+
+import { fetchJson } from '../../utils.js';
+
+export const lifecycleMethods = {
+  // ── Memo-Helper (ein Helper pro Modul, Array-Deps shallow ===) ─────────────
+  _memo(key, deps, fn) {
+    const cache = (this._memos = this._memos || {});
+    const prev = cache[key];
+    if (prev && prev.deps.length === deps.length && prev.deps.every((d, i) => d === deps[i])) {
+      return prev.val;
+    }
+    const val = fn();
+    cache[key] = { deps, val };
+    return val;
+  },
+
+  // ── Lifecycle ──────────────────────────────────────────────────────────────
+  async loadBoard() {
+    const app = window.__app;
+    const bookId = app.selectedBookId;
+    if (!bookId) { this.acts = []; this.threads = []; this.beats = []; this.draftFiguren = []; return; }
+    this.loading = true;
+    this._memos = {};
+    try {
+      const data = await fetchJson(`/plot?book_id=${bookId}`);
+      this.acts = Array.isArray(data.acts) ? data.acts : [];
+      this.threads = Array.isArray(data.threads) ? data.threads : [];
+      this.beats = Array.isArray(data.beats) ? data.beats : [];
+      this.errorMessage = '';
+    } catch (e) {
+      this.errorMessage = app.t('plot.error.load');
+      this.acts = []; this.threads = []; this.beats = [];
+    } finally {
+      this.loading = false;
+    }
+    // Werkstatt-Figuren separat laden — ein Fehler hier darf das Board nicht
+    // leeren (Board ist die Primärdaten, Drafts nur Beilage fürs Picker/Badge).
+    // draftFigurenById (Getter in plot-card.js) baut sich aus der neuen Referenz neu.
+    try {
+      const drafts = await fetchJson(`/draft-figures/${bookId}`);
+      this.draftFiguren = Array.isArray(drafts) ? drafts : [];
+    } catch (e) {
+      this.draftFiguren = [];
+    }
+    // Konsistenz-Prüfungs-Historie laden (best-effort, eigenständig vom Board).
+    this.loadConsistencyRuns();
+  },
+
+  resetPlot() {
+    this._clearJobs();
+    this.acts = [];
+    this.threads = [];
+    this.beats = [];
+    this.draftFiguren = [];
+    this._memos = {};
+    this.editingBeatId = null;
+    this.addingActId = null;
+    this.addingCell = null;
+    this.newBeatTitel = '';
+    this.editingActId = null;
+    this.actDraft = '';
+    this.addingAct = false;
+    this.addingActScope = false;
+    this.newActName = '';
+    this.editingThreadId = null;
+    this.addingThread = false;
+    this.newThreadName = '';
+    this.threadColorPickerId = null;
+    this._dragBeatId = null;
+    this._dragOverActId = null;
+    this._dragOverCell = null;
+    this.brainstormResult = null;
+    this.brainstormActId = null;
+    this.brainstormThreadId = null;
+    this.consistencyResult = null;
+    this.selectedKonfliktIdx = null;
+    this.consistencyRuns = [];
+    this.selectedRunId = null;
+    this.plotFilters = { kapitel: '', figurId: '', draftFigurId: '' };
+    this.verworfenOpen = {};
+    this.actColorPickerId = null;
+    this.errorMessage = '';
+    this.busy = false;
+  },
+};
