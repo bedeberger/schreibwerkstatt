@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 195, 99 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 196, 100 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -33,6 +33,7 @@ erDiagram
   books ||--|| book_settings         : has
   books ||--o{ job_checkpoints       : has
   books ||--o{ job_runs              : has
+  books ||--o{ ai_cost_ledger        : has
   books ||--o{ chat_sessions         : has
   books ||--o{ ideen                 : has
   books ||--o{ pdf_export_profile    : has
@@ -840,6 +841,23 @@ erDiagram
     REAL    tokens_per_sec
     TEXT    error
     TEXT    error_params  "JSON, i18n-Params zum error-Key"
+  }
+  ai_cost_ledger {
+    INTEGER id          PK
+    TEXT    ts          "ISO+Z, Call-Abschluss"
+    TEXT    user_email
+    TEXT    source      "job|chat"
+    TEXT    type        "Job-Typ oder Chat-Kind"
+    INTEGER book_id     FK "SET NULL"
+    TEXT    provider    "claude|ollama|llama"
+    TEXT    model
+    INTEGER tokens_in
+    INTEGER tokens_out
+    INTEGER cache_read_in
+    INTEGER cache_creation_in
+    INTEGER cache_creation_1h_in
+    REAL    usd         "eingefroren zur Call-Zeit"
+    TEXT    source_ref  "UNIQUE: job:<job_id> | chatmsg:<id>"
   }
   job_checkpoints {
     INTEGER id          PK

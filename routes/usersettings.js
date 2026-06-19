@@ -135,6 +135,44 @@ router.get('/profile-stats', (req, res) => {
 });
 
 /**
+ * Tages-Zeitreihe ueber ALLE eigenen Buecher fuer den Entwicklungs-Chart.
+ * `history`: pro Tag (`recorded_at`, YYYY-MM-DD) die Summe der letzten
+ * Buch-Snapshots aller eigenen Buecher — book_stats_history hat genau eine Row
+ * pro (book_id, Tag), Summe ueber book_id ergibt den Gesamtstand an dem Tag.
+ * `writing`: pro Tag die summierten Schreib-Sekunden (eigene Buecher).
+ */
+router.get('/profile-stats-history', (req, res) => {
+  const email = req.session.user.email;
+  const owned = listBookIdsForUser(email)
+    .filter(r => r.role === 'owner')
+    .map(r => r.book_id);
+  if (!owned.length) return res.json({ history: [], writing: [] });
+  try {
+    const ph = owned.map(() => '?').join(',');
+    const history = db.prepare(`
+      SELECT recorded_at,
+             COALESCE(SUM(chars),         0) AS chars,
+             COALESCE(SUM(words),         0) AS words,
+             COALESCE(SUM(tok),           0) AS tok,
+             COALESCE(SUM(page_count),    0) AS page_count,
+             COALESCE(SUM(chapter_count), 0) AS chapter_count,
+             COALESCE(SUM(unique_words),  0) AS unique_words
+      FROM book_stats_history WHERE book_id IN (${ph})
+      GROUP BY recorded_at ORDER BY recorded_at ASC
+    `).all(...owned);
+    const writing = db.prepare(`
+      SELECT date, COALESCE(SUM(seconds), 0) AS seconds
+      FROM writing_time WHERE user_email = ? AND book_id IN (${ph})
+      GROUP BY date ORDER BY date ASC
+    `).all(email, ...owned);
+    res.json({ history, writing });
+  } catch (e) {
+    logger.error('[me/profile-stats-history] DB-Fehler: ' + e.message, { user: email });
+    res.status(500).json({ error_code: 'DB_ERROR' });
+  }
+});
+
+/**
  * Email → Display-Name-Map fuer Anzeige in Revision-Listen, Tree-Toasts und
  * generelle „Wer hat editiert"-Hints. Nur active/invited User. Keine PII
  * ausserhalb dessen, was die Buch-Mitglieder ohnehin via book_access sehen.

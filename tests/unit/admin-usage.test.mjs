@@ -16,6 +16,11 @@ require('../../db/migrations');
 const { db } = require('../../db/connection');
 const appUsers = require('../../db/app-users');
 const adminUsage = require('../../db/admin-usage');
+// Kosten-Aggregate lesen aus dem persistenten Ledger (db/cost-ledger). Die
+// Seed-Helfer schreiben — wie die Produktion (endJobRun / Chat-Insert) —
+// zusaetzlich ins Ledger. Detail-Listen (getJobRuns/getChatMessages) lesen
+// weiter aus den Quelltabellen; die Extra-Ledger-Rows stoeren sie nicht.
+const { recordJobLedger, recordChatLedgerForMessage } = require('../../db/cost-ledger');
 
 function seedUser(email) {
   appUsers.createUser({ email });
@@ -27,15 +32,18 @@ function seedBook(id, name = 'B') {
 }
 
 function insertJobRun({ email, bookId = null, type = 'check', tokensIn = 0, tokensOut = 0, model = 'claude-sonnet-4-6', provider = 'claude', when = new Date() }) {
+  const jobId = `j-${Math.random().toString(36).slice(2, 10)}`;
   db.prepare(`
     INSERT INTO job_runs (job_id, type, book_id, user_email, status, queued_at, started_at, ended_at,
                           tokens_in, tokens_out, provider, model, cache_read_in, cache_creation_in)
     VALUES (?, ?, ?, ?, 'done', ?, ?, ?, ?, ?, ?, ?, 0, 0)
   `).run(
-    `j-${Math.random().toString(36).slice(2, 10)}`,
+    jobId,
     type, bookId, email, when.toISOString(), when.toISOString(), when.toISOString(),
     tokensIn, tokensOut, provider, model,
   );
+  // chat-sourced Typen (z.B. 'book-chat') werden hier wie in Produktion uebersprungen.
+  recordJobLedger(jobId);
 }
 
 function insertChatMsg({ email, bookId, kind = 'book', tokensIn = 0, tokensOut = 0, model = 'claude-sonnet-4-6' }) {
@@ -43,10 +51,11 @@ function insertChatMsg({ email, bookId, kind = 'book', tokensIn = 0, tokensOut =
     INSERT INTO chat_sessions (book_id, kind, user_email, created_at, last_message_at)
     VALUES (?, ?, ?, datetime('now'), datetime('now'))
   `).run(bookId, kind, email);
-  db.prepare(`
+  const msg = db.prepare(`
     INSERT INTO chat_messages (session_id, role, content, tokens_in, tokens_out, provider, model, cache_read_in, cache_creation_in, created_at)
     VALUES (?, 'assistant', 'hi', ?, ?, 'claude', ?, 0, 0, datetime('now'))
   `).run(csResult.lastInsertRowid, tokensIn, tokensOut, model);
+  recordChatLedgerForMessage(msg.lastInsertRowid);
 }
 
 test('listUsersWithUsage: aggregiert Jobs + Chat pro User', () => {

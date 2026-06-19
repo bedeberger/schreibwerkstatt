@@ -15,6 +15,10 @@ require('../../db/migrations');
 const { db } = require('../../db/connection');
 const appUsers = require('../../db/app-users');
 const { checkBudget, enforceBudget, firstOfCurrentMonthIso, sumCostUsdSince } = require('../../lib/budget');
+// Budget summiert aus dem persistenten Kosten-Ledger (db/cost-ledger), nicht
+// mehr re-computed aus job_runs/chat_messages. Die Helfer schreiben darum — wie
+// die Produktion (endJobRun / Chat-Insert) — zusaetzlich ins Ledger.
+const { recordJobLedger, recordChatLedgerForMessage } = require('../../db/cost-ledger');
 
 function seedUser(email, mode = 'none', budget = null) {
   appUsers.createUser({ email });
@@ -22,15 +26,26 @@ function seedUser(email, mode = 'none', budget = null) {
 }
 
 function insertJobRun({ email, type = 'check', tokensIn = 0, tokensOut = 0, model = 'claude-sonnet-4-6', provider = 'claude', when = new Date() }) {
+  const jobId = `j-${Math.random().toString(36).slice(2, 10)}`;
   db.prepare(`
     INSERT INTO job_runs (job_id, type, book_id, user_email, status, queued_at, started_at, ended_at,
                           tokens_in, tokens_out, provider, model, cache_read_in, cache_creation_in)
     VALUES (?, ?, NULL, ?, 'done', ?, ?, ?, ?, ?, ?, ?, 0, 0)
   `).run(
-    `j-${Math.random().toString(36).slice(2, 10)}`,
+    jobId,
     type, email, when.toISOString(), when.toISOString(), when.toISOString(),
     tokensIn, tokensOut, provider, model,
   );
+  // chat-sourced Typen werden hier (wie in Produktion) uebersprungen.
+  recordJobLedger(jobId);
+}
+
+function insertChatMessage(sessionId, { tokensIn = 0, tokensOut = 0, model = 'claude-sonnet-4-6', provider = 'claude' } = {}) {
+  const r = db.prepare(`
+    INSERT INTO chat_messages (session_id, role, content, tokens_in, tokens_out, provider, model, cache_read_in, cache_creation_in, created_at)
+    VALUES (?, 'assistant', 'hi', ?, ?, ?, ?, 0, 0, datetime('now'))
+  `).run(sessionId, tokensIn, tokensOut, provider, model);
+  recordChatLedgerForMessage(r.lastInsertRowid);
 }
 
 test('checkBudget: mode none → allowed, kein DB-Scan', () => {
@@ -104,7 +119,7 @@ test('checkBudget: budget=null mit mode=soft/hard → kein numerisches Limit, al
   assert.equal(r.allowed, true);
 });
 
-test('sumCostUsdSince: aggregiert ueber job_runs + chat_messages', () => {
+test('sumCostUsdSince: aggregiert Job- + Chat-Verbrauch (aus dem Ledger)', () => {
   seedUser('agg@ex.com', 'none', null);
   insertJobRun({ email: 'agg@ex.com', tokensIn: 1_000_000, tokensOut: 0 });
 
@@ -116,10 +131,7 @@ test('sumCostUsdSince: aggregiert ueber job_runs + chat_messages', () => {
     INSERT INTO chat_sessions (book_id, kind, user_email, created_at, last_message_at)
     VALUES (4242, 'book', 'agg@ex.com', datetime('now'), datetime('now'))
   `).run();
-  db.prepare(`
-    INSERT INTO chat_messages (session_id, role, content, tokens_in, tokens_out, provider, model, cache_read_in, cache_creation_in, created_at)
-    VALUES (?, 'assistant', 'hi', 1000000, 0, 'claude', 'claude-sonnet-4-6', 0, 0, datetime('now'))
-  `).run(csResult.lastInsertRowid);
+  insertChatMessage(csResult.lastInsertRowid, { tokensIn: 1_000_000, tokensOut: 0 });
 
   const total = sumCostUsdSince('agg@ex.com', firstOfCurrentMonthIso());
   // 2 Mio Input @ 3 USD/Mio = 6 USD
@@ -136,8 +148,7 @@ test('sumCostUsdSince: book-chat job_run wird NICHT mit chat_message doppelt gez
               VALUES (4343, 'bc-dup', datetime('now'), datetime('now'))`).run();
   const cs = db.prepare(`INSERT INTO chat_sessions (book_id, kind, user_email, created_at, last_message_at)
                          VALUES (4343, 'book', 'bcdup@ex.com', datetime('now'), datetime('now'))`).run();
-  db.prepare(`INSERT INTO chat_messages (session_id, role, content, tokens_in, tokens_out, provider, model, cache_read_in, cache_creation_in, created_at)
-              VALUES (?, 'assistant', 'hi', 1000000, 0, 'claude', 'claude-sonnet-4-6', 0, 0, datetime('now'))`).run(cs.lastInsertRowid);
+  insertChatMessage(cs.lastInsertRowid, { tokensIn: 1_000_000, tokensOut: 0 });
   const total = sumCostUsdSince('bcdup@ex.com', firstOfCurrentMonthIso());
   // 1 Mio Input = $3.00 EINMAL.
   assert.equal(Math.round(total * 100) / 100, 3.00);

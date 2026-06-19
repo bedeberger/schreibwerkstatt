@@ -45,12 +45,32 @@
   color: var(--color-muted);
 }
 
+/* Entwicklungs-Chart (Chart.js, lazy). */
+.mystats-chart-section {
+  margin-top: var(--space-lg);
+}
+.mystats-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: flex-start;
+}
+.mystats-chart-wrap {
+  position: relative;
+  width: 100%;
+  height: 240px;
+  margin: var(--space-md) 0 var(--space-xs);
+}
+
 @media (max-width: 600px) {
   .mystats-grid {
     grid-template-columns: repeat(2, 1fr);
   }
   .mystats-value {
     font-size: var(--font-size-2xl);
+  }
+  .mystats-chart-wrap {
+    height: 200px;
   }
 }
 }

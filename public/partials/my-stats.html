@@ -44,4 +44,33 @@
       </div>
     </div>
   </template>
+
+  <!-- Entwicklung über die Zeit -->
+  <template x-if="!myStatsLoading && !myStatsError && myStatsHasChart">
+    <div class="mystats-chart-section">
+      <div class="mystats-controls">
+        <div x-data="combobox($app.t('mystats.metric'))"
+             x-modelable="value" x-model="myStatsMetric"
+             x-effect="options = [
+               {value:'chars',         label: $app.t('mystats.metric.chars')},
+               {value:'normseiten',    label: $app.t('mystats.metric.normseiten')},
+               {value:'words',         label: $app.t('mystats.metric.words')},
+               {value:'page_count',    label: $app.t('mystats.metric.pages')},
+               {value:'chapter_count', label: $app.t('mystats.metric.chapters')},
+               {value:'writing',       label: $app.t('mystats.metric.writing')}
+             ]"
+             @combobox-change="$nextTick(() => renderMyStatsChart())"></div>
+        <div class="btn-group">
+          <template x-for="r in [{v:30,k:'30'},{v:90,k:'90'},{v:365,k:'365'},{v:0,k:'all'}]" :key="r.v">
+            <button type="button" class="btn-compact" :class="{ primary: myStatsRange === r.v }"
+                    @click="myStatsRange = r.v; renderMyStatsChart()"
+                    x-text="$app.t('mystats.range.' + r.k)"></button>
+          </template>
+        </div>
+      </div>
+      <div class="mystats-chart-wrap">
+        <canvas id="my-stats-chart" role="img" :aria-label="$app.t('mystats.chartFallback')"><span x-text="$app.t('mystats.chartFallback')"></span></canvas>
+      </div>
+    </div>
+  </template>
 </div>
