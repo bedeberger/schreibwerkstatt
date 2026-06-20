@@ -404,4 +404,40 @@ router.delete('/consistency-runs/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Brainstorm-Lauf-Historie ─────────────────────────────────────────────────
+// Persistierte Plot-Brainstorm-Läufe pro (Buch, User), zusätzlich pro Akt/Strang.
+// Insert geschieht beim Job-Complete in routes/jobs/plot.js. Hier nur Lesen +
+// Löschen. Liste mit act_name/thread_name (JOIN, nullbar bei gelöschtem Akt/Strang).
+router.get('/brainstorm-runs', (req, res) => {
+  const userEmail = userEmailOrNull(req);
+  const bookId = toIntId(req.query.book_id);
+  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  if (!bookId)    return res.status(400).json({ error_code: 'INVALID_ID' });
+  if (!_guard(req, res, bookId)) return;
+  res.json(plotDb.listPlotBrainstormRuns(bookId, userEmail));
+});
+
+router.get('/brainstorm-runs/:id', (req, res) => {
+  const userEmail = userEmailOrNull(req);
+  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  const id = toIntId(req.params.id);
+  if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
+  const run = plotDb.getPlotBrainstormRun(id);
+  if (!run || run.user_email !== userEmail) return res.status(404).json({ error_code: 'RUN_NOT_FOUND' });
+  if (!_guard(req, res, run.book_id)) return;
+  res.json(run);
+});
+
+router.delete('/brainstorm-runs/:id', (req, res) => {
+  const userEmail = userEmailOrNull(req);
+  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  const id = toIntId(req.params.id);
+  if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
+  const run = plotDb.getPlotBrainstormRun(id);
+  if (!run || run.user_email !== userEmail) return res.status(404).json({ error_code: 'RUN_NOT_FOUND' });
+  if (!_guard(req, res, run.book_id)) return;
+  plotDb.deletePlotBrainstormRun(id, userEmail);
+  res.json({ ok: true });
+});
+
 module.exports = router;

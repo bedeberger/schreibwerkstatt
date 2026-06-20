@@ -7904,6 +7904,236 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 198 abgeschlossen (app_users.daily_goal_minutes — persoenliches Tagesziel).');
   }
 
+  if (version < 199) {
+    // Buch-Schreibziel mit Deadline: Zielzeichenzahl (gesamt) + Abgabedatum
+    // (ISO YYYY-MM-DD). Treibt die Deadline-Projektion in der Buch-Uebersicht
+    // ("bei deinem Schnitt fertig am ..."). Beide NULL = kein Ziel gesetzt.
+    // Additiv: nullable Spalten ohne FK, kein Recreate noetig.
+    const bsCols199 = db.pragma('table_info(book_settings)').map(c => c.name);
+    if (!bsCols199.includes('goal_target_chars')) {
+      db.exec('ALTER TABLE book_settings ADD COLUMN goal_target_chars INTEGER');
+    }
+    if (!bsCols199.includes('goal_deadline')) {
+      db.exec('ALTER TABLE book_settings ADD COLUMN goal_deadline TEXT');
+    }
+
+    const fkErrors199 = db.pragma('foreign_key_check');
+    if (fkErrors199.length) {
+      throw new Error(`Migration 199: foreign_key_check meldet ${fkErrors199.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 199').run();
+    logger.info('DB-Migration auf Version 199 abgeschlossen (book_settings.goal_target_chars + goal_deadline — Schreibziel mit Deadline).');
+  }
+
+  if (version < 200) {
+    // Beta-Leser-Feedback: share_comments wird von flachem Kommentarstrom zu
+    // verankerten Threads ausgebaut.
+    //   parent_id    — Self-FK: NULL = Root-Kommentar, sonst Antwort auf Root
+    //                  (Threads sind eine Ebene tief; Antworten erben den Anker).
+    //   anchor_bid   — data-bid des Blocks, an dem die Textstelle haengt
+    //                  (NULL = allgemeine Anmerkung, altes Verhalten).
+    //   anchor_quote — markierter Text (Re-Anchor bei Live-Editieren + Anzeige).
+    //   anchor_start/_end — Offset-Hinweis im Block-Text.
+    //   author_email — gesetzt, wenn der Buch-Owner antwortet (vs. reader_name
+    //                  beim anonymen Leser). Identitaets-Quelle ist im Code
+    //                  exklusiv (entweder author_email ODER reader_*-Pfad).
+    //   resolved_at  — Owner markiert einen Root-Thread als erledigt.
+    //   reader_token — opaker Per-Browser-Token (localStorage), damit ein Leser
+    //                  seine eigenen Anmerkungen wiedererkennt + der Name vorbefuellt.
+    // Additiv: alle Spalten nullable, FKs mit Default NULL — kein Recreate noetig.
+    const scCols200 = db.pragma('table_info(share_comments)').map(c => c.name);
+    if (scCols200.length > 0) {
+      if (!scCols200.includes('parent_id'))    db.exec('ALTER TABLE share_comments ADD COLUMN parent_id INTEGER REFERENCES share_comments(id) ON DELETE CASCADE');
+      if (!scCols200.includes('anchor_bid'))   db.exec('ALTER TABLE share_comments ADD COLUMN anchor_bid TEXT');
+      if (!scCols200.includes('anchor_quote')) db.exec('ALTER TABLE share_comments ADD COLUMN anchor_quote TEXT');
+      if (!scCols200.includes('anchor_start')) db.exec('ALTER TABLE share_comments ADD COLUMN anchor_start INTEGER');
+      if (!scCols200.includes('anchor_end'))   db.exec('ALTER TABLE share_comments ADD COLUMN anchor_end INTEGER');
+      if (!scCols200.includes('author_email')) db.exec('ALTER TABLE share_comments ADD COLUMN author_email TEXT REFERENCES app_users(email) ON DELETE SET NULL');
+      if (!scCols200.includes('resolved_at'))  db.exec('ALTER TABLE share_comments ADD COLUMN resolved_at TEXT');
+      if (!scCols200.includes('reader_token')) db.exec('ALTER TABLE share_comments ADD COLUMN reader_token TEXT');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_share_comments_parent ON share_comments(parent_id)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_share_comments_author ON share_comments(author_email)');
+    }
+
+    const fkErrors200 = db.pragma('foreign_key_check');
+    if (fkErrors200.length) {
+      throw new Error(`Migration 200: foreign_key_check meldet ${fkErrors200.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 200').run();
+    logger.info('DB-Migration auf Version 200 abgeschlossen (share_comments — verankerte Beta-Leser-Threads).');
+  }
+
+  if (version < 201) {
+    // Manuskript-Meilensteine: ganze-Buch-Snapshots („Fassung 1/2/3") als
+    // selbsttragende Momentaufnahme. Im Gegensatz zu page_revisions (write-heavy,
+    // aggressiv geprunt, pro Seite) sind Snapshots sparse + user-initiiert + ohne
+    // Pruning. `content_json` = buildBookJson-Output ({ book, tree:[node…] }) mit
+    // Seiten-HTML inline → unabhaengig von spaeteren Seiten-Loeschungen.
+    // `extras_json` = collectExtras (Analyse + Lektorat) fuer spaeteren Restore.
+    // Reine Lese-/Diff-Daten → ON DELETE CASCADE am book_id.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS book_snapshots (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id      INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        seq          INTEGER NOT NULL,
+        label        TEXT,
+        description  TEXT,
+        content_json TEXT NOT NULL,
+        extras_json  TEXT,
+        chars        INTEGER NOT NULL DEFAULT 0,
+        words        INTEGER NOT NULL DEFAULT 0,
+        pages        INTEGER NOT NULL DEFAULT 0,
+        chapters     INTEGER NOT NULL DEFAULT 0,
+        user_email   TEXT,
+        created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_book_snapshots_book ON book_snapshots(book_id, created_at DESC);
+    `);
+
+    const fkErrors201 = db.pragma('foreign_key_check');
+    if (fkErrors201.length) {
+      throw new Error(`Migration 201: foreign_key_check meldet ${fkErrors201.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 201').run();
+    logger.info('DB-Migration auf Version 201 abgeschlossen (book_snapshots — Manuskript-Meilensteine / Fassungen).');
+  }
+
+  if (version < 202) {
+    // Namens-/Konsistenz-Waechter: Ignore-Liste fuer akzeptierte Schreibvarianten.
+    // Der Waechter erkennt buchweite Tippfehler/Varianten von Eigennamen regelbasiert
+    // (lib/name-guard.js, kein KI-Call); was der User als „gewollt“ markiert, landet
+    // hier und wird bei kuenftigen Laeufen unterdrueckt. Pro Buch + User. Rein
+    // kuratierte Lese-Daten → ON DELETE CASCADE am book_id. `variant` ist der
+    // unterdrueckte Treffer, `canonical` der zugehoerige Stammname (Display/Kontext).
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS name_guard_ignores (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id    INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        user_email TEXT,
+        canonical  TEXT NOT NULL,
+        variant    TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        UNIQUE(book_id, user_email, variant)
+      );
+      CREATE INDEX IF NOT EXISTS idx_name_guard_ignores_book ON name_guard_ignores(book_id, user_email);
+    `);
+
+    const fkErrors202 = db.pragma('foreign_key_check');
+    if (fkErrors202.length) {
+      throw new Error(`Migration 202: foreign_key_check meldet ${fkErrors202.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 202').run();
+    logger.info('DB-Migration auf Version 202 abgeschlossen (name_guard_ignores — Namens-Waechter Ignore-Liste).');
+  }
+
+  if (version < 203) {
+    // Recherche-/Wissensboard: geteiltes Buch-Archiv fuer Notizen, Links, Zitate,
+    // Faktensplitter und Bilder. Buchweit geteilt (alle Editoren sehen dieselben
+    // Schnipsel; `user_email` ist reine Ersteller-Attribution, KEIN Sichtbarkeits-
+    // Scope — anders als `ideen`). Rein rueckwaertsgewandt/kuratierend, nie
+    // generativ im Buchtext. Schnipsel-Loeschung beim Buch → ON DELETE CASCADE.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS research_items (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id     INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        user_email  TEXT    NOT NULL,
+        kind        TEXT    NOT NULL DEFAULT 'note'
+                      CHECK(kind IN ('note','link','quote','fact','image')),
+        title       TEXT,
+        body        TEXT,
+        url         TEXT,
+        source      TEXT,
+        image       BLOB,
+        image_mime  TEXT,
+        pinned      INTEGER NOT NULL DEFAULT 0,
+        archived    INTEGER NOT NULL DEFAULT 0,
+        created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        updated_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_research_items_book ON research_items(book_id);
+
+      CREATE TABLE IF NOT EXISTS research_item_tags (
+        item_id INTEGER NOT NULL REFERENCES research_items(id) ON DELETE CASCADE,
+        tag     TEXT    NOT NULL,
+        PRIMARY KEY (item_id, tag)
+      );
+      CREATE INDEX IF NOT EXISTS idx_research_tags_tag ON research_item_tags(tag);
+
+      CREATE TABLE IF NOT EXISTS research_item_links (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        item_id     INTEGER NOT NULL REFERENCES research_items(id) ON DELETE CASCADE,
+        target_kind TEXT    NOT NULL
+                      CHECK(target_kind IN ('chapter','page','figure','location','scene','beat')),
+        chapter_id  INTEGER REFERENCES chapters(chapter_id)   ON DELETE CASCADE,
+        page_id     INTEGER REFERENCES pages(page_id)         ON DELETE CASCADE,
+        figure_id   INTEGER REFERENCES figures(id)            ON DELETE CASCADE,
+        location_id INTEGER REFERENCES locations(id)          ON DELETE CASCADE,
+        scene_id    INTEGER REFERENCES figure_scenes(id)      ON DELETE CASCADE,
+        beat_id     INTEGER REFERENCES plot_beats(id)         ON DELETE CASCADE,
+        created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        -- Genau ein *_id passend zu target_kind gesetzt, alle anderen NULL
+        -- (sentinel-frei; eine Zeile = genau eine Verknuepfung).
+        CHECK (
+          (target_kind='chapter'  AND chapter_id  IS NOT NULL AND page_id IS NULL AND figure_id IS NULL AND location_id IS NULL AND scene_id IS NULL AND beat_id IS NULL) OR
+          (target_kind='page'     AND page_id     IS NOT NULL AND chapter_id IS NULL AND figure_id IS NULL AND location_id IS NULL AND scene_id IS NULL AND beat_id IS NULL) OR
+          (target_kind='figure'   AND figure_id   IS NOT NULL AND chapter_id IS NULL AND page_id IS NULL AND location_id IS NULL AND scene_id IS NULL AND beat_id IS NULL) OR
+          (target_kind='location' AND location_id IS NOT NULL AND chapter_id IS NULL AND page_id IS NULL AND figure_id IS NULL AND scene_id IS NULL AND beat_id IS NULL) OR
+          (target_kind='scene'    AND scene_id    IS NOT NULL AND chapter_id IS NULL AND page_id IS NULL AND figure_id IS NULL AND location_id IS NULL AND beat_id IS NULL) OR
+          (target_kind='beat'     AND beat_id     IS NOT NULL AND chapter_id IS NULL AND page_id IS NULL AND figure_id IS NULL AND location_id IS NULL AND scene_id IS NULL)
+        )
+      );
+      CREATE INDEX IF NOT EXISTS idx_research_links_item     ON research_item_links(item_id);
+      CREATE INDEX IF NOT EXISTS idx_research_links_chapter  ON research_item_links(chapter_id);
+      CREATE INDEX IF NOT EXISTS idx_research_links_page     ON research_item_links(page_id);
+      CREATE INDEX IF NOT EXISTS idx_research_links_figure   ON research_item_links(figure_id);
+      CREATE INDEX IF NOT EXISTS idx_research_links_location ON research_item_links(location_id);
+      CREATE INDEX IF NOT EXISTS idx_research_links_scene    ON research_item_links(scene_id);
+      CREATE INDEX IF NOT EXISTS idx_research_links_beat     ON research_item_links(beat_id);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_research_links_unique ON research_item_links(
+        item_id, target_kind,
+        COALESCE(chapter_id,0), COALESCE(page_id,0), COALESCE(figure_id,0),
+        COALESCE(location_id,0), COALESCE(scene_id,0), COALESCE(beat_id,0)
+      );
+    `);
+
+    const fkErrors203 = db.pragma('foreign_key_check');
+    if (fkErrors203.length) {
+      throw new Error(`Migration 203: foreign_key_check meldet ${fkErrors203.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 203').run();
+    logger.info('DB-Migration auf Version 203 abgeschlossen (research_items/research_item_links/research_item_tags — Recherche-Board).');
+  }
+
+  if (version < 204) {
+    // plot_brainstorm_runs: Historie der Plot-Brainstorm-Laeufe, pro (Buch, User)
+    // skopiert — analog plot_consistency_runs, aber zusaetzlich pro Akt/Strang
+    // (act_id/thread_id). Beide FK SET NULL: ein geloeschter Akt/Strang entkoppelt
+    // den Lauf nur, der Name kommt zur Lesezeit per JOIN (kein Snapshot). book_id
+    // CASCADE — die Historie stirbt mit dem Buch. result_json = { vorschlaege[] }.
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS plot_brainstorm_runs (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id         INTEGER NOT NULL REFERENCES books(book_id)    ON DELETE CASCADE,
+        user_email      TEXT    NOT NULL,
+        act_id          INTEGER REFERENCES plot_acts(id)              ON DELETE SET NULL,
+        thread_id       INTEGER REFERENCES plot_threads(id)           ON DELETE SET NULL,
+        created_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        vorschlag_count INTEGER NOT NULL DEFAULT 0,
+        result_json     TEXT    NOT NULL,
+        model           TEXT
+      )
+    `).run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_pbr_book_user_date ON plot_brainstorm_runs(book_id, user_email, created_at DESC)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_pbr_act ON plot_brainstorm_runs(act_id)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_pbr_thread ON plot_brainstorm_runs(thread_id)').run();
+    const fkErrors204 = db.pragma('foreign_key_check');
+    if (fkErrors204.length) {
+      throw new Error(`Migration 204: foreign_key_check meldet ${fkErrors204.length} Verstoesse: ${JSON.stringify(fkErrors204.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 204').run();
+    logger.info('DB-Migration auf Version 204 abgeschlossen (plot_brainstorm_runs).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

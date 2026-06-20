@@ -35,10 +35,12 @@ import { kapitelMethods } from './book-overview/kapitel.js';
 import { recentMethods } from './book-overview/recent.js';
 import { formatMethods } from './book-overview/format.js';
 import { diaryMethods } from './book-overview/diary.js';
+import { projectionMethods } from './book-overview/projection.js';
 
 export const bookOverviewMethods = {
   ...loadMethods,
   ...statsMethods,
+  ...projectionMethods,
   ...diaryMethods,
   ...coverageMethods,
   ...reviewMethods,

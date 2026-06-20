@@ -54,6 +54,8 @@ export const FEATURES = [
     aliases: ['plot','handlung','beat','beat-board','board','akt','struktur','outline','dramaturgie','story','plotten','beats','skizze','wendepunkt'] },
   { key: 'weltfakten',     kind: 'toggle', group: 'world',  labelKey: 'tile.weltfakten',     descKey: 'tile.weltfakten.desc',     flag: 'showWorldFactsCard',     toggle: 'toggleWorldFactsCard',     requiresBook: true, minRole: 'editor', dependsOnKomplett: true,
     aliases: ['facts','fakten','weltregeln','worldbuilding','lore','magiesystem','rules','kanon','canon','regeln'] },
+  { key: 'recherche',      kind: 'toggle', group: 'world',  labelKey: 'tile.recherche',      descKey: 'tile.recherche.desc',      flag: 'showRechercheCard',      toggle: 'toggleRechercheCard',      requiresBook: true, minRole: 'editor',
+    aliases: ['research','wissen','knowledge','notizen','notes','quellen','sources','zitate','quotes','links','material','archiv','board'] },
   // Werkzeug
   { key: 'bookchat',       kind: 'toggle', group: 'tools',  labelKey: 'tile.bookchat',       descKey: 'tile.bookchat.desc',       flag: 'showBookChatCard',       toggle: 'toggleBookChatCard',       requiresPages: true, minRole: 'editor',
     aliases: ['ai','frage','question','rag','assistant'] },
@@ -63,6 +65,8 @@ export const FEATURES = [
     aliases: ['settings','config','buchtyp','booktype','einstellungen','genre'] },
   { key: 'finetuneExport', kind: 'toggle', group: 'tools',  labelKey: 'tile.finetuneExport', descKey: 'tile.finetuneExport.desc', flag: 'showFinetuneExportCard', toggle: 'toggleFinetuneExportCard', requiresBook: true, minRole: 'editor',
     aliases: ['export','training','jsonl','llm','dataset','samples'] },
+  { key: 'snapshots',      kind: 'toggle', group: 'tools',  labelKey: 'tile.snapshots',      descKey: 'tile.snapshots.desc',      flag: 'showSnapshotsCard',      toggle: 'toggleSnapshotsCard',      requiresPages: true, minRole: 'editor',
+    aliases: ['fassung','fassungen','version','versionen','meilenstein','milestone','snapshot','snapshots','manuskript','vergleich','diff','revision'] },
   // Export: viewer reicht (Lese-Zugang impliziert Export).
   { key: 'export',         kind: 'toggle', group: 'tools',  labelKey: 'tile.export',         descKey: 'tile.export.desc',         flag: 'showExportCard',         toggle: 'toggleExportCard',         requiresBook: true, minRole: 'viewer',
     aliases: ['download','pdf','epub','html','txt','markdown','md','herunterladen','speichern'] },
@@ -177,6 +181,7 @@ export const EXCLUSIVE_CARDS = [
   { key: 'plot',           flag: 'showPlotCard',           toggle: 'togglePlotCard',           onReclick: 'refresh', requiresBook: true, partial: 'plot',
     loadDeps: [{ method: 'loadFiguren', skipIfNonEmpty: 'figuren' }] },
   { key: 'weltfakten',     flag: 'showWorldFactsCard',     toggle: 'toggleWorldFactsCard',     onReclick: 'refresh', extraRefreshOnOpen: true, partial: 'world-facts' },
+  { key: 'recherche',      flag: 'showRechercheCard',      toggle: 'toggleRechercheCard',      onReclick: 'refresh', requiresBook: true, partial: 'recherche' },
   { key: 'bookStats',      flag: 'showBookStatsCard',      toggle: 'toggleBookStatsCard',      onReclick: 'close', partial: 'bookstats' },
   { key: 'stil',           flag: 'showStilCard',           toggle: 'toggleStilCard',           onReclick: 'close', partial: 'stil-heatmap' },
   { key: 'fehlerHeatmap',  flag: 'showFehlerHeatmapCard',  toggle: 'toggleFehlerHeatmapCard',  onReclick: 'close', partial: 'fehler-heatmap' },
@@ -200,6 +205,7 @@ export const EXCLUSIVE_CARDS = [
   { key: 'adminJsErrors',  flag: 'showAdminJsErrorsCard',  toggle: 'toggleAdminJsErrorsCard',  onReclick: 'close', partial: 'admin-js-errors' },
   { key: 'adminDevices',   flag: 'showAdminDevicesCard',   toggle: 'toggleAdminDevicesCard',   onReclick: 'refresh', partial: 'admin-devices' },
   { key: 'finetuneExport', flag: 'showFinetuneExportCard', toggle: 'toggleFinetuneExportCard', onReclick: 'close', partial: 'finetune-export' },
+  { key: 'snapshots',      flag: 'showSnapshotsCard',      toggle: 'toggleSnapshotsCard',      onReclick: 'refresh', requiresBook: true, partial: 'snapshots' },
   { key: 'export',         flag: 'showExportCard',         toggle: 'toggleExportCard',         onReclick: 'close', partial: 'export' },
   { key: 'pdfExport',      flag: 'showPdfExportCard',      toggle: 'togglePdfExportCard',      onReclick: 'close', partial: 'pdf-export' },
   { key: 'epubExport',     flag: 'showEpubExportCard',     toggle: 'toggleEpubExportCard',     onReclick: 'close', partial: 'epub-export' },

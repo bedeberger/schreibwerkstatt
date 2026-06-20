@@ -57,6 +57,8 @@ export const loadMethods = {
       this.overviewLektoratTime = lektoratTime || null;
       this.overviewIsFinished = !!settings?.is_finished;
       this.overviewDailyGoalChars = settings?.daily_goal_chars != null ? Number(settings.daily_goal_chars) : null;
+      this.overviewGoalTargetChars = settings?.goal_target_chars != null ? Number(settings.goal_target_chars) : null;
+      this.overviewGoalDeadline = settings?.goal_deadline || null;
       this.overviewBuchtyp = settings?.buchtyp || null;
       this._memos = {};
       // Rückblick-Heatmap-Coverage nur für Tagebücher laden — der Buchtyp steht
@@ -202,6 +204,8 @@ export const loadMethods = {
     this.overviewLektoratTime = null;
     this.overviewIsFinished = false;
     this.overviewDailyGoalChars = null;
+    this.overviewGoalTargetChars = null;
+    this.overviewGoalDeadline = null;
     this.overviewBuchtyp = null;
     this.overviewRueckblickCoverage = null;
     this.overviewBookId = null;

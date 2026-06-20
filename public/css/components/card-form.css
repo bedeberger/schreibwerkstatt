@@ -444,6 +444,29 @@ select:focus {
   padding-top: var(--space-14);
   border-top: 0.5px solid var(--color-border);
 }
+/* Inline-Zahlenfeld mit Einheit (z.B. Tagesziel Minuten/Tag im Profil). */
+.card-form-goal-edit {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+.card-form-goal-input {
+  box-sizing: border-box;
+  width: 5rem;
+  padding: var(--size-compact-padding);
+  border: 0.5px solid var(--color-border-input);
+  border-radius: var(--radius-md);
+  font-size: var(--size-compact-font-size);
+  background: var(--color-surface);
+  color: var(--color-text);
+  text-align: right;
+}
+.card-form-goal-input:focus { outline: none; border-color: var(--color-border-focus); }
+.card-form-goal-unit { font-size: var(--font-size-sm); color: var(--color-muted); }
+@media (max-width: 600px) {
+  /* iOS: >= 16px verhindert Zoom-in beim Fokus des Zahlenfelds. */
+  .card-form-goal-input { font-size: var(--font-size-reading); }
+}
 .card-form-saved {
   margin: var(--space-sm) 0 0;
   font-size: var(--font-size-mini);

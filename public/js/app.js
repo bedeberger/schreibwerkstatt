@@ -32,6 +32,7 @@ import { registerStilCard } from './cards/stil-card.js';
 import { registerFehlerHeatmapCard } from './cards/fehler-heatmap-card.js';
 import { registerChatCard } from './cards/chat-card.js';
 import { registerIdeenCard } from './cards/ideen-card.js';
+import { registerRechercheCard } from './cards/recherche-card.js';
 import { registerBookChatCard } from './cards/book-chat-card.js';
 import { szenenMethods } from './book/szenen.js';
 import { orteMethods } from './book/orte.js';
@@ -65,6 +66,7 @@ import { notebookTrampoline } from './editor/notebook/trampoline.js';
 import { registerEditorFindCard } from './cards/editor-find-card.js';
 import { focusMethods } from './editor/focus.js';
 import { sttDictationMethods } from './editor/notebook/stt-dictation.js';
+import { ttsProofMethods } from './editor/notebook/tts-proof.js';
 import { synonymMethods } from './editor/synonyme.js';
 import { registerEditorSynonymeCard } from './cards/editor-synonyme-card.js';
 import { figurLookupMethods } from './editor/figur-lookup.js';
@@ -78,6 +80,7 @@ import { setupSpellcheckDispatch } from './cards/editor-spellcheck/dispatch.js';
 import { registerLektoratFindingsCard } from './cards/lektorat-findings-card.js';
 import { registerPageHistoryCard } from './cards/page-history-card.js';
 import { registerPageRevisionsCard } from './cards/page-revisions-card.js';
+import { registerSnapshotsCard } from './cards/snapshots-card.js';
 import { registerPaletteCard } from './cards/palette-card.js';
 import { registerBlogSyncCard } from './cards/blog-sync-card.js';
 import { registerHubspotSyncCard } from './cards/hubspot-sync-card.js';
@@ -285,6 +288,7 @@ document.addEventListener('alpine:init', () => {
   registerAdminJsErrorsCard();
   registerAdminDevicesCard();
   registerFinetuneExportCard();
+  registerSnapshotsCard();
   registerExportCard();
   registerPdfExportCard();
   registerEpubExportCard();
@@ -307,6 +311,7 @@ document.addEventListener('alpine:init', () => {
   registerKapitelReviewCard();
   registerChatCard();
   registerIdeenCard();
+  registerRechercheCard();
   registerBookChatCard();
   registerEditorFindCard();
   registerEditorFigurLookupCard();
@@ -600,6 +605,7 @@ document.addEventListener('alpine:init', () => {
       window.addEventListener('session-expired', () => { this.sessionExpired = true; }, { signal });
       window.addEventListener('job:finished', (e) => this._onJobFinished(e.detail), { signal });
       this._initSttDictation?.(signal);
+      this._initTtsProof?.(signal);
       // Sleep/Wake-Recovery: bei längerer Hide-Phase (>30 s) Daten neu laden,
       // sonst bleiben Listen leer (in-flight Fetches sterben mit TCP-Socket).
       let _hiddenAt = 0;
@@ -722,6 +728,7 @@ document.addEventListener('alpine:init', () => {
             maxSegmentS: Number(cfg.stt.vad.maxSegmentS) || this.sttVad.maxSegmentS,
           };
         }
+        this.ttsEnabled = !!cfg.tts?.enabled;
         if (cfg.mapTiles?.url) {
           this.mapTiles = {
             url: cfg.mapTiles.url,
@@ -851,6 +858,7 @@ document.addEventListener('alpine:init', () => {
     ...notebookTrampoline,
     ...focusMethods,
     ...sttDictationMethods,
+    ...ttsProofMethods,
     ...synonymMethods,
     ...figurLookupMethods,
     ...shortcutsMethods,

@@ -545,6 +545,7 @@ Neue Aktionen erweitern diese Tabelle und das Sprite (siehe [Icon-System](#icon-
 - `.icon-btn--reset` — Legacy-Override für mehrzeichige Glyphen; mit SVG-Icons nicht mehr nötig (kann beim nächsten Refactor entfernt werden).
 - `.icon-btn[aria-pressed="true"]` — aktiver Toggle (Fullscreen ein): `--color-history-active-bg` Hintergrund, `--color-primary` Border + Text. Greift automatisch — Konsument setzt nur `:aria-pressed`.
 - `.stt-mic-btn.is-recording[aria-pressed="true"]` — Recording-State des STT-Diktat-Mic-Buttons (Notebook-Toolbar): roter Akzent (`--color-danger`) + pulsierender `box-shadow` via `@keyframes sttRecPulse` (1.4s, `prefers-reduced-motion` aus). `.is-pending` = `opacity: 0.6` während getUserMedia läuft. Übersteuert den generischen `aria-pressed`-Highlight. CSS in [public/css/page/page-view.css](public/css/page/page-view.css). Verwendung nur Notebook-STT.
+- `.tts-dock` / `.tts-dock-btn` / `.tts-status` — Proof-Listening-Vorlese-Dock (Notebook-Editor), schwebend unten **links** im Edit-Feld (Schwester zum `.stt-dock` unten rechts; gleiche sticky/floating-Mechanik, gespiegelte Ecke → nie kollidierend). `.tts-dock-btn` ist der runde Haupttaster (Kopfhörer→Pause→Play), `.tts-dock-btn--sub` die kleineren Skip/Stop-Taster, `.tts-status` die Fortschritts-Pille. `.tts-dock-btn.is-reading[aria-pressed="true"]` = akzentfarbener Puls via `@keyframes ttsReadPulse` (1.8s, `prefers-reduced-motion` aus). CSS in [public/css/page/page-view.css](public/css/page/page-view.css). Der gerade vorgelesene Satz wird via `::highlight(tts-sentence)` (CSS Custom Highlight, keine DOM-Mutation) akzentfarben markiert.
 - `.figuren-graph-toolbar` — Inline-Wrapper: `display: flex; justify-content: space-between; gap: --space-sm`, oberhalb/unterhalb der Canvas.
 - `.figuren-graph-toolbar-zoom` — Button-Cluster mit `gap: --space-xs`, `flex-shrink: 0`.
 - `.<viewer>-mindmap-controls--overlay` — Overlay-Wrapper: `position: absolute; top: 8px; right: 8px`, `--color-surface` 88% mit `backdrop-filter: blur(4px)`, `--border-thin` + `--radius-sm` + `--shadow-sm`, `z-index: --z-sticky`. Parent muss `position: relative`.
@@ -724,6 +725,14 @@ Referenz: [user-settings.html](public/partials/user-settings.html), [book-settin
 - Pure Helper `copyText(text)` (gleiches Modul) für Auto-Copy ohne Button (z.B. direkt nach Link-Erstellung) — enthält den `execCommand`-Fallback für non-secure-context.
 
 Referenz: [admin-users.html](public/partials/admin-users.html), [admin-settings.html](public/partials/admin-settings.html), [user-settings.html](public/partials/user-settings.html). Ausnahme [share-links.html](public/partials/share-links.html): dort teilt der Button den Flash-State mit dem Auto-Copy bei Link-Erstellung und bleibt manuell (nutzt aber `copyText`).
+
+### Kommentar-Thread (Beta-Leser-Feedback)
+
+**Use:** verankerte + allgemeine Leser-Anmerkungen als Threads (Root + Antworten) — im **Reader** (Share-Link, standalone) und in der **Owner-Karte** „Geteilte Links".
+
+- **Reader (standalone, kein Alpine):** [public/css/share.css](public/css/share.css) + [public/js/share-reader.js](public/js/share-reader.js). Inline-Verankerung via **CSS Custom Highlight API** (`::highlight(share-anchor)` / `::highlight(share-anchor-active)`) — kein DOM-Eingriff am Content, kein `innerHTML`-Sink (Inhalt nur über `textContent`). Selektion → schwebender `.share-sel-btn` → `.share-composer`-Overlay. Thread-Liste `.share-thread` (Root + `.share-thread__replies` + Reader-`.share-thread__reply`-Form), Resolved-/Stale-/Autor-Marker.
+- **Owner-Karte:** [public/css/components/share-links.css](public/css/components/share-links.css) — `.share-thread-owner` (Quote-Zeile `__anchor`, Owner-`__reply`-Form), erweitert das bestehende `.share-comment` um `__actions` (Resolve/Reopen + Delete im Flow), `--reply`/`--author`-Modifier, `__resolved`-Badge. Threads via `threadsFor(token)` (Root+Replies gruppiert, verankerte zuerst). Klick auf die `__anchor`-Zeile springt via `gotoComment` → `gotoPageById` in den Notebook-Editor und markiert die Stelle transient (`::highlight(share-comment-jump)`, 6 s).
+- **Bidirektional:** Owner-Antwort trägt `author_email` (Display via JOIN), Reader-Identität ist ein opaker localStorage-`reader_token`. Unread zählt nur Reader-Kommentare. Details: [docs/share-link.md](docs/share-link.md).
 
 ### Datei-Auswahl (`fileDrop`)
 

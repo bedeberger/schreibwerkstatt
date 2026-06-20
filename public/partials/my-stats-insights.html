@@ -3,8 +3,9 @@
      display:contents (css/components/my-stats.css), damit die .overview-tile direkte
      Grid-Children der .overview-grid bleiben. Daten: my-stats-card.js / -compute.js. -->
 
-<!-- Tagesziel (Minuten/Tag): Live-Fortschritt heute + Ziel-Streak + Editor.
-     Immer sichtbar (auch ohne gesetztes Ziel → Prompt + Eingabe). -->
+<!-- Tagesziel (Minuten/Tag): Live-Fortschritt heute + Ziel-Streak.
+     Gesetzt wird das Ziel im Profil (userSettingsCard); hier nur die Anzeige.
+     Immer sichtbar (auch ohne gesetztes Ziel → Hinweis aufs Profil). -->
 <template x-if="myStatsData && myStatsData.books > 0">
   <div class="overview-tile overview-tile--medium">
     <div class="overview-tile-label" x-text="$app.t('mystats.goal.title')"></div>
@@ -42,18 +43,6 @@
     </template>
 
     <p class="mystats-goal-prompt" x-show="!myStatsHasGoal" x-text="$app.t('mystats.goal.prompt')"></p>
-
-    <div class="mystats-goal-edit">
-      <input type="text" class="mystats-goal-input"
-             x-data="numInput({ integer: true, min: 0, max: 1440 })"
-             x-modelable="value" x-model="myStatsGoalInput"
-             :aria-label="$app.t('mystats.goal.minutesLabel')">
-      <span class="mystats-goal-unit" x-text="$app.t('mystats.goal.minutesLabel')"></span>
-      <button type="button" class="btn-compact primary"
-              :disabled="myStatsGoalSaving"
-              @click="saveMyStatsGoal()"
-              x-text="$app.t('common.save')"></button>
-    </div>
   </div>
 </template>
 

@@ -134,6 +134,8 @@ export const beatsMethods = {
 
   startEditBeat(beat) {
     this.editingBeatId = beat.id;
+    // Root-SSoT für den Beat-Permalink (#book/X/plot/<beatId>) spiegeln.
+    if (window.__app) window.__app.plotBeatId = beat.id;
     this.beatDraft = {
       titel: beat.titel || '',
       beschreibung: beat.beschreibung || '',
@@ -144,7 +146,18 @@ export const beatsMethods = {
       draft_figure_ids: [...(beat.draft_fig_ids || [])],
     };
   },
-  cancelEditBeat() { this.editingBeatId = null; },
+  cancelEditBeat() { this.editingBeatId = null; if (window.__app) window.__app.plotBeatId = null; },
+
+  // Deep-Link-Ziel öffnen: Beat suchen → Edit + zentriert ins Bild. Noch nicht
+  // geladenes Board → ID merken, loadBoard() ruft uns danach erneut auf.
+  _focusBeatById(rawId) {
+    const id = parseInt(rawId);
+    if (!Number.isInteger(id)) return;
+    const beat = (this.beats || []).find(b => b.id === id);
+    if (!beat) { this._pendingFocusBeatId = id; return; }
+    this.startEditBeat(beat);
+    this.$nextTick(() => this.scrollToBeat(id));
+  },
 
   intensitaetScale() { return [1, 2, 3, 4, 5]; },
 
@@ -187,6 +200,7 @@ export const beatsMethods = {
       });
       this._replaceBeat(updated);
       this.editingBeatId = null;
+      if (window.__app) window.__app.plotBeatId = null;
       this.errorMessage = '';
     } catch (e) {
       this.errorMessage = app.t('plot.error.save');
@@ -219,7 +233,7 @@ export const beatsMethods = {
       await fetchJson(`/plot/beats/${beat.id}`, { method: 'DELETE' });
       this.beats = this.beats.filter(b => b.id !== beat.id);
       this._memos = {};
-      if (this.editingBeatId === beat.id) this.editingBeatId = null;
+      if (this.editingBeatId === beat.id) { this.editingBeatId = null; if (window.__app) window.__app.plotBeatId = null; }
       this.errorMessage = '';
     } catch (e) {
       this.errorMessage = app.t('plot.error.delete');

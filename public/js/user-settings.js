@@ -14,6 +14,7 @@ export const userSettingsMethods = {
       this.userSettingsDefaultRegion    = data.default_region    || '';
       this.userSettingsDefaultBuchtyp   = data.default_buchtyp   || '';
       this.userSettingsFocusGranularity = data.focus_granularity || 'paragraph';
+      this.userSettingsDailyGoal        = data.daily_goal_minutes || 0;
     } catch (e) {
       console.error('[user-settings] Laden fehlgeschlagen:', e);
     } finally {
@@ -34,6 +35,7 @@ export const userSettingsMethods = {
           default_region:    this.userSettingsDefaultRegion    || null,
           default_buchtyp:   this.userSettingsDefaultBuchtyp   || null,
           focus_granularity: this.userSettingsFocusGranularity || 'paragraph',
+          daily_goal_minutes: Math.max(0, Math.min(1440, Math.round(Number(this.userSettingsDailyGoal) || 0))),
         }),
       });
       if (!r.ok) {

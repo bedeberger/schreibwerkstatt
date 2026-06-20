@@ -16,6 +16,10 @@ const BUCH_KONTEXT_MAX = 1000;
 // 50 000 ≈ 33 Normseiten als praktisches Maximum.
 const DAILY_GOAL_MIN = 100;
 const DAILY_GOAL_MAX = 50000;
+// Schreibziel (gesamt): 1 000 Zeichen Untergrenze, 20 Mio (~13 000 Normseiten)
+// als praktisches Maximum gegen Tippfehler.
+const GOAL_TARGET_MIN = 1000;
+const GOAL_TARGET_MAX = 20000000;
 
 /** Gibt Sprache, Region, Buchtyp und Buchkontext für ein Buch zurück. */
 router.get('/:book_id', aclParamGuard('viewer'), (req, res) => {
@@ -28,7 +32,7 @@ router.get('/:book_id', aclParamGuard('viewer'), (req, res) => {
 router.put('/:book_id', aclParamGuard('editor'), jsonBody, (req, res) => {
   const bookId = req.bookId;
 
-  const { language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, orte_real, schauplatz_land } = req.body || {};
+  const { language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, goal_target_chars, goal_deadline, orte_real, schauplatz_land } = req.body || {};
   if (!language || !region) {
     return res.status(400).json({ error_code: 'LANGUAGE_REGION_REQUIRED' });
   }
@@ -59,6 +63,26 @@ router.put('/:book_id', aclParamGuard('editor'), jsonBody, (req, res) => {
     dailyGoal = n;
   }
 
+  // Schreibziel: Zielzeichenzahl (gesamt). NULL/leer = kein Ziel.
+  let goalTarget = null;
+  if (goal_target_chars !== undefined && goal_target_chars !== null && goal_target_chars !== '') {
+    const n = Number(goal_target_chars);
+    if (!Number.isFinite(n) || !Number.isInteger(n) || n < GOAL_TARGET_MIN || n > GOAL_TARGET_MAX) {
+      return res.status(400).json({ error_code: 'INVALID_VALUE', params: { field: 'goal_target_chars', allowed: `${GOAL_TARGET_MIN}–${GOAL_TARGET_MAX}` } });
+    }
+    goalTarget = n;
+  }
+
+  // Abgabedatum: striktes ISO YYYY-MM-DD. NULL/leer = keine Deadline.
+  let goalDeadline = null;
+  if (goal_deadline !== undefined && goal_deadline !== null && goal_deadline !== '') {
+    const s = String(goal_deadline);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s) || Number.isNaN(Date.parse(s))) {
+      return res.status(400).json({ error_code: 'INVALID_VALUE', params: { field: 'goal_deadline', allowed: 'YYYY-MM-DD' } });
+    }
+    goalDeadline = s;
+  }
+
   let schauplatzLand = null;
   if (schauplatz_land !== undefined && schauplatz_land !== null && schauplatz_land !== '') {
     if (!/^[A-Za-z]{2}$/.test(String(schauplatz_land))) {
@@ -70,7 +94,7 @@ router.put('/:book_id', aclParamGuard('editor'), jsonBody, (req, res) => {
   const finished = is_finished ? 1 : 0;
   const lektorBookChat = allow_lektor_book_chat ? 1 : 0;
   const orteReal = orte_real ? 1 : 0;
-  saveBookSettings(bookId, language, region, buchtyp || null, buch_kontext || null, erzaehlperspektive || null, erzaehlzeit || null, finished, lektorBookChat, dailyGoal, orteReal, schauplatzLand);
+  saveBookSettings(bookId, language, region, buchtyp || null, buch_kontext || null, erzaehlperspektive || null, erzaehlzeit || null, finished, lektorBookChat, dailyGoal, orteReal, schauplatzLand, goalTarget, goalDeadline);
   res.json({
     ok: true, language, region,
     buchtyp: buchtyp || null, buch_kontext: buch_kontext || null,
@@ -79,6 +103,8 @@ router.put('/:book_id', aclParamGuard('editor'), jsonBody, (req, res) => {
     is_finished: finished,
     allow_lektor_book_chat: lektorBookChat,
     daily_goal_chars: dailyGoal,
+    goal_target_chars: goalTarget,
+    goal_deadline: goalDeadline,
     orte_real: orteReal,
     schauplatz_land: schauplatzLand,
     locale: `${language}-${region}`,

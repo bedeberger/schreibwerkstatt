@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 198, 101 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 204, 107 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -71,6 +71,9 @@ erDiagram
   chapters ||--o| plot_threads       : "thread chapter"
   chapters ||--o| plot_beats         : "beat lands in"
   books ||--o{ plot_consistency_runs : has
+  books ||--o{ plot_brainstorm_runs  : has
+  plot_acts ||--o| plot_brainstorm_runs : "for act"
+  plot_threads ||--o| plot_brainstorm_runs : "for thread"
   plot_beats ||--o{ plot_beat_figures : has
   figures ||--o{ plot_beat_figures   : "appears in beat"
   plot_beats ||--o{ plot_beat_draft_figures : has
@@ -322,12 +325,82 @@ erDiagram
     INTEGER is_finished              "0|1, blendet Schreib-Tracking aus"
     INTEGER allow_lektor_book_chat   "Lektor darf Buch-Chat (Default 0)"
     INTEGER daily_goal_chars         "Tagesziel Zeichen (NULL = Default 1500)"
+    INTEGER goal_target_chars        "Schreibziel Gesamt-Zeichen (NULL = kein Ziel) → Deadline-Projektion"
+    TEXT    goal_deadline            "Abgabedatum YYYY-MM-DD (NULL = keine Deadline)"
     INTEGER entities_enabled         "0|1, Figuren/Orte-Highlights + Szenen/Ereignisse-Panel im Notebook-Editor"
     INTEGER orte_real                "0|1, Orte sind reale Schauplätze → Geo-Karte in der Orte-Karte"
     TEXT    schauplatz_land          "ISO-3166-1-alpha-2 Haupt-Schauplatzland (Geocode-Bias + KI-Land-Fallback)"
     TEXT    updated_at
   }
+  book_snapshots {
+    INTEGER id            PK
+    INTEGER book_id       FK "ON DELETE CASCADE"
+    INTEGER seq           "fortlaufende Fassungsnummer pro Buch"
+    TEXT    label
+    TEXT    description
+    TEXT    content_json  "buildBookJson-Output ({book, tree:[node…]}) mit Seiten-HTML inline"
+    TEXT    extras_json   "collectExtras (Analyse + Lektorat) für Restore"
+    INTEGER chars
+    INTEGER words
+    INTEGER pages
+    INTEGER chapters
+    TEXT    user_email
+    TEXT    created_at
+  }
+  name_guard_ignores {
+    INTEGER id            PK
+    INTEGER book_id       FK "ON DELETE CASCADE"
+    TEXT    user_email
+    TEXT    canonical     "Stammname (Display/Kontext)"
+    TEXT    variant       "unterdrueckte Schreibvariante"
+    TEXT    created_at
+    %% UNIQUE(book_id, user_email, variant)
+  }
+  research_items {
+    INTEGER id          PK
+    INTEGER book_id     FK "ON DELETE CASCADE"
+    TEXT    user_email  "Ersteller-Attribution (kein Sichtbarkeits-Scope; buchweit geteilt)"
+    TEXT    kind        "note|link|quote|fact|image"
+    TEXT    title
+    TEXT    body        "Plain-Text"
+    TEXT    url         "bei kind=link"
+    TEXT    source      "Quellen-/Zitatnachweis"
+    BLOB    image       "bei kind=image, sharp-normalisiert"
+    TEXT    image_mime
+    INTEGER pinned
+    INTEGER archived
+    TEXT    created_at
+    TEXT    updated_at
+  }
+  research_item_tags {
+    INTEGER item_id PK,FK "ON DELETE CASCADE"
+    TEXT    tag     PK
+  }
+  research_item_links {
+    INTEGER id          PK
+    INTEGER item_id     FK "ON DELETE CASCADE"
+    TEXT    target_kind "chapter|page|figure|location|scene|beat"
+    INTEGER chapter_id  FK "ON DELETE CASCADE, genau eins gesetzt passend zu target_kind"
+    INTEGER page_id     FK "ON DELETE CASCADE"
+    INTEGER figure_id   FK "ON DELETE CASCADE"
+    INTEGER location_id FK "ON DELETE CASCADE"
+    INTEGER scene_id    FK "ON DELETE CASCADE"
+    INTEGER beat_id     FK "ON DELETE CASCADE"
+    TEXT    created_at
+    %% UNIQUE(item_id, target_kind, COALESCE(alle *_id,0))
+  }
 
+  books     ||--o{ book_snapshots : has
+  books     ||--o{ name_guard_ignores : has
+  books             ||--o{ research_items      : has
+  research_items    ||--o{ research_item_tags  : tagged
+  research_items    ||--o{ research_item_links : links
+  chapters          ||--o{ research_item_links : "linked (chapter)"
+  pages             ||--o{ research_item_links : "linked (page)"
+  figures           ||--o{ research_item_links : "linked (figure)"
+  locations         ||--o{ research_item_links : "linked (location)"
+  figure_scenes     ||--o{ research_item_links : "linked (scene)"
+  plot_beats        ||--o{ research_item_links : "linked (beat)"
   books     ||--o{ chapters    : has
   books     ||--o{ pages       : has
   chapters  ||--o{ pages       : groups
@@ -734,6 +807,17 @@ erDiagram
     TEXT    result_json    "konflikte + fazit"
     TEXT    model
   }
+  plot_brainstorm_runs {
+    INTEGER id              PK
+    INTEGER book_id         FK "CASCADE"
+    TEXT    user_email
+    INTEGER act_id          FK "SET NULL"
+    INTEGER thread_id       FK "SET NULL"
+    TEXT    created_at
+    INTEGER vorschlag_count "denormalisiert fürs Listen-Rendering"
+    TEXT    result_json     "vorschlaege"
+    TEXT    model
+  }
 
   continuity_checks ||--o{ continuity_issues          : has
   continuity_issues ||--o{ continuity_issue_figures   : refs
@@ -751,9 +835,12 @@ erDiagram
   plot_beats        ||--o{ plot_beat_figures          : refs
   plot_beats        ||--o{ plot_beat_draft_figures    : refs
   books             ||--o{ plot_consistency_runs      : "ki-history"
+  books             ||--o{ plot_brainstorm_runs       : "ki-history"
+  plot_acts         ||--o| plot_brainstorm_runs       : "for act"
+  plot_threads      ||--o| plot_brainstorm_runs       : "for thread"
 ```
 
-**Plot-Werkstatt (Beat-Board).** Planendes Pendant zur rückwärtsgewandten Szenen-/Ereignis-Analyse: `plot_acts` sind die Spalten (Akte/Phasen, geordnet via `position`), `plot_beats` die Karten darin (Handlungspunkte, geordnet via `sort_order`). Optionale zweite Ordnungsachse sind die Handlungsstränge (`plot_threads`, Swimlanes, geordnet via `position`) — das Board wird ein Raster Akte × Stränge, ein Beat sitzt in der Zelle (`act_id`, `thread_id`). `thread_id` (SET NULL) ist die Strang-Zuordnung (NULL = „ohne Strang"-Lane; null Stränge = flaches Board); ein Strang ist optional an eine Katalog-Figur (`figure_id`) ODER Werkstatt-Figur (`draft_figure_id`) gebunden (beide SET NULL — Hauptfigur-Strang). `status` hält „geplant → entwurf → im_buch (schon geschrieben) → verworfen" nach; `chapter_id` (SET NULL) verknüpft einen Beat mit dem Zielkapitel; `plot_beat_figures` ist die M:M-Brücke zu beteiligten Katalog-Figuren (`figures`), `plot_beat_draft_figures` die parallele M:M-Brücke zu Werkstatt-Figuren (`draft_figures`, vorwärts-entwickelt, evtl. noch nicht im Manuskript) — beide CASCADE auf Beat- und Figur-Seite. Pro Buch + User skopiert. KI assistiert ausschliesslich planend/überwachend (Brainstorm + Consistency gegen Buchrealität, beide kennen Katalog- **und** Werkstatt-Figuren), nie generativ in den Text. `plot_consistency_runs` historisiert jede Konsistenz-Prüfung als kompletten Result-JSON (`konflikte` + `fazit`, `konflikt_count` denormalisiert fürs Listen-Rendering) — `ON DELETE CASCADE` auf `book_id`, pro (Buch, User) skopiert; das Frontend zeigt einen klappbaren Prüfungs-Verlauf, Klick lädt einen Lauf wie ein Live-Resultat ins Consistency-Panel.
+**Plot-Werkstatt (Beat-Board).** Planendes Pendant zur rückwärtsgewandten Szenen-/Ereignis-Analyse: `plot_acts` sind die Spalten (Akte/Phasen, geordnet via `position`), `plot_beats` die Karten darin (Handlungspunkte, geordnet via `sort_order`). Optionale zweite Ordnungsachse sind die Handlungsstränge (`plot_threads`, Swimlanes, geordnet via `position`) — das Board wird ein Raster Akte × Stränge, ein Beat sitzt in der Zelle (`act_id`, `thread_id`). `thread_id` (SET NULL) ist die Strang-Zuordnung (NULL = „ohne Strang"-Lane; null Stränge = flaches Board); ein Strang ist optional an eine Katalog-Figur (`figure_id`) ODER Werkstatt-Figur (`draft_figure_id`) gebunden (beide SET NULL — Hauptfigur-Strang). `status` hält „geplant → entwurf → im_buch (schon geschrieben) → verworfen" nach; `chapter_id` (SET NULL) verknüpft einen Beat mit dem Zielkapitel; `plot_beat_figures` ist die M:M-Brücke zu beteiligten Katalog-Figuren (`figures`), `plot_beat_draft_figures` die parallele M:M-Brücke zu Werkstatt-Figuren (`draft_figures`, vorwärts-entwickelt, evtl. noch nicht im Manuskript) — beide CASCADE auf Beat- und Figur-Seite. Pro Buch + User skopiert. KI assistiert ausschliesslich planend/überwachend (Brainstorm + Consistency gegen Buchrealität, beide kennen Katalog- **und** Werkstatt-Figuren), nie generativ in den Text. `plot_consistency_runs` historisiert jede Konsistenz-Prüfung als kompletten Result-JSON (`konflikte` + `fazit`, `konflikt_count` denormalisiert fürs Listen-Rendering) — `ON DELETE CASCADE` auf `book_id`, pro (Buch, User) skopiert; das Frontend zeigt einen klappbaren Prüfungs-Verlauf, Klick lädt einen Lauf wie ein Live-Resultat ins Consistency-Panel. `plot_brainstorm_runs` historisiert analog jeden Brainstorm-Lauf (`result_json` = `vorschlaege`, `vorschlag_count` denormalisiert), zusätzlich pro `act_id`/`thread_id` (beide **SET NULL** — ein gelöschter Akt/Strang entkoppelt den Lauf nur, der Name kommt zur Lesezeit per JOIN, kein Snapshot); Klick lädt die Vorschläge zurück ins Inline-Panel des Akts/der Zelle.
 
 ---
 
@@ -1341,8 +1428,16 @@ erDiagram
   share_comments {
     INTEGER id           PK
     TEXT    share_token  FK "FK share_links(token) ON DELETE CASCADE"
-    TEXT    reader_name  "max 80 Zeichen, nullable"
+    INTEGER parent_id    FK "Self-FK share_comments(id) ON DELETE CASCADE — NULL=Root, sonst Reply"
+    TEXT    reader_name  "max 80 Zeichen, nullable (Leser)"
+    TEXT    reader_token "opaker Per-Browser-Token (Self-Erkennung), nullable"
+    TEXT    author_email FK "FK app_users(email) ON DELETE SET NULL — gesetzt bei Owner-Antwort"
     TEXT    body         "max 4000 Zeichen"
+    TEXT    anchor_bid   "data-bid des verankerten Blocks, NULL=allgemein"
+    TEXT    anchor_quote "markierter Text (Re-Anchor + Anzeige)"
+    INTEGER anchor_start "Offset-Hinweis im Block"
+    INTEGER anchor_end   "Offset-Hinweis im Block"
+    TEXT    resolved_at  "Owner-Resolve-Marker (nur Root)"
     TEXT    ip_hash      "SHA-256(ip + Server-Salt) fuer Rate-Limit"
     TEXT    created_at
   }
@@ -1385,6 +1480,8 @@ erDiagram
   chapters         ||--o{ share_links       : "shared as chapter"
   app_users        ||--o{ share_links       : owns
   share_links      ||--o{ share_comments    : has
+  share_comments   ||--o{ share_comments    : "reply (parent_id)"
+  app_users        ||--o{ share_comments    : "authored reply"
   app_users        ||--o{ api_tokens        : owns
   app_users        ||--o{ device_tokens     : owns
 

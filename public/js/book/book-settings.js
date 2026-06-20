@@ -23,6 +23,8 @@ export const bookSettingsMethods = {
       this.bookSettingsIsFinished         = !!data.is_finished;
       this.bookSettingsAllowLektorBookChat = !!data.allow_lektor_book_chat;
       this.bookSettingsDailyGoalChars     = data.daily_goal_chars != null ? Number(data.daily_goal_chars) : 1500;
+      this.bookSettingsGoalTargetChars    = data.goal_target_chars != null ? Number(data.goal_target_chars) : 0;
+      this.bookSettingsGoalDeadline       = data.goal_deadline || '';
       this.bookSettingsOrteReal           = !!data.orte_real;
       this.bookSettingsSchauplatzLand     = data.schauplatz_land || '';
     } catch (e) {
@@ -114,6 +116,9 @@ export const bookSettingsMethods = {
           is_finished:       this.bookSettingsIsFinished ? 1 : 0,
           allow_lektor_book_chat: this.bookSettingsAllowLektorBookChat ? 1 : 0,
           daily_goal_chars:  Number.isFinite(Number(this.bookSettingsDailyGoalChars)) ? Number(this.bookSettingsDailyGoalChars) : null,
+          // Ziel < 1000 (inkl. 0/leer) = kein Ziel → null. Deadline leer → null.
+          goal_target_chars: Number(this.bookSettingsGoalTargetChars) >= 1000 ? Math.round(Number(this.bookSettingsGoalTargetChars)) : null,
+          goal_deadline:     this.bookSettingsGoalDeadline || null,
           orte_real:         this.bookSettingsOrteReal ? 1 : 0,
           schauplatz_land:   this.bookSettingsSchauplatzLand || null,
         }),

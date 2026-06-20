@@ -865,10 +865,10 @@ function deleteFinetuneAiCache(bookId, userEmail) {
 
 // ── Buch-Einstellungen (Sprache + Region) ─────────────────────────────────────
 
-const _getBookSettings = db.prepare('SELECT language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, entities_enabled, orte_real, schauplatz_land FROM book_settings WHERE book_id = ?');
+const _getBookSettings = db.prepare('SELECT language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, goal_target_chars, goal_deadline, entities_enabled, orte_real, schauplatz_land FROM book_settings WHERE book_id = ?');
 const _upsertBookSettings = db.prepare(`
-  INSERT INTO book_settings (book_id, language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, orte_real, schauplatz_land, updated_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  INSERT INTO book_settings (book_id, language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, goal_target_chars, goal_deadline, orte_real, schauplatz_land, updated_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT(book_id) DO UPDATE SET
     language=excluded.language, region=excluded.region,
     buchtyp=excluded.buchtyp, buch_kontext=excluded.buch_kontext,
@@ -876,6 +876,8 @@ const _upsertBookSettings = db.prepare(`
     is_finished=excluded.is_finished,
     allow_lektor_book_chat=excluded.allow_lektor_book_chat,
     daily_goal_chars=excluded.daily_goal_chars,
+    goal_target_chars=excluded.goal_target_chars,
+    goal_deadline=excluded.goal_deadline,
     orte_real=excluded.orte_real,
     schauplatz_land=excluded.schauplatz_land,
     updated_at=excluded.updated_at
@@ -906,10 +908,10 @@ function getBookSettings(bookId, userEmail = null) {
     if (u && (u.default_language || u.default_buchtyp)) {
       const language = u.default_language || 'de';
       const region   = u.default_region   || (language === 'en' ? 'US' : 'CH');
-      return { language, region, buchtyp: u.default_buchtyp || null, buch_kontext: null, erzaehlperspektive: null, erzaehlzeit: null, is_finished: 0, allow_lektor_book_chat: 0, daily_goal_chars: null, entities_enabled: 0, orte_real: 0, schauplatz_land: null };
+      return { language, region, buchtyp: u.default_buchtyp || null, buch_kontext: null, erzaehlperspektive: null, erzaehlzeit: null, is_finished: 0, allow_lektor_book_chat: 0, daily_goal_chars: null, goal_target_chars: null, goal_deadline: null, entities_enabled: 0, orte_real: 0, schauplatz_land: null };
     }
   }
-  return { language: 'de', region: 'CH', buchtyp: null, buch_kontext: null, erzaehlperspektive: null, erzaehlzeit: null, is_finished: 0, allow_lektor_book_chat: 0, daily_goal_chars: null, entities_enabled: 0, orte_real: 0, schauplatz_land: null };
+  return { language: 'de', region: 'CH', buchtyp: null, buch_kontext: null, erzaehlperspektive: null, erzaehlzeit: null, is_finished: 0, allow_lektor_book_chat: 0, daily_goal_chars: null, goal_target_chars: null, goal_deadline: null, entities_enabled: 0, orte_real: 0, schauplatz_land: null };
 }
 
 /** Locale-Key für ein Buch: z.B. "de-CH", "en-US". */
@@ -920,7 +922,7 @@ function getBookLocale(bookId, userEmail = null) {
 
 /** Speichert/aktualisiert Sprache, Region, Buchtyp, Buchkontext, Erzählperspektive, Erzählzeit, is_finished, allow_lektor_book_chat, daily_goal_chars.
  *  `entities_enabled` wird hier nicht angefasst — Quick-Toggle aus der Notebook-Toolbar laeuft ueber setBookEntitiesEnabled. */
-function saveBookSettings(bookId, language, region, buchtyp, buchKontext, erzaehlperspektive = null, erzaehlzeit = null, isFinished = 0, allowLektorBookChat = 0, dailyGoalChars = null, orteReal = 0, schauplatzLand = null) {
+function saveBookSettings(bookId, language, region, buchtyp, buchKontext, erzaehlperspektive = null, erzaehlzeit = null, isFinished = 0, allowLektorBookChat = 0, dailyGoalChars = null, orteReal = 0, schauplatzLand = null, goalTargetChars = null, goalDeadline = null) {
   _upsertBookSettings.run(
     parseInt(bookId), language, region,
     buchtyp || null, buchKontext || null,
@@ -928,6 +930,8 @@ function saveBookSettings(bookId, language, region, buchtyp, buchKontext, erzaeh
     isFinished ? 1 : 0,
     allowLektorBookChat ? 1 : 0,
     dailyGoalChars == null ? null : Math.round(Number(dailyGoalChars)),
+    goalTargetChars == null ? null : Math.round(Number(goalTargetChars)),
+    goalDeadline || null,
     orteReal ? 1 : 0,
     schauplatzLand || null,
     new Date().toISOString()

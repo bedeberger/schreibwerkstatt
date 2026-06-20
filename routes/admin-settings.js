@@ -162,6 +162,26 @@ router.post('/test-stt', async (req, res) => {
   }
 });
 
+// POST /admin/settings/test-tts — Health-Probe des konfigurierten Speech-
+// Hosts. Pingt /v1/models (billig, no-Body) mit optionalem Bearer; ok wenn 200.
+router.post('/test-tts', async (req, res) => {
+  const enabled = appSettings.get('tts.enabled') === true;
+  const host = String(appSettings.get('tts.host') || '').replace(/\/+$/, '').replace(/\/v1$/i, '');
+  if (!host) return res.json({ ok: false, error: 'NO_HOST', enabled });
+  const apiKey = String(appSettings.get('tts.api_key') || '').trim();
+  const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined;
+  const t0 = Date.now();
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 5000);
+    const r = await fetch(`${host}/v1/models`, { headers, signal: ctrl.signal });
+    clearTimeout(timer);
+    return res.json({ ok: !!r.ok, status: r.status, latency_ms: Date.now() - t0, enabled });
+  } catch (e) {
+    return res.json({ ok: false, error: e.name === 'AbortError' ? 'TIMEOUT' : e.message, latency_ms: Date.now() - t0, enabled });
+  }
+});
+
 // POST /admin/settings/test-geocode — Health-Probe der konfigurierten
 // Geocoding-Quelle. Fragt eine bekannte Stadt ab; ok wenn >=1 Treffer.
 router.post('/test-geocode', async (req, res) => {

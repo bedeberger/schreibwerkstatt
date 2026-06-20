@@ -19,7 +19,7 @@
 
   <main id="share-content" class="share-main">
     {{intro_block}}
-    <article class="share-content">{{content_html}}</article>
+    <article class="share-content" id="share-article">{{content_html}}</article>
   </main>
 
   <section class="share-comments" aria-label="{{t_comments}}">
@@ -32,6 +32,7 @@
     <a class="share-footer__link" href="{{app_url}}" target="_blank" rel="noopener noreferrer">{{app_name}}</a>
   </footer>
 
-  <script src="/js/share-reader.js" defer></script>
+  <script id="share-config" type="application/json">{{config_json}}</script>
+  <script src="/js/share-reader.js" type="module"></script>
 </body>
 </html>

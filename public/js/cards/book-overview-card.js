@@ -22,6 +22,8 @@ export function registerBookOverviewCard() {
     overviewLektoratTime: null,
     overviewIsFinished: false,
     overviewDailyGoalChars: null,
+    overviewGoalTargetChars: null,
+    overviewGoalDeadline: null,
     overviewBuchtyp: null,
     overviewRueckblickCoverage: null,
 

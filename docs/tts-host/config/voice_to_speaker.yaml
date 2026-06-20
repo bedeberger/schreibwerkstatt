@@ -1,0 +1,34 @@
+# Stimmen-Definitionen fuer openedai-speech.
+#
+# Jeder Eintrag ist ein „voice"-Name, den du im Admin-Tab „Vorlesen" eintraegst
+# (tts.voice / tts.voice.de / tts.voice.en). Der oberste Schluessel ist der
+# „model"-Name (tts-1 = Piper schnell, tts-1-hd = XTTS hochwertig) — er muss zum
+# Feld „Modell" in der App passen.
+#
+# XTTS braucht je Stimme ein Referenz-Sample (6–30 s sauberes Sprechen, mono,
+# 22–24 kHz) unter ./voices/ und das language-Feld. Piper-Stimmen (.onnx) laedt
+# openedai-speech bei Bedarf selbst herunter.
+#
+# Den genauen Schema-Stand zeigt die im Image mitgelieferte
+# config/voice_to_speaker.default.yaml — Keys koennen je Version minimal
+# abweichen. Diese Datei ist ein funktionierendes Minimalbeispiel fuer DE + EN.
+
+tts-1-hd:
+  de_studio:
+    model: xtts
+    speaker: voices/de_sample.wav
+    language: de
+    enable_text_splitting: true
+  en_studio:
+    model: xtts
+    speaker: voices/en_sample.wav
+    language: en
+    enable_text_splitting: true
+
+tts-1:
+  de_thorsten:
+    model: voices/de_DE-thorsten-high.onnx
+    speaker: 0
+  en_amy:
+    model: voices/en_US-amy-medium.onnx
+    speaker: 0

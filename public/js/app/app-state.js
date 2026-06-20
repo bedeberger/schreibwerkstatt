@@ -85,6 +85,18 @@ const shellState = () => ({
   // Caret-Position, sonst haengt es ans Editorende an. Auto-Fokus beim Öffnen
   // des Edit-Modus zaehlt NICHT (in startEdit auf false zurueckgesetzt).
   sttCaretUserSet: false,
+  // TTS / Proof-Listening (nur Notebook-Editor). /config liefert `tts.enabled`
+  // (true wenn Admin enabled + Host gesetzt). Blendet den Vorlese-Dock im
+  // Edit-Feld ein. Voice/Speed/Format loest der /tts/speak-Proxy serverseitig
+  // auf — kein Frontend-State dafuer. ttsPlaying = Session aktiv (inkl.
+  // pausiert); ttsPaused = pausiert; ttsLoading = wartet auf Audio des aktuellen
+  // Satzes; ttsIndex/ttsTotal = Satz-Fortschritt fuer die Status-Pille.
+  ttsEnabled: false,
+  ttsPlaying: false,
+  ttsPaused: false,
+  ttsLoading: false,
+  ttsIndex: 0,
+  ttsTotal: 0,
   // Plattform-Detect für Tasten-Hint-Anzeige (⌘ vs. Ctrl). Wird in init()
   // gesetzt; default true wäre auf Windows falsch, default false ist sichere
   // Annahme bevor JS gelaufen ist (Hero erscheint mit Ctrl, dann snap auf ⌘ falls Mac).
@@ -291,6 +303,7 @@ const cardsState = () => ({
   showOrteCard: false,
   showSongsCard: false,
   showWorldFactsCard: false,
+  showRechercheCard: false,
   showKontinuitaetCard: false,
   showTagebuchRueckblickCard: false,
   showBookStatsCard: false,
@@ -313,6 +326,7 @@ const cardsState = () => ({
   showAdminDevicesCard: false,
   adminUsageTab: 'users',
   showFinetuneExportCard: false,
+  showSnapshotsCard: false,
   showExportCard: false,
   showPdfExportCard: false,
   showEpubExportCard: false,
@@ -436,6 +450,13 @@ const tagebuchRueckblickNavState = () => ({
 const figurWerkstattState = () => ({
   werkstattDraftId: null,
   werkstattDrafts: [],
+});
+
+// Hash-Router-SSoT für die Plot-Werkstatt: der gerade bearbeitete Beat
+// (Permalink #book/<id>/plot/<beatId>). Die plotCard-Sub spiegelt ihren
+// editingBeatId hierher; der Hash-Router liest/schreibt nur hier.
+const plotNavState = () => ({
+  plotBeatId: null,
 });
 
 // Root-seitig: figurenLoading/Progress/Status, selectedFigurId, Filters —
@@ -645,6 +666,7 @@ export function initialLektoratState() {
     ...kapitelReviewState(),
     ...tagebuchRueckblickNavState(),
     ...figurWerkstattState(),
+    ...plotNavState(),
     ...figurenState(),
     ...ereignisseState(),
     ...szenenState(),

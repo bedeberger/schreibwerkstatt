@@ -161,6 +161,10 @@
   border-bottom-color: transparent;
   margin-bottom: 0;
 }
+/* Nicht-reaktivierbarer Eintrag (z.B. Plot-Brainstorm-Lauf mit gelöschtem Akt):
+   gedämpft + kein Klick-Cursor, Löschen bleibt möglich. */
+.history-item--disabled { cursor: default; opacity: 0.6; }
+.history-item--disabled:hover { background: transparent; border-color: var(--color-border); }
 
 /* Mobil: Badges/Buttons nicht umbrechen (unschönes Stapeln), sondern die
    Zeile horizontal scrollbar machen. Gilt fuer Verlauf + page_revisions-Liste

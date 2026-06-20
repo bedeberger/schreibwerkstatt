@@ -12,6 +12,10 @@ export function registerKontinuitaetCard() {
     kontinuitaetProgress: 0,
     kontinuitaetStatus: '',
     selectedKontinuitaetIssueKey: null,
+    // Namens-/Konsistenz-Waechter (regelbasiert, eigene Sektion in dieser Karte).
+    nameGuardResult: null,
+    nameGuardLoading: false,
+    selectedNameGuardKey: null,
     _kontinuitaetPollTimer: null,
     _lifecycle: null,
 
@@ -24,6 +28,9 @@ export function registerKontinuitaetCard() {
         ctx.kontinuitaetProgress = 0;
         ctx.kontinuitaetStatus = '';
         ctx.selectedKontinuitaetIssueKey = null;
+        ctx.nameGuardResult = null;
+        ctx.nameGuardLoading = false;
+        ctx.selectedNameGuardKey = null;
       };
 
       this._lifecycle = setupCardLifecycle(this, {

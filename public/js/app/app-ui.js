@@ -318,9 +318,35 @@ export const appUiMethods = {
   },
 
   // Helper: fetcht Partial, injiziert in Element, initialisiert Alpine.
+  // Fragment-Includes werden VOR dem innerHTML-Set string-seitig aufgelöst —
+  // anders als der DOM-Placeholder-Mechanismus (`<div id="partial-X">`) greift
+  // das auch INNERHALB von `<template>`/`x-for` (querySelector steigt nicht in
+  // Template-Content ab). So bleibt geteiltes Markup (z.B. die Plot-Beat-Karte
+  // in flachem + Grid-Board) an EINER Stelle. Siehe `_resolveIncludes`.
   async _injectPartial(el, name) {
-    const html = await fetchText(`/partials/${name}.html`);
+    let html = await fetchText(`/partials/${name}.html`);
+    html = await this._resolveIncludes(html);
     el.innerHTML = html;
     Alpine.initTree(el);
+  },
+
+  // String-seitige Fragment-Includes: ersetzt jeden Marker `<!-- @include NAME -->`
+  // durch den Inhalt von `/partials/NAME.html` (rekursiv, Tiefenlimit gegen Zyklen;
+  // jeder Name pro Pass nur einmal gefetcht). Reines Text-Splicing vor jeglichem
+  // DOM/Alpine-Processing — der eingefügte Markup-Block ist danach Teil des
+  // Template-Contents und wird pro x-for-Iteration normal geklont.
+  async _resolveIncludes(html, depth = 0) {
+    if (depth > 5) return html;
+    const re = /<!--\s*@include\s+([\w-]+)\s*-->/g;
+    const matches = [...html.matchAll(re)];
+    if (!matches.length) return html;
+    const cache = {};
+    for (const m of matches) {
+      const frag = m[1];
+      if (!(frag in cache)) {
+        cache[frag] = await this._resolveIncludes(await fetchText(`/partials/${frag}.html`), depth + 1);
+      }
+    }
+    return html.replace(re, (_, frag) => cache[frag] ?? '');
   },
 };

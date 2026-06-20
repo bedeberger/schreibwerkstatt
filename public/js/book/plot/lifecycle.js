@@ -45,8 +45,13 @@ export const lifecycleMethods = {
     } catch (e) {
       this.draftFiguren = [];
     }
-    // Konsistenz-Prüfungs-Historie laden (best-effort, eigenständig vom Board).
+    // Konsistenz- + Brainstorm-Historie laden (best-effort, eigenständig vom Board).
     this.loadConsistencyRuns();
+    this.loadBrainstormRuns();
+    // Deep-Link-Ziel (#book/X/plot/<beatId>) nach Board-Load anwenden.
+    const pendingBeat = this._pendingFocusBeatId;
+    this._pendingFocusBeatId = null;
+    if (pendingBeat != null) this._focusBeatById(pendingBeat);
   },
 
   resetPlot() {
@@ -79,6 +84,10 @@ export const lifecycleMethods = {
     this.selectedKonfliktIdx = null;
     this.consistencyRuns = [];
     this.selectedRunId = null;
+    this.brainstormRuns = [];
+    this.selectedBrainstormRunId = null;
+    this._pendingFocusBeatId = null;
+    if (window.__app) window.__app.plotBeatId = null;
     this.plotFilters = { kapitel: '', figurId: '', draftFigurId: '', text: '' };
     this.verworfenOpen = {};
     this.actColorPickerId = null;

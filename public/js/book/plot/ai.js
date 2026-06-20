@@ -38,6 +38,9 @@ export const aiMethods = {
           this.brainstormStatus = '';
           this._brainstormJobId = null;
           this.brainstormResult = { actId: job.result.actId, threadId: job.result.threadId ?? null, vorschlaege: job.result.vorschlaege || [] };
+          // Frisch persistierten Lauf als ausgewählt markieren + Historie neu laden.
+          this.selectedBrainstormRunId = job.result.runId || null;
+          this.loadBrainstormRuns();
         },
         onError: (job) => {
           this.brainstormLoading = false;
@@ -89,7 +92,80 @@ export const aiMethods = {
     this._brainstormJobId = null;
   },
 
-  dismissBrainstorm() { this.brainstormResult = null; this.brainstormActId = null; this.brainstormThreadId = null; },
+  dismissBrainstorm() { this.brainstormResult = null; this.brainstormActId = null; this.brainstormThreadId = null; this.selectedBrainstormRunId = null; },
+
+  // ── KI: Brainstorm-Lauf-Historie ──────────────────────────────────────────
+  // Persistierte Läufe pro Buch (zusätzlich pro Akt/Strang). Liste kommt ohne
+  // result_json; Detail wird beim Öffnen lazy geholt und in das bestehende
+  // Inline-Vorschlags-Panel des zugehörigen Akts/der Zelle gelegt (brainstormResult)
+  // — genau wie ein frischer Lauf, sodass „Übernehmen" unverändert greift.
+  async loadBrainstormRuns() {
+    const app = window.__app;
+    const bookId = app.selectedBookId;
+    if (!bookId) { this.brainstormRuns = []; return; }
+    try {
+      const rows = await fetchJson(`/plot/brainstorm-runs?book_id=${bookId}`);
+      this.brainstormRuns = Array.isArray(rows) ? rows : [];
+    } catch (e) {
+      this.brainstormRuns = [];
+    }
+  },
+
+  // Toggle: Klick auf den aktiven Eintrag schliesst das Panel; sonst Detail laden
+  // und brainstormResult füllen. Ein Lauf mit gelöschtem Akt (act_id == null) hat
+  // keine Ziel-Spalte/-Zelle mehr — das Inline-Panel kann nicht erscheinen, darum
+  // im Template nicht klickbar (hier defensiv nochmal geguardet).
+  async openBrainstormRun(run) {
+    const app = window.__app;
+    if (!run || this.brainstormLoading) return;
+    if (run.act_id == null) { this.errorMessage = app.t('plot.error.runLoad'); return; }
+    if (this.selectedBrainstormRunId === run.id) {
+      this.selectedBrainstormRunId = null;
+      this.brainstormResult = null;
+      this.brainstormActId = null;
+      this.brainstormThreadId = null;
+      return;
+    }
+    try {
+      const detail = await fetchJson(`/plot/brainstorm-runs/${run.id}`);
+      if (!detail?.result) throw new Error('no result');
+      this.brainstormActId = detail.act_id;
+      this.brainstormThreadId = detail.thread_id ?? null;
+      this.brainstormResult = { actId: detail.act_id, threadId: detail.thread_id ?? null, vorschlaege: detail.result.vorschlaege || [] };
+      this.selectedBrainstormRunId = detail.id;
+      this._scrollToBrainstormPanel();
+    } catch (e) {
+      this.errorMessage = app.t('plot.error.runLoad');
+    }
+  },
+
+  async deleteBrainstormRun(runId) {
+    const app = window.__app;
+    if (!runId) return;
+    if (!await app.appConfirm({ message: app.t('plot.brainstorm.confirmDeleteRun'), danger: true })) return;
+    try {
+      await fetchJson(`/plot/brainstorm-runs/${runId}`, { method: 'DELETE' });
+      this.brainstormRuns = this.brainstormRuns.filter(r => r.id !== runId);
+      if (this.selectedBrainstormRunId === runId) {
+        this.selectedBrainstormRunId = null;
+        this.brainstormResult = null;
+        this.brainstormActId = null;
+        this.brainstormThreadId = null;
+      }
+    } catch (e) {
+      this.errorMessage = app.t('plot.error.runDelete');
+    }
+  },
+
+  // Das eine sichtbare Vorschlags-Panel (flach ODER Grid-Zelle) ins Bild holen —
+  // beim Reopen eines Laufs steht der Ziel-Akt evtl. ausserhalb des Sichtfelds.
+  _scrollToBrainstormPanel() {
+    this.$nextTick(() => {
+      const panels = [...(this.$root?.querySelectorAll('.plot-brainstorm-panel') || [])];
+      const vis = panels.find(p => p.offsetParent !== null);
+      vis?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  },
 
   // ── KI: Consistency ─────────────────────────────────────────────────────
   async runConsistency() {

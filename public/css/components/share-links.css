@@ -229,6 +229,123 @@
 }
 .share-comment__delete:hover { color: var(--color-err-text); border-color: var(--color-err-border); }
 
+/* ── Threads (Beta-Leser-Feedback) ─────────────────────────────────────────── */
+.share-thread-owner {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-10);
+  background: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.share-thread-owner--resolved { opacity: 0.62; }
+.share-thread-owner__anchor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-6);
+  font-size: 13px;
+}
+.share-thread-owner__anchor--clickable { cursor: pointer; }
+.share-thread-owner__anchor--clickable:hover .share-thread-owner__quote {
+  color: var(--card-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.share-thread-owner__anchor-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-faint);
+}
+.share-thread-owner__quote { color: var(--color-muted); font-style: italic; }
+.share-thread-owner__goto {
+  width: 14px;
+  height: 14px;
+  color: var(--card-accent);
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+.share-thread-owner__anchor--clickable:hover .share-thread-owner__goto { opacity: 1; }
+
+/* Transientes Highlight der angesprungenen Stelle im Notebook-Editor.
+   Dokument-global (CSS Custom Highlight Registry) — wird per Timer entfernt. */
+::highlight(share-comment-jump) {
+  background: color-mix(in srgb, var(--card-accent-share, #5a4a8e) 38%, transparent);
+  border-radius: 2px;
+}
+
+/* Actions-Zeile am Root: Delete läuft hier im Flow (überschreibt absolute). */
+.share-comment__actions {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-6);
+}
+.share-comment__actions .share-comment__delete {
+  position: static;
+  top: auto;
+  right: auto;
+}
+.share-comment__action {
+  padding: var(--space-2xs) var(--space-sm);
+  font-size: 12px;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--color-muted);
+}
+.share-comment__action:hover { background: var(--color-hover); color: var(--color-text); }
+.share-comment__action:disabled { opacity: 0.6; cursor: not-allowed; }
+.share-comment__resolved {
+  margin-left: var(--space-6);
+  padding: var(--space-1) var(--space-6);
+  background: color-mix(in srgb, var(--card-accent) 16%, transparent);
+  color: var(--card-accent);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+}
+.share-comment--reply {
+  margin-left: var(--space-md);
+  border-left: 2px solid var(--color-border);
+}
+.share-comment--author { border-left-color: var(--card-accent); }
+
+.share-thread-owner__reply {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+.share-thread-owner__reply textarea {
+  resize: vertical;
+  min-height: 44px;
+  padding: var(--space-6) var(--space-10);
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 14px;
+}
+.share-thread-owner__reply button {
+  align-self: flex-end;
+  padding: var(--space-6) var(--space-md);
+  background: var(--card-accent);
+  color: #fff;
+  border: 0;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.share-thread-owner__reply button:disabled { opacity: 0.6; cursor: not-allowed; }
+/* Mobile: 16px verhindert iOS-Zoom (font: inherit erbt <16px). */
+@media (max-width: 768px) {
+  .share-thread-owner__reply textarea { font-size: var(--font-size-reading); }
+}
+
 @media (max-width: 600px) {
   .share-row__head { flex-direction: column; align-items: flex-start; }
   .share-row__url { flex-direction: column; align-items: stretch; }

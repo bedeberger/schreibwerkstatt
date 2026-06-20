@@ -278,4 +278,55 @@
   .overview-donut { width: 60px; height: 60px; }
   .overview-donut-row { gap: var(--space-10); }
 }
+
+/* ── Schreibziel + Deadline-Projektion ─────────────────────────────────────── */
+.overview-goal-deadline {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+.overview-goal-bar-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+.overview-goal-current {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-text);
+}
+.overview-goal-target {
+  font-size: var(--font-size-sm);
+  font-weight: 400;
+  color: var(--color-muted);
+  margin-left: var(--space-2xs);
+}
+.overview-goal-pct {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+}
+.progress-bar--reached { background: var(--color-success); }
+.overview-goal-projection {
+  margin-top: var(--space-xs);
+  font-size: var(--font-size-sm);
+}
+.overview-goal-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  color: var(--color-text);
+}
+.overview-goal-status--reached { color: var(--color-success); font-weight: 600; }
+.overview-goal-status--stalled { color: var(--color-muted); }
+.overview-goal-status .icon { width: 0.9em; height: 0.9em; }
+.overview-goal-stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm) var(--space-md);
+  margin-top: var(--space-xs);
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
 }

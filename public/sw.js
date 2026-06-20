@@ -14,7 +14,7 @@
 //  - Auth/KI/Job-Queue/SSE: Network-Only, nie cachen
 //  - Version-Bump der Konstanten invalidiert den jeweiligen Cache
 
-const SHELL_CACHE = 'schreibwerkstatt-shell-v1331';
+const SHELL_CACHE = 'schreibwerkstatt-shell-v1343';
 const CONTENT_CACHE = 'schreibwerkstatt-content-v1';
 const CONFIG_CACHE = 'schreibwerkstatt-config-v2';
 const ACTIVE_CACHES = new Set([SHELL_CACHE, CONTENT_CACHE, CONFIG_CACHE]);
@@ -34,6 +34,7 @@ const NEVER_CACHE_PREFIXES = [
   '/booksettings',
   '/publication',
   '/ideen',
+  '/research',
   '/book-editor',
   '/search',
   '/share',

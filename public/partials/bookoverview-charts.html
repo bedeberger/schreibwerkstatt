@@ -1,3 +1,59 @@
+<!-- Schreibziel + Deadline-Projektion: Fortschritt zur Zielzeichenzahl plus
+     "bei deinem Schnitt fertig am ..." (Schnitt = Zuwachs der letzten 30 Tage).
+     Sichtbar sobald ein Ziel in den Buch-Einstellungen gesetzt ist. -->
+<template x-if="overviewHasGoal()">
+  <div class="overview-tile overview-tile--wide">
+    <div class="overview-tile-head">
+      <div class="overview-tile-label" x-text="$app.t('overview.goal.title')"></div>
+      <div class="overview-goal-deadline" x-show="overviewGoalProjection().deadlineIso" x-cloak
+           x-text="$app.t('overview.goal.deadline', { date: overviewGoalDateLabel(overviewGoalProjection().deadlineIso) })"></div>
+    </div>
+
+    <div class="overview-goal-bar-head">
+      <span class="overview-goal-current">
+        <span x-text="_fmtNum(overviewGoalProjection().currentChars)"></span>
+        <span class="overview-goal-target" x-text="$app.t('overview.goal.ofTarget', { n: _fmtNum(overviewGoalProjection().targetChars) })"></span>
+      </span>
+      <span class="overview-goal-pct" x-text="overviewGoalProjection().progressPct + '%'"></span>
+    </div>
+    <div class="progress-bar-wrap">
+      <div class="progress-bar" :class="{ 'progress-bar--reached': overviewGoalProjection().reached }"
+           :style="{ '--progress': overviewGoalProjection().progressPct + '%' }"></div>
+    </div>
+
+    <div class="overview-goal-projection">
+      <span class="overview-goal-status overview-goal-status--reached" x-show="overviewGoalProjection().reached" x-cloak>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#check"></use></svg>
+        <span x-text="$app.t('overview.goal.reached')"></span>
+      </span>
+      <span class="overview-goal-status overview-goal-status--stalled"
+            x-show="!overviewGoalProjection().reached && overviewGoalProjection().stalled" x-cloak
+            x-text="$app.t('overview.goal.stalled')"></span>
+      <span class="overview-goal-status"
+            x-show="!overviewGoalProjection().reached && !overviewGoalProjection().stalled" x-cloak
+            x-text="$app.t('overview.goal.finishOn', { date: overviewGoalDateLabel(overviewGoalProjection().projectedFinishIso) })"></span>
+    </div>
+
+    <div class="overview-goal-stats">
+      <span class="overview-goal-stat" x-show="overviewGoalProjection().pace > 0" x-cloak
+            x-text="$app.t('overview.goal.pace', { n: _fmtNum(overviewGoalProjection().pace) })"></span>
+      <span class="overview-goal-stat"
+            x-show="overviewGoalProjection().requiredPace && !overviewGoalProjection().reached" x-cloak
+            x-text="$app.t('overview.goal.required', { n: _fmtNum(overviewGoalProjection().requiredPace) })"></span>
+      <span class="overview-trend-pct"
+            x-show="overviewGoalProjection().deadlineIso && !overviewGoalProjection().reached && overviewGoalProjection().daysBuffer !== null"
+            x-cloak
+            :class="overviewGoalProjection().onTrack ? 'overview-trend-pct--up' : 'overview-trend-pct--down'"
+            x-text="overviewGoalProjection().onTrack
+              ? $app.t('overview.goal.buffer', { n: overviewGoalProjection().daysBuffer })
+              : $app.t('overview.goal.late', { n: Math.abs(overviewGoalProjection().daysBuffer) })"></span>
+      <span class="overview-trend-pct overview-trend-pct--down"
+            x-show="overviewGoalProjection().deadlineIso && !overviewGoalProjection().reached && overviewGoalProjection().stalled"
+            x-cloak x-text="$app.t('overview.goal.unreachable')"></span>
+    </div>
+  </div>
+</template>
+
 <!-- Sparkline mit Gradient-Fill + farb-codiert + Endpunkt-Marker.
      SVG ist aria-hidden — Trend-Prozent darunter trägt die Info,
      das Tile selbst hat ein zusammenfassendes aria-label. -->

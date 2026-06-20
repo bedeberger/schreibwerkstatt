@@ -58,6 +58,7 @@ const songsRouter = require('./routes/songs');
 const { router: jobsRouter, runKomplettAnalyseAll } = require('./routes/jobs');
 const chatRouter = require('./routes/chat');
 const ideenRouter = require('./routes/ideen');
+const researchRouter = require('./routes/research');
 const plotRouter = require('./routes/plot');
 const bookSettingsRouter = require('./routes/booksettings');
 const userSettingsRouter = require('./routes/usersettings');
@@ -70,6 +71,7 @@ const pdfExportRouter = require('./routes/pdf-export');
 const usageRouter = require('./routes/usage');
 const { router: draftFiguresRouter } = require('./routes/draft-figures');
 const contentRouter = require('./routes/content');
+const snapshotsRouter = require('./routes/snapshots');
 const shareRouter = require('./routes/share');
 
 const PORT = process.env.PORT || 3737;
@@ -127,6 +129,9 @@ function buildCspHeader() {
     'style-src':    styleSrc,
     'img-src':      imgSrc,
     'font-src':     fontSrc,
+    // TTS / Proof-Listening: das synthetisierte Audio kommt vom /tts/speak-Proxy
+    // (same-origin) und wird als blob:-Object-URL abgespielt.
+    'media-src':    ["'self'", 'blob:'],
     'connect-src':  connectSrc,
     'frame-src':    frameSrc,
     // ALTCHA loest das PoW in einem Blob-Web-Worker.
@@ -341,7 +346,7 @@ app.use('/metrics', require('./routes/metrics'));
 
 // ── Auth-Guard ────────────────────────────────────────────────────────────────
 // API-Pfade → 401 JSON; HTML-Pfade → Redirect zu /auth/login
-const API_PREFIXES = ['/history/', '/figures/', '/locations/', '/world-facts/', '/songs/', '/jobs/', '/sync/', '/chat/', '/booksettings/', '/publication/', '/content/', '/stt/', '/books/', '/me/', '/admin/', '/local/', '/config', '/share/api/'];
+const API_PREFIXES = ['/history/', '/figures/', '/locations/', '/world-facts/', '/songs/', '/jobs/', '/sync/', '/chat/', '/booksettings/', '/publication/', '/content/', '/stt/', '/tts/', '/books/', '/me/', '/admin/', '/local/', '/config', '/share/api/', '/name-guard/'];
 
 app.use((req, res, next) => {
   // Device-Token (native Clients, z.B. Mac-Focus-Writer): Bearer swd_… loest auf
@@ -439,6 +444,7 @@ app.use('/songs', songsRouter);
 app.use('/jobs', jobsRouter);
 app.use('/chat', chatRouter);
 app.use('/ideen', ideenRouter);
+app.use('/research', researchRouter);
 app.use('/plot', plotRouter);
 app.use('/booksettings', bookSettingsRouter);
 app.use('/me', userSettingsRouter);
@@ -451,9 +457,12 @@ app.use('/usage', usageRouter);
 app.use('/telemetry', require('./routes/telemetry'));
 app.use('/draft-figures', draftFiguresRouter);
 app.use('/content', contentRouter);
+app.use('/snapshots', snapshotsRouter);
 app.use('/search', require('./routes/search'));
 app.use('/languagetool', require('./routes/languagetool'));
+app.use('/name-guard', require('./routes/name-guard'));
 app.use('/stt', require('./routes/stt'));
+app.use('/tts', require('./routes/tts'));
 app.use('/dictionary', require('./routes/dictionary'));
 app.use('/books', require('./routes/book-access'));
 app.use('/book-editor', require('./routes/book-editor'));

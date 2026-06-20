@@ -6,6 +6,7 @@
 import { setupCardLifecycle } from './card-lifecycle.js';
 import { fetchJson } from '../utils.js';
 import { copyText } from '../copy-button.js';
+import { locateRange } from '../share-anchor.js';
 
 export function registerShareLinksCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -29,6 +30,12 @@ export function registerShareLinksCard() {
     savingEdit: false,
     // Comment-Liste-Toggle
     openCommentsToken: null,
+    // Thread-Reply / Resolve
+    replyDrafts: {},
+    savingReply: null,
+    savingResolve: null,
+    // Transienter Timer fürs Jump-Highlight im Editor
+    _jumpClearTimer: null,
     // Copy-Feedback
     copiedToken: null,
     _copiedTimer: null,
@@ -90,6 +97,8 @@ export function registerShareLinksCard() {
 
     destroy() {
       if (this._copiedTimer) { clearTimeout(this._copiedTimer); this._copiedTimer = null; }
+      if (this._jumpClearTimer) { clearTimeout(this._jumpClearTimer); this._jumpClearTimer = null; }
+      try { if (typeof CSS !== 'undefined' && CSS.highlights) CSS.highlights.delete('share-comment-jump'); } catch {}
       this._lifecycle?.destroy();
     },
 
@@ -265,6 +274,135 @@ export function registerShareLinksCard() {
       }
     },
 
+    // Kommentare eines Tokens als Threads gruppieren (Root + Antworten).
+    // Verankerte zuerst, dann allgemeine; innerhalb nach Zeit (neueste zuerst).
+    threadsFor(token) {
+      const rows = this.commentsByToken[token] || [];
+      const repliesByParent = {};
+      for (const c of rows) {
+        if (c.parent_id) (repliesByParent[c.parent_id] = repliesByParent[c.parent_id] || []).push(c);
+      }
+      return rows
+        .filter(c => !c.parent_id)
+        .map(root => ({
+          root,
+          replies: (repliesByParent[root.id] || []).sort((a, b) => new Date(a.created_at) - new Date(b.created_at)),
+        }))
+        .sort((a, b) => {
+          const aa = a.root.anchor_bid ? 0 : 1;
+          const bb = b.root.anchor_bid ? 0 : 1;
+          if (aa !== bb) return aa - bb;
+          return new Date(b.root.created_at) - new Date(a.root.created_at);
+        });
+    },
+
+    commentAuthorLabel(c) {
+      if (c.author_email) return window.__app.t('share.reader.author_badge');
+      return c.reader_name || window.__app.t('share.reader.anon');
+    },
+
+    // ── Sprung zur kommentierten Stelle im Notebook-Editor ────────────────────
+    // Öffnet die betroffene Seite und markiert die Textstelle transient.
+    async gotoComment(link, comment) {
+      if (!comment.anchor_bid) return;
+      const app = window.__app;
+      if (!app) return;
+      // Seite ermitteln: Page-Share = link.page_id; Chapter-Share = Block per
+      // bid serverseitig der Seite zuordnen (Anker speichert keine page_id).
+      let pageId = link.page_id;
+      if (link.kind === 'chapter') {
+        try {
+          const r = await fetchJson(`/share/api/links/${encodeURIComponent(link.token)}/locate?bid=${encodeURIComponent(comment.anchor_bid)}`);
+          pageId = r && r.page_id;
+        } catch { pageId = null; }
+      }
+      if (!pageId) { this.loadError = window.__app.t('share.comments.pageGone'); return; }
+      app.gotoPageById(pageId);
+      this._highlightInEditor({
+        bid: comment.anchor_bid, quote: comment.anchor_quote,
+        start: comment.anchor_start, end: comment.anchor_end,
+      });
+    },
+
+    // Wartet, bis die Seite im Editor gerendert ist, markiert die Stelle per
+    // CSS Custom Highlight (transient) und scrollt hin.
+    _highlightInEditor(anchor) {
+      const ok = typeof CSS !== 'undefined' && 'highlights' in CSS && typeof Highlight !== 'undefined';
+      let tries = 0;
+      const tick = () => {
+        const view = document.querySelector('.page-content-view');
+        const block = view && anchor.bid
+          ? (() => { try { return view.querySelector(`[data-bid="${CSS.escape(anchor.bid)}"]`); } catch { return null; } })()
+          : null;
+        if (view && block) {
+          if (ok) {
+            const range = locateRange(view, anchor);
+            if (range) {
+              CSS.highlights.set('share-comment-jump', new Highlight(range));
+              clearTimeout(this._jumpClearTimer);
+              this._jumpClearTimer = setTimeout(() => { try { CSS.highlights.delete('share-comment-jump'); } catch {} }, 6000);
+              const r = range.getBoundingClientRect();
+              if (r && r.height) { window.scrollTo({ top: window.scrollY + r.top - 140, behavior: 'smooth' }); return; }
+            }
+          }
+          block.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return;
+        }
+        if (tries++ < 40) setTimeout(tick, 100); // bis ~4s auf Render warten
+      };
+      setTimeout(tick, 150);
+    },
+
+    async reloadComments(token) {
+      try {
+        const rows = await fetchJson(`/share/api/links/${encodeURIComponent(token)}/comments`);
+        this.commentsByToken[token] = Array.isArray(rows) ? rows : [];
+      } catch (e) {
+        this.loadError = e.message;
+      }
+    },
+
+    async replyToComment(token, rootId) {
+      const body = (this.replyDrafts[rootId] || '').trim();
+      if (!body) return;
+      this.savingReply = rootId;
+      try {
+        const res = await fetch(`/share/api/links/${encodeURIComponent(token)}/comments`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ parent_id: rootId, body }),
+        });
+        if (!res.ok) throw new Error('reply failed');
+        const reply = await res.json();
+        this.commentsByToken[token] = [...(this.commentsByToken[token] || []), reply];
+        this.replyDrafts[rootId] = '';
+        const link = this.links.find(l => l.token === token);
+        if (link) link.comment_count = (link.comment_count || 0) + 1;
+      } catch (e) {
+        this.loadError = e.message;
+      } finally {
+        this.savingReply = null;
+      }
+    },
+
+    async toggleResolve(token, comment) {
+      const resolved = !comment.resolved_at;
+      this.savingResolve = comment.id;
+      try {
+        const res = await fetch(`/share/api/comments/${comment.id}/resolve`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ resolved }),
+        });
+        if (!res.ok) throw new Error('resolve failed');
+        comment.resolved_at = resolved ? new Date().toISOString() : null;
+      } catch (e) {
+        this.loadError = e.message;
+      } finally {
+        this.savingResolve = null;
+      }
+    },
+
     async deleteComment(token, id) {
       const ok = await window.__app.appConfirm({
         message: window.__app.t('share.comments.deleteConfirm'),
@@ -275,9 +413,10 @@ export function registerShareLinksCard() {
       try {
         const res = await fetch(`/share/api/comments/${id}`, { method: 'DELETE' });
         if (!res.ok) throw new Error('delete failed');
-        this.commentsByToken[token] = (this.commentsByToken[token] || []).filter(c => c.id !== id);
+        // Root-Delete kascadiert Antworten serverseitig — neu laden für korrekten Stand.
+        await this.reloadComments(token);
         const link = this.links.find(l => l.token === token);
-        if (link && link.comment_count > 0) link.comment_count -= 1;
+        if (link) link.comment_count = (this.commentsByToken[token] || []).length;
       } catch (e) {
         this.loadError = e.message;
       }

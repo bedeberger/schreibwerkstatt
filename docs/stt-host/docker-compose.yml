@@ -1,0 +1,31 @@
+# Self-hosted Speech-to-Text-Backend fuer das STT-Diktat-Feature
+# (siehe docs/stt.md). speaches (frueher faster-whisper-server) ist ein
+# OpenAI-kompatibler /v1/audio/transcriptions-Shim auf Basis von faster-whisper
+# (CTranslate2). Top-Modell fuer DE/EN: Systran/faster-whisper-large-v3.
+#
+# Voraussetzung am Host: NVIDIA-Container-Toolkit (Test:
+#   docker run --rm --gpus all nvidia/cuda:12.4.0-base-ubuntu22.04 nvidia-smi)
+#
+# Port 8001 (Host) -> 8000 (Container), damit der TTS-Host (docs/tts-host,
+# Port 8000) parallel laufen kann. Modelle werden beim ersten Request automatisch
+# nach hf-hub-cache geladen (large-v3 ~3 GB) und danach von dort bedient.
+
+services:
+  stt:
+    image: ghcr.io/speaches-ai/speaches:latest-cuda
+    container_name: speaches
+    ports:
+      - "8001:8000"
+    volumes:
+      - hf-hub-cache:/home/ubuntu/.cache/huggingface/hub
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  hf-hub-cache:

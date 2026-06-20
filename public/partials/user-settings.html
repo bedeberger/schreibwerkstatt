@@ -77,6 +77,22 @@
       </div>
     </div>
 
+    <p class="card-form-section-divider" x-text="$app.t('profile.writingSection')"></p>
+
+    <div class="card-form-row">
+      <label class="card-form-label" x-text="$app.t('profile.dailyGoal')"></label>
+      <div class="card-form-field">
+        <div class="card-form-goal-edit">
+          <input type="text" class="card-form-goal-input"
+                 x-data="numInput({ integer: true, min: 0, max: 1440 })"
+                 x-modelable="value" x-model="userSettingsDailyGoal"
+                 :aria-label="$app.t('profile.dailyGoal')">
+          <span class="card-form-goal-unit" x-text="$app.t('mystats.goal.minutesLabel')"></span>
+        </div>
+        <p class="card-form-field-note" x-text="$app.t('profile.dailyGoalHint')"></p>
+      </div>
+    </div>
+
     <p class="card-form-saved" x-show="userSettingsSaved" x-cloak x-transition.opacity.duration.250ms x-text="$app.t('profile.savedMsg')"></p>
     <p class="card-form-error" x-show="userSettingsError" x-text="userSettingsError"></p>
 

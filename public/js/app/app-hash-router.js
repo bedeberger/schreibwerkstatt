@@ -49,6 +49,8 @@ export const appHashRouterMethods = {
       parts.push('werkstatt', String(this.werkstattDraftId));
     } else if (this.showTagebuchRueckblickCard && this.rueckblickEntryId) {
       parts.push('rueckblick', String(this.rueckblickEntryId));
+    } else if (this.showPlotCard && this.plotBeatId) {
+      parts.push('plot', String(this.plotBeatId));
     } else if (this.showFiguresCard) parts.push('figuren');
     else if (this.showFigurWerkstattCard) parts.push('werkstatt');
     else if (this.showOrteCard) parts.push('orte');
@@ -57,6 +59,7 @@ export const appHashRouterMethods = {
     else if (this.showEreignisseCard) parts.push('ereignisse');
     else if (this.showPlotCard) parts.push('plot');
     else if (this.showWorldFactsCard) parts.push('fakten');
+    else if (this.showRechercheCard) parts.push('recherche');
     else if (this.showKontinuitaetCard) parts.push('kontinuitaet');
     else if (this.showTagebuchRueckblickCard) parts.push('rueckblick');
     else if (this.showBookReviewCard) parts.push('bewertung');
@@ -68,6 +71,7 @@ export const appHashRouterMethods = {
     else if (this.showFehlerHeatmapCard) parts.push('fehler');
     else if (this.showBookSettingsCard) parts.push('einstellungen');
     else if (this.showFinetuneExportCard) parts.push('finetune');
+    else if (this.showSnapshotsCard) parts.push('fassungen');
     else if (this.showExportCard) parts.push('export');
     else if (this.showPdfExportCard) parts.push('pdf');
     else if (this.showEpubExportCard) parts.push('epub');
@@ -340,12 +344,21 @@ export const appHashRouterMethods = {
           if (!this.showEreignisseCard) await this.toggleEreignisseCard();
           break;
         case 'plot':
+          // Optionaler Beat-Permalink (#…/plot/<beatId>). Root-SSoT vor dem Toggle
+          // setzen; die plotCard fokussiert den Beat nach dem Board-Load (bzw.
+          // sofort, falls schon geladen) via `plot:focus-beat` + _pendingFocusBeatId.
+          this.plotBeatId = arg ? String(arg) : null;
           if (!this.showPlotCard) await this.togglePlotCard();
           else { this._closeOtherMainCards('plot'); this._scrollToCardByKey('plot'); }
+          if (arg) window.dispatchEvent(new CustomEvent('plot:focus-beat', { detail: { beatId: arg } }));
           break;
         case 'fakten':
           if (!this.showWorldFactsCard) await this.toggleWorldFactsCard();
           else { this._closeOtherMainCards('weltfakten'); this._scrollToCardByKey('weltfakten'); }
+          break;
+        case 'recherche':
+          if (!this.showRechercheCard) await this.toggleRechercheCard();
+          else { this._closeOtherMainCards('recherche'); this._scrollToCardByKey('recherche'); }
           break;
         case 'kontinuitaet':
           if (!this.showKontinuitaetCard) await this.toggleKontinuitaetCard();
@@ -390,6 +403,9 @@ export const appHashRouterMethods = {
         case 'finetune':
           if (!this.showFinetuneExportCard) await this.toggleFinetuneExportCard();
           break;
+        case 'fassungen':
+          if (!this.showSnapshotsCard) await this.toggleSnapshotsCard();
+          break;
         case 'export':
           if (!this.showExportCard) await this.toggleExportCard();
           break;
@@ -424,15 +440,17 @@ export const appHashRouterMethods = {
       'selectedBookId', 'currentPage', 'showEditorCard',
       'selectedFigurId', 'selectedOrtId', 'selectedSongId', 'selectedSzeneId',
       'showFiguresCard', 'showFigurWerkstattCard', 'showOrteCard', 'showSongsCard', 'showSzenenCard', 'showEreignisseCard', 'showPlotCard', 'showWorldFactsCard',
+      'showRechercheCard',
       'showKontinuitaetCard', 'showTagebuchRueckblickCard', 'rueckblickEntryId', 'showBookReviewCard', 'showBookChatCard',
       'showKapitelReviewCard', 'kapitelReviewChapterId',
-      'werkstattDraftId',
+      'werkstattDraftId', 'plotBeatId',
       'showBookStatsCard', 'showStilCard', 'showFehlerHeatmapCard',
       'showBookSettingsCard', 'showUserSettingsCard', 'showMyStatsCard',
       'showAdminUsersCard', 'showAdminSettingsCard', 'showAdminUsageCard', 'adminUsageTab',
       'showAdminCategoriesCard', 'showAdminBooksCard', 'showAdminLogsCard', 'showAdminParseFailsCard',
       'showAdminJsErrorsCard', 'showAdminDevicesCard',
       'showFinetuneExportCard',
+      'showSnapshotsCard',
       'showExportCard',
       'showPdfExportCard',
       'showEpubExportCard',

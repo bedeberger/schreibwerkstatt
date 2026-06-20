@@ -104,6 +104,7 @@ export const adminSettingsMethods = {
                : kind === 'smtp'         ? '/admin/settings/smtp/test-send'
                : kind === 'languagetool' ? '/admin/settings/test-languagetool'
                : kind === 'stt'          ? '/admin/settings/test-stt'
+               : kind === 'tts'          ? '/admin/settings/test-tts'
                : kind === 'geocode'      ? '/admin/settings/test-geocode'
                : kind === 'tiles'        ? '/admin/settings/test-tiles'
                : null;

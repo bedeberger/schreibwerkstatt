@@ -1,0 +1,36 @@
+# Self-hosted Text-to-Speech-Backend fuer das Proof-Listening-Feature
+# (siehe docs/tts.md). openedai-speech ist ein OpenAI-kompatibler
+# /v1/audio/speech-Shim und liefert XTTS-v2 (Top-Qualitaet, DE/EN, Voice-
+# Cloning) UND Piper (schnell, robust) in einem Container.
+#
+# model: tts-1     -> Piper-Stimmen (schnell)
+# model: tts-1-hd  -> XTTS-v2 (natuerlicher; ideal, weil der /tts/speak-Proxy
+#                     satzweise sendet = kurze Eingaben, XTTS-stabil)
+#
+# Voraussetzung am Host: NVIDIA-Container-Toolkit (Test:
+#   docker run --rm --gpus all nvidia/cuda:12.4.0-base-ubuntu22.04 nvidia-smi)
+#
+# Stimmen pro Sprache definierst du in ./config/voice_to_speaker.yaml und
+# traegst die Namen im Admin-Tab „Vorlesen" als tts.voice.de / tts.voice.en ein.
+
+services:
+  tts:
+    image: ghcr.io/matatonic/openedai-speech:latest
+    container_name: openedai-speech
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./voices:/app/voices       # XTTS-Sprecher-Samples + Modell-Cache (HF/Coqui)
+      - ./config:/app/config       # voice_to_speaker.yaml
+    environment:
+      - TTS_HOME=/app/voices
+      - HF_HOME=/app/voices
+      - COQUI_TOS_AGREED=1         # XTTS-Lizenz akzeptiert (sonst Crash beim Start)
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

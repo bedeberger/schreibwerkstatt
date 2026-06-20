@@ -61,3 +61,5 @@ Notebook-Toolbar Mic-Button (Root-Scope) → MediaRecorder + WebAudio-RMS-VAD
 ## Betreiber (self-hosted Backend)
 
 OpenAI-kompatibler Whisper-Endpunkt mit `/v1/audio/transcriptions`: Speaches / faster-whisper-server / whisper.cpp im Server-Mode. Host + Model im Admin-Tab „Diktat" eintragen, testen, aktivieren.
+
+**Fertiges docker-compose-Setup (GPU, large-v3): [docs/stt-host/](stt-host/)** — speaches (faster-whisper) mit Systran/faster-whisper-large-v3, Schritt-für-Schritt-Anleitung. Läuft auf Port 8001 parallel zum [TTS-Host](tts-host/) (8000).

@@ -90,6 +90,12 @@ router.get('/config', (req, res) => {
         maxSegmentS:  Number(appSettings.get('stt.vad.max_segment_s')) || 30,
       },
     },
+    // TTS (Proof-Listening): nur enabled. Host/Model/Voice/Speed/Key verlassen
+    // den Server nie — die Synthese laeuft komplett ueber den /tts/speak-Proxy.
+    tts: {
+      enabled: appSettings.get('tts.enabled') === true
+        && !!String(appSettings.get('tts.host') || '').trim(),
+    },
     // Tile-Server der Orte-Karte. Leaflet holt die Kacheln direkt im Browser,
     // darum muss die URL ans Frontend (anders als die Geocoder-URLs, die nur der
     // server-seitige /geocode-Proxy nutzt). Ein nur-HTTP-Upstream (z. B. LAN-Tile-

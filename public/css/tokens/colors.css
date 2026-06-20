@@ -170,7 +170,9 @@
   --card-accent-kapitel: #5e7a3a;
   --card-accent-chat: #4e6e9a;
   --card-accent-ideen: #b8862a;
+  --card-accent-recherche: #1f7a73;
   --card-accent-finetune: #5a5a5a;
+  --card-accent-snapshots: #3f6f7a;
   --card-accent-pdfexport: #6a4a3a;
   --card-accent-epubexport: #3a5a52;
   --card-accent-settings: #5a5a5a;
@@ -362,7 +364,9 @@
   --card-accent-kapitel: #9eb878;
   --card-accent-chat: #8aaadc;
   --card-accent-ideen: #d6b260;
+  --card-accent-recherche: #4cc4ba;
   --card-accent-finetune: #989286;
+  --card-accent-snapshots: #7fb0bb;
   --card-accent-pdfexport: #a8806a;
   --card-accent-epubexport: #7aa89c;
   --card-accent-settings: #989286;

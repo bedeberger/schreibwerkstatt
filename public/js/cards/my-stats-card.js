@@ -61,9 +61,6 @@ export function registerMyStatsCard() {
     myStatsCumulative: false,  // nur fuer Metrik 'writing' (kumulierte Schreibzeit)
     myStatsLoading: false,
     myStatsError: '',
-    // Editierwert (Minuten) fuer das Tagesziel + Save-Guard.
-    myStatsGoalInput: 0,
-    myStatsGoalSaving: false,
     _myStatsMemos: {},
 
     init() {
@@ -94,7 +91,6 @@ export function registerMyStatsCard() {
         ]);
         if (!statsR.ok) throw new Error('HTTP ' + statsR.status);
         this.myStatsData = await statsR.json();
-        this.myStatsGoalInput = this.myStatsData?.daily_goal_minutes || 0;
         const hist = histR.ok ? await histR.json() : { history: [], writing: [], lektorat: [] };
         this.myStatsHistory = Array.isArray(hist.history) ? hist.history : [];
         this.myStatsWriting = Array.isArray(hist.writing) ? hist.writing : [];
@@ -286,29 +282,6 @@ export function registerMyStatsCard() {
                                     this.myStatsData?.today_writing_seconds));
     },
     get myStatsHasGoal() { return this.myStatsGoal().active; },
-
-    async saveMyStatsGoal() {
-      if (this.myStatsGoalSaving) return;
-      const minutes = Math.max(0, Math.min(1440, Math.round(Number(this.myStatsGoalInput) || 0)));
-      this.myStatsGoalSaving = true;
-      try {
-        const r = await fetch('/me/settings', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'same-origin',
-          body: JSON.stringify({ daily_goal_minutes: minutes }),
-        });
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        const j = await r.json();
-        // SSoT bleibt der Server-Wert (0 → null normalisiert).
-        if (this.myStatsData) this.myStatsData.daily_goal_minutes = j.daily_goal_minutes ?? null;
-        this.myStatsGoalInput = j.daily_goal_minutes || 0;
-      } catch (e) {
-        console.error('[myStats saveGoal]', e);
-      } finally {
-        this.myStatsGoalSaving = false;
-      }
-    },
 
     // Zahl mit einer Nachkommastelle (Lesbarkeitswerte), Locale-aware.
     myStatsDec(n) {

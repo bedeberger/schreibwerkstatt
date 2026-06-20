@@ -416,6 +416,60 @@ test('plot DB: createAct mit threadId nummeriert position pro Scope', () => {
   plot.deleteAct(shared.id);
 });
 
+// ── Brainstorm-Lauf-Historie ─────────────────────────────────────────────────
+
+test('plot DB: Brainstorm-Run insert/list/get/delete + JOIN auf Akt/Strang-Name', () => {
+  const act = plot.createAct(BOOK, USER, { name: 'BR-Akt' });
+  const thread = plot.createThread(BOOK, USER, { name: 'BR-Strang' });
+  const runId = plot.insertPlotBrainstormRun({
+    bookId: BOOK, userEmail: USER, actId: act.id, threadId: thread.id,
+    vorschlagCount: 2, result: { vorschlaege: [{ label: 'A', begruendung: 'x' }, { label: 'B', begruendung: 'y' }] },
+    model: 'test-model',
+  });
+  assert.ok(runId);
+
+  const list = plot.listPlotBrainstormRuns(BOOK, USER);
+  const row = list.find(r => r.id === runId);
+  assert.ok(row);
+  assert.equal(row.vorschlag_count, 2);
+  assert.equal(row.act_name, 'BR-Akt');     // via JOIN, kein Snapshot
+  assert.equal(row.thread_name, 'BR-Strang');
+  assert.equal(row.result_json, undefined);  // Liste ohne result_json
+
+  const detail = plot.getPlotBrainstormRun(runId);
+  assert.equal(detail.result.vorschlaege.length, 2);
+  assert.equal(detail.result.vorschlaege[0].label, 'A');
+  assert.equal(detail.act_id, act.id);
+
+  // Fremd-User darf nicht löschen.
+  assert.equal(plot.deletePlotBrainstormRun(runId, 'someone@else.test'), 0);
+  assert.equal(plot.deletePlotBrainstormRun(runId, USER), 1);
+  assert.equal(plot.listPlotBrainstormRuns(BOOK, USER).find(r => r.id === runId), undefined);
+
+  plot.deleteThread(thread.id);
+  plot.deleteAct(act.id);
+});
+
+test('plot DB: Brainstorm-Run überlebt Akt-/Strang-Löschung (FK SET NULL, Name → null)', () => {
+  const act = plot.createAct(BOOK, USER, { name: 'Vergänglich' });
+  const thread = plot.createThread(BOOK, USER, { name: 'Auch-weg' });
+  const runId = plot.insertPlotBrainstormRun({
+    bookId: BOOK, userEmail: USER, actId: act.id, threadId: thread.id,
+    vorschlagCount: 1, result: { vorschlaege: [{ label: 'X', begruendung: '' }] }, model: null,
+  });
+  plot.deleteAct(act.id);
+  plot.deleteThread(thread.id);
+
+  const row = plot.listPlotBrainstormRuns(BOOK, USER).find(r => r.id === runId);
+  assert.ok(row, 'Lauf bleibt erhalten');
+  assert.equal(row.act_id, null);      // SET NULL
+  assert.equal(row.thread_id, null);
+  assert.equal(row.act_name, null);    // JOIN findet keinen Akt mehr
+  assert.equal(row.thread_name, null);
+
+  plot.deletePlotBrainstormRun(runId, USER);
+});
+
 // ── Prompts ──────────────────────────────────────────────────────────────────
 
 const prompts = await import('../../public/js/prompts/plot.js');

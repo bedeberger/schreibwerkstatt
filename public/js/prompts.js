@@ -210,6 +210,12 @@ export {
 } from './prompts/geocode.js';
 
 export {
+  buildSystemResearchLink,
+  buildResearchLinkPrompt,
+  SCHEMA_RESEARCH_LINK,
+} from './prompts/recherche.js';
+
+export {
   buildFinetuneAugmentSystem,
   buildFinetuneReversePromptsPrompt,
   buildFinetuneFactQAPrompt,

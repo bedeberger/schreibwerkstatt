@@ -110,6 +110,15 @@ export function registerPlotCard() {
     consistencyRuns: [],
     selectedRunId: null,
 
+    // Brainstorm-Lauf-Historie (persistierte Läufe pro Buch, zusätzlich pro
+    // Akt/Strang). Klick auf einen Eintrag lädt seine Vorschläge zurück in das
+    // Inline-Panel des zugehörigen Akts/der Zelle (selectedBrainstormRunId).
+    brainstormRuns: [],
+    selectedBrainstormRunId: null,
+
+    // Deep-Link-Ziel (#book/X/plot/<beatId>): gemerkt, bis das Board geladen ist.
+    _pendingFocusBeatId: null,
+
     _lifecycle: null,
 
     init() {
@@ -133,6 +142,12 @@ export function registerPlotCard() {
         signal: this._lifecycle.signal,
         onChange: (active) => { this.plotFullscreen = active; },
       });
+
+      // Deep-Link-Permalink #book/X/plot/<beatId>: Hash-Router dispatcht das Event;
+      // _focusBeatById fokussiert den Beat (bzw. merkt ihn bis zum Board-Load vor).
+      window.addEventListener('plot:focus-beat', (e) => {
+        this._focusBeatById(e.detail?.beatId);
+      }, { signal: this._lifecycle.signal });
     },
 
     destroy() {

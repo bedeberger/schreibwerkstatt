@@ -167,7 +167,23 @@ async function runPlotBrainstormJob(jobId, bookId, actId, threadId, userEmail) {
         begruendung: typeof v.begruendung === 'string' ? v.begruendung.trim() : '',
       }));
 
-    completeJob(jobId, { vorschlaege, actId, threadId: threadId ?? null, tokensIn: tok.in, tokensOut: tok.out },
+    // Lauf historisieren (nur bei echten Vorschlägen), damit der User frühere
+    // Brainstorms später nochmal ansehen + anwenden kann. Best-effort: ein DB-
+    // Fehler hier darf das Job-Resultat nicht verschlucken.
+    let runId = null;
+    if (vorschlaege.length) {
+      try {
+        runId = plotDb.insertPlotBrainstormRun({
+          bookId, userEmail, actId, threadId: threadId ?? null,
+          vorschlagCount: vorschlaege.length,
+          result: { vorschlaege }, model: _modelName(),
+        });
+      } catch (e) {
+        logger.warn(`Plot-Brainstorm-Run-Insert fehlgeschlagen book=${bookId}: ${e.message}`);
+      }
+    }
+
+    completeJob(jobId, { vorschlaege, actId, threadId: threadId ?? null, runId, tokensIn: tok.in, tokensOut: tok.out },
       tps(tok), `${vorschlaege.length} Vorschläge für "${act.name}"`);
   } catch (e) {
     if (e.name !== 'AbortError') logger.error(`Plot-Brainstorm-Fehler book=${bookId}: ${e.message}${e.cause ? ` (${e.cause.message})` : ''}`, { stack: e.cause?.stack || e.stack });

@@ -185,4 +185,54 @@ export const kontinuitaetMethods = {
     const page = this.kontinuitaetResolveStelle(stelle, issue, side);
     if (page) window.__app.selectPage(page);
   },
+
+  // ── Namens-/Konsistenz-Waechter ────────────────────────────────────────────
+  // Regelbasierte Erkennung buchweiter Schreibvarianten/Tippfehler von Eigennamen
+  // (Figuren + Orte). Synchroner Endpunkt, kein KI-Job. Auf Knopfdruck.
+  async nameGuardRun() {
+    const root = window.__app;
+    const bookId = root.selectedBookId;
+    if (!bookId || this.nameGuardLoading) return;
+    this.nameGuardLoading = true;
+    try {
+      const data = await fetchJson('/name-guard/' + bookId + '/check', { method: 'POST' });
+      this.nameGuardResult = data;
+      this.selectedNameGuardKey = null;
+    } catch (e) {
+      console.error('[nameGuardRun]', e);
+      this.nameGuardResult = { clusters: [], error: true };
+    } finally {
+      this.nameGuardLoading = false;
+    }
+  },
+
+  nameGuardKey(cluster) {
+    return 'ng:' + (cluster?.canonical || '');
+  },
+
+  nameGuardConfidenceSeverity(conf) {
+    // Auf die bestehende severity-tag-Farbskala mappen (Farbe = Aufmerksamkeit):
+    // hohe Konfidenz = stark hervorgehoben.
+    return conf === 'hoch' ? 'kritisch' : (conf === 'mittel' ? 'mittel' : 'niedrig');
+  },
+
+  // Eine Variante als gewollt akzeptieren → serverseitige Ignore-Liste + lokal entfernen.
+  async nameGuardIgnore(cluster, variant) {
+    const root = window.__app;
+    const bookId = root.selectedBookId;
+    if (!bookId || !cluster || !variant) return;
+    try {
+      await fetchJson('/name-guard/' + bookId + '/ignore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ canonical: cluster.canonical, variant: variant.form }),
+      });
+      cluster.variants = (cluster.variants || []).filter(v => v.form !== variant.form);
+      if (!cluster.variants.length && this.nameGuardResult?.clusters) {
+        this.nameGuardResult.clusters = this.nameGuardResult.clusters.filter(c => c !== cluster);
+      }
+    } catch (e) {
+      console.error('[nameGuardIgnore]', e);
+    }
+  },
 };

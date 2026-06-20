@@ -226,4 +226,26 @@
       </div>
     </template>
   </div>
+
+  <!-- Brainstorm-Lauf-Historie: persistierte Läufe pro Buch (zusätzlich pro Akt/
+       Strang). Klick lädt die Vorschläge zurück ins Inline-Panel des Akts/der Zelle
+       (selectedBrainstormRunId). Läufe mit gelöschtem Akt sind nicht reaktivierbar. -->
+  <div class="history-bar" x-show="brainstormRuns.length > 0" x-cloak>
+    <div class="history-heading" x-text="$app.t('plot.brainstorm.runs', { count: brainstormRuns.length })"></div>
+    <template x-for="r in brainstormRuns" :key="r.id">
+      <div class="history-item" :class="{ 'history-item--open': selectedBrainstormRunId === r.id, 'history-item--disabled': r.act_id === null }"
+           @click="r.act_id !== null && openBrainstormRun(r)">
+        <span class="history-date" x-text="formatRunDate(r.created_at)"></span>
+        <span class="tag" x-text="r.act_name || $app.t('plot.brainstorm.actDeleted')"></span>
+        <span x-show="r.thread_name" class="tag tag--werkstatt" x-text="r.thread_name"></span>
+        <span class="tag" x-text="$app.t('plot.brainstorm.vorschlagCount', { n: r.vorschlag_count })"></span>
+        <span x-show="r.model" class="tag" x-text="r.model"></span>
+        <span class="history-chevron" :class="{ open: selectedBrainstormRunId === r.id }" aria-hidden="true" x-show="r.act_id !== null"></span>
+        <button type="button" class="history-item-delete"
+                @click.stop="deleteBrainstormRun(r.id)"
+                :data-tip="$app.t('common.deleteEntry')"
+                :aria-label="$app.t('common.deleteEntry')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
+      </div>
+    </template>
+  </div>
 </div>
