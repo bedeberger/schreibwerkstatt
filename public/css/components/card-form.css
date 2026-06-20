@@ -196,10 +196,11 @@ input[type=number],
 input[type=date],
 input[type=month],
 input[type=datetime-local],
-select {
+select,
+.card-form-input {
   width: 100%;
   padding: var(--size-default-padding-y) 10px;
-  border: 0.5px solid var(--color-border-input);
+  border: 1px solid var(--color-border-input);
   border-radius: var(--radius-md);
   font-size: var(--font-size-base);
   font-family: inherit;
@@ -225,9 +226,22 @@ select {
 }
 
 input:focus,
-select:focus {
+select:focus,
+textarea:focus,
+.card-form-input:focus,
+.card-form-textarea:focus {
   outline: none;
   border-color: var(--color-border-focus);
+}
+
+/* Disabled: gedämpft + not-allowed, einheitlich über alle Form-Felder. */
+input:disabled,
+select:disabled,
+textarea:disabled,
+.card-form-input:disabled,
+.card-form-textarea:disabled {
+  opacity: var(--opacity-hint);
+  cursor: not-allowed;
 }
 
 /* === Combobox (Searchable Select) === */
@@ -243,7 +257,7 @@ select:focus {
   width: 100%;
   flex: 1 1 auto;
   padding: var(--size-default-padding-y) 10px;
-  border: 0.5px solid var(--color-border-input);
+  border: 1px solid var(--color-border-input);
   border-radius: var(--radius-md);
   background: var(--color-surface);
   font-size: var(--font-size-base);
@@ -338,10 +352,16 @@ select:focus {
   cursor: not-allowed;
   pointer-events: none;
 }
-/* Compact variant – Grösse über --size-compact-* synchron mit .btn-compact. */
+/* Compact variant – Grösse über --size-compact-* synchron mit .btn-compact.
+   Hairline-Border (0.5px) statt der 1px-Feldborder: compact lebt in dichten
+   Kontexten (Filter-Bars), wo die Höhe mit Suchfeld/Tabs auf 0.5px matchen
+   muss (Filter-Bar-Höhen-Invariante). Full-size-Form-Comboboxen erben 1px aus
+   .combobox-trigger; der card-form-row-Override unten zieht compact dort wieder
+   auf 1px hoch. */
 .combobox-wrap--compact .combobox-trigger {
   font-size: var(--size-compact-font-size);
   padding: var(--size-compact-padding);
+  border-width: 0.5px;
   border-color: var(--color-border);
   background: var(--color-bg);
 }
@@ -377,6 +397,7 @@ select:focus {
   padding: var(--size-default-padding-y) 10px;
   font-size: var(--font-size-base);
   background: var(--color-surface);
+  border-width: 1px;
   border-color: var(--color-border-input);
 }
 
@@ -461,7 +482,7 @@ select:focus {
   box-sizing: border-box;
   width: 5rem;
   padding: var(--size-compact-padding);
-  border: 0.5px solid var(--color-border-input);
+  border: 1px solid var(--color-border-input);
   border-radius: var(--radius-md);
   font-size: var(--size-compact-font-size);
   background: var(--color-surface);
@@ -552,8 +573,8 @@ select:focus {
   font-size: var(--font-size-sm);
   font-family: inherit;
   padding: var(--space-6) 8px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-md);
   background: var(--color-surface);
   color: var(--color-text);
   resize: vertical;

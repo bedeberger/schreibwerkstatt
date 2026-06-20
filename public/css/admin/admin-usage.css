@@ -135,14 +135,6 @@
   color: var(--color-text);
 }
 
-.admin-usage-mode-select {
-  padding: var(--space-2xs) var(--space-xs);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-bg);
-  color: var(--color-text);
-}
-
 /* Numerische + Form-Spalten nowrap, damit nichts umbricht.
    Auto-Layout verteilt freie Breite proportional zur Max-Content-Breite —
    ohne `width: 1%` werden Spalten nicht künstlich an den rechten Rand gedrückt. */

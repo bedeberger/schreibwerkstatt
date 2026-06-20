@@ -85,11 +85,9 @@
                      class="admin-usage-budget-input">
             </td>
             <td class="admin-usage-cell-shrink">
-              <select x-model="u._draftMode" class="admin-usage-mode-select">
-                <option value="none"   x-text="$app.t('admin.usage.user.mode.none')"></option>
-                <option value="soft"   x-text="$app.t('admin.usage.user.mode.soft')"></option>
-                <option value="hard"   x-text="$app.t('admin.usage.user.mode.hard')"></option>
-              </select>
+              <div x-data="combobox($app.t('admin.usage.user.mode.none'))"
+                   x-modelable="value" x-model="u._draftMode"
+                   x-effect="options = [{ value: 'none', label: $app.t('admin.usage.user.mode.none') }, { value: 'soft', label: $app.t('admin.usage.user.mode.soft') }, { value: 'hard', label: $app.t('admin.usage.user.mode.hard') }]"></div>
             </td>
             <td class="admin-usage-cell-shrink">
               <div class="admin-usage-actions">

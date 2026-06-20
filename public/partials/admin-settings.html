@@ -328,11 +328,9 @@
     <section x-show="adminSettingsTab === 'jobs'" class="admin-settings-section">
       <label>jobs.max_concurrent <input type="text" x-data="numInput({ step: 1, min: 1, max: 8 })" x-modelable="value" x-model="adminSettingsForm['jobs.max_concurrent']"></label>
       <label>jobs.book_chat.mode
-        <select x-model="adminSettingsForm['jobs.book_chat.mode']">
-          <option value="auto">auto</option>
-          <option value="agent">agent</option>
-          <option value="classic">classic</option>
-        </select>
+        <div x-data="combobox({ placeholder: 'jobs.book_chat.mode', compact: false })"
+             x-modelable="value" x-model="adminSettingsForm['jobs.book_chat.mode']"
+             x-effect="options = [{ value: 'auto', label: 'auto' }, { value: 'agent', label: 'agent' }, { value: 'classic', label: 'classic' }]"></div>
       </label>
       <label>jobs.book_chat.max_tool_iter <input type="text" x-data="numInput({ step: 1, min: 1, max: 50 })" x-modelable="value" x-model="adminSettingsForm['jobs.book_chat.max_tool_iter']"></label>
       <label>jobs.book_chat.token_budget <input type="text" x-data="numInput({ step: 1, min: 0, max: 2000000 })" x-modelable="value" x-model="adminSettingsForm['jobs.book_chat.token_budget']"></label>
@@ -350,10 +348,9 @@
     <!-- PDF/A-Tab -->
     <section x-show="adminSettingsTab === 'pdfa'" class="admin-settings-section">
       <label>pdfa.flavour
-        <select x-model="adminSettingsForm['pdfa.flavour']">
-          <option value="2b">2b</option>
-          <option value="3b">3b</option>
-        </select>
+        <div x-data="combobox({ placeholder: 'pdfa.flavour', compact: false })"
+             x-modelable="value" x-model="adminSettingsForm['pdfa.flavour']"
+             x-effect="options = [{ value: '2b', label: '2b' }, { value: '3b', label: '3b' }]"></div>
       </label>
       <label class="checkbox-row">
         <input type="checkbox" :checked="adminSettingsForm['pdfa.disabled'] === true || adminSettingsForm['pdfa.disabled'] === 'true'"
@@ -431,7 +428,7 @@
       </label>
       <label>
         <span x-text="$app.t('admin.settings.stt.language.label')"></span>
-        <div x-data="combobox($app.t('admin.settings.stt.language.label'))"
+        <div x-data="combobox({ placeholder: $app.t('admin.settings.stt.language.label'), compact: false })"
              x-modelable="value" x-model="adminSettingsForm['stt.language']"
              x-effect="options = [{ value: 'de', label: 'Deutsch' }, { value: 'en', label: 'English' }]"></div>
         <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.stt.language.help')"></small>
@@ -496,7 +493,7 @@
       </label>
       <label>
         <span x-text="$app.t('admin.settings.tts.format.label')"></span>
-        <div x-data="combobox($app.t('admin.settings.tts.format.label'))"
+        <div x-data="combobox({ placeholder: $app.t('admin.settings.tts.format.label'), compact: false })"
              x-modelable="value" x-model="adminSettingsForm['tts.format']"
              x-effect="options = [{ value: 'mp3', label: 'MP3' }, { value: 'opus', label: 'Opus' }, { value: 'aac', label: 'AAC' }, { value: 'flac', label: 'FLAC' }, { value: 'wav', label: 'WAV' }, { value: 'pcm', label: 'PCM' }]"></div>
         <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.tts.format.help')"></small>
@@ -534,7 +531,7 @@
       <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.geocode.hint')"></p>
       <label>
         <span x-text="$app.t('admin.settings.geocode.provider.label')"></span>
-        <div x-data="combobox($app.t('admin.settings.geocode.provider.label'))"
+        <div x-data="combobox({ placeholder: $app.t('admin.settings.geocode.provider.label'), compact: false })"
              x-modelable="value" x-model="adminSettingsForm['geocode.provider']"
              x-effect="options = [{ value: 'nominatim', label: 'Nominatim (OSM)' }, { value: 'photon', label: 'Photon (Komoot)' }]"></div>
       </label>

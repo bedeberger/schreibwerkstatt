@@ -59,13 +59,9 @@
               <td class="admin-pool-num" x-text="fmtNormseiten(b.chars)"></td>
               <td class="admin-pool-num" x-text="fmtBytes(b.bytes)"></td>
               <td>
-                <select class="card-form-input"
-                        @change="setAssignTarget(b.book_id, $event.target.value)">
-                  <option value="" x-text="$app.t('admin.books.selectUser')"></option>
-                  <template x-for="u in users" :key="u.email">
-                    <option :value="u.email" x-text="u.email"></option>
-                  </template>
-                </select>
+                <div x-data="combobox($app.t('admin.books.selectUser'), $app.t('admin.books.selectUser'))"
+                     x-modelable="value" x-model="assignTarget[b.book_id]"
+                     x-effect="options = users.map(u => ({ value: u.email, label: u.email }))"></div>
               </td>
               <td class="admin-pool-actions">
                 <button type="button"

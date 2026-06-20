@@ -52,10 +52,6 @@ export const adminBooksMethods = {
     return _fmtBytes(n, window.__app?.uiLocale);
   },
 
-  setAssignTarget(bookId, email) {
-    this.assignTarget = { ...this.assignTarget, [bookId]: email };
-  },
-
   async assignOwner(book) {
     const email = (this.assignTarget?.[book.book_id] || '').trim().toLowerCase();
     if (!email) {

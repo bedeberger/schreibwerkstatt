@@ -683,6 +683,10 @@ Neue Aktionen erweitern diese Tabelle und das Sprite (siehe [Icon-System](#icon-
 | `.form-section` | Wrapper unter dem Form-Output (Trennstrich + 14 px Abstand) |
 | `.form-stats` | flex-wrap gap 8 — Reihe aus `.tok-badge`-Stats |
 | `.form-size-hint` | sekundärer Inline-Hinweis im Button (z.B. Dateigröße) |
+| `.card-form-input` | explizite Basisklasse für Text-Felder — teilt die Geometrie der `input[type=…]`-Elementregel (1px-Border, `--radius-md`). Nutzen, wenn ein Feld die Optik per Klasse statt über den Element-Selektor tragen soll |
+| `.card-form-textarea` | volle Breite, vertikal resizable; gleiche 1px-Feldborder + `--radius-md` wie Inputs |
+
+**Feld-Geometrie:** volle Form-Felder (Text-Inputs, default-Combobox, Textarea) tragen **1px**-Border (`--color-border-input`) + `--radius-md`. **Compact**-Controls (Filter-Bars, dichte Toolbars, `.combobox-wrap--compact`) bleiben auf **0.5px**-Hairline — innerhalb `.card-form-row` zieht ein Override compact-Comboboxen aber wieder auf 1px (Feldgrösse). Neben vollen Feldern (Settings-Form) Comboboxen mit `compact: false` rendern. Disabled-State (`--opacity-hint` + `not-allowed`) ist global über alle Feldtypen gesetzt. **Kein natives `<select>`** — Combobox-Pflicht.
 
 ### Section-Trenner innerhalb des Forms
 
