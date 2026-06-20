@@ -7,6 +7,46 @@ import { localIsoDate, localIsoDaysAgo } from '../utils.js';
 
 const WEEKS = 52;
 
+// Reine Tages-Arithmetik auf ISO-Strings (YYYY-MM-DD), TZ-frei via UTC, damit
+// DST-Spruenge die Kalendertage nicht verschieben.
+function isoAddDays(iso, n) {
+  const [y, m, d] = iso.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + n);
+  return dt.toISOString().slice(0, 10);
+}
+
+// Rows auf ein Zeitfenster [from, to] (inklusive, ISO-Strings) einschraenken.
+// from/to je null = unbegrenzt. dateField ist der Feldname mit dem Tagesdatum
+// (writing/lektorat: 'date', book_stats_history: 'recorded_at').
+export function filterByWindow(rows, dateField, from, to) {
+  return (rows || []).filter(r => {
+    const d = r[dateField];
+    if (!d) return false;
+    if (from && d < from) return false;
+    if (to && d > to) return false;
+    return true;
+  });
+}
+
+// Im Zeitfenster produzierter Umfang (Zeichen/Woerter/Seiten) als Delta der
+// kumulierten book_stats_history-Snapshots: Endstand (letzter Snapshot <= to,
+// bzw. juengster falls to null) minus Basis (letzter Snapshot STRIKT vor from).
+// Buecher, die erst im Fenster angelegt wurden, haben keine Basis → voller
+// Zuwachs zaehlt. Net-Wert (kann bei Loeschungen negativ sein), analog Wochen-Delta.
+export function computeVolumeDelta(historyRows, fromIso, toIso) {
+  const end = toIso ? snapshotPerBookOnOrBefore(historyRows, toIso) : latestSnapshotPerBook(historyRows);
+  const base = fromIso ? snapshotPerBookOnOrBefore(historyRows, isoAddDays(fromIso, -1)) : new Map();
+  let chars = 0, words = 0, pages = 0;
+  for (const [bid, snap] of end) {
+    const b = base.get(bid);
+    chars += (Number(snap.chars) || 0)      - (Number(b?.chars) || 0);
+    words += (Number(snap.words) || 0)      - (Number(b?.words) || 0);
+    pages += (Number(snap.page_count) || 0) - (Number(b?.page_count) || 0);
+  }
+  return { chars, words, pages };
+}
+
 // Schreib-Sekunden pro Tag ueber alle Buecher summieren → Map(date → seconds).
 export function secondsByDate(writingRows) {
   const m = new Map();

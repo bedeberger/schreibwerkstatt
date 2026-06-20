@@ -7,7 +7,8 @@ import assert from 'node:assert/strict';
 globalThis.window = { __app: { uiLocale: 'de' } };
 
 const { computeWritingStreak, computeWeekdayPattern, computeDerived, computeMilestones, secondsByDate,
-        computeReadability, computeWeeklyDelta, computePerBookTime, computeEffortSplit } =
+        computeReadability, computeWeeklyDelta, computePerBookTime, computeEffortSplit,
+        computeVolumeDelta, filterByWindow } =
   await import('../../public/js/cards/my-stats-compute.js');
 
 import { localIsoDaysAgo } from '../../public/js/utils.js';
@@ -196,4 +197,47 @@ test('computeEffortSplit: ohne Daten → hasData false', () => {
   const e = computeEffortSplit(0, 0);
   assert.equal(e.hasData, false);
   assert.equal(e.writingPct, 0);
+});
+
+test('filterByWindow: from/to inklusive, null = unbegrenzt', () => {
+  const rows = [
+    { date: '2026-06-01', seconds: 1 },
+    { date: '2026-06-05', seconds: 2 },
+    { date: '2026-06-10', seconds: 3 },
+    { date: null,         seconds: 9 },
+  ];
+  assert.deepEqual(filterByWindow(rows, 'date', '2026-06-05', '2026-06-10').map(r => r.seconds), [2, 3]);
+  assert.deepEqual(filterByWindow(rows, 'date', null, '2026-06-05').map(r => r.seconds), [1, 2]);
+  assert.deepEqual(filterByWindow(rows, 'date', '2026-06-05', null).map(r => r.seconds), [2, 3]);
+  assert.equal(filterByWindow(rows, 'date', null, null).length, 3, 'Rows ohne Datum fallen raus');
+});
+
+test('computeVolumeDelta: Zuwachs = Endstand minus Basis vor Fensterbeginn', () => {
+  const rows = [
+    { book_id: 1, recorded_at: '2026-05-31', chars: 1000, words: 200, page_count: 2 }, // Basis (Tag vor from)
+    { book_id: 1, recorded_at: '2026-06-15', chars: 1800, words: 360, page_count: 3 }, // im Fenster
+    { book_id: 1, recorded_at: '2026-06-30', chars: 2500, words: 500, page_count: 4 }, // Endstand <= to
+    { book_id: 1, recorded_at: '2026-07-05', chars: 9999, words: 999, page_count: 9 }, // nach to → ignoriert
+  ];
+  const v = computeVolumeDelta(rows, '2026-06-01', '2026-06-30');
+  assert.equal(v.chars, 1500, '2500 - 1000');
+  assert.equal(v.words, 300);
+  assert.equal(v.pages, 2);
+});
+
+test('computeVolumeDelta: Buch ohne Basis-Snapshot → voller Zuwachs', () => {
+  const rows = [
+    { book_id: 2, recorded_at: '2026-06-10', chars: 800, words: 100, page_count: 1 }, // erst im Fenster angelegt
+  ];
+  const v = computeVolumeDelta(rows, '2026-06-01', '2026-06-30');
+  assert.equal(v.chars, 800);
+});
+
+test('computeVolumeDelta: to=null → juengster Snapshot als Endstand', () => {
+  const rows = [
+    { book_id: 1, recorded_at: '2026-05-31', chars: 1000, words: 200, page_count: 2 },
+    { book_id: 1, recorded_at: '2026-06-20', chars: 1700, words: 340, page_count: 3 },
+  ];
+  const v = computeVolumeDelta(rows, '2026-06-01', null);
+  assert.equal(v.chars, 700);
 });

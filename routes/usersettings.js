@@ -151,6 +151,8 @@ router.get('/profile-stats', (req, res) => {
  * auch die Pro-Buch-Linien; Buchnamen kommen aus der bereits geladenen
  * Root-Buchliste (kein books-Query hier → Content-Store-Regel).
  * `writing`: Schreib-Sekunden pro (book_id, Tag) (nur aktive Tage).
+ * `lektorat`: Lektorats-Sekunden pro (book_id, Tag) (Tagesaggregat aus dem
+ * seiten-granularen `lektorat_time`) — fuer den zeitraum-gefilterten Aufwands-Split.
  */
 router.get('/profile-stats-history', (req, res) => {
   const email = req.session.user.email;
@@ -171,7 +173,16 @@ router.get('/profile-stats-history', (req, res) => {
       FROM writing_time WHERE user_email = ? AND book_id IN (${ph}) AND seconds > 0
       ORDER BY date ASC
     `).all(email, ...owned);
-    res.json({ history, writing });
+    // Lektorats-Sekunden pro (book_id, Tag) — lektorat_time ist seiten-granular,
+    // hier auf Tagesebene aggregiert. Basis fuer den zeitraum-gefilterten
+    // Aufwands-Split (Schreiben vs. Ueberarbeiten) im Frontend.
+    const lektorat = db.prepare(`
+      SELECT book_id, date, SUM(seconds) AS seconds
+      FROM lektorat_time WHERE user_email = ? AND book_id IN (${ph}) AND seconds > 0
+      GROUP BY book_id, date
+      ORDER BY date ASC
+    `).all(email, ...owned);
+    res.json({ history, writing, lektorat });
   } catch (e) {
     logger.error('[me/profile-stats-history] DB-Fehler: ' + e.message, { user: email });
     res.status(500).json({ error_code: 'DB_ERROR' });

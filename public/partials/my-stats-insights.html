@@ -6,7 +6,10 @@
 <!-- Lesbarkeit: chars-gewichteter Mittelwert + Trend ggü. ~30 Tagen -->
 <template x-if="myStatsHasReadability">
   <div class="overview-tile overview-tile--medium">
-    <div class="overview-tile-label" x-text="$app.t('mystats.readability')"></div>
+    <div class="overview-tile-label">
+      <span x-text="$app.t('mystats.readability')"></span>
+      <span class="mystats-alltime-tag" x-show="myStatsWindowActive" x-text="$app.t('mystats.allTimeTag')"></span>
+    </div>
     <div class="overview-consistency-grid">
       <div class="overview-consistency-item" x-show="myStatsReadability().flesch !== null">
         <span class="overview-consistency-value">

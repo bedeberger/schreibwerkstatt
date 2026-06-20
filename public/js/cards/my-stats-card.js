@@ -5,9 +5,10 @@
 // `GET /me/profile-stats` (Tiles) + `GET /me/profile-stats-history` (Chart).
 
 import { loadChart } from '../lazy-libs.js';
-import { tzOpts } from '../utils.js';
+import { tzOpts, localIsoDate, localIsoDaysAgo } from '../utils.js';
 import { computeWritingStreak, computeWeekdayPattern, computeDerived, computeMilestones,
-         computeReadability, computeWeeklyDelta, computePerBookTime, computeEffortSplit } from './my-stats-compute.js';
+         computeReadability, computeWeeklyDelta, computePerBookTime, computeEffortSplit,
+         computeVolumeDelta, filterByWindow } from './my-stats-compute.js';
 
 const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
@@ -49,8 +50,13 @@ export function registerMyStatsCard() {
     myStatsData: null,
     myStatsHistory: [],
     myStatsWriting: [],
+    myStatsLektorat: [],
     myStatsMetric: 'chars',
-    myStatsRange: 0,
+    // Globaler Zeitraum-Filter (steuert die ganze Karte). Preset-Tage
+    // (30/90/365, 0 = alles) ODER freie Von/Bis-ISO-Daten — Custom hat Vorrang.
+    myStatsRangeDays: 0,
+    myStatsFrom: '',
+    myStatsTo: '',
     myStatsChartMode: 'total', // 'total' | 'byBook'
     myStatsCumulative: false,  // nur fuer Metrik 'writing' (kumulierte Schreibzeit)
     myStatsLoading: false,
@@ -85,15 +91,17 @@ export function registerMyStatsCard() {
         ]);
         if (!statsR.ok) throw new Error('HTTP ' + statsR.status);
         this.myStatsData = await statsR.json();
-        const hist = histR.ok ? await histR.json() : { history: [], writing: [] };
+        const hist = histR.ok ? await histR.json() : { history: [], writing: [], lektorat: [] };
         this.myStatsHistory = Array.isArray(hist.history) ? hist.history : [];
         this.myStatsWriting = Array.isArray(hist.writing) ? hist.writing : [];
+        this.myStatsLektorat = Array.isArray(hist.lektorat) ? hist.lektorat : [];
       } catch (e) {
         console.error('[myStats load]', e);
         this.myStatsError = window.__app.t('mystats.loadError');
         this.myStatsData = null;
         this.myStatsHistory = [];
         this.myStatsWriting = [];
+        this.myStatsLektorat = [];
       } finally {
         this.myStatsLoading = false;
       }
@@ -118,20 +126,81 @@ export function registerMyStatsCard() {
       return val;
     },
 
-    // ── Schreibrhythmus (alle aus der writing-Zeitreihe) ───────────────────
+    // ── Zeitraum-Filter (steuert die ganze Karte) ──────────────────────────
+    // Aktives Fenster { active, from, to } (ISO, inklusive; null = unbegrenzt).
+    // Custom Von/Bis hat Vorrang vor dem Tages-Preset; kein Filter aktiv = alles.
+    myStatsWindow() {
+      if (this.myStatsFrom || this.myStatsTo) {
+        return { active: true, from: this.myStatsFrom || null, to: this.myStatsTo || null };
+      }
+      if (this.myStatsRangeDays > 0) {
+        return { active: true, from: localIsoDaysAgo(this.myStatsRangeDays), to: localIsoDate() };
+      }
+      return { active: false, from: null, to: null };
+    },
+    get myStatsWindowActive() { return this.myStatsWindow().active; },
+
+    // Auf das Fenster gefilterte Zeitreihen (memoized; deps inkl. from/to).
+    _winWriting() {
+      const w = this.myStatsWindow();
+      return this._memo('winWriting', [this.myStatsWriting, w.from, w.to], () =>
+        filterByWindow(this.myStatsWriting, 'date', w.from, w.to));
+    },
+    _winLektorat() {
+      const w = this.myStatsWindow();
+      return this._memo('winLektorat', [this.myStatsLektorat, w.from, w.to], () =>
+        filterByWindow(this.myStatsLektorat, 'date', w.from, w.to));
+    },
+    _sumSeconds(rows) {
+      return (rows || []).reduce((s, r) => s + (Number(r.seconds) || 0), 0);
+    },
+
+    // Preset waehlen → Custom-Felder leeren. Custom setzen → Preset auf 0.
+    myStatsSetPreset(days) {
+      this.myStatsRangeDays = days;
+      this.myStatsFrom = '';
+      this.myStatsTo = '';
+      this._onRangeChange();
+    },
+    _onRangeChange() {
+      // Memos haengen an from/to → aktualisieren sich selbst; nur Chart neu zeichnen.
+      this.$nextTick(() => requestAnimationFrame(() => this.renderMyStatsChart()));
+    },
+
+    // Im Zeitraum produzierter Umfang (Zeichen/Woerter/Seiten). Ohne Filter:
+    // Live-Gesamtstand aus page_stats; mit Filter: Snapshot-Delta aus der Historie.
+    myStatsVolume() {
+      const w = this.myStatsWindow();
+      if (!w.active) {
+        const d = this.myStatsData || {};
+        return { chars: d.chars || 0, words: d.words || 0, pages: d.pages || 0 };
+      }
+      return this._memo('volume', [this.myStatsHistory, w.from, w.to], () =>
+        computeVolumeDelta(this.myStatsHistory, w.from, w.to));
+    },
+
+    // ── Schreibrhythmus (aus der gefilterten writing-Zeitreihe) ────────────
     myStatsStreak() {
-      return this._memo('streak', [this.myStatsWriting], () => computeWritingStreak(this.myStatsWriting));
+      const win = this._winWriting();
+      return this._memo('streak', [win], () => computeWritingStreak(win));
     },
     myStatsWeekdays() {
-      return this._memo('weekdays', [this.myStatsWriting], () => computeWeekdayPattern(this.myStatsWriting));
+      const win = this._winWriting();
+      return this._memo('weekdays', [win], () => computeWeekdayPattern(win));
     },
     myStatsDerived() {
-      return this._memo('derived', [this.myStatsData, this.myStatsWriting], () =>
-        computeDerived(this.myStatsData, this.myStatsWriting));
+      const win = this._winWriting();
+      // Tempo = Zeichen pro Schreibstunde IM Zeitraum: Volumen-Delta / gefilterte Sekunden.
+      const data = this.myStatsWindowActive
+        ? { chars: this.myStatsVolume().chars, writing_seconds: this._sumSeconds(win) }
+        : this.myStatsData;
+      return this._memo('derived', [data?.chars, data?.writing_seconds, win], () =>
+        computeDerived(data, win));
     },
+    // Meilensteine sind Lifetime-Achievements → immer ueber ALLE Daten, nie gefiltert.
     myStatsMilestones() {
       return this._memo('milestones', [this.myStatsData, this.myStatsWriting], () =>
-        computeMilestones(this.myStatsData, this.myStatsDerived()));
+        computeMilestones(this.myStatsData, computeDerived(this.myStatsData, this.myStatsWriting)));
     },
 
     get myStatsHasRhythm() {
@@ -173,12 +242,18 @@ export function registerMyStatsCard() {
       return this._memo('weekDelta', [this.myStatsHistory], () => computeWeeklyDelta(this.myStatsHistory));
     },
     myStatsEffort() {
-      return this._memo('effort', [this.myStatsData], () =>
-        computeEffortSplit(this.myStatsData?.writing_seconds, this.myStatsData?.lektorat_seconds));
+      if (!this.myStatsWindowActive) {
+        return this._memo('effort', [this.myStatsData], () =>
+          computeEffortSplit(this.myStatsData?.writing_seconds, this.myStatsData?.lektorat_seconds));
+      }
+      const win = this._winWriting(), winL = this._winLektorat();
+      return this._memo('effortWin', [win, winL], () =>
+        computeEffortSplit(this._sumSeconds(win), this._sumSeconds(winL)));
     },
     myStatsPerBookTime() {
-      return this._memo('perBook', [this.myStatsWriting], () =>
-        computePerBookTime(this.myStatsWriting).map(r => ({ ...r, name: this._bookName(r.book_id) })));
+      const win = this._winWriting();
+      return this._memo('perBook', [win], () =>
+        computePerBookTime(win).map(r => ({ ...r, name: this._bookName(r.book_id) })));
     },
 
     get myStatsHasReadability() { return this.myStatsReadability().hasData; },
@@ -251,12 +326,9 @@ export function registerMyStatsCard() {
       let rows = src.map(r => ({ book_id: r.book_id, date: r.recorded_at || r.date, raw: r }));
       if (!rows.length) return;
 
-      if (this.myStatsRange > 0) {
-        const cutoff = new Date();
-        cutoff.setDate(cutoff.getDate() - this.myStatsRange);
-        const cutoffStr = cutoff.toISOString().slice(0, 10);
-        rows = rows.filter(r => r.date >= cutoffStr);
-      }
+      const win = this.myStatsWindow();
+      if (win.from) rows = rows.filter(r => r.date >= win.from);
+      if (win.to)   rows = rows.filter(r => r.date <= win.to);
       if (!rows.length) return;
 
       // Nur bis zum letzten vollständigen Sync zeigen: book_stats_history bekommt
@@ -392,14 +464,17 @@ export function registerMyStatsCard() {
       return Number(n || 0).toLocaleString(loc);
     },
 
-    // Normseite = 1500 Zeichen (primaere Umfangs-Kennzahl).
+    // Normseite = 1500 Zeichen (primaere Umfangs-Kennzahl) — zeitraum-bewusst.
     myStatsNormpages() {
-      return this._myStatsFmt(Math.round((this.myStatsData?.chars || 0) / 1500));
+      return this._myStatsFmt(Math.round((this.myStatsVolume().chars || 0) / 1500));
     },
 
-    // Schreibzeit kompakt: „12 h 30 min" bzw. „45 min".
+    // Schreibzeit kompakt: „12 h 30 min" bzw. „45 min" — im Zeitraum bzw. gesamt.
     myStatsWritingTime() {
-      const total = Math.max(0, Math.round((this.myStatsData?.writing_seconds || 0) / 60));
+      const sec = this.myStatsWindowActive
+        ? this._sumSeconds(this._winWriting())
+        : (this.myStatsData?.writing_seconds || 0);
+      const total = Math.max(0, Math.round(sec / 60));
       const h = Math.floor(total / 60);
       const m = total % 60;
       const t = window.__app.t;

@@ -14,6 +14,14 @@
 }
 
 /* ── Entwicklungs-Chart (Chart.js, lazy) ─────────────────────────────────── */
+/* `.overview-tile` setzt `container-type: inline-size` und wird damit zum
+   Containing-Block für `position:fixed`-Nachfahren. Das via x-anchor (.fixed)
+   verankerte combobox-Dropdown (Entitäts-Auswahl) würde dadurch relativ zu
+   diesem Tile statt zum Viewport positioniert → Dropdown sitzt verschoben, auf
+   allen Viewports. Dieses Tile nutzt keine Container-Queries, daher Containment
+   lösen, damit das Dropdown wieder viewport-relativ ankert. */
+.card--mystats .mystats-chart-tile { container-type: normal; }
+
 .mystats-controls {
   display: flex;
   flex-wrap: wrap;
@@ -111,9 +119,64 @@
 .mystats-effort-dot--write { background: var(--color-accent); }
 .mystats-effort-dot--edit  { background: color-mix(in srgb, var(--color-accent) 35%, var(--color-bg)); }
 
+/* ── Globaler Zeitraum-Filter (Presets + freie Von/Bis-Auswahl) ──────────── */
+.mystats-range {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm) var(--space-md);
+  margin-bottom: var(--space-md);
+}
+/* .btn-group bringt ein margin-bottom mit → im zentrierten Flex-Row säße die
+   Preset-Reihe sonst höher als die Datumsfelder. Hier neutralisieren. */
+.mystats-range .btn-group { margin-bottom: 0; }
+.mystats-range-custom {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+/* Höhe + Metrik exakt wie .btn-compact, damit Presets und Datumsfelder auf
+   gleicher Höhe sitzen (gleiche Token für Font/Padding/Border, gleiche 0.5px-
+   Border wie button-Basis). */
+.mystats-date-input {
+  box-sizing: border-box;
+  padding: var(--size-compact-padding);
+  border: 0.5px solid var(--color-border-input);
+  border-radius: var(--radius-md);
+  font-size: var(--size-compact-font-size);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+.mystats-date-input:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+}
+.mystats-range-sep { color: var(--color-muted); }
+
+/* „gesamt"-Tag auf Lifetime-Werten bei aktivem Zeitraum-Filter (eckig). */
+.mystats-alltime-tag {
+  display: inline-flex;
+  align-items: center;
+  margin-left: var(--space-xs);
+  padding: 0 var(--space-2xs);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  color: var(--color-muted);
+  background: var(--color-tag-bg);
+  border-radius: var(--radius-sm);
+  vertical-align: middle;
+}
+/* Gesamt-Kennzahlen-Zeile (Bücher/Kapitel/Wortschatz) unter der Hero-Zahl. */
+.mystats-state-row {
+  align-items: center;
+  margin-top: var(--space-sm);
+}
+
 @media (max-width: 600px) {
   .mystats-chart-wrap {
     height: 200px;
   }
+  /* iOS: >= 16px verhindert Zoom-in beim Fokus der Datumsfelder. */
+  .mystats-date-input { font-size: var(--font-size-reading); }
 }
 }

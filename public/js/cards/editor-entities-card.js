@@ -260,6 +260,13 @@ export function registerEditorEntitiesCard() {
       if (!data || !ev?.currentTarget) return;
       ev.preventDefault();
       ev.stopPropagation();
+      // Erneuter Klick auf denselben Chip → Popover schliessen (Toggle).
+      // Der mousedown-Capture-Listener laesst Chip-Targets durch, daher sind
+      // entityPopover + _popoverAnchor beim Click noch gesetzt.
+      if (this.entityPopover && this._popoverAnchor === ev.currentTarget) {
+        this.closePopover();
+        return;
+      }
       const rect = ev.currentTarget.getBoundingClientRect();
       const { x, y } = this._computePopoverXY(rect);
       this._popoverRange = null;
