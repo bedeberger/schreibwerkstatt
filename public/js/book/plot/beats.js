@@ -245,32 +245,14 @@ export const beatsMethods = {
     this._memos = {};
   },
 
-  // ── Drag & Drop ──────────────────────────────────────────────────────────
-  onBeatDragStart(beat, ev) {
-    this._dragBeatId = beat.id;
-    if (ev?.dataTransfer) { ev.dataTransfer.effectAllowed = 'move'; try { ev.dataTransfer.setData('text/plain', String(beat.id)); } catch {} }
-  },
-  onBeatDragEnd() { this._dragBeatId = null; this._dragOverActId = null; this._dragOverCell = null; },
-  onActDragOver(actId) { if (this._dragBeatId != null) this._dragOverActId = actId; },
-  onCellDragOver(actId, threadId) { if (this._dragBeatId != null) this._dragOverCell = this._cellKey(actId, threadId); },
-
-  // Flacher Pfad (Board ohne Stränge): Drop in eine Akt-Spalte → Strang bleibt
-  // NULL. Signatur unverändert, damit das flache Board-Template unberührt bleibt.
-  async onBeatDrop(targetActId, beforeBeatId = null) {
-    return this._dropBeat(targetActId, null, beforeBeatId);
-  },
-  // Grid-Pfad: Drop in eine Zelle (Akt × Strang) → setzt act_id + thread_id.
-  async onCellDrop(targetActId, targetThreadId, beforeBeatId = null) {
-    return this._dropBeat(targetActId, targetThreadId, beforeBeatId);
-  },
-
-  // Gemeinsame DnD-Mechanik für beide Pfade: verschiebt den gezogenen Beat in die
-  // Ziel-Zelle (Akt × Strang; threadId null = „ohne Strang"), nummeriert Ziel- und
-  // Quell-Zelle neu und persistiert nur die betroffenen Zellen.
+  // ── Drop-Mechanik (von SortableJS via dnd.js#onBeatSortEnd aufgerufen) ──────
+  // Verschiebt den gezogenen Beat (this._dragBeatId) in die Ziel-Zelle (Akt ×
+  // Strang; threadId null = „ohne Strang"), nummeriert Ziel- und Quell-Zelle neu
+  // und persistiert nur die betroffenen Zellen. SortableJS' physischer DOM-Move
+  // ist vor dem Aufruf bereits revertet — hier mutiert allein das Modell, Alpine
+  // x-for rendert daraus neu.
   async _dropBeat(targetActId, targetThreadId, beforeBeatId = null) {
     const beatId = this._dragBeatId;
-    this._dragOverActId = null;
-    this._dragOverCell = null;
     if (beatId == null) return;
     const beat = this.beats.find(b => b.id === beatId);
     if (!beat) { this._dragBeatId = null; return; }

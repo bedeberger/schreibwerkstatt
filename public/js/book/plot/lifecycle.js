@@ -52,6 +52,8 @@ export const lifecycleMethods = {
     const pendingBeat = this._pendingFocusBeatId;
     this._pendingFocusBeatId = null;
     if (pendingBeat != null) this._focusBeatById(pendingBeat);
+    // Beat-Zellen für SortableJS (neu) binden, sobald das Board gerendert ist.
+    this._scheduleReattach?.();
   },
 
   resetPlot() {
@@ -75,8 +77,6 @@ export const lifecycleMethods = {
     this.newThreadName = '';
     this.threadColorPickerId = null;
     this._dragBeatId = null;
-    this._dragOverActId = null;
-    this._dragOverCell = null;
     this.brainstormResult = null;
     this.brainstormActId = null;
     this.brainstormThreadId = null;

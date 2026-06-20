@@ -189,23 +189,22 @@
 
             <!-- Zellen (Akt × Strang) -->
             <template x-for="act in row.acts" :key="act.id">
-              <div class="plot-swim-cell"
-                   :class="{ 'plot-swim-cell--dropzone': _dragOverCell === (act.id + ':' + (row.lane.id === null ? 'null' : row.lane.id)) }"
-                   @dragover.prevent="onCellDragOver(act.id, row.lane.id)"
-                   @drop.prevent="onCellDrop(act.id, row.lane.id, null)">
+              <div class="plot-swim-cell">
 
-                <template x-for="beat in filteredBeatsForCell(act.id, row.lane.id)" :key="beat.id">
-                  <div class="plot-beat" :class="'plot-beat--' + beat.status" :data-beat-id="beat.id"
-                       draggable="true"
-                       @dragstart="onBeatDragStart(beat, $event)" @dragend="onBeatDragEnd()"
-                       @dragover.prevent.stop="onCellDragOver(act.id, row.lane.id)"
-                       @drop.prevent.stop="onCellDrop(act.id, row.lane.id, beat.id)">
+                <!-- SortableJS-Container der Zelle: nur x-for-Anker + Beat-Karten.
+                     thread_id leer = „ohne Strang"-Lane (dnd.js parst → NULL). -->
+                <div class="plot-beats" data-plot-cell :data-act-id="act.id"
+                     :data-thread-id="row.lane.id === null ? '' : row.lane.id">
+                  <template x-for="beat in filteredBeatsForCell(act.id, row.lane.id)" :key="beat.id">
+                    <div class="plot-beat" :data-beat-id="beat.id"
+                         :class="['plot-beat--' + beat.status, { 'plot-beat--editing': editingBeatId === beat.id }]">
 
-                    <!-- Beat-Karte (Ansicht + Bearbeiten) — geteilt mit dem flachen Board.
-                         SSoT: plot-beat-cell.html (string-seitiger Fragment-Include). -->
-                    <!-- @include plot-beat-cell -->
-                  </div>
-                </template>
+                      <!-- Beat-Karte (Ansicht + Bearbeiten) — geteilt mit dem flachen Board.
+                           SSoT: plot-beat-cell.html (string-seitiger Fragment-Include). -->
+                      <!-- @include plot-beat-cell -->
+                    </div>
+                  </template>
+                </div>
 
                 <!-- Beat in dieser Zelle hinzufügen -->
                 <template x-if="addingCell === (act.id + ':' + (row.lane.id === null ? 'null' : row.lane.id))">

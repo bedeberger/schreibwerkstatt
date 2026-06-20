@@ -6,10 +6,7 @@
 <div class="plot-board" x-show="(acts.length || addingAct) && !threads.length" x-cloak>
   <template x-for="act in acts" :key="act.id">
     <div class="plot-column"
-         :class="{ 'plot-column--dropzone': _dragOverActId === act.id }"
-         :style="{ '--col-accent': actAccent(act) }"
-         @dragover.prevent="onActDragOver(act.id)"
-         @drop.prevent="onBeatDrop(act.id, null)">
+         :style="{ '--col-accent': actAccent(act) }">
 
       <!-- Spalten-Kopf -->
       <div class="plot-column-header">
@@ -70,18 +67,20 @@
 
       <!-- Beats -->
       <div class="plot-column-body">
-        <template x-for="beat in visibleBeatsForAct(act.id)" :key="beat.id">
-          <div class="plot-beat" :class="'plot-beat--' + beat.status" :data-beat-id="beat.id"
-               draggable="true"
-               @dragstart="onBeatDragStart(beat, $event)" @dragend="onBeatDragEnd()"
-               @dragover.prevent.stop="onActDragOver(act.id)"
-               @drop.prevent.stop="onBeatDrop(act.id, beat.id)">
+        <!-- SortableJS-Container: enthält nur den x-for-Anker + die Beat-Karten
+             (Add-/Toggle-/Brainstorm-Elemente liegen bewusst ausserhalb, damit
+             Drop-Index + Revert sauber rechnen). thread_id ist im flachen Board NULL. -->
+        <div class="plot-beats" data-plot-cell :data-act-id="act.id">
+          <template x-for="beat in visibleBeatsForAct(act.id)" :key="beat.id">
+            <div class="plot-beat" :data-beat-id="beat.id"
+                 :class="['plot-beat--' + beat.status, { 'plot-beat--editing': editingBeatId === beat.id }]">
 
-            <!-- Beat-Karte (Ansicht + Bearbeiten) — geteilt mit dem Grid-Board.
-                 SSoT: plot-beat-cell.html (string-seitiger Fragment-Include). -->
-            <!-- @include plot-beat-cell -->
-          </div>
-        </template>
+              <!-- Beat-Karte (Ansicht + Bearbeiten) — geteilt mit dem Grid-Board.
+                   SSoT: plot-beat-cell.html (string-seitiger Fragment-Include). -->
+              <!-- @include plot-beat-cell -->
+            </div>
+          </template>
+        </div>
 
         <!-- Verworfene Beats ein-/ausklappen -->
         <button type="button" class="collapsible-toggle plot-verworfen-toggle"

@@ -119,7 +119,7 @@ Sub-Komponente `plotCard` ([public/js/cards/plot-card.js](../public/js/cards/plo
 
 **Akt-Reordering** per Pfeil-Button (`moveAct(act, dir)`, a11y statt Spalten-Drag) → `PUT /plot/acts/order`.
 
-**Beat-Reordering** per HTML5-Drag-&-Drop (`onBeatDragStart`/`onBeatDrop`/`_persistOrder`): optimistisch lokal umsortiert (inkl. Neu-Nummerierung der Quell- + Ziel-Spalte), dann `PUT /plot/beats/order`. Bei Persist-Fehler `loadBoard()` als Rollback auf Server-Stand.
+**Beat-Reordering** per SortableJS (lazy via `loadSortable()`, geteilt mit dem Buchorganizer; Code [public/js/book/plot/dnd.js](../public/js/book/plot/dnd.js)): pro Beat-Zelle ein Container `.plot-beats[data-plot-cell]` (nur x-for-Anker + Beat-Karten), alle in der `plot-beats`-Gruppe → Drag zwischen Zellen. Ein **Ghost-Slot** zeigt vor dem Loslassen die Landeposition. `onBeatSortEnd` liest Ziel-`act_id`/`thread_id` (aus `data-*` der Ziel-Zelle) + die Vor-Beat-ID (nächste `.plot-beat`-Geschwisterkarte), nimmt SortableJS' physischen DOM-Move zurück (`_revertSortable`, gegen Alpine-x-for-Doppelbesitz) und delegiert an die geprüfte `_dropBeat`-Mechanik (optimistisch lokal umsortiert inkl. Neu-Nummerierung Quell-+Ziel-Zelle, dann `PUT /plot/beats/order`). Bei Persist-Fehler `loadBoard()` als Rollback. Strukturelle Änderungen (Akt-/Strang-CRUD, Fork, loadBoard) binden die Container via `_scheduleReattach`/`_reattachSortables` neu (`$watch('acts'|'threads')`). Akte werden per Pfeil-Button verschoben (a11y), nicht per Drag.
 
 **Quick-Status:** Klick aufs Status-Badge (`cycleBeatStatus`) schaltet `geplant → entwurf → im_buch → verworfen` zyklisch durch (einzelnes `PATCH`).
 
@@ -151,7 +151,7 @@ Sub-Komponente `plotCard` ([public/js/cards/plot-card.js](../public/js/cards/plo
 
 **Live-Vererbung im Grid:** `inheritedFigureForBeat(beat)` / `inheritedChapterForBeat(beat)` (in [public/js/book/plot.js](../public/js/book/plot.js)) liefern die vom Strang geerbten Werte für die Beat-Anzeige — geerbte Figur nur, wenn nicht schon explizit am Beat; geerbtes Kapitel nur, wenn der Beat kein eigenes `chapter_id` hat. Gerendert als gedämpfte, gepunktete `tag--inherited`/`kapitel-badge--inherited`-Badges (`plot-board.css`) neben den expliziten Tags. Lane-Label zeigt die gebundene Figur (`threadFigureLabel`) **und** das gebundene Kapitel (`lane.thread.chapter_name`). Rein Anzeige — nichts davon wird je auf den Beat geschrieben.
 
-**2D-DnD:** `onBeatDrop(actId, beforeBeatId)` (flach) und `onCellDrop(actId, threadId, beforeBeatId)` (Grid) delegieren beide an `_dropBeat(actId, threadId, beforeBeatId)` — setzt `act_id` + `thread_id`, nummeriert Ziel- + Quell-**Zelle** neu, persistiert via `_persistCells` → `PUT /plot/beats/order` mit `{actId, threadId, beatIds}`-Gruppen. Fehler → `loadBoard()`-Rollback.
+**2D-DnD:** flaches Board und Grid nutzen dieselbe SortableJS-Anbindung — jede Beat-Zelle (`.plot-beats[data-plot-cell]`) trägt `data-act-id` + (im Grid) `data-thread-id` (leer = „ohne Strang"). `onBeatSortEnd` liest beide aus der Ziel-Zelle und ruft `_dropBeat(actId, threadId, beforeBeatId)` — setzt `act_id` + `thread_id`, nummeriert Ziel- + Quell-**Zelle** neu, persistiert via `_persistCells` → `PUT /plot/beats/order` mit `{actId, threadId, beatIds}`-Gruppen. Fehler → `loadBoard()`-Rollback.
 
 **Spannungsbogen:** `tensionCurve()` liefert weiterhin die globale `points`/`polyline`/`count` (Board ohne Stränge) **plus** `series[]` (pro Strang eine farbige Polyline). Template rendert `series` wenn Stränge existieren, sonst die globale Kurve.
 

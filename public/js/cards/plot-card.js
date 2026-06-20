@@ -6,6 +6,7 @@
 import { plotMethods } from '../book/plot.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
 import { attachFullscreenSync } from '../fullscreen.js';
+import { loadSortable } from '../lazy-libs.js';
 
 export function registerPlotCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -80,11 +81,12 @@ export function registerPlotCard() {
     // horizontaler Platz fürs Akt-Board. Toggle in plotMethods.togglePlotFullscreen.
     plotFullscreen: false,
 
-    // Drag & Drop
+    // Drag & Drop (SortableJS, eine Instanz pro Beat-Zelle — siehe book/plot/dnd.js).
+    _sortables: [],
+    _reattachQueued: false,
+    // ID des gerade gezogenen Beats (von dnd.js#onBeatSortEnd gesetzt, von
+    // beats.js#_dropBeat gelesen).
     _dragBeatId: null,
-    _dragOverActId: null,
-    // Grid-Drop-Ziel: Zell-Schlüssel `${actId}:${threadId|null}`.
-    _dragOverCell: null,
 
     // KI: Brainstorm
     brainstormActId: null,
@@ -126,14 +128,24 @@ export function registerPlotCard() {
         name: 'plot',
         showFlag: 'showPlotCard',
         timerKeys: ['_brainstormPollTimer', '_consistencyPollTimer'],
-        onShow: () => this.loadBoard(),
+        // Sortable vor dem ersten Board-Render laden — _reattachSortables (via
+        // loadBoard / $watch) bindet die Beat-Zellen, sobald window.Sortable da ist.
+        onShow: async () => { await loadSortable(); await this.loadBoard(); },
         onBookChanged: () => {
+          this._destroySortables();
           this.resetPlot();
           if (window.__app.showPlotCard && window.__app.selectedBookId) this.loadBoard();
         },
-        onViewReset: () => this.resetPlot(),
+        onViewReset: () => { this._destroySortables(); this.resetPlot(); },
         onCardRefresh: () => this.loadBoard(),
       });
+
+      // Strukturelle Änderungen (Akt-/Strang-CRUD, Fork/Unfork, loadBoard-Reassign)
+      // tauschen die Beat-Zell-Container im DOM → SortableJS muss neu binden.
+      // Beat-only-Änderungen (Add/Delete/Drop) lassen die Container stehen und
+      // brauchen kein Reattach. _scheduleReattach coalesct Mehrfach-Feuer pro Frame.
+      this.$watch('acts', () => this._scheduleReattach());
+      this.$watch('threads', () => this._scheduleReattach());
 
       // Native Fullscreen-API: Status spiegeln (Toggle-Button + Esc-Exit).
       // $root = die Karten-Wurzel (.card--plot), unabhängig vom Klick-Kontext.
@@ -151,6 +163,7 @@ export function registerPlotCard() {
     },
 
     destroy() {
+      this._destroySortables();
       this._lifecycle?.destroy();
     },
 

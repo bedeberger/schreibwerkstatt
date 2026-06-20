@@ -11,7 +11,8 @@
 //   - derived.js   — abgeleitete Reads: Beats/Stats, Stränge, Grid, Spannungsbogen, Filter
 //   - acts.js      — Akt-CRUD, Reihenfolge, Farbe, scoped Anlegen, Hybrid-Fork
 //   - threads.js   — Strang-CRUD (Swimlanes)
-//   - beats.js     — Beat-CRUD (flach + grid-zellen) + Drag & Drop
+//   - beats.js     — Beat-CRUD (flach + grid-zellen) + Drop-Mechanik (_dropBeat)
+//   - dnd.js       — SortableJS-Anbindung (Init/Reattach/Revert → _dropBeat)
 //   - ai.js        — KI-Jobs (Brainstorm/Consistency), Lauf-Historie, Fullscreen
 
 import { lifecycleMethods } from './plot/lifecycle.js';
@@ -19,6 +20,7 @@ import { derivedMethods } from './plot/derived.js';
 import { actsMethods } from './plot/acts.js';
 import { threadsMethods } from './plot/threads.js';
 import { beatsMethods } from './plot/beats.js';
+import { dndMethods } from './plot/dnd.js';
 import { aiMethods } from './plot/ai.js';
 
 export const plotMethods = {
@@ -27,5 +29,6 @@ export const plotMethods = {
   ...actsMethods,
   ...threadsMethods,
   ...beatsMethods,
+  ...dndMethods,
   ...aiMethods,
 };
