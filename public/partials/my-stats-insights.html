@@ -3,6 +3,83 @@
      display:contents (css/components/my-stats.css), damit die .overview-tile direkte
      Grid-Children der .overview-grid bleiben. Daten: my-stats-card.js / -compute.js. -->
 
+<!-- Tagesziel (Minuten/Tag): Live-Fortschritt heute + Ziel-Streak + Editor.
+     Immer sichtbar (auch ohne gesetztes Ziel → Prompt + Eingabe). -->
+<template x-if="myStatsData && myStatsData.books > 0">
+  <div class="overview-tile overview-tile--medium">
+    <div class="overview-tile-label" x-text="$app.t('mystats.goal.title')"></div>
+
+    <template x-if="myStatsHasGoal">
+      <div class="mystats-goal-progress">
+        <div class="mystats-goal-head">
+          <span class="mystats-goal-today">
+            <span class="mystats-goal-done" x-text="myStatsMinFmt(myStatsGoal().todayMinutes)"></span>
+            <span class="mystats-goal-target" x-text="$app.t('mystats.goal.ofTarget', { n: myStatsGoal().goalMinutes })"></span>
+          </span>
+          <span class="mystats-goal-reached" x-show="myStatsGoal().reachedToday" x-cloak>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#check"></use></svg>
+            <span x-text="$app.t('mystats.goal.reached')"></span>
+          </span>
+        </div>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar" :style="{ '--progress': myStatsGoal().progressPct + '%' }"></div>
+        </div>
+        <div class="overview-consistency-grid mystats-goal-stats">
+          <div class="overview-consistency-item">
+            <span class="overview-consistency-value" x-text="$app.t('mystats.days', { n: myStatsGoal().currentStreak })"></span>
+            <span class="overview-consistency-label" x-text="$app.t('mystats.goal.streak')"></span>
+          </div>
+          <div class="overview-consistency-item">
+            <span class="overview-consistency-value" x-text="$app.t('mystats.days', { n: myStatsGoal().longestStreak })"></span>
+            <span class="overview-consistency-label" x-text="$app.t('mystats.goal.streakLongest')"></span>
+          </div>
+          <div class="overview-consistency-item">
+            <span class="overview-consistency-value" x-text="_myStatsFmt(myStatsGoal().daysHit)"></span>
+            <span class="overview-consistency-label" x-text="$app.t('mystats.goal.daysHit')"></span>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <p class="mystats-goal-prompt" x-show="!myStatsHasGoal" x-text="$app.t('mystats.goal.prompt')"></p>
+
+    <div class="mystats-goal-edit">
+      <input type="text" class="mystats-goal-input"
+             x-data="numInput({ integer: true, min: 0, max: 1440 })"
+             x-modelable="value" x-model="myStatsGoalInput"
+             :aria-label="$app.t('mystats.goal.minutesLabel')">
+      <span class="mystats-goal-unit" x-text="$app.t('mystats.goal.minutesLabel')"></span>
+      <button type="button" class="btn-compact primary"
+              :disabled="myStatsGoalSaving"
+              @click="saveMyStatsGoal()"
+              x-text="$app.t('common.save')"></button>
+    </div>
+  </div>
+</template>
+
+<!-- Tageszeit-Muster: 24 Balken (wann am Tag du schreibst), lebenslang -->
+<template x-if="myStatsHasHours">
+  <div class="overview-tile overview-tile--medium">
+    <div class="overview-tile-label">
+      <span x-text="$app.t('mystats.hourPattern')"></span>
+      <span class="mystats-alltime-tag" x-show="myStatsWindowActive" x-text="$app.t('mystats.allTimeTag')"></span>
+    </div>
+    <div class="overview-weekday-bars mystats-hour-bars">
+      <template x-for="h in myStatsHours().hours" :key="h.hour">
+        <div class="overview-weekday-col"
+             :data-tip="myStatsHourTip(h.hour, h.minutes)">
+          <div class="overview-weekday-track">
+            <div class="overview-weekday-fill" :style="{ '--progress': h.pct + '%' }"></div>
+          </div>
+          <span class="overview-weekday-label" x-text="myStatsHourLabel(h.hour)"></span>
+        </div>
+      </template>
+    </div>
+    <p class="mystats-hour-peak" x-show="myStatsHours().peakHour !== null"
+       x-text="$app.t('mystats.hourPeak', { from: String(myStatsHours().peakHour).padStart(2,'0'), to: String((myStatsHours().peakHour + 1) % 24).padStart(2,'0') })"></p>
+  </div>
+</template>
+
 <!-- Lesbarkeit: chars-gewichteter Mittelwert + Trend ggü. ~30 Tagen -->
 <template x-if="myStatsHasReadability">
   <div class="overview-tile overview-tile--medium">

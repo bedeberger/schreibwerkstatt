@@ -23,7 +23,7 @@ const _stmtFindByEmail = db.prepare(`
          model_override, can_invite_users, first_seen_at, last_seen_at,
          invited_by, invited_at, created_at, last_login_at,
          theme, default_buchtyp, default_language, default_region,
-         focus_granularity,
+         focus_granularity, daily_goal_minutes,
          monthly_budget_usd, budget_mode, ai_provider_override
     FROM app_users
    WHERE email = ?
@@ -55,7 +55,8 @@ const _stmtUpdateUserSettings = db.prepare(`
          default_buchtyp   = ?,
          default_language  = ?,
          default_region    = ?,
-         focus_granularity = ?
+         focus_granularity = ?,
+         daily_goal_minutes = ?
    WHERE email = ?
 `);
 
@@ -231,6 +232,7 @@ function updateUserSettings(email, settings) {
     settings.default_language  ?? null,
     settings.default_region    ?? null,
     settings.focus_granularity ?? null,
+    settings.daily_goal_minutes ?? null,
     e,
   );
 }

@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 196, 100 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 198, 101 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -43,6 +43,7 @@ erDiagram
   books ||--o{ book_share_invites    : has
   books ||--o{ page_locks            : locks
   books ||--o{ writing_time          : has
+  books ||--o{ writing_hour          : has
   books ||--o{ lektorat_time         : has
   books ||--o{ stt_time              : has
   books ||--o{ chapter_extract_cache : has
@@ -993,6 +994,7 @@ erDiagram
     TEXT    default_language  "Buch-Default (de | en)"
     TEXT    default_region    "Buch-Default (CH | DE | US | GB)"
     TEXT    focus_granularity "paragraph | sentence | window-3 | typewriter-only"
+    INTEGER daily_goal_minutes "persoenliches Tagesziel (min); NULL = aus"
     REAL    monthly_budget_usd "NULL = kein numerisches Limit"
     TEXT    budget_mode        "none | soft | hard (Default none)"
     TEXT    ai_provider_override "NULL = follows global ai.provider; CHECK in ('claude','ollama','llama')"
@@ -1131,6 +1133,12 @@ erDiagram
     TEXT    user_email
     INTEGER book_id    FK
     TEXT    date
+    INTEGER seconds
+  }
+  writing_hour {
+    TEXT    user_email PK
+    INTEGER book_id    PK
+    INTEGER hour       PK
     INTEGER seconds
   }
   lektorat_time {

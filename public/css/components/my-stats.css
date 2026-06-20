@@ -172,10 +172,75 @@
   margin-top: var(--space-sm);
 }
 
+/* ── Tageszeit-Muster: 24 Balken statt 7 ─────────────────────────────────── */
+/* Erbt die .overview-weekday-*-Atome; nur das Spaltenraster + der dichtere
+   Abstand sind tageszeit-spezifisch. */
+.mystats-hour-bars {
+  grid-template-columns: repeat(24, 1fr);
+  gap: 2px;
+}
+.mystats-hour-peak {
+  margin: var(--space-sm) 0 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+
+/* ── Tagesziel (Minuten/Tag): Fortschritt + Editor ───────────────────────── */
+.mystats-goal-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-2xs);
+}
+.mystats-goal-done {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--color-text);
+}
+.mystats-goal-target { font-size: var(--font-size-sm); color: var(--color-muted); margin-left: var(--space-2xs); }
+.mystats-goal-reached {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  color: var(--color-accent);
+}
+.mystats-goal-reached .icon { width: 0.9em; height: 0.9em; }
+.mystats-goal-stats { margin-top: var(--space-md); }
+.mystats-goal-prompt {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+  margin: 0 0 var(--space-sm);
+}
+.mystats-goal-edit {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-top: var(--space-md);
+}
+.mystats-goal-input {
+  box-sizing: border-box;
+  width: 5rem;
+  padding: var(--size-compact-padding);
+  border: 0.5px solid var(--color-border-input);
+  border-radius: var(--radius-md);
+  font-size: var(--size-compact-font-size);
+  background: var(--color-surface);
+  color: var(--color-text);
+  text-align: right;
+}
+.mystats-goal-input:focus { outline: none; border-color: var(--color-border-focus); }
+.mystats-goal-unit { font-size: var(--font-size-sm); color: var(--color-muted); }
+
 @media (max-width: 600px) {
   .mystats-chart-wrap {
     height: 200px;
   }
+  /* iOS: >= 16px verhindert Zoom-in beim Fokus des Ziel-Eingabefelds. */
+  .mystats-goal-input { font-size: var(--font-size-reading); }
   /* iOS: >= 16px verhindert Zoom-in beim Fokus der Datumsfelder. */
   .mystats-date-input { font-size: var(--font-size-reading); }
 }

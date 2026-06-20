@@ -318,6 +318,79 @@ export function computePerBookTime(writingRows) {
   return rows.map(r => ({ ...r, pct: Math.round((r.seconds / max) * 100) }));
 }
 
+// Tageszeit-Muster: Schreibminuten je Stunde (0..23) aus dem lebenslangen
+// writing_hour-Histogramm. Liefert immer 24 Buckets (auch leere) plus pct
+// (Anteil am Maximum, fuer die Balkenhoehe). Rows: [{ hour, seconds }].
+export function computeHourPattern(byHourRows) {
+  const sec = new Array(24).fill(0);
+  for (const r of (byHourRows || [])) {
+    const h = Number(r.hour);
+    if (!Number.isInteger(h) || h < 0 || h > 23) continue;
+    sec[h] += Number(r.seconds) || 0;
+  }
+  const minutes = sec.map(s => Math.round(s / 60));
+  const max = Math.max(1, ...minutes);
+  let peakHour = -1, peakMin = 0, total = 0;
+  const hours = minutes.map((m, h) => {
+    total += sec[h];
+    if (m > peakMin) { peakMin = m; peakHour = h; }
+    return { hour: h, seconds: sec[h], minutes: m, pct: Math.round((m / max) * 100) };
+  });
+  return { hours, peakHour: peakMin > 0 ? peakHour : null, totalSeconds: total, hasData: total > 0 };
+}
+
+// Tagesziel-Erreichung (Minuten/Tag). Quelle ist die Schreibzeit-Reihe; ein Tag
+// gilt als erreicht, wenn seine Schreibminuten >= Ziel sind. `todaySeconds` ist
+// der LIVE-Stand von heute (vom Server separat geliefert) und ueberschreibt den
+// ggf. noch nicht geflushten Reihen-Wert. Aktueller Streak: konsekutive
+// erreichte Tage endend HEUTE oder GESTERN — ein heute noch nicht erreichtes
+// Ziel bricht NICHT (Tag laeuft noch), analog computeWritingStreak.
+export function computeGoalAttainment(writingRows, goalMinutes, todaySeconds = null, todayLocal = new Date()) {
+  const goalMin = Math.max(0, Math.round(Number(goalMinutes) || 0));
+  if (goalMin <= 0) return { active: false };
+  const goalSec = goalMin * 60;
+
+  const secByDate = secondsByDate(writingRows);
+  const today = new Date(todayLocal); today.setHours(12, 0, 0, 0);
+  const isoToday = localIsoDate(today);
+  if (todaySeconds != null) secByDate.set(isoToday, Number(todaySeconds) || 0);
+
+  const todaySec = secByDate.get(isoToday) || 0;
+  const todayMin = Math.round(todaySec / 60);
+  const progressPct = Math.min(100, Math.round((todaySec / goalSec) * 100));
+  const reachedToday = todaySec >= goalSec;
+
+  // Alle erreichten Tage + laengster Streak ueber die gesamte Reihe.
+  let daysHit = 0, longest = 0, run = 0;
+  const isos = [...secByDate.keys()].sort();
+  for (const iso of isos) {
+    if ((secByDate.get(iso) || 0) >= goalSec) { daysHit++; run++; if (run > longest) longest = run; }
+    else run = 0;
+  }
+
+  // Aktueller Streak: ab heute rueckwaerts. Heute offen (noch nicht erreicht)
+  // wird uebersprungen, nicht als Bruch gewertet.
+  let current = 0;
+  for (let off = 0; off <= 4000; off++) {
+    const iso = localIsoDaysAgo(off, today);
+    const hit = (secByDate.get(iso) || 0) >= goalSec;
+    if (off === 0 && !hit) continue;
+    if (hit) current++;
+    else break;
+  }
+
+  return {
+    active: true,
+    goalMinutes: goalMin,
+    todayMinutes: todayMin,
+    progressPct,
+    reachedToday,
+    daysHit,
+    currentStreak: current,
+    longestStreak: longest,
+  };
+}
+
 // Aufwands-Aufteilung Schreiben vs. Ueberarbeiten (Sekunden → Prozent).
 export function computeEffortSplit(writingSeconds, lektoratSeconds) {
   const w = Math.max(0, Number(writingSeconds) || 0);

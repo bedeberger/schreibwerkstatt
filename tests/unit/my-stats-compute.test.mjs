@@ -8,7 +8,7 @@ globalThis.window = { __app: { uiLocale: 'de' } };
 
 const { computeWritingStreak, computeWeekdayPattern, computeDerived, computeMilestones, secondsByDate,
         computeReadability, computeWeeklyDelta, computePerBookTime, computeEffortSplit,
-        computeVolumeDelta, filterByWindow } =
+        computeVolumeDelta, computeHourPattern, computeGoalAttainment, filterByWindow } =
   await import('../../public/js/cards/my-stats-compute.js');
 
 import { localIsoDaysAgo } from '../../public/js/utils.js';
@@ -240,4 +240,69 @@ test('computeVolumeDelta: to=null → juengster Snapshot als Endstand', () => {
   ];
   const v = computeVolumeDelta(rows, '2026-06-01', null);
   assert.equal(v.chars, 700);
+});
+
+test('computeHourPattern: 24 Buckets, Minuten + pct relativ zum Max, Peak-Stunde', () => {
+  const rows = [
+    { hour: 9, seconds: 1200 },   // 20 min
+    { hour: 9, seconds: 600 },    // +10 min → 30 min gesamt
+    { hour: 22, seconds: 900 },   // 15 min
+  ];
+  const r = computeHourPattern(rows);
+  assert.equal(r.hours.length, 24);
+  assert.equal(r.hasData, true);
+  assert.equal(r.hours[9].minutes, 30);
+  assert.equal(r.hours[9].pct, 100);     // Max
+  assert.equal(r.hours[22].minutes, 15);
+  assert.equal(r.hours[22].pct, 50);     // 15/30
+  assert.equal(r.hours[0].minutes, 0);
+  assert.equal(r.peakHour, 9);
+});
+
+test('computeHourPattern: leere/ungueltige Eingabe → hasData false, peakHour null', () => {
+  const r = computeHourPattern([{ hour: 99, seconds: 100 }, { hour: -1, seconds: 50 }]);
+  assert.equal(r.hasData, false);
+  assert.equal(r.peakHour, null);
+  assert.equal(r.hours.length, 24);
+});
+
+test('computeGoalAttainment: ohne Ziel → active false', () => {
+  assert.equal(computeGoalAttainment([], 0).active, false);
+  assert.equal(computeGoalAttainment([], null).active, false);
+});
+
+test('computeGoalAttainment: heute live gegen Ziel, Fortschritt + erreicht', () => {
+  const rows = [{ book_id: 1, date: isoDaysAgo(0), seconds: 0 }];
+  // Ziel 30 min, heute 1200s = 20 min live → 67% (gerundet), noch nicht erreicht
+  const r = computeGoalAttainment(rows, 30, 1200);
+  assert.equal(r.active, true);
+  assert.equal(r.goalMinutes, 30);
+  assert.equal(r.todayMinutes, 20);
+  assert.equal(r.progressPct, 67);
+  assert.equal(r.reachedToday, false);
+});
+
+test('computeGoalAttainment: erreichte Tage + Serie (heute offen bricht nicht)', () => {
+  const rows = [
+    { book_id: 1, date: isoDaysAgo(1), seconds: 2400 }, // 40 min ≥ 30
+    { book_id: 1, date: isoDaysAgo(2), seconds: 1800 }, // 30 min ≥ 30
+    { book_id: 1, date: isoDaysAgo(3), seconds: 600 },  // 10 min < 30 (Bruch)
+  ];
+  // heute noch 0 → offen, darf die Serie aus gestern/vorgestern nicht brechen
+  const r = computeGoalAttainment(rows, 30, 0);
+  assert.equal(r.daysHit, 2);
+  assert.equal(r.currentStreak, 2);
+  assert.equal(r.longestStreak, 2);
+  assert.equal(r.reachedToday, false);
+});
+
+test('computeGoalAttainment: heute erreicht zaehlt in die Serie', () => {
+  const rows = [
+    { book_id: 1, date: isoDaysAgo(0), seconds: 1800 }, // 30 min heute
+    { book_id: 1, date: isoDaysAgo(1), seconds: 2400 }, // 40 min gestern
+  ];
+  const r = computeGoalAttainment(rows, 30, 1800);
+  assert.equal(r.reachedToday, true);
+  assert.equal(r.currentStreak, 2);
+  assert.equal(r.progressPct, 100);
 });

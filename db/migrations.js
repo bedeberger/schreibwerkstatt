@@ -7860,6 +7860,50 @@ function _runMigrationsLocked() {
     logger.info(`DB-Migration auf Version 196 abgeschlossen (ai_cost_ledger + Backfill: ${_jobRows.length} Job- / ${_chatRows.length} Chat-Rows).`);
   }
 
+  if (version < 197) {
+    // Tageszeit-Histogramm der Schreibzeit: Sekunden je (User, Buch, Stunde 0-23),
+    // lebenslang aggregiert (KEINE Datums-Dimension — „wann am Tag schreibst du"
+    // ist eine Rhythmus-Frage, kein Zeitraum-Wert). Gegenstueck zu writing_time
+    // (das auf Tagesebene aggregiert); der Heartbeat-Handler schreibt beide.
+    // Wird erst ab Deploy befuellt — historische writing_time-Rows haben keine
+    // Uhrzeit. PK (user_email, book_id, hour) = ein Bucket je Stunde/Buch/User.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS writing_hour (
+        user_email TEXT    NOT NULL REFERENCES app_users(email) ON DELETE CASCADE,
+        book_id    INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        hour       INTEGER NOT NULL CHECK(hour >= 0 AND hour <= 23),
+        seconds    INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (user_email, book_id, hour)
+      )
+    `);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_writing_hour_book ON writing_hour(book_id)');
+
+    const fkErrors197 = db.pragma('foreign_key_check');
+    if (fkErrors197.length) {
+      throw new Error(`Migration 197: foreign_key_check meldet ${fkErrors197.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 197').run();
+    logger.info('DB-Migration auf Version 197 abgeschlossen (writing_hour — Tageszeit-Histogramm der Schreibzeit).');
+  }
+
+  if (version < 198) {
+    // Persoenliches Tages-Schreibziel in Minuten (app_users.daily_goal_minutes).
+    // NULL/0 = kein Ziel gesetzt. Treibt den Fortschrittsbalken + die
+    // Ziel-Erreichungs-Quote in „Meine Statistik". Additiv: nullable Spalte ohne
+    // FK, kein Recreate noetig.
+    const userCols198 = db.pragma('table_info(app_users)').map(c => c.name);
+    if (!userCols198.includes('daily_goal_minutes')) {
+      db.exec('ALTER TABLE app_users ADD COLUMN daily_goal_minutes INTEGER');
+    }
+
+    const fkErrors198 = db.pragma('foreign_key_check');
+    if (fkErrors198.length) {
+      throw new Error(`Migration 198: foreign_key_check meldet ${fkErrors198.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 198').run();
+    logger.info('DB-Migration auf Version 198 abgeschlossen (app_users.daily_goal_minutes — persoenliches Tagesziel).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

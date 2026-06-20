@@ -6,6 +6,7 @@ const deviceTokens = require('../db/device-tokens');
 const { db } = require('../db/schema');
 const { listBookIdsForUser } = require('../db/book-access');
 const { setContext } = require('../lib/log-context');
+const { localIsoDate } = require('../lib/local-date');
 const logger = require('../logger');
 
 const router = express.Router();
@@ -66,6 +67,7 @@ function toResponse(u) {
     default_language:  u.default_language,
     default_region:    u.default_region,
     focus_granularity: u.focus_granularity,
+    daily_goal_minutes: u.daily_goal_minutes ?? null,
     role:              u.global_role || 'user',
     status:            u.status || 'active',
     can_invite_users:  u.can_invite_users ? 1 : 0,
@@ -95,7 +97,8 @@ router.get('/profile-stats', (req, res) => {
   const owned = listBookIdsForUser(email)
     .filter(r => r.role === 'owner')
     .map(r => r.book_id);
-  const empty = { books: 0, chapters: 0, pages: 0, chars: 0, words: 0, unique_words: 0, tok: 0, writing_seconds: 0, lektorat_seconds: 0 };
+  const goalMin = getUser(email)?.daily_goal_minutes ?? null;
+  const empty = { books: 0, chapters: 0, pages: 0, chars: 0, words: 0, unique_words: 0, tok: 0, writing_seconds: 0, lektorat_seconds: 0, today_writing_seconds: 0, daily_goal_minutes: goalMin, by_hour: [] };
   if (!owned.length) return res.json(empty);
   try {
     const ph = owned.map(() => '?').join(',');
@@ -127,6 +130,17 @@ router.get('/profile-stats', (req, res) => {
       SELECT COALESCE(SUM(seconds), 0) AS lektorat_seconds
       FROM lektorat_time WHERE user_email = ? AND book_id IN (${ph})
     `).get(email, ...owned);
+    // Heute geschriebene Sekunden (live) — Basis fuer den Tagesziel-Fortschritt.
+    const todayWt = db.prepare(`
+      SELECT COALESCE(SUM(seconds), 0) AS s
+      FROM writing_time WHERE user_email = ? AND book_id IN (${ph}) AND date = ?
+    `).get(email, ...owned, localIsoDate());
+    // Tageszeit-Histogramm (Sekunden je Stunde 0-23, lebenslang ueber alle Buecher).
+    const byHour = db.prepare(`
+      SELECT hour, COALESCE(SUM(seconds), 0) AS seconds
+      FROM writing_hour WHERE user_email = ? AND book_id IN (${ph})
+      GROUP BY hour ORDER BY hour ASC
+    `).all(email, ...owned);
     res.json({
       books:            owned.length,
       chapters:         snap?.chapters || 0,
@@ -137,6 +151,9 @@ router.get('/profile-stats', (req, res) => {
       tok:              content?.tok || 0,
       writing_seconds:  wt?.writing_seconds || 0,
       lektorat_seconds: lt?.lektorat_seconds || 0,
+      today_writing_seconds: todayWt?.s || 0,
+      daily_goal_minutes: goalMin,
+      by_hour:          byHour,
     });
   } catch (e) {
     logger.error('[me/profile-stats] DB-Fehler: ' + e.message, { user: email });
@@ -233,6 +250,21 @@ router.patch('/settings', jsonBody, (req, res) => {
     if (body[key] === undefined)                     merged[col] = existing[col];
     else if (body[key] === '' || body[key] === null) merged[col] = null;
     else                                             merged[col] = body[key];
+  }
+
+  // Numerisches Feld (kein Enum): persoenliches Tagesziel in Minuten. 0..1440;
+  // NULL/0/'' = kein Ziel. Separat behandelt, da der FIELDS-Loop Enum-validiert.
+  const dg = body.daily_goal_minutes;
+  if (dg === undefined) {
+    merged.daily_goal_minutes = existing.daily_goal_minutes ?? null;
+  } else if (dg === '' || dg === null) {
+    merged.daily_goal_minutes = null;
+  } else {
+    const n = Math.round(Number(dg));
+    if (!Number.isFinite(n) || n < 0 || n > 1440) {
+      return res.status(400).json({ error_code: 'INVALID_VALUE', params: { field: 'daily_goal_minutes', allowed: '0–1440' } });
+    }
+    merged.daily_goal_minutes = n > 0 ? n : null;
   }
 
   updateUserSettings(email, merged);

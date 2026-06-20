@@ -1,7 +1,7 @@
 const express = require('express');
 const { db } = require('../db/schema');
 const { toIntId } = require('../lib/validate');
-const { localIsoDate } = require('../lib/local-date');
+const { localIsoDate, localHour } = require('../lib/local-date');
 const { setContext } = require('../lib/log-context');
 const { aclParamGuard, requireBookAccess, sendACLError } = require('../lib/acl');
 const { buildRueckblickCoverage } = require('./jobs/rueckblick-dates');
@@ -603,6 +603,13 @@ router.post('/writing-time', jsonBody, (req, res) => {
     VALUES (?, ?, ?, ?)
     ON CONFLICT(user_email, book_id, date) DO UPDATE SET seconds = seconds + excluded.seconds
   `).run(user_email, book_id, date, seconds);
+  // Tageszeit-Histogramm (writing_hour): denselben Delta der aktuellen lokalen
+  // Stunde zuschlagen. Lebenslang aggregiert, ohne Datums-Dimension.
+  db.prepare(`
+    INSERT INTO writing_hour (user_email, book_id, hour, seconds)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(user_email, book_id, hour) DO UPDATE SET seconds = seconds + excluded.seconds
+  `).run(user_email, book_id, localHour(), seconds);
   res.json({ ok: true, added: seconds });
 });
 
