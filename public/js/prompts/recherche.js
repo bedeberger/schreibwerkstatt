@@ -15,6 +15,7 @@ Deine Aufgabe: bestimme, auf welche dieser Entitäten sich der Schnipsel bezieht
 
 Regeln:
 - Gib NUR Verknüpfungen zurück, deren id exakt in den gelieferten Listen steht. Erfinde keine ids und keine neuen Entitäten.
+- Hinter jeder Entität steht nach «—» ein kurzer Kontext (Typ, Rolle, Beschreibung). Nutze ihn zum Abgleich, auch wenn der Name selbst im Schnipsel nicht vorkommt (z.B. Schnipsel über Bronzezeit-Grabungen passt zur Figur «Archäologin»).
 - Verknüpfe nur bei klarem inhaltlichem Bezug (genannte Figur, beschriebener Ort, thematisch passende Szene). Im Zweifel weglassen — lieber wenige präzise Treffer als viele vage.
 - Eine Entität höchstens einmal.
 - «art» ist die Kategorie der Entität: «figur», «ort», «szene» oder «beat».
@@ -22,15 +23,24 @@ Regeln:
 }
 
 export function buildResearchLinkPrompt(snippet, candidates) {
-  const block = (label, arr) => {
+  const trunc = (s, n) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, n);
+  const block = (label, arr, meta) => {
     if (!arr || !arr.length) return `${label}: (keine)`;
-    return `${label}:\n` + arr.map(c => `- id=${c.id}: ${c.label}`).join('\n');
+    return `${label}:\n` + arr.map(c => {
+      const m = trunc(meta(c), 200);
+      return `- id=${c.id}: ${c.label}${m ? ` — ${m}` : ''}`;
+    }).join('\n');
   };
+  const head = (...fields) => fields.map(f => trunc(f, 40)).filter(Boolean).join(', ');
+  const figMeta = (c) => [head(c.typ, c.beruf, c.rolle), trunc(c.beschreibung, 150)].filter(Boolean).join(' · ');
+  const ortMeta = (c) => [head(c.typ, c.land), trunc(c.beschreibung, 150)].filter(Boolean).join(' · ');
+  const szeneMeta = (c) => trunc(c.kommentar, 150);
+  const beatMeta = (c) => [head(c.status), trunc(c.beschreibung, 150)].filter(Boolean).join(' · ');
   const parts = [
-    block('Figuren', candidates.figur),
-    block('Schauplätze', candidates.ort),
-    block('Szenen', candidates.szene),
-    block('Plot-Abschnitte', candidates.beat),
+    block('Figuren', candidates.figur, figMeta),
+    block('Schauplätze', candidates.ort, ortMeta),
+    block('Szenen', candidates.szene, szeneMeta),
+    block('Plot-Abschnitte', candidates.beat, beatMeta),
   ].join('\n\n');
   const snip = [snippet.title, snippet.body, snippet.source, snippet.url]
     .filter(Boolean).join('\n').slice(0, 4000);

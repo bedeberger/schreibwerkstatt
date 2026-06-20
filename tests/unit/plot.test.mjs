@@ -582,6 +582,59 @@ test('plot prompts: ohne Stränge bleibt der Strang-Block weg (Abwärtskompat)',
   assert.ok(!cons.includes('Strang-Balance'));
 });
 
+test('plot prompts: Brainstorm rendert Figuren-Beziehungen + Lebensereignisse', () => {
+  const figuren = [{
+    name: 'Anna', typ: 'Prot',
+    beziehungen: [{ mit: 'Bert', typ: 'Schwester' }, { mit: 'Carl', typ: 'Rivalin' }],
+    lebensereignisse: [{ datum: '1990', ereignis: 'Geburt', kapitel: 'Kap 1' }],
+  }];
+  const out = prompts.buildPlotBrainstormPrompt('Akt 1', [{ id: 1, name: 'Akt 1' }], [], '', figuren);
+  assert.ok(out.includes('Beziehungen: Bert (Schwester); Carl (Rivalin)'));
+  assert.ok(out.includes('Ereignisse: 1990: Geburt [Kap 1]'));
+});
+
+test('plot prompts: Brainstorm rendert Schauplätze + Zeitstrahl-Blöcke', () => {
+  const orte = [{ name: 'Burg', typ: 'Schauplatz', stimmung: 'düster', beschreibung: 'Alte Festung.' }];
+  const zeitstrahl = [{ datum: '1991', ereignis: 'Brand', figur: 'Anna', kapitel: 'Kap 2' }];
+  const out = prompts.buildPlotBrainstormPrompt('Akt 1', [{ id: 1, name: 'Akt 1' }], [], '',
+    [], [], [], [], null, orte, zeitstrahl);
+  assert.ok(out.includes('SCHAUPLÄTZE'));
+  assert.ok(out.includes('Burg'));
+  assert.ok(out.includes('düster'));
+  assert.ok(out.includes('ZEITSTRAHL'));
+  assert.ok(out.includes('1991 — Brand (Anna) [Kap 2]'));
+});
+
+test('plot prompts: Consistency rendert Schauplätze + Zeitstrahl + Kontinuitäts-Befunde + Chronologie-Check', () => {
+  const acts = [{ id: 1, name: 'Akt 1' }];
+  const beats = [{ id: 9, act_id: 1, titel: 'Showdown', status: 'geplant', chapter_name: null }];
+  const orte = [{ name: 'Burg', typ: 'Schauplatz' }];
+  const zeitstrahl = [{ datum: '1991', ereignis: 'Brand', figur: 'Anna' }];
+  const konti = [{ schwere: 'stark', beschreibung: 'Augenfarbe wechselt', figuren: ['Anna'], kapitel: ['Kap 3'], empfehlung: 'vereinheitlichen' }];
+  const out = prompts.buildPlotConsistencyPrompt(acts, beats, [], [], [], '', [], [], orte, zeitstrahl, konti);
+  assert.ok(out.includes('SCHAUPLÄTZE'));
+  assert.ok(out.includes('Burg'));
+  assert.ok(out.includes('ZEITSTRAHL'));
+  assert.ok(out.includes('1991 — Brand (Anna)'));
+  assert.ok(out.includes('BEKANNTE KONTINUITÄTS-BEFUNDE'));
+  assert.ok(out.includes('[stark] Augenfarbe wechselt'));
+  assert.ok(out.includes('Empfehlung: vereinheitlichen'));
+  assert.ok(/Chronologie gegen Zeitstrahl/i.test(out));
+});
+
+test('plot prompts: neue Kontext-Blöcke entfallen ohne Daten (Abwärtskompat)', () => {
+  const acts = [{ id: 1, name: 'Akt 1' }];
+  const beats = [{ id: 9, act_id: 1, titel: 'Auftakt', status: 'geplant', chapter_name: null }];
+  const bs = prompts.buildPlotBrainstormPrompt('Akt 1', acts, beats, '', [], []);
+  assert.ok(!bs.includes('SCHAUPLÄTZE'));
+  assert.ok(!bs.includes('ZEITSTRAHL'));
+  const cons = prompts.buildPlotConsistencyPrompt(acts, beats, [], [], [], '');
+  assert.ok(!cons.includes('SCHAUPLÄTZE'));
+  assert.ok(!cons.includes('ZEITSTRAHL'));
+  assert.ok(!cons.includes('BEKANNTE KONTINUITÄTS-BEFUNDE'));
+  assert.ok(!/Chronologie gegen Zeitstrahl/i.test(cons));
+});
+
 test('plot prompts: Schemas haben die erwartete Form', () => {
   assert.deepEqual(prompts.SCHEMA_PLOT_BRAINSTORM.properties.vorschlaege.items.required.sort(), ['begruendung', 'label']);
   const k = prompts.SCHEMA_PLOT_CONSISTENCY.properties.konflikte.items;

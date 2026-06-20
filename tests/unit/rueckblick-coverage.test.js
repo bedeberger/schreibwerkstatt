@@ -4,7 +4,15 @@
 // entryDate gegen gemischte Page-Namen, Jahr- vs. Monats-Rückblick-Match.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { buildRueckblickCoverage } = require('../../routes/jobs/rueckblick-dates');
+const { buildRueckblickCoverage, previousZeitraum } = require('../../routes/jobs/rueckblick-dates');
+
+test('previousZeitraum: Monat → Vor-Monat, Jahres-Übergang, Jahr → Vorjahr', () => {
+  assert.equal(previousZeitraum('2024-03'), '2024-02');
+  assert.equal(previousZeitraum('2024-01'), '2023-12');
+  assert.equal(previousZeitraum('2024'), '2023');
+  assert.equal(previousZeitraum('garbage'), null);
+  assert.equal(previousZeitraum('2024-13'), null);
+});
 
 test('buildRueckblickCoverage: datierte Einträge → Monats-/Jahres-Buckets', () => {
   const pages = [

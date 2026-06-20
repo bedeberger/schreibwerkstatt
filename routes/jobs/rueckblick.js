@@ -18,7 +18,8 @@ const {
   createJob, enqueueJob, findActiveJobId,
   jsonBody,
 } = require('./shared');
-const { parseZeitraum: _parseZeitraum, entryDate: _entryDate, matchesZeitraum: _matchesZeitraum } = require('./rueckblick-dates');
+const { parseZeitraum: _parseZeitraum, entryDate: _entryDate, matchesZeitraum: _matchesZeitraum, previousZeitraum: _previousZeitraum } = require('./rueckblick-dates');
+const crypto = require('crypto');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
 
@@ -42,12 +43,37 @@ async function runRueckblickJob(jobId, bookId, userEmail, userToken, zeitraum) {
     const cacheVersion = `${_modelName(effectiveProvider)}:${PROMPTS_VERSION || ''}`;
 
     // Optionaler Entitäts-Kontext (verbessert Personen-/Orts-Verknüpfung, kein Muss).
-    let figurenNamen = [], orteNamen = [];
+    // Pro Entität Name + kompakte Info (Rolle/Beruf/Alias bzw. Typ/Land) — hilft
+    // dem Modell, Erwähnungen korrekt der kanonischen Schreibweise zuzuordnen.
+    let figuren = [], orte = [];
     try {
-      figurenNamen = (getFiguren(bookIdInt, email) || []).map(f => f.name).filter(Boolean).slice(0, 80);
-      orteNamen = db.prepare('SELECT name FROM locations WHERE book_id = ? AND user_email = ?')
-        .all(bookIdInt, email).map(r => r.name).filter(Boolean).slice(0, 80);
+      figuren = (getFiguren(bookIdInt, email) || [])
+        .filter(f => f.name)
+        .slice(0, 80)
+        .map(f => {
+          const info = [f.typ, f.beruf, (f.kurzname && f.kurzname !== f.name) ? `auch: ${f.kurzname}` : null]
+            .filter(Boolean).join(', ');
+          return { name: f.name, info };
+        });
+      orte = db.prepare('SELECT name, typ, land FROM locations WHERE book_id = ? AND user_email = ?')
+        .all(bookIdInt, email)
+        .filter(r => r.name)
+        .slice(0, 80)
+        .map(r => ({ name: r.name, info: [r.typ, r.land].filter(Boolean).join(', ') }));
     } catch (e) { logger.warn(`Entitäts-Kontext übersprungen: ${e.message}`); }
+
+    // Vorangegangener Rückblick (Vor-Monat bzw. Vorjahr), falls vorhanden — gibt
+    // dem Modell Kontext für Entwicklungen über die Zeit. Nur verdichtet (ohne
+    // Belege), keine Faktenübernahme (Constraint im Prompt).
+    let vorblick = null, vorblickSig = '';
+    try {
+      const prevZeitraum = _previousZeitraum(zeitraum);
+      const prevJson = prevZeitraum ? latestRueckblickJson(bookIdInt, email, prevZeitraum) : null;
+      if (prevJson) {
+        vorblick = { zeitraum: prevZeitraum, result: JSON.parse(prevJson) };
+        vorblickSig = `${prevZeitraum}:${crypto.createHash('sha1').update(prevJson).digest('hex').slice(0, 12)}`;
+      }
+    } catch (e) { logger.warn(`Vorblick-Kontext übersprungen: ${e.message}`); }
 
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
     const { chMap, pages } = await loadOrderedBookContents(bookId, userToken)
@@ -78,7 +104,9 @@ async function runRueckblickJob(jobId, bookId, userEmail, userToken, zeitraum) {
       })
       .sort((a, b) => a.datum.localeCompare(b.datum));
 
-    const pagesSig = entries.map(e => `${e.id}:${e.updated_at || ''}`).sort().join('|') + `||${zeitraum}||${cacheVersion}`;
+    // vorblickSig fliesst in den Cache-Key: wird der Vor-Zeitraum neu generiert,
+    // ändert sich dieser Rückblick (Entwicklungs-Kontext) → Cache-Miss erzwingen.
+    const pagesSig = entries.map(e => `${e.id}:${e.updated_at || ''}`).sort().join('|') + `||${zeitraum}||${cacheVersion}||${vorblickSig}`;
     let r = loadRueckblickCache(bookIdInt, email, zeitraum, pagesSig, effectiveProvider);
     const fromCache = !!r;
 
@@ -98,7 +126,7 @@ async function runRueckblickJob(jobId, bookId, userEmail, userToken, zeitraum) {
       if (totalChars <= SINGLE_PASS_LIMIT || byMonth.size <= 1) {
         updateJob(jobId, { progress: 55, statusText: 'job.phase.rueckblickConsolidating' });
         r = await aiCall(jobId, tok,
-          buildRueckblickPrompt(entries, { zeitraum, figurenNamen, orteNamen }),
+          buildRueckblickPrompt(entries, { zeitraum, figuren, orte, vorblick }),
           SYSTEM_RUECKBLICK, 55, 97, 3000, 0.25, null, effectiveProvider, SCHEMA_RUECKBLICK,
         );
       } else {
@@ -114,15 +142,17 @@ async function runRueckblickJob(jobId, bookId, userEmail, userToken, zeitraum) {
             progress: fromPct, statusText: 'job.phase.rueckblickAnalyzingMonth',
             statusParams: { monat: key, current: mi + 1, total: monthKeys.length },
           });
+          // Vorblick bewusst NICHT an die Monats-Maps — der Entwicklungs-Kontext
+          // gehört in den Reduce, sonst bläht er jeden Monats-Call auf.
           const mr = await aiCall(jobId, tok,
-            buildRueckblickPrompt(byMonth.get(key), { zeitraum: key, figurenNamen, orteNamen }),
+            buildRueckblickPrompt(byMonth.get(key), { zeitraum: key, figuren, orte }),
             SYSTEM_RUECKBLICK, fromPct, toPct, 2000, 0.25, null, effectiveProvider, SCHEMA_RUECKBLICK,
           );
           monthResults.push({ ...mr, monat: key });
         }
         updateJob(jobId, { progress: 88, statusText: 'job.phase.rueckblickConsolidating' });
         r = await aiCall(jobId, tok,
-          buildRueckblickReducePrompt(monthResults, { zeitraum }),
+          buildRueckblickReducePrompt(monthResults, { zeitraum, vorblick }),
           SYSTEM_RUECKBLICK, 88, 97, 3000, 0.25, null, effectiveProvider, SCHEMA_RUECKBLICK,
         );
       }

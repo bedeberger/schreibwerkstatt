@@ -13,9 +13,11 @@ const {
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
 const { requireBookAccess, sendACLError } = require('../../lib/acl');
+const { getContextConfigFor, resolveProvider } = require('../../lib/ai');
 const { db } = require('../../db/connection');
 const plotDb = require('../../db/plot');
 const draftFiguresDb = require('../../db/draft-figures');
+const { getLatestContinuityCheck } = require('../../db/schema');
 
 const plotRouter = express.Router();
 
@@ -34,18 +36,118 @@ function _plotContextError(source, cause) {
   return err;
 }
 
-// Figuren-Ensemble als Grundierung für beide Jobs. Brainstorm rendert den
-// reichen Kontext (Beschreibung/Beruf/Tags), Consistency nutzt nur Name + Typ —
-// die Extra-Felder bleiben dort ungenutzt (kein zweiter DB-Load nötig).
+// Figuren-Ensemble als Grundierung für beide Jobs — der volle reiche Kontext aus
+// getFiguren: Rollen-Meta, Tags, Beschreibung, Beziehungen (Soziogramm) und
+// Lebensereignisse (Figuren-Zeitstrahl). getFiguren liefert Beziehungspartner als
+// TEXT-fig_id (`mit`); hier auf Namen aufgelöst (id→name aus derselben Liste),
+// damit die reinen, frontend-geteilten Prompt-Builder namensbasiert bleiben.
 function _figurenContext(bookId, userEmail) {
-  return getFiguren(bookId, userEmail).map(f => ({
+  const figuren = getFiguren(bookId, userEmail);
+  const nameById = {};
+  for (const f of figuren) nameById[f.id] = f.name;
+  return figuren.map(f => ({
     name: f.name,
     typ: f.typ || null,
     kurzname: f.kurzname || null,
     beschreibung: f.beschreibung || null,
     beruf: f.beruf || null,
     geschlecht: f.geschlecht || null,
-    tags: typeof f.tags === 'string' && f.tags ? f.tags.split(',').filter(Boolean) : [],
+    tags: Array.isArray(f.eigenschaften) ? f.eigenschaften : [],
+    beziehungen: Array.isArray(f.beziehungen)
+      ? f.beziehungen
+          .map(b => ({ mit: nameById[b.mit] || null, typ: b.typ || null, beschreibung: b.beschreibung || null }))
+          .filter(b => b.mit)
+      : [],
+    lebensereignisse: Array.isArray(f.lebensereignisse)
+      ? f.lebensereignisse.map(e => ({ datum: e.datum || null, ereignis: e.ereignis || null, typ: e.typ || null, kapitel: e.kapitel || null }))
+      : [],
+  }));
+}
+
+// Schauplätze des Buchs (Orte). locations ist keine pages/chapters/books →
+// Direkt-SQL erlaubt. Ein Buch ohne Orte liefert regulär [].
+function _orteContext(bookId, userEmail) {
+  return db.prepare(`
+    SELECT name, typ, beschreibung, stimmung
+      FROM locations
+     WHERE book_id = ? AND user_email = ?
+     ORDER BY sort_order, id
+  `).all(parseInt(bookId), userEmail).map(o => ({
+    name: o.name,
+    typ: o.typ || null,
+    beschreibung: o.beschreibung || null,
+    stimmung: o.stimmung || null,
+  }));
+}
+
+// Buchweiter Figuren-Zeitstrahl (figure_events, chronologisch nach sort_order)
+// mit aufgelöster Figur + Kapitel. figure_events/figures sind keine pages/
+// chapters/books → Direkt-SQL erlaubt; chapter_name via JOIN (Anzeige zur Lesezeit).
+function _zeitstrahlContext(bookId, userEmail) {
+  return db.prepare(`
+    SELECT fe.datum, fe.ereignis, fe.typ, f.name AS figur, c.chapter_name AS kapitel
+      FROM figure_events fe
+      JOIN figures f ON f.id = fe.figure_id
+      LEFT JOIN chapters c ON c.chapter_id = fe.chapter_id
+     WHERE f.book_id = ? AND f.user_email = ?
+     ORDER BY fe.sort_order, fe.id
+     LIMIT 300
+  `).all(parseInt(bookId), userEmail).map(e => ({
+    datum: e.datum || null,
+    ereignis: e.ereignis,
+    typ: e.typ || null,
+    figur: e.figur || null,
+    kapitel: e.kapitel || null,
+  }));
+}
+
+// Offene Kontinuitäts-Befunde aus dem letzten Continuity-Check (nur Consistency).
+// Erdet den Plot-Check auf bereits bekannte Brüche, statt sie neu zu erfinden.
+// Kein Check vorhanden → regulär []; echter DB-Fehler failt den Job.
+function _kontinuitaetContext(bookId, userEmail) {
+  try {
+    const check = getLatestContinuityCheck(bookId, userEmail);
+    if (!check || !Array.isArray(check.issues)) return [];
+    return check.issues
+      .filter(i => !i.resolved)
+      .map(i => ({
+        schwere: i.schwere || null,
+        typ: i.typ || null,
+        beschreibung: i.beschreibung || null,
+        figuren: Array.isArray(i.figuren) ? i.figuren : [],
+        kapitel: Array.isArray(i.kapitel) ? i.kapitel : [],
+        empfehlung: i.empfehlung || null,
+      }));
+  } catch (e) {
+    throw _plotContextError('kontinuitaet', e);
+  }
+}
+
+// Adaptives Kontext-Budget: kleine (lokale) Modelle bekommen knappere Listen,
+// damit der Plot-Prompt das Eingabe-Budget nicht sprengt (Truncation-Schutz);
+// Claude (200k+) bekommt den vollen Kontext. Schwelle grob am Input-Budget in
+// Zeichen des effektiven Providers (Per-User-Override berücksichtigt).
+function _ctxLimits(userEmail) {
+  let budgetChars = 600000;
+  try {
+    budgetChars = getContextConfigFor(resolveProvider({ userEmail })).inputBudgetChars || budgetChars;
+  } catch { /* Default = grosszügig */ }
+  if (budgetChars < 80000) {
+    return { figuren: 25, relPerFig: 4, evtPerFig: 0, kapitel: 40, szenen: 30, orte: 15, zeitstrahl: 0, kontinuitaet: 8 };
+  }
+  if (budgetChars < 250000) {
+    return { figuren: 45, relPerFig: 6, evtPerFig: 4, kapitel: 80, szenen: 70, orte: 30, zeitstrahl: 60, kontinuitaet: 15 };
+  }
+  return { figuren: 120, relPerFig: 12, evtPerFig: 10, kapitel: 200, szenen: 150, orte: 60, zeitstrahl: 200, kontinuitaet: 40 };
+}
+
+// Wendet die Figuren-Limits an: Figurenzahl kappen, Beziehungen/Ereignisse pro
+// Figur kürzen (auf knappen Modellen Ereignisse ganz weglassen).
+function _trimFiguren(figuren, limits) {
+  return figuren.slice(0, limits.figuren).map(f => ({
+    ...f,
+    beziehungen: (f.beziehungen || []).slice(0, limits.relPerFig),
+    lebensereignisse: limits.evtPerFig ? (f.lebensereignisse || []).slice(0, limits.evtPerFig) : [],
   }));
 }
 
@@ -143,18 +245,21 @@ async function runPlotBrainstormJob(jobId, bookId, actId, threadId, userEmail) {
     const beats = plotDb.listBeats(bookId, userEmail);
 
     const { BUCH_KONTEXT } = await getBookPrompts(bookId, userEmail);
-    const figuren = _figurenContext(bookId, userEmail);
+    const limits = _ctxLimits(userEmail);
+    const figuren = _trimFiguren(_figurenContext(bookId, userEmail), limits);
     const werkstattFiguren = _werkstattFigurenContext(bookId, userEmail);
-    const kapitel = await _kapitelContext(bookId);
+    const kapitel = (await _kapitelContext(bookId)).slice(0, limits.kapitel);
+    const orte = _orteContext(bookId, userEmail).slice(0, limits.orte);
+    const zeitstrahl = limits.zeitstrahl ? _zeitstrahlContext(bookId, userEmail).slice(0, limits.zeitstrahl) : [];
     const threads = _threadContext(bookId, userEmail);
     const threadInfo = threadId != null ? (threads.find(t => t.id === threadId) || null) : null;
 
-    logger.info(`Plot-Brainstorm Start: book=${bookId} akt="${act.name}"${threadInfo ? ` strang="${threadInfo.name}"` : ''} beats=${beats.length} figuren=${figuren.length} werkstatt=${werkstattFiguren.length}`);
+    logger.info(`Plot-Brainstorm Start: book=${bookId} akt="${act.name}"${threadInfo ? ` strang="${threadInfo.name}"` : ''} beats=${beats.length} figuren=${figuren.length} orte=${orte.length} zeitstrahl=${zeitstrahl.length} werkstatt=${werkstattFiguren.length}`);
     updateJob(jobId, { statusText: 'job.plot.brainstorm.aiReply', progress: 10 });
 
     const tok = { in: 0, out: 0, ms: 0 };
     const result = await aiCall(jobId, tok,
-      buildPlotBrainstormPrompt(act.name, acts, beats, BUCH_KONTEXT, figuren, kapitel, werkstattFiguren, threads, threadInfo),
+      buildPlotBrainstormPrompt(act.name, acts, beats, BUCH_KONTEXT, figuren, kapitel, werkstattFiguren, threads, threadInfo, orte, zeitstrahl),
       buildPlotSystemPrompt(),
       10, 95, 1500, 0.3, 1500, undefined, SCHEMA_PLOT_BRAINSTORM,
     );
@@ -203,13 +308,17 @@ async function runPlotConsistencyJob(jobId, bookId, userEmail) {
     if (!beats.length) throw i18nError('job.error.plot.boardEmpty');
 
     const { BUCH_KONTEXT } = await getBookPrompts(bookId, userEmail);
-    const figuren = _figurenContext(bookId, userEmail);
+    const limits = _ctxLimits(userEmail);
+    const figuren = _trimFiguren(_figurenContext(bookId, userEmail), limits);
     const werkstattFiguren = _werkstattFigurenContext(bookId, userEmail);
-    const kapitel = await _kapitelContext(bookId);
-    const szenen = _szenenContext(bookId, userEmail);
+    const kapitel = (await _kapitelContext(bookId)).slice(0, limits.kapitel);
+    const szenen = _szenenContext(bookId, userEmail).slice(0, limits.szenen);
+    const orte = _orteContext(bookId, userEmail).slice(0, limits.orte);
+    const zeitstrahl = limits.zeitstrahl ? _zeitstrahlContext(bookId, userEmail).slice(0, limits.zeitstrahl) : [];
+    const kontinuitaet = _kontinuitaetContext(bookId, userEmail).slice(0, limits.kontinuitaet);
     const threads = _threadContext(bookId, userEmail);
 
-    logger.info(`Plot-Consistency Start: book=${bookId} beats=${beats.length} szenen=${szenen.length} kapitel=${kapitel.length} werkstatt=${werkstattFiguren.length} straenge=${threads.length}`);
+    logger.info(`Plot-Consistency Start: book=${bookId} beats=${beats.length} szenen=${szenen.length} kapitel=${kapitel.length} orte=${orte.length} zeitstrahl=${zeitstrahl.length} kontinuitaet=${kontinuitaet.length} werkstatt=${werkstattFiguren.length} straenge=${threads.length}`);
     updateJob(jobId, { statusText: 'job.plot.consistency.aiReply', progress: 10 });
 
     // maxTokens grosszuegig: ein schonungsloser Check ueber alle Beats/Szenen/
@@ -217,7 +326,7 @@ async function runPlotConsistencyJob(jobId, bookId, userEmail) {
     // 3000 schnitt die JSON-Antwort regelmaessig mitten im Array ab → Truncation.
     const tok = { in: 0, out: 0, ms: 0 };
     const result = await aiCall(jobId, tok,
-      buildPlotConsistencyPrompt(acts, beats, kapitel, szenen, figuren, BUCH_KONTEXT, werkstattFiguren, threads),
+      buildPlotConsistencyPrompt(acts, beats, kapitel, szenen, figuren, BUCH_KONTEXT, werkstattFiguren, threads, orte, zeitstrahl, kontinuitaet),
       buildPlotSystemPrompt(),
       10, 95, 6000, 0.3, 12000, undefined, SCHEMA_PLOT_CONSISTENCY,
     );

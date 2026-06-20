@@ -31,13 +31,53 @@ test('buildRueckblickPrompt: Halluzinations-Constraint + kein Schreiben in den T
   assert.match(p, /Schreibe NICHT in den Tagebuchtext/);
 });
 
-test('buildRueckblickPrompt: optionaler Figuren-/Orts-Kontext', () => {
-  const withCtx = buildRueckblickPrompt(ENTRIES, { zeitraum: '2024-03', figurenNamen: ['Anna'], orteNamen: ['Zürich'] });
+test('buildRueckblickPrompt: optionaler Figuren-/Orts-Kontext (Namen + Info)', () => {
+  const withCtx = buildRueckblickPrompt(ENTRIES, {
+    zeitraum: '2024-03',
+    figuren: [{ name: 'Anna', info: 'Protagonistin, auch: Annie' }],
+    orte: [{ name: 'Zürich', info: 'Stadt, Schweiz' }],
+  });
   assert.match(withCtx, /Bekannte Figuren/);
-  assert.match(withCtx, /Anna/);
-  assert.match(withCtx, /Zürich/);
+  assert.match(withCtx, /- Anna \(Protagonistin, auch: Annie\)/);
+  assert.match(withCtx, /- Zürich \(Stadt, Schweiz\)/);
   const noCtx = buildRueckblickPrompt(ENTRIES, { zeitraum: '2024-03' });
   assert.doesNotMatch(noCtx, /Bekannte Figuren/);
+});
+
+test('buildRueckblickPrompt: nackte Namen-Strings bleiben unterstützt', () => {
+  const p = buildRueckblickPrompt(ENTRIES, { zeitraum: '2024-03', figuren: ['Anna'], orte: ['Zürich'] });
+  assert.match(p, /- Anna\n/);
+  assert.match(p, /- Zürich\n/);
+});
+
+test('buildRueckblickPrompt: vorheriger Rückblick als Entwicklungs-Kontext', () => {
+  const vorblick = {
+    zeitraum: '2024-02',
+    result: {
+      themen: [{ label: 'Umzug', haeufigkeit: 3, belege: ['2024-02-01'] }],
+      personen: [{ name: 'Anna', haeufigkeit: 2 }],
+      orte: [], bemerkenswerteTage: [], zusammenfassung: 'Februar war turbulent.',
+    },
+  };
+  const p = buildRueckblickPrompt(ENTRIES, { zeitraum: '2024-03', vorblick });
+  assert.match(p, /<vorheriger_rueckblick zeitraum="2024-02">/);
+  assert.match(p, /Themen: Umzug/);
+  assert.match(p, /Februar war turbulent\./);
+  // Belege des Vorblicks dürfen NICHT eingebettet sein (nur verdichtet).
+  assert.doesNotMatch(p, /2024-02-01/);
+  // Kein Vorblick → kein Block.
+  const noVb = buildRueckblickPrompt(ENTRIES, { zeitraum: '2024-03' });
+  assert.doesNotMatch(noVb, /vorheriger_rueckblick/);
+});
+
+test('buildRueckblickReducePrompt: vorheriger Rückblick fliesst in den Reduce', () => {
+  const monthResults = [
+    { monat: '2024-01', themen: [], personen: [], orte: [], bemerkenswerteTage: [], zusammenfassung: 'Januar.' },
+  ];
+  const vorblick = { zeitraum: '2023', result: { themen: [], personen: [], orte: [], bemerkenswerteTage: [], zusammenfassung: 'Das Vorjahr.' } };
+  const p = buildRueckblickReducePrompt(monthResults, { zeitraum: '2024', vorblick });
+  assert.match(p, /<vorheriger_rueckblick zeitraum="2023">/);
+  assert.match(p, /Das Vorjahr\./);
 });
 
 test('buildRueckblickReducePrompt: Monats-Teilergebnisse + Konsolidierung', () => {

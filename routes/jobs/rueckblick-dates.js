@@ -38,6 +38,20 @@ function matchesZeitraum(ed, z) {
   return true;
 }
 
+// Vorangegangener Zeitraum: Monats-Rückblick → Vor-Monat (Januar → Dezember des
+// Vorjahres), Jahres-Rückblick → Vorjahr. Liefert denselben String-Typ wie der
+// Input ('YYYY-MM' bzw. 'YYYY') oder null bei ungültigem Input.
+function previousZeitraum(z) {
+  const p = parseZeitraum(z);
+  if (!p) return null;
+  if (p.month != null) {
+    let y = p.year, m = p.month - 1;
+    if (m < 1) { m = 12; y -= 1; }
+    return `${y}-${String(m).padStart(2, '0')}`;
+  }
+  return String(p.year - 1);
+}
+
 // Aggregiert datierte Seiten + vorhandene Rückblicke zu Monats-/Jahres-Buckets
 // für die Overview-Heatmap. Pure (kein DB-State) — Datums-Parsing bleibt
 // serverseitige SSoT, das Frontend bekommt fertige Buckets.
@@ -76,4 +90,4 @@ function buildRueckblickCoverage(pages, rbRows) {
   return { months, years, minYear, maxYear };
 }
 
-module.exports = { parseZeitraum, entryDate, matchesZeitraum, buildRueckblickCoverage };
+module.exports = { parseZeitraum, entryDate, matchesZeitraum, previousZeitraum, buildRueckblickCoverage };

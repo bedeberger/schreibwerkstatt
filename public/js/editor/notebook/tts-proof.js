@@ -26,6 +26,15 @@ const TTS_MAX_RETRY = 1;
 const TTS_RETRY_DELAY_MS = 600;
 const TTS_RETRYABLE_STATUS = new Set([408, 500, 502, 503]);
 
+// Aktive Vorlese-Session (Segmente, Audio, Prefetch-Cache, AbortController).
+// Bewusst MODUL-scoped, NICHT auf der Alpine-Card: ein an `this` (= reaktiver
+// Alpine-Root-Proxy) zugewiesenes Objekt wird von Alpine/Vue in einen reaktiven
+// Proxy gewrappt, sodass `activeRt === rt` (Referenz-Identitaet) NIE haelt —
+// die Abspiel-Schleife laeuft dann nie an. Als Modul-Variable bleibt die
+// Referenz roh und die Guards greifen. Es gibt genau einen Root → ein Singleton
+// reicht. Pro Session neu befuellt, bei Stop genullt.
+let activeRt = null;
+
 export const ttsProofMethods = {
   // Diagnostik-Logger: meldet reine Vorlese-Frontend-Events fire-and-forget an
   // POST /telemetry/tts-log, sodass sie zentral in schreibwerkstatt.log landen
@@ -75,10 +84,10 @@ export const ttsProofMethods = {
   // ── Lifecycle ────────────────────────────────────────────────────────────
 
   _initTtsProof(signal) {
-    // Runtime-Container (Segmente, Audio-Element, Prefetch-Cache, AbortController)
-    // — bewusst kein deklarierter Karten-State, sondern ein Runtime-Handle analog
-    // den STT-Re-Entry-Guards. Pro Vorlese-Session neu befuellt, bei Stop genullt.
-    this._ttsRt = null;
+    // Session-Handle zuruecksetzen (siehe `activeRt`-Deklaration oben: bewusst
+    // modul-scoped, damit die Referenz-Identitaets-Guards nicht am Alpine-Proxy
+    // scheitern).
+    activeRt = null;
     this._ttsFailToasted = false; // Fehler-Toast nur einmal pro Session (kein Flood)
     const stop = () => { if (this.ttsPlaying) this._ttsStop(); };
     window.addEventListener('book:changed', stop, { signal });
@@ -176,7 +185,7 @@ export const ttsProofMethods = {
   _ttsHighlight(idx) {
     if (typeof CSS === 'undefined' || !CSS.highlights || typeof Highlight === 'undefined') return;
     CSS.highlights.delete(TTS_HIGHLIGHT);
-    const rt = this._ttsRt;
+    const rt = activeRt;
     const seg = rt?.segs?.[idx];
     if (!seg || !seg.block?.isConnected) return;
     const range = this._ttsBuildRange(seg.block, seg.startOff, seg.endOff);
@@ -196,7 +205,7 @@ export const ttsProofMethods = {
   // Hauptbutton: idle -> starten; aktiv -> pausieren <-> fortsetzen.
   toggleTtsProof() {
     if (!this.ttsEnabled) return;
-    const rt = this._ttsRt;
+    const rt = activeRt;
     if (!this.ttsPlaying || !rt) { this._ttsStart(); return; }
     if (this.ttsPaused) {
       rt.paused = false;
@@ -220,7 +229,7 @@ export const ttsProofMethods = {
   // laufenden (nicht pausierten) Zustand sinnvoll — der Skip-Button ist im
   // pausierten Zustand ausgeblendet.
   skipTtsProof() {
-    const rt = this._ttsRt;
+    const rt = activeRt;
     if (!rt || this.ttsPaused) return;
     try { rt.audio?.pause(); } catch { /* noop */ }
     if (rt.resolveCurrent) {
@@ -251,7 +260,7 @@ export const ttsProofMethods = {
       abort: new AbortController(),
       resolveCurrent: null, // beendet das aktuelle _ttsPlayUrl-Promise (Skip/Stop)
     };
-    this._ttsRt = rt;
+    activeRt = rt;
     this._ttsFailToasted = false;
     this.ttsPlaying = true;
     this.ttsPaused = false;
@@ -262,10 +271,10 @@ export const ttsProofMethods = {
   },
 
   // Abspiel-Schleife: highlightet Satz i, laedt i (+Lookahead) vor, spielt ab,
-  // rueckt vor. Alle Guards pruefen `this._ttsRt === rt` — eine beendete oder
+  // rueckt vor. Alle Guards pruefen `activeRt === rt` — eine beendete oder
   // gewechselte Session bricht still ab.
   async _ttsRun(rt) {
-    while (this._ttsRt === rt && rt.i < rt.segs.length) {
+    while (activeRt === rt && rt.i < rt.segs.length) {
       if (rt.paused) return; // Fortsetzen treibt die Schleife neu an
       const idx = rt.i;
       this.ttsIndex = idx + 1;
@@ -274,14 +283,14 @@ export const ttsProofMethods = {
       this.ttsLoading = true;
       const url = await rt.cache.get(idx);
       this.ttsLoading = false;
-      if (this._ttsRt !== rt || rt.paused) return;
+      if (activeRt !== rt || rt.paused) return;
       if (url == null) { this._ttsWarn(`segment ${idx} skipped (synth failed)`); rt.i++; continue; } // Fehler-Satz uebersprungen (schon getoastet)
       const ended = await this._ttsPlayUrl(rt, url);
-      if (this._ttsRt !== rt) return;
+      if (activeRt !== rt) return;
       if (!ended) return; // pausiert/gestoppt -> Steuerung liegt bei Toggle/Stop
       rt.i++;
     }
-    if (this._ttsRt === rt) this._ttsStop(); // ans Ende gelesen
+    if (activeRt === rt) this._ttsStop(); // ans Ende gelesen
   },
 
   // Spielt eine Audio-URL; resolved true bei natuerlichem Ende (oder Defekt ->
@@ -312,7 +321,7 @@ export const ttsProofMethods = {
     const seg = rt.segs[idx];
     const p = this._ttsFetchAudio(seg.text, 0, rt.abort.signal)
       .then((blob) => {
-        if (this._ttsRt !== rt || !blob) return null;
+        if (activeRt !== rt || !blob) return null;
         const objUrl = URL.createObjectURL(blob);
         rt.urls.add(objUrl);
         return objUrl;
@@ -391,8 +400,8 @@ export const ttsProofMethods = {
   },
 
   _ttsStop() {
-    const rt = this._ttsRt;
-    this._ttsRt = null; // Guard: laufende Schleife/Prefetches verwerfen ab hier
+    const rt = activeRt;
+    activeRt = null; // Guard: laufende Schleife/Prefetches verwerfen ab hier
     this.ttsPlaying = false;
     this.ttsPaused = false;
     this.ttsLoading = false;

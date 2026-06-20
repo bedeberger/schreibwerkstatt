@@ -74,6 +74,45 @@ function _loadBookOrte(bookId, userEmail) {
   `).all(parseInt(bookId), userEmail);
 }
 
+// Buch-weites Beziehungsgeflecht (from/to via INTEGER-FK auf figures.id → Namen).
+// Gibt Konflikt-Erkennung ("Doppelung von Rolle/Funktion") + Brainstorm-
+// Abgrenzung Substanz, die name/typ/beschreibung alleine nicht liefern.
+function _loadBookBeziehungen(bookId, userEmail) {
+  return db.prepare(`
+    SELECT ff.name AS fromName, tf.name AS toName, r.typ, r.beschreibung
+      FROM figure_relations r
+      JOIN figures ff ON ff.id = r.from_fig_id
+      JOIN figures tf ON tf.id = r.to_fig_id
+     WHERE r.book_id = ? AND r.user_email IS ?
+     ORDER BY ff.name, tf.name
+     LIMIT 60
+  `).all(parseInt(bookId), userEmail);
+}
+
+// „Geschriebene Realität" der Quell-Figur: Szenen (via scene_figures-Bridge) +
+// Ereignisse (figure_events.figure_id direkt). Nur für Consistency: Abgleich
+// des Mindmap-Plans gegen das, was im Buch bereits über die Figur steht.
+// Leer, wenn der Draft keine source_figure_id hat (reiner Neu-Entwurf).
+function _loadFigurAuftritte(figureId, bookId, userEmail) {
+  if (!figureId) return { szenen: [], ereignisse: [] };
+  const szenen = db.prepare(`
+    SELECT fs.titel, fs.wertung, fs.kommentar
+      FROM figure_scenes fs
+      JOIN scene_figures sf ON sf.scene_id = fs.id
+     WHERE sf.figure_id = ? AND fs.book_id = ? AND fs.user_email IS ?
+     ORDER BY fs.sort_order
+     LIMIT 40
+  `).all(parseInt(figureId), parseInt(bookId), userEmail);
+  const ereignisse = db.prepare(`
+    SELECT datum_label, ereignis, bedeutung
+      FROM figure_events
+     WHERE figure_id = ?
+     ORDER BY sort_order, datum
+     LIMIT 40
+  `).all(parseInt(figureId));
+  return { szenen, ereignisse };
+}
+
 // ── Brainstorm-Job ──────────────────────────────────────────────────────────
 
 async function runBrainstormJob(jobId, draftId, knotenId, userEmail) {
@@ -104,13 +143,14 @@ async function runBrainstormJob(jobId, draftId, knotenId, userEmail) {
     const figuren = _loadBookFiguren(draft.book_id, userEmail, draft.source_figure_id)
       .filter(f => (f.name || '').trim().toLowerCase() !== draftNameNorm);
     const orte = _loadBookOrte(draft.book_id, userEmail);
+    const beziehungen = _loadBookBeziehungen(draft.book_id, userEmail);
 
-    logger.info(`Brainstorm Start: draft=${draftId} knoten="${knotenPfad}" figuren=${figuren.length} orte=${orte.length} kinder=${existingChildren.length}`);
+    logger.info(`Brainstorm Start: draft=${draftId} knoten="${knotenPfad}" figuren=${figuren.length} orte=${orte.length} beziehungen=${beziehungen.length} kinder=${existingChildren.length}`);
     updateJob(jobId, { statusText: 'job.werkstatt.brainstorm.aiReply', progress: 10 });
 
     const tok = { in: 0, out: 0, ms: 0 };
     const result = await aiCall(jobId, tok,
-      buildBrainstormPrompt(draft.name, draft.archetype, knotenPfad, mindmapResolved, BUCH_KONTEXT, figuren, orte, existingChildren),
+      buildBrainstormPrompt(draft.name, draft.archetype, knotenPfad, mindmapResolved, BUCH_KONTEXT, figuren, orte, existingChildren, beziehungen),
       SYSTEM_FIGUREN,
       10, 95, 1500, 0.3, 1500, undefined, SCHEMA_BRAINSTORM,
     );
@@ -161,13 +201,16 @@ async function runConsistencyJob(jobId, draftId, userEmail) {
     const figuren = _loadBookFiguren(draft.book_id, userEmail, draft.source_figure_id)
       .filter(f => (f.name || '').trim().toLowerCase() !== draftNameNorm);
     const orte    = _loadBookOrte(draft.book_id, userEmail);
+    const beziehungen = _loadBookBeziehungen(draft.book_id, userEmail);
+    // Abgleich gegen die geschriebene Realität der Quell-Figur (nur wenn importiert).
+    const eigeneAuftritte = _loadFigurAuftritte(draft.source_figure_id, draft.book_id, userEmail);
 
-    logger.info(`Consistency Start: draft=${draftId} figuren=${figuren.length} orte=${orte.length}`);
+    logger.info(`Consistency Start: draft=${draftId} figuren=${figuren.length} orte=${orte.length} beziehungen=${beziehungen.length} szenen=${eigeneAuftritte.szenen.length} ereignisse=${eigeneAuftritte.ereignisse.length}`);
     updateJob(jobId, { statusText: 'job.werkstatt.consistency.aiReply', progress: 10 });
 
     const tok = { in: 0, out: 0, ms: 0 };
     const result = await aiCall(jobId, tok,
-      buildConsistencyPrompt(draft.name, draft.archetype, mindmapResolved, BUCH_KONTEXT, figuren, orte),
+      buildConsistencyPrompt(draft.name, draft.archetype, mindmapResolved, BUCH_KONTEXT, figuren, orte, beziehungen, eigeneAuftritte),
       SYSTEM_FIGUREN,
       10, 95, 2500, 0.3, 3000, undefined, SCHEMA_CONSISTENCY,
     );

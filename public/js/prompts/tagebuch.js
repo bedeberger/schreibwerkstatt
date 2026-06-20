@@ -45,30 +45,71 @@ function _formatEntries(entries) {
     .join('\n\n---\n\n');
 }
 
-function _kontextBlock(figurenNamen, orteNamen) {
+// Eine Entitäts-Zeile: akzeptiert nackten Namen (String) oder ein Objekt
+// { name, info } — info trägt Rolle/Beruf/Alias bzw. Land/Typ, in Klammern.
+// Die kanonische Schreibweise steht stets VOR der Klammer.
+function _entityLine(item) {
+  if (typeof item === 'string') return item.trim();
+  if (!item || !item.name) return '';
+  const info = (item.info || '').trim();
+  return info ? `${item.name} (${info})` : item.name;
+}
+
+function _entityList(items) {
+  return (items || []).map(_entityLine).filter(Boolean).map(l => `- ${l}`).join('\n');
+}
+
+function _kontextBlock(figuren, orte) {
   const parts = [];
-  if (figurenNamen?.length) {
-    parts.push(`Bekannte Figuren dieses Buchs (nutze diese Schreibweise, wenn eine Person gemeint ist): ${figurenNamen.join(', ')}`);
+  const figLines = _entityList(figuren);
+  if (figLines) {
+    parts.push(`Bekannte Figuren dieses Buchs (kanonische Schreibweise steht vor der Klammer; nutze sie, wenn eine Person gemeint ist):\n${figLines}`);
   }
-  if (orteNamen?.length) {
-    parts.push(`Bekannte Orte dieses Buchs: ${orteNamen.join(', ')}`);
+  const ortLines = _entityList(orte);
+  if (ortLines) {
+    parts.push(`Bekannte Orte dieses Buchs:\n${ortLines}`);
   }
   if (!parts.length) return '';
   return `\n<kontext>\n${parts.join('\n')}\n</kontext>`;
 }
 
+// Verdichteter Rückblick des vorangegangenen Zeitraums. Dient NUR der Einordnung
+// von Entwicklungen über die Zeit — Belege/Fakten dürfen NICHT übernommen werden.
+function _vorblickBlock(vorblick) {
+  if (!vorblick || !vorblick.result) return '';
+  const r = vorblick.result;
+  const themen   = (r.themen   || []).slice(0, 8).map(t => t.label).filter(Boolean).join(', ');
+  const personen = (r.personen || []).slice(0, 12).map(p => p.name).filter(Boolean).join(', ');
+  const orte     = (r.orte     || []).slice(0, 12).map(o => o.name).filter(Boolean).join(', ');
+  const zus      = (r.zusammenfassung || '').trim();
+  const lines = [];
+  if (themen)   lines.push(`Themen: ${themen}`);
+  if (personen) lines.push(`Personen: ${personen}`);
+  if (orte)     lines.push(`Orte: ${orte}`);
+  if (zus)      lines.push(`Zusammenfassung: ${zus}`);
+  if (!lines.length) return '';
+  return `\n<vorheriger_rueckblick zeitraum="${vorblick.zeitraum}">
+Verdichteter Rückblick des unmittelbar vorangegangenen Zeitraums. Nutze ihn AUSSCHLIESSLICH, um
+Entwicklungen über die Zeit zu benennen (z.B. fortgesetzt, neu hinzugekommen, nicht mehr erwähnt).
+Übernimm KEINE Belege, Daten oder Fakten daraus — jeder Beleg im neuen Rückblick muss aus den
+aktuellen Einträgen stammen.
+${lines.join('\n')}
+</vorheriger_rueckblick>`;
+}
+
 /**
  * Single-Pass-Rückblick über alle gefilterten Einträge eines Zeitraums.
  * @param {Array<{datum:string, titel:string, text:string}>} entries
- * @param {{ zeitraum:string, figurenNamen?:string[], orteNamen?:string[] }} opts
+ * @param {{ zeitraum:string, figuren?:Array, orte?:Array, vorblick?:{zeitraum:string, result:object} }} opts
+ *   figuren/orte: Namen (String) oder { name, info } (info = Rolle/Beruf/Alias bzw. Land/Typ).
  */
-export function buildRueckblickPrompt(entries, { zeitraum, figurenNamen = [], orteNamen = [] } = {}) {
+export function buildRueckblickPrompt(entries, { zeitraum, figuren = [], orte = [], vorblick = null } = {}) {
   return `<aufgabe>
 Erstelle einen rückwärtsgewandten Rückblick über die Tagebuch-Einträge des Zeitraums «${zeitraum}».
 Verdichte das Geschriebene zu wiederkehrenden Themen, Personen, Orten und bemerkenswerten Tagen
 sowie einer zusammenfassenden Betrachtung. Du bewertest nicht und schreibst nicht weiter.
 </aufgabe>
-${RUECKBLICK_CONSTRAINT}${_kontextBlock(figurenNamen, orteNamen)}
+${RUECKBLICK_CONSTRAINT}${_kontextBlock(figuren, orte)}${_vorblickBlock(vorblick)}
 ${RUECKBLICK_OUTPUT}
 <eintraege zeitraum="${zeitraum}" anzahl="${entries.length}">
 ${_formatEntries(entries)}
@@ -93,14 +134,14 @@ function _formatMonthResults(monthResults) {
  * @param {Array<object>} monthResults  je Monat ein SCHEMA_RUECKBLICK-Objekt + `monat`
  * @param {{ zeitraum:string }} opts
  */
-export function buildRueckblickReducePrompt(monthResults, { zeitraum } = {}) {
+export function buildRueckblickReducePrompt(monthResults, { zeitraum, vorblick = null } = {}) {
   return `<aufgabe>
 Konsolidiere die folgenden Monats-Teilrückblicke zu EINEM Gesamt-Rückblick über den Zeitraum «${zeitraum}».
 Führe gleiche Themen/Personen/Orte zusammen und summiere ihre Häufigkeiten. Wähle die über den
 ganzen Zeitraum bemerkenswertesten Tage aus. Erzeuge eine zusammenfassende Betrachtung des gesamten
 Zeitraums. Nutze NUR Informationen aus den Teilrückblicken; füge nichts hinzu.
 </aufgabe>
-${RUECKBLICK_CONSTRAINT}
+${RUECKBLICK_CONSTRAINT}${_vorblickBlock(vorblick)}
 ${RUECKBLICK_OUTPUT}
 <monats_teilrueckblicke zeitraum="${zeitraum}" monate="${monthResults.length}">
 ${_formatMonthResults(monthResults)}

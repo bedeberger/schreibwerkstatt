@@ -110,6 +110,46 @@ test('buildBrainstormPrompt: ohne Sub-Knoten/Orte/Figuren → keine leeren Blöc
   assert.doesNotMatch(p, /VORHANDENE SUB-KNOTEN/);
 });
 
+test('buildBrainstormPrompt: Beziehungsgeflecht wird gelistet (from –[typ]→ to)', async () => {
+  const { buildBrainstormPrompt } = await import(promptsUrl);
+  const p = buildBrainstormPrompt('Anna', null, 'Stimme', sampleMindmap, 'Krimi', [], [], [], [
+    { fromName: 'Boris', toName: 'Clara', typ: 'Mentor', beschreibung: 'lehrt sie das Handwerk' },
+  ]);
+  assert.match(p, /BESTEHENDES BEZIEHUNGSGEFLECHT IM BUCH/);
+  assert.match(p, /Boris –\[Mentor\]→ Clara: lehrt sie das Handwerk/);
+});
+
+test('buildBrainstormPrompt: ohne Beziehungen → kein Beziehungs-Block', async () => {
+  const { buildBrainstormPrompt } = await import(promptsUrl);
+  const p = buildBrainstormPrompt('Anna', null, 'Stimme', sampleMindmap, '', [], [], [], []);
+  assert.doesNotMatch(p, /BEZIEHUNGSGEFLECHT/);
+});
+
+test('buildConsistencyPrompt: Beziehungsgeflecht + eigene Auftritte werden gelistet', async () => {
+  const { buildConsistencyPrompt } = await import(promptsUrl);
+  const p = buildConsistencyPrompt(
+    'Anna', 'protagonist', sampleMindmap, 'Krimi', [], [],
+    [{ fromName: 'Anna', toName: 'Boris', typ: 'Rivalin', beschreibung: 'alter Streit' }],
+    {
+      szenen: [{ titel: 'Verhör im Regen', wertung: 'stark', kommentar: 'sie bricht zusammen' }],
+      ereignisse: [{ datum_label: '1923', ereignis: 'Vater stirbt', bedeutung: 'Wendepunkt' }],
+    },
+  );
+  assert.match(p, /BESTEHENDES BEZIEHUNGSGEFLECHT IM BUCH/);
+  assert.match(p, /Anna –\[Rivalin\]→ Boris: alter Streit/);
+  assert.match(p, /SO KOMMT DIE FIGUR IM BUCH BISHER VOR/);
+  assert.match(p, /Verhör im Regen \[stark\]: sie bricht zusammen/);
+  assert.match(p, /1923: Vater stirbt \(Wendepunkt\)/);
+  assert.match(p, /Mindmap-Plan und dem, was im Buch bereits über die Figur geschrieben steht/);
+});
+
+test('buildConsistencyPrompt: ohne Auftritte → kein Realitäts-Block + kein Check-Punkt', async () => {
+  const { buildConsistencyPrompt } = await import(promptsUrl);
+  const p = buildConsistencyPrompt('Anna', null, sampleMindmap, '', [], [], [], { szenen: [], ereignisse: [] });
+  assert.doesNotMatch(p, /SO KOMMT DIE FIGUR IM BUCH BISHER VOR/);
+  assert.doesNotMatch(p, /Mindmap-Plan und dem, was im Buch bereits/);
+});
+
 test('buildConsistencyPrompt: enthält Figuren-Liste, Orte-Liste mit Beschreibung, Severity-Skala', async () => {
   const { buildConsistencyPrompt } = await import(promptsUrl);
   const p = buildConsistencyPrompt(

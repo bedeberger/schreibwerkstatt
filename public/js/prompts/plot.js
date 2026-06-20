@@ -81,24 +81,76 @@ function _hasThreadInheritance(threads) {
   return (threads || []).some(t => t && (t.figur || t.kapitel));
 }
 
-function _figurenLines(figuren) {
-  return (figuren || []).slice(0, 60)
-    .map(f => `- ${f.name}${f.typ ? ` [${f.typ}]` : ''}`)
-    .join('\n');
+function _trunc(s, max = 280) {
+  const t = (s || '').trim().replace(/\s+/g, ' ');
+  return t.length > max ? `${t.slice(0, max)}…` : t;
 }
 
-// Detaillierter Figuren-Block für den Brainstorm: Name + Kurzname, Rollen-Meta
-// (Typ/Beruf/Geschlecht), Tags und eine gekürzte Beschreibung — damit die KI
-// die Beats auf konkrete Figurenprofile statt nur Namen zuschneiden kann.
+// Beziehungen einer Figur (Soziogramm): „Partner (Typ)". `mit` ist bereits ein
+// aufgelöster Name (der Job übersetzt die fig_id vor dem Prompt-Bau).
+function _relLine(beziehungen) {
+  const rels = (beziehungen || []).filter(b => b && b.mit).slice(0, 12);
+  if (!rels.length) return '';
+  return `\n  Beziehungen: ${rels.map(b => `${b.mit}${b.typ ? ` (${b.typ})` : ''}`).join('; ')}`;
+}
+
+// Lebensereignisse einer Figur (Figuren-Zeitstrahl): „Datum: Ereignis [Kapitel]".
+function _eventsLine(lebensereignisse) {
+  const evs = (lebensereignisse || []).filter(e => e && e.ereignis).slice(0, 10);
+  if (!evs.length) return '';
+  return `\n  Ereignisse: ${evs.map(e => `${e.datum ? `${e.datum}: ` : ''}${e.ereignis}${e.kapitel ? ` [${e.kapitel}]` : ''}`).join(' · ')}`;
+}
+
+// Detaillierter Figuren-Block für BEIDE Jobs: Name + Kurzname, Rollen-Meta
+// (Typ/Beruf/Geschlecht), Tags, gekürzte Beschreibung und — sofern vorhanden —
+// Beziehungen (Soziogramm) + Lebensereignisse (Zeitstrahl). So kann die KI Beats
+// auf konkrete Figurenprofile, ihr Beziehungsgeflecht und ihre Chronologie
+// zuschneiden statt nur auf Namen.
 function _figurenLinesDetail(figuren) {
-  const trunc = (s) => { const t = (s || '').trim().replace(/\s+/g, ' '); return t.length > 280 ? `${t.slice(0, 280)}…` : t; };
-  return (figuren || []).slice(0, 60)
+  return (figuren || []).slice(0, 120)
     .map(f => {
       const meta = [f.typ, f.beruf, f.geschlecht].filter(Boolean).join(', ');
       const head = `- ${f.name}${f.kurzname ? ` („${f.kurzname}")` : ''}${meta ? ` [${meta}]` : ''}`;
-      const besch = f.beschreibung ? `\n  ${trunc(f.beschreibung)}` : '';
+      const besch = f.beschreibung ? `\n  ${_trunc(f.beschreibung)}` : '';
       const tags = (f.tags || []).length ? `\n  Tags: ${f.tags.join(', ')}` : '';
-      return `${head}${besch}${tags}`;
+      return `${head}${besch}${tags}${_relLine(f.beziehungen)}${_eventsLine(f.lebensereignisse)}`;
+    })
+    .join('\n');
+}
+
+// Schauplätze des Buchs: Name + Typ/Stimmung + gekürzte Beschreibung.
+function _orteLines(orte) {
+  return (orte || []).slice(0, 60)
+    .map(o => {
+      const meta = [o.typ, o.stimmung].filter(Boolean).join(', ');
+      const besch = o.beschreibung ? `: ${_trunc(o.beschreibung, 160)}` : '';
+      return `- ${o.name}${meta ? ` [${meta}]` : ''}${besch}`;
+    })
+    .join('\n');
+}
+
+// Buchweiter Figuren-Zeitstrahl (figure_events, chronologisch): „Datum — Ereignis
+// (Figur) [Kapitel]". Grundlage für Chronologie-Prüfungen im Consistency-Check.
+function _zeitstrahlLines(zeitstrahl) {
+  return (zeitstrahl || []).slice(0, 200)
+    .map(e => {
+      const d = e.datum ? `${e.datum} — ` : '';
+      const fig = e.figur ? ` (${e.figur})` : '';
+      const kap = e.kapitel ? ` [${e.kapitel}]` : '';
+      return `- ${d}${e.ereignis}${fig}${kap}`;
+    })
+    .join('\n');
+}
+
+// Bekannte (offene) Kontinuitäts-Befunde aus dem letzten Continuity-Check.
+function _kontinuitaetLines(issues) {
+  return (issues || []).slice(0, 40)
+    .map(i => {
+      const sev = i.schwere ? `[${i.schwere}] ` : '';
+      const figs = (i.figuren || []).length ? ` (Figuren: ${i.figuren.join(', ')})` : '';
+      const kap = (i.kapitel || []).length ? ` [${i.kapitel.join(', ')}]` : '';
+      const emp = i.empfehlung ? `\n  Empfehlung: ${i.empfehlung}` : '';
+      return `- ${sev}${i.beschreibung}${figs}${kap}${emp}`;
     })
     .join('\n');
 }
@@ -112,14 +164,14 @@ function _werkstattFigurenLines(figuren) {
 }
 
 function _kapitelLines(kapitel) {
-  return (kapitel || []).slice(0, 120)
+  return (kapitel || []).slice(0, 200)
     .map((k, i) => `${i + 1}. ${k}`)
     .join('\n');
 }
 
 // Szenen als „Buchrealität": Titel — Kapitel — beteiligte Figuren.
 function _szenenLines(szenen) {
-  return (szenen || []).slice(0, 120)
+  return (szenen || []).slice(0, 150)
     .map(s => {
       const kap = s.kapitel ? ` — ${s.kapitel}` : '';
       const figs = (s.figuren || []).length ? ` (${s.figuren.join(', ')})` : '';
@@ -141,7 +193,7 @@ WICHTIG: Du planst und prüfst nur die STRUKTUR. Du schreibst NIEMALS Fliesstext
 // Schlägt 3–7 Beats für einen bestimmten Akt vor, passend zum bisherigen Board,
 // Buchkontext und Figuren-Ensemble.
 
-export function buildPlotBrainstormPrompt(aktName, acts, beats, buchKontext, figuren = [], kapitel = [], werkstattFiguren = [], threads = [], threadInfo = null) {
+export function buildPlotBrainstormPrompt(aktName, acts, beats, buchKontext, figuren = [], kapitel = [], werkstattFiguren = [], threads = [], threadInfo = null, orte = [], zeitstrahl = []) {
   const ctxSeg = (buchKontext || '').trim() ? `\nBUCH-KONTEXT:\n${buchKontext}\n` : '';
   const figLines = _figurenLinesDetail(figuren);
   const figSeg = figLines ? `\nFIGUREN-ENSEMBLE:\n${figLines}\n` : '';
@@ -149,6 +201,10 @@ export function buildPlotBrainstormPrompt(aktName, acts, beats, buchKontext, fig
   const wfSeg = wfLines ? `\nFIGUREN-WERKSTATT (in Entwicklung, evtl. noch nicht im Manuskript — als Beat-Figuren nutzbar):\n${wfLines}\n` : '';
   const kapLines = _kapitelLines(kapitel);
   const kapSeg = kapLines ? `\nVORHANDENE KAPITEL (chronologisch):\n${kapLines}\n` : '';
+  const orteLines = _orteLines(orte);
+  const orteSeg = orteLines ? `\nSCHAUPLÄTZE (Orte des Buchs):\n${orteLines}\n` : '';
+  const zeitLines = _zeitstrahlLines(zeitstrahl);
+  const zeitSeg = zeitLines ? `\nZEITSTRAHL (chronologische Ereignisse der Figuren):\n${zeitLines}\n` : '';
   const strLines = _straengeLines(threads);
   const inheritNote = _hasThreadInheritance(threads)
     ? '\nVERERBUNG: Ein Beat in einem Strang beteiligt IMPLIZIT dessen Hauptfigur; hat er kein eigenes Kapitel, gilt das Kapitel des Strangs. Behandle das als gesetzt, auch wenn es nicht pro Beat wiederholt wird.\n'
@@ -173,7 +229,7 @@ export function buildPlotBrainstormPrompt(aktName, acts, beats, buchKontext, fig
 
 AKTUELLES BOARD:
 ${_boardOutline(acts, beats, _threadInfoMap(threads))}
-${ctxSeg}${figSeg}${wfSeg}${kapSeg}${strSeg}${threadGoal}${existSeg}
+${ctxSeg}${figSeg}${wfSeg}${kapSeg}${orteSeg}${zeitSeg}${strSeg}${threadGoal}${existSeg}
 ZIEL-AKT: "${aktName}"
 
 Liefere 3–7 konkrete, voneinander unterscheidbare Beat-Vorschläge für diesen Akt${threadInfo ? ' + Strang' : ''}. Jeder Beat:
@@ -202,7 +258,7 @@ export const SCHEMA_PLOT_BRAINSTORM = _obj({
 // Prüft den geplanten Plot gegen die Buchrealität: extrahierte Szenen + Kapitel +
 // Figuren. Findet Brüche, Lücken und „geplant vs. schon geschrieben"-Drift.
 
-export function buildPlotConsistencyPrompt(acts, beats, kapitel = [], szenen = [], figuren = [], buchKontext = '', werkstattFiguren = [], threads = []) {
+export function buildPlotConsistencyPrompt(acts, beats, kapitel = [], szenen = [], figuren = [], buchKontext = '', werkstattFiguren = [], threads = [], orte = [], zeitstrahl = [], kontinuitaet = []) {
   const ctxSeg = (buchKontext || '').trim() ? `\nBUCH-KONTEXT:\n${buchKontext}\n` : '';
   const kapLines = _kapitelLines(kapitel);
   const kapSeg = kapLines ? `\nKAPITEL DES BUCHS (chronologisch):\n${kapLines}\n` : '';
@@ -210,8 +266,14 @@ export function buildPlotConsistencyPrompt(acts, beats, kapitel = [], szenen = [
   const szSeg = szLines
     ? `\nIM BUCH VORHANDENE SZENEN (aus der Analyse, = „Buchrealität"):\n${szLines}\n`
     : '\nHINWEIS: Es liegen noch keine analysierten Szenen vor (Komplettanalyse evtl. nicht gelaufen). Prüfe den Plot dann primär gegen die Kapitelstruktur.\n';
-  const figLines = _figurenLines(figuren);
+  const figLines = _figurenLinesDetail(figuren);
   const figSeg = figLines ? `\nFIGUREN-ENSEMBLE:\n${figLines}\n` : '';
+  const orteLines = _orteLines(orte);
+  const orteSeg = orteLines ? `\nSCHAUPLÄTZE (Orte des Buchs):\n${orteLines}\n` : '';
+  const zeitLines = _zeitstrahlLines(zeitstrahl);
+  const zeitSeg = zeitLines ? `\nZEITSTRAHL (chronologische Ereignisse der Figuren, = Buchrealität):\n${zeitLines}\n` : '';
+  const kontiLines = _kontinuitaetLines(kontinuitaet);
+  const kontiSeg = kontiLines ? `\nBEKANNTE KONTINUITÄTS-BEFUNDE (offen, aus dem letzten Continuity-Check — beziehe sie ein, dopple sie aber nicht):\n${kontiLines}\n` : '';
   const wfLines = _werkstattFigurenLines(werkstattFiguren);
   const wfSeg = wfLines ? `\nFIGUREN-WERKSTATT (geplante/in Entwicklung befindliche Figuren — Beats dürfen sie referenzieren, ohne dass sie schon im Manuskript stehen müssen):\n${wfLines}\n` : '';
   const strLines = _straengeLines(threads);
@@ -221,6 +283,11 @@ export function buildPlotConsistencyPrompt(acts, beats, kapitel = [], szenen = [
   const strSeg = strLines ? `\nHANDLUNGSSTRÄNGE (Swimlanes — parallele Erzähllinien, oft je Hauptfigur; im Board hinter den Beats als {Strang: …} annotiert):\n${strLines}\n${inheritNote}` : '';
   const hybridNote = _hasOwnActs(acts)
     ? '\nHYBRID-AKTE: Manche Stränge haben eine EIGENE Aktstruktur (im Board als „eigener Akt von Strang …" gekennzeichnet), andere teilen sich die geteilten Akte. Ein Strang mit eigenen Akten plant absichtlich unabhängig — beanstande NICHT, dass er die geteilten Akte „überspringt". Prüfe seinen dramaturgischen Bogen INNERHALB seiner eigenen Akte.\n'
+    : '';
+  // Zeitstrahl-spezifischer Prüfpunkt nur, wenn ein Figuren-Zeitstrahl vorliegt.
+  const zeitChecks = zeitLines
+    ? `
+- Chronologie gegen Zeitstrahl: Widerspricht die Beat-Reihenfolge der zeitlichen Abfolge der Figuren-Ereignisse (Vorgriffe, Rückblenden ohne Kennzeichnung, unmögliche Gleichzeitigkeit)?`
     : '';
   // Strang-spezifische Prüfpunkte nur ergänzen, wenn überhaupt Stränge existieren.
   const strChecks = strLines
@@ -234,7 +301,7 @@ export function buildPlotConsistencyPrompt(acts, beats, kapitel = [], szenen = [
 
 GEPLANTES BEAT-BOARD:
 ${_boardOutline(acts, beats, _threadInfoMap(threads))}
-${ctxSeg}${kapSeg}${szSeg}${figSeg}${wfSeg}${strSeg}${hybridNote}
+${ctxSeg}${kapSeg}${szSeg}${figSeg}${wfSeg}${orteSeg}${zeitSeg}${kontiSeg}${strSeg}${hybridNote}
 Status-Legende der Beats: geplant (noch nicht geschrieben) · Entwurf (in Arbeit) · im Buch (laut Plan schon geschrieben) · verworfen (ausgemustert).
 
 Prüfe auf:
@@ -243,7 +310,7 @@ Prüfe auf:
 - Chronologie-Brüche: die Reihenfolge der Beats (Akte → Beats) passt nicht zur Reihenfolge der verknüpften Kapitel
 - Logische Brüche / Widersprüche innerhalb der Handlung (Kausalität, Motivation, Figurenlogik)
 - Lücken: Kapitel mit Szenen, für die es keinen Beat gibt — oder dramaturgische Leerstellen (fehlender Wendepunkt, fehlende Auflösung eines Konflikts)
-- Verworfene Beats, deren Inhalt trotzdem noch im Buch auftaucht${strChecks}
+- Verworfene Beats, deren Inhalt trotzdem noch im Buch auftaucht${zeitChecks}${strChecks}
 
 Schwere-Skala:
 - "kritisch": logischer Bruch oder Plan-Realität-Widerspruch, der die Handlung zerstört
