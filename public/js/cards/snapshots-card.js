@@ -16,6 +16,7 @@ export function registerSnapshotsCard() {
     loading: false,
     capturing: false,
     deletingId: null,
+    restoringId: null,
     newLabel: '',
     newDescription: '',
     _bookId: null,
@@ -60,6 +61,7 @@ export function registerSnapshotsCard() {
       this.loading = false;
       this.capturing = false;
       this.deletingId = null;
+      this.restoringId = null;
       this.newLabel = '';
       this.newDescription = '';
       this._bookId = null;
@@ -160,11 +162,45 @@ export function registerSnapshotsCard() {
       }
     },
 
+    // ── Restore (Buch auf eine Fassung zuruecksetzen) ──────────────────────────────
+    async restoreSnapshot(snap) {
+      const app = window.__app;
+      const bookId = app?.selectedBookId;
+      if (!snap?.id || !bookId || this.restoringId || this.deletingId) return;
+      if (!confirm(app.t('snapshots.restoreConfirm', { n: snap.seq }))) return;
+      this.restoringId = snap.id;
+      try {
+        const r = await fetch(`/snapshots/${bookId}/${snap.id}/restore`, { method: 'POST' });
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({}));
+          throw new Error(body?.error_code || `HTTP ${r.status}`);
+        }
+        // Inhalt wurde serverseitig komplett ersetzt → Buch/Tree neu laden und
+        // die Fassungs-Liste auffrischen (Auto-Sicherung ist neu dazugekommen).
+        await app.loadPages?.();
+        await this.loadSnapshots(bookId, { fresh: true });
+        app.setStatus?.(app.t('snapshots.restored', { n: snap.seq }), false, 5000);
+      } catch (e) {
+        console.error('[snapshots:restore]', e);
+        app.setStatus?.(app.t('snapshots.restoreFailed') + ' ' + (e.message || ''), true, 6000);
+      } finally {
+        this.restoringId = null;
+      }
+    },
+
     // ── Anzeige-Helfer ────────────────────────────────────────────────────────────
+    // Server kann ein Label als __i18n:key__-Marker persistieren (z.B. die
+    // Auto-Sicherung vor einem Restore) — in der Locale des Betrachters aufloesen.
+    _resolveLabel(label) {
+      const m = /^__i18n:([a-zA-Z0-9_.-]+)__$/.exec(label || '');
+      return m ? window.__app.t(m[1]) : label;
+    },
+
     fassungLabel(snap) {
       const app = window.__app;
       const base = app.t('snapshots.fassung', { n: snap.seq });
-      return snap.label ? `${base} · ${snap.label}` : base;
+      const label = this._resolveLabel(snap.label);
+      return label ? `${base} · ${label}` : base;
     },
 
     snapOptionLabel(snap) {

@@ -44,8 +44,13 @@ export function buildResearchLinkPrompt(snippet, candidates) {
     block('Plot-Abschnitte', candidates.beat, beatMeta),
     block('Handlungsstränge', candidates.strang, strangMeta),
   ].join('\n\n');
-  const snip = [snippet.title, snippet.body, snippet.source, snippet.url]
-    .filter(Boolean).join('\n').slice(0, 4000);
+  // Dokument-Text (PDF) ist potentiell lang → eigener, grosszuegig gedeckelter
+  // Block hinter den Kurzfeldern, damit Titel/Notiz nicht abgeschnitten werden.
+  const docPart = snippet.doc_text
+    ? `\nAngehängtes Dokument${snippet.doc_name ? ` (${snippet.doc_name})` : ''}:\n${String(snippet.doc_text).slice(0, 6000)}`
+    : '';
+  const snip = ([snippet.title, snippet.body, snippet.source, snippet.url]
+    .filter(Boolean).join('\n').slice(0, 4000)) + docPart;
   return `Recherche-Schnipsel:
 """
 ${snip}

@@ -92,6 +92,10 @@ const shellState = () => ({
   // pausiert); ttsPaused = pausiert; ttsLoading = wartet auf Audio des aktuellen
   // Satzes; ttsIndex/ttsTotal = Satz-Fortschritt fuer die Status-Pille.
   ttsEnabled: false,
+  // Atempause (ms) zwischen den vorgelesenen Fragmenten (aus /config, vom Admin
+  // konfigurierbar). fragmentMs Satz-zu-Satz, paragraphMs an Absatzgrenzen; 0 =
+  // keine Pause. Defaults mirroren die app-settings-Defaults.
+  ttsPause: { fragmentMs: 250, paragraphMs: 550 },
   ttsPlaying: false,
   ttsPaused: false,
   ttsLoading: false,
@@ -195,6 +199,7 @@ const pageState = () => ({
   pageLastEditor: null,
   currentPageEmpty: false,
   currentPageIdeenOpenCount: 0,
+  currentPageRechercheCount: 0,
   currentPageChatSessionCount: 0,
   renderedPageHtml: '',
   chapterFigures: [],
@@ -395,6 +400,9 @@ const lektoratState = () => ({
   pageLastChecked: {},
   ideenCounts: {},
   chapterIdeenCounts: {},
+  // Map page_id → Anzahl verknüpfter Recherche-Items (buchweit geteilt).
+  // Speist den Seiten-Indikator in Sidebar + Editor.
+  rechercheCounts: {},
   // Scope der aktuell offenen Ideen-Karte: 'page' (neben Editor) oder
   // 'chapter' (neben Kapitelreview). ideenChapterId nur in 'chapter'-Modus
   // gesetzt. currentPageIdeenOpenCount/currentChapterIdeenOpenCount halten die

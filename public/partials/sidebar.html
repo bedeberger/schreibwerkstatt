@@ -133,7 +133,7 @@
                       x-text="userInitials(p.user_email)"></span>
               </template>
             </span>
-            <span x-show="tokEsts[page.id] || ideenCounts[page.id] > 0" class="tok-stats">
+            <span x-show="tokEsts[page.id] || ideenCounts[page.id] > 0 || rechercheCounts[page.id] > 0" class="tok-stats">
               <template x-if="tokEsts[page.id]?.words > 0">
                 <span class="tok-stats-wrap">
                   <span class="tok-badge tok-neutral"
@@ -149,6 +149,12 @@
                     class="ideen-count-badge"
                     x-text="ideenCounts[page.id]"
                     :data-tip="t('ideen.openCountTitle', { n: ideenCounts[page.id] })"></span>
+              <span x-show="rechercheCounts[page.id] > 0"
+                    class="recherche-count-badge internal-link"
+                    @click.stop="openRechercheForPage(page.id)"
+                    x-text="rechercheCounts[page.id]"
+                    :data-tip="t('recherche.openCountTitle', { n: rechercheCounts[page.id] })"
+                    :aria-label="t('recherche.openCountTitle', { n: rechercheCounts[page.id] })"></span>
             </span>
           </div>
         </template>

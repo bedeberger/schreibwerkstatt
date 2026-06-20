@@ -48,7 +48,12 @@ test('tts disabled by default -> enabled=false, kein Secret-Feld', async () => {
   const { json } = await getConfig();
   assert.ok(json.tts, 'tts-Block vorhanden');
   assert.equal(json.tts.enabled, false);
-  assert.deepEqual(Object.keys(json.tts), ['enabled']);
+  // Erlaubt sind nur nicht-geheime Felder: enabled + die browserseitigen
+  // Atempausen (analog STT-VAD-Schwellen). Host/Key/Model/Voice/Speed/Format
+  // bleiben serverseitig (eigene Asserts unten).
+  assert.deepEqual(Object.keys(json.tts).sort(), ['enabled', 'pause']);
+  assert.equal(typeof json.tts.pause.fragmentMs, 'number');
+  assert.equal(typeof json.tts.pause.paragraphMs, 'number');
 });
 
 test('enabled + host -> enabled=true; weder host/key/model/voice im Block', async () => {

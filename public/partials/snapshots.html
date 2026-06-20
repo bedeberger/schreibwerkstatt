@@ -45,7 +45,7 @@
 
   <!-- Fassungs-Liste. -->
   <div x-show="!loading && snapshots.length" x-cloak class="table-scroll">
-    <table class="data-table snapshots-table"
+    <table class="entity-grid-table snapshots-table"
            x-data="sortableTable({
              rows: () => snapshots,
              defaultKey: 'created_at',
@@ -91,10 +91,16 @@
             <td class="snapshots-num" x-text="formatNum(s.pages)"></td>
             <td class="snapshots-num" x-text="formatNum(s.chapters)"></td>
             <td>
-              <button type="button" class="btn-compact snapshots-del-btn"
-                      @click="deleteSnapshot(s)"
-                      :disabled="deletingId === s.id"
-                      x-text="deletingId === s.id ? $app.t('snapshots.deleting') : $app.t('snapshots.delete')"></button>
+              <div class="snapshots-actions">
+                <button type="button" class="btn-compact"
+                        @click="restoreSnapshot(s)"
+                        :disabled="restoringId === s.id || deletingId === s.id"
+                        x-text="restoringId === s.id ? $app.t('snapshots.restoring') : $app.t('snapshots.restore')"></button>
+                <button type="button" class="btn-compact snapshots-del-btn"
+                        @click="deleteSnapshot(s)"
+                        :disabled="deletingId === s.id || restoringId === s.id"
+                        x-text="deletingId === s.id ? $app.t('snapshots.deleting') : $app.t('snapshots.delete')"></button>
+              </div>
             </td>
           </tr>
         </template>

@@ -15,6 +15,7 @@ const { toIntId } = require('../lib/validate');
 const { setContext } = require('../lib/log-context');
 const { requireBookAccess, sendACLError } = require('../lib/acl');
 const { prepareCover } = require('../lib/cover-prepare');
+const { extractPdfText } = require('../lib/pdf-extract');
 const { NOW_ISO_SQL } = require('../db/now');
 const searchIndex = require('../lib/search');
 const logger = require('../logger');
@@ -22,6 +23,8 @@ const logger = require('../logger');
 const router = express.Router();
 const jsonBody = express.json();
 const rawImage = express.raw({ type: ['image/*'], limit: '12mb' });
+const rawDoc = express.raw({ type: ['application/pdf'], limit: '25mb' });
+const DOCNAME_MAX = 200;
 
 const KINDS = new Set(['note', 'link', 'quote', 'fact', 'image']);
 const TITLE_MAX = 300;
@@ -110,7 +113,9 @@ function _attachRelations(items) {
     it.tags = tagsByItem.get(it.id) || [];
     it.links = linksByItem.get(it.id) || [];
     it.has_image = !!it.image_mime;
+    it.has_doc = !!it.doc_mime;
     delete it.image_mime;
+    delete it.doc_mime;
   }
   return items;
 }
@@ -118,7 +123,7 @@ function _attachRelations(items) {
 function _emitItem(id) {
   const row = db.prepare(
     `SELECT id, book_id, user_email, kind, title, body, url, source, image_mime,
-            pinned, archived, created_at, updated_at
+            doc_mime, doc_name, doc_pages, pinned, archived, created_at, updated_at
        FROM research_items WHERE id = ?`
   ).get(id);
   if (!row) return null;
@@ -208,7 +213,8 @@ router.get('/', (req, res) => {
 
   const rows = db.prepare(
     `SELECT ri.id, ri.book_id, ri.user_email, ri.kind, ri.title, ri.body, ri.url,
-            ri.source, ri.image_mime, ri.pinned, ri.archived, ri.created_at, ri.updated_at${selectExtra}
+            ri.source, ri.image_mime, ri.doc_mime, ri.doc_name, ri.doc_pages,
+            ri.pinned, ri.archived, ri.created_at, ri.updated_at${selectExtra}
        FROM research_items ri
       WHERE ${where.join(' AND ')}
       ORDER BY ${orderBy}`
@@ -261,6 +267,26 @@ router.get('/link-targets', (req, res) => {
     'SELECT id, name AS label FROM plot_threads WHERE book_id = ? AND user_email = ? ORDER BY position, name'
   ).all(bookId, userEmail);
   res.json(out);
+});
+
+// Map page_id → Anzahl verknüpfter, nicht-archivierter Recherche-Items eines
+// Buchs. Speist den Seiten-Indikator (Sidebar + Editor) wie /ideen/counts.
+// Buchweit geteilt → kein user_email-Filter (anders als Ideen).
+router.get('/page-counts', (req, res) => {
+  const bookId = toIntId(req.query.book_id);
+  if (!bookId) return res.status(400).json({ error_code: 'INVALID_ID' });
+  if (!_guard(req, res, bookId, 'editor')) return;
+  const rows = db.prepare(
+    `SELECT l.page_id AS page_id, COUNT(DISTINCT l.item_id) AS n
+       FROM research_item_links l
+       JOIN research_items ri ON ri.id = l.item_id
+      WHERE ri.book_id = ? AND ri.archived = 0
+        AND l.target_kind = 'page' AND l.page_id IS NOT NULL
+      GROUP BY l.page_id`
+  ).all(bookId);
+  const map = {};
+  for (const r of rows) map[r.page_id] = r.n;
+  res.json(map);
 });
 
 // ── Anlegen ──────────────────────────────────────────────────────────────
@@ -418,6 +444,73 @@ router.get('/:id/image', (req, res) => {
   res.set('Content-Type', row.image_mime || 'image/jpeg');
   res.set('Cache-Control', 'private, max-age=3600');
   res.send(row.image);
+});
+
+// ── Dokument (PDF) hochladen ─────────────────────────────────────────────────
+// Original-PDF als BLOB + extrahierter Plain-Text (FTS + KI-Verknuepfung).
+// Dateiname kommt als ?name= (URL-encoded). Rein lesend, nie generativ.
+router.post('/:id/doc', rawDoc, async (req, res) => {
+  const userEmail = userEmailOrNull(req);
+  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  const id = toIntId(req.params.id);
+  if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
+  const bookId = _itemBookId(id);
+  if (!bookId) return res.status(404).json({ error_code: 'ITEM_NOT_FOUND' });
+  if (!_guard(req, res, bookId, 'editor')) return;
+  if (!Buffer.isBuffer(req.body) || !req.body.length) {
+    return res.status(400).json({ error_code: 'NO_DOC' });
+  }
+  const docName = _clean(String(req.query.name || ''), DOCNAME_MAX) || 'Dokument.pdf';
+  try {
+    const { text, pages } = await extractPdfText(req.body);
+    db.prepare(
+      `UPDATE research_items
+          SET doc = ?, doc_mime = 'application/pdf', doc_name = ?, doc_text = ?, doc_pages = ?,
+              kind = 'document', updated_at = ${NOW_ISO_SQL}
+        WHERE id = ?`
+    ).run(req.body, docName, text, pages, id);
+    searchIndex.upsertResearch(id);
+    logger.info(`[research] doc upload id=${id} pages=${pages} chars=${text.length}`);
+    res.json(_emitItem(id));
+  } catch (e) {
+    logger.warn('[research] Dokument-Upload fehlgeschlagen: ' + e.message);
+    res.status(400).json({ error_code: 'DOC_INVALID' });
+  }
+});
+
+// Dokument ausliefern (BLOB-Stream, inline mit Original-Dateinamen).
+router.get('/:id/doc', (req, res) => {
+  const id = toIntId(req.params.id);
+  if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
+  const row = db.prepare('SELECT book_id, doc, doc_mime, doc_name FROM research_items WHERE id = ?').get(id);
+  if (!row || !row.doc) return res.status(404).json({ error_code: 'NO_DOC' });
+  if (!_guard(req, res, row.book_id, 'viewer')) return;
+  const safeName = encodeURIComponent(row.doc_name || 'dokument.pdf');
+  res.set('Content-Type', row.doc_mime || 'application/pdf');
+  res.set('Content-Disposition', `inline; filename*=UTF-8''${safeName}`);
+  res.set('Cache-Control', 'private, max-age=3600');
+  res.send(row.doc);
+});
+
+// Dokument entfernen (Item bleibt; kind faellt auf 'note' zurueck, falls es nur
+// wegen des Dokuments 'document' war).
+router.delete('/:id/doc', (req, res) => {
+  const userEmail = userEmailOrNull(req);
+  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  const id = toIntId(req.params.id);
+  if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
+  const bookId = _itemBookId(id);
+  if (!bookId) return res.status(404).json({ error_code: 'ITEM_NOT_FOUND' });
+  if (!_guard(req, res, bookId, 'editor')) return;
+  db.prepare(
+    `UPDATE research_items
+        SET doc = NULL, doc_mime = NULL, doc_name = NULL, doc_text = NULL, doc_pages = NULL,
+            kind = CASE WHEN kind = 'document' THEN 'note' ELSE kind END,
+            updated_at = ${NOW_ISO_SQL}
+      WHERE id = ?`
+  ).run(id);
+  searchIndex.upsertResearch(id);
+  res.json(_emitItem(id));
 });
 
 module.exports = router;

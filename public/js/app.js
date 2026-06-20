@@ -729,6 +729,14 @@ document.addEventListener('alpine:init', () => {
           };
         }
         this.ttsEnabled = !!cfg.tts?.enabled;
+        if (cfg.tts?.pause) {
+          const frag = Number(cfg.tts.pause.fragmentMs);
+          const para = Number(cfg.tts.pause.paragraphMs);
+          this.ttsPause = {
+            fragmentMs:  Number.isFinite(frag) ? frag : this.ttsPause.fragmentMs,
+            paragraphMs: Number.isFinite(para) ? para : this.ttsPause.paragraphMs,
+          };
+        }
         if (cfg.mapTiles?.url) {
           this.mapTiles = {
             url: cfg.mapTiles.url,

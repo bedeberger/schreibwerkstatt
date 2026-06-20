@@ -36,7 +36,7 @@ async function runResearchLinkJob(jobId, itemId, bookId, userEmail) {
   try {
     updateJob(jobId, { statusText: 'job.phase.researchLinking', progress: 15 });
     const item = db.prepare(
-      'SELECT id, title, body, url, source FROM research_items WHERE id = ? AND book_id = ?'
+      'SELECT id, title, body, url, source, doc_name, doc_text FROM research_items WHERE id = ? AND book_id = ?'
     ).get(itemId, bookId);
     if (!item) throw i18nError('job.error.researchItemMissing');
 

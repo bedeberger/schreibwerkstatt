@@ -492,6 +492,7 @@ export const treeMethods = {
         this.pageLastChecked = {};
         this.ideenCounts = {};
         this.chapterIdeenCounts = {};
+        this.rechercheCounts = {};
       }
       this._tokenEstGen++;
       // Buchwechsel: SW-CONTENT_CACHE (SWR) kann stale Listen liefern, daher fresh.
@@ -587,17 +588,22 @@ export const treeMethods = {
       }
       this._refreshChapterStats();
 
-      // Gecachte Stats + Page-Ages + Ideen-Counts (Page + Chapter) aus DB laden
+      // Gecachte Stats + Page-Ages + Ideen-Counts (Page + Chapter) + Recherche-Counts laden
       try {
-        const [statsCache, ageMap, ideenMap, chapterIdeenMap] = await Promise.all([
+        const [statsCache, ageMap, ideenMap, chapterIdeenMap, rechercheMap] = await Promise.all([
           fetchJson('/history/page-stats/' + bookId, { signal }),
           fetchJson('/history/page-ages/' + bookId, { signal }),
           fetchJson('/ideen/counts?book_id=' + bookId, { signal }).catch(() => ({})),
           fetchJson('/ideen/counts?book_id=' + bookId + '&kind=chapter', { signal }).catch(() => ({})),
+          fetchJson('/research/page-counts?book_id=' + bookId, { signal }).catch(() => ({})),
         ]);
         this.pageLastChecked = ageMap || {};
         this.ideenCounts = ideenMap || {};
         this.chapterIdeenCounts = chapterIdeenMap || {};
+        this.rechercheCounts = rechercheMap || {};
+        // Editor-Badge der offenen Seite mit frischer Map abgleichen (Race: Seite
+        // kann vor dem Counts-Fetch via restoreLastPage geöffnet worden sein).
+        if (this.currentPage?.id) this.currentPageRechercheCount = this.rechercheCounts[this.currentPage.id] || 0;
         // Cache-Hits in einem Rutsch zuweisen (statt Index-Assign in der Loop),
         // damit der tokEsts-$watch in app.js#init feuert und die Kapitel-Stats
         // synchron mit dem ersten Tree-Render aktualisiert.

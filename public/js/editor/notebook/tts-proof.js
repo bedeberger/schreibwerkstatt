@@ -30,6 +30,13 @@ const TTS_PREFETCH_AHEAD = 1;   // wie viele Saetze im Voraus synthetisiert werd
 // einzeln, der Highlight also satzgenau. Piper braucht das nicht, schadet aber
 // nicht; das Frontend kennt die Engine nicht (`/config` liefert nur `enabled`).
 const TTS_MIN_CHUNK_CHARS = 60;
+// Default-Atempause (ms) zwischen den vorgelesenen Fragmenten: statt nahtlos ins
+// naechste Fragment ueberzugehen, gibt eine kurze Stille dem Ohr Luft — naeher
+// am natuerlichen Vorlesen. An Absatzgrenzen (Block-Wechsel) etwas laenger.
+// Fallback, falls /config keine Werte liefert — der Admin ueberschreibt sie via
+// `tts.pause.fragment_ms` / `tts.pause.paragraph_ms` (this.ttsPause).
+const TTS_FRAGMENT_PAUSE_MS = 250;
+const TTS_PARAGRAPH_PAUSE_MS = 550;
 const TTS_MAX_RETRY = 1;
 const TTS_RETRY_DELAY_MS = 600;
 const TTS_RETRYABLE_STATUS = new Set([408, 500, 502, 503]);
@@ -247,7 +254,10 @@ export const ttsProofMethods = {
       // neu antreiben.
       if (rt.resolveCurrent && rt.audio && !rt.audio.ended) {
         try { rt.audio.play(); } catch { /* noop */ }
-      } else {
+      } else if (!rt.running) {
+        // Beim Laden / in einer Inter-Fragment-Pause pausiert: die alte Schleife
+        // laeuft ggf. noch (running) und nimmt den Resume selbst auf — dann hier
+        // keine zweite anwerfen.
         this._ttsRun(rt);
       }
     } else {
@@ -289,6 +299,7 @@ export const ttsProofMethods = {
       urls: new Set(),      // alle erzeugten Object-URLs (Revoke beim Stop)
       audio: null,
       paused: false,
+      running: false,       // Re-Entry-Guard fuer _ttsRun (siehe dort)
       abort: new AbortController(),
       resolveCurrent: null, // beendet das aktuelle _ttsPlayUrl-Promise (Skip/Stop)
     };
@@ -306,23 +317,49 @@ export const ttsProofMethods = {
   // rueckt vor. Alle Guards pruefen `activeRt === rt` — eine beendete oder
   // gewechselte Session bricht still ab.
   async _ttsRun(rt) {
-    while (activeRt === rt && rt.i < rt.segs.length) {
-      if (rt.paused) return; // Fortsetzen treibt die Schleife neu an
-      const idx = rt.i;
-      this.ttsIndex = idx + 1;
-      this._ttsHighlight(idx);
-      for (let k = 0; k <= TTS_PREFETCH_AHEAD; k++) this._ttsPrefetch(rt, idx + k);
-      this.ttsLoading = true;
-      const url = await rt.cache.get(idx);
-      this.ttsLoading = false;
-      if (activeRt !== rt || rt.paused) return;
-      if (url == null) { this._ttsWarn(`segment ${idx} skipped (synth failed)`); rt.i++; continue; } // Fehler-Satz uebersprungen (schon getoastet)
-      const ended = await this._ttsPlayUrl(rt, url);
-      if (activeRt !== rt) return;
-      if (!ended) return; // pausiert/gestoppt -> Steuerung liegt bei Toggle/Stop
-      rt.i++;
+    // Re-Entry-Guard: solange die Schleife laeuft (auch waehrend einer
+    // Inter-Fragment-Pause oder eines Lade-Awaits), darf der Resume-Pfad in
+    // `toggleTtsProof` keine zweite Schleife anwerfen — sonst spielen zwei
+    // Schleifen parallel. `running` wird in `finally` garantiert zurueckgesetzt.
+    if (rt.running) return;
+    rt.running = true;
+    try {
+      while (activeRt === rt && rt.i < rt.segs.length) {
+        if (rt.paused) return; // Fortsetzen treibt die Schleife neu an
+        const idx = rt.i;
+        this.ttsIndex = idx + 1;
+        this._ttsHighlight(idx);
+        for (let k = 0; k <= TTS_PREFETCH_AHEAD; k++) this._ttsPrefetch(rt, idx + k);
+        this.ttsLoading = true;
+        const url = await rt.cache.get(idx);
+        this.ttsLoading = false;
+        if (activeRt !== rt || rt.paused) return;
+        if (url == null) { this._ttsWarn(`segment ${idx} skipped (synth failed)`); rt.i++; continue; } // Fehler-Satz uebersprungen (schon getoastet)
+        const ended = await this._ttsPlayUrl(rt, url);
+        if (activeRt !== rt) return;
+        if (!ended) return; // pausiert/gestoppt -> Steuerung liegt bei Toggle/Stop
+        rt.i++;
+        // Atempause vor dem naechsten Fragment (an Absatzgrenzen laenger). Dauer
+        // vom Admin konfigurierbar (this.ttsPause aus /config), Default via
+        // Konstanten. 0 = keine Pause (kein unnoetiger Await). Kein Audio aktiv
+        // -> nur via Stop abbrechbar (abort.signal); Pause waehrend der Pause
+        // faengt der `rt.paused`-Return oben in der naechsten Runde.
+        const next = rt.segs[rt.i];
+        if (next) {
+          const blockChange = next.block !== rt.segs[idx].block;
+          const ms = blockChange
+            ? (this.ttsPause?.paragraphMs ?? TTS_PARAGRAPH_PAUSE_MS)
+            : (this.ttsPause?.fragmentMs ?? TTS_FRAGMENT_PAUSE_MS);
+          if (ms > 0) {
+            await this._ttsDelay(ms, rt.abort.signal);
+            if (activeRt !== rt || rt.paused) return;
+          }
+        }
+      }
+      if (activeRt === rt) this._ttsStop(); // ans Ende gelesen
+    } finally {
+      rt.running = false;
     }
-    if (activeRt === rt) this._ttsStop(); // ans Ende gelesen
   },
 
   // Spielt eine Audio-URL; resolved true bei natuerlichem Ende (oder Defekt ->
@@ -339,7 +376,15 @@ export const ttsProofMethods = {
         resolve(val);
       };
       audio.addEventListener('ended', () => done(true));
-      audio.addEventListener('error', () => { this._ttsWarn('audio playback error, skipping segment', audio.error?.message); done(true); }); // defektes Segment -> weiter
+      audio.addEventListener('error', () => {
+        // Beim Stop setzt `_ttsStop` `audio.src = ''`, was ein spaeteres
+        // MEDIA_ELEMENT_ERROR ("Empty src attribute") feuert. Da `activeRt`
+        // dort vorher genullt wird, ist das nur Teardown-Rauschen -> still
+        // verwerfen. Nur bei lebender Session ist es ein echter Defekt.
+        if (activeRt !== rt) return;
+        this._ttsWarn('audio playback error, skipping segment', audio.error?.message);
+        done(true); // defektes Segment -> weiter
+      });
       audio.play().catch((e) => { if (!rt.paused) { this._ttsWarn('audio.play() rejected, skipping segment', e?.message); done(true); } });
     });
   },
@@ -367,8 +412,17 @@ export const ttsProofMethods = {
   // TTS_MAX_RETRY-mal wiederholt. 404 (Feature aus) / 401 (Session abgelaufen)
   // stoppen die Session. `signal` (Session-AbortController) beendet Request UND
   // Retry-Wait sofort und still beim Stop.
+  // Schweizer Guillemets (« »), inkl. der einfachen (‹ ›), spricht XTTS als
+  // Lautfolge aus statt sie als Anfuehrung zu ignorieren. Vor der Synthese auf
+  // gerade Anfuehrungszeichen normalisieren — rein fuer die Sprachausgabe, der
+  // angezeigte Text + die Highlight-Offsets bleiben unveraendert.
+  _ttsNormalizeForSpeech(text) {
+    return text.replace(/[«»]/g, '"').replace(/[‹›]/g, "'");
+  },
+
   async _ttsFetchAudio(text, attempt, signal) {
     if (signal?.aborted) return null;
+    text = this._ttsNormalizeForSpeech(text);
     const params = new URLSearchParams();
     if (this.selectedBookId) params.set('bookId', this.selectedBookId);
     if (this.currentPage?.id) params.set('pageId', this.currentPage.id);

@@ -57,6 +57,21 @@
         <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.registrationExpireDays')"></small>
       </label>
 
+      <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.auth.rateLimitTitle')"></span></h4>
+      <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.auth.rateLimitHint')"></p>
+      <label>auth.register.rate_limit_max
+        <input type="text" x-data="numInput({ integer: true, min: 1, max: 1000 })" x-modelable="value" x-model="adminSettingsForm['auth.register.rate_limit_max']">
+      </label>
+      <label>auth.register.rate_limit_window_min
+        <input type="text" x-data="numInput({ integer: true, min: 1, max: 1440 })" x-modelable="value" x-model="adminSettingsForm['auth.register.rate_limit_window_min']">
+      </label>
+      <label>auth.admin_login.max_fails
+        <input type="text" x-data="numInput({ integer: true, min: 1, max: 1000 })" x-modelable="value" x-model="adminSettingsForm['auth.admin_login.max_fails']">
+      </label>
+      <label>auth.admin_login.window_min
+        <input type="text" x-data="numInput({ integer: true, min: 1, max: 1440 })" x-modelable="value" x-model="adminSettingsForm['auth.admin_login.window_min']">
+      </label>
+
       <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.auth.captchaTitle')"></span></h4>
       <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.auth.captchaHint')"></p>
       <label class="checkbox-row">
@@ -67,6 +82,10 @@
       <label>auth.altcha.complexity
         <input type="text" x-data="numInput({ integer: true, min: 1000, max: 5000000 })" x-modelable="value" x-model="adminSettingsForm['auth.altcha.complexity']">
         <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.altchaComplexity')"></small>
+      </label>
+      <label>auth.altcha.challenge_ttl_min
+        <input type="text" x-data="numInput({ integer: true, min: 1, max: 120 })" x-modelable="value" x-model="adminSettingsForm['auth.altcha.challenge_ttl_min']">
+        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.altchaChallengeTtl')"></small>
       </label>
 
       <div class="admin-settings-actions">
@@ -488,6 +507,16 @@
         <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.tts.speed.help')"></small>
       </label>
       <label>
+        <span x-text="$app.t('admin.settings.tts.pauseFragmentMs.label')"></span>
+        <input type="text" x-data="numInput({ integer: true, min: 0, max: 5000 })" x-modelable="value" x-model="adminSettingsForm['tts.pause.fragment_ms']">
+        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.tts.pauseFragmentMs.help')"></small>
+      </label>
+      <label>
+        <span x-text="$app.t('admin.settings.tts.pauseParagraphMs.label')"></span>
+        <input type="text" x-data="numInput({ integer: true, min: 0, max: 5000 })" x-modelable="value" x-model="adminSettingsForm['tts.pause.paragraph_ms']">
+        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.tts.pauseParagraphMs.help')"></small>
+      </label>
+      <label>
         <span x-text="$app.t('admin.settings.tts.apiKey.label')"></span>
         <input type="password" x-model="adminSettingsForm['tts.api_key']" :placeholder="$app.t('admin.settings.secret.masked')" autocomplete="off">
         <small x-show="adminSettingsMap['tts.api_key']?.masked" class="muted-msg muted-msg--sm" x-text="adminSettingsMap['tts.api_key']?.masked"></small>
@@ -727,6 +756,17 @@
         <label>app.page_revision_limit
           <input type="text" x-data="numInput({ integer: true, min: 1, max: 500 })" x-modelable="value" x-model="adminSettingsForm['app.page_revision_limit']">
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.pageRevisionLimit')"></small>
+        </label>
+        <label>editor.lock_ttl_min
+          <input type="text" x-data="numInput({ integer: true, min: 1, max: 1440 })" x-modelable="value" x-model="adminSettingsForm['editor.lock_ttl_min']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.editorLockTtl')"></small>
+        </label>
+        <label>share.comment.rate_limit_max
+          <input type="text" x-data="numInput({ integer: true, min: 1, max: 1000 })" x-modelable="value" x-model="adminSettingsForm['share.comment.rate_limit_max']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.shareCommentRateLimit')"></small>
+        </label>
+        <label>share.comment.rate_limit_window_min
+          <input type="text" x-data="numInput({ integer: true, min: 1, max: 1440 })" x-modelable="value" x-model="adminSettingsForm['share.comment.rate_limit_window_min']">
         </label>
         <label>macclient.github_token
           <input type="password" x-model="adminSettingsForm['macclient.github_token']" :placeholder="$app.t('admin.settings.secret.masked')" autocomplete="off">

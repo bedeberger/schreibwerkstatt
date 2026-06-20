@@ -50,7 +50,8 @@ test('null IP: silent no-op', () => {
   assert.equal(s2.blocked, false);
 });
 
-test('Konstanten exportiert', () => {
-  assert.equal(rl.MAX_FAILS, 5);
-  assert.equal(rl.WINDOW_MS, 15 * 60 * 1000);
+test('Defaults aus app-settings', () => {
+  const appSettings = require('../../lib/app-settings');
+  assert.equal(appSettings.get('auth.admin_login.max_fails'), 5);
+  assert.equal(appSettings.get('auth.admin_login.window_min'), 15);
 });

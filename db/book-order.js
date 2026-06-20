@@ -168,6 +168,15 @@ const _upsertStmt = db.prepare(`
     updated_by = excluded.updated_by
 `);
 
+// Order-Overlay eines Buchs loeschen — ensureTree baut danach frisch aus den
+// aktuellen pages.position/chapters.position auf (buildFromCurrentState). Noetig
+// nach einem Voll-Wipe (z.B. Fassungs-Restore), weil die alte Row sonst auf
+// geloeschte Page-/Chapter-IDs zeigt.
+const _deleteOrderStmt = db.prepare('DELETE FROM book_order WHERE book_id = ?');
+function clearOrder(bookId) {
+  _deleteOrderStmt.run(bookId);
+}
+
 // Validiert + materialisiert + persistiert in einer Transaction.
 function putOrder(bookId, tree, userEmail = null) {
   validateTree(tree, bookId);
@@ -419,6 +428,7 @@ module.exports = {
   materializeTree,
   getOrder,
   putOrder,
+  clearOrder,
   buildFromCurrentState,
   reconcile,
   ensureTree,

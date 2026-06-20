@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 208, 107 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 209, 107 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -358,13 +358,18 @@ erDiagram
     INTEGER id          PK
     INTEGER book_id     FK "ON DELETE CASCADE"
     TEXT    user_email  "Ersteller-Attribution (kein Sichtbarkeits-Scope; buchweit geteilt)"
-    TEXT    kind        "note|link|quote|fact|image"
+    TEXT    kind        "note|link|quote|fact|image|document"
     TEXT    title
     TEXT    body        "Plain-Text"
     TEXT    url         "bei kind=link"
     TEXT    source      "Quellen-/Zitatnachweis"
     BLOB    image       "bei kind=image, sharp-normalisiert"
     TEXT    image_mime
+    BLOB    doc         "bei kind=document, Original-PDF"
+    TEXT    doc_mime    "application/pdf"
+    TEXT    doc_name    "Original-Dateiname"
+    TEXT    doc_text    "extrahierter Plain-Text (FTS + KI-Verknuepfung)"
+    INTEGER doc_pages
     INTEGER pinned
     INTEGER archived
     TEXT    created_at

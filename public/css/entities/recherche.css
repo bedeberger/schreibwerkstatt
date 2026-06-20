@@ -174,6 +174,22 @@ textarea.recherche-input { resize: vertical; min-height: 2.75rem; }
 }
 .research-item-url .icon { width: 0.9em; height: 0.9em; flex-shrink: 0; }
 
+.research-item-doc {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  align-self: flex-start;
+  padding: var(--space-2xs) var(--space-xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--card-accent);
+  font-size: var(--font-size-sm);
+  max-width: 100%;
+}
+.research-item-doc .icon { width: 1em; height: 1em; flex-shrink: 0; }
+.research-item-doc-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.research-item-doc-meta { color: var(--color-muted); flex-shrink: 0; }
+
 .research-item-source {
   font-size: var(--font-size-sm);
   color: var(--color-muted);

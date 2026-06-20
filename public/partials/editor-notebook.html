@@ -184,6 +184,11 @@
                   <span x-text="t('ideen.title')"></span>
                   <span class="btn-count" x-show="currentPageIdeenOpenCount > 0" x-text="currentPageIdeenOpenCount"></span>
                 </button>
+                <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem" x-show="currentPageRechercheCount > 0" @click="openRechercheForPage(currentPage?.id); pageActionsMenuOpen = false">
+                  <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#book-open"/></svg>
+                  <span x-text="t('recherche.title')"></span>
+                  <span class="btn-count" x-text="currentPageRechercheCount"></span>
+                </button>
                 <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem" x-show="canEdit() && currentPage" :disabled="currentPageEmpty" @click="openShareLinksForPage(currentPage.id); pageActionsMenuOpen = false">
                   <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#share-2"/></svg>
                   <span x-text="t('share.btn.sharePage')"></span>

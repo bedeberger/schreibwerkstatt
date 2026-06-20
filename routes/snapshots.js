@@ -11,19 +11,27 @@
 const express = require('express');
 const logger = require('../logger');
 const contentStore = require('../lib/content-store');
-const { getBookSettings } = require('../db/schema');
-const { treeToNodes, buildBookJson } = require('../lib/book-bundle');
+const { getBookSettings, saveBookSettings, setBookEntitiesEnabled } = require('../db/schema');
+const { treeToNodes, buildBookJson, validateBookJson, planFromNodes } = require('../lib/book-bundle');
 const { collectExtras } = require('../db/book-migration-data');
 const { htmlToPlainText } = require('../lib/html-text');
 const { toIntId } = require('../lib/validate');
 const { setContext } = require('../lib/log-context');
 const { requireBookAccess, sendACLError } = require('../lib/acl');
+const bookOrder = require('../db/book-order');
 const snapshots = require('../db/book-snapshots');
 
 const router = express.Router();
 
 const LABEL_MAX = 120;
 const DESC_MAX = 1000;
+
+// Label der automatischen Sicherung, die ein Restore anlegt. Persistiert als
+// __i18n:-Marker, damit der spaetere Betrachter die Bezeichnung in seiner
+// eigenen Locale sieht (Frontend loest via t() auf).
+const AUTO_BACKUP_LABEL = '__i18n:snapshots.autoBackupLabel__';
+
+function _err(code) { const e = new Error(code); e.code = code; return e; }
 
 function _clip(s, max) {
   if (s == null) return null;
@@ -54,6 +62,59 @@ function _countChapters(nodes) {
     }
   })(nodes);
   return n;
+}
+
+// Selbsttragende Momentaufnahme des aktuellen Buchstands bauen (content_json +
+// extras_json + Stats). Gemeinsame Basis fuer „Fassung speichern" und die
+// automatische Sicherung vor einem Restore. Wirft typisierte Fehler:
+//   BOOK_EMPTY     — Buch hat keine Seiten
+//   CAPTURE_FAILED — Load der Inhalte fehlgeschlagen
+async function _buildSnapshotPayload(bookId, req) {
+  let book, tree;
+  try {
+    [book, tree] = await Promise.all([
+      contentStore.loadBook(bookId, req),
+      contentStore.bookTree(bookId, req),
+    ]);
+  } catch (e) {
+    if (e.status === 404) throw _err('NOT_FOUND');
+    throw _err('CAPTURE_FAILED');
+  }
+
+  const metas = _collectMetas(tree);
+  if (!metas.length) throw _err('BOOK_EMPTY');
+
+  let details;
+  try {
+    details = await contentStore.loadPagesBatch(metas, req, { batchSize: 15, onError: () => null });
+  } catch (e) {
+    throw _err('CAPTURE_FAILED');
+  }
+  const htmlById = new Map();
+  for (const d of details) if (d && d.id) htmlById.set(d.id, d.html || '');
+
+  const nodes = treeToNodes(tree, htmlById);
+  const settings = (() => { try { return getBookSettings(bookId); } catch { return null; } })();
+  const content = buildBookJson({ book, settings, nodes });
+
+  // Stats aus dem inline-HTML (gleiche Normalisierung wie page_stats).
+  let chars = 0; let words = 0;
+  for (const html of htmlById.values()) {
+    const text = htmlToPlainText(html);
+    chars += text.length;
+    if (text) words += text.split(/\s+/).filter(Boolean).length;
+  }
+
+  // Extras (Analyse + Lektorat) synchron einsammeln — reiner DB-Read, kein KI-Call.
+  let extrasJson = null;
+  try {
+    const extras = collectExtras(bookId, { analysis: true, lektorat: true });
+    if (extras && (extras.analysis || extras.lektorat)) extrasJson = JSON.stringify(extras);
+  } catch (e) {
+    logger.warn(`Snapshot-Extras fehlgeschlagen (book=${bookId}): ${e.message}`);
+  }
+
+  return { content, extrasJson, chars, words, pages: htmlById.size, chapters: _countChapters(nodes) };
 }
 
 // ── List ──────────────────────────────────────────────────────────────────────
@@ -110,53 +171,14 @@ router.post('/:bookId', express.json({ limit: '1mb' }), async (req, res) => {
   const label = _clip(req.body?.label, LABEL_MAX);
   const description = _clip(req.body?.description, DESC_MAX);
 
-  let book, tree;
+  let payload;
   try {
-    [book, tree] = await Promise.all([
-      contentStore.loadBook(bookId, req),
-      contentStore.bookTree(bookId, req),
-    ]);
+    payload = await _buildSnapshotPayload(bookId, req);
   } catch (e) {
-    if (e.status === 404) return res.status(404).json({ error_code: 'NOT_FOUND' });
-    logger.error(`Snapshot-Capture Load fehlgeschlagen (book=${bookId}): ${e.message}`);
+    if (e.code === 'NOT_FOUND') return res.status(404).json({ error_code: 'NOT_FOUND' });
+    if (e.code === 'BOOK_EMPTY') return res.status(400).json({ error_code: 'BOOK_EMPTY' });
+    logger.error(`Snapshot-Capture fehlgeschlagen (book=${bookId}): ${e.message}`);
     return res.status(502).json({ error_code: 'CAPTURE_FAILED' });
-  }
-
-  const metas = _collectMetas(tree);
-  if (!metas.length) return res.status(400).json({ error_code: 'BOOK_EMPTY' });
-
-  let details;
-  try {
-    details = await contentStore.loadPagesBatch(metas, req, { batchSize: 15, onError: () => null });
-  } catch (e) {
-    logger.error(`Snapshot-Capture Pages fehlgeschlagen (book=${bookId}): ${e.message}`);
-    return res.status(502).json({ error_code: 'CAPTURE_FAILED' });
-  }
-  const htmlById = new Map();
-  for (const d of details) if (d && d.id) htmlById.set(d.id, d.html || '');
-
-  const nodes = treeToNodes(tree, htmlById);
-  const settings = (() => { try { return getBookSettings(bookId); } catch { return null; } })();
-  const content = buildBookJson({ book, settings, nodes });
-
-  // Stats aus dem inline-HTML (gleiche Normalisierung wie page_stats).
-  let chars = 0; let words = 0;
-  for (const html of htmlById.values()) {
-    const text = htmlToPlainText(html);
-    chars += text.length;
-    if (text) words += text.split(/\s+/).filter(Boolean).length;
-  }
-  const pages = htmlById.size;
-  const chapters = _countChapters(nodes);
-
-  // Extras (Analyse + Lektorat) synchron einsammeln — reiner DB-Read, kein KI-Call.
-  let extrasJson = null;
-  try {
-    const extras = collectExtras(bookId, { analysis: true, lektorat: true });
-    if (extras && (extras.analysis || extras.lektorat)) extrasJson = JSON.stringify(extras);
-  } catch (e) {
-    // Extras sind best-effort (fuer spaeteren Restore); Snapshot trotzdem anlegen.
-    logger.warn(`Snapshot-Extras fehlgeschlagen (book=${bookId}): ${e.message}`);
   }
 
   const userEmail = req.session?.user?.email || null;
@@ -164,22 +186,135 @@ router.post('/:bookId', express.json({ limit: '1mb' }), async (req, res) => {
   try {
     created = snapshots.createSnapshot({
       bookId, label, description,
-      contentJson: JSON.stringify(content), extrasJson,
-      chars, words, pages, chapters, userEmail,
+      contentJson: JSON.stringify(payload.content), extrasJson: payload.extrasJson,
+      chars: payload.chars, words: payload.words, pages: payload.pages, chapters: payload.chapters,
+      userEmail,
     });
   } catch (e) {
     logger.error(`Snapshot-Insert fehlgeschlagen (book=${bookId}): ${e.message}`);
     return res.status(500).json({ error_code: 'CAPTURE_FAILED' });
   }
 
-  logger.info(`Snapshot «Fassung ${created.seq}» angelegt (book=${bookId}, pages=${pages}, chars=${chars}).`);
+  logger.info(`Snapshot «Fassung ${created.seq}» angelegt (book=${bookId}, pages=${payload.pages}, chars=${payload.chars}).`);
   return res.json({
     snapshot: {
       id: created.id, seq: created.seq, label, description,
-      chars, words, pages, chapters, user_email: userEmail,
-      created_at: new Date().toISOString(), has_extras: extrasJson ? 1 : 0,
+      chars: payload.chars, words: payload.words, pages: payload.pages, chapters: payload.chapters,
+      user_email: userEmail,
+      created_at: new Date().toISOString(), has_extras: payload.extrasJson ? 1 : 0,
     },
   });
+});
+
+// ── Restore (Buch auf eine Fassung zuruecksetzen) ───────────────────────────────
+// Destruktiv: ersetzt den GESAMTEN aktuellen Buchinhalt (Kapitel + Seiten) durch
+// den Stand der Ziel-Fassung. Vorher wird automatisch eine Sicherung des
+// aktuellen Stands als neue Fassung abgelegt → der Schritt ist umkehrbar.
+// Synchroner Pfad wie der Capture (reiner DB-Read/-Write, kein KI-/Netz-Call).
+router.post('/:bookId/:id/restore', express.json({ limit: '1mb' }), async (req, res) => {
+  const bookId = toIntId(req.params.bookId);
+  const id = toIntId(req.params.id);
+  if (!bookId || !id) return res.status(400).json({ error_code: 'ID_REQUIRED' });
+  setContext({ book: bookId });
+  try { requireBookAccess(req, bookId, 'editor'); }
+  catch (e) { if (sendACLError(res, e)) return; throw e; }
+
+  // Ziel-Fassung laden + zu Op-Liste planen.
+  const row = snapshots.getSnapshot(bookId, id);
+  if (!row) return res.status(404).json({ error_code: 'NOT_FOUND' });
+  let plan;
+  try {
+    const content = JSON.parse(row.content_json);
+    validateBookJson(content);
+    plan = planFromNodes(content.tree);
+    if (!plan.ops.length) throw _err('CORRUPT_SNAPSHOT');
+    plan.settings = content.book?.settings || null;
+  } catch (e) {
+    logger.error(`Restore: Ziel-Fassung defekt (book=${bookId}, id=${id}): ${e.message}`);
+    return res.status(422).json({ error_code: 'CORRUPT_SNAPSHOT' });
+  }
+
+  const userEmail = req.session?.user?.email || null;
+
+  // 1) Automatische Sicherung des aktuellen Stands → Restore bleibt umkehrbar.
+  //    BOOK_EMPTY (Buch hat gerade keine Seiten) ist ok — dann gibt es nichts zu
+  //    sichern. Jeder andere Fehler bricht ab, bevor wir etwas loeschen.
+  try {
+    const cur = await _buildSnapshotPayload(bookId, req);
+    snapshots.createSnapshot({
+      bookId, label: AUTO_BACKUP_LABEL, description: null,
+      contentJson: JSON.stringify(cur.content), extrasJson: cur.extrasJson,
+      chars: cur.chars, words: cur.words, pages: cur.pages, chapters: cur.chapters,
+      userEmail,
+    });
+  } catch (e) {
+    if (e.code !== 'BOOK_EMPTY') {
+      logger.error(`Restore-Sicherung fehlgeschlagen (book=${bookId}): ${e.message}`);
+      return res.status(500).json({ error_code: 'BACKUP_FAILED' });
+    }
+  }
+
+  // 2) Aktuellen Inhalt komplett entfernen. pages.chapter_id und
+  //    chapters.parent_chapter_id sind ON DELETE SET NULL → Loeschen eines
+  //    Kapitels entfernt weder Seiten noch Sub-Kapitel; darum beides explizit
+  //    abraeumen. Order-Overlay loeschen, sonst zeigt es auf alte IDs.
+  try {
+    for (const p of await contentStore.listPages(bookId, req)) {
+      await contentStore.deletePage(p.id, req);
+    }
+    for (const c of await contentStore.listChapters(bookId, req)) {
+      await contentStore.deleteChapter(c.id, req);
+    }
+    bookOrder.clearOrder(bookId);
+  } catch (e) {
+    logger.error(`Restore-Wipe fehlgeschlagen (book=${bookId}): ${e.message}`);
+    return res.status(500).json({ error_code: 'RESTORE_FAILED' });
+  }
+
+  // 3) Inhalt der Ziel-Fassung neu anlegen (gleiche Op-Reihenfolge wie Buch-Import).
+  const chapterIdByTemp = new Map();
+  let pagesCreated = 0; let chaptersCreated = 0;
+  for (const o of plan.ops) {
+    const parentChapterId = o.parentTempId == null ? null : (chapterIdByTemp.get(o.parentTempId) ?? null);
+    try {
+      if (o.op === 'chapter') {
+        const ch = await contentStore.createChapter(
+          { book_id: bookId, name: o.name || '', parent_chapter_id: parentChapterId }, req);
+        chapterIdByTemp.set(o.tempId, ch.id);
+        chaptersCreated += 1;
+      } else if (o.op === 'page') {
+        await contentStore.createPage(
+          { book_id: bookId, chapter_id: parentChapterId, name: o.name || '', html: o.html || '' }, req);
+        pagesCreated += 1;
+      }
+    } catch (e) {
+      logger.warn(`Restore createXxx «${o.name}» fehlgeschlagen (book=${bookId}): ${e.message}`);
+    }
+  }
+
+  // 4) Buch-Settings der Fassung uebernehmen (best-effort). allow_lektor_book_chat
+  //    bewusst 0 lassen — ACL-relevant, nicht Teil der Inhalts-Fassung.
+  const s = plan.settings;
+  if (s && typeof s === 'object') {
+    try {
+      saveBookSettings(
+        bookId, s.language || 'de', s.region || 'CH', s.buchtyp || null, s.buch_kontext || null,
+        s.erzaehlperspektive || null, s.erzaehlzeit || null, s.is_finished ? 1 : 0, 0,
+        Number.isFinite(s.daily_goal_chars) ? s.daily_goal_chars : null,
+        s.orte_real ? 1 : 0, s.schauplatz_land || null,
+      );
+      if (s.entities_enabled) setBookEntitiesEnabled(bookId, 1);
+    } catch (e) { logger.warn(`Restore-Settings fehlgeschlagen (book=${bookId}): ${e.message}`); }
+  }
+
+  // 5) Statistik neu syncen (Tages-Donut, Buch-Stats).
+  try {
+    const { syncBook } = require('./sync');
+    await syncBook(bookId, req);
+  } catch (e) { logger.warn(`Restore-Sync fehlgeschlagen (book=${bookId}): ${e.message}`); }
+
+  logger.info(`Buch auf «Fassung ${row.seq}» zurueckgesetzt (book=${bookId}, pages=${pagesCreated}, chapters=${chaptersCreated}).`);
+  return res.json({ ok: true, seq: row.seq, pagesCreated, chaptersCreated });
 });
 
 // ── Delete ──────────────────────────────────────────────────────────────────────

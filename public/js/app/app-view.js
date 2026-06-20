@@ -354,6 +354,9 @@ export const appViewMethods = {
       if (this.currentPage?.id !== pageId) return;
       const openCount = (Array.isArray(ideen) ? ideen : []).filter(i => !i.erledigt).length;
       this.currentPageIdeenOpenCount = openCount;
+      // Recherche-Count aus der buchweit geladenen Map (kein Extra-Request);
+      // wird bei Link-Änderungen in der Recherche-Karte frisch gehalten.
+      this.currentPageRechercheCount = (this.rechercheCounts || {})[pageId] || 0;
       this.currentPageChatSessionCount = (Array.isArray(sessions) ? sessions : []).length;
       // Tree-Indikator mit frischer Wahrheit syncen (z.B. bei Cross-Tab-Edits).
       const next = { ...(this.ideenCounts || {}) };
@@ -432,6 +435,22 @@ export const appViewMethods = {
     this.ideenChapterId = cid;
     this.showIdeenCard = true;
   },
+  // Sprung von einem Seiten-Indikator (Sidebar/Editor) in die Recherche-Karte,
+  // vorgefiltert auf die verknüpften Schnipsel dieser Seite. Recherche ist eine
+  // exklusive Hauptkarte → öffnen schliesst den Editor (anders als Ideen-Slot).
+  async openRechercheForPage(pageId) {
+    const pid = parseInt(pageId ?? this.currentPage?.id, 10);
+    if (!pid) return;
+    await this._ensurePartial('recherche');
+    // Filter-Event VOR dem Sichtbar-Schalten: bei frischem Öffnen liest der
+    // Lifecycle-Load (rising edge) den schon gesetzten Filter → ein Fetch.
+    window.dispatchEvent(new CustomEvent('recherche:filter-page', { detail: { pageId: pid } }));
+    if (!this.showRechercheCard) {
+      this._closeOtherMainCards('recherche');
+      this.showRechercheCard = true;
+    }
+    this._scrollToCardByKey('recherche');
+  },
   // Seiten-Chat: lebt neben dem Editor, schließt NICHT den Editor. Toggle
   // merkt sich checkDone-Snapshot (Chat soll Findings temporär verbergen).
   // checkDoneBeforeChat wird in chat-base beim onVisible gesetzt.
@@ -505,6 +524,7 @@ export const appViewMethods = {
     this.pageLastEditor = null;
     this.currentPageEmpty = false;
     this.currentPageIdeenOpenCount = 0;
+    this.currentPageRechercheCount = 0;
     this.currentPageChatSessionCount = 0;
     this.renderedPageHtml = '';
     this.chapterFigures = [];
@@ -568,6 +588,8 @@ export const appViewMethods = {
     this.tokEsts = {};
     this.ideenCounts = {};
     this.chapterIdeenCounts = {};
+    this.rechercheCounts = {};
+    this.currentPageRechercheCount = 0;
     this.currentChapterIdeenOpenCount = 0;
     // Chapter-Ideen-Scope verwerfen beim Buchwechsel.
     if (this.ideenScope === 'chapter') {

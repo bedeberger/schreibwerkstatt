@@ -117,6 +117,25 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Recherche-Indikator pro Seite: gleiche Outline-Optik wie der Ideen-Marker,
+   aber in der Recherche-Akzentfarbe und klickbar (Sprung in die vorgefilterte
+   Recherche-Karte). */
+.recherche-count-badge {
+  flex-shrink: 0;
+  font-size: var(--font-size-xs);
+  line-height: 1;
+  padding: var(--space-2xs) 5px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--card-accent-recherche);
+  background: transparent;
+  color: var(--card-accent-recherche);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.recherche-count-badge:hover {
+  background: color-mix(in srgb, var(--card-accent-recherche) 14%, transparent);
+}
+
 /* === Tags === */
 .tag {
   font-size: var(--font-size-xs);

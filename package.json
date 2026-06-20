@@ -47,6 +47,7 @@
     "openid-client": "^5.7.1",
     "pdfkit": "^0.18.0",
     "sharp": "^0.34.5",
+    "unpdf": "^1.6.2",
     "winston": "^3.19.0",
     "word-extractor": "^1.0.4",
     "xmlbuilder2": "^4.0.3"

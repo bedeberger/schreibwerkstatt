@@ -108,12 +108,23 @@
                     <span x-text="$app.t('recherche.image.upload')"></span>
                     <input type="file" accept="image/*" @change="onImagePick(item, $event); menuOpenId = null">
                   </label>
+                  <label class="context-menu-item research-menu-upload" role="menuitem">
+                    <span x-text="$app.t('recherche.doc.upload')"></span>
+                    <input type="file" accept="application/pdf" @change="onDocPick(item, $event); menuOpenId = null">
+                  </label>
+                  <button type="button" class="context-menu-item" role="menuitem" x-show="item.has_doc" @click="removeDoc(item)" x-text="$app.t('recherche.doc.remove')"></button>
                   <button type="button" class="context-menu-item context-menu-item--danger" role="menuitem" @click="deleteItem(item)" x-text="$app.t('recherche.delete')"></button>
                 </div>
               </div>
             </div>
 
             <img x-show="item.has_image" class="research-item-image" :src="imageUrl(item)" :alt="item.title || ''" loading="lazy">
+
+            <a x-show="item.has_doc" class="research-item-doc" :href="docUrl(item)" target="_blank" rel="noopener noreferrer">
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#file-plus"/></svg>
+              <span class="research-item-doc-name" x-text="item.doc_name || $app.t('recherche.doc.fallbackName')"></span>
+              <span class="research-item-doc-meta" x-show="item.doc_pages" x-text="$app.t('recherche.doc.pages', { n: item.doc_pages })"></span>
+            </a>
 
             <div class="research-item-text" x-show="item.body" :class="{ 'research-item-text--quote': item.kind === 'quote' }" x-text="item.body"></div>
 

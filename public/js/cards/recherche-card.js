@@ -54,6 +54,9 @@ export function registerRechercheCard() {
         timerKeys: ['_suggestTimer'],
         resetState: { creating: false, editingId: null, menuOpenId: null, linkPickerItemId: null, busy: false },
         load: () => this.loadRecherche(),
+        extraListeners: [
+          { type: 'recherche:filter-page', handler: (e) => this.filterToPage(e.detail?.pageId) },
+        ],
         onBookChanged: (e, ctx, root) => {
           this.resetRecherche();
           if (root.showRechercheCard && root.selectedBookId) this.loadRecherche();

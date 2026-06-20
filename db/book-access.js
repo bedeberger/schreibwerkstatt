@@ -162,7 +162,12 @@ function getBlockingLockFor(pageId, currentEmail) {
   return lock;
 }
 
-const LOCK_TTL_MS = 30 * 60 * 1000;
+// Lock-TTL live aus app_settings (editor.lock_ttl_min). Lazy require, weil dies
+// ein db/-File ist und lib/app-settings selbst db/ laedt — Top-Level-Require
+// koennte einen Import-Zyklus eroeffnen.
+function _lockTtlMs() {
+  return (require('../lib/app-settings').get('editor.lock_ttl_min') || 30) * 60 * 1000;
+}
 
 function _acquireOrExtendLock(pageId, bookId, email, reason) {
   const pid = parseInt(pageId, 10);
@@ -171,7 +176,7 @@ function _acquireOrExtendLock(pageId, bookId, email, reason) {
   if (!Number.isInteger(pid) || pid <= 0) throw new Error('acquireLock: invalid pageId');
   if (!Number.isInteger(bid) || bid <= 0) throw new Error('acquireLock: invalid bookId');
   if (!e) throw new Error('acquireLock: invalid email');
-  const expires = new Date(Date.now() + LOCK_TTL_MS).toISOString();
+  const expires = new Date(Date.now() + _lockTtlMs()).toISOString();
   const existing = getPageLock(pid);
   if (existing && _normEmail(existing.locked_by_email) !== e) {
     const err = new Error('PAGE_LOCKED');
@@ -207,7 +212,7 @@ function heartbeatLock(pageId, email) {
     err.lock = lock;
     throw err;
   }
-  const expires = new Date(Date.now() + LOCK_TTL_MS).toISOString();
+  const expires = new Date(Date.now() + _lockTtlMs()).toISOString();
   db.prepare(`
     UPDATE page_locks SET expires_at = ?, last_heartbeat_at = ${NOW_ISO_SQL} WHERE page_id = ?
   `).run(expires, pid);

@@ -8257,6 +8257,56 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 208 abgeschlossen (pages/page_revisions.body_markdown entfernt).');
   }
 
+  if (version < 209) {
+    // Recherche-Board: Dokument-Upload (PDF). Neue Spalten doc/doc_mime/doc_name/
+    // doc_text/doc_pages am research_items + neuer kind 'document'. Das Original-PDF
+    // liegt als BLOB (doc), der extrahierte Plain-Text (doc_text) speist FTS-Suche
+    // und KI-Verknuepfung. SQLite kann die kind-CHECK-Constraint nicht via ALTER
+    // erweitern → Recreate-Pattern. Die FK-Kinder (research_item_tags/_links)
+    // referenzieren research_items(id) und bleiben ueber den id-erhaltenden
+    // Recreate intakt.
+    db.pragma('foreign_keys = OFF');
+    db.exec('DROP TABLE IF EXISTS research_items_new');
+    db.exec(`
+      CREATE TABLE research_items_new (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id     INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        user_email  TEXT    NOT NULL,
+        kind        TEXT    NOT NULL DEFAULT 'note'
+                      CHECK(kind IN ('note','link','quote','fact','image','document')),
+        title       TEXT,
+        body        TEXT,
+        url         TEXT,
+        source      TEXT,
+        image       BLOB,
+        image_mime  TEXT,
+        doc         BLOB,
+        doc_mime    TEXT,
+        doc_name    TEXT,
+        doc_text    TEXT,
+        doc_pages   INTEGER,
+        pinned      INTEGER NOT NULL DEFAULT 0,
+        archived    INTEGER NOT NULL DEFAULT 0,
+        created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        updated_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      );
+    `);
+    db.exec(`INSERT INTO research_items_new
+        (id, book_id, user_email, kind, title, body, url, source, image, image_mime, pinned, archived, created_at, updated_at)
+        SELECT id, book_id, user_email, kind, title, body, url, source, image, image_mime, pinned, archived, created_at, updated_at
+          FROM research_items`);
+    db.exec('DROP TABLE research_items');
+    db.exec('ALTER TABLE research_items_new RENAME TO research_items');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_research_items_book ON research_items(book_id)');
+    db.pragma('foreign_keys = ON');
+    const fkErrors209 = db.pragma('foreign_key_check');
+    if (fkErrors209.length) {
+      throw new Error(`Migration 209: foreign_key_check meldet ${fkErrors209.length} Verstoesse: ${JSON.stringify(fkErrors209.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 209').run();
+    logger.info('DB-Migration auf Version 209 abgeschlossen (research_items: Dokument-Upload doc/doc_text + kind document).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

@@ -1,7 +1,8 @@
 /* Manuskript-Meilensteine („Fassung 1/2/3") — snapshotsCard.
    Liste der Fassungen + Vergleich zweier Fassungen (Buch-Level-Diff).
-   Diff-Zellen-Styling (revision-diff-*) lebt in page/page-revision-viewer.css
-   und wird hier wiederverwendet. */
+   Tabelle nutzt die Standard-Klasse .entity-grid-table (entities/entity-grid.css);
+   hier nur snapshot-spezifische Zell-Tweaks. Diff-Zellen-Styling (revision-diff-*)
+   lebt in page/page-revision-viewer.css und wird wiederverwendet. */
 
 .snapshots-capture {
   display: flex;
@@ -14,7 +15,9 @@
 .snapshots-capture__desc { flex: 2 1 18rem; min-width: 0; }
 .snapshots-capture__btn { white-space: nowrap; }
 
-.snapshots-num { text-align: right; font-variant-numeric: tabular-nums; }
+/* Numerik-Spalten rechtsbuendig — Selektor schlaegt bewusst die linksbuendige
+   .entity-grid-table th/td-Default-Regel (hoehere Specificity). */
+.snapshots-table .snapshots-num { text-align: right; font-variant-numeric: tabular-nums; }
 
 .snapshots-desc {
   display: block;
@@ -24,6 +27,12 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 22rem;
+}
+
+.snapshots-actions {
+  display: flex;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
 }
 
 .snapshots-del-btn { color: var(--color-err-text); }

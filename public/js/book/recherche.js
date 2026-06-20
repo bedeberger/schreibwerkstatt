@@ -6,7 +6,7 @@
 import { fetchJson } from '../utils.js';
 import { startPoll } from '../cards/job-helpers.js';
 
-const KINDS = ['note', 'link', 'quote', 'fact', 'image'];
+const KINDS = ['note', 'link', 'quote', 'fact', 'image', 'document'];
 // Verknüpfungs-Kategorien (Reihenfolge = Anzeige in Picker/Filter/Sortierung).
 const LINK_KINDS = ['figure', 'location', 'scene', 'beat', 'thread', 'chapter', 'page'];
 
@@ -128,6 +128,22 @@ export const rechercheMethods = {
     return this.loadRecherche();
   },
 
+  // Sprung vom Seiten-Indikator: alle Filter zurücksetzen und nur die mit dieser
+  // Seite verknüpften Schnipsel zeigen. Beim frischen Öffnen lädt der Lifecycle
+  // (rising edge) selbst; ist die Karte schon offen, hier nachladen.
+  filterToPage(pageId) {
+    const pid = parseInt(pageId, 10);
+    if (!pid) return;
+    this.filterKind = '';
+    this.filterTag = '';
+    this.filterText = '';
+    this.showArchived = false;
+    this.filterLinkedKind = 'page';
+    this.filterLinkedTargetId = String(pid);
+    this.filterLinked = `page:${pid}`;
+    if (window.__app?.showRechercheCard) this.loadRecherche();
+  },
+
   // ── Anlegen ────────────────────────────────────────────────────────────────
   startCreate() {
     this.creating = true;
@@ -229,6 +245,8 @@ export const rechercheMethods = {
       // Bei aktivem „nur aktive"-Filter verschwindet das Item aus der Liste.
       if (!this.showArchived) this.items = this.items.filter(i => i.id !== item.id);
       else { item.archived = item.archived ? 0 : 1; }
+      // Archivierte Items zählen nicht im Seiten-Indikator.
+      if ((item.links || []).some(l => l.target_kind === 'page')) this._refreshRecherchePageCounts();
     } catch { this.errorMessage = window.__app.t('recherche.error.save'); }
     this.menuOpenId = null;
   },
@@ -243,6 +261,7 @@ export const rechercheMethods = {
       await fetchJson(`/research/${item.id}`, { method: 'DELETE' });
       this.items = this.items.filter(i => i.id !== item.id);
       this._loadTags();
+      if ((item.links || []).some(l => l.target_kind === 'page')) this._refreshRecherchePageCounts();
     } catch { this.errorMessage = app.t('recherche.error.delete'); }
     this.menuOpenId = null;
   },
@@ -272,6 +291,7 @@ export const rechercheMethods = {
       this._replaceItem(row);
       this.linkPickerItemId = null;
       this.linkPickerTargetId = '';
+      if (targetKind === 'page') this._refreshRecherchePageCounts();
     } catch { this.errorMessage = app.t('recherche.error.link'); }
   },
 
@@ -284,6 +304,7 @@ export const rechercheMethods = {
     try {
       const row = await fetchJson(`/research/${item.id}/links/${link.link_id}`, { method: 'DELETE' });
       this._replaceItem(row);
+      if (link.target_kind === 'page') this._refreshRecherchePageCounts();
     } catch { this.errorMessage = window.__app.t('recherche.error.link'); }
   },
 
@@ -309,6 +330,42 @@ export const rechercheMethods = {
     if (ev?.target) ev.target.value = '';
   },
   imageUrl(item) { return `/research/${item.id}/image`; },
+
+  // ── Dokument-Upload (PDF) ──────────────────────────────────────────────────
+  async uploadDoc(item, file) {
+    const app = window.__app;
+    if (!file) return;
+    this.busy = true;
+    try {
+      const buf = await file.arrayBuffer();
+      const qs = file.name ? `?name=${encodeURIComponent(file.name)}` : '';
+      const row = await fetchJson(`/research/${item.id}/doc${qs}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/pdf' },
+        body: buf,
+      });
+      this._replaceItem(row);
+    } catch { this.errorMessage = app.t('recherche.error.doc'); }
+    finally { this.busy = false; }
+  },
+  onDocPick(item, ev) {
+    const file = ev?.target?.files?.[0];
+    if (file) this.uploadDoc(item, file);
+    if (ev?.target) ev.target.value = '';
+  },
+  docUrl(item) { return `/research/${item.id}/doc`; },
+  async removeDoc(item) {
+    const app = window.__app;
+    if (!await app.appConfirm({
+      message: app.t('recherche.doc.confirmRemove'),
+      confirmLabel: app.t('common.delete'), danger: true,
+    })) return;
+    try {
+      const row = await fetchJson(`/research/${item.id}/doc`, { method: 'DELETE' });
+      this._replaceItem(row);
+    } catch { this.errorMessage = app.t('recherche.error.doc'); }
+    this.menuOpenId = null;
+  },
 
   // ── KI-Verknüpfungsvorschläge ──────────────────────────────────────────────
   async suggestLinks(item) {
@@ -364,6 +421,18 @@ export const rechercheMethods = {
 
   // ── Helpers ──────────────────────────────────────────────────────────────
   _replaceItem(row) { this.items = this.items.map(i => (i.id === row.id ? row : i)); },
+  // Seiten-Indikator-Map (Sidebar + Editor) nach Link-/Archiv-/Lösch-Änderungen
+  // frisch ziehen. Buchweit geteilt → ein leichter Request hält alle Editoren sync.
+  async _refreshRecherchePageCounts() {
+    const app = window.__app;
+    const bookId = app?.selectedBookId;
+    if (!bookId) return;
+    try {
+      const map = await fetchJson(`/research/page-counts?book_id=${bookId}`);
+      app.rechercheCounts = map || {};
+      if (app.currentPage?.id) app.currentPageRechercheCount = (map || {})[app.currentPage.id] || 0;
+    } catch { /* Indikator-Refresh ist best-effort */ }
+  },
   _sortItems(arr) {
     return [...arr].sort((a, b) => {
       if (!!b.pinned !== !!a.pinned) return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
